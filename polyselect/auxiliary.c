@@ -1441,19 +1441,23 @@ static void
 optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
               int method)
 {
-  mpz_t k, l; /* current offset */
+  mpz_t kt, k2, k1, k, l; /* current offset */
   mpz_t ktot, khitot, lamtot, mutot; /* compute total translation and rotation,
                                         such that current polynomial are
                                         [f+(khitot*x^2+lamtot*x+mutot)*g](x+k)
                                         and g(x+k) */
   mpz_t tmp;
-  int changed;
+  int changed, changedt, changed2, changed1;
   double logmu00, logmu0, logmu, skew;
   int prec = SKEWNESS_DEFAULT_PREC;
+  int count = 0;
 
   skew = L2_skewness (f, d, prec, method);
   logmu00 = logmu0 = L2_lognorm (f, d, skew, method);
   mpz_init_set_ui (k, 1);
+  mpz_init_set_ui (k2, 1);
+  mpz_init_set_ui (k1, 1);
+  mpz_init_set_ui (kt, 1);
   mpz_init (l);
   mpz_init (ktot);
   mpz_init (lamtot);
@@ -1462,108 +1466,109 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
   mpz_init (tmp);
   while (1)
     {
-      changed = 0;
+      changed = changedt = changed2 = changed1 = 0;
 
-      mpz_mul_si (l, k, -2); /* l = -2k */
-
-      /* first try translation by k */
-      do_translate_z (f, d, g, k); /* f(x+k) */
-      mpz_add (ktot, ktot, k);
+      /* first try translation by kt */
+      do_translate_z (f, d, g, kt); /* f(x+kt) */
+      mpz_add (ktot, ktot, kt);
       skew = L2_skewness (f, d, prec, method);
       logmu = L2_lognorm (f, d, skew, method);
-      if (logmu < logmu0)
+      if (logmu < logmu0 || (logmu == logmu0 && (rand() & 1)))
         {
-          changed = 1;
+          changedt = 1;
           logmu0 = logmu;
         }
       else
         {
-          do_translate_z (f, d, g, l); /* f(x-k) */
+          mpz_mul_si (l, kt, -2); /* l = -2*kt */
+          do_translate_z (f, d, g, l); /* f(x-kt) */
           mpz_add (ktot, ktot, l);
           skew = L2_skewness (f, d, prec, method);
           logmu = L2_lognorm (f, d, skew, method);
-          if (logmu < logmu0)
+          if (logmu < logmu0 || (logmu == logmu0 && (rand() & 1)))
             {
-              changed = 1;
+              changedt = 1;
               logmu0 = logmu;
             }
           else
             {
-              do_translate_z (f, d, g, k); /* original f */
-              mpz_add (ktot, ktot, k);
+              do_translate_z (f, d, g, kt); /* original f */
+              mpz_add (ktot, ktot, kt);
             }
         }
       
-      /* then do rotation by k*x^2*g if d >= 6 */
+      /* then do rotation by k2*x^2*g if d >= 6 */
       if (d >= 6 && use_rotation)
         {
-          rotate_auxg_z (f, g[1], g[0], k, 2);
-          mpz_mul (tmp, ktot, k);
+          rotate_auxg_z (f, g[1], g[0], k2, 2);
+          mpz_mul (tmp, ktot, k2);
           mpz_submul_ui (lamtot, tmp, 2);
           mpz_addmul (mutot, tmp, ktot);
-          mpz_add (khitot, khitot, k);
+          mpz_add (khitot, khitot, k2);
           skew = L2_skewness (f, d, prec, method);
           logmu = L2_lognorm (f, d, skew, method);
-          if (logmu < logmu0)
+          if (logmu < logmu0 || (logmu == logmu0 && (rand() & 1)))
             {
-              changed = 1;
+              changed2 = 1;
               logmu0 = logmu;
             }
           else
             {
-              rotate_auxg_z (f, g[1], g[0], l, 2); /* f - k*x^2*g */
+              mpz_mul_si (l, k2, -2); /* l = -2*k2 */
+              rotate_auxg_z (f, g[1], g[0], l, 2); /* f - k2*x^2*g */
               mpz_mul (tmp, ktot, l);
               mpz_submul_ui (lamtot, tmp, 2);
               mpz_addmul (mutot, tmp, ktot);
               mpz_add (khitot, khitot, l);
               skew = L2_skewness (f, d, prec, method);
               logmu = L2_lognorm (f, d, skew, method);
-              if (logmu < logmu0)
+              if (logmu < logmu0 || (logmu == logmu0 && (rand() & 1)))
                 {
-                  changed = 1;
+                  changed2 = 1;
                   logmu0 = logmu;
                 }
               else
                 {
-                  rotate_auxg_z (f, g[1], g[0], k, 2); /* previous f */
-                  mpz_mul (tmp, ktot, k);
+                  rotate_auxg_z (f, g[1], g[0], k2, 2); /* previous f */
+                  mpz_mul (tmp, ktot, k2);
                   mpz_submul_ui (lamtot, tmp, 2);
                   mpz_addmul (mutot, tmp, ktot);
-                  mpz_add (khitot, khitot, k);
+                  mpz_add (khitot, khitot, k2);
                 }
             }
         }
 
       if (use_rotation)
         {
-          /* then do rotation by k*x*g */
-          rotate_auxg_z (f, g[1], g[0], k, 1);
-          mpz_submul (mutot, ktot, k);
-          mpz_add (lamtot, lamtot, k);
+          /* then do rotation by k1*x*g */
+          rotate_auxg_z (f, g[1], g[0], k1, 1);
+          mpz_submul (mutot, ktot, k1);
+          mpz_add (lamtot, lamtot, k1);
           skew = L2_skewness (f, d, prec, method);
           logmu = L2_lognorm (f, d, skew, method);
-          if (logmu < logmu0)
+          if (logmu < logmu0 || (logmu == logmu0 && (rand() & 1)))
             {
-              changed = 1;
+              changed1 = 1;
               logmu0 = logmu;
             }
           else
             {
-              rotate_auxg_z (f, g[1], g[0], l, 1); /* f - k*x*g */
+              mpz_mul_si (l, k1, -2); /* l = -2*k1 */
+              rotate_auxg_z (f, g[1], g[0], l, 1); /* f - k1*x*g */
               mpz_submul (mutot, ktot, l);
               mpz_add (lamtot, lamtot, l);
               skew = L2_skewness (f, d, prec, method);
               logmu = L2_lognorm (f, d, skew, method);
-              if (logmu < logmu0)
+              if (logmu < logmu0 || (logmu == logmu0 && (rand() & 1)))
                 {
-                  changed = 1;
+                  changed1 = 1;
                   logmu0 = logmu;
                 }
               else
                 {
-                  rotate_auxg_z (f, g[1], g[0], k, 1); /* previous f */
-                  mpz_submul (mutot, ktot, k);
-                  mpz_add (lamtot, lamtot, k);
+                  rotate_auxg_z (f, g[1], g[0], k1, 1); /* previous f */
+                  mpz_submul (mutot, ktot, k1);
+                  mpz_add (lamtot, lamtot, k1);
                 }
             }
 
@@ -1572,18 +1577,19 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
           mpz_add (mutot, mutot, k);
           skew = L2_skewness (f, d, prec, method);
           logmu = L2_lognorm (f, d, skew, method);
-          if (logmu < logmu0)
+          if (logmu < logmu0 || (logmu == logmu0 && (rand() & 1)))
             {
               changed = 1;
               logmu0 = logmu;
             }
           else
             {
+              mpz_mul_si (l, k, -2); /* l = -2*k */
               rotate_auxg_z (f, g[1], g[0], l, 0); /* f - k*g */
               mpz_add (mutot, mutot, l);
               skew = L2_skewness (f, d, prec, method);
               logmu = L2_lognorm (f, d, skew, method);
-              if (logmu < logmu0)
+              if (logmu < logmu0 || (logmu == logmu0 && (rand() & 1)))
                 {
                   changed = 1;
                   logmu0 = logmu;
@@ -1596,11 +1602,28 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
             }
         } /* use_rotation */
 
+      if (changedt == 1)
+        mpz_mul_2exp (kt, kt, 1);       /* kt <- 2*kt */
+      else if (mpz_cmp_ui (kt, 1) > 0)
+        mpz_div_2exp (kt, kt, 1);       /* kt <- kt/2 */
       if (changed == 1)
-        mpz_neg (k, l);               /* k <- 2k */
+        mpz_mul_2exp (k, k, 1);       /* k <- 2*k */
       else if (mpz_cmp_ui (k, 1) > 0)
         mpz_div_2exp (k, k, 1);       /* k <- k/2 */
-      else /* changed = 0 and k = 1 */
+      if (changed2 == 1)
+        mpz_mul_2exp (k2, k2, 1);       /* k2 <- 2*k2 */
+      else if (mpz_cmp_ui (k2, 1) > 0)
+        mpz_div_2exp (k2, k2, 1);       /* k2 <- k2/2 */
+      if (changed1 == 1)
+        mpz_mul_2exp (k1, k1, 1);       /* k1 <- 2*k1 */
+      else if (mpz_cmp_ui (k1, 1) > 0)
+        mpz_div_2exp (k1, k1, 1);       /* k1 <- k1/2 */
+      if (changedt == 0 && changed == 0 && changed2 == 0 && changed1 == 0 &&
+          mpz_cmp_ui (kt, 1) == 0 && mpz_cmp_ui (k, 1) == 0 &&
+          mpz_cmp_ui (k2, 1) == 0 && mpz_cmp_ui (k1, 1) == 0)
+        break;
+      if (count++ > 10000) /* avoid an infinite loop due to the random
+                              choices when logmu=logmu0 */
         break;
     }
 
@@ -1617,7 +1640,10 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
         }
     }
 
+  mpz_clear (k2);
+  mpz_clear (k1);
   mpz_clear (k);
+  mpz_clear (kt);
   mpz_clear (l);
   mpz_clear (ktot);
   mpz_clear (khitot);
@@ -1636,15 +1662,11 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
      to increase the skewness. This decreases the chance to get stuck in a
      local minimum in the optimization routine.
      Assuming a_{d/2} should be of size about m, we expect the
-     final skewness to be about (m/a_{d/2})^{2/d}. However experimentally this
-     seems to be too big, and still experimentally (m/a_{d/2})^{1/d} seems to
-     work very well. Note: a large range of values gives good results, for
-     example for RSA-768 with degree 6, ad <= 11460 and P=10^5, we find 10
-     hits, and 2^12 <= k <= 2^35 gives the same optimized polynomials, all
-     with 71.09 <= lognorm <= 72.25. */
+     final skewness to be about (m/a_{d/2})^{2/d}. Experimentally this
+     seems to work well. */
   mpz_init (k);
   mpz_tdiv_q (k, g[0], f[d]);
-  mpz_abs (k, k);
+  mpz_mul (k, k, k);
   mpz_root (k, k, d);
   do_translate_z (f, d, g, k);
   mpz_clear (k);

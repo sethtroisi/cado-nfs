@@ -67,6 +67,8 @@ int found = 0;
 double potential_collisions = 0.0, aver_lognorm = 0.0;
 unsigned long collisions = 0;
 unsigned long collisionsQ[MAXQ];
+double total_adminus2[MAXQ];
+double total_lognorm[MAXQ];
 
 void
 roots_init (roots_t R)
@@ -268,6 +270,10 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 #endif
   mpz_divexact (t, t, l);
   mpz_set (f[0], t);
+
+  total_adminus2[q] += (double) mpz_sizeinbase (f[d-2], 2);
+  //  gmp_printf ("# a_{d-2}=%Zd\n", f[d-2]);
+
 #ifdef DEBUG
   for (j = d + 1; j -- != 0; )
     gmp_printf ("c%u: %Zd\n", j, f[j]);
@@ -280,12 +286,11 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   gmp_printf ("Optimized polynomial:\n");
 #endif
 
-  //  gmp_printf ("# a_{d-2}=%Zd\n", f[d-2]);
-
   optimize (f, d, g, 0, 1);
   nroots = numberOfRealRoots (f, d, 0, 0);
   skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
   logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
+  total_lognorm[q] += logmu;
 
   pthread_mutex_lock (&lock);
   collisions ++;
@@ -759,8 +764,17 @@ stats_sq (void)
   unsigned long sq[] = SPECIAL_Q;
   int i;
 
+  printf ("Hits:");
   for (i = 0; i < MAXQ && sq[i] != ULONG_MAX; i++)
-    printf ("%lu:%lu ", sq[i], collisionsQ[sq[i]]);
+    printf (" %lu:%lu", sq[i], collisionsQ[sq[i]]);
+  printf ("\n");
+  printf ("a[d-2]:");
+  for (i = 0; i < MAXQ && sq[i] != ULONG_MAX; i++)
+    printf (" %lu:%1.0f", sq[i], total_adminus2[sq[i]] / (double) collisionsQ[sq[i]]);
+  printf ("\n");
+  printf ("lognorm:");
+  for (i = 0; i < MAXQ && sq[i] != ULONG_MAX; i++)
+    printf (" %lu:%1.0f", sq[i], total_lognorm[sq[i]] / (double) collisionsQ[sq[i]]);
   printf ("\n");
 }
 
@@ -906,6 +920,8 @@ main (int argc, char *argv[])
       if (sq[i] == ULONG_MAX)
         break;
       collisionsQ[sq[i]] = 0;
+      total_adminus2[sq[i]] = 0.0;
+      total_lognorm[sq[i]] = 0.0;
     }
   if (i == MAXQ)
     {
