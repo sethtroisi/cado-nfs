@@ -281,8 +281,8 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
   logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
   alpha = get_alpha (f, d, ALPHA_BOUND);
-  printf ("# lognorm %1.2f, alpha %1.2f, E %1.2f, %u rroots\n",
-          logmu, alpha, logmu + alpha, nroots);
+  printf ("# lognorm %1.2f, skew %1.2f, alpha %1.2f, E %1.2f, %u rroots\n",
+          logmu, skew, alpha, logmu + alpha, nroots);
   gmp_printf ("Optimized polynomial:\n");
 #endif
 
@@ -305,8 +305,8 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       gmp_printf ("Y1: %Zd\nY0: %Zd\n", g[1], g[0]);
       for (j = d + 1; j -- != 0; )
         gmp_printf ("c%u: %Zd\n", j, f[j]);
-      printf ("# lognorm %1.2f, alpha %1.2f, E %1.2f, %u rroots\n",
-              logmu, alpha, logmu + alpha, nroots);
+      printf ("# lognorm %1.2f, skew %1.2f, alpha %1.2f, E %1.2f, %u rroots\n",
+              logmu, skew, alpha, logmu + alpha, nroots);
       printf ("\n");
       fflush (stdout);
       pthread_mutex_lock (&lock);
