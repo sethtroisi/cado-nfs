@@ -216,9 +216,22 @@ L2_lognorm (mpz_t *f, unsigned long d, double s, int method)
   return L2_lognorm_d (a, d, s, method);
 }
 
+/* call L2_skewness_old() or L2_skewness_Newton() or  L2_skewness_derivative() */
+double
+L2_skewness (mpz_t *f, int d, int prec, int method) {
+
+	 double s;
+
+	 s = L2_skewness_old (f, d, prec, method);
+	 /* Newton method may not converge? */
+	 //s = L2_skewness_Newton (f, d, prec, method);
+	 //s = L2_skewness_derivative (f, d, prec, method);
+	 return s;
+}
+
 /* returns the optimal skewness corresponding to L2_lognorm */
 double
-L2_skewness (mpz_t *f, int deg, int prec, int method)
+L2_skewness_old (mpz_t *f, int deg, int prec, int method)
 {
   double s, n0, n1, a, b, c, d, nc, nd, fd[MAX_DEGREE + 1];
   int i;
@@ -263,6 +276,412 @@ L2_skewness (mpz_t *f, int deg, int prec, int method)
   s = (a + b) * 0.5;
 
   return s;
+}
+
+/* Newton's method, use with care since it may not converge? Or there may be a bug */
+double
+L2_skewness_Newton (mpz_t *f, int d, int prec, int method) {
+	 double s = 1.0, n0, n1, fd[d+1], dfd[d+1], d2fd[d+1];
+	 double epsilon = 1; // when to stop
+	 int i;
+#ifdef DEBUG_SKEW
+	 int count = 0;
+#endif
+	 /* convert once for all to double's to avoid expensive mpz_get_d() */
+	 for (i = 0; i <= d; i++) {
+		  fd[i] = mpz_get_d (f[i]);
+	 }
+	 if (d == 6) {
+		  double s1, s2, s4, s5, s6;
+		  if (method == CIRCULAR) {
+		   /*
+				 99*a6^2 * s^5 +
+				 6*(2*a4*a6 + a5^2) * s^3 +
+				 (2*a2*a6 + 2*a3*a5 + a4^2) * s -
+				 (2*a0*a4 + 2*a1*a3 + a2^2) / s^3 -
+				 6*(2*a0*a2 + a1^2) / s^5 -
+				 99*a0^2 / s^7
+
+				 495*a6^2 * s^4 +
+				 18*(2*a4*a6 + a5^2) * s^2 +
+				 (2*a2*a6 + 2*a3*a5 + a4^2) +
+				 3*(2*a0*a4 + 2*a1*a3 + a2^2) / s^4 +
+				 30*(2*a0*a2 + a1^2) / s^6 +
+				 693*a0^2 / s^8
+			   */
+			   dfd[6] = 99.0 * fd[6] * fd[6];
+			   d2fd[6] = 5.0 * dfd[6];
+			   dfd[5] = 6.0 * ( 2.0 * fd[4] * fd[6] + fd[5] * fd[5] );
+			   d2fd[5] = 3.0 * dfd[5];
+			   dfd[4] = 2.0 * ( fd[2] * fd[6] + fd[3] * fd[5] ) + fd[4] * fd[4];
+			   d2fd[4] = dfd[4];
+			   // dfd3 d2fd3 null
+			   dfd[3] = d2fd[3] = 0.0;
+			   dfd[2] = 2.0 * ( fd[0] * fd[4] + fd[1] * fd[3] ) + fd[2] * fd[2];
+			   d2fd[2] = 3.0 * dfd[2];
+			   dfd[1] = 6.0 * ( 2.0 * fd[0] * fd[2] + fd[1] * fd[1] );
+			   d2fd[1] = 5.0 * dfd[1];
+			   dfd[0] = 99.0 * fd[0] * fd[0] ;
+			   d2fd[0] = 7.0 * dfd[0];
+
+			   /* first isolate the minimum in an interval [s, 2s] */
+			   n0 = -1.0;
+			   s = 1.0;
+			   while (n0 < 0) {
+					s = 2.0 * s;
+					// si is actually s2i, [s^2, s^4, s^8, s^10, s^12]
+					s1 = s * s;
+					s2 = s1 * s1;
+					s4 = s2 * s2;
+					s5 = s4 * s1;
+					s6 = s5 * s1;
+					n0 = dfd[6] * s6 + dfd[5] * s5 + dfd[4] * s4
+						 - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
+#ifdef DEBUG_SKEW
+					count ++;
+#endif
+			   }
+			   s = (s == 2.0) ? 1.0 : 0.75 * s;
+			   n0 = 0.0;
+			   n1 = 0.0;
+			   s1 = 0.0;
+			   while ( abs(s - s1) > epsilon ) {
+					s1 = s * s;
+					s2 = s1 * s1;
+					s4 = s2 * s2;
+					s5 = s4 * s1;
+					s6 = s5 * s1;
+					n0 = dfd[6] * s6 + dfd[5] * s5 + dfd[4] * s4
+						 - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
+					n1 = d2fd[6] * s6 + d2fd[5] * s5 + d2fd[4] * s4
+						 + d2fd[2] * s2 + d2fd[1] * s1 + d2fd[0];
+					s1 = s;
+					s = s * (1.0 - n0 / n1);
+#ifdef DEBUG_SKEW
+					count = count + 2;
+#endif
+			   }
+			   s = (s + s1) * 0.5;
+			   if (s < 0)
+					// a workaround for negative s here. However, beside the negative value, it doesn't converge at all sometimes.
+					s = L2_skewness_derivative (f, d, prec, method);
+		  }
+		  else
+			   s = L2_skewness (f, d, prec, method); // rectangular not implemented
+	 }
+	 else if (d == 5) {
+		  double s1, s2, s3, s4, s5;
+		  if (method == CIRCULAR) {
+			   /*
+				 105*a5^2*s^4 +
+				 14*a3*a5*s^2 + 7*a4^2*s^2 +
+				 2*a1*a5 + 2*a2*a4 + a3^2 -
+				 (2*a0*a4/s^2 + 2*a1*a3/s^2 + a2^2/s^2) -
+				 (14*a0*a2/s^4 + 7*a1^2/s^4) -
+				 105*a0^2/s^6
+
+				 420*a5^2*s^3 +
+				 28*a3*a5*s + 14*a4^2*s +
+				 4*a0*a4/s^3 + 4*a1*a3/s^3 + 2*a2^2/s^3 +
+				 56*a0*a2/s^5 + 28*a1^2/s^5 +
+				 630*a0^2/s^7
+			   */
+			   dfd[5] = 105.0 * fd[5] * fd[5];
+			   d2fd[5] = 4.0 * dfd[5];
+			   dfd[4] = 7.0 * ( 2.0 * fd[3] * fd[5] + fd[4] * fd[4] );
+			   d2fd[4] = 2.0 * dfd[4];
+			   dfd[3] = 2.0 * ( fd[1] * fd[5] + fd[2] * fd[4] ) + fd[3] * fd[3];
+			   // d2fd[3] null
+			   d2fd[3] = 0.0;
+			   dfd[2] = 2.0 * ( fd[0] * fd[4] + fd[1] * fd[3] ) + fd[2] * fd[2];
+			   d2fd[2] = 2.0 * dfd[2];
+			   dfd[1] = 7.0 * ( 2.0 * fd[0] * fd[2] + fd[1] * fd[1] );
+			   d2fd[1] = 4.0 * dfd[1];
+			   dfd[0] = 105.0 * fd[0] * fd[0] ;
+			   d2fd[0] = 6.0 * dfd[0];
+
+			   /* first isolate the minimum in an interval [s, 2s] */
+			   n0 = -1.0;
+			   s = 1.0;
+			   while (n0 < 0) {
+					s = 2.0 * s;
+					s1 = s * s;
+					s2 = s1 * s1;
+					s3 = s2 * s1;
+					s4 = s3 * s1;
+					s5 = s4 * s1;
+					n0 = dfd[5] * s5 + dfd[4] * s4 + dfd[3] * s3
+						 - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
+#ifdef DEBUG_SKEW
+					count ++;
+#endif
+			   }
+			   s = (s == 2.0) ? 1.0 : 0.75 * s;
+
+			   n0 = 0.0;
+			   n1 = 0.0;
+			   s1 = 0.0;
+			   while ( abs(s - s1) > epsilon ) {
+					s1 = s * s;
+					s2 = s1 * s1;
+					s3 = s2 * s1;
+					s4 = s3 * s1;
+					s5 = s4 * s1;
+					n0 = dfd[5] * s5 + dfd[4] * s4 + dfd[3] * s3
+						 - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
+					n1 = d2fd[5] * s5 + d2fd[4] * s4 + d2fd[2] * s2
+						 + d2fd[1] * s1 + d2fd[0];
+					s1 = s;
+					s = s * (1.0 - n0 / n1);
+#ifdef DEBUG_SKEW
+					count = count + 2;
+#endif
+			   }
+			   s = (s + s1) * 0.5;
+		  }
+		  else
+			   s = L2_skewness (f, d, prec, method); // rectangular not implemented
+	 }
+	 else if (d == 4) {
+		  double s1, s3, s4;
+		  if (method == CIRCULAR) {
+			   /*
+				 14*a4^2*s^3 +
+				 2*a2*a4*s + a3^2*s -
+				 (2*a0*a2/s^3 + a1^2/s^3) -
+				 14*a0^2/s^5
+
+				 42*a4^2*s^2 +
+				 2*a2*a4 + a3^2 +
+				 6*a0*a2/s^4 + 3*a1^2/s^4 +
+				 70*a0^2/s^6
+			   */
+			   dfd[4] = 14.0 * fd[4] * fd[4];
+			   d2fd[4] = 3.0 * dfd[4];
+			   dfd[3] = 2.0 * fd[2] * fd[4] + fd[3] * fd[3];
+			   d2fd[3] = dfd[3];
+			   // dfd[2] null
+			   dfd[2] = d2fd[2] = 0.0;
+			   dfd[1] = 2.0 * fd[0] * fd[2] + fd[1] * fd[1];
+			   d2fd[1] = 3.0 * dfd[2];
+			   dfd[0] = 14.0 * fd[0] * fd[0] ;
+			   d2fd[0] = 5.0 * dfd[0];
+
+			   /* first isolate the minimum in an interval [s, 2s] by dichotomy */
+			   n0 = -1.0;
+			   s = 1.0;
+			   while (n0 < 0) {
+					s = 2.0 * s;
+					s1 = s * s;
+					s3 = s1 * s1 * s1;
+					s4 = s3 * s1;
+					n0 = dfd[4] * s4 + dfd[3] * s3
+						 - dfd[1] * s1 - dfd[0];
+#ifdef DEBUG_SKEW
+					count ++;
+#endif
+			   }
+			   s = (s == 2.0) ? 1.0 : 0.75 * s;
+
+			   n0 = 0.0;
+			   n1 = 0.0;
+			   s1 = 0.0;
+			   while ( abs(s - s1) > epsilon ) {
+					s1 = s * s;
+					s3 = s1 * s1 * s1;
+					s4 = s3 * s1;
+					n0 = dfd[4] * s4 + dfd[3] * s3
+						 - dfd[1] * s1 - dfd[0];
+					n1 = d2fd[4] * s4 + d2fd[3] * s3
+						 + d2fd[1] * s1 + d2fd[0];
+					s1 = s;
+					s = s * (1.0 - n0 / n1);
+#ifdef DEBUG_SKEW
+					count = count + 2;
+#endif
+			   }
+			   s = (s + s1) * 0.5;
+		  }
+		  else
+			   s = L2_skewness (f, d, prec, method); // rectangular not implemented
+	 }
+	 else if (d == 3) {
+		  double s1, s2, s3;
+		  if (method == CIRCULAR) {
+			   /*
+				 15*a3^2*s^2 +
+				 2*a1*a3 + a2^2 -
+				 (2*a0*a2/s^2 + a1^2/s^2) -
+				 15*a0^2/s^4
+
+				 30*a3^2*s +
+				 4*a0*a2/s^3 + 2*a1^2/s^3 +
+				 60*a0^2/s^5
+			   */
+			   dfd[3] = 15.0 * fd[3] * fd[3];
+			   d2fd[3] = 2.0 * dfd[3];
+			   dfd[2] = 2.0 * fd[1] * fd[3] + fd[2] * fd[2];
+			   // d2fd[2] null
+			   d2fd[2] = 0.0;
+			   dfd[1] = 2.0 * fd[0] * fd[2] + fd[1] * fd[1];
+			   d2fd[1] = 2.0 * dfd[1];
+			   dfd[0] = 15.0 * fd[0] * fd[0] ;
+			   d2fd[0] = 4.0 * dfd[0];
+
+			   /* first isolate the minimum in an interval [s, 2s] by dichotomy */
+			   n0 = -1.0;
+			   s = 1.0;
+			   while (n0 < 0) {
+					s = 2.0 * s;
+					s1 = s * s;
+					s2 = s1 * s1;
+					s3 = s2 * s1;
+					n0 = dfd[3] * s3 + dfd[2] * s2
+						 - dfd[1] * s1 - dfd[0];
+#ifdef DEBUG_SKEW
+					count ++;
+#endif
+			   }
+			   s = (s == 2.0) ? 1.0 : 0.75 * s;
+
+			   n0 = 0.0;
+			   n1 = 0.0;
+			   s1 = 0.0;
+			   while ( abs(s - s1) > epsilon ) {
+					s1 = s * s;
+					s2 = s1 * s1;
+					s3 = s2 * s1;
+					n0 = dfd[3] * s3 + dfd[2] * s2
+						 - dfd[1] * s1 - dfd[0];
+					n1 = d2fd[3] * s3 + d2fd[1] * s1 + d2fd[0];
+					s1 = s;
+					s = s * (1.0 - n0 / n1);
+#ifdef DEBUG_SKEW
+					count = count + 2;
+#endif
+			   }
+			   s = (s + s1) * 0.5;
+		  }
+		  else
+			   s = L2_skewness (f, d, prec, method); // rectangular not implemented
+	 }
+	 else {
+		  fprintf (stderr, "L2_skewness_Newton not yet implemented for degree %d\n", d);
+		  exit (1);
+	 }
+#ifdef DEBUG_SKEW
+	 fprintf (stderr, "# evaluations newton: %d\n", count);
+#endif
+
+	 return s;
+}
+
+/* Use derivative test, only for degree 6 with ellipse regions*/
+double
+L2_skewness_derivative (mpz_t *f, int d, int prec, int method)
+{
+	 double s = 0.0, a = 0.0, b = 0.0, c, e, nc, nd, fd[d+1], dfd[d+1], s1, s2, s4, s5, s6;
+	 int i;
+#ifdef DEBUG_SKEW
+	 int count = 0;
+#endif
+
+	 /* convert once for all to double's to avoid expensive mpz_get_d() */
+	 for (i = 0; i <= d; i++) {
+		  fd[i] = mpz_get_d (f[i]);
+	 }
+	 if (d == 6)
+	 {
+		  if (method == RECTANGULAR)
+			   s = L2_skewness (f, d, prec, method); // rectangular not implemented
+		  else
+		  {
+			   /*
+				 99*a6^2 * s^5 +
+				 6*(2*a4*a6 + a5^2) * s^3 +
+				 (2*a2*a6 + 2*a3*a5 + a4^2) * s -
+				 (2*a0*a4 + 2*a1*a3 + a2^2) / s^3 -
+				 6*(2*a0*a2 + a1^2) / s^5 -
+				 99*a0^2 / s^7
+			   */
+			   dfd[6] = 99.0 * fd[6] * fd[6];
+			   dfd[5] = 6.0 * ( 2.0 * fd[4] * fd[6] + fd[5] * fd[5] );
+			   dfd[4] = 2.0 * ( fd[2] * fd[6] + fd[3] * fd[5] ) + fd[4] * fd[4];
+			   dfd[2] = 2.0 * ( fd[0] * fd[4] + fd[1] * fd[3] ) + fd[2] * fd[2];
+			   dfd[1] = 6.0 * ( 2.0 * fd[0] * fd[2] + fd[1] * fd[1] );
+			   dfd[0] = 99.0 * fd[0] * fd[0] ;
+			   nc = -1.0;
+			   s = 1.0;
+			   /* first isolate the minimum in an interval [s, 2s] by dichotomy */
+			   while (nc < 0)
+			   {
+					s = 2.0 * s;
+					s1 = s * s;
+					s2 = s1 * s1;
+					s4 = s2 * s2;
+					s5 = s4 * s1;
+					s6 = s5 * s1;
+					nc = dfd[6] * s6 + dfd[5] * s5 + dfd[4] * s4
+						 - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
+#ifdef DEBUG_SKEW
+					count ++;
+#endif
+			   }
+
+			   a = (s == 2.0) ? 1.0 : 0.5 * s;
+			   b = s;
+			   /* since we use trichotomy, the intervals shrink by 3/2 instead of 2 at each
+				  iteration, thus we multiply the precision (in bits) by log(2)/log(3/2) */
+			   prec = (int) (1.70951129135145 * (double) prec);
+			   /* use trichotomy */
+			   while (prec--)
+			   {
+					c = (2.0 * a + b) / 3.0;
+					e = (a + 2.0 * b) / 3.0;
+					s1 = c * c;
+					s2 = s1 * s1;
+					s4 = s2 * s2;
+					s5 = s4 * s1;
+					s6 = s5 * s1;
+
+					nc = dfd[6] * s6 + dfd[5] * s5 + dfd[4] * s4
+						 - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
+#ifdef DEBUG_SKEW
+					count ++;
+#endif
+					if (nc > 0)
+						 b = c;
+					else {
+						 s1 = e * e;
+						 s2 = s1 * s1;
+						 s4 = s2 * s2;
+						 s5 = s4 * s1;
+						 s6 = s5 * s1;
+						 nd = dfd[6] * s6 + dfd[5] * s5 + dfd[4] * s4
+							  - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
+#ifdef DEBUG_SKEW
+						 count ++;
+#endif
+						 if (nd > 0) {
+							  a = c;
+							  b = e;
+						 }
+						 else
+							  a = e;
+					}
+			   }
+		  }
+	 }
+	 else
+	 {
+		  fprintf (stderr, "L2_skewness_derivative not yet implemented for degree %d\n", d);
+		  exit (1);
+	 }
+#ifdef DEBUG_SKEW
+	 printf ("evaluation derivative test: %d", count);
+#endif
+	 s = (a + b) * 0.5;
+	 return s;
 }
 
 /********************* data structures for first phase ***********************/
