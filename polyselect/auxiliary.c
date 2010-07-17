@@ -218,15 +218,16 @@ L2_lognorm (mpz_t *f, unsigned long d, double s, int method)
 
 /* call L2_skewness_old() or L2_skewness_Newton() or  L2_skewness_derivative() */
 double
-L2_skewness (mpz_t *f, int d, int prec, int method) {
+L2_skewness (mpz_t *f, int d, int prec, int method)
+{
 
-	 double s;
+  double s;
 
-	 s = L2_skewness_old (f, d, prec, method);
-	 /* Newton method may not converge? */
-	 //s = L2_skewness_Newton (f, d, prec, method);
-	 //s = L2_skewness_derivative (f, d, prec, method);
-	 return s;
+  // s = L2_skewness_old (f, d, prec, method);
+  /* Newton method may not converge? */
+  // s = L2_skewness_Newton (f, d, prec, method);
+  s = L2_skewness_derivative (f, d, prec, method);
+  return s;
 }
 
 /* returns the optimal skewness corresponding to L2_lognorm */
@@ -576,7 +577,7 @@ L2_skewness_Newton (mpz_t *f, int d, int prec, int method) {
 	 return s;
 }
 
-/* Use derivative test, only for degree 6 with ellipse regions*/
+/* Use derivative test, only for degree 6 with ellipse regions */
 double
 L2_skewness_derivative (mpz_t *f, int d, int prec, int method)
 {
@@ -2087,6 +2088,7 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
 void
 optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
 {
+#if 0
   mpz_t k;
 
   /* We use an idea from Shi Bai: we first translate the algebraic polynomial
@@ -2101,6 +2103,7 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
   mpz_root (k, k, d);
   do_translate_z (f, d, g, k);
   mpz_clear (k);
+#endif
 
   optimize_aux (f, d, g, verbose, use_rotation, CIRCULAR);
   /* if we want to optimize for the rectangular method, it seems better to

@@ -286,11 +286,38 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   gmp_printf ("Optimized polynomial:\n");
 #endif
 
+  double logmu0 = logmu;
   optimize (f, d, g, 0, 1);
   nroots = numberOfRealRoots (f, d, 0, 0);
   skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
   logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
   total_lognorm[q] += logmu;
+  // /* work around
+  if ( (logmu0 - logmu) < 6) { //say, 10% of target l2
+	   mpz_t k;
+	   mpz_init_set_si (k, 1);
+	   for (i = 1; i < 64; i ++) {
+			logmu0 = logmu;
+			do_translate_z (f, d, g, k); // f(x+k)
+			skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+			logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
+			//gmp_printf ("k=%Zd, skew=%d, logmu=%.7g\n", k, i, logmu);
+			mpz_mul_ui (k, k, 2);
+			// say 1% of the l2 norm, so 0.6 for rsa768
+			if ((logmu - logmu0) < -0.5 || (logmu - logmu0) > 0.5)
+				 break;
+			//gmp_printf ("k=%Zd, skew=%d, logmu=%.7g\n", k, i, logmu);
+	   }
+	   mpz_clear(k);
+	   optimize (f, d, g, 0, 1);
+	   nroots = numberOfRealRoots (f, d, 0, 0);
+	   skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+	   logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
+  }
+
+  printf ("# optimized_lognorm %1.2f, alpha %1.2f, %u rroots, skew %f\n", logmu, alpha, nroots, skew);
+
+
 
   pthread_mutex_lock (&lock);
   collisions ++;
@@ -761,9 +788,9 @@ one_thread (void* args)
 static void
 stats_sq (void)
 {
+#ifdef DEBUG
   unsigned long sq[] = SPECIAL_Q;
   int i;
-
   printf ("Hits:");
   for (i = 0; i < MAXQ && sq[i] != ULONG_MAX; i++)
     printf (" %lu:%lu", sq[i], collisionsQ[sq[i]]);
@@ -776,6 +803,7 @@ stats_sq (void)
   for (i = 0; i < MAXQ && sq[i] != ULONG_MAX; i++)
     printf (" %lu:%1.0f", sq[i], total_lognorm[sq[i]] / (double) collisionsQ[sq[i]]);
   printf ("\n");
+#endif
 }
 
 int
