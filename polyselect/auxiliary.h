@@ -53,6 +53,9 @@ void mpz_ndiv_qr (mpz_t, mpz_t, mpz_t, mpz_t);
 void generate_base_mb (cado_poly, mpz_t, mpz_t);
 double L2_lognorm (mpz_t*, unsigned long, double, int);
 double L2_skewness (mpz_t*, int, int, int);
+double L2_skewness_old (mpz_t*, int, int, int);
+double L2_skewness_Newton (mpz_t*, int, int, int);
+double L2_skewness_derivative (mpz_t*, int, int, int);
 /* rotation */
 double special_val0 (mpz_t*, int, unsigned long);
 double get_alpha (mpz_t*, const int, unsigned long);
