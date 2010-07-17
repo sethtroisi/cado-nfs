@@ -1433,6 +1433,18 @@ do_translate_z (mpz_t *f, int d, mpz_t *g, mpz_t k)
   mpz_addmul (g[0], g[1], k);
 }
 
+static double
+L2_lognorm_rounded (mpz_t *f, unsigned long d, double s, int method)
+{
+  double res = L2_lognorm (f, d, s, method);
+
+#define CST 1125899906842624.0
+  res += CST;
+  res -= CST;
+#undef CST
+  return res;
+}
+
 /* Use rotation and translation to find a polynomial with smaller norm
    (local minimum). Modify f and g accordingly.
    If use_rotation is non zero, use also rotation.
@@ -1453,7 +1465,7 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
   int count = 0;
 
   skew = L2_skewness (f, d, prec, method);
-  logmu00 = logmu0 = L2_lognorm (f, d, skew, method);
+  logmu00 = logmu0 = L2_lognorm_rounded (f, d, skew, method);
   mpz_init_set_ui (k, 1);
   mpz_init_set_ui (k2, 1);
   mpz_init_set_ui (k1, 1);
@@ -1472,7 +1484,7 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
       do_translate_z (f, d, g, kt); /* f(x+kt) */
       mpz_add (ktot, ktot, kt);
       skew = L2_skewness (f, d, prec, method);
-      logmu = L2_lognorm (f, d, skew, method);
+      logmu = L2_lognorm_rounded (f, d, skew, method);
       if (logmu < logmu0 || (logmu == logmu0 && (rand() & 1)))
         {
           changedt = 1;
@@ -1484,7 +1496,7 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
           do_translate_z (f, d, g, l); /* f(x-kt) */
           mpz_add (ktot, ktot, l);
           skew = L2_skewness (f, d, prec, method);
-          logmu = L2_lognorm (f, d, skew, method);
+          logmu = L2_lognorm_rounded (f, d, skew, method);
           if (logmu < logmu0 || (logmu == logmu0 && (rand() & 1)))
             {
               changedt = 1;
@@ -1506,7 +1518,7 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
           mpz_addmul (mutot, tmp, ktot);
           mpz_add (khitot, khitot, k2);
           skew = L2_skewness (f, d, prec, method);
-          logmu = L2_lognorm (f, d, skew, method);
+          logmu = L2_lognorm_rounded (f, d, skew, method);
           if (logmu < logmu0 || (logmu == logmu0 && (rand() & 1)))
             {
               changed2 = 1;
@@ -1521,7 +1533,7 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
               mpz_addmul (mutot, tmp, ktot);
               mpz_add (khitot, khitot, l);
               skew = L2_skewness (f, d, prec, method);
-              logmu = L2_lognorm (f, d, skew, method);
+              logmu = L2_lognorm_rounded (f, d, skew, method);
               if (logmu < logmu0 || (logmu == logmu0 && (rand() & 1)))
                 {
                   changed2 = 1;
@@ -1545,7 +1557,7 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
           mpz_submul (mutot, ktot, k1);
           mpz_add (lamtot, lamtot, k1);
           skew = L2_skewness (f, d, prec, method);
-          logmu = L2_lognorm (f, d, skew, method);
+          logmu = L2_lognorm_rounded (f, d, skew, method);
           if (logmu < logmu0 || (logmu == logmu0 && (rand() & 1)))
             {
               changed1 = 1;
@@ -1558,7 +1570,7 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
               mpz_submul (mutot, ktot, l);
               mpz_add (lamtot, lamtot, l);
               skew = L2_skewness (f, d, prec, method);
-              logmu = L2_lognorm (f, d, skew, method);
+              logmu = L2_lognorm_rounded (f, d, skew, method);
               if (logmu < logmu0 || (logmu == logmu0 && (rand() & 1)))
                 {
                   changed1 = 1;
@@ -1576,7 +1588,7 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
           rotate_auxg_z (f, g[1], g[0], k, 0);
           mpz_add (mutot, mutot, k);
           skew = L2_skewness (f, d, prec, method);
-          logmu = L2_lognorm (f, d, skew, method);
+          logmu = L2_lognorm_rounded (f, d, skew, method);
           if (logmu < logmu0 || (logmu == logmu0 && (rand() & 1)))
             {
               changed = 1;
@@ -1588,7 +1600,7 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
               rotate_auxg_z (f, g[1], g[0], l, 0); /* f - k*g */
               mpz_add (mutot, mutot, l);
               skew = L2_skewness (f, d, prec, method);
-              logmu = L2_lognorm (f, d, skew, method);
+              logmu = L2_lognorm_rounded (f, d, skew, method);
               if (logmu < logmu0 || (logmu == logmu0 && (rand() & 1)))
                 {
                   changed = 1;
