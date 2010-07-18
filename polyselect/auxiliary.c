@@ -174,12 +174,14 @@ L2_lognorm_d (double *a, unsigned long d, double s, int method)
           + 8.0 / 49.0 * (a6 * a0 + a5 * a1 + a4 * a2) + 4.0 / 49.0 * a3 * a3;
       else
         { /* use circular integral (Sage code):
-             var('a6,a5,a4,a3,a2,a1,a0,x,r,s,t')
-             f = a6*x^6+a5*x^5+a4*x^4+a3*x^3+a2*x^2+a1*x+a0
-             F = expand(f(x=x/y)*y^6)
+             R.<x> = PolynomialRing(ZZ)
+             S.<a> = InfinitePolynomialRing(R)
+             d=6; f = SR(sum(a[i]*x^i for i in range(d+1)))
+             F = expand(f(x=x/y)*y^d)
+             var('r,s,t')
              F = F.subs(x=s^(1/2)*r*cos(t),y=r/s^(1/2)*sin(t))
              v = integrate(integrate(F^2*r,(r,0,1)),(t,0,2*pi))
-             (s^6*v).expand().collect(pi)
+             (s^d*v).expand().collect(pi)
           */
           n = 231.0 * (a6 * a6 + a0 * a0) + 42.0 * (a6 * a4 + a2 * a0)
             + 21.0 * (a5 * a5 + a1 * a1) + 7.0 * (a4 * a4 + a2 * a2)
@@ -581,97 +583,143 @@ L2_skewness_Newton (mpz_t *f, int d, int prec, int method) {
 double
 L2_skewness_derivative (mpz_t *f, int d, int prec, int method)
 {
-  double s = 0.0, a = 0.0, b = 0.0, c, e, nc, nd, fd[d+1], dfd[d+1],
-    s1, s2, s4, s5, s6;
+  double s = 0.0, a = 0.0, b = 0.0, c, nc, fd[d+1], dfd[d+1],
+    s1, s2, s3, s4, s5, s6;
   int i;
 #ifdef DEBUG_SKEW
   int count = 0;
 #endif
+
+  if (method == RECTANGULAR)
+    {
+      fprintf (stderr, "Error in L2_skewness_derivative, rectangular method not implemented\n");
+      exit (1);
+    }
 
   /* convert once for all to double's to avoid expensive mpz_get_d() */
   for (i = 0; i <= d; i++)
     fd[i] = mpz_get_d (f[i]);
   if (d == 6)
     {
-      if (method == RECTANGULAR)
-        s = L2_skewness (f, d, prec, method); /* rectangular not implemented */
-      else
+      /* Sage code:
+         R.<x> = PolynomialRing(ZZ)
+         S.<a> = InfinitePolynomialRing(R)
+         d=6; f = SR(sum(a[i]*x^i for i in range(d+1)))
+         F = expand(f(x=x/y)*y^d)
+         var('r,s,t')
+         F = F.subs(x=s^(1/2)*r*cos(t),y=r/s^(1/2)*sin(t))
+         v = integrate(integrate(F^2*r,(r,0,1)),(t,0,2*pi))
+         v = (7168*v/pi).expand()
+         dv = v.diff(s)
+         dv = (dv*s^7/14).expand().collect(s)
+         99*a6^2 * s^12 +
+         6*(2*a4*a6 + a5^2) * s^10 +
+         (2*a2*a6 + 2*a3*a5 + a4^2) * s^8 -
+         (2*a0*a4 + 2*a1*a3 + a2^2) * s^4 -
+         6*(2*a0*a2 + a1^2) * s^2 -
+         99*a0^2
+      */
+      dfd[6] = 99.0 * fd[6] * fd[6];
+      dfd[5] = 6.0 * ( 2.0 * fd[4] * fd[6] + fd[5] * fd[5] );
+      dfd[4] = 2.0 * ( fd[2] * fd[6] + fd[3] * fd[5] ) + fd[4] * fd[4];
+      dfd[2] = 2.0 * ( fd[0] * fd[4] + fd[1] * fd[3] ) + fd[2] * fd[2];
+      dfd[1] = 6.0 * ( 2.0 * fd[0] * fd[2] + fd[1] * fd[1] );
+      dfd[0] = 99.0 * fd[0] * fd[0] ;
+      nc = -1.0;
+      s = 1.0;
+      /* first isolate the minimum in an interval [s, 2s] by dichotomy */
+      while (nc < 0)
         {
-          /*
-            99*a6^2 * s^5 +
-            6*(2*a4*a6 + a5^2) * s^3 +
-            (2*a2*a6 + 2*a3*a5 + a4^2) * s -
-            (2*a0*a4 + 2*a1*a3 + a2^2) / s^3 -
-            6*(2*a0*a2 + a1^2) / s^5 -
-            99*a0^2 / s^7
-          */
-          dfd[6] = 99.0 * fd[6] * fd[6];
-          dfd[5] = 6.0 * ( 2.0 * fd[4] * fd[6] + fd[5] * fd[5] );
-          dfd[4] = 2.0 * ( fd[2] * fd[6] + fd[3] * fd[5] ) + fd[4] * fd[4];
-          dfd[2] = 2.0 * ( fd[0] * fd[4] + fd[1] * fd[3] ) + fd[2] * fd[2];
-          dfd[1] = 6.0 * ( 2.0 * fd[0] * fd[2] + fd[1] * fd[1] );
-          dfd[0] = 99.0 * fd[0] * fd[0] ;
-          nc = -1.0;
-          s = 1.0;
-          /* first isolate the minimum in an interval [s, 2s] by dichotomy */
-          while (nc < 0)
-            {
-              s = 2.0 * s;
-              s1 = s * s;
-              s2 = s1 * s1;
-              s4 = s2 * s2;
-              s5 = s4 * s1;
-              s6 = s5 * s1;
-              nc = dfd[6] * s6 + dfd[5] * s5 + dfd[4] * s4
-                - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
+          s = 2.0 * s;
+          s1 = s * s;   /* s^2 */
+          s2 = s1 * s1; /* s^4 */
+          s4 = s2 * s2; /* s^8 */
+          s5 = s4 * s1; /* s^10 */
+          s6 = s5 * s1; /* s^12 */
+          nc = dfd[6] * s6 + dfd[5] * s5 + dfd[4] * s4
+            - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
 #ifdef DEBUG_SKEW
-              count ++;
+          count ++;
 #endif
-            }
+        }
 
-          a = (s == 2.0) ? 1.0 : 0.5 * s;
-          b = s;
-          /* since we use trichotomy, the intervals shrink by 3/2 instead of 2
-             at each iteration, thus we multiply the precision (in bits) by
-             log(2)/log(3/2) */
-          prec = (int) (1.70951129135145 * (double) prec);
-          /* use trichotomy */
-          while (prec--)
-            {
-              c = (2.0 * a + b) / 3.0;
-              e = (a + 2.0 * b) / 3.0;
-              s1 = c * c;
-              s2 = s1 * s1;
-              s4 = s2 * s2;
-              s5 = s4 * s1;
-              s6 = s5 * s1;
+      /* now dv(s/2) < 0 < dv(s) thus the minimum is in [s/2, s] */
+      a = (s == 2.0) ? 1.0 : 0.5 * s;
+      b = s;
+      /* use dichotomy to refine the root */
+      while (prec--)
+        {
+          c = (a + b) * 0.5;
+          s1 = c * c;
+          s2 = s1 * s1;
+          s4 = s2 * s2;
+          s5 = s4 * s1;
+          s6 = s5 * s1;
               
-              nc = dfd[6] * s6 + dfd[5] * s5 + dfd[4] * s4
-                - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
+          nc = dfd[6] * s6 + dfd[5] * s5 + dfd[4] * s4
+            - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
 #ifdef DEBUG_SKEW
-              count ++;
+          count ++;
 #endif
-              if (nc > 0)
-                b = c;
-              else {
-                s1 = e * e;
-                s2 = s1 * s1;
-                s4 = s2 * s2;
-                s5 = s4 * s1;
-                s6 = s5 * s1;
-                nd = dfd[6] * s6 + dfd[5] * s5 + dfd[4] * s4
-                  - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
-#ifdef DEBUG_SKEW
-                count ++;
-#endif
-                if (nd > 0) {
-                  a = c;
-                  b = e;
-                }
-                else
-                  a = e;
-              }
-            }
+          if (nc > 0)
+            b = c;
+          else
+            a = c;
+        }
+    }
+  else if (d == 5)
+    {
+      /* Sage code:
+         R.<x> = PolynomialRing(ZZ)
+         S.<a> = InfinitePolynomialRing(R)
+         d=5; f = SR(sum(a[i]*x^i for i in range(d+1)))
+         F = expand(f(x=x/y)*y^d)
+         var('r,s,t')
+         F = F.subs(x=s^(1/2)*r*cos(t),y=r/s^(1/2)*sin(t))
+         v = integrate(integrate(F^2*r,(r,0,1)),(t,0,2*pi))
+         v = (1536*v/pi).expand()
+         dv = v.diff(s)
+         dv = (dv*s^6/3).expand().collect(s)
+      */
+      dfd[5] = 105.0 * fd[5] * fd[5];
+      dfd[4] = 7.0 * (2.0 * fd[3] * fd[5] + fd[4] * fd[4]);
+      dfd[3] = 2.0 * (fd[1] * fd[5] + fd[2] * fd[4]) + fd[3] * fd[3];
+      dfd[2] = 2.0 * (fd[0] * fd[4] + fd[1] * fd[3]) + fd[2] * fd[2];
+      dfd[1] = 7.0 * (2.0 * fd[0] * fd[2] + fd[1] * fd[1]);
+      dfd[0] = 105.0 * fd[0] * fd[0];
+      nc = -1.0;
+      s = 1.0;
+      /* first isolate the minimum in an interval [s, 2s] by dichotomy */
+      while (nc < 0)
+        {
+          s = 2.0 * s;
+          s1 = s * s;   /* s^2 */
+          s2 = s1 * s1; /* s^4 */
+          s3 = s2 * s1; /* s^6 */
+          s4 = s2 * s2; /* s^8 */
+          s5 = s4 * s1; /* s^10 */
+          nc = dfd[5] * s5 + dfd[4] * s4 + dfd[3] * s3
+            - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
+        }
+
+      /* now dv(s/2) < 0 < dv(s) thus the minimum is in [s/2, s] */
+      a = (s == 2.0) ? 1.0 : 0.5 * s;
+      b = s;
+      /* use dichotomy to refine the root */
+      while (prec--)
+        {
+          c = (a + b) * 0.5;
+          s1 = c * c;   /* s^2 */
+          s2 = s1 * s1; /* s^4 */
+          s3 = s2 * s1; /* s^6 */
+          s4 = s2 * s2; /* s^8 */
+          s5 = s4 * s1; /* s^10 */
+          nc = dfd[5] * s5 + dfd[4] * s4 + dfd[3] * s3
+            - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
+          if (nc > 0)
+            b = c;
+          else
+            a = c;
         }
     }
   else

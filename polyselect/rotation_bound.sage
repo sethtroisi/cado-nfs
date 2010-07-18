@@ -193,8 +193,7 @@ def best_l2norm_tk_circular(f):
 
 def skew_l2norm_tk_circular(f):
    if f.degree()==6:
-      # R.<s> = RDF[]
-      R.<s> = RealField(128)[]
+      R.<s> = RDF[]
       a0 = f[0]
       a1 = f[1] * s
       a2 = f[2] * s^2
@@ -203,6 +202,20 @@ def skew_l2norm_tk_circular(f):
       a5 = f[5] * s^5
       a6 = f[6] * s^6
       e = -1386*a0^2+168*a6*a4+28*a6*a2-28*a4*a0-168*a2*a0+84*a5^2-84*a1^2+1386*a6^2+14*a4^2-14*a2^2+28*a5*a3-28*a3*a1
+      r = e.real_roots()
+      root_pos=[s for s in r if s > 0]
+      if len(root_pos) <> 1:
+         raise ValueError, "number of positive roots <> 1"
+      return root_pos[0]
+   elif f.degree()==5:
+      R.<s> = RDF[]
+      a0 = f[0]
+      a1 = f[1] * s
+      a2 = f[2] * s^2
+      a3 = f[3] * s^3
+      a4 = f[4] * s^4
+      a5 = f[5] * s^5
+      e = 105*a5^2+7*(2*a3*a5+a4^2)+(2*a1*a5+2*a2*a4+a3^2)-(2*a0*a4+2*a1*a3+a2^2)-7*(2*a0*a2+a1^2)-105*a0^2
       r = e.real_roots()
       root_pos=[s for s in r if s > 0]
       if len(root_pos) <> 1:
