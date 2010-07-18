@@ -680,3 +680,103 @@ def optimize(f,g):
             break
     return f, g
 
+
+###################################################
+# 1. symbolically generate l2norm
+# usage sage: [f, fd, fd2] = symbolic_l2norm(6, 0)
+#             6 is the degree, 0 means ellipse region;
+#                              1 is rectangular region.
+###################################################
+def symbolic_l2(d, method):
+    if ((d < 3) | (d > 6)):
+        return "Not Implemented"
+    a6, a5, a4, a3, a2, a1, a0 = var('a6 a5 a4 a3 a2 a1 a0')
+    x, y, s, r, t = var('x, y, s, r, t')
+    if (d == 3):
+        a6 = 0
+        a5 = 0
+        a4 = 0
+    if (d == 4):
+        a6 = 0
+        a5 = 0
+    if (d == 5):
+        a6 = 0
+    f = a6*x^6+a5*x^5+a4*x^4+a3*x^3+a2*x^2+a1*x+a0
+    g(x, y) = f(x=x/y)*y^d
+
+    # 0 means ellilpse, others means rectangular
+    if (method == 0):
+        g(x=r*cos(t), y=r*sin(t))
+        h(r,t,s)= g(x=s^(1/2)*r*cos(t), y=r/s^(1/2)*sin(t))
+        l(t,s) = integrate(h^2*r, r, 0, 1)
+        F(s) = integrate(l, t, 0, 2*pi)
+    else:
+        l(x,s) = integrate(g^2/s^d, y, 0, 1)
+        F(s) = integrate(l, x, 0, 1)
+
+    return [F, F.derivative(s), F.derivative(s).derivative(s)]
+
+# Usage: define the polynomial f and g, then use
+# symbolic_l2_f(f, method) to return  [normf, normfd, normfd2]
+def symbolic_l2_f(f, method):
+    d = f.degree()
+    if ((d < 3) | (d > 6)):
+        return "Not Implemented"
+    a6, a5, a4, a3, a2, a1, a0 = var('a6 a5 a4 a3 a2 a1 a0')
+    x, y, s, r, t = var('x, y, s, r, t')
+    if (d == 3):
+        a6 = 0
+        a5 = 0
+        a4 = 0
+    if (d == 4):
+        a6 = 0
+        a5 = 0
+        a4 = f[4]
+    if (d == 5):
+        a6 = 0
+        a5 = f[5]
+        a4 = f[4]
+    if (d == 6):
+        a6 = f[6]
+        a5 = f[5]
+        a4 = f[4]
+    a3 = f[3]
+    a2 = f[2]
+    a1 = f[1]
+    a0 = f[0]
+    f = a6*x^6+a5*x^5+a4*x^4+a3*x^3+a2*x^2+a1*x+a0
+    g(x, y) = f(x=x/y)*y^d
+    # 0 means ellilpse, others means rectangular
+    if (method == 0):
+        g(x=r*cos(t), y=r*sin(t))
+        h(r,t,s)= g(x=s^(1/2)*r*cos(t), y=r/s^(1/2)*sin(t))
+        l(t,s) = integrate(h^2*r, r, 0, 1)
+        F(s) = integrate(l, t, 0, 2*pi)
+    else:
+        l(x,s) = integrate(g^2/s^d, y, 0, 1)
+        F(s) = integrate(l, x, 0, 1)
+
+    return [F, F.derivative(s), F.derivative(s).derivative(s)]
+
+###################################
+# 2. symbolically do translation
+###################################
+def symbolic_translate(d):
+    if ((d < 3) | (d > 6)):
+        return "Not Implemented"
+    a6, a5, a4, a3, a2, a1, a0 = var('a6 a5 a4 a3 a2 a1 a0')
+    x, y, l, m, k = var('x, y, l, m, k')
+    if (d == 3):
+        a6 = 0
+        a5 = 0
+        a4 = 0
+    if (d == 4):
+        a6 = 0
+        a5 = 0
+    if (d == 5):
+        a6 = 0
+    f = a6*x^6+a5*x^5+a4*x^4+a3*x^3+a2*x^2+a1*x+a0
+    g = l*x - m
+    f = f(x = x + k)
+    g = g + k*l
+    return [f, g]
