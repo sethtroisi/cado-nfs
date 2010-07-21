@@ -586,11 +586,11 @@ sub drive {
 
     	opendir DIR, $wdir
         	or die "Cannot open directory `$wdir': $!\n";
-		my @cp_krylov = grep /^V0/, readdir DIR;
+		my @cp_krylov = grep /^V/, readdir DIR;
 		close DIR;
     	opendir DIR, $wdir
         	or die "Cannot open directory `$wdir': $!\n";
-		my @cp_mksol= grep /^S0/, readdir DIR;
+		my @cp_mksol= grep /^S/, readdir DIR;
 		close DIR;
 
 		if ( @cp_mksol ) {

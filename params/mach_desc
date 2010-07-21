@@ -11,13 +11,24 @@
 # the machine.
 #
 # Some info on accepted variables:
-# tmpdir and cadodir are mandatory.
-# cores defaults to 1.
-# group is planned for use in linear algebra.
-# 
+# tmpdir and bindir are mandatory:
+# 	tmpdir = directory containing the relations during the calculation on a machine.
+# 	bindir = directory containing the binary files on a machine.
+# cores is the number of cores used on a machine for the sieve defaults to 1.
+#	For example: if cores=5 and $param{'sieve_max_threads'}=2 then 3 jobs will be run on
+#	the machine (2+2+1).
+# poly_cores (optional) defaults to cores.
+# mpi=1 (optional) after machine name for use MPI in linear algebra on this machine,
+# 	default mpi=0. If mpi=0 for all machines, then the linear algebra will be run:
+# 	- on localhost
+# 	- or if you are on grid'5000, on all reserve machines (uniq $OAR_NODEFILE)
+# 	For use MPI, CADO-NFS must be compiled with a MPI library, check that the path
+# 	of the MPI library is in the file local.sh (for example: MPI=/usr/lib64/openmpi).
+# 	The path $param{'wdir'} must be visible on each machine.
 #
-# Changing the list during a computation:
+#
 # #######################################
+# Changing the list during a computation:
 #
 # If during a computation you want to add a machine, you just have to add
 # appropriate line. Next time cadofactor.pl will check if there are finished
@@ -45,25 +56,26 @@
 #  - put the previous value of cores.
 #
 
-[cacao]
+[caramel]
 # WARNING: $HOME is substitued locally!
 tmpdir=/localdisk/tmp
-cadodir=$HOME/Recherche/cado/trunk/dist/src
+bindir=$HOME/Recherche/cado/trunk/dist/src
 
 cores=2
-group=0
-    pasta
-    tiramisu cores=4
+poly_cores=1
 
-group=1
-    achille
-    hecube
-    helene
+pasta
+tiramisu cores=4 poly_cores=3
+patate cores=8 poly_cores=6
+achille mpi=1
+hecube mpi=1
+helene mpi=1
+hector mpi=1
 
 
 [lix]
 # WARNING: $HOME is substitued locally!
-cadodir=/users/crypto/gaudry/cado
+bindir=/users/crypto/gaudry/cado
 tmpdir=/localdisk/tmp
 
 cores=2

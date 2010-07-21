@@ -1,6 +1,6 @@
-[cacao]
+[caramel]
 tmpdir=/localdisk/tmp
-cadodir=$CADO
+bindir=$CADO
 
 cores=2
 group=0

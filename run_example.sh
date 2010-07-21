@@ -32,8 +32,8 @@ if [ -d "$cado_prefix" ] ; then
     if [ -f "$cado_prefix/$example_subdir/params.$file" ] ; then
         file="$cado_prefix/$example_subdir/params.$file" 
     fi
-    cadodir="$cado_prefix/bin"
-    cadofactor="$cadodir/cadofactor.pl"
+    bindir="$cado_prefix/bin"
+    cadofactor="$bindir/cadofactor.pl"
 else
     # Otherwise we're called from the source tree (or we hope so)
     call_cmake="`dirname $0`/scripts/call_cmake.sh"
@@ -47,7 +47,7 @@ else
     cadofactor="${up_path}cadofactor.pl"
     # Make the path absolute.
     build_tree=`cd "$build_tree" ; pwd`
-    cadodir="$build_tree"
+    bindir="$build_tree"
 fi
 
 if [ ! -f $file ] ; then
@@ -62,7 +62,7 @@ echo "Testing factorization as given by $file in $t"
 
 cp $file $t/param
 
-$cadodir/fixup_params_file.sh $t/param
+$bindir/fixup_params_file.sh $t/param
 
 # Sets the machine description file
 if [ -z "$CADO_USEHOST" ] ; then
@@ -74,11 +74,11 @@ fi
 cat > $t/mach_desc <<EOF
 [local]
 tmpdir=$t/tmp
-cadodir=$cadodir
+bindir=$bindir
 $host cores=2
 EOF
 
-$cadofactor cadodir=$cadodir $t/param machines=$t/mach_desc wdir=$t delay=60 sievenice=0 selectnice=0 logfile=$t/out "$@"
+$cadofactor $t/param bindir=$bindir machines=$t/mach_desc wdir=$t delay=60 sievenice=0 selectnice=0 logfile=$t/out "$@"
 
 rc=$?
 

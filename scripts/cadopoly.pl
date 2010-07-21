@@ -1,8 +1,8 @@
 #!/usr/bin/perl -w
 
-# Usage: cadopoly.pl
-# 	read files params_* in dir "." and run polyselect
-# 	the params_* must contain: different name, n, machines, params polyselect ...
+# Usage: cadopoly.pl $paramfile1 $paramfile2 ...
+# 	read paramfiles and run polyselect
+# 	the paramfiles must contain: different name!, n, machines, params polyselect ...
 #
 # TODO: generate input
 # 		...
@@ -16,11 +16,11 @@ use strict;
 use warnings;
 
 # input
-opendir DIR, "."
-	or die "Cannot open directory `.': $!\n";
-my @files = grep /^params_/,
-				readdir DIR;
-closedir DIR;
+print "$0 @ARGV\n";
+my @files;
+while (@ARGV) {
+	push @files, shift @ARGV;
+}
 @files = sort @files;
 
 # recover
@@ -41,7 +41,8 @@ while (@files) {
 		next if ($recover[0] ne basename("$param{'prefix'}.polysel_jobs"));
 		shift @recover;
 	}
-	cmd ("mv $old_prefix.polysel_jobs $param{'prefix'}.polysel_jobs") if ($old_prefix);
+	rename ( "$old_prefix.polysel_jobs", "$param{'prefix'}.polysel_jobs" )
+		if ($old_prefix);
 	read_machines();
 	open FILE, "> $param{'prefix'}.n"
 		or die "Cannot open `$param{'prefix'}.n' for writing: $!.\n";
@@ -51,7 +52,10 @@ while (@files) {
 		do_polysel_bench();
 	} else {
 		do_polysel_bench(1);
-		cmd ("mv $param{'prefix'}.polysel_jobs $param{'prefix'}.polysel_done");
+        unlink "$param{'prefix'}.polysel_jobs";
+		open FILE, "> $param{'prefix'}.polysel_done"
+    	    or die "Cannot open `$param{'prefix'}.polysel_done' for writing: $!.\n";
+		close FILE;
 	}
 	$old_prefix = $param{'prefix'};
 }

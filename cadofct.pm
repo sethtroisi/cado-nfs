@@ -23,7 +23,7 @@
 package cadofct;
 use Exporter;
 our @ISA= qw(Exporter);
-our @EXPORT=qw(%param $tab_level &cmd &read_machines &read_param &do_polysel_bench
+our @EXPORT=qw(%param $tab_level &read_machines &read_param &do_polysel_bench
 &do_sieve_bench &do_factbase &do_init &do_task &banner &info &last_line
 &format_dhms);
 
@@ -130,7 +130,7 @@ $SIG{__DIE__}  = sub {
 my @default_param = (
     # global
     wdir         => undef,
-    cadodir      => undef,
+    bindir      => undef,
     name         => undef,
     machines     => undef,
     n            => undef,
@@ -186,6 +186,8 @@ my @default_param = (
     # linalg
     linalg       => 'bwc',
     bwmt         => 2,
+	mpi			 => 0,
+	hosts		 => "",
     bwthreshold  => 64,
     bwtidy       => 1,
     bwc_interval => 1000,
@@ -273,9 +275,9 @@ sub read_param {
         die "The parameter `machines' is mandatory for parallel mode.\n"
             if $param->{'parallel'} && !$param->{'machines'};
 
-        if (!$param->{'cadodir'}) {
-            warn "Taking current script's directory as `cadodir'.\n";
-            $param->{'cadodir'} = abs_path(dirname($0));
+        if (!$param->{'parallel'} && !$param->{'bindir'}) {
+            warn "Taking current script's directory as `bindir'.\n";
+            $param->{'bindir'} = abs_path(dirname($0));
         }
     }
 
@@ -306,12 +308,18 @@ my %machines;
 
 # Reads the machine description file for parallel computing
 sub read_machines {
+	my $file = shift;
     die "No machine description file was defined.\n" if !$param{'machines'};
-    open FILE, "< $param{'machines'}"
-        or die "Cannot open `$param{'machines'}' for reading: $!.\n";
+	if ( $file ) {
+    	open FILE, "< $file"
+        	or die "Cannot open `$param{'machines'}' for reading: $!.\n";
+	} else {
+    	open FILE, "< $param{'machines'}"
+        	or die "Cannot open `$param{'machines'}' for reading: $!.\n";
+	}
 
     my %vars = ();
-
+	
     while (<FILE>) {
         s/^\s+//; s/\s*(#.*)?$//;
         next if /^$/;
@@ -320,7 +328,7 @@ sub read_machines {
             %vars = ( cluster => $1 );
         } elsif (/^(\w+)=(.*)$/) {
             $vars{$1} = $2;
-			$param{'cadodir'} = $2 if ($1 eq "cadodir");
+			$param{'bindir'} = $2 if ($1 eq "bindir");
 			if ($1 eq "tmpdir") {
 				my $wdir = 
 					abs_path(dirname($param{'wdir'}))."/".basename($param{'wdir'});
@@ -337,11 +345,25 @@ sub read_machines {
             die "Cannot parse line `$_' in file `$param{'machines'}'.\n"
                 if !/^$/;
 
-            for my $k ("tmpdir", "cadodir") {
-                die "The parameter `$k' is mandatory in $param{'machines'}.\n" if !$desc{$k};
+            for my $k ("tmpdir", "bindir") {
+                die "The parameter `$k' is mandatory in $param{'machines'}.\n"
+					if !$desc{$k};
             }
             $desc{'tmpdir'} =~ s/%s/$param{'name'}/g;
             $desc{'cores'}  = 1 unless defined $desc{'cores'};
+			$desc{'poly_cores'} = $desc{'cores'} 
+				unless defined $desc{'poly_cores'};
+			$desc{'mpi'} = 0 unless defined $desc{'mpi'};
+			if ( $desc{'mpi'} ) {
+				die "the directory wdir or bindir don't exist on $host.\n"
+					if ( remote_cmd($host, "env test -d $param{'wdir'} && test ".
+								"-d $param{'bindir'}")->{'status'} );
+			}
+			while ( $desc{'mpi'} ) {
+				$desc{'mpi'}--;
+				$param{'mpi'}++;
+				$param{'hosts'} .= "$host,";
+			}
             $desc{'prefix'} = "$desc{'tmpdir'}/$param{'name'}";
             $desc{'files'}  = {}; # List of files uploaded to the host
 
@@ -352,6 +374,30 @@ sub read_machines {
     }
 
     close FILE;
+
+	if ( $param{'mpi'} ) {
+		chop $param{'hosts'};
+		open FILE, "< $param{'bindir'}/linalg/bwc/bwc.pl"
+    		or die "Cannot open `$param{'bindir'}/linalg/bwc/bwc.pl' for reading: $!.\n";
+		while (<FILE>) {
+			next unless /^my \$mpiexec='';$/;
+			die "CADO-NFS has not been compiled with MPI flag.\n".
+					"Please add the path of the MPI library in the file local.sh ".
+					"(for example: MPI=/usr/lib64/openmpi) and recompile.\n";
+		} 
+		close FILE;
+	} else {
+		if (exists($ENV{'OAR_JOBID'})) {
+    		open FILE, "> $param{'machines'}.tmp"
+        		or die "Cannot open `$param{'machines'}.tmp' for writing: $!.\n";
+			print FILE "tmpdir=$vars{'tmpdir'}\n";
+			print FILE "bindir=$param{'bindir'}\n";
+			print FILE "mpi=1\n";
+			close FILE;
+			cmd( "uniq $ENV{'OAR_NODEFILE'} >> $param{'machines'}.tmp" );
+			read_machines( "$param{'machines'}.tmp" );
+		}
+	}
 }
 
 
@@ -411,7 +457,12 @@ sub remote_cmd {
     # don't ask for a password: we don't want to fall into interactive mode
     # all the time (especially not in the middle of the night!)
     # use public-key authentification instead!
-    $cmd = "env ssh -q ".
+	my $rsh = 'ssh';
+    if (exists($ENV{'OAR_JOBID'})) {
+        $rsh="/usr/bin/oarsh";
+    }
+
+    $cmd = "env $rsh -q ".
            "-o ConnectTimeout=$opt->{'timeout'} ".
            "-o ServerAliveInterval=".int($opt->{'timeout'}/3)." ".
            "-o PasswordAuthentication=no ".
@@ -434,7 +485,7 @@ sub remote_cmd {
 
 # Reads a job status file
 # Format:
-# <host> <pid> <file> <param1> <param2> ...
+# <host> <pid> <threads> <file> <param1> <param2> ...
 # The PID is "done" when the job is finished.
 sub read_jobs {
     my ($file) = @_;
@@ -451,9 +502,9 @@ sub read_jobs {
         s/^\s+//; s/\s*(#.*)?$//;
         next if /^$/;
 
-        if (s/^(\S+)\s+(\d+|done)\s+(\S+)\s*//) {
+        if (s/^(\S+)\s+(\d+|done)\s+(\d+)\s+(\S+)\s*//) {
             my @param = split;
-            my %job = ( host => $1, file => $3, param => \@param );
+            my %job = ( host => $1, threads => $3, file => $4, param => \@param );
             $job{'pid'} = $2 unless $2 eq "done";
             push @$jobs, \%job;
         } else {
@@ -473,7 +524,8 @@ sub write_jobs {
         or die "Cannot open `$file' for writing: $!.\n";
     for my $job (@$jobs) {
         print FILE "$job->{'host'} ".($job->{'pid'} ? $job->{'pid'} : "done").
-                   " $job->{'file'} ".join(" ", @{$job->{'param'}})."\n";
+				   " $job->{'threads'} $job->{'file'} ".
+				   join(" ", @{$job->{'param'}})."\n";
     }
     close FILE;
 }
@@ -541,7 +593,7 @@ sub job_status {
         info "Finished!\n";
         $status = 0;
     } elsif (!$ret->{'status'} && $ret->{'out'} =~ /No such file or directory$/) {
-        die "The executable was not found. Make sure the `cadodir' parameter ".
+        die "The executable was not found. Make sure the `bindir' parameter ".
             "is valid for host `$job->{'host'}'.\n";
     } elsif (!$ret->{'status'} && $ret->{'out'} =~ /BUG/) {
 		die $ret->{'out'};
@@ -943,19 +995,27 @@ sub distribute_task {
 
             HOST : for my $h (keys %machines) {
                 my $m = $machines{$h};
-				my $mth = min ( $opt->{'max_threads'},
-								$m->{'cores'} );
-				my $process = ceil( $m->{'cores'} / $mth );
+				my $cores= $m->{'cores'};
+				$cores = $m->{'poly_cores'} 
+					if ( $opt->{'task'} eq "polysel" ); 
 				
                 # How many free cores on this host?
-                my $n = $process - grep { $_->{'host'} eq $h } @$jobs;
-                next unless $n;
+                my $busy_cores = 0;
+				foreach (@$jobs) {
+					$busy_cores += $_->{'threads'}
+						 if $_->{'host'} eq $h;
+				}
+                my $n = $cores - $busy_cores;
+                next if ( $n < 1 );
 
                 # Send files and skip to next host if not all files are here
                 send_file($h, $_) for @{$opt->{'files'}};
                 next if grep !$m->{'files'}->{$_}, @{$opt->{'files'}};
 
-                while ($n-- > 0) {
+				my $nth = $opt->{'max_threads'};
+                while ($n > 0) {
+					$n -= $opt->{'max_threads'};
+					$nth = $n + $opt->{'max_threads'} if $n < 0;
                     my @r = find_hole($opt->{'min'}, $opt->{'max'},
                                       $opt->{'len'}, $ranges);
 
@@ -973,6 +1033,7 @@ sub distribute_task {
                     last HOST unless @r;
 
                     my $job = { host  => $h,
+								threads => $nth,
                                 file  => "$m->{'prefix'}.$opt->{'suffix'}.".
                                          "$r[0]-$r[1]",
                                 param => \@r };
@@ -980,7 +1041,7 @@ sub distribute_task {
 
                     info "Starting job: ".job_string($job)."\n";
                     $tab_level++;
-                   	my $cmd = &{$opt->{'cmd'}}(@r, $m, $mth, $opt->{'gzip'}).
+                   	my $cmd = &{$opt->{'cmd'}}(@r, $m, $nth, $opt->{'gzip'}).
 								" & echo \\\$!";
 					my $ret = remote_cmd($h, $cmd, { log => 1 });
                     if (!$ret->{'status'}) {
@@ -1013,11 +1074,11 @@ sub distribute_task {
                                                     $opt->{'len'}, $ranges))) {
 			my $mt = $param{'bwmt'};
 			$mt=$1*$2 if ($mt =~ /^(\d+)x(\d+)$/);
-		    my $mth = min ( $opt->{'max_threads'}, $mt );
+		    my $nth = min ( $opt->{'max_threads'}, $mt );
 
             info "Starting job: ".pad($r[0], 8)." ".pad($r[1], 8)."\n";
             $tab_level++;
-            my $cmd = &{$opt->{'cmd'}}(@r, $machines{'localhost'}, $mth, $opt->{'gzip'});
+            my $cmd = &{$opt->{'cmd'}}(@r, $machines{'localhost'}, $nth, $opt->{'gzip'});
             cmd($cmd, { log => 1, kill => 1 });
 			my $check_cmd = "$param{'prefix'}.$opt->{'suffix'}.$r[0]-$r[1]";
 			$check_cmd .= ".gz" if $opt->{'gzip'};
@@ -1227,7 +1288,7 @@ sub do_init {
         $tab_level--;
     } else {
         $machines{'localhost'} = { tmpdir  => $param{'wdir'},
-                                 cadodir => $param{'cadodir'},
+                                 bindir => $param{'bindir'},
                                  prefix  => $param{'prefix'} };
     }
 
@@ -1500,7 +1561,7 @@ my $polysel_check = sub {
 my $polysel_cmd = sub {
     my ($a, $b, $m, $max_threads, $gzip) = @_;
     return "env nice -$param{'selectnice'} ".
-           "$m->{'cadodir'}/polyselect/polyselect ".
+           "$m->{'bindir'}/polyselect/polyselect ".
            "-keep $param{'kjkeep'} ".
            "-kmax $param{'kjkmax'} ".
            "-incr $param{'kjincr'} ".
@@ -1621,7 +1682,7 @@ sub do_polysel_bench {
         $total = ceil ($total / $param{'kjadrange'});
 		my $total_cores=0;
 		foreach (keys %machines) {
-			$total_cores += $machines{$_}{'cores'};
+			$total_cores += $machines{$_}{'poly_cores'};
 		}
         my $size = count_lines("$param{'prefix'}.polysel_jobs", "$param{'name'}\.");
 		my $total_jobs = ceil (($max-$min)/$param{'kjadrange'});
@@ -1665,7 +1726,7 @@ sub do_factbase {
     info "Generating factor base...\n";
     $tab_level++;
 
-    my $cmd = "$param{'cadodir'}/sieve/makefb ".
+    my $cmd = "$param{'bindir'}/sieve/makefb ".
               "-poly $param{'prefix'}.poly ".
               "> $param{'prefix'}.roots ".
               "2> $param{'prefix'}.makefb.stderr";
@@ -1684,7 +1745,7 @@ sub do_freerels {
     info "Computing free relations...\n";
     $tab_level++;
 
-    my $cmd = "$param{'cadodir'}/sieve/freerel ".
+    my $cmd = "$param{'bindir'}/sieve/freerel ".
               "-poly $param{'prefix'}.poly ".
               "-fb $param{'prefix'}.roots ".
               "> $param{'prefix'}.freerels ".
@@ -1704,7 +1765,7 @@ sub do_freerels {
 my $sieve_cmd = sub {
     my ($a, $b, $m, $max_threads, $gzip) = @_;
     my $cmd = "env nice -$param{'sievenice'} ".
-               		"$m->{'cadodir'}/sieve/las ".
+               		"$m->{'bindir'}/sieve/las ".
 					"-I $param{'I'} ".
     	       		"-poly $m->{'prefix'}.poly ".
         	  		"-fb $m->{'prefix'}.roots ".
@@ -1765,7 +1826,7 @@ sub do_sieve {
         }
 
         # Check relations
-        my $ret = cmd("$param{'cadodir'}/utils/check_rels ".
+        my $ret = cmd("$param{'bindir'}/utils/check_rels ".
                       "-poly $param{'prefix'}.poly $check > /dev/null 2>&1");
         unlink "$check" unless $full;
 
@@ -1896,7 +1957,7 @@ sub do_sieve {
         	my $new_files =
 				join " ", (map "$param{'wdir'}/$_", sort @new_files);
 			info "split new files in $nslices slices...";
-        	cmd("$param{'cadodir'}/filter/dup1 ".
+        	cmd("$param{'bindir'}/filter/dup1 ".
             	"-out $param{'prefix'}.nodup $new_files ".
             	"> $param{'prefix'}.dup1.stderr 2>&1",
             	{ log => 1, kill => 1 });
@@ -1909,10 +1970,10 @@ sub do_sieve {
 			$allfiles[$i] = 
 				join "", (map "$param{'prefix'}.nodup/$i/$_\n", sort @files);
 			open FILE, "> $param{'prefix'}.dup2files"
-				or die "Cannot open `$param{'prefix'}.dup2files' for reading: $!.\n";
+				or die "Cannot open `$param{'prefix'}.dup2files' for writing: $!.\n";
 			print FILE $allfiles[$i];
 			close FILE;
-	        cmd("$param{'cadodir'}/filter/dup2 ".
+	        cmd("$param{'bindir'}/filter/dup2 ".
     	        "-K $K -out $param{'prefix'}.nodup/$i ".
 				"-filelist $param{'prefix'}.dup2files ".
             	"> $param{'prefix'}.dup2.stderr 2>&1",
@@ -1936,12 +1997,12 @@ sub do_sieve {
         info "Removing singletons...";
         $tab_level++;
 		open FILE, "> $param{'prefix'}.purgefiles"
-			or die "Cannot open `$param{'prefix'}.purgefiles' for reading: $!.\n";
+			or die "Cannot open `$param{'prefix'}.purgefiles' for writing: $!.\n";
 		for (@allfiles) {
 			print FILE $_;
 		}
 		close FILE;
-        my $ret = cmd("$param{'cadodir'}/filter/purge ".
+        my $ret = cmd("$param{'bindir'}/filter/purge ".
                       "-poly $param{'prefix'}.poly -keep $param{'keeppurge'} ".
                       "-excess $param{'excesspurge'} ".
                       "-nrels $n -out $param{'prefix'}.purged ".
@@ -2006,13 +2067,12 @@ sub do_sieve_bench {
 	my $max_rels = shift;
 	my $last = shift;
     my $nrels      = 0;
-    my $last_check = 0;
 	my $max_files;
 
     my $import_rels = sub {
         my ($f) = @_;
         my $n = count_lines($f, '^#');
-        $nrels += $$max_rels[0] * $n / $param{'qrange'};
+        $nrels += $$max_rels[1] * $n / $param{'qrange'};
         info "Imported $n relations from `".basename($f)."'.\n" if $n > 0;
     };
 
@@ -2049,7 +2109,7 @@ sub do_sieve_bench {
         }
 
         # Check relations
-        my $ret = cmd("$param{'cadodir'}/utils/check_rels ".
+        my $ret = cmd("$param{'bindir'}/utils/check_rels ".
                       "-poly $param{'prefix'}.poly $check > /dev/null 2>&1");
         unlink "$check" unless $full;
 
@@ -2082,10 +2142,7 @@ sub do_sieve_bench {
     };
 	
     my $sieve_is_done = sub {
-        # Check only every $param{'checkrange'} relations
-        return 0 if $nrels - $last_check < $param{'checkrange'};
-        $last_check = $nrels;
-		return 0 if $nrels < $$max_rels[1];
+		return 0 if $nrels < $$max_rels[2];
 
         opendir DIR, $param{'wdir'}
             or die "Cannot open directory `$param{'wdir'}': $!\n";
@@ -2097,7 +2154,7 @@ sub do_sieve_bench {
 		@files = sort ( {$a <=> $b} @files );
 		$max_files = $files[-1] unless ($max_files);
 		my $number_files_total = ( $max_files - $param{'qmin'} ) /
-										$$max_rels[0] + 1;
+										$$max_rels[1] + 1;
 		my $number_files = 1;
 		while ($files[0] != $max_files) {
 			$number_files++;
@@ -2148,7 +2205,7 @@ sub do_merge {
     info "Merging relations...\n";
     $tab_level++;
 
-    my $cmd = "$param{'cadodir'}/filter/merge ".
+    my $cmd = "$param{'bindir'}/filter/merge ".
               "-out $param{'prefix'}.merge.his ".
               "-mat $param{'prefix'}.purged ".
               "-forbw $param{'bwstrat'} ".
@@ -2185,7 +2242,7 @@ sub do_replay {
         $bwcostmin = $1;
     }
 
-    my $cmd = "$param{'cadodir'}/filter/replay ".
+    my $cmd = "$param{'bindir'}/filter/replay ".
               "-his $param{'prefix'}.merge.his ".
               "-index $param{'prefix'}.index ".
               "-purged $param{'prefix'}.purged ".
@@ -2197,7 +2254,7 @@ sub do_replay {
     cmd($cmd, { log => 1, kill => 1 });
 
     my ($nrows, $ncols, $weight);
-    open FILE, "$param{'prefix'}.replay.stderr"
+    open FILE, "< $param{'prefix'}.replay.stderr"
         or die "Cannot open `$param{'prefix'}.replay.stderr' for reading: $!.\n";
     while (<FILE>) {
         $nrows = $1, $ncols = $2 if /^small_nrows=(\d+) small_ncols=(\d+)/;
@@ -2219,7 +2276,7 @@ sub do_transpose {
     info "Transposing the matrix...\n";
     $tab_level++;
 
-    my $cmd = "$param{'cadodir'}/linalg/transpose ".
+    my $cmd = "$param{'bindir'}/linalg/transpose ".
               "-T $param{'wdir'} ".
               "-skip $param{'skip'} ".
               "-in $param{'prefix'}.small ".
@@ -2253,7 +2310,7 @@ sub do_linalg {
 #            $mt = $1 * $2;
 #        }
 #
-#        $cmd = "$param{'cadodir'}/linalg/bw/bw.pl ".
+#        $cmd = "$param{'bindir'}/linalg/bw/bw.pl ".
 #               "seed=1 ". # For debugging purposes, we use a deterministic BW
 #               "mt=$mt ".
 #               "matrix=$param{'prefix'}.small.tr ".
@@ -2278,13 +2335,13 @@ sub do_linalg {
             $mt = "${mt}x1";
         }
 
-        my $bwc_script = "$param{'cadodir'}/linalg/bwc/bwc.pl";
+        my $bwc_script = "$param{'bindir'}/linalg/bwc/bwc.pl";
 
-        # Note: $param{'cadodir'} is not expanded yet. So if we get it as
+        # Note: $param{'bindir'} is not expanded yet. So if we get it as
         # a variable from the mach_desc file, it won't do. It's better to
         # pass it as a command-line argument to bwc.pl
         
-        my $bwc_bindir = "$param{'cadodir'}/linalg/bwc";
+        my $bwc_bindir = "$param{'bindir'}/linalg/bwc";
 
         # XXX NOTE: This is a despair-mode fallback. It's really not
         # guaranteed to work, even though it's the way I'm sometimes
@@ -2302,9 +2359,22 @@ sub do_linalg {
         $cmd = "$bwc_script ".
                ":complete " .
                "seed=1 ". # For debugging purposes, we use a deterministic BW
-               "thr=$mt ".
-               "mpi=1x1 ".
-               "matrix=$param{'prefix'}.small " .
+               "thr=$mt ";
+		if ( $param{'mpi'} ) {
+			my $a = int ( sqrt($param{'mpi'}) );
+			$a-- while ( $param{'mpi'} % $a != 0);
+			my $b = $param{'mpi'} / $a;				
+       	    $cmd .= "mpi=$b"."x$a hosts=$param{'hosts'} ";
+    		if (exists($ENV{'OAR_JOBID'})) {
+				$cmd .= 
+		"mpi_extra_args='--mca btl_tcp_if_exclude lo,virbr0 --mca plm_rsh_agent oarsh' ";
+			} else {
+				$cmd .= "mpi_extra_args='--mca btl_tcp_if_exclude lo,virbr0' ";
+			}
+		} else {
+       		$cmd .= "mpi=1x1 ";
+		}
+        $cmd .= "matrix=$param{'prefix'}.small " .
                "nullspace=left " .
                "mm_impl=$param{'bwc_mm_impl'} ".
                "interleaving=$param{'bwc_interleaving'} ".
@@ -2316,7 +2386,7 @@ sub do_linalg {
 	       "2>&1";
         cmd($cmd, { log => 1, kill => 1 });
 
-        $cmd = "$param{'cadodir'}/linalg/apply_perm " .
+        $cmd = "$param{'bindir'}/linalg/apply_perm " .
             "--perm $param{'prefix'}.bwc/mat.row_perm " .
             "--in $param{'prefix'}.bwc/W.twisted " .
             "--out $param{'prefix'}.W.bin";
@@ -2331,7 +2401,7 @@ sub do_linalg {
 #
 #        info "Calling Block-Lanczos...\n";
 #        $tab_level++;
-#        $cmd = "$param{'cadodir'}/linalg/bl/bl.pl ".
+#        $cmd = "$param{'bindir'}/linalg/bl/bl.pl ".
 #               "matrix=$param{'prefix'}.small.tr ".
 #               "wdir=$param{'wdir'}/bw" .
 #               "solution=$param{'prefix'}.W ".
@@ -2357,7 +2427,7 @@ sub do_bitstr {
     info "Converting dependencies to CADO format...\n";
     $tab_level++;
 
-    my $cmd = "$param{'cadodir'}/linalg/mkbitstrings ".
+    my $cmd = "$param{'bindir'}/linalg/mkbitstrings ".
               "$param{'prefix'}.W ".
               "> $param{'prefix'}.ker_raw ".
               "2> $param{'prefix'}.mkbitstrings.stderr";
@@ -2384,7 +2454,7 @@ sub do_chars {
 
     $nker = count_lines("$param{'prefix'}.ker_raw") unless defined $nker;
 
-    my $cmd = "$param{'cadodir'}/linalg/characters ".
+    my $cmd = "$param{'bindir'}/linalg/characters ".
               "-poly $param{'prefix'}.poly ".
               "-purged $param{'prefix'}.purged ".
               "-ker $param{'prefix'}.ker_raw ".
@@ -2428,7 +2498,7 @@ sub do_sqrt {
 		my ($new_element, $all_elements) = @_;
 		if (++$$all_elements{$new_element}->{'exist'} == 1) {
 			$$all_elements{$new_element}->{'prime'} =
-				cmd("$param{'cadodir'}/utils/gmp_prob_prime ".
+				cmd("$param{'bindir'}/utils/gmp_prob_prime ".
 				"$new_element")->{'out'};
 			return 1;
 		}
@@ -2453,7 +2523,7 @@ sub do_sqrt {
 				chomp $_;
 				if ($_ ne $new_gcd_element) {
 					my $gcd =
-						cmd("$param{'cadodir'}/utils/gmp_gcd ".
+						cmd("$param{'bindir'}/utils/gmp_gcd ".
 						"$new_gcd_element $_")->{'out'};
 					if ($gcd ne "1\n") {
 						if (add_element ( $gcd, $all_elements)) {
@@ -2484,7 +2554,7 @@ sub do_sqrt {
 		my $f="$param{'prefix'}.fact.".add_zero_before($numdep);
 		info "Testing dependency number $numdep...\n";
 		$tab_level++;
-    	my $cmd = "$param{'cadodir'}/sqrt/sqrt ".
+    	my $cmd = "$param{'bindir'}/sqrt/sqrt ".
               "-poly $param{'prefix'}.poly ".
               "-dep $param{'prefix'}.dep $numdep ".
               "-rel $param{'prefix'}.nodup.gz ".
@@ -2538,7 +2608,7 @@ sub do_sqrt {
 			
 				if( $new_prime_factor == 1) {
 					my $cmd =
-						cmd("$param{'cadodir'}/utils/gmp_factorization_complete ".
+						cmd("$param{'bindir'}/utils/gmp_factorization_complete ".
 						"$param{'n'} ".
 						join(" ",split(/\n/, join("",@all_prime_factors))))->{'out'};
 					if ( $cmd == 0) {
@@ -2546,7 +2616,7 @@ sub do_sqrt {
 						my $all_prime_factors= $#all_prime_factors + 1;
 						info $all_prime_factors." prime factors were found!\n";
 						open FILE, "> $param{'prefix'}.fact"
-							or die "Cannot open `$param{'prefix'}.fact' for reading: $!.\n";
+							or die "Cannot open `$param{'prefix'}.fact' for writing: $!.\n";
 						for ( @all_prime_factors) {
 							print FILE $_;
 						}
@@ -2568,7 +2638,7 @@ sub do_sqrt {
 
 	my $f1 = "$param{'prefix'}.allfactors";
 	open FILE, "> $f1"
-		or die "Cannot open `$f1' for reading: $!.\n";
+		or die "Cannot open `$f1' for wrinting: $!.\n";
 	for ( keys %all_factors ) {
 		print FILE $_;
 	}

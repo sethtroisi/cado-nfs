@@ -76,7 +76,7 @@ $ mv dup2/c59.rels.gz /tmp/c59/c59.nodup.gz
 $ cat mach_desc
 [local]
 tmpdir=/tmp
-cadodir=$CADO/build/$HOSTNAME
+bindir=$CADO/build/$HOSTNAME
 localhost cores=2
 
 $ touch /tmp/c59/c59.polysel_done

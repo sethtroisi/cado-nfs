@@ -1,11 +1,14 @@
 #!/usr/bin/perl -w
 
-# Usage: cadosieve.pl
-# 	read files params_* in dir "." and estimate time for sieve
-# 	the params_* must contain: different name, machines, params sieve
-# 							   and filter ...
-#							   qrange=1000, 2000, 4000 ...
-# 	( read one file *.poly in dir and generate the others and run makefb )
+# Usage: cadosieve.pl $polyfile $paramfile1 $paramfile2 ...
+# 	read polyfile and paramfiles and estimate time for sieve
+# 	the paramfiles must contain: different name!, machines, params sieve ...
+#
+# note: - it's not necessary than the polyfile contain the parameters of sieve.
+#		  For each paramfiles, an other polyfile is created and factors
+#		  base is calculated.
+# 		- you can to choose the interval of sieve for one job. (by
+# 		  default range=4000 for Imin)
 #
 # TODO: generate input
 # 		...
@@ -17,69 +20,90 @@ use cadofct;
 use strict;
 use warnings;
 
+my $range = 4000; # for Imin ($range = 2000 for Imin+1 ...)
+my $int_num = 10; # approximate interval numbers
+my $old_range = $range;
+
 # input
-opendir DIR, "."
-	or die "Cannot open directory `.': $!\n";
-my @files = grep /^params_/,
-				readdir DIR;
-closedir DIR;
+print "$0 @ARGV\n";
+my $poly = shift @ARGV;
+my @files;
+while (@ARGV) {
+	push @files, shift @ARGV;
+}
 @files = sort @files;
 
 # recover
 my @done = <*.sieve_done>;
 my @recover = <*.sieve_jobs>;
 
-my @poly = <*.poly>;
-die unless (@poly);
-
 my %link_name_params;
 
-# lpbr => [jump to next interval, nrels max with 20% duplicates]
-my %max_rels = ( 25 => [  500000,   5000000],
-				 26 => [ 1000000,   8000000],
-				 27 => [ 2000000,  14000000], 
-				 28 => [ 5000000,  25000000],
-				 29 => [10000000,  50000000],
-				 30 => [20000000, 100000000],
-				 31 => [40000000, 200000000] );
+my %max_rels = ( # lpbr => [Imin, approximate total interval for Imin,
+				 #				nrels max with ~20% duplicates]
+				 25 => [ 11,  4000000,  5000000],
+				 26 => [ 11,  4000000,  7500000],
+				 27 => [ 11,  8000000, 13000000], 
+				 28 => [ 12, 80000000, 26000000],
+				 29 => [ 12,160000000, 52000000],
+				 30 => [ 12,160000000,105000000],
+				 31 => [ 13,100000000,210000000] );
 # sieve
 my $file;
 while (@files) {
 	$file = shift @files;
 	read_param(\%param, { strict => 1 }, "$file");
+	$range = $old_range;
 	$link_name_params{"$param{'name'}"} = $file;
 	next if (@done);
 	if (@recover) {
 		next if ($recover[0] ne basename("$param{'prefix'}.sieve_jobs"));
 		shift @recover;
 	}
-	if ($poly[0] ne basename("$param{'prefix'}.poly")) {
-		cmd ("sed '/^rlim/d;/^alim/d;/^lpbr/d;/^lpba/d;/^mfbr/d;/^mfba/d;
-				/^rlambda/d;/^alambda/d' $poly[0] > $param{'prefix'}.poly");
-	    open FILE, ">> $param{'prefix'}.poly"
+	if (basename($poly) ne basename("$param{'prefix'}.poly")) {
+	    open FILE, "< $poly"
+    	    or die "Cannot open `$poly' for reading: $!.\n";
+	    open FILE2, "> $param{'prefix'}.poly"
     	    or die "Cannot open `$param{'prefix'}.poly' for writing: $!.\n";
-    	print FILE "$_: $param{$_}\n"
+		while (<FILE>) {
+			print FILE2 "$_" 
+				unless /^(rlim|alim|lpbr|lpba|mfbr|mfba|rlambda|alambda)/;
+		}
+    	close FILE;
+    	print FILE2 "$_: $param{$_}\n"
         	for qw(rlim alim lpbr lpba mfbr mfba rlambda alambda);
     	close FILE;
 	}
+	read_machines();
 	do_factbase() unless (-f "$param{'prefix'}.roots");
 	
-	read_machines();
 	my @r;
 	my @t = @{$max_rels{"$param{'lpbr'}"}};
-	$r[0] = $param{'qmin'} + $param{'qrange'};
-	$r[1] = $param{'qmin'} + $t[0];
-	my @ranges;
-	while ( $r[1] < 50 * $t[1] ) {
-		cmd ("touch $param{'prefix'}.rels.$r[0]-$r[1]");
-		$r[0] += $t[0];
-		$r[1] += $t[0];
+	my $i = $param{'I'};
+	while ( $i > $t[0] ) {
+			$i--;
+			$t[1] = int ( $t[1] / 2 );
+			$range = int ( $range / 2 );
+	}
+	$t[1] = int ( $t[1] / $int_num );
+			
+	$r[0] = $param{'qmin'} + $range;
+	$param{'qrange'} = $range;
+	$r[1] = $param{'qmin'} + $t[1];
+	while ( $r[1] < 30 * $t[2] ) {
+		open FILE, "> $param{'prefix'}.rels.$r[0]-$r[1]"
+    	    or die "Cannot open `$param{'prefix'}.rels.$r[0]-$r[1]' for writing: $!.\n";
+		close FILE;
+		$r[0] += $t[1];
+		$r[1] += $t[1];
 	}
 	if (@files) {
 		do_sieve_bench(\@t);
 	} else {
 		do_sieve_bench(\@t, 1);
-		cmd ("touch $param{'prefix'}.sieve_done");
+		open FILE, "> $param{'prefix'}.sieve_done"
+    	    or die "Cannot open `$param{'prefix'}.sieve_done' for writing: $!.\n";
+		close FILE;
 	}
 }
 
@@ -103,24 +127,37 @@ foreach my $name (sort keys %link_name_params) {
 
 	$file = $link_name_params{"$name"};
 	read_param(\%param, { strict => 1 }, "$file");
-	sub plus_qrange {
-		my $x = shift;
-		return ( $x + $param{'qrange'} );
+	$range = $old_range;
+	my @t = @{$max_rels{"$param{'lpbr'}"}};
+	my $i = $param{'I'};
+	while ( $i > $t[0] ) {
+			$i--;
+			$t[1] = int ( $t[1] / 2 );
+			$range = int ( $range / 2 );
 	}
-	my @rels_files = map { /^(\d+)$/; "$name.rels.$1-".plus_qrange($1).".gz" } @int_files;
+	$t[1] = int ( $t[1] / $int_num );
 
+	sub plus_range {
+		my $x = shift;
+		return ( $x + $range );
+	}
+	my @rels_files = map { /^(\d+)$/; "$name.rels.$1-".plus_range($1).".gz" } @int_files;
+
+	info "Params: rlim $param{'rlim'} alim $param{'alim'} lpbr $param{'lpbr'} ".
+		 	"lpba $param{'lpba'} mfbr $param{'mfbr'} mfba $param{'mfba'}\n".
+		 	"        rlambda $param{'rlambda'} alambda $param{'alambda'} ".
+			"I $param{'I'} qmin $param{'qmin'} sieve_max_threads $param{'sieve_max_threads'}\n";
 	foreach my $f (@rels_files) {
 		if ( last_line($f) =~ /# Total (\d+) reports \[(\S+)s/ ) {
 				info "$f: ".last_line($f)."\n";
 				$reports = $1;
 				$time_by_rels = $2; 
-				my @t = @{$max_rels{"$param{'lpbr'}"}};
-				my $rels = $t[0] * $reports / $param{'qrange'};
+				my $rels = $t[1] * $reports / $range;
         		$nrels += $rels;
-				if ($nrels < $t[1]) {
+				if ($nrels < $t[2]) {
 					$estimate_time += $rels * $time_by_rels;
 				} else {
-					$estimate_time += ( $t[1] - ($nrels - $rels) ) * $time_by_rels;
+					$estimate_time += ( $t[2] - ($nrels - $rels) ) * $time_by_rels;
 					last;
 				}
 		}
@@ -129,6 +166,7 @@ foreach my $name (sort keys %link_name_params) {
 	$tab_level++;
 	info "Estimate time for configuration $name : \033[01;31m$estimate_time"."s, ".
 								format_dhms($estimate_time)."\033[01;00m\n";
+	print "\n";
 	$tab_level--;
 }
 	
