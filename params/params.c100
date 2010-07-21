@@ -5,7 +5,7 @@ name=c100
 
 ##########################################################################
 
-#cadodir=$HOME/svn/cado/dist/src      # where to find cado binaries
+#bindir=$HOME/svn/cado/dist/src      # where to find cado binaries
 parallel=1           # do we use parallel computation?
 delay=300
 

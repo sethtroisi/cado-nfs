@@ -16,7 +16,7 @@
 
 wdir=/tmp/noise         # directory where temporary files are put
 name=c59                # basename for temporary files
-#cadodir=$HOME/cado     # where to find cado binaries
+#bindir=$HOME/cado     # where to find cado binaries
 parallel=1              # do we use parallel computation?
 delay=120               # time in seconds between two checks
 

@@ -5,7 +5,7 @@ name=c138
 
 ##########################################################################
 
-#cadodir=$HOME/svn/cado/dist/bin      # where to find cado binaries
+#bindir=$HOME/svn/cado/dist/bin      # where to find cado binaries
 parallel=1           # do we use parallel computation?
 delay=300
 
@@ -29,7 +29,7 @@ kjadrange=2e5           # individual tasks
 
 ## Other parameters of polyselect
 kjkeep=100              # number of preselected polynomials
-kjkmax=17               # rotation is bounded by 2^kmax
+kjkmax=22               # rotation is bounded by 2^kmax
 kjincr=60               # forced divisor of lc(f)
 kjpb=1024               # bound on primes allowed in lc(g)
 kjp0max=100000          # bound on the additional factor in lc(g)

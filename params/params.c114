@@ -1,5 +1,5 @@
 # Sample parameter file for a 114-digit gnfs input
-# Example: cadofactor.pl wdir=... n=... cadodir=...
+# Example: cadofactor.pl wdir=... n=... bindir=...
 
 name=c114
 
@@ -28,7 +28,7 @@ kjadrange=8e4           # individual tasks
 
 ## Other parameters of polyselect
 kjkeep=100              # number of preselected polynomials
-kjkmax=15               # rotation is bounded by 2^kmax
+kjkmax=21               # rotation is bounded by 2^kmax
 kjincr=60               # forced divisor of lc(f)
 kjpb=1024               # bound on primes allowed in lc(g)
 kjp0max=100000          # bound on the additional factor in lc(g)

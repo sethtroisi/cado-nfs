@@ -5,7 +5,7 @@ name=c180
 
 ##########################################################################
 
-#cadodir=$HOME/svn/cado/dist/bin  # where to find cado binaries
+#bindir=$HOME/svn/cado/dist/bin  # where to find cado binaries
 parallel=1           # do we use parallel computation?
 delay=300
 
@@ -29,7 +29,7 @@ kjadrange=1e8           # individual tasks
 
 ## Other parameters of polyselect
 kjkeep=200              # number of preselected polynomials
-kjkmax=18               # rotation is bounded by 2^kmax
+kjkmax=25               # rotation is bounded by 2^kmax
 kjincr=210              # forced divisor of lc(f)
 kjpb=1024               # bound on primes allowed in lc(g)
 kjp0max=100000          # bound on the additional factor in lc(g)
@@ -50,17 +50,17 @@ kjp0max=100000          # bound on the additional factor in lc(g)
 #                                      lambda times lpb, we reject.
 rlim=40000000
 alim=80000000
-lpbr=33
-lpba=33
-mfbr=66
-mfba=99
-rlambda=2.2
+lpbr=32
+lpba=32
+mfbr=64
+mfba=96
+rlambda=2.1
 alambda=3.2
 
 I=14                    # Sieving range in lattice siever
 qmin=80000000           # Start of the special-q range
-qrange=100000           # The size of an elementary sieving task
-checkrange=1000000      # We check if we have enough after each step
+qrange=200000           # The size of an elementary sieving task
+checkrange=2000000      # We check if we have enough after each step
                         # of that many relations found.
 sievenice=10
 sieve_max_threads=2
@@ -69,7 +69,7 @@ sieve_max_threads=2
 # Filtering
 ###########################################################################
 
-excesspurge=2000000     # minimal excess we want before pruning
+excesspurge=4000000     # minimal excess we want before pruning
 excess=1                # minimal excess we want after purge
 keeppurge=160           # shrink in purge if excess exceeds keeppurge
 keep=160                # keep euh le plus
