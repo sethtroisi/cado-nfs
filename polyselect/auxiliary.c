@@ -78,7 +78,7 @@ L2_lognorm_d (double *a, unsigned long d, double s, int method)
         n = 4.0/7.0*(a3*a3+a0*a0)+8.0/15.0*(a1*a3+a0*a2)+4.0/15.0*(a2*a2+a1*a1);
       else
         { /* use circular integral (Sage code):
-             var('a3,a2,a1,a0,x,r,s,t')
+             var('a3,a2,a1,a0,x,y,r,s,t')
              f = a3*x^3+a2*x^2+a1*x+a0
              F = expand(f(x=x/y)*y^3)
              F = F.subs(x=s^(1/2)*r*cos(t),y=r/s^(1/2)*sin(t))
@@ -2123,28 +2123,138 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
   mpz_clear (tmp);
 }
 
-/* b <- coefficient of degree d-3 of f(x+k).
-   f[d] (x+k)^d       -> f[d] binomial(d,3) k^3
-   f[d-1] (x+k)^(d-1) -> f[d-1] binomial(d-1,2) k^2
-   f[d-2] (x+k)^(d-2) -> f[d-2] binomial(d-2,1) k
-   f[d-3] (x+k)^(d-3) -> f[d-3]
+/* b <- h(k) where deg(h)=3 */
+static void
+eval_fdminus3_translated (mpz_t b, mpz_t *h, mpz_t k)
+{
+  mpz_mul (b, h[3], k);
+  mpz_add (b, b, h[2]);
+  mpz_mul (b, b, k);
+  mpz_add (b, b, h[1]);
+  mpz_mul (b, b, k);
+  mpz_add (b, b, h[0]);
+}
+
+/* puts in h[3], ..., h[0] the coefficients (in k) of the degree-3 (in x)
+   coefficient of f(x+k) */
+static void
+fdminus3_translated (mpz_t *h, mpz_t *f, int d)
+{
+  mpz_mul_ui (h[3], f[d], (d * (d-1) * (d-2)) / 6);
+  mpz_mul_ui (h[2], f[d-1], ((d-1) * (d-2)) / 2);
+  mpz_mul_ui (h[1], f[d-2], d-2);
+  mpz_set (h[0], f[d-3]);
+}
+
+/* assuming h(a)*h(b) < 0 where h(k) = h[3]*k^3+...+h[0] and a < b,
+   refines the root such that a + 1 = b
 */
 static void
-eval_fdminus3_translated (mpz_t b, mpz_t *f, int d, mpz_t k)
+root_refine (mpz_t a, mpz_t b, mpz_t *h)
 {
-  mpz_t t;
+  mpz_t c, v;
+  int sa;
 
-  mpz_init (t);
-  mpz_mul (b, f[d], k);
-  mpz_mul_ui (b, b, (d * (d-1) * (d-2)) / 6); /* d(d-1)(d-2)/6 f[d] k */
-  mpz_mul_ui (t, f[d-1], ((d-1) * (d-2)) / 2); /* (d-1)(d-2)/2 f[d-1] */
-  mpz_add (b, b, t);
-  mpz_mul (b, b, k);
-  mpz_mul_ui (t, f[d-2], d-2);
-  mpz_add (b, b, t);
-  mpz_mul (b, b, k);
-  mpz_add (b, b, f[d-3]);
-  mpz_clear (t);
+  mpz_init (c);
+  mpz_init (v);
+  eval_fdminus3_translated (v, h, a);
+  sa = mpz_sgn (v);
+  while (1)
+    {
+      mpz_add (c, a, b);
+      mpz_fdiv_q_2exp (c, c, 1);
+      if (mpz_cmp (c, a) == 0)
+        break;
+      eval_fdminus3_translated (v, h, c);
+      if (mpz_sgn (v) == sa)
+        mpz_swap (a, c);
+      else
+        mpz_swap (b, c);
+    }
+  mpz_clear (c);
+  mpz_clear (v);
+}
+
+/* puts in r[0], r[1], r[2] integer approximations of the real roots of
+   h[3]*x^3+...+h[0], and return the number of real roots */
+static int
+roots3 (mpz_t *r, mpz_t *h)
+{
+  int n = 0;
+  mpz_t v, k;
+  int s1, s2;
+
+  /* if h2^2-3*h1*h3 >= 0, the derivative of h has two real roots */
+  mpz_mul (r[2], h[2], h[2]);
+  mpz_mul (r[1], h[1], h[3]);
+  mpz_mul_ui (r[1], r[1], 3);
+  mpz_sub (r[2], r[2], r[1]);
+  if (mpz_sgn (r[2]) >= 0) /* 1 or 3 real roots */
+    {
+      /* the roots of h' are (-h2 +/- sqrt(h2^2-3*h1*h3))/(3*h3) */
+      mpz_sqrt (r[2], r[2]);
+      mpz_neg (r[1], h[2]);
+      mpz_sub (r[1], r[1], r[2]);
+      mpz_add (r[2], r[2], h[2]);
+      mpz_tdiv_q_ui (r[1], r[1], 3);
+      mpz_tdiv_q (r[1], r[1], h[3]);
+      mpz_tdiv_q_ui (r[2], r[2], 3);
+      mpz_tdiv_q (r[2], r[2], h[3]);
+      if (mpz_cmp (r[1], r[2]) > 0)
+        mpz_swap (r[1], r[2]);
+      /* now r[1] < r[2] are approximations of the two real roots of h' */
+    }
+  else /* only 1 real root */
+    {
+      mpz_set_ui (r[1], 0);
+      mpz_set_ui (r[2], 0);
+    }
+  /* now we have four control points -Inf < r[1] < r[2] < +Inf */
+  mpz_init (v);
+  mpz_init (k);
+  eval_fdminus3_translated (v, h, r[1]);
+  s1 = mpz_sgn (v);
+  if (-mpz_sgn (h[3]) * s1 < 0) /* one root in -Inf..r[1] */
+    {
+      mpz_set_si (k, -1);
+      while (mpz_cmp (r[1], k) <= 0)
+        mpz_mul_2exp (k, k, 1);
+      while (1)
+        {
+          eval_fdminus3_translated (v, h, k);
+          if (mpz_sgn (v) * s1 < 0)
+            break;
+          mpz_mul_2exp (k, k, 1);
+        }
+      root_refine (k, r[1], h);
+      mpz_swap (r[n++], k);
+    }
+  eval_fdminus3_translated (v, h, r[2]);
+  s2 = mpz_sgn (v);
+  if (s1 * s2 < 0) /* one root in r[1]..r[2] */
+    {
+      root_refine (r[1], r[2], h);
+      mpz_swap (r[n++], r[1]);
+    }
+  if (s2 * mpz_sgn (h[3]) < 0) /* one root in r[2]..+Inf */
+    {
+      mpz_set_ui (k, 1);
+      while (mpz_cmp (k, r[2]) <= 0)
+        mpz_mul_2exp (k, k, 1);
+      while (1)
+        {
+          eval_fdminus3_translated (v, h, k);
+          if (mpz_sgn (v) * s2 < 0)
+            break;
+          mpz_mul_2exp (k, k, 1);
+        }
+      root_refine (r[2], k, h);
+      mpz_swap (r[n++], r[2]);
+    }
+  mpz_clear (v);
+  mpz_clear (k);
+
+  return n;
 }
 
 /* if use_rotation is non-zero, also use rotation */
@@ -2155,136 +2265,90 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
      and we want to force f[d-3] to be small. */
   if (d == 6)
     {
-      mpz_t k, k0, l, m, a, b, c;
+      mpz_t k, h[4], r[4], f_copy[MAX_DEGREE + 1], g_copy[2];
+      int i, j, best_j = 0, n;
+      double skew, logmu, best_logmu = DBL_MAX;
 
       mpz_init (k);
-      mpz_init (k0);
-      mpz_init (l);
-      mpz_init (m);
-      mpz_init (a);
-      mpz_init (b);
-      mpz_init (c);
-
-      // fprint_polynomial (stdout, f, d); fprint_polynomial (stdout, g, 1);
-
-      /* First minimize the coefficient of degree 3 by translation.
-         The coefficient of degree 3 of f(x+k) is
-         20 f[6] k^3 + 10 f[5] k^2 + 4 f[4] k + f[3].
-         We know there is at least one root for k > 0 if f[6] and f[3] are
-         of opposite signs, and for k < 0 if they are of the same sign. */
-      if (mpz_sgn (f[6]) * mpz_sgn (f[3]) < 0)
-        mpz_set_ui (k, 1);
-      else /* f[6] and f[3] have the same sign, search for k < 0 */
-        mpz_set_si (k, -1);
-      mpz_set (a, f[3]);
-      eval_fdminus3_translated (b, f, d, k);
-      while (mpz_sgn (a) == mpz_sgn (b))
+      for (i = 0; i <= 3; i++)
         {
-          mpz_set (a, b);
-          mpz_mul_2exp (k, k, 1);
-          eval_fdminus3_translated (b, f, d, k);
+          mpz_init (h[i]);
+          mpz_init (r[i]);
         }
-      mpz_div_2exp (l, k, 1);
-      /* now the coefficients of degree d-3 in f(x+2^l) and f(x+2^k)
-         have different signs */
-      while (1)
-        {
-          mpz_add (m, l, k);
-          mpz_tdiv_q_2exp (m, m, 1);
-          if (mpz_cmp (m, l) == 0)
-            break;
-          eval_fdminus3_translated (c, f, d, m);
-          if (mpz_sgn (a) == mpz_sgn (c))
-            {
-              mpz_set (l, m);
-              mpz_set (a, c);
-            }
-          else
-            {
-              mpz_set (k, m);
-              mpz_set (b, c);
-            }
-        }
-      mpz_swap (k0, k);
-      // gmp_printf ("k=%Zd\n", k0);
+      for (i = 0; i <= d; i++)
+        mpz_init_set (f_copy[i], f[i]);
+      mpz_init_set (g_copy[0], g[0]);
+      mpz_init_set (g_copy[1], g[1]);
 
-#if 1
-      /* search if there is a smaller root of opposite sign. The roots of the
-         derivative are 1/30*(5*f5 +/- sqrt(5*f5^2 - 12*f4*f6)*sqrt(5))/f6.
-         It suffices to consider the sign at the largest root in absolute
-         value and sign opposite to k, where sgn(k)=-sgn(f6*f3). */
-      mpz_mul (m, f[5], f[5]);
-      mpz_mul_ui (m, m, 5); /* 5*f5^2 */
-      mpz_mul (l, f[4], f[6]);
-      mpz_submul_ui (m, l, 12); /* 5*f5^2 - 12*f4*f6 */
-      if (mpz_sgn (m) < 0)
-        goto end;
-      mpz_mul_ui (m, m, 5);
-      mpz_sqrt (m, m);
-      mpz_mul_ui (l, f[5], 5);
-      if (mpz_sgn (f[3]) < 0) /* sgn(k) = sgn(f6) */
-        mpz_sub (l, l, m);
-      else
-        mpz_add (l, l, m);
-      mpz_tdiv_q (l, l, f[6]);
-      mpz_tdiv_q_ui (k, l, 30);
-      // gmp_printf ("k1=%Zd\n", k);
-      eval_fdminus3_translated (b, f, d, k);
-      if (mpz_sgn (b) != mpz_sgn (f[3])) /* there is a smaller root */
+      fdminus3_translated (h, f, d);
+      n = roots3 (r, h);
+
+      for (j = 0; j < n; j++)
         {
-          mpz_set (a, f[3]);
-          mpz_set_ui (l, 0);
-          while (1)
+          mpz_set (k, r[j]);
+          if (j > 0)
             {
-              mpz_add (m, l, k);
-              mpz_tdiv_q_2exp (m, m, 1);
-              if (mpz_cmp (m, l) == 0)
-                break;
-              eval_fdminus3_translated (c, f, d, m);
-              if (mpz_sgn (a) == mpz_sgn (c))
-                {
-                  mpz_set (l, m);
-                  mpz_set (a, c);
-                }
-              else
-                {
-                  mpz_set (k, m);
-                  mpz_set (b, c);
-                }
+              for (i = 0; i <= d; i++)
+                mpz_set (f[i], f_copy[i]);
+              mpz_set (g[0], g_copy[0]);
+              mpz_set (g[1], g_copy[1]);
+            }
+          do_translate_z (f, d, g, k);
+
+          /* now reduce coefficients f[0], f[1], f[2] using rotation */
+          mpz_tdiv_q (k, f[0], g[0]);
+          mpz_neg (k, k);
+          rotate_auxg_z (f, g[1], g[0], k, 0);
+          mpz_tdiv_q (k, f[1], g[0]);
+          mpz_neg (k, k);
+          rotate_auxg_z (f, g[1], g[0], k, 1);
+          mpz_tdiv_q (k, f[2], g[0]);
+          mpz_neg (k, k);
+          rotate_auxg_z (f, g[1], g[0], k, 2);
+
+          optimize_aux (f, d, g, verbose, use_rotation, CIRCULAR);
+
+          skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+          logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
+          // gmp_printf ("k=%Zd logmu=%1.2f\n", r[j], logmu);
+          if (j == 0 || logmu < best_logmu)
+            {
+              best_logmu = logmu;
+              best_j = j;
             }
         }
 
-      if (mpz_cmpabs (l, k) < 0)
-        mpz_swap (k0, l);
+      if (j - 1 != best_j)
+        {
+          mpz_set (k, r[best_j]);
+          for (i = 0; i <= d; i++)
+            mpz_set (f[i], f_copy[i]);
+          mpz_set (g[0], g_copy[0]);
+          mpz_set (g[1], g_copy[1]);
+          do_translate_z (f, d, g, k);
 
-    end:
-#endif
-      mpz_swap (k, k0);
-      // gmp_printf ("k=%Zd\n", k);
-      do_translate_z (f, d, g, k);
-
-      // fprint_polynomial (stdout, f, d); fprint_polynomial (stdout, g, 1);
-
-      /* now reduce coefficients f[0], f[1], f[2] using rotation */
-      mpz_tdiv_q (k, f[0], g[0]);
-      mpz_neg (k, k);
-      rotate_auxg_z (f, g[1], g[0], k, 0);
-      mpz_tdiv_q (k, f[1], g[0]);
-      mpz_neg (k, k);
-      rotate_auxg_z (f, g[1], g[0], k, 1);
-      mpz_tdiv_q (k, f[2], g[0]);
-      mpz_neg (k, k);
-      rotate_auxg_z (f, g[1], g[0], k, 2);
-
-      // fprint_polynomial (stdout, f, d); fprint_polynomial (stdout, g, 1);
+          /* now reduce coefficients f[0], f[1], f[2] using rotation */
+          mpz_tdiv_q (k, f[0], g[0]);
+          mpz_neg (k, k);
+          rotate_auxg_z (f, g[1], g[0], k, 0);
+          mpz_tdiv_q (k, f[1], g[0]);
+          mpz_neg (k, k);
+          rotate_auxg_z (f, g[1], g[0], k, 1);
+          mpz_tdiv_q (k, f[2], g[0]);
+          mpz_neg (k, k);
+          rotate_auxg_z (f, g[1], g[0], k, 2);
+        }
 
       mpz_clear (k);
-      mpz_clear (k0);
-      mpz_clear (l);
-      mpz_clear (m);
-      mpz_clear (a);
-      mpz_clear (b);
-      mpz_clear (c);
+      for (i = 0; i <= 3; i++)
+        {
+          mpz_clear (h[i]);
+          mpz_clear (r[i]);
+        }
+      for (i = 0; i <= d; i++)
+        mpz_clear (f_copy[i]);
+      mpz_clear (g_copy[0]);
+      mpz_clear (g_copy[1]);
     }
 
   optimize_aux (f, d, g, verbose, use_rotation, CIRCULAR);
