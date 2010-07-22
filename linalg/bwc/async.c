@@ -65,6 +65,7 @@ void timing_flip_timer(struct timing_data * t)
 
 static void timing_partial_init(struct timing_data * t, int iter)
 {
+    memset(t, 0, sizeof(struct timing_data));
     t->go_mark = iter;
     t->last_print = iter;
     t->next_print = iter + 1;
