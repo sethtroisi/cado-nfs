@@ -443,16 +443,18 @@ void remove_prefix(char * s, const char * pfx)
 void fileset_name(fileset x, const char * name, const char * key)
 {
     unsigned int i;
-    for(i = 0 ; i < x->n ; i++) {
+    int rc;
+    for(i = 0 ; i < x->n ; i++)
         free(x->names[i]);
-    }
     const char * prefix = x->status == TEMP ? "tmp-" : "";
     if (x->n == 1) {
-        asprintf(&(x->names[0]), "%s%s", prefix, name);
+        rc = asprintf(&(x->names[0]), "%s%s", prefix, name);
+        ASSERT_ALWAYS(rc >= 0);
         prefix_fixup(x->names[0], prefix);
     } else {
         for(i = 0 ; i < x->n ; i++) {
-            asprintf(&(x->names[i]), "%s%s.%s%u", prefix, name, key, i);
+            rc = asprintf(&(x->names[i]), "%s%s.%s%u", prefix, name, key, i);
+            ASSERT_ALWAYS(rc >= 0);
             prefix_fixup(x->names[i], prefix);
         }
     }
@@ -835,8 +837,11 @@ void read_shuffled_matrix(const char * bigfile, const char * base)
     FILE * big;
     char * infoname;
     char rbuf[BIGCHUNK];
+    int rc;
+    char * rp;
 
-    asprintf(&infoname, "%s.info", base);
+    rc = asprintf(&infoname, "%s.info", base);
+    ASSERT_ALWAYS(rc >= 0);
 
     info = fopen(infoname, "r");
     DIE_ERRNO_DIAG(info == NULL, "fopen", infoname);
@@ -844,7 +849,8 @@ void read_shuffled_matrix(const char * bigfile, const char * base)
     big = fopen(bigfile, "w");
     DIE_ERRNO_DIAG(big == NULL, "fopen", bigfile);
 
-    fgets(rbuf, sizeof(rbuf), info);
+    rp = fgets(rbuf, sizeof(rbuf), info);
+    ASSERT_ALWAYS(rp);
     if (strncmp(rbuf, "//", 2) == 0) {
         int rc = sscanf(rbuf, "// %" SCNu32 " ROWS %" SCNu32, &nr, &nc);
         PARSE_CHECK(rc < 2, "header", rbuf);
@@ -859,7 +865,8 @@ void read_shuffled_matrix(const char * bigfile, const char * base)
     update_header();
 
     unsigned int nhs, nvs;
-    fscanf(info, "%u %u", &nhs, &nvs);
+    rc = fscanf(info, "%u %u", &nhs, &nvs);
+    ASSERT_ALWAYS(rc == 2);
     fprintf(stderr, "Existing matrix is split %ux%u\n", nhs, nvs);
 
     struct onefile {
@@ -945,7 +952,8 @@ void read_shuffled_matrix(const char * bigfile, const char * base)
             fps[sj] = fopen(nm, "r");
             DIE_ERRNO_DIAG(fps[sj] == NULL, "fopen", nm);
             /* discard the header. */
-            fgets(rbuf, sizeof(rbuf), fps[sj]);
+            rp = fgets(rbuf, sizeof(rbuf), fps[sj]);
+            ASSERT_ALWAYS(rp);
             // fos[sj] = ftello(fps[sj]);
         }
 
@@ -1302,6 +1310,7 @@ void dispatcher(
     unsigned int ii;
     FILE * f;
     unsigned int i;
+    size_t rs;
 
     assert(src->n == 1);
 
@@ -1322,9 +1331,11 @@ void dispatcher(
             fprintf(g[ii], "0\n");
             continue;
         }
-        fread(cb->buf, 1, sz, f);
+        rs = fread(cb->buf, 1, sz, f);
+        ASSERT_ALWAYS(rs == sz);
         assert(cb->buf[sz-1] == '\n');
-        fwrite(cb->buf, 1, sz, g[ii]);
+        rs = fwrite(cb->buf, 1, sz, g[ii]);
+        ASSERT_ALWAYS(rs == sz);
     }
     fclose(f);
     cb_clear(cb);
@@ -1822,6 +1833,8 @@ void sink_feed_memory(sink s,
 
 void weight_sort_hslice(sink datasink, fileset fs, unsigned int ii)
 {
+    size_t rs;
+
     copybuf cb;
     cb_init(cb);
     cb_ensure(cb, BIGCHUNK);
@@ -1945,7 +1958,8 @@ void weight_sort_hslice(sink datasink, fileset fs, unsigned int ii)
              * knowing later on that zero rows should be written out
              */
             cb_ensure(cb, sz);
-            fread(cb->buf, 1, sz, g);
+            rs = fread(cb->buf, 1, sz, g);
+            ASSERT_ALWAYS(rs == (size_t) sz);
             assert(cb->buf[sz-1] == '\n');
             assert(poking_place[i] >= 0);
             assert(poking_place[i] + sz <= (off_t) sc->sz);
@@ -1983,6 +1997,8 @@ void weight_sort_hslice(sink datasink, fileset fs, unsigned int ii)
 
 void do_per_hslice_stuff(sink datasink, fileset fs)
 {
+    size_t rs;
+
     if (weight_sort_in_cells && !rows_are_weight_sorted) {
         unsigned int ii;
         for(ii = 0 ; ii < nhslices ; ii++) {
@@ -2020,7 +2036,8 @@ void do_per_hslice_stuff(sink datasink, fileset fs)
                     cb_ensure(cb, sz);
                     strcpy(cb->buf, zrow);
                 } else {
-                    fread(cb->buf, 1, sz, f);
+                    rs = fread(cb->buf, 1, sz, f);
+                    ASSERT_ALWAYS(rs == sz);
                 }
                 assert(cb->buf[sz-1] == '\n');
                 sink_feed_row(datasink, cb->buf, sz);
@@ -2051,7 +2068,11 @@ void write_info_file(int argc, char * argv[])
     char * info;
     FILE * f;
     unsigned int i,j;
-    asprintf(&info, "%s.info", filename_out);
+    int rc;
+
+    rc = asprintf(&info, "%s.info", filename_out);
+    ASSERT_ALWAYS(rc >= 0);
+
     f = fopen(info, "w");
     DIE_ERRNO_DIAG(f == NULL, "fopen", info);
     fprintf(f, "%s", header);
@@ -2102,16 +2123,19 @@ void cleanup()
 
 void writeout_both_permutations()
 {
+    int rc;
     if (permute_rows) {
         char * rp;
-        asprintf(&rp, "%s.row_perm", filename_out);
+        rc = asprintf(&rp, "%s.row_perm", filename_out);
+        ASSERT_ALWAYS(rc >= 0);
         write_permutation(rp, row_slices, nhslices);
         // write_permutation(rp, row_slices, nhslices, rows_are_weight_sorted);
         free(rp);
     }
     if (permute_cols) {
         char * cp;
-        asprintf(&cp, "%s.col_perm", filename_out);
+        rc = asprintf(&cp, "%s.col_perm", filename_out);
+        ASSERT_ALWAYS(rc >= 0);
         write_permutation(cp, col_slices, nvslices);
         // write_permutation(cp, col_slices, nvslices, cols_are_weight_sorted);
         free(cp);
@@ -2276,7 +2300,9 @@ int main(int argc, char * argv[])
     int recycle_shuffled_matrix = 0;
     if (access(filename_in, F_OK) < 0) {
         char * tmp;
-        asprintf(&tmp, "%s.info", filename_in);
+        int rc;
+        rc = asprintf(&tmp, "%s.info", filename_in);
+        ASSERT_ALWAYS(rc >= 0);
         if (access(tmp, F_OK) < 0) {
             fprintf(stderr, "%s: file not found\n", filename_in);
             exit(1);
@@ -2296,7 +2322,10 @@ int main(int argc, char * argv[])
          * I/O-smart way, in that we create a temporary file which could
          * be avoided. This would be a nightmare, however.
          */
-        asprintf(&(work->names[0]), "tmp-%s", filename_out);
+        int rc;
+        rc = asprintf(&(work->names[0]), "tmp-%s", filename_out);
+        ASSERT_ALWAYS(rc >= 0);
+
         prefix_fixup(work->names[0],"tmp-");
 
         read_shuffled_matrix(work->names[0], filename_in);
@@ -2314,12 +2343,16 @@ int main(int argc, char * argv[])
         work->status = TEMP;
 
         char * oldrp = NULL;
-        asprintf(&oldrp, "%s.row_perm", filename_in);
+        rc = asprintf(&oldrp, "%s.row_perm", filename_in);
+        ASSERT_ALWAYS(rc >= 0);
+
         unsigned int * old_rowperm = read_permutation(oldrp, nr);
         free(oldrp);
 
         char * oldcp = NULL;
-        asprintf(&oldcp, "%s.col_perm", filename_in);
+        rc = asprintf(&oldcp, "%s.col_perm", filename_in);
+        ASSERT_ALWAYS(rc >= 0);
+
         unsigned int * old_colperm = read_permutation(oldcp, nc);
         free(oldcp);
 

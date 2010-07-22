@@ -36,8 +36,7 @@
 #include <inttypes.h>
 #include <ctype.h>  // for isspace
 
-#define LIKELY(x)   __builtin_expect(x,1)
-#define UNLIKELY(x) __builtin_expect(x,0)
+#include "macros.h"
 
 #define CA 271828182845904523UL
 #define CB 577215664901532889UL
@@ -233,8 +232,10 @@ remove_dup (char *infile, char *dirname, uint32_t *H, unsigned long K)
           }
       }
       char * s1, * s2;
-      asprintf(&s1, "%s/%s.part", dirname, basename(outfile));
-      asprintf(&s2, "%s/%s", dirname, basename(outfile));
+      ret = asprintf(&s1, "%s/%s.part", dirname, basename(outfile));
+      ASSERT_ALWAYS(ret >= 0);
+      ret = asprintf(&s2, "%s/%s", dirname, basename(outfile));
+      ASSERT_ALWAYS(ret >= 0);
       fprintf (stderr, "Renaming result file %s to %s\n", s1, s2);
       int ret = rename(s1, s2);
       if (ret) {

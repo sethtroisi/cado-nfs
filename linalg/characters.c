@@ -212,11 +212,15 @@ buildCharacterMatrix(char **charmat, int k, alg_prime_t * tabchar,
     int i, j, r, nr, nrows, ncols, irel, kk;
     char str[1024];
     char **charbig;
+    char * rp;
+    int rc;
 
     // let's dump purgedfile which is a nrows x ncols matrix
     //    rewind(purgedfile);
-    fgets(str, 1024, purgedfile);
-    sscanf(str, "%d %d", &nrows, &ncols);
+    rp = fgets(str, 1024, purgedfile);
+    ASSERT_ALWAYS(rp);
+    rc = sscanf(str, "%d %d", &nrows, &ncols);
+    ASSERT_ALWAYS(rc ==  2);
     fprintf(stderr, "Reading indices in purgedfile\n");
 
     fprintf(stderr, "Reading all (a, b)'s just once\n");
@@ -227,8 +231,10 @@ buildCharacterMatrix(char **charmat, int k, alg_prime_t * tabchar,
     irel = 0;
     //    rewind(relfile); // useless?
     for (i = 0; i < nrows; i++) {
-        fgets(str, 1024, purgedfile);
-        sscanf(str, "%d", &nr);
+        rp  = fgets(str, 1024, purgedfile);
+        ASSERT_ALWAYS(rp);
+        rc = sscanf(str, "%d", &nr);
+        ASSERT_ALWAYS(rc == 1);
         skip_relations_in_file(relfile, nr - irel);
         fread_relation(relfile, &rel);
         irel = nr + 1;
@@ -246,9 +252,11 @@ buildCharacterMatrix(char **charmat, int k, alg_prime_t * tabchar,
         if (!(i % 10000))
             fprintf(stderr, "Treating relation #%d / %d at %2.2lf\n",
                     i, small_nrows, seconds());
-        fscanf(indexfile, "%d", &nr);
+        rc = fscanf(indexfile, "%d", &nr);
+        ASSERT_ALWAYS(rc == 1);
         for (j = 0; j < nr; j++) {
-            fscanf(indexfile, PURGE_INT_FORMAT, &r);
+            rc = fscanf(indexfile, PURGE_INT_FORMAT, &r);
+            ASSERT_ALWAYS(rc == 1);
             for (kk = 0; kk < k; kk++)
                 charmat[i][kk] *= charbig[r][kk];
         }
@@ -316,13 +324,16 @@ static void
 addHeavyBlock(char **charmat, FILE * smallfile, int kmin, int skip)
 {
     int i, nc, j, u;
+    int rc;
 
     fprintf(stderr, "Adding heavy block of width %d\n", skip);
-    fscanf(smallfile, "%d %d", &i, &nc);
+    rc = fscanf(smallfile, "%d %d", &i, &nc);
+    ASSERT_ALWAYS(rc == 2);
     i = 0;
     while (fscanf(smallfile, "%d", &nc) != EOF) {
         for (u = 0; u < nc; u++) {
-            fscanf(smallfile, "%d", &j);
+            rc = fscanf(smallfile, "%d", &j);
+            ASSERT_ALWAYS(rc == 1);
             if (j < skip)
                 charmat[i][kmin + j] = (char) (-1);        // humf...!
         }

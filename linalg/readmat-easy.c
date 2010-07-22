@@ -119,9 +119,12 @@ void read_easy(const char * filename,
         unsigned int * p_nr, unsigned int * p_nc)
 {
     char * cname;
-    asprintf(&cname, "%s-easy.bin", filename);
+    int rc;
+    rc = asprintf(&cname, "%s-easy.bin", filename);
+    ASSERT_ALWAYS(rc >= 0);
     char * cnameT;
-    asprintf(&cnameT, "%s-easyT.bin", filename);
+    rc = asprintf(&cnameT, "%s-easyT.bin", filename);
+    ASSERT_ALWAYS(rc >= 0);
 
     FILE * f;
     if (p_direct) {
@@ -130,14 +133,18 @@ void read_easy(const char * filename,
             printf("Reusing intermediary cache file %s\n", cname);
             unsigned int nr;
             unsigned int nc;
-            size_t fsize;
-            fread(&nr, sizeof(unsigned int), 1, f);
-            fread(&nc, sizeof(unsigned int), 1, f);
-            fread(&fsize, sizeof(size_t), 1, f);
+            size_t fsize, rs;
+            rs = fread(&nr, sizeof(unsigned int), 1, f);
+            ASSERT_ALWAYS(rs == 1);
+            rs = fread(&nc, sizeof(unsigned int), 1, f);
+            ASSERT_ALWAYS(rs == 1);
+            rs = fread(&fsize, sizeof(size_t), 1, f);
+            ASSERT_ALWAYS(rs == 1);
             if (p_nr) { *p_nr = nr; p_nr = NULL; }
             if (p_nc) { *p_nc = nc; p_nc = NULL; }
             *p_direct = malloc(fsize * sizeof(uint32_t));
-            fread(*p_direct, sizeof(uint32_t), fsize, f);
+            rs = fread(*p_direct, sizeof(uint32_t), fsize, f);
+            ASSERT_ALWAYS(rs == fsize);
             p_direct = NULL;
             fclose(f);
         }
@@ -150,13 +157,18 @@ void read_easy(const char * filename,
             unsigned int nc;
             unsigned int nr;
             size_t fsize;
-            fread(&nc, sizeof(unsigned int), 1, f);
-            fread(&nr, sizeof(unsigned int), 1, f);
-            fread(&fsize, sizeof(size_t), 1, f);
+            size_t rs;
+            rs = fread(&nc, sizeof(unsigned int), 1, f);
+            ASSERT_ALWAYS(rs == 1);
+            rs = fread(&nr, sizeof(unsigned int), 1, f);
+            ASSERT_ALWAYS(rs == 1);
+            rs = fread(&fsize, sizeof(size_t), 1, f);
+            ASSERT_ALWAYS(rs == 1);
             if (p_nr) { *p_nr = nr; p_nr = NULL; }
             if (p_nc) { *p_nc = nc; p_nc = NULL; }
             *p_transposed = malloc(fsize * sizeof(uint32_t));
-            fread(*p_transposed, sizeof(uint32_t), fsize, f);
+            rs = fread(*p_transposed, sizeof(uint32_t), fsize, f);
+            ASSERT_ALWAYS(rs == fsize);
             p_transposed = NULL;
             fclose(f);
         }

@@ -178,7 +178,10 @@ main(int argc, char *argv[])
     ASSERT_ALWAYS(nrows > 0);
     indexfile = gzip_open(indexname, "r");
     ASSERT_ALWAYS(indexfile != NULL);
-    fscanf(indexfile, "%d %d", &small_nrows, &small_ncols);
+    int rc;
+    rc = fscanf(indexfile, "%d %d", &small_nrows, &small_ncols);
+    ASSERT_ALWAYS(rc == 2);
+
     // a typical line is 
     // nj j1 ... j_nj where 0 <= j_r < nrows and not small_ncols...! 
     mat.nrows = small_nrows;

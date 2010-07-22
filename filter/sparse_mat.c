@@ -89,7 +89,7 @@ void
 initWeightFromFile (sparse_mat_t *mat, FILE *purgedfile, int skipfirst)
 {
   int32_t j, jmin = mat->jmin, jmax = mat->jmax;
-  int i, k, nc;
+  int i, k, nc, dummy;
   char s[MAX_LENGTH], *ptr[1];
 
    
@@ -100,7 +100,8 @@ initWeightFromFile (sparse_mat_t *mat, FILE *purgedfile, int skipfirst)
       ptr[0] = fgets (s, MAX_LENGTH, purgedfile);
       ASSERT_ALWAYS (ptr[0] != NULL);
       if(skipfirst != 0)
-	strtol (s, ptr, 10); /* unused index to rels file */
+	dummy = strtol (s, ptr, 10); /* unused index to rels file */
+
       nc = strtol (ptr[0], ptr, 10);
       /* nc is the number of prime ideals of the current relation */
       for (k = 0; k < nc; k++)

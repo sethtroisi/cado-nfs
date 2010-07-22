@@ -194,7 +194,11 @@ void skip_relations_in_file(FILE * f, int n)
     char str[STR_LEN_MAX];
 
     for( ; n-- ; ) {
-	fgets(str, STR_LEN_MAX, f);
+	char * p = fgets(str, STR_LEN_MAX, f);
+        if (!p) {
+	    fprintf(stderr, "short read in skip_relations_in_file\n");
+            abort();
+        }
 	if(str[strlen(str)-1] != '\n'){
 	    fprintf(stderr, "Too long string in skip_relations_in_file\n");
 	}

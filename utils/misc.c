@@ -35,7 +35,7 @@ void *malloc_check(const size_t x)
  * alternative, we need an ``aligned free'' matching the ``aligned
  * malloc''. We rely on posix_memalign if it is available, or else fall
  * back on ugly pointer arithmetic so as to guarantee alignment. Note
- * that not providing the requested alignment can have trouble some
+ * that not providing the requested alignment can have some troublesome
  * consequences. At best, a performance hit, at worst a segv (sse-2
  * movdqa on a pentium4 causes a GPE if improperly aligned).
  */
@@ -44,7 +44,8 @@ void *malloc_aligned(size_t size, size_t alignment)
 {
 #ifdef HAVE_POSIX_MEMALIGN
     void *res = NULL;
-    posix_memalign(&res, alignment, size);
+    int rc = posix_memalign(&res, alignment, size);
+    ASSERT_ALWAYS(rc == 0);
     return res;
 #else
     char * res;

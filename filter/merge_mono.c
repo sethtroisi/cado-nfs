@@ -1282,10 +1282,13 @@ resume(report_t *rep, sparse_mat_t *mat, char *resumename)
     unsigned long addread = 0;
     int nactivej;
     int32_t j;
+    char * rp;
 
     fprintf(stderr, "Resuming computations from %s\n", resumename);
     // skip first line containing nrows ncols
-    fgets(str, STR_LEN_MAX, resumefile);
+    rp = fgets(str, STR_LEN_MAX, resumefile);
+    ASSERT_ALWAYS(rp);
+
     fprintf(stderr, "Reading row additions\n");
     while(fgets(str, STR_LEN_MAX, resumefile)){
 	addread++;

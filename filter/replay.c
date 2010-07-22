@@ -132,11 +132,14 @@ makeSparse(int **sparsemat, int *colweight, FILE *purgedfile,
 {
     int i, j, nj, *buf, buf_len, ibuf, ind, k;
     int report = (verbose == 0) ? 100000 : 10000;
+    int rc;
 
     buf_len = 100;
     buf = (int *) malloc (buf_len * sizeof(int));
     fprintf(stderr, "Reading and treating relations from purged file\n");
-    fscanf(purgedfile, "%d %d", &i, &j); // skip first line; check?
+    rc = fscanf(purgedfile, "%d %d", &i, &j); // skip first line; check?
+    ASSERT_ALWAYS(rc == 2);
+
     ind = 0;
     while(fscanf(purgedfile, "%d %d", &i, &nj) != EOF){
 	if(!(ind % report))
@@ -150,7 +153,9 @@ makeSparse(int **sparsemat, int *colweight, FILE *purgedfile,
 	// take everybody and clean
 	ibuf = 0;
 	for(i = 0; i < nj; i++){
-	    fscanf(purgedfile, PURGE_INT_FORMAT, buf+ibuf);
+	    rc = fscanf(purgedfile, PURGE_INT_FORMAT, buf+ibuf);
+            ASSERT_ALWAYS(rc == 1);
+
 	    // what a trick!!!!
 	    if((buf[ibuf] >= jmin) && (buf[ibuf] < jmax))
 		ibuf++;
@@ -540,14 +545,22 @@ static void
 read_newrows_from_file(int **newrows, int nrows, FILE *file)
 {
     int small_nrows, small_ncols, i, nc, k, *tmp;
-    
-    fscanf(file, "%d %d", &small_nrows, &small_ncols);
+    int rc;
+
+    rc = fscanf(file, "%d %d", &small_nrows, &small_ncols);
+    ASSERT_ALWAYS(rc == 2);
+
     for(i = 0; i < small_nrows; i++){
-	fscanf(file, "%d", &nc);
+	rc = fscanf(file, "%d", &nc);
+        ASSERT_ALWAYS(rc == 1);
+
 	tmp = (int *)malloc((1+nc) * sizeof(int));
 	tmp[0] = nc;
-	for(k = 0; k < nc; k++)
-	    fscanf(file, PURGE_INT_FORMAT, tmp+k+1);
+	for(k = 0; k < nc; k++) {
+	    rc = fscanf(file, PURGE_INT_FORMAT, tmp+k+1);
+            ASSERT_ALWAYS(rc == 1);
+        }
+
 	newrows[i] = tmp;
     }
     for( ; i < nrows; i++)
@@ -571,6 +584,7 @@ main(int argc, char *argv[])
     int verbose = 0, writeindex;
     char str[STRLENMAX];
     int bin=0;
+    char * rp;
 
     // printing the arguments as everybody does these days
     fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
@@ -607,7 +621,9 @@ main(int argc, char *argv[])
 
     hisfile = fopen(hisname, "r");
     ASSERT(hisfile != NULL);
-    fgets(str, STRLENMAX, hisfile);
+    rp = fgets(str, STRLENMAX, hisfile);
+    ASSERT_ALWAYS(rp);
+
     // read parameters that should be the same as in purgedfile!
     sscanf(str, "%d %d", &nrows, &ncols);
     fprintf(stderr, "Original matrix has size %d x %d\n", nrows, ncols);

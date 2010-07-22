@@ -129,12 +129,15 @@ treatDep(char *prefix, int numdep, cado_poly pol, char *relname, char *purgednam
     char *small_row_used, *rel_used;
     int *vec; // useful to check dependency relation in the purged matrix
     int need64 = (pol->lpba > 32) || (pol->lpbr > 32);
+    int rc;
 
     purgedfile = gzip_open(purgedname, "r");
-    fscanf(purgedfile, "%d %d", &nrows, &ncols);
+    rc = fscanf(purgedfile, "%d %d", &nrows, &ncols);
+    ASSERT_ALWAYS(rc == 2);
 
     indexfile = gzip_open(indexname, "r");
-    fscanf(indexfile, "%d %d", &small_nrows, &small_ncols);
+    rc = fscanf(indexfile, "%d %d", &small_nrows, &small_ncols);
+    ASSERT_ALWAYS(rc == 2);
 
     nlimbs = ((small_nrows - 1) / 64) + 1;
     // first read used rows in the small matrix
@@ -174,9 +177,11 @@ treatDep(char *prefix, int numdep, cado_poly pol, char *relname, char *purgednam
     // now map to the rels of the purged matrix
     memset(rel_used, 0, nrows * sizeof(char));
     for(i = 0; i < small_nrows; i++){
-	fscanf(indexfile, "%d", &nrel);
+	rc = fscanf(indexfile, "%d", &nrel);
+        ASSERT_ALWAYS(rc == 1);
 	for(j = 0; j < nrel; j++){
-	    fscanf(indexfile, PURGE_INT_FORMAT, &r);
+	    rc = fscanf(indexfile, PURGE_INT_FORMAT, &r);
+            ASSERT_ALWAYS(rc == 1);
 	    if(small_row_used[i]){
 #if DEBUG >= 1
 		fprintf(stderr, "# Small[%d] -> %d\n", i, r);
@@ -199,27 +204,31 @@ treatDep(char *prefix, int numdep, cado_poly pol, char *relname, char *purgednam
     sg = 1;
     depfile = fopen(depname, "w");
     // now really read the purged matrix in
-	vec = (int *)malloc(nrows * sizeof(int));
-	fgets(str, 1024, purgedfile); // get rid of end of first line
+    vec = (int *)malloc(nrows * sizeof(int));
+    char * rp;
+    rp = fgets(str, 1024, purgedfile); // get rid of end of first line
+    ASSERT_ALWAYS(rp);
+
 
     // we assume purgedfile is stored in increasing order of the indices
     // of the real relations, so that one pass in the rels file is needed...!
     relfile = gzip_open(relname, "r");
     irel = 0; // we are ready to read relation irel
     for(i = 0; i < nrows; i++){
-	    fgets(str, 1024, purgedfile);
-	    sscanf(str, "%d", vec+i);
-		if(rel_used[i]){
+        rp = fgets(str, 1024, purgedfile);
+        ASSERT_ALWAYS(rp);
+        sscanf(str, "%d", vec+i);
+        if(rel_used[i]){
 #if DEBUG >= 1
-	    	fprintf(stderr, "Reading in rel %d of index %d\n", i, vec[i]);
+            fprintf(stderr, "Reading in rel %d of index %d\n", i, vec[i]);
 #endif
             skip_relations_in_file(relfile, vec[i] - irel);
             fread_relation(relfile, &rel);
-	    	irel = vec[i]+1;
-			treatRelation(depfile, &H, rel);
-	    	sg *= treatSign(rel, pol);
-	    	clear_relation(&rel);
-		}
+            irel = vec[i]+1;
+            treatRelation(depfile, &H, rel);
+            sg *= treatSign(rel, pol);
+            clear_relation(&rel);
+        }
     }
     gzip_close(relfile, relname);
     //ASSERT(checkVector(vec, ncols));

@@ -627,7 +627,8 @@ void ab_source_init(ab_source_ptr ab, const char * fname, int rank, int root, MP
         if (rank == root) {
             char buf[16384];
             FILE * f = fopen(fname, "r");
-            fread(buf, 1, sizeof(buf), f);
+            rc = fread(buf, 1, sizeof(buf), f);
+            ASSERT_ALWAYS(rc == sizeof(buf));
             fclose(f);
             int nrows_16k = 0;
             for(unsigned int i = 0 ; i < sizeof(buf) ; i++) {
@@ -736,7 +737,8 @@ int ab_openfile_internal(ab_source_ptr ab)
         ab->tpos = ab->file_bases[ab->c];
         ab->cpos = 0;
         char header[80];
-        fgets(header, sizeof(header), ab->f);
+        char * rp = fgets(header, sizeof(header), ab->f);
+        ASSERT_ALWAYS(rp);
     }
     ab->cpos = ftell(ab->f);
     ab->tpos += ab->cpos;
@@ -2264,6 +2266,7 @@ void * a_poly_read_share_child(struct subtask_info_t * info)
 {
     size_t off0 = info->off0;
     size_t off1 = info->off1;
+        int rc;
     poly_ptr P = info->P;
     cachefile c;
 
@@ -2271,9 +2274,11 @@ void * a_poly_read_share_child(struct subtask_info_t * info)
 
     if (rcache && cachefile_open_r(c)) {
         logprint("reading cache %s\n", c->basename);
-        fscanf(c->f, "%zu", &info->nab_loc);
+        rc = fscanf(c->f, "%zu", &info->nab_loc);
+        ASSERT_ALWAYS(rc == 1);
         for(int i = 0 ; i < glob.n ; i++) {
-            gmp_fscanf(c->f, "%Zx", info->P->coeff[i]);
+            rc = gmp_fscanf(c->f, "%Zx", info->P->coeff[i]);
+            ASSERT_ALWAYS(rc == 1);
         }
         cleandeg(info->P, glob.n - 1);
         cachefile_close(c);
@@ -2312,6 +2317,7 @@ size_t a_poly_read_share(poly_t P, size_t off0, size_t off1)
     STOPWATCH_GO();
 
     size_t nab_loc = 0;
+    int rc;
     log_begin();
 
     cachefile c;
@@ -2320,9 +2326,11 @@ size_t a_poly_read_share(poly_t P, size_t off0, size_t off1)
 
     if (rcache && cachefile_open_r(c)) {
         logprint("reading cache %s\n", c->basename);
-        fscanf(c->f, "%zu", &nab_loc);
+        rc = fscanf(c->f, "%zu", &nab_loc);
+        ASSERT_ALWAYS(rc == 1);
         for(int i = 0 ; i < glob.n ; i++) {
-            gmp_fscanf(c->f, "%Zx", P->coeff[i]);
+            rc = gmp_fscanf(c->f, "%Zx", P->coeff[i]);
+            ASSERT_ALWAYS(rc == 1);
         }
         cleandeg(P, glob.n - 1);
         cachefile_close(c);
@@ -2764,6 +2772,7 @@ void rational_reduction(struct prime_data * primes, int i0, int i1, poly_ptr P, 
     STOPWATCH_DECL;
     STOPWATCH_GO();
     log_begin();
+    int rc;
 
     ASSERT_ALWAYS(P->deg >= 0);
 
@@ -2775,9 +2784,11 @@ void rational_reduction(struct prime_data * primes, int i0, int i1, poly_ptr P, 
                     off0, off1, primes[i].p, glob.prec);
             if (cachefile_open_r(c)) {
                 logprint("reading cache %s\n", c->basename);
-                fscanf(c->f, "%zu", p_nab_total);
+                rc = fscanf(c->f, "%zu", p_nab_total);
+                ASSERT_ALWAYS(rc == 1);
                 for(int j = 0 ; j < glob.n ; j++) {
-                    gmp_fscanf(c->f, "%Zx", primes[i].A->coeff[j]);
+                    rc = gmp_fscanf(c->f, "%Zx", primes[i].A->coeff[j]);
+                    ASSERT_ALWAYS(rc == 1);
                 }
                 cachefile_close(c);
             }
@@ -2820,6 +2831,7 @@ void * algebraic_reduction_child(struct subtask_info_t * info)
 {
     struct prime_data * p = info->p;
     int j = info->j;
+    int rc;
     logprint("alg_red (%lu, x-%lu) starts\n", p->p, p->r[j]);
 
     cachefile c;
@@ -2829,8 +2841,10 @@ void * algebraic_reduction_child(struct subtask_info_t * info)
 
     if (rcache && cachefile_open_r(c)) {
         logprint("reading cache %s\n", c->basename);
-        fscanf(c->f, "%zu", &info->nab_loc);
-        gmp_fscanf(c->f, "%Zx", p->evals->coeff[j]);
+        rc = fscanf(c->f, "%zu", &info->nab_loc);
+        ASSERT_ALWAYS(rc == 1);
+        rc = gmp_fscanf(c->f, "%Zx", p->evals->coeff[j]);
+        ASSERT_ALWAYS(rc == 1);
         cachefile_close(c);
         return NULL;
     }
@@ -2911,6 +2925,7 @@ void multiply_all_shares(struct prime_data * primes, int i0, int i1, size_t * p_
     STOPWATCH_DECL;
     STOPWATCH_GO();
     log_begin();
+    int rc;
 
     // ok. for all eval points, collect the reduced stuff. we'll do the
     // collection in a tree-like manner.
@@ -2926,8 +2941,10 @@ void multiply_all_shares(struct prime_data * primes, int i0, int i1, size_t * p_
                 int ok = cachefile_open_r(c);
                 ASSERT_ALWAYS(ok);
                 logprint("reading cache %s\n", c->basename);
-                fscanf(c->f, "%zu", p_nab_total);
-                gmp_fscanf(c->f, "%Zx", primes[i].evals->coeff[j]);
+                rc = fscanf(c->f, "%zu", p_nab_total);
+                ASSERT_ALWAYS(rc == 1);
+                rc = gmp_fscanf(c->f, "%Zx", primes[i].evals->coeff[j]);
+                ASSERT_ALWAYS(rc == 1);
                 cachefile_close(c);
             }
         }
@@ -2968,12 +2985,15 @@ void * local_square_roots_child(struct subtask_info_t * info)
 {
     struct prime_data * p = info->p;
     int j = info->j;
+    int rc;
     cachefile c;
     cachefile_init(c, "sqrt_%lu_%lu_%lu", p->p, p->r[j], glob.prec);
     if (rcache && cachefile_open_r(c)) {
-        fscanf(c->f, "%zu", &info->nab_loc);
+        rc = fscanf(c->f, "%zu", &info->nab_loc);
+        ASSERT_ALWAYS(rc == 1);
         logprint("reading cache %s\n", c->basename);
-        gmp_fscanf(c->f, "%Zx", p->sqrts->coeff[j]);
+        rc = gmp_fscanf(c->f, "%Zx", p->sqrts->coeff[j]);
+        ASSERT_ALWAYS(rc == 1);
         cachefile_close(c);
         return NULL;
     }

@@ -202,7 +202,11 @@ main (int argc, char *argv[])
     }
     purgedfile = gzip_open (purgedname, "r");
     ASSERT_ALWAYS (purgedfile != NULL);
-    fscanf (purgedfile, "%d %d\n", &nrows, &ncols);
+    int rc;
+
+    rc = fscanf (purgedfile, "%d %d\n", &nrows, &ncols);
+    ASSERT_ALWAYS(rc == 2);
+
 
     mat->nrows = nrows;
     mat->ncols = ncols;

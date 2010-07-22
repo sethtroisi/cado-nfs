@@ -27,25 +27,30 @@ checkSparse (FILE *matfile, FILE *kerfile, int ncols, int nlimbs, int *vec,
     memset(vec, 0, ncols * sizeof(int));
     // get next dependance relation
     rewind(matfile);
-    fscanf(matfile, "%d %d", &i, &j);
+    ret = fscanf(matfile, "%d %d", &i, &j);
+    ASSERT_ALWAYS(ret == 2);
     while((c = getc(matfile)) != '\n');
     for(i = 0; i < nlimbs; ++i){
 	ret = fscanf(kerfile, "%lx", &w);
 	if(ret == -1)
 	    break;
-	ASSERT (ret == 1);
+	ASSERT_ALWAYS (ret == 1);
 	if(verbose)
 	    fprintf(stderr, "w=%lx\n", w);
 	for(j = 0; j < GMP_NUMB_BITS; ++j){
 	    if(w & 1UL){
 		if(verbose)
 		    fprintf(stderr, "+R_%d\n", (i * GMP_NUMB_BITS)+j);
-		if(compact == 0)
-		    fscanf(matfile, "%ld %lu %d", &a, &b, &nc);
-		else
-		    fscanf(matfile, "%d", &nc);
+		if(compact == 0) {
+		    ret = fscanf(matfile, "%ld %lu %d", &a, &b, &nc);
+                    ASSERT_ALWAYS(ret == 3);
+                } else {
+		    ret = fscanf(matfile, "%d", &nc);
+                    ASSERT_ALWAYS(ret == 1);
+                }
 		for(jj = 0; jj < nc; jj++){
-		    fscanf(matfile, "%d", &cc);
+		    ret = fscanf(matfile, "%d", &cc);
+                    ASSERT_ALWAYS(ret == 1);
 		    if(verbose >= 2)
 			fprintf(stderr, "vec[%d]++\n", cc);
 		    if(cc >= ncols){
@@ -96,7 +101,8 @@ checkSparseAll (char *matname, char *kername, int compact, int skip, int verbose
 
     matfile = fopen(matname, "r");
     kerfile = fopen(kername, "r");
-    fscanf(matfile, "%d %d", &nrows, &ncols);
+    ret = fscanf(matfile, "%d %d", &nrows, &ncols);
+    ASSERT_ALWAYS(ret == 2);
     nlimbs = (nrows / GMP_NUMB_BITS) + 1;
     vec = (int *)malloc(ncols * sizeof(int));
     ndep = 0;
@@ -129,46 +135,52 @@ checkWithIndex (FILE *purgedfile, FILE *indexfile, FILE *kerfile, int verbose,
     small_row_used = (char *)malloc(small_nrows * sizeof(char));
     memset(small_row_used, 0, small_nrows * sizeof(char));
     for(i = 0; i < nlimbs; ++i){
-	ret = fscanf(kerfile, "%lx", &w);
-	if(ret == -1){
-	    free(small_row_used);
-	    return ret;
-	}
-	ASSERT (ret == 1);
-	if(verbose)
-	    fprintf(stderr, "w=%lx\n", w);
-	for(j = 0; j < GMP_NUMB_BITS; ++j){
-	    if(w & 1UL){
-		ind = (i * GMP_NUMB_BITS)+j;
-		if(verbose)
-		    fprintf(stderr, "+R_%d\n", ind);
-		small_row_used[ind] = 1;
-	    }
-	    w >>= 1;
-	}
+        ret = fscanf(kerfile, "%lx", &w);
+        if(ret == -1){
+            free(small_row_used);
+            return ret;
+        }
+        ASSERT_ALWAYS (ret == 1);
+        if(verbose)
+            fprintf(stderr, "w=%lx\n", w);
+        for(j = 0; j < GMP_NUMB_BITS; ++j){
+            if(w & 1UL){
+                ind = (i * GMP_NUMB_BITS)+j;
+                if(verbose)
+                    fprintf(stderr, "+R_%d\n", ind);
+                small_row_used[ind] = 1;
+            }
+            w >>= 1;
+        }
     }
     // now map to the rels of the big matrix
     rel_used = (char *)malloc(nrows * sizeof(char));
     memset(rel_used, 0, nrows * sizeof(char));
     rewind(indexfile);
-    fscanf(indexfile, "%d %d", &i, &j); // skip first line
+    ret = fscanf(indexfile, "%d %d", &i, &j); // skip first line
+    ASSERT_ALWAYS(ret == 2);
     for(i = 0; i < small_nrows; i++){
-	fscanf(indexfile, "%d", &nrel);
-	for(j = 0; j < nrel; j++){
-	    fscanf(indexfile, "%d", &r);
-	    if(small_row_used[i])
-		rel_used[r] ^= 1;
-	}
+        ret = fscanf(indexfile, "%d", &nrel);
+        ASSERT_ALWAYS(ret == 1);
+        for(j = 0; j < nrel; j++){
+            ret = fscanf(indexfile, "%d", &r);
+            ASSERT_ALWAYS(ret == 2);
+            if(small_row_used[i])
+                rel_used[r] ^= 1;
+        }
     }
     // now really read the big matrix in
     rewind(purgedfile);
-    fscanf(purgedfile, "%d %d", &i, &j);
+    ret = fscanf(purgedfile, "%d %d", &i, &j);
+    ASSERT_ALWAYS(ret == 2);
     memset(vec, 0, ncols * sizeof(int));
     for(i = 0; i < nrows; i++){
-	fscanf(purgedfile, "%d %d", &j, &nc);
-	for(j = 0; j < nc; j++){
-	    fscanf(purgedfile, "%d", &k);
-	    if(rel_used[i])
+        ret = fscanf(purgedfile, "%d %d", &j, &nc);
+        ASSERT_ALWAYS(ret == 2);
+        for(j = 0; j < nc; j++){
+            ret = fscanf(purgedfile, "%d", &k);
+            ASSERT_ALWAYS(ret == 1);
+            if(rel_used[i])
 		vec[k]++;
 	}
     }
@@ -184,8 +196,10 @@ checkWithIndexAll (char *purgedname, char *indexname, char *kername,
     FILE *kerfile = fopen(kername, "r");
     int nrows, ncols, *vec, small_nrows, small_ncols, ret, ndep;
 
-    fscanf(purgedfile, "%d %d", &nrows, &ncols);
-    fscanf(indexfile, "%d %d", &small_nrows, &small_ncols);
+    ret = fscanf(purgedfile, "%d %d", &nrows, &ncols);
+    ASSERT_ALWAYS(ret == 2);
+    ret = fscanf(indexfile, "%d %d", &small_nrows, &small_ncols);
+    ASSERT_ALWAYS(ret == 2);
     vec = (int *)malloc(ncols * sizeof(int));
     ndep = 0;
     while(1){
