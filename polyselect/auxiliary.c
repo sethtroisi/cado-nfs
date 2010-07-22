@@ -225,6 +225,8 @@ L2_skewness (mpz_t *f, int d, int prec, int method)
 
   double s;
 
+  if (d == 4)
+      return L2_skewness_old (f, d, prec, method);
   // s = L2_skewness_old (f, d, prec, method);
   /* Newton method may not converge? */
   // s = L2_skewness_Newton (f, d, prec, method);
