@@ -1307,6 +1307,13 @@ rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k, unsigned int t)
   return k;
 }
 
+static void
+rotate_auxg_si (mpz_t *f, mpz_t *g, long k, unsigned int t)
+{
+  mpz_addmul_si (f[t + 1], g[1], k);
+  mpz_addmul_si (f[t], g[0], k);
+}
+
 /* replace f by f + k * x^t * (b*x + g0) */
 static void
 rotate_auxg_z (mpz_t *f, mpz_t b, mpz_t g0, mpz_t k, unsigned int t)
@@ -2265,90 +2272,117 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
      and we want to force f[d-3] to be small. */
   if (d == 6)
     {
-      mpz_t k, h[4], r[4], f_copy[MAX_DEGREE + 1], g_copy[2];
-      int i, j, best_j = 0, n;
+      mpz_t k, h[4], r[4], f_copy[MAX_DEGREE], g0_copy, best_k;
+      int i, j, n;
       double skew, logmu, best_logmu = DBL_MAX;
+      long l, best_l = LONG_MAX;
 
       mpz_init (k);
+      mpz_init (best_k);
       for (i = 0; i <= 3; i++)
         {
           mpz_init (h[i]);
           mpz_init (r[i]);
         }
-      for (i = 0; i <= d; i++)
+
+      /* f[d] and g[1] are not changed below */
+      for (i = 0; i < d; i++)
         mpz_init_set (f_copy[i], f[i]);
-      mpz_init_set (g_copy[0], g[0]);
-      mpz_init_set (g_copy[1], g[1]);
+      mpz_init_set (g0_copy, g[0]);
 
-      fdminus3_translated (h, f, d);
-      n = roots3 (r, h);
-
-      for (j = 0; j < n; j++)
+      /* We use here an idea suggested by Thorsten Kleinjung, namely
+         rotating by l*x^3*g for several values of l, and keeping the
+         best value of l.
+         With RSA-768, P=10^5, admax=25000 we get the following average
+         lognorms (61 hits):
+         LMAX=0: 70.68
+         LMAX=1: 70.29
+         LMAX=2: 70.02
+         LMAX=4: 69.81
+         LMAX=8: 69.64
+         LMAX=16: 69.46
+         LMAX=32: 69.35
+         LMAX=64: 69.27
+         LMAX=128: 69.23
+         LMAX=256: 69.22
+      */
+#define LMAX 256
+      for (l = -LMAX; l <= LMAX; l++) /* we consider f + l*x^(d-3)*g */
         {
-          mpz_set (k, r[j]);
-          if (j > 0)
-            {
-              for (i = 0; i <= d; i++)
-                mpz_set (f[i], f_copy[i]);
-              mpz_set (g[0], g_copy[0]);
-              mpz_set (g[1], g_copy[1]);
-            }
-          do_translate_z (f, d, g, k);
-
-          /* now reduce coefficients f[0], f[1], f[2] using rotation */
-          mpz_tdiv_q (k, f[0], g[0]);
-          mpz_neg (k, k);
-          rotate_auxg_z (f, g[1], g[0], k, 0);
-          mpz_tdiv_q (k, f[1], g[0]);
-          mpz_neg (k, k);
-          rotate_auxg_z (f, g[1], g[0], k, 1);
-          mpz_tdiv_q (k, f[2], g[0]);
-          mpz_neg (k, k);
-          rotate_auxg_z (f, g[1], g[0], k, 2);
-
-          optimize_aux (f, d, g, verbose, use_rotation, CIRCULAR);
-
-          skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-          logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
-          // gmp_printf ("k=%Zd logmu=%1.2f\n", r[j], logmu);
-          if (j == 0 || logmu < best_logmu)
-            {
-              best_logmu = logmu;
-              best_j = j;
-            }
-        }
-
-      if (j - 1 != best_j)
-        {
-          mpz_set (k, r[best_j]);
-          for (i = 0; i <= d; i++)
+          for (i = 0; i < d; i++)
             mpz_set (f[i], f_copy[i]);
-          mpz_set (g[0], g_copy[0]);
-          mpz_set (g[1], g_copy[1]);
-          do_translate_z (f, d, g, k);
+          mpz_set (g[0], g0_copy);
 
-          /* now reduce coefficients f[0], f[1], f[2] using rotation */
-          mpz_tdiv_q (k, f[0], g[0]);
-          mpz_neg (k, k);
-          rotate_auxg_z (f, g[1], g[0], k, 0);
-          mpz_tdiv_q (k, f[1], g[0]);
-          mpz_neg (k, k);
-          rotate_auxg_z (f, g[1], g[0], k, 1);
-          mpz_tdiv_q (k, f[2], g[0]);
-          mpz_neg (k, k);
-          rotate_auxg_z (f, g[1], g[0], k, 2);
+          rotate_auxg_si (f, g, l, 3);
+          fdminus3_translated (h, f, d);
+          n = roots3 (r, h);
+
+          for (j = 0; j < n; j++)
+            {
+              for (i = 0; i < d; i++)
+                mpz_set (f[i], f_copy[i]);
+              mpz_set (g[0], g0_copy);
+              rotate_auxg_si (f, g, l, 3);
+              mpz_set (k, r[j]);
+              do_translate_z (f, d, g, k);
+
+              /* now reduce coefficients f[0], f[1], f[2] using rotation */
+              mpz_tdiv_q (k, f[0], g[0]);
+              mpz_neg (k, k);
+              rotate_auxg_z (f, g[1], g[0], k, 0);
+              mpz_tdiv_q (k, f[1], g[0]);
+              mpz_neg (k, k);
+              rotate_auxg_z (f, g[1], g[0], k, 1);
+              mpz_tdiv_q (k, f[2], g[0]);
+              mpz_neg (k, k);
+              rotate_auxg_z (f, g[1], g[0], k, 2);
+
+              optimize_aux (f, d, g, verbose, use_rotation, CIRCULAR);
+
+              skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC,
+                                  DEFAULT_L2_METHOD);
+              logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
+              // gmp_printf ("l=%ld k=%Zd logmu=%1.2f\n", l, r[j], logmu);
+              if (logmu < best_logmu)
+                {
+                  best_logmu = logmu;
+                  best_l = l;
+                  mpz_set (best_k, r[j]);
+                }
+            }
         }
+
+      ASSERT(best_l != LONG_MAX);
+
+      /* now consider the best (l,j) */
+      for (i = 0; i < d; i++)
+        mpz_set (f[i], f_copy[i]);
+      mpz_set (g[0], g0_copy);
+      rotate_auxg_si (f, g, best_l, 3);
+      mpz_set (k, best_k);
+      do_translate_z (f, d, g, k);
+
+      /* now reduce coefficients f[0], f[1], f[2] using rotation */
+      mpz_tdiv_q (k, f[0], g[0]);
+      mpz_neg (k, k);
+      rotate_auxg_z (f, g[1], g[0], k, 0);
+      mpz_tdiv_q (k, f[1], g[0]);
+      mpz_neg (k, k);
+      rotate_auxg_z (f, g[1], g[0], k, 1);
+      mpz_tdiv_q (k, f[2], g[0]);
+      mpz_neg (k, k);
+      rotate_auxg_z (f, g[1], g[0], k, 2);
 
       mpz_clear (k);
+      mpz_clear (best_k);
       for (i = 0; i <= 3; i++)
         {
           mpz_clear (h[i]);
           mpz_clear (r[i]);
         }
-      for (i = 0; i <= d; i++)
+      for (i = 0; i < d; i++)
         mpz_clear (f_copy[i]);
-      mpz_clear (g_copy[0]);
-      mpz_clear (g_copy[1]);
+      mpz_clear (g0_copy);
     }
 
   optimize_aux (f, d, g, verbose, use_rotation, CIRCULAR);
