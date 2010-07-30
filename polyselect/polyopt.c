@@ -42,12 +42,13 @@ polyprint (mpz_t *f, mpz_t *g, int deg, mpz_t N) {
 	 {
 		  gmp_printf ("Y%d: %Zd\n", i, g[i]);
 	 }
+	 return 0;
 }
 
 /* optimize all raw polynomial in the file. "skip" denotes position of raw poly */
 static int
 opt_file (FILE *file, int deg, mpz_t N) {
-	 int ret, i, nroots;
+	 int i, nroots;
 	 unsigned flag = 0UL, skip = 0UL, count = 0;
 	 char str[MAX_LINE_LENGTH];
 	 mpz_t g[2];
@@ -63,8 +64,7 @@ opt_file (FILE *file, int deg, mpz_t N) {
 	 for (i = 0; i <= deg; i ++ )
 		  mpz_init (f[i]);
 	 while (1) {
-		  ret = fgets(str, MAX_LINE_LENGTH, file);
-		  if (ret == NULL)
+		  if (fgets(str, MAX_LINE_LENGTH, file) == NULL)
 			   break; /* wrong line or EOF */
 
 		  if ( str[0] == 'Y' ) {
@@ -191,6 +191,7 @@ opt_file (FILE *file, int deg, mpz_t N) {
 	 mpz_clear (M);
 	 for (i = 0; i <= deg; i ++ )
 		  mpz_clear (f[i]);
+	 return 0;
 }
 
 /* print usage and exit */
