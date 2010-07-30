@@ -2342,6 +2342,14 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
               skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC,
                                   DEFAULT_L2_METHOD);
               logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
+
+              /* we estimate here the expected alpha value we can get from
+                 rotation. For a rotation space of K vakues, we can expect
+                 alpha ~ -sqrt(2*log(K)) (asymptotic expansion).
+                 Since for degree 6 the rotation space is in S^6, we consider
+                 -sqrt(12*log(S)). */
+              logmu -= sqrt (12.0 * log (skew));
+
               // gmp_printf ("l=%ld k=%Zd logmu=%1.2f\n", l, r[j], logmu);
               if (logmu < best_logmu)
                 {
