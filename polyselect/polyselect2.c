@@ -149,6 +149,9 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   unsigned int j, nroots;
   int cmp;
   double skew, logmu, alpha;
+  /* the expected rotation space is S^6 for degree 6, S^4.5 for degree 5,
+     S^3 for degree 4, S^2 for degree 3, S for degree 2, S^0.5 for degree 1 */
+  double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.5, 6.0, 0};
 
 #ifdef DEBUG
   printf ("Found match: (%lu,%ld) (%lu,%ld) for ad=%lu, q=%lu, rq=%lu\n",
@@ -337,8 +340,9 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       gmp_printf ("Y1: %Zd\nY0: %Zd\n", g[1], g[0]);
       for (j = d + 1; j -- != 0; )
         gmp_printf ("c%u: %Zd\n", j, f[j]);
-      printf ("# lognorm %1.2f, skew %1.2f, alpha %1.2f, E %1.2f, %u rroots\n",
-              logmu, skew, alpha, logmu + alpha, nroots);
+      printf ("# lognorm %1.2f, skew %1.2f, expected E %1.2f, %u rroots\n",
+              logmu, skew, logmu - sqrt (2.0 * exp_rot[d] * log (skew)),
+              nroots);
       printf ("\n");
       fflush (stdout);
       pthread_mutex_lock (&lock);
