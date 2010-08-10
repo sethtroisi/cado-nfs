@@ -169,8 +169,8 @@ my @default_param = (
     delay        => 120,
     sievenice    => 19,
     keeprelfiles => 0,
-	sieve_max_threads => 2,
-	ratq		 => 0,
+    sieve_max_threads => 2,
+    ratq	 => 0,
 
     # filtering
     keep         => 160, # should be 128+skip
@@ -186,8 +186,8 @@ my @default_param = (
     # linalg
     linalg       => 'bwc',
     bwmt         => 2,
-	mpi			 => 0,
-	hosts		 => "",
+    mpi		 => 0,
+    hosts	 => "",
     bwthreshold  => 64,
     bwtidy       => 1,
     bwc_interval => 1000,
@@ -328,8 +328,6 @@ sub write_param {
     close FILE;
 }
 
-
-
 # Global hash for the machine descriptions
 my %machines;
 
@@ -349,8 +347,7 @@ sub read_machines {
             info "interpreting filename $m as relative to wdir $param{'wdir'}\n";
             $m = "$param{'wdir'}/$m";
         }
-        open FILE, "< $m"
-            or die "Cannot open `$m' for reading: $!.\n";
+        open FILE, "< $m" or die "Cannot open `$m' for reading: $!.\n";
     }
 
     my %vars = ();
@@ -363,14 +360,14 @@ sub read_machines {
             %vars = ( cluster => $1 );
         } elsif (/^(\w+)=(.*)$/) {
             $vars{$1} = $2;
-			$param{'bindir'} = $2 if ($1 eq "bindir");
-			if ($1 eq "tmpdir") {
-				my $wdir = 
-					abs_path(dirname($param{'wdir'}))."/".basename($param{'wdir'});
-				my $tmpdir = abs_path(dirname($2))."/".basename($2);
-				die "tmpdir must be different of wdir in parallel mode.\n"
-					if ($wdir eq $tmpdir);
-			}
+            $param{'bindir'} = $2 if ($1 eq "bindir");
+            if ($1 eq "tmpdir") {
+                    my $wdir = $param{'wdir'};
+                    $wdir = abs_path(dirname($wdir))."/".basename($wdir);
+                    my $tmpdir = abs_path(dirname($2))."/".basename($2);
+                    die "tmpdir must be different of wdir in parallel mode.\n"
+                            if $wdir eq $tmpdir;
+            }
         } elsif (s/^(\S+)\s*//) {
             my $host = $1;
             my %desc = %vars;
@@ -386,22 +383,21 @@ sub read_machines {
             }
             $desc{'tmpdir'} =~ s/%s/$param{'name'}/g;
             $desc{'cores'}  = 1 unless defined $desc{'cores'};
-			$desc{'poly_cores'} = $desc{'cores'} 
-				unless defined $desc{'poly_cores'};
-			$desc{'mpi'} = 0 unless defined $desc{'mpi'};
-			if ( $desc{'mpi'} ) {
-				die "the directory wdir or bindir don't exist on $host.\n"
-					if ( remote_cmd($host, "env test -d $param{'wdir'} && test ".
-								"-d $param{'bindir'}")->{'status'} );
-			}
-			while ( $desc{'mpi'} ) {
-				$desc{'mpi'}--;
-				$param{'mpi'}++;
-				$param{'hosts'} .= "$host,";
-			}
+            $desc{'poly_cores'} = $desc{'cores'} 
+                    unless defined $desc{'poly_cores'};
+            $desc{'mpi'} = 0 unless defined $desc{'mpi'};
+            if ( $desc{'mpi'} ) {
+                    die "the directory wdir or bindir don't exist on $host.\n"
+                    if ( remote_cmd($host, "env test -d $param{'wdir'} && test ".
+                                    "-d $param{'bindir'}")->{'status'} );
+            }
+            while ( $desc{'mpi'} ) {
+                    $desc{'mpi'}--;
+                    $param{'mpi'}++;
+                    $param{'hosts'} .= "$host,";
+            }
             $desc{'prefix'} = "$desc{'tmpdir'}/$param{'name'}";
             $desc{'files'}  = {}; # List of files uploaded to the host
-
             $machines{$host} = \%desc;
         } else {
             die "Cannot parse line `$_' in file `$param{'machines'}'.\n";
@@ -410,29 +406,30 @@ sub read_machines {
 
     close FILE;
 
-	if ( $param{'mpi'} ) {
-		chop $param{'hosts'};
-		open FILE, "< $param{'bindir'}/linalg/bwc/bwc.pl"
-    		or die "Cannot open `$param{'bindir'}/linalg/bwc/bwc.pl' for reading: $!.\n";
-		while (<FILE>) {
-			next unless /^my \$mpiexec='';$/;
-			die "CADO-NFS has not been compiled with MPI flag.\n".
-					"Please add the path of the MPI library in the file local.sh ".
-					"(for example: MPI=/usr/lib64/openmpi) and recompile.\n";
-		} 
-		close FILE;
-	} else {
-		if (exists($ENV{'OAR_JOBID'})) {
-    		open FILE, "> $param{'machines'}.tmp"
-        		or die "Cannot open `$param{'machines'}.tmp' for writing: $!.\n";
-			print FILE "tmpdir=$vars{'tmpdir'}\n";
-			print FILE "bindir=$param{'bindir'}\n";
-			print FILE "mpi=1\n";
-			close FILE;
-			cmd( "uniq $ENV{'OAR_NODEFILE'} >> $param{'machines'}.tmp" );
-			read_machines( "$param{'machines'}.tmp" );
-		}
-	}
+    if ( $param{'mpi'} ) {
+            chop $param{'hosts'};
+            open FILE, "< $param{'bindir'}/linalg/bwc/bwc.pl"
+                    or die "Cannot open `$param{'bindir'}/linalg/bwc/bwc.pl' for reading: $!.\n";
+            while (<FILE>) {
+                    next unless /^my \$mpiexec='';$/;
+                    die "CADO-NFS has not been compiled with MPI flag.\n".
+                    "Please add the path of the MPI library in the file local.sh ".
+                    "(for example: MPI=/usr/lib64/openmpi) and recompile.\n";
+            } 
+            close FILE;
+    } else {
+            if (exists($ENV{'OAR_JOBID'})) {
+                    open FILE, "> $param{'machines'}.tmp"
+                            or die "Cannot open `$param{'machines'}.tmp' for writing: $!.\n";
+                    print FILE "tmpdir=$vars{'tmpdir'}\n";
+                    print FILE "bindir=$param{'bindir'}\n";
+                    print FILE "mpi=1\n";
+                    close FILE;
+                    cmd( "uniq $ENV{'OAR_NODEFILE'} >> $param{'machines'}.tmp" );
+                    read_machines( "$param{'machines'}.tmp" );
+            }
+            # TODO: Support other scheduling environments.
+    }
 }
 
 
@@ -452,6 +449,10 @@ my $cmdlog;
 # The return value is another pointer to a hash table:
 #  - `out'    is the captured standard output of the command;
 #  - `status' is the exit status of the command.
+#  - `stderr' where to redirect stderr
+#  - `stdout_and_stderr' redirect both stdout and stderr to given file.
+#  - `append_output' whether to append to redirection file in one of the
+#     two cases above.
 sub cmd {
     my ($cmd, $opt) = @_;
 
@@ -479,7 +480,8 @@ sub cmd {
     my $status = $? >> 8;
 
     if ($? && $opt->{'kill'}) {
-        my $diagnostic= "Command `$cmd' terminated unexpectedly with exit status $status.\n";
+        my $diagnostic= "Command `$cmd' terminated unexpectedly" .
+                " with exit status $status.\n";
         if (!defined($opt->{'stdout_stderr'})) {
             if ($out) {
                 $out =~ s/^/STDOUT: /m;
@@ -537,8 +539,6 @@ sub remote_cmd {
     return $ret;
 }
 
-
-
 ###############################################################################
 # Remote jobs #################################################################
 ###############################################################################
@@ -595,8 +595,8 @@ sub write_jobs {
 # Job description string, with padded fields
 sub job_string {
     my ($job) = @_;
-	my @name = split (/\./, basename($job->{'file'}));
-	my $str = "$name[0] ";  
+    my @name = split (/\./, basename($job->{'file'}));
+    my $str = "$name[0] ";  
     $str .= pad($job->{'host'}, 16);
     $str .= " ".pad($_, 8) for @{$job->{'param'}};
     return $str;
@@ -639,12 +639,14 @@ sub job_status {
     my $status;
 
     my $alive = is_job_alive($job);
-	my $ret;
-	if ($job->{'file'} =~ /\.gz$/) {
-    	$ret   = remote_cmd($job->{'host'}, "env zcat $job->{'file'} | tail -n1 2>&1");
-	} else {	
-    	$ret   = remote_cmd($job->{'host'}, "env tail -n1 $job->{'file'} 2>&1");
-	}
+    my $ret;
+    if ($job->{'file'} =~ /\.gz$/) {
+            $ret = remote_cmd($job->{'host'},
+                    "env zcat $job->{'file'} | tail -n1 2>&1");
+    } else {	
+            $ret = remote_cmd($job->{'host'},
+                    "env tail -n1 $job->{'file'} 2>&1");
+    }
 
     if ($ret->{'status'} == 255) {
         info "Unknown status. Assuming job is still running.\n";
@@ -750,11 +752,11 @@ sub count_lines {
     my ($f, $re) = @_;
 
     my $n = 0;
-	if ($f =~ /\.gz$/) {
-		$n= cmd ( "zcat $f | grep -v '#' | wc -l" )->{'out'};
-		chomp $n;
-		return $n;
-	}
+    if ($f =~ /\.gz$/) {
+            $n= cmd ( "zcat $f | grep -v '#' | wc -l" )->{'out'};
+            chomp $n;
+            return $n;
+    }
     # This seems to be a tad faster than grep -v '$re' | wc -l, so...
     open FILE, "< $f"
        	or die "Cannot open `$f' for reading: $!.\n";
@@ -769,9 +771,7 @@ sub count_lines {
 # Returns the first line of a file.
 sub first_line {
     my ($f) = @_;
-    open FILE, "< $f"
-       	or die "Cannot open `$f' for reading: $!.\n";
-	
+    open FILE, "< $f" or die "Cannot open `$f' for reading: $!.\n";
     $_ = <FILE>;
     close FILE;
     chomp;
@@ -782,13 +782,12 @@ sub first_line {
 sub last_line {
     my ($f) = @_;
     my $last = "";
-	if ($f =~ /\.gz$/) {
-		$last= cmd ("zcat $f | tail -n 1" )->{'out'};
-		chomp $last;
-		return $last;
-	}
-    open FILE, "< $f"
-       	or die "Cannot open `$f' for reading: $!.\n";
+    if ($f =~ /\.gz$/) {
+            $last= cmd ("zcat $f | tail -n 1" )->{'out'};
+            chomp $last;
+            return $last;
+    }
+    open FILE, "< $f" or die "Cannot open `$f' for reading: $!.\n";
 	
     # That should be enough to catch the last line
     seek FILE, -512, 2;
@@ -828,8 +827,7 @@ sub append_poly_params {
 sub local_time {
     my $job= shift;
     $cmdlog = "$param{'prefix'}.cmd";
-    open LOG, ">> $cmdlog"
-        or die "Cannot open `$cmdlog' for writing: $!.\n";
+    open LOG, ">> $cmdlog" or die "Cannot open `$cmdlog' for writing: $!.\n";
     print LOG "# Starting $job on " . localtime() . "\n";
     close LOG;
 }
@@ -1063,6 +1061,8 @@ sub distribute_task {
                 next if $n < 1;
 
                 # Send files and skip to next host if not all files are here
+                # (don't do this as an anonymous loop, as I've seen it
+                # behave oddly).
                 for my $f (@{$opt->{'files'}}) {
                     send_file($h, $f);
                 }
@@ -1093,17 +1093,17 @@ sub distribute_task {
                     last HOST unless @r;
 
                     my $job = { host  => $h,
-								threads => $nth,
-                                file  => "$m->{'prefix'}.$opt->{'suffix'}.".
+                            threads => $nth,
+                            file  => "$m->{'prefix'}.$opt->{'suffix'}.".
                                          "$r[0]-$r[1]",
-                                param => \@r };
-					$job->{'file'} .= ".gz" if $opt->{'gzip'};
+                            param => \@r };
+                    $job->{'file'} .= ".gz" if $opt->{'gzip'};
 
                     info "Starting job: ".job_string($job)."\n";
                     $tab_level++;
-                   	my $cmd = &{$opt->{'cmd'}}(@r, $m, $nth, $opt->{'gzip'}).
-								" & echo \\\$!";
-					my $ret = remote_cmd($h, $cmd, { log => 1 });
+                    my $cmd = &{$opt->{'cmd'}}(@r, $m, $nth, $opt->{'gzip'}).
+                            " & echo \\\$!";
+                    my $ret = remote_cmd($h, $cmd, { log => 1 });
                     if (!$ret->{'status'}) {
                         chomp $ret->{'out'};
                         $job->{'pid'} = $ret->{'out'};
@@ -1119,8 +1119,6 @@ sub distribute_task {
             $tab_level--;
         }
 
-
-
         # Print the progress of the task
         &{$opt->{'progress'}}($file_ranges) if $opt->{'progress'};
 
@@ -1131,22 +1129,22 @@ sub distribute_task {
 
         # Start new job (sequential mode)
         if (!$param{'parallel'} && (my @r = find_hole($opt->{'min'}, $opt->{'max'},
-                                                    $opt->{'len'}, $ranges))) {
-			my $mt = $param{'bwmt'};
-			$mt=$1*$2 if ($mt =~ /^(\d+)x(\d+)$/);
-		    my $nth = min ( $opt->{'max_threads'}, $mt );
+                                $opt->{'len'}, $ranges)))
+        {
+                # XXX What is bwmt doing in here ???
+                my $mt = $param{'bwmt'};
+                $mt=$1*$2 if ($mt =~ /^(\d+)x(\d+)$/);
+                my $nth = min ( $opt->{'max_threads'}, $mt );
 
-            info "Starting job: ".pad($r[0], 8)." ".pad($r[1], 8)."\n";
-            $tab_level++;
-            my $cmd = &{$opt->{'cmd'}}(@r, $machines{'localhost'}, $nth, $opt->{'gzip'});
-            cmd($cmd, { log => 1, kill => 1 });
-			my $check_cmd = "$param{'prefix'}.$opt->{'suffix'}.$r[0]-$r[1]";
-			$check_cmd .= ".gz" if $opt->{'gzip'};
-            &{$opt->{'check'}}($check_cmd, 1); # Exhaustive testing!
-            $tab_level--;
+                info "Starting job: ".pad($r[0], 8)." ".pad($r[1], 8)."\n";
+                $tab_level++;
+                my $cmd = &{$opt->{'cmd'}}(@r, $machines{'localhost'}, $nth, $opt->{'gzip'});
+                cmd($cmd, { log => 1, kill => 1 });
+                my $check_cmd = "$param{'prefix'}.$opt->{'suffix'}.$r[0]-$r[1]";
+                $check_cmd .= ".gz" if $opt->{'gzip'};
+                &{$opt->{'check'}}($check_cmd, 1); # Exhaustive testing!
+                $tab_level--;
         }
-
-
 
         # Wait for a bit before having another go
         if ($param{'parallel'}) {
@@ -1155,8 +1153,6 @@ sub distribute_task {
             sleep $opt->{'delay'};
         }
     }
-
-
 
     # A bit of cleaning on slaves
     if (! $opt->{'bench'}) {
@@ -1825,18 +1821,18 @@ sub do_freerels {
 my $sieve_cmd = sub {
     my ($a, $b, $m, $max_threads, $gzip) = @_;
     my $cmd = "env nice -$param{'sievenice'} ".
-               		"$m->{'bindir'}/sieve/las ".
-					"-I $param{'I'} ".
-    	       		"-poly $m->{'prefix'}.poly ".
-        	  		"-fb $m->{'prefix'}.roots ".
-            		"-q0 $a ".
-		       		"-q1 $b ".
-			  	 	"-mt $max_threads ";
-	$cmd .= "-ratq " if ($param{'ratq'});
+        "$m->{'bindir'}/sieve/las ".
+        "-I $param{'I'} ".
+        "-poly $m->{'prefix'}.poly ".
+        "-fb $m->{'prefix'}.roots ".
+        "-q0 $a ".
+        "-q1 $b ".
+        "-mt $max_threads ";
+    $cmd .= "-ratq " if ($param{'ratq'});
     $cmd .=	"-out $m->{'prefix'}.rels.$a-$b";
-	$cmd .= ".gz" if ($gzip);
-	$cmd .= " > /dev/null 2>&1";
-	return $cmd;
+    $cmd .= ".gz" if ($gzip);
+    $cmd .= " > /dev/null 2>&1";
+    return $cmd;
 };
 
 sub do_sieve {
@@ -1850,30 +1846,32 @@ sub do_sieve {
         info "Imported $n relations from `".basename($f)."'.\n";
     };
 
+    # XXX. No. choose a way -- separate packages, whatever. But an
+    # anonymous function of this size is a no-go.
     my $sieve_check = sub {
         my ($f, $full) = @_;
 
-		unless (-f $f) {
-			warn "File `$f' not found, check not done.\n";
-			return;
-		}
+        unless (-f $f) {
+            warn "File `$f' not found, check not done.\n";
+            return;
+        }
 
 
         return &$import_rels($f) if $f =~ /\.freerels.gz$/;
-		my $is_gzip;
-		$is_gzip=1 if $f =~ /\.gz$/;
+        my $is_gzip;
+        $is_gzip=1 if $f =~ /\.gz$/;
 
         my $check = $f;
         if (!$full) {
             $check = "$param{'prefix'}.rels.tmp";
             # Put the first 10 relations into a temp file
-			if ($is_gzip) {
-				open FILE, "zcat $f|"
-                	or die "Cannot open `$f' for reading: $!.\n";
-			} else {
-            	open FILE, "< $f"
-                	or die "Cannot open `$f' for reading: $!.\n";
-			}
+            if ($is_gzip) {
+                open FILE, "zcat $f|"
+                    or die "Cannot open `$f' for reading: $!.\n";
+            } else {
+                open FILE, "< $f"
+                    or die "Cannot open `$f' for reading: $!.\n";
+            }
             open TMP, "> $check"
                 or die "Cannot open `$check' for writing: $!.\n";
             my $n = 10;
@@ -1914,11 +1912,11 @@ sub do_sieve {
         # If this is a partial (i.e. incomplete) file, we need to adjust
         # the range of covered special q's
         if (last_line($f) !~ /^# (Total \d+ reports|Warning: truncated)/) {
-			if ($is_gzip) {
-				cmd ("gzip -d $f", { kill => 1});
-            	basename($f) =~ /^$param{'name'}\.rels\.([\de.]+)-([\de.]+)\.gz$/;
-				$f = "$param{'prefix'}.rels.$1-$2";
-			}
+            if ($is_gzip) {
+                cmd ("gzip -d $f", { kill => 1});
+                basename($f) =~ /^$param{'name'}\.rels\.([\de.]+)-([\de.]+)\.gz$/;
+                $f = "$param{'prefix'}.rels.$1-$2";
+            }
             open FILE, "+< $f"
                 or die "Cannot open `$f' for update: $!.\n";
 
@@ -1957,10 +1955,10 @@ sub do_sieve {
             $tab_level++;
             cmd("env mv -f $f $param{'prefix'}.rels.$r[0]-$r[1]", { kill => 1 });
             $f = "$param{'prefix'}.rels.$r[0]-$r[1]";
-			if ($is_gzip) {
-				cmd ("gzip $f", { kill => 1});
-            	$f .= ".gz";
-			}
+            if ($is_gzip) {
+                cmd ("gzip $f", { kill => 1});
+                $f .= ".gz";
+            }
             $tab_level--;
         }
 
@@ -1986,103 +1984,97 @@ sub do_sieve {
         # Get the list of relation files
         opendir DIR, $param{'wdir'}
             or die "Cannot open directory `$param{'wdir'}': $!\n";
-        my @files = grep
-			/^$param{'name'}\.(rels\.[\de.]+-[\de.]+(|\.gz)|freerels.gz)$/,
-                         readdir DIR;
+
+        my $pat=qr/^$param{'name'}\.(rels\.[\de.]+-[\de.]+|freerels(?:|.gz))$/;
+
+        my @files = grep /$pat/, readdir DIR;
         closedir DIR;
-		mkdir "$param{'prefix'}.nodup"
-			unless (-d "$param{'prefix'}.nodup");
-		my $nslices = 4;
-		for (my $i=0; $i < $nslices; $i++) {
-			mkdir "$param{'prefix'}.nodup/$i"
-				unless (-d "$param{'prefix'}.nodup/$i");
-		}
+        mkdir "$param{'prefix'}.nodup"
+        unless (-d "$param{'prefix'}.nodup");
+        my $nslices = 4;
+        for (my $i=0; $i < $nslices; $i++) {
+                mkdir "$param{'prefix'}.nodup/$i"
+                unless (-d "$param{'prefix'}.nodup/$i");
+        }
         opendir DIR, "$param{'prefix'}.nodup/0/"
             or die "Cannot open directory `$param{'prefix'}.nodup/0/': $!\n";
-        my @old_files = grep
-			/^$param{'name'}\.(rels\.[\de.]+-[\de.]+(|\.gz)|freerels.gz)$/,
-                         readdir DIR;
+        my @old_files = grep /$pat/, readdir DIR;
         closedir DIR;
-		my %old_files;		
-		$old_files{$_} = 1 for (@old_files);
-		my @new_files;
-		for (@files) {
-			push @new_files, $_ unless (exists ($old_files{$_}));
-		}
+        my %old_files;		
+        $old_files{$_} = 1 for (@old_files);
+        my @new_files;
+        for (@files) {
+                push @new_files, $_ unless (exists ($old_files{$_}));
+        }
 
         # Remove duplicates
         info "Removing duplicates...";
         $tab_level++;
         if (@new_files) {
-        	my $new_files =
-				join " ", (map "$param{'wdir'}/$_", sort @new_files);
-			info "split new files in $nslices slices...";
-        	cmd("$param{'bindir'}/filter/dup1 ".
-            	"-out $param{'prefix'}.nodup $new_files ",
-            	{ log => 1, kill => 1,
-                    stdout_stderr=>"$param{'prefix'}.dup1.stderr" });
-		}
-		my $n = 0;
-		my @allfiles;
-		my $K = int ( 100 + (1.2 * $nrels / $nslices) );
-		for (my $i=0; $i < $nslices; $i++) {
-			info "removing duplicates on slice $i...";
-			$allfiles[$i] = 
-				join "", (map "$param{'prefix'}.nodup/$i/$_\n", sort @files);
-			open FILE, "> $param{'prefix'}.dup2files"
-				or die "Cannot open `$param{'prefix'}.dup2files' for writing: $!.\n";
-			print FILE $allfiles[$i];
-			close FILE;
-	        cmd("$param{'bindir'}/filter/dup2 ".
-    	        "-K $K -out $param{'prefix'}.nodup/$i ".
-				"-filelist $param{'prefix'}.dup2files ",
+                my $new_files = join " ",
+                (map "$param{'wdir'}/$_", sort @new_files);
+                info "split new files in $nslices slices...";
+                cmd("$param{'bindir'}/filter/dup1 ".
+                        "-out $param{'prefix'}.nodup $new_files ",
                         { log => 1, kill => 1,
-                        stdout_stderr => "$param{'prefix'}.dup2.stderr",
+                                stdout_stderr=>"$param{'prefix'}.dup1.stderr" });
+        }
+        my $n = 0;
+        my @allfiles;
+        my $K = int ( 100 + (1.2 * $nrels / $nslices) );
+        for (my $i=0; $i < $nslices; $i++) {
+                info "removing duplicates on slice $i...";
+                $allfiles[$i] = 
+                join "", (map "$param{'prefix'}.nodup/$i/$_\n", sort @files);
+                open FILE, "> $param{'prefix'}.dup2files"
+                        or die "Cannot open `$param{'prefix'}.dup2files' for writing: $!.\n";
+                print FILE $allfiles[$i];
+                close FILE;
+                cmd("$param{'bindir'}/filter/dup2 ".
+                        "-K $K -out $param{'prefix'}.nodup/$i ".
+                        "-filelist $param{'prefix'}.dup2files ",
+                        { log => 1, kill => 1,
+                                stdout_stderr => "$param{'prefix'}.dup2.stderr",
                         });
-			my $f = "$param{'prefix'}.dup2.stderr";
-			open FILE, "< $f"
-				or die "Cannot open `$f' for reading: $!.\n";
-			while (<FILE>) {
-				if ( $_ =~ /^\s+(\d+) remaining relations/ ) {
-                                        # shiftwidth
-                                        # 8 in
-                                        # perl
-                                        # scripts
-                                        # is
-                                        # totally
-                                        # nuts.
-					$n += $1;
-					last;
-				}
-			}
-			close FILE;
-		}
-
-                info "Number of relations left: $n.\n";
-                $tab_level--;
-
-                # Remove singletons
-                info "Removing singletons...";
-                $tab_level++;
-		open FILE, "> $param{'prefix'}.purgefiles"
-			or die "Cannot open `$param{'prefix'}.purgefiles' for writing: $!.\n";
-		for (@allfiles) {
-			print FILE $_;
-		}
-		close FILE;
-                my $ret = cmd("$param{'bindir'}/filter/purge ".
-                    "-poly $param{'prefix'}.poly -keep $param{'keeppurge'} ".
-                    "-excess $param{'excesspurge'} ".
-                    "-nrels $n -out $param{'prefix'}.purged ".
-                    "-filelist $param{'prefix'}.purgefiles ",
-                    { log => 1,
-                        stdout_stderr => "$param{'prefix'}.purge.stderr"
-                    });
-                if ($ret->{'status'}) {
-                    info "Not enough relations! Continuing sieving...\n";
-                    $tab_level--;
-                    return 0;
+                my $f = "$param{'prefix'}.dup2.stderr";
+                open FILE, "< $f"
+                        or die "Cannot open `$f' for reading: $!.\n";
+                while (<FILE>) {
+                        if ( $_ =~ /^\s+(\d+) remaining relations/ ) {
+                                # shiftwidth 8 in perl scripts is
+                                # totally nuts.
+                                $n += $1;
+                                last;
+                        }
                 }
+                close FILE;
+        }
+
+        info "Number of relations left: $n.\n";
+        $tab_level--;
+
+        # Remove singletons
+        info "Removing singletons...";
+        $tab_level++;
+        open FILE, "> $param{'prefix'}.purgefiles"
+                or die "Cannot open `$param{'prefix'}.purgefiles' for writing: $!.\n";
+        for (@allfiles) {
+                print FILE $_;
+        }
+        close FILE;
+        my $ret = cmd("$param{'bindir'}/filter/purge ".
+                "-poly $param{'prefix'}.poly -keep $param{'keeppurge'} ".
+                "-excess $param{'excesspurge'} ".
+                "-nrels $n -out $param{'prefix'}.purged ".
+                "-filelist $param{'prefix'}.purgefiles ",
+                { log => 1,
+                        stdout_stderr => "$param{'prefix'}.purge.stderr"
+                });
+        if ($ret->{'status'}) {
+                info "Not enough relations! Continuing sieving...\n";
+                $tab_level--;
+                return 0;
+        }
 
         # Get the number of rows and columns from the .purged file
         my ($nrows, $ncols) = split / /, first_line("$param{'prefix'}.purged");
@@ -2095,26 +2087,23 @@ sub do_sieve {
 		
         info "Nrows: $nrows; Ncols: $ncols; Excess: $excess.\n";
         $tab_level--;
-		info "Join all no duplicates files into one file...";
-		cmd("cat $param{'prefix'}.purgefiles | xargs zcat ".
-			"| gzip --best > $param{'prefix'}.nodup.gz ",
+        info "Join all no duplicates files into one file...";
+        cmd("cat $param{'prefix'}.purgefiles | xargs zcat ".
+            "| gzip --best > $param{'prefix'}.nodup.gz ",
             { log => 1, kill => 1 });
         $tab_level++;
-		info "clean directory nodup...";
-		cmd("rm -rf $param{'prefix'}.nodup");
+        info "clean directory nodup...";
+        cmd("rm -rf $param{'prefix'}.nodup");
         $tab_level--;
 
         return 1;
     };
-
-
-
     
     distribute_task({ task     => "sieve",
                       title    => "Sieve",
                       suffix   => "rels",
                       extra    => "freerels.gz",
-					  gzip	   => 1,
+                      gzip     => 1,
                       files    => ["$param{'name'}.poly",
                                    "$param{'name'}.roots"],
                       pattern  => '^# Total \d+ reports',
@@ -2127,17 +2116,17 @@ sub do_sieve {
                       progress => $sieve_progress,
                       is_done  => $sieve_is_done,
                       cmd      => $sieve_cmd,
-					  max_threads => $param{'sieve_max_threads'} });
+                      max_threads => $param{'sieve_max_threads'} });
 
     info "All done!\n";
 }
 
 
 sub do_sieve_bench {
-	my $max_rels = shift;
-	my $last = shift;
+    my $max_rels = shift;
+    my $last = shift;
     my $nrels      = 0;
-	my $max_files;
+    my $max_files;
 
     my $import_rels = sub {
         my ($f) = @_;
@@ -2149,24 +2138,24 @@ sub do_sieve_bench {
     my $sieve_check = sub {
         my ($f, $full) = @_;
 
-		unless (-f $f) {
-			warn "File `$f' not found, check not done.\n";
-			return;
-		}
+        unless (-f $f) {
+                warn "File `$f' not found, check not done.\n";
+                return;
+        }
 
-		my $is_gzip;
-		$is_gzip=1 if $f =~ /\.gz$/;
+        my $is_gzip;
+        $is_gzip=1 if $f =~ /\.gz$/;
         my $check = $f;
         if (!$full) {
             $check = "$param{'prefix'}.rels.tmp";
             # Put the first 10 relations into a temp file
-			if ($is_gzip) {
-				open FILE, "zcat $f|"
-                	or die "Cannot open `$f' for reading: $!.\n";
-			} else {
-            	open FILE, "< $f"
-                	or die "Cannot open `$f' for reading: $!.\n";
-			}
+            if ($is_gzip) {
+                open FILE, "zcat $f|"
+                    or die "Cannot open `$f' for reading: $!.\n";
+            } else {
+                open FILE, "< $f"
+                    or die "Cannot open `$f' for reading: $!.\n";
+            }
             open TMP, "> $check"
                 or die "Cannot open `$check' for writing: $!.\n";
             my $n = 10;
@@ -2212,36 +2201,36 @@ sub do_sieve_bench {
     };
 	
     my $sieve_is_done = sub {
-		return 0 if $nrels < $$max_rels[2];
+        return 0 if $nrels < $$max_rels[2];
 
         opendir DIR, $param{'wdir'}
             or die "Cannot open directory `$param{'wdir'}': $!\n";
         my @files = grep /^$param{'name'}\.rels\.[\de.]+-[\de.]+\.gz$/,
                          readdir DIR;
         closedir DIR;
-		@files = map { /\.([\de.]+)-[\de.]+\.gz$/; $1 }
-									@files;
-		@files = sort ( {$a <=> $b} @files );
-		$max_files = $files[-1] unless ($max_files);
-		my $number_files_total = ( $max_files - $param{'qmin'} ) /
-										$$max_rels[1] + 1;
-		my $number_files = 1;
-		while ($files[0] != $max_files) {
-			$number_files++;
-			shift @files;
-		}
-		if ( $number_files == $number_files_total ) {
-	        return 1;
-		} else {
-			return 0;
-		}
+        @files = map { /\.([\de.]+)-[\de.]+\.gz$/; $1 }
+        @files;
+        @files = sort ( {$a <=> $b} @files );
+        $max_files = $files[-1] unless ($max_files);
+        my $number_files_total = ( $max_files - $param{'qmin'} ) /
+        $$max_rels[1] + 1;
+        my $number_files = 1;
+        while ($files[0] != $max_files) {
+            $number_files++;
+            shift @files;
+        }
+        if ( $number_files == $number_files_total ) {
+            return 1;
+        } else {
+            return 0;
+        }
     };
 
     distribute_task({ task     => "sieve",
                       title    => "Sieve",
                       suffix   => "rels",
                       extra    => "freerels.gz",
-					  gzip	   => 1,
+                      gzip	   => 1,
                       files    => ["$param{'name'}.poly",
                                    "$param{'name'}.roots"],
                       pattern  => '^# Total \d+ reports',
@@ -2383,20 +2372,22 @@ sub do_linalg {
                ":complete " .
                "seed=1 ". # For debugging purposes, we use a deterministic BW
                "thr=$mt ";
-		if ( $param{'mpi'} ) {
-			my $a = int ( sqrt($param{'mpi'}) );
-			$a-- while ( $param{'mpi'} % $a != 0);
-			my $b = $param{'mpi'} / $a;				
-       	    $cmd .= "mpi=$b"."x$a hosts=$param{'hosts'} ";
-    		if (exists($ENV{'OAR_JOBID'})) {
-				$cmd .= 
-		"mpi_extra_args='--mca btl_tcp_if_exclude lo,virbr0 --mca plm_rsh_agent oarsh' ";
-			} else {
-				$cmd .= "mpi_extra_args='--mca btl_tcp_if_exclude lo,virbr0' ";
-			}
-		} else {
-       		$cmd .= "mpi=1x1 ";
-		}
+        if ( $param{'mpi'} ) {
+            my $a = int ( sqrt($param{'mpi'}) );
+            $a-- while ( $param{'mpi'} % $a != 0);
+            my $b = $param{'mpi'} / $a;				
+            $cmd .= "mpi=$b"."x$a hosts=$param{'hosts'} ";
+            # TODO: Support other scheduling environments.
+            # TODO: Support non-openmpi command lines.
+            if (exists($ENV{'OAR_JOBID'})) {
+                $cmd .= 
+                "mpi_extra_args='--mca btl_tcp_if_exclude lo,virbr0 --mca plm_rsh_agent oarsh' ";
+            } else {
+                $cmd .= "mpi_extra_args='--mca btl_tcp_if_exclude lo,virbr0' ";
+            }
+        } else {
+            $cmd .= "mpi=1x1 ";
+        }
         $cmd .= "matrix=$param{'prefix'}.small.bin " .
                "nullspace=left " .
                "mm_impl=$param{'bwc_mm_impl'} ".
@@ -2530,13 +2521,13 @@ sub do_sqrt {
         info "Testing dependency number $numdep...\n";
         $tab_level++;
         my $cmd = "$param{'bindir'}/sqrt/sqrt ".
-        "-poly $param{'prefix'}.poly ".
-        "-dep $param{'prefix'}.dep $numdep ".
-        "-rel $param{'prefix'}.nodup.gz ".
-        "-purged $param{'prefix'}.purged ".
-        "-index $param{'prefix'}.index ".
-        "-ker $param{'prefix'}.ker ".
-        "> $f";
+            "-poly $param{'prefix'}.poly ".
+            "-dep $param{'prefix'}.dep $numdep ".
+            "-rel $param{'prefix'}.nodup.gz ".
+            "-purged $param{'prefix'}.purged ".
+            "-index $param{'prefix'}.index ".
+            "-ker $param{'prefix'}.ker ".
+            "> $f";
 
         cmd($cmd, { log => 1, kill => 1,
                 append_output=>1,
@@ -2610,3 +2601,5 @@ sub do_sqrt {
 
 close $log_fh if $log_fh;
 1;
+
+# vim: set tabstop=8 shiftwidth=4 sta et:
