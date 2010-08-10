@@ -51,11 +51,11 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     
     abzero(abase, mrow->v->v, mrow->i1 - mrow->i0);
 
-    uint32_t * gxvecs;
+    uint32_t * gxvecs = NULL;
     
     if (!bw->skip_online_checks) {
         gxvecs = malloc(bw->nx * bw->m * sizeof(uint32_t));
-        load_x(gxvecs, bw->m, bw->nx, pi);
+        load_x(gxvecs, bw->m, bw->nx, pi, mmt->bal);
     }
 
     int rc;
@@ -292,7 +292,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         }
 
         char * s_name2;
-        rc = asprintf(&s_name2, COMMON_VECTOR_ITERATE_PATTERN, s_name, s + bw->interval);
+        rc = asprintf(&s_name2, COMMON_VECTOR_ITERATE_PATTERN, s_name, s + bw->interval, mmt->bal->h->checksum);
 
         pi_save_file_2d(pi, bw->dir, s_name2, sum->v, (ii1 - ii0) * rstride);
         free(s_name2);

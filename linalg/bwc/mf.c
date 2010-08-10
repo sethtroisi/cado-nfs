@@ -437,6 +437,36 @@ void balancing_write(balancing_ptr bal, const char * mfile, const char * suggest
     free(filename);
 }
 
+void balancing_read_header_inner(balancing_ptr bal, FILE * pfile)
+{
+    int rc = fread(&bal->h, sizeof(struct balancing_header_s), 1, pfile);
+    ASSERT_ALWAYS(rc == 1);
+    bal->trows = bal->h->nrows;
+    bal->tcols = bal->h->ncols;
+    if (bal->h->flags & FLAG_PADDING) {
+        bal->tcols = bal->trows = MAX(bal->h->nrows, bal->h->ncols);
+    }
+}
+
+void balancing_read_header(balancing_ptr bal, const char * filename)
+{
+    FILE * pfile;
+    char * derived = derived_filename(filename, "hdr", ".bin");
+    ASSERT_ALWAYS(filename);
+    pfile = fopen(filename, "r");
+    if (pfile == NULL) {
+        pfile = fopen(derived, "r");
+        if (pfile == NULL) {
+            fprintf(stderr, "Cannot read %s nor %s: %s\n",
+                    filename, derived, strerror(errno));
+            abort();
+        }
+    }
+    balancing_read_header_inner(bal, pfile);
+    fclose(pfile);
+    free(derived);
+}
+
 void balancing_read(balancing_ptr bal, const char * filename)
 {
     FILE * pfile;
@@ -446,19 +476,19 @@ void balancing_read(balancing_ptr bal, const char * filename)
         perror(filename);
         abort();
     }
-    int rc = fread(&bal->h, sizeof(struct balancing_header_s), 1, pfile);
-    bal->trows = bal->h->nrows;
-    bal->tcols = bal->h->ncols;
+    balancing_read_header_inner(bal, pfile);
     if (bal->h->flags & FLAG_PADDING) {
         bal->tcols = bal->trows = MAX(bal->h->nrows, bal->h->ncols);
     }
     if (bal->h->flags & FLAG_ROWPERM) {
         bal->rowperm = malloc(bal->trows * sizeof(uint32_t));
-        rc = fread(bal->rowperm, sizeof(uint32_t), bal->trows, pfile);
+        int rc = fread(bal->rowperm, sizeof(uint32_t), bal->trows, pfile);
+        ASSERT_ALWAYS(rc == (int) bal->trows);
     }
     if (bal->h->flags & FLAG_COLPERM) {
         bal->colperm = malloc(bal->tcols * sizeof(uint32_t));
-        rc = fread(bal->colperm, sizeof(uint32_t), bal->tcols, pfile);
+        int rc = fread(bal->colperm, sizeof(uint32_t), bal->tcols, pfile);
+        ASSERT_ALWAYS(rc == (int) bal->tcols);
     }
     fclose(pfile);
 }

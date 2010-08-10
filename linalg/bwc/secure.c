@@ -49,7 +49,7 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
 
     uint32_t * gxvecs = malloc(bw->nx * bw->m * sizeof(uint32_t));
 
-    load_x(gxvecs, bw->m, bw->nx, pi);
+    load_x(gxvecs, bw->m, bw->nx, pi, mmt->bal);
 
     ASSERT_ALWAYS(bw->m >= NCHECKS_CHECK_VECTOR);
     for(int j = 0 ; j < NCHECKS_CHECK_VECTOR ; j++) {

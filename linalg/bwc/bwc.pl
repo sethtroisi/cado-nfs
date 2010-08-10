@@ -23,7 +23,7 @@ The action to be performed is either:
 - one of the special actions defined by the script. These actions are
   prepended by a colon.
     :complete -- do a complete linear system solving. The solution ends
-                 up in \$wdir/W.twisted.
+                 up in \$wdir/W.
     :wipeout  -- quite like rm -rf \$wdir, but focuses on bwc files. Does
                  not wipe out matrix file, nor cached in-memory files.
     :bench    -- does :wipeout, dispatch, prep, secure, and krylov with
@@ -93,6 +93,7 @@ my @mpi_split=(1,1);
 my @thr_split=(1,1);
 my $matrix;
 my $balancing;
+my $balancing_hash;
 my $hostfile;
 
 ## mpiexec is substituted by cmake in case mpi has been used for the
@@ -544,11 +545,13 @@ push @main_args, splice @extra_args;
 push @main_args, "matrix=$matrix";
 
 sub obtain_bfile {
+    return if $balancing;
     opendir(my $dh, $wdir);
     my $x = $matrix;
     $x =~ s/\.(bin|txt)$//;
     $x =~ s/^.*\/([^\/]+)$/$1/;
-    my @bfiles = grep { /^$x.${nh}x${nv}.[0-9a-f]{8}.bin$/ } readdir $dh;
+    my $pat = qr/^$x.${nh}x${nv}.([0-9a-f]{8}).bin$/;
+    my @bfiles = grep { /$pat/ } readdir $dh;
     if (scalar @bfiles != 1) {
         print STDERR "Expected 1 bfile, found ", scalar @bfiles, ":\n";
         print "$_\n" foreach (@bfiles);
@@ -556,6 +559,8 @@ sub obtain_bfile {
     }
     closedir $dh;
     $balancing=$bfiles[0];
+    $balancing =~ /$pat/;
+    $balancing_hash = $1;
 }
 
 sub last_cp {
@@ -569,11 +574,12 @@ sub last_cp {
         die "please enlighten me";
     }
     opendir DIR, $wdir or die "Cannot open directory `$wdir': $!\n";
-    my @cp= grep $pat, readdir DIR;
+    my @cp= grep /$pat/, readdir DIR;
     close DIR;
     return undef unless @cp;
-    @cp = grep { /\.(\d+)\.twisted$/ } @cp;
-    @cp = map { /\.(\d+)\.twisted$/; $1 } @cp;
+    obtain_bfile();
+    @cp = grep { /\.(\d+)\.$balancing_hash$/ } @cp;
+    @cp = map { /\.(\d+)\.$balancing_hash$/; $1 } @cp;
     my $l = max( @cp );
     return $l;
 }
@@ -616,9 +622,9 @@ sub drive {
                 &drive("mf_bal", "mfile=$matrix", "out=$wdir/", $nh, $nv);
                 obtain_bfile();
                 push @_, "balancing=$balancing";
-                &drive("u64_dispatch", @_, "sequential_cache_build=1");
+                &drive("${mode}_dispatch", @_, "sequential_cache_build=1");
                 &drive("u64n_prep", @_);
-                &drive("u64_secure", @_);
+                &drive("u64_secure", @_) unless $param->{'skip_online_checks'};
                 &drive("./split", @_, "--split-y");
                 &drive("${mode}_krylov", @_);
             } else {
@@ -643,9 +649,9 @@ sub drive {
         # Pending an improvement to the gather code, a quick workaround
         # is to return the full thing for the characters step.
         opendir D, $wdir;
-        for my $f (grep { /^K\.\d+\.twisted$/ } readdir D) {
+        for my $f (grep { /^K\.\d+\.$balancing_hash$/ } readdir D) {
             my $g = $f;
-            $g =~ s/\.twisted$//;
+            $g =~ s/\.$balancing_hash$//;
             &drive("mf_untwistvec", "$wdir/$balancing", "$wdir/$f", "--out", "$wdir/$g");
         }
         closedir D;

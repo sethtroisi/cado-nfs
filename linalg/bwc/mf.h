@@ -73,6 +73,7 @@ extern void balancing_finalize(balancing_ptr bal);
 extern void balancing_write_inner(balancing_ptr bal, const char *);
 extern void balancing_write(balancing_ptr bal, const char * , const char *);
 extern void balancing_read(balancing_ptr bal, const char *);
+extern void balancing_read_header(balancing_ptr bal, const char * filename);
 extern void balancing_clear(balancing_ptr bal);
 extern void balancing_init(balancing_ptr bal);
 

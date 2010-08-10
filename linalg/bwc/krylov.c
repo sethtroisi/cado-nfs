@@ -53,7 +53,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
     uint32_t * gxvecs = malloc(bw->nx * bw->m * sizeof(uint32_t));
 
-    load_x(gxvecs, bw->m, bw->nx, pi);
+    load_x(gxvecs, bw->m, bw->nx, pi, mmt->bal);
 
     char * v_name;
 

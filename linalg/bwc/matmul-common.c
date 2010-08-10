@@ -19,7 +19,8 @@ FILE * matmul_common_reload_cache_fopen(size_t stride, struct matmul_public_s * 
     FILE * f = fopen(mm->cachefile_name, "r");
     if (f == NULL) return NULL;
 
-    printf("Loading %s via cache file %s\n", mm->locfile, mm->cachefile_name);
+    // mm->cachefile_name is a cache file for mm->locfile (which in
+    // general never exists)
 
     uint32_t magic_check;
     MATMUL_COMMON_READ_ONE32(magic_check, f);

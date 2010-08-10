@@ -17,7 +17,7 @@ set_target_properties(test_hello PROPERTIES
         LINK_FLAGS "--mpi")
 
 add_executable(random random.c)
-add_executable(split split.c bw-common.c)
+add_executable(split split.c bw-common.c mf.c)
 #add_executable(shell
 #    shell.c parallelizing_info.c bw-common.c bw-common-mpi.c)
 #set_target_properties(shell

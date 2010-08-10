@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <dirent.h>
+#include <unistd.h>
 
 #include "bwc_config.h"
 #include "debug.h"
@@ -32,7 +33,7 @@ void keep_rolling_checkpoints(balancing_ptr bal, const char * stem, unsigned int
     struct dirent * de;
 
     char * spat;
-    int rc = asprintf(&spat, "%s.%%u.twisted", stem);
+    int rc = asprintf(&spat, COMMON_VECTOR_ITERATE_PARSE_PATTERN, stem, bal->h->checksum);
     ASSERT_ALWAYS(rc >= 0);
 
     unsigned int * vs = NULL;

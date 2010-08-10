@@ -164,7 +164,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
         bw->nx = my_nx;
     }
 
-    save_x(xvecs, bw->m, my_nx, pi);
+    save_x(xvecs, bw->m, my_nx, pi, mmt->bal);
 
     matmul_top_clear(mmt, abase);
 

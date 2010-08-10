@@ -14,6 +14,7 @@
 #include "filenames.h"
 #include "bw-common.h"
 #include "params.h"
+#include "mf.h"
 
 char * ifile;
 char * ofile_fmt;
@@ -40,6 +41,7 @@ void usage()
 int main(int argc, char * argv[])
 {
     FILE ** files;
+    balancing bal;
 
     param_list pl;
     param_list_init(pl);
@@ -49,6 +51,14 @@ int main(int argc, char * argv[])
     bw_common_init(bw, pl, &argc, &argv);
     int nsplits;
     nsplits = param_list_parse_int_list(pl, "splits", splits, MAXSPLITS, ",");
+
+    const char * balancing_filename = param_list_lookup_string(pl, "balancing");
+    if (!balancing_filename) {
+        fprintf(stderr, "Required argument `balancing' is missing\n");
+        usage();
+    }
+    balancing_read_header(bal, balancing_filename);
+
     if (param_list_warn_unused(pl)) usage();
     if (split_f + split_y != 1) {
         fprintf(stderr, "Please select one of --split-y or --split-f\n");
@@ -58,7 +68,6 @@ int main(int argc, char * argv[])
         fprintf(stderr, "Please indicate the splitting points\n");
         usage();
     }
-    param_list_clear(pl);
 
     files = malloc(nsplits * sizeof(FILE *));
 
@@ -83,9 +92,9 @@ int main(int argc, char * argv[])
     /* prepare the file names */
     if (split_y) {
         rc = asprintf(&ifile, COMMON_VECTOR_ITERATE_PATTERN,
-                Y_FILE_BASE, 0);
+                Y_FILE_BASE, 0, bal->h->checksum);
         rc = asprintf(&ofile_fmt, COMMON_VECTOR_ITERATE_PATTERN,
-                V_FILE_BASE_PATTERN, 0);
+                V_FILE_BASE_PATTERN, 0, bal->h->checksum);
     } else {
         ifile = strdup(LINGEN_F_FILE);
         ofile_fmt = strdup(F_FILE_SLICE_PATTERN);
@@ -176,6 +185,7 @@ int main(int argc, char * argv[])
         }
     }
 
+    param_list_clear(pl);
     for(int i = 0 ; i < nsplits ; i++) {
         fclose(files[i]);
     }

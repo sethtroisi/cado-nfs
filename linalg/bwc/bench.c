@@ -87,6 +87,13 @@ void init_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct b
         pthread_mutex_unlock(&tg->mu);
     }
 
+    pthread_mutex_lock(&tg->mu);
+    fprintf(stderr, "T%u uses cache file %s\n",
+            tnum,
+            /* cache for mmt->locfile, */
+            p->mm->cachefile_name);
+    pthread_mutex_unlock(&tg->mu);
+
     unsigned int nr = p->mm->dim[0];
     unsigned int nc = p->mm->dim[1];
     matmul_aux(p->mm, MATMUL_AUX_GET_READAHEAD, &nr);

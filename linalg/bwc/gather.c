@@ -17,6 +17,7 @@
 #include "xvectors.h"
 #include "bw-common-mpi.h"
 #include "filenames.h"
+#include "mf.h"
 
 struct sfile_info {
     unsigned int n0,n1;
@@ -30,12 +31,16 @@ struct sfiles_list {
 };
 
 
-void prelude(parallelizing_info_ptr pi, struct sfiles_list * s)
+static void prelude(parallelizing_info_ptr pi, struct sfiles_list * s, balancing_ptr bal)
 {
     s->sfiles_alloc=0;
     s->sfiles = NULL;
     s->nsfiles=0;
     serialize_threads(pi->m);
+    int rc;
+    char * spat;
+    rc = asprintf(&spat, S_FILE_PATTERN "%%n", bal->h->checksum);
+    ASSERT_ALWAYS(rc >= 0);
     if (pi->m->jrank == 0 && pi->m->trank == 0) {
         /* It's our job to collect the directory data.
          */
@@ -45,11 +50,9 @@ void prelude(parallelizing_info_ptr pi, struct sfiles_list * s)
         for( ; (de = readdir(dir)) != NULL ; ) {
             int k;
             int rc;
-            // S_FILE_BASE_PATTERN
-            // COMMON_VECTOR_ITERATE_PATTERN
             unsigned int n0,n1;
             unsigned int iter;
-            rc = sscanf(de->d_name, S_FILE_PATTERN "%n", &n0, &n1, &iter, &k);
+            rc = sscanf(de->d_name, spat, &n0, &n1, &iter, &k);
             if (rc < 3 || k != (int) strlen(de->d_name)) {
                 continue;
             }
@@ -71,7 +74,7 @@ void prelude(parallelizing_info_ptr pi, struct sfiles_list * s)
         }
         closedir(dir);
     }
-
+    free(spat);
     /* Note that it's not necessary to care about the file names -- in
      * practice, the file name is only relevant to the job/thread doing
      * actual I/O.
@@ -119,8 +122,6 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
     struct sfiles_list sf[1];
 
-    prelude(pi, sf);
-
     abobj_t abase;
     abobj_init(abase);
     abobj_set_nbys(abase, bw->n);
@@ -133,6 +134,8 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     flags[!bw->dir] = 0;
 
     matmul_top_init(mmt, abase, pi, flags, pl, bw->dir);
+
+    prelude(pi, sf, mmt->bal);
 
     mmt_wiring_ptr mcol = mmt->wr[bw->dir];
     mmt_wiring_ptr mrow = mmt->wr[!bw->dir];
@@ -160,9 +163,12 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
     int rc;
     char * tmp;
+    char * spat;
+    rc = asprintf(&spat, S_FILE_PATTERN, mmt->bal->h->checksum);
+    ASSERT_ALWAYS(rc >= 0);
 
     for(int i = 0 ; i < sf->nsfiles ; i++) {
-        rc = asprintf(&tmp, S_FILE_PATTERN,
+        rc = asprintf(&tmp, spat,
                 sf->sfiles[i].n0,
                 sf->sfiles[i].n1,
                 sf->sfiles[i].iter);
@@ -178,11 +184,13 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                     svec->v + abbytes(abase, j - ii0));
         }
     }
+    free(spat);
 
     /* We're simply using file I/O as a means of broadcast. It's much
      * easier, since we'll be doing I/O anyway...
      */
-    rc = asprintf(&tmp, K_FILE_PATTERN, 0);
+    rc = asprintf(&tmp, COMMON_VECTOR_ITERATE_PATTERN, K_FILE_BASE_PATTERN, 0, mmt->bal->h->checksum);
+    ASSERT_ALWAYS(rc >= 0);
     pi_save_file_2d(pi, bw->dir, tmp, tvec->v, (ii1 - ii0) * stride);
     free(tmp);
     
@@ -219,14 +227,18 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             }
             if (pi->m->jrank == 0 && pi->m->trank == 0) {
                 int rc;
-                rc = asprintf(&tmp, K_FILE_PATTERN, i-1);
+                rc = asprintf(&tmp, K_FILE_PATTERN, i-1, mmt->bal->h->checksum);
                 ASSERT_ALWAYS(rc != -1);
-                unlink(W_FILE);
-                rc = link(tmp, W_FILE);
+                char * tmp2;
+                rc = asprintf(&tmp2, W_FILE, mmt->bal->h->checksum);
+                ASSERT_ALWAYS(rc >= 0);
+                unlink(tmp2);
+                rc = link(tmp, tmp2);
                 if (rc < 0) {
                     fprintf(stderr, "Cannot hard link %s to %s: %s\n",
-                            W_FILE, tmp, strerror(errno));
+                            tmp2, tmp, strerror(errno));
                 }
+                free(tmp2);
                 free(tmp);
             }
             break;

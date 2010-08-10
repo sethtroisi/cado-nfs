@@ -304,7 +304,7 @@ static void save_vector_toprow_generic(matmul_top_data_ptr mmt, size_t stride, m
 
     char * filename;
     int rc;
-    rc = asprintf(&filename, COMMON_VECTOR_ITERATE_PATTERN, name, iter);
+    rc = asprintf(&filename, COMMON_VECTOR_ITERATE_PATTERN, name, iter, mmt->bal->h->checksum);
     FATAL_ERROR_CHECK(rc < 0, "out of memory");
 
     size_t mysize = stride * (mcol->i1 - mcol->i0);
@@ -330,7 +330,7 @@ void load_vector_toprow_generic(matmul_top_data_ptr mmt, size_t stride, mmt_gene
 
     char * filename;
     int rc;
-    rc = asprintf(&filename, COMMON_VECTOR_ITERATE_PATTERN, name, iter);
+    rc = asprintf(&filename, COMMON_VECTOR_ITERATE_PATTERN, name, iter, mmt->bal->h->checksum);
     FATAL_ERROR_CHECK(rc < 0, "out of memory");
 
     size_t mysize = stride * (mcol->i1 - mcol->i0);
@@ -537,7 +537,7 @@ void matmul_top_init(matmul_top_data_ptr mmt,
     // wr[]->*
     // are filled in later within read_info_file
 
-    balancing_read(mmt->bal, param_list_lookup_string(pl, "balancing"));
+    balancing_read_header(mmt->bal, param_list_lookup_string(pl, "balancing"));
     mmt_fill_fields_from_balancing(mmt, pl);
 
     // after that, we need to check for every node if the cache file can
@@ -707,9 +707,10 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
     }
 
     my_pthread_mutex_lock(mmt->pi->m->th->m);
-    fprintf(stderr, "J%uT%u uses %s via cache file %s\n",
+    fprintf(stderr, "J%uT%u uses cache file %s\n",
             mmt->pi->m->jrank, mmt->pi->m->trank,
-            mmt->locfile, mmt->mm->cachefile_name);
+            /* cache for mmt->locfile, */
+            mmt->mm->cachefile_name);
     my_pthread_mutex_unlock(mmt->pi->m->th->m);
 
     abobj_set_nbys(mmt->abase, normal_nbys);
