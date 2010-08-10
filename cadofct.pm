@@ -242,11 +242,14 @@ sub read_param {
         }
         for my $p (@param_list) {
             if (/^$p=(.*)$/) {
+                my $v=$1;
                 if ($secondary && $p =~ /^(wdir)$/) {
-                    warn "$_ ignored in secondary input file\n";
+                    if (!defined($param->{$p}) || $param->{$p} ne $v) {
+                        warn "$_ ignored in secondary input file\n";
+                    }
                     next ARGS;
                 }
-                $param->{$p} = $1;
+                $param->{$p} = $v;
                 $count_args++;
                 my $f;
                 if ($p eq 'wdir') {

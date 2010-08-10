@@ -5,7 +5,7 @@
 # General parameters
 ###########################################################################
 
-wdir=/tmp/noise         # directory where temporary files are put
+#wdir=/tmp/noise         # directory where temporary files are put
 name=c72                # basename for temporary files
 #bindir=$HOME/cado     # where to find cado binaries
 parallel=1              # do we use parallel computation?
