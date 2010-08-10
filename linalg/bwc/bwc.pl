@@ -610,29 +610,46 @@ sub drive {
 
     if ($program eq ':complete') {
         my $cp;
-        if (defined($cp = last_cp('mksol'))) {
-            &drive("${mode}_mksol", @_, "start=$cp");
-            &drive("u64n_gather", @_);
-            return;
-        } elsif (defined($cp = last_cp('krylov'))) {
-            &drive("${mode}_krylov", @_, "start=$cp");
+        unless (defined($cp = last_cp('mksol'))) {
+            unless (defined($cp = last_cp('krylov'))) {
+                &drive(":wipeout", @_);
+                &drive("mf_bal", "mfile=$matrix", "out=$wdir/", $nh, $nv);
+                obtain_bfile();
+                push @_, "balancing=$balancing";
+                &drive("u64_dispatch", @_, "sequential_cache_build=1");
+                &drive("u64n_prep", @_);
+                &drive("u64_secure", @_);
+                &drive("./split", @_, "--split-y");
+                &drive("${mode}_krylov", @_);
+            } else {
+                obtain_bfile();
+                push @_, "balancing=$balancing";
+                &drive("${mode}_krylov", @_, "start=$cp");
+            }
+            &drive("./acollect", @_, "--remove-old");
+            &drive("./lingen", @_, "--lingen-threshold", 64);
+            &drive("./split", @_, "--split-f");
+            &drive("${mode}_mksol", @_);
         } else {
-            &drive(":wipeout", @_);
-            &drive("mf_bal", "mfile=$matrix", "out=$wdir/", $nh, $nv);
             obtain_bfile();
             push @_, "balancing=$balancing";
-            &drive("u64_dispatch", @_, "sequential_cache_build=1");
-            &drive("u64n_prep", @_);
-            &drive("u64_secure", @_);
-            &drive("./split", @_, "--split-y");
-            &drive("${mode}_krylov", @_);
+            &drive("${mode}_mksol", @_, "start=$cp");
         }
-        &drive("./acollect", @_, "--remove-old");
-        &drive("./lingen", @_, "--lingen-threshold", 64);
-        &drive("./split", @_, "--split-f");
-        &drive("${mode}_mksol", @_);
         &drive("u64n_gather", @_);
-        &drive("mf_untwistvec", "$wdir/$balancing", "$wdir/W.twisted", "--out", "$wdir/W");
+        # The kernel is within the space K, MK, M^2K, and so on.
+        # Restricting to the last non-zero member is not necessarily
+        # correct, if we happen to have pathological matrices (with
+        # zero rows in the case of left nullspaces, for instance).
+        # Pending an improvement to the gather code, a quick workaround
+        # is to return the full thing for the characters step.
+        opendir D, $wdir;
+        for my $f (grep { /^K\.\d+\.twisted$/ } readdir D) {
+            my $g = $f;
+            $g =~ s/\.twisted$//;
+            &drive("mf_untwistvec", "$wdir/$balancing", "$wdir/$f", "--out", "$wdir/$g");
+        }
+        closedir D;
+        # &drive("mf_untwistvec", "$wdir/$balancing", "$wdir/W.twisted", "--out", "$wdir/W");
         return;
     }
 
@@ -651,7 +668,6 @@ sub drive {
 
     $program="$bindir/$program";
 
-    # if ($mpi_split[0] * $mpi_split[1] != 1) {
     if ($mpi_needed) {
         unshift @_, $program;
         if ($program =~ /(?:split|acollect|lingen)$/) {

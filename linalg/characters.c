@@ -320,15 +320,22 @@ static void printTabMatrix(dense_mat_t * mat, int nrows, int ncols)
 
 // We add the heaviest columns of M_small to the last
 // [k_minus_skip..k_minus_skip+skip[ columns of charmat.
+//
+// Since replay now splits M_small into a dense and a sparse block
+// according to the skip parameter, this exactly corresponds to adding
+// the small.dense submatrix, whose number of columns is equal to skip by
+// construction.
+//
 static void
 addHeavyBlock(char **charmat, const char * smallfilename, int small_nrows, int k_minus_skip, int skip)
 {
-    int i, nc, j, u;
+    int i, nc, u;
     int rc;
 
-    fprintf(stderr, "Adding heavy block of width %d\n", skip);
+    
     FILE * smallfile = fopen(smallfilename, "r");
-    ASSERT_ALWAYS(smallfile);
+    ASSERT_ALWAYS((smallfile != NULL) == (skip != 0));
+    fprintf(stderr, "Adding heavy block of width %d\n", skip);
     if (has_suffix(smallfilename, ".bin")) {
         fprintf(stderr, "Reading %s in binary format\n", smallfilename);
         for(int i = 0 ; i < small_nrows ; i++) {
@@ -348,20 +355,22 @@ addHeavyBlock(char **charmat, const char * smallfilename, int small_nrows, int k
                     fprintf(stderr, "%s: short read\n", smallfilename);
                     exit(1);
                 }
-                if (j < (uint32_t) skip)
-                    charmat[i][k_minus_skip + j] = (char) (-1);        // humf...!
+                ASSERT_ALWAYS(j < (uint32_t) skip);
+                charmat[i][k_minus_skip + j] = (char) (-1);        // humf...!
             }
         }
     } else {
         rc = fscanf(smallfile, "%d %d", &i, &nc);
         ASSERT_ALWAYS(rc == 2);
+        ASSERT_ALWAYS(nc == skip);
         i = 0;
         while (fscanf(smallfile, "%d", &nc) != EOF) {
             for (u = 0; u < nc; u++) {
+                int j;
                 rc = fscanf(smallfile, "%d", &j);
                 ASSERT_ALWAYS(rc == 1);
-                if (j < skip)
-                    charmat[i][k_minus_skip + j] = (char) (-1);        // humf...!
+                ASSERT_ALWAYS(j < skip);
+                charmat[i][k_minus_skip + j] = (char) (-1);        // humf...!
             }
             i++;
         }
@@ -392,8 +401,7 @@ handleKer (dense_mat_t * mat, alg_prime_t * tabchar, FILE * purgedfile,
     }
     buildCharacterMatrix(charmat, k - skip, tabchar,
                          purgedfile, indexfile, relfile, pol, small_nrows);
-    if (skip > 0)
-        addHeavyBlock(charmat, smallfilename, small_nrows, k - skip, skip);
+    addHeavyBlock(charmat, smallfilename, small_nrows, k - skip, skip);
 #ifndef NDEBUG
     fprintf (stderr, "Checking character matrix\n");
     for (i = 0; i < small_nrows; ++i)

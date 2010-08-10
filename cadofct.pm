@@ -34,7 +34,7 @@ use File::Basename;
 use Cwd qw(abs_path);
 use List::Util qw[min];
 use POSIX qw(ceil);
-
+use Math::BigInt;
 
 
 ###############################################################################
@@ -224,19 +224,46 @@ while (@default_param) {
 #             (i.e. die in case of parsing errors)
 sub read_param {
     my ($param, $opt) = (shift, shift);
-	my $count_args = 0;
+    my $count_args = 0;
+
+    my %files_read = ();
+
+    @_ = map { [$_, 0] } @_;
 
     ARGS : while (defined ($_ = shift)) {
+        die unless ref $_ eq 'ARRAY';
+        my $secondary = $_->[1];
+        $_=$_->[0];
+        next if $files_read{$_};
+        $files_read{$_}=1;
+        if (-d $_) {
+            info "interpreting directory $_ as wdir=$_";
+            $_ = "wdir=$_";
+        }
         for my $p (@param_list) {
             if (/^$p=(.*)$/) {
+                if ($secondary && $p =~ /^(wdir)$/) {
+                    warn "$_ ignored in secondary input file\n";
+                    next ARGS;
+                }
                 $param->{$p} = $1;
-				$count_args++;
+                $count_args++;
+                my $f;
+                if ($p eq 'wdir') {
+                    $f = "$1/param";
+                } elsif ($p eq 'name' && defined($param->{'wdir'})) {
+                    $f = "$param->{'wdir'}/$param->{'name'}.param";
+                }
+                if (defined($f) && -f $f && !$files_read{$f}) {
+                    $count_args--;
+                    info "Reading extra parameters from $f\n";
+                    unshift @_, [$f,1]
+                }
                 next ARGS;
             }
         }
         if (/^params?=(.*)$/) {
-			warn "Paramfile is not the first arguments !\n"
-				if ($count_args);
+            warn "Paramfile is not the first argument !\n" if ($count_args);
             my $file = $1;
             open FILE, "< $file"
                 or die "Cannot open `$file' for reading: $!.\n";
@@ -252,9 +279,9 @@ sub read_param {
                     if $opt->{'strict'};
             }
             close FILE;
-            unshift @_, @args;
+            unshift @_, map { [$_,$secondary] } @args;
         } elsif (-f $_) {
-            unshift @_, "param=$_";
+            unshift @_, [ "param=$_", $secondary ];
         } else {
             die "Unknown argument: `$_'.\n" if $opt->{'strict'};
         }
@@ -308,15 +335,23 @@ my %machines;
 
 # Reads the machine description file for parallel computing
 sub read_machines {
-	my $file = shift;
+    my $file = shift;
     die "No machine description file was defined.\n" if !$param{'machines'};
-	if ( $file ) {
-    	open FILE, "< $file"
-        	or die "Cannot open `$param{'machines'}' for reading: $!.\n";
-	} else {
-    	open FILE, "< $param{'machines'}"
-        	or die "Cannot open `$param{'machines'}' for reading: $!.\n";
-	}
+    if ( $file ) {
+        open FILE, "< $file"
+            or die "Cannot open `$param{'machines'}' for reading: $!.\n";
+    } else {
+        # read from given location if given as an absolute file,
+        # otherwise understand as a location relative to the working
+        # directory.
+        my $m = $param{'machines'};
+        if ($m !~ m{/}) {
+            info "interpreting filename $m as relative to wdir $param{'wdir'}\n";
+            $m = "$param{'wdir'}/$m";
+        }
+        open FILE, "< $m"
+            or die "Cannot open `$m' for reading: $!.\n";
+    }
 
     my %vars = ();
 	
@@ -420,6 +455,19 @@ my $cmdlog;
 sub cmd {
     my ($cmd, $opt) = @_;
 
+    my $error_file;
+    my $redir='>';
+    if ($opt->{'append_output'}) {
+        $redir='>>'
+    }
+    if (defined($_=$opt->{'stderr'})) {
+        $error_file=$_;
+        $cmd .= " 2$redir$_";
+    } elsif (defined($_=$opt->{'stdout_stderr'})) {
+        $error_file=$_;
+        $cmd .= " $redir$_ 2>&1";
+    }
+
     if ($cmdlog && $opt->{'log'}) {
         open LOG, ">> $cmdlog"
             or die "Cannot open `$cmdlog' for writing: $!.\n";
@@ -430,9 +478,21 @@ sub cmd {
     my $out    = `$cmd`;
     my $status = $? >> 8;
 
-    die "Command `$cmd' terminated unexpectedly with exit status $status".
-        ($out ? ":\n$out\n" : ".\n")
-        if $? && $opt->{'kill'};
+    if ($? && $opt->{'kill'}) {
+        my $diagnostic= "Command `$cmd' terminated unexpectedly with exit status $status.\n";
+        if (!defined($opt->{'stdout_stderr'})) {
+            if ($out) {
+                $out =~ s/^/STDOUT: /m;
+                $diagnostic .= "$out\n";
+            } else {
+                $diagnostic .= "STDOUT: none.\n";
+            }
+        }
+        if ($error_file) {
+            $diagnostic .= `tail $error_file | sed -e 's,^,STDERR: ,'`;
+        }
+        die $diagnostic;
+    }
 
     return { out => $out, status => $status };
 }
@@ -917,13 +977,11 @@ sub distribute_task {
                     if ($status == 1) {
                         # Job is still alive: keep it in the list
                         push @new_jobs, $job;
-                    }
-                    elsif ($status == 0 || $opt->{'partial'}) {
+                    } elsif ($status == 0 || $opt->{'partial'}) {
                         # Job is (partially) terminated: mark it as done
                         delete $job->{'pid'};
                         push @done, $job;
-                    }
-                    else {
+                    } else {
                         # Job is dead: remove its output file on the host
                         remote_cmd($job->{'host'}, "env rm -f $job->{'file'}");
                     }
@@ -966,8 +1024,6 @@ sub distribute_task {
             write_jobs($jobs, "$param{'prefix'}.$opt->{'task'}_jobs");
         }
 
-
-
         # Scan ranges
         my $ranges = [];
 
@@ -984,7 +1040,7 @@ sub distribute_task {
         my $file_ranges = [ map [@$_], @$ranges ];
 
         # Add the ranges from running or done jobs
-		my $good_jobs = [ grep { $_->{'file'} =~ /$param{'name'}\./ } @$jobs ];
+        my $good_jobs = [ grep { $_->{'file'} =~ /$param{'name'}\./ } @$jobs ];
         push @$ranges, map { my @p = @{$_->{'param'}}; \@p } @$good_jobs;
         $ranges = merge_ranges($ranges);
 
@@ -995,27 +1051,31 @@ sub distribute_task {
 
             HOST : for my $h (keys %machines) {
                 my $m = $machines{$h};
-				my $cores= $m->{'cores'};
-				$cores = $m->{'poly_cores'} 
-					if ( $opt->{'task'} eq "polysel" ); 
+                my $cores= $m->{'cores'};
+                $cores = $m->{'poly_cores'} if ($opt->{'task'} eq "polysel"); 
 				
                 # How many free cores on this host?
                 my $busy_cores = 0;
-				foreach (@$jobs) {
-					$busy_cores += $_->{'threads'}
-						 if $_->{'host'} eq $h;
-				}
+                foreach (@$jobs) {
+                    $busy_cores += $_->{'threads'} if $_->{'host'} eq $h;
+                }
                 my $n = $cores - $busy_cores;
-                next if ( $n < 1 );
+                next if $n < 1;
 
                 # Send files and skip to next host if not all files are here
-                send_file($h, $_) for @{$opt->{'files'}};
-                next if grep !$m->{'files'}->{$_}, @{$opt->{'files'}};
+                for my $f (@{$opt->{'files'}}) {
+                    send_file($h, $f);
+                }
+                for my $f (@{$opt->{'files'}}) {
+                    next if $m->{'files'}->{$f};
+                    warn "$h does not have file $f, skipping host\n";
+                    next HOST;
+                }
 
-				my $nth = $opt->{'max_threads'};
+                my $nth = $opt->{'max_threads'};
                 while ($n > 0) {
-					$n -= $opt->{'max_threads'};
-					$nth = $n + $opt->{'max_threads'} if $n < 0;
+                    $n -= $opt->{'max_threads'};
+                    $nth = $n + $opt->{'max_threads'} if $n < 0;
                     my @r = find_hole($opt->{'min'}, $opt->{'max'},
                                       $opt->{'len'}, $ranges);
 
@@ -1198,16 +1258,17 @@ my %tasks = (
                    files  => ['merge\.his', 'merge\.stderr'] },
 
     replay    => { dep    => ['merge'],
-                   files  => ['index', 'small', 'replay\.stderr'] },
+                   files  => ['index', 'small.bin', 'replay\.stderr'],
+                   param  => ['skip'], },
 
     linalg    => { name   => "linear algebra",
                    dep    => ['replay'],
-                   param  => [ qw/skip bwmt bwthreshold linalg
+                   param  => [ qw/bwmt bwthreshold linalg
                                bwc_interval
                                bwc_mm_impl
                                bwc_interleaving/],
                    files  => ['bwc', 'bwc\.stderr', 'bl', 'bl\.stderr',
-							  'W', 'W\.bin'] },
+							  'W\d+'] },
 
     bitstr    => { dep    => ['linalg'],
                    files  => ['ker_raw', 'mkbitstrings\.stderr'] },
@@ -1484,11 +1545,11 @@ sub do_init {
             my $task  = $tasks{$t};
 
             # Clean up old files...
-			if ( $task->{'name'} ) {
-				if ( $task->{'name'} eq "linear algebra" ) {
-					next if $r eq "l";
-				}
-			}
+            if ( $task->{'name'} ) {
+                if ( $task->{'name'} eq "linear algebra" ) {
+                    next if $r eq "l";
+                }
+            }
             info "Cleaning up $task->{'name'}..." if $task->{'name'};
             $tab_level++;
             for (map "$param{'wdir'}/$_", sort @$files) {
@@ -1589,20 +1650,20 @@ sub do_polysel {
         return 0;
     };
 
-	my $polysel_progress = sub {
-    	my ($ranges) = @_;
-    	my ($min, $max) = ($param{'kjadmin'}, $param{'kjadmax'});
+    my $polysel_progress = sub {
+        my ($ranges) = @_;
+        my ($min, $max) = ($param{'kjadmin'}, $param{'kjadmax'});
 
-    	my $total = 0;
-    	for (@$ranges) {
-        	my @r = ($_->[0] < $min ? $min : $_->[0],
-            	     $_->[1] > $max ? $max : $_->[1]);
-        	$total += $r[1] - $r[0] if $r[0] < $r[1];
-    	}
-    	$total = (100 * $total) / ($max - $min);
+        my $total = 0;
+        for (@$ranges) {
+            my @r = ($_->[0] < $min ? $min : $_->[0],
+                $_->[1] > $max ? $max : $_->[1]);
+            $total += $r[1] - $r[0] if $r[0] < $r[1];
+        }
+        $total = (100 * $total) / ($max - $min);
 
-    	info "Total interval coverage: ".sprintf("%3.0f", $total)." %.\n";
-	};
+        info "Total interval coverage: ".sprintf("%3.0f", $total)." %.\n";
+    };
 
     distribute_task({ task     => "polysel",
                       title    => "Polynomial selection",
@@ -1709,11 +1770,11 @@ sub do_polysel_bench {
 					  bench	   => 1,
 					  max_threads => 1 });
 
-	if ($last) {
+    if ($last) {
     	info "All done!\n";
-	} else {
+    } else {
     	info "Switch to next configuration...\n";
-	}
+    }
 }
 
 
@@ -1728,10 +1789,9 @@ sub do_factbase {
 
     my $cmd = "$param{'bindir'}/sieve/makefb ".
               "-poly $param{'prefix'}.poly ".
-              "> $param{'prefix'}.roots ".
-              "2> $param{'prefix'}.makefb.stderr";
-
-    cmd($cmd, { log => 1, kill => 1 });
+              "> $param{'prefix'}.roots ";
+    cmd($cmd, { log => 1, kill => 1,
+            stderr=>"$param{'prefix'}.makefb.stderr" });
     $tab_level--;
 }
 
@@ -1748,10 +1808,10 @@ sub do_freerels {
     my $cmd = "$param{'bindir'}/sieve/freerel ".
               "-poly $param{'prefix'}.poly ".
               "-fb $param{'prefix'}.roots ".
-              "> $param{'prefix'}.freerels ".
-              "2> $param{'prefix'}.freerel.stderr";
+              "> $param{'prefix'}.freerels ";
 
-    cmd($cmd, { log => 1, kill => 1 });
+    cmd($cmd, { log => 1, kill => 1,
+            stderr=>"$param{'prefix'}.freerel.stderr" });
 	cmd("gzip $param{'prefix'}.freerels");
     $tab_level--;
 }
@@ -1953,14 +2013,14 @@ sub do_sieve {
         # Remove duplicates
         info "Removing duplicates...";
         $tab_level++;
-		if (@new_files) {
+        if (@new_files) {
         	my $new_files =
 				join " ", (map "$param{'wdir'}/$_", sort @new_files);
 			info "split new files in $nslices slices...";
         	cmd("$param{'bindir'}/filter/dup1 ".
-            	"-out $param{'prefix'}.nodup $new_files ".
-            	"> $param{'prefix'}.dup1.stderr 2>&1",
-            	{ log => 1, kill => 1 });
+            	"-out $param{'prefix'}.nodup $new_files ",
+            	{ log => 1, kill => 1,
+                    stdout_stderr=>"$param{'prefix'}.dup1.stderr" });
 		}
 		my $n = 0;
 		my @allfiles;
@@ -1975,14 +2035,22 @@ sub do_sieve {
 			close FILE;
 	        cmd("$param{'bindir'}/filter/dup2 ".
     	        "-K $K -out $param{'prefix'}.nodup/$i ".
-				"-filelist $param{'prefix'}.dup2files ".
-            	"> $param{'prefix'}.dup2.stderr 2>&1",
-            	{ log => 1, kill => 1 });
+				"-filelist $param{'prefix'}.dup2files ",
+                        { log => 1, kill => 1,
+                        stdout_stderr => "$param{'prefix'}.dup2.stderr",
+                        });
 			my $f = "$param{'prefix'}.dup2.stderr";
 			open FILE, "< $f"
 				or die "Cannot open `$f' for reading: $!.\n";
 			while (<FILE>) {
 				if ( $_ =~ /^\s+(\d+) remaining relations/ ) {
+                                        # shiftwidth
+                                        # 8 in
+                                        # perl
+                                        # scripts
+                                        # is
+                                        # totally
+                                        # nuts.
 					$n += $1;
 					last;
 				}
@@ -1990,29 +2058,31 @@ sub do_sieve {
 			close FILE;
 		}
 
-        info "Number of relations left: $n.\n";
-        $tab_level--;
+                info "Number of relations left: $n.\n";
+                $tab_level--;
 
-        # Remove singletons
-        info "Removing singletons...";
-        $tab_level++;
+                # Remove singletons
+                info "Removing singletons...";
+                $tab_level++;
 		open FILE, "> $param{'prefix'}.purgefiles"
 			or die "Cannot open `$param{'prefix'}.purgefiles' for writing: $!.\n";
 		for (@allfiles) {
 			print FILE $_;
 		}
 		close FILE;
-        my $ret = cmd("$param{'bindir'}/filter/purge ".
-                      "-poly $param{'prefix'}.poly -keep $param{'keeppurge'} ".
-                      "-excess $param{'excesspurge'} ".
-                      "-nrels $n -out $param{'prefix'}.purged ".
-                      "-filelist $param{'prefix'}.purgefiles ".
-                      "> $param{'prefix'}.purge.stderr 2>&1", { log => 1 });
-        if ($ret->{'status'}) {
-           info "Not enough relations! Continuing sieving...\n";
-           $tab_level--;
-           return 0;
-		}
+                my $ret = cmd("$param{'bindir'}/filter/purge ".
+                    "-poly $param{'prefix'}.poly -keep $param{'keeppurge'} ".
+                    "-excess $param{'excesspurge'} ".
+                    "-nrels $n -out $param{'prefix'}.purged ".
+                    "-filelist $param{'prefix'}.purgefiles ",
+                    { log => 1,
+                        stdout_stderr => "$param{'prefix'}.purge.stderr"
+                    });
+                if ($ret->{'status'}) {
+                    info "Not enough relations! Continuing sieving...\n";
+                    $tab_level--;
+                    return 0;
+                }
 
         # Get the number of rows and columns from the .purged file
         my ($nrows, $ncols) = split / /, first_line("$param{'prefix'}.purged");
@@ -2185,11 +2255,11 @@ sub do_sieve_bench {
                       cmd      => $sieve_cmd,
 					  max_threads => $param{'sieve_max_threads'} });
 
-	if ($last) {
+    if ($last) {
     	info "All done!\n";
-	} else {
+    } else {
     	info "Switch to next configuration...\n";
-	}
+    }
 }
 
 
@@ -2213,11 +2283,10 @@ sub do_merge {
               "-maxlevel $param{'maxlevel'} ".
               "-cwmax $param{'cwmax'} ".
               "-rwmax $param{'rwmax'} ".
-              "-ratio $param{'ratio'} ".
-              "> $param{'prefix'}.merge.stderr ".
-              "2>&1";
+              "-ratio $param{'ratio'} ";
 
-    cmd($cmd, { log => 1, kill => 1 });
+    cmd($cmd, { log => 1, kill => 1, stdout_stderr =>
+            "$param{'prefix'}.merge.stderr" });
 
     if (last_line("$param{'prefix'}.merge.his") =~ /^BWCOSTMIN: (\d+)/) {
         $bwcostmin = $1;
@@ -2244,15 +2313,16 @@ sub do_replay {
 
     my $cmd = "$param{'bindir'}/filter/replay ".
               "--binary " .
+              "-skip $param{'skip'} " .
               "-his $param{'prefix'}.merge.his ".
               "-index $param{'prefix'}.index ".
               "-purged $param{'prefix'}.purged ".
               "-out $param{'prefix'}.small.bin ".
-              (defined $bwcostmin ? "-costmin $bwcostmin " : "").
-              "> $param{'prefix'}.replay.stderr ".
-              "2>&1";
+              (defined $bwcostmin ? "-costmin $bwcostmin " : "");
 
-    cmd($cmd, { log => 1, kill => 1 });
+    cmd($cmd, { log => 1, kill => 1,
+              stdout_stderr=>"$param{'prefix'}.replay.stderr "
+        });
 
     my ($nrows, $ncols, $weight);
     open FILE, "< $param{'prefix'}.replay.stderr"
@@ -2279,33 +2349,8 @@ sub do_linalg {
 
     my $cmd;
     if ($param{'linalg'} eq "bw") {
-        die "No longer supported";
-#
-#        info "Calling Block-Wiedemann (old code)...\n";
-#        $tab_level++;
-#        my $mt = $param{'bwmt'};
-#        if ($mt =~ /^(\d+)x(\d+)$/) {
-#            $mt = $1 * $2;
-#        }
-#
-#        $cmd = "$param{'bindir'}/linalg/bw/bw.pl ".
-#               "seed=1 ". # For debugging purposes, we use a deterministic BW
-#               "mt=$mt ".
-#               "matrix=$param{'prefix'}.small.tr ".
-#               "mn=64 ".
-#               "vectoring=64 ".
-#               "multisols=1 ".
-#               "wdir=$param{'wdir'}/bw " .
-#               "tidy=$param{'bwtidy'} ".
-#               "threshold=$param{'bwthreshold'} ".
-#               "solution=$param{'prefix'}.W ".
-#               "> $param{'prefix'}.bw.stderr ".
-#               "2>&1";
-#        cmd($cmd, { log => 1, kill => 1 });
+        die "Old code no longer supported";
     } elsif ($param{'linalg'} eq "bwc") {
-        if ($param{'skip'}) {
-            warn "Parameter 'skip' currently unhandled by bwc code\n";
-        }
         info "Calling Block-Wiedemann (new code)...\n";
         $tab_level++;
         my $mt = $param{'bwmt'};
@@ -2359,26 +2404,23 @@ sub do_linalg {
                "interval=$param{'bwc_interval'} ".
                "mode=u64 mn=64 splits=0,64 ys=0..64 ".
                "wdir=$param{'prefix'}.bwc " .
-               "bwc_bindir=$bwc_bindir " .
-               ">> $param{'prefix'}.bwc.stderr ".
-	       "2>&1";
-        cmd($cmd, { log => 1, kill => 1 });
+               "bwc_bindir=$bwc_bindir ";
+        cmd($cmd, { log => 1, kill => 1,
+                append_output=>1,
+                stdout_stderr=>"$param{'prefix'}.bwc.stderr" });
 
-        $cmd = "xxd -c 8 -ps $param{'prefix'}.bwc/W > $param{'prefix'}.W";
-        cmd($cmd, { log => 1, kill => 1 });
-
+        opendir D, "$param{'prefix'}.bwc";
+        for my $f (grep { /^K\.\d+$/ } readdir D) {
+            $f =~ /^K\.(\d+)$/;
+            my  $j=$1;
+            # TODO: remove dependency on xxd, it's stupid.
+            $cmd = "xxd -c 8 -ps $param{'prefix'}.bwc/$f > $param{'prefix'}.W$j";
+            cmd($cmd, { log => 1, kill => 1 });
+        }
+        # $cmd = "xxd -c 8 -ps $param{'prefix'}.bwc/W > $param{'prefix'}.W";
+        closedir D;
     } elsif ($param{'linalg'} eq "bl") {
         die "No longer supported";
-#
-#        info "Calling Block-Lanczos...\n";
-#        $tab_level++;
-#        $cmd = "$param{'bindir'}/linalg/bl/bl.pl ".
-#               "matrix=$param{'prefix'}.small.tr ".
-#               "wdir=$param{'wdir'}/bw" .
-#               "solution=$param{'prefix'}.W ".
-#               "> $param{'prefix'}.bl.stderr ".
-#               "2>&1";
-#        cmd($cmd, { log => 1, kill => 1 });
     } else {
         die "Value `$param{'linalg'}' is unknown for parameter `linalg'\n";
     }
@@ -2398,15 +2440,20 @@ sub do_bitstr {
     info "Converting dependencies to CADO format...\n";
     $tab_level++;
 
-    my $cmd = "$param{'bindir'}/linalg/mkbitstrings ".
-              "$param{'prefix'}.W ".
-              "> $param{'prefix'}.ker_raw ".
-              "2> $param{'prefix'}.mkbitstrings.stderr";
-
-    cmd($cmd, { log => 1, kill => 1 });
+    unlink "$param{'prefix'}.ker_raw";
+    opendir D, $param{'wdir'};
+    for my $f (grep { /^$param{'name'}\.W\d+$/ } readdir D) {
+        my $cmd = "$param{'bindir'}/linalg/mkbitstrings ".
+                  "$param{'wdir'}/$f ".
+                  ">> $param{'prefix'}.ker_raw ";
+        cmd($cmd, { log => 1, kill => 1,
+                append_output=>1,
+                stderr=>"$param{'prefix'}.mkbitstrings.stderr" });
+    }
+    closedir D;
 
     $nker = count_lines("$param{'prefix'}.ker_raw");
-    info "Computed $nker vectors of the kernel.\n";
+    info "Kernel within space of dimension at most $nker.\n";
 
     $tab_level--;
 }
@@ -2431,14 +2478,14 @@ sub do_chars {
               "-ker $param{'prefix'}.ker_raw ".
               "-index $param{'prefix'}.index ".
               "-rel $param{'prefix'}.nodup.gz ".
-              "-small $param{'prefix'}.small.bin ".
+              "-small $param{'prefix'}.small.dense.bin ".
               "-nker $nker ".
               "-skip $param{'skip'} ".
               "-nchar $param{'nchar'} ".
-              "-out $param{'prefix'}.ker ".
-              "2> $param{'prefix'}.characters.stderr";
+              "-out $param{'prefix'}.ker ";
 
-    cmd($cmd, { log => 1, kill => 1 });
+    cmd($cmd, { log => 1, kill => 1,
+            stderr=>"$param{'prefix'}.characters.stderr" });
 
     $ndep = count_lines("$param{'prefix'}.ker");
     info "$ndep vectors remaining after characters.\n";
@@ -2452,169 +2499,113 @@ sub do_chars {
 # Square root #################################################################
 ###############################################################################
 
+sub is_prime {
+    my $n = shift;
+    my $z=0+cmd("$param{'bindir'}/utils/gmp_prob_prime $n")->{'out'};
+    return $z;
+}
+
+sub primetest_print {
+    my $n=shift;
+    if (is_prime($n)) {
+        return "$n [prime]";
+    } else {
+        return "$n [composite]";
+    }
+}
+
 sub do_sqrt {
     banner "Square root";
     local_time "Square root";
     $ndep = count_lines("$param{'prefix'}.ker") unless defined $ndep;
     $ndep = $param{'nkermax'} if $ndep > $param{'nkermax'};
 
-    my %all_factors;
-    my @all_prime_factors;
-    my $number_fact = 0; # number factorizations with at least
-                         # one different factor
-    my $new_factor = 0;
-    my $new_prime_factor = 0;
-
-	sub add_element {
-		my ($new_element, $all_elements) = @_;
-		if (++$$all_elements{$new_element}->{'exist'} == 1) {
-			$$all_elements{$new_element}->{'prime'} =
-				cmd("$param{'bindir'}/utils/gmp_prob_prime ".
-				"$new_element")->{'out'};
-			return 1;
-		}
-		return 0;
-	}
-	
-	sub add_prime_element {
-		my ($new_prime_element, $all_prime_elements, $all_elements) = @_;
-		if ( $$all_elements{$new_prime_element}->{'prime'} == 1) {
-			push @$all_prime_elements, $new_prime_element;
-			return 1;
-		}
-		return 0;
-	}
-
-	sub add_gcd_element {
-		my ($new_gcd_element, $all_prime_elements, $all_elements) = @_;
-		my $new_prime_element=0;
-		chomp $new_gcd_element;
-		for (keys %$all_elements) {
-			if ($$all_elements{$_}->{'prime'} == 0) {
-				chomp $_;
-				if ($_ ne $new_gcd_element) {
-					my $gcd =
-						cmd("$param{'bindir'}/utils/gmp_gcd ".
-						"$new_gcd_element $_")->{'out'};
-					if ($gcd ne "1\n") {
-						if (add_element ( $gcd, $all_elements)) {
-							if (add_prime_element ($gcd,
-								$all_prime_elements, $all_elements)) {
-								$new_prime_element=1;
-							}
-						}
-					}
-				}
-			}
-		}
-		return $new_prime_element;
-	}
-
-	sub add_zero_before {
-		my ($number) = @_;
-		if ($number < 10) {
-			return "00$number";
-		} elsif ($number < 100) {
-			return "0$number";
-		} else {
-			return $number;
-		}
-	}
+    # We don't use bigints as hash keys.
+    my @prime_factors=();
+    my %composite_factors=($param{'n'}=>1);
 
     for (my $numdep=0; $numdep<$ndep; $numdep++) {
-		my $f="$param{'prefix'}.fact.".add_zero_before($numdep);
-		info "Testing dependency number $numdep...\n";
-		$tab_level++;
-    	my $cmd = "$param{'bindir'}/sqrt/sqrt ".
-              "-poly $param{'prefix'}.poly ".
-              "-dep $param{'prefix'}.dep $numdep ".
-              "-rel $param{'prefix'}.nodup.gz ".
-              "-purged $param{'prefix'}.purged ".
-              "-index $param{'prefix'}.index ".
-              "-ker $param{'prefix'}.ker ".
-              "2>> $param{'prefix'}.sqrt.stderr ".
-              "> $f";
+        my $znumdep=sprintf('%03d', $numdep);
+        my $f="$param{'prefix'}.fact.$znumdep";
+        info "Testing dependency number $numdep...\n";
+        $tab_level++;
+        my $cmd = "$param{'bindir'}/sqrt/sqrt ".
+        "-poly $param{'prefix'}.poly ".
+        "-dep $param{'prefix'}.dep $numdep ".
+        "-rel $param{'prefix'}.nodup.gz ".
+        "-purged $param{'prefix'}.purged ".
+        "-index $param{'prefix'}.index ".
+        "-ker $param{'prefix'}.ker ".
+        "> $f";
 
-		cmd($cmd, { log => 1, kill => 1 });
+        cmd($cmd, { log => 1, kill => 1,
+                append_output=>1,
+                stderr=>"$param{'prefix'}.sqrt.stderr"});
 
+        do { $tab_level--; next; } if first_line($f) =~ /^Failed/;
 
-		if (first_line($f) !~ /^Failed/) {
-			open FILE, "< $f" 
-				or die "Cannot open `$f' for reading: $!.\n";
-			while (<FILE>) {
-				if(add_element ($_, \%all_factors)) {
-					if(add_prime_element($_, \@all_prime_factors,
-						\%all_factors)) {
-						$new_prime_factor = 1;
-					}
-					else {
-						if (add_gcd_element ($_, \@all_prime_factors,
-							\%all_factors)) {
-							$new_prime_factor = 1;
-						}
-					}
-					$new_factor = 1;
-				}
-			}
-			close FILE;
+        info "Factorization was successful!\n";
+        # only informational.
+        cmd("env cp -f $f $param{'prefix'}.fact", { kill => 1 });
 
-			if( $new_factor == 1 ) {
-				$number_fact++;
-				if ( $number_fact == 1) {
-					info "Factorization was successful!\n";
-					cmd("env cp -f $f $param{'prefix'}.fact",
-							{ kill => 1 });
-					for ( keys ( %all_factors ) ) {
-						info $_;
-					}
-				}
-				else {
-					if( $new_prime_factor == 1) {
-						info "new prime factors were found!\n";
-					}
-					else {
-						info "new factors were found!\n";
-					}
-				}
-			
-				if( $new_prime_factor == 1) {
-					my $cmd =
-						cmd("$param{'bindir'}/utils/gmp_factorization_complete ".
-						"$param{'n'} ".
-						join(" ",split(/\n/, join("",@all_prime_factors))))->{'out'};
-					if ( $cmd == 0) {
-						$tab_level--;
-						my $all_prime_factors= $#all_prime_factors + 1;
-						info $all_prime_factors." prime factors were found!\n";
-						open FILE, "> $param{'prefix'}.fact"
-							or die "Cannot open `$param{'prefix'}.fact' for writing: $!.\n";
-						for ( @all_prime_factors) {
-							print FILE $_;
-						}
-						close FILE;
-						last;
-					}
-				}
-				info "try to find other factors...\n";
-				$new_factor = 0;
-				$new_prime_factor = 0;
-			}  
-		}
-		$tab_level--;
-	}
+        my @factors_thisdep=();
+        open FILE, "< $f" 
+            or die "Cannot open `$f' for reading: $!.\n";
+        while (<FILE>) {
+            chomp($_);
+            push @factors_thisdep, $_;
+        }
+        close FILE;
 
-	if ( %all_factors eq 0 ) {
-		die "No square root was found.\n";
-	}
+        for my $p (@factors_thisdep) {
+            info(primetest_print($p) ."\n");
+        }
+            
+        info "Doing gcds with previously known composite factors\n";
 
-	my $f1 = "$param{'prefix'}.allfactors";
-	open FILE, "> $f1"
-		or die "Cannot open `$f1' for wrinting: $!.\n";
-	for ( keys %all_factors ) {
-		print FILE $_;
-	}
-	close FILE;
+        my @kcomp = keys %composite_factors;
+        for my $m (@kcomp) {
+            my @nontriv=();
+            my $zm = Math::BigInt->new($m);
+            for my $p (@factors_thisdep) {
+                my $zp = Math::BigInt->new($p);
+                my $za = Math::BigInt::bgcd($zp, $zm);
+                next if $za->is_one();
+                next if $za->bcmp($zm) == 0;
+                # We have a non-trivial factor, thus a split of m.
+                push @nontriv, $za->bstr();
+            }
+            if (@nontriv) {
+                delete $composite_factors{$m};
+                for my $a (@nontriv) {
+                    info "non-trivial factor: ".primetest_print($a)."\n";
+                    if (is_prime($a)) {
+                        push @prime_factors, $a;
+                    } else {
+                        $composite_factors{$a}=1;
+                    }
+                }
+            }
+        }
 
+        my $np = scalar @prime_factors;
+        my $nc = scalar keys %composite_factors;
+        info "Now: $np prime factors, $nc composite factors\n";
+
+        if ($nc == 0) {
+            info "Factorization complete\n";
+            $tab_level--;
+            last;
+        }
+        $tab_level--;
+    }
+
+    die "No square root was found.\n" unless @prime_factors;
+
+    my $f1 = "$param{'prefix'}.allfactors";
+    open FILE, "> $f1" or die "Cannot open `$f1' for writing: $!.\n";
+    print FILE "$_\n" for @prime_factors;
+    close FILE;
 }
 
 close $log_fh if $log_fh;

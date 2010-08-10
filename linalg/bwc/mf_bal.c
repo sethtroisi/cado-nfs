@@ -399,7 +399,9 @@ int main(int argc, char * argv[])
 
     if (bal->h->ncoeffs) {
         if (tw != bal->h->ncoeffs) {
-            fprintf(stderr, "Inconsistency in number of coefficients\n");
+            fprintf(stderr, "Inconsistency in number of coefficients\n"
+                    "From %s: %"PRIu64", from file sizes; %"PRIu64"\n",
+                    cwfile, tw, bal->h->ncoeffs);
             exit(1);
         }
     } else {

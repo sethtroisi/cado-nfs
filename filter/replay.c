@@ -178,137 +178,193 @@ makeSparse(int **sparsemat, int *colweight, FILE *purgedfile,
 }
 
 static unsigned long
-flushSparse_ascii(const char *sparsename, int **sparsemat, int small_nrows, int small_ncols, int *code)
+flushSparse(const char *sparsename, int **sparsemat, int small_nrows, int small_ncols, int *code, int skip, int bin)
 {
-    FILE *ofile;
-    unsigned long W = 0;
-    int i, j;
+    const struct {
+        const char * ext;
+        const char * smat;
+        const char * srw;
+        const char * scw;
+        const char * dmat;
+        const char * drw;
+        const char * dcw;
+    } suffixes[2] = {
+        {
+          .ext = ".txt",
+          .smat = "txt",
+          .srw = "rw.txt",
+          .scw = "cw.txt",
+          .dmat = "dense.txt",
+          .drw = "dense.rw.txt",
+          .dcw = "dense.cw.txt",
+        },
+        {
+          .ext = ".bin",
+          .smat = "bin",
+          .srw = "rw.bin",
+          .scw = "cw.bin",
+          .dmat = "dense.bin",
+          .drw = "dense.rw.bin",
+          .dcw = "dense.cw.bin",
+        },
+    }, * suf = &(suffixes[bin]);
 
-    ofile = gzip_open(sparsename, "w");
-    fprintf(ofile, "%d %d\n", small_nrows, small_ncols);
-    for(i = 0; i < small_nrows; i++){
-	if(sparsemat[i] == NULL)
-	    fprintf(ofile, "0");
-	else{
-	    W += sparsemat[i][0];
-	    fprintf(ofile, "%d", sparsemat[i][0]);
-	    for(j = 1; j <= sparsemat[i][0]; j++){
-#if DEBUG >= 1
-		ASSERT(code[sparsemat[i][j]] > 0);
-#endif
-		fprintf(ofile, " %d", code[sparsemat[i][j]]-1); // FIXME
-	    }
-	}
-	fprintf(ofile, "\n");
-    }
-    gzip_close (ofile, sparsename);
-    return W;
-}
-
-static unsigned long
-flushSparse_binary(const char *sparsename, int **sparsemat, int small_nrows, int small_ncols, int *code)
-{
-    FILE *ofile;
     unsigned long W = 0;
+    unsigned long DW = 0;
     char * zip = has_suffix(sparsename, ".gz") ? ".gz" : NULL;
-    uint32_t x;
     uint32_t * weights = malloc(small_ncols * sizeof(uint32_t));
     memset(weights, 0, small_ncols * sizeof(uint32_t));
 
-    char * zname = strdup(sparsename);
-    if (zip) { zname[strlen(zname)-3]='\0'; }
-    char * bname = strdup(zname);
-    if (has_suffix(bname, ".bin")) { bname[strlen(bname)-4]='\0'; }
+    char * base = strdup(sparsename);
+    if (zip) { base[strlen(base)-3]='\0'; }
+    if (has_suffix(base, suf->ext)) { base[strlen(base)-4]='\0'; }
 
-    char * name = derived_filename(bname, "bin", zip);
-    ofile = gzip_open(name, "w");
+    char * smatname = NULL;
+    FILE * smatfile = NULL;
+    char * srwname  = NULL;
+    FILE * srwfile  = NULL;
+    char * scwname  = NULL;
+    FILE * scwfile  = NULL;
+
+    {
+        smatname = derived_filename(base, suf->smat, zip);
+        srwname  = derived_filename(base, suf->srw, zip);
+        smatfile = gzip_open(smatname, "w");
+        srwfile  = gzip_open(srwname, "w");
+        if (!bin)
+            fprintf(smatfile, "%d %d\n", small_nrows, small_ncols - skip);
+    }
+
+    char * dmatname = NULL;
+    FILE * dmatfile = NULL;
+    char * drwname  = NULL;
+    FILE * drwfile  = NULL;
+    char * dcwname  = NULL;
+    FILE * dcwfile  = NULL;
+
+    if (skip) {
+        dmatname = derived_filename(base, suf->dmat, zip);
+        drwname  = derived_filename(base, suf->drw, zip);
+        dmatfile = gzip_open(dmatname, "w");
+        drwfile  = gzip_open(drwname, "w");
+        if (!bin)
+            fprintf(dmatfile, "%d %d\n", small_nrows, skip);
+    }
+
     for(int i = 0; i < small_nrows; i++){
 	if(sparsemat[i] == NULL) {
-	    x = 0;
-            fwrite(&x, sizeof(uint32_t), 1, ofile);
+            if (bin) {
+                const uint32_t x = 0;
+                fwrite(&x, sizeof(uint32_t), 1, smatfile);
+                if (skip) fwrite(&x, sizeof(uint32_t), 1, dmatfile);
+            } else {
+                fprintf(smatfile, "0");
+                if (skip) fprintf(dmatfile, "0");
+            }
         } else {
-	    W += sparsemat[i][0];
-	    x = sparsemat[i][0];
-            fwrite(&x, sizeof(uint32_t), 1, ofile);
+            uint32_t dw = 0;
+            uint32_t sw = 0;
+	    for(int j = 1; j <= sparsemat[i][0]; j++){
+		if (code[sparsemat[i][j]]-1 < skip) {
+                    dw++;
+                    DW++;
+                } else {
+                    sw++;
+                    W++;
+                }
+            }
+            if (bin) {
+                fwrite(&sw, sizeof(uint32_t), 1, smatfile);
+                fwrite(&sw, sizeof(uint32_t), 1, srwfile);
+                if (skip) fwrite(&dw, sizeof(uint32_t), 1, dmatfile);
+                if (skip) fwrite(&dw, sizeof(uint32_t), 1, drwfile);
+            } else {
+                fprintf(smatfile, "%"PRIu32"", sw);
+                fprintf(srwfile, "%"PRIu32"\n", sw);
+                if (skip) fprintf(dmatfile, "%"PRIu32"", dw);
+                if (skip) fprintf(drwfile, "%"PRIu32"\n", dw);
+            }
 	    for(int j = 1; j <= sparsemat[i][0]; j++){
 #if DEBUG >= 1
 		ASSERT(code[sparsemat[i][j]] > 0);
 #endif
-		x=code[sparsemat[i][j]]-1;
-                fwrite(&x, sizeof(uint32_t), 1, ofile);
+		uint32_t x = code[sparsemat[i][j]]-1;
                 weights[x]++;
+                if ((int) x < skip) {
+                    ASSERT_ALWAYS(skip);
+                    if (bin) {
+                        fwrite(&x, sizeof(uint32_t), 1, dmatfile);
+                    } else {
+                        fprintf(dmatfile, " %"PRIu32"", x);
+                    }
+                } else {
+                    x-=skip;
+                    if (bin) {
+                        fwrite(&x, sizeof(uint32_t), 1, smatfile);
+                    } else {
+                        fprintf(smatfile, " %"PRIu32"", x);
+                    }
+                }
 	    }
 	}
+	if (!bin) {
+            fprintf(smatfile, "\n");
+            if (skip) fprintf(dmatfile, "\n");
+        }
     }
-    gzip_close (ofile, name);
-    free(name);
 
-    name = derived_filename(bname, "rw.bin", zip);
-    ofile = gzip_open(name, "w");
-    for(int i = 0; i < small_nrows; i++){
-	x = sparsemat[i] == NULL ? 0 : sparsemat[i][0];
-        fwrite(&x, sizeof(uint32_t), 1, ofile);
+    {
+        gzip_close (smatfile, smatname);
+        gzip_close (srwfile, srwname);
+        free(smatname);
+        free(srwname);
     }
-    gzip_close (ofile, name);
-    free(name);
+    if (skip) {
+        fprintf(stderr, "%lu coeffs (out of %lu total) put into %s (%.1f%%)\n",
+                DW, DW+W, dmatname,
+                100.0 * (double) DW / (DW+W));
 
-    name = derived_filename(bname, "cw.bin", zip);
-    ofile = gzip_open(name, "w");
-    for(int j = 0; j < small_ncols; j++){
-	x = weights[j];
-        fwrite(&x, sizeof(uint32_t), 1, ofile);
+        gzip_close (dmatfile, dmatname);
+        gzip_close (drwfile, drwname);
+        free(dmatname);
+        free(drwname);
     }
-    gzip_close (ofile, name);
-    free(name);
 
-    free(bname);
-    free(zname);
+    if (skip) {
+        dcwname = derived_filename(base, suf->dcw, zip);
+        dcwfile = gzip_open(dcwname, "w");
+        for(int j = 0; j < skip; j++){
+            uint32_t x = weights[j];
+            if (bin) {
+                fwrite(&x, sizeof(uint32_t), 1, dcwfile);
+            } else {
+                fprintf(dcwfile, "%"PRIu32"\n", x);
+            }
+        }
+        gzip_close(dcwfile, dcwname);
+        free(dcwname);
+    }
 
-    free(weights);
+    {
+        scwname = derived_filename(base, suf->scw, zip);
+        scwfile = gzip_open(scwname, "w");
+        for(int j = skip; j < small_ncols; j++){
+            uint32_t x = weights[j];
+            if (bin) {
+                fwrite(&x, sizeof(uint32_t), 1, scwfile);
+            } else {
+                fprintf(scwfile, "%"PRIu32"\n", x);
+            }
+        }
+        gzip_close(scwfile, scwname);
+        free(scwname);
+    }
+
+    free(base);
 
     return W;
+
 }
-
-static unsigned long
-flushSparse(const char *sparsename, int **sparsemat, int small_nrows, int small_ncols, int *code, int bin)
-{
-    if (bin)
-        return flushSparse_binary(sparsename, sparsemat, small_nrows, small_ncols, code);
-    else
-        return flushSparse_ascii(sparsename, sparsemat, small_nrows, small_ncols, code);
-}
-
-/*
-static void
-infos4Manu(char *name, char *sparsename, int small_nrows, int small_ncols, int nvslices, int *tabnc, unsigned long *Wslice)
-{
-    FILE *ofile;
-    int j;
-    int jtotal;
-
-    sprintf(name, "%s.info", sparsename);
-    fprintf(stderr, "Creating file %s\n", name);
-    ofile = fopen(name, "w");
-    fprintf(ofile, "%d %d\n", small_nrows, small_ncols);
-    fprintf(ofile, "%d %d\n", 1, nvslices);
-    const char * sparse_basename;
-    sparse_basename = strrchr(sparsename, '/');
-    if (sparse_basename == NULL) {
-        sparse_basename = sparsename;
-    } else {
-        sparse_basename++;
-    }
-
-    jtotal=0;
-    for(j = 0; j < nvslices; j++){
-	sprintf(name, "%s.%02d", sparse_basename, j);
-	fprintf(ofile, "%d %d %d %d", 0, j, 0, jtotal);
-	fprintf(ofile, " %d %d %lu %s\n",small_nrows,tabnc[j],Wslice[j],name);
-        jtotal += tabnc[j];
-    }
-    fclose(ofile);
-}
-*/
 
 // dump of newrows in indexname.
 static void
@@ -418,7 +474,7 @@ doAllAdds(int **newrows, char *str)
 #define STRLENMAX 2048
 
 static int
-oneFile(const char *sparsename, int **sparsemat, int *colweight, const char *purgedname, FILE *purgedfile, int **oldrows, int ncols, int small_nrows, int verbose, int bin)
+oneFile(const char *sparsename, int **sparsemat, int *colweight, const char *purgedname, FILE *purgedfile, int **oldrows, int ncols, int small_nrows, int verbose, int skip, int bin)
 {
     unsigned long W;
     int small_ncols;
@@ -433,7 +489,7 @@ oneFile(const char *sparsename, int **sparsemat, int *colweight, const char *pur
 
     double tt = seconds();
     fprintf(stderr, "Writing sparse representation to file\n");
-    W = flushSparse(sparsename, sparsemat, small_nrows, small_ncols, colweight, bin);
+    W = flushSparse(sparsename, sparsemat, small_nrows, small_ncols, colweight, skip, bin);
     fprintf(stderr, "#T# writing sparse: %2.2lf\n", seconds()-tt);
     fprintf(stderr, "# Weight(M_small) = %lu\n", W);
 
@@ -441,7 +497,7 @@ oneFile(const char *sparsename, int **sparsemat, int *colweight, const char *pur
 }
 
 static int
-manyFiles(const char *sparsename, int **sparsemat, int *colweight, const char *purgedname, FILE *purgedfile, int **oldrows, int ncols, int small_nrows, int verbose, int bin, int nslices)
+manyFiles(const char *sparsename, int **sparsemat, int *colweight, const char *purgedname, FILE *purgedfile, int **oldrows, int ncols, int small_nrows, int verbose, int skip, int bin, int nslices)
 {
     char *name;
     int small_ncols = 1; // always the +1 trick
@@ -459,6 +515,7 @@ manyFiles(const char *sparsename, int **sparsemat, int *colweight, const char *p
 	jstep = ncols/nslices;
     else
 	jstep = ncols/(nslices-1);
+    ASSERT_ALWAYS(skip <= jstep);
     for(slice = 0; slice < nslices; slice++){
 	// we operate on [jmin..jmax[
 	jmin = jmax;
@@ -480,7 +537,7 @@ manyFiles(const char *sparsename, int **sparsemat, int *colweight, const char *p
 	    }
 	// warning: take care to the +1 trick
 	Wslice[slice] = flushSparse(name, sparsemat, small_nrows, small_ncols,
-				    colweight, bin);
+				    colweight, bin, jmin == 0 ? skip : 0);
 	// do not forget to clean the rows in sparsemat to be ready for
 	// next time if any
 	if(slice < nslices-1){
@@ -585,6 +642,7 @@ main(int argc, char *argv[])
     char str[STRLENMAX];
     int bin=0;
     char * rp;
+    int skip=0;
 
     // printing the arguments as everybody does these days
     fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
@@ -612,6 +670,7 @@ main(int argc, char *argv[])
     const char * fromname = param_list_lookup_string(pl, "from");
     param_list_parse_int(pl, "binary", &bin);
     param_list_parse_int(pl, "nslices", &nslices);
+    param_list_parse_int(pl, "skip", &skip);
     param_list_parse_uint64(pl, "bwcostmin", &bwcostmin);
     if (has_suffix(sparsename, ".bin") || has_suffix(sparsename, ".bin.gz"))
         bin=1;
@@ -692,11 +751,11 @@ main(int argc, char *argv[])
     if(nslices == 0) {
 	small_ncols = oneFile(sparsename, sparsemat, colweight, 
 			      purgedname, purgedfile,
-			      oldrows, ncols, small_nrows, verbose, bin);
+			      oldrows, ncols, small_nrows, verbose, skip, bin);
     } else {
 	small_ncols = manyFiles(sparsename, sparsemat, colweight, 
 				purgedname, purgedfile,
-				oldrows, ncols, small_nrows, verbose, bin,
+				oldrows, ncols, small_nrows, verbose, skip, bin,
 				nslices);
 	exit(0);
     }

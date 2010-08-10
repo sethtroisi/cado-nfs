@@ -65,8 +65,8 @@ do_task("sqrt");
 
 banner("All done!");
 
-open FILE, "$param{'prefix'}.fact"
-or die "Cannot open `$param{'prefix'}.fact' for reading: $!.\n";
+open FILE, "$param{'prefix'}.allfactors"
+or die "Cannot open `$param{'prefix'}.allfactors' for reading: $!.\n";
 my @l = <FILE>;
 close FILE;
 chomp for @l;

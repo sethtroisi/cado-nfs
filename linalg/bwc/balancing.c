@@ -1308,6 +1308,19 @@ int master_dispatcher_put(master_dispatcher_ptr d, uint32_t * p, size_t n)
                 where->put(where, x, 2);
                 /* debug only */
                 m->sent_rows[d->noderow + i]++;
+                if(m->sent_rows[d->noderow + i] >
+                        m->exp_rows[d->noderow + i]) {
+                    fprintf(stderr,
+                            "d->noderow = %d\n", d->noderow);
+                    fprintf(stderr,
+                            "i=%d\n", i);
+                    fprintf(stderr,
+                            "m->sent_rows[d->noderow + i] = %"PRIu32"\n",
+                            m->sent_rows[d->noderow + i]);
+                    fprintf(stderr,
+                            "m->exp_rows[d->noderow + i] = %"PRIu32"\n",
+                            m->exp_rows[d->noderow + i]);
+                }
                 ASSERT_ALWAYS(m->sent_rows[d->noderow + i] <=
                         m->exp_rows[d->noderow + i]);
             }
