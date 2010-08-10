@@ -164,9 +164,10 @@ struct matmul_sliced_data_s * matmul_sliced_init(abobj_ptr xx MAYBE_UNUSED, para
 }
 
 
-void matmul_sliced_build_cache(struct matmul_sliced_data_s * mm)
+void matmul_sliced_build_cache(struct matmul_sliced_data_s * mm, uint32_t * data)
 {
-    uint32_t * data = matmul_common_read_stupid_data(mm->public_);
+    if (!data)
+        data = matmul_common_read_stupid_data(mm->public_);
 
     uint32_t i0 = 0;
     uint32_t i1 = mm->public_->dim[ mm->public_->store_transposed];

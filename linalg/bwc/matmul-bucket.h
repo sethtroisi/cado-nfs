@@ -10,7 +10,7 @@ extern "C" {
 struct matmul_bucket_data_s;
 
 struct matmul_bucket_data_s * matmul_bucket_init(abobj_ptr xx MAYBE_UNUSED, param_list pl, int optimized_direction);
-extern void matmul_bucket_build_cache(struct matmul_bucket_data_s *);
+extern void matmul_bucket_build_cache(struct matmul_bucket_data_s *, uint32_t *);
 extern int matmul_bucket_reload_cache(struct matmul_bucket_data_s *);
 extern void matmul_bucket_save_cache(struct matmul_bucket_data_s *);
 extern void matmul_bucket_mul(struct matmul_bucket_data_s *, abt *, abt const *, int);

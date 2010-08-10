@@ -318,27 +318,55 @@ static void printTabMatrix(dense_mat_t * mat, int nrows, int ncols)
 }
 #endif
 
-// We add the heaviest columns of M_small to the last [kmin..kmin+skip[
-// columns of charmat.
+// We add the heaviest columns of M_small to the last
+// [k_minus_skip..k_minus_skip+skip[ columns of charmat.
 static void
-addHeavyBlock(char **charmat, FILE * smallfile, int kmin, int skip)
+addHeavyBlock(char **charmat, const char * smallfilename, int small_nrows, int k_minus_skip, int skip)
 {
     int i, nc, j, u;
     int rc;
 
     fprintf(stderr, "Adding heavy block of width %d\n", skip);
-    rc = fscanf(smallfile, "%d %d", &i, &nc);
-    ASSERT_ALWAYS(rc == 2);
-    i = 0;
-    while (fscanf(smallfile, "%d", &nc) != EOF) {
-        for (u = 0; u < nc; u++) {
-            rc = fscanf(smallfile, "%d", &j);
-            ASSERT_ALWAYS(rc == 1);
-            if (j < skip)
-                charmat[i][kmin + j] = (char) (-1);        // humf...!
+    FILE * smallfile = fopen(smallfilename, "r");
+    ASSERT_ALWAYS(smallfile);
+    if (has_suffix(smallfilename, ".bin")) {
+        fprintf(stderr, "Reading %s in binary format\n", smallfilename);
+        for(int i = 0 ; i < small_nrows ; i++) {
+            uint32_t rowlen;
+            int k = fread(&rowlen, sizeof(uint32_t), 1, smallfile);
+            if (k != 1) {
+                if (!feof(smallfile)) {
+                    fprintf(stderr, "%s: short read\n", smallfilename);
+                    exit(1);
+                }
+                break;
+            }
+            for( ; rowlen-- ; ) {
+                uint32_t j;
+                k = fread(&j, sizeof(uint32_t), 1, smallfile);
+                if (k != 1) {
+                    fprintf(stderr, "%s: short read\n", smallfilename);
+                    exit(1);
+                }
+                if (j < (uint32_t) skip)
+                    charmat[i][k_minus_skip + j] = (char) (-1);        // humf...!
+            }
         }
-        i++;
+    } else {
+        rc = fscanf(smallfile, "%d %d", &i, &nc);
+        ASSERT_ALWAYS(rc == 2);
+        i = 0;
+        while (fscanf(smallfile, "%d", &nc) != EOF) {
+            for (u = 0; u < nc; u++) {
+                rc = fscanf(smallfile, "%d", &j);
+                ASSERT_ALWAYS(rc == 1);
+                if (j < skip)
+                    charmat[i][k_minus_skip + j] = (char) (-1);        // humf...!
+            }
+            i++;
+        }
     }
+    fclose (smallfile);
     fprintf (stderr, "   done at %2.2lf\n", seconds ());
 }
 
@@ -346,7 +374,7 @@ static void
 handleKer (dense_mat_t * mat, alg_prime_t * tabchar, FILE * purgedfile,
 	   mp_limb_t ** ker, cado_poly pol,
 	   FILE * indexfile, FILE * relfile,
-	   int small_nrows, FILE * smallfile, int skip)
+	   int small_nrows, const char * smallfilename, int skip)
 {
     int i, n;
     unsigned int j, k;
@@ -365,7 +393,7 @@ handleKer (dense_mat_t * mat, alg_prime_t * tabchar, FILE * purgedfile,
     buildCharacterMatrix(charmat, k - skip, tabchar,
                          purgedfile, indexfile, relfile, pol, small_nrows);
     if (skip > 0)
-        addHeavyBlock(charmat, smallfile, k - skip, skip);
+        addHeavyBlock(charmat, smallfilename, small_nrows, k - skip, skip);
 #ifndef NDEBUG
     fprintf (stderr, "Checking character matrix\n");
     for (i = 0; i < small_nrows; ++i)
@@ -441,7 +469,7 @@ int main(int argc, char **argv)
     FILE *kerfile = NULL;
     FILE *indexfile = NULL;
     FILE *relfile = NULL;
-    FILE *smallfile = NULL;
+    const char * smallfilename = NULL;
     FILE *outfile = stdout;
     int ret;
     int k, isz, skip = 0;
@@ -518,7 +546,7 @@ int main(int argc, char **argv)
             argv += 2;
         }
         if (argc > 2 && strcmp(argv[1], "-small") == 0) {
-            smallfile = fopen (argv[2], "r");
+            smallfilename = argv[2];
             argc -= 2;
             argv += 2;
         }
@@ -540,7 +568,7 @@ int main(int argc, char **argv)
     ASSERT_ALWAYS(kerfile != NULL);
     ASSERT_ALWAYS(indexfile != NULL);
     ASSERT_ALWAYS(relfile != NULL);
-    ASSERT_ALWAYS(smallfile != NULL);
+    ASSERT_ALWAYS(smallfilename != NULL);
 
     // only k-1, since the k-th character is sign on rational side
     tabchar = (alg_prime_t *) malloc((k - 1) * sizeof(alg_prime_t));
@@ -586,7 +614,7 @@ int main(int argc, char **argv)
     fprintf(stderr, "start computing characters...\n");
 
     handleKer(&mymat, tabchar, purgedfile, ker, pol,
-              indexfile, relfile, small_nrows, smallfile, skip);
+              indexfile, relfile, small_nrows, smallfilename, skip);
 
     /* this is a cheap loop, since mymat.nrows is small, typically 64 */
     myker = (mp_limb_t **) malloc(mymat.nrows * sizeof(mp_limb_t *));
@@ -655,7 +683,6 @@ int main(int argc, char **argv)
     gzip_close (relfile, relname);
     fclose (kerfile);
     fclose (indexfile);
-    fclose (smallfile);
     if (outname != NULL)
        fclose (outfile);
 

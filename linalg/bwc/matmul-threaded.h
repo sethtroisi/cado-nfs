@@ -10,7 +10,7 @@ extern "C" {
 struct matmul_threaded_data_s;
 
 extern struct matmul_threaded_data_s * matmul_threaded_init(abobj_ptr, param_list pl, int);
-extern void matmul_threaded_build_cache(struct matmul_threaded_data_s *);
+extern void matmul_threaded_build_cache(struct matmul_threaded_data_s *, uint32_t *);
 extern int matmul_threaded_reload_cache(struct matmul_threaded_data_s *);
 extern void matmul_threaded_save_cache(struct matmul_threaded_data_s *);
 extern void matmul_threaded_mul(struct matmul_threaded_data_s *, abt *, abt const *, int);

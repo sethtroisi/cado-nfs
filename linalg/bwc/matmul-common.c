@@ -19,7 +19,7 @@ FILE * matmul_common_reload_cache_fopen(size_t stride, struct matmul_public_s * 
     FILE * f = fopen(mm->cachefile_name, "r");
     if (f == NULL) return NULL;
 
-    printf("Loading %s via cache file %s\n", mm->filename, mm->cachefile_name);
+    printf("Loading %s via cache file %s\n", mm->locfile, mm->cachefile_name);
 
     uint32_t magic_check;
     MATMUL_COMMON_READ_ONE32(magic_check, f);
@@ -61,7 +61,7 @@ FILE * matmul_common_save_cache_fopen(size_t stride, struct matmul_public_s * mm
         abort();
     }
 
-    printf("Saving %s to cache file %s\n", mm->filename, mm->cachefile_name);
+    printf("Saving %s to cache file %s\n", mm->locfile, mm->cachefile_name);
 
     MATMUL_COMMON_WRITE_ONE32(magic,f);
     MATMUL_COMMON_WRITE_ONE32(MM_COMMON_MAGIC,f);
@@ -83,11 +83,17 @@ void matmul_common_clear(struct matmul_public_s * mm MAYBE_UNUSED)
 uint32_t * matmul_common_read_stupid_data(struct matmul_public_s * mm)
 {
     uint32_t * data;
-
+    unsigned int nr, nc;
     if (mm->store_transposed) {
-        read_easy(mm->filename, NULL, &data, &mm->dim[0], &mm->dim[1]);
+        read_easy(mm->locfile, NULL, &data, &nr, &nc);
     } else {
-        read_easy(mm->filename, &data, NULL, &mm->dim[0], &mm->dim[1]);
+        read_easy(mm->locfile, &data, NULL, &nr, &nc);
     }
+    if (mm->dim[0] == 0 && mm->dim[1] == 0) {
+        mm->dim[0] = nr;
+        mm->dim[1] = nc;
+    }
+    ASSERT_ALWAYS(mm->dim[0] == nr);
+    ASSERT_ALWAYS(mm->dim[1] == nc);
     return data;
 }

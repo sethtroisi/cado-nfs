@@ -367,6 +367,8 @@ void transfer(list<T> * ctr, T * elem)
 
 struct builder {
     uint32_t * data[2];
+    // rowhead is a pointer which is naturally excpected to *move* within
+    // the data[0] array.
     uint32_t * rowhead;
     uint32_t nrows_t;
     uint32_t ncols_t;
@@ -376,9 +378,11 @@ struct builder {
      * subroutines. All are computed as (total sum, #samples) */
 };
 
-void builder_init(builder * mb, struct matmul_bucket_data_s * mm)
+void builder_init(builder * mb, struct matmul_bucket_data_s * mm, uint32_t * data)
 {
-    mb->data[0] = matmul_common_read_stupid_data(mm->public_);
+    memset(mb, 0, sizeof(struct builder));
+    if (!data) data = matmul_common_read_stupid_data(mm->public_);
+    mb->data[0] = data;
     mb->data[1] = NULL;
 
     mb->nrows_t = mm->public_->dim[ mm->public_->store_transposed];
@@ -387,6 +391,12 @@ void builder_init(builder * mb, struct matmul_bucket_data_s * mm)
     mb->rowname = rowcol[ mm->public_->store_transposed];
     mb->colname = rowcol[!mm->public_->store_transposed];
     mb->rowhead = mb->data[0];
+}
+
+void builder_clear(builder * mb)
+{
+    free(mb->data[0]);
+    memset(mb, 0, sizeof(struct builder));
 }
 
 /************************************/
@@ -1767,10 +1777,10 @@ void builder_push_vsc_slices(struct matmul_bucket_data_s * mm, vsc_slice_t * V)
 }
 /* }}} */
 
-void matmul_bucket_build_cache(struct matmul_bucket_data_s * mm)
+void matmul_bucket_build_cache(struct matmul_bucket_data_s * mm, uint32_t * data)
 {
     builder mb[1];
-    builder_init(mb, mm);
+    builder_init(mb, mm, data);
 
     printf("%u rows %u cols\n", mm->public_->dim[0], mm->public_->dim[1]);
 

@@ -40,7 +40,7 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
      * optimized direction. So we pass bw->dir even though _we_ are going
      * to call mmt_mul with !bw->dir.
      */
-    matmul_top_init(mmt, abase, pi, flags, pl, MATRIX_INFO_FILE, bw->dir);
+    matmul_top_init(mmt, abase, pi, flags, pl, bw->dir);
 
     // mmt_wiring_ptr mcol = mmt->wr[bw->dir];
     mmt_wiring_ptr mrow = mmt->wr[!bw->dir];

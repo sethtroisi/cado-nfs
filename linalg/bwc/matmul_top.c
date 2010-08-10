@@ -11,7 +11,6 @@
 #include "matmul_top.h"
 #include "select_mpi.h"
 #include "intersections.h"
-#include "info_file.h"
 #include "debug.h"
 #include "filenames.h"
 
@@ -43,7 +42,7 @@ void vec_init_generic(pi_wiring_ptr picol, size_t stride, mmt_generic_vec_ptr v,
             r = abase_generic_init(stride, n);
             abase_generic_zero(stride, r, n);
         }
-        thread_agreement(picol, &r, 0);
+        thread_broadcast(picol, &r, 0);
         v->v = r;
         for(unsigned int t = 0 ; t < picol->ncores ; t++) {
             v->all_v[t] = v->v;
@@ -56,7 +55,7 @@ void vec_init_generic(pi_wiring_ptr picol, size_t stride, mmt_generic_vec_ptr v,
             serialize_threads(picol);
             void * r;
             r = v->v;
-            thread_agreement(picol, &r, t);
+            thread_broadcast(picol, &r, t);
             v->all_v[t] = r;
         }
     }
@@ -431,13 +430,98 @@ void matmul_top_vec_init(matmul_top_data_ptr mmt, int d, int flags)
 static void mmt_finish_init(matmul_top_data_ptr mmt, int const *, param_list pl, int optimized_direction);
 static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, int optimized_direction);
 
+static void mmt_fill_fields_from_balancing(matmul_top_data_ptr mmt, param_list pl)
+{
+    mmt->n[0] = mmt->bal->trows;
+    mmt->n[1] = mmt->bal->tcols;
+   
+    // nslices[0] is the number of slices in a row -- this is the number of
+    // ``vertical slices'', in balance.c parlance.
+    unsigned int nslices[2];
+    nslices[1] = mmt->bal->h->nh;
+    nslices[0] = mmt->bal->h->nv;
+
+    int ok = 1;
+
+    for(int d = 0 ; d < 2 ; d++)
+        ok = ok && mmt->pi->wr[d]->totalsize == nslices[d];
+
+    if (!ok) {
+        fprintf(stderr, "Configured split %ux%ux%ux%u does not match "
+                "on-disk data %ux%u\n",
+                mmt->pi->wr[1]->njobs,
+                mmt->pi->wr[0]->njobs,
+                mmt->pi->wr[1]->ncores,
+                mmt->pi->wr[0]->ncores,
+                nslices[1],
+                nslices[0]);
+        serialize(mmt->pi->m);
+        exit(1);
+    }
+
+    // mmt->ncoeffs_total = 0;
+    unsigned int ix[2];
+
+    for(int d = 0 ; d < 2 ; d++)  {
+        unsigned int * f = malloc((1 + nslices[d])*sizeof(unsigned int));
+        // we use UINT_MAX markers for sanity checking.
+        memset(f, -1, (1+nslices[d]) * sizeof(unsigned int));
+        f[nslices[d]] = mmt->n[d];
+        uint32_t quo = mmt->n[d] / nslices[d];
+        unsigned int rem = mmt->n[d] % nslices[d];
+        for(unsigned int k = 0 ; k < nslices[d] ; k++) {
+            f[k] = k * quo + MIN(rem, k);
+        }
+        mmt->fences[d^1] = f;
+    }
+
+    for(int d = 0 ; d < 2 ; d++)  {
+        ix[d] = mmt->pi->wr[1^d]->jrank * mmt->pi->wr[1^d]->ncores;
+        ix[d]+= mmt->pi->wr[1^d]->trank;
+        mmt->wr[d]->i0 = mmt->fences[d][ix[d]];
+        mmt->wr[d]->i1 = mmt->fences[d][ix[d] + 1];
+        ASSERT_ALWAYS(mmt->wr[d]->i0 < mmt->wr[d]->i1);
+        ASSERT_ALWAYS(mmt->wr[d]->i1 <= mmt->n[d]);
+
+        // the mm layer has an ncoeffs field as well, which is used,
+        // while to the contrary the one in the mmt structure is totally
+        // unused (and is now gone)
+        // mmt->ncoeffs = ncoeffs;
+        // mmt->ncoeffs_total += ncoeffs;
+    }
+
+    char * base;
+    {
+        const char * mname;
+        // get basename of matrix file. Remove potential suffix, .txt or .bin
+        mname = param_list_lookup_string(pl, "matrix");
+        ASSERT_ALWAYS(mname);
+        char * last_slash = strrchr(mname, '/');
+        if (last_slash) {
+            mname = last_slash + 1;
+        }
+        const char * suffixes[] = { ".txt", ".bin" };
+        unsigned int l = strlen(mname);
+        for(unsigned int k = 0 ; k < sizeof(suffixes) / sizeof(suffixes[0]) ; k++) {
+            unsigned int ls = strlen(suffixes[k]);
+            if (ls > l) continue;
+            if (strcmp(mname+l-ls,suffixes[k]) == 0)
+                l -= ls;
+        }
+        base = cado_strndup(mname, l);
+    }
+
+    int rc = asprintf(&mmt->locfile, "%s.%08"PRIx32".h%d.v%d", base, mmt->bal->h->checksum, ix[1], ix[0]);
+    free(base);
+    ASSERT_ALWAYS(rc >= 0);
+}
+
 void matmul_top_init(matmul_top_data_ptr mmt,
         abobj_ptr abase,
         /* matmul_ptr mm, */
         parallelizing_info_ptr pi,
         int const * flags,
         param_list pl,
-        const char * filename,
         int optimized_direction)
 {
     memset(mmt, 0, sizeof(*mmt));
@@ -453,8 +537,12 @@ void matmul_top_init(matmul_top_data_ptr mmt,
     // wr[]->*
     // are filled in later within read_info_file
 
-    read_info_file(mmt, filename);
+    balancing_read(mmt->bal, param_list_lookup_string(pl, "balancing"));
+    mmt_fill_fields_from_balancing(mmt, pl);
 
+    // after that, we need to check for every node if the cache file can
+    // be found. If none is found, rebuild the cache files with an
+    // equivalent of mf_dobal.
     mmt_finish_init(mmt, flags, pl, optimized_direction);
 }
 
@@ -538,8 +626,13 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
         abobj_set_nbys(mmt->abase, cache_nbys);
     }
 
-    mmt->mm = matmul_init(mmt->abase, mmt->locfile, impl, pl, optimized_direction); 
+    mmt->mm = matmul_init(mmt->abase,
+            mmt->wr[0]->i1 - mmt->wr[0]->i0,
+            mmt->wr[1]->i1 - mmt->wr[1]->i0,
+            mmt->locfile, impl, pl, optimized_direction); 
 
+    // *IF* we need to do a collective read of the matrix, we need to
+    // provide the pointer *now*.
     unsigned int sqread = 0;
     param_list_parse_uint(pl, "sequential_cache_read", &sqread);
 
@@ -557,9 +650,35 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
             cache_loaded = matmul_reload_cache(mmt->mm);
         }
     }
+    ASSERT_ALWAYS(global_data_eq(mmt->pi, &cache_loaded, sizeof(int)));
 
     unsigned int sqb = 0;
     param_list_parse_uint(pl, "sequential_cache_build", &sqb);
+
+    uint32_t * matrix_ptr = NULL;
+
+    if (!cache_loaded) {
+        matrix_u32 m;
+        if (mmt->pi->m->jrank == 0 && mmt->pi->m->trank == 0) {
+            fprintf(stderr, "Matrix dispatching starts\n");
+        }
+        m->mfile = param_list_lookup_string(pl, "matrix");
+        m->bfile = param_list_lookup_string(pl, "balancing");
+        // the mm layer is informed of the higher priority computations
+        // that will take place. Depending on the implementation, this
+        // may cause the direct or transposed ordering to be preferred.
+        // Thus we have to read this back from the mm structure.
+        m->transpose = mmt->mm->store_transposed;
+        get_matrix_u32(mmt->pi, pl, m);
+        matrix_ptr = m->p;
+        // note that this pointer will not necessarily be freed
+        // immediately. Ownership is transferred to the mm layer, which
+        // may decide to keep the pointer for the computations. This is
+        // what the basic layer does. In contrast, the bucket layer
+        // discards this data, as the post-processed matrix form is more
+        // efficient eventually.
+    }
+
 
     if (!sqb) {
         if (!cache_loaded) {
@@ -568,7 +687,7 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
                     mmt->pi->m->jrank,
                     mmt->pi->m->trank,
                     mmt->locfile);
-            matmul_build_cache(mmt->mm);
+            matmul_build_cache(mmt->mm, matrix_ptr);
             matmul_save_cache(mmt->mm);
         }
     } else {
@@ -580,7 +699,7 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
                         mmt->pi->m->jrank,
                         mmt->pi->m->trank,
                         mmt->locfile);
-                matmul_build_cache(mmt->mm);
+                matmul_build_cache(mmt->mm, matrix_ptr);
             } else if (j == mmt->pi->m->trank + 1) {
                 matmul_save_cache(mmt->mm);
             }

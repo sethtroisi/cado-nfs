@@ -57,7 +57,7 @@ void init_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct b
     int t0 = time(NULL);
     struct private_args * p = ba->p + tnum;
 
-    p->mm = matmul_init(ba->xx, ba->mfiles[tnum], ba->impl, ba->pl, !ba->transpose);
+    p->mm = matmul_init(ba->xx, 0, 0, ba->mfiles[tnum], ba->impl, ba->pl, !ba->transpose);
 
     if (!ba->rebuild && matmul_reload_cache(p->mm)) {
         pthread_mutex_lock(&tg->mu);
@@ -72,7 +72,7 @@ void init_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct b
         fprintf(stderr, "T%d Building cache file for %s\n",
                 tnum, ba->mfiles[tnum]);
         pthread_mutex_unlock(&tg->mu);
-        matmul_build_cache(p->mm);
+        matmul_build_cache(p->mm, NULL);
         pthread_mutex_lock(&tg->mu);
         fprintf(stderr, "T%d Cache build time %.2fs cpu\n",
                 tnum, (double) (clock()-ct0) / CLOCKS_PER_SEC);

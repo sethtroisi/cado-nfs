@@ -56,7 +56,7 @@ void setup_x_random(uint32_t * xs,
             }
         }
     }
-    complete_broadcast(pi->m, xs, nx * m * sizeof(unsigned int), 0, 0);
+    global_broadcast(pi->m, xs, nx * m * sizeof(unsigned int), 0, 0);
 }
 
 void load_x(uint32_t * xs, unsigned int m, unsigned int nx,
@@ -79,7 +79,7 @@ void load_x(uint32_t * xs, unsigned int m, unsigned int nx,
         }
         fclose(f);
     }
-    complete_broadcast(pi->m, xs, nx * m * sizeof(unsigned int), 0, 0);
+    global_broadcast(pi->m, xs, nx * m * sizeof(unsigned int), 0, 0);
 }
 
 void save_x(uint32_t * xs, unsigned int m, unsigned int nx, parallelizing_info_ptr pi)

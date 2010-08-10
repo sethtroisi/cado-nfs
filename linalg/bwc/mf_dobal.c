@@ -34,7 +34,7 @@ void * all(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
     matrix_u32 mat;
     mat->transpose=1;
-    mat->bfile = param_list_lookup_string(pl, "balancing_file");
+    mat->bfile = param_list_lookup_string(pl, "balancing");
     mat->mfile = param_list_lookup_string(pl, "matrix");
     get_matrix_u32(pi, pl, mat);
     return NULL;
@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
 	if (param_list_update_cmdline(pl, &argc, &argv))
 	    continue;
 	if (wild == 0) {
-            param_list_add_key(pl, "balancing_file", argv[0], PARAMETER_FROM_CMDLINE);
+            param_list_add_key(pl, "balancing", argv[0], PARAMETER_FROM_CMDLINE);
 	    wild++, argv++, argc--;
 	    continue;
 	}
@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
     // just as a reminder -- this is looked up from balancing.c
     param_list_lookup_string(pl, "balancing_use_auxfile");
 
-    if (!param_list_lookup_string(pl, "balancing_file")) usage();
+    if (!param_list_lookup_string(pl, "balancing")) usage();
     pi_go(all, pl, 0);
 
     param_list_clear(pl);

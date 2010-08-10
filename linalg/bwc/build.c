@@ -50,8 +50,8 @@ int main(int argc, char * argv[])
         } else {
             fprintf(stderr, "Saving cache for vector-times-matrix\n");
         }
-        mm = matmul_init(xx, argv[1], argv[2], NULL, d);
-        matmul_build_cache(mm);
+        mm = matmul_init(xx, 0, 0, argv[1], argv[2], NULL, d);
+        matmul_build_cache(mm, NULL);
         matmul_save_cache(mm);
         matmul_clear(mm);
     }

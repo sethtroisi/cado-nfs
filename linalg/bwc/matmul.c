@@ -68,17 +68,24 @@ void do_rebinding(matmul_ptr mm, const char * impl)
     }
 }
 
-matmul_ptr matmul_init(abobj_ptr x, const char * filename, const char * impl, param_list pl, int optimized_direction)
+matmul_ptr matmul_init(abobj_ptr x, unsigned int nr, unsigned int nc, const char * locfile, const char * impl, param_list pl, int optimized_direction)
 {
     struct matmul_public_s fake[1];
+    memset(fake, 0, sizeof(fake));
     do_rebinding(fake, impl);
     matmul_ptr mm = fake->bind->init(x, pl, optimized_direction);
     if (mm == NULL) return NULL;
     do_rebinding(mm, impl);
 
-    mm->filename = filename;
+    mm->dim[0] = nr;
+    mm->dim[1] = nc;
 
-    int rc = asprintf(&mm->cachefile_name, "%s-%s%s.bin", filename, mm->bind->impl, mm->store_transposed ? "T" : "");
+    // this just copies the locfile field from the parent structure
+    // matmul_top... Except that for benches, the matmul structure lives
+    // outside of this.
+    mm->locfile = locfile;
+
+    int rc = asprintf(&mm->cachefile_name, "%s-%s%s.bin", locfile, mm->bind->impl, mm->store_transposed ? "T" : "");
     FATAL_ERROR_CHECK(rc < 0, "out of memory");
 
     mm->local_cache_copy = NULL;
@@ -104,13 +111,12 @@ matmul_ptr matmul_init(abobj_ptr x, const char * filename, const char * impl, pa
         FATAL_ERROR_CHECK(rc < 0, "out of memory");
     }
 
-
     return mm;
 }
 
-void matmul_build_cache(matmul_ptr mm)
+void matmul_build_cache(matmul_ptr mm, uint32_t * ptr)
 {
-    mm->bind->build_cache(mm);
+    mm->bind->build_cache(mm, ptr);
 }
 
 static void save_to_local_copy(matmul_ptr mm)
@@ -233,7 +239,7 @@ void matmul_clear(matmul_ptr mm)
 {
     if (mm->cachefile_name != NULL) free(mm->cachefile_name);
     if (mm->local_cache_copy != NULL) free(mm->local_cache_copy);
-    mm->filename = NULL;
+    mm->locfile = NULL;
     mm->bind->clear(mm);
 }
 

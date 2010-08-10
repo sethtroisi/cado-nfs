@@ -2243,10 +2243,11 @@ sub do_replay {
     }
 
     my $cmd = "$param{'bindir'}/filter/replay ".
+              "--binary " .
               "-his $param{'prefix'}.merge.his ".
               "-index $param{'prefix'}.index ".
               "-purged $param{'prefix'}.purged ".
-              "-out $param{'prefix'}.small ".
+              "-out $param{'prefix'}.small.bin ".
               (defined $bwcostmin ? "-costmin $bwcostmin " : "").
               "> $param{'prefix'}.replay.stderr ".
               "2>&1";
@@ -2269,28 +2270,6 @@ sub do_replay {
 
 
 ###############################################################################
-# Transpose ###################################################################
-###############################################################################
-
-sub do_transpose {
-    info "Transposing the matrix...\n";
-    $tab_level++;
-
-    my $cmd = "$param{'bindir'}/linalg/transpose ".
-              "-T $param{'wdir'} ".
-              "-skip $param{'skip'} ".
-              "-in $param{'prefix'}.small ".
-              "-out $param{'prefix'}.small.tr ".
-              "> /dev/null ".
-              "2>&1";
-
-    cmd($cmd, { log => 1, kill => 1 });
-    $tab_level--;
-}
-
-
-
-###############################################################################
 # Linear algebra ##############################################################
 ###############################################################################
 
@@ -2301,7 +2280,6 @@ sub do_linalg {
     my $cmd;
     if ($param{'linalg'} eq "bw") {
         die "No longer supported";
-#        do_transpose;
 #
 #        info "Calling Block-Wiedemann (old code)...\n";
 #        $tab_level++;
@@ -2374,7 +2352,7 @@ sub do_linalg {
 		} else {
        		$cmd .= "mpi=1x1 ";
 		}
-        $cmd .= "matrix=$param{'prefix'}.small " .
+        $cmd .= "matrix=$param{'prefix'}.small.bin " .
                "nullspace=left " .
                "mm_impl=$param{'bwc_mm_impl'} ".
                "interleaving=$param{'bwc_interleaving'} ".
@@ -2386,18 +2364,11 @@ sub do_linalg {
 	       "2>&1";
         cmd($cmd, { log => 1, kill => 1 });
 
-        $cmd = "$param{'bindir'}/linalg/apply_perm " .
-            "--perm $param{'prefix'}.bwc/mat.row_perm " .
-            "--in $param{'prefix'}.bwc/W.twisted " .
-            "--out $param{'prefix'}.W.bin";
-        cmd($cmd, { log => 1, kill => 1 });
-
-        $cmd = "xxd -c 8 -ps $param{'prefix'}.W.bin > $param{'prefix'}.W";
+        $cmd = "xxd -c 8 -ps $param{'prefix'}.bwc/W > $param{'prefix'}.W";
         cmd($cmd, { log => 1, kill => 1 });
 
     } elsif ($param{'linalg'} eq "bl") {
         die "No longer supported";
-#        do_transpose;
 #
 #        info "Calling Block-Lanczos...\n";
 #        $tab_level++;
@@ -2460,7 +2431,7 @@ sub do_chars {
               "-ker $param{'prefix'}.ker_raw ".
               "-index $param{'prefix'}.index ".
               "-rel $param{'prefix'}.nodup.gz ".
-              "-small $param{'prefix'}.small ".
+              "-small $param{'prefix'}.small.bin ".
               "-nker $nker ".
               "-skip $param{'skip'} ".
               "-nchar $param{'nchar'} ".

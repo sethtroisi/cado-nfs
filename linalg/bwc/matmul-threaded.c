@@ -146,9 +146,10 @@ void matmul_threaded_blocks_info(struct matmul_threaded_data_s * mm)
             (100.0 * padding / sparse_coeffs));
 }
 
-void matmul_threaded_build_cache(struct matmul_threaded_data_s * mm)
+void matmul_threaded_build_cache(struct matmul_threaded_data_s * mm, uint32_t * data)
 {
-    uint32_t * data = matmul_common_read_stupid_data(mm->public_);
+    if (!data)
+        data = matmul_common_read_stupid_data(mm->public_);
 
     unsigned int nrows_t = mm->public_->dim[ mm->public_->store_transposed];
     unsigned int ncols_t = mm->public_->dim[!mm->public_->store_transposed];

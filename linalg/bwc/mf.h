@@ -70,8 +70,8 @@ int matrix_autodetect_input(struct mf_io_file * mf_in, const char * mfile);
  * compute the checksum of the balancing.
  */
 extern void balancing_finalize(balancing_ptr bal);
-extern void balancing_write(balancing_ptr bal, const char *);
-extern void balancing_write_namefile(balancing_ptr bal, const char *);
+extern void balancing_write_inner(balancing_ptr bal, const char *);
+extern void balancing_write(balancing_ptr bal, const char * , const char *);
 extern void balancing_read(balancing_ptr bal, const char *);
 extern void balancing_clear(balancing_ptr bal);
 extern void balancing_init(balancing_ptr bal);

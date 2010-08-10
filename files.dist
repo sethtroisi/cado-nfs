@@ -36,8 +36,6 @@ gf2x/
 scripts/install-cmake.sh
 linalg/CMakeLists.txt
 linalg/Makefile
-linalg/apply_perm.c
-linalg/balance.c
 linalg/bwc/CMakeLists.txt
 linalg/bwc/CMakeLists.txt
 linalg/bwc/README
@@ -84,8 +82,6 @@ utils/fakempi.h
 utils/fakepthread.h
 linalg/bwc/filenames.h
 linalg/bwc/gather.c
-linalg/bwc/info_file.c
-linalg/bwc/info_file.h
 linalg/bwc/intersections.cpp
 linalg/bwc/intersections.h
 linalg/bwc/krylov.c
@@ -374,3 +370,8 @@ sqrt/knapsack.c
 sqrt/knapsack.h
 params/params.c128
 params/params.c110
+linalg/bwc/mf.c
+linalg/bwc/mf.h
+linalg/bwc/mf_bal.c
+linalg/bwc/mf_scan.c
+linalg/bwc/mf_dobal.c

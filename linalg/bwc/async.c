@@ -124,7 +124,7 @@ static void timing_rare_checks(pi_wiring_ptr wr, struct timing_data * t, int ite
 
     double good_period = PREFERRED_ASYNC_LAG / av;
     int guess = 1 + (int) good_period;
-    complete_broadcast(wr, &guess, sizeof(int), 0, 0);
+    global_broadcast(wr, &guess, sizeof(int), 0, 0);
     /* negative stuff is most probably caused by overflows in a fast
      * context */
     if (guess <= 0) guess = 10;
@@ -147,9 +147,9 @@ static void timing_rare_checks(pi_wiring_ptr wr, struct timing_data * t, int ite
     }
 
     /* reconcile threads */
-    // serialize_threads(wr);      // bug in thread_agreement
+    // serialize_threads(wr);      // bug in thread_broadcast
     void * ptr = &caught_something;
-    thread_agreement(wr, &ptr, 0);
+    thread_broadcast(wr, &ptr, 0);
     caught_something = * (unsigned int *) ptr;
 
     /* ok, got it. Before we possibly leave, make sure everybody has read
@@ -256,7 +256,7 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
     double ncoeffs_total = 0;
     {
         void * ptr = &ncoeffs_total;
-        thread_agreement(pi->m, &ptr, 0);
+        thread_broadcast(pi->m, &ptr, 0);
         double * main_ncoeffs_total = ptr;
         my_pthread_mutex_lock(pi->m->th->m);
         * main_ncoeffs_total += ncoeffs_d;
@@ -270,7 +270,7 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
     double aggr_dwct[2] = {0,0};
     {
         void * ptr = aggr_dwct;
-        thread_agreement(pi->m, &ptr, 0);
+        thread_broadcast(pi->m, &ptr, 0);
         double * px = ptr;
         my_pthread_mutex_lock(pi->m->th->m);
         px[0] += since_last_reset[0]->wct;

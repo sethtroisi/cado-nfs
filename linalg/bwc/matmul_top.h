@@ -106,11 +106,12 @@ struct matmul_top_data_s {
     // is the horizontal size -- the size of the rows --. This means the
     // number of columns.
     unsigned int n[2];
-    unsigned int ncoeffs_total;
+    // unsigned int ncoeffs_total;
 
     // local stuff
-    unsigned int ncoeffs;
+    // // unsigned int ncoeffs;
     
+    // this really ends up within the mm field.
     char * locfile;
 
     mmt_wiring wr[2];
@@ -126,7 +127,7 @@ struct matmul_top_data_s {
     // bad decision. Fortunately, fences[] is rarely used.
     unsigned int * fences[2];
 #endif
-    balancing_header bal;
+    balancing bal;
 };
 
 /* THREAD_MULTIPLE_VECTOR is when several threads will be writing to the
@@ -150,7 +151,6 @@ extern void matmul_top_init(matmul_top_data_ptr mmt,
         parallelizing_info_ptr pi,
         int const * flags,
         param_list pl,
-        const char * filename,
         int optimized_direction);
 
 

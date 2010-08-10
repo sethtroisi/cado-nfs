@@ -77,21 +77,21 @@ void prelude(parallelizing_info_ptr pi, struct sfiles_list * s)
      * actual I/O.
      */
     serialize(pi->m);
-    complete_broadcast(pi->m, &s->sfiles_alloc, sizeof(int), 0, 0);
+    global_broadcast(pi->m, &s->sfiles_alloc, sizeof(int), 0, 0);
     serialize(pi->m);
-    complete_broadcast(pi->m, &s->nsfiles, sizeof(int), 0, 0);
+    global_broadcast(pi->m, &s->nsfiles, sizeof(int), 0, 0);
     serialize(pi->m);
     if (!(pi->m->jrank == 0 && pi->m->trank == 0)) {
         s->sfiles = malloc(s->sfiles_alloc * sizeof(struct sfile_info));
     }
-    complete_broadcast(pi->m, s->sfiles, s->nsfiles * sizeof(struct sfile_info), 0, 0);
+    global_broadcast(pi->m, s->sfiles, s->nsfiles * sizeof(struct sfile_info), 0, 0);
     serialize(pi->m);
 }
 
 int agree_on_flag(pi_wiring_ptr w, int v)
 {
     int * ptr = &v;
-    thread_agreement(w, (void**) &ptr, 0);
+    thread_broadcast(w, (void**) &ptr, 0);
     for(unsigned int i = 0 ; i < w->ncores ; i++) {
         serialize_threads(w);
         * ptr &= v;
@@ -132,7 +132,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     flags[bw->dir] = THREAD_SHARED_VECTOR;
     flags[!bw->dir] = 0;
 
-    matmul_top_init(mmt, abase, pi, flags, pl, MATRIX_INFO_FILE, bw->dir);
+    matmul_top_init(mmt, abase, pi, flags, pl, bw->dir);
 
     mmt_wiring_ptr mcol = mmt->wr[bw->dir];
     mmt_wiring_ptr mrow = mmt->wr[!bw->dir];

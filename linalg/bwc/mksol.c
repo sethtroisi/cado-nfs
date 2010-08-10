@@ -40,7 +40,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
 
     block_control_signals();
 
-    matmul_top_init(mmt, abase, pi, flags, pl, MATRIX_INFO_FILE, bw->dir);
+    matmul_top_init(mmt, abase, pi, flags, pl, bw->dir);
 
     mmt_wiring_ptr mcol = mmt->wr[bw->dir];
     mmt_wiring_ptr mrow = mmt->wr[!bw->dir];

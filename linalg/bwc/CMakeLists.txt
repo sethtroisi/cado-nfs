@@ -45,10 +45,14 @@ add_library(bwc_base
     mf.c
     balancing.c
     worker-threads.c)
-target_link_libraries(bwc_base ${pthread_libs})
+target_link_libraries(bwc_base utils ${pthread_libs})
 set_target_properties(bwc_base PROPERTIES
         COMPILE_FLAGS "--mpi"
         LINK_FLAGS "--mpi")
+
+add_executable(mf_untwistvec mf_untwistvec.c)
+target_link_libraries(mf_untwistvec bwc_base)
+install(TARGETS mf_untwistvec RUNTIME DESTINATION bin/linalg/bwc)
 
 set(all_variants)
 macro(configure_bwc_variant v)
@@ -84,7 +88,7 @@ macro(configure_bwc_variant v)
     target_link_libraries(${v}_matmul mat_io)
 
 
-    add_library(${v}_bwc abase-${v}.c info_file.c matmul_top.c)
+    add_library(${v}_bwc abase-${v}.c matmul_top.c)
     set_target_properties(${v}_bwc PROPERTIES
             COMPILE_FLAGS "--mpi -DSELECT_ABASE_${v}"
             LINK_FLAGS "--mpi")
@@ -103,6 +107,7 @@ set(bench_objs bench.c)
 set(prep_objs prep.c xymats.c ../gauss.c)
 set_source_files_properties (../gauss.c COMPILE_FLAGS "-DMULTI_ROW=3 -DNO_MAIN")
 set(krylov_objs krylov.c xymats.c xdotprod.c)
+set(dispatch_objs dispatch.c xymats.c xdotprod.c)
 set(mksol_objs mksol.c xymats.c xdotprod.c)
 set(gather_objs gather.c)
 set(secure_objs secure.c)
@@ -119,10 +124,14 @@ macro(configure_program prg)
     endforeach(v)
 endmacro(configure_program)
 
-configure_program(krylov ${all_variants})
-configure_program(mksol  ${all_variants})
-configure_program(build  ${all_variants})
-configure_program(bench  ${all_variants})
+set(used_variants       u64)
+#set(used_variants ${all_variants})
+
+configure_program(krylov ${used_variants})
+configure_program(dispatch ${used_variants})
+configure_program(mksol  ${used_variants})
+configure_program(build  ${used_variants})
+configure_program(bench  ${used_variants})
 configure_program(prep   u64n)
 configure_program(gather u64n)
 configure_program(secure u64)
@@ -135,5 +144,7 @@ include_directories(${CADO_NFS_SOURCE_DIR}/gf2x-fft)
 add_executable(lingen lingen_binary.cpp)
 install(TARGETS lingen RUNTIME DESTINATION bin/linalg/bwc)
 target_link_libraries(lingen bwc_base utils gf2x-fft)
+
+add_executable(short_matmul EXCLUDE_FROM_ALL short_matmul.c)
 
 include(CMakeLists-nodist.txt OPTIONAL)

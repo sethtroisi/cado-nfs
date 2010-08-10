@@ -753,13 +753,16 @@ template<typename fft_type> struct tpolmat /* {{{ */
         x = NULL;
         order = NULL;
         _deg = NULL;
+        po = NULL;
     }
     private:
     tpolmat(tpolmat const& a) { }
     tpolmat& operator=(tpolmat const&){ return *this;}
     public:
     ~tpolmat() {
-        po->free(x, nrows * ncols); x = NULL;
+        if (po)
+            po->free(x, nrows * ncols);
+        x = NULL;
         mydelete(order, ncols);
         mydelete(_deg, ncols);
     }

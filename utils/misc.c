@@ -18,7 +18,7 @@
 char *cado_strndup(const char *a, size_t n)
 {
     char *r = malloc(n+1);
-    memcpy(r, a, n+1);
+    memcpy(r, a, MIN(strlen(a),n)+1);
     r[n] = '\0';
     return r;
 }

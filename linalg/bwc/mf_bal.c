@@ -429,8 +429,10 @@ int main(int argc, char * argv[])
     bal->h->flags = FLAG_REPLICATE|FLAG_PADDING|FLAG_COLPERM;
     balancing_finalize(bal);
 
-    balancing_write_namefile(bal, mfile);
+    balancing_write(bal, mfile, param_list_lookup_string(pl, "out"));
     balancing_clear(bal);
+
+    param_list_clear(pl);
 
     return 0;
 }

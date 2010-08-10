@@ -328,7 +328,7 @@ polymodF_mul_monic (poly_t Q, const poly_t P1, const poly_t P2,
         const poly_t F);
 
 /* {{{ mpi-gmp helpers */
-static int all_agree(void *buffer, int count, MPI_Datatype datatype,/*{{{*/
+static int mpi_data_agrees(void *buffer, int count, MPI_Datatype datatype,/*{{{*/
         MPI_Comm comm)
 {
     int s;
@@ -617,7 +617,7 @@ void ab_source_init(ab_source_ptr ab, const char * fname, int rank, int root, MP
     int rc;
     if (ab->nfiles == 0) {
         rc = stat(fname, sbuf);
-        ASSERT_ALWAYS(all_agree(&rc, 1, MPI_INT, comm));
+        ASSERT_ALWAYS(mpi_data_agrees(&rc, 1, MPI_INT, comm));
         ASSERT_ALWAYS(rc == 0);
         tsize=sbuf->st_size;
         // we have 2.5 non-digit bytes per file line. However we
@@ -665,7 +665,7 @@ void ab_source_init(ab_source_ptr ab, const char * fname, int rank, int root, MP
                     ab->prefix, ab->depnum, ab->nfiles);
             rc = stat(ab->sname, sbuf);
             ASSERT_ALWAYS(rc == 0 || errno == ENOENT);
-            ASSERT_ALWAYS(all_agree(&rc, 1, MPI_INT, comm));
+            ASSERT_ALWAYS(mpi_data_agrees(&rc, 1, MPI_INT, comm));
             if (rc < 0) break;
             tsize += sbuf->st_size - hdrbytes;
         }
@@ -679,7 +679,7 @@ void ab_source_init(ab_source_ptr ab, const char * fname, int rank, int root, MP
                     ab->prefix, ab->depnum, i);
             rc = stat(ab->sname, sbuf);
             ASSERT_ALWAYS(rc == 0);
-            ASSERT_ALWAYS(all_agree(&rc, 1, MPI_INT, comm));
+            ASSERT_ALWAYS(mpi_data_agrees(&rc, 1, MPI_INT, comm));
             ab->file_bases[i+1]=ab->file_bases[i] + sbuf->st_size;
         }
         ab->totalsize = ab->file_bases[ab->nfiles];
@@ -3649,7 +3649,7 @@ int main(int argc, char **argv)
     }
     glob.prec = ceil((glob.nbits_sqrt + 128)/ log2_P);
 
-    ASSERT_ALWAYS(all_agree(&glob.prec, 1, MPI_INT, MPI_COMM_WORLD));
+    ASSERT_ALWAYS(mpi_data_agrees(&glob.prec, 1, MPI_INT, MPI_COMM_WORLD));
 
     if (glob.rank == 0) {
         char sbuf[32];

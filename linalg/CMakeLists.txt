@@ -8,9 +8,6 @@
 add_executable(characters characters.c gauss.c)
 target_link_libraries(characters utils)
 
-add_executable(apply_perm apply_perm.c)
-target_link_libraries(apply_perm utils)
-
 add_executable(mkbitstrings mkbitstrings.c)
 target_link_libraries(mkbitstrings utils)
 
@@ -18,14 +15,11 @@ target_link_libraries(mkbitstrings utils)
 # well...
 add_library(mat_io readbuffer.c readmat.c readmat-easy.c)
 
-add_executable(balance balance.c readbuffer.c rowset_heap.cpp)
-target_link_libraries(balance utils m)
-
-add_executable(transpose transpose.c readmat.c)
+add_executable(transpose EXCLUDE_FROM_ALL transpose.c readmat.c)
 target_link_libraries(transpose utils m)
 
 
-install(TARGETS mkbitstrings characters apply_perm balance transpose RUNTIME DESTINATION bin/linalg)
+install(TARGETS mkbitstrings characters RUNTIME DESTINATION bin/linalg)
 
 set_source_files_properties (gauss.c COMPILE_FLAGS "-DMULTI_ROW=3 -DNO_MAIN")
 

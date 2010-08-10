@@ -10,7 +10,7 @@ extern "C" {
 struct matmul_basic_data_s;
 
 extern struct matmul_basic_data_s * matmul_basic_init(abobj_ptr, param_list pl, int);
-extern void matmul_basic_build_cache(struct matmul_basic_data_s *);
+extern void matmul_basic_build_cache(struct matmul_basic_data_s *, uint32_t *);
 extern int matmul_basic_reload_cache(struct matmul_basic_data_s *);
 extern void matmul_basic_save_cache(struct matmul_basic_data_s *);
 extern void matmul_basic_mul(struct matmul_basic_data_s *, abt *, abt const *, int);

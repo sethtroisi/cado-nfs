@@ -179,13 +179,21 @@ extern void hello(parallelizing_info_ptr pi);
  *
  * This function uses the wr->utility_ptr field.
  */
-extern void thread_agreement(pi_wiring_ptr wr, void ** ptr, unsigned int i);
+extern void thread_broadcast(pi_wiring_ptr wr, void ** ptr, unsigned int i);
 
 /* This one is the higher level thingy on top of MPI_Bcast and the
  * previous one. It broadcast data computed by job j, thread t (e.g. 0,0)
  * to all jobs and threads.
  */
-extern void complete_broadcast(pi_wiring_ptr wr, void * ptr, size_t size, unsigned int j, unsigned int t);
+extern void global_broadcast(pi_wiring_ptr wr, void * ptr, size_t size, unsigned int j, unsigned int t);
+
+/* companions to the above, the three functions below compare a data area
+ * between threads and/or mpi jobs, and collectively return the result.
+ * Useful for deciding on a common way to go given a condition.
+ */
+extern int mpi_data_eq(parallelizing_info_ptr pi, void *buffer, size_t sz);
+extern int thread_data_eq(parallelizing_info_ptr pi, void *buffer, size_t sz);
+extern int global_data_eq(parallelizing_info_ptr pi, void *buffer, size_t sz);
 
 /* prints the given string in a ascii-form matrix. */
 extern void grid_print(parallelizing_info_ptr pi, char * buf, size_t siz, int print);

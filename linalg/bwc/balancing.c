@@ -86,7 +86,7 @@
  */
 
 /* There are several modes of operations considered. Note that the
- * program has to privide some basic functionality even in the absence of
+ * program has to provide some basic functionality even in the absence of
  * an available MPI environment (threads are required though).
  *
  * 1) The matrix has to be split according to an m*n grid, on a single
@@ -552,7 +552,7 @@ void mf_pipe(data_source_ptr input, data_dest_ptr output, const char * name)/*{{
 
 struct mpi_dest_s;
 
-// all outbounc channels use the same type of send queue. There is a
+// all outbound channels use the same type of send queue. There is a
 // double-size buffer, and flushes are performed each time one of the two
 // gets filled (while the other one continues filling up normally).
 // only the flush operations are virtual.
@@ -820,9 +820,9 @@ void read_bfile(master_data m, const char * bfile)
 
 void share_bfile_header_data(parallelizing_info_ptr pi, balancing_ptr bal)
 {
-    complete_broadcast(pi->m, bal->h, sizeof(balancing_header), 0, 0);
-    complete_broadcast(pi->m, &bal->trows, sizeof(uint32_t), 0, 0);
-    complete_broadcast(pi->m, &bal->tcols, sizeof(uint32_t), 0, 0);
+    global_broadcast(pi->m, bal->h, sizeof(balancing_header), 0, 0);
+    global_broadcast(pi->m, &bal->trows, sizeof(uint32_t), 0, 0);
+    global_broadcast(pi->m, &bal->tcols, sizeof(uint32_t), 0, 0);
 }
 
 /* {{{ slave loops 1 and 2 */
@@ -1492,7 +1492,7 @@ void * get_matrix_u32(parallelizing_info_ptr pi, param_list pl, matrix_u32_ptr a
         slaves = malloc(pi->m->totalsize * sizeof(slave_data_ptr));
         memset(slaves, 0, pi->m->totalsize * sizeof(slave_data_ptr));
     }
-    thread_agreement(pi->m, (void**) &slaves, 0);
+    thread_broadcast(pi->m, (void**) &slaves, 0);
 
     slave_data_ptr s = malloc(sizeof(slave_data));
     pthread_mutex_lock(pi->m->th->m);

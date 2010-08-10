@@ -17,7 +17,7 @@ typedef struct matmul_public_s  * matmul_t;
 typedef struct matmul_public_s  * matmul_ptr;
 
 typedef matmul_ptr (*matmul_init_t)(abobj_ptr, param_list pl, int);
-typedef void (*matmul_build_cache_t)(matmul_ptr);
+typedef void (*matmul_build_cache_t)(matmul_ptr, uint32_t *);
 typedef int (*matmul_reload_cache_t)(matmul_ptr);
 typedef void (*matmul_save_cache_t)(matmul_ptr);
 typedef void (*matmul_mul_t)(matmul_ptr, abt *, abt const *, int);
@@ -50,7 +50,8 @@ struct matmul_public_s {
 
     int iteration[2];
 
-    const char * filename;
+    const char * locfile;
+
     char * cachefile_name;
     char * local_cache_copy;
 
@@ -70,11 +71,11 @@ struct matmul_public_s {
 extern "C" {
 #endif
 
-extern matmul_ptr matmul_init(abobj_ptr, const char * filename, const char * impl, param_list pl, int);
+extern matmul_ptr matmul_init(abobj_ptr, unsigned int, unsigned int, const char * locfile, const char * impl, param_list pl, int);
 
 /* These two functions are the means of initializing the mm layer. No
  * bare _init() function is publicly accessible */
-extern void matmul_build_cache(matmul_ptr mm);
+extern void matmul_build_cache(matmul_ptr mm, uint32_t *);
 extern int matmul_reload_cache(matmul_ptr mm);
 
 /* Exit point */

@@ -1,4 +1,5 @@
 #define _POSIX_C_SOURCE 200112L
+#define _BSD_SOURCE
 
 #include <stdlib.h>
 #include <unistd.h>
@@ -83,9 +84,6 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     }
 
 
-    // Here, the matrix filename really ends up in some heap data that will
-    // survive after freeing the param_list (if ever we do so early -- as a
-    // matter of fact, in prep.c we don't)
     param_list_parse_intxint(pl, "mpi", bw->mpi_split);
     param_list_parse_intxint(pl, "thr", bw->thr_split);
     param_list_parse_int(pl, "seed", &bw->seed);
@@ -95,6 +93,9 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     param_list_parse_int(pl, "start", &bw->start);
     param_list_parse_int(pl, "end", &bw->end);
     param_list_parse_int(pl, "checkpoints", &bw->checkpoints);
+
+    param_list_lookup_string(pl, "matrix");
+    param_list_lookup_string(pl, "balancing");
 
 
     mpz_init_set_ui(bw->p, 2);
@@ -125,8 +126,10 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     }
     okm += param_list_parse_int(pl, "m", &bw->m);
     okn += param_list_parse_int(pl, "n", &bw->n);
-    if (!okm || !okn)
+    if (!okm || !okn) {
+        fprintf(stderr, "parameter m and/or n is missing\n");
         usage();
+    }
 
     if (bw->verbose && bw->can_print)
         param_list_display (pl, stderr);

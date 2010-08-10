@@ -384,26 +384,7 @@ void balancing_finalize(balancing_ptr bal)
     }
 }
 
-void balancing_write_namefile(balancing_ptr bal, const char * mfile)
-{
-    char * dup_prefix=strdup(mfile);
-    char * ext[2] = { ".bin", ".txt" };
-    for(int j = 0 ; j < 2 ; j++) {
-        if (has_suffix(dup_prefix, ext[j])) {
-            dup_prefix[strlen(dup_prefix)-strlen(ext[j])]='\0';
-            break;
-        }
-    }
-    char * filename;
-    int rc = asprintf(&filename, "%s.%dx%d.%08"PRIx32".bin",
-            dup_prefix, bal->h->nh, bal->h->nv, bal->h->checksum);
-    ASSERT_ALWAYS(rc >= 0);
-    free(dup_prefix);
-    balancing_write(bal, filename);
-    free(filename);
-}
-
-void balancing_write(balancing_ptr bal, const char * filename)
+void balancing_write_inner(balancing_ptr bal, const char * filename)
 {
     FILE * pfile;
     pfile = fopen(filename, "w");
@@ -421,9 +402,45 @@ void balancing_write(balancing_ptr bal, const char * filename)
     fclose(pfile);
 }
 
+void balancing_write(balancing_ptr bal, const char * mfile, const char * suggest)
+{
+    if (suggest && strlen(suggest) && suggest[strlen(suggest)-1] != '/') {
+        balancing_write_inner(bal, suggest);
+    }
+
+    char * dup_prefix=strdup(mfile);
+    char * ext[2] = { ".bin", ".txt" };
+    for(int j = 0 ; j < 2 ; j++) {
+        if (has_suffix(dup_prefix, ext[j])) {
+            dup_prefix[strlen(dup_prefix)-strlen(ext[j])]='\0';
+            break;
+        }
+    }
+
+    /* If we've been suggested an output directory, use it ! */
+    const char * q = dup_prefix; 
+    const char * d = "";
+    if (suggest && strlen(suggest)) {
+        d=suggest;
+        char * last_slash = strrchr(q, '/');
+        if (last_slash) {
+            q = last_slash + 1;
+        }
+    }
+    char * filename;
+    int rc = asprintf(&filename, "%s%s.%dx%d.%08"PRIx32".bin",
+            d,q, bal->h->nh, bal->h->nv, bal->h->checksum);
+
+    ASSERT_ALWAYS(rc >= 0);
+    free(dup_prefix);
+    balancing_write_inner(bal, filename);
+    free(filename);
+}
+
 void balancing_read(balancing_ptr bal, const char * filename)
 {
     FILE * pfile;
+    ASSERT_ALWAYS(filename);
     pfile = fopen(filename, "r");
     if (pfile == NULL) {
         perror(filename);

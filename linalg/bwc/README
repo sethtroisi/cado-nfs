@@ -30,30 +30,36 @@ Calling sequence of binaries
 We describe here the list of binaries to run. This can be somewhat automated
 using the bwc.pl driver script, documented below.
 
- 1 - balance
+ 1 - mf_bal
+     Given files for row and column frequencies of the input matrix,
+     compute a permutation of rows and columns which would provide the
+     best balancing of the computation load across the different jobs.
      decomposes the input matrix into blocks that will be dispatched to
      nodes
- 2 - prep
+ 2 - dispatch
+     apply the previous permutation to the input matrix, and compute
+     in-memory caches.
+ 3 - prep
      select input blocks of vectors, and check that rank conditions are
      satisfied
- 3 - secure
+ 4 - secure
      precompute some data useful for checksums
- 4 - split Y
+ 5 - split Y
      split the main input vector Y into several blocks for independent
      processing at different sites.
-!5 - krylov
+!6 - krylov
      compute the Krylov sequence
- 6 - acollect
+ 7 - acollect
      collect the Krylov sequence files into one big file. Can be done at
      several moments in the computation.
-!7 - lingen
+!8 - lingen
      Berlekamp-Massey -like step: produces a generating polynomial
- 8 - split F
+ 9 - split F
      split the linear generator computed into several blocks for independent
      processing at each site.
-!9 - mksol
+!10 - mksol
      create the solutions from the polynomial
- 10 - gather / apply_perm
+ 11 - gather / apply_perm
      reconstruct solutions from the mess
 
 krylov, lingen, mksol are the steps having a real computational impact.
@@ -100,6 +106,14 @@ suggests only the <key>=<value> form.
     (either the cwd or the wdir parameter above), then parameters are obtained
     from that file.
 
+* matrix=<path>
+* balancing=<path>
+    path to matrix file, and to balancing file. May be absolute paths,
+    otherwise understood as relative from the current directory (working
+    directory). Note that the matrix cache files are named relative to
+    that directory as well (unless the local_cache_copy_dir parameter is
+    used).
+    
 * m=<number>, n=<number>, or mn=<number> for setting both.
 
     Set the corresponding parameters from the block Wiedemann algorithm. Note
@@ -163,7 +177,7 @@ Some more internal parameters.
   must be a sub-interval of [0,n[ . (y1-y0) must be equal to
   nbys*(1+interleaving), where nbys is the XXX value in uXXX_krylov for
   instance.
-* checkpoints=[0|1] whether LINGEN must save checkpoints. This flag is not
+* checkpoints=[0|1] whether LINGEN must save checkpoints. This flag is NOT
   used for krylov/mksol, which always store checkpoints.
 * splits=<number1>,<number2>,... Only for the auxilary program ``split''.
   Splits Y0-<n> (or equivalently F) in files V<number1>-<number2>.*,
@@ -188,22 +202,19 @@ Some more internal parameters.
 Files (standard name, standard place, etc)
 ==========================================
 
-This list links at who creates what and uses what:
+This list links at who creates what and uses what. The prefix ``mat'' is
+actually replaced by the basename of the input matrix, with suffixes
+removed.
 
-wdir/tmp-mat.xxxx               temporary files for balance.
-wdir/mat.info                   sub-matrix placement, + stats
-    created by balance
-    read by *_{prep,secure,krylov,mksol,gather}
+XXX TODO the new apply_perm is not yet implemented.
+
 wdir/mat.col_perm
 wdir/mat.row_perm               permutations used for balancing.
     created by balance
     read by apply_perm
-wdir/mat.hi.vj                  contains the (i,j) block of the matrix
-    created by balance
-    read by *_{prep,secure,krylov,mksol} unless the .bin file is found.
-wdir/mat.hi.vj-XXXXXX.bin         in-memory version of the above
-    created by *_{prep,secure,krylov,mksol,gather} if not found.
-    used by the 
+wdir/mat.hi.vj-XXXXXX.bin       in-memory version of the sub-matrices
+    created by *_{dispatch,prep,secure,krylov,mksol,gather} if not found.
+    used by {prep,secure,krylov,mksol,gather}
 wdir/bw.cfg                     recalls the command-line parameters
     re-read by all programs.
 wdir/X.twisted                  X vector used for Krylov.
@@ -254,10 +265,10 @@ Per-program documentation
 For all programs, more extensive documentation can often be found in the
 source file comments if there are such comments.
 
-balance
--------
-
-    balance transforms the input matrix M into a twisted matrix Mt which
+mf_bal
+------
+    mf_bal computes a row and column permutation which is applicable to
+    the input matrix M, to be transformed into a twisted matrix Mt which
     satisfies
         Sr^-1 * Mt * Sc eq M; 
     Mt enjoys the property that when split in a 2d rectangular grid matching
@@ -267,8 +278,17 @@ balance
     Sc is the permutation sending 0 to the first 32-bit integer found
     in col_perm, etc.
 
-    mat.hi.vj                    (i,j) block of the matrix
-    mat.info                     global placement
+    mf_bal does not actually read the input matrix, but works only with
+    the row and column frequencies.
+
+    mf_bal is not an mpi program.
+
+dispatch
+--------
+    dispatch uses the mf_bal output to compute the per-job in-memory
+    data.  mat.hi.vj denotes the (i,j) block of the matrix, but is
+    normally not saved to disk. Rather, the copies mat.hi.vj-XXXXXXXX.bin
+    of the in-memory structures are saved.
 
     All vector files created later on, and relative to the matrix Mt, are
     ``twisted'' files. Ytwisted is Sc * Yuntwisted. So:

@@ -24,11 +24,9 @@ The action to be performed is either:
   prepended by a colon.
     :complete -- do a complete linear system solving. The solution ends
                  up in \$wdir/W.twisted.
-    :balance  -- compute a balanced splitting of the matrix, according
-                 the specified mpi and thr parameters.
     :wipeout  -- quite like rm -rf \$wdir, but focuses on bwc files. Does
                  not wipe out matrix file, nor cached in-memory files.
-    :bench    -- does :balance, :wipeout, prep, secure, and krylov with
+    :bench    -- does :wipeout, dispatch, prep, secure, and krylov with
                  an exceedingly large finish bound in order to perform
                  some timings.
 
@@ -54,8 +52,6 @@ hosts                Comma-separated list of hosts. 'hosts' may be supplied
 hostfile             path to a host list file to be understood by mpiexec
                      NOTE: multi-hosts support is incomplete in this
                      script at the moment, and specific to mpich2+pm=hydra.
-tmpdir               if the ``balance'' program has to be called, put
-                     temporary files there
 
 Amongst parameters, some options with leading dashes may be set:
 
@@ -96,6 +92,7 @@ my @extra_args = ();
 my @mpi_split=(1,1);
 my @thr_split=(1,1);
 my $matrix;
+my $balancing;
 my $hostfile;
 
 ## mpiexec is substituted by cmake in case mpi has been used for the
@@ -131,6 +128,7 @@ my $mpi;
 my $mpi_ver;
 my $tmpdir;
 my $interleaving;
+my $force_complete;
 
 # {{{ MPI detection
 
@@ -280,8 +278,8 @@ if (!defined($wdir) && defined($matrix)) {
     $matrix =~ s/~/$ENV{HOME}/g;
     $wdir="$matrix-${nh}x${nv}";
     # In most cases, a non-existing wdir is an error, but not for
-    # :balance or :complete, which are entitled to create it.
-    if ($main !~ /^:(?:balance|complete|bench)$/ && !-d $wdir) {
+    # :complete, which is entitled to create it.
+    if ($main !~ /^:(?:complete|bench)$/ && !-d $wdir) {
         die "No directory $wdir found";
     }
     push @main_args, "wdir=$wdir";
@@ -325,6 +323,7 @@ while (my ($k,$v) = each %$param) {
     if ($k eq 'matpath') { $matpath=$v; next; }
     if ($k eq 'hostfile') { $hostfile=$v; next; }
     if ($k eq 'mpi_extra_args') { $mpi_extra_args=$v; next; }
+    if ($k eq 'force_complete') { $force_complete=$v; next; }
     if ($k eq 'mode') { $mode=$v; next; }
     if ($k eq 'hosts') {
         $v=[$v] if (ref $v eq '');
@@ -358,7 +357,7 @@ $nv = $mpi_split[1] * $thr_split[1];
 ##################################################
 # Some more default values to set. Setting separately splits=, ys= and so
 # on is quite awkward in the case of a single-site test.
-if ((!defined($m) || !defined($n)) && $main !~ /^:(?:wipeout|balance)$/) {
+if ((!defined($m) || !defined($n)) && $main !~ /^:wipeout$/) {
     usage "The parameters m and n must be set";
 }
 if (!defined($param->{'splits'})) {
@@ -472,6 +471,14 @@ my $mpi_needed = $mpiexec ne '';
 my @mpi_precmd;
 my @mpi_precmd_single;
 
+if (!-d $wdir) {
+    if ($show_only) {
+        print "mkdir $wdir\n";
+    } else {
+        mkdir $wdir;
+    }
+}
+
 if ($mpi_needed) {
     detect_mpi;
 
@@ -483,13 +490,6 @@ if ($mpi_needed) {
         print STDERR "OAR environment detected, setting hostfile.\n";
         system "uniq $ENV{'OAR_NODEFILE'} > /tmp/HOSTS.$ENV{'OAR_JOBID'}";
         $hostfile = "/tmp/HOSTS.$ENV{'OAR_JOBID'}";
-    }
-    if (!-d $wdir) {
-        if ($show_only) {
-            print "mkdir $wdir\n";
-        } else {
-            mkdir $wdir;
-        }
     }
     if (scalar @hosts) {
         # Don't use an uppercase filename, it would be deleted by
@@ -541,7 +541,42 @@ if ($mpi_needed) {
 # print "main_args:\n", join("\n", @main_args), "\n";
 
 push @main_args, splice @extra_args;
+push @main_args, "matrix=$matrix";
 
+sub obtain_bfile {
+    opendir(my $dh, $wdir);
+    my $x = $matrix;
+    $x =~ s/\.(bin|txt)$//;
+    $x =~ s/^.*\/([^\/]+)$/$1/;
+    my @bfiles = grep { /^$x.${nh}x${nv}.[0-9a-f]{8}.bin$/ } readdir $dh;
+    if (scalar @bfiles != 1) {
+        print STDERR "Expected 1 bfile, found ", scalar @bfiles, ":\n";
+        print "$_\n" foreach (@bfiles);
+        die;
+    }
+    closedir $dh;
+    $balancing=$bfiles[0];
+}
+
+sub last_cp {
+    my $pat;
+    return undef if $force_complete;
+    if ($_[0] eq 'krylov') {
+        $pat = qr/^V/;
+    } elsif ($_[0] eq 'mksol') {
+        $pat = qr/^S/;
+    } else {
+        die "please enlighten me";
+    }
+    opendir DIR, $wdir or die "Cannot open directory `$wdir': $!\n";
+    my @cp= grep $pat, readdir DIR;
+    close DIR;
+    return undef unless @cp;
+    @cp = grep { /\.(\d+)\.twisted$/ } @cp;
+    @cp = map { /\.(\d+)\.twisted$/; $1 } @cp;
+    my $l = max( @cp );
+    return $l;
+}
 sub drive {
     my $program = shift @_;
 
@@ -568,91 +603,36 @@ sub drive {
     }
 
     if ($program eq ':bench') {
-        if (! -d $wdir || ! -f "$wdir/mat.info") {
-            &drive(':balance', @_);
-        }
-        &drive(":wipeout", @_);
-        &drive("u64n_prep", @_, "sequential_cache_build=1");
-        &drive("u64_secure", @_);
-        &drive("./split", @_, "--split-y");
-        &drive("${mode}_krylov", @_, "end=1000000");
+        &drive(":complete", @_, "end=1000000");
         return;
     }
 
+
     if ($program eq ':complete') {
-        if (! -d $wdir || ! -f "$wdir/mat.info") {
-            &drive(':balance', @_);
+        my $cp;
+        if (defined($cp = last_cp('mksol'))) {
+            &drive("${mode}_mksol", @_, "start=$cp");
+            &drive("u64n_gather", @_);
+            return;
+        } elsif (defined($cp = last_cp('krylov'))) {
+            &drive("${mode}_krylov", @_, "start=$cp");
+        } else {
+            &drive(":wipeout", @_);
+            &drive("mf_bal", "mfile=$matrix", "out=$wdir/", $nh, $nv);
+            obtain_bfile();
+            push @_, "balancing=$balancing";
+            &drive("u64_dispatch", @_, "sequential_cache_build=1");
+            &drive("u64n_prep", @_);
+            &drive("u64_secure", @_);
+            &drive("./split", @_, "--split-y");
+            &drive("${mode}_krylov", @_);
         }
-
-    	opendir DIR, $wdir
-        	or die "Cannot open directory `$wdir': $!\n";
-		my @cp_krylov = grep /^V/, readdir DIR;
-		close DIR;
-    	opendir DIR, $wdir
-        	or die "Cannot open directory `$wdir': $!\n";
-		my @cp_mksol= grep /^S/, readdir DIR;
-		close DIR;
-
-		if ( @cp_mksol ) {
-			@cp_mksol = map { /\.(\d+)\.twisted$/; $1 }
-									@cp_mksol;
-			my $last_cp_mksol = max( @cp_mksol );
-			&drive("${mode}_mksol", @_, "start=$last_cp_mksol");
-			&drive("u64n_gather", @_);
-			return;
-		} elsif ( @cp_krylov ) {
-			@cp_krylov = map { /\.(\d+)\.twisted$/; $1 }
-									@cp_krylov;
-			my $last_cp_krylov = max( @cp_krylov );
-			&drive("${mode}_krylov", @_, "start=$last_cp_krylov");
-		} else {
-	        &drive(":wipeout", @_);
-    	    &drive("u64n_prep", @_, "sequential_cache_build=1");
-        	&drive("u64_secure", @_);
-	        &drive("./split", @_, "--split-y");
-    	    &drive("${mode}_krylov", @_);
-		}
         &drive("./acollect", @_, "--remove-old");
         &drive("./lingen", @_, "--lingen-threshold", 64);
         &drive("./split", @_, "--split-f");
         &drive("${mode}_mksol", @_);
         &drive("u64n_gather", @_);
-        return;
-    }
-
-    if ($program eq ':balance') {
-        if (!-d $wdir) {
-            if ($show_only) {
-                print "mkdir $wdir\n";
-            } else {
-                mkdir $wdir;
-            }
-        }
-        my $in = $matrix;
-        my $out = "$wdir/mat";
-        my $td;
-        if (defined($tmpdir)) {
-            my $filename = fileparse($matrix);
-            $td = tempdir("$filename-${nh}x${nv}.XXXXX", DIR=>$tmpdir, CLEANUP=>1);
-            $out = "$td/mat";
-            $in = "$td/$filename";
-            if (-w "$tmpdir/$filename") {
-                # Give a chance to factorize copies.
-                dosystem("cp", "$tmpdir/$filename", "$td/$filename");
-            }
-            dosystem("rsync", "-a", $matrix, "$td/$filename");
-        }
-        my $cmd="$bindir/../balance";
-        my @args= (
-                "-in", $in,
-                "-out", "$out",
-                "--nslices", "${nh}x${nv}",
-                "--conjugate-permutations",
-                "--square");
-        dosystem($cmd, @args);
-        if (defined($tmpdir)) {
-            dosystem("rsync", "-a", "$td/", "$wdir/");
-        }
+        &drive("mf_untwistvec", "$wdir/$balancing", "$wdir/W.twisted", "--out", "$wdir/W");
         return;
     }
 
@@ -665,7 +645,7 @@ sub drive {
     unless ($program =~ /split$/) {
         @_ = grep !/^(?:splits?=|--split-[yf])/, @_;
     }
-    unless ($program =~ /(?:krylov|mksol)$/) {
+    unless ($program =~ /(?:krylov|mksol|dispatch)$/) {
         @_ = grep !/^ys=/, @_;
     }
 
