@@ -17,6 +17,7 @@
 // #include "rusage.h"
 #include "filenames.h"
 #include "xdotprod.h"
+#include "rolling.h"
 
 void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
@@ -62,22 +63,27 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     matmul_top_load_vector(mmt, v_name, bw->dir, bw->start);
     if (tcan_print) { printf("done\n"); }
 
-    // We must also fetch the check vector C.
-    abvobj_t abase_check;
-    abvobj_set_nbys(abase_check, NCHECKS_CHECK_VECTOR);
-    size_t vstride = abvbytes(abase_check, 1);
     size_t stride =  abbytes(abase, 1);
 
+    // We must also fetch the check vector C.
+    abvobj_t abase_check;
     mmt_generic_vec check_vector;
-    matmul_top_vec_init_generic(mmt, abvbytes(abase_check, 1),
-            check_vector, !bw->dir, THREAD_SHARED_VECTOR);
-    if (tcan_print) { printf("Loading check vector..."); fflush(stdout); }
-    matmul_top_load_vector_generic(mmt, vstride,
-            check_vector, CHECK_FILE_BASE, !bw->dir, bw->interval);
-    if (tcan_print) { printf("done\n"); }
-
     mmt_vec ahead;
-    vec_init_generic(pi->m, stride, (mmt_generic_vec_ptr) ahead, 0, NCHECKS_CHECK_VECTOR);
+
+    if (!bw->skip_online_checks) {
+        abvobj_set_nbys(abase_check, NCHECKS_CHECK_VECTOR);
+        size_t vstride = abvbytes(abase_check, 1);
+        matmul_top_vec_init_generic(mmt, abvbytes(abase_check, 1),
+                check_vector, !bw->dir, THREAD_SHARED_VECTOR);
+        if (tcan_print) { printf("Loading check vector..."); fflush(stdout); }
+        matmul_top_load_vector_generic(mmt, vstride,
+                check_vector, CHECK_FILE_BASE, !bw->dir, bw->interval);
+        if (tcan_print) { printf("done\n"); }
+    }
+
+    if (!bw->skip_online_checks) {
+        vec_init_generic(pi->m, stride, (mmt_generic_vec_ptr) ahead, 0, NCHECKS_CHECK_VECTOR);
+    }
 
     /* We'll store all xy matrices locally before doing reductions. Given
      * the small footprint of these matrices, it's rather innocuous.
@@ -130,12 +136,14 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 mrow->i0, mrow->i1,
                 mcol->i0, mcol->i1);
 
-        abzero(abase, ahead->v, NCHECKS_CHECK_VECTOR);
-        if (how_many) {
-            size_t bytes_c =  abvbytes(abase_check, offset_c);
-            abvt * c = abase_generic_ptr_add(check_vector->v, bytes_c);
-            abt * v = mcol->v->v + aboffset(abase, offset_v);
-            abvdotprod(abase, abase_check, ahead->v, c, v, how_many);
+        if (!bw->skip_online_checks) {
+            abzero(abase, ahead->v, NCHECKS_CHECK_VECTOR);
+            if (how_many) {
+                size_t bytes_c =  abvbytes(abase_check, offset_c);
+                abvt * c = abase_generic_ptr_add(check_vector->v, bytes_c);
+                abt * v = mcol->v->v + aboffset(abase, offset_v);
+                abvdotprod(abase, abase_check, ahead->v, c, v, how_many);
+            }
         }
 
         abzero(abase, xymats->v, bw->m*bw->interval);
@@ -159,13 +167,15 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         }
         serialize(pi->m);
 
-        /* Last dot product. This must cancel ! */
-        x_dotprod(mmt, gxvecs, ahead->v, NCHECKS_CHECK_VECTOR);
+        if (!bw->skip_online_checks) {
+            /* Last dot product. This must cancel ! */
+            x_dotprod(mmt, gxvecs, ahead->v, NCHECKS_CHECK_VECTOR);
 
-        allreduce_generic(abase, ahead, pi->m, NCHECKS_CHECK_VECTOR);
-        if (!abis_zero(abase, ahead->v, NCHECKS_CHECK_VECTOR)) {
-            printf("Failed check at iteration %d\n", s + bw->interval);
-            exit(1);
+            allreduce_generic(abase, ahead, pi->m, NCHECKS_CHECK_VECTOR);
+            if (!abis_zero(abase, ahead->v, NCHECKS_CHECK_VECTOR)) {
+                printf("Failed check at iteration %d\n", s + bw->interval);
+                exit(1);
+            }
         }
 
         /* Now (and only now) collect the xy matrices */
@@ -186,8 +196,9 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             free(tmp);
         }
 
-        // TODO: save only rolling checkpoints (?)
         matmul_top_save_vector(mmt, v_name, bw->dir, s + bw->interval);
+        if (pi->m->trank == 0 && pi->m->jrank == 0)
+            keep_rolling_checkpoints(mmt->bal, v_name, s + bw->interval);
 
         serialize(pi->m);
 
@@ -206,9 +217,13 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     }
     serialize(pi->m);
 
-    matmul_top_vec_clear_generic(mmt, abvbytes(abase_check, 1), check_vector, !bw->dir);
     vec_clear_generic(pi->m, stride, (mmt_generic_vec_ptr) xymats, bw->m*bw->interval);
-    vec_clear_generic(pi->m, stride, (mmt_generic_vec_ptr) ahead, NCHECKS_CHECK_VECTOR);
+
+    if (!bw->skip_online_checks) {
+        matmul_top_vec_clear_generic(mmt, abvbytes(abase_check, 1), check_vector, !bw->dir);
+        vec_clear_generic(pi->m, stride, (mmt_generic_vec_ptr) ahead, NCHECKS_CHECK_VECTOR);
+    }
+
     free(gxvecs);
     free(v_name);
 

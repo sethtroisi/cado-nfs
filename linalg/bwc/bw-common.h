@@ -70,6 +70,28 @@ struct bw_params {
 
     /* Save checkpoints or not */
     int checkpoints;
+
+    /* If enabled, do not check the intermediate results while running
+     * (the possibility of doing the checks offline still exists,
+     * though). This makes it possible to run krylov without having run
+     * the secure program first.
+     */
+    int skip_online_checks;
+
+    /* If keep_rolling_checkpoints is defined to a positive integer X,
+     * keep only the last X vector checkpoints, and remove the others.
+     * Otherwise (if the parameter is zero), all checkpoints are kept.
+     * See also next parameter.
+     *
+     * Note that having skip_online_checks and keep_rolling_checkpoints
+     * at the same time is dangerous.
+     */
+    int keep_rolling_checkpoints;
+
+    /* In case the previous flag is enabled, still keep all the
+     * checkpoints which are multiple of the length given here.
+     */
+    int checkpoint_precious;
 };
 
 extern struct bw_params bw[1];

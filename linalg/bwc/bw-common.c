@@ -93,6 +93,21 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     param_list_parse_int(pl, "start", &bw->start);
     param_list_parse_int(pl, "end", &bw->end);
     param_list_parse_int(pl, "checkpoints", &bw->checkpoints);
+    param_list_parse_int(pl, "skip_online_checks", &bw->skip_online_checks);
+    param_list_parse_int(pl, "keep_rolling_checkpoints", &bw->keep_rolling_checkpoints);
+    param_list_parse_int(pl, "checkpoint_precious", &bw->checkpoint_precious);
+
+    int yes_i_insist = 0;
+    param_list_parse_int(pl, "yes_i_insist", &yes_i_insist);
+
+    if (bw->skip_online_checks && bw->keep_rolling_checkpoints) {
+        fprintf(stderr, "The combination of skip_online_checks and keep_rolling_checkpointsis a dangerous match.");
+        if (!yes_i_insist) {
+            printf("\n");
+            exit(1);
+        }
+        fprintf(stderr, " Proceeding anyway\n");
+    }
 
     param_list_lookup_string(pl, "matrix");
     param_list_lookup_string(pl, "balancing");

@@ -16,6 +16,7 @@
 #include "async.h"
 #include "filenames.h"
 #include "xdotprod.h"
+#include "rolling.h"
 
 void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
@@ -50,9 +51,12 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     
     abzero(abase, mrow->v->v, mrow->i1 - mrow->i0);
 
-    uint32_t * gxvecs = malloc(bw->nx * bw->m * sizeof(uint32_t));
-
-    load_x(gxvecs, bw->m, bw->nx, pi);
+    uint32_t * gxvecs;
+    
+    if (!bw->skip_online_checks) {
+        gxvecs = malloc(bw->nx * bw->m * sizeof(uint32_t));
+        load_x(gxvecs, bw->m, bw->nx, pi);
+    }
 
     int rc;
 
@@ -65,19 +69,22 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     matmul_top_load_vector(mmt, v_name, bw->dir, bw->start);
     if (tcan_print) { printf("done\n"); }
 
-    // We must also fetch the check vector C.
-    abvobj_t abase_check;
-    abvobj_set_nbys(abase_check, NCHECKS_CHECK_VECTOR);
-    size_t vstride = abvbytes(abase_check, 1);
     size_t stride =  abbytes(abase, 1);
 
+    // We must also fetch the check vector C.
+    abvobj_t abase_check;
     mmt_generic_vec check_vector;
-    matmul_top_vec_init_generic(mmt, abvbytes(abase_check, 1),
-            check_vector, !bw->dir, THREAD_SHARED_VECTOR);
-    if (tcan_print) { printf("Loading check vector..."); fflush(stdout); }
-    matmul_top_load_vector_generic(mmt, vstride,
-            check_vector, CHECK_FILE_BASE, !bw->dir, bw->interval);
-    if (tcan_print) { printf("done\n"); }
+
+    if (!bw->skip_online_checks) {
+        abvobj_set_nbys(abase_check, NCHECKS_CHECK_VECTOR);
+        size_t vstride = abvbytes(abase_check, 1);
+        matmul_top_vec_init_generic(mmt, abvbytes(abase_check, 1),
+                check_vector, !bw->dir, THREAD_SHARED_VECTOR);
+        if (tcan_print) { printf("Loading check vector..."); fflush(stdout); }
+        matmul_top_load_vector_generic(mmt, vstride,
+                check_vector, CHECK_FILE_BASE, !bw->dir, bw->interval);
+        if (tcan_print) { printf("done\n"); }
+    }
 
     /* F plays the role of a right-hand-side in mksol. Vector iterates
      * have to be multiplied on the right by a matrix corresponding to
@@ -232,12 +239,14 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
                 mrow->i0, mrow->i1,
                 mcol->i0, mcol->i1);
 
-        abzero(abase, ahead->v, NCHECKS_CHECK_VECTOR);
-        if (how_many) {
-            size_t bytes_c =  abvbytes(abase_check, offset_c);
-            abvt * c = abase_generic_ptr_add(check_vector->v, bytes_c);
-            abt * v = mcol->v->v + aboffset(abase, offset_v);
-            abvdotprod(abase, abase_check, ahead->v, c, v, how_many);
+        if (!bw->skip_online_checks) {
+            abzero(abase, ahead->v, NCHECKS_CHECK_VECTOR);
+            if (how_many) {
+                size_t bytes_c =  abvbytes(abase_check, offset_c);
+                abvt * c = abase_generic_ptr_add(check_vector->v, bytes_c);
+                abt * v = mcol->v->v + aboffset(abase, offset_v);
+                abvdotprod(abase, abase_check, ahead->v, c, v, how_many);
+            }
         }
 
         serialize(pi->m);
@@ -270,14 +279,16 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         }
         serialize(pi->m);
 
-        /* Last dot product. This must cancel ! Recall that x_dotprod
-         * adds to the result. */
-        x_dotprod(mmt, gxvecs, ahead->v, NCHECKS_CHECK_VECTOR);
+        if (!bw->skip_online_checks) {
+            /* Last dot product. This must cancel ! Recall that x_dotprod
+             * adds to the result. */
+            x_dotprod(mmt, gxvecs, ahead->v, NCHECKS_CHECK_VECTOR);
 
-        allreduce_generic(abase, ahead, pi->m, NCHECKS_CHECK_VECTOR);
-        if (!abis_zero(abase, ahead->v, NCHECKS_CHECK_VECTOR)) {
-            printf("Failed check at iteration %d\n", s + bw->interval);
-            exit(1);
+            allreduce_generic(abase, ahead, pi->m, NCHECKS_CHECK_VECTOR);
+            if (!abis_zero(abase, ahead->v, NCHECKS_CHECK_VECTOR)) {
+                printf("Failed check at iteration %d\n", s + bw->interval);
+                exit(1);
+            }
         }
 
         char * s_name2;
@@ -287,6 +298,8 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         free(s_name2);
 
         matmul_top_save_vector(mmt, v_name, bw->dir, s + bw->interval);
+        if (pi->m->trank == 0 && pi->m->jrank == 0)
+            keep_rolling_checkpoints(mmt->bal, v_name, s + bw->interval);
 
         serialize(pi->m);
 
@@ -299,11 +312,13 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     }
     serialize(pi->m);
 
-    matmul_top_vec_clear_generic(mmt, abvbytes(abase_check, 1), check_vector, !bw->dir);
     matmul_top_vec_clear_generic(mmt, rstride, (mmt_generic_vec_ptr) sum, bw->dir);
-    vec_clear_generic(pi->m, stride, (mmt_generic_vec_ptr) ahead, NCHECKS_CHECK_VECTOR);
+    if (!bw->skip_online_checks) {
+        matmul_top_vec_clear_generic(mmt, abvbytes(abase_check, 1), check_vector, !bw->dir);
+        vec_clear_generic(pi->m, stride, (mmt_generic_vec_ptr) ahead, NCHECKS_CHECK_VECTOR);
+        free(gxvecs);
+    }
     vec_clear_generic(pi->m, rstride, (mmt_generic_vec_ptr) fcoeffs, abnbits(abase)*bw->interval);
-    free(gxvecs);
     free(v_name);
     free(s_name);
 

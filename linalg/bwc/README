@@ -59,18 +59,17 @@ using the bwc.pl driver script, documented below.
      processing at each site.
 !10 - mksol
      create the solutions from the polynomial
- 11 - gather / apply_perm
+ 11 - gather / mf_untwistvec
      reconstruct solutions from the mess
 
 krylov, lingen, mksol are the steps having a real computational impact.
 prep is cheap but important for ensuring the success of the algorithm.
-split,acollect,gather,apply_perm are just trivial bookkeeping.
-balance is I/O intensive.
+split,acollect,gather,mf_untwistvec are just trivial bookkeeping.
+dispatch may be I/O intensive.
 secure is akin to doing a few krylov iterations. It runs for roughly just
 as long as the desired time between two recoverable checkpoints (the
 longer it runs, the less often checks are done -- but checks are
 relatively cheap anyway).
-
 
 Parameters
 ==========
@@ -206,12 +205,10 @@ This list links at who creates what and uses what. The prefix ``mat'' is
 actually replaced by the basename of the input matrix, with suffixes
 removed.
 
-XXX TODO the new apply_perm is not yet implemented.
-
 wdir/mat.col_perm
 wdir/mat.row_perm               permutations used for balancing.
     created by balance
-    read by apply_perm
+    read by mf_untwistvec
 wdir/mat.hi.vj-XXXXXX.bin       in-memory version of the sub-matrices
     created by *_{dispatch,prep,secure,krylov,mksol,gather} if not found.
     used by {prep,secure,krylov,mksol,gather}
@@ -256,7 +253,7 @@ wdir/S<n1>-<n2>.<j>.twisted     mksol sequence data.
     read by gather
 wdir/W.twisted                  kernel vectors
     created by gather
-    read by apply_perm
+    read by mf_untwistvec
 
 
 Per-program documentation
@@ -492,7 +489,7 @@ gather
 
     W.twisted                   M^(k-1)*sum_of_S (see note T).
 
-apply_perm
+mf_untwistvec
 ----------
 
     This un-twists W.

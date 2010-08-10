@@ -43,6 +43,7 @@ add_library(bwc_base
     async.c
     debug.c
     mf.c
+    rolling.c
     balancing.c
     worker-threads.c)
 target_link_libraries(bwc_base utils ${pthread_libs})
