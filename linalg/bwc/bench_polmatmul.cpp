@@ -15,7 +15,7 @@
 
 void usage()
 {
-    fprintf(stderr, "Usage: ./bench_polmatmul [--nrep <k>] <deg> <m> <n>\n");
+    fprintf(stderr, "Usage: ./bench_polmatmul [--nrep <k>] <N> <m> <n>\n");
     exit(1);
 }
 
@@ -183,6 +183,7 @@ struct my_strassen_selector {
         return answer;
     }
     void dump(const char * name) const {
+        printf("#ifdef  STRASSEN_THRESHOLDS_AS_CPP_CONSTANTS\n");
         printf("#define %s_STRASSEN_THRESHOLDS_D %u\n", name, BITS_IN_DIM_D);
         printf("#define %s_STRASSEN_THRESHOLDS_I %u\n", name, BITS_IN_DIM_I);
         printf("#define %s_STRASSEN_THRESHOLDS {\t\\\n\t", name);
@@ -196,6 +197,29 @@ struct my_strassen_selector {
             }
         }
         printf("}\n");
+        printf("#else   /*  STRASSEN_THRESHOLDS_AS_CPP_CONSTANTS */\n");
+        char * s = strdup(name);
+        for(unsigned int i = 0 ; i < strlen(s) ; i++) {
+            if (s[i] >= 'A' && s[i] <= 'Z')
+                s[i] |= 0x20;
+        }
+        printf("template<> unsigned int foo<%s>::default_selector_data[] = {\n",
+                s);
+        free(s);
+        printf("\t/* D = %u */\n", BITS_IN_DIM_D);
+        printf("\t/* I = %u */\n", BITS_IN_DIM_I);
+        printf("\t");
+        disp = 0;
+        for(unsigned int i = 0 ; i < SELECTOR_NB_INDICES ; i++) {
+            if (strassen_threshold[i]) {
+                printf(" [%u] = %d,", i, (int) strassen_threshold[i]);
+                if (++disp % 4 == 0) {
+                    printf("\t\\\n\t");
+                }
+            }
+        }
+        printf("}\n");
+        printf("#endif   /*  STRASSEN_THRESHOLDS_AS_CPP_CONSTANTS */\n");
     }
 };
 
@@ -211,6 +235,7 @@ template<typename T>
 struct foo {
     static logbook l;
     static my_strassen_selector s;
+    static unsigned int default_selector_data[];
 };
 
 template<> logbook foo<fake_fft>::l = logbook();
@@ -219,6 +244,15 @@ template<> logbook foo<gf2x_tfft>::l = logbook();
 template<> my_strassen_selector foo<fake_fft>::s = my_strassen_selector();
 template<> my_strassen_selector foo<c128_fft>::s = my_strassen_selector();
 template<> my_strassen_selector foo<gf2x_tfft>::s = my_strassen_selector();
+
+#define STRASSEN_THRESHOLDS_AS_CPP_CONSTANTS
+#include "strassen-thresholds.h"
+/*
+template<> unsigned int foo<fake_fft>::default_selector_data[] = {};
+template<> unsigned int foo<c128_fft>::default_selector_data[] = {};
+template<> unsigned int foo<gf2x_tfft>::default_selector_data[] = {};
+*/
+
 
 template<typename fft_type>
 int depth(fft_type const& o, size_t d1, size_t d2, size_t d3)
@@ -398,7 +432,7 @@ void tune_strassen1(fft_type const& base,
         // in order to avoid accumulating errors, we introduce some
         // looseness here. Setting wt1 to twice the old wt value will
         // force re-checking at the previous cutoff value. If ever this
-        // cutoff value was wrong, we'll settle one one which sits above
+        // cutoff value was wrong, we'll settle for one which sits above
         // in the interval.
         unsigned int wt1 = 2 * old_wt;
         unsigned int wt0 = min_wt;
@@ -681,11 +715,19 @@ int main(int argc, char * argv[])
     }
 #endif
 #if 1
-    /* une for E * pi */
+    /* Tune for E * pi */
     {
         size_t d = (N * b / m / n);
-        size_t n1 = d;
-        size_t n2 = d * m / b;
+
+        unsigned long dl = d-d/2;
+        unsigned long pi_l_len = dl*m/b;   // always <= dl
+        unsigned long chop = dl - pi_l_len;
+
+        size_t n1 = d - chop;
+        size_t n2 = pi_l_len;
+        printf("Top-level multiplications E*pi: len%zu, %lux%lu * len%zu, %lux%lu\n",
+                n1, m, b, n2, b, b);
+
         c128_fft oc(n1, n2); printf("c128");
         tune_strassen1(oc, m, b, b, n1 + n2 - 1);
         fake_fft of(n1, n2); printf("fake");
@@ -694,30 +736,34 @@ int main(int argc, char * argv[])
         tune_strassen1(os, m, b, b, n1 + n2 - 1);
 
         printf("Options for composition at top level E*pi\n");
-        printf("c128: %u levels of strassen, %lu muls\n",
+        printf("c128: %u levels of strassen, %lu pol.muls\n",
                 depth(oc,m,b,b), nmults(oc,m,b,b));
-        printf("fake: %u levels of strassen, %lu muls\n",
+        printf("fake: %u levels of strassen, %lu pol.muls\n",
                 depth(of,m,b,b), nmults(of,m,b,b));
-        printf("gf2x: %u levels of strassen, %lu muls\n",
+        printf("gf2x: %u levels of strassen, %lu pol.muls\n",
                 depth(os,m,b,b), nmults(os,m,b,b));
     }
     /* Tune for pi * pi */
     {
         size_t d = (N * b / m / n);
-        size_t n1 = (d-d/2) * m / b;
-        size_t n2 = d / 2 * m / b; 
+
+        unsigned long dl = d-d/2;
+        unsigned long pi_l_len = dl*m/b;   // always <= dl
+        size_t n1 = pi_l_len;
+        size_t n2 = pi_l_len;
+
         c128_fft oc(n1, n2); printf("c128");
         tune_strassen1(oc, b, b, b, n1 + n2 - 1);
         fake_fft of(n1, n2); printf("fake");
         tune_strassen1(of, b, b, b, n1 + n2 - 1);
         gf2x_tfft os(n1, n2, 81); printf("tfft(%u)", 81);
         tune_strassen1(os, b, b, b, n1 + n2 - 1);
-        printf("Options for composition at top level E*pi\n");
-        printf("c128: %u levels of strassen, %lu muls\n",
+        printf("Options for composition at top level pi*pi\n");
+        printf("c128: %u levels of strassen, %lu pol.muls\n",
                 depth(oc,b,b,b), nmults(oc,b,b,b));
-        printf("fake: %u levels of strassen, %lu muls\n",
+        printf("fake: %u levels of strassen, %lu pol.muls\n",
                 depth(of,b,b,b), nmults(of,b,b,b));
-        printf("gf2x: %u levels of strassen, %lu muls\n",
+        printf("gf2x: %u levels of strassen, %lu pol.muls\n",
                 depth(os,b,b,b), nmults(os,b,b,b));
     }
     foo<c128_fft>::s.dump("C128");
