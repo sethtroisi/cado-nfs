@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include "parallelizing_info.h"
-#include "mf.h"
+#include "balancing.h"
 
 #ifdef __cplusplus
 extern "C" {

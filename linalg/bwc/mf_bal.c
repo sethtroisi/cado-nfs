@@ -12,6 +12,7 @@
 #include "utils.h"
 #include <math.h>
 #include "mf.h"
+#include "balancing.h"
 #include "rowset_heap.h"
 
 /* This program computes how a matrix would have to be balanced for

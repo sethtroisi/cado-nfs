@@ -16,3 +16,5 @@
 #cmakedefine    HAVE_GCC_STYLE_AMD64_ASM
 
 #cmakedefine    HAVE_PTHREAD_BARRIER_WAIT
+
+#cmakedefine    HAVE_CURL

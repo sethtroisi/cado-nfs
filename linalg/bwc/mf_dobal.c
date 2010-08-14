@@ -15,6 +15,7 @@
 #include "utils.h"
 #include "mf.h"
 #include "balancing.h"
+#include "balancing_workhorse.h"
 
 // FIXME -- the command line currently does not allow changing this.
 int transposing = 1;
@@ -36,7 +37,7 @@ void * all(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
     mat->transpose=1;
     mat->bfile = param_list_lookup_string(pl, "balancing");
     mat->mfile = param_list_lookup_string(pl, "matrix");
-    get_matrix_u32(pi, pl, mat);
+    balancing_get_matrix_u32(pi, pl, mat);
     return NULL;
 }
 

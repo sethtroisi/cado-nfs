@@ -17,7 +17,7 @@
 #include "xvectors.h"
 #include "bw-common-mpi.h"
 #include "filenames.h"
-#include "mf.h"
+#include "balancing.h"
 
 struct sfile_info {
     unsigned int n0,n1;

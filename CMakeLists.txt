@@ -75,6 +75,7 @@ CHECK_FUNCTION_EXISTS(posix_memalign      HAVE_POSIX_MEMALIGN)
 
 include(${CADO_NFS_SOURCE_DIR}/config/sse2.cmake)
 include(${CADO_NFS_SOURCE_DIR}/config/gcc-assembly.cmake)
+include(${CADO_NFS_SOURCE_DIR}/config/curl.cmake)
 
 ######################################################################
 # Try to detect whether pthreads and/or MPI are available.

@@ -13,6 +13,7 @@
 #include "intersections.h"
 #include "debug.h"
 #include "filenames.h"
+#include "balancing_workhorse.h"
 
 #ifndef CONJUGATED_PERMUTATIONS
 #error "Do you really, really want to use arbitrary left and right sigmas ?"
@@ -669,7 +670,7 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
         // may cause the direct or transposed ordering to be preferred.
         // Thus we have to read this back from the mm structure.
         m->transpose = mmt->mm->store_transposed;
-        get_matrix_u32(mmt->pi, pl, m);
+        balancing_get_matrix_u32(mmt->pi, pl, m);
         matrix_ptr = m->p;
         // note that this pointer will not necessarily be freed
         // immediately. Ownership is transferred to the mm layer, which

@@ -168,3 +168,4 @@
 #
 # ``PTHREADS=1'', ``PTHREADS=yes'', ``PTHREADS=on'', are equivalent.
 # ``PTHREADS=0'', ``PTHREADS=no'', ``PTHREADS=off'': idem.
+#

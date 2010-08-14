@@ -53,6 +53,11 @@ fi
 ########################################################################
 # Arrange so that relevant stuff is passed to cmake -- the other end of
 # the magic is in CMakeLists.txt. The two lists must agree.
+# (no, it's not as simple. As long as the cmake checks care about
+# *environment variables*, we are here at the right place for setting
+# them. However, we might also be interested in having cmake export test
+# results to scripts. This is done by cmake substitutions, but the
+# corresponding names need not match the ones below).
 
 export PREFIX
 export CFLAGS
@@ -66,6 +71,9 @@ export GMP
 export GMP_INCDIR
 export GMP_LIBDIR
 export PTHREADS
+export CURL
+export CURL_INCDIR
+export CURL_LIBDIR
 
 if [ "$1" = "tidy" ] ; then
     echo "Wiping out $build_tree"

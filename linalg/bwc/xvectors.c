@@ -11,7 +11,7 @@
 #include "xvectors.h"
 #include "utils.h"
 #include "filenames.h"
-#include "mf.h"
+#include "balancing.h"
 
 typedef int (*sortfunc_t) (const void *, const void *);
 

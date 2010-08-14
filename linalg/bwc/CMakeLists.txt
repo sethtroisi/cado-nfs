@@ -17,7 +17,11 @@ set_target_properties(test_hello PROPERTIES
         LINK_FLAGS "--mpi")
 
 add_executable(random random.c)
-add_executable(split split.c bw-common.c mf.c)
+
+# balancing.c itself is in fact standalone, and lightweight. We prefer to
+# avoid having the whole thing entangled with too many dependencies all
+# around, since all that split.c actually needs is very, very little.
+add_executable(split split.c bw-common.c balancing.c)
 #add_executable(shell
 #    shell.c parallelizing_info.c bw-common.c bw-common-mpi.c)
 #set_target_properties(shell
@@ -33,7 +37,26 @@ target_link_libraries(split utils)
 # target_link_libraries(shell utils ${pthread_libs})
 target_link_libraries(acollect utils)
 
-add_library(bwc_base
+set(balancing_sources
+    balancing.c
+    balancing_workhorse.c
+    balancing_file_source.c
+    balancing_mpi_source.c)
+
+if (HAVE_CURL)
+set(balancing_sources ${balancing_sources} balancing_rollbuf.c balancing_curl_source.c)
+endif (HAVE_CURL)
+
+add_library(balancing ${balancing_sources})
+set_target_properties(balancing PROPERTIES
+        COMPILE_FLAGS "--mpi"
+        LINK_FLAGS "--mpi")
+
+if (HAVE_CURL)
+target_link_libraries(balancing curl)
+endif (HAVE_CURL)
+
+set(bwc_base_sources
     parallelizing_info.c
     intersections.cpp
     xvectors.c
@@ -42,11 +65,12 @@ add_library(bwc_base
     rusage.c
     async.c
     debug.c
-    mf.c
     rolling.c
-    balancing.c
     worker-threads.c)
-target_link_libraries(bwc_base utils ${pthread_libs})
+
+add_library(bwc_base ${bwc_base_sources})
+
+target_link_libraries(bwc_base balancing utils ${pthread_libs})
 set_target_properties(bwc_base PROPERTIES
         COMPILE_FLAGS "--mpi"
         LINK_FLAGS "--mpi")

@@ -14,7 +14,7 @@
 #include "filenames.h"
 #include "bw-common.h"
 #include "params.h"
-#include "mf.h"
+#include "balancing.h"
 
 char * ifile;
 char * ofile_fmt;
