@@ -387,6 +387,7 @@ void balancing_finalize(balancing_ptr bal)
 void balancing_write_inner(balancing_ptr bal, const char * filename)
 {
     FILE * pfile;
+    fprintf(stderr, "Writing balancing data to %s\n", filename);
     pfile = fopen(filename, "w");
     if (pfile == NULL) {
         perror(filename);

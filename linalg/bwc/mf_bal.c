@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <errno.h>
 #include "utils.h"
 #include <math.h>
 #include "mf.h"
@@ -20,7 +21,7 @@
 
 void usage(int rc) {
     fprintf(stderr,
-            "Usage: ./mf_bal [options,flags] <nh> <nv> [<matrix file>]\n");
+            "Usage: ./mf_bal [options,flags] <nh> <nv> <matrix file>\n");
     fprintf(stderr,
             "Recognized options"
                 " (<option_name>=<value>, or --<option_name> <value>:\n"
@@ -286,6 +287,7 @@ int main(int argc, char * argv[])
             continue;
         }
         fprintf(stderr, "unknown option %s\n", argv[0]);
+        exit(1);
     }
 
     if (nh == 0 || nv == 0)
@@ -327,6 +329,11 @@ int main(int argc, char * argv[])
         if (!cwfile) { fprintf(stderr, "No cwfile given\n"); exit(1); }
     }
 
+    if (!mfile) {
+        fprintf(stderr, "Matrix file name (mfile) must be given, even though the file itself does not have to be present\n");
+        exit(1);
+    }
+
     balancing bal;
     balancing_init(bal);
 
@@ -352,12 +359,22 @@ int main(int argc, char * argv[])
 
 
     struct stat sbuf_mat[1];
-    rc = stat(mfile, sbuf_mat);
-    if (rc < 0) { perror(mfile); exit(1); }
-    bal->h->ncoeffs = sbuf_mat->st_size / sizeof(uint32_t) - bal->h->nrows;
-    fprintf(stderr, "%s: %"PRIu32" rows %"PRIu32" cols weight %" PRIu64 "\n",
-            mfile, bal->h->nrows, bal->h->ncols, bal->h->ncoeffs);
 
+    rc = stat(mfile, sbuf_mat);
+    if (rc < 0) {
+        fprintf(stderr, "Reading %s: %s (not fatal)\n", mfile, strerror(errno));
+        fprintf(stderr, "%s: %" PRIu32 " rows %" PRIu32 " cols\n",
+                mfile, bal->h->nrows, bal->h->ncols);
+        fprintf(stderr,
+                "%s: main input file not present, total weight unknown\n", mfile);
+        bal->h->ncoeffs = 0;
+    } else {
+        bal->h->ncoeffs = sbuf_mat->st_size / sizeof(uint32_t) - bal->h->nrows;
+        fprintf(stderr,
+                "%s: %" PRIu32 " rows %" PRIu32 " cols"
+                " weight %" PRIu64 "\n",
+                mfile, bal->h->nrows, bal->h->ncols, bal->h->ncoeffs);
+    }
     /* TODO: In case we rely on the rows, not columns for doing the
      * balancing, there is of course some code which must be modified
      * along the lines of the following.
@@ -368,20 +385,19 @@ int main(int argc, char * argv[])
     if (fcw == NULL) { perror(cwfile); exit(1); }
 
     bal->colperm = malloc(maxdim * sizeof(uint32_t) * 2);
-    time_t t_cw;
-    t_cw = -time(NULL);
+    double t_cw;
+    t_cw = -wct_seconds();
     size_t nc = fread(bal->colperm, sizeof(uint32_t), bal->h->ncols, fcw);
     if (nc < bal->h->ncols) {
         fprintf(stderr, "%s: short column count\n", cwfile);
         exit(1);
     }
-    t_cw += time(NULL);
-    double dt = (double) t_cw / CLOCKS_PER_SEC;
-    fprintf(stderr, "read %s in %.1f s (%.1f MB / s)\n", cwfile, dt,
-            1.0e-6 * sbuf_cw->st_size / dt);
+    t_cw += wct_seconds();
+    fprintf(stderr, "read %s in %.1f s (%.1f MB / s)\n", cwfile, t_cw,
+            1.0e-6 * sbuf_cw->st_size / t_cw);
 
     /* prepare for qsort */
-    t_cw = -time(NULL);
+    t_cw = -wct_seconds();
     double s1 = 0, s2 = 0;
     uint64_t tw = 0;
     for(size_t r = bal->h->ncols ; r-- ; ) {
@@ -395,7 +411,7 @@ int main(int argc, char * argv[])
     }
     double avg = s1 / bal->h->ncols;
     double sdev = sqrt(s2 / bal->h->ncols - avg*avg);
-    t_cw += time(NULL);
+    t_cw += wct_seconds();
 
     if (bal->h->ncoeffs) {
         if (tw != bal->h->ncoeffs) {
@@ -409,8 +425,8 @@ int main(int argc, char * argv[])
         fprintf(stderr, "%"PRIu64" coefficients counted\n", tw);
     }
 
-    fprintf(stderr, "%"PRIu32" cols ; avg %.1f sdev %.1f [scan time %d s]\n",
-            bal->h->ncols, avg, sdev, (int) t_cw);
+    fprintf(stderr, "%"PRIu32" cols ; avg %.1f sdev %.1f [scan time %.1f s]\n",
+            bal->h->ncols, avg, sdev, t_cw);
 
     /* Unless we're doing 2d balancing, we need to fill with zero columns
      */
