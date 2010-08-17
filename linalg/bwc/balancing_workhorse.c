@@ -244,6 +244,15 @@ typedef struct thread_source_s thread_source[1];
 int thread_dest_put(thread_dest_ptr D, uint32_t * p, size_t n)
 {
     thread_pipe_ptr t = D->t;
+    FATAL_ERROR_CHECK(D->b->pos + n > t->size,
+        "Argh, error in estimation of the per-core memory\n");
+    /* It is presently *NOT* possible to realloc() here, since mf_pipe
+     * keeps the pointer it has received from the other side of the
+     * thread_pipe, and passes it to slave_dest_put. Fixing this would
+     * require changing the structures a bit (probably doable without too
+     * much harm).
+     */
+
     ASSERT_ALWAYS(D->b->pos + n <= t->size);
     if (n) {
         /* This memcpy should be the only data duplication in the
@@ -738,10 +747,19 @@ void set_slave_variables(slave_data s, param_list pl, parallelizing_info_ptr pi)
     free(suffix);
     */
 
+    /* Get a rough estimate on the number of coefficients we will see.
+     * Since this has to be rewinded, it remains in core memory, thus the
+     * necessity of guessing this.
+     */
     s->expected_size = s->bal->h->ncoeffs / pi->m->totalsize;
-    s->expected_size += sqrt(s->expected_size);
+    s->expected_size += 2 * sqrt(s->expected_size);
     s->expected_size += 2 * s->bal->trows;
     s->expected_size += s->expected_size / 10;
+
+    /* For small matrices, the deviation is sometimes quite high. Don't
+     * bother for such tiny amounts.
+     */
+    s->expected_size += 1 << 20;
 
     // in an mpi environment, the threads will see more data passing
     // through than just the expected size.

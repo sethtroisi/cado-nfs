@@ -616,6 +616,7 @@ sub drive {
 
     if ($program eq ':complete') {
         my $cp;
+        &drive(":wipeout", @_) if $force_complete;
         unless (defined($cp = last_cp('mksol'))) {
             unless (defined($cp = last_cp('krylov'))) {
                 &drive(":wipeout", @_);

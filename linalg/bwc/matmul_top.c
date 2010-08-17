@@ -512,7 +512,7 @@ static void mmt_fill_fields_from_balancing(matmul_top_data_ptr mmt, param_list p
         base = cado_strndup(mname, l);
     }
 
-    int rc = asprintf(&mmt->locfile, "%s.%08"PRIx32".h%d.v%d", base, mmt->bal->h->checksum, ix[1], ix[0]);
+    int rc = asprintf(&mmt->locfile, "%s.%dx%d.%08"PRIx32".h%d.v%d", base, nslices[1], nslices[0], mmt->bal->h->checksum, ix[1], ix[0]);
     free(base);
     ASSERT_ALWAYS(rc >= 0);
 }
