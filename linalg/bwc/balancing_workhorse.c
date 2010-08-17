@@ -368,7 +368,7 @@ void mf_progress(data_source_ptr s, data_dest_ptr d, time_t dt, const char * nam
     printf("%s: %s, %" PRIu32 " rows in %d s ; %s/s  \r",
             name,
             size_disp(s->pos * sizeof(uint32_t), buf), d->r, (int) dt,
-            size_disp((size_t) (s->pos * sizeof(uint32_t) / dt), buf2));
+            size_disp(dt > 0 ? (size_t) (s->pos * sizeof(uint32_t) / dt) : 0, buf2));
     fflush(stdout);
 }
 
@@ -631,9 +631,7 @@ int who_has_row(master_data m, uint32_t rnum)
     return b * m->bal->h->nv;
 }
 /*}}}*/
-
-    /*{{{*/
-int who_has_col_bare(master_data m, uint32_t cnum)
+int who_has_col_bare(master_data m, uint32_t cnum) /*{{{*/
 {
     int b;
     ASSERT(cnum < m->bal->tcols);
