@@ -1988,7 +1988,7 @@ sub do_sieve {
         opendir DIR, $param{'wdir'}
             or die "Cannot open directory `$param{'wdir'}': $!\n";
 
-        my $pat=qr/^$param{'name'}\.(rels\.[\de.]+-[\de.]+|freerels(?:|.gz))$/;
+        my $pat=qr/^$param{'name'}\.(rels\.[\de.]+-[\de.]+|freerels)\.gz$/;
 
         my @files = grep /$pat/, readdir DIR;
         closedir DIR;
