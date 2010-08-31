@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Run cadofactor.pl with 2 jobs on the current machine, to factor the
-# number given by the specified example file. One may use a abbreviation
-# like c59 or c79, provided the corresponding params.xxx file is found in
-# @CMAKE_INSTALL_PREFIX@/@example_subdir@
-
+# Run cadofactor.pl with 2 jobs (or 1 job with 2 threads) on the current
+# machine, to factor the number given by the specified example file. One may
+# use a abbreviation like c59 or c79, provided the corresponding params.xxx
+# file is found in @CMAKE_INSTALL_PREFIX@/@example_subdir@
+#
 # this prints OK or FAILED, and the exit status corresponds.
 #
 # All partial data are put in a temp dir that is removed at the end in

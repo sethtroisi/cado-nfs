@@ -425,8 +425,8 @@ sub read_machines {
                     open FILE, "> $param{'machines'}.tmp"
                             or die "Cannot open `$param{'machines'}.tmp' for writing: $!.\n";
                     print FILE "tmpdir=$vars{'tmpdir'}\n";
-                    print FILE "bindir=$param{'bindir'}\n";
-                    print FILE "mpi=1\n";
+                               "bindir=$param{'bindir'}\n";
+                               "mpi=1\n";
                     close FILE;
                     cmd( "uniq $ENV{'OAR_NODEFILE'} >> $param{'machines'}.tmp" );
                     read_machines( "$param{'machines'}.tmp" );
@@ -1681,8 +1681,8 @@ sub do_polysel {
 
     info "All done!\n";
 
-    # Choose best according to logmu+alpha
-    my $Emin;
+    # Choose best according to the Murphy value
+    my $Emax;
     my $best;
 
     opendir DIR, $param{'wdir'}
@@ -1695,24 +1695,28 @@ sub do_polysel {
         open FILE, "< $f"
             or die "Cannot open `$f' for reading: $!.\n";
         my $last;
-        while (<FILE>) {
-            $last = $_ if /E=/;
+        my $line;
+        while ($line=<FILE>) {
+            if ($line =~ /Murphy/ ) {
+                $last = $line;
+                last;
+            }
         }
         close FILE;
 
-        next unless $last && $last =~ /E=([\d.]+)/;
-        if (!defined $Emin || $1 < $Emin) {
-            $Emin = $1;
+        next unless $last && $last =~ /\)=(.+)$/;
+        if (!defined $Emax || $1 > $Emax) {
+            $Emax = $1;
             $best = $f;
         }
     }
 
     die "No polynomial was found in the given range!\n".
         "Please increase the range or the [kj]M value.\n"
-      unless defined $Emin;
+      unless defined $Emax;
 
     # Copy the best polynomial
-    info "The best polynomial is from `".basename($best)."' (E = $Emin).\n";
+    info "The best polynomial is from `".basename($best)."' (E = $Emax).\n";
     $tab_level++;
     cmd("env cp -f $best $param{'prefix'}.poly 2>&1",
         { log => 1, kill => 1 });
@@ -1766,8 +1770,8 @@ sub do_polysel_bench {
                       check    => $polysel_check,
                       is_done  => $polysel_is_done,
                       cmd      => $polysel_cmd,
-					  bench	   => 1,
-					  max_threads => 1 });
+                      bench    => 1,
+                      max_threads => 1 });
 
     if ($last) {
     	info "All done!\n";
@@ -1982,8 +1986,6 @@ sub do_sieve {
         return 0 if $nrels - $last_check < $param{'checkrange'};
         $last_check = $nrels;
 
-        banner "Duplicate and singleton removal";
-
         # Get the list of relation files
         opendir DIR, $param{'wdir'}
             or die "Cannot open directory `$param{'wdir'}': $!\n";
@@ -2010,6 +2012,26 @@ sub do_sieve {
                 push @new_files, $_ unless (exists ($old_files{$_}));
         }
 
+        # print number of primes in factor base
+        if (scalar @files >= 2) {
+            my $f = $files[0];
+            $f = $files[1]
+                if $files[0] =~ /^$param{'name'}\.freerels.gz$/;
+            $f = "$param{'wdir'}/".$f;
+            open FILE, "zcat $f|"
+                or die "Cannot open `$f' for reading: $!.\n";
+            my $i=0;
+            while (<FILE>) {
+                if ( $_ =~ /^# (Number of primes in \S+ factor base = \d+)$/ ) {
+                    info "$1\n";
+                    $i++;
+                    last if $i==2; 
+                }
+            }
+            close FILE;
+        }
+
+        banner "Duplicate and singleton removal";
         # Remove duplicates
         info "Removing duplicates...";
         $tab_level++;
@@ -2375,7 +2397,7 @@ sub do_linalg {
                ":complete " .
                "seed=1 ". # For debugging purposes, we use a deterministic BW
                "thr=$mt ";
-        if ( $param{'mpi'} ) {
+        if ( $param{'mpi'} > 1 ) {
             my $a = int ( sqrt($param{'mpi'}) );
             $a-- while ( $param{'mpi'} % $a != 0);
             my $b = $param{'mpi'} / $a;				
