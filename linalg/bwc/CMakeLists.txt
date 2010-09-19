@@ -123,9 +123,9 @@ macro(configure_bwc_variant v)
 endmacro(configure_bwc_variant)
 
 configure_bwc_variant(u64)
-configure_bwc_variant(u64k)
+# configure_bwc_variant(u64k)
 configure_bwc_variant(u64n)
-configure_bwc_variant(u128)
+# configure_bwc_variant(u128)
 
 set(build_objs build.c)
 set(bench_objs bench.c)
