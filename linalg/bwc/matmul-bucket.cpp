@@ -1352,100 +1352,11 @@ int builder_prepare_vsc_slices(builder * mb, struct vsc_slice_t * V, uint32_t i0
 
 /* }}} */
 
-/******************************************/
-/* Iteratively call the building routines */
-
-void builder_push_one_small_slice(struct matmul_bucket_data_s * mm, small_slice_t * S);
-
-/* {{{ small slices */
-void builder_do_all_small_slices(builder * mb, uint32_t * p_i0, unsigned int npack)
-{
-    /* npack is a guess for the expected size of small slices ; they are
-     * arranged later to all have approximately equal size.
-     */
-    unsigned int nslices = iceildiv(mb->nrows_t, npack);
-    unsigned int s;
-    for(s = 0 ; s < nslices ; s++) {
-        uint32_t i0 =  s    * mb->nrows_t / nslices;
-        uint32_t i1 = (s+1) * mb->nrows_t / nslices;
-
-        small_slice_t S;
-
-        printf("Ssl%u: %ss %u+%u...", s, mb->rowname, i0, i1-i0);
-        fflush(stdout);
-
-        int keep = builder_do_small_slice(mb, &S, i0, i1);
-
-        printf(" w %" PRIu32 " ; avg dj %.1f ; max dj %u%s\n",
-                S.ncoeffs, S.dj_avg, S.dj_max,
-                S.is_small2 ? " [packed]" : "");
-        fflush(stdout);
-
-        if (!keep) {
-            printf("Switching to large slices. Ssl%u to be redone\n", s);
-            break;
-        }
-        builder_push_one_small_slice(mb->mm, &S);
-        // transfer(Sq, &S);
-    }
-    *p_i0 = s * mb->nrows_t / nslices;
-}
-/* }}} */
-
-/* {{{ large slices */
-void builder_do_all_large_slices(builder * mb, uint32_t * p_i0, list<large_slice_t> * Lq, unsigned int scratch1size)
-{
-    unsigned int rem_nrows = mb->nrows_t - *p_i0;
-    unsigned int nlarge_slices = iceildiv(rem_nrows, LSL_NBUCKETS_MAX * 256);
-    uint32_t done = 0;
-    for(unsigned int s = 0 ; s < nlarge_slices ; s++) {
-        large_slice_t L[1];
-        uint32_t i0 = * p_i0 +  s      * rem_nrows / nlarge_slices;
-        uint32_t i1 = * p_i0 + (s + 1) * rem_nrows / nlarge_slices;
-
-        printf("Lsl%u %ss %u+%u", s, mb->rowname, i0, i1-i0);
-        fflush(stdout);
-
-        int keep = builder_do_large_slice(mb, L, i0, i1, scratch1size);
-
-        if (!keep) {
-            printf("Switching to huge slices. Lsl%u to be redone\n", s);
-            break;
-        }
-
-        transfer(Lq, L);
-        done += i1 - i0;
-    }
-    *p_i0 += done;
-}
-/* }}} */
-
-/* {{{ huge slices */
-void builder_do_all_huge_slices(builder * mb, uint32_t * p_i0, list<huge_slice_t> * Hq, unsigned int scratch2size)
-{
-    unsigned int rem_nrows = mb->nrows_t - *p_i0;
-    unsigned int nhuge_slices = iceildiv(rem_nrows, HUGE_MPLEX_MAX * LSL_NBUCKETS_MAX * 256);
-    uint32_t done = 0;
-    for(unsigned int s = 0 ; s < nhuge_slices ; s++) {
-        huge_slice_t H[1];
-        uint32_t i0 = * p_i0 +  s      * rem_nrows / nhuge_slices;
-        uint32_t i1 = * p_i0 + (s + 1) * rem_nrows / nhuge_slices;
-
-        printf("Hsl%u %ss %u+%u", s, mb->rowname, i0, i1-i0);
-        fflush(stdout);
-        builder_do_huge_slice(mb, H, i0, i1, scratch2size);
-        transfer(Hq, H);
-        done += i1 - i0;
-    }
-    *p_i0 += done;
-}
-/* }}} */
-
 /*************************************************************************/
 /* Pushing slices to mm ; all these routines clear the given slice stack */
 
 /* {{{ small slices */
-void builder_push_one_small_slice(struct matmul_bucket_data_s * mm, small_slice_t * S)
+void builder_push_small_slice(struct matmul_bucket_data_s * mm, small_slice_t * S)
 {
     unsigned int ncols_t = mm->public_->dim[!mm->public_->store_transposed];
     if (S->is_small2) {
@@ -1478,18 +1389,13 @@ void builder_push_one_small_slice(struct matmul_bucket_data_s * mm, small_slice_
                 ASSERT(dj < (1 << SMALL_SLICES_DJ_BITS) );
                 ASSERT(lvp->second < (1 << SMALL_SLICES_I_BITS) );
                 mm->t16.push_back((dj << SMALL_SLICES_I_BITS) | lvp->second);
-                if ((mm->t16.size() & 0xFFFFFF) == 0)
-                    fprintf(stderr, "t16.size() = %zu\n", mm->t16.size());
             }
             lu_offset += 1 << 16;
         }
 
         // align.
-        for( ; (mm->t16.size() & (2-1)) ; ) {
+        for( ; (mm->t16.size() & (2-1)) ; )
             mm->t16.push_back(0);
-            if ((mm->t16.size() & 0xFFFFFF) == 0)
-                fprintf(stderr, "t16.size() = %zu\n", mm->t16.size());
-        }
 
         mm->headers.push_back(*hdr);
     } else {
@@ -1535,62 +1441,129 @@ void builder_push_one_small_slice(struct matmul_bucket_data_s * mm, small_slice_
     mm->public_->ncoeffs += S->ncoeffs;
 }
 
-#if 0
-void builder_push_small_slices(struct matmul_bucket_data_s * mm, list<small_slice_t> * Sq)
-{
-    /* we're now flushing the small slices immediately for memory reasons
-     */
-    ASSERT_ALWAYS(Sq->size() == 0);
-    printf("Flushing %zu small slices\n", Sq->size());
-    for(unsigned int s = 0 ; !Sq->empty() ; s++, Sq->pop_front()) {
-        builder_push_one_small_slice(mm, &Sq->front());
-    }
-}
-#endif
-
 /* }}} */
 
 /* {{{ large slices */
-void builder_push_large_slices(struct matmul_bucket_data_s * mm, list<large_slice_t> * Lq)
+void builder_push_large_slice(struct matmul_bucket_data_s * mm, large_slice_t * L)
 {
-    printf("Flushing %zu large slices\n", Lq->size());
-
-    for(unsigned int l = 0 ; !Lq->empty() ; l++, Lq->pop_front()) {
-        large_slice_t * L = &Lq->front();
-        mm->headers.push_back(*L->hdr);
-        for( ; ! L->vbl.empty() ; L->vbl.pop_front()) {
-            large_slice_vblock_t & V(L->vbl.front());
-            mm->aux.insert(mm->aux.end(), V.auxc.begin(), V.auxc.end());
-            unsigned t8_size =  V.t8c.size();
-            mm->t8.insert(mm->t8.end(), V.t8c.begin(), V.t8c.end());
-            // large slices, but not huge slices, may put an odd number
-            // of coefficients in t8
-            if (t8_size & 1) { mm->t8.push_back(0); }
-        }
-        mm->public_->ncoeffs += L->hdr->ncoeffs;
+    mm->headers.push_back(*L->hdr);
+    for( ; ! L->vbl.empty() ; L->vbl.pop_front()) {
+        large_slice_vblock_t & V(L->vbl.front());
+        mm->aux.insert(mm->aux.end(), V.auxc.begin(), V.auxc.end());
+        unsigned t8_size =  V.t8c.size();
+        mm->t8.insert(mm->t8.end(), V.t8c.begin(), V.t8c.end());
+        // large slices, but not huge slices, may put an odd number
+        // of coefficients in t8
+        if (t8_size & 1) { mm->t8.push_back(0); }
     }
+    mm->public_->ncoeffs += L->hdr->ncoeffs;
 }
+
 /* }}} */
 
 /* {{{ huge slices */
 
-void builder_push_huge_slices(struct matmul_bucket_data_s * mm, list<huge_slice_t> * Hq)
+void builder_push_huge_slice(struct matmul_bucket_data_s * mm, huge_slice_t * H)
 {
-    printf("Flushing %zu huge slices\n", Hq->size());
-
-    for(unsigned int l = 0 ; !Hq->empty() ; l++, Hq->pop_front()) {
-        huge_slice_t * H = &Hq->front();
-        mm->headers.push_back(*H->hdr);
-        mm->aux.push_back(H->nlarge);
-        for( ; ! H->vbl.empty() ; H->vbl.pop_front()) {
-            large_slice_vblock_t & V(H->vbl.front());
-            mm->aux.insert(mm->aux.end(), V.auxc.begin(), V.auxc.end());
-            unsigned t8_size =  V.t8c.size();
-            ASSERT_ALWAYS((t8_size & 1) == 0);
-            mm->t8.insert(mm->t8.end(), V.t8c.begin(), V.t8c.end());
-        }
-        mm->public_->ncoeffs += H->hdr->ncoeffs;
+    mm->headers.push_back(*H->hdr);
+    mm->aux.push_back(H->nlarge);
+    for( ; ! H->vbl.empty() ; H->vbl.pop_front()) {
+        large_slice_vblock_t & V(H->vbl.front());
+        mm->aux.insert(mm->aux.end(), V.auxc.begin(), V.auxc.end());
+        unsigned t8_size =  V.t8c.size();
+        ASSERT_ALWAYS((t8_size & 1) == 0);
+        mm->t8.insert(mm->t8.end(), V.t8c.begin(), V.t8c.end());
     }
+    mm->public_->ncoeffs += H->hdr->ncoeffs;
+}
+/* }}} */
+
+/******************************************/
+/* Iteratively call the building routines */
+
+/* {{{ small slices */
+void builder_do_all_small_slices(builder * mb, uint32_t * p_i0, unsigned int npack)
+{
+    /* npack is a guess for the expected size of small slices ; they are
+     * arranged later to all have approximately equal size.
+     */
+    unsigned int nslices = iceildiv(mb->nrows_t, npack);
+    unsigned int s;
+    for(s = 0 ; s < nslices ; s++) {
+        uint32_t i0 =  s    * mb->nrows_t / nslices;
+        uint32_t i1 = (s+1) * mb->nrows_t / nslices;
+
+        small_slice_t S[1];
+
+        printf("Ssl%u: %ss %u+%u...", s, mb->rowname, i0, i1-i0);
+        fflush(stdout);
+
+        int keep = builder_do_small_slice(mb, S, i0, i1);
+
+        printf(" w %" PRIu32 " ; avg dj %.1f ; max dj %u%s\n",
+                S->ncoeffs, S->dj_avg, S->dj_max,
+                S->is_small2 ? " [packed]" : "");
+        fflush(stdout);
+
+        if (!keep) {
+            printf("Switching to large slices. Ssl%u to be redone\n", s);
+            break;
+        }
+        builder_push_small_slice(mb->mm, S);
+        // transfer(Sq, S);
+    }
+    *p_i0 = s * mb->nrows_t / nslices;
+}
+/* }}} */
+
+/* {{{ large slices */
+void builder_do_all_large_slices(builder * mb, uint32_t * p_i0, unsigned int scratch1size)
+{
+    unsigned int rem_nrows = mb->nrows_t - *p_i0;
+    unsigned int nlarge_slices = iceildiv(rem_nrows, LSL_NBUCKETS_MAX * 256);
+    uint32_t done = 0;
+    for(unsigned int s = 0 ; s < nlarge_slices ; s++) {
+        large_slice_t L[1];
+        uint32_t i0 = * p_i0 +  s      * rem_nrows / nlarge_slices;
+        uint32_t i1 = * p_i0 + (s + 1) * rem_nrows / nlarge_slices;
+
+        printf("Lsl%u %ss %u+%u", s, mb->rowname, i0, i1-i0);
+        fflush(stdout);
+
+        int keep = builder_do_large_slice(mb, L, i0, i1, scratch1size);
+
+        if (!keep) {
+            printf("Switching to huge slices. Lsl%u to be redone\n", s);
+            break;
+        }
+
+        // transfer(Lq, L);
+        builder_push_large_slice(mb->mm, L);
+        done += i1 - i0;
+    }
+    *p_i0 += done;
+}
+/* }}} */
+
+/* {{{ huge slices */
+void builder_do_all_huge_slices(builder * mb, uint32_t * p_i0, unsigned int scratch2size)
+{
+    unsigned int rem_nrows = mb->nrows_t - *p_i0;
+    unsigned int nhuge_slices = iceildiv(rem_nrows, HUGE_MPLEX_MAX * LSL_NBUCKETS_MAX * 256);
+    uint32_t done = 0;
+    for(unsigned int s = 0 ; s < nhuge_slices ; s++) {
+        huge_slice_t H[1];
+        uint32_t i0 = * p_i0 +  s      * rem_nrows / nhuge_slices;
+        uint32_t i1 = * p_i0 + (s + 1) * rem_nrows / nhuge_slices;
+
+        printf("Hsl%u %ss %u+%u", s, mb->rowname, i0, i1-i0);
+        fflush(stdout);
+        builder_do_huge_slice(mb, H, i0, i1, scratch2size);
+        builder_push_huge_slice(mb->mm, H);
+        // transfer(Hq, H);
+        done += i1 - i0;
+    }
+    *p_i0 += done;
 }
 /* }}} */
 
@@ -1823,14 +1796,8 @@ void matmul_bucket_build_cache(struct matmul_bucket_data_s * mm, uint32_t * data
 
     uint32_t main_i0 = 0;
 
-    // list<small_slice_t> Sq[1];
     builder_do_all_small_slices(mb, &main_i0, mm->npack);
-    /* Now builder_push_small_slices is a no-op */
-    // builder_push_small_slices(mm, Sq);
-
-    list<large_slice_t> Lq[1];
-    builder_do_all_large_slices(mb, &main_i0, Lq, mm->scratch1size);
-    builder_push_large_slices(mm, Lq);
+    builder_do_all_large_slices(mb, &main_i0, mm->scratch1size);
 
 #if 1
     if (main_i0 < mb->nrows_t) {
@@ -1840,9 +1807,7 @@ void matmul_bucket_build_cache(struct matmul_bucket_data_s * mm, uint32_t * data
         builder_push_vsc_slices(mm, V);
     }
 #else
-    list<huge_slice_t> Hq[1];
-    builder_do_all_huge_slices(mb, &main_i0, Hq, mm->scratch2size);
-    builder_push_huge_slices(mm, Hq);
+    builder_do_all_huge_slices(mb, &main_i0, mm->scratch2size);
 #endif
 
     /* done, at last ! */
@@ -2891,7 +2856,6 @@ static inline void matmul_bucket_mul_loop(struct matmul_bucket_data_s * mm, abt 
     vector<slice_header_t>::iterator hdr;
 
     for(hdr = mm->headers.begin() ; hdr != mm->headers.end() ; hdr++) {
-        slice_header_t * h = &*hdr;
         unsigned int hidx = hdr - mm->headers.begin();
         mm->slice_timings[hidx].t -= clock();
         switch(hdr->t) {
@@ -2928,7 +2892,7 @@ static inline void matmul_bucket_mul_loop(struct matmul_bucket_data_s * mm, abt 
                 break;
                 break;
         }
-        if (h->j1 == pos->ncols_t) { pos->i = h->i1; }
+        if (hdr->j1 == pos->ncols_t) { pos->i = hdr->i1; }
         mm->slice_timings[hidx].t += clock();
     }
 }
