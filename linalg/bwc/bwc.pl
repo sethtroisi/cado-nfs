@@ -131,6 +131,8 @@ my $tmpdir;
 my $interleaving;
 my $force_complete;
 
+print $0, " ", join(" ", @ARGV), "\n";
+
 # {{{ MPI detection
 
 sub detect_mpi {
@@ -650,7 +652,7 @@ sub drive {
         # Pending an improvement to the gather code, a quick workaround
         # is to return the full thing for the characters step.
         opendir D, $wdir;
-        for my $f (grep { /^K\.\d+\.$balancing_hash$/ } readdir D) {
+        for my $f (grep { /^(?:K\.\d+|W)\.$balancing_hash$/ } readdir D) {
             my $g = $f;
             $g =~ s/\.$balancing_hash$//;
             &drive("mf_untwistvec", "$wdir/$balancing", "$wdir/$f", "--out", "$wdir/$g");
@@ -677,7 +679,7 @@ sub drive {
 
     if ($mpi_needed) {
         unshift @_, $program;
-        if ($program =~ /(?:split|acollect|lingen)$/) {
+        if ($program =~ /(?:split|acollect|lingen|mf_bal)$/) {
             unshift @_, @mpi_precmd_single;
         } else {
             unshift @_, @mpi_precmd;
