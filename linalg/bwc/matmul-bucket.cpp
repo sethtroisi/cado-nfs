@@ -26,6 +26,7 @@
 // C++ headers.
 // #include <string>
 #include <vector>
+#include <deque>
 #include <list>
 #include <algorithm>    // sort
 #include <iostream>     // cout
@@ -376,6 +377,7 @@ struct builder {
     const char * colname;
     /* Statistics on the prime parameter affecting performance of
      * subroutines. All are computed as (total sum, #samples) */
+    struct matmul_bucket_data_s * mm;
 };
 
 void builder_init(builder * mb, struct matmul_bucket_data_s * mm, uint32_t * data)
@@ -391,6 +393,7 @@ void builder_init(builder * mb, struct matmul_bucket_data_s * mm, uint32_t * dat
     mb->rowname = rowcol[ mm->public_->store_transposed];
     mb->colname = rowcol[!mm->public_->store_transposed];
     mb->rowhead = mb->data[0];
+    mb->mm = mm;
 }
 
 void builder_clear(builder * mb)
@@ -422,44 +425,56 @@ struct small_slice_t {
     uint32_t dj_max;
     int is_small2;
 
-    typedef std::vector<std::pair<uint32_t, uint16_t> > L_t;
-    typedef L_t::const_iterator Lci_t;
-    typedef L_t::iterator Li_t;
+    typedef std::vector<std::pair<uint16_t, uint16_t> > Lv_t;
+    typedef Lv_t::const_iterator Lvci_t;
+    typedef Lv_t::iterator Lvi_t;
 
-    L_t L;
+    typedef std::deque<Lv_t> Lu_t;
+    typedef Lu_t::const_iterator Luci_t;
+    typedef Lu_t::iterator Lui_t;
+
+    Lu_t Lu;
 };
 
 int builder_do_small_slice(builder * mb, struct small_slice_t * S, uint32_t i0, uint32_t i1)
 {
     S->i0 = i0;
     S->i1 = i1;
-
+    S->ncoeffs = 0;
     ASSERT_ALWAYS(i1-i0 <= (1 << SMALL_SLICES_I_BITS) );
 
+    /* Make enough vstrips */
+    S->Lu.assign(iceildiv(mb->ncols_t, 1UL << 16), small_slice_t::Lv_t());
     uint32_t * ptr0 = mb->rowhead;
     /* We're doing a new slice */
     for(uint32_t i = i0 ; i < i1 ; i++) {
         for(unsigned int j = 0 ; j < *mb->rowhead ; j++) {
-            S->L.push_back(std::make_pair(mb->rowhead[1+j],i-i0));
+            uint32_t jj = mb->rowhead[1+j];
+            S->Lu[jj>>16].push_back(std::make_pair(jj%(1<<16),i-i0));
+            S->ncoeffs++;
         }
         mb->rowhead += 1 + *mb->rowhead;
     }
     /* L is the list of (column index, row index) of all
      * coefficients in the current horizontal slice */
-    std::sort(S->L.begin(), S->L.end());
 
     /* Convert all j indices to differences */
     S->dj_max = 0;
-    S->ncoeffs = S->L.size();
-    uint32_t j = 0;
-
-    for(small_slice_t::Li_t lp = S->L.begin() ; lp != S->L.end() ; ++lp) {
-        uint32_t dj = lp->first - j;
-        j = lp->first;
-        if (dj > S->dj_max) { S->dj_max = dj; }
-    }
-
     S->dj_avg = mb->ncols_t / (double) S->ncoeffs;
+
+    typedef small_slice_t::Lui_t Lui_t;
+    typedef small_slice_t::Lvci_t Lvci_t;
+    uint32_t lu_offset = 0;
+    uint32_t j = 0;
+    for(Lui_t lup = S->Lu.begin() ; lup != S->Lu.end() ; ++lup) {
+        std::sort(lup->begin(), lup->end());
+        for(Lvci_t lvp = lup->begin() ; lvp != lup->end() ; ++lvp) {
+            uint32_t dj = (lu_offset + lvp->first) - j;
+            j = lu_offset + lvp->first;
+            if (dj > S->dj_max) { S->dj_max = dj; }
+        }
+        lu_offset += 1 << 16;
+    }
 
     /* There are two possible reasons for this slice to be discarded.
      * Either the max dj is too large -- larger than 16 bits -- or the
@@ -1319,6 +1334,7 @@ int builder_prepare_vsc_slices(builder * mb, struct vsc_slice_t * V, uint32_t i0
         uint32_t i0 = V->hdr->i0;
         for(unsigned int l = 0 ; l < V->steps.size() ; l++) {
             vsc_sub_slice_t w;
+            memset(w.hdr, 0, sizeof(slice_header_t));
             w.hdr->t = SLICE_TYPE_DEFER_DIS;
             w.hdr->i0 = i0;
             w.hdr->i1 = (i0 += V->steps[l].nrows);
@@ -1339,8 +1355,10 @@ int builder_prepare_vsc_slices(builder * mb, struct vsc_slice_t * V, uint32_t i0
 /******************************************/
 /* Iteratively call the building routines */
 
+void builder_push_one_small_slice(struct matmul_bucket_data_s * mm, small_slice_t * S);
+
 /* {{{ small slices */
-void builder_do_all_small_slices(builder * mb, uint32_t * p_i0, list<small_slice_t> * Sq, unsigned int npack)
+void builder_do_all_small_slices(builder * mb, uint32_t * p_i0, unsigned int npack)
 {
     /* npack is a guess for the expected size of small slices ; they are
      * arranged later to all have approximately equal size.
@@ -1367,7 +1385,8 @@ void builder_do_all_small_slices(builder * mb, uint32_t * p_i0, list<small_slice
             printf("Switching to large slices. Ssl%u to be redone\n", s);
             break;
         }
-        transfer(Sq, &S);
+        builder_push_one_small_slice(mb->mm, &S);
+        // transfer(Sq, &S);
     }
     *p_i0 = s * mb->nrows_t / nslices;
 }
@@ -1426,93 +1445,109 @@ void builder_do_all_huge_slices(builder * mb, uint32_t * p_i0, list<huge_slice_t
 /* Pushing slices to mm ; all these routines clear the given slice stack */
 
 /* {{{ small slices */
-void builder_push_small_slices(struct matmul_bucket_data_s * mm, list<small_slice_t> * Sq)
+void builder_push_one_small_slice(struct matmul_bucket_data_s * mm, small_slice_t * S)
 {
-    printf("Flushing %zu small slices\n", Sq->size());
-
     unsigned int ncols_t = mm->public_->dim[!mm->public_->store_transposed];
-    for(unsigned int s = 0 ; !Sq->empty() ; s++, Sq->pop_front()) {
-        small_slice_t * S = &Sq->front();
+    if (S->is_small2) {
+        slice_header_t hdr[1];
+        memset(hdr, 0, sizeof(slice_header_t));
+        hdr->t = SLICE_TYPE_SMALL2;
+        hdr->i0 = S->i0;
+        hdr->i1 = S->i1;
+        hdr->j0 = 0;
+        hdr->j1 = ncols_t;
+        hdr->ncoeffs = S->ncoeffs;
+        hdr->nchildren = 0;
 
-        if (S->is_small2) {
+        /* small2 slices are smaller, and faster -- but more
+         * restrictive.  */
+
+        /* Because a small2 slice has data in 16bits chunks, we'll
+         * have to ensure proper alignment in the end. */
+        ASSERT_ALWAYS((mm->t16.size() & (2-1)) == 0);
+
+        unsigned int j = 0;
+        uint32_t lu_offset = 0;
+        for( ; ! S->Lu.empty() ; S->Lu.pop_front(), lu_offset+=1<<16) {
+            small_slice_t::Lv_t lv;
+            swap(lv, S->Lu.front());
+            typedef small_slice_t::Lvci_t Lvci_t;
+            for(Lvci_t lvp = lv.begin() ; lvp != lv.end() ; ++lvp) {
+                uint32_t dj = (lu_offset + lvp->first) - j;
+                j = lu_offset + lvp->first;
+                ASSERT(dj < (1 << SMALL_SLICES_DJ_BITS) );
+                ASSERT(lvp->second < (1 << SMALL_SLICES_I_BITS) );
+                mm->t16.push_back((dj << SMALL_SLICES_I_BITS) | lvp->second);
+                if ((mm->t16.size() & 0xFFFFFF) == 0)
+                    fprintf(stderr, "t16.size() = %zu\n", mm->t16.size());
+            }
+            lu_offset += 1 << 16;
+        }
+
+        // align.
+        for( ; (mm->t16.size() & (2-1)) ; ) {
+            mm->t16.push_back(0);
+            if ((mm->t16.size() & 0xFFFFFF) == 0)
+                fprintf(stderr, "t16.size() = %zu\n", mm->t16.size());
+        }
+
+        mm->headers.push_back(*hdr);
+    } else {
+        /* How many vertical parts -- this merely has to do with index
+         * wraparound, since we're processing data column-major anyway.
+         */
+        slice_header_t ehdr[1];
+        vector<slice_header_t> hdrs;
+        memset(ehdr, 0, sizeof(slice_header_t));
+        ehdr->t = SLICE_TYPE_SMALL1;
+        ehdr->i0 = S->i0;
+        ehdr->i1 = S->i1;
+        ehdr->j0 = 0;
+        ehdr->j1 = ncols_t;
+        ehdr->ncoeffs = S->ncoeffs;
+
+        unsigned int lu_offset = 0;
+        for( ; ! S->Lu.empty() ; S->Lu.pop_front()) {
+            small_slice_t::Lv_t lv;
+            swap(lv, S->Lu.front());
+            typedef small_slice_t::Lvci_t Lvci_t;
+
             slice_header_t hdr[1];
             memset(hdr, 0, sizeof(slice_header_t));
-            hdr->t = SLICE_TYPE_SMALL2;
+            hdr->t = SLICE_TYPE_SMALL1_VBLOCK;
             hdr->i0 = S->i0;
             hdr->i1 = S->i1;
-            hdr->j0 = 0;
-            hdr->j1 = ncols_t;
-            hdr->ncoeffs = S->L.size();
+            hdr->j0 = lu_offset;
             hdr->nchildren = 0;
-
-            /* small2 slices are smaller, and faster -- but more
-             * restrictive.  */
-
-            /* Because a small2 slice has data in 16bits chunks, we'll
-             * have to ensure proper alignment in the end. */
-            ASSERT_ALWAYS((mm->t16.size() & (2-1)) == 0);
-
-            unsigned int j = 0;
-            small_slice_t::Lci_t lp;
-            for(lp = S->L.begin() ; lp != S->L.end() ; ++lp) {
-                unsigned int dj = lp->first - j;
-                j = lp->first;
-                ASSERT(dj < (1 << SMALL_SLICES_DJ_BITS) );
-                ASSERT(lp->second < (1 << SMALL_SLICES_I_BITS) );
-                mm->t16.push_back((dj << SMALL_SLICES_I_BITS) | lp->second);
+            hdr->ncoeffs = lv.size();
+            for(Lvci_t lvp = lv.begin() ; lvp != lv.end() ; ++lvp) {
+                mm->t16.push_back(lvp->first);
+                mm->t16.push_back(lvp->second);
             }
-
-            // align.
-            for( ; (mm->t16.size() & (2-1)) ; ) { mm->t16.push_back(0); }
-
-            mm->headers.push_back(*hdr);
-        } else {
-            /* How many vertical parts -- this merely has to do with index
-             * wraparound, since we're processing data column-major anyway.
-             */
-            slice_header_t ehdr[1];
-            vector<slice_header_t> hdrs;
-            memset(ehdr, 0, sizeof(slice_header_t));
-            ehdr->t = SLICE_TYPE_SMALL1;
-            ehdr->i0 = S->i0;
-            ehdr->i1 = S->i1;
-            ehdr->j0 = 0;
-            ehdr->j1 = ncols_t;
-            ehdr->ncoeffs = S->L.size();
-
-            unsigned int nvstrips = 0;
-            unsigned int j0 = 0;
-            small_slice_t::Lci_t lp;
-            for(lp = S->L.begin() ; lp != S->L.end() ; nvstrips++) {
-                slice_header_t hdr[1];
-                memset(hdr, 0, sizeof(slice_header_t));
-                hdr->t = SLICE_TYPE_SMALL1_VBLOCK;
-                hdr->i0 = S->i0;
-                hdr->i1 = S->i1;
-                hdr->j0 = j0;
-                hdr->nchildren = 0;
-                unsigned int j = j0;
-                unsigned int stripsize = 0;
-                for( ; lp != S->L.end() ; ++lp, stripsize++) {
-                    if (lp->first - j0 >= (1UL << 16)) 
-                        break;
-                    // mm->t16.push_back(lp->first - j);
-                    mm->t16.push_back(lp->first);
-                    j = lp->first;
-                    mm->t16.push_back(lp->second);
-                }
-                j0 += (1UL << 16);
-                hdr->j1 = min(j0, ncols_t);
-                hdr->ncoeffs = stripsize;
-                hdrs.push_back(*hdr);
-            }
-            ehdr->nchildren = hdrs.size();
-            mm->headers.push_back(*ehdr);
-            mm->headers.insert(mm->headers.end(), hdrs.begin(), hdrs.end());
+            lu_offset += (1UL << 16);
+            hdr->j1 = min(lu_offset, ncols_t);
+            hdrs.push_back(*hdr);
         }
-        mm->public_->ncoeffs += S->ncoeffs;
+        ehdr->nchildren = hdrs.size();
+        mm->headers.push_back(*ehdr);
+        mm->headers.insert(mm->headers.end(), hdrs.begin(), hdrs.end());
+    }
+    mm->public_->ncoeffs += S->ncoeffs;
+}
+
+#if 0
+void builder_push_small_slices(struct matmul_bucket_data_s * mm, list<small_slice_t> * Sq)
+{
+    /* we're now flushing the small slices immediately for memory reasons
+     */
+    ASSERT_ALWAYS(Sq->size() == 0);
+    printf("Flushing %zu small slices\n", Sq->size());
+    for(unsigned int s = 0 ; !Sq->empty() ; s++, Sq->pop_front()) {
+        builder_push_one_small_slice(mm, &Sq->front());
     }
 }
+#endif
+
 /* }}} */
 
 /* {{{ large slices */
@@ -1679,6 +1714,7 @@ void builder_push_vsc_slices(struct matmul_bucket_data_s * mm, vsc_slice_t * V)
 
     for(unsigned int l = 0 ; l < V->steps.size() ; l++) {
         slice_header_t chdr[1];
+        memset(chdr, 0, sizeof(slice_header_t));
         chdr->t = SLICE_TYPE_DEFER_ROW;
         chdr->i0 = V->dispatch[0].sub[l].hdr->i0;
         chdr->i1 = V->dispatch[0].sub[l].hdr->i1;
@@ -1711,6 +1747,7 @@ void builder_push_vsc_slices(struct matmul_bucket_data_s * mm, vsc_slice_t * V)
             unsigned int k0 = k - (k % V->steps[l].defer);
             /* Think about the combining header ! */
             slice_header_t chdr[1];
+            memset(chdr, 0, sizeof(slice_header_t));
             chdr->t = SLICE_TYPE_DEFER_CMB;
             chdr->i0 = V->dispatch[k0].sub[l].hdr->i0;
             chdr->i1 = V->dispatch[k0].sub[l].hdr->i1;
@@ -1786,9 +1823,10 @@ void matmul_bucket_build_cache(struct matmul_bucket_data_s * mm, uint32_t * data
 
     uint32_t main_i0 = 0;
 
-    list<small_slice_t> Sq[1];
-    builder_do_all_small_slices(mb, &main_i0, Sq, mm->npack);
-    builder_push_small_slices(mm, Sq);
+    // list<small_slice_t> Sq[1];
+    builder_do_all_small_slices(mb, &main_i0, mm->npack);
+    /* Now builder_push_small_slices is a no-op */
+    // builder_push_small_slices(mm, Sq);
 
     list<large_slice_t> Lq[1];
     builder_do_all_large_slices(mb, &main_i0, Lq, mm->scratch1size);
