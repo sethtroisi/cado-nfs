@@ -2112,7 +2112,7 @@ sub do_sieve {
 		
         info "Nrows: $nrows; Ncols: $ncols; Excess: $excess.\n";
         $tab_level--;
-        info "Join all no duplicates files into one file...";
+        info "Join all no duplicate files into one file...";
         cmd("cat $param{'prefix'}.purgefiles | xargs zcat ".
             "| gzip --best > $param{'prefix'}.nodup.gz ",
             { log => 1, kill => 1 });
