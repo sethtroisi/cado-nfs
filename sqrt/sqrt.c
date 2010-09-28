@@ -529,7 +529,31 @@ calculateSqrtRat (char *prefix, int numdep, cado_poly pol)
 
   if (mpz_cmp_ui (v, 0) != 0)
     {
+      unsigned long p = 2, e;
+      mpz_t pp;
+
+      mpz_init (pp);
       fprintf (stderr, "Error, square root remainder is not zero\n");
+      /* reconstruct the initial value of prd[0] to debug */
+      mpz_mul (prd[0], prd[0], prd[0]);
+      mpz_add (prd[0], prd[0], v);
+      while (mpz_cmp_ui (prd[0], 1) > 0)
+        {
+          e = 0;
+          printf ("Removing p=%lu:", p);
+          mpz_set_ui (pp, p);
+          e = mpz_remove (prd[0], prd[0], pp);
+          printf (" exponent=%lu, remaining %lu bits\n", e,
+                  mpz_sizeinbase (prd[0], 2));
+          if ((e % 2) != 0)
+            {
+              fprintf (stderr, "Prime %lu appears to odd power %lu\n", p, e);
+              break;
+            }
+          p = getprime (p);
+        }
+      mpz_clear (pp);
+      p = getprime (0);
       exit (1);
     }
 
