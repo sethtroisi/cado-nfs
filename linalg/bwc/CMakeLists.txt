@@ -8,6 +8,15 @@ if (${WITH_MPI})
 add_definitions(-DWITH_MPI)
 endif (${WITH_MPI})
 
+add_library(mf mf.c)
+target_link_libraries(mf balancing utils)
+add_executable(mf_scan mf_scan.c)
+target_link_libraries(mf_scan mf)
+
+include_directories(${CADO_NFS_SOURCE_DIR}/linalg)
+add_executable(mf_bal mf_bal.c ../rowset_heap.cpp)
+target_link_libraries(mf_bal mf m)
+
 
 configure_file(bwc.pl ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl ESCAPE_QUOTES @ONLY)
 

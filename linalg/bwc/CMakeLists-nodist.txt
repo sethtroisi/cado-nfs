@@ -5,15 +5,6 @@ include_directories(${CADO_NFS_SOURCE_DIR}/cantor)
 add_executable(bench_polmatmul bench_polmatmul.cpp)
 target_link_libraries(bench_polmatmul utils gf2x-fft)
 
-add_library(mf mf.c)
-target_link_libraries(mf balancing utils)
-add_executable(mf_scan mf_scan.c)
-target_link_libraries(mf_scan mf)
-
-include_directories(${CADO_NFS_SOURCE_DIR}/linalg)
-add_executable(mf_bal mf_bal.c ../rowset_heap.cpp)
-target_link_libraries(mf_bal mf m)
-
 add_executable(mf_dobal mf_dobal.c)
 target_link_libraries(mf_dobal mf m bwc_base balancing)
 set_target_properties(mf_dobal PROPERTIES
