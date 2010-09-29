@@ -1,6 +1,6 @@
-# This file gives the exact contents of the distribution. If a directory
-# mentioned (with a trailing slash), then all its children are included.  Note
-# that the joint of this file and its companion files.nodist must agree with
+# This file gives the exact contents of the distribution. If a directory is
+# mentioned (with a trailing slash), then all its children are included. Note
+# that the union of this file and its companion files.nodist must agree with
 # the list of files known to the SCM.  A further word of caution: wildcards
 # are *NOT* recognized (by the fascist sanity check program).
 CMakeLists.txt
