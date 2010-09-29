@@ -425,8 +425,8 @@ sub read_machines {
                     open FILE, "> $param{'machines'}.tmp"
                             or die "Cannot open `$param{'machines'}.tmp' for writing: $!.\n";
                     print FILE "tmpdir=$vars{'tmpdir'}\n";
-                               "bindir=$param{'bindir'}\n";
-                               "mpi=1\n";
+                    print FILE "bindir=$param{'bindir'}\n";
+                    print FILE "mpi=1\n";
                     close FILE;
                     cmd( "uniq $ENV{'OAR_NODEFILE'} >> $param{'machines'}.tmp" );
                     read_machines( "$param{'machines'}.tmp" );
