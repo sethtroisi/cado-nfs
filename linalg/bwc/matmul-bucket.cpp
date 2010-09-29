@@ -276,7 +276,7 @@ struct slice_header_t {
 /* Ok, there's only one field for the moment. But there might be more
  * eventually */
 struct slice_runtime_stats {
-    clock_t t;
+    double t;
     slice_runtime_stats() : t(0) {}
 };
 
@@ -2540,23 +2540,23 @@ static inline void matmul_bucket_mul_vsc(struct matmul_bucket_data_s * mm, vecto
         for(unsigned int k = 0 ; k < V->dispatch.size() ; k++) {
             vsc_middle_slice_t const & D(V->dispatch[k]);
             const abt * qr = src + aboffset(x, D.hdr->j0);
-            mm->slice_timings[Midx].t -= clock();
+            mm->slice_timings[Midx].t -= wct_seconds();
             for(unsigned int l = 0 ; l < V->steps.size() ; l++) {
                 vsc_sub_slice_t const & S(D.sub[l]);
                 abt * q = cptrs[l];
                 unsigned int count = S.hdr->ncoeffs;
                 ASSERT(base_ptrs[l] <= q);
                 ASSERT(q <= base_ptrs[l+1]);
-                mm->slice_timings[Didx].t -= clock();
+                mm->slice_timings[Didx].t -= wct_seconds();
                 matmul_sub_vsc_dispatch(x, q, qr, pos->q16, count);
                 q += aboffset(x, count);
                 pos->q16 += count;
-                mm->slice_timings[Didx].t += clock();
+                mm->slice_timings[Didx].t += wct_seconds();
                 Didx++;
                 ASSERT(q <= base_ptrs[l+1]);
                 cptrs[l] = q;
             }
-            mm->slice_timings[Midx].t += clock();
+            mm->slice_timings[Midx].t += wct_seconds();
             Midx++;
 
             for(unsigned int l = 0 ; l < V->steps.size() ; l++) {
@@ -2580,12 +2580,12 @@ static inline void matmul_bucket_mul_vsc(struct matmul_bucket_data_s * mm, vecto
                 ASSERT(V->steps[l].nrows == S.hdr->i1 - S.hdr->i0);
                 ASSERT(q - base_ptrs[l] == (ptrdiff_t) mm->headers[Cidx].ncoeffs);
 
-                clock_t t = clock();
+                double t = wct_seconds();
                 mm->slice_timings[Cidx].t -= t;
                 mm->slice_timings[Ridx+l].t -= t;
                 matmul_sub_vsc_combine(x, qw, ptrbegin(mptrs), pos->q8, count, defer);
                 pos->q8 += compressed_size(count, defer);
-                t = clock();
+                t = wct_seconds();
                 mm->slice_timings[Cidx].t += t;
                 mm->slice_timings[Ridx+l].t += t;
                 Cidx++;
@@ -2628,33 +2628,33 @@ static inline void matmul_bucket_mul_vsc(struct matmul_bucket_data_s * mm, vecto
                 const uint8_t * z = pos->q8 + *pos->ql++;
                 unsigned int count = *pos->ql++;
 
-                clock_t t = clock();
+                double t = wct_seconds();
                 // mm->slice_timings[Cidx].t -= t;
                 mm->slice_timings[Ridx+l].t -= t;
                 matmul_sub_vsc_combine_tr(x, ptrbegin(mptrs), qw, z, count, defer);
                 z += compressed_size(count, defer);
-                t = clock();
+                t = wct_seconds();
                 // mm->slice_timings[Cidx].t += t;
                 mm->slice_timings[Ridx+l].t += t;
                 // Cidx++;
             }
 
-            mm->slice_timings[Midx].t -= clock();
+            mm->slice_timings[Midx].t -= wct_seconds();
             for(unsigned int l = 0 ; l < V->steps.size() ; l++) {
                 vsc_sub_slice_t const & S(D.sub[l]);
                 abt * q = cptrs[l];
                 unsigned int count = S.hdr->ncoeffs;
                 ASSERT(base_ptrs[l] <= q);
                 ASSERT(q <= base_ptrs[l+1]);
-                mm->slice_timings[Didx].t -= clock();
+                mm->slice_timings[Didx].t -= wct_seconds();
                 matmul_sub_vsc_dispatch_tr(x, qr, q, pos->q16, count);
                 cptrs[l] += count;
                 pos->q16 += count;
-                mm->slice_timings[Didx].t += clock();
+                mm->slice_timings[Didx].t += wct_seconds();
                 Didx++;
                 ASSERT(q <= base_ptrs[l+1]);
             }
-            mm->slice_timings[Midx].t += clock();
+            mm->slice_timings[Midx].t += wct_seconds();
             Midx++;
         }
         // ASSERT(Cidx == hdr - mm->headers.begin());
@@ -2844,9 +2844,9 @@ static inline void matmul_bucket_mul_small1(struct matmul_bucket_data_s * mm, ve
     for(unsigned int i = 0 ; i < h.nchildren ; i++, hdr++) {
         ASSERT(hdr != mm->headers.end());
         ASSERT(hdr->t == SLICE_TYPE_SMALL1_VBLOCK);
-        mm->slice_timings[hdr - mm->headers.begin()].t -= clock();
+        mm->slice_timings[hdr - mm->headers.begin()].t -= wct_seconds();
         matmul_bucket_mul_small1_vblock(mm, &*hdr, dst, src, d, pos);
-        mm->slice_timings[hdr - mm->headers.begin()].t += clock();
+        mm->slice_timings[hdr - mm->headers.begin()].t += wct_seconds();
     }
     hdr--;
 }
@@ -2857,7 +2857,7 @@ static inline void matmul_bucket_mul_loop(struct matmul_bucket_data_s * mm, abt 
 
     for(hdr = mm->headers.begin() ; hdr != mm->headers.end() ; hdr++) {
         unsigned int hidx = hdr - mm->headers.begin();
-        mm->slice_timings[hidx].t -= clock();
+        mm->slice_timings[hidx].t -= wct_seconds();
         switch(hdr->t) {
             case SLICE_TYPE_SMALL2:
                 matmul_bucket_mul_small2(mm, &*hdr, dst, src, d, pos);
@@ -2893,7 +2893,7 @@ static inline void matmul_bucket_mul_loop(struct matmul_bucket_data_s * mm, abt 
                 break;
         }
         if (hdr->j1 == pos->ncols_t) { pos->i = hdr->i1; }
-        mm->slice_timings[hidx].t += clock();
+        mm->slice_timings[hidx].t += wct_seconds();
     }
 }
 
@@ -2981,13 +2981,13 @@ void matmul_bucket_report_vsc(struct matmul_bucket_data_s * mm, double scale, ve
         uint64_t nc;
         double a;
         nc = dtime[l].first;
-        t = dtime[l].second / CLOCKS_PER_SEC / scale0;
+        t = dtime[l].second / scale0;
         a = 1.0e9 * t / nc;
         printf("defer\t%.2fs ; n=%-9"PRIu64" ; %5.2f ns/c ;"
             " scaled*%.2f : %5.2f/c\n",
             t, nc, a, scale, a * scale);
         nc = ctime[l].first;
-        t = ctime[l].second / CLOCKS_PER_SEC / scale0;
+        t = ctime[l].second / scale0;
         a = 1.0e9 * t / nc;
         printf("      + %.2fs ; n=%-9"PRIu64" ; %5.2f ns/c ;"
             " scaled*%.2f : %5.2f/c\n",
@@ -3014,7 +3014,6 @@ void matmul_bucket_report(struct matmul_bucket_data_s * mm, double scale)
         }
         double t = mm->slice_timings[hdr - mm->headers.begin()].t;
         uint64_t nc = hdr->ncoeffs;
-        t /= CLOCKS_PER_SEC;
         t /= scale0;
         double a = 1.0e9 * t / nc;
         printf("%s\t%.2fs ; n=%-9"PRIu64" ; %5.2f ns/c ;"
@@ -3034,7 +3033,6 @@ void matmul_bucket_report(struct matmul_bucket_data_s * mm, double scale)
             t += mm->slice_timings[hdr - mm->headers.begin()].t;
         }
         if (nc == 0) continue;
-        t /= CLOCKS_PER_SEC;
         t /= scale0;
         double a = 1.0e9 * t / nc;
         printf("%s\t%.2fs ; n=%-9"PRIu64" ; %5.2f ns/c ;"
