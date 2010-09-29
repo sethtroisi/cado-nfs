@@ -1,19 +1,35 @@
-/* 
- * Program: gauss
- * Author : P. Gaudry
- * Purpose: solve linear systems over GF(2)
+/* gauss.c ; solve small linear systems over GF(2)
  * 
  * Algorithm: Gaussian elimination as described in ...
- *
- */
+   
+   Copyright 2007, 2008, 2009, 2010 Pierrick Gaudry, Francois Morain, Emmanuel Thom\'e, Paul Zimmermann
+   
+   This file is part of CADO-NFS.
+   
+   CADO-NFS is free software; you can redistribute it and/or modify it
+   under the terms of the GNU Lesser General Public License as published
+   by the Free Software Foundation; either version 2.1 of the License, or
+   (at your option) any later version.
+   
+   CADO-NFS is distributed in the hope that it will be useful, but
+   WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+   Lesser General Public License for more
+   details.
+   
+   You should have received a copy of the GNU Lesser General Public
+   License along with CADO-NFS; see the file COPYING.  If not, write to
+   the Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+   Boston, MA 02110-1301, USA.
+*/
 
 
 /*
 Compile with one of these:
 
-gcc -O4 -DNDEBUG -funroll-loops -DMULTI_ROW=3 -DNB_TEST=10 gauss.c -lgmp
+gcc -I../ -I../utils -I../build/x86_64 -L../build/x86_64/utils gauss.c -lgmp -lutils -lm
 
-gcc gauss.c -lgmp
+gcc -O4 -DNDEBUG -funroll-loops -I../ -I../utils -I../build/x86_64 -L../build/x86_64/utils -DMULTI_ROW=3 -DNB_TEST=10 gauss.c -lgmp -lutils -lm
 
 
 Note: for small sizes (100-200), MULTI_ROW=2 seems to be fine,
@@ -73,6 +89,17 @@ If just the dimension of kernel is wanted, set ker=NULL.
 #endif
 #endif
 
+/* If the flag below is set, the interface to kernel() changes slightly, as the
+ * mp_limb_t ** ker argument is expected to hold space for pointers BUT
+ * these pointers need not be initialized to anything. The number of pointers
+ * eventually returned, and pointing to data, is exactly the dimension of
+ * the kernel.
+ *
+ * For tiny matrices, this feature does not make sense, as a flat storage
+ * for the kernel vectors is enough.
+ */
+#define SAVE_KERNEL_MEMORY 0
+
 #ifndef __GMP_H__
 typedef unsigned long int mp_limb_t;
 #endif
@@ -101,8 +128,10 @@ static inline void add3Rows(int row, int row2, int row3, int pivot,
 			    mp_limb_t **ptr_current);
 static inline int getPivot(mp_limb_t **ptr, mp_limb_t mask);
 #if VERBOSE
+#ifndef NO_MAIN
 static void printVector(mp_limb_t *V, int n);
 static void printMatrix(mp_limb_t *M, int nrows, int ncols, int limbs_per_row);
+#endif
 #endif
 
 
@@ -142,10 +171,11 @@ int main(int argc, char **argv) {
     ncols = 163;
   }
 
-  /* FIXME: This code is not used, but clearly limbs_per_row is too large
-   * that way */
-  limbs_per_row = (ncols / MACHINE_WORD_SIZE) + 1;
-  limbs_per_col = (nrows / MACHINE_WORD_SIZE) + 1;
+  // nrows = 1024;
+  // ncols = 128;
+
+  limbs_per_row = iceildiv(ncols, MACHINE_WORD_SIZE);
+  limbs_per_col = iceildiv(nrows, MACHINE_WORD_SIZE);
 
   mat = (mp_limb_t *)malloc(limbs_per_row*nrows*sizeof(mp_limb_t));
   ker = (mp_limb_t **)malloc(nrows*sizeof(mp_limb_t *));
@@ -155,10 +185,28 @@ int main(int argc, char **argv) {
   for (i = 0; i < NB_TEST; ++i) {
     int dim;
     mpn_random(mat, limbs_per_row*nrows);
+#if 0
+    {
+        int i;
+        FILE * f;
+        f = fopen("/tmp/cado.ZxyM8F58ky//c59.bwc/K.1", "r");
+        for(i = 0 ; i < nrows ; i++) {
+            fread(&mat[i * limbs_per_row], sizeof(uint64_t), 1, f);
+        }
+        fclose(f);
+        f = fopen("/tmp/cado.ZxyM8F58ky//c59.bwc/K.0", "r");
+        for(i = 0 ; i < nrows ; i++) {
+            fread(&mat[1 + i * limbs_per_row], sizeof(uint64_t), 1, f);
+        }
+        fclose(f);
+    }
+#endif
+
 
 #if VERBOSE
-    printf("Matrix is :\n");
+    printf("M:=\n");
     printMatrix(mat, nrows, ncols, limbs_per_row);
+    printf(";\n");
 #endif
 
     if (!justrank)
@@ -167,18 +215,22 @@ int main(int argc, char **argv) {
       dim = kernel(mat, NULL, nrows, ncols, limbs_per_row, limbs_per_col);
 
 #if VERBOSE
-    printf("Echelonized matrix is :\n");
+    printf("E:=\n");
     printMatrix(mat, nrows, ncols, limbs_per_row);
+    printf(";\n");
 #endif
     
-    printf("dim of ker = %d\n", dim);
+    printf("dimker:=%d;\n", dim);
 
 #if VERBOSE
     if ((!justrank) && (dim > 0)) 
-      printf("Basis of kernel given by:\n");
+      printf("Bker:=[\n");
       for (j = 0; j < dim; ++j) {
-	printVector(ker[j], nrows); printf("\n");
+	printVector(ker[j], nrows);
+        if (j < dim-1) printf(",");
+        printf("\n");
       }
+      printf("];\n");
 #endif
 
   }
@@ -226,13 +278,43 @@ static void check_soundness(){
  *   i, j        : used in for(;;) loops
  */
 
+struct gaussian_elimination_data {
+    int rank;
+    int nrows;
+    int ncols;
+    mp_limb_t* mat;
+    int limbs_per_row;
+    int *set_pivot;
+    int *set_used;
+};
 
-int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
-	   int limbs_per_row, int limbs_per_col) {
-  int i, j, rank;
+
+
+
+void gaussian_elimination(struct gaussian_elimination_data * G)
+{
+  int i;
+
+  /* store the data in the global variables */
+  matrix = G->mat;
+  NROWS = G->nrows;
+  NCOLS = G->ncols;
+  LIMBS_PER_ROW = G->limbs_per_row;
+  ptr_rows = (mp_limb_t **)malloc((NROWS+1)*sizeof(mp_limb_t *));
+  for (i = 0; i < NROWS+1; ++i)
+    ptr_rows[i] = matrix + LIMBS_PER_ROW*i;
+
+
+
+  G->set_pivot = (int *)malloc(NCOLS*sizeof(int));
+  G->set_used  = (int *)malloc(NROWS*sizeof(int));
+
+  for (i = 0; i < NCOLS; ++i)
+    G->set_pivot[i] = -1;
+  for (i = 0; i < NROWS; ++i)
+    G->set_used[i] = 0;
+
   mp_limb_t **ptr_current;
-  int *set_pivot;
-  int *set_used;
   int j_current, col_current;
   mp_limb_t mask1, mask2;
   double st0 = seconds(), st;
@@ -242,26 +324,12 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
   fprintf (stderr, "Using MULTI_ROW=%d\n", MULTI_ROW);
 #endif
 
-  /* store the data in the global variables */
-  matrix = mat;
-  NROWS = nrows;
-  NCOLS = ncols;
-  LIMBS_PER_ROW = limbs_per_row;
-  ptr_rows = (mp_limb_t **)malloc((NROWS+1)*sizeof(mp_limb_t *));
-  for (i = 0; i < NROWS+1; ++i)
-    ptr_rows[i] = matrix + LIMBS_PER_ROW*i;
   check_soundness();
   
   /* initialize ptr_current, set_used and set_pivot */
   ptr_current = (mp_limb_t **)malloc((NROWS)*sizeof(mp_limb_t *));
   for (i = 0; i < NROWS; ++i)
     ptr_current[i] = ptr_rows[i];
-  set_pivot = (int *)malloc(NCOLS*sizeof(int));
-  set_used  = (int *)malloc(NROWS*sizeof(int));
-  for (i = 0; i < NCOLS; ++i)
-    set_pivot[i] = -1;
-  for (i = 0; i < NROWS; ++i)
-    set_used[i] = 0;
 
   /* Main Loop: for each column, find the pivot and eliminate */
   j_current = 0;
@@ -278,10 +346,10 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
       for (i = 0; i < pivot; ++i)
 	assert (!((*ptr_current[i]) & mask1 ));
       assert (((*ptr_current[pivot]) & mask1 ));
-      assert (set_used[pivot] == 0);
+      assert (G->set_used[pivot] == 0);
 #endif
-      set_pivot[col_current] = pivot;
-      set_used[pivot] = 1;
+      G->set_pivot[col_current] = pivot;
+      G->set_used[pivot] = 1;
 
       /* Eliminate with the pivot */
 #if MULTI_ROW == 1
@@ -372,27 +440,41 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
       }
 
   } /* end while */
+  free(ptr_current);
+}
+
+int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
+	   int limbs_per_row, int limbs_per_col)
+{
+    int i,j;
+
+    struct gaussian_elimination_data G[1] = {{
+        .mat = mat,
+        .nrows = nrows, .ncols = ncols, .limbs_per_row = limbs_per_row,
+        .rank = 0, }};
+    gaussian_elimination(G);
 
 #if VERBOSE
-  printf("Pivots are: [");
+  printf("Pivots:=[");
   for (i = 0; i < NCOLS-1; ++i)
-    printf("%d,", set_pivot[i]);
-  printf("%d]\n", set_pivot[NCOLS-1]);
+    printf("%d,", G->set_pivot[i]);
+  printf("%d];\n", G->set_pivot[NCOLS-1]);
 
-  printf("Used rows are: [");
+  printf("usedrows:= [");
   for (i = 0; i < NROWS-1; ++i)
-    printf("%d,", set_used[i]);
-  printf("%d]\n", set_used[NROWS-1]);
+    printf("%d,", G->set_used[i]);
+  printf("%d];\n", G->set_used[NROWS-1]);
 #endif     
+
  
   /* if ker == NULL, then don't bug the user if he just gave 0 for the
    * otherwise unused limbs_per_col value */
   assert (ker == NULL || limbs_per_col*MACHINE_WORD_SIZE >= NROWS);
-  /* Explore the set of unused rows, get the rank */
-  rank = NROWS;
+  /* Explore the set of unused rows, get the G->rank */
+  G->rank = NROWS;
   for (i = 0; i < NROWS; ++i)
-    if (!set_used[i]) {
-      rank--;
+    if (!G->set_used[i]) {
+      G->rank--;
       if (ker != NULL) {
 	/* each unused row gives one element of the kernel */
 #if SAVE_KERNEL_MEMORY
@@ -406,12 +488,12 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
 	  ker[0][j] = 0;
 	ker[0][i / MACHINE_WORD_SIZE] = 1UL << (i % MACHINE_WORD_SIZE);
 
-	mask1 = 1UL;
+	mp_limb_t mask1 = 1UL;
 	j = 0;
 	while (j < NCOLS) {
 	  if ((*ptr) & mask1) { /* have to recover the pivoting */
 	    int pivot;
-	    pivot = set_pivot[j];
+	    pivot = G->set_pivot[j];
 	    (ker[0])[pivot / MACHINE_WORD_SIZE] |= 
 	      (1UL << (pivot % MACHINE_WORD_SIZE));
 	  } /* end if */
@@ -428,13 +510,51 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
     } /* end if / for, loop over all unused */
 
   free(ptr_rows);
-  free(ptr_current);
-  free(set_pivot);
-  free(set_used);
+  free(G->set_pivot);
+  free(G->set_used);
 
-  return NROWS - rank;
+  return NROWS - G->rank;
 } /* end function kernel */
 
+/* puts in rmat a matrix of size ncols*ncols, and return a rank value r,
+ * such that the r first (least significant bits) columns of the matrix
+ * mat * rmat for a basis of the column span of the matrix mat
+ *
+ * rmat is expected to be already allocated, and to have a striding equal
+ * to limbs_per_row.
+ */
+int spanned_basis(mp_limb_t * rmat, mp_limb_t* mat, int nrows, int ncols,
+        int limbs_per_row)
+{
+    int i;
+
+#if 0
+#if VERBOSE
+    printf("M:=\n");
+    printMatrix(mat, nrows, ncols, limbs_per_row);
+    printf(";\n");
+#endif
+#endif
+
+    struct gaussian_elimination_data G[1] = {{
+        .mat = mat,
+            .nrows = nrows, .ncols = ncols, .limbs_per_row = limbs_per_row,
+            .rank = 0, }};
+    gaussian_elimination(G);
+
+    memset(rmat, 0, ncols * limbs_per_row * sizeof(mp_limb_t));
+
+    int r = 0;
+    for (i = 0; i < NCOLS; ++i) {
+        int p = G->set_pivot[i];
+        if (p < 0) continue;
+        // set bit r of row i
+        rmat[i * limbs_per_row + r / MACHINE_WORD_SIZE] = 1UL << (r % MACHINE_WORD_SIZE);
+        r++;
+    }
+
+    return r;
+}
 
 
 /* add the pivot row to the given row, expect for the given column 
@@ -540,6 +660,7 @@ static inline int getPivot(mp_limb_t **ptr, mp_limb_t mask) {
 
 
 #if	VERBOSE
+#ifndef NO_MAIN
 static void printVector(mp_limb_t *V, int n) {
   int i;
   printf("[");
@@ -565,4 +686,5 @@ static void printMatrix(mp_limb_t *M, int nrows, int ncols,
   }
   printf("\n]\n");
 }
+#endif
 #endif

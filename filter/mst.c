@@ -4,7 +4,7 @@
 #include "merge_opts.h"
 #include "sparse.h"
 #include "dclist.h"
-#include "sparse_mat.h"
+#include "filter_matrix.h"
 #include "mst.h"
 
 //////////////////////////////////////////////////////////////////////
@@ -239,7 +239,7 @@ minimalSpanningTreeWithPrim(int *w, int *father, int *height,
 }
 
 void
-fillRowAddMatrix(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], sparse_mat_t *mat,
+fillRowAddMatrix(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], filter_matrix_t *mat,
                  int m, int32_t *ind)
 {
     int i, j;
@@ -267,7 +267,7 @@ minimalSpanningTree(int *w, int *father, int *height,
 }
 
 int
-minCostUsingMST(sparse_mat_t *mat, int m, int32_t *ind, double *tfill, double *tMST)
+minCostUsingMST(filter_matrix_t *mat, int m, int32_t *ind, double *tfill, double *tMST)
 {
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
     int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];

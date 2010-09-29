@@ -1,13 +1,12 @@
 #include <string.h>
 
 #include "utils.h"
-#include "files.h"
 #include "merge_opts.h"
 #include "sparse.h"
 #ifndef USE_MARKOWITZ
 # include "dclist.h"
 #endif
-#include "sparse_mat.h"
+#include "filter_matrix.h"
 #ifndef USE_MARKOWITZ
 # include "swar.h"
 #endif
@@ -30,7 +29,7 @@ incrS (int w)
    where we consider only columns from jmin to jmax-1 */
 // TODO: ncols could be a new renumbered ncols...
 void
-initMat (sparse_mat_t *mat, int32_t jmin, int32_t jmax)
+initMat (filter_matrix_t *mat, int32_t jmin, int32_t jmax)
 {
     int32_t **R;
 
@@ -48,7 +47,7 @@ initMat (sparse_mat_t *mat, int32_t jmin, int32_t jmax)
 }
 
 void
-clearMat (sparse_mat_t *mat)
+clearMat (filter_matrix_t *mat)
 {
   int32_t i, j;
 
@@ -63,7 +62,7 @@ clearMat (sparse_mat_t *mat)
 }
 
 void
-checkData(sparse_mat_t *mat)
+checkData(filter_matrix_t *mat)
 {
     int j, nbj = 0;
 
@@ -86,36 +85,21 @@ checkData(sparse_mat_t *mat)
    If skipfirst is non-zero, skip the 1st entry of each line.
 */
 void
-initWeightFromFile (sparse_mat_t *mat, FILE *purgedfile, int skipfirst)
+filter_matrix_read_weights(filter_matrix_t * mat, purgedfile_stream_ptr ps)
 {
-  int32_t j, jmin = mat->jmin, jmax = mat->jmax;
-  int i, k, nc, dummy;
-  char s[MAX_LENGTH], *ptr[1];
-
-   
-  /* this code was rewritten using fgets/strtol instead of fscanf,
-     giving a speedup of a factor about 2 */
-  for (i = 0; i < mat->nrows; i++)
-    {
-      ptr[0] = fgets (s, MAX_LENGTH, purgedfile);
-      ASSERT_ALWAYS (ptr[0] != NULL);
-      if(skipfirst != 0)
-	dummy = strtol (s, ptr, 10); /* unused index to rels file */
-
-      nc = strtol (ptr[0], ptr, 10);
-      /* nc is the number of prime ideals of the current relation */
-      for (k = 0; k < nc; k++)
-	{
-	  j = strtol (ptr[0], ptr, 16);
-	  if (LIKELY((j >= jmin) && (j < jmax)))
-	    mat->wt[GETJ(mat, j)]++;
+    int32_t jmin = mat->jmin, jmax = mat->jmax;
+    for (; purgedfile_stream_get(ps,NULL) >= 0;) {
+	for (int k = 0; k < ps->nc; k++) {
+	    int32_t j = ps->cols[k];
+	    if (LIKELY((j >= jmin) && (j < jmax)))
+		mat->wt[GETJ(mat, j)]++;
 	}
     }
 }
 
 /* initialize Rj[j] for light columns, i.e., for those of weight <= cwmax */
 void
-fillmat (sparse_mat_t *mat)
+fillmat (filter_matrix_t *mat)
 {
   int32_t j, *Rj, jmin = mat->jmin, jmax = mat->jmax, wj;
 
@@ -161,12 +145,9 @@ fillmat (sparse_mat_t *mat)
    when skipheavycols will be activated.
 */
 int
-readmat (sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols,
-	 int verbose MAYBE_UNUSED)
+filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps, int verbose)
 {
-    int ret;
-    int i, k;
-    int nc, lbuf = 100, *buf;
+    int lbuf = 100, *buf;
 #if !defined(USE_MPI)
     int nh = 0;
 #endif
@@ -175,125 +156,108 @@ readmat (sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols,
 
     mat->nburied = 0;
     buf = (int *) malloc(lbuf * sizeof(int));
-    ret = fscanf (file, "%d %d", &i, &k); // already set up...!
-    ASSERT_ALWAYS (ret == 2);
-    
+
     fprintf(stderr, "Reading matrix of %d rows and %d columns: excess is %d\n",
-	    mat->nrows, mat->ncols, mat->nrows - mat->ncols);
+            mat->nrows, mat->ncols, mat->nrows - mat->ncols);
     mat->rem_nrows = mat->nrows;
     mat->weight = 0;
 
-    if(skipheavycols != 0){
-	int bmin = mat->nrows, bmax = 0, wmax;
+    int bmin = mat->nrows, bmax = 0, wmax;
 
-	/* don't consider heavy columns of density > 1/2000, this roughly
-	   corresponds to primes < 2000 or ideals of norm < 2000 */
-	wmax = -(mat->nrows / 2000);
-	/* heavy columns already have wt < 0 */
-	tooheavy = (char *) malloc (mat->ncols * sizeof(char));
-	memset (tooheavy, 0, mat->ncols * sizeof(char));
-	for(j = 0; j < mat->ncols; j++){
-	    if(mat->wt[j] < wmax){
-              int wc = -mat->wt[j];
+    /* don't consider heavy columns of density > 1/2000, this roughly
+       corresponds to primes < 2000 or ideals of norm < 2000 */
+    wmax = -(mat->nrows / 2000);
+    /* heavy columns already have wt < 0 */
+    tooheavy = (char *) malloc (mat->ncols * sizeof(char));
+    memset (tooheavy, 0, mat->ncols * sizeof(char));
+    for(j = 0; j < mat->ncols; j++){
+        if(mat->wt[j] < wmax){
+            int wc = -mat->wt[j];
 #if DEBUG >= 1
-	      fprintf(stderr, "Burying j=%d (wt=%d)\n", j, wc);
+            fprintf(stderr, "Burying j=%d (wt=%d)\n", j, wc);
 #endif
-		tooheavy[j] = 1;
-		mat->nburied += 1;
-		if(wc > bmax) bmax = wc;
-		if(wc < bmin) bmin = wc;
-	    }
-	}
-	fprintf(stderr, "# Number of buried columns is %d", mat->nburied);
-	fprintf(stderr, " (min=%d max=%d)\n", bmin, bmax);
+            tooheavy[j] = 1;
+            mat->nburied += 1;
+            if(wc > bmax) bmax = wc;
+            if(wc < bmin) bmin = wc;
+        }
     }
+    fprintf(stderr, "# Number of buried columns is %d", mat->nburied);
+    fprintf(stderr, " (min=%d max=%d)\n", bmin, bmax);
 
-    for (i = 0; i < mat->nrows; i++){
-      if(!(i % 100000))
-	    fprintf (stderr, "Reading %d-th row\r", i);
-	if(skipfirst != 0){
-	    ret = fscanf(file, "%d", &nc); // unused index to rels file
-	    if(ret != 1){
-		fprintf(stderr, "Pb1 in readmat\n");
-		return 0;
-	    }
-	}
-	ret = fscanf (file, "%d", &nc);
-	if(ret != 1){
-	    fprintf(stderr, "Pb2 in readmat\n");
-	    return 0;
-	}
-	if(nc == 0){
-	    mat->rows[i] = NULL;
-	    mat->rem_nrows--;
-	}
-	else{
+    for (int i = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; i++) {
+        ASSERT_ALWAYS(i < mat->nrows);
+        if (purgedfile_stream_disp_progress_now_p(ps))
+            fprintf(stderr, "read %d rows in %.1f s (%.1f MB/s, %.1f rows/s)\n",
+                    ps->rrows, ps->dt, ps->mb_s, ps->rows_s);
+
+        if(ps->nc == 0) {
+            mat->rows[i] = NULL;
+            mat->rem_nrows--;
+        } else{
 #if !defined(USE_MPI)
-	    int nb_heavy_j = 0;
+            int nb_heavy_j = 0;
 #endif
-	    if(nc > lbuf){
-		lbuf <<= 1;
-		fprintf(stderr, "Warning: doubling lbuf in readmat;");
-		fprintf(stderr, " new value is %d\n", lbuf);
-		free(buf);
-		buf = (int *)malloc(lbuf * sizeof(int));
-	    }
-	    for(k = 0, ibuf = 0; k < nc; k++){
-		ret = fscanf(file, PURGE_INT_FORMAT, &j);
-		if(ret != 1){
-		    fprintf(stderr, "Pb3 in readmat: k=%d\n", k);
-		    return 0;
-		}
-		ASSERT_ALWAYS (0 <= j && j < mat->ncols);
+            if(ps->nc > lbuf){
+                lbuf <<= 1;
+                fprintf(stderr, "Warning: doubling lbuf in readmat;");
+                fprintf(stderr, " new value is %d\n", lbuf);
+                free(buf);
+                buf = (int *)malloc(lbuf * sizeof(int));
+            }
+            ibuf = 0;
+            for(int k = 0 ; k < ps->nc; k++) {
+                int32_t j = ps->cols[k];
+                ASSERT_ALWAYS (0 <= j && j < mat->ncols);
 #if !defined(USE_MPI)
-		if(mat->wt[GETJ(mat, j)] < 0)
-		    nb_heavy_j++;
+                if(mat->wt[GETJ(mat, j)] < 0)
+                    nb_heavy_j++;
 #endif
-		// always store j in the right interval...!
-		if((j >= jmin) && (j < jmax)){
-		    // this will be the weight in the current slice
-		    mat->weight++; 
-		    if((tooheavy != NULL) && (tooheavy[j] != 0))
-			mat->wburied[i] += 1;
-		    else{
-			buf[ibuf++] = j;
-			if(mat->wt[GETJ(mat, j)] > 0){ // redundant test?
+                // always store j in the right interval...!
+                if((j >= jmin) && (j < jmax)){
+                    // this will be the weight in the current slice
+                    mat->weight++; 
+                    if ((tooheavy != NULL) && (tooheavy[j] != 0)) {
+                        mat->wburied[i] += 1;
+                    } else {
+                        buf[ibuf++] = j;
+                        if(mat->wt[GETJ(mat, j)] > 0){ // redundant test?
 #ifndef USE_COMPACT_R
-			    mat->R[GETJ(mat, j)][0]++;
-			    mat->R[GETJ(mat, j)][mat->R[GETJ(mat, j)][0]] = i;
+                            mat->R[GETJ(mat, j)][0]++;
+                            mat->R[GETJ(mat, j)][mat->R[GETJ(mat, j)][0]] = i;
 #else
-			    fprintf(stderr, "R: NYI in readmat\n");
-			    exit(1);
+                            fprintf(stderr, "R: NYI in readmat\n");
+                            exit(1);
 #endif
-			}
-		    }
-		}
-	    }
+                        }
+                    }
+                }
+            }
 #if !defined(USE_MPI)
-	    if(nb_heavy_j == nc){
-		// all the columns are heavy and thus will never participate
-		mat->rows[i] = NULL;
-		nh++;
-		continue;
-	    }
+            if(nb_heavy_j == ps->nc){
+                // all the columns are heavy and thus will never participate
+                mat->rows[i] = NULL;
+                nh++;
+                continue;
+            }
 #endif
-	    // TODO: do not store rows not having at least one light
-	    // column, but do not decrease mat->nrows!
-	    mat->rows[i] = (int32_t*) malloc ((ibuf+1) * sizeof (int32_t));
-	    mat->rows[i][0] = ibuf;
-	    memcpy(mat->rows[i]+1, buf, ibuf * sizeof(int32_t));
-	    // sort indices in val to ease row merges
+            // TODO: do not store rows not having at least one light
+            // column, but do not decrease mat->nrows!
+            mat->rows[i] = (int32_t*) malloc ((ibuf+1) * sizeof (int32_t));
+            mat->rows[i][0] = ibuf;
+            memcpy(mat->rows[i]+1, buf, ibuf * sizeof(int32_t));
+            // sort indices in val to ease row merges
             qsort(mat->rows[i]+1, ibuf, sizeof(int32_t), cmp);
             /* check all indices are distinct, otherwise this is a bug of
                purge */
-            for (k = 1; k < ibuf; k++)
-              if (mat->rows[i][k] == mat->rows[i][k+1])
+            for (int k = 1; k < ibuf; k++)
+                if (mat->rows[i][k] == mat->rows[i][k+1])
                 {
-                  fprintf (stderr, "Error, duplicate ideal %x in row %i\n",
-                           mat->rows[i][k], i);
-                  exit (1);
+                    fprintf (stderr, "Error, duplicate ideal %x in row %i\n",
+                            mat->rows[i][k], i);
+                    exit (1);
                 }
-	}
+        }
     }
     fprintf (stderr, "\n"); /* to keep last output on screen */
 #if !defined(USE_MPI)
@@ -304,29 +268,29 @@ readmat (sparse_mat_t *mat, FILE *file, int skipfirst, int skipheavycols,
     mat->rem_ncols = mat->ncols;
 #ifndef USE_MARKOWITZ
     if (verbose)
-      printStatsSWAR (mat);
+        printStatsSWAR (mat);
 #endif
     free (buf);
     if (tooheavy != NULL)
-      free (tooheavy);
+        free (tooheavy);
     return 1;
 }
 
 void
-print_row(sparse_mat_t *mat, int i)
+print_row(filter_matrix_t *mat, int i)
 {
     fprintRow(stderr, mat->rows[i]);
 }
 
 void
-destroyRow(sparse_mat_t *mat, int i)
+destroyRow(filter_matrix_t *mat, int i)
 {
     free(mat->rows[i]);
     mat->rows[i] = NULL;
 }
 
 void
-freeRj(sparse_mat_t *mat, int j)
+freeRj(filter_matrix_t *mat, int j)
 {
 #ifndef USE_COMPACT_R
     free(mat->R[GETJ(mat, j)]);
@@ -339,7 +303,7 @@ freeRj(sparse_mat_t *mat, int j)
 
 // Don't touch to R[j][0]!!!!
 void
-remove_i_from_Rj(sparse_mat_t *mat, int i, int j)
+remove_i_from_Rj(filter_matrix_t *mat, int i, int j)
 {
     // be dumb for a while
     int k;
@@ -366,7 +330,7 @@ remove_i_from_Rj(sparse_mat_t *mat, int i, int j)
 // cell M[i, j] is incorporated in the data structure. It is used
 // later on in cases where i is not already present in row[j].
 void
-add_i_to_Rj(sparse_mat_t *mat, int i, int j)
+add_i_to_Rj(filter_matrix_t *mat, int i, int j)
 {
     // be semi-dumb for a while
     int k;
@@ -399,7 +363,7 @@ add_i_to_Rj(sparse_mat_t *mat, int i, int j)
 
 // Remove j from R[i] and crunch R[i].
 void
-remove_j_from_row(sparse_mat_t *mat, int i, int j)
+remove_j_from_row(filter_matrix_t *mat, int i, int j)
 {
     int k;
 
@@ -443,7 +407,7 @@ remove_j_from_row(sparse_mat_t *mat, int i, int j)
 // scenario of MPI.
 // New: uses the estimated wburied stuff. TODO: what about MPI???
 int
-weightSum(sparse_mat_t *mat, int i1, int i2)
+weightSum(filter_matrix_t *mat, int i1, int i2)
 {
     int k1, k2, w, len1, len2;
 
@@ -474,7 +438,7 @@ weightSum(sparse_mat_t *mat, int i1, int i2)
 }
 
 void
-fillTabWithRowsForGivenj(int32_t *ind, sparse_mat_t *mat, int32_t j)
+fillTabWithRowsForGivenj(int32_t *ind, filter_matrix_t *mat, int32_t j)
 {
     int ni = 0, k, i;
 

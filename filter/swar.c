@@ -25,7 +25,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "merge_opts.h"
 #include "sparse.h"
 #include "dclist.h"
-#include "sparse_mat.h"
+#include "filter_matrix.h"
 #include "report.h"
 
 #ifndef USE_MARKOWITZ
@@ -43,7 +43,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
       mat->S[w]  - doubly-chained list with columns j of weight w
  */
 void
-initSWAR (sparse_mat_t *mat)
+initSWAR (filter_matrix_t *mat)
 {
     /* mat->cwmax+2 to prevent bangs */
     /* FIXME: what is the purpose of S[cwmax+1]? */
@@ -62,7 +62,7 @@ initSWAR (sparse_mat_t *mat)
 
 /* free the memory allocated in mat */
 void
-closeSWAR (sparse_mat_t *mat)
+closeSWAR (filter_matrix_t *mat)
 {
   int k;
 
@@ -74,7 +74,7 @@ closeSWAR (sparse_mat_t *mat)
 
 // dump for debugging reasons
 void
-printSWAR(sparse_mat_t *mat, int ncols)
+printSWAR(filter_matrix_t *mat, int ncols)
 {
     int j, w;
     int32_t k;
@@ -105,7 +105,7 @@ printSWAR(sparse_mat_t *mat, int ncols)
 }
 
 void
-printStatsSWAR (sparse_mat_t *mat)
+printStatsSWAR (filter_matrix_t *mat)
 {
     int w;
 
@@ -116,7 +116,7 @@ printStatsSWAR (sparse_mat_t *mat)
 
 // remove j from the stack it belongs to.
 static void
-remove_j_from_S(sparse_mat_t *mat, int j)
+remove_j_from_S(filter_matrix_t *mat, int j)
 {
     dclist dcl = mat->A[GETJ(mat, j)];
 
@@ -141,7 +141,7 @@ remove_j_from_S(sparse_mat_t *mat, int j)
 }
 
 void
-remove_j_from_SWAR(sparse_mat_t *mat, int j)
+remove_j_from_SWAR(filter_matrix_t *mat, int j)
 {
     remove_j_from_S(mat, j);
     mat->A[GETJ(mat, j)] = NULL;
@@ -160,7 +160,7 @@ remove_j_from_SWAR(sparse_mat_t *mat, int j)
 
 */
 void
-decreaseColWeightSWAR(sparse_mat_t *mat, int32_t j)
+decreaseColWeightSWAR(filter_matrix_t *mat, int32_t j)
 {
     int ind;
 
@@ -188,7 +188,7 @@ decreaseColWeightSWAR(sparse_mat_t *mat, int32_t j)
 
 // Returns a value < 0 if nothing was done, since the weight was too heavy.
 int
-addColSWAR(sparse_mat_t *mat, int32_t j)
+addColSWAR(filter_matrix_t *mat, int32_t j)
 {
     int ind;
 
@@ -214,7 +214,7 @@ addColSWAR(sparse_mat_t *mat, int32_t j)
 }
 
 int
-deleteEmptyColumnsSWAR (sparse_mat_t *mat)
+deleteEmptyColumnsSWAR (filter_matrix_t *mat)
 {
     dclist dcl = mat->S[0];
     int njrem = 0;

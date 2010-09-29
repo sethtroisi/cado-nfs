@@ -1,6 +1,7 @@
 #ifndef SPARSE_MAT_H_
 #define SPARSE_MAT_H_
 
+#include "purgedfile.h"
 #include "dclist.h"
 
 #define USE_TAB 1 // 1 for compact rows...
@@ -51,7 +52,7 @@ typedef struct {
   int mkztype;       /* which type of count */
 #endif
   int itermax;       /* used for performing some sampling */
-} sparse_mat_t;
+} filter_matrix_t;
 
 #ifdef __cplusplus
 extern "C" {
@@ -65,15 +66,14 @@ extern "C" {
 #define GETJ(mat, j) (j)
 #endif
 
-extern void initMat(sparse_mat_t *mat, int32_t jmin, int32_t jmax);
-extern void clearMat (sparse_mat_t *mat);
-extern void initWeightFromFile(sparse_mat_t *mat, FILE *purgedfile, int skipfirst);
-extern void fillmat(sparse_mat_t *mat);
-extern int readmat (sparse_mat_t *mat, FILE *file, int skipfirst,
-                    int skipheavycols, int verbose);
+extern void initMat(filter_matrix_t *mat, int32_t jmin, int32_t jmax);
+extern void clearMat (filter_matrix_t *mat);
+extern void filter_matrix_read_weights(filter_matrix_t *mat, purgedfile_stream_ptr);
+extern void fillmat(filter_matrix_t *mat);
+extern int filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr, int verbose);
 
-extern void remove_j_from_row(sparse_mat_t *mat, int i, int j);
-extern void print_row(sparse_mat_t *mat, int i);
+extern void remove_j_from_row(filter_matrix_t *mat, int i, int j);
+extern void print_row(filter_matrix_t *mat, int i);
 
 #if USE_TAB == 0
 #define isRowNull(mat, i) ((mat)->data[(i)].val == NULL)
@@ -86,15 +86,15 @@ extern void print_row(sparse_mat_t *mat, int i);
 #define cell(mat, i, k) (mat)->rows[(i)][(k)]
 #define SPARSE_ITERATE(mat, i, k) for((k)=1; (k)<=lengthRow((mat),(i)); (k)++)
 #endif
-extern void freeRj(sparse_mat_t *mat, int j);
-extern void remove_i_from_Rj(sparse_mat_t *mat, int i, int j);
-extern void add_i_to_Rj(sparse_mat_t *mat, int i, int j);
+extern void freeRj(filter_matrix_t *mat, int j);
+extern void remove_i_from_Rj(filter_matrix_t *mat, int i, int j);
+extern void add_i_to_Rj(filter_matrix_t *mat, int i, int j);
 extern int decrS(int w);
 extern int incrS(int w);
-extern int weightSum(sparse_mat_t *mat, int i1, int i2);
-extern void fillTabWithRowsForGivenj(int32_t *ind, sparse_mat_t *mat, int32_t j);
-extern void checkData(sparse_mat_t *mat);
-extern void destroyRow(sparse_mat_t *mat, int i);
+extern int weightSum(filter_matrix_t *mat, int i1, int i2);
+extern void fillTabWithRowsForGivenj(int32_t *ind, filter_matrix_t *mat, int32_t j);
+extern void checkData(filter_matrix_t *mat);
+extern void destroyRow(filter_matrix_t *mat, int i);
 
 #ifdef __cplusplus
 }

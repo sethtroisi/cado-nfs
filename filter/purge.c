@@ -56,6 +56,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
                     prime ideal).
 */
 
+#define _POSIX_C_SOURCE 200112L /* pclose */
 #include <gmp.h>
 #include "mod_ul.c"
 #include <stdio.h>
@@ -66,7 +67,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "utils.h"
 
 #include "hashpair.h"
-#include "files.h"
 #include "gzip.h"
 
 #define LINE_SIZE 512
@@ -173,9 +173,11 @@ fprint_free (int *table_ind, int *nb_coeff, relation_t rel, hashtable_t *H)
 
 /* Print the relation 'rel' in matrix format, i.e., a line of the form:
 
-   i k t_1 t_2 ... t_k
+   i a b k t_1 t_2 ... t_k
 
    i (decimal) is the row index from the nodup file (starting at 0)
+   a (signed decimal) is a
+   b (signed decimal) is b
    k (decimal) is the number of rational and algebraic primes in the relation
    t_1 ... t_k (hexadecimal) are the indices of the primes (starting at 0)
 
@@ -208,7 +210,8 @@ fprint_rel_row (FILE *file, int irel, relation_t rel, hashtable_t *H)
       fprint_alg (table_ind, &nb_coeff, rel, H);
     }
 
-  fprintf (file, "%d %d", irel, nb_coeff);
+  fprintf (file, "%d %"PRId64" %"PRIu64" %d",
+          irel, rel.a, rel.b, nb_coeff);
   for (i = 0; i < nb_coeff; ++i)
     /* due to the +1 in renumber */
     fprintf (file, " " PURGE_INT_FORMAT, table_ind[i] - 1);
@@ -319,46 +322,6 @@ insertFreeRelation (int **rel_compact, int irel, int *nprimes,
     rel_compact[irel] = tmp;
 }
 
-/* Trick: read only active relations, i.e., for which rel_used[i] = 1. */
-static int
-scan_relations_from_file (int *irel, int **rel_compact, char *rel_used,
-                          int nrelmax, int *nprimes, hashtable_t *H,
-                          FILE *file, long minpr, long minpa,
-                          unsigned long *tot_alloc)
-{
-    relation_t rel;
-    int ret = 1;
-    char str[STR_LEN_MAX];
-
-    while(1){
-        /* read rational and algebraic primes and put them in rel
-           (identical primes are merged and the corresponding exponent
-            computed, but the root for alg. primes is not computed) */
-      if (fgets (str, STR_LEN_MAX, file) == NULL)
-        break; /* end of file or error */
-      //ret = fread_relation (file, &rel);
-	*irel += 1;
-	if(!(*irel % 100000))
-	    fprintf(stderr, "   nrel = %d at %2.2lfs (memory %luMb)\n",
-                    *irel, seconds (), *tot_alloc >> 20);
-        ASSERT_ALWAYS(*irel < nrelmax);
-        if (rel_used[*irel])
-          {
-            ret = read_relation (&rel, str);
-            if (ret != 1)
-              break;
-            if (rel.b > 0)
-              insertNormalRelation (rel_compact, *irel, nprimes, H, &rel,
-                                    minpr, minpa, tot_alloc);
-            else
-              insertFreeRelation (rel_compact, *irel, nprimes, H, &rel,
-                                  minpr, minpa, tot_alloc);
-            clear_relation(&rel);
-          }
-    }
-    return ret;
-}
-
 /* Read all relations from file, and fills the rel_used and rel_compact arrays
    for each relation i:
    - rel_used[i] = 0 if the relation i is deleted
@@ -369,42 +332,54 @@ scan_relations_from_file (int *irel, int **rel_compact, char *rel_used,
      Trick: we only read relations for which rel_used[i]=1.
  */
 static int
-scan_relations (char *ficname[], int nbfic, int *nprimes, hashtable_t *H,
-                char *rel_used, int nrelmax, int **rel_compact,
+scan_relations (char **ficname, int *nprimes, hashtable_t *H,
+                bit_vector_srcptr rel_used, int nrelmax, int **rel_compact,
 		long minpr, long minpa, unsigned long *tot_alloc)
 {
-    FILE *relfile;
-    int ret = 0, irel = -1;
-    int i;
-
     *nprimes = 0;
 
-    ASSERT(nbfic > 0);
     ASSERT(rel_compact != NULL);
-    for(i = 0; i < nbfic; i++){
-	relfile = gzip_open (ficname[i], "r");
-	if(relfile == NULL){
-	    fprintf(stderr, "Pb opening file %s\n", ficname[i]);
-	    exit(1);
-	}
-	fprintf(stderr, "   Adding file %s\n", ficname[i]);
-	ret = scan_relations_from_file (&irel, rel_compact, rel_used, nrelmax,
-                                        nprimes, H, relfile, minpr, minpa,
-                                        tot_alloc);
-	if (ret == 0) {
-	    fprintf(stderr, "Warning: error when reading file %s\n", ficname[i]);
-	    break;
-	}
-	gzip_close (relfile, ficname[i]);
+
+    relation_stream rs;
+    relation_stream_init(rs);
+
+    for( ; *ficname ; ficname++) {
+	fprintf(stderr, "   %-70s\n", *ficname);
+        relation_stream_openfile(rs, *ficname);
+        for ( ; ; ) {
+            int irel = rs->nrels;
+            if (relation_stream_get(rs, NULL) < 0)
+                break;
+            ASSERT_ALWAYS(rs->nrels <= nrelmax);
+            if (bit_vector_getbit(rel_used, irel)) {
+                if (rs->rel.b > 0)
+                    insertNormalRelation (rel_compact, irel, nprimes,
+                            H, &(rs->rel), minpr, minpa, tot_alloc);
+                else
+                    insertFreeRelation (rel_compact, irel, nprimes,
+                            H, &(rs->rel), minpr, minpa, tot_alloc);
+            }
+            if (!relation_stream_disp_progress_now_p(rs))
+                continue;
+
+            fprintf(stderr, 
+                    "read %d relations in %.1fs"
+                    " -- %.1f MB/s -- %.1f rels/s\n",
+                    rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
+        }
+        relation_stream_closefile(rs);
     }
-    fprintf (stderr, "   Scanned %d relations\n", irel + 1);
-    if (irel + 1 != nrelmax)
-      {
+    fprintf(stderr, 
+            "read %d relations in %.1fs -- %.1f MB/s -- %.1f rels/s\n",
+            rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
+    if (rs->nrels != nrelmax) {
         fprintf (stderr, "Error, -nrels value should match the number of scanned relations\n");
         exit (EXIT_FAILURE);
-      }
+    }
 
-    return ret;
+    relation_stream_clear(rs);
+
+    return 1;
 }
 
 /* Return a non-zero value iff some prime (ideal) in the array tab[] is single
@@ -428,7 +403,7 @@ has_singleton (int *tab, hashtable_t *H)
 */
 static void
 delete_relation (int i, int *nprimes, hashtable_t *H,
-                 char *rel_used, int **rel_compact)
+                 bit_vector_ptr rel_used, int **rel_compact)
 {
   int j, *tab = rel_compact[i];
 
@@ -438,7 +413,7 @@ delete_relation (int i, int *nprimes, hashtable_t *H,
       *nprimes -= (H->hashcount[tab[j]] == 0);
     }
   rel_compact[i] = NULL;
-  rel_used[i] = 0;
+  bit_vector_clearbit(rel_used, i);
 }
 
 /* New pruning code, which optimizes the decrease of N*W where N is the number
@@ -472,14 +447,11 @@ compare (const void *v1, const void *v2)
     return (w1 >= w2) ? -1 : 1;
 }
 
-#define GET_REL(T,i) ((T)[(i) >> 5] & (1 << ((i) & 31)))
-#define SET_REL(T,i) (T)[(i) >> 5] |= (1 << ((i) & 31))
-
 /* Compute connected component of row i for the relation R(i1,i2) if rows
    i1 and i2 share a prime of weight 2.
    Return number of rows of components, and put in w the total weight. */
 static int
-compute_connected_component (uint32_t *T, uint32_t i, hashtable_t *H,
+compute_connected_component (bit_vector_ptr T, uint32_t i, hashtable_t *H,
                              unsigned long *w, int **rel_compact,
                              uint32_t *sum)
 {
@@ -487,12 +459,12 @@ compute_connected_component (uint32_t *T, uint32_t i, hashtable_t *H,
   uint32_t k;
 
   n = 1;         /* current row */
-  SET_REL(T, i); /* mark row as visited */
+  bit_vector_setbit(T, i); /* mark row as visited */
   for (j = 0; (h = rel_compact[i][j]) != -1; j++)
     if (H->hashcount[h] == 2)
       {
         k = sum[h] - i; /* other row where prime of index h appears */
-        if (GET_REL(T, k) == 0) /* row k was not visited yet */
+        if (!bit_vector_getbit(T, k)) /* row k was not visited yet */
           n += compute_connected_component (T, k, H, w, rel_compact, sum);
       }
   *w += j; /* add weight of current row */
@@ -505,12 +477,11 @@ typedef struct {
 } comp_t;
 
 static void
-deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes, char *rel_used,
+deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes, bit_vector_ptr rel_used,
                    int **rel_compact, int nrelmax, int keep)
 {
   uint32_t *sum; /* sum of row indices for primes with weight 2 */
-  int i, j, h, lT, n, ltmp = 0;
-  uint32_t *T; /* bit table */
+  int i, j, h, n, ltmp = 0;
   unsigned long w;
   double W = 0.0; /* total matrix weight */
   double N = 0.0; /* numebr of rows */
@@ -524,8 +495,7 @@ deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes, char *rel_used,
   sum = (uint32_t*) malloc (H->hashmod * sizeof (uint32_t));
   memset (sum, 0, H->hashmod * sizeof (uint32_t));
   for (i = 0; i < nrelmax; i++)
-    if (rel_used[i] > 0)
-      {
+    if (bit_vector_getbit(rel_used, i)) {
         for (j = 0; (h = rel_compact[i][j]) != -1; j++)
           if (H->hashcount[h] == 2)
             sum[h] += i;
@@ -536,12 +506,11 @@ deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes, char *rel_used,
   ASSERT_ALWAYS(N == (double) *nrel);
 
   /* now initialize bit table for relations used */
-  lT = 1 + (nrelmax - 1) / 32;
-  T = (uint32_t*) malloc (lT * sizeof (uint32_t));
-  memset (T, 0, lT * sizeof (uint32_t));
+  bit_vector T;
+  bit_vector_init_set(T, nrelmax, 0);
 
   for (i = 0; i < nrelmax; i++)
-    if (rel_used[i] > 0 && GET_REL(T,i) == 0)
+    if (bit_vector_getbit(rel_used, i) && bit_vector_getbit(T,i) == 0)
       {
         w = 0;
         n = compute_connected_component (T, i, H, &w, rel_compact, sum);
@@ -565,19 +534,19 @@ deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes, char *rel_used,
       *nrel -= 1;
     }
 
-  free (T);
+  bit_vector_clear(T);
   free (sum);
   free (tmp);
 }
 
 static void
 onepass_singleton_removal (int nrelmax, int *nrel, int *nprimes,
-                           hashtable_t *H, char *rel_used, int **rel_compact)
+                           hashtable_t *H, bit_vector_ptr rel_used, int **rel_compact)
 {
   int i;
 
   for (i = 0; i < nrelmax; i++)
-    if (rel_used[i] > 0 && has_singleton (rel_compact[i], H))
+    if (bit_vector_getbit(rel_used, i) && has_singleton (rel_compact[i], H))
       {
         delete_relation (i, nprimes, H, rel_used, rel_compact);
         *nrel -= 1;
@@ -586,7 +555,7 @@ onepass_singleton_removal (int nrelmax, int *nrel, int *nprimes,
 
 static void
 remove_singletons (int *nrel, int nrelmax, int *nprimes, hashtable_t *H,
-                   char *rel_used, int **rel_compact, int keep, int final)
+                   bit_vector_ptr rel_used, int **rel_compact, int keep, int final)
 {
   int old, newnrel = *nrel, newnprimes = *nprimes;
 
@@ -669,62 +638,64 @@ renumber (int *nprimes, hashtable_t *H, char *sos)
    (otherwise in format used by merge).
 */
 static void
-reread (char *oname, char *ficname[], unsigned int nbfic,
-        hashtable_t *H, char *rel_used, int nrows, int ncols, int raw)
+reread (char *oname, char ** ficname,
+        hashtable_t *H, bit_vector_srcptr rel_used, int nrows, int ncols, int raw)
 {
-  FILE *file, *ofile;
-  relation_t rel;
-  int irel = -1, ret, nr = 0;
-  unsigned int i;
-  char str[STR_LEN_MAX];
+  FILE *ofile;
+  int ret, nr = 0;
   double W = 0.0; /* total weight */
+  int pipe;
 
-  ofile = gzip_open (oname, "w");
+  ofile = fopen_compressed_w(oname, &pipe, NULL);
   if (raw == 0)
     fprintf (ofile, "%d %d\n", nrows, ncols);
   fprintf (stderr, "Final pass:\n");
-  for (i = 0; i < nbfic; i++)
-    {
-      file = gzip_open (ficname[i], "r");
-      if (file == NULL)
-        {
-          fprintf (stderr,"Can't open file %s for reading\n", ficname[i]);
-          exit (1);
-        }
-      fprintf (stderr, "   Adding file %s\n", ficname[i]);
-      do {
-        /* Trick: only parse used relations. This assumes there is no
-           comment or other stuff in the input (nodup) files. */
-        ret = fgets (str, STR_LEN_MAX, file) != NULL;
-        if (ret == 1)
-          {
-            irel++;
-            if (!(irel % 100000))
-              fprintf (stderr, "   nrel = %d at %2.2lf\n", irel, seconds ());
-            if (rel_used[irel])
+
+  relation_stream rs;
+  relation_stream_init(rs);
+
+  for ( ; *ficname ; ficname++) {
+      relation_stream_openfile(rs, *ficname);
+      fprintf(stderr, "   %-70s\n", *ficname);
+      for ( ; ; ) {
+          int irel = rs->nrels;
+          if (relation_stream_get(rs, NULL) < 0)
+              break;
+          // ASSERT_ALWAYS(rs->nrels <= nrelmax);
+          if (bit_vector_getbit(rel_used, irel)) {
+              if (raw == 0)
               {
-                read_relation (&rel, str);
-                if (raw == 0)
+                  if (rs->rel.b > 0)
                   {
-                    if (rel.b > 0)
-                      {
-                        reduce_exponents_mod2 (&rel);
-                        computeroots (&rel);
-                      }
-                    W += (double) fprint_rel_row (ofile, irel, rel, H);
+                      reduce_exponents_mod2 (&rs->rel);
+                      computeroots (&rs->rel);
                   }
-                else
-                  fprint_relation_raw (ofile, rel);
-                nr++;
-                if (nr >= nrows)
-                  ret = 0; /* we are done */
-                clear_relation (&rel);
+                  W += (double) fprint_rel_row (ofile, irel, rs->rel, H);
               }
+              else
+                  fprint_relation_raw (ofile, rs->rel);
+              nr++;
+              if (nr >= nrows)
+                  ret = 0; /* we are done */
           }
-      } while (ret == 1);
-      gzip_close (file, ficname[i]);
-    }
-  gzip_close (ofile, oname);
+          if (!relation_stream_disp_progress_now_p(rs))
+              continue;
+
+          fprintf(stderr, 
+                  "re-read %d relations in %.1fs"
+                  " -- %.1f MB/s -- %.1f rels/s\n",
+                  rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
+      }
+      relation_stream_closefile(rs);
+  }
+  relation_stream_trigger_disp_progress(rs);
+  fprintf(stderr, 
+          "re-read %d relations in %.1fs"
+          " -- %.1f MB/s -- %.1f rels/s\n",
+          rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
+  relation_stream_clear(rs);
+  if (pipe) pclose(ofile); else fclose(ofile);
+
   /* write excess to stdout */
   if (raw == 0)
     printf ("WEIGHT: %1.0f WEIGHT*NROWS=%1.2e\n", W, W * (double) nr);
@@ -754,20 +725,12 @@ approx_phi (long B)
   return (B <= 1) ? 0 : (int) (0.85 * (double) B / log ((double) B));
 }
 
-void chomp(const char *s) {
-	char *p;
-	while (NULL != s && NULL != (p = strrchr(s, '\n')))
-		*p = '\0';
-}
-
 int
 main (int argc, char **argv)
 {
     hashtable_t H;
     char **fic, *polyname = NULL, *sos = NULL, *purgedname = NULL;
-  	char *filelist = NULL;
-    unsigned int nfic = 0;
-    char *rel_used;
+    char *filelist = NULL;
     int **rel_compact = NULL;
     int ret, k;
     int nrel, nprimes = 0;
@@ -866,26 +829,9 @@ main (int argc, char **argv)
         exit (1);
       }
 
-	if (filelist != NULL) {
-		FILE *f;
-		f = fopen(filelist, "r");
-      	if (f == NULL) {
-        	perror("Problem opening filelist");
-        	exit(1);
-      	}
-		char relfile[LINE_SIZE];
-		fic = (char **) malloc (MAX_FILES * sizeof(char));
-		while (fgets(relfile, LINE_SIZE, f) != NULL) {
-			fic[nfic] = (char *) malloc (LINE_SIZE * sizeof(char));
-			chomp(relfile);
-			strcpy (fic[nfic], relfile);
-			nfic++;
-		}
-		fclose(f);
-	} else {
-	    fic = argv + 1;
-    	nfic = argc - 1;
-	}
+    argv++,argc--;
+    fic = filelist ? filelist_from_file(filelist) : argv;
+
     cado_poly_init (pol);
     cado_poly_read (pol, polyname);
 
@@ -922,14 +868,12 @@ main (int argc, char **argv)
     hashInit (&H, Hsize, 1, need64);
     tot_alloc0 = H.hashmod * H.size;
 
-    /* FIXME: we could use a bit table for rel_used */
-    rel_used = (char *) malloc (nrelmax);
+    bit_vector rel_used;
+    bit_vector_init_set(rel_used, nrelmax, 1);
     tot_alloc0 += nrelmax;
     fprintf (stderr, "Allocated rel_used of %uMb (total %luMb so far)\n",
-             nrelmax >> 20,
+             nrelmax >> 23,
              tot_alloc0 >> 20);
-    /* initialize rel_used[i] to 1 */
-    memset (rel_used, 1, nrelmax);
 
     /* FIXME: we could allocate rel_compact[] at each pass according to the
        number of *remaining* relations. We could also manage so that it takes
@@ -948,7 +892,7 @@ main (int argc, char **argv)
         tot_alloc = tot_alloc0;
 
         fprintf (stderr, "Pass %d:\n", ++pass);
-        ret = scan_relations (fic, nfic, &nprimes, &H, rel_used, nrelmax,
+        ret = scan_relations (fic, &nprimes, &H, rel_used, nrelmax,
                               rel_compact, minpr, minpa, &tot_alloc);
         ASSERT (ret);
 
@@ -995,17 +939,13 @@ main (int argc, char **argv)
 
     /* reread the relation files and convert them to the new coding */
     fprintf (stderr, "Storing remaining relations...\n");
-    reread (purgedname, fic, nfic, &H, rel_used, nrel_new, nprimes_new, raw);
+    reread (purgedname, fic, &H, rel_used, nrel_new, nprimes_new, raw);
 
     hashFree (&H);
-    free (rel_used);
+    bit_vector_clear(rel_used);
     cado_poly_clear (pol);
 
-	if (filelist != NULL) {
-    	for (unsigned int i = 0; i < nfic; i++)
-			free(fic[i]);
-		free(fic);
-	}
+    if (filelist) filelist_clear(fic);
 
     return 0;
 }

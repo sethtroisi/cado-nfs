@@ -1,7 +1,7 @@
 /* debug functions for merge and replay */
 
 void
-dumpSparse(FILE *ofile, sparse_mat_t *mat)
+dumpSparse(FILE *ofile, filter_matrix_t *mat)
 {
     long w = 0;
     int i, j, k, buf[1000], ibuf, new_nrows = 0;

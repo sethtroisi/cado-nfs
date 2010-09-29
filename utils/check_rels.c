@@ -26,13 +26,6 @@ void norm(mpz_t *f, int deg, mpz_t r, long a, unsigned long b)
     mpz_clear(tmp);
 }
 
-
-int is_gzip(const char * s)
-{
-    unsigned int l = strlen(s);
-    return l >= 3 && strcmp(s + l - 3, ".gz") == 0;
-}
-
 int
 check_relation (relation_t *rel, cado_poly_ptr cpoly)
 {
@@ -93,64 +86,54 @@ check_relation (relation_t *rel, cado_poly_ptr cpoly)
     return 1;
 }
 
-#define MAX_LENGTH 512
-
-int check_stream(const char *name, FILE * stream, cado_poly_ptr cpoly)
-{
-    int lnum;
-    int nrels = 0;
-	int nrels_ok = 0;
-	int ret = 0;
-    char line[MAX_LENGTH];
-
-    for (lnum = 1;; lnum++) {
-        if (fgets(line, sizeof(line), stream) == NULL)
-            break;
-        if (line[strlen(line) - 1] != '\n')
-          {
-            fprintf (stderr, "Line %d of %s is buggy or too long, please check or increase MAX_LENGTH in check_rels.c\n", lnum, name);
-            exit (1);
-          }
-        if (line[0] == '#') {
-			printf("%s", line);
-			continue;
-		}
-
-        relation_t rel;
-		nrels++;
-        if (!read_relation(&rel, line)) {
-            fprintf(stderr, "Failed on line %d in %s: %s\n", lnum, name, line);
-			ret = 1;
-			continue;
-        }
-        if (!check_relation(&rel, cpoly)) {
-            fprintf(stderr, "Failed on line %d in %s: %s\n", lnum, name, line);
-        	clear_relation(&rel);
-            ret = 1;
-			continue;
-        }
-
-		printf("%s", line);
-        clear_relation(&rel);
-        nrels_ok++;
-    }
-	if (line[0] != '#') 
-		printf("# Total %d reports\n", nrels_ok);
-    fprintf(stderr, "%s : %d rels ok on %d rels\n", name, nrels_ok, nrels);
-    return ret;
-}
-
-
 void usage_and_die(char *str) {
     fprintf(stderr, "usage: %s -poly <polyfile> <relfile1> <relfile2> ...\n",
             str);
     exit(3);
 }
 
+int check_relation_files(char ** files, cado_poly_ptr cpoly)
+{
+    relation_stream rs;
+    relation_stream_init(rs);
+    unsigned long ok = 0;
+    unsigned long bad = 0;
+    int had_error = 0;
+    for( ; *files ; files++) {
+        relation_stream_openfile(rs, *files);
+        char line[RELATION_MAX_BYTES];
+        unsigned long l0 = rs->lnum;
+        unsigned long ok0 = ok;
+        unsigned long bad0 = bad;
+        for( ; relation_stream_get(rs, line) >= 0 ; ) {
+            unsigned long l = rs->lnum - l0;
+            if (check_relation(&rs->rel, cpoly)) {
+                printf("%s", line);
+                ok++;
+                continue;
+            }
+            fprintf(stderr, "Failed at line %lu in %s: %s",
+                    l, *files, line);
+            bad++;
+            had_error = 1;
+        }
+        if (bad == bad0) {
+            fprintf(stderr, "%s : %lu ok\n", *files, ok-ok0);
+        } else {
+            fprintf(stderr, "%s : %lu ok ; FOUND %lu ERRORS\n",
+                    *files, ok-ok0, bad-bad0);
+        }
+        relation_stream_closefile(rs);
+    }
+    relation_stream_clear(rs);
+
+    return had_error ? -1 : 0;
+}
+
 int main(int argc, char * argv[])
 {
     cado_poly cpoly;
-    int i, had_error = 0;
+    int had_error = 0;
 
     if (argc < 4 || strcmp(argv[1], "-poly") != 0) {
         usage_and_die(argv[0]);
@@ -159,22 +142,11 @@ int main(int argc, char * argv[])
     if (!cado_poly_read(cpoly, argv[2])) 
         return 2;
 
-    for(i = 3 ; i < argc ; i++) {
-        FILE * f;
-        if (is_gzip(argv[i])) {
-            char command[1024];
-            snprintf(command, sizeof(command), "gzip -dc %s", argv[i]);
-            f = popen(command, "r");
-            if (check_stream(argv[i], f, cpoly) != 0)
-                had_error = 1;
-            pclose(f);
-        } else {
-            f = fopen(argv[i], "r");
-            if (check_stream(argv[i], f, cpoly) != 0)
-                had_error = 1;
-            fclose(f);
-        }
-    }
+    argv++,argc--;
+    argv++,argc--;
+    argv++,argc--;
+
+    had_error = check_relation_files(argv, cpoly) < 0;
 
     cado_poly_clear(cpoly);
 

@@ -13,6 +13,9 @@ extern char * cado_strndup(const char * a, size_t n);
 extern char * derived_filename(const char * prefix, const char * what, const char * ext);
 extern int has_suffix(const char * path, const char * sfx);
 
+extern char ** filelist_from_file(const char * filename);
+extern void filelist_clear(char ** filelist);
+
 extern void * malloc_check(const size_t x);
 
 extern void * malloc_aligned(size_t size, size_t alignment);

@@ -14,7 +14,6 @@
 #include <string.h>
 
 #include "utils.h"
-#include "files.h"
 
 #include "sparse.h"
 #include "gzip.h"
@@ -127,54 +126,38 @@ addrel(int **sparsemat, int *colweight, int *buf, int ibuf, int i)
 }
 
 static void
-makeSparse(int **sparsemat, int *colweight, FILE *purgedfile,
+makeSparse(int **sparsemat, int *colweight, purgedfile_stream ps,
            int jmin, int jmax, int **oldrows, int verbose, int nslices)
 {
-    int i, j, nj, *buf, buf_len, ibuf, ind, k;
-    int report = (verbose == 0) ? 100000 : 10000;
-    int rc;
-
-    buf_len = 100;
-    buf = (int *) malloc (buf_len * sizeof(int));
     fprintf(stderr, "Reading and treating relations from purged file\n");
-    rc = fscanf(purgedfile, "%d %d", &i, &j); // skip first line; check?
-    ASSERT_ALWAYS(rc == 2);
 
-    ind = 0;
-    while(fscanf(purgedfile, "%d %d", &i, &nj) != EOF){
-	if(!(ind % report))
-	    fprintf(stderr, "Treating old rel #%d at %2.2lf\n",ind,seconds());
-	// store primes in rel
-	if(nj > buf_len){
-	    fprintf(stderr, "WARNING: realloc for buf [nj=%d]\n", nj);
-	    buf = (int *) realloc (buf, nj * sizeof(int));
-	    buf_len = nj;
-	}
-	// take everybody and clean
-	ibuf = 0;
-	for(i = 0; i < nj; i++){
-	    rc = fscanf(purgedfile, PURGE_INT_FORMAT, buf+ibuf);
-            ASSERT_ALWAYS(rc == 1);
+    for(int i = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; i++) {
+	if (verbose && purgedfile_stream_disp_progress_now_p(ps))
+	    fprintf(stderr, "Treating old rel #%d at %2.2lf\n",
+                    ps->rrows,ps->dt);
 
-	    // what a trick!!!!
-	    if((buf[ibuf] >= jmin) && (buf[ibuf] < jmax))
-		ibuf++;
-	}
+        // take only the primes within the requested interval.
+        int ibuf = 0;
+        for(int k = 0; k < ps->nc; k++) {
+            int j = ps->cols[k];
+            if (j >= jmin && j < jmax)
+                ps->cols[ibuf++] = j;
+        }
+        ps->nc = ibuf;
+
 	if(ibuf > 0){
-	    qsort(buf, ibuf, sizeof(int), cmp);
+	    qsort(ps->cols, ps->nc, sizeof(int), cmp);
 	    // now, we "add" relation [a, b] in all new relations in which it
 	    // participates
-	    for(k = 1; k <= oldrows[ind][0]; k++)
-		addrel(sparsemat, colweight, buf, ibuf, oldrows[ind][k]);
+	    for(int k = 1; k <= oldrows[i][0]; k++)
+		addrel(sparsemat, colweight, ps->cols, ps->nc, oldrows[i][k]);
 	}
 	if(nslices == 0){
 	    // free space just in case
-	    free(oldrows[ind]);
-	    oldrows[ind] = NULL;
+	    free(oldrows[i]);
+	    oldrows[i] = NULL;
 	}
-	ind++;
     }
-    free (buf);
 }
 
 static unsigned long
@@ -474,13 +457,12 @@ doAllAdds(int **newrows, char *str)
 #define STRLENMAX 2048
 
 static int
-oneFile(const char *sparsename, int **sparsemat, int *colweight, const char *purgedname, FILE *purgedfile, int **oldrows, int ncols, int small_nrows, int verbose, int skip, int bin)
+oneFile(const char *sparsename, int **sparsemat, int *colweight, purgedfile_stream_ptr ps, int **oldrows, int ncols, int small_nrows, int verbose, int skip, int bin)
 {
     unsigned long W;
     int small_ncols;
 
-    makeSparse(sparsemat, colweight, purgedfile, 0, ncols, oldrows, verbose,0);
-    gzip_close(purgedfile, purgedname);
+    makeSparse(sparsemat, colweight, ps, 0, ncols, oldrows, verbose,0);
 
     fprintf(stderr, "Renumbering columns (including sorting w.r.t. weight)\n");
     renumber(&small_ncols, colweight, ncols);
@@ -497,7 +479,7 @@ oneFile(const char *sparsename, int **sparsemat, int *colweight, const char *pur
 }
 
 static int
-manyFiles(const char *sparsename, int **sparsemat, int *colweight, const char *purgedname, FILE *purgedfile, int **oldrows, int ncols, int small_nrows, int verbose, int skip, int bin, int nslices)
+manyFiles(const char *sparsename, int **sparsemat, int *colweight, purgedfile_stream_ptr ps, int **oldrows, int ncols, int small_nrows, int verbose, int skip, int bin, int nslices)
 {
     char *name;
     int small_ncols = 1; // always the +1 trick
@@ -524,9 +506,9 @@ manyFiles(const char *sparsename, int **sparsemat, int *colweight, const char *p
 	    jmax = ncols;
 	sprintf(name, "%s.%02d", sparsename, slice);
 	fprintf(stderr, "Dealing with M[%d..%d[ -> %s\n", jmin, jmax, name);
-	makeSparse(sparsemat,colweight,purgedfile,jmin,jmax,oldrows,verbose,
+        purgedfile_stream_rewind(ps);
+	makeSparse(sparsemat,colweight,ps,jmin,jmax,oldrows,verbose,
 		   nslices);
-	gzip_close(purgedfile, purgedname);
 	// colweight[jmin..jmax[ contains the new weights of the
 	// corresponding columns
 	tabnc[slice] = 0;
@@ -546,8 +528,6 @@ manyFiles(const char *sparsename, int **sparsemat, int *colweight, const char *p
 		    free(sparsemat[i]);
 		    sparsemat[i] = NULL;
 		}
-	    purgedfile = gzip_open(purgedname, "r");
-	    ASSERT(purgedfile != NULL);
 	}
     }
     small_ncols--; // undoing the +1 trick
@@ -633,7 +613,7 @@ read_newrows_from_file(int **newrows, int nrows, FILE *file)
 int
 main(int argc, char *argv[])
 {
-    FILE *hisfile, *purgedfile, *fromfile;
+    FILE *hisfile, *fromfile;
     uint64_t bwcostmin = 0;
     int nrows, ncols, nslices = 0;
     int **newrows, i, j, nb, *nbrels, **oldrows, *colweight;
@@ -650,7 +630,7 @@ main(int argc, char *argv[])
       fprintf (stderr, " %s", argv[i]);
     fprintf (stderr, "\n");
 
-    param_list(pl);
+    param_list pl;
 
     param_list_init(pl);
     argv++,argc--;
@@ -675,8 +655,9 @@ main(int argc, char *argv[])
     if (has_suffix(sparsename, ".bin") || has_suffix(sparsename, ".bin.gz"))
         bin=1;
 
-    purgedfile = gzip_open(purgedname, "r");
-    ASSERT(purgedfile != NULL);
+    purgedfile_stream ps;
+    purgedfile_stream_init(ps);
+    purgedfile_stream_openfile(ps, purgedname);
 
     hisfile = fopen(hisname, "r");
     ASSERT(hisfile != NULL);
@@ -685,14 +666,16 @@ main(int argc, char *argv[])
 
     // read parameters that should be the same as in purgedfile!
     sscanf(str, "%d %d", &nrows, &ncols);
+    ASSERT_ALWAYS(nrows == ps->nrows);
+    ASSERT_ALWAYS(ncols == ps->ncols);
+
     fprintf(stderr, "Original matrix has size %d x %d\n", nrows, ncols);
     newrows = (int **)malloc(nrows * sizeof(int *));
 
     if(fromname == NULL){
 	writeindex = 1;
 	build_newrows_from_file(newrows, nrows, hisfile, bwcostmin);
-    }
-    else{
+    } else {
 	writeindex = 0;
 	fromfile = fopen(fromname, "r");
 	ASSERT(fromfile != NULL);
@@ -749,12 +732,10 @@ main(int argc, char *argv[])
     for(i = 0; i < small_nrows; i++)
 	sparsemat[i] = NULL;
     if(nslices == 0) {
-	small_ncols = oneFile(sparsename, sparsemat, colweight, 
-			      purgedname, purgedfile,
+	small_ncols = oneFile(sparsename, sparsemat, colweight, ps,
 			      oldrows, ncols, small_nrows, verbose, skip, bin);
     } else {
-	small_ncols = manyFiles(sparsename, sparsemat, colweight, 
-				purgedname, purgedfile,
+	small_ncols = manyFiles(sparsename, sparsemat, colweight, ps,
 				oldrows, ncols, small_nrows, verbose, skip, bin,
 				nslices);
 	exit(0);
@@ -766,6 +747,9 @@ main(int argc, char *argv[])
 	makeIndexFile(indexname, nrows, newrows, small_nrows, small_ncols);
 	fprintf(stderr, "#T# writing index file: %2.2lf\n", seconds()-tt);
     }
+
+    purgedfile_stream_closefile(ps);
+    purgedfile_stream_clear(ps);
 
     for(i = 0; i < small_nrows; i++)
 	if(sparsemat[i] != NULL)

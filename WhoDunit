@@ -22,30 +22,30 @@ freerels:
 	writes:
 		.rels (this will be part of the final .rels)
 
-sieve:
+sieve (a.k.a. las):
 	reads:
 		.poly
 		.roots
 	writes:
-		.rels.raw
+		.rels
 
-checknorms:
+check_rels:
 	reads:
 		.poly
-		.rels.raw
+		.rels
 	writes:
 		.rels (concatenated with output of freerels)
 
-duplicates:
+dup1 / dup2:
         reads:
                 .rels
         writes:
-                .nodup
+                .nodup/i/*.rels
 
 purge:
 	reads:
 		.poly
-		.nodup
+		.nodup/i/*.rels
 	writes:
 		.purged
 
@@ -53,42 +53,36 @@ merge / replay:
 	reads:
 		.purged
 	writes:
-		.small
+		.small.bin
+		.small.rw.bin
+		.small.cw.bin
 		.index
 		.merge.his (not used thereafter)
 
-linalg || bw/doit.pl:
+linalg (a.k.a. bwc.pl):
 	reads:
-		.small
+		.small.bin
+		.small.rw.bin
+		.small.cw.bin
 	writes:
-		.ker.raw
+		.K.i
 
 characters:
 	reads:
 		.poly
-		.nodup
 		.purged
 		.index
-		.ker.raw
+		.K.i
 	writes:
 		.ker
 
-allsqrt:
+sqrt:
 	reads:
 		.poly
-		.nodup
 		.purged
 		.index
 		.ker
 	writes:
+                .dep.i
 		.dep.rat.i
 		.dep.alg.i
-
-algsqrt:
-	reads:
-		.poly
-		.dep.rat.i 
-		.dep.alg.i
-	writes:
-		.fact.i
-

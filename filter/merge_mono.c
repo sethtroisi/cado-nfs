@@ -12,12 +12,11 @@
 #include <unistd.h>
 
 #include "utils.h"
-#include "files.h"
 
 #include "merge_opts.h"
 #include "sparse.h"
 #include "dclist.h"
-#include "sparse_mat.h"
+#include "filter_matrix.h"
 #include "mst.h"
 #include "report.h"
 
@@ -36,7 +35,7 @@
 
 // not mallocing to speed up(?).
 static int
-findBestIndex(sparse_mat_t *mat, int m, int32_t *ind)
+findBestIndex(filter_matrix_t *mat, int m, int32_t *ind)
 {
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], i, j, imin, wmin, w;
 
@@ -67,7 +66,7 @@ findBestIndex(sparse_mat_t *mat, int m, int32_t *ind)
 #if DEBUG >= 2
 // We should have mat->wt[j] == m == nchk
 static void
-checkCoherence(sparse_mat_t *mat, int m, int j)
+checkCoherence(filter_matrix_t *mat, int m, int j)
 {
     int nchk = 0, k;
 
@@ -97,7 +96,7 @@ checkCoherence(sparse_mat_t *mat, int m, int j)
 //////////////////////////////////////////////////////////////////////
 
 static void
-removeColDefinitely(report_t *rep, sparse_mat_t *mat, int32_t j)
+removeColDefinitely(report_t *rep, filter_matrix_t *mat, int32_t j)
 {
     int32_t k;
 
@@ -120,7 +119,7 @@ removeColDefinitely(report_t *rep, sparse_mat_t *mat, int32_t j)
 }
 
 static void
-removeColumnAndUpdate(sparse_mat_t *mat, int j)
+removeColumnAndUpdate(filter_matrix_t *mat, int j)
 {
 #ifndef USE_MARKOWITZ
     remove_j_from_SWAR(mat, j);
@@ -134,7 +133,7 @@ removeColumnAndUpdate(sparse_mat_t *mat, int j)
 // The cell [i, j] may be incorporated to the data structure, at least
 // if j is not too heavy, etc. 
 static void
-addCellAndUpdate(sparse_mat_t *mat, int i, int32_t j)
+addCellAndUpdate(filter_matrix_t *mat, int i, int32_t j)
 {
 #if TRACE_ROW >= 0
     if(i == TRACE_ROW)
@@ -165,7 +164,7 @@ addCellAndUpdate(sparse_mat_t *mat, int i, int32_t j)
 
 // remove the cell (i,j), and updates matrix correspondingly.
 static void
-removeCellAndUpdate(sparse_mat_t *mat, int i, int32_t j)
+removeCellAndUpdate(filter_matrix_t *mat, int i, int32_t j)
 {
 #if TRACE_ROW >= 0
     if(i == TRACE_ROW){
@@ -190,7 +189,7 @@ removeCellAndUpdate(sparse_mat_t *mat, int i, int32_t j)
 // not from the small matrix.
 #ifndef USE_MARKOWITZ
 static int
-deleteAllColsFromStack(report_t *rep, sparse_mat_t *mat, int iS)
+deleteAllColsFromStack(report_t *rep, filter_matrix_t *mat, int iS)
 {
 #ifdef USE_MARKOWITZ
     fprintf(stderr, "What's the point to have deleteAllColsFromStack?\n");
@@ -238,7 +237,7 @@ deleteAllColsFromStack(report_t *rep, sparse_mat_t *mat, int iS)
 
 // for all j in row[i], removes j and update data
 static void
-removeRowAndUpdate(sparse_mat_t *mat, int i)
+removeRowAndUpdate(filter_matrix_t *mat, int i)
 {
     int k;
 
@@ -260,7 +259,7 @@ removeRowAndUpdate(sparse_mat_t *mat, int i)
 
 // All entries M[i, j] are potentially added to the structure.
 static void
-addOneRowAndUpdate(sparse_mat_t *mat, int i)
+addOneRowAndUpdate(filter_matrix_t *mat, int i)
 {
     int k;
 
@@ -272,7 +271,7 @@ addOneRowAndUpdate(sparse_mat_t *mat, int i)
 // realize mat[i1] += mat[i2] and update the data structure.
 // len could be the real length of row[i1]+row[i2] or -1.
 void
-addRowsAndUpdate(sparse_mat_t *mat, int i1, int i2, int len)
+addRowsAndUpdate(filter_matrix_t *mat, int i1, int i2, int len)
 {
     // cleaner one, that shares addRowsData() to prepare the next move...!
     // i1 is to disappear, replaced by a new one
@@ -283,7 +282,7 @@ addRowsAndUpdate(sparse_mat_t *mat, int i1, int i2, int len)
 }
 
 static int
-removeSingletons(report_t *rep, sparse_mat_t *mat)
+removeSingletons(report_t *rep, filter_matrix_t *mat)
 {
 #ifndef USE_MARKOWITZ
     return deleteAllColsFromStack(rep, mat, 1);
@@ -301,7 +300,7 @@ removeSingletons(report_t *rep, sparse_mat_t *mat)
 }
 
 int
-deleteHeavyColumns(report_t *rep, sparse_mat_t *mat)
+deleteHeavyColumns(report_t *rep, filter_matrix_t *mat)
 {
 #ifndef USE_MARKOWITZ
     return deleteAllColsFromStack(rep, mat, mat->cwmax+1);
@@ -311,7 +310,7 @@ deleteHeavyColumns(report_t *rep, sparse_mat_t *mat)
 }
 
 void
-removeRowDefinitely(report_t *rep, sparse_mat_t *mat, int32_t i)
+removeRowDefinitely(report_t *rep, filter_matrix_t *mat, int32_t i)
 {
     removeRowAndUpdate(mat, i);
     destroyRow(mat, i);
@@ -321,7 +320,7 @@ removeRowDefinitely(report_t *rep, sparse_mat_t *mat, int32_t i)
 
 // try all combinations to find the smaller one; resists to m==1
 static void
-tryAllCombinations(report_t *rep, sparse_mat_t *mat, int m, int32_t *ind)
+tryAllCombinations(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind)
 {
     int i, k;
 
@@ -360,7 +359,7 @@ tryAllCombinations(report_t *rep, sparse_mat_t *mat, int m, int32_t *ind)
 // A[i][j] contains the estimated weight/length of R[ind[i]]+R[ind[j]].
 static int
 addFatherToSonsRec(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
-		   sparse_mat_t *mat, int m, int *ind,
+		   filter_matrix_t *mat, int m, int *ind,
 		   int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX],
 		   int *father,
 		   int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
@@ -402,7 +401,7 @@ addFatherToSonsRec(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 
 int
 addFatherToSons(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
-		sparse_mat_t *mat, int m, int *ind,
+		filter_matrix_t *mat, int m, int *ind,
 		int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX],
 		int *father,
                 int *height MAYBE_UNUSED, int hmax MAYBE_UNUSED,
@@ -412,7 +411,7 @@ addFatherToSons(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 }
 
 void
-MSTWithA(report_t *rep, sparse_mat_t *mat, int m, int32_t *ind, double *tMST,
+MSTWithA(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind, double *tMST,
 	 int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX])
 {
     int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
@@ -437,7 +436,7 @@ MSTWithA(report_t *rep, sparse_mat_t *mat, int m, int32_t *ind, double *tMST,
 }
 
 static void
-useMinimalSpanningTree(report_t *rep, sparse_mat_t *mat, int m,
+useMinimalSpanningTree(report_t *rep, filter_matrix_t *mat, int m,
 		       int32_t *ind, double *tfill, double *tMST)
 {
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
@@ -449,7 +448,7 @@ useMinimalSpanningTree(report_t *rep, sparse_mat_t *mat, int m,
 }
 
 static void
-findOptimalCombination(report_t *rep, sparse_mat_t *mat, int m,
+findOptimalCombination(report_t *rep, filter_matrix_t *mat, int m,
 		       int32_t *ind, double *tfill, double *tMST, int useMST)
 {
     if((m <= 2) || !useMST){
@@ -462,7 +461,7 @@ findOptimalCombination(report_t *rep, sparse_mat_t *mat, int m,
 
 #if DEBUG >= 1
 static void
-checkWeight(sparse_mat_t *mat, int32_t j)
+checkWeight(filter_matrix_t *mat, int32_t j)
 {
     int i, w = 0;
 
@@ -478,7 +477,7 @@ checkWeight(sparse_mat_t *mat, int32_t j)
 }
 
 static void
-checkMatrixWeight(sparse_mat_t *mat)
+checkMatrixWeight(filter_matrix_t *mat)
 {
     unsigned long w = 0;
     int i;
@@ -493,7 +492,7 @@ checkMatrixWeight(sparse_mat_t *mat)
 // j has weight m, which should coherent with mat->wt[j] == m
 static void
 mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
-	       sparse_mat_t *mat, int m, int32_t j, int useMST)
+	       filter_matrix_t *mat, int m, int32_t j, int useMST)
 {
     int32_t ind[MERGE_LEVEL_MAX];
     int ni, k;
@@ -559,7 +558,7 @@ mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
 // an integer >= 1 otherwise.
 // Default for the monoproc version is 0.
 static int
-merge_m_fast(report_t *rep, sparse_mat_t *mat, int m, int maxdo, int verbose)
+merge_m_fast(report_t *rep, filter_matrix_t *mat, int m, int maxdo, int verbose)
 {
     double totopt=0, tot=seconds(), tt, totfill=0, totMST=0, tfill, tMST;
     double totdel = 0;
@@ -623,13 +622,13 @@ merge_m_fast(report_t *rep, sparse_mat_t *mat, int m, int maxdo, int verbose)
 }
 
 static int
-merge_m(report_t *rep, sparse_mat_t *mat, int m, int maxdo, int verbose)
+merge_m(report_t *rep, filter_matrix_t *mat, int m, int maxdo, int verbose)
 {
   return merge_m_fast(rep, mat, m, maxdo, verbose);
 }
 
 static int
-minColWeight(sparse_mat_t *mat)
+minColWeight(filter_matrix_t *mat)
 {
     // in this case, locating minw is easy: inspect the stacks!
     int m;
@@ -643,7 +642,7 @@ minColWeight(sparse_mat_t *mat)
 
 #if !defined(USE_MPI)
 static int
-isRowToBeDeleted(sparse_mat_t *mat, int i)
+isRowToBeDeleted(filter_matrix_t *mat, int i)
 {
     int heavy = 0;
 
@@ -660,7 +659,7 @@ isRowToBeDeleted(sparse_mat_t *mat, int i)
 #endif
 
 static int
-inspectRowWeight(report_t *rep, sparse_mat_t *mat)
+inspectRowWeight(report_t *rep, filter_matrix_t *mat)
 {
     int i, nirem = 0, niremmax = 128;
 #if !defined(USE_MPI)
@@ -714,7 +713,7 @@ inspectRowWeight(report_t *rep, sparse_mat_t *mat)
 // rows of smallest value of sf?
 // For the time being, remove heaviest rows.
 static int
-deleteScore(sparse_mat_t *mat, int32_t i)
+deleteScore(filter_matrix_t *mat, int32_t i)
 {
 #if 1
     // plain weight to remove heaviest rows
@@ -753,7 +752,7 @@ deleteScore(sparse_mat_t *mat, int32_t i)
 
 // locate columns of weight 3 and delete one of the rows, but just one!
 static int
-findSuperfluousRowsFor2(int *tmp, int ntmp, sparse_mat_t *mat)
+findSuperfluousRowsFor2(int *tmp, int ntmp, filter_matrix_t *mat)
 {
 #ifdef USE_MARKOWITZ
 # if DEBUG >= 1
@@ -791,7 +790,7 @@ findSuperfluousRowsFor2(int *tmp, int ntmp, sparse_mat_t *mat)
 
 // this guy is linear => total is quadratic, be careful!
 static int
-findSuperfluousRows(int *tmp, int ntmp, sparse_mat_t *mat, int m)
+findSuperfluousRows(int *tmp, int ntmp, filter_matrix_t *mat, int m)
 {
     int i, itmp;
 
@@ -813,7 +812,7 @@ findSuperfluousRows(int *tmp, int ntmp, sparse_mat_t *mat, int m)
 // Delete superfluous rows s.t. nrows-ncols >= keep.
 // Let's say we are at "step" m.
 static int
-deleteSuperfluousRows(report_t *rep, sparse_mat_t *mat, int keep, int niremmax, int m)
+deleteSuperfluousRows(report_t *rep, filter_matrix_t *mat, int keep, int niremmax, int m)
 {
     int nirem = 0, *tmp, ntmp, i;
 
@@ -840,7 +839,7 @@ deleteSuperfluousRows(report_t *rep, sparse_mat_t *mat, int keep, int niremmax, 
 
 #ifndef USE_MARKOWITZ
 void
-merge(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int forbw)
+merge(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, int forbw)
 {
     unsigned long bwcostmin = 0, oldcost = 0, cost;
     int old_nrows, old_ncols, m, mm, njrem = 0, ncost = 0, ncostmax;
@@ -953,7 +952,7 @@ my_cost(unsigned long N, unsigned long c, int forbw)
 }
 
 static void
-mergeForColumn2(report_t *rep, sparse_mat_t *mat, int *njrem, 
+mergeForColumn2(report_t *rep, filter_matrix_t *mat, int *njrem, 
 		double *totopt, double *totfill, double *totMST, 
 		double *totdel, int useMST, int32_t j)
 {
@@ -970,7 +969,7 @@ mergeForColumn2(report_t *rep, sparse_mat_t *mat, int *njrem,
 
 // njrem is the number of columns removed.
 void
-doOneMerge(report_t *rep, sparse_mat_t *mat, int *njrem, double *totopt, double *totfill, double *totMST, double *totdel, int m, int maxdo, int useMST, int verbose)
+doOneMerge(report_t *rep, filter_matrix_t *mat, int *njrem, double *totopt, double *totfill, double *totMST, double *totdel, int m, int maxdo, int useMST, int verbose)
 {
 #ifdef USE_MARKOWITZ
     fprintf(stderr, "What's the use of doOneMerge for MKZ?\n");
@@ -996,7 +995,7 @@ doOneMerge(report_t *rep, sparse_mat_t *mat, int *njrem, double *totopt, double 
 }
 
 int
-number_of_superfluous_rows(sparse_mat_t *mat)
+number_of_superfluous_rows(filter_matrix_t *mat)
 {
     int kappa = (mat->rem_nrows-mat->rem_ncols) / mat->keep, ni2rem;
     
@@ -1016,7 +1015,7 @@ number_of_superfluous_rows(sparse_mat_t *mat)
 }
 
 int
-deleteEmptyColumns(sparse_mat_t *mat)
+deleteEmptyColumns(filter_matrix_t *mat)
 {
 #ifndef USE_MARKOWITZ
     return deleteEmptyColumnsSWAR(mat);
@@ -1027,7 +1026,7 @@ deleteEmptyColumns(sparse_mat_t *mat)
 }
 
 void
-mergeOneByOne(report_t *rep, sparse_mat_t *mat, int maxlevel, int verbose, int forbw, double ratio, int coverNmax)
+mergeOneByOne(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, int forbw, double ratio, int coverNmax)
 {
     double totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;
     uint64_t bwcostmin = 0, oldbwcost = 0, bwcost = 0;
@@ -1243,7 +1242,7 @@ indicesFromString(int32_t *ind, char *str)
 //     row[-i-1] is to be added to rows i1...ik and NOT destroyed.
 //
 static void
-doAllAdds(report_t *rep, sparse_mat_t *mat, char *str)
+doAllAdds(report_t *rep, filter_matrix_t *mat, char *str)
 {
     int32_t ind[MERGE_LEVEL_MAX], i0;
     int ni, sg, k;
@@ -1275,10 +1274,10 @@ doAllAdds(report_t *rep, sparse_mat_t *mat, char *str)
 // resumename is a file of the type mergehis.
 // TODO: Compiles, but not really tested with Markowitz...!
 void
-resume(report_t *rep, sparse_mat_t *mat, char *resumename)
+resume(report_t *rep, filter_matrix_t *mat, char *resumename)
 {
     FILE *resumefile = fopen(resumename, "r");
-    char str[STR_LEN_MAX];
+    char str[RELATION_MAX_BYTES];
     unsigned long addread = 0;
     int nactivej;
     int32_t j;
@@ -1286,11 +1285,11 @@ resume(report_t *rep, sparse_mat_t *mat, char *resumename)
 
     fprintf(stderr, "Resuming computations from %s\n", resumename);
     // skip first line containing nrows ncols
-    rp = fgets(str, STR_LEN_MAX, resumefile);
+    rp = fgets(str, RELATION_MAX_BYTES, resumefile);
     ASSERT_ALWAYS(rp);
 
     fprintf(stderr, "Reading row additions\n");
-    while(fgets(str, STR_LEN_MAX, resumefile)){
+    while(fgets(str, RELATION_MAX_BYTES, resumefile)){
 	addread++;
 	if((addread % 100000) == 0)
 	    fprintf(stderr, "%lu lines read at %2.2lf\n", addread, seconds());

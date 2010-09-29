@@ -1284,7 +1284,6 @@ void level1_mul_tests_64()
     l1_data_clear(D);
 }
 
-
 int main()
 {
   unsigned int n = 2 * 1000 * 1000;

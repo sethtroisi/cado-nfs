@@ -1256,7 +1256,9 @@ my %tasks = (
                               'ratio', 'bwstrat'],
                    files  => ['merge\.his', 'merge\.stderr'] },
 
-    replay    => { dep    => ['merge'],
+    # replay shouldn't appear as a step in its own right. It's a bug.
+    replay    => { name   => "replay",
+                   dep    => ['merge'],
                    files  => ['index', 'small.bin', 'replay\.stderr'],
                    param  => ['skip'], },
 
@@ -1269,12 +1271,9 @@ my %tasks = (
                    files  => ['bwc', 'bwc\.stderr', 'bl', 'bl\.stderr',
 							  'W\d+'] },
 
-    bitstr    => { dep    => ['linalg'],
-                   files  => ['ker_raw', 'mkbitstrings\.stderr'] },
-
     chars     => { name   => "characters",
-                   dep    => ['bitstr'],
-                   param  => ['skip', 'nchar'],
+                   dep    => ['linalg'],
+                   param  => ['nchar'],
                    files  => ['ker', 'characters\.stderr'] },
 
     sqrt	  => { name	  => "square root",
@@ -2112,6 +2111,8 @@ sub do_sieve {
 		
         info "Nrows: $nrows; Ncols: $ncols; Excess: $excess.\n";
         $tab_level--;
+        # note: the nodup.gz file is no longer used now.
+        # Thus we may spare the hassle of creating it.
         info "Join all no duplicate files into one file...";
         cmd("cat $param{'prefix'}.purgefiles | xargs zcat ".
             "| gzip --best > $param{'prefix'}.nodup.gz ",
@@ -2425,51 +2426,11 @@ sub do_linalg {
                 append_output=>1,
                 stdout_stderr=>"$param{'prefix'}.bwc.stderr" });
 
-        opendir D, "$param{'prefix'}.bwc";
-        for my $f (grep { /^K\.\d+$/ } readdir D) {
-            $f =~ /^K\.(\d+)$/;
-            my  $j=$1;
-            # TODO: remove dependency on xxd, it's stupid.
-            $cmd = "xxd -c 8 -ps $param{'prefix'}.bwc/$f > $param{'prefix'}.W$j";
-            cmd($cmd, { log => 1, kill => 1 });
-        }
-        # $cmd = "xxd -c 8 -ps $param{'prefix'}.bwc/W > $param{'prefix'}.W";
-        closedir D;
     } elsif ($param{'linalg'} eq "bl") {
         die "No longer supported";
     } else {
         die "Value `$param{'linalg'}' is unknown for parameter `linalg'\n";
     }
-
-    $tab_level--;
-}
-
-
-
-###############################################################################
-# Conversion to CADO format ###################################################
-###############################################################################
-
-my $nker;
-
-sub do_bitstr {
-    info "Converting dependencies to CADO format...\n";
-    $tab_level++;
-
-    unlink "$param{'prefix'}.ker_raw";
-    opendir D, $param{'wdir'};
-    for my $f (grep { /^$param{'name'}\.W\d+$/ } readdir D) {
-        my $cmd = "$param{'bindir'}/linalg/mkbitstrings ".
-                  "$param{'wdir'}/$f ".
-                  ">> $param{'prefix'}.ker_raw ";
-        cmd($cmd, { log => 1, kill => 1,
-                append_output=>1,
-                stderr=>"$param{'prefix'}.mkbitstrings.stderr" });
-    }
-    closedir D;
-
-    $nker = count_lines("$param{'prefix'}.ker_raw");
-    info "Kernel within space of dimension at most $nker.\n";
 
     $tab_level--;
 }
@@ -2486,19 +2447,21 @@ sub do_chars {
     info "Adding characters...\n";
     $tab_level++;
 
-    $nker = count_lines("$param{'prefix'}.ker_raw") unless defined $nker;
-
     my $cmd = "$param{'bindir'}/linalg/characters ".
               "-poly $param{'prefix'}.poly ".
               "-purged $param{'prefix'}.purged ".
-              "-ker $param{'prefix'}.ker_raw ".
               "-index $param{'prefix'}.index ".
-              "-rel $param{'prefix'}.nodup.gz ".
-              "-small $param{'prefix'}.small.dense.bin ".
-              "-nker $nker ".
-              "-skip $param{'skip'} ".
+              "-heavyblock $param{'prefix'}.small.dense.bin ".
               "-nchar $param{'nchar'} ".
               "-out $param{'prefix'}.ker ";
+
+    opendir BWC, "$param{'prefix'}.bwc";
+    my @kers = grep { /^K.\d+$/ } readdir BWC;
+    closedir BWC;
+    if (!scalar @kers) {
+        die "No kernel files out of bwc ???";
+    }
+    $cmd .= " $param{'prefix'}.bwc/$_" foreach @kers;
 
     cmd($cmd, { log => 1, kill => 1,
             stderr=>"$param{'prefix'}.characters.stderr" });
@@ -2547,8 +2510,8 @@ sub do_sqrt {
         $tab_level++;
         my $cmd = "$param{'bindir'}/sqrt/sqrt ".
             "-poly $param{'prefix'}.poly ".
-            "-dep $param{'prefix'}.dep $numdep ".
-            "-rel $param{'prefix'}.nodup.gz ".
+            "-prefix $param{'prefix'}.dep " .
+            "-dep $numdep " .
             "-purged $param{'prefix'}.purged ".
             "-index $param{'prefix'}.index ".
             "-ker $param{'prefix'}.ker ".

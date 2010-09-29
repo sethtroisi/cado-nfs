@@ -100,46 +100,26 @@ findFreeRelations(hashtable_t *H, cado_poly pol, int nprimes)
     return nfree;
 }
 
-int
-scan_relations(FILE *file, int *nprimes_alg, hashtable_t *H, int verbose)
-{
-    relation_t rel;
-    unsigned int h;
-    int ret, irel = -1, j;
+/* On largeFreeRelations:
+ *
+commit 7cb6c0e177ed7ba86c1768942bfb42f2e575522e
+Author: morain <morain@de4796e2-0b1e-0410-91b4-86bc23549317>
+Date:   Tue Feb 12 12:41:46 2008 +0000
+
+    * Cleaned purge.c
+    * added a new option to freerel to look for (small and large) free relations
+    by inspection of all the relations found. Quite experimental at the time
+    being. Do not use it.
     
-    while(1){
-	ret = fread_relation (file, &rel);
-	if(ret != 1)
-	    break;
-	irel += 1;
-	if (verbose && !(irel % 100000))
-	    fprintf (stderr, "nrel = %d at %2.2lf\n", irel, seconds());
-	// ignore already found free relations...
-	if(rel.b == 0){
-	    fprintf(stderr, "Ignoring already found free relation...\n");
-	}
-	else{
-	    reduce_exponents_mod2(&rel);
-	    computeroots(&rel);
-	    for(j = 0; j < rel.nb_ap; j++){
-		h = hashInsert(H, rel.ap[j].p, rel.ap[j].r);
-		if(H->hashcount[h] == 1){
-		    // new prime
-		    *nprimes_alg += 1;
-		}
-	    }
-	}
-	clear_relation(&rel);
-    }
-    return ret;
-}
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/cado/trunk@801 de4796e2-0b1e-0
+ */
 
 void
-largeFreeRelations (cado_poly pol, char **fic, int nfic, int verbose)
+largeFreeRelations (cado_poly pol, char **fic, int verbose)
 {
-    FILE *file;
     hashtable_t H;
-    int Hsizea, nprimes_alg = 0, nfree = 0, i;
+    int Hsizea, nprimes_alg = 0, nfree = 0;
     int need64 = (pol->lpbr > 32) || (pol->lpba > 32);
 
     ASSERT(fic != NULL);
@@ -151,20 +131,41 @@ largeFreeRelations (cado_poly pol, char **fic, int nfic, int verbose)
     hashInit (&H, Hsizea, verbose, need64);
     if (verbose)
       fprintf (stderr, "Scanning relations\n");
-    for(i = 0; i < nfic; i++){
-      if (verbose)
-	fprintf (stderr, "Adding file %s\n", fic[i]);
-      file = fopen(fic[i], "r");
-      scan_relations (file, &nprimes_alg, &H, verbose);
-      fclose(file);
-      if (verbose)
-        hashCheck (&H);
+
+    relation_stream rs;
+    relation_stream_init(rs);
+    // rs->sort_primes = 1;
+    // rs->reduce_mod2 = 1;
+    for( ; *fic ; fic++) {
+        relation_stream_openfile(rs, *fic);
+        if (verbose)
+            fprintf (stderr, "Adding file %s\n", *fic);
+        for( ; relation_stream_get(rs, NULL) >= 0 ; ) {
+            if (rs->rel.b == 0) {
+                fprintf(stderr, "Ignoring already found free relation...\n");
+                continue;
+            }
+            relation_compress_rat_primes(&rs->rel);
+            relation_compress_alg_primes(&rs->rel);
+            reduce_exponents_mod2(&rs->rel);
+            computeroots(&rs->rel);
+            for(int j = 0; j < rs->rel.nb_ap; j++){
+                int h = hashInsert(&H, rs->rel.ap[j].p, rs->rel.ap[j].r);
+                nprimes_alg += (H.hashcount[h] == 1); // new prime
+            }
+        }
+        relation_stream_closefile(rs);
+        if (verbose)
+            hashCheck (&H);
     }
+    relation_stream_clear(rs);
+
     if (verbose)
       fprintf (stderr, "nprimes_alg = %d\n", nprimes_alg);
     nfree = findFreeRelations(&H, pol, nprimes_alg);
     if (verbose)
       fprintf (stderr, "Found %d usable free relations\n", nfree);
+    hashFree(&H);
 }
 
 int
@@ -309,7 +310,7 @@ main(int argc, char *argv[])
     if (nfic == 0)
 	smallFreeRelations(fbfilename);
     else
-      largeFreeRelations(cpoly, fic, nfic, verbose);
+      largeFreeRelations(cpoly, fic, verbose);
 
     cado_poly_clear (cpoly);
 

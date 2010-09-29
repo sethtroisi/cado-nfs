@@ -33,7 +33,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "utils.h" /* for gzip_open */
 
 #include "merge_opts.h" /* for USE_MARKOWITZ */
-#include "sparse_mat.h" /* for sparse_mat_t */
+#include "filter_matrix.h" /* for filter_matrix_t */
 #include "report.h"     /* for report_t */
 #ifndef USE_MARKOWITZ
 # include "swar.h"      /* for initSWAR */
@@ -86,12 +86,10 @@ usage (void)
 int
 main (int argc, char *argv[])
 {
-    FILE *purgedfile;
-    sparse_mat_t mat[1];
+    filter_matrix_t mat[1];
     report_t rep[1];
     char *purgedname = NULL, *outname = NULL;
     char *resumename = NULL;
-    int nrows, ncols;
     int cwmax = CWMAX_DEFAULT, rwmax = RWMAX_DEFAULT;
     int maxlevel = MAXLEVEL_DEFAULT, keep = KEEP_DEFAULT;
     int verbose = 0; /* default verbose level */
@@ -200,16 +198,13 @@ main (int argc, char *argv[])
 	else
 	  usage ();
     }
-    purgedfile = gzip_open (purgedname, "r");
-    ASSERT_ALWAYS (purgedfile != NULL);
-    int rc;
 
-    rc = fscanf (purgedfile, "%d %d\n", &nrows, &ncols);
-    ASSERT_ALWAYS(rc == 2);
+    purgedfile_stream ps;
+    purgedfile_stream_init(ps);
+    purgedfile_stream_openfile(ps, purgedname);
 
-
-    mat->nrows = nrows;
-    mat->ncols = ncols;
+    mat->nrows = ps->nrows;
+    mat->ncols = ps->ncols;
     mat->keep  = keep;
     mat->cwmax = cwmax;
     mat->rwmax = rwmax;
@@ -223,12 +218,12 @@ main (int argc, char *argv[])
     MPI_Finalize();
     return 0;
 #endif    
-    initMat (mat, 0, ncols);
+    initMat (mat, 0, ps->ncols);
 
     tt = seconds ();
-    initWeightFromFile (mat, purgedfile, 1);
+    filter_matrix_read_weights (mat, ps);
     fprintf (stderr, "Getting column weights took %2.2lf\n", seconds () - tt);
-    gzip_close (purgedfile, purgedname);
+    purgedfile_stream_rewind(ps);
 
     /* print weight counts */
     {
@@ -257,14 +252,9 @@ main (int argc, char *argv[])
 #endif
     fillmat (mat);
     
-    tt = seconds ();
-    purgedfile = gzip_open (purgedname, "r");
-    ASSERT_ALWAYS (purgedfile != NULL);
-    /* the first 1 means we ignore the 1st entry of each purged line;
-       the second 1 is to bury heavy columns (0 considers all columns) */
-    readmat (mat, purgedfile, 1, 1, verbose);
-    gzip_close (purgedfile, purgedname);
-    fprintf (stderr, "Time for readmat: %2.2lf\n", seconds () - tt);
+    tt = wct_seconds ();
+    filter_matrix_read (mat, ps, verbose);
+    fprintf (stderr, "Time for filter_matrix_read: %2.2lf\n", wct_seconds () - tt);
 
     /* initialize rep, i.e., mostly opens outname */
     init_rep (rep, outname, mat, 0, MERGE_LEVEL_MAX);

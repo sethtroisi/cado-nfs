@@ -30,7 +30,7 @@ struct vec_uint_struct {
 
 typedef struct vec_uint_struct vec_uint_t[1];
 
-sparse_mat_t mat;
+filter_matrix_t mat;
 vec_uint_t * transposed;
 
 unsigned int vec_next_size(unsigned int x)
@@ -254,7 +254,7 @@ int main(int argc, char * argv[])
     fin = fopen(filename_in, "r");
     ASSERT_ALWAYS(fin);
 
-    sparse_mat_init(mat);
+    filter_matrix_init(mat);
 
     read_matrix_header(fin, mat);
 

@@ -12,12 +12,11 @@
 #include <unistd.h>
 
 #include "utils.h"
-#include "files.h"
 #include "gzip.h"
 
 #include "merge_opts.h"
 #include "sparse.h"
-#include "sparse_mat.h"
+#include "filter_matrix.h"
 #include "report.h"
 
 # include "swar.h"
@@ -165,7 +164,7 @@ mpi_kill_slaves()
 }
 
 void
-mpi_check_rows(sparse_mat_t *mat, int32_t i, int32_t *tab, int ntab)
+mpi_check_rows(filter_matrix_t *mat, int32_t i, int32_t *tab, int ntab)
 {
     int k1, k2;
 #if DEBUG >= 1
@@ -216,7 +215,7 @@ mpi_check_rows(sparse_mat_t *mat, int32_t i, int32_t *tab, int ntab)
 
 #if 0 // useful???
 void
-mpi_load_rows_for_j(sparse_mat_t *mat, int m, int32_t j)
+mpi_load_rows_for_j(filter_matrix_t *mat, int m, int32_t j)
 {
     MPI_Status status;
     unsigned int buf[MPI_BUF_SIZE];
@@ -333,7 +332,7 @@ mpi_send_inactive_rows(int i)
 }
 
 int
-mpi_get_number_of_active_colums(sparse_mat_t *mat)
+mpi_get_number_of_active_colums(filter_matrix_t *mat)
 {
     int32_t j;
     int nb = 0;
@@ -344,7 +343,7 @@ mpi_get_number_of_active_colums(sparse_mat_t *mat)
 }
 
 void
-mpi_inactivate_rows(report_t *rep, sparse_mat_t *mat, unsigned int *tab, int ntab)
+mpi_inactivate_rows(report_t *rep, filter_matrix_t *mat, unsigned int *tab, int ntab)
 {
     int k, i;
 
@@ -390,7 +389,7 @@ mpi_broadcast_history(report_t *rep, int mpi_rank)
 
 // buf = [index, m, ...] and surely, we have m > 2.
 void
-mpi_MST(report_t *rep, sparse_mat_t *mat, int *njrem, unsigned int *buf)
+mpi_MST(report_t *rep, filter_matrix_t *mat, int *njrem, unsigned int *buf)
 {
 #if FULL_MONTY
     MPI_Status status;
@@ -474,7 +473,7 @@ mpi_MST(report_t *rep, sparse_mat_t *mat, int *njrem, unsigned int *buf)
 // *njdel is the number of columns deleted, not counting the obvious one, yet.
 // *dw is the "loss" of weight in the whole matrix.
 void
-mpi_doOneMerge(report_t *rep, sparse_mat_t *mat, int *njdel, int *dw, unsigned int *buf, int mpi_rank)
+mpi_doOneMerge(report_t *rep, filter_matrix_t *mat, int *njdel, int *dw, unsigned int *buf, int mpi_rank)
 {
     MPI_Status status;
     double totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;
@@ -592,7 +591,7 @@ mpi_doOneMerge(report_t *rep, sparse_mat_t *mat, int *njdel, int *dw, unsigned i
 // in such a way that w(new_i1) = w(i1) + dw(i1), etc.
 // Of course, dw can be < 0 also.
 int
-mpi_replay_history(report_t *rep, sparse_mat_t *mat, unsigned int *send_buf, unsigned int *buf, int cnt)
+mpi_replay_history(report_t *rep, filter_matrix_t *mat, unsigned int *send_buf, unsigned int *buf, int cnt)
 {
     int r = 0, ind, k, kmax, i, i0, isb = 0, sgi0;
 
@@ -686,7 +685,7 @@ mpi_replay_history(report_t *rep, sparse_mat_t *mat, unsigned int *send_buf, uns
 // submaster. A priori, we will be sending A[r][s] for r < s only, so that
 // we can gain on the communication load.
 int
-mpi_mst_share(unsigned int *send_buf, sparse_mat_t *mat, unsigned int *buf)
+mpi_mst_share(unsigned int *send_buf, filter_matrix_t *mat, unsigned int *buf)
 {
     int32_t ind[MERGE_LEVEL_MAX];
     int m = (int)buf[1], r, s, A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], ibuf;
@@ -704,7 +703,7 @@ mpi_mst_share(unsigned int *send_buf, sparse_mat_t *mat, unsigned int *buf)
 }
 
 void
-mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char *purgedname, char *resumename)
+mpi_slave(report_t *rep, int mpi_rank, filter_matrix_t *mat, FILE *purgedfile, char *purgedname, char *resumename)
 {
     double totwait = 0.0, tt, wctstart = MPI_Wtime();
     unsigned int buf[MPI_BUF_SIZE];
@@ -841,7 +840,7 @@ mpi_slave(report_t *rep, int mpi_rank, sparse_mat_t *mat, FILE *purgedfile, char
 }
 
 void
-mpi_start_slaves(int mpi_size, sparse_mat_t *mat)
+mpi_start_slaves(int mpi_size, filter_matrix_t *mat)
 {
     MPI_Status status;
     double wctstart = MPI_Wtime();
@@ -945,7 +944,7 @@ mpi_get_minimal_m_proc(int *m, int *proc, int mpi_size, unsigned int index, int 
 }
 
 void
-mpi_feed(int *row_weight, sparse_mat_t *mat, FILE *purgedfile)
+mpi_feed(int *row_weight, filter_matrix_t *mat, FILE *purgedfile)
 {
     int i, j, nc, ret, x;
 
@@ -963,7 +962,7 @@ mpi_feed(int *row_weight, sparse_mat_t *mat, FILE *purgedfile)
 }
 
 void
-mpi_delete_superfluous_rows(report_t *rep, sparse_mat_t *mat, int *row_weight, int mpi_size)
+mpi_delete_superfluous_rows(report_t *rep, filter_matrix_t *mat, int *row_weight, int mpi_size)
 {
     MPI_Status status;
     unsigned int send_buf[MPI_BUF_SIZE];
@@ -1028,7 +1027,7 @@ mpi_delete_superfluous_rows(report_t *rep, sparse_mat_t *mat, int *row_weight, i
 // TODO: when debugged, transfer this to merge_mono.c
 //
 int
-stop_merge(sparse_mat_t *mat, int forbw, double ratio, int coverNmax, int m)
+stop_merge(filter_matrix_t *mat, int forbw, double ratio, int coverNmax, int m)
 {
     if(m > mat->mergelevelmax){
 	// a stopping criterion whatever forbw is...!
@@ -1066,7 +1065,7 @@ stop_merge(sparse_mat_t *mat, int forbw, double ratio, int coverNmax, int m)
 // actually, mat is rather empty, since it does not use too much fancy things.
 // So we just need to init the row weights.
 void
-mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile, int forbw, double ratio, int coverNmax, int first)
+mpi_master(report_t *rep, filter_matrix_t *mat, int mpi_size, FILE *purgedfile, int forbw, double ratio, int coverNmax, int first)
 {
     MPI_Status status;
     double totwait = 0.0, tt, wctstart = MPI_Wtime();
@@ -1249,7 +1248,7 @@ mpi_master(report_t *rep, sparse_mat_t *mat, int mpi_size, FILE *purgedfile, int
 }
 
 void
-mpi_start_proc(char *outname, sparse_mat_t *mat, FILE *purgedfile, char *purgedname, int forbw, double ratio, int coverNmax, char *resumename)
+mpi_start_proc(char *outname, filter_matrix_t *mat, FILE *purgedfile, char *purgedname, int forbw, double ratio, int coverNmax, char *resumename)
 {
     report_t rep;
     char *str;

@@ -20,11 +20,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
 #include "utils.h"
-#include "files.h"
 #include "gzip.h"
 #include "sparse.h"
 #include "dclist.h"
-#include "sparse_mat.h"
+#include "filter_matrix.h"
 #include "report.h"
 
 /* initialize the rep data structure
@@ -33,7 +32,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
    type = 2 does nothing
 */
 void
-init_rep (report_t *rep, char *outname, sparse_mat_t *mat, int type,
+init_rep (report_t *rep, char *outname, filter_matrix_t *mat, int type,
 	  int bufsize)
 {
     int32_t** tmp, i;

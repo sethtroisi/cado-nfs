@@ -1,6 +1,6 @@
 /* dup2: 2nd pass
 
-   Usage: dup2 [-out <dir>] [-rm] [-bz] [-filelist <fl>] -K <K> file1 ... filen
+   Usage: dup2 [-out <dir>] [-rm] [-filelist <fl>] -K <K> file1 ... filen
 
    Puts non-duplicate files (among file1 ... filen only) into:
    <dir>/file1 ... <dir>/filen
@@ -13,8 +13,8 @@
    If -rm is given, the input files are removed after having been treated.
    This is also the case if -out . is given. 
 
-   By default, the output will be gzipped, but if -bz is passed, then bzip2
-   is used.
+   By default, the output will be bzipped/gzipped according to the status
+   of the input file.
 
    Allocates a hash-table of 2^k 32-bit entries.
 
@@ -35,16 +35,15 @@
 #include <unistd.h>     // for unlink
 #include <inttypes.h>
 #include <ctype.h>  // for isspace
+#include "cado.h"
+#include "utils.h"
+#include "relation.h"
 
 #include "macros.h"
 
 #define CA 271828182845904523UL
 #define CB 577215664901532889UL
 
-#define LINE_SIZE 512
-#define COMMAND_SIZE 1024
-
-unsigned long rread = 0;
 unsigned long dupl = 0;
 unsigned long nodu = 0;
 double cost = 0.0;
@@ -58,250 +57,235 @@ unsigned long sanity_checked = 0;
 unsigned long sanity_collisions = 0;
 /* end sanity check */
 
-int bz = 0;
 int rm = 0;
-
-int is_gzip (const char * s) {
-    unsigned int l = strlen (s);
-    return l >= 3 && strcmp (s + l - 3, ".gz") == 0;
-}
-
-int is_bzip2 (const char * s) {
-    unsigned int l = strlen (s);
-    return l >= 4 && strcmp (s + l - 4, ".bz2") == 0;
-}
-
-
-char * gz2bz(const char * s)
-{
-    unsigned int l = strlen (s);
-    char *ns = malloc(l+2); // 1 for additional char and 1 for \0
-    strcpy(ns, s);
-    strcpy(ns+l-3, ".bz2");
-    return ns;
-}
-
-char * bz2gz(const char * s)
-{
-    unsigned int l = strlen (s);
-    char *ns = strdup(s);
-    strcpy(ns+l-4, ".gz");
-    return ns;
-}
-
 
 /* infile is the input file
    if dirname is NULL, no output is done */
-void
-remove_dup (char *infile, char *dirname, uint32_t *H, unsigned long K)
+unsigned long
+remove_dup_in_files (char ** files, const char *dirname, const char * outfmt, uint32_t * H, unsigned long K)
 {
-  char line[LINE_SIZE];
-  int64_t a;
-  uint64_t b;
-  uint64_t h;
-  uint32_t i, j;
-  int ret;
-  FILE *f, *ofile = NULL;
-  char command[COMMAND_SIZE];
-  static double factor = 1.0;
-  char *outfile = NULL;
-  static int filenb=1;
-  double full_table;
+    FILE * f_in;
+    int p_in;
+    const char * suffix_in;
+    FILE * f_out;
+    int p_out;
+    const char * suffix_out;
 
-  fprintf (stderr, "Reading %d-th file: %s\n", filenb++, infile);
-  if (is_gzip(infile))
-      snprintf (command, COMMAND_SIZE, "gzip -dc %s", infile);
-  else if (is_bzip2(infile))
-      snprintf (command, COMMAND_SIZE, "bzip2 -dc %s", infile);
-  else {
-      fprintf(stderr, "Sorry, don't understand format of %s\n", infile);
-      fprintf(stderr, "Let's skip it\n");
-      return;
-  }
-  f = popen (command, "r");
-  if (dirname != NULL) {
-      if (bz) {
-          if (is_gzip(infile))
-              outfile = gz2bz(infile);
-          else
-              outfile = strdup(infile);
-          snprintf(command, COMMAND_SIZE, "bzip2 -c --fast > %s/%s.part",
-                  dirname, basename(outfile));
-      } else {
-          if (is_gzip(infile))
-              outfile = strdup(infile);
-          else
-              outfile = bz2gz(infile);
-          snprintf(command, COMMAND_SIZE, "gzip -c --best > %s/%s.part",
-                  dirname, basename(outfile));
-      }
-      ofile = popen (command, "w");
-  }
+    relation_stream rs;
+    relation_stream_init(rs);
 
-  for (;;)
-    {
-      if (rread % 1000000 == 0)
-        fprintf (stderr, "Read %lu relations, %lu duplicates (%1.2f%%)\r",
-                 rread, dupl, 100.0 * (double) dupl / (double) rread);
-      
-      if (fgets (line, LINE_SIZE, f) == NULL)
-        break; /* end of file */
+    rs->parse_only_ab = 1;
 
+    for( ; *files ; files++) {
+        const char * name = *files;
 
-      ret = sscanf (line, "%ld,%lu", (int64_t *) &a,
-                    (uint64_t *) &b);
-      if (UNLIKELY(ret != 2))
-        {
-          fprintf (stderr, "Error, could not parse line\n");
-          exit (1);
+        f_in = fopen_compressed_r(name, &p_in, &suffix_in);
+        ASSERT_ALWAYS(f_in != NULL);
+
+        suffix_out = outfmt ? outfmt : suffix_in;
+        char * newname = strdup(name);
+        ASSERT_ALWAYS(strlen(suffix_in) <= strlen(newname));
+        newname[strlen(newname)-strlen(suffix_in)]='\0';
+        int only_ab = has_suffix(newname, ".ab");
+        char * oname = NULL;
+        char * oname_tmp = NULL;
+        if (dirname) {
+            int rc;
+            rc = asprintf(&oname_tmp, "%s/pre-%s%s", dirname, path_basename(newname), suffix_out);
+            ASSERT_ALWAYS(rc >= 0);
+            rc = asprintf(&oname, "%s/%s%s", dirname, path_basename(newname), suffix_out);
+            ASSERT_ALWAYS(rc >= 0);
+
+            f_out = fopen_compressed_w(oname_tmp, &p_out, NULL);
+            ASSERT_ALWAYS(f_out != NULL);
+        } else {
+            f_out = NULL;
         }
+        free(newname);
 
-      rread ++;
+        relation_stream_bind(rs, f_in);
 
-      h = CA * (uint64_t) a + CB * b;
-      /* dup1 uses the high 5 bits of h to identify the slices 
-         but now we use a different hash function, so we can keep these
-         5 bits
-         */
-      i = h % K;
-      j = (uint32_t) (h >> 32);
-      /* Note: in the case where K > 2^32, i and j share some bits.
-       * The high bits of i are in j. These bits correspond therefore to
-       * far away positions in the tables, and keeping them in j can only
-       * help.
-       * FIXME:
-       * TODO: that's wrong!!! it would be better do take i from high
-       * bits instead!
-       */
-      while (H[i] != 0 && H[i] != j)
-        {
-          i ++;
-          if (UNLIKELY(i == K))
-            i = 0;
-          cost ++;
-        }
-      if (H[i] == j)
-        {
-          dupl ++;
-          continue; /* probably duplicate */
-        }
+        uint64_t h;
+        uint32_t i, j;
+        static double factor = 1.0;
+        double full_table;
 
-      if (i < sanity_size)
-        {
-          sanity_checked ++;
-          if (sanity_a[i] == 0)
-            {
-              sanity_a[i] = a;
-              sanity_b[i] = b;
+        for (;;) {
+            char line[RELATION_MAX_BYTES];
+            struct {
+                int64_t a;
+                uint64_t b;
+                size_t pos;
+            } desc;
+
+            if (only_ab) {
+                int readbytes = fread(&desc, sizeof(desc), 1, f_in);
+                if (readbytes == 0)
+                    break;
+                rs->pos += readbytes * sizeof(desc);
+                rs->nrels++;
+                rs->rel.a = desc.a;
+                rs->rel.b = desc.b;
+            } else {
+                if (relation_stream_get(rs, line) < 0)
+                    break;
             }
-          else if (sanity_a[i] != a)
-            {
-              sanity_collisions ++;
-              fprintf (stderr, "Collision between (%" PRId64 ",%" PRIu64 ") and (%" PRId64 ",%" PRIu64 ")\n",
-                       sanity_a[i], sanity_b[i], a, b);
+
+            h = CA * (uint64_t) rs->rel.a + CB * rs->rel.b;
+            /* dup1 uses the high 5 bits of h to identify the slices 
+               but now we use a different hash function, so we can keep these
+               5 bits
+               */
+            i = h % K;
+            j = (uint32_t) (h >> 32);
+            /* Note: in the case where K > 2^32, i and j share some bits.
+             * The high bits of i are in j. These bits correspond therefore to
+             * far away positions in the tables, and keeping them in j can only
+             * help.
+             * FIXME:
+             * TODO: that's wrong!!! it would be better do take i from high
+             * bits instead!
+             */
+            while (H[i] != 0 && H[i] != j) {
+                i++;
+                if (UNLIKELY(i == K))
+                    i = 0;
+                cost++;
+            }
+            if (H[i] == j) {
+                dupl++;
+                continue;		/* probably duplicate */
+            }
+
+            if (i < sanity_size) {
+                sanity_checked++;
+                if (sanity_a[i] == 0) {
+                    sanity_a[i] = rs->rel.a;
+                    sanity_b[i] = rs->rel.b;
+                } else if (sanity_a[i] != rs->rel.a) {
+                    sanity_collisions++;
+                    fprintf(stderr,
+                            "Collision between (%" PRId64 ",%" PRIu64 ") and (%"
+                            PRId64 ",%" PRIu64 ")\n", sanity_a[i], sanity_b[i], rs->rel.a,
+                            rs->rel.b);
+                }
+            }
+
+            nodu++;
+            if (cost >= factor * (double) rs->nrels) {
+                full_table = 100.0 * (double) nodu / (double) K;
+                fprintf(stderr, "Warning, hash table is %1.0f%% full\n",
+                        full_table);
+                if (full_table >= 99) {
+                    fprintf(stderr, "Error, hash table is full\n");
+                    exit(1);
+                }
+                factor += 1.0;
+            }
+            /* now H[i] = 0 */
+            H[i] = j;
+            if (f_out) {
+                if (only_ab) {
+                    fwrite(&desc, sizeof(desc), 1, f_out);
+                } else {
+                    fputs(line, f_out);
+                }
+            }
+
+            if (relation_stream_disp_progress_now_p(rs)) {
+                fprintf(stderr,
+                        "Read %d relations, %lu duplicates (%1.2f%%)"
+                        " in %.1f s -- %.1f MB/s, %.1f rels/s\n",
+                        rs->nrels, dupl, 100.0 * (double) dupl / (double) rs->nrels,
+                        rs->dt, rs->mb_s, rs->rels_s);
             }
         }
+        relation_stream_unbind(rs);
+        if (p_out) pclose(f_out); else fclose(f_out);
+        if (p_in) pclose(f_in); else fclose(f_in);
 
-      nodu ++;
-      if (cost >= factor * (double) rread)
-        {
-		  full_table = 100.0 * (double) nodu / (double) K;
-          fprintf (stderr, "Warning, hash table is %1.0f%% full\n", full_table);
-		  if (full_table >= 99) {
-			fprintf(stderr, "Error, hash table is full\n");
-			exit(1);
-		  }
-          factor += 1.0;
+
+        if (dirname) {
+            if (rm || (strcmp(dirname, ".") == 0)) {
+                fprintf(stderr, "Removing old file %s\n", name);
+                int ret = unlink(name);
+                if (ret) {
+                    perror("Problem removing file");
+                    fprintf(stderr, "Let's hope that it's ok to continue!\n");
+                }
+            }
+            fprintf(stderr, "%s/{%s => %s}\n",
+                    dirname, path_basename(oname_tmp), path_basename(oname));
+            int ret = rename(oname_tmp, oname);
+            if (ret) {
+                perror("Problem renaming result file");
+                fprintf(stderr, "Let's hope that it's ok to continue!\n");
+            }
+            free(oname);
+            free(oname_tmp);
         }
-      /* now H[i] = 0 */
-      H[i] = j;
-      if (dirname != NULL)
-          fprintf (ofile, "%s", line);
     }
-  pclose (f);
-  fprintf (stderr, "Read %lu relations, %lu duplicates (%1.2f%%)\n",
-                 rread, dupl, 100.0 * (double) dupl / (double) rread);
-  if (dirname != NULL) {
-      pclose (ofile);
-      if (rm || (strcmp(dirname, ".") == 0)) {
-          fprintf (stderr, "Removing old file %s\n", infile);
-          int ret = unlink(infile);
-          if (ret) {
-              perror("Problem removing file");
-              fprintf(stderr, "Let's hope that it's ok to continue!\n");
-          }
-      }
-      char * s1, * s2;
-      ret = asprintf(&s1, "%s/%s.part", dirname, basename(outfile));
-      ASSERT_ALWAYS(ret >= 0);
-      ret = asprintf(&s2, "%s/%s", dirname, basename(outfile));
-      ASSERT_ALWAYS(ret >= 0);
-      fprintf (stderr, "Renaming result file %s to %s\n", s1, s2);
-      int ret = rename(s1, s2);
-      if (ret) {
-          perror("Problem renaming result file");
-          fprintf(stderr, "Let's hope that it's ok to continue!\n");
-      }
-      free(s1);
-      free(s2);
-      free(outfile);
-  }
+    relation_stream_trigger_disp_progress(rs);
+    fprintf(stderr,
+            "Read %d relations, %lu duplicates (%1.2f%%)"
+            " in %.1f s -- %.1f MB/s, %.1f rels/s\n",
+            rs->nrels, dupl, 100.0 * (double) dupl / (double) rs->nrels,
+            rs->dt, rs->mb_s, rs->rels_s);
+    unsigned long rread = rs->nrels;
+    relation_stream_clear(rs);
+    return rread;
 }
 
-int
-main (int argc, char *argv[])
+void usage()
 {
-  char *dirname = NULL;
-  unsigned long K = 4294967296; /* 2^32 */
-  uint32_t *H;
-  char *filelist = NULL;
+    fprintf (stderr, "Usage: dup2 [-rm] [-out <dir>] [-filelist <fl>] -K <K> file1 ... filen\n");
+    exit (1);
+}
 
-  while (argc > 2 && argv[1][0] == '-')
-    {
-      if (strcmp (argv[1], "-out") == 0)
-        {
-          dirname = argv[2];
-          argv += 2;
-          argc -= 2;
-        }
-      else if (strcmp (argv[1], "-rm") == 0)
-        {
-          rm = 1;
-          argv += 1;
-          argc -= 1;
-        }
-      else if (strcmp (argv[1], "-bz") == 0)
-        {
-          bz = 1;
-          argv += 1;
-          argc -= 1;
-        }
+int main (int argc, char *argv[])
+{
+    unsigned long K = 4294967296; /* 2^32 */
+    uint32_t *H;
 
-      else if (strcmp (argv[1], "-filelist") == 0)
-        {
-          filelist = argv[2];
-          argv += 2;
-          argc -= 2;
-        }
+    param_list pl;
+    param_list_init(pl);
+    argv++,argc--;
 
-      else if (strcmp (argv[1], "-K") == 0)
-        {
-          K = (unsigned long) atol (argv[2]);
-          argv += 2;
-          argc -= 2;
-        }
-      else
-        {
-          fprintf (stderr, "Unknown option %s\n", argv[1]);
-          exit (1);
-        }
+    int bz = 0;
+    param_list_configure_knob(pl, "bz", &bz);
+    param_list_configure_knob(pl, "rm", &rm);
+
+    for( ; argc ; ) {
+        if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
+        /* Since we accept file names freeform, we decide to never abort
+         * on unrecognized options */
+        break;
+        // fprintf (stderr, "Unknown option: %s\n", argv[0]);
+        // abort(); 
     }
 
-  if (K == 0)
-    {
-      fprintf (stderr, "Usage: dup2 [-rm] [-bz] [-out <dir>] [-filelist <fl>] -K <K> file1 ... filen\n");
-      exit (1);
+    const char * dirname = param_list_lookup_string(pl, "out");
+    const char * outfmt = param_list_lookup_string(pl, "outfmt");
+    const char * filelist = param_list_lookup_string(pl, "filelist");
+
+    param_list_parse_ulong(pl, "K", &K);
+
+    if (K == 0)
+        usage();
+
+    if (bz) {
+        if (outfmt) {
+            fprintf(stderr, "-bz and -outfmt are exclusive");
+            usage();
+        } else {
+            outfmt = ".bz2";
+        }
     }
+    if (outfmt && !is_supported_compression_format(outfmt)) {
+        fprintf(stderr, "output compression format unsupported\n");
+        usage();
+    }
+
 
   /* sanity check: since we allocate two 64-bit words for each, instead of
      one 32-bit word for the hash table, taking K/100 will use 2.5% extra
@@ -323,39 +307,16 @@ main (int argc, char *argv[])
   fprintf (stderr, "Allocated hash table of %lu entries (%zuMb)\n", K,
            (K * sizeof (uint32_t)) >> 20);
 
-  if (filelist != NULL) {
-      FILE *f;
-      f = fopen(filelist, "r");
-      if (f == NULL) {
-          perror("Problem opening filelist");
-          exit(1);
-      }
-      char relfile[LINE_SIZE];
-      while (fgets(relfile, LINE_SIZE, f) != NULL) {
-          // skip leading blanks
-          char *rfile = relfile;
-          while (isspace(rfile[0]))
-              rfile++;
-          // if empty line or comment line, continue
-          if ((rfile[0] == '#') || (rfile[0] == '\0') || (rfile[0] == '\n'))
-              continue;
-          // get rid of newline char
-          char *str = rfile;
-          while (str[0] != '\0') {
-              str++;
-              if (str[0] == '\n')
-                  str[0] = '\0';
-          }
-          remove_dup(rfile, dirname, H, K);
-      }
-      fclose(f);
+
+  if ((filelist != NULL) + (argc != 0) != 1) {
+      fprintf(stderr, "Provide either -filelist or freeform file names\n");
+      usage();
   }
 
-  while (argc > 1) {
-      remove_dup (argv[1], dirname, H, K);
-      argv ++;
-      argc --;
-  }
+  char ** files = filelist ? filelist_from_file(filelist) : argv;
+  unsigned long rread = remove_dup_in_files (files, dirname, outfmt, H, K);
+  if (filelist) filelist_clear(files);
+
 
   fprintf (stderr, "Read %lu relations, %lu duplicates (%1.2f%%)\n",
            rread, dupl, 100.0 * (double) dupl / (double) rread);

@@ -23,7 +23,7 @@ unsigned int next_alloc_size(unsigned int s, unsigned int needed)
     return s;
 }
 
-unsigned int *read_matrix_row(FILE * file, sparse_mat_t mat,
+unsigned int *read_matrix_row(FILE * file, filter_matrix_t mat,
 			      unsigned int *dst, int compact)
 {
     unsigned int nc;
@@ -88,7 +88,7 @@ unsigned int *read_matrix_row(FILE * file, sparse_mat_t mat,
     return dst;
 }
 
-void read_matrix_header(FILE * file, sparse_mat_t mat)
+void read_matrix_header(FILE * file, filter_matrix_t mat)
 {
     int ret;
 
@@ -99,7 +99,7 @@ void read_matrix_header(FILE * file, sparse_mat_t mat)
     mat->wt = 0;
 }
 
-void readmat(FILE * file, sparse_mat_t mat, int compact)
+void readmat(FILE * file, filter_matrix_t mat, int compact)
 {
     unsigned int i;
     unsigned int *dst;
@@ -110,15 +110,15 @@ void readmat(FILE * file, sparse_mat_t mat, int compact)
     }
 }
 
-void sparse_mat_init(sparse_mat_t dst)
+void filter_matrix_init(filter_matrix_t dst)
 {
-    memset(dst, 0, sizeof(sparse_mat_t));
+    memset(dst, 0, sizeof(filter_matrix_t));
 }
 
-void sparse_mat_clear(sparse_mat_t dst)
+void filter_matrix_clear(filter_matrix_t dst)
 {
     free(dst->data);
-    memset(dst, 0, sizeof(sparse_mat_t));
+    memset(dst, 0, sizeof(filter_matrix_t));
 }
 
 /* vim: set sw=4 sta et: */

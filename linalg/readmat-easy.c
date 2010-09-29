@@ -27,10 +27,10 @@ void read_easy_inner(const char * filename,
         unsigned int * p_nr, unsigned int * p_nc,
         size_t * sz0, size_t * sz1)
 {
-    sparse_mat_t smat;
+    filter_matrix_t smat;
     FILE * f;
 
-    sparse_mat_init(smat);
+    filter_matrix_init(smat);
     f = fopen(filename, "r");
     if (f == NULL) {
         fprintf(stderr, "fopen(%s): %s\n", filename, strerror(errno));
@@ -111,7 +111,7 @@ void read_easy_inner(const char * filename,
 
     free(colweights);
     free(colptrs);
-    sparse_mat_clear(smat);
+    filter_matrix_clear(smat);
 }
 
 void read_easy(const char * filename,

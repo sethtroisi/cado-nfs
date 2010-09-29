@@ -1,4 +1,4 @@
-/* routines for TeX output, extracted from sparse_mat.c */
+/* routines for TeX output, extracted from filter_matrix.c */
 
 void
 dclistTex(FILE *file, dclist dcl)
@@ -12,7 +12,7 @@ dclistTex(FILE *file, dclist dcl)
 }
 
 void
-matrix2tex(sparse_mat_t *mat)
+matrix2tex(filter_matrix_t *mat)
 {
     int i, j, k, *tab;
 
@@ -40,7 +40,7 @@ matrix2tex(sparse_mat_t *mat)
 }
 
 void
-Sparse2Tex(sparse_mat_t *mat)
+Sparse2Tex(filter_matrix_t *mat)
 {
     int j;
     int32_t k;
@@ -76,7 +76,7 @@ Sparse2Tex(sparse_mat_t *mat)
 }
 
 void
-texSWAR(sparse_mat_t *mat)
+texSWAR(filter_matrix_t *mat)
 {
     int w;
 

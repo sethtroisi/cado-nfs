@@ -11,7 +11,7 @@
 const char * filename_in;
 const char * filename_out;
 
-sparse_mat_t mat;
+filter_matrix_t mat;
 
 void usage()
 {
@@ -87,7 +87,7 @@ int main(int argc, char * argv[])
         f_out = stdout;
     }
 
-    sparse_mat_init(mat);
+    filter_matrix_init(mat);
     read_matrix_header(f_in, mat);
 
     if (i1 > mat->nrows || j1 > mat->nrows) {
@@ -122,7 +122,7 @@ int main(int argc, char * argv[])
     if (filename_in) fclose(f_in);
     if (filename_out) fclose(f_out);
 
-    sparse_mat_clear(mat);
+    filter_matrix_clear(mat);
     param_list_clear(pl);
     return 0;
 }

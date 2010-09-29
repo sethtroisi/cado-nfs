@@ -6,7 +6,7 @@
 
 #include "sparse.h"
 #include "dclist.h"
-#include "sparse_mat.h"
+#include "filter_matrix.h"
 #include "mst.h"
 #include "report.h"
 #include "markowitz.h"
@@ -241,7 +241,7 @@ MkzIsHeap(int32_t *Q)
 }
 
 static void
-MkzCheck(sparse_mat_t *mat)
+MkzCheck(filter_matrix_t *mat)
 {
     int32_t dj;
 
@@ -252,13 +252,13 @@ MkzCheck(sparse_mat_t *mat)
 }
 
 static int
-Cavallar(sparse_mat_t *mat, int32_t j)
+Cavallar(filter_matrix_t *mat, int32_t j)
 {
     return abs(mat->wt[GETJ(mat, j)]);
 }
 
 static int
-pureMkz(sparse_mat_t *mat, int32_t j)
+pureMkz(filter_matrix_t *mat, int32_t j)
 {
     int mkz, k, i;
     int32_t ind[MERGE_LEVEL_MAX];
@@ -291,7 +291,7 @@ pureMkz(sparse_mat_t *mat, int32_t j)
 
 // forcing lighter columns first.
 static int
-lightColAndMkz(sparse_mat_t *mat, int32_t j)
+lightColAndMkz(filter_matrix_t *mat, int32_t j)
 {
     int mkz, k, i, wj, cte;
     int32_t ind[MERGE_LEVEL_MAX];
@@ -331,7 +331,7 @@ lightColAndMkz(sparse_mat_t *mat, int32_t j)
 }
 
 static int
-MkzCount(sparse_mat_t *mat, int32_t j)
+MkzCount(filter_matrix_t *mat, int32_t j)
 {
     switch(mat->mkztype){
     case 2:
@@ -345,7 +345,7 @@ MkzCount(sparse_mat_t *mat, int32_t j)
 }
 
 void
-MkzInit(sparse_mat_t *mat)
+MkzInit(filter_matrix_t *mat)
 {
     int32_t j, mkz;
     int sz = 0;
@@ -386,7 +386,7 @@ MkzInit(sparse_mat_t *mat)
 }
 
 void
-MkzClose(sparse_mat_t *mat)
+MkzClose(filter_matrix_t *mat)
 {
     fprintf(stderr, "Max Markowitz count: %d\n", 
 	    MkzGet(mat->MKZQ, mat->MKZQ[0], 1));
@@ -399,7 +399,7 @@ MkzClose(sparse_mat_t *mat)
 }
 
 int
-MkzIncrCol(sparse_mat_t *mat, int32_t j)
+MkzIncrCol(filter_matrix_t *mat, int32_t j)
 {
     int ind;
 
@@ -413,7 +413,7 @@ MkzIncrCol(sparse_mat_t *mat, int32_t j)
 // Row[i] has been adjoined to column j, so that we can incrementally
 // change the Markowitz count.
 void
-MkzUpdate(sparse_mat_t *mat, int32_t i MAYBE_UNUSED, int32_t j)
+MkzUpdate(filter_matrix_t *mat, int32_t i MAYBE_UNUSED, int32_t j)
 {
     int32_t adr = mat->MKZA[GETJ(mat, j)];
     int mkz;
@@ -460,7 +460,7 @@ MkzUpdate(sparse_mat_t *mat, int32_t i MAYBE_UNUSED, int32_t j)
 
 */
 void
-MkzDecreaseColWeight(sparse_mat_t *mat, int32_t j)
+MkzDecreaseColWeight(filter_matrix_t *mat, int32_t j)
 {
     int32_t dj = GETJ(mat, j);
 
@@ -471,7 +471,7 @@ MkzDecreaseColWeight(sparse_mat_t *mat, int32_t j)
 }
 
 void
-MkzRemoveJ(sparse_mat_t *mat, int32_t j)
+MkzRemoveJ(filter_matrix_t *mat, int32_t j)
 {
     int32_t dj = GETJ(mat, j);
 
@@ -496,7 +496,7 @@ MkzRemoveJ(sparse_mat_t *mat, int32_t j)
 // let's say we remove some columns with the highest Mkz count.
 // Not very pertinent right now.
 int
-MkzDeleteHeavyColumns(report_t *rep MAYBE_UNUSED, sparse_mat_t *mat MAYBE_UNUSED)
+MkzDeleteHeavyColumns(report_t *rep MAYBE_UNUSED, filter_matrix_t *mat MAYBE_UNUSED)
 {
 #if 1
     return 0;

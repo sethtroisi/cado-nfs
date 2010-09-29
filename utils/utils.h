@@ -37,5 +37,7 @@
 #include "poly.h"
 #include "crc.h"
 #include "usp.h"
+#include "purgedfile.h"
+#include "bit_vector.h"
 
 #endif	/* CADO_UTILS_H_ */

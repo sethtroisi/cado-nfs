@@ -12,7 +12,7 @@ typedef struct{
     int bufsize; // says it!
 } report_t;
 
-extern void init_rep(report_t *rep, char *outname, sparse_mat_t *mat, int type, int bufsize);
+extern void init_rep(report_t *rep, char *outname, filter_matrix_t *mat, int type, int bufsize);
 extern void report1(report_t *rep, int32_t i);
 extern void report2(report_t *rep, int32_t i1, int32_t i2);
 extern void reportn(report_t *rep, int32_t *ind, int n);

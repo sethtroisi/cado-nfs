@@ -1,2 +1,2 @@
-void dumpSparse(FILE *ofile, sparse_mat_t *mat);
+void dumpSparse(FILE *ofile, filter_matrix_t *mat);
 

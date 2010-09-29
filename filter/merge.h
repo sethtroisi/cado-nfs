@@ -40,7 +40,7 @@ typedef struct {
                         weight(j) <= cwmax.
                         R[j][k] = -1 if the corresponding row has been deleted.
                         R[j]=NULL for weight(j) > cwmax. */
-} sparse_mat_t;
+} filter_matrix_t;
 
 #if USE_TAB == 0
 #define isRowNull(mat, i) ((mat)->data[(i)].val == NULL)
@@ -59,12 +59,12 @@ extern "C" {
 #endif
 
 extern void report1(FILE *outfile, int32_t i);
-extern void removeCellSWAR(sparse_mat_t *mat, int i, int32_t j);
+extern void removeCellSWAR(filter_matrix_t *mat, int i, int32_t j);
 
 #ifdef USE_MPI
 extern void mpi_send_inactive_cols(int i);
-extern void mpi_add_rows(sparse_mat_t *mat, int m, int32_t j, int32_t *ind);
-extern void mpi_load_rows_for_j(sparse_mat_t *mat, int m, int32_t j);
+extern void mpi_add_rows(filter_matrix_t *mat, int m, int32_t j, int32_t *ind);
+extern void mpi_load_rows_for_j(filter_matrix_t *mat, int m, int32_t j);
 #endif
 
 #ifdef __cplusplus

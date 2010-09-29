@@ -136,7 +136,6 @@ linalg/bwc/xymats.h
 linalg/characters.c
 linalg/gauss.c
 linalg/gauss.h
-linalg/mkbitstrings.c
 linalg/readbuffer.c
 linalg/readbuffer.h
 linalg/readmat-easy.c
@@ -155,8 +154,6 @@ filter/dclist.c
 filter/dclist.h
 filter/dup1.c
 filter/dup2.c
-filter/files.c
-filter/files.h
 filter/markowitz.c
 filter/markowitz.h
 filter/merge.c
@@ -166,15 +163,14 @@ filter/merge_mono.h
 filter/merge_opts.h
 filter/mst.c
 filter/mst.h
-filter/postprocess.c
 filter/purge.c
 filter/replay.c
 filter/report.c
 filter/report.h
 filter/sparse.c
 filter/sparse.h
-filter/sparse_mat.c
-filter/sparse_mat.h
+filter/filter_matrix.c
+filter/filter_matrix.h
 filter/swar.c
 filter/swar.h
 params/params.c59
@@ -420,3 +416,11 @@ linalg/bwc/short_matmul.c
 linalg/bwc/strassen-thresholds.h
 polyselect/twoquadratics.c
 polyselect/polyopt.c
+linalg/bit_matrices.c
+linalg/bit_matrices.h
+utils/bit_vector.c
+utils/bit_vector.h
+utils/purgedfile.c
+utils/purgedfile.h
+linalg/blockmatrix.c
+linalg/blockmatrix.h

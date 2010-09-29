@@ -1,11 +1,15 @@
+#define _POSIX_C_SOURCE 200112L /* pclose */
 #include <stdio.h>
 #include <stdlib.h>
 #include <ctype.h> /* for isxdigit */
 #include <string.h>
+#include <errno.h>
 
 #include "cado.h"
 #include "mod_ul.h"
 #include "relation.h"
+#include "gzip.h"
+#include "timing.h"
 
 /*
   Convention for I/O of rels:
@@ -13,188 +17,20 @@
     primes are printed in hexadecimal.
 */
 
-void
-copy_rel (relation_t *Rel, relation_t rel)
-{
-  int i;
-
-  Rel->a = rel.a;
-  Rel->b = rel.b;
-  Rel->nb_rp = rel.nb_rp;
-  Rel->nb_ap = rel.nb_ap;
-  Rel->rp = (rat_prime_t*) realloc (Rel->rp, Rel->nb_rp * sizeof(rat_prime_t));
-  Rel->ap = (alg_prime_t*) realloc (Rel->ap, Rel->nb_ap * sizeof(alg_prime_t));
-  for (i = 0; i < Rel->nb_rp; ++i)
-    {
-      Rel->rp[i].p = rel.rp[i].p;
-      Rel->rp[i].e = rel.rp[i].e;
-    }
-  for (i = 0; i < Rel->nb_ap; ++i)
-    {
-      Rel->ap[i].p = rel.ap[i].p;
-      Rel->ap[i].r = rel.ap[i].r;
-      Rel->ap[i].e = rel.ap[i].e;
-    }
-}
-
 // Sometimes, we want our space back...!
 void
 clear_relation (relation_t *rel)
 {
-    free(rel->rp);
-    free(rel->ap);
-}
-
-// return 0 on failure.
-// The input should be a single line of the form
-//   a,b:p1,p2,...:q1,q2,...
-// Stores the primes into the relation, by collecting identical primes
-// and setting the corresponding exponents. Thus a given prime will
-// appear only once in rel (but it can appear with an even exponent).
-int
-read_relation (relation_t *rel, const char *str)
-{
-  int i, j, k, ret;
-  unsigned long p;
-  
-  ret = sscanf (str, "%ld,%lu:", &(rel->a), &(rel->b));
-  if (UNLIKELY(ret != 2))
-    {
-      fprintf (stderr, "warning: failed reading a,b in relation '%s'\n", str);
-      return 0;
-    }
-  while (str[0] != ':')
-    str++;
-  str++;
-
-  /* count number of rational primes by counting commas (have to add one) */
-  {
-    int cpt = 1;
-    const char * pstr = str;
-
-    while (pstr[0] != ':') {
-      if (pstr[0] == ',')
-	cpt++, pstr += 2; /* there cannot be two consecutive ',' or ':' */
-      else
-	pstr++;
-    }
-    rel->nb_rp = cpt;
-  }
-
-  /* read rational primes */
-  rel->rp = (rat_prime_t*) malloc (rel->nb_rp * sizeof (rat_prime_t));
-  /* j is the number of (p,e) pairs already stored in rel */
-  for (i = j = 0; i < rel->nb_rp; ++i)
-    {
-      ret = sscanf (str, "%lx", &p);
-      if (UNLIKELY(ret != 1))
-        {
-          fprintf (stderr, "warning: failed reading rat prime %d\n", i);
-          return 0;
-        }
-      /* check if the prime already appears */
-      for (k = j - 1; k >= 0 && rel->rp[k].p != p; k--);
-      if (k >= 0) /* p = rel->rp[k].p */
-	rel->rp[k].e ++;
-      else /* new prime */
-        {
-          rel->rp[j].p = p;
-          rel->rp[j].e = 1;
-          j ++;
-        }
-      while (isxdigit(str[0]))
-        str++;
-      str++; /* skip ',' or ':' */
-    }
-  rel->nb_rp = j;
-  rel->rp = (rat_prime_t*) realloc (rel->rp, j * sizeof (rat_prime_t));
-
-  /* count number of algebraic primes by counting commas (have to add one) */
-  {
-    int cpt = 1;
-    const char * pstr = str;
-
-    while (pstr[0] != '\n') {
-      if (pstr[0] == ',')
-	cpt++, pstr += 2; /* there cannot be two consecutive ',' or ':' */
-      else
-        pstr++;
-    }
-    rel->nb_ap = cpt;
-  }
-
-  /* read algebraic primes */
-  rel->ap = (alg_prime_t*) malloc (rel->nb_ap * sizeof (alg_prime_t));
-  /* j is the number of (p,e) pairs already stored in rel */
-  for (i = j = 0; i < rel->nb_ap; ++i)
-    {
-      ret = sscanf(str, "%lx", &p);
-      /* corresponding root must be computed by the caller */
-      if (UNLIKELY(ret != 1))
-        {
-          fprintf (stderr, "warning: failed reading alg prime %d\n", i);
-          return 0;
-        }
-      /* check if the prime ideal already appears */
-      for (k = j - 1; k >= 0 && rel->ap[k].p != p; k--);
-      if (k >= 0) /* rel->ap[k].p = k */
-	rel->ap[k].e ++;
-      else /* new prime */
-        {
-          rel->ap[j].p = p;
-          rel->ap[j].e = 1;
-          j ++;
-        }
-      while (isxdigit(str[0]))
-        str++;
-      str++; /* skip ',' or ':' */
-    }
-  rel->nb_ap = j;
-  rel->ap = (alg_prime_t*) realloc (rel->ap, j * sizeof (alg_prime_t));
-
-  return 1;
-}
-
-/* Read a new relation line from file 'file', and put in in 'str'.
-   Return 0 on failure
-          1 on success
-         -1 on EOF
-*/
-int
-fread_buf (char str[STR_LEN_MAX], FILE *file)
-{
-  do
-    {
-      /* fgets returns NULL on error or EOF */
-      if (fgets (str, STR_LEN_MAX, file) == NULL)
-	return feof (file) ? -1 : 0;
-    }
-  while (str[0] == '#'); /* skip comments */
-  return 1;
-}
-
-// return 0 on failure
-//        1 on success
-//        -1 if EOF
-// This reads the next valid (non blank, non commented) line and fill in
-// the relation. 
-int fread_relation (FILE *file, relation_t *rel)
-{
-  int ret;
-  char str[STR_LEN_MAX];
-
-  ret = fread_buf (str, file);
-  if (ret != 1)
-    return ret;
-  return read_relation (rel, str);
+    free(rel->rp); rel->rp = NULL;
+    free(rel->ap); rel->ap = NULL;
 }
 
 void skip_relations_in_file(FILE * f, int n)
 {
-    char str[STR_LEN_MAX];
+    char str[RELATION_MAX_BYTES];
 
     for( ; n-- ; ) {
-	char * p = fgets(str, STR_LEN_MAX, f);
+	char * p = fgets(str, RELATION_MAX_BYTES, f);
         if (!p) {
 	    fprintf(stderr, "short read in skip_relations_in_file\n");
             abort();
@@ -316,6 +152,7 @@ fprint_relation_raw (FILE *file, relation_t rel)
 }
 
 /* reduces exponents mod 2, and discards primes with even exponent */
+/* This assumes that relations have already been sorted */
 void
 reduce_exponents_mod2 (relation_t *rel)
 {
@@ -336,8 +173,6 @@ reduce_exponents_mod2 (relation_t *rel)
     }
   if(j == 0)
       fprintf(stderr, "WARNING: j_rp=0 in reduce_exponents_mod2\n");
-  else
-      rel->rp = (rat_prime_t*) realloc (rel->rp, j * sizeof (rat_prime_t));
   rel->nb_rp = j;
 
   if(rel->nb_ap == 0)
@@ -349,15 +184,265 @@ reduce_exponents_mod2 (relation_t *rel)
       if (rel->ap[i].e != 0)
         {
           rel->ap[j].p = rel->ap[i].p;
+          rel->ap[j].r = rel->ap[i].r;  // in fact useless at this point.
           rel->ap[j].e = 1;
           j ++;
         }
     }
   if(j == 0)
       fprintf(stderr, "WARNING: j_ap = 0 in reduce_exponents_mod2\n");
-  else
-      rel->ap = (alg_prime_t*) realloc (rel->ap, j * sizeof (alg_prime_t));
   rel->nb_ap = j;
 }
 
+static int rat_prime_cmp(rat_prime_t * a, rat_prime_t * b)
+{
+    return (b->p < a->p) - (a->p < b->p);
+}
 
+static int alg_prime_cmp(alg_prime_t * a, alg_prime_t * b)
+{
+    int r = (b->p < a->p) - (a->p < b->p);
+    if (r) return r;
+    return (b->r < a->r) - (a->r < b->r);
+}
+
+typedef int (*sortfunc_t) (const void *, const void *);
+
+void relation_provision_for_primes(relation_t * rel, int nr, int na)
+{
+    if (nr > 0 && rel->nb_rp_alloc < nr) {
+        rel->nb_rp_alloc = nr + nr / 2;
+        rel->rp = (rat_prime_t *) realloc(rel->rp, rel->nb_rp_alloc * sizeof(rat_prime_t));
+    }
+    if (na > 0 && rel->nb_ap_alloc < na) {
+        rel->nb_ap_alloc = na + na / 2;
+        rel->ap = (alg_prime_t *) realloc(rel->ap, rel->nb_ap_alloc * sizeof(alg_prime_t));
+    }
+}
+
+void relation_compress_rat_primes(relation_t * rel)
+{
+    qsort(rel->rp, rel->nb_rp, sizeof(rat_prime_t), (sortfunc_t) &rat_prime_cmp);
+    int j = 0;
+    for(int i = 0 ; i < rel->nb_rp ; j++) {
+        if (i-j) memcpy(rel->rp + j, rel->rp + i, sizeof(rat_prime_t));
+        int e = 0;
+        for( ; i < rel->nb_rp && rat_prime_cmp(rel->rp+i, rel->rp+j) == 0 ; i++)
+            e+=rel->rp[i].e;
+        rel->rp[j].e = e;
+    }
+    rel->nb_rp = j;
+}
+
+void relation_compress_alg_primes(relation_t * rel)
+{
+    /* We're considering the list as containing possibly distinct (p,r)
+     * pairs, although in reality it cannot happen. I doubt this causes
+     * any performance hit though.
+     */
+    qsort(rel->ap, rel->nb_ap, sizeof(alg_prime_t), (sortfunc_t) &alg_prime_cmp);
+    int j = 0;
+    for(int i = 0 ; i < rel->nb_ap ; j++) {
+        if (i-j) memcpy(rel->ap + j, rel->ap + i, sizeof(alg_prime_t));
+        int e = 0;
+        for( ; i < rel->nb_ap && alg_prime_cmp(rel->ap+i, rel->ap+j) == 0 ; i++)
+            e+=rel->ap[i].e;
+        rel->ap[j].e = e;
+    }
+    rel->nb_ap = j;
+}
+
+/* sets a,b. Unless rs->parse_only_ab is set, also fill rs->rel with the
+ * (sorted) relation which is read in the input file.
+ */
+int relation_stream_get(relation_stream_ptr rs, char * supplied_line)
+{
+    FILE * f = rs->source;
+    char tbuf[RELATION_MAX_BYTES];
+    char * line = supplied_line ? supplied_line : tbuf;
+    int64_t * pa = &rs->rel.a;
+    uint64_t * pb = &rs->rel.b;
+
+    static const int ugly[256] = {
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        0,1,2,3,4,5,6,7,8,9,-1, -1, -1, -1, -1, -1,
+        -1, 10, 11, 12, 13, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, 10, 11, 12, 13, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+        -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+
+    int c;
+    char * p;
+    
+another_line:
+    rs->lnum++;
+
+    p = line;
+
+    *p++ = (c = fgetc(f));
+    if (c == EOF) return -1;
+    if (c == '#') {
+        for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc(f))) ;
+        goto another_line;
+    }
+
+    *pa = 0;
+    *pb = 0;
+    int s = 1;
+    int v;
+    if (c == '-') { s=-1; *p++ = (c=fgetc(f)); }
+    for( ; (v=ugly[(unsigned char) c]) >= 0 ; *p++ = (c=fgetc(f)))
+        *pa=*pa*10+v;
+    ASSERT_ALWAYS(c == ',');
+    *p++ = (c=fgetc(f));
+    *pa*=s;
+    for( ; (v=ugly[(unsigned char) c]) >= 0 ; *p++ = (c=fgetc(f)))
+        *pb=*pb*10+v;
+    ASSERT_ALWAYS(c == ':');
+
+    if (!rs->parse_only_ab) {
+        /* Do something if we're also interested in primes */
+        char * q;
+        char * base;
+        int n,k;
+
+        base = p;
+        n = 1;
+        *p++ = (c = fgetc(f));
+        for (; c != EOF && c != '\n' && c != ':'; *p++ = (c = fgetc(f)))
+            n += c == ',';
+        ASSERT_ALWAYS(c == ':');
+
+        relation_provision_for_primes(&rs->rel, n, 0);
+        k = 0;
+        for (q = base; q != p;) {
+            unsigned long pr = 0;
+            for (; (v = ugly[(unsigned char) (c = *q++)]) >= 0;)
+                pr = pr * 16 + v;
+            if (pr)
+                rs->rel.rp[k++] = (rat_prime_t) { .p = pr,.e = 1};
+        }
+
+        rs->rel.nb_rp = k;
+        relation_compress_rat_primes(&rs->rel);
+
+        ASSERT_ALWAYS(c == ':');
+        ASSERT_ALWAYS(q == p);
+
+        base = p;
+        n = 1;
+        *p++ = (c = fgetc(f));
+        for (; c != EOF && c != '\n' && c != ':'; *p++ = (c = fgetc(f)))
+            n += c == ',';
+        ASSERT_ALWAYS(c == '\n');
+
+        relation_provision_for_primes(&rs->rel, 0, n);
+        k = 0;
+        for (q = base; q != p;) {
+            unsigned long pr = 0;
+            for (; (v = ugly[(unsigned char) (c = *q++)]) >= 0;)
+                pr = pr * 16 + v;
+            if (pr)
+                rs->rel.ap[k++] = (alg_prime_t) { .p = pr,.r = -1,.e = 1};
+        }
+
+        rs->rel.nb_ap = k;
+        relation_compress_alg_primes(&rs->rel);
+
+        ASSERT_ALWAYS(c == '\n');
+        ASSERT_ALWAYS(q == p);
+    }
+
+    /* skip rest of line -- a no-op if we've been told to parse
+     * everything. */
+    for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc(f)));
+
+    size_t nread =  p-line;
+    *p++='\0';
+
+    rs->pos += nread;
+    rs->nrels++;
+
+    return nread;
+}
+
+void relation_stream_init(relation_stream_ptr rs)
+{
+    memset(rs, 0, sizeof(relation_stream));
+    rs->t0 = rs->t1 = wct_seconds();
+}
+
+void relation_stream_closefile(relation_stream_ptr rs)
+{
+    ASSERT_ALWAYS(rs->pipe != -1);
+    if (rs->source) {
+        if (rs->pipe) pclose(rs->source); else fclose(rs->source);
+    }
+    rs->source = NULL;
+    rs->pipe = 0;
+}
+
+void relation_stream_clear(relation_stream_ptr rs)
+{
+    relation_stream_closefile(rs);
+    free(rs->rel.rp); rs->rel.rp = NULL;
+    free(rs->rel.ap); rs->rel.ap = NULL;
+}
+
+void relation_stream_openfile(relation_stream_ptr rs, const char * name)
+{
+    /* enforce using relation_stream_closefile, which is better practice */
+    ASSERT_ALWAYS(rs->source == NULL);
+    rs->source = fopen_compressed_r(name, &(rs->pipe), NULL);
+    if (rs->source == NULL) {
+        fprintf(stderr, "opening %s: %s\n", name, strerror(errno));
+        exit(1);
+    }
+}
+
+void relation_stream_bind(relation_stream_ptr rs, FILE * f)
+{
+    rs->source = f;
+    rs->pipe = -1;
+}
+
+void relation_stream_unbind(relation_stream_ptr rs)
+{
+    rs->source = NULL;
+    rs->pipe = 0;
+}
+
+
+int relation_stream_disp_progress_now_p(relation_stream_ptr rs)
+{
+    if (rs->nrels % 100)
+        return 0;
+    double t = wct_seconds();
+    if (rs->nrels % 1000000 == 0 || t >= rs->t1 + 1) {
+        rs->dt = t - rs->t0;
+        rs->mb_s = rs->dt > 0.01 ? (rs->pos/rs->dt * 1.0e-6) : 0;
+        rs->rels_s = rs->dt > 0.01 ? rs->nrels/rs->dt : 0;
+        rs->t1 = t;
+        return 1;
+    }
+    return 0;
+}
+
+void relation_stream_trigger_disp_progress(relation_stream_ptr rs)
+{
+    double t = wct_seconds();
+    rs->dt = t - rs->t0;
+    rs->mb_s = rs->dt > 0.01 ? (rs->pos/rs->dt * 1.0e-6) : 0;
+    rs->rels_s = rs->dt > 0.01 ? rs->nrels/rs->dt : 0;
+    rs->t1 = t;
+}

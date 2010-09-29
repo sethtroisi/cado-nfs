@@ -13,8 +13,10 @@
 */
 
 #define _GNU_SOURCE
+
 #define NSLICES_LOG 2
 #define NSLICES (1 << NSLICES_LOG)
+
 #define CA 314159265358979323UL
 #define CB 271828182845904523UL
 
@@ -29,225 +31,191 @@
 #include <unistd.h>
 #include <assert.h>
 
-clock_t start;
+#include "cado.h"
+#include "macros.h"
+#include "utils.h"
+#include "relation.h"
 
-static int checked=0;
-
-int bz;
-
-    
-int
-is_gzip (const char * s)
-{
-  unsigned int l = strlen (s);
-  return l >= 3 && strcmp (s + l - 3, ".gz") == 0;
-}
-
-int is_bzip2 (const char * s)
-{
-    unsigned int l = strlen (s);
-    return l >= 4 && strcmp (s + l - 4, ".bz2") == 0;
-}
-
-char * gz2bz(const char * s)
-{
-    unsigned int l = strlen (s);
-    char *ns = malloc(l+2); // 1 for additional char and 1 for \0
-    strcpy(ns, s);
-    strcpy(ns+l-3, ".bz2");
-    return ns;
-}
-
-char * bz2gz(const char * s)
-{
-    unsigned int l = strlen (s);
-    char *ns = strdup(s);
-    strcpy(ns+l-4, ".gz");
-    return ns;
-}
-
-
-#define LINE_SIZE 512
-#define COMMAND_SIZE 1024
+/* Only (a,b) are parsed on input. This flags control whether we copy the
+ * rest of the relation data to the output file, or if we content
+ * ourselves with smaller .ab files */
+static int only_ab = 0;
 
 /* output relations in dirname/0/name, ..., dirname/31/name */
 int
-check_stream (const char *name, FILE * stream, const char *dirname, char *Only)
+split_relfile (relation_stream_ptr rs, const char *name, const char *dirname, const char * outfmt, int *do_slice)
 {
-    int lnum, i, ok;
-    FILE *ofile[NSLICES];
-    unsigned long count[NSLICES];
-	char line[LINE_SIZE];
-    int64_t a;
-    uint64_t b;
+    FILE * f_in;
+    int p_in;
+    const char * suffix_in;
+
+    int ok;
+    char * oname[NSLICES];
+    FILE * ofile[NSLICES];
+    int p_out[NSLICES];
+
+    unsigned long count[NSLICES] = {0,};
     uint64_t h;
-    char command[COMMAND_SIZE];
-    char *newname;
 
-    if (bz && is_gzip(name))
-        newname = gz2bz(name);
-    else if ((!bz) && is_bzip2(name))
-        newname = bz2gz(name);
-    else
-        newname = strdup(name);
+    f_in = fopen_compressed_r(name, &p_in, &suffix_in);
+    ASSERT_ALWAYS(f_in != NULL);
 
-    for (i = 0; i < NSLICES; i++)
-      if (Only[i])
-        {
-          if (!bz)
-              snprintf (command, COMMAND_SIZE, "gzip -c --best > %s/%d/%s",
-                      dirname, i, basename(newname));
-          else 
-              snprintf (command, COMMAND_SIZE, "bzip2 -c --fast > %s/%d/%s",
-                      dirname, i, basename(newname));
-          ofile[i] = popen (command, "w");
-          if (ofile[i] == NULL)
-            {
-              fprintf (stderr, "Error, popen call failed\n");
-              exit (1);
-            }
-          count[i] = 0;
-        }
+    char * newname = strdup(name);
+    const char * suffix_out = outfmt;
+    if (!suffix_out) suffix_out = suffix_in;
+    // remove recognized suffix.
+    ASSERT_ALWAYS(strlen(suffix_in) <= strlen(newname));
+    newname[strlen(newname)-strlen(suffix_in)]='\0';
+    for(int i = 0 ; i < NSLICES ; i++) {
+        int rc = asprintf(&oname[i],
+                only_ab ? "%s/%d/%s.ab%s" : "%s/%d/%s%s",
+                dirname, i, path_basename(newname), suffix_out);
+        ASSERT_ALWAYS(rc >= 0);
+        ofile[i] = fopen_compressed_w(oname[i], &p_out[i], NULL);
+        ASSERT_ALWAYS(ofile[i] != NULL);
+    }
+    free(newname);
 
-    for (lnum = 0;; lnum++)
-      {
-	if (fgets (line, LINE_SIZE, stream) == NULL)
-          break; /* end of file */
+    relation_stream_bind(rs, f_in);
+    rs->parse_only_ab = 1;
 
-	if (line[0] == '#')
-            continue; /* comment line */
+    size_t pos0 = rs->pos;
+    for (int lnum = 0 ; ; lnum++) {
+        char line[RELATION_MAX_BYTES];
+        size_t rpos = rs->pos - pos0;
 
-	if (sscanf (line, "%ld,%lu", (int64_t *) &a,
-                    (uint64_t *) &b) != 2)
-          {
-	    fprintf (stderr, "Failed on line %d in %s: %s\n", lnum, name,
-                     line);
-            exit (1); /* errors are fatal here */
-        }
+        if (relation_stream_get(rs, line) < 0)
+            break;
 
 	ok = 1;
 
-        h = CA * (uint64_t) a + CB * b;
+        h = CA * (uint64_t) rs->rel.a + CB * rs->rel.b;
         /* Using the low bit of h is not a good idea, since then
            odd values of i are twice more likely. The second low bit
            also gives a small bias with RSA768 (but not for random
            coprime a, b). We use here the NSLICES_LOG high bits.
         */
-        i = h >> (64 - NSLICES_LOG);
+        int i = h >> (64 - NSLICES_LOG);
 
         /* print relation */
-        if (Only[i])
-          {
-            if (fprintf (ofile[i], "%s", line) < 0 ) {
-                fprintf (stderr, "Problem writing to file %d\n", i);
-                exit(1);
+        if (do_slice[i]) {
+            if (only_ab) {
+                struct {
+                    int64_t a;
+                    uint64_t b;
+                    size_t pos;
+                } foo = { .a = rs->rel.a, .b=rs->rel.b, .pos=rpos, };
+                fwrite(&foo, sizeof(foo), 1, ofile[i]);
+            } else {
+                if (fputs(line, ofile[i]) < 0) {
+                    fprintf (stderr, "Problem writing to file %d\n", i);
+                    exit(1);
+                }
             }
-          }
+        }
         count[i] ++;
 
-        if (++checked % 1000000 == 0)
-          fprintf (stderr, "Split %d relations in %fs\r", checked,
-                   (clock()-start)*1.0/CLOCKS_PER_SEC);
-      }
+        if (relation_stream_disp_progress_now_p(rs)) {
+            fprintf (stderr,
+                    "# split %d relations in %.1fs"
+                    " -- %.1f MB/s -- %.1f rels/s\n",
+                    rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
+        }
+    }
 
-    for (i = 0; i < NSLICES; i++)
-      if (Only[i])
+    relation_stream_unbind(rs);
+
+    for (int i = 0; i < NSLICES; i++) {
+      if (do_slice[i])
         {
-          pclose (ofile[i]);
+          if (p_out[i]) pclose (ofile[i]); else fclose(ofile[i]);
           fprintf (stderr, "%d:%lu ", i, count[i]);
         }
-    fprintf (stderr, "\n");
-    free(newname);
+      free(oname[i]);
+    }
+    fprintf (stderr, " %s\n", name);
+
+
+
+    if (p_in) pclose(f_in); else fclose(f_in);
     return 0;
+}
+
+void usage()
+{
+    fprintf(stderr, "Usage: ./dup1 [-outfmt <fmt> | -bz] [-only <i>] -out <output_dir> [files...]\n");
 }
 
 int
 main (int argc, char * argv[])
 {
     int had_error = 0;
-    char *dirname = NULL;
-    char Only[NSLICES];
-    int i, only = -1;
-    bz = 0;
 
-    while (argc > 2 && argv[1][0] == '-')
-      {
-        if (strcmp (argv[1], "-out") == 0)
-          {
-            dirname = argv[2];
-            argv += 2;
-            argc -= 2;
-          }
-        else if (strcmp (argv[1], "-bz") == 0)
-          {
-            argv += 1;
-            argc -= 1;
-            bz = 1;
-          }
-        else if (strcmp (argv[1], "-only") == 0)
-          {
-            only = atoi (argv[2]);
-            assert (0 <= only && only < NSLICES);
-            argv += 2;
-            argc -= 2;
-          }
-        else
-          {
-            fprintf (stderr, "Unknown option %s\n", argv[1]);
-            exit (1);
-          }
-      }
+    param_list pl;
+    param_list_init(pl);
+    argv++,argc--;
 
-    if (dirname == NULL)
-      {
-        fprintf (stderr, "Usage: dup1 [-bz] [-only i] -out <dir> file1 ... filen\n");
-        exit (1);
-      }
+    int bz = 0;
+    param_list_configure_knob(pl, "bz", &bz);
+    param_list_configure_knob(pl, "ab", &only_ab);
 
-    if (only == -1) /* split all slices */
-      {
-        for (i = 0; i < NSLICES; i++)
-          Only[i] = 1;
-      }
-    else /* split only slide i */
-      {
-        for (i = 0; i < NSLICES; i++)
-          Only[i] = i == only;
-      }
-
-    start = clock();
-
-    if (argc == 1)
-      {
-        fprintf (stderr, "Error, stdin input is not allowed\n");
-        exit (1);
-      }
-    else
-      {
-        int i = 0;
-        for (i = 1 ; i < argc ; i++) {
-            FILE * f;
-            if (strcmp(argv[i], "-") == 0) {
-              fprintf (stderr, "Error, stdin input is not allowed\n");
-              exit (1);
-            } else if (is_gzip(argv[i]) || is_bzip2(argv[i])) {
-                char command[1024];
-                if (is_gzip(argv[i])) 
-                    snprintf(command, sizeof(command), "gzip -dc %s", argv[i]);
-                else
-                    snprintf(command, sizeof(command), "bzip2 -dc %s", argv[i]);
-                f = popen(command, "r");
-                had_error |= check_stream (argv[i], f, dirname, Only);
-                pclose(f);
-            } else {
-                fprintf (stderr, "Error, compressed input expected\n");
-                exit (1);
-            }
-        }
+    for( ; argc ; ) {
+        if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
+        /* Since we accept file names freeform, we decide to never abort
+         * on unrecognized options */
+        break;
+        // fprintf (stderr, "Unknown option: %s\n", argv[0]);
+        // abort(); 
     }
 
-    fprintf (stderr, "Split %d relations in %fs\n", checked,
-             (clock()-start)*1.0/CLOCKS_PER_SEC);
+    const char * dirname = param_list_lookup_string(pl, "out");
+    int only_slice = -1;
+    param_list_parse_int(pl, "only", &only_slice);
+    const char * outfmt = param_list_lookup_string(pl, "outfmt");
+
+    if (!dirname)
+        usage();
+    if (bz) {
+        if (outfmt) {
+            fprintf(stderr, "-bz and -outfmt are exclusive");
+            usage();
+        } else {
+            outfmt = ".bz2";
+        }
+    }
+    if (outfmt && !is_supported_compression_format(outfmt)) {
+        fprintf(stderr, "output compression format unsupported\n");
+        usage();
+    }
+
+    int do_slice[NSLICES];
+
+    if (only_slice == -1) { /* split all slices */
+        for (int i = 0; i < NSLICES; i++)
+          do_slice[i] = 1;
+    } else { /* split only slide i */
+        for (int i = 0; i < NSLICES; i++)
+          do_slice[i] = i == only_slice;
+    }
+
+    if (argc == 0) {
+        fprintf (stderr, "Error: no files provided\n");
+        exit (1);
+    }
+
+    relation_stream rs;
+    relation_stream_init(rs);
+    for (int i = 0 ; i < argc ; i++) {
+        had_error |= split_relfile (rs, argv[i], dirname, outfmt, do_slice);
+    }
+    relation_stream_trigger_disp_progress(rs);
+    fprintf (stderr,
+            "# split %d relations in %.1fs"
+            " -- %.1f MB/s -- %.1f rels/s\n",
+            rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
+    relation_stream_clear(rs);
+
+    param_list_clear(pl);
 
     if (had_error)
       return 1;

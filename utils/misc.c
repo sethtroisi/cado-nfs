@@ -8,6 +8,7 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <ctype.h>
 
 #include "cado_config.h"
 #include "macros.h"
@@ -116,3 +117,55 @@ char * derived_filename(const char * prefix, const char * what, const char * ext
     return str;
 }
 
+
+void chomp(char *s) {
+    char *p;
+    if (s && (p = strrchr(s, '\n')) != NULL)
+        *p = '\0';
+}
+
+char ** filelist_from_file(const char * filename)
+{
+    char ** files = NULL;
+    int nfiles_alloc = 0;
+    int nfiles = 0;
+    FILE *f;
+    f = fopen(filename, "r");
+    if (f == NULL) {
+        perror("Problem opening filelist");
+        exit(1);
+    }
+    char relfile[FILENAME_MAX + 10];
+    while (fgets(relfile, FILENAME_MAX + 10, f) != NULL) {
+
+        // skip leading blanks
+        char *rfile = relfile;
+        while (isspace(rfile[0]))
+            rfile++;
+        // if empty line or comment line, continue
+        if ((rfile[0] == '#') || (rfile[0] == '\0') || (rfile[0] == '\n'))
+            continue;
+        chomp(rfile);
+
+        if (nfiles == nfiles_alloc) {
+            nfiles_alloc += nfiles_alloc / 2 + 16;
+            files = realloc(files, nfiles_alloc * sizeof(char*));
+        }
+        files[nfiles++] = strdup(rfile);
+    }
+    fclose(f);
+
+    if (nfiles == nfiles_alloc) {
+        nfiles_alloc += nfiles_alloc / 2 + 16;
+        files = realloc(files, nfiles_alloc * sizeof(char*));
+    }
+    files[nfiles++] = NULL;
+    return files;
+}
+
+void filelist_clear(char ** filelist)
+{
+    for(char ** p = filelist ; *p ; p++)
+        free(*p);
+    free(filelist);
+}

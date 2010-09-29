@@ -5,10 +5,10 @@
 extern "C" {
 #endif
 
-extern void mpi_start_proc(char *outname, sparse_mat_t *mat, FILE *purgedfile, char *purgedname, int forbw, double ratio, int coverNmax, char *resumename);
+extern void mpi_start_proc(char *outname, filter_matrix_t *mat, FILE *purgedfile, char *purgedname, int forbw, double ratio, int coverNmax, char *resumename);
 extern void mpi_send_inactive_rows(int i);
-extern void mpi_add_rows(sparse_mat_t *mat, int m, int32_t j, int32_t *ind);
-extern void mpi_load_rows_for_j(sparse_mat_t *mat, int m, int32_t j);
+extern void mpi_add_rows(filter_matrix_t *mat, int m, int32_t j, int32_t *ind);
+extern void mpi_load_rows_for_j(filter_matrix_t *mat, int m, int32_t j);
 
 #ifdef __cplusplus
 }

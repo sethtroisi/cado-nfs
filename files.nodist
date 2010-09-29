@@ -19,7 +19,6 @@ filter/debug.c
 filter/debug.h
 filter/merge_mpi.c
 filter/merge_mpi.h
-filter/duplicates.c
 misc/
 nightly-test
 params/README.params

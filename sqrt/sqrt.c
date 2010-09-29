@@ -1,3 +1,5 @@
+#define _GNU_SOURCE    /* asprintf */
+#define _DARWIN_C_SOURCE        /* asprintf */
 #include <stdio.h>
 #include <stdlib.h>
 #include <gmp.h>
@@ -8,9 +10,11 @@
 #include <sys/resource.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "cado.h"
 #include "utils.h"
+#include "purgedfile.h"
 
 #define DEBUG 0
 #define MAPLE 0
@@ -20,234 +24,6 @@
  * include the corresponding header.
  */
 #include "plain_poly.h"
-
-//#include "poly.h"
-
-// #define VERBOSE
-
-
-
-/********** DEP **********/
-int
-checkVector(int *vec, int ncols)
-{
-    int ok, i;
-
-    ok = 1;
-    for(i = 0; i < ncols; i++)
-	if(vec[i] & 1){
-	    ok = 0;
-	    break;
-	}
-#if 0
-    if(ok)
-	printf(" -> y\n");
-    else
-	printf(" -> n (%d)\n", i);
-#endif
-    return ok;
-}
-
-void
-computefree(relation_t *rel)
-{
-    int i;
-
-    for(i = 0; i < rel->nb_ap; i++){
-        rel->ap[i].r = rel->ap[i].p;
-        rel->ap[i].p = rel->a;
-        rel->ap[i].e = 1;
-    }
-}
-
-void
-treatRelation(FILE *depfile, hashtable_t *H, relation_t rel)
-{
-    int j, h;
-
-    if(rel.b > 0)
-	computeroots(&rel);
-    else
-	computefree(&rel);
-    fprintf(depfile, "%ld %lu\n", rel.a, rel.b);
-#if MAPLE >= 1
-    fprintf(stderr, "NORM:=NORM*mynorm(f, %ld, %lu):\n", rel.a, rel.b);
-    fprintf(stderr, "AX:=AX*(%ld-%lu*X):\n", rel.a, rel.b);
-#endif
-    for(j = 0; j < rel.nb_ap; j++){
-#if MAPLE >= 2
-	fprintf(stderr, "A2:=A2*[%ld, %ld]^%d:\n",
-		rel.ap[j].p, rel.ap[j].r, rel.ap[j].e);
-#endif
-	h = getHashAddr(H, rel.ap[j].p, rel.ap[j].r);
-	if(H->hashcount[h] == 0){
-	    // new empty place
-            SET_HASH_P(H,h,rel.ap[j].p);
-            SET_HASH_R(H,h,rel.ap[j].r);
-	}
-	H->hashcount[h] += rel.ap[j].e;
-    }
-}
-
-// returns the sign of m1*a+m2*b
-int
-treatSign(relation_t rel, cado_poly pol)
-{
-    mpz_t tmp1, tmp2;
-    int s;
-
-    /* first perform a quick check */
-    s = (rel.a > 0) ? mpz_sgn (pol->g[1]) : -mpz_sgn (pol->g[1]);
-    if (mpz_sgn (pol->g[0]) == s)
-      return s;
-
-    mpz_init(tmp1);
-    mpz_mul_si(tmp1, pol->g[1], rel.a);
-    mpz_init(tmp2);
-    mpz_mul_ui(tmp2, pol->g[0], rel.b);
-    mpz_add(tmp1, tmp1, tmp2);
-    s = (mpz_sgn(tmp1) >= 0 ? 1 : -1);
-    mpz_clear(tmp1);
-    mpz_clear(tmp2);
-
-    return s;
-}
-
-// RETURN VALUE: -1 if file exhausted.
-//                0 if product is negative...
-//                1 if product is positive...
-int
-treatDep(char *prefix, int numdep, cado_poly pol, char *relname, char *purgedname, char *indexname, char *kername, int verbose)
-{
-    FILE *depfile, *relfile, *indexfile, *kerfile, *purgedfile = NULL;
-    char depname[200], str[1024];
-    hashtable_t H;
-    relation_t rel;
-    uint64_t w;
-    int i, j, ret, nlimbs, nrows, ncols, small_nrows, small_ncols;
-    int nrel, r, irel, sg, ind;
-    char *small_row_used, *rel_used;
-    int *vec; // useful to check dependency relation in the purged matrix
-    int need64 = (pol->lpba > 32) || (pol->lpbr > 32);
-    int rc;
-
-    purgedfile = gzip_open(purgedname, "r");
-    rc = fscanf(purgedfile, "%d %d", &nrows, &ncols);
-    ASSERT_ALWAYS(rc == 2);
-
-    indexfile = gzip_open(indexname, "r");
-    rc = fscanf(indexfile, "%d %d", &small_nrows, &small_ncols);
-    ASSERT_ALWAYS(rc == 2);
-
-    nlimbs = ((small_nrows - 1) / 64) + 1;
-    // first read used rows in the small matrix
-    small_row_used = (char *)malloc(small_nrows * sizeof(char));
-    rel_used = (char *)malloc(nrows * sizeof(char));
-
-    // skip first numdep-1 relations
-    kerfile = fopen(kername, "r");
-    for(j = 0; j < numdep; j++)
-	for(i = 0; i < nlimbs; ++i)
-	    ret = fscanf (kerfile, "%" SCNx64, &w);
-
-    // use a hash table to rebuild P2
-    hashInit(&H, nrows, 1, need64);
-	sprintf(depname, "%s.%03d", prefix, numdep);
-
-    memset(small_row_used, 0, small_nrows * sizeof(char));
-    // now use this dep
-    for(i = 0; i < nlimbs; ++i){
-		ret = fscanf (kerfile, "%" SCNx64, &w);
-		if(ret == -1)
-	    	return ret;
-		ASSERT (ret == 1);
-		if (verbose)
-	    	fprintf(stderr, "w=%" PRIx64 "\n", w);
-		for(j = 0; j < 64; ++j){
-	    	if(w & 1UL){
-				ind = (i * 64) + j;
-			if(verbose)
-		    	fprintf(stderr, "+R_%d\n", ind);
-			small_row_used[ind] = 1;
-	    	}
-	    w >>= 1;
-		}
-    }
-	fclose(kerfile);
-    // now map to the rels of the purged matrix
-    memset(rel_used, 0, nrows * sizeof(char));
-    for(i = 0; i < small_nrows; i++){
-	rc = fscanf(indexfile, "%d", &nrel);
-        ASSERT_ALWAYS(rc == 1);
-	for(j = 0; j < nrel; j++){
-	    rc = fscanf(indexfile, PURGE_INT_FORMAT, &r);
-            ASSERT_ALWAYS(rc == 1);
-	    if(small_row_used[i]){
-#if DEBUG >= 1
-		fprintf(stderr, "# Small[%d] -> %d\n", i, r);
-#endif
-#if DEBUG >= 1
-		if(rel_used[r])
-		    fprintf(stderr, "WARNING: flipping rel_used[%d]\n", r);
-#endif
-		rel_used[r] ^= 1;
-	    }
-	}
-    }
-    gzip_close(indexfile, indexname);
-#if MAPLE >= 1
-	fprintf(stderr, "A2:=1;\n");
-	fprintf(stderr, "AX:=1;\n");
-	fprintf(stderr, "NORM:=1;\n");
-#endif
-    // FIXME: sg should be removed...
-    sg = 1;
-    depfile = fopen(depname, "w");
-    // now really read the purged matrix in
-    vec = (int *)malloc(nrows * sizeof(int));
-    char * rp;
-    rp = fgets(str, 1024, purgedfile); // get rid of end of first line
-    ASSERT_ALWAYS(rp);
-
-
-    // we assume purgedfile is stored in increasing order of the indices
-    // of the real relations, so that one pass in the rels file is needed...!
-    relfile = gzip_open(relname, "r");
-    irel = 0; // we are ready to read relation irel
-    for(i = 0; i < nrows; i++){
-        rp = fgets(str, 1024, purgedfile);
-        ASSERT_ALWAYS(rp);
-        sscanf(str, "%d", vec+i);
-        if(rel_used[i]){
-#if DEBUG >= 1
-            fprintf(stderr, "Reading in rel %d of index %d\n", i, vec[i]);
-#endif
-            skip_relations_in_file(relfile, vec[i] - irel);
-            fread_relation(relfile, &rel);
-            irel = vec[i]+1;
-            treatRelation(depfile, &H, rel);
-            sg *= treatSign(rel, pol);
-            clear_relation(&rel);
-        }
-    }
-    gzip_close(relfile, relname);
-    //ASSERT(checkVector(vec, ncols));
-    if(sg == -1)
-	fprintf(stderr, "prod(a-b*m) < 0\n");
-    fclose(depfile);
-	gzip_close(purgedfile, purgedname);
-
-	fprintf(stderr, "# Treated dependency #%d at %2.2lf\n",
-		numdep, seconds());
-	hashClear(&H);
-    hashFree(&H);
-    free(small_row_used);
-    free(rel_used);
-    free(vec);
-    return (sg == -1 ? 0 : 1);
-}
-
-
 
 /********** RATSQRT **********/
 
@@ -418,7 +194,7 @@ stats (mpz_t *prd, unsigned long lprd)
 }
 
 int 
-calculateSqrtRat (char *prefix, int numdep, cado_poly pol)
+calculateSqrtRat (const char *prefix, int numdep, cado_poly pol)
 {
   char depname[200];
   char ratname[200];
@@ -456,11 +232,11 @@ calculateSqrtRat (char *prefix, int numdep, cado_poly pol)
 
   depfile = fopen (depname, "r");
   /*if(!depfile) {
-	fprintf (stderr, "Error: file %s not exist\n", depname);
-	exit(1);
+    fprintf (stderr, "Error: file %s not exist\n", depname);
+    exit(1);
   }*/
   ASSERT_ALWAYS(depfile != NULL);
-	
+    
   line_number = 2;
   for (;;)
     {
@@ -682,7 +458,7 @@ TonelliShanks (poly_t res, const poly_t a, const poly_t F, unsigned long p)
       int i;
       // pick a random delta
       for (i = 0; i < d; ++i)
-	mpz_urandomm(delta->coeff[i], state, myp);
+    mpz_urandomm(delta->coeff[i], state, myp);
       cleandeg(delta, d-1);
       // raise it to power (q-1)/2
       poly_power_mod_f_mod_ui(auxpol, delta, F, aux, p);
@@ -706,7 +482,7 @@ TonelliShanks (poly_t res, const poly_t a, const poly_t F, unsigned long p)
       mpz_ui_pow_ui(aux, 2, (s-1-i));
       poly_power_mod_f_mod_ui(auxpol, auxpol, F, aux, p);
       if ((auxpol->deg == 0) && (mpz_cmp_ui(auxpol->coeff[0], p-1)== 0))
-	mpz_add_ui(m, m, 1UL<<i);
+    mpz_add_ui(m, m, 1UL<<i);
     }
     mpz_add_ui(t, t, 1);
     mpz_divexact_ui(t, t, 2);
@@ -817,7 +593,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
     // since we work mod q-1, this gives (3*q-5)/4
     mpz_mul_ui(aux, q, 3);
     mpz_sub_ui(aux, aux, 5);
-    mpz_divexact_ui(aux, aux, 4);		        // aux := (3q-5)/4
+    mpz_divexact_ui(aux, aux, 4);               // aux := (3q-5)/4
     poly_power_mod_f_mod_ui(invsqrtA, a, F, aux, p);
 #else
     TonelliShanks(invsqrtA, a, F, p);
@@ -856,7 +632,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
     ASSERT_ALWAYS(k == K[logk]);
 
     mpz_set (invpk, pk);
-    mpz_mul (pk, pk, pk);	// double the current precision
+    mpz_mul (pk, pk, pk);   // double the current precision
     logk --;
     if (K[logk] & 1)
       {
@@ -968,10 +744,10 @@ accumulate_fast_F (polymodF_t *prd, const polymodF_t a, const poly_t F,
         {
           lprd[0] ++;
           prd = (polymodF_t*) realloc (prd, *lprd * sizeof (polymodF_t));
-	  poly_alloc(prd[i+1]->p, F->deg);
+      poly_alloc(prd[i+1]->p, F->deg);
           mpz_set_ui(prd[i + 1]->p->coeff[0], 1);
-	  prd[i+1]->p->deg = 0;
-	  prd[i+1]->v = 0;
+      prd[i+1]->p->deg = 0;
+      prd[i+1]->v = 0;
         }
       polymodF_mul (prd[i+1], prd[i+1], prd[i], F);
       mpz_set_ui(prd[i]->p->coeff[0], 1);
@@ -996,7 +772,7 @@ accumulate_fast_F_end (polymodF_t *prd, const poly_t F, unsigned long lprd)
    side=1: consider the polynomial g
 */
 int
-calculateSqrtAlg (char *prefix, int numdep, cado_poly pol, int side)
+calculateSqrtAlg (const char *prefix, int numdep, cado_poly pol, int side)
 {
   char depname[200];
   char algname[200];
@@ -1067,14 +843,14 @@ calculateSqrtAlg (char *prefix, int numdep, cado_poly pol, int side)
       prd_tab[0]->v = 0;
       while(fscanf(depfile, "%ld %lu", &a, &b) != EOF){
         if(!(nab % 100000))
-  	fprintf(stderr, "# Reading ab pair #%d at %2.2lf\n", nab, seconds ());
+    fprintf(stderr, "# Reading ab pair #%d at %2.2lf\n", nab, seconds ());
         if((a == 0) && (b == 0))
-  	break;
+    break;
         polymodF_from_ab(tmp, a, b);
         prd_tab = accumulate_fast_F (prd_tab, tmp, F, &lprd, nprd++);
         nab++;
         if(b == 0)
-  	  nfree++;
+      nfree++;
       }
       fprintf (stderr, "# Read %d including %d free relations\n", nab, nfree);
       ASSERT_ALWAYS ((nab & 1) == 0);
@@ -1130,9 +906,9 @@ calculateSqrtAlg (char *prefix, int numdep, cado_poly pol, int side)
     mpz_mul(algsqrt, algsqrt, aux);
     mpz_mod(algsqrt, algsqrt, pol->n);
   
-	algfile = fopen (algname, "w");
-	gmp_fprintf (algfile, "%Zd\n", algsqrt);
-	fclose(algfile);
+    algfile = fopen (algname, "w");
+    gmp_fprintf (algfile, "%Zd\n", algsqrt);
+    fclose(algfile);
 
     gmp_fprintf(stderr, "algebraic square root is: %Zd\n", algsqrt);
     fprintf (stderr, "Algebraic square root time is %2.2lf\n", seconds() - t0);
@@ -1141,21 +917,21 @@ calculateSqrtAlg (char *prefix, int numdep, cado_poly pol, int side)
     poly_free(prd->p);
     poly_free(tmp->p);
     poly_free(F);
-	return 0;
+    return 0;
 }
 
 
 
 /********** GCD **********/
 int
-calculateGcd(char *prefix, int numdep, cado_poly pol)
+calculateGcd(const char *prefix, int numdep, cado_poly pol)
 {
-	char ratname[200];
-	char algname[200];
+    char ratname[200];
+    char algname[200];
     sprintf(ratname, "%s.rat.%03d", prefix, numdep);
     sprintf(algname, "%s.alg.%03d", prefix, numdep);
-	FILE *ratfile = NULL;
-	FILE *algfile = NULL;
+    FILE *ratfile = NULL;
+    FILE *algfile = NULL;
     int found = 0;
     mpz_t ratsqrt, algsqrt, g1, g2;
 
@@ -1164,14 +940,14 @@ calculateGcd(char *prefix, int numdep, cado_poly pol)
     mpz_init(g1);
     mpz_init(g2);
   
-	ratfile = fopen(ratname, "r");
-	algfile = fopen(algname, "r");
-	ASSERT_ALWAYS(ratfile != NULL);
-	ASSERT_ALWAYS(algfile != NULL);
-	gmp_fscanf(ratfile, "%Zd", ratsqrt);
-	gmp_fscanf(algfile, "%Zd", algsqrt);
-	fclose(ratfile);
-	fclose(algfile);
+    ratfile = fopen(ratname, "r");
+    algfile = fopen(algname, "r");
+    ASSERT_ALWAYS(ratfile != NULL);
+    ASSERT_ALWAYS(algfile != NULL);
+    gmp_fscanf(ratfile, "%Zd", ratsqrt);
+    gmp_fscanf(algfile, "%Zd", algsqrt);
+    fclose(ratfile);
+    fclose(algfile);
 
     // First check that the squares agree
     mpz_mul(g1, ratsqrt, ratsqrt);
@@ -1182,7 +958,7 @@ calculateGcd(char *prefix, int numdep, cado_poly pol)
 
     if (mpz_cmp(g1, g2)!=0) {
       fprintf(stderr, "Bug: the squares do not agree modulo n!\n");
-	  exit(1);
+      exit(1);
       //      gmp_printf("g1:=%Zd;\ng2:=%Zd;\n", g1, g2);
     }
 
@@ -1215,137 +991,211 @@ calculateGcd(char *prefix, int numdep, cado_poly pol)
     return 0;
 }
 
+void create_dependencies(const char * prefix, const char * indexname, const char * purgedname, const char * kername)
+{
+    FILE * ix = fopen(indexname, "r");
+    int small_nrows, small_ncols;
+    int ret;
+
+    /* small_ncols isn't used here: we don't care. */
+    ret = fscanf(ix, "%d %d", &small_nrows, &small_ncols);
+    ASSERT(ret == 2);
+
+    FILE * ker;
+    size_t ker_stride;
+    /* Check that kername has consistent size */
+    {
+        ker = fopen(kername, "r");
+        if (ker == NULL) { perror(kername); exit(errno); }
+        struct stat sbuf[1];
+        ret = fstat(fileno(ker), sbuf);
+        if (ret < 0) { perror(kername); exit(errno); }
+        ASSERT_ALWAYS(sbuf->st_size % small_nrows == 0);
+        unsigned int ndepbytes = sbuf->st_size / small_nrows;
+        fprintf(stderr, "%s contains %u dependencies (including padding)\n",
+                kername, 8 * ndepbytes);
+        ker_stride = ndepbytes - sizeof(uint64_t);
+        if (ker_stride)
+            fprintf(stderr, "Considering only the first 64 dependencies\n");
+    }
+
+    /* We also initiate the purgedfile_stream structure, it gives us the
+     * number of (a,b) pairs -- and we need to allocate a structure of
+     * that size early on
+     */
+    purgedfile_stream ps;
+    purgedfile_stream_init(ps);
+    purgedfile_stream_openfile(ps, purgedname);
+    
+    uint64_t * abs = malloc(ps->nrows * sizeof(uint64_t));
+    memset(abs, 0, ps->nrows * sizeof(uint64_t));
+
+    for(int i = 0 ; i < small_nrows ; i++) {
+        uint64_t v;
+        ret = fread(&v, sizeof(uint64_t), 1, ker);
+        if (ker_stride) fseek(ker, ker_stride, SEEK_CUR);
+
+        /* read the index row */
+        int nc;
+        ret = fscanf(ix, "%d", &nc); ASSERT_ALWAYS(ret == 1);
+        for(int k = 0 ; k < nc ; k++) {
+            unsigned int col;
+            ret = fscanf(ix, "%x", &col); ASSERT_ALWAYS(ret == 1);
+            ASSERT_ALWAYS(col < (unsigned int) ps->nrows);
+            abs[col] ^= v;
+        }
+    }
+    fclose(ix);
+    fclose(ker);
+
+    unsigned int nonzero_deps = 0;
+    uint64_t sanity = 0;
+    for(int i = 0 ; i < ps->nrows ; i++) {
+        sanity |= abs[i];
+    }
+    uint64_t dep_masks[64]={0,};
+    char * dep_names[64];
+    FILE * dep_files[64];
+    unsigned int dep_counts[64]={0,};
+
+    for(int i = 0 ; i < 64 ; i++) {
+        uint64_t m = 1UL << i;
+        if (sanity & m)
+            dep_masks[nonzero_deps++] = m;
+    }
+    fprintf(stderr, "Total: %u non-zero dependencies\n", nonzero_deps);
+    for(unsigned int i = 0 ; i < nonzero_deps ; i++) {
+        ret = asprintf(&dep_names[i], "%s.%03d", prefix, i);
+        ASSERT_ALWAYS(ret >= 0);
+        dep_files[i] = fopen(dep_names[i], "w");
+        ASSERT_ALWAYS(dep_files[i] != NULL);
+    }
+    ps->parse_only_ab = 1;
+    for(int i = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; i++) {
+        ASSERT_ALWAYS(i < ps->nrows);
+        for(unsigned int j = 0 ; j < nonzero_deps ; j++) {
+            if (abs[i] & dep_masks[j]) {
+                fprintf(dep_files[j], "%"PRId64" %"PRIu64"\n", ps->a, ps->b);
+                dep_counts[j]++;
+            }
+        }
+        if (purgedfile_stream_disp_progress_now_p(ps)) {
+            fprintf(stderr, "read (a,b) pair # %d / %d at %.1f -- %.1f MB/s -- %.1f pairs / s\n",
+                    ps->rrows, ps->nrows, ps->dt, ps->mb_s, ps->rows_s);
+        }
+    }
+    purgedfile_stream_trigger_disp_progress(ps);
+    fprintf(stderr, "read (a,b) pair # %d / %d at %.1f -- %.1f MB/s -- %.1f pairs / s\n",
+            ps->rrows, ps->nrows, ps->dt, ps->mb_s, ps->rows_s);
+
+    purgedfile_stream_closefile(ps);
+    purgedfile_stream_clear(ps);
+
+    fprintf(stderr, "Written %u dependencies files\n", nonzero_deps);
+    for(unsigned int i = 0 ; i < nonzero_deps ; i++) {
+        fprintf(stderr, "%s : %u (a,b) pairs\n", dep_names[i], dep_counts[i]);
+        fclose(dep_files[i]);
+        free(dep_names[i]);
+    }
+}
+
+
+void usage(const char * me)
+{
+    fprintf(stderr, "Usage: %s [-ab || -rat || -alg || -gcd] -poly polyname -prefix prefix -dep numdep", me);
+    fprintf(stderr, " -purged purgedname -index indexname -ker kername\n");
+    fprintf(stderr, "or %s (-rat || -alg || -gcd) -poly polyname -prefix prefix -dep numdep\n\n", me);
+    fprintf(stderr, "(a,b) pairs of dependency relation 'numdep' will be r/w in file 'prefix.numdep',");
+    fprintf(stderr, " rational sqrt in 'prefix.rat.numdep' ...\n");
+    exit(1);
+}
+
 
 int main(int argc, char *argv[])
 {
-	char *polyname = NULL, *prefix = NULL;
-    char *relname = NULL, *purgedname = NULL, *indexname = NULL, *kername = NULL;
     cado_poly pol;
-    int verbose = 0, numdep = -1, opt = 0, ret, i;
+    int numdep = -1, ret, i;
 
+    char * me = *argv;
     /* print the command line */
     fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
     for (i = 1; i < argc; i++)
       fprintf (stderr, " %s", argv[i]);
     fprintf (stderr, "\n");
 
-	if (argc == 1 || (argc > 1 && strcmp(argv[1], "--help") == 0 )) {
-		fprintf(stderr, "Usage: %s [-ab || -rat || -alg || -gcd] -poly polyname -dep prefix numdep", argv[0]);
-		fprintf(stderr, " -rel relname -purged purgedname -index indexname -ker kername\n");
-		fprintf(stderr, "or %s (-rat || -alg || -gcd) -poly polyname -dep prefix numdep\n\n", argv[0]);
-		fprintf(stderr, "(a,b) pairs of dependency relation 'numdep' will be r/w in file 'prefix.numdep',");
-		fprintf(stderr, " rational sqrt in 'prefix.rat.numdep' ...\n");
-		exit(1);
-	}
-		
-	/* args */
-    while (argc > 1 && argv[1][0] == '-') {
-		if(argc > 1 && strcmp(argv[1], "-ab") == 0) {
-			opt += 1;
-			argc--;
-			argv++;
-		}
-		else if(argc > 1 && strcmp(argv[1], "-rat") == 0) {
-			opt += 2;
-			argc--;
-			argv++;
-		}
-		else if(argc > 1 && strcmp(argv[1], "-alg") == 0) {
-			opt += 4;
-			argc--;
-			argv++;
-		}
-		else if(argc > 1 && strcmp(argv[1], "-gcd") == 0) {
-			opt += 8;
-			argc--;
-			argv++;
-		}
-        else if (argc > 2 && strcmp(argv[1], "-poly") == 0) {
-	    	polyname = argv[2];
-            argc -= 2;
-            argv += 2;
-        }
-        else if (argc > 3 && strcmp(argv[1], "-dep") == 0) {
-	    	prefix = argv[2];
-	    	numdep = atoi(argv[3]);
-            argc -= 3;
-            argv += 3;
-        }
-        else if (argc > 2 && strcmp(argv[1], "-rel") == 0) {
-	    	relname = argv[2];
-            argc -= 2;
-            argv += 2;
-        }
-        else if (argc > 2 && strcmp(argv[1], "-purged") == 0) {
-	    	purgedname = argv[2];
-            argc -= 2;
-            argv += 2;
-        }
-        else if (argc > 2 && strcmp(argv[1], "-index") == 0) {
-	    	indexname = argv[2];
-            argc -= 2;
-            argv += 2;
-        }
-        else if (argc > 2 && strcmp(argv[1], "-ker") == 0) {
-	    	kername = argv[2];
-            argc -= 2;
-            argv += 2;
-        }
-		else {
-			fprintf(stderr, "Error: %s parameter unknown or bad arguments in command line\n", argv[1]);
-			exit(1);
-		}
-	}
+    param_list pl;
+    param_list_init(pl);
 
-	/* if no options then -ab -rat -alg -gcd */
-	if (!opt)
-		opt = 15;
-
-    ASSERT_ALWAYS(polyname != NULL);
-    ASSERT_ALWAYS(prefix != NULL);
-    ASSERT_ALWAYS(numdep != -1);
-
+    int opt_ab = 0;
+    int opt_rat = 0;
+    int opt_alg = 0;
+    int opt_gcd = 0;
+    param_list_configure_knob(pl, "ab", &opt_ab);
+    param_list_configure_knob(pl, "rat", &opt_rat);
+    param_list_configure_knob(pl, "alg", &opt_alg);
+    param_list_configure_knob(pl, "gcd", &opt_gcd);
+    argc--,argv++;
+    for( ; argc ; ) {
+        if (param_list_update_cmdline(pl, &argc, &argv)) continue;
+        if (strcmp(*argv, "--help") == 0) {
+            usage(me);
+            exit(0);
+        } else {
+            fprintf(stderr, "unexpected argument: %s\n", *argv);
+            usage(me);
+            exit(1);
+        }
+    }
+    const char * tmp;
+    ASSERT_ALWAYS((tmp = param_list_lookup_string(pl, "poly")) != NULL);
     cado_poly_init(pol);
-    ret = cado_poly_read(pol, polyname);
+    ret = cado_poly_read(pol, tmp);
     ASSERT (ret);
 
-    /* if bit 0 of opt is set: compute the (a,b) pairs
-       if bit 1 of opt is set: compute the rational square root
-       if bit 2 of opt is set: compute the algebraic square root
-       if bit 3 of opt is set: compute the gcd */
-           
-    int count = 0;
-    while (opt)
-      {
-        if (opt%2 == 1)
-          {
-            if (count == 0)
-              { /* compute the (a,b) pairs */
-                ASSERT_ALWAYS(relname != NULL);
-                ASSERT_ALWAYS(purgedname != NULL);
-                ASSERT_ALWAYS(indexname != NULL);
-                ASSERT_ALWAYS(kername != NULL);
-                treatDep (prefix, numdep, pol, relname, purgedname, indexname,
-                          kername, verbose);
-              } 
-            else if (count == 1) /* compute the square root on the g-side */
-              {
-                if (pol->degreeg == 1)
-                  calculateSqrtRat (prefix, numdep, pol);
-                else
-                  calculateSqrtAlg (prefix, numdep, pol, 1);
-              }
-            else if (count == 2) /* compute the square root on the f-side */
-              calculateSqrtAlg (prefix, numdep, pol, 0);
-            else 
-              calculateGcd (prefix, numdep, pol);
-            opt--;
-          }
-        opt = opt / 2;
-        count++;
-      }
-	
+    param_list_parse_int(pl, "dep", &numdep);
+    const char * purgedname = param_list_lookup_string(pl, "purged");
+    const char * indexname = param_list_lookup_string(pl, "index");
+    const char * kername = param_list_lookup_string(pl, "ker");
+    const char * prefix = param_list_lookup_string(pl, "prefix");
+    if (param_list_warn_unused(pl))
+        exit(1);
+
+    /* if no options then -ab -rat -alg -gcd */
+    if (!(opt_ab || opt_rat || opt_alg || opt_gcd))
+        opt_ab = opt_rat = opt_alg = opt_gcd = 1;
+
+
+    if (opt_ab) {
+        /* Computing (a,b) pairs is now done in batch for 64 dependencies
+         * together -- should be enough for our purposes, even if we do
+         * have more dependencies !
+         */
+        create_dependencies(prefix, indexname, purgedname, kername);
+        ASSERT_ALWAYS(indexname != NULL);
+        ASSERT_ALWAYS(purgedname != NULL);
+        ASSERT_ALWAYS(kername != NULL);
+    }
+
+    if (opt_rat) {
+        ASSERT_ALWAYS(numdep != -1);
+        if (pol->degreeg == 1)
+            calculateSqrtRat (prefix, numdep, pol);
+        else
+            calculateSqrtAlg (prefix, numdep, pol, 1);
+    }
+
+    if (opt_alg) {
+        ASSERT_ALWAYS(numdep != -1);
+        calculateSqrtAlg (prefix, numdep, pol, 0);
+    }
+
+    if (opt_gcd) {
+        ASSERT_ALWAYS(numdep != -1);
+        calculateGcd (prefix, numdep, pol);
+    }
+    
     cado_poly_clear (pol);
+    param_list_clear(pl);
     return 0;
 }
   

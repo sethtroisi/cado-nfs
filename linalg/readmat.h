@@ -10,7 +10,7 @@ extern "C" {
 
 // data is stored in a huge table:
 //   [ nb_coeff c0 c1 ... ck nb_coeff c0 c1 ..... ]
-struct sparse_mat_s {
+struct filter_matrix_s {
     unsigned int nrows;
     unsigned int ncols;
     unsigned int *data;
@@ -19,17 +19,17 @@ struct sparse_mat_s {
     unsigned int wt;		// number of coeffs
 };
 
-typedef struct sparse_mat_s sparse_mat_t[1];
+typedef struct filter_matrix_s filter_matrix_t[1];
 
 /* Reads the whole matrix */
-extern void readmat(FILE *file, sparse_mat_t mat, int compact);
+extern void readmat(FILE *file, filter_matrix_t mat, int compact);
 
-static inline void readmat_with_ab(FILE *file, sparse_mat_t mat)
+static inline void readmat_with_ab(FILE *file, filter_matrix_t mat)
 { readmat(file, mat, 0); }
 
-extern void read_matrix_header(FILE *file, sparse_mat_t mat);
+extern void read_matrix_header(FILE *file, filter_matrix_t mat);
 
-/* Reads only one row of the matrix. Reallocates the sparse_mat_t
+/* Reads only one row of the matrix. Reallocates the filter_matrix_t
  * structure if needed. The data is put at the location pointed to by
  * dst. A pointer to the end of the written area is returned.
  *
@@ -50,10 +50,10 @@ extern void read_matrix_header(FILE *file, sparse_mat_t mat);
  * dst = mat->data
  *
  */
-extern unsigned int * read_matrix_row(FILE * file, sparse_mat_t mat, unsigned int * dst, int compact);
+extern unsigned int * read_matrix_row(FILE * file, filter_matrix_t mat, unsigned int * dst, int compact);
 
-extern void sparse_mat_init(sparse_mat_t dst);
-extern void sparse_mat_clear(sparse_mat_t dst);
+extern void filter_matrix_init(filter_matrix_t dst);
+extern void filter_matrix_clear(filter_matrix_t dst);
 
 #ifdef __cplusplus
 }
