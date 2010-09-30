@@ -57,6 +57,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 */
 
 #define _POSIX_C_SOURCE 200112L /* pclose */
+#define _GNU_SOURCE     /* asprintf */
+#define _DARWIN_C_SOURCE     /* asprintf */
 #include <gmp.h>
 #include "mod_ul.c"
 #include <stdio.h>
@@ -591,7 +593,7 @@ remove_singletons (int *nrel, int nrelmax, int *nprimes, hashtable_t *H,
    weight, since this will probably be done later on.
    All rows will be 1 more that needed -> subtract 1 in fprint...! */
 static void
-renumber (int *nprimes, hashtable_t *H, char *sos)
+renumber (int *nprimes, hashtable_t *H, const char *sos)
 {
     FILE *fsos = NULL;
     unsigned int i;
@@ -640,7 +642,7 @@ renumber (int *nprimes, hashtable_t *H, char *sos)
    (otherwise in format used by merge).
 */
 static void
-reread (char *oname, char ** ficname,
+reread (const char *oname, char ** ficname,
         hashtable_t *H, bit_vector_srcptr rel_used, int nrows, int ncols, int raw)
 {
   FILE *ofile;
@@ -707,7 +709,7 @@ reread (char *oname, char ** ficname,
 static void
 usage (void)
 {
-  fprintf (stderr, "Usage: purge [options] -poly polyfile -out purgedfile -nrels nnn [-filelist <fl>] file1 ... filen\n");
+  fprintf (stderr, "Usage: purge [options] -poly polyfile -out purgedfile -nrels nnn [-basepath <path>] [-subdirlist <sl>] [-filelist <fl>] file1 ... filen\n");
   fprintf (stderr, "Options:\n");
   fprintf (stderr, "       -excess  nnn - initial excess must be >= nnn (default 1)\n");
   fprintf (stderr, "       -keep    nnn - prune if excess > nnn (default 160)\n");
@@ -731,8 +733,6 @@ int
 main (int argc, char **argv)
 {
     hashtable_t H;
-    char **fic, *polyname = NULL, *sos = NULL, *purgedname = NULL;
-    char *filelist = NULL;
     int **rel_compact = NULL;
     int ret, k;
     int nrel, nprimes = 0;
@@ -746,96 +746,64 @@ main (int argc, char **argv)
     int need64 = 0; /* non-zero if large primes are > 2^32 */
     int final, pass = 0;
     int raw = 0;
+    char ** fic;
 
     fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
     for (k = 1; k < argc; k++)
       fprintf (stderr, " %s", argv[k]);
     fprintf (stderr, "\n");
 
-    while(argc > 1 && argv[1][0] == '-'){
-	if(argc > 2 && strcmp (argv[1], "-poly") == 0){
-	    polyname = argv[2];
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if(argc > 2 && strcmp (argv[1], "-nrels") == 0){
-	    nrelmax = atoi(argv[2]);
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if(argc > 2 && strcmp (argv[1], "-nprimes") == 0){
-	    nprimes = atoi(argv[2]);
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if(argc > 2 && strcmp (argv[1], "-minpr") == 0){
-	    minpr = atol (argv[2]);
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if(argc > 2 && strcmp (argv[1], "-minpa") == 0){
-	    minpa = atol (argv[2]);
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if(argc > 2 && strcmp (argv[1], "-excess") == 0){
-	    excess = atol (argv[2]);
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if(argc > 2 && strcmp (argv[1], "-keep") == 0){
-	    keep = atol (argv[2]);
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if(argc > 2 && strcmp (argv[1], "-sos") == 0){
-	    sos = argv[2];
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if(argc > 2 && strcmp (argv[1], "-out") == 0){
-	    purgedname = argv[2];
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if(argc > 1 && strcmp (argv[1], "-raw") == 0){
-            raw = 1;
-	    argc --;
-	    argv ++;
-	}
-    else if(argc > 1 && strcmp (argv[1], "-filelist") == 0) {
-        filelist = argv[2];
-        argv += 2;
-        argc -= 2;
-    }
-        else
-          {
-            fprintf (stderr, "Error, unknown option %s\n", argv[1]);
-            usage ();
-          }
-    }
+    param_list pl;
+    param_list_init(pl);
 
-    /*if (argc == 1)
-      usage ();
-	*/
-
-    if (polyname == NULL)
-      {
-        fprintf (stderr, "Error, missing -poly ... option\n");
-        exit (1);
-      }
-
-    if (nrelmax == 0)
-      {
-        fprintf (stderr, "Error, missing -nrels ... option\n");
-        exit (1);
-      }
+    param_list_configure_knob(pl, "raw", &raw);
 
     argv++,argc--;
-    fic = filelist ? filelist_from_file(filelist) : argv;
+
+    for( ; argc ; ) {
+        if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
+        /* Since we accept file names freeform, we decide to never abort
+         * on unrecognized options */
+        if (strcmp(*argv, "--help") == 0)
+            usage();
+        break;
+        // fprintf (stderr, "Unknown option: %s\n", argv[0]);
+        // abort(); 
+    }
+
+    param_list_parse_uint(pl, "nrels", &nrelmax);
+    param_list_parse_int(pl, "nprimes", &nprimes);
+    param_list_parse_long(pl, "minpr", &minpr);
+    param_list_parse_long(pl, "minpa", &minpa);
+    param_list_parse_long(pl, "excess", &excess);
+    param_list_parse_long(pl, "keep", &keep);
+
+    const char * filelist = param_list_lookup_string(pl, "filelist");
+    const char * basepath = param_list_lookup_string(pl, "basepath");
+    const char * subdirlist = param_list_lookup_string(pl, "subdirlist");
+    const char * purgedname = param_list_lookup_string(pl, "out");
+    const char * sos = param_list_lookup_string(pl, "sos");
 
     cado_poly_init (pol);
-    cado_poly_read (pol, polyname);
+
+    const char * tmp;
+
+    ASSERT_ALWAYS((tmp = param_list_lookup_string(pl, "poly")) != NULL);
+    cado_poly_read(pol, tmp);
+
+    if (param_list_warn_unused(pl)) {
+        usage();
+    }
+
+    if ((basepath || subdirlist) && !filelist) {
+        fprintf(stderr, "-basepath / -subdirlist only valid with -filelist\n");
+        usage();
+    }
+
+    if (nrelmax == 0) {
+        fprintf (stderr, "Error, missing -nrels ... option\n");
+        usage();
+    }
 
     /* On a 32-bit computer, even 1 << 32 would overflow. Well, we could set
        map[ra] = 2^32-1 in that case, but not sure we want to support 32-bit
@@ -845,7 +813,7 @@ main (int argc, char **argv)
     if (need64 && sizeof (long) < 8)
       {
         fprintf (stderr, "Error, too large LPBs for a 32-bit computer\n");
-        exit (1);
+        usage();
       }
 
     minus2 = (need64) ? 18446744073709551614UL : 4294967294UL;
@@ -886,6 +854,45 @@ main (int argc, char **argv)
     fprintf (stderr, "Allocated rel_compact of %zuMb (total %luMb so far)\n",
              (nrelmax * sizeof (int *)) >> 20,
              tot_alloc0 >> 20);
+
+    /* Build the file list (ugly). It is the concatenation of all
+     *  b s p
+     * where:
+     *    b is the basepath (empty if not given)
+     *    s ranges over all subdirs listed in the subdirlist (empty if no
+     *    such list)
+     *    p ranges over all paths listed in the filelist.
+     *
+     * If files are provided directly on the command line, the basepath
+     * and subdirlist arguments are ignored.
+     */
+
+    if (!filelist) {
+        fic = argv;
+    } else if (!subdirlist) {
+        fic = filelist_from_file(basepath, filelist);
+    } else {
+        /* count the number of files in the filelist */
+        int nfiles = 0;
+        int nsubdirs = 0;
+        char ** fl = filelist_from_file(NULL, filelist);
+        for(char ** p = fl ; *p ; p++, nfiles++);
+
+        char ** sl = filelist_from_file(basepath, subdirlist);
+        for(char ** p = sl ; *p ; p++, nsubdirs++);
+
+        fic = malloc((nsubdirs * nfiles + 1) * sizeof(char*));
+        char ** full = fic;
+        for(char ** f = fl ; *f ; f++) {
+            for(char ** s = sl ; *s ; s++, full++) {
+                int ret = asprintf(full, "%s/%s", *s, *f);
+                ASSERT_ALWAYS(ret >= 0);
+            }
+        }
+        *full=NULL;
+        filelist_clear(fl);
+        filelist_clear(sl);
+    }
 
     nrel = nrelmax;
     while (1)
@@ -948,6 +955,8 @@ main (int argc, char **argv)
     cado_poly_clear (pol);
 
     if (filelist) filelist_clear(fic);
+
+    param_list_clear(pl);
 
     return 0;
 }

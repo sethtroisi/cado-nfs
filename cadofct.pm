@@ -2043,20 +2043,29 @@ sub do_sieve {
                         { log => 1, kill => 1,
                                 stdout_stderr=>"$param{'prefix'}.dup1.stderr" });
         }
+        {
+            my $name="$param{'prefix'}.subdirlist";
+            open FILE, "> $name" or die "$name: $!";
+            print FILE join("\n", map { "$param{'name'}.nodup/$_"; } (0..$nslices-1));
+            close FILE;
+        }
+        {
+            # Put basenames of relation files in list.
+            my $name="$param{'prefix'}.filelist";
+            open FILE, "> $name" or die "$name: $!";
+            print FILE join("\n", map { m{([^/]+)$}; $1; } @files);
+            close FILE;
+        }
+
         my $n = 0;
         my @allfiles;
         my $K = int ( 100 + (1.2 * $nrels / $nslices) );
         for (my $i=0; $i < $nslices; $i++) {
                 info "removing duplicates on slice $i...";
-                $allfiles[$i] = 
-                join "", (map "$param{'prefix'}.nodup/$i/$_\n", sort @files);
-                open FILE, "> $param{'prefix'}.dup2files"
-                        or die "Cannot open `$param{'prefix'}.dup2files' for writing: $!.\n";
-                print FILE $allfiles[$i];
-                close FILE;
                 cmd("$param{'bindir'}/filter/dup2 ".
                         "-K $K -out $param{'prefix'}.nodup/$i ".
-                        "-filelist $param{'prefix'}.dup2files ",
+                        "-filelist $param{'prefix'}.filelist ".
+                        "-basepath $param{'prefix'}.nodup/$i ",
                         { log => 1, kill => 1,
                                 stdout_stderr => "$param{'prefix'}.dup2.stderr",
                         });
@@ -2080,17 +2089,13 @@ sub do_sieve {
         # Remove singletons
         info "Removing singletons...";
         $tab_level++;
-        open FILE, "> $param{'prefix'}.purgefiles"
-                or die "Cannot open `$param{'prefix'}.purgefiles' for writing: $!.\n";
-        for (@allfiles) {
-                print FILE $_;
-        }
-        close FILE;
         my $ret = cmd("$param{'bindir'}/filter/purge ".
                 "-poly $param{'prefix'}.poly -keep $param{'keeppurge'} ".
                 "-excess $param{'excesspurge'} ".
                 "-nrels $n -out $param{'prefix'}.purged ".
-                "-filelist $param{'prefix'}.purgefiles ",
+                "-basepath $param{'wdir'} " .
+                "-subdirlist $param{'prefix'}.subdirlist ".
+                "-filelist $param{'prefix'}.filelist ",
                 { log => 1,
                         stdout_stderr => "$param{'prefix'}.purge.stderr"
                 });

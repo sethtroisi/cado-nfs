@@ -267,8 +267,18 @@ int main (int argc, char *argv[])
     const char * dirname = param_list_lookup_string(pl, "out");
     const char * outfmt = param_list_lookup_string(pl, "outfmt");
     const char * filelist = param_list_lookup_string(pl, "filelist");
+    const char * basepath = param_list_lookup_string(pl, "basepath");
 
     param_list_parse_ulong(pl, "K", &K);
+
+    if (param_list_warn_unused(pl)) {
+        usage();
+    }
+
+    if (basepath && !filelist) {
+        fprintf(stderr, "-basepath only valid with -filelist\n");
+        exit(1);
+    }
 
     if (K == 0)
         usage();
@@ -313,7 +323,7 @@ int main (int argc, char *argv[])
       usage();
   }
 
-  char ** files = filelist ? filelist_from_file(filelist) : argv;
+  char ** files = filelist ? filelist_from_file(basepath, filelist) : argv;
   unsigned long rread = remove_dup_in_files (files, dirname, outfmt, H, K);
   if (filelist) filelist_clear(files);
 
@@ -333,5 +343,6 @@ int main (int argc, char *argv[])
   fprintf (stderr, "[found %lu true duplicates on sample of %lu relations]\n",
            sanity_collisions, sanity_checked);
 
+  param_list_clear(pl);
   return 0;
 }

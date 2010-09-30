@@ -12,7 +12,8 @@
    Input can be in gzipped or bzipped format.
 */
 
-#define _GNU_SOURCE
+#define _GNU_SOURCE     /* asprintf */
+#define _DARWIN_C_SOURCE     /* asprintf */
 
 #define NSLICES_LOG 2
 #define NSLICES (1 << NSLICES_LOG)
@@ -172,6 +173,17 @@ main (int argc, char * argv[])
     int only_slice = -1;
     param_list_parse_int(pl, "only", &only_slice);
     const char * outfmt = param_list_lookup_string(pl, "outfmt");
+    const char * filelist = param_list_lookup_string(pl, "filelist");
+    const char * basepath = param_list_lookup_string(pl, "basepath");
+
+    if (param_list_warn_unused(pl)) {
+        exit(1);
+    }
+
+    if (basepath && !filelist) {
+        fprintf(stderr, "-basepath only valid with -filelist\n");
+        exit(1);
+    }
 
     if (!dirname)
         usage();
@@ -198,15 +210,17 @@ main (int argc, char * argv[])
           do_slice[i] = i == only_slice;
     }
 
-    if (argc == 0) {
-        fprintf (stderr, "Error: no files provided\n");
-        exit (1);
+    if ((filelist != NULL) + (argc != 0) != 1) {
+        fprintf(stderr, "Provide either -filelist or freeform file names\n");
+        usage();
     }
+
+    char ** files = filelist ? filelist_from_file(basepath, filelist) : argv;
 
     relation_stream rs;
     relation_stream_init(rs);
-    for (int i = 0 ; i < argc ; i++) {
-        had_error |= split_relfile (rs, argv[i], dirname, outfmt, do_slice);
+    for (char ** fp = files ; *fp ; fp++) {
+        had_error |= split_relfile (rs, *fp, dirname, outfmt, do_slice);
     }
     relation_stream_trigger_disp_progress(rs);
     fprintf (stderr,
@@ -214,6 +228,8 @@ main (int argc, char * argv[])
             " -- %.1f MB/s -- %.1f rels/s\n",
             rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
     relation_stream_clear(rs);
+
+    if (filelist) filelist_clear(files);
 
     param_list_clear(pl);
 

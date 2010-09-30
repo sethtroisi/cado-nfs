@@ -124,7 +124,7 @@ void chomp(char *s) {
         *p = '\0';
 }
 
-char ** filelist_from_file(const char * filename)
+char ** filelist_from_file(const char * basepath, const char * filename)
 {
     char ** files = NULL;
     int nfiles_alloc = 0;
@@ -151,7 +151,15 @@ char ** filelist_from_file(const char * filename)
             nfiles_alloc += nfiles_alloc / 2 + 16;
             files = realloc(files, nfiles_alloc * sizeof(char*));
         }
-        files[nfiles++] = strdup(rfile);
+        if (basepath) {
+            char * name;
+            int ret = asprintf(&name, "%s/%s", basepath, rfile);
+            ASSERT_ALWAYS(ret >= 0);
+            files[nfiles] = name;
+        } else {
+            files[nfiles] = strdup(rfile);
+        }
+        nfiles++;
     }
     fclose(f);
 
