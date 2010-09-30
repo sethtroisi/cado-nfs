@@ -1164,6 +1164,7 @@ int main(int argc, char *argv[])
     if (!(opt_ab || opt_rat || opt_alg || opt_gcd))
         opt_ab = opt_rat = opt_alg = opt_gcd = 1;
 
+    ASSERT_ALWAYS(prefix);
 
     if (opt_ab) {
         /* Computing (a,b) pairs is now done in batch for 64 dependencies
