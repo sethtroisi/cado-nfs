@@ -2053,12 +2053,21 @@ sub do_sieve {
             # Put basenames of relation files in list.
             my $name="$param{'prefix'}.filelist";
             open FILE, "> $name" or die "$name: $!";
-            print FILE join("\n", map { m{([^/]+)$}; $1; } @files);
+            for (@files) {
+                m{([^/]+)$};
+                print FILE "$_\n";
+            }
             close FILE;
         }
 
         my $n = 0;
-        my @allfiles;
+        my @allfiles=();
+        for my $f (@files) {
+            for (my $i=0; $i < $nslices; $i++) {
+                push @allfiles, "$param{'prefix'}.nodup/$i/$f";
+            }
+        }
+
         my $K = int ( 100 + (1.2 * $nrels / $nslices) );
         for (my $i=0; $i < $nslices; $i++) {
                 info "removing duplicates on slice $i...";
@@ -2119,8 +2128,11 @@ sub do_sieve {
         # note: the nodup.gz file is no longer used now.
         # Thus we may spare the hassle of creating it.
         info "Join all no duplicate files into one file...";
-        cmd("cat $param{'prefix'}.purgefiles | xargs zcat ".
-            "| gzip --best > $param{'prefix'}.nodup.gz ",
+        my $join_allfiles=join(' ', @allfiles);
+        # The man page of gzip informs us that the following is
+        # legitimate usage (provided all files are gzipped)
+        for (@allfiles) { die unless m{\.gz$}; }
+        cmd("cat $join_allfiles > $param{'prefix'}.nodup.gz ",
             { log => 1, kill => 1 });
         $tab_level++;
         info "clean directory nodup...";

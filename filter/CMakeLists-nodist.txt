@@ -2,4 +2,7 @@
 add_executable(refresh-purged refresh-purged.c)
 target_link_libraries(refresh-purged utils)
 
+add_executable(explain explain.c)
+target_link_libraries(explain utils)
+
 # vim: ft=cmake:

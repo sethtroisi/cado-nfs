@@ -344,9 +344,9 @@ flushSparse(const char *sparsename, int **sparsemat, int small_nrows, int small_
     }
 
     free(base);
+    free(weights);
 
     return W;
-
 }
 
 // dump of newrows in indexname.
@@ -373,7 +373,7 @@ makeIndexFile(const char *indexname, int nrows, int **newrows, int small_nrows, 
 // on input, colweight[j] contains the weight; on exit, colweight[j]
 // contains the new index for j.
 static void
-renumber(int *small_ncols, int *colweight, int ncols)
+renumber(const char * sosname, int *small_ncols, int *colweight, int ncols)
 {
     int j, k, nb, *tmp;
 
@@ -400,6 +400,21 @@ renumber(int *small_ncols, int *colweight, int ncols)
     fprintf (stderr, "Sorting columns by decreasing weight\n");
     for(j = nb-1, k = 1; j >= 0; j -= 2)
 	colweight[tmp[j]] = k++; // always this +1 trick
+    if (sosname) {
+        fprintf(stderr, "Saving ideal renumbering info to %s\n", sosname);
+        FILE * f = fopen(sosname, "w");
+        ASSERT_ALWAYS(f);
+        for(j = nb-1, k = 0; j >= 0; j -= 2) {
+            // column number k in the output matrix corresponds to ideal
+            // number tmp[j] (whose meaning can be fetched from the sos
+            // file produced by purge)
+            uint32_t z = tmp[j];
+            int r = fwrite(&z, sizeof(uint32_t), 1, f);
+            ASSERT_ALWAYS(r == 1);
+        }
+        fclose(f);
+    }
+
 #endif
     free(tmp);
 }
@@ -457,7 +472,7 @@ doAllAdds(int **newrows, char *str)
 #define STRLENMAX 2048
 
 static int
-oneFile(const char *sparsename, int **sparsemat, int *colweight, purgedfile_stream_ptr ps, int **oldrows, int ncols, int small_nrows, int verbose, int skip, int bin)
+oneFile(const char *sparsename, const char * sosname, int **sparsemat, int *colweight, purgedfile_stream_ptr ps, int **oldrows, int ncols, int small_nrows, int verbose, int skip, int bin)
 {
     unsigned long W;
     int small_ncols;
@@ -465,7 +480,7 @@ oneFile(const char *sparsename, int **sparsemat, int *colweight, purgedfile_stre
     makeSparse(sparsemat, colweight, ps, 0, ncols, oldrows, verbose,0);
 
     fprintf(stderr, "Renumbering columns (including sorting w.r.t. weight)\n");
-    renumber(&small_ncols, colweight, ncols);
+    renumber(sosname, &small_ncols, colweight, ncols);
 
     fprintf(stderr, "small_nrows=%d small_ncols=%d\n",small_nrows,small_ncols);
 
@@ -552,10 +567,11 @@ build_newrows_from_file(int **newrows, int nrows, FILE *hisfile, uint64_t bwcost
 	newrows[i][1] = i;
     }
     fprintf(stderr, "Reading row additions\n");
+	double tt = wct_seconds();
     while(fgets(str, STRLENMAX, hisfile)){
 	addread++;
 	if((addread % 100000) == 0)
-	    fprintf(stderr, "%lu lines read at %2.2lf\n", addread, seconds());
+	    fprintf(stderr, "%lu lines read at %2.2lf\n", addread, wct_seconds() - tt);
 	if(str[strlen(str)-1] != '\n'){
 	    fprintf(stderr, "Gasp: not a complete a line!");
 	    fprintf(stderr, " I stop reading and go to the next phase\n");
@@ -648,6 +664,7 @@ main(int argc, char *argv[])
     const char * sparsename = param_list_lookup_string(pl, "out");
     const char * indexname = param_list_lookup_string(pl, "index");
     const char * fromname = param_list_lookup_string(pl, "from");
+    const char * sosname = param_list_lookup_string(pl, "sos");
     param_list_parse_int(pl, "binary", &bin);
     param_list_parse_int(pl, "nslices", &nslices);
     param_list_parse_int(pl, "skip", &skip);
@@ -732,7 +749,7 @@ main(int argc, char *argv[])
     for(i = 0; i < small_nrows; i++)
 	sparsemat[i] = NULL;
     if(nslices == 0) {
-	small_ncols = oneFile(sparsename, sparsemat, colweight, ps,
+	small_ncols = oneFile(sparsename, sosname, sparsemat, colweight, ps,
 			      oldrows, ncols, small_nrows, verbose, skip, bin);
     } else {
 	small_ncols = manyFiles(sparsename, sparsemat, colweight, ps,
@@ -742,10 +759,10 @@ main(int argc, char *argv[])
     }
     if(writeindex){
 	// this part depends on newrows only
-	double tt = seconds();
+	double tt = wct_seconds();
 	fprintf(stderr, "Writing index file\n");
 	makeIndexFile(indexname, nrows, newrows, small_nrows, small_ncols);
-	fprintf(stderr, "#T# writing index file: %2.2lf\n", seconds()-tt);
+	fprintf(stderr, "#T# writing index file: %2.2lf\n", wct_seconds()-tt);
     }
 
     purgedfile_stream_closefile(ps);
