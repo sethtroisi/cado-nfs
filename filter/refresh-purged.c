@@ -1,6 +1,13 @@
+
+/* This tool may be used to transform an old style .nodup + .purged
+ * combination into a new style .purged file. Use as follows:
+ *
+ *  ./refresh-purged -oldpurged /localdisk/tmp/160/160.purged  -oldnodup /localdisk/tmp/160/160.nodup.gz  -out /localdisk/tmp/160/160.purged2
+ *
+ */
+
 #include <stdio.h>
 #include <string.h>
-
 #include "utils.h"
 
 int
