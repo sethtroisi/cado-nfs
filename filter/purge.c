@@ -95,9 +95,14 @@ my_malloc_int (unsigned long n)
 
   if (relcompact_used + n > BLOCK_SIZE)
     {
+#if 0
+        /* NEVER EVER rely on the fact that a shrinking something by
+         * realloc does not change the pointer !
+         */
       /* first shrink current block */
       if (relcompact_current >= 0)
         relcompact_list[relcompact_current] = (int*) realloc (relcompact_list[relcompact_current], relcompact_used * sizeof (int));
+#endif
       /* allocate a new block */
       relcompact_current ++;
       relcompact_list = (int**) realloc (relcompact_list, (relcompact_current + 1) * sizeof (int*));
