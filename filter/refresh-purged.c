@@ -1,10 +1,4 @@
-#define _POSIX_C_SOURCE 200112L /* pclose */
-#define _GNU_SOURCE     /* asprintf */
-#define _DARWIN_C_SOURCE     /* asprintf */
-#include <gmp.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
 #include <string.h>
 
 #include "utils.h"
