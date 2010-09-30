@@ -80,3 +80,5 @@ linalg/bwc/bench_polmatmul.cpp
 polyselect/CMakeLists-nodist.txt
 polyselect/fast_rootsieve.h
 polyselect/fast_rootsieve.c
+filter/CMakeLists-nodist.txt
+filter/refresh-purged.c

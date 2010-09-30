@@ -71,7 +71,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "hashpair.h"
 #include "gzip.h"
 
-#define LINE_SIZE 512
 #define MAX_FILES 1000000
 
 /********************** own memory allocation routines ***********************/
