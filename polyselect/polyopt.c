@@ -30,7 +30,7 @@
 #define DEG_F 6
 
 /* Care: poly_print is named in utils.h */
-static int
+static void
 polyprint (mpz_t *f, mpz_t *g, int deg, mpz_t N) {
 	 int i;
 	 gmp_printf ("\nn: %Zd\n", N);
@@ -42,7 +42,6 @@ polyprint (mpz_t *f, mpz_t *g, int deg, mpz_t N) {
 	 {
 		  gmp_printf ("Y%d: %Zd\n", i, g[i]);
 	 }
-	 return 0;
 }
 
 /* optimize all raw polynomial in the file. "skip" denotes position of raw poly */
