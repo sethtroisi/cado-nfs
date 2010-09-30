@@ -128,6 +128,8 @@ uint64_t eval_64chars(int64_t a, uint64_t b, alg_prime_t * chars, cado_poly_ptr 
                 } else {
                     res = res < 0;
                 }
+            } else if (ch->r == 3) {
+                res = (b==0);        // parity of the number of free relations
             } else {
                 abort();
             }
@@ -173,12 +175,14 @@ static alg_prime_t * create_characters(int nchars, cado_poly pol)
     chars[0] = (alg_prime_t) { .p = 0, .r = 2 };
     /* force parity */
     chars[1] = (alg_prime_t) { .p = 0, .r = 1 };
+    /* force parity of the free relations. */
+    chars[2] = (alg_prime_t) { .p = 0, .r = 3 };
 
     /* we might want to force evenness of the number of relations as well. Easy
      * to put this in chars[1] if needed (and add the appropriate stuff above
      * of course).  */
 
-    for(int i = 2 ; i < nchars ; ) {
+    for(int i = 3 ; i < nchars ; ) {
         mpz_nextprime(pp, pp);
         p = mpz_get_ui(pp);
         ret = poly_roots_ulong(roots, pol->f, pol->degree, p);
@@ -216,11 +220,16 @@ static blockmatrix big_character_matrix(alg_prime_t * chars, unsigned int nchars
 
     fprintf(stderr, "Computing %u characters for %u (a,b) pairs\n",
             nchars2, ps->nrows);
+    ps->parse_only_ab = 1;
 
     for(int i = 0 ; purgedfile_stream_get(ps, NULL) >= 0  ; i++) {
         for(unsigned int cg = 0 ; cg < nchars2 ; cg+=64) {
             uint64_t v = eval_64chars(ps->a, ps->b, chars + cg, pol);
             res->mb[(i/64) + (cg/64) * res->nrblocks][i%64] = v;
+        }
+        if (purgedfile_stream_disp_progress_now_p(ps)) {
+            fprintf(stderr, "Read %d/%d (a,b) pairs -- %.1f MB/s -- %.1f pairs/s\n",
+                    ps->rrows, ps->nrows, ps->mb_s, ps->rows_s);
         }
     }
     purgedfile_stream_closefile(ps);
