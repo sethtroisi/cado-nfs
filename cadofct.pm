@@ -2471,7 +2471,8 @@ sub do_chars {
     cmd($cmd, { log => 1, kill => 1,
             stderr=>"$param{'prefix'}.characters.stderr" });
 
-    $ndep = count_lines("$param{'prefix'}.ker");
+    $ndep = `awk '/^Wrote/ { print \$2; }' $param{'prefix'}.characters.stderr`;
+    chomp($ndep);
     info "$ndep vectors remaining after characters.\n";
 
     $tab_level--;
@@ -2501,13 +2502,35 @@ sub primetest_print {
 sub do_sqrt {
     banner "Square root";
     local_time "Square root";
-    $ndep = count_lines("$param{'prefix'}.ker") unless defined $ndep;
-    $ndep = $param{'nkermax'} if $ndep > $param{'nkermax'};
+    if (!defined($ndep)) {
+        $ndep = `awk '/^Wrote/ { print \$2; }' $param{'prefix'}.characters.stderr`;
+        chomp($ndep);
+    }
+    if (!defined($ndep) || $ndep > $param{'nkermax'}) {
+        $ndep = $param{'nkermax'};
+    }
 
     # We don't use bigints as hash keys.
     my @prime_factors=();
     my %composite_factors=($param{'n'}=>1);
 
+    {
+        # First prepare all deps files
+        info "Preparing $ndep dependency files\n";
+        my $cmd = "$param{'bindir'}/sqrt/sqrt ".
+            "-poly $param{'prefix'}.poly ".
+            "-prefix $param{'prefix'}.dep " .
+            "-ab " .
+            "-purged $param{'prefix'}.purged ".
+            "-index $param{'prefix'}.index ".
+            "-ker $param{'prefix'}.ker ";
+
+        cmd($cmd, { log => 1, kill => 1,
+                append_output=>1,
+                stdout_stderr=>"$param{'prefix'}.sqrt.stderr"});
+    }
+
+    # later processing does not need re-generation of the .dep files.
     for (my $numdep=0; $numdep<$ndep; $numdep++) {
         my $znumdep=sprintf('%03d', $numdep);
         my $f="$param{'prefix'}.fact.$znumdep";
@@ -2517,6 +2540,7 @@ sub do_sqrt {
             "-poly $param{'prefix'}.poly ".
             "-prefix $param{'prefix'}.dep " .
             "-dep $numdep " .
+            "-rat -alg -gcd " .
             "-purged $param{'prefix'}.purged ".
             "-index $param{'prefix'}.index ".
             "-ker $param{'prefix'}.ker ".
