@@ -374,6 +374,8 @@ scan_relations (char **ficname, int *nprimes, hashtable_t *H,
             rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
     if (rs->nrels != nrelmax) {
         fprintf (stderr, "Error, -nrels value should match the number of scanned relations\n");
+        fprintf (stderr, "expected %d relations, found %d\n", nrelmax,
+                 rs->nrels);
         exit (EXIT_FAILURE);
     }
 
