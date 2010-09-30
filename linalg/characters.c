@@ -91,6 +91,7 @@
 #include "utils.h"
 #include "blockmatrix.h"
 #include "gauss.h"
+#include "worker-threads.h"
 
 /* Calculates a 64-bit word with the values of the characters chi(a,b), where
  * chi ranges from chars to chars+64
@@ -154,6 +155,33 @@ uint64_t eval_64chars(int64_t a, uint64_t b, alg_prime_t * chars, cado_poly_ptr 
     return v;
 }
 
+struct charbatch {
+    uint64_t * W;
+    int64_t * A;
+    uint64_t *B;
+    unsigned int n;
+    alg_prime_t * chars;
+    cado_poly_ptr pol;
+};
+void eval_64chars_batch_thread(struct worker_threads_group * g, int tnum, void * t)
+{
+    struct charbatch * ss = (struct charbatch *) t;
+
+    for(unsigned int z = tnum * ss->n / g->n ; z < (tnum + 1) * ss->n / g->n ; z++) {
+        int64_t a = ss->A[z];
+        uint64_t b = ss->B[z];
+        ss->W[z] = eval_64chars(a,b,ss->chars,ss->pol);
+    }
+    return;
+}
+
+/* Does the same for a batch of N (a,b) pairs. */
+void eval_64chars_batch(uint64_t * W, int64_t * A, uint64_t *B, alg_prime_t * chars, cado_poly_ptr pol, unsigned int n, struct worker_threads_group * g)
+{
+    struct charbatch ss = { .W=W,.A=A,.B=B,.chars=chars,.pol=pol,.n=n };
+    worker_threads_do(g, eval_64chars_batch_thread, &ss);
+}
+
 static alg_prime_t * create_characters(int nchars, cado_poly pol)
 {
     unsigned long p;
@@ -208,7 +236,7 @@ static alg_prime_t * create_characters(int nchars, cado_poly pol)
 // The big character matrix has (number of purged rels) rows, and (number of
 // characters) cols
 
-static blockmatrix big_character_matrix(alg_prime_t * chars, unsigned int nchars2, const char * purgedname, cado_poly_ptr pol)
+static blockmatrix big_character_matrix(alg_prime_t * chars, unsigned int nchars2, const char * purgedname, cado_poly_ptr pol, struct worker_threads_group * g)
 {
     purgedfile_stream ps;
     purgedfile_stream_init(ps);
@@ -222,15 +250,29 @@ static blockmatrix big_character_matrix(alg_prime_t * chars, unsigned int nchars
             nchars2, ps->nrows);
     ps->parse_only_ab = 1;
 
-    for(int i = 0 ; purgedfile_stream_get(ps, NULL) >= 0  ; i++) {
-        for(unsigned int cg = 0 ; cg < nchars2 ; cg+=64) {
-            uint64_t v = eval_64chars(ps->a, ps->b, chars + cg, pol);
-            res->mb[(i/64) + (cg/64) * res->nrblocks][i%64] = v;
+    for(int i = 0 ; ; ) {
+        static const int batchsize = 16384;
+        int64_t A[batchsize];
+        uint64_t B[batchsize];
+        uint64_t W[batchsize];
+        int bs = 0;
+        for( ; bs < batchsize && purgedfile_stream_get(ps, NULL) >= 0  ; bs++) {
+            A[bs] = ps->a;
+            B[bs] = ps->b;
         }
+        for(unsigned int cg = 0 ; cg < nchars2 ; cg+=64) {
+            eval_64chars_batch(W, A, B, chars + cg, pol, bs, g);
+            for(int z = 0 ; z < bs ; z++) {
+                res->mb[((i+z)/64) + (cg/64) * res->nrblocks][(i+z)%64] = W[z];
+            }
+        }
+        i += bs;
         if (purgedfile_stream_disp_progress_now_p(ps)) {
             fprintf(stderr, "Read %d/%d (a,b) pairs -- %.1f MB/s -- %.1f pairs/s\n",
                     ps->rrows, ps->nrows, ps->mb_s, ps->rows_s);
         }
+        if (bs < batchsize)
+            break;
     }
     purgedfile_stream_closefile(ps);
     purgedfile_stream_clear(ps);
@@ -494,14 +536,13 @@ int main(int argc, char **argv)
     ASSERT_ALWAYS(purgedname != NULL);
     ASSERT_ALWAYS(indexname != NULL);
 
+    struct worker_threads_group * g = worker_threads_init(16);
     chars = create_characters (nchars, pol);
-
     int nchars2 = iceildiv(nchars, 64) * 64;
-
     double tt=wct_seconds();
-
-    blockmatrix bcmat = big_character_matrix(chars, nchars2, purgedname, pol);
+    blockmatrix bcmat = big_character_matrix(chars, nchars2, purgedname, pol, g);
     free(chars);
+    worker_threads_clear(g);
 
     fprintf(stderr, "done building big character matrix at %.1f\n", wct_seconds()-tt);
 
