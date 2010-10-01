@@ -412,6 +412,7 @@ linalg/bwc/matops.c
 linalg/bwc/mf_untwistvec.c
 linalg/bwc/rolling.c
 linalg/bwc/rolling.h
+linalg/bwc/cleanup.c
 linalg/bwc/short_matmul.c
 linalg/bwc/strassen-thresholds.h
 polyselect/twoquadratics.c
