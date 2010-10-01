@@ -181,4 +181,8 @@ target_link_libraries(lingen bwc_base utils gf2x-fft)
 
 add_executable(short_matmul EXCLUDE_FROM_ALL short_matmul.c)
 
+add_executable(cleanup cleanup.c ../blockmatrix.c ../bit_matrices.c
+    ../gauss.c)
+target_link_libraries(cleanup utils m)
+
 include(CMakeLists-nodist.txt OPTIONAL)

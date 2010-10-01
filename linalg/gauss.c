@@ -149,30 +149,26 @@ int main(int argc, char **argv) {
   int j;
 #endif
   
+  nrows = ncols = 0;
 
-  if (argc > 1) {
-    nrows = atoi(argv[1]);
-    if ((nrows < 1) || (nrows > 1000000)) {
-      printf("usage: %s n [justrank]\n", argv[0]);
-      printf("   where n is the size of the matrix\n");
-      exit(1);
-    }
-    ncols = nrows;
-    if (argc > 2) {
-      justrank = 1;
-      if (strcmp(argv[2], "justrank")!=0) {
+  argc--,argv++;
+  for( ; argc ; argc--,argv++) {
+      int u = atoi(*argv);
+      if (u) {
+          if (nrows == 0) {
+              nrows = ncols = u;
+          } else {
+              ncols = u;
+          }
+      } else if (strcmp(argv[2], "justrank") == 0) {
+          justrank = 1;
+      } else {
 	printf("usage: %s n [justrank]\n", argv[0]);
 	printf("   where n is the size of the matrix\n");
 	exit(1);
       }
-    }
-  } else {
-    nrows = 163;
-    ncols = 163;
   }
-
-  // nrows = 1024;
-  // ncols = 128;
+  if (nrows == 0) nrows = ncols = 163;
 
   limbs_per_row = iceildiv(ncols, MACHINE_WORD_SIZE);
   limbs_per_col = iceildiv(nrows, MACHINE_WORD_SIZE);
@@ -185,7 +181,9 @@ int main(int argc, char **argv) {
   for (i = 0; i < NB_TEST; ++i) {
     int dim;
     mpn_random(mat, limbs_per_row*nrows);
+
 #if 0
+    // special case for a 1024x128 matrix.
     {
         int i;
         FILE * f;
@@ -209,17 +207,23 @@ int main(int argc, char **argv) {
     printf(";\n");
 #endif
 
+
+#if VERBOSE
+    mp_limb_t * s = malloc(nrows * limbs_per_col * sizeof(mp_limb_t));
+    dim = spanned_basis(s, mat, nrows, ncols, limbs_per_row, limbs_per_col);
+    printf("rank:=%d\n", dim);
+    printf("S:=\n");
+    printMatrix(s,nrows,nrows,limbs_per_col);
+    printf(";\n");
+    free(s);
+#endif
+
+
     if (!justrank)
       dim = kernel(mat, ker, nrows, ncols, limbs_per_row, limbs_per_col);
     else
       dim = kernel(mat, NULL, nrows, ncols, limbs_per_row, limbs_per_col);
 
-#if VERBOSE
-    printf("E:=\n");
-    printMatrix(mat, nrows, ncols, limbs_per_row);
-    printf(";\n");
-#endif
-    
     printf("dimker:=%d;\n", dim);
 
 #if VERBOSE
@@ -253,6 +257,17 @@ static void check_soundness(){
 #endif
 }
 
+void simple_addrows(mp_limb_t * p, int d, int s, int stride)
+{
+    if (!p) return;
+    mp_limb_t * src = p + s * stride;
+    mp_limb_t * dst = p + d * stride;
+    int j;
+    for(j = 0 ; j < stride ; j++) {
+        dst[j] ^= src[j];
+    }
+}
+
 /* 
  * Kernel computation.
  *
@@ -283,13 +298,15 @@ struct gaussian_elimination_data {
     int nrows;
     int ncols;
     mp_limb_t* mat;
+    mp_limb_t* lmat;
     int limbs_per_row;
+    int limbs_per_col;
     int *set_pivot;
     int *set_used;
 };
 
-
-
+#define ADDBIT_SLOW(r, l, i, j)    \
+    r[i * l + j / MACHINE_WORD_SIZE] ^= 1UL << (j % MACHINE_WORD_SIZE)
 
 void gaussian_elimination(struct gaussian_elimination_data * G)
 {
@@ -300,11 +317,15 @@ void gaussian_elimination(struct gaussian_elimination_data * G)
   NROWS = G->nrows;
   NCOLS = G->ncols;
   LIMBS_PER_ROW = G->limbs_per_row;
+  int limbs_per_col = G->limbs_per_col;
   ptr_rows = (mp_limb_t **)malloc((NROWS+1)*sizeof(mp_limb_t *));
   for (i = 0; i < NROWS+1; ++i)
     ptr_rows[i] = matrix + LIMBS_PER_ROW*i;
 
 
+  /* if G->lmat == NULL, then don't bug the user if he just gave 0 for the
+   * otherwise unused limbs_per_col value */
+  assert (G->lmat == NULL || limbs_per_col*MACHINE_WORD_SIZE >= NROWS);
 
   G->set_pivot = (int *)malloc(NCOLS*sizeof(int));
   G->set_used  = (int *)malloc(NROWS*sizeof(int));
@@ -355,8 +376,10 @@ void gaussian_elimination(struct gaussian_elimination_data * G)
 #if MULTI_ROW == 1
       for (i = pivot + 1; i < NROWS; ++i) {
 	/* is there a 1 in position (i, col_current) ? */
-	if ( (*ptr_current[i]) & mask1 )   
+	if ( (*ptr_current[i]) & mask1 ) {
 	  addRows(i, pivot, mask1, /*j_current,*/ ptr_current);
+          simple_addrows(G->lmat, i, pivot, limbs_per_col);
+        }
       }      
 #elif MULTI_ROW == 2
       /* try with two rows at a time */
@@ -368,6 +391,8 @@ void gaussian_elimination(struct gaussian_elimination_data * G)
 	  if ( (*ptr_current[i]) & mask1 ) {
 	    if (i1 >= 0) {
 	      add2Rows(i1, i, pivot, mask1, /*j_current,*/ ptr_current);
+              simple_addrows(G->lmat, i, pivot, limbs_per_col);
+              simple_addrows(G->lmat, i1, pivot, limbs_per_col);
 	      i1 = -1;
 	    } else {
 	      i1 = i;
@@ -375,8 +400,10 @@ void gaussian_elimination(struct gaussian_elimination_data * G)
 	  } /* end if */
 	  ++i;
 	} /* end while */
-	if (i1 >= 0) 
+	if (i1 >= 0)  {
 	  addRows(i1, pivot, mask1, /*j_current,*/ ptr_current);
+          simple_addrows(G->lmat, i1, pivot, limbs_per_col);
+        }
       } /* end block */
 #elif MULTI_ROW == 3
       /* try with three rows at a time */
@@ -389,6 +416,9 @@ void gaussian_elimination(struct gaussian_elimination_data * G)
 	    if (i1 >= 0) {
 	      if (i2 >= 0) {
 		add3Rows(i1, i2, i, pivot, mask1, /*j_current,*/ ptr_current);
+                simple_addrows(G->lmat, i, pivot, limbs_per_col);
+                simple_addrows(G->lmat, i1, pivot, limbs_per_col);
+                simple_addrows(G->lmat, i2, pivot, limbs_per_col);
 		i1 = -1; i2 = -1;
 	      }
 	      else {
@@ -401,10 +431,14 @@ void gaussian_elimination(struct gaussian_elimination_data * G)
 	  ++i;
 	} /* end while */
 	if (i1 >= 0)  {
-	  if (i2 >= 0)
+	  if (i2 >= 0) {
 	    add2Rows(i1, i2, pivot, mask1, /*j_current,*/ ptr_current);
-	  else
+            simple_addrows(G->lmat, i1, pivot, limbs_per_col);
+            simple_addrows(G->lmat, i2, pivot, limbs_per_col);
+          } else {
 	    addRows(i1, pivot, mask1, /*j_current,*/ ptr_current);
+            simple_addrows(G->lmat, i1, pivot, limbs_per_col);
+          }
 	}
       } /* end block */
 #else
@@ -413,6 +447,15 @@ void gaussian_elimination(struct gaussian_elimination_data * G)
 
       /* Purge the pivot line */
       addRows(pivot, pivot, mask1, /*j_current,*/ ptr_current);
+#if 0
+#if VERBOSE
+      if (G->lmat) {
+          printf("L:=\n");
+          printMatrix(G->lmat, NROWS, NROWS, limbs_per_col);
+          printf(";\n");
+      }
+#endif
+#endif
     }
 
     /* increment */
@@ -443,6 +486,7 @@ void gaussian_elimination(struct gaussian_elimination_data * G)
   free(ptr_current);
 }
 
+
 int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
 	   int limbs_per_row, int limbs_per_col)
 {
@@ -450,7 +494,9 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
 
     struct gaussian_elimination_data G[1] = {{
         .mat = mat,
-        .nrows = nrows, .ncols = ncols, .limbs_per_row = limbs_per_row,
+        .nrows = nrows, .ncols = ncols,
+        .limbs_per_row = limbs_per_row,
+        .limbs_per_col = limbs_per_col,
         .rank = 0, }};
     gaussian_elimination(G);
 
@@ -516,15 +562,16 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
   return NROWS - G->rank;
 } /* end function kernel */
 
-/* puts in rmat a matrix of size ncols*ncols, and return a rank value r,
- * such that the r first (least significant bits) columns of the matrix
- * mat * rmat for a basis of the column span of the matrix mat
+/* puts in lmat a full rank matrix of size nrows*nrows, and return a rank
+ * value r, such that the r first (least significant bits) rows of the
+ * matrix lmat * mat form a basis of the row span of the matrix mat,
+ * while the last (nrows-r) (most significant bits) rows are zero.
  *
- * rmat is expected to be already allocated, and to have a striding equal
- * to limbs_per_row.
+ * lmat is expected to be already allocated, and to have a striding equal
+ * to limbs_per_col.
  */
-int spanned_basis(mp_limb_t * rmat, mp_limb_t* mat, int nrows, int ncols,
-        int limbs_per_row)
+int spanned_basis(mp_limb_t * lmat, mp_limb_t * mat, int nrows, int ncols,
+        int limbs_per_row, int limbs_per_col)
 {
     int i;
 
@@ -535,23 +582,36 @@ int spanned_basis(mp_limb_t * rmat, mp_limb_t* mat, int nrows, int ncols,
     printf(";\n");
 #endif
 #endif
+    mp_limb_t * lmat2 = malloc(nrows * limbs_per_col * sizeof(mp_limb_t));
+    memset(lmat2, 0, nrows * limbs_per_col * sizeof(mp_limb_t));
+    for (i = 0; i < nrows; ++i)
+        ADDBIT_SLOW(lmat2, limbs_per_col, i, i);
 
     struct gaussian_elimination_data G[1] = {{
         .mat = mat,
-            .nrows = nrows, .ncols = ncols, .limbs_per_row = limbs_per_row,
+            .lmat = lmat2,
+            .nrows = nrows, .ncols = ncols,
+        .limbs_per_row = limbs_per_row,
+        .limbs_per_col = limbs_per_col,
             .rank = 0, }};
     gaussian_elimination(G);
 
-    memset(rmat, 0, ncols * limbs_per_row * sizeof(mp_limb_t));
-
     int r = 0;
-    for (i = 0; i < NCOLS; ++i) {
-        int p = G->set_pivot[i];
-        if (p < 0) continue;
-        // set bit r of row i
-        rmat[i * limbs_per_row + r / MACHINE_WORD_SIZE] = 1UL << (r % MACHINE_WORD_SIZE);
-        r++;
+    int h = NROWS;
+    for (i = 0; i < NROWS; ++i) {
+        assert(r < h);
+        if (G->set_used[i]) {
+            memcpy(lmat + r * limbs_per_col, lmat2 + i * limbs_per_col, limbs_per_col * sizeof(mp_limb_t));
+            r++;
+        } else {
+            h--;
+            memcpy(lmat + h * limbs_per_col, lmat2 + i * limbs_per_col, limbs_per_col * sizeof(mp_limb_t));
+        }
     }
+    free(lmat2);
+  free(ptr_rows);
+  free(G->set_pivot);
+  free(G->set_used);
 
     return r;
 }
@@ -669,8 +729,7 @@ static void printVector(mp_limb_t *V, int n) {
       printf("1");
     else
       printf("0");
-    if (i < n - 1)
-      printf(",");
+    if (i < n - 1) printf(",");
   }
   printf("]");
 }

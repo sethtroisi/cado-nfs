@@ -185,6 +185,7 @@ void blockmatrix_read_from_flat_file(blockmatrix k, int i0, int j0, const char *
     ASSERT_ALWAYS(j0 + fncols <= k->ncols);
     ASSERT_ALWAYS(j0 % 64 == 0);
     ASSERT_ALWAYS(fncols % 64 == 0);
+    blockmatrix_zero(k);
     for(unsigned int r = 0 ; r < fnrows ; r++) {
         for(unsigned int g = 0 ; g < fncols ; g+=64) {
             uint64_t v;
@@ -195,6 +196,40 @@ void blockmatrix_read_from_flat_file(blockmatrix k, int i0, int j0, const char *
     }
     fclose(f);
 }
+
+#if 0
+void blockmatrix_read_transpose_from_flat_file(blockmatrix k, int i0, int j0, const char * name, unsigned int fnrows, unsigned int fncols)
+{
+    abort();    /* not thoroughly tested */
+    FILE * f = fopen(name, "r");
+    ASSERT_ALWAYS(f);
+    ASSERT_ALWAYS(i0 + fncols <= k->nrows);
+    ASSERT_ALWAYS(j0 + fnrows <= k->ncols);
+    ASSERT_ALWAYS(i0 % 64 == 0);
+    ASSERT_ALWAYS(j0 % 64 == 0);
+    ASSERT_ALWAYS(fncols % 64 == 0);
+    blockmatrix_zero(k);
+    mat64 * tmp = malloc((fncols/64) * sizeof(mat64));
+    ASSERT_ALWAYS(tmp);
+    for(unsigned int g = 0 ; g < fnrows ; g+=64) {
+        /* Fill next block. */
+        memset(tmp, 0, (fncols/64) * sizeof(mat64));
+        for(unsigned int i = 0 ; g + i < fnrows && i < 64 ; i++) {
+            for(unsigned int s = 0 ; s < fncols ; s+=64) {
+                uint64_t v;
+                int rc = fread(&v, sizeof(uint64_t), 1, f);
+                ASSERT_ALWAYS(rc == 1);
+                tmp[s/64][i]=v;
+            }
+        }
+        for(unsigned int s = 0 ; s < fncols ; s+=64) {
+            transp_6464(k->mb[s/64 + (g/64) * k->stride], tmp[s/64]);
+        }
+    }
+    free(tmp);
+    fclose(f);
+}
+#endif
 
 void blockmatrix_write_to_flat_file(const char * name, blockmatrix k, int i0, int j0, unsigned int fnrows, unsigned int fncols)
 {
@@ -245,3 +280,11 @@ blockmatrix blockmatrix_submatrix(blockmatrix k, int i0, int j0, unsigned int nr
     res->sub = 1;
     return res;
 }
+void blockmatrix_swap(blockmatrix B, blockmatrix A)
+{
+    struct blockmatrix_s tmp[1];
+    memcpy(tmp, A, sizeof(struct blockmatrix_s));
+    memcpy(A, B, sizeof(struct blockmatrix_s));
+    memcpy(B, tmp, sizeof(struct blockmatrix_s));
+}
+

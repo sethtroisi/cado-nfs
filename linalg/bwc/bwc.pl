@@ -644,21 +644,23 @@ sub drive {
             push @_, "balancing=$balancing";
             &drive("${mode}_mksol", @_, "start=$cp");
         }
-        &drive("u64n_gather", @_);
-        # The kernel is within the space K, MK, M^2K, and so on.
-        # Restricting to the last non-zero member is not necessarily
-        # correct, if we happen to have pathological matrices (with
-        # zero rows in the case of left nullspaces, for instance).
-        # Pending an improvement to the gather code, a quick workaround
-        # is to return the full thing for the characters step.
         opendir D, $wdir;
-        for my $f (grep { /^(?:K\.\d+|W)\.$balancing_hash$/ } readdir D) {
-            my $g = $f;
-            $g =~ s/\.$balancing_hash$//;
-            &drive("mf_untwistvec", "$wdir/$balancing", "$wdir/$f", "--out", "$wdir/$g");
+        # remove all files which will be created by gather. This is done
+        # in order to allow an easier cleanup step.
+        for my $f (grep { /^K\.\d+\.$balancing_hash$/ } readdir D) {
+            unlink "$wdir/$f";
+        }
+        &drive("u64n_gather", @_);
+        my @my_ks=();
+        opendir D, $wdir;
+        for my $f (grep { /^K\.\d+\.$balancing_hash$/ } readdir D) {
+            push @my_ks, "$wdir/$f";
         }
         closedir D;
-        # &drive("mf_untwistvec", "$wdir/$balancing", "$wdir/W.twisted", "--out", "$wdir/W");
+        &drive("./cleanup", "--ncols", $n,
+            "--out", "$wdir/W.$balancing_hash", @my_ks);
+
+        &drive("mf_untwistvec", "$wdir/$balancing", "$wdir/W.$balancing_hash", "--out", "$wdir/W");
         return;
     }
 
@@ -679,7 +681,7 @@ sub drive {
 
     if ($mpi_needed) {
         unshift @_, $program;
-        if ($program =~ /(?:split|acollect|lingen|mf_bal)$/) {
+        if ($program =~ /(?:split|acollect|lingen|mf_bal|cleanup)$/) {
             unshift @_, @mpi_precmd_single;
         } else {
             unshift @_, @mpi_precmd;

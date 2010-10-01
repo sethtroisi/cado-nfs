@@ -39,6 +39,8 @@ extern void blockmatrix_read_from_flat_file(blockmatrix k, int i0, int j0, const
 extern void blockmatrix_write_to_flat_file(const char * name, blockmatrix k, int i0, int j0, unsigned int fnrows, unsigned int fncols);
 extern void blockmatrix_transpose(blockmatrix b, blockmatrix a);
 extern blockmatrix blockmatrix_submatrix(blockmatrix k, int i0, int j0, unsigned int nrows, unsigned int ncols);
+// extern void blockmatrix_read_transpose_from_flat_file(blockmatrix k, int i0, int j0, const char * name, unsigned int fnrows, unsigned int fncols);
+extern void blockmatrix_swap(blockmatrix B, blockmatrix A);
 
 /* Use this macro to allocate flat matrix areas with proper readahead
  * padding. In some situations, it is also necessary to use zero out the

@@ -23,13 +23,14 @@ extern "C" {
  */
 extern int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
 		  int limbs_per_row, int limbs_per_col);
-/* This is the dual function. It returns into rmat an extraction matrix
- * such that the first column of mat*rmat are linearly independent. Of
- * course this number matches the rank of the matrix, and is actually
- * returned by the function.
+/* This is the dual function. It returns into lmat an extraction matrix
+ * such that the first rows of lmat*mat are linearly independent, while
+ * the rest is zero. lmat is full rank. Of course the number of
+ * independent rows matches the rank of mat, and is actually returned by
+ * the function.
  */
-extern int spanned_basis(mp_limb_t * rmat, mp_limb_t* mat, int nrows, int ncols,
-        int limbs_per_row);
+extern int spanned_basis(mp_limb_t * lmat, mp_limb_t * mat, int nrows, int ncols,
+        int limbs_per_row, int limbs_per_col);
 #ifdef __cplusplus
 }
 #endif

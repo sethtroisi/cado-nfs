@@ -203,7 +203,9 @@ static alg_prime_t * create_characters(int nchars, cado_poly pol)
     chars[0] = (alg_prime_t) { .p = 0, .r = 2 };
     /* force parity */
     chars[1] = (alg_prime_t) { .p = 0, .r = 1 };
-    /* force parity of the free relations. */
+    /* force parity of the free relations. This is really only because
+     * we're lazy -- it's been asserted that it eases stuff at some
+     * point, but nobody remembers the why and how. */
     chars[2] = (alg_prime_t) { .p = 0, .r = 3 };
 
     /* we might want to force evenness of the number of relations as well. Easy
@@ -362,8 +364,7 @@ read_heavyblock_matrix_binary(const char * heavyblockname)
         ASSERT_ALWAYS(r == 1);
         for( ; len-- ; ) {
             uint32_t v;
-            r = fread(&v, sizeof(uint32_t), 1, f);
-            ASSERT_ALWAYS(r == 1);
+            r = fread(&v, sizeof(uint32_t), 1, f); ASSERT_ALWAYS(r == 1);
             res->mb[(i/64) + (v/64) * res->nrblocks][i%64] ^= ((uint64_t)1) << (v%64);
         }
     }
@@ -460,37 +461,41 @@ int compute_transpose_of_blockmatrix_kernel(blockmatrix kb, blockmatrix t)
     return dim;
 }
 
-/* This only builds a basis, not an echenlonized basis */
+/* This only builds a basis, not an echelonized basis */
 blockmatrix blockmatrix_column_reduce(blockmatrix m, unsigned int max_rows_to_consider)
 {
     blockmatrix t = blockmatrix_submatrix(m, 0, 0, MIN(max_rows_to_consider, m->nrows), m->ncols);
 
-    unsigned int tiny_nrows = t->nrows;
-    unsigned int tiny_ncols = t->ncols;
+    unsigned int tiny_nrows = t->ncols;
+    unsigned int tiny_ncols = t->nrows;
     unsigned int tiny_limbs_per_row = iceildiv(tiny_ncols, 64);
-    // unsigned int tiny_limbs_per_col = iceildiv(tiny_nrows, 64);
+    unsigned int tiny_limbs_per_col = iceildiv(tiny_nrows, 64);
 
     unsigned int tiny_nlimbs = tiny_nrows * tiny_limbs_per_row;
     uint64_t * tiny = malloc(tiny_nlimbs * sizeof(uint64_t));
     memset(tiny, 0, tiny_nlimbs * sizeof(uint64_t));
-    blockmatrix_copy_to_flat(tiny, tiny_limbs_per_row, 0, 0, t);
+    blockmatrix_copy_transpose_to_flat(tiny, tiny_limbs_per_row, 0, 0, t);
 
-    uint64_t * sdata = (uint64_t *) malloc(tiny_ncols * tiny_limbs_per_row * sizeof(uint64_t));
-    memset(sdata, 0, tiny_ncols * tiny_limbs_per_row * sizeof(uint64_t *));
+    uint64_t * sdata = (uint64_t *) malloc(tiny_nrows * tiny_limbs_per_col * sizeof(uint64_t));
+    memset(sdata, 0, tiny_nrows * tiny_limbs_per_col * sizeof(uint64_t *));
     free(t);
 
     int rank = spanned_basis(
             (mp_limb_t *) sdata,
             (mp_limb_t *) tiny,
-            tiny_nrows, tiny_ncols,
-            sizeof(uint64_t) / sizeof(mp_limb_t) * tiny_limbs_per_row);
+            tiny_nrows,
+            tiny_ncols,
+            sizeof(uint64_t) / sizeof(mp_limb_t) * tiny_limbs_per_row,
+            sizeof(uint64_t) / sizeof(mp_limb_t) * tiny_limbs_per_col
+            );
     free(tiny);
 
     blockmatrix s = blockmatrix_alloc(m->ncols, rank);
-    blockmatrix_copy_from_flat(s, sdata, tiny_limbs_per_row, 0, 0);
+    blockmatrix_copy_transpose_from_flat(s, sdata, tiny_limbs_per_col, 0, 0);
     blockmatrix k2 = blockmatrix_alloc(m->nrows, rank);
     blockmatrix_mul_smallb(k2, m, s);
     blockmatrix_free(s);
+    free(sdata);
     return k2;
 }
 
@@ -594,7 +599,7 @@ int main(int argc, char **argv)
             total_kernel_cols, wct_seconds() - tt);
 
     {
-        blockmatrix k2 = blockmatrix_column_reduce(k, 4096); // only consider first 4k rows.
+        blockmatrix k2 = blockmatrix_column_reduce(k, 4096);
         blockmatrix_free(k);
         k = k2;
         total_kernel_cols = k->ncols;

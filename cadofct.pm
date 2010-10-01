@@ -2470,15 +2470,8 @@ sub do_chars {
               "-index $param{'prefix'}.index ".
               "-heavyblock $param{'prefix'}.small.dense.bin ".
               "-nchar $param{'nchar'} ".
-              "-out $param{'prefix'}.ker ";
-
-    opendir BWC, "$param{'prefix'}.bwc";
-    my @kers = grep { /^K.\d+$/ } readdir BWC;
-    closedir BWC;
-    if (!scalar @kers) {
-        die "No kernel files out of bwc ???";
-    }
-    $cmd .= " $param{'prefix'}.bwc/$_" foreach @kers;
+              "-out $param{'prefix'}.ker " .
+              "$param{'prefix'}.bwc/W";
 
     cmd($cmd, { log => 1, kill => 1,
             stderr=>"$param{'prefix'}.characters.stderr" });
