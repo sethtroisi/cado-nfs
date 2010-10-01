@@ -19,6 +19,8 @@
 #define DEBUG 0
 #define MAPLE 0
 
+static int verbose = 0;
+
 /* Although the functions in plain_poly are not readily available in the
  * publicized interface of utils.h, it's ok to use them if we explicitly
  * include the corresponding header.
@@ -316,15 +318,18 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol)
       while (mpz_cmp_ui (prd[0], 1) > 0)
         {
           e = 0;
-          printf ("Removing p=%lu:", p);
+          if (verbose)
+            printf ("Removing p=%lu:", p);
           mpz_set_ui (pp, p);
           e = mpz_remove (prd[0], prd[0], pp);
-          printf (" exponent=%lu, remaining %lu bits\n", e,
-                  mpz_sizeinbase (prd[0], 2));
+          if (verbose)
+            printf (" exponent=%lu, remaining %lu bits\n", e,
+                    mpz_sizeinbase (prd[0], 2));
           if ((e % 2) != 0)
             {
               fprintf (stderr, "Prime %lu appears to odd power %lu\n", p, e);
-              break;
+              if (verbose)
+                break;
             }
           p = getprime (p);
         }
@@ -1110,7 +1115,6 @@ void usage(const char * me)
     exit(1);
 }
 
-
 int main(int argc, char *argv[])
 {
     cado_poly pol;
@@ -1134,6 +1138,7 @@ int main(int argc, char *argv[])
     param_list_configure_knob(pl, "rat", &opt_rat);
     param_list_configure_knob(pl, "alg", &opt_alg);
     param_list_configure_knob(pl, "gcd", &opt_gcd);
+    param_list_configure_knob(pl, "-v", &verbose);
     argc--,argv++;
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) continue;
@@ -1152,7 +1157,7 @@ int main(int argc, char *argv[])
     ret = cado_poly_read(pol, tmp);
     ASSERT (ret);
 
-    param_list_parse_int(pl, "dep", &numdep);
+    param_list_parse_int (pl, "dep", &numdep);
     const char * purgedname = param_list_lookup_string(pl, "purged");
     const char * indexname = param_list_lookup_string(pl, "index");
     const char * kername = param_list_lookup_string(pl, "ker");
