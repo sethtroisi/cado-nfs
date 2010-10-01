@@ -26,6 +26,8 @@ main()
  * -start defaults to 0
  * -end defaults to nrows
  */
+
+#define _POSIX_C_SOURCE 200112L
 #include <stdio.h>
 #include <string.h>
 #include <sys/types.h>
@@ -122,6 +124,7 @@ main (int argc, char **argv)
     const char * purged = param_list_lookup_string(pl, "purged");
     const char * index = param_list_lookup_string(pl, "index");
     const char * matrix = param_list_lookup_string(pl, "matrix");
+    const char * outname = param_list_lookup_string(pl, "out");
 
     int skip=0;
     param_list_parse_int(pl, "skip", &skip);
@@ -133,6 +136,12 @@ main (int argc, char **argv)
     param_list_lookup_string(pl, "end");
     if (param_list_warn_unused(pl))
         exit(1);
+
+    FILE * outfile = stdout;
+    int pipe = 0;
+    if (outname) {
+        outfile = fopen_compressed_w(outname,&pipe,NULL);
+    }
 
     /* Prepare the list of (a,b) pairs */
     unsigned int n_ab;
@@ -212,16 +221,17 @@ main (int argc, char **argv)
         FILE * f = fopen(index, "r"); ASSERT_ALWAYS(f);
         unsigned int nrows;
         unsigned int ncols;
+        int r = fscanf(f, "%u %u",&nrows, &ncols);
         unsigned int i0 = 0;
         unsigned int i1 = nrows;
         param_list_parse_uint(pl, "start", &i0);
         param_list_parse_uint(pl, "end", &i1);
-        int r = fscanf(f, "%u %u",&nrows, &ncols);
         ASSERT_ALWAYS(r == 2);
         ASSERT_ALWAYS(ncols == n_ideals_inmat);
 
         FILE * g = fopen(matrix, "r"); ASSERT_ALWAYS(f);
 
+        fprintf(stderr, "Dumping relset info for relsets [%d..%d[ (complete range is [%d..%d[\n",i0,i1,0,nrows);
         for(unsigned int i = 0 ; i < i0 ; i++) {
             int nc;
             r = fscanf(f, "%u", &nc);
@@ -248,13 +258,13 @@ main (int argc, char **argv)
             fac_size = 0;
             r = fscanf(f, "%u", &nc);
             ASSERT_ALWAYS(r == 1);
-            printf("relset\n");
+            fprintf(outfile, "relset\n");
             for(int j = 0 ; j < nc ; j++) {
                 unsigned int k;
                 r = fscanf(f, "%x", &k);
                 ASSERT_ALWAYS(r == 1);
                 ASSERT_ALWAYS(k < n_ab);
-                printf("%"PRId64" %"PRIu64"\n", abs[k].a, abs[k].b);
+                fprintf(outfile, "%"PRId64" %"PRIu64"\n", abs[k].a, abs[k].b);
                 int * ff = mmi_translate(abs[k].mmi_index);
                 if (fac_size + *ff > fac_alloc) {
                     fac_alloc += *ff + 64 + fac_alloc / 2;
@@ -263,17 +273,17 @@ main (int argc, char **argv)
                 memcpy(fac + fac_size, ff + 1, *ff * sizeof(int));
                 fac_size += *ff;
             }
-            printf("expected\n");
+            fprintf(outfile, "expected\n");
             qsort(fac, fac_size, sizeof(int), (sortfunc_t)&intcmp2);
             for(int s = 0; s < fac_size ;) {
                 int idl = fac[s];
                 int v = 0;
                 for( ; s + v < fac_size && fac[s+v] == idl ; v++) ;
                 ASSERT_ALWAYS((unsigned int) idl < n_ideals);
-                printf("%d %d %d\n", v, ideal_decode[idl].p, ideal_decode[idl].r);
+                fprintf(outfile, "%d %d %d\n", v, ideal_decode[idl].p, ideal_decode[idl].r);
                 s+=v;
             }
-            printf("recorded\n");
+            fprintf(outfile, "recorded\n");
             uint32_t z;
             int r = fread(&z, sizeof(uint32_t), 1, g);
             ASSERT_ALWAYS(r == 1);
@@ -299,17 +309,22 @@ main (int argc, char **argv)
                 int v = 0;
                 for( ; s + v < fac_size && fac[s+v] == idl ; v++) ;
                 ASSERT_ALWAYS((unsigned int) idl < n_ideals);
-                printf("%d %d %d\n", v, ideal_decode[idl].p, ideal_decode[idl].r);
+                fprintf(outfile, "%d %d %d\n", v, ideal_decode[idl].p, ideal_decode[idl].r);
                 s+=v;
             }
-            printf("\n");
+            fprintf(outfile, "\n");
         }
         free(fac);
         fclose(f);
         fclose(g);
     }
 
-
+    if (outname) {
+        if (pipe)
+            pclose(outfile);
+        else
+            fclose(outfile);
+    }
 
     mmi_clear();
     param_list_clear(pl);
