@@ -171,7 +171,7 @@ fprint_free (int *table_ind, int *nb_coeff, relation_t rel, hashtable_t *H)
     for(i = 0; i < rel.nb_ap; i++)
       {
 	index = getHashAddr (H, p, rel.ap[i].p);
-        ASSERT(H->hashcount[index] >= 0);
+        ASSERT_ALWAYS(H->hashcount[index] >= 0);
         table_ind[nbc++] = H->hashcount[index];
     }
     *nb_coeff = nbc;

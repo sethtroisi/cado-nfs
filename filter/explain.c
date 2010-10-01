@@ -258,7 +258,7 @@ main (int argc, char **argv)
             fac_size = 0;
             r = fscanf(f, "%u", &nc);
             ASSERT_ALWAYS(r == 1);
-            fprintf(outfile, "relset\n");
+            fprintf(outfile, "relset %u\n", i);
             for(int j = 0 ; j < nc ; j++) {
                 unsigned int k;
                 r = fscanf(f, "%x", &k);

@@ -327,9 +327,10 @@ another_line:
         k = 0;
         for (q = base; q != p;) {
             unsigned long pr = 0;
+            char * q0 = q;
             for (; (v = ugly[(unsigned char) (c = *q++)]) >= 0;)
                 pr = pr * 16 + v;
-            if (pr)
+            if (q>q0+1)
                 rs->rel.rp[k++] = (rat_prime_t) { .p = pr,.e = 1};
         }
 
@@ -350,9 +351,10 @@ another_line:
         k = 0;
         for (q = base; q != p;) {
             unsigned long pr = 0;
+            char * q0 = q;
             for (; (v = ugly[(unsigned char) (c = *q++)]) >= 0;)
                 pr = pr * 16 + v;
-            if (pr)
+            if (q>q0+1)
                 rs->rel.ap[k++] = (alg_prime_t) { .p = pr,.r = -1,.e = 1};
         }
 
