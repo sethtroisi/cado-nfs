@@ -603,10 +603,15 @@ renumber (int *nprimes, hashtable_t *H, const char *sos)
     unsigned int i;
     int nb = 1; /* we start at 1 here, but subtract 1 in fprint_rel_row */
 
-    if(sos != NULL){
-	fprintf(stderr, "Outputting renumber table in file %s\n", sos);
+    if (sos != NULL)
+      {
+	fprintf (stderr, "Output renumber table in file %s\n", sos);
 	fsos = gzip_open (sos, "w");
-    }
+        fprintf (fsos, "# each row contains 3 hexadecimal values: i p r\n");
+        fprintf (fsos, "# i is the ideal index value (starting from 0)\n");
+        fprintf (fsos, "# p is the corresponding prime\n");
+        fprintf (fsos, "# r is the corresponding root (-2=fffffffe on the rational side)\n");
+      }
     for(i = 0; i < H->hashmod; i++)
       if (H->hashcount[i] == 0)
         H->hashcount[i] = -1;
