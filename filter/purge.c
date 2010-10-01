@@ -635,7 +635,7 @@ renumber (int *nprimes, hashtable_t *H, const char *sos)
             }
           H->hashcount[i] = nb++;
           if (fsos != NULL)
-            fprintf(fsos, "%d %" PRIx64 " %" PRIx64 "\n",
+            fprintf(fsos, "%x %" PRIx64 " %" PRIx64 "\n",
                     H->hashcount[i] - 1, GET_HASH_P(H,i), GET_HASH_R(H,i));
 	}
     if (fsos != NULL)
