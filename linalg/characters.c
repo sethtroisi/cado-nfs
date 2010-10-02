@@ -115,6 +115,10 @@ uint64_t eval_64chars(int64_t a, uint64_t b, alg_prime_t * chars, cado_poly_ptr 
                 /* Special: rational sign (sign of m1*a+m2*b) */
                 mpz_t tmp1, tmp2;
 
+		/* FIXME: the code below only works for a rational g(x),
+		   extend it to non-linear g(x) */
+		ASSERT_ALWAYS(pol->degreeg == 1);
+
                 /* first perform a quick check */
                 res = (a > 0) ? mpz_sgn(pol->g[1]) : -mpz_sgn(pol->g[1]);
                 if (mpz_sgn(pol->g[0]) != res) {
