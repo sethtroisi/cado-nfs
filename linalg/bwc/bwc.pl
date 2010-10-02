@@ -657,6 +657,8 @@ sub drive {
             push @my_ks, "$wdir/$f";
         }
         closedir D;
+        @my_ks = sort { $a=~/K.(\d+)/; my $xa=$1; $b=~/K.(\d+)/; my
+            $xb=$1; $xa <=> $xb; } @my_ks;
         &drive("./cleanup", "--ncols", $n,
             "--out", "$wdir/W.$balancing_hash", @my_ks);
 
