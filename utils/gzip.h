@@ -15,7 +15,7 @@ extern int is_supported_compression_format(const char * s);
  * been opened by either fopen() of popen(), depending on whether an
  * external decompression program has to be called. If the caller is
  * intersted in knowing, the integer *p_pipeflag is filled with 1 (for
- * popen) or 0 (for popen). In fact, the caller should care, because this
+ * popen) or 0 (for fopen). In fact, the caller should care, because this
  * can be used to decide whether to close the stream with pclose or
  * fclose (even if fclose works, it's almost guaranteed to create
  * zombies).
