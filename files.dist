@@ -410,6 +410,7 @@ linalg/bwc/balancing_workhorse.h
 linalg/bwc/dispatch.c
 linalg/bwc/matops.c
 linalg/bwc/mf_untwistvec.c
+linalg/bwc/mf_twistvec.c
 linalg/bwc/rolling.c
 linalg/bwc/rolling.h
 linalg/bwc/cleanup.c
