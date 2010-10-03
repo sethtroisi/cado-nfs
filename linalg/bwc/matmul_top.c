@@ -537,8 +537,15 @@ void matmul_top_init(matmul_top_data_ptr mmt,
     // fences[]
     // wr[]->*
     // are filled in later within read_info_file
+    //
 
-    balancing_read_header(mmt->bal, param_list_lookup_string(pl, "balancing"));
+    const char * tmp = param_list_lookup_string(pl, "balancing");
+    if (!tmp) {
+        fprintf(stderr, "Missing parameter balancing=\n");
+        exit(1);
+    }
+
+    balancing_read_header(mmt->bal, tmp);
     mmt_fill_fields_from_balancing(mmt, pl);
 
     // after that, we need to check for every node if the cache file can
