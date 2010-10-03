@@ -1187,12 +1187,10 @@ compute_staircase(builder * mb, struct vsc_slice_t * V)
         uint32_t old_ii = ii;
         int merge_with_next = 0;
         int merge_with_previous = 0;
-        if (V->steps.size() > 1 && k < V->steps.size()) {
+        if ((k+1) < V->steps.size())
             merge_with_next = w <= 8192; // || w <= V->steps[k+1].nrows / 10;
-        }
-        if (V->steps.size() > 1 && k > 0) {
+        if (k > 0)
             merge_with_previous = w <= 8192; // || w <= V->steps[k-1].nrows / 10;
-        }
         if (!merge_with_previous && !merge_with_next) {
             ii += w;
             k++;
@@ -1206,6 +1204,7 @@ compute_staircase(builder * mb, struct vsc_slice_t * V)
         if (merge_with_next) {
             printf("strip %"PRIu32"+%lu merged with next\n",
                     old_ii, w);
+            ASSERT_ALWAYS(k < V->steps.size());
             V->steps[k].nrows += w;
             // don't increment k here.
             // don't increment ii either.
