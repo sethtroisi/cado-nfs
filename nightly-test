@@ -56,7 +56,6 @@ fi
 
 cd cado-nfs-$CADO_VERSION
 make "$@"
-#cd $DIR/cado-nfs-$CADO_VERSION/run_example.sh c59
 ./run_example.sh c59
 
 /bin/rm -fr "$DIR"
