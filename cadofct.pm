@@ -35,7 +35,7 @@ use Cwd qw(abs_path);
 use List::Util qw[min];
 use POSIX qw(ceil);
 use Math::BigInt;
-
+use IPC::Open3;
 
 ###############################################################################
 # Message and error handling ##################################################
@@ -49,6 +49,12 @@ my $use_colors = defined $ENV{CADO_COLOR} ? $ENV{CADO_COLOR} : 1;
 
 # Terminal width
 my $term_cols = 80;
+
+# Whether to show output.
+my $verbose = 0;
+
+# Whether to show output.
+my $assume_yes = 0;
 
 # Pads a string with spaces to match the speficied width
 sub pad {
@@ -234,6 +240,9 @@ sub read_param {
         die unless ref $_ eq 'ARRAY';
         my $secondary = $_->[1];
         $_=$_->[0];
+        if (/^-v$/) { $verbose=1; next; }
+        if (/^-y$/) { $assume_yes='y'; next; }
+        if (/^-l$/) { $assume_yes='l'; next; }
         next if $files_read{$_};
         $files_read{$_}=1;
         if (-d $_) {
@@ -450,57 +459,93 @@ my $cmdlog;
 #  - `log'  specifies that the command should be logged into the command log;
 #  - `kill' specifies that if the command fails (non-zero exit status)
 #           we should report the error and die immediately.
+#  - `logfile' redirect both stdout and stderr to given file.
+#  - `appendlog' whether to append to redirection file in one of the
+#     two cases above.
 # The return value is another pointer to a hash table:
 #  - `out'    is the captured standard output of the command;
-#  - `status' is the exit status of the command.
-#  - `stderr' where to redirect stderr
-#  - `stdout_and_stderr' redirect both stdout and stderr to given file.
-#  - `append_output' whether to append to redirection file in one of the
-#     two cases above.
 sub cmd {
     my ($cmd, $opt) = @_;
-
-    my $error_file;
-    my $redir='>';
-    if ($opt->{'append_output'}) {
-        $redir='>>'
+    my $logfile;
+    if ($opt->{'logfile'}) {
+        if ($opt->{'appendlog'}) {
+            open($logfile, ">", $opt->{'logfile'}) or die;
+        } else {
+            open($logfile, ">>", $opt->{'logfile'}) or die;
+        }
     }
-    if (defined($_=$opt->{'stderr'})) {
-        $error_file=$_;
-        $cmd .= " 2$redir$_";
-    } elsif (defined($_=$opt->{'stdout_stderr'})) {
-        $error_file=$_;
-        $cmd .= " $redir$_ 2>&1";
-    }
+    my $dummy='';
 
-    if ($cmdlog && $opt->{'log'}) {
-        open LOG, ">> $cmdlog"
-            or die "Cannot open `$cmdlog' for writing: $!.\n";
-        print LOG "$cmd\n";
-        close LOG;
+    if ($verbose) {
+        print "## $cmd\n";
     }
 
-    my $out    = `$cmd`;
-    my $status = $? >> 8;
-
-    if ($? && $opt->{'kill'}) {
-        my $diagnostic= "Command `$cmd' terminated unexpectedly" .
-                " with exit status $status.\n";
-        if (!defined($opt->{'stdout_stderr'})) {
-            if ($out) {
-                $out =~ s/^/STDOUT: /m;
-                $diagnostic .= "$out\n";
+    my $pid = open3($dummy,\*CHLD_OUT, \*CHLD_ERR, $cmd);
+    
+    my $fds = {
+        'out' => [ *CHLD_OUT{IO}, "", 1, "" ],
+        'err' => [ *CHLD_ERR{IO}, "", 1, "" ],
+    };
+    
+    while (scalar grep { $_->[2] } values %$fds) {
+        my $rin = '';
+        for my $v (values %$fds) {
+            next if !$v->[2]; 
+            vec($rin, fileno($v->[0]), 1) = 1;
+        }
+        
+        my $rc;
+        while ($rc = select(my $rout=$rin, undef, undef, 1.0) == 0) {}
+        if ($rc < 0) {
+            print STDERR "Left select with $!\n";
+            last;
+        }
+    
+        for my $k (keys %$fds) {
+            my $v = $fds->{$k};
+            next unless vec($rin, fileno($v->[0]), 1);
+            if (sysread $v->[0], my $x, 1024) { 
+                $v->[1] .= $x;
+                while ($v->[1]=~s/^(.*(?:\n|\r))//) {
+                    print $logfile $1 if $logfile;
+                    print $1 if $verbose;
+                    # print "$k $1";
+                    $v->[3] .= $1;
+                }
             } else {
-                $diagnostic .= "STDOUT: none.\n";
+                if (length($v->[1])) {
+                    print $logfile $v->[1] if $logfile;
+                    $v->[3] .= $v->[1];
+                    # $v->[1] =~ s/^/$k /gm;
+                    print $v->[1] if $verbose;
+                    $v->[1] = '';
+                }
+                $v->[2]=0;
             }
         }
-        if ($error_file) {
-            $diagnostic .= `tail $error_file | sed -e 's,^,STDERR: ,'`;
-        }
+    }
+    close $logfile if $logfile;
+    waitpid($pid,0) or warn "Can't wait() for children, weird";
+    my $rc = $?>>8;
+    my $res = {
+        'status' => $rc,
+        'out' => $fds->{'out'}->[3],
+        'err' => $fds->{'err'}->[3],
+    };
+    if ($? && $opt->{'kill'}) {
+        my $diagnostic= "Command `$cmd' terminated unexpectedly" .
+                " with exit status $rc.\n";
+        my $out = $fds->{'out'}->[3];
+        my $err = $fds->{'err'}->[3];
+        my @out = split /^/m, $out;
+        my @err = split /^/m, $err;
+        while (scalar @out > 10) { shift @out; }
+        while (scalar @err > 10) { shift @err; }
+        $diagnostic .= "STDOUT $_\n" for (@out);
+        $diagnostic .= "STDERR $_\n" for (@err);
         die $diagnostic;
     }
-
-    return { out => $out, status => $status };
+    return $res;
 }
 
 # Runs the command $cmd on the remote host $host.
@@ -523,7 +568,7 @@ sub remote_cmd {
     # don't ask for a password: we don't want to fall into interactive mode
     # all the time (especially not in the middle of the night!)
     # use public-key authentification instead!
-	my $rsh = 'ssh';
+    my $rsh = 'ssh';
     if (exists($ENV{'OAR_JOBID'})) {
         $rsh="/usr/bin/oarsh";
     }
@@ -1531,20 +1576,26 @@ sub do_init {
         my $list = join "; ", (grep { defined $_ }
                                (map $tasks{$_->{'task'}}->{'name'}, @cleanup));
         $list =~ s/^(.*);/$1; and/;
-        warn "I will clean up the following tasks: $list.\n";
-        warn "Are you OK to continue? [y/l/N] (30s timeout)\n";
-        warn "(l: recover linear algebra with checkpoint, clean the other tasks)\n";
         my $r = "";
-        eval {
-            local $SIG{'ALRM'} = sub { die "alarm\n" }; # NB: \n required
-            alarm 30;
-            $r = <STDIN>;
-            alarm 0;
-        };
-        if ($@) {
-            die unless $@ eq "alarm\n"; # propagate unexpected errors
+        if ($assume_yes) {
+            warn "Cleaning up the following tasks: $list.\n";
+            warn "[ -y flag found on command line, assuming approval.  ]\n";
+            $r = $assume_yes;
+        } else {
+            warn "I will clean up the following tasks: $list.\n";
+            warn "Are you OK to continue? [y/l/N] (30s timeout)\n";
+            warn "(l: recover linear algebra with checkpoint, clean the other tasks)\n";
+            eval {
+                local $SIG{'ALRM'} = sub { die "alarm\n" }; # NB: \n required
+                alarm 30;
+                $r = <STDIN>;
+                alarm 0;
+            };
+            if ($@) {
+                die unless $@ eq "alarm\n"; # propagate unexpected errors
+            }
+            chomp $r;
         }
-        chomp $r;
         die "Aborting...\n" unless $r =~ /^(y|l)/i;
 
         for (@cleanup) {
@@ -1803,7 +1854,7 @@ sub do_factbase {
               "-poly $param{'prefix'}.poly ".
               "> $param{'prefix'}.roots ";
     cmd($cmd, { log => 1, kill => 1,
-            stderr=>"$param{'prefix'}.makefb.stderr" });
+            logfile=>"$param{'prefix'}.makefb.stderr" });
     $tab_level--;
 }
 
@@ -1823,7 +1874,7 @@ sub do_freerels {
               "> $param{'prefix'}.freerels ";
 
     cmd($cmd, { log => 1, kill => 1,
-            stderr=>"$param{'prefix'}.freerel.stderr" });
+            logfile=>"$param{'prefix'}.freerel.stderr" });
 	cmd("gzip $param{'prefix'}.freerels");
     $tab_level--;
 }
@@ -1875,7 +1926,7 @@ sub dup {
         cmd("$param{'bindir'}/filter/dup1 ".
             "-out $param{'prefix'}.nodup $new_files ",
             { log => 1, kill => 1,
-              stdout_stderr=>"$param{'prefix'}.dup1.stderr" });
+              logfile=>"$param{'prefix'}.dup1.stderr" });
     }
     {
         my $name="$param{'prefix'}.subdirlist";
@@ -1895,6 +1946,7 @@ sub dup {
     }
 
     my $nrels = first_line("$param{'prefix'}.nrels");
+
     my $K = int ( 100 + (1.2 * $nrels / $nslices) );
     for (my $i=0; $i < $nslices; $i++) {
         info "removing duplicates on slice $i...";
@@ -1903,7 +1955,7 @@ sub dup {
             "-filelist $param{'prefix'}.filelist ".
             "-basepath $param{'prefix'}.nodup/$i ",
             { log => 1, kill => 1,
-              stdout_stderr => "$param{'prefix'}.dup2_$i.stderr",
+              logfile => "$param{'prefix'}.dup2_$i.stderr",
             });
     }
     $tab_level--;
@@ -1945,7 +1997,7 @@ sub purge {
                   "-subdirlist $param{'prefix'}.subdirlist ".
                   "-filelist $param{'prefix'}.filelist ",
                   { log => 1,
-                    stdout_stderr => "$param{'prefix'}.purge.stderr"
+                    logfile => "$param{'prefix'}.purge.stderr"
                  });
     $tab_level--;
     return $cmd;
@@ -2163,7 +2215,7 @@ sub do_sieve {
         }
 
         # Get the number of rows and columns from the .purged file
-        my ($nrows, $ncols) = split / /, first_line("$param{'prefix'}.purged");
+        my ($nrows, $ncols) = split ' ', first_line("$param{'prefix'}.purged");
         my $excess = $nrows - $ncols;
         if ($excess < $param{'excess'}) {
             info "Not enough relations! Continuing sieving...\n";
@@ -2357,7 +2409,7 @@ sub do_merge {
               "-rwmax $param{'rwmax'} ".
               "-ratio $param{'ratio'} ";
 
-    cmd($cmd, { log => 1, kill => 1, stdout_stderr =>
+    cmd($cmd, { log => 1, kill => 1, logfile =>
             "$param{'prefix'}.merge.stderr" });
 
     if (last_line("$param{'prefix'}.merge.his") =~ /^BWCOSTMIN: (\d+)/) {
@@ -2392,18 +2444,16 @@ sub do_replay {
               "-out $param{'prefix'}.small.bin ".
               (defined $bwcostmin ? "-costmin $bwcostmin " : "");
 
-    cmd($cmd, { log => 1, kill => 1,
-              stdout_stderr=>"$param{'prefix'}.replay.stderr "
+    my $res = cmd($cmd, { log => 1, kill => 1,
+              logfile=>"$param{'prefix'}.replay.stderr "
         });
 
-    my ($nrows, $ncols, $weight);
-    open FILE, "< $param{'prefix'}.replay.stderr"
-        or die "Cannot open `$param{'prefix'}.replay.stderr' for reading: $!.\n";
-    while (<FILE>) {
-        $nrows = $1, $ncols = $2 if /^small_nrows=(\d+) small_ncols=(\d+)/;
-        $weight = $1             if /^# Weight\(M_small\) = (\d+)/;
-    }
-    close FILE;
+    $res->{'err'} =~ /^small_nrows=(\d+) small_ncols=(\d+)/m or die;
+    my $nrows = $1;
+    my $ncols = $2;
+    $res->{'err'} =~ /^# Weight\(M_small\) = (\d+)/m or die;
+    my $weight= $1;
+
     info "Nrows: $nrows; Ncols: $ncols; Weight: $weight.\n";
 
     $tab_level--;
@@ -2480,8 +2530,8 @@ sub do_linalg {
                "wdir=$param{'prefix'}.bwc " .
                "bwc_bindir=$bwc_bindir ";
         cmd($cmd, { log => 1, kill => 1,
-                append_output=>1,
-                stdout_stderr=>"$param{'prefix'}.bwc.stderr" });
+                appendlog=>1,
+                logfile=>"$param{'prefix'}.bwc.stderr" });
 
     } elsif ($param{'linalg'} eq "bl") {
         die "No longer supported";
@@ -2513,11 +2563,11 @@ sub do_chars {
               "-out $param{'prefix'}.ker " .
               "$param{'prefix'}.bwc/W";
 
-    cmd($cmd, { log => 1, kill => 1,
-            stderr=>"$param{'prefix'}.characters.stderr" });
+    my $res = cmd($cmd, { log => 1, kill => 1,
+            logfile=>"$param{'prefix'}.characters.stderr" });
 
-    $ndep = `awk '/^Wrote/ { print \$2; }' $param{'prefix'}.characters.stderr`;
-    chomp($ndep);
+    $res->{'err'} =~ /^Wrote (\d+) non-zero dependencies/m or die;
+    my $ndep = $1;
     info "$ndep vectors remaining after characters.\n";
 
     $tab_level--;
@@ -2571,8 +2621,8 @@ sub do_sqrt {
             "-ker $param{'prefix'}.ker ";
 
         cmd($cmd, { log => 1, kill => 1,
-                append_output=>1,
-                stdout_stderr=>"$param{'prefix'}.sqrt.stderr"});
+                appendlog=>1,
+                logfile=>"$param{'prefix'}.sqrt.stderr"});
     }
 
     # later processing does not need re-generation of the .dep files.
@@ -2592,8 +2642,8 @@ sub do_sqrt {
             "> $f";
 
         cmd($cmd, { log => 1, kill => 1,
-                append_output=>1,
-                stderr=>"$param{'prefix'}.sqrt.stderr"});
+                appendlog=>1,
+                logfile=>"$param{'prefix'}.sqrt.stderr"});
 
         do { $tab_level--; next; } if first_line($f) =~ /^Failed/;
 
