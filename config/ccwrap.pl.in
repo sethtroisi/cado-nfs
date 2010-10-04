@@ -36,4 +36,6 @@ while (defined($_=shift @ARGV)) {
 
 usage unless scalar @a;
 
+# print "$cc ", join(" ", @a), "\n";
+
 exec $cc, @a;

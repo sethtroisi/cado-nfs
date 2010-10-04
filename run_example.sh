@@ -18,6 +18,8 @@
 
 : ${t:=`mktemp -d /tmp/cado.XXXXXXXXXX`}
 
+chmod 755 $t
+
 file=$1
 shift
 
@@ -34,20 +36,18 @@ if [ -d "$cado_prefix" ] ; then
     fi
     bindir="$cado_prefix/bin"
     cadofactor="$bindir/cadofactor.pl"
-else
+elif [ -x "@CADO_NFS_SOURCE_DIR@/cadofactor.pl" ] ; then
     # Otherwise we're called from the source tree (or we hope so)
-    call_cmake="`dirname $0`/scripts/call_cmake.sh"
-    if ! [ -x "$call_cmake" ] ; then
-        echo "I don't know where I am !" >&2
+    if [ -f "@CADO_NFS_SOURCE_DIR@/params/params.$file" ] ; then
+        file="@CADO_NFS_SOURCE_DIR@/params/params.$file"
     fi
-    eval `$call_cmake show`
-    if [ -f "${up_path}params/params.$file" ] ; then
-        file="${up_path}params/params.$file"
-    fi
-    cadofactor="${up_path}cadofactor.pl"
+    cadofactor="@CADO_NFS_SOURCE_DIR@/cadofactor.pl"
     # Make the path absolute.
-    build_tree=`cd "$build_tree" ; pwd`
-    bindir="$build_tree"
+    bindir=$(cd "`dirname $0`" ; pwd)
+    export bindir
+else
+    echo "I don't know where I am" >&2
+    exit 1
 fi
 
 if [ ! -f $file ] ; then
