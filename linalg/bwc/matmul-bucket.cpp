@@ -280,6 +280,49 @@ struct slice_runtime_stats {
     slice_runtime_stats() : t(0) {}
 };
 
+struct matmul_bucket_methods {
+    int small1;
+    int small2;
+    int large;
+    int huge;
+    int vsc;
+    inline matmul_bucket_methods(const char * desc = NULL) {
+        small1=small2=large=vsc=huge=0;
+        if (!desc) {
+            /* default configuration */
+            small1=small2=large=vsc=1;
+            return;
+        } 
+        const char * p = desc;
+        for( ; ; ) {
+            const char * q = strchr(p, ',');
+            int n = q ? q-p : strlen(p);
+            if (strncmp(p, "small1", n) == 0) {
+                ASSERT_ALWAYS(!small1);
+                small1=1;
+            } else if (strncmp(p, "small2", n) == 0) {
+                ASSERT_ALWAYS(!small2);
+                small2=1;
+            } else if (strncmp(p, "large", n) == 0) {
+                ASSERT_ALWAYS(!large);
+                large=1;
+            } else if (strncmp(p, "huge", n) == 0) {
+                ASSERT_ALWAYS(!huge && !vsc);
+                huge=1;
+            } else if (strncmp(p, "vsc", n) == 0) {
+                ASSERT_ALWAYS(!huge && !vsc);
+                vsc=1;
+            } else {
+                fprintf(stderr, "Parse error: %s\n", p);
+            }
+            if (!q) break;
+            p = q + 1;
+        }
+        ASSERT_ALWAYS(small1||!small2);
+        ASSERT_ALWAYS(small1||small2||large||vsc||huge);
+    }
+};
+
 struct matmul_bucket_data_s {
     /* repeat the fields from the public_ interface */
     struct matmul_public_s public_[1];
@@ -298,6 +341,7 @@ struct matmul_bucket_data_s {
     /* headers are the first thing found in memory */
     vector<slice_header_t> headers;
     vector<slice_runtime_stats> slice_timings;
+    matmul_bucket_methods methods;
 };
 
 void matmul_bucket_clear(struct matmul_bucket_data_s * mm)
@@ -353,6 +397,13 @@ struct matmul_bucket_data_s * matmul_bucket_init(abobj_ptr xx MAYBE_UNUSED, para
                     " overrides suggested matrix storage ordering\n");
         }   
     }
+
+    const char * tmp = NULL;
+
+    if (pl)
+        tmp = param_list_lookup_string(pl, "matmul_bucket_methods");
+
+    mm->methods = matmul_bucket_methods(tmp);
 
     return mm;
 }
@@ -482,6 +533,9 @@ int builder_do_small_slice(builder * mb, struct small_slice_t * S, uint32_t i0, 
      */
     int keep1 = S->dj_max < (1UL << 16) && S->dj_avg < DJ_CUTOFF1;
     int keep2 = S->dj_max < (1 << SMALL_SLICES_DJ_BITS) && S->dj_avg < DJ_CUTOFF1;
+
+    if (!mb->mm->methods.small2) keep2=0;
+
     S->is_small2 = keep2;
 
     if (!keep1 && !keep2) {
@@ -1654,7 +1708,7 @@ void builder_push_vsc_slices(struct matmul_bucket_data_s * mm, vsc_slice_t * V)
     printf("Flushing staircase slices\n");
 
     mm->headers.push_back(*V->hdr);
-    
+
     mm->aux.push_back(V->dispatch.size());
     mm->aux.push_back(V->steps.size());
 
@@ -1704,7 +1758,7 @@ void builder_push_vsc_slices(struct matmul_bucket_data_s * mm, vsc_slice_t * V)
     /* dispatch data goes in dispatching order */
     for(unsigned int k = 0 ; k < V->dispatch.size() ; k++) {
         vsc_middle_slice_t& D(V->dispatch[k]);
-        
+
         /* The stream of u16 values corresponding to this strip */
         for(unsigned int l = 0 ; l < V->steps.size() ; l++) {
             vsc_sub_slice_t & S(D.sub[l]);
@@ -1795,19 +1849,23 @@ void matmul_bucket_build_cache(struct matmul_bucket_data_s * mm, uint32_t * data
 
     uint32_t main_i0 = 0;
 
-    builder_do_all_small_slices(mb, &main_i0, mm->npack);
-    builder_do_all_large_slices(mb, &main_i0, mm->scratch1size);
+    if (mm->methods.small1 || mm->methods.small2)
+        builder_do_all_small_slices(mb, &main_i0, mm->npack);
 
-#if 1
-    if (main_i0 < mb->nrows_t) {
+    if (mm->methods.large)
+        builder_do_all_large_slices(mb, &main_i0, mm->scratch1size);
+
+    /* Note that vsc and huge are exclusive ! */
+    if (mm->methods.vsc && main_i0 < mb->nrows_t) {
         vsc_slice_t V[1];
         builder_prepare_vsc_slices(mb, V, main_i0);
         mm->scratch3size = V->tbuf_space;
         builder_push_vsc_slices(mm, V);
     }
-#else
-    builder_do_all_huge_slices(mb, &main_i0, mm->scratch2size);
-#endif
+    if (mm->methods.huge && main_i0 < mb->nrows_t) {
+        builder_do_all_huge_slices(mb, &main_i0, mm->scratch2size);
+    }
+
 
     /* done, at last ! */
 
