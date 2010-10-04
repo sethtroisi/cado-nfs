@@ -1915,6 +1915,25 @@ sub dup {
         push @new_files, $_ unless (exists ($old_files{$_}));
     }
 
+    # print number of primes in factor base
+    if (scalar @files >= 2) {
+        my $f = $files[0];
+        $f = $files[1]
+            if $files[0] =~ /^$param{'name'}\.freerels.gz$/;
+        $f = "$param{'wdir'}/".$f;
+        open FILE, "zcat $f|"
+            or die "Cannot open `$f' for reading: $!.\n";
+        my $i=0;
+        while (<FILE>) {
+           if ( $_ =~ /^# (Number of primes in \S+ factor base = \d+)$/ ) {
+                info "$1\n";
+                $i++;
+                last if $i==2; 
+            }
+        }
+        close FILE;
+    }
+
     banner "Duplicate and singleton removal";
     # Remove duplicates
     info "Removing duplicates...";
@@ -2175,25 +2194,6 @@ sub do_sieve {
 
 
     my $sieve_is_done = sub {
-        # print number of primes in factor base
-        #if (scalar @files >= 2) {
-        #    my $f = $files[0];
-        #    $f = $files[1]
-        #        if $files[0] =~ /^$param{'name'}\.freerels.gz$/;
-        #    $f = "$param{'wdir'}/".$f;
-        #    open FILE, "zcat $f|"
-        #        or die "Cannot open `$f' for reading: $!.\n";
-        #    my $i=0;
-        #    while (<FILE>) {
-        #       if ( $_ =~ /^# (Number of primes in \S+ factor base = \d+)$/ ) {
-        #            info "$1\n";
-        #            $i++;
-        #            last if $i==2; 
-        #        }
-        #    }
-        #    close FILE;
-        #}
-
         # Check only every $param{'checkrange'} relations
         return 0 if $nrels - $last_check < $param{'checkrange'};
         $last_check = $nrels;

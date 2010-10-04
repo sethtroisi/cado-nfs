@@ -44,7 +44,7 @@
 #  - Bench polynomials with some sieve before selecting the best one.
 #  - Enable a 'lowmem' option
 #  - To be able to import the msieve relations in CADO-NFS.
-#  - Use new Murphy value in polynomial selection (C code and perl script).
+#  - Use new Murphy value in polynomial selection (C code only).
 #  - Print in each kjout the number of real roots of polynomial
 #  - Automate the parameters setting.
 
