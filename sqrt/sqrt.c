@@ -129,7 +129,7 @@ my_mpz_mul (mpz_t a, mpz_t b, mpz_t c)
   large = mpz_size (b) + mpz_size (c) >= 5000000;
   if (large)
     {
-      fprintf (stderr, "[multiplying %lu*%lu limbs: ",
+      fprintf (stderr, "[multiplying %zu*%zu limbs: ",
                mpz_size (b), mpz_size (c));
       fflush (stderr);
       st = cputime ();
@@ -323,7 +323,7 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol)
           mpz_set_ui (pp, p);
           e = mpz_remove (prd[0], prd[0], pp);
           if (verbose)
-            printf (" exponent=%lu, remaining %lu bits\n", e,
+            printf (" exponent=%lu, remaining %zu bits\n", e,
                     mpz_sizeinbase (prd[0], 2));
           if ((e % 2) != 0)
             {
