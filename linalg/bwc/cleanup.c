@@ -22,7 +22,7 @@ void blockmatrix_copy_colrange(blockmatrix B, blockmatrix A, int j0, int j1)
     int block0 = j0 / 64;
     uint64_t * masks = malloc(A->ncblocks * sizeof(uint64_t));
     for(int b = block0 ; b*64 < j1 ; b++) {
-        uint64_t mask = -1UL;
+        uint64_t mask = -((uint64_t)1);
         int z0 = j0 - b*64;
         ASSERT_ALWAYS(z0 < 64);
         if (z0>=0) mask &= ((uint64_t)-1) << z0;
@@ -74,8 +74,9 @@ int main(int argc, char **argv)
     S = blockmatrix_alloc(ncols, ncols);
     ST = blockmatrix_alloc(ncols, ncols);
     T = blockmatrix_alloc(ncols, ncols);
+    blockmatrix_zero(S);
     for(unsigned int i = 0 ; i < ncols ; i++)
-        S->mb[i/64 + (i/64)*S->stride][i%64] ^= 1UL << (i%64);
+        S->mb[i/64 + (i/64)*S->stride][i%64] ^= ((uint64_t)1) << (i%64);
     uint64_t * kzone = malloc(FLAT_BYTES_WITH_READAHEAD(ncols, ncols));
     int limbs_per_row = iceildiv(ncols, 64);
 
@@ -178,6 +179,7 @@ int main(int argc, char **argv)
     blockmatrix_free(T);
     free(zone);
     free(kzone);
+    param_list_clear(pl);
 
     return 0;
 }

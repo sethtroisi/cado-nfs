@@ -54,7 +54,7 @@ void blockmatrix_print(blockmatrix b, const char *vname)
 		    mat64_ptr bl = b->mb[i / 64 + (j / 64) * b->stride];
 		    if (j + jj)
 			fprintf(f,",");
-		    fprintf(f,"%"PRIu64, (bl[ii] >> jj) & 1UL);
+		    fprintf(f,"%"PRIu64, (bl[ii] >> jj) & ((uint64_t)1));
 		}
 	    }
 	}

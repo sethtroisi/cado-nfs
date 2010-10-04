@@ -694,7 +694,7 @@ static uint32_t * do_partial_transpose(builder * mb, vector<uint32_t> & cs, uint
         colptrs.push_back(qptr);
         qptr += cs[j];
     }
-    ASSERT(qptr-cols == ptr - mb->rowhead - (i1 - i0));
+    ASSERT(qptr-cols == ptr - mb->rowhead - (ptrdiff_t) (i1 - i0));
     ptr = mb->rowhead;
     for(uint32_t i = i0 ; i < i1 ; i++) {
         uint32_t w = *ptr++;
@@ -767,7 +767,7 @@ int builder_do_large_slice(builder * mb, struct large_slice_t * L, uint32_t i0, 
         }
         R->main.pop_back();
     }
-    ASSERT(qptr-cols == mb->rowhead - ptr0 - (i1 - i0));
+    ASSERT(qptr-cols == mb->rowhead - ptr0 - (ptrdiff_t) (i1 - i0));
     qptr = NULL;
     delete[] cols;
     cols = NULL;
@@ -960,7 +960,7 @@ void split_huge_slice_in_vblocks(builder * mb, huge_slice_t * H, huge_slice_raw_
             // unsigned int i_size = MIN(H->hdr->i1 - H->hdr->i0 - l * lsize, lsize);
 
             for(int k = 0 ; k < LSL_NBUCKETS_MAX ; k++) {
-                ASSERT(ptrs[l].ip[k]-(ptrbegin(R->subs[l].ind[k]))+ind_sizes[k] <= (ptrdiff_t) R->subs[l].ind[k].size());
+                ASSERT(ptrs[l].ip[k]-(ptrbegin(R->subs[l].ind[k]))+(ptrdiff_t) ind_sizes[k] <= (ptrdiff_t) R->subs[l].ind[k].size());
                 memcpy(q, ptrs[l].ip[k], ind_sizes[k] * sizeof(uint8_t));
                 q += ind_sizes[k];
                 ptrs[l].ip[k] += ind_sizes[k];
@@ -1076,7 +1076,7 @@ int builder_do_huge_slice(builder * mb, struct huge_slice_t * H, uint32_t i0, ui
         R->super.pop_back();
     }
     printf("\n");
-    ASSERT(qptr-cols == mb->rowhead - ptr0 - (i1 - i0));
+    ASSERT(qptr-cols == mb->rowhead - ptr0 - (ptrdiff_t) (i1 - i0));
     qptr = NULL;
     delete[] cols;
     cols = NULL;
@@ -2649,7 +2649,7 @@ static inline void matmul_bucket_mul_vsc(struct matmul_bucket_data_s * mm, vecto
                 cptrs[l]=base_ptrs[l];
             }
         }
-        ASSERT(Cidx == hdr - mm->headers.begin());
+        ASSERT((ptrdiff_t) Cidx == hdr - mm->headers.begin());
     } else {
         /* There's quite an annoying difficulty here. Combining buffers
          * are not read in the same order here, because ``combining'' (whose
