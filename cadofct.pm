@@ -421,7 +421,8 @@ sub read_machines {
             } 
             close FILE;
     } else {
-            if (exists($ENV{'OAR_JOBID'})) {
+            if (exists($ENV{'OAR_JOBID'}) &&
+               cmd("uniq $ENV{'OAR_NODEFILE'} | wc -l")->{'out'} > 1) {
                     open FILE, "> $param{'machines'}.tmp"
                             or die "Cannot open `$param{'machines'}.tmp' for writing: $!.\n";
                     print FILE "tmpdir=$vars{'tmpdir'}\n";
@@ -1244,14 +1245,23 @@ my %tasks = (
                    dep    => ['polysel'],
                    req    => ['factbase', 'freerels'],
                    param  => ['excess'],
-                   files  => ['rels\.[\de.]+-[\de.]+(|\.gz)', 'rels\.tmp',
-                              'nodup\.gz', 'dup1\.stderr', 'dup2\.stderr',
-                              'purged', 'purge\.stderr'],
+                   files  => ['rels\.[\de.]+-[\de.]+(|\.gz)', 
+                              'rels\.tmp', 'nrels'], 
                    resume => 1,
                    dist   => 1 },
 
-    merge     => { name   => "merge",
+    dup       => { name   => "duplicates",
                    dep    => ['sieve'],
+                   files  => ['nodup\.gz', 'dup1\.stderr',
+                              'subdirlist', 'filelist',
+                              'dup2_\d+\.stderr', 'nodup'] },
+
+    purge     => { name   => "singletons and cliques",
+                   dep    => ['dup'],
+                   files  => ['purged', 'purge\.stderr'] },
+
+    merge     => { name   => "merge",
+                   dep    => ['purge'],
                    param  => ['keep', 'maxlevel', 'cwmax', 'rwmax',
                               'ratio', 'bwstrat'],
                    files  => ['merge\.his', 'merge\.stderr'] },
@@ -1276,12 +1286,12 @@ my %tasks = (
                    param  => ['nchar'],
                    files  => ['ker', 'characters\.stderr'] },
 
-    sqrt	  => { name	  => "square root",
-				   dep    => ['chars'],
+    sqrt      => { name	  => "square root",
+                   dep    => ['chars'],
                    param  => ['nkermax'],
                    files  => ['dep\.\d+', 'dep\.alg\.\d+', 'dep\.rat\.\d+',
                               'sqrt\.stderr', 'fact\.\d+',
-							  'fact', 'allfactors'] }
+                              'fact', 'allfactors'] }
 );
 
 # Initialize empty arrays
@@ -1824,6 +1834,138 @@ sub do_freerels {
 # Sieve and purge #############################################################
 ###############################################################################
 
+my $dup_purge_done = 0;
+my $nslices = 4;
+
+# duplicates
+sub dup {
+    # Get the list of relation files
+    opendir DIR, $param{'wdir'}
+        or die "Cannot open directory `$param{'wdir'}': $!\n";
+
+    my $pat=qr/^$param{'name'}\.(rels\.[\de.]+-[\de.]+|freerels)\.gz$/;
+
+    my @files = grep /$pat/, readdir DIR;
+    closedir DIR;
+    mkdir "$param{'prefix'}.nodup"
+        unless (-d "$param{'prefix'}.nodup");
+    for (my $i=0; $i < $nslices; $i++) {
+        mkdir "$param{'prefix'}.nodup/$i"
+            unless (-d "$param{'prefix'}.nodup/$i");
+    }
+    opendir DIR, "$param{'prefix'}.nodup/0/"
+        or die "Cannot open directory `$param{'prefix'}.nodup/0/': $!\n";
+    my @old_files = grep /$pat/, readdir DIR;
+    closedir DIR;
+    my %old_files;		
+    $old_files{$_} = 1 for (@old_files);
+    my @new_files;
+    for (@files) {
+        push @new_files, $_ unless (exists ($old_files{$_}));
+    }
+
+    banner "Duplicate and singleton removal";
+    # Remove duplicates
+    info "Removing duplicates...";
+    $tab_level++;
+    if (@new_files) {
+        my $new_files = join " ",
+            (map "$param{'wdir'}/$_", sort @new_files);
+        info "split new files in $nslices slices...";
+        cmd("$param{'bindir'}/filter/dup1 ".
+            "-out $param{'prefix'}.nodup $new_files ",
+            { log => 1, kill => 1,
+              stdout_stderr=>"$param{'prefix'}.dup1.stderr" });
+    }
+    {
+        my $name="$param{'prefix'}.subdirlist";
+        open FILE, "> $name" or die "$name: $!";
+        print FILE join("\n", map { "$param{'name'}.nodup/$_"; } (0..$nslices-1));
+        close FILE;
+    }
+    {
+        # Put basenames of relation files in list.
+        my $name="$param{'prefix'}.filelist";
+        open FILE, "> $name" or die "$name: $!";
+        for (@files) {
+            m{([^/]+)$};
+            print FILE "$_\n";
+        }
+        close FILE;
+    }
+
+    my $nrels = first_line("$param{'prefix'}.nrels");
+    my $K = int ( 100 + (1.2 * $nrels / $nslices) );
+    for (my $i=0; $i < $nslices; $i++) {
+        info "removing duplicates on slice $i...";
+        cmd("$param{'bindir'}/filter/dup2 ".
+            "-K $K -out $param{'prefix'}.nodup/$i ".
+            "-filelist $param{'prefix'}.filelist ".
+            "-basepath $param{'prefix'}.nodup/$i ",
+            { log => 1, kill => 1,
+              stdout_stderr => "$param{'prefix'}.dup2_$i.stderr",
+            });
+    }
+    $tab_level--;
+}
+
+sub do_dup {
+    if ($dup_purge_done == 0) {
+        dup();
+    } else {
+        info "Duplicates has already been done\n";
+    }
+}
+
+# purge (singletons and cliques)
+sub purge {
+    my $nbrels = 0;
+    for (my $i=0; $i < $nslices; $i++) {
+        my $f = "$param{'prefix'}.dup2_$i.stderr";
+        open FILE, "< $f"
+            or die "Cannot open `$f' for reading: $!.\n";
+        while (<FILE>) {
+            if ( $_ =~ /^\s+(\d+) remaining relations/ ) {
+                $nbrels += $1;
+                last;
+            }
+        }
+        close FILE;
+    }
+    $tab_level++;
+    info "Number of relations left: $nbrels.\n";
+    $tab_level--;
+    info "Removing singletons...";
+    $tab_level++;
+    my $cmd = cmd("$param{'bindir'}/filter/purge ".
+                  "-poly $param{'prefix'}.poly -keep $param{'keeppurge'} ".
+                  "-excess $param{'excesspurge'} ".
+                  "-nrels $nbrels -out $param{'prefix'}.purged ".
+                  "-basepath $param{'wdir'} " .
+                  "-subdirlist $param{'prefix'}.subdirlist ".
+                  "-filelist $param{'prefix'}.filelist ",
+                  { log => 1,
+                    stdout_stderr => "$param{'prefix'}.purge.stderr"
+                 });
+    $tab_level--;
+    return $cmd;
+}
+
+sub do_purge {
+    if ($dup_purge_done == 0) {
+        purge();
+        # Get the number of rows and columns from the .purged file
+        my ($nrows, $ncols) = split / /, first_line("$param{'prefix'}.purged");
+        my $excess = $nrows - $ncols;
+        $tab_level++;
+        info "Nrows: $nrows; Ncols: $ncols; Excess: $excess.\n";
+        $tab_level--;
+    } else {
+        info "Purge has already been done\n";
+    }
+}
+
+# sieve
 my $sieve_cmd = sub {
     my ($a, $b, $m, $max_threads, $gzip) = @_;
     my $cmd = "env nice -$param{'sievenice'} ".
@@ -1981,133 +2123,39 @@ sub do_sieve {
 
 
     my $sieve_is_done = sub {
+        # print number of primes in factor base
+        #if (scalar @files >= 2) {
+        #    my $f = $files[0];
+        #    $f = $files[1]
+        #        if $files[0] =~ /^$param{'name'}\.freerels.gz$/;
+        #    $f = "$param{'wdir'}/".$f;
+        #    open FILE, "zcat $f|"
+        #        or die "Cannot open `$f' for reading: $!.\n";
+        #    my $i=0;
+        #    while (<FILE>) {
+        #       if ( $_ =~ /^# (Number of primes in \S+ factor base = \d+)$/ ) {
+        #            info "$1\n";
+        #            $i++;
+        #            last if $i==2; 
+        #        }
+        #    }
+        #    close FILE;
+        #}
+
         # Check only every $param{'checkrange'} relations
         return 0 if $nrels - $last_check < $param{'checkrange'};
         $last_check = $nrels;
-
-        # Get the list of relation files
-        opendir DIR, $param{'wdir'}
-            or die "Cannot open directory `$param{'wdir'}': $!\n";
-
-        my $pat=qr/^$param{'name'}\.(rels\.[\de.]+-[\de.]+|freerels)\.gz$/;
-
-        my @files = grep /$pat/, readdir DIR;
-        closedir DIR;
-        mkdir "$param{'prefix'}.nodup"
-        unless (-d "$param{'prefix'}.nodup");
-        my $nslices = 4;
-        for (my $i=0; $i < $nslices; $i++) {
-                mkdir "$param{'prefix'}.nodup/$i"
-                unless (-d "$param{'prefix'}.nodup/$i");
-        }
-        opendir DIR, "$param{'prefix'}.nodup/0/"
-            or die "Cannot open directory `$param{'prefix'}.nodup/0/': $!\n";
-        my @old_files = grep /$pat/, readdir DIR;
-        closedir DIR;
-        my %old_files;		
-        $old_files{$_} = 1 for (@old_files);
-        my @new_files;
-        for (@files) {
-                push @new_files, $_ unless (exists ($old_files{$_}));
-        }
-
-        # print number of primes in factor base
-        if (scalar @files >= 2) {
-            my $f = $files[0];
-            $f = $files[1]
-                if $files[0] =~ /^$param{'name'}\.freerels.gz$/;
-            $f = "$param{'wdir'}/".$f;
-            open FILE, "zcat $f|"
-                or die "Cannot open `$f' for reading: $!.\n";
-            my $i=0;
-            while (<FILE>) {
-                if ( $_ =~ /^# (Number of primes in \S+ factor base = \d+)$/ ) {
-                    info "$1\n";
-                    $i++;
-                    last if $i==2; 
-                }
-            }
-            close FILE;
-        }
-
-        banner "Duplicate and singleton removal";
+        open FILE, "> $param{'prefix'}.nrels"
+            or die "Cannot open `$param{'prefix'}.nrels' for writing: $!.\n";
+        print FILE "$nrels\n";
+        close FILE;
+        
         # Remove duplicates
-        info "Removing duplicates...";
+        dup();
+
+        # Remove singletons and cliques
+        my $ret = purge();
         $tab_level++;
-        if (@new_files) {
-                my $new_files = join " ",
-                (map "$param{'wdir'}/$_", sort @new_files);
-                info "split new files in $nslices slices...";
-                cmd("$param{'bindir'}/filter/dup1 ".
-                        "-out $param{'prefix'}.nodup $new_files ",
-                        { log => 1, kill => 1,
-                                stdout_stderr=>"$param{'prefix'}.dup1.stderr" });
-        }
-        {
-            my $name="$param{'prefix'}.subdirlist";
-            open FILE, "> $name" or die "$name: $!";
-            print FILE join("\n", map { "$param{'name'}.nodup/$_"; } (0..$nslices-1));
-            close FILE;
-        }
-        {
-            # Put basenames of relation files in list.
-            my $name="$param{'prefix'}.filelist";
-            open FILE, "> $name" or die "$name: $!";
-            for (@files) {
-                m{([^/]+)$};
-                print FILE "$_\n";
-            }
-            close FILE;
-        }
-
-        my $n = 0;
-        my @allfiles=();
-        for my $f (@files) {
-            for (my $i=0; $i < $nslices; $i++) {
-                push @allfiles, "$param{'prefix'}.nodup/$i/$f";
-            }
-        }
-
-        my $K = int ( 100 + (1.2 * $nrels / $nslices) );
-        for (my $i=0; $i < $nslices; $i++) {
-                info "removing duplicates on slice $i...";
-                cmd("$param{'bindir'}/filter/dup2 ".
-                        "-K $K -out $param{'prefix'}.nodup/$i ".
-                        "-filelist $param{'prefix'}.filelist ".
-                        "-basepath $param{'prefix'}.nodup/$i ",
-                        { log => 1, kill => 1,
-                                stdout_stderr => "$param{'prefix'}.dup2.stderr",
-                        });
-                my $f = "$param{'prefix'}.dup2.stderr";
-                open FILE, "< $f"
-                        or die "Cannot open `$f' for reading: $!.\n";
-                while (<FILE>) {
-                        if ( $_ =~ /^\s+(\d+) remaining relations/ ) {
-                                # shiftwidth 8 in perl scripts is
-                                # totally nuts.
-                                $n += $1;
-                                last;
-                        }
-                }
-                close FILE;
-        }
-
-        info "Number of relations left: $n.\n";
-        $tab_level--;
-
-        # Remove singletons
-        info "Removing singletons...";
-        $tab_level++;
-        my $ret = cmd("$param{'bindir'}/filter/purge ".
-                "-poly $param{'prefix'}.poly -keep $param{'keeppurge'} ".
-                "-excess $param{'excesspurge'} ".
-                "-nrels $n -out $param{'prefix'}.purged ".
-                "-basepath $param{'wdir'} " .
-                "-subdirlist $param{'prefix'}.subdirlist ".
-                "-filelist $param{'prefix'}.filelist ",
-                { log => 1,
-                        stdout_stderr => "$param{'prefix'}.purge.stderr"
-                });
         if ($ret->{'status'}) {
                 info "Not enough relations! Continuing sieving...\n";
                 $tab_level--;
@@ -2124,19 +2172,6 @@ sub do_sieve {
         }
 		
         info "Nrows: $nrows; Ncols: $ncols; Excess: $excess.\n";
-        $tab_level--;
-        # note: the nodup.gz file is no longer used now.
-        # Thus we may spare the hassle of creating it.
-        info "Join all no duplicate files into one file...";
-        my $join_allfiles=join(' ', @allfiles);
-        # The man page of gzip informs us that the following is
-        # legitimate usage (provided all files are gzipped)
-        for (@allfiles) { die unless m{\.gz$}; }
-        cmd("cat $join_allfiles > $param{'prefix'}.nodup.gz ",
-            { log => 1, kill => 1 });
-        $tab_level++;
-        info "clean directory nodup...";
-        cmd("rm -rf $param{'prefix'}.nodup");
         $tab_level--;
 
         return 1;
@@ -2162,6 +2197,11 @@ sub do_sieve {
                       max_threads => $param{'sieve_max_threads'} });
 
     info "All done!\n";
+    open FILE, "> $param{'name'}.nrels"
+        or die "Cannot open `$param{'name'}.nrels' for writing: $!.\n";
+    print FILE "$nrels\n";
+    close FILE;
+    $dup_purge_done = 1;
 }
 
 
@@ -2285,7 +2325,7 @@ sub do_sieve_bench {
                       progress => $sieve_progress,
                       is_done  => $sieve_is_done,
                       cmd      => $sieve_cmd,
-					  max_threads => $param{'sieve_max_threads'} });
+                      max_threads => $param{'sieve_max_threads'} });
 
     if ($last) {
     	info "All done!\n";
