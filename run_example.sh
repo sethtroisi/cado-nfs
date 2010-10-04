@@ -44,10 +44,20 @@ elif [ -x "@CADO_NFS_SOURCE_DIR@/cadofactor.pl" ] ; then
     cadofactor="@CADO_NFS_SOURCE_DIR@/cadofactor.pl"
     # Make the path absolute.
     bindir=$(cd "`dirname $0`" ; pwd)
-    export bindir
 else
-    echo "I don't know where I am" >&2
-    exit 1
+    # Otherwise we're called from the source tree (or we hope so)
+    call_cmake="`dirname $0`/scripts/call_cmake.sh"
+    if ! [ -x "$call_cmake" ] ; then
+        echo "I don't know where I am !" >&2
+    fi
+    eval `$call_cmake show`
+    if [ -f "${up_path}params/params.$file" ] ; then
+        file="${up_path}params/params.$file"
+    fi
+    cadofactor="${up_path}cadofactor.pl"
+    # Make the path absolute.
+    build_tree=`cd "$build_tree" ; pwd`
+    bindir="$build_tree"
 fi
 
 if [ ! -f $file ] ; then
