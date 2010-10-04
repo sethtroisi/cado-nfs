@@ -3059,7 +3059,7 @@ void matmul_bucket_report(struct matmul_bucket_data_s * mm, double scale)
     uint64_t scale0;
     scale0 = (mm->public_->iteration[0] + mm->public_->iteration[1]);
 
-    printf("n %lu\n", mm->public_->ncoeffs);
+    printf("n %"PRIu64"\n", mm->public_->ncoeffs);
 
     vector<slice_header_t>::iterator hdr;
 

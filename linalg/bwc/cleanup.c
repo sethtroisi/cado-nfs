@@ -120,7 +120,14 @@ int main(int argc, char **argv)
         blockmatrix_swap(kS, k);
 
         blockmatrix_copy_transpose_to_flat(zone, limbs_per_col, 0, 0, k);
-        int rank = spanned_basis(kzone, zone, ncols, nrows, limbs_per_col, limbs_per_row);
+        int rank = spanned_basis(
+                (mp_limb_t *) kzone,
+                (mp_limb_t *) zone,
+                ncols,
+                nrows,
+                sizeof(uint64_t) / sizeof(mp_limb_t) * limbs_per_col,
+                sizeof(uint64_t) / sizeof(mp_limb_t) * limbs_per_row
+                );
         // kzone*transpose(kS) is reduced
         // kS*transpose(kzone) is reduced (equivalent formulation)
         blockmatrix_copy_transpose_from_flat(T, kzone, limbs_per_row, 0, 0);

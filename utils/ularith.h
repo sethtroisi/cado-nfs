@@ -279,7 +279,7 @@ ularith_sub_2ul_2ul_cy (unsigned long *r1, unsigned long *r2,
   __asm__ ( "subl %3, %0\n\t"
             "sbbl %4, %1\n"
 	    "setc %2\n"
-            : "+&r" (*r1), "+r" (*r2), "=r" (cy)
+            : "+&r" (*r1), "+r" (*r2), "=q" (cy)
             : "g" (a1), "g" (a2)
             : "cc");
 #else

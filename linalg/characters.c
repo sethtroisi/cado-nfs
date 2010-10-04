@@ -141,15 +141,15 @@ uint64_t eval_64chars(int64_t a, uint64_t b, alg_prime_t * chars, cado_poly_ptr 
         } else {
             if (a < 0) {
                 unsigned long ua = ((unsigned long) (-a)) % ch->p;
-                b = b % ch->p;
-                modul_mul(&aux, &b, &ch->r, &ch->p);
+                unsigned long ub = b % ch->p;
+                modul_mul(&aux, &ub, &ch->r, &ch->p);
                 modul_add(&aux, &ua, &aux, &ch->p);
                 modul_neg(&aux, &aux, &ch->p);
                 res = modul_jacobi(&aux, &ch->p) < 0;   // -1->1, 1->0
             } else {
                 unsigned long ua = ((unsigned long) (a)) % ch->p;
-                b = b % ch->p;
-                modul_mul(&aux, &b, &ch->r, &ch->p);
+                unsigned long ub = b % ch->p;
+                modul_mul(&aux, &ub, &ch->r, &ch->p);
                 modul_sub(&aux, &ua, &aux, &ch->p);
                 res = modul_jacobi(&aux, &ch->p) < 0;   // -1->1, 1->0
             }

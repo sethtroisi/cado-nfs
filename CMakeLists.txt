@@ -48,8 +48,6 @@ get_override(CXX                  CMAKE_CXX_COMPILER)
 get_override(CADO_VERSION         CADO_VERSION)
 get_override(MPI                  MPI)
 get_override(PTHREADS             PTHREADS)
-set(GF2X_CONFIGURE_FLAGS --silent --disable-shared --disable-dependency-tracking)
-get_override(GF2X_CONFIGURE_FLAGS GF2X_CONFIGURE_FLAGS)
 
 #####################################################################
 # Add the CFLAGS that are needed in all cases.
@@ -58,6 +56,11 @@ if(CMAKE_COMPILER_IS_GNUCC)
     set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -g -W -Wall")
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -W -Wall")
 endif(CMAKE_COMPILER_IS_GNUCC)
+
+#####
+
+set(GF2X_CONFIGURE_FLAGS --disable-shared --disable-dependency-tracking CFLAGS=${CMAKE_C_FLAGS} CXXFLAGS=${CMAKE_CXX_FLAGS})
+get_override(GF2X_CONFIGURE_FLAGS GF2X_CONFIGURE_FLAGS)
 
 #####################################################################
 # Set dependencies for external software.

@@ -225,7 +225,7 @@ static inline void addmul_To64_o64_lsb_sse_v1(uint64_t * r, uint64_t a, uint64_t
 
 static inline void mul_o64_6464_C_lsb(uint64_t * r, uint64_t a, mat64_srcptr w)
 {
-    unsigned long c = 0;
+    uint64_t c = 0;
     for (unsigned int i = 0; i < WBITS; i++) {
 	c ^= (w[i] & -(a & 1UL));
 	a >>= 1UL;
@@ -239,7 +239,7 @@ static inline void mul_o64_6464_C_msb(uint64_t *r,
 {
     uint64_t c = 0UL;
     for (int i = 64 - 1; i >= 0; i--) {
-        c ^= (w[i] & (((long) a) >> (64 - 1)));
+        c ^= (w[i] & (((int64_t) a) >> (64 - 1)));
         a <<= 1UL;
     }
     *r = c;
@@ -251,7 +251,7 @@ static inline void mul_o64_T6464_C_parity(uint64_t * w, uint64_t a, mat64_srcptr
     // Uses unoptimized __builtin_parityl function -- maybe better with gcc 4.3
     // note that popcnt is faster in asm than the more restricted parity
     // functions. So if it's available, it should be tested.
-    unsigned long c = 0;
+    uint64_t c = 0;
     for (unsigned int i = 0; i < WBITS; i++) {
         uint64_t p = __builtin_parityl(a & b[i]);
 	c ^= p << i;
@@ -363,7 +363,7 @@ static inline void mul_N64_6464_lookup4(uint64_t *C,
         Bx[j][9]  = w; w ^= bb[0];
         Bx[j][8]  = w;
     }
-    memset(C, 0, m * sizeof(unsigned long));
+    memset(C, 0, m * sizeof(uint64_t));
     for (unsigned long i = 0; i < m; i++) {
         uint64_t aa = A[i];
         C[i] = Bx[0][aa & 15]; aa>>=4;
@@ -669,7 +669,7 @@ static inline void mul_N64_6464_vec(uint64_t *C,
                    const uint64_t *B, unsigned long m)
 {
 
-    memset(C, 0, m * sizeof(unsigned long));
+    memset(C, 0, m * sizeof(uint64_t));
     for (unsigned long i = 0; i < m; i++) {
         mul_o64_6464(C++, *A++, B);
     }
@@ -680,7 +680,7 @@ static inline void mul_N64_T6464_vec(uint64_t *C,
                    const uint64_t *B, unsigned long m)
 {
 
-    memset(C, 0, m * sizeof(unsigned long));
+    memset(C, 0, m * sizeof(uint64_t));
     for (unsigned long i = 0; i < m; i++) {
         mul_o64_T6464(C++, *A++, B);
     }

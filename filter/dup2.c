@@ -244,7 +244,7 @@ void usage()
 
 int main (int argc, char *argv[])
 {
-    unsigned long K = 4294967296; /* 2^32 */
+    unsigned long K = 0;
     uint32_t *H;
 
     param_list pl;
@@ -314,7 +314,7 @@ int main (int argc, char *argv[])
       exit (1);
     }
   memset (H, 0, K * sizeof (uint32_t));
-  fprintf (stderr, "Allocated hash table of %lu entries (%zuMb)\n", K,
+  fprintf (stderr, "Allocated hash table of %lu entries (%luMb)\n", K,
            (K * sizeof (uint32_t)) >> 20);
 
 
