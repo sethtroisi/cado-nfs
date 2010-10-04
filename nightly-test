@@ -55,7 +55,11 @@ if [ -f "$SCM/local.sh.$h" ] ; then
 fi
 
 cd cado-nfs-$CADO_VERSION
+echo -n "Starting compilation at: "
+date
 make "$@"
+echo -n "Starting factorization at: "
+date
 ./run_example.sh c59
 
 /bin/rm -fr "$DIR"
