@@ -1991,17 +1991,18 @@ sub do_dup {
 # purge (singletons and cliques)
 sub purge {
     my $nbrels = 0;
+    my $last = 0;
     for (my $i=0; $i < $nslices; $i++) {
         my $f = "$param{'prefix'}.dup2_$i.stderr";
         open FILE, "< $f"
             or die "Cannot open `$f' for reading: $!.\n";
         while (<FILE>) {
             if ( $_ =~ /^\s+(\d+) remaining relations/ ) {
-                $nbrels += $1;
-                last;
+                $last = $1;
             }
         }
         close FILE;
+        $nbrels += $last;
     }
     $tab_level++;
     info "Number of relations left: $nbrels.\n";
