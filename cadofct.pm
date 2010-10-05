@@ -456,7 +456,7 @@ my $cmdlog;
 
 # Runs the command $cmd.
 # The second argument is an optional pointer to a hash table of options:
-#  - `log'  specifies that the command should be logged into the command log;
+#  - `cmdlog'  specifies that the command should be logged into the command log;
 #  - `kill' specifies that if the command fails (non-zero exit status)
 #           we should report the error and die immediately.
 #  - `logfile' redirect both stdout and stderr to given file.
@@ -479,10 +479,10 @@ sub cmd {
     if ($verbose) {
         print "## $cmd\n";
     }
-    if ($cmdlog && $opt->{'log'}) {
-        open LOG, ">> $cmdlog" or die "$cmdlog: $!";
-        print LOG "$cmd\n";
-        close LOG;
+    if ($cmdlog && $opt->{'cmdlog'}) {
+        open CMDLOG, ">> $cmdlog" or die "$cmdlog: $!";
+        print CMDLOG "$cmd\n";
+        close CMDLOG;
     }
 
     my $pid = open3($dummy,\*CHLD_OUT, \*CHLD_ERR, $cmd);
@@ -555,8 +555,6 @@ sub cmd {
 
 # Runs the command $cmd on the remote host $host.
 # The second argument is an optional pointer to a hash table of options:
-#  - `nolog'   specifies that the command should not be logged into the
-#              command log;
 #  - `kill'    specifies that if the command fails (non-zero exit status)
 #              or times out we should report the error and die immediately;
 #  - `timeout' specifies how many seconds to wait before giving up.
@@ -764,7 +762,7 @@ sub send_file {
     # Try to upload the file
     $ret = remote_cmd($host, "env mkdir -p $m->{'tmpdir'} 2>&1");
     $ret = cmd("env rsync --timeout=30 $param{'wdir'}/$file ".
-               "$host:$m->{'tmpdir'}/ 2>&1", { log => 1 })
+               "$host:$m->{'tmpdir'}/ 2>&1", { cmdlog => 1 })
         unless $ret->{'status'};
 
     if ($ret->{'status'}) {
@@ -783,7 +781,7 @@ sub get_job_output {
     my ($job, $keep) = (@_);
 
     my $ret = cmd("env rsync --timeout=30 $job->{'host'}:$job->{'file'} ".
-                  "$param{'wdir'}/ 2>&1", { log => 1 });
+                  "$param{'wdir'}/ 2>&1", { cmdlog => 1 });
     my $status = 1;
     if ($ret->{'status'}) {
         my @out = split /\n/, $ret->{'out'};
@@ -881,9 +879,9 @@ sub append_poly_params {
 sub local_time {
     my $job= shift;
     $cmdlog = "$param{'prefix'}.cmd";
-    open LOG, ">> $cmdlog" or die "Cannot open `$cmdlog' for writing: $!.\n";
-    print LOG "# Starting $job on " . localtime() . "\n";
-    close LOG;
+    open CMDLOG, ">> $cmdlog" or die "Cannot open `$cmdlog' for writing: $!.\n";
+    print CMDLOG "# Starting $job on " . localtime() . "\n";
+    close CMDLOG;
 }
     
 sub format_dhms {
@@ -1157,7 +1155,7 @@ sub distribute_task {
                     $tab_level++;
                     my $cmd = &{$opt->{'cmd'}}(@r, $m, $nth, $opt->{'gzip'}).
                             " & echo \\\$!";
-                    my $ret = remote_cmd($h, $cmd, { log => 1 });
+                    my $ret = remote_cmd($h, $cmd, { cmdlog => 1 });
                     if (!$ret->{'status'}) {
                         chomp $ret->{'out'};
                         $job->{'pid'} = $ret->{'out'};
@@ -1193,7 +1191,7 @@ sub distribute_task {
                 info "Starting job: ".pad($r[0], 8)." ".pad($r[1], 8)."\n";
                 $tab_level++;
                 my $cmd = &{$opt->{'cmd'}}(@r, $machines{'localhost'}, $nth, $opt->{'gzip'});
-                cmd($cmd, { log => 1, kill => 1 });
+                cmd($cmd, { cmdlog => 1, kill => 1 });
                 my $check_cmd = "$param{'prefix'}.$opt->{'suffix'}.$r[0]-$r[1]";
                 $check_cmd .= ".gz" if $opt->{'gzip'};
                 &{$opt->{'check'}}($check_cmd, 1); # Exhaustive testing!
@@ -1286,10 +1284,10 @@ my %tasks = (
     factbase  => { name   => "factor base",
                    dep    => ['polysel'],
                    param  => ['alim'],
-                   files  => ['roots', 'makefb\.stderr'] },
+                   files  => ['roots', 'makefb\.log'] },
 
     freerels  => { dep    => ['factbase'],
-                   files  => ['freerels.gz', 'freerel\.stderr'] },
+                   files  => ['freerels.gz', 'freerel\.log'] },
 
     sieve     => { name   => "sieve and purge",
                    dep    => ['polysel'],
@@ -1302,24 +1300,24 @@ my %tasks = (
 
     dup       => { name   => "duplicates",
                    dep    => ['sieve'],
-                   files  => ['nodup\.gz', 'dup1\.stderr',
+                   files  => ['nodup\.gz', 'dup1\.log',
                               'subdirlist', 'filelist',
-                              'dup2_\d+\.stderr', 'nodup'] },
+                              'dup2_\d+\.log', 'nodup'] },
 
     purge     => { name   => "singletons and cliques",
                    dep    => ['dup'],
-                   files  => ['purged', 'purge\.stderr'] },
+                   files  => ['purged', 'purge\.log'] },
 
     merge     => { name   => "merge",
                    dep    => ['purge'],
                    param  => ['keep', 'maxlevel', 'cwmax', 'rwmax',
                               'ratio', 'bwstrat'],
-                   files  => ['merge\.his', 'merge\.stderr'] },
+                   files  => ['merge\.his', 'merge\.log'] },
 
     # replay shouldn't appear as a step in its own right. It's a bug.
     replay    => { name   => "replay",
                    dep    => ['merge'],
-                   files  => ['index', 'small.bin', 'replay\.stderr'],
+                   files  => ['index', 'small.bin', 'replay\.log'],
                    param  => ['skip'], },
 
     linalg    => { name   => "linear algebra",
@@ -1328,19 +1326,19 @@ my %tasks = (
                                bwc_interval
                                bwc_mm_impl
                                bwc_interleaving/],
-                   files  => ['bwc', 'bwc\.stderr', 'bl', 'bl\.stderr',
+                   files  => ['bwc', 'bwc\.log', 'bl', 'bl\.log',
 							  'W\d+'] },
 
     chars     => { name   => "characters",
                    dep    => ['linalg'],
                    param  => ['nchar'],
-                   files  => ['ker', 'characters\.stderr'] },
+                   files  => ['ker', 'characters\.log'] },
 
     sqrt      => { name	  => "square root",
                    dep    => ['chars'],
                    param  => ['nkermax'],
                    files  => ['dep\.\d+', 'dep\.alg\.\d+', 'dep\.rat\.\d+',
-                              'sqrt\.stderr', 'fact\.\d+',
+                              'sqrt\.log', 'fact\.\d+',
                               'fact', 'allfactors'] }
 );
 
@@ -1784,7 +1782,7 @@ sub do_polysel {
     info "The best polynomial is from `".basename($best)."' (E = $Emax).\n";
     $tab_level++;
     cmd("env cp -f $best $param{'prefix'}.poly 2>&1",
-        { log => 1, kill => 1 });
+        { cmdlog => 1, kill => 1 });
     $tab_level--;
 
     # Append sieving parameters to the poly file
@@ -1858,8 +1856,8 @@ sub do_factbase {
     my $cmd = "$param{'bindir'}/sieve/makefb ".
               "-poly $param{'prefix'}.poly ".
               "> $param{'prefix'}.roots ";
-    cmd($cmd, { log => 1, kill => 1,
-            logfile=>"$param{'prefix'}.makefb.stderr" });
+    cmd($cmd, { cmdlog => 1, kill => 1,
+            logfile=>"$param{'prefix'}.makefb.log" });
     $tab_level--;
 }
 
@@ -1878,8 +1876,8 @@ sub do_freerels {
               "-fb $param{'prefix'}.roots ".
               "> $param{'prefix'}.freerels ";
 
-    cmd($cmd, { log => 1, kill => 1,
-            logfile=>"$param{'prefix'}.freerel.stderr" });
+    cmd($cmd, { cmdlog => 1, kill => 1,
+            logfile=>"$param{'prefix'}.freerel.log" });
 	cmd("gzip $param{'prefix'}.freerels");
     $tab_level--;
 }
@@ -1949,8 +1947,8 @@ sub dup {
         info "split new files in $nslices slices...";
         cmd("$param{'bindir'}/filter/dup1 ".
             "-out $param{'prefix'}.nodup $new_files ",
-            { log => 1, kill => 1,
-              logfile=>"$param{'prefix'}.dup1.stderr" });
+            { cmdlog => 1, kill => 1,
+              logfile=>"$param{'prefix'}.dup1.log" });
     }
     {
         my $name="$param{'prefix'}.subdirlist";
@@ -1978,8 +1976,8 @@ sub dup {
             "-K $K -out $param{'prefix'}.nodup/$i ".
             "-filelist $param{'prefix'}.filelist ".
             "-basepath $param{'prefix'}.nodup/$i ",
-            { log => 1, kill => 1,
-              logfile => "$param{'prefix'}.dup2_$i.stderr",
+            { cmdlog => 1, kill => 1,
+              logfile => "$param{'prefix'}.dup2_$i.log",
             });
     }
     $tab_level--;
@@ -1998,7 +1996,7 @@ sub purge {
     my $nbrels = 0;
     my $last = 0;
     for (my $i=0; $i < $nslices; $i++) {
-        my $f = "$param{'prefix'}.dup2_$i.stderr";
+        my $f = "$param{'prefix'}.dup2_$i.log";
         open FILE, "< $f"
             or die "Cannot open `$f' for reading: $!.\n";
         while (<FILE>) {
@@ -2021,8 +2019,8 @@ sub purge {
                   "-basepath $param{'wdir'} " .
                   "-subdirlist $param{'prefix'}.subdirlist ".
                   "-filelist $param{'prefix'}.filelist ",
-                  { log => 1,
-                    logfile => "$param{'prefix'}.purge.stderr"
+                  { cmdlog => 1,
+                    logfile => "$param{'prefix'}.purge.log"
                  });
     $tab_level--;
     return $cmd;
@@ -2415,8 +2413,8 @@ sub do_merge {
               "-rwmax $param{'rwmax'} ".
               "-ratio $param{'ratio'} ";
 
-    cmd($cmd, { log => 1, kill => 1, logfile =>
-            "$param{'prefix'}.merge.stderr" });
+    cmd($cmd, { cmdlog => 1, kill => 1, logfile =>
+            "$param{'prefix'}.merge.log" });
 
     if (last_line("$param{'prefix'}.merge.his") =~ /^BWCOSTMIN: (\d+)/) {
         $bwcostmin = $1;
@@ -2450,8 +2448,8 @@ sub do_replay {
               "-out $param{'prefix'}.small.bin ".
               (defined $bwcostmin ? "-costmin $bwcostmin " : "");
 
-    my $res = cmd($cmd, { log => 1, kill => 1,
-              logfile=>"$param{'prefix'}.replay.stderr "
+    my $res = cmd($cmd, { cmdlog => 1, kill => 1,
+              logfile=>"$param{'prefix'}.replay.log "
         });
 
     $res->{'err'} =~ /^small_nrows=(\d+) small_ncols=(\d+)/m or die;
@@ -2535,9 +2533,9 @@ sub do_linalg {
                "mode=u64 mn=64 splits=0,64 ys=0..64 ".
                "wdir=$param{'prefix'}.bwc " .
                "bwc_bindir=$bwc_bindir ";
-        cmd($cmd, { log => 1, kill => 1,
+        cmd($cmd, { cmdlog => 1, kill => 1,
                 appendlog=>1,
-                logfile=>"$param{'prefix'}.bwc.stderr" });
+                logfile=>"$param{'prefix'}.bwc.log" });
 
     } elsif ($param{'linalg'} eq "bl") {
         die "No longer supported";
@@ -2569,8 +2567,8 @@ sub do_chars {
               "-out $param{'prefix'}.ker " .
               "$param{'prefix'}.bwc/W";
 
-    my $res = cmd($cmd, { log => 1, kill => 1,
-            logfile=>"$param{'prefix'}.characters.stderr" });
+    my $res = cmd($cmd, { cmdlog => 1, kill => 1,
+            logfile=>"$param{'prefix'}.characters.log" });
 
     $res->{'err'} =~ /^Wrote (\d+) non-zero dependencies/m or die;
     my $ndep = $1;
@@ -2604,7 +2602,7 @@ sub do_sqrt {
     banner "Square root";
     local_time "Square root";
     if (!defined($ndep)) {
-        $ndep = `awk '/^Wrote/ { print \$2; }' $param{'prefix'}.characters.stderr`;
+        $ndep = `awk '/^Wrote/ { print \$2; }' $param{'prefix'}.characters.log`;
         chomp($ndep);
     }
     if (!defined($ndep) || $ndep > $param{'nkermax'}) {
@@ -2626,9 +2624,9 @@ sub do_sqrt {
             "-index $param{'prefix'}.index ".
             "-ker $param{'prefix'}.ker ";
 
-        cmd($cmd, { log => 1, kill => 1,
+        cmd($cmd, { cmdlog => 1, kill => 1,
                 appendlog=>1,
-                logfile=>"$param{'prefix'}.sqrt.stderr"});
+                logfile=>"$param{'prefix'}.sqrt.log"});
     }
 
     # later processing does not need re-generation of the .dep files.
@@ -2647,9 +2645,9 @@ sub do_sqrt {
             "-ker $param{'prefix'}.ker ".
             "> $f";
 
-        cmd($cmd, { log => 1, kill => 1,
+        cmd($cmd, { cmdlog => 1, kill => 1,
                 appendlog=>1,
-                logfile=>"$param{'prefix'}.sqrt.stderr"});
+                logfile=>"$param{'prefix'}.sqrt.log"});
 
         do { $tab_level--; next; } if first_line($f) =~ /^Failed/;
 
