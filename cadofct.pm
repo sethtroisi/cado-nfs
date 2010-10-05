@@ -479,6 +479,11 @@ sub cmd {
     if ($verbose) {
         print "## $cmd\n";
     }
+    if ($cmdlog && $opt->{'log'}) {
+        open LOG, ">> $cmdlog" or die "$cmdlog: $!";
+        print LOG "$cmd\n";
+        close LOG;
+    }
 
     my $pid = open3($dummy,\*CHLD_OUT, \*CHLD_ERR, $cmd);
     
