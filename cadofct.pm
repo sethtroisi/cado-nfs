@@ -469,9 +469,9 @@ sub cmd {
     my $logfile;
     if ($opt->{'logfile'}) {
         if ($opt->{'appendlog'}) {
-            open($logfile, ">", $opt->{'logfile'}) or die;
-        } else {
             open($logfile, ">>", $opt->{'logfile'}) or die;
+        } else {
+            open($logfile, ">", $opt->{'logfile'}) or die;
         }
     }
     select($logfile); $|=1;select(STDOUT);
@@ -1319,7 +1319,10 @@ my %tasks = (
     # replay shouldn't appear as a step in its own right. It's a bug.
     replay    => { name   => "replay",
                    dep    => ['merge'],
-                   files  => ['index', 'small.bin', 'replay\.log'],
+                   files  => ['index', 'small.bin', 'replay\.log',
+                              'small.cw.bin', 'small.dense.bin',
+                              'small.dense.cw.bin', 'small.rw.bin',
+                              'small.dense.rw.bin'],
                    param  => ['skip'], },
 
     linalg    => { name   => "linear algebra",

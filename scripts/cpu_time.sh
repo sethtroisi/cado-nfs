@@ -45,20 +45,20 @@ fi
 
 if [[ -z $1 || $(expr $1 : '.*[l].*') != 0 ]]
   then echo "CPU or real time for linear algebra"
-    num_lines=$(grep -n Done. ${name}.bwc.stderr | sed "s/^\([0-9]*\):Done./\1-1/g")
+    num_lines=$(grep -n Done. ${name}.bwc.log | sed "s/^\([0-9]*\):Done./\1-1/g")
     if [[ $(echo $num_lines | wc -w) == 2 ]]
       then echo -n "        krylov [real time]:   "
         num_line_v=$(echo $num_lines | cut -d' ' -f 1 | bc)
-        line_v=$(head -$num_line_v ${name}.bwc.stderr | tail -1)
+        line_v=$(head -$num_line_v ${name}.bwc.log | tail -1)
         v0=$(echo $line_v | sed "s/^.*ETA (N=\(\S*\)): .*/\1/g")
         v1=$(echo $line_v | sed "s/^.*\[\(\S*\) s\/iter\]$/\1/g")
         t=$(echo $v0*$v1 | bc | f)
         echo "$t ($v1 s/iter)"
         echo -n "        lingen:               "
-        grep "^Total computation took" ${name}.bwc.stderr | sed "s/^.*took \(\S*\)$/\1/g" | f
+        grep "^Total computation took" ${name}.bwc.log | sed "s/^.*took \(\S*\)$/\1/g" | f
         echo -n "        mksol [real time]:    "
         num_line_s=$(echo $num_lines | cut -d' ' -f 2 | bc)
-        line_s=$(head -$num_line_s ${name}.bwc.stderr | tail -1)
+        line_s=$(head -$num_line_s ${name}.bwc.log | tail -1)
         s0=$(echo $line_s | sed "s/^.*ETA (N=\(\S*\)): .*/\1/g")
         s1=$(echo $line_s | sed "s/^.*\[\(\S*\) s\/iter\]$/\1/g")
         t=$(echo $s0*$s1 | bc | f)
@@ -70,10 +70,10 @@ fi
 if [[ -z $1 || $(expr $1 : '.*[r].*') != 0 ]]
   then echo "CPU time for sqrt (one root): "
     echo -n "        ab pairs:             "
-    grep dependency ${name}.sqrt.stderr | head -1 | cut -d' ' -f 6 | f
+    grep dependency ${name}.sqrt.log | head -1 | cut -d' ' -f 6 | f
     echo -n "        ratsqrt:              "
-    rat=$(grep Rational ${name}.sqrt.stderr | head -1 | sed "s/.* at \(\S*\)ms$/\1/g")
+    rat=$(grep Rational ${name}.sqrt.log | head -1 | sed "s/.* at \(\S*\)ms$/\1/g")
     echo "scale=3; $rat/1000" | bc -l | f
     echo -n "        algsqrt:              "
-    grep Algebraic ${name}.sqrt.stderr | head -1 | cut -d' ' -f6 | f
+    grep Algebraic ${name}.sqrt.log | head -1 | cut -d' ' -f6 | f
 fi
