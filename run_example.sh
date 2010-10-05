@@ -23,6 +23,12 @@ chmod 755 $t
 file=$1
 shift
 
+if ! [ "$file" ] ; then
+    echo "Usage: $0 <file>" >&2
+    echo "(in some cases, provided params.XXX can be found, XXX is an acceptable argument)" >&2
+    exit 1
+fi
+
 #########################################################################
 # Set paths properly.
 cado_prefix="@CMAKE_INSTALL_PREFIX@"

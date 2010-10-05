@@ -36,6 +36,10 @@ use List::Util qw[min];
 use POSIX qw(ceil);
 use Math::BigInt;
 use IPC::Open3;
+use IO::Tty qw(TIOCNOTTY);
+require POSIX;
+
+
 
 ###############################################################################
 # Message and error handling ##################################################
@@ -55,6 +59,9 @@ my $verbose = 0;
 
 # Whether to show output.
 my $assume_yes = 0;
+
+# Whether to replace ``remote'' accesses to localhost by localhost.
+my $elide_localhost = 0;
 
 # Pads a string with spaces to match the speficied width
 sub pad {
@@ -466,6 +473,7 @@ my $cmdlog;
 #  - `out'    is the captured standard output of the command;
 sub cmd {
     my ($cmd, $opt) = @_;
+    $cmd =~ s/localhost:// if $elide_localhost && $cmd =~ /rsync/;
     my $logfile;
     if ($opt->{'logfile'}) {
         if ($opt->{'appendlog'}) {
@@ -474,8 +482,9 @@ sub cmd {
             open($logfile, ">", $opt->{'logfile'}) or die;
         }
     }
-    select($logfile); $|=1;select(STDOUT);
-    my $dummy='';
+    if ($logfile) {
+        select($logfile); $|=1;select(STDOUT);
+    }
 
     if ($verbose) {
         print "## $cmd\n";
@@ -486,7 +495,9 @@ sub cmd {
         close CMDLOG;
     }
 
-    my $pid = open3($dummy,\*CHLD_OUT, \*CHLD_ERR, $cmd);
+    open NULL, "</dev/null" or die;
+    my $pid = open3(*NULL,\*CHLD_OUT, \*CHLD_ERR, $cmd);
+    close NULL;
     
     my $fds = {
         'out' => [ *CHLD_OUT{IO}, "", 1, "" ],
@@ -564,8 +575,12 @@ sub cmd {
 #  - `out'     is the captured standard output of the command;
 #  - `status'  is the exit status of the command;
 sub remote_cmd {
-    my ($host, $cmd, $opt) = @_;
+    my $host = shift;
+    return cmd(@_) if $elide_localhost && $host eq 'localhost';
 
+    my ($cmd, $opt) = @_;
+
+    print "# $host $cmd\n";
     $opt->{'timeout'} = 30 unless $opt->{'timeout'};
 
     $cmd =~ s/"/\\"/g;
@@ -730,6 +745,18 @@ sub job_status {
     return $status;
 }
 
+# # Sanity check: verifies that we are able to run remote commands.
+# sub remote_check {
+#     my $host = shift;
+#     my $m = $machines{$host};
+#     my $ret = remote_cmd($host, "test -d $m->{'bindir'}");
+#     return 1 unless $ret->{'status'};
+#     return 0;
+# }
+# (since we're tolerant about nodes being unreachable, it's unclear which
+# semantic we're willing to give to such test. Fail if no host is
+# reachable on startup ?)
+
 # Kills a remote job.
 # The $keep argument prevents the output file to be removed on the host.
 sub kill_job {
@@ -742,7 +769,6 @@ sub kill_job {
     }
     $tab_level--;
 }
-
 
 
 # Sends a file to a remote host.
@@ -1155,6 +1181,8 @@ sub distribute_task {
 
                     info "Starting job: ".job_string($job)."\n";
                     $tab_level++;
+                    # FIXME: if $elide_localhost is true, then the
+                    # over-zealous quoting of $! here leads to a crash.
                     my $cmd = &{$opt->{'cmd'}}(@r, $m, $nth, $opt->{'gzip'}).
                             " & echo \\\$!";
                     my $ret = remote_cmd($h, $cmd, { cmdlog => 1 });
@@ -1396,6 +1424,14 @@ sub do_task {
 
 sub do_init {
     banner "Initialization";
+
+    if (defined TIOCNOTTY) {
+        if (open (DEVTTY, "/dev/tty")) {
+            ioctl(DEVTTY, TIOCNOTTY, 0 );
+            close DEVTTY;
+        }
+    }
+
 
     # Getting configuration
     info "Reading the parameters...\n";
