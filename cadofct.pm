@@ -580,7 +580,6 @@ sub remote_cmd {
 
     my ($cmd, $opt) = @_;
 
-    print "# $host $cmd\n";
     $opt->{'timeout'} = 30 unless $opt->{'timeout'};
 
     $cmd =~ s/"/\\"/g;
