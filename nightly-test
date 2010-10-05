@@ -10,9 +10,14 @@
 # 3) add the following lines in your .ssh/config file:
 # Host scm.gforge.inria.fr
 #    IdentityFile /users/mygroup/mylogin/.ssh/cle_gforge
-# 4) since run.c59 also calls ssh, you need to add also IdentityFile ... for
-#    the computer on which you run nightly-test, and to add the content of
-#    cle_gforge.pub in the authorized_keys on that computer.
+# 4) since run.c59 also calls ssh, you need to add also the lines:
+# Host localhost
+#    StrictHostKeyChecking no
+#    UserKnownHostsFile /dev/null
+#    IdentityFile /users/mygroup/mylogin/.ssh/cle_gforge
+#    in the .ssh/config file on the computer on which you run nightly-test
+#    (since run_example.sh runs the factorization on localhost), and to add
+#    the content of cle_gforge.pub in the authorized_keys on that computer.
 set -e
 # If the DIR variable is set, then use it as the basename of the temp directory.
 if ! [ "$DIR" ] ; then
