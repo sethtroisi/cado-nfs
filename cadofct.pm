@@ -474,6 +474,7 @@ sub cmd {
             open($logfile, ">>", $opt->{'logfile'}) or die;
         }
     }
+    select($logfile); $|=1;select(STDOUT);
     my $dummy='';
 
     if ($verbose) {
@@ -500,7 +501,8 @@ sub cmd {
         }
         
         my $rc;
-        while ($rc = select(my $rout=$rin, undef, undef, 1.0) == 0) {}
+        my $rout;
+        while ($rc = select($rout=$rin, undef, undef, 1.0) == 0) {}
         if ($rc < 0) {
             print STDERR "Left select with $!\n";
             last;
@@ -508,7 +510,7 @@ sub cmd {
     
         for my $k (keys %$fds) {
             my $v = $fds->{$k};
-            next unless vec($rin, fileno($v->[0]), 1);
+            next unless vec($rout, fileno($v->[0]), 1);
             if (sysread $v->[0], my $x, 1024) { 
                 $v->[1] .= $x;
                 while ($v->[1]=~s/^(.*(?:\n|\r))//) {
@@ -2449,7 +2451,7 @@ sub do_replay {
               (defined $bwcostmin ? "-costmin $bwcostmin " : "");
 
     my $res = cmd($cmd, { cmdlog => 1, kill => 1,
-              logfile=>"$param{'prefix'}.replay.log "
+              logfile=>"$param{'prefix'}.replay.log"
         });
 
     $res->{'err'} =~ /^small_nrows=(\d+) small_ncols=(\d+)/m or die;
