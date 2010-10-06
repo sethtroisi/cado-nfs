@@ -36,8 +36,8 @@ use List::Util qw[min];
 use POSIX qw(ceil);
 use Math::BigInt;
 use IPC::Open3;
-use IO::Tty qw(TIOCNOTTY);
-require POSIX;
+BEGIN { local $SIG{__WARN__} = sub { }; require "sys/ioctl.ph"; }
+
 
 
 
@@ -1424,12 +1424,17 @@ sub do_task {
 sub do_init {
     banner "Initialization";
 
-    if (defined TIOCNOTTY) {
+    if (defined &TIOCNOTTY) {
         if (open (DEVTTY, "/dev/tty")) {
-            ioctl(DEVTTY, TIOCNOTTY, 0 );
+            ioctl(DEVTTY, TIOCNOTTY(), 0 );
             close DEVTTY;
         }
     }
+    # Turns out that ssh, when it has neither a connected stdin, nor a
+    # controlling tty, tries to run an ssh-askpass dialog on the
+    # $DISPLAY, if that is an existing variable. Since we consider this
+    # as essentially a nuisance, we forbid this behaviour.
+    delete $ENV{'DISPLAY'};
 
 
     # Getting configuration
