@@ -517,14 +517,13 @@ int builder_do_small_slice(builder * mb, struct small_slice_t * S, uint32_t i0, 
     typedef small_slice_t::Lvci_t Lvci_t;
     uint32_t lu_offset = 0;
     uint32_t j = 0;
-    for(Lui_t lup = S->Lu.begin() ; lup != S->Lu.end() ; ++lup) {
+    for(Lui_t lup = S->Lu.begin() ; lup != S->Lu.end() ; ++lup, lu_offset+=1<<16) {
         std::sort(lup->begin(), lup->end());
         for(Lvci_t lvp = lup->begin() ; lvp != lup->end() ; ++lvp) {
             uint32_t dj = (lu_offset + lvp->first) - j;
             j = lu_offset + lvp->first;
             if (dj > S->dj_max) { S->dj_max = dj; }
         }
-        lu_offset += 1 << 16;
     }
 
     /* There are two possible reasons for this slice to be discarded.
@@ -1438,12 +1437,11 @@ void builder_push_small_slice(struct matmul_bucket_data_s * mm, small_slice_t * 
             typedef small_slice_t::Lvci_t Lvci_t;
             for(Lvci_t lvp = lv.begin() ; lvp != lv.end() ; ++lvp) {
                 uint32_t dj = (lu_offset + lvp->first) - j;
-                j = lu_offset + lvp->first;
                 ASSERT(dj < (1 << SMALL_SLICES_DJ_BITS) );
                 ASSERT(lvp->second < (1 << SMALL_SLICES_I_BITS) );
                 mm->t16.push_back((dj << SMALL_SLICES_I_BITS) | lvp->second);
+                j = lu_offset + lvp->first;
             }
-            lu_offset += 1 << 16;
         }
 
         // align.
