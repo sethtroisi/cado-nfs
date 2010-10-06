@@ -65,7 +65,6 @@ date
 make "$@"
 echo -n "Starting factorization at: "
 date
-./run_example.sh c59
+CADO_COLOR=0 ./run_example.sh c59
 
 /bin/rm -fr "$DIR"
-
