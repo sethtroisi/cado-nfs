@@ -1331,6 +1331,7 @@ my %tasks = (
                    dep    => ['sieve'],
                    files  => ['nodup\.gz', 'dup1\.log',
                               'subdirlist', 'filelist',
+                              'newfilelist',
                               'dup2_\d+\.log', 'nodup'] },
 
     purge     => { name   => "singletons and cliques",
@@ -1963,6 +1964,22 @@ sub dup {
         push @new_files, $_ unless (exists ($old_files{$_}));
     }
 
+    # Put basenames of relation files in list.
+    my $name="$param{'prefix'}.filelist";
+    open FILE, "> $name" or die "$name: $!";
+    for (@files) {
+        m{([^/]+)$};
+        print FILE "$_\n";
+    }
+    close FILE;
+    $name="$param{'prefix'}.newfilelist";
+    open FILE, "> $name" or die "$name: $!";
+    for (@new_files) {
+        m{([^/]+)$};
+        print FILE "$_\n";
+    }
+    close FILE;
+
     # print number of primes in factor base
     if (scalar @files >= 2) {
         my $f = $files[0];
@@ -1991,26 +2008,17 @@ sub dup {
             (map "$param{'wdir'}/$_", sort @new_files);
         info "split new files in $nslices slices...";
         cmd("$param{'bindir'}/filter/dup1 ".
-            "-out $param{'prefix'}.nodup $new_files ",
+            "-out $param{'prefix'}.nodup ".
+            "-filelist $param{'prefix'}.newfilelist ".
+            "-basepath $param{'wdir'} ",
             { cmdlog => 1, kill => 1,
               logfile=>"$param{'prefix'}.dup1.log" });
     }
-    {
-        my $name="$param{'prefix'}.subdirlist";
-        open FILE, "> $name" or die "$name: $!";
-        print FILE join("\n", map { "$param{'name'}.nodup/$_"; } (0..$nslices-1));
-        close FILE;
-    }
-    {
-        # Put basenames of relation files in list.
-        my $name="$param{'prefix'}.filelist";
-        open FILE, "> $name" or die "$name: $!";
-        for (@files) {
-            m{([^/]+)$};
-            print FILE "$_\n";
-        }
-        close FILE;
-    }
+    
+    $name="$param{'prefix'}.subdirlist";
+    open FILE, "> $name" or die "$name: $!";
+    print FILE join("\n", map { "$param{'name'}.nodup/$_"; } (0..$nslices-1));
+    close FILE;
 
     my $nrels = first_line("$param{'prefix'}.nrels");
 
