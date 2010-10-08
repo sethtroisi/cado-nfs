@@ -2306,7 +2306,7 @@ sub do_sieve {
                       max_threads => $param{'sieve_max_threads'} });
 
     info "All done!\n";
-    open FILE, "> $param{'name'}.nrels"
+    open FILE, "> $param{'prefix'}.nrels"
         or die "Cannot open `$param{'name'}.nrels' for writing: $!.\n";
     print FILE "$nrels\n";
     close FILE;
