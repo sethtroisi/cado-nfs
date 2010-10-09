@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200112L /* pclose */
 #include <stdio.h>
 #include <stdlib.h>
+#include <inttypes.h> /* for PRId64 */
 #include <ctype.h> /* for isxdigit */
 #include <string.h>
 #include <errno.h>
@@ -98,10 +99,11 @@ computeroots (relation_t *rel)
 }
 
 void
-fprint_relation(FILE *file, relation_t rel) {
+fprint_relation (FILE *file, relation_t rel)
+{
   int i, j;
 
-  fprintf(file, "%ld,%lu:", rel.a, rel.b);
+  fprintf(file, "%" PRId64 ",%" PRIu64 ":", rel.a, rel.b);
   for (i = 0; i < rel.nb_rp - 1; ++i)
     for (j = 0; j < rel.rp[i].e; j++)
       fprintf (file, "%lx,", rel.rp[i].p);
@@ -124,7 +126,7 @@ fprint_relation_raw (FILE *file, relation_t rel)
 {
   int i, j;
 
-  fprintf (file, "%ld,%lu:", rel.a, rel.b);
+  fprintf (file, "%" PRId64 ",%" PRIu64 ":", rel.a, rel.b);
   for (i = 0; i < rel.nb_rp; ++i)
     {
       ASSERT (rel.rp[i].e >= 1);

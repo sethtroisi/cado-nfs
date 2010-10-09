@@ -58,7 +58,8 @@ check_relation (relation_t *rel, cado_poly_ptr cpoly)
 	  mpz_gcd (g, acc, no);
 	  mpz_divexact (acc, acc, g);
 	  fprintf (stderr,
-		   "Wrong algebraic side for (%ld, %lu)\n", rel->a, rel->b);
+		   "Wrong algebraic side for (%" PRId64 ", %" PRIu64 ")\n",
+                   rel->a, rel->b);
 	  gmp_fprintf (stderr, "Given factor %Zd does not divide norm\n", acc);
 	  mpz_clear (g);
 	}
@@ -76,7 +77,9 @@ check_relation (relation_t *rel, cado_poly_ptr cpoly)
             mpz_mul_ui(acc, acc, (rel->rp[i]).p);
     }
     if (mpz_cmp(acc, no) != 0) {
-        fprintf(stderr, "Wrong rational side for (%ld, %lu)\n", rel->a, rel->b);
+        fprintf (stderr,
+                 "Wrong rational side for (%" PRId64 ", %" PRIu64 ")\n",
+                 rel->a, rel->b);
         mpz_clear(no);
         mpz_clear(acc);
         return 0;

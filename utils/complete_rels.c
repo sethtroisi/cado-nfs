@@ -58,7 +58,8 @@ complete_relation (relation_t *rel, cado_poly_ptr cpoly)
       for (j = 0; j < (rel->ap[i]).e; ++j)
 	if (mpz_divisible_ui_p (no, (rel->ap[i]).p) == 0)
 	  {
-	    fprintf (stderr, "Wrong algebraic side for (%ld, %lu)\n",
+	    fprintf (stderr,
+                     "Wrong algebraic side for (%" PRId64 ", %" PRIu64 ")\n",
 		     rel->a, rel->b);
 	    fprintf (stderr, "Given factor %lu does not divide norm\n",
 		     (rel->ap[i]).p);
@@ -85,7 +86,8 @@ complete_relation (relation_t *rel, cado_poly_ptr cpoly)
       for (j = 0; j < (rel->rp[i]).e; ++j)
 	if (mpz_divisible_ui_p (no, (rel->rp[i]).p) == 0)
 	  {
-	    fprintf (stderr, "Wrong rational side for (%ld, %lu)\n",
+	    fprintf (stderr,
+                     "Wrong rational side for (%" PRId64 ", %" PRIu64 ")\n",
 		     rel->a, rel->b);
 	    fprintf (stderr, "Given factor %lu does not divide norm\n",
 		     (rel->rp[i]).p);
