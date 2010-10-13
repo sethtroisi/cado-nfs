@@ -227,6 +227,7 @@ polyselect/rho.c
 polyselect/rho.h
 polyselect/murphyE.c
 polyselect/murphyE.h
+polyselect/rootsieve5.c
 run_example.sh
 scripts/call_cmake.sh
 scripts/version.sh
