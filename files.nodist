@@ -46,6 +46,8 @@ polyselect/fast_rootsieve.c
 polyselect/play.c
 polyselect/rotation_bound.sage
 polyselect/ROOTSIEVE_TODO
+polyselect/rootsieve5.c
+polyselect/rootsieve5.h
 scripts/check_file_lists.pl
 scripts/dist.sh
 sieve/CMakeLists-nodist.txt
