@@ -260,7 +260,7 @@ poly_info ( mpz_t *f,
 /*   @Tree-related functions.  */
 /*-----------------------------*/
 
-
+#if DEBUG
 /*
    Print the info for the node
 */
@@ -272,7 +272,6 @@ print_node ( node *pnode )
 	 /* for (i = 0; i < pnode->nr; i++) */
 	 /*  	  printf ("pnode->r[%d]: %lu\n", i, pnode->r[i]); */
 }
-
 
 /*
   Print a tree, non-recursive. Two styles.
@@ -330,7 +329,7 @@ print_tree ( node *root,
 	 printf ("\n");
 	 return;
 }
-
+#endif
 
 /*
   Create new empty node.
@@ -1083,7 +1082,7 @@ ij2uv ( long A,
 	 return ( ab2uv(A, MOD, ij2ab(Amin, i)) );
 }
 
-
+#if DEBUG
 /*
   Change coordinate from (i, j) to (u, v).
 */
@@ -1114,7 +1113,7 @@ print_sievearray ( double **A,
 	 }
 	 printf ("\n");
 }
-
+#endif
 
 /*
   Given numerator = f(x)*g'(x) - f'(x)*g(x) and g(x),
@@ -2118,7 +2117,7 @@ free_2D ( long ***array,
 		  free (*array);
 }
 
-
+#if 0
 /*
   THE CODE IS NOT CORRECT !
   Do a quick selection of the best k on the
@@ -2179,7 +2178,7 @@ quick_selection_2d_ul ( unsigned long **array,
 			   quick_selection_2d_ul ( array, dim, pivot_i + 1, h, k );
 	 }
 }
-
+#endif
 
 /*
   Do a quicksort -- change this to quick_selection since
@@ -2692,7 +2691,7 @@ rootsieve_array_init ( double ***A,
 	 }
 }
 
-
+#if 0
 /*
   free array
 */
@@ -2705,7 +2704,7 @@ rootsieve_array_free ( double ***A,
 		  free ((*A)[i]);
 	 free (*A);
 }
-
+#endif
 
 /*
   Init root sieve bound and sublattice.
@@ -2815,10 +2814,11 @@ rootsieve_free ( rs_t rs )
   Usage
 */
 static void
-usage ()
+usage (char *argv1)
 {
-	 fprintf (stderr, "Usage: ./rootsieve5 < POLYFILE \n");
-	 exit(1);
+  fprintf (stderr, "Unexpected argument: %s\n", argv1);
+  fprintf (stderr, "Usage: ./rootsieve5 < POLYFILE \n");
+  exit(1);
 }
 
 
@@ -2826,14 +2826,13 @@ usage ()
   Main
 */
 int
-main ( int argc,
-	   char *argv[] )
+main (int argc, char *argv[])
 {
 	 /* only use stdin */
 	 if (argc > 1)
 	 {
-		  usage ();
-		  exit (1);
+           usage (argv[1]);
+           exit (1);
 	 }
 
 	 int st;

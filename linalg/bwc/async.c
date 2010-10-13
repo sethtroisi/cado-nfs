@@ -222,7 +222,8 @@ void timing_check(parallelizing_info pi, struct timing_data * timing, int iter, 
     grid_print(pi, buf, sizeof(buf), print);
 }
 
-void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * timing, int iter, unsigned long ncoeffs, int print)
+/* stage=0 for krylov, 1 for mksol */
+void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * timing, int iter, unsigned long ncoeffs, int print, int stage)
 {
     timing_interval_data since_last_reset[2];
     timing_interval_data since_beginning[2];
@@ -335,7 +336,9 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
             unsigned int s = strlen(eta_string);
             for( ; s && isspace(eta_string[s-1]) ; eta_string[--s]='\0') ;
 
-            printf("N=%d ; ETA (N=%d): %s [%.2f s/iter]\n", iter, timing->end_mark, eta_string, dwct / di);
+            printf("%s: N=%d ; ETA (N=%d): %s [%.2f s/iter]\n",
+                   (stage == 0) ? "krylov" : "mksol",
+                   iter, timing->end_mark, eta_string, dwct / di);
         }
     }
 }
