@@ -968,9 +968,8 @@ content_poly (mpz_t g, mpz_t *f, int d)
     mpz_gcd (g, g, f[i]);
 }
 
-#if 0
 /* v <- f(r), where f is of degree d */
-static void
+void
 eval_poly_ui (mpz_t v, mpz_t *f, int d, unsigned long r)
 {
   int i;
@@ -982,10 +981,9 @@ eval_poly_ui (mpz_t v, mpz_t *f, int d, unsigned long r)
       mpz_add (v, v, f[i]);
     }
 }
-#endif
 
 /* v <- f'(r), where f is of degree d */
-static void
+void
 eval_poly_diff_ui (mpz_t v, mpz_t *f, int d, unsigned long r)
 {
   int i;
@@ -1125,7 +1123,7 @@ always returns 0 in val(f,p).
 
 Assumes p divides disc = disc(f), d is the degree of f.
 */
-static double
+double
 special_valuation (mpz_t * f, int d, unsigned long p, mpz_t disc)
 {
     double v;

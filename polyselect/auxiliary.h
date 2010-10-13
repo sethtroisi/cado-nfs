@@ -69,6 +69,11 @@ void optimize (mpz_t*, int, mpz_t*, int, int);
 void rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1, long *J0, long *J1, int verbose, int);
 void do_translate_z (mpz_t *f, int d, mpz_t *g, mpz_t k);
 
+/* changed for rootsieve5.c */
+void eval_poly_ui (mpz_t v, mpz_t *f, int d, unsigned long r);
+void eval_poly_diff_ui (mpz_t v, mpz_t *f, int d, unsigned long r);
+double special_valuation (mpz_t * f, int d, unsigned long p, mpz_t disc);
+
 /********************* data structures for first phase ***********************/
 
 typedef struct {
