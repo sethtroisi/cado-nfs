@@ -99,6 +99,3 @@ bwc_interval=100        # checkpointing interval for bwc.
 
 nkermax=30              # maximal size of computed kernel
 nchar=50                # number of characters
-
-# Used for employing this parameter file as a test.
-expected_factorization=1113954325148827987925490175477024844070922844843,1917481702524504439375786268230862180696934189293
