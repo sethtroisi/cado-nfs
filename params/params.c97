@@ -14,8 +14,6 @@ delay=60                # time in seconds between two checks
 machines=mach_desc      # file describing available computers for parallel
                         # computation
 
-n=2135987035920910082395022704999628797051095341826417406442524165008583957746445088405009430865999
-
 ###########################################################################
 # Polynomial selection with Kleinjung's algorithm
 ###########################################################################
