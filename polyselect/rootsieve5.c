@@ -2180,6 +2180,40 @@ quick_selection_2d_ul ( unsigned long **array,
 }
 #endif
 
+
+/*
+  partition.
+*/
+static unsigned long
+quick_sort_2d_ul_partition  ( unsigned long **array,
+							  const unsigned short dim,
+							  const long l,
+							  const long h )
+{
+	 unsigned long pivot = 0, tmp = 0;
+	 long i = l - 1, j;
+	 pivot = array [h][dim];
+	 for (j = l; j < h; j ++) {
+		  if ( array [j][dim] < pivot ) {
+			   i ++;
+			   tmp = array [i][dim];
+			   array [i][dim] = array [j][dim];
+			   array [j][dim] = tmp;
+			   tmp = array [i][1 - dim];
+			   array [i][1 - dim] = array [j][1 - dim];
+			   array [j][1 - dim] = tmp;
+		  }
+	 }
+	 tmp = array [i+1][dim];
+	 array [i+1][dim] = array [h][dim];
+	 array [h][dim] = tmp;
+	 tmp = array [i+1][1 - dim];
+	 array [i+1][1 - dim] = array [h][1 - dim];
+	 array [h][1 - dim] = tmp;
+	 return i+1;
+}
+
+
 /*
   Do a quicksort -- change this to quick_selection since
   we only want the best k.
@@ -2187,45 +2221,14 @@ quick_selection_2d_ul ( unsigned long **array,
 static void
 quick_sort_2d_ul ( unsigned long **array,
 				   const unsigned short dim,
-				   const unsigned long l,
-				   const unsigned long h )
+				   const long l,
+				   const long h )
 {
-	 unsigned long pivot = 0UL, tmp = 0UL, pivot_i = 0UL;
-	 unsigned long i = l, j = h;
-
+	 long pivot = 0;
 	 if (l < h) {
-		  /* the middle one, as usual */
-		  pivot_i = (i + j) / 2;
-		  pivot = array [pivot_i][dim];
-
-		  /* partitioning */
-		  do
-		  {
-			   while ( array [i][dim] < pivot )
-					i++;
-			   while ( array [j][dim] > pivot )
-					j--;
-			   if (i <= j)
-			   {
-					tmp = array [i][dim];
-					array [i][dim] = array [j][dim];
-					array [j][dim] = tmp;
-
-					tmp = array [i][1 - dim];
-					array [i][1 - dim] = array [j][1 - dim];
-					array [j][1 - dim] = tmp;
-
-					i++;
-					j--;
-			   }
-		  }
-		  while (i <= j);
-
-		  /* recursion -- change this to non-recursive. */
-		  if (l < j )
-			   quick_sort_2d_ul ( array, dim, l, j);
-		  if (h > i)
-			   quick_sort_2d_ul ( array, dim, i, h);
+		  pivot = quick_sort_2d_ul_partition  (array, dim, l, h);
+		  quick_sort_2d_ul (array, dim, l, pivot - 1);
+		  quick_sort_2d_ul (array, dim, pivot + 1, h);
 	 }
 }
 
@@ -2853,7 +2856,7 @@ main (int argc, char *argv[])
 	 /* use the nbest good sublattices. */
 	 nbest = 10UL;
 	 /* only want those with affine alpha < -5 */
-	 double alpha_bound = -5;
+	 double alpha_bound = -4;
 	 /* only use u in the sublattice itself. This should be fine. */
 	 unsigned long sieve_size_u = 0;
 	 unsigned long sieve_size_v = 100000;
