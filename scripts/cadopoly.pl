@@ -1,17 +1,16 @@
 #!/usr/bin/perl -w
 
 # Usage: cadopoly.pl $paramfile1 $paramfile2 ...
-# 	read paramfiles and run polyselect
-# 	the paramfiles must contain: different name!, n, machines, params polyselect ...
+#        read paramfiles and run polyselect
+#        the paramfiles must contain: different name!, n, machines, params polyselect ...
 #
 # TODO: generate input
-# 		...
-
 
 use Cwd qw(abs_path);
 use File::Basename;
 use lib abs_path(dirname(dirname($0)));
 use cadofct;
+use POSIX qw(ceil);
 use strict;
 use warnings;
 
@@ -19,7 +18,7 @@ use warnings;
 print "$0 @ARGV\n";
 my @files;
 while (@ARGV) {
-	push @files, shift @ARGV;
+  push @files, shift @ARGV;
 }
 @files = sort @files;
 
@@ -27,149 +26,125 @@ while (@ARGV) {
 my @done = <*.polysel_done>;
 my @recover = <*.polysel_jobs>;
 
+# polyselect
 my %link_name_params;
-
-# polysel
 my $old_prefix;
 my $file;
 while (@files) {
-	$file = shift @files;
-	read_param(\%param, { strict => 1 }, "$file");
-	$link_name_params{"$param{'name'}"} = $file;
-	next if (@done);
-	if (@recover) {
-		next if ($recover[0] ne basename("$param{'prefix'}.polysel_jobs"));
-		shift @recover;
-	}
-	rename ( "$old_prefix.polysel_jobs", "$param{'prefix'}.polysel_jobs" )
-		if ($old_prefix);
-	read_machines();
-	open FILE, "> $param{'prefix'}.n"
-		or die "Cannot open `$param{'prefix'}.n' for writing: $!.\n";
-	print FILE "n: $param{'n'}\n";
-	close FILE;
-	if (@files) {
-		do_polysel_bench();
-	} else {
-		do_polysel_bench(1);
-        unlink "$param{'prefix'}.polysel_jobs";
-		open FILE, "> $param{'prefix'}.polysel_done"
-    	    or die "Cannot open `$param{'prefix'}.polysel_done' for writing: $!.\n";
-		close FILE;
-	}
-	$old_prefix = $param{'prefix'};
+  $file = shift @files;
+  read_param(\%param, { strict => 1 }, "$file");
+  $link_name_params{"$param{'name'}"} = $file;
+  next if (@done);
+  if (@recover) {
+    next if ($recover[0] ne basename("$param{'prefix'}.polysel_jobs"));
+    shift @recover;
+  }
+  rename ( "$old_prefix.polysel_jobs", "$param{'prefix'}.polysel_jobs" )
+    if ($old_prefix);
+  read_machines();
+  open FILE, "> $param{'prefix'}.n"
+    or die "Cannot open `$param{'prefix'}.n' for writing: $!.\n";
+  print FILE "n: $param{'n'}\n";
+  close FILE;
+  if (@files) {
+    do_polysel_bench();
+  } else {
+    do_polysel_bench(1);
+    unlink "$param{'prefix'}.polysel_jobs";
+    open FILE, "> $param{'prefix'}.polysel_done"
+      or die "Cannot open `$param{'prefix'}.polysel_done' for writing: $!.\n";
+    close FILE;
+  }
+  $old_prefix = $param{'prefix'};
 }
 
 # info kjout
 banner "Info kjout";
 my @kjout_files;
-
-my $time_max = 100000;
-info "Time max for one phase: $time_max"."s";
-
 my $time;
 my $phase;
+my %h = ( First  => 0,
+          Second => 1,
+          Third  => 2 );
+foreach my $name (sort keys %link_name_params) {
+  my (@Emax, $Emin, $Emoy);
+  my $best;
+  my (@min, @max, @total);
+  my $total;
 
-NAME : foreach my $name (sort keys %link_name_params) {
-	my $Emoy;
-	my $Emax;
-	my $Emax2;
-	my $Emax3;
-	my $Emin;
-	my $best;
-	my ($min_first, $min_second, $min_third);
-	my ($max_first, $max_second, $max_third);
-	my ($total_first, $total_second, $total_third);
-	my $total;
+  opendir DIR, "."
+    or die "Cannot open directory `.': $!\n";
+  @kjout_files = grep /^$name\.kjout\.[\de.]+-[\de.]+$/, readdir DIR;
+  closedir DIR;
+  my $size = scalar(@kjout_files);
 
-	opendir DIR, "."
-		or die "Cannot open directory `.': $!\n";
-	@kjout_files = grep /^$name\.kjout\.[\de.]+-[\de.]+$/,
-   						readdir DIR;
-	closedir DIR;
-	my $size = scalar(@kjout_files);
-
-	foreach my $f (@kjout_files) {
-		open FILE, "< $f"
-			or die "Cannot open `$f' for reading: $!.\n";
-		my $murphy;
-		while (<FILE>) {
-			if ( /#\s+(\S+)\s+phase took\s+([\d.]+)s/ ) {
-				$time = $2; 
-				$total += $time;
-				$phase = $1;
-				if ($time > $time_max ) {
-					warn "$phase phase of polyselect for configuration $name is too long!\n";
-					next NAME;
-				}
-	
-				if ( $phase eq "First" ) {
-					$total_first += $time;
-        			$min_first = $time if (!defined $min_first || $time < $min_first);
-        			$max_first = $time if (!defined $max_first || $time > $max_first);
-				} elsif ( $phase eq "Second" ) {
-					$total_second += $time;
-        			$min_second = $time if (!defined $min_second || $time < $min_second);
-        			$max_second = $time if (!defined $max_second || $time > $max_second);
-				} else {
-					$total_third += $time;
-        			$min_third = $time if (!defined $min_third || $time < $min_third);
-        			$max_third = $time if (!defined $max_third || $time > $max_third);
-				}
-			}
-
-			$murphy = $_ if /Murphy/;
-		}
-		close FILE;
+  foreach my $f (@kjout_files) {
+    open FILE, "< $f"
+      or die "Cannot open `$f' for reading: $!.\n";
+    my $murphy;
+    while (<FILE>) {
+      if ( /#\s+(\S+)\s+phase took\s+([\d.]+)s/ ) {
+        $time = $2; 
+        $total += $time;
+        $phase = $1;
+        $total[$h{$phase}] += $time;
+        $min[$h{$phase}] = $time if (!defined $min[$h{$phase}] || $time < $min[$h{$phase}]);
+        $max[$h{$phase}] = $time if (!defined $max[$h{$phase}] || $time > $max[$h{$phase}]);
+      }
+      $murphy = $_ if /Murphy/;
+    }
+    close FILE;
 		
-		next unless $murphy;
-        $murphy =~ /\)=(.+)$/;
-		$Emoy += $1;
-        if (!defined $Emax3 || $1 > $Emax3) {
-        	if (!defined $Emax2 || $1 > $Emax2) {
-        		if (!defined $Emax || $1 > $Emax) {
-					$Emax3 = $Emax2;
-					$Emax2 = $Emax;
-					$Emax = $1;
-            		$best = $f;
-				} else {
-					$Emax3 = $Emax2;
-					$Emax2 = $1;
-				}
-			} else {
-				$Emax3 = $1;
-			}
-		}
-        if (!defined $Emin || $1 < $Emin) {
-            $Emin = $1;
-		}
-	}
+    next unless $murphy;
+    $murphy =~ /\)=(.+)$/;
+    $Emoy += $1;
+    if (!defined $Emax[2] || $1 > $Emax[2]) {
+      if (!defined $Emax[1] || $1 > $Emax[1]) {
+        $Emax[2] = $Emax[1];
+        if (!defined $Emax[0] || $1 > $Emax[0]) {
+          $Emax[1] = $Emax[0];
+          $Emax[0] = $1;
+          $best = $f;
+        } else {
+          $Emax[1] = $1;
+        }
+      } else {
+        $Emax[2] = $1;
+      }
+    }
+    $Emin = $1 if (!defined $Emin || $1 < $Emin);
+  }
 		
-    die "No polynomial was found for configuration $name!\n"
-    	unless defined $Emax;
+  die "No polynomial was found for configuration $name!\n"
+    unless defined $Emax[0];
 
-	$Emoy = ($Emoy-$Emin-$Emax) / ($size-2);
-	$file = $link_name_params{"$name"};
-	read_param(\%param, { strict => 1 }, "$file");
-	info "Params: M $param{'kjM'} l $param{'kjl'} kmax $param{'kjkmax'} ".
-		 	"adrange $param{'kjadrange'} admin $param{'kjadmin'} admax $param{'kjadmax'}\n".
-		 	"        degree $param{'degree'} p0max $param{'kjp0max'} ".
-			"keep $param{'kjkeep'} incr $param{'kjincr'} pb $param{'kjpb'}\n";
-	$tab_level++;
-    info "The best polynomial for $name is from `".basename($best)."'\n";
-	info "Emax = $Emax - ".
-		 "Emax2 = $Emax2 - ".
-		 "Emax3 = $Emax3 - ".
-		 "Emoy = \033[01;31m$Emoy\033[01;00m  ";
-	info "Time min for first phase: $min_first"."s,  second phase: $min_second".
-		 "s,  third phase: $min_third"."s\n".
-		 "Time max for first phase: $max_first"."s,  second phase: $max_second".
-		 "s,  third phase: $max_third"."s\n";
-	info "Time total for first phase: $total_first"."s,  second phase: ".
-$total_second."s, third phase: $total_third"."s\n";
-	info "Time total: $total"."s,  \033[01;31m".format_dhms($total)."s\033[01;00m\n";
-	print "\n";
-	$tab_level--;
+  $Emoy = $Emoy / $size;
+  my $ampl = $Emax[0]-$Emin;
+  $file = $link_name_params{"$name"};
+  read_param(\%param, { strict => 1 }, "$file");
+  my $size_expect = ceil (($param{'kjadmax'} -  $param{'kjadmin'} ) /
+                          $param{'kjadrange'});
+  die "kjout missing for configuration $name! ($size on $size_expect)\n"
+    if ( $size != $size_expect );
+
+  # print infos
+  info "Params: M $param{'kjM'} l $param{'kjl'} kmax $param{'kjkmax'} ".
+       "adrange $param{'kjadrange'} admin $param{'kjadmin'} admax $param{'kjadmax'}\n".
+       "        degree $param{'degree'} p0max $param{'kjp0max'} ".
+       "keep $param{'kjkeep'} incr $param{'kjincr'} pb $param{'kjpb'}\n";
+  $tab_level++;
+  info "The best polynomial for $name is from `".basename($best)."'\n".
+       "Emax = $Emax[0] - Emax2 = $Emax[1] - Emax3 = $Emax[2]\n".
+       "Emoy = \033[01;31m$Emoy\033[01;00m - ".
+       "Emin = $Emin - ". "Ampl = $ampl\n".
+       "Time min for first phase: $min[0]"."s,  second phase: $min[1]".
+       "s,  third phase: $min[2]"."s\n".
+       "Time max for first phase: $max[0]"."s,  second phase: $max[1]".
+       "s,  third phase: $max[2]"."s\n".
+       "Time total for first phase: $total[0]"."s,  second phase: ".
+       $total[1]."s, third phase: $total[2]"."s\n".
+       "Time total: $total"."s,  \033[01;31m".format_dhms($total)."s\033[01;00m\n";
+  print "\n";
+  $tab_level--;
 }
-
 			

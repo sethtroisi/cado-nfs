@@ -851,7 +851,7 @@ main (int argc, char **argv)
     bit_vector_init_set(rel_used, nrelmax, 1);
     tot_alloc0 += nrelmax;
     fprintf (stderr, "Allocated rel_used of %uMb (total %luMb so far)\n",
-             nrelmax >> 23,
+             nrelmax >> 20,
              tot_alloc0 >> 20);
 
     /* FIXME: we could allocate rel_compact[] at each pass according to the
