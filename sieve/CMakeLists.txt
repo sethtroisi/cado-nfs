@@ -35,7 +35,10 @@ add_executable (makefb makefb.c)
 target_link_libraries (makefb utils m)
 
 add_executable (las las.c fb.c trialdiv.c sieve_config.h)
-target_link_libraries (las facul utils m pthread)
+target_link_libraries (las facul utils m ${pthread_libs})
+
+#add_executable (las-copper las-copper.c fb.c trialdiv.c sieve_config.h)
+#target_link_libraries (las-copper facul utils m pthread)
 
 add_executable(trialdiv EXCLUDE_FROM_ALL trialdiv.c)
 target_link_libraries (trialdiv utils)

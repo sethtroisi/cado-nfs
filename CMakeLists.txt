@@ -47,7 +47,6 @@ get_override(CC                   CMAKE_C_COMPILER)
 get_override(CXX                  CMAKE_CXX_COMPILER)
 get_override(CADO_VERSION         CADO_VERSION)
 get_override(MPI                  MPI)
-get_override(PTHREADS             PTHREADS)
 
 #####################################################################
 # Add the CFLAGS that are needed in all cases.
