@@ -1,6 +1,8 @@
 #ifndef CADO_LINALG_GAUSS_H_
 #define CADO_LINALG_GAUSS_H_
 
+#include <gmp.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -30,7 +32,7 @@ extern int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
  * the function.
  */
 extern int spanned_basis(mp_limb_t * lmat, mp_limb_t * mat, int nrows, int ncols,
-        int limbs_per_row, int limbs_per_col);
+        int limbs_per_row, int limbs_per_col, mp_limb_t * elim_table);
 #ifdef __cplusplus
 }
 #endif

@@ -37,6 +37,43 @@ void blockmatrix_free(blockmatrix b)
     free(b);
 }
 
+uint64_t * blockmatrix_subrow_ptr(blockmatrix res, int i, int j)
+{
+    ASSERT_ALWAYS(j % 64 == 0);
+    return &(res->mb[(i/64) + (j/64) * res->stride][(i)%64]);
+}
+void blockmatrix_copy_colrange(blockmatrix B, blockmatrix A, int j0, int j1)
+{
+    ASSERT_ALWAYS(A->nrows == B->nrows);
+    ASSERT_ALWAYS(A->ncols == B->ncols);
+    ASSERT_ALWAYS(A->ncblocks == B->ncblocks);
+
+    int block0 = j0 / 64;
+    uint64_t * masks = malloc(A->ncblocks * sizeof(uint64_t));
+    for(int b = block0 ; b*64 < j1 ; b++) {
+        uint64_t mask = -((uint64_t)1);
+        int z0 = j0 - b*64;
+        ASSERT_ALWAYS(z0 < 64);
+        if (z0>=0) mask &= ((uint64_t)-1) << z0;
+        int z1 = 64 - (j1 - b*64);
+        ASSERT_ALWAYS(z1 < 64);
+        if (z1>=0) mask &= ((uint64_t)-1) >> z1;
+        masks[b] = mask;
+    }
+    for(unsigned int i0 = 0 ; i0 < A->nrows ; i0 += 64) {
+        for(unsigned int i = 0 ; i0 + i < A->nrows && i < 64 ; i++) {
+            for(int b = block0 ; b*64 < j1 ; b++) {
+                uint64_t m = masks[b];
+                uint64_t v = A->mb[i0/64 + b*A->stride][i];
+                v&=m;
+                B->mb[i0/64 + b*B->stride][i] &= ~m;
+                B->mb[i0/64 + b*B->stride][i] |= v;
+            }
+        }
+    }
+    free(masks);
+}
+
 void blockmatrix_print(blockmatrix b, const char *vname)
 {
     FILE * f = fopen("/tmp/debug", "a");
@@ -63,7 +100,7 @@ void blockmatrix_print(blockmatrix b, const char *vname)
     fclose(f);
 }
 
-void blockmatrix_zero(blockmatrix b)
+void blockmatrix_set_zero(blockmatrix b)
 {
     if (!b->sub) {
         memset(b->mb, 0, b->nrblocks * b->ncblocks * sizeof(mat64));
@@ -71,6 +108,13 @@ void blockmatrix_zero(blockmatrix b)
         for(unsigned int j = 0 ; j < b->ncblocks ; j++)  
             memset(b->mb + j * b->stride, 0, b->nrblocks * sizeof(mat64));
     }
+}
+
+void blockmatrix_set_identity(blockmatrix S)
+{
+    blockmatrix_set_zero(S);
+    for(unsigned int i = 0 ; i < S->ncols ; i++)
+        S->mb[i/64 + (i/64)*S->stride][i%64] ^= ((uint64_t)1) << (i%64);
 }
 
 /* Computes transpose(a) * b */
@@ -85,7 +129,7 @@ void blockmatrix_mul_Ta_b(blockmatrix c,
     ASSERT_ALWAYS(a != b);
     ASSERT_ALWAYS(a != c);
 
-    blockmatrix_zero(c);
+    blockmatrix_set_zero(c);
 
     for(unsigned int i = 0 ; i < c->nrblocks ; i++) {
         for(unsigned int j = 0 ; j < c->ncblocks ; j++) {
@@ -108,7 +152,7 @@ void blockmatrix_mul_smallb(blockmatrix c,
     ASSERT_ALWAYS(a != b);
     ASSERT_ALWAYS(a != c);
 
-    blockmatrix_zero(c);
+    blockmatrix_set_zero(c);
 
     for(unsigned int j = 0 ; j < b->ncblocks ; j++) {
         for(unsigned int i = 0 ; i < b->nrblocks ; i++) {
@@ -186,7 +230,7 @@ void blockmatrix_read_from_flat_file(blockmatrix k, int i0, int j0, const char *
     ASSERT_ALWAYS(j0 + fncols <= k->ncols);
     ASSERT_ALWAYS(j0 % 64 == 0);
     ASSERT_ALWAYS(fncols % 64 == 0);
-    blockmatrix_zero(k);
+    blockmatrix_set_zero(k);
     for(unsigned int r = 0 ; r < fnrows ; r++) {
         for(unsigned int g = 0 ; g < fncols ; g+=64) {
             uint64_t v;
@@ -198,10 +242,9 @@ void blockmatrix_read_from_flat_file(blockmatrix k, int i0, int j0, const char *
     fclose(f);
 }
 
-#if 0
+#if 1
 void blockmatrix_read_transpose_from_flat_file(blockmatrix k, int i0, int j0, const char * name, unsigned int fnrows, unsigned int fncols)
 {
-    abort();    /* not thoroughly tested */
     FILE * f = fopen(name, "r");
     ASSERT_ALWAYS(f);
     ASSERT_ALWAYS(i0 + fncols <= k->nrows);
@@ -209,7 +252,7 @@ void blockmatrix_read_transpose_from_flat_file(blockmatrix k, int i0, int j0, co
     ASSERT_ALWAYS(i0 % 64 == 0);
     ASSERT_ALWAYS(j0 % 64 == 0);
     ASSERT_ALWAYS(fncols % 64 == 0);
-    blockmatrix_zero(k);
+    blockmatrix_set_zero(k);
     mat64 * tmp = malloc((fncols/64) * sizeof(mat64));
     ASSERT_ALWAYS(tmp);
     for(unsigned int g = 0 ; g < fnrows ; g+=64) {

@@ -18,3 +18,7 @@
 #cmakedefine    HAVE_PTHREAD_BARRIER_WAIT
 
 #cmakedefine    HAVE_CURL
+
+#cmakedefine    HAVE_SSE2
+
+#cmakedefine    HAVE_SSE41

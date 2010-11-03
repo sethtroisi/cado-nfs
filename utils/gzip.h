@@ -7,7 +7,14 @@
 extern "C" {
 #endif
 
+/* There are of course scores of existing basename() codes accessible,
+ * starting with POSIX basename. However we fear posible inconsistencies
+ * here, so we stick to a simple-and-stupid version, whose specification
+ * meets our needs. Here, the returned string is always a substring of
+ * the input string, and the latter never undergoes any modification.
+ */
 extern const char * path_basename(const char * path);
+
 extern int is_supported_compression_format(const char * s);
 
 /* Takes a filename, possibly ending with any recognized compression

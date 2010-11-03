@@ -35,7 +35,7 @@ cado_prefix="@CMAKE_INSTALL_PREFIX@"
 example_subdir="@example_subdir@"
 mpiexec="@MPIEXEC@"
 
-if [ -d "$cado_prefix" ] ; then
+if [ -d "$cado_prefix/$example_subdir" ] ; then
     # We're called in the install tree.
     if [ -f "$cado_prefix/$example_subdir/params.$file" ] ; then
         file="$cado_prefix/$example_subdir/params.$file" 

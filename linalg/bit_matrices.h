@@ -28,6 +28,10 @@ extern void addmul_N64_6464(uint64_t *C,
                    const uint64_t *A,
                    mat64 B, unsigned long m);
 
+
+/* this one is simple enough to figure out */
+extern void mul_6464_6464(mat64_ptr C, mat64_srcptr A, mat64_srcptr B);
+
 /* No other interface is exposed for now, although some more exist in the
  * development source */
 

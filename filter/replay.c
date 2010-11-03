@@ -640,6 +640,9 @@ main(int argc, char *argv[])
     char * rp;
     int skip=0;
 
+    setbuf(stdout, NULL);
+    setbuf(stderr, NULL);
+
     // printing the arguments as everybody does these days
     fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
     for (i = 1; i < argc; i++)

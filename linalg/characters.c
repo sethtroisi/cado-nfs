@@ -250,7 +250,7 @@ static blockmatrix big_character_matrix(alg_prime_t * chars, unsigned int nchars
 
     blockmatrix res = blockmatrix_alloc(ps->nrows, nchars2);
 
-    blockmatrix_zero(res);
+    blockmatrix_set_zero(res);
 
     fprintf(stderr, "Computing %u characters for %u (a,b) pairs\n",
             nchars2, ps->nrows);
@@ -269,7 +269,7 @@ static blockmatrix big_character_matrix(alg_prime_t * chars, unsigned int nchars
         for(unsigned int cg = 0 ; cg < nchars2 ; cg+=64) {
             eval_64chars_batch(W, A, B, chars + cg, pol, bs, g);
             for(int z = 0 ; z < bs ; z++) {
-                res->mb[((i+z)/64) + (cg/64) * res->nrblocks][(i+z)%64] = W[z];
+                *blockmatrix_subrow_ptr(res, i+z, cg) = W[z];
             }
         }
         i += bs;
@@ -360,7 +360,7 @@ read_heavyblock_matrix_binary(const char * heavyblockname)
 
     /* Sometimes the heavy block width is not a multiple of 64. Thus we pad
      * with zeros */
-    blockmatrix_zero(res);
+    blockmatrix_set_zero(res);
 
     for(unsigned int i = 0 ; i < nrows ; i++) {
         uint32_t len;
@@ -394,7 +394,7 @@ read_heavyblock_matrix_ascii(const char * heavyblockname)
 
     /* Sometimes the heavy block width is not a multiple of 64. Thus we pad
      * with zeros */
-    blockmatrix_zero(res);
+    blockmatrix_set_zero(res);
 
     for(unsigned int i = 0 ; i < nrows ; i++) {
         uint32_t len;
@@ -490,7 +490,8 @@ blockmatrix blockmatrix_column_reduce(blockmatrix m, unsigned int max_rows_to_co
             tiny_nrows,
             tiny_ncols,
             sizeof(uint64_t) / sizeof(mp_limb_t) * tiny_limbs_per_row,
-            sizeof(uint64_t) / sizeof(mp_limb_t) * tiny_limbs_per_col
+            sizeof(uint64_t) / sizeof(mp_limb_t) * tiny_limbs_per_col,
+            NULL
             );
     free(tiny);
 
@@ -628,7 +629,7 @@ int main(int argc, char **argv)
 
 
     blockmatrix kb = blockmatrix_alloc(k->ncols, k->ncols);
-    blockmatrix_zero(kb);
+    blockmatrix_set_zero(kb);
     int dim = compute_transpose_of_blockmatrix_kernel(kb, t);
     blockmatrix_free(t);
     fprintf(stderr, "dim of ker = %d\n", dim);

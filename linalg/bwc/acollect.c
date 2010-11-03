@@ -48,11 +48,80 @@ int afile_cmp(afile_ptr a, afile_ptr b)
     int dn0 = a->n0 - b->n0;
     int dn1 = a->n1 - b->n1;
 
-    if (dj0) return dj0;
-    if (dj1) return dj1;
     if (dn0) return dn0;
     if (dn1) return dn1;
+    if (dj0) return dj0;
+    if (dj1) return dj1;
     return 0;
+}
+
+struct afile_list {
+    afile * a;
+    int n;
+    int alloc;
+};
+
+int read_afiles(struct afile_list * a)
+{
+    a->n = 0;
+    DIR * dir = opendir(".");
+    struct dirent * de;
+
+    for( ; (de = readdir(dir)) != NULL ; ) {
+        if (a->n >= a->alloc) {
+            a->alloc += 32 + a->alloc / 4;
+            a->a = realloc(a->a, a->alloc * sizeof(afile));
+        }
+        afile_ptr A = a->a[a->n];
+        int k;
+        int rc = sscanf(de->d_name, A_FILE_PATTERN "%n", &A->n0, &A->n1, &A->j0, &A->j1, &k);
+        /* rc is expected to be 4 or 5 depending on our reading of the
+         * standard */
+        if (rc < 4 || k != (int) strlen(de->d_name)) {
+            // fprintf(stderr, "skipped %s\n", de->d_name);
+            continue;
+        }
+        if (A->n1 % CHAR_BIT || A->n0 % CHAR_BIT) {
+            fprintf(stderr, "%s has bad boundaries\n",
+                    de->d_name);
+            exit(1);
+        }
+        struct stat sbuf[1];
+        rc = stat(de->d_name, sbuf);
+        if (rc < 0) {
+            fprintf(stderr, "stat(%s): %s\n", de->d_name, strerror(errno));
+            exit(1);
+        }
+        ssize_t expected = bw->m * (A->n1-A->n0) / CHAR_BIT * (A->j1 - A->j0);
+
+        if (sbuf->st_size != expected) {
+            fprintf(stderr, "%s does not have expected size %zu\n",
+                    de->d_name, expected);
+            exit(1);
+        }
+
+        a->n++;
+    }
+    closedir(dir);
+
+    if (a->n == 0) {
+        return 0;
+    }
+
+    if (a->n == 1) {
+        char * tmp;
+        int rc = asprintf(&tmp, A_FILE_PATTERN,
+                a->a[0]->n0,a->a[0]->n1,a->a[0]->j0,a->a[0]->j1);
+        ASSERT_ALWAYS(rc >= 0);
+        printf("%s\n", tmp);
+        free(tmp);
+        free(a->a);
+        return 0;
+    }
+
+    qsort(a->a, a->n, sizeof(afile), (sortfunc_t) &afile_cmp);
+
+    return a->n;
 }
 
 int main(int argc, char * argv[])
@@ -65,68 +134,98 @@ int main(int argc, char * argv[])
     bw_common_init(bw, pl, &argc, &argv);
     param_list_clear(pl);
 
+    struct afile_list a[1];
+    memset(a,0,sizeof(a));
+    if (read_afiles(a) == 0)
+        return 0;
 
-    afile * afiles = NULL;
-    int n_afiles = 0;
-    int alloc_afiles=1024;
-    afiles = realloc(afiles, alloc_afiles * sizeof(afile));
-    DIR * dir = opendir(".");
-    struct dirent * de;
 
-    for( ; (de = readdir(dir)) != NULL ; ) {
-        afile_ptr a = afiles[n_afiles];
-        int k;
-        int rc = sscanf(de->d_name, A_FILE_PATTERN "%n", &a->n0, &a->n1, &a->j0, &a->j1, &k);
-        /* rc is expected to be 4 or 5 depending on our reading of the
-         * standard */
-        if (rc < 4 || k != (int) strlen(de->d_name)) {
-            // fprintf(stderr, "skipped %s\n", de->d_name);
+    /* First merge all files we find with similar [n0..n1[ range. Since
+     * these files are expected to come from different sites, it's normal
+     * to have different [n0..n1[ ranges progress at different speeds.
+     */
+    int did_merge = 0;
+    for(int k0=0, k1 ; k0 < a->n ; k0 = k1) {
+        unsigned int j0 = a->a[k0]->j0;
+        unsigned int j1 = a->a[k0]->j1;
+        k1 = k0;
+        unsigned int n0 = a->a[k0]->n0;
+        unsigned int n1 = a->a[k0]->n1;
+        unsigned int j = j0;
+        for( ; k1 < a->n && a->a[k1]->n0 == n0 ; k1++) {
+            if (a->a[k1]->n1 != n1 || a->a[k1]->j0 != j) {
+                fprintf(stderr, "Found inconsistent files A%u-%u.%u-%u and A%u-%u.%u-%u\n",
+                        a->a[k0]->n0, a->a[k0]->n1, a->a[k0]->j0, a->a[k0]->j1,
+                        a->a[k1]->n0, a->a[k1]->n1, a->a[k1]->j0, a->a[k1]->j1);
+                exit(1);
+            }
+            j = a->a[k1]->j1;
+        }
+        j1 = j;
+        
+        /* creating file [n0..n1[.., [j0..j1[ ; since we're just catting
+         * the files, no trouble.
+         */
+        if (k1-k0 == 1)
             continue;
-        }
-        if (a->n1 % CHAR_BIT || a->n0 % CHAR_BIT) {
-            fprintf(stderr, "%s has bad boundaries\n",
-                    de->d_name);
-            exit(1);
-        }
-        struct stat sbuf[1];
-        rc = stat(de->d_name, sbuf);
-        if (rc < 0) {
-            fprintf(stderr, "stat(%s): %s\n", de->d_name, strerror(errno));
-            exit(1);
-        }
-        ssize_t expected = bw->m * (a->n1-a->n0) / CHAR_BIT * (a->j1 - a->j0);
+        did_merge++;
+        FILE * f = fopen("A.temp", "w");
+        for(int k = k0 ; k < k1 ; k++) {
+            char * tmp;
+            int rc = asprintf(&tmp, A_FILE_PATTERN,
+                    a->a[k]->n0,a->a[k]->n1,a->a[k]->j0,a->a[k]->j1);
+            ASSERT_ALWAYS(rc >= 0);
+            FILE * g = fopen(tmp, "r");
+            char buf[BUFSIZ];
+            for( ; ; ) {
+                int nr = fread(buf, 1, BUFSIZ, g);
+                if (nr < BUFSIZ && ferror(g)) {
+                    fprintf(stderr, "%s: %s\n", tmp, strerror(errno));
+                    exit(1);
+                }
+                if (nr == 0)
+                    break;
+                int nw = fwrite(buf, 1, nr, f);
+                if (nr < nw) {
+                    fprintf(stderr, "copying %s: %s\n", tmp, strerror(errno));
+                    exit(1);
+                }
+                if (nr < BUFSIZ)
+                    break;
+            }
+            fclose(g);
 
-        if (sbuf->st_size != expected) {
-            fprintf(stderr, "%s does not have expected size %zu\n",
-                    de->d_name, expected);
-            exit(1);
+            if (remove_old) {
+                if (unlink(tmp) < 0) {
+                    fprintf(stderr, "unlink(%s): %s\n", tmp, strerror(errno));
+                    exit(1);
+                }
+            }
+            free(tmp);
         }
-
-        // fprintf(stderr, "take %s\n", de->d_name);
-        n_afiles++;
-        if (n_afiles >= alloc_afiles) {
-            alloc_afiles += alloc_afiles / 4;
-            afiles = realloc(afiles, alloc_afiles * sizeof(afile));
+        fclose(f);
+        {
+            char * tmp;
+            int r = asprintf(&tmp, A_FILE_PATTERN, n0,n1,j0,j1);
+            ASSERT_ALWAYS(r >= 0);
+            r = rename("A.temp", tmp);
+            if (r < 0) {
+                fprintf(stderr, "rename(A.temp, %s): %s\n",
+                        tmp, strerror(errno));
+                exit(1);
+            }
+            free(tmp);
         }
     }
-    closedir(dir);
 
-    if (n_afiles == 0) {
-        free(afiles);
-        return 0;
+    if (did_merge && !remove_old) {
+        fprintf(stderr, "Done some merges, but cannot continue unless --remove-old is specified\n");
+        exit(1);
     }
 
-    if (n_afiles == 1) {
-        char * tmp;
-        rc = asprintf(&tmp, A_FILE_PATTERN,
-                afiles[0]->n0,afiles[0]->n1,afiles[0]->j0,afiles[0]->j1);
-        printf("%s\n", tmp);
-        free(tmp);
-        free(afiles);
-        return 0;
-    }
-
-    qsort(afiles, n_afiles, sizeof(afile), (sortfunc_t) &afile_cmp);
+    /* Good. Now merge the other way around. Not clear it's really
+     * something we want to do like this, though.
+     */
 
     afile final;
     /* start with unset values */
@@ -134,26 +233,26 @@ int main(int argc, char * argv[])
     final->n1 = UINT_MAX;
     final->j0 = UINT_MAX;
     final->j1 = UINT_MAX;
+
+    if (read_afiles(a) == 0)
+        return 0;
+
     FILE * f = fopen("A.temp", "w");
-
-    int k0 = 0;
-    int k1;
-
-    for( ; k0 < n_afiles ; ) {
-        unsigned int j0 = afiles[k0]->j0;
-        unsigned int j1 = afiles[k0]->j1;
+    for(int k0=0, k1 ; k0 < a->n ; k0 = k1) {
+        unsigned int j0 = a->a[k0]->j0;
+        unsigned int j1 = a->a[k0]->j1;
         k1 = k0;
-        unsigned int n0 = afiles[k0]->n0;
-        unsigned int n1 = afiles[k0]->n1;
+        unsigned int n0 = a->a[k0]->n0;
+        unsigned int n1 = a->a[k0]->n1;
         unsigned int n = n0;
-        for( ; k1 < n_afiles && afiles[k1]->j0 == j0 ; k1++) {
-            if (afiles[k1]->j1 != j1 || afiles[k1]->n0 != n) {
+        for( ; k1 < a->n && a->a[k1]->j0 == j0 ; k1++) {
+            if (a->a[k1]->j1 != j1 || a->a[k1]->n0 != n) {
                 fprintf(stderr, "Found inconsistent files A%u-%u.%u-%u and A%u-%u.%u-%u\n",
-                        afiles[k0]->n0, afiles[k0]->n1, afiles[k0]->j0, afiles[k0]->j1,
-                        afiles[k1]->n0, afiles[k1]->n1, afiles[k1]->j0, afiles[k1]->j1);
+                        a->a[k0]->n0, a->a[k0]->n1, a->a[k0]->j0, a->a[k0]->j1,
+                        a->a[k1]->n0, a->a[k1]->n1, a->a[k1]->j0, a->a[k1]->j1);
                 exit(1);
             }
-            n = afiles[k1]->n1;
+            n = a->a[k1]->n1;
         }
         n1 = n;
         
@@ -171,17 +270,15 @@ int main(int argc, char * argv[])
         }
 
         FILE ** rs = malloc((k1-k0) * sizeof(FILE *));
-        int k;
-        for(k = k0 ; k < k1 ; k++) {
+        for(int k = k0 ; k < k1 ; k++) {
             char * tmp;
             int rc = asprintf(&tmp, A_FILE_PATTERN,
-                    afiles[k]->n0,afiles[k]->n1,afiles[k]->j0,afiles[k]->j1);
+                    a->a[k]->n0,a->a[k]->n1,a->a[k]->j0,a->a[k]->j1);
+            ASSERT_ALWAYS(rc >= 0);
             rs[k - k0] = fopen(tmp, "r");
             if (rs[k-k0] == NULL) {
                 fprintf(stderr, "fopen(%s): %s\n", tmp, strerror(errno));
-                rc = 2;
-                free(tmp);
-                goto bailout;
+                exit(1);
             }
             free(tmp);
         }
@@ -196,13 +293,11 @@ int main(int argc, char * argv[])
                 size_t rz;
                 size_t sz;
                 for(int k = k0 ; k < k1 ; k++) {
-                    sz = (afiles[k]->n1 - afiles[k]->n0) / CHAR_BIT;
+                    sz = (a->a[k]->n1 - a->a[k]->n0) / CHAR_BIT;
                     rz = fread(ptr, 1, sz, rs[k-k0]);
                     if (rz < sz) {
-                        fprintf(stderr, "fread: short read\n");
                         rc = 2;
-                        fflush(f);
-                        goto bailout;
+                        exit(1);
                     }
                     ptr += sz;
                 }
@@ -210,9 +305,7 @@ int main(int argc, char * argv[])
                 rz = fwrite(buf, 1, sz, f);
                 if (rz != sz) {
                     fprintf(stderr, "fwrite: short write\n");
-                    rc = 2;
-                    fflush(f);
-                    goto bailout;
+                    exit(1);
                 }
             }
             final->j1++;
@@ -226,8 +319,7 @@ int main(int argc, char * argv[])
         if (fflush(f) != 0) {
             // we're in trouble
             fprintf(stderr, "fflush(): %s\n", strerror(errno));
-            rc = 2;
-            break;
+            exit(1);
         }
 
         final->j1 = j1;
@@ -237,18 +329,16 @@ int main(int argc, char * argv[])
             if (!remove_old) continue;
             char * tmp;
             int rc = asprintf(&tmp, A_FILE_PATTERN,
-                    afiles[k]->n0,afiles[k]->n1,afiles[k]->j0,afiles[k]->j1);
+                    a->a[k]->n0,a->a[k]->n1,a->a[k]->j0,a->a[k]->j1);
             ASSERT_ALWAYS(rc >= 0);
             if (unlink(tmp) < 0) {
                 fprintf(stderr, "unlink(%s): %s\n", tmp, strerror(errno));
+                exit(1);
             }
             free(tmp);
         }
         free(rs);
-
-        k0 = k1;
     }
-bailout:
     fclose(f);
     if (final->j0 != UINT_MAX) {
         char * tmp;
@@ -257,10 +347,11 @@ bailout:
         r = rename("A.temp", tmp);
         if (r < 0) {
             fprintf(stderr, "rename(A.temp, %s): %s\n", tmp, strerror(errno));
+            exit(1);
         }
         printf("%s\n",tmp);
         free(tmp);
     }
-    free(afiles);
+    free(a->a);
     return rc;
 }

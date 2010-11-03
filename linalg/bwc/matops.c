@@ -28,17 +28,23 @@
 #include <string.h>
 #include <assert.h>
 #include <emmintrin.h>
+#ifdef  HAVE_SSE41
+#include <smmintrin.h>  // sse 4.1 _mm_cmpeq_epi64
+#endif  /* HAVE_SSE41 */
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <inttypes.h>
 
+#include "cado.h"
 /* Define this to check these functions against the m4ri library */
 #define xxxHAVE_M4RI
 #ifdef  HAVE_M4RI
 #include "m4ri/m4ri.h"
 #endif  /* HAVE_M4RI */
+#include "gauss.h"
+#include "macros.h"
 
 /* This is **only** for 64 * 64 matrices */
 
@@ -47,7 +53,7 @@ typedef uint64_t mat64[64];
 typedef uint64_t * mat64_ptr;
 typedef const uint64_t * mat64_srcptr;
 
-#if 0
+#if 0/*{{{*/
 static int urandom_fd = -1;
 
 static inline uint64_t rand64()
@@ -81,9 +87,9 @@ static inline void rand64_mem(uint64_t * ptr, size_t z)
 {
     for( ; z-- ; ptr[z] = rand64());
 }
-#endif
+#endif/*}}}*/
 
-static inline uint64_t bitrev(uint64_t a)
+static inline uint64_t bitrev(uint64_t a)/*{{{*/
 {
     a = (a >> 32) ^ (a << 32);
     uint64_t m;
@@ -111,14 +117,20 @@ static inline uint64_t nibrev(uint64_t a)
     m = 0x0f0f0f0f0f0f0f0fUL;
     a = ((a >> 4) & m) ^ ((a << 4) & ~m);
     return a;
-}
-#define mul_6464_6464 mul_6464_6464_sse
-#define add_6464_6464 add_6464_6464_C
-#define mul_N64_6464 mul_N64_6464_sse
-#define mul_N64_T6464 mul_N64_6464_vec
-#define addmul_To64_o64 addmul_To64_o64_lsb_sse_v1
-#define mul_o64_6464 mul_o64_6464_C_lsb
-#define mul_o64_T6464 mul_o64_T6464_C_parity
+}/*}}}*/
+
+/* prototypes for the functions defined */
+static void mul_6464_6464(mat64 C, mat64 A, mat64 B);
+static void add_6464_6464(mat64_ptr C, mat64_srcptr A, mat64_srcptr B);
+static void mul_o64_6464(uint64_t *r, uint64_t a, mat64_srcptr w);
+static void mul_N64_6464(uint64_t *C, const uint64_t *A,
+		 const uint64_t *B, unsigned long m);
+static void mul_N64_T6464(uint64_t *C, const uint64_t *A,
+                   const uint64_t *B, unsigned long m);
+static void addmul_To64_o64(uint64_t * r, uint64_t a, uint64_t w);
+static void mul_o64_6464(uint64_t * r, uint64_t a, mat64_srcptr w);
+static void mul_o64_T6464(uint64_t * w, uint64_t a, mat64_srcptr b);
+
 
 /* level 1 */
 
@@ -338,7 +350,54 @@ static inline int cmp_N64(const uint64_t * dst, const uint64_t * src, unsigned l
 }
 
 
+/* This can work in place (C==A, or C==B, or both) */
 static inline void mul_N64_6464_lookup4(uint64_t *C,
+                   const uint64_t *A,
+                   const uint64_t *B, unsigned long m)
+{
+    uint64_t Bx[16][16];
+    for(int j = 0 ; j < 16 ; j++) {
+        const uint64_t * bb = B + 4 * j;
+        uint64_t w = 0;
+        Bx[j][0]  = w; w ^= bb[0];
+        Bx[j][1]  = w; w ^= bb[1];
+        Bx[j][3]  = w; w ^= bb[0];
+        Bx[j][2]  = w; w ^= bb[2];
+        Bx[j][6]  = w; w ^= bb[0];
+        Bx[j][7]  = w; w ^= bb[1];
+        Bx[j][5]  = w; w ^= bb[0];
+        Bx[j][4]  = w; w ^= bb[3];
+        Bx[j][12] = w; w ^= bb[0];
+        Bx[j][13] = w; w ^= bb[1];
+        Bx[j][15] = w; w ^= bb[0];
+        Bx[j][14] = w; w ^= bb[2];
+        Bx[j][10] = w; w ^= bb[0];
+        Bx[j][11] = w; w ^= bb[1];
+        Bx[j][9]  = w; w ^= bb[0];
+        Bx[j][8]  = w;
+    }
+    for (unsigned long i = 0; i < m; i++) {
+        uint64_t aa = A[i];
+        C[i] = Bx[0][aa & 15]; aa>>=4;
+        C[i]^= Bx[1][aa & 15]; aa>>=4;
+        C[i]^= Bx[2][aa & 15]; aa>>=4;
+        C[i]^= Bx[3][aa & 15]; aa>>=4;
+        C[i]^= Bx[4][aa & 15]; aa>>=4;
+        C[i]^= Bx[5][aa & 15]; aa>>=4;
+        C[i]^= Bx[6][aa & 15]; aa>>=4;
+        C[i]^= Bx[7][aa & 15]; aa>>=4;
+        C[i]^= Bx[8][aa & 15]; aa>>=4;
+        C[i]^= Bx[9][aa & 15]; aa>>=4;
+        C[i]^= Bx[10][aa & 15]; aa>>=4;
+        C[i]^= Bx[11][aa & 15]; aa>>=4;
+        C[i]^= Bx[12][aa & 15]; aa>>=4;
+        C[i]^= Bx[13][aa & 15]; aa>>=4;
+        C[i]^= Bx[14][aa & 15]; aa>>=4;
+        C[i]^= Bx[15][aa];
+    }
+}
+/* This can work in place (C==A, or C==B, or both) */
+static inline void addmul_N64_6464_lookup4(uint64_t *C,
                    const uint64_t *A,
                    const uint64_t *B, unsigned long m)
 {
@@ -366,7 +425,7 @@ static inline void mul_N64_6464_lookup4(uint64_t *C,
     memset(C, 0, m * sizeof(uint64_t));
     for (unsigned long i = 0; i < m; i++) {
         uint64_t aa = A[i];
-        C[i] = Bx[0][aa & 15]; aa>>=4;
+        C[i]^= Bx[0][aa & 15]; aa>>=4;
         C[i]^= Bx[1][aa & 15]; aa>>=4;
         C[i]^= Bx[2][aa & 15]; aa>>=4;
         C[i]^= Bx[3][aa & 15]; aa>>=4;
@@ -692,7 +751,17 @@ static inline void mul_N64_6464_transB(uint64_t *C,
 {
     uint64_t *tb = malloc(64 * sizeof(uint64_t));
     transp_6464(tb, B);
-    mul_N64_T6464(C, A, B, m);
+    mul_N64_T6464(C, A, tb, m);
+    free(tb);
+}
+
+static inline void mul_N64_T6464_transB(uint64_t *C,
+                   const uint64_t *A,
+                   const uint64_t *B, unsigned long m)
+{
+    uint64_t *tb = malloc(64 * sizeof(uint64_t));
+    transp_6464(tb, B);
+    mul_N64_6464(C, A, tb, m);
     free(tb);
 }
 
@@ -909,7 +978,17 @@ void m64pol_addmul_kara(m64pol_ptr r, m64pol_srcptr a1, m64pol_srcptr a2, unsign
 // 0.19 -- 512 512 based on basecase @ 2
 // 0.14 -- 512 512 based on basecase @ 1
 
-#define TIME1(maxtime, what, args) do {			        	\
+#define t_and_unit_from_clock__bare(t, unit, t1, j)                     \
+    double t = t1;							\
+    t /= CLOCKS_PER_SEC;						\
+    if (j) t /= j; else t = 0;						\
+    char * unit = "s";							\
+    if (t < 1.0e-7) { unit = "ns"; t *= 1.0e9;			        \
+    } else if (1 || t < 1.0e-4) { unit = "micros"; t *= 1.0e6;		\
+    } else if (t < 1.0e-1) { unit = "ms"; t *= 1.0e3; }                 \
+    do { } while (0)
+
+#define TIME1__bare(maxtime, what, args) 		        	\
     clock_t measuring_time = maxtime * CLOCKS_PER_SEC;			\
     clock_t t0, t1;							\
     int j;								\
@@ -920,16 +999,49 @@ void m64pol_addmul_kara(m64pol_ptr r, m64pol_srcptr a1, m64pol_srcptr a2, unsign
         if (j && t1 > measuring_time)					\
             break;							\
     }									\
-    double t = t1;							\
-    t /= CLOCKS_PER_SEC;						\
-    t /= j;								\
-    char * unit = "s";							\
-    if (t < 1.0e-7) { unit = "ns"; t *= 1.0e9;			\
-    } else if (t < 1.0e-4) { unit = "micros"; t *= 1.0e6;		\
-    } else if (t < 1.0e-1) { unit = "ms"; t *= 1.0e3; }		\
+    t_and_unit_from_clock__bare(t, unit, t1, j);
+
+#define TIME1(maxtime, what, args) do {			        	\
+    TIME1__bare(maxtime, what, args)                                    \
     printf(#what " \t%d times in %.4f %s each\n",       		\
             j, t, unit);		                        	\
 } while (0)
+
+#define TIME1N(maxtime, what, args) do {		        	\
+    TIME1__bare(maxtime, what, args)                                    \
+    printf(#what "(n=%d) \t%d times in %.4f %s each\n", n,     	        \
+            j, t, unit);		                        	\
+} while (0)
+
+#define TIME1N_spins(rexpr, maxtime, what, args, spinexpr, spinmax) do {        \
+    clock_t ts[spinmax];						\
+    int ns[spinmax];                                                    \
+    for(int s = 0 ; s < spinmax ; s++) ts[s] = ns[s] = 0;		\
+    clock_t t0, t1;							\
+    int j;								\
+    t0 = clock();							\
+    clock_t t = t0;                                                     \
+    clock_t fence = t0 + maxtime * CLOCKS_PER_SEC;			\
+    for (j = 0; ; j++) {						\
+        rexpr;                                                          \
+        int ret = what args;						\
+        int s = spinexpr;                                               \
+        ts[s] += (t1 = clock()) - t;                                    \
+        ns[s] ++;                                                       \
+        t = t1;                                                         \
+        if (j && t1 > fence)					        \
+            break;							\
+    }									\
+    int nch=0;                                                          \
+    for(int s = 0 ; s < spinmax ; s++) {				\
+        if (s == 0) nch=printf(#what"(n=%d)", n);			\
+        else for(int k = nch ; k-- ; putchar(' '));		        \
+        t_and_unit_from_clock__bare(t, unit, ts[s], ns[s]);		\
+        printf(" \t[%d] %d times in %.4fs %s each\n",s,ns[s],t,unit);	\
+    }									\
+} while (0)
+
+
 
 /* Same spirit, but treat multiplication of 64K by 64K matrices (of
  * polynomials).
@@ -1025,6 +1137,270 @@ void mzd_check_memT(mzd_t * M, uint64_t * s, unsigned int n)
 #endif  /* HAVE_M4RI */
 
 
+/* level 3 -- linear systems */
+
+int gauss_6464_C(mat64 mm, mat64 e, mat64 m)
+{
+    memcpy(mm,m,sizeof(mat64));
+    uint64_t * ee[64];
+    for(int j = 0 ; j < 64 ; j++) ee[j] = &(e[j]);
+    int r = kernel(mm, ee, 64, 64, 1, 1);
+    return r;
+}
+
+int gauss_6464_imm(mat64 mm, mat64 e, mat64 m)
+{
+    memcpy(mm,m,sizeof(mat64));
+    uint64_t mask=1;
+    uint64_t taken=0;
+    uint64_t cancelled_cols=0;
+    int r = 0;
+    for(int j = 0 ; j < 64 ; j++, mask<<=1) e[j]=mask;
+    mask=1;
+    for(int j = 0 ; j < 64 ; j++, mask<<=1) {
+        int k = 0;
+        uint64_t z = 1UL;
+        uint64_t pr;
+        for(k = 0 ; z && !(((pr=mm[k])&mask) && !(taken&z)); k++, z<<=1) ;
+        if (!z) continue;
+        taken|=z;
+        r++;
+        cancelled_cols|=mask;
+        uint64_t er = e[k];
+        for(k++ ; k < 64 ; k++) {
+            uint64_t w = -((mm[k]&mask)!=0);
+            mm[k]^=pr&w;
+            e[k]^=er&w;
+        }
+    }
+    return r;
+}
+
+/* Computes l,u,p, such that:
+ *  - l is unit lower triangular
+ *  - l*a=u
+ *  - up=u*transpose(p) is upper triangular,
+ *  -   up[k]==0 iff up[k,k] == 0
+ *  -   rank(up)=rank(a)=# of diagonal 1's in up.
+ */
+int LUP64_imm(mat64 l, mat64 u, mat64 p, mat64 a)
+{
+    memcpy(u,a,sizeof(mat64));
+    uint64_t mask=1;
+    uint64_t todo=~((uint64_t)0);
+    int r = 0;
+    for(int j = 0 ; j < 64 ; j++, mask<<=1) p[j]=l[j]=mask;
+    mask=1;
+    int store[64];
+    int * ps = store;
+    for(int j = 0 ; j < 64 ; j++, mask<<=1) {
+#if 0
+            mat64 t;
+            mul_6464_6464(t,l,a); ASSERT_ALWAYS(mat64_eq(t,u));
+#endif
+        uint64_t pr=u[j];
+        // ASSERT(!(pr&~todo));
+        if (!(pr&todo)) { *ps++=j; continue; }
+        // this keeps only the least significant bit of pr.
+        uint64_t v = pr^(pr&(pr-1));
+        p[j]=v;
+#if defined(HAVE_SSE41) && !defined(VALGRIND)
+        int k = j+1;
+        if (k&1) {      // alignment call
+            uint64_t w = -((u[k]&v)!=0);
+            u[k]^=pr&w;
+            l[k]^=l[j]&w;
+            k++;
+        }
+        /* ok, it's ugly, and requires sse 4.1.
+         * but otoh is churns out data veeery fast */
+        __m128i vv = (__v2di) { v,v };
+        __m128i pp = (__v2di) { pr, pr };
+        __m128i ee = (__v2di) { l[j], l[j] };
+        __m128i * uu = (__m128i*) (u+k);
+        __m128i * ll = (__m128i*) (l+k);
+        for( ; k < 64 ; k+=2 ) {
+            __v2di ww = _mm_cmpeq_epi64(*uu&vv,vv);
+            *uu++ ^= pp & ww;
+            *ll++ ^= ee & ww;
+        }
+#else
+        uint64_t er = l[j];
+        for(int k = j+1 ; k<64 ; k++) {
+            uint64_t w = -((u[k]&v)!=0);
+            u[k]^=pr&w;
+            l[k]^=er&w;
+        }
+#endif
+        todo^=v;
+        r++;
+    }
+    for(ps = store ; todo ; ) {
+        uint64_t vv = todo^(todo&(todo-1));
+        p[*ps++] = vv;
+        todo^=vv;
+    }
+    return r;
+}
+
+/* Computes e,mm such that mm=e*m is in row echelon form */
+int full_echelon_6464_imm(mat64 mm, mat64 e, mat64 m)
+{
+    memcpy(mm,m,sizeof(mat64));
+    uint64_t mask=1;
+    uint64_t cancelled_cols=0;
+    int r = 0;
+    for(int j = 0 ; j < 64 ; j++, mask<<=1) e[j]=mask;
+    mask=1;
+    for(int j = 0 ; j < 64 ; j++, mask<<=1) {
+        int k = 0;
+        uint64_t z = 1UL;
+        uint64_t pr;
+        for(k = 0 ; z ; k++, z<<=1) {
+            pr=mm[k];
+            if ((pr&mask)&&!(pr&(mask-1)))
+                break;
+        }
+        if (!z) continue;
+        z=mm[k];mm[k]=mm[j];mm[j]=z;
+        z=e[k];e[k]=e[j];e[j]=z;
+        r++;
+        cancelled_cols|=mask;
+        uint64_t er = e[j];
+        for(k = 0 ; k < 64 ; k++) {
+            if (k==j) continue;
+            uint64_t w = -((mm[k]&mask)!=0);
+            mm[k]^=pr&w;
+            e[k]^=er&w;
+        }
+    }
+    return r;
+}
+
+int gauss_128128_C(uint64_t * m)
+{
+    mat64 mm[4]; /* handy, even though it does not properly reflect how data is used */
+    memcpy(mm,m,4*sizeof(mat64));
+    int r = kernel((uint64_t*)mm, NULL, 128, 128, 2, 2);
+    return r;
+}
+
+#if 0
+int gauss_128128_imm(uint64_t * m)
+{
+    mat64 mm[4];
+    uint64_t * pm = m;
+    for(int j = 0 ; j < 64 ; j++, pm+=2) {
+        mm[0][j] = pm[0];
+        mm[1][j] = pm[1];
+    }
+    for(int j = 0 ; j < 64 ; j++, pm+=2) {
+        mm[2][j] = pm[0];
+        mm[3][j] = pm[1];
+    }
+
+
+    mat64 e;
+    memcpy(mm,m,sizeof(mat64));
+    uint64_t mask=1;
+    uint64_t taken=0;
+    uint64_t cancelled_cols=0;
+    int r = 0;
+    for(int j = 0 ; j < 64 ; j++, mask<<=1) e[j]=mask;
+    mask=1;
+    for(int j = 0 ; j < 64 ; j++, mask<<=1) {
+        int k = 0;
+        uint64_t z = 1UL;
+        uint64_t pr;
+        for(k = 0 ; z && !(((pr=mm[k])&mask) && !(taken&z)); k++, z<<=1) ;
+        if (!z) continue;
+        taken|=z;
+        r++;
+        cancelled_cols|=mask;
+        uint64_t er = e[k];
+        int k0=k;
+#define TRIANGULAR_ONLY /* speeds up things by 20 to 25% */
+#ifndef  TRIANGULAR_ONLY
+        k = 0;
+#endif
+        for( ; k < 64 ; k++) {
+            if (k==k0) continue;
+            uint64_t w = -((mm[k]&mask)!=0);
+            mm[k]^=pr&w;
+            e[k]^=er&w;
+        }
+    }
+    return r;
+}
+#endif
+
+void pmat_6464(mat64 m)
+{
+    for(int i = 0; i < 64 ; i++) {
+        uint64_t mask=1;
+        for(int j = 0 ; j < 64 ; j++, mask<<=1) {
+            putchar((m[i]&mask) ?'1':'0');
+        }
+        putchar('\n');
+    }
+}
+
+void pmat_mn(mat64 * m, int rb, int cb)
+{
+    ASSERT_ALWAYS(rb%64 == 0); rb /= 64;
+    ASSERT_ALWAYS(cb%64 == 0); cb /= 64;
+    for(int ib = 0 ; ib < rb ; ib++) {
+        mat64 * mr = m + ib * cb;
+        for(int i = 0; i < 64 ; i++) {
+            for(int jb = 0 ; jb < cb ; jb++) {
+                uint64_t mask=1;
+                for(int j = 0 ; j < 64 ; j++, mask<<=1) {
+                    putchar((mr[jb][i]&mask) ?'1':'0');
+                }
+            }
+            putchar('\n');
+        }
+    }
+}
+
+
+/*** table of best functions ***/
+
+static inline void mul_6464_6464(mat64 C, mat64 A, mat64 B)
+{
+    mul_N64_6464_lookup4(C,A,B,64);
+}
+static inline void add_6464_6464(mat64_ptr C, mat64_srcptr A, mat64_srcptr B)
+{
+    add_6464_6464_C(C,A,B);
+}
+static inline void mul_N64_6464(uint64_t *C,
+		 const uint64_t *A,
+		 const uint64_t *B, unsigned long m)
+{
+    mul_N64_6464_sse(C,A,B,m);
+}
+static inline void mul_N64_T6464(uint64_t *C,
+                   const uint64_t *A,
+                   const uint64_t *B, unsigned long m)
+{
+    mul_N64_T6464_transB(C,A,B,m);
+}
+static inline void addmul_To64_o64(uint64_t * r, uint64_t a, uint64_t w)
+{
+    addmul_To64_o64_lsb_sse_v1(r,a,w);
+}
+static inline void mul_o64_6464(uint64_t * r, uint64_t a, mat64_srcptr w)
+{
+    mul_o64_6464_C_lsb(r,a,w);
+}
+static inline void mul_o64_T6464(uint64_t * w, uint64_t a, mat64_srcptr b)
+{
+    mul_o64_T6464_C_parity(w,a,b);
+}
+
+
+/* {{{ test routines */
 struct l1_data_s {
     uint64_t * xr;
     uint64_t * r;
@@ -1163,23 +1539,31 @@ void level1_mul_tests_N_list(l1_data_ptr D)
 
     mul_N64_6464_vec(r, a, w, n);
     if (memcmp(xr, r, n * sizeof(uint64_t))) abort();
-    TIME1(2, mul_N64_6464_vec, (r,a,w,n));
+    TIME1N(2, mul_N64_6464_vec, (r,a,w,n));
 
     mul_N64_6464_transB(r, a, w, n);
     if (memcmp(xr, r, n * sizeof(uint64_t))) abort();
-    TIME1(2, mul_N64_6464_transB, (r,a,w,n));
+    TIME1N(2, mul_N64_6464_transB, (r,a,w,n));
 
     mul_N64_6464_sse(r, a, w, n);
     if (memcmp(xr, r, n * sizeof(uint64_t))) abort();
-    TIME1(2, mul_N64_6464_sse, (r,a,w,n));
+    TIME1N(2, mul_N64_6464_sse, (r,a,w,n));
 
     mul_N64_6464_lookup4(r, a, w, n);
     if (memcmp(xr, r, n * sizeof(uint64_t))) abort();
-    TIME1(2, mul_N64_6464_lookup4, (r,a,w,n));
+    TIME1N(2, mul_N64_6464_lookup4, (r,a,w,n));
 
     mul_N64_6464_lookup8(r, a, w, n);
     if (memcmp(xr, r, n * sizeof(uint64_t))) abort();
-    TIME1(2, mul_N64_6464_lookup8, (r,a,w,n));
+    TIME1N(2, mul_N64_6464_lookup8, (r,a,w,n));
+
+    mul_N64_T6464_vec(r, a, wt, n);
+    if (memcmp(xr, r, n * sizeof(uint64_t))) abort();
+    TIME1N(2, mul_N64_T6464_vec, (r,a,w,n));
+
+    mul_N64_T6464_transB(r, a, wt, n);
+    if (memcmp(xr, r, n * sizeof(uint64_t))) abort();
+    TIME1N(2, mul_N64_T6464_transB, (r,a,w,n));
 
 #ifdef  HAVE_M4RI
     mzd_mul_naive(R, A, W);
@@ -1283,12 +1667,503 @@ void level1_mul_tests_64()
 
     l1_data_clear(D);
 }
+/* }}} */
+
+int mat64_is_uppertriangular(mat64_srcptr u)
+{
+    uint64_t mask = 1;
+    for(int k =0 ; k < 64 ; k++,mask<<=1) {
+        if (u[k]&(mask-1)) return 0;
+    }
+    return 1;
+}
+
+int mat64_is_lowertriangular(mat64_srcptr u)
+{
+    uint64_t mask = -2;
+    for(int k =0 ; k < 64 ; k++,mask<<=1) {
+        if (u[k]&mask) return 0;
+    }
+    return 1;
+}
+
+int mat64_triangular_is_unit(mat64_srcptr u)
+{
+    uint64_t mask = 1;
+    for(int k =0 ; k < 64 ; k++,mask<<=1) {
+        if (!(u[k]&mask)) return 0;
+    }
+    return 1;
+}
+
+int mat64_eq(mat64_srcptr a, mat64_srcptr b)
+{
+    for(int k =0 ; k < 64 ; k++) {
+        if (a[k]!=b[k]) return 0;
+    }
+    return 1;
+}
+
+#ifdef  HAVE_M4RI
+static inline void mzd_mypluq(mzd_t * LU, mzd_t * M, mzp_t * P, mzp_t * Q, int c)
+{
+    mzd_copy(LU, M);
+    mzd_pluq(LU,P,Q,c);
+}
+static inline void mzd_myechelonize_m4ri(mzd_t * E, mzd_t * M, int full, int k)
+{
+    mzd_copy(E, M);
+    mzd_echelonize_m4ri(E,full,k);
+}
+static inline void mzd_myechelonize_pluq(mzd_t * E, mzd_t * M, int full)
+{
+    mzd_copy(E, M);
+    mzd_echelonize_pluq(E,full);
+}
+#endif
+
+struct pmat_s {/*{{{*/
+    int * v;
+    int n;
+};
+typedef struct pmat_s pmat[1];
+typedef struct pmat_s * pmat_ptr;
+typedef const struct pmat_s * pmat_srcptr;
+
+void pmat_init(pmat_ptr x, int n)
+{
+    x->n=n;
+    x->v=malloc(n*sizeof(int));
+    for(int i = 0 ; i < n ; i++) x->v[i]=i;
+}
+void pmat_clear(pmat_ptr x)
+{
+    free(x->v); x->v = NULL; x->n = 0;
+}
+static inline int pmat_get(pmat_srcptr x, int k) { return x->v[k]; }
+static inline void pmat_set(pmat_srcptr x, int k, int w) { x->v[k]=w; }
+
+static inline void pmat_transpose(pmat_ptr x, pmat_srcptr y)
+{
+    if (x == y) {
+        pmat t;
+        pmat_init(t, y->n);
+        pmat_transpose(x, t);
+        pmat_clear(t);
+        return;
+    }
+    ASSERT_ALWAYS(x->n == y->n);
+    for(int i = 0 ; i < x->n ; i++)
+        x->v[i]=-1;
+    for(int i = 0 ; i < x->n ; i++) {
+        if (y->v[i] >= 0)
+            x->v[y->v[i]]=i;
+    }
+}
+
+void pmat_get_matrix(mat64 * qm, pmat_ptr qp)
+{
+    int * phi = qp->v;
+    int n = qp->n;
+    ASSERT_ALWAYS((n%64)==0);
+    int nb = n/64;
+    memset(qm, 0, n*nb*sizeof(uint64_t));
+    uint64_t * qq = (uint64_t*) qm;
+    for(int k = 0 ; k < n ; ) {
+        for(int jq = 0 ; jq < 64 ; jq++, k++, qq++) {
+            int v = phi[k];
+            ASSERT_ALWAYS(v >= 0);
+            qq[v&~63]=((uint64_t)1)<<(v%64);
+        }
+        qq+=(nb-1)*64;
+    }
+}
+
+/* phi_p must point to a zone where at least as many limbs as the number
+ * of set bits in the bits[] array
+ */
+static void pmattab_complete(int * phi, uint64_t * bits, int nbits)
+{
+    ASSERT_ALWAYS(nbits % 64 == 0);
+    for(int offset=0 ; offset < nbits ; offset+=64) {
+        for(uint64_t w = bits[offset/64], z ; w ; w^=z) {
+            z = w^(w&(w-1));
+            uint64_t j;
+            __asm__ ("bsfq %1,%0" : "=r" (j) : "rm" ((uint64_t)w));
+            *phi++ = offset + j;
+        }
+    }
+}
+
+void pqperms_from_phi(pmat_ptr p, pmat_ptr q, int * phi, int m, int n)
+{
+    int ip = 0;ASSERT_ALWAYS((m%64)==0);ASSERT_ALWAYS(p->n==m);
+    int jq = 0;ASSERT_ALWAYS((n%64)==0);ASSERT_ALWAYS(q->n==n);
+    uint64_t ms[m/64]; for(int i = 0 ; i < m/64 ; i++) ms[i]=~((uint64_t)0);
+    uint64_t ns[n/64]; for(int j = 0 ; j < n/64 ; j++) ns[j]=~((uint64_t)0);
+    uint64_t w;
+    for(int k = 0 ; k < m ; k++) {
+        int v = phi[k];
+        if (v < 0) continue;
+        p->v[ip++] = k; w=((uint64_t)1)<<(k%64); ms[k/64]^=w;
+        q->v[jq++] = v; w=((uint64_t)1)<<(v%64); ns[v/64]^=w;
+    }
+    pmattab_complete(p->v + ip, ms, m);
+    pmattab_complete(q->v + jq, ns, n);
+}
+/*}}}*/
+
+void mat64_set_identity(mat64_ptr m)
+{
+    uint64_t mask = 1;
+    for(int j = 0 ; j < 64 ; j++, mask<<=1) m[j]=mask;
+}
+void mat64_copy(mat64_ptr b, mat64_srcptr a)
+{
+    memcpy(b,a,sizeof(mat64));
+}
+
+
+int PLUQ64_inner(int * phi, mat64 l, mat64 u, mat64 a, int col_offset)
+{
+    const int m = 64;
+    const int n = 64;
+    int phi0[64];
+    if (phi == NULL) {
+        phi = phi0;
+        for(int i = 0 ; i < 64 ; i++) phi[i]=-1;
+    }
+
+    mat64_copy(u, a);
+    mat64_set_identity(l);
+    int rank = 0;
+    uint64_t todo=~((uint64_t)0);
+    for(int i = 0 ; i < m ; i++) {
+        uint64_t r=u[i];
+        if (phi[i]>=0) continue;
+        if (!(r&todo) || phi[i]>=0) continue;
+        // this keeps only the least significant bit of r.
+        uint64_t v = r^(r&(r-1));
+        uint64_t j;
+        __asm__ ("bsfq %1,%0" : "=r" (j) : "rm" ((uint64_t)r));
+        phi[i] = col_offset + j;
+#if defined(HAVE_SSE41) && !defined(VALGRIND)
+        int k = i+1;
+        if (k&1) {      // alignment call
+            uint64_t w = -((u[k]&v)!=0);
+            u[k]^=r&w;
+            l[k]^=l[i]&w;
+            k++;
+        }
+        /* ok, it's ugly, and requires sse 4.1.
+         * but otoh is churns out data veeery fast */
+        __m128i vv = (__v2di) { v,v };
+        __m128i pp = (__v2di) { r, r };
+        __m128i ee = (__v2di) { l[i], l[i] };
+        __m128i * uu = (__m128i*) (u+k);
+        __m128i * ll = (__m128i*) (l+k);
+        for( ; k < n ; k+=2 ) {
+            __v2di ww = _mm_cmpeq_epi64(*uu&vv,vv);
+            *uu++ ^= pp & ww;
+            *ll++ ^= ee & ww;
+        }
+#else
+        uint64_t er = l[i];
+        for(int k = i+1 ; k<n ; k++) {
+            uint64_t w = -((u[k]&v)!=0);
+            u[k]^=r&w;
+            l[k]^=er&w;
+        }
+#endif
+        todo^=v;
+        rank++;
+    }
+    return rank;
+}
+
+/* outer routine */
+int PLUQ64(pmat_ptr p, mat64 * l, mat64 * u, pmat_ptr q, mat64 * m)
+{
+    int phi[64];
+    for(int i = 0 ; i < 64 ; i++) phi[i]=-1;
+    int r = PLUQ64_inner(phi,l[0],u[0],m[0],0);
+    pqperms_from_phi(p,q,phi,64,64);
+    return r;
+}
+
+int PLUQ64_n(int * phi, mat64 l, mat64 * u, mat64 * a, int n)
+{
+    const int m = 64;
+    ASSERT_ALWAYS(n % 64 == 0);
+    int nb = n/m;
+    mat64_set_identity(l);
+    for(int i = 0 ; i < 64 ; i++) phi[i]=-1;
+    int rank = 0;
+    int b = 0;
+#ifdef ALLOC_LS
+    mat64 ** ls = malloc(nb * sizeof(mat64*));
+#else
+    mat64 ls[nb];
+#endif
+    mat64 tl;
+    for( ; b < nb && rank < m ; b++) {
+        mat64 ta;
+        mul_6464_6464(ta, l, a[b]);
+        rank += PLUQ64_inner(phi, tl, u[b], ta, b*m);
+        mul_6464_6464(l, tl, l);
+#ifdef  ALLOC_LS
+        ls[b]=malloc(sizeof(mat64));
+        mat64_copy(*ls[b], tl);
+#else
+        mat64_copy(ls[b], tl);
+#endif
+    }
+    int nspins = b;
+#ifdef  ALLOC_LS
+    free(ls[b-1]);
+    for(int c = b-2 ; c >= 0 ; c--) {
+        mul_6464_6464(u[c], tl, u[c]);
+        mul_6464_6464(tl, *ls[c], tl);
+        free(ls[c]);
+    }
+    free(ls);
+#else
+    for(int c = b-2 ; c >= 0 ; c--) {
+        mul_6464_6464(u[c], tl, u[c]);
+        mul_6464_6464(tl, ls[c], tl);
+    }
+#endif
+    for( ; b < nb ; b++)
+        mul_6464_6464(u[b], l, u[b]);
+    return nspins*m+b;
+}
+
+static inline void bli_64x64N_clobber(mat64 h, mat64 * us, int * phi, int nb)
+{
+    /* problem: we're modifying U here. So either we do a copy of U,
+     * which can be probelmatic memory-wise, or we do an extraction ;
+     * it's also possible to rebuild the original U from the extracted H
+     * and U', merely with a product (_if ever_ we care about U, in
+     * fact). However this latter option seems messy.
+     */
+    mat64_set_identity(h);
+    const int m = 64;
+    for(int i = 0 ; i < m ; i++) {
+        int j = phi[i];
+        if (j<0) continue;
+        uint64_t m = ((uint64_t)1) << (j%64);
+        int d = j/64;
+        /* TODO: use _mm_cmpeq_epi64 for this as well, of course */
+        ASSERT(us[d][i]&m);
+        int k = 0;
+#if defined(HAVE_SSE41) && !defined(VALGRIND)
+        __v2di mm = (__v2di) { m,m};
+        __m128i * uu = (__m128i*) us[d];
+        __m128i * hh = (__m128i*) h;
+        __m128i hi = (__v2di) { h[i], h[i] };
+        int ii=i/2;
+        for( ; k < ii ; k++) {
+            __v2di ww = _mm_cmpeq_epi64(*uu++&mm,mm);
+            for(int b = 0 ; b < nb ; b++) {
+                ((__m128i*)us[b])[k] ^= ww & (__v2di) {us[b][i],us[b][i]};
+            }
+            hh[k] ^= ww & hi;
+        }
+        k*=2;
+#endif
+        for( ; k < i ; k++) {
+            uint64_t w = -((us[d][k]&m) != 0);
+            for(int b = 0 ; b < nb ; b++) {
+                us[b][k] ^= w & us[b][i];
+            }
+            h[k] ^= w & h[i];
+        }
+    }
+}
+
+void bli_64x128(mat64 h, mat64 * us, int * phi)
+{
+    mat64 uc[2];
+    memcpy(uc,us,2*sizeof(mat64));
+    bli_64x64N_clobber(h,uc,phi,2);
+}
+
+void extract_cols_64_from_128(mat64 t, mat64 * m, int * phi)
+{
+    // given the list of 64 integers phi, all in the rage {-1} union
+    // {0..127}, constitute a 64x64 matrix whose column of index j is
+    // column of index phi[j] in the input matrix m. -1 means a zero
+    // column.
+    uint64_t s[2][64]={{0,},};
+    for(int j = 0 ; j < 64 ; j++) {
+        if (phi[j]<0) continue;
+        s[phi[j]/64][j]=((uint64_t)1)<<(phi[j]%64);
+    }
+    memset(t, 0, sizeof(mat64));
+    uint64_t mask = 1;
+    for(int j = 0 ; j < 64 ; j++, mask<<=1) {
+#if defined(HAVE_SSE41) && !defined(VALGRIND)
+        __v2di ss[2] = {(__v2di) {s[0][j],s[0][j]}, (__v2di) {s[1][j],s[1][j]}};
+        __m128i * mm[2] = {(__m128i*)m[0],(__m128i*)m[1]};
+        __m128i * tt = (__m128i*)t;
+        __v2di mmk = (__v2di) {mask,mask};
+        for(int i = 0 ; i < 64 ; i+=2) {
+            *tt ^= mmk & _mm_cmpeq_epi64((*mm[0]&ss[0])^(*mm[1]&ss[1]),ss[0]^ss[1]);
+            mm[0]++,mm[1]++;
+            tt++;
+        }
+#else
+        for(int i = 0 ; i < 64 ; i++) {
+            t[i] ^= mask & -(((m[0][i]&s[0][j]) ^ (m[1][i]&s[1][j])) != 0);
+        }
+#endif
+    }
+}
+
+    /*
+        __m128i vv = (__v2di) { v,v };
+        __m128i pp = (__v2di) { r, r };
+        __m128i ee = (__v2di) { l[i], l[i] };
+    __m128i * tt = (__m128i*) (t);
+    __m128i * mm[2] = { (__m128i*) m[0], (__m128i *) m[1] };
+    __m128i * ss[2] = { (__m128i*) s[0], (__m128i *) s[1] };
+    __v2di mask = (__v2di) {1,1};
+    for(int i = 0 ; i < 64 ; i++) {
+        *tt = mask & _mm_cmpeq_epi64(*mm&*ss,*ss);
+        tt++,mm++,ss++,mask<<=1;
+    }
+    */
+
+int PLUQ128(pmat_ptr p, mat64 * l, mat64 * u, pmat_ptr q, mat64 * m)
+{
+    /* This is really an outer routine. An inner routine will not have p
+     * and q, but rather both merged as a phi argument, in the manner of
+     * PLUQ64_inner (and of course the following lines would be changed a
+     * bit).
+     */
+    int phi[128];
+    for(int i = 0 ; i < 128 ; i++) phi[i]=-1;
+
+    int r1 = PLUQ64_n(phi,l[0],u,m,128);
+    r1 = r1 % 64;
+
+    // andouille 7.65
+
+    mat64 h;
+    bli_64x128(h, u, phi);
+    mat64 l21;
+
+    /* This is __very__ expensive w.r.t. what it really does :-(( */
+    extract_cols_64_from_128(l21, m+2, phi);
+
+    // andouille 16.7 -- 17.5
+    mul_6464_6464(l21, l21, h);
+    mul_6464_6464(l[2], l21, l[0]);
+
+    mat64 t2[2];
+    mul_6464_6464(t2[0], l21, u[0]); add_6464_6464(t2[0], m[2], t2[0]);
+    mul_6464_6464(t2[1], l21, u[1]); add_6464_6464(t2[1], m[3], t2[1]);
+
+    int r2 = PLUQ64_n(phi + 64,l[3],u+2,t2,128);
+    r2 = r2 % 64;
+    mul_6464_6464(l[2], l[3], l[2]);
+
+    pqperms_from_phi(p,q,phi,128,128);
+    
+    return r1 + r2;
+}
+
+void check_pluq(pmat_ptr p, mat64 * l, mat64 * u, pmat_ptr q, mat64 * m, int n)
+{
+    mat64 pm[(n/64)*(n/64)];
+    pmat_get_matrix(pm, p);
+
+    pmat qt;
+    pmat_init(qt, n);
+    pmat_transpose(qt, q);
+
+    mat64 qmt[(n/64)*(n/64)];
+    pmat_get_matrix(qmt, qt);
+
+    /* compute p*u*q^-1 */
+    mat64 pu[(n/64)*(n/64)];
+    memset(pu, 0, (n/64)*(n/64)*sizeof(mat64));
+
+    for(int i = 0 ; i < (n/64) ; i++ )
+    for(int j = 0 ; j < (n/64) ; j++ )
+    for(int k = 0 ; k < (n/64) ; k++ ) {
+        mat64 tmp;
+        mul_6464_6464(tmp, pm[i*(n/64)+k], u[k*(n/64)+j]);
+        add_6464_6464(pu[i*(n/64)+j], pu[i*(n/64)+j], tmp);
+    }
+
+    mat64 puq[(n/64)*(n/64)];
+    memset(puq, 0, (n/64)*(n/64)*sizeof(mat64));
+
+    for(int i = 0 ; i < (n/64) ; i++ )
+    for(int j = 0 ; j < (n/64) ; j++ )
+    for(int k = 0 ; k < (n/64) ; k++ ) {
+        mat64 tmp;
+        mul_6464_6464(tmp, pu[i*(n/64)+k], qmt[k*(n/64)+j]);
+        add_6464_6464(puq[i*(n/64)+j], puq[i*(n/64)+j], tmp);
+    }
+
+    mat64 lm[(n/64)*(n/64)];
+    memset(lm, 0, (n/64)*(n/64)*sizeof(mat64));
+
+    for(int i = 0 ; i < (n/64) ; i++ )
+    for(int j = 0 ; j < (n/64) ; j++ )
+    for(int k = 0 ; k <= i ; k++ ) {
+        mat64 tmp;
+        mul_6464_6464(tmp, l[i*(n/64)+k], m[k*(n/64)+j]);
+        add_6464_6464(lm[i*(n/64)+j], lm[i*(n/64)+j], tmp);
+    }
+
+    for(int i = 0 ; i < (n/64) ; i++ ) {
+        ASSERT_ALWAYS(mat64_is_lowertriangular(l[i*(n/64)+i]));
+        ASSERT_ALWAYS(mat64_triangular_is_unit(l[i*(n/64)+i]));
+        for(int j = 0 ; j < (n/64) ; j++ ) {
+            ASSERT_ALWAYS(mat64_eq(lm[i*(n/64)+j], u[i*(n/64)+j]));
+        }
+    }
+    for(int i = 0 ; i < (n/64) ; i++ ) {
+        ASSERT_ALWAYS(mat64_is_uppertriangular(puq[i*(n/64)+i]));
+    }
+}
+
+void level3_gauss_tests_N(int n __attribute__((unused)))
+{
+#ifdef  HAVE_M4RI
+    mzd_t * M;
+    mzd_t * LU;
+    mzp_t * P, *Q;
+    M = mzd_init(n, n);
+#if 0
+    mzd_set_mem(M, m, n);
+    uint64_t m = malloc((n*n/64)*sizeof(uint64_t));
+    rand64_mem(m, 64);
+    free(m);
+#else
+    my_mzd_randomize(M);
+#endif
+    LU = mzd_init(n,n);
+    P = mzp_init(n);
+    Q = mzp_init(n);
+    TIME1N(2, mzd_mypluq, (LU, M, P, Q, 0));
+    TIME1N(2, mzd_myechelonize_m4ri, (LU, M, 0, 0));
+    TIME1N(2, mzd_myechelonize_pluq, (LU, M, 0));
+    mzd_free(M);
+    mzd_free(LU);
+    mzp_free(P);
+    mzp_free(Q);
+#endif
+}
 
 int main()
 {
   unsigned int n = 2 * 1000 * 1000;
 
-    if (1) {
+    if (0) {
         uint64_t * r = (uint64_t *) malloc(64 * sizeof(uint64_t));
         uint64_t a = rand64();
         uint64_t w = rand64();
@@ -1307,7 +2182,7 @@ int main()
         free(r);
     }
 
-    if (1) {
+    if (0) {
         uint64_t * r = (uint64_t *) malloc(64 * sizeof(uint64_t));
         uint64_t * a = (uint64_t *) malloc(n * sizeof(uint64_t));
         uint64_t * w = (uint64_t *) malloc(n * sizeof(uint64_t));
@@ -1316,11 +2191,110 @@ int main()
 
         printf("-- level-2 benches (N=%u) --\n", n);
         level1_mul_tests_N(n);
-        TIME1(1, mul_64N_N64_addmul, (r,a,w,n));
-        TIME1(5, mul_TN32_N64_C, (r,(uint32_t*)a,w,n));
-        TIME1(5, mul_TN64_N64_C, (r,a,w,n));
+        TIME1N(1, mul_64N_N64_addmul, (r,a,w,n));
+        TIME1N(5, mul_TN32_N64_C, (r,(uint32_t*)a,w,n));
+        TIME1N(5, mul_TN64_N64_C, (r,a,w,n));
 
         free(r); free(a); free(w);
+    }
+
+    if (1) {
+        mat64 m[4],l[4],u[4];
+        srand(1728);
+
+        {
+            pmat p,q;
+            pmat_init(p, 64);
+            pmat_init(q, 64);
+            rand64_mem((uint64_t*)m, 64);
+            PLUQ64(p,l,u,q,m);
+            check_pluq(p,l,u,q,m,64);
+            pmat_clear(p);
+            pmat_clear(q);
+        }
+
+        {
+            pmat p,q;
+            pmat_init(p, 128);
+            pmat_init(q, 128);
+            rand64_mem((uint64_t*)m, 4*64);
+            PLUQ128(p,l,u,q,m);
+            check_pluq(p,l,u,q,m,128);
+            pmat_clear(p);
+            pmat_clear(q);
+        }
+
+        printf("PLUQ128 stub executed ok\n");
+
+
+            // pmat_6464(m[0]); printf("\n");
+            // pmat_6464(u); printf("\n");
+            // pmat_6464(l); printf("\n");
+            // pmat_6464(p); printf("\n");
+            // pmat_6464(t); printf("\n");
+            
+
+            // mul_N64_T6464(t,u,p,64);
+            // pmat_6464(t); printf("\n");
+
+            
+#if 0
+            memset(e,0,sizeof(e));
+            rand64_mem(m[0], 64);
+            rand64_mem(m[1], 64);
+            rand64_mem(m[2], 64);
+            rand64_mem(m[3], 64);
+            // pmat_6464(m[0]); printf("\n");
+            full_echelon_6464_imm(mm,e[0],m[0]);
+
+            /* 
+            mul_6464
+
+            pmat_6464(mm); printf("\n");
+            pmat_6464(e); printf("\n"); printf("\n");
+            */
+#endif
+    }
+
+    if (1) {
+        mat64 m;
+        mat64 e;
+        mat64 mm;
+        mat64 l,u,p;
+        rand64_mem(m, 64);
+        rand64_mem(e, 64);
+        rand64_mem(mm, 64);
+        mat64 m4[4];
+        mat64 u4[4];
+        rand64_mem((uint64_t*)m4, 256);
+        // printf("-- for reference: best matrix mult, 64x64 --\n");
+        // TIME1(2, mul_6464_6464, (mm,e,m));
+        // TIME1(2, mul_N64_T6464, (mm,e,m,64));
+        printf("-- level-3 (reduction) benches, n=64 --\n");
+        // TIME1(2, gauss_6464_C, (mm,e,m));
+        // TIME1(2, gauss_6464_imm, (mm,e,m));
+        // TIME1(2, PLUQ64_inner, (NULL,l,u,m,0));
+        int phi[128];
+        {
+            pmat p,q;
+            mat64 m[4],l[2],u[4];
+            rand64_mem((uint64_t*)m, 4*64);
+            pmat_init(p, 128);
+            pmat_init(q, 128);
+            TIME1(2, PLUQ128, (p,l,u,q,m));
+        }
+        int n=2;
+        TIME1N(2, rand64_mem((uint64_t*)m4, n*64), );
+        TIME1N_spins(, 2, PLUQ64_n, (phi,l,u4,m4,64*n), ret/64,n+1);
+        TIME1N_spins(rand64_mem((uint64_t*)m4, n*64), 2, PLUQ64_n, (phi,l,u4,m4,64*n), ret/64,n+1);
+        TIME1(2, LUP64_imm, (l,u,p,m));
+        TIME1(2, full_echelon_6464_imm, (mm,e,m));
+        TIME1(2, gauss_128128_C, (m));
+        level3_gauss_tests_N(64);
+        level3_gauss_tests_N(128);
+        level3_gauss_tests_N(256);
+        level3_gauss_tests_N(512);
+        level3_gauss_tests_N(1024);
     }
 
     if (0) {
@@ -1336,7 +2310,7 @@ int main()
         free(C);
     }
 
-    {
+    if (0) {
         size_t n = 512;
         mat64 * A = (mat64 *) malloc(2 * 2 * n * sizeof(mat64));
         mat64 * B = (mat64 *) malloc(2 * 2 * n * sizeof(mat64));

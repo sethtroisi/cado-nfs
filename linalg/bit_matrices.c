@@ -28,6 +28,9 @@
  */
 
 #include <string.h>
+#ifdef HAVE_SSE2
+#include <emmintrin.h>
+#endif
 #include "bit_matrices.h"
 
 /* copy-pasted from mul_TN64_N64_C in linalg/bwc/matops.c
@@ -107,3 +110,50 @@ void addmul_N64_6464(uint64_t *C,
         C[i]^= Bx[15][aa];
     }
 }
+
+#ifdef  HAVE_SSE2
+void mul_6464_6464(mat64_ptr C, mat64_srcptr A, mat64_srcptr B)
+{
+    int i;
+    memset(C, 0, sizeof(mat64));
+ 
+    /* As per emmintrin.h, only the __m128i type is declared with
+     * attribute __may_alias__, meaning that accesses through this
+     * pointer may alias other types (e.g. uint64_t's, in our cases). For
+     * this reason, we _must_ use this pointer type, and not __v2di, for
+     * our pointer types. Reading from a __m128 * into a __v2di, or the
+     * converse, are legal operations.
+     */
+    __m128i *Cw = (__m128i *) C;
+    __m128i *Aw = (__m128i *) A;
+
+    for (int j = 0; j < 64; j += 2) {
+	__v2di c = { 0, 0 };
+	__v2di a = *Aw++;
+
+	__v2di one = { 1, 1, };
+#define SHR(x,r) _mm_srli_epi64((x),(r))
+	for (i = 0; i < 64; i++) {
+	    __v2di bw = { B[i], B[i], };
+
+	    c ^= (bw & -(a & one));
+	    a = SHR(a, 1);
+	}
+#undef  SHR
+	*Cw++ = c;
+    }
+}
+#else
+/* slow fallback */
+void mul_6464_6464(mat64_ptr C, mat64_srcptr A, mat64_srcptr B)
+{
+    memset(C, 0, sizeof(mat64));
+ 
+    for (int i = 0; i < 64; i++) {
+    for (int j = 0; j < 64; j++) {
+        if ((A[i]>>j)&1)
+            C[i]^=B[j];
+    }
+    }
+}
+#endif

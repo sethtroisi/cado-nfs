@@ -569,9 +569,17 @@ int kernel(mp_limb_t* mat, mp_limb_t** ker, int nrows, int ncols,
  *
  * lmat is expected to be already allocated, and to have a striding equal
  * to limbs_per_col.
+ *
+ * elim_table is an extra field, which should only be used when ncols is
+ * small. If not null, one expects there a malloc()'ed area (see size
+ * below), where each block of 16*limbs_per_col limbs contains
+ * precomputed row combinations. Row combination of index i, in the k-th
+ * such block, is such that the multiplication of this row by the
+ * original matrix mat yields a row whose bits of indices k to k+4 are
+ * exactly set to i. This can be used to do a projection.
  */
 int spanned_basis(mp_limb_t * lmat, mp_limb_t * mat, int nrows, int ncols,
-        int limbs_per_row, int limbs_per_col)
+        int limbs_per_row, int limbs_per_col, mp_limb_t * elim_table)
 {
     int i;
 
@@ -588,16 +596,16 @@ int spanned_basis(mp_limb_t * lmat, mp_limb_t * mat, int nrows, int ncols,
         ADDBIT_SLOW(lmat2, limbs_per_col, i, i);
 
     struct gaussian_elimination_data G[1] = {{
-        .mat = mat,
-            .lmat = lmat2,
+            .mat = mat, .lmat = lmat2,
             .nrows = nrows, .ncols = ncols,
-        .limbs_per_row = limbs_per_row,
-        .limbs_per_col = limbs_per_col,
+            .limbs_per_row = limbs_per_row,
+            .limbs_per_col = limbs_per_col,
             .rank = 0, }};
     gaussian_elimination(G);
 
     int r = 0;
     int h = NROWS;
+
     for (i = 0; i < NROWS; ++i) {
         assert(r < h);
         if (G->set_used[i]) {
@@ -608,10 +616,46 @@ int spanned_basis(mp_limb_t * lmat, mp_limb_t * mat, int nrows, int ncols,
             memcpy(lmat + h * limbs_per_col, lmat2 + i * limbs_per_col, limbs_per_col * sizeof(mp_limb_t));
         }
     }
+
+    if (elim_table) {
+        // clearing is done progressively below
+        // memset(elim_table, 0, iceildiv(NCOLS, 4) * 16 * limbs_per_col);
+        mp_limb_t * zcol = malloc(limbs_per_col * sizeof(mp_limb_t));
+        memset(zcol, 0, limbs_per_col * sizeof(mp_limb_t));
+        mp_limb_t * e = elim_table;
+        for (i = 0; i < NCOLS ; i+=4, e+=16 * limbs_per_col) {
+            memset(e, 0, 16 * limbs_per_col);
+            mp_limb_t * killer[4];
+            for(int di = 0;di<4 ; di++) {
+                if (i+di >= NCOLS || G->set_pivot[i+di]<0)
+                    killer[di] = zcol;
+                else
+                    killer[di] = lmat2 + G->set_pivot[i+di] * limbs_per_col;
+            }
+            /* Do a gray code walk to fill in the table. */
+            mp_limb_t * ex, * ey;
+            int d = 0;
+            memset(e, 0, limbs_per_col); ex=e;
+#define DO_BIT(z) do {							\
+            d^=1<<z; ey=e+d*limbs_per_col;				\
+            for(int j = 0 ; j < limbs_per_col ; j++) {			\
+                ey[j] = ex[j] ^ killer[z][j];				\
+            }								\
+            ex=ey;							\
+        } while (0)
+            /* zero */ DO_BIT(0); DO_BIT(1); DO_BIT(0);
+            DO_BIT(2); DO_BIT(0); DO_BIT(1); DO_BIT(0);
+            DO_BIT(3); DO_BIT(0); DO_BIT(1); DO_BIT(0);
+            DO_BIT(2); DO_BIT(0); DO_BIT(1); DO_BIT(0);
+        }
+#undef  DO_BIT
+        free(zcol);
+    }
+
     free(lmat2);
-  free(ptr_rows);
-  free(G->set_pivot);
-  free(G->set_used);
+    free(ptr_rows);
+    free(G->set_pivot);
+    free(G->set_used);
 
     return r;
 }

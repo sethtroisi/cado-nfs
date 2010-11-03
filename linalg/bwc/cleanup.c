@@ -13,39 +13,6 @@
 #include "blockmatrix.h"
 #include "gauss.h"
 
-void blockmatrix_copy_colrange(blockmatrix B, blockmatrix A, int j0, int j1)
-{
-    ASSERT_ALWAYS(A->nrows == B->nrows);
-    ASSERT_ALWAYS(A->ncols == B->ncols);
-    ASSERT_ALWAYS(A->ncblocks == B->ncblocks);
-
-    int block0 = j0 / 64;
-    uint64_t * masks = malloc(A->ncblocks * sizeof(uint64_t));
-    for(int b = block0 ; b*64 < j1 ; b++) {
-        uint64_t mask = -((uint64_t)1);
-        int z0 = j0 - b*64;
-        ASSERT_ALWAYS(z0 < 64);
-        if (z0>=0) mask &= ((uint64_t)-1) << z0;
-        int z1 = 64 - (j1 - b*64);
-        ASSERT_ALWAYS(z1 < 64);
-        if (z1>=0) mask &= ((uint64_t)-1) >> z1;
-        masks[b] = mask;
-    }
-    for(unsigned int i0 = 0 ; i0 < A->nrows ; i0 += 64) {
-        for(unsigned int i = 0 ; i0 + i < A->nrows && i < 64 ; i++) {
-            for(int b = block0 ; b*64 < j1 ; b++) {
-                uint64_t m = masks[b];
-                uint64_t v = A->mb[i0/64 + b*A->stride][i];
-                v&=m;
-                B->mb[i0/64 + b*B->stride][i] &= ~m;
-                B->mb[i0/64 + b*B->stride][i] |= v;
-            }
-        }
-    }
-    free(masks);
-}
-
-
 int main(int argc, char **argv)
 {
     param_list pl;
@@ -74,9 +41,7 @@ int main(int argc, char **argv)
     S = blockmatrix_alloc(ncols, ncols);
     ST = blockmatrix_alloc(ncols, ncols);
     T = blockmatrix_alloc(ncols, ncols);
-    blockmatrix_zero(S);
-    for(unsigned int i = 0 ; i < ncols ; i++)
-        S->mb[i/64 + (i/64)*S->stride][i%64] ^= ((uint64_t)1) << (i%64);
+    blockmatrix_set_identity(S);
     uint64_t * kzone = malloc(FLAT_BYTES_WITH_READAHEAD(ncols, ncols));
     int limbs_per_row = iceildiv(ncols, 64);
 
@@ -104,7 +69,7 @@ int main(int argc, char **argv)
             k = blockmatrix_alloc(nrows, ncols);
             kprev = blockmatrix_alloc(nrows, ncols);
             kfinal = blockmatrix_alloc(nrows, ncols);
-            blockmatrix_zero(kfinal);
+            blockmatrix_set_zero(kfinal);
             kS = blockmatrix_alloc(nrows, ncols);
             zone = malloc(FLAT_BYTES_WITH_READAHEAD(ncols, nrows));
             limbs_per_col = iceildiv(nrows, 64);
@@ -127,8 +92,8 @@ int main(int argc, char **argv)
                 ncols,
                 nrows,
                 sizeof(uint64_t) / sizeof(mp_limb_t) * limbs_per_col,
-                sizeof(uint64_t) / sizeof(mp_limb_t) * limbs_per_row
-                );
+                sizeof(uint64_t) / sizeof(mp_limb_t) * limbs_per_row,
+                NULL);
         // kzone*transpose(kS) is reduced
         // kS*transpose(kzone) is reduced (equivalent formulation)
         blockmatrix_copy_transpose_from_flat(T, kzone, limbs_per_row, 0, 0);
