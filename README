@@ -9,7 +9,7 @@ Required software tools:
 *) The general script uses a lot of unix tools: perl, ssh, gzip to
    mention but a few. 
 
-Optionnally:
+Optionally:
 *) Support for curl library.
 *) Support for MPI.
 
