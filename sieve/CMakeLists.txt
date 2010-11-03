@@ -19,7 +19,7 @@ set_property(DIRECTORY APPEND PROPERTY COMPILE_FLAGS fno-ivopts -fno-regmove -fn
 
 include_directories (ecm)
 include_directories (${CMAKE_CURRENT_BINARY_DIR})
-link_directories (ecm)
+link_directories (${CMAKE_CURRENT_BINARY_DIR}/ecm)
 
 # XXX TODO: sieve_config.h is dead -- remove it, place relevant #defines in
 # the source file instead. Then remove the custom command below as well as

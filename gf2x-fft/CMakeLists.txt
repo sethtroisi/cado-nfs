@@ -2,7 +2,7 @@
 # include_directories(${CADO_NFS_SOURCE_DIR}/gf2x/gf2x)
 
 add_subdirectory(cantor)
-link_directories(cantor)
+link_directories(${CMAKE_CURRENT_BINARY_DIR}/gf2x/cantor)
 
 add_library(gf2x-fft fake_fft.c)
 
