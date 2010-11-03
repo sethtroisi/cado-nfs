@@ -158,14 +158,3 @@
 #
 # ``MPI=1'', ``MPI=yes'', ``MPI=on'', are equivalent.
 # ``MPI=0'', ``MPI=no'', ``MPI=off'', are equivalent.
-
-############################################################
-# PTHREADS: whether to use POSIX threads.
-#
-# Example values:
-# PTHREADS=1
-# PTHREADS=0
-#
-# ``PTHREADS=1'', ``PTHREADS=yes'', ``PTHREADS=on'', are equivalent.
-# ``PTHREADS=0'', ``PTHREADS=no'', ``PTHREADS=off'': idem.
-#

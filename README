@@ -2,8 +2,17 @@ Required software tools:
 ========================
 
 *) GMP (http://gmplib.org): usually installed in most Linux distributions
-*) The GCC compiler works ; some others might, but it is untested.
+*) The GCC compiler works ; some others might, but it is untested. C and
+   C++ are required.
 *) GNU make and CMake for building (CMake is installed on the fly if missing)
+*) Support for posix threads.
+*) The general script uses a lot of unix tools: perl, ssh, gzip to
+   mention but a few. 
+
+Optionnally:
+*) Support for curl library.
+*) Support for MPI.
+
 
 [Configure]
 ===========

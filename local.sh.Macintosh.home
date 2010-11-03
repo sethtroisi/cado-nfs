@@ -19,6 +19,6 @@ CXXFLAGS="-m64 -O2 -DNDEBUG"
 # Mac OS X's C library does not have pthread_barrier_wait, which calls
 # for enabling home-brewed code (existing, but untested). I'd rather
 # check whether by chance, they haven't fixed this in a recent release.
-# So the quick contingency plan is to disable pthreads (and use bwmt=1x1
-# as a parameter).
-WITH_PTHREADS=0
+# Now the use of pthread_barrier_wait is protected. So we can still
+# activate pthreads on Mac.
+WITH_PTHREADS=1
