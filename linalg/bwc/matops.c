@@ -28,16 +28,19 @@
 #include <string.h>
 #include <assert.h>
 #include <emmintrin.h>
-#ifdef  HAVE_SSE41
-#include <smmintrin.h>  // sse 4.1 _mm_cmpeq_epi64
-#endif  /* HAVE_SSE41 */
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <inttypes.h>
 
-#include "cado.h"
+#include "cado.h"       /* HAVE_* macros ! */
+
+#ifdef  HAVE_SSE41
+#include <smmintrin.h>  // sse 4.1 _mm_cmpeq_epi64
+#endif  /* HAVE_SSE41 */
+
+
 /* Define this to check these functions against the m4ri library */
 #define xxxHAVE_M4RI
 #ifdef  HAVE_M4RI
