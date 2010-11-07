@@ -9,8 +9,8 @@
 #include "rho.h"
 #include "cado.h"
 
+/* At most consider so much */
 #define NP 46
-
 static unsigned int primes[NP] = {
 	2, 3, 5, 7, 11, 13, 17, 19, 23, 29,
 	31, 37, 41, 43, 47, 53, 59, 61, 67, 71,
@@ -19,7 +19,7 @@ static unsigned int primes[NP] = {
 	179, 181, 191, 193, 197, 199
 };
 
-/* matrix bound for (A + MOD*i)*x + (B + MOD*j) */
+/* Sieve bound for (A + MOD*i)*x + (B + MOD*j) */
 typedef struct {
 	 long Umax;
 	 long Umin;
@@ -35,7 +35,7 @@ typedef struct {
 } _rsbound_t;
 typedef _rsbound_t rsbound_t[1];
 
-/* sieveing region for (a*x + b) */
+/* Sieving data struct */
 typedef struct {
      mpz_t n;
      mpz_t m;
@@ -46,10 +46,30 @@ typedef struct {
 	 mpz_t *numerator;
      double skew;
      int d;
-} _rs_t;
-typedef _rs_t rs_t[1];
+} _rsstr_t;
+typedef _rsstr_t rsstr_t[1];
 
-/* struct for the lift */
+/* Parameters for root sieve (customize) */
+typedef struct {
+	 /* regarding find_sublattice() functions. */
+	 unsigned short len_e_sl;
+	 unsigned short *e_sl;
+	 unsigned long nbest_sl;
+	 unsigned long modulus;
+
+	 /* regarding rootsieve_run() functions. */
+	 float sizebound_ratio_rs;
+	 unsigned long sizebound_u_rs;
+	 mpz_t sizebound_v_rs;
+	 unsigned short len_p_rs;
+	 float alpha_bound_rs;
+} _rsparam_t;
+typedef _rsparam_t rsparam_t[1];
+
+
+/* Struct for the lift. Note we could rely on stack
+   in the recursive calls. But this is more convenient
+   as long as the memory is not a problem. */
 typedef struct node_t {
 	 unsigned long u;
 	 unsigned long v;
@@ -65,15 +85,17 @@ typedef struct node_t {
 	 struct node_t *parent;
 } node;
 
-/* list struct for the (u, v) with valuations;
- it is similar to a stack but different in
- permittable operations. */
+
+/* List struct for the (u, v) with valuations;
+   it is similar to a stack but different in
+   permittable operations. */
 typedef struct listnode_t {
 	 unsigned long u;
 	 unsigned long v;
 	 double val;
 	 struct listnode_t *next;
 } listnode;
+
 
 /* -- ADD FUNCTION DECLARES -- */
 static inline unsigned long solve_lineq ( unsigned long a,
