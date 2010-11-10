@@ -2272,7 +2272,8 @@ return_all_sublattice ( rsstr_t rs,
 		  exit(1);
 	 }
 
-	 unsigned short i, j;
+	 unsigned short i;
+	 unsigned long j;
 	 unsigned long *pe, *size, *ind, ***sublattice_array, tmpu, tmpv, tmpmod = 0UL;
 	 listnode *top, *tmp;
 
