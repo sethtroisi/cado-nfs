@@ -36,12 +36,12 @@ int main(int argc, char * argv[])
 
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
-        if (wild < 2) {
+        if (argv[0][0] != '-' && wild < 2) {
             anchor[wild++]=atoi(argv[0]);
             argv++,argc--;
             continue;
         }
-        if (wild < 4) {
+        if (argv[0][0] != '-' && wild < 4) {
             size[wild++-2]=atoi(argv[0]);
             argv++,argc--;
             continue;

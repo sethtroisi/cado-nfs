@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
     for (; argc;) {
 	if (param_list_update_cmdline(pl, &argc, &argv))
 	    continue;
-	if (wild == 0) {
+	if (argv[0][0] != '-' && wild == 0) {
             param_list_add_key(pl, "balancing", argv[0], PARAMETER_FROM_CMDLINE);
 	    wild++, argv++, argc--;
 	    continue;

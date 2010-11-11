@@ -271,7 +271,7 @@ int main(int argc, char * argv[])
         char * q;
         if (param_list_update_cmdline(pl, &argc, &argv)) continue;
 
-        if (wild == 0 && (q = strchr(argv[0],'x')) != NULL) {
+        if (argv[0][0] != '-' && wild == 0 && (q = strchr(argv[0],'x')) != NULL) {
             nh = atoi(argv[0]);
             nv = atoi(q+1);
             wild+=2;
@@ -279,9 +279,9 @@ int main(int argc, char * argv[])
             continue;
         }
 
-        if (wild == 0) { nh = atoi(argv[0]); wild++,argv++,argc--; continue; }
-        if (wild == 1) { nv = atoi(argv[0]); wild++,argv++,argc--; continue; }
-        if (wild == 2) {
+        if (argv[0][0] != '-' && wild == 0) { nh = atoi(argv[0]); wild++,argv++,argc--; continue; }
+        if (argv[0][0] != '-' && wild == 1) { nv = atoi(argv[0]); wild++,argv++,argc--; continue; }
+        if (argv[0][0] != '-' && wild == 2) {
             mfile = argv[0];
             wild++;
             argv++,argc--;

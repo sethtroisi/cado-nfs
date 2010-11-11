@@ -27,13 +27,13 @@ int main(int argc, char * argv[])
     const char * vname = NULL;
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) continue;
-        if (wild == 0) {
+        if (argv[0][0] != '-' && wild == 0) {
             bname = argv[0];
             wild++;
             argv++, argc--;
             continue;
         }
-        if (wild == 1) {
+        if (argv[0][0] != '-' && wild == 1) {
             vname = argv[0];
             wild++;
             argv++, argc--;

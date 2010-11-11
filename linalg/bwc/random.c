@@ -143,7 +143,7 @@ int main(int argc, char * argv[])
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
 
-        if (wild < 3) {
+        if (argv[0][0] != '-' && wild < 3) {
             char * tmp;
             wild_args[wild] = strtoul(argv[0], &tmp, 0);
             if (*tmp != '\0') {

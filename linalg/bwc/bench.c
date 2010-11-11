@@ -228,7 +228,7 @@ int main(int argc, char * argv[])
             argv++, argc--;
             break;
         }
-        if (wild == 0) {
+        if (argv[0][0] != '-' && wild == 0) {
             file = argv[0];
             argv++,argc--;
             wild++;

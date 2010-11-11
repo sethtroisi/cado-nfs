@@ -3526,21 +3526,21 @@ int main(int argc, char **argv)
         if (param_list_update_cmdline(pl, &argc, &argv)) {
             continue;
         }
-        if (wild == 0) {
+        if (argv[0][0] != '-' && wild == 0) {
             param_list_add_key(pl, "depfile", argv[0],
                     PARAMETER_FROM_CMDLINE);
             wild++;
             argv++, argc--;
             continue;
         }
-        if (wild == 1) {
+        if (argv[0][0] != '-' && wild == 1) {
             param_list_add_key(pl, "ratdepfile", argv[0],
                     PARAMETER_FROM_CMDLINE);
             wild++;
             argv++, argc--;
             continue;
         }
-        if (wild == 2) {
+        if (argv[0][0] != '-' && wild == 2) {
             param_list_add_key(pl, "polyfile", argv[0],
                     PARAMETER_FROM_CMDLINE);
             wild++;
