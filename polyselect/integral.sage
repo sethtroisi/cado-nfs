@@ -1,19 +1,21 @@
 
 attach linear_interpolation.sage
 
+_sigma = 1 # one can change it to say 0.95
+
 def pdf_normal(x):
     """
     Returns the probability density function (pdf) of the
     standard normal distribution.
     """
-    return exp(-x^2/2)/sqrt(2*RR.pi())
+    return exp(-x^2/2/_sigma^2)/sqrt(2*RR.pi()*_sigma^2)
 
 def cdf_normal(x):
     """
     Returns the cumulative distribution function (cdf) of the
     standard normal distribution.
     """
-    return 1-1/2*error_fcn(1.0*float(x/sqrt(2)))
+    return 1-1/2*error_fcn(1.0*float(x/sqrt(2)/_sigma))
 
 
 def pdf_normal_minimum(n, x):
