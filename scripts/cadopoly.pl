@@ -143,7 +143,7 @@ foreach my $name (sort keys %link_name_params) {
        "s,  third phase: $max[2]"."s\n".
        "Time total for first phase: $total[0]"."s,  second phase: ".
        $total[1]."s, third phase: $total[2]"."s\n".
-       "Time total: $total"."s,  \033[01;31m".format_dhms($total)."s\033[01;00m\n";
+       "Time total: $total"."s,  \033[01;31m".format_dhms($total)."\033[01;00m\n";
   print "\n";
   $tab_level--;
 }

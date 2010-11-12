@@ -27,10 +27,10 @@ my $var=<STDIN>; print format_dhms($var)."\n"'
 
 if [[ -z $1 || $(expr $1 : '.*[p].*') != 0 ]]
   then echo -n "CPU time for polyselect:      "
-    if [ ! -f ${name}.kjout.* ] 2> /dev/null
-      then stty -echo; read c; stty echo
-        ls ${name}_$c.kjout.* | while read line; do new_line=$(echo $line | sed "s/^${name}_$c\.\(.*\)/${name}\.\1/g"); cp $line $new_line; done
-    fi
+    #if [ ! -f ${name}.kjout.* ] 2> /dev/null
+    #  then stty -echo; read c; stty echo
+    #    ls ${name}_$c.kjout.* | while read line; do new_line=$(echo $line | sed "s/^${name}_$c\.\(.*\)/${name}\.\1/g"); cp $line $new_line; done
+    #fi
     grep phase ${name}.kjout.* | sed "s/^.*phase took \(\S*\)s.*$/\1/g" | tr "\n" "+" | sed "s/^\(.*\)+$/\1\n/" | bc | f
 fi
 

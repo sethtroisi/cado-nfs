@@ -58,7 +58,7 @@ alambda=3.2
 I=13                    # Sieving range in lattice siever
 qmin=20000000           # Start of the special-q range
 qrange=100000           # The size of an elementary sieving task
-checkrange=1            # We check if we have enough after each step
+checkrange=250000       # We check if we have enough after each step
                         # of that many relations found.
 sievenice=10
 sieve_max_threads=2
@@ -67,8 +67,9 @@ sieve_max_threads=2
 # Filtering
 ###########################################################################
 
-excess=400000           # minimal excess we want after purge
-keeppurge=10000000      # shrink in purge if excess exceeds keeppurge
+excesspurge=1000000     # minimal excess we want before pruning
+excess=1                # minimal excess we want after purge
+keeppurge=160           # shrink in purge if excess exceeds keeppurge
 keep=160                # keep euh le plus
 maxlevel=15             # ???
 cwmax=100               # ???

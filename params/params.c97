@@ -5,9 +5,9 @@
 # General parameters
 ###########################################################################
 
-#wdir=/tmp/noise         # directory where temporary files are put
+#wdir=/tmp/noise        # directory where temporary files are put
 name=c97                # basename for temporary files
-#bindir=$HOME/cado     # where to find cado binaries
+#bindir=$HOME/cado      # where to find cado binaries
 parallel=1              # do we use parallel computation?
 delay=60                # time in seconds between two checks
 
@@ -18,23 +18,23 @@ machines=mach_desc      # file describing available computers for parallel
 # Polynomial selection with Kleinjung's algorithm
 ###########################################################################
 
-degree=5                # degree of the algebraic polynomial
+degree=4                # degree of the algebraic polynomial
 kjdelay=60              # time between two checks
-selectnice=10           # nice level for selection
+selectnice=4            # nice level for selection
 
 ## Most important parameters of polyselect
-kjM=6e13                # maximum norm allowed
-kjl=4                   # minimal number of primes in lc(g)
+kjM=2e17                # maximum norm allowed
+kjl=5                   # minimal number of primes in lc(g)
 kjadmin=1               # min value for lc(f)
-kjadmax=8e6             # max value for lc(f)
-kjadrange=4e6           # individual tasks
+kjadmax=1e6             # max value for lc(f)
+kjadrange=25e4          # individual tasks
 
 ## Other parameters of polyselect
 kjkeep=100              # number of preselected polynomials
-kjkmax=13               # rotation is bounded by 2^kmax
+kjkmax=19               # rotation is bounded by 2^kmax
 kjincr=60               # forced divisor of lc(f)
 kjpb=512                # bound on primes allowed in lc(g)
-kjp0max=5000            # bound on the additional factor in lc(g)
+kjp0max=10000           # bound on the additional factor in lc(g)
 
 ###########################################################################
 # Sieve
@@ -48,17 +48,17 @@ kjp0max=5000            # bound on the additional factor in lc(g)
 # rlambda/alambda is the early-abort ratio: if after sieving the
 #                                      approximate norm is more than
 #                                      lambda times lpb, we reject.
-rlim=600000
-alim=1200000
-lpbr=24
-lpba=24
-mfbr=48
-mfba=48
-rlambda=2.0
-alambda=2.3
+rlim=500000
+alim=1000000
+lpbr=25
+lpba=25
+mfbr=50
+mfba=50
+rlambda=2.1
+alambda=2.2
 
 I=11                    # Sieving range in lattice siever
-qmin=1200000            # Start of the special-q range
+qmin=1000000            # Start of the special-q range
 qrange=20000            # The size of an elementary sieving task
 checkrange=1            # We check if we have enough after each step
                         # of that many relations found.
@@ -69,17 +69,15 @@ sieve_max_threads=2
 # Filtering
 ###########################################################################
 
-excess=100000           # minimal excess wanted after purge
-                        # (don't start merge otherwise)
-                        # 20k is largely enough for a c59, for a larger
-                        # number 400k should be ok
-keeppurge=1000000       # maximal excess wanted after purge
+excesspurge=100000       # minimal excess we want before pruning
+excess=1                # minimal excess we want after purge
+keeppurge=160           # maximal excess wanted after purge
                         # (purge shrinks if needed)
 keep=160                # excess wanted after merge
 maxlevel=15             # ???
-cwmax=200               # ???
-rwmax=200               # ???
-ratio=1.5               # ???
+cwmax=100               # ???
+rwmax=100               # ???
+ratio=1.1               # ???
 bwstrat=1
 
 ###########################################################################

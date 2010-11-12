@@ -178,6 +178,7 @@ my @default_param = (
     qmin         => 12000000,
     qrange       => 1000000,
     checkrange   => 1000000,
+    firstcheck   => 1,
 
     delay        => 120,
     sievenice    => 19,
@@ -282,7 +283,7 @@ sub read_param {
             }
         }
         if (/^params?=(.*)$/) {
-            warn "Paramfile is not the first argument !\n" if ($count_args);
+            die "Paramfile must be the first argument !\n" if ($count_args);
             my $file = $1;
             open FILE, "< $file"
                 or die "Cannot open `$file' for reading: $!.\n";
@@ -1236,7 +1237,7 @@ sub distribute_task {
     }
 
     # A bit of cleaning on slaves
-    if (! $opt->{'bench'}) {
+    if (!$opt->{'bench'} && $param{'parallel'}) {
         info "Cleaning up...\n";
         $tab_level++;
         # Kill jobs
@@ -2251,6 +2252,8 @@ sub do_sieve {
 
 
     my $sieve_is_done = sub {
+        # Start filters only after $param{'firstcheck'} relations
+        return 0 if $nrels < $param{'firstcheck'};
         # Check only every $param{'checkrange'} relations
         return 0 if $nrels - $last_check < $param{'checkrange'};
         $last_check = $nrels;
