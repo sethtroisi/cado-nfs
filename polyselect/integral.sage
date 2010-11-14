@@ -1,21 +1,19 @@
 
 attach linear_interpolation.sage
 
-_sigma = 1 # one can change it to say 0.95
-
 def pdf_normal(x):
     """
     Returns the probability density function (pdf) of the
     standard normal distribution.
     """
-    return exp(-x^2/2/_sigma^2)/sqrt(2*RR.pi()*_sigma^2)
+    return exp(-x^2/2)/sqrt(2*RR.pi())
 
 def cdf_normal(x):
     """
     Returns the cumulative distribution function (cdf) of the
     standard normal distribution.
     """
-    return 1-1/2*error_fcn(1.0*float(x/sqrt(2)/_sigma))
+    return 1-1/2*error_fcn(1.0*float(x/sqrt(2)))
 
 
 def pdf_normal_minimum(n, x):
@@ -25,6 +23,10 @@ def pdf_normal_minimum(n, x):
     """
     return n*pdf_normal(x)*(1-cdf_normal(x))^(n-1)
 
+# note: numerical_integral(lambda x: x*pdf_normal_minimum(2^i,x), -20,20)
+# can be approximated asymptotically by
+# -sqrt(2*ln(2)*i)+(ln(ln(2)*i)+ln(4*pi)-2*0.5772)/(2*sqrt(2*ln(2)*i))
+# see http://gupea.ub.gu.se/bitstream/2077/3092/1/correction.pdf
 def build_minimum_normal_table(M,B):
     """
     precomputes a table with the mean and standard deviation of the
