@@ -2640,10 +2640,22 @@ return_best_sublattice ( rsstr_t rs,
 
 	 /* decide the length of returnd best sublattices. */
 	 len = count_list (sublattice_list);
-	 if (len == 0) {
-		  fprintf (stderr, "# Error, not enough sublattice classes. Please enlarge 'len_e_sl' and 'e_sl' in CUSTOM PARAMETERS.\n");
-		  exit (1);
+
+	 /* if no sublattice is found with u < rsparam->sizebound_u_rs,
+		then we try to enlarge u bound. However, it might be better
+		to enlarge e_sl[] to allow to check more sublattices. */
+	 while (len == 0) {
+		  free_list (&sublattice_list);
+		  new_list (&sublattice_list);
+		  rsparam->sizebound_u_rs *= 2;
+		  return_all_sublattice (rs, rsparam->e_sl, rsparam->len_e_sl, &(rsparam->modulus), rsparam->sizebound_u_rs, &sublattice_list);
+		  len = count_list (sublattice_list);
+		  fprintf (stderr, "# Warn: Not enough sublattice classes. Reset \"rsparam->sizebound_u_rs = %lu\";\n",
+				   rsparam->sizebound_u_rs);
+
+		  fprintf (stderr, "# Warn: It's better to enlarge 'len_e_sl' and 'e_sl' if want to restrict \"rsparam->sizebound_u_rs\".\n");
 	 }
+
 	 if ( (rsparam->nbest_sl == 0) || (rsparam->nbest_sl > len) ) {
 		  rsparam->nbest_sl = len;
 	 }
@@ -3220,8 +3232,9 @@ rsbound_init ( rsbound_t rsbound )
 {
 	 rsbound->Umax = rsbound->Umin =
 		  rsbound->Vmax = rsbound->Vmin =
-		  rsbound->Amax = rsbound->Amin =
+		  rsbound->Amax = rsbound->Amin = 0;
 		  rsbound->Bmax = rsbound->Bmin = 0;
+
 	 rsbound->A = 0;
 	 rsbound->B = 0;
 	 rsbound->MOD = 0;
@@ -3233,20 +3246,15 @@ rsbound_init ( rsbound_t rsbound )
   sieving region. Set the Amax, Amin, Amax, Amin.
 */
 void
-rsbound_setup_AB_bound ( rsbound_t rsbound,
-						 rsparam_t rsparam )
+rsbound_setup_AB_bound ( rsbound_t rsbound )
 {
 	 /* this is all most always 0 since MOD is much larger than u,
 		hence we only want to sieve over matrix of 1xV. */
 	 rsbound->Amax = 0;
 	 rsbound->Amin = 0;
 
-	 /* double sizebound_v_rs divide by MOD */
-	 rsbound->Bmax = abs(mpz_fdiv_ui (rsparam->sizebound_v_rs, rsparam->modulus));
-
-	 if (rsbound->Bmax <= 1000000)
-		  rsbound->Bmax = 1000000;
-
+	 /* fixed for all */
+	 rsbound->Bmax = 10000000;
 	 rsbound->Bmin = -rsbound->Bmax;
 }
 
@@ -3256,10 +3264,10 @@ rsbound_setup_AB_bound ( rsbound_t rsbound,
   Note that they should have similar size as rsparam->sizebound_v_rs.
 */
 void
-rsbound_setup_UV_bound ( rsbound_t rsbound,
-						 unsigned long sl_A,
-						 unsigned long sl_B,
-						 unsigned long sl_MOD )
+rsbound_setup_sublattice ( rsbound_t rsbound,
+						   unsigned long sl_A,
+						   unsigned long sl_B,
+						   unsigned long sl_MOD )
 {
 	 rsbound->A = sl_A;
 	 rsbound->B = sl_B;
@@ -3411,37 +3419,40 @@ rsstr_free ( rsstr_t rs )
 static void
 rsparam_init ( rsparam_t rsparam )
 {
-	 /* for rsa 190, customize like "if (digit(n) == 190)".  */
+	 /* for rsa 190, customize like "if (digit(n) == 190)". */
 	 if (1) {
 
 		  /* find_sublattice() consider the first four primes
-			 2, 3, 5, 7 with exponents in e[] */
+			 2, 3, 5, 7 with exponents in e[]. Note that, they
+			 will be set in rsparam_setup().
+			 Only the length is fixed at this moment. */
 		  rsparam->len_e_sl = 4;
-		  rsparam->e_sl = (unsigned short*) malloc (rsparam->len_e_sl * sizeof (unsigned short));
+		  rsparam->e_sl = (unsigned short*) malloc ( rsparam->len_e_sl * sizeof (unsigned short) );
 		  if (rsparam->e_sl == NULL) {
 			   fprintf (stderr, "Error, cannot allocate memory in rsparam_init().\n");
 			   exit (1);
 		  }
-		  rsparam->e_sl[0] = 5;
-		  rsparam->e_sl[1] = 3;
-		  rsparam->e_sl[2] = 2;
-		  rsparam->e_sl[3] = 2;
+		  rsparam->e_sl[0] = 0UL;
+		  rsparam->e_sl[1] = 0UL;
+		  rsparam->e_sl[2] = 0UL;
+		  rsparam->e_sl[3] = 0UL;
 
 		  /* often set this to 0 unless you find there are too much
 			 sublattices found from the find_sublattice() */
 		  rsparam->nbest_sl = 0UL;
 
-		  /* between 1 and 1.1, the higher, larger sieving space. */
-		  rsparam->sizebound_ratio_rs = 1.05;
+		  /* between 1 and 1.1, the higher, the larger e_sl[]
+			 (Note, e_sl[] can be re-set in rsparam_setup(). ) */
+		  rsparam->sizebound_ratio_rs = 1.03;
 
 		  /* note sizebound_ratio_rs affects the following.
 			 sizebound_v_rs will be computed in rsparam_setup;
 			 sizebound_u_rs is hard-wired here. */
-		  rsparam->sizebound_u_rs = 10000UL;
+		  rsparam->sizebound_u_rs = 0UL;
 		  mpz_init_set_ui (rsparam->sizebound_v_rs, 0);
 
 		  /* number of primes beside e_sl[] considered in sieve.
-			 larger take longer time */
+			 larger takes longer time, but more accurate. */
 		  rsparam->len_p_rs = 20;
 
 		  /* only (further) consider those f_{u, v} which has smaller
@@ -3450,12 +3461,11 @@ rsparam_init ( rsparam_t rsparam )
 			 e_sl[], hence this should lie far away from their actual
 			 values. However, this seems not too bad since we only want
 			 to compare between polynomials. */
-		  rsparam->alpha_bound_rs = -1.5;
+		  rsparam->alpha_bound_rs = 0.0;
 	 }
 
 	 if (rsparam->len_p_rs < rsparam->len_e_sl) {
-		  fprintf (stderr, "Error, number of primes considered in the sieve should be more than that in the sublattice. \n");
-		  exit (1);
+		  fprintf (stderr, "# Warning: number of primes considered in the root sieve is smaller than that in fin_sublattice(). This might not be accurate. \n");
 	 }
 	 if (rsparam->len_p_rs > NP)
 		  rsparam->len_p_rs = NP;
@@ -3463,7 +3473,7 @@ rsparam_init ( rsparam_t rsparam )
 
 
 /*
-  replace f + k0 * x^t * (b*x - m) by f + k * x^t * (b*x - m), and return k
+  replace f + k0 * x^t * (b*x - m) by f + k * x^t * (b*x - m), and return k to k0
   (modified from auxiliary.c)
 */
 static void
@@ -3485,10 +3495,9 @@ rotate_aux_mpz ( mpz_t *f,
 
 
 /*
-  Modifed from auxiliary.c using Emmanuel Thome's idea. Assume
-  lognorm(f + k*g) + E(alpha(f + k*g)) is first decreasing, then
-  increasing, then the optimal K corresponds to the minimum of
-  that function.
+  Modifed from auxiliary.c using Emmanuel Thome and Paul Zimmermann's ideas.
+  Assume lognorm(f + k*g) + E(alpha(f + k*g)) is first decreasing, then
+  increasing, then the optimal K corresponds to the minimum of that function.
 */
 static void
 rotate_bounds_V_mpz ( mpz_t *f,
@@ -3499,18 +3508,6 @@ rotate_bounds_V_mpz ( mpz_t *f,
 					  mpz_t V,
 					  int method )
 {
-	 /* need better approximations */
-	 double exp_alpha[] = { -3.6, /* 2^10 */
-							-5.2, /* 2^20 */
-							-6.4, /* 2^30 */
-							-7.5, /* 2^40 */
-							-8.4, /* 2^50 */
-							-9.2, /* 2^60 */
-							-9.8, /* 2^70 */
-							-10.5, /* 2^80 */
-							-11.1, /* 2^90 */
-							0 };
-
 	 int i;
 	 double lognorm, skewness, alpha, init_lognorm, E, best_E;
 	 mpz_t max_v;
@@ -3524,7 +3521,7 @@ rotate_bounds_V_mpz ( mpz_t *f,
 	 best_E = init_lognorm;
 
 	 /* look for negative k: -2, -4, -8, ... */
-	 for (i = 0; mpz_cmpabs (V, max_v) > 0; i++, mpz_mul_ui (V, V, 1024) )
+	 for (i = 0; ; i++, mpz_mul_ui (V, V, 2) )
 	 {
 		  /*
 		  skewness = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, method);
@@ -3537,7 +3534,8 @@ rotate_bounds_V_mpz ( mpz_t *f,
 		  alpha = exp_alpha[i];
 		  E = lognorm + alpha;
 		  if (DEBUG)
-			   gmp_printf ("# DEBUG: [%d-th] V: %30Zd, E: %.3f, lognorm: %.3f, alpha: %.2f\n", i, V, E, lognorm, alpha);
+			   gmp_fprintf (stderr, "# DEBUG: [%d-th] V: %30Zd, E: %.3f, lognorm: %.3f, alpha: %.2f\n",
+							i, V, E, lognorm, alpha);
 
 		  if (E < best_E * ratio_margin)
 		  {
@@ -3557,25 +3555,126 @@ rotate_bounds_V_mpz ( mpz_t *f,
 
 
 /*
-  Given rsparam->sizebound_ratio_rs and polynomial information,
-  compute rsparam->sizebound_u_rs = 0UL and rsparam->sizebound_v_rs = 0UL,
+  Same as above, but use unsigned long for U
 */
 static void
+rotate_bounds_U ( mpz_t *f,
+					  int d,
+					  double ratio_margin,
+					  mpz_t b,
+					  mpz_t m,
+					  long *U,
+					  int method )
+{
+	 int i;
+	 long k0 = 0;
+	 double lognorm, skewness, alpha, init_lognorm, E, best_E;
+
+	 *U = 1;
+	 skewness = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, method);
+	 init_lognorm = L2_lognorm (f, d, skewness, method);
+	 best_E = init_lognorm;
+
+	 /* look for positive k: 2, 4, 8, ... */
+	 for (i = 0; i <= 63; i++, *U = (*U) * 2)
+	 {
+		  k0 = rotate_aux (f, b, m, k0, *U, 1);
+		  lognorm = L2_lognorm (f, d, L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, method), method);
+		  alpha = exp_alpha[i];
+		  E = lognorm + alpha;
+		  if (DEBUG)
+			   fprintf (stderr, "# DEBUG: [%d-th] U: %20ld, E: %.3f, lognorm: %.3f, alpha: %.2f\n",
+						i, *U, E, lognorm, alpha);
+
+		  if (E < best_E * ratio_margin)
+		  {
+			   if (E < best_E)
+					best_E = E;
+		  }
+		  else
+			   break;
+	 }
+
+	 /* go back to k=0 */
+	 rotate_aux (f, b, m, k0, 0, 1);
+}
+
+
+/*
+  Given rsparam->sizebound_ratio_rs and polynomial information,
+  compute rsparam->sizebound_u_rs = 0UL and rsparam->sizebound_v_rs = 0UL;
+  Then it will set e_sl[];
+*/
+static double
 rsparam_setup ( rsparam_t rsparam,
 				rsstr_t rs )
 {
+	 long U = 0;
+	 int size;
 	 mpz_t V, b, m;
 	 mpz_init_set_ui (V, 0);
 	 mpz_init_set (b, rs->g[1]);
 	 mpz_init_set (m, rs->g[0]);
 	 mpz_neg (m, m);
 
-	 /* compute bound_v */
+	 /* compute bound_v, bound_u (separately, hence if you consider
+		them simultaneously, the polynomial size will become larger) */
 	 rotate_bounds_V_mpz (rs->f, rs->d, rsparam->sizebound_ratio_rs, b, m, V, DEFAULT_L2_METHOD);
 	 mpz_set (rsparam->sizebound_v_rs, V);
+
+	 rotate_bounds_U (rs->f, rs->d, rsparam->sizebound_ratio_rs, b, m, &U, DEFAULT_L2_METHOD);
+
+	 /* compute expected alpha. Note we don't use u*v since it is
+		often too large and not practical due to above construction. */
+	 size = mpz_sizeinbase (rsparam->sizebound_v_rs, 2);
+	 gmp_fprintf (stderr, "# Info: bound V: %Zd, expected min alpha: %.2f\n", rsparam->sizebound_v_rs, exp_alpha[size-1]);
+
+	 /* MOD is around sizebound_v_rs divide by 1000000 */
+	 if (U < 1000) {
+		  rsparam->e_sl[0] = 5;
+		  rsparam->e_sl[1] = 2;
+		  rsparam->e_sl[2] = 2;
+		  rsparam->e_sl[3] = 2;
+	 }
+	 else if (U < 10000) {
+		  rsparam->e_sl[0] = 5;
+		  rsparam->e_sl[1] = 2;
+		  rsparam->e_sl[2] = 2;
+		  rsparam->e_sl[3] = 2;
+	 }
+	 else if (U < 100000) {
+		  rsparam->e_sl[0] = 6;
+		  rsparam->e_sl[1] = 2;
+		  rsparam->e_sl[2] = 2;
+		  rsparam->e_sl[3] = 2;
+	 }
+	 else if (U < 1000000) {
+		  rsparam->e_sl[0] = 7;
+		  rsparam->e_sl[1] = 2;
+		  rsparam->e_sl[2] = 2;
+		  rsparam->e_sl[3] = 2;
+	 }
+	 else if (U < 10000000) {
+		  rsparam->e_sl[0] = 7;
+		  rsparam->e_sl[1] = 3;
+		  rsparam->e_sl[2] = 2;
+		  rsparam->e_sl[3] = 2;
+	 }
+	 else {
+		  rsparam->e_sl[0] = 8;
+		  rsparam->e_sl[1] = 3;
+		  rsparam->e_sl[2] = 2;
+		  rsparam->e_sl[3] = 2;
+	 }
+
+	 /* sublattice u will < than this bound */
+	 rsparam->sizebound_u_rs = U / 100;
+
 	 mpz_clear (V);
 	 mpz_clear (b);
 	 mpz_clear (m);
+
+	 return exp_alpha[size-1];
 }
 
 
@@ -3600,6 +3699,7 @@ rootsieve_main ( rsstr_t rs )
 	 unsigned long i, j, k, ** sublattice_array; /* array contains good sulattices */
 	 long u, v;
 	 float ** MAT, alpha_p;
+	 double tmp;
 	 mpz_t *fuv;
 	 rsparam_t rsparam;
 	 rsbound_t rsbound;
@@ -3614,8 +3714,20 @@ rootsieve_main ( rsstr_t rs )
 		  mpz_init_set (fuv[i], rs->f[i]);
 
 	 /* STAGE 1: compute good sublattices. */
+
+	 /* set root sieve and find_sublattice() parameter */
 	 rsparam_init (rsparam);
-	 rsparam_setup (rsparam, rs);
+	 tmp = rsparam_setup (rsparam, rs);
+
+	 /* alpha projective + alpha contributions from sublattices primes.
+		This will be pre-added to the sieve array. */
+	 alpha_p = (float) get_alpha_projective (rs->f, rs->d, 200);
+	 alpha_p += (float) get_alpha (rs->f, rs->d, primes[rsparam->len_e_sl - 1]);
+
+	 rsparam->alpha_bound_rs = tmp - alpha_p;
+	 fprintf (stderr, "# Info: alpha_bound: %f\n",
+			  rsparam->alpha_bound_rs);
+
 
 	 /* return the first nbest good sulattices to array */
 	 st = cputime ();
@@ -3623,22 +3735,20 @@ rootsieve_main ( rsstr_t rs )
 	 fprintf (stderr, "# Info: find best sublattices over (Mod %lu) took %dms\n",
 			  rsparam->modulus, cputime () - st);
 
-	 /* set sieving matrix size AB given rsparam */
+	 /* set sieving matrix size AB */
 	 rsbound_init (rsbound);
-	 rsbound_setup_AB_bound (rsbound, rsparam);
-	 fprintf (stderr, "# Info: sieving matrix size: 1 x [%ld, %ld]\n", rsbound->Bmin, rsbound->Bmax);
-
-	 /* alpha projective + alpha contributions from sublattices primes.
-		This will be pre-added to the sieve array. */
-	 alpha_p = (float) get_alpha_projective (rs->f, rs->d, 200);
-	 alpha_p += (float) get_alpha (rs->f, rs->d, primes[rsparam->len_e_sl - 1]);
+	 rsbound_setup_AB_bound (rsbound);
+	 fprintf (stderr, "# Info: sieving matrix size: 1 x [%ld, %ld]\n",
+			  rsbound->Bmin, rsbound->Bmax);
 
 	 /* STAGE2: for each sublattice, do the sieve. */
+
 	 for (i = 0; i < rsparam->nbest_sl; i ++) {
 
 		  /* compute exact sieving bounds UV given size AB depending
 			 on current A, B, MOD */
-		  rsbound_setup_UV_bound (rsbound, sublattice_array [i][0], sublattice_array [i][1], rsparam->modulus);
+		  rsbound_setup_sublattice (rsbound, sublattice_array [i][0],
+									sublattice_array [i][1], rsparam->modulus);
 		  fprintf (stderr, "\n# Info: Sieve on sublattice (# %2lu)\n", i);
 		  rsbound_print (rsbound);
 
@@ -3650,24 +3760,39 @@ rootsieve_main ( rsstr_t rs )
 		  rootsieve_run (MAT, rs, rsbound, rsparam);
 
 		  /* output good polynomials */
-		  for (k = 0; k < (unsigned long) (rsbound->Amax - rsbound->Amin + 1); k++)
-		  {
-			   for (j = 0; j < (unsigned long) (rsbound->Bmax - rsbound->Bmin + 1); j++)
-			   {
-					if (MAT[k][j] < rsparam->alpha_bound_rs) {
-						 u = ij2uv (rsbound->A, rsbound->MOD, rsbound->Amin, k);
-						 v = ij2uv (rsbound->B, rsbound->MOD, rsbound->Bmin, j);
-						 compute_fuv (fuv, rs->f, rs->g, u, v);
-						 fprintf (stderr, "\n# Found (%16ld, %16ld)", u, v);
-						 print_poly_info (fuv, rs->g, rs->d, rs->n, rs->m);
-						 /* no alpha information will be printed here, please
-						  check the stdout for information. */
+		  int found = 0;
+
+		  while (1) {
+			   found = 0;
+			   for (k = 0; k < (unsigned long) (rsbound->Amax - rsbound->Amin + 1); k++) {
+					for (j = 0; j < (unsigned long) (rsbound->Bmax - rsbound->Bmin + 1); j++) {
+						 if (MAT[k][j] < rsparam->alpha_bound_rs) {
+							  found ++;
+							  u = ij2uv (rsbound->A, rsbound->MOD, rsbound->Amin, k);
+							  v = ij2uv (rsbound->B, rsbound->MOD, rsbound->Bmin, j);
+							  compute_fuv (fuv, rs->f, rs->g, u, v);
+							  fprintf (stderr, "\n# Found (%16ld, %16ld)", u, v);
+							  print_poly_info (fuv, rs->g, rs->d, rs->n, rs->m);
+							  /* no alpha information will be printed here, please
+								 check the stdout for information. */
+						 }
 					}
 			   }
-			   free (MAT[k]);
+
+			   if (found < 10) {
+					rsparam->alpha_bound_rs += 0.5;
+					fprintf (stderr, "# Warn: Reset \"rsparam->alpha_bound_rs = %f\";\n",
+							 rsparam->alpha_bound_rs);
+			   }
+			   else
+					break;
 		  }
+
 		  fprintf (stderr, "\n");
+
 		  /* free sieving array. */
+		  for (k = 0; k < (unsigned long) (rsbound->Amax - rsbound->Amin + 1); k++)
+			   free (MAT[k]);
 		  free (MAT);
 	 }
 
