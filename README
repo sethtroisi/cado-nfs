@@ -40,6 +40,26 @@ make
 It may or may not be relevant to do ``make install'' as well ; at the
 moment consider ``make install'' to be badly tested.
 
+Run a factorization on current machine:
+=======================================
+
+./factor.sh 100000000000000000000000000000000000000000031900000000000000000000000000000000000000000279 -t 2
+
+The integer must be at least 90 digits and not contain small prime
+factor. The option '-t 2' notice the number of cores on current machine,
+sieve and linear algebra use 2 threads.
+
+./factor.sh 100000000000000000000000000000000000000000031900000000000000000000000000000000000000000279 -t 4 -ssh
+
+If the number of cores is strictly greater than 2, it is more efficient
+to use ssh to distribute the polynomial selection and sieve on localhost.
+For configure ssh, see the next section.
+
+For a larger factorization (distribute on several machines),
+please use directly the main script cadofactor.pl
+
+To factor a number with two non linear polynomials, see README.nonlinear.
+
 Check that your SSH configuration is correct:
 =============================================
 
@@ -62,18 +82,6 @@ ssh localhost
 
 you should end up with a new shell on your machine, without having to
 type any password/passphrase.
-
-Run an example:
-===============
-
-./run_example.sh c59
-
-The script tries to factor a 59 digit number.
-
-For other numbers, create a parameter file analogous to params/params.c59
-and call ./run_example.sh the same way.
-
-To factor a number with two non linear polynomials, see README.nonlinear.
 
 Using CADO-NFS under Windows:
 =============================

@@ -14,9 +14,9 @@
 # General parameters
 ###########################################################################
 
-#wdir=/tmp/noise         # directory where temporary files are put
+#wdir=/tmp/noise        # directory where temporary files are put
 name=dl30               # basename for temporary files
-#bindir=$HOME/cado     # where to find cado binaries
+#bindir=$HOME/cado      # where to find cado binaries
 parallel=1              # do we use parallel computation?
 delay=120               # time in seconds between two checks
 
@@ -31,7 +31,7 @@ n=100000000000000000000000000319
 
 degree=4                # degree of the algebraic polynomial
 kjdelay=60              # time between two checks
-selectnice=10           # nice level for selection
+selectnice=4            # nice level for selection
 
 ## Most important parameters of polyselect
 kjM=5e10                # maximum norm allowed

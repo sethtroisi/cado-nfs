@@ -10,14 +10,13 @@
 # 3) add the following lines in your .ssh/config file:
 # Host scm.gforge.inria.fr
 #    IdentityFile /users/mygroup/mylogin/.ssh/cle_gforge
-# 4) since run.c59 also calls ssh, you need to add also the lines:
+# 4) you need to add also the lines:
 # Host localhost
 #    StrictHostKeyChecking no
 #    UserKnownHostsFile /dev/null
 #    IdentityFile /users/mygroup/mylogin/.ssh/cle_gforge
-#    in the .ssh/config file on the computer on which you run nightly-test
-#    (since run_example.sh runs the factorization on localhost), and to add
-#    the content of cle_gforge.pub in the authorized_keys on that computer.
+#    in the .ssh/config file on the computer on which you run nightly-test, and
+#    to add the content of cle_gforge.pub in the authorized_keys on that computer.
 set -e
 # If the DIR variable is set, then use it as the basename of the temp directory.
 if ! [ "$DIR" ] ; then
@@ -65,6 +64,7 @@ date
 make "$@"
 echo -n "Starting factorization at: "
 date
-CADO_COLOR=0 ./run_example.sh c59
+CADO_COLOR=0 ./factor.sh 71641520761751435455133616475667090434063332228247871795429 -t 4 -ssh expected_factorization=200429218120815554269743635437,357440504101388365610785389017
+CADO_COLOR=0 ./factor.sh 360734200739506433432799924420757232179644683346158567095169 -t 2 expected_factorization=1971117821296879,1957501450907479,45856749204683,2038775367385723
 
 /bin/rm -fr "$DIR"

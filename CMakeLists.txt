@@ -177,8 +177,8 @@ install(FILES params/params.c59 DESTINATION ${example_subdir})
 install(FILES params/params.c79 DESTINATION ${example_subdir})
 
 configure_file(
-    ${CADO_NFS_SOURCE_DIR}/run_example.sh
-    ${CADO_NFS_BINARY_DIR}/run_example.sh
+    ${CADO_NFS_SOURCE_DIR}/factor.sh
+    ${CADO_NFS_BINARY_DIR}/factor.sh
     ESCAPE_QUOTES
     @ONLY)
 
@@ -188,5 +188,5 @@ configure_file(
     ESCAPE_QUOTES
     @ONLY)
 
-install(PROGRAMS ${CADO_NFS_BINARY_DIR}/run_example.sh DESTINATION bin)
+install(PROGRAMS ${CADO_NFS_BINARY_DIR}/factor.sh DESTINATION bin)
 install(PROGRAMS ${CADO_NFS_BINARY_DIR}/fixup_params_file.sh DESTINATION bin)
