@@ -43,13 +43,13 @@ moment consider ``make install'' to be badly tested.
 Run a factorization on current machine:
 =======================================
 
-./factor.sh 100000000000000000000000000000000000000000031900000000000000000000000000000000000000000279 -t 2
+./factor.sh 353493749731236273014678071260920590602836471854359705356610427214806564110716801866803409 -t 2
 
 The integer must be at least 90 digits and not contain small prime
 factor. The option '-t 2' notice the number of cores on current machine,
 sieve and linear algebra use 2 threads.
 
-./factor.sh 100000000000000000000000000000000000000000031900000000000000000000000000000000000000000279 -t 4 -ssh
+./factor.sh 353493749731236273014678071260920590602836471854359705356610427214806564110716801866803409 -t 4 -ssh
 
 If the number of cores is strictly greater than 2, it is more efficient
 to use ssh to distribute the polynomial selection and sieve on localhost.

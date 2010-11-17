@@ -11,6 +11,8 @@
 # the machine.
 #
 # Some info on accepted variables:
+# ================================
+#
 # tmpdir and bindir are mandatory:
 # 	tmpdir = directory containing the relations during the calculation on a machine.
 # 	bindir = directory containing the binary files on a machine.
@@ -27,8 +29,8 @@
 # 	The path $param{'wdir'} must be visible on each machine.
 #
 #
-# #######################################
 # Changing the list during a computation:
+# =======================================
 #
 # If during a computation you want to add a machine, you just have to add
 # appropriate line. Next time cadofactor.pl will check if there are finished
@@ -55,28 +57,29 @@
 #  - change tmpdir for this machine
 #  - put the previous value of cores.
 #
-
+# Examples:
+# ========
 [caramel]
 # WARNING: $HOME is substitued locally!
 tmpdir=/localdisk/tmp
 bindir=$HOME/Recherche/cado/trunk/dist/src
 
-cores=2
-poly_cores=1
+cores=12
+poly_cores=9
 
-pasta
+pasta cores=2 poly_cores=1
 tiramisu cores=4 poly_cores=3
 patate cores=8 poly_cores=6
-achille mpi=1
-hecube mpi=1
-helene mpi=1
-hector mpi=1
+chorizo mpi=1
+andouille mpi=1
+merguez mpi=1
+chipolata mpi=1
 
 
 [lix]
 # WARNING: $HOME is substitued locally!
-bindir=/users/crypto/gaudry/cado
 tmpdir=/localdisk/tmp
+bindir=/users/crypto/gaudry/cado
 
 cores=2
     beaufort
