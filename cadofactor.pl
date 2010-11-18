@@ -31,7 +31,7 @@
 # Parameters passed in arguments *after* param=... will override choices
 # that are made in paramfile.
 #
-# See params/params.c59 for an example of parameter file.
+# See params/params.c91 for an example of parameter file.
 #
 # If the parameter n=<n> is given, then n is factored. Otherwise, it is
 # taken from stdin.
@@ -87,15 +87,6 @@
 # $touch snfs<size>.polysel_done
 # $CADO_DIR/cadofactor.pl params.c<size> wdir=$HOME/snfs name=snfs<size> \
 #    machines=mach_desc n=<n>
-#
-#
-# TODO-list:
-#  - Bench polynomials with some sieve before selecting the best one.
-#  - Enable a 'lowmem' option
-#  - To be able to import the msieve relations in CADO-NFS.
-#  - Use new Murphy value in polynomial selection (C code only).
-#  - Print in each kjout the number of real roots of polynomial
-#  - Automate the parameters setting.
 
 use Cwd qw(abs_path);
 use File::Basename;

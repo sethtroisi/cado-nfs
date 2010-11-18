@@ -7,6 +7,7 @@ WhoDunit
 gf2x-fft/cantor/cantor128.m
 dev_docs/
 factor_from_rels
+TODO
 files.dist
 files.nodist
 files.unknown
@@ -21,16 +22,6 @@ filter/merge_mpi.c
 filter/merge_mpi.h
 misc/
 nightly-test
-params/README.params
-params/mach_desc
-params/mach_desc.rsa100
-params/params.c135
-params/params.c142
-params/params.c143
-params/params.c144
-params/params.c158
-params/params.rsa100
-params/rsa155.poly
 polyselect/alpha.mpl
 polyselect/alpha.sage
 polyselect/alpha.c
@@ -84,3 +75,12 @@ polyselect/fast_rootsieve.h
 polyselect/fast_rootsieve.c
 filter/CMakeLists-nodist.txt
 filter/refresh-purged.c
+params/params.dl30
+params/params.rsa100
+params/README.params
+params/rsa155.poly
+params/rsa155.poly2
+params/rsa155.poly3
+params/rsa155.poly4
+params/rsa180.poly
+params/mach_desc.rsa100

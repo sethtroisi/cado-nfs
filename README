@@ -58,8 +58,6 @@ For configure ssh, see the next section.
 For a larger factorization (distribute on several machines),
 please use directly the main script cadofactor.pl
 
-To factor a number with two non linear polynomials, see README.nonlinear.
-
 Check that your SSH configuration is correct:
 =============================================
 
