@@ -1,7 +1,7 @@
 #!/usr/bin/perl -w
 
-# Copyright 2008 Pierrick Gaudry, Emmanuel Thome, Paul Zimmermann,
-#                Jeremie Detrey
+# Copyright 2008, 2009, 2010 Pierrick Gaudry, Emmanuel Thome, Paul Zimmermann,
+#                            Jeremie Detrey, Lionel Muller
 #
 # This file is part of CADO-NFS.
 #
@@ -2533,7 +2533,7 @@ sub do_linalg {
     if ($param{'linalg'} eq "bw") {
         die "Old code no longer supported";
     } elsif ($param{'linalg'} eq "bwc") {
-        info "Calling Block-Wiedemann (new code)...\n";
+        info "Calling Block-Wiedemann...\n";
         $tab_level++;
         my $mt = $param{'bwmt'};
         if ($mt =~ /^(\d+)$/) {
