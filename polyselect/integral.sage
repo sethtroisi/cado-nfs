@@ -23,10 +23,14 @@ def pdf_normal_minimum(n, x):
     """
     return n*pdf_normal(x)*(1-cdf_normal(x))^(n-1)
 
-# note: numerical_integral(lambda x: x*pdf_normal_minimum(2^i,x), -20,20)
+# note: numerical_integral(lambda x: x*pdf_normal_minimum(2^i,x), -infinity,+infinity)
 # can be approximated asymptotically by
 # -sqrt(2*ln(2)*i)+(ln(ln(2)*i)+ln(4*pi)-2*0.5772)/(2*sqrt(2*ln(2)*i))
+# where a relatively good fit of the gap between this expansion and the
+# real value for reasonably small terms yields:
+# -sqrt(2*ln(2)*i)-(ln(ln(2)*i)+ln(4*pi)-2*0.5772)/(2*sqrt(2*ln(2)*i))-0.1727*exp(-0.2759*ln(2)*i)
 # see http://gupea.ub.gu.se/bitstream/2077/3092/1/correction.pdf
+# The cited book by Cramer contains more info (page 374).
 def build_minimum_normal_table(M,B):
     """
     precomputes a table with the mean and standard deviation of the
