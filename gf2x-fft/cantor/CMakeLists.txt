@@ -5,6 +5,9 @@ add_executable(cantor_bench EXCLUDE_FROM_ALL cantor_bench.c)
 add_executable(cantor EXCLUDE_FROM_ALL cantor_main.c)
 target_link_libraries(cantor_bench cantor128 gmp)
 target_link_libraries(cantor cantor128 gmp)
+add_dependencies(cantor128 gf2x-build)
+add_dependencies(cantor gf2x-build)
+add_dependencies(cantor_bench gf2x-build)
 
 add_custom_target(test-cantor
     COMMAND CANTOR=${CMAKE_CURRENT_BINARY_DIR}/cantor ${CMAKE_CURRENT_SOURCE_DIR}/check_cantor.sh `seq 60 70` `seq 120 140` `seq 250 270`
