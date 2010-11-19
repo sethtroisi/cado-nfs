@@ -56,7 +56,10 @@ extern void gf2x_tfft_addcompose(gf2x_tfft_info_srcptr o, gf2x_tfft_ptr tc, gf2x
 extern void gf2x_tfft_add(gf2x_tfft_info_srcptr o, gf2x_tfft_ptr tc, gf2x_tfft_srcptr ta, gf2x_tfft_srcptr tb);
 extern void gf2x_tfft_ift(gf2x_tfft_info_srcptr o, unsigned long * c, size_t bits_c, gf2x_tfft_ptr tr);
 extern void gf2x_tfft_init(gf2x_tfft_info_ptr o, size_t bits_a, size_t bits_b, ...);
+extern void gf2x_tfft_init_similar(gf2x_tfft_info_ptr o, size_t bits_a, size_t bits_b, gf2x_tfft_info_srcptr other);
+extern int gf2x_tfft_compatible(gf2x_tfft_info_srcptr o1, gf2x_tfft_info_srcptr o2);
 extern void gf2x_tfft_clear(gf2x_tfft_info_ptr o);
+
 
 #ifdef __cplusplus
 }

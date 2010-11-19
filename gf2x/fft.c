@@ -1051,6 +1051,16 @@ void gf2x_tfft_init(gf2x_tfft_info_ptr o, size_t bits_a, size_t bits_b, ...)
     va_end(ap);
 }
 
+void gf2x_tfft_init_similar(gf2x_tfft_info_ptr o, size_t bits_a, size_t bits_b, gf2x_tfft_info_srcptr other)
+{
+    gf2x_tfft_init(o, bits_a, bits_b, other->K);
+}
+
+int gf2x_tfft_compatible(gf2x_tfft_info_srcptr o1, gf2x_tfft_info_srcptr o2)
+{
+    return o1->K == o2->K && o1->M == o2->M;
+}
+
 void gf2x_tfft_clear(gf2x_tfft_info_ptr o)
 {
     if (o->K) {
