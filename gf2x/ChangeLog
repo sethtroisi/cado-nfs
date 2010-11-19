@@ -1,11 +1,62 @@
-commit 7f36998c932662c8985ec3e472ffc2a771d0fa33
+commit dfce9a378f271664cd0696711eb20cb36f10374d
 Author: Emmanuel Thomé <Emmanuel.Thome@gmail.com>
-Date:   Fri Nov 19 13:14:12 2010 +0100
+Date:   Fri Nov 19 14:49:48 2010 +0100
 
     release gf2x-1.0
 
- trunk/ChangeLog | 1152 ++++++++++++++++++++++++++++++++++++++++++++++++++++++-
- 1 files changed, 1146 insertions(+), 6 deletions(-)
+ trunk/ChangeLog |   52 +++++++++++++++++++++++++++++++++++++++++++++++-----
+ 1 files changed, 47 insertions(+), 5 deletions(-)
+
+commit 6c95f0823778dfb87838ba37ecdf9e7a726a937a
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Fri Nov 19 13:06:46 2010 +0000
+
+    shortened readme lines to avoid untidy linewrap.
+    also changed the encoding to utf-8, it's more usual.
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@114 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/README |    7 +++----
+ 1 files changed, 3 insertions(+), 4 deletions(-)
+
+commit 160e22622a10cd95e6a71824caceac18a85d882e
+Author: zimmerma <zimmerma@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Fri Nov 19 12:58:22 2010 +0000
+
+    licence -> license
+    
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@113 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/README |    2 +-
+ trunk/toom.c |   12 ++++++------
+ 2 files changed, 7 insertions(+), 7 deletions(-)
+
+commit 10f2d56f89cd8f0c227e4d3bb57f177dbdfd3edf
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Fri Nov 19 12:29:02 2010 +0000
+
+    added a few more calls to the tfft api, to accomodate cado needs
+    
+    (this change used to exist in the cado tree only, no reason not to have
+    it here as well).
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@112 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/fft.c            |   10 ++++++++++
+ trunk/gf2x/gf2x-tfft.h |    3 +++
+ 2 files changed, 13 insertions(+), 0 deletions(-)
+
+commit 7ee9a3f58ffbe8537ade34f64bbdc6b64f6fc69f
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Fri Nov 19 12:16:06 2010 +0000
+
+    release gf2x-1.0
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@111 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/ChangeLog | 1161 ++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 1155 insertions(+), 6 deletions(-)
 
 commit a844359883fb1b2c09ed466abe92793d01087404
 Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>

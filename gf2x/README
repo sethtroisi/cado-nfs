@@ -1,8 +1,7 @@
-
-Authors: Richard Brent, Pierrick Gaudry, Emmanuel Thomé, Paul Zimmermann.
-Licence:
-    library: GNU Lesser General Public License (version 2.1 or any later version).
-    apps: GNU general Public License (version 2 or any later version)
+Authors: Richard Brent, Pierrick Gaudry, Emmanuel ThomÃ©, Paul Zimmermann.
+License:
+ library: GNU Lesser General Public License (version 2.1 or any later version).
+ apps: GNU general Public License (version 2 or any later version).
 
 This package contains routines for fast arithmetic in GF(2)[x]
 (multiplication, squaring, gcd).

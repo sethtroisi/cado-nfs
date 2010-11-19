@@ -243,7 +243,7 @@ void gf2x_mul_kara(unsigned long * c, const unsigned long * a, const unsigned lo
 /********************************************************************
  * Below this line, experimental code
  * (C) 2007 Marco Bodrato <optimaltoom@bodrato.it>
- * This code is released under GPL 2.0 licence.
+ * This code is released under GPL 2.0 license.
  * Modified by Paul Zimmermann, April 2007.
  *
  * Reference: http://bodrato.it/papers/#WAIFI2007
@@ -627,7 +627,7 @@ void gf2x_mul_tc3(unsigned long *c, const unsigned long *a,
 /*
  * Below this line, experimental code
  * (C) 2007 Richard Brent <trinom@rpbrent.com>
- * This code will be released under the GPL 2.0 licence.
+ * This code will be released under the GPL 2.0 license.
  *
  * Based on Sec. 5.2 of Marco Bodrato's paper (reference below)
  * but with full-word aligned operations to reduce overheads.
@@ -974,7 +974,7 @@ void gf2x_mul_tc3u(unsigned long * c, const unsigned long * a, long sa,
 /*
  * Below this line, experimental code
  * (C) 2007 Richard Brent <trinom@rpbrent.com>
- * This code will be released under the GPL 2.0 licence.
+ * This code will be released under the GPL 2.0 license.
  *
  * Based on Marco Bodrato's mul-tc3.c but with full-word aligned
  * operations to reduce overheads.
@@ -1243,7 +1243,7 @@ void gf2x_mul_tc3w(unsigned long * c, const unsigned long * a, const unsigned lo
 /*
  * Below this line, experimental code
  * (C) 2007 Richard Brent <trinom@rpbrent.com>
- * This code will be released under the GPL 2.0 licence.
+ * This code will be released under the GPL 2.0 license.
  *
  * Based on Marco Bodrato's mul-tc3.c but with full-word aligned
  * operations to reduce overheads.
@@ -1525,7 +1525,7 @@ void gf2x_mul_tc3w (unsigned long *c, const unsigned long *a, const unsigned lon
  * Below this line, experimental code
  * (C) 2007 Marco Bodrato <optimaltoom@bodrato.it>
  * Modified by Paul Zimmermann, April 2007.
- * This code is released under GPL 2.0 licence.
+ * This code is released under GPL 2.0 license.
  *
  * Reference: http://bodrato.it/papers/#WAIFI2007
  *
@@ -1696,7 +1696,7 @@ static unsigned long DivExactD2a(unsigned long * c, long n)
 /*
 \\ gp-pari check code.
 \\ (C) 2007 Marco Bodrato <optimaltoom@bodrato.it>
-\\ This code is released under GPL 2.0 licence.
+\\ This code is released under GPL 2.0 license.
 
 U0=u0*Mod(1,2);U1=u1*Mod(1,2);U2=u2*Mod(1,2);U3=u3*Mod(1,2);
 V0=v0*Mod(1,2);V1=v1*Mod(1,2);V2=v2*Mod(1,2);V3=v3*Mod(1,2);
