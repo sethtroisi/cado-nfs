@@ -1585,6 +1585,14 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
   for (p = 2; p <= alim; p += 1 + (p & 1))
     if (isprime (p))
       {
+        int i;
+        /* We skip primes which divide all coefficients of f, since then
+           f mod p is zero. This can only happen when p divides N, which is
+           silly in GNFS, but maybe the user is stupid. */
+        for (i = d; i >= 0 && mpz_divisible_ui_p (f[i], p); i--);
+        if (i < 0)
+          continue;
+        
 	if (k0 != 0)
 	  k0 = rotate_aux (f, b, m, k0, 0, 0);
 
