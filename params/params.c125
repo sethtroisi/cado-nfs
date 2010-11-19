@@ -1,10 +1,23 @@
+###########################################################################
+#     Parameter file for Cado-NFS
+###########################################################################
+
+# Anything after a # is a comment, until end of line.
+# Any empty line is ignored
+#
+#
+# Each parameter should be on an individual line, like
+#   param0=42.17
+#
+
+###########################################################################
+# General parameters
+###########################################################################
+
 # Sample parameter file for a 125-digit gnfs input
 # Example: cadofactor.pl wdir=... name=... n=...
 
 name=c125
-
-##########################################################################
-
 #bindir=$HOME/svn/cado/dist/bin      # where to find cado binaries
 parallel=1           # do we use parallel computation?
 delay=300

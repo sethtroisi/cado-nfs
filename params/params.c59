@@ -14,8 +14,12 @@
 # General parameters
 ###########################################################################
 
+# Sample parameter file for a 59-digit gnfs input
+# Warning: the parameters here are not claimed to be optimal!
+# Example: cadofactor.pl wdir=... name=... n=...
+
+name=c59
 #wdir=/tmp/noise        # directory where temporary files are put
-name=c59                # basename for temporary files
 #bindir=$HOME/cado      # where to find cado binaries
 parallel=1              # do we use parallel computation?
 delay=60                # time in seconds between two checks
