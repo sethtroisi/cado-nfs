@@ -1,6 +1,8 @@
 
 Authors: Richard Brent, Pierrick Gaudry, Emmanuel Thomé, Paul Zimmermann.
-Licence: GNU General Public License (version 2 or any later version).
+Licence:
+    library: GNU Lesser General Public License (version 2.1 or any later version).
+    apps: GNU general Public License (version 2 or any later version)
 
 This package contains routines for fast arithmetic in GF(2)[x]
 (multiplication, squaring, gcd).
@@ -27,9 +29,9 @@ Miscellaneous doc files:
 
 README
 BUGS
-tuning/TODO
-tuning/README
-hardware/tuned/README
+src/TODO
+src/README
+already_tuned/tuned/README
 AUTHORS
 ChangeLog
 
@@ -45,14 +47,14 @@ ntl_gf2x_mul_code.h    - file to be hooked in NTL (see below)
 
 Code adapted for the selected hardware
 
-hardware/              - pre-configured codes for selected architectures.
-hardware/*/gf2x-thresholds.h - pre-tuned thresholds files
-hardware/generic/gf2x-thresholds.h - placeholder thresholds
-hardware/generic64/    - code that works on any 64-bit platform
-hardware/generic32/    - code that works on any 32-bit platform
-hardware/x86_64/       - code that works on amd64 and intel core2
-hardware/x86_sse2/     - code that works on x86 platforms supporting sse2
-hardware/generic/      - code that works everywhere. Does _not_ include mul1
+already_tuned/              - pre-configured codes for selected architectures.
+already_tuned/*/gf2x-thresholds.h - pre-tuned thresholds files
+already_tuned/generic/gf2x-thresholds.h - placeholder thresholds
+already_tuned/generic64/    - code that works on any 64-bit platform
+already_tuned/generic32/    - code that works on any 32-bit platform
+already_tuned/x86_64/       - code that works on amd64 and intel core2
+already_tuned/x86_sse2/     - code that works on x86 platforms supporting sse2
+already_tuned/generic/      - code that works everywhere. Does _not_ include mul1
 
 gf2x/                  - place where symlinks to the files above go
 
@@ -64,22 +66,23 @@ tests/do-check-mul.sh   - shell script driving check-mul
 
 For tuning:
 
-tuning/tuneup.c         - tuning program for basecase multiplication
-tuning/tunetoom.c       - tuning program for Karatsuba/Toom-Cook multiplication
-tuning/tunefft.c        - tuning program for FFT multiplication
-tuning/tune-lowlevel.pl
+src/mul*.c              - various candidate code samples for basic routines
+src/tuneup.c            - tuning program for basecase multiplication
+src/tunetoom.c          - tuning program for Karatsuba/Toom-Cook multiplication
+src/tunefft.c           - tuning program for FFT multiplication
+src/tune-lowlevel.pl
 
-tuning/mul*.c              - various candidate code samples for basic routines
-tuning/gen_bb_mul_code.c   - program to generate many alternatives for mul1
-tuning/replace.h           - helper code
-tuning/replace.c           - helper code
-tuning/tuning-common.h     - helper code
-tuning/tuning-common.c     - helper code
-tuning/timing.h            - helper code
-tuning/timing.c            - helper code
-tuning/update-thresholds.c - helper code
+src/gen_bb_mul_code.c   - program to generate many alternatives for mul1
+src/replace.h           - helper code
+src/replace.c           - helper code
+src/tuning-common.h     - helper code
+src/tuning-common.c     - helper code
+src/timing.h            - helper code
+src/timing.c            - helper code
+src/update-thresholds.c - helper code
 
-Applications that use gf2x and NTL:
+Applications that use gf2x and NTL. These applications are covered by the
+GPL.
 
 apps/halfgcd.hpp - subquadratic gcd over GF(2)[x]
 apps/halfgcd.cpp - subquadratic gcd over GF(2)[x]

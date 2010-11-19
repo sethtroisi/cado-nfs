@@ -1,5 +1,26 @@
-#ifndef gf2x_tfft_H_
-#define gf2x_tfft_H_
+/* This file is part of the gf2x library.
+
+   Copyright 2007, 2008, 2009
+   Richard Brent, Pierrick Gaudry, Emmanuel Thome', Paul Zimmermann
+
+   This program is free software; you can redistribute it and/or modify it
+   under the terms of the GNU Lesser General Public License as published by
+   the Free Software Foundation; either version 2.1 of the License, or (at
+   your option) any later version.
+   
+   This program is distributed in the hope that it will be useful, but WITHOUT
+   ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+   FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
+   License for more details.
+   
+   You should have received a copy of the GNU Lesser General Public
+   License along with CADO-NFS; see the file COPYING.  If not, write to
+   the Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+   Boston, MA 02110-1301, USA.
+*/
+
+#ifndef GF2X_TFFT_H_
+#define GF2X_TFFT_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -8,7 +29,7 @@ extern "C" {
 struct gf2x_tfft_info_s {
     size_t bits_a;  // number of bits of operand1
     size_t bits_b;  // number of bits of operand2
-    size_t K;       // 0 indicates fallback. negative means split.
+    size_t K;       // 0 indicates fallback.
     size_t M;
     unsigned long * tmp;
     size_t * perm;
@@ -36,11 +57,9 @@ extern void gf2x_tfft_add(gf2x_tfft_info_srcptr o, gf2x_tfft_ptr tc, gf2x_tfft_s
 extern void gf2x_tfft_ift(gf2x_tfft_info_srcptr o, unsigned long * c, size_t bits_c, gf2x_tfft_ptr tr);
 extern void gf2x_tfft_init(gf2x_tfft_info_ptr o, size_t bits_a, size_t bits_b, ...);
 extern void gf2x_tfft_clear(gf2x_tfft_info_ptr o);
-extern void gf2x_tfft_init_similar(gf2x_tfft_info_ptr o, size_t bits_a, size_t bits_b, gf2x_tfft_info_srcptr other);
-extern int gf2x_tfft_compatible(gf2x_tfft_info_srcptr o1, gf2x_tfft_info_srcptr o2);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif	/* gf2x_tfft_H_ */
+#endif	/* GF2X_TFFT_H_ */

@@ -1,11 +1,1296 @@
-commit 93c45603532ac46fe48a05282c27873de7928e4e
-Author: Emmanuel Thomé <Emmanuel.Thome@normalesup.org>
-Date:   Mon Apr 27 21:29:00 2009 +0200
+commit 7f36998c932662c8985ec3e472ffc2a771d0fa33
+Author: Emmanuel Thomé <Emmanuel.Thome@gmail.com>
+Date:   Fri Nov 19 13:14:12 2010 +0100
+
+    release gf2x-1.0
+
+ trunk/ChangeLog | 1152 ++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 1146 insertions(+), 6 deletions(-)
+
+commit a844359883fb1b2c09ed466abe92793d01087404
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Fri Nov 19 12:12:47 2010 +0000
+
+    various automake changes so that make dist does the right thing.
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@110 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/Makefile.am           |  140 +++++++++++++++++++++++++++-----------
+ trunk/src/generate-test-list.pl |    7 ++-
+ 2 files changed, 104 insertions(+), 43 deletions(-)
+
+commit 8d73e458d43a8b80777a39dfa2f80cd24fb4a6b7
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Fri Nov 19 10:35:46 2010 +0000
+
+    modified include path ; out-of-source builds had been broken at some
+    point.
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@109 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/Makefile.am                         |    2 ++
+ trunk/already_tuned/generic32/gf2x_mul1.h |    2 +-
+ trunk/already_tuned/generic64/gf2x_mul1.h |    2 +-
+ trunk/already_tuned/opteron/gf2x_mul1.h   |    2 +-
+ trunk/already_tuned/x86_64/gf2x_mul1.h    |    2 +-
+ trunk/already_tuned/x86_sse2/gf2x_mul1.h  |    2 +-
+ trunk/src/gen_bb_mul_code.c               |    2 +-
+ trunk/src/mul2t.c                         |    2 +-
+ trunk/src/mul2t2.c                        |    2 +-
+ 9 files changed, 10 insertions(+), 8 deletions(-)
+
+commit 51f7c2ee8491fd449d935a4bb2fac248545fcac7
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Fri Nov 19 10:35:44 2010 +0000
+
+    updated version number in configure.ac to 1.0
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@108 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/configure.ac |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+commit 0ea615a1b109f8f278c29e47d56db98d438bc20b
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Tue Oct 5 15:26:13 2010 +0000
+
+    disabling mul3k3, as it's really a time bomb. As is, if it wins, it
+    breaks the code.
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@107 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/Makefile.am |    9 +--------
+ 1 files changed, 1 insertions(+), 8 deletions(-)
+
+commit e21e2408a35e4ff8360663ef1c010a70132a7f5a
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Tue Oct 5 15:21:37 2010 +0000
+
+    configfsf* files are gone now
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@106 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/Makefile.am |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
+
+commit b5d89d2513fd40a51be20c1eeb1c48cfd08a4e5e
+Author: zimmerma <zimmerma@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Tue Sep 21 09:46:11 2010 +0000
+
+    [mul9cl.c] optimized with Maple codegen[optimize] function
+    	   (now mul9cl takes 199.5ns, whereas mul9k3 takes 197.6, we are
+    	    close)
+    
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@105 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/mul9cl.c |  136 +++++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 135 insertions(+), 1 deletions(-)
+
+commit 7d5e2c7472cb8c756fc184a50d6c43cab61188b2
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Tue Sep 21 09:08:07 2010 +0000
+
+    some pxors, yields an improvement.
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@104 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/mul2cl.c |    7 ++-
+ trunk/src/mul9cl.c |  149 ++++++++++++++++++++++-----------------------------
+ 2 files changed, 70 insertions(+), 86 deletions(-)
+
+commit 9096d86526f3cb265ee4378eb4149d9f5aeab0d3
+Author: gaudry <gaudry@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 20 17:37:33 2010 +0000
+
+    mul9 in 30 mul1.
+    Terribly slow; showed probably write common subexpression optimization
+    manually. Use maple's "optimize" functionality ?
+    
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@103 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/Makefile.am |    8 +++
+ trunk/src/mul9cl.c    |  159 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 167 insertions(+), 0 deletions(-)
+
+commit c1490908ae517cb7d321700965bc3ebd0dca9708
+Author: zimmerma <zimmerma@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 20 15:42:29 2010 +0000
+
+    added references and comments
+    
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@102 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/mul5clk_c.c |    4 +++-
+ trunk/src/mul5k_c.c   |    4 +++-
+ trunk/src/mul7cl.c    |    4 +++-
+ trunk/src/mul9clk2.c  |    3 +++
+ trunk/src/mul9k2.c    |    1 +
+ 5 files changed, 13 insertions(+), 3 deletions(-)
+
+commit 87754975e75437cb62c24fa4f4c7cbb4caaed70d
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Thu Sep 16 14:09:18 2010 +0000
+
+    just having fun with sse-2.
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@101 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/Makefile.am |    8 ++
+ trunk/src/mul9clk2.c  |  173 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 181 insertions(+), 0 deletions(-)
+
+commit 6d90c2f6cccdcc6ee49143d4ad4a1357dd4a56ef
+Author: zimmerma <zimmerma@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Thu Sep 16 12:44:06 2010 +0000
+
+    added mul7k3 and mul9k3
+    mul9k3 wins:
+    mul9 -> mul9k.c [ 214.5 ns ]
+    mul9 -> mul9k3.c [ 197.6 ns ]
+    
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@100 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/Makefile.am |   48 ++++++++----
+ trunk/src/mul7k3.c    |  185 ++++++++++++++++++++++++++++++++++++++++++
+ trunk/src/mul9k3.c    |  212 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 429 insertions(+), 16 deletions(-)
+
+commit 8b2c887dbee458cc35801a20ee5482fec9cb6016
+Author: zimmerma <zimmerma@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Thu Sep 16 11:57:18 2010 +0000
+
+    added mul5k3 (14 muls vs 13 for mul5clk_c)
+    ./tune_mul5clk_c : 74.0 ns
+    ./tune_mul5k3 : 80.9 ns
+    
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@99 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/Makefile.am |    8 +++
+ trunk/src/mul2cl2.c   |    1 +
+ trunk/src/mul4clk.c   |    2 +-
+ trunk/src/mul5clk_c.c |    2 +-
+ trunk/src/mul5k3.c    |  155 +++++++++++++++++++++++++++++++++++++++++++++++++
+ trunk/src/mul6clk2.c  |    1 +
+ trunk/src/mul7cl.c    |    2 +
+ trunk/src/mul8k.c     |    1 +
+ trunk/src/mul9k.c     |    2 +
+ 9 files changed, 172 insertions(+), 2 deletions(-)
+
+commit 4d7780f16572dc4f273412028d209c19d3dfb253
+Author: zimmerma <zimmerma@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Thu Sep 16 08:16:54 2010 +0000
+
+    [mul2cl.c,mul3k3.c] gross hack to avoid duplicating code from mul2cl.c, feel
+    		    free to revert or to improve!
+    		    The idea is to be able to easily replace mul2cl by say
+    		    mul2cl2 in mul3k3. Ideally if each function has a carry
+    		    and a borrow variant, we could directly call mul2carry
+    		    and mul2borrow.
+    
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@98 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/mul2cl.c |   26 +++++++++++++++++
+ trunk/src/mul3k3.c |   80 ++++++----------------------------------------------
+ 2 files changed, 35 insertions(+), 71 deletions(-)
+
+commit a72162828c35707ac5d8fe1e118a56ba10ab7afe
+Author: zimmerma <zimmerma@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Thu Sep 16 07:36:50 2010 +0000
+
+    [mul3k3.c] oups, I forgot to reuse the cached product! Current timings are
+    promising:
+    ./tune_mul3k : 63.3 ns
+    ./tune_mul3k2 : 38.5 ns
+    ./tune_mul3k3 : 37.2 ns
+    ./tune_mul3cl : 34.7 ns
+    Maybe somebody can improve mul3k3 to beat mul3cl. In the meantime I will
+    work on a mul5 version.
+    
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@97 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/mul3k3.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+commit 9beba34c00879edf2bf8a30879d2135c5c8a8af9
+Author: zimmerma <zimmerma@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Thu Sep 16 07:32:09 2010 +0000
+
+    [mul3k3.c] new mul3 code using Montgomery's variant for the odd case
+    
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@96 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/Makefile.am  |    8 +++
+ trunk/src/mul3k3.c     |  147 ++++++++++++++++++++++++++++++++++++++++++++++++
+ trunk/src/tuneup_pre.c |    9 +++
+ 3 files changed, 164 insertions(+), 0 deletions(-)
+
+commit 6c4b49c7887ab1fd585d7cdbf1fb8ee7c26973d4
+Author: gaudry <gaudry@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Tue Sep 14 13:35:59 2010 +0000
+
+    configure tries pclmul support by default
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@95 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/config/acinclude.m4 |    2 +-
+ trunk/configure.ac        |    4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+commit 3dbc9ca127e1877cd8e18a31090600f10a62df35
+Author: gaudry <gaudry@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Tue Sep 14 13:22:33 2010 +0000
+
+    tuned on crumble
+    
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@94 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/already_tuned/x86_sse2/gf2x-thresholds.h |  214 ++++++++++++------------
+ trunk/already_tuned/x86_sse2/gf2x_mul2.h       |    1 +
+ trunk/already_tuned/x86_sse2/gf2x_mul5.h       |    1 +
+ trunk/already_tuned/x86_sse2/gf2x_mul6.h       |    1 +
+ trunk/already_tuned/x86_sse2/gf2x_mul7.h       |    1 +
+ trunk/already_tuned/x86_sse2/gf2x_mul8.h       |    1 +
+ trunk/already_tuned/x86_sse2/gf2x_mul9.h       |    1 +
+ 7 files changed, 113 insertions(+), 107 deletions(-)
+
+commit 4ecbe3674857c6cbc82fce46fd20fb460ee3a579
+Author: gaudry <gaudry@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Tue Sep 14 10:04:19 2010 +0000
+
+    how did it work before???
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@93 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/tests/check-addmul.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+commit b278e1141825d954886c13a4600b63385146fe35
+Author: gaudry <gaudry@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Tue Sep 14 09:34:03 2010 +0000
+
+    tuning for westmere
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@92 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ .../already_tuned/x86_64_pclmul/gf2x-thresholds.h  |   91 +++++++++++---------
+ trunk/already_tuned/x86_64_pclmul/gf2x_mul2.h      |    2 +-
+ trunk/already_tuned/x86_64_pclmul/gf2x_mul3.h      |    2 +-
+ trunk/already_tuned/x86_64_pclmul/gf2x_mul4.h      |    1 +
+ trunk/already_tuned/x86_64_pclmul/gf2x_mul5.h      |    1 +
+ trunk/already_tuned/x86_64_pclmul/gf2x_mul6.h      |    1 +
+ trunk/already_tuned/x86_64_pclmul/gf2x_mul7.h      |    1 +
+ trunk/already_tuned/x86_64_pclmul/gf2x_mul8.h      |    1 +
+ trunk/already_tuned/x86_64_pclmul/gf2x_mul9.h      |    1 +
+ 9 files changed, 58 insertions(+), 43 deletions(-)
+
+commit aaa7bfe6a972f41b5efeb899e96064f7b1749730
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Tue Sep 14 09:02:35 2010 +0000
+
+    tuning for core2
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@91 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/already_tuned/x86_64/gf2x-thresholds.h |   88 ++++++------
+ trunk/already_tuned/x86_64/gf2x_mul1.h       |  216 ++++++++++++++++++++++++++
+ trunk/already_tuned/x86_64/gf2x_mul2.h       |    2 +-
+ trunk/already_tuned/x86_64/gf2x_mul3.h       |    1 +
+ trunk/already_tuned/x86_64/gf2x_mul4.h       |    1 +
+ trunk/already_tuned/x86_64/gf2x_mul5.h       |    1 +
+ trunk/already_tuned/x86_64/gf2x_mul6.h       |    1 +
+ trunk/already_tuned/x86_64/gf2x_mul7.h       |    1 +
+ trunk/already_tuned/x86_64/gf2x_mul8.h       |    1 +
+ trunk/already_tuned/x86_64/gf2x_mul9.h       |    1 +
+ 10 files changed, 268 insertions(+), 45 deletions(-)
+
+commit ff92314d6905daca7e2fe7a7d448c3844ae11a9c
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Tue Sep 14 07:29:14 2010 +0000
+
+    bugfix in tune-lowlevel script
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@90 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/tune-lowlevel.pl |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+commit bf243f39d0af63cbb5f1b0eb4e4282ee46724e78
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Tue Sep 14 07:21:54 2010 +0000
+
+    move mul3cl and mul7cl in the right place
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@89 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/Makefile.am |   32 ++++++++++++++++----------------
+ 1 files changed, 16 insertions(+), 16 deletions(-)
+
+commit 4cf21352133ccebbb2101b984cedc10c4957fa79
+Author: gaudry <gaudry@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 13 18:39:55 2010 +0000
+
+    mul7 in 22, a la Mgy
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@88 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/Makefile.am |    8 ++
+ trunk/src/mul7cl.c    |  180 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 188 insertions(+), 0 deletions(-)
+
+commit c93b1589e6052dbca6a8a17be10246b750e61cff
+Author: gaudry <gaudry@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 13 13:44:35 2010 +0000
+
+    faster mul3 with pclmul, about 10%
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@87 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/Makefile.am |    8 ++++
+ trunk/src/mul3cl.c    |   88 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 96 insertions(+), 0 deletions(-)
+
+commit 5efb1892aa09d289346c9011886fde9c0fcdf19d
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 13 13:39:10 2010 +0000
+
+    renamed local functions, and protect them for re-tuning.
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@86 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/gf2x/gf2x-small.h       |    4 ++
+ trunk/src/mul4clk.c           |   10 +++---
+ trunk/src/mul5clk_c.c         |   71 ++++++++++++++--------------------------
+ trunk/src/mul6clk2.c          |   16 +++++-----
+ trunk/src/tuning_undefs_pre.h |    2 +
+ 5 files changed, 44 insertions(+), 59 deletions(-)
+
+commit d90b8d868d1ccb93c3463bf124bdce077fced18e
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 13 13:21:44 2010 +0000
+
+    25% improvement on mul4
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@85 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/Makefile.am |    8 +++++
+ trunk/src/mul4clk.c   |   85 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 93 insertions(+), 0 deletions(-)
+
+commit 1f6c07359f1a49c3479beb1e80ce5c52d83a9baa
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 13 13:08:48 2010 +0000
+
+    ahem. Better not have a function which does not support f(foo,foo,bar), right ?
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@84 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/mul4k.c |   23 ++++++++++++++---------
+ 1 files changed, 14 insertions(+), 9 deletions(-)
+
+commit 23cdba4ad77bcd390e46ecda66134f80fbc8c558
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 13 12:49:31 2010 +0000
+
+    new mul5
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@83 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/Makefile.am |    8 +++
+ trunk/src/mul5clk_c.c |  133 +++++++++++++++++++++++++++++++++++++++++++++++++
+ trunk/src/mul6clk2.c  |   17 ++++---
+ 3 files changed, 151 insertions(+), 7 deletions(-)
+
+commit 9e1af8110fd9d4939a3b638802c243e7392dda0b
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 13 12:19:58 2010 +0000
+
+    fixed a few copyright strings
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@82 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/Makefile.am                |   19 +++++++++++++++++++
+ trunk/config/acinclude.m4        |   19 +++++++++++++++++++
+ trunk/configure.ac               |   20 ++++++++++++++++++++
+ trunk/src/Makefile.am            |   20 ++++++++++++++++++++
+ trunk/src/gen_bb_mul_code.c      |    2 +-
+ trunk/src/generate-test-list.pl  |   20 ++++++++++++++++++++
+ trunk/src/mul2k.c                |    2 +-
+ trunk/src/mul2t.c                |    2 +-
+ trunk/src/mul2t2.c               |    2 +-
+ trunk/src/mul5k_d.c              |    2 +-
+ trunk/src/mul6clk2.c             |    2 +-
+ trunk/src/mul6k_c.c              |    2 +-
+ trunk/src/mul9k2.c               |    2 +-
+ trunk/src/tune-lowlevel.pl       |   20 ++++++++++++++++++++
+ trunk/src/tuneup_pre.c           |    2 +-
+ trunk/src/tuning_undef_wrapper.h |   20 ++++++++++++++++++++
+ trunk/src/tuning_undefs_pre.h    |   20 ++++++++++++++++++++
+ trunk/tests/Makefile.am          |   20 ++++++++++++++++++++
+ trunk/tests/do-check-mul.sh      |   20 ++++++++++++++++++++
+ 19 files changed, 207 insertions(+), 9 deletions(-)
+
+commit a2564d13c540670ce7abac4201fbb289a258cbf5
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 13 12:19:56 2010 +0000
+
+    also remove src/.libs when cleaning up stuff
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@81 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/wipeout-autotools |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+commit 8084e4971439e6c48b1196d0e1e4130a56a39d11
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 13 11:55:34 2010 +0000
+
+    yet another code, for mul6
+    
+    manipulates sse-2 data for as long as possible.
+    
+    also removed cruft in several files.
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@80 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/Makefile.am |   15 +++++++
+ trunk/src/mul1cl.c    |    5 --
+ trunk/src/mul2cl.c    |    5 --
+ trunk/src/mul2cl2.c   |    5 --
+ trunk/src/mul2k.c     |    4 --
+ trunk/src/mul6clk2.c  |   98 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 113 insertions(+), 19 deletions(-)
+
+commit c38f868e6f65144652ad0edb9d48f63f1db6da75
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 13 11:41:55 2010 +0000
+
+    who says a file is missing ?
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@79 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/mul2cl2.c |   73 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 73 insertions(+), 0 deletions(-)
+
+commit 6a08256d143ed50d42e32fca96620b59f08b356f
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 13 11:34:56 2010 +0000
+
+    avoid warning
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@78 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/tuneup_pre.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+commit 752a18a8bd713825df3f36c2aaa0e2d0ceedb4ab
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 13 11:34:55 2010 +0000
+
+    test another variant of mul2cl
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@77 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/Makefile.am |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+commit ae3dc676a82bb9210aa28a3dde0cfc72687d8df2
+Author: gaudry <gaudry@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 13 11:01:51 2010 +0000
+
+    another mul5, with 13 mul1 (try again)
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@76 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/mul5k_c.c |   80 +++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 80 insertions(+), 0 deletions(-)
+
+commit 3224786ebb118f1bcff9aedf24603cbe42533395
+Author: gaudry <gaudry@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 13 11:01:19 2010 +0000
+
+    another mul5, with 13 mul1
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@75 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/Makefile.am |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
+
+commit 17e3ea02a0a037a333af6d6601a4f79ce2d6f608
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 13 10:44:01 2010 +0000
+
+    improved mul1cl by about 10% ;-)
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@74 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/mul1cl.c |   16 +++-------------
+ 1 files changed, 3 insertions(+), 13 deletions(-)
+
+commit 3cda474da64744560617c08dd0228cd91e8961d3
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 13 10:07:05 2010 +0000
+
+    be more explicit.
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@73 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/Makefile.am        |   13 ++++++++-----
+ trunk/src/README.adding_code |   19 +++++++++----------
+ 2 files changed, 17 insertions(+), 15 deletions(-)
+
+commit 7b24d6af90b30390963247004e1a955dfced4166
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 13 09:59:28 2010 +0000
+
+    two new codes.
+    
+    mul5k_d.c: downgrade mul6k_c to a mul5 (previously mul6k_c was faster
+    than the best mul5...)
+    mul2t2.c: use the load/store intrinsics for movdqu. On i7's, it's
+    probably faster.
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@72 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/Makefile.am |   16 ++++++
+ trunk/src/mul2t2.c    |  140 +++++++++++++++++++++++++++++++++++++++++++++++++
+ trunk/src/mul5k_d.c   |   65 +++++++++++++++++++++++
+ 3 files changed, 221 insertions(+), 0 deletions(-)
+
+commit 5525189f82ee2027efe82989c0bf93e66e6d1982
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 13 09:38:46 2010 +0000
+
+    removed the ``only one possibility'' test skipping
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@71 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/tune-lowlevel.pl |   13 +++++++------
+ 1 files changed, 7 insertions(+), 6 deletions(-)
+
+commit d00fa129ad81b11a7383df6780d93da008b7f14c
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 13 09:33:45 2010 +0000
+
+    faster mul9
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@70 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/Makefile.am |    8 +++++
+ trunk/src/mul9k2.c    |   79 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 87 insertions(+), 0 deletions(-)
+
+commit 08df7dde810ec4a9d19292a1c591df5e83955d11
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 13 09:22:22 2010 +0000
+
+    changed default CFLAGS
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@69 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/configure.ac |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+commit 15d2d7d2533c0470ed3db2dfe0bbe61e369f43be
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 13 09:11:46 2010 +0000
+
+    new mul6 variant, sligthly faster than mul6k_a
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@68 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/Makefile.am |   66 +++++++-----------------------------------------
+ trunk/src/mul6k_c.c   |   67 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 77 insertions(+), 56 deletions(-)
+
+commit a4ead49604e5495ee49f3ca58c6e3cf091dddd5d
+Author: gaudry <gaudry@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 13 09:03:54 2010 +0000
+
+    _mm_loadu_si128 is our friend (removed asm).
+    
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@67 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/mul2cl.c |   63 ++-------------------------------------------------
+ 1 files changed, 3 insertions(+), 60 deletions(-)
+
+commit 487b2399422698ffbc4f3afa55d284f899053f3a
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Sep 13 08:40:30 2010 +0000
+
+    see if it's any nicer.
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@66 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/Makefile.am           |  108 ++++++++++++++++++++++++++-------------
+ trunk/src/generate-test-list.pl |   76 +++++++++++++++++++++++++++
+ 2 files changed, 148 insertions(+), 36 deletions(-)
+
+commit 5681cc0ada729bcb38ae86a13c41ae6f6215dacb
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Sun Sep 12 13:02:49 2010 +0000
+
+    well, after all fixing the bug wasn't so hard.
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@65 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/mul2cl.c |   33 +++++++++++++++++++++------------
+ 1 files changed, 21 insertions(+), 12 deletions(-)
+
+commit c94a45ff87942fcd7e8bda6734d9c23670edb289
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Sun Sep 12 12:57:48 2010 +0000
+
+    temporarily disable buggy asm version for mul2cl
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@64 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/mul2cl.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+commit e3e9f98060b5fbf25e9361c9beb30f416b043c7a
+Author: zimmerma <zimmerma@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Sun Sep 12 12:49:17 2010 +0000
+
+    [src/tuneup_pre.c] improved error message
+    
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@63 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/tuneup_pre.c |   18 ++++++++++++++----
+ 1 files changed, 14 insertions(+), 4 deletions(-)
+
+commit 81b1e6a42630cef351a4d640a673f462052cece0
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Sat Sep 11 15:57:40 2010 +0000
+
+    include all mul5 to mul9 in the tuning mechanism.
+    
+    This kills the middle man.
+    
+    NOTE: Either the mul[56]k_a versions are buggy, or they're revealing a
+    bug in the asm constraints used for mul2cl. Presently tune-lowlevel fails
+    on westmere.
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@62 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/Makefile.am                                  |   15 ++-
+ trunk/already_tuned/generic/gf2x-thresholds.h      |    5 +
+ trunk/already_tuned/generic/gf2x_mul5.h            |    1 +
+ trunk/already_tuned/generic/gf2x_mul6.h            |    1 +
+ trunk/already_tuned/generic/gf2x_mul7.h            |    1 +
+ trunk/already_tuned/generic/gf2x_mul8.h            |    1 +
+ trunk/already_tuned/generic/gf2x_mul9.h            |    1 +
+ trunk/already_tuned/opteron/gf2x-thresholds.h      |    5 +
+ trunk/already_tuned/x86_64/gf2x-thresholds.h       |    5 +
+ .../already_tuned/x86_64_pclmul/gf2x-thresholds.h  |    5 +
+ trunk/already_tuned/x86_sse2/gf2x-thresholds.h     |    5 +
+ trunk/configure.ac                                 |    5 +-
+ trunk/gf2x/gf2x-small.h                            |  229 +-------------------
+ trunk/src/Makefile.am                              |  148 ++++++++-----
+ trunk/src/mul5k_a.c                                |   60 +++++
+ trunk/src/mul5k_b.c                                |   54 +++++
+ trunk/src/mul6k_a.c                                |   62 ++++++
+ trunk/src/mul6k_b.c                                |   54 +++++
+ trunk/src/mul7k.c                                  |   60 +++++
+ trunk/src/mul8k.c                                  |   61 ++++++
+ trunk/src/mul9k.c                                  |   65 ++++++
+ trunk/src/tuning_undef_wrapper.h                   |    2 +
+ trunk/wipeout-autotools                            |    3 +-
+ 23 files changed, 573 insertions(+), 275 deletions(-)
+
+commit e98c43f4c893672daa65932b350e3f6ed67e16b3
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Sat Sep 11 15:24:25 2010 +0000
+
+    removed unneeded lines and dependencies in mul3k2.c
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@61 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/mul3k2.c |   15 ---------------
+ 1 files changed, 0 insertions(+), 15 deletions(-)
+
+commit 00e16eb2a7ea1c336281261d0f7a4d2aac30c559
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Sat Sep 11 15:24:23 2010 +0000
+
+    fixed bug in tune-lowlevel
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@60 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/tune-lowlevel.pl |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+commit ee014c3728dd322c4296515054dac150156c6251
+Author: gaudry <gaudry@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Sat Sep 11 09:18:57 2010 +0000
+
+    broken link in previous commit
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@59 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/already_tuned/x86_64_pclmul/gf2x_mul3.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+commit 92f3682c597c0957d372d5b5ae598cae56eea97f
+Author: gaudry <gaudry@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Sat Sep 11 05:45:46 2010 +0000
+
+    renamed mul3cl.c since it is generic code
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@58 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/Makefile.am |   10 +++---
+ trunk/src/mul3cl.c    |   76 -------------------------------------------------
+ trunk/src/mul3k2.c    |   72 ++++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 77 insertions(+), 81 deletions(-)
+
+commit 6e2d7f258c58907baf123447652201c984318883
+Author: zimmerma <zimmerma@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Fri Sep 10 19:16:56 2010 +0000
+
+    [config/acinclude.m4] fixed typo
+    
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@57 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/config/acinclude.m4 |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+commit 96ac1f87423f3aa8cebe68018b683621b19a5de6
+Author: gaudry <gaudry@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Fri Sep 10 15:26:27 2010 +0000
+
+    retuned westmere
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@56 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ .../already_tuned/x86_64_pclmul/gf2x-thresholds.h  |  169 +++++++-------------
+ trunk/already_tuned/x86_64_pclmul/gf2x_mul2.h      |    2 +-
+ 2 files changed, 61 insertions(+), 110 deletions(-)
+
+commit aa929f1d15fa635aadef4b4508fa7c3ec796e024
+Author: gaudry <gaudry@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Fri Sep 10 14:07:29 2010 +0000
+
+    fixed make distclean
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@55 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/Makefile.am |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+commit e5805b5c58aa4f4f26532eb5c696d42c9800b8ca
+Author: zimmerma <zimmerma@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Fri Sep 10 13:58:19 2010 +0000
+
+    [src/tuneup_pre.c] typo
+    
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@54 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/tuneup_pre.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
+
+commit 6b244f54208004a270c208ded38f3152667effd5
+Author: gaudry <gaudry@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Fri Sep 10 13:38:37 2010 +0000
+
+    time spend in tune-lowlevel controlled by environment
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@53 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/tuneup_pre.c |   16 +++++++++++++++-
+ 1 files changed, 15 insertions(+), 1 deletions(-)
+
+commit 4b4fd01b66f9c5941f2b1dbd406f01698d197ed3
+Author: gaudry <gaudry@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Fri Sep 10 13:06:32 2010 +0000
+
+    fixed buggy asm
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@52 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/mul2cl.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
+
+commit a064320d2673faea972840b0cd77e252f38f9916
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Fri Sep 10 11:55:33 2010 +0000
+
+    also remove already_tuned/tuned files on make distclean
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@51 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/Makefile.am |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+commit eddbc7bf93373e322a84ea6dec94ad0e3252b760
+Author: gaudry <gaudry@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Fri Sep 10 11:49:33 2010 +0000
+
+    slight improvement in mul2cl
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@50 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/mul2cl.c |   58 +++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 files changed, 55 insertions(+), 3 deletions(-)
+
+commit 5fc33bf51982b7fb128f631895ae3a318c2e6985
+Author: gaudry <gaudry@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Thu Sep 9 18:45:31 2010 +0000
+
+    tuned values for westmere (merguez)
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@49 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ .../already_tuned/x86_64_pclmul/gf2x-thresholds.h  |  133 ++++++++++++++------
+ trunk/already_tuned/x86_64_pclmul/gf2x_mul2.h      |    2 +-
+ trunk/already_tuned/x86_64_pclmul/gf2x_mul3.h      |    1 +
+ 3 files changed, 97 insertions(+), 39 deletions(-)
+
+commit f0a3b47d27b7bd07a5857824fc00df4ffbffa3da
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Thu Sep 9 15:27:58 2010 +0000
+
+    new doc
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@48 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/gf2x.c                 |    3 --
+ trunk/src/README.adding_code |   45 ++++++++++++++++++++++++++++++++++++++++++
+ trunk/wipeout-autotools      |    3 ++
+ 3 files changed, 48 insertions(+), 3 deletions(-)
+
+commit b151bca4e5c0b06fc10b6981285326836dc25bdd
+Author: gaudry <gaudry@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Thu Sep 9 15:17:40 2010 +0000
+
+    activate mul3cl in tuning
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@47 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/src/Makefile.am |    7 ++++-
+ trunk/src/mul3cl.c    |   76 +++++++++++++++++++++++++++++++++++++++++++++++++
+ trunk/src/mul3k.c     |   33 ---------------------
+ 3 files changed, 82 insertions(+), 34 deletions(-)
+
+commit c6f12ed84bbfcedfbb2806f0ad8e3f6033e4fbbc
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Thu Sep 9 14:36:32 2010 +0000
+
+    tuning/ -> src/ , and hardware/ -> already_tuned/
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@44 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/Makefile.am                                  |    8 +-
+ trunk/README                                       |   50 ++--
+ trunk/already_tuned/generic/gf2x-thresholds.h      |   95 +++++
+ trunk/already_tuned/generic/gf2x_mul2.h            |    1 +
+ trunk/already_tuned/generic/gf2x_mul3.h            |    1 +
+ trunk/already_tuned/generic/gf2x_mul4.h            |    1 +
+ trunk/already_tuned/generic32/gf2x_mul1.h          |  162 ++++++++
+ trunk/already_tuned/generic64/gf2x_mul1.h          |  204 ++++++++++
+ trunk/already_tuned/opteron/gf2x-thresholds.h      |  235 +++++++++++
+ trunk/already_tuned/opteron/gf2x_mul1.h            |  216 ++++++++++
+ trunk/already_tuned/tuned/README                   |    2 +
+ trunk/already_tuned/x86_64/gf2x-thresholds.h       |  269 +++++++++++++
+ trunk/already_tuned/x86_64/gf2x_mul2.h             |    1 +
+ .../already_tuned/x86_64_pclmul/gf2x-thresholds.h  |  220 ++++++++++
+ trunk/already_tuned/x86_64_pclmul/gf2x_mul1.h      |    1 +
+ trunk/already_tuned/x86_64_pclmul/gf2x_mul2.h      |    1 +
+ trunk/already_tuned/x86_sse2/gf2x-thresholds.h     |  291 +++++++++++++
+ trunk/already_tuned/x86_sse2/gf2x_mul1.h           |  162 ++++++++
+ trunk/already_tuned/x86_sse2/gf2x_mul3.h           |    1 +
+ trunk/already_tuned/x86_sse2/gf2x_mul4.h           |    1 +
+ trunk/configure.ac                                 |   20 +-
+ trunk/hardware/generic/gf2x-thresholds.h           |   95 -----
+ trunk/hardware/generic/gf2x_mul2.h                 |    1 -
+ trunk/hardware/generic/gf2x_mul3.h                 |    1 -
+ trunk/hardware/generic/gf2x_mul4.h                 |    1 -
+ trunk/hardware/generic32/gf2x_mul1.h               |  162 --------
+ trunk/hardware/generic64/gf2x_mul1.h               |  204 ----------
+ trunk/hardware/opteron/gf2x-thresholds.h           |  235 -----------
+ trunk/hardware/opteron/gf2x_mul1.h                 |  216 ----------
+ trunk/hardware/tuned/README                        |    2 -
+ trunk/hardware/x86_64/gf2x-thresholds.h            |  269 -------------
+ trunk/hardware/x86_64/gf2x_mul2.h                  |    1 -
+ trunk/hardware/x86_64_pclmul/gf2x-thresholds.h     |  220 ----------
+ trunk/hardware/x86_64_pclmul/gf2x_mul1.h           |    1 -
+ trunk/hardware/x86_64_pclmul/gf2x_mul2.h           |    1 -
+ trunk/hardware/x86_sse2/gf2x-thresholds.h          |  291 -------------
+ trunk/hardware/x86_sse2/gf2x_mul1.h                |  162 --------
+ trunk/hardware/x86_sse2/gf2x_mul3.h                |    1 -
+ trunk/hardware/x86_sse2/gf2x_mul4.h                |    1 -
+ trunk/src/Makefile.am                              |  375 +++++++++++++++++
+ trunk/src/README                                   |   55 +++
+ trunk/src/TODO                                     |    3 +
+ trunk/src/gen_bb_mul_code.c                        |  178 ++++++++
+ trunk/src/mul1cl.c                                 |  171 ++++++++
+ trunk/src/mul2cl.c                                 |   79 ++++
+ trunk/src/mul2k.c                                  |   46 +++
+ trunk/src/mul2t.c                                  |  155 +++++++
+ trunk/src/mul3k.c                                  |   82 ++++
+ trunk/src/mul3t.c                                  |  195 +++++++++
+ trunk/src/mul4k.c                                  |   49 +++
+ trunk/src/mul4t.c                                  |  210 ++++++++++
+ trunk/src/replace.c                                |  135 +++++++
+ trunk/src/replace.h                                |   43 ++
+ trunk/src/timing.c                                 |   35 ++
+ trunk/src/timing.h                                 |   41 ++
+ trunk/src/tune-lowlevel.pl                         |  102 +++++
+ trunk/src/tunefft.c                                |  317 +++++++++++++++
+ trunk/src/tunetoom.c                               |  397 ++++++++++++++++++
+ trunk/src/tuneup_pre.c                             |  111 +++++
+ trunk/src/tuning-common.c                          |  143 +++++++
+ trunk/src/tuning-common.h                          |   66 +++
+ trunk/src/tuning_undef_wrapper.h                   |   19 +
+ trunk/src/tuning_undefs_pre.h                      |   53 +++
+ trunk/src/update-thresholds.c                      |  425 ++++++++++++++++++++
+ trunk/tuning/Makefile.am                           |  375 -----------------
+ trunk/tuning/README                                |   55 ---
+ trunk/tuning/TODO                                  |    3 -
+ trunk/tuning/gen_bb_mul_code.c                     |  178 --------
+ trunk/tuning/mul1cl.c                              |  171 --------
+ trunk/tuning/mul2cl.c                              |   79 ----
+ trunk/tuning/mul2k.c                               |   46 ---
+ trunk/tuning/mul2t.c                               |  155 -------
+ trunk/tuning/mul3k.c                               |   82 ----
+ trunk/tuning/mul3t.c                               |  195 ---------
+ trunk/tuning/mul4k.c                               |   49 ---
+ trunk/tuning/mul4t.c                               |  210 ----------
+ trunk/tuning/replace.c                             |  135 -------
+ trunk/tuning/replace.h                             |   43 --
+ trunk/tuning/timing.c                              |   35 --
+ trunk/tuning/timing.h                              |   41 --
+ trunk/tuning/tune-lowlevel.pl                      |  102 -----
+ trunk/tuning/tunefft.c                             |  317 ---------------
+ trunk/tuning/tunetoom.c                            |  397 ------------------
+ trunk/tuning/tuneup_pre.c                          |  111 -----
+ trunk/tuning/tuning-common.c                       |  143 -------
+ trunk/tuning/tuning-common.h                       |   66 ---
+ trunk/tuning/tuning_undef_wrapper.h                |   19 -
+ trunk/tuning/tuning_undefs_pre.h                   |   53 ---
+ trunk/tuning/update-thresholds.c                   |  425 --------------------
+ trunk/wipeout-autotools                            |    3 +-
+ 90 files changed, 5390 insertions(+), 5389 deletions(-)
+
+commit 69310be1cef0685f4983e27371fc6dc810df22d9
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Thu Sep 9 14:36:28 2010 +0000
+
+    now files under tuning/ are real sources
+    
+    and they are going to move to src/ really soon.
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@43 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/config/config.guess                |  853 ----------------
+ trunk/config/config.sub                  |  143 ---
+ trunk/config/configfsf.guess             | 1460 ----------------------------
+ trunk/config/configfsf.sub               | 1554 ------------------------------
+ trunk/configure.ac                       |    1 +
+ trunk/gf2x/gf2x-small.h                  |    4 +
+ trunk/hardware/generic/gf2x_mul2.h       |   42 +-
+ trunk/hardware/generic/gf2x_mul3.h       |   48 +-
+ trunk/hardware/generic/gf2x_mul4.h       |   48 +-
+ trunk/hardware/generic32/gf2x_mul1.h     |   13 +-
+ trunk/hardware/generic64/gf2x_mul1.h     |   13 +-
+ trunk/hardware/opteron/gf2x_mul1.h       |   14 +-
+ trunk/hardware/x86_64/gf2x_mul2.h        |  157 +---
+ trunk/hardware/x86_64_pclmul/gf2x_mul1.h |  175 +----
+ trunk/hardware/x86_64_pclmul/gf2x_mul2.h |   77 +--
+ trunk/hardware/x86_sse2/gf2x_mul1.h      |   14 +-
+ trunk/hardware/x86_sse2/gf2x_mul3.h      |  198 +----
+ trunk/hardware/x86_sse2/gf2x_mul4.h      |  213 +----
+ trunk/no-distribute.txt                  |    1 -
+ trunk/tuning/Makefile.am                 |  249 ++++--
+ trunk/tuning/gen_bb_mul_code.c           |   67 +-
+ trunk/tuning/mul1_avx.c                  |   40 -
+ trunk/tuning/mul1cl.c                    |  171 ++++
+ trunk/tuning/mul2cl.c                    |   79 ++
+ trunk/tuning/mul2k.c                     |   13 +-
+ trunk/tuning/mul2t.c                     |   17 +-
+ trunk/tuning/mul3k.c                     |   15 +-
+ trunk/tuning/mul3t.c                     |   16 +-
+ trunk/tuning/mul4k.c                     |   15 +-
+ trunk/tuning/mul4t.c                     |   16 +-
+ trunk/tuning/tune-lowlevel.pl            |   20 +-
+ trunk/tuning/tuneup.c                    |  107 --
+ trunk/tuning/tuneup_pre.c                |  111 +++
+ trunk/tuning/tuning_undef_wrapper.h      |   19 +
+ trunk/tuning/tuning_undefs_pre.h         |   53 +
+ trunk/wipeout-autotools                  |   14 +
+ 36 files changed, 749 insertions(+), 5301 deletions(-)
+
+commit 4b0eef0575efd875c5d03a378a7dfca577780d57
+Author: zimmerma <zimmerma@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Thu Sep 9 13:25:05 2010 +0000
+
+    [check-addmul.c] fixed test according to semantics of gf2x_mul_1_n and gf2x_addmul_1_n
+    
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@42 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/tests/check-addmul.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
+
+commit 8606f480643cb2352acaa21ec6a7e4e773478eab
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Thu Sep 9 13:22:29 2010 +0000
+
+    plugged in Paul's test. reveals a core2 bug ?
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@41 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/tests/check-addmul.c  |    7 +++++--
+ trunk/tests/do-check-mul.sh |    6 ++++--
+ 2 files changed, 9 insertions(+), 4 deletions(-)
+
+commit 30f288e310f5b4c31840b9a943c6d732a76a3797
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Thu Sep 9 13:22:28 2010 +0000
+
+    included Changelog info for previous release (0.9.6)
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@40 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/ChangeLog |  144 +++++++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 files changed, 140 insertions(+), 4 deletions(-)
+
+commit 319a3d9e6b1036017a9ae10c21159b1a373359ab
+Author: gaudry <gaudry@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Thu Sep 9 09:32:13 2010 +0000
+
+    kara variant for mul3, not tested
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@39 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/tuning/mul3k.c |   33 +++++++++++++++++++++++++++++++++
+ 1 files changed, 33 insertions(+), 0 deletions(-)
+
+commit 209dfc8115fcb231fe9348113211d1201400711b
+Author: gaudry <gaudry@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Thu Sep 9 09:09:45 2010 +0000
+
+    kara for mul2
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@38 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/hardware/x86_64_pclmul/gf2x_mul2.h |   21 +++++++++++----------
+ 1 files changed, 11 insertions(+), 10 deletions(-)
+
+commit 44b490bd78036b4fdc13302fd31d30541db4bd8e
+Author: zimmerma <zimmerma@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Thu Sep 9 08:45:09 2010 +0000
+
+    added test check-addmul.c
+    
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@37 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/tests/Makefile.am    |    4 +-
+ trunk/tests/check-addmul.c |   89 ++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 92 insertions(+), 1 deletions(-)
+
+commit 548fad65b3c30fc7734f17465fc21900cc559262
+Author: gaudry <gaudry@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Thu Sep 9 08:11:42 2010 +0000
+
+    fix bug in mul_1n
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@36 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/hardware/x86_64_pclmul/gf2x_mul1.h |   12 +++++++++---
+ 1 files changed, 9 insertions(+), 3 deletions(-)
+
+commit 5a1aae3c277fa37ef98437d86cf900e85338581b
+Author: zimmerma <zimmerma@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Thu Sep 9 06:43:26 2010 +0000
+
+    [configure.ac] improved the output of configure --help
+    
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@35 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/configure.ac |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+commit 3fa0352daf8b09698c88c715f6056d5f514e3c4e
+Author: gaudry <gaudry@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Wed Sep 8 22:19:37 2010 +0000
+
+    Some tuning for westmere with pclmulqdq.
+    The code is still experimental: not really tested.
+    
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@34 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/hardware/x86_64_pclmul/gf2x-thresholds.h |  143 ++++++++----------------
+ 1 files changed, 47 insertions(+), 96 deletions(-)
+
+commit 7a8f634e3921e5b39a9855dcfd3711a04383623e
+Author: gaudry <gaudry@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Wed Sep 8 20:50:29 2010 +0000
+
+    Here comes pclmulqdq support.
+    Not yet set by default (use --enable-pclmul).
+    Not yet tuned.
+    
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@33 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/config/acinclude.m4                      |   69 ++++++
+ trunk/configure.ac                             |   12 +-
+ trunk/hardware/x86_64_pclmul/gf2x-thresholds.h |  269 ++++++++++++++++++++++++
+ trunk/hardware/x86_64_pclmul/gf2x_mul1.h       |  168 +++++++++++++++
+ trunk/hardware/x86_64_pclmul/gf2x_mul2.h       |   75 +++++++
+ 5 files changed, 592 insertions(+), 1 deletions(-)
+
+commit 1a505ef45eaf9dd3215dbb5a486adfd64fe51020
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Thu Nov 26 10:00:45 2009 +0000
+
+    fft2 disappeared, using new interface
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@32 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/tuning/tunefft.c |    8 ++++++--
+ 1 files changed, 6 insertions(+), 2 deletions(-)
+
+commit 1b47e3dfd89823ba055e75e7ad4bdb0418d50f15
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Nov 9 15:45:15 2009 +0000
+
+    oops
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@31 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/Makefile.am |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+commit 3f9f8072247dcde60a6e657ea078a717be22697c
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Nov 9 15:36:39 2009 +0000
+
+    prepare rev 0.9.6
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@30 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/configure.ac |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+commit ae0065f0f886a7df5c7f1d0e8eb06cb43cc8e00f
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Nov 9 15:36:36 2009 +0000
+
+    changed license GPLv2+ --> LGPLv2+ except for apps/ which remains GPLv2+
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@29 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/COPYING                             |  662 ++++++++++++++++++-----------
+ trunk/README                              |    7 +-
+ trunk/apps/COPYING                        |  340 +++++++++++++++
+ trunk/bench.c                             |   23 +-
+ trunk/fft.c                               |   23 +-
+ trunk/gf2x.c                              |   23 +-
+ trunk/gf2x.h                              |   23 +-
+ trunk/gf2x/gf2x-impl.h                    |   23 +-
+ trunk/gf2x/gf2x-small.h                   |   23 +-
+ trunk/gf2x/gf2x-tfft.h                    |   27 +-
+ trunk/hardware/generic/gf2x-thresholds.h  |   23 +-
+ trunk/hardware/generic/gf2x_mul2.h        |   23 +-
+ trunk/hardware/generic/gf2x_mul3.h        |   23 +-
+ trunk/hardware/generic/gf2x_mul4.h        |   23 +-
+ trunk/hardware/generic32/gf2x_mul1.h      |   23 +-
+ trunk/hardware/generic64/gf2x_mul1.h      |   23 +-
+ trunk/hardware/opteron/gf2x-thresholds.h  |   23 +-
+ trunk/hardware/opteron/gf2x_mul1.h        |   23 +-
+ trunk/hardware/x86_64/gf2x-thresholds.h   |   23 +-
+ trunk/hardware/x86_64/gf2x_mul2.h         |   23 +-
+ trunk/hardware/x86_sse2/gf2x-thresholds.h |   23 +-
+ trunk/hardware/x86_sse2/gf2x_mul1.h       |   23 +-
+ trunk/hardware/x86_sse2/gf2x_mul3.h       |   23 +-
+ trunk/hardware/x86_sse2/gf2x_mul4.h       |   23 +-
+ trunk/tests/check-mul.c                   |   23 +-
+ trunk/toom.c                              |   23 +-
+ trunk/tuning/gen_bb_mul_code.c            |   23 +-
+ trunk/tuning/mul1_avx.c                   |   23 +-
+ trunk/tuning/mul2k.c                      |   23 +-
+ trunk/tuning/mul2t.c                      |   23 +-
+ trunk/tuning/mul3k.c                      |   23 +-
+ trunk/tuning/mul3t.c                      |   23 +-
+ trunk/tuning/mul4k.c                      |   23 +-
+ trunk/tuning/mul4t.c                      |   23 +-
+ trunk/tuning/replace.c                    |   23 +-
+ trunk/tuning/replace.h                    |   23 +-
+ trunk/tuning/timing.c                     |   23 +-
+ trunk/tuning/timing.h                     |   23 +-
+ trunk/tuning/tunefft.c                    |   23 +-
+ trunk/tuning/tunetoom.c                   |   23 +-
+ trunk/tuning/tuneup.c                     |   23 +-
+ trunk/tuning/tuning-common.c              |   23 +-
+ trunk/tuning/tuning-common.h              |   23 +-
+ trunk/tuning/update-thresholds.c          |   23 +-
+ 44 files changed, 1222 insertions(+), 734 deletions(-)
+
+commit b6e7e16184b5946feecf3b5eef032783c35a01e8
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Nov 9 15:36:34 2009 +0000
+
+    experimental interface for fft transform caching.
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@28 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/Makefile.am      |    1 +
+ trunk/TODO             |    4 -
+ trunk/fft.c            |  830 ++++++++++++++++++++++++++++++------------------
+ trunk/gf2x.c           |   14 +-
+ trunk/gf2x/gf2x-impl.h |   19 +-
+ trunk/gf2x/gf2x-tfft.h |   44 +++
+ 6 files changed, 578 insertions(+), 334 deletions(-)
+
+commit 0fc6e16f2762da4190b9567e1cc990f0411a1b12
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Nov 9 15:36:33 2009 +0000
+
+    for some reason the TODO file wasn't checked in.
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@27 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/TODO |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
+
+commit 0d0291ccfd97d078e344a14eda765a9a0aa5f629
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Nov 9 15:36:32 2009 +0000
+
+    s/echo/AC_MSG_NOTICE, for configure --silent
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@26 e5c1114b-a573-4582-9dac-f72f410959ce
+
+ trunk/configure.ac |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
+
+commit 40c792ce2baa493fa47db9479eccffd00b9a55be
+Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>
+Date:   Mon Apr 27 19:30:20 2009 +0000
 
     release gf2x-0.9.5
+    
+    git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/gf2x@25 e5c1114b-a573-4582-9dac-f72f410959ce
 
- trunk/ChangeLog |   67 ++++++++++++++++++++++++++++++++++++++++++++++++++-----
- 1 files changed, 61 insertions(+), 6 deletions(-)
+ trunk/ChangeLog |   74 +++++++++++++++++++++++++++++++++++++++++++++++++++---
+ 1 files changed, 69 insertions(+), 5 deletions(-)
 
 commit b974195b8d7af3fb19100d53ea54a3d1291756ea
 Author: thome <thome@e5c1114b-a573-4582-9dac-f72f410959ce>

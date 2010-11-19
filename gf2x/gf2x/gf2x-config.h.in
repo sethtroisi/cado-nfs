@@ -9,6 +9,10 @@
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H
 
+/* Define if pclmul as present in the source tree is supported by the compiler
+   and hardware */
+#undef HAVE_PCLMUL_SUPPORT
+
 /* Define if sse-2 code as present in the source tree is supported by the
    compiler */
 #undef HAVE_SSE2_SUPPORT
@@ -55,6 +59,9 @@
 
 /* Define to the one symbol short name of this package. */
 #undef PACKAGE_TARNAME
+
+/* Define to the home page for this package. */
+#undef PACKAGE_URL
 
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION

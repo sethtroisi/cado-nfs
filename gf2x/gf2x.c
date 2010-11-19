@@ -4,21 +4,20 @@
    Richard Brent, Pierrick Gaudry, Emmanuel Thome', Paul Zimmermann
 
    This program is free software; you can redistribute it and/or modify it
-   under the terms of the GNU General Public License as published by the
-   Free Software Foundation; either version 2 of the License, or (at your
-   option) any later version.
-
+   under the terms of the GNU Lesser General Public License as published by
+   the Free Software Foundation; either version 2.1 of the License, or (at
+   your option) any later version.
+   
    This program is distributed in the hope that it will be useful, but WITHOUT
    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-   FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-   more details.
-
-   You should have received a copy of the GNU General Public License along
-   with this program; see the file COPYING.  If not, write to the Free
-   Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
-   02111-1307, USA.
+   FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
+   License for more details.
+   
+   You should have received a copy of the GNU Lesser General Public
+   License along with CADO-NFS; see the file COPYING.  If not, write to
+   the Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+   Boston, MA 02110-1301, USA.
 */
-
 #include <string.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -53,8 +52,6 @@ void gf2x_mul_basecase(unsigned long * c, const unsigned long * a,
 		    "na=nb=%ld ; decrease GF2X_MUL_KARA_THRESHOLD\n", na);
 	    exit(1);
 	}
-    } else if (!(na && nb)) {   /* One of them has zero words, thus is 0 */
-        memset(c, 0, (na + nb) * sizeof(unsigned long));
     } else if (na < nb) {
         /* FIXME -- this does not seem efficient */
         long i;
@@ -184,9 +181,6 @@ void gf2x_mul_r(unsigned long * c,
                 ptr[sb] ^= gf2x_addmul_1_n(ptr, ptr, b, sb, a[0]);
                 break;
             }
-
-            /* TODO: Should do addmul_2_n here, that would be an easy
-             * improvement. */
 
             // finally: the general case
             for (i = 0; i + sa <= sb; i += sa) {

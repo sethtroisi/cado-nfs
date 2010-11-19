@@ -4,27 +4,25 @@
    Richard Brent, Pierrick Gaudry, Emmanuel Thome', Paul Zimmermann
 
    This program is free software; you can redistribute it and/or modify it
-   under the terms of the GNU General Public License as published by the
-   Free Software Foundation; either version 2 of the License, or (at your
-   option) any later version.
-
+   under the terms of the GNU Lesser General Public License as published by
+   the Free Software Foundation; either version 2.1 of the License, or (at
+   your option) any later version.
+   
    This program is distributed in the hope that it will be useful, but WITHOUT
    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-   FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-   more details.
-
-   You should have received a copy of the GNU General Public License along
-   with this program; see the file COPYING.  If not, write to the Free
-   Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
-   02111-1307, USA.
+   FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
+   License for more details.
+   
+   You should have received a copy of the GNU Lesser General Public
+   License along with CADO-NFS; see the file COPYING.  If not, write to
+   the Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+   Boston, MA 02110-1301, USA.
 */
-
 /* Multiplication over GF(2)[x] using Fast Fourier Transform.
  * Bit-aligned version. */
 
 #include <stdio.h>
 #include <stdint.h> /* for uint64_t in Lshift */
-#include <inttypes.h> /* for PRIu64 */
 #include <stdlib.h>
 #include <string.h>
 
@@ -36,10 +34,8 @@
 
 
 // #define DEBUG
-// #define DEBUG_LSHIFT    100     /* trace only if N >= <value> */
-// #define DEBUG_MULMOD    100     /* trace only if N >= <value> */
-// #define DEBUG_FFT       100     /* trace only if K >= <value> */
-// #define DEBUG_RECOMPOSE 1     /* trace only if K >= <value> */
+// #define DEBUG_LSHIFT
+// #define DEBUG_MULMOD
 // #define VERBOSE
 // #define TIMING
 
@@ -55,7 +51,7 @@
 #error "MUL_FFT_THRESHOLD too small, should be at least 28"
 #endif
 
-/* Assume wordlength WLEN is 32 or 64 */
+/* Assume wordlength  WLEN is 32 or 64 */
 
 # define WLEN GF2X_WORDSIZE
 
@@ -267,16 +263,16 @@ static unsigned long LshRsh(unsigned long *c, unsigned long *a, size_t n,
 
 #endif
 
-#if (defined(DEBUG) || defined(DEBUG_LSHIFT) || defined(DEBUG_MULMOD) || defined(DEBUG_RECOMPOSE))
+#if (defined(DEBUG) || defined(DEBUG_LSHIFT) || defined(DEBUG_MULMOD))
 
 static void dump(const unsigned long *a, size_t n)
 {
-    printf("[");
     for (size_t i = 0; i < n; i++) {
-        if (i) printf(", ");
-	printf("%lu", a[i]);
+	printf("+%lu*X^%lu", a[i], i);
+	if ((i + 1) % 3 == 0)
+	    printf("\n");
     }
-    printf("];\n");
+    printf(":\n");
 }
 #endif
 
@@ -291,11 +287,8 @@ static void Lshift(unsigned long *a, unsigned long *b, uint64_t k, size_t N)
     n = W(2 * N);
 
 #ifdef DEBUG_LSHIFT
-    if (N >= DEBUG_LSHIFT) {
-        // printf("R:=x^%u+x^%u+1: k:=%ld:\nb:=", 2 * N, N, k);
-        printf("N:=%zu; k:=%"PRIu64"; // R:=x^%zu+x^%zu+1\n", N, k, 2 * N, N);
-        printf("b:="); dump(b, n);
-    }
+    printf("R:=x^%u+x^%u+1: k:=%ld:\nb:=", 2 * N, N, k);
+    dump(b, n);
 #endif
 
     k = k % (3 * N);
@@ -373,25 +366,16 @@ static void Lshift(unsigned long *a, unsigned long *b, uint64_t k, size_t N)
 	if (R(N) > 0)
 	    s1 = a[I(N)];
 	// ASSERT(I(N) >= 0);
-        // we may have I(N) == 0 here.
-        if (I(N)) {
-            s2 = Lsh(a + I(N), a, I(N), R(N));
-            if (R(N) > 0) {
-                a[I(N)] ^= s1;	/* restore high R(N) bits */
-                a[2 * I(N)] = s2 ^ (s1 << R(N));
-                if (2 * R(N) > WLEN)
-                    a[2 * I(N) + 1] = s1 >> (WLEN - R(N));
-            }
-        } else {
-            assert(R(N));
-            a[I(N)] ^= s1 << R(N);
-            if (2 * R(N) > WLEN)
-                a[2 * I(N) + 1] = s1 >> (WLEN - R(N));
-        }
+	s2 = Lsh(a + I(N), a, I(N), R(N));
+	if (R(N) > 0) {
+	    a[I(N)] ^= s1;	/* restore high R(N) bits */
+	    a[2 * I(N)] = s2 ^ (s1 << R(N));
+	    if (2 * R(N) > WLEN)
+		a[2 * I(N) + 1] = s1 >> (WLEN - R(N));
+	}
 	/* now we have a = H0:H1:H0:H1 */
 	AddRsh(a, b + I(N + l), W(2 * N) - I(N + l), R(N + l));
 	/* now we have a = H0+H2:H1:H0:H1 */
-        /* XXX We may have W(l) == 0 here */
 	s1 = AddLsh(a + I(N + h), b, W(l), R(N + h));
 	if (r > 0)		/* mask shifted low bits from H0 */
 	    a[I(N + h) + I(l)] ^= (b[I(l)] & ~MASK(R(l))) << R(N + h);
@@ -442,22 +426,8 @@ static void Lshift(unsigned long *a, unsigned long *b, uint64_t k, size_t N)
     if (r > 0)
 	a[n - 1] &= MASK(r);
 #ifdef DEBUG_LSHIFT
-    if (N >= DEBUG_LSHIFT) {
-        printf("a:=");
-        dump(a, n);
-        printf("check_lshift(N,k,a,b);\n");
-    }
-#if 0
-w:=64;
-function check_lshift(N,k,a,b)
-    KP<x>:=PolynomialRing(GF(2));
-    bb:=KP!Intseq(Seqint(b,2^w),2);
-    aa:=KP!Intseq(Seqint(a,2^w),2);
-    R:=x^(2*N)+x^N+1;
-    return aa eq (bb * x^k) mod R;
-end function;
-#endif
-    
+    printf("a:=");
+    dump(a, n);
 #endif
 }
 
@@ -478,12 +448,10 @@ static void MulMod(unsigned long *a, const unsigned long *b, const unsigned long
        tests below. */
 
 #ifdef DEBUG_MULMOD
-    if (N >= DEBUG_MULMOD) {
-        printf("b:=");
-        dump(b, n);
-        printf("c:=");
-        dump(c, n);
-    }
+    printf("b:=");
+    dump(b, n);
+    printf("c:=");
+    dump(c, n);
 #endif
     gf2x_mul_toom(t, b, c, n, u);	/* t = | L0:N | L1:N | H0:N | H1:N | */
     /* t mod x^(2*N)+x^(N)+1 = | L0+H0+H1:N | L1+H0:N | */
@@ -494,7 +462,6 @@ static void MulMod(unsigned long *a, const unsigned long *b, const unsigned long
     if (I(N) < l)		/* necessarily l = I(N)+1 */
 	u[0] = a[l - 1];
     // ASSERT(I(N) >= 0);
-    /* XXX We may have I(N) == 0 here */
     u[1] = Lsh(a + I(N), a, I(N), R(N));	/* H0:H0 */
     /* u[0] and a[1] have R(N) bits */
     if (I(N) < l) {
@@ -513,23 +480,8 @@ static void MulMod(unsigned long *a, const unsigned long *b, const unsigned long
     if (sh > 0)
 	a[n - 1] &= MASK(sh);
 #ifdef DEBUG_MULMOD
-    if (N >= DEBUG_MULMOD) {
-        printf("a:=");
-        dump(a, W(2 * N));
-        printf("check_mulmod(%zu,a,b,c);\n", N);
-    }
-
-#if 0
-w:=64;
-function check_mulmod(N,a,b,c)
-    KP<x>:=PolynomialRing(GF(2));
-    bb:=KP!Intseq(Seqint(b,2^w),2);
-    cc:=KP!Intseq(Seqint(c,2^w),2);
-    aa:=KP!Intseq(Seqint(a,2^w),2);
-    R:=x^(2*N)+x^N+1;
-    return aa eq (bb * cc) mod R;
-end function;
-#endif
+    printf("a:=");
+    dump(a, W(2 * N));
 #endif
 }
 
@@ -547,23 +499,6 @@ static void bitrev(size_t i, size_t j, size_t K, size_t Z, size_t *perm)
 	bitrev(i + 2 * K / 3, j + 2 * Z, K / 3, 3 * Z, perm);
     }
 }
-
-#if defined(DEBUG_FFT) || defined(DEBUG_RECOMPOSE)
-void dump_stride(unsigned long ** A, size_t K, size_t stride, size_t twonp)
-{
-    printf("[");
-    for(size_t c = 0 ; c < K ; c++) {
-        if (c) printf(", ");
-        printf("[");
-        for(size_t l = 0 ; l < twonp ; l++) {
-            if (l) printf(", ");
-            printf("%lu", A[c * stride][l]);
-        }
-        printf("]");
-    }
-    printf("]");
-}
-#endif
 
 /* performs an FFT of length K on A[0], A[stride], A[(K-1)*stride] with
    omega=x^j as root of unity, where all computations are
@@ -587,17 +522,6 @@ static void fft(unsigned long **A, uint64_t K, uint64_t j, size_t Np, size_t str
 
     size_t i, k = K / 3, twonp = W(2 * Np);
     uint64_t ii;
-
-#ifdef  DEBUG_FFT
-    static unsigned long key;
-    unsigned long mykey = key++;
-
-    if (K >= DEBUG_FFT) {
-        printf("A_%lu:=", mykey);
-        dump_stride(A, K, stride, twonp);
-        printf(";\n");
-    }
-#endif
 
     fft(A, k, (3 * j) % (3 * Np), Np, 3 * stride, t1, t2, t3, p);
     fft(A + stride, k, (3 * j) % (3 * Np), Np, 3 * stride, t1, t2, t3, p);
@@ -624,29 +548,6 @@ static void fft(unsigned long **A, uint64_t K, uint64_t j, size_t Np, size_t str
 #undef a
 #undef b
 #undef c
-
-#ifdef  DEBUG_FFT
-    if (K >= DEBUG_FFT) {
-        printf("At_%lu:=", mykey);
-        dump_stride(A, K, stride, twonp);
-        printf(";\n");
-        printf("check_fft(A_%lu, At_%lu, %zu, %zu, %zu);\n",
-                mykey,mykey,K,j,Np);
-    }
-#if 0
-function check_fft(p, q, K, j, Np)
-    KP<x>:=PolynomialRing(GF(2));
-    R:=x^(2*Np)+x^Np+1;
-    perm:=[Seqint(Reverse(Intseq(u,3,Ilog(3,K))),3):u in [0..K-1]];
-    L<z>:=quo<KP|R>;
-    LP<T>:=PolynomialRing(L);
-    pp:=LP![L!Intseq(Seqint(u,2^64),2):u in p];
-    qq:=LP![L!Intseq(Seqint(u,2^64),2):u in q];
-    return qq eq LP![Evaluate(pp,z^(j*perm[1+i])):i in [0..K-1]];
-end function;
-#endif
-
-#endif
 }
 
 /* allocate A[0]...A[K-1], and put there {a, an} cut into K chunks of M bits;
@@ -693,25 +594,12 @@ static void recompose(unsigned long * c, size_t cn, unsigned long **C, size_t K,
        Each C[i] has 2*Np bits, thus the full C has (K-1)*M+2*Np
        = N - M + 2*Np >= N + Np >= 2*n*WLEN + Np bits.
        Thus exactly 2*Np-M bits wrap around mod x^N+1.
-
-       Note though that we are _NOT_ doing the wrapping by ourselves. We should.
      */
 
-#ifdef  DEBUG_RECOMPOSE
-    if (K >= DEBUG_RECOMPOSE) {
-        printf("C:=");
-        dump_stride(C, K, 1, 2*W(Np));
-        printf(";\n");
-    }
-#endif
-
-#if 1
     size_t l = 2 * Np - M;/* number of overlapping bits with previous C[i] */
     size_t i, j, k;
     size_t j1, k1;
     size_t z;
-
-    Zero(c, cn);
 
     for (i = 0, j = 0, k = 0, j1 = I(l), k1 = R(l); i < K; i++) {
 	// unsigned long cy;
@@ -733,29 +621,18 @@ static void recompose(unsigned long * c, size_t cn, unsigned long **C, size_t K,
 		    ASSERT((j + W(2 * Np) < cn));
 		    c[j + W(2 * Np)] =
 			Lsh(c + j + z, C[i] + z, W(2 * Np) - z, k);
-		} else /* if (z == W(2 * Np)) */ {	/* all words overlap with C[i-1] */
-                    /* XXX In fact, it may even be > ! */
-		    // c[j + W(2 * Np)] = 0UL;
+		} else if (z == W(2 * Np)) {	/* all words overlap with C[i-1] */
+		    ASSERT((j + W(2 * Np) < cn));
+		    c[j + W(2 * Np)] = 0UL;
 		}
 	    } else if (j + z < cn) {
-                ASSERT(cn - j <= W(2*Np));
 		Lsh(c + j + z, C[i] + z, cn - j - z, k);
 	    }
 	    /* then deal with the low bits of C[i], overlapping with C[i-1] */
-	    if (j + z < cn) {
-                /* First make sure we're not going to read too many bits
-                 * from C[i] ! */
-                if (z > W(2*Np)) {
-                    z = W(2*Np);
-                }
-                c[j + z] ^= AddLsh(c + j, C[i], z, k);
-            } else if (j < cn) {
-                if (cn - j <= W(2*Np)) {
-                    AddLsh(c + j, C[i], cn - j, k);
-                } else {
-                    c[j + W(2*Np)] ^= AddLsh(c + j, C[i], W(2*Np), k);
-                }
-            }
+	    if (j + z < cn)
+		c[j + z] ^= AddLsh(c + j, C[i], z, k);
+	    else if (j < cn)
+		AddLsh(c + j, C[i], cn - j, k);
 	}
 
 	k += M;
@@ -765,72 +642,6 @@ static void recompose(unsigned long * c, size_t cn, unsigned long **C, size_t K,
 	j1 += k1 / WLEN;
 	k1 %= WLEN;
     }
-#else
-    Zero(c, cn);
-    size_t i;
-    size_t N = K * M;
-    for(i = 0 ; i < K ; i++) {
-        size_t lo = i * M;      // This < N
-        size_t hi = lo + 2 * Np;
-        if (hi <= N) {
-            /* Then we have no overwrapping bits */
-            /* See how far we can fill c. */
-            size_t last = I(lo) + W(2*Np);
-            if (last < cn) {
-                c[last] ^= AddLsh(c + I(lo), C[i], W(2*Np), R(lo));
-            } else if (I(lo) <= cn) {
-                /* By assumption, we have a zero, or for some reason
-                 * we're truncating. In any case the carry out here does
-                 * not have to be saved. Neither can it, anyway. */
-                ASSERT(cn - I(lo) <= W(2*Np));   // follows from above.
-                AddLsh(c + I(lo), C[i], cn - I(lo), R(lo));
-            } else {
-                /* this part is dropped (known zero ???) */
-            }
-        } else {
-            sizet f = N - lo;
-            {
-                size_t last = I(lo) + W(f);
-                if (last < cn) {
-                    c[last] ^= AddLsh(c + I(lo), C[i], W(f), R(lo));
-                } else if (I(lo) <= cn) {
-                    AddLsh(c + I(lo), C[i], cn - I(lo), R(lo));
-                }
-            }
-            /* Now place bits [f..2*Np[ at bit zero */
-            {
-                size_t last = W(2*Np) - I(f);
-                if (last < cn) {
-                    c[last] ^= AddRsh(c, C[i] + I(f), W(2*Np) - I(f), R(f));
-                } else {
-                    AddRsh(c, C[i] + I(f), cn, R(f));
-                }
-            }
-        }
-    }
-#endif
-
-
-#ifdef  DEBUG_RECOMPOSE
-    if (K >= DEBUG_RECOMPOSE) {
-        printf("c:=");dump(c,cn);
-        printf("check_recompose(C,c,%zu,%zu,%zu);\n",K,M,Np);
-    }
-#if 0
-function check_recompose(C,c,K,M,Np)
-    KP<x>:=PolynomialRing(GF(2));
-    R:=x^(2*Np)+x^Np+1;
-    L<z>:=quo<KP|R>;
-    LP<T>:=PolynomialRing(L);
-    R:=LP![L!Intseq(Seqint(u, 2^64), 2) : u in C];
-    shouldbe:=&+[KP!Coefficient(R,i)*x^(M*i):i in [0..K-1]];
-    got:=KP!Intseq(Seqint(c,2^64),2);
-    return got eq shouldbe;
-end function;
-
-#endif
-#endif
-
 }
 
 static inline size_t compute_Np(size_t M, size_t K)
@@ -1087,7 +898,6 @@ static void gf2x_tfft_compose_inner(gf2x_tfft_info_srcptr o, gf2x_tfft_ptr tc, g
 void gf2x_tfft_compose(gf2x_tfft_info_srcptr o, gf2x_tfft_ptr tc, gf2x_tfft_srcptr ta, gf2x_tfft_srcptr tb)
 {
     if (o->K == 0) {
-        // ASSERT(W(o->bits_a) + W(o->bits_b) <= gf2x_tfft_size(o));
         gf2x_mul(tc, ta, W(o->bits_a), tb, W(o->bits_b));
     } else if (!o->split){
         gf2x_tfft_compose_inner(o, tc, ta, tb, o->M);
@@ -1174,9 +984,6 @@ void gf2x_tfft_ift(gf2x_tfft_info_srcptr o, unsigned long * c, size_t bits_c, gf
         gf2x_tfft_ift_inner(o, c2, cn * WLEN, tr, m2);
         wrap(c2, cn2 * WLEN, K * m2);
 
-        /* TODO: We should rather do a more intelligent recompose() step,
-         * skipping the c1 and c2 buffers entirely.
-         */
         split_reconstruct(c, c1, c2, cn0, K, m1);
         free(c1);
         free(c2);
@@ -1205,27 +1012,13 @@ void gf2x_tfft_init(gf2x_tfft_info_ptr o, size_t bits_a, size_t bits_b, ...)
     va_list ap;
     va_start(ap, bits_b);
     long K = va_arg(ap, long);
-    va_end(ap);
-
-    size_t M = 0;
-    long Kx = K;
-    for( ; Kx ; ) {
-        if (Kx == 1 || Kx == -1)
-            break;
-        if ((Kx % 3) != 0) {
-            fprintf(stderr, "gf2x_tfft_init called with wrong size parameter"
-                    " (%ld is not a power of 3)\n", K);
-            abort();
-        }
-        Kx /= 3;
-    }
-    assert((Kx == 0) == (K == 0));
+    size_t M;
     if (K > 0) {
         M = CEIL((nwa + nwb) * WLEN, K);	// ceil(bits(product)/K)
         o->K = K;
         o->M = M;
         o->split = 0;
-    } else if (K < 0) {
+    } else {
         ASSERT(-K >= WLEN);
         size_t cn2 = CEIL(nwa + nwb, 2);	// Space for half product
         size_t m2 = CEIL(cn2 * WLEN, -K);	// m2 = ceil(cn2*WLEN/K)
@@ -1236,7 +1029,7 @@ void gf2x_tfft_init(gf2x_tfft_info_ptr o, size_t bits_a, size_t bits_b, ...)
         o->split = 1;
     }
 
-    if (nwa + nwb < MUL_FFT_THRESHOLD || K == 0) {
+    if (nwa + nwb < MUL_FFT_THRESHOLD) {
         // make this special.
         o->K = 0;
         o->M = 0;
@@ -1255,16 +1048,7 @@ void gf2x_tfft_init(gf2x_tfft_info_ptr o, size_t bits_a, size_t bits_b, ...)
     o->tmp = (unsigned long *) malloc_or_die(ltmp * sizeof(unsigned long));
     o->perm = (size_t *) malloc_or_die(o->K * sizeof(size_t));
     bitrev(0, 0, o->K, 1, o->perm);
-}
-
-void gf2x_tfft_init_similar(gf2x_tfft_info_ptr o, size_t bits_a, size_t bits_b, gf2x_tfft_info_srcptr other)
-{
-    gf2x_tfft_init(o, bits_a, bits_b, other->K);
-}
-
-int gf2x_tfft_compatible(gf2x_tfft_info_srcptr o1, gf2x_tfft_info_srcptr o2)
-{
-    return o1->K == o2->K && o1->M == o2->M;
+    va_end(ap);
 }
 
 void gf2x_tfft_clear(gf2x_tfft_info_ptr o)
@@ -1294,7 +1078,7 @@ void gf2x_mul_fft(unsigned long *c, const unsigned long *a, size_t an,
     gf2x_tfft_init(o, an * WLEN, bn * WLEN, K);
     
     if (o->K == 0) {
-	printf("gf2x_mul_fft: arguments (%zu, %zu) too small\n", an, bn);
+	printf("gf2x_mul_fft: arguments (%ld, %ld) too small\n", an, bn);
         /* Note that actually the routines below do work, because they're
          * specified for working. However, this contradicts the fact that
          * via this entry point, we have explicitly asked for _not_

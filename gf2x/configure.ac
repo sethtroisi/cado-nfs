@@ -1,5 +1,26 @@
+#  This file is part of the gf2x library.
+# 
+#  Copyright 2007, 2008, 2009, 2010
+#  Richard Brent, Pierrick Gaudry, Emmanuel Thome', Paul Zimmermann
+# 
+#  This program is free software; you can redistribute it and/or modify it
+#  under the terms of the GNU Lesser General Public License as published by
+#  the Free Software Foundation; either version 2.1 of the License, or (at
+#  your option) any later version.
+#  
+#  This program is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
+#  License for more details.
+#  
+#  You should have received a copy of the GNU Lesser General Public
+#  License along with CADO-NFS; see the file COPYING.  If not, write to
+#  the Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
+#  Boston, MA 02110-1301, USA.
 
-AC_INIT([gf2x], [0.9.5])
+
+AC_INIT([gf2x], [1.0])
+: ${CFLAGS=-g -O4}
 AC_CONFIG_AUX_DIR([config])
 AC_CONFIG_MACRO_DIR([config])
 AC_CANONICAL_TARGET
@@ -16,6 +37,10 @@ AC_ARG_ENABLE([ntl-checks],
 AC_ARG_ENABLE([sse2],
               [AS_HELP_STRING([--enable-sse2],
                               [Turn on sse-2 code (default is yes)])])
+
+AC_ARG_ENABLE([pclmul],
+              [AS_HELP_STRING([--enable-pclmul],
+                              [Turn on pclmul code (default is yes)])])
 
 AM_CONDITIONAL([ENABLE_NTL_CHECKS],[test x$enable_ntl_checks = xyes])
 
@@ -34,6 +59,8 @@ AC_SUBST([GF2X_WORDSIZE], [$gf2x_wordsize])
 
 
 CHECK_SSE2_SUPPORT()
+
+CHECK_PCLMUL_SUPPORT()
 
 : ${ABI='default'}
 
@@ -63,7 +90,11 @@ if test x$hwdir = x ; then
    ;;
   core2|opteron|x86_64|nocona|k10)
    # Note: could set to something else if we have separate tuning files.
-   hwdir=x86_64
+   if test "$gf2x_cv_cc_supports_pclmul" = "no" ; then
+     hwdir=x86_64
+   else
+     hwdir=x86_64_pclmul
+   fi
    if test x$ABI = x32 ; then
     hwdir=x86_sse2
    elif test x$ABI = xdefault ; then
@@ -87,15 +118,18 @@ AC_MSG_NOTICE([      CFLAGS="$CFLAGS"])
 AC_MSG_NOTICE([      CPPFLAGS="$CPPFLAGS"])
 AC_MSG_NOTICE([      hwdir="$hwdir"])
 
-for f in gf2x-thresholds.h gf2x_mul1.h gf2x_mul2.h gf2x_mul3.h gf2x_mul4.h ; do
+for f in gf2x-thresholds.h      \
+        gf2x_mul1.h gf2x_mul2.h gf2x_mul3.h gf2x_mul4.h \
+        gf2x_mul5.h gf2x_mul6.h gf2x_mul7.h gf2x_mul8.h \
+        gf2x_mul9.h ; do
  who=tuned
- if ! test -f $srcdir/hardware/$who/$f ; then who=$hwdir; fi
- if ! test -f $srcdir/hardware/$who/$f ; then who=generic$gf2x_wordsize; fi
- if ! test -f $srcdir/hardware/$who/$f ; then who=generic; fi
- if ! test -f $srcdir/hardware/$who/$f ; then AC_MSG_ERROR([$f not found]); fi
- AC_CONFIG_LINKS([gf2x/$f:hardware/$who/$f])
+ if ! test -f $srcdir/already_tuned/$who/$f ; then who=$hwdir; fi
+ if ! test -f $srcdir/already_tuned/$who/$f ; then who=generic$gf2x_wordsize; fi
+ if ! test -f $srcdir/already_tuned/$who/$f ; then who=generic; fi
+ if ! test -f $srcdir/already_tuned/$who/$f ; then AC_MSG_ERROR([$f not found]); fi
+ AC_CONFIG_LINKS([gf2x/$f:already_tuned/$who/$f])
  if test "$f" = "gf2x-thresholds.h" ; then
-    tuned_nbits=[`sed -n 's/^#define[ 	][ 	]*GF2X_WORDSIZE[ 	][ 	]*\([0-9][0-9]*\).*$/\1/p' $srcdir/hardware/$who/$f`]
+    tuned_nbits=[`sed -n 's/^#define[ 	][ 	]*GF2X_WORDSIZE[ 	][ 	]*\([0-9][0-9]*\).*$/\1/p' $srcdir/already_tuned/$who/$f`]
  fi
 done
 
@@ -104,22 +138,23 @@ if test x$tuned_nbits = x ; then
 else
  if test x$ABI != xdefault ; then
   if test x$tuned_nbits != x$ABI ; then
-   AC_MSG_ERROR([hardware/$hwdir/ assumes $tuned_nbits-bits unsigned longs, which conflicts with ABI=$ABI])
+   AC_MSG_ERROR([already_tuned/$hwdir/ assumes $tuned_nbits-bits unsigned longs, which conflicts with ABI=$ABI])
   fi
  else
   # At this point we haven't run the standard check.
-  VERIFY_WORDSIZE([$tuned_nbits],[whether hardware/$hwdir/ is right assuming $tuned_nbits-bits unsigned longs])
+  VERIFY_WORDSIZE([$tuned_nbits],[whether already_tuned/$hwdir/ is right assuming $tuned_nbits-bits unsigned longs])
  fi
 fi
 
-# This is used in tuning/Makefile.am
+# This is used in src/Makefile.am
 AM_CONDITIONAL([GF2X_32BIT_SOURCES],[test "x$tuned_nbits" = x32])
 AM_CONDITIONAL([GF2X_64BIT_SOURCES],[test "x$tuned_nbits" = x64])
 AM_CONDITIONAL([GF2X_SSE2_AVAILABLE],[test "x$gf2x_cv_cc_supports_sse2" != xno])
+AM_CONDITIONAL([GF2X_PCLMUL_AVAILABLE],[test "x$gf2x_cv_cc_supports_pclmul" != xno])
 
 AC_CONFIG_HEADERS([gf2x/gf2x-config.h])
 
-AC_CONFIG_FILES([version.sh Makefile tests/Makefile apps/Makefile tuning/Makefile])
+AC_CONFIG_FILES([version.sh Makefile tests/Makefile apps/Makefile src/Makefile])
 AC_OUTPUT
 
 # vim: set sw=1:
