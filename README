@@ -4,10 +4,11 @@ Required software tools:
 *) GMP (http://gmplib.org): usually installed in most Linux distributions
 *) The GCC compiler works ; some others might, but it is untested. C and
    C++ are required.
-*) GNU make and CMake for building (CMake is installed on the fly if missing)
+*) GNU make and CMake for building (CMake is installed on the fly if missing
+   (requires an Internet connection))
 *) Support for posix threads.
-*) The general script uses a lot of unix tools: perl, ssh, gzip to
-   mention but a few. 
+*) The main cadofactor.pl script uses a lot of unix tools: perl, ssh, gzip
+   to mention but a few. 
 
 Optionally:
 *) Support for curl library.
@@ -26,10 +27,7 @@ Edit according to your local settings and your taste. local.sh.example
 gives documentation on the recognized environment variables and their
 effect.
 
-Note that tweaks in local.sh are global ; although earlier CADO versions
-offered the possibility of setting tweaks at a sub-directory level, this
-is no longer so easily doable (one could try to restore this
-functionality, though).
+Note that tweaks in local.sh are global.
 
 
 Compile:
@@ -43,20 +41,21 @@ moment consider ``make install'' to be badly tested.
 Run a factorization on current machine:
 =======================================
 
-./factor.sh 353493749731236273014678071260920590602836471854359705356610427214806564110716801866803409 -t 2
+./factor.sh 90377629292003121684002147101760858109247336549001090677693 -t 2
 
-The integer must be at least 90 digits and not contain small prime
-factor. The option '-t 2' notice the number of cores on current machine,
-sieve and linear algebra use 2 threads.
+The integer must be at least 58 digits [optimize for more than 90 digits] and
+not contain small prime factors. The option '-t 2' tells how many cores to use
+on the current machine (for sieving and linear algebra).
+
 
 ./factor.sh 353493749731236273014678071260920590602836471854359705356610427214806564110716801866803409 -t 4 -ssh
 
 If the number of cores is strictly greater than 2, it is more efficient
 to use ssh to distribute the polynomial selection and sieve on localhost.
-For configure ssh, see the next section.
+To configure ssh, see the next section.
 
-For a larger factorization (distribute on several machines),
-please use directly the main script cadofactor.pl
+For a larger factorization (distributed on several machines),
+please use directly the main script cadofactor.pl (doc included in the script).
 
 Check that your SSH configuration is correct:
 =============================================

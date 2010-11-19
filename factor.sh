@@ -12,7 +12,7 @@
 
 #CADO_DEBUG=1
 usage="Usage: $0 <integer> [options] [arguments cadofactor.pl]\n
-       \t <integer> \t \t - integer to factor of more than 90 digits without small prime factor\n
+       \t <integer> \t \t - integer must be at least 58 digits [optimize for more than 90 digits] without small prime factors\n
        \t options:\n
        \t \t -t <integer> \t - numbers of cores\n
        \t \t -ssh \t \t - use ssh (doc README) for distribute the polynomial selection and
@@ -53,7 +53,7 @@ done
 a=`expr $cores / $b`
 bwmt=${a}x$b
 
-size=$(echo "scale=10; log=l($n)/l(10); scale=0; log/1+1" | bc -l);
+size=$(echo "scale=10; log=l($n)/l(10); scale=0; log/1+1" | bc -l)
 file="params.c$size"
 
 
@@ -106,6 +106,7 @@ done
 
 if [ ! -f $file ] ; then
     echo "$file not found" >&2
+    echo -e $usage
     exit 1
 fi
 
