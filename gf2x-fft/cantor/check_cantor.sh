@@ -4,7 +4,7 @@ if [ -z "$CANTOR" ] ; then CANTOR=./cantor ; fi
 
 for i in "$@" ; do
   "$CANTOR" $i > /tmp/toto
-  if `magma < cantor128.m | grep true`; then
+  if `magma < check_cantor.m | grep true`; then
     echo "ok $i"
   else
     echo "failed $i"
