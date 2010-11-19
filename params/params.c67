@@ -14,38 +14,36 @@
 # General parameters
 ###########################################################################
 
-# Sample parameter file for a 72-digit gnfs input
+# Sample parameter file for a 66/67-digit gnfs input
 # Warning: the parameters here are not claimed to be optimal!
 # Example: cadofactor.pl wdir=... name=... n=...
 
-name=c72
+name=c67
 #wdir=/tmp/noise        # directory where temporary files are put
 #bindir=$HOME/cado      # where to find cado binaries
 parallel=1              # do we use parallel computation?
-delay=60                # time in seconds between two checks
+delay=30                # time in seconds between two checks
 
 machines=mach_desc      # file describing available computers for parallel
                         # computation
-
-n=695221602308839832510083267912277946811716406435035154483960202768992997
 
 ###########################################################################
 # Polynomial selection with Kleinjung's algorithm
 ###########################################################################
 
-degree=5                # degree of the algebraic polynomial
-kjdelay=60              # time between two checks
+degree=4                # degree of the algebraic polynomial
+kjdelay=30              # time between two checks
 selectnice=4            # nice level for selection
 
 ## Most important parameters of polyselect
-kjM=2e11                # maximum norm allowed
+kjM=1e12                # maximum norm allowed
 kjl=4                   # minimal number of primes in lc(g)
 kjadmin=1               # min value for lc(f)
-kjadmax=6e5             # max value for lc(f)
-kjadrange=3e5           # individual tasks
+kjadmax=1e5             # max value for lc(f)
+kjadrange=5e4           # individual tasks
 
 ## Other parameters of polyselect
-kjkeep=16               # number of preselected polynomials
+kjkeep=10               # number of preselected polynomials
 kjkmax=10               # rotation is bounded by 2^kmax
 kjincr=60               # forced divisor of lc(f)
 kjpb=256                # bound on primes allowed in lc(g)
@@ -63,19 +61,19 @@ kjp0max=1000            # bound on the additional factor in lc(g)
 # rlambda/alambda is the early-abort ratio: if after sieving the
 #                                      approximate norm is more than
 #                                      lambda times lpb, we reject.
-rlim=200000
+rlim=100000
 alim=200000
 lpbr=23
 lpba=23
 mfbr=26
 mfba=26
-rlambda=1.4
-alambda=1.6
+rlambda=1.2
+alambda=1.2
 
 I=11                    # Sieving range in lattice siever
 qmin=200000             # Start of the special-q range
-qrange=50000            # The size of an elementary sieving task
-checkrange=1            # We check if we have enough after each step
+qrange=5000             # The size of an elementary sieving task
+checkrange=50000        # We check if we have enough after each step
                         # of that many relations found.
 sievenice=10            # nice level for the sieving jobs
 sieve_max_threads=2
@@ -84,8 +82,9 @@ sieve_max_threads=2
 # Filtering
 ###########################################################################
 
-excesspurge=20000       # minimal excess we want before pruning
+excesspurge=10000       # minimal excess we want before pruning
 excess=1                # minimal excess wanted after purge
+                        # (don't start merge otherwise)
 keeppurge=160           # maximal excess wanted after purge
                         # (purge shrinks if needed)
 keep=160                # excess wanted after merge
@@ -94,6 +93,9 @@ cwmax=200               # ???
 rwmax=200               # ???
 ratio=1.5               # ???
 bwstrat=1
+#  maxpr=???
+#  maxpa=???
+#  nrels_dup=???ke
 
 ###########################################################################
 # Linear algebra
@@ -112,3 +114,4 @@ bwc_interval=100        # checkpointing interval for bwc.
 
 nkermax=30              # maximal size of computed kernel
 nchar=50                # number of characters
+
