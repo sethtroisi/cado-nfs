@@ -196,7 +196,7 @@ stats (mpz_t *prd, unsigned long lprd)
 }
 
 int 
-calculateSqrtRat (const char *prefix, int numdep, cado_poly pol)
+calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
 {
   char depname[200];
   char ratname[200];
@@ -338,19 +338,19 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol)
       exit (1);
     }
 
-  mpz_mod (prd[0], prd[0], pol->n);
+  mpz_mod (prd[0], prd[0], Np);
 
   fprintf (stderr, "Reduced mod n at %dms\n", cputime ());
 
   /* now divide by g1^(ab_pairs/2) if ab_pairs is even, and g1^((ab_pairs+1)/2)
      if ab_pairs is odd */
   
-  mpz_powm_ui (v, pol->g[1], (ab_pairs + 1) / 2, pol->n);
+  mpz_powm_ui (v, pol->g[1], (ab_pairs + 1) / 2, Np);
   fprintf (stderr, "Computed g1^(nab/2) mod n at %dms\n", cputime ());
 
-  mpz_invert (v, v, pol->n);
+  mpz_invert (v, v, Np);
   mpz_mul (prd[0], prd[0], v);
-  mpz_mod (prd[0], prd[0], pol->n);
+  mpz_mod (prd[0], prd[0], Np);
   
   ratfile = fopen (ratname, "w");
   gmp_fprintf (ratfile, "%Zd\n", prd[0]);
@@ -777,7 +777,8 @@ accumulate_fast_F_end (polymodF_t *prd, const poly_t F, unsigned long lprd)
    side=1: consider the polynomial g
 */
 int
-calculateSqrtAlg (const char *prefix, int numdep, cado_poly pol, int side)
+calculateSqrtAlg (const char *prefix, int numdep, cado_poly pol, int side, 
+        mpz_t Np)
 {
   char depname[200];
   char algname[200];
@@ -905,11 +906,11 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly pol, int side)
   
     mpz_init(algsqrt);
     mpz_init(aux);
-    poly_eval_mod_mpz(algsqrt, prd->p, pol->m, pol->n);
-    mpz_invert(aux, F->coeff[F->deg], pol->n);  // 1/fd mod n
-    mpz_powm_ui(aux, aux, prd->v, pol->n);      // 1/fd^v mod n
+    poly_eval_mod_mpz(algsqrt, prd->p, pol->m, Np);
+    mpz_invert(aux, F->coeff[F->deg], Np);  // 1/fd mod n
+    mpz_powm_ui(aux, aux, prd->v, Np);      // 1/fd^v mod n
     mpz_mul(algsqrt, algsqrt, aux);
-    mpz_mod(algsqrt, algsqrt, pol->n);
+    mpz_mod(algsqrt, algsqrt, Np);
   
     algfile = fopen (algname, "w");
     gmp_fprintf (algfile, "%Zd\n", algsqrt);
@@ -929,7 +930,7 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly pol, int side)
 
 /********** GCD **********/
 int
-calculateGcd(const char *prefix, int numdep, cado_poly pol)
+calculateGcd(const char *prefix, int numdep, mpz_t Np)
 {
     char ratname[200];
     char algname[200];
@@ -956,10 +957,10 @@ calculateGcd(const char *prefix, int numdep, cado_poly pol)
 
     // First check that the squares agree
     mpz_mul(g1, ratsqrt, ratsqrt);
-    mpz_mod(g1, g1, pol->n);
+    mpz_mod(g1, g1, Np);
 
     mpz_mul(g2, algsqrt, algsqrt);
-    mpz_mod(g2, g2, pol->n);
+    mpz_mod(g2, g2, Np);
 
     if (mpz_cmp(g1, g2)!=0) {
       fprintf(stderr, "Bug: the squares do not agree modulo n!\n");
@@ -968,8 +969,8 @@ calculateGcd(const char *prefix, int numdep, cado_poly pol)
     }
 
     mpz_sub(g1, ratsqrt, algsqrt);
-    mpz_gcd(g1, g1, pol->n);
-    if (mpz_cmp(g1,pol->n)) {
+    mpz_gcd(g1, g1, Np);
+    if (mpz_cmp(g1,Np)) {
       if (mpz_cmp_ui(g1,1)) {
         found = 1;
         gmp_printf("%Zd\n", g1);
@@ -977,8 +978,8 @@ calculateGcd(const char *prefix, int numdep, cado_poly pol)
     }
 
     mpz_add(g2, ratsqrt, algsqrt);
-    mpz_gcd(g2, g2, pol->n);
-    if (mpz_cmp(g2,pol->n)) {
+    mpz_gcd(g2, g2, Np);
+    if (mpz_cmp(g2,Np)) {
       if (mpz_cmp_ui(g2,1)) {
         found = 1;
         gmp_printf("%Zd\n", g2);
@@ -1171,6 +1172,48 @@ int main(int argc, char *argv[])
 
     ASSERT_ALWAYS(prefix);
 
+    /*
+     * In the case where the number N to factor has a prime factor that
+     * divides the leading coefficient of f or g, the reduction modulo N
+     * will fail. Let's compute N', the factor of N that is coprime to
+     * those leading coefficients.
+     */
+    mpz_t Np;
+    mpz_init(Np);
+    {
+        mpz_t gg;
+        mpz_init(gg);
+        mpz_set(Np, pol->n);
+        do {
+            mpz_gcd(gg, Np, pol->g[pol->degreeg]);
+            if (mpz_cmp_ui(gg, 1) != 0) {
+                gmp_fprintf(stderr, "Warning: found the following factor of N as a factor of g: %Zd\n", gg);
+                gmp_printf("%Zd\n", gg);
+                mpz_divexact(Np, Np, gg);
+            }
+        } while (mpz_cmp_ui(gg, 1) != 0);
+        do {
+            mpz_gcd(gg, Np, pol->f[pol->degree]);
+            if (mpz_cmp_ui(gg, 1) != 0) {
+                gmp_fprintf(stderr, "Warning: found the following factor of N as a factor of f: %Zd\n", gg);
+                gmp_printf("%Zd\n", gg);
+                mpz_divexact(Np, Np, gg);
+            }
+        } while (mpz_cmp_ui(gg, 1) != 0);
+        mpz_clear(gg);
+        if (mpz_cmp(pol->n, Np) != 0) {
+            gmp_fprintf(stderr, "Now factoring N' = %Zd\n", Np);
+            if (mpz_probab_prime_p(Np, 10)) {
+                gmp_fprintf(stderr, "Hey N' is prime! Stopping\n");
+                gmp_printf("%Zd\n", Np);
+                cado_poly_clear (pol);
+                param_list_clear(pl);
+                mpz_clear(Np);
+                return 0;
+            }
+        }
+    }
+
     if (opt_ab) {
         /* Computing (a,b) pairs is now done in batch for 64 dependencies
          * together -- should be enough for our purposes, even if we do
@@ -1185,23 +1228,24 @@ int main(int argc, char *argv[])
     if (opt_rat) {
         ASSERT_ALWAYS(numdep != -1);
         if (pol->degreeg == 1)
-            calculateSqrtRat (prefix, numdep, pol);
+            calculateSqrtRat (prefix, numdep, pol, Np);
         else
-            calculateSqrtAlg (prefix, numdep, pol, 1);
+            calculateSqrtAlg (prefix, numdep, pol, 1, Np);
     }
 
     if (opt_alg) {
         ASSERT_ALWAYS(numdep != -1);
-        calculateSqrtAlg (prefix, numdep, pol, 0);
+        calculateSqrtAlg (prefix, numdep, pol, 0, Np);
     }
 
     if (opt_gcd) {
         ASSERT_ALWAYS(numdep != -1);
-        calculateGcd (prefix, numdep, pol);
+        calculateGcd (prefix, numdep, Np);
     }
     
     cado_poly_clear (pol);
     param_list_clear(pl);
+    mpz_clear(Np);
     return 0;
 }
   
