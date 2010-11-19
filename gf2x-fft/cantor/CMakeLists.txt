@@ -1,6 +1,6 @@
 
 
-add_library(cantor128 cantor128.c mpfq_2_128.c)
+add_library(cantor128 cantor128.c)
 add_executable(cantor_bench EXCLUDE_FROM_ALL cantor_bench.c)
 add_executable(cantor EXCLUDE_FROM_ALL cantor_main.c)
 target_link_libraries(cantor_bench cantor128 gmp)

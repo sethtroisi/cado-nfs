@@ -31,9 +31,11 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <assert.h>
+#include <string.h>
 
 #include "cantor128.h"
-#include "mpfq_2_128.h"
+#include "gf2x.h"
+#include "gf2x/gf2x-small.h"
 
 /* The following flags affect the behaviour of the program */
 
@@ -41,32 +43,206 @@
 #define xxxCANTOR_GM_TRUNCATE   /* Use truncated variant */
 #define xxxCOUNT_MULTS          /* Count multiplications */
 
-#define Kelt            mpfq_2_128_elt
-#define Kdst_elt        mpfq_2_128_dst_elt
-#define Ksrc_elt        mpfq_2_128_src_elt
+#define Kelt            c128_t
+#define Kdst_elt        unsigned long *
+#define Ksrc_elt        const unsigned long *
 
 size_t mulcount=0;
 Kelt * fbase;
 size_t * findex;
 
-#define Kadd(a0,a1,a2)  mpfq_2_128_add (NULL,a0,a1,a2)
-#if 0
-#define Kmul(a0,a1,a2)  do { \
-    mpfq_2_128_mul (NULL,a0,a1,a2);     \
-    mpfq_2_128_mul (NULL,a0,a1,a2);     \
+/*
+ * Basic function for Kelt
+ */
+#if GMP_LIMB_BITS == 32                 
+#define Kadd(a0,a1,a2)  do {            \
+    a0[0] = a1[0] ^ a2[0];              \
+    a0[1] = a1[1] ^ a2[1];              \
+    a0[2] = a1[2] ^ a2[2];              \
+    a0[3] = a1[3] ^ a2[3];              \
+} while (0)
+#define Kset(a0,a1)  do {            \
+    a0[0] = a1[0];                   \
+    a0[1] = a1[1];                   \
+    a0[2] = a1[2];                   \
+    a0[3] = a1[3];                   \
+} while (0)
+#define Kset_zero(a0) do {            \
+    a0[0] = 0;                        \
+    a0[1] = 0;                        \
+    a0[2] = 0;                        \
+    a0[3] = 0;                        \
+} while (0)
+#else
+#define Kadd(a0,a1,a2)  do {            \
+    a0[0] = a1[0] ^ a2[0];              \
+    a0[1] = a1[1] ^ a2[1];              \
+} while (0)
+#define Kset(a0,a1)  do {            \
+    a0[0] = a1[0];                   \
+    a0[1] = a1[1];                   \
+} while (0)
+#define Kset_zero(a0) do {            \
+    a0[0] = 0;                        \
+    a0[1] = 0;                        \
 } while (0)
 #endif
 
-#ifdef  COUNT_MULTS
-#define Kmul(a0,a1,a2)  do { mpfq_2_128_mul (NULL,a0,a1,a2); mulcount++; } while (0)
-#else
-#define Kmul(a0,a1,a2)  mpfq_2_128_mul (NULL,a0,a1,a2)
-#endif
 
-#define Kset_ui(a0,a1)  mpfq_2_128_set_ui (NULL,a0,a1)
-#define Kcmp(a0,a1)  mpfq_2_128_cmp (NULL,a0,a1)
-#define Kset(a0,a1)  mpfq_2_128_set (NULL,a0,a1)
-#define Ksqr(a0,a1)     mpfq_2_128_sqr (NULL,a0,a1)
+/*
+ * Arithmetic in GF(2^128).
+ * We rely on gf2x for the unreduced multiplication,
+ * and the reduction modulo X^128 + X^7 + X^2 + X + 1
+ * is hardcoded for 32- and 64-bit architecture.
+ */
+static void Kmul(Kdst_elt a0, Ksrc_elt a1, Ksrc_elt a2) {
+#if GMP_LIMB_BITS == 32
+    unsigned long tmp[8];
+    gf2x_mul4(tmp, a1, a2);
+    {
+        unsigned long s[5];
+        /* 127 excess bits */
+        {
+            unsigned long z;
+            z = tmp[0];
+            s[0] = z;
+            z = tmp[1];
+            s[1] = z;
+            z = tmp[2];
+            s[2] = z;
+            z = tmp[3];
+            s[3] = z;
+        }
+        s[4] = 0;
+        {
+            unsigned long z;
+            z = tmp[4];
+            s[0]^= z <<  7;
+            s[0]^= z <<  2;
+            s[0]^= z <<  1;
+            s[0]^= z;
+            z >>= 25;
+            z^= tmp[5] <<  7;
+            s[1]^= z;
+            z >>= 5;
+            z^= tmp[5] >> 25 << 27;
+            s[1]^= z;
+            z >>= 1;
+            z^= tmp[5] >> 30 << 31;
+            s[1]^= z;
+            z >>= 1;
+            z^= (tmp[5] & ~0x7fffffffUL);
+            s[1]^= z;
+            z >>= 25;
+            z^= tmp[6] <<  7;
+            s[2]^= z;
+            z >>= 5;
+            z^= tmp[6] >> 25 << 27;
+            s[2]^= z;
+            z >>= 1;
+            z^= tmp[6] >> 30 << 31;
+            s[2]^= z;
+            z >>= 1;
+            z^= (tmp[6] & ~0x7fffffffUL);
+            s[2]^= z;
+            z >>= 25;
+            z^= tmp[7] <<  7;
+            s[3]^= z;
+            z >>= 5;
+            z^= tmp[7] >> 25 << 27;
+            s[3]^= z;
+            z >>= 1;
+            z^= tmp[7] >> 30 << 31;
+            s[3]^= z;
+            z >>= 1;
+            s[3]^= z;
+            z >>= 25;
+            s[4]^= z;
+            z >>= 5;
+            s[4]^= z;
+        }
+        /* 6 excess bits */
+        {
+            unsigned long z;
+            z = s[0];
+            a0[0] = z;
+            z = s[1];
+            a0[1] = z;
+            z = s[2];
+            a0[2] = z;
+            z = s[3];
+            a0[3] = z;
+        }
+        {
+            unsigned long z;
+            z = s[4];
+            a0[0]^= z <<  7;
+            a0[0]^= z <<  2;
+            a0[0]^= z <<  1;
+            a0[0]^= z;
+        }
+    }
+#else
+    unsigned long tmp[4];
+    gf2x_mul2(tmp, a1, a2);
+    {
+        unsigned long s[3];
+        /* 127 excess bits */
+        {
+            unsigned long z;
+            z = tmp[0];
+            s[0] = z;
+            z = tmp[1];
+            s[1] = z;
+        }
+        s[2] = 0;
+        {
+            unsigned long z;
+            z = tmp[2];
+            s[0]^= z <<  7;
+            s[0]^= z <<  2;
+            s[0]^= z <<  1;
+            s[0]^= z;
+            z >>= 57;
+            z^= tmp[3] <<  7;
+            s[1]^= z;
+            z >>= 5;
+            z^= tmp[3] >> 57 << 59;
+            s[1]^= z;
+            z >>= 1;
+            z^= tmp[3] >> 62 << 63;
+            s[1]^= z;
+            z >>= 1;
+            s[1]^= z;
+            z >>= 57;
+            s[2]^= z;
+            z >>= 5;
+            s[2]^= z;
+        }
+        /* 6 excess bits */
+        {
+            unsigned long z;
+            z = s[0];
+            a0[0] = z;
+            z = s[1];
+            a0[1] = z;
+        }
+        {
+            unsigned long z;
+            z = s[2];
+            a0[0]^= z <<  7;
+            a0[0]^= z <<  2;
+            a0[0]^= z <<  1;
+            a0[0]^= z;
+        }
+    }
+#endif 
+#ifdef  COUNT_MULTS
+    mulcount++;
+#endif
+}
+
+
 
 // Some constants related to Cantor's algorithm
 // Beta_i are such that Beta_{i-1} = Beta_i^2 + Beta_i
@@ -161,7 +337,7 @@ static const unsigned int ind_number[31] =
 static inline void allBetai(Kdst_elt x, size_t i)
 {
     size_t j;
-    Kset_ui(x,0);
+    Kset_zero(x);
     j = 0;
     for( ; i ; i>>=1, j++) {
         if (!(i & 1)) continue;
@@ -176,7 +352,7 @@ static inline void allBetai(Kdst_elt x, size_t i)
 static inline void allBetai1(Kdst_elt x, size_t i)
 {
     size_t j;
-    Kset_ui(x,0);
+    Kset_zero(x);
     j = 0;
     __v2di m[2] = { (__v2di) {0,0}, (__v2di) { -1L, -1L } };
     for( ; i ; i>>=1, j++) {
@@ -188,8 +364,8 @@ static inline void allBetai1(Kdst_elt x, size_t i)
 static inline void allBetai2(Kdst_elt x, Kdst_elt y, size_t i)
 {
     size_t j;
-    Kset_ui(x,0);
-    Kset_ui(y,0);
+    Kset_zero(x);
+    Kset_zero(y);
     j = 0;
     __v2di m[2] = { (__v2di) {0,0}, (__v2di) { -1L, -1L } };
     for( ; i ; i>>=1, j++) {
@@ -200,10 +376,10 @@ static inline void allBetai2(Kdst_elt x, Kdst_elt y, size_t i)
 static inline void allBetai4(Kdst_elt x, Kdst_elt y, Kdst_elt z, Kdst_elt t, size_t i)
 {
     size_t j;
-    Kset_ui(x,0);
-    Kset_ui(y,0);
-    Kset_ui(z,0);
-    Kset_ui(t,0);
+    Kset_zero(x);
+    Kset_zero(y);
+    Kset_zero(z);
+    Kset_zero(t);
     j = 0;
     __v2di m[2] = { (__v2di) {0,0}, (__v2di) { -1L, -1L } };
     for( ; i ; i>>=1, j++) {
@@ -217,7 +393,7 @@ static inline void allBetai4(Kdst_elt x, Kdst_elt y, Kdst_elt z, Kdst_elt t, siz
 static inline void allBetai1(Kdst_elt x, size_t i)
 {
     size_t j;
-    Kset_ui(x,0);
+    Kset_zero(x);
     j = 0;
     for( ; i ; i>>=1, j++) {
         if (!(i & 1)) continue;
@@ -227,8 +403,8 @@ static inline void allBetai1(Kdst_elt x, size_t i)
 static inline void allBetai2(Kdst_elt x, Kdst_elt y, size_t i)
 {
     size_t j;
-    Kset_ui(x,0);
-    Kset_ui(y,0);
+    Kset_zero(x);
+    Kset_zero(y);
     j = 0;
     for( ; i ; i>>=1, j++) {
         if (!(i & 1)) continue;
@@ -239,10 +415,10 @@ static inline void allBetai2(Kdst_elt x, Kdst_elt y, size_t i)
 static inline void allBetai4(Kdst_elt x, Kdst_elt y, Kdst_elt z, Kdst_elt t, size_t i)
 {
     size_t j;
-    Kset_ui(x,0);
-    Kset_ui(y,0);
-    Kset_ui(z,0);
-    Kset_ui(t,0);
+    Kset_zero(x);
+    Kset_zero(y);
+    Kset_zero(z);
+    Kset_zero(t);
     j = 0;
     for( ; i ; i>>=1, j++) {
         if (!(i & 1)) continue;

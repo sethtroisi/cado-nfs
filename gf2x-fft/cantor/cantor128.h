@@ -3,7 +3,8 @@
 
 #include <stdint.h>
 #include <stdlib.h>
-#include "mpfq_2_128.h"
+#include <gmp.h>
+#include "cado.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -27,7 +28,14 @@ typedef struct c128_info_struct c128_info_t[1];
 typedef struct c128_info_struct * c128_info_ptr;
 typedef const struct c128_info_struct * c128_info_srcptr;
 
-typedef mpfq_2_128_elt c128_t;
+#if GMP_LIMB_BITS == 32
+typedef unsigned long c128_t[4];
+#elif GMP_LIMB_BITS == 64
+typedef unsigned long c128_t[2];
+#else 
+#error "Do not know how to define c128_t"
+#endif
+
 typedef c128_t * c128_ptr;
 /* aliasing is not our friend here ;-( */
 typedef c128_t * c128_srcptr;
