@@ -46,13 +46,13 @@ nobase_nodist_include_HEADERS=	\
 
 libgf2x_la_LDFLAGS=-version-info @gf2x_lib_version@
 
-if ENABLE_NTL_CHECKS
-    MAYBE_APPS=apps
-endif
+#if ENABLE_NTL_CHECKS
+#    MAYBE_APPS=apps
+#endif
 
-SUBDIRS=. tests src $(MAYBE_APPS)
+SUBDIRS=. tests src 
 
-DIST_SUBDIRS=tests src apps
+DIST_SUBDIRS=tests src 
 
 DISTCLEANFILES=gf2x/gf2x-thresholds.h	\
 	       gf2x/gf2x_mul1.h		\

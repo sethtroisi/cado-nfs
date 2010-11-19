@@ -16183,7 +16183,7 @@ fi
 ac_config_headers="$ac_config_headers gf2x/gf2x-config.h"
 
 
-ac_config_files="$ac_config_files version.sh Makefile tests/Makefile apps/Makefile src/Makefile"
+ac_config_files="$ac_config_files version.sh Makefile tests/Makefile src/Makefile"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -17296,7 +17296,6 @@ do
     "version.sh") CONFIG_FILES="$CONFIG_FILES version.sh" ;;
     "Makefile") CONFIG_FILES="$CONFIG_FILES Makefile" ;;
     "tests/Makefile") CONFIG_FILES="$CONFIG_FILES tests/Makefile" ;;
-    "apps/Makefile") CONFIG_FILES="$CONFIG_FILES apps/Makefile" ;;
     "src/Makefile") CONFIG_FILES="$CONFIG_FILES src/Makefile" ;;
 
   *) as_fn_error $? "invalid argument: \`$ac_config_target'" "$LINENO" 5 ;;
