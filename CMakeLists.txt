@@ -58,7 +58,7 @@ endif(CMAKE_COMPILER_IS_GNUCC)
 
 #####
 
-set(GF2X_CONFIGURE_FLAGS --disable-shared --disable-dependency-tracking CFLAGS=${CMAKE_C_FLAGS} CXXFLAGS=${CMAKE_CXX_FLAGS})
+set(GF2X_CONFIGURE_FLAGS --disable-shared --disable-dependency-tracking --disabel-maintainer-mode CFLAGS=${CMAKE_C_FLAGS} CXXFLAGS=${CMAKE_CXX_FLAGS})
 get_override(GF2X_CONFIGURE_FLAGS GF2X_CONFIGURE_FLAGS)
 
 #####################################################################
