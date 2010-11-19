@@ -81,6 +81,19 @@ ssh localhost
 you should end up with a new shell on your machine, without having to
 type any password/passphrase.
 
+Factoring with SNFS:
+====================
+
+It is possible to take advantage of the special form of an integer and 
+use the Special Number Field Sieve. See the doc in cadofactor.pl for
+that. Note in particular that you can force the special-q to be on the
+rational side if this is more appropriate for your number.
+
+The default square root algorithm does not work in some very rare cases
+that could possibly occur with SNFS polynomials (a degree 4 polynomial
+with Galois group Z/2 x Z/2 is the only reasonnable example, next case is
+for degree 8). The CRT approach is a workaround. See crtaglsqrt.c . 
+
 Using CADO-NFS under Windows:
 =============================
 
