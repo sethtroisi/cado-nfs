@@ -2747,6 +2747,17 @@ sub do_sqrt {
                     } else {
                         $composite_factors{$a}=1;
                     }
+                    # m /= gcd(m, a)
+                    my $za = Math::BigInt->new($a);
+                    my $zg = Math::BigInt::bgcd($zm,$za); 
+                    $zm->bdiv($zg);
+                }
+            }
+            if (!$zm->is_one()) {
+                if (is_prime($zm->bstr())) {
+                    push @prime_factors, $zm->bstr();
+                } else {
+                    $composite_factors{$zm->bstr()}=1;
                 }
             }
         }
@@ -2767,7 +2778,19 @@ sub do_sqrt {
 
     my $f1 = "$param{'prefix'}.allfactors";
     open FILE, "> $f1" or die "Cannot open `$f1' for writing: $!.\n";
-    print FILE "$_\n" for @prime_factors;
+    # Check again, since prime can occur the wrong number of times in
+    # @prime_factors
+    my $zn = Math::BigInt->new($param{'n'});
+    for my $a (@prime_factors) {
+        my $za = Math::BigInt->new($a);
+        my $zzn = $zn->copy();
+        while (Math::BigInt::bmod($zzn, $za)->is_zero()) {
+            print FILE "$a ";
+            $zn->bdiv($za);
+            $zzn = $zn->copy();
+        }
+    }
+    print FILE "\n";
     close FILE;
 }
 

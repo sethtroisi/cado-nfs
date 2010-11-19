@@ -926,6 +926,42 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly pol, int side,
     return 0;
 }
 
+/*
+ * Try to factor input using trial division up to bound B.
+ * Found factors are printed (one per line).
+ * Returns 1 if input is completely factored, otherwise, returns
+ * remaining factor.
+ */
+unsigned long 
+trialdivide_print(unsigned long N, unsigned long B)
+{
+    ASSERT(N != 0);
+    if (N == 1) return 1;
+    unsigned long p;
+    for (p = 2; p <= B; p = getprime (p)) {
+        while ((N%p) == 0) {
+            N /= p;
+            printf("%ld\n", p);
+            if (N == 1) {
+                getprime(0);  // free table
+                return N;
+            }
+        }
+    }
+    getprime(0);
+    return N;
+}
+
+void print_factor(mpz_t N) 
+{
+    unsigned long xx = mpz_get_ui(N);
+    if (mpz_cmp_ui(N, xx) == 0) {
+        xx = trialdivide_print(xx, 1000000);
+        if (xx != 1)
+            printf("%ld\n", xx);
+    } else 
+        gmp_printf("%Zd\n", N);
+}
 
 
 /********** GCD **********/
@@ -955,6 +991,10 @@ calculateGcd(const char *prefix, int numdep, mpz_t Np)
     fclose(ratfile);
     fclose(algfile);
 
+    // reduce mod Np
+    mpz_mod(ratsqrt, ratsqrt, Np);
+    mpz_mod(algsqrt, algsqrt, Np);
+
     // First check that the squares agree
     mpz_mul(g1, ratsqrt, ratsqrt);
     mpz_mod(g1, g1, Np);
@@ -973,7 +1013,7 @@ calculateGcd(const char *prefix, int numdep, mpz_t Np)
     if (mpz_cmp(g1,Np)) {
       if (mpz_cmp_ui(g1,1)) {
         found = 1;
-        gmp_printf("%Zd\n", g1);
+        print_factor(g1);
       }
     }
 
@@ -982,7 +1022,7 @@ calculateGcd(const char *prefix, int numdep, mpz_t Np)
     if (mpz_cmp(g2,Np)) {
       if (mpz_cmp_ui(g2,1)) {
         found = 1;
-        gmp_printf("%Zd\n", g2);
+        print_factor(g2);
       }
     }
     mpz_clear(g1);
@@ -1188,7 +1228,7 @@ int main(int argc, char *argv[])
             mpz_gcd(gg, Np, pol->g[pol->degreeg]);
             if (mpz_cmp_ui(gg, 1) != 0) {
                 gmp_fprintf(stderr, "Warning: found the following factor of N as a factor of g: %Zd\n", gg);
-                gmp_printf("%Zd\n", gg);
+                print_factor(gg);
                 mpz_divexact(Np, Np, gg);
             }
         } while (mpz_cmp_ui(gg, 1) != 0);
@@ -1196,7 +1236,7 @@ int main(int argc, char *argv[])
             mpz_gcd(gg, Np, pol->f[pol->degree]);
             if (mpz_cmp_ui(gg, 1) != 0) {
                 gmp_fprintf(stderr, "Warning: found the following factor of N as a factor of f: %Zd\n", gg);
-                gmp_printf("%Zd\n", gg);
+                print_factor(gg);
                 mpz_divexact(Np, Np, gg);
             }
         } while (mpz_cmp_ui(gg, 1) != 0);
