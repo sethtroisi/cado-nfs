@@ -878,7 +878,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
           mpz_mul (m0, t, P);
           eps = max_adm2 / mpz_get_d (m0);
           if (eps >= 1.0) {
-              fprintf(stderr, "Warning, epsilon > 1, restricting to 1."
+              fprintf(stderr, "# Warning, epsilon > 1, restricting to 1."
                       " M should be below %e\n",
                       pow(pow(mpz_get_d(mtilde),d-4)*pow(mpz_get_d(m0),d-2),1.0/(double)(2*d-6)));
               eps = 1.0;
@@ -1147,7 +1147,7 @@ Algo36 (mpz_t N, unsigned int d, double M, unsigned int l, unsigned int pb,
     if (isprime (r))
       {
         if (mpz_divisible_ui_p (N, r))
-          fprintf (stderr, "Warning, N is divisible by %u\n", r);
+          fprintf (stderr, "# Warning, N is divisible by %u\n", r);
         else /* add r to P */
           {
             lP ++;

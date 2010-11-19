@@ -191,8 +191,12 @@ plain_poly_set_mod (plain_poly_t fp, mpz_t *f, int d, plain_poly_coeff_t p)
 
   while (d >= 0 && mpz_divisible_ui_p (f[d], p))
     d --;
-  ASSERT (d >= 0); /* f is 0 mod p: should not happen in the CADO-NFS context
-                      since otherwise p would divide N, indeed f(m)=N */
+  /* Let's allow N that have a small factor and remove this assertion:
+  ASSERT (d >= 0); // f is 0 mod p: should not happen in the CADO-NFS context
+                   // since otherwise p would divide N, indeed f(m)=N
+  */
+  if (d<0)
+      return d;
   plain_poly_realloc (fp, d + 1);
   fp->degree = d;
   for (i = 0; i <= d; i++)
@@ -668,7 +672,7 @@ plain_poly_roots (plain_poly_coeff_t *r, mpz_t *f, int d, const plain_poly_coeff
   d = plain_poly_set_mod (fp, f, d, p);
   /* d is the degree of fp (-1 if fp=0) */
 
-  if (d == 0)
+  if (d <= 0)
     {
       df = 0;
       goto clear_fp;

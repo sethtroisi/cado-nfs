@@ -243,6 +243,9 @@ makefb (FILE *fp, cado_poly cpoly)
   for (p = 2; p <= cpoly->alim; p = getprime (p))
     {
         nroots = poly_roots_ulong(roots, cpoly->f, d, p);
+        // TODO: poly_roots_ulong returns 0 if f mod p is 0.
+        // This corresponds to complicated roots that should maybe go to
+        // the factor base (hum... maybe not!)
       if (nroots != 0)
         {
           fprintf (fp, "%lu: %lld", p, (long long int) roots[0]);
