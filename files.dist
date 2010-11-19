@@ -19,14 +19,7 @@ gf2x-fft/cantor/cantor128.h
 gf2x-fft/cantor/cantor_bench.c
 gf2x-fft/cantor/cantor_main.c
 gf2x-fft/cantor/check_cantor.sh
-gf2x-fft/cantor/mpfq.h
-gf2x-fft/cantor/mpfq_2_128.c
-gf2x-fft/cantor/mpfq_2_128.c.32
-gf2x-fft/cantor/mpfq_2_128.c.64
-gf2x-fft/cantor/mpfq_2_128.h
-gf2x-fft/cantor/mpfq_2_128.h.32
-gf2x-fft/cantor/mpfq_2_128.h.64
-gf2x-fft/cantor/mpfq_gf2n_common.h
+gf2x-fft/cantor/check_cantor.m
 gf2x-fft/fft_adapter.hpp
 gf2x-fft/fake_fft.c
 gf2x-fft/fake_fft.h
