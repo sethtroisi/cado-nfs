@@ -7,6 +7,7 @@ CMakeLists.txt
 COPYING
 Makefile
 README
+AUTHORS
 cado.h
 cadofactor.pl
 cadofct.pm

@@ -1,0 +1,18 @@
+
+This release of cado-nfs is to be cited as:
+
+Pierrick Gaudry, Alexander Kruppa, Lionel Muller, François Morain,
+Emmanuel Thomé, Paul Zimmermann, \texttt{cado-nfs}, An Implementation of
+the Number Field Sieve Algorithm.  Release \texttt{1.0}, available from
+\url{http://cado-nfs.gforge.inria.fr/}
+
+Other persons have contributed parts of the code, in current or in
+earlier revisions of cado-nfs.
+
+Shi Bai
+Jérémie Detrey
+Andreas Enge
+Nuno Franco
+Jérome Milan
+Thomas Prest
+Antonio Vera
