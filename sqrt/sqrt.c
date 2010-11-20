@@ -952,15 +952,41 @@ trialdivide_print(unsigned long N, unsigned long B)
     return N;
 }
 
+void print_nonsmall(mpz_t zx)
+{
+    if (mpz_probab_prime_p(zx, 10))
+        gmp_printf("%Zd\n", zx);
+    else {
+        int pp = mpz_perfect_power_p(zx);
+        if (pp) {
+            pp = 2;
+            mpz_t roo;
+            mpz_init(roo);
+            while (!mpz_root(roo, zx, pp))
+                pp++;
+            int i;
+            for (i = 0; i < pp; ++i)
+                gmp_printf("%Zd\n", roo);
+            mpz_clear(roo);
+        } else
+            gmp_printf("%Zd\n", zx);
+    }
+}
+
 void print_factor(mpz_t N) 
 {
     unsigned long xx = mpz_get_ui(N);
     if (mpz_cmp_ui(N, xx) == 0) {
         xx = trialdivide_print(xx, 1000000);
-        if (xx != 1)
-            printf("%ld\n", xx);
+        if (xx != 1) {
+            mpz_t zx;
+            mpz_init(zx);
+            mpz_set_ui(zx, xx);
+            print_nonsmall(zx);
+            mpz_clear(zx);
+        }
     } else 
-        gmp_printf("%Zd\n", N);
+        print_nonsmall(N);
 }
 
 
