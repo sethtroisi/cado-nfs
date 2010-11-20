@@ -959,11 +959,11 @@ void print_nonsmall(mpz_t zx)
     else {
         int pp = mpz_perfect_power_p(zx);
         if (pp) {
-            pp = 2;
+            pp = mpz_sizeinbase(zx, 2);
             mpz_t roo;
             mpz_init(roo);
             while (!mpz_root(roo, zx, pp))
-                pp++;
+                pp--;
             int i;
             for (i = 0; i < pp; ++i)
                 gmp_printf("%Zd\n", roo);
@@ -1267,16 +1267,15 @@ int main(int argc, char *argv[])
             }
         } while (mpz_cmp_ui(gg, 1) != 0);
         mpz_clear(gg);
-        if (mpz_cmp(pol->n, Np) != 0) {
+        if (mpz_cmp(pol->n, Np) != 0) 
             gmp_fprintf(stderr, "Now factoring N' = %Zd\n", Np);
-            if (mpz_probab_prime_p(Np, 10)) {
-                gmp_fprintf(stderr, "Hey N' is prime! Stopping\n");
-                gmp_printf("%Zd\n", Np);
-                cado_poly_clear (pol);
-                param_list_clear(pl);
-                mpz_clear(Np);
-                return 0;
-            }
+        if (mpz_probab_prime_p(Np, 10) || mpz_perfect_power_p(Np)) {
+            gmp_fprintf(stderr, "Hey N' is (power of) prime! Stopping\n");
+            print_factor(Np);
+            cado_poly_clear (pol);
+            param_list_clear(pl);
+            mpz_clear(Np);
+            return 0;
         }
     }
 
