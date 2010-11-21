@@ -12,7 +12,7 @@
 
 #CADO_DEBUG=1
 usage="Usage: $0 <integer> [options] [arguments cadofactor.pl]\n
-       \t <integer> \t \t - integer must be at least 58 digits [optimize for more than 90 digits] without small prime factors\n
+       \t <integer> \t \t - integer must be at least 60 digits [optimize for more than 90 digits] without small prime factors\n
        \t options:\n
        \t \t -t <integer> \t - numbers of cores\n
        \t \t -ssh \t \t - use ssh (doc README) for distribute the polynomial selection and
@@ -24,7 +24,7 @@ chmod 755 $t
 
 n=$1
 shift
-if [ ! "$(echo $n | grep "^[ [:digit:] ]*$")" ]; then
+if [ ! "$(grep "^[ [:digit:] ]*$" <<< $n)" ]; then
   echo -e $usage
   exit 1
 fi
@@ -34,7 +34,7 @@ cores=1
 for ((i=1; i<=2; i=i+1)) ; do
   if [ "$1" = "-t" ]; then
     cores=$2
-    if [ ! "$(echo $cores | grep "^[ [:digit:] ]*$")" ]; then
+    if [ ! "$(grep "^[ [:digit:] ]*$" <<< $cores)" ]; then
       echo -e $usage
       exit 1
     fi
@@ -46,14 +46,14 @@ for ((i=1; i<=2; i=i+1)) ; do
   fi
 done
     
-b=$(echo "sqrt($cores)" | bc)
+b=$(perl -e '{print int(sqrt(<STDIN>))."\n"}' <<< $cores)
 until [ `expr $cores % $b` -eq  0 ]; do
       b=`expr $b - 1`
 done
 a=`expr $cores / $b`
 bwmt=${a}x$b
 
-size=$(echo "scale=10; log=l($n)/l(10); scale=0; log/1+1" | bc -l)
+size=${#n}
 file="params.c$size"
 
 
