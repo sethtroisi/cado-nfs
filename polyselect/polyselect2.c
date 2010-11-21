@@ -915,7 +915,7 @@ main (int argc, char *argv[])
 
   if (argc != 2)
     {
-      fprintf (stderr, "Usage: %s [-t nthreads -nr nnn -admin nnn -admax nnn -N nnn -d nnn -save xxx -resume xxx] P\n", argv0);
+      fprintf (stderr, "Usage: %s [-t nthreads -nr nnn -admin nnn -admax nnn -N nnn -d nnn -save xxx -resume xxx -maxnorm xxx] P\n", argv0);
       exit (1);
     }
 
