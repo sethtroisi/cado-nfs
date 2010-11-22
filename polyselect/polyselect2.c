@@ -23,6 +23,8 @@
 #define MAXQ 256
 #define SPECIAL_Q {1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173, 179, 181, 191, 193, 197, 199, 211, 223, 227, 229, 233, 239, 241, 251, ULONG_MAX}
 
+extern int MAX_k;
+
 /* hash table structure */
 typedef struct
 {
@@ -57,7 +59,6 @@ typedef _roots_struct roots_t[1];
 
 /* read-only global variables */
 int verbose = 0, incr = 60;
-unsigned int nr = 0; /* minimum number of real roots wanted */
 double max_norm = DBL_MAX; /* maximal wanted norm (before rotation) */
 uint32_t *Primes;
 
@@ -151,7 +152,6 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   double skew, logmu, alpha;
   /* the expected rotation space is S^6 for degree 6, S^4.5 for degree 5,
      S^3 for degree 4, S^2 for degree 3, S for degree 2, S^0.5 for degree 1 */
-  double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.5, 6.0, 0};
 
 #ifdef DEBUG
   printf ("Found match: (%lu,%ld) (%lu,%ld) for ad=%lu, q=%lu, rq=%lu\n",
@@ -327,22 +327,38 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   total_lognorm[q] += logmu;
 #endif
 
+#if 1 /* rootsieve */
+  if (logmu <= max_norm)
+    {
+      unsigned long alim = 2000;
+      long jmin, kmin;
+
+      mpz_neg (m, g[0]);
+      rotate (f, d, alim, m, g[1], &jmin, &kmin, 0, verbose, DEFAULT_L2_METHOD);
+      mpz_neg (g[0], m);
+      /* optimize again, but only translation */
+      optimize (f, d, g, verbose, 0);
+      nroots = numberOfRealRoots (f, d, 0, 0);
+      skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+      logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
+    }
+#endif
+
   pthread_mutex_lock (&lock);
   collisions ++;
   collisionsQ[q] ++;
   aver_lognorm += logmu;
   pthread_mutex_unlock (&lock);
 
-  if (nroots >= nr && logmu <= max_norm)
+  if (logmu <= max_norm)
     {
       alpha = get_alpha (f, d, ALPHA_BOUND);
       gmp_printf ("n: %Zd\n", N);
       gmp_printf ("Y1: %Zd\nY0: %Zd\n", g[1], g[0]);
       for (j = d + 1; j -- != 0; )
         gmp_printf ("c%u: %Zd\n", j, f[j]);
-      printf ("# lognorm %1.2f, skew %1.2f, expected E %1.2f, %u rroots\n",
-              logmu, skew, logmu - sqrt (2.0 * exp_rot[d] * log (skew)),
-              nroots);
+      printf ("# lognorm %1.2f, skew %1.2f, alpha %1.2f, E %1.2f, %u rroots\n",
+              logmu, skew, alpha, logmu + alpha, nroots);
       printf ("\n");
       fflush (stdout);
       pthread_mutex_lock (&lock);
@@ -822,7 +838,7 @@ main (int argc, char *argv[])
   mpz_t N;
   unsigned int d = 0;
   unsigned long P, admin = 0, admax = ULONG_MAX;
-  int tries = 0, i, nthreads = 1, nr = 0, st, target_time = TARGET_TIME;
+  int tries = 0, i, nthreads = 1, st, target_time = TARGET_TIME;
   tab_t *T;
   FILE *fp;
 #ifdef MAX_THREADS
@@ -846,12 +862,6 @@ main (int argc, char *argv[])
           argv += 2;
           argc -= 2;
         }
-      else if (strcmp (argv[1], "-nr") == 0)
-        {
-          nr = atoi (argv[2]);
-          argv += 2;
-          argc -= 2;
-        }
       else if (strcmp (argv[1], "-maxnorm") == 0)
         {
           max_norm = atof (argv[2]);
@@ -860,13 +870,27 @@ main (int argc, char *argv[])
         }
       else if (strcmp (argv[1], "-admin") == 0)
         {
-          admin = strtoul (argv[2], NULL, 10);
+          double d;
+          d = strtod (argv[2], NULL);
+          if (d > (double) ULONG_MAX)
+            {
+              fprintf (stderr, "Error, too large value of admin\n");
+              exit (1);
+            }
+          admin = (unsigned long) d;
           argv += 2;
           argc -= 2;
         }
       else if (strcmp (argv[1], "-admax") == 0)
         {
-          admax = strtoul (argv[2], NULL, 10);
+          double d;
+          d = strtod (argv[2], NULL);
+          if (d > (double) ULONG_MAX)
+            {
+              fprintf (stderr, "Error, too large value of admax\n");
+              exit (1);
+            }
+          admax = (unsigned long) d;
           argv += 2;
           argc -= 2;
         }
@@ -900,6 +924,12 @@ main (int argc, char *argv[])
           argv += 2;
           argc -= 2;
         }
+      else if (strcmp (argv[1], "-kmax") == 0)
+        {
+	  MAX_k = atoi (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
       else if (strcmp (argv[1], "-v") == 0)
         {
           verbose ++;
@@ -915,7 +945,7 @@ main (int argc, char *argv[])
 
   if (argc != 2)
     {
-      fprintf (stderr, "Usage: %s [-t nthreads -nr nnn -admin nnn -admax nnn -N nnn -d nnn -save xxx -resume xxx -maxnorm xxx] P\n", argv0);
+      fprintf (stderr, "Usage: %s [-v -t nthreads -admin nnn -admax nnn -N nnn -d nnn -save xxx -resume xxx -maxnorm xxx] P\n", argv0);
       exit (1);
     }
 
