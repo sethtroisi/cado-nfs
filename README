@@ -98,7 +98,8 @@ Factoring with two non-linear polynomials:
 ==========================================
 
 This is not yet possible with this release. You can find a bit of
-information on this topic in the development version, in the SVN repository.
+information on this topic in the development version, in the SVN repository
+(see file README.nonlinear).
 
 Using CADO-NFS under Windows:
 =============================
