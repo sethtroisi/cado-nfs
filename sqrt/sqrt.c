@@ -702,7 +702,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
 }
 
 static unsigned long
-FindSuitableModP (poly_t F)
+FindSuitableModP (poly_t F, mpz_t N)
 {
   unsigned long p = 2;
   int dF = F->deg;
@@ -715,6 +715,8 @@ FindSuitableModP (poly_t F)
     int d;
 
     p = getprime (p);
+    if (mpz_gcd_ui(NULL, N, p) != 1)
+      continue;
     if (! plain_poly_fits (dF, p))
       {
         fprintf (stderr, "You are in trouble. Please contact the CADO support team at cado-nfs-commits@lists.gforge.inria.fr.\n");
@@ -897,7 +899,7 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly pol, int side,
     fprintf (stderr, "maximal polynomial bit-size = %lu\n",
              (unsigned long) poly_sizeinbase (prd->p, deg - 1, 2));
   
-    p = FindSuitableModP(F);
+    p = FindSuitableModP(F, Np);
     fprintf(stderr, "Using p=%lu for lifting\n", p);
   
     double tm = seconds();
@@ -1267,8 +1269,25 @@ int main(int argc, char *argv[])
             }
         } while (mpz_cmp_ui(gg, 1) != 0);
         mpz_clear(gg);
+        /* Trial divide Np, to avoid bug if a stupid input is given */
+        {
+            unsigned long p;
+            for (p = 2; p <= 1000000; p = getprime (p)) {
+                while (mpz_tdiv_ui(Np, p) == 0) {
+                    printf("%lu\n", p);
+                    mpz_divexact_ui(Np, Np, p);
+                }
+            }
+        }
         if (mpz_cmp(pol->n, Np) != 0) 
             gmp_fprintf(stderr, "Now factoring N' = %Zd\n", Np);
+        if (mpz_cmp_ui(Np, 1) == 0) {
+            gmp_fprintf(stderr, "Hey N' is 1! Stopping\n");
+            cado_poly_clear (pol);
+            param_list_clear(pl);
+            mpz_clear(Np);
+            return 0;
+        }
         if (mpz_probab_prime_p(Np, 10) || mpz_perfect_power_p(Np)) {
             gmp_fprintf(stderr, "Hey N' is (power of) prime! Stopping\n");
             print_factor(Np);
