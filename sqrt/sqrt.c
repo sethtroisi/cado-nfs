@@ -1278,6 +1278,7 @@ int main(int argc, char *argv[])
                     mpz_divexact_ui(Np, Np, p);
                 }
             }
+            getprime(0);
         }
         if (mpz_cmp(pol->n, Np) != 0) 
             gmp_fprintf(stderr, "Now factoring N' = %Zd\n", Np);
