@@ -4,7 +4,7 @@
 # with the list of files known to the SCM.  A further word of caution:
 # wildcards are *NOT* recognized (by the fascist sanity check program).
 WhoDunit
-gf2x-fft/cantor/cantor128.m
+gf2x/gf2x-fft/cantor128.m
 dev_docs/
 factor_from_rels
 TODO
