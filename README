@@ -94,6 +94,12 @@ that could possibly occur with SNFS polynomials (a degree 4 polynomial
 with Galois group Z/2 x Z/2 is the only reasonnable example, next case is
 for degree 8). The CRT approach is a workaround. See crtaglsqrt.c . 
 
+Factoring with two non-linear polynomials:
+==========================================
+
+This is not yet possible with this release. You can find a bit of
+information on this topic in the development version, in the SVN repository.
+
 Using CADO-NFS under Windows:
 =============================
 

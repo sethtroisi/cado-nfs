@@ -81,7 +81,7 @@
 #   some parameters in this file or on line command of cadofactor.pl.
 #   If the paramfile does not exist then you must to create it.
 # $cp <polynomial choosen in the cado format> snfs<size>.poly
-#   The polynomial file must also to contain the sieve parameters.
+#   The polynomial file must also contain the sieve parameters.
 # $CADO_DIR/cadofactor.pl params.c<size> wdir=$HOME/snfs name=snfs<size> \
 #    machines=mach_desc n=<n>
 # $touch snfs<size>.polysel_done
