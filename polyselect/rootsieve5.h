@@ -51,7 +51,7 @@ static double exp_alpha[] = { 0 ,
 							  -13.3095974869 ,-13.3612834859 ,-13.4127725259 ,-13.4640668332 ,-13.5151685928 ,
 							  -13.5660799493 ,-13.6168030075 ,-13.6673398341 ,-13.7176924584 ,-13.7678628729 ,
 							  -13.8178530347 ,-13.8676648661 ,-13.9173002556 ,-13.9667610588 ,-14.0160490987 ,
-							  -14.0651661673 ,-14.1141140255 ,-14.1628944044 ,-14.211509006 /* 2^2, 2^3 ... */ };
+							  -14.0651661673 ,-14.1141140255 ,-14.1628944044 ,-14.211509006 };
 
 
 /* Sieve bound for (A + MOD*i)*x + (B + MOD*j) */
@@ -64,7 +64,7 @@ typedef struct {
 	 long Amin;
 	 long Bmax;
 	 long Bmin;
-	 unsigned long A;
+	 long A;
 	 unsigned long B;
 	 unsigned long MOD;
 } _rsbound_t;
@@ -84,18 +84,26 @@ typedef struct {
 } _rsstr_t;
 typedef _rsstr_t rsstr_t[1];
 
-/* Parameters for root sieve (customize) */
+
+/* Global parameters for root sieve for each sublattice */
 typedef struct {
+
 	 /* regarding find_sublattice() functions. */
 	 unsigned short len_e_sl;
 	 unsigned short *e_sl;
 	 unsigned long nbest_sl;
 	 unsigned long modulus;
 
+	 /* only only those u < the following in sublattices().
+		also choose e_sl and len_e_sl such that \prod p_i^{e_i}
+		is larger than global_u_bound_rs, then we only need to
+		do a line sieving 1x[-U, U]  */
+	 unsigned long global_u_bound_rs;
+	 mpz_t global_v_bound_rs;
+
 	 /* regarding rootsieve_run() functions. */
 	 float sizebound_ratio_rs;
-	 unsigned long sizebound_u_rs;
-	 mpz_t sizebound_v_rs;
+
 	 unsigned short len_p_rs;
 	 float alpha_bound_rs;
 } _rsparam_t;
