@@ -133,7 +133,7 @@ include_directories (${CADO_NFS_BINARY_DIR})
 
 # link_directories (${CADO_NFS_BINARY_DIR}/utils)
 # link_directories (${CADO_NFS_BINARY_DIR}/gf2x/.libs)
-# link_directories (${CADO_NFS_BINARY_DIR}/cantor)
+# link_directories (${CADO_NFS_BINARY_DIR}/gf2x/gf2x-fft/.libs)
 
 include_directories(${CADO_NFS_SOURCE_DIR}/gf2x)
 include_directories(${CADO_NFS_BINARY_DIR}/gf2x)
@@ -151,9 +151,11 @@ add_custom_target(gf2x-build ALL
     COMMENT "Building gf2x"
 )
 
-set(GF2X_LIB_FILE  ${CADO_NFS_BINARY_DIR}/gf2x/.libs/libgf2x.a)
+# set(GF2X_LIB_FILE  ${CADO_NFS_BINARY_DIR}/gf2x/.libs/libgf2x.a)
+# set(GF2X-FFT_LIB_FILE ${CADO_NFS_BINARY_DIR}/gf2x/gf2x-fft/.libs/libgf2x-fft.a)
+# set(CANTOR128_LIB_FILE ${CADO_NFS_BINARY_DIR}/gf2x/gf2x-fft/.libs/libcantor128.a)
 
-add_subdirectory (gf2x-fft)
+# add_subdirectory (gf2x-fft)
 add_subdirectory (utils)
 add_subdirectory (polyselect)
 add_subdirectory (sieve)

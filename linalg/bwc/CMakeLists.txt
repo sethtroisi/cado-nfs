@@ -178,10 +178,13 @@ install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl DESTINATION bin/linalg/bwc)
 
 # Also lingen.
 
-include_directories(${CADO_NFS_SOURCE_DIR}/gf2x-fft)
+link_directories (${CADO_NFS_BINARY_DIR}/gf2x/.libs)
+link_directories (${CADO_NFS_BINARY_DIR}/gf2x/gf2x-fft/.libs)
+
+include_directories(${CADO_NFS_SOURCE_DIR}/gf2x/gf2x-fft)
 add_executable(lingen lingen_binary.cpp)
 install(TARGETS lingen RUNTIME DESTINATION bin/linalg/bwc)
-target_link_libraries(lingen bwc_base utils gf2x-fft)
+target_link_libraries(lingen bwc_base utils gf2x-fft gf2x cantor128)
 
 add_executable(short_matmul EXCLUDE_FROM_ALL short_matmul.c)
 
