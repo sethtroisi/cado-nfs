@@ -2785,12 +2785,11 @@ sub do_sqrt {
         my $za = Math::BigInt->new($a);
         my $zzn = $zn->copy();
         while (Math::BigInt::bmod($zzn, $za)->is_zero()) {
-            print FILE "$a ";
+            print FILE "$a\n";
             $zn->bdiv($za);
             $zzn = $zn->copy();
         }
     }
-    print FILE "\n";
     close FILE;
 }
 
