@@ -230,7 +230,6 @@ PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
 PACKAGE_NAME = @PACKAGE_NAME@
 PACKAGE_STRING = @PACKAGE_STRING@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
-PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 RANLIB = @RANLIB@
@@ -322,12 +321,8 @@ nobase_nodist_include_HEADERS = \
 		gf2x/gf2x_mul9.h
 
 libgf2x_la_LDFLAGS = -version-info @gf2x_lib_version@
-
-#if ENABLE_NTL_CHECKS
-#    MAYBE_APPS=apps
-#endif
-SUBDIRS = . tests src 
-DIST_SUBDIRS = tests src 
+SUBDIRS = . tests src gf2x-fft
+DIST_SUBDIRS = tests src gf2x-fft
 DISTCLEANFILES = gf2x/gf2x-thresholds.h	\
 	       gf2x/gf2x_mul1.h		\
 	       gf2x/gf2x_mul2.h		\

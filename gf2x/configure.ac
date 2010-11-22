@@ -154,7 +154,7 @@ AM_CONDITIONAL([GF2X_PCLMUL_AVAILABLE],[test "x$gf2x_cv_cc_supports_pclmul" != x
 
 AC_CONFIG_HEADERS([gf2x/gf2x-config.h])
 
-AC_CONFIG_FILES([version.sh Makefile tests/Makefile src/Makefile])
+AC_CONFIG_FILES([version.sh Makefile tests/Makefile src/Makefile gf2x-fft/Makefile])
 AC_OUTPUT
 
 # vim: set sw=1:
