@@ -1,0 +1,74 @@
+Cantor's multiplication algorithm for GF(2)[x].
+===============================================
+
+Authors: Richard Brent, Pierrick Gaudry, Emmanuel Thomé, Paul Zimmermann.
+Licence: GNU General Public License (version 2 or any later version).
+
+This package provides an implementation of Cantor's algorithm for
+multiplying two binary polynomials using "additive FFT".
+
+The exported function are:
+
+void mulCantor128(unsigned long *H, unsigned long *F, int Fl, unsigned long *G, int Gl);
+
+	multiplies two polynomials F(x) and G(x) and put the results in
+	H(x).  F(x) is represented in a dense way by an array F of Fl
+	blocks of w bits (where w is the bit width of unsigned long), the
+	same for G, with Gl blocks, and the result is put in the table H,
+	that must have room for Fl+Gl blocks of w bits.
+
+as well as other functions allowing FFT caching.
+
+extern void c128_setup(c128_info_t p, int nF, int nG);
+
+	sets up the appropriate data for multiplying polynomials having
+	numbers of coefficients bounded respectively by nF and nG.
+	
+extern c128_t c128_alloc(const c128_info_t p, int n);
+
+	allocates space for n transforms.
+
+extern void c128_free(const c128_info_t p, c128_t x, int n); 
+
+	frees the n transforms allocated at x
+
+extern void c128_zero(const c128_info_t p, c128_t x, int n); 
+
+	initialize to zero the n transforms allocated at x
+
+extern inline c128_get(const c128_info_t p, c128_t x, int k); 
+
+	accesses the k-th transform stored at location x.
+
+extern void c128_dft(const c128_info_t p, c128_t x, unsigned long * F, int nF);
+
+	performs a direct transform of F, having at most nF coefficients.
+
+extern void c128_compose(const c128_info_t p,
+		c128_t y, c128_src_t x1, c128_src_t x2);
+
+	composes the transforms of two polynomials. The result is by
+	definition the transform of their product.
+
+extern void c128_add(const c128_info_t p,
+		c128_t y, c128_src_t x1, c128_src_t x2);
+
+	adds two transforms (the direct transform is linear).
+
+extern void c128_ift(const c128_info_t p, unsigned long * H, int nH, c128_t h);
+
+	performs an inverse transform. nH is the number of coefficients.
+
+
+bench measures the time spent to multiply two polynomials (type ./bench
+for usage).  cantor is a small utility that takes two random polynomials,
+multiply them and print the corresponding data, for testing purpose. It
+is used by the script check_cantor that will checked the result against
+Magma (assuming it is installed).
+
+Examples:
+
+./bench 64 1000 -f 1.1
+
+
+

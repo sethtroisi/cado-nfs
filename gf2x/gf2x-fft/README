@@ -1,0 +1,7 @@
+WARNING: this package is *not* part of gf2x.
+
+This provides a generic FFT API for multiplication of polynomials over
+GF(2), and an implementation of Cantor's algorithm.
+
+It can not compile outside CADO-NFS, since it uses some of the general
+headers of CADO.
