@@ -56,16 +56,18 @@ if(CMAKE_COMPILER_IS_GNUCC)
     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -W -Wall")
 endif(CMAKE_COMPILER_IS_GNUCC)
 
-#####
-
-set(GF2X_CONFIGURE_FLAGS --disable-shared --disable-dependency-tracking --disable-maintainer-mode CFLAGS=${CMAKE_C_FLAGS} CXXFLAGS=${CMAKE_CXX_FLAGS})
-get_override(GF2X_CONFIGURE_FLAGS GF2X_CONFIGURE_FLAGS)
-
 #####################################################################
 # Set dependencies for external software.
 
 # locates gmp. Obeys the env variables GMP GMP_LIBDIR GMP_INCDIR
 include(${CADO_NFS_SOURCE_DIR}/config/gmp.cmake)
+
+#####
+
+set(GF2X_C_FLAGS "${CMAKE_C_FLAGS} -I${GMP_INCDIR}")
+set(GF2X_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${GMP_INCDIR}")
+set(GF2X_CONFIGURE_FLAGS --disable-shared --disable-dependency-tracking --disable-maintainer-mode CFLAGS=${GF2X_C_FLAGS} CXXFLAGS=${GF2X_CXX_FLAGS})
+get_override(GF2X_CONFIGURE_FLAGS GF2X_CONFIGURE_FLAGS)
 
 #####################################################################
 # Obtain information from the host.
