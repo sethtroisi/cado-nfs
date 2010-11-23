@@ -6,6 +6,7 @@ include_directories(${CADO_NFS_BINARY_DIR}/gf2x)
 include_directories(${CADO_NFS_SOURCE_DIR}/cantor)
 add_executable(bench_polmatmul bench_polmatmul.cpp)
 target_link_libraries(bench_polmatmul utils gf2x-fft gf2x cantor128)
+add_dependencies(bench_polmatmul gf2x-build)
 
 add_executable(mf_dobal mf_dobal.c)
 target_link_libraries(mf_dobal mf m bwc_base balancing)
