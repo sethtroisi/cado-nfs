@@ -4,9 +4,36 @@
 #include <stdio.h>
 #include <gmp.h>
 
-/* cado_poly is defined in cado.h */
 #include "cado.h"
 #include "params.h"
+
+/* The maximum degree of polynomials supported. Used for statically 
+   allocating storage (i.e. "mpz_t poly[MAXDEGREE]") */
+#define MAXDEGREE 10
+
+typedef struct
+{
+  mpz_t n;        /* number to factor */
+  double skew;    /* skewness */
+  int degree;     /* (algebraic) degree */
+  mpz_t *f;       /* algebraic coefficients */
+  mpz_t *g;       /* rational coefficients */
+  int degreeg;    /* degree of polynomial g */
+  mpz_t m;        /* common root of f and g mod n */
+  char type[256]; /* type (gnfs or snfs) */
+  unsigned long rlim; /* rational  factor base bound */
+  unsigned long alim; /* algebraic factor base bound */
+  int lpbr;           /* rational  large prime bound is 2^lpbr */
+  int lpba;           /* algebraic large prime bound is 2^lpba */
+  int mfbr;           /* bound for rational  residuals is 2^mfbr */
+  int mfba;           /* bound for algebraic residuals is 2^mfba */
+  double rlambda;     /* lambda sieve parameter on the rational  side */
+  double alambda;     /* lambda sieve parameter on the algebraic side */
+  int qintsize;       /* sieve block range */
+} cado_poly_struct;
+
+typedef cado_poly_struct cado_poly[1];
+typedef cado_poly_struct * cado_poly_ptr;
 
 #ifdef __cplusplus
 extern "C" {

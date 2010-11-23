@@ -1,3 +1,6 @@
+#ifndef POLYSELECT_AUXILIARY_H_
+#define POLYSELECT_AUXILIARY_H_
+
 /* header file for auxiliary routines for polyselect
 
 Copyright 2008, 2009, 2010 Emmanuel Thome, Paul Zimmermann
@@ -49,6 +52,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
   if (c >= 0) mpz_submul_ui (a, b, c);          \
   else mpz_addmul_ui (a, b, -(c))
   
+#include "cado_poly.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void mpz_ndiv_qr (mpz_t, mpz_t, mpz_t, mpz_t);
 void generate_base_mb (cado_poly, mpz_t, mpz_t);
 double L2_lognorm (mpz_t*, unsigned long, double, int);
@@ -74,6 +83,11 @@ void eval_poly_ui (mpz_t v, mpz_t *f, int d, unsigned long r);
 void eval_poly_diff_ui (mpz_t v, mpz_t *f, int d, unsigned long r);
 double special_valuation (mpz_t * f, int d, unsigned long p, mpz_t disc);
 
+
+#ifdef __cplusplus
+}
+#endif
+
 /********************* data structures for first phase ***********************/
 
 typedef struct {
@@ -83,9 +97,19 @@ typedef struct {
   double logmu;
 } m_logmu_t;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 m_logmu_t* m_logmu_init (unsigned long);
 void m_logmu_clear (m_logmu_t*, unsigned long);
 int m_logmu_insert (m_logmu_t*, unsigned long, unsigned long*, mpz_t, mpz_t,
                     double, char*);
 
+#ifdef __cplusplus
+}
+#endif
+
+
+#endif	/* POLYSELECT_AUXILIARY_H_ */
 

@@ -1,4 +1,13 @@
-/* Some data type definition for sieve that aren't used anywhere else */
+#ifndef LINESIEVE_H_
+#define LINESIEVE_H_
+
+#include "fb.h" /* for fbprime_t */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* Some data type definition for linesieve that aren't used anywhere else */
 
 
 /* A sieve report, filled in when sieving large factor base primes and
@@ -52,3 +61,9 @@ typedef struct {
 			     missinglog when we discard due to guessed 
 			     cofactor > mfb */
 } refactor_stats_t;
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif	/* LINESIEVE_H_ */

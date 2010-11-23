@@ -2,11 +2,41 @@
 *                Functions for the factor base                  *
 *****************************************************************/
 
-#ifndef __FB_H
-#define __FB_H
+#ifndef FB_H
+#define FB_H
 
 #include <stdio.h>
 #include "cado.h"
+
+/* Data types */
+
+typedef unsigned int fbprime_t; /* 32 bits should be enough for everyone */
+#define FBPRIME_FORMAT "%u"
+#define FBPRIME_MAX 4294967295U
+#define FBPRIME_BITS 32
+typedef fbprime_t fbroot_t;
+#define FBROOT_FORMAT "%u"
+typedef unsigned long largeprime_t; /* On IA32 they'll only get 32 bit 
+                                       large primes */
+#define LARGEPRIME_FORMAT "%lu"
+
+/* Factor base entry with (possibly) several roots */
+typedef struct {
+  fbprime_t p;            /* A prime or a prime power */
+  unsigned long invp;     /* -1/p (mod 2^wordsize) for REDC: although we need
+			     only a 32-bit inverse in say redc_32, we need a
+			     full-limb inverse on 64-bit machines for trial
+			     division */
+  unsigned char plog;     /* logarithm (to some suitable base) of this prime */
+  unsigned char nr_roots; /* how many roots there are for this prime */
+  unsigned char size;     /* The length of the struct in bytes */
+  unsigned char dummy[1]; /* For dword aligning the roots. In fact uneeded, C99
+                             guarantees proper alignment of roots[]. It's only a
+                             precaution against -fpack-struct or other
+                             ABI-breaking behaviours */
+  fbroot_t roots[0];      /* the actual length of this array is determined
+                             by nr_roots */
+} factorbase_degn_t;
 
 #define FB_END ((fbprime_t) 1)
 
@@ -14,21 +44,12 @@ void		fb_fprint_entry (FILE *, const factorbase_degn_t *);
 void            fb_fprint (FILE *, const factorbase_degn_t *);
 void            fb_sortprimes (fbprime_t *, const unsigned int);
 unsigned char	fb_log (double, double, double);
-void            fb_init_firstlog (factorbase_t);
 factorbase_degn_t * 	fb_make_linear (const mpz_t *, const fbprime_t, 
 					const fbprime_t, const double, 
 					const int, const int, FILE *);
 factorbase_degn_t *	fb_read (const char *, const double, const int);
 factorbase_degn_t *     fb_read_addproj (const char *, const double, const int,
 					 const fbprime_t *);
-void		fb_disable_roots (factorbase_degn_t *, const unsigned long, 
-                                  const int);
-void		fb_restore_roots (factorbase_degn_t *, const unsigned long, 
-                                  const int);
-void 		fb_extract_small (factorbase_t, const unsigned int, const int,
-                                  const int);
-int             fb_check (factorbase_t, cado_poly, int);
-void            fb_clear (factorbase_t);
 fbprime_t	*fb_extract_bycost (const factorbase_degn_t *, 
                                     const fbprime_t, const fbprime_t costlim);
 size_t          fb_size (const factorbase_degn_t *);                   

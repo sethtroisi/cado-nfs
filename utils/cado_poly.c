@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include "cado.h"
 #include "params.h"
+#include "cado_poly.h"
 
 void cado_poly_init(cado_poly poly)
 {

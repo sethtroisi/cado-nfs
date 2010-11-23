@@ -9,9 +9,10 @@
 #include <ctype.h>
 #include <time.h>
 #include "cado.h"
-#include "sieve.h"
+#include "linesieve.h"
 #include "mod_ul.h"
 #include "fb.h"
+#include "linesieve-fb.h"
 #include "basicnt.h"
 #include "utils.h"
 
