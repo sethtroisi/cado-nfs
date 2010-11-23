@@ -12,7 +12,7 @@
 
 #CADO_DEBUG=1
 usage="Usage: $0 <integer> [options] [arguments cadofactor.pl]\n
-       \t <integer> \t \t - integer must be at least 60 digits [optimize for more than 90 digits] without small prime factors\n
+       \t <integer> \t \t - integer must be at least 60 digits [optimize for more than 85 digits] without small prime factors\n
        \t options:\n
        \t \t -t <integer> \t - numbers of cores\n
        \t \t -ssh \t \t - use ssh (doc README) for distribute the polynomial selection and
@@ -63,7 +63,7 @@ cado_prefix="@CMAKE_INSTALL_PREFIX@"
 example_subdir="@example_subdir@"
 mpiexec="@MPIEXEC@"
 
-for ((i=1; i<=3; i=i+1)) ; do
+for ((i=1; i<=4; i=i+1)) ; do
   if [ -d "$cado_prefix/$example_subdir" ] ; then
       # We're called in the install tree.
       if [ -f "$cado_prefix/$example_subdir/params.c$size" ] ; then
@@ -101,6 +101,8 @@ for ((i=1; i<=3; i=i+1)) ; do
     size=`expr $size + 1`
   elif [ $i -eq 2 ]; then
     size=`expr $size - 2`
+  elif [ $i -eq 3 ]; then
+    size=`expr $size + 3`
   fi
 done
 

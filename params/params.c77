@@ -14,11 +14,11 @@
 # General parameters
 ###########################################################################
 
-# Sample parameter file for a 58/59-digit gnfs input
+# Sample parameter file for a 76/77-digit gnfs input
 # Warning: the parameters here are not claimed to be optimal!
 # Example: cadofactor.pl wdir=... name=... n=...
 
-name=c59
+name=c77
 #wdir=/tmp/noise        # directory where temporary files are put
 #bindir=$HOME/cado      # where to find cado binaries
 parallel=1              # do we use parallel computation?
@@ -26,8 +26,6 @@ delay=30                # time in seconds between two checks
 
 machines=mach_desc      # file describing available computers for parallel
                         # computation
-
-#n=71641520761751435455133616475667090434063332228247871795429
 
 ###########################################################################
 # Polynomial selection with Kleinjung's algorithm
@@ -38,15 +36,15 @@ kjdelay=30              # time between two checks
 selectnice=4            # nice level for selection
 
 ## Most important parameters of polyselect
-kjM=1e11                # maximum norm allowed
+kjM=1e14                # maximum norm allowed
 kjl=4                   # minimal number of primes in lc(g)
 kjadmin=1               # min value for lc(f)
-kjadmax=4e4             # max value for lc(f)
-kjadrange=2e4           # individual tasks
+kjadmax=2e5             # max value for lc(f)
+kjadrange=1e5           # individual tasks
 
 ## Other parameters of polyselect
-kjkeep=10               # number of preselected polynomials
-kjkmax=10               # rotation is bounded by 2^kmax
+kjkeep=50               # number of preselected polynomials
+kjkmax=14               # rotation is bounded by 2^kmax
 kjincr=60               # forced divisor of lc(f)
 kjpb=256                # bound on primes allowed in lc(g)
 kjp0max=1000            # bound on the additional factor in lc(g)
@@ -68,13 +66,13 @@ alim=200000
 lpbr=22
 lpba=22
 mfbr=24
-mfba=24
+mfba=44
 rlambda=1.2
-alambda=1.2
+alambda=2.2
 
 I=11                    # Sieving range in lattice siever
 qmin=200000             # Start of the special-q range
-qrange=2000             # The size of an elementary sieving task
+qrange=10000            # The size of an elementary sieving task
 checkrange=50000        # We check if we have enough after each step
                         # of that many relations found.
 sievenice=10            # nice level for the sieving jobs
@@ -117,5 +115,3 @@ bwc_interval=100        # checkpointing interval for bwc.
 nkermax=30              # maximal size of computed kernel
 nchar=50                # number of characters
 
-# Used for employing this parameter file as a test.
-#expected_factorization=200429218120815554269743635437,357440504101388365610785389017

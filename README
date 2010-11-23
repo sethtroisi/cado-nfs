@@ -45,7 +45,7 @@ Run a factorization on current machine:
 ./factor.sh 90377629292003121684002147101760858109247336549001090677693 -t 2
 
 The integer must not be too small, say at least 60 digits [note though
-that cado-nfs is optimized only for numbers above 90 digits] and it is a
+that cado-nfs is optimized only for numbers above 85 digits] and it is a
 good idea to remove its small prime factors. The option '-t 2' tells how many
 cores to use on the current machine (for sieving and linear algebra).
 

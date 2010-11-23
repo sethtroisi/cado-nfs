@@ -110,12 +110,12 @@ or die "Cannot open `$param{'prefix'}.allfactors' for reading: $!.\n";
 my @l = <FILE>;
 close FILE;
 chomp for @l;
+@l = sort {$a <=> $b} @l;
 print "@l\n";
 
 if (defined(my $e = $param{'expected_factorization'})) {
 	my @exp=split(',',$e);
-	@exp = sort @exp;
-	@l = sort @l;
+	@exp = sort {$a <=> $b} @exp;
 	my $ok = "@exp" eq "@l";
 	if ($ok) {
 		print "Factorization matches expected result\n";
