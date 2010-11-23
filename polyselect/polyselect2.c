@@ -61,6 +61,7 @@ typedef _roots_struct roots_t[1];
 int verbose = 0, incr = 60;
 double max_norm = DBL_MAX; /* maximal wanted norm (before rotation) */
 uint32_t *Primes;
+char *out = NULL; /* output file for msieve input (msieve.dat.m) */
 
 /* read-write global variables */
 pthread_mutex_t lock; /* used as mutual exclusion lock for those variables */
@@ -361,6 +362,22 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
               logmu, skew, alpha, logmu + alpha, nroots);
       printf ("\n");
       fflush (stdout);
+      if (out != NULL)
+	{
+	  FILE *fp;
+	  fp = fopen (out, "a");
+	  if (fp == NULL)
+	    {
+	      fprintf (stderr, "Error, cannot open file %s\n", out);
+	      exit (1);
+	    }
+	  fprintf (fp, "0");
+	  for (j = d + 1; j -- != 0; )
+	    gmp_fprintf (fp, " %Zd", f[j]);
+	  mpz_neg (m, g[0]);
+	  gmp_fprintf (fp, " %Zd %Zd\n", g[1], m);
+	  fclose (fp);
+	}
       pthread_mutex_lock (&lock);
       found ++;
       pthread_mutex_unlock (&lock);
@@ -924,6 +941,12 @@ main (int argc, char *argv[])
           argv += 2;
           argc -= 2;
         }
+      else if (strcmp (argv[1], "-out") == 0)
+        {
+	  out = argv[2];
+          argv += 2;
+          argc -= 2;
+        }
       else if (strcmp (argv[1], "-kmax") == 0)
         {
 	  MAX_k = atoi (argv[2]);
@@ -945,7 +968,7 @@ main (int argc, char *argv[])
 
   if (argc != 2)
     {
-      fprintf (stderr, "Usage: %s [-v -t nthreads -admin nnn -admax nnn -N nnn -d nnn -save xxx -resume xxx -maxnorm xxx] P\n", argv0);
+      fprintf (stderr, "Usage: %s [-v -t nthreads -admin nnn -admax nnn -N nnn -d nnn -save xxx -resume xxx -maxnorm xxx -out fff] P\n", argv0);
       exit (1);
     }
 
