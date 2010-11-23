@@ -22,6 +22,12 @@
  * Boston, MA 02110-1301, USA.
  */
 
+/*
+ * Warning: this code is specific to x86_64 architecture.
+ */
+
+
+
 #include <stdio.h>
 #include <stdint.h>
 #include <time.h>

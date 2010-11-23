@@ -13,6 +13,9 @@ set_target_properties(mf_dobal PROPERTIES
         COMPILE_FLAGS "--mpi"
         LINK_FLAGS "--mpi")
 
+if(HAVE_GCC_STYLE_AMD64_ASM)
 add_executable(matops matops.c ../gauss.c)
 target_link_libraries(matops gmp utils m)
+endif(HAVE_GCC_STYLE_AMD64_ASM)
+
 # vim: ft=cmake:
