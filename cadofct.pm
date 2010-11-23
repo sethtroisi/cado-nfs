@@ -31,14 +31,18 @@ use strict;
 use warnings;
 
 use File::Basename;
+use File::Temp qw/:POSIX/;
 use Cwd qw(abs_path);
 use List::Util qw[min];
 use POSIX qw(ceil);
 use Math::BigInt;
 use IPC::Open3;
-BEGIN { local $SIG{__WARN__} = sub { }; require "sys/ioctl.ph"; }
+eval q{local $SIG{__WARN__}=sub{}; require "sys/ioctl.ph"};
 
-
+my $can_use_new_cado_cmd=1;
+if ($@) {
+    $can_use_new_cado_cmd=0;
+}
 
 
 ###############################################################################
@@ -131,6 +135,10 @@ $SIG{__DIE__}  = sub {
     die          format_message("\033[01;31mError\033[01;00m:", $text);
 };
 
+
+if (!$can_use_new_cado_cmd) {
+    warn "sys/ioctl.ph cannot be loaded. This mildly affects cadofactor's output\n";
+}
 
 ###############################################################################
 # Parameters ##################################################################
@@ -248,7 +256,14 @@ sub read_param {
         die unless ref $_ eq 'ARRAY';
         my $secondary = $_->[1];
         $_=$_->[0];
-        if (/^-v$/) { $verbose=1; next; }
+        if (/^-v$/) {
+            if ($can_use_new_cado_cmd) {
+                $verbose=1;
+            } else {
+                warn "Option -v is not supported when ioctl.ph cannot be found";
+            }
+            next;
+        }
         if (/^-y$/) { $assume_yes='y'; next; }
         if (/^-l$/) { $assume_yes='l'; next; }
         next if $files_read{$_};
@@ -468,23 +483,24 @@ my $cmdlog;
 #  - `kill' specifies that if the command fails (non-zero exit status)
 #           we should report the error and die immediately.
 #  - `logfile' redirect both stdout and stderr to given file.
-#  - `appendlog' whether to append to redirection file in one of the
-#     two cases above.
+#  - `appendlog' whether to append to redirection file.
 # The return value is another pointer to a hash table:
-#  - `out'    is the captured standard output of the command;
-sub cmd {
+#  - `out'    is the captured standard output stream of the command;
+#  - `err'    is the captured standard error stream of the command;
+#  - `status' is the return code of the command.
+sub cmd_new {
     my ($cmd, $opt) = @_;
     $cmd =~ s/localhost:// if $elide_localhost && $cmd =~ /rsync/;
-    my $logfile;
+    my $logfh;
     if ($opt->{'logfile'}) {
         if ($opt->{'appendlog'}) {
-            open($logfile, ">>", $opt->{'logfile'}) or die;
+            open($logfh, ">>", $opt->{'logfile'}) or die;
         } else {
-            open($logfile, ">", $opt->{'logfile'}) or die;
+            open($logfh, ">", $opt->{'logfile'}) or die;
         }
     }
-    if ($logfile) {
-        select($logfile); $|=1;select(STDOUT);
+    if ($logfh) {
+        select($logfh); $|=1;select(STDOUT);
     }
 
     if ($verbose) {
@@ -526,24 +542,24 @@ sub cmd {
             if (sysread $v->[0], my $x, 1024) { 
                 $v->[1] .= $x;
                 while ($v->[1]=~s/^(.*(?:\n|\r))//) {
-                    print $logfile $1 if $logfile;
+                    print $logfh $1 if $logfh;
                     print $1 if $verbose;
                     # print "$k $1";
                     $v->[3] .= $1;
                 }
             } else {
                 if (length($v->[1])) {
-                    print $logfile $v->[1] if $logfile;
+                    print $logfh $v->[1] if $logfh;
                     $v->[3] .= $v->[1];
-                    # $v->[1] =~ s/^/$k /gm;
-                    print $v->[1] if $verbose;
+                    $v->[1] =~ s/^/$k /gm;
+                    # print $v->[1] if $verbose;
                     $v->[1] = '';
                 }
                 $v->[2]=0;
             }
         }
     }
-    close $logfile if $logfile;
+    close $logfh if $logfh;
     waitpid($pid,0) or warn "Can't wait() for children, weird";
     my $rc = $?>>8;
     my $res = {
@@ -565,6 +581,72 @@ sub cmd {
         die $diagnostic;
     }
     return $res;
+}
+
+sub cat {
+    my $f = shift @_;
+    open my $fh, "<$f" or die "$f: $!";
+    local $/;
+    my $out=<$fh>;
+    close $fh;
+    return $out;
+}
+
+sub cmd_classic {
+    my ($cmd, $opt) = @_;
+
+    my $error_file;
+    my $redir='>';
+    if ($opt->{'appendlog'}) {
+        $redir='>>'
+    }
+    my $logfile = $opt->{'logfile'};
+
+    if ($cmdlog && $opt->{'log'}) {
+        open CMDLOG, ">> $cmdlog"
+            or die "Cannot open `$cmdlog' for writing: $!.\n";
+        print CMDLOG "$cmd\n";
+        print CMDLOG "# output logged to $logfile\n" if $logfile;
+        close CMDLOG;
+    }
+
+    my $outfile_tmp = tmpnam();
+    my $errfile_tmp = tmpnam();
+    my $kid;
+    unless ($kid = fork) {
+        open STDOUT, ">$outfile_tmp";
+        open STDERR, ">$errfile_tmp";
+        exec $cmd;
+    }
+    waitpid($kid, 0) or die "waitpid: $!";
+    my $rc = $?;
+
+    system "cat $outfile_tmp $errfile_tmp $redir$logfile" if $logfile;
+
+    my $out = cat($outfile_tmp);
+    my $err = cat($errfile_tmp);
+
+    my $status = $rc >> 8;
+    if ($rc && $opt->{'kill'}) {
+        my $diagnostic= "Command `$cmd' terminated unexpectedly" .
+                " with exit status $status.\n";
+        $diagnostic .= `tail $outfile_tmp | sed -e 's,^,STDOUT: ,'`;
+        $diagnostic .= `tail $errfile_tmp | sed -e 's,^,STDERR: ,'`;
+        die $diagnostic;
+    }
+
+    unlink $outfile_tmp;
+    unlink $errfile_tmp;
+
+    return { out => $out, err=> $err, status => $status };
+}
+
+sub cmd {
+    if ($can_use_new_cado_cmd) {
+        return cmd_new(@_);
+    } else {
+        return cmd_classic(@_);
+    }
 }
 
 # Runs the command $cmd on the remote host $host.
