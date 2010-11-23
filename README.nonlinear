@@ -14,7 +14,7 @@ f = 215609964539787*x^2 + 75006949764904*x + 44337721223995
 g = -205964131819700*x^2 - 71651332635517*x + 1199051061668898
 skew = 1.29196058385
 m = 14849204829709953721577291784724593124898329527333780861554
-(m is the common root of f and g mod n)
+(m is the common root of f and g mod n.)
 
 In the following, we assume $CADO is the directory .../svn/cado-nfs, and
 $HOSTNAME is the hostname of your computer.
@@ -83,5 +83,7 @@ $ touch /tmp/c59/c59.polysel_done
 $ touch /tmp/c59/c59.factbase_done
 $ touch /tmp/c59/c59.freerels_done
 $ touch /tmp/c59/c59.sieve_done
+
+6) we can finally run cado:
 
 $ ./cadofactor.pl n=71641520761751435455133616475667090434063332228247871795429 params=params/params.c59 machines=mach_desc wdir=/tmp/c59

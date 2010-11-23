@@ -1998,7 +1998,17 @@ sub dup {
             }
         }
         close FILE;
+        # print approximate number of large primes
+        my $nlpa;
+        my $nlpr;
+        $nlpa = 2**$param{'lpba'};
+        $nlpa = $nlpa / log($nlpa);
+        $nlpr = 2**$param{'lpbr'};
+        $nlpr = $nlpr / log($nlpr);
+        my $nlp = ceil(($nlpa+$nlpr)/100000)*100000;
+        info "Approx. number of large primes: $nlp";
     }
+
 
     banner "Duplicate and singleton removal";
     # Remove duplicates

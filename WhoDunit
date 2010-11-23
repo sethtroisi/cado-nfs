@@ -1,6 +1,6 @@
-For each binary, we gives the files it reads, and the files it writes.
+For each binary, we give the files it reads, and the files it writes.
 The files might be stdin / stdout; in that case, we take the typical name
-given in README. Log files are not mentionned.
+given in README. Log files are not mentioned.
 
 
 polyselect:
