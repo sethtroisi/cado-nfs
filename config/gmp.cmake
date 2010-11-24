@@ -19,8 +19,19 @@ if (HAS_GMP_LIBDIR_OVERRIDE)
     message(STATUS "Adding $ENV{GMP_LIBDIR} to the search path for Gnu MP")
     set(GMP_LIBDIR_HINTS "$ENV{GMP_LIBDIR}"     ${GMP_LIBDIR_HINTS})
 endif(HAS_GMP_LIBDIR_OVERRIDE)
+
+find_path   (GMP_INCDIR gmp.h HINTS ${GMP_INCDIR_HINTS} DOC "Gnu MP headers" NO_DEFAULT_PATH)
+string(COMPARE EQUAL "${GMP_INCDIR}" GMP_INCDIR-NOTFOUND GMP_INCDIR_NOTOK)
+if(GMP_INCDIR_NOTOK)
 find_path   (GMP_INCDIR gmp.h HINTS ${GMP_INCDIR_HINTS} DOC "Gnu MP headers")
+endif(GMP_INCDIR_NOTOK)
+
+find_library(GMP_LIB    gmp   HINTS ${GMP_LIBDIR_HINTS} DOC "Gnu MP library" NO_DEFAULT_PATH)
+string(COMPARE EQUAL "${GMP_LIBDIR}" GMP_LIBDIR-NOTFOUND GMP_LIBDIR_NOTOK)
+if(GMP_LIBDIR_NOTOK)
 find_library(GMP_LIB    gmp   HINTS ${GMP_LIBDIR_HINTS} DOC "Gnu MP library")
+endif(GMP_LIBDIR_NOTOK)
+
 # Yeah. CMake docs defines the ``PATH'' to a file as being its dirname. Very
 # helpful documentation there :-((
 get_filename_component(GMP_LIBDIR ${GMP_LIB} PATH)
