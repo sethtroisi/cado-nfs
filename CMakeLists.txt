@@ -66,7 +66,7 @@ include(${CADO_NFS_SOURCE_DIR}/config/gmp.cmake)
 
 set(GF2X_C_FLAGS "${CMAKE_C_FLAGS} -I${GMP_INCDIR}")
 set(GF2X_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${GMP_INCDIR}")
-set(GF2X_CONFIGURE_FLAGS --disable-shared --disable-dependency-tracking --disable-maintainer-mode CFLAGS=${GF2X_C_FLAGS} CXXFLAGS=${GF2X_CXX_FLAGS} $ENV{GF2X_CONFIGURE_EXTRA_FLAGS})
+set(GF2X_CONFIGURE_FLAGS --disable-shared --disable-dependency-tracking CFLAGS=${GF2X_C_FLAGS} CXXFLAGS=${GF2X_CXX_FLAGS} $ENV{GF2X_CONFIGURE_EXTRA_FLAGS})
 get_override(GF2X_CONFIGURE_FLAGS GF2X_CONFIGURE_FLAGS)
 
 #####################################################################
