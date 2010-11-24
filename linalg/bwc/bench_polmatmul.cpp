@@ -527,7 +527,7 @@ void plot_compose(const char * name,
     nmul *= nx1 * nx2 * nx3;
     printf("For %ux%u * %ux%u, strassen begins at %ux%u * %ux%u ; roughly %lu mults\n", n1,n2,n2,n3,nx1,nx2,nx2,nx3,nmul);
 
-    for( ; !((nx1|nx2|nx3)&1UL) ; nx1>>=1,nx2>>=1,nx3>>=1);
+    for( ; !((nx1|nx2|nx3)&1UL) ; nx1>>=1,nx2>>=1,nx3>>=1) ;
 
     /* Start by a measurement of the unit time */
     fft_type o(wt/2,wt/2);

@@ -19,13 +19,18 @@
 /* Number of words holding B bits ; better naming sought. */
 #define BITS_TO_WORDS(B,W)      iceildiv((B),(W))
 
-#if defined(__cplusplus) && GNUC_VERSION_ATLEAST(4,3,0)
 /* Starting with gcc 4.3, -Wempty-body moans for loops like
  * for(;(x=x->next)!=NULL;y++);
  * It must shut up.
+ *
+ * Unfortunately the apple-bastardized gcc-4.2.1 backported this feature,
+ * which gives rise to spurious warnings in that case as well. Since
+ * there is no way to tell whether this pragma will be recognize or not,
+ * we accept the change...
  */
-#pragma GCC diagnostic ignored "-Wempty-body"
-#endif
+// #if defined(__cplusplus) && GNUC_VERSION_ATLEAST(4,3,0)
+// #pragma GCC diagnostic ignored "-Wempty-body"
+// #endif
 
 /* See the discussion in lingen_binary about the pros and cons of data
  * ordering schemes */
@@ -546,7 +551,7 @@ struct polmat { /* {{{ */
         int k;
         /* Keep only (ULONG_BITS-ncoef) mod ULONG BITS in the top word. */
         y[stride()-1] &= ~0UL >> ((-ncoef) & (ULONG_BITS-1));
-        for(k = stride() - 1 ; k >= 0 && y[k] == 0 ; k--);
+        for(k = stride() - 1 ; k >= 0 && y[k] == 0 ; k--) ;
         if (k < 0) {
             deg(j) = -1;
         } else {
