@@ -793,7 +793,7 @@ sub job_status {
     my $ret;
     if ($job->{'file'} =~ /\.gz$/) {
             $ret = remote_cmd($job->{'host'},
-                    "env zcat $job->{'file'} | tail -n1 2>&1");
+                    "env gzip -dc $job->{'file'} | tail -n1 2>&1");
     } else {	
             $ret = remote_cmd($job->{'host'},
                     "env tail -n1 $job->{'file'} 2>&1");
@@ -915,7 +915,7 @@ sub count_lines {
 
     my $n = 0;
     if ($f =~ /\.gz$/) {
-            $n= cmd ( "zcat $f | grep -v '#' | wc -l" )->{'out'};
+            $n= cmd ( "gzip -dc $f | grep -v '#' | wc -l" )->{'out'};
             chomp $n;
             return $n;
     }
@@ -945,7 +945,7 @@ sub last_line {
     my ($f) = @_;
     my $last = "";
     if ($f =~ /\.gz$/) {
-            $last= cmd ("zcat $f | tail -n 1" )->{'out'};
+            $last= cmd ("gzip -dc $f | tail -n 1" )->{'out'};
             chomp $last;
             return $last;
     }
@@ -2069,7 +2069,7 @@ sub dup {
         $f = $files[1]
             if $files[0] =~ /^$param{'name'}\.freerels.gz$/;
         $f = "$param{'wdir'}/".$f;
-        open FILE, "zcat $f|"
+        open FILE, "gzip -dc $f|"
             or die "Cannot open `$f' for reading: $!.\n";
         my $i=0;
         while (<FILE>) {
@@ -2235,7 +2235,7 @@ sub do_sieve {
             $check = "$param{'prefix'}.rels.tmp";
             # Put the first 10 relations into a temp file
             if ($is_gzip) {
-                open FILE, "zcat $f|"
+                open FILE, "gzip -dc $f|"
                     or die "Cannot open `$f' for reading: $!.\n";
             } else {
                 open FILE, "< $f"
@@ -2437,7 +2437,7 @@ sub do_sieve_bench {
             $check = "$param{'prefix'}.rels.tmp";
             # Put the first 10 relations into a temp file
             if ($is_gzip) {
-                open FILE, "zcat $f|"
+                open FILE, "gzip -dc $f|"
                     or die "Cannot open `$f' for reading: $!.\n";
             } else {
                 open FILE, "< $f"
