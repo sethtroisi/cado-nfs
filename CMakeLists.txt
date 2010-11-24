@@ -67,7 +67,6 @@ include(${CADO_NFS_SOURCE_DIR}/config/gmp.cmake)
 set(GF2X_C_FLAGS "${CMAKE_C_FLAGS} -I${GMP_INCDIR}")
 set(GF2X_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${GMP_INCDIR}")
 set(GF2X_CONFIGURE_FLAGS --disable-shared --disable-dependency-tracking --disable-maintainer-mode CFLAGS=${GF2X_C_FLAGS} CXXFLAGS=${GF2X_CXX_FLAGS} $ENV{GF2X_CONFIGURE_EXTRA_FLAGS})
-message(STATUS "GF2X_CONFIGURE_FLAGS=${GF2X_CONFIGURE_FLAGS}")
 get_override(GF2X_CONFIGURE_FLAGS GF2X_CONFIGURE_FLAGS)
 
 #####################################################################
@@ -143,6 +142,7 @@ include_directories(${CADO_NFS_BINARY_DIR}/gf2x)
 
 add_custom_command(OUTPUT ${CADO_NFS_BINARY_DIR}/gf2x/Makefile
     COMMAND mkdir -p ${CADO_NFS_BINARY_DIR}/gf2x
+    COMMAND echo Configuring gf2x with options ${GF2X_CONFIGURE_FLAGS}
     COMMAND cd gf2x && ${CADO_NFS_SOURCE_DIR}/gf2x/configure ${GF2X_CONFIGURE_FLAGS}
     COMMENT "Configuring gf2x"
 )
