@@ -1,3 +1,22 @@
+
+Supported platforms:
+====================
+
+ - The primary development platform is x86_64 linux with gcc 4.4 or
+   later, the most common processor being Intel core2-like. Other 64-bit
+   microarchitectures and processors are checked regularly.
+
+Anything else than the primary platform perhaps works, perhaps does not work.
+
+ - Mac OS X Leopard and Snow Leopard have been tested to work at least
+   once, provided some additional tools and libraries (see below) have
+   been installed, notably for Leopard. ABI selection is sometimes
+   tricky.
+ - 32-bit linux with gcc-4.4 or later is supposed to work.
+ - FreeBSD is currently not supported, pending at least a fix to the
+   missing log2() function in math.h.
+ - Windows is not supported (see a longer note at the end of this file).
+
 Required software tools:
 ========================
 
@@ -15,8 +34,8 @@ Optionally:
 *) Support for MPI.
 
 
-[Configure]
-===========
+Configure
+=========
 
 if your site needs tweaks, set such tweaks using environment variables,
 or via the shell script local.sh ; you may start with
