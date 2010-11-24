@@ -5,6 +5,7 @@
  */
 #define _POSIX_C_SOURCE 200112L
 #define _GNU_SOURCE     /* asprintf */
+#define _DARWIN_C_SOURCE     /* asprintf */
 
 #include <stdlib.h>
 #include <stdio.h>
