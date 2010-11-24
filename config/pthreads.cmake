@@ -17,5 +17,7 @@ if(HAVE_PTHREAD_CREATE)
     if(HAVE_PTHREAD_BARRIER_WAIT)
         set(pthread_libs ${pthread_libs} ${CMAKE_REQUIRED_LIBRARIES})
     endif(HAVE_PTHREAD_BARRIER_WAIT)
+else(HAVE_PTHREAD_CREATE)
+    message(FATAL_ERROR "POSIX threads not found. Basic thread support is required by cado-nfs")
 endif(HAVE_PTHREAD_CREATE)
 
