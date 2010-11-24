@@ -104,7 +104,7 @@ int barrier_wait(barrier_t * barrier,
     pthread_mutex_unlock (&barrier->lock);
 
     /* error: negative number, -(error code)
-     * waker: return 1
+     * waker: return BARRIER_SERIAL_THREAD
      * other: return 0 */
     return rc;
 }

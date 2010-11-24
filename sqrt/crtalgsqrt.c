@@ -998,7 +998,7 @@ struct sqrt_globals {
     MPI_Comm pcomm;     // same sub-product tree
     int arank, asize;
     int prank, psize;
-    pthread_barrier_t barrier[1];
+    barrier_t barrier[1];
 };
 
 struct sqrt_globals glob = { .lll_maxdim=50, .ncores = 2 };
@@ -2717,7 +2717,7 @@ void * rational_reduction_child(struct subtask_info_t * info)
             }
             cleandeg(ptree->p->A, glob.n-1);
         }
-        if (pthread_barrier_wait(glob.barrier) == PTHREAD_BARRIER_SERIAL_THREAD) {
+        if (barrier_wait(glob.barrier, NULL, NULL, NULL) == BARRIER_SERIAL_THREAD) {
             poly_t foo;
             poly_alloc(foo, glob.n);
             poly_swap(info->P, foo);
@@ -2732,7 +2732,7 @@ void * rational_reduction_child(struct subtask_info_t * info)
             WRAP_mpz_mod(temp->coeff[i], info->P->coeff[i], ptree->zx);
         }
         cleandeg(temp, glob.n-1);
-        if (pthread_barrier_wait(glob.barrier) == PTHREAD_BARRIER_SERIAL_THREAD) {
+        if (barrier_wait(glob.barrier, NULL, NULL, NULL) == BARRIER_SERIAL_THREAD) {
             poly_t foo;
             poly_alloc(foo, glob.n);
             poly_swap(info->P, foo);
@@ -3662,7 +3662,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "# [%2.2lf] starting %d worker threads on each node\n", WCT, glob.ncores);
     }
     wq_init(glob.wq, glob.ncores);
-    pthread_barrier_init(glob.barrier, NULL, glob.ncores);
+    barrier_init(glob.barrier, glob.ncores);
 
     int pgnum = glob.rank % t;
     int apnum = glob.rank / t;
@@ -3820,7 +3820,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "# [%2.2lf] clearing work queues\n", WCT);
     }
     wq_clear(glob.wq, glob.ncores);
-    pthread_barrier_destroy(glob.barrier);
+    barrier_destroy(glob.barrier);
 
     for(int i = i0 ; i < i1 ; i++) prime_cleanup(&(primes[i]));
     free(primes);

@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200112L
 #define _BSD_SOURCE     /* strdup */
 #define _GNU_SOURCE		/* asprintf */
+#define _DARWIN_C_SOURCE	/* asprintf */
 #include <string.h>
 #include <stdio.h>
 #include <stdint.h>
