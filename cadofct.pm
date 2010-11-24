@@ -2808,7 +2808,7 @@ sub do_sqrt {
             or die "Cannot open `$f' for reading: $!.\n";
         while (<FILE>) {
             chomp($_);
-            push @factors_thisdep, $_;
+            push @factors_thisdep, $_ unless ( /^Failed/ );
         }
         close FILE;
 
