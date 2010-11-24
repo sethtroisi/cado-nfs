@@ -74,6 +74,7 @@ export PTHREADS
 export CURL
 export CURL_INCDIR
 export CURL_LIBDIR
+export GF2X_CONFIGURE_EXTRA_FLAGS
 
 if [ "$1" = "tidy" ] ; then
     echo "Wiping out $build_tree"

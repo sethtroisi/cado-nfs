@@ -1,3 +1,10 @@
+# This is an example local.sh file for a machine which says:
+# Darwin Macintosh-2.home 9.8.0 Darwin Kernel Version 9.8.0: Wed Jul 15 16:55:01 PDT 2009; root:xnu-1228.15.4~1/RELEASE_I386 i386
+#
+# IOW a MacIntel with a 32-bit leopard kernel
+#
+# Our intent is to build a 64-bit cado.
+
 # We assume that the proper tools have been compiled here. GMP must have
 # been compiled with ABI=64 (should be the default setting).
 # Note that gcc-4.3.x and later require both gmp and mpfr to compile. The
@@ -22,3 +29,8 @@ CXXFLAGS="-m64 -O2 -DNDEBUG"
 # Now the use of pthread_barrier_wait is protected. So we can still
 # activate pthreads on Mac.
 WITH_PTHREADS=1
+
+# gf2x needs also the ABI=64 configure option. Other options like CFLAGS
+# and so on are also forwarded by default to gf2x.
+GF2X_CONFIGURE_EXTRA_FLAGS="ABI=64"
+
