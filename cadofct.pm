@@ -124,7 +124,7 @@ sub banner {
 $SIG{__WARN__} = sub {
     my $text=shift;
     print $log_fh format_message("Warning:", $text) if defined($log_fh);
-    warn         format_message("\033[01;33mWarning\033[01;00m:", $text);
+    warn         format_message("\033[01;35mWarning\033[01;00m:", $text);
 };
 
 # Error hook
