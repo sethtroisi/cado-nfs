@@ -119,6 +119,13 @@ if ! [ "$cmake_path" ] ; then
     if [ -x "$cmake_path" ] ; then
         echo "Using custom cmake in $cmake_companion_install_location" >&2
     else
+        echo "I am about to download and compile a compatible version of Cmake."
+        echo "Do you want to continue ? (y/n)"
+        read INSTALL_CMAKE
+        if [ ! $INSTALL_CMAKE = "y" ]; then
+            echo "Please install a compatible version of Cmake."
+            exit 1
+        fi
         echo "Need to get cmake first -- this takes long !"
         cd $up_path
         if ! scripts/install-cmake.sh "$cmake_companion_install_location" ; then
