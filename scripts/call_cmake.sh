@@ -121,7 +121,12 @@ if ! [ "$cmake_path" ] ; then
     else
         echo "I am about to download and compile a compatible version of Cmake."
         echo "Do you want to continue ? (y/n)"
-        read INSTALL_CMAKE
+        if [ -f "`tty`" ] ; then
+            read INSTALL_CMAKE
+        else
+            echo "No input terminal, assuming yes"
+            INSTALL_CMAKE=yes
+        fi
         if [ ! $INSTALL_CMAKE = "y" ]; then
             echo "Please install a compatible version of Cmake."
             exit 1

@@ -1465,6 +1465,7 @@ sub do_init {
 
     # If we can do so, detach the controlling tty. Otherwise ssh might
     # try to ask for authentication data if needed.
+    # Note that POSIX::setsid apparently does not work as expected.
     if ($can_use_tiocnotty) {
         if (defined &TIOCNOTTY) {
             if (open (DEVTTY, "/dev/tty")) {
