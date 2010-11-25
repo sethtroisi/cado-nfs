@@ -33,7 +33,7 @@
 #
 # See params/params.c91 for an example of parameter file.
 #
-# If the parameter n=<n> is given, then n is factored. Otherwise, it is
+# If the parameter n=<n> is given, then n is factored. Otherwise, n is
 # taken from stdin.
 #
 # NB: all the shell commands that are run by this script are reported in
@@ -42,25 +42,25 @@
 #
 # cadofactor.pl is resistant to crash of the host or remote machines.
 #  
-# For a small factorization, you can use the factor.sh script (easier
-# to use) who run the factorization only on your machine.
+# For a small factorization, it is possible to use the factor.sh script
+# (easier to use) which runs the factorization only on the local machine.
 #
 #
 # Example for factorize an integer of 155 digits (on several machines):
 # ====================================================================
 # 
-# Before to start the factorization, you must have to configure ssh (cf
-# README) for all the machines.
+# Before starting the factorization, you must configure ssh (cf README)
+# for all the machines.
 #
-# $mkdir $HOME/c155
-# $cd $HOME/c155
-# $cp $CADO_DIR/params/mach_desc .
+# $ mkdir $ HOME/c155
+# $ cd $ HOME/c155
+# $ cp $ CADO_DIR/params/mach_desc .
 #   Edit the file mach_desc and configure it.
-# $cp $CADO_DIR/params/params.c155 .
-#   It's not require to edit the paramfile but you can choose to modify
-#   some parameters in this file or on line command of cadofactor.pl.
-#   If the paramfile does not exist then you must to create it.
-# $CADO_DIR/cadofactor.pl params.c155 wdir=$HOME/c155 name=rsa155 \
+# $ cp $ CADO_DIR/params/params.c155 .
+#   It is not necessary to edit the paramfile but you can choose to modify
+#   some parameters in this file or on the cadofactor.pl command line.
+#   If the paramfile does not exist then you must create it.
+# $ CADO_DIR/cadofactor.pl params.c155 wdir=$ HOME/c155 name=rsa155 \
 #    machines=mach_desc \
 #    n=10941738641570527421809707322040357612003732945449205990913842131476349984288934784717997257891267332497625752899781833797076537244027146743531593354333897
 #
@@ -68,24 +68,24 @@
 # To factorize an integer with SNFS (on several machines):
 # ==============================================================================
 # 
-# Before to start the factorization, you must have to configure ssh (cf
-# README) for all the machines.
+# Before starting the factorization, you must configure ssh (cf README)
+# for all the machines.
 #
-# $mkdir $HOME/snfs
-# $cd $HOME/snfs
-# $cp $CADO_DIR/params/mach_desc .
+# $ mkdir $ HOME/snfs
+# $ cd $ HOME/snfs
+# $ cp $ CADO_DIR/params/mach_desc .
 #   Edit the file mach_desc and configure it.
-# $cp $CADO_DIR/params/params.c<size> .  
+# $ cp $ CADO_DIR/params/params.c<size> .  
 #   [substitute <size> by the integer size]
-#   It's not require to edit the paramfile but you can choose to modify
-#   some parameters in this file or on line command of cadofactor.pl.
-#   If the paramfile does not exist then you must to create it.
-# $cp <polynomial choosen in the cado format> snfs<size>.poly
+#   It is not necessary to edit the paramfile but you can choose to modify
+#   some parameters in this file or the cadofactor.pl command line.
+#   If the paramfile does not exist then you must create it.
+# $ cp <polynomial choosen in the cado format> snfs<size>.poly
 #   The polynomial file must also contain the sieve parameters.
-# $CADO_DIR/cadofactor.pl params.c<size> wdir=$HOME/snfs name=snfs<size> \
+# $ CADO_DIR/cadofactor.pl params.c<size> wdir=$ HOME/snfs name=snfs<size> \
 #    machines=mach_desc n=<n>
-# $touch snfs<size>.polysel_done
-# $CADO_DIR/cadofactor.pl params.c<size> wdir=$HOME/snfs name=snfs<size> \
+# $ touch snfs<size>.polysel_done
+# $ CADO_DIR/cadofactor.pl params.c<size> wdir=$ HOME/snfs name=snfs<size> \
 #    machines=mach_desc n=<n>
 
 use Cwd qw(abs_path);
