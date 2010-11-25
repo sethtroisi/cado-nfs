@@ -248,11 +248,12 @@ sub read_param {
 
     my %files_read = ();
 
-    @_ = map { [$_, 0] } @_;
+    @_ = map { [$_, 0, 'cmdline'] } @_;
 
     ARGS : while (defined ($_ = shift)) {
         die unless ref $_ eq 'ARRAY';
         my $secondary = $_->[1];
+        my $origin = $_->[2];
         $_=$_->[0];
         if (/^-v$/) { $verbose=1; next; }
         if (/^-y$/) { $assume_yes='y'; next; }
@@ -272,6 +273,15 @@ sub read_param {
                     }
                     next ARGS;
                 }
+                if ($secondary && defined($param->{$p}) && $param->{$p} ne $v) {
+                    die "parameter $p from $origin clashes with value defined earlier from other config files";
+                    # We may also warn, provided we make a choice for who
+                    # wins. Presently early wins. late wins would be:
+                    # $param->{$p} = $v;
+                    # $count_args++;
+                    next ARGS;
+                }
+
                 $param->{$p} = $v;
                 $count_args++;
                 my $f;
@@ -283,13 +293,13 @@ sub read_param {
                 if (defined($f) && -f $f && !$files_read{$f}) {
                     $count_args--;
                     info "Reading extra parameters from $f\n";
-                    unshift @_, [$f,1]
+                    unshift @_, [$f,1,$origin]
                 }
                 next ARGS;
             }
         }
         if (/^params?=(.*)$/) {
-            die "Paramfile must be the first argument !\n" if ($count_args);
+            # die "Paramfile must be the first argument !\n" if ($count_args);
             my $file = $1;
             open FILE, "< $file"
                 or die "Cannot open `$file' for reading: $!.\n";
@@ -305,9 +315,9 @@ sub read_param {
                     if $opt->{'strict'};
             }
             close FILE;
-            unshift @_, map { [$_,$secondary] } @args;
+            unshift @_, map { [$_,$secondary, $file] } @args;
         } elsif (-f $_) {
-            unshift @_, [ "param=$_", $secondary ];
+            unshift @_, [ "param=$_", $secondary, $origin ];
         } else {
             die "Unknown argument: `$_'.\n" if $opt->{'strict'};
         }
