@@ -37,11 +37,14 @@ use List::Util qw[min];
 use POSIX qw(ceil);
 use Math::BigInt;
 use IPC::Open3;
-eval q{local $SIG{__WARN__}=sub{}; require "sys/ioctl.ph"};
 
-my $can_use_new_cado_cmd=1;
+# Failing to load ioctl.ph is mostly harmless. It just prevents us from
+# detaching the controlling tty, which is a measure meant to forbid any
+# attempt of interaction between ssh and the ``user''.
+eval q{local $SIG{__WARN__}=sub{}; require "sys/ioctl.ph"};
+my $can_use_tiocnotty=1;
 if ($@) {
-    $can_use_new_cado_cmd=0;
+    $can_use_tiocnotty=0;
 }
 
 
@@ -134,11 +137,6 @@ $SIG{__DIE__}  = sub {
     print $log_fh format_message("Error:", $text) if defined($log_fh);
     die          format_message("\033[01;31mError\033[01;00m:", $text);
 };
-
-
-if (!$can_use_new_cado_cmd) {
-    warn "sys/ioctl.ph cannot be loaded. This mildly affects cadofactor's output\n";
-}
 
 ###############################################################################
 # Parameters ##################################################################
@@ -256,14 +254,7 @@ sub read_param {
         die unless ref $_ eq 'ARRAY';
         my $secondary = $_->[1];
         $_=$_->[0];
-        if (/^-v$/) {
-            if ($can_use_new_cado_cmd) {
-                $verbose=1;
-            } else {
-                warn "Option -v is not supported when ioctl.ph cannot be found";
-            }
-            next;
-        }
+        if (/^-v$/) { $verbose=1; next; }
         if (/^-y$/) { $assume_yes='y'; next; }
         if (/^-l$/) { $assume_yes='l'; next; }
         next if $files_read{$_};
@@ -488,7 +479,7 @@ my $cmdlog;
 #  - `out'    is the captured standard output stream of the command;
 #  - `err'    is the captured standard error stream of the command;
 #  - `status' is the return code of the command.
-sub cmd_new {
+sub cmd {
     my ($cmd, $opt) = @_;
     $cmd =~ s/localhost:// if $elide_localhost && $cmd =~ /rsync/;
     my $logfh;
@@ -590,63 +581,6 @@ sub cat {
     my $out=<$fh>;
     close $fh;
     return $out;
-}
-
-sub cmd_classic {
-    my ($cmd, $opt) = @_;
-
-    my $error_file;
-    my $redir='>';
-    if ($opt->{'appendlog'}) {
-        $redir='>>'
-    }
-    my $logfile = $opt->{'logfile'};
-
-    if ($cmdlog && $opt->{'log'}) {
-        open CMDLOG, ">> $cmdlog"
-            or die "Cannot open `$cmdlog' for writing: $!.\n";
-        print CMDLOG "$cmd\n";
-        print CMDLOG "# output logged to $logfile\n" if $logfile;
-        close CMDLOG;
-    }
-
-    my $outfile_tmp = tmpnam();
-    my $errfile_tmp = tmpnam();
-    my $kid;
-    unless ($kid = fork) {
-        open STDOUT, ">$outfile_tmp";
-        open STDERR, ">$errfile_tmp";
-        exec $cmd;
-    }
-    waitpid($kid, 0) or die "waitpid: $!";
-    my $rc = $?;
-
-    system "cat $outfile_tmp $errfile_tmp $redir$logfile" if $logfile;
-
-    my $out = cat($outfile_tmp);
-    my $err = cat($errfile_tmp);
-
-    my $status = $rc >> 8;
-    if ($rc && $opt->{'kill'}) {
-        my $diagnostic= "Command `$cmd' terminated unexpectedly" .
-                " with exit status $status.\n";
-        $diagnostic .= `tail $outfile_tmp | sed -e 's,^,STDOUT: ,'`;
-        $diagnostic .= `tail $errfile_tmp | sed -e 's,^,STDERR: ,'`;
-        die $diagnostic;
-    }
-
-    unlink $outfile_tmp;
-    unlink $errfile_tmp;
-
-    return { out => $out, err=> $err, status => $status };
-}
-
-sub cmd {
-    if ($can_use_new_cado_cmd) {
-        return cmd_new(@_);
-    } else {
-        return cmd_classic(@_);
-    }
 }
 
 # Runs the command $cmd on the remote host $host.
@@ -1508,13 +1442,17 @@ sub do_task {
 sub do_init {
     banner "Initialization";
 
-    if (defined &TIOCNOTTY) {
-        if (open (DEVTTY, "/dev/tty")) {
-            ioctl(DEVTTY, TIOCNOTTY(), 0 );
-            close DEVTTY;
+    # If we can do so, detach the controlling tty. Otherwise ssh might
+    # try to ask for authentication data if needed.
+    if ($can_use_tiocnotty) {
+        if (defined &TIOCNOTTY) {
+            if (open (DEVTTY, "/dev/tty")) {
+                ioctl(DEVTTY, TIOCNOTTY(), 0 );
+                close DEVTTY;
+            }
         }
     }
-    # Turns out that ssh, when it has neither a connected stdin, nor a
+    # It turns out that ssh, when it has neither a connected stdin, nor a
     # controlling tty, tries to run an ssh-askpass dialog on the
     # $DISPLAY, if that is an existing variable. Since we consider this
     # as essentially a nuisance, we forbid this behaviour.
