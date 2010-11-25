@@ -3903,8 +3903,9 @@ main (int argc0, char *argv0[])
               nb_q, nb_q*rep_bench, t0*nb_q, t0/((double)rep_bench));
             bench_tot_time += t0*nb_q;
             bench_tot_rep += nb_q*rep_bench;
-            fprintf(output, "# Cumulative (estimated): %lu reports in %1.1f s\n",
-                    bench_tot_rep, bench_tot_time);
+            fprintf(output, "# Cumulative (estimated): %lu reports in %1.1f s, %1.1f s/r\n",
+                    bench_tot_rep, bench_tot_time,
+		    (double) bench_tot_time / (double) bench_tot_rep);
         }
       } // end of loop over special q ideals.
 
