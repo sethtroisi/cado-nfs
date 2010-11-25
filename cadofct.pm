@@ -2220,16 +2220,21 @@ sub do_sieve {
         # the range of covered special q's
         if (last_line($f) !~ /^# (Total \d+ reports|Warning: truncated)/) {
             if ($is_gzip) {
-                cmd ("gzip -d $f", { kill => 1});
+                # avoid gzip -d, since it fails on truncated files.
                 basename($f) =~ /^$param{'name'}\.rels\.([\de.]+)-([\de.]+)\.gz$/;
-                $f = "$param{'prefix'}.rels.$1-$2";
+                my $f_new = "$param{'prefix'}.rels.$1-$2";
+                my $ret = cmd ("gzip -dc $f >$f_new");
+                if (my $e = $ret->{'err'}) { warn $e; }
+                unlink $f;
+                $f = $f_new;
             }
             open FILE, "+< $f"
                 or die "Cannot open `$f' for update: $!.\n";
 
-            # TODO: Since the file is truncated, we assume that the last
+            # Since the file is truncated, we assume that the last
             # reported special q was not completely sieved, so we remove it.
-            # Maybe we can still save it, but is it worth the trouble?
+            # It would not be a good idea to try to save it (incompletely
+            # sieved ranges are a nuisance).
             my @lastq;
             my $pos = 0;
             while (<FILE>) {
