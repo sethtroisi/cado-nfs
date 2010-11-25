@@ -3887,7 +3887,7 @@ main (int argc0, char *argv0[])
         if (bench) {
             uint64_t newq0 = (uint64_t) (skip_factor*((double) q0));
             uint64_t savq0 = q0;
-            /* print some estimates for special-q's between q0 and the next */
+            // print some estimates for special-q's between q0 and the next
             int nb_q = 1;
             do {
                 q0 = uint64_nextprime (q0);
@@ -3906,7 +3906,7 @@ main (int argc0, char *argv0[])
             fprintf(output, "# Cumulative (estimated): %lu reports in %1.1f s\n",
                     bench_tot_rep, bench_tot_time);
         }
-      } /* end of loop over special q ideals. */
+      } // end of loop over special q ideals.
 
  end:
     t0 = seconds () - t0;
