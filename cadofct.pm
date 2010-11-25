@@ -978,6 +978,17 @@ sub find_hole {
     my $a = $ranges->[0]->[1];
     my $b = $a + $len;
 
+    # FIXME (or not). We assume that native integers (32 or 64 bits) are
+    # large enough to represent both ends of sieving ranges. It may be a
+    # problem.
+
+    # Arrange so that in all cases, the range ends at a multiple of the
+    # length. Note that doing so, the range can't be empty.
+    $b -= ($b % $len);
+    if ($b-$a < $len / 10) {
+        $b += $len;
+    }
+
     # Truncate the hole if needed
     $b = $max              if $max                && $max              < $b;
     $b = $ranges->[1]->[0] if scalar @$ranges > 1 && $ranges->[1]->[0] < $b;
