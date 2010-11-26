@@ -122,6 +122,7 @@ pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // General information about the siever
 typedef struct {
+    int bench;
     // multithreading info
     int nb_threads;
     // sieving area
@@ -2615,41 +2616,55 @@ factor_survivors (const unsigned char *rat_S, unsigned char *alg_S, int N,
 #endif
 
             pthread_mutex_lock(&io_mutex);
-            fprintf (output, "%" PRId64 ",%" PRIu64 ":", a, b);
+            if (!si->bench)
+                fprintf (output, "%" PRId64 ",%" PRIu64 ":", a, b);
             int first_factor = 0;
             if (rat_factors.n != 0) {
-                factor_list_fprint (output, rat_factors);
+                if (!si->bench)
+                    factor_list_fprint (output, rat_factors);
                 first_factor = 1;
             }
             for (i = 0; i < f_r->length; ++i)
               for (j = 0; j < m_r->data[i]; j++)
                   if (!first_factor) {
-                      gmp_fprintf (output, "%Zx", f_r->data[i]);
+                      if (!si->bench)
+                          gmp_fprintf (output, "%Zx", f_r->data[i]);
                       first_factor = 1;
-                  } else 
-                      gmp_fprintf (output, ",%Zx", f_r->data[i]);
+                  } else {
+                      if (!si->bench)
+                          gmp_fprintf (output, ",%Zx", f_r->data[i]);
+                  }
             if (si->ratq) {
-                fprintf (output, ",%" PRIx64 "", si->q);
+                if (!si->bench)
+                    fprintf (output, ",%" PRIx64 "", si->q);
             }
-            fprintf (output, ":");
+            if (!si->bench)
+                fprintf (output, ":");
             first_factor = 0;
             if (alg_factors.n != 0) {
-                factor_list_fprint (output, alg_factors);
+                if (!si->bench)
+                    factor_list_fprint (output, alg_factors);
                 first_factor = 1;
             }
             for (i = 0; i < f_a->length; ++i)
               for (j = 0; j < m_a->data[i]; j++)
                   if (!first_factor) {
-                      gmp_fprintf (output, "%Zx", f_a->data[i]);
+                      if (!si->bench)
+                          gmp_fprintf (output, "%Zx", f_a->data[i]);
                       first_factor = 1;
-                  } else
-                      gmp_fprintf (output, ",%Zx", f_a->data[i]);
+                  } else {
+                      if (!si->bench)
+                          gmp_fprintf (output, ",%Zx", f_a->data[i]);
+                  }
             /* print special q */
             if (!si->ratq) {
-                fprintf (output, ",%" PRIx64 "", si->q);
+                if (!si->bench)
+                    fprintf (output, ",%" PRIx64 "", si->q);
             }
-            fprintf (output, "\n");
-            fflush (output);
+            if (!si->bench) {
+                fprintf (output, "\n");
+                fflush (output);
+            }
             pthread_mutex_unlock(&io_mutex);
             cpt++;
 	    /* Build histogram of lucky S[x] values */
@@ -3657,6 +3672,8 @@ main (int argc0, char *argv0[])
         exit (EXIT_FAILURE);
       }
 
+    si.bench=bench;
+
     /* this does not depend on the special-q */
     si.ratq = ratq;
     sieve_info_init (&si, cpoly, I, q0, bucket_thresh, output, nb_threads);
@@ -3894,16 +3911,17 @@ main (int argc0, char *argv0[])
                 nb_q ++;
             } while (q0 < newq0);
             q0 = newq0;
+            nroots=0;
             t_bench = seconds() - t_bench;
             fprintf(output,
               "# Stats for q=%" PRIu64 ": %d reports in %1.1f s\n",
               savq0, rep_bench, t0);
             fprintf(output,
-              "# Estimates for next %d q's: %d reports in %1.1f s, %1.1f s/r\n",
+              "# Estimates for next %d q's: %d reports in %1.0f s, %1.2f s/r\n",
               nb_q, nb_q*rep_bench, t0*nb_q, t0/((double)rep_bench));
             bench_tot_time += t0*nb_q;
             bench_tot_rep += nb_q*rep_bench;
-            fprintf(output, "# Cumulative (estimated): %lu reports in %1.1f s, %1.1f s/r\n",
+            fprintf(output, "# Cumulative (estimated): %lu reports in %1.0f s, %1.2f s/r\n",
                     bench_tot_rep, bench_tot_time,
 		    (double) bench_tot_time / (double) bench_tot_rep);
         }
