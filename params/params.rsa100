@@ -6,9 +6,7 @@
 # General parameters
 ###########################################################################
 
-#wdir=/localdisk/tmp/rsa100 # directory where temporary files are put
 name=rsa100             # basename for temporary files
-#bindir=$CADO           # where to find cado binaries
 parallel=1              # do we use parallel computation?
 delay=120               # time in seconds between two checks
 
@@ -65,7 +63,6 @@ sieve_max_threads=2
 ###########################################################################
 
 excesspurge=20000       # minimal excess we want before pruning
-excess=1                # minimal excess wanted after purge
                         # (don't start merge otherwise)
 keeppurge=160           # maximal excess wanted after purge
                         # (purge shrinks if needed)
@@ -84,7 +81,6 @@ bwstrat=1
 ###########################################################################
 
 bwmt=2x2                # Multithreading level of Block-Wiedemann
-linalg=bwc              # Choose linalg algorithm
 
 ###########################################################################
 # Characters
