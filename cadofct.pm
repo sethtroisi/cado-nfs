@@ -70,6 +70,10 @@ my $assume_yes = 0;
 # Whether to replace ``remote'' accesses to localhost by localhost.
 my $elide_localhost = 0;
 
+my $ssh = 'ssh';
+if (exists($ENV{'OAR_JOBID'})) { $ssh="/usr/bin/oarsh"; }
+if (exists $ENV{'SSH'}) { $ssh=$ENV{'SSH'}; }
+
 # Pads a string with spaces to match the speficied width
 sub pad {
     my $str = "" . shift;
@@ -614,12 +618,8 @@ sub remote_cmd {
     # don't ask for a password: we don't want to fall into interactive mode
     # all the time (especially not in the middle of the night!)
     # use public-key authentification instead!
-    my $rsh = 'ssh';
-    if (exists($ENV{'OAR_JOBID'})) {
-        $rsh="/usr/bin/oarsh";
-    }
 
-    $cmd = "env $rsh -q ".
+    $cmd = "env $ssh -q ".
            "-o ConnectTimeout=$opt->{'timeout'} ".
            "-o ServerAliveInterval=".int($opt->{'timeout'}/3)." ".
            "-o PasswordAuthentication=no ".
@@ -815,7 +815,7 @@ sub send_file {
 
     # Try to upload the file
     $ret = remote_cmd($host, "env mkdir -p $m->{'tmpdir'} 2>&1");
-    $ret = cmd("env rsync --timeout=30 $param{'wdir'}/$file ".
+    $ret = cmd("env rsync -e $ssh --timeout=30 $param{'wdir'}/$file ".
                "$host:$m->{'tmpdir'}/ 2>&1", { cmdlog => 1 })
         unless $ret->{'status'};
 
@@ -834,7 +834,7 @@ sub send_file {
 sub get_job_output {
     my ($job, $keep) = (@_);
 
-    my $ret = cmd("env rsync --timeout=30 $job->{'host'}:$job->{'file'} ".
+    my $ret = cmd("env rsync -e $ssh --timeout=30 $job->{'host'}:$job->{'file'} ".
                   "$param{'wdir'}/ 2>&1", { cmdlog => 1 });
     my $status = 1;
     if ($ret->{'status'}) {
