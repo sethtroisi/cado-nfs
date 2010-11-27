@@ -596,26 +596,31 @@ modul_addredcsemi_ul (residueul_t r, const residueul_t a,
                       const modulusul_t m)
 {
   unsigned long slow, shigh, tlow;
-  unsigned char sb;
   
   ASSERT_EXPENSIVE(a[0] <= m[0]);
   slow = b;
 #if defined(__x86_64__) && defined(__GNUC__)
-   __asm__ ( "addq %2, %0\n\t" /* cy * 2^w + slow = a + b */
-            "setne %1\n\t"     /* if (slow != 0) sb = 1 */
-            "adcb $0, %1\n"    /* sb += cy */
-            : "+&r" (slow), "=qm" (sb)
-            : "rm" (a[0])
-            : "cc");
-  shigh = sb;
+  {
+    unsigned char sb;
+    __asm__ ( "addq %2, %0\n\t" /* cy * 2^w + slow = a + b */
+	      "setne %1\n\t"     /* if (slow != 0) sb = 1 */
+	      "adcb $0, %1\n"    /* sb += cy */
+	      : "+&r" (slow), "=qm" (sb)
+	      : "rm" (a[0])
+	      : "cc");
+    shigh = sb;
+  }
 #elif defined(__i386__) && defined(__GNUC__)
-   __asm__ ( "addl %2, %0\n\t"
-            "setne %1\n\t"
-            "adcb $0, %1\n"
-            : "+&r" (slow), "=qm" (sb)
-            : "rm" (a[0])
-            : "cc");
-  shigh = sb;
+  {
+    unsigned char sb;
+    __asm__ ( "addl %2, %0\n\t"
+	      "setne %1\n\t"
+	      "adcb $0, %1\n"
+	      : "+&r" (slow), "=qm" (sb)
+	      : "rm" (a[0])
+	      : "cc");
+    shigh = sb;
+  }
 #else
   shigh = 0UL;
   ularith_add_ul_2ul (&slow, &shigh, a[0]);
