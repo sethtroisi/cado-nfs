@@ -447,30 +447,20 @@ sub read_machines {
     close FILE;
 
     if ( $param{'mpi'} ) {
-            chop $param{'hosts'};
-            open FILE, "< $param{'bindir'}/linalg/bwc/bwc.pl"
-                    or die "Cannot open `$param{'bindir'}/linalg/bwc/bwc.pl' for reading: $!.\n";
-            while (<FILE>) {
-                    next unless /^my \$mpiexec='';$/;
-                    die "CADO-NFS has not been compiled with MPI flag.\n".
-                    "Please add the path of the MPI library in the file local.sh ".
-                    "(for example: MPI=/usr/lib64/openmpi) and recompile.\n";
-            } 
-            close FILE;
-    } else {
-            if (exists($ENV{'OAR_JOBID'}) &&
-               cmd("uniq $ENV{'OAR_NODEFILE'} | wc -l")->{'out'} > 1) {
-                    open FILE, "> $param{'machines'}.tmp"
-                            or die "Cannot open `$param{'machines'}.tmp' for writing: $!.\n";
-                    print FILE "tmpdir=$vars{'tmpdir'}\n";
-                    print FILE "bindir=$param{'bindir'}\n";
-                    print FILE "mpi=1\n";
-                    close FILE;
-                    cmd( "uniq $ENV{'OAR_NODEFILE'} >> $param{'machines'}.tmp" );
-                    read_machines( "$param{'machines'}.tmp" );
-            }
-            # TODO: Support other scheduling environments.
+        chop $param{'hosts'};
+        open FILE, "< $param{'bindir'}/linalg/bwc/bwc.pl"
+                or die "Cannot open `$param{'bindir'}/linalg/bwc/bwc.pl' for reading: $!.\n";
+        while (<FILE>) {
+                next unless /^my \$mpiexec='';$/;
+                die "CADO-NFS has not been compiled with MPI flag.\n".
+                "Please add the path of the MPI library in the file local.sh ".
+                "(for example: MPI=/usr/lib64/openmpi) and recompile.\n";
+        } 
+        close FILE;
     }
+    # We used to reconstruct a mach_desc file here based on e.g.
+    # OAR_NODEFILE. This is fragile. We prefer to keep this out of the
+    # job of cadofactor.
 }
 
 
