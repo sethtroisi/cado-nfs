@@ -84,7 +84,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #define iceildiv(x,y)	(((x)+(y)-1)/(y))
 #endif
 
-#if defined(__GNUC__)
+#if defined(__GNUC__) && (__GNUC__ >= 4 || __GNUC__ >= 3 && __GNUC_MINOR__ >= 4)
 
 #ifndef	MAYBE_UNUSED
 #define MAYBE_UNUSED __attribute__ ((unused))
