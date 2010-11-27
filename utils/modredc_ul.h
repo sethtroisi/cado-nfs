@@ -595,11 +595,11 @@ modredcul_sub (residueredcul_t r, const residueredcul_t a,
   {
     unsigned long t = 0UL, tr;
     if ((tr = a[0] - b[0]) > a[0])
-      t = m;
+      t = m[0].m;
     r[0] = tr + t;
   }
 #else
-  r[0] = (a[0] < b[0]) ? (a[0] - b[0] + m[0]) : (a[0] - b[0]);
+  r[0] = (a[0] < b[0]) ? (a[0] - b[0] + m[0].m) : (a[0] - b[0]);
 #endif
 
 #ifdef MODTRACE
