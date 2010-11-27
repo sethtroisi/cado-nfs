@@ -47,8 +47,9 @@
 #define ASSERT_EXPENSIVE(x)
 #endif
 
+/* this macro is also defined in mod_ul.h */
 #ifndef	MAYBE_UNUSED
-#if defined(__GNUC__)
+#if defined(__GNUC__) && (__GNUC__ >= 4 || __GNUC__ >= 3 && __GNUC_MINOR__ >= 4)
 #define MAYBE_UNUSED __attribute__ ((unused))
 #else
 #define MAYBE_UNUSED

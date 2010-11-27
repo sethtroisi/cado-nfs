@@ -30,7 +30,7 @@
 #endif
 
 /*********************************************************************/
-/* Helper macros */
+/* Helper macros, see also ularith.h */
 #ifndef	MAYBE_UNUSED
 #if defined(__GNUC__) && (__GNUC__ >= 4 || __GNUC__ >= 3 && __GNUC_MINOR__ >= 4)
 #define MAYBE_UNUSED __attribute__ ((unused))
