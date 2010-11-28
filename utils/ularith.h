@@ -13,6 +13,7 @@
 
 #include <assert.h>
 #include <limits.h>
+#include <gmp.h>
 #include "macros.h"
 
 /* <limits.h> defines LONG_BIT only with _XOPEN_SOURCE defined, but if 
@@ -429,7 +430,10 @@ ularith_div_2ul_ul_ul (unsigned long *q, unsigned long *r,
             : "0" (a1), "1" (a2), "rm" (b)
             : "cc");
 #else
-  abort ();
+  mp_limb_t A[2] = {a1, a2};
+  ASSERT(sizeof(unsigned long) == sizeof(mp_limb_t));
+  r[0] = mpn_divmod_1 (A, A, 2, b);
+  q[0] = A[0];
 #endif
 }
 
@@ -457,7 +461,9 @@ ularith_div_2ul_ul_ul_r (unsigned long *r, unsigned long a1,
             : "1" (a2), "rm" (b)
             : "cc");
 #else
-  abort ();
+  mp_limb_t A[2] = {a1, a2};
+  ASSERT(sizeof(unsigned long) == sizeof(mp_limb_t));
+  r[0] = mpn_divmod_1 (A, A, 2, b);
 #endif
 }
 
