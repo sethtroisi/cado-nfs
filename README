@@ -32,7 +32,7 @@ Required software tools:
 
 *) GMP (http://gmplib.org): usually installed in most Linux distributions
 *) The GCC compiler works ; some others might, but it is untested. C and
-   C++ are required.
+   C++ are required, with C99 support.
 *) GNU make and CMake for building (CMake is installed on the fly if missing
    (requires an Internet connection))
 *) Support for posix threads.
