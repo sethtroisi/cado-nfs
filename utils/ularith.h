@@ -13,6 +13,7 @@
 
 #include <assert.h>
 #include <limits.h>
+#include "macros.h"
 
 /* <limits.h> defines LONG_BIT only with _XOPEN_SOURCE defined, but if 
    another header (such as <stdio.h>) already included <features.h> before 
@@ -45,15 +46,6 @@
 #define ASSERT_EXPENSIVE(x) ASSERT(x)
 #else
 #define ASSERT_EXPENSIVE(x)
-#endif
-
-/* this macro is also defined in mod_ul.h */
-#ifndef	MAYBE_UNUSED
-#if defined(__GNUC__) && (__GNUC__ >= 4 || __GNUC__ >= 3 && __GNUC_MINOR__ >= 4)
-#define MAYBE_UNUSED __attribute__ ((unused))
-#else
-#define MAYBE_UNUSED
-#endif
 #endif
 
 /* On 32 bit x86, the general constrains for, e.g., the source operand

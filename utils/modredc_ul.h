@@ -15,6 +15,7 @@
 /**********************************************************************/
 #include <assert.h>
 #include <limits.h>
+#include "macros.h"
 #include "ularith.h"
 
 #ifndef ASSERT
@@ -31,13 +32,6 @@
 
 /*********************************************************************/
 /* Helper macros */
-#ifndef	MAYBE_UNUSED
-#if defined(__GNUC__) && (__GNUC__ >= 4 || __GNUC__ >= 3 && __GNUC_MINOR__ >= 4)
-#define MAYBE_UNUSED __attribute__ ((unused))
-#else
-#define MAYBE_UNUSED
-#endif
-#endif
 
 /* A macro for function renaming. All functions here start with modul_ */
 #define MODREDCUL_RENAME(x) modredcul_##x
