@@ -85,6 +85,11 @@ If the number of cores is strictly greater than 2, it is more efficient
 to use ssh to distribute the polynomial selection and sieve on localhost.
 To configure ssh, see the next section.
 
+Note: you might add the -v option at the end of the command line, to see more
+details about the different stages of the factorization:
+
+./factor.sh 90377629292003121684002147101760858109247336549001090677693 -t 2 -v
+
 For a larger factorization (distributed on several machines),
 please use directly the main script cadofactor.pl (doc included in the script).
 
