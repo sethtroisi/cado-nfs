@@ -580,3 +580,5 @@ gf2x/tests/check-mul.res
 gf2x/tests/do-check-mul.sh
 gf2x/toom.c
 gf2x/version.sh.in
+utils/fix-endianness.c
+utils/fix-endianness.h

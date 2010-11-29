@@ -238,8 +238,8 @@ flushSparse(const char *sparsename, int **sparsemat, int small_nrows, int small_
 	if(sparsemat[i] == NULL) {
             if (bin) {
                 const uint32_t x = 0;
-                fwrite(&x, sizeof(uint32_t), 1, smatfile);
-                if (skip) fwrite(&x, sizeof(uint32_t), 1, dmatfile);
+                fwrite32_little(&x, 1, smatfile);
+                if (skip) fwrite32_little(&x, 1, dmatfile);
             } else {
                 fprintf(smatfile, "0");
                 if (skip) fprintf(dmatfile, "0");
@@ -257,10 +257,10 @@ flushSparse(const char *sparsename, int **sparsemat, int small_nrows, int small_
                 }
             }
             if (bin) {
-                fwrite(&sw, sizeof(uint32_t), 1, smatfile);
-                fwrite(&sw, sizeof(uint32_t), 1, srwfile);
-                if (skip) fwrite(&dw, sizeof(uint32_t), 1, dmatfile);
-                if (skip) fwrite(&dw, sizeof(uint32_t), 1, drwfile);
+                fwrite32_little(&sw, 1, smatfile);
+                fwrite32_little(&sw, 1, srwfile);
+                if (skip) fwrite32_little(&dw, 1, dmatfile);
+                if (skip) fwrite32_little(&dw, 1, drwfile);
             } else {
                 fprintf(smatfile, "%"PRIu32"", sw);
                 fprintf(srwfile, "%"PRIu32"\n", sw);
@@ -276,14 +276,14 @@ flushSparse(const char *sparsename, int **sparsemat, int small_nrows, int small_
                 if ((int) x < skip) {
                     ASSERT_ALWAYS(skip);
                     if (bin) {
-                        fwrite(&x, sizeof(uint32_t), 1, dmatfile);
+                        fwrite32_little(&x, 1, dmatfile);
                     } else {
                         fprintf(dmatfile, " %"PRIu32"", x);
                     }
                 } else {
                     x-=skip;
                     if (bin) {
-                        fwrite(&x, sizeof(uint32_t), 1, smatfile);
+                        fwrite32_little(&x, 1, smatfile);
                     } else {
                         fprintf(smatfile, " %"PRIu32"", x);
                     }
@@ -319,7 +319,7 @@ flushSparse(const char *sparsename, int **sparsemat, int small_nrows, int small_
         for(int j = 0; j < skip; j++){
             uint32_t x = weights[j];
             if (bin) {
-                fwrite(&x, sizeof(uint32_t), 1, dcwfile);
+                fwrite32_little(&x, 1, dcwfile);
             } else {
                 fprintf(dcwfile, "%"PRIu32"\n", x);
             }
@@ -334,7 +334,7 @@ flushSparse(const char *sparsename, int **sparsemat, int small_nrows, int small_
         for(int j = skip; j < small_ncols; j++){
             uint32_t x = weights[j];
             if (bin) {
-                fwrite(&x, sizeof(uint32_t), 1, scwfile);
+                fwrite32_little(&x, 1, scwfile);
             } else {
                 fprintf(scwfile, "%"PRIu32"\n", x);
             }
@@ -409,7 +409,7 @@ renumber(const char * sosname, int *small_ncols, int *colweight, int ncols)
             // number tmp[j] (whose meaning can be fetched from the sos
             // file produced by purge)
             uint32_t z = tmp[j];
-            int r = fwrite(&z, sizeof(uint32_t), 1, f);
+            int r = fwrite32_little(&z, 1, f);
             ASSERT_ALWAYS(r == 1);
         }
         fclose(f);

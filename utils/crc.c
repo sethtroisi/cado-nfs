@@ -63,9 +63,9 @@ void cado_crc_lfsr_init(cado_crc_lfsr l)
 
 void cado_crc_lfsr_clear(cado_crc_lfsr l MAYBE_UNUSED) { }
 
-uint32_t cado_crc_lfsr_turn(cado_crc_lfsr l, void * data, unsigned int count)
+uint32_t cado_crc_lfsr_turn(cado_crc_lfsr l, const void * data, unsigned int count)
 {
-    uint8_t * ptr = (uint8_t *) data;
+    const uint8_t * ptr = (const uint8_t *) data;
     uint32_t w = 0;
 
     for( ; count-- ; ) {
@@ -74,7 +74,26 @@ uint32_t cado_crc_lfsr_turn(cado_crc_lfsr l, void * data, unsigned int count)
     return w;
 }
 
-uint32_t crc32(void * data, size_t count)
+uint32_t cado_crc_lfsr_turn32_little(cado_crc_lfsr l, const uint32_t * data, unsigned int count)
+{
+    ASSERT_ALWAYS(sizeof(uint32_t) == 4);
+    int twist[sizeof(uint32_t)];
+    for(unsigned int j = 0 ; j < sizeof(uint32_t) ; j++) {
+        const uint32_t c = 0x03020100;
+        twist[((uint8_t *)&c)[j]]=j;
+    }
+    uint32_t w = 0;
+
+    for( ; count-- ; data++) {
+        const uint8_t * ptr = (const uint8_t *) data;
+        for(unsigned int j = 0 ; j < sizeof(uint32_t) ; j++) {
+            w = cado_crc_lfsr_turn1(l, ptr[twist[j]]);
+        }
+    }
+    return w;
+}
+
+uint32_t crc32(const void * data, size_t count)
 {
     cado_crc_lfsr l;
     cado_crc_lfsr_init(l);

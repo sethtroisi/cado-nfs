@@ -364,11 +364,11 @@ read_heavyblock_matrix_binary(const char * heavyblockname)
 
     for(unsigned int i = 0 ; i < nrows ; i++) {
         uint32_t len;
-        int r = fread(&len, sizeof(uint32_t), 1, f);
+        int r = fread32_little(&len, 1, f);
         ASSERT_ALWAYS(r == 1);
         for( ; len-- ; ) {
             uint32_t v;
-            r = fread(&v, sizeof(uint32_t), 1, f); ASSERT_ALWAYS(r == 1);
+            r = fread32_little(&v, 1, f); ASSERT_ALWAYS(r == 1);
             res->mb[(i/64) + (v/64) * res->nrblocks][i%64] ^= ((uint64_t)1) << (v%64);
         }
     }

@@ -39,5 +39,6 @@
 #include "usp.h"
 #include "purgedfile.h"
 #include "bit_vector.h"
+#include "fix-endianness.h"
 
 #endif	/* CADO_UTILS_H_ */
