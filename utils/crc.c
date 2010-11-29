@@ -35,7 +35,13 @@ uint32_t cado_crc_lfsr_turn1(cado_crc_lfsr l, uint32_t c)
 
     uint32_t w = 0;
 
-    w = (c >> (31^l->r)) ^ (c << (31&-l->r));
+    // FIXME. We used to have 31^l->r, which very much seems to be a typo
+    // for 31&l->r. Unfortunately, ``fixing'' this would mean changing
+    // behaviour on our main platform, so for the time being we change
+    // this in a compatible way so as to reach the same output on non-x86
+    // hardware (which wraps around shift counts, not a guaranteed
+    // behaviour everywhere).
+    w = (c >> (31&(31^l->r))) ^ (c << (31&-l->r));
     l->i--;
     l->r+=11;
     l->i &= 31;
