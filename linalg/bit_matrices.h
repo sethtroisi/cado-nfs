@@ -18,7 +18,7 @@ extern "C" {
 extern void addmul_TN64_N64(mat64 b, uint64_t * A, uint64_t * x, unsigned int ncol);
 
 /* This transposes a 64x64 matrix. Relatively slow */
-extern void transp_6464(mat64 dst, mat64 src);
+extern void transp_6464(mat64 dst, mat64 src, int mask);
 
 /* This multiplies A by B. The chosen function is optimal for N about
  * 20000. At N=2000000, a twice faster version can be obtained. However,

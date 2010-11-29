@@ -430,10 +430,12 @@ int compute_transpose_of_blockmatrix_kernel(blockmatrix kb, blockmatrix t)
     unsigned int tiny_ncols = t->ncols;
     unsigned int tiny_limbs_per_row = iceildiv(tiny_ncols, 64);
     unsigned int tiny_limbs_per_col = iceildiv(tiny_nrows, 64);
+    unsigned int tiny_chars = FLAT_BYTES_WITH_READAHEAD(t->nrows, t->ncols);
+    unsigned int tiny_64bit_words = tiny_chars / 8;
 
     /* we need some readahead zones because of the block matrix structure */
-    uint64_t * tiny = malloc(FLAT_BYTES_WITH_READAHEAD(t->nrows, t->ncols));
-    memset(tiny, 0, FLAT_BYTES_WITH_READAHEAD(t->nrows, t->ncols));
+    uint64_t * tiny = malloc (tiny_chars);
+    memset(tiny, 0, tiny_chars);
     
     blockmatrix_copy_to_flat(tiny, tiny_limbs_per_row, 0, 0, t);
 
@@ -451,15 +453,26 @@ int compute_transpose_of_blockmatrix_kernel(blockmatrix kb, blockmatrix t)
         myker[i] = kerdata + i * tiny_limbs_per_col;
     /* gauss.c knows about mp_limb_t's only */
     ASSERT_ALWAYS(sizeof(uint64_t) % sizeof(mp_limb_t) == 0);
+    swap_words_if_needed (tiny, tiny_64bit_words);
     int dim = kernel((mp_limb_t *) tiny,
             (mp_limb_t **) myker,
             tiny_nrows, tiny_ncols,
             sizeof(uint64_t) / sizeof(mp_limb_t) * tiny_limbs_per_row,
             sizeof(uint64_t) / sizeof(mp_limb_t) * tiny_limbs_per_col);
+    swap_words_if_needed (tiny, tiny_64bit_words); /* FIXME: this is maybe not
+                                                      needed since tiny is
+                                                      destroyed, but keep it
+                                                      for debugging */
     free(tiny);
     /* Now take back our kernel to block format, and multiply. Exciting. */
+#if (CADO_BYTE_ORDER == 4321) && (GMP_LIMB_BITS == 32) /* big endian */
+    int mask = 32;
+#else
+    int mask = 0;
+#endif
     if (kb)
-    blockmatrix_copy_transpose_from_flat(kb, kerdata, tiny_limbs_per_col, 0, 0);
+      blockmatrix_copy_transpose_from_flat(kb, kerdata, tiny_limbs_per_col,
+                                           0, 0, mask);
     free(myker);
     free(kerdata);
     return dim;
@@ -498,7 +511,13 @@ blockmatrix blockmatrix_column_reduce(blockmatrix m, unsigned int max_rows_to_co
     free(tiny);
 
     blockmatrix s = blockmatrix_alloc(m->ncols, rank);
-    blockmatrix_copy_transpose_from_flat(s, sdata, tiny_limbs_per_col, 0, 0);
+#if (CADO_BYTE_ORDER == 4321) && (GMP_LIMB_BITS == 32) /* big endian */
+    int mask = 32;
+#else
+    int mask = 0;
+#endif
+    blockmatrix_copy_transpose_from_flat(s, sdata, tiny_limbs_per_col, 0, 0,
+                                         mask);
     blockmatrix k2 = blockmatrix_alloc(m->nrows, rank);
     blockmatrix_mul_smallb(k2, m, s);
     blockmatrix_free(s);
