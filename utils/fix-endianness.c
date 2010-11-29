@@ -23,7 +23,7 @@ size_t fwrite64_little(const uint64_t * ptr, size_t nmemb, FILE * stream)
 {
     return fwrite(ptr, sizeof(uint64_t), nmemb, stream);
 }
-#elif CADO_BIG_ENDIAN
+#elif defined(CADO_BIG_ENDIAN)
 
 /* This is slow and stupid. */
 size_t fread32_little(uint32_t * ptr, size_t nmemb, FILE * stream)
