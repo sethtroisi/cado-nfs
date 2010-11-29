@@ -223,6 +223,41 @@ void blockmatrix_copy_from_flat(blockmatrix m, uint64_t * tiny, unsigned int str
     }
 }
 
+/* swap characters in a 64-bit word if necessary */
+static uint64_t
+little_endian_64 (uint64_t v)
+{
+#if CADO_BYTE_ORDER == 1234 /* little endian: nothing to do */
+  return v;
+#elif CADO_BYTE_ORDER == 4321
+  return ((v & 255) << 56) + (((v >> 8) & 255) << 48)
+    + (((v >> 16) & 255) << 40) + (((v >> 24) & 255) << 32)
+    + (((v >> 32) & 255) << 24) + (((v >> 40) & 255) << 16)
+    + (((v >> 48) & 255) << 8) + ((v >> 56) & 255);
+#else
+#error "neither little nor big endian: implement me"
+#endif
+}
+
+/* if mp_limb_t has 32 bits and we are on a big-endian machine, swap            
+   32-bit words */
+void
+swap_words_if_needed (uint64_t *v MAYBE_UNUSED, unsigned long n MAYBE_UNUSED)
+{
+#if CADO_BYTE_ORDER == 1234
+  /* do nothing */
+#elif CADO_BYTE_ORDER == 4321
+  if (GMP_LIMB_BITS == 32)
+    {
+      unsigned long i;
+      for (i = 0; i < n; i++)
+        v[i] = (v[i] >> 32) + ((v[i] & 4294967295UL) << 32);
+    }
+#else
+#error "neither little nor big endian: implement me"
+#endif
+}
+
 /* reads matrix from file 'name',  considering the input as little endian */
 void
 blockmatrix_read_from_flat_file (blockmatrix k, int i0, int j0,
@@ -241,21 +276,8 @@ blockmatrix_read_from_flat_file (blockmatrix k, int i0, int j0,
             uint64_t v;
             int rc = fread(&v, sizeof(uint64_t), 1, f);
             ASSERT_ALWAYS(rc == 1);
-#if CADO_BYTE_ORDER == 4321
-            v = ((v & 255) << 56)
-              + (((v >> 8) & 255) << 48)
-              + (((v >> 16) & 255) << 40)
-              + (((v >> 24) & 255) << 32)
-              + (((v >> 32) & 255) << 24)
-              + (((v >> 40) & 255) << 16)
-              + (((v >> 48) & 255) << 8)
-              + ((v >> 56) & 255);
-#elif CADO_BYTE_ORDER == 1234
-            /* nothing to do */
-#else
-#error "implement me"
-#endif
-            k->mb[((i0+r)/64) + ((j0+g)/64) * k->stride][(i0+r)%64] = v;
+            k->mb[((i0+r)/64) + ((j0+g)/64) * k->stride][(i0+r)%64] = 
+              little_endian_64 (v);
         }
     }
     fclose(f);

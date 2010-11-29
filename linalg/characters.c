@@ -484,6 +484,7 @@ blockmatrix blockmatrix_column_reduce(blockmatrix m, unsigned int max_rows_to_co
     memset(sdata, 0, tiny_nrows * tiny_limbs_per_col * sizeof(uint64_t *));
     free(t);
 
+    swap_words_if_needed (tiny, tiny_nlimbs);
     int rank = spanned_basis(
             (mp_limb_t *) sdata,
             (mp_limb_t *) tiny,
@@ -493,6 +494,7 @@ blockmatrix blockmatrix_column_reduce(blockmatrix m, unsigned int max_rows_to_co
             sizeof(uint64_t) / sizeof(mp_limb_t) * tiny_limbs_per_col,
             NULL
             );
+    swap_words_if_needed (tiny, tiny_nlimbs);
     free(tiny);
 
     blockmatrix s = blockmatrix_alloc(m->ncols, rank);
