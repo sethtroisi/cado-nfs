@@ -88,8 +88,8 @@ void blockmatrix_print(blockmatrix b, const char *vname)
 	    if (i + ii)
 		fprintf(f,",\n");
 	    for (unsigned int j = 0; j < b->ncols; j += 64) {
+                mat64_ptr bl = b->mb[i / 64 + (j / 64) * b->stride];
 		for (unsigned int jj = 0; jj < 64 && j + jj < b->ncols; jj++) {
-		    mat64_ptr bl = b->mb[i / 64 + (j / 64) * b->stride];
 		    if (j + jj)
 			fprintf(f,",");
 		    fprintf(f,"%"PRIu64, (bl[ii] >> jj) & ((uint64_t)1));
