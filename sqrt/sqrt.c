@@ -1133,7 +1133,7 @@ void create_dependencies(const char * prefix, const char * indexname, const char
     unsigned int dep_counts[64]={0,};
 
     for(int i = 0 ; i < 64 ; i++) {
-        uint64_t m = 1UL << i;
+        uint64_t m = UINT64_C(1) << i;
         if (sanity & m)
             dep_masks[nonzero_deps++] = m;
     }
