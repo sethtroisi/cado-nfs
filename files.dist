@@ -435,6 +435,7 @@ gf2x/NEWS
 gf2x/README
 gf2x/TODO
 gf2x/aclocal.m4
+gf2x/macros.h
 gf2x/already_tuned/generic/gf2x-thresholds.h
 gf2x/already_tuned/generic/gf2x_mul2.h
 gf2x/already_tuned/generic/gf2x_mul3.h
