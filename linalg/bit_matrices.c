@@ -52,13 +52,20 @@ void addmul_TN64_N64(mat64 b, uint64_t * A, uint64_t * x, unsigned int ncol)
 
 void transp_6464(mat64 dst, mat64 src)
 {
-    int i, j;
-    for (i = 0; i < 64; i++) {
-        dst[i] = 0;
-        for (j = 0; j < 64; j++) {
-            dst[i] ^= ((src[j] >> i) & 1UL) << j;
-        }
+  int i, j, k;
+
+  for (i = 0; i < 64; i++) {
+    dst[i] = 0;
+    for (j = 0; j < 64; j++) {
+#if (__BYTE_ORDER == __BIG_ENDIAN) && (GMP_LIMB_BITS == 32)
+      /* swap rows 0..31 with 32..64, and so on */
+      k = i ^ 32;
+#else
+      k = i;
+#endif
+      dst[k] ^= ((src[j] >> i) & 1UL) << j;
     }
+  }
 }
 
 /* With a table of 256 precomputed multiples, we get a nice speed
