@@ -222,7 +222,11 @@ void blockmatrix_copy_from_flat(blockmatrix m, uint64_t * tiny, unsigned int str
     }
 }
 
-void blockmatrix_read_from_flat_file(blockmatrix k, int i0, int j0, const char * name, unsigned int fnrows, unsigned int fncols)
+/* reads matrix from file 'name',  considering the input as little endian */
+void
+blockmatrix_read_from_flat_file (blockmatrix k, int i0, int j0,
+                                 const char * name, unsigned int fnrows,
+                                 unsigned int fncols)
 {
     FILE * f = fopen(name, "r");
     ASSERT_ALWAYS(f);
@@ -234,6 +238,16 @@ void blockmatrix_read_from_flat_file(blockmatrix k, int i0, int j0, const char *
     for(unsigned int r = 0 ; r < fnrows ; r++) {
         for(unsigned int g = 0 ; g < fncols ; g+=64) {
             uint64_t v;
+#if __BYTE_ORDER == __BIG_ENDIAN
+            v = ((v & 255) << 56)
+              + (((v >> 8) & 255) << 48)
+              + (((v >> 16) & 255) << 40)
+              + (((v >> 24) & 255) << 32)
+              + (((v >> 32) & 255) << 24)
+              + (((v >> 40) & 255) << 16)
+              + (((v >> 48) & 255) << 8)
+              + ((v >> 56) & 255);
+#endif
             int rc = fread(&v, sizeof(uint64_t), 1, f);
             ASSERT_ALWAYS(rc == 1);
             k->mb[((i0+r)/64) + ((j0+g)/64) * k->stride][(i0+r)%64] = v;
