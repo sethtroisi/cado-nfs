@@ -7,6 +7,7 @@
 #include "blockmatrix.h"
 #include "bit_matrices.h"
 #include "macros.h"
+#include "cado-endian.h"
 
 blockmatrix blockmatrix_alloc(unsigned int nrows, unsigned int ncols)
 {
@@ -240,7 +241,7 @@ blockmatrix_read_from_flat_file (blockmatrix k, int i0, int j0,
             uint64_t v;
             int rc = fread(&v, sizeof(uint64_t), 1, f);
             ASSERT_ALWAYS(rc == 1);
-#if __BYTE_ORDER == __BIG_ENDIAN
+#if CADO_BYTE_ORDER == 4321
             v = ((v & 255) << 56)
               + (((v >> 8) & 255) << 48)
               + (((v >> 16) & 255) << 40)
@@ -249,6 +250,10 @@ blockmatrix_read_from_flat_file (blockmatrix k, int i0, int j0,
               + (((v >> 40) & 255) << 16)
               + (((v >> 48) & 255) << 8)
               + ((v >> 56) & 255);
+#elif CADO_BYTE_ORDER == 1234
+            /* nothing to do */
+#else
+#error "implement me"
 #endif
             k->mb[((i0+r)/64) + ((j0+g)/64) * k->stride][(i0+r)%64] = v;
         }

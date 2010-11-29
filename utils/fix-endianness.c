@@ -4,9 +4,28 @@
 #include "macros.h"
 
 #include "fix-endianness.h"
+#include "cado-endian.h"
+
+#ifdef CADO_LITTLE_ENDIAN
+size_t fread32_little(uint32_t * ptr, size_t nmemb, FILE * stream)
+{
+    return fread(ptr, sizeof(uint32_t), nmemb, stream);
+}
+size_t fwrite32_little(const uint32_t * ptr, size_t nmemb, FILE * stream)
+{
+    return fwrite(ptr, sizeof(uint32_t), nmemb, stream);
+}
+size_t fread64_little(uint64_t * ptr, size_t nmemb, FILE * stream)
+{
+    return fread(ptr, sizeof(uint64_t), nmemb, stream);
+}
+size_t fwrite64_little(const uint64_t * ptr, size_t nmemb, FILE * stream)
+{
+    return fwrite(ptr, sizeof(uint64_t), nmemb, stream);
+}
+#elif CADO_BIG_ENDIAN
 
 /* This is slow and stupid. */
-
 size_t fread32_little(uint32_t * ptr, size_t nmemb, FILE * stream)
 {
     uint32_t * p = malloc(nmemb * sizeof(uint32_t));
@@ -103,4 +122,6 @@ size_t fwrite64_little(const uint64_t * ptr, size_t nmemb, FILE * stream)
     free(p);
     return n;
 }
-
+#else
+#error "implement me"
+#endif

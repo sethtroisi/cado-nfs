@@ -582,3 +582,4 @@ gf2x/toom.c
 gf2x/version.sh.in
 utils/fix-endianness.c
 utils/fix-endianness.h
+utils/cado-endian.h
