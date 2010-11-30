@@ -17,8 +17,8 @@ install(TARGETS sqrt checkdep RUNTIME DESTINATION bin/sqrt)
 if(${WITH_PTHREADS})
 add_definitions(-DWITH_PTHREADS)
 
-add_executable(crtalgsqrt crtalgsqrt.c powers_of_p.cpp polyroots.c
-    knapsack.c)
+add_executable(crtalgsqrt EXCLUDE_FROM_ALL crtalgsqrt.c powers_of_p.cpp
+    polyroots.c knapsack.c)
 target_link_libraries(crtalgsqrt utils m ${pthread_libs})
 
 set_target_properties(crtalgsqrt PROPERTIES
