@@ -55,9 +55,14 @@ static inline int clzl(unsigned long x)
         res = GMP_LIMB_BITS - 2 - a + t[x];
         return res;
 }
+
+/* the following code is correct because if x = 0...0abc10...0, then
+   -x = ~x + 1, where ~x = 1...1(1-a)(1-b)(1-c)01...1, thus
+   -x = 1...1(1-a)(1-b)(1-c)10...0, and x & (-x) = 0...000010...0 */
 static inline int ctzl(unsigned long x)
 {
-	return GMP_LIMB_BITS - clzl(x & - x);
+  ASSERT(GMP_LIMB_BITS == sizeof(unsigned long) * CHAR_BIT);
+  return (GMP_LIMB_BITS - 1) - clzl(x & - x);
 }
 #endif
 
