@@ -432,7 +432,7 @@ int compute_transpose_of_blockmatrix_kernel(blockmatrix kb, blockmatrix t)
     unsigned int tiny_limbs_per_row = iceildiv(tiny_ncols, 64);
     unsigned int tiny_limbs_per_col = iceildiv(tiny_nrows, 64);
     unsigned int tiny_chars = FLAT_BYTES_WITH_READAHEAD(t->nrows, t->ncols);
-    unsigned int tiny_64bit_words = tiny_chars / 8;
+    unsigned int tiny_64bit_words = tiny_chars / sizeof(uint64_t);
 
     /* we need some readahead zones because of the block matrix structure */
     uint64_t * tiny = malloc (tiny_chars);
@@ -446,6 +446,7 @@ int compute_transpose_of_blockmatrix_kernel(blockmatrix kb, blockmatrix t)
     /* we need some readahead zones because of the block matrix structure */
     uint64_t * kerdata = malloc(FLAT_BYTES_WITH_READAHEAD(t->nrows, t->nrows));
     memset(kerdata, 0, FLAT_BYTES_WITH_READAHEAD(t->nrows, t->nrows));
+    unsigned int kerdata_64bit_words = FLAT_BYTES_WITH_READAHEAD(t->nrows, t->nrows) / sizeof(uint64_t);
 
 
     uint64_t ** myker = (uint64_t **) malloc(tiny_nrows * sizeof(uint64_t *));
@@ -464,16 +465,12 @@ int compute_transpose_of_blockmatrix_kernel(blockmatrix kb, blockmatrix t)
                                                       needed since tiny is
                                                       destroyed, but keep it
                                                       for debugging */
+    swap_words_if_needed(kerdata, kerdata_64bit_words);
     free(tiny);
     /* Now take back our kernel to block format, and multiply. Exciting. */
-#if (CADO_BYTE_ORDER == 4321) && (GMP_LIMB_BITS == 32) /* big endian */
-    int mask = 32;
-#else
-    int mask = 0;
-#endif
     if (kb)
       blockmatrix_copy_transpose_from_flat(kb, kerdata, tiny_limbs_per_col,
-                                           0, 0, mask);
+                                           0, 0);
     free(myker);
     free(kerdata);
     return dim;
@@ -496,6 +493,7 @@ blockmatrix blockmatrix_column_reduce(blockmatrix m, unsigned int max_rows_to_co
 
     uint64_t * sdata = (uint64_t *) malloc(tiny_nrows * tiny_limbs_per_col * sizeof(uint64_t));
     memset(sdata, 0, tiny_nrows * tiny_limbs_per_col * sizeof(uint64_t *));
+    unsigned int sdata_64bit_words = tiny_nrows * tiny_limbs_per_col;
     free(t);
 
     swap_words_if_needed (tiny, tiny_nlimbs);
@@ -509,16 +507,11 @@ blockmatrix blockmatrix_column_reduce(blockmatrix m, unsigned int max_rows_to_co
             NULL
             );
     swap_words_if_needed (tiny, tiny_nlimbs);
+    swap_words_if_needed (sdata, sdata_64bit_words);
     free(tiny);
 
     blockmatrix s = blockmatrix_alloc(m->ncols, rank);
-#if (CADO_BYTE_ORDER == 4321) && (GMP_LIMB_BITS == 32) /* big endian */
-    int mask = 32;
-#else
-    int mask = 0;
-#endif
-    blockmatrix_copy_transpose_from_flat(s, sdata, tiny_limbs_per_col, 0, 0,
-                                         mask);
+    blockmatrix_copy_transpose_from_flat(s, sdata, tiny_limbs_per_col, 0, 0);
     blockmatrix k2 = blockmatrix_alloc(m->nrows, rank);
     blockmatrix_mul_smallb(k2, m, s);
     blockmatrix_free(s);

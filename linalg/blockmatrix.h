@@ -36,7 +36,7 @@ extern void blockmatrix_copy_to_flat(uint64_t * tiny, unsigned int stride,
         int i0, int j0, blockmatrix m);
 extern void blockmatrix_copy_transpose_to_flat(uint64_t * tiny, unsigned int stride,
         int i0, int j0, blockmatrix m);
-extern void blockmatrix_copy_transpose_from_flat(blockmatrix m, uint64_t * tiny, unsigned int stride, int i0, int j0, int mask);
+extern void blockmatrix_copy_transpose_from_flat(blockmatrix m, uint64_t * tiny, unsigned int stride, int i0, int j0);
 extern void blockmatrix_copy_from_flat(blockmatrix m, uint64_t * tiny, unsigned int stride, int i0, int j0);
 extern void blockmatrix_read_from_flat_file(blockmatrix k, int i0, int j0, const char * name, unsigned int fnrows, unsigned int fncols);
 extern void blockmatrix_write_to_flat_file(const char * name, blockmatrix k, int i0, int j0, unsigned int fnrows, unsigned int fncols);

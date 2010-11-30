@@ -50,17 +50,14 @@ void addmul_TN64_N64(mat64 b, uint64_t * A, uint64_t * x, unsigned int ncol)
     }
 }
 
-/* mask is 0 normally, except on big-endian machines with 32-bit limbs,
-   where mask = 32 */
-void transp_6464(mat64 dst, mat64 src, int mask)
+void transp_6464(mat64 dst, mat64 src)
 {
-  int i, j, k;
+  int i, j;
 
   for (i = 0; i < 64; i++) {
-    k = i ^ mask;
-    dst[k] = 0;
+    dst[i] = 0;
     for (j = 0; j < 64; j++) {
-      dst[k] ^= ((src[j] >> i) & 1UL) << j;
+      dst[i] ^= ((src[j] >> i) & 1UL) << j;
     }
   }
 }

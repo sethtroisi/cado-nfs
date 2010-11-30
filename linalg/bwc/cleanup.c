@@ -96,7 +96,7 @@ int main(int argc, char **argv)
                 NULL);
         // kzone*transpose(kS) is reduced
         // kS*transpose(kzone) is reduced (equivalent formulation)
-        blockmatrix_copy_transpose_from_flat(T, kzone, limbs_per_row, 0, 0, 0);
+        blockmatrix_copy_transpose_from_flat(T, kzone, limbs_per_row, 0, 0);
 
         /* multiply kprev, k, and S by T */
         /* same comment as above applies, btw. */

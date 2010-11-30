@@ -189,7 +189,7 @@ void blockmatrix_copy_transpose_to_flat(uint64_t * tiny, unsigned int stride,
     for(unsigned int i = 0 ; i < m->nrblocks ; i++) {
         for(unsigned int j = 0 ; j < m->ncblocks ; j++) {
             mat64 tm;
-            transp_6464(tm, m->mb[i + j * m->stride], 0);
+            transp_6464(tm, m->mb[i + j * m->stride]);
             uint64_t * tp = tiny + (i0+j*64) * stride + j0/64 + i;
             /* Note that the tiny matrix must have space allocated for rows and
              * cols multiples of 64, otherwise disaster will occur */
@@ -201,7 +201,7 @@ void blockmatrix_copy_transpose_to_flat(uint64_t * tiny, unsigned int stride,
 
 /* swap characters in a 64-bit word if necessary */
 static uint64_t
-little_endian_64 (uint64_t v)
+u64_convert_to_little_endian (uint64_t v)
 {
 #if CADO_BYTE_ORDER == 1234 /* little endian: nothing to do */
   return v;
@@ -213,6 +213,11 @@ little_endian_64 (uint64_t v)
 #else
 #error "neither little nor big endian: implement me"
 #endif
+}
+static uint64_t
+u64_convert_from_little_endian (uint64_t v)
+{
+    return u64_convert_to_little_endian(v);
 }
 
 /* if mp_limb_t has 32 bits and we are on a big-endian machine, swap
@@ -234,7 +239,7 @@ swap_words_if_needed (uint64_t *v MAYBE_UNUSED, unsigned long n MAYBE_UNUSED)
 #endif
 }
 
-void blockmatrix_copy_transpose_from_flat(blockmatrix m, uint64_t * tiny, unsigned int stride, int i0, int j0, int mask)
+void blockmatrix_copy_transpose_from_flat(blockmatrix m, uint64_t * tiny, unsigned int stride, int i0, int j0)
 {
     for(unsigned int i = 0 ; i < m->nrblocks ; i++) {
         for(unsigned int j = 0 ; j < m->ncblocks ; j++) {
@@ -242,7 +247,7 @@ void blockmatrix_copy_transpose_from_flat(blockmatrix m, uint64_t * tiny, unsign
             uint64_t * tp = tiny + (i0+j*64) * stride + j0/64 + i;
             for(unsigned int k = 0 ; k < 64 ; k++)
                 tm[k] = tp[k*stride];
-            transp_6464(m->mb[i + j * m->stride], tm, mask);
+            transp_6464(m->mb[i + j * m->stride], tm);
         }
     }
 }
@@ -278,7 +283,7 @@ blockmatrix_read_from_flat_file (blockmatrix k, int i0, int j0,
             int rc = fread(&v, sizeof(uint64_t), 1, f);
             ASSERT_ALWAYS(rc == 1);
             k->mb[((i0+r)/64) + ((j0+g)/64) * k->stride][(i0+r)%64] = 
-              little_endian_64 (v);
+              u64_convert_from_little_endian (v);
         }
     }
     fclose(f);
@@ -309,7 +314,7 @@ void blockmatrix_read_transpose_from_flat_file(blockmatrix k, int i0, int j0, co
             }
         }
         for(unsigned int s = 0 ; s < fncols ; s+=64) {
-          transp_6464(k->mb[s/64 + (g/64) * k->stride], tmp[s/64], 0);
+            transp_6464(k->mb[s/64 + (g/64) * k->stride], tmp[s/64]);
         }
     }
     free(tmp);
@@ -330,7 +335,7 @@ void blockmatrix_write_to_flat_file(const char * name, blockmatrix k, int i0, in
         for(unsigned int g = 0 ; g < fncols ; g+=64) {
             uint64_t v;
             v = k->mb[((i0+r)/64) + ((j0+g)/64) * k->stride][(i0+r)%64];
-            v = little_endian_64 (v);
+            v = u64_convert_to_little_endian (v);
             int rc = fwrite(&v, sizeof(uint64_t), 1, f);
             ASSERT_ALWAYS(rc == 1);
         }
@@ -344,7 +349,7 @@ void blockmatrix_transpose(blockmatrix b, blockmatrix a)
     ASSERT_ALWAYS(a->nrows == b->ncols);
     for(unsigned int i = 0 ; i < a->nrblocks ; i++) {
         for(unsigned int j = 0 ; j < a->ncblocks ; j++) {
-          transp_6464(b->mb[j + i * b->stride], a->mb[i + j * a->stride], 0);
+            transp_6464(b->mb[j + i * b->stride], a->mb[i + j * a->stride]);
         }
     }
 }
