@@ -422,14 +422,17 @@ sub read_machines {
 					if !$desc{$k};
             }
             $desc{'tmpdir'} =~ s/%s/$param{'name'}/g;
+            die "the directory tmpdir=$desc{'tmpdir'} or bindir=$desc{'bindir'} don't exist on $host.\n"
+            if ( remote_cmd($host, "env test -d $desc{'tmpdir'} " .
+                " && test -d $desc{'bindir'}")->{'status'} );
             $desc{'cores'}  = 1 unless defined $desc{'cores'};
             $desc{'poly_cores'} = $desc{'cores'} 
                     unless defined $desc{'poly_cores'};
             $desc{'mpi'} = 0 unless defined $desc{'mpi'};
             if ( $desc{'mpi'} ) {
-                    die "the directory wdir or bindir don't exist on $host.\n"
-                    if ( remote_cmd($host, "env test -d $param{'wdir'} && test ".
-                                    "-d $param{'bindir'}")->{'status'} );
+                    die "the directory wdir don't exist on $host.\n"
+                    if ( remote_cmd($host,
+                            "env test -d $param{'wdir'} ")->{'status'} );
             }
             while ( $desc{'mpi'} ) {
                     $desc{'mpi'}--;
