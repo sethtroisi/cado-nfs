@@ -1510,12 +1510,19 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
     if (t < t0 + llen) {
         ASSERT(finished_early);
     }
+    if (pi_l_deg >= (int) expected_pi_deg) {
+        printf("%-8u" "deg(pi_l) = %d >= %u ; escaping\n",
+                t, pi_l_deg, expected_pi_deg);
+        finished_early=1;
+    }
+
     if (finished_early) {
         printf("%-8u" "deg(pi_l) = %d ; escaping\n",
                 t, pi_l_deg);
         pi.swap(pi_left);
         return true;
     }
+
 
     tmiddle = t;
 
