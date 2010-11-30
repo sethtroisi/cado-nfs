@@ -48,6 +48,12 @@ get_override(CXX                  CMAKE_CXX_COMPILER)
 get_override(CADO_VERSION         CADO_VERSION)
 get_override(MPI                  MPI)
 
+if(EXISTS ${CADO_NFS_SOURCE_DIR}/files.dist)
+    set(EXCLUDE_FROM_RELEASE_BUILD )
+else(EXISTS ${CADO_NFS_SOURCE_DIR}/files.dist)
+    set(EXCLUDE_FROM_RELEASE_BUILD EXCLUDE_FROM_ALL)
+endif(EXISTS ${CADO_NFS_SOURCE_DIR}/files.dist)
+
 #####################################################################
 # Add the CFLAGS that are needed in all cases.
 
