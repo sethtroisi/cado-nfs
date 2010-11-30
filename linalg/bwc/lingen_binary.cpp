@@ -1252,9 +1252,9 @@ static unsigned int pi_deg_bound(unsigned int d)/*{{{*/
      * different columns to be quite even. Only at the end of the computation
      * does it begin to go live.
      *
-     * The + 10 excess here is sort of a safety net.
+     * The + 11 excess here is sort of a safety net.
      */
-    return iceildiv(d * m, (m + n)) + 10;
+    return iceildiv(d * m, (m + n)) + 11;
 }/*}}}*/
 
 /*
@@ -1534,6 +1534,10 @@ static bool go_recursive(polmat& pi, recursive_tree_timer_t& tim)
      *
      * ./doit.pl msize=500 dimk=99 mn=8 vectoring=8 modulus=2 dens=4
      * multisols=1 tidy=0 seed=714318 dump=1
+     *
+     * Another case which failed (20101129) on a 64-bit Core 2:
+     * cadofactor.pl params=params.c100 n=8629007704268343292699373415320999727349017259324300710654086838576679934757298577716056231336635221 bwmt=4x3
+     * (increasing the safety net in pi_deg_bound from +10 to +11 made it work)
      */
     ASSERT_ALWAYS(pi_l_deg < (int) expected_pi_deg);
 #if 0
