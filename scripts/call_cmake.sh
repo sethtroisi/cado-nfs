@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This script is responsible of handing over the build process, in a
 # proper out of source build directory. It takes care of calling cmake
