@@ -237,7 +237,6 @@ sieve/CMakeLists.txt
 sieve/Makefile
 sieve/basicnt.h
 sieve/bucket.h
-sieve/sieve_config_h.in
 sieve/ecm/CMakeLists.txt
 sieve/ecm/Makefile
 sieve/ecm/ecm.c
