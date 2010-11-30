@@ -41,7 +41,7 @@ Required software tools:
 
 Optionally:
 *) Support for curl library.
-*) Support for MPI.
+*) Support for MPI (see local.sh.example).
 
 
 Configure
