@@ -32,10 +32,17 @@
 # Changing the list during a computation:
 # =======================================
 #
+# The mach_desc file is read once and for all by cadofactor.pl at the very
+# begining. However, cadofactor.pl is (supposed to be) robust to being killed
+# and restarted. So to force a modification in mach_desc to be taken into
+# account, you just have to kill and restart cadofactor.pl.
+#
+# Here is a rough description of the expected behaviour when you change
+# mach_desc.
+#
 # If during a computation you want to add a machine, you just have to add
-# appropriate line. Next time cadofactor.pl will check if there are finished
-# jobs, it will also start new ones on the new machine. You can also increase
-# the number of cores of an already listed machine. 
+# appropriate line.  You can also increase the number of cores of an
+# already listed machine. 
 #
 # If you need to stop the jobs on a machine, you can put cores=0 after its
 # name. Once the current job is finished on the machine, no new job will be
@@ -49,13 +56,15 @@
 # script will let the job finish but won't start new ones until the number of 
 # jobs becomes less than the value of cores.
 #
-# If you need to change the tmpdir during a computation, this is more tricky, 
-# since cadofactor.pl assumes that all the jobs on a machine run with the same
-# tmpdir. Therefore, you have do it like so:
+# If you need to change the tmpdir or bindir during a computation, this is
+# more tricky, since cadofactor.pl assumes that all the jobs on a machine
+# run with the same tmpdir. Therefore, you have do it like so:
 #  - put cores=0 for the target machine
+#  - restart cadofactor.pl
 #  - wait until all running jobs of the machine are finished
-#  - change tmpdir for this machine
+#  - change tmpdir / bindir for this machine
 #  - put the previous value of cores.
+#  - restart cadofactor.pl
 #
 
 
