@@ -42,7 +42,8 @@
 #
 # If during a computation you want to add a machine, you just have to add
 # appropriate line.  You can also increase the number of cores of an
-# already listed machine. 
+# already listed machine. Such changes require cadofactor.pl to be interrupted
+# and re-run (which resumes the computation from where it has been left off).
 #
 # If you need to stop the jobs on a machine, you can put cores=0 after its
 # name. Once the current job is finished on the machine, no new job will be
