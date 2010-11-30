@@ -3672,6 +3672,13 @@ main (int argc0, char *argv0[])
         exit (EXIT_FAILURE);
       }
 
+    /* check that nb_threads (-mt nnn) is positive */
+    if (nb_threads <= 0)
+      {
+        fprintf (stderr, "Error, please provide a positive number of threads\n");
+        exit (EXIT_FAILURE);
+      }
+
     si.bench=bench;
 
     /* this does not depend on the special-q */
