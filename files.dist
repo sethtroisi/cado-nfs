@@ -368,6 +368,7 @@ cado_mpi_config_h.in
 config/asm_sample.c
 config/sse2.c
 config/sse2.cmake
+config/alloca.cmake
 config/gcc-assembly.cmake
 config/search_for_function.cmake
 config/pthreads.cmake

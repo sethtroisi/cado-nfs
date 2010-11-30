@@ -22,3 +22,4 @@
 #cmakedefine    HAVE_SSE2
 
 #cmakedefine    HAVE_SSE41
+#cmakedefine    HAVE_ALLOCA_H
