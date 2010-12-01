@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 #include <stdlib.h>
-#include "cado.h"
 
 #ifdef __cplusplus
 extern "C" {

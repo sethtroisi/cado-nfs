@@ -1,10 +1,10 @@
+#include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <inttypes.h> /* for PRIx64 macro and strtoumax */
 #include <math.h>   // for ceiling, floor in cfrac
-#include "cado.h"
 #include "fb.h"
 #include "utils.h"           /* lots of stuff */
 #include "basicnt.h"         /* ctzl bin_gcd */

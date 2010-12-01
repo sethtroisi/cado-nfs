@@ -1,4 +1,4 @@
-Here are the useful macros that are defined by cado.h and their
+Here are the useful macros that are defined by macros.h and their
 semantics:
 
 ASSERT(x)       
@@ -28,7 +28,7 @@ Usage of asserts:
 
         You are of course allowed to add your own additional assert
         variants in a specific file, (like ASSERT_EXPENSIVE), but they
-        should not go to cado.h. 
+        should not go to macros.h. 
 
 
 ABS(x)

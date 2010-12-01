@@ -1,7 +1,6 @@
 #ifndef	CADO_UTILS_H_
 #define	CADO_UTILS_H_
 
-#include "cado.h"
 #include "mod_ul.h"
 #include <stdint.h>
 

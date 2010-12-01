@@ -27,6 +27,7 @@
  */
 
 
+#include "cado.h"       /* HAVE_* macros ! */
 
 #include <stdio.h>
 #include <stdint.h>
@@ -40,7 +41,6 @@
 #include <unistd.h>
 #include <inttypes.h>
 
-#include "cado.h"       /* HAVE_* macros ! */
 
 #ifdef  HAVE_SSE41
 #include <smmintrin.h>  // sse 4.1 _mm_cmpeq_epi64

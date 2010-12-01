@@ -1,4 +1,4 @@
-#define _POSIX_C_SOURCE 200112L	/* fileno */
+#include "cado.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

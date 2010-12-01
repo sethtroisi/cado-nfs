@@ -2,8 +2,9 @@
 #define CADO_UTILS_MISC_H_
 
 #include <stddef.h>
+#include <limits.h>
 #include "macros.h"
-#include "gmp.h" /* for GMP_LIMB_BITS */
+#include <gmp.h>
 
 #ifdef __cplusplus
 extern "C" {

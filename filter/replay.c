@@ -1,4 +1,4 @@
-#define _BSD_SOURCE     /* strdup */
+#include "cado.h"
 /* 
  * Program: replay
  * Author : F. Morain
@@ -8,7 +8,7 @@
  *
  */
 
-
+#include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -502,7 +502,8 @@ manyFiles(const char *sparsename, int **sparsemat, int *colweight, purgedfile_st
     unsigned long *Wslice;
 
     // to add ".00" or to add ".infos"
-    name = (char *)malloc((strlen(sparsename)+7) * sizeof(char));
+    size_t namelen = strlen(sparsename)+7;
+    name = (char *)malloc(namelen * sizeof(char));
     jmin = jmax = 0;
     // tabnc[slice] = number of columns in slice
     tabnc = (int *)malloc(nslices * sizeof(int));
@@ -519,7 +520,7 @@ manyFiles(const char *sparsename, int **sparsemat, int *colweight, purgedfile_st
 	jmax += jstep;
 	if(slice == (nslices-1))
 	    jmax = ncols;
-	sprintf(name, "%s.%02d", sparsename, slice);
+	snprintf(name, namelen, "%s.%02d", sparsename, slice);
 	fprintf(stderr, "Dealing with M[%d..%d[ -> %s\n", jmin, jmax, name);
         purgedfile_stream_rewind(ps);
 	makeSparse(sparsemat,colweight,ps,jmin,jmax,oldrows,verbose,

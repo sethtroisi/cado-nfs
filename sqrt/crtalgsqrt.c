@@ -1,5 +1,3 @@
-#define _BSD_SOURCE     /* M_LN2 */
-#define _POSIX_C_SOURCE 200112L
 /*
  * Program: crtalgsqrt
  * Authors: E. Thomé.
@@ -44,6 +42,7 @@
  *   valgrind. I don't understand.
  */
 
+#include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -61,7 +60,6 @@
 #include <sys/stat.h>
 #include <errno.h>
 
-#include "cado.h"
 #include "utils.h"
 #include "modul_poly.h"
 #include "powers_of_p.h"

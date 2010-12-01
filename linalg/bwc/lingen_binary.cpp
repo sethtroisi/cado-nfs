@@ -1,8 +1,4 @@
-#ifndef __cplusplus
-#define _GNU_SOURCE         /* asprintf */
-#endif
-#define __STDC_FORMAT_MACROS    /* PRIu32 in lingen_mat_types.hpp */
-#define _DARWIN_C_SOURCE    /* for asprintf. _ANSI_SOURCE must be undefined */
+#include "cado.h"
 
 #include <sys/time.h>
 #include <sys/types.h>
@@ -34,7 +30,6 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include "bwc_config.h"
-#include "cado.h"
 #include "utils.h"
 #include "bw-common.h"
 #include "filenames.h"

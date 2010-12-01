@@ -141,12 +141,12 @@ See the scripts "dist/src/new_run.X" where X is c59 or c79.
 
 */
 
+#include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <math.h> /* for log, pow, fabs */
-#include "cado.h"
 #include "utils.h"
 #include "auxiliary.h" /* for common routines with polyselect.c */
 

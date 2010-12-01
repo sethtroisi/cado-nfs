@@ -1,3 +1,4 @@
+#include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -7,7 +8,6 @@
 #include <math.h>
 #include <ctype.h>
 #include <time.h>
-#include "cado.h"
 #include "linesieve.h"
 #include "mod_ul.h"
 #include "fb.h"

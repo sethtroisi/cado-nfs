@@ -74,8 +74,7 @@
 // This is done on a heuristic basis, taking the first 4k coordinates
 // only.
 
-#define _GNU_SOURCE     /* asprintf */
-#define _DARWIN_C_SOURCE        /* asprintf */
+#include "cado.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -87,7 +86,6 @@
 
 #include "mod_ul.c"
 
-#include "cado.h"
 #include "cado-endian.h"
 #include "utils.h"
 #include "blockmatrix.h"

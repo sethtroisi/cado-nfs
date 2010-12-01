@@ -10,7 +10,6 @@
 #define LINESIEVE_FB_H
 
 #include <stdio.h>
-#include "cado.h"
 #include "cado_poly.h"
 #include "fb.h"
 
