@@ -122,7 +122,7 @@ static long PeakMemusage() {
 static void
 my_mpz_mul (mpz_t a, mpz_t b, mpz_t c)
 {
-  int large, st;
+  int large, st = 0;
 
   large = mpz_size (b) + mpz_size (c) >= 5000000;
   if (large)

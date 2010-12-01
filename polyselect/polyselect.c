@@ -931,7 +931,7 @@ enumerate (unsigned int *Q, int lQ, int l, double max_adm1, double max_adm2,
                 }
               else /* case p0 > 1 */
                 {
-                  unsigned long inv;
+                  static unsigned long inv;
 
                   if (i == 0)
                     {
