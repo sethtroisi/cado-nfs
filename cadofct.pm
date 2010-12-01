@@ -807,7 +807,6 @@ sub send_file {
     $tab_level++;
 
     # Try to upload the file
-    $ret = remote_cmd($host, "env mkdir -p $m->{'tmpdir'} 2>&1");
     $ret = cmd("env rsync -e $ssh --timeout=30 $param{'wdir'}/$file ".
                "$host:$m->{'tmpdir'}/ 2>&1", { cmdlog => 1 })
         unless $ret->{'status'};

@@ -120,6 +120,8 @@ else
    host=`hostname --short`
 fi
 
+mkdir $t/tmp
+
 cat > $t/mach_desc <<EOF
 [local]
 tmpdir=$t/tmp
