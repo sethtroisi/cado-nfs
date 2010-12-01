@@ -56,10 +56,12 @@ endif(EXISTS ${CADO_NFS_SOURCE_DIR}/files.dist)
 
 #####################################################################
 # Add the CFLAGS that are needed in all cases.
+# Append them at the *end* of the parameter list so as to allow tweaking
+# of e.g. warnings by the user-defined overrides.
 
 if(CMAKE_COMPILER_IS_GNUCC)
-    set (CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99 -g -W -Wall")
-    set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -W -Wall")
+    set (CMAKE_C_FLAGS   "-std=c99 -g -W -Wall ${CMAKE_C_FLAGS}")
+    set (CMAKE_CXX_FLAGS "-g -W -Wall ${CMAKE_CXX_FLAGS}")
 endif(CMAKE_COMPILER_IS_GNUCC)
 
 #####################################################################
