@@ -100,7 +100,8 @@ LEXGE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
 LEXLE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
 
 #ifndef MAYBE_UNUSED
-#if GNUC_VERSION_ATLEAST(3,4,0)
+#if GNUC_VERSION_ATLEAST(3,1,1)
+/* according to http://gcc.gnu.org/onlinedocs/gcc-3.1.1/gcc/Variable-Attributes.html#Variable%20Attributes the 'unused' attribute already existed in 3.1.1 */
 #define MAYBE_UNUSED __attribute__ ((unused))
 #else
 #define MAYBE_UNUSED
