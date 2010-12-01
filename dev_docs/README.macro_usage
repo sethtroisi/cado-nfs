@@ -56,8 +56,8 @@ MAYBE_UNUSED
             int n MAYBE_UNUSED;
         or for a static function:
             MAYBE_UNUSED static inline void foo() { print("Foo\n"); }
-        Note that while MAYBE_UNUSED, as described here, can be used only
-        for gcc 3.4 and later. Earlier versions (3.1 to 3.3) did have the
+        Note that MAYBE_UNUSED, as described here, can be used only for
+        gcc 3.4 and later. Earlier versions (3.1 to 3.3) did have the
         unused attribute, but the rules for the placement of the
         attribute were different. For the record:
             int first_arg(int x, int MAYBE_UNUSED y) { blah blah }
