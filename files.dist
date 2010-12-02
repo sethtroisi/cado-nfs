@@ -583,7 +583,5 @@ gf2x/version.sh.in
 utils/fix-endianness.c
 utils/fix-endianness.h
 utils/cado-endian.h
-config/cabsl.c
 config/cabsl.cmake
-config/log2.c
 config/log2.cmake
