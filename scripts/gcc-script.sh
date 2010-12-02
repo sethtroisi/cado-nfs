@@ -4,7 +4,7 @@
 # ssh gcc64 < gcc-script.sh
 
 remote_cmake_path=/home/zimmerma/bin
-cado_tree=$HOME/cado-svn
+cado_tree=$HOME/cado-nfs-1.0-rc3
 
 if [ -x $remote_cmake_path/cmake ] ; then
     echo "$remote_cmake_path/cmake found, good"
@@ -18,7 +18,8 @@ if [ -d $cado_tree ] ; then
     /bin/rm -rf $cado_tree
 else
     echo "Checking out remote tree"
-    svn co -q svn://scm.gforge.inria.fr/svn/cado-nfs/trunk $cado_tree
+    #svn co -q svn://scm.gforge.inria.fr/svn/cado-nfs/trunk $cado_tree
+    wget -q http://www.loria.fr/~zimmerma/cado-nfs-1.0-rc3.tar.gz -O- | tar xzf -
 fi
 
 cd $cado_tree
