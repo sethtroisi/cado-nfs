@@ -17,6 +17,13 @@
 #include <emmintrin.h>
 #endif
 
+#if (HAVE_LOG2 == 0)
+static double
+log2 (double x)
+{
+  return log (x) / log (2.0);
+}
+#endif
 
 /* As its name says, this is a ugly hack that initializes all lognorms to the
    maximal value (255) on the rational side. But it seems to work well, and to

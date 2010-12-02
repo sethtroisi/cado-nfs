@@ -91,6 +91,7 @@ include(${CADO_NFS_SOURCE_DIR}/config/gcc-assembly.cmake)
 include(${CADO_NFS_SOURCE_DIR}/config/curl.cmake)
 include(${CADO_NFS_SOURCE_DIR}/config/alloca.cmake)
 include(${CADO_NFS_SOURCE_DIR}/config/cabsl.cmake)
+include(${CADO_NFS_SOURCE_DIR}/config/log2.cmake)
 
 ######################################################################
 # Try to detect whether pthreads and/or MPI are available.
