@@ -17,7 +17,7 @@
 #include <emmintrin.h>
 #endif
 
-#if (HAVE_LOG2 == 0)
+#ifndef HAVE_LOG2
 static double
 log2 (double x)
 {
