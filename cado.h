@@ -35,7 +35,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * cado_config.h, which makes sense to include here as well).
  */
 
-#ifndef __OpenBSD__
+#if !(defined(__OpenBSD__) || defined(__FreeBSD__))
 #define _POSIX_C_SOURCE 200112L /* strtoumax */
 /* POSIX: popen/pclose with -std=c99, -pedantic or -ansi (requires
  * _POSIX_C_SOURCE==2 ?) fileno */
@@ -47,9 +47,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 #define _DARWIN_C_SOURCE    /* asprintf ; getpagesize ; _ANSI_SOURCE must be undefined */
 #else
-/* OpenBSD exposes *all* functions by default, and feature macros are
- * (apparently) used the other way around to restrict the exposed
- * interfaces.
+/* OpenBSD and FreeBSD expose *all* functions by default, and feature
+ * macros are (apparently) used the other way around to restrict the
+ * exposed interfaces.
  */
 #endif
 
