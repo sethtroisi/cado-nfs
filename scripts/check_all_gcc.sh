@@ -27,7 +27,7 @@ gcc40
 gcc42
 # (ssh timeout) # gcc43
 # (ssh timeout) # gcc50
-# (/home/zimmerma not found) # gcc51
+gcc51
 # (ssh timeout) # gcc53
 gcc54
 # (ssh timeout) # gcc55
