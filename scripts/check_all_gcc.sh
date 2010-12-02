@@ -24,7 +24,7 @@ gccs=(\
 # (/home/zimmerma not found) # gcc16
 # (/home/zimmerma not found) # gcc17
 gcc40
-gcc42
+# gcc42 # disabled 20101202 because the C++ compiler is non-functional
 # (ssh timeout) # gcc43
 # (ssh timeout) # gcc50
 gcc51

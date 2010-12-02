@@ -16,11 +16,11 @@ fi
 if [ -d $cado_tree ] ; then
     echo "Clearing old $cado_tree"
     /bin/rm -rf $cado_tree
-else
-    echo "Checking out remote tree"
-    #svn co -q svn://scm.gforge.inria.fr/svn/cado-nfs/trunk $cado_tree
-    wget -q http://www.loria.fr/~zimmerma/cado-nfs-1.0-rc3.tar.gz -O- | tar xzf -
 fi
+
+echo "Checking out remote tree"
+#svn co -q svn://scm.gforge.inria.fr/svn/cado-nfs/trunk $cado_tree
+wget -q http://www.loria.fr/~zimmerma/cado-nfs-1.0-rc3.tar.gz -O- | tar xzf -
 
 cd $cado_tree
 
