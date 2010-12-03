@@ -92,6 +92,13 @@
 #include "gauss.h"
 #include "worker-threads.h"
 
+#if defined(__FreeBSD__) && (__FreeBSD__ <= 7)
+/* pthread_cond_wait seems to be buggy on FreeBSD 7 (shard.starfyre.net) */
+#define NTHREADS 1
+#else
+#define NTHREADS 16
+#endif
+
 /* Calculates a 64-bit word with the values of the characters chi(a,b), where
  * chi ranges from chars to chars+64
  */
@@ -559,7 +566,7 @@ int main(int argc, char **argv)
     ASSERT_ALWAYS(purgedname != NULL);
     ASSERT_ALWAYS(indexname != NULL);
 
-    struct worker_threads_group * g = worker_threads_init(16);
+    struct worker_threads_group * g = worker_threads_init (NTHREADS);
     chars = create_characters (nchars, pol);
     int nchars2 = iceildiv(nchars, 64) * 64;
     double tt=wct_seconds();
@@ -584,7 +591,6 @@ int main(int argc, char **argv)
           fprintf(stderr, "done reading heavy block of size %u x %u at %.1f\n",
                   h->nrows, h->ncols, wct_seconds()-tt);
     ASSERT_ALWAYS(h->nrows == small_nrows);
-
 
     /* Now do dot products of these matrices by the kernel vectors
      * supplied on input */
