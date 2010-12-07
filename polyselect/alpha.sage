@@ -224,7 +224,7 @@ def alpha_simplistic(f,B):
     return sum([alpha_p_simplistic(f,p) for p in prime_range(2,B+1)])
 
 # this function loops for f=144*x^4 + 576*x^3 + 864*x^2 + 576*x + 144
-# = 144*(x+1)^4 and p=2
+# = 144*(x+1)^4 and p=2, or more simply with f=(x+1)^2 and p=2
 def special_val0 (f, p):
     c = f.content ()
     v = 0.0
