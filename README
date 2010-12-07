@@ -31,6 +31,8 @@ Required software tools:
 ========================
 
 *) GMP (http://gmplib.org): usually installed in most Linux distributions
+   (on some Linux distributions you need to install libgmp*-dev
+    including gmp.h, which is not installed by default)
 *) The GCC compiler works ; some others might, but it is untested. C and
    C++ are required, with C99 support.
 *) GNU make and CMake for building (CMake is installed on the fly if missing
