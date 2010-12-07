@@ -223,6 +223,8 @@ def alpha_simplistic(f,B):
     """
     return sum([alpha_p_simplistic(f,p) for p in prime_range(2,B+1)])
 
+# this function loops for f=144*x^4 + 576*x^3 + 864*x^2 + 576*x + 144
+# = 144*(x+1)^4 and p=2
 def special_val0 (f, p):
     c = f.content ()
     v = 0.0
@@ -241,12 +243,11 @@ def special_val0 (f, p):
         r = roots[i][0]
         fp = f.derivative()
         c = fp(r)
-        if c % p == 0:
+        if c % p <> 0:
             v += 1.0 / (p - 1)
         else:
             h = h(x+ZZ(r)/p)
             h = PolynomialRing(ZZ,'x')(h)
-            print h, h.parent()
             r0 = r
             v += special_val0 (h, p) / p
     return v
