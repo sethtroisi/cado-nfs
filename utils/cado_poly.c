@@ -102,9 +102,6 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
 	mpz_sub (tmp, poly->n, tmp);
 	mpz_mod (tmp, tmp, poly->n);
 
-    fprintf( stderr, "Debug0: %d\n", have_m );
-    gmp_fprintf( stderr , "Debug1: %Zd\n", poly->m );
-    gmp_fprintf( stderr , "Debug2: %Zd\n", tmp );
         if (have_m && (mpz_cmp (poly->m, tmp) != 0))
           {
             fprintf (stderr, "m is not a root of g mod N\n");
