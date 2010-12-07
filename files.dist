@@ -362,6 +362,7 @@ utils/gmp_gcd.c
 utils/gmp_prob_prime.c
 utils/usp.c
 utils/usp.h
+utils/cut_n_roots.c
 cado_config_h.in
 cado_mpi_config_h.in
 config/asm_sample.c
