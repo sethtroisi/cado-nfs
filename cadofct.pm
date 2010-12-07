@@ -336,6 +336,8 @@ sub read_param {
 
     # checking mandatory parameters
     if ($opt->{'strict'}) {
+        die "The paramater `n' must be an integer larger than 1.\n"
+          if ($param->{'n'} < 2);
         for my $k ("wdir", "name", "kjadmin", "kjadmax") {
             die "The parameter `$k' is mandatory.\n" if !$param->{$k};
         }

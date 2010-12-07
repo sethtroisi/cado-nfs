@@ -5,7 +5,7 @@ set (sources
         mpz_poly.c fpoly.c rootfinder.c params.c gcd_int64.c gcd_uint64.c
         discriminant.c random_generation.c mpz_array.c gzip.c misc.c
         hashpair.c poly.c crc.c purgedfile.c bit_vector.c
-	barrier.c usp.c fix-endianness.c
+        barrier.c usp.c fix-endianness.c cut_n_roots.c 
 )
 
 add_library (utils ${sources})
@@ -18,8 +18,10 @@ target_link_libraries(check_rels utils)
 add_executable(complete_rels ${EXCLUDE_FROM_RELEASE_BUILD} complete_rels.c)
 target_link_libraries(complete_rels utils)
 
-# install(TARGETS complete_rels check_rels RUNTIME DESTINATION bin/utils)
+add_executable(cut_n_roots cut_n_roots.c)
+target_link_libraries(cut_n_roots utils)
 
+# install(TARGETS complete_rels check_rels RUNTIME DESTINATION bin/utils)
 
 add_executable(test_mod_ul ${EXCLUDE_FROM_RELEASE_BUILD} test_mod_ul.c)
 add_executable(test_modredc_ul ${EXCLUDE_FROM_RELEASE_BUILD} test_modredc_ul.c)
