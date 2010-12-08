@@ -68,8 +68,10 @@ Compile:
 
 make
 
-It may or may not be relevant to do ``make install'' as well ; at the
-moment consider ``make install'' to be broken.
+It may or may not be relevant to do ``make install'' as well ; by default
+``make install'' will install binaries in installed/bin (with respect to
+current directory), thus replace ./factor.sh by installed/bin/factor.sh.
+
 
 Run a factorization on current machine:
 =======================================

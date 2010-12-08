@@ -16,7 +16,7 @@ target_link_libraries(mf_scan mf)
 include_directories(${CADO_NFS_SOURCE_DIR}/linalg)
 add_executable(mf_bal mf_bal.c ../rowset_heap.cpp)
 target_link_libraries(mf_bal mf m)
-
+install(TARGETS mf_bal RUNTIME DESTINATION bin/linalg/bwc)
 
 configure_file(bwc.pl ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl ESCAPE_QUOTES @ONLY)
 
@@ -193,5 +193,6 @@ add_executable(short_matmul ${EXCLUDE_FROM_RELEASE_BUILD} short_matmul.c)
 add_executable(cleanup cleanup.c ../blockmatrix.c ../bit_matrices.c
     ../gauss.c)
 target_link_libraries(cleanup utils m)
+install(TARGETS cleanup RUNTIME DESTINATION bin/linalg/bwc)
 
 include(CMakeLists-nodist.txt OPTIONAL)

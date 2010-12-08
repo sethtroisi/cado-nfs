@@ -21,8 +21,6 @@ target_link_libraries(complete_rels utils)
 add_executable(cut_n_roots cut_n_roots.c)
 target_link_libraries(cut_n_roots utils)
 
-# install(TARGETS complete_rels check_rels RUNTIME DESTINATION bin/utils)
-
 add_executable(test_mod_ul ${EXCLUDE_FROM_RELEASE_BUILD} test_mod_ul.c)
 add_executable(test_modredc_ul ${EXCLUDE_FROM_RELEASE_BUILD} test_modredc_ul.c)
 add_executable(test_modredc_15ul ${EXCLUDE_FROM_RELEASE_BUILD} test_modredc_15ul.c)
@@ -36,3 +34,5 @@ target_link_libraries(test_modredc_2ul2 utils)
 target_link_libraries(gmp_prob_prime gmp)
 
 include(CMakeLists-nodist.txt OPTIONAL)
+
+install(TARGETS check_rels gmp_prob_prime RUNTIME DESTINATION bin/utils)

@@ -3,6 +3,7 @@ include_directories (bwc)
 add_executable(characters characters.c gauss.c blockmatrix.c
     bit_matrices.c bwc/worker-threads.c)
 target_link_libraries(characters utils pthread)
+install(TARGETS characters RUNTIME DESTINATION bin/linalg)
 
 # This library is used by bwc mostly, but since its files are relevant here as
 # well...
