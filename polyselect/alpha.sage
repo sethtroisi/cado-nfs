@@ -235,6 +235,7 @@ def special_val0 (f, p):
         g = f // p^v
     else:
         g = f
+    # g(x) = f(x)/p^v
     h = g(p*x)
     roots = g.roots(GF(p))
     nroots = len(roots)
@@ -249,7 +250,13 @@ def special_val0 (f, p):
             h = h(x+ZZ(r)/p)
             h = PolynomialRing(ZZ,'x')(h)
             r0 = r
-            v += special_val0 (h, p) / p
+	    # here we have h(x) = f(p*x+r)/p^v
+	    # we can have h(x) = f(x) only when v=d, and then the roots x of f
+	    # are invariant under x -> p*x+r, which means that x = r/(1-p),
+	    # thus f has one single root of multiplicity d, i.e.,
+	    # f = lc(f) * (x + r/(p-1))^d
+	    if h <> f: # avoid infinite loop
+               v += special_val0 (h, p) / p
     return v
 
 def special_valuation (f, p):
