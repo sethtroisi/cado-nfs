@@ -165,3 +165,8 @@ under Windows:
 
 * you might try to use MPIR (mpir.org) instead of GMP. MPIR is a fork of GMP,
   which claims to be more portable under Windows.
+
+Known problems:
+===============
+
+* under FreeBSD, GCC 4.2.1 is known to miscompile CADO-NFS (GCC 4.5.1 is ok)
