@@ -118,7 +118,7 @@ ssh localhost
 you should end up with a new shell on your machine, without having to
 type any password/passphrase.
 
-Most of the recent Linux distribution will run an ssh-agent for you. But
+Most of the recent Linux distributions will run an ssh-agent for you. But
 if this is not the case with your distribution, or if you are running
 cadofactor.pl inside a ``screen'' in order to logout of your desktop, you
 will need to run the ssh-agent by hand (see man ssh-agent). As a short
