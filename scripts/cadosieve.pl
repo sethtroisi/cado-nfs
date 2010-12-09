@@ -19,7 +19,7 @@ use strict;
 use warnings;
 
 my $range = 4000; # for Imin ($range = $range / 2 for Imin+1 ...)
-my $int_num = 10; # approximate interval numbers
+my $int_num = 2; # approximate interval numbers
 my $old_range = $range;
 
 # input
