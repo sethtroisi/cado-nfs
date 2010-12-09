@@ -181,14 +181,14 @@ Contact, links:
 The website of the project is hosted at:
    http://cado-nfs.gforge.inria.fr/
 
-You can find the latest development version at:
-   svn://scm.gforge.inria.fr/svn/cado-nfs
+You can get the latest development version with:
+   svn checkout svn://scm.gforge.inria.fr/svn/cado-nfs
 
 There are two mailing-lists associated to Cado-nfs:
   - cado-nfs-commits: if you want to receive an email each time a
     modification to the development version is committed to the
     repository.
-  - cado-nfs-discuss: for general discussion about cado-nfs. 
+  - cado-nfs-discuss: for general discussions about cado-nfs. 
 Instructions about how to subscribe are available at
    http://gforge.inria.fr/mail/?group_id=2065
 
