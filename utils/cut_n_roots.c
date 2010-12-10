@@ -115,7 +115,7 @@ main (int argc0, char *argv0[])
     mpz_nextprime(Q,Q);
   }
   if (totnr > 0)
-    printf ("%lu,%lu\n", base, q1 - base);
+    printf ("%lu,%" PRIu64 "\n", base, q1 - base);
 
   mpz_clear (P);
   mpz_clear (Q);
