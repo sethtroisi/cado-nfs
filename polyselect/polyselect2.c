@@ -966,9 +966,36 @@ main (int argc, char *argv[])
         }
     }
 
+  if (mpz_cmp_ui (N, 0) == 0)
+    {
+      int ret;
+
+      ret = gmp_scanf ("n: %Zd\n", N);
+      if (ret != 1)
+	{
+	  fprintf (stderr, "Error, input number N cannot be read\n");
+	  exit (1);
+	}
+    }
+
   if (argc != 2)
     {
-      fprintf (stderr, "Usage: %s [-v -t nthreads -admin nnn -admax nnn -N nnn -d nnn -save xxx -resume xxx -maxnorm xxx -out fff] P\n", argv0);
+      fprintf (stderr, "Usage: %s [options] P\n", argv0);
+      fprintf (stderr, "Parameters and options:\n");
+      fprintf (stderr, "P            --- degree-1 coefficient of g(x) has\n");
+      fprintf (stderr, "                 two prime factors in [P,2P]\n");
+      fprintf (stderr, "-v           --- verbose mode\n");
+      fprintf (stderr, "-t nnn       --- use n threads (default 1)\n");
+      fprintf (stderr, "-admin nnn   --- start from ad=nnn (default 0)\n");
+      fprintf (stderr, "-admax nnn   --- stop at ad=nnn\n");
+      fprintf (stderr, "-incr nnn    --- increment for ad (default 60)\n");
+      fprintf (stderr, "-N nnn       --- input number\n");
+      fprintf (stderr, "-d nnn       --- wanted polynomial degree\n");
+      fprintf (stderr, "-kmax nnn    --- rotation bound\n");
+      fprintf (stderr, "-save xxx    --- save state in file xxx\n");
+      fprintf (stderr, "-resume xxx  --- resume state from file xxx\n");
+      fprintf (stderr, "-maxnorm xxx --- only print polynomials with norm <= xxx\n");
+      fprintf (stderr, "-out xxx     --- for msieve-format output\n");
       exit (1);
     }
 
@@ -980,9 +1007,15 @@ main (int argc, char *argv[])
     }
 #endif
 
-  if (mpz_cmp_ui (N, 0) <= 0 || d == 0)
+  if (mpz_cmp_ui (N, 0) <= 0)
     {
-      fprintf (stderr, "Error, missing -N number or -d degree\n");
+      fprintf (stderr, "Error, missing input number (-N option)\n");
+      exit (1);
+    }
+
+  if (d == 0)
+    {
+      fprintf (stderr, "Error, missing degree (-d option)\n");
       exit (1);
     }
 

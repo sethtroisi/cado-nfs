@@ -222,16 +222,7 @@ L2_lognorm (mpz_t *f, unsigned long d, double s, int method)
 double
 L2_skewness (mpz_t *f, int d, int prec, int method)
 {
-
-  double s;
-
-  if (d == 4)
-      return L2_skewness_old (f, d, prec, method);
-  // s = L2_skewness_old (f, d, prec, method);
-  /* Newton method may not converge? */
-  // s = L2_skewness_Newton (f, d, prec, method);
-  s = L2_skewness_derivative (f, d, prec, method);
-  return s;
+  return L2_skewness_derivative (f, d, prec, method);
 }
 
 /* returns the optimal skewness corresponding to L2_lognorm */
@@ -581,7 +572,7 @@ L2_skewness_Newton (mpz_t *f, int d, int prec, int method) {
 	 return s;
 }
 
-/* Use derivative test, only for degree 6 with ellipse regions */
+/* Use derivative test, with ellipse regions */
 double
 L2_skewness_derivative (mpz_t *f, int d, int prec, int method)
 {
@@ -718,6 +709,102 @@ L2_skewness_derivative (mpz_t *f, int d, int prec, int method)
           s5 = s4 * s1; /* s^10 */
           nc = dfd[5] * s5 + dfd[4] * s4 + dfd[3] * s3
             - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
+          if (nc > 0)
+            b = c;
+          else
+            a = c;
+        }
+    }
+  else if (d == 4)
+    {
+      /* Sage code:
+         R.<x> = PolynomialRing(ZZ)
+         S.<a> = InfinitePolynomialRing(R)
+         d=4; f = SR(sum(a[i]*x^i for i in range(d+1)))
+         F = expand(f(x=x/y)*y^d)
+         var('r,s,t')
+         F = F.subs(x=s^(1/2)*r*cos(t),y=r/s^(1/2)*sin(t))
+         v = integrate(integrate(F^2*r,(r,0,1)),(t,0,2*pi))
+         v = (640*v/pi).expand()
+         dv = v.diff(s)
+         dv = (dv*s^5/10).expand().collect(s)
+      */
+      dfd[4] = 14.0 * fd[4] * fd[4];
+      dfd[3] = 2.0 * fd[2] * fd[4] + fd[3] * fd[3];
+      dfd[1] = 2.0 * fd[0] * fd[2] + fd[1] * fd[1];
+      dfd[0] = 14.0 * fd[0] * fd[0];
+      nc = -1.0;
+      s = 1.0;
+      /* first isolate the minimum in an interval [s, 2s] by dichotomy */
+      while (nc < 0)
+        {
+          s = 2.0 * s;
+          s1 = s * s;   /* s^2 */
+          s2 = s1 * s1; /* s^4 */
+          s3 = s2 * s1; /* s^6 */
+          s4 = s2 * s2; /* s^8 */
+          nc = dfd[4] * s4 + dfd[3] * s3 - dfd[1] * s1 - dfd[0];
+        }
+
+      /* now dv(s/2) < 0 < dv(s) thus the minimum is in [s/2, s] */
+      a = (s == 2.0) ? 1.0 : 0.5 * s;
+      b = s;
+      /* use dichotomy to refine the root */
+      while (prec--)
+        {
+          c = (a + b) * 0.5;
+          s1 = c * c;   /* s^2 */
+          s2 = s1 * s1; /* s^4 */
+          s3 = s2 * s1; /* s^6 */
+          s4 = s2 * s2; /* s^8 */
+          nc = dfd[4] * s4 + dfd[3] * s3 - dfd[1] * s1 - dfd[0];
+          if (nc > 0)
+            b = c;
+          else
+            a = c;
+        }
+    }
+  else if (d == 3)
+    {
+      /* Sage code:
+         R.<x> = PolynomialRing(ZZ)
+         S.<a> = InfinitePolynomialRing(R)
+         d=3; f = SR(sum(a[i]*x^i for i in range(d+1)))
+         F = expand(f(x=x/y)*y^d)
+         var('r,s,t')
+         F = F.subs(x=s^(1/2)*r*cos(t),y=r/s^(1/2)*sin(t))
+         v = integrate(integrate(F^2*r,(r,0,1)),(t,0,2*pi))
+         v = (64*v/pi).expand()
+         dv = v.diff(s)
+         dv = (dv*s^4).expand().collect(s)
+      */
+      dfd[3] = 15.0 * fd[3] * fd[3];
+      dfd[2] = 2.0 * fd[1] * fd[3] + fd[2] * fd[2];
+      dfd[1] = 2.0 * fd[0] * fd[2] + fd[1] * fd[1];
+      dfd[0] = 15.0 * fd[0] * fd[0];
+      nc = -1.0;
+      s = 1.0;
+      /* first isolate the minimum in an interval [s, 2s] by dichotomy */
+      while (nc < 0)
+        {
+          s = 2.0 * s;
+          s1 = s * s;   /* s^2 */
+          s2 = s1 * s1; /* s^4 */
+          s3 = s2 * s1; /* s^6 */
+          nc = dfd[3] * s3 + dfd[2] * s2 - dfd[1] * s1 - dfd[0];
+        }
+
+      /* now dv(s/2) < 0 < dv(s) thus the minimum is in [s/2, s] */
+      a = (s == 2.0) ? 1.0 : 0.5 * s;
+      b = s;
+      /* use dichotomy to refine the root */
+      while (prec--)
+        {
+          c = (a + b) * 0.5;
+          s1 = c * c;   /* s^2 */
+          s2 = s1 * s1; /* s^4 */
+          s3 = s2 * s1; /* s^6 */
+          nc = dfd[3] * s3 + dfd[2] * s2 - dfd[1] * s1 - dfd[0];
           if (nc > 0)
             b = c;
           else
