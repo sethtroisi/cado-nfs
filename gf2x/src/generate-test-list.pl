@@ -76,7 +76,7 @@ tune_${code}_CPPFLAGS=-I\$(top_builddir) -I\$(top_srcdir) -DTUNING=$size
 nodist_tune_${code}_SOURCES=$code.c tuning_undefs_$size.h
 $code.\$(OBJEXT): tuning_undefs_$size.h
 tune_${code}_LDADD=libtuneup-s$size.la libtiming.la ../libgf2x.la
-$code.c: gen_bb_mul_code\$(EXEEXT) ; ./gen_bb_mul_code $w $k > \$@
+$code.c: gen_bb_mul_code\$(EXEEXT_FOR_BUILD) ; ./gen_bb_mul_code$(EXEEXT_FOR_BUILD) $w $k > \$@
 BUILT_SOURCES+=$code.c
 EOF
             } else {

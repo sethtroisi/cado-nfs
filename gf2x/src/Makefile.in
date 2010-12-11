@@ -134,9 +134,6 @@ libtuneup_s8_la_OBJECTS = $(nodist_libtuneup_s8_la_OBJECTS)
 libtuneup_s9_la_LIBADD =
 nodist_libtuneup_s9_la_OBJECTS = libtuneup_s9_la-tuneup_9.lo
 libtuneup_s9_la_OBJECTS = $(nodist_libtuneup_s9_la_OBJECTS)
-am_gen_bb_mul_code_OBJECTS = gen_bb_mul_code.$(OBJEXT)
-gen_bb_mul_code_OBJECTS = $(am_gen_bb_mul_code_OBJECTS)
-gen_bb_mul_code_LDADD = $(LDADD)
 @GF2X_32BIT_SOURCES_TRUE@nodist_tune_gen_mul1_w32k2_OBJECTS = tune_gen_mul1_w32k2-gen_mul1_w32k2.$(OBJEXT)
 tune_gen_mul1_w32k2_OBJECTS = $(nodist_tune_gen_mul1_w32k2_OBJECTS)
 @GF2X_32BIT_SOURCES_TRUE@tune_gen_mul1_w32k2_DEPENDENCIES =  \
@@ -441,7 +438,7 @@ SOURCES = $(libtiming_la_SOURCES) $(nodist_libtuneup_s1_la_SOURCES) \
 	$(nodist_libtuneup_s6_la_SOURCES) \
 	$(nodist_libtuneup_s7_la_SOURCES) \
 	$(nodist_libtuneup_s8_la_SOURCES) \
-	$(nodist_libtuneup_s9_la_SOURCES) $(gen_bb_mul_code_SOURCES) \
+	$(nodist_libtuneup_s9_la_SOURCES) \
 	$(nodist_tune_gen_mul1_w32k2_SOURCES) \
 	$(nodist_tune_gen_mul1_w32k3_SOURCES) \
 	$(nodist_tune_gen_mul1_w32k4_SOURCES) \
@@ -485,8 +482,7 @@ SOURCES = $(libtiming_la_SOURCES) $(nodist_libtuneup_s1_la_SOURCES) \
 	$(nodist_tune_mul9k2_SOURCES) $(tune_mul9k3_SOURCES) \
 	$(nodist_tune_mul9k3_SOURCES) $(tunefft_SOURCES) \
 	$(tunetoom_SOURCES) $(update_thresholds_SOURCES)
-DIST_SOURCES = $(libtiming_la_SOURCES) $(gen_bb_mul_code_SOURCES) \
-	$(am__tune_mul1cl_SOURCES_DIST) \
+DIST_SOURCES = $(libtiming_la_SOURCES) $(am__tune_mul1cl_SOURCES_DIST) \
 	$(am__tune_mul2cl_SOURCES_DIST) \
 	$(am__tune_mul2cl2_SOURCES_DIST) $(tune_mul2k_SOURCES) \
 	$(am__tune_mul2t_SOURCES_DIST) $(am__tune_mul2t2_SOURCES_DIST) \
@@ -519,6 +515,7 @@ AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
+CC_FOR_BUILD = @CC_FOR_BUILD@
 CFLAGS = @CFLAGS@
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
@@ -536,6 +533,7 @@ ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
 EGREP = @EGREP@
 EXEEXT = @EXEEXT@
+EXEEXT_FOR_BUILD = @EXEEXT_FOR_BUILD@
 FGREP = @FGREP@
 GF2X_WORDSIZE = @GF2X_WORDSIZE@
 GREP = @GREP@
@@ -635,9 +633,19 @@ top_srcdir = @top_srcdir@
 
 # This impacts the storage class of the functions in the inlines files.
 AM_CPPFLAGS = -I$(top_builddir) -I$(top_srcdir)
+
+# -- end generated code --
+
+######################################################################
+
+######################################################################
+
+######################################################################
+EXTRA_PROGRAMS = $(LOWLEVEL) update-thresholds$(EXEEXT) \
+	tunetoom$(EXEEXT) tunefft$(EXEEXT)
 EXTRA_DIST = README.adding_code generate-test-list.pl mul3k3.c \
 	tuneup_pre.c tuning_undef_wrapper.h tuning_undefs_pre.h \
-	tune-lowlevel.pl
+	gen_bb_mul_code.c tune-lowlevel.pl
 
 # We've got a lot of per-target cfiles here, but it's rather silly to
 # have automake produce separate .o files for the files which fo _not_
@@ -661,29 +669,16 @@ CLEANFILES = tuning_undefs_1.h tuning_undefs_2.h tuning_undefs_3.h \
 	tuning_undefs_7.h tuning_undefs_8.h tuning_undefs_9.h \
 	$(EXTRA_PROGRAMS) $(EXTRA_LTLIBRARIES) tunetoom.res \
 	tunefft.res $(BUILT_SOURCES)
-DISTCLEANFILES = tuning_undefs_1.h tuning_undefs_2.h tuning_undefs_3.h \
-	tuning_undefs_4.h tuning_undefs_5.h tuning_undefs_6.h \
-	tuning_undefs_7.h tuning_undefs_8.h tuning_undefs_9.h
+DISTCLEANFILES = gen_bb_mul_code$(EXEEXT_FOR_BUILD) tuning_undefs_1.h \
+	tuning_undefs_2.h tuning_undefs_3.h tuning_undefs_4.h \
+	tuning_undefs_5.h tuning_undefs_6.h tuning_undefs_7.h \
+	tuning_undefs_8.h tuning_undefs_9.h
 BUILT_SOURCES = tuneup_1.c tuning_undefs_1.h tuneup_2.c \
 	tuning_undefs_2.h tuneup_3.c tuning_undefs_3.h tuneup_4.c \
 	tuning_undefs_4.h tuneup_5.c tuning_undefs_5.h tuneup_6.c \
 	tuning_undefs_6.h tuneup_7.c tuning_undefs_7.h tuneup_8.c \
 	tuning_undefs_8.h tuneup_9.c tuning_undefs_9.h $(am__append_2) \
 	$(am__append_4)
-
-# Autotools already use sed, so normally sed is not an extraordinary
-# difficult dependency.
-
-# -- end generated code --
-
-######################################################################
-
-######################################################################
-
-######################################################################
-EXTRA_PROGRAMS = gen_bb_mul_code$(EXEEXT) $(LOWLEVEL) \
-	update-thresholds$(EXEEXT) tunetoom$(EXEEXT) tunefft$(EXEEXT)
-gen_bb_mul_code_SOURCES = gen_bb_mul_code.c
 nodist_libtuneup_s1_la_SOURCES = tuneup_1.c tuning_undefs_1.h
 libtuneup_s1_la_CPPFLAGS = -I$(top_builddir) -I$(top_srcdir)
 nodist_libtuneup_s2_la_SOURCES = tuneup_2.c tuning_undefs_2.h
@@ -925,9 +920,6 @@ libtuneup-s8.la: $(libtuneup_s8_la_OBJECTS) $(libtuneup_s8_la_DEPENDENCIES)
 	$(LINK)  $(libtuneup_s8_la_OBJECTS) $(libtuneup_s8_la_LIBADD) $(LIBS)
 libtuneup-s9.la: $(libtuneup_s9_la_OBJECTS) $(libtuneup_s9_la_DEPENDENCIES) 
 	$(LINK)  $(libtuneup_s9_la_OBJECTS) $(libtuneup_s9_la_LIBADD) $(LIBS)
-gen_bb_mul_code$(EXEEXT): $(gen_bb_mul_code_OBJECTS) $(gen_bb_mul_code_DEPENDENCIES) 
-	@rm -f gen_bb_mul_code$(EXEEXT)
-	$(LINK) $(gen_bb_mul_code_OBJECTS) $(gen_bb_mul_code_LDADD) $(LIBS)
 tune_gen_mul1_w32k2$(EXEEXT): $(tune_gen_mul1_w32k2_OBJECTS) $(tune_gen_mul1_w32k2_DEPENDENCIES) 
 	@rm -f tune_gen_mul1_w32k2$(EXEEXT)
 	$(LINK) $(tune_gen_mul1_w32k2_OBJECTS) $(tune_gen_mul1_w32k2_LDADD) $(LIBS)
@@ -1070,7 +1062,6 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gen_bb_mul_code.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libtuneup_s1_la-tuneup_1.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libtuneup_s2_la-tuneup_2.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libtuneup_s3_la-tuneup_3.Plo@am__quote@
@@ -2009,6 +2000,12 @@ uninstall-am:
 	tags uninstall uninstall-am
 
 
+# EXTRA_PROGRAMS=gen_bb_mul_code$(EXEEXT_FOR_BUILD)
+# gen_bb_mul_code_SOURCES=gen_bb_mul_code.c
+
+gen_bb_mul_code$(EXEEXT_FOR_BUILD): gen_bb_mul_code.c
+	$(CC_FOR_BUILD) `test -f 'gen_bb_mul_code.c' || echo '$(srcdir)/'`gen_bb_mul_code.c -o gen_bb_mul_code$(EXEEXT_FOR_BUILD)
+
 # The stuff after "-- begin generated code --" following this comment
 # block is auto-generated by a perl script, from the input data provided
 # in this comment block in the ACTIVE COMMENTS below.
@@ -2065,6 +2062,10 @@ uninstall-am:
 #*   test mul9clk2
 #*   test mul9cl
 #* endif
+
+# Autotools already use sed, so normally sed is not an extraordinary
+# difficult dependency.
+
 # -- begin generated code --
 tuning_undefs_1.h: tuning_undefs_pre.h ; sed -e s/@@SIZE@@/1/g < $< > $@
 tuneup_1.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/1/g < $< > $@
@@ -2102,25 +2103,25 @@ tuning_undefs_9.h: tuning_undefs_pre.h ; sed -e s/@@SIZE@@/9/g < $< > $@
 tuneup_9.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/9/g < $< > $@
 tuneup_9.$(OBJEXT): tuning_undefs_9.h
 @GF2X_32BIT_SOURCES_TRUE@gen_mul1_w32k2.$(OBJEXT): tuning_undefs_1.h
-@GF2X_32BIT_SOURCES_TRUE@gen_mul1_w32k2.c: gen_bb_mul_code$(EXEEXT) ; ./gen_bb_mul_code 32 2 > $@
+@GF2X_32BIT_SOURCES_TRUE@gen_mul1_w32k2.c: gen_bb_mul_code$(EXEEXT_FOR_BUILD) ; ./gen_bb_mul_code$(EXEEXT_FOR_BUILD) 32 2 > $@
 @GF2X_32BIT_SOURCES_TRUE@gen_mul1_w32k3.$(OBJEXT): tuning_undefs_1.h
-@GF2X_32BIT_SOURCES_TRUE@gen_mul1_w32k3.c: gen_bb_mul_code$(EXEEXT) ; ./gen_bb_mul_code 32 3 > $@
+@GF2X_32BIT_SOURCES_TRUE@gen_mul1_w32k3.c: gen_bb_mul_code$(EXEEXT_FOR_BUILD) ; ./gen_bb_mul_code$(EXEEXT_FOR_BUILD) 32 3 > $@
 @GF2X_32BIT_SOURCES_TRUE@gen_mul1_w32k4.$(OBJEXT): tuning_undefs_1.h
-@GF2X_32BIT_SOURCES_TRUE@gen_mul1_w32k4.c: gen_bb_mul_code$(EXEEXT) ; ./gen_bb_mul_code 32 4 > $@
+@GF2X_32BIT_SOURCES_TRUE@gen_mul1_w32k4.c: gen_bb_mul_code$(EXEEXT_FOR_BUILD) ; ./gen_bb_mul_code$(EXEEXT_FOR_BUILD) 32 4 > $@
 @GF2X_32BIT_SOURCES_TRUE@gen_mul1_w32k5.$(OBJEXT): tuning_undefs_1.h
-@GF2X_32BIT_SOURCES_TRUE@gen_mul1_w32k5.c: gen_bb_mul_code$(EXEEXT) ; ./gen_bb_mul_code 32 5 > $@
+@GF2X_32BIT_SOURCES_TRUE@gen_mul1_w32k5.c: gen_bb_mul_code$(EXEEXT_FOR_BUILD) ; ./gen_bb_mul_code$(EXEEXT_FOR_BUILD) 32 5 > $@
 @GF2X_32BIT_SOURCES_TRUE@gen_mul1_w32k6.$(OBJEXT): tuning_undefs_1.h
-@GF2X_32BIT_SOURCES_TRUE@gen_mul1_w32k6.c: gen_bb_mul_code$(EXEEXT) ; ./gen_bb_mul_code 32 6 > $@
+@GF2X_32BIT_SOURCES_TRUE@gen_mul1_w32k6.c: gen_bb_mul_code$(EXEEXT_FOR_BUILD) ; ./gen_bb_mul_code$(EXEEXT_FOR_BUILD) 32 6 > $@
 @GF2X_64BIT_SOURCES_TRUE@gen_mul1_w64k2.$(OBJEXT): tuning_undefs_1.h
-@GF2X_64BIT_SOURCES_TRUE@gen_mul1_w64k2.c: gen_bb_mul_code$(EXEEXT) ; ./gen_bb_mul_code 64 2 > $@
+@GF2X_64BIT_SOURCES_TRUE@gen_mul1_w64k2.c: gen_bb_mul_code$(EXEEXT_FOR_BUILD) ; ./gen_bb_mul_code$(EXEEXT_FOR_BUILD) 64 2 > $@
 @GF2X_64BIT_SOURCES_TRUE@gen_mul1_w64k3.$(OBJEXT): tuning_undefs_1.h
-@GF2X_64BIT_SOURCES_TRUE@gen_mul1_w64k3.c: gen_bb_mul_code$(EXEEXT) ; ./gen_bb_mul_code 64 3 > $@
+@GF2X_64BIT_SOURCES_TRUE@gen_mul1_w64k3.c: gen_bb_mul_code$(EXEEXT_FOR_BUILD) ; ./gen_bb_mul_code$(EXEEXT_FOR_BUILD) 64 3 > $@
 @GF2X_64BIT_SOURCES_TRUE@gen_mul1_w64k4.$(OBJEXT): tuning_undefs_1.h
-@GF2X_64BIT_SOURCES_TRUE@gen_mul1_w64k4.c: gen_bb_mul_code$(EXEEXT) ; ./gen_bb_mul_code 64 4 > $@
+@GF2X_64BIT_SOURCES_TRUE@gen_mul1_w64k4.c: gen_bb_mul_code$(EXEEXT_FOR_BUILD) ; ./gen_bb_mul_code$(EXEEXT_FOR_BUILD) 64 4 > $@
 @GF2X_64BIT_SOURCES_TRUE@gen_mul1_w64k5.$(OBJEXT): tuning_undefs_1.h
-@GF2X_64BIT_SOURCES_TRUE@gen_mul1_w64k5.c: gen_bb_mul_code$(EXEEXT) ; ./gen_bb_mul_code 64 5 > $@
+@GF2X_64BIT_SOURCES_TRUE@gen_mul1_w64k5.c: gen_bb_mul_code$(EXEEXT_FOR_BUILD) ; ./gen_bb_mul_code$(EXEEXT_FOR_BUILD) 64 5 > $@
 @GF2X_64BIT_SOURCES_TRUE@gen_mul1_w64k6.$(OBJEXT): tuning_undefs_1.h
-@GF2X_64BIT_SOURCES_TRUE@gen_mul1_w64k6.c: gen_bb_mul_code$(EXEEXT) ; ./gen_bb_mul_code 64 6 > $@
+@GF2X_64BIT_SOURCES_TRUE@gen_mul1_w64k6.c: gen_bb_mul_code$(EXEEXT_FOR_BUILD) ; ./gen_bb_mul_code$(EXEEXT_FOR_BUILD) 64 6 > $@
 mul2k.$(OBJEXT): tuning_undefs_2.h
 mul3k.$(OBJEXT): tuning_undefs_3.h
 mul3k2.$(OBJEXT): tuning_undefs_3.h
