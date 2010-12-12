@@ -159,15 +159,10 @@ my @default_param = (
     n            => undef,
     parallel     => 0,
 
-    # polyselect using Kleinjung (kj) algorithm
+    # polyselect using Kleinjung's (kj) algorithm
     degree       => 5,
-    kjkeep       => 100,
     kjkmax       => 10,
     kjincr       => 60,
-    kjl          => 7,
-    kjM          => 1e25,
-    kjpb         => 256,
-    kjp0max      => 100000,
     kjadmin      => 0,
     kjadmax      => undef,
     kjadrange    => 1e7,
@@ -1344,8 +1339,7 @@ my %tasks = (
 
     polysel   => { name   => "polynomial selection",
                    dep    => ['init'],
-                   param  => ['degree', 'kjM', 'kjl', 'kjkeep', 'kjkmax',
-                              'kjincr', 'kjpb', 'kjp0max', 'kjadmin',
+                   param  => ['degree', 'kjkmax', 'kjincr', 'kjadmin',
                               'kjadmax'],
                    files  => ['kjout\.[\de.]+-[\de.]+', 'poly', 'poly_tmp'],
                    resume => 1,
@@ -1751,7 +1745,7 @@ my $polysel_check = sub {
     while (<FILE>) {
         if (/^No polynomial found/) {
             warn "No polynomial in file `$f'.\n".
-			     "check [kj]M value.\n";
+			     "check [kj]P value.\n";
             close FILE;
             return;
         }
@@ -1863,7 +1857,7 @@ sub do_polysel {
     }
 
     die "No polynomial was found in the given range!\n".
-        "Please increase the range or the [kj]M value.\n"
+        "Please increase the range or decrease the [kj]P value.\n"
       unless defined $Emax;
 
     # Copy the best polynomial
