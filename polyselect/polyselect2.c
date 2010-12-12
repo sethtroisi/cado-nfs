@@ -15,6 +15,7 @@
 #include <pthread.h>
 #include "utils.h"
 #include "auxiliary.h"
+#include "murphyE.h"
 
 // #define DEBUG
 
@@ -62,8 +63,8 @@ static int verbose = 0, incr = 60, default_MAX_k;
 double max_norm = DBL_MAX; /* maximal wanted norm (before rotation) */
 uint32_t *Primes;
 char *out = NULL; /* output file for msieve input (msieve.dat.m) */
-cado_poly best_poly;
-double best_E = DBL_MAX;
+cado_poly best_poly, curr_poly;
+double best_E = 0.0; /* Murphy's E (the larger the better) */
 
 /* read-write global variables */
 pthread_mutex_t lock; /* used as mutual exclusion lock for those variables */
@@ -152,7 +153,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_t l, mtilde, m, adm1, t, k, *f, g[2];
   unsigned int j, nroots;
   int cmp;
-  double skew, logmu, alpha;
+  double skew, logmu, alpha, E;
   /* the expected rotation space is S^6 for degree 6, S^4.5 for degree 5,
      S^3 for degree 4, S^2 for degree 3, S for degree 2, S^0.5 for degree 1 */
 
@@ -336,14 +337,17 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 	  fflush (stdout);
 	}
 
-      if (logmu + alpha < best_E)
+      mpz_set (curr_poly->g[0], g[0]);
+      mpz_set (curr_poly->g[1], g[1]);
+      for (j = d + 1; j -- != 0; )
+	mpz_set (curr_poly->f[j], f[j]);
+      curr_poly->skew = skew;
+
+      E =  MurphyE (curr_poly, BOUND_F, BOUND_G, AREA, MURPHY_K);
+      if (E > best_E)
 	{
-	  best_E = logmu + alpha;
-	  mpz_set (best_poly->g[0], g[0]);
-	  mpz_set (best_poly->g[1], g[1]);
-	  for (j = d + 1; j -- != 0; )
-	    mpz_set (best_poly->f[j], f[j]);
-	  best_poly->skew = skew;
+	  best_E = E;
+	  cado_poly_set (best_poly, curr_poly);
 	}
 
       if (out != NULL) /* msieve output */
@@ -882,6 +886,7 @@ main (int argc, char *argv[])
   mpz_init (N);
   default_MAX_k = MAX_k;
   cado_poly_init (best_poly);
+  cado_poly_init (curr_poly);
 
   while (argc >= 2 && argv[1][0] == '-')
     {
@@ -996,6 +1001,7 @@ main (int argc, char *argv[])
 	}
     }
   mpz_set (best_poly->n, N);
+  mpz_set (curr_poly->n, N);
 
   if (argc != 2)
     usage (argv0[0]);
@@ -1021,6 +1027,8 @@ main (int argc, char *argv[])
     }
   best_poly->degree = d;
   best_poly->degreeg = 1;
+  curr_poly->degree = d;
+  curr_poly->degreeg = 1;
 
   if (resume != NULL)
     {
@@ -1142,7 +1150,10 @@ main (int argc, char *argv[])
 	  potential_collisions, 1000.0 * potential_collisions
 	  / (double) cputime ());
 
-  if (best_E == DBL_MAX)
+  /* print total time (format for cpu_time.sh) */
+  printf ("# Total phase took %.2fs\n", seconds () - st0);
+
+  if (best_E == 0.0)
     fprintf (stderr, "No polynomial found, please increase the ad range or decrease P\n");
   else
     print_poly (stdout, best_poly, argc0, argv0, st0, 1 /* raw */);
@@ -1153,6 +1164,7 @@ main (int argc, char *argv[])
   mpz_clear (N);
   clearPrimes ();
   cado_poly_clear (best_poly);
+  cado_poly_clear (curr_poly);
 
   return 0;
 }

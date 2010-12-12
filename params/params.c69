@@ -34,19 +34,18 @@ degree=4                # degree of the algebraic polynomial
 kjdelay=30              # time between two checks
 selectnice=4            # nice level for selection
 
-## Most important parameters of polyselect
-kjM=5e12                # maximum norm allowed
-kjl=4                   # minimal number of primes in lc(g)
-kjadmin=1               # min value for lc(f)
-kjadmax=1e5             # max value for lc(f)
-kjadrange=5e4           # individual tasks
+# on the test number
+# 316227766016876889247891683315809882613302287311747247733939854383731
+# we get
+# lognorm: 25.08, alpha: -3.73 E=21.35
+# Murphy's E(Bf=10000000,Bg=5000000,area=1.00e+16)=6.48e-07
 
-## Other parameters of polyselect
-kjkeep=20               # number of preselected polynomials
-kjkmax=12               # rotation is bounded by 2^kmax
+## Parameters of polyselect
+kjadmax=5000            # max value for lc(f)
+kjadrange=1000          # individual tasks
+kjkmax=17               # rotation is bounded by 2^kmax
 kjincr=60               # forced divisor of lc(f)
-kjpb=256                # bound on primes allowed in lc(g)
-kjp0max=1000            # bound on the additional factor in lc(g)
+kjP=5000                # choose lc(g) with two prime factors in [P,2P]
 
 ###########################################################################
 # Sieve
@@ -71,9 +70,8 @@ alambda=2.2
 
 I=11                    # Sieving range in lattice siever
 qmin=200000             # Start of the special-q range
-qrange=10000            # The size of an elementary sieving task
-checkrange=50000        # We check if we have enough after each step
-                        # of that many relations found.
+qrange=5000             # The size of an elementary sieving task
+firstcheck=326000       # Try filtering only up from that many relations
 sievenice=10            # nice level for the sieving jobs
 sieve_max_threads=2
 

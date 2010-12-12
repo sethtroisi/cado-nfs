@@ -183,7 +183,7 @@ my @default_param = (
     excess       => 1,
     qmin         => 12000000,
     qrange       => 1000000,
-    checkrange   => 1000000,
+    checkrange   => 1,
     firstcheck   => 1,
 
     delay        => 120,
@@ -2027,7 +2027,6 @@ sub dup {
         my $i=0;
         while (<FILE>) {
            if ( $_ =~ /^# (Number of primes in \S+ factor base = \d+)$/ ) {
-                info "$1\n";
                 $i++;
                 last if $i==2; 
             }

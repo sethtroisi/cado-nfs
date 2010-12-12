@@ -40,6 +40,24 @@ void cado_poly_clear(cado_poly poly)
     memset(poly, 0, sizeof(poly));
 }
 
+/* p <- q */
+void
+cado_poly_set (cado_poly p, cado_poly q)
+{
+    int i;
+
+    mpz_set (p->n, q->n);
+    p->skew = q->skew;
+    p->degree = q->degree;
+    for (i = 0; i <= q->degree; i++)
+      mpz_set (p->f[i], q->f[i]);
+    p->degreeg = q->degreeg;
+    for (i = 0; i <= q->degreeg; i++)
+      mpz_set (p->g[i], q->g[i]);
+    mpz_set (p->m, q->m);
+    strcpy (p->type, q->type);
+}
+
 int cado_poly_set_plist(cado_poly poly, param_list pl)
 {
     int have_n = 0;

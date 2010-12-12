@@ -16,8 +16,8 @@ typedef struct
   double skew;    /* skewness */
   int degree;     /* (algebraic) degree */
   mpz_t *f;       /* algebraic coefficients */
-  mpz_t *g;       /* rational coefficients */
   int degreeg;    /* degree of polynomial g */
+  mpz_t *g;       /* rational coefficients */
   mpz_t m;        /* common root of f and g mod n */
   char type[256]; /* type (gnfs or snfs) */
   unsigned long rlim; /* rational  factor base bound */
@@ -45,6 +45,7 @@ extern void fprint_polynomial (FILE *, mpz_t *, const int);
 // stderr)
 extern int cado_poly_read (cado_poly, const char *filename);
 extern int cado_poly_read_stream (cado_poly, FILE *);
+extern void cado_poly_set (cado_poly p, cado_poly q);
 extern int cado_poly_set_plist(cado_poly poly, param_list pl);
 
 extern void cado_poly_init (cado_poly);
