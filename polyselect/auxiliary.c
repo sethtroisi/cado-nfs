@@ -1519,7 +1519,7 @@ rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1,
     }
   *J1 = -*J0;
 
-  if (verbose)
+  if (verbose > 0)
     fprintf (stderr, "# Rotate bounds: %ld <= j <= %ld, %ld <= k <= %ld\n",
              *J0, *J1, *K0, *K1);
 
@@ -1802,7 +1802,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
   rotate_aux (f, b, m, k0, *kmin, 0);
   rotate_aux (f, b, m, j0, *jmin, 1);
 
-  if (verbose && (multi <= 1))
+  if ((verbose > 0) && (multi <= 1))
     {
       fprintf (stderr, "# Rotate by ");
       if (*jmin != 0)
@@ -1888,7 +1888,8 @@ print_poly (FILE *fp, cado_poly p, int argc, char *argv[], double st, int raw)
     mpz_neg (p->m, p->g[0]);
   mpz_out_str (fp, 10, p->m);
   fprintf (fp, "\n");
-  fprintf (fp, "type: %s\n", p->type);
+  if (strlen (p->type) != 0)
+    fprintf (fp, "type: %s\n", p->type);
   if (raw == 0)
     {
       fprintf (fp, "rlim: %lu\n", p->rlim);

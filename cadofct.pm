@@ -168,10 +168,11 @@ my @default_param = (
     kjM          => 1e25,
     kjpb         => 256,
     kjp0max      => 100000,
-    kjadmin      => undef,
+    kjadmin      => 0,
     kjadmax      => undef,
     kjadrange    => 1e7,
     kjdelay      => 120,
+    kjP          => undef,
     selectnice   => 10,
 
     # sieve
@@ -338,7 +339,7 @@ sub read_param {
     if ($opt->{'strict'}) {
         die "The paramater `n' must be an integer larger than 1.\n"
           if ($param->{'n'} < 2);
-        for my $k ("wdir", "name", "kjadmin", "kjadmax") {
+        for my $k ("wdir", "name", "kjadmax", "kjP") {
             die "The parameter `$k' is mandatory.\n" if !$param->{$k};
         }
         die "The parameter `machines' is mandatory for parallel mode.\n"
@@ -1775,17 +1776,13 @@ my $polysel_check = sub {
 my $polysel_cmd = sub {
     my ($a, $b, $m, $max_threads, $gzip) = @_;
     return "env nice -$param{'selectnice'} ".
-           "$m->{'bindir'}/polyselect/polyselect ".
-           "-keep $param{'kjkeep'} ".
+           "$m->{'bindir'}/polyselect/polyselect2 -q ".
            "-kmax $param{'kjkmax'} ".
            "-incr $param{'kjincr'} ".
-           "-l $param{'kjl'} ".
-           "-M $param{'kjM'} ".
-           "-pb $param{'kjpb'} ".
-           "-p0max $param{kjp0max} ".
            "-admin $a ".
            "-admax $b ".
            "-degree $param{'degree'} ".
+           "$param{'kjP'} ".
            "< $m->{'prefix'}.n ".
            "> $m->{'prefix'}.kjout.$a-$b ".
            "2>&1";

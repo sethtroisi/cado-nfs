@@ -1,0 +1,3 @@
+Changes between cado-nfs-1.0 and cado-nfs-1.1:
+* the polynomial selection uses the new algorithm presented by Kleinjung at
+  the 2008 CADO workshop

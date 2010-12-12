@@ -9,6 +9,7 @@ extern "C" {
 
 int lift_root(mpz_t * f, int d, unsigned long pk, unsigned long * r);
 int lift_rootz(mpz_t * f, int d, mpz_t pk, mpz_t r);
+int mp_poly_cmp (mpz_t *f, mpz_t *g, int d);
 
 #ifdef __cplusplus
 }

@@ -58,10 +58,12 @@ typedef struct
 typedef _roots_struct roots_t[1];
 
 /* read-only global variables */
-int verbose = 0, incr = 60;
+static int verbose = 0, incr = 60, default_MAX_k;
 double max_norm = DBL_MAX; /* maximal wanted norm (before rotation) */
 uint32_t *Primes;
 char *out = NULL; /* output file for msieve input (msieve.dat.m) */
+cado_poly best_poly;
+double best_E = DBL_MAX;
 
 /* read-write global variables */
 pthread_mutex_t lock; /* used as mutual exclusion lock for those variables */
@@ -292,43 +294,12 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 
   optimize (f, d, g, 0, 1);
 
-#if 0
-  double logmu0 = logmu;
   nroots = numberOfRealRoots (f, d, 0, 0);
   skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
   logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
   total_lognorm[q] += logmu;
-  /* initial translation to improve optimization: */
-  if ( (logmu0 - logmu) < 6) { /* say, 10% of target l2 */
-    mpz_t k;
-    mpz_init_set_si (k, 1);
-    for (i = 1; i < 64; i ++)
-      {
-        logmu0 = logmu;
-        do_translate_z (f, d, g, k); /* f(x+k) */
-        skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-        logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
-        mpz_mul_ui (k, k, 2);
-        /* say 1% of the l2 norm, so 0.6 for rsa768 */
-        if ((logmu - logmu0) < -0.5 || (logmu - logmu0) > 0.5)
-          break;
-      }
-    mpz_clear (k);
-    optimize (f, d, g, 0, 1);
-    nroots = numberOfRealRoots (f, d, 0, 0);
-    skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-    logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
-  }
 
-  printf ("# optimized_lognorm %1.2f, alpha %1.2f, %u rroots, skew %f\n", logmu, alpha, nroots, skew);
-#else
-  nroots = numberOfRealRoots (f, d, 0, 0);
-  skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-  logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
-  total_lognorm[q] += logmu;
-#endif
-
-#if 1 /* rootsieve */
+  /* rootsieve */
   if (logmu <= max_norm)
     {
       unsigned long alim = 2000;
@@ -343,7 +314,6 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
       logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
     }
-#endif
 
   pthread_mutex_lock (&lock);
   collisions ++;
@@ -354,15 +324,29 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   if (logmu <= max_norm)
     {
       alpha = get_alpha (f, d, ALPHA_BOUND);
-      gmp_printf ("n: %Zd\n", N);
-      gmp_printf ("Y1: %Zd\nY0: %Zd\n", g[1], g[0]);
-      for (j = d + 1; j -- != 0; )
-        gmp_printf ("c%u: %Zd\n", j, f[j]);
-      printf ("# lognorm %1.2f, skew %1.2f, alpha %1.2f, E %1.2f, %u rroots\n",
-              logmu, skew, alpha, logmu + alpha, nroots);
-      printf ("\n");
-      fflush (stdout);
-      if (out != NULL)
+      if (verbose >= 0)
+	{
+	  gmp_printf ("n: %Zd\n", N);
+	  gmp_printf ("Y1: %Zd\nY0: %Zd\n", g[1], g[0]);
+	  for (j = d + 1; j -- != 0; )
+	    gmp_printf ("c%u: %Zd\n", j, f[j]);
+	  printf ("# lognorm %1.2f, skew %1.2f, alpha %1.2f, E %1.2f, %u rroots\n",
+		  logmu, skew, alpha, logmu + alpha, nroots);
+	  printf ("\n");
+	  fflush (stdout);
+	}
+
+      if (logmu + alpha < best_E)
+	{
+	  best_E = logmu + alpha;
+	  mpz_set (best_poly->g[0], g[0]);
+	  mpz_set (best_poly->g[1], g[1]);
+	  for (j = d + 1; j -- != 0; )
+	    mpz_set (best_poly->f[j], f[j]);
+	  best_poly->skew = skew;
+	}
+
+      if (out != NULL) /* msieve output */
 	{
 	  FILE *fp;
 	  fp = fopen (out, "a");
@@ -848,10 +832,36 @@ stats_sq (void)
 #endif
 }
 
+static void
+usage (char *argv)
+{
+  fprintf (stderr, "Usage: %s [options] P\n", argv);
+  fprintf (stderr, "Parameters and options:\n");
+  fprintf (stderr, "P            --- degree-1 coefficient of g(x) has\n");
+  fprintf (stderr, "                 two prime factors in [P,2P]\n");
+  fprintf (stderr, "-v           --- verbose mode\n");
+  fprintf (stderr, "-q           --- quiet mode\n");
+  fprintf (stderr, "-t nnn       --- use n threads (default 1)\n");
+  fprintf (stderr, "-admin nnn   --- start from ad=nnn (default 0)\n");
+  fprintf (stderr, "-admax nnn   --- stop at ad=nnn\n");
+  fprintf (stderr, "-incr nnn    --- forced factor of ad (default 60)\n");
+  fprintf (stderr, "-N nnn       --- input number\n");
+  fprintf (stderr, "-degree nnn  --- wanted polynomial degree\n");
+  fprintf (stderr, "-kmax nnn    --- rotation bound (default %d)\n",
+	   default_MAX_k);
+  fprintf (stderr, "-save xxx    --- save state in file xxx\n");
+  fprintf (stderr, "-resume xxx  --- resume state from file xxx\n");
+  fprintf (stderr, "-maxnorm xxx --- only print polynomials with norm <= xxx\n");
+  fprintf (stderr, "-out xxx     --- for msieve-format output\n");
+  exit (1);
+}
+
 int
 main (int argc, char *argv[])
 {
-  char *argv0 = argv[0], *save = NULL, *resume = NULL;
+  int argc0 = argc;
+  char **argv0 = argv, *save = NULL, *resume = NULL;
+  double st0 = seconds ();
   mpz_t N;
   unsigned int d = 0;
   unsigned long P, admin = 0, admax = ULONG_MAX;
@@ -870,6 +880,8 @@ main (int argc, char *argv[])
   fflush (stdout);
 
   mpz_init (N);
+  default_MAX_k = MAX_k;
+  cado_poly_init (best_poly);
 
   while (argc >= 2 && argv[1][0] == '-')
     {
@@ -923,7 +935,7 @@ main (int argc, char *argv[])
           argv += 2;
           argc -= 2;
         }
-      else if (strcmp (argv[1], "-d") == 0)
+      else if (strcmp (argv[1], "-degree") == 0)
         {
 	  d = atoi (argv[2]);
           argv += 2;
@@ -959,6 +971,12 @@ main (int argc, char *argv[])
           argv += 1;
           argc -= 1;
         }
+      else if (strcmp (argv[1], "-q") == 0)
+        {
+	  verbose = -1;
+          argv += 1;
+          argc -= 1;
+        }
       else
         {
           fprintf (stderr, "Invalid option: %s\n", argv[1]);
@@ -977,27 +995,10 @@ main (int argc, char *argv[])
 	  exit (1);
 	}
     }
+  mpz_set (best_poly->n, N);
 
   if (argc != 2)
-    {
-      fprintf (stderr, "Usage: %s [options] P\n", argv0);
-      fprintf (stderr, "Parameters and options:\n");
-      fprintf (stderr, "P            --- degree-1 coefficient of g(x) has\n");
-      fprintf (stderr, "                 two prime factors in [P,2P]\n");
-      fprintf (stderr, "-v           --- verbose mode\n");
-      fprintf (stderr, "-t nnn       --- use n threads (default 1)\n");
-      fprintf (stderr, "-admin nnn   --- start from ad=nnn (default 0)\n");
-      fprintf (stderr, "-admax nnn   --- stop at ad=nnn\n");
-      fprintf (stderr, "-incr nnn    --- increment for ad (default 60)\n");
-      fprintf (stderr, "-N nnn       --- input number\n");
-      fprintf (stderr, "-d nnn       --- wanted polynomial degree\n");
-      fprintf (stderr, "-kmax nnn    --- rotation bound\n");
-      fprintf (stderr, "-save xxx    --- save state in file xxx\n");
-      fprintf (stderr, "-resume xxx  --- resume state from file xxx\n");
-      fprintf (stderr, "-maxnorm xxx --- only print polynomials with norm <= xxx\n");
-      fprintf (stderr, "-out xxx     --- for msieve-format output\n");
-      exit (1);
-    }
+    usage (argv0[0]);
 
 #ifdef MAX_THREADS
   if (nthreads > MAX_THREADS)
@@ -1018,6 +1019,8 @@ main (int argc, char *argv[])
       fprintf (stderr, "Error, missing degree (-d option)\n");
       exit (1);
     }
+  best_poly->degree = d;
+  best_poly->degreeg = 1;
 
   if (resume != NULL)
     {
@@ -1055,7 +1058,7 @@ main (int argc, char *argv[])
   P = atoi (argv[1]);
   st = cputime ();
   initPrimes (P);
-  printf ("Initializing primes took %dms\n", cputime () - st);
+  printf ("# Initializing primes took %dms\n", cputime () - st);
   T = malloc (nthreads * sizeof (tab_t));
   if (T == NULL)
     {
@@ -1068,8 +1071,19 @@ main (int argc, char *argv[])
       T[i]->d = d;
       T[i]->thread = i;
     }
+
+  if (incr <= 0)
+    {
+      fprintf (stderr, "Error, incr should be positive\n");
+      exit (1);
+    }
+
   if (admin == 0)
     admin = incr;
+
+  /* force admin to be divisible by incr */
+  admin = ((admin + incr - 1) / incr) * incr; /* incr * ceil (admin/incr) */
+
   while (admin <= admax)
     {
       for (i = 0; i < nthreads ; i++)
@@ -1122,15 +1136,23 @@ main (int argc, char *argv[])
           target_time += TARGET_TIME;
         }
     }
-  printf ("Tried %d ad-value(s), found %d polynomial(s)\n", tries, found);
+
+  printf ("# Tried %d ad-value(s), found %d polynomial(s)\n", tries, found);
   printf ("# potential collisions=%1.2e (%1.2e/s)\n",
 	  potential_collisions, 1000.0 * potential_collisions
 	  / (double) cputime ());
+
+  if (best_E == DBL_MAX)
+    fprintf (stderr, "No polynomial found, please increase the ad range or decrease P\n");
+  else
+    print_poly (stdout, best_poly, argc0, argv0, st0, 1 /* raw */);
+
   for (i = 0; i < nthreads ; i++)
     mpz_clear (T[i]->N);
   free (T);
   mpz_clear (N);
   clearPrimes ();
+  cado_poly_clear (best_poly);
 
   return 0;
 }
