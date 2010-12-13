@@ -46,55 +46,38 @@ machines=mach_desc      # file describing available computers for parallel
     # machines description file.
     
 ###########################################################################
-# Polynomial selection with Kleinjung's algorithm
+# Polynomial selection with Kleinjung's algorithm (2008)
 ###########################################################################
 
-# - first step of polyselect: algebraic polynomial (f) -
 degree=4                # degree of the algebraic polynomial
-kjM=4e16                # maximum norm allowed
-    # Setting a small norm is demanding more to the polynomial selection
-    # step. A excessively small value will discard all polynomials.
-    # Appropriate tuning of this maximum norm require some acquaintance
-    # with the polynomial selection algorithm. A rough way to choose a
-    # good maximum norm might be to try the polyselect code with large
-    # kjM at first, and lower the bound until the fraction of polynomials
-    # being checked is small enough.
-kjadmin=1               # min value for lc(f)
-kjadmax=2e5             # max value for lc(f)
-kjadrange=5e4           # individual tasks
+kjP=20000               # choose lc(g) with two prime factors in [P,2P]
+    # Setting a large value will most likely find better polynomials,
+    # but the number of found polynomials will be smaller.
+    # As a rule of thumb, we want at least 100 found polynomials in total
+    # (without norm limitation, see below).
+kjmaxnorm=32.6          # max. lognorm of polynomials (before rootsieve)
+    # If not set, a default value of 1e9 (in practice infinity) is used.
+    # Setting this value right might speed up a lot the polynomial
+    # selection, by discarding right away polynomials which are not
+    # promising. As a rule of thumb, we want at least 10 polynomials
+    # in total below this bound.
+kjadmin=0               # min value for lc(f)
+    # If not set, the default is 0.
+kjadmax=100000          # max value for lc(f)
+    # The polynomial selection search time is proportional to the
+    # length of the interval [kjadmin,kjadmax]
+kjadrange=10000         # individual tasks
     # Polynomial selection is split into several individual tasks. The
     # complete range from kjadmin to kjadmax has to be covered for the
     # polynomial selection to complete. The number of individual tasks is
-    # obviously (kjadmax-kjadmin)/kjadrange
+    # obviously (kjadmax-kjadmin)/kjadrange. 
 kjincr=60               # forced divisor of lc(f)
     # This factor is usually a smooth number, which forces roots in the
     # algebraic polynomial. 60 is a good start, 210 is popular as well.
-    
-# - first step of polyselect: linear polynomial (g) -
-kjl=5                   # minimal number of primes in lc(g)
-    # the rational polynomial in Kleinjung's algorithm has the form
-    # g_1x-g_0, where g_1 is composite. This parameter fixes the maximum
-    # number of prime factors in g_1. This controls how many candidate
-    # polynomials are tested simultaneously (larger means more). This
-    # parameter affects the memory footprint of polyselect.
-    
-kjpb=512                # upper bound on primes allowed in lc(g)
-kjp0max=10000           # bound on the additional factor in lc(g)
-    # note that kjl and kjpb must be compatible. kjp0max refers to the
-    # ``P0 variation'' as referred to in the article describing
-    # Kleinjung's algorithm. (kjpb and kjp0max are parameters of
-    # secondary importance).
-
-# - second step of polyselect (rotation) -
-    # After a first selection step, the few best polynomials are kept and
-    # modified by a procedure called ``rotation'', in order to select the
-    # winning polynomial.
-kjkeep=100              # number of preselected polynomials
-    # Only the best <kjkeep> polynomials out of the first step (for each
-    # individual job) are kept.  The winning candidate it taken among
-    # these candidates
 kjkmax=18               # rotation is bounded by 2^kmax
     # This controls the computational effort put into the rotation step.
+    # The higher this value is, the better the found polynomial will be,
+    # but it will take more time.
 
 # - runtime environment parameters for polyselect -
 kjdelay=60              # time between two checks
@@ -104,6 +87,12 @@ kjdelay=60              # time between two checks
 selectnice=4            # nice level for polyselect
     # This sets the posix ``nice level'' for polyselect jobs. If you
     # don't know what it is, you may leave as is, or set to 0.
+
+# on the test number
+# 3162277660168379331998893544432718533719555265930689508199398508902378895852672407128275763
+# we get
+# lognorm: 32.47, alpha: -4.31 E=28.17
+# Murphy's E(Bf=10000000,Bg=5000000,area=1.00e+16)=3.46e-08
 
 ###########################################################################
 # Sieve
@@ -153,7 +142,7 @@ qrange=20000            # The size of an elementary sieving task
     # The sieving process is split into many individual tasks. This
     # parameter controls the size of individual tasks.
 
-firstcheck=1500000      # Start of filtering tries
+firstcheck=1660000      # Start of filtering tries
     # We only try to do filtering (and thus check if we have enough relations)
     # once we have accumulated <firstcheck> relations (including duplicates).
     # A rule of thumb is to use 1.6*N/log(N) if N=2^n when lpba=lpbr=n, or

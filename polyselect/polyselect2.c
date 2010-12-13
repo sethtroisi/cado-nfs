@@ -68,7 +68,8 @@ double best_E = 0.0; /* Murphy's E (the larger the better) */
 
 /* read-write global variables */
 pthread_mutex_t lock; /* used as mutual exclusion lock for those variables */
-int found = 0;
+int tot_found = 0; /* total number of polynomials */
+int found = 0; /* number of polynomials below maxnorm */
 double potential_collisions = 0.0, aver_lognorm = 0.0;
 unsigned long collisions = 0;
 unsigned long collisionsQ[MAXQ];
@@ -320,36 +321,26 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   collisions ++;
   collisionsQ[q] ++;
   aver_lognorm += logmu;
+  tot_found ++;
   pthread_mutex_unlock (&lock);
 
   if (logmu <= max_norm)
     {
       alpha = get_alpha (f, d, ALPHA_BOUND);
-      if (verbose >= 0)
-	{
-	  gmp_printf ("n: %Zd\n", N);
-	  gmp_printf ("Y1: %Zd\nY0: %Zd\n", g[1], g[0]);
-	  for (j = d + 1; j -- != 0; )
-	    gmp_printf ("c%u: %Zd\n", j, f[j]);
-	  printf ("# lognorm %1.2f, skew %1.2f, alpha %1.2f, E %1.2f, %u rroots\n",
-		  logmu, skew, alpha, logmu + alpha, nroots);
-	  printf ("\n");
-	  fflush (stdout);
-	}
 
       mpz_set (curr_poly->g[0], g[0]);
       mpz_set (curr_poly->g[1], g[1]);
       for (j = d + 1; j -- != 0; )
 	mpz_set (curr_poly->f[j], f[j]);
       curr_poly->skew = skew;
-
       E =  MurphyE (curr_poly, BOUND_F, BOUND_G, AREA, MURPHY_K);
+
+      pthread_mutex_lock (&lock);
       if (E > best_E)
 	{
 	  best_E = E;
 	  cado_poly_set (best_poly, curr_poly);
 	}
-
       if (out != NULL) /* msieve output */
 	{
 	  FILE *fp;
@@ -366,9 +357,22 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 	  gmp_fprintf (fp, " %Zd %Zd\n", g[1], m);
 	  fclose (fp);
 	}
-      pthread_mutex_lock (&lock);
       found ++;
       pthread_mutex_unlock (&lock);
+
+      if (verbose >= 0)
+	{
+	  gmp_printf ("n: %Zd\n", N);
+	  gmp_printf ("Y1: %Zd\nY0: %Zd\n", g[1], g[0]);
+	  for (j = d + 1; j -- != 0; )
+	    gmp_printf ("c%u: %Zd\n", j, f[j]);
+	  printf ("# lognorm %1.2f, skew %1.2f, alpha %1.2f, E %1.2f, %u rroots\n",
+		  logmu, skew, alpha, logmu + alpha, nroots);
+          printf ("# Murphy's E(Bf=%.0f,Bg=%.0f,area=%.2e)=%1.2e (best so far %1.2e)\n",
+                  BOUND_F, BOUND_G, AREA, E, best_E);
+	  printf ("\n");
+	  fflush (stdout);
+	}
     }
 
   mpz_clear (l);
@@ -1145,7 +1149,8 @@ main (int argc, char *argv[])
         }
     }
 
-  printf ("# Tried %d ad-value(s), found %d polynomial(s)\n", tries, found);
+  printf ("# Tried %d ad-value(s), found %d polynomial(s), %d below maxnorm\n",
+          tries, tot_found, found);
   printf ("# potential collisions=%1.2e (%1.2e/s)\n",
 	  potential_collisions, 1000.0 * potential_collisions
 	  / (double) cputime ());

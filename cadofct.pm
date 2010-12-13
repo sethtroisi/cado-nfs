@@ -168,6 +168,7 @@ my @default_param = (
     kjadrange    => 1e7,
     kjdelay      => 120,
     kjP          => undef,
+    kjmaxnorm    => 1e9,
     selectnice   => 10,
 
     # sieve
@@ -1776,6 +1777,7 @@ my $polysel_cmd = sub {
            "-admin $a ".
            "-admax $b ".
            "-degree $param{'degree'} ".
+           "-maxnorm $param{'kjmaxnorm'} ".
            "$param{'kjP'} ".
            "< $m->{'prefix'}.n ".
            "> $m->{'prefix'}.kjout.$a-$b ".
