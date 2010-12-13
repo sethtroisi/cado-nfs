@@ -46,7 +46,6 @@ polyselect/twoquadratics.sage
 scripts/cadopoly.pl
 scripts/benchsieve.pl
 scripts/cadosieve.pl
-scripts/cpu_time.sh
 scripts/check_file_lists.pl
 scripts/dist.sh
 sieve/CMakeLists-nodist.txt

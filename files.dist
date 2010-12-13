@@ -234,6 +234,7 @@ polyselect/murphyE.h
 factor.sh
 scripts/call_cmake.sh
 scripts/version.sh
+scripts/cpu_time.sh
 sieve/CMakeLists.txt
 sieve/Makefile
 sieve/basicnt.h
