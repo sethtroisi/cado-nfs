@@ -15,6 +15,11 @@
 #define FORMAT_GGNFS 2 /* GGNFS format (default input format) */
 #define FORMAT_CWI   3 /* CWI format */
 
+static const char *format_names[4] = {
+  "CADO", "Franke-Kleinjung", "GGNFS", "CWI"
+};
+
+#include <cado.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h> /* for UINT32_MAX */
@@ -60,16 +65,15 @@ typedef struct
   unsigned long aprimes[MAX_PRIMES];
   unsigned long aexp[MAX_PRIMES];
   unsigned long sprimes[MAX_PRIMES];
-  uint32_t sexp[MAX_PRIMES];
-  uint32_t large_rprimes[MAX_LPRIMES]; /* large rational primes are 32-bit */
-  uint32_t large_aprimes[MAX_LPRIMES]; /* large algebraic primes are 32-bit
-					  too, but the file stores also the
-					  corresponding root, which we don't
-					  need here. */
+  unsigned long sexp[MAX_PRIMES];
+  unsigned long large_rprimes[MAX_LPRIMES];
+  unsigned long large_aprimes[MAX_LPRIMES];
   int32_t qcb1, qcb2; /* quadratic characters */
+  int end_of_set;
 } relation_t;
 
-/* prints a large prime, given its low and high 32-bit parts */
+/* prints a large prime, given its low and high 32-bit parts.
+   Currently not used. */
 void
 print_large_prime (uint32_t l, uint32_t h)
 {
@@ -83,7 +87,8 @@ print_large_prime (uint32_t l, uint32_t h)
   mpz_clear (P);
 }
 
-/* Return 1 if the largest prime in rel is < 2^lpb, 0 otherwise */
+/* Return 1 if the largest prime in rel is < 2^lpb or if lpb == 0, 
+   return 0 otherwise */
 int
 checksize_relation_cado (relation_t *rel, int32_t *rfb, int32_t *afb, int lpb)
 {
@@ -150,14 +155,16 @@ void
 print_relation_cado (relation_t *rel, int32_t *rfb, int32_t *afb)
 {
   unsigned int i, j;
+  int need_comma;
 
-  printf ("%ld,%u", rel->a, rel->b);
+  printf ("%ld,%u:", rel->a, rel->b);
+  need_comma = 0;
 
   /* rational side */
   for (i = 0; i < rel->rfb_entries; i++)
     for (j = 0; j < rel->rexp[i]; j++)
       {
-	putchar ((i + j == 0) ? ':' : ',');
+	if (need_comma++) putchar (',');
         if (rfb == NULL) /* primes are given directly */
           printf ("%lx", rel->rprimes[i]);
         else /* primes are given by their index */
@@ -166,17 +173,18 @@ print_relation_cado (relation_t *rel, int32_t *rfb, int32_t *afb)
       }
   for (i = 0; i < rel->num_lrp; i++)
     {
-      putchar ((rel->rfb_entries + i == 0) ? ':' : ',');
-      printf ("%x", rel->large_rprimes[i]);
+      if (need_comma++) putchar (',');
+      printf ("%lx", rel->large_rprimes[i]);
     }
-  if (rel->rfb_entries + rel->num_lrp == 0)
-    putchar (':');
+
+  putchar (':'); 
+  need_comma = 0;
 
   /* algebraic side */
   for (i = 0; i < rel->afb_entries; i++)
     for (j = 0; j < rel->aexp[i]; j++)
       {
-	putchar ((i + j == 0) ? ':' : ',');
+	if (need_comma++) putchar (',');
         if (afb == NULL) /* primes are given directly */
           printf ("%lx", rel->aprimes[i]);
         else /* primes are given by their index */
@@ -187,17 +195,15 @@ print_relation_cado (relation_t *rel, int32_t *rfb, int32_t *afb)
       if (rel->sexp[i] > 0)
 	for (j = 0; j < rel->sexp[i]; j++)
 	  {
-	    putchar ((rel->afb_entries + i + j == 0) ? ':' : ',');
+	    if (need_comma++) putchar (',');
 	    printf ("%lx", rel->sprimes[i]);
 	  }
     }
   for (i = 0; i < rel->num_lap; i++)
     {
-      putchar ((rel->afb_entries + rel->sp_entries == 0) ? ':' : ',');
-      printf ("%x", rel->large_aprimes[i]);
+      if (need_comma++) putchar (',');
+      printf ("%lx", rel->large_aprimes[i]);
     }
-  if (rel->afb_entries + rel->sp_entries + rel->num_lap == 0)
-    putchar (':');
   printf ("\n");
 }
 
@@ -228,7 +234,7 @@ print_relation_fk (relation_t *rel, int32_t *rfb, int32_t *afb, int iformat)
     for (j = 0; j < rel->sexp[i]; j++)
       printf (" %lx", rel->sprimes[i]);
   for (i = 0; i < rel->num_lap; i++)
-    printf (" %x", rel->large_aprimes[i]);
+    printf (" %lx", rel->large_aprimes[i]);
   printf ("\n");
   /* rational side */
   printf ("Y");
@@ -237,8 +243,87 @@ print_relation_fk (relation_t *rel, int32_t *rfb, int32_t *afb, int iformat)
       printf (" %x", (iformat == FORMAT_GGNFS) ? rfb[rel->rprimes[i]]
               : (int32_t) rel->rprimes[i]);
   for (i = 0; i < rel->num_lrp; i++)
-    printf (" %x", rel->large_rprimes[i]);
+    printf (" %lx", rel->large_rprimes[i]);
   printf ("\n");
+}
+
+
+/* Map 0, 1, ..., 61 to '0',...,'9','A',...,'Z','a',...'z' */
+static unsigned char
+cwi_idx_to_char (unsigned char i)
+{
+  if (i < 10)
+    return i + '0';
+  if (i < 36)
+    return i - 10 + 'A';
+  if (i < 62)
+    return i - 36 + 'a';
+  abort();
+}
+
+
+/* Map '0',...,'9','A',...,'Z','a',...'z' to 0, 1, ..., 61 */
+static unsigned char
+cwi_char_to_idx (unsigned char i)
+{
+  assert (i >= '0');
+  if (i <= '9')
+    return i - '0';
+  assert (i >= 'A');
+  if (i <= 'Z')
+    return i - 'A' + 10;
+  assert (i >= 'a');
+  if (i <= 'z')
+    return i - 'a' + 36;
+  abort();
+}
+
+
+static void 
+print_primes_cwi (unsigned long *primes, unsigned long *exp,
+                  int32_t *fb, const unsigned int np)
+{
+  unsigned long i,j;
+
+  for (i = 0; i < np; i++)
+    for (j = 0; j < (exp != NULL ? exp[i] : 1); j++)
+      {
+        if (fb == NULL) /* primes are given directly */
+          printf (" %lu", primes[i]);
+        else /* primes are given by their index */
+          printf (" %u", fb[primes[i]]);
+      }
+}
+
+void
+print_relation_cwi (relation_t *rel, int32_t *rfb, int32_t *afb)
+{
+  unsigned long i, nr, na;
+  
+  nr = 0;
+  na = 0;
+  for (i = 0; i < rel->rfb_entries; i++)
+    nr += rel->rexp[i];
+  for (i = 0; i < rel->afb_entries; i++)
+    na += rel->aexp[i];
+  for (i = 0; i < rel->sp_entries; i++)
+    na += rel->sexp[i];
+  
+  printf ("01%c%c %ld %u", cwi_idx_to_char(nr), cwi_idx_to_char(na), 
+          rel->a, rel->b);
+
+  /* rational side first */
+  print_primes_cwi (rel->rprimes, rel->rexp, rfb, rel->rfb_entries);
+  print_primes_cwi (rel->large_rprimes, NULL, NULL, rel->num_lrp);
+
+  /* algebraic side and special primes */
+  print_primes_cwi (rel->aprimes, rel->aexp, afb, rel->afb_entries);
+  print_primes_cwi (rel->sprimes, rel->sexp, NULL, rel->sp_entries);
+  print_primes_cwi (rel->large_aprimes, NULL, NULL, rel->num_lap);
+
+  printf ("%c\n", rel->end_of_set ? ';' : ':');
+
+  fflush (stdout);
 }
 
 /* norm <- |f(a,b)| = |f[d]*a^d + ... + f[0]*b^d| */
@@ -258,6 +343,29 @@ eval_algebraic (mpz_t norm, mpz_t *f, int d, long a, unsigned long b)
   mpz_abs (norm, norm);
 }
 
+
+/* Add the prime p to *primes with exponents in *exp. 
+   If p is already present in *primes, its exponent is increased. 
+   i is the number of entries in *primes so far, the new number 
+   of entries (after adding p) is the return value. */
+static unsigned int
+add_prime (unsigned long *primes, unsigned long *exp,
+           const unsigned int i, const unsigned long p)
+{
+  unsigned int j;
+  for (j = 0; j < i; j++)
+    if (primes[j] == p)
+      {
+        exp[j] ++;
+        return i;
+      }
+  
+  assert (i < MAX_PRIMES);
+  primes[i] = p;
+  exp[i] = 1;
+  return i + 1;
+}
+
 /* Read one relation in CADO format from fp, and put it in rel.
    Return 1 if relation is valid, 0 if invalid, -1 if end of file. */
 int
@@ -271,7 +379,17 @@ read_relation_cado (FILE *fp, relation_t *rel)
     {
       if (feof (fp))
         return 0;
-      fprintf (stderr, "Error, invalid relation: ");
+      if ((c = getc (fp)) == '#')
+        {
+          /* Discard comments? Copy to output? For now, discard */
+          do
+              c = getc (fp);
+          while (c != '\n');
+          return 0;
+        }
+      ungetc (c, fp);
+      
+      fprintf (stderr, "Error, invalid relation (could not read a,b): ");
       do
         {
           c = getc (fp);
@@ -282,53 +400,41 @@ read_relation_cado (FILE *fp, relation_t *rel)
     }
 
   i = 0; /* number of rational primes */
-  while (fscanf (fp, "%lx", &p) == 1) /* new rational prime */
-    {
-      if (i > 0 && rel->rprimes[i - 1] == p)
-        /* assumes identical primes are consecutive */
-        rel->rexp[i - 1] ++;
-      else /* i = 0 or rel->rprimes[i - 1] <> p */
-        {
-          rel->rprimes[i] = p;
-          rel->rexp[i] = 1;
-          i ++;
-        }
-      c = getc (fp);
-      if (c == ':')
-        break; /* end of rational primes */
-      else if (c != ',')
-        {
-          fprintf (stderr, "Error, invalid relation\n");
-          exit (1);
-        }
-    }
+  do
+    if (fscanf (fp, "%lx", &p) == 1)  /* new rational prime */
+      i = add_prime (rel->rprimes, rel->rexp, i, p);
+  while ((c = getc (fp)) == ',');
   rel->rfb_entries = i;
   rel->num_lrp = 0;
 
-  i = 0; /* number of algebraic primes */
-  while (fscanf (fp, "%lx", &p) == 1) /* new algebraic prime */
+  if (c != ':')
     {
-      if (i > 0 && rel->aprimes[i - 1] == p)
-        /* assumes identical primes are consecutive */
-        rel->aexp[i - 1] ++;
-      else /* i = 0 or rel->aprimes[i - 1] <> p */
-        {
-          rel->aprimes[i] = p;
-          rel->aexp[i] = 1;
-          i ++;
-        }
-      c = getc (fp);
-      if (c == '\n')
-        break; /* end of rational primes */
-      else if (c != ',')
-        {
-          fprintf (stderr, "Error, invalid relation\n");
-          exit (1);
-        }
+      fprintf (stderr, "Error, invalid relation (expected \":\"): ");
+      exit(1);
     }
+
+  i = 0; /* number of algebraic primes */
+  /* fscanf() skips leading whitespace so we need to test for a 
+     newline here which can occur if there are no algebraic primes */
+  if ((c = getc (fp)) != '\n')
+    {
+      ungetc (c, fp);
+      do
+        if (fscanf (fp, "%lx", &p) == 1) /* new algebraic prime */
+          i = add_prime (rel->aprimes, rel->aexp, i, p);
+      while ((c = getc (fp)) == ',');
+    }
+    
+  if (c != '\n')
+    {
+      fprintf (stderr, "Error, invalid relation (expected newline): ");
+      exit(1);
+    }
+
   rel->afb_entries = i;
   rel->sp_entries = 0;
   rel->num_lap = 0;
+  rel->end_of_set = 1;
 
   return 1;
 }
@@ -384,15 +490,7 @@ fk_read_primes (char **lp, unsigned long *exponent, unsigned long *primes)
 	}
       *lp = nlp;
       
-      if (i > 0 && primes[i - 1] == p)
-        /* assumes identical primes are consecutive */
-        exponent[i - 1] ++;
-      else /* i = 0 or rel->rprimes[i - 1] <> p */
-        {
-          primes[i] = p;
-          exponent[i] = 1;
-          i ++;
-        }
+      i = add_prime (primes, exponent, i, p);
     }
   
   return i;
@@ -430,12 +528,12 @@ read_relation_fk (FILE *fp, relation_t *rel, char *file)
       fprintf (stderr, "Error, incomplete relation at end of file\n");
       exit (1);
     }
-  if (line[0] != 'X' || line[1] != ' ')
+  if (line[0] != 'X' || (line[1] != ' ' && line[1] != '\n'))
     {
       fprintf (stderr, "Error, no X line after W line\n");
       exit (1);
     }
-  lp = line + 2;
+  lp = line + (line[1] == ' ' ? 2 : 1);
 
   rel->afb_entries = fk_read_primes (&lp, rel->aexp, rel->aprimes);
   rel->num_lap = 0;
@@ -446,16 +544,17 @@ read_relation_fk (FILE *fp, relation_t *rel, char *file)
       fprintf (stderr, "Error, incomplete relations at end of file\n");
       exit (1);
     }
-  if (line[0] != 'Y' || line[1] != ' ')
+  if (line[0] != 'Y' || (line[1] != ' ' && line[1] != '\n'))
     {
       fprintf (stderr, "Error, no Y line after X line\n");
       exit (1);
     }
-  lp = line + 2;
+  lp = line + (line[1] == ' ' ? 2 : 1);
 
   rel->rfb_entries = fk_read_primes (&lp, rel->rexp, rel->rprimes);
   rel->num_lrp = 0;
   rel->sp_entries = 0;
+  rel->end_of_set = 1;
 
   return 1;
 }
@@ -465,13 +564,13 @@ read_relation_fk (FILE *fp, relation_t *rel, char *file)
 int
 read_relation_cwi (FILE *fp, relation_t *rel)
 {
-  int flag, ret;
+  int ret;
   unsigned long p;
   unsigned int i; /* number of given primes */
   unsigned int j; /* number of entries <= i (if multiplicities) */
-  char c;
+  char c, flag[4];
 
-  ret = fscanf (fp, "%x %ld %u", &flag, &(rel->a), &(rel->b));
+  ret = fscanf (fp, "%4s %ld %u", flag, &(rel->a), &(rel->b));
   if (ret != 3)
     {
       if (feof (fp))
@@ -487,13 +586,13 @@ read_relation_cwi (FILE *fp, relation_t *rel)
     }
 
   /* check flag=01xy */
-  if (flag / 256 != 01)
+  if (flag[0] != '0' || flag[1] != '1')
     {
-      fprintf (stderr, "Error, flag differs from 01xy: %x\n", flag);
+      fprintf (stderr, "Error, flag differs from 01xy: %.4s\n", flag);
       exit (1);
     }
 
-  rel->rfb_entries = (flag & 0xFF) >> 4;
+  rel->rfb_entries = cwi_char_to_idx(flag[2]);
   for (i = j = 0; i < rel->rfb_entries; i++) /* new rational prime */
     {
       if (fscanf (fp, " %ld", &p) != 1)
@@ -501,19 +600,12 @@ read_relation_cwi (FILE *fp, relation_t *rel)
           fprintf (stderr, "Error, can't read next rational prime\n");
           exit (1);
         }
-      if (j > 0 && p == rel->rprimes[j-1])
-        rel->rexp[j-1] ++;
-      else
-        {
-          rel->rprimes[j] = p;
-          rel->rexp[j] = 1;
-          j ++;
-        }
+      j = add_prime (rel->rprimes, rel->rexp, j, p);
     }
   rel->rfb_entries = j;
   rel->num_lrp = 0;
 
-  rel->afb_entries = flag & 0xF;
+  rel->afb_entries = cwi_char_to_idx(flag[3]);
   for (i = j = 0; i < rel->afb_entries; i++) /* new algebraic prime */
     {
       if (fscanf (fp, " %ld", &p) != 1)
@@ -521,14 +613,7 @@ read_relation_cwi (FILE *fp, relation_t *rel)
           fprintf (stderr, "Error, can't read next algebraic prime\n");
           exit (1);
         }
-      if (j > 0 && p == rel->aprimes[j-1])
-        rel->aexp[j-1] ++;
-      else
-        {
-          rel->aprimes[j] = p;
-          rel->aexp[j] = 1;
-          j ++;
-        }
+      j = add_prime (rel->aprimes, rel->aexp, j, p);
     }
   rel->afb_entries = j;
   rel->sp_entries = 0;
@@ -541,6 +626,8 @@ read_relation_cwi (FILE *fp, relation_t *rel)
                rel->a, rel->b);
       exit (1);
     }
+
+  rel->end_of_set = (c == ';');
 
   return 1;
 }
@@ -602,15 +689,16 @@ read_relation_ggnfs (FILE *fp, relation_t *rel, mpz_t norm, mpz_t *f,
   rel->qcb2 = get_uint32 (fp);
   rel->num_lrp = (size_field >> 6) & 3;
   for (i = 0; i < rel->num_lrp; i++)
-    rel->large_rprimes[i] = get_uint32 (fp);
+    rel->large_rprimes[i] = (unsigned long) get_uint32 (fp);
   rel->num_lap = (size_field >> 4) & 3;
   for (i = 0; i < rel->num_lap; i++)
     {
-      rel->large_aprimes[i] = get_uint32 (fp);
+      unsigned long p;
+      p = (unsigned long) get_uint32 (fp);
       get_uint32 (fp); /* corresponding root, not used here */
-      p = rel->large_aprimes[i];
+      rel->large_aprimes[i] = p;
       if (!mpz_divisible_ui_p (norm, p))
-        fprintf (stderr, "Warning, f(%ld,%u) not divisible by large prime %d\n",
+        fprintf (stderr, "Warning, f(%ld,%u) not divisible by large prime %lu\n",
                  rel->a, rel->b, p);
       else
         mpz_divexact_ui (norm, norm, p);
@@ -647,6 +735,8 @@ read_relation_ggnfs (FILE *fp, relation_t *rel, mpz_t norm, mpz_t *f,
           i ++;
         }
     }
+
+  rel->end_of_set = 1;
   return 1; /* valid relation */
 }
 
@@ -662,18 +752,18 @@ read_relation_ggnfs (FILE *fp, relation_t *rel, mpz_t norm, mpz_t *f,
 */
 unsigned long
 convert_relations (char *rels, int32_t *rfb, int32_t *afb, mpz_t *f, int degf,
-                   int iformat, int oformat, int lpb, int verbose)
+                   int iformat, int oformat, int lpb, int verbose, int multi)
 {
   FILE *fp;
   relation_t rel[1];
-  uint32_t relsInFile, outputRels = 0;
+  uint32_t relsInFile;
+  unsigned long outputRels = 0;
   unsigned int j;
   mpz_t norm;
   int ok;
-  int compressed = 0;
+  int compressed;
 
-  compressed = is_gzip (rels);
-  fp = (compressed) ? gzip_open (rels, "r") : fopen (rels, "rb");
+  fp = fopen_compressed_r (rels, &compressed, NULL);
   if (fp == NULL)
     {
       fprintf (stderr, "Error, unable to open relation file %s\n", rels);
@@ -717,6 +807,17 @@ convert_relations (char *rels, int32_t *rfb, int32_t *afb, mpz_t *f, int degf,
 
       if (ok != 0 && checksize_relation_cado (rel, rfb, afb, lpb))
         {
+          if (!multi)
+            {
+              unsigned long i;
+              for (i = 0; i < rel->rfb_entries; i++)
+                rel->rexp[i] = 1;
+              for (i = 0; i < rel->afb_entries; i++)
+                rel->aexp[i] = 1;
+              for (i = 0; i < rel->sp_entries; i++)
+                rel->sexp[i] = 1;
+            }
+            
           switch (oformat)
             {
             case FORMAT_CADO:
@@ -724,6 +825,9 @@ convert_relations (char *rels, int32_t *rfb, int32_t *afb, mpz_t *f, int degf,
               break;
             case FORMAT_FK:
               print_relation_fk (rel, rfb, afb, iformat);
+              break;
+            case FORMAT_CWI:
+              print_relation_cwi (rel, rfb, afb);
               break;
             default:
               fprintf (stderr, "Error, unknown format %d\n", oformat);
@@ -748,7 +852,7 @@ convert_relations (char *rels, int32_t *rfb, int32_t *afb, mpz_t *f, int degf,
   mpz_clear (norm);
 
   if (compressed)
-    gzip_close (fp, rels);
+    pclose (fp);
   else
     fclose (fp);
 
@@ -878,10 +982,11 @@ usage (char *s)
   fprintf (stderr, "       -v       - verbose\n");
   fprintf (stderr, "       -if xxx  - specifies input format (default ggnfs)\n");
   fprintf (stderr, "       -of yyy  - specifies output format (default cado)\n");
-  fprintf (stderr, "                  where xxx, yyy are in {cado, fk, ggnfs}\n");
+  fprintf (stderr, "                  where xxx, yyy are in {cado, fk, cwi, ggnfs}\n");
   fprintf (stderr, "       -fb file - factor base (needed for ggnfs input)\n");
   fprintf (stderr, "       -deg d   - algebraic degree (for fk output)\n");
   fprintf (stderr, "       -lpb l   - discard relations with primes >= 2^l\n");
+  fprintf (stderr, "       -nomulti - print repeated primes only once\n");
 }
 
 int
@@ -900,6 +1005,7 @@ main (int argc, char *argv[])
   int num_files = 0;
   char *program_name = argv[0];
   int lpb = 0; /* 0 means no bound */
+  int multi = 1;
 
   while (argc > 1 && argv[1][0] == '-')
     {
@@ -929,6 +1035,8 @@ main (int argc, char *argv[])
             oformat = FORMAT_FK;
           else if (strcmp (argv[2], "ggnfs") == 0)
             oformat = FORMAT_GGNFS;
+          else if (strcmp (argv[2], "cwi") == 0)
+            oformat = FORMAT_CWI;
           else
             {
               fprintf (stderr, "Unknown format: %s\n", argv[2]);
@@ -961,6 +1069,12 @@ main (int argc, char *argv[])
 	  argv += 2;
 	  argc -= 2;
 	}
+      else if (strcmp (argv[1], "-nomulti") == 0)
+	{
+	  multi = 0;
+	  argv ++;
+	  argc --;
+	}
       else
 	{
 	  fprintf (stderr, "Unknown option: %s\n", argv[1]);
@@ -977,23 +1091,13 @@ main (int argc, char *argv[])
     }
 
   fprintf (stderr, "Convert relations from %s to %s format\n",
-           (iformat == FORMAT_CADO) ? "CADO" :
-           ((iformat == FORMAT_FK) ? "Franke-Kleinjung" :
-            ((iformat == FORMAT_CWI) ? "CWI" : "GGNFS")),
-           (oformat == FORMAT_CADO) ? "CADO" :
-           ((oformat == FORMAT_FK) ? "Franke-Kleinjung" : "GGNFS"));
+           format_names[iformat], format_names[oformat]);
   if (lpb != 0)
     fprintf (stderr, "(keeping relations with primes < 2^%d only)\n", lpb);
 
   if (oformat == FORMAT_GGNFS)
     {
       fprintf (stderr, "Error, GGNFS output format not yet implemented\n");
-      exit (1);
-    }
-
-  if (oformat == FORMAT_CWI)
-    {
-      fprintf (stderr, "Error, CWI output format not yet implemented\n");
       exit (1);
     }
 
@@ -1023,7 +1127,7 @@ main (int argc, char *argv[])
 	printf ("F 0 X %d 1\n", degf);
       num_files ++;
       num_rels += convert_relations (RELS, rfb, afb, f, degf, iformat, oformat,
-                                     lpb, verbose);
+                                     lpb, verbose, multi);
     }
 
   fprintf (stderr, "Output %lu relations from %d file(s).\n", num_rels,
