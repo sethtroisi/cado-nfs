@@ -33,6 +33,10 @@ degree=4                # degree of the algebraic polynomial
 kjdelay=120             # time between two checks
 selectnice=4            # nice level for selection
 
+# on the test number
+# 3162277660168379331998893544432718533719555139357026630225229499972098669068236545079015407810251223
+# we get
+
 ## Most important parameters of polyselect
 kjM=6e17                # maximum norm allowed
 kjl=5                   # minimal number of primes in lc(g)

@@ -36,6 +36,8 @@ selectnice=4            # nice level for selection
 # on the test number
 # 3162277660168379331998893544432718533719555140056959748004286946962165015333668357350077955980039
 # we get
+# lognorm: 33.67, alpha: -4.35 E=29.32
+# Murphy's E(Bf=10000000,Bg=5000000,area=1.00e+16)=1.64e-08
 
 ## Parameters of polyselect
 kjP=20000               # choose lc(g) with two prime factors in [P,2P]
@@ -70,7 +72,7 @@ alambda=2.2
 I=11                    # Sieving range in lattice siever
 qmin=1000000            # Start of the special-q range
 qrange=50000            # The size of an elementary sieving task
-firstcheck=2900000      # try filtering only up from that many relations
+firstcheck=2980000      # try filtering only up from that many relations
 checkrange=1            # We check if we have enough after each step
                         # of that many relations found.
 sievenice=10            # nice level for the sieving jobs
