@@ -75,6 +75,7 @@ unsigned long collisions = 0;
 unsigned long collisionsQ[MAXQ];
 double total_adminus2[MAXQ];
 double total_lognorm[MAXQ];
+double best_logmu[11];
 
 void
 roots_init (roots_t R)
@@ -301,6 +302,17 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
   total_lognorm[q] += logmu;
 
+  for (i = 10; i > 0 && logmu < best_logmu[i-1]; i--)
+    best_logmu[i] = best_logmu[i-1];
+  best_logmu[i] = logmu;
+
+  pthread_mutex_lock (&lock);
+  collisions ++;
+  collisionsQ[q] ++;
+  aver_lognorm += logmu;
+  tot_found ++;
+  pthread_mutex_unlock (&lock);
+
   /* rootsieve */
   if (logmu <= max_norm)
     {
@@ -315,17 +327,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       nroots = numberOfRealRoots (f, d, 0, 0);
       skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
       logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
-    }
 
-  pthread_mutex_lock (&lock);
-  collisions ++;
-  collisionsQ[q] ++;
-  aver_lognorm += logmu;
-  tot_found ++;
-  pthread_mutex_unlock (&lock);
-
-  if (logmu <= max_norm)
-    {
       alpha = get_alpha (f, d, ALPHA_BOUND);
 
       mpz_set (curr_poly->g[0], g[0]);
@@ -900,13 +902,13 @@ main (int argc, char *argv[])
           argv += 2;
           argc -= 2;
         }
-      else if (strcmp (argv[1], "-maxnorm") == 0)
+      else if (argc >= 3 && strcmp (argv[1], "-maxnorm") == 0)
         {
           max_norm = atof (argv[2]);
           argv += 2;
           argc -= 2;
         }
-      else if (strcmp (argv[1], "-admin") == 0)
+      else if (argc >= 3 && strcmp (argv[1], "-admin") == 0)
         {
           double d;
           d = strtod (argv[2], NULL);
@@ -919,7 +921,7 @@ main (int argc, char *argv[])
           argv += 2;
           argc -= 2;
         }
-      else if (strcmp (argv[1], "-admax") == 0)
+      else if (argc >= 3 && strcmp (argv[1], "-admax") == 0)
         {
           double d;
           d = strtod (argv[2], NULL);
@@ -932,43 +934,43 @@ main (int argc, char *argv[])
           argv += 2;
           argc -= 2;
         }
-      else if (strcmp (argv[1], "-incr") == 0)
+      else if (argc >= 3 && strcmp (argv[1], "-incr") == 0)
         {
           incr = strtoul (argv[2], NULL, 10);
           argv += 2;
           argc -= 2;
         }
-      else if (strcmp (argv[1], "-N") == 0)
+      else if (argc >= 3 && strcmp (argv[1], "-N") == 0)
         {
           mpz_set_str (N, argv[2], 10);
           argv += 2;
           argc -= 2;
         }
-      else if (strcmp (argv[1], "-degree") == 0)
+      else if (argc >= 3 && strcmp (argv[1], "-degree") == 0)
         {
 	  d = atoi (argv[2]);
           argv += 2;
           argc -= 2;
         }
-      else if (strcmp (argv[1], "-save") == 0)
+      else if (argc >= 3 && strcmp (argv[1], "-save") == 0)
         {
 	  save = argv[2];
           argv += 2;
           argc -= 2;
         }
-      else if (strcmp (argv[1], "-resume") == 0)
+      else if (argc >= 3 && strcmp (argv[1], "-resume") == 0)
         {
 	  resume = argv[2];
           argv += 2;
           argc -= 2;
         }
-      else if (strcmp (argv[1], "-out") == 0)
+      else if (argc >= 3 && strcmp (argv[1], "-out") == 0)
         {
 	  out = argv[2];
           argv += 2;
           argc -= 2;
         }
-      else if (strcmp (argv[1], "-kmax") == 0)
+      else if (argc >= 3 && strcmp (argv[1], "-kmax") == 0)
         {
 	  MAX_k = atoi (argv[2]);
           argv += 2;
@@ -1066,6 +1068,9 @@ main (int argc, char *argv[])
       fprintf (stderr, "Error, too large special-q's, increase MAXQ\n");
       exit (1);
     }
+
+  for (i = 0; i <= 10; i++)
+    best_logmu[i] = 999.9;
   
   P = atoi (argv[1]);
   st = cputime ();
@@ -1162,6 +1167,11 @@ main (int argc, char *argv[])
     fprintf (stderr, "No polynomial found, please increase the ad range or decrease P\n");
   else
     print_poly (stdout, best_poly, argc0, argv0, st0, 1 /* raw */);
+
+  printf ("#");
+  for (i = 0; i < 10; i++)
+    printf (" %1.2f", best_logmu[i]);
+  printf ("\n");
 
   for (i = 0; i < nthreads ; i++)
     mpz_clear (T[i]->N);
