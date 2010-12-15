@@ -365,6 +365,8 @@ utils/gmp_prob_prime.c
 utils/usp.c
 utils/usp.h
 utils/cut_n_roots.c
+utils/roots.c
+utils/nextprime.c
 cado_config_h.in
 cado_mpi_config_h.in
 config/asm_sample.c
@@ -376,6 +378,7 @@ config/search_for_function.cmake
 config/pthreads.cmake
 config/mpi.cmake
 scripts/fixup_params_file.sh.in
+scripts/merge.pl
 linalg/bwc/matmul-sub-large-fbd.S
 linalg/bwc/matmul-sub-large-fbd.h
 linalg/bwc/matmul-sub-vsc-combine.S
