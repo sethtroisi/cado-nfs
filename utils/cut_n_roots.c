@@ -8,14 +8,7 @@
 #include "modul_poly.h"
 #include <gmp.h>
 #include "utils.h"
-
-#ifndef MIN
-#define MIN(l,o) ((l) < (o) ? (l) : (o))
-#endif
-
-#ifndef MAX
-#define MAX(h,i) ((h) > (i) ? (h) : (i))
-#endif
+#include "macros.h"
 
 void usage(const char *argv0)
 {
@@ -23,6 +16,8 @@ void usage(const char *argv0)
     fprintf(stderr, "  split [q0, q1[ into maximal intervals of N special q's each.\n");
     exit(1);
 }
+
+static const int base_interval = 1000000;
 
 int
 main (int argc0, char *argv0[])
@@ -34,12 +29,6 @@ main (int argc0, char *argv0[])
   mpz_t P, Q;
   int argc = argc0;
   char **argv = argv0;
-
-  /* print the command line */
-  fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
-  for (int k = 1; k < argc; k++)
-    fprintf (stderr, " %s", argv[k]);
-  fprintf (stderr, "\n");
 
   param_list_init(pl);
   argv++, argc--;
@@ -85,7 +74,7 @@ main (int argc0, char *argv0[])
   mpz_init(Q);
   mpz_nextprime (P, P);
   mpz_nextprime(Q, P);
-  unsigned long fence = 1000000 * (1 + (q0 / 1000000));
+  unsigned long fence = base_interval * (1 + (q0 / base_interval));
   unsigned long totnr = 0;
   unsigned long base = q0;
   while (mpz_cmp_ui (P, q1) < 0) {
@@ -99,14 +88,14 @@ main (int argc0, char *argv0[])
       if (mpz_cmp_ui(Q, fence) >= 0) {
         /* swallow the tail */
         len = fence - base;
-        fence += 1000000;
+        fence += base_interval;
       }
       printf ("%lu,%lu\n", base, len);
       base += len;
       totnr = 0;
     } else if (mpz_cmp_ui(Q, fence) >= 0) {
       unsigned long len = fence - base;
-      fence += 1000000;
+      fence += base_interval;
       printf ("%lu,%lu\n", base, len);
       base += len;
       totnr = 0;
