@@ -366,7 +366,7 @@ utils/usp.c
 utils/usp.h
 utils/cut_n_roots.c
 utils/roots.c
-utils/nextprime.c
+utils/gmp_nextprime.c
 cado_config_h.in
 cado_mpi_config_h.in
 config/asm_sample.c
