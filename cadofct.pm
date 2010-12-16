@@ -703,7 +703,7 @@ sub is_job_alive {
     # Using lsof, check if this process is accessing the $job->{'file'} file.
     # We need to call readlink here to get the _absolute_ path of the file,
     # as returned by lsof.
-    # FIXME: on some hosts (e.g. our trojans) lsof is not in PATH
+    # FIXME: on some hosts lsof is not in PATH
     if (0) {
       $ret = remote_cmd($job->{'host'}, "env lsof -Fn -a -p$job->{'pid'} -d1 | ".
                         "env grep ^n\\`env readlink -f $job->{'file'}\\`\$");
