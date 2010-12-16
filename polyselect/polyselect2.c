@@ -1160,6 +1160,15 @@ main (int argc, char *argv[])
 	  potential_collisions, 1000.0 * potential_collisions
 	  / (double) cputime ());
 
+  if (verbose > 0)
+    {
+      /* print best 10 values of logmu */
+      printf ("# best logmu:");
+      for (i = 0; i < 10; i++)
+        printf (" %1.2f", best_logmu[i]);
+      printf ("\n");
+    }
+
   /* print total time (format for cpu_time.sh) */
   printf ("# Total phase took %.2fs\n", seconds () - st0);
 
@@ -1167,11 +1176,6 @@ main (int argc, char *argv[])
     fprintf (stderr, "No polynomial found, please increase the ad range or decrease P\n");
   else
     print_poly (stdout, best_poly, argc0, argv0, st0, 1 /* raw */);
-
-  printf ("#");
-  for (i = 0; i < 10; i++)
-    printf (" %1.2f", best_logmu[i]);
-  printf ("\n");
 
   for (i = 0; i < nthreads ; i++)
     mpz_clear (T[i]->N);
