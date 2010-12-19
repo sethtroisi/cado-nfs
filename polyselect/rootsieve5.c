@@ -82,22 +82,17 @@ m: 29506931142426628023257550385021294340054764681825893027768721114850381094216
 
 */
 
-#include "cado.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <math.h>
-#include "utils.h"
-#include "auxiliary.h"
-#include "murphyE.h"
-#include "rho.h"
+
 #include "rootsieve5.h"
 
 #define MAX_LINE_LENGTH 4096
+#define BLOCK_SIZE 12288
+#define TUNE_SIEVE_SIZE BLOCK_SIZE / 2
+
 #define PI 3.14159265358979324
 #define MAX_DEGREE 6
 #define DEBUG 0
-#define SUP_ALPHA 4.842767
+#define SUP_ALPHA 4.843
 
 /*-----------------------------*/
 /*   @Input-output functions.  */
@@ -226,7 +221,8 @@ print_poly_info ( mpz_t *f,
 				  mpz_t *g,
 				  int d,
 				  mpz_t N,
-				  mpz_t M )
+				  mpz_t M,
+				  int verbose )
 {
 	 /* print info about the polynomial */
 	 unsigned int nroots = 0;
@@ -244,15 +240,19 @@ print_poly_info ( mpz_t *f,
 		  mpz_set(cpoly->g[i], g[i]);
 	 }
 
-	 /* output original poly */
-	 gmp_printf ("\nn: %Zd\n", N);
-	 for (i = d; i >= 0; i --) {
-		  gmp_printf ("c%d: %Zd\n", i, f[i]);
+	 if (verbose) {
+
+		  /* output original poly */
+		  gmp_printf ("\nn: %Zd\n", N);
+		  for (i = d; i >= 0; i --) {
+			   gmp_printf ("c%d: %Zd\n", i, f[i]);
+		  }
+		  for (i = 1; i >= 0; i --) {
+			   gmp_printf ("Y%d: %Zd\n", i, g[i]);
+		  }
+		  if (verbose == 2) // don't want m in general
+			   gmp_printf ("m: %Zd\n", M);
 	 }
-	 for (i = 1; i >= 0; i --) {
-		  gmp_printf ("Y%d: %Zd\n", i, g[i]);
-	 }
-	 gmp_printf ("m: %Zd\n", M);
 
 	 /* compute skew, logmu, nroots */
 	 nroots = numberOfRealRoots (f, d, 0, 0);
@@ -266,16 +266,18 @@ print_poly_info ( mpz_t *f,
 	 cpoly->skew = skew;
 	 e = MurphyE (cpoly, BOUND_F, BOUND_G, AREA, MURPHY_K);
 
-	 printf ("# skew: %.2f, ", skew);
-	 printf ("lognorm: %.2f, alpha: %.2f, E: %.2f, nr: %u \n# MurphyE: %1.2e (Bf=%.0f, Bg=%.0f, area=%1.2e)\n",
-			 logmu,
-			 alpha,
-			 logmu + alpha,
-			 nroots,
-			 e,
-			 BOUND_F,
-			 BOUND_G,
-			 AREA );
+	 if (verbose) {
+		  printf ("# skew: %.2f, ", skew);
+		  printf ("lognorm: %.2f, alpha: %.2f, E: %.2f, nr: %u \n# MurphyE: %1.2e (Bf=%.0f, Bg=%.0f, area=%1.2e)\n",
+				  logmu,
+				  alpha,
+				  logmu + alpha,
+				  nroots,
+				  e,
+				  BOUND_F,
+				  BOUND_G,
+				  AREA );
+	 }
 
 	 cado_poly_clear (cpoly);
 
@@ -286,6 +288,7 @@ print_poly_info ( mpz_t *f,
 /*-----------------------------*/
 /*   @Tree-related functions.  */
 /*-----------------------------*/
+
 
 #if 0
 /*
@@ -299,6 +302,7 @@ print_node ( node *pnode )
 	 /* for (i = 0; i < pnode->nr; i++) */
 	 /*  	  printf ("pnode->r[%d]: %lu\n", i, pnode->r[i]); */
 }
+
 
 /*
   Print a tree, non-recursive. Two styles.
@@ -358,6 +362,7 @@ print_tree ( node *root,
 }
 #endif
 
+
 /*
   Create new empty node.
 */
@@ -405,6 +410,7 @@ free_node ( node **ptr )
 		  free (*ptr);
 	 }
 }
+
 
 #if 0
 /*
@@ -1277,8 +1283,8 @@ test_special_u ( unsigned long numerator,
 
 
 /*
-  Compute fuv = f+(u*x+v)*g, where
-  f(r) + u*r*g(r) + v*g(r) = 0 (mod p).
+  Compute fuv = f+(u*x+v)*g,
+  f(r) + u*r*g(r) + v*g(r) = 0
   The inputs for f and g are mpz.
 */
 static inline void
@@ -1591,9 +1597,6 @@ isroot_fuv ( mpz_t *f,
 	 eval_poly_diff_ui (fr, f, d, r); // keep fr unchanged for further reference.
 	 mpz_add (tmp, fr, gr); // tmp is f'_uv(r)
 
-	 /* if (u == 45 && v == 33) */
-	 /* 	  gmp_printf("r: %lu, f'(r): %Zd\n", r, tmp); */
-
 	 /* cmpute f(x) + g(x)*(ux + v) */
 	 mpz_set_ui (tmp2, r);
 	 mpz_mul_ui (tmp2, tmp2, u);
@@ -1810,7 +1813,7 @@ liftroot_fuv_ul ( unsigned long *f,
   Given modulus pe, return f (mod pe).
 */
 static inline void
-reduce_f_ul ( unsigned long *f_ul,
+reduce_poly_ul ( unsigned long *f_ul,
 			  mpz_t *f,
 			  int d,
 			  unsigned long pe )
@@ -2071,8 +2074,8 @@ find_sublattice ( listnode **top,
 
 	 /* compute f (mod pe), then we only refer to this instead
 		of mpz_t. Note f (mod p) = (f (mod pe)) (mod p). */
-	 reduce_f_ul (f_ul, f, d, pe);
-	 reduce_f_ul (g_ul, g, 1, pe);
+	 reduce_poly_ul (f_ul, f, d, pe);
+	 reduce_poly_ul (g_ul, g, 1, pe);
 
 	 /* for each root 0 <= r < p  */
 	 for (r = 0; r < p; r ++) {
@@ -2291,22 +2294,23 @@ quick_sort_2d_ld ( long **array,
   Return all sublattices by calling CRT, where for each sublattice,
   the seperate (mod p) valuations are the best.
 */
-static void
+static int
 return_all_sublattice ( rsstr_t rs,
 						unsigned short *e,
 						unsigned short len_e,
 						unsigned long *modulus,
 						unsigned long U_bound,
-						listnode **all_sublattice )
+						listnode **all_sublattice,
+						int verbose )
 {
 	 /* at least consider three primes */
-	 if (len_e < 3) {
+	 if (len_e < 2) {
 		  fprintf (stderr,
-				   "Error: At least consider three primes (2, 3, 5) in return_all_sublattice. \n");
+				   "Error: At least consider two primes (2, 3) in return_all_sublattice. \n");
 		  exit(1);
 	 }
 
-	 unsigned short i;
+	 unsigned short i, fail = 0;
 	 unsigned long j;
 	 unsigned long *pe, *size, *ind, ***sublattice_array, tmpu, tmpv, tmpmod = 0UL;
 	 listnode *top, *tmp;
@@ -2326,6 +2330,7 @@ return_all_sublattice ( rsstr_t rs,
 		and return (u, v) with best score. */
 	 for (i = 0; i < len_e; i ++) {
 		  pe[i] = 1UL;
+
 		  for (j = 0; j < e[i]; j ++)
 			   pe[i] = pe[i] * primes[i];
 
@@ -2334,7 +2339,16 @@ return_all_sublattice ( rsstr_t rs,
 		  find_sublattice (&top, rs, primes[i], e[i]);
 		  size[i] = count_list (top);
 
-		  fprintf (stderr, "# Info: p: %u, p^e: %lu, list_size: %lu\n", primes[i], pe[i], size[i]);
+		  if (verbose)
+			   fprintf ( stderr,
+						 "# Info: p: %2u, p^e: %3lu, size_list: %lu\n",
+						 primes[i], pe[i], size[i]);
+
+		  /* check whether current list is valid. "len=0" shows
+			 the polynomials has no root p, we discard it. */
+		  if (size[i] == 0) {
+			   fail = 1;
+		  }
 
 		  tmp = top;
 		  /* allocate array for the i-th prime. */
@@ -2355,6 +2369,23 @@ return_all_sublattice ( rsstr_t rs,
 			   //printf ("#%lu, (%lu, %lu)\n", j, sublattice_array[i][j][0], sublattice_array[i][j][1]);
 		  }
 		  free_list (&top);
+	 }
+
+	 /* some len = 0, this set of parameters fails */
+	 if (fail == 1) {
+
+		  /* clearence */
+		  for (i = 0; i < len_e; i ++) {
+			   for (j = 0; j < size[i]; j ++) {
+					free (sublattice_array[i][j]);
+			   }
+			   free (sublattice_array[i]);
+		  }
+		  free (sublattice_array);
+		  free (size);
+		  free (ind);
+		  free (pe);
+		  return 0;
 	 }
 
 	 /* Loop over combinations of all arrays. This is awkward.
@@ -2616,15 +2647,55 @@ return_all_sublattice ( rsstr_t rs,
 					}
 	 }
 
+	 /* 2, 3 */
+	 else if (len_e == 2) {
+		  for (ind[0] = 0; ind[0] < size[0]; ind[0] ++)
+			   for (ind[1] = 0; ind[1] < size[1]; ind[1] ++) {
+
+					tmpmod = pe[0];
+					modulus[0] = size[0];
+					tmpu = sublattice_array[0][ind[0]][0];
+
+					/* compute u */
+					for (i = 0; i < len_e - 1; i ++) {
+						 tmpu = crt_pair(tmpu, tmpmod,
+										 sublattice_array[i+1][ind[i+1]][0], pe[i+1]);
+
+						 tmpmod = tmpmod * pe[i+1];
+						 modulus[0] = modulus[0] * size[i+1];
+					}
+
+					/* if u is good, compute v */
+					if ( (tmpu <= U_bound) || (tmpmod - U_bound <= tmpu) ) {
+
+						 tmpmod = pe[0];
+						 modulus[0] = size[0];
+						 tmpv = sublattice_array[0][ind[0]][1];
+
+						 for (i = 0; i < len_e - 1; i ++) {
+							  tmpv = crt_pair(tmpv, tmpmod,
+											  sublattice_array[i+1][ind[i+1]][1], pe[i+1]);
+
+							  tmpmod = tmpmod * pe[i+1];
+							  modulus[0] = modulus[0] * size[i+1];
+						 }
+						 top = new_listnode (tmpu, tmpv, 0.0);
+						 top->next = (*all_sublattice);
+						 (*all_sublattice) = top;
+					}
+			   }
+	 }
+
 	 /* too aggressive */
 	 else {
-		  fprintf (stderr, "Error, only len_e_sl: 4, 5, 6, 7, 8 is supported at the moment. \n");
+		  fprintf (stderr, "Error, only len_e_sl: 2, 3, 4, 5, 6, 7, 8 is supported at the moment. \n");
 		  exit (1);
 	 }
 
 	 /* info */
-	 fprintf (stderr, "# Info: computed %lu CRTs\n",
-			  modulus[0]);
+	 if (verbose)
+		  fprintf (stderr, "# Info: computed %lu CRTs\n",
+				   modulus[0]);
 
 	 /* fix this later. */
 	 modulus[0] = tmpmod;
@@ -2640,6 +2711,8 @@ return_all_sublattice ( rsstr_t rs,
 	 free (size);
 	 free (ind);
 	 free (pe);
+
+	 return 1;
 }
 
 
@@ -2659,23 +2732,41 @@ return_all_sublattice ( rsstr_t rs,
 
   RETURN: *sublattice_array which has k slots.
 */
-static void
+static int
 return_best_sublattice ( rsstr_t rs,
 						 rsparam_t rsparam,
-						 long ***sublattice_array )
+						 long ***sublattice_array,
+						 int verbose )
 {
-	 unsigned long i = 0UL, len = 0UL;
+	 unsigned long i = 0UL, len = 0UL, global_u_bound_rs_tmp;
 	 listnode *sublattice_list, *tmp;
 	 long ** sublattice_array_all;
+	 unsigned short len_e_sl_tmp;
+
+	 /* Repair step: important to get correct length;
+		Its assumed that all 0 exponents happens in the tail. */
+	 len_e_sl_tmp = rsparam->len_e_sl;
+	 global_u_bound_rs_tmp = rsparam->global_u_bound_rs;
+	 for (i = 0; i < rsparam->len_e_sl; i ++) {
+		  if (rsparam->e_sl[i] == 0)
+			   len_e_sl_tmp --;
+	 }
 
 	 /* find and return good sublattices to sublattice_list */
 	 new_list (&sublattice_list);
-	 return_all_sublattice (rs,
-							rsparam->e_sl,
-							rsparam->len_e_sl,
-							&(rsparam->modulus),
-							rsparam->global_u_bound_rs,
-							&sublattice_list);
+
+	 int re = return_all_sublattice ( rs,
+									  rsparam->e_sl,
+									  len_e_sl_tmp,
+									  &(rsparam->modulus),
+									  rsparam->global_u_bound_rs,
+									  &sublattice_list,
+									  verbose );
+	 /* failed, return */
+	 if (re == 0) {
+		  free_list (&sublattice_list);
+		  return 0;
+	 }
 
 	 /* decide the length of returnd best sublattices. */
 	 len = count_list (sublattice_list);
@@ -2683,37 +2774,47 @@ return_best_sublattice ( rsstr_t rs,
 	 /* if no sublattice is found with u < rsparam->global_u_bound_rs,
 		then we try to enlarge u bound. However, it might be better
 		to enlarge e_sl[] to allow to check more sublattices. */
+	 int count = 0;
 	 while (len == 0) {
 		  free_list (&sublattice_list);
 		  new_list (&sublattice_list);
 		  rsparam->global_u_bound_rs *= 2;
-		  return_all_sublattice (rs,
-								 rsparam->e_sl,
-								 rsparam->len_e_sl,
-								 &(rsparam->modulus),
-								 rsparam->global_u_bound_rs,
-								 &sublattice_list);
+		  return_all_sublattice ( rs,
+								  rsparam->e_sl,
+								  len_e_sl_tmp,
+								  &(rsparam->modulus),
+								  rsparam->global_u_bound_rs,
+								  &sublattice_list,
+								  verbose );
 		  len = count_list (sublattice_list);
-		  fprintf (stderr,
-				   "# Warn: Not enough sublattice classes. Reset \"rsparam->global_u_bound_rs = %lu\";\n",
-				   rsparam->global_u_bound_rs);
+		  if (verbose) {
+			   fprintf (stderr,
+						"# Warn: Not enough sublattice classes. Reset \"rsparam->global_u_bound_rs = %lu\" (#%d)\n",
+						rsparam->global_u_bound_rs, count);
 
-		  fprintf (stderr,
-				   "# Warn: It's better to enlarge 'len_e_sl' and 'e_sl' if want to restrict \"rsparam->global_u_bound_rs\".\n");
+			   /* fprintf (stderr, */
+			   /* 			"# Warn: It's better to enlarge 'len_e_sl' and 'e_sl' if want to restrict \"rsparam->global_u_bound_rs\".\n"); */
+		  }
+		  count ++;
 	 }
 
-	 if ( (rsparam->nbest_sl == 0) || (rsparam->nbest_sl > len) ) {
+	 //printf ("rsparam->nbest_sl: %lu, len: %lu\n", rsparam->nbest_sl, len);
+	 //if ( (rsparam->nbest_sl == 0) || (rsparam->nbest_sl > len) )
+
+	 if (rs->d == 5)
 		  rsparam->nbest_sl = len;
-	 }
+	 else
+		  rsparam->nbest_sl = 10;
 
 	 /* info */
-	 fprintf (stderr,
-			  "# Info: found %lu sublattices with small u, where u < %lu (\"rsparam->global_u_bound_rs = %lu\")\n",
-			  len, rsparam->global_u_bound_rs, rsparam->global_u_bound_rs);
-	 fprintf (stderr,
-			  "# Info: choose %lu best ones among the above all (\"rsparam->nbest_sl = %lu\")\n",
-			  rsparam->nbest_sl, rsparam->nbest_sl);
-
+	 if (verbose) {
+		  fprintf (stderr,
+				   "# Info: found %lu sublattices with small u, where |u| < %lu (\"rsparam->global_u_bound_rs = %lu\")\n",
+				   len, rsparam->global_u_bound_rs, rsparam->global_u_bound_rs);
+		  fprintf (stderr,
+				   "# Info: choose %lu best ones among the above all (\"rsparam->nbest_sl = %lu\")\n",
+				   rsparam->nbest_sl, rsparam->nbest_sl);
+	 }
 	 /* now rsbound->nbest_sl <= len. */
 	 init_2D_ld (&sublattice_array_all, len, 2);
 	 init_2D_ld (sublattice_array, rsparam->nbest_sl, 2);
@@ -2743,15 +2844,22 @@ return_best_sublattice ( rsstr_t rs,
 
 	 /* copy to another smaller array -- this is awkward -- */
 	 for (i = 0; i < rsparam->nbest_sl; i ++) {
-		  fprintf (stderr, "# Info: sublattice #%4lu, (u, v): (%6ld, %10ld)\n",
-				   i,
-				   sublattice_array_all [i][0],
-				   sublattice_array_all [i][1] );
+		  if (verbose) {
+			   fprintf (stderr, "# Info: sublattice #%4lu, (u, v): (%6ld, %10ld)\n",
+						i,
+						sublattice_array_all [i][0],
+						sublattice_array_all [i][1] );
+		  }
 		  (*sublattice_array)[i][0] = sublattice_array_all [i][0];
 		  (*sublattice_array)[i][1] = sublattice_array_all [i][1];
 	 }
 
+	 /* recover */
+	 rsparam->global_u_bound_rs = global_u_bound_rs_tmp;
+
 	 free_2D_ld (&sublattice_array_all, len);
+
+	 return 1;
 }
 
 
@@ -2761,171 +2869,126 @@ return_best_sublattice ( rsstr_t rs,
 
 /*
   root sieve over ARRAY with initial point
-  (i, j) (mod pe).
-
-  TODO: Make this faster.
+  (i, j) (mod pe), where i is fixed, so only
+  need to sieve along the line j.
 */
-static inline void
-rootsieve_run_ij ( float **ARRAY,
-				   rsbound_t rsbound,
-				   long i,
-				   long j,
-				   unsigned long pe,
-				   float val )
+static inline long
+rootsieve_run_line ( int16_t *ARRAY,
+					 long V,
+					 long j,
+					 unsigned long pe,
+					 int16_t subu )
 {
-	 long startj, V, U;
-	 V = (rsbound->Amax - rsbound->Amin + 1);
-	 U = (rsbound->Bmax - rsbound->Bmin + 1);
-	 startj = j;
-	 pe = (long) pe;
-
-	 /* Bounding i with B0 < tmp + p*i < B1 */
-	 while ( i < V ) {
-		  while ( j < U ) {
-			   ARRAY[i][j] = ARRAY[i][j] - val;
-			   j = j + pe;
-		  }
-		  i = i + pe;
-		  j = startj;
+	 /* Bounding j with B0 < tmp + p*j < B1 */
+	 while ( j < V ) {
+		  ARRAY[j] = ARRAY[j] - subu;
+		  j = j + (long) pe;
 	 }
+	 return j + (long) pe;
 }
 
 
 /*
   rootsieve_run_lift for the dual root. Since we are
   sure that level 1 node only contains one dual root
-  r, we don't need to consider single root at all.
+  r, we don't need to (and can't, otherwise, may count
+  repeatedly) consider single root at all.
 */
 static inline void
-rootsieve_run_dualroot_lift ( node *firstchild,
-							  float **ARRAY,
-							  unsigned long * f_ul,
-							  unsigned long * g_ul,
-							  unsigned long * fuv_ul,
+rootsieve_run_dualroot_lift ( node *currnode,
+							  int16_t *ARRAY,
+							  unsigned long *f_ul,
+							  unsigned long *g_ul,
+							  unsigned long *fuv_ul,
 							  int d,
 							  rsbound_t rsbound,
 							  unsigned int p,
 							  unsigned int e,
 							  unsigned int curr_e,
-							  float val )
+							  int16_t subu )
 {
-	 if (firstchild == NULL || curr_e > e)
+	 /* recursion end */
+	 if (currnode == NULL || curr_e > e)
 		  return;
 
 	 /* variables */
 	 unsigned int nroots;
-	 unsigned long i, j, pe, pem1, pep1, uu, vv, fr, gr, tmp, tmp1, tmp2;
-	 node *currnode, *tmpnode, *tmpnode2;
-	 uu = vv = 0;
-	 currnode = firstchild;
-	 tmpnode = tmpnode2 = NULL;
+	 unsigned long pe, pem1, pep1, fr, gr;
+	 node *tmpnode = NULL;
+	 long j;
 
 	 /* compute p^e */
 	 pem1 = 1UL;
-	 for (i = 0; i < curr_e - 1; i ++)
+	 for (j = 0; j < curr_e - 1; j ++)
 		  pem1 = pem1 * p;
 	 pe = pem1 * p;
 	 pep1 = pe * p;
 
-	 /* loop until all siblings are checked. */
-	 while ( (currnode != NULL) ) {
+	 /* loop all (lifted multiple) roots */
+	 for (nroots = 0; nroots < currnode->nr; nroots++) {
 
-		  /* loop all roots */
-		  for (nroots = 0; nroots < currnode->nr; nroots++) {
+		  /* compute g(r) */
+		  gr = eval_poly_ui_mod (g_ul, 1, currnode->r[nroots], pe);
+		  if (gr % p == 0)
+			   continue;
 
-			   /* compute g(r) */
-			   gr = eval_poly_ui_mod (g_ul, 1, currnode->r[nroots], pe);
-			   if (gr % p == 0)
-					continue;
+		  /* compute f_uv(x) and then evaluate it at r. */
+		  compute_fuv_ul (fuv_ul, f_ul, g_ul, d, currnode->u, currnode->v, pe);
+		  fr = eval_poly_ui_mod (fuv_ul, d, currnode->r[nroots], pe);
+		  fr = fr / pem1;
 
-			   /* compute f_uv(x) and then evaluate it at r. */
-			   compute_fuv_ul (fuv_ul, f_ul, g_ul, d, currnode->u, currnode->v, pe);
-			   fr = eval_poly_ui_mod (fuv_ul, d, currnode->r[nroots], pe);
-			   fr = fr / pem1;
-			   /* solve on fr + gr*x = 0 (mod p), where x = uu*r + vv. */
-			   fr = solve_lineq (fr, gr, 0, p);
-			   fr = fr % p;
+		  /* solve on fr + gr*x = 0 (mod p), where x = uu*r + vv. */
+		  fr = solve_lineq (fr, gr, 0, p); //fr = fr % p;
 
-			   /* r not invertible, fix vv and loop over uu. */
-			   if (currnode->r[nroots] % p == 0) {
-					for (uu = 0; uu < p; uu ++) {
-						 for (j = 0; j < p; j ++) {
-
-							  /* printf ("insert.. (%lu, %lu) level %lu\n", currnode->u + pem1 * uu, */
-							  /* 		  currnode->v + fr *pem1, curr_e); */
-
-							  insert_node (currnode, &tmpnode, currnode->u + pem1 * uu,
-										   currnode->v + fr * pem1, currnode->r[nroots] + j * pem1, curr_e, pe, 0);
-						 }
-					}
-			   }
-			   /* r invertible, loop vv and solve uu in fr = uu*r + vv (mod p)  */
-			   else {
-					for (vv = 0; vv < p; vv ++) {
-						 uu = solve_lineq (vv, currnode->r[nroots], fr, p);
-						 for (j = 0; j < p; j ++) {
-
-							  /* printf ("insert.. (%lu, %lu) level %lu\n", currnode->u + pem1 * uu, */
-							  /* 		  currnode->v + vv *pem1, curr_e); */
-
-							  insert_node (currnode, &tmpnode, currnode->u + pem1 * uu,
-										   currnode->v + pem1 * vv, currnode->r[nroots] + j * pem1, curr_e, pe, 0);
-						 }
-					}
-			   }
-		  } // consider next root of current (u, v)
-
-		  rootsieve_run_dualroot_lift (currnode->firstchild, ARRAY, f_ul, g_ul, fuv_ul, d, rsbound, p, e, curr_e+1, val);
-
-		  /* If current node is the 2nd bottom level, do the sieving
-			 for the bbottom level leaves. */
-		  if (curr_e == e) {
-			   tmpnode = currnode->firstchild;
-			   while (tmpnode != NULL) {
-					tmp = uv2ab_mod (rsbound->A, rsbound->MOD, tmpnode->u, pep1);
-					tmp1 = uv2ab_mod (rsbound->B, rsbound->MOD, tmpnode->v, pep1);
-					tmp2 = (long) ceil (((float) rsbound->Amin - (float) tmp) / (float) pep1) * (long) pep1
-						 + (long) tmp;
-					i = ab2ij (rsbound->Amin, tmp2);
-					tmp2 = (long) ceil (((float) rsbound->Bmin - (float) tmp1) / (float) pep1) * (long) pep1
-						 + (long) tmp1;
-					j = ab2ij (rsbound->Bmin, tmp2);
-					rootsieve_run_ij (ARRAY, rsbound, i, j, pep1, val / (float) pe);
-					tmpnode2 = tmpnode;
-					tmpnode = tmpnode->nextsibling;
-
-					/* printf ("deleting bottom.. (%lu, %lu) level %lu\n", tmpnode2->u, */
-					/* 		tmpnode2->v, curr_e); */
-
-					free_node (&tmpnode2);
-			   }
+		  /* insert (u, v), u unchanged, v is fr. to insert roots,
+			 r is a multiple root, we need to insert all r + p*j */
+		  for (j = 0; j < p; j ++) {
+			   /* printf ("insert.. (%lu, %lu) level %lu\n", currnode->u + pem1 * uu, */
+			   /* 		  currnode->v + fr *pem1, curr_e); */
+			   insert_node ( currnode, &tmpnode,
+							 currnode->u,
+							 currnode->v + fr * pem1,
+							 currnode->r[nroots] + j * pem1,
+							 curr_e, pe, 0 );
 		  }
 
-		  /* delete current node and move to next sibling. */
-		  tmpnode = currnode;
-		  currnode = currnode->nextsibling;
-		  if (currnode != NULL)
-			   (currnode->parent)->firstchild = currnode;
-
-		  tmp = uv2ab_mod (rsbound->A, rsbound->MOD, tmpnode->u, pe);
-		  tmp1 = uv2ab_mod (rsbound->B, rsbound->MOD, tmpnode->v, pe);
-		  tmp2 = (long) ceil (((float) rsbound->Amin - (float) tmp) / (float) pe) * (long) pe
-			   + (long) tmp;
-		  i = ab2ij (rsbound->Amin, tmp2);
-		  tmp2 = (long) ceil (((float) rsbound->Bmin - (float) tmp1) / (float) pe) * (long) pe
-			   + (long) tmp1;
-		  j = ab2ij (rsbound->Bmin, tmp2);
-		  rootsieve_run_ij (ARRAY, rsbound, i, j, pe, val / (float) pep1);
-
-		  /* printf ("deleting.. (%lu, %lu) level %lu\n", tmpnode->u, */
-		  /* 		  tmpnode->v, curr_e); */
-
-		  free_node (&tmpnode);
+		  // next root of current (u, v)
 	 }
 
-	 currnode = NULL;
+	 /* recursieve to next level, curr_e + 1 */
+	 rootsieve_run_dualroot_lift ( currnode->firstchild,
+								   ARRAY,
+								   f_ul,
+								   g_ul,
+								   fuv_ul,
+								   d,
+								   rsbound,
+								   p,
+								   e,
+								   curr_e + 1,
+								   subu );
+
+	 /* delete current node and move to next sibling. */
+	 j = uv2ab_mod (rsbound->B, rsbound->MOD, currnode->v, pe);
+	 j = (long) ceil (((float) rsbound->Bmin - (float) j) / (float) pe)
+		  * (long) pe + (long) j;
+	 j = ab2ij (rsbound->Bmin, j);
+
+
+	 subu = (int16_t) ceil ( (double) subu / (double) pep1 );
+
+	 rootsieve_run_line ( ARRAY,
+						  rsbound->Bmax - rsbound->Bmin + 1,
+						  j, pe, subu );
+
+	 //rootsieve_run_ij (ARRAY, rsbound, i, j, pe, val / (float) pep1);
+
+	 /* printf ("deleting.. (%lu, %lu) level %lu\n", tmpnode->u, */
+	 /* 		  tmpnode->v, curr_e); */
+
+	 free_node (&currnode);
 	 tmpnode = NULL;
-	 tmpnode2 = NULL;
+
 	 return;
 }
 
@@ -2934,330 +2997,400 @@ rootsieve_run_dualroot_lift ( node *firstchild,
   rootsieve_run_lift for the dual root r of the
   congruence class (i, j) (mod p)
 */
-static inline void
-rootsieve_run_dualroot ( float **ARRAY,
+static inline  void
+rootsieve_run_dualroot ( int16_t *ARRAY,
 						 rsstr_t rs,
 						 rsbound_t rsbound,
-						 long i,
+						 unsigned int u,
 						 long j,
-						 unsigned long r,
+						 unsigned int r,
 						 unsigned int p,
 						 unsigned int e,
-						 float val )
+						 int16_t subu )
 {
 	 /* some variables */
+	 int tmp;
+	 unsigned int v;
 	 unsigned long pe, *f_ul, *g_ul, *fuv_ul;
-	 long u, v;
-	 node *tmpnode, *root;
-	 int d;
-	 unsigned int k;
-	 d = rs->d;
 
 	 /* compute p^e */
 	 pe = 1UL;
-	 for (k = 0; k < e; k ++)
+	 for (v = 0; v < e ; v ++)
 		  pe = pe * p;
 
-	 /* record f, g (mod pe) for each pe. */
-	 f_ul = (unsigned long*) malloc ((d + 1) * sizeof (unsigned long));
-	 fuv_ul = (unsigned long*) malloc ((d + 1) * sizeof (unsigned long));
+	 /* use s.p instead of m.p */
+	 f_ul = (unsigned long*) malloc ((rs->d + 1) * sizeof (unsigned long));
+	 fuv_ul = (unsigned long*) malloc ((rs->d + 1) * sizeof (unsigned long));
 	 g_ul = (unsigned long*) malloc ((2) * sizeof (unsigned long));
 	 if ((f_ul == NULL) || (g_ul == NULL) || (fuv_ul == NULL)) {
-		  fprintf (stderr, "Error, cannot allocate memory in rootsieve_run_dual(). \n");
+		  fprintf (stderr, "Error, cannot allocate memory in rootsieve_run_dualroot(). \n");
 		  exit (1);
 	 }
+	 reduce_poly_ul (f_ul, rs->f, rs->d, pe);
+	 reduce_poly_ul (g_ul, rs->g, 1, pe);
 
-	 /* compute f (mod pe), then we only refer to this instead
-		of mpz_t. Note f (mod p) = (f (mod pe)) (mod p). */
-	 reduce_f_ul (f_ul, rs->f, d, pe);
-	 reduce_f_ul (g_ul, rs->g, 1, pe);
-
-	 /* computer (u, v) (mod p) from (i, j) */
-	 u = ij2uv (rsbound->A, rsbound->MOD, rsbound->Amin, i) % p;
-	 v = ij2uv (rsbound->B, rsbound->MOD, rsbound->Bmin, j) % p;
-	 if (u < 0)
-		  u = u + p;
-	 if (v < 0)
-		  v = v + p;
+	 /* j -> v (mod p) */
+	 tmp = ij2uv (rsbound->B, rsbound->MOD, rsbound->Bmin, j) % p;
+	 v = (unsigned int) ( (tmp >= 0) ? tmp : tmp + (int) p );
 
 	 /* we've already known that r is a dual root for f_{u, v}. */
+	 node *tmpnode, *root;
 	 new_tree (&root);
 	 root = new_node ();
 	 insert_node (root, &tmpnode, u, v, r, 1, p, 2);
-	 rootsieve_run_ij (ARRAY, rsbound, i, j, p, val);
+
+	 /* sieve f(r) + (u*r + (B + MOD * (j+k*p)))*g(r) for k*/
+	 rootsieve_run_line ( ARRAY,
+						  rsbound->Bmax - rsbound->Bmin + 1,
+						  j, p, subu );
+
 
 	 /* lift to higher p^e */
-	 rootsieve_run_dualroot_lift (root->firstchild, ARRAY, f_ul, g_ul, fuv_ul, d, rsbound, p, e, 2, val);
+	 rootsieve_run_dualroot_lift ( root->firstchild,
+								   ARRAY,
+								   f_ul,
+								   g_ul,
+								   fuv_ul,
+								   rs->d,
+								   rsbound,
+								   p,
+								   e,
+								   2,
+								   subu );
 
-     /* clear, either root itself or root with a level 1 node.
+     /* free, either root itself or root with a level 1 node.
 		Note, if e>1, freeing will be done in the lift function;
 		However, if e=1, we need to manaully free root->firstchild. */
-	 if (e == 1)
-		  free_node ( &(root->firstchild) );
-	 free_node (&root);
 
+	 free_node ( &(root->firstchild) );
+	 free_node (&root);
 	 tmpnode = NULL;
+
 	 free (f_ul);
 	 free (fuv_ul);
 	 free (g_ul);
 }
 
+//#define OLD_ROOTSIEVE_V
 
+#ifdef OLD_ROOTSIEVE_V
 /*
-  Main function for root sieve.
+  Root sieve for f + u*x*g(x) + v*g(x) for fixed u, variable v.
 */
 static void
-rootsieve_run ( float **ARRAY,
-				rsstr_t rs,
-				rsbound_t rsbound,
-				rsparam_t rsparam )
+rootsieve_v ( int16_t *ARRAY,
+			  rsstr_t rs,
+			  rsbound_t rsbound,
+			  rsparam_t rsparam,
+			  const long fixed_i )
 {
-	 unsigned long r, u, v, tmp, tmp1, special_u, fx_ul, gx_ul, *r_uv;
-	 unsigned int p, max_e;
-	 long tmp2, i, j;
-	 int np, k;
-	 mpz_t *fuv;
-	 float sub[NP], logp;
+	 unsigned int np, p, max_e, r, u, v, tmp, tmp1, special_u, fx_ul, gx_ul, nblock;
+	 long tmp_ld, i, j;
+	 float sub;
+	 int16_t subu;
 
-	 /* fuv is f+(u*x+v)*g */
-	 fuv = (mpz_t*) malloc ((rs->d + 1) * sizeof (mpz_t));
-	 if (fuv == NULL) {
-		  fprintf (stderr, "Error, cannot allocate memory in rootsieve_run().\n");
-		  exit (1);
-	 }
-	 for (k = 0; k <= rs->d; k++)
-		  mpz_init_set (fuv[k], rs->f[k]);
-
-	 /* roots of fuv used for those p | MOD. */
-	 r_uv = (unsigned long*) malloc (rs->d * sizeof (unsigned long));
-	 if (r_uv == NULL) {
-		  fprintf (stderr, "Error, cannot allocate memory in rootsieve_run(). \n");
-		  exit (1);
-	 }
+	 // nblock = (rsbound->block rsbound->Bmax - rsbound->Bmin + 1) / 4096;
 
 	 /* For each prime p */
 	 for (np = 0; np < rsparam->len_p_rs; np ++) {
 		  p = primes[np];
-		  logp = log ((float) p);
-		  sub[np] = (float) p * logp /
-			   ((float) p * (float) p - 1.0);
-
-		  /* approximation level, this should depend on p
-			 and sieving length. We use 1 here for speed. */
-		  /* max_e = (unsigned short) (log((float) rsbound->Bmax - rsbound->Bmin + 1) / logp); */
-		  max_e = 1;
-		  if (DEBUG)
-			   fprintf (stderr, "# DEBUG: p: %u, logp_k: %u\n", p, max_e);
 
 		  /* For each prime not appearing in MOD */
-		  if ((rsbound->MOD) % p != 0) {
+		  if ( (rsbound->MOD) % p != 0 ) {
+			   sub = (float) p * log ( (float) p) /
+					((float) p * (float) p - 1.0);
+			   subu = (int16_t) ceil (sub * 1000.0);
+
+			   /* find u (mod p) which correponds to current i */
+			   tmp_ld = ij2uv (rsbound->A, rsbound->MOD, rsbound->Amin, fixed_i) % p;
+			   u = (unsigned int) ((tmp_ld >= 0) ? tmp_ld : tmp_ld + p);
+
+			   /* approximation level, this should depend on p */
+			   /* max_e = (unsigned short) (log((float) rsbound->Bmax - rsbound->Bmin + 1) / logp); */
+			   max_e = 1;
+
+			   if (DEBUG)
+					fprintf (stderr, "# DEBUG: p: %u, logp_k: %u\n", p, max_e);
 
 			   /* For each possible root < p. */
 			   for (r = 0; r < p; r++) {
 
-			   		/* f(r), g(r) cannot simultaneously = 0 (mod p),
-					   hence no such pair (U, V) exists in gnfs */
+			   		/* If this happens, f(r) != 0 (mod p). Hence
+					   we can through this r. Note f(r), g(r) donot
+					   simultaneously = 0 (mod p) in gnfs */
 			   		if (mpz_divisible_ui_p(rs->gx[r], p) != 0)
 			   			 continue;
+
+					//fprintf (stderr, "# p: %u, r: %u\n", p, r);
 
 			   		/* compute special_u */
 					tmp = mpz_fdiv_ui (rs->numerator[r], p);
 					tmp1 = mpz_fdiv_ui (rs->gx[r], p);
-					special_u = compute_special_u (tmp, tmp1, p);
+					special_u = (unsigned int) compute_special_u (tmp, tmp1, p);
+
 					fx_ul = mpz_fdiv_ui (rs->fx[r], p);
 					gx_ul = mpz_fdiv_ui (rs->gx[r], p);
 
-					/* for each u */
-			   		for (u = 0; u < p; u ++) {
+					/* find v (mod p) in f(r) + u*r*g(r) + v*g(r) = 0 (mod p) */
+					v = (unsigned int) compute_v_ul (fx_ul, gx_ul, r, u, p);
+					tmp1 = (unsigned int) uv2ab_mod (rsbound->B, rsbound->MOD, v, p);
 
-						 /* find v in f(r) + u*r*g(r) + v*g(r) = 0 (mod p) */
-						 v = compute_v_ul (fx_ul, gx_ul, r, u, p);
+					/* smallest tmp + p*i such that A0 < tmp + p*i, where A0 < 0,
+					   hence i = ceil((A0-tmp)/p). Note, this should be negative. */
+					tmp_ld = (long) ceil ( (float) (rsbound->Bmin -tmp1) / (float) p)
+						 * (long) p + (long) tmp1;
+					j = ab2ij (rsbound->Bmin, tmp_ld);
 
-						 /* find i, j (mod p) which correponds to
-							the current u, v */
-						 tmp = uv2ab_mod (rsbound->A, rsbound->MOD, u, p);
-						 tmp1 = uv2ab_mod (rsbound->B, rsbound->MOD, v, p);
+					/* sieve array indices (i, j) to real pairs (u, v) */
+					if (DEBUG) {
+						 gmp_printf ("\nf(%lu): %Zd\n", r, rs->fx[r]);
+						 gmp_printf ("g(%lu): %Zd\n",
+									 r, rs->gx[r], u, v);
+						 gmp_printf ("numerator(%lu): %Zd\n", r, rs->numerator[r]);
+						 printf (" -- %ld + [%2u] * %lu = %u (mod %u), ",
+								 rsbound->A, tmp, rsbound->MOD, u, p);
+						 printf (" %lu + [%2u] * %lu = %u (mod %u), ",
+								 rsbound->B, tmp1, rsbound->MOD, v, p);
+						 printf (" f(%u) + ( %u * %u + %u ) * g(%u) = 0 (mod %u)\n",
+								 r, u, r, v, r, p);
 
-						 /* print f_(u, v) and its root r. */
-						 if (DEBUG) {
-							  gmp_printf ("\nf(%lu): %Zd\n", r, rs->fx[r]);
-							  gmp_printf ("g(%lu): %Zd\n",
-										  r, rs->gx[r], u, v);
-							  gmp_printf ("numerator(%lu): %Zd\n", r, rs->numerator[r]);
-							  printf (" -- %ld + [%2lu] * %lu = %lu (mod %u), ",
-									  rsbound->A, tmp, rsbound->MOD, u, p);
-							  printf (" %lu + [%2lu] * %lu = %lu (mod %u), ",
-									  rsbound->B, tmp1, rsbound->MOD, v, p);
-							  printf (" f(%lu) + ( %lu * %lu + %lu ) * g(%lu) = 0 (mod %u)\n",
-									  r, u, r, v, r, p);
-						 }
-
-						 /* smallest tmp + p*i such that A0 < tmp + p*i, where A0 < 0,
-							hence i = ceil((A0-tmp)/p). Note, this should be negative. */
-						 tmp2 = (long) ceil (((float) rsbound->Amin - (float) tmp) / (float) p) * (long) p
-							  + (long) tmp;
-						 i = ab2ij (rsbound->Amin, tmp2);
-
-						 tmp2 = (long) ceil (((float)rsbound->Bmin - (float) tmp1) / (float) p) * (long) p
-							  + (long) tmp1;
-						 j = ab2ij (rsbound->Bmin, tmp2);
-
-						 /* sieve array indices (i, j) to real pairs (u, v) */
-						 if (DEBUG) {
-							  printf (" -- %ld + %lu * (%ld + %ld) = %ld = %lu (mod %u), ",
-									  rsbound->A, rsbound->MOD, i, rsbound->Amin,
-									  ij2uv (rsbound->A, rsbound->MOD, rsbound->Amin, i), u, p);
-
-							  printf ("%lu + %lu * (%ld + %ld) = %ld = %lu (mod %u)\n",
-									  rsbound->B, rsbound->MOD, j, rsbound->Bmin,
-									  ij2uv (rsbound->B, rsbound->MOD, rsbound->Bmin, j), v, p);
-						 }
-
-						 /* If r is not a dual root for this f + (u*x+v)*g,
-							then r is not a dual root for
-							f + {[A+MOD*(tmp+p*i)]*x + [J_ST+MOD*(tmp1+p*j)]}*g
-							for	all i, j.  */
-						 if (u != special_u) {
-							  rootsieve_run_ij (ARRAY, rsbound, i, j, p, sub[np]);
-						 }
-
-						 /* u is special and r is a dual root of f_uv */
-						 else {
-							  rootsieve_run_dualroot (ARRAY, rs, rsbound, i, j, r, p, max_e, sub[np]);
-						 }
-
-						 /* LEAVE THESE HERE FOR COMPARISION (WILLED BE USED) */
-						 /* { */
-						 /* 	  while ( i < (rsbound->Amax - rsbound->Amin + 1) ) { */
-						 /* 		   while ( j < (rsbound->Bmax - rsbound->Bmin + 1) ) { */
-						 /* 				/\* compute new polynomial f_uv = f + (u*x+v)*g, (u, v) is computed */
-						 /* 				 from the current (i, j) using ij2uv(). *\/ */
-						 /* 				compute_fuv (fuv, f, g, */
-						 /* 							 ij2uv (rsbound->A, rsbound->MOD, rsbound->Amin, i), */
-						 /* 							 ij2uv (rsbound->B, rsbound->MOD, rsbound->Bmin, j)); */
-						 /* 				/\* update the contribution of this root r to f_uv for all uv. */
-						 /* 				   Note that, we need to look recursively for each u, v pair. *\/ */
-						 /* 				val = average_valuation_affine_root (fuv, d, p, r); */
-						 /* 				ARRAY[i][j] = ARRAY[i][j] - val * logp; */
-						 /* 				j = j + (long) p; */
-						 /* 		   } */
-						 /* 		   i = i + (long) p; */
-						 /* 		   j = ab2ij (rsbound->Bmin, tmp2); */
-						 /* 	  } */
-						 /* } */
-			   		}
-			   }
-		  }
-
-		  /* For those p which divides MOD.
-			 (1) We can ignore them all together since they will have exactly the
-			 same scores over (mod p1^e1 p2^e2 ...) dut to find_sublattice(). Hence,
-			 as long as the precision in pi^ei is fine, we don't need to look at
-			 these primes.
-
-			 (2) Alternatively, if we want more accuracy, there are two ways depending
-			 on the precision.
-			 -- We could use a similar approximated method as in find_sublattice(), but
-			 considering more and/or higher pi^ei and do the sieving.
-			 -- We could use the following commented code to find the exact alpha
-			 contribution for these small primes. Note this will be slow. */
-#ifdef DETAIL
-		  else {
-			   /* only these (u, v) are possible such that A + MOD*i = u (mod p) */
-			   u = rsbound->A % p;
-			   v = rsbound->B % p;
-			   compute_fuv (fuv, rs->f, rs->g, rs->d, u, v);
-			   k = poly_roots_ulong (r_uv, fuv, rs->d, p);
-
-			   /* for all the roots fo this f_uv. */
-			   for (l = 0; l < k; l++) {
-
-					r = r_uv[l];
-					/* test whether r is dual, we could call roottype(), but its heavier. */
-					tmp = mpz_fdiv_ui (rs->numerator[r], p);
-					tmp1 = mpz_fdiv_ui (rs->gx[r], p);
-
-					/* test u * tmp1^2 == tmp, whether r is a dual root for this u. */
-					if (test_special_u (tmp, tmp1, u, p) != 1) {
-						 for (i = 0; i < (rsbound->Amax - rsbound->Amin + 1); i ++) {
-							  for (j = 0; j < (rsbound->Bmax - rsbound->Bmin + 1); j ++)
-								   ARRAY[i][j] = ARRAY[i][j] - sub[np];
-							  j = 0;
-						 }
+						 printf (" -- %ld + %lu * (%ld + %ld) = %ld = %u (mod %u), ",
+								 rsbound->A, rsbound->MOD, i, rsbound->Amin,
+								 ij2uv (rsbound->A, rsbound->MOD, rsbound->Amin, i), u, p);
+						 printf ("%lu + %lu * (%ld + %ld) = %ld = %u (mod %u)\n",
+								 rsbound->B, rsbound->MOD, j, rsbound->Bmin,
+								 ij2uv (rsbound->B, rsbound->MOD, rsbound->Bmin, j), v, p);
 					}
-					/* r is dual root for f_uv */
+
+					/* If r is not a dual root for this f + (u*x+v)*g,
+					   then r is not a dual root for
+					   f + {[A+MOD*(tmp+p*i)]*x + [J_ST+MOD*(tmp1+p*j)]}*g
+					   for	all i, j.  */
+					if (u != special_u) {
+						 rootsieve_run_line ( ARRAY,
+											  rsbound->Bmax - rsbound->Bmin + 1,
+											  j, p, subu );
+					}
+					/* r is multiple root */
 					else {
-						 for (i = 0; i < (rsbound->Amax - rsbound->Amin + 1); i ++) {
-							  for (j = 0; j < (rsbound->Bmax - rsbound->Bmin + 1); j ++) {
-
-								   /* compute new polynomial f_uv = f + (u*x+v)*g, (u, v) is computed
-									  from the current (i, j) using ij2uv(). */
-								   compute_fuv (fuv, rs->f, rs->g, rs->d,
-												ij2uv (rsbound->A, rsbound->MOD, rsbound->Amin, i),
-												ij2uv (rsbound->B, rsbound->MOD, rsbound->Bmin, j));
-								   /* update the contribution of this root r to f_uv for all uv.
-									  Note that, we need to look recursively for each u, v pair. */
-								   val = average_valuation_affine_root (fuv, rs->d, p, r);
-								   ARRAY[i][j] = ARRAY[i][j] - val * logp;
-							  }
-							  j = 0;
-						 }
+						 rootsieve_run_dualroot ( ARRAY,
+												  rs,
+												  rsbound,
+												  u,
+												  j,
+												  r,
+												  p,
+												  max_e,
+												  subu );
 					}
 			   }
 		  }
-#endif
-
 	 }
-
 	 /*
 	   print_sievearray (ARRAY, rsbound->Bmin, rsbound->Bmax, rsbound->Amin, rsbound->Amax,
 	   rsbound->A, rsbound->B, rsbound->MOD);
 	 */
-
-	 for (k = 0; k <= rs->d; k++) {
-		  mpz_clear (fuv[k]);
-	 }
-
-	 free (fuv);
-	 free (r_uv);
 }
 
+#else
+
+/*
+  Root sieve for f + u*x*g(x) + v*g(x) for fixed u, variable v.
+*/
+static void
+rootsieve_v ( int16_t *ARRAY,
+			  rsstr_t rs,
+			  rsbound_t rsbound,
+			  rsparam_t rsparam,
+			  const long fixed_i,
+			  int verbose )
+{
+	 unsigned int np, nb, p, r, u, v, tmp, max_e;
+	 int16_t sub[rsparam->len_p_rs];
+	 unsigned long fx_ul, gx_ul;
+	 long tmp1, tmp2, start_j_idx[rsparam->len_p_rs], totnb, block_size;
+	 float subf;
+	 mpz_t tmpz;
+
+	 block_size = BLOCK_SIZE;
+	 totnb = (rsbound->Bmax - rsbound->Bmin + 1) / block_size;
+
+	 if (verbose) {
+		  fprintf ( stderr,
+					"# Stat: totnb: %ld, block_size: %ld, total_size: %ld\n",
+					totnb, block_size, totnb*block_size );
+	 }
+
+	 mpz_init (tmpz);
+
+	 int total = 0;
+	 int st = 0;
+	 int c = 0, cs = 0, cm = 0;
+
+	 /* initialize sub[] for all primes in root sieve */
+	 for (np = 0; np < rsparam->len_p_rs; np ++) {
+		  p = primes[np];
+		  subf = (float) p * log ( (float) p) /
+			   ((float) p * (float) p - 1.0);
+		  sub[np] = (int16_t) ceil (subf * 1000.0);
+		  start_j_idx[np] = 0;
+	 }
+
+	 /* this is sublattice_u + fixed_i*MOD, */
+	 tmp1 = ij2uv (rsbound->A, rsbound->MOD, rsbound->Amin, fixed_i);
+
+	 /* For each r < bound_prime */
+	 for (r = 0; r < primes[rsparam->len_p_rs]; r++) {
+
+		  /* compute u*g(r)^2 - f(r)g'(r) + f'(r)g(r) */
+		  mpz_mul (tmpz, rs->gx[r], rs->gx[r]);
+		  mpz_mul_si (tmpz, tmpz, tmp1);
+		  mpz_sub (tmpz, tmpz, rs->numerator[r]);
+
+		  st = cputime ();
+
+		  /* For each block */
+		  for (nb = 0; nb < totnb; nb ++) {
+
+			   /* For each r < p < Bound_p*/
+			   for (np = next_prime_idx[r]; np < rsparam->len_p_rs; np ++) {
+
+					p = primes[np];
+
+					/* skip if need */
+					if ((rsbound->MOD) % p == 0)
+						 continue;
+					if (mpz_divisible_ui_p(rs->gx[r], p) != 0)
+						 continue;
+
+					/* compute u (mod p) from u */
+					tmp2 = tmp1 % p;
+					u = (unsigned int) ((tmp2 >= 0) ? tmp2 : tmp2 + p);
+
+					/* The first block */
+					if (nb == 0) {
+
+						 max_e = 1; // should depend on p!!!
+
+						 /* use single precision */
+						 fx_ul = mpz_fdiv_ui (rs->fx[r], p);
+						 gx_ul = mpz_fdiv_ui (rs->gx[r], p);
+
+						 /* compute v in f(r) + u*r*g(r) + v*g(r) = 0 (mod p) */
+						 v = (unsigned int) compute_v_ul (fx_ul, gx_ul, r, u, p);
+
+						 /* v -> j in B + MOD*j = v (mod p) */
+						 tmp = (unsigned int) uv2ab_mod (rsbound->B, rsbound->MOD, v, p);
+
+						 /* smallest tmp + p*i such that A0 < tmp + p*i, where A0 < 0,
+							hence i = ceil((A0-tmp)/p). Note, this should be negative. */
+						 tmp2 = (long) ceil ( (float) (rsbound->Bmin -tmp) / (float) p)
+							  * (long) p + (long) tmp;
+						 start_j_idx[np] = ab2ij (rsbound->Bmin, tmp2);
+
+						 /* DEBUG */
+						 if (DEBUG) {
+							  printf (" f(%u) + ( %u * %u + %u ) * g(%u) = 0 (mod %u)\n",
+									  r, u, r, v, r, p);
+
+							  printf (" -- %ld + %lu * (%ld + %ld) = %ld = %u (mod %u), ",
+									  rsbound->A, rsbound->MOD, fixed_i, rsbound->Amin,
+									  ij2uv (rsbound->A, rsbound->MOD, rsbound->Amin, fixed_i), u, p);
+
+							  printf ("%lu + %lu * (%ld + %ld) = %ld = %u (mod %u)\n",
+									  rsbound->B, rsbound->MOD, start_j_idx[np], rsbound->Bmin,
+									  ij2uv (rsbound->B, rsbound->MOD, rsbound->Bmin, start_j_idx[np]), v, p);
+						 }
+						 /* !DEBUG */
+
+					}
+
+					c++;
+
+					/* r is simple root for current u, p */
+					if (mpz_divisible_ui_p(tmpz, p) == 0)
+					{
+						 cs ++;
+						 if (nb != (totnb - 1)) {
+							  start_j_idx[np] = rootsieve_run_line ( ARRAY,
+																	 block_size * (nb + 1),
+																	 start_j_idx[np], p, sub[np] );
+						 }
+						 /* boundary */
+						 else {
+							  start_j_idx[np] = rootsieve_run_line ( ARRAY,
+																	 rsbound->Bmax - rsbound->Bmin + 1,
+																	 start_j_idx[np], p, sub[np] );
+						 }
+					}
+					/* r is multiple root for current u, p */
+					else {
+						 cm++;
+						 /* don't sieve in block as the max_e may > 1. */
+						 if (nb == 0) {
+							  rootsieve_run_dualroot ( ARRAY,
+													   rs,
+													   rsbound,
+													   u,
+													   start_j_idx[np],
+													   r,
+													   p,
+													   max_e,
+													   sub[np] );
+						 }
+					}
+			   }
+		  }
+
+		  if (verbose) {
+			   fprintf (stderr,
+						"# Stat: r = %u,  p >= %u, takes %dms\n",
+						r, primes[next_prime_idx[r]], cputime() - st);
+		  }
+
+		  total += cputime() - st;
+	 }
+
+	 mpz_clear (tmpz);
+
+	 if (verbose)
+		  fprintf ( stderr,
+					"# Stat: sieve took %dms, total_loops: %d, simple_loops: %d, mul_loops: %d, estimate_mul_loops: %.2f\n",
+					total, c, cs, cm,  (double) primes[rsparam->len_p_rs] / log( (double) primes[rsparam->len_p_rs]));
+
+}
+
+
+#endif
 
 
 /*
   init root sieve array with biased alpha.
 */
 static void
-rootsieve_array_init ( float ***A,
-					   unsigned long ibound,
+rootsieve_array_init ( int16_t **A,
 					   unsigned long jbound,
 					   float alpha_bias )
 {
-	 unsigned long i, j;
 	 /* Init array A
 		sage: sum ([1/(p-1)*log(p) for p in prime_range(200)])
 		4.842766583050838  */
-	 float tmp = SUP_ALPHA + alpha_bias;
 
+	 float tmpf = SUP_ALPHA + alpha_bias;
+
+	 int16_t tmpu = (int16_t) ceil (tmpf * 1000.0);
+
+	 unsigned long j;
 	 /* allocate matrix A. */
-	 (*A) = (float **) malloc ( ibound * sizeof (float *) );
-	 if ((*A) != NULL) {
-		  for (i = 0; i < ibound; i ++) {
-			   (*A)[i] = (float *) malloc ( jbound * sizeof(float) );
+	 *A = (int16_t *) malloc ( jbound * sizeof (int16_t));
 
-			   if ((*A)[i] != NULL) {
-					for (j = 0; j < jbound; j++) {
-						 (*A)[i][j] = tmp;
-					}
-			   }
-			   else {
-					fprintf (stderr, "Error, cannot allocate memory in rootsieve_array_init().\n");
-					exit (1);
-			   }
+	 if ((*A) != NULL) {
+		  for (j = 0; j < jbound; j++) {
+			   (*A)[j] = tmpu;
 		  }
 	 }
 	 else {
-		  fprintf (stderr, "Error, cannot allocate memory in main\n");
+		  fprintf (stderr, "Error, cannot allocate memory in rootsieve_array_init().\n");
 		  exit (1);
 	 }
 }
@@ -3301,7 +3434,8 @@ rsbound_init ( rsbound_t rsbound )
   sieving region. Set the Amax, Amin, Amax, Amin.
 */
 void
-rsbound_setup_AB_bound ( rsbound_t rsbound )
+rsbound_setup_AB_bound ( rsbound_t rsbound,
+						 int verbose )
 {
 	 /* this is all most always 0 since MOD is much larger than u,
 		due to our parameters in rsparam_setup(). Hence we only
@@ -3309,8 +3443,11 @@ rsbound_setup_AB_bound ( rsbound_t rsbound )
 	 rsbound->Amax = 0;
 	 rsbound->Amin = 0;
 
-	 /* fixed for all */
-	 rsbound->Bmax = 10000000;
+	 /* tune mode ? */
+	 if (verbose)
+		  rsbound->Bmax = 13107200;
+	 else
+		  rsbound->Bmax = TUNE_SIEVE_SIZE;
 	 rsbound->Bmin = -rsbound->Bmax;
 }
 
@@ -3321,15 +3458,11 @@ rsbound_setup_AB_bound ( rsbound_t rsbound )
 */
 void
 rsbound_setup_sublattice ( rsbound_t rsbound,
-						   unsigned long sl_A,
+						   long sl_A,
 						   unsigned long sl_B,
 						   rsparam_t rsparam )
 {
-	 if (sl_A <= rsparam->global_u_bound_rs)
-		  rsbound->A = sl_A;
-	 else
-		  rsbound->A = (long)sl_A - (long) rsparam->modulus;
-
+	 rsbound->A = sl_A;
 	 rsbound->B = sl_B;
 	 rsbound->MOD = rsparam->modulus;
 	 rsbound->Umax = ab2uv (rsbound->A, rsbound->MOD, rsbound->Amax);
@@ -3497,8 +3630,8 @@ rsparam_init ( rsparam_t rsparam )
 		root sieve. Larger takes longer time, but more accurate. */
 	 rsparam->len_p_rs = 20;
 
-	 if (rsparam->len_p_rs > NP)
-		  rsparam->len_p_rs = NP;
+	 if (rsparam->len_p_rs >= NP)
+		  rsparam->len_p_rs = NP - 1;
 
 	 /* only (further) consider those f_{u, v} which has smaller
 		alpha than this which will be set in rsparam_setup(). */
@@ -3647,8 +3780,9 @@ rotate_bounds_UV ( mpz_t *f,
 	 long k0 = 0, tmpU;
 	 double skewness, init_lognorm, E, best_E;
 	 mpz_t best_V;
+
 	 mpz_init (best_V);
-	 mpz_set_ui (best_V, 0);
+	 mpz_set_ui (best_V, 0UL);
 
 	 skewness = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, method);
 	 init_lognorm = L2_lognorm (f, d, skewness, method);
@@ -3656,7 +3790,7 @@ rotate_bounds_UV ( mpz_t *f,
 
 	 /* look for positive k: 2, 4, 8, ... */
 	 tmpU = 1;
-	 for (i = 0; i <= 63; i++, tmpU *= 2)
+	 for (i = 0; i < 48; i++, tmpU *= 2)
 	 {
 		  /* rotate by u*x, and fix this polynomial in this loop. */
 		  k0 = rotate_aux (f, b, m, k0, tmpU, 1);
@@ -3675,7 +3809,8 @@ rotate_bounds_UV ( mpz_t *f,
 		  if (E < best_E)
 		  {
 			   best_E = E;
-			   *U = abs(tmpU);
+			   // *U = abs(tmpU); problem for tmpU >= 2^31
+			   (*U) = (unsigned long) (tmpU >= 0) ? tmpU : -tmpU;
 			   mpz_set (best_V, V);
 		  }
 	 }
@@ -3686,15 +3821,15 @@ rotate_bounds_UV ( mpz_t *f,
 	 /* allow some margin */
 	 (*U) *= 2;
 	 mpz_add (V, best_V, best_V);
-
 	 mpz_clear (best_V);
+
 	 return best_E;
 }
 
 
 /*
   Given rsparam->sizebound_ratio_rs and polynomial information,
-  compute rsparam->global_u_bound_rs = 0UL and rsparam->global_v_bound_rs = 0UL;
+  compute rsparam->global_u_bound_rs and rsparam->global_v_bound_rs;
   Then it will set e_sl[];
 */
 static void
@@ -3704,102 +3839,80 @@ rsparam_setup ( rsparam_t rsparam,
 	 double best_E;
 	 int size;
 	 mpz_t b, m;
-	 mpz_init_set (b, rs->g[1]);
-	 mpz_init_set (m, rs->g[0]);
+	 mpz_init (b);
+	 mpz_init (m);
+	 mpz_set (b, rs->g[1]);
+	 mpz_set (m, rs->g[0]);
 	 mpz_neg (m, m);
 
 	 /* compute global bound_v, bound_u.
 		-- global_u_bound will be used to identify good sublattice and decide e[],
 		-- global_v_bound will be used to identify sieving bound */
-	 best_E = rotate_bounds_UV (rs->f, rs->d, rsparam->sizebound_ratio_rs, b, m,
-								&(rsparam->global_u_bound_rs), rsparam->global_v_bound_rs, /* u, v */
-								DEFAULT_L2_METHOD);
+	 best_E = rotate_bounds_UV ( rs->f,
+								 rs->d,
+								 rsparam->sizebound_ratio_rs,
+								 b,
+								 m,
+								 &(rsparam->global_u_bound_rs),
+								 rsparam->global_v_bound_rs, /* u, v */
+								 DEFAULT_L2_METHOD );
 
 	 /* compute expected alpha */
 	 size = mpz_sizeinbase (rsparam->global_v_bound_rs, 2);
 	 size += (int) (log ( (double) rsparam->global_u_bound_rs ) * 1.442695);
 
-	 /* sublattice u will < than this bound */
-	 gmp_fprintf (stderr,
-				  "# Info: global (u, v) bound (%ld, %Zd) gives best_E: %.3f, exp_min_alpha: %.3f\n",
-				  rsparam->global_u_bound_rs, rsparam->global_v_bound_rs, best_E,  exp_alpha[size-1]);
+	 /* sublattice u will often < than this u */
+	 gmp_fprintf ( stderr,
+				   "# Info: global (u, v) bound (%ld, %Zd) gives best_E: %.3f, exp_min_alpha: %.3f\n",
+				   rsparam->global_u_bound_rs,
+				   rsparam->global_v_bound_rs,
+				   best_E,
+				   exp_alpha[size-1] );
 
-	 /* find_sublattice() consider the first four primes
-		2, 3, 5, 7 with exponents in e[]. */
-	 rsparam->len_e_sl = 4;
+	 /* for degree five polynomial */
+	 if (rs->d == 5 || rs->d == 6) {
 
-	 rsparam->e_sl = (unsigned short*) malloc ( rsparam->len_e_sl * sizeof (unsigned short) );
-	 if (rsparam->e_sl == NULL) {
-		  fprintf (stderr, "Error, cannot allocate memory in rsparam_setup().\n");
-		  exit (1);
-	 }
+		  /* find_sublattice() consider the first four primes
+			 2, 3, 5, 7 with exponents in e[]. */
+		  rsparam->len_e_sl = 4;
 
-	 /* pure experimental */
-	 if (rsparam->global_u_bound_rs <= 512) {
-		  rsparam->e_sl[0] = 4;
-		  rsparam->e_sl[1] = 2;
-		  rsparam->e_sl[2] = 2;
-		  rsparam->e_sl[3] = 1;
-	 }
-	 else if (rsparam->global_u_bound_rs <= 1024) {
-		  rsparam->e_sl[0] = 4;
-		  rsparam->e_sl[1] = 2;
-		  rsparam->e_sl[2] = 2;
-		  rsparam->e_sl[3] = 2;
-	 }
-	 else if (rsparam->global_u_bound_rs <= 2048) {
-		  rsparam->e_sl[0] = 5;
-		  rsparam->e_sl[1] = 2;
-		  rsparam->e_sl[2] = 2;
-		  rsparam->e_sl[3] = 2;
-	 }
-	 else if (rsparam->global_u_bound_rs <= 4096) {
-		  rsparam->e_sl[0] = 6;
-		  rsparam->e_sl[1] = 2;
-		  rsparam->e_sl[2] = 2;
-		  rsparam->e_sl[3] = 2;
-	 }
-	 else if (rsparam->global_u_bound_rs <= 8192) {
-		  rsparam->e_sl[0] = 6;
-		  rsparam->e_sl[1] = 3;
-		  rsparam->e_sl[2] = 2;
-		  rsparam->e_sl[3] = 2;
-	 }
-	 else if (rsparam->global_u_bound_rs <= 16384) {
-		  rsparam->e_sl[0] = 6;
-		  rsparam->e_sl[1] = 3;
-		  rsparam->e_sl[2] = 3;
-		  rsparam->e_sl[3] = 2;
-	 }
-	 else if (rsparam->global_u_bound_rs <= 32768) {
-		  rsparam->e_sl[0] = 6;
-		  rsparam->e_sl[1] = 3;
-		  rsparam->e_sl[2] = 3;
-		  rsparam->e_sl[3] = 3;
-	 }
-	 else if (rsparam->global_u_bound_rs <= 65536) {
-		  rsparam->e_sl[0] = 7;
-		  rsparam->e_sl[1] = 3;
-		  rsparam->e_sl[2] = 3;
-		  rsparam->e_sl[3] = 2;
-	 }
-	 else if (rsparam->global_u_bound_rs <= 131072) {
-		  rsparam->e_sl[0] = 7;
-		  rsparam->e_sl[1] = 3;
-		  rsparam->e_sl[2] = 3;
-		  rsparam->e_sl[3] = 3;
-	 }
-	 else if (rsparam->global_u_bound_rs <= 262144) {
-		  rsparam->e_sl[0] = 7;
-		  rsparam->e_sl[1] = 3;
-		  rsparam->e_sl[2] = 2;
-		  rsparam->e_sl[3] = 2;
-	 }
-	 else {
-		  rsparam->e_sl[0] = 8;
-		  rsparam->e_sl[1] = 3;
-		  rsparam->e_sl[2] = 2;
-		  rsparam->e_sl[3] = 2;
+		  rsparam->e_sl = (unsigned short*) malloc ( rsparam->len_e_sl * sizeof (unsigned short) );
+		  if (rsparam->e_sl == NULL) {
+			   fprintf (stderr, "Error, cannot allocate memory in rsparam_setup().\n");
+			   exit (1);
+		  }
+
+		  /* pure experimental, they are the lower bounds in rsparam_tune */
+		  if (rsparam->global_u_bound_rs <= 1024) {
+			   rsparam->e_sl[0] = 2;
+			   rsparam->e_sl[1] = 1;
+			   rsparam->e_sl[2] = 0;
+			   rsparam->e_sl[3] = 0;
+		  }
+		  else if (rsparam->global_u_bound_rs <= 2048) {
+			   rsparam->e_sl[0] = 3;
+			   rsparam->e_sl[1] = 1;
+			   rsparam->e_sl[2] = 0;
+			   rsparam->e_sl[3] = 0;
+		  }
+		  else if (rsparam->global_u_bound_rs <= 4096) {
+			   rsparam->e_sl[0] = 4;
+			   rsparam->e_sl[1] = 1;
+			   rsparam->e_sl[2] = 0;
+			   rsparam->e_sl[3] = 0;
+		  }
+		  else if (rsparam->global_u_bound_rs <= 8192) {
+			   rsparam->e_sl[0] = 4;
+			   rsparam->e_sl[1] = 2;
+			   rsparam->e_sl[2] = 0;
+			   rsparam->e_sl[3] = 0;
+		  }
+		  else {
+			   rsparam->e_sl[0] = 4;
+			   rsparam->e_sl[1] = 2;
+			   rsparam->e_sl[2] = 1;
+			   rsparam->e_sl[3] = 0;
+		  }
 	 }
 
 	 /* this is the expected min alpha */
@@ -3828,159 +3941,503 @@ rsparam_free ( rsparam_t rsparam )
 
 
 /*
-static void
-rsparam_tune ( rsstr_t rs,
+  Rootsieve for f + (u*x +v)*g for each sublattice
+*/
+static double
+rootsieve_uv ( rsstr_t rs,
+			   rsbound_t rsbound,
 			   rsparam_t rsparam,
-			   unsigned long length )
+			   mpz_t *fuv,
+			   mpz_t *guv,
+			   float alpha_bias,
+			   int verbose )
 {
-}
-*/
+	 int16_t *MAT, tmp;
+	 long i, u, v;
+	 unsigned long j;
+	 double MurphyE = 0.0, ave_MurphyE = 0.0;
+	 int found = 0, WANT;
 
+	 WANT = 64;
+	 /* if tune, we want fewer polynomials for speed */
+	 if (!verbose)
+		  WANT /= 4;
 
-/*
-  Call rootsieve_run() for a single polynomial defined in rs.
-*/
-static void
-rootsieve_main ( rsstr_t rs )
-{
-	 int st;
-	 unsigned long i, j, k;
-	 long ** sublattice_array; /* array contains good sulattices */
-	 long u, v;
-	 float ** MAT, alpha_p;
-	 double tmp, tmp2;
-	 mpz_t *fuv, *guv;
-	 rsparam_t rsparam;
-	 rsbound_t rsbound;
+	 /* for each i -> each u = A + MOD * i */
+	 for (i = 0; i < (rsbound->Amax - rsbound->Amin + 1); i ++)
+	 {
+		  /* init the sieve array */
+		  rootsieve_array_init (&MAT, rsbound->Bmax - rsbound->Bmin + 1, alpha_bias);
 
-	 /* fuv is f+(u*x+v)*g */
-	 fuv = (mpz_t*) malloc ((rs->d + 1) * sizeof (mpz_t));
-	 guv = (mpz_t*) malloc (2 * sizeof (mpz_t));
-	 if (fuv == NULL || guv == NULL) {
-		  fprintf (stderr, "Error, cannot allocate memory in rootsieve_main().\n");
-		  exit (1);
-	 }
+		  int st = cputime ();
 
-	 for (i = 0; i <= (unsigned long) rs->d; i++)
-		  mpz_init_set (fuv[i], rs->f[i]);
-	 for (i = 0; i < 2; i++)
-		  mpz_init_set (guv[i], rs->g[i]);
+		  /* root sieve for v */
+		  rootsieve_v (MAT, rs, rsbound, rsparam, i, 0);
 
-	 /* STAGE 1: compute good sublattices */
-
-	 /* set root sieve and find_sublattice() parameter */
-	 rsparam_init (rsparam);
-	 rsparam_setup (rsparam, rs);
-
-	 /* alpha projective + alpha contributions from sublattices primes.
-		This will be pre-added to the sieve array. */
-	 tmp = get_biased_alpha_projective (rs->f, rs->d, 200);
-	 fprintf (stderr, "# Info: projective alpha: %.3f\n", tmp);
-
-	 /* tune parameters in rsparam */
-	 //rsparam_tune (rs, rsparam, 1000);
-
-	 /* return the first nbest good sulattices to array */
-	 st = cputime ();
-	 return_best_sublattice (rs, rsparam, &sublattice_array);
-	 fprintf (stderr, "# Info: find best sublattices over (Mod %lu) took %dms\n",
-			  rsparam->modulus, cputime () - st);
-
-	 /* set sieving matrix size AB */
-	 rsbound_init (rsbound);
-	 rsbound_setup_AB_bound (rsbound);
-	 fprintf (stderr, "# Info: sieving matrix size: 1 x [%ld, %ld]\n",
-			  rsbound->Bmin, rsbound->Bmax);
-
-	 /* STAGE2: for each sublattice, do the sieve */
-	 for (i = 0; i < rsparam->nbest_sl; i ++) {
-
-		  /* compute exact sieving bounds UV given size AB depending
-			 on current A, B, MOD */
-		  rsbound_setup_sublattice (rsbound, sublattice_array [i][0],
-									sublattice_array [i][1], rsparam);
-		  fprintf (stderr, "\n# Info: Sieve on sublattice (# %2lu)\n", i);
-		  rsbound_print (rsbound);
-
-		  /* alpha values on the subllatice primes */
-		  compute_fuv (fuv, rs->f, rs->g, rs->d, rsbound->A, rsbound->B);
-		  alpha_p = get_biased_alpha_affine (fuv, rs->d, primes[rsparam->len_e_sl - 1]);
-
-		  tmp2 = rsparam->alpha_bound_rs;
-		  fprintf (stderr, "# Info: affine_alpha (sublattice): %.3f, projective_alpha: %.3f, total: %.3f, exp_min_alpha: %.3f \n",
-				   alpha_p, tmp, alpha_p + tmp, tmp2);
-
-		  /* init the sieve array and return alpha bound */
-		  rootsieve_array_init (&MAT, rsbound->Amax - rsbound->Amin + 1,
-								rsbound->Bmax - rsbound->Bmin + 1, alpha_p + tmp);
-
-		  /* root sieve run on the current sublattice */
-		  rootsieve_run (MAT, rs, rsbound, rsparam);
-
-
-		  /* output good polynomials */
-		  int found;
-		  const int WANT = 64;
-		  double MurphyE = 0.0;
+		  if (verbose)
+			   fprintf ( stderr, "# Info: root sieve took %dms\n",
+						 cputime () - st );
 
 		  /* find suitable tmp2 */
+		  found = 0;
+		  tmp = (int16_t) ceil (rsparam->alpha_bound_rs * 1000.0);
 		  while (1) {
 			   found = 0;
-			   for (k = 0; k < (unsigned long) (rsbound->Amax - rsbound->Amin + 1); k++) {
-					for (j = 0; j < (unsigned long) (rsbound->Bmax - rsbound->Bmin + 1); j++) {
-						 if (MAT[k][j] < tmp2)
-							  found ++;
-					}
+			   for (j = 0; j < (unsigned long) (rsbound->Bmax - rsbound->Bmin + 1); j++) {
+
+					if (MAT[j] <= tmp)
+						 found ++;
 			   }
+
 			   if (found < WANT) {
-					tmp2 += 0.1;
-					fprintf (stderr, "# Warn: Reset \"rsparam->alpha_bound_rs = %f\";\n",
-							 tmp2);
+					tmp += 100; // 100 / 1000 = 0.1 in actual alpha
+
+					if (verbose)
+						 fprintf ( stderr,
+								   "# Warn: Reset \"rsparam->alpha_bound_rs = %.3f\"\n",
+								   (float) tmp / 1000.0 );
 			   }
 			   else
 					break;
 		  }
 
-		  found = 0;
 		  /* output polynomial */
-		  for (k = 0; k < (unsigned long) (rsbound->Amax - rsbound->Amin + 1); k++) {
-			   for (j = 0; j < (unsigned long) (rsbound->Bmax - rsbound->Bmin + 1); j++) {
+		  found = 0;
+		  for (j = 0; j < (unsigned long) (rsbound->Bmax - rsbound->Bmin + 1); j++) {
+			   if (MAT[j] < tmp) {
 
-					if (MAT[k][j] < tmp2) {
-						 found ++;
-						 u = ij2uv (rsbound->A, rsbound->MOD, rsbound->Amin, k);
-						 v = ij2uv (rsbound->B, rsbound->MOD, rsbound->Bmin, j);
-						 compute_fuv (fuv, rs->f, rs->g, rs->d, u, v);
-						 mpz_set (guv[0], rs->g[0]);
-						 mpz_set (guv[1], rs->g[1]);
-						 optimize (fuv, rs->d, guv, 0, 0);
+					found ++;
+					u = ij2uv (rsbound->A, rsbound->MOD, rsbound->Amin, i);
+					v = ij2uv (rsbound->B, rsbound->MOD, rsbound->Bmin, j);
 
-						 fprintf (stderr, "\n# Found #%2d of (u=%ld, v=%ld) on sublattice #%lu", found, u, v, i);
-						 MurphyE += print_poly_info (fuv, guv, rs->d, rs->n, rs->m);
-					}
+					compute_fuv (fuv, rs->f, rs->g, rs->d, u, v);
+					mpz_set (guv[0], rs->g[0]);
+					mpz_set (guv[1], rs->g[1]);
+
+					//optimize (fuv, rs->d, guv, 0, 0); not correct for deg 6 polynomial
+					optimize_aux (fuv, rs->d, guv, 0, 0, CIRCULAR);
+
+					if (verbose)
+						 fprintf ( stderr,
+								   "\n# Found #%2d of (u=%ld, v=%ld) on sublattice #%lu",
+								   found, u, v, i );
+
+					MurphyE += print_poly_info (fuv, guv, rs->d, rs->n, rs->m, verbose);
 			   }
 		  }
 
-		  fprintf (stderr, "\n");
-		  fprintf (stderr, "# Stat: average_MurphyE on %d polynomials on sublattice #%lu: %1.2e\n",
-				   found, i, MurphyE / (double) (found));
+		  ave_MurphyE += MurphyE / (double) (found);
+
+		  if (verbose) {
+			   fprintf (stderr, "\n");
+			   fprintf (stderr, "# Stat: average_MurphyE on %d polynomials: %1.2e (on sublattice %ld, %ld)\n",
+						found, MurphyE / (double) (found), rsbound->A, rsbound->B);
+		  }
 
 		  /* free sieving array. */
-		  for (k = 0; k < (unsigned long) (rsbound->Amax - rsbound->Amin + 1); k++)
-			   free (MAT[k]);
 		  free (MAT);
 	 }
 
-	 /* free */
-	 rsparam_free (rsparam);
-	 free_2D_ld (&sublattice_array, rsparam->nbest_sl);
+	 ave_MurphyE = ave_MurphyE / (double) (rsbound->Amax - rsbound->Amin + 1);
 
-	 for (i = 0; i <= (unsigned long) rs->d; i++)
+	 return ave_MurphyE;
+}
+
+
+/*
+  Stage 2: root sieve on the sublattice points;
+  For each sublattice, call rootsieve_uv().
+*/
+static double
+rootsieve_main_stage2_run ( rsstr_t rs,
+							rsbound_t rsbound,
+							rsparam_t rsparam,
+							float alpha_proj,
+							int verbose )
+{
+	 int i;
+	 mpz_t *fuv, *guv;
+	 float alpha_lat, tmp;
+	 double ave_MurphyE = 0.0;
+
+	 /* fuv is f+(u*x+v)*g */
+	 fuv = (mpz_t*) malloc ((rs->d + 1) * sizeof (mpz_t));
+	 guv = (mpz_t*) malloc (2 * sizeof (mpz_t));
+	 if (fuv == NULL || guv == NULL) {
+		  fprintf (stderr, "Error, cannot allocate memory in rootsieve_main_stage2_run().\n");
+		  exit (1);
+	 }
+	 for (i = 0; i <= rs->d; i++)
+		  mpz_init_set (fuv[i], rs->f[i]);
+	 for (i = 0; i < 2; i++)
+		  mpz_init_set (guv[i], rs->g[i]);
+
+	 /* alpha values on the subllatice primes */
+	 compute_fuv (fuv, rs->f, rs->g, rs->d, rsbound->A, rsbound->B);
+	 alpha_lat = (float) get_biased_alpha_affine (fuv, rs->d, primes[rsparam->len_e_sl - 1]);
+	 tmp = rsparam->alpha_bound_rs;
+
+	 if (verbose)
+		  fprintf (stderr,
+				   "# Info: affine_alpha (sublattice): %.3f, projective_alpha: %.3f, total: %.3f, exp_min_alpha: %.3f \n",
+			  alpha_lat, alpha_proj, alpha_lat + alpha_proj, tmp);
+
+	 /* On this sublattice, sieve (i, j) */
+	 ave_MurphyE = rootsieve_uv ( rs,
+								  rsbound,
+								  rsparam,
+								  fuv,
+								  guv,
+								  alpha_lat + alpha_proj,
+								  verbose );
+
+	 for (i = 0; i <= rs->d; i++)
 		  mpz_clear (fuv[i]);
 	 for (i = 0; i < 2; i++)
 		  mpz_clear (guv[i]);
 	 free (fuv);
 	 free (guv);
+
+	 return ave_MurphyE;
+}
+
+
+
+/*
+  Stage 2: root sieve on the sublattice points.
+*/
+static double
+rootsieve_main_stage2_prepare ( rsstr_t rs,
+								rsparam_t rsparam,
+								long U,
+								long V,
+								float alpha_proj,
+								int verbose )
+{
+	 double ave_MurphyE = 0.0;
+	 /* init rsbound */
+	 rsbound_t rsbound;
+	 rsbound_init (rsbound);
+
+	 /* set root sieve bounds, depending on U, V */
+	 rsbound_setup_AB_bound (rsbound, verbose);
+
+	 if (verbose)
+		  fprintf (stderr, "# Info: sieving matrix size: 1 x [%ld, %ld]\n",
+				   rsbound->Bmin, rsbound->Bmax);
+
+	 /* root sieve on this sublattice */
+	 rsbound_setup_sublattice ( rsbound,
+								U,
+								V,
+								rsparam );
+
+	 /* compute exact sieving bounds UV given size AB depending
+		on current A, B, MOD */
+	 if (verbose)
+		  rsbound_print (rsbound);
+
+	 /* root sieve */
+	 ave_MurphyE = rootsieve_main_stage2_run ( rs,
+											   rsbound,
+											   rsparam,
+											   alpha_proj,
+											   verbose );
+	 return ave_MurphyE;
+}
+
+
+/*
+  Stage 1: find good sublattices.
+*/
+static double
+rootsieve_main_stage1 ( rsstr_t rs,
+						rsparam_t rsparam,
+						int verbose,
+						unsigned long num_sublattices )
+{
+	 unsigned long i;
+	 int st;
+	 long ** sublattice_array; /* array contains good sulattices */
+	 float alpha_proj;
+	 double ave_MurphyE = 0.0, ave2_MurphyE = 0.0;
+
+	 /* alpha projective + alpha contributions from sublattices primes.
+		This will be pre-added to the sieve array. */
+	 alpha_proj = (float) get_biased_alpha_projective (rs->f, rs->d, 2000);
+
+	 if (verbose)
+		  fprintf (stderr, "# Info: projective alpha: %.3f\n", alpha_proj);
+
+	 /* return the first nbest good sulattices to array */
+	 st = cputime ();
+
+	 int re = return_best_sublattice (rs, rsparam, &sublattice_array, verbose);
+
+	 /* failed, dont need to free sublattice_array since it has not
+		been created in return_best_sublattice(). */
+	 if (re == 0) {
+		  return -1;
+	 }
+
+	 if (verbose)
+		  fprintf (stderr, "# Info: find best sublattices over (Mod %lu) took %dms\n",
+				   rsparam->modulus, cputime () - st);
+
+	 /* For each sublattice, do the root sieve */
+	 for (i = 0; i < rsparam->nbest_sl; i ++) {
+
+		  if (i > num_sublattices)
+			   break;
+
+		  if (verbose)
+			   fprintf (stderr, "\n# Info: Sieve on sublattice (# %2lu)\n", i);
+
+		  ave_MurphyE = rootsieve_main_stage2_prepare ( rs,
+														rsparam,
+														sublattice_array [i][0],
+														sublattice_array [i][1],
+														alpha_proj,
+														verbose );
+		  ave2_MurphyE += ave_MurphyE;
+	 }
+
+	 ave2_MurphyE /= (double) i;
+
+	 /* free */
+	 free_2D_ld (&sublattice_array, rsparam->nbest_sl);
+
+	 return ave2_MurphyE;
+}
+
+
+/*
+  Tune parameters for find_sublattice().
+*/
+static double
+rsparam_tune ( rsstr_t rs,
+			   rsparam_t rsparam,
+			   int num_trials )
+{
+	 unsigned short i, j, best_j = 0, tmp_e_sl[rsparam->len_e_sl], k;
+	 unsigned int p, pearr[rsparam->len_e_sl];
+	 double ave_MurphyE = 0.0, best_MurphyE = 0.0;
+
+	 /* setup initial */
+	 for (i = 0; i < rsparam->len_e_sl; i ++) {
+		  p = primes[i];
+		  pearr[i] = 1;
+		  tmp_e_sl[i] = rsparam->e_sl[i];
+		  for (j = 0; j < rsparam->e_sl[i]; j ++) {
+			   pearr[i] *= p;
+		  }
+	 }
+
+	 /* First set of parameters */
+	 fprintf (stderr, "# Tune:");
+	 for (i = 0; i < rsparam->len_e_sl; i ++) {
+		  fprintf (stderr, " %u^%u=%u ", primes[i],
+				   rsparam->e_sl[i], pearr[i]);
+	 }
+
+	 best_MurphyE = rootsieve_main_stage1 (rs, rsparam, 0, 3UL);
+
+	 if (best_MurphyE == -1)
+		  fprintf (stderr, " ave_MurphyE: failed\n");
+	 else
+		  fprintf (stderr, " ave_MurphyE: %.3e\n", best_MurphyE);
+
+	 /* Other sets of parameters, try next "num_trials" sets
+		of parameters and keep the best one. */
+	 char flag;
+	 for (j = 0; j < num_trials; j ++) {
+
+		  flag = 0;
+
+		  /* loops */
+		  for (i = 1; i < rsparam->len_e_sl; i ++) {
+			   if (pearr[i] * primes[i] < pearr[i-1]) {
+					pearr[i] *= primes[i];
+					rsparam->e_sl[i] += 1;
+					flag = 1;
+					break;
+			   }
+		  }
+
+		  if (flag == 0) {
+			   pearr[0] *= primes[0];
+			   rsparam->e_sl[0] += 1;
+		  }
+
+		  /* some info and tune */
+		  fprintf (stderr, "# Tune:");
+		  for (i = 0; i < rsparam->len_e_sl; i ++) {
+			   fprintf (stderr, " %u^%u=%u ", primes[i],
+						rsparam->e_sl[i], pearr[i]);
+		  }
+
+		  ave_MurphyE = rootsieve_main_stage1 (rs, rsparam, 0, 3UL);
+
+		  if (best_MurphyE == -1)
+			   fprintf (stderr, " ave_MurphyE: failed\n");
+		  else
+			   fprintf (stderr, " ave_MurphyE: %.3e\n", ave_MurphyE);
+
+		  if (ave_MurphyE >= best_MurphyE) {
+			   best_MurphyE = ave_MurphyE;
+			   //printf ("current best: %.6e\n", best_MurphyE);
+			   best_j = j;
+			   for (k = 0; k < rsparam->len_e_sl; k ++) {
+					//printf ("exp: %u\n", rsparam->e_sl[k]);
+					tmp_e_sl[k] = rsparam->e_sl[k];
+			   }
+		  }
+	 }
+
+	 /* finally, save best parameters back */
+	 for (k = 0; k < rsparam->len_e_sl; k ++) {
+		   rsparam->e_sl[k] = tmp_e_sl[k];
+		   //printf ("e: %u\n", rsparam->e_sl[k]);
+	 }
+
+	 return best_MurphyE;
+}
+
+
+/*
+  Deg 6
+*/
+static void
+rootsieve_main6 ( rsstr_t rs )
+{
+	 rsparam_t rsparam, rsparam2;
+	 int i, old_i = 0, j;
+	 double bestE = 0.0;
+	 mpz_t b, m;
+
+	 mpz_init_set (b, rs->g[1]);
+	 mpz_init_set (m, rs->g[0]);
+	 mpz_neg (m, m);
+
+	 int LEFT = -512, RIGHT = 512;
+
+	 /* Tune parameters:
+		fixed a set of parameter e_sl[] for ALL
+		(rotated) polynomials: f(x) + i*x^2*g(x). */
+	 for (i = 0; i <= RIGHT; i++)
+	 {
+
+		  /* rotate polynomial by f + w*x^2 for various w */
+		  old_i = rotate_aux (rs->f, b, m, old_i, i, 2);
+		  fprintf (stderr, "\n# Info: rotated by %d*x^2\n", i);
+		  rsstr_setup (rs);
+
+		  //print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 1);
+
+		  /* set initial parameters */
+		  rsparam_init (rsparam);
+		  rsparam_setup (rsparam, rs);
+
+		  /* tune parameters in rsparam (try 8 parameter-setups) */
+		  bestE = rsparam_tune (rs, rsparam, 8);
+
+		  if (bestE != -1) {
+			   break;
+		  }
+		  rsparam_free (rsparam);
+	 }
+
+	 /* rotate back */
+	 rotate_aux (rs->f, b, m, old_i, 0, 2);
+	 old_i = 0;
+
+	 /* best parameters */
+	 fprintf (stderr, "\n# Info: best parameters ");
+	 for (j = 0; j < rsparam->len_e_sl; j ++) {
+		  fprintf (stderr, "%u:%u ", primes[j], rsparam->e_sl[j]);
+	 }
+	 fprintf (stderr, "\n");
+
+	 /* Start sieve with above fixed pamaters */
+	 for (i = LEFT; i <= RIGHT; i++) {
+
+		  /* rotate polynomial by f + w*x^2 for various w */
+		  old_i = rotate_aux (rs->f, b, m, old_i, i, 2);
+		  /* reset fx, gx, numerator since f is different */
+		  rsstr_setup (rs);
+
+		  fprintf (stderr, "\n# Info: rotated by %d*x^2\n", i);
+		  //print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 1);
+
+		  rsparam_init (rsparam2);
+		  rsparam_setup (rsparam2, rs);
+
+		  /* save parameters. Note they should have
+			 the save length "len_e_sl" */
+		  for (j = 0; j < rsparam->len_e_sl; j ++) {
+			   rsparam2->e_sl[j] = rsparam->e_sl[j];
+		  }
+
+		  /* Call stage 1 & 2. Note, rsparam need to be fixed
+			 now since it will be used to find sublattices. */
+		  rootsieve_main_stage1 (rs, rsparam2, 1, ULONG_MAX);
+
+		  /* "Tune mode"
+			 bestE = rootsieve_main_stage1 (rs, rsparam2, 0, ULONG_MAX);
+			 printf ("# TUNE: ave_E: %.3g\n", bestE); */
+
+		  rsparam_free (rsparam2);
+	 }
+
+	 rsparam_free (rsparam);
+
+	 /* rotate back */
+	 rotate_aux (rs->f, b, m, old_i, 0, 2);
+
+	 mpz_clear (b);
+	 mpz_clear (m);
+}
+
+
+/*
+  Deg 5
+*/
+static void
+rootsieve_main5 ( rsstr_t rs )
+{
+	 rsparam_t rsparam;
+
+	 /* set initial parameters */
+	 rsparam_init (rsparam);
+	 rsparam_setup (rsparam, rs);
+
+	 /* tune parameters in rsparam (try 6 parameter-setups) */
+	 rsparam_tune (rs, rsparam, 6);
+
+	 /* Call stage 1 & 2. Note, rsparam need to be fixed
+		now since it will be used to find sublattices. */
+	 rootsieve_main_stage1 (rs, rsparam, 1, ULONG_MAX);
+
+	 rsparam_free (rsparam);
+}
+
+
+/*
+  For the current polynomial (rs), start two-stage root sieve.
+*/
+static void
+rootsieve_main ( rsstr_t rs )
+{
+
+	 if (rs->d == 5) {
+		  rootsieve_main5 (rs);
+	 }
+	 else if (rs->d == 6) {
+		  rootsieve_main6 (rs);
+	 }
+	 else {
+		  fprintf (stderr, "Error: only support deg 5 or 6.\n");
+	 }
 }
 
 
@@ -4001,7 +4458,6 @@ rootsieve_file ( FILE *file )
 	 while (1) {
 
 		  /* read poly */
-
 		  if (fgets(str, MAX_LINE_LENGTH, file) == NULL)
 			   break;
 
@@ -4044,6 +4500,12 @@ rootsieve_file ( FILE *file )
 					gmp_sscanf (str, "c5: %Zd\n", rs->f[5]);
 					(flag) ^= (1<<5);
 			   }
+			   else if ( str[1] == '6' ) {
+					gmp_sscanf (str, "c6: %Zd\n", rs->f[6]);
+					(flag) ^= (1<<6);
+			   }
+
+
 			   else
 			   {
 					fprintf (stderr, "Error in parsing line %s.\n", str);
@@ -4052,19 +4514,19 @@ rootsieve_file ( FILE *file )
 		  }
 		  else if ( str[0] == 'n') {
 			   gmp_sscanf (str, "n: %Zd\n", rs->n);
-			   (flag) ^= (1<<6);
+			   (flag) ^= (1<<9);
 		  }
 
 		  else
 			   continue;
 
-		  if (flag == 511UL) {
+		  if (flag == 1023UL) {
 
 			   /* pre-compute and setup rs */
 			   rsstr_setup (rs);
 
 			   fprintf (stderr, "\n# Polynomial (# %5d).\n", count);
-			   print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m);
+			   print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 1);
 
 			   /* start main rootsieve function */
 			   rootsieve_main (rs);
@@ -4098,7 +4560,7 @@ rootsieve_stdin ( void )
 	 rsstr_setup (rs);
 
 	 fprintf (stderr, "\n# Polynomial (# 0).\n");
-	 print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m);
+	 print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 1);
 
 	 /* start main rootsieve function */
 	 rootsieve_main (rs);

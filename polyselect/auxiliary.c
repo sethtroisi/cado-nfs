@@ -2022,7 +2022,7 @@ do_translate_z (mpz_t *f, int d, mpz_t *g, mpz_t k)
    (local minimum). Modify f and g accordingly.
    If use_rotation is non zero, use also rotation.
 */
-static void
+void
 optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
               int method)
 {

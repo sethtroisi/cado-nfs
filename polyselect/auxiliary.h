@@ -75,6 +75,7 @@ double rotate (mpz_t*, int, unsigned long, mpz_t, mpz_t, long*, long*, int,
 void print_poly (FILE*, cado_poly, int, char**, double, int);
 long translate (mpz_t*, int, mpz_t*, mpz_t, mpz_t, int, int);
 void optimize (mpz_t*, int, mpz_t*, int, int);
+void optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation, int method);
 void rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1, long *J0, long *J1, int verbose, int);
 void do_translate_z (mpz_t *f, int d, mpz_t *g, mpz_t k);
 
