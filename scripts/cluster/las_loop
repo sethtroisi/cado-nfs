@@ -1,9 +1,9 @@
 #!/bin/sh
 
-cd `dirname $0`
+WDIR=`dirname $0`
 
 while true ; do
-    if ! ./las_1job "$@" ; then
+    if ! $WDIR/las_1job "$@" ; then
         exit 1
     fi
     # Do so to avoid crazy loops
