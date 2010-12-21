@@ -11,14 +11,6 @@
 #
 # The changes so far are as follows:
 #  - the relation format has been changed from franke-kleinjung to cado.
-#  - [FIXME] This isn't really linked to cado for the moment, since the
-#    `roots' binary is just expected in the same location as the current
-#    script.
-#  - the rsa768 file names have been changed to snfs247.rels.* ;
-#    [FIXME] For the moment it's still hard-coded, but really this should
-#    go as a parameter. In this spirit, for the moment the poly file is
-#    expected in the same directory as the current script, under the name
-#    snfs247.poly
 #  - the nextprime binary is no longer used. Instead, we rely on the
 #    `roots' binary to provide all the roots for a given range of
 #    special-qs with the -q0 -q1 args. Note that the format of `roots'
@@ -36,9 +28,9 @@
 sub usage {
     print <<EOF;
 Usage:
-    merge.pl <input directory> -o <output directory> [options]
+    merge.pl <input directory> -o <output directory> -n <name> [options]
 Options:
-    -s <number>         split in ranges of given width (default 100000)
+    -s <number>         split in ranges of given width (default 1000000)
     --range <q0>-<q1>   treat only files within range <q0>-<q1>
 
 Note that existing files in the output directory which match the names of
@@ -54,21 +46,27 @@ EOF
 use strict;
 use warnings;
 # use Data::Dumper;
+use File::Basename;
+use Cwd qw(abs_path);
 
+my $wdir = abs_path(dirname(dirname($0)));
 my $scriptsdir = $0;
 # dirname:
 $scriptsdir =~ s{/[^/]+$}{} || do { $scriptsdir = '.'; };
 
 # my $nextprime = "$scriptsdir/gmp_nextprime";
-my $roots = "$scriptsdir/roots";
+my $roots = "$wdir/bin/roots";
+$roots = "$wdir/scripts/roots" unless -x $roots;
+$roots = "$scriptsdir/roots" unless -x $roots;
 
 # die "Need nextprime program ; could not find $nextprime" unless -x $nextprime;
-die "Need roots program ; could not find $roots" unless -x $roots;
+die "Need roots program ; could not find `$wdir/bin/roots'" unless -x $roots;
 
 my @input_dirs;
 my $output_dir;
+my $name;
 
-my $slice = 100000;
+my $slice = 1000000;
 
 my $forced_range;
 
@@ -95,6 +93,9 @@ while (defined(my $x = shift @ARGV)) {
     } elsif ($x eq '-o') {
         $output_dir = shift @ARGV or die "$x needs an argument\n";
         next;
+    } elsif ($x eq '-n') {
+        $name = shift @ARGV or die "$x needs an argument\n";
+        next;
     } elsif (-d $x) {
         push @input_dirs, $x;
         next;
@@ -103,9 +104,13 @@ while (defined(my $x = shift @ARGV)) {
     }
 }
 
-my $name = 'snfs247';
 my $file_base = "$name.rels";
-my $poly_file = "$scriptsdir/$name.poly";
+my $poly_file = "$wdir/$name.poly";
+$poly_file = "$scriptsdir/$name.poly" unless -e $poly_file;
+
+# die "Need nextprime program ; could not find $nextprime" unless -x $nextprime;
+die "Need poly file ; could not find `$wdir/$name.poly'" unless -x $poly_file;
+
 my $file_pattern = qr/^(?:.*\/)?$file_base.(\d+)-(\d+)(?:\.gz)?$/;
 
 # Here is a trimmed-down version of scan-holes.pl. We bark whenever

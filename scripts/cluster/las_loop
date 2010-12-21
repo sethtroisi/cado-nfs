@@ -1,0 +1,11 @@
+#!/bin/sh
+
+cd `dirname $0`
+
+while true ; do
+    if ! ./las_1job "$@" ; then
+        exit 1
+    fi
+    # Do so to avoid crazy loops
+    sleep 10
+done

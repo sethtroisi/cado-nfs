@@ -1,0 +1,88 @@
+#!/bin/bash
+
+# This script is OAR-specific.
+#
+# The purpose is to decompose a multi-node job into several jobs, each
+# sitting on one core.
+#
+# BUGS:
+# - there is some NUMA support, but it's thought as if the number of
+#   cores were always equal to the number of cpus, which is of course very
+#   wrong.
+# - there is no consideration of the case when we want to have, say 2
+#   multithreaded jobs using 2 cores each, on a 4-core machine
+
+# The script takes a typical command line. The command line is run
+# afterwards with two extra arguments:
+#   -- the OAR job id.
+#   -- an extra integer argument indicating its number.
+
+# For example, ./dispatcher echo, given an 8-node reservation on 4-core
+# machines, with OAR job is 1234, will run
+# echo 1234 001 on machine1
+# echo 1234 002 on machine1
+# echo 1234 003 on machine1
+# echo 1234 004 on machine1
+# echo 1234 001 on machine2
+# etc.
+# child programs are waited for by the scripts, so this script finishes
+# only when all sub-scripts are done.
+
+# -n or --numa binds the tasks to their specific cpu.
+# beware that numactl is not available everywhere !
+
+# See the rsa-768 oar cookbook for details.
+
+#while [ $# != 0 ] ; do
+#    case "$1" in
+#        -n|--numa)     shift; numa=1;;
+#        --)     shift; break;;
+#        *)      break;;
+#    esac
+#done
+
+nb_jobs_by_node=4
+
+run_jobs_normal() {
+    i=0
+    for m in $(uniq $OAR_NODEFILE) ; do
+            j=0
+            until [ `expr ${nb_jobs_by_node} - $j` -eq 0 ] ; do
+              SUB="$OAR_JOBID-$(printf '%03d' $i)"
+              oarsh -n $m $@ $OAR_JOBID $i &
+              echo "[`date`] started $SUB $@ $OAR_JOBID $i on $m --> $!"
+              let i+=1
+              let j+=1
+            done
+    done
+    echo "[`date`] wait"
+    wait
+    echo "[`date`] bye"
+}
+
+run_jobs_numa() {
+    i=0
+    while read n m ; do
+            SUB="$OAR_JOBID-$(printf '%03d' $i)"
+            j=0
+            while [ $j -lt $n ] ; do
+                oarsh -n $m numactl -l --physcpubind=$j $@ $OAR_JOBID $i &
+                echo "[`date`] started $SUB $@ $OAR_JOBID $i on $m (cpu $j) --> $!"
+                let i+=1
+                let j+=1
+            done
+    done
+    echo "[`date`] wait"
+    wait
+    echo "[`date`] bye"
+}
+
+run_jobs_normal "$@"
+#if [ "$numa" != 1 ] ; then
+#    run_jobs_normal "$@"
+#else
+#    # Unfortunately piping through a loop spawns a subshell in bash,
+#    # and we can't wait for children (it's not so with zsh, but zsh
+#    # is not everywhere).
+#    uniq -c $OAR_NODEFILE | run_jobs_numa "$@"
+#fi

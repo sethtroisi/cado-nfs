@@ -1,0 +1,214 @@
+#!/bin/bash
+
+# This script tries to grab a parameter-file from ~/rsa768/inqueue 
+# and start a sieving job using the parameters derived from the 
+# parameter-file's name. The format of the parameter-file's name is 
+# "start,len" where start is the start of the interval of primes 
+# to be used for special-q values, and len is the length of the 
+# interval. (Just as the -f and -c parameters for Franke/Kleinjung's 
+# siever.)
+# While the job is running, the parameter-file resides in 
+# ~/rsa768/<cluster>/inprogress and relations are written to a file in 
+# ~/rsa768/<cluster>/working, where <cluster> is the name of the cluster, 
+# i.e. if the name of the node is "bordemer-23", the name of the cluster is
+# "bordemer".
+# Output (stdout and stderr) is written to a file in ~/rsa768/<cluster>/output, 
+# the file name is rsa-<start,len>.out, where <start,len> is as in the 
+# name of the parameter-file.
+# When the job finishes sucessfully, the relations file is moved to
+# ~/rsa768/<cluster>/results and the parameter-file in 
+# ~/rsa768/<cluster>/inprogress is deleted.
+# The script then terminates with an exit code of 0.
+# If any error occurs, the script terminates with an exit code of 1.
+
+# The siever binary is expected to reside in the ~/bin/ directory under the
+# name lasieve-<cluster>. The ~/rsa768/<cluster>/working directory is expected 
+# to contain the polynomial file, factor base file and refactoring strategy
+# file (.st) - the siever expects them all in the current working directory,
+# which is also where it writes its output. The ~/rsa768/<cluster>/working
+# should also contain (a link to) the factor base file to avoid recomputing
+# the factor base each time the siever is run.
+
+
+
+# Cluster name is like host name up to the first "." or  "-"
+#CLUSTER=${HOSTNAME%%[.-]*}
+NAME=snfs247
+OPT="-I 14"
+# OPT="-I 15 -ratq"
+WDIR=$(dirname `dirname $0`)
+GZIP=0
+
+BIN_DIR=${BIN_DIR:-"$WDIR/bin"}
+SCRIPTS_DIR=${SCRIPTS_DIR:-"$WDIR/scripts"}
+#SIEVER=${BIN_DIR}/las_${CLUSTER}
+SIEVER=${BIN_DIR}/las
+# If you want separate inqueues for each cluster, you might populate
+# these directories differently. If you don't care, leave this
+# nonexisting, or better, have it be a link to ../inqueue. It's possible
+# to change it on the fly as well.
+#SPECIFIC_INQUEUE_DIR="${WDIR}/${CLUSTER}/inqueue"
+#COMMON_INQUEUE_DIR="${WDIR}/inqueue"
+#INPROGRESS_DIR="${WDIR}/${CLUSTER}/inprogress"
+#WORKING_DIR="${WDIR}/${CLUSTER}/working_rels"
+#OUTPUT_DIR="${WDIR}/${CLUSTER}/output"
+#RESULTS_DIR="${WDIR}/${CLUSTER}/results_rels"
+INQUEUE_DIR="${WDIR}/inqueue"
+INPROGRESS_DIR="${WDIR}/inprogress"
+WORKING_DIR="${WDIR}/working_rels"
+#OUTPUT_DIR="${WDIR}/output"
+RESULTS_DIR="${WDIR}/results_rels"
+LOG_DIR="${WDIR}/log_rels"
+TIME_CMD="/usr/bin/time"
+
+#LARGESIEVER=${BIN_DIR}/las_${CLUSTER}-l
+#if [[ ! -x $LARGESIEVER ]] ; then
+#    echo "no siever for large q $LARGESIEVER" >&2
+#    # try something desperate.
+#    LARGESIEVER="${BIN_DIR}/`readlink $SIEVER`-l"
+#    if [[ -x $LARGESIEVER ]] ; then
+#        :
+#    else
+#        LARGESIEVER=$SIEVER
+#    fi
+#    echo "picking $LARGESIEVER instead" >&2
+#fi
+
+# See if directories exist
+checkdir() {
+    if [[ ! -d "$1" ]] ; then echo "no dir $1" >&2 ; exit 1 ; fi
+}
+checkbin() {
+    if [[ ! -x "$1" ]] ; then echo "no binary $1" >&2 ; exit 1 ; fi
+}
+#checkdir "$COMMON_INQUEUE_DIR"
+checkdir "$INQUEUE_DIR"
+checkdir "$INPROGRESS_DIR"
+checkdir "$WORKING_DIR"
+#checkdir "$OUTPUT_DIR"
+checkdir "$RESULTS_DIR"
+checkbin "$SIEVER"
+
+#job=$1
+#shift
+
+# Find a file to process
+
+# This caused problems with the same range being processed by two nodes,
+# possibly because the perl script issues rename calls much faster than
+# the shell code and so increases the probability of simultaneous move 
+# attempts on the same file. Exact reason not fully understood, though.
+
+#INQUEUE_DIR="$SPECIFIC_INQUEUE_DIR"
+#if [ ! -d "$INQUEUE_DIR" ] ; then
+#    INQUEUE_DIR="${COMMON_INQUEUE_DIR}"
+#fi
+
+#BASEFILE=`"${SCRIPTS_DIR}/pick_one.pl" "${INQUEUE_DIR}" "${INPROGRESS_DIR}"`
+#
+#if [ "${BASEFILE}" = "" ] ; then
+#    echo "${INQUEUE_DIR} is empty" >&2
+#    if [ "${INQUEUE_DIR}" = "${COMMON_INQUEUE_DIR}" ] ; then
+#        exit 1
+#    else
+#        INQUEUE_DIR="${COMMON_INQUEUE_DIR}"
+#        BASEFILE=`"${SCRIPTS_DIR}/pick_one.pl" "${INQUEUE_DIR}" "${INPROGRESS_DIR}"`
+#        if [ "${BASEFILE}" = "" ] ; then
+#            echo "${INQUEUE_DIR} is empty" >&2
+#            exit 1
+#        fi
+#    fi
+#fi
+#
+#if [[ ! ${BASEFILE} =~ "^[0-9]+,[0-9]+$" ]] ; then
+#  echo "Parameter-file ${BASEFILE} has incorrect format" >& 2
+#  exit 1
+#fi
+
+until
+  unset INFILE
+  INFILE=`ls -U ${INQUEUE_DIR} | sort -n | head -n 1`
+  if [ -z "${INFILE}" ] ; then
+      echo "${INQUEUE_DIR} is empty" >&2
+      #if [ "${INQUEUE_DIR}" = "${COMMON_INQUEUE_DIR}" ] ; then
+      #    exit 1
+      #fi
+      #INQUEUE_DIR="${COMMON_INQUEUE_DIR}"
+      echo "Falling back to shared inqueue" >&2
+      # Force another run through the loop
+      false
+  else
+      BASEFILE=`basename "${INFILE}"`
+
+      # Check if the parameter-file has a properly formatted filename
+      if [[ ! ${BASEFILE} =~ ^[0-9]+,[0-9]+$ ]]
+      then
+        echo "Parameter-file ${BASEFILE} has incorrect format"
+        exit 1
+      fi
+
+      mv "${INQUEUE_DIR}/${BASEFILE}" "${INPROGRESS_DIR}/${BASEFILE}"
+  fi
+do
+    # When we've exhausted our prioritized inqueue, loop once again.
+    if [ ! -z "${INFILE}" ] ; then
+        echo File "$INFILE" suddenly disappered, trying another one. >& 2
+    fi
+  sleep $((RANDOM / 1000))
+done
+
+#echo $job > "${INPROGRESS_DIR}/${BASEFILE}"
+
+# Get the start and length values from the parameter-file
+START="${BASEFILE%,*}"
+LENGTH="${BASEFILE#*,}"
+END="$((START+LENGTH))"
+RELATIONS_FILENAME="${NAME}.rels.${START}-${END}"
+
+if [[ -z ${START} || -z ${LENGTH} ]]
+then
+  echo The start or end value derived from "${INPUTFILE}" is empty. >& 2
+  exit 1
+fi
+
+# This is a bit ugly. Franke's siever seems to want to write to the
+# current working directory, though.
+cd ${WORKING_DIR} 
+
+# echo ${SIEVER} -b rsa768 -v -a -S 44204.72 -f "${START}" -c "${LENGTH}"
+
+#if [[ ${START} -ge 4294960000 ]] ; then
+#    SIEVER=$LARGESIEVER
+#fi
+#SIEVER=$LARGESIEVER
+
+if [ $GZIP -eq 1 ]
+then
+  ${RELATIONS_FILENAME}=${RELATIONS_FILENAME}.gz
+fi
+
+${TIME_CMD} ${SIEVER} ${OPT} -poly ${WDIR}/${NAME}.poly -fb ${WDIR}/${NAME}.roots -q0 "${START}" -q1 "${END}" -mt 2 -out "${WORKING_DIR}/${RELATIONS_FILENAME}" 2> /dev/null 2>&1
+
+# If the siever terminated with an error code, quit
+if [ $? -ne 0 ]
+then
+  exit 1
+fi
+
+# Check that the relations file exist, is non-empty and decompresses 
+# correctly
+if [ ! -s "${RELATIONS_FILENAME}" ]
+then
+  echo Relations file "${RELATIONS_FILENAME}" does not exist or is empty >& 2
+  exit 1
+fi
+
+#ret=`${BIN_DIR}/check_rels -poly ${WDIR}/${NAME}.poly ${RELATIONS_FILENAME}.gz > /dev/null 2>&1`
+#if [ $ret -eq 1 ]]
+#then
+#  echo check_rels failed >&2 ; exit 1
+#fi
+
+# This will overwrite existing files in ${RESULTS_DIR}. Is this what we want?
+mv ${WORKING_DIR}/${RELATIONS_FILENAME} "${RESULTS_DIR}/"
+rm -f "${INPROGRESS_DIR}/${BASEFILE}"
