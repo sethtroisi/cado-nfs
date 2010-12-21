@@ -862,6 +862,7 @@ usage (char *argv)
   fprintf (stderr, "-save xxx    --- save state in file xxx\n");
   fprintf (stderr, "-resume xxx  --- resume state from file xxx\n");
   fprintf (stderr, "-maxnorm xxx --- only print polynomials with norm <= xxx\n");
+  fprintf (stderr, "-maxtime xxx --- stop the search after xxx seconds\n");
   fprintf (stderr, "-out xxx     --- for msieve-format output\n");
   exit (1);
 }
@@ -871,7 +872,7 @@ main (int argc, char *argv[])
 {
   int argc0 = argc;
   char **argv0 = argv, *save = NULL, *resume = NULL;
-  double st0 = seconds ();
+  double st0 = seconds (), maxtime = DBL_MAX;
   mpz_t N;
   unsigned int d = 0;
   unsigned long P, admin = 0, admax = ULONG_MAX;
@@ -905,6 +906,12 @@ main (int argc, char *argv[])
       else if (argc >= 3 && strcmp (argv[1], "-maxnorm") == 0)
         {
           max_norm = atof (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
+      else if (argc >= 3 && strcmp (argv[1], "-maxtime") == 0)
+        {
+          maxtime = atof (argv[2]);
           argv += 2;
           argc -= 2;
         }
@@ -1101,7 +1108,7 @@ main (int argc, char *argv[])
   /* force admin to be divisible by incr */
   admin = ((admin + incr - 1) / incr) * incr; /* incr * ceil (admin/incr) */
 
-  while (admin <= admax)
+  while (admin <= admax && seconds () - st0 <= maxtime)
     {
       for (i = 0; i < nthreads ; i++)
         {
@@ -1160,14 +1167,11 @@ main (int argc, char *argv[])
 	  potential_collisions, 1000.0 * potential_collisions
 	  / (double) cputime ());
 
-  if (verbose > 0)
-    {
-      /* print best 10 values of logmu */
-      printf ("# best logmu:");
-      for (i = 0; i < 10; i++)
-        printf (" %1.2f", best_logmu[i]);
-      printf ("\n");
-    }
+  /* print best 10 values of logmu */
+  printf ("# best logmu:");
+  for (i = 0; i < 10; i++)
+    printf (" %1.2f", best_logmu[i]);
+  printf ("\n");
 
   /* print total time (format for cpu_time.sh) */
   printf ("# Total phase took %.2fs\n", seconds () - st0);
