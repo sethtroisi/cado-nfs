@@ -191,6 +191,7 @@ my @default_param = (
     sievenice    => 19,
     keeprelfiles => 0,
     sieve_max_threads => 2,
+    poly_max_threads => 4,
     ratq	 => 0,
 
     # filtering
@@ -1249,10 +1250,7 @@ sub distribute_task {
         if (!$param{'parallel'} && (my @r = find_hole($opt->{'min'}, $opt->{'max'},
                                 $opt->{'len'}, $ranges)))
         {
-                # XXX What is bwmt doing in here ???
-                my $mt = $param{'bwmt'};
-                $mt=$1*$2 if ($mt =~ /^(\d+)x(\d+)$/);
-                my $nth = min ( $opt->{'max_threads'}, $mt );
+                my $nth = $opt->{'max_threads'};
 
                 info "Starting job: ".pad($r[0], 8)." ".pad($r[1], 8)."\n";
                 $tab_level++;
@@ -1769,7 +1767,7 @@ my $polysel_check = sub {
 };
 
 my $polysel_cmd = sub {
-    my ($a, $b, $m, $max_threads, $gzip) = @_;
+    my ($a, $b, $m, $nthreads, $gzip) = @_;
     return "env nice -$param{'selectnice'} ".
            "$m->{'bindir'}/polyselect/polyselect2 -q ".
            "-kmax $param{'kjkmax'} ".
@@ -1778,6 +1776,7 @@ my $polysel_cmd = sub {
            "-admax $b ".
            "-degree $param{'degree'} ".
            "-maxnorm $param{'kjmaxnorm'} ".
+           "-t $nthreads ".
            "$param{'kjP'} ".
            "< $m->{'prefix'}.n ".
            "> $m->{'prefix'}.kjout.$a-$b ".
@@ -1824,7 +1823,7 @@ sub do_polysel {
                       progress => $polysel_progress,
                       is_done  => $polysel_is_done,
                       cmd      => $polysel_cmd,
-					  max_threads => 1 });
+					  max_threads => $param{'poly_max_threads'} });
 
     info "All done!\n";
 
@@ -1918,7 +1917,7 @@ sub do_polysel_bench {
                       is_done  => $polysel_is_done,
                       cmd      => $polysel_cmd,
                       bench    => 1,
-                      max_threads => 1 });
+                      max_threads => $param{'poly_max_threads'} });
 
     if ($last) {
     	info "All done!\n";
@@ -2050,9 +2049,7 @@ sub dup {
     # Remove duplicates
     info "Removing duplicates...";
     $tab_level++;
-    if (@new_files) {
-        my $new_files = join " ",
-            (map "$param{'wdir'}/$_", sort @new_files);
+    if (exists($new_files[0])) {
         info "split new files in $nslices slices..." if ($verbose);
         cmd("$param{'bindir'}/filter/dup1 ".
             "-out $param{'prefix'}.nodup ".
@@ -2142,7 +2139,7 @@ sub do_purge {
 
 # sieve
 my $sieve_cmd = sub {
-    my ($a, $b, $m, $max_threads, $gzip) = @_;
+    my ($a, $b, $m, $nthreads, $gzip) = @_;
     my $cmd = "env nice -$param{'sievenice'} ".
         "$m->{'bindir'}/sieve/las ".
         "-I $param{'I'} ".
@@ -2150,7 +2147,7 @@ my $sieve_cmd = sub {
         "-fb $m->{'prefix'}.roots ".
         "-q0 $a ".
         "-q1 $b ".
-        "-mt $max_threads ";
+        "-mt $nthreads ";
     $cmd .= "-ratq " if ($param{'ratq'});
     $cmd .=	"-out $m->{'prefix'}.rels.$a-$b";
     $cmd .= ".gz" if ($gzip);
