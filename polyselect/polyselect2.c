@@ -59,7 +59,7 @@ typedef struct
 typedef _roots_struct roots_t[1];
 
 /* read-only global variables */
-static int verbose = 0, incr = 60, default_MAX_k;
+static int verbose = 0, incr = DEFAULT_INCR, default_MAX_k;
 double max_norm = DBL_MAX; /* maximal wanted norm (before rotation) */
 uint32_t *Primes;
 char *out = NULL; /* output file for msieve input (msieve.dat.m) */

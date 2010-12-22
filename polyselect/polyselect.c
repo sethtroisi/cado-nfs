@@ -158,7 +158,6 @@ See the scripts "dist/src/new_run.X" where X is c59 or c79.
 #define DEFAULT_KEEP   100
 #define DEFAULT_M      1e25
 #define DEFAULT_PB     256
-#define DEFAULT_INCR   60
 #define DEFAULT_L      7
 
 extern int MAX_k;
@@ -1313,7 +1312,7 @@ main (int argc, char *argv[])
 
   param_list_init (pl);
   mpz_init_set_ui (n, 0);
-  mpz_init_set_ui (incr, 60);
+  mpz_init_set_ui (incr, DEFAULT_INCR);
   mpz_init (newm);
 
   int full = 0;

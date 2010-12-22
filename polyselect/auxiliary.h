@@ -27,6 +27,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 
 #define MAX_DEGREE 6
 
+#define DEFAULT_INCR 60 /* we want a positive integer with many divisors,
+                           other values are 210, 2310, 30030, 510510, 9699690,
+                           223092870 */
+
 /* differents methods for the L2 norm */
 #define RECTANGULAR 0
 #define CIRCULAR 1
@@ -58,8 +62,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 extern "C" {
 #endif
 
-void mpz_ndiv_qr (mpz_t, mpz_t, mpz_t, mpz_t);
-void generate_base_mb (cado_poly, mpz_t, mpz_t);
 double L2_lognorm (mpz_t*, unsigned long, double, int);
 double L2_skewness (mpz_t*, int, int, int);
 double L2_skewness_old (mpz_t*, int, int, int);
