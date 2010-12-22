@@ -346,7 +346,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       if (out != NULL) /* msieve output */
 	{
 	  FILE *fp;
-	  fp = fopen (out, "a");
+	  fp = fopen (out, "w");
 	  if (fp == NULL)
 	    {
 	      fprintf (stderr, "Error, cannot open file %s\n", out);
