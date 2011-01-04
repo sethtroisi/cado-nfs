@@ -72,20 +72,29 @@ static double exp_alpha[] = {
 	 -14.0651661673 ,-14.1141140255 ,-14.1628944044 ,-14.211509006 };
 
 
-/* Sieve bound for (A + MOD*i)*x + (B + MOD*j) */
+/* Sieve bound for (A + MOD*i)*x + (B + MOD*j), mainly
+   used for stage 2 */
 typedef struct {
-	 long Umax;
-	 long Umin;
-	 long Vmax;
-	 long Vmin;
+	 mpz_t Umax;
+	 mpz_t Umin;
+	 mpz_t Vmax;
+	 mpz_t Vmin;
 	 long Amax;
 	 long Amin;
 	 long Bmax;
 	 long Bmin;
 	 long Blocksize;
-	 long A;
-	 unsigned long B;
-	 unsigned long MOD;
+	 mpz_t A;
+	 mpz_t B;
+	 mpz_t MOD;
+
+	 /* long Umax; */
+	 /* long Umin; */
+	 /* long Vmax; */
+	 /* long Vmin; */
+	 /* long A; */
+	 /* unsigned long B; */
+	 /* unsigned long MOD; */
 } _rsbound_t;
 typedef _rsbound_t rsbound_t[1];
 
@@ -105,14 +114,16 @@ typedef struct {
 typedef _rsstr_t rsstr_t[1];
 
 
-/* Global parameters for root sieve for each sublattice */
+/* parameters for stage 1 */
 typedef struct {
 
 	 /* regarding find_sublattice() functions. */
 	 unsigned short len_e_sl;
+	 unsigned short tlen_e_sl;
 	 unsigned short *e_sl;
+	 unsigned short ncrts_sl;
+	 unsigned short len_p_rs;
 	 unsigned long nbest_sl;
-	 unsigned long modulus;
 
 	 /* only those u < the following in sublattices().
 		also choose e_sl and len_e_sl such that \prod p_i^{e_i}
@@ -120,13 +131,13 @@ typedef struct {
 		do a line sieving 1x[-U, U]  */
 	 unsigned long global_w_bound_rs;
 	 unsigned long global_u_bound_rs;
-	 mpz_t global_v_bound_rs;
-
 	 /* regarding rootsieve_run() functions. */
 	 float sizebound_ratio_rs;
-
-	 unsigned short len_p_rs;
 	 float alpha_bound_rs;
+
+	 mpz_t global_v_bound_rs;
+	 mpz_t modulus;
+
 } _rsparam_t;
 typedef _rsparam_t rsparam_t[1];
 
@@ -160,6 +171,14 @@ typedef struct listnode_t {
 	 struct listnode_t *next;
 } listnode;
 
+
+/* Priority queue to record best sublattices (u, v) */
+typedef struct sublattice_pq_t {
+	 mpz_t *u;
+	 mpz_t *v;
+	 int len;
+	 int used;
+} sublattice_pq;
 
 /* -- ADD FUNCTION DECLARES -- */
 static inline unsigned long solve_lineq ( unsigned long a,
