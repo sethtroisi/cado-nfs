@@ -2105,7 +2105,7 @@ sub purge {
         $nbrels += $last;
     }
     $tab_level++;
-    info "Number of relations left: $nbrels.\n";
+    info "Number of relations left after duplicates: $nbrels.\n";
     $tab_level--;
     info "Removing singletons...";
     $tab_level++;
@@ -2158,6 +2158,7 @@ my $sieve_cmd = sub {
 sub do_sieve {
     my $nrels      = 0;
     my $last_check = 0;
+    my $force_purge = 0;
 
     my $import_rels = sub {
         my ($f) = @_;
@@ -2300,26 +2301,31 @@ sub do_sieve {
 
 
     my $sieve_is_done = sub {
-        # Start filters only after $param{'firstcheck'} relations
-        return 0 if $nrels < $param{'firstcheck'};
-        # Check only every $param{'checkrange'} relations
-        return 0 if $nrels - $last_check < $param{'checkrange'};
-        $last_check = $nrels;
-        open FILE, "> $param{'prefix'}.nrels"
-            or die "Cannot open `$param{'prefix'}.nrels' for writing: $!.\n";
-        print FILE "$nrels\n";
-        close FILE;
+        if ($force_purge == 0) {
+            # Start filters only after $param{'firstcheck'} relations
+            return 0 if $nrels < $param{'firstcheck'};
+            # Check only every $param{'checkrange'} relations
+            return 0 if $nrels - $last_check < $param{'checkrange'};
+            $last_check = $nrels;
+            open FILE, "> $param{'prefix'}.nrels"
+                or die "Cannot open `$param{'prefix'}.nrels' for writing: $!.\n";
+            print FILE "$nrels\n";
+            close FILE;
         
-        # Remove duplicates
-        dup();
-
+            # Remove duplicates
+            dup();
+            $force_purge++;
+            return 0 if ($nrels > 20000000);
+        } 
+        
+        $force_purge = 0;
         # Remove singletons and cliques
         my $ret = purge();
         $tab_level++;
         if ($ret->{'status'}) {
-                info "Not enough relations! Continuing sieving...\n";
-                $tab_level--;
-                return 0;
+            info "Not enough relations! Continuing sieving...\n";
+            $tab_level--;
+            return 0;
         }
 
         # Get the number of rows and columns from the .purged file
@@ -2333,7 +2339,6 @@ sub do_sieve {
 		
         info "Nrows: $nrows; Ncols: $ncols; Excess: $excess.\n";
         $tab_level--;
-
         return 1;
     };
     
