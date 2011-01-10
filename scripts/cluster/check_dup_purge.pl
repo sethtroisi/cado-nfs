@@ -125,7 +125,7 @@ if ($nrels_check) {
     print "  Number of relations left: $rels_after_dup.\n";
     print "Removing singletons...\n";
     system "$wdir/bin/purge ".
-           "-poly $wdir/$name.poly -keep 1 -excess 1 ".
+           "-poly $wdir/$name.poly -keep 160 -excess 1 ".
            "-nrels $rels_after_dup -out $wdir/$name.purged ".
            "-basepath $wdir " .
            "-subdirlist $wdir/$name.subdirlist ".
