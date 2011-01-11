@@ -146,6 +146,7 @@ my $date_f = 0;
 my $ntrunc = 0;
 my $nfiles = 0;
 for (@files) {
+    next unless (-f "$wdir/working_rels/$_");
     $date_f = `ls -go --time-style=+%s "$wdir/working_rels/$_"  | cut -d" "  -f4`;
     next if ($date - $date_f < $interval);
     $ntrunc++ if (clean_1file ("$wdir/working_rels/$_") >= 0);
