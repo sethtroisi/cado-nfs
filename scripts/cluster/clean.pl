@@ -1,13 +1,14 @@
 #!/usr/bin/perl -w
-# usage: $0 $number_files_clean
+# usage: $0
+# cleanup files in working_rels no modified in the last 10 minutes.
 
 use strict;
 use warnings;
 use File::Basename;
 use Cwd qw(abs_path);
 
-my $nfiles=shift;
 my $is_gzip = 0;
+my $interval = 600;
 my $wdir = abs_path(dirname(dirname($0)));
 
 sub last_line {
@@ -129,7 +130,7 @@ sub clean_1file {
   return 1;
 }
 
-# clean old files
+# cleanup old files
 opendir DIR, "$wdir/working_rels/"
     or die "Cannot open directory `$wdir/working_rels/': $!\n";
 my @files;
@@ -138,42 +139,23 @@ if ($is_gzip) {
 } else {
     @files = grep /\.rels\.\d+-\d+$/, readdir DIR;
 }
-my %cache;
-$cache{$_} = -M "$wdir/working_rels/$_" for @files;
-@files = sort { $cache{$b} <=> $cache{$a} } @files;
 closedir DIR;
 
-if (! exists ($files[$nfiles]))
-{
-    $nfiles = scalar @files;
-    print "The directory `$wdir/working_rels/' contains $nfiles relations files.\n";
-}
-my $last_file = `ls -go --time-style=long-iso "$wdir/working_rels/$files[$nfiles-1]"  | cut -d" "  -f4,5`;
-chomp $last_file;
-
-warn "I will clean up the files whose modified date is before : $last_file.\n";
-warn "Are you OK to continue? [y/N] (30s timeout)\n";
-my $r;
-eval {
-    local $SIG{'ALRM'} = sub { die "alarm\n" }; # NB: \n required
-    alarm 30;
-    $r = <STDIN>;
-    alarm 0;
-};
-if ($@) {
-    die unless $@ eq "alarm\n"; # propagate unexpected errors
-}
-die "Aborting...\n" unless $r =~ /^(y|yes|Y)/i;
-
+my $date = `date +%s`;
+my $date_f = 0;
 my $ntrunc = 0;
-my $nfiles0 = $nfiles;
+my $nfiles = 0;
 for (@files) {
-    last if ($nfiles-- == 0);
+    $date_f = `ls -go --time-style=+%s "$wdir/working_rels/$_"  | cut -d" "  -f4`;
+    next if ($date - $date_f < $interval);
     $ntrunc++ if (clean_1file ("$wdir/working_rels/$_") >= 0);
+    $nfiles++;
 }
 
-my $p = int ( $ntrunc * 1000 / $nfiles0 ) / 10;
-print "$p% ($ntrunc/$nfiles0) of files have been recovered.\n";
+if ($nfiles > 0) {
+    my $p = int ( $ntrunc * 1000 / $nfiles ) / 10;
+    print "$p% ($ntrunc/$nfiles) of files have been recovered.\n";
+}
 
 # move and gzip
 opendir DIR, "$wdir/results_rels/"
