@@ -192,8 +192,14 @@ keeppurge=160           # maximal excess wanted after purge
 maxlevel=15             # perform up to <maxlevel>-way merges
 cwmax=100               # maximum column weight
 rwmax=100               # maximum row weight
-ratio=1.1               # ???
-bwstrat=1
+ratio=1.1               # used only when bwstrat=0 (see below)
+bwstrat=1               # bwstrat=0: stops the merge when the weight of
+                        #    the matrix multiplied by the number of rows c*N
+                        #    exceeds ratio*min(c*N)
+                        # bwstrat=1: stops when the product c*N is minimal
+                        #    (more exactly when it increases 20 times in a row)
+                        # bwstrat=3: stops when the average number of non-zero
+                        #    coefficients c/N exceeds coverNmax (default 100)
 
 ###########################################################################
 # Linear algebra
