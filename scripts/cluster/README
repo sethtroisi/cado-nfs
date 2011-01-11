@@ -38,7 +38,7 @@ $ oarsub "$wdir/scripts/dispatcher $wdir/scripts/las_loop" -l nodes=20,walltime=
 
 - clean several times by day the killed jobs because of the besteffort
 mode:
-$ $cdir/scripts/clean.pl $numbers_of_files_to_clean
+$ $cdir/scripts/clean.pl
 
 
 
