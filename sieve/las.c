@@ -3530,6 +3530,8 @@ usage (const char *argv0, const char * missing)
   fprintf (stderr, "          The following are for benchs:\n");
   fprintf (stderr, "          -bench          activate bench mode\n");
   fprintf (stderr, "          -skfact   xxx   skip factor, default=1.01\n");
+  fprintf (stderr, "          -bench2         activate alternate bench mode\n");
+  fprintf (stderr, "          -percent   xxx  percentage of sieving, default=1e-3\n");
   if (missing) {
       fprintf(stderr, "\nError: missing parameter %s\n", missing);
   }
@@ -3565,7 +3567,9 @@ main (int argc0, char *argv0[])
     double max_full = 0.;
     int nb_threads = 1;
     int bench = 0;
+    int bench2 = 0;
     double skip_factor = 1.01;  /* next_q = q*skip_factor in bench mode */
+    double bench_percent = 1e-3; 
     long bench_tot_rep = 0;
     double bench_tot_time = 0.0;
 
@@ -3575,6 +3579,7 @@ main (int argc0, char *argv0[])
     param_list_configure_knob(pl, "-v", &verbose);
     param_list_configure_knob(pl, "-ratq", &ratq);
     param_list_configure_knob(pl, "-bench", &bench);
+    param_list_configure_knob(pl, "-bench2", &bench2);
     argv++, argc--;
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
@@ -3610,6 +3615,7 @@ main (int argc0, char *argv0[])
     param_list_parse_int(pl, "apowlim", &apow_lim);
     param_list_parse_double(pl, "S", &cpoly->skew);
     param_list_parse_double(pl, "skfact", &skip_factor);
+    param_list_parse_double(pl, "percent", &bench_percent);
     int ok = 1;
     ok = ok && param_list_parse_ulong(pl, "rlim", &cpoly->rlim);
     ok = ok && param_list_parse_ulong(pl, "alim", &cpoly->alim);
@@ -3686,7 +3692,7 @@ main (int argc0, char *argv0[])
         exit (EXIT_FAILURE);
       }
 
-    si.bench=bench;
+    si.bench=bench + bench2;
 
     /* this does not depend on the special-q */
     si.ratq = ratq;
@@ -3812,10 +3818,11 @@ main (int argc0, char *argv0[])
     tn_rat = tn_alg = tts = ttsm = ttf = 0.0;
     t0 = seconds ();
     fprintf (output, "#\n");
+    int rep_bench = 0;
+    int nbq_bench = 0;
+    double t_bench = seconds();
     while (q0 < q1)
       {
-        double t_bench = seconds();
-        int rep_bench = 0;
         while (nroots == 0) /* go to next prime and generate roots */
           {
             q0 = uint64_nextprime (q0);
@@ -3902,7 +3909,7 @@ main (int argc0, char *argv0[])
             tn_alg      += rep.tn_alg;
             ttsm        += rep.ttsm;
             ttf         += rep.ttf;
-            rep_bench = rep.reports;
+            rep_bench   += rep.reports;
             for (i = 0; i < 256; ++i) {
                 report_sizes_a[i] += rep.report_sizes_a[i];
                 report_sizes_r[i] += rep.report_sizes_r[i];
@@ -3935,9 +3942,41 @@ main (int argc0, char *argv0[])
               nb_q, nb_q*rep_bench, t0*nb_q, t0/((double)rep_bench));
             bench_tot_time += t0*nb_q;
             bench_tot_rep += nb_q*rep_bench;
+            rep_bench = 0;
             fprintf(output, "# Cumulative (estimated): %lu reports in %1.0f s, %1.2f s/r\n",
                     bench_tot_rep, bench_tot_time,
 		    (double) bench_tot_time / (double) bench_tot_rep);
+            t_bench = seconds();
+        }
+        if (bench2) {
+            nbq_bench++;
+            const int BENCH2 = 50;
+            if (rep_bench >= BENCH2) {
+                t_bench = seconds() - t_bench;
+                fprintf(output,
+                  "# Got %d reports in %1.1f s using %d specialQ\n",
+                  rep_bench, t_bench, nbq_bench);
+                double relperq = (double)rep_bench / (double)nbq_bench;
+                double est_rep = (double)rep_bench;
+                do {
+                    q0 = uint64_nextprime (q0);
+                    est_rep += relperq;
+                } while (est_rep <= BENCH2 / bench_percent);
+                fprintf(output,
+                  "# Extrapolate to %ld reports up to q = %" PRIu64 "\n",
+                  (long) est_rep, q0);
+                bench_tot_time += t_bench / bench_percent;
+                bench_tot_rep += BENCH2 / bench_percent;
+                fprintf(output,
+                  "# Cumulative (estimated): %lu reports in %1.0f s, %1.2f s/r\n",
+                  bench_tot_rep, bench_tot_time,
+                  (double) bench_tot_time / (double) bench_tot_rep);
+                // reinit for next slice of bench:
+                t_bench = seconds();
+                nbq_bench = 0;
+                rep_bench = 0;
+                nroots=0;
+            }
         }
       } // end of loop over special q ideals.
 
@@ -3970,7 +4009,7 @@ main (int argc0, char *argv0[])
     fprintf (output, "# Total %lu reports [%1.3fs/r, %1.1fr/sq]\n",
              tot_reports, t0 / (double) tot_reports,
              (double) tot_reports / (double) sq);
-    if (bench) {
+    if (bench || bench2) {
         fprintf(output, "# Total (estimated): %lu reports in %1.1f s\n",
                 bench_tot_rep, bench_tot_time);
     }
