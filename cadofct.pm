@@ -32,6 +32,7 @@ use warnings;
 
 use File::Basename;
 use File::Temp qw/:POSIX/;
+use File::Copy;
 use Cwd qw(abs_path);
 use List::Util qw[min];
 use POSIX qw(ceil);
@@ -204,6 +205,7 @@ my @default_param = (
     ratio        => 1.5,
     bwstrat      => 1,
     skip         => 32,
+    nslices_log  => 1,
 
     # linalg
     linalg       => 'bwc',
@@ -1972,10 +1974,11 @@ sub do_freerels {
 ###############################################################################
 
 my $dup_purge_done = 0;
-my $nslices = 4;
+my $nslices;
 
 # duplicates
 sub dup {
+    $nslices = 2**$param{'nslices_log'};
     # Get the list of relation files
     opendir DIR, $param{'wdir'}
         or die "Cannot open directory `$param{'wdir'}': $!\n";
@@ -2050,13 +2053,26 @@ sub dup {
     info "Removing duplicates...";
     $tab_level++;
     if (exists($new_files[0])) {
-        info "split new files in $nslices slices..." if ($verbose);
-        cmd("$param{'bindir'}/filter/dup1 ".
-            "-out $param{'prefix'}.nodup ".
-            "-filelist $param{'prefix'}.newfilelist ".
-            "-basepath $param{'wdir'} ",
-            { cmdlog => 1, kill => 1,
-              logfile=>"$param{'prefix'}.dup1.log" });
+        if ($nslices == 1) {
+            info "copy new files in $param{'prefix'}.nodup/0/..." if ($verbose);
+            open FILE, "< $param{'prefix'}.newfilelist"
+                or die "Cannot open `$param{'prefix'}.newfilelist' for reading: $!.\n";
+            while (<FILE>) {
+                chomp $_;
+                copy "$param{'wdir'}/$_", "$param{'prefix'}.nodup/0/$_"
+                    or die "Cannot copy `$param{'wdir'}/$_'.\n";
+            }
+            close FILE;
+        } else {
+            info "split new files in $nslices slices..." if ($verbose);
+            cmd("$param{'bindir'}/filter/dup1 ".
+                "-n $param{'nslices_log'} ".
+                "-out $param{'prefix'}.nodup ".
+                "-filelist $param{'prefix'}.newfilelist ".
+                "-basepath $param{'wdir'} ",
+                { cmdlog => 1, kill => 1,
+                  logfile=>"$param{'prefix'}.dup1.log" });
+        }
     }
     
     $name="$param{'prefix'}.subdirlist";
@@ -2090,6 +2106,7 @@ sub do_dup {
 
 # purge (singletons and cliques)
 sub purge {
+    $nslices = 2**$param{'nslices_log'};
     my $nbrels = 0;
     my $last = 0;
     for (my $i=0; $i < $nslices; $i++) {

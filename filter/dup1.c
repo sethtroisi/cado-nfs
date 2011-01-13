@@ -1,10 +1,11 @@
-/* dup1: 1st duplicate pass, split relation files into NSLICES slices
-   (adapted from check).
+/* dup1: 1st duplicate pass, split relation files into 'nslices' 
+         slices (adapted from check).
 
    Usage:
-   dup1 [-bz] -out <dir> file1 ... filen
+   dup1 [-bz] [-n nslices_log] -out <dir> file1 ... filen
+   by default nslices_log = 1 (nslices = 2).
 
-   Files file1 ... filen are split into NSLICES slices in
+   Files file1 ... filen are split into 'nslices' slices in
    <dir>/0/filej ... <dir>/31/filej.
 
    If option -bz is given, then the output is compressed with bzip2
@@ -13,9 +14,6 @@
 */
 
 #include "cado.h"
-
-#define NSLICES_LOG 2
-#define NSLICES (1 << NSLICES_LOG)
 
 #define CA 314159265358979323UL
 #define CB 271828182845904523UL
@@ -41,19 +39,22 @@
 static int only_ab = 0;
 
 /* output relations in dirname/0/name, ..., dirname/31/name */
-int
-split_relfile (relation_stream_ptr rs, const char *name, const char *dirname, const char * outfmt, int *do_slice)
+int split_relfile (relation_stream_ptr rs, const char *name,
+                   const char *dirname, const char * outfmt,
+                   int *do_slice, int nslices_log, int nslices)
 {
     FILE * f_in;
     int p_in;
     const char * suffix_in;
 
     int ok;
-    char * oname[NSLICES];
-    FILE * ofile[NSLICES];
-    int p_out[NSLICES];
+    char * oname[nslices];
+    FILE * ofile[nslices];
+    int p_out[nslices];
 
-    unsigned long count[NSLICES] = {0,};
+    //unsigned long count[nslices] = {0,};
+    unsigned long count[nslices];
+    count[0] = 0;
     uint64_t h;
 
     f_in = fopen_compressed_r(name, &p_in, &suffix_in);
@@ -65,7 +66,7 @@ split_relfile (relation_stream_ptr rs, const char *name, const char *dirname, co
     // remove recognized suffix.
     ASSERT_ALWAYS(strlen(suffix_in) <= strlen(newname));
     newname[strlen(newname)-strlen(suffix_in)]='\0';
-    for(int i = 0 ; i < NSLICES ; i++) {
+    for(int i = 0 ; i < nslices ; i++) {
         int rc = asprintf(&oname[i],
                 only_ab ? "%s/%d/%s.ab%s" : "%s/%d/%s%s",
                 dirname, i, path_basename(newname), suffix_out);
@@ -92,9 +93,9 @@ split_relfile (relation_stream_ptr rs, const char *name, const char *dirname, co
         /* Using the low bit of h is not a good idea, since then
            odd values of i are twice more likely. The second low bit
            also gives a small bias with RSA768 (but not for random
-           coprime a, b). We use here the NSLICES_LOG high bits.
+           coprime a, b). We use here the nslices_log high bits.
         */
-        int i = h >> (64 - NSLICES_LOG);
+        int i = h >> (64 - nslices_log);
 
         /* print relation */
         if (do_slice[i]) {
@@ -124,7 +125,7 @@ split_relfile (relation_stream_ptr rs, const char *name, const char *dirname, co
 
     relation_stream_unbind(rs);
 
-    for (int i = 0; i < NSLICES; i++) {
+    for (int i = 0; i < nslices; i++) {
       if (do_slice[i])
         {
           if (p_out[i]) pclose (ofile[i]); else fclose(ofile[i]);
@@ -142,7 +143,7 @@ split_relfile (relation_stream_ptr rs, const char *name, const char *dirname, co
 
 void usage()
 {
-    fprintf(stderr, "Usage: ./dup1 [-outfmt <fmt> | -bz] [-only <i>] -out <output_dir> [files...]\n");
+    fprintf(stderr, "Usage: ./dup1 [-outfmt <fmt> | -bz] [-only <i>] [-n <nslices_log>] -out <output_dir> [files...]\n");
 }
 
 int
@@ -167,6 +168,9 @@ main (int argc, char * argv[])
         // abort(); 
     }
 
+    int nslices_log = 1;
+    param_list_parse_int(pl, "n", &nslices_log);
+    int nslices = 1 << nslices_log;
     const char * dirname = param_list_lookup_string(pl, "out");
     int only_slice = -1;
     param_list_parse_int(pl, "only", &only_slice);
@@ -198,13 +202,13 @@ main (int argc, char * argv[])
         usage();
     }
 
-    int do_slice[NSLICES];
+    int do_slice[nslices];
 
     if (only_slice == -1) { /* split all slices */
-        for (int i = 0; i < NSLICES; i++)
+        for (int i = 0; i < nslices; i++)
           do_slice[i] = 1;
     } else { /* split only slide i */
-        for (int i = 0; i < NSLICES; i++)
+        for (int i = 0; i < nslices; i++)
           do_slice[i] = i == only_slice;
     }
 
@@ -218,7 +222,8 @@ main (int argc, char * argv[])
     relation_stream rs;
     relation_stream_init(rs);
     for (char ** fp = files ; *fp ; fp++) {
-        had_error |= split_relfile (rs, *fp, dirname, outfmt, do_slice);
+        had_error |= split_relfile (rs, *fp, dirname, outfmt, do_slice,
+                                    nslices_log, nslices);
     }
     relation_stream_trigger_disp_progress(rs);
     fprintf (stderr,
