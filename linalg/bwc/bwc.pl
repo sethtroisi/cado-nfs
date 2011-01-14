@@ -131,7 +131,7 @@ my $tmpdir;
 my $interleaving;
 my $force_complete;
 
-print $0, " ", join(" ", @ARGV), "\n";
+print $0, " ", $main, " ", join(" ", @ARGV), "\n";
 
 # {{{ MPI detection
 
