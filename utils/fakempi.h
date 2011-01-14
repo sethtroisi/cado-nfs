@@ -37,9 +37,10 @@ typedef int MPI_Request;
 #define MPI_BXOR       0
 #define MPI_SUM        1
 #define MPI_MAX        2
-#define MPI_LAND       3
-#define MPI_BAND       4
-#define MPI_BOR        5
+#define MPI_MIN        3
+#define MPI_LAND       4
+#define MPI_BAND       5
+#define MPI_BOR        6
 
 #define MPI_ERRORS_ARE_FATAl        0
 #define MPI_ERRORS_RETURN        1

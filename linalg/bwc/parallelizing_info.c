@@ -13,6 +13,7 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include <inttypes.h>
+#include <ctype.h>
 #include "bwc_config.h"
 #include "select_mpi.h"
 #include "parallelizing_info.h"
@@ -173,6 +174,99 @@ void grid_print(parallelizing_info_ptr pi, char * buf, size_t siz, int print)
     free(strings);
 }
 
+static void get_node_number_and_prefix(parallelizing_info_ptr pi)
+{
+    int len = strlen(pi->nodename);
+    int minlen = len;
+    int maxlen = len;
+    MPI_Allreduce(MPI_IN_PLACE, &minlen, 1, MPI_INT, MPI_MIN, pi->m->pals);
+    MPI_Allreduce(MPI_IN_PLACE, &maxlen, 1, MPI_INT, MPI_MAX, pi->m->pals);
+    int j;
+    for(j = 0 ; j < minlen ; j++) {
+        int c = pi->nodename[j];
+        if (isdigit(c)) {
+            c = -1;
+        }
+        int cmin = c;
+        int cmax = c;
+        MPI_Allreduce(MPI_IN_PLACE, &cmin, 1, MPI_INT, MPI_MIN, pi->m->pals);
+        MPI_Allreduce(MPI_IN_PLACE, &cmax, 1, MPI_INT, MPI_MAX, pi->m->pals);
+        if (cmin != cmax || cmin < 0)
+            break;
+    }
+    memcpy(pi->nodeprefix, pi->nodename, j);
+    pi->nodeprefix[j]='\0';
+    if (j && pi->nodeprefix[j-1] == '-')
+        pi->nodeprefix[j-1] = '\0';
+    memset(pi->nodenumber_s, ' ', maxlen - j);
+    pi->nodenumber_s[maxlen-j]='\0';
+    memcpy(pi->nodenumber_s + maxlen-len, pi->nodename + j, len-j);
+    if (j == maxlen) {
+        // all nodes have the same name. Most probably because we're only
+        // on one node. Arrange for the display to look vaguely right.
+        memcpy(pi->nodeprefix, pi->nodename, PI_NAMELEN);
+        memcpy(pi->nodenumber_s, pi->nodename, PI_NAMELEN);
+    }
+}
+
+static void display_process_grid(parallelizing_info_ptr pi)
+{
+    char * all_node_ids = malloc(PI_NAMELEN * pi->m->njobs);
+    char * all_node_ids2 = malloc(PI_NAMELEN * pi->m->njobs);
+    typedef int cpair[2];
+    cpair my_coords = { pi->wr[0]->jrank, pi->wr[1]->jrank, };
+    cpair * all_cpairs = malloc(sizeof(cpair) * pi->m->njobs);
+
+    MPI_Allgather(pi->nodenumber_s, PI_NAMELEN, MPI_BYTE,
+            all_node_ids, PI_NAMELEN, MPI_BYTE, pi->m->pals);
+    MPI_Allgather(my_coords, 2, MPI_INT, all_cpairs, 2, MPI_INT, pi->m->pals);
+
+    for(unsigned int i = 0 ; i < pi->m->njobs ; i++) {
+        int x = all_cpairs[i][0];
+        int y = all_cpairs[i][1];
+        unsigned int j = y * pi->wr[0]->njobs + x;
+        if (j >= pi->m->njobs) {
+            fprintf(stderr, "uh ?\n");
+            MPI_Abort(pi->m->pals, 42);
+        }
+        memcpy(all_node_ids2 + j * PI_NAMELEN,
+                all_node_ids + i * PI_NAMELEN,
+                PI_NAMELEN);
+    }
+
+    if (pi->m->jrank == 0) {
+        if (strlen(pi->nodeprefix)) {
+            printf("%d nodes on %s\n", pi->m->njobs, pi->nodeprefix);
+        } else {
+            printf("%d nodes, no common name prefix\n", pi->m->njobs);
+        }
+        char * pad = malloc(PI_NAMELEN);
+        memset(pad, ' ', PI_NAMELEN);
+        int node_id_len = strlen(pi->nodenumber_s);
+        pad[node_id_len]='\0';
+        if (node_id_len) pad[node_id_len/2]='.';
+        for(unsigned int i = 0 ; i < pi->wr[1]->njobs ; i++) {       // i == y
+        for(unsigned int it = 0 ; it < pi->wr[1]->ncores ; it++) {
+            for(unsigned int j = 0 ; j < pi->wr[0]->njobs ; j++) {       // j == x
+            for(unsigned int jt = 0 ; jt < pi->wr[0]->ncores ; jt++) {       // jt == x
+                char * what = pad;
+                if (!it && !jt) {
+                    what = all_node_ids2 + PI_NAMELEN * (i * pi->wr[0]->njobs + j); 
+                }
+                printf(" %s", what);
+            }
+            }
+            printf("\n");
+        }
+        }
+        free(pad);
+    }
+    free(all_node_ids2);
+    free(all_node_ids);
+    free(all_cpairs);
+    MPI_Barrier(pi->m->pals);
+}
+
 static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
 {
     int err;
@@ -193,13 +287,12 @@ static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
     {
         struct utsname u[1];
         uname(u);
-        memcpy(pi->nodename, u->nodename, MAX(sizeof(pi->nodename), sizeof(u->nodename)));
-        pi->nodename[sizeof(pi->nodename)-1]='\0';
+        memcpy(pi->nodename, u->nodename, MAX(PI_NAMELEN, sizeof(u->nodename)));
+        pi->nodename[PI_NAMELEN-1]='\0';
         char * p = strchr(pi->nodename, '.');
         if (p) *p='\0';
     }
 #endif
-
     pi->m->njobs = nhj * nvj;
     pi->m->ncores = nhc * nvc;
     pi->m->totalsize = pi->m->njobs * pi->m->ncores;
@@ -255,6 +348,9 @@ static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
         ASSERT_ALWAYS(!err);
         MPI_Comm_rank(pi->wr[d]->pals, (int*) &pi->wr[d]->jrank);
     }
+
+    get_node_number_and_prefix(pi);
+    display_process_grid(pi);
 }
 
     static parallelizing_info *
@@ -1330,6 +1426,7 @@ int pi_load_file(pi_wiring_ptr w, const char * name, void * buf, size_t mysize)
             cs[j] = sendcounts[j];
             cd[j] = displs[j];
         }
+        err = 0;
         for(int spin = 0;;spin++) {
             int ts[w->njobs];
             int ts0=1;

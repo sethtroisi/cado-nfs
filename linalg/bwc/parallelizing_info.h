@@ -139,6 +139,7 @@ struct pi_dictionary_s {
 typedef struct pi_dictionary_s pi_dictionary[1];
 typedef struct pi_dictionary_s * pi_dictionary_ptr;
 
+#define PI_NAMELEN      32
 struct parallelizing_info_s {
     // row-wise, column-wise.
     pi_wiring wr[2];
@@ -146,7 +147,9 @@ struct parallelizing_info_s {
     pi_wiring m;
     pi_interleaving_ptr interleaved;
     pi_dictionary_ptr dict;
-    char nodename[32];
+    char nodename[PI_NAMELEN];
+    char nodeprefix[PI_NAMELEN];
+    char nodenumber_s[PI_NAMELEN];
 };
 
 typedef struct parallelizing_info_s parallelizing_info[1];
