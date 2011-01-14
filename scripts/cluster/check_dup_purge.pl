@@ -44,6 +44,9 @@ print "TOTAL : Read $nrels relations and imported $nrels_check relations.\n".
 
 ##### PREP DUP #####
 my $total_rels = $nrels_check;
+my $nslices_log = 2;
+my $nslices = 2**$nslices_log;
+
 if (-e "$wdir/$name.nrels") {
     open FILE, "< $wdir/$name.nrels"
         or die "Cannot open `$wdir/$name.nrels' for reading: $!.\n";
@@ -74,7 +77,6 @@ my @all_files = grep /$pat/, readdir DIR;
 closedir DIR;
 mkdir "$wdir/$name.nodup"
         unless (-d "$wdir/$name.nodup");
-my $nslices = 4;
 for (my $i=0; $i < $nslices; $i++) {
     mkdir "$wdir/$name.nodup/$i"
         unless (-d "$wdir/$name.nodup/$i");
@@ -92,6 +94,7 @@ if ($nrels_check) {
     print "Removing duplicates...\n";
     print "  split new files in $nslices slices...\n";
     system "$wdir/bin/dup1 ".
+           "-n $nslices_log ".
            "-out $wdir/$name.nodup ".
            "-filelist $wdir/$name.newfilelist ".
            "-basepath $wdir ".
