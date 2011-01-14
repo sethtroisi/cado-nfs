@@ -146,6 +146,7 @@ struct parallelizing_info_s {
     pi_wiring m;
     pi_interleaving_ptr interleaved;
     pi_dictionary_ptr dict;
+    char nodename[32];
 };
 
 typedef struct parallelizing_info_s parallelizing_info[1];

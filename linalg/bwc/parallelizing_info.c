@@ -19,6 +19,10 @@
 #include "macros.h"
 
 #include <sys/time.h>   // gettimeofday
+#define OBTAIN_NODENAME
+#ifdef  OBTAIN_NODENAME /* in case someday we have difficulties with this */
+#include <sys/utsname.h>   // gettimeofday      
+#endif
 
 static inline void pi_wiring_init_pthread_things(pi_wiring_ptr w, const char * desc)
 {
@@ -184,6 +188,15 @@ static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
     unsigned int nvc = thr[1];
 
     memset(pi, 0, sizeof(parallelizing_info));
+
+#ifdef OBTAIN_NODENAME
+    {
+        struct utsname u[1];
+        uname(u);
+        memcpy(pi->nodename, u->nodename, MAX(sizeof(pi->nodename), sizeof(u->nodename)));
+        pi->nodename[sizeof(pi->nodename)-1]='\0';
+    }
+#endif
 
     pi->m->njobs = nhj * nvj;
     pi->m->ncores = nhc * nvc;
