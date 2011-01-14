@@ -367,6 +367,13 @@ void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_
         load_vector_toprow_generic(mmt, stride, v, name, d, iter);
     }
 
+    if (picol->trank == 0) {
+        SEVERAL_THREADS_PLAY_MPI_BEGIN(pirow) {
+            int err = MPI_Barrier(picol->pals);
+            ASSERT_ALWAYS(!err);
+        }
+        SEVERAL_THREADS_PLAY_MPI_END;
+    }
     serialize(mmt->pi->m);
     serialize_threads(mmt->pi->m);
 

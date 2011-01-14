@@ -95,7 +95,11 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
             int rc = asprintf(&filename, COMMON_VECTOR_ITERATE_PATTERN, Y_FILE_BASE, 0, mmt->bal->h->checksum);
 
             abt * y = abinit(abase, mmt->n[!bw->dir]);
-            abrandom(abase, y, mmt->n[!bw->dir]);
+            abzero(abase, y, mmt->n[!bw->dir]);
+            if (pi->m->jrank == 0)
+                abrandom(abase, y, mmt->n[!bw->dir]);
+            int err = MPI_Bcast(y, abbytes(abase, mmt->n[!bw->dir]), MPI_BYTE, 0, pi->m->pals);
+            ASSERT_ALWAYS(!err);
             FILE * f = fopen(filename, "w");
             ASSERT_ALWAYS(f);
             rc = fwrite(y, sizeof(abt), mmt->n[!bw->dir], f);
