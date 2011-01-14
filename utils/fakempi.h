@@ -102,6 +102,13 @@ static inline int MPI_Scatterv(void * sendbuf, int * sendcounts, int * displs,  
     return 0;
 }
 
+static inline int MPI_Scatter(void * sendbuf, int sendcount, MPI_Datatype st, void * recvbuf, int recvcount, MPI_Datatype rt, int root MAYBE_UNUSED, MPI_Comm x MAYBE_UNUSED) {
+    ASSERT_ALWAYS(sendcount * st == recvcount * rt);
+    if (recvbuf && sendbuf)
+        memcpy(recvbuf, sendbuf, recvcount * rt);
+    return 0;
+}
+
 static inline int MPI_Barrier (MPI_Comm x MAYBE_UNUSED) { return 0; }
 
 static inline int MPI_Gatherv(void * sendbuf, int sendcount,  MPI_Datatype st, void * recvbuf, int * recvcounts, int * displs, MPI_Datatype rt, int root MAYBE_UNUSED, MPI_Comm x MAYBE_UNUSED) {

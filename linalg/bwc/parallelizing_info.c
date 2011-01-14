@@ -195,6 +195,8 @@ static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
         uname(u);
         memcpy(pi->nodename, u->nodename, MAX(sizeof(pi->nodename), sizeof(u->nodename)));
         pi->nodename[sizeof(pi->nodename)-1]='\0';
+        char * p = strchr(pi->nodename, '.');
+        if (p) *p='\0';
     }
 #endif
 
@@ -1307,9 +1309,55 @@ int pi_load_file(pi_wiring_ptr w, const char * name, void * buf, size_t mysize)
 
     SEVERAL_THREADS_PLAY_MPI_BEGIN(w) {
         ASSERT_ALWAYS(mysize == (size_t) sendcounts[w->jrank]);
+#if 1
+        /* There seems to be a concurrency problem with the openmpi
+         * implementation of MPI_Scatterv. We resort to an emulation
+         * which uses MPI_Scatter. It's tailored-fit to our purpose,
+         * since we know that the send counts will almost all be equal in
+         * most cases. We also use somewhat jumbo frames.
+         */
+        int chunksize = 1 << 20;
+        void * tsendbuf = NULL;
+        void * trecvbuf = malloc(chunksize);
+        if (w->jrank == 0) {
+            tsendbuf = malloc(w->njobs * chunksize);
+            memset(tsendbuf, 0, w->njobs * chunksize);
+        }
+        memset(trecvbuf, 0, chunksize);
+        int cs[w->njobs];
+        int cd[w->njobs];
+        for(unsigned int j = 0 ; j < w->njobs ; j++) {
+            cs[j] = sendcounts[j];
+            cd[j] = displs[j];
+        }
+        for(int spin = 0;;spin++) {
+            int ts[w->njobs];
+            int ts0=1;
+            for(unsigned int j = 0 ; j < w->njobs ; j++) {
+                ts[j] = MIN(chunksize, cs[j]);
+                if (ts[j]) {
+                    if (w->jrank == 0)
+                        memcpy(tsendbuf + j * chunksize, sendbuf + cd[j], ts[j]);
+                    ts0=0;
+                }
+            }
+            if (ts0) break;
+            err = MPI_Scatter(tsendbuf, chunksize, MPI_BYTE, trecvbuf,
+                    chunksize, MPI_BYTE, 0, w->pals);
+            memcpy(buf + cd[w->jrank] - displs[w->jrank], trecvbuf, ts[w->jrank]);
+            for(unsigned int j = 0 ; j < w->njobs ; j++) {
+                cs[j] -= ts[j];
+                cd[j] += ts[j];
+            }
+        }
+        if (w->jrank == 0) {
+            free(tsendbuf);
+        }
+#else
         err = MPI_Scatterv(sendbuf, sendcounts, displs, MPI_BYTE,
-                buf, mysize, MPI_BYTE,
+                buf, sendcounts[w->jrank], MPI_BYTE,
                 0, w->pals);
+#endif
         ASSERT_ALWAYS(!err);
     }
     SEVERAL_THREADS_PLAY_MPI_END;

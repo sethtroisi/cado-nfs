@@ -367,6 +367,9 @@ void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_
         load_vector_toprow_generic(mmt, stride, v, name, d, iter);
     }
 
+    if (picol->jrank == 0) {
+        serialize_threads(mmt->pi->m);
+    }
     if (picol->trank == 0) {
         SEVERAL_THREADS_PLAY_MPI_BEGIN(pirow) {
             int err = MPI_Barrier(picol->pals);
@@ -668,7 +671,21 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
             cache_loaded = matmul_reload_cache(mmt->mm);
         }
     }
-    ASSERT_ALWAYS(global_data_eq(mmt->pi, &cache_loaded, sizeof(int)));
+    if (!global_data_eq(mmt->pi, &cache_loaded, sizeof(int))) {
+        if (mmt->pi->m->trank == 0) {
+        if (mmt->pi->m->jrank == 0) {
+            fprintf(stderr, "Fatal error: cache files not present at expected locations\n");
+        }
+            fprintf(stderr, "%s (J%uT%u): cache %s: %s\n",
+                    mmt->pi->nodename,
+                    mmt->pi->m->jrank,
+                    mmt->pi->m->trank,
+                    mmt->mm->cachefile_name,
+                    cache_loaded ? "ok" : "not ok");
+        }
+        serialize(mmt->pi->m);
+        abort();
+    }
 
     unsigned int sqb = 0;
     param_list_parse_uint(pl, "sequential_cache_build", &sqb);
@@ -725,7 +742,8 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
     }
 
     my_pthread_mutex_lock(mmt->pi->m->th->m);
-    fprintf(stderr, "J%uT%u uses cache file %s\n",
+    fprintf(stderr, "%s J%uT%u uses cache file %s\n",
+            mmt->pi->nodename,
             mmt->pi->m->jrank, mmt->pi->m->trank,
             /* cache for mmt->locfile, */
             mmt->mm->cachefile_name);

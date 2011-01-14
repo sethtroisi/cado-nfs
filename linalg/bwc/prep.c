@@ -109,6 +109,9 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
             free(filename);
         }
         matmul_top_load_vector(mmt, Y_FILE_BASE, bw->dir, 0);
+        if (tcan_print) {
+            printf("// vector generated and dispatched (trial # %u)\n", ntri);
+        }
 
 #if 0
         // Compute y.
