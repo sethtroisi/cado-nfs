@@ -157,31 +157,46 @@ sub detect_mpi {
     }
 
     if (defined($mpi)) {
-        CHECK_MPICH2_VERSION: {
-            if (-x "$mpi/mpich2version") {
-                my $v = `$mpi/mpich2version -v`;
-                chomp($v);
-                if ($v =~ /MPICH2 Version:\s*(\d.*)$/) {
-                    $mpi_ver="mpich2-$1";
-                } else {
-                    $mpi_ver="mpich2-UNKNOWN";
-                }
-                $v = `$mpi/mpich2version -c`;
-                chomp($v);
-                if ($v =~ /--with-pm=hydra/) {
-                    $mpi_ver .= "+hydra";
+        SEVERAL_CHECKS: {
+            CHECK_MVAPICH2: {
+                if (-x "$mpi/mpiname") {
+                    my $v = `$mpi/mpiname -n -v`;
+                    chomp($v);
+                    if ($v =~ /MVAPICH2\s+([\w\.]+)/) {
+                        $mpi_ver="mvapich2-$1";
+                        last SEVERAL_CHECKS;
+                    }
                 }
             }
-        }
-        CHECK_OMPI_VERSION: {
-            if (-x "$mpi/ompi_info") {
-                my @v = `$mpi/ompi_info`;
-                my @vv = grep { /Open MPI:/; } @v;
-                last CHECK_OMPI_VERSION unless scalar @vv == 1;
-                if ($vv[0] =~ /Open MPI:\s*(\d\S*)$/) {
-                    $mpi_ver="openmpi-$1";
-                } else {
-                    $mpi_ver="openmpi-UNKNOWN";
+            CHECK_MPICH2_VERSION: {
+                if (-x "$mpi/mpich2version") {
+                    my $v = `$mpi/mpich2version -v`;
+                    chomp($v);
+                    if ($v =~ /MPICH2 Version:\s*(\d.*)$/) {
+                        $mpi_ver="mpich2-$1";
+                    } else {
+                        $mpi_ver="mpich2-UNKNOWN";
+                    }
+                    $v = `$mpi/mpich2version -c`;
+                    chomp($v);
+                    if ($v =~ /--with-pm=hydra/) {
+                        $mpi_ver .= "+hydra";
+                    }
+                        last SEVERAL_CHECKS;
+                }
+            }
+            CHECK_OMPI_VERSION: {
+                if (-x "$mpi/ompi_info") {
+                    my @v = `$mpi/ompi_info`;
+                    my @vv = grep { /Open MPI:/; } @v;
+                    last CHECK_OMPI_VERSION unless scalar @vv == 1;
+                    if ($vv[0] =~ /Open MPI:\s*(\d\S*)$/) {
+                        $mpi_ver="openmpi-$1";
+                        last SEVERAL_CHECKS;
+                    } else {
+                        $mpi_ver="openmpi-UNKNOWN";
+                        last SEVERAL_CHECKS;
+                    }
                 }
             }
         }
@@ -422,17 +437,22 @@ sub dosystem
 ##################################################
 # Do we need mpi ??
 
+sub ssh_program() {
+    my $ssh='ssh';
+    if (exists($ENV{'OAR_JOBID'})) {
+        $ssh="/usr/bin/oarsh";
+    }
+    return $ssh
+}
+
 # Starting daemons for mpich2 1.0.x
 sub check_mpd_daemons()
 {
     return if !defined $mpi_ver;
-    return if $mpi_ver !~ /^mpich2/;
+    return if $mpi_ver !~ /^(?:mpich2|mvapich2)/;
     return if $mpi_ver =~ /^mpich2.*\+hydra/;
 
-    my $rsh='ssh';
-    if (exists($ENV{'OAR_JOBID'})) {
-        $rsh="/usr/bin/oarsh";
-    }
+    my $ssh = ssh_program();
 
     my $rc = system "$mpi/mpdtrace > /dev/null 2>&1";
     if ($rc == 0) {
@@ -456,7 +476,7 @@ sub check_mpd_daemons()
     close F;
     my $n = scalar keys %hosts;
     print "Running $n mpi daemons\n";
-    dosystem "$mpi/mpdboot -n $n -r $rsh -f $hostfile -v";
+    dosystem "$mpi/mpdboot -n $n -r $ssh -f $hostfile -v";
 }
 
 # my $mpi_needed = $mpi_split[0] * $mpi_split[1] != 1;
@@ -510,6 +530,8 @@ if ($mpi_needed) {
             push @mpi_precmd, "--hostfile", $hostfile;
         } elsif ($mpi_ver =~ /^mpich2/) {
             # Assume daemons do the job.
+        } elsif ($mpi_ver =~ /^mvapich2/) {
+            # Assume daemons do the job.
         } else {
             push @mpi_precmd, "-file", $hostfile;
         }
@@ -523,6 +545,9 @@ if ($mpi_needed) {
     }
     check_mpd_daemons();
     push @mpi_precmd, '-n', $mpi_split[0] * $mpi_split[1];
+    if ($mpi_ver =~ /^openmpi/) {
+        push @mpi_precmd, qw/--mca plm_rsh_agent/, ssh_program();
+    }
     push @mpi_precmd_single, '-n', 1;
 
     if (defined($mpi_extra_args)) {
