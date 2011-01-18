@@ -99,7 +99,10 @@ int main(int argc, char * argv[])
     }
 
     struct stat sbuf[1];
-    stat(ifile, sbuf);
+    if (stat(ifile, sbuf) < 0) {
+        perror(ifile);
+        exit(1);
+    }
 
     if ((sbuf->st_size) % splits[nsplits] != 0) {
         fprintf(stderr, 
