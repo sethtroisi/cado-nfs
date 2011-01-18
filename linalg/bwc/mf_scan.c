@@ -37,17 +37,17 @@ void usage(int rc)
             " mfile       matrix file (can also be given freeform)\n"
             " rwfile      row weight file\n"
             " cwfile      col weight file\n"
-            " ofile       output file name\n"
+            " ofile       output file name ; no output if unspecified\n"
             "Recognized flags:"
             " --ascii-in   mfile in ascii\n"
-            " --ascii-out  mfile in ascii\n"
-            " --binary-in  mfile in ascii\n"
-            " --binary-out mfile in ascii\n"
+            " --ascii-out  ofile in ascii\n"
+            " --binary-in  mfile in binary\n"
+            " --binary-out ofile in binary\n"
             " --quiet      no progress info\n"
             " --nofreq     no .rw and .cw files\n"
             " --freq       output .rw and .cw files\n"
             " --ascii-freq .rw and .cw files in ascii\n"
-            " --binary-freq .rw and .cw files in ascii\n"
+            " --binary-freq .rw and .cw files in binary\n"
     );
     exit(rc);
 }
