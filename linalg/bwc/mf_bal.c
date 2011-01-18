@@ -370,10 +370,29 @@ int main(int argc, char * argv[])
         bal->h->ncoeffs = 0;
     } else {
         bal->h->ncoeffs = sbuf_mat->st_size / sizeof(uint32_t) - bal->h->nrows;
-        fprintf(stderr,
-                "%s: %" PRIu32 " rows %" PRIu32 " cols"
-                " weight %" PRIu64 "\n",
-                mfile, bal->h->nrows, bal->h->ncols, bal->h->ncoeffs);
+        int extra = bal->h->ncols - bal->h->nrows;
+        if (extra > 0) {
+            fprintf(stderr,
+                    "%s: %" PRIu32 " rows %" PRIu32 " cols"
+                    " (%d extra cols)"
+                    " weight %" PRIu64 "\n",
+                    mfile, bal->h->nrows, bal->h->ncols,
+                    extra,
+                    bal->h->ncoeffs);
+        } else if (extra < 0) {
+            fprintf(stderr,
+                    "%s: %" PRIu32 " rows %" PRIu32 " cols"
+                    " (%d extra rows)"
+                    " weight %" PRIu64 "\n",
+                    mfile, bal->h->nrows, bal->h->ncols,
+                    -extra,
+                    bal->h->ncoeffs);
+        } else {
+            fprintf(stderr,
+                    "%s: %" PRIu32 " rows %" PRIu32 " cols"
+                    " weight %" PRIu64 "\n",
+                    mfile, bal->h->nrows, bal->h->ncols, bal->h->ncoeffs);
+        }
     }
     /* TODO: In case we rely on the rows, not columns for doing the
      * balancing, there is of course some code which must be modified

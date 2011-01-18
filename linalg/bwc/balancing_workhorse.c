@@ -1412,8 +1412,24 @@ void * balancing_get_matrix_u32(parallelizing_info_ptr pi, param_list pl, matrix
             exit(1);
         }
 
-	printf("Total %" PRIu32 " rows %" PRIu32 " cols %" PRIu64 " coeffs\n",
-	       m->bal->h->nrows, m->bal->h->ncols, m->bal->h->ncoeffs);
+        int extra = m->bal->h->ncols - m->bal->h->nrows;
+        if (extra > 0) {
+            printf("Total %" PRIu32 " rows %" PRIu32 " cols "
+                    "(%d extra cols) "
+                    "%" PRIu64 " coeffs\n",
+                    m->bal->h->nrows, m->bal->h->ncols,
+                    extra, m->bal->h->ncoeffs);
+        } else if (extra < 0) {
+            printf("Total %" PRIu32 " rows %" PRIu32 " cols "
+                    "(%d extra rows) "
+                    "%" PRIu64 " coeffs\n",
+                    m->bal->h->nrows, m->bal->h->ncols,
+                    -extra, m->bal->h->ncoeffs);
+        } else {
+            printf("Total %" PRIu32 " rows %" PRIu32 " cols "
+                    "%" PRIu64 " coeffs\n",
+                    m->bal->h->nrows, m->bal->h->ncols, m->bal->h->ncoeffs);
+        }
 	if (m->bal->h->flags & FLAG_PADDING) {
 	    uint32_t maxdim = MAX(m->bal->h->nrows, m->bal->h->ncols);
 	    printf("Padding to a matrix of size %" PRIu32 "x%" PRIu32 "\n",
