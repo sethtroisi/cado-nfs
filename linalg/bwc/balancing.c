@@ -31,6 +31,12 @@ void balancing_finalize(balancing_ptr bal)
         // a trick to identify conjugated perms.
         bal->h->checksum &= ~0xff;
     }
+    /* There's another code branch which uses a reordered matrix product.
+     * We use the least significant bit to indicate whether this is being
+     * used or not. (for now it has never been, and all experiments have
+     * used FLAG_REPLICATE, so bit has always been cleared so far).
+     */
+    bal->h->checksum &= ~0x1;
 }
 
 void balancing_write_inner(balancing_ptr bal, const char * filename)

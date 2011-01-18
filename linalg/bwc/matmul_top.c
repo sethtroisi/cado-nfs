@@ -559,6 +559,10 @@ void matmul_top_init(matmul_top_data_ptr mmt,
     }
 
     balancing_read_header(mmt->bal, tmp);
+    if (mmt->bal->h->checksum & 0x1) {
+        fprintf(stderr, "This balancing is intended for use with the stirred matrix multiplier\n");
+        exit(1);
+    }
     mmt_fill_fields_from_balancing(mmt, pl);
 
     // after that, we need to check for every node if the cache file can
