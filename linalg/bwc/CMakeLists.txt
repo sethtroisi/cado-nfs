@@ -62,6 +62,13 @@ set_target_properties(balancing PROPERTIES
         COMPILE_FLAGS "--mpi"
         LINK_FLAGS "--mpi")
 
+if (${WITH_MPI})
+add_executable(bcast-file bcast-file.c)
+set_target_properties(bcast-file PROPERTIES
+        COMPILE_FLAGS "--mpi"
+        LINK_FLAGS "--mpi")
+endif (${WITH_MPI})
+
 if (HAVE_CURL)
 target_link_libraries(balancing curl)
 endif (HAVE_CURL)

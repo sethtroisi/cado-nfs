@@ -574,6 +574,8 @@ push @main_args, splice @extra_args;
 push @main_args, "matrix=$matrix";
 
 sub obtain_bfile {
+    # TODO: we're checking on the localhost, which does not really make
+    # sense.
     return if $balancing;
     opendir(my $dh, $wdir);
     my $x = $matrix;
