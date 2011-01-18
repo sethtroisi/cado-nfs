@@ -506,7 +506,6 @@ if ($mpi_needed) {
     detect_mpi;
 
     push @mpi_precmd, "$mpi/mpiexec";
-    push @mpi_precmd_single, "$mpi/mpiexec";
 
     # Need hosts.
     if (exists($ENV{'OAR_JOBID'}) && !defined($hostfile) && !scalar @hosts) {
@@ -544,15 +543,18 @@ if ($mpi_needed) {
         # Otherwise we'll assume that the simple setup will work fine.
     }
     check_mpd_daemons();
-    push @mpi_precmd, '-n', $mpi_split[0] * $mpi_split[1];
     if ($mpi_ver =~ /^openmpi/) {
         push @mpi_precmd, qw/--mca plm_rsh_agent/, ssh_program();
     }
-    push @mpi_precmd_single, '-n', 1;
-
     if (defined($mpi_extra_args)) {
         push @mpi_precmd, split(' ', $mpi_extra_args);
     }
+
+    @mpi_precmd_single = @mpi_precmd;
+    push @mpi_precmd, '-n', $mpi_split[0] * $mpi_split[1];
+    push @mpi_precmd_single, '-n', 1;
+
+    dosystem(@mpi_precmd, split(' ', "mkdir -p $wdir"));
 #} elsif (defined(my $mpi_path=$ENV{'MPI'})) {
 #    my $ldlp;
 #    if (defined($ldlp=$ENV{'LD_LIBRARY_PATH'})) {
