@@ -201,7 +201,7 @@ int rollbuf_get(rollbuf_ptr r, char * p, size_t s)
 #ifndef NDEBUG
         ptrdiff_t head = r->avail_to_read - tail;
         assert(head > 0);
-        assert((size_t) (s - tail) <= head);
+        assert((size_t) (s - tail) <= (size_t) head);
         // s = tail + MIN((size_t) head, s - tail);
 #endif
         assert(s >= tail);
