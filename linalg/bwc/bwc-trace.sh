@@ -13,8 +13,8 @@ if [ -d $wdir ] ; then rm -rf $wdir 2>/dev/null ; fi
 mkdir $wdir
 
 
-Mh=1; Mv=1;
-Th=3; Tv=5;
+Mh=2; Mv=2;
+Th=3; Tv=2;
 Nh=$((Mh*Th))
 Nv=$((Mv*Tv))
 

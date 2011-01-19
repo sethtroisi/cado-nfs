@@ -75,6 +75,7 @@ struct mmt_wiring_s {
     mmt_vec v;
     unsigned int i0;
     unsigned int i1;
+    abt * rsbuf[2];             // only for USE_ALTERNATIVE_REDUCE_SCATTER
 #if 0
 #ifdef  CONJUGATED_PERMUTATIONS
     /* This is likely to be relevant only for conjugated matrices */

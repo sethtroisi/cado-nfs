@@ -16,6 +16,15 @@
 #error "Do you really, really want to use arbitrary left and right sigmas ?"
 #endif
 
+
+/* This enables an alternative algorithm instead of the stock
+ * reduce_scatter implementation. It's slightly worrying to reach this
+ * conclusion, but our simple contender wins with flying colours against
+ * mvapich2's.
+ */
+#define USE_ALTERNATIVE_REDUCE_SCATTER
+
+
 ///////////////////////////////////////////////////////////////////
 /* Start with stuff that does not depend on abase at all -- this
  * provides a half-baked interface */
@@ -554,6 +563,12 @@ static void mmt_finish_init(matmul_top_data_ptr mmt, int const * flags, param_li
     matmul_top_vec_init(mmt, 0, flags ? flags[0] : 0);
     matmul_top_vec_init(mmt, 1, flags ? flags[1] : 0);
 
+#ifdef USE_ALTERNATIVE_REDUCE_SCATTER
+    for(int d = 0 ; d < 2 ; d++)  {
+        mmt->wr[d]->rsbuf[0] = abinit(mmt->abase, mmt->n[d] / mmt->pi->m->totalsize * mmt->pi->wr[d]->ncores);
+        mmt->wr[d]->rsbuf[1] = abinit(mmt->abase, mmt->n[d] / mmt->pi->m->totalsize * mmt->pi->wr[d]->ncores);
+    }
+#endif  /* USE_ALTERNATIVE_REDUCE_SCATTER */
 }
 
 static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, int optimized_direction)
@@ -700,6 +715,12 @@ void matmul_top_clear(matmul_top_data_ptr mmt, abobj_ptr abase MAYBE_UNUSED)
     serialize(mmt->pi->m);
     matmul_top_vec_clear(mmt,0);
     matmul_top_vec_clear(mmt,1);
+#ifdef USE_ALTERNATIVE_REDUCE_SCATTER
+    for(int d = 0 ; d < 2 ; d++)  {
+        abclear(mmt->abase, mmt->wr[d]->rsbuf[0], mmt->n[d] / mmt->pi->m->totalsize * mmt->pi->wr[d]->ncores);
+        abclear(mmt->abase, mmt->wr[d]->rsbuf[1], mmt->n[d] / mmt->pi->m->totalsize * mmt->pi->wr[d]->ncores);
+    }
+#endif  /* USE_ALTERNATIVE_REDUCE_SCATTER */
     serialize(mmt->pi->m);
     if (!mmt->pi->interleaved) {
         matmul_clear(mmt->mm);
@@ -725,47 +746,41 @@ broadcast_down(matmul_top_data_ptr mmt, int d)
     broadcast_down_generic(mmt, abbytes(mmt->abase, 1), NULL, d);
 }
 
-/* input: targ[i]=w_part[ydim*i+ycoord],
-   output: rop[i]=(w[i] on this node) */
-#if 0
-void collect_row_r(vector rop, mpi_sparse_matrix M, vector src, vector targ)
+#ifdef USE_ALTERNATIVE_REDUCE_SCATTER
+void alternative_reduce_scatter(abt * dst, abt * src, int eitems, matmul_top_data_ptr mmt, int d)
 {
-    MPI_Status commstat;
-    u32_t i, j, k, l, j0, j1;
-    int sr_count;
-    vector buf1, buf2, buf;
+    pi_wiring_ptr wr = mmt->pi->wr[d];
+    int njobs = wr->njobs;
+    int rank = wr->jrank;
+    int esize = abbytes(mmt->abase, eitems);
 
-    sr_count = M.veclen_per_host * ULL2UL_MULTIPLIER;
-    memset(rs_buffer1, 0, M.veclen_per_host * sizeof(*rs_buffer1));
-    buf1 = rs_buffer1;
-    buf2 = rs_buffer2;
-    if (M.my_x)
-	l = M.my_x - 1;
-    else
-	l = M.hsize - 1;
-    for (i = 0; i < M.hsize; i++) {	/* data for node (l,my_y) */
-	j0 = l * M.veclen_per_host;
-	j1 = j0 + M.veclen_per_host;
-	if (j1 > M.rows_per_host)
-	    j1 = M.rows_per_host;
-	for (j = j0, k = 0; j < j1; j++, k++)
-	    buf1[k] ^= targ[j];
-	if (i == M.hsize - 1)
-	    break;
-	MPI_Sendrecv(buf1, sr_count, MPI_U32_T, M.x_dest, TAG_CR0,
-		      buf2, sr_count, MPI_U32_T, M.x_src, TAG_CR0,
-		      M.hcomm, &commstat);
-	buf = buf1;
-	buf1 = buf2;
-	buf2 = buf;
-	if (l)
-	    l--;
-	else
-	    l = M.hsize - 1;
-    }
-    memcpy(rop, buf1, M.veclen_per_host * sizeof(*rop));
-}
-#endif
+    abt *b[2];
+    b[0] = mmt->wr[d]->rsbuf[0];
+    b[1] = mmt->wr[d]->rsbuf[1];
+    abzero(mmt->abase, b[0], eitems);
+
+    int l = (rank + njobs - 1) % njobs;
+    int drank = (rank + 1) % njobs;
+    int srank = (rank + njobs - 1) % njobs;
+
+    for (int i = 0; i < njobs; i++) {
+        int j0, j1;
+        j0 = l * eitems; 
+        j1 = j0 +  eitems;
+        for (int j = j0, k = 0; j < j1; j++, k++)
+            abadd(mmt->abase, b[0] + aboffset(mmt->abase, k), src + aboffset(mmt->abase, j));
+        if (i == njobs - 1)  
+            break;
+        MPI_Sendrecv(b[0], esize, MPI_BYTE, drank, 0xbeef,
+                b[1], esize, MPI_BYTE, srank, 0xbeef,
+                wr->pals, MPI_STATUS_IGNORE);
+        abt * tb = b[0];   b[0] = b[1];  b[1] = tb; 
+        l = (l + njobs - 1) % njobs;
+    }   
+    abcopy(mmt->abase, dst, b[0], eitems); 
+}   
+#endif  /* USE_ALTERNATIVE_REDUCE_SCATTER */
+
 
 /* Note that because reduce_across does additions, it is _NOT_ generic.
  *
@@ -783,7 +798,7 @@ reduce_across(matmul_top_data_ptr mmt, int d)
     choke me;
 #endif
 
-    int err;
+    int err=0;
 
     /* reducing across a row is when d == 0 */
     pi_wiring_ptr pirow = mmt->pi->wr[d];
@@ -954,17 +969,22 @@ reduce_across(matmul_top_data_ptr mmt, int d)
 
                 abase_generic_ptr dptr = mrow->v->all_v[0];
                 pi_log_op(pirow, "[%s] MPI_Reduce_scatter", __func__);
-                // all recvcounts are now equal
-                int * rc = malloc(pirow->njobs * sizeof(int));
                 ASSERT((mrow->i1 - mrow->i0) % pirow->totalsize == 0);
+#ifdef USE_ALTERNATIVE_REDUCE_SCATTER
+                int z = (mrow->i1 - mrow->i0) / pirow->njobs;
+                alternative_reduce_scatter(dptr + z * pirow->jrank, dptr, z, mmt, d);
+                pi_log_op(pirow, "[%s] MPI_Reduce_scatter done", __func__);
+#else   /* USE_ALTERNATIVE_REDUCE_SCATTER */
+                // all recvcounts are equal
+                int * rc = malloc(pirow->njobs * sizeof(int));
                 for(unsigned int k = 0 ; k < pirow->njobs ; k++) {
                     rc[k] = (mrow->i1 - mrow->i0) / pirow->njobs;
                     rc[k] = abbytes(mmt->abase, rc[k]);
                 }
                 err = MPI_Reduce_scatter(MPI_IN_PLACE, dptr, rc, MPI_BYTE, MPI_BXOR, pirow->pals);
-                free(rc);
-                pi_log_op(pirow, "[%s] MPI_Reduce_scatter done", __func__);
                 ASSERT_ALWAYS(!err);
+                free(rc);
+#endif  /* USE_ALTERNATIVE_REDUCE_SCATTER */
             }
         }
         serialize_threads(pirow);
