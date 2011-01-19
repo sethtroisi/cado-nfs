@@ -61,7 +61,7 @@ utils/fakempi.h
 utils/fakepthread.h
 linalg/bwc/filenames.h
 linalg/bwc/gather.c
-linalg/bwc/intersections.cpp
+linalg/bwc/intersections.c
 linalg/bwc/intersections.h
 linalg/bwc/krylov.c
 linalg/bwc/lingen_binary.cpp
