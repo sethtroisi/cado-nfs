@@ -1,4 +1,11 @@
 
+*** THIS DOCUMENTATION IS NOT REGULARILY CHECKED TO BE UP-TO-DATE. ***
+
+See bwc-trace.sh and bwc-trace.m for the most up-to-date checks relative
+to the exact meaning of most files.
+
+
+
 The tools present in this subdirectory form an implementation of the
 Block-Wiedemann algorithm with the following features:
 
@@ -59,12 +66,12 @@ using the bwc.pl driver script, documented below.
      processing at each site.
 !10 - mksol
      create the solutions from the polynomial
- 11 - gather / mf_untwistvec
+ 11 - gather / mf_twistvec
      reconstruct solutions from the mess
 
 krylov, lingen, mksol are the steps having a real computational impact.
 prep is cheap but important for ensuring the success of the algorithm.
-split,acollect,gather,mf_untwistvec are just trivial bookkeeping.
+split,acollect,gather,mf_twistvec are just trivial bookkeeping.
 dispatch may be I/O intensive.
 secure is akin to doing a few krylov iterations. It runs for roughly just
 as long as the desired time between two recoverable checkpoints (the
@@ -195,6 +202,10 @@ Some more internal parameters.
       a preferred ordering in mind which is set automatically, so don't change
       this unless you're willing to try out with something new.
     - other mm_xxx_* parameters are not yet documented.
+* sequential_cache_build=[0|1] whether the in-memory caches must be built
+  one after another (=1), or all in parallel (=0, default behaviour).
+  Since this operation requires significantly more RAM than what is used
+  within the actual computation, it makes sense.
 
 
 
@@ -208,29 +219,29 @@ removed.
 wdir/mat.col_perm
 wdir/mat.row_perm               permutations used for balancing.
     created by balance
-    read by mf_untwistvec
+    read by mf_twistvec
 wdir/mat.hi.vj-XXXXXX.bin       in-memory version of the sub-matrices
     created by *_{dispatch,prep,secure,krylov,mksol,gather} if not found.
     used by {prep,secure,krylov,mksol,gather}
 wdir/bw.cfg                     recalls the command-line parameters
     re-read by all programs.
-wdir/X.twisted                  X vector used for Krylov.
+wdir/X.<bchecksum>                  X vector used for Krylov.
     created by prep
     read by krylov and secure
-wdir/Y.0.twisted                Y vector used for Krylov.
+wdir/Y.0.<bchecksum>                Y vector used for Krylov.
     created by prep
     read by split --split-y
-wdir/C.<n>.twisted              check vector = trsp(M)^n * X  (See note (T))
+wdir/C.<n>.<bchecksum>              check vector = trsp(M)^n * X  (See note (T))
     created by secure
     read by krylov mksol
-wdir/V<n1>-<n2>.0.twisted       columns <n1>..<n2> (n2 exclusive) of Y
+wdir/V<n1>-<n2>.0.<bchecksum>       columns <n1>..<n2> (n2 exclusive) of Y
     created by split --split-y splits=[...,]<n1>,<n2>[,...]
     read by krylov mksol
 wdir/A<n1>-<n2>.<j1>-<j2>       krylov sequence data.
     created by krylov
     read by acollect. acollect replaces all these files by a file matching the
     same pattern, read in turn by lingen.
-wdir/V<n1>-<n2>.<j>.twisted     columns <n1>..<n2> of M^j Y (See note (T))
+wdir/V<n1>-<n2>.<j>.<bchecksum>     columns <n1>..<n2> of M^j Y (See note (T))
     created by krylov while computing.
     never read again unless for external checking (not all of it implemented
     yet)
@@ -248,12 +259,35 @@ wdir/F                          linear generator.
 wdir/F<n1>..<n2>                columns <n1>..<n2> of F (n2 exclusive).
     created by split --split-f
     read by mksol
-wdir/S<n1>-<n2>.<j>.twisted     mksol sequence data.
+wdir/S<n1>-<n2>.<j>.<bchecksum>     mksol sequence data.
     created by mksol
     read by gather
-wdir/W.twisted                  kernel vectors
+wdir/W.<bchecksum>                  kernel vectors
     created by gather
-    read by mf_untwistvec
+    read by mf_twistvec
+
+The permutation P
+=================
+
+bwc now uses (optionally) a shuffled matrix times vector product, which
+as a side effect of the matrix times vector product also multiplies by a
+certain permutation matrix. This is done for best efficiency. For the
+case of the un-shuffled product, P is the identity.
+
+This permutation matrix is as follows. We assume that the matrix m is
+split in nh horizontal and nv vertical strips. M is first and foremost
+padded trivially to obtain a larger matrix Mx whose number of rows and
+columns are equal, and both multiples of nh*nv, say we have
+nr==nc==nh*nv*nz for an integer nz.
+
+Each row index i in [0..nr] can be written (i*nv+j)*nz+k, 0<=i<nh,
+0<=j<nv, 0<=k<nz. The image by P of this index is (j*nh+i)*nz+k (or the
+opposite, see bwc_trace.m to see which is right). Magma code for
+computing the corresponding permutation matrix follows:
+
+    pr:=func<x|(qr*nh+qq)*nz+r+1 where qq,qr is Quotrem(q, nv) where q,r is
+    Quotrem(x-1,nz)>;
+    Pr:=PermutationMatrix(GF(2),[pr(x):x in [1..nrx]]);
 
 
 Per-program documentation
@@ -265,35 +299,58 @@ source file comments if there are such comments.
 mf_bal
 ------
     mf_bal computes a row and column permutation which is applicable to
-    the input matrix M, to be transformed into a twisted matrix Mt which
-    satisfies
-        Sr^-1 * Mt * Sc eq M; 
-    Mt enjoys the property that when split in a 2d rectangular grid matching
-    the job organization, one expect the blocks to be reasonably balanced in
-    terms of number of coefficients.
+    the input matrix M, to be transformed into a twisted matrix
+    Sr*M*Sc^-1 which such that when split in a 2d rectangular grid
+    matching the job organization, one expect the blocks to be reasonably
+    balanced in terms of number of coefficients.
 
     Sc is the permutation sending 0 to the first 32-bit integer found
-    in col_perm, etc.
+    in col_perm, etc.  The current code enforces Sr == Sc.
 
     mf_bal does not actually read the input matrix, but works only with
     the row and column frequencies.
 
     mf_bal is not an mpi program.
 
+    mf_bal computes a ``bchecksum'' which identifies the permutation
+    being used.
+
 dispatch
 --------
     dispatch uses the mf_bal output to compute the per-job in-memory
-    data.  mat.hi.vj denotes the (i,j) block of the matrix, but is
-    normally not saved to disk. Rather, the copies mat.hi.vj-XXXXXXXX.bin
-    of the in-memory structures are saved.
+    data.  mat.<nh>x<nv>.<bchecksum>.hi.vj denotes the (i,j) block of the
+    matrix, but is normally not saved to disk. Rather, the copies
+    mat.<nh>x<nv>.<bchecksum>.hi.vj-XXXXXXXX.bin of the in-memory
+    structures are saved.
+
+    <ugly>
+        There is an nfs-related kludge here, which may make bwc
+        inappropriate for foreign matrices (this is fixable). We rely on
+        the fact that the weight of the *columns* of the input matrix
+        (assuming it's stored on disk row by row) is most unbalanced, so
+        that mf_bal has computed Sc first, and Sr hardly matters. We
+        expect Sr==Sc. Write Mt the matrix corresponding to the local
+        blocks as they are present on the nodes/cores. The ``shuffled
+        product'' will actually mutiply by Mt*Pr^-1 (when multiplying on
+        the left), or P^-1*Mt when multiplying on the right.
+
+        For this reason, the blocks dispatched are not the blocks of the
+        matrix Sr*M*Sc^-1, but those of the matrix Mt==P*Sr*M*Sc^-1. This
+        way, we are working with iterates of the matrix P*Sc*M*(P*Sr)^-1
+        for nullspace=left, and Sr*M*Sc^-1 for nullspace=right. For
+        Sc==Sr, these are conjugates of M in both cases.
+    </ugly>
 
     All vector files created later on, and relative to the matrix Mt, are
-    ``twisted'' files. Ytwisted is Sc * Yuntwisted. So:
-        Mt * Ytwisted == Sc * (Sc^-1 * Sr) * (M * Yuntwisted)
-    When Sc == Sr, which makes it possible to reconstruct data vectors which
-    carry a meaning irrespective of the balancing chosen. When (Sc^-1 * Sr =
-    T) is a constant permutation matrix consistent across several balancings,
-    the same holds for T*M the case by default.
+    ``twisted'' by the permutation related to the one computed by mf_bal.
+    In the case of nullspace=left, we have
+        Ytwisted = Y * (P*Sc)^-1 -- or P*Sc*Y if written transposed.
+        Ytwisted * Mt = Y * M * (P*Sr)^-1 = Y * M * Sr^-1*Sc * (P*Sc)^-1
+    and for nullspace=right:
+        Ytwisted = Sc * Y
+        Mt * Ytwisted = Sr*M*Y = Sc * Sc^-1*Sr * M * Y.
+    Thus in the case where Sc==Sr, it is possible to untwist the twisted
+    files in a consistent way.
 
 build
 -----
@@ -347,15 +404,15 @@ prep
 
     X and Y are stored as:
 
-    X.twisted                    X vector used for Krylov.
-    Y.0.twisted                  Y vector used for Krylov.
+    X.<bchecksum>                    X vector used for Krylov.
+    Y.0.<bchecksum>                  Y vector used for Krylov.
 
 secure
 ------
 
     secure reads the output from prep, and creates:
     
-    C.<interval>.twisted         check vector = trsp(M)^<interval> * X
+    C.<interval>.<bchecksum>         check vector = trsp(M)^<interval> * X
     
     When M^(k*interval)*Y has been computed, using C one can look ahead the
     value trsp(X) * M^((k+1)*interval) * Y which will be computed after
@@ -375,11 +432,11 @@ split (split Y)
 
     We assume below that the integer list is for example 0,64,192
 
-    split --split-y reads only Y.0.twisted, which is a vector whose entries
+    split --split-y reads only Y.0.<bchecksum>, which is a vector whose entries
     are 192-bit wide, and creates
 
-    V0-64.0.twisted            columns 0..63 of Y.
-    V64-192.0.twisted          columns 64..191 of Y.
+    V0-64.0.<bchecksum>            columns 0..63 of Y.
+    V64-192.0.<bchecksum>          columns 64..191 of Y.
 
 krylov
 ------
@@ -402,21 +459,21 @@ krylov
 
     krylov also creates
     
-    V<n1>-<n2>.<j>.twisted      columns <n1>..<n2> of M^j Y. (see note (T)).
+    V<n1>-<n2>.<j>.<bchecksum>      columns <n1>..<n2> of M^j Y. (see note (T)).
 
     This can be used to resume computations at iteration j.
 
-    (j2-j1 is always equal to <interval> as in C.<interval>.twisted, and j is
+    (j2-j1 is always equal to <interval> as in C.<interval>.<bchecksum>, and j is
     always a multiple of <interval>).
 
-    When V<n1>-<n2>.<j2>.twisted is computed, krylov verifies that it is in
-    accordance with the input vector V<n1>-<n2>.<j1>.twisted. The file
+    When V<n1>-<n2>.<j2>.<bchecksum> is computed, krylov verifies that it is in
+    accordance with the input vector V<n1>-<n2>.<j1>.<bchecksum>. The file
     A<n1>-<n2>.<j1>-<j2> is written only if this test succeeds. Otherwise the
     program aborts.
 
     Note on resuming. If the extra parameter start=<j> is passed to krylov,
     then computations resume after iteration <j>. Instead of
-    V.<n1>-<n2>.0.twisted, V.<n1>-<n2>.<j>.twisted is read instead, and
+    V.<n1>-<n2>.0.<bchecksum>, V.<n1>-<n2>.<j>.<bchecksum> is read instead, and
     only subsequent A files will be touched. It is also possible to change the
     end value for the computation, in order to stop the subsequence
     computation prematurely.
@@ -467,10 +524,10 @@ split (split F)
 mksol
 -----
 
-    This reads the files F<n1>..<n2> as well as Y<n1>..<n2>.0.twisted,
+    This reads the files F<n1>..<n2> as well as Y<n1>..<n2>.0.<bchecksum>,
     and creates files:
 
-    S<n1>..<n2>.<j1>..<j2>.twisted      partial sums for evaluation.
+    S<n1>..<n2>.<j1>..<j2>.<bchecksum>      partial sums for evaluation.
 
     All the S* files must be summed to form the final kernel vector
     element.
@@ -487,13 +544,27 @@ gather
     This sums all S* files, and check how many times one must iterate in
     order to obtain M^k*(sum_of_S) == 0 (see note T). Then it stores:
 
-    W.twisted                   M^(k-1)*sum_of_S (see note T).
+    W.<bchecksum>                   M^(k-1)*sum_of_S (see note T).
 
-mf_untwistvec
+mf_twistvec
 ----------
 
-    This un-twists W.
+    This un-twists W. There are several options which control exactly how
+    un-twisting is performed. The balancing file must be provided.
+    
+    The option --untwist does what one imagines. This is the one which is
+    used.
 
+    With regard to the above, specifying --nullspace=left or
+    --nullspace=right (the latter being the default as in other parts of
+    the code) changes which permutation is being used for untwisting.
+
+    Specifying --truncate (for untwisting) removes coordinates which
+    correspond to padding rows/cols in the matrix.
+
+    Twisting, as opposed to untwisting, is only useful when working with
+    several sequences. Twisting also recognizes the option --expand,
+    which adds phony coordinates corresponding to padding rows/cols.
 
 Using bwc.pl
 ============
@@ -509,8 +580,8 @@ Using bwc.pl
     added, and possibly the unrecognized arguments stripped out), or one
     of the meta-commands :balance, :complete, and :wipeout.
 
-    More extensive documentation in bwc.pl will come someday in this
-    README. Meanwhile, bwc.pl contains some useful info.
+    More extensive documentation in bwc.pl is included in the file
+    header.
 
 Notes:
 ======
