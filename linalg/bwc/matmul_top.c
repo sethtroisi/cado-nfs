@@ -114,7 +114,7 @@ broadcast_down_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_p
     mmt_wiring_ptr mcol = mmt->wr[d];
     // mmt_wiring_ptr mrow = mmt->wr[!d];
 
-    // unsigned int ncols = mmt->n[d];
+    unsigned int ncols = mmt->n[d];
     unsigned int nrows = mmt->n[!d];
 
     /* The intersection of our column-wise input range [i0..i1[ with
@@ -122,22 +122,14 @@ broadcast_down_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_p
      * mcol->x ; note how this intersection is common to a
      * complete column.
      */
-    /* If our vector data is not shared amongst threads, it has to be
-     * broadcasted. We define the ``extra'' flag in this case.
+    /* We used to support (prior to 2011/01/19) the source vector *not*
+     * being shared among threads. This has never been actively checked,
+     * so despite the fact that the code probably used to work at some
+     * point, it was most probably buggy and has been removed.
+     * Furthermore, the corresponding code has not been ported to support
+     * shuffled mult. The corresponding code has thus been removed.
      */
-    unsigned int extra = (v->flags & THREAD_SHARED_VECTOR) == 0;
-
-    if (extra) {
-        /* While this code has been written with some caution, it has had
-         * zero coverage at the moment. So please be kind when
-         * encountering bugs.
-         *
-         * XXX A second word of caution. Some serializing calls could
-         * very probably be dropped if we don't have a shared vector. So
-         * performance-wise, that could be a thing to check.
-         */
-        ASSERT_ALWAYS(0);
-    }
+    ASSERT_ALWAYS(v->flags & THREAD_SHARED_VECTOR);
 
     pi_log_op(mmt->pi->m, "[%s] enter first loop", __func__);
     /* Make sure that no thread on the column is wandering in other
@@ -149,132 +141,63 @@ broadcast_down_generic(matmul_top_data_ptr mmt, size_t stride, mmt_generic_vec_p
      * help here.
      */
 #ifndef MPI_LIBRARY_MT_CAPABLE
-    for(unsigned int t = 0 ; t < pirow->ncores + extra ; t++) {
+    for(unsigned int t = 0 ; t < pirow->ncores ; t++) {
         pi_log_op(pirow, "[%s] serialize_threads", __func__);
         serialize_threads(pirow);
         pi_log_op(pirow, "[%s] serialize_threads done", __func__);
-        if (t == pirow->trank) {
-            for(unsigned int u = 0 ; u < picol->ncores ; u++) {
-                serialize_threads(picol);
-                if (u != picol->trank) {
-                    continue;
-                }
-                // our turn.
-                for(unsigned int i = 0 ; i < mcol->xlen ; i++) {
-                    struct isect_info * xx = &(mcol->x[i]);
-                    if (xx->k % picol->ncores != picol->trank) {
-                        // then we're not going to have any work to do.
-                        // except that we possibly could do right now the
-                        // inter-thread broadcast in columns -- this
-                        // would incur more locking, so we rather take
-                        // advantage of the upper lock for that (see
-                        // below)
-                        continue;
-                    }
-                    size_t off = xx->offset_me * stride;
+        if (t != pirow->trank) 
+            continue;
+        for(unsigned int u = 0 ; u < picol->ncores ; u++) {
+            serialize_threads(picol);
+            if (u != picol->trank)
+                continue;
+            // our turn.
+            ASSERT(mcol->i0 % picol->totalsize == 0);
+            ASSERT(mcol->i1 % picol->totalsize == 0);
+            unsigned int z = ncols / mmt->pi->m->totalsize;
+            ASSERT(nrows == ncols);
+            ASSERT(mcol->i0 % z == 0);
+            ASSERT(mcol->i1 % z == 0);
+            unsigned int nv = pirow->totalsize;
+            unsigned int nh = picol->totalsize;
+            unsigned int cz = ncols / nv; ASSERT(cz == z * nh);
+            unsigned int rz = nrows / nh; ASSERT(rz == z * nv);
+            for(unsigned int ii = mcol->i0 ; ii < mcol->i1 ; ) {
+                unsigned int znum = ii / z;
+                unsigned int k = znum / nv;
+                unsigned int offset_there = (znum % nv) * z;
+                unsigned int count = MIN(mcol->i1 - ii, rz - offset_there);
+                unsigned int offset_me = ii - mcol->i0;
+                /*
+                ASSERT(l < mcol->xlen);
+                ASSERT(mcol->x[l].k == (int) k);
+                ASSERT(mcol->x[l].offset_me == offset_me);
+                ASSERT(mcol->x[l].offset_there == offset_there);
+                ASSERT(mcol->x[l].count == count);
+                */
+                if (k % picol->ncores == picol->trank) {
+                    size_t off = offset_me * stride;
                     abase_generic_ptr ptr = abase_generic_ptr_add(v->v, off);
-                    size_t siz = xx->count * stride;
-                    unsigned int root = xx->k / picol->ncores;
+                    size_t siz = count * stride;
+                    unsigned int root = k / picol->ncores;
                     pi_log_op(picol, "[%s] MPI_Bcast", __func__);
                     err = MPI_Bcast(ptr, siz, MPI_BYTE, root, picol->pals);
                     pi_log_op(picol, "[%s] MPI_Bcast done", __func__);
                     ASSERT_ALWAYS(!err);
                 }
-                /* Note that at this point, it is not guaranteed that all
-                 * our input range [i0,i1[ has been covered. In the case
-                 * of rectangular matrices, we might have to cope with
-                 * this case. This is done later on. Note though that
-                 * rectangular matrices (= block lanczos case) yield an
-                 * allreduce call instead of broadcast, so the point is
-                 * moot.
-                 */
-            }
-        } else if (t == pirow->trank + 1 && extra) {
-            /* Then, while the next column is communicating, we'll do the
-             * inter-thread (column) bcast if needed. It is pointless (and
-             * skipped) when the right vectors are shared, of course,
-             * since no matter which thread received the data, it ends up
-             * in the right place.
-             *
-             * Note that it would be possible to to this above (see
-             * comment) and avoid the complication of the ``extra''
-             * parameter. The trick here serves only to limit the number
-             * of serialization points.
-             */
-            for(unsigned int i = 0 ; i < mcol->xlen ; i++) {
-                struct isect_info * xx = &(mcol->x[i]);
-                unsigned int src = xx->k % picol->ncores;
-                if (picol->trank == src) {
-                    /* as a symmetry compared to above, the leader is
-                     * specifically the guy who's not working.  */
-                    continue;
-                }
-                size_t off = xx->offset_me * stride;
-                abase_generic_ptr ptr = abase_generic_ptr_add(v->v, off);
-                abase_generic_ptr sptr = abase_generic_ptr_add(v->all_v[src], off);
-                size_t siz = xx->count * stride;
-                ASSERT(ptr != sptr);
-                memcpy(ptr, sptr, siz);
+                ii += count;
             }
         }
     }
 #else   /* MPI_LIBRARY_MT_CAPABLE */
-    for(unsigned int i = 0 ; i < mcol->xlen ; i++) {
-        struct isect_info * xx = &(mcol->x[i]);
-        unsigned int src = xx->k % picol->ncores;
-        if (src != picol->trank) {
-            continue;
-        }
-        size_t off = xx->offset_me * stride;
-        abase_generic_ptr ptr = abase_generic_ptr_add(v->v,off);
-        size_t siz = xx->count * stride;
-        unsigned int root = xx->k / picol->ncores;
-        pi_log_op(picol, "[%s] MPI_Bcast", __func__);
-        err = MPI_Bcast(ptr, siz, MPI_BYTE, root, picol->pals);
-        pi_log_op(picol, "[%s] MPI_Bcast done", __func__);
-        ASSERT_ALWAYS(!err);
-    }
-    if (extra) {
-        /* The inter-column broadcast, for non-shared right vectors, must
-         * occur with column threads serialized.
-         */
-        pi_log_op(picol, "[%s] serialize_threads", __func__);
-        serialize_threads(picol);
-        pi_log_op(picol, "[%s] serialize_threads done", __func__);
-        for(unsigned int i = 0 ; i < mcol->xlen ; i++) {
-            struct isect_info * xx = &(mcol->x[i]);
-            unsigned int src = xx->k % picol->ncores;
-            if (picol->trank == src) {
-                /* as a symmetry compared to above, the leader is
-                 * specifically the guy who's not working.  */
-                continue;
-            }
-            size_t off = xx->offset_me * stride;
-            abase_generic_ptr ptr = abase_generic_ptr_add(v->v, off);
-            abase_generic_ptr sptr = abase_generic_ptr_add(v->all_v[src], off);
-            size_t siz = xx->count * stride;
-            ASSERT(ptr != sptr);
-            memcpy(ptr, sptr, siz);
-        }
-    }
+    /* Code deleted 20110119, as I've never been able to have enough
+     * trust in an MPI implementation to check this */
+    ASSERT_ALWAYS(0);
 #endif  /* MPI_LIBRARY_MT_CAPABLE */
 
     pi_log_op(mmt->pi->m, "[%s] trailer", __func__);
 
-    if (mcol->i1 > nrows) {
-        /* untested */
-        ASSERT_ALWAYS(0);
-        if (extra || picol->trank == 0) {
-            abase_generic_zero(stride, abase_generic_ptr_add(v->v,
-                        (nrows-mcol->i0) * stride),
-                    (mcol->i1-nrows));
-        }
-        if (!extra) {
-            /* of course all threads within the same column have common
-             * i0 and i1, so no bug here apparently */
-            serialize_threads(picol);
-        }
-    }
+    ASSERT_ALWAYS(mcol->i1 <= nrows);
 }
 
 #if 0
@@ -579,34 +502,6 @@ static void mmt_finish_init(matmul_top_data_ptr mmt, int const * flags, param_li
 #ifndef  CONJUGATED_PERMUTATIONS
     choke me;
 #endif
-    for(unsigned int d = 0 ; d < 2 ; d++) {
-        // assume d == 1 ; we have some column indices given by our i0 and i1
-        // values. We want to know how this intersects the horizontal fences
-
-        mmt_wiring_ptr mcol = mmt->wr[d];
-        pi_wiring_ptr picol = mmt->pi->wr[d];
-
-
-        // intersect with horizontal fences, but of course we limit to the numer
-        // of rows, which is a vertical data.
-        unsigned int i0 = mcol->i0;
-        unsigned int i1 = mcol->i1;
-        intersect(&(mcol->xlen), &(mcol->x),
-                mmt->fences[!d], i0, i1, mmt->n[d]);
-
-        // do also the secondary level intersections. They're used for
-        // reduction.
-        unsigned int ii0 = i0 +  picol->trank    * (i1 - i0) / picol->ncores;
-        unsigned int ii1 = i0 + (picol->trank+1) * (i1 - i0) / picol->ncores;
-        intersect(&(mcol->ylen), &(mcol->y),
-                mmt->fences[!d], ii0, ii1, mmt->n[d]);
-
-        // adjust by ii0-i0.
-        for(unsigned int z = 0 ; z < mcol->ylen ; z++) {
-            mcol->y[z].offset_me += ii0-i0;
-        }
-    }
-
     // TODO: reuse the ../bw-matmul/matmul/matrix_base.cpp things for
     // displaying communication info.
 
@@ -782,10 +677,6 @@ void matmul_top_clear(matmul_top_data_ptr mmt, abobj_ptr abase MAYBE_UNUSED)
     }
     free(mmt->fences[0]);
     free(mmt->fences[1]);
-    for(unsigned int d = 0 ; d < 2 ; d++) {
-        free(mmt->wr[d]->x);
-        free(mmt->wr[d]->y);
-    }
     free(mmt->locfile);
 }
 
@@ -820,7 +711,8 @@ reduce_across(matmul_top_data_ptr mmt, int d)
 #endif
 
     mmt_wiring_ptr mrow = mmt->wr[d];
-    mmt_wiring_ptr mcol = mmt->wr[!d];
+    mmt_wiring_ptr mcol = mmt->wr[!d]; unsigned int nrows = mmt->n[d];
+    unsigned int ncols = mmt->n[!d];
 
     pi_log_op(mmt->pi->m, "[%s] enter first loop", __func__);
 
@@ -847,25 +739,48 @@ reduce_across(matmul_top_data_ptr mmt, int d)
          * relationship with the thread doing the computation ! In any
          * case, one should consider that data in threads other than the
          * destination thread may be clobbered by the operation (although
-         * in the present implementation it is not -- faster n\log n
-         * reducing compared to n^2 would cause clobbering).
-         *
+         * in the present implementation it is not).
          */
         /* y gives the intersections of the range
          * [ii0..ii1[ (where ii1-ii0=(i1-i0)/pirow->ncores, ii0=i0+k*(ii1-ii0))
          * with the fences in the other direction (vertical fences).
          */
-        for(unsigned int i = 0 ; i < mrow->ylen ; i++) {
-            struct isect_info * xx = &(mrow->y[i]);
-            unsigned int dst = xx->k % pirow->ncores;
+        ASSERT(mrow->i0 % pirow->ncores == 0);
+        ASSERT(mrow->i1 % pirow->ncores == 0);
+        unsigned int z = nrows / mmt->pi->m->totalsize;
+        unsigned int z1 = z * pirow->njobs;
+        ASSERT(nrows == ncols);
+        ASSERT(mrow->i0 % z1 == 0);
+        ASSERT(mrow->i1 % z1 == 0);
+        unsigned int nv = pirow->totalsize;
+        unsigned int nh = picol->totalsize;
+        unsigned int cz = ncols / nv; ASSERT(cz == z * nh);
+        unsigned int rz = nrows / nh; ASSERT(rz == z * nv);
+        unsigned int ii0 = mrow->i0 + pirow->trank * z1;
+        unsigned int ii1 = ii0 + z1;
+        for(unsigned int ii = ii0 ; ii < ii1 ; ) {
+            unsigned int znum = ii / z;
+            unsigned int k = znum / nh;
+            unsigned int offset_there = (znum % nh) * z;
+            unsigned int count = MIN(ii1 - ii, cz - offset_there);
+            unsigned int offset_me = ii - mrow->i0;
+            /*
+            ASSERT(l < mrow->ylen);
+            ASSERT(mrow->y[l].k == (int) k);
+            ASSERT(mrow->y[l].offset_me == offset_me);
+            ASSERT(mrow->y[l].offset_there == offset_there);
+            ASSERT(mrow->y[l].count == count);
+            */
+
+            unsigned int dst = k % pirow->ncores;
             /* Note that ``offset_there'' does not count here, since at
              * this point we're not yet flipping to the buffer in the
              * other direction.
              */
-            unsigned int off = aboffset(mmt->abase, xx->offset_me);
+            unsigned int off = aboffset(mmt->abase, offset_me);
             abt * dptr = mrow->v->all_v[dst] + off;
-            // size_t siz = abbytes(mmt->abase, xx->count);
-            ASSERT(xx->offset_me + xx->count <= mrow->i1 - mrow->i0);
+            // size_t siz = abbytes(mmt->abase, count);
+            ASSERT(offset_me + count <= mrow->i1 - mrow->i0);
             /* j indicates a thread number offset -- 0 means destination, and
              * so on. all_v has been allocated with wraparound pointers
              * precisely for accomodating the hack here. */
@@ -878,10 +793,10 @@ reduce_across(matmul_top_data_ptr mmt, int d)
                 /*
                 printf("thread %u sums %p..%p onto %p..%p\n",
                         mmt->pi->m->trank,
-                        sptr, sptr + xx->count,
-                        dptr, dptr + xx->count);
+                        sptr, sptr + count,
+                        dptr, dptr + count);
                         */
-                for(unsigned int k = 0 ; k < xx->count ; k++) {
+                for(unsigned int k = 0 ; k < count ; k++) {
                     abadd(mmt->abase, dptr + aboffset(mmt->abase, k),
                             sptr + aboffset(mmt->abase, k));
                     // TODO: for non-binary fields, here we would have an
@@ -891,6 +806,7 @@ reduce_across(matmul_top_data_ptr mmt, int d)
                     // in dptr.
                 }
             }
+            ii += count;
         }
         pi_log_op(pirow, "[%s] thread reduction done", __func__);
     }
@@ -933,42 +849,49 @@ reduce_across(matmul_top_data_ptr mmt, int d)
 
         // all row threads are likely to engage in a collective operation
         // at one moment or another.
-        for(unsigned int i = 0 ; i < mrow->xlen ; i++) {
-            struct isect_info * xx = &(mrow->x[i]);
-            unsigned int tdst = xx->k % pirow->ncores;
+        ASSERT(mrow->i0 % pirow->totalsize == 0);
+        ASSERT(mrow->i1 % pirow->totalsize == 0);
+        unsigned int z = nrows / mmt->pi->m->totalsize;
+        ASSERT(nrows == ncols);
+        ASSERT(mrow->i0 % z == 0);
+        ASSERT(mrow->i1 % z == 0);
+        unsigned int nv = pirow->totalsize;
+        unsigned int nh = picol->totalsize;
+        unsigned int cz = ncols / nv; ASSERT(cz == z * nh);
+        unsigned int rz = nrows / nh; ASSERT(rz == z * nv);
+        for(unsigned int ii = mrow->i0 ; ii < mrow->i1 ; ) {
+            unsigned int znum = ii / z;
+            unsigned int k = znum / nh;
+            unsigned int offset_there = (znum % nh) * z;
+            unsigned int count = MIN(mrow->i1 - ii, cz - offset_there);
+            unsigned int offset_me = ii - mrow->i0;
+            /*
+            ASSERT(l < mrow->xlen);
+            ASSERT(mrow->x[l].k == (int) k);
+            ASSERT(mrow->x[l].offset_me == offset_me);
+            ASSERT(mrow->x[l].offset_there == offset_there);
+            ASSERT(mrow->x[l].count == count);
+            */
+            unsigned int tdst = k % pirow->ncores;
             serialize_threads(pirow);
-            if (pirow->trank != tdst)
-                continue;
-            unsigned int jdst = xx->k / pirow->ncores;
-            // MPI_Reduce does not know about const-ness !
-            abt * sptr = mrow->v->v + aboffset(mmt->abase, xx->offset_me);
-            abt * dptr = mcol->v->v + aboffset(mmt->abase, xx->offset_there);
-            size_t siz = abbytes(mmt->abase, xx->count);
-            pi_log_op(pirow, "[%s] MPI_Reduce", __func__);
-            err = MPI_Reduce(sptr, dptr, siz, MPI_BYTE, MPI_BXOR, jdst, pirow->pals);
-            pi_log_op(pirow, "[%s] MPI_Reduce done", __func__);
-            ASSERT_ALWAYS(!err);
+            if (pirow->trank == tdst) {
+                unsigned int jdst = k / pirow->ncores;
+                // MPI_Reduce does not know about const-ness !
+                abt * sptr = mrow->v->v + aboffset(mmt->abase, offset_me);
+                abt * dptr = mcol->v->v + aboffset(mmt->abase, offset_there);
+                size_t siz = abbytes(mmt->abase, count);
+                pi_log_op(pirow, "[%s] MPI_Reduce", __func__);
+                err = MPI_Reduce(sptr, dptr, siz, MPI_BYTE, MPI_BXOR, jdst, pirow->pals);
+                pi_log_op(pirow, "[%s] MPI_Reduce done", __func__);
+                ASSERT_ALWAYS(!err);
+            }
+            ii+=count;
         }
     }
 #else   /* MPI_LIBRARY_MT_CAPABLE */
-        /* Different rows will operate concurrently ; and even within a
-         * row, all threads may trigger an operation */
-        for(unsigned int i = 0 ; i < mrow->xlen ; i++) {
-            struct isect_info * xx = &(mrow->x[i]);
-            unsigned int tdst = xx->k % pirow->ncores;
-            // serialize_threads(pirow);
-            if (pirow->trank != tdst)
-                continue;
-            unsigned int jdst = xx->k / pirow->ncores;
-            // MPI_Reduce does not know about const-ness !
-            abt * sptr = mrow->v->v + aboffset(mmt->abase, xx->offset_me);
-            abt * dptr = mcol->v->v + aboffset(mmt->abase, xx->offset_there);
-            size_t siz = abbytes(mmt->abase, xx->count);
-            pi_log_op(pirow, "[%s] MPI_Reduce", __func__);
-            err = MPI_Reduce(sptr, dptr, siz, MPI_BYTE, MPI_BXOR, jdst, pirow->pals);
-            pi_log_op(pirow, "[%s] MPI_Reduce done", __func__);
-            ASSERT_ALWAYS(!err);
-        }
+    /* Code deleted 20110119, as I've never been able to have enough
+     * trust in an MPI implementation to check this */
+    ASSERT_ALWAYS(0);
 #endif
 
     // as usual, we do not serialize on exit. Up to the next routine to

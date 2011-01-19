@@ -63,39 +63,40 @@ struct mmt_vec_s {
 typedef struct mmt_vec_s mmt_vec[1];
 typedef struct mmt_vec_s * mmt_vec_ptr;
 
+struct isect_info_s {
+    // int k;                      // intersection with [fences[k]..fences[k+1][
+    unsigned int offset_me;     // offset w.r.t. i0
+    unsigned int offset_there;  // offset w.r.t. fences[k]
+    unsigned int count;         // size of the intersection
+};
+typedef struct isect_info_s isect[1];
 
 struct mmt_wiring_s {
     mmt_vec v;
     unsigned int i0;
     unsigned int i1;
+#if 0
 #ifdef  CONJUGATED_PERMUTATIONS
     /* This is likely to be relevant only for conjugated matrices */
-    struct isect_info * x;
-    unsigned int xlen;
-
-    // this second intersection list is used for reduction, where the row
-    // threads collectively build the result vector from their respective
-    // parts -- deciding where the computed sum eventually goes is
-    // determined by the intersection of i0+k/n*(i1-i0)..i0+(k+1)/n*(i1-i0)
-    // with the vertical fences.
-    //
-    // note that the way reduction is performed is likely to cause some
-    // cache invalidates unless some fences end up correctly aligned.
-    struct isect_info * y;
-    unsigned int ylen;
+    // used when this is a row:
+    isect * x;
+    int * xgrouped; // for intersections -- counts bytes
+    int * xgrouped_sum; // for intersections -- counts bytes
+    // used when this is a column:
+    isect * y;
+    int * ygrouped; // for intersections -- counts bytes
+    int * ygrouped_sum; // for intersections -- counts bytes
+#endif
 #endif
 };
 typedef struct mmt_wiring_s mmt_wiring[1];
 typedef struct mmt_wiring_s * mmt_wiring_ptr;
 typedef struct mmt_wiring_s const * mmt_wiring_srcptr;
 
-/* TODO: It's unhandy to have abase here, since it forces info-file to ba
- * abase-dependent, which it isn't in reality... Perhaps split the interface
- * in two ?
+/* TODO: It's unhandy to have abase here, since it forces some files to
+ * be abase-dependent, without any real reason.
  */
-struct matmul_top_data_s {
-    abobj_ptr abase;
-    parallelizing_info_ptr pi;
+struct matmul_top_data_s { abobj_ptr abase; parallelizing_info_ptr pi;
     matmul_ptr mm;
 
     // w <- M v, or v^T <- w^T M would make sense. Of course v^T and w^T

@@ -75,7 +75,7 @@ endif (HAVE_CURL)
 
 set(bwc_base_sources
     parallelizing_info.c
-    intersections.cpp
+    intersections.c
     xvectors.c
     bw-common.c
     bw-common-mpi.c
