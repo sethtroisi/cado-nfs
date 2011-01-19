@@ -98,13 +98,13 @@ int main(int argc, char * argv[])
             MPI_Allreduce(MPI_IN_PLACE, &ok, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
             if (ok != 1) {
                 if (rank == 0)
-                    fprintf(stderr, "%d<%d full files found for %s\n", ok, size, argv[i]);
-                MPI_Abort(MPI_COMM_WORLD,1);
+                    fprintf(stderr, "warning: %d<%d full files found for %s\n", ok, size, argv[i]);
+                // MPI_Abort(MPI_COMM_WORLD,1);
             }
         }
         int node=0;
         if (rc == 0) node = rank;
-        MPI_Allreduce(MPI_IN_PLACE, &node, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+        MPI_Allreduce(MPI_IN_PLACE, &node, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
         if (rank == 0) {
             printf("%s (%zu MB, node %d)\n", argv[i], szmax >> 20, node);
             fflush(stdout);

@@ -206,8 +206,9 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
     abt * check_area = mcol->v->v + aboffset(abase, offset_v);
     is_zero = abis_zero(abase, check_area, how_many);
+    is_zero = agree_on_flag(pi->m, is_zero);
 
-    if (agree_on_flag(pi->m, is_zero)) {
+    if (is_zero) {
         fprintf(stderr, "Found zero vector. Most certainly a bug. "
                 "No solution found.\n");
         exit(1);
@@ -218,11 +219,11 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         serialize(pi->m);
         matmul_top_mul(mmt, bw->dir);
         is_zero = abis_zero(abase, check_area, how_many);
+        is_zero = agree_on_flag(pi->m, is_zero);
         serialize(pi->m);
         if (agree_on_flag(pi->m, is_zero)) {
-            if (tcan_print) {
+            if (tcan_print)
                 printf("M^%u * V is zero !\n", i);
-            }
             if (pi->m->jrank == 0 && pi->m->trank == 0) {
                 int rc;
                 rc = asprintf(&tmp, K_FILE_PATTERN, i-1, mmt->bal->h->checksum);
@@ -244,11 +245,8 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         matmul_top_save_vector(mmt, K_FILE_BASE_PATTERN, bw->dir, i);
     }
-    if (!is_zero) {
-        if (tcan_print) {
-            printf("No solution found ; most probably a bug\n");
-        }
-    }
+    if (!is_zero && tcan_print)
+        printf("No solution found ; most probably a bug\n");
 
     serialize(pi->m);
 

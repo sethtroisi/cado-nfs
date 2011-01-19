@@ -171,6 +171,7 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     param_list_lookup_string(pl, "local_cache_copy_dir");
     param_list_lookup_string(pl, "matmul_bucket_methods");
     param_list_lookup_string(pl, "sequence");   // for lingen
+    param_list_lookup_string(pl, "save_submatrices");
 
     return 0;
 }

@@ -52,6 +52,8 @@ env | egrep '(MPI|DISPLAY)'
 CAN_PRINT=1
 export CAN_PRINT
 
+echo -n "\e]0;$OMPI_COMM_WORLD_NODE_RANK\007"
+
 if [ $tool = "gdb" ] ; then
     gdb --args "$@"
     exit 0

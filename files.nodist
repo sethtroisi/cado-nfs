@@ -95,3 +95,5 @@ params/rsa190.poly
 params/mach_desc.rsa100
 scripts/check_all_gcc.sh
 scripts/gcc-script.sh
+linalg/bwc/bwc-trace.sh
+linalg/bwc/bwc-trace.m

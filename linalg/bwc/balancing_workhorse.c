@@ -26,10 +26,21 @@
 
 #include "balancing_workhorse.h"
 
-/* TODO: implement file-backed rewind on thread pipes. There's a
- * balancing_use_auxfile parameter for this. */
-/* TODO: integrate fully with matmul_top.c, and also call mf_scan and
- * mf_bal when needed (we also want a standalone tool, though).
+/* TODO:
+ * - implement file-backed rewind on thread pipes. There's a
+ *   balancing_use_auxfile parameter for this.
+ * - integrate fully with matmul_top.c, (DONE)
+ * - also call mf_scan and mf_bal when needed (we also want a standalone
+ *   tool, though). Not done yet. Chicken and egg problem: mf_bal
+ *   computes the permutation checksum, and we need it early here.
+ *
+ * Note:
+ * This code handles blocks of varying sizes. However, code in
+ * matmul_top.c now enforces blocks of equal sizes, and mf_bal has been
+ * patched to this purpose. Therefore the code here for handling blocks
+ * of unequal sizes (when nrows is not a multiple of nh for instance) is
+ * no longer being actively tested. For these reasons, some ASSERT_ALWAYS
+ * will cause the program to abort() as a protective measure.
  */
 
 /**********************************************************************/
@@ -603,10 +614,12 @@ void mpi_dest_free(data_dest_ptr M)
 struct master_data_s {/*{{{*/
     balancing bal;
     const char * mfile;
+    /*
     uint32_t row_block0;
     uint32_t col_block0;
     uint32_t row_cellbase;
     uint32_t col_cellbase;
+    */
 
     uint32_t *fw_rowperm;
     uint32_t *fw_colperm;
@@ -621,6 +634,7 @@ typedef struct master_data_s *master_data_ptr;/*}}}*/
 
 int who_has_row_bare(master_data m, uint32_t rnum)/*{{{*/
 {
+    /*
     int b;
     ASSERT(rnum < m->bal->trows);
     if (rnum < m->row_block0) {
@@ -629,7 +643,10 @@ int who_has_row_bare(master_data m, uint32_t rnum)/*{{{*/
 	int q = m->bal->trows % m->bal->h->nh;
 	b = (rnum - q) / m->row_cellbase;
     }
+    assert(b == balancing_progressive_dispatch_block(m->bal->trows, m->bal->h->nh, rnum));
     return b;
+    */
+    return balancing_progressive_dispatch_block(m->bal->trows, m->bal->h->nh, rnum);
 }
 
 int who_has_row(master_data m, uint32_t rnum)
@@ -640,6 +657,7 @@ int who_has_row(master_data m, uint32_t rnum)
 /*}}}*/
 int who_has_col_bare(master_data m, uint32_t cnum) /*{{{*/
 {
+    /*
     int b;
     ASSERT(cnum < m->bal->tcols);
     if (cnum < m->col_block0) {
@@ -648,7 +666,10 @@ int who_has_col_bare(master_data m, uint32_t cnum) /*{{{*/
 	int q = m->bal->tcols % m->bal->h->nv;
 	b = (cnum - q) / m->col_cellbase;
     }
+    assert(b == balancing_progressive_dispatch_block(m->bal->tcols, m->bal->h->nv, cnum));
     return b;
+    */
+    return balancing_progressive_dispatch_block(m->bal->tcols, m->bal->h->nv, cnum);
 }
 
 int who_has_col(master_data m, uint32_t cnum)
@@ -665,14 +686,7 @@ void read_bfile(master_data m, const char * bfile)
 {
     balancing_init(m->bal);
     balancing_read(m->bal, bfile);
-
-    /* FIXME: this does not really belong here. OTOH the slaves do work
-     * with something half-baked, as a matter of fact. */
-    m->bal->trows = m->bal->h->nrows;
-    m->bal->tcols = m->bal->h->ncols;
-    if (m->bal->h->flags & FLAG_PADDING) {
-	m->bal->tcols = m->bal->trows = MAX(m->bal->h->nrows, m->bal->h->ncols);
-    }
+    balancing_set_row_col_count(m->bal);
 }
 
 void share_bfile_header_data(parallelizing_info_ptr pi, balancing_ptr bal)
@@ -694,7 +708,7 @@ struct slave_data_s {/*{{{*/
     uint32_t my_col0;
 
     // char *tmatfile;		/* This stores the transposed matrix file */
-    // char *tmatfile_aux;		/* This stores the transposed matrix file */
+    // char *tmatfile_aux;	/* This stores the transposed matrix file */
     // FILE *auxfile;
 
     size_t expected_size;       // labelled in data words, not counting
@@ -730,6 +744,9 @@ void set_slave_variables(slave_data s, param_list pl, parallelizing_info_ptr pi)
     uint32_t quo_cols = s->bal->tcols / s->bal->h->nv;
     int rem_rows = s->bal->trows % s->bal->h->nh;
     int rem_cols = s->bal->tcols % s->bal->h->nv;
+
+    ASSERT_ALWAYS(rem_rows == 0);       // now it's simpler
+    ASSERT_ALWAYS(rem_cols == 0);       // now it's simpler
 
     s->my_ncols = quo_cols + (s->my_j < rem_cols);
     s->my_nrows = quo_rows + (s->my_i < rem_rows);
@@ -1053,16 +1070,21 @@ void endpoint_loop(parallelizing_info_ptr pi, param_list_ptr pl, slave_data_ptr 
 void set_master_variables(master_data m, parallelizing_info_ptr pi)/*{{{*/
 {
     uint32_t quo_r = m->bal->trows / m->bal->h->nh;
-    uint32_t quo_c = m->bal->tcols / m->bal->h->nv;
     int rem_r = m->bal->trows % m->bal->h->nh;
+    ASSERT_ALWAYS(rem_r == 0); // now it's easier
+    /*
+    uint32_t quo_c = m->bal->tcols / m->bal->h->nv;
     int rem_c = m->bal->tcols % m->bal->h->nv;
+    */
 
     m->pi = pi;
 
+    /*
     m->row_cellbase = quo_r;
     m->col_cellbase = quo_c;
     m->row_block0 = (quo_r + 1) * rem_r;
     m->col_block0 = (quo_c + 1) * rem_c;
+    */
 
     /* these two fields are in fact used only for debugging */
     m->sent_rows = malloc(pi->m->totalsize * sizeof(uint32_t));
@@ -1076,31 +1098,72 @@ void set_master_variables(master_data m, parallelizing_info_ptr pi)/*{{{*/
         }
     }
 
-    if (m->bal->h->flags && FLAG_REPLICATE) {
-        uint32_t maxdim = MAX(m->bal->h->nrows, m->bal->h->ncols);
-	m->fw_rowperm = m->fw_colperm = malloc(maxdim * sizeof(uint32_t));
-	memset(m->fw_rowperm, -1, maxdim * sizeof(uint32_t));
-	uint32_t *x = (m->bal->colperm ? m->bal->colperm : m->bal->rowperm);
-	for (uint32_t i = 0; i < maxdim; i++) {
-	    uint32_t j = x[i];
-	    ASSERT(m->fw_colperm[j] == UINT32_MAX);
-	    m->fw_colperm[j] = i;
-	}
+    uint32_t * xc = m->bal->colperm;
+    uint32_t * xr = m->bal->rowperm;
+    if (!(m->bal->h->flags & FLAG_REPLICATE)) {
+        ASSERT_ALWAYS(m->bal->h->flags & FLAG_COLPERM);
+        ASSERT_ALWAYS(m->bal->h->flags & FLAG_ROWPERM);
+    } else {
+        if (!xc) xc = xr;
+        if (!xr) xr = xc;
+    }
+    ASSERT_ALWAYS(xc);
+    ASSERT_ALWAYS(xr);
+
+    if (m->bal->h->flags & FLAG_REPLICATE) {
+        if (m->bal->h->flags & FLAG_SHUFFLED_MUL) {
+            m->fw_colperm = malloc(m->bal->tcols * sizeof(uint32_t));
+            memset(m->fw_colperm, -1, m->bal->tcols * sizeof(uint32_t));
+            for (uint32_t i = 0; i < m->bal->trows; i++) {
+                ASSERT(m->fw_colperm[xc[i]] == UINT32_MAX);
+                m->fw_colperm[xc[i]] = i;
+            }
+            /* In this case we arrange so that the replicated permutation is so
+             * that eventually, we are still computing iterates of a matrix
+             * which is conjugate to the one we're interested in */
+            m->fw_rowperm = malloc(m->bal->trows * sizeof(uint32_t));
+            memset(m->fw_rowperm, -1, m->bal->trows * sizeof(uint32_t));
+            uint32_t nh = m->bal->h->nh;
+            uint32_t nv = m->bal->h->nv;
+            ASSERT_ALWAYS(m->bal->trows % (nh * nv) == 0);
+            uint32_t elem = m->bal->trows / (nh * nv);
+            uint32_t ix = 0;
+            uint32_t iy = 0;
+            for(uint32_t i = 0 ; i < nh ; i++) {
+                for(uint32_t j = 0 ; j < nv ; j++) {
+                    ix = (i * nv + j) * elem;
+                    iy = (j * nh + i) * elem;
+                    for(uint32_t k = 0 ; k < elem ; k++) {
+                        ASSERT(m->fw_rowperm[xr[iy+k]] == UINT32_MAX);
+                        m->fw_rowperm[xr[iy+k]] = ix+k;
+                    }
+                }
+            }
+        } else {
+            uint32_t maxdim = MAX(m->bal->trows, m->bal->tcols);
+            m->fw_rowperm = m->fw_colperm = malloc(maxdim * sizeof(uint32_t));
+            memset(m->fw_rowperm, -1, maxdim * sizeof(uint32_t));
+            for (uint32_t i = 0; i < maxdim; i++) {
+                uint32_t j = xc[i];
+                ASSERT(m->fw_colperm[j] == UINT32_MAX);
+                m->fw_colperm[j] = i;
+            }
+        }
     } else {
 	ASSERT_ALWAYS(m->bal->h->flags & FLAG_COLPERM);
 	m->fw_colperm = malloc(m->bal->tcols * sizeof(uint32_t));
 	memset(m->fw_colperm, -1, m->bal->tcols * sizeof(uint32_t));
 	for (uint32_t i = 0; i < m->bal->trows; i++) {
-	    ASSERT(m->fw_colperm[m->bal->colperm[i]] == UINT32_MAX);
-	    m->fw_colperm[m->bal->colperm[i]] = i;
+	    ASSERT(m->fw_colperm[xc[i]] == UINT32_MAX);
+	    m->fw_colperm[xc[i]] = i;
 	}
 
 	ASSERT_ALWAYS(m->bal->h->flags & FLAG_ROWPERM);
 	m->fw_rowperm = malloc(m->bal->trows * sizeof(uint32_t));
 	memset(m->fw_rowperm, -1, m->bal->trows * sizeof(uint32_t));
 	for (uint32_t i = 0; i < m->bal->tcols; i++) {
-	    ASSERT(m->fw_rowperm[m->bal->colperm[i]] == UINT32_MAX);
-	    m->fw_rowperm[m->bal->rowperm[i]] = i;
+	    ASSERT(m->fw_rowperm[xr[i]] == UINT32_MAX);
+	    m->fw_rowperm[xr[i]] = i;
 	}
     }
 
@@ -1110,8 +1173,8 @@ void set_master_variables(master_data m, parallelizing_info_ptr pi)/*{{{*/
     fflush(stdout);
     uint32_t *ttab = malloc(m->bal->h->nh * sizeof(uint32_t));
     memset(ttab, 0, m->bal->h->nh * sizeof(uint32_t));
-    for (uint32_t j = 0; j < m->bal->h->nrows; j++) {
-	ttab[who_has_row_bare(m, m->fw_rowperm[j])]++;
+    for (uint32_t j = 0; j < m->bal->trows; j++) {
+        ttab[who_has_row_bare(m, m->fw_rowperm[j])]++;
     }
     ASSERT_ALWAYS(m->bal->h->nh == pi->wr[1]->totalsize);
     for (uint32_t k = 0; k < m->bal->h->nh; k++) {
@@ -1122,7 +1185,7 @@ void set_master_variables(master_data m, parallelizing_info_ptr pi)/*{{{*/
 
 void clear_master_variables(master_data m)/*{{{*/
 {
-    if (m->bal->h->flags && FLAG_REPLICATE) {
+    if (m->bal->h->flags & FLAG_REPLICATE) {
 	free(m->fw_rowperm);
     } else {
 	free(m->fw_rowperm);
@@ -1165,11 +1228,14 @@ int master_dispatcher_put(master_dispatcher_ptr d, uint32_t * p, size_t n)
     for (size_t s = 0; s < n; s++) {
         if (d->crow_togo == 0) {
             d->crow_togo = p[s];
-            d->noderow = who_has_row(m, m->fw_rowperm[r]);
+            ASSERT_ALWAYS(r < m->bal->trows);
+            uint32_t rr = m->fw_rowperm[r];
+            ASSERT_ALWAYS(rr < m->bal->trows);
+            d->noderow = who_has_row(m, rr);
             /* Send a new row info _only_ to the nodes on the
              * corresponding row in the process grid ! */
             for (int i = 0; i < (int) m->bal->h->nv; i++) {
-                uint32_t x[2] = {UINT32_MAX, m->fw_rowperm[r], };
+                uint32_t x[2] = {UINT32_MAX, rr, };
                 data_dest_ptr where = d->x[d->noderow + i];
                 where->put(where, x, 2);
                 /* debug only */
@@ -1291,20 +1357,21 @@ void master_loop_inner(master_data m, data_source_ptr input, data_dest_ptr outpu
     mf_pipe(input, output, "main");
     uint32_t r = output->r;
 
-    ASSERT(r == m->bal->h->nrows);
+    ASSERT_ALWAYS(r == m->bal->h->nrows);
     printf("Master loop finished\n");
     /* complete from nrows to maxdim if necessary ! */
-    for (; r < m->bal->trows;) {
+    for (; output->r < m->bal->trows;) {
         uint32_t zero = 0;
-        r += output->put(output, &zero, 1);
+        int rc = output->put(output, &zero, 1);
+        ASSERT_ALWAYS(rc == 0);
     }
-    r += output->put(output, NULL, 0);
+    output->put(output, NULL, 0);
     printf("Final sends completed, everybody should finish.\n");
 }
 
 void master_loop(master_data m, parallelizing_info_ptr pi, param_list_ptr pl, slave_data_ptr * slaves, int nslaves MAYBE_UNUSED)
 {
-    size_t esz = (m->bal->h->ncoeffs + m->bal->trows) * sizeof(uint32_t);
+    size_t esz = (m->bal->h->ncoeffs + m->bal->h->nrows) * sizeof(uint32_t);
     size_t queue_size = default_queue_size;
     if (param_list_parse_size_t(pl, "balancing_queue_size", &queue_size)) {
         queue_size /= sizeof(uint32_t);
@@ -1431,9 +1498,8 @@ void * balancing_get_matrix_u32(parallelizing_info_ptr pi, param_list pl, matrix
                     m->bal->h->nrows, m->bal->h->ncols, m->bal->h->ncoeffs);
         }
 	if (m->bal->h->flags & FLAG_PADDING) {
-	    uint32_t maxdim = MAX(m->bal->h->nrows, m->bal->h->ncols);
 	    printf("Padding to a matrix of size %" PRIu32 "x%" PRIu32 "\n",
-		   maxdim, maxdim);
+		   m->bal->trows, m->bal->tcols);
 	}
         set_master_variables(m, pi);
         memcpy(s->bal->h, m->bal->h, sizeof(balancing_header));

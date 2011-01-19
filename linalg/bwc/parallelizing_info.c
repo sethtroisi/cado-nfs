@@ -1621,6 +1621,8 @@ int global_data_eq(parallelizing_info_ptr pi, void *buffer, size_t sz)
     }
     thread_broadcast(pi->m, (void**) &pok, 0);
     ok = pok != NULL;
+    if (pi->m->trank == 0)
+        free(bufs);
     return ok;
 }
 

@@ -94,11 +94,7 @@ set_target_properties(bwc_base PROPERTIES
 
 add_executable(mf_twistvec ${EXCLUDE_FROM_RELEASE_BUILD} mf_twistvec.c)
 target_link_libraries(mf_twistvec bwc_base)
-# install(TARGETS mf_twistvec RUNTIME DESTINATION bin/linalg/bwc)
-
-add_executable(mf_untwistvec mf_untwistvec.c)
-target_link_libraries(mf_untwistvec bwc_base)
-install(TARGETS mf_untwistvec RUNTIME DESTINATION bin/linalg/bwc)
+install(TARGETS mf_twistvec RUNTIME DESTINATION bin/linalg/bwc)
 
 set(all_variants)
 macro(configure_bwc_variant v)

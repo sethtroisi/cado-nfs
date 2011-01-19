@@ -7,16 +7,30 @@
 #include "balancing.h"
 #include "utils.h"
 
+void balancing_set_row_col_count(balancing_ptr bal)
+{
+    bal->trows = bal->h->nrows;
+    bal->tcols = bal->h->ncols;
+    if (bal->h->flags & FLAG_PADDING) {
+        bal->tcols = bal->trows = MAX(bal->h->nrows, bal->h->ncols);
+    } else {
+        ASSERT_ALWAYS(0);       // read me:
+        // The constraint on equal-sized blocks must be changed in this
+        // case. If we don't insist on having a square matrix, it's
+        // probably because we're in the situation of block lanczos, with
+        // row blocks only ever matching with other row blocks.
+    }
+    unsigned int s = bal->h->nh * bal->h->nv;
+    bal->trows = s * iceildiv(bal->trows, s);
+    bal->tcols = s * iceildiv(bal->tcols, s);
+}
+
 void balancing_finalize(balancing_ptr bal)
 {
     cado_crc_lfsr l;
     cado_crc_lfsr_init(l);
     uint32_t w = 0;
-    bal->trows = bal->h->nrows;
-    bal->tcols = bal->h->ncols;
-    if (bal->h->flags & FLAG_PADDING) {
-        bal->tcols = bal->trows = MAX(bal->h->nrows, bal->h->ncols);
-    }
+    balancing_set_row_col_count(bal);
     if (bal->h->flags & FLAG_ROWPERM) {
         // w = cado_crc_lfsr_turn(l, bal->rowperm, bal->trows * sizeof(uint32_t));
         w = cado_crc_lfsr_turn32_little(l, bal->rowperm, bal->trows);
@@ -31,12 +45,11 @@ void balancing_finalize(balancing_ptr bal)
         // a trick to identify conjugated perms.
         bal->h->checksum &= ~0xff;
     }
-    /* There's another code branch which uses a reordered matrix product.
-     * We use the least significant bit to indicate whether this is being
-     * used or not. (for now it has never been, and all experiments have
-     * used FLAG_REPLICATE, so bit has always been cleared so far).
+    /* with FLAG_SHUFFLED_MUL, matmul considers a matrix of the form P*M
+     * instead of M itself, we have to indicate this in the checksum.
      */
     bal->h->checksum &= ~0x1;
+    bal->h->checksum |= (bal->h->flags & FLAG_SHUFFLED_MUL) ? 0x1 : 0x0;
 }
 
 void balancing_write_inner(balancing_ptr bal, const char * filename)
@@ -115,11 +128,6 @@ void balancing_read_header_inner(balancing_ptr bal, FILE * pfile)
     rc += fread32_little(&bal->h->checksum, 1, pfile);
     rc += fread32_little(&bal->h->flags, 1, pfile);
     ASSERT_ALWAYS(rc == 7);
-    bal->trows = bal->h->nrows;
-    bal->tcols = bal->h->ncols;
-    if (bal->h->flags & FLAG_PADDING) {
-        bal->tcols = bal->trows = MAX(bal->h->nrows, bal->h->ncols);
-    }
 }
 
 void balancing_read_header(balancing_ptr bal, const char * filename)
@@ -137,6 +145,7 @@ void balancing_read_header(balancing_ptr bal, const char * filename)
         }
     }
     balancing_read_header_inner(bal, pfile);
+    balancing_set_row_col_count(bal);
     fclose(pfile);
     free(derived);
 }
@@ -151,9 +160,7 @@ void balancing_read(balancing_ptr bal, const char * filename)
         abort();
     }
     balancing_read_header_inner(bal, pfile);
-    if (bal->h->flags & FLAG_PADDING) {
-        bal->tcols = bal->trows = MAX(bal->h->nrows, bal->h->ncols);
-    }
+    balancing_set_row_col_count(bal);
     if (bal->h->flags & FLAG_ROWPERM) {
         bal->rowperm = malloc(bal->trows * sizeof(uint32_t));
         int rc = fread32_little(bal->rowperm, bal->trows, pfile);

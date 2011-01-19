@@ -80,6 +80,12 @@ static inline int MPI_Reduce ( void *sendbuf, void *recvbuf, int count,MPI_Datat
     if (sendbuf) memcpy(recvbuf, sendbuf, count * datatype);
     return 0;
 }
+static inline int MPI_Reduce_scatter(void *sendbuf, void *recvbuf, int *recvcounts,
+                    MPI_Datatype datatype, MPI_Op op MAYBE_UNUSED, MPI_Comm comm MAYBE_UNUSED)
+{
+    if (sendbuf) memcpy(recvbuf, sendbuf, recvcounts[0] * datatype);
+    return 0;
+}
 static inline int MPI_Allreduce ( void *sendbuf, void *recvbuf, int count,MPI_Datatype datatype, MPI_Op op MAYBE_UNUSED, MPI_Comm comm  MAYBE_UNUSED)
 {
     if (sendbuf) memcpy(recvbuf, sendbuf, count * datatype);
@@ -118,7 +124,7 @@ static inline int MPI_Gatherv(void * sendbuf, int sendcount,  MPI_Datatype st, v
     return 0;
 }
 static inline int MPI_Allgather(void * sendbuf MAYBE_UNUSED, int sendcount MAYBE_UNUSED,  MPI_Datatype st MAYBE_UNUSED, void * recvbuf MAYBE_UNUSED, int recvcount MAYBE_UNUSED, MPI_Datatype rt MAYBE_UNUSED, MPI_Comm x MAYBE_UNUSED) {
-    ASSERT_ALWAYS(sendcount * st == recvcount * rt);
+    ASSERT_ALWAYS(sendbuf == MPI_IN_PLACE || sendcount * st == recvcount * rt);
     if (sendbuf) memcpy(recvbuf, sendbuf, sendcount * st);
     return 0;
 }

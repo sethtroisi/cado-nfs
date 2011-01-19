@@ -64,7 +64,7 @@ int matrix_autodetect_input(struct mf_io_file * m_in, const char * mfile)
         }
         char test[1024];
         int n = fread(test, 1, 1024, m_in->f);
-        DIE_ERRNO_DIAG(n < 1024, "fread", mfile);
+        DIE_ERRNO_DIAG(n < 1024 && !feof(m_in->f), "fread", mfile);
         int k;
         for(k = 0 ; k < n && (isdigit(test[k]) || isspace(test[k])) ; k++);
         if (k < n) {

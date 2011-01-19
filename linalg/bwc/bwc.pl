@@ -233,14 +233,15 @@ my $param={};
 while (defined($_ = shift @ARGV)) {
     # -d will never be found as a bw argument, it is 
     if ($_ eq '--') {
-        push @extra_args, $_, splice @ARGV;
+        push @extra_args, splice @ARGV;
         last;
     }
     if (/^(-d|--show|--dry-run)$/) { $show_only=1; next; }
     if (/^(-h|--help)$/) { usage; }
     my ($k,$v);
-    if (/^(-.*)$/) { $k=$1; $v=1; }
-    if (/^([^=]+)=(.*)$/) { $k=$1; $v=$2; }
+    if (/^--([^=]+)$/ && scalar @ARGV) { $k=$1; $v=shift(@ARGV); }
+    elsif (/^(-.*)$/) { $k=$1; $v=1; }
+    elsif (/^([^=]+)=(.*)$/) { $k=$1; $v=$2; }
     if (!defined($k)) {
         usage "Garbage not undertood on command line: $_";
     }
@@ -694,7 +695,11 @@ sub drive {
         &drive("./cleanup", "--ncols", $n,
             "--out", "$wdir/W.$balancing_hash", @my_ks);
 
-        &drive("mf_untwistvec", "$wdir/$balancing", "$wdir/W.$balancing_hash", "--out", "$wdir/W");
+        my @untwist = ("mf_twistvec", "--truncate", "--untwist", "$wdir/$balancing", "$wdir/W.$balancing_hash", "--out", "$wdir/W");
+        if (defined(my $ns = $param->{'nullspace'})) {
+            push @untwist, "--nullspace", $ns;
+        }
+        &drive(@untwist);
         return;
     }
 

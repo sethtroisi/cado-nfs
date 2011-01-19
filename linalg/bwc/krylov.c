@@ -127,15 +127,15 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         // Note that our share of the dot product is determined by the
         // intersections of the i0..i1 intervals on both sides.
         
-        unsigned int how_many;
-        unsigned int offset_c;
-        unsigned int offset_v;
-        how_many = intersect_two_intervals(&offset_c, &offset_v,
-                mrow->i0, mrow->i1,
-                mcol->i0, mcol->i1);
-
         if (!bw->skip_online_checks) {
             abzero(abase, ahead->v, NCHECKS_CHECK_VECTOR);
+            unsigned int how_many;
+            unsigned int offset_c;
+            unsigned int offset_v;
+            how_many = intersect_two_intervals(&offset_c, &offset_v,
+                    mrow->i0, mrow->i1,
+                    mcol->i0, mcol->i1);
+
             if (how_many) {
                 size_t bytes_c =  abvbytes(abase_check, offset_c);
                 abvt * c = abase_generic_ptr_add(check_vector->v, bytes_c);

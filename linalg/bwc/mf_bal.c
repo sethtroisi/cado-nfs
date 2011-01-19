@@ -98,10 +98,13 @@ struct slice * alloc_slices(unsigned int water, unsigned int n)
 
     res = (struct slice*) malloc(n * sizeof(struct slice));
 
-    uint32_t min_size = water / n;
+    uint32_t common_size = water / n;
+
+    // we now require equal-sized blocks.
+    ASSERT_ALWAYS(water % n == 0);
 
     for(i = 0 ; i < n ; i++) {
-        res[i].nrows = min_size + (i < (water % n));
+        res[i].nrows = common_size; // min_size + (i < (water % n));
         res[i].r = (uint32_t *) malloc(res[i].nrows * sizeof(uint32_t));
         res[i].coeffs = 0;
     }
@@ -352,10 +355,24 @@ int main(int argc, char * argv[])
 
     size_t maxdim = MAX(bal->h->nrows, bal->h->ncols);
     if (maxdim != bal->h->nrows) {
-        // weird. nothing wrong, but that's not what this program was
-        // written in mind, so most probably we're going to lack stuff.
+        // weird. nothing wrong, but this program has not been written
+        // with this situation in mind, so most probably we're going to
+        // lack stuff.
         abort();
     }
+
+    // we are forcibly computing a symmetric permutation, according to a
+    // situation where the _columns_ of the input matrix are the most
+    // unbalanced.
+    
+    uint32_t elem_block = iceildiv(maxdim, nh * nv);
+    // uint32_t rslice_size = nv * elem_block;
+    uint32_t cslice_size = nh * elem_block;
+    uint32_t padding = nv * nh * elem_block - maxdim;
+
+    fprintf(stderr,
+            "Using %" PRIu32" padding %ss to obtain %u blocks of %u*%"PRIu32"=%"PRIu32" %ss\n",
+                padding, "col", nv, nh, elem_block, cslice_size, "col");
 
 
     struct stat sbuf_mat[1];
@@ -403,7 +420,8 @@ int main(int argc, char * argv[])
     FILE * fcw = fopen(cwfile, "r");
     if (fcw == NULL) { perror(cwfile); exit(1); }
 
-    bal->colperm = malloc(maxdim * sizeof(uint32_t) * 2);
+    bal->colperm = malloc((maxdim + padding) * sizeof(uint32_t) * 2);
+    memset(bal->colperm + 2 * maxdim, 0, padding * sizeof(uint32_t) * 2);
     double t_cw;
     t_cw = -wct_seconds();
     size_t nc = fread32_little(bal->colperm, bal->h->ncols, fcw);
@@ -449,21 +467,22 @@ int main(int argc, char * argv[])
 
     /* Unless we're doing 2d balancing, we need to fill with zero columns
      */
-    for(uint32_t r = bal->h->ncols ; r < maxdim ; r++) {
+    for(uint32_t r = bal->h->ncols ; r < maxdim + padding ; r++) {
         bal->colperm[2*r]=0;
         bal->colperm[2*r+1]=r;
     }
 
-    struct slice * h = shuffle_rtable("col", bal->colperm, maxdim, bal->h->nv);
+    struct slice * h = shuffle_rtable("col", bal->colperm, maxdim + padding, bal->h->nv);
 
     /* we can now make the column permutation tidier */
-    bal->colperm = realloc(bal->colperm, maxdim * sizeof(uint32_t));
+    bal->colperm = realloc(bal->colperm, (maxdim + padding) * sizeof(uint32_t));
     for(int ii = 0 ; ii < nv ; ii++) {
         const struct slice * r = &(h[ii]);
         memcpy(bal->colperm + r->i0, r->r, r->nrows * sizeof(uint32_t));
     }
     free_slices(h, bal->h->nv);
     bal->h->flags = FLAG_REPLICATE|FLAG_PADDING|FLAG_COLPERM;
+    // bal->h->flags |= FLAG_SHUFFLED_MUL; // not yet !
     balancing_finalize(bal);
 
     balancing_write(bal, mfile, param_list_lookup_string(pl, "out"));

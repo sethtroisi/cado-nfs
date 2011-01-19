@@ -168,6 +168,8 @@ static inline void matmul_top_mul(matmul_top_data_ptr mmt, int d)
     matmul_top_mul_comm(mmt, d);
 }
 
+extern void matmul_top_vec_init(matmul_top_data_ptr mmt, int d, int flags);
+extern void matmul_top_vec_clear(matmul_top_data_ptr mmt, int d);
 
 /* Now some of the generic interface calls. By design, not everything is
  * possible with these calls. In particular, nothing critical is doable.
