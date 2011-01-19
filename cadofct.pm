@@ -217,6 +217,7 @@ my @default_param = (
     bwc_interval => 1000,
     bwc_mm_impl => 'bucket',
     bwc_interleaving => 0,
+    bwc_shuffled_product => 0,
 
     # characters
     nkermax      => 30,
@@ -2658,6 +2659,7 @@ sub do_linalg {
                "interval=$param{'bwc_interval'} ".
                "mode=u64 mn=64 splits=0,64 ys=0..64 ".
                "wdir=$param{'prefix'}.bwc " .
+               "shuffled_product=$param{'bwc_shuffled_product'}" .
                "bwc_bindir=$bwc_bindir ";
         cmd($cmd, { cmdlog => 1, kill => 1,
                 appendlog=>1,

@@ -130,6 +130,7 @@ my $mpi_ver;
 my $tmpdir;
 my $interleaving;
 my $force_complete;
+my $shuffled_product;
 
 print $0, " ", $main, " ", join(" ", @ARGV), "\n";
 
@@ -344,6 +345,7 @@ while (my ($k,$v) = each %$param) {
     if ($k eq 'mpi_extra_args') { $mpi_extra_args=$v; next; }
     if ($k eq 'force_complete') { $force_complete=$v; next; }
     if ($k eq 'mode') { $mode=$v; next; }
+    if ($k eq 'shuffled_product') { $shuffled_product=$v; next; }
     if ($k eq 'hosts') {
         $v=[$v] if (ref $v eq '');
         for (@$v) { push @hosts, split(',',$_); }
@@ -652,7 +654,9 @@ sub drive {
         unless (defined($cp = last_cp('mksol'))) {
             unless (defined($cp = last_cp('krylov'))) {
                 &drive(":wipeout", @_);
-                &drive("mf_bal", "mfile=$matrix", "out=$wdir/", $nh, $nv);
+                my @mfbal=("mfile=$matrix", "out=$wdir/", $nh, $nv);
+                unshift @mfbal, "--shuffled-product" if $shuffled_product;
+                &drive("mf_bal", @mfbal);
                 obtain_bfile();
                 push @_, "balancing=$balancing";
                 &drive("${mode}_dispatch", @_, "sequential_cache_build=1");

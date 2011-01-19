@@ -36,6 +36,7 @@ void usage(int rc) {
             " --quiet     be quiet\n"
             " --rowperm   permute rows in priority (defaults to auto)\n"
             " --colperm   permute rows in priority (defaults to auto)\n"
+            " --shuffled-product   prepare permutation for shuffled product\n"
            );
     exit(rc);
 }
@@ -256,6 +257,7 @@ int main(int argc, char * argv[])
     // to be supported one day maybe. for now, it's not useful.
     int rowperm = 0;
     int colperm = 0;
+    int shuffled_product = 0;
     // const char * ref_balance = NULL;
 
     param_list_init(pl);
@@ -268,6 +270,7 @@ int main(int argc, char * argv[])
     // param_list_configure_knob(pl, "--ascii-freq", &ascii_freq);
     // param_list_configure_knob(pl, "--binary-freq", &binary_freq);
     param_list_configure_knob(pl, "--balance2d", &twodim);
+    param_list_configure_knob(pl, "--shuffled-product", &shuffled_product);
 
     for(;argc;) {
         char * q;
@@ -482,7 +485,7 @@ int main(int argc, char * argv[])
     }
     free_slices(h, bal->h->nv);
     bal->h->flags = FLAG_REPLICATE|FLAG_PADDING|FLAG_COLPERM;
-    // bal->h->flags |= FLAG_SHUFFLED_MUL; // not yet !
+    if (shuffled_product) bal->h->flags |= FLAG_SHUFFLED_MUL;
     balancing_finalize(bal);
 
     balancing_write(bal, mfile, param_list_lookup_string(pl, "out"));
