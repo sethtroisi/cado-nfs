@@ -584,17 +584,28 @@ sub obtain_bfile {
     my $x = $matrix;
     $x =~ s/\.(bin|txt)$//;
     $x =~ s/^.*\/([^\/]+)$/$1/;
-    my $pat = qr/^$x.${nh}x${nv}.([0-9a-f]{8}).bin$/;
-    my @bfiles = grep { /$pat/ } readdir $dh;
+    my $foo = join(' ', @mpi_precmd_single) . ' ' . "find $wdir -name $x.${nh}x${nv}.????????.bin -printf '%f\\n'";
+    print "Running $foo\n";
+    $foo = `$foo`;
+    my $pat;
+    if ($param->{'shuffled_product'}) {
+        $pat = qr/^$x.${nh}x${nv}.([0-9a-f]{7}[13579bdf]).bin$/;
+    } else {
+        $pat = qr/^$x.${nh}x${nv}.([0-9a-f]{7}[02468ace]).bin$/;
+    }
+    # my @bfiles = grep { /$pat/ } readdir $dh;
+    my @bfiles = split(' ', $foo);
+    @bfiles = grep { /$pat/ } @bfiles;
     if (scalar @bfiles != 1) {
         print STDERR "Expected 1 bfile, found ", scalar @bfiles, ":\n";
         print "$_\n" foreach (@bfiles);
         die;
     }
     closedir $dh;
-    $balancing=$bfiles[0];
+    $balancing=$wdir . "/" . $bfiles[0];
     $balancing =~ /$pat/;
     $balancing_hash = $1;
+    dosystem(@mpi_precmd, split(' ', "$bindir/bcast-file $balancing"));
 }
 
 sub last_cp {
