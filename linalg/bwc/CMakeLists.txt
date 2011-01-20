@@ -92,7 +92,7 @@ set_target_properties(bwc_base PROPERTIES
         COMPILE_FLAGS "--mpi"
         LINK_FLAGS "--mpi")
 
-add_executable(mf_twistvec ${EXCLUDE_FROM_RELEASE_BUILD} mf_twistvec.c)
+add_executable(mf_twistvec mf_twistvec.c)
 target_link_libraries(mf_twistvec bwc_base)
 install(TARGETS mf_twistvec RUNTIME DESTINATION bin/linalg/bwc)
 
