@@ -759,9 +759,9 @@ void alternative_reduce_scatter(abt * dst, abt * src, int eitems, matmul_top_dat
     b[1] = mmt->wr[d]->rsbuf[1];
     abzero(mmt->abase, b[0], eitems);
 
-    int l = (rank + njobs - 1) % njobs;
-    int drank = (rank + 1) % njobs;
-    int srank = (rank + njobs - 1) % njobs;
+    int l = (rank + 1) % njobs;
+    int srank = (rank + 1) % njobs;
+    int drank = (rank + njobs - 1) % njobs;
 
     for (int i = 0; i < njobs; i++) {
         int j0, j1;
@@ -771,16 +771,15 @@ void alternative_reduce_scatter(abt * dst, abt * src, int eitems, matmul_top_dat
             abadd(mmt->abase, b[0] + aboffset(mmt->abase, k), src + aboffset(mmt->abase, j));
         if (i == njobs - 1)  
             break;
-        MPI_Sendrecv(b[0], esize, MPI_BYTE, drank, 0xbeef,
-                b[1], esize, MPI_BYTE, srank, 0xbeef,
-                wr->pals, MPI_STATUS_IGNORE);
+        MPI_Sendrecv(   b[0], esize, MPI_BYTE, drank, 0xbeef,
+                        b[1], esize, MPI_BYTE, srank, 0xbeef,
+                        wr->pals, MPI_STATUS_IGNORE);
         abt * tb = b[0];   b[0] = b[1];  b[1] = tb; 
-        l = (l + njobs - 1) % njobs;
+        l = (l + 1) % njobs;
     }   
     abcopy(mmt->abase, dst, b[0], eitems); 
 }   
 #endif  /* USE_ALTERNATIVE_REDUCE_SCATTER */
-
 
 /* Note that because reduce_across does additions, it is _NOT_ generic.
  *
@@ -972,8 +971,7 @@ reduce_across(matmul_top_data_ptr mmt, int d)
                 ASSERT((mrow->i1 - mrow->i0) % pirow->totalsize == 0);
 #ifdef USE_ALTERNATIVE_REDUCE_SCATTER
                 int z = (mrow->i1 - mrow->i0) / pirow->njobs;
-                alternative_reduce_scatter(dptr + z * pirow->jrank, dptr, z, mmt, d);
-                pi_log_op(pirow, "[%s] MPI_Reduce_scatter done", __func__);
+                alternative_reduce_scatter(dptr, dptr, z, mmt, d);
 #else   /* USE_ALTERNATIVE_REDUCE_SCATTER */
                 // all recvcounts are equal
                 int * rc = malloc(pirow->njobs * sizeof(int));
@@ -981,10 +979,12 @@ reduce_across(matmul_top_data_ptr mmt, int d)
                     rc[k] = (mrow->i1 - mrow->i0) / pirow->njobs;
                     rc[k] = abbytes(mmt->abase, rc[k]);
                 }
-                err = MPI_Reduce_scatter(MPI_IN_PLACE, dptr, rc, MPI_BYTE, MPI_BXOR, pirow->pals);
+                int z = (mrow->i1 - mrow->i0) / pirow->njobs;
+                err = MPI_Reduce_scatter(dptr, dptr, rc, MPI_BYTE, MPI_BXOR, pirow->pals);
                 ASSERT_ALWAYS(!err);
                 free(rc);
 #endif  /* USE_ALTERNATIVE_REDUCE_SCATTER */
+                pi_log_op(pirow, "[%s] MPI_Reduce_scatter done", __func__);
             }
         }
         serialize_threads(pirow);

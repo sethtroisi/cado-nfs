@@ -3,9 +3,10 @@
 set -e
 set -x
 
-MPI=1 make -s -C ../../ -j 32
-eval `MPI=1 make -s -C ../../ show`
-bins=../../$build_tree/linalg/bwc
+top=`dirname $0`/../..
+MPI=1 make -s -C $top -j 32
+eval `MPI=1 make -s -C $top show`
+bins=$top/$build_tree/linalg/bwc
 mats=$HOME/Local/mats
 
 wdir=/tmp/bwc
@@ -13,8 +14,8 @@ if [ -d $wdir ] ; then rm -rf $wdir 2>/dev/null ; fi
 mkdir $wdir
 
 
-Mh=2; Mv=2;
-Th=3; Tv=2;
+Mh=3; Mv=4;
+Th=1; Tv=1;
 Nh=$((Mh*Th))
 Nv=$((Mv*Tv))
 
@@ -30,13 +31,17 @@ thr=${Th}x${Tv}
 # singular inputs. In particular, a matrix rank below 64 won't work.
 matrix=$mats/t100b.bin
 nullspace=left
+shuffle=1
 
 # Note that it's better to look for a kernel which is not trivial. Thus
 # specifying --kleft for random generation is a good move prior to
 # running this script for nullspace=left
 
+if [ "$shuffle" = 1 ] ; then
+    shuffle_option=--shuffled-product
+fi
 
-$bins/mf_bal mfile=$matrix $Nh $Nv out=$wdir/
+$bins/mf_bal $shuffle_option mfile=$matrix $Nh $Nv out=$wdir/
 
 if [ $(ls $wdir/`basename $matrix .bin`.${Nh}x${Nv}.*.bin | wc -l) != 1 ] ; then
     echo "Weird -- should have only one balancing file as output." >&2
@@ -82,7 +87,7 @@ c=$b.$split.$checksum
 
 mdir=$wdir
 
-cmd=./convert_magma.pl
+cmd=`dirname $0`/convert_magma.pl
 
 $cmd balancing < $wdir/$c.bin > $mdir/b.m
 
