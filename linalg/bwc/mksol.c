@@ -49,10 +49,11 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     abzero(abase, mrow->v->v, mrow->i1 - mrow->i0);
 
     uint32_t * gxvecs = NULL;
+    unsigned int nx = 0;
+
     
     if (!bw->skip_online_checks) {
-        gxvecs = malloc(bw->nx * bw->m * sizeof(uint32_t));
-        load_x(gxvecs, bw->m, bw->nx, pi, mmt->bal);
+        load_x(&gxvecs, bw->m, &nx, pi, mmt->bal);
     }
 
     int rc;
@@ -279,7 +280,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         if (!bw->skip_online_checks) {
             /* Last dot product. This must cancel ! Recall that x_dotprod
              * adds to the result. */
-            x_dotprod(mmt, gxvecs, ahead->v, NCHECKS_CHECK_VECTOR);
+            x_dotprod(mmt, gxvecs, nx, ahead->v, NCHECKS_CHECK_VECTOR);
 
             allreduce_generic(abase, ahead, pi->m, NCHECKS_CHECK_VECTOR);
             if (!abis_zero(abase, ahead->v, NCHECKS_CHECK_VECTOR)) {
@@ -343,7 +344,6 @@ int main(int argc, char * argv[])
     bw_common_init_mpi(bw, pl, &argc, &argv);
     if (param_list_warn_unused(pl)) usage();
 
-    if (bw->nx == 0) { fprintf(stderr, "no nx value set\n"); exit(1); } 
     if (bw->ys[0] < 0) { fprintf(stderr, "no ys value set\n"); exit(1); }
 
     setvbuf(stdout,NULL,_IONBF,0);

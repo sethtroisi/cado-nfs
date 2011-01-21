@@ -47,9 +47,6 @@ struct bw_params {
      */
     int ys[2];
 
-    /* Number of coordinates in the X vectors */
-    unsigned int nx;
-
     /* dir is a boolean flag equal to 1 if we are looking for the right
      * nullspace of the matrix. In matmul_top speak, it indicates where the
      * source vector is.

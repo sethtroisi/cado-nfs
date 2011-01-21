@@ -108,9 +108,7 @@ suggests only the <key>=<value> form.
 * cfg=<filename>
 
     Read extra parameters from file name. Note that if this parameter is not
-    present, and if a file named bw.cfg is found in the working directory
-    (either the cwd or the wdir parameter above), then parameters are obtained
-    from that file.
+    present, then parameters are obtained from that file.
 
 * matrix=<path>
 * balancing=<path>

@@ -36,9 +36,6 @@
 #define LINGEN_F_FILE   "F"
 #define LINGEN_PI_PATTERN       "pi-%u-%u"
 
-/* misc */
-#define BW_CONFIG_FILE "bw.cfg"
-
 /* mksol */
 #define F_FILE_SLICE_PATTERN "F%u-%u"
 

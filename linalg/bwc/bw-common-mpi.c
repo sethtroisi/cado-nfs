@@ -10,8 +10,6 @@
 
 int bw_common_init_mpi(struct bw_params * bw, param_list pl, int * p_argc, char *** p_argv)
 {
-    bw_common_init_defaults(bw);
-
 #ifdef  MPI_LIBRARY_MT_CAPABLE
     int req = MPI_THREAD_MULTIPLE;
     int prov;
@@ -30,6 +28,8 @@ int bw_common_init_mpi(struct bw_params * bw, param_list pl, int * p_argc, char 
 
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
+
+    bw_common_init_defaults(bw);
 
     bw->can_print = rank == 0 || getenv("CAN_PRINT");
 

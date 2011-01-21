@@ -188,10 +188,6 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
         }
     }
 
-    if (pi->m->trank == 0) {
-        bw->nx = my_nx;
-    }
-
     save_x(xvecs, bw->m, my_nx, pi, mmt->bal);
 
     matmul_top_clear(mmt, abase);
@@ -226,14 +222,9 @@ int main(int argc, char * argv[])
 
     pi_go(prep_prog, pl, 0);
 
-    // we save the parameter list once again, because the prep program
-    // generates some useful info, bw->nx in particular.
-    param_list_save_parameter(pl, PARAMETER_FROM_FILE, "nx", "%u", bw->nx);
-
     param_list_remove_key(pl, "sequential_cache_build");
     param_list_remove_key(pl, "rebuild_cache");
 
-    param_list_save(pl, BW_CONFIG_FILE);
     param_list_clear(pl);
 
     bw_common_clear_mpi(bw);

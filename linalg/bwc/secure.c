@@ -47,9 +47,9 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
 
     abzero(abase, mrow->v->v, mrow->i1 - mrow->i0);
 
-    uint32_t * gxvecs = malloc(bw->nx * bw->m * sizeof(uint32_t));
-
-    load_x(gxvecs, bw->m, bw->nx, pi, mmt->bal);
+    uint32_t * gxvecs = NULL;
+    unsigned int nx = 0;
+    load_x(&gxvecs, bw->m, &nx, pi, mmt->bal);
 
     /* Since we are going to do a _reduction_, it is important to make
      * sure that an *odd* number of copies of the vector is present
@@ -58,9 +58,9 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     if (picol->trank == 0 && picol->jrank == 0) {
         ASSERT_ALWAYS(bw->m >= NCHECKS_CHECK_VECTOR);
         for(int j = 0 ; j < NCHECKS_CHECK_VECTOR ; j++) {
-            for(unsigned int k = 0 ; k < bw->nx ; k++) {
+            for(unsigned int k = 0 ; k < nx ; k++) {
                 // set bit j of entry gxvecs[j*bw->nx+k] to 1.
-                uint32_t i = gxvecs[j*bw->nx+k];
+                uint32_t i = gxvecs[j*nx+k];
                 if (i < mcol->i0 || i >= mcol->i1)
                     continue;
                 abt * where;
@@ -165,8 +165,6 @@ int main(int argc, char * argv[])
     param_list_init(pl);
     bw_common_init_mpi(bw, pl, &argc, &argv);
     if (param_list_warn_unused(pl)) usage();
-
-    if (bw->nx == 0) { fprintf(stderr, "no nx value set\n"); exit(1); } 
 
     setvbuf(stdout,NULL,_IONBF,0);
     setvbuf(stderr,NULL,_IONBF,0);

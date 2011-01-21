@@ -1379,6 +1379,7 @@ int pi_load_file(pi_wiring_ptr w, const char * name, void * buf, size_t mysize)
     int * displs = (int *) malloc(w->njobs * sizeof(int));
     int * sendcounts = (int *) malloc(w->njobs * sizeof(int));
     size_t siz;
+
     siz = get_counts_and_displacements(w, mysize, displs, sendcounts);
 
     // the page size is always a power of two, so rounding to the next
@@ -1439,8 +1440,10 @@ int pi_load_file(pi_wiring_ptr w, const char * name, void * buf, size_t mysize)
                 }
             }
             if (ts0) break;
+            // printf("J%uT%u start mpi_scatter\n", w->jrank, w->trank);
             err = MPI_Scatter(tsendbuf, chunksize, MPI_BYTE, trecvbuf,
                     chunksize, MPI_BYTE, 0, w->pals);
+            // printf("J%uT%u end mpi_scatter\n", w->jrank, w->trank);
             memcpy(buf + cd[w->jrank] - displs[w->jrank], trecvbuf, ts[w->jrank]);
             for(unsigned int j = 0 ; j < w->njobs ; j++) {
                 cs[j] -= ts[j];

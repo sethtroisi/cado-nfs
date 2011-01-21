@@ -275,8 +275,6 @@ int main(int argc, char * argv[])
     bw_common_init_mpi(bw, pl, &argc, &argv);
     if (param_list_warn_unused(pl)) usage();
 
-    if (bw->nx == 0) { fprintf(stderr, "no nx value set\n"); exit(1); } 
-
     setvbuf(stdout,NULL,_IONBF,0);
     setvbuf(stderr,NULL,_IONBF,0);
 

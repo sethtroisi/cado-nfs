@@ -335,6 +335,7 @@ void matmul_top_load_vector_generic(matmul_top_data_ptr mmt, size_t stride, mmt_
         }
         SEVERAL_THREADS_PLAY_MPI_END;
     }
+    // serialize_threads(picol);
     serialize(mmt->pi->m);
     serialize_threads(mmt->pi->m);
 

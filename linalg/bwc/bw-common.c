@@ -24,7 +24,6 @@ int bw_common_init_defaults(struct bw_params * bw)
     bw->interval = 1000;
     bw->can_print = 1;
     bw->ys[0] = bw->ys[1] = -1;
-    bw->nx = 0;
     bw->dir = 1;
     bw->mpi_split[0] = bw->mpi_split[1] = 1;
     bw->thr_split[0] = bw->thr_split[1] = 1;
@@ -74,12 +73,6 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
 
     if ((cfg = param_list_lookup_string(pl, "cfg"))) {
         param_list_read_file(pl, cfg);
-    } else {
-        /* Otherwise we check first that the file exists */
-        cfg = BW_CONFIG_FILE;
-        if (access(cfg, R_OK) == 0) {
-            param_list_read_file(pl, cfg);
-        }
     }
 
 
@@ -87,7 +80,6 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     param_list_parse_intxint(pl, "thr", bw->thr_split);
     param_list_parse_int(pl, "seed", &bw->seed);
     param_list_parse_int(pl, "interval", &bw->interval);
-    param_list_parse_uint(pl, "nx", &bw->nx);
     param_list_parse_int_and_int(pl, "ys", bw->ys, "..");
     param_list_parse_int(pl, "start", &bw->start);
     param_list_parse_int(pl, "end", &bw->end);

@@ -313,30 +313,6 @@ if (!defined($wdir) && !defined($matrix)) {
     die "At least one of matrix or wdir must be defined";
 }
 
-# Assuming that the parameters given on the command line are sufficient
-# to determine an existing wdir, then this wdir is scanned for an
-# existing bw.cfg file. This file is read. However, parameters read from
-# the bw.cfg have _lower_ precedence than the ones on the command line.
-
-if (defined($wdir) && -d $wdir && -f "$wdir/bw.cfg") {
-    open F, "$wdir/bw.cfg";
-    while (<F>) {
-        chomp($_);
-        next if /^#/;
-        next if /^\s*$/;
-        my ($k,$v);
-        if (/^(-.*)$/) { $k=$1; $v=1; }
-        if (/^([^=]+)=(.*)$/) { $k=$1; $v=$2; }
-        if (!defined($k)) {
-            usage "Garbage not undertood in $wdir/bw.cfg:\n$_";
-        }
-        if (!defined($param->{$k})) {
-            $param->{$k}=$v;
-        }
-    }
-    close F;
-}
-
 while (my ($k,$v) = each %$param) {
     # First the ones that are _not_ relevant to the bwc programs.
     if ($k eq 'matrix') { $matrix=$v; next; }

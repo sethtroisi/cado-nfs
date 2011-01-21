@@ -49,9 +49,10 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     
     abzero(abase, mrow->v->v, mrow->i1 - mrow->i0);
 
-    uint32_t * gxvecs = malloc(bw->nx * bw->m * sizeof(uint32_t));
 
-    load_x(gxvecs, bw->m, bw->nx, pi, mmt->bal);
+    uint32_t * gxvecs = NULL;
+    unsigned int nx = 0;
+    load_x(&gxvecs, bw->m, &nx, pi, mmt->bal);
 
     char * v_name;
 
@@ -77,6 +78,8 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         matmul_top_load_vector_generic(mmt, vstride,
                 check_vector, CHECK_FILE_BASE, !bw->dir, bw->interval);
         if (tcan_print) { printf("done\n"); }
+    } else {
+        printf("skip online checks\n");
     }
 
     if (!bw->skip_online_checks) {
@@ -152,7 +155,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             /* This segment must be guaranteed to be free of any mpi
              * calls */
             /* Compute the product by x */
-            x_dotprod(mmt, gxvecs,
+            x_dotprod(mmt, gxvecs, nx,
                     xymats->v + aboffset(abase, i * bw->m), bw->m);
 
             
@@ -167,7 +170,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         if (!bw->skip_online_checks) {
             /* Last dot product. This must cancel ! */
-            x_dotprod(mmt, gxvecs, ahead->v, NCHECKS_CHECK_VECTOR);
+            x_dotprod(mmt, gxvecs, nx, ahead->v, NCHECKS_CHECK_VECTOR);
 
             allreduce_generic(abase, ahead, pi->m, NCHECKS_CHECK_VECTOR);
             if (!abis_zero(abase, ahead->v, NCHECKS_CHECK_VECTOR)) {
@@ -249,13 +252,13 @@ int main(int argc, char * argv[])
     bw_common_init_mpi(bw, pl, &argc, &argv);
     if (param_list_warn_unused(pl)) usage();
 
-    if (bw->nx == 0) { fprintf(stderr, "no nx value set\n"); exit(1); } 
     if (bw->ys[0] < 0) { fprintf(stderr, "no ys value set\n"); exit(1); }
 
     setvbuf(stdout,NULL,_IONBF,0);
     setvbuf(stderr,NULL,_IONBF,0);
 
     catch_control_signals();
+
     pi_go(krylov_prog, pl, 0);
     param_list_clear(pl);
     bw_common_clear_mpi(bw);
