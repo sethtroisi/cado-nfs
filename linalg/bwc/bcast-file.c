@@ -15,12 +15,12 @@ int size;
 
 #define BUFFERSIZE      (1 << 28)
 
-void share_file(const char * fname, int root, size_t total)
+void share_file(const char * fname, int root, size_t total, MPI_Comm comm)
 {
     FILE * f;
     f = fopen(fname, rank == root ? "r" : "w");
     if (f == NULL)
-        MPI_Abort(MPI_COMM_WORLD,1);
+        MPI_Abort(comm,1);
 
     char * buf = malloc(BUFFERSIZE);
     size_t fsz = 0;
@@ -31,11 +31,11 @@ void share_file(const char * fname, int root, size_t total)
         if (rank == root)
             n = fread(buf, 1, BUFFERSIZE, f);
 
-        MPI_Bcast(&n, 1, MPI_INT, root, MPI_COMM_WORLD);
+        MPI_Bcast(&n, 1, MPI_INT, root, comm);
         fsz += n;
         if (n == 0)
             break;
-        MPI_Bcast(buf, n, MPI_BYTE, root, MPI_COMM_WORLD);
+        MPI_Bcast(buf, n, MPI_BYTE, root, comm);
         if (rank != root) {
             int m=fwrite(buf, 1, n, f);
             if (m != n)
@@ -72,7 +72,31 @@ int main(int argc, char * argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     printf("node %d/%d on %s\n", rank,size,u->nodename);
 
-    for(int i = 1 ; i < argc ; i++) {
+    int duplicate=0;
+    size_t minname=sizeof(u->nodename);
+    size_t maxname=sizeof(u->nodename);
+    MPI_Allreduce(MPI_IN_PLACE, &maxname, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+    MPI_Allreduce(MPI_IN_PLACE, &minname, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+    ASSERT_ALWAYS(minname == maxname);
+    char * allnames = malloc(size * sizeof(u->nodename));
+    MPI_Allgather(u->nodename, sizeof(u->nodename), MPI_BYTE, allnames, sizeof(u->nodename), MPI_BYTE, MPI_COMM_WORLD);
+    for(int i = 0 ; i < rank ; i++) {
+        if (memcmp(allnames + i * sizeof(u->nodename), u->nodename, sizeof(u->nodename)) == 0) {
+            fprintf(stderr, "%s on node %d/%d duplicates node %d/%d\n",
+                    u->nodename, rank, size, i, size);
+            duplicate=1;
+        }
+    }
+
+    MPI_Comm comm;
+    MPI_Comm_split(MPI_COMM_WORLD, duplicate, rank, &comm);
+
+    MPI_Comm_size(comm, &size);
+    MPI_Comm_rank(comm, &rank);
+    if (!duplicate)
+    printf("reduced node %d/%d on %s\n", rank,size,u->nodename);
+
+    for(int i = 1 ; i < argc && !duplicate; i++) {
         int rc;
         rc = stat(argv[i], sbuf);
         if (rc < 0 && errno != ENOENT)
@@ -82,9 +106,9 @@ int main(int argc, char * argv[])
         off_t szmin;
         szmax = ok ? sbuf->st_size : 0;
         szmin = ok ? sbuf->st_size : 0;
-        MPI_Allreduce(MPI_IN_PLACE, &ok, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
-        MPI_Allreduce(MPI_IN_PLACE, &szmax, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
-        MPI_Allreduce(MPI_IN_PLACE, &szmin, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
+        MPI_Allreduce(MPI_IN_PLACE, &ok, 1, MPI_INT, MPI_SUM, comm);
+        MPI_Allreduce(MPI_IN_PLACE, &szmax, 1, MPI_INT, MPI_MAX, comm);
+        MPI_Allreduce(MPI_IN_PLACE, &szmin, 1, MPI_INT, MPI_MIN, comm);
         if (szmax == szmin) {
             if (rank == 0)
                 printf("%s ok everywhere (%zu MB)\n", argv[i], szmax >> 20);
@@ -97,23 +121,25 @@ int main(int argc, char * argv[])
                 rc = -1;
             }
             ok = rc == 0;
-            MPI_Allreduce(MPI_IN_PLACE, &ok, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+            MPI_Allreduce(MPI_IN_PLACE, &ok, 1, MPI_INT, MPI_SUM, comm);
             if (ok != 1) {
                 if (rank == 0)
                     fprintf(stderr, "warning: %d<%d full files found for %s\n", ok, size, argv[i]);
-                // MPI_Abort(MPI_COMM_WORLD,1);
+                // MPI_Abort(comm,1);
             }
         }
         int node=0;
         if (rc == 0) node = rank;
-        MPI_Allreduce(MPI_IN_PLACE, &node, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+        MPI_Allreduce(MPI_IN_PLACE, &node, 1, MPI_INT, MPI_MAX, comm);
         if (rank == 0) {
             printf("%s (%zu MB, node %d)\n", argv[i], szmax >> 20, node);
             fflush(stdout);
         }
-        share_file(argv[i], node, szmax);
+        share_file(argv[i], node, szmax, comm);
     }
 
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Comm_free(&comm);
 
     MPI_Finalize();
 }
