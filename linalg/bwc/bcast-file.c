@@ -1,3 +1,5 @@
+#define _POSIX_C_SOURCE 200112L
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -6,7 +8,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <time.h>
-#include <mpi.h>
+#include "select_mpi.h"
 
 int rank;
 int size;
@@ -25,7 +27,7 @@ void share_file(const char * fname, int root, size_t total)
     time_t t0 = time(NULL);
     time_t t1 = t0 + 1;
     for( ; ; ) {
-        int n;
+        int n = 0;
         if (rank == root)
             n = fread(buf, 1, BUFFERSIZE, f);
 

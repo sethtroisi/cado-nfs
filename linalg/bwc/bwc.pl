@@ -579,23 +579,27 @@ push @main_args, "matrix=$matrix";
 sub obtain_bfile {
     # TODO: we're checking on the localhost, which does not really make
     # sense.
-    return if $balancing;
-    opendir(my $dh, $wdir);
+    my $pat;
     my $x = $matrix;
-    $x =~ s/\.(bin|txt)$//;
-    $x =~ s/^.*\/([^\/]+)$/$1/;
+    $x =~ s{^(?:.*/)?([^/]+)$}{$1};
+    $x =~ s/\.(?:bin|txt)$//;
+    if ($param->{'shuffled_product'}) {
+        $pat = qr/$x\.${nh}x${nv}\.([0-9a-f]{7}[13579bdf])\.bin\s*$/;
+    } else {
+        $pat = qr/$x\.${nh}x${nv}\.([0-9a-f]{7}[02468ace])\.bin\s*$/;
+    }
+    if ($balancing) {
+        $balancing =~ /$pat/ or die "$balancing does not match pattern";
+        $balancing_hash = $1;
+        return;
+    }
+    opendir(my $dh, $wdir);
     my $foo = join(' ', @mpi_precmd_single) . ' ' . "find $wdir -name $x.${nh}x${nv}.????????.bin -printf '%f\\n'";
     print "Running $foo\n";
     $foo = `$foo`;
-    my $pat;
-    if ($param->{'shuffled_product'}) {
-        $pat = qr/^$x.${nh}x${nv}.([0-9a-f]{7}[13579bdf]).bin$/;
-    } else {
-        $pat = qr/^$x.${nh}x${nv}.([0-9a-f]{7}[02468ace]).bin$/;
-    }
-    # my @bfiles = grep { /$pat/ } readdir $dh;
     my @bfiles = split(' ', $foo);
-    @bfiles = grep { /$pat/ } @bfiles;
+    @bfiles = map { /^\s*(.*)\s*$/; $_=$1; } @bfiles;
+    @bfiles = grep { /^$pat/ } @bfiles;
     if (scalar @bfiles != 1) {
         print STDERR "Expected 1 bfile, found ", scalar @bfiles, ":\n";
         print "$_\n" foreach (@bfiles);
@@ -603,7 +607,7 @@ sub obtain_bfile {
     }
     closedir $dh;
     $balancing=$wdir . "/" . $bfiles[0];
-    $balancing =~ /$pat/;
+    $balancing =~ /$pat/ or die "$balancing does not match pattern";
     $balancing_hash = $1;
     dosystem(@mpi_precmd, split(' ', "$bindir/bcast-file $balancing"));
 }
@@ -696,10 +700,12 @@ sub drive {
             unlink "$wdir/$f";
         }
         &drive("u64n_gather", @_);
+        print "Fetching result for $balancing_hash\n";
         my @my_ks=();
         opendir D, $wdir;
         for my $f (grep { /^K\.\d+\.$balancing_hash$/ } readdir D) {
             push @my_ks, "$wdir/$f";
+            print "$f\n";
         }
         closedir D;
         @my_ks = sort {
@@ -710,7 +716,7 @@ sub drive {
         &drive("./cleanup", "--ncols", $n,
             "--out", "$wdir/W.$balancing_hash", @my_ks);
 
-        my @untwist = ("mf_twistvec", "--truncate", "--untwist", "$wdir/$balancing", "$wdir/W.$balancing_hash", "--out", "$wdir/W");
+        my @untwist = ("mf_twistvec", "--truncate", "--untwist", "$balancing", "$wdir/W.$balancing_hash", "--out", "$wdir/W");
         if (defined(my $ns = $param->{'nullspace'})) {
             push @untwist, "--nullspace", $ns;
         }
