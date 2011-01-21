@@ -1357,8 +1357,8 @@ void master_loop_inner(master_data m, data_source_ptr input, data_dest_ptr outpu
     mf_pipe(input, output, "main");
     uint32_t r = output->r;
 
+    printf("Master loop finished ; read %"PRIu32" rows\n", r);
     ASSERT_ALWAYS(r == m->bal->h->nrows);
-    printf("Master loop finished\n");
     /* complete from nrows to maxdim if necessary ! */
     for (; output->r < m->bal->trows;) {
         uint32_t zero = 0;
