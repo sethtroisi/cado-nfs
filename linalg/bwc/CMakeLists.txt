@@ -62,7 +62,7 @@ set_target_properties(balancing PROPERTIES
         COMPILE_FLAGS "--mpi"
         LINK_FLAGS "--mpi")
 
-add_executable(bcast-file bcast-file.c)
+add_executable(bcast-file ${EXCLUDE_FROM_RELEASE_BUILD} bcast-file.c)
 set_target_properties(bcast-file PROPERTIES
         COMPILE_FLAGS "--mpi"
         LINK_FLAGS "--mpi")

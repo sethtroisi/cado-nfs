@@ -585,7 +585,8 @@ sub obtain_bfile {
     $balancing=$wdir . "/" . $bfiles[0];
     $balancing =~ /$pat/ or die "$balancing does not match pattern";
     $balancing_hash = $1;
-    dosystem(@mpi_precmd, split(' ', "$bindir/bcast-file $balancing"));
+    # no longer necessary.
+    # dosystem(@mpi_precmd, split(' ', "$bindir/bcast-file $balancing"));
 }
 
 sub last_cp {

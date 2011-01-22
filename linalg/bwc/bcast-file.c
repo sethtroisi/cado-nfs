@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <unistd.h>
 #include <time.h>
+#include <string.h>
 #include "select_mpi.h"
 
 int rank;
@@ -102,21 +103,25 @@ int main(int argc, char * argv[])
         if (rc < 0 && errno != ENOENT)
             abort();
         int ok = rc == 0;
-        off_t szmax;
-        off_t szmin;
-        szmax = ok ? sbuf->st_size : 0;
-        szmin = ok ? sbuf->st_size : 0;
-        MPI_Allreduce(MPI_IN_PLACE, &ok, 1, MPI_INT, MPI_SUM, comm);
-        MPI_Allreduce(MPI_IN_PLACE, &szmax, 1, MPI_INT, MPI_MAX, comm);
-        MPI_Allreduce(MPI_IN_PLACE, &szmin, 1, MPI_INT, MPI_MIN, comm);
-        if (szmax == szmin) {
+        size_t * allsizes = malloc(size * sizeof(size_t));
+        size_t me = sbuf->st_size;
+        MPI_Allgather(&me, sizeof(size_t), MPI_BYTE,
+                allsizes, sizeof(size_t), MPI_BYTE, comm);
+        size_t szmax = 0;
+        for(int k = 0 ; k < size ; k++) {
+            ok = ok && allsizes[k] == me;
+            if (allsizes[k] > szmax)
+                szmax = allsizes[k];
+        }
+        MPI_Allreduce(MPI_IN_PLACE, &ok,    1, MPI_INT, MPI_SUM, comm);
+        if (ok) {
             if (rank == 0)
                 printf("%s ok everywhere (%zu MB)\n", argv[i], szmax >> 20);
             continue;
         } else {
-            if (rc == 0 && sbuf->st_size < szmax) {
-                printf("node %d/%d, %s is only %zd < %zd. Removed\n",
-                        rank,size,argv[i],sbuf->st_size,szmax);
+            if (rc == 0 && me < szmax) {
+                printf("node %d/%d, %s is only %zu < %zu. Removed\n",
+                        rank,size,argv[i],me,szmax);
                 unlink(argv[i]);
                 rc = -1;
             }

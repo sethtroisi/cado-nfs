@@ -518,7 +518,9 @@ void matmul_top_init(matmul_top_data_ptr mmt,
         exit(1);
     }
 
-    balancing_read_header(mmt->bal, tmp);
+    if (pi->m->jrank == 0 && pi->m->trank == 0)
+        balancing_read_header(mmt->bal, tmp);
+    global_broadcast(pi->m, mmt->bal, sizeof(mmt->bal), 0, 0);
     serialize(mmt->pi->m);
 
     // after that, we need to check for every node if the cache file can

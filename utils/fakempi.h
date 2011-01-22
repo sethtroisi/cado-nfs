@@ -91,8 +91,9 @@ static inline int MPI_Allreduce ( void *sendbuf, void *recvbuf, int count,MPI_Da
     if (sendbuf) memcpy(recvbuf, sendbuf, count * datatype);
     return 0;
 }
-static inline int MPI_Comm_split (MPI_Comm x MAYBE_UNUSED, int color MAYBE_UNUSED, int key MAYBE_UNUSED, MPI_Comm * y MAYBE_UNUSED)
+static inline int MPI_Comm_split (MPI_Comm x MAYBE_UNUSED, int color MAYBE_UNUSED, int key MAYBE_UNUSED, MPI_Comm * y)
 {
+    *y=0;
     return 0;
 }
 static inline int MPI_Comm_set_errhandler (MPI_Comm x MAYBE_UNUSED, MPI_Errhandler e MAYBE_UNUSED)
