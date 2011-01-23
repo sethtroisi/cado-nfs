@@ -120,13 +120,15 @@ int main(int argc, char * argv[])
                 ix = (i * nv + j) * elem;
                 iy = (j * nh + i) * elem;
                 for(uint32_t k = 0 ; k < elem ; k++) {
-                    pr_perm[ix+k]=iy+k;
+                    if (untwist) {
+                        pr_perm[ix+k]=iy+k;
+                    } else {
+                        pr_perm[iy+k]=ix+k;
+                    }
                 }
             }
         }
     }
-
-    uint32_t * p = untwist ? perm : iperm;
 
     ASSERT_ALWAYS(vname);
     FILE * v;
@@ -162,8 +164,13 @@ int main(int argc, char * argv[])
                 exit(1);
             }
             if (pr_perm) {
-                memcpy(area + p[pr_perm[k]] * chunk, tmp, chunk);
+                if (untwist) {
+                    memcpy(area + perm[pr_perm[k]] * chunk, tmp, chunk);
+                } else {
+                    memcpy(area + pr_perm[iperm[k]] * chunk, tmp, chunk);
+                }
             } else {
+                uint32_t * p = untwist ? perm : iperm;
                 memcpy(area + p[k] * chunk, tmp, chunk);
             }
         }
@@ -183,8 +190,13 @@ int main(int argc, char * argv[])
             rc = fscanf(v,"%u", &col);
             if (rc <= 0) break;
             if (pr_perm) {
-                col = p[pr_perm[col]];
+                if (untwist) {
+                    col = perm[pr_perm[col]];
+                } else {
+                    col = pr_perm[iperm[col]];
+                }
             } else {
+                uint32_t * p = untwist ? perm : iperm;
                 col = p[col];
             }
             fprintf(o, "%u\n", col);
