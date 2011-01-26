@@ -192,7 +192,7 @@ my @default_param = (
     sievenice    => 19,
     keeprelfiles => 0,
     sieve_max_threads => 2,
-    poly_max_threads => 4,
+    poly_max_threads => 2,
     ratq	 => 0,
 
     # filtering
@@ -1245,7 +1245,7 @@ sub distribute_task {
         &{$opt->{'progress'}}($file_ranges) if $opt->{'progress'};
 
         # This might be enough to exit the loop now
-        last if &{$opt->{is_done}}($file_ranges);
+        last if &{$opt->{is_done}}(\$opt->{'delay'}, $file_ranges);
 
 
 
@@ -1788,6 +1788,7 @@ my $polysel_cmd = sub {
 
 sub do_polysel {
     my $polysel_is_done = sub {
+        shift;
         my ($ranges) = @_;
         for (@$ranges) {
             next     if $_->[1] <  $param{'kjadmax'};
@@ -1883,6 +1884,7 @@ sub do_polysel_bench {
 	my $last = shift;
 
     my $polysel_is_done = sub {
+        shift;
         my ($ranges) = @_;
         my ($min, $max) = ($param{'kjadmin'}, $param{'kjadmax'});
 
@@ -2319,11 +2321,14 @@ sub do_sieve {
 
 
     my $sieve_is_done = sub {
+        my $delay = shift;
+        $$delay = $param{'delay'};
         if ($force_purge == 0) {
             # Start filters only after $param{'firstcheck'} relations
             return 0 if $nrels < $param{'firstcheck'};
             # Check only every $param{'checkrange'} relations
             return 0 if $nrels - $last_check < $param{'checkrange'};
+            $$delay = 0  if ($nrels > 10000000);
             $last_check = $nrels;
             open FILE, "> $param{'prefix'}.nrels"
                 or die "Cannot open `$param{'prefix'}.nrels' for writing: $!.\n";
@@ -2337,6 +2342,7 @@ sub do_sieve {
         } 
         
         $force_purge = 0;
+        $$delay = 0  if ($nrels > 10000000);
         # Remove singletons and cliques
         my $ret = purge();
         $tab_level++;
@@ -2467,6 +2473,7 @@ sub do_sieve_bench {
     };
 	
     my $sieve_is_done = sub {
+        shift;
         return 0 if $nrels < $$max_rels[2];
 
         opendir DIR, $param{'wdir'}
