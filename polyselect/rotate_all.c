@@ -48,29 +48,33 @@ main (int argc, char **argv)
 
     poly->skew = L2_skewness (poly->f, poly->degree, SKEWNESS_DEFAULT_PREC,
                            DEFAULT_L2_METHOD);
+
+    printf ("Initial polynomial:\n");
     if (verbose)
       print_poly (stdout, poly, argc0, argv0, 0, 1);
     else
-      printf ("Initial skewness=%1.2f, alpha=%1.2f\n", poly->skew,
+      printf ("skewness=%1.2f, alpha=%1.2f\n", poly->skew,
               get_alpha (poly->f, poly->degree, ALPHA_BOUND));
-    optimize (poly->f, poly->degree, poly->g, verbose, 1);
+    optimize (poly->f, poly->degree, poly->g, verbose - 1, 1);
     poly->skew = L2_skewness (poly->f, poly->degree, SKEWNESS_DEFAULT_PREC,
                            DEFAULT_L2_METHOD);
+    
+    printf ("After norm optimization:\n");
     if (verbose)
       print_poly (stdout, poly, argc0, argv0, 0, 1);
     else
-      printf ("After norm optimization, skewness=%1.2f, alpha=%1.2f\n",
+      printf ("skewness=%1.2f, alpha=%1.2f\n",
               poly->skew, get_alpha (poly->f, poly->degree, ALPHA_BOUND));
 
     mpz_set (b, poly->g[1]);
     mpz_neg (m, poly->g[0]);
-    rotate (poly->f, poly->degree, alim, m, b, &jmin, &kmin, 0, verbose,
+    rotate (poly->f, poly->degree, alim, m, b, &jmin, &kmin, 0, verbose - 1,
             DEFAULT_L2_METHOD);
     mpz_set (poly->g[1], b);
     mpz_neg (poly->g[0], m);
     /* optimize again, but only translation */
     fprint_polynomial (stdout, poly->g, poly->degreeg);
-    optimize (poly->f, poly->degree, poly->g, verbose, 0);
+    optimize (poly->f, poly->degree, poly->g, verbose - 1, 0);
     poly->skew = L2_skewness (poly->f, poly->degree, SKEWNESS_DEFAULT_PREC,
                            DEFAULT_L2_METHOD);
     mpz_clear(b);
