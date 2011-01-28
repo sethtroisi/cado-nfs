@@ -18,21 +18,21 @@ $cdir/bin
   copy las_1job, las_loop, dispatcher and clean.pl in $cdir/scripts.
   edit las_1job and adjust the variables NAME (=$name) and OPT.
   edit dispatcher and adjust the variable nb_jobs_by_node
-    ( $nb_cores / 2  with -mt 2 in las by defaut )
+    ( $nb_cores / 2  with -mt 2 in las by default )
   copy las, cut_n_roots in $cdir/bin.
 
 - run cut_n_roots to create waiting list:
 $ cd $cdir/inqueue
-$ ../bin/cut_n_roots -q0 $q0 -q1 $q1 -N $N | xargs touch
+$ ../bin/cut_n_roots -poly $cdir/$name.poly -q0 $q0 -q1 $q1 -N $N | xargs touch
   (split [q0, q1[ into maximal intervals of N special q's each)
 NB : fill the inqueue directory step-by-step to avoid that it contains
      a lot of files.
 
 - run several jobs oarsub:
 $ cd $cdir/log_oar
-$ oarsub "$wdir/scripts/dispatcher $wdir/scripts/las_loop" -l nodes=20,walltime=24
+$ oarsub "$cdir/scripts/dispatcher $cdir/scripts/las_loop" -l nodes=20,walltime=24
 -t besteffort -t idempotent -n $name_20
-$ oarsub "$wdir/scripts/dispatcher $wdir/scripts/las_loop" -l nodes=20,walltime=24
+$ oarsub "$cdir/scripts/dispatcher $cdir/scripts/las_loop" -l nodes=20,walltime=24
 -t besteffort -t idempotent -n $name_20
 ...
 
