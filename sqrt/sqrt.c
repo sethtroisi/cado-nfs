@@ -122,6 +122,7 @@ static long PeakMemusage() {
 static void
 my_mpz_mul (mpz_t a, mpz_t b, mpz_t c)
 {
+#if 0
   int large, st = 0;
 
   large = mpz_size (b) + mpz_size (c) >= 5000000;
@@ -132,13 +133,16 @@ my_mpz_mul (mpz_t a, mpz_t b, mpz_t c)
       fflush (stderr);
       st = cputime ();
     }
+#endif
   mpz_mul (a, b, c);
   mpz_realloc2 (c, 0);
+#if 0
   if (large)
     {
       fprintf (stderr, "%dms]\n", cputime () - st);
       fflush (stderr);
     }
+#endif
 }
 
 #define THRESHOLD 2 /* must be >= 2 */
