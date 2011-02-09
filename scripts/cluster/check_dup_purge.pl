@@ -18,32 +18,39 @@ $name = $1;
 
 ##### CHECK RELS #####
 my $rels;
-my $rels_check;
+my $rels_errors;
 my $nrels = 0;
-my $nrels_check = 0;
+my $nrels_errors = 0;
 my $newfilelist = "$wdir/$name.newfilelist";
 open FILE, "> $newfilelist" or die "$newfilelist: $!";
 for (@files) {
     next if (-e "$wdir/$_");
     system "$wdir/bin/check_rels -poly $wdir/$name.poly ".
-           "$wdir/merge_rels/$_ 2> /dev/null | gzip > $wdir/$_";
-    $rels = `zgrep -v '^#' "$wdir/merge_rels/$_" | wc -l`;
-    $rels_check = `zgrep -v '^#' "$wdir/$_" | wc -l`;
+           "$wdir/merge_rels/$_ 2> $wdir/$_.log > /dev/null";
+    $rels_errors = `grep BUG "$wdir/$_.log"`;
+    if ($rels_errors) {
+        system "$wdir/bin/check_rels -poly $wdir/$name.poly -f ".
+               "$wdir/merge_rels/$_ 2> $wdir/$_.log | gzip > $wdir/$_";
+        $rels_errors = `tail -1 "$wdir/$_.log" | cut -d" " -f7`;
+        chomp $rels_errors;
+    } else {
+        symlink "$wdir/merge_rels/$_", "$wdir/$_";
+        $rels_errors = 0;
+    }
+    $rels = `tail -1 "$wdir/$_.log" | cut -d" " -f3`;
     chomp $rels;
-    chomp $rels_check;
+        
     $nrels += $rels;
-    $nrels_check += $rels_check;
-    print "Read $rels relations and imported $rels_check relations ".
+    $nrels_errors += $rels_errors;
+    print "Imported $rels relations ($rels_errors wrong relations) ".
          "from `".basename($_)."'.\n";
     print FILE "$_\n";
 }
 close FILE;
-my $diff = $nrels - $nrels_check;
-print "TOTAL : Read $nrels relations and imported $nrels_check relations.\n".
-      "      : $diff wrong relations.\n";
+print "TOTAL : Imported $nrels relations ($nrels_errors wrong relations).\n";
 
 ##### PREP DUP #####
-my $total_rels = $nrels_check;
+my $total_rels = $nrels;
 my $nslices_log = 2;
 my $nslices = 2**$nslices_log;
 
@@ -90,7 +97,7 @@ for (@all_files) {
 close FILE;
 
 ##### DUP AND PURGE #####
-if ($nrels_check) {
+if ($nrels) {
     print "Removing duplicates...\n";
     print "  split new files in $nslices slices...\n";
     system "$wdir/bin/dup1 ".

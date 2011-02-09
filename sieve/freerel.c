@@ -140,7 +140,7 @@ largeFreeRelations (cado_poly pol, char **fic, int verbose)
         relation_stream_openfile(rs, *fic);
         if (verbose)
             fprintf (stderr, "Adding file %s\n", *fic);
-        for( ; relation_stream_get(rs, NULL) >= 0 ; ) {
+        for( ; relation_stream_get(rs, NULL, 0) >= 0 ; ) {
             if (rs->rel.b == 0) {
                 fprintf(stderr, "Ignoring already found free relation...\n");
                 continue;

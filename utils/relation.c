@@ -256,7 +256,8 @@ void relation_compress_alg_primes(relation_t * rel)
 /* sets a,b. Unless rs->parse_only_ab is set, also fill rs->rel with the
  * (sorted) relation which is read in the input file.
  */
-int relation_stream_get(relation_stream_ptr rs, char * supplied_line)
+int relation_stream_get(relation_stream_ptr rs, char * supplied_line,
+                        int force_read)
 {
     FILE * f = rs->source;
     char tbuf[RELATION_MAX_BYTES];
@@ -304,12 +305,12 @@ another_line:
     if (c == '-') { s=-1; *p++ = (c=fgetc(f)); }
     for( ; (v=ugly[(unsigned char) c]) >= 0 ; *p++ = (c=fgetc(f)))
         *pa=*pa*10+v;
-    ASSERT_ALWAYS(c == ',');
+    if (!force_read) ASSERT_ALWAYS(c == ',');
     *p++ = (c=fgetc(f));
     *pa*=s;
     for( ; (v=ugly[(unsigned char) c]) >= 0 ; *p++ = (c=fgetc(f)))
         *pb=*pb*10+v;
-    ASSERT_ALWAYS(c == ':');
+    if (!force_read) ASSERT_ALWAYS(c == ':');
 
     if (!rs->parse_only_ab) {
         /* Do something if we're also interested in primes */
@@ -322,7 +323,7 @@ another_line:
         *p++ = (c = fgetc(f));
         for (; c != EOF && c != '\n' && c != ':'; *p++ = (c = fgetc(f)))
             n += c == ',';
-        ASSERT_ALWAYS(c == ':');
+        if (!force_read) ASSERT_ALWAYS(c == ':');
 
         relation_provision_for_primes(&rs->rel, n, 0);
         k = 0;
@@ -338,7 +339,7 @@ another_line:
         rs->rel.nb_rp = k;
         relation_compress_rat_primes(&rs->rel);
 
-        ASSERT_ALWAYS(c == ':');
+        if (!force_read) ASSERT_ALWAYS(c == ':');
         ASSERT_ALWAYS(q == p);
 
         base = p;
@@ -346,7 +347,7 @@ another_line:
         *p++ = (c = fgetc(f));
         for (; c != EOF && c != '\n' && c != ':'; *p++ = (c = fgetc(f)))
             n += c == ',';
-        ASSERT_ALWAYS(c == '\n');
+        if (!force_read) ASSERT_ALWAYS(c == '\n');
 
         relation_provision_for_primes(&rs->rel, 0, n);
         k = 0;
@@ -362,7 +363,7 @@ another_line:
         rs->rel.nb_ap = k;
         relation_compress_alg_primes(&rs->rel);
 
-        ASSERT_ALWAYS(c == '\n');
+        if (!force_read) ASSERT_ALWAYS(c == '\n');
         ASSERT_ALWAYS(q == p);
     }
 

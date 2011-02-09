@@ -63,6 +63,7 @@ banner "Info kjout";
 my @kjout_files;
 my $time;
 my $phase;
+my $npoly;
 my %h = ( Total  => 0 );
 foreach my $name (sort keys %link_name_params) {
   my (@Emax, $Emin, $Emoy);
@@ -75,6 +76,7 @@ foreach my $name (sort keys %link_name_params) {
   @kjout_files = grep /^$name\.kjout\.[\de.]+-[\de.]+$/, readdir DIR;
   closedir DIR;
   my $size = scalar(@kjout_files);
+  $npoly = 0;
 
   foreach my $f (@kjout_files) {
     open FILE, "< $f"
@@ -96,6 +98,7 @@ foreach my $name (sort keys %link_name_params) {
     next unless $murphy;
     $murphy =~ /\)=(.+)$/;
     $Emoy += $1;
+    $npoly += 1;
     if (!defined $Emax[2] || $1 > $Emax[2]) {
       if (!defined $Emax[1] || $1 > $Emax[1]) {
         $Emax[2] = $Emax[1];
@@ -116,7 +119,7 @@ foreach my $name (sort keys %link_name_params) {
   die "No polynomial was found for configuration $name!\n"
     unless defined $Emax[0];
 
-  $Emoy = $Emoy / $size;
+  $Emoy = $Emoy / $npoly;
   my $ampl = $Emax[0]-$Emin;
   $file = $link_name_params{"$name"};
   read_param(\%param, { strict => 1 }, "$file");
@@ -124,6 +127,8 @@ foreach my $name (sort keys %link_name_params) {
                           $param{'kjadrange'});
   die "kjout missing for configuration $name! ($size on $size_expect)\n"
     if ( $size != $size_expect );
+  warn "No polynomial found in some files! (only $npoly poly on $size files)\n"
+    if ( $size != $npoly );
 
   # print infos
   info "Params: P $param{'kjP'} maxnorm $param{'kjmaxnorm'} kmax $param{'kjkmax'} ".

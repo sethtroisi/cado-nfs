@@ -126,7 +126,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt, ui
                 rs->rel.a = desc.a;
                 rs->rel.b = desc.b;
             } else {
-                if (relation_stream_get(rs, line) < 0)
+                if (relation_stream_get(rs, line, 0) < 0)
                     break;
             }
 

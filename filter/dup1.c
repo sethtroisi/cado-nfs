@@ -84,7 +84,7 @@ int split_relfile (relation_stream_ptr rs, const char *name,
         char line[RELATION_MAX_BYTES];
         size_t rpos = rs->pos - pos0;
 
-        if (relation_stream_get(rs, line) < 0)
+        if (relation_stream_get(rs, line, 0) < 0)
             break;
 
 	ok = 1;

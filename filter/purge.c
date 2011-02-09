@@ -352,7 +352,7 @@ scan_relations (char **ficname, int *nprimes, hashtable_t *H,
         relation_stream_openfile(rs, *ficname);
         for ( ; ; ) {
             int irel = rs->nrels;
-            if (relation_stream_get(rs, NULL) < 0)
+            if (relation_stream_get(rs, NULL, 0) < 0)
                 break;
             ASSERT_ALWAYS(rs->nrels <= nrelmax);
             if (bit_vector_getbit(rel_used, irel)) {
@@ -670,7 +670,7 @@ reread (const char *oname, char ** ficname,
       fprintf(stderr, "   %-70s\n", *ficname);
       for ( ; ; ) {
           int irel = rs->nrels;
-          if (relation_stream_get(rs, NULL) < 0)
+          if (relation_stream_get(rs, NULL, 0) < 0)
               break;
           // ASSERT_ALWAYS(rs->nrels <= nrelmax);
           if (bit_vector_getbit(rel_used, irel)) {

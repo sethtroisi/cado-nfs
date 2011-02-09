@@ -94,7 +94,7 @@ void usage_and_die(char *str) {
     exit(3);
 }
 
-int check_relation_files(char ** files, cado_poly_ptr cpoly)
+int check_relation_files(char ** files, cado_poly_ptr cpoly, int force_read)
 {
     relation_stream rs;
     relation_stream_init(rs);
@@ -107,7 +107,7 @@ int check_relation_files(char ** files, cado_poly_ptr cpoly)
         unsigned long l0 = rs->lnum;
         unsigned long ok0 = ok;
         unsigned long bad0 = bad;
-        for( ; relation_stream_get(rs, line) >= 0 ; ) {
+        for( ; relation_stream_get(rs, line, force_read) >= 0 ; ) {
             unsigned long l = rs->lnum - l0;
             if (check_relation(&rs->rel, cpoly)) {
                 printf("%s", line);
@@ -136,6 +136,7 @@ int main(int argc, char * argv[])
 {
     cado_poly cpoly;
     int had_error = 0;
+    int force_read = 0;
 
     if (argc < 4 || strcmp(argv[1], "-poly") != 0) {
         usage_and_die(argv[0]);
@@ -144,11 +145,15 @@ int main(int argc, char * argv[])
     if (!cado_poly_read(cpoly, argv[2])) 
         return 2;
 
+    if (strcmp(argv[3], "-f") == 0) {
+        force_read=1;
+        argv++,argc--;
+    }
     argv++,argc--;
     argv++,argc--;
     argv++,argc--;
 
-    had_error = check_relation_files(argv, cpoly) < 0;
+    had_error = check_relation_files(argv, cpoly, force_read) < 0;
 
     cado_poly_clear(cpoly);
 
