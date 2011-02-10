@@ -2195,6 +2195,13 @@ void factor_list_clear(factor_list_t *fl) {
     free(fl->fac);
 }
 
+static void 
+factor_list_add(factor_list_t *fl, const uint64_t p)
+{
+  ASSERT_ALWAYS(fl->n < FL_MAX_SIZE);
+  fl->fac[fl->n++] = p;
+}
+
 // print a comma-separated list of factors.
 // assumes there is at least one factor
 void factor_list_fprint(FILE *f, factor_list_t fl) {
@@ -2234,9 +2241,7 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const int x,
               continue;
           }
           do {
-              fl->fac[fl->n] = p;
-              fl->n++;
-              ASSERT_ALWAYS(fl->n <= FL_MAX_SIZE);
+              factor_list_add(fl, p);
               mpz_divexact_ui (norm, norm, p);
           } while (mpz_divisible_ui_p (norm, p));
       }
@@ -2250,6 +2255,7 @@ trial_div (factor_list_t *fl, mpz_t norm, int x,
 	   trialdiv_divisor_t *trialdiv_data, const unsigned long fbb)
 {
     const int trial_div_very_verbose = 0; // (x == 30878);
+    int nr_factors;
     fl->n = 0; /* reset factor list */
 
     if (trial_div_very_verbose) {
@@ -2286,10 +2292,10 @@ trial_div (factor_list_t *fl, mpz_t norm, int x,
         pthread_mutex_unlock(&io_mutex);
     }
 
-    {
+    do {
       /* Trial divide primes with precomputed tables */
-#define TRIALDIV_MAX_FACTORS 64
-      int nr_factors, i;
+#define TRIALDIV_MAX_FACTORS 32
+      int i;
       unsigned long factors[TRIALDIV_MAX_FACTORS];
       if (trial_div_very_verbose)
       {
@@ -2302,23 +2308,22 @@ trial_div (factor_list_t *fl, mpz_t norm, int x,
       }
 
       nr_factors = trialdiv (factors, norm, trialdiv_data, TRIALDIV_MAX_FACTORS);
-      ASSERT (nr_factors <= TRIALDIV_MAX_FACTORS);
 
-      for (i = 0; i < nr_factors; i++)
+      for (i = 0; i < MIN(nr_factors, TRIALDIV_MAX_FACTORS); i++)
       {
           if (trial_div_very_verbose) {
               pthread_mutex_lock(&io_mutex);
               fprintf (stderr, " %lu", factors[i]);
               pthread_mutex_unlock(&io_mutex);
           }
-          fl->fac[fl->n++] = factors[i];
+          factor_list_add (fl, factors[i]);
       }
       if (trial_div_very_verbose) {
           pthread_mutex_lock(&io_mutex);
           gmp_fprintf (stderr, "\n# After trialdiv(): norm = %Zd\n", norm);
           pthread_mutex_unlock(&io_mutex);
       }
-    }
+    } while (nr_factors == TRIALDIV_MAX_FACTORS + 1);
 }
 
 /* Return 0 if the leftover norm n cannot yield a relation:
