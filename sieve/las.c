@@ -2288,8 +2288,9 @@ trial_div (factor_list_t *fl, mpz_t norm, int x,
 
     {
       /* Trial divide primes with precomputed tables */
+#define TRIALDIV_MAX_FACRORS 64
       int nr_factors, i;
-      unsigned long factors[32];
+      unsigned long factors[TRIALDIV_MAX_FACRORS];
       if (trial_div_very_verbose)
       {
           pthread_mutex_lock(&io_mutex);
@@ -2300,8 +2301,8 @@ trial_div (factor_list_t *fl, mpz_t norm, int x,
           pthread_mutex_unlock(&io_mutex);
       }
 
-      nr_factors = trialdiv (factors, norm, trialdiv_data, 32);
-      ASSERT (nr_factors <= 32);
+      nr_factors = trialdiv (factors, norm, trialdiv_data, TRIALDIV_MAX_FACRORS);
+      ASSERT (nr_factors <= TRIALDIV_MAX_FACRORS);
 
       for (i = 0; i < nr_factors; i++)
       {
