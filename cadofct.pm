@@ -182,7 +182,6 @@ my @default_param = (
     rlambda      => 2.3,
     alambda      => 2.3,
     I            => 13,
-    excess       => 1,
     qmin         => 12000000,
     qrange       => 1000000,
     checkrange   => 1,
@@ -206,6 +205,7 @@ my @default_param = (
     bwstrat      => 1,
     skip         => 32,
     nslices_log  => 1,
+    filterlastrels => 1,
 
     # linalg
     linalg       => 'bwc',
@@ -1358,7 +1358,6 @@ my %tasks = (
     sieve     => { name   => "sieve and purge",
                    dep    => ['polysel'],
                    req    => ['factbase', 'freerels'],
-                   param  => ['excess'],
                    files  => ['rels\.[\de.]+-[\de.]+(|\.gz)', 
                               'rels\.tmp', 'nrels'], 
                    resume => 1,
@@ -2100,7 +2099,7 @@ sub dup {
 }
 
 sub do_dup {
-    if ($dup_purge_done == 0) {
+    if (!$dup_purge_done || $param{'filterlastrels'} && $param{'parallel'}) {
         dup();
     } else {
         info "Duplicates has already been done\n";
@@ -2109,6 +2108,8 @@ sub do_dup {
 
 # purge (singletons and cliques)
 sub purge {
+    my $noclique = shift;
+    $noclique = 0 if (!$param{'parallel'});
     $nslices = 2**$param{'nslices_log'};
     my $nbrels = 0;
     my $last = 0;
@@ -2135,7 +2136,8 @@ sub purge {
                   "-nrels $nbrels -out $param{'prefix'}.purged ".
                   "-basepath $param{'wdir'} " .
                   "-subdirlist $param{'prefix'}.subdirlist ".
-                  "-filelist $param{'prefix'}.filelist ",
+                  "-filelist $param{'prefix'}.filelist ".
+                  "-noclique $noclique ",
                   { cmdlog => 1,
                     logfile => "$param{'prefix'}.purge.log"
                  });
@@ -2144,17 +2146,17 @@ sub purge {
 }
 
 sub do_purge {
-    if ($dup_purge_done == 0) {
-        purge();
-        # Get the number of rows and columns from the .purged file
-        my ($nrows, $ncols) = split / /, first_line("$param{'prefix'}.purged");
-        my $excess = $nrows - $ncols;
-        $tab_level++;
-        info "Nrows: $nrows; Ncols: $ncols; Excess: $excess.\n";
-        $tab_level--;
+    if (!$dup_purge_done || $param{'filterlastrels'} && $param{'parallel'}) {
+        purge(0);
     } else {
         info "Purge has already been done\n";
     }
+    # Get the number of rows and columns from the .purged file
+    my ($nrows, $ncols) = split / /, first_line("$param{'prefix'}.purged");
+    my $excess = $nrows - $ncols;
+    $tab_level++;
+    info "Nrows: $nrows; Ncols: $ncols; Excess: $excess.\n";
+    $tab_level--;
 }
 
 # sieve
@@ -2344,25 +2346,14 @@ sub do_sieve {
         $force_purge = 0;
         $$delay = 0  if ($nrels > 10000000);
         # Remove singletons and cliques
-        my $ret = purge();
-        $tab_level++;
+        my $ret = purge($param{'filterlastrels'});
         if ($ret->{'status'}) {
+            $tab_level++;
             info "Not enough relations! Continuing sieving...\n";
             $tab_level--;
             return 0;
         }
 
-        # Get the number of rows and columns from the .purged file
-        my ($nrows, $ncols) = split ' ', first_line("$param{'prefix'}.purged");
-        my $excess = $nrows - $ncols;
-        if ($excess < $param{'excess'}) {
-            info "Not enough relations! Continuing sieving...\n";
-            $tab_level--;
-            return 0;
-        }
-		
-        info "Nrows: $nrows; Ncols: $ncols; Excess: $excess.\n";
-        $tab_level--;
         return 1;
     };
     

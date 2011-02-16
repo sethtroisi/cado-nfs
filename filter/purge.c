@@ -754,6 +754,7 @@ main (int argc, char **argv)
     int final, pass = 0;
     int raw = 0;
     char ** fic;
+    int noclique = 0;
 
     fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
     for (k = 1; k < argc; k++)
@@ -784,6 +785,7 @@ main (int argc, char **argv)
     param_list_parse_long(pl, "minpa", &minpa);
     param_list_parse_long(pl, "excess", &excess);
     param_list_parse_long(pl, "keep", &keep);
+    param_list_parse_int(pl, "noclique", &noclique);
 
     const char * filelist = param_list_lookup_string(pl, "filelist");
     const char * basepath = param_list_lookup_string(pl, "basepath");
@@ -923,6 +925,11 @@ main (int argc, char **argv)
             fprintf (stderr, "Initial excess is below requested %ld, stopping.\n",
                      excess);
             exit (1); /* initial excess is too small */
+          }
+        if (final && noclique)
+          {
+            fprintf (stderr, "Initial excess is attained, purge will be completed at the next filtering.\n");
+            return 0;
           }
         remove_singletons (&nrel_new, nrelmax, &nprimes_new, &H, rel_used,
                            rel_compact, keep, final);
