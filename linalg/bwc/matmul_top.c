@@ -574,6 +574,66 @@ static void mmt_finish_init(matmul_top_data_ptr mmt, int const * flags, param_li
 #endif  /* USE_ALTERNATIVE_REDUCE_SCATTER */
 }
 
+static int export_cache_list_if_requested(matmul_top_data_ptr mmt, param_list pl)
+{
+    const char * cachelist = param_list_lookup_string(pl, "export_cachelist");
+    if (!cachelist) return 0;
+
+    char * myline = NULL;
+    int rc;
+    rc = asprintf(&myline, "%s %s", mmt->pi->nodename, mmt->mm->cachefile_name);
+    ASSERT_ALWAYS(rc >= 0);
+    ASSERT_ALWAYS(myline != NULL);
+    char ** tlines = NULL;
+    if (mmt->pi->m->trank == 0) {
+        tlines = malloc(mmt->pi->m->ncores * sizeof(const char *));
+    }
+    thread_broadcast(mmt->pi->m, (void**) &tlines, 0);
+    tlines[mmt->pi->m->trank] = myline;
+    serialize_threads(mmt->pi->m);
+    int len = 0;
+    if (mmt->pi->m->trank == 0) {
+        for(unsigned int j = 0 ; j < mmt->pi->m->ncores ; j++) {
+            int s = strlen(tlines[j]);
+            if (s >= len) len = s;
+        }
+        MPI_Allreduce(MPI_IN_PLACE, &len, 1, MPI_INT, MPI_MAX, mmt->pi->m->pals);
+        char * info = malloc(mmt->pi->m->totalsize * (len + 1));
+        char * mybuf = malloc(mmt->pi->m->ncores * (len+1));
+        memset(mybuf, 0, mmt->pi->m->ncores * (len+1));
+        for(unsigned int j = 0 ; j < mmt->pi->m->ncores ; j++) {
+            memcpy(mybuf + j * (len+1), tlines[j], strlen(tlines[j])+1);
+        }
+        MPI_Allgather(mybuf, mmt->pi->m->ncores * (len+1), MPI_BYTE,
+                info, mmt->pi->m->ncores * (len+1), MPI_BYTE,
+                mmt->pi->m->pals);
+        if (mmt->pi->m->jrank == 0) {
+            FILE * f = fopen(cachelist, "w");
+            DIE_ERRNO_DIAG(f == NULL, "fopen", cachelist);
+            for(unsigned int j = 0 ; j < mmt->pi->m->njobs ; j++) {
+                unsigned int j0 = j * mmt->pi->m->ncores;
+                fprintf(f, "get-cache %s", info + j0 * (len + 1));
+                for(unsigned int k = 1 ; k < mmt->pi->m->ncores ; k++) {
+                    char * t = strchr(info + (j0 + k) * (len + 1), ' ');
+                    ASSERT_ALWAYS(t);
+                    fprintf(f, "%s", t);
+                }
+                fprintf(f, "\n");
+            }
+            fclose(f);
+        }
+        free(info);
+        free(mybuf);
+        free(tlines);
+    }
+    serialize_threads(mmt->pi->m);
+    free(myline);
+    serialize(mmt->pi->m);
+
+    return 1;
+}
+
+
 static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, int optimized_direction)
 {
     const char * impl = param_list_lookup_string(pl, "mm_impl");
@@ -600,6 +660,12 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
 
     int cache_loaded = 0;
 
+    if (export_cache_list_if_requested(mmt, pl)) {
+        /* This has the effect of terminating the program if we are being
+         * called from dispatch */
+        return;
+    }
+
     if (!rebuild) {
         if (sqread) {
             for(unsigned int j = 0 ; j < mmt->pi->m->ncores ; j++) {
@@ -612,6 +678,7 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
             cache_loaded = matmul_reload_cache(mmt->mm);
         }
     }
+
     if (!global_data_eq(mmt->pi, &cache_loaded, sizeof(int))) {
         if (mmt->pi->m->trank == 0) {
         if (mmt->pi->m->jrank == 0) {
