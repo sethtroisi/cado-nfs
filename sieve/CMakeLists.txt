@@ -17,6 +17,9 @@ set_property(DIRECTORY APPEND PROPERTY COMPILE_FLAGS fno-ivopts -fno-regmove -fn
 # -fkeep-inline-functions does not yield any speedup, is it useful?
 # CFLAGS+=-fkeep-inline-functions
 
+# The following is needed for some SSE stuff
+# set (CMAKE_C_FLAGS   "-flax-vector-conversions ${CMAKE_C_FLAGS}")
+
 include_directories (ecm)
 include_directories (${CMAKE_CURRENT_BINARY_DIR})
 link_directories (${CMAKE_CURRENT_BINARY_DIR}/ecm)
