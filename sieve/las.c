@@ -1424,6 +1424,7 @@ init_alg_norms_bucket_region (unsigned char *alg_S,
 typedef struct {
     fbprime_t p;
     fbprime_t r;        // in [ 0, p [
+    fbprime_t offset;        // in [ 0, p [
     int next_position;  // start of the sieve for next bucket_region
     unsigned char logp;
 } small_typical_prime_data_t;
@@ -1710,6 +1711,84 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
       fprintf (output, 
 	       "# init_small_sieve: side %c has %d nice and %d bad primes\n",
 	       side, ssd->nb_nice_p, ssd->nb_bad_p);
+}
+
+// The processing of bucket region by nb_threads is interleaved.
+// It means that the positions for the small sieve must jump over the 
+// (nb_threads - 1) regions after each region.
+// For typical primes, this jump can be easily precomputed.
+
+void ssd_precompute_jumps(small_sieve_data_t *ssd, MAYBE_UNUSED sieve_info_t *si, int nl)
+{
+    // do it only for good primes
+    for (int n = 0; n < ssd->nb_nice_p; ++n) {
+        unsigned long i0;
+        i0 = nl*ssd->nice_p[n].r;
+        i0 = i0 % ssd->nice_p[n].p;
+        ssd->nice_p[n].offset=i0;
+    }
+}
+
+
+// Update the positions in the small_sieve_data ssd for going up in the
+// sieve region by nl lines 
+// This takes the position in ref_ssd as a reference.
+// For typical primes, and if use_offset is set to 1, one uses the
+// precomputed offset to jump without mod p reduction.
+void ssd_update_positions(small_sieve_data_t *ssd, 
+        small_sieve_data_t *ref_ssd, sieve_info_t *si, int nl,
+        int use_offset)
+{
+    // nice primes
+    for (int n = 0; n < ssd->nb_nice_p; ++n) {
+        unsigned long i0;
+
+        if (ssd->nice_p[n].p % 2 == 0 && nl % 2 == 1) {
+            /* Make sure that next_position points to a location
+               where i and j are not both even */
+            i0 = ref_ssd->nice_p[n].next_position & (si->I - 1);
+            ASSERT (i0 < ssd->nice_p[n].p);
+            i0 += (nl + 1) * ssd->nice_p[n].r;
+            i0 = i0 & (ssd->nice_p[n].p - 1);
+            ssd->nice_p[n].next_position = i0 + 
+                (ref_ssd->nice_p[n].next_position & (~(si->I - 1)));
+        } else {
+            /* We want to add nl*r to the offset *relative to the 
+               start of the line*, but next_position may be larger 
+               than I, so we treat the multiple-of-I and mod-I parts
+               separately */
+            if (use_offset) {
+                i0 = ssd->nice_p[n].next_position & (si->I - 1);
+                ASSERT (i0 < ssd->nice_p[n].p);
+                i0 += ssd->nice_p[n].offset;
+                if (i0 >= ssd->nice_p[n].p)
+                    i0 -= ssd->nice_p[n].p;
+                ssd->nice_p[n].next_position = i0 + 
+                    (ssd->nice_p[n].next_position & (~(si->I - 1)));
+            } else {
+                i0 = ref_ssd->nice_p[n].next_position & (si->I - 1);
+                ASSERT (i0 < ssd->nice_p[n].p);
+                i0 += nl*ssd->nice_p[n].r;
+                i0 = i0 % ssd->nice_p[n].p;
+                ssd->nice_p[n].next_position = i0 + 
+                    (ref_ssd->nice_p[n].next_position & (~(si->I - 1)));
+            }
+        }
+    }
+
+    // bad primes
+    for (int n = 0; n < ssd->nb_bad_p; ++n) {
+        /* First line to sieve is the smallest j with g|j and j >= nl,
+           however, if nl == 0 we don't sieve j==0 since it contains
+           only one possible relation (i,j) = (1,0). */
+        unsigned int ng, x, j;
+        ng = iceildiv(nl, ssd->bad_p[n].g);
+        if (ng == 0)
+            ng++;
+        x = (si->I / 2 + ng * ssd->bad_p[n].U) % ssd->bad_p[n].q;
+        j = ng * ssd->bad_p[n].g;
+        ssd->bad_p[n].next_position = (j - nl) * si->I + x;
+    }
 }
 
 
@@ -3247,7 +3326,8 @@ typedef struct {
 } process_bucket_region_report_t;
 
 /* id gives the number of the thread: it is supposed to deal with the set
- * of bucket_regions corresponding to that number
+ * of bucket_regions corresponding to that number, ie those that are
+ * congruent to id mod nb_thread.
  */
 process_bucket_region_report_t * 
 process_regions_one_thread(process_bucket_region_arg_t *arg)
@@ -3280,72 +3360,23 @@ process_regions_one_thread(process_bucket_region_arg_t *arg)
     small_sieve_data_t lssd_alg, lssd_rat;
     clone_small_sieve (&lssd_alg, ssd_alg);
     clone_small_sieve (&lssd_rat, ssd_rat);
-
-    /* find the first sieve location for each small prime */
-    small_sieve_data_t *ssd;
-    int side;
-    for (side = 0; side < 2; side++) {
-        if (side == 0) 
-            ssd = &lssd_alg;
-        else
-            ssd = &lssd_rat;
-        int n;
-	/* Number of lines to skip to get the first bucket for this thread */
-        const unsigned long nj = (si->bucket_region >> si->logI) * 
-	  (si->nb_buckets / si->nb_threads) * id;
-        ASSERT(si->nb_buckets % si->nb_threads == 0);
-
-        // nice primes
-        for (n = 0; n < ssd->nb_nice_p; ++n) {
-            unsigned long i0;
-
-            if (ssd->nice_p[n].p % 2 == 0 && nj % 2 == 1)
-	      {
-		/* Make sure that next_position points to a location
-		   where i and j are not both even */
-		i0 = ssd->nice_p[n].next_position & (si->I - 1);
-		ASSERT (i0 < ssd->nice_p[n].p);
-		i0 += (nj + 1) * ssd->nice_p[n].r;
-		i0 = i0 & (ssd->nice_p[n].p - 1);
-		ssd->nice_p[n].next_position = i0 + 
-		  (ssd->nice_p[n].next_position & (~(si->I - 1)));
-	      }
-	    else
-	      {
-		/* We want to add nj*r to the offset *relative to the 
-		   start of the line*, but next_position may be larger 
-		   than I, so we treat the multiple-of-I and mod-I parts
-		   separately */
-		i0 = ssd->nice_p[n].next_position & (si->I - 1);
-		ASSERT (i0 < ssd->nice_p[n].p);
-		i0 += nj*ssd->nice_p[n].r;
-		i0 = i0 % ssd->nice_p[n].p;
-		ssd->nice_p[n].next_position = i0 + 
-		  (ssd->nice_p[n].next_position & (~(si->I - 1)));
-	      }
-        }
-	
-        // bad primes
-        for (n = 0; n < ssd->nb_bad_p; ++n) 
-	  {
-            /* First line to sieve is the smallest j with g|j and j >= nj,
-	       however, if nj == 0 we don't sieve j==0 since it contains
-	       only one possible relation (i,j) = (1,0). */
-	    unsigned int ng, x, j;
-	    ng = iceildiv(nj, ssd->bad_p[n].g);
-	    if (ng == 0)
-	      ng++;
-	    x = (si->I / 2 + ng * ssd->bad_p[n].U) % ssd->bad_p[n].q;
-	    j = ng * ssd->bad_p[n].g;
-	    ssd->bad_p[n].next_position = (j - nj) * si->I + x;
-	  }
-    }
+    ssd_precompute_jumps(&lssd_alg, si,
+            (si->bucket_region >> si->logI)*(si->nb_threads-1));
+    ssd_precompute_jumps(&lssd_rat, si,
+            (si->bucket_region >> si->logI)*(si->nb_threads-1));
 
     /* Yet another copy: used in factor_survivors for resieving small
      * primes */
     small_sieve_data_t lsrsd_alg, lsrsd_rat;
     copy_small_sieve (&lsrsd_alg, &lssd_alg, si->trialdiv_primes_alg);
     copy_small_sieve (&lsrsd_rat, &lssd_rat, si->trialdiv_primes_rat);
+
+    /* A third copy? 
+     * TODO: come on! we should be able to do it with less copies 
+     */
+    small_sieve_data_t rssd_alg, rssd_rat;
+    clone_small_sieve (&rssd_alg, &lsrsd_alg);
+    clone_small_sieve (&rssd_rat, &lsrsd_rat);
 
     /* local sieve region */
     unsigned char *alg_S, *rat_S;
@@ -3361,10 +3392,18 @@ process_regions_one_thread(process_bucket_region_arg_t *arg)
       }
 
     /* loop over appropriate set of sieve regions */
-    i = (si->nb_buckets / si->nb_threads) * id;
-    for (; i < (si->nb_buckets / si->nb_threads) * (id+1); ++i) 
+    for (i = id; i < si->nb_buckets; i += si->nb_threads) 
       {
 	int j;
+        
+        /* update the positions */
+        const int nl = (si->bucket_region >> si->logI)*i;
+        int use_offset = ((i == id)?0:1);
+        ssd_update_positions(&lssd_rat, ssd_rat, si,    nl, use_offset);
+        ssd_update_positions(&lssd_alg, ssd_alg, si,    nl, use_offset);
+        ssd_update_positions(&lsrsd_rat, &rssd_rat, si, nl, use_offset);
+        ssd_update_positions(&lsrsd_alg, &rssd_alg, si, nl, use_offset);
+
         /* Init rational norms */
         tn_rat -= seconds ();
         init_rat_norms_bucket_region(rat_S, i, cpoly, si);
