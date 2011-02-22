@@ -13,6 +13,10 @@
 #include "trialdiv.h"
 #include <pthread.h>
 
+#ifdef HAVE_SSE2
+#define SSE_NORM_INIT
+#endif
+
 #ifdef SSE_NORM_INIT
 #include <emmintrin.h>
 #endif
@@ -1227,12 +1231,12 @@ init_rat_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
       }
     for (; j < lastj; ++j)
       {
-        unsigned char n;
         gjj = gj * (double) j;
         zx->z = gjj - gi * (double) halfI;
         __asm__("### Begin rational norm loop\n");
 #ifndef SSE_NORM_INIT
         uint64_t y;
+        unsigned char n;
         for (i = 0; i < (int) si->I; i++) {
           /* the double precision number 1.0 has high bit 0 (sign),
              then 11-bit biased exponent 1023, and 52-bit mantissa 0 */
@@ -1387,7 +1391,11 @@ init_alg_norms_bucket_region (unsigned char *alg_S,
 #endif
           if (si->rat_Bound[*rat_S] < 127)
             {
-#ifndef SSE_NORM_INIT
+//  The SSE version seems to be slower on the algebraic side...
+//  Let's forget it for the moment.
+//  TODO: try with single precision.
+//#ifndef SSE_NORM_INIT
+#if 1
               unsigned char n;
               zx->z = fpoly_eval (u, d, i);
               /* 4607182418800017408 = 1023*2^52 */
@@ -3726,6 +3734,9 @@ main (int argc0, char *argv0[])
     for (i = 1; i < argc0; i++)
       fprintf (output, " %s", argv0[i]);
     fprintf (output, "\n");
+#ifdef SSE_NORM_INIT
+    fprintf (output, "# SSE_NORM_INIT is activated\n");
+#endif
 
     if (fbfilename == NULL) usage(argv0[0], "fb");
     if (q0 == 0) usage(argv0[0], "q0");
