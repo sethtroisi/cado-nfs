@@ -1249,28 +1249,54 @@ init_rat_norms_bucket_region (unsigned char *S, int N, cado_poly cpoly,
             __v2di intg;
             struct {uint64_t y0; uint64_t y1; } intpair;
         } y_vec;
+        if ((j & 1) == 1) {
+            __v2df gi_vec = { 2*gi, 2*gi };
+            __v2di mask_vec = { mask, mask };
+            __v2di cst_vec = { (uint64_t) 0x3FF0000000000000,
+                (uint64_t) 0x3FF0000000000000 };
 
-        __v2df gi_vec = { 2*gi, 2*gi };
-        __v2di mask_vec = { mask, mask };
-        __v2di cst_vec = { (uint64_t) 0x3FF0000000000000,
-            (uint64_t) 0x3FF0000000000000 };
+            // in spite of the appearance, only the low word gives the shift
+            // count. The high word is ignored.
+            __v2di shift_value = { (uint64_t)(52 - l), (uint64_t)(52 - l) };
+            __v2df z_vec = { zx->z, zx->z+gi };
 
-        // in spite of the appearance, only the low word gives the shift
-        // count. The high word is ignored.
-        __v2di shift_value = { (uint64_t)(52 - l), (uint64_t)(52 - l) };
-        __v2df z_vec = { zx->z, zx->z+gi };
+            for (i = 0; i < halfI; ++i) {
+                y_vec.dble = z_vec;
+                y_vec.intg -= cst_vec;
+                y_vec.intg = _mm_srl_epi64(y_vec.intg, shift_value);
+                y_vec.intg &= mask_vec;
+                //            *S++ = si->S_rat[((uint32_t *)(&y_vec.intg))[0]];
+                //             *S++ = si->S_rat[((uint32_t *)(&y_vec.intg))[2]];
+                *S++ = si->S_rat[y_vec.intpair.y0];
+                *S++ = si->S_rat[y_vec.intpair.y1];
+                z_vec += gi_vec;
+            }
+        } else { // skip when i and j are both even
+            __v2df gi_vec = { 4*gi, 4*gi };
+            __v2di mask_vec = { mask, mask };
+            __v2di cst_vec = { (uint64_t) 0x3FF0000000000000,
+                (uint64_t) 0x3FF0000000000000 };
 
-        for (i = 0; i < halfI; ++i) {
-            y_vec.dble = z_vec;
-            y_vec.intg -= cst_vec;
-            y_vec.intg = _mm_srl_epi64(y_vec.intg, shift_value);
-            y_vec.intg &= mask_vec;
-//            *S++ = si->S_rat[((uint32_t *)(&y_vec.intg))[0]];
-//             *S++ = si->S_rat[((uint32_t *)(&y_vec.intg))[2]];
-            *S++ = si->S_rat[y_vec.intpair.y0];
-            *S++ = si->S_rat[y_vec.intpair.y1];
-            z_vec += gi_vec;
+            // in spite of the appearance, only the low word gives the shift
+            // count. The high word is ignored.
+            __v2di shift_value = { (uint64_t)(52 - l), (uint64_t)(52 - l) };
+            __v2df z_vec = { zx->z + gi, zx->z+3*gi };
+
+            for (i = 0; i < halfI; i+=2) {
+                y_vec.dble = z_vec;
+                y_vec.intg -= cst_vec;
+                y_vec.intg = _mm_srl_epi64(y_vec.intg, shift_value);
+                y_vec.intg &= mask_vec;
+                //            *S++ = si->S_rat[((uint32_t *)(&y_vec.intg))[0]];
+                //             *S++ = si->S_rat[((uint32_t *)(&y_vec.intg))[2]];
+                *S++ = 255;
+                *S++ = si->S_rat[y_vec.intpair.y0];
+                *S++ = 255;
+                *S++ = si->S_rat[y_vec.intpair.y1];
+                z_vec += gi_vec;
+            }
         }
+
 #endif
         __asm__("### End rational norm loop\n");
       }
@@ -1288,17 +1314,13 @@ init_fpoly_v2df(__v2df *F, const double *f, const int deg)
     }
 }
 
-
 static inline __v2df
-fpoly_eval_v2df_deg5(const __v2df *f, const __v2df x)
+fpoly_eval_v2df(const __v2df *f, const __v2df x, int d)
 {
     __v2df r;
-    r = f[5];
-    r = r * x + f[4];
-    r = r * x + f[3];
-    r = r * x + f[2];
-    r = r * x + f[1];
-    r = r * x + f[0];
+    r = f[d--];
+    for (; d>=0; --d)
+        r = r * x + f[d];
     return r;
 }
 #endif
@@ -1375,7 +1397,6 @@ init_alg_norms_bucket_region (unsigned char *alg_S,
               ASSERT (n > 0);
               *alg_S = n;
 #else
-              ASSERT(d == 5);
               __v2di mask_vec = { mask, mask };
               __v2di cst_vec = { (uint64_t) 0x3FF0000000000000,
                   (uint64_t) 0x3FF0000000000000 };
@@ -1392,7 +1413,7 @@ init_alg_norms_bucket_region (unsigned char *alg_S,
                       __v2di intg;
                       struct {uint64_t y0; uint64_t y1; } intpair;
                   } fi_vec;
-                  fi_vec.dble = fpoly_eval_v2df_deg5(u_vec, i_vec);
+                  fi_vec.dble = fpoly_eval_v2df(u_vec, i_vec, d);
                   fi_vec.intg -= cst_vec;
                   fi_vec.intg = _mm_srl_epi64(fi_vec.intg, shift_value);
                   fi_vec.intg &= mask_vec;
