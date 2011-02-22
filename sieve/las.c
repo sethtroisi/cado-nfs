@@ -1693,6 +1693,12 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
 	      ssd->nice_p[n].r = r;
 	      ssd->nice_p[n].logp = fb->plog;
 	      ssd->nice_p[n].next_position = (si->I >> 1)%p;
+              // The processing of bucket region by nb_threads is interleaved.
+              // It means that the positions for the small sieve must jump
+              // over the (nb_threads - 1) regions after each region.
+              // For typical primes, this jump can be easily precomputed:
+              ssd->nice_p[n].offset=(ssd->nice_p[n].r*
+                      (si->bucket_region >> si->logI)*(si->nb_threads-1))%p;
 	      /* For powers of 2, we sieve only odd lines and 
 	         next_position needs to point at line j=1. We assume
 	         that in this case (si->I/2) % p == 0 */
@@ -1711,22 +1717,6 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
       fprintf (output, 
 	       "# init_small_sieve: side %c has %d nice and %d bad primes\n",
 	       side, ssd->nb_nice_p, ssd->nb_bad_p);
-}
-
-// The processing of bucket region by nb_threads is interleaved.
-// It means that the positions for the small sieve must jump over the 
-// (nb_threads - 1) regions after each region.
-// For typical primes, this jump can be easily precomputed.
-
-void ssd_precompute_jumps(small_sieve_data_t *ssd, MAYBE_UNUSED sieve_info_t *si, int nl)
-{
-    // do it only for good primes
-    for (int n = 0; n < ssd->nb_nice_p; ++n) {
-        unsigned long i0;
-        i0 = nl*ssd->nice_p[n].r;
-        i0 = i0 % ssd->nice_p[n].p;
-        ssd->nice_p[n].offset=i0;
-    }
 }
 
 
@@ -3357,26 +3347,36 @@ process_regions_one_thread(process_bucket_region_arg_t *arg)
     /* make copies of small sieve data: the "next_position" field is
      * specific to each thread.
      */
-    small_sieve_data_t lssd_alg, lssd_rat;
-    clone_small_sieve (&lssd_alg, ssd_alg);
-    clone_small_sieve (&lssd_rat, ssd_rat);
-    ssd_precompute_jumps(&lssd_alg, si,
-            (si->bucket_region >> si->logI)*(si->nb_threads-1));
-    ssd_precompute_jumps(&lssd_rat, si,
-            (si->bucket_region >> si->logI)*(si->nb_threads-1));
+    small_sieve_data_t *lssd_alg, *lssd_rat;
+    if (si->nb_threads > 1) {
+        lssd_alg = (small_sieve_data_t *)malloc(sizeof(small_sieve_data_t));
+        lssd_rat = (small_sieve_data_t *)malloc(sizeof(small_sieve_data_t));
+        clone_small_sieve (lssd_alg, ssd_alg);
+        clone_small_sieve (lssd_rat, ssd_rat);
+    } else {
+        lssd_alg = ssd_alg;
+        lssd_rat = ssd_rat;
+    }
 
     /* Yet another copy: used in factor_survivors for resieving small
      * primes */
-    small_sieve_data_t lsrsd_alg, lsrsd_rat;
-    copy_small_sieve (&lsrsd_alg, &lssd_alg, si->trialdiv_primes_alg);
-    copy_small_sieve (&lsrsd_rat, &lssd_rat, si->trialdiv_primes_rat);
+    small_sieve_data_t lsrsd_alg[1], lsrsd_rat[1];
+    copy_small_sieve (lsrsd_alg, lssd_alg, si->trialdiv_primes_alg);
+    copy_small_sieve (lsrsd_rat, lssd_rat, si->trialdiv_primes_rat);
 
     /* A third copy? 
      * TODO: come on! we should be able to do it with less copies 
      */
-    small_sieve_data_t rssd_alg, rssd_rat;
-    clone_small_sieve (&rssd_alg, &lsrsd_alg);
-    clone_small_sieve (&rssd_rat, &lsrsd_rat);
+    small_sieve_data_t *rssd_alg, *rssd_rat;
+    if (si->nb_threads > 1) {
+        rssd_alg = (small_sieve_data_t *)malloc(sizeof(small_sieve_data_t));
+        rssd_rat = (small_sieve_data_t *)malloc(sizeof(small_sieve_data_t));
+        clone_small_sieve (rssd_alg, lsrsd_alg);
+        clone_small_sieve (rssd_rat, lsrsd_rat);
+    } else {
+        rssd_rat = &lsrsd_rat[0];
+        rssd_alg = &lsrsd_alg[0];
+    }
 
     /* local sieve region */
     unsigned char *alg_S, *rat_S;
@@ -3397,12 +3397,14 @@ process_regions_one_thread(process_bucket_region_arg_t *arg)
 	int j;
         
         /* update the positions */
-        const int nl = (si->bucket_region >> si->logI)*i;
-        int use_offset = ((i == id)?0:1);
-        ssd_update_positions(&lssd_rat, ssd_rat, si,    nl, use_offset);
-        ssd_update_positions(&lssd_alg, ssd_alg, si,    nl, use_offset);
-        ssd_update_positions(&lsrsd_rat, &rssd_rat, si, nl, use_offset);
-        ssd_update_positions(&lsrsd_alg, &rssd_alg, si, nl, use_offset);
+        if (si->nb_threads > 1) {
+            const int nl = (si->bucket_region >> si->logI)*i;
+            int use_offset = ((i == id)?0:1);
+            ssd_update_positions(lssd_rat, ssd_rat, si,    nl, use_offset);
+            ssd_update_positions(lssd_alg, ssd_alg, si,    nl, use_offset);
+            ssd_update_positions(lsrsd_rat, rssd_rat, si, nl, use_offset);
+            ssd_update_positions(lsrsd_alg, rssd_alg, si, nl, use_offset);
+        }
 
         /* Init rational norms */
         tn_rat -= seconds ();
@@ -3414,7 +3416,7 @@ process_regions_one_thread(process_bucket_region_arg_t *arg)
             apply_one_bucket(rat_S, rat_BA[j], i, si);
         ttsm += seconds();
         /* Sieve small rational primes */
-        sieve_small_bucket_region(rat_S, i, lssd_rat, si, 'r');
+        sieve_small_bucket_region(rat_S, i, lssd_rat[0], si, 'r');
 	
         /* Init algebraic norms */
         tn_alg -= seconds ();
@@ -3427,13 +3429,13 @@ process_regions_one_thread(process_bucket_region_arg_t *arg)
             apply_one_bucket(alg_S, alg_BA[j], i, si);
         ttsm += seconds();
         /* Sieve small algebraic primes */
-        sieve_small_bucket_region(alg_S, i, lssd_alg, si, 'a');
+        sieve_small_bucket_region(alg_S, i, lssd_alg[0], si, 'a');
 
         /* Factor survivors */
         ttf -= seconds ();
         reports += factor_survivors (rat_S, alg_S, i, rat_BA, alg_BA, 
 		fb_rat, fb_alg, cpoly, si, &survivors1,
-                &survivors2, &lsrsd_alg, &lsrsd_rat,
+                &survivors2, lsrsd_alg, lsrsd_rat,
                 report_sizes_a, report_sizes_r,
                 output);
         ttf += seconds ();
@@ -3442,10 +3444,18 @@ process_regions_one_thread(process_bucket_region_arg_t *arg)
     /* clear */
     free(alg_S);
     free(rat_S);
-    clear_small_sieve(lssd_alg);
-    clear_small_sieve(lssd_rat);
-    clear_small_sieve(lsrsd_alg);
-    clear_small_sieve(lsrsd_rat);
+    clear_small_sieve(lsrsd_alg[0]);
+    clear_small_sieve(lsrsd_rat[0]);
+    if (si->nb_threads > 1) {
+        clear_small_sieve(lssd_alg[0]);
+        clear_small_sieve(lssd_rat[0]);
+        free(lssd_alg);
+        free(lssd_rat);
+        clear_small_sieve(rssd_alg[0]);
+        clear_small_sieve(rssd_rat[0]);
+        free(rssd_alg);
+        free(rssd_rat);
+    }
 
     process_bucket_region_report_t *rep;
     rep = (process_bucket_region_report_t *)
