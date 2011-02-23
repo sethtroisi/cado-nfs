@@ -250,6 +250,18 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0,
   /* initialize bounds for the norm computation, see lattice.tex */
   si->B = sqrt (2.0 * (double) q0 / (cpoly->skew * sqrt (3.0)));
   si->logmax_alg = get_maxnorm (cpoly, si, q0); /* log2(max norm) */
+#ifdef SSE_NORM_INIT
+  // Using the single precision requires the norms to be not too large. 
+  // Right now, the limit is 254 = 126 + 128
+  //  . before evaluation of the polynomial, the coefficients are divided
+  //    by 2^126 (see initialization of powj below).
+  //  . 128 is the maximal exponent for a float
+  // If you hit this abort, a quick fix is to disable SSE_NORM_INIT.
+  // A better fix would (maybe?) be to divide by more than 2^126 when the
+  // norms are large; and fix the rest of the code accordingly.
+  if (si->logmax_alg > 254)
+      abort();
+#endif
 
   /* We want some margin, (see below), so that we can set 255 to discard
    * non-survivors.*/
@@ -1447,7 +1459,12 @@ init_alg_norms_bucket_region (unsigned char *alg_S,
   for (; j < lastj; j++)
     {
       /* scale by j^(d-k) the coefficients of fij */
-      for (k = 0, powj = 1.0; k <= d; k++, powj *= (double) j)
+#ifdef SSE_NORM_INIT
+        powj = 0x1P-126;
+#else 
+        powj = 1.0;
+#endif
+      for (k = 0; k <= d; k++, powj *= (double) j)
         u[d - k] = t[d - k] * powj;
 
 #ifdef SSE_NORM_INIT
@@ -1490,8 +1507,8 @@ init_alg_norms_bucket_region (unsigned char *alg_S,
 
               uint32_t mask32 = mask;
               __v4si mask_vec = { mask32, mask32, mask32, mask32 };
-              __v4si cst_vec = { (uint32_t) 0x3F800000, (uint32_t) 0x3F800000,
-                  (uint32_t) 0x3F800000, (uint32_t) 0x3F800000 };
+              __v4si cst_vec = { (uint32_t) 0x800000, (uint32_t) 0x800000,
+                  (uint32_t) 0x800000, (uint32_t) 0x800000 };
               __v4si shift_value = { (uint32_t)(23 - l), (uint32_t)(23 - l),
                   (uint32_t)(23 - l), (uint32_t)(23 - l) };
               report++;      
@@ -1528,8 +1545,9 @@ init_alg_norms_bucket_region (unsigned char *alg_S,
         }
 #ifdef SSE_NORM_INIT
       for (int xx = 0; xx < cpt; ++xx) { // number of computation is not 0 mod 4
+          // TODO, FIXME, WARNING: is it wise to use doubles, here????
           zx->z = fpoly_eval (u, d, i0[xx]);
-          y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
+          y = (zx->x - (uint64_t) 0x3810000000000000) >> (52 - l);
           *S_ptr0[xx] = T[y & mask];
       }
 #endif
