@@ -12,12 +12,7 @@
   For deg 6 polynomial, "-w" is the leftmost of a qudratic rotation
   and "-l" is the step from the "-w".
 
-  [2. Parameters]
-
-  The default parameters is in rsparam_setup(). There is a tuning
-  procedure for several sets of parameters for each polynomial.
-
-  [3. Algorithm]
+  [2. Algorithm]
 
   There are two steps in the root sieve.
 
@@ -36,16 +31,92 @@
   in the modulus of the sublattice, we have already considred their
   valuations from the previous step and hence we may ignore them in
   the actual sieve. For other primes, we sieve them upt to some bound.
-  Currently, the code doesn't consider any p^e for e>1 for these primes.
+  Currently, the code doesn't consider any p^e for e>2 for these primes
+  by default. It is easy to turn on this by tweaking "max_e = 2" in
+  rootsieve_v().
 
-  [4. TODO and history]
+  [3. Degree 6]
+
+  For degree 6 polynomial, the following processes are called in order,
+
+  (a) - For each qudratic rotation w;
+  (b) -- Tune parameters;
+  (c) -- Find good sublattices (w, u, v)
+  (d) - Compare (priority queue) all good sublattices and pick up top ones.
+  (e) - For each such sublattice (w, u, v)
+  (f) -- Do the root sieve.
+
+  Details:
+  (a) In the following command,
+
+  rootsieve5 < POLY -w 0 -l 8 > OUTPUT 2> ERRINFO
+
+  "-w" defines the leftmost point of qudratic rotation.
+  f'(x) = f(x) + w*x^2*g(x)
+
+  "-l" defines the steps for quadratic rotation, (w+l-1)
+
+  (b, c)
+  The code starts by looking each qudratic rotation, say
+  [w, \cdots, w+l-1]. For each rotated polynomial, we will
+  have to find a suitable set of parameters (p1^e1 * p2^e2* \cdots *pn^en)
+  to produce the sublattice. Note that, if it is larger, then
+  we could find polynomials with better alpha, but probably
+  worse size; reversly, a small parameter gives worse alpha, but
+  probably better size. It is hard to prebuilt a universel parameter.
+  Hence  we tune the parameters (p1^e1 * p2^e2* \cdots *pn^en)
+  using a trial sieving. The starting point for the parameter
+  tunning is in rsparam_setup(). In general, there is no need
+  to change this.
+
+  (d)
+  After good sublattices (w, u, v) are found for all w in the
+  permitted range (as you set by "-w" and "-l"), we will compare
+  the alpha values between all these sublattices. At the moment,
+  we only pick up the top "rsparam->nbest_sl = 128" sublattices
+  for sieving. You may change this in rsparam().
+
+  (e, f)
+  For each survived sublattice (w, u, v), we do the root sieve.
+  The permitted bound for "v" could be huge which runs forever.
+  Therefore, function "rsbound_setup_AB_bound()" limits the sieving
+  range for "v".
+
+  Even the range "v" is limited, it may take much memory.
+  Therefore, we divide it into "SIEVEARRAY_SIZE = 2097152" in #define.
+  In my laptop, it is similar to L2 cache. Setting it larger take more
+  memory and can reduce (setup) time.
+
+  For each such "SIEVEARRAY_SIZE", we actually sieving in blocks
+  of "L1_SIZE 12288".
+
+  One important parameter:  "TOPALPHA_EACH_SIEVEARRAY 8"
+
+  For each sieve array of "SIEVEARRAY_SIZE", compute the MurphyE of
+  8 polynomials whose alpha values are the best among this array.
+  These poynomials will be then filtered into another priority queue
+  which records "TOPE_EACH_SUBLATTICE=8" polynomials with top MurphyE.
+
+  Note that, for polynomials of small skewness. Size can be more
+  important, hence you may want to set "TOPALPHA_EACH_SIEVEARRAY 8"
+  larger. However, this may reduce the performance since MurphyE
+  computation is slow.
+
+  [4. Tuning]
+
+  The "#define" in the beginning and functions:
+  "rsbound_setup_AB_bound()" and  "rsparam_setup ()"
+  might be tuned to fit your computation.
+
+  [5. TODO and history]
 
   -- (Dec) block sieving.
   -- (Dec 30) reduced memory usage in return_all_sublattices().
   -- (Jan 2) addded priority queue, changed precion in return_all_sublattices().
-  -- (Feb) some tunnings
+  -- (Feb) some tunnings, correct bugs in rootsieve_v().
+  -- (Mar) readme.
 
-  [5. Bugs]
+  [6. Bugs]
 
   Please report bugs to Shi Bai (shi.bai AT anu.edu.au).
 */
@@ -61,12 +132,14 @@
 #include "rho.h"
 #include "rootsieve5.h"
 
+/* Things you don't want to change */
 #define MAX_LINE_LENGTH 4096
 #define PI 3.14159265358979324
 #define MAX_DEGREE 6
 #define DEBUG 0
 #define SUP_ALPHA 4.843
 
+/* Things for tuning */
 #define L1_SIZE 12288 // ~ l1 cache
 #define SIEVEARRAY_SIZE 2097152 // ~ l2 cache
 #define TUNE_SIEVEARRAY_SIZE L1_SIZE / 2
@@ -208,7 +281,7 @@ print_poly_info ( mpz_t *f,
 {
 	 /* print info about the polynomial */
 	 unsigned int nroots = 0;
-	 double skew, logmu, alpha, e;
+	 double skew, logmu, alpha, e, alpha_proj;
 	 int i;
 
 	 /* initlize cado_poly for Murphy E */
@@ -241,6 +314,7 @@ print_poly_info ( mpz_t *f,
 	 skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
 	 logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
 	 alpha = get_alpha (f, d, ALPHA_BOUND);
+	 alpha_proj = get_biased_alpha_projective (f, d, ALPHA_BOUND);
 
 	 mpz_set (cpoly->n, N);
 	 cpoly->degree = d;
@@ -250,9 +324,10 @@ print_poly_info ( mpz_t *f,
 
 	 if (verbose) {
 		  printf ("# skew: %.2f, ", skew);
-		  printf ("lognorm: %.2f, alpha: %.2f, E: %.2f, nr: %u \n# MurphyE: %1.2e (Bf=%.0f, Bg=%.0f, area=%1.2e)\n",
+		  printf ("lognorm: %.2f, alpha: %.2f, (alpha_proj: %.2f) E: %.2f, nr: %u \n# MurphyE: %1.2e (Bf=%.0f, Bg=%.0f, area=%1.2e)\n",
 				  logmu,
 				  alpha,
+				  alpha_proj,
 				  logmu + alpha,
 				  nroots,
 				  e,
@@ -261,6 +336,7 @@ print_poly_info ( mpz_t *f,
 				  AREA );
 	 }
 
+     fflush( stdout );
 	 cado_poly_clear (cpoly);
 
 	 return e;

@@ -210,3 +210,7 @@ static inline unsigned long solve_lineq ( unsigned long a,
 										  unsigned long b,
 										  unsigned long c,
 										  unsigned long p );
+
+static double get_biased_alpha_projective ( mpz_t *f,
+											const int d,
+											unsigned long B );
