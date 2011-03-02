@@ -75,6 +75,7 @@ static double exp_alpha[] = {
 /* Sieve bound for (A + MOD*i)*x + (B + MOD*j), mainly
    used for stage 2 */
 typedef struct {
+	 int Wbound;
 	 mpz_t Umax;
 	 mpz_t Umin;
 	 mpz_t Vmax;
@@ -87,14 +88,6 @@ typedef struct {
 	 mpz_t A;
 	 mpz_t B;
 	 mpz_t MOD;
-
-	 /* long Umax; */
-	 /* long Umin; */
-	 /* long Vmax; */
-	 /* long Vmin; */
-	 /* long A; */
-	 /* unsigned long B; */
-	 /* unsigned long MOD; */
 } _rsbound_t;
 typedef _rsbound_t rsbound_t[1];
 
@@ -109,6 +102,7 @@ typedef struct {
 	 mpz_t *gx;
 	 mpz_t *numerator;
      double skew;
+	 double alpha_proj;
      int d;
 } _rsstr_t;
 typedef _rsstr_t rsstr_t[1];
@@ -133,7 +127,7 @@ typedef struct {
 	 unsigned long global_u_bound_rs;
 	 /* regarding rootsieve_run() functions. */
 	 float sizebound_ratio_rs;
-	 float alpha_bound_rs;
+	 float exp_min_alpha_rs;
 
 	 mpz_t global_v_bound_rs;
 	 mpz_t modulus;
@@ -172,13 +166,44 @@ typedef struct listnode_t {
 } listnode;
 
 
-/* Priority queue to record best sublattices (u, v) */
+/* Priority queue to record sublattices (u, v) */
 typedef struct sublattice_pq_t {
 	 mpz_t *u;
 	 mpz_t *v;
 	 int len;
 	 int used;
 } sublattice_pq;
+
+/* Priority queue to record sublattices (w, u, v)'s alpha's */
+typedef struct sub_alpha_pq_t {
+	 int *w;
+	 mpz_t *u;
+	 mpz_t *v;
+	 mpz_t *modulus;
+	 double *sub_alpha;
+	 int len;
+	 int used;
+} sub_alpha_pq;
+
+/* Priority queue to record alpha values */
+typedef struct rootscore_pq_t {
+	 long *i;
+	 long *j;
+	 int16_t *alpha;
+	 int len;
+	 int used;
+} rootscore_pq;
+
+/* Priority queue to record E */
+typedef struct MurphyE_pq_t {
+	 mpz_t *u;
+	 mpz_t *v;
+	 double *E;
+	 int len;
+	 int used;
+} MurphyE_pq;
+
+
 
 /* -- ADD FUNCTION DECLARES -- */
 static inline unsigned long solve_lineq ( unsigned long a,
