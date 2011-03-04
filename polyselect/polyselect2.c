@@ -18,13 +18,14 @@
 #include "murphyE.h"
 
 // #define DEBUG
-
+#define NEW_ROOTSIEVE
 #define MAX_THREADS 16
 
 #define MAXQ 256
 #define SPECIAL_Q {1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173, 179, 181, 191, 193, 197, 199, 211, 223, 227, 229, 233, 239, 241, 251, ULONG_MAX}
 
 extern int MAX_k;
+void rootsieve_polyselect ( mpz_t *f, int d, mpz_t m, mpz_t l, mpz_t N, int verbose );
 
 /* hash table structure */
 typedef struct
@@ -316,14 +317,25 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   /* rootsieve */
   if (logmu <= max_norm)
     {
+
+#ifndef NEW_ROOTSIEVE
       unsigned long alim = 2000;
       long jmin, kmin;
+#endif
 
       mpz_neg (m, g[0]);
+
+#ifdef NEW_ROOTSIEVE
+	  rootsieve_polyselect (f, d, m, g[1], N, 0); // verbose = 2 to see details.
+#else
       rotate (f, d, alim, m, g[1], &jmin, &kmin, 0, verbose, DEFAULT_L2_METHOD);
+#endif
+
       mpz_neg (g[0], m);
       /* optimize again, but only translation */
-      optimize (f, d, g, verbose, 0);
+      //optimize (f, d, g, verbose, 0);
+	  optimize_aux (f, d, g, 0, 0, CIRCULAR);
+
       nroots = numberOfRealRoots (f, d, 0, 0);
       skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
       logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);

@@ -1,7 +1,7 @@
 add_executable (polyselect polyselect.c auxiliary.c rootsieve.c rho.c murphyE.c)
 add_executable (rotate rotate.c auxiliary.c rootsieve.c murphyE.c rho.c)
 add_executable (rotate_all rotate_all.c auxiliary.c rootsieve.c rho.c murphyE.c)
-add_executable (polyselect2 polyselect2.c auxiliary.c rootsieve.c murphyE.c rho.c)
+add_executable (polyselect2 polyselect2.c auxiliary.c rootsieve.c rootsieve5.c murphyE.c rho.c)
 add_executable (twoquadratics twoquadratics.c auxiliary.c murphyE.c rootsieve.c rho.c)
 add_executable (polyopt polyopt.c auxiliary.c murphyE.c rho.c rootsieve.c)
 

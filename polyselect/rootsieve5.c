@@ -132,23 +132,26 @@
 #include "rho.h"
 #include "rootsieve5.h"
 
-/* Things you don't want to change */
-#define MAX_LINE_LENGTH 4096
-#define PI 3.14159265358979324
-#define MAX_DEGREE 6
-#define DEBUG 0
-#define SUP_ALPHA 4.843
-
 /* Things for tuning */
 #define L1_SIZE 12288 // ~ l1 cache
-#define SIEVEARRAY_SIZE 2097152 // ~ l2 cache
+#define SIEVEARRAY_SIZE 20971520 // ~ l2 cache = 2097152
 #define TUNE_SIEVEARRAY_SIZE L1_SIZE / 2
 #define TOPALPHA_EACH_SIEVEARRAY 8 // For each "SIEVEARRAY_SIZE", record top 8 poly's alpha avalues.
 #define TOPE_EACH_SUBLATTICE 8 // For sublattice, record top 8 poly's E avalues.
 
 /* default parameters */
-int w_left_bound = 0;
-int w_length = 1;
+static int w_left_bound = 0;
+static int w_length = 1;
+static bestpoly_t bestpoly;
+
+static inline unsigned long solve_lineq ( unsigned long a,
+										  unsigned long b,
+										  unsigned long c,
+										  unsigned long p );
+static double get_biased_alpha_projective ( mpz_t *f,
+											const int d,
+											unsigned long B );
+
 
 /*-----------------------------*/
 /*   @Input-output functions.  */
@@ -295,7 +298,7 @@ print_poly_info ( mpz_t *f,
 		  mpz_set(cpoly->g[i], g[i]);
 	 }
 
-	 if (verbose) {
+	 if (verbose == 2) {
 
 		  /* output original poly */
 		  gmp_printf ("\nn: %Zd\n", N);
@@ -305,8 +308,8 @@ print_poly_info ( mpz_t *f,
 		  for (i = 1; i >= 0; i --) {
 			   gmp_printf ("Y%d: %Zd\n", i, g[i]);
 		  }
-		  if (verbose == 2) // don't want m in general
-			   gmp_printf ("m: %Zd\n", M);
+		  if (verbose == 3) // don't want m in general, and this m might be wrong
+		  	   gmp_printf ("m: %Zd\n", M);
 	 }
 
 	 /* compute skew, logmu, nroots */
@@ -322,7 +325,7 @@ print_poly_info ( mpz_t *f,
 	 cpoly->skew = skew;
 	 e = MurphyE (cpoly, BOUND_F, BOUND_G, AREA, MURPHY_K);
 
-	 if (verbose) {
+	 if (verbose == 2) {
 		  printf ("# skew: %.2f, ", skew);
 		  printf ("lognorm: %.2f, alpha: %.2f, (alpha_proj: %.2f) E: %.2f, nr: %u \n# MurphyE: %1.2e (Bf=%.0f, Bg=%.0f, area=%1.2e)\n",
 				  logmu,
@@ -1243,12 +1246,14 @@ new_MurphyE_pq ( MurphyE_pq **ppqueue,
 	 }
 
 	 (*ppqueue)->len = len;
+	 (*ppqueue)->w = (int *) malloc (len* sizeof (int));
 	 (*ppqueue)->u = (mpz_t *) malloc (len* sizeof (mpz_t));
 	 (*ppqueue)->v = (mpz_t *) malloc (len* sizeof (mpz_t));
 	 (*ppqueue)->E = (double *) malloc (len* sizeof (double));
 
 	 if ( (*ppqueue)->u == NULL ||
 		  (*ppqueue)->v == NULL ||
+		  (*ppqueue)->w == NULL ||
 		  (*ppqueue)->E == NULL ) {
 		  fprintf(stderr,"Error: malloc failed in new_MurphyE_pq()\n");
 		  exit(1);
@@ -1263,6 +1268,7 @@ new_MurphyE_pq ( MurphyE_pq **ppqueue,
 
 	 mpz_set_ui ( (*ppqueue)->u[0], 0 );
 	 mpz_set_ui ( (*ppqueue)->v[0], 0 );
+	 (*ppqueue)->w[0] = 0;
 	 (*ppqueue)->E[0] = -DBL_MAX; // E should be positive, so larger than 0 anyway.
 
 	 (*ppqueue)->used = 1UL;
@@ -1283,6 +1289,7 @@ free_MurphyE_pq ( MurphyE_pq **ppqueue )
 		  mpz_clear ( (*ppqueue)->v[i] );
 	 }
 
+	 free ( (*ppqueue)->w );
 	 free ( (*ppqueue)->u );
 	 free ( (*ppqueue)->v );
 	 free ( (*ppqueue)->E );
@@ -1296,6 +1303,7 @@ free_MurphyE_pq ( MurphyE_pq **ppqueue )
 */
 static inline void
 insert_MurphyE_pq_up ( MurphyE_pq *pqueue,
+					   int w,
 					   mpz_t u,
 					   mpz_t v,
 					   double E )
@@ -1309,11 +1317,13 @@ insert_MurphyE_pq_up ( MurphyE_pq *pqueue,
 
 		  mpz_set ( pqueue->u[k], pqueue->u[pq_parent(k)] );
 		  mpz_set ( pqueue->v[k], pqueue->v[pq_parent(k)] );
+		  pqueue->w[k] = pqueue->w[pq_parent(k)];
 		  pqueue->E[k] = pqueue->E[pq_parent(k)];
 	 }
 
 	 mpz_set (pqueue->u[k], u);
 	 mpz_set (pqueue->v[k], v);
+	 pqueue->w[k] = w;
 	 pqueue->E[k] = E;
 
 	 pqueue->used ++;
@@ -1325,6 +1335,7 @@ insert_MurphyE_pq_up ( MurphyE_pq *pqueue,
 */
 static inline void
 insert_MurphyE_pq_down ( MurphyE_pq *pqueue,
+						 int w,
 						 mpz_t u,
 						 mpz_t v,
 						 double E )
@@ -1345,6 +1356,7 @@ insert_MurphyE_pq_down ( MurphyE_pq *pqueue,
 
 			   mpz_set (pqueue->u[k], pqueue->u[l]);
 	  		   mpz_set (pqueue->v[k], pqueue->v[l]);
+			   pqueue->w[k] = pqueue->w[l];
 			   pqueue->E[k] = pqueue->E[l];
 		  }
 		  else
@@ -1353,6 +1365,7 @@ insert_MurphyE_pq_down ( MurphyE_pq *pqueue,
 
 	 mpz_set (pqueue->u[k], u);
 	 mpz_set (pqueue->v[k], v);
+	 pqueue->w[k] = w;
 	 pqueue->E[k] = E;
 }
 
@@ -1362,6 +1375,7 @@ insert_MurphyE_pq_down ( MurphyE_pq *pqueue,
 */
 static void
 insert_MurphyE_pq ( MurphyE_pq *pqueue,
+					int w,
 					mpz_t u,
 					mpz_t v,
 					double E )
@@ -1370,12 +1384,12 @@ insert_MurphyE_pq ( MurphyE_pq *pqueue,
 	 /* queue is full,  */
 	 if (pqueue->len == pqueue->used) {
 		  if ( E > pqueue->E[1] ) {
-			   insert_MurphyE_pq_down (pqueue, u, v, E);
+			   insert_MurphyE_pq_down (pqueue, w, u, v, E);
 		  }
 	 }
 	 /* queue is not full, sift-up */
 	 else if (pqueue->len > pqueue->used) {
-		  insert_MurphyE_pq_up (pqueue, u, v, E);
+		  insert_MurphyE_pq_up (pqueue, w, u, v, E);
 	 }
 	 else {
 		  fprintf(stderr,"Error: error (pqueue->len < pqueue->used) in insert_MurphyE_pq()\n");
@@ -1799,7 +1813,7 @@ special_valuation_affine ( mpz_t * f,
   biased part in the alpha. Hence, we can just add
   this to our affine part.
 */
-static double
+double
 get_biased_alpha_projective ( mpz_t *f,
 							  const int d,
 							  unsigned long B )
@@ -4138,7 +4152,8 @@ rsbound_setup_AB_bound ( rsbound_t rsbound,
 						 int verbose )
 {
 
-	 if (verbose) {
+	 /* If verbose == 0, linked with polyselect2 in "silent mode", B_max is normal, but A_max is always 1. */
+	 if (verbose == 2 || verbose == 0) {
 		  unsigned long len;
 		  mpz_t q;
 		  mpz_init (q);
@@ -4147,11 +4162,12 @@ rsbound_setup_AB_bound ( rsbound_t rsbound,
 
 		  /* Given "rsparam->global_v_bound_rs", compute permited range of B.
 			 Note, global_u_bound_rs is type lu, hence overflow is unlikely. */
+
 		  if (len < SIEVEARRAY_SIZE) {
-			   rsbound->Bmax = SIEVEARRAY_SIZE << 3;
+			   rsbound->Bmax = SIEVEARRAY_SIZE;
 		  }
-		  else if (len > (SIEVEARRAY_SIZE << 7)) { // comparison
-			   rsbound->Bmax = (SIEVEARRAY_SIZE << 7);
+		  else if (len > (SIEVEARRAY_SIZE << 3)) {
+			   rsbound->Bmax = (SIEVEARRAY_SIZE << 3);
 		  }
 		  else {
 			   rsbound->Bmax = (long) len;
@@ -4173,9 +4189,13 @@ rsbound_setup_AB_bound ( rsbound_t rsbound,
 		  }
 
 		  mpz_clear (q);
+
+		  /* If linked with polyselect */
+		  if (verbose == 0)
+			   rsbound->Amax = 0;
 	 }
 
-	 /* verbosee == 0 means "tune mode" */
+	 /* verbosee == 1 means "tune mode" */
 	 else {
 		  rsbound->Amax = 0;
 		  rsbound->Bmax = TUNE_SIEVEARRAY_SIZE;
@@ -4235,7 +4255,7 @@ rsbound_print ( rsbound_t rsbound )
 /*
   Init rsstr_t with.
 */
-static void
+void
 rsstr_init ( rsstr_t rs )
 {
 	 unsigned int i;
@@ -4567,7 +4587,8 @@ rotate_bounds_W ( mpz_t *f,
 				  mpz_t b,
 				  mpz_t m,
 				  unsigned long *W,
-				  int method )
+				  int method,
+				  int verbose )
 {
 	 int i;
 	 double skewness, init_lognorm, lognorm;
@@ -4594,7 +4615,8 @@ rotate_bounds_W ( mpz_t *f,
 
 	 (*W) = (unsigned long) w;
 
-	 fprintf (stderr, "# Info: w bound: %lu, norm bound: %.2f", *W, init_lognorm * 1.1);
+	 if (verbose == 2)
+		  fprintf (stderr, "# Info: w bound: %lu, norm bound: %.2f", *W, init_lognorm * 1.1); // TBC
 
 	 /* go back to w=0 */
 	 rotate_aux (f, b, m, w0, 0, 2);
@@ -4635,7 +4657,8 @@ rsparam_setup ( rsparam_t rsparam,
 											b,
 											m,
 											&(rsparam->global_w_bound_rs),
-											DEFAULT_L2_METHOD );
+											DEFAULT_L2_METHOD,
+											verbose );
 	 }
 	 else
 		  rsparam->global_w_bound_rs = 0;
@@ -4660,7 +4683,7 @@ rsparam_setup ( rsparam_t rsparam,
 	 size += (int) (log ( (double) rsparam->global_u_bound_rs ) * 1.442695);
 	 rsparam->exp_min_alpha_rs = exp_alpha[size-1];
 
-	 if (verbose)
+	 if (verbose == 2)
 		  gmp_fprintf ( stderr,
 						"# Info: (u, v) bound (%ld, %Zd) gives exp_best_E: %.3f, exp_min_alpha: %.3f\n",
 						rsparam->global_u_bound_rs,
@@ -4764,7 +4787,7 @@ rsparam_reset ( rsparam_t rsparam,
 	 size += (int) (log ( (double) rsparam->global_u_bound_rs ) * 1.442695);
 	 rsparam->exp_min_alpha_rs = exp_alpha[size-1];
 
-	 if (verbose)
+	 if (verbose == 2)
 		  gmp_fprintf ( stderr,
 						"# Info: (u, v) bound (%ld, %Zd) gives exp_best_E: %.3f, exp_min_alpha: %.3f\n",
 						rsparam->global_u_bound_rs,
@@ -4829,8 +4852,10 @@ static double
 rootsieve_uv ( rsstr_t rs,
 			   rsbound_t rsbound,
 			   rsparam_t rsparam,
+			   MurphyE_pq *global_E_pqueue,
 			   mpz_t *fuv,
 			   mpz_t *guv,
+			   int w,
 			   float alpha_bias,
 			   int verbose )
 {
@@ -4842,22 +4867,27 @@ rootsieve_uv ( rsstr_t rs,
 
 	 /* for each sieving array, we first look at the E of #TOPALPHA polynomials which
 		have best alpha */
-	 int TOPALPHA = 0;
+	 const int TOPALPHA = TOPALPHA_EACH_SIEVEARRAY;
 	 const int TOPE = TOPE_EACH_SUBLATTICE;
 
 	 /* if sieving bound v is small, size might be important, we want
 		to check more polynomials' E. But how much more we examine? heuristics. */
-	 if (rsbound->Bmax >= (SIEVEARRAY_SIZE << 7))
-		  TOPALPHA = TOPALPHA_EACH_SIEVEARRAY;
-	 else if (rsbound->Bmax <= (SIEVEARRAY_SIZE << 3))
-		  TOPALPHA = TOPALPHA_EACH_SIEVEARRAY * 16;
-	 else
-		  TOPALPHA = TOPALPHA_EACH_SIEVEARRAY * 8;
+	 /* if (rsbound->Bmax >= (SIEVEARRAY_SIZE << 7)) */
+	 /* 	  TOPALPHA = TOPALPHA_EACH_SIEVEARRAY; */
+	 /* else if (rsbound->Bmax <= (SIEVEARRAY_SIZE << 3)) */
+	 /* 	  TOPALPHA = TOPALPHA_EACH_SIEVEARRAY * 16; */
+	 /* else */
+	 /* 	  TOPALPHA = TOPALPHA_EACH_SIEVEARRAY * 8; */
 
 	 mpz_init (tmpv);
 	 mpz_init (tmpu);
 
-	 block_size = SIEVEARRAY_SIZE;
+	 /* test sieve in tune mode ? */
+	 if (verbose != 1)
+		  block_size = SIEVEARRAY_SIZE;
+	 else
+		  block_size = TUNE_SIEVEARRAY_SIZE;
+
 	 tmpBmax = rsbound->Bmax;
 	 tmpBmin = rsbound->Bmin;
 
@@ -4911,7 +4941,6 @@ rootsieve_uv ( rsstr_t rs,
 					/* 	 ij2uv (rsbound->B, rsbound->MOD, rsbound->Bmin, j, tmpv); */
 					/* 	 gmp_fprintf (stderr, "MAT[]: %d, u: %Zd, v: %Zd\n", MAT[j], tmpu, tmpv); */
 					/* } */
-
 			   }
 
 			   /* output polynomials (put them into the MurphyE priority queue) */
@@ -4932,7 +4961,7 @@ rootsieve_uv ( rsstr_t rs,
 #endif
 
 			   		MurphyE = print_poly_info (fuv, guv, rs->d, rs->n, rs->m, 0);
-					insert_MurphyE_pq ( E_pqueue, tmpu, tmpv, MurphyE );
+					insert_MurphyE_pq ( E_pqueue, w, tmpu, tmpv, MurphyE );
 			   }
 
 			   /* next j */
@@ -4955,10 +4984,13 @@ rootsieve_uv ( rsstr_t rs,
 
 	 for (l = 1; l < E_pqueue->used; l ++) {
 
-		  if (verbose) {
-			   gmp_fprintf ( stderr, "\n# Found (%dth) (u=%Zd, v=%Zd) gives E = %1.2e",
-							 l, E_pqueue->u[l], E_pqueue->v[l], E_pqueue->E[l]);
+		  if (verbose == 2) {
+			   gmp_fprintf ( stderr, "\n# Found (%dth) (w=%d, u=%Zd, v=%Zd) gives E = %1.2e",
+							 l, E_pqueue->w[l], E_pqueue->u[l], E_pqueue->v[l], E_pqueue->E[l]);
 		  }
+
+		  /* insert E scores to a global queue */
+		  insert_MurphyE_pq ( global_E_pqueue, E_pqueue->w[l], E_pqueue->u[l], E_pqueue->v[l], E_pqueue->E[l] );
 
 		  compute_fuv_mp (fuv, rs->f, rs->g, rs->d, E_pqueue->u[l], E_pqueue->v[l]);
 		  mpz_set (guv[0], rs->g[0]);
@@ -4969,7 +5001,7 @@ rootsieve_uv ( rsstr_t rs,
 
 	 MurphyE = MurphyE / (double) (E_pqueue->used - 1);
 
-	 if (verbose) {
+	 if (verbose == 2) {
 		  gmp_fprintf ( stderr,
 						"\n# Stat: ave_MurphyE of top %ld polynomials: %1.2e (on sublattice %Zd, %Zd)\n",
 						E_pqueue->used - 1,
@@ -4996,7 +5028,9 @@ static double
 rootsieve_main_stage2_run ( rsstr_t rs,
 							rsbound_t rsbound,
 							rsparam_t rsparam,
+							MurphyE_pq *global_E_pqueue,
 							double alpha_proj_lat,
+							int w,
 							int verbose )
 {
 	 int i;
@@ -5022,8 +5056,10 @@ rootsieve_main_stage2_run ( rsstr_t rs,
 	 ave_MurphyE = rootsieve_uv ( rs,
 								  rsbound,
 								  rsparam,
+								  global_E_pqueue,
 								  fuv,
 								  guv,
+								  w,
 								  alpha_proj_lat,
 								  verbose );
 
@@ -5044,6 +5080,8 @@ rootsieve_main_stage2_run ( rsstr_t rs,
 static double
 rootsieve_main_stage2_prepare ( rsstr_t rs,
 								rsparam_t rsparam,
+								MurphyE_pq *global_E_pqueue,
+								int w,
 								mpz_t u,
 								mpz_t v,
 								mpz_t mod,
@@ -5059,7 +5097,7 @@ rootsieve_main_stage2_prepare ( rsstr_t rs,
 	 /* set root sieve bounds, depending on U, V bounds */
 	 rsbound_setup_AB_bound (rsbound, rsparam, mod, verbose);
 
-	 if (verbose)
+	 if (verbose == 2)
 		  fprintf ( stderr, "# Info: sieving matrix size: [%ld, %ld] x [%ld, %ld]\n",
 					rsbound->Amin, rsbound->Amax,
 					rsbound->Bmin, rsbound->Bmax );
@@ -5072,14 +5110,16 @@ rootsieve_main_stage2_prepare ( rsstr_t rs,
 
 	 /* compute exact sieving bounds UV given size AB depending
 		on current A, B, MOD */
-	 if (verbose)
+	 if (verbose == 2)
 		  rsbound_print (rsbound);
 
 	 /* root sieve */
 	 ave_MurphyE = rootsieve_main_stage2_run ( rs,
 											   rsbound,
 											   rsparam,
+											   global_E_pqueue,
 											   alpha_proj_lat,
+											   w,
 											   verbose );
 	 /* free rsbound */
 	 rsbound_free (rsbound);
@@ -5132,7 +5172,7 @@ rootsieve_main_stage1 ( rsstr_t rs,
 		  return -1;
 	 }
 
-	 if (verbose)
+	 if (verbose == 2)
 		  gmp_fprintf ( stderr, "# Info: find best sublattices over (Mod %Zd) took %dms\n",
 						rsparam->modulus, cputime () - st );
 
@@ -5235,20 +5275,23 @@ rsparam_tune_aux ( rsstr_t rs,
 	 }
 
 	 /* For each sublattice, do the root sieve */
+	 MurphyE_pq *global_E_pqueue;
+	 new_MurphyE_pq (&global_E_pqueue, 4);
+
 	 re = 0;
 	 for (i = used - 1; i >= 0; i --) {
 
 		  if (re > nbest_sl_tunecut)
 			   break;
 
-		  /*
+		  /* TBC
 		  gmp_fprintf ( stderr,
 		  				"\n# Tune: Sieve on sublattice (# %2d), (w, u, v): (%d, %Zd, %Zd)  (mod %Zd)\n# Info: affine_alpha: %.2f, proj_alpha: %.2f, exp_min_alpha: %.2f\n",
 		  				i + 1,
 		  				w[i],
 		  				u[i],
 		  				v[i],
-						mod[i]k
+						mod[i],
 		  				sub_alpha[i],
 		  				rs->alpha_proj,
 		  				rsparam->exp_min_alpha_rs );
@@ -5256,15 +5299,18 @@ rsparam_tune_aux ( rsstr_t rs,
 
 		  ave_MurphyE = rootsieve_main_stage2_prepare ( rs,
 														rsparam,
+														global_E_pqueue,
+														w[i],
 														u[i],
 														v[i],
 														mod[i],
 														sub_alpha[i] + rs->alpha_proj,
-														0 );
+														1 ); // tune mode, this is 1 in order to to set the correct length (short) of sieve array.
 		  ave2_MurphyE += ave_MurphyE;
 		  re ++;
 	 }
 
+	 free_MurphyE_pq (&global_E_pqueue);
 	 for (i = 0; i < used; i ++) {
 		  mpz_clear (u[i]);
 		  mpz_clear (v[i]);
@@ -5281,6 +5327,7 @@ rsparam_tune_aux ( rsstr_t rs,
 	 return ave2_MurphyE;
 }
 
+
 /*
   Tune parameters for find_sublattice().
 */
@@ -5288,7 +5335,8 @@ static double
 rsparam_tune ( rsstr_t rs,
 			   rsparam_t rsparam,
 			   int num_trials,
-			   int w )
+			   int w,
+			   int verbose )
 {
 	 unsigned short i, j, best_j = 0, tmp_e_sl[rsparam->len_e_sl], k;
 	 unsigned int p, pearr[rsparam->len_e_sl];
@@ -5303,13 +5351,14 @@ rsparam_tune ( rsstr_t rs,
 		  }
 	 }
 
-	 /* first set of parameters */
-	 fprintf (stderr, "# Tune:");
-	 for (i = 0; i < rsparam->len_e_sl; i ++) {
-		  fprintf (stderr, " %u^%u=%u ", primes[i],
-				   rsparam->e_sl[i], pearr[i]);
+	 if (verbose != 0) {
+		  /* first set of parameters */
+		  fprintf (stderr, "# Tune:");
+		  for (i = 0; i < rsparam->len_e_sl; i ++) {
+			   fprintf (stderr, " %u^%u=%u ", primes[i],
+						rsparam->e_sl[i], pearr[i]);
+		  }
 	 }
-
 	 /* queue */
 	 sub_alpha_pq *alpha_pqueue;
 	 new_sub_alpha_pq (&alpha_pqueue, rsparam->nbest_sl);
@@ -5317,15 +5366,16 @@ rsparam_tune ( rsstr_t rs,
 	 best_MurphyE = rsparam_tune_aux ( rs,
 									   rsparam,
 									   alpha_pqueue,
-									   8, // nbest_sl_tunecut
+									   3, // nbest_sl_tunecut
 									   w );
 	 alpha_pqueue->used = 1;
 
-	 if (best_MurphyE == -1)
-		  fprintf (stderr, " ave_MurphyE: failed\n");
-	 else
-		  fprintf (stderr, " ave_MurphyE: %.3e\n", best_MurphyE);
-
+	 if (verbose != 0) {
+		  if (best_MurphyE == -1)
+			   fprintf (stderr, " ave_MurphyE: failed\n");
+		  else
+			   fprintf (stderr, " ave_MurphyE: %.3e\n", best_MurphyE);
+	 }
 	 /* Other sets of parameters, try next "num_trials" sets
 		of parameters and keep the best one. */
 	 char flag;
@@ -5348,26 +5398,28 @@ rsparam_tune ( rsstr_t rs,
 			   rsparam->e_sl[0] += 1;
 		  }
 
-		  /* some info and tune */
-		  fprintf (stderr, "# Tune:");
-		  for (i = 0; i < rsparam->len_e_sl; i ++) {
-			   fprintf (stderr, " %u^%u=%u ", primes[i],
-						rsparam->e_sl[i], pearr[i]);
+		  if (verbose != 0) {
+			   /* some info and tune */
+			   fprintf (stderr, "# Tune:");
+			   for (i = 0; i < rsparam->len_e_sl; i ++) {
+					fprintf (stderr, " %u^%u=%u ", primes[i],
+							 rsparam->e_sl[i], pearr[i]);
+			   }
 		  }
-
 		  /* test sieve */
 		  ave_MurphyE = rsparam_tune_aux ( rs,
-											rsparam,
-											alpha_pqueue,
-											8, // nbest_sl_tunecut
-											w );
+										   rsparam,
+										   alpha_pqueue,
+										   8, // nbest_sl_tunecut
+										   w );
 		  alpha_pqueue->used = 1;
 
-		  if (ave_MurphyE == -1)
-			   fprintf (stderr, " ave_MurphyE: failed\n");
-		  else
-			   fprintf (stderr, " ave_MurphyE: %.3e\n", ave_MurphyE);
-
+		  if (verbose != 0) {
+			   if (ave_MurphyE == -1)
+					fprintf (stderr, " ave_MurphyE: failed\n");
+			   else
+					fprintf (stderr, " ave_MurphyE: %.3e\n", ave_MurphyE);
+		  }
 		  if (ave_MurphyE >= best_MurphyE) {
 			   best_MurphyE = ave_MurphyE;
 			   //printf ("current best: %.6e\n", best_MurphyE);
@@ -5387,13 +5439,14 @@ rsparam_tune ( rsstr_t rs,
 		  //printf ("e: %u\n", rsparam->e_sl[k]);
 	 }
 
-	 /* output best parameters */
-	 fprintf (stderr, "# Tune: best parameters ");
-	 for (i = 0; i < rsparam->len_e_sl; i ++) {
-		  fprintf (stderr, "%u:%u ", primes[i], rsparam->e_sl[i]);
+	 if (verbose != 0) {
+		  /* output best parameters */
+		  fprintf (stderr, "# Tune: best parameters ");
+		  for (i = 0; i < rsparam->len_e_sl; i ++) {
+			   fprintf (stderr, "%u:%u ", primes[i], rsparam->e_sl[i]);
+		  }
+		  fprintf (stderr, "\n");
 	 }
-	 fprintf (stderr, "\n");
-
 	 return best_MurphyE;
 }
 
@@ -5422,22 +5475,29 @@ rootsieve_main_run ( rsstr_t rs,
 	 new_sub_alpha_pq (&alpha_pqueue, rsparam->nbest_sl);
 
 	 /* For each qudratic rotation i, find sublattice */
+	 re = 0;
 	 for (i = w_left_bound; i < w_length + w_left_bound; i++) {
 
 		  /* rotate polynomial by f + rot*x^2 for various rot */
 		  old_i = rotate_aux (rs->f, rs->g[1], m, old_i, i, 2);
 
-		  if (verbose)
+		  if (verbose == 2)
 			   fprintf (stderr, "\n# Info: quadratic rotation by %d*x^2\n", i);
 
 		  /* reset fx, gx, numerator since f is different */
 		  rsstr_setup (rs);
 
 		  /* re-compute some bounds for this w-rotated polynomial */
-		  rsparam_reset (rsparam, rs, 1);
+		  rsparam_reset (rsparam, rs, verbose);
 
-		  /* re-tune the parameters for finding sublattice */
-		  rsparam_tune (rs, rsparam, 10, i);
+		  /* two modes, either tune all rotated polys or only tune one. */
+		  //if (verbose == 2 || re == 0) { TBC
+		  if (re == 0) {
+			   /* re-tune the parameters for finding sublattice */
+			   rsparam_tune (rs, rsparam, 10, i, verbose);
+		  }
+
+		  re ++;
 
 		  /* find sublattices */
 		  k = rootsieve_main_stage1 ( rs,
@@ -5486,7 +5546,7 @@ rootsieve_main_run ( rsstr_t rs,
 								 mod[i],
 								 &(sub_alpha[i]) );
 
-		  if (verbose) {
+		  if (verbose != 0) {
 			   gmp_fprintf ( stderr, "# Info: #%4d sublattice (w, u, v): (%d, %Zd, %Zd) (mod %Zd), alpha: %.2f\n",
 							 i + 1,
 							 w[i],
@@ -5500,12 +5560,22 @@ rootsieve_main_run ( rsstr_t rs,
 	 /* free alpha queue */
 	 free_sub_alpha_pq (&alpha_pqueue);
 
+	 /* E priority queue for all sublattice, only consider the top three polynomials */
+	 MurphyE_pq *global_E_pqueue;
+	 new_MurphyE_pq (&global_E_pqueue, 4);
+
 	 /* For each sublattice, do the root sieve */
 	 re = 0;
 	 for (i = used - 1; i >= 0; i --) {
 
+		  /* for polyselect2.c */
+		  if (verbose == 0) {
+			   if (re > 3)
+					break;
+		  }
+
 		  /* Don't output in tune mode */
-		  if (verbose) {
+		  if (verbose != 0) {
 			   gmp_fprintf ( stderr,
 							 "\n# Info: Sieve on sublattice (# %2d), (w, u, v): (%d, %Zd, %Zd) (mod %Zd) \n# Info: affine_alpha: %.2f, proj_alpha: %.2f, exp_min_alpha: %.2f\n",
 							 i + 1,
@@ -5527,6 +5597,8 @@ rootsieve_main_run ( rsstr_t rs,
 
 		  ave_MurphyE = rootsieve_main_stage2_prepare ( rs,
 														rsparam,
+														global_E_pqueue,
+														w[i],
 														u[i],
 														v[i],
 														mod[i],
@@ -5540,6 +5612,59 @@ rootsieve_main_run ( rsstr_t rs,
 	 rotate_aux (rs->f, rs->g[1], m, old_i, 0, 2);
 	 old_i = 0;
 
+	 /* SPECIAL, in the silent mode, nothing had been outputed and we output the top three polynomials. */
+	 if (verbose == 0) {
+
+		  ave_MurphyE = 0.0;
+		  double best_E = 0.0;
+
+		  mpz_t *fuv, *guv;
+		  /* var for computing E */
+		  fuv = (mpz_t*) malloc ((rs->d + 1) * sizeof (mpz_t));
+		  guv = (mpz_t*) malloc (2 * sizeof (mpz_t));
+		  if (fuv == NULL || guv == NULL) {
+			   fprintf (stderr, "Error, cannot allocate memory in rootsieve_main_run().\n");
+			   exit (1);
+		  }
+		  for (i = 0; i <= rs->d; i++)
+			   mpz_init_set (fuv[i], rs->f[i]);
+		  for (i = 0; i < 2; i++)
+			   mpz_init_set (guv[i], rs->g[i]);
+
+		  /* output all polys in the global queue */
+		  for (i = 1; i < global_E_pqueue->used; i ++) {
+
+			   old_i = 0;
+			   old_i = rotate_aux (rs->f, rs->g[1], m, old_i, global_E_pqueue->w[i], 2);
+
+			   for (k = 0; k <= rs->d; k++)
+					mpz_set (fuv[k], rs->f[k]);
+
+			   compute_fuv_mp (fuv, rs->f, rs->g, rs->d, global_E_pqueue->u[i], global_E_pqueue->v[i]);
+			   optimize_aux (fuv, rs->d, guv, 0, 0, CIRCULAR);
+			   ave_MurphyE = print_poly_info (fuv, guv, rs->d, rs->n, rs->m, 0); // only output when verbose == 2.
+
+			   // if better
+			   if (ave_MurphyE > best_E) {
+					best_E = ave_MurphyE;
+
+					for (k = 0; k <= rs->d; k++)
+						 mpz_set (bestpoly->f[k], fuv[k]);
+					for (k = 0; k < 2; k++)
+						 mpz_set (bestpoly->g[k], guv[k]);
+			   }
+			   rotate_aux (rs->f, rs->g[1], m, old_i, 0, 2);
+		  }
+
+		  for (i = 0; i <= rs->d; i++)
+			   mpz_clear (fuv[i]);
+		  for (i = 0; i < 2; i++)
+			   mpz_clear (guv[i]);
+		  free (fuv);
+		  free (guv);
+	 }
+
+	 free_MurphyE_pq (&global_E_pqueue);
 	 rsparam_free (rsparam);
 	 mpz_clear (m);
 	 for (i = 0; i < used; i ++) {
@@ -5562,17 +5687,18 @@ rootsieve_main_run ( rsstr_t rs,
   For the current polynomial (rs), start two-stage root sieve.
 */
 static void
-rootsieve_main ( rsstr_t rs )
+rootsieve_main ( rsstr_t rs,
+				 int verbose )
 {
 
 	 if (rs->d == 5) {
 		  /* not qudratci rot for deg 5 polynomial */
 		  w_left_bound = 0;
 		  w_length = 1;
-		  rootsieve_main_run (rs, 1);
+		  rootsieve_main_run (rs, verbose);
 	 }
 	 else if (rs->d == 6) {
-		  rootsieve_main_run (rs, 1);
+		  rootsieve_main_run (rs, verbose);
 	 }
 	 else {
 		  fprintf (stderr, "Error: only support deg 5 or 6.\n");
@@ -5584,9 +5710,83 @@ rootsieve_main ( rsstr_t rs )
 /*
   Do the root sieve on all polynomials in the file.
 */
-static void
-rootsieve_file ( FILE *file )
+void
+rootsieve_polyselect ( mpz_t *f,
+					   int d,
+					   mpz_t m,
+					   mpz_t l,
+					   mpz_t N,
+					   int verbose )
 {
+	 int i;
+	 w_left_bound = 0;
+	 w_length = 1;
+
+	 /* this should be fast to tune */
+	 if (d == 6) {
+		  w_left_bound = -32;
+		  w_length = 64;
+	 }
+
+	 /* rootsieve_struct */
+	 rsstr_t rs;
+	 rsstr_init (rs);
+	 mpz_set (rs->g[1], l);
+	 mpz_neg (rs->g[0], m);
+	 for (i = 0; i <=d; i ++)
+		  mpz_set (rs->f[i], f[i]);
+	 mpz_set (rs->n, N);
+	 rsstr_setup (rs);
+	 mpz_init (rs->m);
+
+	 /* bestpoly for return */
+	 bestpoly->f = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
+	 bestpoly->g = (mpz_t*) malloc (2 * sizeof (mpz_t));
+	 if ((bestpoly->f == NULL) || (bestpoly->g == NULL)) {
+		  fprintf (stderr, "Error, cannot allocate memory for bestpoly.\n");
+		  exit (1);
+	 }
+	 for (i = 0; i <= d; i++)
+	 {
+		  mpz_init_set (bestpoly->f[i], f[i]);
+	 }
+	 /* for safety */
+	 mpz_init (bestpoly->g[0]);
+	 mpz_neg (bestpoly->g[0], m);
+	 mpz_init_set (bestpoly->g[1], l);
+
+	 //print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 2);
+
+	 /* start main rootsieve function */
+	 rootsieve_main (rs, verbose);
+
+	 /* set and free */
+	 for (i = 0; i <= d; i++) {
+		  mpz_set (f[i], bestpoly->f[i]);
+		  mpz_clear (bestpoly->f[i]);
+	 }
+
+	 mpz_set (m, bestpoly->g[0]);
+	 mpz_set (l, bestpoly->g[1]);
+
+	 mpz_clear (bestpoly->g[0]);
+	 mpz_clear (bestpoly->g[1]);
+	 free (bestpoly->f);
+	 free (bestpoly->g);
+	 rsstr_free (rs);
+}
+
+/*
+  Do the root sieve on all polynomials in the file.
+*/
+void
+rootsieve_file ( FILE *file,
+				 int wlb,
+				 int wl )
+{
+	 w_left_bound = wlb;
+	 w_length = wl;
+
 	 unsigned flag = 0UL, count = 0;
 	 char str[MAX_LINE_LENGTH];
 
@@ -5666,10 +5866,10 @@ rootsieve_file ( FILE *file )
 			   rsstr_setup (rs);
 
 			   fprintf (stderr, "\n# Polynomial (# %5d).\n", count);
-			   print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 1);
+			   print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 2);
 
 			   /* start main rootsieve function */
-			   rootsieve_main (rs);
+			   rootsieve_main (rs, 2);
 
 			   count += 1;
 			   flag = 0UL;
@@ -5685,9 +5885,13 @@ rootsieve_file ( FILE *file )
   Do the root sieve for one polynomial from stdin.
   For debugging purpose.
 */
-static void
-rootsieve_stdin ( void )
+void
+rootsieve_stdin ( int wlb,
+				  int wl )
 {
+
+	 w_left_bound = wlb;
+	 w_length = wl;
 
 	 /* rootsieve_struct */
 	 rsstr_t rs;
@@ -5700,110 +5904,10 @@ rootsieve_stdin ( void )
 	 rsstr_setup (rs);
 
 	 fprintf (stderr, "\n# Polynomial (# 0).\n");
-	 print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 1);
+	 print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 2);
 
 	 /* start main rootsieve function */
-	 rootsieve_main (rs);
+	 rootsieve_main (rs, 2);
 
 	 rsstr_free (rs);
-}
-
-
-/*
-  Usage
-*/
-static void
-usage (char **argv)
-{
-	 fprintf (stderr, "# Error: Unexpected argument: %s\n", argv[1]);
-	 fprintf (stderr, "# Usage: \n# %s < STDIN -w WLEFT -l WLENGTH\n", argv[0]);
-	 fprintf (stderr, "# %s -f FILE -w WLEFT -l WLENGTH\n", argv[0]);
-	 fprintf (stderr, "# Note: WLEFT is the left-bound of a qudratic rotation and WLENGTH is the amount for qudratic rotation.\n");
-	 exit(1);
-}
-
-
-/*
-  Main
-*/
-int
-main (int argc, char **argv)
-{
-
-	 int i;
-	 /* print command-line arguments */
-	 fprintf (stderr, "# %s.r%s", *argv, CADO_REV);
-	 for (i = 1; i < argc; i++)
-		  fprintf (stderr, " %s", *(argv+i));
-	 fprintf (stderr, "\n");
-
-	 /* read polynomials from "-f file" */
-	 if (argc == 7) {
-
-		  FILE *file = NULL;
-		  char *filename = NULL;
-
-		  while (argc >= 3 && argv[1][0] == '-') {
-			   if (argc >= 3 && strcmp(argv[1], "-f") == 0) {
-					filename = argv[2];
-					argv += 2;
-					argc -= 2;
-			   }
-			   else if (argc >= 3 && strcmp (argv[1], "-w") == 0)
-			   {
-					w_left_bound = atoi (argv[2]);
-					argv += 2;
-					argc -= 2;
-			   }
-			   else if (argc >= 3 && strcmp (argv[1], "-l") == 0)
-			   {
-					w_length = atoi (argv[2]);
-					argv += 2;
-					argc -= 2;
-			   }
-			   else {
-					usage (argv);
-			   }
-		  }
-
-		  // read
-		  file = fopen(filename, "r");
-		  if (file == NULL) {
-			   fprintf(stderr, "# Error in reading file\n");
-			   exit (1);
-		  }
-
-		  // optimize the raw polys in the file
-		  rootsieve_file (file);
-		  fclose (file);
-		  return 0;
-	 }
-
-	 /* read polynomials from stdin*/
-	 else if (argc == 5)
-	 {
-		  while (argc >= 3 && argv[1][0] == '-') {
-			   if (argc >= 3 && strcmp (argv[1], "-w") == 0)
-			   {
-					w_left_bound = atoi (argv[2]);
-					argv += 2;
-					argc -= 2;
-			   }
-			   else if (argc >= 3 && strcmp (argv[1], "-l") == 0)
-			   {
-					w_length = atoi (argv[2]);
-					argv += 2;
-					argc -= 2;
-			   }
-			   else {
-					usage (argv);
-			   }
-		  }
-
-		  rootsieve_stdin ();
-		  return 0;
-	 }
-	 else {
-		  usage (argv);
-	 }
 }

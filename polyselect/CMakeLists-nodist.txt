@@ -1,8 +1,7 @@
-
 add_executable(alpha alpha.c auxiliary.c fast_rootsieve.c rootsieve.c murphyE.c rho.c)
-add_executable (rootsieve5 rootsieve5.c auxiliary.c murphyE.c rho.c rootsieve.c)
+add_executable(rootsieve5 rootsieve5_main.c rootsieve5.c auxiliary.c murphyE.c rho.c rootsieve.c)
 
 target_link_libraries(alpha utils m gmp)
-target_link_libraries (rootsieve5 utils m)
+target_link_libraries (rootsieve5 utils m ${pthread_libs})
 
 # vim: set ft=cmake:
