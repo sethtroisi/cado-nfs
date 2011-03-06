@@ -231,6 +231,7 @@ polyselect/polyselect.c
 polyselect/polyselect2.c
 polyselect/rotate.c
 polyselect/rootsieve.c
+polyselect/rootsieve5.c
 polyselect/rootsieve.h
 polyselect/rho.c
 polyselect/rho.h
