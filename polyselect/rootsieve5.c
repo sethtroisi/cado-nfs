@@ -136,7 +136,7 @@
 #define L1_SIZE 12288 // ~ l1 cache
 #define SIEVEARRAY_SIZE 20971520 // ~ l2 cache = 2097152
 #define TUNE_SIEVEARRAY_SIZE L1_SIZE / 2
-#define TOPALPHA_EACH_SIEVEARRAY 8 // For each "SIEVEARRAY_SIZE", record top 8 poly's alpha avalues.
+#define TOPALPHA_EACH_SIEVEARRAY 64 // For each "SIEVEARRAY_SIZE", record top 8 poly's alpha avalues.
 #define TOPE_EACH_SUBLATTICE 8 // For sublattice, record top 8 poly's E avalues.
 
 /* default parameters */
@@ -4162,11 +4162,7 @@ rsbound_setup_AB_bound ( rsbound_t rsbound,
 
 		  /* Given "rsparam->global_v_bound_rs", compute permited range of B.
 			 Note, global_u_bound_rs is type lu, hence overflow is unlikely. */
-
-		  if (len < SIEVEARRAY_SIZE) {
-			   rsbound->Bmax = SIEVEARRAY_SIZE;
-		  }
-		  else if (len > (SIEVEARRAY_SIZE << 3)) {
+		  if (len > (SIEVEARRAY_SIZE << 3)) {
 			   rsbound->Bmax = (SIEVEARRAY_SIZE << 3);
 		  }
 		  else {
@@ -4513,13 +4509,66 @@ rotate_bounds_V_mpz ( mpz_t *f,
 }
 
 
+/* find bound w for qudratic rotation */
+static double
+rotate_bounds_W ( mpz_t *f,
+				  int d,
+				  mpz_t b,
+				  mpz_t m,
+				  unsigned long *W,
+				  int rotation_degree,
+				  int method,
+				  int verbose )
+{
+	 int i, upper_bound = 12;
+	 double skewness, init_lognorm, lognorm;
+	 long w0 = 0, w;
+
+	 skewness = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, method);
+	 init_lognorm = L2_lognorm (f, d, skewness, method);
+
+	 /* look for positive w: 1, 2, 4, 8, ... */
+	 w = 1;
+
+	 /* decide the bound for the loop */
+	 if (rotation_degree == 1)
+		  upper_bound = 48;
+
+	 for (i = 0; i < upper_bound; i++, w *= 2)
+	 {
+		  /* rotate by w*x, and fix this polynomial in this loop. */
+		  w0 = rotate_aux (f, b, m, w0, w, rotation_degree);
+
+		  skewness = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, method);
+		  lognorm = L2_lognorm (f, d, skewness, method);
+
+		  //fprintf (stderr, "# DEBUG --- [%d-th] W: %ld, lognorm: %f, bound_norm: %f\n", i, w, lognorm, init_lognorm * 1.1);
+
+		  if (lognorm > init_lognorm * 1.1)
+			   break;
+	 }
+
+	 (*W) = (unsigned long) w;
+
+	 if (verbose == 2) {
+		  if (rotation_degree == 2)
+			   fprintf (stderr, "# Info: w upper bound: %lu, norm bound: %.2f\n", *W, init_lognorm * 1.1); // TBC
+		  else if (rotation_degree == 1)
+			   fprintf (stderr, "# Info: u upper bound: %lu, norm bound: %.2f\n", *W, init_lognorm * 1.1); // TBC
+	 }
+	 /* go back to w=0 */
+	 rotate_aux (f, b, m, w0, 0, rotation_degree);
+
+	 return init_lognorm * 1.1;
+}
+
+
 /*
   For each U bound, identify the best V bound (such that E is
   smallest for this fixed U). Then return the best (U, V) pair.
 
   Experimentally, this is better than considering U and U*skew
-  but will be slower. Anyway, this will only be done once for
-  each polynomial (sorry if there are thousands).
+  but will be slower.
 */
 static double
 rotate_bounds_UV ( mpz_t *f,
@@ -4529,12 +4578,14 @@ rotate_bounds_UV ( mpz_t *f,
 				   mpz_t m,
 				   unsigned long *U,
 				   mpz_t V,
-				   int method )
+				   int method,
+				   int verbose )
 {
 	 int i;
 	 long k0 = 0, tmpU;
 	 double skewness, init_lognorm, E, best_E;
 	 mpz_t best_V;
+	 unsigned long upper_bound_U = 0;
 
 	 mpz_init (best_V);
 	 mpz_set_ui (best_V, 0UL);
@@ -4543,9 +4594,20 @@ rotate_bounds_UV ( mpz_t *f,
 	 init_lognorm = L2_lognorm (f, d, skewness, method);
 	 best_E = init_lognorm;
 
-	 /* look for positive k: 2, 4, 8, ... */
+	 /* First, compute an upper bound for linear rotation U. */
+	 rotate_bounds_W ( f,
+					   d,
+					   b,
+					   m,
+					   &upper_bound_U,
+					   1,
+					   DEFAULT_L2_METHOD,
+					   verbose );
+	 upper_bound_U = (unsigned long) (log ((double) upper_bound_U) / log(2.0));
+
+	 /* Then, look for best (U, V) combinations, where positive k: 2, 4, 8, ... */
 	 tmpU = 1;
-	 for (i = 0; i < 48; i++, tmpU *= 2)
+	 for (i = 0; i < (int) upper_bound_U; i++, tmpU *= 2)
 	 {
 		  /* rotate by u*x, and fix this polynomial in this loop. */
 		  k0 = rotate_aux (f, b, m, k0, tmpU, 1);
@@ -4555,7 +4617,7 @@ rotate_bounds_UV ( mpz_t *f,
 
 		  /* identify best v in rotating by v */
 		  E = rotate_bounds_V_mpz (f, d, ratio_margin,
-								   b, m, V, DEFAULT_L2_METHOD, i);
+		  						   b, m, V, DEFAULT_L2_METHOD, i);
 
 		  if (DEBUG)
 			   gmp_fprintf (stderr, "# DEBUG: (U: %ld, V: %Zd), best_E: %.3f\n",
@@ -4577,51 +4639,6 @@ rotate_bounds_UV ( mpz_t *f,
 	 mpz_clear (best_V);
 
 	 return best_E;
-}
-
-
-/* find bound w for qudratic rotation */
-static double
-rotate_bounds_W ( mpz_t *f,
-				  int d,
-				  mpz_t b,
-				  mpz_t m,
-				  unsigned long *W,
-				  int method,
-				  int verbose )
-{
-	 int i;
-	 double skewness, init_lognorm, lognorm;
-	 long w0 = 0, w;
-
-	 skewness = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, method);
-	 init_lognorm = L2_lognorm (f, d, skewness, method);
-
-	 /* look for positive w: 1, 2, 4, 8, ... */
-	 w = 1;
-	 for (i = 0; i < 12; i++, w *= 2)
-	 {
-		  /* rotate by w*x, and fix this polynomial in this loop. */
-		  w0 = rotate_aux (f, b, m, w0, w, 2);
-
-		  skewness = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, method);
-		  lognorm = L2_lognorm (f, d, skewness, method);
-
-		  //fprintf (stderr, "# DEBUG --- [%d-th] W: %ld, lognorm: %f, bound_norm: %f\n", i, w, lognorm, init_lognorm * 1.1);
-
-		  if (lognorm > init_lognorm * 1.1)
-			   break;
-	 }
-
-	 (*W) = (unsigned long) w;
-
-	 if (verbose == 2)
-		  fprintf (stderr, "# Info: w bound: %lu, norm bound: %.2f", *W, init_lognorm * 1.1); // TBC
-
-	 /* go back to w=0 */
-	 rotate_aux (f, b, m, w0, 0, 2);
-
-	 return init_lognorm * 1.1;
 }
 
 
@@ -4657,6 +4674,7 @@ rsparam_setup ( rsparam_t rsparam,
 											b,
 											m,
 											&(rsparam->global_w_bound_rs),
+											2,
 											DEFAULT_L2_METHOD,
 											verbose );
 	 }
@@ -4673,7 +4691,8 @@ rsparam_setup ( rsparam_t rsparam,
 								 m,
 								 &(rsparam->global_u_bound_rs),
 								 rsparam->global_v_bound_rs, /* u, v */
-								 DEFAULT_L2_METHOD );
+								 DEFAULT_L2_METHOD,
+								 verbose );
 	 mpz_clear (b);
 	 mpz_clear (m);
 
@@ -4778,7 +4797,8 @@ rsparam_reset ( rsparam_t rsparam,
 								 m,
 								 &(rsparam->global_u_bound_rs),
 								 rsparam->global_v_bound_rs, /* u, v */
-								 DEFAULT_L2_METHOD );
+								 DEFAULT_L2_METHOD,
+								 verbose );
 	 mpz_clear (b);
 	 mpz_clear (m);
 
@@ -4883,18 +4903,25 @@ rootsieve_uv ( rsstr_t rs,
 	 mpz_init (tmpu);
 
 	 /* test sieve in tune mode ? */
-	 if (verbose != 1)
-		  block_size = SIEVEARRAY_SIZE;
-	 else
+	 if (verbose == 1)
 		  block_size = TUNE_SIEVEARRAY_SIZE;
+	 else {
+		  block_size = SIEVEARRAY_SIZE;
+
+		  /* one block is all ready too long */
+		  if ( (rsbound->Bmax - rsbound->Bmin + 1) < block_size ) {
+			   block_size = rsbound->Bmax - rsbound->Bmin + 1;
+			   }
+	 }
 
 	 tmpBmax = rsbound->Bmax;
 	 tmpBmin = rsbound->Bmin;
 
 #if DEBUG
-	 fprintf (stderr, "# Info: totalnb: %lu\n",
+	 fprintf (stderr, "# Info: totalnb: %lu, %lu, %lu\n", (rsbound->Bmax - rsbound->Bmin + 1), block_size,
 			  (rsbound->Bmax - rsbound->Bmin + 1) / block_size);
 #endif
+
 
 	 /* E priority queue for each sublattice */
 	 MurphyE_pq *E_pqueue;
@@ -5140,7 +5167,7 @@ rootsieve_main_stage1 ( rsstr_t rs,
 {
 	 int st, i, re;
 	 mpz_t *fuv;
-	 double alpha_lat;
+	 double alpha_lat, skew, logmu;
 	 sublattice_pq *pqueue;
 
 	 /* fuv is f+(u*x+v)*g */
@@ -5184,13 +5211,18 @@ rootsieve_main_stage1 ( rsstr_t rs,
 		  compute_fuv_mp (fuv, rs->f, rs->g, rs->d, pqueue->u[i], pqueue->v[i]);
 		  alpha_lat = get_biased_alpha_affine (fuv, rs->d, primes[rsparam->tlen_e_sl - 1]);
 
+		  skew = L2_skewness (fuv, rs->d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+		  logmu = L2_lognorm (fuv, rs->d, skew, DEFAULT_L2_METHOD);
+
+
 #if DEBUG
-		  gmp_fprintf ( stderr, "# Info: insert sublattice #%4d, (w, u, v): (%d, %Zd, %Zd), alpha: %.2f\n",
+		  gmp_fprintf ( stderr, "# Info: insert sublattice #%4d, (w, u, v): (%d, %Zd, %Zd), alpha: %.2f, logmu: %.2f\n",
 						i,
 						w,
 						pqueue->u[i],
 						pqueue->v[i],
-						alpha_lat );
+						alpha_lat,
+						logmu );
 #endif
 		  /* insert to a global priority queue */
 		  insert_sub_alpha_pq ( alpha_pqueue,
@@ -5755,7 +5787,7 @@ rootsieve_polyselect ( mpz_t *f,
 	 mpz_neg (bestpoly->g[0], m);
 	 mpz_init_set (bestpoly->g[1], l);
 
-	 //print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 2);
+	 print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 0);
 
 	 /* start main rootsieve function */
 	 rootsieve_main (rs, verbose);
