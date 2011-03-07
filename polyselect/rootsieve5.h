@@ -111,6 +111,8 @@ typedef struct {
      double skew;
 	 double alpha_proj;
      int d;
+	 int w_left_bound;
+	 int w_length;
 } _rsstr_t;
 typedef _rsstr_t rsstr_t[1];
 

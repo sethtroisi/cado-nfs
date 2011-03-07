@@ -136,14 +136,10 @@
 #define L1_SIZE 12288 // ~ l1 cache
 #define SIEVEARRAY_SIZE 20971520 // ~ l2 cache = 2097152
 #define TUNE_SIEVEARRAY_SIZE L1_SIZE / 2
-#define TOPALPHA_EACH_SIEVEARRAY 64 // For each "SIEVEARRAY_SIZE", record top 8 poly's alpha avalues.
+#define TOPALPHA_EACH_SIEVEARRAY 8 // For each "SIEVEARRAY_SIZE", record top 8 poly's alpha avalues.
 #define TOPE_EACH_SUBLATTICE 8 // For sublattice, record top 8 poly's E avalues.
 
 /* default parameters */
-static int w_left_bound = 0;
-static int w_length = 1;
-static bestpoly_t bestpoly;
-
 static inline unsigned long solve_lineq ( unsigned long a,
 										  unsigned long b,
 										  unsigned long c,
@@ -4286,6 +4282,10 @@ rsstr_init ( rsstr_t rs )
 		  mpz_init (rs->gx[i]);
 		  mpz_init (rs->numerator[i]);
 	 }
+
+	 /* bound for qudratic rotation*/
+	 rs->w_left_bound = 0;
+	 rs->w_length = 1;
 }
 
 
@@ -4389,6 +4389,49 @@ rsparam_init ( rsparam_t rsparam )
 		  rsparam->len_p_rs = NP - 1;
 }
 
+
+/*
+  init the best poly (for the return)
+*/
+static void
+bestpoly_init ( bestpoly_t bestpoly,
+				int d )
+{
+	 int i;
+	 bestpoly->f = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
+	 bestpoly->g = (mpz_t*) malloc (2 * sizeof (mpz_t));
+	 if ((bestpoly->f == NULL) || (bestpoly->g == NULL)) {
+		  fprintf (stderr, "Error, cannot allocate memory for bestpoly_init()\n");
+		  exit (1);
+	 }
+	 for (i = 0; i <= d; i++)
+	 {
+		  mpz_init (bestpoly->f[i]);
+	 }
+
+	 mpz_init (bestpoly->g[0]);
+	 mpz_init (bestpoly->g[1]);
+}
+
+
+/*
+  free the best poly (for the return)
+*/
+static void
+bestpoly_free ( bestpoly_t bestpoly,
+				int d )
+{
+	 int i;
+	 for (i = 0; i <= d; i++)
+	 {
+		  mpz_clear (bestpoly->f[i]);
+	 }
+
+	 mpz_clear (bestpoly->g[0]);
+	 mpz_clear (bestpoly->g[1]);
+	 free (bestpoly->f);
+	 free (bestpoly->g);
+}
 
 /*
   replace f + k0 * x^t * (b*x - m) by f + k * x^t * (b*x - m), and return k to k0
@@ -5488,6 +5531,7 @@ rsparam_tune ( rsstr_t rs,
 */
 static double
 rootsieve_main_run ( rsstr_t rs,
+					 bestpoly_t bestpoly,
 					 int verbose )
 {
 	 int i, k, old_i = 0, re, used;
@@ -5508,7 +5552,7 @@ rootsieve_main_run ( rsstr_t rs,
 
 	 /* For each qudratic rotation i, find sublattice */
 	 re = 0;
-	 for (i = w_left_bound; i < w_length + w_left_bound; i++) {
+	 for (i = rs->w_left_bound; i < rs->w_length + rs->w_left_bound; i++) {
 
 		  /* rotate polynomial by f + rot*x^2 for various rot */
 		  old_i = rotate_aux (rs->f, rs->g[1], m, old_i, i, 2);
@@ -5643,9 +5687,10 @@ rootsieve_main_run ( rsstr_t rs,
 	 /* rotate back */
 	 rotate_aux (rs->f, rs->g[1], m, old_i, 0, 2);
 	 old_i = 0;
+	 rsparam_free (rsparam);
 
-	 /* SPECIAL, in the silent mode, nothing had been outputed and we output the top three polynomials. */
-	 if (verbose == 0) {
+	 /* Output the best polynomial */
+	 if (verbose == 0 || verbose == 2) {
 
 		  ave_MurphyE = 0.0;
 		  double best_E = 0.0;
@@ -5697,7 +5742,6 @@ rootsieve_main_run ( rsstr_t rs,
 	 }
 
 	 free_MurphyE_pq (&global_E_pqueue);
-	 rsparam_free (rsparam);
 	 mpz_clear (m);
 	 for (i = 0; i < used; i ++) {
 		  mpz_clear (u[i]);
@@ -5720,17 +5764,18 @@ rootsieve_main_run ( rsstr_t rs,
 */
 static void
 rootsieve_main ( rsstr_t rs,
+				 bestpoly_t bestpoly,
 				 int verbose )
 {
 
 	 if (rs->d == 5) {
 		  /* not qudratci rot for deg 5 polynomial */
-		  w_left_bound = 0;
-		  w_length = 1;
-		  rootsieve_main_run (rs, verbose);
+		  rs->w_left_bound = 0;
+		  rs->w_length = 1;
+		  rootsieve_main_run (rs, bestpoly, verbose);
 	 }
 	 else if (rs->d == 6) {
-		  rootsieve_main_run (rs, verbose);
+		  rootsieve_main_run (rs, bestpoly, verbose);
 	 }
 	 else {
 		  fprintf (stderr, "Error: only support deg 5 or 6.\n");
@@ -5751,14 +5796,6 @@ rootsieve_polyselect ( mpz_t *f,
 					   int verbose )
 {
 	 int i;
-	 w_left_bound = 0;
-	 w_length = 1;
-
-	 /* this should be fast to tune */
-	 if (d == 6) {
-		  w_left_bound = -32;
-		  w_length = 64;
-	 }
 
 	 /* rootsieve_struct */
 	 rsstr_t rs;
@@ -5769,42 +5806,36 @@ rootsieve_polyselect ( mpz_t *f,
 		  mpz_set (rs->f[i], f[i]);
 	 mpz_set (rs->n, N);
 	 rsstr_setup (rs);
-	 mpz_init (rs->m);
+
+	 /* this should be fast to tune */
+	 if (d == 6) {
+		  rs->w_left_bound = -32;
+		  rs->w_length = 64;
+	 }
 
 	 /* bestpoly for return */
-	 bestpoly->f = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
-	 bestpoly->g = (mpz_t*) malloc (2 * sizeof (mpz_t));
-	 if ((bestpoly->f == NULL) || (bestpoly->g == NULL)) {
-		  fprintf (stderr, "Error, cannot allocate memory for bestpoly.\n");
-		  exit (1);
-	 }
-	 for (i = 0; i <= d; i++)
+	 bestpoly_t bestpoly;
+	 bestpoly_init (bestpoly, rs->d);
+	 for (i = 0; i <= rs->d; i++)
 	 {
-		  mpz_init_set (bestpoly->f[i], f[i]);
+		  mpz_set (bestpoly->f[i], f[i]);
 	 }
-	 /* for safety */
-	 mpz_init (bestpoly->g[0]);
 	 mpz_neg (bestpoly->g[0], m);
-	 mpz_init_set (bestpoly->g[1], l);
+	 mpz_set (bestpoly->g[1], l);
 
 	 print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 0);
 
 	 /* start main rootsieve function */
-	 rootsieve_main (rs, verbose);
+	 rootsieve_main (rs, bestpoly, verbose);
 
 	 /* set and free */
 	 for (i = 0; i <= d; i++) {
 		  mpz_set (f[i], bestpoly->f[i]);
-		  mpz_clear (bestpoly->f[i]);
 	 }
-
 	 mpz_set (m, bestpoly->g[0]);
 	 mpz_set (l, bestpoly->g[1]);
 
-	 mpz_clear (bestpoly->g[0]);
-	 mpz_clear (bestpoly->g[1]);
-	 free (bestpoly->f);
-	 free (bestpoly->g);
+	 bestpoly_free (bestpoly, d);
 	 rsstr_free (rs);
 }
 
@@ -5816,15 +5847,15 @@ rootsieve_file ( FILE *file,
 				 int wlb,
 				 int wl )
 {
-	 w_left_bound = wlb;
-	 w_length = wl;
-
 	 unsigned flag = 0UL, count = 0;
 	 char str[MAX_LINE_LENGTH];
 
 	 /* rootsieve_struct */
 	 rsstr_t rs;
 	 rsstr_init (rs);
+
+	 rs->w_left_bound = wlb;
+	 rs->w_length = wl;
 
 	 /* for each polynomial, do the root sieve. */
 	 while (1) {
@@ -5897,11 +5928,24 @@ rootsieve_file ( FILE *file,
 			   /* pre-compute and setup rs */
 			   rsstr_setup (rs);
 
+			   bestpoly_t bestpoly;
+			   bestpoly_init (bestpoly, rs->d);
+
+			   /* set best poly */
+			   int i;
+			   for (i = 0; i <= rs->d; i++)
+			   {
+					mpz_set (bestpoly->f[i], rs->f[i]);
+			   }
+			   mpz_set (bestpoly->g[0], rs->g[0]);
+			   mpz_set (bestpoly->g[1], rs->g[1]);
+
 			   fprintf (stderr, "\n# Polynomial (# %5d).\n", count);
 			   print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 2);
 
 			   /* start main rootsieve function */
-			   rootsieve_main (rs, 2);
+			   rootsieve_main (rs, bestpoly, 2);
+			   bestpoly_free (bestpoly, rs->d);
 
 			   count += 1;
 			   flag = 0UL;
@@ -5921,13 +5965,11 @@ void
 rootsieve_stdin ( int wlb,
 				  int wl )
 {
-
-	 w_left_bound = wlb;
-	 w_length = wl;
-
 	 /* rootsieve_struct */
 	 rsstr_t rs;
 	 rsstr_init (rs);
+	 rs->w_left_bound = wlb;
+	 rs->w_length = wl;
 
 	 /* read poly to rs */
 	 read_ggnfs (rs->n, rs->f, rs->g, rs->m);
@@ -5935,11 +5977,25 @@ rootsieve_stdin ( int wlb,
 	 /* pre-compute and setup rs */
 	 rsstr_setup (rs);
 
+	 bestpoly_t bestpoly;
+	 bestpoly_init (bestpoly, rs->d);
+
+	 /* set best poly */
+	 int i;
+	 for (i = 0; i <= rs->d; i++)
+	 {
+		  mpz_set (bestpoly->f[i], rs->f[i]);
+	 }
+	 mpz_set (bestpoly->g[0], rs->g[0]);
+	 mpz_set (bestpoly->g[1], rs->g[1]);
+
+
 	 fprintf (stderr, "\n# Polynomial (# 0).\n");
 	 print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 2);
 
 	 /* start main rootsieve function */
-	 rootsieve_main (rs, 2);
+	 rootsieve_main (rs, bestpoly, 2);
 
 	 rsstr_free (rs);
+	 bestpoly_free (bestpoly, rs->d);
 }
