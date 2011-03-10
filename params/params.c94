@@ -42,7 +42,7 @@ selectnice=4            # nice level for selection
 
 ## Parameters of polyselect
 kjP=20000               # choose lc(g) with two prime factors in [P,2P]
-kjmaxnorm=34            # max. lognorm of polynomials (before rootsieve)
+kjmaxnorm=35            # max. lognorm of polynomials (before rootsieve)
 kjadmax=500000          # max value for lc(f)
 kjadrange=50000         # individual tasks
 kjkmax=19               # rotation is bounded by 2^kmax
@@ -80,7 +80,7 @@ sieve_max_threads=2
 # Filtering
 ###########################################################################
 
-excesspurge=50000       # minimal excess we want before pruning
+excessratio=1.01        # minimal excess we want before pruning
 keeppurge=160           # maximal excess wanted after purge
                         # (purge shrinks if needed)
 keep=160                # excess wanted after merge

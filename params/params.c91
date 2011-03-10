@@ -179,7 +179,7 @@ sievenice=10            # nice level for the sieving jobs
 # Filtering
 ###########################################################################
 
-excesspurge=50000       # minimal excess we want before pruning
+excessratio=1.01        # minimal excess we want before pruning
     # This parameter also controls at which moment we choose to stop
     # sieving before entering the filtering step.
 

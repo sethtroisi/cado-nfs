@@ -34,18 +34,17 @@ kjdelay=300             # time between two checks
 selectnice=4            # nice level for selection
 
 # on the test number
-# 1934069958915019049000954961721596874698936479450280020377699611134606271860665724352339610254878388954224815592508578550703336984671610557840943552691
-# we get (with admax=5000000000)
-# lognorm: 47.20, alpha: -4.64 E=42.55
-# Murphy's E(Bf=10000000,Bg=5000000,area=1.00e+16)=3.16e-12
+# 5124377314513816534816955204809074534655653857766212432881568350815853811914340595008170713654418898121148860730086712200667744074443999117714165156831
+# lognorm: 45.81, alpha: -4.73 E=41.08
+# Murphy's E(Bf=10000000,Bg=5000000,area=1.00e+16)=3.93e-12
 
 ## Parameters of polyselect
 kjP=200000              # choose lc(g) with two prime factors in [P,2P]
 kjmaxnorm=49            # max. lognorm of polynomials (before rootsieve)
-kjadmax=10000000000     # max value for lc(f)
-kjadrange=1000000000    # individual tasks
-kjkmax=20               # rotation is bounded by 2^kmax
-kjincr=30030            # forced divisor of lc(f)
+kjadmax=1e8             # max value for lc(f)
+kjadrange=2e6           # individual tasks
+kjkmax=23               # rotation is bounded by 2^kmax
+kjincr=210              # forced divisor of lc(f)
 
 ###########################################################################
 # Sieve
@@ -59,8 +58,8 @@ kjincr=30030            # forced divisor of lc(f)
 # rlambda/alambda is the early-abort ratio: if after sieving the
 #                                      approximate norm is more than
 #                                      lambda times lpb, we reject.
-rlim=10000000
-alim=20000000
+rlim=16000000
+alim=32000000
 lpbr=29
 lpba=29
 mfbr=58
@@ -79,7 +78,7 @@ sieve_max_threads=2
 # Filtering
 ###########################################################################
 
-excesspurge=1000000      # minimal excess we want before pruning
+excessratio=1.01        # minimal excess we want before pruning
 keeppurge=160           # shrink in purge if excess exceeds keeppurge
 keep=160                # excess wanted after merge
 maxlevel=20             # maximal merge level

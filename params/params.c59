@@ -83,7 +83,7 @@ sieve_max_threads=2
 # Filtering
 ###########################################################################
 
-excesspurge=10000       # minimal excess we want before pruning
+excessratio=1.01        # minimal excess we want before pruning
                         # (don't start merge otherwise)
 keeppurge=160           # maximal excess wanted after purge
                         # (purge shrinks if needed)
