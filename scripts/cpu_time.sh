@@ -73,6 +73,9 @@ if [[ -z $1 || $(expr $1 : '.*[r].*') != 0 ]]
     grep dependency ${name}.sqrt.log | head -1 | cut -d' ' -f 6 | f
     echo -n "        ratsqrt:              "
     rat=$(grep Rational ${name}.sqrt.log | head -1 | sed "s/.* at \(\S*\)ms$/\1/g")
+    if [ "$rat" == "" ]
+      then rat=0
+    fi
     echo "scale=3; $rat/1000" | bc -l | f
     echo -n "        algsqrt:              "
     grep Algebraic ${name}.sqrt.log | head -1 | cut -d' ' -f6 | f

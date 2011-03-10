@@ -30,10 +30,8 @@ NB : fill the inqueue directory step-by-step to avoid that it contains
 
 - run several jobs oarsub:
 $ cd $cdir/log_oar
-$ oarsub "$cdir/scripts/dispatcher $cdir/scripts/las_loop" -l nodes=20,walltime=24
--t besteffort -t idempotent -n $name_20
-$ oarsub "$cdir/scripts/dispatcher $cdir/scripts/las_loop" -l nodes=20,walltime=24
--t besteffort -t idempotent -n $name_20
+$ oarsub "$cdir/scripts/dispatcher $cdir/scripts/las_loop" -l nodes=20,walltime=24 -t besteffort -t idempotent -n $name_20
+$ oarsub "$cdir/scripts/dispatcher $cdir/scripts/las_loop" -l nodes=20,walltime=24 -t besteffort -t idempotent -n $name_20
 ...
 
 - clean several times by day the killed jobs because of the besteffort

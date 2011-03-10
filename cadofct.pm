@@ -196,7 +196,7 @@ my @default_param = (
 
     # filtering
     keep         => 160, # should be 128+skip
-    excesspurge  => 1,
+    excessratio  => 1.01,
     keeppurge    => 160,
     maxlevel     => 15,
     cwmax        => 200,
@@ -222,6 +222,7 @@ my @default_param = (
     # characters
     nkermax      => 30,
     nchar        => 50,
+    nthchar      => 2,
 
     # holy grail
     expected_factorization => undef,
@@ -2132,7 +2133,7 @@ sub purge {
     $tab_level++;
     my $cmd = cmd("$param{'bindir'}/filter/purge ".
                   "-poly $param{'prefix'}.poly -keep $param{'keeppurge'} ".
-                  "-excess $param{'excesspurge'} ".
+                  "-excess $param{'excessratio'} ".
                   "-nrels $nbrels -out $param{'prefix'}.purged ".
                   "-basepath $param{'wdir'} " .
                   "-subdirlist $param{'prefix'}.subdirlist ".
@@ -2232,8 +2233,14 @@ sub do_sieve {
         unlink "$check" unless $full;
 
         # Remove invalid files
-        if ($ret->{'status'} == 1) {
-            my $msg="File `$f' is invalid (check_rels failed).";
+        if ($ret->{'status'}) {
+            my $msg;
+            if ($ret->{'status'} == 1) {
+                $msg = "File `$f' is invalid (check_rels failed).";
+            } else {
+                # Non-zero, but not 1? Something's wrong, bail out
+                $msg = "check_rels exited with unknown error code $ret->{'status'}.";
+            }
             if ($ENV{'CADO_DEBUG'}) {
                 my $nf = "$f.error";
                 $msg .= " Moving to $nf\n";
@@ -2246,10 +2253,6 @@ sub do_sieve {
             }
             close FILE;
             return;
-        } elsif ($ret->{'status'}) {
-            # Non-zero, but not 1? Something's wrong, bail out
-            die "check_rels exited with unknown error code ", 
-                 $ret->{'status'}, ", aborting."
         }
 
         # If this is a partial (i.e. incomplete) file, we need to adjust
@@ -2690,6 +2693,7 @@ sub do_chars {
               "-index $param{'prefix'}.index ".
               "-heavyblock $param{'prefix'}.small.dense.bin ".
               "-nchar $param{'nchar'} ".
+              "-t $param{'nthchar'} ".
               "-out $param{'prefix'}.ker " .
               "$param{'prefix'}.bwc/W";
 

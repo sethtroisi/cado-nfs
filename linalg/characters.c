@@ -92,12 +92,12 @@
 #include "gauss.h"
 #include "worker-threads.h"
 
-#if defined(__FreeBSD__) && (__FreeBSD__ <= 7)
+// #if defined(__FreeBSD__) && (__FreeBSD__ <= 7)
 /* pthread_cond_wait seems to be buggy on FreeBSD 7 (shard.starfyre.net) */
-#define NTHREADS 1
+/* #define NTHREADS 1
 #else
 #define NTHREADS 16
-#endif
+#endif */
 
 /* Calculates a 64-bit word with the values of the characters chi(a,b), where
  * chi ranges from chars to chars+64
@@ -533,6 +533,7 @@ int main(int argc, char **argv)
     const char *purgedname = NULL;
     const char *indexname = NULL;
     const char *outname = NULL;
+    int nthreads = 1;
 
     param_list pl;
     param_list_init(pl);
@@ -559,6 +560,7 @@ int main(int argc, char **argv)
     cado_poly_read(pol, tmp);
 
     ASSERT_ALWAYS(param_list_parse_int(pl, "nchar", &nchars));
+    param_list_parse_int(pl, "t", &nthreads);
 
     if (param_list_warn_unused(pl))
         exit(1);
@@ -566,7 +568,7 @@ int main(int argc, char **argv)
     ASSERT_ALWAYS(purgedname != NULL);
     ASSERT_ALWAYS(indexname != NULL);
 
-    struct worker_threads_group * g = worker_threads_init (NTHREADS);
+    struct worker_threads_group * g = worker_threads_init (nthreads);
     chars = create_characters (nchars, pol);
     int nchars2 = iceildiv(nchars, 64) * 64;
     double tt=wct_seconds();

@@ -718,7 +718,7 @@ usage (void)
 {
   fprintf (stderr, "Usage: purge [options] -poly polyfile -out purgedfile -nrels nnn [-basepath <path>] [-subdirlist <sl>] [-filelist <fl>] file1 ... filen\n");
   fprintf (stderr, "Options:\n");
-  fprintf (stderr, "       -excess  nnn - initial excess must be >= nnn (default 1)\n");
+  fprintf (stderr, "       -excess  nnn - initial excess (default 1.01)\n");
   fprintf (stderr, "       -keep    nnn - prune if excess > nnn (default 160)\n");
   fprintf (stderr, "       -minpa   nnn - purge alg. primes >= nnn (default alim)\n");
   fprintf (stderr, "       -minpr   nnn - purge rat. primes >= nnn (default rlim)\n");
@@ -745,7 +745,7 @@ main (int argc, char **argv)
     int nrel, nprimes = 0;
     unsigned int nrelmax = 0;
     int nrel_new, nprimes_new, Hsize, Hsizer, Hsizea;
-    long excess = 1;    /* minimum initial excess */
+    double excess = 1.01;    /* minimum initial excess */
     long keep = 160;    /* maximum final excess */
     long minpr = -1, minpa = -1; /* -1 means use minpr=rlim, minpa=alim */
     cado_poly pol;
@@ -783,7 +783,7 @@ main (int argc, char **argv)
     param_list_parse_int(pl, "nprimes", &nprimes);
     param_list_parse_long(pl, "minpr", &minpr);
     param_list_parse_long(pl, "minpa", &minpa);
-    param_list_parse_long(pl, "excess", &excess);
+    param_list_parse_double(pl, "excess", &excess);
     param_list_parse_long(pl, "keep", &keep);
     param_list_parse_int(pl, "noclique", &noclique);
 
@@ -920,10 +920,10 @@ main (int argc, char **argv)
         fprintf (stderr, "   Starting singleton removal...\n");
         nrel_new = nrel;
         nprimes_new = nprimes;
-        if (final && (nrel_new < nprimes_new + excess))
+        if (final && (nrel_new < nprimes_new * excess))
           {
             fprintf (stderr, "Initial excess is below requested %ld, stopping.\n",
-                     excess);
+                     (long int)(nprimes_new * (excess - 1)));
             exit (1); /* initial excess is too small */
           }
         if (final && noclique)
