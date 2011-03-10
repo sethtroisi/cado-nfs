@@ -327,14 +327,14 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 
 #ifdef NEW_ROOTSIEVE
 	  rootsieve_polyselect (f, d, m, g[1], N, 0); // verbose = 2 to see details.
+      mpz_neg (g[0], m);
+
 #else
       rotate (f, d, alim, m, g[1], &jmin, &kmin, 0, verbose, DEFAULT_L2_METHOD);
-#endif
-
       mpz_neg (g[0], m);
       /* optimize again, but only translation */
-      //optimize (f, d, g, verbose, 0);
 	  optimize_aux (f, d, g, 0, 0, CIRCULAR);
+#endif
 
       nroots = numberOfRealRoots (f, d, 0, 0);
       skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
