@@ -109,7 +109,7 @@ my $poly_file = "$wdir/$name.poly";
 $poly_file = "$scriptsdir/$name.poly" unless -e $poly_file;
 
 # die "Need nextprime program ; could not find $nextprime" unless -x $nextprime;
-die "Need poly file ; could not find `$wdir/$name.poly'" unless -x $poly_file;
+die "Need poly file ; could not find `$wdir/$name.poly'" unless -e $poly_file;
 
 my $file_pattern = qr/^(?:.*\/)?$file_base.(\d+)-(\d+)(?:\.gz)?$/;
 
