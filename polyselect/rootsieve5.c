@@ -27,13 +27,7 @@
 
   In the second step, we do the actually root sieve for all primes
   up to some bound. We only consider the (u, v) points lying on the
-  sublattice within the sieving range (U, V). For those p appearing
-  in the modulus of the sublattice, we have already considred their
-  valuations from the previous step and hence we may ignore them in
-  the actual sieve. For other primes, we sieve them upt to some bound.
-  Currently, the code doesn't consider any p^e for e>2 for these primes
-  by default. It is easy to turn on this by tweaking "max_e = 2" in
-  rootsieve_v().
+  sublattice within the sieving range (U, V).
 
   [3. Degree 6]
 
@@ -572,7 +566,7 @@ free_tree ( node *root )
 
   TBA: This function is buggy. You should always call
   alloc_r_node(ptr, 1) and then alloc_r_node(ptr, 0) without
-  any overlapping. In out case, we call alloc_r_node(ptr, 1)
+  any overlapping. In our case, we call alloc_r_node(ptr, 1)
   for all the base case in find_sublattice(), and call
   alloc_r_node(ptr, 0) for all the lifted cases.
 */
@@ -3680,13 +3674,13 @@ rootsieve_run_multroot_lift ( node *currnode,
 							  int16_t sub )
 {
 	 /* recursion end */
-	 if (currnode == NULL || curr_e > e)
+	 if (currnode == NULL || curr_e > e || sub == 0)
 		  return;
 
 	 /* variables */
 	 int16_t subtmp;
 	 unsigned int nroots;
-	 unsigned long pe, pem1, pep1, fr, gr;
+	 unsigned long pe, pem1, fr, gr, step;
 	 node *tmpnode = NULL, *tmpnode2 = NULL;
 	 long j;
 
@@ -3695,7 +3689,6 @@ rootsieve_run_multroot_lift ( node *currnode,
 	 for (j = 0; j < curr_e - 1; j ++)
 		  pem1 = pem1 * p;
 	 pe = pem1 * p;
-	 pep1 = pe * p;
 
 	 /* loop until all siblings are checked. */
 	 while ( (currnode != NULL) ) {
@@ -3715,6 +3708,14 @@ rootsieve_run_multroot_lift ( node *currnode,
 
 			   /* solve on fr + gr*x = 0 (mod p), where x = uu*r + vv. */
 			   fr = solve_lineq (fr, gr, 0, p); //fr = fr % p;
+
+			   /* If gcd (MOD, p) != 1 && B + MOD*j != v (mod pe), there is no need to
+				  record this (u, v). */
+			   if (mpz_fdiv_ui (rsbound->MOD, p) == 0) {
+					if ( mpz_fdiv_ui (rsbound->B, pe) != (currnode->v + fr * pem1) ) {
+						 continue; // no need to insert, skip this loop.
+					}
+			   }
 
 			   /* insert (u, v), u unchanged, v is fr. to insert roots,
 				  r is a multiple root, we need to insert all r + p*j.
@@ -3749,31 +3750,57 @@ rootsieve_run_multroot_lift ( node *currnode,
 
 		  /* we are in the second level from bottom, consider all children of this node and sieve */
 		  if (curr_e == e) {
-
 			   tmpnode = currnode->firstchild;
 
 			   while (tmpnode != NULL) {
 
-					j = uv2ab_mod (rsbound->B, rsbound->MOD, tmpnode->v, pe);
-					j = (long) ceil (((double) rsbound->Bmin - (double) j) / (double) pe)
-						 * (long) pe + (long) j;
-					j = ab2ij (rsbound->Bmin, j);
+					/* if MOD = 0 (mod p) in B + MOD*j = v (mod pe), no inverse
+					   -- if B = v (mod pe), then sieve whole array;
+					   -- otherwise, continue; */
+					if (mpz_divisible_ui_p (rsbound->MOD, p) != 0) {
+						 if ( mpz_fdiv_ui (rsbound->B, pe) == tmpnode->v) {
+							  if (mpz_divisible_ui_p (rsbound->MOD, pe ) == 0) {
+								   j = 0;
+								   step = pe;
+							  }
+							  /* seems to be redundant since in rootsieve_v(), this
+								 situation is discarded */
+							  else {
+								   tmpnode2 = tmpnode;
+								   tmpnode = tmpnode->nextsibling;
+								   free_node (&tmpnode2);
+								   continue;
+							  }
+						 }
+						 else {
+						 	  tmpnode2 = tmpnode;
+						 	  tmpnode = tmpnode->nextsibling;
+						 	  free_node (&tmpnode2);
+						 	  continue;
+						 }
+					}
+					else {
+						 j = uv2ab_mod (rsbound->B, rsbound->MOD, tmpnode->v, pe);
+						 j = (long) ceil (((double) rsbound->Bmin - (double) j) / (double) pe)
+							  * (long) pe + (long) j;
+						 j = ab2ij (rsbound->Bmin, j);
+						 step = pe;
+					}
 
 					/* be careful about this */
-					subtmp = (int16_t) ceil ( (double) sub / (double) pem1  ) * tmpnode->nr;
+					subtmp = (int16_t) ceil ( (double) sub / (double) pem1  * tmpnode->nr);
 
 					rootsieve_run_line ( ARRAY,
 										 rsbound->Bmax - rsbound->Bmin,
-										 j, pe, subtmp );
+										 j, step, subtmp );
 
 					tmpnode2 = tmpnode;
 					tmpnode = tmpnode->nextsibling;
 
 #if DEBUG_MULTROOT_LIFT
-					fprintf (stderr, "deleting ... (%lu, %lu) with %u roots in level %u, ",
+					fprintf (stderr, "deleting bottomnode ... (%lu, %lu) with %u roots in level %u, ",
 							 tmpnode2->u, tmpnode2->v, tmpnode2->nr, curr_e);
-					fprintf (stderr, "sieving ... %d in steps %lu\n", subtmp, pe);
-
+					fprintf (stderr, "sieving bottomnode ... %d in steps %lu\n", subtmp, step); // pe
 #endif
 
 					free_node (&tmpnode2);
@@ -3786,21 +3813,41 @@ rootsieve_run_multroot_lift ( node *currnode,
 		  if (currnode != NULL)
 			   (currnode->parent)->firstchild = currnode;
 
-		  j = uv2ab_mod (rsbound->B, rsbound->MOD, tmpnode->v, pe);
-		  j = (long) ceil (((double) rsbound->Bmin - (double) j) / (double) pe)
-			   * (long) pe + (long) j;
-		  j = ab2ij (rsbound->Bmin, j);
+		  if (mpz_divisible_ui_p (rsbound->MOD, p) != 0) {
+			   if ( mpz_fdiv_ui (rsbound->B, pem1) == tmpnode->v) {
+					if (mpz_divisible_ui_p (rsbound->MOD, pem1 ) == 0) {
+						 j = 0;
+						 step = pem1;
+					}
+					/* seems to be redundant since in rootsieve_v(), this
+					   situation is discarded */
+					else {
+						 free_node (&tmpnode);
+						 continue;
+					}
+			   }
+			   else {
+					free_node (&tmpnode);
+					continue;
+			   }
+		  }
+		  else {
+			   j = uv2ab_mod (rsbound->B, rsbound->MOD, tmpnode->v, pem1);
+			   j = (long) ceil (((double) rsbound->Bmin - (double) j) / (double) pem1)
+					* (long) pem1 + (long) j;
+			   j = ab2ij (rsbound->Bmin, j);
+			   step = pem1;
+		  }
 
 		  /* be careful about this */
-		  subtmp = (int16_t) ceil ( (double) sub / (double) pem1 * (double) p ) * tmpnode->nr;
-
+		  subtmp = (int16_t) ceil ( (double) sub / (double) pem1 * (double) p  * tmpnode->nr );
 		  rootsieve_run_line ( ARRAY,
 							   rsbound->Bmax - rsbound->Bmin,
-							   j, pem1, subtmp );
+							   j, step, subtmp );
 
 #if DEBUG_MULTROOT_LIFT
 		  fprintf (stderr, "deleting ... (%lu, %lu) with %u roots in level %u, ", tmpnode->u, tmpnode->v, tmpnode->nr, curr_e - 1);
-		  fprintf (stderr, "sieving ... %d in steps %lu\n", subtmp, pem1);
+		  fprintf (stderr, "sieving ... %d in steps %lu\n", subtmp, step); //pem1
 #endif
 
 		  free_node (&tmpnode);
@@ -3827,13 +3874,17 @@ rootsieve_run_multroot ( int16_t *ARRAY,
 
 	 /* sieve f(r) + (u*r + (B + MOD * (j+k*p)))*g(r) for k,
 		we sieve (mod p) case in the beginning since r would
-		be a single root for all (j + k*p) */
+		be a multiple root for all (j + k*p).
+		In the rootsieve_v(), there are two cases in calling
+		this function:
+		Either flag = 1, e = 1; We can sieve starting from j.
+		Note if flag = 2, e > 1. We jump out of this. */
 	 if (e <= 1) {
 		  rootsieve_run_line ( ARRAY,
 							   rsbound->Bmax - rsbound->Bmin,
 							   j, p, sub );
 #if DEBUG_MULTROOT_LIFT
-		  fprintf (stderr, "sieving ... %d in steps %u\n", sub, p);
+		  fprintf (stderr, "sieving ... %d in steps %u starting from j: %ld ->, r: %u\n", sub, p, j, r);
 #endif
 		  return;
 	 }
@@ -3916,10 +3967,11 @@ rootsieve_v ( int16_t *ARRAY,
 {
 	 unsigned int np, nb, p, r, u, v, tmp, max_e;
 	 int16_t subsgl[rsparam->len_p_rs], submul[rsparam->len_p_rs];
-	 unsigned long fx_ul, gx_ul;
+	 unsigned long fx_ul, gx_ul, pe = 1;
 	 long  tmp2, start_j_idx[rsparam->len_p_rs], totnb, block_size;
 	 float subf;
 	 mpz_t tmpz, tmpu;
+	 char flag[rsparam->len_p_rs];
 
 	 block_size = L1_SIZE;
 	 totnb = (rsbound->Bmax - rsbound->Bmin + 1) / block_size;
@@ -3941,27 +3993,24 @@ rootsieve_v ( int16_t *ARRAY,
 	 int c = 0, cs = 0, cm = 0;
 #endif
 
-	 /* initialize subsgl[] for all primes in root sieve */
+	 /* Init subsgl[] for all primes in root sieve */
 	 for (np = 0; np < rsparam->len_p_rs; np ++) {
 		  p = primes[np];
-
-		  subf = (float) p * log ( (float) p) /
-			   ((float) p * (float) p - 1.0);
+		  subf = (float) p * log ( (float) p) / ((float) p * (float) p - 1.0);
 		  subsgl[np] = (int16_t) ceil (subf * 1000.0);
-
 		  subf = log ( (float) p) / ( (float) p + 1.0);
 		  submul[np] = (int16_t) ceil (subf * 1000.0);
-
 		  start_j_idx[np] = 0;
+		  flag[np] = 0;
 	 }
 
-	 /* this is A + i*MOD = u */
+	 /* Compute u by A + i*MOD = u */
 	 ij2uv (rsbound->A, rsbound->MOD, rsbound->Amin, fixed_i, tmpu);
 
 	 /* For each r < bound_prime */
 	 for (r = 0; r < primes[rsparam->len_p_rs]; r++) {
 
-		  /* compute u*g(r)^2 - f(r)g'(r) + f'(r)g(r) */
+		  /* u*g(r)^2 - f(r)g'(r) + f'(r)g(r) */
 		  mpz_mul (tmpz, rs->gx[r], rs->gx[r]);
 		  mpz_mul (tmpz, tmpz, tmpu);
 		  mpz_sub (tmpz, tmpz, rs->numerator[r]);
@@ -3969,7 +4018,6 @@ rootsieve_v ( int16_t *ARRAY,
 #if DEBUG_ROOTSIEVE_V
 		  st = cputime ();
 #endif
-
 		  /* For each block */
 		  for (nb = 0; nb < totnb + 1; nb ++) {
 
@@ -3979,18 +4027,20 @@ rootsieve_v ( int16_t *ARRAY,
 					p = primes[np];
 
 					/* skip these */
-					if (mpz_fdiv_ui (rsbound->MOD, p) == 0)
-						 continue;
 					if (mpz_divisible_ui_p(rs->gx[r], p) != 0)
 						 continue;
 
-					/* compute u (mod p) from u */
-					u = (unsigned int) mpz_fdiv_ui (tmpu, p);
-
-					//u = (unsigned int) ((tmp2 >= 0) ? tmp2 : tmp2 + p);
+					/* e depends on p */
+					max_e = log (200.0) / log ((double) p);
+					pe = 1UL;
+					for (tmp = 0; tmp < max_e; tmp ++)
+						 pe = pe * p;
 
 					/* The first block, compute starting points for the sieve */
 					if (nb == 0) {
+
+						 /* compute u (mod p) from u */
+						 u = (unsigned int) mpz_fdiv_ui (tmpu, p);
 
 						 /* use single precision */
 						 fx_ul = mpz_fdiv_ui (rs->fx[r], p);
@@ -3999,46 +4049,85 @@ rootsieve_v ( int16_t *ARRAY,
 						 /* compute v in f(r) + u*r*g(r) + v*g(r) = 0 (mod p) */
 						 v = (unsigned int) compute_v_ul (fx_ul, gx_ul, r, u, p);
 
-						 /* v -> j in B + MOD*j = v (mod p) */
-						 tmp = (unsigned int) uv2ab_mod (rsbound->B, rsbound->MOD, v, p);
+						 /* reset for the first block */
+						 flag[np] = 0;
 
-						 /* smallest tmp + p*i such that A0 < tmp + p*i, where A0 < 0,
-							hence i = ceil((A0-tmp)/p). Note, this should be negative. */
-						 tmp2 = (long) ceil ( (double) (rsbound->Bmin -tmp) / (double) p)
-						  	  * (long) p + (long) tmp;
+						 /* If MOD = 0 (mod p) in B + MOD*j = v (mod p), and B = v (mod p) */
+						 if (mpz_divisible_ui_p (rsbound->MOD, p) != 0) {
 
-						 start_j_idx[np] = ab2ij (rsbound->Bmin, tmp2);
+							  if (mpz_fdiv_ui (rsbound->B, p) == v) {
 
-						 /* fprintf (stderr, "tmp: %u, tmp2: %ld, rsbound->Bmin: %ld\n", */
-						 /* 		  tmp, tmp2, rsbound->Bmin); */
-						 /* fprintf (stderr, " f(%u) + ( %u * %u + %u ) * g(%u) = 0 (mod %u)\n", */
-						 /* 		  r, u, r, v, r, p); */
-						 /* fprintf (stderr, " start_j_idx: %ld\n", start_j_idx[np]); */
+								   /* don't sieve in this case, since all the elements on
+									  the array is B + MOD*j = 0 (mod pe), are p-valuation equiv */
+								   if (mpz_divisible_ui_p (rsbound->MOD, pe ) != 0)
+										continue;
+								   /* case where MOD has p-valuation smaller than e.
+									  In this case, if r is multiple root, then do the resursion;
+									  If r is simple, the all ele on the array are equivalent. So
+									  we ignore sieving. */
+								   else {
+										if (mpz_divisible_ui_p(tmpz, p) == 0)
+											 continue;
+										/* the multiple root case will be caught by flag == 2 */
+										else {
+											 start_j_idx[np] = 0;
+											 flag[np] = 2;
+										}
+								   }
+							  }
+							  else
+								   continue;
+						 }
+						 else {
+							  flag[np] = 1;
+							  /* v -> j in B + MOD*j = v (mod p) */
+							  tmp = (unsigned int) uv2ab_mod (rsbound->B, rsbound->MOD, v, p);
+							  /* smallest tmp + p*i such that A0 < tmp + p*i, where A0 < 0,
+								 hence i = ceil((A0-tmp)/p). Note, this should be negative. */
+							  tmp2 = (long) ceil ( (double) (rsbound->Bmin -tmp) / (double) p)
+								   * (long) p + (long) tmp;
+							  start_j_idx[np] = ab2ij (rsbound->Bmin, tmp2);
+							  /*
+								if (r == 1) {
+								fprintf (stderr, "tmp: %u, tmp2: %ld, rsbound->Bmin: %ld\n",
+								tmp, tmp2, rsbound->Bmin);
+								fprintf (stderr, " f(%u) + ( %u * %u + %u ) * g(%u) = 0 (mod %u)\n",
+								r, u, r, v, r, p);
+								fprintf (stderr, " start_j_idx: %ld\n", start_j_idx[np]);
+								}
+							  */
+						 }
 					}
+
+
 
 #if DEBUG_ROOTSIEVE_V
 					c++;
 #endif
+
+					/* cases where we don't want to sieve at all */
+					if (flag[np] == 0)
+						 continue;
+
 					/* r is a simple root for current (u, v, p). Then r is simple root
 					   for (u, v+i*p, p) for all i. */
 					if (mpz_divisible_ui_p(tmpz, p) == 0)
 					{
+
 #if DEBUG_ROOTSIEVE_V
 						 cs ++;
 						 sts1 = cputime();
 #endif
 
-						 if (nb != totnb) {
+						 if (nb != totnb)
 							  start_j_idx[np] = rootsieve_run_line ( ARRAY,
 																	 block_size * (nb + 1), // largest index of the array
 																	 start_j_idx[np], p, subsgl[np] );
-						 }
-						 /* the last interval */
-						 else {
+						 else
 							  start_j_idx[np] = rootsieve_run_line ( ARRAY,
 																	 rsbound->Bmax - rsbound->Bmin, // largest index of the array
 																	 start_j_idx[np], p, subsgl[np] );
-						 }
+
 #if DEBUG_ROOTSIEVE_V
 						 sts2 += cputime() - sts1;
 #endif
@@ -4047,19 +4136,21 @@ rootsieve_v ( int16_t *ARRAY,
 					/* r is multiple root for current u, p */
 					else {
 
-#if DEBUG_ROOTSIEVE_V
-						 cm++;
-						 stm1 = cputime();
-#endif
-						 max_e = 2; // should depend on p!!!
-
-						 /* don't sieve in block, cm << cs */
+						 /* don't sieve in block, assume cm << cs */
 						 if (nb == 0) {
+#if DEBUG_ROOTSIEVE_V
+							  cm++;
+							  stm1 = cputime();
+#endif
 
+							  /* Two cases:
+								 If flag = 1, then MOD != 0 (mod p), everything is normal;
+								 If MOD = 0 (mod p), then at nb = 0, start_j_idx is 0;
+								 Also note, must use u (mod pe) instead of u (mod p) */
 							  rootsieve_run_multroot ( ARRAY,
 													   rs,
 													   rsbound,
-													   u,
+													   (unsigned int) mpz_fdiv_ui (tmpu, pe),
 													   start_j_idx[np],
 													   r,
 													   p,
@@ -4069,7 +4160,6 @@ rootsieve_v ( int16_t *ARRAY,
 #if DEBUG_ROOTSIEVE_V
 						 stm2 += cputime() - stm1;
 #endif
-
 					}
 			   }
 		  }
@@ -4091,7 +4181,6 @@ rootsieve_v ( int16_t *ARRAY,
 			   "# Stat: tot_sieve_time: %dms, tot_loops: %d, simple_loops: %d took %dms, mul_loops: %d took %dms\n",
 			   total, c, cs, sts2, cm, stm2 );
 #endif
-
 }
 
 
@@ -4100,23 +4189,20 @@ rootsieve_v ( int16_t *ARRAY,
 */
 static void
 rootsieve_array_init ( int16_t **A,
-					   unsigned long jbound,
-					   float alpha_bias )
+					   unsigned long len )
 {
 	 /* Init array A
-		sage: sum ([1/(p-1)*log(p) for p in prime_range(200)])
+		sage: sum ([p/(p^2-1)*log(p) for p in prime_range(200)])
 		4.842766583050838  */
 
-	 float tmpf = SUP_ALPHA + alpha_bias;
-
+	 float tmpf = SUP_ALPHA;
 	 int16_t tmpu = (int16_t) ceil (tmpf * 1000.0);
-
 	 unsigned long j;
 	 /* allocate matrix A. */
-	 *A = (int16_t *) malloc ( jbound * sizeof (int16_t));
+	 *A = (int16_t *) malloc ( len * sizeof (int16_t));
 
 	 if ((*A) != NULL) {
-		  for (j = 0; j < jbound; j++) {
+		  for (j = 0; j < len; j++) {
 			   (*A)[j] = tmpu;
 		  }
 	 }
@@ -4126,26 +4212,20 @@ rootsieve_array_init ( int16_t **A,
 	 }
 }
 
+
 /*
   re-set root sieve array with biased alpha.
 */
 static void
 rootsieve_array_reset ( int16_t *A,
-						unsigned long jbound,
-						float alpha_bias )
+						unsigned long len )
 {
-	 /* Init array A
-		sage: sum ([1/(p-1)*log(p) for p in prime_range(200)])
-		4.842766583050838  */
-
-	 float tmpf = SUP_ALPHA + alpha_bias;
-
+	 float tmpf = SUP_ALPHA;
 	 int16_t tmpu = (int16_t) ceil (tmpf * 1000.0);
-
 	 unsigned long j;
 
 	 if (A != NULL) {
-		  for (j = 0; j < jbound; j++) {
+		  for (j = 0; j < len; j++) {
 			   A[j] = tmpu;
 		  }
 	 }
@@ -4297,8 +4377,8 @@ rsbound_setup_sublattice ( rsbound_t rsbound,
 
 	 ab2uv (rsbound->A, rsbound->MOD, rsbound->Amax, rsbound->Umax);
 	 ab2uv (rsbound->A, rsbound->MOD, rsbound->Amin, rsbound->Umin);
-	 ab2uv (rsbound->A, rsbound->MOD, rsbound->Bmax, rsbound->Vmax);
-	 ab2uv (rsbound->A, rsbound->MOD, rsbound->Bmin, rsbound->Vmin);
+	 ab2uv (rsbound->B, rsbound->MOD, rsbound->Bmax, rsbound->Vmax);
+	 ab2uv (rsbound->B, rsbound->MOD, rsbound->Bmin, rsbound->Vmin);
 }
 
 
@@ -4460,7 +4540,7 @@ rsparam_init ( rsparam_t rsparam )
 
 	 /* number of primes beside e_sl[] considered in second stage
 		root sieve. Larger takes longer time, but more accurate. */
-	 rsparam->len_p_rs = 20;
+	 rsparam->len_p_rs = NP - 1;
 	 if (rsparam->len_p_rs >= NP)
 		  rsparam->len_p_rs = NP - 1;
 }
@@ -5031,7 +5111,6 @@ rootsieve_uv ( rsstr_t rs,
 			   mpz_t *fuv,
 			   mpz_t *guv,
 			   int w,
-			   float alpha_bias,
 			   int verbose )
 {
 	 /* for each sieving array, we first look at the E
@@ -5058,10 +5137,6 @@ rootsieve_uv ( rsstr_t rs,
 			   block_size = rsbound->Bmax - rsbound->Bmin + 1;
 			   }
 	 }
-
-	 tmpBmax = rsbound->Bmax;
-	 tmpBmin = rsbound->Bmin;
-
 #if DEBUG
 	 fprintf (stderr, "# Info: totalnb: %lu, %lu, %lu\n", (rsbound->Bmax - rsbound->Bmin + 1), block_size,
 			  (rsbound->Bmax - rsbound->Bmin + 1) / block_size);
@@ -5072,42 +5147,40 @@ rootsieve_uv ( rsstr_t rs,
 	 new_MurphyE_pq (&E_pqueue, TOPE);
 	 int st = cputime ();
 
+	 int16_t *MAT;
+	 rootscore_pq *alpha_pqueue;
+
+	 /* init the sieve array and priority queue */
+	 rootsieve_array_init (&MAT, block_size + 1);
+	 new_rootscore_pq (&alpha_pqueue, TOPALPHA);
+
 	 /* for each i -> each u = A + MOD * i */
+	 tmpBmax = rsbound->Bmax;
+	 tmpBmin = rsbound->Bmin;
 	 for (i = 0; i < (rsbound->Amax - rsbound->Amin + 1); i ++)
 	 {
-		  int16_t *MAT;
-		  rootscore_pq *alpha_pqueue;
 		  long k = 0;
-
-		  /* init the sieve array and priority queue */
-		  rootsieve_array_init (&MAT, block_size + 1, alpha_bias);
-		  new_rootscore_pq (&alpha_pqueue, TOPALPHA);
-
-		  /* for each block of size = |L2| */
-		  rsbound->Bmax = rsbound->Bmin + block_size;
 
 		  do {
 			   k ++;
-
-			   /* reset sieve array and priority queue */
-			   rootsieve_array_reset (MAT, block_size + 1, alpha_bias);
-			   reset_rootscore_pq ( alpha_pqueue );
-
+			   /* for each block of size = |L2| */
+			   rsbound->Bmax = rsbound->Bmin + block_size;
 #if DEBUG
 			   fprintf (stderr, "[%ld, %ld] ", rsbound->Bmin, rsbound->Bmax);
+			   fprintf (stderr, "NEXT i: %lu\n", i);
 #endif
 
-			   /* root sieve for v */
+			   /* root sieve for v. Note, rsbound with changed Bmin and Bmax will be used in rootsieve_v(). */
 			   rootsieve_v (MAT, rs, rsbound, rsparam, i);
 
 			   /* record top n slots */
 			   for (j = 0; j < (unsigned long) (rsbound->Bmax - rsbound->Bmin + 1); j++) {
 					insert_rootscore_pq ( alpha_pqueue, i, j, MAT[j] );
 
-					/* if (j == 20891251) { */
+					/* if (MAT[j] < -2000) { */
 					/* 	 ij2uv (rsbound->A, rsbound->MOD, rsbound->Amin, i, tmpu); */
 					/* 	 ij2uv (rsbound->B, rsbound->MOD, rsbound->Bmin, j, tmpv); */
-					/* 	 gmp_fprintf (stderr, "MAT[]: %d, u: %Zd, v: %Zd\n", MAT[j], tmpu, tmpv); */
+					/* 	 gmp_fprintf (stderr, "MAT[]: %d, u: %Zd, v: %Zd, i: %lu, j: %lu\n", MAT[j], tmpu, tmpv, i, j); */
 					/* } */
 			   }
 
@@ -5134,19 +5207,26 @@ rootsieve_uv ( rsstr_t rs,
 
 			   /* next j */
 			   rsbound->Bmin = rsbound->Bmax + 1;
-			   rsbound->Bmax = rsbound->Bmin + block_size;
+
+			   /* reset sieve array and priority queue */
+			   rootsieve_array_reset (MAT, block_size + 1);
+			   reset_rootscore_pq ( alpha_pqueue );
 
 		  } while (rsbound->Bmin < tmpBmax);
-
-		  /* free priority queue and sieving array */
-		  free_rootscore_pq (&alpha_pqueue);
-		  free (MAT);
 
 		  /* next i */
 		  rsbound->Bmax = tmpBmax;
 		  rsbound->Bmin = tmpBmin;
 
+		  /* reset sieve array and priority queue */
+		  rootsieve_array_reset (MAT, block_size + 1);
+		  reset_rootscore_pq ( alpha_pqueue );
+
 	 } // FINISHING U-ROTATION
+
+	 /* free priority queue and sieving array */
+	 free_rootscore_pq (&alpha_pqueue);
+	 free (MAT);
 
 	 /* output polynomials */
 	 MurphyE = 0.0;
@@ -5197,7 +5277,6 @@ rootsieve_main_stage2_run ( rsstr_t rs,
 							rsbound_t rsbound,
 							rsparam_t rsparam,
 							MurphyE_pq *global_E_pqueue,
-							double alpha_proj_lat,
 							int w,
 							int verbose )
 {
@@ -5228,7 +5307,6 @@ rootsieve_main_stage2_run ( rsstr_t rs,
 								  fuv,
 								  guv,
 								  w,
-								  alpha_proj_lat,
 								  verbose );
 
 	 for (i = 0; i <= rs->d; i++)
@@ -5254,7 +5332,6 @@ rootsieve_main_stage2_prepare ( rsstr_t rs,
 								mpz_t u,
 								mpz_t v,
 								mpz_t mod,
-								double alpha_proj_lat,
 								int verbose )
 {
 	 double ave_MurphyE = 0.0;
@@ -5287,7 +5364,6 @@ rootsieve_main_stage2_prepare ( rsstr_t rs,
 											   rsbound,
 											   rsparam,
 											   global_E_pqueue,
-											   alpha_proj_lat,
 											   w,
 											   verbose );
 	 /* free rsbound */
@@ -5351,7 +5427,7 @@ rootsieve_main_stage1 ( rsstr_t rs,
 
 		  compute_fuv_mp (fuv, rs->f, rs->g, rs->d, pqueue->u[i], pqueue->v[i]);
 		  //alpha_lat = get_biased_alpha_affine (fuv, rs->d, primes[rsparam->tlen_e_sl - 1]);
-		  alpha_lat = get_alpha (fuv, rs->d, 200);
+		  alpha_lat = get_alpha (fuv, rs->d, 2000);
 		  skew = L2_skewness (fuv, rs->d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
 		  logmu = L2_lognorm (fuv, rs->d, skew, DEFAULT_L2_METHOD);
 
@@ -5478,7 +5554,6 @@ rsparam_tune_aux ( rsstr_t rs,
 														u[i],
 														v[i],
 														mod[i],
-														sub_alpha[i] + rs->alpha_proj,
 														1 ); // tune mode, this is 1 in order to to set the correct length (short) of sieve array.
 		  ave2_MurphyE += ave_MurphyE;
 		  re ++;
@@ -5662,7 +5737,7 @@ rootsieve_main_run_bestpoly ( rsstr_t rs,
 			   mpz_set (fuv[k], rs->f[k]);
 
 		  for (k = 0; k < 2; k++)
-			   mpz_init_set (guv[k], rs->g[k]);
+			   mpz_set (guv[k], rs->g[k]);
 
 		  compute_fuv_mp (fuv, rs->f, rs->g, rs->d, global_E_pqueue->u[i], global_E_pqueue->v[i]);
 		  optimize_aux (fuv, rs->d, guv, 0, 0, CIRCULAR);
@@ -5842,7 +5917,6 @@ rootsieve_main_run ( rsstr_t rs,
 														u[i],
 														v[i],
 														mod[i],
-														sub_alpha[i] + rs->alpha_proj,
 														verbose );
 		  ave2_MurphyE += ave_MurphyE;
 		  re ++;
@@ -5914,7 +5988,7 @@ rootsieve_main_run_stage2only ( rsstr_t rs,
 
 	 /* alpha values on the subllatice primes */
 	 compute_fuv_mp (fuv, rs->f, rs->g, rs->d, param->s2_u, param->s2_v);
-	 alpha_lat = get_alpha (fuv, rs->d, 200);
+	 alpha_lat = get_alpha (fuv, rs->d, 2000);
 	 gmp_fprintf ( stderr,
 				   "\n# Info: Sieve on sublattice, (w, u, v): (%d, %Zd, %Zd) (mod %Zd) \n# Info: alpha: %.2f, proj_alpha: %.2f, exp_min_alpha: %.2f\n",
 				   param->s2_w,
@@ -5937,7 +6011,6 @@ rootsieve_main_run_stage2only ( rsstr_t rs,
 												   param->s2_u,
 												   param->s2_v,
 												   param->s2_mod,
-												   alpha_lat + rs->alpha_proj,
 												   2 );
 
      /* rotate back */

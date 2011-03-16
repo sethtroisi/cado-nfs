@@ -5,7 +5,8 @@
 #define PI 3.14159265358979324
 #define MAX_DEGREE 6
 #define DEBUG 0
-#define SUP_ALPHA 4.843
+//#define SUP_ALPHA 4.843
+#define SUP_ALPHA 4.277
 #define NP 46
 
 /* Sieve bound for (A + MOD*i)*x + (B + MOD*j), mainly
