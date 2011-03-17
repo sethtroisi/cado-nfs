@@ -4193,7 +4193,7 @@ rootsieve_array_init ( int16_t **A,
 {
 	 /* Init array A
 		sage: sum ([p/(p^2-1)*log(p) for p in prime_range(200)])
-		4.842766583050838  */
+		4.2774597204802731 */
 
 	 float tmpf = SUP_ALPHA;
 	 int16_t tmpu = (int16_t) ceil (tmpf * 1000.0);
@@ -4731,7 +4731,7 @@ rotate_bounds_W ( mpz_t *f,
 
 	 /* decide the bound for the loop */
 	 if (rotation_degree == 1)
-		  upper_bound = 48;
+		  upper_bound = 63;
 
 	 for (i = 0; i < upper_bound; i++, w *= 2)
 	 {
@@ -4751,9 +4751,9 @@ rotate_bounds_W ( mpz_t *f,
 
 	 if (verbose == 2) {
 		  if (rotation_degree == 2)
-			   fprintf (stderr, "# Info: w upper bound: %lu, norm bound: %.2f\n", *W, init_lognorm * 1.1); // TBC
+			   fprintf (stderr, "# Info: W (qudratic rotation) upper bound: %lu, norm bound: %.2f\n", *W, init_lognorm * 1.1); // TBC
 		  else if (rotation_degree == 1)
-			   fprintf (stderr, "# Info: u upper bound: %lu, norm bound: %.2f\n", *W, init_lognorm * 1.1); // TBC
+			   fprintf (stderr, "# Info: U (linear rotation) upper bound: %lu, norm bound: %.2f\n", *W, init_lognorm * 1.1); // TBC
 	 }
 	 /* go back to w=0 */
 	 rotate_aux (f, b, m, w0, 0, rotation_degree);
@@ -4762,6 +4762,9 @@ rotate_bounds_W ( mpz_t *f,
 }
 
 
+#define DEBUG_ROTATE_BOUND 1
+
+#if DEBUG_ROTATE_BOUND
 /*
   For each U bound, identify the best V bound (such that E is
   smallest for this fixed U). Then return the best (U, V) pair.
@@ -4839,7 +4842,7 @@ rotate_bounds_UV ( mpz_t *f,
 
 	 return best_E;
 }
-
+#endif
 
 /*
   Given rsparam->sizebound_ratio_rs and polynomial information,
@@ -4883,6 +4886,8 @@ rsparam_setup ( rsparam_t rsparam,
 	 /* 3. "global_u_bound_rs" and "global_v_bound_rs"
 		-- global_u_bound will be used to identify good sublattice and decide e[],
 		-- global_v_bound will be used to identify sieving bound */
+
+#if DEBUG_ROTATE_BOUND
 	 best_E = rotate_bounds_UV ( rs->f,
 								 rs->d,
 								 rsparam->sizebound_ratio_rs,
@@ -4892,6 +4897,34 @@ rsparam_setup ( rsparam_t rsparam,
 								 rsparam->global_v_bound_rs, /* u, v */
 								 DEFAULT_L2_METHOD,
 								 verbose );
+
+#else
+	 rotate_bounds_W ( rs->f,
+					   rs->d,
+					   b,
+					   m,
+					   &rsparam->global_u_bound_rs,
+					   1,
+					   DEFAULT_L2_METHOD,
+					   verbose );
+
+	 long k0 = 0;
+	 unsigned long idx = 0;
+	 k0 = rotate_aux (rs->f, b, m, k0, rsparam->global_u_bound_rs, 1);
+	 idx = (unsigned long) (log ((double) rsparam->global_u_bound_rs) / log(2.0));
+	 /* identify best v in rotating by v */
+	 best_E = rotate_bounds_V_mpz ( rs->f,
+									rs->d,
+									rsparam->sizebound_ratio_rs,
+									b,
+									m,
+									rsparam->global_v_bound_rs,
+									DEFAULT_L2_METHOD,
+									idx );
+	 /* go back to k=0 */
+	 rotate_aux (rs->f, b, m, k0, 0, 1);
+#endif
+
 	 mpz_clear (b);
 	 mpz_clear (m);
 
@@ -4902,17 +4935,29 @@ rsparam_setup ( rsparam_t rsparam,
 	 rsparam->exp_min_alpha_rs = exp_alpha[size-1];
 
 	 if (verbose == 2)
+
+#if DEBUG_ROTATE_BOUND
 		  gmp_fprintf ( stderr,
-						"# Info: best (u, v) bound (%ld, %Zd) gives exp_best_E: %.3f, exp_min_alpha: %.3f\n",
+						"# Info: Best (W, U, V) bound (%ld, %ld, %Zd) gives exp_best_E: %.3f, exp_min_alpha: %.3f\n",
+						rsparam->global_w_bound_rs,
 						rsparam->global_u_bound_rs,
 						rsparam->global_v_bound_rs,
 						best_E,
 						exp_alpha[size-1] );
+#else
+		  gmp_fprintf ( stderr,
+						"# Info: Upper (W, U, V) bound (%ld, %ld, %Zd) gives exp_best_E: %.3f, exp_min_alpha: %.3f\n",
+						rsparam->global_w_bound_rs,
+						rsparam->global_u_bound_rs,
+						rsparam->global_v_bound_rs,
+						best_E,
+						exp_alpha[size-1] );
+#endif
 
 	 /* 5. "rsparam->nbest_sl" and "rsparam->ncrts_sl" */
 	 if (rs->d == 6) {
 		  rsparam->nbest_sl = 128;
-		  rsparam->ncrts_sl = 64; // for deg 6, there could be too much individual sublattices to do crts. We restrict the num.
+		  rsparam->ncrts_sl = 16; // for deg 6, there could be too much individual sublattices to do crts. We restrict the num.
 	 }
 	 else {
 		  rsparam->nbest_sl = 128;
@@ -4989,6 +5034,7 @@ rsparam_reset ( rsparam_t rsparam,
 	 mpz_set (m, rs->g[0]);
 	 mpz_neg (m, m);
 
+#if DEBUG_ROTATE_BOUND
 	 best_E = rotate_bounds_UV ( rs->f,
 								 rs->d,
 								 rsparam->sizebound_ratio_rs,
@@ -4998,6 +5044,33 @@ rsparam_reset ( rsparam_t rsparam,
 								 rsparam->global_v_bound_rs, /* u, v */
 								 DEFAULT_L2_METHOD,
 								 verbose );
+#else
+	 rotate_bounds_W ( rs->f,
+					   rs->d,
+					   b,
+					   m,
+					   &rsparam->global_u_bound_rs,
+					   1,
+					   DEFAULT_L2_METHOD,
+					   verbose );
+
+	 long k0 = 0;
+	 unsigned long idx = 0;
+	 k0 = rotate_aux (rs->f, b, m, k0, rsparam->global_u_bound_rs, 1);
+	 idx = (unsigned long) (log ((double) rsparam->global_u_bound_rs) / log(2.0));
+	 /* identify best v in rotating by v */
+	 best_E = rotate_bounds_V_mpz ( rs->f,
+									rs->d,
+									rsparam->sizebound_ratio_rs,
+									b,
+									m,
+									rsparam->global_v_bound_rs,
+									DEFAULT_L2_METHOD,
+									idx );
+	 /* go back to k=0 */
+	 rotate_aux (rs->f, b, m, k0, 0, 1);
+#endif
+
 	 mpz_clear (b);
 	 mpz_clear (m);
 
@@ -6017,6 +6090,24 @@ rootsieve_main_run_stage2only ( rsstr_t rs,
 	 rotate_aux (rs->f, rs->g[1], m, old_i, 0, 2);
 	 old_i = 0;
 
+	 /* Record the best polynomial */
+	 bestpoly_t bestpoly;
+	 bestpoly_init (bestpoly, rs->d);
+	 for (i = 0; i <= rs->d; i++)
+	 {
+		  mpz_set (bestpoly->f[i], rs->f[i]);
+	 }
+	 mpz_neg (bestpoly->g[0], rs->g[0]);
+	 mpz_set (bestpoly->g[1], rs->g[1]);
+
+	 rootsieve_main_run_bestpoly ( rs,
+								   global_E_pqueue,
+								   bestpoly );
+
+	 fprintf (stderr, "\n# Info: Best E is:\n");
+	 print_poly_info (bestpoly->f, bestpoly->g, rs->d, rs->n, rs->m, 2);
+
+	 bestpoly_free (bestpoly, rs->d);
 	 rsparam_free (rsparam);
 	 free_MurphyE_pq (&global_E_pqueue);
 
@@ -6050,7 +6141,7 @@ rootsieve_main ( rsstr_t rs,
 		  rootsieve_main_run_stage2only (rs, param);
 	 }
 	 else {
-		  if (rs->d == 5) {
+		  if (rs->d == 5 || rs->d == 4) {
 			   /* not qudratci rot for deg 5 polynomial */
 			   param->w_left_bound = 0;
 			   param->w_length = 1;
@@ -6060,7 +6151,7 @@ rootsieve_main ( rsstr_t rs,
 			   rootsieve_main_run (rs, bestpoly, param, verbose);
 		  }
 		  else {
-			   fprintf (stderr, "Error: only support deg 5 or 6.\n");
+			   fprintf (stderr, "Error: only support deg 4, 5 or 6.\n");
 			   exit(1);
 		  }
 	 }

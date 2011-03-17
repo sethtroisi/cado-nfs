@@ -326,9 +326,18 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       mpz_neg (m, g[0]);
 
 #ifdef NEW_ROOTSIEVE
-	  rootsieve_polyselect (f, d, m, g[1], N, 0); // verbose = 2 to see details.
-      mpz_neg (g[0], m);
-
+	  if (d > 4) {
+		   rootsieve_polyselect (f, d, m, g[1], N, 0); // verbose = 2 to see details.
+		   mpz_neg (g[0], m);
+	  }
+	  else {
+		   unsigned long alim = 2000;
+		   long jmin, kmin;
+		   rotate (f, d, alim, m, g[1], &jmin, &kmin, 0, verbose, DEFAULT_L2_METHOD);
+		   mpz_neg (g[0], m);
+		   /* optimize again, but only translation */
+		   optimize_aux (f, d, g, 0, 0, CIRCULAR);
+	  }
 #else
       rotate (f, d, alim, m, g[1], &jmin, &kmin, 0, verbose, DEFAULT_L2_METHOD);
       mpz_neg (g[0], m);
