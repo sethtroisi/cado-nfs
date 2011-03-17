@@ -3262,9 +3262,9 @@ return_all_sublattices_crt ( rsparam_t rsparam,
 	 mpz_sub (re, tmpu1, rsparam->modulus);
 
 	 /* if u is good, compute v */
-	 if ( mpz_cmp_ui (tmpu1, rsparam->global_u_bound_rs) <= 0 ||
+/*	 if ( mpz_cmp_ui (tmpu1, rsparam->global_u_bound_rs) <= 0 ||
 		  mpz_cmpabs_ui (re, rsparam->global_u_bound_rs) <= 0 ) {
-
+*/
 		  /* compute v */
 		  mpz_set_ui (tmpu2, individual_sublattices[0][ind[0]][1]);
 		  mpz_set_ui (tmpp1, pe[0]);
@@ -3288,7 +3288,7 @@ return_all_sublattices_crt ( rsparam_t rsparam,
 			   mpz_sub (tmpu1, tmpu1, rsparam->modulus);
 
 		  insert_sublattice_pq ( pqueue, tmpu1, tmpu2 );
-	 }
+//	 }
 
 	 mpz_clear (tmpp1);
 	 mpz_clear (tmpp2);
@@ -3679,14 +3679,14 @@ rootsieve_run_multroot_lift ( node *currnode,
 
 	 /* variables */
 	 int16_t subtmp;
-	 unsigned int nroots;
+	 unsigned int k, nroots;
 	 unsigned long pe, pem1, fr, gr, step;
 	 node *tmpnode = NULL, *tmpnode2 = NULL;
 	 long j;
 
 	 /* compute p^e */
 	 pem1 = 1UL;
-	 for (j = 0; j < curr_e - 1; j ++)
+	 for (k = 0; k < curr_e - 1; k ++)
 		  pem1 = pem1 * p;
 	 pe = pem1 * p;
 
@@ -3709,7 +3709,7 @@ rootsieve_run_multroot_lift ( node *currnode,
 			   /* solve on fr + gr*x = 0 (mod p), where x = uu*r + vv. */
 			   fr = solve_lineq (fr, gr, 0, p); //fr = fr % p;
 
-			   /* If gcd (MOD, p) != 1 && B + MOD*j != v (mod pe), there is no need to
+			   /* If gcd (MOD, p) != 1 && B + MOD*k != v (mod pe), there is no need to
 				  record this (u, v). */
 			   if (mpz_fdiv_ui (rsbound->MOD, p) == 0) {
 					if ( mpz_fdiv_ui (rsbound->B, pe) != (currnode->v + fr * pem1) ) {
@@ -3718,19 +3718,19 @@ rootsieve_run_multroot_lift ( node *currnode,
 			   }
 
 			   /* insert (u, v), u unchanged, v is fr. to insert roots,
-				  r is a multiple root, we need to insert all r + p*j.
-				  since if r can be lifted, then all r + p*j are roots */
-			   for (j = 0; j < p; j ++) {
+				  r is a multiple root, we need to insert all r + p*k.
+				  since if r can be lifted, then all r + p*k are roots */
+			   for (k = 0; k < p; k ++) {
 
 #if DEBUG_MULTROOT_LIFT
 					fprintf (stderr, "level %u, (%lu, %lu), r: %lu\n",
-							 curr_e, currnode->u, currnode->v + fr *pem1, currnode->r[nroots] + j * pem1);
+							 curr_e, currnode->u, currnode->v + fr *pem1, currnode->r[nroots] + k * pem1);
 #endif
 
 					insert_node ( currnode, &tmpnode,
 								  currnode->u,
 								  currnode->v + fr * pem1,
-								  currnode->r[nroots] + j * pem1,
+								  currnode->r[nroots] + k * pem1,
 								  curr_e, pe, 0 );
 			   } // next root of current (u, v)
 		  }
@@ -3754,7 +3754,7 @@ rootsieve_run_multroot_lift ( node *currnode,
 
 			   while (tmpnode != NULL) {
 
-					/* if MOD = 0 (mod p) in B + MOD*j = v (mod pe), no inverse
+					/* if MOD = 0 (mod p) in B + MOD*k = v (mod pe), no inverse
 					   -- if B = v (mod pe), then sieve whole array;
 					   -- otherwise, continue; */
 					if (mpz_divisible_ui_p (rsbound->MOD, p) != 0) {
@@ -3965,21 +3965,21 @@ rootsieve_v ( int16_t *ARRAY,
 			  rsparam_t rsparam,
 			  const long fixed_i )
 {
-	 unsigned int np, nb, p, r, u, v, tmp, max_e;
+	 unsigned int np, nb, p, r, u, v, tmp, max_e, totnb;
 	 int16_t subsgl[rsparam->len_p_rs], submul[rsparam->len_p_rs];
 	 unsigned long fx_ul, gx_ul, pe = 1;
-	 long  tmp2, start_j_idx[rsparam->len_p_rs], totnb, block_size;
+	 long  tmp2, start_j_idx[rsparam->len_p_rs], block_size;
 	 float subf;
 	 mpz_t tmpz, tmpu;
 	 char flag[rsparam->len_p_rs];
 
 	 block_size = L1_SIZE;
-	 totnb = (rsbound->Bmax - rsbound->Bmin + 1) / block_size;
+	 totnb = (unsigned int) ((rsbound->Bmax - rsbound->Bmin + 1) / block_size);
 
 #if DEBUG_ROOTSIEVE_V
 	 fprintf ( stderr,
-			   "# Stat: totnb: %ld, block_size: %ld, total_size: %ld\n",
-			   totnb, block_size, totnb*block_size );
+			   "# Stat: totnb: %u, block_size: %ld, total_size: %ld\n",
+			   totnb, block_size, (long) totnb * block_size );
 #endif
 
 	 mpz_init (tmpz);
