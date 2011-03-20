@@ -24,10 +24,10 @@ static void
 usage (char **argv)
 {
 	 fprintf (stderr, "# Error: Unexpected argument: %s\n", argv[1]);
-	 fprintf (stderr, "# Usage 1 (a): %s -f FILE -w WLEFT -l WLENGTH\n", argv[0]);
-	 fprintf (stderr, "# Usage 1 (b): %s -f FILE -w WLEFT -l WLENGTH -E N E_1 E_2 ... E_N \n", argv[0]);
-	 fprintf (stderr, "# Parameters: \n#\t\"WLEFT\" is the left-bound of a qudratic rotation; \n#\t\"WLENGTH\" is the amount for qudratic rotation; \n#\t\"N\" and \"e_i\" are the number of sublattice primes and exponents. \n");
-	 fprintf (stderr, "# Usage 2: %s -f FILE --s2 -w W -u U -v V -mod MOD -umax MAX2 -vmax MAX1\n", argv[0]);
+	 fprintf (stderr, "# Usage 1 (a): %s -f FILE -w WLEFT -l WLENGTH -norm NORM_BOUND\n", argv[0]);
+	 fprintf (stderr, "# Usage 1 (b): %s -f FILE -w WLEFT -l WLENGTH -E N E_1 E_2 ... E_N -norm NORM_BOUND \n", argv[0]);
+	 fprintf (stderr, "# Parameters: \n#\t\"WLEFT\" is the left-bound of a qudratic rotation; \n#\t\"WLENGTH\" is the amount for qudratic rotation; \n#\t\"N\" and \"e_i\" are the number of sublattice primes and exponents;  \n#\t\"NORM_BOUND\" is the approximated lognorm bound for rotation.\n");
+	 fprintf (stderr, "# Usage 2: %s -f FILE --s2 -w W -u U -v V -mod MOD -umax MAX2 -vmax MAX1 -norm NORM_BOUND\n", argv[0]);
 	 fprintf (stderr, "# Parameters: \n#\t\"W, U, V, MOD\" defines a sublattice; \n#\t\"MAX2, MAX1\" are the rotation bounds;\n");
 	 exit(1);
 }
@@ -101,6 +101,12 @@ main (int argc, char **argv)
 						 argv += 2;
 						 argc -= 2;
 					}
+					else if (argc >= 3 && strcmp (argv[1], "-norm") == 0)
+					{
+						 param->lognorm_bound = atof (argv[2]);
+						 argv += 2;
+						 argc -= 2;
+					}
 					else {
 						 usage (argv);
 					}
@@ -120,6 +126,12 @@ main (int argc, char **argv)
 					else if (argc >= 3 && strcmp (argv[1], "-l") == 0)
 					{
 						 param->w_length = atoi (argv[2]);
+						 argv += 2;
+						 argc -= 2;
+					}
+					else if (argc >= 3 && strcmp (argv[1], "-norm") == 0)
+					{
+						 param->lognorm_bound = atof (argv[2]);
 						 argv += 2;
 						 argc -= 2;
 					}
@@ -204,6 +216,12 @@ main (int argc, char **argv)
 						 argv += 2;
 						 argc -= 2;
 					}
+					else if (argc >= 3 && strcmp (argv[1], "-norm") == 0)
+					{
+						 param->lognorm_bound = atof (argv[2]);
+						 argv += 2;
+						 argc -= 2;
+					}
 					else {
 						 usage (argv);
 					}
@@ -223,6 +241,12 @@ main (int argc, char **argv)
 					else if (argc >= 3 && strcmp (argv[1], "-l") == 0)
 					{
 						 param->w_length = atoi (argv[2]);
+						 argv += 2;
+						 argc -= 2;
+					}
+					else if (argc >= 3 && strcmp (argv[1], "-norm") == 0)
+					{
+						 param->lognorm_bound = atof (argv[2]);
 						 argv += 2;
 						 argc -= 2;
 					}

@@ -129,8 +129,9 @@
 /* Things for tuning */
 #define L1_SIZE 12288 // ~ l1 cache
 #define SIEVEARRAY_SIZE 20971520 // ~ l2 cache = 2097152
+#define MAX_SIEVEARRAY_SIZE (SIEVEARRAY_SIZE << 3)
 #define TUNE_SIEVEARRAY_SIZE L1_SIZE / 2
-#define TOPALPHA_EACH_SIEVEARRAY 8 // For each "SIEVEARRAY_SIZE", record top 8 poly's alpha avalues.
+#define TOPALPHA_EACH_SIEVEARRAY 16 // For each "SIEVEARRAY_SIZE", record top 8 poly's alpha avalues.
 #define TOPE_EACH_SUBLATTICE 8 // For sublattice, record top 8 poly's E avalues.
 #define LEN_SUBLATTICE_PRIMES 9
 
@@ -418,7 +419,8 @@ print_poly_info ( mpz_t *f,
 static void
 print_node ( node *pnode )
 {
-	 printf("(%lu,%lu):%d:%d:(%.2f)\n",pnode->u, pnode->v, pnode->nr, pnode->e, pnode->val);
+	 fprintf(stderr, "(%u,%u):%u:%d:(%.2f)\n",
+			 pnode->u, pnode->v, pnode->nr, pnode->e, pnode->val);
 	 /* int i; */
 	 /* for (i = 0; i < pnode->nr; i++) */
 	 /*  	  printf ("pnode->r[%d]: %lu\n", i, pnode->r[i]); */
@@ -560,41 +562,30 @@ free_tree ( node *root )
 
 
 /*
-  Double the memory space of pnode->r[]. If need_roottype
-  is 1, we also want to allocate memory for pnode->roottype[].
-  This is only used for base case in the find_sublattice().
-
-  TBA: This function is buggy. You should always call
-  alloc_r_node(ptr, 1) and then alloc_r_node(ptr, 0) without
-  any overlapping. In our case, we call alloc_r_node(ptr, 1)
-  for all the base case in find_sublattice(), and call
-  alloc_r_node(ptr, 0) for all the lifted cases.
+  Malloc or realloc (double) the memory space of pnode->r[] and pnode->roottype[].
 */
 static void
-alloc_r_node ( node *pnode,
-			   int need_roottype )
+alloc_r_node ( node *pnode )
 {
 	 //assert (pnode->alloc <= pnode->nr);
 
 	 if (pnode->nr == 0) {
-		  pnode->r = (unsigned long *) realloc (pnode->r, (sizeof (unsigned long)));
-		  if (need_roottype == 1)
-			   pnode->roottype = (unsigned short *) realloc (pnode->roottype, (sizeof (unsigned short)));
+		  pnode->r = (unsigned int *)
+			   malloc ( sizeof (unsigned int) );
+		  pnode->roottype = (char *)
+			   malloc ( sizeof (char) );
 		  pnode->alloc = 1;
 	 }
 	 else {
-		  pnode->r = (unsigned long *) realloc (pnode->r, (unsigned long) (2 * (pnode->nr)) * sizeof (unsigned long));
-		  if (need_roottype == 1)
-			   pnode->roottype = (unsigned short *) realloc (pnode->roottype, (unsigned long) (2 * (pnode->nr)) * sizeof (unsigned short));
-		  pnode->alloc = (unsigned long) (pnode->alloc * 2);
+		  pnode->r = (unsigned int *)
+			   realloc ( pnode->r, 2 * pnode->nr * sizeof (unsigned int) );
+		  pnode->roottype = (char *)
+			   realloc ( pnode->roottype, 2 * pnode->nr * sizeof (char) );
+		  pnode->alloc = (pnode->alloc * 2);
 	 }
 
 	 if (pnode->r == NULL) {
-		  fprintf (stderr, "Error, cannot reallocate memory in alloc_r_node\n");
-		  exit (1);
-	 }
-	 if ( (need_roottype == 1) && (pnode->roottype == NULL) ) {
-		  fprintf (stderr, "Error, cannot reallocate memory in alloc_r_node\n");
+		  fprintf (stderr, "Error, cannot reallocate memory in alloc_r_node().\n");
 		  exit (1);
 	 }
 }
@@ -609,67 +600,64 @@ alloc_r_node ( node *pnode,
   --- If not, add r and/or "is_multiple=k".
   - If (u, v) doesnot exit;
   -- Add a node with (u, v, r, curr_e, val) and/or "is_multiple=k".
-
-  k = 0 means don't allocate for currnode->roottype[]
-  k = 1/2 means currnode->roottype[] = 1 or 2
 */
+#define DEBUG_INSERT_NODE 0
 static void
 insert_node ( node *parent,
 			  node **currnode,
-			  unsigned long u,
-			  unsigned long v,
-			  unsigned long r,
-			  unsigned int curr_e,
-			  unsigned long pe,
-			  int k )
+			  unsigned int u,
+			  unsigned int v,
+			  unsigned int r,
+			  char curr_e,
+			  unsigned int p,
+			  unsigned int pe,
+			  char k )
 {
-	 unsigned int i, r_exit = 0;
+	 unsigned int i;
 	 node *lastnode = NULL;
 	 node *nextnode = NULL;
 	 nextnode = parent->firstchild;
 	 lastnode = nextnode;
 
-	 /* if the (u, v) pair already exists, don't
-		create new node, but add possibly new root. */
+	 /* add r to some existing node (u, v) */
 	 while ((nextnode != NULL)) {
 
 		  if ((nextnode->u == u) && (nextnode->v == v)) {
+
 			   /* if (u,v) pair exists, see whether
 				  the root r already exists in the node. */
 			   for (i = 0; i < nextnode->nr; i ++) {
-					if ((nextnode->r[i]) == r)
-						 r_exit = 1;
+					if ( nextnode->r[i] == r )
+						 return;
 			   }
-			   /* r already exits, do nothing and return */
-			   if (r_exit == 1)
-					return;
 
 			   /* otherwise, insert this root */
-			   if (nextnode->alloc <= nextnode->nr) {
-					/* rellocate memory for the new root without allocating nextnode->roottype[]. */
-					if (k == 0)
-						 alloc_r_node (nextnode, 0);
-					/* rellocate memory for the new root and allocate nextnode->roottype[]. */
-					else
-						 alloc_r_node (nextnode, 1);
-					//printf ("alloc: %lu, nr: %lu\n", nextnode->alloc, nextnode->nr);
-			   }
-
-			   if (k != 0)
-					nextnode->roottype[nextnode->nr] = k;
+			   if (nextnode->alloc <= nextnode->nr)
+					alloc_r_node (nextnode);
+			   nextnode->roottype[nextnode->nr] = k;
 			   nextnode->r[nextnode->nr] = r;
 			   nextnode->nr += 1;
-			   /* such (u, v) exists, hence we increase the valuation. */
-			   nextnode->val += 1.0 / (double) pe;
-			   /* printf ("(u: %lu, v: %lu), nr: %lu, r: %lu, e: %lu, val: %f\n", u, v,
-				  nextnode->nr, nextnode->r[nextnode->nr], curr_e, nextnode->val); */
+
+			   if (k == 2)
+					nextnode->val += 1.0 / (double) pe;
+			   else {
+					if (curr_e == 1)
+						 nextnode->val += 1.0 / ((double)p - 1.0);
+			   }
+
+#if DEBUG_INSERT_NODE
+			   if (pe == 7)
+					fprintf ( stderr, "add to (u: %u, v: %u), nr: %u, r: %u, e: %d, val: %f\n",
+							  u, v, nextnode->nr, nextnode->r[nextnode->nr-1], curr_e, nextnode->val );
+#endif
+
 			   break;
 		  }
 		  lastnode = nextnode;
 		  nextnode = nextnode->nextsibling;
 	 }
 
-	 /* add new node */
+	 /* add new (u, v) node */
 	 if (nextnode == NULL) {
 
 		  *currnode = new_node();
@@ -683,21 +671,28 @@ insert_node ( node *parent,
 		  (*currnode)->parent = parent;
 		  (*currnode)->u = u;
 		  (*currnode)->v = v;
-		  /* rellocate memory for the new root without allocating nextnode->roottype[]. */
 
-		  if (k == 0)
-			   alloc_r_node (*currnode, 0);
-		  /* rellocate memory for the new root and allocate nextnode->roottype[]. */
-		  else {
-			   alloc_r_node (*currnode, 1);
-			   (*currnode)->roottype[0] = k;
-		  }
+		  alloc_r_node (*currnode);
 		  (*currnode)->r[0] = r;
+		  (*currnode)->roottype[0] = k;
 		  (*currnode)->nr += 1;
 		  (*currnode)->e = curr_e;
 		  /* such (u, v) is new, hence we inheritate the val from its parent. */
-		  (*currnode)->val = 1.0 / (double) pe + (*currnode)->parent->val;
-		  //printf ("(u: %lu, v: %lu), e: %lu, val: %f\n", u, v, curr_e, (*currnode)->val);
+
+		  if (k == 2)
+			   (*currnode)->val += 1.0 / (double) pe + (*currnode)->parent->val;
+		  else {
+			   if (curr_e == 1)
+					(*currnode)->val += 1.0 / ((double)p - 1.0);
+			   else
+					(*currnode)->val = (*currnode)->parent->val;
+		  }
+
+#if DEBUG_INSERT_NODE
+		  if (pe == 7)
+			   fprintf ( stderr, "creating (u: %u, v: %u), nr: %u, r: %u, e: %d, val: %f\n", u, v,
+						 (*currnode)->nr, (*currnode)->r[0], curr_e, (*currnode)->val );
+#endif
 	 }
 
 	 //print_tree(parent, 0);
@@ -853,81 +848,6 @@ insert_listnode ( listnode **top,
 
 
 /*
-  Insert a listnode to current list, record all. Line 2323
-*/
-static void
-insert_listnode_plain ( listnode **top,
-						unsigned long u,
-						unsigned long v,
-						double val )
-{
-	 listnode *newlistnode;
-
-	 /* if empty, create node */
-	 if ( (*top) == NULL ) {
-		  newlistnode = new_listnode (u, v, val);
-		  (*top) = newlistnode;
-		  (*top)->next = NULL;
-	 }
-	 else {
-		  /* if income has equal val, add */
-		  newlistnode = new_listnode (u, v, val);
-		  newlistnode->next = (*top);
-		  (*top) = newlistnode;
-	 }
-	 newlistnode = NULL;
-}
-
-#if 0
-/*
-  Scan a tree, return the best (u, v).
-  //scan_tree (root, e[i], &top);
-  */
-static void
-scan_tree ( node *root,
-			int level,
-			listnode **top )
-{
-
-	 if (level <= 0) {
-		  fprintf(stderr,"Error: level > 0. \n");
-		  exit(1);
-	 }
-
-	 int currlevel = 0;
-	 node *ptr = root;
-
-	 if (!ptr)  /* if empty */
-		  return;
-
-     /* find leftmost */
-	 while (ptr->firstchild) {
-		  ptr = ptr->firstchild;
-		  ++ currlevel;
-	 }
-	 while (ptr) {
-		  if (currlevel == level) {
-			   insert_listnode (top, ptr->u, ptr->v, ptr->val);
-		  }
-		  if (ptr->nextsibling) {
-			   ptr = ptr->nextsibling;
-			   //++ level; // aligned layout, uncommont for sloped layout
-			   while (ptr->firstchild) {
-					ptr = ptr->firstchild;
-					++ currlevel;
-			   }
-		  }
-		  else {
-			   ptr = ptr->parent;  /* move up */
-			   -- currlevel;
-		  }
-	 }
-	 return;
-}
-#endif
-
-
-/*
   Some indices, note the queue is shifted by 1.
 */
 static inline int
@@ -1065,25 +985,6 @@ insert_sublattice_pq_down ( sublattice_pq *pqueue,
 	 mpz_set (pqueue->v[i], v);
 }
 
-#if 0
-/*
-  Extract the max of the priority queue.
-*/
-static void
-extract_sublattice_pq ( sublattice_pq *pqueue,
-						mpz_t u,
-						mpz_t v )
-{
-	 // don't extract u[0] since it is just a placeholder.
-	 pqueue->used --;
-	 mpz_set (u, pqueue->u[1]);
-	 mpz_set (v, pqueue->v[1]);
-
-	 insert_sublattice_pq_down ( pqueue,
-								 pqueue->u[pqueue->used],
-								 pqueue->v[pqueue->used] );
-}
-#endif
 
 /*
   Insert to the priority queue.
@@ -1689,72 +1590,6 @@ crt_pair_mp ( mpz_t a,
 }
 
 
-#if 0
-
-
-/*
-  Recover x (mod p1*p2) in
-  x = a (mod p1)
-  x = b (mod p2)
-
-  - p1 is probably larger than p2.
-*/
-static unsigned long
-crt_pair ( unsigned long a,
-		   unsigned long p1,
-		   unsigned long b,
-		   unsigned long p2 )
-{
-	 unsigned long tmp;
-	 /* solve x in a + p1*x = b (mod p2) */
-	 tmp = solve_lineq (a, p1, b, p2);
-	 tmp = tmp * p1 + a;
-	 return tmp;
-}
-
-
-/*
-  Do crt for each element between lists <- top1 and top2
-  Return the new list pointed to top3.
-*/
-static void
-crt_list ( listnode *top1,
-		   unsigned long pe1,
-		   listnode *top2,
-		   unsigned long pe2,
-		   listnode **top3 )
-{
-	 if ( (!top1) || (!top2) ) {
-		  fprintf (stderr, "Error, empty list in crt_list().\n");
-		  exit (1);
-	 }
-
-	 unsigned long tmp1, tmp2;
-	 listnode *holdtop2 = top2, *holdtop3 = NULL;
-
-	 do {
-		  top2 = holdtop2;
-		  do {
-			   tmp1 = crt_pair(top1->u, pe1, top2->u, pe2);
-			   tmp2 = crt_pair(top1->v, pe1, top2->v, pe2);
-
-			   /* printf ("(%lu, %lu) in %lu\t", top1->u, top1->v, pe1);
-				  printf ("(%lu, %lu) in %lu\n", top2->u, top2->v, pe2); */
-
-			   /* add to list <- (*top3) */
-			   holdtop3 = (*top3);
-			   (*top3) = new_listnode (tmp1, tmp2, 0.0);
-			   (*top3)->next = holdtop3;
-
-			   //printf ("Sol (u, v): %lu, %lu\n", tmp1, tmp2);
-			   top2 = top2->next;
-		  }
-		  while (top2);
-		  top1 = top1->next;
-	 }
-	 while (top1);
-}
-#endif
 
 /*-----------------------------*/
 /*   @Some arithmetics.        */
@@ -1797,24 +1632,6 @@ solve_lineq ( unsigned long a,
 	 return tmp;
 }
 
-#if 0
-/*
-  Could call from auxiliary.c.
-*/
-static void
-content_poly ( mpz_t g,
-			   mpz_t *f,
-			   int d )
-{
-	 int i;
-
-	 ASSERT(d >= 1);
-
-	 mpz_gcd (g, f[0], f[1]);
-	 for (i = 2; i <= d; i++)
-		  mpz_gcd (g, g, f[i]);
-}
-#endif
 
 /*
   Affine part of the special valution for polynomial f over p.
@@ -2271,20 +2088,21 @@ compute_fuv ( mpz_t *fuv,
 	 mpz_clear (tmp1);
 }
 
+
 /*
   Compute fuv = f+(u*x+v)*g,
   The inputs for f and g are unsigne long.
-  Note, u, v must be unsigned long.
+  Note, u, v are unsigned int.
   So they should be reduce (mod p) if necessary.
 */
 static inline void
-compute_fuv_ul ( unsigned long *fuv_ul,
-				 unsigned long *f_ul,
-				 unsigned long *g_ul,
+compute_fuv_ui ( unsigned int *fuv_ui,
+				 unsigned int *f_ui,
+				 unsigned int *g_ui,
 				 int d,
-				 unsigned long u,
-				 unsigned long v,
-				 unsigned long p )
+				 unsigned int u,
+				 unsigned int v,
+				 unsigned int p )
 {
 	 int i;
 	 modulusul_t mod;
@@ -2295,53 +2113,53 @@ compute_fuv_ul ( unsigned long *fuv_ul,
 	 modul_init (tmp2, mod);
 
 	 for (i = 3; i <= d; i ++)
-		  fuv_ul[i] = f_ul[i];
+		  fuv_ui[i] = f_ui[i];
 
 	 /* f + u*g1*x^2
 		+ (g0*u* + v*g1)*x
 		+ v*g0 */
 
 	 /* u*g1*x^2 */
-	 modul_set_ul (tmp, g_ul[1], mod);
+	 modul_set_ul (tmp, g_ui[1], mod);
 	 modul_set_ul (tmp2, u, mod);
 	 modul_mul (tmp, tmp, tmp2, mod);
-	 modul_set_ul (tmp1, f_ul[2], mod);
+	 modul_set_ul (tmp1, f_ui[2], mod);
 	 modul_add (tmp, tmp, tmp1, mod);
-	 fuv_ul[2] = modul_get_ul(tmp, mod);
+	 fuv_ui[2] = (unsigned int) modul_get_ul(tmp, mod);
 
 	 /* (g0*u* + v*g1)*x */
-	 modul_set_ul (tmp, g_ul[1], mod);
+	 modul_set_ul (tmp, g_ui[1], mod);
 	 modul_set_ul (tmp1, v, mod);
 	 modul_mul (tmp, tmp, tmp1, mod);
-	 modul_set_ul (tmp1, g_ul[0], mod);
+	 modul_set_ul (tmp1, g_ui[0], mod);
 	 // tmp2 = u as set above.
 	 modul_mul (tmp1, tmp1, tmp2, mod);
 	 modul_add (tmp, tmp, tmp1, mod);
-	 modul_set_ul (tmp1, f_ul[1], mod);
+	 modul_set_ul (tmp1, f_ui[1], mod);
 	 modul_add (tmp, tmp, tmp1, mod);
-	 fuv_ul[1] = modul_get_ul(tmp, mod);
+	 fuv_ui[1] = (unsigned int) modul_get_ul(tmp, mod);
 
 	 /* v*g0 */
 	 modul_set_ul (tmp1, v, mod);
-	 modul_set_ul (tmp2, g_ul[0], mod);
+	 modul_set_ul (tmp2, g_ui[0], mod);
 	 modul_mul (tmp1, tmp1, tmp2, mod);
-	 modul_set_ul (tmp, f_ul[0], mod);
+	 modul_set_ul (tmp, f_ui[0], mod);
 	 modul_add (tmp, tmp, tmp1, mod);
-	 fuv_ul[0] = modul_get_ul(tmp, mod);
+	 fuv_ui[0] = (unsigned int) modul_get_ul(tmp, mod);
 }
 
 
 /*
   Compute v (mod p) by
   f(r) + u*r*g(r) + v*g(r) = 0 (mod p).
-  The inputs for f(r) and g(r) are unsigned long.
+  The inputs for f(r) and g(r) are unsigned int.
 */
-static inline unsigned long
-compute_v_ul ( unsigned long fx,
-			   unsigned long gx,
-			   unsigned long r,
-			   unsigned long u,
-			   unsigned long p)
+static inline unsigned int
+compute_v_ui ( unsigned int fx,
+			   unsigned int gx,
+			   unsigned int r,
+			   unsigned int u,
+			   unsigned int p)
 {
 	 modulusul_t mod;
 	 residueul_t tmp, tmp1;
@@ -2361,13 +2179,14 @@ compute_v_ul ( unsigned long fx,
 	 v = modul_get_ul(tmp, mod);
 
 	 /* solve v in tmp2 + v*g(r) = 0 (mod p) */
-	 v = solve_lineq(v, gx, 0, p);
+	 v = solve_lineq (v, gx, 0, p);
 
 	 modul_clear (tmp, mod);
 	 modul_clear (tmp1, mod);
 	 modul_clearmod (mod);
-	 return v;
+	 return (unsigned int) v;
 }
+
 
 /*
   Evaluation polynomials at many points.
@@ -2407,20 +2226,18 @@ eval_polys ( mpz_t *f,
 
 /*
   Compute v = f(r) (mod pe), where f is of degree d.
-  The input f should be unsigned long.
+  The input f should be unsigned int.
 */
-static inline unsigned long
-eval_poly_ui_mod ( unsigned long *f,
+static inline unsigned int
+eval_poly_ui_mod ( unsigned int *f,
 				   int d,
-				   unsigned long r,
-				   unsigned long pe )
+				   unsigned int r,
+				   unsigned int pe )
 {
-
-
 	 int i;
 	 modulusul_t mod;
 	 residueul_t vtmp, rtmp, tmp;
-	 unsigned long v;
+	 unsigned int v;
 
 	 modul_initmod_ul (mod, pe);
 	 modul_init (vtmp, mod);
@@ -2437,7 +2254,7 @@ eval_poly_ui_mod ( unsigned long *f,
 		  modul_add (vtmp, tmp, vtmp, mod);
 	 }
 
-	 v = modul_get_ul (vtmp, mod);
+	 v = (unsigned int) modul_get_ul (vtmp, mod);
 	 modul_clear (vtmp, mod);
 	 modul_clear (rtmp, mod);
 	 modul_clear (tmp, mod);
@@ -2595,120 +2412,6 @@ isroot_fuv ( mpz_t *f,
 	 return type;
 }
 
-
-/*
-  Do the same thing but consider f_uv in ul.
-  Given f (mod pe) and (u, v) (mod pe) pair.
-*/
-static inline int
-isroot_fuv_ul ( unsigned long *f,
-				unsigned long *g,
-				int d,
-				unsigned long u,
-				unsigned long v,
-				unsigned long r,
-				unsigned long p,
-				unsigned long pe,
-				unsigned long *r_lifted )
-{
-	 int type;
-	 modulusul_t mod, modpe;
-	 residueul_t tmp, tmp1, tmp2;
-	 unsigned long gr, fr;
-	 modul_initmod_ul (mod, p);
-	 modul_init (tmp, mod);
-	 modul_init (tmp1, mod);
-	 modul_init (tmp2, mod);
-
-	 /* r is a root over p^(e-1) = pe / p, we need to see
-		whether it is a	single or multiple root;
-		- If it is a single, computer r_lifted
-		- If it is a multiple, see whether it can be lifted
-		-- consider f(r) (mod p^e)	 */
-
-	 /* f_uv'(x) = f'(x) + u*g(x)+ g'(x)*(ux + v) */
-
-	 /* g'(x)*(ux + v) */
-	 modul_set_ul (tmp, u, mod);
-	 modul_set_ul (tmp1, r, mod);
-	 modul_mul (tmp, tmp, tmp1, mod);
-	 modul_set_ul (tmp1, v, mod);
-	 modul_add (tmp, tmp, tmp1, mod);
-	 modul_set_ul (tmp1, g[1], mod);
-	 modul_mul (tmp, tmp, tmp1, mod);
-
-	 /* u*g(x) + g'(x)*(ux + v) */
-	 gr = eval_poly_ui_mod (g, 1, r, pe);
-	 modul_set_ul (tmp1, gr, mod);
-	 modul_set_ul (tmp2, u, mod);
-	 modul_mul (tmp2, tmp1, tmp2, mod);
-	 modul_add (tmp, tmp, tmp2, mod);
-
-	 /* f'(x) */
-	 fr = eval_poly_diff_ui_mod (f, d, r, p);
-	 modul_set_ul (tmp2, fr, mod);
-	 modul_add (tmp, tmp, tmp2, mod); // tmp should be kept unchanged from now on.
-
-	 /* f_uv(r) = f(r) + g(r)*(ur + v) (mod pe) */
-	 modul_clear (tmp1, mod);
-	 modul_clear (tmp2, mod);
-	 modul_initmod_ul (modpe, pe);
-	 modul_init (tmp1, modpe);
-	 modul_init (tmp2, modpe);
-	 /* tmp1 = g(r)*(ur + v) */
-	 modul_set_ul (tmp1, u, modpe);
-	 modul_set_ul (tmp2, r, modpe);
-	 modul_mul (tmp1, tmp1, tmp2, modpe);
-	 modul_set_ul (tmp2, v, modpe);
-	 modul_add (tmp1, tmp1, tmp2, modpe);
-	 modul_set_ul (tmp2, gr, modpe);
-	 modul_mul (tmp1, tmp1, tmp2, modpe);
-	 /* f(r) */
-	 fr = eval_poly_ui_mod (f, d, r, pe);
-	 modul_set_ul (tmp2, fr, modpe);
-	 modul_add (tmp1, tmp1, tmp2, modpe);
-	 modul_clear (tmp1, modpe);
-
-	 /* if f_uv(r) = 0 (mod pe), then it is a root. We
-		need to check whether it is single or multiple. */
-	 if ( modul_get_ul (tmp1, modpe) == 0 ) {
-
-		  if ( modul_get_ul (tmp, mod) == 0 )
-			   type = 2;
-
-		  else {
-
-			   modul_init (tmp1, mod);
-
-			   /* 1/f'(r) (mod p) */
-			   modul_inv (tmp, tmp, mod);
-
-			   /* -f(r)/p^(e-1) (mod p) */
-			   fr = fr / (pe/p);
-			   modul_set_ul (tmp1, fr, mod);
-			   modul_neg (tmp1, tmp1, mod);
-			   modul_mul (tmp, tmp, tmp1, mod);
-
-			   (*r_lifted) = modul_get_ul(tmp, mod);
-			   (*r_lifted) = (*r_lifted) * (pe/p) + r;
-			   //printf ("lifted_r: %lu\n", *r_lifted);
-			   type = 1;
-
-			   modul_clear (tmp1, mod);
-		  }
-	 }
-	 /* r is not a root mod (pe) */
-	 else
-		  type = 0;
-
-	 modul_clear (tmp2, modpe);
-	 modul_clear (tmp, mod);
-	 modul_clearmod (mod);
-	 modul_clearmod (modpe);
-	 return type;
-}
-
-
 /*
   Given f (mod pe) and (u, v) (mod pe) pair.
   Lift a single root r (mod pe/p) to r (mod p)
@@ -2754,18 +2457,18 @@ liftroot_fuv_ul ( unsigned long *f,
 
 
 /*
-  Reduce mpz_t *f to unsigned long *f_mod;
+  Reduce mpz_t *f to unsigned int *f_mod;
   Given modulus pe, return f (mod pe).
 */
 static inline void
-reduce_poly_ul ( unsigned long *f_ul,
+reduce_poly_ul ( unsigned int *f_ui,
 				 mpz_t *f,
 				 int d,
-				 unsigned long pe )
+				 unsigned int pe )
 {
 	 int i;
 	 for (i = 0; i <= d; i ++) {
-		  f_ul[i] = mpz_fdiv_ui (f[i], pe);
+		  f_ui[i] = (unsigned int) mpz_fdiv_ui (f[i], pe);
 	 }
 }
 
@@ -2775,173 +2478,135 @@ reduce_poly_ul ( unsigned long *f_ul,
 /*-----------------------------*/
 
 
+#define DEBUG_FIND_SUBLATTICE 0
 /*
   Find good sublattice, the lifted cases.
 */
 static void
 find_sublattice_lift ( node *firstchild,
 					   listnode **top,
-					   unsigned long * f_ul,
-					   unsigned long * g_ul,
-					   unsigned long * fuv_ul,
+					   unsigned int * f_ui,
+					   unsigned int * g_ui,
+					   unsigned int * fuv_ui,
 					   int d,
 					   unsigned int p,
-					   unsigned int e,
-					   unsigned int curr_e )
+					   char e,
+					   char curr_e )
 {
+	 /* recursion end */
 	 if (firstchild == NULL || curr_e > e)
 		  return;
 
-	 /* some tmp variables */
-	 unsigned short nd, ns;
-	 unsigned int i, k, nroots;
-	 unsigned long pe, pem1, r_lifted[1], *r, uu, vv, fr, gr;
-	 node *currnode, *tmpnode, *l1node;
-	 uu = vv = r_lifted[0] = 0;
-
-	 /* until now, all the siblings to the left of "firstchild" has
-		been considered. Therefore, we only consider the "nextsibling".
-		hence we call it "first" sibling. */
-	 currnode = firstchild;
-	 tmpnode = l1node = NULL;
+	 char l;
+	 unsigned int i, j, k, nroots, pe, pem1, fr, gr;
+	 node *currnode, *tmpnode = NULL, *tmpnode2 = NULL;
 
 	 /* compute p^e */
 	 pem1 = 1UL;
-	 for (i = 0; i < curr_e - 1; i ++)
+	 for (l = 0; l < curr_e - 1; l ++)
 		  pem1 = pem1 * p;
 	 pe = pem1 * p;
 
 	 /* loop until all siblings are checked. */
-	 while ( (currnode != NULL) ) {
+	 currnode = firstchild;
+	 while (currnode != NULL) {
 
-		  /* find level 1 nodes, those (u, v) (mod p). */
-		  l1node = currnode;
-		  while (l1node->e != 1)
-			   l1node = l1node->parent;
+		  /*
+			printf("-----\n");
+			printf("p: %u, e: %d -> %d\n", p, curr_e - 1, curr_e);
+			printf("(u, v) pair: (%u, %u) has roots: \n",
+			currnode->u, currnode->v);
+			for (i = 0; i < (currnode->nr); i++)
+			printf("\tr[%u]: %u\n", i, currnode->r[i]);
+			printf("-----\n");
+		  */
 
-		  if (DEBUG) {
-			   printf("-----\n");
-			   printf("p: %u, e: %u -> %u\n", p, curr_e - 1, curr_e);
-			   printf("u-v pair: (%lu, %lu) has roots: \n",
-					  currnode->u, currnode->v);
-			   for (i = 0; i < (currnode->nr); i++)
-					printf("\tr[%u]: %lu\n", i, currnode->r[i]);
-			   //print_tree(l1node->parent, 0);
-			   printf("-----\n");
-		  }
+		  /* compute f_uv(x) and then evaluate it at r. */
+		  compute_fuv_ui (fuv_ui, f_ui, g_ui, d, currnode->u, currnode->v, pe);
 
-		  /* save current roots */
-		  r = (unsigned long *) malloc ( (currnode->nr) * sizeof (unsigned long) );
-		  if (r == NULL) {
-			   fprintf (stderr, "Error, cannot allocate memory in find_sublattice_lift(). \n");
-			   exit (1);
-		  }
-		  for (i = 0; i < currnode->nr; i ++)
-			   r[i] = 0;
+		  /* loop all roots */
+		  for (nroots = 0; nroots < currnode->nr; nroots++) {
 
-		  /* save all the multiple and single roots for this node. */
-		  nd = 0;
-		  ns = 0;
-		  for (nroots = 0; nroots < (currnode->nr); nroots++) {
-			   /* search all roots of the (u, v) (mod p) to find
-				  the level 1 ancestor of the current root. */
-			   for (i = 0; i < (l1node->nr); i++) {
-					if ( l1node->r[i] == (currnode->r[nroots] % p) ) {
-						 if (l1node->roottype[i] == 2) {
-							  r[nd] = currnode->r[nroots];
-							  nd ++;
-						 }
-						 else if (l1node->roottype[i] == 1) {
-							  r[currnode->nr - 1 - ns] = currnode->r[nroots];
-							  ns ++;
-						 }
-						 else {
-							  fprintf (stderr, "Error, roottype wrong in find_sublattice_lift(). \n");
-							  exit (1);
-						 }
-					}
-			   }
-		  }
-
-		  /* Now a pair (u, v) is fixed. Fix this pair,
-			 -- r is multiple, solve lifted (u, v) who has this r + i*p^k as
-			 multiple roots; Also for these (u, v), lift any possible single r;
-			 -- Note if it is single root. We ignore it. r could be a
-			 single root for some other pair (u', v') where (u', v') has
-			 some other multiple root. However, this situation will be
-			 detected by other (u', v') r' pair. */
-		  compute_fuv_ul (fuv_ul, f_ul, g_ul, d, currnode->u, currnode->v, pe);
-
-		  for (nroots = 0; nroots < nd; nroots++) {
-
-			   /* compute g(r) */
-			   gr = eval_poly_ui_mod (g_ul, 1, r[nroots], pe);
+			   gr = (unsigned int) eval_poly_ui_mod (g_ui, 1, currnode->r[nroots], pe);
 			   if (gr % p == 0)
 					continue;
 
-			   /* compute f_uv(x) and then evaluate it at r. */
-			   fr = eval_poly_ui_mod (fuv_ul, d, r[nroots], pe);
-			   fr = fr / pem1;
-			   /* solve on fr + gr*x = 0 (mod p), where x = uu*r + vv. */
-			   fr = solve_lineq (fr, gr, 0, p);
-			   fr = fr % p;
+			   /* If the root is multiple */
+			   if (currnode->roottype[nroots] == 2) {
 
-			   /* we want to solve (uu, vv) in  fr = uu*r + vv (mod p).
-				  - if r is not invertible, fix vv and loop all uu.
-				  - otherwise, fix vv and solve uu. */
-			   if (r[nroots] % p == 0) {
+					fr = (unsigned int) eval_poly_ui_mod (fuv_ui, d, currnode->r[nroots], pe);
+					fr = fr / pem1;
 
-					for (uu = 0; uu < p; uu ++) {
-						 if (DEBUG)
-							  printf ("fr: %lu, r: %lu,  (uu, vv): (%lu, %lu) -> (%lu, %lu) (non-invertible, multiple) \n",
-									  fr, r[nroots], uu, fr, currnode->u + pem1 * uu,
-									  currnode->v + pem1 * fr);
+					/* solve on fr + gr*A = 0 (mod p), where A = i*r + j. */
+					fr = (unsigned int) solve_lineq (fr, gr, 0, p);
 
-						 /* since now r is a multiple root, add r + k * p^{e-1}. */
-						 for (k = 0; k < p; k ++) {
-							  insert_node (currnode, &tmpnode, currnode->u + pem1 * uu,
-										   currnode->v + fr * pem1, r[nroots] + k * pem1, curr_e, pe, 0);
+					/* we want to solve (i, j) in  fr = i*r + j (mod p).
+					   - if r is not invertible, loop i with fixed j;
+					   - otherwise, loop j to solve i. */
+					if (currnode->r[nroots] % p == 0) {
+
+						 for (i = 0; i < p; i ++) {
+
+#if DEBUG_FIND_SUBLATTICE
+							  fprintf (stderr, "fr: %u, r: %u,  (i, j): (%u, %u) -> (%u, %u) (non-invertible, multiple)\n",
+									   fr, currnode->r[nroots], i, fr, currnode->u + pem1 * i,
+									   currnode->v + pem1 * fr);
+#endif
+							  /* r is a multiple root, add r + k * p^{e-1}. */
+							  for (k = 0; k < p; k ++) {
+								   insert_node (currnode, &tmpnode, currnode->u + pem1 * i,
+												currnode->v + pem1 * fr, currnode->r[nroots] + k * pem1, curr_e, p, pe, 2);
+							  }
+
+							  /* count the lifted single roots for any lifted pairs (u, v). Note
+								 the lifted single roots will not be computed actually. */
+							  for (k = 0; k < (currnode->nr); k++) {
+								   if (currnode->roottype[k] == 1) {
+										insert_node (currnode, &tmpnode, currnode->u + pem1 * i,
+													 currnode->v + pem1 * fr, currnode->r[k], curr_e, p, pe, 1);
+								   }
+							  }
 						 }
+					}
+					else {
+						 for (j = 0; j < p; j ++) {
 
-						 /* we want to find all the lifted single roots for this pair (u, v) */
-						 for (k = nd; k < (currnode->nr); k++) {
-							  r_lifted[0] = 0;
-							  compute_fuv_ul (fuv_ul, f_ul, g_ul, d, currnode->u + pem1 * uu,
-											  currnode->v + fr * pem1, pe);
-							  liftroot_fuv_ul (fuv_ul, d, r[k], p, pe, r_lifted);
-							  insert_node (currnode, &tmpnode, currnode->u + pem1 * uu,
-										   currnode->v + fr * pem1, r_lifted[0], curr_e, pe, 0);
+							  /* given j, solve i in  fr = i*r + j (mod p). */
+							  i = solve_lineq (j, currnode->r[nroots], fr, p);
+#if DEBUG_FIND_SUBLATTICE
+							  fprintf (stderr, "fr: %u, r: %u,  (i, j): (%u, %u) -> (%u, %u) (invertible, multiple)\n",
+									   fr, currnode->r[nroots], i, j, currnode->u + pem1 * i,
+									   currnode->v + pem1 * j);
+#endif
+							  /* r is a multiple root, add r + k * p^{e-1}. */
+							  for (k = 0; k < p; k ++) {
+								   insert_node (currnode, &tmpnode, currnode->u + pem1 * i,
+												currnode->v + pem1 * j, currnode->r[nroots] + k * pem1, curr_e, p, pe, 2);
+							  }
+
+							  /* count the lifted single roots for any lifted pairs (u, v). Note
+								 the lifted single roots will not be computed actually. */
+							  for (k = 0; k < (currnode->nr); k++) {
+								   if (currnode->roottype[k] == 1) {
+										insert_node (currnode, &tmpnode, currnode->u + pem1 * i,
+													 currnode->v + pem1 * j, currnode->r[k], curr_e, p, pe, 1);
+								   }
+							  }
 						 }
 					}
 			   }
-			   else {
-					for (vv = 0; vv < p; vv ++) {
-						 uu = solve_lineq (vv, r[nroots], fr, p);
-						 if (DEBUG)
-							  printf ("fr: %lu, r: %lu, (uu, vv): (%lu, %lu) -> (%lu, %lu) (invertible, multiple) \n",
-									  fr, r[nroots], uu, vv, currnode->u + pem1 * uu, currnode->v + pem1 * vv);
+		  }  // next root of current (u, v)
 
-						 /* since now r is a multiple root, add r + k * p^{e-1}. */
-						 for (k = 0; k < p; k ++) {
-							  insert_node (currnode, &tmpnode, currnode->u + pem1 * uu,
-										   currnode->v + pem1 * vv, r[nroots] + k * pem1, curr_e, pe, 0);
-						 }
-
-						 /* we want to find all the lifted single roots for this pair (u, v) */
-						 for (k = nd; k < (currnode->nr); k++) {
-							  r_lifted[0] = 0;
-							  compute_fuv_ul (fuv_ul, f_ul, g_ul, d, currnode->u + pem1 * uu,
-											  currnode->v + pem1 * vv, pe);
-							  liftroot_fuv_ul (fuv_ul, d, r[k], p, pe, r_lifted);
-							  insert_node (currnode, &tmpnode, currnode->u + pem1 * uu,
-										   currnode->v + pem1 * vv, r_lifted[0], curr_e, pe, 0);
-						 }
-					}
-			   }
-		  } // consider next root of current (u, v)
-
-		  free (r);
-		  find_sublattice_lift (currnode->firstchild, top, f_ul, g_ul, fuv_ul, d, p, e, curr_e + 1);
+		  /* recursieve to next level, curr_e + 1 */
+		  find_sublattice_lift ( currnode->firstchild,
+								 top,
+								 f_ui,
+								 g_ui,
+								 fuv_ui,
+								 d,
+								 p,
+								 e,
+								 curr_e + 1 );
 
 		  /* If current node is the 2nd bottom leave, add the bottom level leaves
 			 with highest valuations to the list and delete them. */
@@ -2949,10 +2614,15 @@ find_sublattice_lift ( node *firstchild,
 			   tmpnode = currnode->firstchild;
 			   while (tmpnode != NULL) {
 					insert_listnode (top, tmpnode->u, tmpnode->v, tmpnode->val);
-					l1node = tmpnode;
+					tmpnode2 = tmpnode;
 					tmpnode = tmpnode->nextsibling;
-					//printf ("deleting ... (%lu, %lu)\n", l1node->u, l1node->v);
-					free_node (&l1node);
+
+#if DEBUG_FIND_SUBLATTICE
+					fprintf (stderr, "DEBUG_FIND_SUBLATTICE (2nd bottom): p: %u, (%u, %u), val: %f, e: %d, max_e: %d\n",
+							 p, tmpnode2->u, tmpnode2->v, tmpnode2->val, curr_e, e);
+#endif
+
+					free_node (&tmpnode2);
 			   }
 		  }
 
@@ -2961,121 +2631,85 @@ find_sublattice_lift ( node *firstchild,
 		  currnode = currnode->nextsibling;
 		  if (currnode != NULL)
 			   (currnode->parent)->firstchild = currnode;
-		  //printf ("deleting ... (%lu, %lu)\n", tmpnode->u, tmpnode->v);
+
+#if DEBUG_FIND_SUBLATTICE
+					fprintf (stderr, "DEBUG_FIND_SUBLATTICE (bottom): p: %u, (%u, %u), val: %f, e: %d, max_e: %d\n",
+							 p, tmpnode->u, tmpnode->v, tmpnode->val, curr_e, e);
+#endif
+
 		  free_node (&tmpnode);
-	 }
+	 } // next sibling of current node
+
 	 return;
 }
 
 
 /*
-  Find sublattices, the base case.
-
-  Only consider those (u, v) which has at least one multiple root;
-  Ignore those pairs which have no multiple root. Note, for the
-  (u, v) pairs, we consider all the roots (simple + mul) of them.
+  Find sublattices, the base case. Note, for the (u, v)
+  pairs, we consider all the simple + multi roots.
 */
 static void
 find_sublattice ( listnode **top,
 				  rsstr_t rs,
 				  unsigned int p,
-				  unsigned int e )
+				  char e )
 {
-	 mpz_t fx_tmp, gx_tmp, numerator_tmp, tmp;
-	 unsigned long pe, i, r, v, a, b, u, *f_ul, *g_ul, *fuv_ul, r_lifted[1];
+	 unsigned int pe, r, u, v, fx_ui, gx_ui;
+	 char i;
 	 node *currnode, *root;
-	 int k;
-
-	 mpz_init (fx_tmp);
-	 mpz_init (gx_tmp);
+	 mpz_t tmp;
 	 mpz_init (tmp);
-	 mpz_init (numerator_tmp);
-
-	 f_ul = (unsigned long*) malloc ((rs->d + 1) * sizeof (unsigned long));
-	 fuv_ul = (unsigned long*) malloc ((rs->d + 1) * sizeof (unsigned long));
-	 g_ul = (unsigned long*) malloc ((2) * sizeof (unsigned long));
-	 if ((f_ul == NULL) || (g_ul == NULL) || (fuv_ul == NULL)) {
-		  fprintf (stderr, "Error, cannot allocate memory in find_sublattice(). \n");
-		  exit (1);
-	 }
 
 	 /* compute p^e */
 	 pe = 1UL;
 	 for (i = 0; i < e; i ++)
 		  pe = pe * p;
 
-	 /* compute f (mod pe) */
-	 reduce_poly_ul (f_ul, rs->f, rs->d, pe);
-	 reduce_poly_ul (g_ul, rs->g, 1, pe);
-
      /* new (u, v, val) tree */
-	 new_tree(&root);
+	 new_tree (&root);
 	 root = new_node ();
 
 	 /* for each root 0 <= r < p  */
 	 for (r = 0; r < p; r ++) {
 
-		  /* set f(r), g(r), numerator(r) */
-		  if (r < primes[NP-1]) {
-			   mpz_set (fx_tmp, rs->fx[r]);
-			   mpz_set (gx_tmp, rs->gx[r]);
-			   mpz_set (numerator_tmp, rs->numerator[r]);
-		  }
-		  else {
-			   fprintf (stderr, "Error, something strange in find_sublattice(). \n");
-			   exit(1);
-		  }
-
-		  /* ignore those non-invertible g[r] */
-		  if (mpz_divisible_ui_p(gx_tmp, p) != 0)
+		  /* skip these */
+		  if (mpz_divisible_ui_p(rs->gx[r], p) != 0)
 			   continue;
 
-		  /* solve u in g(r)^2 * u = numerators_ext(r) (mod p) */
-		  b = mpz_fdiv_ui (numerator_tmp, p);
-		  b = p - b;
-		  mpz_mul (tmp, gx_tmp, gx_tmp);
-		  a = mpz_fdiv_ui (tmp, p);
+		  /* use single precision */
+		  fx_ui = (unsigned int) mpz_fdiv_ui (rs->fx[r], p);
+		  gx_ui = (unsigned int) mpz_fdiv_ui (rs->gx[r], p);
 
-		  /* call solve_lineq function on b + a*su = 0 (mod p) */
-		  u = solve_lineq (b, a, 0, p);
+		  for (u = 0; u < p; u ++) {
 
-		  /* only need to consider the special u pair (u, v), we
-			 want to solve v given u and r. */
-		  mpz_mul_ui (tmp, gx_tmp, r);
-		  mpz_mul_ui (tmp, tmp, u);
-		  mpz_add (tmp, tmp, fx_tmp);
-		  b = mpz_fdiv_ui (tmp, p);
-		  a = mpz_fdiv_ui (gx_tmp, p);
-		  v = solve_lineq (b, a, 0, p);
+			   /* u*g(r)^2 - f(r)g'(r) + f'(r)g(r) */
+			   mpz_mul (tmp, rs->gx[r], rs->gx[r]);
+			   mpz_mul_ui (tmp, tmp, u);
+			   mpz_sub (tmp, tmp, rs->numerator[r]);
 
-		  /* For this (u, v) pair which is already known to have a
-			 multiple root r, we search for any other possible single
-			 and  multiple roots (not necessary for multiple since other r's
-			 will generate the same (u, v). ). We exhaustively search. */
-		  for (i = 0; i < p; i ++) {
+			   /* compute v in f(r) + u*r*g(r) + v*g(r) = 0 (mod p) */
+			   v =  compute_v_ui (fx_ui, gx_ui, r, u, p);
 
-			   /* r_lifted is not correct, but not important here. Only k is used. */
-			   k  = isroot_fuv_ul (f_ul, g_ul, rs->d, u, v, i, p, p, r_lifted);
-			   if (DEBUG)
-					printf ("(u, v): %lu, %lu  r: %lu, is_root: %d\n", u, v, i, k);
+			   /* simple root */
+			   if (mpz_divisible_ui_p(tmp, p) == 0) {
 
-			   /* if i is some root, either single or multiple. */
-			   if (k != 0) {
-					/* insert i, which does not equal to r, if exits.*/
-					insert_node (root, &currnode, u, v, i, 1, p, k);
+					/* fprintf (stderr, "p: %u, r: %u, u: %u, v: %u\n", */
+					/* 		 p, r, u, v); */
+
+					insert_node (root, &currnode, u, v, r, 1, p, p, 1);
+			   }
+			   else {
+					insert_node (root, &currnode, u, v, r, 1, p, p, 2);
 			   }
 		  }
 	 }
 
-	 /* if e == 1, add nodes to list top. Note that, we add all nodes
-		since now e == 1 is too small. It might be inaccurate if we only
-		add nodes with best valuation. For accuracy considerations, we
-		add all nodes to the list. */
+	 /* If e == 1, add all nodes to list top */
 	 if (e == 1) {
 		  node *tmpnode;
 		  currnode = root->firstchild;
 		  while (currnode != NULL) {
-			   insert_listnode_plain (top, currnode->u, currnode->v, currnode->val);
+			   insert_listnode (top, currnode->u, currnode->v, currnode->val);
 			   tmpnode = currnode;
 			   currnode = currnode->nextsibling;
 			   free_node (&tmpnode);
@@ -3084,78 +2718,75 @@ find_sublattice ( listnode **top,
 	 }
 	 /* if e > 1, lift to higher p^e */
 	 else {
-		  find_sublattice_lift (root->firstchild, top, f_ul, g_ul, fuv_ul, rs->d, p, e, 2);
-	 }
+		  /* find_sublattice_lift() only consider those pairs with at least one multiple
+			 , hence we need to consider those (u,v) which solely have single roots */
+		  node *tmpnode = NULL, *lastnode = NULL;
+		  unsigned int j, c;
+		  currnode = root->firstchild;
+		  while (currnode != NULL) {
 
-	 free_node(&root);
+			   c = 1;
+			   for (j = 0; j < currnode->nr; j ++)
+					if (currnode->roottype[j] == 2)
+						 c = 0;
 
-     /* clear */
-	 free (f_ul);
-	 free (fuv_ul);
-	 free (g_ul);
-	 mpz_clear (tmp);
-	 mpz_clear (fx_tmp);
-	 mpz_clear (gx_tmp);
-	 mpz_clear (numerator_tmp);
-}
+			   /* case when (u, v) only has single roots */
+			   if (c == 1) {
 
-#if 0
+					insert_listnode (top, currnode->u, currnode->v, currnode->nr / ( (double) p - 1) );
 
-/*
-  Init a 2D arrary of type ul, the
-  dimension X by Y.
-
-*/
-static void
-init_2D_ld ( long ***array,
-			 const unsigned long X,
-			 const unsigned long Y )
-{
-	 unsigned long i, j;
-
-	 /* alloc */
-	 (*array) = (long **) malloc (X * sizeof (long *));
-	 if ( (*array) != NULL) {
-		  for (i = 0; i < X; i ++) {
-			   (*array)[i] = (long *) malloc ( Y * sizeof(long) );
-			   if ( (*array)[i] == NULL) {
-					fprintf (stderr, "Error, cannot allocate memory in init_2D_ld(). \n");
-					exit (1);
+					/* delete this node */
+					tmpnode = currnode;
+					currnode = currnode->nextsibling;
+					if (lastnode != NULL)
+						 lastnode->nextsibling = currnode;
+					else
+						 (currnode->parent)->firstchild = currnode;
+					free_node (&tmpnode);
+			   }
+			   else {
+					lastnode = currnode;
+					currnode = currnode->nextsibling;
 			   }
 		  }
-	 }
-	 else {
-		  fprintf (stderr, "Error, cannot allocate memory in main\n");
-		  exit (1);
+
+		  /* data struct for the lift */
+		  unsigned int *f_ui, *g_ui, *fuv_ui;
+		  f_ui = (unsigned int*) malloc ( (rs->d + 1) * sizeof (unsigned int) );
+		  fuv_ui = (unsigned int*) malloc ( (rs->d + 1) * sizeof (unsigned int) );
+		  g_ui = (unsigned int*) malloc ( 2 * sizeof (unsigned int) );
+		  if ( (f_ui == NULL) ||
+			   (g_ui == NULL) ||
+			   (fuv_ui == NULL) ) {
+			   fprintf (stderr, "Error, cannot allocate memory in find_sublattice(). \n");
+			   exit (1);
+		  }
+		  /* compute f (mod pe) */
+		  reduce_poly_ul (f_ui, rs->f, rs->d, pe);
+		  reduce_poly_ul (g_ui, rs->g, 1, pe);
+
+		  find_sublattice_lift ( root->firstchild,
+								 top,
+								 f_ui,
+								 g_ui,
+								 fuv_ui,
+								 rs->d,
+								 p,
+								 e,
+								 2 );
+
+		  /* clear */
+		  free (f_ui);
+		  free (fuv_ui);
+		  free (g_ui);
 	 }
 
-	 /* init */
-	 for (i = 0; i < X; i ++)
-		  for (j = 0; j < Y; j ++)
-			   (*array)[i][j] = 0UL;
+	 mpz_clear (tmp);
+	 free_node(&root);
 }
 
 
-/*
-  Free a 2D arrary of type ul, the
-  dimension X by Y.
-*/
-static void
-free_2D_ld ( long ***array,
-			 const unsigned long X )
-{
-	 unsigned long i;
-
-	 for (i = 0; i < X; i++) {
-		  if ((*array)[i])
-			   free ((*array)[i]);
-	 }
-
-	 if (*array)
-		  free (*array);
-}
-
-
+#if 0
 /*
   partition.
 */
@@ -3263,31 +2894,31 @@ return_all_sublattices_crt ( rsparam_t rsparam,
 
 	 /* if u is good, compute v */
 /*	 if ( mpz_cmp_ui (tmpu1, rsparam->global_u_bound_rs) <= 0 ||
-		  mpz_cmpabs_ui (re, rsparam->global_u_bound_rs) <= 0 ) {
+	 mpz_cmpabs_ui (re, rsparam->global_u_bound_rs) <= 0 ) {
 */
-		  /* compute v */
-		  mpz_set_ui (tmpu2, individual_sublattices[0][ind[0]][1]);
-		  mpz_set_ui (tmpp1, pe[0]);
-		  for (i = 1; i < rsparam->tlen_e_sl; i ++) {
+	 /* compute v */
+	 mpz_set_ui (tmpu2, individual_sublattices[0][ind[0]][1]);
+	 mpz_set_ui (tmpp1, pe[0]);
+	 for (i = 1; i < rsparam->tlen_e_sl; i ++) {
 
-			   mpz_set_ui (tmpv, individual_sublattices[i][ind[i]][1]);
-			   mpz_set_ui (tmpp2, pe[i]);
+		  mpz_set_ui (tmpv, individual_sublattices[i][ind[i]][1]);
+		  mpz_set_ui (tmpp2, pe[i]);
 
-			   crt_pair_mp ( tmpu2,
-							 tmpp1,
-							 tmpv,
-							 tmpp2,
-							 re );
+		  crt_pair_mp ( tmpu2,
+						tmpp1,
+						tmpv,
+						tmpp2,
+						re );
 
-			   mpz_mul_ui (tmpp1, tmpp1, pe[i]);
-			   mpz_set (tmpu2, re);
-		  }
+		  mpz_mul_ui (tmpp1, tmpp1, pe[i]);
+		  mpz_set (tmpu2, re);
+	 }
 
-		  /* (u, v) pair in (tmpu1, tmpu2) */
-		  if (mpz_cmp_ui (tmpu1, rsparam->global_u_bound_rs) > 0)
-			   mpz_sub (tmpu1, tmpu1, rsparam->modulus);
+	 /* (u, v) pair in (tmpu1, tmpu2) */
+	 if (mpz_cmp_ui (tmpu1, rsparam->global_u_bound_rs) > 0)
+		  mpz_sub (tmpu1, tmpu1, rsparam->modulus);
 
-		  insert_sublattice_pq ( pqueue, tmpu1, tmpu2 );
+	 insert_sublattice_pq ( pqueue, tmpu1, tmpu2 );
 //	 }
 
 	 mpz_clear (tmpp1);
@@ -3298,6 +2929,15 @@ return_all_sublattices_crt ( rsparam_t rsparam,
 	 mpz_clear (re);
 }
 
+/*
+  static void
+  SORT ( listnode **top,
+  rsstr_t rs,
+  unsigned int p,
+  unsigned int e )
+
+
+*/
 
 /*
   Return all sublattices by calling CRT, where for each sublattice,
@@ -3377,6 +3017,8 @@ return_all_sublattices ( rsstr_t rs,
 			   exit (1);
 		  }
 
+		  //sort_list_alpha (&top, rs, tsize[i]); TBA
+
 		  tmp = top;
 		  for (j = 0; j < size[i]; j ++) {
 			   (individual_sublattices)[i][j] =
@@ -3388,7 +3030,7 @@ return_all_sublattices ( rsstr_t rs,
 			   individual_sublattices[i][j][0] = tmp->u;
 			   individual_sublattices[i][j][1] = tmp->v;
 			   tmp = tmp->next;
-			   //printf ("#%lu, (%lu, %lu)\n", j, individual_sublattices[i][j][0], individual_sublattices[i][j][1]);
+			   //fprintf (stderr, "SUBLATTICE: #%lu, (%lu, %lu)\n", j, individual_sublattices[i][j][0], individual_sublattices[i][j][1]);
 		  }
 		  free_list (&top);
 	 }
@@ -3663,9 +3305,9 @@ rootsieve_run_line ( int16_t *ARRAY,
 static inline void
 rootsieve_run_multroot_lift ( node *currnode,
 							  int16_t *ARRAY,
-							  unsigned long *f_ul,
-							  unsigned long *g_ul,
-							  unsigned long *fuv_ul,
+							  unsigned int *f_ui,
+							  unsigned int *g_ui,
+							  unsigned int *fuv_ui,
 							  int d,
 							  rsbound_t rsbound,
 							  unsigned int p,
@@ -3679,8 +3321,7 @@ rootsieve_run_multroot_lift ( node *currnode,
 
 	 /* variables */
 	 int16_t subtmp;
-	 unsigned int k, nroots;
-	 unsigned long pe, pem1, fr, gr, step;
+	 unsigned int k, nroots, pe, pem1, fr, gr, step;
 	 node *tmpnode = NULL, *tmpnode2 = NULL;
 	 long j;
 
@@ -3697,13 +3338,13 @@ rootsieve_run_multroot_lift ( node *currnode,
 		  for (nroots = 0; nroots < currnode->nr; nroots++) {
 
 			   /* compute g(r) */
-			   gr = eval_poly_ui_mod (g_ul, 1, currnode->r[nroots], pe);
+			   gr = eval_poly_ui_mod (g_ui, 1, currnode->r[nroots], pe);
 			   if (gr % p == 0)
 					continue;
 
 			   /* compute f_uv(x) and then evaluate it at r. */
-			   compute_fuv_ul (fuv_ul, f_ul, g_ul, d, currnode->u, currnode->v, pe);
-			   fr = eval_poly_ui_mod (fuv_ul, d, currnode->r[nroots], pe);
+			   compute_fuv_ui (fuv_ui, f_ui, g_ui, d, currnode->u, currnode->v, pe);
+			   fr = eval_poly_ui_mod (fuv_ui, d, currnode->r[nroots], pe);
 			   fr = fr / pem1;
 
 			   /* solve on fr + gr*x = 0 (mod p), where x = uu*r + vv. */
@@ -3723,7 +3364,7 @@ rootsieve_run_multroot_lift ( node *currnode,
 			   for (k = 0; k < p; k ++) {
 
 #if DEBUG_MULTROOT_LIFT
-					fprintf (stderr, "level %u, (%lu, %lu), r: %lu\n",
+					fprintf (stderr, "level %u, (%u, %u), r: %u\n",
 							 curr_e, currnode->u, currnode->v + fr *pem1, currnode->r[nroots] + k * pem1);
 #endif
 
@@ -3731,16 +3372,16 @@ rootsieve_run_multroot_lift ( node *currnode,
 								  currnode->u,
 								  currnode->v + fr * pem1,
 								  currnode->r[nroots] + k * pem1,
-								  curr_e, pe, 0 );
-			   } // next root of current (u, v)
-		  }
+								  curr_e, p, pe, 0 );
+			   }
+		  }  // next root of current (u, v)
 
 		  /* recursieve to next level, curr_e + 1 */
 		  rootsieve_run_multroot_lift ( currnode->firstchild,
 										ARRAY,
-										f_ul,
-										g_ul,
-										fuv_ul,
+										f_ui,
+										g_ui,
+										fuv_ui,
 										d,
 										rsbound,
 										p,
@@ -3798,7 +3439,7 @@ rootsieve_run_multroot_lift ( node *currnode,
 					tmpnode = tmpnode->nextsibling;
 
 #if DEBUG_MULTROOT_LIFT
-					fprintf (stderr, "deleting bottomnode ... (%lu, %lu) with %u roots in level %u, ",
+					fprintf (stderr, "deleting bottomnode ... (%u, %u) with %u roots in level %u, ",
 							 tmpnode2->u, tmpnode2->v, tmpnode2->nr, curr_e);
 					fprintf (stderr, "sieving bottomnode ... %d in steps %lu\n", subtmp, step); // pe
 #endif
@@ -3846,7 +3487,7 @@ rootsieve_run_multroot_lift ( node *currnode,
 							   j, step, subtmp );
 
 #if DEBUG_MULTROOT_LIFT
-		  fprintf (stderr, "deleting ... (%lu, %lu) with %u roots in level %u, ", tmpnode->u, tmpnode->v, tmpnode->nr, curr_e - 1);
+		  fprintf (stderr, "deleting ... (%u, %u) with %u roots in level %u, ", tmpnode->u, tmpnode->v, tmpnode->nr, curr_e - 1);
 		  fprintf (stderr, "sieving ... %d in steps %lu\n", subtmp, step); //pem1
 #endif
 
@@ -3890,8 +3531,7 @@ rootsieve_run_multroot ( int16_t *ARRAY,
 	 }
 
 	 /* some variables */
-	 unsigned int v;
-	 unsigned long pe, *f_ul, *g_ul, *fuv_ul;
+	 unsigned int v, pe, *f_ui, *g_ui, *fuv_ui;
 	 mpz_t tmpz;
 
 	 mpz_init_set_ui (tmpz, 0UL);
@@ -3902,15 +3542,15 @@ rootsieve_run_multroot ( int16_t *ARRAY,
 		  pe = pe * p;
 
 	 /* use s.p instead of m.p */
-	 f_ul = (unsigned long*) malloc ((rs->d + 1) * sizeof (unsigned long));
-	 fuv_ul = (unsigned long*) malloc ((rs->d + 1) * sizeof (unsigned long));
-	 g_ul = (unsigned long*) malloc ((2) * sizeof (unsigned long));
-	 if ((f_ul == NULL) || (g_ul == NULL) || (fuv_ul == NULL)) {
+	 f_ui = (unsigned int*) malloc ((rs->d + 1) * sizeof (unsigned int));
+	 fuv_ui = (unsigned int*) malloc ((rs->d + 1) * sizeof (unsigned int));
+	 g_ui = (unsigned int*) malloc ((2) * sizeof (unsigned int));
+	 if ((f_ui == NULL) || (g_ui == NULL) || (fuv_ui == NULL)) {
 		  fprintf (stderr, "Error, cannot allocate memory in rootsieve_run_multroot(). \n");
 		  exit (1);
 	 }
-	 reduce_poly_ul (f_ul, rs->f, rs->d, pe);
-	 reduce_poly_ul (g_ul, rs->g, 1, pe);
+	 reduce_poly_ul (f_ui, rs->f, rs->d, pe);
+	 reduce_poly_ul (g_ui, rs->g, 1, pe);
 
 	 /* j -> v (mod p) */
 	 ij2uv (rsbound->B, rsbound->MOD, rsbound->Bmin, j, tmpz);
@@ -3926,14 +3566,14 @@ rootsieve_run_multroot ( int16_t *ARRAY,
 	 node *tmpnode, *root;
 	 new_tree (&root);
 	 root = new_node ();
-	 insert_node (root, &tmpnode, u, v, r, 1, p, 2);
+	 insert_node (root, &tmpnode, u, v, r, 1, p, p, 2);
 
 	 /* lift to higher p^e */
 	 rootsieve_run_multroot_lift ( root->firstchild,
 								   ARRAY,
-								   f_ul,
-								   g_ul,
-								   fuv_ul,
+								   f_ui,
+								   g_ui,
+								   fuv_ui,
 								   rs->d,
 								   rsbound,
 								   p,
@@ -3947,9 +3587,9 @@ rootsieve_run_multroot ( int16_t *ARRAY,
 	 free_node (&root);
 	 tmpnode = NULL;
 
-	 free (f_ul);
-	 free (fuv_ul);
-	 free (g_ul);
+	 free (f_ui);
+	 free (fuv_ui);
+	 free (g_ui);
 	 mpz_clear (tmpz);
 }
 
@@ -3965,9 +3605,8 @@ rootsieve_v ( int16_t *ARRAY,
 			  rsparam_t rsparam,
 			  const long fixed_i )
 {
-	 unsigned int np, nb, p, r, u, v, tmp, max_e, totnb;
+	 unsigned int np, nb, p, r, u, v, tmp, max_e, totnb, fx_ui, gx_ui, pe = 1;
 	 int16_t subsgl[rsparam->len_p_rs], submul[rsparam->len_p_rs];
-	 unsigned long fx_ul, gx_ul, pe = 1;
 	 long  tmp2, start_j_idx[rsparam->len_p_rs], block_size;
 	 float subf;
 	 mpz_t tmpz, tmpu;
@@ -4043,11 +3682,11 @@ rootsieve_v ( int16_t *ARRAY,
 						 u = (unsigned int) mpz_fdiv_ui (tmpu, p);
 
 						 /* use single precision */
-						 fx_ul = mpz_fdiv_ui (rs->fx[r], p);
-						 gx_ul = mpz_fdiv_ui (rs->gx[r], p);
+						 fx_ui = mpz_fdiv_ui (rs->fx[r], p);
+						 gx_ui = mpz_fdiv_ui (rs->gx[r], p);
 
 						 /* compute v in f(r) + u*r*g(r) + v*g(r) = 0 (mod p) */
-						 v = (unsigned int) compute_v_ul (fx_ul, gx_ul, r, u, p);
+						 v = compute_v_ui (fx_ui, gx_ui, r, u, p);
 
 						 /* reset for the first block */
 						 flag[np] = 0;
@@ -4236,21 +3875,6 @@ rootsieve_array_reset ( int16_t *A,
 }
 
 
-#if 0
-/*
-  free array
-*/
-static void
-rootsieve_array_free ( float ***A,
-					   unsigned long ibound )
-{
-	 unsigned long i;
-	 for (i = 0; i < ibound; i++)
-		  free ((*A)[i]);
-	 free (*A);
-}
-#endif
-
 
 /*
   Init rsbound.
@@ -4311,41 +3935,22 @@ rsbound_setup_AB_bound ( rsbound_t rsbound,
 			   mpz_init (q);
 			   mpz_fdiv_q (q, rsparam->global_v_bound_rs, mod);
 			   len =  mpz_get_ui (q);
-			   if (len > (SIEVEARRAY_SIZE << 3)) {
-					rsbound->Bmax = (SIEVEARRAY_SIZE << 3);
-			   }
-			   else {
-					rsbound->Bmax = (long) len;
-			   }
+			   rsbound->Bmax = ( (len > MAX_SIEVEARRAY_SIZE) ? MAX_SIEVEARRAY_SIZE : (long) len);
 			   mpz_set_ui (q, rsparam->global_u_bound_rs);
 			   mpz_fdiv_q (q, q, mod);
 			   len =  mpz_get_ui (q);
-			   if (len > 8) {
-					rsbound->Amax = 8;
-			   }
-			   else {
-					rsbound->Amax = (long) len;
-			   }
+			   rsbound->Amax = ( (len > 8) ? 8 : (long) len);
 			   mpz_clear (q);
 		  }
 	 }
 	 else if (verbose == 0) {
-
 		  rsbound->Amax = 0;
-
 		  unsigned long len;
 		  mpz_t q;
 		  mpz_init (q);
 		  mpz_fdiv_q (q, rsparam->global_v_bound_rs, mod);
 		  len =  mpz_get_ui (q);
-
-		  if (len > (SIEVEARRAY_SIZE << 3)) {
-			   rsbound->Bmax = (SIEVEARRAY_SIZE << 3);
-		  }
-		  else {
-			   rsbound->Bmax = (long) len;
-		  }
-
+		  rsbound->Bmax = ( (len > MAX_SIEVEARRAY_SIZE) ? MAX_SIEVEARRAY_SIZE : (long) len);
 		  mpz_clear (q);
 	 }
 	 else {
@@ -4374,7 +3979,6 @@ rsbound_setup_sublattice ( rsbound_t rsbound,
 		changed for different qudratic rotations. Instead, the true mod
 		is recorded in the priority queue */
 	 mpz_set (rsbound->MOD, mod);
-
 	 ab2uv (rsbound->A, rsbound->MOD, rsbound->Amax, rsbound->Umax);
 	 ab2uv (rsbound->A, rsbound->MOD, rsbound->Amin, rsbound->Umin);
 	 ab2uv (rsbound->B, rsbound->MOD, rsbound->Bmax, rsbound->Vmax);
@@ -4524,17 +4128,25 @@ rsstr_free ( rsstr_t rs )
   them. The real customisation happens in rsparam_setup() function.
 */
 static void
-rsparam_init ( rsparam_t rsparam )
+rsparam_init ( rsparam_t rsparam,
+			   rsstr_t rs,
+			   param_t param )
 {
 	 /* will be set in rsparam_setup */
 	 rsparam->nbest_sl = 0;
 	 rsparam->ncrts_sl = 0;
 	 rsparam->len_e_sl = 0;
 	 rsparam->tlen_e_sl = 0;
-	 rsparam->sizebound_ratio_rs = 0;
 	 rsparam->exp_min_alpha_rs = 0.0;
 	 rsparam->global_w_bound_rs = 0;
 	 rsparam->global_u_bound_rs = 0;
+	 rsparam->init_lognorm = 0.0;
+
+	 /* "rsparam->sizebound_ratio_rs"
+		the higher, the more margin in computing the sieving bound
+		u and v, hence the larger the sieving bound, and hence
+		larger e_sl[] in rsparam_setup(). */
+	 rsparam->sizebound_ratio_rs = 1.01;
 	 mpz_init (rsparam->modulus);
 	 mpz_init_set_ui (rsparam->global_v_bound_rs, 0UL);
 
@@ -4543,6 +4155,15 @@ rsparam_init ( rsparam_t rsparam )
 	 rsparam->len_p_rs = NP - 1;
 	 if (rsparam->len_p_rs >= NP)
 		  rsparam->len_p_rs = NP - 1;
+
+	 /* decide the lognorm bound */
+	 if (param->lognorm_bound > 0)
+		  rsparam->lognorm_bound = param->lognorm_bound;
+	 else {
+		  double skewness = L2_skewness (rs->f, rs->d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+		  rsparam->init_lognorm = L2_lognorm (rs->f, rs->d, skewness, DEFAULT_L2_METHOD);
+		  rsparam->lognorm_bound = rsparam->init_lognorm * 1.08;
+	 }
 }
 
 
@@ -4588,6 +4209,7 @@ bestpoly_free ( bestpoly_t bestpoly,
 	 free (bestpoly->f);
 	 free (bestpoly->g);
 }
+
 
 /*
   replace f + k0 * x^t * (b*x - m) by f + k * x^t * (b*x - m), and return k to k0
@@ -4708,143 +4330,185 @@ rotate_bounds_V_mpz ( mpz_t *f,
 }
 
 
-/* find bound w for qudratic rotation */
-static double
-rotate_bounds_W ( mpz_t *f,
-				  int d,
-				  mpz_t b,
-				  mpz_t m,
-				  unsigned long *W,
-				  int rotation_degree,
-				  int method,
-				  int verbose )
+/* find bound U for linear rotation */
+static void
+rotate_bounds_U_lu ( rsstr_t rs,
+					 rsparam_t rsparam )
 {
-	 int i, upper_bound = 12;
-	 double skewness, init_lognorm, lognorm;
-	 long w0 = 0, w;
-
-	 skewness = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, method);
-	 init_lognorm = L2_lognorm (f, d, skewness, method);
+	 unsigned int i;
+	 int j;
+	 double skewness, lognorm;
+	 mpz_t *f, *g, b, m;
+	 f = (mpz_t *) malloc ( (rs->d + 1)* sizeof (mpz_t));
+	 g = (mpz_t *) malloc ( 2 * sizeof (mpz_t));
+	 for (j = 0; j <= rs->d; j ++)
+		  mpz_init_set (f[j], rs->f[j]);
+	 for (j = 0; j < 2; j ++)
+		  mpz_init_set (g[j], rs->g[j]);
+	 mpz_init_set (b, rs->g[1]);
+	 mpz_init_set (m, rs->g[0]);
+	 mpz_neg (m, m);
 
 	 /* look for positive w: 1, 2, 4, 8, ... */
-	 w = 1;
-
-	 /* decide the bound for the loop */
-	 if (rotation_degree == 1)
-		  upper_bound = 63;
-
-	 for (i = 0; i < upper_bound; i++, w *= 2)
+	 long w0 = 0, w = 1;
+	 for (i = 0; i < (sizeof (long) * 8 - 1); i++, w *= 2)
 	 {
-		  /* rotate by w*x, and fix this polynomial in this loop. */
-		  w0 = rotate_aux (f, b, m, w0, w, rotation_degree);
+		  /* rotate by w*x */
+		  w0 = rotate_aux (rs->f, b, m, w0, w, 1);
 
-		  skewness = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, method);
-		  lognorm = L2_lognorm (f, d, skewness, method);
+		  /* translation-optimize the rotated polynomial */
+		  for (j = 0; j <= rs->d; j ++)
+			   mpz_set (f[j], rs->f[j]);
+		  for (j = 0; j < 2; j ++)
+			   mpz_set (g[j], rs->g[j]);
+		  optimize_aux (f, rs->d, g, 0, 0, CIRCULAR);
 
-		  //fprintf (stderr, "# DEBUG --- [%d-th] W: %ld, lognorm: %f, bound_norm: %f\n", i, w, lognorm, init_lognorm * 1.1);
+		  skewness = L2_skewness (f, rs->d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+		  lognorm = L2_lognorm (f, rs->d, skewness, DEFAULT_L2_METHOD);
 
-		  if (lognorm > init_lognorm * 1.1)
+		  //fprintf (stderr, "# DEBUG --- [%d-th] U: %ld, lognorm: %f, lognorm_bound: %f\n", i, w, lognorm,  rsparam->lognorm_bound);
+
+		  if (lognorm > rsparam->lognorm_bound)
 			   break;
 	 }
 
-	 (*W) = (unsigned long) w;
-
-	 if (verbose == 2) {
-		  if (rotation_degree == 2)
-			   fprintf (stderr, "# Info: W (qudratic rotation) upper bound: %lu, norm bound: %.2f\n", *W, init_lognorm * 1.1); // TBC
-		  else if (rotation_degree == 1)
-			   fprintf (stderr, "# Info: U (linear rotation) upper bound: %lu, norm bound: %.2f\n", *W, init_lognorm * 1.1); // TBC
-	 }
 	 /* go back to w=0 */
-	 rotate_aux (f, b, m, w0, 0, rotation_degree);
+	 rotate_aux (rs->f, b, m, w0, 0, 1);
+	 rsparam->global_u_bound_rs = (unsigned long) w;
 
-	 return init_lognorm * 1.1;
-}
-
-
-#define DEBUG_ROTATE_BOUND 1
-
-#if DEBUG_ROTATE_BOUND
-/*
-  For each U bound, identify the best V bound (such that E is
-  smallest for this fixed U). Then return the best (U, V) pair.
-
-  Experimentally, this is better than considering U and U*skew
-  but will be slower.
-*/
-static double
-rotate_bounds_UV ( mpz_t *f,
-				   int d,
-				   double ratio_margin,
-				   mpz_t b,
-				   mpz_t m,
-				   unsigned long *U,
-				   mpz_t V,
-				   int method,
-				   int verbose )
-{
-	 int i;
-	 long k0 = 0, tmpU;
-	 double skewness, init_lognorm, E, best_E;
-	 mpz_t best_V;
-	 unsigned long upper_bound_U = 0;
-
-	 mpz_init (best_V);
-	 mpz_set_ui (best_V, 0UL);
-
-	 skewness = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, method);
-	 init_lognorm = L2_lognorm (f, d, skewness, method);
-	 best_E = init_lognorm;
-
-	 /* First, compute an upper bound for linear rotation U. */
-	 rotate_bounds_W ( f,
-					   d,
-					   b,
-					   m,
-					   &upper_bound_U,
-					   1,
-					   DEFAULT_L2_METHOD,
-					   verbose );
-	 upper_bound_U = (unsigned long) (log ((double) upper_bound_U) / log(2.0));
-
-	 /* Then, look for best (U, V) combinations, where positive k: 2, 4, 8, ... */
-	 tmpU = 1;
-	 for (i = 0; i < (int) upper_bound_U; i++, tmpU *= 2)
+	 /* look for negative w: -1, -2, -4, -8, ... */
+	 w0 = 0;
+	 w = -1;
+	 for (i = 0; i < (sizeof (long int) * 8 - 1); i++, w *= 2)
 	 {
-		  /* rotate by u*x, and fix this polynomial in this loop. */
-		  k0 = rotate_aux (f, b, m, k0, tmpU, 1);
+		  /* rotate by w*x */
+		  w0 = rotate_aux (rs->f, b, m, w0, w, 1);
 
-		  if (DEBUG)
-			   fprintf (stderr, "# DEBUG --- [%d-th] U: %ld ---\n", i, tmpU);
+		  /* translation-optimize the rotated polynomial */
+		  for (j = 0; j <= rs->d; j ++)
+			   mpz_set (f[j], rs->f[j]);
+		  for (j = 0; j < 2; j ++)
+			   mpz_set (g[j], rs->g[j]);
+		  optimize_aux (f, rs->d, g, 0, 0, CIRCULAR);
 
-		  /* identify best v in rotating by v */
-		  E = rotate_bounds_V_mpz (f, d, ratio_margin,
-		  						   b, m, V, DEFAULT_L2_METHOD, i);
+		  skewness = L2_skewness (f, rs->d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+		  lognorm = L2_lognorm (f, rs->d, skewness, DEFAULT_L2_METHOD);
 
-		  if (DEBUG)
-			   gmp_fprintf (stderr, "# DEBUG: (U: %ld, V: %Zd), best_E: %.3f\n",
-							tmpU, V, E);
+		  //fprintf (stderr, "# DEBUG --- [%d-th] U: %ld, lognorm: %f, lognorm_bound: %f\n", i, w, lognorm,  rsparam->lognorm_bound);
 
-		  if (E < best_E)
-		  {
-			   best_E = E;
-			   // *U = abs(tmpU); problem for tmpU >= 2^31
-			   (*U) = (unsigned long) (tmpU >= 0) ? tmpU : -tmpU;
-			   mpz_set (best_V, V);
-		  }
+		  if (lognorm > rsparam->lognorm_bound)
+			   break;
 	 }
 
-	 /* go back to k=0 */
-	 rotate_aux (f, b, m, k0, 0, 1);
+	 /* go back to w=0 */
+	 rotate_aux (rs->f, b, m, w0, 0, 1);
 
-	 mpz_set (V, best_V);
-	 mpz_clear (best_V);
+	 if ( (unsigned long) labs(w) > rsparam->global_u_bound_rs )
+		  rsparam->global_u_bound_rs = (unsigned long) labs(w);
 
-	 return best_E;
+	 for (j = 0; j <= rs->d; j ++)
+		  mpz_clear (f[j]);
+	 for (j = 0; j < 2; j ++)
+		  mpz_clear (g[j]);
+	 free (f);
+	 free (g);
+	 mpz_clear (b);
+	 mpz_clear (m);
 }
-#endif
+
+
+/* find bound W for qudratic rotation*/
+static void
+rotate_bounds_W_lu ( rsstr_t rs,
+					 rsparam_t rsparam )
+{
+	 int i, j;
+	 double skewness, lognorm;
+	 mpz_t *f, *g, b, m;
+	 f = (mpz_t *) malloc ( (rs->d + 1)* sizeof (mpz_t));
+	 g = (mpz_t *) malloc ( 2 * sizeof (mpz_t));
+	 for (i = 0; i <= rs->d; i ++)
+		  mpz_init_set (f[i], rs->f[i]);
+	 for (i = 0; i < 2; i ++)
+		  mpz_init_set (g[i], rs->g[i]);
+	 mpz_init_set (b, rs->g[1]);
+	 mpz_init_set (m, rs->g[0]);
+	 mpz_neg (m, m);
+
+	 /* look for positive w: , ... 0, 1, 2 */
+	 long w0 = 0, w = 0;
+	 for (i = 0; i < 2048; i++, w += 1)
+	 {
+		  /* rotate by w*x */
+		  w0 = rotate_aux (rs->f, b, m, w0, w, 2);
+
+		  /* translation-optimize the rotated polynomial */
+		  for (j = 0; j <= rs->d; j ++)
+			   mpz_set (f[j], rs->f[j]);
+		  for (j = 0; j < 2; j ++)
+			   mpz_set (g[j], rs->g[j]);
+		  optimize_aux (f, rs->d, g, 0, 0, CIRCULAR);
+
+		  skewness = L2_skewness (f, rs->d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+		  lognorm = L2_lognorm (f, rs->d, skewness, DEFAULT_L2_METHOD);
+
+		  //fprintf (stderr, "# DEBUG --- [%d-th] W: %ld, lognorm: %f, lognorm_bound: %f\n", i, w, lognorm,  rsparam->lognorm_bound);
+
+		  if (lognorm > rsparam->lognorm_bound)
+			   break;
+	 }
+
+	 /* go back to w=0 */
+	 rotate_aux (rs->f, b, m, w0, 0, 2);
+	 rsparam->global_w_bound_rs = (unsigned long) w;
+
+	 /* look for positive w: , ... 0, -1, -2 */
+	 w0 = 0;
+	 w = 0;
+	 for (i = 0; i < 2048; i++, w -= 1)
+	 {
+		  /* rotate by w*x */
+		  w0 = rotate_aux (rs->f, b, m, w0, w, 2);
+
+		  /* translation-optimize the rotated polynomial */
+		  for (j = 0; j <= rs->d; j ++)
+			   mpz_set (f[j], rs->f[j]);
+		  for (j = 0; j < 2; j ++)
+			   mpz_set (g[j], rs->g[j]);
+		  optimize_aux (f, rs->d, g, 0, 0, CIRCULAR);
+
+		  skewness = L2_skewness (f, rs->d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+		  lognorm = L2_lognorm (f, rs->d, skewness, DEFAULT_L2_METHOD);
+
+		  //fprintf (stderr, "# DEBUG --- [%d-th] W: %ld, lognorm: %f, lognorm_bound: %f\n", i, w, lognorm,  rsparam->lognorm_bound);
+
+		  if (lognorm > rsparam->lognorm_bound)
+			   break;
+	 }
+
+	 /* go back to w=0 */
+	 rotate_aux (rs->f, b, m, w0, 0, 2);
+
+	 if ( (unsigned long) labs(w) > rsparam->global_w_bound_rs )
+		  rsparam->global_w_bound_rs = (unsigned long) labs(w);
+
+	 for (i = 0; i <= rs->d; i ++)
+		  mpz_clear (f[i]);
+	 for (i = 0; i < 2; i ++)
+		  mpz_clear (g[i]);
+	 free (f);
+	 free (g);
+	 mpz_clear (b);
+	 mpz_clear (m);
+}
+
 
 /*
+  Note, this function should be called in the first instance,
+  without doing any rotation on the origional polynomial,
+  since the rsparam->init_lognorm parameter will be set to decide
+  the rotation range in the follows.
+
   Given rsparam->sizebound_ratio_rs and polynomial information,
   compute rsparam->global_u_bound_rs and rsparam->global_v_bound_rs;
   Then it will set e_sl[];
@@ -4854,14 +4518,7 @@ rsparam_setup ( rsparam_t rsparam,
 				rsstr_t rs,
 				int verbose )
 {
-
-	 /* 1. "rsparam->sizebound_ratio_rs"
-		the higher, the more margin in computing the sieving bound
-		u and v, hence the larger the sieving bound, and hence
-		larger e_sl[] in rsparam_setup(). */
-	 rsparam->sizebound_ratio_rs = 1.01;
-
-	 double best_E, lognorm_bound;
+	 double best_E;
 	 mpz_t b, m;
 	 mpz_init (b);
 	 mpz_init (m);
@@ -4869,45 +4526,20 @@ rsparam_setup ( rsparam_t rsparam,
 	 mpz_set (m, rs->g[0]);
 	 mpz_neg (m, m);
 
-	 /* 2. "global_w_bound_rs" */
-	 if (rs->d == 6) {
-		  lognorm_bound = rotate_bounds_W ( rs->f,
-											rs->d,
-											b,
-											m,
-											&(rsparam->global_w_bound_rs),
-											2,
-											DEFAULT_L2_METHOD,
-											verbose );
-	 }
+	 /* "global_w_bound_rs" */
+	 if (rs->d == 6)
+		  rotate_bounds_W_lu ( rs,
+							   rsparam );
 	 else
 		  rsparam->global_w_bound_rs = 0;
 
-	 /* 3. "global_u_bound_rs" and "global_v_bound_rs"
+	 /* "global_u_bound_rs" */
+	 rotate_bounds_U_lu ( rs,
+						  rsparam );
+
+	 /* "global_v_bound_rs"
 		-- global_u_bound will be used to identify good sublattice and decide e[],
 		-- global_v_bound will be used to identify sieving bound */
-
-#if DEBUG_ROTATE_BOUND
-	 best_E = rotate_bounds_UV ( rs->f,
-								 rs->d,
-								 rsparam->sizebound_ratio_rs,
-								 b,
-								 m,
-								 &(rsparam->global_u_bound_rs),
-								 rsparam->global_v_bound_rs, /* u, v */
-								 DEFAULT_L2_METHOD,
-								 verbose );
-
-#else
-	 rotate_bounds_W ( rs->f,
-					   rs->d,
-					   b,
-					   m,
-					   &rsparam->global_u_bound_rs,
-					   1,
-					   DEFAULT_L2_METHOD,
-					   verbose );
-
 	 long k0 = 0;
 	 unsigned long idx = 0;
 	 k0 = rotate_aux (rs->f, b, m, k0, rsparam->global_u_bound_rs, 1);
@@ -4923,52 +4555,42 @@ rsparam_setup ( rsparam_t rsparam,
 									idx );
 	 /* go back to k=0 */
 	 rotate_aux (rs->f, b, m, k0, 0, 1);
-#endif
-
 	 mpz_clear (b);
 	 mpz_clear (m);
 
-	 /* 4. "rsparam->exp_min_alpha_rs" */
+	 /* "rsparam->exp_min_alpha_rs" */
 	 int size;
 	 size = mpz_sizeinbase (rsparam->global_v_bound_rs, 2);
 	 size += (int) (log ( (double) rsparam->global_u_bound_rs ) * 1.442695);
 	 rsparam->exp_min_alpha_rs = exp_alpha[size-1];
 
-	 if (verbose == 2)
-
-#if DEBUG_ROTATE_BOUND
-		  gmp_fprintf ( stderr,
-						"# Info: Best (W, U, V) bound (%ld, %ld, %Zd) gives exp_best_E: %.3f, exp_min_alpha: %.3f\n",
+	 if (verbose == 2) {
+		  gmp_fprintf ( stderr, "# Info: Bounds (%lu, %lu, %Zd) gives:\n",
 						rsparam->global_w_bound_rs,
 						rsparam->global_u_bound_rs,
-						rsparam->global_v_bound_rs,
-						best_E,
-						exp_alpha[size-1] );
-#else
+						rsparam->global_v_bound_rs );
 		  gmp_fprintf ( stderr,
-						"# Info: Upper (W, U, V) bound (%ld, %ld, %Zd) gives exp_best_E: %.3f, exp_min_alpha: %.3f\n",
-						rsparam->global_w_bound_rs,
-						rsparam->global_u_bound_rs,
-						rsparam->global_v_bound_rs,
+						"# Info: exp_E: %.3f, exp_alpha: %.3f, bound: %.3f\n",
 						best_E,
-						exp_alpha[size-1] );
-#endif
+						exp_alpha[size-1],
+						rsparam->lognorm_bound );
+	 }
 
-	 /* 5. "rsparam->nbest_sl" and "rsparam->ncrts_sl" */
+	 /* "rsparam->nbest_sl" and "rsparam->ncrts_sl" */
 	 if (rs->d == 6) {
 		  rsparam->nbest_sl = 128;
-		  rsparam->ncrts_sl = 16; // for deg 6, there could be too much individual sublattices to do crts. We restrict the num.
+		  rsparam->ncrts_sl = 64; // for deg 6, there could be too much individual sublattices to do crts. We restrict the num.
 	 }
 	 else {
 		  rsparam->nbest_sl = 128;
 	 }
 
-	 /* 6. "rsparam->len_e_sl" and "rsparam->e_sl" */
+	 /* "rsparam->len_e_sl" and "rsparam->e_sl" */
 	 rsparam->len_e_sl = LEN_SUBLATTICE_PRIMES;
 	 rsparam->tlen_e_sl = rsparam->len_e_sl;
 
 	 if (rsparam->len_p_rs < rsparam->len_e_sl) {
-		  fprintf (stderr, "# Warning: number of primes considered in the root sieve is smaller than that in fin_sublattice(). This might not be accurate. \n");
+		  fprintf (stderr, "# Warning: number of primes considered in the root sieve is smaller than that in find_sublattice(). This might not be accurate. \n");
 	 }
 
 	 rsparam->e_sl = (unsigned short*)
@@ -4983,7 +4605,7 @@ rsparam_setup ( rsparam_t rsparam,
 		  rsparam->e_sl[size] = 0;
 	 }
 
-	 /* Experimental */
+	 /* Experimental. Note at least consider two primes. */
 	 if (rsparam->global_u_bound_rs <= 1024) {
 		  rsparam->e_sl[0] = 2;
 		  rsparam->e_sl[1] = 1;
@@ -5018,14 +4640,17 @@ rsparam_setup ( rsparam_t rsparam,
 
 
 /*
-  For existing rsparam and when rs is changed, we update
-  the new rotate-bounds.
+  For existing rsparam and when rs is changed,
 */
 static void
-rsparam_reset ( rsparam_t rsparam,
-				rsstr_t rs,
-				int verbose )
+rsparam_reset_bounds ( rsstr_t rs,
+					   rsparam_t rsparam,
+					   int verbose )
 {
+	 /* "global_u_bound_rs" only */
+	 rotate_bounds_U_lu ( rs,
+						  rsparam );
+
 	 double best_E;
 	 mpz_t b, m;
 	 mpz_init (b);
@@ -5034,30 +4659,12 @@ rsparam_reset ( rsparam_t rsparam,
 	 mpz_set (m, rs->g[0]);
 	 mpz_neg (m, m);
 
-#if DEBUG_ROTATE_BOUND
-	 best_E = rotate_bounds_UV ( rs->f,
-								 rs->d,
-								 rsparam->sizebound_ratio_rs,
-								 b,
-								 m,
-								 &(rsparam->global_u_bound_rs),
-								 rsparam->global_v_bound_rs, /* u, v */
-								 DEFAULT_L2_METHOD,
-								 verbose );
-#else
-	 rotate_bounds_W ( rs->f,
-					   rs->d,
-					   b,
-					   m,
-					   &rsparam->global_u_bound_rs,
-					   1,
-					   DEFAULT_L2_METHOD,
-					   verbose );
-
+	 /* "global_v_bound_rs" */
 	 long k0 = 0;
 	 unsigned long idx = 0;
 	 k0 = rotate_aux (rs->f, b, m, k0, rsparam->global_u_bound_rs, 1);
 	 idx = (unsigned long) (log ((double) rsparam->global_u_bound_rs) / log(2.0));
+
 	 /* identify best v in rotating by v */
 	 best_E = rotate_bounds_V_mpz ( rs->f,
 									rs->d,
@@ -5069,8 +4676,6 @@ rsparam_reset ( rsparam_t rsparam,
 									idx );
 	 /* go back to k=0 */
 	 rotate_aux (rs->f, b, m, k0, 0, 1);
-#endif
-
 	 mpz_clear (b);
 	 mpz_clear (m);
 
@@ -5079,48 +4684,15 @@ rsparam_reset ( rsparam_t rsparam,
 	 size += (int) (log ( (double) rsparam->global_u_bound_rs ) * 1.442695);
 	 rsparam->exp_min_alpha_rs = exp_alpha[size-1];
 
-	 if (verbose == 2)
-		  gmp_fprintf ( stderr,
-						"# Info: (u, v) bound (%ld, %Zd) gives exp_best_E: %.3f, exp_min_alpha: %.3f\n",
+	 if (verbose == 2) {
+		  gmp_fprintf ( stderr, "# Info: Reset (U, V) to (%lu, %Zd) gives:\n",
 						rsparam->global_u_bound_rs,
-						rsparam->global_v_bound_rs,
+						rsparam->global_v_bound_rs );
+		  gmp_fprintf ( stderr,
+						"# Info: exp_E: %.3f, exp_alpha: %.3f, bound: %.3f\n",
 						best_E,
-						exp_alpha[size-1] );
-
-	 /* Reset these, since anyway, there is a tune procedure after rsparam_reset being called. */
-	 for (size = 0; size < rsparam->len_e_sl; size ++) {
-		  rsparam->e_sl[size] = 0;
-	 }
-
-	 if (rsparam->global_u_bound_rs <= 1024) {
-		  rsparam->e_sl[0] = 2;
-		  rsparam->e_sl[1] = 1;
-		  rsparam->e_sl[2] = 0;
-		  rsparam->e_sl[3] = 0;
-	 }
-	 else if (rsparam->global_u_bound_rs <= 2048) {
-		  rsparam->e_sl[0] = 3;
-		  rsparam->e_sl[1] = 1;
-		  rsparam->e_sl[2] = 0;
-		  rsparam->e_sl[3] = 0;
-	 }
-	 else if (rsparam->global_u_bound_rs <= 4096) {
-		  rsparam->e_sl[0] = 4;
-		  rsparam->e_sl[1] = 1;
-		  rsparam->e_sl[2] = 0;
-		  rsparam->e_sl[3] = 0;
-	 }
-	 else if (rsparam->global_u_bound_rs <= 8192) {
-		  rsparam->e_sl[0] = 4;
-		  rsparam->e_sl[1] = 2;
-		  rsparam->e_sl[2] = 0;
-		  rsparam->e_sl[3] = 0;
-	 }
-	 else {
-		  rsparam->e_sl[0] = 4;
-		  rsparam->e_sl[1] = 2;
-		  rsparam->e_sl[2] = 1;
-		  rsparam->e_sl[3] = 0;
+						exp_alpha[size-1],
+						rsparam->lognorm_bound );
 	 }
 }
 
@@ -5155,6 +4727,7 @@ param_init ( param_t param )
 	 param->s2_Amax = 0;
 	 param->s2_Bmax = 0;
 	 param->s2_w = 0;
+	 param->lognorm_bound = 0;
 	 param->s1_e_sl = (unsigned short*)
 		  malloc ( LEN_SUBLATTICE_PRIMES * sizeof (unsigned short) );
 	 int i;
@@ -5208,7 +4781,7 @@ rootsieve_uv ( rsstr_t rs,
 		  /* one block is all ready too long */
 		  if ( (rsbound->Bmax - rsbound->Bmin + 1) < block_size ) {
 			   block_size = rsbound->Bmax - rsbound->Bmin + 1;
-			   }
+		  }
 	 }
 #if DEBUG
 	 fprintf (stderr, "# Info: totalnb: %lu, %lu, %lu\n", (rsbound->Bmax - rsbound->Bmin + 1), block_size,
@@ -5421,7 +4994,6 @@ rootsieve_main_stage2_prepare ( rsstr_t rs,
 					rsbound->Amin, rsbound->Amax,
 					rsbound->Bmin, rsbound->Bmax );
 
-	 /* root sieve on this sublattice */
 	 rsbound_setup_sublattice ( rsbound,
 								u,
 								v,
@@ -5586,13 +5158,13 @@ rsparam_tune_aux ( rsstr_t rs,
 								 &(sub_alpha[i]) );
 
 		  /*
-		  gmp_fprintf ( stderr, "# Tune: #%4d sublattice (w, u, v): (%d, %Zd, %Zd) (mod %Zd), alpha: %.2f\n",
-		  				i + 1,
-		  				w[i],
-		  				u[i],
-		  				v[i],
-		  				mod[i],
-		  				sub_alpha[i] );
+			gmp_fprintf ( stderr, "# Tune: #%4d sublattice (w, u, v): (%d, %Zd, %Zd) (mod %Zd), alpha: %.2f\n",
+			i + 1,
+			w[i],
+			u[i],
+			v[i],
+			mod[i],
+			sub_alpha[i] );
 		  */
 	 }
 
@@ -5607,16 +5179,16 @@ rsparam_tune_aux ( rsstr_t rs,
 			   break;
 
 		  /* TBC
-		  gmp_fprintf ( stderr,
-		  				"\n# Tune: Sieve on sublattice (# %2d), (w, u, v): (%d, %Zd, %Zd)  (mod %Zd)\n# Info: affine_alpha: %.2f, proj_alpha: %.2f, exp_min_alpha: %.2f\n",
-		  				i + 1,
-		  				w[i],
-		  				u[i],
-		  				v[i],
-						mod[i],
-		  				sub_alpha[i],
-		  				rs->alpha_proj,
-		  				rsparam->exp_min_alpha_rs );
+			 gmp_fprintf ( stderr,
+			 "\n# Tune: Sieve on sublattice (# %2d), (w, u, v): (%d, %Zd, %Zd)  (mod %Zd)\n# Info: affine_alpha: %.2f, proj_alpha: %.2f, exp_min_alpha: %.2f\n",
+			 i + 1,
+			 w[i],
+			 u[i],
+			 v[i],
+			 mod[i],
+			 sub_alpha[i],
+			 rs->alpha_proj,
+			 rsparam->exp_min_alpha_rs );
 		  */
 
 		  ave_MurphyE = rootsieve_main_stage2_prepare ( rs,
@@ -5853,8 +5425,8 @@ rootsieve_main_run ( rsstr_t rs,
 
 	 mpz_init_set (m, rs->g[0]);
 	 mpz_neg (m, m);
-	 rsparam_init (rsparam);
-	 rsparam_setup (rsparam, rs, 0);
+	 rsparam_init (rsparam, rs, param);
+	 rsparam_setup (rsparam, rs, verbose);
 	 new_sub_alpha_pq (&alpha_pqueue, rsparam->nbest_sl);
 
 	 /* read e_sl from input */
@@ -5869,20 +5441,17 @@ rootsieve_main_run ( rsstr_t rs,
 	 for (i = param->w_left_bound; i < param->w_length + param->w_left_bound; i++) {
 
 		  if (verbose == 2)
-			   fprintf (stderr,
-						"# Info: quadratic rotation by %d*x^2\n", i);
+			   fprintf (stderr, "# Info: quadratic rotation by %d*x^2\n", i);
 		  old_i = rotate_aux (rs->f, rs->g[1], m, old_i, i, 2);
 		  rsstr_setup (rs);
 
 		  /* either use input e_sl[] or tune only once */
 		  if (re == 0) {
 			   if (param->flag == 1) {
-					rsparam_reset (rsparam, rs, verbose);
-					for (k = 0; k < LEN_SUBLATTICE_PRIMES; k ++)
-						 rsparam->e_sl[k] = param->s1_e_sl[k];
+					rsparam_reset_bounds (rs, rsparam, verbose);
 			   }
 			   else {
-					rsparam_reset (rsparam, rs, verbose);
+					rsparam_reset_bounds (rs, rsparam, verbose);
 					rsparam_tune (rs, rsparam, param, 10, i, verbose);
 			   }
 		  }
@@ -5978,7 +5547,7 @@ rootsieve_main_run ( rsstr_t rs,
 		  /* rotate polynomial by f + rot*x^2 for various rot */
 		  old_i = rotate_aux (rs->f, rs->g[1], m, old_i, w[i], 2);
 		  rsstr_setup (rs);
-		  rsparam_reset (rsparam, rs, 1);
+		  rsparam_reset_bounds (rs, rsparam, verbose);
 
 		  //print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 1);
 
@@ -6005,6 +5574,11 @@ rootsieve_main_run ( rsstr_t rs,
 		  rootsieve_main_run_bestpoly ( rs,
 										global_E_pqueue,
 										bestpoly );
+
+		  if (verbose == 2) {
+			   fprintf (stderr, "\n# Info: Best E is:\n");
+			   print_poly_info (bestpoly->f, bestpoly->g, rs->d, rs->n, rs->m, 2);
+		  }
 	 }
 
 	 free_MurphyE_pq (&global_E_pqueue);
@@ -6050,14 +5624,14 @@ rootsieve_main_run_stage2only ( rsstr_t rs,
 	 for (i = 0; i < 2; i++)
 		  mpz_init_set (guv[i], rs->g[i]);
 
-	 rsparam_init (rsparam);
+	 rsparam_init (rsparam, rs, param);
 	 rsparam_setup (rsparam, rs, 2);
 
 	 /* rotate polynomial by f + rot*x^2 */
 	 old_i = 0;
 	 old_i = rotate_aux (rs->f, rs->g[1], m, old_i, param->s2_w, 2);
 	 rsstr_setup (rs);
-	 rsparam_reset (rsparam, rs, 1);
+	 rsparam_reset_bounds (rs, rsparam, 2);
 
 	 /* alpha values on the subllatice primes */
 	 compute_fuv_mp (fuv, rs->f, rs->g, rs->d, param->s2_u, param->s2_v);

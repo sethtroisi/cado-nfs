@@ -62,11 +62,15 @@ typedef struct {
 		do a line sieving 1x[-U, U]  */
 	 unsigned long global_w_bound_rs;
 	 unsigned long global_u_bound_rs;
+	 mpz_t global_v_bound_rs;
+
 	 /* regarding rootsieve_run() functions. */
 	 float sizebound_ratio_rs;
 	 float exp_min_alpha_rs;
 
-	 mpz_t global_v_bound_rs;
+	 double init_lognorm;
+	 double lognorm_bound;
+
 	 mpz_t modulus;
 
 } _rsparam_t;
@@ -77,14 +81,14 @@ typedef _rsparam_t rsparam_t[1];
    in the recursive calls. But this is more convenient
    as long as the memory is not a problem. */
 typedef struct node_t {
-	 unsigned long u;
-	 unsigned long v;
-	 unsigned long *r;
-	 unsigned short *roottype;
+	 unsigned int u;
+	 unsigned int v;
+	 unsigned int *r;
+	 char *roottype;
 	 unsigned int alloc;
 	 unsigned int nr;
-	 unsigned int e;
-	 double val;
+	 char e;
+	 float val;
 	 struct node_t *firstchild;
 	 struct node_t *nextsibling;
 	 // might remove parent in future.
@@ -154,7 +158,7 @@ typedef _bestpoly_t bestpoly_t[1];
 
 
 /* Sieving data struct */
-typedef struct{
+typedef struct {
 	 int w_left_bound;
 	 int w_length;
 	 unsigned short s1_num_e_sl;
@@ -167,6 +171,7 @@ typedef struct{
 	 long s2_Amax;
 	 long s2_Bmax;
 
+	 double lognorm_bound;
 	 /* flag == 0, only use -w and -l
 	    flag == 1, use stage 1 params
 		flag == 2, use stage 2 params */
