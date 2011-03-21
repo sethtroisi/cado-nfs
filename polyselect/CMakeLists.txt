@@ -5,7 +5,7 @@ add_library(polyselect_common SHARED auxiliary.c rootsieve.c rho.c murphyE.c)
 add_executable (polyselect polyselect.c)
 add_executable (rotate rotate.c)
 add_executable (rotate_all rotate_all.c)
-add_executable (polyselect2 polyselect2.c)
+add_executable (polyselect2 polyselect2.c rootsieve5.c)
 add_executable (twoquadratics twoquadratics.c)
 add_executable (polyopt polyopt.c)
 
