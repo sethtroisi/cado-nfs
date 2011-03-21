@@ -12,6 +12,7 @@ set (sources
 # matmul shared libs in bwc), and therefore must be shared.
 add_library (utils SHARED ${sources})
 target_link_libraries(utils gmp m)
+install(TARGETS utils LIBRARY DESTINATION lib/${package_basename})
 
 
 add_executable(check_rels check_rels.c)

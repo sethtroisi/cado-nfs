@@ -11,8 +11,10 @@ set(CADO_DIST_ARCHIVE_NAME "cado-nfs-${CADO_VERSION_STRING}")
 #####################################################################
 # cmake version -- set_property requires 2.6. Note that haters of progress
 # report things (this include me, casually) have to wait for cmake 2.7, since
-# it has only recently become possible to disable them:
+# it has only recently become possible to (only partially) disable them:
 # http://public.kitware.com/Bug/view.php?id=8726
+# set_property(GLOBAL PROPERTY RULE_MESSAGES OFF)
+# set(CMAKE_COLOR_MAKEFILE OFF)
 
 # Unfortunately cmake 2.6.0 at least seems to have some bugs with the
 # find_program command, which prevent mpi from being properly detected.
@@ -155,6 +157,18 @@ include_directories (${CADO_NFS_BINARY_DIR})
 include_directories(${CADO_NFS_SOURCE_DIR}/gf2x)
 include_directories(${CADO_NFS_BINARY_DIR}/gf2x)
 
+
+############################################################
+
+set(package_basename ${CADO_DIST_ARCHIVE_NAME})
+set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/lib/${package_basename}")
+set(example_subdir share/${package_basename}/examples)
+
+# These refer only to the place where files are put in the *build tree* !
+# set(LIBRARY_OUTPUT_DIRECTORY "${CMAKE_INSTALL_PREFIX}/lib/${package_basename}")
+# set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_INSTALL_PREFIX}/bin")
+
+
 add_custom_command(OUTPUT ${CADO_NFS_BINARY_DIR}/gf2x/Makefile
     COMMAND mkdir -p ${CADO_NFS_BINARY_DIR}/gf2x
     COMMAND echo Configuring gf2x with options ${GF2X_CONFIGURE_FLAGS}
@@ -173,6 +187,7 @@ add_custom_target(gf2x-build ALL
 # set(GF2X-FFT_LIB_FILE ${CADO_NFS_BINARY_DIR}/gf2x/gf2x-fft/.libs/libgf2x-fft.a)
 # set(CANTOR128_LIB_FILE ${CADO_NFS_BINARY_DIR}/gf2x/gf2x-fft/.libs/libcantor128.a)
 
+
 # add_subdirectory (gf2x-fft)
 add_subdirectory (utils)
 add_subdirectory (polyselect)
@@ -182,8 +197,6 @@ add_subdirectory (linalg)
 add_subdirectory (filter)
 add_subdirectory (linalg/bwc)
 
-set(package_basename ${CADO_DIST_ARCHIVE_NAME})
-
 add_custom_target(dist
     COMMAND scripts/dist.sh ${package_basename}
     WORKING_DIRECTORY ${CADO_NFS_SOURCE_DIR}
@@ -191,16 +204,15 @@ add_custom_target(dist
 
 install(PROGRAMS cadofactor.pl DESTINATION bin)
 
-set(example_subdir share/${package_basename}/examples)
-
-install(FILES params/params.c59 DESTINATION ${example_subdir})
-install(FILES params/params.c79 DESTINATION ${example_subdir})
+install(DIRECTORY params/ DESTINATION ${example_subdir} FILES_MATCHING PATTERN "params.*")
 
 configure_file(
     ${CADO_NFS_SOURCE_DIR}/factor.sh
     ${CADO_NFS_BINARY_DIR}/factor.sh
     ESCAPE_QUOTES
     @ONLY)
+
+install(PROGRAMS scripts/cpu_time.sh DESTINATION bin)
 
 configure_file(
     ${CADO_NFS_SOURCE_DIR}/scripts/fixup_params_file.sh.in

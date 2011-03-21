@@ -68,10 +68,10 @@ for ((i=1; i<=4; i=i+1)) ; do
       # We're called in the install tree.
       if [ -f "$cado_prefix/$example_subdir/params.c$size" ] ; then
           file="$cado_prefix/$example_subdir/params.c$size"
-          cputime="$cado_prefix/scripts/cpu_time.sh"
       fi
       bindir="$cado_prefix/bin"
       cadofactor="$bindir/cadofactor.pl"
+      cputime="$bindir/cpu_time.sh"
   elif [ -x "@CADO_NFS_SOURCE_DIR@/cadofactor.pl" ] ; then
       # Otherwise we're called from the source tree (or we hope so)
       if [ -f "@CADO_NFS_SOURCE_DIR@/params/params.c$size" ] ; then

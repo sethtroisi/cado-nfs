@@ -97,6 +97,7 @@ set(bwc_base_sources
 
 add_library(bwc_base ${bwc_base_sources})
 add_library(bwc_mpfq SHARED ${bwc_mpfq_sources})
+install(TARGETS bwc_mpfq LIBRARY DESTINATION "lib/${package_basename}")
 
 target_link_libraries(bwc_base balancing utils bwc_mpfq ${pthread_libs})
 set_target_properties(bwc_base PROPERTIES
@@ -144,6 +145,7 @@ macro(configure_matmul_lib v i)
             COMPILE_FLAGS "--mpi -DSELECT_ABASE_${v} -DMM_IMPL=${i}"
             LINK_FLAGS "--mpi")
     set(all_matmul_libs ${all_matmul_libs} "matmul_${v}_${i}")
+    install(TARGETS matmul_${v}_${i} LIBRARY DESTINATION "lib/${package_basename}")
 endmacro(configure_matmul_lib)
 
 if(EXISTS ${CADO_NFS_SOURCE_DIR}/files.dist)
@@ -160,6 +162,7 @@ foreach(v ${bwc_abases})
     endforeach(i)
 endforeach(v)
 
+# INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/share/${CADO_DIST_ARCHIVE_NAME}/libexec"
 
 macro(bwc_program v)
     add_executable(${v} ${ARGN})
@@ -167,7 +170,8 @@ macro(bwc_program v)
     set_target_properties(${v} PROPERTIES
             LINKER_LANGUAGE CXX
             COMPILE_FLAGS "--mpi"
-            LINK_FLAGS "--mpi  -Wl,-rpath,${CMAKE_CURRENT_BINARY_DIR}")
+            LINK_FLAGS "--mpi")
+        # -Wl,-rpath,${CMAKE_CURRENT_BINARY_DIR}")
     target_link_libraries(${v} bwc_base)
     add_dependencies(${v} ${all_matmul_libs})
 endmacro(bwc_program)
@@ -202,6 +206,7 @@ target_link_libraries(short_matmul balancing)
 add_executable(cleanup cleanup.c ../blockmatrix.c ../bit_matrices.c
     ../gauss.c)
 target_link_libraries(cleanup utils m)
+
 install(TARGETS cleanup RUNTIME DESTINATION bin/linalg/bwc)
 
 include(CMakeLists-nodist.txt OPTIONAL)
