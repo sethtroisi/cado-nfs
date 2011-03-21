@@ -26,6 +26,12 @@
 
 #include "balancing_workhorse.h"
 
+/* This is used only for checking. */
+/* The primes are 2^64-59 and 2^63-25 */
+#define DUMMY_VECTOR_COORD_VALUE(j)     \
+                UINT64_C(0xffffffffffffffc5) / (1 + (j))  \
+              + UINT64_C(0x7fffffffffffffe7) * (1 + (j));
+
 /* TODO:
  * - implement file-backed rewind on thread pipes. There's a
  *   balancing_use_auxfile parameter for this.
@@ -806,6 +812,10 @@ void set_slave_variables(slave_data s, param_list pl, parallelizing_info_ptr pi)
            s->my_i, s->my_j,
            s->my_row0, s->my_nrows,
            s->my_col0, s->my_ncols);
+
+    s->mat->twist=malloc(s->my_nrows * sizeof(int[2]));
+    s->mat->ntwists=0;
+
     /*
     char buf[16];
 	   // " Datafile %s."
@@ -833,6 +843,7 @@ struct slave_dest_s {/*{{{*/
     uint32_t *row_weights;
     uint32_t *col_weights;
     uint32_t current_row;
+    uint32_t original_row;
     int incoming_rowindex;
     uint64_t tw;
     slave_data_ptr s;
@@ -847,18 +858,35 @@ uint32_t slave_dest_put(slave_dest_ptr R, uint32_t * p, size_t n)
 {
     for(size_t i = 0 ; i < n ; i++) {
         uint32_t x = p[i];
-        if (R->incoming_rowindex) {
+        if (R->incoming_rowindex == 2) {
             R->current_row = x;
-            R->incoming_rowindex = 0;
-            // don't increase the row counter upon exit.
-            R->b->r++;
+            R->incoming_rowindex--;
             ASSERT(R->current_row <= R->s->bal->trows);
             ASSERT(R->current_row >= R->s->my_row0);
             ASSERT(R->current_row < R->s->my_row0 + R->s->my_nrows);
             continue;
         }
+        if (R->incoming_rowindex) {
+            /* TODO: for now this is unused. We can obtain the info on
+             * the balancing permutation for a small cost */
+            R->original_row = x;
+            R->incoming_rowindex = 0;
+            // don't increase the row counter upon exit.
+            R->b->r++;
+            ASSERT_ALWAYS(R->original_row <= R->s->bal->trows);
+            if (R->s->mat->p == NULL && R->original_row >= R->s->my_col0 && R->original_row < R->s->my_col0 + R->s->my_ncols) {
+                R->s->mat->twist[R->s->mat->ntwists][0] = R->current_row;
+                R->s->mat->twist[R->s->mat->ntwists][1] = R->original_row;
+                R->s->mat->ntwists++;
+                ASSERT_ALWAYS(R->s->mat->ntwists <= R->b->r);
+                ASSERT_ALWAYS(R->s->mat->ntwists <= R->s->my_nrows);
+            }
+            // ASSERT(R->current_row >= R->s->my_row0);
+            // ASSERT(R->current_row < R->s->my_row0 + R->s->my_nrows);
+            continue;
+        }
         if (x == UINT32_MAX) {
-            R->incoming_rowindex = 1;
+            R->incoming_rowindex = 2;
             continue;
         }
         ASSERT(x <= R->s->bal->tcols);
@@ -944,6 +972,7 @@ data_dest_ptr slave_dest_alloc(slave_data s)
     x->col_weights = malloc(s->my_ncols * sizeof(uint32_t));
     memset(x->row_weights, 0, s->my_nrows * sizeof(uint32_t));
     memset(x->col_weights, 0, s->my_ncols * sizeof(uint32_t));
+
     return (data_dest_ptr) x;
 }
 
@@ -952,6 +981,7 @@ void slave_dest_free(data_dest_ptr xx)
     slave_dest_ptr x = (slave_dest_ptr) xx;
     free(x->row_weights);
     free(x->col_weights);
+    free(x->fill);
     free(xx);
 }
 
@@ -987,6 +1017,15 @@ void slave_dest_engage_final_pass(slave_dest_ptr D)
 }
 /*}}}*/
 
+int intpair_cmp(int a[2], int b[2])
+{
+    int r = a[0]-b[0];
+    if (r) return r;
+    return a[1]-b[1];
+}
+
+typedef int (*sortfunc_t) (const void*, const void*);
+
 void slave_loop(slave_data s)
 {
     char name[80];
@@ -1003,6 +1042,9 @@ void slave_loop(slave_data s)
     slave_dest_stats((slave_dest_ptr) output);
 
     slave_dest_engage_final_pass((slave_dest_ptr) output);
+    s->mat->twist = realloc(s->mat->twist, s->mat->ntwists * sizeof(int[2]));
+    qsort(s->mat->twist, s->mat->ntwists, sizeof(int[2]), (sortfunc_t) &intpair_cmp);
+
     printf("[J%uT%u] building local matrix\n",
             s->pi->m->jrank, s->pi->m->trank);
     snprintf(name, sizeof(name),
@@ -1061,6 +1103,8 @@ void endpoint_loop(parallelizing_info_ptr pi, param_list_ptr pl, slave_data_ptr 
         ASSERT_ALWAYS(output);
         output->put(output, NULL, 0);
     }
+
+    mpi_source_free(input);
 }
 
 /* }}} */
@@ -1204,6 +1248,8 @@ struct master_dispatcher_s { /*{{{*/
     uint32_t crow_togo;
     int noderow;
     int npeers;
+    FILE * check_vector;
+    uint64_t w;
     data_dest_ptr * x;
 };
 typedef struct master_dispatcher_s master_dispatcher[1];
@@ -1235,9 +1281,9 @@ int master_dispatcher_put(master_dispatcher_ptr d, uint32_t * p, size_t n)
             /* Send a new row info _only_ to the nodes on the
              * corresponding row in the process grid ! */
             for (int i = 0; i < (int) m->bal->h->nv; i++) {
-                uint32_t x[2] = {UINT32_MAX, rr, };
+                uint32_t x[3] = {UINT32_MAX, rr, m->fw_colperm[rr], };
                 data_dest_ptr where = d->x[d->noderow + i];
-                where->put(where, x, 2);
+                where->put(where, x, 3);
                 /* debug only */
                 m->sent_rows[d->noderow + i]++;
                 if(m->sent_rows[d->noderow + i] >
@@ -1259,12 +1305,21 @@ int master_dispatcher_put(master_dispatcher_ptr d, uint32_t * p, size_t n)
             /* This advances, even if the row is not complete. */
             r++;
         } else {
+            if (d->check_vector) {
+                /* column index is p[s]. Get the index of our constant
+                 * vector which corresponds to p[s] */
+                d->w ^= DUMMY_VECTOR_COORD_VALUE(p[s]);
+            }
             uint32_t c = m->fw_colperm[p[s]];
             int nodecol = who_has_col(m, c);
             ASSERT_ALWAYS(d->noderow + nodecol < (int) d->m->pi->m->totalsize);
             data_dest_ptr where = d->x[d->noderow + nodecol];
             where->put(where, &c, 1);
             d->crow_togo--;
+        }
+        if (d->check_vector && d->crow_togo == 0) {
+            fwrite(&d->w, sizeof(uint64_t), 1, d->check_vector);
+            d->w = 0;
         }
         d->b->pos++;
     }
@@ -1327,9 +1382,20 @@ data_dest_ptr master_dispatcher_alloc(master_data m, parallelizing_info_ptr pi, 
     return (data_dest_ptr) d;
 }
 
+void master_dispatcher_setup_check_vector(data_dest_ptr xd, const char * name)
+{
+    master_dispatcher_ptr d = (master_dispatcher_ptr) xd;
+    d->check_vector = fopen(name, "w");
+    ASSERT_ALWAYS(d->check_vector != NULL);
+}
+
 void master_dispatcher_free(data_dest_ptr xd, parallelizing_info_ptr pi, slave_data_ptr * slaves MAYBE_UNUSED)
 {
     master_dispatcher_ptr d = (master_dispatcher_ptr) xd;
+    if (d->check_vector) {
+        fclose(d->check_vector);
+        d->check_vector = NULL;
+    }
     // int n = pi->m->totalsize;
     // the thread_pipe structures are freed in another place.
     for(int j0 = 0 ; j0 < (int) pi->wr[0]->njobs ; j0++)
@@ -1385,6 +1451,10 @@ void master_loop(master_data m, parallelizing_info_ptr pi, param_list_ptr pl, sl
 #endif  /* HAVE_CURL */
     input = file_source_alloc(m->mfile, esz);
     data_dest_ptr output = master_dispatcher_alloc(m, pi, slaves, queue_size);
+    const char * tmp;
+    if ((tmp = param_list_lookup_string(pl, "sanity_check_vector")) != NULL) {
+        master_dispatcher_setup_check_vector(output, tmp);
+    }
     master_loop_inner(m, input, output);
     master_dispatcher_stats((master_dispatcher_ptr) output);
     master_dispatcher_free(output, pi, slaves);
@@ -1507,8 +1577,8 @@ void * balancing_get_matrix_u32(parallelizing_info_ptr pi, param_list pl, matrix
         s->bal->tcols = m->bal->tcols;
     }
 
-    set_slave_variables(s, pl, pi);
     memcpy(s->mat, arg, sizeof(matrix_u32));
+    set_slave_variables(s, pl, pi);
 
     serialize(pi->m);
 

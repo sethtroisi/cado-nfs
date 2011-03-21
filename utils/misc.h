@@ -10,6 +10,12 @@
 extern "C" {
 #endif
 
+static inline void* pointer_arith(void * a, ptrdiff_t q) {
+    return (void*)(((char*)a)+q);
+}
+static inline const void* pointer_arith_const(const void * a, ptrdiff_t q) {
+    return (const void*)(((const char*)a)+q);
+}
 extern char * cado_strndup(const char * a, size_t n);
 
 extern char * derived_filename(const char * prefix, const char * what, const char * ext);

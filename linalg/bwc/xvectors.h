@@ -13,9 +13,9 @@ void setup_x_random(uint32_t * xs,
         unsigned int m, unsigned int nx, unsigned int nr,
         parallelizing_info_ptr pi);
 void load_x(uint32_t ** xs, unsigned int m, unsigned int *pnx,
-        parallelizing_info_ptr pi, balancing_ptr bal);
+        parallelizing_info_ptr pi);
 void save_x(uint32_t * xs, unsigned int m, unsigned int nx,
-        parallelizing_info_ptr pi, balancing_ptr bal);
+        parallelizing_info_ptr pi);
 
 #ifdef __cplusplus
 }

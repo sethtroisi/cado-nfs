@@ -5,22 +5,23 @@
 #include <stdint.h>
 
 /* This header is common to the different matrix product implementations
- * (note that it depends on abase, though). So the matrix product codes
- * are meant to be used as interchangeable .o files.
+ * So the matrix product codes are meant to be used as interchangeable .o
+ * files.
  */
-#include "abase.h"
 #include "params.h"
+#include "mpfq/abase_vbase.h"
+#include "raw_matrix_u32.h"
 
 struct matmul_public_s;
 
 typedef struct matmul_public_s  * matmul_t;
 typedef struct matmul_public_s  * matmul_ptr;
 
-typedef matmul_ptr (*matmul_init_t)(abobj_ptr, param_list pl, int);
+typedef matmul_ptr (*matmul_init_t)(void *, param_list pl, int);
 typedef void (*matmul_build_cache_t)(matmul_ptr, uint32_t *);
 typedef int (*matmul_reload_cache_t)(matmul_ptr);
 typedef void (*matmul_save_cache_t)(matmul_ptr);
-typedef void (*matmul_mul_t)(matmul_ptr, abt *, abt const *, int);
+typedef void (*matmul_mul_t)(matmul_ptr, void *, const void *, int);
 typedef void (*matmul_report_t)(matmul_ptr, double scale);
 typedef void (*matmul_clear_t)(matmul_ptr mm);
 typedef void (*matmul_auxv_t)(matmul_ptr mm, int op, ...);
@@ -55,9 +56,13 @@ struct matmul_public_s {
     char * cachefile_name;
     char * local_cache_copy;
 
+    uint32_t (*twist)[2];
+    uint32_t ntwists;
+
     /* Now the virtual method table */
     struct matmul_bindings_s bind[1];
 
+    void * solib_handle;        /* passed to dlclose() eventually */
     /* The rest of the implementation-dependent storage comes right after
      * that, in memory. Therefore, only the pointer may be manipulated
      * freely. The datasize field merely indicates the __on-disk__ data
@@ -71,11 +76,14 @@ struct matmul_public_s {
 extern "C" {
 #endif
 
-extern matmul_ptr matmul_init(abobj_ptr, unsigned int, unsigned int, const char * locfile, const char * impl, param_list pl, int);
+/* This is defined only in the low-level code (e.g. matmul-bucket.cpp) */
+extern const char * matmul_abase_name();
+
+extern matmul_ptr matmul_init(abase_vbase_ptr, unsigned int, unsigned int, const char * locfile, const char * impl, param_list pl, int);
 
 /* These two functions are the means of initializing the mm layer. No
  * bare _init() function is publicly accessible */
-extern void matmul_build_cache(matmul_ptr mm, uint32_t *);
+extern void matmul_build_cache(matmul_ptr mm, matrix_u32_ptr m);
 extern int matmul_reload_cache(matmul_ptr mm);
 
 /* Exit point */
@@ -93,7 +101,7 @@ extern void matmul_save_cache(matmul_ptr);
  * paper, both are dual to each other, but doing so equally efficiently
  * with the same in-memory structure is not easy.
  */
-extern void matmul_mul(matmul_ptr, abt *, abt const *, int);
+extern void matmul_mul(matmul_ptr, void *, const void *, int);
 
 /* matmul_aux is used on some occasions for obtaining private
  * informations on the matmul structure. It's really a virtual method

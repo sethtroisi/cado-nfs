@@ -44,7 +44,6 @@ matrix matpath       input matrix file. Either 'matrix' is a full
                      path, or a basename relative to 'matpath'
 wdir                 working directory.
                      If unset, derived from 'matrix', 'mpi' 'thr'
-mode                 Family of binaries to be used for e.g. krylov/mksol
 mpiexec              Command to invoke for mpiexec
 hosts                Comma-separated list of hosts. 'hosts' may be supplied
                      several times, so that lists concatenate. Thus one
@@ -81,7 +80,7 @@ EOF
 
 # $program denotes either a simple command, or something prepended by ':'
 # which indicates something having a special meaning for the script.
-my $main = shift @ARGV;
+my $main = shift @ARGV or usage;
 
 # First we're going to parse globally the list of arguments, to see if
 # there's something to infer.
@@ -121,7 +120,6 @@ my $m;
 my $n;
 my @splits=();
 my @hosts=();
-my $mode='u64';
 my $show_only=0;
 my $nh;
 my $nv;
@@ -131,6 +129,8 @@ my $tmpdir;
 my $interleaving;
 my $force_complete;
 my $shuffled_product;
+
+my $needs_mpd;
 
 print $0, " ", $main, " ", join(" ", @ARGV), "\n";
 
@@ -165,6 +165,12 @@ sub detect_mpi {
                     chomp($v);
                     if ($v =~ /MVAPICH2\s+([\w\.]+)/) {
                         $mpi_ver="mvapich2-$1";
+                        # Presently all known versions of mvapich2 (up
+                        # until 1.6) need mpd daemons. However, since it
+                        # embeds mpich2, and the latter is now switching
+                        # to daemon-less mode, this might evolve in the
+                        # near future.
+                        $needs_mpd = 1;
                         last SEVERAL_CHECKS;
                     }
                 }
@@ -175,13 +181,17 @@ sub detect_mpi {
                     chomp($v);
                     if ($v =~ /MPICH2 Version:\s*(\d.*)$/) {
                         $mpi_ver="mpich2-$1";
+                        # Versions above 1.3 use hydra.
+                        $needs_mpd=($mpi_ver =~ /^mpich2-(0|1\.[012])/);
                     } else {
                         $mpi_ver="mpich2-UNKNOWN";
+                        $needs_mpd=1;
                     }
                     $v = `$mpi/mpich2version -c`;
                     chomp($v);
                     if ($v =~ /--with-pm=hydra/) {
                         $mpi_ver .= "+hydra";
+                        $needs_mpd=0;
                     }
                         last SEVERAL_CHECKS;
                 }
@@ -191,6 +201,7 @@ sub detect_mpi {
                     my @v = `$mpi/ompi_info`;
                     my @vv = grep { /Open MPI:/; } @v;
                     last CHECK_OMPI_VERSION unless scalar @vv == 1;
+                    $needs_mpd=0;
                     if ($vv[0] =~ /Open MPI:\s*(\d\S*)$/) {
                         $mpi_ver="openmpi-$1";
                         last SEVERAL_CHECKS;
@@ -206,6 +217,14 @@ sub detect_mpi {
             print STDERR "Using $mpi_ver, MPI_BINDIR=$mpi\n";
         } else {
             print STDERR "Using UNKNOWN mpi, MPI_BINDIR=$mpi\n";
+            if (defined($needs_mpd=getenv("needs_mpd"))) {
+                warn "Assuming needs_mpd=$needs_mpd as per env variable.\n";
+            } else {
+                $needs_mpd=1;
+                warn "Assuming needs_mpd=$needs_mpd ; " .
+                    "modify env variable \$needs_mpd to " .
+                    "change fallback behaviour\n";
+            }
         }
     }
 
@@ -320,7 +339,6 @@ while (my ($k,$v) = each %$param) {
     if ($k eq 'hostfile') { $hostfile=$v; next; }
     if ($k eq 'mpi_extra_args') { $mpi_extra_args=$v; next; }
     if ($k eq 'force_complete') { $force_complete=$v; next; }
-    if ($k eq 'mode') { $mode=$v; next; }
     if ($k eq 'shuffled_product') { $shuffled_product=$v; next; }
     if ($k eq 'hosts') {
         $v=[$v] if (ref $v eq '');
@@ -424,12 +442,12 @@ sub ssh_program() {
     return $ssh
 }
 
-# Starting daemons for mpich2 1.0.x
+# Starting daemons for mpich2 1.[012].x and mvapich2 ; we're assuming
+# this works the same for older mpich2's, although this has never been
+# checked.
 sub check_mpd_daemons()
 {
-    return if !defined $mpi_ver;
-    return if $mpi_ver !~ /^(?:mpich2|mvapich2)/;
-    return if $mpi_ver =~ /^mpich2.*\+hydra/;
+    return unless $needs_mpd;
 
     my $ssh = ssh_program();
 
@@ -502,17 +520,22 @@ if ($mpi_needed) {
         print STDERR "Created $hostfile\n";
     }
     if (defined($hostfile)) {
-        if ($mpi_ver =~ /^\+hydra/) {
+        if ($needs_mpd) {
+            # Assume daemons do the job.
+        } elsif ($mpi_ver =~ /^\+hydra/) {
             my_setenv 'HYDRA_HOST_FILE', $hostfile;
-        } elsif ($mpi_ver =~ /^openmpi/) {
-            push @mpi_precmd, "--hostfile", $hostfile;
-        } elsif ($mpi_ver =~ /^mpich2/) {
-            # Assume daemons do the job.
-        } elsif ($mpi_ver =~ /^mvapich2/) {
-            # Assume daemons do the job.
+            # I used to have various setups using --hostfile for openmpi,
+            # --file in some other cases and so on. I think that
+            # -machinefile is documented in the published standard, so
+            # it's better to stick to it.
+#        } elsif ($mpi_ver =~ /^openmpi/) {
+#            push @mpi_precmd, "--hostfile", $hostfile;
+#        } else {
+#            push @mpi_precmd, "-file", $hostfile;
         } else {
-            push @mpi_precmd, "-file", $hostfile;
+            push @mpi_precmd, "-machinefile", $hostfile;
         }
+
     }
     if (!defined($hostfile)) {
         # At this point we're going to run processes on localhost.
@@ -522,8 +545,19 @@ if ($mpi_needed) {
         # Otherwise we'll assume that the simple setup will work fine.
     }
     check_mpd_daemons();
-    if ($mpi_ver =~ /^openmpi/) {
-        push @mpi_precmd, qw/--mca plm_rsh_agent/, ssh_program();
+    if (!$needs_mpd) {
+        # Then we must configure ssh
+        if ($mpi_ver =~ /^openmpi-1\.2/) {
+            push @mpi_precmd, qw/--mca pls_rsh_agent/, ssh_program();
+        } elsif ($mpi_ver =~ /^openmpi-1\.[34]/) {
+            push @mpi_precmd, qw/--mca plm_rsh_agent/, ssh_program();
+        } elsif ($mpi_ver =~ /^openmpi/) {
+            # Default to orte_rsh_agent which is the new name as of 1.5
+            push @mpi_precmd, qw/--mca orte_rsh_agent/, ssh_program();
+        } elsif ($mpi_ver =~ /^mpich2/) {
+            # Not older mpich2's, which need a daemon.
+            push @mpi_precmd, qw/-launcher ssh -launcher-exec/, ssh_program();
+        }
     }
     if (defined($mpi_extra_args)) {
         push @mpi_precmd, split(' ', $mpi_extra_args);
@@ -604,8 +638,8 @@ sub last_cp {
     close DIR;
     return undef unless @cp;
     obtain_bfile();
-    @cp = grep { /\.(\d+)\.$balancing_hash$/ } @cp;
-    @cp = map { /\.(\d+)\.$balancing_hash$/; $1 } @cp;
+    @cp = grep { /\.(\d+)$/ } @cp;
+    @cp = map { /\.(\d+)$/; $1 } @cp;
     my $l = max( @cp );
     return $l;
 }
@@ -651,36 +685,36 @@ sub drive {
                 &drive("mf_bal", @mfbal);
                 obtain_bfile();
                 push @_, "balancing=$balancing";
-                &drive("${mode}_dispatch", @_, "sequential_cache_build=1");
-                &drive("u64n_prep", @_);
-                &drive("u64_secure", @_) unless $param->{'skip_online_checks'};
+                &drive("dispatch", @_, "sequential_cache_build=1");
+                &drive("prep", @_);
+                &drive("secure", @_) unless $param->{'skip_online_checks'};
                 &drive("./split", @_, "--split-y");
-                &drive("${mode}_krylov", @_);
+                &drive("krylov", @_);
             } else {
                 obtain_bfile();
                 push @_, "balancing=$balancing";
-                &drive("${mode}_krylov", @_, "start=$cp");
+                &drive("krylov", @_, "start=$cp");
             }
             &drive("./acollect", @_, "--remove-old");
             &drive("./lingen", @_, "--lingen-threshold", 64);
             &drive("./split", @_, "--split-f");
-            &drive("${mode}_mksol", @_);
+            &drive("mksol", @_);
         } else {
             obtain_bfile();
             push @_, "balancing=$balancing";
-            &drive("${mode}_mksol", @_, "start=$cp");
+            &drive("mksol", @_, "start=$cp");
         }
         opendir D, $wdir;
         # remove all files which will be created by gather. This is done
         # in order to allow an easier cleanup step.
-        for my $f (grep { /^K\.\d+\.$balancing_hash$/ } readdir D) {
+        for my $f (grep { /^K\.\d+$/ } readdir D) {
             unlink "$wdir/$f";
         }
-        &drive("u64n_gather", @_);
+        &drive("gather", @_);
         print "Fetching result for $balancing_hash\n";
         my @my_ks=();
         opendir D, $wdir;
-        for my $f (grep { /^K\.\d+\.$balancing_hash$/ } readdir D) {
+        for my $f (grep { /^K\.\d+$/ } readdir D) {
             push @my_ks, "$wdir/$f";
             print "$f\n";
         }
@@ -691,13 +725,13 @@ sub drive {
                 $xa <=> $xb;
             } @my_ks;
         &drive("./cleanup", "--ncols", $n,
-            "--out", "$wdir/W.$balancing_hash", @my_ks);
+            "--out", "$wdir/W", @my_ks);
 
-        my @untwist = ("mf_twistvec", "--truncate", "--untwist", "$balancing", "$wdir/W.$balancing_hash", "--out", "$wdir/W");
-        if (defined(my $ns = $param->{'nullspace'})) {
-            push @untwist, "--nullspace", $ns;
-        }
-        &drive(@untwist);
+        # my @untwist = ("mf_twistvec", "--truncate", "--untwist", "$balancing", "$wdir/W", "--out", "$wdir/W");
+        # if (defined(my $ns = $param->{'nullspace'})) {
+        # push @untwist, "--nullspace", $ns;
+        # }
+        # &drive(@untwist);
         return;
     }
 

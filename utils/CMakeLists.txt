@@ -8,8 +8,10 @@ set (sources
         barrier.c usp.c fix-endianness.c cut_n_roots.c 
 )
 
-add_library (utils ${sources})
-target_link_libraries(utils gmp)
+# the utils library is used by some shared objects (prominently the
+# matmul shared libs in bwc), and therefore must be shared.
+add_library (utils SHARED ${sources})
+target_link_libraries(utils gmp m)
 
 
 add_executable(check_rels check_rels.c)

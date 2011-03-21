@@ -35,7 +35,7 @@ struct matmul_basic_data_s {
     struct matmul_public_s public_[1];
     /* now our private fields */
     size_t datasize;
-    abobj_t xab;
+    abdst_field xab;
     uint32_t * q;
 };
 
@@ -46,12 +46,12 @@ void matmul_basic_clear(struct matmul_basic_data_s * mm)
     free(mm);
 }
 
-struct matmul_basic_data_s * matmul_basic_init(abobj_ptr xx MAYBE_UNUSED, param_list pl, int optimized_direction)
+struct matmul_basic_data_s * matmul_basic_init(void* xx, param_list pl, int optimized_direction)
 {
     struct matmul_basic_data_s * mm;
     mm = malloc(sizeof(struct matmul_basic_data_s));
     memset(mm, 0, sizeof(struct matmul_basic_data_s));
-    abobj_init_set(mm->xab, xx);
+    mm->xab = xx;
 
     int suggest = optimized_direction ^ MM_DIR0_PREFERS_TRANSP_MULT;
     mm->public_->store_transposed = suggest;
@@ -63,7 +63,6 @@ struct matmul_basic_data_s * matmul_basic_init(abobj_ptr xx MAYBE_UNUSED, param_
                     " overrides suggested matrix storage ordering\n");
         }           
     }   
-
 
     return mm;
 }
@@ -106,7 +105,7 @@ void matmul_basic_build_cache(struct matmul_basic_data_s * mm, uint32_t * data)
 int matmul_basic_reload_cache(struct matmul_basic_data_s * mm)
 {
     FILE * f;
-    f = matmul_common_reload_cache_fopen(abbytes(mm->xab,1), mm->public_, MM_MAGIC);
+    f = matmul_common_reload_cache_fopen(sizeof(abelt), mm->public_, MM_MAGIC);
     if (f == NULL) { return 0; }
 
     MATMUL_COMMON_READ_ONE32(mm->datasize, f);
@@ -121,7 +120,7 @@ void matmul_basic_save_cache(struct matmul_basic_data_s * mm)
 {
     FILE * f;
 
-    f = matmul_common_save_cache_fopen(abbytes(mm->xab,1), mm->public_, MM_MAGIC);
+    f = matmul_common_save_cache_fopen(sizeof(abelt), mm->public_, MM_MAGIC);
 
     MATMUL_COMMON_WRITE_ONE32(mm->datasize, f);
     MATMUL_COMMON_WRITE_MANY32(mm->q, mm->datasize, f);
@@ -129,14 +128,16 @@ void matmul_basic_save_cache(struct matmul_basic_data_s * mm)
     fclose(f);
 }
 
-void matmul_basic_mul(struct matmul_basic_data_s * mm, abt * dst, abt const * src, int d)
+void matmul_basic_mul(struct matmul_basic_data_s * mm, void * xdst, void const * xsrc, int d)
 {
     ASM_COMMENT("multiplication code");
     uint32_t * q = mm->q;
-    abobj_ptr x = mm->xab;
+    abdst_field x = mm->xab;
+    absrc_vec src = (absrc_vec) xsrc; // typical C const problem.
+    abdst_vec dst = xdst;
 
     if (d == !mm->public_->store_transposed) {
-        abzero(x, dst, mm->public_->dim[!d]);
+        abvec_set_zero(x, dst, mm->public_->dim[!d]);
         ASM_COMMENT("critical loop");
         for(unsigned int i = 0 ; i < mm->public_->dim[!d] ; i++) {
             uint32_t len = *q++;
@@ -144,7 +145,7 @@ void matmul_basic_mul(struct matmul_basic_data_s * mm, abt * dst, abt const * sr
             for( ; len-- ; ) {
                 j += *q++;
                 ASSERT(j < mm->public_->dim[d]);
-                abadd(x, dst + aboffset(x, i), src + aboffset(x, j));
+                abadd(x, dst[i], dst[i], src[j]);
             }
         }
         ASM_COMMENT("end of critical loop");
@@ -152,7 +153,7 @@ void matmul_basic_mul(struct matmul_basic_data_s * mm, abt * dst, abt const * sr
         if (mm->public_->iteration[d] == 10) {
             fprintf(stderr, "Warning: Doing many iterations with transposed code (not a huge problem for impl=basic)\n");
         }
-        abzero(x, dst, mm->public_->dim[!d]);
+        abvec_set_zero(x, dst, mm->public_->dim[!d]);
         ASM_COMMENT("critical loop (transposed mult)");
         for(unsigned int i = 0 ; i < mm->public_->dim[d] ; i++) {
             uint32_t len = *q++;
@@ -160,7 +161,7 @@ void matmul_basic_mul(struct matmul_basic_data_s * mm, abt * dst, abt const * sr
             for( ; len-- ; ) {
                 j += *q++;
                 ASSERT(j < mm->public_->dim[!d]);
-                abadd(x, dst + aboffset(x, j), src + aboffset(x, i));
+                abadd(x, dst[j], dst[j], src[i]);
             }
         }
         ASM_COMMENT("end of critical loop (transposed mult)");

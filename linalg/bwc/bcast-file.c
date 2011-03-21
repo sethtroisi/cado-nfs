@@ -9,7 +9,12 @@
 #include <unistd.h>
 #include <time.h>
 #include <string.h>
+#ifndef STANDALONE
 #include "select_mpi.h"
+#else
+#include <mpi.h>
+#define ASSERT_ALWAYS(x) do { if (!(x)) abort(); } while (0)
+#endif
 
 int rank;
 int size;
@@ -99,6 +104,7 @@ int main(int argc, char * argv[])
 
     for(int i = 1 ; i < argc && !duplicate; i++) {
         int rc;
+        memset(sbuf, 0, sizeof(struct stat));
         rc = stat(argv[i], sbuf);
         if (rc < 0 && errno != ENOENT)
             abort();

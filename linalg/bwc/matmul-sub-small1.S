@@ -9,7 +9,7 @@ matmul_sub_small1:
         pushq %r14
         pushq %r13
         pushq %r12
-        // rdi is ignored (it's the abobj_t argument)
+        // rdi is ignored (it's the abobj argument)
         // dst pointer --> store in rdi
         movq    %rsi, %rdi
         // src pointer --> store in rsi

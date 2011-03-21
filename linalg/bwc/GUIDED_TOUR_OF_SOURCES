@@ -40,6 +40,9 @@ wirings that links pieces of the matrix.
 The "abase" mechanism
 ---------------------
 
+## THIS IS PARTLY OBSOLETE. THE GENERAL IDEA STILL HOLDS, BUT THE
+## TOPLEVEL CODE NOW EMPLOYS AN ADDITIONAL INDIRECTION LAYER.
+
 The matrix stuff is kind-of generic w.r.t the type of objects inside the
 matrix. The "abase" mechanism provides this genericity -- don't expect a
 clean ring structure, beautifully following the mathematical notions.
@@ -48,7 +51,7 @@ The main idea is to use a block of bits as a main type that corresponds
 to the machine word-size, typically uint64_t on a 64 bit computer.
 
 Two main types:
-  abobj_t               // the parent structure (may be NULL)
+  abobj               // the parent structure (may be NULL)
   abt                   // an element
 
 Each instance of the abase mechanism is a pair abase-xxx.[ch] . This may

@@ -1,7 +1,6 @@
 #ifndef XYMATS_H_
 #define XYMATS_H_
 
-#include "abase.h"
 #include "matmul_top.h"
 #include "parallelizing_info.h"
 
@@ -9,13 +8,21 @@
 extern "C" {
 #endif
 
-// void allreduce_generic_threadlevel(abobj_t abase, mmt_vec_ptr v, pi_wiring_ptr wr, unsigned int n);
-// void allreduce_generic_mpilevel(abobj_t abase, mmt_vec_ptr v, pi_wiring_ptr wr, unsigned int n);
-void allreduce_generic(abobj_t abase, mmt_vec_ptr v, pi_wiring_ptr wr, unsigned int n);
+/* This is used as a very simple reduction routine, mostly for the small
+ * m*n matrices. It has nothing to do with the more involved reduce
+ * operations relevant to vectors. Here, the data we're dealing with is
+ * tiny.
+ *
+ * Clearly the function names should be changed.
+ *
+ * This operation serializes threads.
+ */
 
-// slightly different calling interface because broadcasting is not
-// abase-dependent.
-void broadcast_generic(mmt_generic_vec_ptr v, pi_wiring_ptr wr, size_t siz, unsigned int j0, unsigned int t0);
+// void allreduce_generic_threadlevel(mmt_vec_ptr v, pi_wiring_ptr wr, unsigned int n);
+// void allreduce_generic_mpilevel(mmt_vec_ptr v, pi_wiring_ptr wr, unsigned int n);
+void allreduce_generic(mmt_vec_ptr v, pi_wiring_ptr wr, unsigned int n);
+
+void broadcast_generic(mmt_vec_ptr v, pi_wiring_ptr wr, unsigned int n, unsigned int j0, unsigned int t0);
 
 #ifdef __cplusplus
 }

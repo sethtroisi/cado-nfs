@@ -163,6 +163,9 @@ while (defined($_=shift(@ARGV))) {
         while (defined($_=<F>)) {
             chomp($_);
             my ($sum, $path) = split(' ', $_);
+            next unless $path;
+            next unless $sum;
+            $path =~ s{^.*/}{};
             $md5db->{$path}=$sum;
         }
         close F;

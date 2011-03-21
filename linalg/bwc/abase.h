@@ -1,20 +1,30 @@
 #ifndef ABASE_H_
 #define ABASE_H_
 
-#include "abase-common.h"
-
-#if defined(SELECT_ABASE_u64)
-#include "abase-u64.h"
-#elif defined(SELECT_ABASE_u64k)
-#include "abase-u64k.h"
+#if defined(SELECT_ABASE_u64k1) || defined(SELECT_ABASE_u64)
+#include "mpfq/abase_u64k1.h"
+#elif defined(SELECT_ABASE_u64k2)
+#include "mpfq/abase_u64k2.h"
+#elif defined(SELECT_ABASE_u64k3)
+#include "mpfq/abase_u64k3.h"
+#elif defined(SELECT_ABASE_u64k4)
+#include "mpfq/abase_u64k4.h"
 #elif defined(SELECT_ABASE_u64n)
-#include "abase-u64n.h"
+#error "argh"
+#include "mpfq/abase_u64n.h"
 #elif defined(SELECT_ABASE_u128)
-#include "abase-u128.h"
+#error "argh"
+#include "mpfq/abase_u128.h"
 #else
-
 #warning "Using default selection for abase"
-#include "abase-u64.h"
+#error "argh"
+#include "mpfq/abase_u64.h"
 #endif
+
+/* This is used as a shorthand throughout in order to ease the access to
+ * the _primary_ abase. Other abases have to be accessed via the OO
+ * interface.
+ */
+#include "mpfq/mpfq_name_ab.h"
 
 #endif	/* ABASE_H_ */

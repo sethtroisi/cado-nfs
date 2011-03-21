@@ -1,6 +1,7 @@
 #include "cado.h"
 
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
 #include <limits.h>
 #include <dirent.h>
@@ -8,7 +9,6 @@
 #include "bwc_config.h"
 #include "parallelizing_info.h"
 #include "matmul_top.h"
-#include "abase.h"
 #include "select_mpi.h"
 
 #include "params.h"
@@ -28,17 +28,13 @@ struct sfiles_list {
     struct sfile_info * sfiles;
 };
 
-
-static void prelude(parallelizing_info_ptr pi, struct sfiles_list * s, balancing_ptr bal)
+static void prelude(parallelizing_info_ptr pi, struct sfiles_list * s)
 {
     s->sfiles_alloc=0;
     s->sfiles = NULL;
     s->nsfiles=0;
     serialize_threads(pi->m);
-    int rc;
-    char * spat;
-    rc = asprintf(&spat, S_FILE_PATTERN "%%n", bal->h->checksum);
-    ASSERT_ALWAYS(rc >= 0);
+    const char * spat = S_FILE_BASE_PATTERN ".%u" "%n";
     if (pi->m->jrank == 0 && pi->m->trank == 0) {
         /* It's our job to collect the directory data.
          */
@@ -72,7 +68,6 @@ static void prelude(parallelizing_info_ptr pi, struct sfiles_list * s, balancing
         }
         closedir(dir);
     }
-    free(spat);
     /* Note that it's not necessary to care about the file names -- in
      * practice, the file name is only relevant to the job/thread doing
      * actual I/O.
@@ -118,29 +113,34 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     if (pi->interleaved && pi->interleaved->idx)
         return NULL;
 
-    struct sfiles_list sf[1];
-
-    abobj_t abase;
-    abobj_init(abase);
-    abobj_set_nbys(abase, bw->n);
-
     int tcan_print = bw->can_print && pi->m->trank == 0;
     matmul_top_data mmt;
+
 
     int flags[2];
     flags[bw->dir] = THREAD_SHARED_VECTOR;
     flags[!bw->dir] = 0;
 
-    matmul_top_init(mmt, abase, pi, flags, pl, bw->dir);
+    abase_vbase A;
+    abase_vbase_oo_field_init_bygroupsize(A, bw->n);
+    A->set_groupsize(A, bw->n);
 
-    prelude(pi, sf, mmt->bal);
+    matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
+    unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
 
     mmt_wiring_ptr mcol = mmt->wr[bw->dir];
     mmt_wiring_ptr mrow = mmt->wr[!bw->dir];
 
+    struct sfiles_list sf[1];
+    prelude(pi, sf);
+    if (sf->nsfiles == 0) {
+        fprintf(stderr, "Found zero S files. Problem with command line ?\n");
+        exit(1);
+    }
+
     pi_wiring_ptr picol = mmt->pi->wr[bw->dir];
 
-    abzero(abase, mrow->v->v, mrow->i1 - mrow->i0);
+    A->vec_set_zero(A, mrow->v->v, mrow->i1 - mrow->i0);
 
     unsigned int ii0, ii1;
     unsigned int di = mcol->i1 - mcol->i0;
@@ -150,52 +150,38 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     ii1 = mcol->i0 + di * (picol->jrank * picol->ncores + picol->trank + 1) /
         (picol->njobs * picol->ncores);
 
-    size_t stride =  abbytes(abase, 1);
+    mmt_vec svec;
+    mmt_vec tvec;
+    vec_init_generic(mmt->pi->m, A, svec, 0, ii1-ii0);
+    vec_init_generic(mmt->pi->m, A, tvec, 0, ii1-ii0);
 
-    mmt_generic_vec svec;
-    vec_init_generic(mmt->pi->m, stride, svec, 0, ii1-ii0);
-    mmt_generic_vec tvec;
-    vec_init_generic(mmt->pi->m, stride, tvec, 0, ii1-ii0);
+    A->vec_set_zero(A, tvec->v, ii1 - ii0);
 
-    abase_generic_zero(stride, tvec->v, ii1 - ii0);
-
-    int rc;
-    char * tmp;
-    char * spat;
-    rc = asprintf(&spat, S_FILE_PATTERN, mmt->bal->h->checksum);
-    ASSERT_ALWAYS(rc >= 0);
 
     for(int i = 0 ; i < sf->nsfiles ; i++) {
-        rc = asprintf(&tmp, spat,
-                sf->sfiles[i].n0,
-                sf->sfiles[i].n1,
-                sf->sfiles[i].iter);
+        char * tmp;
+        int rc = asprintf(&tmp, S_FILE_BASE_PATTERN,
+                sf->sfiles[i].n0, sf->sfiles[i].n1);
+        ASSERT_ALWAYS(rc >= 0);
 
         if (tcan_print) {
-            printf("loading %s\n", tmp);
+            printf("loading %s.%u\n", tmp, sf->sfiles[i].iter);
         }
-        pi_load_file_2d(pi, bw->dir, tmp, svec->v, (ii1 - ii0) * stride);
+        pi_load_file_2d(pi, bw->dir, tmp, sf->sfiles[i].iter, svec->v, A->vec_elt_stride(A, ii1 - ii0), A->vec_elt_stride(A, unpadded));
         free(tmp);
-        for(unsigned int j = ii0 ; j < ii1 ; j++) {
-            abadd(abase,
-                    tvec->v + abbytes(abase, j - ii0),
-                    svec->v + abbytes(abase, j - ii0));
-        }
+        A->vec_add(A, tvec->v, tvec->v, svec->v, ii1 - ii0);
     }
-    free(spat);
 
     /* We're simply using file I/O as a means of broadcast. It's much
      * easier, since we'll be doing I/O anyway...
      */
-    rc = asprintf(&tmp, COMMON_VECTOR_ITERATE_PATTERN, K_FILE_BASE_PATTERN, 0, mmt->bal->h->checksum);
-    ASSERT_ALWAYS(rc >= 0);
-    pi_save_file_2d(pi, bw->dir, tmp, tvec->v, (ii1 - ii0) * stride);
-    free(tmp);
+    pi_save_file_2d(pi, bw->dir, K_FILE_BASE_PATTERN, 0, tvec->v, A->vec_elt_stride(A, ii1 - ii0),  A->vec_elt_stride(A, unpadded));
     
     int is_zero = 0;
 
     serialize(pi->m);
-    matmul_top_load_vector(mmt, K_FILE_BASE_PATTERN, bw->dir, 0);
+    matmul_top_load_vector(mmt, K_FILE_BASE_PATTERN, bw->dir, 0, unpadded);
+    matmul_top_twist_vector(mmt, bw->dir);
 
     unsigned int how_many;
     unsigned int offset_c;
@@ -204,8 +190,8 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 mrow->i0, mrow->i1,
                 mcol->i0, mcol->i1);
 
-    abt * check_area = mcol->v->v + aboffset(abase, offset_v);
-    is_zero = abis_zero(abase, check_area, how_many);
+    void * check_area = SUBVEC(mcol->v, v, offset_v);
+    is_zero = A->vec_is_zero(A, check_area, how_many);
     is_zero = agree_on_flag(pi->m, is_zero);
 
     if (is_zero) {
@@ -217,8 +203,10 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
     for(int i = 1 ; i < 10 ; i++) {
         serialize(pi->m);
+
         matmul_top_mul(mmt, bw->dir);
-        is_zero = abis_zero(abase, check_area, how_many);
+
+        is_zero = A->vec_is_zero(A, check_area, how_many);
         is_zero = agree_on_flag(pi->m, is_zero);
         serialize(pi->m);
         if (agree_on_flag(pi->m, is_zero)) {
@@ -226,34 +214,36 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                 printf("M^%u * V is zero !\n", i);
             if (pi->m->jrank == 0 && pi->m->trank == 0) {
                 int rc;
-                rc = asprintf(&tmp, K_FILE_PATTERN, i-1, mmt->bal->h->checksum);
+                char * tmp;
+                rc = asprintf(&tmp, K_FILE_BASE_PATTERN ".%u", i-1);
                 ASSERT_ALWAYS(rc != -1);
-                char * tmp2;
-                rc = asprintf(&tmp2, W_FILE, mmt->bal->h->checksum);
-                ASSERT_ALWAYS(rc >= 0);
-                unlink(tmp2);
-                rc = link(tmp, tmp2);
+                rc = link(tmp, W_FILE);
                 if (rc < 0) {
                     fprintf(stderr, "Cannot hard link %s to %s: %s\n",
-                            tmp2, tmp, strerror(errno));
+                            W_FILE, tmp, strerror(errno));
                 }
-                free(tmp2);
                 free(tmp);
             }
             break;
         }
 
-        matmul_top_save_vector(mmt, K_FILE_BASE_PATTERN, bw->dir, i);
+        matmul_top_untwist_vector(mmt, bw->dir);
+        matmul_top_save_vector(mmt, K_FILE_BASE_PATTERN, bw->dir, i, unpadded);
+        matmul_top_twist_vector(mmt, bw->dir);
     }
-    if (!is_zero && tcan_print)
+    if (!is_zero && tcan_print) {
         printf("No solution found ; most probably a bug\n");
+        exit(1);
+    }
 
     serialize(pi->m);
 
-    vec_clear_generic(mmt->pi->m, stride, svec, ii1-ii0);
-    vec_clear_generic(mmt->pi->m, stride, tvec, ii1-ii0);
+    vec_clear_generic(mmt->pi->m, svec, ii1-ii0);
+    vec_clear_generic(mmt->pi->m, tvec, ii1-ii0);
 
-    matmul_top_clear(mmt, abase);
+    matmul_top_clear(mmt);
+    A->oo_field_clear(A);
+
     return NULL;
 }
 

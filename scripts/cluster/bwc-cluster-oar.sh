@@ -65,13 +65,18 @@ set_runtime_variables() {
 
 pick_cluster_configuration() {
     case "$cluster/$nnodes" in
-        edel/30)    mpi=5x6 thr=4x2 bcode=8e0d9701;;
-        parapluie/20) mpi=5x4 thr=4x3 bcode=8e0d9701;;
+        edel/30)    mpi=5x6 thr=4x2 bcode=8e0d9701;; # 0.40
+        chinqchint/12)    mpi=3x4 thr=4x2 bcode=1cb0aa01;; # 1.73 mpich2-1.3.2p1
+        chinqchint/30)    mpi=5x6 thr=4x2 bcode=8e0d9701;;
+        parapluie/20) mpi=5x4 thr=4x3 bcode=8e0d9701;; # 0.72
+        parapluie/10) mpi=5x2 thr=4x6 bcode=8e0d9701;;
+        # parapluie/12) mpi=4x3 thr=5x4 bcode=8e0d9701;; # 0.92
         # parapluie/12)    mpi=2x6 thr=6x2 bcode=32d5f701;;
         # parapluie/12)    mpi=3x4 thr=4x3 bcode=32d5f701;;
-        parapluie/12)    mpi=1x12 thr=12x1 bcode=32d5f701;;
+        # parapluie/12)    mpi=1x12 thr=12x1 bcode=32d5f701;;
         parapluie/6)    mpi=2x3 thr=6x4 bcode=32d5f701;;
         parapluie/8)    mpi=1x8 thr=8x1 bcode=67030201;;
+        graphene/60)    mpi=6x10 thr=2x2 bcode=8e0d9701;;
         *)
             echo "Configuration $cluster/$nnodes not configured" >&2
             exit 1
@@ -129,6 +134,10 @@ echo "need to get $bfile"
 
 fetch="$src/scripts/cluster/bwc-fetchfiles.pl --localdir $wdir"
 
+$fetch --fetch $leader "md5s"
+
+fetch="$fetch --md5db $wdir/md5s"
+
 $fetch --fetch $leader "${nh}x${nv}/$bfile"
 
 bwc_common_args="nullspace=left matrix=$matrix_base.bin wdir=$wdir mn=64 balancing=$wdir/$bfile mpi=$mpi thr=$thr"
@@ -144,7 +153,7 @@ perl -ne "/^get-cache/ or die; chomp(\$_); my @x=split ' ', \$_; shift @x; my \$
 
 if ! [ -f /tmp/rsyncd.conf ] ; then
     cat > /tmp/rsyncd.conf <<EOF
-port=8873
+port = 8873
 use chroot = no
 max connections = 8
 lock file = /tmp/rsyncd.lock
@@ -154,12 +163,16 @@ lock file = /tmp/rsyncd.lock
       comment = cado
       read only = yes
 EOF
-    $MPI/bin/mpiexec -n $nnodes $build_tree/linalg/bwc/bcast-file /tmp/rsyncd.conf
+    for m in "${nodes[@]}" ; do rsync -e $SSH /tmp/rsyncd.conf ${m}:/tmp/rsyncd.conf & : ; done 
+    wait
     for m in "${nodes[@]}" ; do $SSH -n $m rsync --daemon --config /tmp/rsyncd.conf & : ; done 
     wait
 fi
 
 $fetch --dispatch-list $wdir/cachelist
+save_once() {
+    rsync --port=8873 -av ${wdir}/[AVS]* rsa768.rennes.grid5000.fr::cado/${bcode}/
+}
 
 backlog() {
 while true ; do
@@ -181,25 +194,34 @@ get_last() {
 }
 
 
-if [ "$mksol" ] ; then
-    rsync -aP --port=8873 rsa768.rennes.grid5000.fr::cado/F0-64 $wdir/
-fi
-
 # Make sure to move V files before starting mksol
 start=`get_last $bcode`
 interval=4000
 
 rsync -aP --port=8873 root@rsa768.rennes.grid5000.fr::cado/${bcode}/{V0-64.${start}.${bcode},C.${interval}.${bcode},X.${bcode}} /tmp/bwc.$cluster/
 
-# This could be something to consider including
-# +bwc u64n_prep interval=${interval} 2>&1
-# +bwc :ysplit interval=${interval} 2>&1
+checkpoint_mode="keep_rolling_checkpoints=4"
 
-if [ "$mksol" ] ; then
-    bwc u64_mksol interval=${interval} keep_rolling_checkpoints=4 start=${start} 2>&1
-else
-    bwc u64_krylov interval=${interval} keep_rolling_checkpoints=4 start=${start} 2>&1
+if ! [ -f "$wdir/C.${interval}.${bcode}" ] ; then
+    echo "Check vector C.${interval}.${bcode} missing. Keeping all V files"
+    checkpoint_mode="skip_online_checks=1"
 fi
 
-echo bye
+    
+if [ "$mksol" ] ; then
+    rsync -aP --port=8873 rsa768.rennes.grid5000.fr::cado/F0-64 $wdir/
+
+    bwc u64_mksol interval=${interval} $checkpoint_mode start=${start} 2>&1
+else
+    # This could be something to consider including
+    if ! [ -f "$wdir/X.${bcode}" ] ; then
+        bwc u64n_prep interval=${interval} 2>&1
+        bwc :ysplit interval=${interval} 2>&1
+    fi
+
+    bwc u64_krylov interval=${interval} $checkpoint_mode start=${start} 2>&1
+fi
+
 kill -9 $backlog_pid
+save_once
+echo bye

@@ -1,10 +1,12 @@
 #include "cado.h"
 
 #include <stdio.h>
+#include <string.h>
+
 #include "bwc_config.h"
 #include "matmul.h"
-#include "abase.h"
 #include "macros.h"
+#include "mpfq/abase_vbase.h"
 
 void usage()
 {
@@ -13,8 +15,9 @@ void usage()
 }
 int main(int argc, char * argv[])
 {
-    abobj_t xx MAYBE_UNUSED;
-    abobj_init(xx);
+    abase_vbase xx;
+    abase_vbase_oo_field_init_byname(xx, "u64k1");
+    xx->set_groupsize(xx, 64);
 
     matmul_t mm;
 

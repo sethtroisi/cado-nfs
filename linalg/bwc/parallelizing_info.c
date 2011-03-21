@@ -18,6 +18,7 @@
 #include "select_mpi.h"
 #include "parallelizing_info.h"
 #include "macros.h"
+#include "misc.h"
 
 #include <sys/time.h>   // gettimeofday
 #define OBTAIN_NODENAME
@@ -1037,7 +1038,7 @@ static int get_counts_and_displacements(pi_wiring_ptr w, int my_size,
      * positives or not. Better shut them up for good. */
     void * allcounts_void;
     if (w->trank == 0) {
-        allcounts_void = malloc(w->njobs*w->ncores*sizeof(int));
+        allcounts_void = malloc(w->totalsize*sizeof(int));
     }
     thread_broadcast(w, &allcounts_void, 0);
     int * allcounts = (int *) allcounts_void;
@@ -1052,8 +1053,7 @@ static int get_counts_and_displacements(pi_wiring_ptr w, int my_size,
             dis += allcounts[k * w->ncores + t];
         }
         displs[k] = dis;
-        dis += allcounts[k * w->ncores + t];
-        for(t++ ; t < w->ncores ; t++) {
+        for( ; t < w->ncores ; t++) {
             dis += allcounts[k * w->ncores + t];
         }
     }
@@ -1185,10 +1185,35 @@ int get_counts_and_displacements_2d(parallelizing_info_ptr pi, int d,
     return dis;
 }
 
+int truncate_counts_and_displacements(pi_wiring_ptr w, int * displs, int * counts, int sizeondisk)
+{
+    for(unsigned int k = 0 ; k < w->njobs ; k++) {
+        if (displs[k] + counts[k] >= sizeondisk) {
+            if (displs[k] >= sizeondisk) {
+                displs[k] = sizeondisk;
+                counts[k] = 0;
+            } else {
+                counts[k] = sizeondisk - displs[k];
+            }
+        }
+    }
+    return sizeondisk;
+}
+
+int area_is_zero(const void * src, ptrdiff_t offset0, ptrdiff_t offset1)
+{
+    const char * b0 = pointer_arith_const(src, offset0);
+    const char * b1 = pointer_arith_const(src, offset1);
+    for( ; b0 < b1 ; b0++) {
+        if (*b0) return 0;
+    }
+    return 1;
+}
+
 /* That's a workalike to MPI_File_write_ordered, except that we work with
  * the finer-grained pi_wiring_ptr's.
  */
-int pi_save_file(pi_wiring_ptr w, const char * name, void * buf, size_t mysize)
+int pi_save_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * buf, size_t mysize, size_t sizeondisk)
 {
     int * displs = (int *) malloc(w->njobs * sizeof(int));
     int * recvcounts = (int *) malloc(w->njobs * sizeof(int));
@@ -1205,29 +1230,33 @@ int pi_save_file(pi_wiring_ptr w, const char * name, void * buf, size_t mysize)
     int err;
 
     if (leader) {
-        fd = open(name, O_RDWR|O_CREAT, 0666);
+        char * filename;
+        int rc;
+        rc = asprintf(&filename, "%s.%u", name, iter);
+        FATAL_ERROR_CHECK(rc < 0, "out of memory");
+        fd = open(filename, O_RDWR|O_CREAT, 0666);
         if (fd < 0) {
-            fprintf(stderr, "fopen(%s): %s\n", name, strerror(errno));
+            fprintf(stderr, "fopen(%s): %s\n", filename, strerror(errno));
             goto pi_save_file_leader_init_done;
         }
 
         rc = ftruncate(fd, wsiz);
         if (rc < 0) {
             fprintf(stderr, "ftruncate(%s): %s\n",
-                    name, strerror(errno));
+                    filename, strerror(errno));
             close(fd);
             goto pi_save_file_leader_init_done;
         }
         recvbuf = mmap(NULL, wsiz, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
         if (recvbuf == MAP_FAILED) {
             fprintf(stderr, "mmap(%s): %s\n",
-                    name, strerror(errno));
+                    filename, strerror(errno));
             recvbuf = NULL;
             close(fd);
             goto pi_save_file_leader_init_done;
         }
 pi_save_file_leader_init_done:
-        ;
+        free(filename);
     }
 
     /* Now all threads from job zero see the area mmaped by their leader
@@ -1239,7 +1268,7 @@ pi_save_file_leader_init_done:
 
     /* Rather unfortunate, but error checking requires some checking. As
      * mentioned earlier, we don't feel concerned a lot by this, since
-     * inour context I/Os are rare enough
+     * in our context I/Os are rare enough
      */
     int ok = recvbuf != NULL;
     SEVERAL_THREADS_PLAY_MPI_BEGIN(w) {
@@ -1267,8 +1296,9 @@ pi_save_file_leader_init_done:
     free(displs);
 
     if (leader) {
+        ASSERT_ALWAYS(area_is_zero(recvbuf, sizeondisk, siz));
         munmap(recvbuf, wsiz);
-        rc = ftruncate(fd, siz);
+        rc = ftruncate(fd, sizeondisk);
         if (rc < 0) {
             fprintf(stderr, "ftruncate(): %s\n", strerror(errno));
             /* If only ftruncate failed, don't return an error */
@@ -1281,7 +1311,7 @@ pi_save_file_leader_init_done:
 
 /* d indicates whether we read the ranks row by row (d==0) or column by
  * column */
-int pi_save_file_2d(parallelizing_info_ptr pi, int d, const char * name, void * buf, size_t mysize)
+int pi_save_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigned int iter, void * buf, size_t mysize, size_t sizeondisk)
 {
     pi_wiring_ptr w = pi->m;
 
@@ -1300,29 +1330,33 @@ int pi_save_file_2d(parallelizing_info_ptr pi, int d, const char * name, void * 
     int err;
 
     if (leader) {
-        fd = open(name, O_RDWR|O_CREAT, 0666);
+        char * filename;
+        int rc;
+        rc = asprintf(&filename, "%s.%u", name, iter);
+        FATAL_ERROR_CHECK(rc < 0, "out of memory");
+        fd = open(filename, O_RDWR|O_CREAT, 0666);
         if (fd < 0) {
-            fprintf(stderr, "fopen(%s): %s\n", name, strerror(errno));
+            fprintf(stderr, "fopen(%s): %s\n", filename, strerror(errno));
             goto pi_save_file_2d_leader_init_done;
         }
 
         rc = ftruncate(fd, wsiz);
         if (rc < 0) {
             fprintf(stderr, "ftruncate(%s): %s\n",
-                    name, strerror(errno));
+                    filename, strerror(errno));
             close(fd);
             goto pi_save_file_2d_leader_init_done;
         }
         recvbuf = mmap(NULL, wsiz, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
         if (recvbuf == MAP_FAILED) {
             fprintf(stderr, "mmap(%s): %s\n",
-                    name, strerror(errno));
+                    filename, strerror(errno));
             recvbuf = NULL;
             close(fd);
             goto pi_save_file_2d_leader_init_done;
         }
 pi_save_file_2d_leader_init_done:
-        ;
+        free(filename);
     }
 
     /* Now all threads from job zero see the area mmaped by their leader
@@ -1362,8 +1396,9 @@ pi_save_file_2d_leader_init_done:
     free(displs);
 
     if (leader) {
+        ASSERT_ALWAYS(area_is_zero(recvbuf, sizeondisk, siz));
         munmap(recvbuf, wsiz);
-        rc = ftruncate(fd, siz);
+        rc = ftruncate(fd, sizeondisk);
         if (rc < 0) {
             fprintf(stderr, "ftruncate(): %s\n", strerror(errno));
             /* If only ftruncate failed, don't return an error */
@@ -1374,13 +1409,14 @@ pi_save_file_2d_leader_init_done:
     return 1;
 }
 
-int pi_load_file(pi_wiring_ptr w, const char * name, void * buf, size_t mysize)
+int pi_load_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * buf, size_t mysize, size_t sizeondisk)
 {
     int * displs = (int *) malloc(w->njobs * sizeof(int));
     int * sendcounts = (int *) malloc(w->njobs * sizeof(int));
     size_t siz;
 
     siz = get_counts_and_displacements(w, mysize, displs, sendcounts);
+    truncate_counts_and_displacements(w, displs, sendcounts, sizeondisk);
 
     // the page size is always a power of two, so rounding to the next
     // multiple is easy.
@@ -1391,10 +1427,15 @@ int pi_load_file(pi_wiring_ptr w, const char * name, void * buf, size_t mysize)
     int err;
 
     if (leader) {
-        fd = open(name, O_RDONLY, 0666);
-        DIE_ERRNO_DIAG(fd < 0, "fopen", name);
+        char * filename;
+        int rc;
+        rc = asprintf(&filename, "%s.%u", name, iter);
+        FATAL_ERROR_CHECK(rc < 0, "out of memory");
+        fd = open(filename, O_RDONLY, 0666);
+        DIE_ERRNO_DIAG(fd < 0, "fopen", filename);
         sendbuf = mmap(NULL, wsiz, PROT_READ, MAP_SHARED, fd, 0);
-        DIE_ERRNO_DIAG(sendbuf == MAP_FAILED, "mmap", name);
+        DIE_ERRNO_DIAG(sendbuf == MAP_FAILED, "mmap", filename);
+        free(filename);
     }
 
     if (w->jrank == 0) {
@@ -1405,7 +1446,8 @@ int pi_load_file(pi_wiring_ptr w, const char * name, void * buf, size_t mysize)
      * can't work. So no need to agree on an ok value. */
 
     SEVERAL_THREADS_PLAY_MPI_BEGIN(w) {
-        ASSERT_ALWAYS(mysize == (size_t) sendcounts[w->jrank]);
+        // the send count might actually be a tiny bit smaller.
+        // ASSERT_ALWAYS(mysize == (size_t) sendcounts[w->jrank]);
 #if 1
         /* There seems to be a concurrency problem with the openmpi
          * implementation of MPI_Scatterv. We resort to an emulation
@@ -1462,6 +1504,13 @@ int pi_load_file(pi_wiring_ptr w, const char * name, void * buf, size_t mysize)
     }
     SEVERAL_THREADS_PLAY_MPI_END;
 
+    /* clear the tail if needed ! */
+    if (mysize >= (size_t) sendcounts[w->jrank]) {
+        memset(pointer_arith(buf, sendcounts[w->jrank]),
+                0,
+                mysize - sendcounts[w->jrank]);
+    }
+
     serialize_threads(w);
 
     free(sendcounts);
@@ -1474,7 +1523,7 @@ int pi_load_file(pi_wiring_ptr w, const char * name, void * buf, size_t mysize)
     return 1;
 }
 
-int pi_load_file_2d(parallelizing_info_ptr pi, int d, const char * name, void * buf, size_t mysize)
+int pi_load_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigned int iter, void * buf, size_t mysize, size_t sizeondisk)
 {
     pi_wiring_ptr w = pi->m;
 
@@ -1482,6 +1531,7 @@ int pi_load_file_2d(parallelizing_info_ptr pi, int d, const char * name, void * 
     int * sendcounts = (int *) malloc(w->njobs * sizeof(int));
     size_t siz;
     siz = get_counts_and_displacements_2d(pi, d, mysize, displs, sendcounts);
+    truncate_counts_and_displacements(w, displs, sendcounts, sizeondisk);
 
     // the page size is always a power of two, so rounding to the next
     // multiple is easy.
@@ -1492,10 +1542,15 @@ int pi_load_file_2d(parallelizing_info_ptr pi, int d, const char * name, void * 
     int err;
 
     if (leader) {
-        fd = open(name, O_RDONLY, 0666);
-        DIE_ERRNO_DIAG(fd < 0, "fopen", name);
+        char * filename;
+        int rc;
+        rc = asprintf(&filename, "%s.%u", name, iter);
+        FATAL_ERROR_CHECK(rc < 0, "out of memory");
+        fd = open(filename, O_RDONLY, 0666);
+        DIE_ERRNO_DIAG(fd < 0, "fopen", filename);
         sendbuf = mmap(NULL, wsiz, PROT_READ, MAP_SHARED, fd, 0);
-        DIE_ERRNO_DIAG(sendbuf == MAP_FAILED, "mmap", name);
+        DIE_ERRNO_DIAG(sendbuf == MAP_FAILED, "mmap", filename);
+        free(filename);
     }
 
     if (w->jrank == 0) {
@@ -1506,13 +1561,21 @@ int pi_load_file_2d(parallelizing_info_ptr pi, int d, const char * name, void * 
      * can't work. So no need to agree on an ok value. */
 
     SEVERAL_THREADS_PLAY_MPI_BEGIN(w) {
-        ASSERT_ALWAYS(mysize == (size_t) sendcounts[w->jrank]);
+        // the send count might actually be a tiny bit smaller.
+        // ASSERT_ALWAYS(mysize == (size_t) sendcounts[w->jrank]);
         err = MPI_Scatterv(sendbuf, sendcounts, displs, MPI_BYTE,
-                buf, mysize, MPI_BYTE,
+                buf, sendcounts[w->jrank], MPI_BYTE,
                 0, w->pals);
         ASSERT_ALWAYS(!err);
     }
     SEVERAL_THREADS_PLAY_MPI_END;
+
+    /* clear the tail if needed ! */
+    if (mysize >= (size_t) sendcounts[w->jrank]) {
+        memset(pointer_arith(buf, sendcounts[w->jrank]),
+                0,
+                mysize - sendcounts[w->jrank]);
+    }
 
     serialize_threads(w);
 

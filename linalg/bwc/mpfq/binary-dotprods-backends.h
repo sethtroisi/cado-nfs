@@ -1,10 +1,17 @@
-#ifndef ABASE_BINARY_DOTPROD_BACKENDS_H_
-#define ABASE_BINARY_DOTPROD_BACKENDS_H_
+#ifndef BINARY_DOTPROD_BACKENDS_H_
+#define BINARY_DOTPROD_BACKENDS_H_
 
 /* TODO: there's some duplicated code between here and matops.c */
 
-#ifdef  need_dotprod_64K_64
+/* require all versions */
+#define  need_dotprod_64K_64
+#define  need_dotprod_64K_128
+#define  need_dotprod_64K_64L
+#define  need_vaddmul_tiny_64K_64L
+#define  need_vtranspose_64K_64L
+#define  need_dotprod_64K_64
 
+#ifdef  need_dotprod_64K_64
 #ifdef  HAVE_SSE2
 #include <emmintrin.h>
 /* u has n rows of 64K bits
@@ -144,7 +151,7 @@ static inline void dotprod_64K_128(uint64_t * b, const uint64_t * A, const uint6
  * as usual. We're not using sse-2 here because of lazyness -- and little
  * expected returns.
  */
-static void dotprod_64K_64L(
+static inline void dotprod_64K_64L(
         uint64_t * w,           // 64L at a time
         const uint64_t * u,     // 64K at a time
         const uint64_t * v,     // 64L at a time
@@ -285,4 +292,4 @@ static inline void vtranspose_64K_64L(
 }
 #endif
 
-#endif	/* ABASE_BINARY_DOTPROD_BACKENDS_H_ */
+#endif	/* BINARY_DOTPROD_BACKENDS_H_ */

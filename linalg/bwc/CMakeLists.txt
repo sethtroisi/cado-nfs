@@ -1,5 +1,6 @@
 
 include_directories(..)
+# include_directories(mpfq)
 
 # Use with care. Normally, binaries not needed MPI for real should not
 # emit MPI symbols since they don't do anything depending on this config
@@ -67,9 +68,17 @@ set_target_properties(bcast-file PROPERTIES
         COMPILE_FLAGS "--mpi"
         LINK_FLAGS "--mpi")
 
+target_link_libraries(balancing utils)
 if (HAVE_CURL)
 target_link_libraries(balancing curl)
 endif (HAVE_CURL)
+
+set(bwc_abases u64k1 u64k2)
+
+set(bwc_mpfq_sources mpfq/abase_vbase.c)
+foreach(v ${bwc_abases})
+    set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/abase_${v}.c mpfq/abase_${v}_t.c )
+endforeach(v)
 
 set(bwc_base_sources
     parallelizing_info.c
@@ -81,12 +90,19 @@ set(bwc_base_sources
     async.c
     debug.c
     rolling.c
-    worker-threads.c)
+    worker-threads.c
+    matmul.c
+    matmul_top.c
+)
 
 add_library(bwc_base ${bwc_base_sources})
+add_library(bwc_mpfq SHARED ${bwc_mpfq_sources})
 
-target_link_libraries(bwc_base balancing utils ${pthread_libs})
+target_link_libraries(bwc_base balancing utils bwc_mpfq ${pthread_libs})
 set_target_properties(bwc_base PROPERTIES
+        COMPILE_FLAGS "--mpi"
+        LINK_FLAGS "--mpi")
+set_target_properties(bwc_mpfq PROPERTIES
         COMPILE_FLAGS "--mpi"
         LINK_FLAGS "--mpi")
 
@@ -94,16 +110,18 @@ add_executable(mf_twistvec mf_twistvec.c)
 target_link_libraries(mf_twistvec bwc_base)
 install(TARGETS mf_twistvec RUNTIME DESTINATION bin/linalg/bwc)
 
-set(all_variants)
-macro(configure_bwc_variant v)
-    set(${v}_matmul_sources 
-        matmul-common.c matmul-basic.c matmul-sliced.cpp
-        matmul-threaded.c matmul-bucket.cpp matmul.c)
+set(matmul_basic_sources    matmul-basic.c)
+set(matmul_sliced_sources   matmul-sliced.cpp)
+set(matmul_bucket_sources   matmul-bucket.cpp)
+set(matmul_threaded_sources matmul-threaded.c)
 
-    string(COMPARE EQUAL "${v}" "u64" doing_u64)
-    if(doing_u64)
+macro(configure_matmul_lib v i)
+    string(COMPARE EQUAL "${v}" "u64k1" doing_u64)
+    string(COMPARE EQUAL "${i}" "bucket" doing_bucket)
+    set(sources matmul-common.c matmul_facade.c ${matmul_${i}_sources})
+    if(doing_u64 AND doing_bucket)
         if(HAVE_GCC_STYLE_AMD64_ASM)
-            set(${v}_matmul_sources ${${v}_matmul_sources}
+            set(sources ${sources}
                     matmul-sub-small1.S
                     matmul-sub-small2.S
                     matmul-sub-large-fbi.S
@@ -118,63 +136,52 @@ macro(configure_bwc_variant v)
             set_property(SOURCE matmul-sub-vsc-dispatch.S PROPERTY LANGUAGE C)
             set_property(SOURCE matmul-sub-vsc-combine.S PROPERTY LANGUAGE C)
         endif(HAVE_GCC_STYLE_AMD64_ASM)
-    endif(doing_u64)
+    endif(doing_u64 AND doing_bucket)
 
-    add_library(${v}_matmul ${${v}_matmul_sources})
-    set_target_properties(${v}_matmul PROPERTIES
-            COMPILE_FLAGS "--mpi -DSELECT_ABASE_${v}"
+    add_library(matmul_${v}_${i} SHARED ${sources})
+    target_link_libraries(matmul_${v}_${i} bwc_mpfq mat_io)
+    set_target_properties(matmul_${v}_${i} PROPERTIES
+            COMPILE_FLAGS "--mpi -DSELECT_ABASE_${v} -DMM_IMPL=${i}"
             LINK_FLAGS "--mpi")
-    target_link_libraries(${v}_matmul bwc_base)
-    target_link_libraries(${v}_matmul mat_io)
+    set(all_matmul_libs ${all_matmul_libs} "matmul_${v}_${i}")
+endmacro(configure_matmul_lib)
+
+if(EXISTS ${CADO_NFS_SOURCE_DIR}/files.dist)
+# We are a release build. Pick everything.
+set(mm_impls basic sliced bucket threaded)
+else(EXISTS ${CADO_NFS_SOURCE_DIR}/files.dist)
+# Otherwise don't take the obsolete code.
+set(mm_impls bucket)
+endif(EXISTS ${CADO_NFS_SOURCE_DIR}/files.dist)
+
+foreach(v ${bwc_abases})
+    foreach(i ${mm_impls})
+        configure_matmul_lib(${v} ${i})
+    endforeach(i)
+endforeach(v)
 
 
-    add_library(${v}_bwc abase-${v}.c matmul_top.c)
-    set_target_properties(${v}_bwc PROPERTIES
-            COMPILE_FLAGS "--mpi -DSELECT_ABASE_${v}"
-            LINK_FLAGS "--mpi")
-    target_link_libraries(${v}_bwc bwc_base ${v}_matmul utils pthread)
+macro(bwc_program v)
+    add_executable(${v} ${ARGN})
+    install(TARGETS ${v} RUNTIME DESTINATION bin/linalg/bwc)
+    set_target_properties(${v} PROPERTIES
+            LINKER_LANGUAGE CXX
+            COMPILE_FLAGS "--mpi"
+            LINK_FLAGS "--mpi  -Wl,-rpath,${CMAKE_CURRENT_BINARY_DIR}")
+    target_link_libraries(${v} bwc_base)
+    add_dependencies(${v} ${all_matmul_libs})
+endmacro(bwc_program)
 
-    set(all_variants ${all_variants} ${v})
-endmacro(configure_bwc_variant)
-
-configure_bwc_variant(u64)
-# configure_bwc_variant(u64k)
-configure_bwc_variant(u64n)
-# configure_bwc_variant(u128)
-
-set(build_objs build.c)
-set(bench_objs bench.c)
-set(prep_objs prep.c xymats.c ../gauss.c)
+bwc_program(build build.c)
+bwc_program(bench bench.c)
 set_source_files_properties (../gauss.c COMPILE_FLAGS "-DMULTI_ROW=3 -DNO_MAIN")
-set(krylov_objs krylov.c xymats.c xdotprod.c)
-set(dispatch_objs dispatch.c xymats.c xdotprod.c)
-set(mksol_objs mksol.c xymats.c xdotprod.c)
-set(gather_objs gather.c)
-set(secure_objs secure.c)
-
-macro(configure_program prg)
-    foreach(v ${ARGN})
-        add_executable(${v}_${prg} ${${prg}_objs})
-        install(TARGETS ${v}_${prg} RUNTIME DESTINATION bin/linalg/bwc)
-        target_link_libraries(${v}_${prg} ${v}_bwc)
-        set_target_properties(${v}_${prg} PROPERTIES
-                LINKER_LANGUAGE CXX
-                COMPILE_FLAGS "-DSELECT_ABASE_${v} --mpi"
-                LINK_FLAGS "--mpi")
-    endforeach(v)
-endmacro(configure_program)
-
-set(used_variants       u64)
-#set(used_variants ${all_variants})
-
-configure_program(krylov ${used_variants})
-configure_program(dispatch ${used_variants})
-configure_program(mksol  ${used_variants})
-configure_program(build  ${used_variants})
-configure_program(bench  ${used_variants})
-configure_program(prep   u64n)
-configure_program(gather u64n)
-configure_program(secure u64)
+bwc_program(prep prep.c xymats.c ../gauss.c)
+bwc_program(krylov krylov.c xymats.c xdotprod.c)
+bwc_program(dispatch dispatch.c xymats.c xdotprod.c)
+bwc_program(mksol mksol.c xymats.c xdotprod.c)
+bwc_program(gather gather.c)
+bwc_program(secure secure.c)
+# bwc_program(test test.c)
 
 install(PROGRAMS ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl DESTINATION bin/linalg/bwc)
 
@@ -190,6 +197,7 @@ target_link_libraries(lingen bwc_base utils gf2x-fft gf2x cantor128)
 add_dependencies(lingen gf2x-build)
 
 add_executable(short_matmul ${EXCLUDE_FROM_RELEASE_BUILD} short_matmul.c)
+target_link_libraries(short_matmul balancing)
 
 add_executable(cleanup cleanup.c ../blockmatrix.c ../bit_matrices.c
     ../gauss.c)

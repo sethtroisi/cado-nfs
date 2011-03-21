@@ -9,7 +9,6 @@
 #include "bwc_config.h"
 #include "parallelizing_info.h"
 #include "matmul_top.h"
-#include "abase.h"
 #include "select_mpi.h"
 #include "debug.h"
 #include "params.h"
@@ -22,7 +21,6 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
 {
     matmul_top_data mmt;
     struct timing_data timing[1];
-    abobj_t abase;
 
     int flags[2];
     flags[bw->dir] = THREAD_SHARED_VECTOR;
@@ -35,14 +33,16 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         ys[1] = ys[0] + (bw->ys[1]-bw->ys[0])/2;
     }
 
-    abobj_init(abase);
-    abobj_set_nbys(abase, ys[1]-ys[0]);
+    abase_vbase A;
+    abase_vbase_oo_field_init_bygroupsize(A, ys[1]-ys[0]);
+    A->set_groupsize(A, ys[1]-ys[0]);
 
     block_control_signals();
 
-    matmul_top_init(mmt, abase, pi, flags, pl, bw->dir);
+    matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
 
-    matmul_top_clear(mmt, abase);
+    matmul_top_clear(mmt);
+    A->oo_field_clear(A);
 
     timing_clear(timing);
 

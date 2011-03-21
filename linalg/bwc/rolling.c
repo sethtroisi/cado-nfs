@@ -20,7 +20,7 @@ int uint_cmp(const unsigned int * a, const unsigned int * b)
     return (*b < *a) - (*a < *b);
 }
 
-void keep_rolling_checkpoints(balancing_ptr bal, const char * stem, unsigned int v)
+void keep_rolling_checkpoints(const char * stem, unsigned int v)
 {
     if (bw->keep_rolling_checkpoints == 0)
         return;
@@ -30,7 +30,7 @@ void keep_rolling_checkpoints(balancing_ptr bal, const char * stem, unsigned int
     struct dirent * de;
 
     char * spat;
-    int rc = asprintf(&spat, COMMON_VECTOR_ITERATE_PARSE_PATTERN, stem, bal->h->checksum);
+    int rc = asprintf(&spat, "%s.%%u", stem);
     ASSERT_ALWAYS(rc >= 0);
 
     unsigned int * vs = NULL;

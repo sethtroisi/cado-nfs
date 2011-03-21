@@ -15,13 +15,14 @@
 #include <limits.h>
 #include <inttypes.h>
 #include <unistd.h>
+#include <string.h>
 #include "bwc_config.h"
 #include "matmul.h"
-#include "abase.h"
 #include "macros.h"
 #include "params.h"
 #include "worker-threads.h"
 #include "utils.h"
+#include "mpfq/abase_vbase.h"
 // #include "debug.h"
 
 void usage()
@@ -34,12 +35,12 @@ void usage()
 
 struct private_args {
     matmul_t mm;
-    abt * src;
-    abt * dst;
+    void * src;
+    void * dst;
 };
 
 struct bench_args {
-    abobj_t xx;
+    abase_vbase xx;
     param_list pl;
     const char * impl;
     int nthreads;
@@ -99,16 +100,16 @@ void init_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct b
     matmul_aux(p->mm, MATMUL_AUX_GET_READAHEAD, &nr);
     matmul_aux(p->mm, MATMUL_AUX_GET_READAHEAD, &nc);
 
-    p->src = abinit(ba->xx, nc);
-    p->dst = abinit(ba->xx, nr);
-
-    abzero(ba->xx, p->dst, nr);
-    abzero(ba->xx, p->src, nc);
+    ba->xx->vec_init(ba->xx, &p->src, nc);
+    ba->xx->vec_init(ba->xx, &p->dst, nr);
+    ba->xx->vec_set_zero(ba->xx, p->src, nc);
+    ba->xx->vec_set_zero(ba->xx, p->dst, nr);
 }/*}}}*/
 
 void check_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct bench_args * ba)/*{{{*/
 {
     struct private_args * p = ba->p + tnum;
+    abase_vbase_ptr A = ba->xx;
 
     unsigned int nr = p->mm->dim[0];
     unsigned int nc = p->mm->dim[1];
@@ -117,47 +118,52 @@ void check_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct 
     matmul_aux(p->mm, MATMUL_AUX_GET_READAHEAD, &nr);
     matmul_aux(p->mm, MATMUL_AUX_GET_READAHEAD, &nc);
 
-    abt * dstT = abinit(ba->xx, nc);
-    abt * srcT = abinit(ba->xx, nr);
-    abzero(ba->xx, dstT, nc);
-    abzero(ba->xx, srcT, nr);
+    void * dstT;
+    void * srcT;
+    A->vec_init(A, &dstT, nc);
+    A->vec_init(A, &srcT, nr);
+    A->vec_set_zero(A, dstT, nc);
+    A->vec_set_zero(A, srcT, nr);
 
-    abt * checkA = abinit(ba->xx, abnbits(ba->xx));
-    abt * checkB = abinit(ba->xx, abnbits(ba->xx));
+    void * check0;
+    void * check1;
+    A->vec_init(A, &check0, A->groupsize(A));
+    A->vec_init(A, &check1, A->groupsize(A));
 
-    abcopy(ba->xx, dstT, p->src, nc);
-    abcopy(ba->xx, srcT, p->dst, nr);
+    A->vec_set(A, dstT, p->src, nc);
+    A->vec_set(A, srcT, p->dst, nr);
+
     printf("T%d src(%u): %08" PRIx32 "\n", tnum,
-            nc, crc32((unsigned long*) p->src, abbytes(ba->xx, nc0) / sizeof(unsigned long)));
+            nc, crc32((unsigned long*) p->src, A->vec_elt_stride(A, nc0) / sizeof(unsigned long)));
     matmul_mul(p->mm, p->dst, p->src, 1);
     printf("T%d dst(%u): %08" PRIx32 "\n", tnum,
-            nr, crc32((unsigned long*) p->dst, abbytes(ba->xx, nr0) / sizeof(unsigned long)));
-    // debug_write(p->dst, abbytes(ba->xx, nr), "/tmp/Lmul");
+            nr, crc32((unsigned long*) p->dst, A->vec_elt_stride(A, nr0) / sizeof(unsigned long)));
+    // debug_write(p->dst, abbytes(A, nr), "/tmp/Lmul");
 
-    abdotprod(ba->xx, checkA, p->dst, srcT, nr0);
+    A->dotprod(A, check0, p->dst, srcT, nr0);
 
     printf("T%d srcT(%u): %08" PRIx32 "\n", tnum,
-            nr, crc32((unsigned long*) srcT, abbytes(ba->xx, nr0) / sizeof(unsigned long)));
+            nr, crc32((unsigned long*) srcT, A->vec_elt_stride(A, nr0) / sizeof(unsigned long)));
     matmul_mul(p->mm, dstT, srcT, 0);
     printf("T%d dstT(%u): %08" PRIx32 "\n", tnum,
-            nc, crc32((unsigned long*) dstT, abbytes(ba->xx, nc0) / sizeof(unsigned long)));
+            nc, crc32((unsigned long*) dstT, A->vec_elt_stride(A, nc0) / sizeof(unsigned long)));
 
-    // debug_write(dstT, abbytes(ba->xx, nc), "/tmp/Rmul");
+    // debug_write(dstT, abbytes(A, nc), "/tmp/Rmul");
 
-    abdotprod(ba->xx, checkB, p->src, dstT, nc0);
+    A->dotprod(A, check1, p->src, dstT, nc0);
 
-    if (memcmp(checkA, checkB, aboffset(ba->xx, abnbits(ba->xx)) * sizeof(abt)) != 0) {
+    if (A->vec_cmp(A, check0, check1, A->groupsize(A)) != 0) {
         pthread_mutex_lock(&tg->mu);
         fprintf(stderr, "T%d : Check failed\n", tnum);
         pthread_mutex_unlock(&tg->mu);
         abort();
     }
 
-    abclear(ba->xx, checkA, abnbits(ba->xx));
-    abclear(ba->xx, checkB, abnbits(ba->xx));
+    A->vec_clear(A, &dstT, nc);
+    A->vec_clear(A, &srcT, nr);
+    A->vec_clear(A, &check0, A->groupsize(A));
+    A->vec_clear(A, &check1, A->groupsize(A));
 
-    abclear(ba->xx, dstT, nc);
-    abclear(ba->xx, srcT, nr);
 
     matmul_aux(p->mm, MATMUL_AUX_ZERO_STATS);
 }/*}}}*/
@@ -173,14 +179,15 @@ void mul_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct be
 void clear_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct bench_args * ba)/*{{{*/
 {
     struct private_args * p = ba->p + tnum;
+    abase_vbase_ptr A = ba->xx;
     unsigned int nr = p->mm->dim[0];
     unsigned int nc = p->mm->dim[1];
     pthread_mutex_lock(&tg->mu);
     matmul_report(p->mm, ba->freq);
     pthread_mutex_unlock(&tg->mu);
     matmul_clear(p->mm);
-    abclear(ba->xx, p->dst, nr);
-    abclear(ba->xx, p->src, nc);
+    A->vec_clear(A, &p->src, nc);
+    A->vec_clear(A, &p->dst, nr);
 }/*}}}*/
 
 void banner(int argc, char * argv[])
@@ -202,8 +209,6 @@ int main(int argc, char * argv[])
     struct bench_args ba[1];
 
     banner(argc, argv);
-
-    abobj_init(ba->xx);
 
     ba->impl = "bucket";
     char * file = NULL;
@@ -280,16 +285,19 @@ int main(int argc, char * argv[])
         ba->impl = tmp;
     }
 
-    unsigned int nbys;
+    unsigned int nbys = 64;
 
-    if (param_list_parse_uint(ba->pl, "nbys", &nbys)) {
-        /* The api mandates that we set the desired value for nbys. Here,
-         * that's not really our intent, since we really want to bench
-         * the layer in its favorite working context. Most of the time,
-         * setting nbys is pointless.
-         */
-        abobj_set_nbys(ba->xx,nbys);
-    }
+    abase_vbase_ptr A = ba->xx;
+
+    /* may leave nbys unchanged ! */
+    param_list_parse_uint(ba->pl, "nbys", &nbys);
+    /* The api mandates that we set the desired value for nbys. Here,
+     * that's not really our intent, since we really want to bench
+     * the layer in its favorite working context. Most of the time,
+     * setting nbys is pointless.
+     */
+    abase_vbase_oo_field_init_bygroupsize(A, nbys);
+    A->set_groupsize(A, nbys);
 
     if (param_list_warn_unused(ba->pl)) {
         usage();
@@ -317,8 +325,8 @@ int main(int argc, char * argv[])
         /* create deterministic test values */
         for(int tnum = 0 ; tnum < ba->nthreads ; tnum++) {
             struct private_args * p = ba->p + tnum;
-            abrandom(ba->xx, p->src, p->mm->dim[1]);
-            abrandom(ba->xx, p->dst, p->mm->dim[0]);
+            A->vec_random(A, p->src, p->mm->dim[1]);
+            A->vec_random(A, p->dst, p->mm->dim[0]);
         }
         worker_threads_do(ba->tg, (worker_func_t) &check_func, ba);
         fprintf(stderr, "Check %d ok\n", t);
@@ -329,8 +337,8 @@ int main(int argc, char * argv[])
 
     for(int tnum = 0 ; tnum < ba->nthreads ; tnum++) {
         struct private_args * p = ba->p + tnum;
-        abrandom(ba->xx, p->src, p->mm->dim[1]);
-        abrandom(ba->xx, p->dst, p->mm->dim[0]);
+        A->vec_random(A, p->src, p->mm->dim[1]);
+        A->vec_random(A, p->dst, p->mm->dim[0]);
     }
 
 #define NLAST   10

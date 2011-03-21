@@ -2658,7 +2658,7 @@ sub do_linalg {
                "mm_impl=$param{'bwc_mm_impl'} ".
                "interleaving=$param{'bwc_interleaving'} ".
                "interval=$param{'bwc_interval'} ".
-               "mode=u64 mn=64 splits=0,64 ys=0..64 ".
+               "mn=64 splits=0,64 ys=0..64 ".
                "wdir=$param{'prefix'}.bwc " .
                "shuffled_product=$param{'bwc_shuffled_product'} " .
                "bwc_bindir=$bwc_bindir ";

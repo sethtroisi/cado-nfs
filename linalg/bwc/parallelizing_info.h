@@ -207,11 +207,11 @@ extern int serialize__(pi_wiring_ptr, const char *, unsigned int);
 #define serialize_threads(w)   serialize_threads__(w, __FILE__, __LINE__)
 extern int serialize_threads__(pi_wiring_ptr, const char *, unsigned int);
 
-extern int pi_save_file(pi_wiring_ptr, const char *, void *, size_t);
-extern int pi_load_file(pi_wiring_ptr, const char *, void *, size_t);
+extern int pi_save_file(pi_wiring_ptr, const char *, unsigned int iter, void *, size_t, size_t);
+extern int pi_load_file(pi_wiring_ptr, const char *, unsigned int iter, void *, size_t, size_t);
 
-extern int pi_load_file_2d(parallelizing_info_ptr, int, const char *, void *, size_t);
-extern int pi_save_file_2d(parallelizing_info_ptr, int, const char *, void *, size_t);
+extern int pi_load_file_2d(parallelizing_info_ptr, int, const char *, unsigned int iter, void *, size_t, size_t);
+extern int pi_save_file_2d(parallelizing_info_ptr, int, const char *, unsigned int iter, void *, size_t, size_t);
 
 /* stuff related to log entry printing */
 extern void pi_log_init(pi_wiring_ptr);

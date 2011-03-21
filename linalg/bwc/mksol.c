@@ -1,9 +1,9 @@
 #include "cado.h"
 #include <stdio.h>
+#include <string.h>
 #include "bwc_config.h"
 #include "parallelizing_info.h"
 #include "matmul_top.h"
-#include "abase.h"
 #include "select_mpi.h"
 #include "debug.h"
 #include "params.h"
@@ -20,7 +20,6 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     int tcan_print = bw->can_print && pi->m->trank == 0;
     matmul_top_data mmt;
     struct timing_data timing[1];
-    abobj_t abase;
 
     int flags[2];
     flags[bw->dir] = THREAD_SHARED_VECTOR;
@@ -33,12 +32,23 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         ys[1] = ys[0] + (bw->ys[1]-bw->ys[0])/2;
     }
 
-    abobj_init(abase);
-    abobj_set_nbys(abase, ys[1]-ys[0]);
+    abase_vbase A;
+    abase_vbase_oo_field_init_bygroupsize(A, ys[1]-ys[0]);
+    A->set_groupsize(A, ys[1]-ys[0]);
+
+    abase_vbase Ac;
+    abase_vbase_oo_field_init_byname(Ac, "u64k1");
+    Ac->set_groupsize(Ac, NCHECKS_CHECK_VECTOR);
+
+    abase_vbase Ar;
+    abase_vbase_oo_field_init_byname(Ar, "u64k1");
+    Ar->set_groupsize(Ac, bw->n);
+    if (pi->m->trank == 0) Ar->mpi_ops_init(Ar);
 
     block_control_signals();
 
-    matmul_top_init(mmt, abase, pi, flags, pl, bw->dir);
+    matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
+    unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
 
     mmt_wiring_ptr mcol = mmt->wr[bw->dir];
     mmt_wiring_ptr mrow = mmt->wr[!bw->dir];
@@ -46,14 +56,18 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
 
     serialize(pi->m);
     
-    abzero(abase, mrow->v->v, mrow->i1 - mrow->i0);
+    A->vec_set_zero(A, mrow->v->v, mrow->i1 - mrow->i0);
 
     uint32_t * gxvecs = NULL;
     unsigned int nx = 0;
-
     
     if (!bw->skip_online_checks) {
-        load_x(&gxvecs, bw->m, &nx, pi, mmt->bal);
+        load_x(&gxvecs, bw->m, &nx, pi);
+        /*
+        indices_apply_S(mmt, gxvecs, nx * bw->m, bw->dir);
+        if (bw->dir == 0)
+            indices_apply_P(mmt, gxvecs, nx * bw->m, bw->dir);
+            */
     }
 
     int rc;
@@ -64,23 +78,30 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     rc = asprintf(&s_name, S_FILE_BASE_PATTERN, ys[0], ys[1]);
 
     if (tcan_print) { printf("Loading %s...", v_name); fflush(stdout); }
-    matmul_top_load_vector(mmt, v_name, bw->dir, bw->start);
+    matmul_top_load_vector(mmt, v_name, bw->dir, bw->start, unpadded);
     if (tcan_print) { printf("done\n"); }
 
-    size_t stride =  abbytes(abase, 1);
+    mmt_vec check_vector;
+    /* Our ``ahead zone'' will also be used for storing the data prior to
+     * transposing */
+    mmt_vec ahead;
+    vec_init_generic(pi->m, A, ahead, 0, bw->n);
 
-    // We must also fetch the check vector C.
-    abvobj_t abase_check;
-    mmt_generic_vec check_vector;
+    abase_vbase_tmpl AxAc;
+    abase_vbase_oo_init_templates(AxAc, A, Ac);
+
+    abase_vbase_tmpl ArxA;
+    abase_vbase_oo_init_templates(ArxA, Ar, A);
+
+    abase_vbase_tmpl AxAr;
+    abase_vbase_oo_init_templates(AxAr, A, Ar);
 
     if (!bw->skip_online_checks) {
-        abvobj_set_nbys(abase_check, NCHECKS_CHECK_VECTOR);
-        size_t vstride = abvbytes(abase_check, 1);
-        matmul_top_vec_init_generic(mmt, abvbytes(abase_check, 1),
+        matmul_top_vec_init_generic(mmt, Ac,
                 check_vector, !bw->dir, THREAD_SHARED_VECTOR);
         if (tcan_print) { printf("Loading check vector..."); fflush(stdout); }
-        matmul_top_load_vector_generic(mmt, vstride,
-                check_vector, CHECK_FILE_BASE, !bw->dir, bw->interval);
+        matmul_top_load_vector_generic(mmt,
+                check_vector, CHECK_FILE_BASE, !bw->dir, bw->interval, unpadded);
         if (tcan_print) { printf("done\n"); }
     }
 
@@ -104,48 +125,39 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
      * to obtain a matrix with ys[1]-ys[0] rows, and bw->n columns. This
      * matrix is called rhs in the text below.
      */
-    abvobj_t abase_rhs;
-    abvobj_set_nbys(abase_rhs, bw->n);
 
-    size_t rstride = abvbytes(abase_rhs, 1);
-
-    ASSERT(bw->n * stride == rstride*abnbits(abase));
-
-    /* Our ``ahead zone'' will be used for storing the data prior to
-     * transposing */
-    mmt_vec ahead;
-    vec_init_generic(pi->m, stride, (mmt_generic_vec_ptr) ahead, 0, bw->n);
+    ASSERT(A->vec_elt_stride(A,bw->n) == Ar->vec_elt_stride(Ar, A->groupsize(A)));
 
     /* We'll load all the F coefficient matrices before the main loop.
      * It's dual to the treatment of the xy matrices in krylov. Same
      * considerations apply w.r.t the memory footprint.
      */
-    mmt_generic_vec fcoeffs;
+    mmt_vec fcoeffs;
     if (tcan_print) {
         printf("Each thread allocates %zu kb for the F matrices\n",
-                abvbytes(abase_rhs, abnbits(abase)*bw->interval) >> 10);
+                Ar->vec_elt_stride(Ar, A->groupsize(A)*bw->interval) >> 10);
     }
-    vec_init_generic(pi->m, rstride, (mmt_generic_vec_ptr) fcoeffs, 0, abnbits(abase)*bw->interval);
+    vec_init_generic(pi->m, Ar, fcoeffs, 0, A->groupsize(A)*bw->interval);
     
     /* Our sum vector is only part of the story of course. All jobs, all
      * threads, will participate to the computation of the products by
      * tiny matrices. When dir==1, within a column, all threads have
      * access to the mcol->i0..mcol->i1 interval (which is roughly a
-     * fraction equal to 1/(pirow->njobs * pirow->ncores) of the total
-     * vector size. Now this interval will be split in (picol->njobs *
-     * picol->ncores) parts.
+     * fraction equal to 1 / pirow->totalsize of the total
+     * vector size. Now this interval will be split in picol->totalsize
+     * parts.
      */
 
     unsigned int ii0, ii1;
     unsigned int di = mcol->i1 - mcol->i0;
 
     ii0 = mcol->i0 + di * (picol->jrank * picol->ncores + picol->trank) /
-        (picol->njobs * picol->ncores);
+        picol->totalsize;
     ii1 = mcol->i0 + di * (picol->jrank * picol->ncores + picol->trank + 1) /
-        (picol->njobs * picol->ncores);
+        picol->totalsize;
 
-    mmt_generic_vec sum;
-    vec_init_generic(mmt->pi->m, rstride, sum, 0, ii1-ii0);
+    mmt_vec sum;
+    vec_init_generic(mmt->pi->m, Ar, sum, 0, ii1-ii0);
 
     if (bw->end == 0) {
         // for mksol we use EOF as an ending indication.
@@ -176,26 +188,24 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     for(int s = bw->start ; s < bw->end ; s += bw->interval ) {
         serialize(pi->m);
         if (pi->m->trank == 0 && pi->m->jrank == 0) {
-            abase_generic_zero(rstride, fcoeffs->v, abnbits(abase)*bw->interval);
+            Ar->vec_set_zero(Ar, fcoeffs->v, A->groupsize(A)*bw->interval);
             char * tmp;
             rc = asprintf(&tmp, F_FILE_SLICE_PATTERN, ys[0], ys[1]);
 
             FILE * f = fopen(tmp, "r");
-            rc = fseek(f, bw->n * stride * s, SEEK_SET);
+            rc = fseek(f, A->vec_elt_stride(A, s * bw->n), SEEK_SET);
             if (rc < 0) {
                 bw->end = s;
             }
 
             for(int i = 0 ; i < bw->interval ; i++) {
-                rc = fread(ahead->v, stride, bw->n, f);
+                rc = fread(ahead->v, A->vec_elt_stride(A,1), bw->n, f);
                 ASSERT_ALWAYS(rc == 0 || rc == bw->n);
                 if (rc == 0) {
                     printf("Exhausted F data after %d coefficients\n", s+i);
                     bw->end = s+i;
                     break;
                 }
-                size_t off = i * abnbits(abase) * rstride;
-                abase_generic_ptr fptr = abase_generic_ptr_add(fcoeffs->v, off);
 
 #if 0
                 {
@@ -205,7 +215,9 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
                     electric_free(test,rstride * abnbits(abase));
                 }
 #endif
-                abvtranspose(abase_rhs, abase, fptr, ahead->v);
+                ArxA->transpose(Ar, A,
+                        SUBVEC(fcoeffs, v, i * A->groupsize(A)),
+                        ahead->v);
             }
             fclose(f);
             free(tmp);
@@ -221,17 +233,16 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         serialize_threads(pi->m);
 
         /* broadcast f */
-        size_t siz = abnbits(abase) * rstride * bw->interval;
-        broadcast_generic(fcoeffs, pi->m, siz, 0, 0);
+        broadcast_generic(fcoeffs, pi->m, A->groupsize(A) * bw->interval, 0, 0);
 
-        abase_generic_zero(rstride, sum->v, ii1 - ii0);
+        Ar->vec_set_zero(Ar, sum->v, ii1 - ii0);
 
         // Plan ahead. The check vector is here to predict the final A matrix.
         // Our share of the dot product is determined by the
         // intersections of the i0..i1 intervals on both sides.
         
         if (!bw->skip_online_checks) {
-            abzero(abase, ahead->v, NCHECKS_CHECK_VECTOR);
+            A->vec_set_zero(A, ahead->v, NCHECKS_CHECK_VECTOR);
             unsigned int how_many;
             unsigned int offset_c;
             unsigned int offset_v;
@@ -240,15 +251,21 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
                     mcol->i0, mcol->i1);
 
             if (how_many) {
-                size_t bytes_c =  abvbytes(abase_check, offset_c);
-                abvt * c = abase_generic_ptr_add(check_vector->v, bytes_c);
-                abt * v = mcol->v->v + aboffset(abase, offset_v);
-                abvdotprod(abase, abase_check, ahead->v, c, v, how_many);
+                AxAc->dotprod(A, Ac, ahead->v,
+                        SUBVEC(check_vector, v, offset_c),
+                        SUBVEC(mcol->v, v, offset_v),
+                        how_many);
             }
         }
 
         serialize(pi->m);
+        /* Create an empty slot in program execution, so that we don't
+         * impose strong constraints on twist/untwist_vector being free of
+         * MPI calls.
+         */
         pi_interleaving_flip(pi);
+        matmul_top_twist_vector(mmt, bw->dir);
+        serialize(pi->m);
 
         /* Despite the fact that the bw->end value might lead us
          * to stop earlier, we want to stop at multiples of the checking
@@ -260,13 +277,12 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             timing_flip_timer(timing);
             /* This segment must be guaranteed to be free of any mpi
              * calls */
-            size_t off = i * abnbits(abase) * rstride;
-            abase_generic_ptr fptr = abase_generic_ptr_add(fcoeffs->v, off);
 
-            abvaddmul_tiny(abase, abase_rhs,
+            AxAr->addmul_tiny(A, Ar,
                     sum->v,
-                    mcol->v->v + aboffset(abase, ii0 - mcol->i0),
-                    fptr, ii1 - ii0);
+                    SUBVEC(mcol->v, v, ii0 - mcol->i0),
+                    SUBVEC(fcoeffs, v, i * A->groupsize(A)),
+                    ii1 - ii0);
 
             matmul_top_mul_cpu(mmt, bw->dir);
             pi_interleaving_flip(pi);
@@ -275,29 +291,92 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             matmul_top_mul_comm(mmt, bw->dir);
             timing_check(pi, timing, s+i+1, tcan_print);
         }
-        serialize(pi->m);
+
+        /* See remark above. */
+        pi_interleaving_flip(pi);
+        pi_interleaving_flip(pi);
+
+        matmul_top_untwist_vector(mmt, bw->dir);
+
+        // FIXME. serialize here ??
+        // serialize(pi->m);
 
         if (!bw->skip_online_checks) {
             /* Last dot product. This must cancel ! Recall that x_dotprod
              * adds to the result. */
-            x_dotprod(mmt, gxvecs, nx, ahead->v, NCHECKS_CHECK_VECTOR);
+            x_dotprod(mmt, gxvecs, nx, ahead, 0, NCHECKS_CHECK_VECTOR);
 
-            allreduce_generic(abase, ahead, pi->m, NCHECKS_CHECK_VECTOR);
-            if (!abis_zero(abase, ahead->v, NCHECKS_CHECK_VECTOR)) {
+            allreduce_generic(ahead, pi->m, NCHECKS_CHECK_VECTOR);
+            if (!A->vec_is_zero(A, ahead->v, NCHECKS_CHECK_VECTOR)) {
                 printf("Failed check at iteration %d\n", s + bw->interval);
                 exit(1);
             }
         }
 
-        char * s_name2;
-        rc = asprintf(&s_name2, COMMON_VECTOR_ITERATE_PATTERN, s_name, s + bw->interval, mmt->bal->h->checksum);
+        matmul_top_save_vector(mmt, v_name, bw->dir, s + bw->interval, unpadded);
 
-        pi_save_file_2d(pi, bw->dir, s_name2, sum->v, (ii1 - ii0) * rstride);
-        free(s_name2);
+        /* We need to write our S files, untwisted. There are several
+         * ways to do this untwisting. In order to keep the memory
+         * footprint to a minimum, we reuse the vector area mcol->v. 
+         */
+        /* Since S is possibly wider than one single vector, we need
+         * several passes. Each corresponds to one batch of potential
+         * solutions in the end.
+         *
+         * We first make sure that an integral number of passes is
+         * needed.
+         */
+        serialize(pi->m);
+        size_t  stride =  A->vec_elt_stride(A, 1);
+        size_t rstride =  Ar->vec_elt_stride(Ar, 1);
+        ASSERT_ALWAYS(rstride % stride == 0);
+        int npasses = rstride / stride;
+        for(int i = 0 ; i < npasses ; i++) {
+            A->vec_set_zero(A, mcol->v->v, mcol->i1 - mcol->i0);
+            serialize(pi->m);
+            /* Each job/thread copies its data share to mcol->v */
+            void * dst;
+            const void * src;
+            src = pointer_arith_const(sum->v, i * stride);
+            dst = pointer_arith(mcol->v->v, (ii0 - mcol->i0) * stride);
+            for(unsigned int ii = ii0 ; ii < ii1 ; ii++) {
+                /* XXX If we dereference a function pointer for each such
+                 * iteration here, we're going to pay a lot. And the mpfq
+                 * API does not contain this ``strided copy''. So for the
+                 * moment, since all types considered are flat anyway,
+                 * this looks good enough.
+                 */
+                memcpy(dst, src, stride);
+                dst = pointer_arith(dst, stride);
+                src = pointer_arith_const(src, rstride);
+            }
+            /* Now we collect the data in mcol->v. Note that each
+             * location is non-zero only at one location, so unreduced
+             * addition is unnecessary.
+             */
+            allreduce_across(mmt, bw->dir);
+            /* untwist the result */
+            matmul_top_untwist_vector(mmt, bw->dir);
 
-        matmul_top_save_vector(mmt, v_name, bw->dir, s + bw->interval);
+            Ar->vec_set_zero(Ar, sum->v, ii1 - ii0);
+            serialize_threads(pi->m);
+            dst = pointer_arith(sum->v, i * stride);
+            src = pointer_arith_const(mcol->v->v, (ii0 - mcol->i0) * stride);
+            for(unsigned int ii = ii0 ; ii < ii1 ; ii++) {
+                memcpy(dst, src, stride);
+                dst = pointer_arith(dst, rstride);
+                src = pointer_arith_const(src, rstride);
+            }
+
+            pi_save_file_2d(pi, bw->dir, s_name, s+bw->interval, sum->v, Ar->vec_elt_stride(Ar, ii1 - ii0), Ar->vec_elt_stride(Ar, unpadded));
+        }
+        serialize(pi->m);
+
+        /* recover the vector */
+        matmul_top_load_vector(mmt, v_name, bw->dir, s + bw->interval, unpadded);
+
         if (pi->m->trank == 0 && pi->m->jrank == 0)
-            keep_rolling_checkpoints(mmt->bal, v_name, s + bw->interval);
+            keep_rolling_checkpoints(v_name, s + bw->interval);
 
         serialize(pi->m);
 
@@ -310,17 +389,22 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     }
     serialize(pi->m);
 
-    matmul_top_vec_clear_generic(mmt, rstride, (mmt_generic_vec_ptr) sum, bw->dir);
+    matmul_top_vec_clear_generic(mmt, sum, bw->dir);
     if (!bw->skip_online_checks) {
-        matmul_top_vec_clear_generic(mmt, abvbytes(abase_check, 1), check_vector, !bw->dir);
-        vec_clear_generic(pi->m, stride, (mmt_generic_vec_ptr) ahead, NCHECKS_CHECK_VECTOR);
+        matmul_top_vec_clear_generic(mmt, check_vector, !bw->dir);
+        vec_clear_generic(pi->m, ahead, NCHECKS_CHECK_VECTOR);
         free(gxvecs);
     }
-    vec_clear_generic(pi->m, rstride, (mmt_generic_vec_ptr) fcoeffs, abnbits(abase)*bw->interval);
+    vec_clear_generic(pi->m, fcoeffs, A->groupsize(A)*bw->interval);
     free(v_name);
     free(s_name);
 
-    matmul_top_clear(mmt, abase);
+    matmul_top_clear(mmt);
+
+    if (pi->m->trank == 0) Ar->mpi_ops_clear(Ar);
+    Ar->oo_field_clear(Ar);
+    Ac->oo_field_clear(Ac);
+    A->oo_field_clear(A);
 
     timing_clear(timing);
 

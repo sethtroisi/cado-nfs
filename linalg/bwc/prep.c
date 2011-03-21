@@ -3,7 +3,6 @@
 #include "bwc_config.h"
 #include "parallelizing_info.h"
 #include "matmul_top.h"
-#include "abase.h"
 #include "select_mpi.h"
 #include "random_generation.h"
 #include "gauss.h"
@@ -26,18 +25,19 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
     // suggest leaving it here as a cheap sanity check.
     hello(pi);
 
-    abobj_t abase;
-    abobj_init(abase);
-    abobj_set_nbys(abase, bw->n);
-
+    int tcan_print = bw->can_print && pi->m->trank == 0;
     matmul_top_data mmt;
 
     int flags[2];
     flags[bw->dir] = THREAD_SHARED_VECTOR;
     flags[!bw->dir] = 0;
 
-    // avoid cluttering output too much.
-    int tcan_print = bw->can_print && pi->m->trank == 0;
+    abase_vbase A;
+    abase_vbase_oo_field_init_bygroupsize(A, bw->n);
+    A->set_groupsize(A, bw->n);
+
+    matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
+    unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
 
     /* Number of copies of m by n matrices to use for trying to obtain a
      * full-rank matrix (rank m).
@@ -49,20 +49,17 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
 
     unsigned int my_nx = 1;
 
-    matmul_top_init(mmt, abase, pi, flags, pl, bw->dir);
-
     mmt_wiring_ptr mcol = mmt->wr[bw->dir];
     mmt_wiring_ptr mrow = mmt->wr[!bw->dir];
 
     uint32_t * xvecs = malloc(my_nx * bw->m * sizeof(uint32_t));
 
     mmt_vec xymats;
-    size_t stride =  abbytes(abase, 1);
 
     /* We're cheating on the generic init routines */
     vec_init_generic(pi->m,
-            stride,
-            (mmt_generic_vec_ptr) xymats,
+            A,
+            xymats,
             0,
             bw->m * prep_lookahead_iterations);
 
@@ -70,7 +67,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
         serialize_threads(pi->m);
 
         if (tcan_print) {
-            printf("// Generating new x,y vector pair (trial # %u)\n", ntri);
+            printf("// Generating new x,y vector pair (trial # %u -- seed %lu)\n", ntri, (unsigned long) myrand());
         }
         if (ntri >= my_nx * 10) {
             ++my_nx;
@@ -83,32 +80,40 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
 
         // if we're looking for the right nullspace, then x is on the left.
         // Otherwise, it's on the right.
-        setup_x_random(xvecs, bw->m, my_nx, mmt->n[bw->dir], pi);
+
+        // generate indices w.r.t *unpadded* dimensions !
+        setup_x_random(xvecs, bw->m, my_nx, mmt->n0[bw->dir], pi);
 
         /* Random generation + save is better done as writing random data
          * to a file followed by reading it: this way, seeding works
          * better.
          */
+
         if (pi->m->trank == 0) {
-            char * filename;
+            const char * filename = Y_FILE_BASE ".0";
 
-            int rc = asprintf(&filename, COMMON_VECTOR_ITERATE_PATTERN, Y_FILE_BASE, 0, mmt->bal->h->checksum);
-
-            abt * y = abinit(abase, mmt->n[!bw->dir]);
-            abzero(abase, y, mmt->n[!bw->dir]);
+            void * y;
+            A->vec_init(A, &y, mmt->n[bw->dir]);
+            A->vec_set_zero(A, y, mmt->n[bw->dir]);
+            /* Again, important. Generate zero coordinates for padding !
+             * This provides reproducibility of random choices.
+             */
             if (pi->m->jrank == 0)
-                abrandom(abase, y, mmt->n[!bw->dir]);
-            int err = MPI_Bcast(y, abbytes(abase, mmt->n[!bw->dir]), MPI_BYTE, 0, pi->m->pals);
+                A->vec_random(A, y, mmt->n0[bw->dir]);
+            int err = MPI_Bcast(y,
+                    mmt->n[bw->dir],
+                    A->mpi_datatype(A),
+                    0, pi->m->pals);
             ASSERT_ALWAYS(!err);
             FILE * f = fopen(filename, "w");
             ASSERT_ALWAYS(f);
-            rc = fwrite(y, sizeof(abt), mmt->n[!bw->dir], f);
-            ASSERT_ALWAYS(rc == (int) mmt->n[!bw->dir]);
+            int rc = fwrite(y, A->vec_elt_stride(A,1), unpadded, f);
+            ASSERT_ALWAYS(rc == (int) unpadded);
             fclose(f);
-            abclear(abase, y, mmt->n[!bw->dir]);
-            free(filename);
+            A->vec_clear(A, &y, mmt->n[bw->dir]);
         }
-        matmul_top_load_vector(mmt, Y_FILE_BASE, bw->dir, 0);
+        matmul_top_load_vector(mmt, Y_FILE_BASE, bw->dir, 0, unpadded);
+
         if (tcan_print) {
             printf("// vector generated and dispatched (trial # %u)\n", ntri);
         }
@@ -119,22 +124,22 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
 
         // we need to save this starting vector for later use if it turns out
         // that we need to save it for real.
-        matmul_top_save_vector(mmt, Y_FILE_BASE, bw->dir, 0);
+        matmul_top_save_vector(mmt, Y_FILE_BASE, bw->dir, 0, unpadded);
 #endif
 
         // We must compute x^T M y, x^T M^2 y, and so on.
-        // XXX Note that x^Ty does not count here, because it does nto
+        // XXX Note that x^Ty does not count here, because it does not
         // take part to the sequence computed by lingen !
+        matmul_top_twist_vector(mmt, bw->dir);
         matmul_top_mul(mmt, bw->dir);
+        matmul_top_untwist_vector(mmt, bw->dir);
         
         // we have indices mmt->wr[1]->i0..i1 available.
-        abzero(abase, xymats->v, bw->m * prep_lookahead_iterations);
+        A->vec_set_zero(A, xymats->v, bw->m * prep_lookahead_iterations);
 
         for(unsigned int k = 0 ; k < prep_lookahead_iterations ; k++) {
             for(int j = 0 ; j < bw->m ; j++) {
-                abt * where = xymats->v;
-                where += aboffset(abase, j * prep_lookahead_iterations);
-                where += aboffset(abase, k);
+                void * where = SUBVEC(xymats, v, j * prep_lookahead_iterations + k);
                 for(unsigned int t = 0 ; t < my_nx ; t++) {
                     uint32_t i = xvecs[j*my_nx+t];
                     if (i < mcol->i0 || i >= mcol->i1)
@@ -146,11 +151,12 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
                      */
                     if (i < mrow->i0 || i >= mrow->i1)
                         continue;
-                    abadd(abase, where,
-                            mcol->v->v + aboffset(abase, i - mcol->i0));
+                    A->add(A, where, where, SUBVEC(mcol->v, v, i - mcol->i0));
                 }
             }
+            matmul_top_twist_vector(mmt, bw->dir);
             matmul_top_mul(mmt, bw->dir);
+            matmul_top_untwist_vector(mmt, bw->dir);
         }
 
         /* Make sure computation is over for everyone ! */
@@ -158,7 +164,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
 
         /* Now all threads and jobs must collectively reduce the zone
          * pointed to by xymats */
-        allreduce_generic(abase, xymats, pi->m,
+        allreduce_generic(xymats, pi->m,
                 bw->m * prep_lookahead_iterations);
 
         /* OK -- now everybody has the same data */
@@ -169,8 +175,8 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
         /* the kernel() call is not reentrant */
         if (pi->m->trank == 0) {
             dimk = kernel((mp_limb_t *) xymats->v, NULL,
-                    bw->m, prep_lookahead_iterations * abnbits(abase), 
-                    abbytes(abase,prep_lookahead_iterations)/sizeof(mp_limb_t),
+                    bw->m, prep_lookahead_iterations * A->groupsize(A),
+                    A->vec_elt_stride(A, prep_lookahead_iterations)/sizeof(mp_limb_t),
                     0);
             pdimk = &dimk;
         }
@@ -188,13 +194,14 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
         }
     }
 
-    save_x(xvecs, bw->m, my_nx, pi, mmt->bal);
+    save_x(xvecs, bw->m, my_nx, pi);
 
-    matmul_top_clear(mmt, abase);
+    matmul_top_clear(mmt);
+    A->oo_field_clear(A);
+
 
     /* clean up xy mats stuff */
-    vec_clear_generic(pi->m, stride, (mmt_generic_vec_ptr) xymats,
-            bw->m * prep_lookahead_iterations);
+    vec_clear_generic(pi->m, xymats, bw->m * prep_lookahead_iterations);
 
     free(xvecs);
     return NULL;

@@ -55,14 +55,23 @@ prinv:=func<x|(qr*nv+qq)*nz+r+1 where qq,qr is Quotrem(q, nh) where q,r is Quotr
 Pr:=PermutationMatrix(GF(2),[pr(x):x in [1..nrx]]);
 
 
+S:=Sr;
+P:=Pr;
+
 // t means twisted.
 
 /* Note that Mt being equal to Pr times Sr*Cr*M*Transpose(Cc)*Sc^-1 is a
  * direct consequence of the fact that balancing_workhorse.c permutes the
  * rows which are being sent.
  */
-assert Transpose(Pr*Sr*Cr)*Mt*Sc*Cc eq M;
-assert Mt eq Pr*Sr*Cr*M*Transpose(Cc)*Sc^-1;
+if Mt eq P*S*Mx*S^-1 then
+    print "Shuffled product detected";
+elif  Mt eq S*Mx*S^-1 then
+    print "non-shuffled product detected";
+    Pr:=Identity(Parent(Pr));
+end if;
+assert Transpose(Pr*Sr)*Mt*Sc eq Mx;
+assert Mt eq Pr*Sr*Mx*Sc^-1;
 
 colweights:=func<M|[#[i:i in [1..Nrows(M)]|M[i,j] ne 0]: j in [1..Ncols(M)]]>;
 rowweights:=func<M|[#[j:j in [1..Ncols(M)]|M[i,j] ne 0]: i in [1..Nrows(M)]]>;
@@ -77,10 +86,11 @@ assert rowweights(Transpose(Pr*Sr*Cr)*Mt) eq rowweights(M);
 
 
 load "/tmp/bwc/x.m";
-C0:=Matrix(GF(2),nrx,64,[]);
-Xt:=Matrix(GF(2),nrx,n,[]);
+C0:=Matrix(GF(2),nr,64,[]);
+Xt:=Matrix(GF(2),nr,n,[]);
 for i in [1..64] do for u in var[i] do C0[u][i] +:=1; end for; end for;
 for i in [1..n] do for u in var[i] do Xt[u][i] +:=1; end for; end for;
+
 
 function vblock(nr,var, nc)
     R:=Matrix(GF(2),nr,nc,[]);
@@ -92,27 +102,44 @@ function vblock(nr,var, nc)
 end function;
 
 
-load "/tmp/bwc/Y.0.m";     Y0:=vblock(ncx, var, n);
-load "/tmp/bwc/V0-64.0.m"; V0:=vblock(ncx, var, n);
-load "/tmp/bwc/V0-64.1.m"; V1:=vblock(ncx, var, n);
-load "/tmp/bwc/V0-64.2.m"; V2:=vblock(ncx, var, n);
-load "/tmp/bwc/V0-64.3.m"; V3:=vblock(ncx, var, n);
-load "/tmp/bwc/V0-64.4.m"; V4:=vblock(ncx, var, n);
-load "/tmp/bwc/V0-64.5.m"; V5:=vblock(ncx, var, n);
-load "/tmp/bwc/V0-64.6.m"; V6:=vblock(ncx, var, n);
-load "/tmp/bwc/V0-64.7.m"; V7:=vblock(ncx, var, n);
-load "/tmp/bwc/V0-64.8.m"; V8:=vblock(ncx, var, n);
-load "/tmp/bwc/V0-64.9.m"; V9:=vblock(ncx, var, n);
-load "/tmp/bwc/V0-64.10.m"; V10:=vblock(ncx, var, n);
-load "/tmp/bwc/V0-64.20.m"; V20:=vblock(ncx, var, n);
-// load "/tmp/bwc/V0-64.12.m"; V12:=vblock(ncx, var, n);
-// load "/tmp/bwc/V0-64.13.m"; V13:=vblock(ncx, var, n);
-// load "/tmp/bwc/V0-64.14.m"; V14:=vblock(ncx, var, n);
-// load "/tmp/bwc/V0-64.15.m"; V15:=vblock(ncx, var, n);
-// load "/tmp/bwc/V0-64.16.m"; V16:=vblock(ncx, var, n);
-// load "/tmp/bwc/V0-64.17.m"; V17:=vblock(ncx, var, n);
-// load "/tmp/bwc/V0-64.18.m"; V18:=vblock(ncx, var, n);
-load "/tmp/bwc/C.10.m";    C10:=vblock(nrx, var, 64);
+load "/tmp/bwc/Y.0.m";     Y0:=vblock(nc, var, n);
+load "/tmp/bwc/V0-64.0.m"; V0:=vblock(nc, var, n);
+load "/tmp/bwc/V0-64.1.m"; V1:=vblock(nc, var, n);
+load "/tmp/bwc/V0-64.2.m"; V2:=vblock(nc, var, n);
+load "/tmp/bwc/V0-64.3.m"; V3:=vblock(nc, var, n);
+load "/tmp/bwc/V0-64.4.m"; V4:=vblock(nc, var, n);
+load "/tmp/bwc/V0-64.5.m"; V5:=vblock(nc, var, n);
+load "/tmp/bwc/V0-64.6.m"; V6:=vblock(nc, var, n);
+load "/tmp/bwc/V0-64.7.m"; V7:=vblock(nc, var, n);
+load "/tmp/bwc/V0-64.8.m"; V8:=vblock(nc, var, n);
+load "/tmp/bwc/V0-64.9.m"; V9:=vblock(nc, var, n);
+load "/tmp/bwc/V0-64.10.m"; V10:=vblock(nc, var, n);
+load "/tmp/bwc/V0-64.20.m"; V20:=vblock(nc, var, n);
+// load "/tmp/bwc/V0-64.12.m"; V12:=vblock(nc, var, n);
+// load "/tmp/bwc/V0-64.13.m"; V13:=vblock(nc, var, n);
+// load "/tmp/bwc/V0-64.14.m"; V14:=vblock(nc, var, n);
+// load "/tmp/bwc/V0-64.15.m"; V15:=vblock(nc, var, n);
+// load "/tmp/bwc/V0-64.16.m"; V16:=vblock(nc, var, n);
+// load "/tmp/bwc/V0-64.17.m"; V17:=vblock(nc, var, n);
+// load "/tmp/bwc/V0-64.18.m"; V18:=vblock(nc, var, n);
+load "/tmp/bwc/C.0.m";    C0:=vblock(nr, var, 64);
+load "/tmp/bwc/C.10.m";   C10:=vblock(nr, var, 64);
+load "/tmp/bwc/D.0.m";    D0:=vblock(nr, var, 64);
+load "/tmp/bwc/D.10.m";   D10:=vblock(nr, var, 64);
+
+load "/tmp/bwc/H1.m";    H1:=vblock(nc, var, 64);
+var:=[(p div j+q*j) mod 2^64:j in [1..nc]]
+    where p is PreviousPrime(2^64)
+    where q is PreviousPrime(2^63);
+H0:=vblock(nc, var, 64);
+assert M*H0 eq H1;
+
+load "/tmp/bwc/H1.m";    H1:=vblock(nrx, var, 64);
+var:=[(p div j+q*j) mod 2^64:j in [1..ncx]]
+    where p is PreviousPrime(2^64)
+    where q is PreviousPrime(2^63);
+H0:=vblock(ncx, var, 64);
+assert Mx*H0 eq H1;
 
 v0z:=[Seqint(ChangeUniverse((Eltseq(V0[i])),Integers()),2):i in [1..nr]];
 
@@ -135,6 +162,10 @@ rowweights(Matrix(Z,Pr*Transpose(Mt)*V0)) eq rowweights(Matrix(Z,V1));;
 */
 
 TMt:=xtr(Pr^-1)*xtr(Mt);
+
+TMx:=xtr(Mx);
+TM:=xtr(M);
+
 // equivalent to TMt:=Transpose(Mt*Pr^-1) for nullspace=left
 // For nullspace=left:
 // TMt eq Transpose(Mt*Pr^-1);
@@ -160,18 +191,21 @@ TMt eq conj_if_left(Sc*Cc*xtr(M)*Transpose(Cr)*Sr^-1);
 
 // Mtt eq Pr*Sc*Cr*M*Transpose(Cc)*Sr^-1*Pr^-1;
 
-TMt*V0 eq V1; assert TMt*V0 eq V1;
-TMt*V1 eq V2; assert TMt*V1 eq V2;
-TMt*V2 eq V3; assert TMt*V2 eq V3;
-TMt*V3 eq V4; assert TMt*V3 eq V4;
-
-TMt^10*V0 eq V10; assert TMt^10*V0 eq V10;
+TM*V0 eq V1; assert TM*V0 eq V1;
+TM*V1 eq V2; assert TM*V1 eq V2;
+TM*V2 eq V3; assert TM*V2 eq V3;
+TM*V3 eq V4; assert TM*V3 eq V4;
+TM^10*V0 eq V10; assert TM^10*V0 eq V10;
 
 // (Pr^-1*Mt)^10*C0 eq C10;
 //
 // This one only valid for nullspace==left
 // Pr*(Pr^-1*Mt)^10*Pr^-1*C0 eq C10;
-Transpose(TMt)^10*C0 eq C10;
+//
+print "check vectors:";
+C0 eq Xt;
+C10 eq Transpose(TM)^10*Xt;
+Transpose(TM)^10*C0 eq C10;
 
 
 Transpose(V0)*C10 eq Transpose(V10)*C0;
@@ -183,17 +217,16 @@ Transpose(C10)*V0 eq Transpose(C0)*V10;
 
 print "Done checking krylov stuff";
 
-
-load "/tmp/bwc/A0-64.0-20.m";
+load "/tmp/bwc/A0-64.0-50.m";   // suited for matrix t100b
 
 stride:=m*n div 64;
-for i in [0..20-1] do
-    vblock(m,var[i*stride+1..i*stride+stride],n) eq Transpose(Xt)*TMt^i*V0;
+for i in [0..50-1] do
+    vblock(m,var[i*stride+1..i*stride+stride],n) eq Transpose(Xt)*TM^i*V0;
 end for;
 
 K:=GF(2);
 b:=m+n;
-N:=nrx;
+N:=nr;
 // KR<x>:=PowerSeriesRing(K);
 KR<x>:=PolynomialAlgebra(K);
 KRmn:=RMatrixSpace(KR,m,n);
@@ -214,14 +247,14 @@ function mycoeff(M,k)
 end function;
 
 // beware -- we're using the sequence starting at 1.
-// A_sequence:=&+[x^(i-1)*KRmn!(Transpose(Xt)*TMt^i*V0):i in [1..100]];
+// A_sequence:=&+[x^(i-1)*KRmn!(Transpose(Xt)*TM^i*V0):i in [1..100]];
 A_sequence:=KRmn!0;
 z:=V0;
 for i in [1..100] do
     A_sequence +:= x^(i-1)*KRmn!(Transpose(Xt)*z);
-    z:=TMt*z;
+    z:=TM*z;
 end for;
-// assert A_sequence eq &+[x^(i-1)*KRmn!(Transpose(Xt)*TMt^(i-1)*V0):i in [1..100]];
+// assert A_sequence eq &+[x^(i-1)*KRmn!(Transpose(Xt)*TM^(i-1)*V0):i in [1..100]];
 
 
 load "/tmp/bwc/F0-64.m";
@@ -241,42 +274,44 @@ not IsZero(mycoeff(A_sequence*Transpose(F),degf-1));
 
 excess:=10;
 
-V_sequence:=&+[x^i*KRNn!(TMt^i*V0):i in [0..degf+excess]];
+V_sequence:=&+[x^i*KRNn!(TM^i*V0):i in [0..degf+excess]];
 
 assert IsZero(Transpose(Xt)*mycoeff(V_sequence*Transpose(F),degf+1));
 
-// Transpose(Xt)*(KRN!TMt)^4*(KRN!TMt*V_sequence) eq mycoeff(A_sequence,3);
+// Transpose(Xt)*(KRN!TM)^4*(KRN!TM*V_sequence) eq mycoeff(A_sequence,3);
 
-IsZero(mycoeff(Transpose(KRNm!Xt)*(&+[x^(i-1)*KRNn!(TMt^(i-1)*V0):i in [1..10\
+IsZero(mycoeff(Transpose(KRNm!Xt)*(&+[x^(i-1)*KRNn!(TM^(i-1)*V0):i in [1..10\
 0]])*Transpose(F),degf+1));
 
 
 for i in [0..excess-1] do
-    IsZero(Transpose(Xt)*TMt*mycoeff(V_sequence*Transpose(F),degf + i));
-    IsZero(TMt*mycoeff(V_sequence*Transpose(F),degf + i));
+    IsZero(Transpose(Xt)*TM*mycoeff(V_sequence*Transpose(F),degf + i));
+    IsZero(TM*mycoeff(V_sequence*Transpose(F),degf + i));
 end for;
 
-S:=&+[TMt^i*V0*mycoeff(Transpose(Fr),i):i in [0..degf]];
-IsZero(TMt*S);
+S:=&+[TM^i*V0*mycoeff(Transpose(Fr),i):i in [0..degf]];
+IsZero(TM*S);
 
-// S:=&+[TMt^i*V0*mycoeff(Transpose(F),i):i in [0..2]];
+// S:=&+[TM^i*V0*mycoeff(Transpose(F),i):i in [0..2]];
 
-load "/tmp/bwc/S0-64.10.m"; S10:=vblock(ncx, var, n);
+load "/tmp/bwc/S0-64.10.m"; S10:=vblock(nc, var, n);
+load "/tmp/bwc/S0-64.20.m"; S20:=vblock(nc, var, n);
+load "/tmp/bwc/K.0.m";    K0:=vblock(nrx, var, 64);
 
-S eq S10;
+S eq S10+S20;
+
+// However K is untwisted.
+S eq K0;
+
 
 b:=Basis(sub<VectorSpace(K,N)|Rows(Transpose(S))>);
 
-IsZero(b[1] * Transpose(TMt));
+IsZero(b[1] * Transpose(TM));
 
-load "/tmp/bwc/W.m";    W:=vblock(nrx, var, 64);    
+load "/tmp/bwc/W.m";    W:=vblock(nr, var, 64);    
 load "/tmp/bwc/Wu.m";    Wu:=vblock(nr, var, 64);
 
-print "The following checks are for nullspace=left only";
-IsZero(Transpose(W)*Mt);
-IsZero(Transpose(W)*Pr*Sr*Cr*M*Transpose(Cc)*Sc^-1);
-IsZero(Transpose(W)*Pr*Sr*Cr*M);
-Matrix(((Pr*Sr)^-1*W)[1..Nrows(M)]) eq Wu;
-IsZero(Transpose(Wu)*M);
+K0 eq W;
+IsZero(TM*W);
 
 

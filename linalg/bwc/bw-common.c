@@ -157,7 +157,6 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     param_list_lookup_string(pl, "interleaving");
 
     param_list_lookup_string(pl, "rebuild_cache");
-    param_list_lookup_string(pl, "cache_nbys");
     param_list_lookup_string(pl, "sequential_cache_build");
     param_list_lookup_string(pl, "sequential_cache_load");
     param_list_lookup_string(pl, "local_cache_copy_dir");
@@ -165,6 +164,7 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     param_list_lookup_string(pl, "sequence");   // for lingen
     param_list_lookup_string(pl, "save_submatrices");
     param_list_lookup_string(pl, "export_cachelist");
+    param_list_lookup_string(pl, "sanity_check_vector");
 
     return 0;
 }

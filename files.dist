@@ -598,3 +598,7 @@ utils/cado-endian.h
 config/cabsl.cmake
 config/log2.cmake
 linalg/bwc/bcast-file.c
+linalg/bwc/raw_matrix_u32.h
+linalg/bwc/vector_reduction_op.c
+linalg/bwc/vector_reduction_op.h
+linalg/bwc/addition.h

@@ -33,7 +33,7 @@ using namespace std;
 // #define L1_CACHE_SIZE   32768
 // take only 3/4 of the L1 cache.
 #define L1_CACHE_SIZE   24576
-// for 8-bytes abt values, this gives 3072 items.
+// for 8-bytes abelt values, this gives 3072 items.
 
 /* Here is how the matrix is stored in memory, in the
  * "matmul_sliced_data_s" type.  The matrix is cut in slices, where each
@@ -92,7 +92,7 @@ struct matmul_sliced_data_s {
     /* repeat the fields from the public_ interface */
     struct matmul_public_s public_[1];
     /* now our private fields */
-    abobj_t xab;
+    abdst_field xab;
     data_t data;
     vector<slice_info> dslices_info;
     unsigned int npack;
@@ -130,16 +130,16 @@ void matmul_sliced_clear(struct matmul_sliced_data_s * mm)
     delete mm;
 }
 
-struct matmul_sliced_data_s * matmul_sliced_init(abobj_ptr xx MAYBE_UNUSED, param_list pl, int optimized_direction)
+struct matmul_sliced_data_s * matmul_sliced_init(abdst_field xx, param_list pl, int optimized_direction)
 {
     struct matmul_sliced_data_s * mm;
     mm = new matmul_sliced_data_s;
     memset(mm, 0, sizeof(struct matmul_sliced_data_s));
-    abobj_init_set(mm->xab, xx);
+    mm->xab = xx;
 
     unsigned int npack = L1_CACHE_SIZE;
     if (pl) param_list_parse_uint(pl, "l1_cache_size", &npack);
-    npack /= abbytes(mm->xab,1);
+    npack /= sizeof(abelt);
     mm->npack = npack;
 
     int suggest = optimized_direction ^ MM_DIR0_PREFERS_TRANSP_MULT;
@@ -313,7 +313,7 @@ int matmul_sliced_reload_cache(struct matmul_sliced_data_s * mm)
 {
     FILE * f;
 
-    f = matmul_common_reload_cache_fopen(abbytes(mm->xab,1), mm->public_, MM_MAGIC);
+    f = matmul_common_reload_cache_fopen(sizeof(abelt), mm->public_, MM_MAGIC);
     if (f == NULL) return 0;
 
     size_t n;
@@ -333,7 +333,7 @@ void matmul_sliced_save_cache(struct matmul_sliced_data_s * mm)
 {
     FILE * f;
 
-    f = matmul_common_save_cache_fopen(abbytes(mm->xab,1), mm->public_, MM_MAGIC);
+    f = matmul_common_save_cache_fopen(sizeof(abelt), mm->public_, MM_MAGIC);
 
     size_t n = mm->data.size();
     MATMUL_COMMON_WRITE_ONE32(n, f);
@@ -342,7 +342,7 @@ void matmul_sliced_save_cache(struct matmul_sliced_data_s * mm)
     fclose(f);
 }
 
-void matmul_sliced_mul(struct matmul_sliced_data_s * mm, abt * dst, abt const * src, int d)
+void matmul_sliced_mul(struct matmul_sliced_data_s * mm, void * xdst, void const * xsrc, int d)
 {
     ASM_COMMENT("multiplication code");
     const uint16_t * q = &(mm->data.front());
@@ -350,7 +350,9 @@ void matmul_sliced_mul(struct matmul_sliced_data_s * mm, abt * dst, abt const * 
     uint16_t nhstrips = *q++;
     q++;        // alignment.
     uint32_t i = 0;
-    abobj_ptr x = mm->xab;
+    abdst_field x = mm->xab;
+    absrc_vec src = (absrc_vec) (const_cast<void*>(xsrc)); // typical C const problem.
+    abdst_vec dst = (abdst_vec) xdst;
 
     if (d == !mm->public_->store_transposed) {
 #ifdef  SLICE_STATS
@@ -359,10 +361,9 @@ void matmul_sliced_mul(struct matmul_sliced_data_s * mm, abt * dst, abt const * 
 #endif
         for(uint16_t s = 0 ; s < nhstrips ; s++) {
             uint32_t nrows_packed = matmul_sliced_data_s::read32(q);
-            abt * where = dst + aboffset(x, i);
-            abzero(x, where, nrows_packed);
+            abelt * where = dst + i;
+            abvec_set_zero(x, where, nrows_packed);
             ASM_COMMENT("critical loop");
-            abt const * from = src;
             /* The external function must have the same semantics as this
              * code block */
             uint32_t ncoeffs_slice = matmul_sliced_data_s::read32(q);
@@ -370,7 +371,7 @@ void matmul_sliced_mul(struct matmul_sliced_data_s * mm, abt * dst, abt const * 
             for(uint32_t c = 0 ; c < ncoeffs_slice ; c++) {
                 j += *q++;
                 uint32_t di = *q++;
-                abadd(x, where + aboffset(x, di), from + aboffset(x, j));
+                abadd(x, where[di], where[di], src[j]);
             }
             ASM_COMMENT("end of critical loop");
             i += nrows_packed;
@@ -392,7 +393,7 @@ void matmul_sliced_mul(struct matmul_sliced_data_s * mm, abt * dst, abt const * 
             fprintf(stderr, "Warning: Doing many iterations with bad code\n");
         }
 
-        abzero(x, dst, mm->public_->dim[!d]);
+        abvec_set_zero(x, dst, mm->public_->dim[!d]);
         for(uint16_t s = 0 ; s < nhstrips ; s++) {
             uint32_t j = 0;
             uint32_t nrows_packed = matmul_sliced_data_s::read32(q);
@@ -401,7 +402,7 @@ void matmul_sliced_mul(struct matmul_sliced_data_s * mm, abt * dst, abt const * 
             for(uint32_t c = 0 ; c < ncoeffs_slice ; c++) {
                 j += *q++;
                 uint32_t di = *q++;
-                abadd(x, dst + aboffset(x, j), src + aboffset(x, i + di));
+                abadd(x, dst[j], dst[j], src[i+di]);
             }
             i += nrows_packed;
             ASM_COMMENT("end of critical loop");

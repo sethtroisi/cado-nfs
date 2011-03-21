@@ -6,7 +6,7 @@
 #include "params.h"
 #include "readmat-easy.h"
 
-#define MM_COMMON_MAGIC 0xb0010001UL
+#define MM_COMMON_MAGIC 0xb0010002UL
 
 const char * rowcol[2] = { "row", "col", };
 
@@ -49,6 +49,14 @@ FILE * matmul_common_reload_cache_fopen(size_t stride, struct matmul_public_s * 
 
     MATMUL_COMMON_READ_ONE64(mm->ncoeffs, f);
 
+    MATMUL_COMMON_READ_ONE32(mm->ntwists, f);
+    if (mm->ntwists) {
+        mm->twist = malloc(mm->ntwists * sizeof(uint32_t[2]));
+        MATMUL_COMMON_READ_MANY32(mm->twist, mm->ntwists * 2, f);
+    } else {
+        mm->twist = NULL;
+    }
+
     return f;
 }
 
@@ -69,12 +77,18 @@ FILE * matmul_common_save_cache_fopen(size_t stride, struct matmul_public_s * mm
     MATMUL_COMMON_WRITE_ONE32(mm->dim[0],f);
     MATMUL_COMMON_WRITE_ONE32(mm->dim[1],f);
     MATMUL_COMMON_WRITE_ONE64(mm->ncoeffs,f);
+    MATMUL_COMMON_WRITE_ONE32(mm->ntwists, f);
+    if (mm->ntwists)
+        MATMUL_COMMON_WRITE_MANY32(mm->twist, mm->ntwists * 2, f);
 
     return f;
 }
 
-void matmul_common_clear(struct matmul_public_s * mm MAYBE_UNUSED)
+void matmul_common_clear(struct matmul_public_s * mm)
 {
+    free(mm->twist);
+    mm->twist = NULL;
+    mm->ntwists = 0;
 }
 
 /* Okay, this matrix reading stage is really a memory hog. But it's

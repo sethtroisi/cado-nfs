@@ -55,20 +55,18 @@ void setup_x_random(uint32_t * xs,
         }
     }
     global_broadcast(pi->m, xs, nx * m * sizeof(unsigned int), 0, 0);
+    serialize(pi->m);
 }
 
 void load_x(uint32_t ** xs, unsigned int m, unsigned int *pnx,
-        parallelizing_info_ptr pi, balancing_ptr bal)
+        parallelizing_info_ptr pi)
 {
     FILE * f = NULL;
-    char * xn = NULL;
     int rc = 0;
 
     /* pretty much the same deal as above */
     if (pi->m->trank == 0 && pi->m->jrank == 0) {
-        rc = asprintf(&xn, X_FILE_BASE_PATTERN, bal->h->checksum);
-        ASSERT_ALWAYS(rc >= 0);
-        f = fopen(xn, "r");
+        f = fopen(X_FILE_BASE_PATTERN, "r");
         FATAL_ERROR_CHECK(f == NULL, "Cannot open "X_FILE_BASE_PATTERN" for reading");
         rc = fscanf(f, "%u", pnx);
         FATAL_ERROR_CHECK(rc != 1, "short read in file X");
@@ -81,23 +79,19 @@ void load_x(uint32_t ** xs, unsigned int m, unsigned int *pnx,
             FATAL_ERROR_CHECK(rc != 1, "short read in " X_FILE_BASE_PATTERN);
         }
         fclose(f);
-        free(xn);
     }
     global_broadcast(pi->m, (*xs), *pnx * m * sizeof(unsigned int), 0, 0);
+    serialize(pi->m);
 }
 
-void save_x(uint32_t * xs, unsigned int m, unsigned int nx, parallelizing_info_ptr pi, balancing_ptr bal)
+void save_x(uint32_t * xs, unsigned int m, unsigned int nx, parallelizing_info_ptr pi)
 {
-    /* Here, we expect that the data is already available to eveybody, so
+    /* Here, we expect that the data is already available to everybody, so
      * no synchronization is necessary.
      */
     if (pi->m->trank == 0 && pi->m->jrank == 0) {
         // write the X vector
-        char * xn;
-        int rc;
-        rc = asprintf(&xn, X_FILE_BASE_PATTERN, bal->h->checksum);
-        ASSERT_ALWAYS(rc >= 0);
-        FILE * fx = fopen(xn,"w");
+        FILE * fx = fopen(X_FILE_BASE_PATTERN,"w");
         FATAL_ERROR_CHECK(fx == NULL, "Cannot open "X_FILE_BASE_PATTERN" for writing");
         fprintf(fx,"%u\n",nx);
         for(unsigned int i = 0 ; i < m ; i++) {
@@ -107,6 +101,6 @@ void save_x(uint32_t * xs, unsigned int m, unsigned int nx, parallelizing_info_p
             fprintf(fx,"\n");
         }
         fclose(fx);
-        free(xn);
     }
 }
+

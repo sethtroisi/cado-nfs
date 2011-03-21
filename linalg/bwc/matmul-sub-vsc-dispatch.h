@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-extern void matmul_sub_vsc_dispatch(abobj_ptr x, abt * dst, abt const * src, const uint16_t * q, unsigned long count);
+extern void matmul_sub_vsc_dispatch(abdst_field x, abt * dst, abt const * src, const uint16_t * q, unsigned long count);
 
 
 #ifdef __cplusplus

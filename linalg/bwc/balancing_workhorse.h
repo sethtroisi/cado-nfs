@@ -5,18 +5,7 @@
 
 #include "parallelizing_info.h"
 #include "utils.h"
-
-struct matrix_u32_s {
-    // input arguments.
-    const char * mfile;    // matrix file name
-    const char * bfile;    // balancing file name ; NULL will mean auto-detect
-    int transpose;
-    // output arguments.
-    uint32_t * p;
-    size_t size;
-};
-typedef struct matrix_u32_s matrix_u32[1];
-typedef struct matrix_u32_s * matrix_u32_ptr;
+#include "raw_matrix_u32.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -6,72 +6,45 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/statvfs.h>
+#include <dlfcn.h>
 
 
 #include "bwc_config.h"
 #include "matmul.h"
 
-#define MATMUL_DEFAULT_IMPL bucket
+#define MATMUL_DEFAULT_IMPL "bucket"
 
-/* Include all matmul implementations here */
-#include "matmul-basic.h"
-#include "matmul-sliced.h"
-#include "matmul-threaded.h"
-#include "matmul-bucket.h"
-
-
-/* Now some cpp glue which sets up the different options */
-#define MATMUL_NAME(kind,func) matmul_ ## kind ## _ ## func
-#define MATMUL_T(func) matmul_ ## func ## _t
-
-#define REBIND_F(mm, kind,func) \
-        mm->bind->func = (MATMUL_T(func)) & MATMUL_NAME(kind, func)
-
-#define SET_IMPL(mm, impl_) do { mm->bind->impl = # impl_ ; } while (0)
-
-#define REBIND_ALL(mm, kind) do {					\
-        REBIND_F(mm, kind, build_cache);				\
-        REBIND_F(mm, kind, reload_cache);				\
-        REBIND_F(mm, kind, save_cache);			        	\
-        REBIND_F(mm, kind, mul);					\
-        REBIND_F(mm, kind, report);					\
-        REBIND_F(mm, kind, clear);					\
-        REBIND_F(mm, kind, init);					\
-        REBIND_F(mm, kind, auxv);					\
-        REBIND_F(mm, kind, aux);					\
-        SET_IMPL(mm, kind);                                             \
-    } while (0)
-
-/* these are just trampoline functions. A macro in the .h would serve the
- * same purpose, but could be misleading. Here at least, ctags bring the
- * reader quickly to the fact that we have macros.
- */
-
-void do_rebinding(matmul_ptr mm, const char * impl)
-{
-#define CHECK_REBIND(mm, K) \
-    if (strcmp(impl, #K) == 0) { REBIND_ALL(mm, K); } else
-
-    if (impl == NULL) { REBIND_ALL(mm, MATMUL_DEFAULT_IMPL); } else
-    CHECK_REBIND(mm, sliced)        // no semicolon !
-    CHECK_REBIND(mm, threaded)      // no semicolon !
-    CHECK_REBIND(mm, basic)         // no semicolon !
-    CHECK_REBIND(mm, bucket)         // no semicolon !
-    {   
-        fprintf(stderr, "no implementation %s known (update %s ?)\n",
-            impl, __FILE__);
-        exit(1);
-    }
-}
-
-matmul_ptr matmul_init(abobj_ptr x, unsigned int nr, unsigned int nc, const char * locfile, const char * impl, param_list pl, int optimized_direction)
+matmul_ptr matmul_init(abase_vbase_ptr x, unsigned int nr, unsigned int nc, const char * locfile, const char * impl, param_list pl, int optimized_direction)
 {
     struct matmul_public_s fake[1];
     memset(fake, 0, sizeof(fake));
-    do_rebinding(fake, impl);
+
+    char solib[256];
+    if (!impl) { impl = MATMUL_DEFAULT_IMPL; }
+
+    snprintf(solib, sizeof(solib), "libmatmul_%s_%s.so",
+            x->oo_impl_name(x), impl);
+
+    void * handle = dlopen(solib, RTLD_NOW);
+    if (handle == NULL) {
+        fprintf(stderr, "loading %s: %s\n", solib, dlerror());
+        abort();
+    }
+    typedef void (*rebinder_t)(matmul_ptr mm);
+    rebinder_t sym = dlsym(handle, "matmul_solib_do_rebinding");
+    if (sym == NULL) {
+        fprintf(stderr, "loading %s: %s\n", solib, dlerror());
+        abort();
+    }
+    (*sym)(fake);
+
+    // do_rebinding(fake, impl);
     matmul_ptr mm = fake->bind->init(x, pl, optimized_direction);
     if (mm == NULL) return NULL;
-    do_rebinding(mm, impl);
+    // do_rebinding(mm, impl);
+    (*sym)(mm);
+
+    mm->solib_handle = handle;
 
     mm->dim[0] = nr;
     mm->dim[1] = nc;
@@ -110,9 +83,19 @@ matmul_ptr matmul_init(abobj_ptr x, unsigned int nr, unsigned int nc, const char
     return mm;
 }
 
-void matmul_build_cache(matmul_ptr mm, uint32_t * ptr)
+void matmul_build_cache(matmul_ptr mm, matrix_u32_ptr m)
 {
-    mm->bind->build_cache(mm, ptr);
+    /* We always have the right to take over the data which is being sent
+     * to use via the matrix_u32_ptr. For sure, we do so for the twisting
+     * info.
+     *
+     * This code fragment should rather be in matmul-common
+     */
+    mm->ntwists = m->ntwists;
+    mm->twist = m->twist;
+    m->ntwists = 0;
+    m->twist = NULL;
+    mm->bind->build_cache(mm, m->p);
 }
 
 static void save_to_local_copy(matmul_ptr mm)
@@ -221,7 +204,7 @@ void matmul_save_cache(matmul_ptr mm)
     save_to_local_copy(mm);
 }
 
-void matmul_mul(matmul_ptr mm, abt * dst, abt const * src, int d)
+void matmul_mul(matmul_ptr mm, void * dst, void const * src, int d)
 {
     mm->bind->mul(mm, dst, src, d);
 }
@@ -236,7 +219,9 @@ void matmul_clear(matmul_ptr mm)
     if (mm->cachefile_name != NULL) free(mm->cachefile_name);
     if (mm->local_cache_copy != NULL) free(mm->local_cache_copy);
     mm->locfile = NULL;
+    void * handle = mm->solib_handle;
     mm->bind->clear(mm);
+    dlclose(handle);
 }
 
 void matmul_auxv(matmul_ptr mm, int op, va_list ap)

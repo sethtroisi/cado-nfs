@@ -78,8 +78,7 @@ size_t curl_source_get(curl_source_ptr f, void ** p, size_t avail)
      */
     assert((*p == NULL) == (avail == 0));
 
-    /* Again, convert to uint32_t's if deemed necessary ! XXX */
-    int rc = rollbuf_get2(f->r, p, avail);
+    int rc = rollbuf_get2(f->r, p, avail * sizeof(uint32_t));
     if (rc == 0)
         assert(rollbuf_is_done(f->r));
     if (!rollbuf_is_done(f->r))

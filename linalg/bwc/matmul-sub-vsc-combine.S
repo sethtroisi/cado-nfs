@@ -20,7 +20,7 @@ matmul_sub_vsc_combine:
         pushq %r14
         pushq %r13
         pushq %r12
-        // rdi ignored (abobj_t arg)
+        // rdi ignored (abobj arg)
 	movq	%rsi, %rdi
 	movq	%rdx, %rsi
 	movq	%rcx, %rbp

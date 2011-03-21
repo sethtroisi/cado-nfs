@@ -89,10 +89,8 @@ int main(int argc, char * argv[])
 
     /* prepare the file names */
     if (split_y) {
-        rc = asprintf(&ifile, COMMON_VECTOR_ITERATE_PATTERN,
-                Y_FILE_BASE, 0, bal->h->checksum);
-        rc = asprintf(&ofile_fmt, COMMON_VECTOR_ITERATE_PATTERN,
-                V_FILE_BASE_PATTERN, 0, bal->h->checksum);
+        rc = asprintf(&ifile, "%s.%u", Y_FILE_BASE, 0);
+        rc = asprintf(&ofile_fmt, "%s.%u", V_FILE_BASE_PATTERN, 0);
     } else {
         ifile = strdup(LINGEN_F_FILE);
         ofile_fmt = strdup(F_FILE_SLICE_PATTERN);

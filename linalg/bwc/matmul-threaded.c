@@ -10,6 +10,7 @@
 #include "matmul-common.h"
 #include "abase.h"
 #include "worker-threads.h"
+#include "utils.h"
 
 /* This extension is used to distinguish between several possible
  * implementations of the product */
@@ -39,7 +40,7 @@ struct matmul_threaded_data_s {
     struct matmul_public_s public_[1];
 
     /* Now our private fields */
-    abobj_t xab;
+    abdst_field xab;
 
     struct {
         uint32_t n;
@@ -68,13 +69,13 @@ struct matmul_threaded_data_s {
 
     struct worker_threads_group * tg;
 
-    void * dst;
-    const void * src;
+    abdst_vec dst;
+    absrc_vec src;
     int d;
 };
 
-extern void matmul_threaded_mul_sub_dense(struct matmul_threaded_data_s * mm, abt * dst, abt const * src, int d, int i);
-extern void matmul_threaded_mul_sub_sparse(struct matmul_threaded_data_s * mm, abt * dst, abt const * src, int d, int i);
+extern void matmul_threaded_mul_sub_dense(struct matmul_threaded_data_s * mm, void * dst, void const * src, int d, int i);
+extern void matmul_threaded_mul_sub_sparse(struct matmul_threaded_data_s * mm, void * dst, void const * src, int d, int i);
 
 void matmul_threaded_clear(struct matmul_threaded_data_s * mm)
 {
@@ -89,12 +90,12 @@ void matmul_threaded_clear(struct matmul_threaded_data_s * mm)
     free(mm);
 }
 
-struct matmul_threaded_data_s * matmul_threaded_init(abobj_ptr xx MAYBE_UNUSED, param_list pl, int optimized_direction)
+struct matmul_threaded_data_s * matmul_threaded_init(abdst_field xx MAYBE_UNUSED, param_list pl, int optimized_direction)
 {
     struct matmul_threaded_data_s * mm;
     mm = malloc(sizeof(struct matmul_threaded_data_s));
     memset(mm, 0, sizeof(struct matmul_threaded_data_s));
-    abobj_init_set(mm->xab, xx);
+    mm->xab = xx;
 
     int suggest = optimized_direction ^ MM_DIR0_PREFERS_TRANSP_MULT;
     mm->public_->store_transposed = suggest;
@@ -126,7 +127,7 @@ struct matmul_threaded_data_s * matmul_threaded_init(abobj_ptr xx MAYBE_UNUSED, 
         param_list_parse_uint(pl, "mm_threaded_offset3", &mm->off3);
     }
 
-    mm->blocksize /= abbytes(mm->xab, 1);
+    mm->blocksize /= sizeof(abelt);
     
     return mm;
 }
@@ -285,7 +286,7 @@ int matmul_threaded_reload_cache(struct matmul_threaded_data_s * mm)
 {
     FILE * f;
 
-    f = matmul_common_reload_cache_fopen(abbytes(mm->xab, 1), mm->public_, MM_MAGIC);
+    f = matmul_common_reload_cache_fopen(sizeof(abelt), mm->public_, MM_MAGIC);
     if (f == NULL) return 0;
 
     MATMUL_COMMON_READ_ONE32(mm->dense->weight, f);
@@ -328,7 +329,7 @@ void matmul_threaded_save_cache(struct matmul_threaded_data_s * mm)
 {
     FILE * f;
 
-    f = matmul_common_save_cache_fopen(abbytes(mm->xab, 1), mm->public_, MM_MAGIC);
+    f = matmul_common_save_cache_fopen(sizeof(abelt), mm->public_, MM_MAGIC);
 
     MATMUL_COMMON_WRITE_ONE32(mm->dense->weight, f);
     MATMUL_COMMON_WRITE_ONE32(mm->sgrp_size, f);
@@ -347,7 +348,7 @@ void matmul_threaded_save_cache(struct matmul_threaded_data_s * mm)
     fclose(f);
 }
 
-void matmul_threaded_mul_sub_dense(struct matmul_threaded_data_s * mm, abt * dst, abt const * src, int d, int throff)
+void matmul_threaded_mul_sub_dense(struct matmul_threaded_data_s * mm, void * xdst, void const * xsrc, int d, int throff)
 {
     if (mm->dense->n == 0) {
         /* We have nothing to do. In this special case, the task of
@@ -357,7 +358,9 @@ void matmul_threaded_mul_sub_dense(struct matmul_threaded_data_s * mm, abt * dst
     }
 
     ASM_COMMENT("dense multiplication code");
-    abobj_ptr x = mm->xab;
+    abdst_field x = mm->xab;
+    absrc_vec src = (absrc_vec) (void*) xsrc; // typical C const problem.
+    abdst_vec dst = (abdst_vec) xdst;
     unsigned int nthr = mm->nthreads;      /* e.g. 4 */
     unsigned int b = mm->blocksize;     /* e.g. 16 */
     unsigned int off3 = mm->off3;
@@ -365,11 +368,11 @@ void matmul_threaded_mul_sub_dense(struct matmul_threaded_data_s * mm, abt * dst
     uint32_t * A = mm->dense->q + throff * b;
     uint32_t i0 = throff * b;
 
-    abt * rx = abinitf(x, 2);
-    abzero(x, rx, 1);
+    abelt rx[2];
+    abvec_set_zero(x, rx, 1);
 
-    abt * dst0 = dst;
-    abt const * src0 = src;
+    abdst_vec dst0 = dst;
+    absrc_vec src0 = src;
 
     if (d == !mm->public_->store_transposed) {
         /* t == 1 is well suited for d == 0. In this case, dst is
@@ -377,28 +380,28 @@ void matmul_threaded_mul_sub_dense(struct matmul_threaded_data_s * mm, abt * dst
 
         /* We expect to have very few dense blocks, so it's acceptable to
          * have temporary storage for all of them on the stack */
-        abt * tdst = abinitf(x, MM_DGRP_SIZE * mm->dense->n);
-        abt * rb = tdst;
+        abelt tdst[MM_DGRP_SIZE * mm->dense->n];
+        abdst_vec rb = tdst;
         for(unsigned int blocknum = 0 ; blocknum < mm->dense->n ; blocknum++) {
-            src = src0 + aboffset(x, i0);
-            abzero(x, rb, MM_DGRP_SIZE);
+            src = src0 + i0;
+            abvec_set_zero(x, rb, MM_DGRP_SIZE);
             ASM_COMMENT("critical loop");
             for(uint32_t i = i0 ; i < mm->public_->dim[d] ; i += nthr * b) {
                 for(uint32_t j = 0 ; j < b ; j++) {
                     __builtin_prefetch(A + nthr * b * off3, 0);
-                    __builtin_prefetch(src + aboffset(x, nthr * b * off3), 0);
+                    __builtin_prefetch(src + nthr * b * off3, 0);
                     uint32_t rA = *A++;
-                    abcopy(x, rx + aboffset(x, 1), src, 1);
-                    src += aboffset(x, 1);
+                    abvec_set(x, rx + 1, src, 1);
+                    src ++;
                     for(unsigned int k = 0 ; k < MM_DGRP_SIZE ; k++) {
-                        abadd(x, rb + aboffset(x, k), rx + aboffset(x, rA&1));
+                        abadd(x, rb[k], rb[k], rx[rA&1]);
                         rA >>= 1;
                     }
                 }
                 A += (nthr-1) * b;
-                src += aboffset(x, (nthr-1) * b);
+                src += (nthr-1) * b;
             }
-            rb += aboffset(x, MM_DGRP_SIZE);
+            rb += MM_DGRP_SIZE;
             ASM_COMMENT("end of critical loop");
         }
 
@@ -406,10 +409,10 @@ void matmul_threaded_mul_sub_dense(struct matmul_threaded_data_s * mm, abt * dst
          * expensive to adopt this crude approach. */
         pthread_mutex_lock(&mm->tg->mu); 
         if (mm->dense->processed++ == 0) {
-            abcopy(x, dst, tdst, MM_DGRP_SIZE * mm->dense->n);
+            abvec_set(x, dst, tdst, MM_DGRP_SIZE * mm->dense->n);
         } else {
             for(unsigned int k = 0 ; k < MM_DGRP_SIZE * mm->dense->n ; k++) {
-                abadd(x, dst + k, tdst + k);
+                abadd(x, dst[k], dst[k], tdst[k]);
             }
         }
         pthread_mutex_unlock(&mm->tg->mu);
@@ -429,9 +432,9 @@ void matmul_threaded_mul_sub_dense(struct matmul_threaded_data_s * mm, abt * dst
          * have to cast everything to unsigned longs */
 
         unsigned int dsize_ulongs;
-        dsize_ulongs = aboffset(x, MM_DGRP_SIZE);
+        dsize_ulongs = MM_DGRP_SIZE;
         dsize_ulongs *= mm->dense->n;
-        dsize_ulongs *= sizeof(abt);
+        dsize_ulongs *= sizeof(void);
         ASSERT(dsize_ulongs % sizeof(unsigned long) == 0);
         dsize_ulongs /= sizeof(unsigned long);
 
@@ -441,31 +444,30 @@ void matmul_threaded_mul_sub_dense(struct matmul_threaded_data_s * mm, abt * dst
                     ((unsigned long*)tdst) [k]);
         }
 #endif
-        abclearf(x, tdst, MM_DGRP_SIZE * mm->dense->n);
     } else {
         for(uint32_t i = i0 ; i < mm->public_->dim[!d] ; i += nthr * b) {
-            abzero(x, dst0 + aboffset(x, i), b);
+            abvec_set_zero(x, dst0 + i, b);
         }
         for(unsigned int blocknum = 0 ; blocknum < mm->dense->n ; blocknum++) {
-            dst = dst0 + aboffset(x, i0);
+            dst = dst0 + i0;
             ASM_COMMENT("critical loop");
             for(uint32_t i = i0 ; i < mm->public_->dim[!d] ; i += nthr * b) {
                 for(uint32_t j = 0 ; j < b ; j++) {
                     __builtin_prefetch(A + nthr * b * off3, 0);
-                    __builtin_prefetch(dst + aboffset(x, nthr * b * off3), 1);
+                    __builtin_prefetch(dst + nthr * b * off3, 1);
                     uint32_t rA = *A++;
-                    abzero(x, rx + aboffset(x, 1), 1);
+                    abvec_set_zero(x, rx + 1, 1);
                     for(unsigned int k = 0 ; k < MM_DGRP_SIZE ; k++) {
-                        abadd(x, rx + aboffset(x, rA&1), src + aboffset(x, k));
+                        abadd(x, rx[rA&1], rx[rA&1], src[k]);
                         rA >>= 1;
                     }
-                    abadd(x, dst, rx + aboffset(x, 1));
-                    dst += aboffset(x, 1);
+                    abadd(x, *dst, *dst, rx[1]);
+                    dst += 1;
                 }
                 A += (nthr-1) * b;
-                dst += aboffset(x, (nthr-1) * b);
+                dst += (nthr-1) * b;
             }
-            src += aboffset(x, MM_DGRP_SIZE);
+            src += MM_DGRP_SIZE;
             ASM_COMMENT("end of critical loop");
         }
         pthread_mutex_lock(&mm->tg->mu); 
@@ -479,14 +481,13 @@ void matmul_threaded_mul_sub_dense(struct matmul_threaded_data_s * mm, abt * dst
         }
         pthread_mutex_unlock(&mm->tg->mu);
     }
-    abclearf(x, rx, 2);
     ASM_COMMENT("end of dense multiplication code");
 }
 
-void matmul_threaded_mul_sub_sparse(struct matmul_threaded_data_s * mm, abt * dst, abt const * src, int d, int throff)
+void matmul_threaded_mul_sub_sparse(struct matmul_threaded_data_s * mm, void * xdst, void const * xsrc, int d, int throff)
 {
     ASM_COMMENT("sparse multiplication code");
-    abobj_ptr x = mm->xab;
+    abdst_field x = mm->xab;
     unsigned int nthr MAYBE_UNUSED = mm->nthreads;
     unsigned int g = mm->sgrp_size;
     unsigned int b = mm->blocksize;
@@ -496,7 +497,8 @@ void matmul_threaded_mul_sub_sparse(struct matmul_threaded_data_s * mm, abt * ds
     uint32_t * A = mm->sparse->q + throff * b;
     uint32_t i0 = throff * b;
 
-
+    absrc_vec src = (absrc_vec) (void*) xsrc; // typical C const problem.
+    abdst_vec dst = (abdst_vec) xdst;
     /* If d == 0, output has ncols == dim[1] entries
      *             input has nrows == dim[0] entries
      */
@@ -515,7 +517,7 @@ void matmul_threaded_mul_sub_sparse(struct matmul_threaded_data_s * mm, abt * ds
     sparse_readahead = mm->nthreads * MAX(mm->off1, mm->off2) * mm->blocksize;
 
     if (d == !mm->public_->store_transposed) {
-        dst += aboffset(x, mm->dense->n * MM_DGRP_SIZE);
+        dst += mm->dense->n * MM_DGRP_SIZE;
 #define xxxHARDCODE
 #ifdef HARDCODE
         ASSERT_ALWAYS(b == MM_BLOCKSIZE);
@@ -534,27 +536,27 @@ void matmul_threaded_mul_sub_sparse(struct matmul_threaded_data_s * mm, abt * ds
             uint32_t rlen= mm->sparse->len[blocknum];
             ASM_COMMENT("critical loop");
             for(uint32_t i = i0 ; i < g ; i += nthr * b) {
-                abzero(x, dst + aboffset(x, i), b);
+                abvec_set_zero(x, dst + i, b);
             }
             for(uint32_t i = i0 ; i < rlen ; i+= nthr * b) {
                 for(unsigned int j = 0 ; j < b ; j++) {
                     // ASSERT((A - mm->sparse->q + nthr * b * off1) < mm->sparse->tlen + sparse_readahead);
                     // ASSERT((A - mm->sparse->q + nthr * b * off2) < mm->sparse->tlen + sparse_readahead);
                     __builtin_prefetch(A + nthr * b * off1, 0);
-                    __builtin_prefetch(src + aboffset(x, A[nthr * b * off2]), 0);
+                    __builtin_prefetch(src + A[nthr * b * off2], 0);
                     uint32_t z = (i + j) & (g-1);
                     uint32_t k = *A++;
                     /*
-                    ASSERT((dst - dst0) < aboffset(x, ra[!d]-z));
-                    ASSERT((src - src0) < aboffset(x, 1 + mm->public_->dim[d]-k));
+                    ASSERT((dst - dst0) < ra[!d]-z);
+                    ASSERT((src - src0) < 1 + mm->public_->dim[d]-k);
                     */
-                    abadd(x, dst + aboffset(x, z), src + aboffset(x, k));
+                    abadd(x, dst[z], dst[z], src[k]);
                 }
                 A += (nthr-1) * b;
             }
             ASM_COMMENT("end of critical loop");
 
-            dst += aboffset(x, g);
+            dst += g;
         }
 #ifdef  HARDCODE
 #undef b
@@ -569,7 +571,7 @@ void matmul_threaded_mul_sub_sparse(struct matmul_threaded_data_s * mm, abt * ds
          * prefer to stay single-threaded here.
          *
          * Note that there _could_ be a way around the problem, using
-         * atomic xors for abadd. But it isn't worth the trouble.
+         * atomic xors for c_abadd. But it isn't worth the trouble.
          */
         if (throff != 0)
             return;
@@ -578,10 +580,10 @@ void matmul_threaded_mul_sub_sparse(struct matmul_threaded_data_s * mm, abt * ds
             fprintf(stderr, "Warning: Doing many iterations with bad code\n");
         }
 
-        src += aboffset(x, mm->dense->n * MM_DGRP_SIZE);
+        src += mm->dense->n * MM_DGRP_SIZE;
 
         if (mm->dense->n == 0) {
-            abzero(x, dst, mm->public_->dim[!d]);
+            abvec_set_zero(x, dst, mm->public_->dim[!d]);
         } else {
             /* We must test whether all threads are done with the dense
              * blocks */
@@ -599,18 +601,18 @@ void matmul_threaded_mul_sub_sparse(struct matmul_threaded_data_s * mm, abt * ds
             for(uint32_t i = i0 ; i < rlen ; i+= b) {
                 for(unsigned int j = 0 ; j < b ; j++) {
                     __builtin_prefetch(A + b * off1, 0);
-                    __builtin_prefetch(dst + aboffset(x, A[b * off2]), 1);
+                    __builtin_prefetch(dst + A[b * off2], 1);
                     uint32_t z = (i + j) % g;
                     uint32_t k = *A++;
                     /*
-                    ASSERT((dst - dst0) < aboffset(x, 1 + mm->public_->dim[!d]-k));
-                    ASSERT((src - src0) < aboffset(x, ra[d]-z));
+                    ASSERT((dst - dst0) < 1 + mm->public_->dim[!d]-k);
+                    ASSERT((src - src0) < ra[d]-z);
                     */
-                    abadd(x, dst + aboffset(x, k), src + aboffset(x, z));
+                    abadd(x, dst[k], dst[k], src[z]);
                 }
             }
             ASM_COMMENT("end of critical loop (transposed mult, SLOW)");
-            src += aboffset(x, g);
+            src += g;
         }
         /* The extra readahead location which is used for non-transposed
          * mult is here an extra scrap location. It's innocuous to write
@@ -618,7 +620,7 @@ void matmul_threaded_mul_sub_sparse(struct matmul_threaded_data_s * mm, abt * ds
          * if we keep a zero there because it may become readahead again
          * for the next turn.
          */
-        abzero(x, dst + aboffset(x, mm->public_->dim[!d]), 1);
+        abvec_set_zero(x, dst + mm->public_->dim[!d], 1);
     }
     ASM_COMMENT("end of sparse multiplication code");
 }
@@ -630,11 +632,11 @@ void matmul_thread_worker_routine(struct worker_threads_group * tg MAYBE_UNUSED,
     matmul_threaded_mul_sub_sparse(mm, mm->dst, mm->src, mm->d, i);
 }
 
-void matmul_threaded_mul(struct matmul_threaded_data_s * mm, abt * dst, abt const * src, int d)
+void matmul_threaded_mul(struct matmul_threaded_data_s * mm, void * dst, void const * src, int d)
 {
     mm->dense->processed = 0;
     mm->dst = dst;
-    mm->src = src;
+    mm->src = (absrc_vec) src;
     mm->d = d;
 
     /* unleash worker threads */

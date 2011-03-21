@@ -15,13 +15,10 @@ extern "C" {
  * If v == 0, consider all checkpoints. Otherwise, restrict to those
  * whose index is <= v
  *
- * The stem is to be understood according to the
- * COMMON_VECTOR_ITERATE_PATTERN constant in filenames.h
- *
  * The bal argument is used only to compose the filename according to the
  * checksum of the current balancing permutation.
  */
-extern void keep_rolling_checkpoints(balancing_ptr bal, const char * stem, unsigned int v);
+extern void keep_rolling_checkpoints(const char * stem, unsigned int v);
 
 #ifdef __cplusplus
 }

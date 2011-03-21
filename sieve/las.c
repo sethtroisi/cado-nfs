@@ -3975,9 +3975,20 @@ main (int argc0, char *argv0[])
             if (buckets_max_full (rat_BA[i]) > max_full)
                 max_full = buckets_max_full (rat_BA[i]);
         }
-        if (max_full >= 1.0) 
+        if (max_full >= 1.0) {
             fprintf(stderr, "maxfull=%f\n", max_full);
-        ASSERT (max_full < 1.);
+            for (i = 0; i < si.nb_threads; ++i) {
+                fprintf(stderr, "freeing [%d] max_full=%f %f\n",
+                        i, buckets_max_full (alg_BA[i]),buckets_max_full (rat_BA[i]));
+                clear_bucket_array(alg_BA[i]);
+                clear_bucket_array(rat_BA[i]);
+            }
+            si.bucket_limit += si.bucket_limit / 10;
+            nroots++;   // ugly: redo the same ideal
+            abort();
+            continue;
+        }
+
 
         ttsm += seconds();
 

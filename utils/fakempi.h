@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include "cado_mpi_config.h"
 #include "macros.h"
 
@@ -10,7 +11,8 @@ typedef int MPI_Status;
 typedef int MPI_Datatype;
 typedef int MPI_Comm;
 typedef int MPI_Op;
-typedef int MPI_User_function;
+typedef void MPI_User_function(void *invec, void *inoutvec,
+             int *len, MPI_Datatype *datatype);
 typedef int MPI_Errhandler;
 typedef int MPI_Request;
 
@@ -69,6 +71,7 @@ static inline int MPI_Init(int * argc MAYBE_UNUSED, char *** argv MAYBE_UNUSED) 
 static inline int MPI_Init_thread(int * argc MAYBE_UNUSED, char *** argv MAYBE_UNUSED, int req, int * prov) { if (prov) *prov=req; return 0; }
 static inline int MPI_Finalize() {return 0;}
 static inline int MPI_Op_create( MPI_User_function *function MAYBE_UNUSED, int commute MAYBE_UNUSED, MPI_Op *op MAYBE_UNUSED ){return 0;}
+static inline int MPI_Op_free(MPI_Op *op MAYBE_UNUSED ){return 0;}
 static inline int MPI_Send( void *buf MAYBE_UNUSED, int count MAYBE_UNUSED, MPI_Datatype datatype MAYBE_UNUSED, int dest MAYBE_UNUSED,int tag MAYBE_UNUSED, MPI_Comm comm  MAYBE_UNUSED){return 0;}
 static inline int MPI_Sendrecv( void *sbuf MAYBE_UNUSED, int scount MAYBE_UNUSED, MPI_Datatype sdatatype MAYBE_UNUSED, int sdest MAYBE_UNUSED,int stag MAYBE_UNUSED,  void *rbuf MAYBE_UNUSED, int rcount MAYBE_UNUSED, MPI_Datatype rdatatype MAYBE_UNUSED, int rdest MAYBE_UNUSED,int rtag MAYBE_UNUSED, MPI_Comm comm  MAYBE_UNUSED, MPI_Status *status MAYBE_UNUSED){return 0;}
 static inline int MPI_Isend( void *buf MAYBE_UNUSED, int count MAYBE_UNUSED, MPI_Datatype datatype MAYBE_UNUSED, int dest MAYBE_UNUSED,int tag MAYBE_UNUSED, MPI_Comm comm  MAYBE_UNUSED, MPI_Request * zz MAYBE_UNUSED){return 0;}
@@ -136,5 +139,66 @@ static inline int MPI_Allgatherv(void *sendbuf, int sendcount MAYBE_UNUSED,
     ASSERT_ALWAYS(sendbuf == MPI_IN_PLACE);
     return 0;
 }
+
+static inline int MPI_Type_contiguous(int count, MPI_Datatype oldtype, MPI_Datatype * newtype)
+{
+    *newtype = count * oldtype;
+    return 0;
+}
+static inline int MPI_Type_commit(MPI_Datatype * t MAYBE_UNUSED) { return 0; }
+static inline int MPI_Type_free(MPI_Datatype * t MAYBE_UNUSED) { return 0; }
+static inline int MPI_Type_set_attr(MPI_Datatype type MAYBE_UNUSED, int key MAYBE_UNUSED, void *value MAYBE_UNUSED)
+{
+    /* XXX We are *NOT* storing the type attribute here. This is because
+     * we expect that the user function that we use, and which exploits
+     * this, will actually *never* be called in this context of ``fake''
+     * mpi: by assumption, all communicator sizes are equal to 1, and
+     * thus mpi reduction just amounts to copying data.
+     */
+    return 0;
+}
+static inline int MPI_Type_get_attr(MPI_Datatype type MAYBE_UNUSED, int key MAYBE_UNUSED, void *value, int * flag)
+{
+    /* Same as above */
+    // *(void**)value = NULL;
+    memset(value, 0, sizeof(void*));
+    *flag=1;
+    return 0;
+}
+static inline int MPI_Type_delete_attr(MPI_Datatype type MAYBE_UNUSED, int key MAYBE_UNUSED) { return 0; }
+
+typedef int MPI_Type_copy_attr_function(MPI_Datatype oldtype,
+           int type_keyval, void *extra_state, void *attribute_val_in,
+           void *attribute_val_out, int *flag);
+typedef int MPI_Type_delete_attr_function(MPI_Datatype type, int type_keyval,
+            void *attribute_val, void *extra_state);
+#define MPI_TYPE_DUP_FN NULL
+#define MPI_TYPE_NULL_DELETE_FN NULL
+static inline int MPI_Type_create_keyval(
+        MPI_Type_copy_attr_function *type_copy_attr_fn MAYBE_UNUSED,
+        MPI_Type_delete_attr_function *type_delete_attr_fn MAYBE_UNUSED,
+        int *type_keyval,
+        void *extra_state MAYBE_UNUSED)
+{
+    /* same rationale as above: we don't care about providing usable
+     * function. Only the prototypes are barely right. The rest will
+     * actually never be called.
+     */
+    *type_keyval = 0;
+    return 0;
+}
+static inline int MPI_Type_free_keyval(int * x MAYBE_UNUSED)
+{
+    return 0;
+}
+
+#define MPI_MAX_ERROR_STRING    64
+static inline int MPI_Error_string(int err, char * msg, int * len)
+{
+    *len = snprintf(msg, MPI_MAX_ERROR_STRING, "%s", strerror(err));
+    return *len >= 0 ? 0 : ENOMEM;
+}
+
+
 
 #endif /* FAKEMPI_H_ */
