@@ -5,6 +5,14 @@
 
 // #include "mf.h"
 
+/* This is used only for sanity checking after dispatch. */
+/* The primes are 2^64-59 and 2^63-25 */
+#define DUMMY_VECTOR_COORD_VALUE(j)     \
+                (UINT64_C(0xffffffffffffffc5) / (1 + (j))  \
+              + UINT64_C(0x7fffffffffffffe7) * (1 + (j)))
+#define DUMMY_VECTOR_COORD_VALUE2(j)     \
+        (DUMMY_VECTOR_COORD_VALUE((j) ^ 0xbeef) ^ ((DUMMY_VECTOR_COORD_VALUE((j) ^ 0xcafe) << 32)))
+
 /* balancing structure */
 
 #define FLAG_COLPERM    1

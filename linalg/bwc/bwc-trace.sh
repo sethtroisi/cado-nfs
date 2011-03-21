@@ -82,8 +82,7 @@ $bins/bwc.pl dispatch sanity_check_vector=H1   $common save_submatrices=1
 [ "$?" = 0 ] && $bins/bwc.pl :fsplit     $common
 [ "$?" = 0 ] && $bins/bwc.pl mksol   $common interval=10 ys=0..64
 [ "$?" = 0 ] && $bins/bwc.pl gather $common interval=10
-[ "$?" = 0 ] && $bins/cleanup --ncols 64 --out $wdir/W $wdir/K.0.$checksum
-# [ "$?" = 0 ] && $bins/mf_twistvec --truncate --nullspace $nullspace --untwist $bfile $wdir/W.$checksum >  $wdir/W
+[ "$?" = 0 ] && $bins/cleanup --ncols 64 --out $wdir/W $wdir/K.0
 
 failure="$?"
 
@@ -121,11 +120,11 @@ for i in `seq 0 $((Nh-1))` ; do
     done
 done) > $mdir/placemats.m
 
-$cmd x $wdir/X.$checksum > $mdir/x.m
+$cmd x $wdir/X > $mdir/x.m
 # ok, strictly speaking the A files have nothing to do with vectors. But
 # the procedure sort of works as is anyway... Same holds for F.
-for f in $wdir/[ZADVCYFSWK]*.$checksum ; do $cmd vector < $f > $mdir/`basename $f .$checksum`.m ; done
-for f in $wdir/[AF]*[0-9] ; do $cmd vector < $f > $mdir/`basename $f .$checksum`.m ; done
+for f in $wdir/[ZADVCYFSWK]* ; do $cmd vector < $f > $mdir/`basename $f`.m ; done
+for f in $wdir/[AF]*[0-9] ; do $cmd vector < $f > $mdir/`basename $f`.m ; done
 $cmd vector < $wdir/W > $mdir/Wu.m
 $cmd vector < $wdir/H1 > $mdir/H1.m
 

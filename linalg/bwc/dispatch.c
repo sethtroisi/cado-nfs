@@ -6,6 +6,7 @@
  * handle different data widths.
  */
 #include <stdio.h>
+#include <string.h>
 #include "bwc_config.h"
 #include "parallelizing_info.h"
 #include "matmul_top.h"
@@ -16,6 +17,7 @@
 #include "async.h"
 // #include "rusage.h"
 #include "filenames.h"
+#include "xymats.h"
 
 void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
@@ -23,7 +25,8 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
     struct timing_data timing[1];
 
     int flags[2];
-    flags[bw->dir] = THREAD_SHARED_VECTOR;
+    /* for the needs of checking, shared vectors are not used here */
+    flags[bw->dir] = 0;
     flags[!bw->dir] = 0;
 
     int ys[2] = { bw->ys[0], bw->ys[1], };
@@ -40,6 +43,93 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
     block_control_signals();
 
     matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
+    unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
+
+    const char * tmp;
+    if ((tmp = param_list_lookup_string(pl, "sanity_check_vector")) != NULL) {
+        /* We have computed a sanity check vector, which is H=M*K, with K
+         * constant and easily given. Note that we have not computed K*M,
+         * but really M*K. Thus independently of which side we prefer, we
+         * are going to check the matrix product in a rigid direction.
+         *
+         * check 1: compute M*K again using the mmt structures, and
+         * compare with H1. This is matmul_top_mul(mmt, 1).
+         *
+         * check 2: for some vector L, compute (L, H=M*K) and (L*M, K).
+         * This means matmul_top_mul(mmt, 0).
+         */
+        mmt_wiring_ptr mcol = mmt->wr[1];
+        mmt_wiring_ptr mrow = mmt->wr[0];
+        A->vec_set_zero(A, mcol->v->v, mcol->i1 - mcol->i0);
+        for(unsigned int i = mcol->i0 ; i < mcol->i1 && i < unpadded ; i++) {
+            void * dst = SUBVEC(mcol->v, v, i - mcol->i0);
+            uint64_t value = DUMMY_VECTOR_COORD_VALUE(i);
+            memset(dst, 0, A->vec_elt_stride(A,1));
+            memcpy(dst, &value, sizeof(uint64_t));
+        }
+        matmul_top_twist_vector(mmt, 1);
+        matmul_top_mul(mmt, 1);
+        matmul_top_untwist_vector(mmt, 1);
+        matmul_top_save_vector(mmt, "Hx", 1, 0, unpadded);
+        // compare if files are equal.
+        if (pi->m->jrank == 0 && pi->m->trank == 0) {
+            char * cmd;
+            asprintf(&cmd, "diff -q %s Hx.0", tmp);
+            int rc = system(cmd);
+            if (rc) {
+                fprintf(stderr, "%s returned %d\n", cmd, rc >> 8);
+                exit(1);
+            } else {
+                printf("Check of %s against %s: ok\n", tmp, "Hx.0");
+            }
+            free(cmd);
+        }
+        serialize(pi->m);
+        A->vec_set_zero(A, mrow->v->v, mrow->i1 - mrow->i0);
+        for(unsigned int i = mrow->i0 ; i < mrow->i1 && i < unpadded ; i++) {
+            void * dst = SUBVEC(mrow->v, v, i - mrow->i0);
+            uint64_t value = DUMMY_VECTOR_COORD_VALUE2(i);
+            memset(dst, 0, A->vec_elt_stride(A,1));
+            memcpy(dst, &value, sizeof(uint64_t));
+        }
+        /* This is L. Now compute the dot product. */
+        mmt_vec dp0, dp1;
+        vec_init_generic(pi->m, A, dp0, 0, A->groupsize(A));
+        vec_init_generic(pi->m, A, dp1, 0, A->groupsize(A));
+        unsigned int how_many;
+        unsigned int offset_c;
+        unsigned int offset_v;
+        how_many = intersect_two_intervals(&offset_c, &offset_v,
+                mrow->i0, mrow->i1,
+                mcol->i0, mcol->i1);
+        A->dotprod(A, dp0->v,
+                SUBVEC(mrow->v, v, offset_c),
+                SUBVEC(mcol->v, v, offset_v),
+                how_many);
+        allreduce_generic(dp0, pi->m, A->groupsize(A));
+        /* now we can throw away Hx */
+        matmul_top_twist_vector(mmt, 0);
+        matmul_top_mul(mmt, 0);
+        matmul_top_untwist_vector(mmt, 0);
+        A->vec_set_zero(A, mcol->v->v, mcol->i1 - mcol->i0);
+        for(unsigned int i = mcol->i0 ; i < mcol->i1 && i < unpadded ; i++) {
+            void * dst = SUBVEC(mcol->v, v, i - mcol->i0);
+            uint64_t value = DUMMY_VECTOR_COORD_VALUE(i);
+            memset(dst, 0, A->vec_elt_stride(A,1));
+            memcpy(dst, &value, sizeof(uint64_t));
+        }
+        A->dotprod(A, dp1->v,
+                SUBVEC(mrow->v, v, offset_c),
+                SUBVEC(mcol->v, v, offset_v),
+                how_many);
+        allreduce_generic(dp1, pi->m, A->groupsize(A));
+        int diff = memcmp(dp0->v, dp1->v, A->vec_elt_stride(A, A->groupsize(A)));
+        printf("Secondary sanity check: %d\n", diff);
+        if (diff) {
+            fprintf(stderr, "aborting on sanity check failure.\n");
+            exit(1);
+        }
+    }
 
     matmul_top_clear(mmt);
     A->oo_field_clear(A);

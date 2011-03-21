@@ -685,7 +685,7 @@ sub drive {
                 &drive("mf_bal", @mfbal);
                 obtain_bfile();
                 push @_, "balancing=$balancing";
-                &drive("dispatch", @_, "sequential_cache_build=1");
+                &drive("dispatch", @_, "sequential_cache_build=1", "sanity_check_vector=H1");
                 &drive("prep", @_);
                 &drive("secure", @_) unless $param->{'skip_online_checks'};
                 &drive("./split", @_, "--split-y");
@@ -727,11 +727,6 @@ sub drive {
         &drive("./cleanup", "--ncols", $n,
             "--out", "$wdir/W", @my_ks);
 
-        # my @untwist = ("mf_twistvec", "--truncate", "--untwist", "$balancing", "$wdir/W", "--out", "$wdir/W");
-        # if (defined(my $ns = $param->{'nullspace'})) {
-        # push @untwist, "--nullspace", $ns;
-        # }
-        # &drive(@untwist);
         return;
     }
 

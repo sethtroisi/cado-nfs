@@ -34,10 +34,6 @@ add_executable(random ${EXCLUDE_FROM_RELEASE_BUILD} random.c)
 # avoid having the whole thing entangled with too many dependencies all
 # around, since all that split.c actually needs is very, very little.
 add_executable(split split.c bw-common.c balancing.c)
-#add_executable(shell
-#    shell.c parallelizing_info.c bw-common.c bw-common-mpi.c)
-#set_target_properties(shell
-#    PROPERTIES COMPILE_FLAGS "--mpi" LINK_FLAGS "--mpi")
 
 add_executable(acollect acollect.c bw-common.c)
 
@@ -45,7 +41,6 @@ install(TARGETS split acollect RUNTIME DESTINATION bin/linalg/bwc)
 
 target_link_libraries(random utils m)
 target_link_libraries(split utils)
-# target_link_libraries(shell utils ${pthread_libs})
 target_link_libraries(acollect utils)
 
 set(balancing_sources
@@ -106,10 +101,6 @@ set_target_properties(bwc_base PROPERTIES
 set_target_properties(bwc_mpfq PROPERTIES
         COMPILE_FLAGS "--mpi"
         LINK_FLAGS "--mpi")
-
-add_executable(mf_twistvec mf_twistvec.c)
-target_link_libraries(mf_twistvec bwc_base)
-install(TARGETS mf_twistvec RUNTIME DESTINATION bin/linalg/bwc)
 
 set(matmul_basic_sources    matmul-basic.c)
 set(matmul_sliced_sources   matmul-sliced.cpp)

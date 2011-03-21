@@ -26,12 +26,6 @@
 
 #include "balancing_workhorse.h"
 
-/* This is used only for checking. */
-/* The primes are 2^64-59 and 2^63-25 */
-#define DUMMY_VECTOR_COORD_VALUE(j)     \
-                UINT64_C(0xffffffffffffffc5) / (1 + (j))  \
-              + UINT64_C(0x7fffffffffffffe7) * (1 + (j));
-
 /* TODO:
  * - implement file-backed rewind on thread pipes. There's a
  *   balancing_use_auxfile parameter for this.
@@ -1317,7 +1311,7 @@ int master_dispatcher_put(master_dispatcher_ptr d, uint32_t * p, size_t n)
             where->put(where, &c, 1);
             d->crow_togo--;
         }
-        if (d->check_vector && d->crow_togo == 0) {
+        if (d->check_vector && d->crow_togo == 0 && r <= m->bal->h->nrows) {
             fwrite(&d->w, sizeof(uint64_t), 1, d->check_vector);
             d->w = 0;
         }

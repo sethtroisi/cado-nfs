@@ -19,4 +19,16 @@ add_executable(matops matops.c ../gauss.c)
 target_link_libraries(matops gmp utils m)
 endif(HAVE_GCC_STYLE_AMD64_ASM)
 
+# should be completely useless now.
+add_executable(mf_twistvec mf_twistvec.c)
+target_link_libraries(mf_twistvec bwc_base)
+
+add_executable(shell
+    shell.c)
+set_target_properties(shell
+    PROPERTIES
+    COMPILE_FLAGS "--mpi"
+    LINK_FLAGS "--mpi")
+target_link_libraries(shell bwc_base)
+
 # vim: ft=cmake:

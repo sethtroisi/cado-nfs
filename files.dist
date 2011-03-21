@@ -42,7 +42,6 @@ linalg/bwc/checks.list.light
 linalg/bwc/checks.sh
 linalg/bwc/debug.c
 linalg/bwc/debug.h
-linalg/bwc/defaults.h
 linalg/bwc/do-one-test.sh
 utils/fakempi.h
 utils/fakepthread.h
@@ -86,11 +85,7 @@ linalg/bwc/rusage.c
 linalg/bwc/rusage.h
 linalg/bwc/secure.c
 utils/select_mpi.h
-linalg/bwc/shell.c
 linalg/bwc/split.c
-linalg/bwc/test_hello.c
-linalg/bwc/test_pthread_reduce.c
-linalg/bwc/tool.sh
 linalg/bwc/worker-threads.c
 linalg/bwc/worker-threads.h
 linalg/bwc/xdotprod.c
@@ -405,7 +400,6 @@ linalg/bwc/balancing_workhorse.c
 linalg/bwc/balancing_workhorse.h
 linalg/bwc/dispatch.c
 linalg/bwc/matops.c
-linalg/bwc/mf_twistvec.c
 linalg/bwc/rolling.c
 linalg/bwc/rolling.h
 linalg/bwc/cleanup.c

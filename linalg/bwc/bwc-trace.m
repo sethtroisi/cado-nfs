@@ -124,8 +124,6 @@ load "/tmp/bwc/V0-64.20.m"; V20:=vblock(nc, var, n);
 // load "/tmp/bwc/V0-64.18.m"; V18:=vblock(nc, var, n);
 load "/tmp/bwc/C.0.m";    C0:=vblock(nr, var, 64);
 load "/tmp/bwc/C.10.m";   C10:=vblock(nr, var, 64);
-load "/tmp/bwc/D.0.m";    D0:=vblock(nr, var, 64);
-load "/tmp/bwc/D.10.m";   D10:=vblock(nr, var, 64);
 
 load "/tmp/bwc/H1.m";    H1:=vblock(nc, var, 64);
 var:=[(p div j+q*j) mod 2^64:j in [1..nc]]
@@ -133,13 +131,6 @@ var:=[(p div j+q*j) mod 2^64:j in [1..nc]]
     where q is PreviousPrime(2^63);
 H0:=vblock(nc, var, 64);
 assert M*H0 eq H1;
-
-load "/tmp/bwc/H1.m";    H1:=vblock(nrx, var, 64);
-var:=[(p div j+q*j) mod 2^64:j in [1..ncx]]
-    where p is PreviousPrime(2^64)
-    where q is PreviousPrime(2^63);
-H0:=vblock(ncx, var, 64);
-assert Mx*H0 eq H1;
 
 v0z:=[Seqint(ChangeUniverse((Eltseq(V0[i])),Integers()),2):i in [1..nr]];
 
@@ -210,10 +201,6 @@ Transpose(TM)^10*C0 eq C10;
 
 Transpose(V0)*C10 eq Transpose(V10)*C0;
 Transpose(C10)*V0 eq Transpose(C0)*V10;
-
-// D10:=Pr*(Pr^-1*Mt)^10*Pr^-1*C0;
-// Transpose(V0)*D10 eq Transpose(V10)*C0;
-// Transpose(D10)*V0 eq Transpose(C0)*V10;
 
 print "Done checking krylov stuff";
 
@@ -296,22 +283,21 @@ IsZero(TM*S);
 
 load "/tmp/bwc/S0-64.10.m"; S10:=vblock(nc, var, n);
 load "/tmp/bwc/S0-64.20.m"; S20:=vblock(nc, var, n);
-load "/tmp/bwc/K.0.m";    K0:=vblock(nrx, var, 64);
+load "/tmp/bwc/K.0.m";    K0:=vblock(nc, var, 64);
 
 S eq S10+S20;
 
-// However K is untwisted.
-S eq K0;
+// K0 is basically S in column echelon form.
+Rowspace(Transpose(S)) eq Rowspace(Transpose(K0));
+IsZero(TM*K0);
 
 
-b:=Basis(sub<VectorSpace(K,N)|Rows(Transpose(S))>);
-
-IsZero(b[1] * Transpose(TM));
 
 load "/tmp/bwc/W.m";    W:=vblock(nr, var, 64);    
-load "/tmp/bwc/Wu.m";    Wu:=vblock(nr, var, 64);
 
-K0 eq W;
+
+// For our simple test cases, K0==W. In more subtle situations, things
+// might differ a bit.
+
+print "FYI: ", K0 eq W;
 IsZero(TM*W);
-
-

@@ -1054,6 +1054,11 @@ void matmul_top_twist_vector(matmul_top_data_ptr mmt, int d)
         matmul_top_apply_S(mmt, d);
     else
         matmul_top_unapply_S_unapply_P(mmt, d);
+    // I know this looks odd, but I have witnessed inconsistencies when
+    // matmul_top_mul is called directly after twist_vector, for the case
+    // of on-shared vectors. twist_vector() is rare enough to allow an
+    // extra serializing call.
+    serialize(mmt->pi->m);
 }
 /* }}} */
 
@@ -1064,6 +1069,11 @@ void matmul_top_untwist_vector(matmul_top_data_ptr mmt, int d)
         matmul_top_unapply_S(mmt, d);
     else
         matmul_top_apply_P_apply_S(mmt, d);
+    // I know this looks odd, but I have witnessed inconsistencies when
+    // matmul_top_mul is called directly after twist_vector, for the case
+    // of on-shared vectors. twist_vector() is rare enough to allow an
+    // extra serializing call.
+    serialize(mmt->pi->m);
 }
 /* }}} */
 

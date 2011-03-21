@@ -108,3 +108,7 @@ scripts/cluster/las_1job
 scripts/cluster/las_loop
 scripts/cluster/merge.pl
 scripts/cluster/oarsh_wrap.sh
+linalg/bwc/mf_twistvec.c
+linalg/bwc/test_hello.c
+linalg/bwc/shell.c
+linalg/bwc/tool.sh
