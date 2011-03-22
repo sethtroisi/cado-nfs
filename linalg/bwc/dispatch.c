@@ -74,8 +74,9 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         // compare if files are equal.
         if (pi->m->jrank == 0 && pi->m->trank == 0) {
             char * cmd;
-            asprintf(&cmd, "diff -q %s Hx.0", tmp);
-            int rc = system(cmd);
+            int rc = asprintf(&cmd, "diff -q %s Hx.0", tmp);
+            ASSERT_ALWAYS(rc>=0);
+            rc = system(cmd);
             if (rc) {
                 fprintf(stderr, "%s returned %d\n", cmd, rc >> 8);
                 exit(1);

@@ -1050,6 +1050,7 @@ void matmul_top_apply_S(matmul_top_data_ptr mmt, int d)
 /* {{{ matmul_top_twist_vector */
 void matmul_top_twist_vector(matmul_top_data_ptr mmt, int d)
 {
+    serialize(mmt->pi->m);
     if (d == 1)
         matmul_top_apply_S(mmt, d);
     else
@@ -1065,6 +1066,7 @@ void matmul_top_twist_vector(matmul_top_data_ptr mmt, int d)
 /* {{{ matmul_top_untwist_vector */
 void matmul_top_untwist_vector(matmul_top_data_ptr mmt, int d)
 {
+    serialize(mmt->pi->m);
     if (d == 1)
         matmul_top_unapply_S(mmt, d);
     else
