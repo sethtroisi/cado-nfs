@@ -94,7 +94,7 @@ add_library(bwc_base ${bwc_base_sources})
 add_library(bwc_mpfq SHARED ${bwc_mpfq_sources})
 install(TARGETS bwc_mpfq LIBRARY DESTINATION "lib/${package_basename}")
 
-target_link_libraries(bwc_base balancing utils bwc_mpfq ${pthread_libs})
+target_link_libraries(bwc_base balancing utils bwc_mpfq ${pthread_libs} dl)
 set_target_properties(bwc_base PROPERTIES
         COMPILE_FLAGS "--mpi"
         LINK_FLAGS "--mpi")
