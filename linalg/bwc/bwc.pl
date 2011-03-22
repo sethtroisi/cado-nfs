@@ -163,14 +163,12 @@ sub detect_mpi {
                 if (-x "$mpi/mpiname") {
                     my $v = `$mpi/mpiname -n -v`;
                     chomp($v);
-                    if ($v =~ /MVAPICH2\s+([\w\.]+)/) {
-                        $mpi_ver="mvapich2-$1";
-                        # Presently all known versions of mvapich2 (up
-                        # until 1.6) need mpd daemons. However, since it
-                        # embeds mpich2, and the latter is now switching
-                        # to daemon-less mode, this might evolve in the
-                        # near future.
-                        $needs_mpd = 1;
+                    if ($v =~ /MVAPICH2\s+([\d\.]+)((?:\D\w*)?)/) {
+                        $mpi_ver="mvapich2-$1$2";
+                        $needs_mpd = ($1 < 1.6) || ($1 == 1.6 && $2 =~ /^rc\d/);
+                        # Presently all versions of mvapich2 up
+                        # until 1.6rc3 included need mpd daemons.
+                        # Released version 1.6 uses hydra.
                         last SEVERAL_CHECKS;
                     }
                 }
@@ -554,7 +552,7 @@ if ($mpi_needed) {
         } elsif ($mpi_ver =~ /^openmpi/) {
             # Default to orte_rsh_agent which is the new name as of 1.5
             push @mpi_precmd, qw/--mca orte_rsh_agent/, ssh_program();
-        } elsif ($mpi_ver =~ /^mpich2/) {
+        } elsif ($mpi_ver =~ /^mpich2/ || $mpi_ver =~ /^mvapich2/) {
             # Not older mpich2's, which need a daemon.
             push @mpi_precmd, qw/-launcher ssh -launcher-exec/, ssh_program();
         }

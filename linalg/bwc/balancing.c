@@ -119,6 +119,7 @@ void balancing_write(balancing_ptr bal, const char * mfile, const char * suggest
 void balancing_read_header_inner(balancing_ptr bal, FILE * pfile)
 {
     int rc = 0;
+    ASSERT_ALWAYS(pfile);
     ASSERT_ALWAYS(sizeof(struct balancing_header_s) == 32);
     rc += fread32_little(&bal->h->nh, 1, pfile);
     rc += fread32_little(&bal->h->nv, 1, pfile);
