@@ -125,10 +125,12 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
                 how_many);
         allreduce_generic(dp1, pi->m, A->groupsize(A));
         int diff = memcmp(dp0->v, dp1->v, A->vec_elt_stride(A, A->groupsize(A)));
-        printf("Secondary sanity check: %d\n", diff);
-        if (diff) {
-            fprintf(stderr, "aborting on sanity check failure.\n");
-            exit(1);
+        if (pi->m->jrank == 0 && pi->m->trank == 0) {
+            printf("Secondary sanity check: %d\n", diff);
+            if (diff) {
+                fprintf(stderr, "aborting on sanity check failure.\n");
+                exit(1);
+            }
         }
     }
 
