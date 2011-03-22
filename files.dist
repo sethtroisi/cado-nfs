@@ -594,3 +594,4 @@ linalg/bwc/mpfq/abase_vbase.h
 linalg/bwc/mpfq/binary-dotprods-backends.h
 linalg/bwc/mpfq/mpfq.h
 linalg/bwc/mpfq/mpfq_name_ab.h
+linalg/bwc/matmul_facade.c
