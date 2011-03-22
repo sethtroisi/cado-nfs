@@ -327,6 +327,16 @@ int main(int argc, char * argv[])
             struct private_args * p = ba->p + tnum;
             A->vec_random(A, p->src, p->mm->dim[1]);
             A->vec_random(A, p->dst, p->mm->dim[0]);
+            /* If we want shared vectors, this is the way to go. */
+            /* Note that for such a test, the clear_func must be skipped
+             * or improved, since we don't really want to free() the same
+             * pointer twice */
+            /*
+            if (ba->transpose)
+                p->dst = ba->p[0].dst;
+            else
+                p->src = ba->p[0].src;
+                */
         }
         worker_threads_do(ba->tg, (worker_func_t) &check_func, ba);
         fprintf(stderr, "Check %d ok\n", t);
