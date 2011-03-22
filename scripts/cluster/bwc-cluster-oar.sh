@@ -76,7 +76,9 @@ pick_cluster_configuration() {
         # parapluie/12)    mpi=1x12 thr=12x1 bcode=32d5f701;;
         parapluie/6)    mpi=2x3 thr=6x4 bcode=32d5f701;;
         parapluie/8)    mpi=1x8 thr=8x1 bcode=67030201;;
-        graphene/60)    mpi=6x10 thr=2x2 bcode=8e0d9701;;
+        # graphene/60)    mpi=5x12 thr=4x1 bcode=8e0d9701;;       # 0.36
+        graphene/60)    mpi=10x6 thr=2x2 bcode=8e0d9701;;       # 0.34
+        griffon/30)    mpi=5x6 thr=4x2 bcode=8e0d9701;; # 0.81
         *)
             echo "Configuration $cluster/$nnodes not configured" >&2
             exit 1
