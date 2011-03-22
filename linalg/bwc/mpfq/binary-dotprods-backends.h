@@ -43,7 +43,7 @@ static inline void dotprod_64K_64(
         for(unsigned int k = 0 ; k < K ; k++) {
             uint64_t a = *u++;
             for (unsigned int j = 0; j < 64; j += 2) {
-                *sw ^= mb[a & 3];
+                _mm_storeu_si128(sw, _mm_loadu_si128(sw) ^ mb[a & 3]);
                 a >>= 2;
                 sw ++;
             }
@@ -107,9 +107,9 @@ static inline void dotprod_64K_128(
         for(unsigned int k = 0 ; k < K ; k++) {
             uint64_t a = *u++;
             for (unsigned int j = 0; j < 64; j += 2) {
-                *sw ^= mb[a & 3][0];
+                _mm_storeu_si128(sw, _mm_loadu_si128(sw) ^ mb[a & 3][0]);
                 sw ++;
-                *sw ^= mb[a & 3][1];
+                _mm_storeu_si128(sw, _mm_loadu_si128(sw) ^ mb[a & 3][1]);
                 sw ++;
                 a >>= 2;
             }
