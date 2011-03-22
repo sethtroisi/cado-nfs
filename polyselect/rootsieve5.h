@@ -100,9 +100,10 @@ typedef struct node_t {
    it is similar to a stack but different in
    permittable operations. */
 typedef struct listnode_t {
-	 unsigned long u;
-	 unsigned long v;
-	 double val;
+	 unsigned int u;
+	 unsigned int v;
+	 char e;
+	 double val; // don't actually need this. TBD
 	 struct listnode_t *next;
 } listnode;
 
@@ -111,6 +112,7 @@ typedef struct listnode_t {
 typedef struct sublattice_pq_t {
 	 mpz_t *u;
 	 mpz_t *v;
+	 mpz_t *modulus;
 	 int len;
 	 int used;
 } sublattice_pq;
@@ -170,12 +172,15 @@ typedef struct {
 	 mpz_t s2_mod;
 	 long s2_Amax;
 	 long s2_Bmax;
+	 int s2_Vmax;
 
 	 double lognorm_bound;
+
 	 /* flag == 0, only use -w and -l
 	    flag == 1, use stage 1 params
 		flag == 2, use stage 2 params */
 	 char flag;
+
 } _param_t;
 typedef _param_t param_t[1];
 

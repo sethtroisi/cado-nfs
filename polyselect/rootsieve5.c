@@ -133,7 +133,8 @@
 #define TUNE_SIEVEARRAY_SIZE L1_SIZE / 2
 #define TOPALPHA_EACH_SIEVEARRAY 16 // For each "SIEVEARRAY_SIZE", record top 8 poly's alpha avalues.
 #define TOPE_EACH_SUBLATTICE 8 // For sublattice, record top 8 poly's E avalues.
-#define LEN_SUBLATTICE_PRIMES 9
+#define LEN_SUBLATTICE_PRIMES 10
+#define WANT_TUNE 0
 
 /* Define primes, exp_alpha. */
 unsigned int primes[NP] = {
@@ -793,9 +794,10 @@ count_list ( listnode *ptop)
   Create new empty listnode.
 */
 static listnode *
-new_listnode ( unsigned long u,
-			   unsigned long v,
-			   double val )
+new_listnode ( unsigned int u,
+			   unsigned int v,
+			   double val,
+			   char e )
 {
 	 listnode *plistnode = NULL;
 	 plistnode = (listnode *) malloc (sizeof(listnode));
@@ -806,6 +808,7 @@ new_listnode ( unsigned long u,
 	 plistnode->u = u;
 	 plistnode->v = v;
 	 plistnode->val = val;
+	 plistnode->e = e;
 	 plistnode->next = NULL;
 	 return plistnode;
 }
@@ -816,29 +819,30 @@ new_listnode ( unsigned long u,
 */
 static void
 insert_listnode ( listnode **top,
-				  unsigned long u,
-				  unsigned long v,
-				  double val )
+				  unsigned int u,
+				  unsigned int v,
+				  double val,
+				  char e )
 {
 	 listnode *newlistnode;
 
 	 /* if empty, create node */
 	 if ( (*top) == NULL ) {
-		  newlistnode = new_listnode (u, v, val);
+		  newlistnode = new_listnode (u, v, val, e);
 		  (*top) = newlistnode;
 		  (*top)->next = NULL;
 	 }
 	 else {
 		  /* if income has better val, delete and add */
 		  if ( (*top)->val < val) {
-			   newlistnode = new_listnode (u, v, val);
+			   newlistnode = new_listnode (u, v, val, e);
 			   free_list (top);
 			   (*top) = newlistnode;
 			   (*top)->next = NULL;
 		  }
 		  /* if income has equal val, add */
 		  else if ( (*top)->val == val) {
-			   newlistnode = new_listnode (u, v, val);
+			   newlistnode = new_listnode (u, v, val, e);
 			   newlistnode->next = (*top);
 			   (*top) = newlistnode;
 		  }
@@ -891,7 +895,10 @@ new_sublattice_pq ( sublattice_pq **ppqueue,
 
 	 (*ppqueue)->u = (mpz_t *) malloc (len* sizeof (mpz_t));
 	 (*ppqueue)->v = (mpz_t *) malloc (len* sizeof (mpz_t));
-	 if ( (*ppqueue)->u == NULL || (*ppqueue)->v == NULL ) {
+	 (*ppqueue)->modulus = (mpz_t *) malloc (len* sizeof (mpz_t));
+	 if ( (*ppqueue)->u == NULL
+		  || (*ppqueue)->v == NULL
+		  ||  (*ppqueue)->v == NULL ) {
 		  fprintf(stderr,"Error: malloc failed in new_sublattice_pq()\n");
 		  exit(1);
 	 }
@@ -901,10 +908,12 @@ new_sublattice_pq ( sublattice_pq **ppqueue,
 	 {
 		  mpz_init ( (*ppqueue)->u[i] );
 		  mpz_init ( (*ppqueue)->v[i] );
+		  mpz_init ( (*ppqueue)->modulus[i] );
 	 }
 
 	 mpz_set_str ( (*ppqueue)->u[0], "340282366920938463463374607431768211456", 10 ); // 2^128
 	 mpz_set_ui ( (*ppqueue)->v[0], 0 );
+	 mpz_set_ui ( (*ppqueue)->modulus[0], 0 );
 
 	 (*ppqueue)->used = 1UL; // u[0] and v[0] are null elements
 
@@ -922,10 +931,12 @@ free_sublattice_pq ( sublattice_pq **ppqueue )
 	 {
 		  mpz_clear ( (*ppqueue)->u[i] );
 		  mpz_clear ( (*ppqueue)->v[i] );
+		  mpz_clear ( (*ppqueue)->modulus[i] );
 	 }
 
 	 free ( (*ppqueue)->u );
 	 free ( (*ppqueue)->v );
+	 free ( (*ppqueue)->modulus );
 	 free ( *ppqueue );
 }
 
@@ -936,7 +947,8 @@ free_sublattice_pq ( sublattice_pq **ppqueue )
 static inline void
 insert_sublattice_pq_up ( sublattice_pq *pqueue,
 						  mpz_t u,
-						  mpz_t v )
+						  mpz_t v,
+						  mpz_t mod )
 {
 	 int i;
 
@@ -945,10 +957,12 @@ insert_sublattice_pq_up ( sublattice_pq *pqueue,
 
 		  mpz_set ( pqueue->u[i], pqueue->u[pq_parent(i)] );
 		  mpz_set ( pqueue->v[i], pqueue->v[pq_parent(i)] );
+		  mpz_set ( pqueue->modulus[i], pqueue->modulus[pq_parent(i)] );
 	 }
 
 	 mpz_set (pqueue->u[i], u);
 	 mpz_set (pqueue->v[i], v);
+	 mpz_set (pqueue->modulus[i], mod);
 	 pqueue->used ++;
 }
 
@@ -959,7 +973,8 @@ insert_sublattice_pq_up ( sublattice_pq *pqueue,
 static inline void
 insert_sublattice_pq_down ( sublattice_pq *pqueue,
 							mpz_t u,
-							mpz_t v )
+							mpz_t v,
+							mpz_t mod )
 {
 	 int i, l;
 
@@ -976,6 +991,7 @@ insert_sublattice_pq_down ( sublattice_pq *pqueue,
 		  if ( mpz_cmpabs (pqueue->u[l], u) > 0 ) {
 			   mpz_set (pqueue->u[i], pqueue->u[l]);
 			   mpz_set (pqueue->v[i], pqueue->v[l]);
+			   mpz_set (pqueue->modulus[i], pqueue->modulus[l]);
 		  }
 		  else
 			   break;
@@ -983,6 +999,7 @@ insert_sublattice_pq_down ( sublattice_pq *pqueue,
 
 	 mpz_set (pqueue->u[i], u);
 	 mpz_set (pqueue->v[i], v);
+	 mpz_set (pqueue->modulus[i], mod);
 }
 
 
@@ -992,20 +1009,21 @@ insert_sublattice_pq_down ( sublattice_pq *pqueue,
 static void
 insert_sublattice_pq ( sublattice_pq *pqueue,
 					   mpz_t u,
-					   mpz_t v )
+					   mpz_t v,
+					   mpz_t mod )
 {
 	 //gmp_fprintf (stderr, "# Debug: inserting (%Zd, %Zd), used: %d, len: %d\n", u, v, pqueue->used, pqueue->len);
 
 	 /* queue is full,  */
 	 if (pqueue->len == pqueue->used) {
 		  if ( mpz_cmpabs (pqueue->u[1], u) > 0 ) {
-			   insert_sublattice_pq_down (pqueue, u, v);
+			   insert_sublattice_pq_down (pqueue, u, v, mod);
 		  }
 	 }
 
 	 /* queue is not full, sift-up */
 	 else if (pqueue->len > pqueue->used) {
-		  insert_sublattice_pq_up (pqueue, u, v);
+		  insert_sublattice_pq_up (pqueue, u, v, mod);
 	 }
 	 else {
 		  fprintf(stderr,"Error: error (pqueue->len < pqueue->used) in insert_sublattice_pq()\n");
@@ -2613,7 +2631,7 @@ find_sublattice_lift ( node *firstchild,
 		  if (curr_e == e) {
 			   tmpnode = currnode->firstchild;
 			   while (tmpnode != NULL) {
-					insert_listnode (top, tmpnode->u, tmpnode->v, tmpnode->val);
+					insert_listnode (top, tmpnode->u, tmpnode->v, tmpnode->val, e);
 					tmpnode2 = tmpnode;
 					tmpnode = tmpnode->nextsibling;
 
@@ -2704,12 +2722,12 @@ find_sublattice ( listnode **top,
 		  }
 	 }
 
-	 /* If e == 1, add all nodes to list top */
+	 /* If e == 1, stop */
 	 if (e == 1) {
 		  node *tmpnode;
 		  currnode = root->firstchild;
 		  while (currnode != NULL) {
-			   insert_listnode (top, currnode->u, currnode->v, currnode->val);
+			   insert_listnode (top, currnode->u, currnode->v, currnode->val, 1);
 			   tmpnode = currnode;
 			   currnode = currnode->nextsibling;
 			   free_node (&tmpnode);
@@ -2733,7 +2751,7 @@ find_sublattice ( listnode **top,
 			   /* case when (u, v) only has single roots */
 			   if (c == 1) {
 
-					insert_listnode (top, currnode->u, currnode->v, currnode->nr / ( (double) p - 1) );
+					insert_listnode (top, currnode->u, currnode->v, currnode->nr / ( (double) p - 1), 1);
 
 					/* delete this node */
 					tmpnode = currnode;
@@ -2857,12 +2875,12 @@ quick_sort_2d_ld ( long **array,
 */
 static inline void
 return_all_sublattices_crt ( rsparam_t rsparam,
-							 unsigned long *pe,
-							 unsigned long *ind,
-							 unsigned long ***individual_sublattices,
+							 unsigned int *ind,
+							 unsigned int ***individual_sublattices,
 							 sublattice_pq *pqueue )
 {
 	 int i;
+	 unsigned int pe[rsparam->tlen_e_sl], j, e;
 	 mpz_t tmpp1, tmpp2, tmpu1, tmpu2, tmpv, re;
 	 mpz_init (tmpp1);
 	 mpz_init (tmpp2);
@@ -2870,6 +2888,20 @@ return_all_sublattices_crt ( rsparam_t rsparam,
 	 mpz_init (tmpu2);
 	 mpz_init (tmpv);
 	 mpz_init (re);
+
+	 /* compute pe[] */
+	 for (j = 0; j < rsparam->tlen_e_sl; j ++) {
+		  pe[j] = 1;
+		  /* note, the actual e can be different from the rsparam->e_sl[] */
+		  for (e = 0; e < individual_sublattices[j][ind[j]][2]; e ++)
+			   pe[j] *= primes[j];
+	 }
+
+	 /* compute modulus based on pe[], put it temperorily to rsparam->modulus */
+	 mpz_set_ui (rsparam->modulus, 1UL);
+	 for (j = 0; j < rsparam->tlen_e_sl; j ++) {
+		  mpz_mul_ui (rsparam->modulus, rsparam->modulus, pe[j]);
+	 }
 
 	 /* compute u */
 	 mpz_set_ui (tmpu1, individual_sublattices[0][ind[0]][0]);
@@ -2889,37 +2921,39 @@ return_all_sublattices_crt ( rsparam_t rsparam,
 		  mpz_mul_ui (tmpp1, tmpp1, pe[i]);
 		  mpz_set (tmpu1, re);
 	 }
-	 /* < 0 by construction */
+
+	 /* re < 0 by construction */
 	 mpz_sub (re, tmpu1, rsparam->modulus);
 
 	 /* if u is good, compute v */
-/*	 if ( mpz_cmp_ui (tmpu1, rsparam->global_u_bound_rs) <= 0 ||
-	 mpz_cmpabs_ui (re, rsparam->global_u_bound_rs) <= 0 ) {
-*/
-	 /* compute v */
-	 mpz_set_ui (tmpu2, individual_sublattices[0][ind[0]][1]);
-	 mpz_set_ui (tmpp1, pe[0]);
-	 for (i = 1; i < rsparam->tlen_e_sl; i ++) {
+	 if ( mpz_cmp_ui (tmpu1, rsparam->global_u_bound_rs) <= 0 ||
+		  mpz_cmpabs_ui (re, rsparam->global_u_bound_rs) <= 0 ) {
 
-		  mpz_set_ui (tmpv, individual_sublattices[i][ind[i]][1]);
-		  mpz_set_ui (tmpp2, pe[i]);
+		  /* compute v */
+		  mpz_set_ui (tmpu2, individual_sublattices[0][ind[0]][1]);
+		  mpz_set_ui (tmpp1, pe[0]);
+		  for (i = 1; i < rsparam->tlen_e_sl; i ++) {
 
-		  crt_pair_mp ( tmpu2,
-						tmpp1,
-						tmpv,
-						tmpp2,
-						re );
+			   mpz_set_ui (tmpv, individual_sublattices[i][ind[i]][1]);
+			   mpz_set_ui (tmpp2, pe[i]);
 
-		  mpz_mul_ui (tmpp1, tmpp1, pe[i]);
-		  mpz_set (tmpu2, re);
+			   crt_pair_mp ( tmpu2,
+							 tmpp1,
+							 tmpv,
+							 tmpp2,
+							 re );
+
+			   mpz_mul_ui (tmpp1, tmpp1, pe[i]);
+			   mpz_set (tmpu2, re);
+		  }
+
+		  /* (u, v) pair in (tmpu1, tmpu2) */
+		  if (mpz_cmp_ui (tmpu1, rsparam->global_u_bound_rs) > 0)
+			   mpz_sub (tmpu1, tmpu1, rsparam->modulus);
+
+		  /* insert this node */
+		  insert_sublattice_pq ( pqueue, tmpu1, tmpu2, rsparam->modulus );
 	 }
-
-	 /* (u, v) pair in (tmpu1, tmpu2) */
-	 if (mpz_cmp_ui (tmpu1, rsparam->global_u_bound_rs) > 0)
-		  mpz_sub (tmpu1, tmpu1, rsparam->modulus);
-
-	 insert_sublattice_pq ( pqueue, tmpu1, tmpu2 );
-//	 }
 
 	 mpz_clear (tmpp1);
 	 mpz_clear (tmpp2);
@@ -2935,9 +2969,8 @@ return_all_sublattices_crt ( rsparam_t rsparam,
   rsstr_t rs,
   unsigned int p,
   unsigned int e )
-
-
 */
+
 
 /*
   Return all sublattices by calling CRT, where for each sublattice,
@@ -2956,21 +2989,16 @@ return_all_sublattices ( rsstr_t rs,
 		  exit(1);
 	 }
 
-	 unsigned short i, fail = 0;
-	 unsigned long j, *pe, *size, *tsize, *ind, ***individual_sublattices;
+	 unsigned short i, k, tmp_e_sl;
+	 unsigned int j, size[rsparam->tlen_e_sl], tsize[rsparam->tlen_e_sl],
+		  ind[rsparam->tlen_e_sl], ***individual_sublattices;
+	 unsigned long count;
 	 listnode *top, *tmp;
 
 	 /* Sublattice[i][length][] save (u, v) for prime[i] */
-	 individual_sublattices = (unsigned long ***)
-		  malloc ( rsparam->tlen_e_sl * sizeof (unsigned long **) );
-	 size = (unsigned long *) malloc ( rsparam->tlen_e_sl * sizeof (unsigned long));
-	 tsize = (unsigned long *) malloc ( rsparam->tlen_e_sl * sizeof (unsigned long));
-	 ind = (unsigned long *) malloc ( rsparam->tlen_e_sl * sizeof (unsigned long));
-	 pe = (unsigned long *) malloc ( rsparam->tlen_e_sl * sizeof (unsigned long));
-	 mpz_set_ui (rsparam->modulus, 1UL);
-
-	 if ( ( (individual_sublattices) == NULL) || (size == NULL)
-		  || (tsize == NULL) || (ind == NULL) || (pe == NULL) ) {
+	 individual_sublattices = (unsigned int ***)
+		  malloc ( rsparam->tlen_e_sl * sizeof (unsigned int **) );
+	 if ( individual_sublattices == NULL ) {
 		  fprintf (stderr,
 				   "Error, cannot allocate memory in return_all_sublattices(). \n");
 		  exit (1);
@@ -2980,81 +3008,78 @@ return_all_sublattices ( rsstr_t rs,
 		and return (u, v) with best score. */
 	 for (i = 0; i < rsparam->tlen_e_sl; i ++) {
 
-		  pe[i] = 1;
-		  for (j = 0; j < rsparam->e_sl[i]; j ++)
-			   pe[i] *= primes[i];
-
 		  new_list (&top);
-
 		  /* find individual sublattices */
 		  find_sublattice ( &top, rs,
 							primes[i], rsparam->e_sl[i] );
 
 		  tsize[i] = count_list (top);
+
+		  /* If individual list has 0 len, this set of parameters fails. */
 		  if (tsize[i] == 0) {
-			   fail = 1;
-			   break;
+			   for (k = 0; k < rsparam->tlen_e_sl; k ++) {
+					for (j = 0; j < size[i]; j ++) {
+						 if (individual_sublattices[k][j] != NULL)
+							  free (individual_sublattices[k][j]);
+					}
+					if (individual_sublattices[k] != NULL)
+						 free (individual_sublattices[k]);
+			   }
+			   if (individual_sublattices != NULL)
+					free (individual_sublattices);
+			   return 0;
 		  }
 
+		  /* If the list is too long (> ncrts_sl), consider lower the e
+			 in p^e. This seems beneficial since we don't want to throw
+			 away any good sublattices. Might be slower but safer */
+		  tmp_e_sl = rsparam->e_sl[i];
+		  while (tsize[i] > rsparam->ncrts_sl) {
+
+			   free_list (&top);
+			   new_list (&top);
+			   tmp_e_sl --;
+
+			   /* find individual sublattices */
+			   find_sublattice ( &top, rs,
+								 primes[i], tmp_e_sl );
+
+			   tsize[i] = count_list (top);
+		  }
+
+		  /* now, tsize[i] must be <= rsparam->ncrts_sl and >0 */
 		  size[i] = tsize[i];
 
-		  if (rs->d == 6 && rsparam->ncrts_sl > 0) {
-			   if (size[i] > rsparam->ncrts_sl)
-					size[i] = rsparam->ncrts_sl;
-		  }
-
-		  if (verbose)
-			   fprintf ( stderr,
-						 "# Info: p: %2u, p^e: %6lu, list_size: %6lu, size_cutoff: %6lu\n",
-						 primes[i], pe[i], tsize[i], size[i] );
-
 		  /* allocate array for the i-th prime. */
-		  (individual_sublattices)[i] = (unsigned long **)
-			   malloc ( size[i] * sizeof(unsigned long *) );
+		  (individual_sublattices)[i] = (unsigned int **)
+			   malloc ( size[i] * sizeof(unsigned int *) );
 
 		  if ( (individual_sublattices)[i] == NULL ) {
 			   fprintf (stderr, "Error, cannot allocate memory in return_all_sublattices(). \n");
 			   exit (1);
 		  }
 
-		  //sort_list_alpha (&top, rs, tsize[i]); TBA
-
 		  tmp = top;
 		  for (j = 0; j < size[i]; j ++) {
 			   (individual_sublattices)[i][j] =
-					(unsigned long *) malloc ( 2 * sizeof(unsigned long));
+					(unsigned int *) malloc ( 3 * sizeof(unsigned int));
 			   if ( individual_sublattices[i][j] == NULL ) {
 					fprintf (stderr, "Error, cannot allocate memory in return_all_sublattices(). \n");
 					exit (1);
 			   }
 			   individual_sublattices[i][j][0] = tmp->u;
 			   individual_sublattices[i][j][1] = tmp->v;
+			   individual_sublattices[i][j][2] = (unsigned int) tmp->e;
 			   tmp = tmp->next;
 			   //fprintf (stderr, "SUBLATTICE: #%lu, (%lu, %lu)\n", j, individual_sublattices[i][j][0], individual_sublattices[i][j][1]);
 		  }
+
+		  if (verbose == 2)
+			   fprintf ( stderr,
+						 "# Info: p: %2u, max_e: %2u (old_e: %2u), list_size: %6u, size_cutoff: %6u\n",
+						 primes[i], tmp_e_sl, rsparam->e_sl[i], tsize[i], size[i] );
+
 		  free_list (&top);
-	 }
-
-	 /* If individual list has 0 len, this set of parameters fails */
-	 if (fail == 1) {
-		  for (i = 0; i < rsparam->tlen_e_sl; i ++) {
-			   for (j = 0; j < size[i]; j ++) {
-					free (individual_sublattices[i][j]);
-			   }
-			   free (individual_sublattices[i]);
-		  }
-		  free (individual_sublattices);
-		  free (size);
-		  free (ind);
-		  free (pe);
-		  return 0;
-	 }
-
-	 /* Compute rsparam->modulus */
-	 j = 1;
-	 for (i = 0; i < rsparam->tlen_e_sl; i ++) {
-		  mpz_mul_ui (rsparam->modulus, rsparam->modulus, pe[i]);
-		  j *= size[i];
 	 }
 
 	 /* Loop over combinations of all arrays. This is awkward.
@@ -3068,7 +3093,6 @@ return_all_sublattices ( rsstr_t rs,
 					for (ind[2] = 0; ind[2] < size[2]; ind[2] ++)
 						 for (ind[3] = 0; ind[3] < size[3]; ind[3] ++)
 							  return_all_sublattices_crt ( rsparam,
-														   pe,
 														   ind,
 														   individual_sublattices,
 														   pqueue );
@@ -3081,7 +3105,6 @@ return_all_sublattices ( rsstr_t rs,
 	 					 for (ind[3] = 0; ind[3] < size[3]; ind[3] ++)
 	 						  for (ind[4] = 0; ind[4] < size[4]; ind[4] ++)
 								   return_all_sublattices_crt ( rsparam,
-																pe,
 																ind,
 																individual_sublattices,
 																pqueue );
@@ -3095,7 +3118,6 @@ return_all_sublattices ( rsstr_t rs,
 	 						  for (ind[4] = 0; ind[4] < size[4]; ind[4] ++)
 	 							   for (ind[5] = 0; ind[5] < size[5]; ind[5] ++)
 										return_all_sublattices_crt ( rsparam,
-																	 pe,
 																	 ind,
 																	 individual_sublattices,
 																	 pqueue );
@@ -3110,7 +3132,6 @@ return_all_sublattices ( rsstr_t rs,
 	 							   for (ind[5] = 0; ind[5] < size[5]; ind[5] ++)
 	 									for (ind[6] = 0; ind[6] < size[6]; ind[6] ++)
 											 return_all_sublattices_crt ( rsparam,
-																		  pe,
 																		  ind,
 																		  individual_sublattices,
 																		  pqueue );
@@ -3126,7 +3147,6 @@ return_all_sublattices ( rsstr_t rs,
 	 									for (ind[6] = 0; ind[6] < size[6]; ind[6] ++)
 	 										 for (ind[7] = 0; ind[7] < size[7]; ind[7] ++)
 												  return_all_sublattices_crt ( rsparam,
-																			   pe,
 																			   ind,
 																			   individual_sublattices,
 																			   pqueue );
@@ -3143,10 +3163,26 @@ return_all_sublattices ( rsstr_t rs,
 	 										 for (ind[7] = 0; ind[7] < size[7]; ind[7] ++)
 												  for (ind[8] = 0; ind[8] < size[8]; ind[8] ++)
 													   return_all_sublattices_crt ( rsparam,
-																					pe,
 																					ind,
 																					individual_sublattices,
 																					pqueue );
+	 }
+	 /* 2, 3, 5, 7, 11, 13, 17, 19, 23, 29 */
+	 else if (rsparam->tlen_e_sl == 10) {
+	 	  for (ind[0] = 0; ind[0] < size[0]; ind[0] ++)
+	 		   for (ind[1] = 0; ind[1] < size[1]; ind[1] ++)
+	 				for (ind[2] = 0; ind[2] < size[2]; ind[2] ++)
+	 					 for (ind[3] = 0; ind[3] < size[3]; ind[3] ++)
+	 						  for (ind[4] = 0; ind[4] < size[4]; ind[4] ++)
+	 							   for (ind[5] = 0; ind[5] < size[5]; ind[5] ++)
+	 									for (ind[6] = 0; ind[6] < size[6]; ind[6] ++)
+	 										 for (ind[7] = 0; ind[7] < size[7]; ind[7] ++)
+												  for (ind[8] = 0; ind[8] < size[8]; ind[8] ++)
+													   for (ind[9] = 0; ind[9] < size[9]; ind[9] ++)
+															return_all_sublattices_crt ( rsparam,
+																						 ind,
+																						 individual_sublattices,
+																						 pqueue );
 	 }
 	 /* 2, 3, 5 */
 	 else if (rsparam->tlen_e_sl == 3) {
@@ -3154,7 +3190,6 @@ return_all_sublattices ( rsstr_t rs,
 	 		   for (ind[1] = 0; ind[1] < size[1]; ind[1] ++)
 	 				for (ind[2] = 0; ind[2] < size[2]; ind[2] ++)
 						 return_all_sublattices_crt ( rsparam,
-													  pe,
 													  ind,
 													  individual_sublattices,
 													  pqueue );
@@ -3164,20 +3199,26 @@ return_all_sublattices ( rsstr_t rs,
 	 	  for (ind[0] = 0; ind[0] < size[0]; ind[0] ++)
 	 		   for (ind[1] = 0; ind[1] < size[1]; ind[1] ++)
 					return_all_sublattices_crt ( rsparam,
-												 pe,
 												 ind,
 												 individual_sublattices,
 												 pqueue );
 	 }
 	 /* too aggressive */
 	 else {
-		  fprintf (stderr, "Error, only len_e_sl: 2, 3, 4, 5, 6, 7, 8 is supported at the moment. \n");
+		  fprintf (stderr, "Error, number of primes in \"-e\" (len_e_sl) should be between 2 to 10\n");
 		  exit (1);
 	 }
 
+
 	 /* info */
-	 if (verbose)
-		  fprintf (stderr, "# Info: computed %lu CRTs\n", j);
+	 if (verbose == 2) {
+		  /* Compute rsparam->modulus */
+		  count = 1;
+		  for (i = 0; i < rsparam->tlen_e_sl; i ++) {
+		  	  count *= size[i];
+		  }
+		  fprintf (stderr, "# Info: computed %lu CRTs\n", count);
+	 }
 
 	 /* clearence */
 	 for (i = 0; i < rsparam->tlen_e_sl; i ++) {
@@ -3187,10 +3228,6 @@ return_all_sublattices ( rsstr_t rs,
 		  free (individual_sublattices[i]);
 	 }
 	 free (individual_sublattices);
-	 free (size);
-	 free (tsize);
-	 free (ind);
-	 free (pe);
 
 	 return 1;
 }
@@ -3237,7 +3274,7 @@ return_best_sublattice ( rsstr_t rs,
 
 		  if (rsparam->global_u_bound_rs < LONG_MAX) {
 			   rsparam->global_u_bound_rs *= 2;
-			   if (verbose) {
+			   if (verbose == 2) {
 					fprintf ( stderr,
 							  "# Warn: Not enough sublattice classes. Reset \"rsparam->global_u_bound_rs = %lu\" (#%d)\n",
 							  rsparam->global_u_bound_rs, count );
@@ -3254,7 +3291,7 @@ return_best_sublattice ( rsstr_t rs,
 	 }
 
 	 /* info */
-	 if (verbose) {
+	 if (verbose == 2) {
 		  fprintf ( stderr,
 					"# Info: found %d sublattices with small u, where |u| < %lu (\"rsparam->global_u_bound_rs\")\n",
 					pqueue->used - 1, rsparam->global_u_bound_rs);
@@ -3921,7 +3958,7 @@ rsbound_setup_AB_bound ( rsbound_t rsbound,
 						 mpz_t mod,
 						 int verbose )
 {
-	 /* verbosee == 1 means "tune mode";
+	 /* verbose == 1 means "tune mode";
 		verbose == 0 means "polyselect2 mode"; */
 	 if (verbose == 2) {
 
@@ -3946,16 +3983,40 @@ rsbound_setup_AB_bound ( rsbound_t rsbound,
 	 else if (verbose == 0) {
 		  rsbound->Amax = 0;
 		  unsigned long len;
-		  mpz_t q;
+		  mpz_t v, q;
 		  mpz_init (q);
+		  mpz_init (v);
+		  /* when from polyselect2, need to pass max_k to global_v_bound_rs. */
+		  if (param->s2_Vmax > 0) {
+			   mpz_ui_pow_ui (v, 2UL, (unsigned long) param->s2_Vmax);
+			   mpz_set (rsparam->global_v_bound_rs, v);
+			   // gmp_fprintf (stderr, "NOTE: reset boundv to rsparam->global_v_bound_rs: %Zd\n", rsparam->global_v_bound_rs);
+		  }
 		  mpz_fdiv_q (q, rsparam->global_v_bound_rs, mod);
 		  len =  mpz_get_ui (q);
 		  rsbound->Bmax = ( (len > MAX_SIEVEARRAY_SIZE) ? MAX_SIEVEARRAY_SIZE : (long) len);
 		  mpz_clear (q);
+		  mpz_clear (v);
 	 }
+	 /* Tune mode. For speed purpose, choose smaller sieving range (compared to TUNE_SIEVEARRAY_SIZE). */
 	 else {
 		  rsbound->Amax = 0;
-		  rsbound->Bmax = TUNE_SIEVEARRAY_SIZE;
+
+		  unsigned long len;
+		  mpz_t q, v;
+		  mpz_init (q);
+		  mpz_init (v);
+		  /* when from polyselect2, need to pass max_k to global_v_bound_rs. */
+		  if (param->s2_Vmax > 0) {
+			   mpz_ui_pow_ui (v, 2UL, (unsigned long) param->s2_Vmax);
+			   mpz_set (rsparam->global_v_bound_rs, v);
+			   // gmp_fprintf (stderr, "NOTE: reset boundv to rsparam->global_v_bound_rs: %Zd\n", rsparam->global_v_bound_rs);
+		  }
+		  mpz_fdiv_q (q, rsparam->global_v_bound_rs, mod);
+		  len =  mpz_get_ui (q);
+		  rsbound->Bmax = ( (len > TUNE_SIEVEARRAY_SIZE) ? TUNE_SIEVEARRAY_SIZE : (long) len);
+		  mpz_clear (q);
+		  mpz_clear (v);
 	 }
 
 	 rsbound->Bmin = -rsbound->Bmax;
@@ -4577,13 +4638,9 @@ rsparam_setup ( rsparam_t rsparam,
 	 }
 
 	 /* "rsparam->nbest_sl" and "rsparam->ncrts_sl" */
-	 if (rs->d == 6) {
-		  rsparam->nbest_sl = 128;
-		  rsparam->ncrts_sl = 64; // for deg 6, there could be too much individual sublattices to do crts. We restrict the num.
-	 }
-	 else {
-		  rsparam->nbest_sl = 128;
-	 }
+	 /* there could be too much individual sublattices to do crts. We restrict the num.*/
+	 rsparam->nbest_sl = 128;
+	 rsparam->ncrts_sl = 64;
 
 	 /* "rsparam->len_e_sl" and "rsparam->e_sl" */
 	 rsparam->len_e_sl = LEN_SUBLATTICE_PRIMES;
@@ -4630,11 +4687,44 @@ rsparam_setup ( rsparam_t rsparam,
 		  rsparam->e_sl[2] = 0;
 		  rsparam->e_sl[3] = 0;
 	 }
-	 else {
+	 else if (rsparam->global_u_bound_rs <= 8192) {
 		  rsparam->e_sl[0] = 4;
 		  rsparam->e_sl[1] = 2;
 		  rsparam->e_sl[2] = 1;
 		  rsparam->e_sl[3] = 0;
+	 }
+	 else if (rsparam->global_u_bound_rs <= 16384) {
+		  rsparam->e_sl[0] = 5;
+		  rsparam->e_sl[1] = 2;
+		  rsparam->e_sl[2] = 1;
+		  rsparam->e_sl[3] = 0;
+	 }
+	 else if (rsparam->global_u_bound_rs <= 32768) {
+		  rsparam->e_sl[0] = 6;
+		  rsparam->e_sl[1] = 2;
+		  rsparam->e_sl[2] = 1;
+		  rsparam->e_sl[3] = 0;
+	 }
+	 else if (rsparam->global_u_bound_rs <= 327680) {
+		  rsparam->e_sl[0] = 6;
+		  rsparam->e_sl[1] = 3;
+		  rsparam->e_sl[2] = 1;
+		  rsparam->e_sl[3] = 0;
+		  rsparam->e_sl[4] = 0;
+	 }
+	 else if (rsparam->global_u_bound_rs <= 3276800) {
+		  rsparam->e_sl[0] = 6;
+		  rsparam->e_sl[1] = 3;
+		  rsparam->e_sl[2] = 2;
+		  rsparam->e_sl[3] = 0;
+		  rsparam->e_sl[4] = 0;
+	 }
+	 else {
+		  rsparam->e_sl[0] = 6;
+		  rsparam->e_sl[1] = 3;
+		  rsparam->e_sl[2] = 2;
+		  rsparam->e_sl[3] = 2;
+		  rsparam->e_sl[4] = 1;
 	 }
 }
 
@@ -4726,6 +4816,7 @@ param_init ( param_t param )
 	 param->s1_num_e_sl = 0;
 	 param->s2_Amax = 0;
 	 param->s2_Bmax = 0;
+	 param->s2_Vmax = 0;
 	 param->s2_w = 0;
 	 param->lognorm_bound = 0;
 	 param->s1_e_sl = (unsigned short*)
@@ -5063,8 +5154,8 @@ rootsieve_main_stage1 ( rsstr_t rs,
 	 }
 
 	 if (verbose == 2)
-		  gmp_fprintf ( stderr, "# Info: find best sublattices over (Mod %Zd) took %dms\n",
-						rsparam->modulus, cputime () - st );
+		  gmp_fprintf ( stderr, "# Info: find best sublattices took %dms\n",
+						cputime () - st );
 
 	 /* filter all sublattices into another, global queue ranked by the
 		sublattice alphas. */
@@ -5090,7 +5181,7 @@ rootsieve_main_stage1 ( rsstr_t rs,
 								w,
 								pqueue->u[i],
 								pqueue->v[i],
-								rsparam->modulus,
+								pqueue->modulus[i],
 								alpha_lat );
 	 }
 
@@ -5105,6 +5196,7 @@ rootsieve_main_stage1 ( rsstr_t rs,
 }
 
 
+#if WANT_TUNE
 /*
   auxiliary for tune
 */
@@ -5347,6 +5439,7 @@ rsparam_tune ( rsstr_t rs,
 	 return best_MurphyE;
 }
 
+#endif
 
 /* Record best poly */
 static void
@@ -5446,15 +5539,14 @@ rootsieve_main_run ( rsstr_t rs,
 		  rsstr_setup (rs);
 
 		  /* either use input e_sl[] or tune only once */
+		  rsparam_reset_bounds (rs, rsparam, verbose);
+
+#if WANT_TUNE
 		  if (re == 0) {
-			   if (param->flag == 1) {
-					rsparam_reset_bounds (rs, rsparam, verbose);
-			   }
-			   else {
-					rsparam_reset_bounds (rs, rsparam, verbose);
-					rsparam_tune (rs, rsparam, param, 10, i, verbose);
-			   }
+			   /* do we really want to tune? slow */
+			   rsparam_tune (rs, rsparam, param, 6, i, verbose);
 		  }
+#endif
 
 		  re ++;
 		  k = rootsieve_main_stage1 ( rs,
@@ -5741,6 +5833,7 @@ rootsieve_polyselect ( mpz_t *f,
 					   mpz_t m,
 					   mpz_t l,
 					   mpz_t N,
+					   int max_k,
 					   int verbose )
 {
 	 /* rootsieve_struct */
@@ -5775,6 +5868,9 @@ rootsieve_polyselect ( mpz_t *f,
 
 	 /* auto-mode */
 	 param->flag = 0;
+	 /* upper bound for sieve */
+	 param->s2_Vmax = max_k;
+
 	 /* start main rootsieve function */
 	 rootsieve_main (rs, bestpoly, param, verbose);
 
