@@ -1594,6 +1594,9 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
             mmt->wr[1]->i1 - mmt->wr[1]->i0,
             mmt->locfile, impl, pl, optimized_direction); 
 
+    mmt->mm->nslices[1] = mmt->bal->h->nh;
+    mmt->mm->nslices[0] = mmt->bal->h->nv;
+
     // *IF* we need to do a collective read of the matrix, we need to
     // provide the pointer *now*.
     unsigned int sqread = 0;

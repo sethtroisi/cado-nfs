@@ -1,4 +1,11 @@
+#ifndef POLY_H_
+#define POLY_H_
+
 #include <gmp.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* FIXME [ET]: Someday, this should me moved to utils/ ; other polynomial
  * libraries are there (admittedly different, since geared towards tiny
@@ -89,3 +96,8 @@ void poly_base_modp_clear (poly_t *P);
 void poly_base_modp_lift (poly_t a, poly_t *P, int k, mpz_t pk);
 size_t poly_sizeinbase (poly_t f, int d, int base);
 
+#ifdef __cplusplus
+}
+#endif
+
+#endif	/* POLY_H_ */

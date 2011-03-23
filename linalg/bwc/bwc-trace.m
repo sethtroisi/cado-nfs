@@ -11,6 +11,9 @@ nc:=nr;
 x:=Matrix(GF(2),nr,nc,[]);InsertBlock(~x,M,1,1);M:=x;
 load "/tmp/bwc/placemats.m";
 
+load "/tmp/bwc/rw.m"; rw:=var;
+load "/tmp/bwc/cw.m"; cw:=var;
+
 load "/tmp/bwc/b.m"; 
 
 //L:=[]; for i in [0..nh-1] do
@@ -36,49 +39,69 @@ assert IsOne(Transpose(Cc)*Cc);
 ncx := nv*ncp;
 nrx := nh*nrp;
 
-sc_inv:=SymmetricGroup(nv*ncp)!var;
-sr_inv:=SymmetricGroup(nh*nrp)!var;
-sr:=sr_inv^-1;
-sc:=sc_inv^-1;
-Sr:=PermutationMatrix(GF(2),sr_inv)/*^-1*/;     // magma thinks backwards
-Sc:=PermutationMatrix(GF(2),sc_inv)/*^-1*/;     // magma thinks backwards
-
-Mx:=Cr*M*Transpose(Cc);
-
-Mx[2] eq (Sr*Mx)[Eltseq(sr)[2]];
-Transpose(Mx)[2] eq (Sc*Transpose(Mx))[Eltseq(sc)[2]];
-
 nz:=nrp div nv;
 assert nz eq ncp div nh;
 pr:=func<x|(qr*nh+qq)*nz+r+1 where qq,qr is Quotrem(q, nv) where q,r is Quotrem(x-1,nz)>;
 prinv:=func<x|(qr*nv+qq)*nz+r+1 where qq,qr is Quotrem(q, nh) where q,r is Quotrem(x-1,nz)>;
+prp:=SymmetricGroup(nrx)![pr(x):x in [1..nrx]];
 Pr:=PermutationMatrix(GF(2),[pr(x):x in [1..nrx]]);
+assert Pr eq PermutationMatrix(GF(2),prp);
 
+
+
+sc:=SymmetricGroup(nv*ncp)!colperm;
+if assigned rowperm then
+    sr:=SymmetricGroup(nh*nrp)!rowperm;
+else
+    sr:=SymmetricGroup(nh*nrp)!colperm;
+end if;
+sr_inv:=sr^-1;
+sc_inv:=sc^-1;
+Sr:=PermutationMatrix(GF(2),sr);
+Sc:=PermutationMatrix(GF(2),sc);
+if assigned rowperm then
+    Sr:=Pr^-1*Sr;
+    sr:=prp^-1*sr;
+end if;
+
+Mx:=Cr*M*Transpose(Cc);
+
+Mx[2] eq (Sr*Mx)[2^(sr^-1)];
+Transpose(Mx)[2] eq (Sc*Transpose(Mx))[2^(sc^-1)];
 
 S:=Sr;
 P:=Pr;
 
+// de-correlation permutation:
+q:=SymmetricGroup(ncx)![preshuf(x):x in [1..ncx]];
+Q:=PermutationMatrix(GF(2),q);
+q0:=SymmetricGroup(nc)![preshuf(x):x in [1..nc]];
+Q0:=PermutationMatrix(GF(2),q0);
+Transpose(Pr*Sr)*Mt*Sc eq Mx*Q;
 // t means twisted.
 
 /* Note that Mt being equal to Pr times Sr*Cr*M*Transpose(Cc)*Sc^-1 is a
  * direct consequence of the fact that balancing_workhorse.c permutes the
  * rows which are being sent.
  */
-if Mt eq P*S*Mx*S^-1 then
+if Mt eq P*S*Mx*Q*S^-1 then
     print "Shuffled product detected";
-elif  Mt eq S*Mx*S^-1 then
+elif  Mt eq S*Mx*Q*S^-1 then
     print "non-shuffled product detected";
     Pr:=Identity(Parent(Pr));
+else
+    assert false;
 end if;
-assert Transpose(Pr*Sr)*Mt*Sc eq Mx;
-assert Mt eq Pr*Sr*Mx*Sc^-1;
+assert Transpose(Pr*Sr)*Mt*Sc eq Mx*Q;
+assert Mt eq Pr*Sr*Mx*Q*Sc^-1;
+
 
 colweights:=func<M|[#[i:i in [1..Nrows(M)]|M[i,j] ne 0]: j in [1..Ncols(M)]]>;
 rowweights:=func<M|[#[j:j in [1..Ncols(M)]|M[i,j] ne 0]: i in [1..Nrows(M)]]>;
 // colsums:=func<M|[&+[Integers()!M[i,j]:i in [1..Nrows(M)]]: j in [1..Ncols(M)]]>;
 // rowsums:=func<M|[&+[Integers()!M[i,j]:j in [1..Ncols(M)]]: i in [1..Nrows(M)]]>;
 
-assert colweights(Mt*Sc*Cc) eq colweights(M);
+assert colweights(Mt*Sc) eq colweights(Mx*Q);
 assert rowweights(Transpose(Pr*Sr*Cr)*Mt) eq rowweights(M);
 
 
@@ -130,7 +153,7 @@ var:=[(p div j+q*j) mod 2^64:j in [1..nc]]
     where p is PreviousPrime(2^64)
     where q is PreviousPrime(2^63);
 H0:=vblock(nc, var, 64);
-assert M*H0 eq H1;
+assert M*Q0*H0 eq H1;
 
 v0z:=[Seqint(ChangeUniverse((Eltseq(V0[i])),Integers()),2):i in [1..nr]];
 
@@ -154,8 +177,7 @@ rowweights(Matrix(Z,Pr*Transpose(Mt)*V0)) eq rowweights(Matrix(Z,V1));;
 
 TMt:=xtr(Pr^-1)*xtr(Mt);
 
-TMx:=xtr(Mx);
-TM:=xtr(M);
+TM:=xtr(M*Q0);
 
 // equivalent to TMt:=Transpose(Mt*Pr^-1) for nullspace=left
 // For nullspace=left:
@@ -178,7 +200,7 @@ conj_if_left:=func<x|xtr(xtr(x)*Pr^-1)*xtr(Pr)>;
 
 // it's normal if one of the two is false. It would help chasing bugs, in
 // fact !
-TMt eq conj_if_left(Sc*Cc*xtr(M)*Transpose(Cr)*Sr^-1);
+TMt eq conj_if_left(Sc*Cc*TM*Transpose(Cr)*Sr^-1);
 
 // Mtt eq Pr*Sc*Cr*M*Transpose(Cc)*Sr^-1*Pr^-1;
 

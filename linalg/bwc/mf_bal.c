@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <inttypes.h>
+#include <float.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <time.h>
@@ -123,7 +124,6 @@ struct slice * shuffle_rtable(
         unsigned int ns)
 {
     uint32_t i;
-    uint32_t ni;
     struct bucket * heap;
     struct slice * slices;
     clock_t t;
@@ -151,44 +151,15 @@ struct slice * shuffle_rtable(
      * Eventually, we have constructed the set of rows going in the
      * bucket into slices[0]...slices[nslices-1]
      */
-    for(i = 0 ; i < n ; i = ni) {
-        int chunk;
-        /* If it turns out that we have a great many rows of the same
-         * weight (this sort of thing happens), then we'll dispatch them
-         * in large chunks and not in a completely alternating way */
-        for(ni = i + 1 ; ni < n && rt[2*i] == rt[2*ni] ; ni++);
-        chunk = (ni-i) / ns;
-        if (chunk) {
-            int oversize=0;
-            unsigned int k;
-            for(k = 0 ; k < ns ; k++) {
-                int l;
-                for(l = 0 ; l < chunk && heap[k].room ; l++) {
-                    int j = heap[k].i;
-                    int pos = slices[j].nrows-heap[k].room;
-                    slices[j].r[pos]=rt[2*i+1];
-                    heap[k].s += rt[2*i];
-                    heap[k].room--;
-                    i++;
-                }
-                /* If one bucket becomes full, then this will change the
-                 * comparison order inevitably */
-                if (heap[k].room == 0)
-                    oversize=1;
-            }
-            if (oversize)
-                make_heap(heap, heap + ns);
-        }
-        for( ; i < ni ; i++) {
-            int j = heap[0].i;
-            int pos = slices[j].nrows-heap[0].room;
-            assert(heap[0].room);
-            slices[j].r[pos] = rt[2*i+1];
-            heap[0].s += rt[2*i];
-            heap[0].room--;
-            pop_heap(heap, heap + ns);
-            push_heap(heap, heap + ns);
-        }
+    for(i = 0 ; i < n ; i++) {
+        int j = heap[0].i;
+        int pos = slices[j].nrows-heap[0].room;
+        assert(heap[0].room);
+        slices[j].r[pos] = rt[2*i+1];
+        heap[0].s += rt[2*i];
+        heap[0].room--;
+        pop_heap(heap, heap + ns);
+        push_heap(heap, heap + ns);
     }
 
     t += clock();
@@ -259,10 +230,12 @@ int main(int argc, char * argv[])
     int colperm = 0;
     int shuffled_product = 0;
     // const char * ref_balance = NULL;
+    int display_correlation = 0;
 
     param_list_init(pl);
     argv++,argc--;
     param_list_configure_knob(pl, "--quiet", &quiet);
+    param_list_configure_knob(pl, "--display-correlation", &display_correlation);
     // param_list_configure_knob(pl, "--ascii-in", &ascii_in);
     // param_list_configure_knob(pl, "--binary-in", &binary_in);
     // param_list_configure_knob(pl, "--ascii-out", &ascii_out);
@@ -420,28 +393,72 @@ int main(int argc, char * argv[])
      */
 
     /* read column data */
-    FILE * fcw = fopen(cwfile, "r");
-    if (fcw == NULL) { perror(cwfile); exit(1); }
-
-    bal->colperm = malloc((maxdim + padding) * sizeof(uint32_t) * 2);
-    memset(bal->colperm + 2 * maxdim, 0, padding * sizeof(uint32_t) * 2);
-    double t_cw;
-    t_cw = -wct_seconds();
-    size_t nc = fread32_little(bal->colperm, bal->h->ncols, fcw);
-    if (nc < bal->h->ncols) {
-        fprintf(stderr, "%s: short column count\n", cwfile);
-        exit(1);
+    uint32_t * colweights;
+    {
+        size_t n = maxdim + padding;
+        bal->colperm = malloc(2 * n * sizeof(uint32_t));
+        FILE * fcw = fopen(cwfile, "r");
+        if (fcw == NULL) { perror(cwfile); exit(1); }
+        colweights = malloc(n * sizeof(uint32_t));
+        memset(colweights, 0, n * sizeof(uint32_t));
+        /* Padding cols have zero weight of course */
+        double t_cw;
+        t_cw = -wct_seconds();
+        size_t nr = fread32_little(colweights, bal->h->ncols, fcw);
+        t_cw += wct_seconds();
+        fclose(fcw);
+        if (nr < bal->h->ncols) {
+            fprintf(stderr, "%s: short col count\n", cwfile);
+            exit(1);
+        }
+        fprintf(stderr, "read %s in %.1f s (%.1f MB / s)\n", cwfile, t_cw,
+                1.0e-6 * sbuf_cw->st_size / t_cw);
     }
-    t_cw += wct_seconds();
-    fprintf(stderr, "read %s in %.1f s (%.1f MB / s)\n", cwfile, t_cw,
-            1.0e-6 * sbuf_cw->st_size / t_cw);
+
+    /* Compute the de-correlating permutation */
+    {
+        modulusul_t M;
+        modul_initmod_ul(M, bal->h->ncols);
+        residueul_t a,b;
+        residueul_t ai,bi;
+        modul_init(a, M);
+        modul_init(b, M);
+        modul_init(ai, M);
+        modul_init(bi, M);
+        modul_set_ul(a, (unsigned long) sqrt(bal->h->ncols), M);
+        modul_set_ul(b, 42, M);
+
+        for( ; modul_inv(ai, a, M) == 0 ; modul_add_ul(a,a,1,M)) ;
+        modul_mul(bi, ai, b, M);
+        modul_neg(bi, bi, M);
+
+        bal->h->pshuf[0] = modul_get_ul(a, M);
+        bal->h->pshuf[1] = modul_get_ul(b, M);
+        bal->h->pshuf_inv[0] = modul_get_ul(ai, M);
+        bal->h->pshuf_inv[1] = modul_get_ul(bi, M);
+
+        modul_clear(a, M);
+        modul_clear(b, M);
+        modul_clear(ai, M);
+        modul_clear(bi, M);
+        modul_clearmod(M);
+    }
 
     /* prepare for qsort */
-    t_cw = -wct_seconds();
+    double t_cw = -wct_seconds();
     double s1 = 0, s2 = 0;
     uint64_t tw = 0;
-    for(size_t r = bal->h->ncols ; r-- ; ) {
-        uint32_t w = bal->colperm[r];
+    for(size_t r = 0 ; r < maxdim + padding ; r++) {
+        /* Column r in the matrix we work with is actually column rx in
+         * the original matrix ! */
+        size_t rx = r;
+        if (r < bal->h->ncols) {
+            rx = balancing_pre_unshuffle(bal, r);
+            ASSERT(balancing_pre_shuffle(bal, rx) == r);
+            ASSERT(rx < bal->h->ncols);
+        }
+        uint32_t w = colweights[rx];
+        colweights[rx] = UINT32_MAX;
         tw += w;
         double x = w;
         bal->colperm[2*r]=w;
@@ -449,6 +466,7 @@ int main(int argc, char * argv[])
         s1 += x;
         s2 += x * x;
     }
+    free(colweights);
     double avg = s1 / bal->h->ncols;
     double sdev = sqrt(s2 / bal->h->ncols - avg*avg);
     t_cw += wct_seconds();
@@ -468,11 +486,41 @@ int main(int argc, char * argv[])
     fprintf(stderr, "%"PRIu32" cols ; avg %.1f sdev %.1f [scan time %.1f s]\n",
             bal->h->ncols, avg, sdev, t_cw);
 
-    /* Unless we're doing 2d balancing, we need to fill with zero columns
-     */
-    for(uint32_t r = bal->h->ncols ; r < maxdim + padding ; r++) {
-        bal->colperm[2*r]=0;
-        bal->colperm[2*r+1]=r;
+    if (display_correlation) {
+        size_t n = maxdim + padding;
+        FILE * frw = fopen(rwfile, "r");
+        if (frw == NULL) { perror(rwfile); exit(1); }
+        uint32_t * rowweights = malloc(n * sizeof(uint32_t));
+        memset(rowweights, 0, n * sizeof(uint32_t));
+        double t_rw;
+        t_rw = -wct_seconds();
+        size_t nr = fread32_little(rowweights, bal->h->nrows, frw);
+        t_rw += wct_seconds();
+        fclose(frw);
+        if (nr < bal->h->nrows) {
+            fprintf(stderr, "%s: short row count\n", rwfile);
+            exit(1);
+        }
+        double rs1 = 0;
+        double rs2 = 0;
+        double rc = 0;
+        for(size_t r = 0 ; r < n ; r++) {
+            double x = rowweights[r];
+            rs1 += x;
+            rs2 += x * x;
+            rc += x * bal->colperm[2*r];
+        }
+        double ravg = rs1 / n;
+        double rsdev = sqrt(rs2 / n - ravg*ravg);
+        double cavg = s1 / n;
+        double csdev = sqrt(s2 / n - cavg*cavg);
+        double cov = rc / n - ravg * cavg;
+        double corr = cov / csdev / rsdev;
+
+        fprintf(stderr, "%"PRIu32" rows ; avg %.1f sdev %.1f [scan time %.1f s]\n",
+                bal->h->nrows, ravg, rsdev, t_rw);
+        fprintf(stderr, "row-column correlation coefficient is %.4f\n",
+                corr);
     }
 
     struct slice * h = shuffle_rtable("col", bal->colperm, maxdim + padding, bal->h->nv);
@@ -484,8 +532,12 @@ int main(int argc, char * argv[])
         memcpy(bal->colperm + r->i0, r->r, r->nrows * sizeof(uint32_t));
     }
     free_slices(h, bal->h->nv);
-    bal->h->flags = FLAG_REPLICATE|FLAG_PADDING|FLAG_COLPERM;
+
+    bal->h->flags = FLAG_PADDING|FLAG_COLPERM;
     if (shuffled_product) bal->h->flags |= FLAG_SHUFFLED_MUL;
+
+    bal->h->flags |= FLAG_REPLICATE;
+
     balancing_finalize(bal);
 
     balancing_write(bal, mfile, param_list_lookup_string(pl, "out"));

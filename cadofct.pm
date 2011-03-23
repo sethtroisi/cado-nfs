@@ -217,7 +217,11 @@ my @default_param = (
     bwc_interval => 1000,
     bwc_mm_impl => 'bucket',
     bwc_interleaving => 0,
-    bwc_shuffled_product => 0,
+    # shuffled product is expected to be better in most cases, at least
+    # when we use MPI. Since it is the preferred communication algorithm
+    # for large runs, we prefer to force its use also for mid-range
+    # examples.
+    bwc_shuffled_product => 1,
 
     # characters
     nkermax      => 30,

@@ -1268,6 +1268,9 @@ int master_dispatcher_put(master_dispatcher_ptr d, uint32_t * p, size_t n)
     for (size_t s = 0; s < n; s++) {
         if (d->crow_togo == 0) {
             d->crow_togo = p[s];
+            /* We are processing row r of the input matrix. As per the
+             * shuffling of the input matrix, this is mapped to some
+             * other row index. */
             ASSERT_ALWAYS(r < m->bal->trows);
             uint32_t rr = m->fw_rowperm[r];
             ASSERT_ALWAYS(rr < m->bal->trows);
@@ -1282,10 +1285,8 @@ int master_dispatcher_put(master_dispatcher_ptr d, uint32_t * p, size_t n)
                 m->sent_rows[d->noderow + i]++;
                 if(m->sent_rows[d->noderow + i] >
                         m->exp_rows[d->noderow + i]) {
-                    fprintf(stderr,
-                            "d->noderow = %d\n", d->noderow);
-                    fprintf(stderr,
-                            "i=%d\n", i);
+                    fprintf(stderr, "d->noderow = %d\n", d->noderow);
+                    fprintf(stderr, "i=%d\n", i);
                     fprintf(stderr,
                             "m->sent_rows[d->noderow + i] = %"PRIu32"\n",
                             m->sent_rows[d->noderow + i]);
@@ -1299,12 +1300,15 @@ int master_dispatcher_put(master_dispatcher_ptr d, uint32_t * p, size_t n)
             /* This advances, even if the row is not complete. */
             r++;
         } else {
+            uint32_t q = p[s];
+            ASSERT_ALWAYS(q < m->bal->h->ncols);
+            q = balancing_pre_shuffle(m->bal, q);
             if (d->check_vector) {
-                /* column index is p[s]. Get the index of our constant
-                 * vector which corresponds to p[s] */
-                d->w ^= DUMMY_VECTOR_COORD_VALUE(p[s]);
+                /* column index is q. Get the index of our constant
+                 * vector which corresponds to q */
+                d->w ^= DUMMY_VECTOR_COORD_VALUE(q);
             }
-            uint32_t c = m->fw_colperm[p[s]];
+            uint32_t c = m->fw_colperm[q];
             int nodecol = who_has_col(m, c);
             ASSERT_ALWAYS(d->noderow + nodecol < (int) d->m->pi->m->totalsize);
             data_dest_ptr where = d->x[d->noderow + nodecol];

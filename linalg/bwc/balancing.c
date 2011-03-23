@@ -63,7 +63,7 @@ void balancing_write_inner(balancing_ptr bal, const char * filename)
     }
     int rc = 0;
     /* Any change to the balancing_header structure must propagate here */
-    ASSERT_ALWAYS(sizeof(struct balancing_header_s) == 32);
+    ASSERT_ALWAYS(sizeof(struct balancing_header_s) == 48);
     rc += fwrite32_little(&bal->h->nh, 1, pfile);
     rc += fwrite32_little(&bal->h->nv, 1, pfile);
     rc += fwrite32_little(&bal->h->nrows, 1, pfile);
@@ -71,7 +71,9 @@ void balancing_write_inner(balancing_ptr bal, const char * filename)
     rc += fwrite64_little(&bal->h->ncoeffs, 1, pfile);
     rc += fwrite32_little(&bal->h->checksum, 1, pfile);
     rc += fwrite32_little(&bal->h->flags, 1, pfile);
-    ASSERT_ALWAYS(rc == 7);
+    rc += fwrite32_little(bal->h->pshuf, 2, pfile);
+    rc += fwrite32_little(bal->h->pshuf_inv, 2, pfile);
+    ASSERT_ALWAYS(rc == 11);
     if (bal->h->flags & FLAG_ROWPERM) {
         rc = fwrite32_little(bal->rowperm, bal->trows, pfile);
     }
@@ -120,7 +122,7 @@ void balancing_read_header_inner(balancing_ptr bal, FILE * pfile)
 {
     int rc = 0;
     ASSERT_ALWAYS(pfile);
-    ASSERT_ALWAYS(sizeof(struct balancing_header_s) == 32);
+    ASSERT_ALWAYS(sizeof(struct balancing_header_s) == 48);
     rc += fread32_little(&bal->h->nh, 1, pfile);
     rc += fread32_little(&bal->h->nv, 1, pfile);
     rc += fread32_little(&bal->h->nrows, 1, pfile);
@@ -128,7 +130,9 @@ void balancing_read_header_inner(balancing_ptr bal, FILE * pfile)
     rc += fread64_little(&bal->h->ncoeffs, 1, pfile);
     rc += fread32_little(&bal->h->checksum, 1, pfile);
     rc += fread32_little(&bal->h->flags, 1, pfile);
-    ASSERT_ALWAYS(rc == 7);
+    rc += fread32_little(bal->h->pshuf, 2, pfile);
+    rc += fread32_little(bal->h->pshuf_inv, 2, pfile);
+    ASSERT_ALWAYS(rc == 11);
 }
 
 void balancing_read_header(balancing_ptr bal, const char * filename)

@@ -68,10 +68,16 @@ if ($mode eq 'bmatrix') {
 if ($mode eq 'balancing') {
     sysread(STDIN, my $x, 32);
     my ($nh,$nv,$nr,$nc,$ncoeffs,$checksum,$flags) = unpack("L4QLL", $x);
+    sysread(STDIN, $x, 8);
+    my ($pa, $pb) = unpack("L2", $x);
+    sysread(STDIN, $x, 8);
+    my ($pai, $pbi) = unpack("L2", $x);
     $checksum = sprintf("%04x", $checksum);
     my $txflags="";
-    $txflags .= ", colperm" if $flags & 1;
-    $txflags .= ", rowperm" if $flags & 2;
+    my $colperm = $flags & 1;
+    my $rowperm = $flags & 2;
+    $txflags .= ", colperm" if $colperm;
+    $txflags .= ", rowperm" if $rowperm;
     $txflags .= ", padding" if $flags & 4;
     $txflags .= ", replicate" if $flags & 8;
     my $tr = $nr;
@@ -79,26 +85,45 @@ if ($mode eq 'balancing') {
     if ($flags & 4) {
         $tr = $tc = $nr > $nc ? $nr : $nc;
     }
-    print "// $nr rows $nc cols, split ${nh}x${nv}, checksum $checksum$txflags\n";
     print "nr:=$tr; // originally $nr\n";
     print "nc:=$tc; // originally $nc\n";
+    my $s = $nh * $nv;
+    while ($tr % $s) { $tr++; }
+    while ($tc % $s) { $tc++; }
+    print "// $nr rows $nc cols, split ${nh}x${nv}, checksum $checksum$txflags\n";
+    print "tr:=$tr; // originally $nr\n";
+    print "tc:=$tc; // originally $nc\n";
     print "nh:=$nh;\n";
     print "nv:=$nv;\n";
-    my @p=();
-    while(sysread(STDIN, my $x, 4)) {
-        push @p, 1+unpack("L",$x);
+    print "preshuf:=func<x|x le $nc select 1+(($pa*(x-1)+$pb) mod $nc) else x>;\n";
+    print "preshuf_inv:=func<x|x le $nc select 1+(($pai*(x-1)+$pbi) mod $nc) else x>;\n";
+    if ($rowperm) {
+        my @p=();
+        for(my $i = 0 ; $i < $tr ; $i++) {
+            die unless sysread(STDIN, my $x, 4);
+            push @p, 1+unpack("L",$x);
+        }
+        print "rowperm:=[", join(", ", @p), "];\n";
     }
-    print "var:=[", join(", ", @p), "];\n";
+    if ($colperm) {
+        my @p=();
+        for(my $i = 0 ; $i < $tc ; $i++) {
+            die unless sysread(STDIN, my $x, 4);
+            push @p, 1+unpack("L",$x);
+        }
+        print "colperm:=[", join(", ", @p), "];\n";
+    }
     exit;
 }
 
 
-if ($mode eq 'permutation') {
+if ($mode =~ /^(permutation|weights)$/) {
     # Dump a list of unsigned ints
+    my $add1 = $mode eq 'permutation';
     my @p=();
     while(sysread(STDIN, my $x, 4)) {
         my $v = unpack("L",$x);
-        push @p, $v+1;
+        push @p, $v+$add1;
     }
     print "var:=[",join(',',@p),"];\n";
     exit;

@@ -702,7 +702,7 @@ static uint32_t * do_partial_transpose(builder * mb, vector<uint32_t> & cs, uint
     return cols;
 }/*}}}*/
 
-int builder_do_large_slice(builder * mb, struct large_slice_t * L, uint32_t i0, uint32_t i1, unsigned int scratch1size)
+int builder_do_large_slice(builder * mb, struct large_slice_t * L, uint32_t i0, uint32_t i1, uint32_t imax, unsigned int scratch1size)
 {
     memset(L->hdr, 0, sizeof(slice_header_t));
     L->hdr->t = SLICE_TYPE_LARGE_ENVELOPE;
@@ -774,7 +774,7 @@ int builder_do_large_slice(builder * mb, struct large_slice_t * L, uint32_t i0, 
 
     if (L->dj_avg > DJ_CUTOFF2) {
         printf("-> too sparse");
-        if (mb->nrows_t - i0 < HUGE_MPLEX_MIN * LSL_NBUCKETS_MAX * 256) {
+        if (imax - i0 < HUGE_MPLEX_MIN * LSL_NBUCKETS_MAX * 256) {
             printf("; kept because of short tail\n");
         } else {
             /* We won't keep this slice */
@@ -1344,12 +1344,12 @@ void vsc_fill_buffers(builder * mb, struct vsc_slice_t * V)
 }
 /*}}}*/
 
-int builder_prepare_vsc_slices(builder * mb, struct vsc_slice_t * V, uint32_t i0)
+int builder_prepare_vsc_slices(builder * mb, struct vsc_slice_t * V, uint32_t i0, uint32_t imax)
 {
     memset(V->hdr, 0, sizeof(slice_header_t));
     V->hdr->t = SLICE_TYPE_DEFER_ENVELOPE;
     V->hdr->i0 = i0;
-    V->hdr->i1 = mb->nrows_t;
+    V->hdr->i1 = imax;
     V->hdr->j0 = 0;
     V->hdr->j1 = mb->ncols_t;
     V->hdr->ncoeffs = 0;
@@ -1528,16 +1528,17 @@ void builder_push_huge_slice(struct matmul_bucket_data_s * mm, huge_slice_t * H)
 /* Iteratively call the building routines */
 
 /* {{{ small slices */
-void builder_do_all_small_slices(builder * mb, uint32_t * p_i0, unsigned int npack)
+void builder_do_all_small_slices(builder * mb, uint32_t * p_i0, uint32_t imax, unsigned int npack)
 {
     /* npack is a guess for the expected size of small slices ; they are
      * arranged later to all have approximately equal size.
      */
-    unsigned int nslices = iceildiv(mb->nrows_t, npack);
     unsigned int s;
+    uint32_t i00 = *p_i0;
+    unsigned int nslices = iceildiv(imax - i00, npack);
     for(s = 0 ; s < nslices ; s++) {
-        uint32_t i0 =  s    * mb->nrows_t / nslices;
-        uint32_t i1 = (s+1) * mb->nrows_t / nslices;
+        uint32_t i0 = i00 +  s    * (imax - i00) / nslices;
+        uint32_t i1 = i00 + (s+1) * (imax - i00) / nslices;
 
         small_slice_t S[1];
 
@@ -1558,14 +1559,14 @@ void builder_do_all_small_slices(builder * mb, uint32_t * p_i0, unsigned int npa
         builder_push_small_slice(mb->mm, S);
         // transfer(Sq, S);
     }
-    *p_i0 = s * mb->nrows_t / nslices;
+    *p_i0 = i00 + s * (imax - i00) / nslices;
 }
 /* }}} */
 
 /* {{{ large slices */
-void builder_do_all_large_slices(builder * mb, uint32_t * p_i0, unsigned int scratch1size)
+void builder_do_all_large_slices(builder * mb, uint32_t * p_i0, unsigned int imax, unsigned int scratch1size)
 {
-    unsigned int rem_nrows = mb->nrows_t - *p_i0;
+    unsigned int rem_nrows = imax - *p_i0;
     unsigned int nlarge_slices = iceildiv(rem_nrows, LSL_NBUCKETS_MAX * 256);
     uint32_t done = 0;
     for(unsigned int s = 0 ; s < nlarge_slices ; s++) {
@@ -1576,7 +1577,7 @@ void builder_do_all_large_slices(builder * mb, uint32_t * p_i0, unsigned int scr
         printf("Lsl%u %ss %u+%u", s, mb->rowname, i0, i1-i0);
         fflush(stdout);
 
-        int keep = builder_do_large_slice(mb, L, i0, i1, scratch1size);
+        int keep = builder_do_large_slice(mb, L, i0, i1, imax, scratch1size);
 
         if (!keep) {
             printf("Switching to huge slices. Lsl%u to be redone\n", s);
@@ -1592,9 +1593,9 @@ void builder_do_all_large_slices(builder * mb, uint32_t * p_i0, unsigned int scr
 /* }}} */
 
 /* {{{ huge slices */
-void builder_do_all_huge_slices(builder * mb, uint32_t * p_i0, unsigned int scratch2size)
+void builder_do_all_huge_slices(builder * mb, uint32_t * p_i0, unsigned int imax, unsigned int scratch2size)
 {
-    unsigned int rem_nrows = mb->nrows_t - *p_i0;
+    unsigned int rem_nrows = imax - *p_i0;
     unsigned int nhuge_slices = iceildiv(rem_nrows, HUGE_MPLEX_MAX * LSL_NBUCKETS_MAX * 256);
     uint32_t done = 0;
     for(unsigned int s = 0 ; s < nhuge_slices ; s++) {
@@ -1841,24 +1842,24 @@ void matmul_bucket_build_cache(struct matmul_bucket_data_s * mm, uint32_t * data
     printf("%u rows %u cols\n", mm->public_->dim[0], mm->public_->dim[1]);
 
     uint32_t main_i0 = 0;
-
+    uint32_t fence = mb->nrows_t;
     if (mm->methods.small1 || mm->methods.small2)
-        builder_do_all_small_slices(mb, &main_i0, mm->npack);
+        builder_do_all_small_slices(mb, &main_i0, fence, mm->npack);
 
     if (mm->methods.large)
-        builder_do_all_large_slices(mb, &main_i0, mm->scratch1size);
+        builder_do_all_large_slices(mb, &main_i0, fence, mm->scratch1size);
 
     /* Note that vsc and huge are exclusive ! */
-    if (mm->methods.vsc && main_i0 < mb->nrows_t) {
+    if (mm->methods.vsc && main_i0 < fence) {
         vsc_slice_t V[1];
-        builder_prepare_vsc_slices(mb, V, main_i0);
-        mm->scratch3size = V->tbuf_space;
+        builder_prepare_vsc_slices(mb, V, main_i0, fence);
+        mm->scratch3size = MAX(mm->scratch3size, V->tbuf_space);
         builder_push_vsc_slices(mm, V);
+        main_i0 = fence;
     }
-    if (mm->methods.huge && main_i0 < mb->nrows_t) {
-        builder_do_all_huge_slices(mb, &main_i0, mm->scratch2size);
+    if (mm->methods.huge && main_i0 < fence) {
+        builder_do_all_huge_slices(mb, &main_i0, fence, mm->scratch2size);
     }
-
 
     /* done, at last ! */
 

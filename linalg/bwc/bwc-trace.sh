@@ -20,7 +20,7 @@ mkdir $wdir
 
 
 Mh=1; Mv=1;
-Th=2; Tv=1;
+Th=3; Tv=4;
 Nh=$((Mh*Th))
 Nv=$((Mv*Tv))
 
@@ -35,8 +35,10 @@ thr=${Th}x${Tv}
 # choice. Note though that the code may encounter random failures due to
 # singular inputs. In particular, a matrix rank below 64 won't work.
 matrix=$mats/t1009.bin
+# matrix=$HOME/Local/mats/c59.small.bin
 nullspace=left
-shuffle=0
+shuffle=1
+
 
 # Note that it's better to look for a kernel which is not trivial. Thus
 # specifying --kleft for random generation is a good move prior to
@@ -62,10 +64,10 @@ checksum=`basename $checksum .bin`
 common="matrix=$matrix mpi=$mpi thr=$thr balancing=$bfile mn=64 wdir=$wdir"
 if [ "$nullspace" = left ] ; then
     common="$common nullspace=left"
-    transpose_if_left="Transpose";
+    transpose_if_left="Transpose"
 else
     common="$common nullspace=right"
-    transpose_if_left="";
+    transpose_if_left=""
 fi
 
 set +e
@@ -94,6 +96,11 @@ mdir=$wdir
 
 cmd=`dirname $0`/convert_magma.pl
 
+rwfile=${matrix%%bin}rw.bin
+cwfile=${matrix%%bin}cw.bin
+$cmd weights < $rwfile > $mdir/rw.m
+$cmd weights < $cwfile > $mdir/cw.m
+
 $cmd balancing < $wdir/$c.bin > $mdir/b.m
 
 $cmd bmatrix < $matrix > $mdir/t.m
@@ -118,7 +125,19 @@ for i in `seq 0 $((Nh-1))` ; do
         echo "x:=RMatrixSpace(GF(2),nr$i,nc$j)!0;InsertBlock(~x,$transpose_if_left(M$i$j),1,1);M$i$j:=x;"
         echo "InsertBlock(~Mt,M$i$j,1+snr$i,1+snc$j);"
     done
-done) > $mdir/placemats.m
+done
+echo "mlist:=["
+for i in `seq 0 $((Nh-1))` ; do
+    if [ "$i" != 0 ] ; then echo "," ; fi
+    echo -n "["
+    for j in `seq 0 $((Nv-1))` ; do
+        if [ "$j" != 0 ] ; then echo -n ", " ; fi
+        echo -n "M$i$j";
+    done
+    echo -n "]"
+done
+echo "];"
+) > $mdir/placemats.m
 
 $cmd x $wdir/X > $mdir/x.m
 # ok, strictly speaking the A files have nothing to do with vectors. But

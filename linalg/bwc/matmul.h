@@ -59,6 +59,11 @@ struct matmul_public_s {
     uint32_t (*twist)[2];
     uint32_t ntwists;
 
+    unsigned int nslices[2];
+    /* shuffled balancing tends to create sub-matrices where rows
+     * typically come in several stripes of decreasing density. Therefore
+     * nslices[1] and nslices[0] contain nh and nv, respectively */
+
     /* Now the virtual method table */
     struct matmul_bindings_s bind[1];
 
