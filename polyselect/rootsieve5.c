@@ -2651,8 +2651,8 @@ find_sublattice_lift ( node *firstchild,
 			   (currnode->parent)->firstchild = currnode;
 
 #if DEBUG_FIND_SUBLATTICE
-					fprintf (stderr, "DEBUG_FIND_SUBLATTICE (bottom): p: %u, (%u, %u), val: %f, e: %d, max_e: %d\n",
-							 p, tmpnode->u, tmpnode->v, tmpnode->val, curr_e, e);
+		  fprintf (stderr, "DEBUG_FIND_SUBLATTICE (bottom): p: %u, (%u, %u), val: %f, e: %d, max_e: %d\n",
+				   p, tmpnode->u, tmpnode->v, tmpnode->val, curr_e, e);
 #endif
 
 		  free_node (&tmpnode);
@@ -3215,7 +3215,7 @@ return_all_sublattices ( rsstr_t rs,
 		  /* Compute rsparam->modulus */
 		  count = 1;
 		  for (i = 0; i < rsparam->tlen_e_sl; i ++) {
-		  	  count *= size[i];
+			   count *= size[i];
 		  }
 		  fprintf (stderr, "# Info: computed %lu CRTs\n", count);
 	 }
@@ -3348,12 +3348,12 @@ rootsieve_run_multroot_lift ( node *currnode,
 							  int d,
 							  rsbound_t rsbound,
 							  unsigned int p,
-							  unsigned int e,
+							  unsigned int max_e,
 							  unsigned int curr_e,
 							  int16_t sub )
 {
 	 /* recursion end */
-	 if (currnode == NULL || curr_e > e || sub == 0)
+	 if (currnode == NULL || curr_e > max_e || sub == 0)
 		  return;
 
 	 /* variables */
@@ -3387,12 +3387,22 @@ rootsieve_run_multroot_lift ( node *currnode,
 			   /* solve on fr + gr*x = 0 (mod p), where x = uu*r + vv. */
 			   fr = solve_lineq (fr, gr, 0, p); //fr = fr % p;
 
-			   /* If gcd (MOD, p) != 1 && B + MOD*k != v (mod pe), there is no need to
-				  record this (u, v). */
-			   if (mpz_fdiv_ui (rsbound->MOD, p) == 0) {
-					if ( mpz_fdiv_ui (rsbound->B, pe) != (currnode->v + fr * pem1) ) {
-						 continue; // no need to insert, skip this loop.
+			   /* p|MOD */
+			   if (mpz_divisible_ui_p (rsbound->MOD, p) != 0) {
+
+					/* If current pe|MOD, then in B + MOD*k = v (mod pe),
+					   it has to satisfy B = v (mod pe) otherwise
+					   there is no need to record this (u, v). */
+					if (mpz_divisible_ui_p (rsbound->MOD, pe) != 0) {
+						 if ( mpz_fdiv_ui (rsbound->B, pe) != (currnode->v + fr * pem1) ) {
+#if DEBUG_MULTROOT_LIFT
+							  fprintf (stderr, "skip found (%u, %u) in level %u.\n", currnode->u, currnode->v + fr * pem1, curr_e);
+#endif
+							  continue;
+						 }
 					}
+					/* If current pe-|-MOD, then in B + MOD*k = v (mod pe),
+					   it is still possible. We leave it to be considered in future. */
 			   }
 
 			   /* insert (u, v), u unchanged, v is fr. to insert roots,
@@ -3422,41 +3432,57 @@ rootsieve_run_multroot_lift ( node *currnode,
 										d,
 										rsbound,
 										p,
-										e,
+										max_e,
 										curr_e + 1,
 										sub );
 
 		  /* we are in the second level from bottom, consider all children of this node and sieve */
-		  if (curr_e == e) {
+		  if (curr_e == max_e) {
 			   tmpnode = currnode->firstchild;
 
 			   while (tmpnode != NULL) {
 
-					/* if MOD = 0 (mod p) in B + MOD*k = v (mod pe), no inverse
-					   -- if B = v (mod pe), then sieve whole array;
-					   -- otherwise, continue; */
+					/* p|MOD, the inverse doesn't exist */
 					if (mpz_divisible_ui_p (rsbound->MOD, p) != 0) {
-						 if ( mpz_fdiv_ui (rsbound->B, pe) == tmpnode->v) {
-							  if (mpz_divisible_ui_p (rsbound->MOD, pe ) == 0) {
-								   j = 0;
-								   step = pe;
-							  }
-							  /* seems to be redundant since in rootsieve_v(), this
-								 situation is discarded */
-							  else {
-								   tmpnode2 = tmpnode;
-								   tmpnode = tmpnode->nextsibling;
-								   free_node (&tmpnode2);
-								   continue;
-							  }
+
+						 /* If current pe|MOD, then in B + MOD*k = v (mod pe),
+							Either, B = v (mod pe) is satisfy, and sieve all
+							or not satisfied which leads to not sieving at all.
+							Since both ways updates are equal, we skip it. */
+						 if (mpz_divisible_ui_p (rsbound->MOD, pe) != 0) {
+							  tmpnode2 = tmpnode;
+							  tmpnode = tmpnode->nextsibling;
+#if DEBUG_MULTROOT_LIFT
+							  fprintf (stderr, "deleting bottomnode (%u, %u) with %u roots in level %u.\n", tmpnode2->u, tmpnode2->v, tmpnode2->nr, curr_e);
+#endif
+							  free_node (&tmpnode2);
+							  continue;
 						 }
+						 /* If current pe-|-MOD, then in B + MOD*k = v (mod pe),
+							it is still possible to solve such k. */
 						 else {
-						 	  tmpnode2 = tmpnode;
-						 	  tmpnode = tmpnode->nextsibling;
-						 	  free_node (&tmpnode2);
-						 	  continue;
+							  /* findthe val_p (MOD), which must be < e */
+							  unsigned int l = 0, tmp_pe = p, a, b, c;
+							  while (mpz_divisible_ui_p(rsbound->MOD, tmp_pe) != 0) {
+								   l ++;
+								   tmp_pe *= p;
+							  } // tmp_pe is p^{l+1}
+
+							  /* (B-v)/p^l + (MOD/p^l)*k = 0 (mod p^{e-l})
+								 Note (B-v)/p^l is exact due to our constructions. */
+							  a = (unsigned int) mpz_fdiv_ui (rsbound->B, pe);
+							  a = (a + pe - tmpnode->v) * p / tmp_pe; // +pe ensure it is positive
+							  b = (unsigned int) mpz_fdiv_ui (rsbound->MOD, pe);
+							  b = b * p / tmp_pe;
+							  tmp_pe = pe * p / tmp_pe; // it is now p^{e-l}
+							  c = (unsigned int) solve_lineq (a, b, 0, tmp_pe);
+							  j = (long) ceil (((double) rsbound->Bmin - (double) c) / (double) tmp_pe)
+								   * (long) tmp_pe + (long) c;
+							  j = ab2ij (rsbound->Bmin, j);
+							  step = tmp_pe;
 						 }
 					}
+					/* p-|-MOD, the inverse exists */
 					else {
 						 j = uv2ab_mod (rsbound->B, rsbound->MOD, tmpnode->v, pe);
 						 j = (long) ceil (((double) rsbound->Bmin - (double) j) / (double) pe)
@@ -3476,9 +3502,9 @@ rootsieve_run_multroot_lift ( node *currnode,
 					tmpnode = tmpnode->nextsibling;
 
 #if DEBUG_MULTROOT_LIFT
-					fprintf (stderr, "deleting bottomnode ... (%u, %u) with %u roots in level %u, ",
+					fprintf (stderr, "deleting bottomnode (%u, %u) with %u roots in level %u AND ",
 							 tmpnode2->u, tmpnode2->v, tmpnode2->nr, curr_e);
-					fprintf (stderr, "sieving bottomnode ... %d in steps %lu\n", subtmp, step); // pe
+					fprintf (stderr, "sieving bottomnode %d in steps %u.\n", subtmp, step); // pe
 #endif
 
 					free_node (&tmpnode2);
@@ -3491,24 +3517,45 @@ rootsieve_run_multroot_lift ( node *currnode,
 		  if (currnode != NULL)
 			   (currnode->parent)->firstchild = currnode;
 
+		  /* p|MOD, the inverse doesn't exist */
 		  if (mpz_divisible_ui_p (rsbound->MOD, p) != 0) {
-			   if ( mpz_fdiv_ui (rsbound->B, pem1) == tmpnode->v) {
-					if (mpz_divisible_ui_p (rsbound->MOD, pem1 ) == 0) {
-						 j = 0;
-						 step = pem1;
-					}
-					/* seems to be redundant since in rootsieve_v(), this
-					   situation is discarded */
-					else {
-						 free_node (&tmpnode);
-						 continue;
-					}
-			   }
-			   else {
+
+			   /* If current pe|MOD, then in B + MOD*k = v (mod pe),
+				  Either, B = v (mod pe) is satisfy, and sieve all
+				  or not satisfied which leads to not sieving at all.
+				  Since both ways updates are equal, we skip it. */
+			   if (mpz_divisible_ui_p (rsbound->MOD, pem1) != 0) {
+#if DEBUG_MULTROOT_LIFT
+					fprintf (stderr, "deleting (%u, %u) with %u roots in level %u.\n", tmpnode->u, tmpnode->v, tmpnode->nr, curr_e - 1);
+#endif
 					free_node (&tmpnode);
 					continue;
 			   }
+			   /* If current pe-|-MOD, then in B + MOD*k = v (mod pe),
+				  it is still possible to solve such k. */
+			   else {
+					/* findthe val_p (MOD), which must be < e */
+					unsigned int l = 0, tmp_pe = p, a, b, c;
+					while (mpz_divisible_ui_p(rsbound->MOD, tmp_pe) != 0) {
+						 l ++;
+						 tmp_pe *= p;
+					} // tmp_pe is p^{l+1}
+
+					/* (B-v)/p^l + (MOD/p^l)*k = 0 (mod p^{e-l})
+					   Note (B-v)/p^l is exact due to our constructions. */
+					a = (unsigned int) mpz_fdiv_ui (rsbound->B, pem1);
+					a = (a + pem1 - tmpnode->v) * p / tmp_pe; // +pe ensure it is positive
+					b = (unsigned int) mpz_fdiv_ui (rsbound->MOD, pem1);
+					b = b * p / tmp_pe;
+					tmp_pe = pem1 * p / tmp_pe; // it is now p^{e-l}
+					c = (unsigned int) solve_lineq (a, b, 0, tmp_pe);
+					j = (long) ceil (((double) rsbound->Bmin - (double) c) / (double) tmp_pe)
+						 * (long) tmp_pe + (long) c;
+					j = ab2ij (rsbound->Bmin, j);
+					step = tmp_pe;
+			   }
 		  }
+		  /* p-|-MOD, the inverse exists */
 		  else {
 			   j = uv2ab_mod (rsbound->B, rsbound->MOD, tmpnode->v, pem1);
 			   j = (long) ceil (((double) rsbound->Bmin - (double) j) / (double) pem1)
@@ -3524,8 +3571,8 @@ rootsieve_run_multroot_lift ( node *currnode,
 							   j, step, subtmp );
 
 #if DEBUG_MULTROOT_LIFT
-		  fprintf (stderr, "deleting ... (%u, %u) with %u roots in level %u, ", tmpnode->u, tmpnode->v, tmpnode->nr, curr_e - 1);
-		  fprintf (stderr, "sieving ... %d in steps %lu\n", subtmp, step); //pem1
+		  fprintf (stderr, "deleting (%u, %u) with %u roots in level %u AND ", tmpnode->u, tmpnode->v, tmpnode->nr, curr_e - 1);
+		  fprintf (stderr, "sieving %d in steps %u.\n", subtmp, step); //pem1
 #endif
 
 		  free_node (&tmpnode);
@@ -3556,7 +3603,7 @@ rootsieve_run_multroot ( int16_t *ARRAY,
 		In the rootsieve_v(), there are two cases in calling
 		this function:
 		Either flag = 1, e = 1; We can sieve starting from j.
-		Note if flag = 2, e > 1. We jump out of this. */
+		Note if flag = 2, e must > 1. We are not here. */
 	 if (e <= 1) {
 		  rootsieve_run_line ( ARRAY,
 							   rsbound->Bmax - rsbound->Bmin,
@@ -3731,10 +3778,13 @@ rootsieve_v ( int16_t *ARRAY,
 						 /* If MOD = 0 (mod p) in B + MOD*j = v (mod p), and B = v (mod p) */
 						 if (mpz_divisible_ui_p (rsbound->MOD, p) != 0) {
 
+							  /* This should be satisfied any way, at least for level one nodes */
 							  if (mpz_fdiv_ui (rsbound->B, p) == v) {
 
 								   /* don't sieve in this case, since all the elements on
-									  the array is B + MOD*j = 0 (mod pe), are p-valuation equiv */
+									  the array is B + MOD*j = B (mod p^k), are p-valuation equiv.
+									  Either B = v (mod p^k) or not. So either sieve whole slots or
+									  don't sieve at all. Hence there is no need to do the sieve. */
 								   if (mpz_divisible_ui_p (rsbound->MOD, pe ) != 0)
 										continue;
 								   /* case where MOD has p-valuation smaller than e.
@@ -3774,8 +3824,6 @@ rootsieve_v ( int16_t *ARRAY,
 							  */
 						 }
 					}
-
-
 
 #if DEBUG_ROOTSIEVE_V
 					c++;
@@ -3818,6 +3866,13 @@ rootsieve_v ( int16_t *ARRAY,
 							  cm++;
 							  stm1 = cputime();
 #endif
+
+							  /* if (p == 5) { */
+							  /* 	   fprintf (stderr, " f(%u) + ( %u * %u + %u ) * g(%u) = 0 (mod %u)\n", */
+							  /* 				r, u, r, v, r, p); */
+							  /* 	   fprintf (stderr, " start_j_idx: %ld\n", start_j_idx[np]); */
+							  /* } */
+
 
 							  /* Two cases:
 								 If flag = 1, then MOD != 0 (mod p), everything is normal;
