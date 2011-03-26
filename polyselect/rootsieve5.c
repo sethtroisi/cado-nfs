@@ -751,7 +751,7 @@ free_list ( listnode **pptop )
 static void
 print_listnode ( listnode *plistnode )
 {
-	 printf("(u, v): (%lu,%lu), val: %.2f\n", plistnode->u, plistnode->v, plistnode->val);
+	 printf("(u, v): (%u,%u), val: %.2f, e: %d\n", plistnode->u, plistnode->v, plistnode->val, plistnode->e);
 }
 
 
@@ -2711,9 +2711,6 @@ find_sublattice ( listnode **top,
 			   /* simple root */
 			   if (mpz_divisible_ui_p(tmp, p) == 0) {
 
-					/* fprintf (stderr, "p: %u, r: %u, u: %u, v: %u\n", */
-					/* 		 p, r, u, v); */
-
 					insert_node (root, &currnode, u, v, r, 1, p, p, 1);
 			   }
 			   else {
@@ -3073,6 +3070,8 @@ return_all_sublattices ( rsstr_t rs,
 			   tmp = tmp->next;
 			   //fprintf (stderr, "SUBLATTICE: #%lu, (%lu, %lu)\n", j, individual_sublattices[i][j][0], individual_sublattices[i][j][1]);
 		  }
+
+		  //print_list (top);
 
 		  if (verbose == 2)
 			   fprintf ( stderr,
@@ -3436,7 +3435,8 @@ rootsieve_run_multroot_lift ( node *currnode,
 										curr_e + 1,
 										sub );
 
-		  /* we are in the second level from bottom, consider all children of this node and sieve */
+		  /* we are in the second level from bottom, consider all
+			 children of this node (bottom nodes) and sieve */
 		  if (curr_e == max_e) {
 			   tmpnode = currnode->firstchild;
 
@@ -3777,32 +3777,31 @@ rootsieve_v ( int16_t *ARRAY,
 
 						 /* If MOD = 0 (mod p) in B + MOD*j = v (mod p), and B = v (mod p) */
 						 if (mpz_divisible_ui_p (rsbound->MOD, p) != 0) {
+							  /* don't sieve in this case, since all the elements on
+								 the array is B + MOD*j = B (mod p^k), are p-valuation equiv.
+								 Either B = v (mod p^k) or not. So either sieve whole slots or
+								 don't sieve at all. Hence there is no need to do the sieve. */
+							  if (mpz_divisible_ui_p (rsbound->MOD, pe ) != 0)
+								   continue;
+							  else {
+								   /* This must be satisfied for any further consideration in the lift */
+								   if (mpz_fdiv_ui (rsbound->B, p) == v) {
 
-							  /* This should be satisfied any way, at least for level one nodes */
-							  if (mpz_fdiv_ui (rsbound->B, p) == v) {
-
-								   /* don't sieve in this case, since all the elements on
-									  the array is B + MOD*j = B (mod p^k), are p-valuation equiv.
-									  Either B = v (mod p^k) or not. So either sieve whole slots or
-									  don't sieve at all. Hence there is no need to do the sieve. */
-								   if (mpz_divisible_ui_p (rsbound->MOD, pe ) != 0)
-										continue;
-								   /* case where MOD has p-valuation smaller than e.
-									  In this case, if r is multiple root, then do the resursion;
-									  If r is simple, the all ele on the array are equivalent. So
-									  we ignore sieving. */
-								   else {
+										/* case where MOD has p-valuation smaller than e.
+										   In this case, if r is multiple root, then do the resursion;
+										   If r is simple, the all ele on the array are equivalent. So
+										   we ignore sieving. */
 										if (mpz_divisible_ui_p(tmpz, p) == 0)
 											 continue;
 										/* the multiple root case will be caught by flag == 2 */
 										else {
-											 start_j_idx[np] = 0;
+											 start_j_idx[np] = 0; // not used actually.
 											 flag[np] = 2;
 										}
 								   }
+								   else
+										continue;
 							  }
-							  else
-								   continue;
 						 }
 						 else {
 							  flag[np] = 1;
@@ -4465,9 +4464,10 @@ rotate_bounds_U_lu ( rsstr_t rs,
 	 mpz_init_set (m, rs->g[0]);
 	 mpz_neg (m, m);
 
-	 /* look for positive w: 1, 2, 4, 8, ... */
+	 /* look for positive w: 1, 2, 4, 8, ...
+		Note (sizeof (long) * 8 - 2) to prevent overflow in the rotate_aux(). */
 	 long w0 = 0, w = 1;
-	 for (i = 0; i < (sizeof (long) * 8 - 1); i++, w *= 2)
+	 for (i = 0; i < (sizeof (long) * 8 - 2); i++, w *= 2)
 	 {
 		  /* rotate by w*x */
 		  w0 = rotate_aux (rs->f, b, m, w0, w, 1);
@@ -4492,10 +4492,11 @@ rotate_bounds_U_lu ( rsstr_t rs,
 	 rotate_aux (rs->f, b, m, w0, 0, 1);
 	 rsparam->global_u_bound_rs = (unsigned long) w;
 
-	 /* look for negative w: -1, -2, -4, -8, ... */
+	 /* look for negative w: -1, -2, -4, -8, ...
+		Note (sizeof (long) * 8 - 2) to prevent overflow in the rotate_aux(). */
 	 w0 = 0;
 	 w = -1;
-	 for (i = 0; i < (sizeof (long int) * 8 - 1); i++, w *= 2)
+	 for (i = 0; i < (sizeof (long int) * 8 - 2); i++, w *= 2)
 	 {
 		  /* rotate by w*x */
 		  w0 = rotate_aux (rs->f, b, m, w0, w, 1);
@@ -4969,7 +4970,7 @@ rootsieve_uv ( rsstr_t rs,
 			   for (j = 0; j < (unsigned long) (rsbound->Bmax - rsbound->Bmin + 1); j++) {
 					insert_rootscore_pq ( alpha_pqueue, i, j, MAT[j] );
 
-					/* if (MAT[j] < -2000) { */
+					/* if (MAT[j] < -2900) { */
 					/* 	 ij2uv (rsbound->A, rsbound->MOD, rsbound->Amin, i, tmpu); */
 					/* 	 ij2uv (rsbound->B, rsbound->MOD, rsbound->Bmin, j, tmpv); */
 					/* 	 gmp_fprintf (stderr, "MAT[]: %d, u: %Zd, v: %Zd, i: %lu, j: %lu\n", MAT[j], tmpu, tmpv, i, j); */
@@ -5574,6 +5575,7 @@ rootsieve_main_run ( rsstr_t rs,
 	 mpz_init_set (m, rs->g[0]);
 	 mpz_neg (m, m);
 	 rsparam_init (rsparam, rs, param);
+
 	 rsparam_setup (rsparam, rs, verbose);
 	 new_sub_alpha_pq (&alpha_pqueue, rsparam->nbest_sl);
 
@@ -5590,6 +5592,7 @@ rootsieve_main_run ( rsstr_t rs,
 
 		  if (verbose == 2)
 			   fprintf (stderr, "# Info: quadratic rotation by %d*x^2\n", i);
+
 		  old_i = rotate_aux (rs->f, rs->g[1], m, old_i, i, 2);
 		  rsstr_setup (rs);
 
@@ -5604,6 +5607,7 @@ rootsieve_main_run ( rsstr_t rs,
 #endif
 
 		  re ++;
+
 		  k = rootsieve_main_stage1 ( rs,
 									  rsparam,
 									  alpha_pqueue,
@@ -5853,6 +5857,7 @@ rootsieve_main ( rsstr_t rs,
 				 param_t param,
 				 int verbose )
 {
+
 	 /* stage 2 (sieve) only */
 	 if (param->flag == 2) {
 		  if (rs->d == 5) {
