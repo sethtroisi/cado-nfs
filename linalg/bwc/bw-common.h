@@ -17,6 +17,8 @@
  * this has not been checked. */
 #define NCHECKS_CHECK_VECTOR    64
 
+#define MAX_NUMBER_OF_CHECK_STOPS       32
+
 struct bw_params {
 
     /* m,n blocking factors as in the textbook BW description */
@@ -85,10 +87,30 @@ struct bw_params {
      */
     int keep_rolling_checkpoints;
 
+    /* This moderates the previous behaviour. If a checkpoint to be
+     * discarded as per the previous flag turns out to have been
+     * modified less than X seconds ago, keep it anyway.
+     */
+    int keep_checkpoints_younger_than;
+
     /* In case the previous flag is enabled, still keep all the
      * checkpoints which are multiple of the length given here.
      */
     int checkpoint_precious;
+
+    /* The check_stops[] array contains the number of known check
+     * vectors, against which data is checked while running.
+     * Note that krylov and mksol store only one vector for the check
+     * stops, and do not afford storing many. This is of course to save
+     * memory. The secure program computes all requested check vectors.
+     * The yet-to-be-written offline check program checks against
+     * everything it can.
+     *
+     * The interval specified by the interval parameter is automatically
+     * counted as a check stop, unless skip_online_checks is true.
+     */
+    int number_of_check_stops;
+    int check_stops[MAX_NUMBER_OF_CHECK_STOPS];
 };
 
 extern struct bw_params bw[1];

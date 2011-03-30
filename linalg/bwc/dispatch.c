@@ -45,8 +45,12 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
     matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
 
-    const char * tmp;
-    if ((tmp = param_list_lookup_string(pl, "sanity_check_vector")) != NULL) {
+    const char * tmp = param_list_lookup_string(pl, "sanity_check_vector");
+    int only_export = param_list_lookup_string(pl, "export_cachelist") != NULL;
+
+    // in no situation shall we try to do our sanity check if we've just
+    // been told to export our cache list
+    if (tmp != NULL && !only_export) {
         /* We have computed a sanity check vector, which is H=M*K, with K
          * constant and easily given. Note that we have not computed K*M,
          * but really M*K. Thus independently of which side we prefer, we

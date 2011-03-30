@@ -51,11 +51,22 @@ void * shell_prog(parallelizing_info_ptr pi, param_list pl MAYBE_UNUSED, void * 
 
     pid_t child = fork();
 
+
     if (child == 0) {
-        execvp(argv[0], argv);
+        const char * script = param_list_lookup_string(pl, "script");
+        const char * command = param_list_lookup_string(pl, "command");
+        if (script) {
+            execvp(script, argv);
+        } else if (command) {
+            int rc = system(command);
+            exit(WEXITSTATUS(rc));
+        } else {
+            fprintf(stderr, "Please supply either script= or command=\n");
+            exit(1);
+        }
     } else {
         int status;
-        wait(&status);
+        waitpid(child,&status,0);
         if (WIFEXITED(status)) {
             int rc;
             if ((rc = WEXITSTATUS(status)) != 0) {

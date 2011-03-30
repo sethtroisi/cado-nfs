@@ -144,11 +144,16 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     // matmul_top_save_vector(mmt, "ux", !bw->dir, 0);
     // save_untwisted_transposed_vector(mmt, "tx", !bw->dir, 0);
     matmul_top_save_vector(mmt, CHECK_FILE_BASE, !bw->dir, 0, unpadded);
-    matmul_top_twist_vector(mmt, !bw->dir);
 
 
     if (tcan_print) {
-        printf("Computing trsp(x)*M^%d\n",bw->interval);
+        printf("Computing trsp(x)*M^k for check stops k=");
+        for(int s = 0 ; s < bw->number_of_check_stops ; s++) {
+            int next = bw->check_stops[s];
+            if (s) printf(",");
+            printf("%d", next);
+        }
+        printf("\n");
     }
 
     serialize(pi->m);
@@ -163,24 +168,27 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     // kill the warning.
     mmt->mm->iteration[!bw->dir] = INT_MIN;
 
-    for(int k = 0 ; k < bw->interval ; k++) {
-        pi_log_op(mmt->pi->m, "iteration %d", k);
-        matmul_top_mul(mmt, !bw->dir);
+    int k = 0;
+    for(int s = 0 ; s < bw->number_of_check_stops ; s++) {
+        int next = bw->check_stops[s];
+        matmul_top_twist_vector(mmt, !bw->dir);
+        for( ; k < next ; k++) {
+            pi_log_op(mmt->pi->m, "iteration %d", k);
+            matmul_top_mul(mmt, !bw->dir);
 
+            if (tcan_print) {
+                putchar('.');
+                fflush(stdout);
+            }
+        }
+        serialize(pi->m);
+        serialize_threads(mmt->pi->m);
+        matmul_top_untwist_vector(mmt, !bw->dir);
+        matmul_top_save_vector(mmt, CHECK_FILE_BASE, !bw->dir, k, unpadded);
         if (tcan_print) {
-            putchar('.');
-            fflush(stdout);
+            printf("saved %s.%d\n", CHECK_FILE_BASE, next);
         }
     }
-    if (tcan_print) {
-        printf("\n");
-    }
-    serialize(pi->m);
-
-    serialize_threads(mmt->pi->m);
-
-    matmul_top_untwist_vector(mmt, !bw->dir);
-    matmul_top_save_vector(mmt, CHECK_FILE_BASE, !bw->dir, bw->interval, unpadded);
 
     matmul_top_clear(mmt);
     A->oo_field_clear(A);

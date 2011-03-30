@@ -403,7 +403,12 @@ sub my_setenv
 
 sub dosystem
 {
+    my $nofatal=0;
     my $prg = shift @_;
+    if ($prg eq '-nofatal') {
+        $nofatal=1;
+        $prg=shift @_;
+    }
     my @args = @_;
     print STDERR '#' x 77, "\n";
     my $msg = "$env_strings$prg " . (join(' ', @args)) . "\n";
@@ -433,7 +438,11 @@ sub dosystem
 # Do we need mpi ??
 
 sub ssh_program() {
-    my $ssh='ssh';
+    my $ssh;
+    if ($ssh = $ENV{'SSH'}) {
+        return $ssh;
+    }
+    $ssh='ssh';
     if (exists($ENV{'OAR_JOBID'})) {
         $ssh="/usr/bin/oarsh";
     }
@@ -565,7 +574,10 @@ if ($mpi_needed) {
     push @mpi_precmd, '-n', $mpi_split[0] * $mpi_split[1];
     push @mpi_precmd_single, '-n', 1;
 
-    dosystem(@mpi_precmd, split(' ', "mkdir -p $wdir"));
+    # mkdir must not be marked fatal, because if the command terminates
+    # without having ever tried to join in an mpi collective like
+    # mpi_init(), there's potential for the mpirun command to complain.
+    dosystem('-nofatal', @mpi_precmd, split(' ', "mkdir -p $wdir"));
 #} elsif (defined(my $mpi_path=$ENV{'MPI'})) {
 #    my $ldlp;
 #    if (defined($ldlp=$ENV{'LD_LIBRARY_PATH'})) {

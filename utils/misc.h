@@ -32,6 +32,8 @@ extern void free_aligned(void * ptr, size_t size, size_t alignment);
 extern void * malloc_pagealigned(size_t sz); 
 extern void free_pagealigned(void * ptr, size_t sz); 
 
+extern int mkdir_with_parents(const char * dir, int fatal);
+
 /* k must be a power of 2. Returns the smallest multiple of k greater
  * than or equal to n
  */

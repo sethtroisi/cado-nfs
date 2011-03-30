@@ -25,7 +25,21 @@ curl_source_callback(void *ptr, size_t size, size_t nmemb, rollbuf_ptr r)
 static void * curl_source_producer_thread(void * data)
 {
     curl_source_ptr cs = (curl_source_ptr)data;
-    curl_easy_perform(cs->curl_handle);
+    int rc = curl_easy_perform(cs->curl_handle);
+    if (rc != 0) {
+        fprintf(stderr, "Error within curl_easy_perform()\n");
+        exit(1);
+    }
+    long resp;
+    rc = curl_easy_getinfo(cs->curl_handle, CURLINFO_RESPONSE_CODE, &resp);
+    if (rc != 0) {
+        fprintf(stderr, "Error within curl_easy_perform()\n");
+        exit(1);
+    }
+    if (resp != 200) {
+        fprintf(stderr, "HTTP response: %ld\n", resp);
+        exit(1);
+    }
     rollbuf_mark_done(cs->r);
     return NULL;
 }

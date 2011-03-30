@@ -20,7 +20,7 @@ mkdir $wdir
 
 
 Mh=1; Mv=1;
-Th=3; Tv=4;
+Th=2; Tv=2;
 Nh=$((Mh*Th))
 Nv=$((Mv*Tv))
 
@@ -37,7 +37,7 @@ thr=${Th}x${Tv}
 matrix=$mats/t1009.bin
 # matrix=$HOME/Local/mats/c59.small.bin
 nullspace=left
-shuffle=1
+shuffle=0
 
 
 # Note that it's better to look for a kernel which is not trivial. Thus

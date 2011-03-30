@@ -1,8 +1,13 @@
+#define _POSIX_C_SOURCE 200112L
 #include "cado.h"
 #include <stdio.h>
+#include <string.h>
 #include <sys/types.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <errno.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include "bwc_config.h"
 #include "debug.h"
@@ -64,10 +69,25 @@ void keep_rolling_checkpoints(const char * stem, unsigned int v)
         char * v;
         rc = asprintf(&v, spat, k);
         ASSERT_ALWAYS(rc >= 0);
-        printf("Discarding old checkpoint %s\n", v);
-        rc = unlink(v);
+        struct stat sbuf[1];
+        rc = stat(v, sbuf);
         if (rc < 0) {
-            perror(v);
+            if (errno == ENOENT) {
+                printf("Old checkpoint %s is gone already\n", v);
+            } else {
+                printf("Old checkpoint %s: %s\n", v, strerror(errno));
+            }
+        } else {
+            ASSERT_ALWAYS(rc == 0);
+            time_t now = time(NULL);
+            int age = now - sbuf->st_mtime;
+            if (age < bw->keep_checkpoints_younger_than) {
+                printf("Not discarding old checkpoint %s, too recent (%d s < %d)\n", v, age, bw->keep_checkpoints_younger_than);
+            } else {
+                printf("Discarding old checkpoint %s\n", v);
+                rc = unlink(v);
+                if (rc < 0) perror(v);
+            }
         }
         free(v);
     }

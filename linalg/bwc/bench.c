@@ -49,6 +49,7 @@ struct bench_args {
     int rebuild;
     double freq;
     char ** mfiles;
+    const char * source_vec;
     struct private_args * p;
     struct worker_threads_group * tg;
 };
@@ -59,6 +60,8 @@ void init_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct b
     struct private_args * p = ba->p + tnum;
 
     p->mm = matmul_init(ba->xx, 0, 0, ba->mfiles[tnum], ba->impl, ba->pl, !ba->transpose);
+
+    fprintf(stderr, "Expect to find or create cache file %s\n", p->mm->cachefile_name);
 
     if (!ba->rebuild && matmul_reload_cache(p->mm)) {
         pthread_mutex_lock(&tg->mu);
@@ -73,6 +76,7 @@ void init_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct b
         fprintf(stderr, "T%d Building cache file for %s\n",
                 tnum, ba->mfiles[tnum]);
         pthread_mutex_unlock(&tg->mu);
+        fprintf(stderr, "Calling matmul_build_cache() with NULL as matrix_u32_ptr argument. Most probably a guaranteed abort()\n");
         matmul_build_cache(p->mm, NULL);
         pthread_mutex_lock(&tg->mu);
         fprintf(stderr, "T%d Cache build time %.2fs cpu\n",
@@ -299,6 +303,7 @@ int main(int argc, char * argv[])
     abase_vbase_oo_field_init_bygroupsize(A, nbys);
     A->set_groupsize(A, nbys);
 
+    param_list_lookup_string(ba->pl, "srcvec");
     if (param_list_warn_unused(ba->pl)) {
         usage();
     }/*}}}*/
@@ -350,6 +355,54 @@ int main(int argc, char * argv[])
         A->vec_random(A, p->src, p->mm->dim[1]);
         A->vec_random(A, p->dst, p->mm->dim[0]);
     }
+
+    if ((tmp = param_list_lookup_string(ba->pl, "srcvec")) != NULL) {
+        struct private_args * p = ba->p;
+        if (ba->nthreads > 1) {
+            fprintf(stderr, "srcvec incompatible with multithread\n");
+            exit(1);
+        }
+        A->vec_set_zero(A, p->src, p->mm->dim[1]);
+        A->vec_set_zero(A, p->dst, p->mm->dim[0]);
+        FILE * f = fopen(tmp, "r");
+        if (f == NULL) {
+            fprintf(stderr, "fopen(%s): %s\n", tmp, strerror(errno));
+            exit(1);
+        }
+        void * src = ba->transpose ? p->dst : p->src;
+        void * dst = ba->transpose ? p->src : p->dst;
+        int n = ba->transpose ? p->mm->dim[0] : p->mm->dim[1];
+        fprintf(stderr, "reading %zu bytes from %s\n",
+                n * sizeof(uint64_t), tmp);
+        int nread = fread(src, sizeof(uint64_t), n, f);
+        if (nread != n) {
+            fprintf(stderr, "short read (%d < %d)\n", nread, n);
+            exit(1);
+        }
+        fclose(f);
+        worker_threads_do(ba->tg, (worker_func_t) &mul_func, ba);
+        char * dstvec;
+        int rc = asprintf(&dstvec, "%s.dst", tmp);
+        ASSERT_ALWAYS(rc >= 0);
+        f = fopen(dstvec, "w");
+        int nw = ba->transpose ? p->mm->dim[1] : p->mm->dim[0];
+        fprintf(stderr, "writing %zu bytes from %s\n",
+                nw * sizeof(uint64_t), dstvec);
+        int nwritten = fwrite(dst, sizeof(uint64_t), nw, f);
+        if (nwritten != nw) {
+            fprintf(stderr, "short write (%d < %d)\n", nwritten, nw);
+            exit(1);
+        }
+        fclose(f);
+        fprintf(stderr, "Saved [%s]%s * [%s] to [%s]\n",
+                p->mm->cachefile_name,
+                ba->transpose ? "^T" : "",
+                tmp,
+                dstvec);
+        free(dstvec);
+    }
+
+
 
 #define NLAST   10
     double last[10]={0,};

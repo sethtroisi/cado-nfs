@@ -20,6 +20,12 @@
  * only the row-weight and col-weight files are read.
  */
 
+/* TODO: Now that all files input and output by bwc are permutation
+ * independent, there is room for computing this permutation on the fly
+ * if the balancing argument is not provided (and only in this case).
+ * Essentially we would hook onto the mmt_fill_fields_from_balancing()
+ * function called from mmt_finish_init().
+ */
 void usage(int rc) {
     fprintf(stderr,
             "Usage: ./mf_bal [options,flags] <nh> <nv> <matrix file>\n");
@@ -331,6 +337,10 @@ int main(int argc, char * argv[])
 
     size_t maxdim = MAX(bal->h->nrows, bal->h->ncols);
     if (maxdim != bal->h->nrows) {
+        fprintf(stderr, "More columns than rows."
+                " Most of the code now requires nrows > ncols,"
+                " so we presume this matrix will lead"
+                " to a failure somewhere\n");
         // weird. nothing wrong, but this program has not been written
         // with this situation in mind, so most probably we're going to
         // lack stuff.
@@ -442,6 +452,12 @@ int main(int argc, char * argv[])
         modul_clear(ai, M);
         modul_clear(bi, M);
         modul_clearmod(M);
+    }
+    if (param_list_lookup_string(pl, "noshuffle")) { /* internal, for debugging. don't use */
+        bal->h->pshuf[0] = 1;
+        bal->h->pshuf[1] = 0;
+        bal->h->pshuf_inv[0] = 1;
+        bal->h->pshuf_inv[1] = 0;
     }
 
     /* prepare for qsort */

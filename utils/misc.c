@@ -1,4 +1,8 @@
+#define _POSIX_C_SOURCE 200112L
 #include "cado.h"       /* feature macros, no includes */
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <stddef.h>
 #include <string.h>
@@ -172,4 +176,44 @@ void filelist_clear(char ** filelist)
     for(char ** p = filelist ; *p ; p++)
         free(*p);
     free(filelist);
+}
+
+int mkdir_with_parents(const char * dir, int fatal)
+{
+    char * tmp = strdup(dir);
+    int n = strlen(dir);
+    int pos = 0;
+    if (dir[0] == '/')
+        pos++;
+    for( ; pos < n ; ) {
+        for( ; dir[pos] == '/' ; pos++) ;
+        if (pos == n) break;
+        const char * slash = strchr(dir + pos, '/');
+        strncpy(tmp, dir, n);
+        if (slash) {
+            pos = slash - dir;
+            tmp[pos]='\0';
+        } else {
+            pos = n;
+        }
+        struct stat sbuf[1];
+        int rc = stat(tmp, sbuf);
+        if (rc < 0) {
+            if (errno != ENOENT) {
+                fprintf(stderr, "accessing %s: %s\n", tmp, strerror(errno));
+                free(tmp);
+                if (fatal) exit(1);
+                return -errno;
+            }
+            rc = mkdir(tmp, 0777);
+            if (rc < 0) {
+                fprintf(stderr, "mkdir(%s): %s\n", tmp, strerror(errno));
+                free(tmp);
+                if (fatal) exit(1);
+                return -errno;
+            }
+        }
+    }
+    free(tmp);
+    return 0;
 }

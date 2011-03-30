@@ -9,6 +9,7 @@
 #include "bw-common.h"
 #include "params.h"
 #include "filenames.h"
+#include "utils.h"
 
 struct bw_params bw[1];
 
@@ -32,6 +33,14 @@ int bw_common_init_defaults(struct bw_params * bw)
 
     return 0;
 }
+
+typedef int (*sortfunc_t) (const void*, const void*);
+
+static int intcmp(const int * a, const int * b)
+{
+    return (*a>*b)-(*b>*a);
+}
+
 
 int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, char *** p_argv)
 {
@@ -63,6 +72,10 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     const char * tmp;
 
     if ((tmp = param_list_lookup_string(pl, "wdir")) != NULL) {
+        /* We now do mkdir -p beforehand on all jobs. Note that at the
+         * point where the current function is being called, we're not
+         * multithreaded yet */
+        mkdir_with_parents(tmp, 1);
         if (chdir(tmp) < 0) {
             fprintf(stderr, "chdir(%s): %s\n", tmp, strerror(errno));
             exit(1);
@@ -86,6 +99,7 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     param_list_parse_int(pl, "checkpoints", &bw->checkpoints);
     param_list_parse_int(pl, "skip_online_checks", &bw->skip_online_checks);
     param_list_parse_int(pl, "keep_rolling_checkpoints", &bw->keep_rolling_checkpoints);
+    param_list_parse_int(pl, "keep_checkpoints_younger_than", &bw->keep_checkpoints_younger_than);
     param_list_parse_int(pl, "checkpoint_precious", &bw->checkpoint_precious);
 
     int yes_i_insist = 0;
@@ -136,6 +150,22 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
         fprintf(stderr, "parameter m and/or n is missing\n");
         usage();
     }
+
+    bw->number_of_check_stops = param_list_parse_int_list(pl, "check_stops", bw->check_stops, MAX_NUMBER_OF_CHECK_STOPS, ",");
+    int interval_already_in_check_stops = 0;
+    for(int i = 0 ; i < bw->number_of_check_stops ; i++) {
+        if (bw->check_stops[i] == bw->interval) {
+            interval_already_in_check_stops = 1;
+            break;
+        }
+    }
+    if (!interval_already_in_check_stops) {
+        ASSERT_ALWAYS(bw->number_of_check_stops < MAX_NUMBER_OF_CHECK_STOPS - 1);
+        bw->check_stops[bw->number_of_check_stops++] = bw->interval;
+    }
+    qsort(bw->check_stops, bw->number_of_check_stops, sizeof(int), (sortfunc_t) &intcmp);
+
+
 
     if (bw->verbose && bw->can_print)
         param_list_display (pl, stderr);
