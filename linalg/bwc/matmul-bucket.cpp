@@ -617,17 +617,17 @@ void split_large_slice_in_vblocks(builder * mb, large_slice_t * L, large_slice_r
          * coefficients, since the padding coeffs need to be cancelled as
          * well.
          */
-        if (vblocknum) {
-            for( ; nf >= 2 ; mp+=4, nf-=2) {
-                if (mp[0] != 255 || mp[1] || mp[2] || mp[3])
-                    break;
-            }
-        }
         V.t8c.resize(3 * nf);
         uint8_t * q = ptrbegin(V.t8c);
         memcpy(q, mp, 2 * nf * sizeof(uint8_t));
         if (vblocknum) {
-            q[0] = 0;
+            uint8_t * pmp = q;
+            for(size_t k = 0 ; k + 2 <= nf ; k+=2, pmp+=4) {
+                if (pmp[0] != 255 || pmp[1] || pmp[2] || pmp[3])
+                    break;
+                pmp[0] = 0;
+            }
+            pmp[0] = 0;
         }
         unsigned int ind_sizes[LSL_NBUCKETS_MAX] = {0,};
         q += 2*nf;

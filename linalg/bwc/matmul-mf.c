@@ -50,7 +50,7 @@ void mf_prepare_matrix_u32(matmul_ptr mm, matrix_u32_ptr m, const char * file)
     m->twist = NULL;
     m->p = mf->p;
 
-    mm->dim[0] = rw->size;
-    mm->dim[1] = cw->size;
+    mm->dim[m->transpose] = rw->size;
+    mm->dim[!m->transpose] = cw->size;
 }
 

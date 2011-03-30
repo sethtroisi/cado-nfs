@@ -1,5 +1,6 @@
 
-include_directories (bwc)
+include_directories(bwc) # for worker-threads.[ch]
+
 add_executable(characters characters.c gauss.c blockmatrix.c
     bit_matrices.c bwc/worker-threads.c)
 target_link_libraries(characters utils pthread)
