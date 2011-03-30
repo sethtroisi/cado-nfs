@@ -47,7 +47,7 @@ struct matmul_public_s {
                                    also obeys the ``transposed'' flag */
     uint64_t ncoeffs;
 
-    unsigned int store_transposed;
+    int store_transposed;
 
     int iteration[2];
 

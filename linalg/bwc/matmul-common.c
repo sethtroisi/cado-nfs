@@ -91,12 +91,15 @@ void matmul_common_clear(struct matmul_public_s * mm)
     mm->ntwists = 0;
 }
 
-/* Okay, this matrix reading stage is really a memory hog. But it's
- * done only once, so we practically don't care. */
+/* This matrix reading stage is really a memory hog. Presently it should
+ * never be called, since we always provide the pointer to the builder
+ * function by other means.
+ */
 uint32_t * matmul_common_read_stupid_data(struct matmul_public_s * mm)
 {
     uint32_t * data;
     unsigned int nr, nc;
+    abort();
     if (mm->store_transposed) {
         read_easy(mm->locfile, NULL, &data, &nr, &nc);
     } else {

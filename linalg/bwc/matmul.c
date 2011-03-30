@@ -91,11 +91,23 @@ void matmul_build_cache(matmul_ptr mm, matrix_u32_ptr m)
      *
      * This code fragment should rather be in matmul-common
      */
-    mm->ntwists = m->ntwists;
-    mm->twist = m->twist;
-    m->ntwists = 0;
-    m->twist = NULL;
-    mm->bind->build_cache(mm, m->p);
+    if (m) {
+        mm->ntwists = m->ntwists;
+        mm->twist = m->twist;
+        m->ntwists = 0;
+        m->twist = NULL;
+    } else {
+        mm->ntwists = 0;
+        mm->twist = NULL;
+    }
+    /*
+    if (m == NULL) {
+        fprintf(stderr, "Called matmul_build_cache() with NULL as matrix_u32_ptr argument. A guaranteed abort() !\n");
+    }
+    */
+    /* read from ->locfile if the raw_matrix_u32 structure has not yet
+     * been created. */
+    mm->bind->build_cache(mm, m ? m->p : NULL);
 }
 
 static void save_to_local_copy(matmul_ptr mm)

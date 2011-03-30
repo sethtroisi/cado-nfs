@@ -145,9 +145,9 @@ struct matmul_sliced_data_s * matmul_sliced_init(abdst_field xx, param_list pl, 
     int suggest = optimized_direction ^ MM_DIR0_PREFERS_TRANSP_MULT;
     mm->public_->store_transposed = suggest;
     if (pl) {
-        param_list_parse_uint(pl, "mm_store_transposed", 
+        param_list_parse_int(pl, "mm_store_transposed", 
                 &mm->public_->store_transposed);
-        if (mm->public_->store_transposed != (unsigned int) suggest) {
+        if (mm->public_->store_transposed != suggest) {
             fprintf(stderr, "Warning, mm_store_transposed"
                     " overrides suggested matrix storage ordering\n");
         }           

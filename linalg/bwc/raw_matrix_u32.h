@@ -38,6 +38,8 @@ typedef struct matrix_u32_s * matrix_u32_ptr;
  * is more efficient eventually.
  */
  
+extern void matrix_u32_init_from_file(matrix_u32_ptr m, const char * file, int stored_transposed);
+
 
 #ifdef __cplusplus
 }

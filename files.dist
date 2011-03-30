@@ -52,6 +52,8 @@ linalg/bwc/intersections.h
 linalg/bwc/krylov.c
 linalg/bwc/lingen_binary.cpp
 linalg/bwc/lingen_mat_types.hpp
+linalg/bwc/matmul-mf.c
+linalg/bwc/matmul-mf.h
 linalg/bwc/matmul-basic.c
 linalg/bwc/matmul-basic.h
 linalg/bwc/matmul-bucket.cpp

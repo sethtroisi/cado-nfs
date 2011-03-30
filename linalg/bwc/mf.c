@@ -307,6 +307,7 @@ void matrix_read_pass(
             fprintf(m_out->f, "\n");
 
         if (rw_out) { /* {{{ write row weight to rw file */
+            rw_out->size++;
             if (rw_out->p) rw_out->p[i]=w;
             if (rw_out->f) {
                 if (rw_out->ascii) {
@@ -323,11 +324,16 @@ row_done:
             if (t >= t1) {
                 t1 = t + 1;
                 int dt = t - t0;
-                size_t sz = ftell(m_in->f) >> 20;
+                size_t sz;
+                if (m_in->f) {
+                    sz = ftell(m_in->f);
+                } else {
+                    sz = (ptr - m_in->p) * sizeof(uint32_t);
+                }
                 fprintf(stderr, "read %zu MB in %d s (%.1f MB/s)   \r",
-                        sz,
+                        sz >> 20,
                         dt,
-                        (double) sz / dt);
+                        1.0e-6 * (double) sz / dt);
             }
         }/*}}}*/
     }

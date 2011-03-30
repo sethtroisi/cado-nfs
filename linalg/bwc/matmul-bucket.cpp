@@ -385,9 +385,9 @@ struct matmul_bucket_data_s * matmul_bucket_init(abdst_field xx MAYBE_UNUSED, pa
     int suggest = optimized_direction ^ MM_DIR0_PREFERS_TRANSP_MULT;
     mm->public_->store_transposed = suggest;
     if (pl) {
-        param_list_parse_uint(pl, "mm_store_transposed",
+        param_list_parse_int(pl, "mm_store_transposed",
                 &mm->public_->store_transposed);
-        if (mm->public_->store_transposed != (unsigned int) suggest) {
+        if (mm->public_->store_transposed != suggest) {
             fprintf(stderr, "Warning, mm_store_transposed"
                     " overrides suggested matrix storage ordering\n");
         }   
@@ -2108,6 +2108,8 @@ static inline void matmul_sub_large_fbi(abdst_field x, abelt ** sb, const abelt 
      * expected in q[] All the sb[] pointers are increased */
     for(unsigned int c = 0 ; c < n ; c++) {
         z += *q;
+        // we might receive zmax and do some checking (see caller)
+        // ASSERT_ALWAYS(z < zmax);
         q++;
         abset(x, sb[*q][0], z[0]);
         sb[*q]+= 1;
@@ -2232,6 +2234,9 @@ static inline void matmul_bucket_mul_large(struct matmul_bucket_data_s * mm, sli
             prepare_buckets(x,bucket,scratch,pos->ql,LSL_NBUCKETS_MAX);
             ASSERT_ALWAYS((((unsigned long)pos->q8)&1)==0);
             matmul_sub_large_fbi(x, bucket, inp, pos->q8, n);
+            // the (inp) variable in the call above never exceeds from +
+            // j1, although we don't do the check in reality.
+            // matmul_sub_large_fbi_boundschecked(x, bucket, inp, pos->q8, n, from + j1);
             matmul_sub_large_asb(x, where, scratch, pos->q8+2*n, pos->ql);
             pos->q8 += 3*n;
             // fix alignment !

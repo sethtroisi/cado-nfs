@@ -54,6 +54,7 @@ set(balancing_sources ${balancing_sources} balancing_rollbuf.c balancing_curl_so
 endif (HAVE_CURL)
 
 add_library(balancing ${balancing_sources})
+
 set_target_properties(balancing PROPERTIES
         COMPILE_FLAGS "--mpi"
         LINK_FLAGS "--mpi")
@@ -167,8 +168,12 @@ macro(bwc_program v)
     add_dependencies(${v} ${all_matmul_libs})
 endmacro(bwc_program)
 
+add_library(matmul_mf matmul-mf.c)
+target_link_libraries(matmul_mf mf)
 bwc_program(build build.c)
+target_link_libraries(build matmul_mf)
 bwc_program(bench bench.c)
+target_link_libraries(bench matmul_mf)
 set_source_files_properties (../gauss.c COMPILE_FLAGS "-DMULTI_ROW=3 -DNO_MAIN")
 bwc_program(prep prep.c xymats.c ../gauss.c)
 bwc_program(krylov krylov.c xymats.c xdotprod.c)

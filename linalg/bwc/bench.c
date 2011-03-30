@@ -23,6 +23,7 @@
 #include "worker-threads.h"
 #include "utils.h"
 #include "mpfq/abase_vbase.h"
+#include "matmul-mf.h"
 // #include "debug.h"
 
 void usage()
@@ -76,8 +77,10 @@ void init_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct b
         fprintf(stderr, "T%d Building cache file for %s\n",
                 tnum, ba->mfiles[tnum]);
         pthread_mutex_unlock(&tg->mu);
-        fprintf(stderr, "Calling matmul_build_cache() with NULL as matrix_u32_ptr argument. Most probably a guaranteed abort()\n");
-        matmul_build_cache(p->mm, NULL);
+        ASSERT_ALWAYS(p->mm->store_transposed == ba->transpose);
+        matrix_u32 m;
+        mf_prepare_matrix_u32(p->mm, m, ba->mfiles[tnum]);
+        matmul_build_cache(p->mm, m);
         pthread_mutex_lock(&tg->mu);
         fprintf(stderr, "T%d Cache build time %.2fs cpu\n",
                 tnum, (double) (clock()-ct0) / CLOCKS_PER_SEC);
@@ -386,7 +389,7 @@ int main(int argc, char * argv[])
         ASSERT_ALWAYS(rc >= 0);
         f = fopen(dstvec, "w");
         int nw = ba->transpose ? p->mm->dim[1] : p->mm->dim[0];
-        fprintf(stderr, "writing %zu bytes from %s\n",
+        fprintf(stderr, "writing %zu bytes to %s\n",
                 nw * sizeof(uint64_t), dstvec);
         int nwritten = fwrite(dst, sizeof(uint64_t), nw, f);
         if (nwritten != nw) {
