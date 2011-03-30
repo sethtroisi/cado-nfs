@@ -627,6 +627,17 @@ void split_large_slice_in_vblocks(builder * mb, large_slice_t * L, large_slice_r
                     break;
                 pmp[0] = 0;
             }
+            if (pmp-q) {
+                /* It's ok to cancel padding coefficients, anyway it
+                 * should be very rare. However, it would be bad to
+                 * start cancelling a huge number of these, because then we
+                 * would be better off adjusting the pointers (peeling
+                 * off the phony computation at the beggining of mf[]).
+                 * Problem is that in such a case, we would also have to
+                 * adjust the indirection pointer as well, which would be
+                 * messy. */
+                printf("*** cancelled %td padding coefficient\n", (pmp-q)/4);
+            }
             pmp[0] = 0;
         }
         unsigned int ind_sizes[LSL_NBUCKETS_MAX] = {0,};
