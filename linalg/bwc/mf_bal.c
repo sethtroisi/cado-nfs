@@ -458,7 +458,6 @@ int main(int argc, char * argv[])
             ASSERT(rx < bal->h->ncols);
         }
         uint32_t w = colweights[rx];
-        colweights[rx] = UINT32_MAX;
         tw += w;
         double x = w;
         bal->colperm[2*r]=w;
@@ -466,7 +465,6 @@ int main(int argc, char * argv[])
         s1 += x;
         s2 += x * x;
     }
-    free(colweights);
     double avg = s1 / bal->h->ncols;
     double sdev = sqrt(s2 / bal->h->ncols - avg*avg);
     t_cw += wct_seconds();
@@ -503,25 +501,32 @@ int main(int argc, char * argv[])
         }
         double rs1 = 0;
         double rs2 = 0;
-        double rc = 0;
+        double rc_plain = 0;
+        double rc_decorr = 0;
         for(size_t r = 0 ; r < n ; r++) {
             double x = rowweights[r];
             rs1 += x;
             rs2 += x * x;
-            rc += x * bal->colperm[2*r];
+            rc_plain += x * colweights[r];
+            rc_decorr += x * bal->colperm[2*r];
         }
         double ravg = rs1 / n;
         double rsdev = sqrt(rs2 / n - ravg*ravg);
         double cavg = s1 / n;
         double csdev = sqrt(s2 / n - cavg*cavg);
-        double cov = rc / n - ravg * cavg;
-        double corr = cov / csdev / rsdev;
+        double pcov = rc_plain / n - ravg * cavg;
+        double pcorr = pcov / csdev / rsdev;
+        double dcov = rc_decorr / n - ravg * cavg;
+        double dcorr = dcov / csdev / rsdev;
 
         fprintf(stderr, "%"PRIu32" rows ; avg %.1f sdev %.1f [scan time %.1f s]\n",
                 bal->h->nrows, ravg, rsdev, t_rw);
         fprintf(stderr, "row-column correlation coefficient is %.4f\n",
-                corr);
+                pcorr);
+        fprintf(stderr, "row-column correlation coefficient after decorrelation is %.4f\n",
+                dcorr);
     }
+    free(colweights);
 
     struct slice * h = shuffle_rtable("col", bal->colperm, maxdim + padding, bal->h->nv);
 
