@@ -101,13 +101,8 @@ linalg/gauss.c
 linalg/gauss.h
 linalg/readbuffer.c
 linalg/readbuffer.h
-linalg/readmat-easy.c
-linalg/readmat-easy.h
-linalg/readmat.c
-linalg/readmat.h
 linalg/rowset_heap.cpp
 linalg/rowset_heap.h
-linalg/transpose.c
 local.sh.macosx-leopard
 local.sh.example
 macros.h

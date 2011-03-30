@@ -98,8 +98,11 @@ void matrix_read_pass(
 
     /* This gathers several possible ways of reading the matrix. It
      * encompasses the task of both mf_b_fq and mf_a2b_fq. It can also be used
-     * to write anf mf_b2a tool, or to supersede the read_easy functions in
-     * ../readmat-easy.c
+     * to write anf mf_b2a tool.
+     *
+     * This supersedes the read_easy functions which used to reside in
+     * ../readmat-easy.c -- see build.c for an example of use (the
+     * function there could be exported somewhere).
      */
     ASSERT_ALWAYS(m_in);
     ASSERT_ALWAYS(m_in->p == NULL || m_in->f == NULL);

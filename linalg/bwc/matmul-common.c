@@ -4,7 +4,6 @@
 #include "bwc_config.h"
 #include "matmul-common.h"
 #include "params.h"
-#include "readmat-easy.h"
 
 #define MM_COMMON_MAGIC 0xb0010002UL
 
@@ -89,27 +88,4 @@ void matmul_common_clear(struct matmul_public_s * mm)
     free(mm->twist);
     mm->twist = NULL;
     mm->ntwists = 0;
-}
-
-/* This matrix reading stage is really a memory hog. Presently it should
- * never be called, since we always provide the pointer to the builder
- * function by other means.
- */
-uint32_t * matmul_common_read_stupid_data(struct matmul_public_s * mm)
-{
-    uint32_t * data;
-    unsigned int nr, nc;
-    abort();
-    if (mm->store_transposed) {
-        read_easy(mm->locfile, NULL, &data, &nr, &nc);
-    } else {
-        read_easy(mm->locfile, &data, NULL, &nr, &nc);
-    }
-    if (mm->dim[0] == 0 && mm->dim[1] == 0) {
-        mm->dim[0] = nr;
-        mm->dim[1] = nc;
-    }
-    ASSERT_ALWAYS(mm->dim[0] == nr);
-    ASSERT_ALWAYS(mm->dim[1] == nc);
-    return data;
 }

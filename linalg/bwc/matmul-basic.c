@@ -69,8 +69,7 @@ struct matmul_basic_data_s * matmul_basic_init(void* xx, param_list pl, int opti
 
 void matmul_basic_build_cache(struct matmul_basic_data_s * mm, uint32_t * data)
 {
-    if (!data)
-        data = matmul_common_read_stupid_data(mm->public_);
+    ASSERT_ALWAYS(data);
 
     unsigned int nrows_t = mm->public_->dim[ mm->public_->store_transposed];
     

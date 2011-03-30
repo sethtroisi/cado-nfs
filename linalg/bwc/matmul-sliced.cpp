@@ -160,8 +160,7 @@ struct matmul_sliced_data_s * matmul_sliced_init(abdst_field xx, param_list pl, 
 
 void matmul_sliced_build_cache(struct matmul_sliced_data_s * mm, uint32_t * data)
 {
-    if (!data)
-        data = matmul_common_read_stupid_data(mm->public_);
+    ASSERT_ALWAYS(data);
 
     uint32_t i0 = 0;
     uint32_t i1 = mm->public_->dim[ mm->public_->store_transposed];

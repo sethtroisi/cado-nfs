@@ -1,5 +1,0 @@
-add_executable(submatrix submatrix.c readmat.c)
-target_link_libraries(submatrix utils)
-
-# vim: set ft=cmake:
-

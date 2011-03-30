@@ -48,7 +48,6 @@ using namespace std;
 // #define ENABLE_ASM
 #endif
 
-#include "readmat-easy.h"
 #include "matmul-common.h"
 
 // take only a portion of the L1 cache.
@@ -429,7 +428,7 @@ struct builder {
 void builder_init(builder * mb, struct matmul_bucket_data_s * mm, uint32_t * data)
 {
     memset(mb, 0, sizeof(struct builder));
-    if (!data) data = matmul_common_read_stupid_data(mm->public_);
+    ASSERT_ALWAYS(data);
     mb->data[0] = data;
     mb->data[1] = NULL;
 

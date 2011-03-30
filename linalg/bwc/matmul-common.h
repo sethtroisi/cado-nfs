@@ -14,7 +14,6 @@ extern "C" {
 FILE * matmul_common_reload_cache_fopen(size_t, struct matmul_public_s * mm, uint32_t magic);
 FILE * matmul_common_save_cache_fopen(size_t, struct matmul_public_s * mm, uint32_t magic);
 void matmul_common_clear(struct matmul_public_s * mm);
-uint32_t * matmul_common_read_stupid_data(struct matmul_public_s * mm);
 
 extern const char * rowcol[2];  // [0] = "row" [1] = "col"
 

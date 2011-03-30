@@ -74,8 +74,6 @@ utils/CMakeLists-nodist.txt
 utils/cache.c
 utils/cachesize.c
 utils/build-testcases-rootfinder.m
-linalg/CMakeLists-nodist.txt
-linalg/submatrix.c
 linalg/bwc/CMakeLists-nodist.txt
 linalg/bwc/bench_polmatmul.cpp
 polyselect/CMakeLists-nodist.txt
