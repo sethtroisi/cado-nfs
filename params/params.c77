@@ -41,7 +41,7 @@ selectnice=4            # nice level for selection
 # Murphy's E(Bf=10000000,Bg=5000000,area=1.00e+16)=2.55e-07
 
 ## Parameters of polyselect
-kjadmax=10000           # max value for lc(f)
+kjadmax=1e4             # max value for lc(f)
 kjadrange=1000          # individual tasks
 kjkmax=18               # rotation is bounded by 2^kmax
 kjincr=60               # forced divisor of lc(f)

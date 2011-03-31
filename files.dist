@@ -43,6 +43,7 @@ linalg/bwc/checks.sh
 linalg/bwc/debug.c
 linalg/bwc/debug.h
 linalg/bwc/do-one-test.sh
+linalg/bwc/test.c
 utils/fakempi.h
 utils/fakepthread.h
 linalg/bwc/filenames.h

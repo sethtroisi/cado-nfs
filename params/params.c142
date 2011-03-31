@@ -38,13 +38,13 @@ selectnice=4            # nice level for selection
 # we get
 # lognorm: 44.62, alpha: -4.82 E=39.80
 # Murphy's E(Bf=10000000,Bg=5000000,area=1.00e+16)=1.08e-11
-# (with kjadmax=2000000000)
+# (with kjadmax=2e9)
 
 ## Parameters of polyselect
 kjP=100000              # choose lc(g) with two prime factors in [P,2P]
 kjmaxnorm=46            # max. lognorm of polynomials (before rootsieve)
-kjadmax=3000000000      # max value for lc(f)
-kjadrange=300000000     # individual tasks
+kjadmax=3e9             # max value for lc(f)
+kjadrange=15e7          # individual tasks
 kjkmax=20               # rotation is bounded by 2^kmax
 kjincr=30030            # forced divisor of lc(f)
 
