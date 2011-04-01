@@ -54,7 +54,9 @@ req_arg() {
 while [ "$#" -gt 0 ] ; do
     arg="$1"
     shift
-    if [ "$arg" = "-i" ] ; then
+    if [[ "$arg" =~ [a-z]+=.* ]] ; then
+        eval "$arg"
+    elif [ "$arg" = "-i" ] ; then
         req_arg $arg 1 $#
         interval="$1"
         shift
@@ -169,45 +171,52 @@ set_runtime_variables() {
     export wdir=/tmp/bwc.$cluster
 }
 
+
+get_possible_bcodes() {
+    split="$1"
+    res=()
+    for rsync_server in ${rsync_servers[@]} ; do
+        x=$( (rsync  --include="$matrix_base.$split.????????.bin" --exclude='*' $rsync_server$server_subdir/$split/ || :) | perl -ne "m,$matrix_base\.$split\.([\da-f]+)\.bin, && print qq{\$1\n};")
+        if [ "$x" ] ; then
+            res=(${res[@]} $x)
+        fi
+    done
+    possible_bcodes=(`echo "${res[@]}" | xargs -n 1 echo | sort -u`)
+    if [ ${#possible_bcodes[@]} -eq 0 ] ; then
+        echo "No known balancing for $split" >&2
+        return 1
+    elif [ ${#possible_bcodes[@]} -gt 1 ] ; then
+        echo "Several known possible balancings for $split: ${possible_bcodes[*]}" >&2
+        return 1
+    else
+        bcode=${possible_bcode[0]}
+        echo "Automatically selecting $bcode as only bcode already configured for $split"
+    fi
+    return 0
+}
+
+
+
 # TODO: presently, when the bcode is not known, then the balancing is
 # computed, which also has the effect of re-computing the dispatch. Of
 # course, the thing to do is to update this file to improve its
 # knowledge.
 pick_cluster_configuration() {
-    if [ "$mpi" ] && [ "$thr" ] && [ "$bcode" ] ; then
+    if [ "$bcode" ] ; then
         return
-    fi
-    case "$matrix_base/$cluster/$nnodes" in
-        example/truffe/1) mpi=1x1 thr=2x2 bcode=78713a01;;
-        # c72/*/1) mpi=1x1 thr=1x1 bcode=26082101;;
-        c72/*/1) mpi=1x1 thr=2x2 bcode=5aae0b01;;
-        snfs247.small/edel/30)    mpi=5x6 thr=4x2 bcode=ca4a7001;; # old 0.40
-        snfs247.small/genepi/12)    mpi=3x4 thr=4x2 bcode=0a426301;;
-        snfs247.small/chinqchint/12)    mpi=3x4 thr=4x2 bcode=0a426301;; # new 1.80 old 1.73 mpich2-1.3.2p1
-        womack/chinqchint/12)    mpi=3x4 thr=4x2 bcode=todo;;
-        snfs247.small/chinqchint/30)    mpi=5x6 thr=4x2 bcode=todo;;
-        snfs247.small/parapluie/20) mpi=5x4 thr=4x3 bcode=ca4a7001;; # new 0.72 old:0.72
-        snfs247.small/parapluie/10) mpi=5x2 thr=4x6 bcode=todo;;
-        # parapluie/12) mpi=4x3 thr=5x4 bcode=todo;; # old 0.92
-        # parapluie/12)    mpi=2x6 thr=6x2 bcode=todo;;
-        # parapluie/12)    mpi=3x4 thr=4x3 bcode=todo;;
-        # parapluie/12)    mpi=1x12 thr=12x1 bcode=todo;;
-        snfs247.small/parapluie/6)    mpi=2x3 thr=6x4 bcode=todo;;
-        snfs247.small/parapluie/8)    mpi=1x8 thr=8x1 bcode=todo;;
-        # graphene/60)    mpi=5x12 thr=4x1 bcode=todo;;       # old 0.36
-        snfs247.small/graphene/60)    mpi=10x6 thr=2x2 bcode=ca4a7001;; # old 0.34
-        womack/graphene/30)    mpi=5x6 thr=2x2 bcode=65bc0c01;;
-        snfs247.small/griffon/30)    mpi=5x6 thr=4x2 bcode=ca4a7001;; # new 0.78 old 0.81
-        snfs247.small/griffon/32)    mpi=4x8 thr=4x2 bcode=cf486301;; # new 0.72
-        snfs247.small/graphene/16)    mpi=4x4 thr=2x2 bcode=50e16501;; # new 0.90
-        snfs247.small/griffon/60)    mpi=10x6 thr=2x2 bcode=ca4a7001;; # new 0.56
-        *)
-            if ! ( [ "$mpi" ] && [ "$thr" ] ) ; then
-                echo "Configuration $matrix_base/$cluster/$nnodes not configured" >&2
+    else
+        # Try to list the known bcodes, if any.
+        if get_possible_bcodes ; then
+            return
+        else
+            # Then it's as if we had nothing. bcode is not
+            # determined, we'll have to recompute the balancing
+            if [ ${#possible_bcodes[@]} -gt 1 ] ; then
+                echo "Cannot decide which bcode to take" >&2
                 exit 1
             fi
-            ;;
-    esac
+        fi
+    fi
 }
 
 late_variables() {
@@ -268,7 +277,7 @@ EOF
     fi
 }
 
-http_get_somewhere() {
+http_head_somewhere() {
     if [ "$1" = "-r" ] ; then
         reuired=1
         shift
@@ -289,11 +298,11 @@ http_get_somewhere() {
     return 1
 }
 
-http_get_somewhere -r "$matrix_base.bin"
+http_head_somewhere -r "$matrix_base.bin"
 ncoeffs=$((`echo "$output" | awk '/^Content-Length/ { print $2 }'`/4))
-http_get_somewhere "$matrix_base.rw.bin"
+http_head_somewhere "$matrix_base.rw.bin"
 nrows=$((`echo "$output" | awk '/^Content-Length/ { print $2 }'`/4))
-http_get_somewhere "$matrix_base.cw.bin"
+http_head_somewhere "$matrix_base.cw.bin"
 ncols=$((`echo "$output" | awk '/^Content-Length/ { print $2 }'`/4))
 let ncoeffs-=$nrows
 
@@ -412,7 +421,7 @@ save_once() {
         # echo "will save $f"
         process=("${process[@]}" "$f")
     done
-    if [ ${#process} -gt 0 ] ; then
+    if [ ${#process[@]} -gt 0 ] ; then
         $fetch --put --on $leader "${process[*]}"
     fi
 }
@@ -428,13 +437,16 @@ backlog() {
     done < /dev/null
 }
 
-
-
-
 get_last() {
-    x=$(rsync  --include='V*' --exclude='*' $rsync_server$server_subdir | perl -ne '/V0-64\.(\d+)$/ && print "$1\n";' | sort -n | tail -1)
-    : ${x:=0}
-    echo $x
+    last=0
+    for rsync_server in ${rsync_servers[@]} ; do
+        x=$(rsync  --include='V*' --exclude='*' $rsync_server$server_subdir | perl -ne '/V0-64\.(\d+)$/ && print "$1\n";' | sort -n | tail -1)
+        : ${x:=0}
+        if [ "$x" -gt "$last" ] ; then
+            last=$x
+        fi
+    done
+    echo $last
 }
 
 # Caveat: we have to make sure to move V files before starting mksol.

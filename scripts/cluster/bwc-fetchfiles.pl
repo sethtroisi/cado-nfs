@@ -340,7 +340,11 @@ for my $h (keys %$dispatch) {
                     $cmd .= " $ldir/$base";
                     $cmd .= " $server/$subdir";
                 } else {
-                    $cmd .= " $server/$subdir$base";
+                    if (defined($cache_server)) {
+                        $cmd .= " $server/$base";
+                    } else {
+                        $cmd .= " $server/$subdir$base";
+                    }
                     $cmd .= " $ldir/";
                 }
                 # We used to discard stderr.
