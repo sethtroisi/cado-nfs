@@ -159,7 +159,7 @@ typedef struct {
 typedef _bestpoly_t bestpoly_t[1];
 
 
-/* Sieving data struct */
+/* Parameters struct */
 typedef struct {
 	 int w_left_bound;
 	 int w_length;
@@ -183,5 +183,14 @@ typedef struct {
 
 } _param_t;
 typedef _param_t param_t[1];
+
+
+/* Sieving array */
+typedef struct {
+	 int16_t *array;
+	 unsigned int len_i;
+	 unsigned int len_j;
+} _sievearray_t;
+typedef _sievearray_t sievearray_t[1];
 
 /* -- ADD FUNCTION DECLARES -- */
