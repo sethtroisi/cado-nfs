@@ -4582,7 +4582,7 @@ rootsieve_run_multroot_lift ( node *currnode,
 
 					/* For each i block */
 					long old_j = j_idx;
-					while (i_idx < sa->len_i) {
+					while (i_idx < (long) sa->len_i) {
 						 j_idx = old_j;
 						 rootsieve_run_line ( sa->array,
 											  i_idx * sa->len_j + sa->len_j - 1,
@@ -4648,7 +4648,7 @@ rootsieve_run_multroot_lift ( node *currnode,
 
 		  /* For each i block */
 		  long old_j = j_idx;
-		  while (i_idx < sa->len_i) {
+		  while (i_idx < (long) sa->len_i) {
 
 			   j_idx = old_j;
 			   rootsieve_run_line ( sa->array,
