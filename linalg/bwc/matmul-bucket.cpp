@@ -50,38 +50,12 @@ using namespace std;
 
 #include "matmul-common.h"
 
-// take only a portion of the L1 cache.
-#define L1_CACHE_SIZE   28000
-// for 8-bytes abt values, this gives 3500 items.
-
-// make sure that it's something each core can use (i.e. divide by two
-// the L2 cache size for a dual-core w/ shared L2).
-#define L2_CACHE_SIZE   1600000
-
-/* To what should we compare the average dj value for determining when we
- * should switch from dense (small) to sparse (large) blocks */
-#define DJ_CUTOFF1   1.5
-
-/* Same, but for stopping large blocks and go to the next type
- * (currently, deferred blocks)
- */
-#define DJ_CUTOFF2   3.0
-
-/* How many buckets in large slices, and in large slices which are
- * contained in small slices. */
-#define LSL_NBUCKETS_MAX      256
-
-/* How many large slices MINIMUM must go in a huge slice ? Below this
- * value, we keep going producing large slices. */
-#define HUGE_MPLEX_MIN        2
-
-/* Here, I've seen 97 slices be handled best with 2 mplexed rounds. So
- * let's fix 64. */
-#define HUGE_MPLEX_MAX        64
-
-#define xxxDEBUG_BUCKETS
-
-/* This implementation builds upon the ``sliced'' variant. 
+/* {{{ Documentation
+ *
+ * Parameters referred to by this documentation text may be tuned via
+ * #define's below.
+ *
+ * This implementation builds upon the ``sliced'' variant. 
  * The format used with the -sliced implementation is still used, but
  * there is also another format used for very dense strips. We refer to
  * matmul-sliced.cpp for the first format, which is called ``small1''
@@ -142,9 +116,9 @@ using namespace std;
  * The portion of the matrix under study is split into several vertical
  * blocks of at most 2^16 entries. In the other direction, we make splits
  * according to the average row density. A first batch of row has some
- * indicative density X, the next one X/2, and so on (the ratio 2 being a
- * tunable constant) until the sparsest block at the bottom.  Such
- * horizontal blocks need not have the same size. 
+ * indicative density X, the next one X/2, and so on (the ratio 2 being
+ * in fact VSC_BLOCKS_FLUSHFREQ_RATIO) until the sparsest block at the
+ * bottom.  Such horizontal blocks need not have the same size. 
  *
  * Vertical strips are processed in order. Buffers corresponding to the
  * sub-matrices in the different sub-matrices created by the horizontal
@@ -159,7 +133,8 @@ using namespace std;
  * needed is proportional to the number of coefficients in an area having
  * a staircase shape. Assume we have N vstrips of width W. Assume
  * horizontal blocks have a number of rows R0, R1, R2, ... corresponding
- * to densities X, X/2, X/4, ... The formula
+ * to densities X, X/2, X/4, ...  (the ratio 2 here is in fact given by
+ * VSC_BLOCKS_FLUSHFREQ_RATIO). The formula
  * for the tbuf space is:
  *   max weight of the N matrices of size R0*W in h. strip #0
  * + max weight of the N/2 matrices of size R1*2W in h. strip #1
@@ -169,7 +144,116 @@ using namespace std;
  * expected to be of the same magnitude asymptotically. For real-life
  * examples though, it's pretty common to observe somewhat degenerate
  * cases.
+ *
+ * }}} */
+
+
+/* {{{ Documentation for parameters */
+// take only a portion of the L1 cache.
+// #define L1_CACHE_SIZE   192000
+// for 8-bytes abt values, this gives 3500 items.
+// note that allowing more than 4096 items here (or anything
+// SMALL_SLICES_I_BITS dictates) effectively disables small2 slices,
+// which pack (i,dj) values in 16 bits.
+
+// tunables for small2 format.
+#define SMALL_SLICES_I_BITS     12
+#define SMALL_SLICES_DJ_BITS    (16 - SMALL_SLICES_I_BITS)
+
+// make sure that it's something each core can use (i.e. divide by two
+// the L2 cache size for a dual-core w/ shared L2).
+// #define L2_CACHE_SIZE   1600000
+
+/* To what should we compare the average dj value for determining when we
+ * should switch from dense (small) to sparse (large) blocks */
+// #define DJ_CUTOFF1   8.0
+
+/* Same, but for stopping large blocks and go to the next type
+ * (currently, deferred blocks). Note thatthe time for large blocks grows
+ * faster with multi-cores, probably because of the strong dependency on
+ * TLB availability.
  */
+// #define DJ_CUTOFF2   24.0
+
+/* How many buckets in large slices, and in large slices which are
+ * contained in huge slices. */
+// #define LSL_NBUCKETS_MAX      256
+
+/* How many large slices MINIMUM must go in a huge slice ? Below this
+ * value, we keep going producing large slices. */
+// note that this part of the code is currently inactive
+#define HUGE_MPLEX_MIN        2 /* default so that the code compiles */
+
+/* Here, I've seen 97 slices be handled best with 2 mplexed rounds. So
+ * let's fix 64. */
+// note that this part of the code is currently inactive
+#define HUGE_MPLEX_MAX        64        /* default so that the code compiles */
+
+/* read batches of VSC_BLOCKS_ROW_BATCH rows, in order to have something
+ * which is less sensible to variations incurred by splitting the matrix
+ * */
+// #define VSC_BLOCKS_ROW_BATCH 512
+
+/* blocks smaller than this amount will be merged with previous / next
+ * block */
+// #define VSC_BLOCKS_TOO_SMALL_CUTOFF     8192
+
+/* The number of flush frequencies (number of staircase steps) is
+ * inversely proportional to this. The larger this value, the taller the
+ * steps, and in return, the larger the temp buffers. The effect is
+ * generally mild but noticeable.
+ */
+// #define VSC_BLOCKS_FLUSHFREQ_RATIO 3
+/* }}} */
+
+/* {{{ Examples of parameter sets */
+/* These defaults work well for 13.4M rows/cols 4x4 submatrix of
+ * snfs247.small on a Xeon L5640 (Westmere), for a single core. Note that
+ * we define L1_CACHE_SIZE to something insane, because in fact we're
+ * utilizing L2.
+ */
+#if 0
+#define L1_CACHE_SIZE   192000
+#define L2_CACHE_SIZE   1600000
+#define DJ_CUTOFF1   8.0
+#define DJ_CUTOFF2   24.0
+#define LSL_NBUCKETS_MAX      256
+#define VSC_BLOCKS_ROW_BATCH 512
+#define VSC_BLOCKS_TOO_SMALL_CUTOFF     8192
+#define VSC_BLOCKS_FLUSHFREQ_RATIO 3
+#endif
+
+/* This parameter set is successful for 4.6M rows x 2.8 cols, 12x20
+ * submatrix of the same snfs247.small, for 4 simultaneous cores of a
+ * Xeon X3440. In effect, we're disabling large slices here, and use
+ * taller steps for vsc.
+ */
+#if 1
+#define L1_CACHE_SIZE   262144
+#define L2_CACHE_SIZE   800000
+#define DJ_CUTOFF1   8.0
+#define DJ_CUTOFF2   24.0 /* This is so small that large slices don't show up */
+#define LSL_NBUCKETS_MAX      32
+#define VSC_BLOCKS_ROW_BATCH 256
+#define VSC_BLOCKS_TOO_SMALL_CUTOFF     8192
+#define VSC_BLOCKS_FLUSHFREQ_RATIO 8.0
+#endif
+
+/* These used to be the cado-nfs defaults for a long time. They are
+ * visibly inferior to the previous parameters on the L5640. */
+#if 0
+#define L1_CACHE_SIZE   28000
+#define L2_CACHE_SIZE   1600000
+#define DJ_CUTOFF1   4.5
+#define DJ_CUTOFF2   8.0
+#define LSL_NBUCKETS_MAX      256
+#define VSC_BLOCKS_ROW_BATCH 256
+#define VSC_BLOCKS_TOO_SMALL_CUTOFF     8192
+#define VSC_BLOCKS_FLUSHFREQ_RATIO 1.7
+#endif
+/* }}} */
+
+#define xxxDEBUG_BUCKETS
 
 /* This extension is used to distinguish between several possible
  * implementations of the matrix-times-vector product.
@@ -457,9 +541,6 @@ void builder_clear(builder * mb)
  * must account for that.
  */
 
-#define SMALL_SLICES_I_BITS     12
-#define SMALL_SLICES_DJ_BITS    (16 - SMALL_SLICES_I_BITS)
-
 /* {{{ small slices */
 
 struct small_slice_t {
@@ -486,7 +567,7 @@ int builder_do_small_slice(builder * mb, struct small_slice_t * S, uint32_t i0, 
     S->i0 = i0;
     S->i1 = i1;
     S->ncoeffs = 0;
-    ASSERT_ALWAYS(i1-i0 <= (1 << SMALL_SLICES_I_BITS) );
+    ASSERT_ALWAYS(i1-i0 <= (1 << 16) );
 
     /* Make enough vstrips */
     S->Lu.assign(iceildiv(mb->ncols_t, 1UL << 16), small_slice_t::Lv_t());
@@ -527,6 +608,7 @@ int builder_do_small_slice(builder * mb, struct small_slice_t * S, uint32_t i0, 
     int keep1 = S->dj_max < (1UL << 16) && S->dj_avg < DJ_CUTOFF1;
     int keep2 = S->dj_max < (1 << SMALL_SLICES_DJ_BITS) && S->dj_avg < DJ_CUTOFF1;
 
+    if ((i1-i0) >> SMALL_SLICES_I_BITS) keep2=0;
     if (!mb->mm->methods.small2) keep2=0;
 
     S->is_small2 = keep2;
@@ -1161,11 +1243,6 @@ struct vsc_slice_t {
     unsigned long tbuf_space;
 };
 
-/* read batches of ROW_BATCH rows, in order to have something which is less
- * sensible to variations incurred by splitting the matrix */
-#define ROW_BATCH 256
-#define FLUSHFREQ_RATIO 1.7
-
 /* {{{ decide on our flushing periods (this step is data independent) */
 static vector<unsigned int> flush_periods(unsigned int nvstrips)
 {
@@ -1178,7 +1255,7 @@ static vector<unsigned int> flush_periods(unsigned int nvstrips)
         if (quo == 1)
             break;
         // next ?
-        nf = max(nf + 1, (unsigned int) (nf * FLUSHFREQ_RATIO));
+        nf = max(nf + 1, (unsigned int) (nf * VSC_BLOCKS_FLUSHFREQ_RATIO));
     }
     std::reverse(fp.begin(), fp.end());
     printf("Considering cells to be flushed every");
@@ -1204,7 +1281,7 @@ static vector<unsigned long> rowblock_weights(builder * mb, struct vsc_slice_t *
     ASSERT_ALWAYS(V->hdr->j0 == 0 && V->hdr->j1 == mb->ncols_t);
     for(uint32_t i = V->hdr->i0 ; i < V->hdr->i1 ; ) {
         unsigned long bw = 0;
-        for(uint32_t di = 0 ; di < ROW_BATCH && i < V->hdr->i1 ; i++, di++) {
+        for(uint32_t di = 0 ; di < VSC_BLOCKS_ROW_BATCH && i < V->hdr->i1 ; i++, di++) {
             unsigned int w = *ptr++;
             ptr += w;
             bw += w;
@@ -1230,10 +1307,10 @@ compute_staircase(builder * mb, struct vsc_slice_t * V)
     for(unsigned int k = 0 ; ; k++) {
         if (k == blockweight.size() ||
                 (s < (int) flushperiod.size() - 1 &&
-                 blockweight[k] < ROW_BATCH * nvstrips / flushperiod[s]))
+                 blockweight[k] < VSC_BLOCKS_ROW_BATCH * nvstrips / flushperiod[s]))
         {
             uint32_t old_ii = ii;
-            ii = min(V->hdr->i0 + k * ROW_BATCH, V->hdr->i1);
+            ii = min(V->hdr->i0 + k * VSC_BLOCKS_ROW_BATCH, V->hdr->i1);
             uint32_t di = ii - old_ii;
             if (di) {
                 vsc_step_t step;
@@ -1258,9 +1335,9 @@ compute_staircase(builder * mb, struct vsc_slice_t * V)
         int merge_with_next = 0;
         int merge_with_previous = 0;
         if ((k+1) < V->steps.size())
-            merge_with_next = w <= 8192; // || w <= V->steps[k+1].nrows / 10;
+            merge_with_next = w <= VSC_BLOCKS_TOO_SMALL_CUTOFF; // || w <= V->steps[k+1].nrows / 10;
         if (k > 0)
-            merge_with_previous = w <= 8192; // || w <= V->steps[k-1].nrows / 10;
+            merge_with_previous = w <= VSC_BLOCKS_TOO_SMALL_CUTOFF; // || w <= V->steps[k-1].nrows / 10;
         if (!merge_with_previous && !merge_with_next) {
             ii += w;
             k++;
@@ -1454,8 +1531,8 @@ void builder_push_small_slice(struct matmul_bucket_data_s * mm, small_slice_t * 
             typedef small_slice_t::Lvci_t Lvci_t;
             for(Lvci_t lvp = lv.begin() ; lvp != lv.end() ; ++lvp) {
                 uint32_t dj = (lu_offset + lvp->first) - j;
-                ASSERT(dj < (1 << SMALL_SLICES_DJ_BITS) );
-                ASSERT(lvp->second < (1 << SMALL_SLICES_I_BITS) );
+                ASSERT_ALWAYS(dj < (1 << SMALL_SLICES_DJ_BITS) );
+                ASSERT_ALWAYS(lvp->second < (1 << SMALL_SLICES_I_BITS) );
                 mm->t16.push_back((dj << SMALL_SLICES_I_BITS) | lvp->second);
                 j = lu_offset + lvp->first;
             }
@@ -2263,6 +2340,9 @@ static inline void matmul_bucket_mul_large(struct matmul_bucket_data_s * mm, sli
             pos->q8 += 3*n;
             // fix alignment !
             pos->q8 += n & 1;
+            /* FIXME. LSL_NBUCKETS_MAX is a compile-time constant, but it
+             * might differ in the computed cache file !!! (occurs here
+             * and in several other places as well) */
             pos->ql += LSL_NBUCKETS_MAX;
             j = j1;
         }

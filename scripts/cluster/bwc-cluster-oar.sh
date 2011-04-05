@@ -136,9 +136,8 @@ set_build_variables() {
                 export LD_LIBRARY_PATH=$HOME/Packages/ib/lib:$LD_LIBRARY_PATH
             fi
             ;;
-        chinqchint)
-            export MPI=$HOME/Packages/mpich2-1.3.2p1/
-            needs_mpd=1
+        gdx|chinqchint)
+            export MPI=$HOME/Packages/mpich2-1.4rc1/
             ;;
         truffe)
             unset GMP
@@ -189,7 +188,7 @@ get_possible_bcodes() {
         echo "Several known possible balancings for $split: ${possible_bcodes[*]}" >&2
         return 1
     else
-        bcode=${possible_bcode[0]}
+        bcode=${possible_bcodes[0]}
         echo "Automatically selecting $bcode as only bcode already configured for $split"
     fi
     return 0
@@ -206,7 +205,7 @@ pick_cluster_configuration() {
         return
     else
         # Try to list the known bcodes, if any.
-        if get_possible_bcodes ; then
+        if get_possible_bcodes ${nh}x${nv} ; then
             return
         else
             # Then it's as if we had nothing. bcode is not
@@ -312,8 +311,14 @@ set_build_variables
 cd "$cado_source"
 build
 set_runtime_variables
-pick_cluster_configuration
-late_variables
+if [ "$mpi" ] && [ "$thr" ] ; then
+    late_variables
+    pick_cluster_configuration
+    echo "bcode is $bcode"
+else
+    echo "Define mpi= and thr= first" >&2
+    exit 1
+fi
 display_all_variables
 mkdir_everywhere
 start_local_rsync_server
@@ -372,7 +377,7 @@ sed_on_cachelist() {
 
 if [ "$creating" ] ; then
     echo "Running original dispatch"
-    bwc dispatch sanity_check_vector=H1
+    bwc dispatch sanity_check_vector=H1 save_submatrices=1 sequential_cache_build=1
     bwc dispatch export_cachelist=$wdir/cachelist
     sed_on_cachelist
     $fetch --put --dispatch-list $wdir/cachelist

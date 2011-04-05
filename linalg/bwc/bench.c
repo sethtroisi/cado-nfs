@@ -191,6 +191,7 @@ void clear_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct 
     unsigned int nc = p->mm->dim[1];
     pthread_mutex_lock(&tg->mu);
     matmul_report(p->mm, ba->freq);
+    printf("\n");
     pthread_mutex_unlock(&tg->mu);
     matmul_clear(p->mm);
     A->vec_clear(A, &p->src, nc);
@@ -214,6 +215,9 @@ void banner(int argc, char * argv[])
 int main(int argc, char * argv[])
 {
     struct bench_args ba[1];
+
+    setbuf(stdout, NULL);
+    setbuf(stderr, NULL);
 
     banner(argc, argv);
 
@@ -281,6 +285,8 @@ int main(int argc, char * argv[])
             exit(1);
         }
     }
+
+    param_list_lookup_string(ba->pl, "matmul_bucket_methods");
 
     double tmax = 100.0;
     param_list_parse_double(ba->pl, "tmax", &tmax);
@@ -429,7 +435,7 @@ int main(int argc, char * argv[])
             do { next += 0.25 * CLOCKS_PER_SEC; } while (dt > next);
             if (next > tmax * CLOCKS_PER_SEC) { next = tmax * CLOCKS_PER_SEC; }
             dt /= CLOCKS_PER_SEC;
-            printf("%d iters in %2.fs, %.2f/1, %.2f %s (last %u : %.2f/1, %.2f %s)        \r",
+            printf("%d iters in %2.fs, %.3f/1, %.2f %s (last %u : %.3f/1, %.2f %s)        \r",
                     n, dt, dt/n, ba->freq * 1.0e9 * dt/n/ncoeffs_total, unit,
                     NLAST, sum_last/NLAST, ba->freq * 1.0e9 *sum_last/NLAST/ncoeffs_total, unit);
             fflush(stdout);

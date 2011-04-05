@@ -289,7 +289,11 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
             double psys = since_last_reset[1]->job[1] / dwct1;
             double pidle = aggr_dwct[1] / dwct1 - puser - psys;
             double avwct = dwct1 / di;
-            double nsc = avwct / ncoeffs_d * 1.0e9;
+            // nanoseconds per coefficient are computed based on the
+            // total (aggregated) wall-clock time per iteration within
+            // the cpu-bound part, and divided by the total number of
+            // coefficients.
+            double nsc = (aggr_dwct[0] + aggr_dwct[1]) / di / ncoeffs_d * 1.0e9;
             char * what_wct = "s";
             if (avwct < 0.1) { what_wct = "ms"; avwct *= 1000.0; }
 

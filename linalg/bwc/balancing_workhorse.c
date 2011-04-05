@@ -982,9 +982,14 @@ void slave_dest_free(data_dest_ptr xx)
 void slave_dest_engage_final_pass(slave_dest_ptr D)
 {
     slave_data_ptr s = D->s;
+    char buf[16];
     if (D->s->mat->transpose) {
 	s->mat->size = s->my_ncols + D->tw;
+        if ((s->mat->size * sizeof(uint32_t)) >> 28) {
+            printf("[J%uT%u] malloc(%s)\n", s->pi->m->jrank, s->pi->m->trank, size_disp(s->mat->size * sizeof(uint32_t), buf));
+        }
 	s->mat->p = malloc(s->mat->size * sizeof(uint32_t));
+        ASSERT_ALWAYS(s->mat->p);
 	D->fill = malloc(s->my_ncols * sizeof(uint32_t *));
 	uint32_t *lptr = s->mat->p;
 	memset(D->fill, 0, s->my_ncols * sizeof(uint32_t));
@@ -996,7 +1001,11 @@ void slave_dest_engage_final_pass(slave_dest_ptr D)
 	ASSERT_ALWAYS((uint32_t) (lptr - s->mat->p) == s->my_ncols + D->tw);
     } else {
 	s->mat->size = s->my_nrows + D->tw;
+        if ((s->mat->size * sizeof(uint32_t)) >> 28) {
+            printf("[J%uT%u] malloc(%s)\n", s->pi->m->jrank, s->pi->m->trank, size_disp(s->mat->size * sizeof(uint32_t), buf));
+        }
 	s->mat->p = malloc(s->mat->size * sizeof(uint32_t));
+        ASSERT_ALWAYS(s->mat->p);
 	D->fill = malloc(s->my_nrows * sizeof(uint32_t *));
 	uint32_t *lptr = s->mat->p;
 	memset(D->fill, 0, s->my_nrows * sizeof(uint32_t));
