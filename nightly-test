@@ -61,7 +61,11 @@ fi
 cd $CADO_DIST_ARCHIVE_NAME
 echo -n "Starting compilation at: "
 date
-make "$@"
+if [ "$CC" ] ; then
+    make "$@" CC=$CC
+else
+    make "$@"
+fi
 echo -n "Starting factorization at: "
 date
 CADO_COLOR=0 ./factor.sh 71641520761751435455133616475667090434063332228247871795429 -t 4 -ssh expected_factorization=200429218120815554269743635437,357440504101388365610785389017
