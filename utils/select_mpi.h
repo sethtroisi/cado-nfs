@@ -59,8 +59,8 @@
 #define my_pthread_barrier_t               barrier_t
 #define my_pthread_barrierattr_t           int
 #define MY_PTHREAD_BARRIER_SERIAL_THREAD   BARRIER_SERIAL_THREAD
-static inline int my_pthread_barrier_init(barrier_t *restrict barrier,
-        const int *restrict attr MAYBE_UNUSED, unsigned count)
+static inline int my_pthread_barrier_init(barrier_t * /* restrict */ barrier,
+        const int * /* restrict */ attr MAYBE_UNUSED, unsigned count)
 {
     return barrier_init(barrier, count);
 }
