@@ -73,7 +73,7 @@
 #
 # Note that some flags, and some compile-time definitions are added
 # anyway and cannot be overridden. For example, one cannot remove
-# -std=c99 for CFLAGS is GNU C is being used, because its use is
+# -std=c99 for CFLAGS if GNU C is being used, because its use is
 # mandatory.
 
 ############################################################
