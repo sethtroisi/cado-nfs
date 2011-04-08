@@ -3367,8 +3367,20 @@ rsbound_setup_AB_bound ( rsbound_t rsbound,
 {
 	 /* verbose == 1 means "tune mode";
 		verbose == 0 means "polyselect2 mode"; */
+	 if (verbose == 0) {
+		  unsigned long len;
+		  mpz_t q;
+		  mpz_init (q);
+		  mpz_fdiv_q (q, rsparam->global_v_bound_rs, mod);
+		  len =  mpz_get_ui (q);
+		  rsbound->Bmax = ( (len > MAX_SIEVEARRAY_SIZE) ? MAX_SIEVEARRAY_SIZE : (long) len);
+		  mpz_set_ui (q, rsparam->global_u_bound_rs);
+		  mpz_fdiv_q (q, q, mod);
+		  len =  mpz_get_ui (q);
+		  rsbound->Amax = ( (len > 128) ? 128 : (long) len);
+		  mpz_clear (q);
+	 }
 	 if (verbose == 2) {
-
 		  if (param->s2_Amax >= 0 && param->s2_Bmax > 0) {
 			   rsbound->Amax = param->s2_Amax;
 			   rsbound->Bmax = param->s2_Bmax;
@@ -3387,42 +3399,13 @@ rsbound_setup_AB_bound ( rsbound_t rsbound,
 			   mpz_clear (q);
 		  }
 	 }
-	 else if (verbose == 0) {
-		  rsbound->Amax = 0;
-		  unsigned long len;
-		  mpz_t v, q;
-		  mpz_init (q);
-		  mpz_init (v);
-		  /* when from polyselect2, need to pass max_k to global_v_bound_rs. */
-		  if (param->s2_Vmax > 0) {
-			   mpz_ui_pow_ui (v, 2UL, (unsigned long) param->s2_Vmax);
-			   mpz_set (rsparam->global_v_bound_rs, v);
-			   // gmp_fprintf (stderr, "NOTE: reset boundv to rsparam->global_v_bound_rs: %Zd\n", rsparam->global_v_bound_rs);
-		  }
-		  mpz_fdiv_q (q, rsparam->global_v_bound_rs, mod);
-		  len =  mpz_get_ui (q);
-		  rsbound->Bmax = ( (len > MAX_SIEVEARRAY_SIZE) ? MAX_SIEVEARRAY_SIZE : (long) len);
-		  mpz_set_ui (q, rsparam->global_u_bound_rs);
-		  mpz_fdiv_q (q, q, mod);
-		  len =  mpz_get_ui (q);
-		  rsbound->Amax = ( (len > 128) ? 128 : (long) len);
-		  mpz_clear (q);
-		  mpz_clear (v);
-	 }
 	 /* Tune mode. For speed purpose, choose smaller sieving range (compared to TUNE_SIEVEARRAY_SIZE). */
 	 else {
 		  rsbound->Amax = 0;
-
 		  unsigned long len;
 		  mpz_t q, v;
 		  mpz_init (q);
 		  mpz_init (v);
-		  /* when from polyselect2, need to pass max_k to global_v_bound_rs. */
-		  if (param->s2_Vmax > 0) {
-			   mpz_ui_pow_ui (v, 2UL, (unsigned long) param->s2_Vmax);
-			   mpz_set (rsparam->global_v_bound_rs, v);
-			   // gmp_fprintf (stderr, "NOTE: reset boundv to rsparam->global_v_bound_rs: %Zd\n", rsparam->global_v_bound_rs);
-		  }
 		  mpz_fdiv_q (q, rsparam->global_v_bound_rs, mod);
 		  len =  mpz_get_ui (q);
 		  rsbound->Bmax = ( (len > TUNE_SIEVEARRAY_SIZE) ? TUNE_SIEVEARRAY_SIZE : (long) len);
@@ -3634,7 +3617,7 @@ rsparam_init ( rsparam_t rsparam,
 	 else {
 		  double skewness = L2_skewness (rs->f, rs->d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
 		  rsparam->init_lognorm = L2_lognorm (rs->f, rs->d, skewness, DEFAULT_L2_METHOD);
-		  rsparam->lognorm_bound = rsparam->init_lognorm * 1.08;
+		  rsparam->lognorm_bound = rsparam->init_lognorm * 1.07;
 	 }
 }
 
@@ -3709,96 +3692,97 @@ rotate_aux_mpz ( mpz_t *f,
   Modifed from auxiliary.c using Emmanuel Thome and Paul Zimmermann's ideas.
   Assume lognorm(f + v*g) + E(alpha(f + v*g)) is first decreasing, then
   increasing, then the optimal v corresponds to the minimum of that function.
-
-  Return best V and best E
 */
-static double
-rotate_bounds_V_mpz ( mpz_t *f,
-					  int d,
-					  double ratio_margin,
-					  mpz_t b,
-					  mpz_t m,
-					  mpz_t V,
-					  int method,
-					  const int i_bias_u )
+static void
+rotate_bounds_V_mpz ( rsstr_t rs,
+					  rsparam_t rsparam )
 {
-	 int i;
-	 double lognorm, alpha, E, best_E;
-	 mpz_t tmpv, best_V;
+	 int i, j;
+	 double skewness, lognorm;
+	 mpz_t *f, *g, b, m, tmpv, V;
 
-	 mpz_init (best_V);
+	 f = (mpz_t *) malloc ( (rs->d + 1)* sizeof (mpz_t));
+	 g = (mpz_t *) malloc ( 2 * sizeof (mpz_t));
+	 for (j = 0; j <= rs->d; j ++)
+		  mpz_init_set (f[j], rs->f[j]);
+	 for (j = 0; j < 2; j ++)
+		  mpz_init_set (g[j], rs->g[j]);
+	 mpz_init_set (b, rs->g[1]);
+	 mpz_init_set (m, rs->g[0]);
+	 mpz_neg (m, m);
+	 mpz_init_set_si (V, 1);
 	 mpz_init_set_ui (tmpv, 0);
 
-	 best_E = L2_lognorm (f, d,
-						  L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, method),
-						  method);
-
-	 /* look for positive k: 2, 4, 8, ... */
-	 mpz_set_si (V, 1);
-	 for (i = 0; i < 150 - i_bias_u ; i++, mpz_mul_si (V, V, 2) )
+	 /* look for positive V: 2, 4, 8, ... */
+	 for (i = 0; i < 150; i++, mpz_mul_si (V, V, 2) )
 	 {
-		  rotate_aux_mpz (f, b, m, tmpv, V, 0);
-		  lognorm = L2_lognorm (f, d,
-								L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, method),
-								method);
-		  alpha = exp_alpha[i + i_bias_u];
-		  E = lognorm + alpha;
+		  /* rotate by w*x */
+		  rotate_aux_mpz (rs->f, b, m, tmpv, V, 0);
 
-		  if (DEBUG)
-			   gmp_fprintf (stderr, "# DEBUG  (V_bound): [%d-th] V: %15Zd, E: %.3f, lognorm: %.3f, alpha: %.2f\n",
-							i, V, E, lognorm, alpha);
+		  /* translation-optimize the rotated polynomial */
+		  for (j = 0; j <= rs->d; j ++)
+			   mpz_set (f[j], rs->f[j]);
+		  for (j = 0; j < 2; j ++)
+			   mpz_set (g[j], rs->g[j]);
+		  optimize_aux (f, rs->d, g, 0, 0, DEFAULT_L2_METHOD);
 
-		  if (E < best_E * ratio_margin)
-		  {
-			   if (E < best_E)
-					best_E = E;
-		  }
-		  else
+		  /* get lognorm */
+		  skewness = L2_skewness (f, rs->d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+		  lognorm = L2_lognorm (f, rs->d, skewness, DEFAULT_L2_METHOD);
+
+		  //fprintf (stderr, "# DEBUG --- [%d-th] U: %ld, lognorm: %f, lognorm_bound: %f\n", i, w, lognorm,  rsparam->lognorm_bound);
+
+		  if (lognorm > rsparam->lognorm_bound)
 			   break;
 	 }
 
-	 mpz_set (best_V, V);
-	 mpz_set_ui (V, 0);
-	 /* go back to k=0 */
-	 rotate_aux_mpz (f, b, m, tmpv, V, 0);
+	 mpz_set (rsparam->global_v_bound_rs, V);
+	 mpz_set_si (V, 0);
+	 /* rotate back */
+	 rotate_aux_mpz (rs->f, b, m, tmpv, V, 0);
 
 	 /* look for negative k: -2, -4, -8, ... */
 	 mpz_set_si (V, -1);
-	 best_E = L2_lognorm (f, d,
-						  L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, method),
-						  method);
-	 for (i = 0; i < 150 - i_bias_u; i++, mpz_mul_si (V, V, 2))
+	 for (i = 0; i < 150; i++, mpz_mul_si (V, V, 2))
 	 {
-		  rotate_aux_mpz (f, b, m, tmpv, V, 0);
-		  lognorm = L2_lognorm (f, d,
-								L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, method),
-								method);
-		  alpha = exp_alpha[i + i_bias_u];
-		  E = lognorm + alpha;
+		  /* rotate by w*x */
+		  rotate_aux_mpz (rs->f, b, m, tmpv, V, 0);
 
-		  if (DEBUG)
-			   gmp_fprintf (stderr, "# DEBUG  (V_bound): [%d-th] V: %15Zd, E: %.3f, lognorm: %.3f, alpha: %.2f\n",
-							i, V, E, lognorm, alpha);
+		  /* translation-optimize the rotated polynomial */
+		  for (j = 0; j <= rs->d; j ++)
+			   mpz_set (f[j], rs->f[j]);
+		  for (j = 0; j < 2; j ++)
+			   mpz_set (g[j], rs->g[j]);
+		  optimize_aux (f, rs->d, g, 0, 0, DEFAULT_L2_METHOD);
 
-		  if (E < best_E * ratio_margin)
-		  {
-			   if (E < best_E) {
-					best_E = E;
-					mpz_set (best_V, V);
-			   }
-		  }
-		  else
+		  /* get lognorm */
+		  skewness = L2_skewness (f, rs->d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+		  lognorm = L2_lognorm (f, rs->d, skewness, DEFAULT_L2_METHOD);
+
+		  //fprintf (stderr, "# DEBUG --- [%d-th] U: %ld, lognorm: %f, lognorm_bound: %f\n", i, w, lognorm,  rsparam->lognorm_bound);
+
+		  if (lognorm > rsparam->lognorm_bound)
 			   break;
 	 }
 
-	 mpz_set (V, best_V);
-	 mpz_set_ui (best_V, 0);
-	 /* go back to k=0 */
-	 rotate_aux_mpz (f, b, m, tmpv, best_V, 0);
+	 /* set bound v */
+	 if (mpz_cmpabs (rsparam->global_v_bound_rs, V) < 0)
+		  mpz_set (rsparam->global_v_bound_rs, V);
+	 mpz_abs (rsparam->global_v_bound_rs, rsparam->global_v_bound_rs);
 
-	 mpz_clear (best_V);
+	 /* rotate back */
+	 mpz_set_ui (V, 0);
+	 rotate_aux_mpz (rs->f, b, m, tmpv, V, 0);
+	 for (j = 0; j <= rs->d; j ++)
+		  mpz_clear (f[j]);
+	 for (j = 0; j < 2; j ++)
+		  mpz_clear (g[j]);
+	 free (f);
+	 free (g);
+	 mpz_clear (b);
+	 mpz_clear (m);
+	 mpz_clear (V);
 	 mpz_clear (tmpv);
-	 return best_E;
 }
 
 
@@ -3990,51 +3974,49 @@ rotate_bounds_W_lu ( rsstr_t rs,
 static void
 rsparam_setup ( rsparam_t rsparam,
 				rsstr_t rs,
+				param_t param,
 				int verbose )
 {
-	 double best_E;
-	 mpz_t b, m;
-	 mpz_init (b);
-	 mpz_init (m);
-	 mpz_set (b, rs->g[1]);
-	 mpz_set (m, rs->g[0]);
-	 mpz_neg (m, m);
+	 mpz_t q;
+	 mpz_init (q);
 
-	 /* "global_w_bound_rs" */
-	 if (rs->d == 6)
-		  rotate_bounds_W_lu ( rs,
-							   rsparam );
-	 else
-		  rsparam->global_w_bound_rs = 0;
+	 /* polyselect2 mode, pass v bounds from param */
+	 if (verbose == 0) {
+		  mpz_ui_pow_ui (q, 2UL, (unsigned long) param->s2_Vmax);
+		  mpz_set (rsparam->global_v_bound_rs, q);
+	 }
+	 /* compute bounds v */
+	 else {
+		  /* "global_w_bound_rs" */
+		  if (rs->d == 6)
+			   rotate_bounds_W_lu ( rs,
+									rsparam );
+		  else
+			   rsparam->global_w_bound_rs = 0;
+
+		  /* "global_v_bound_rs" */
+		  rotate_bounds_V_mpz ( rs,
+								rsparam );
+	 }
 
 	 /* "global_u_bound_rs" */
 	 rotate_bounds_U_lu ( rs,
 						  rsparam );
 
-	 /* "global_v_bound_rs"
+	 /* repair if u is too large:
 		-- global_u_bound will be used to identify good sublattice and decide e[],
 		-- global_v_bound will be used to identify sieving bound */
-	 long k0 = 0;
-	 unsigned long idx = 0;
-	 k0 = rotate_aux (rs->f, b, m, k0, rsparam->global_u_bound_rs, 1);
-	 idx = (unsigned long) (log ((double) rsparam->global_u_bound_rs) / log(2.0));
-	 /* identify best v in rotating by v */
-	 best_E = rotate_bounds_V_mpz ( rs->f,
-									rs->d,
-									rsparam->sizebound_ratio_rs,
-									b,
-									m,
-									rsparam->global_v_bound_rs,
-									DEFAULT_L2_METHOD,
-									idx );
-	 /* go back to k=0 */
-	 rotate_aux (rs->f, b, m, k0, 0, 1);
-	 mpz_clear (b);
-	 mpz_clear (m);
+	 double skewness = L2_skewness (rs->f, rs->d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+	 mpz_fdiv_q_ui (q, rsparam->global_v_bound_rs, lround (skewness));
+	 if (mpz_cmpabs_ui (q, rsparam->global_u_bound_rs) < 0)
+		  rsparam->global_u_bound_rs = mpz_get_ui (q);
+	 mpz_clear (q);
 
 	 /* "rsparam->exp_min_alpha_rs" */
 	 int size;
 	 size = mpz_sizeinbase (rsparam->global_v_bound_rs, 2);
+	 if (rsparam->global_u_bound_rs <= 0)
+		  rsparam->global_u_bound_rs = 1;
 	 size += (int) (log ( (double) rsparam->global_u_bound_rs ) * 1.442695);
 	 rsparam->exp_min_alpha_rs = exp_alpha[size-1];
 
@@ -4044,8 +4026,7 @@ rsparam_setup ( rsparam_t rsparam,
 						rsparam->global_u_bound_rs,
 						rsparam->global_v_bound_rs );
 		  gmp_fprintf ( stderr,
-						"# Info: exp_E: %.3f, exp_alpha: %.3f, bound: %.3f\n",
-						best_E,
+						"# Info: exp_alpha: %.3f, bound: %.3f\n",
 						exp_alpha[size-1],
 						rsparam->lognorm_bound );
 	 }
@@ -4146,44 +4127,51 @@ rsparam_setup ( rsparam_t rsparam,
   For existing rsparam and when rs is changed,
 */
 static void
-rsparam_reset_bounds ( rsstr_t rs,
-					   rsparam_t rsparam,
+rsparam_reset_bounds ( rsparam_t rsparam,
+					   rsstr_t rs,
+					   param_t param,
 					   int verbose )
 {
-	 /* "global_u_bound_rs" only */
+	 mpz_t q;
+	 mpz_init (q);
+
+	 /* polyselect2 mode, pass v bounds from param */
+	 if (verbose == 0) {
+		  mpz_ui_pow_ui (q, 2UL, (unsigned long) param->s2_Vmax);
+		  mpz_set (rsparam->global_v_bound_rs, q);
+	 }
+	 /* compute bounds v */
+	 else {
+		  /* "global_w_bound_rs" */
+		  if (rs->d == 6)
+			   rotate_bounds_W_lu ( rs,
+									rsparam );
+		  else
+			   rsparam->global_w_bound_rs = 0;
+
+		  /* "global_v_bound_rs" */
+		  rotate_bounds_V_mpz ( rs,
+								rsparam );
+	 }
+
+	 /* "global_u_bound_rs" */
 	 rotate_bounds_U_lu ( rs,
 						  rsparam );
 
-	 double best_E;
-	 mpz_t b, m;
-	 mpz_init (b);
-	 mpz_init (m);
-	 mpz_set (b, rs->g[1]);
-	 mpz_set (m, rs->g[0]);
-	 mpz_neg (m, m);
+	 /* repair if u is too large:
+		-- global_u_bound will be used to identify good sublattice and decide e[],
+		-- global_v_bound will be used to identify sieving bound */
+	 double skewness = L2_skewness (rs->f, rs->d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+	 mpz_fdiv_q_ui (q, rsparam->global_v_bound_rs, lround (skewness));
+	 if (mpz_cmpabs_ui (q, rsparam->global_u_bound_rs) < 0)
+		  rsparam->global_u_bound_rs = mpz_get_ui (q);
+	 mpz_clear (q);
 
-	 /* "global_v_bound_rs" */
-	 long k0 = 0;
-	 unsigned long idx = 0;
-	 k0 = rotate_aux (rs->f, b, m, k0, rsparam->global_u_bound_rs, 1);
-	 idx = (unsigned long) (log ((double) rsparam->global_u_bound_rs) / log(2.0));
-
-	 /* identify best v in rotating by v */
-	 best_E = rotate_bounds_V_mpz ( rs->f,
-									rs->d,
-									rsparam->sizebound_ratio_rs,
-									b,
-									m,
-									rsparam->global_v_bound_rs,
-									DEFAULT_L2_METHOD,
-									idx );
-	 /* go back to k=0 */
-	 rotate_aux (rs->f, b, m, k0, 0, 1);
-	 mpz_clear (b);
-	 mpz_clear (m);
-
+	 /* "rsparam->exp_min_alpha_rs" */
 	 int size;
 	 size = mpz_sizeinbase (rsparam->global_v_bound_rs, 2);
+	 if (rsparam->global_u_bound_rs <= 0)
+		  rsparam->global_u_bound_rs = 1;
 	 size += (int) (log ( (double) rsparam->global_u_bound_rs ) * 1.442695);
 	 rsparam->exp_min_alpha_rs = exp_alpha[size-1];
 
@@ -4192,12 +4180,12 @@ rsparam_reset_bounds ( rsstr_t rs,
 						rsparam->global_u_bound_rs,
 						rsparam->global_v_bound_rs );
 		  gmp_fprintf ( stderr,
-						"# Info: exp_E: %.3f, exp_alpha: %.3f, bound: %.3f\n",
-						best_E,
+						"# Info: exp_alpha: %.3f, bound: %.3f\n",
 						exp_alpha[size-1],
 						rsparam->lognorm_bound );
 	 }
 }
+
 
 
 /*
@@ -5029,8 +5017,8 @@ rootsieve_uv ( rsstr_t rs,
 	 mpz_init (tmpv);
 	 mpz_init (tmpu);
 
-	 len_B = (unsigned long) (rsbound->Bmax - rsbound->Bmin + 1);
 	 len_A = (unsigned long) (rsbound->Amax - rsbound->Amin + 1);
+	 len_B = (unsigned long) (rsbound->Bmax - rsbound->Bmin + 1);
 
 	 /* test sieve in tune mode ? */
 	 if (verbose == 1) {
@@ -5046,7 +5034,7 @@ rootsieve_uv ( rsstr_t rs,
 	 }
 
 	 if (array_mem_size <= (unsigned long) len_A) {
-		  fprintf (stderr, "Error: Amax - Amin + 1 is too long. Please use smaller -umax in parameter.\n");
+		  fprintf (stderr, "Error: Amax - Amin + 1 is too long. Please use smaller -umax in parameter. %ld, B  : %ld, max: %ld\n", rsbound->Amax - rsbound->Amin, len_B, rsbound->Bmax);
 		  exit(1);
 	 }
 
@@ -5689,8 +5677,7 @@ rootsieve_main_run ( rsstr_t rs,
 	 mpz_init_set (m, rs->g[0]);
 	 mpz_neg (m, m);
 	 rsparam_init (rsparam, rs, param);
-
-	 rsparam_setup (rsparam, rs, verbose);
+	 rsparam_setup (rsparam, rs, param, verbose);
 	 new_sub_alpha_pq (&alpha_pqueue, rsparam->nbest_sl);
 
 	 /* read e_sl from input */
@@ -5711,7 +5698,7 @@ rootsieve_main_run ( rsstr_t rs,
 		  rsstr_setup (rs);
 
 		  /* either use input e_sl[] or tune only once */
-		  rsparam_reset_bounds (rs, rsparam, verbose);
+		  rsparam_reset_bounds (rsparam, rs, param, verbose);
 
 #if WANT_TUNE
 		  if (re == 0) {
@@ -5721,7 +5708,6 @@ rootsieve_main_run ( rsstr_t rs,
 #endif
 
 		  re ++;
-
 		  k = rootsieve_main_stage1 ( rs,
 									  rsparam,
 									  alpha_pqueue,
@@ -5812,10 +5798,9 @@ rootsieve_main_run ( rsstr_t rs,
 		  /* rotate polynomial by f + rot*x^2 for various rot */
 		  old_i = rotate_aux (rs->f, rs->g[1], m, old_i, w[i], 2);
 		  rsstr_setup (rs);
-		  rsparam_reset_bounds (rs, rsparam, verbose);
+		  rsparam_reset_bounds (rsparam, rs, param, verbose);
 
 		  //print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 1);
-
 		  ave_MurphyE = rootsieve_main_stage2_prepare ( rs,
 														rsparam,
 														param,
@@ -5890,13 +5875,13 @@ rootsieve_main_run_stage2only ( rsstr_t rs,
 		  mpz_init_set (guv[i], rs->g[i]);
 
 	 rsparam_init (rsparam, rs, param);
-	 rsparam_setup (rsparam, rs, 2);
+	 rsparam_setup (rsparam, rs, param, 2);
 
 	 /* rotate polynomial by f + rot*x^2 */
 	 old_i = 0;
 	 old_i = rotate_aux (rs->f, rs->g[1], m, old_i, param->s2_w, 2);
 	 rsstr_setup (rs);
-	 rsparam_reset_bounds (rs, rsparam, 2);
+	 rsparam_reset_bounds (rsparam, rs, param, 2);
 
 	 /* alpha values on the subllatice primes */
 	 compute_fuv_mp (fuv, rs->f, rs->g, rs->d, param->s2_u, param->s2_v);
