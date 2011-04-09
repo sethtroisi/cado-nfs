@@ -33,19 +33,19 @@ degree=5                # degree of the algebraic polynomial
 kjdelay=300             # time between two checks
 selectnice=4            # nice level for selection
 
-## Most important parameters of polyselect
-kjM=1e19                # maximum norm allowed
-kjl=5                   # minimal number of primes in lc(g)
-kjadmin=1               # min value for lc(f)
-kjadmax=1e7             # max value for lc(f)
-kjadrange=5e5           # individual tasks
+# on the test number
+# 2178801510284538198583287343584434450819019843421652036909187142202423933326877872217364246676795731450361112348246574394557063827
+# we got (with admax=2e8)
+# lognorm: 42.81, alpha: -6.21 E=36.59
+# Murphy's E(Bf=10000000,Bg=5000000,area=1.00e+16)=5.11e-11
 
-## Other parameters of polyselect
-kjkeep=100              # number of preselected polynomials
-kjkmax=22               # rotation is bounded by 2^kmax
-kjincr=60               # forced divisor of lc(f)
-kjpb=1024               # bound on primes allowed in lc(g)
-kjp0max=100000             # bound on the additional factor in lc(g)
+## Parameters of polyselect
+kjP=100000              # choose lc(g) with two prime factors in [P,2P]
+kjmaxnorm=43.5          # max. lognorm of polynomials (before rootsieve)
+kjadmax=5e8             # max value for lc(f)
+kjadrange=5e6           # individual tasks
+kjkmax=25               # rotation is bounded by 2^kmax
+kjincr=30030            # forced divisor of lc(f)
 
 ###########################################################################
 # Sieve
@@ -64,15 +64,14 @@ alim=8000000
 lpbr=28
 lpba=28
 mfbr=56
-mfba=56
+mfba=84
 rlambda=2.2
-alambda=2.2
+alambda=3.2
 
 I=12                    # Sieving range in lattice siever
 qmin=8000000            # Start of the special-q range
-qrange=100000           # The size of an elementary sieving task
-checkrange=250000       # We check if we have enough after each step
-                        # of that many relations found.
+qrange=400000           # The size of an elementary sieving task
+firstcheck=29000000
 sievenice=10
 sieve_max_threads=2
 
@@ -80,7 +79,7 @@ sieve_max_threads=2
 # Filtering
 ###########################################################################
 
-excessratio=1.01        # minimal excess we want before pruning
+excessratio=1.1         # minimal excess we want before pruning
 keeppurge=160           # shrink in purge if excess exceeds keeppurge
 keep=160                # excess wanted after merge
 maxlevel=15             # ???
