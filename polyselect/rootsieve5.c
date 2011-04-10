@@ -3380,7 +3380,7 @@ rsbound_setup_AB_bound ( rsbound_t rsbound,
 		  rsbound->Amax = ( (len > 128) ? 128 : (long) len);
 		  mpz_clear (q);
 	 }
-	 if (verbose == 2) {
+	 else if (verbose == 2) {
 		  if (param->s2_Amax >= 0 && param->s2_Bmax > 0) {
 			   rsbound->Amax = param->s2_Amax;
 			   rsbound->Bmax = param->s2_Bmax;
@@ -4057,7 +4057,7 @@ rsparam_setup ( rsparam_t rsparam,
 	 }
 
 	 /* Experimental. Note at least consider two primes. */
-	 if (rsparam->global_u_bound_rs <= 1024) {
+	 if (rsparam->global_u_bound_rs <= 512) {
 		  rsparam->e_sl[0] = 2;
 		  rsparam->e_sl[1] = 1;
 		  rsparam->e_sl[2] = 0;
@@ -5013,7 +5013,6 @@ rootsieve_uv ( rsstr_t rs,
 	 unsigned long j, array_mem_size, B_block_size, len_B, len_A;
 	 double MurphyE;
 	 mpz_t tmpv, tmpu;
-
 	 mpz_init (tmpv);
 	 mpz_init (tmpu);
 
@@ -5034,7 +5033,7 @@ rootsieve_uv ( rsstr_t rs,
 	 }
 
 	 if (array_mem_size <= (unsigned long) len_A) {
-		  fprintf (stderr, "Error: Amax - Amin + 1 is too long. Please use smaller -umax in parameter. %ld, B  : %ld, max: %ld\n", rsbound->Amax - rsbound->Amin, len_B, rsbound->Bmax);
+		  fprintf (stderr, "Error: Amax - Amin + 1 = %lu is too long. This happend when A is too large while B is too small. To be fixed in future.\n", rsbound->Amax - rsbound->Amin);
 		  exit(1);
 	 }
 
@@ -5049,6 +5048,8 @@ rootsieve_uv ( rsstr_t rs,
 
 	 sievearray_t sa;
 	 sievearray_init (sa, len_A, B_block_size);
+	 /* get the correct value */
+	 array_mem_size = len_A * B_block_size;
 
 	 /* for each i -> each u = A + MOD * i */
 	 tmpBmax = rsbound->Bmax;
@@ -5262,7 +5263,6 @@ rootsieve_main_stage2_prepare ( rsstr_t rs,
 											   verbose );
 	 /* free rsbound */
 	 rsbound_free (rsbound);
-
 	 return ave_MurphyE;
 }
 
