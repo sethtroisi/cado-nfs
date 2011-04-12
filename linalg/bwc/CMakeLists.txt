@@ -169,6 +169,9 @@ macro(bwc_program v)
 endmacro(bwc_program)
 
 add_library(matmul_mf matmul-mf.c)
+    set_target_properties(matmul_mf PROPERTIES
+            COMPILE_FLAGS "--mpi"
+            LINK_FLAGS "--mpi")
 target_link_libraries(matmul_mf mf)
 bwc_program(build build.c)
 target_link_libraries(build matmul_mf)
