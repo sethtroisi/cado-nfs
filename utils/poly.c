@@ -376,7 +376,7 @@ void poly_eval_mod_mpz(mpz_t res, const poly_t f, const mpz_t x, const mpz_t m)
 }
 
 
-#if 0
+#if 1
 /* f <- g*h, where g has degree r, and h has degree s */
 static int
 poly_mul_basecase (mpz_t *f, mpz_t *g, int r, mpz_t *h, int s)
@@ -581,9 +581,16 @@ void poly_mul(poly_t f, const poly_t g, const poly_t h) {
   maxdeg = g->deg + h->deg;
   poly_alloc(prd, maxdeg);
 
-#if 1 /* naive product */
-  //  prd->deg = poly_mul_basecase (prd->coeff, g->coeff, g->deg, h->coeff, h->deg);
-  prd->deg = poly_mul_tc (prd->coeff, g->coeff, g->deg, h->coeff, h->deg);
+#if 1
+  if (g->deg + h->deg <= MAX_T) {
+    prd->deg = poly_mul_tc (prd->coeff, g->coeff, g->deg, h->coeff, h->deg);
+  } else {
+      /* naive product */
+      /* currently we have to resort to this for larger degree, because
+       * the generic toom implementation is bounded in degree.
+       */
+    prd->deg = poly_mul_basecase (prd->coeff, g->coeff, g->deg, h->coeff, h->deg);
+  }
 #else /* segmentation, this code has problem with huge runs, for example
          degree 5 with lifting to 631516975 bits */
   {
