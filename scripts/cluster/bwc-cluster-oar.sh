@@ -19,6 +19,8 @@ bw_m=64
 bw_n=64
 interval=100
 backlog_period=120
+slotlength=10000
+slot=0
 # http server is in reality anything which can be accessed by the curl
 # library. Unfortunately, this does not include rsync URIs, which are our
 # primary choice for the rest...
@@ -76,6 +78,14 @@ while [ "$#" -gt 0 ] ; do
     elif [ "$arg" = "--backlog-period" ] ; then
         req_arg $arg 1 $#
         backlog_period="$1"
+        shift
+    elif [ "$arg" = "--slot" ] ; then
+        req_arg $arg 1 $#
+        slot="$1"
+        shift
+    elif [ "$arg" = "--slot-length" ] ; then
+        req_arg $arg 1 $#
+        slotlength="$1"
         shift
     elif [ "$arg" = "--local" ] ; then locally=1
     elif [ "$arg" = "--mksol" ] ; then mksol=1
@@ -138,6 +148,9 @@ set_build_variables() {
             ;;
         gdx|chinqchint)
             export MPI=$HOME/Packages/mpich2-1.4rc1/
+            ;;
+        suno)
+            export MPI=1
             ;;
         truffe)
             unset GMP
@@ -249,15 +262,18 @@ build() {
         cd "$build_tree"
         cmake "$cado_source"
     fi
-    make -j 32
-    make -j 32 shell
+    nprocs=`grep -cw ^processor /proc/cpuinfo`
+    make -j $nprocs
+    make -j $nprocs shell
     cd "$cado_source"
 }
 
 start_local_rsync_server() {
     # FIXME: This check is local, and we want something global. What if
     # the leader has /tmp/rsyncd.conf, and not the other nodes ???
-    if ! [ -f /tmp/rsyncd.conf ] ; then
+    # if ! [ -f /tmp/rsyncd.conf ] ; then
+    # actually the rsync daemon does not care if it gets re-run. And if
+    # conf file changes, it gets reread anyway.
         cat > /tmp/rsyncd.conf <<EOF
 port = 8873
 use chroot = no
@@ -273,7 +289,7 @@ EOF
         wait
         for m in "${nodes[@]}" ; do $SSH -n $m rsync --daemon --config /tmp/rsyncd.conf & : ; done 
         wait
-    fi
+    # fi
 }
 
 http_head_somewhere() {
@@ -323,7 +339,7 @@ display_all_variables
 mkdir_everywhere
 start_local_rsync_server
 
-fetch="$cado_source/scripts/cluster/bwc-fetchfiles.pl --localdir $wdir"
+fetch="$cado_source/scripts/cluster/bwc-fetchfiles.pl --localdir $wdir -v"
 for rsync_server in ${rsync_servers[@]} ; do
     fetch="$fetch -s $rsync_server$server_subdir"
 done
@@ -398,6 +414,12 @@ save_once() {
     # For save_once, it's normal to have failures !
     set +x
     set +e
+    # we're still alive: propose ourselves as exporters of the matrix
+    # files...
+    matrixfiles=(`cd $wdir ; ls ${matrix_base}.*.bin`)
+    for f in "${matrixfiles[@]}" ; do
+        ln -sf "rsync://`hostname`:8873/tmp" $HOME/.cache/$f
+    done
     localfiles=(`cd $wdir ; ls [AVS]*`)
     process=()
     for f in "${localfiles[@]}" ; do
@@ -424,7 +446,7 @@ save_once() {
             continue
         fi
         # echo "will save $f"
-        process=("${process[@]}" "$f")
+        process=("${process[@]}" "$slot/$f")
     done
     if [ ${#process[@]} -gt 0 ] ; then
         $fetch --put --on $leader "${process[*]}"
@@ -443,9 +465,21 @@ backlog() {
 }
 
 get_last() {
-    last=0
+    myslot="$1"
+    base="$1/" ; shift
+    if [ "$mksol" ] && [[ "$myslot" =~ ^([0-9]+),([0-9]+)$ ]] ; then
+        n1=${BASH_REMATCH[1]}
+        n2=$((n1+64))
+        last=${BASH_REMATCH[2]}
+    elif ! [ "$mksol" ] && [[ "$myslot" =~ ^([0-9]+)$ ]] ; then
+        n1=${BASH_REMATCH[1]}
+        n2=$((n1+64))
+        last=0
+    else
+        echo "$1: $!" >&2 ; exit 1
+    fi
     for rsync_server in ${rsync_servers[@]} ; do
-        x=$(rsync  --include='V*' --exclude='*' $rsync_server$server_subdir | perl -ne '/V0-64\.(\d+)$/ && print "$1\n";' | sort -n | tail -1)
+        x=$(rsync --include='V*' --exclude='*' $rsync_server$server_subdir$base | perl -ne 'm{\.(\d+)$} && print "$1\n";' | sort -n | tail -1)
         : ${x:=0}
         if [ "$x" -gt "$last" ] ; then
             last=$x
@@ -457,11 +491,11 @@ get_last() {
 # Caveat: we have to make sure to move V files before starting mksol.
 # This script has no provision for doing this automatically. If it isn't
 # done, we'll do bogus computations.
-start=`get_last`
+start=`get_last $slot`
 
 # This could be something to consider including
-if ! $fetch --on $leader "X V0-64.${start}" ; then
-    if [ "$start" != 0 ] ; then
+if ! $fetch --on $leader "X $slot/V0-64.${start}" ; then
+    if [ "$start" != 0 ] || [ "$slot" != 0 ] ; then
         echo "not finding X where start > 0 looks like a bug" >&2
         exit 1
     fi
@@ -471,7 +505,7 @@ if ! $fetch --on $leader "X V0-64.${start}" ; then
         $fetch --put --on $leader "X Y.0"
     fi
     bwc :ysplit interval=${interval} 2>&1
-    $fetch --put --on $leader "V0-64.${start}"
+    $fetch --put --on $leader "$slot/V0-64.${start}"
 fi
 
 checkpoint_mode="keep_rolling_checkpoints=4 keep_checkpoints_younger_than=$((backlog_period*10))"
@@ -494,8 +528,17 @@ backlog &
 backlog_pid=$!
     
 if [ "$mksol" ] ; then
-    $fetch --on $leader "F0-64"
-    bwc mksol interval=${interval} $checkpoint_mode start=${start} 2>&1
+    if [[ "$slot" =~ ^([0-9]+),([0-9]+)$ ]] ; then
+        n1=${BASH_REMATCH[1]}
+        n2=$((n1+64))
+        slotbase=${BASH_REMATCH[2]}
+        slotend=$((slotbase + slotlength))
+    else
+        echo "$slot: bad slot" >&2 ; exit 1
+    fi
+    # This is fairly stupid. F contains too much information in reality
+    $fetch --on $leader "F${n1}-${n2}"
+    bwc mksol interval=${interval} $checkpoint_mode start=${start} end=$slotend 2>&1
 else
     bwc krylov interval=${interval} $checkpoint_mode start=${start} 2>&1
 fi

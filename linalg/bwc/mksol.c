@@ -1,6 +1,7 @@
 #include "cado.h"
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 #include "bwc_config.h"
 #include "parallelizing_info.h"
 #include "matmul_top.h"
@@ -193,6 +194,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             rc = asprintf(&tmp, F_FILE_SLICE_PATTERN, ys[0], ys[1]);
 
             FILE * f = fopen(tmp, "r");
+            DIE_ERRNO_DIAG(f == NULL, "fopen", tmp);
             rc = fseek(f, A->vec_elt_stride(A, s * bw->n), SEEK_SET);
             if (rc < 0) {
                 bw->end = s;

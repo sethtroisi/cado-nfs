@@ -6,6 +6,8 @@ use File::Spec;
 use Time::HiRes qw/time/;
 use Data::Dumper;
 use List::Util 'shuffle';
+use IPC::Open3;
+
 
 my $ssh = $ENV{'SSH'};
 if (!defined($ssh)) {
@@ -55,8 +57,84 @@ sub node_server {
 }
 
 sub backtick {
+    my $maxtime;
+    if ($_[0] eq '--timeout') {
+        shift;
+        $maxtime = shift;
+    }
     my $cmd = "@_";
-    return `$cmd`;
+    if ($verbose) {
+        my $msg = "";
+        $msg = "[timeout $maxtime] " if defined($maxtime);
+        $msg .= $cmd;
+        print STDERR "## $msg\n";
+    }
+    open NULL, "</dev/null" or die;
+    my $pid = open3(*NULL,\*CHLD_OUT, \*CHLD_ERR, $cmd);
+    close NULL;
+    
+    my $fds = {
+        'out' => [ *CHLD_OUT{IO}, "", 1, "" ],
+        'err' => [ *CHLD_ERR{IO}, "", 1, "" ],
+    };
+    
+    my $t0 = time;
+    while (scalar grep { $_->[2] } values %$fds) {
+        my $rin = '';
+        for my $v (values %$fds) {
+            next if !$v->[2]; 
+            vec($rin, fileno($v->[0]), 1) = 1;
+        }
+        
+        my $rc;
+        my $rout;
+        while ($rc = select($rout=$rin, undef, undef, 1.0) == 0) {
+            if (defined($maxtime) && time - $t0 > $maxtime) {
+                kill 9, $pid;
+                waitpid($pid,0) or warn "Can't wait() for children, weird";
+                my $res = {
+                    'rc' => -1,
+                    'wait'=> -1,
+                    'out' => $fds->{'out'}->[3],
+                    'err' => $fds->{'err'}->[3],
+                };
+                return $res;
+            }
+        }
+        if ($rc < 0) {
+            print STDERR "Left select with $!\n";
+            last;
+        }
+    
+        for my $k (keys %$fds) {
+            my $v = $fds->{$k};
+            next unless vec($rout, fileno($v->[0]), 1);
+            if (sysread $v->[0], my $x, 1024) { 
+                $v->[1] .= $x;
+                while ($v->[1]=~s/^(.*(?:\n|\r))//) {
+                    # print $1 if $verbose;
+                    # print "$k $1";
+                    $v->[3] .= $1;
+                }
+            } else {
+                if (length($v->[1])) {
+                    $v->[3] .= $v->[1];
+                    $v->[1] =~ s/^/$k /gm;
+                    # print $v->[1] if $verbose;
+                    $v->[1] = '';
+                }
+                $v->[2]=0;
+            }
+        }
+    }
+    waitpid($pid,0) or warn "Can't wait() for children, weird";
+    my $res = {
+        'rc' => $?>>8,
+        'wait'=> $?,
+        'out' => $fds->{'out'}->[3],
+        'err' => $fds->{'err'}->[3],
+    };
+    return $res;
 }
 
 sub local_progress_files {
@@ -236,7 +314,7 @@ for my $h (keys %$dispatch) {
             my $server;
             # print "$cmd\n";
             my $t0 = time;
-            my ($u0, $u1);
+            my ($u0, $u1, $filesize);
             my $tw=0;
             my $header = "[$h] $base $pos";
             my $dt;
@@ -247,7 +325,9 @@ for my $h (keys %$dispatch) {
                     $dt = sprintf('%.1f',  time-$start_time);
                     print "$dt $header md5 unknown\n";
                 } else {
-                    my $text = backtick("$ssh -q -n $h md5sum $ldir/$base");
+                    my $res = backtick("$ssh -q -n $h md5sum $ldir/$base");
+                    die if $res->{'rc'} != 0;
+                    my $text = $res->{'out'};
                     chomp($text);
                     my $digest;
                     if ($text =~ m{^([0-9a-f]{32})\s+$ldir/$base$}) {
@@ -329,31 +409,64 @@ for my $h (keys %$dispatch) {
                 } else {
                     $header = "[${h}<-${server}] $base $pos";
                 }
-                my $cmd = "";
-                $cmd = "$ssh -q -n $h " unless $h eq 'localhost';
-                system($cmd . "mkdir -p $ldir");
-                $cmd .= "rsync -av";
-                # $cmd .= join(" ", map {
-                # "nfs.lyon.grid5000.fr::rsa768/${nh}x${nv}/rsa768.comp.local.${nh}x${nv}.$_"
-                # } @{$dispatch->{$h}});
+                my $cmd;
+                my $cmd0 = "";
+                $cmd0 = "$ssh -q -n $h " unless $h eq 'localhost';
+                system($cmd0 . "mkdir -p $ldir");
+
+                # Compute an a priori sleep value in case of failure
+                my $s = $timeout_min + int(rand($timeout_max-$timeout_min));
+                my $fatal;
+                $u0 = time;
+
+                my ($orig, $dest);
                 if ($put) {
-                    $cmd .= " $ldir/$base";
-                    $cmd .= " $server/$subdir";
+                    $orig = " $ldir/$base";
+                    $dest = " $server/$subdir";
                 } else {
                     if (defined($cache_server)) {
-                        $cmd .= " $server/$base";
+                        $orig = " $server/$base";
                     } else {
-                        $cmd .= " $server/$subdir$base";
+                        $orig = " $server/$subdir$base";
                     }
-                    $cmd .= " $ldir/";
+                    $dest = " $ldir/";
                 }
+                my $rc;
+                # try to get the file size.
+                $cmd = $cmd0 . "rsync -a $orig";
+                my $getsize = backtick('--timeout', 2, $cmd);
+                if ($getsize->{'rc'} == -1 || $getsize->{'rc'} == 5) {
+                    $fatal = defined($cache_server);
+                    $rc = "$getsize->{'rc'} (while reading size)";
+                    goto FAILED_COMMAND;
+                } elsif ($getsize->{'rc'} != 0) {
+                    $fatal = 1;
+                    $rc = "$getsize->{'rc'} (while reading size)";
+                    goto FAILED_COMMAND;
+                }
+                my @gs = split(' ', $getsize->{'out'});
+                $filesize = $gs[1];
+                if (!defined($filesize) || $filesize !~ /^\d+/) {
+                    $rc = "-1 (size format mismatch)";
+                    $fatal = 1;
+                    goto FAILED_COMMAND;
+                }
+                my $timeout_val = 1 + int($filesize / (4 * 1024 * 1024));
+
+                $cmd = $cmd0 . "rsync -av $orig $dest";
                 # We used to discard stderr.
-                $cmd .= " 2>&1";
+                # $cmd .= " 2>&1";
                 # print "$header <-- $server\n";
-                $u0 = time;
                 print "$cmd\n" if $verbose;
-                $rsync_output=backtick($cmd);
-                my $res = $?;
+                my $rsync_res=backtick('--timeout', $timeout_val, $cmd);
+                $rsync_output = $rsync_res->{'out'};
+                my $res = $rsync_res->{'rc'};
+                if ($res == -1) {
+                    $fatal = defined($cache_server);
+                    $rc = "rsync timeout after $timeout_val s";
+                    goto FAILED_COMMAND;
+                }
+                $res = $rsync_res->{'wait'};
                 $u1 = time;
                 if ($res == 0) {
                     if ($put) {
@@ -369,16 +482,23 @@ for my $h (keys %$dispatch) {
                     ($res & 127),  ($res & 128) ? 'with' : 'without';
                     die;
                 }
-                # Compute an a priori sleep value.
-                my $s = $timeout_min + int(rand($timeout_max-$timeout_min));
-                $dt = sprintf('%.1f',  time-$start_time);
-                my $rc = $res >> 8;
+                $rc = $res >> 8;
                 if ($rc == 5) {
                     # This error is not fatal for the current server,
                     # because it is the error message we expect to get
                     # when the number of connections exceeds the
                     # configured limit.
+                    $fatal = 0;
                 } else {
+                    $fatal = 1;
+                }
+
+FAILED_COMMAND:
+                die unless defined $fatal;
+
+                $dt = sprintf('%.1f',  time-$start_time);
+
+                if  ($fatal) {
                     print "$cmd: exit code $rc\n";
                     # Assume it's fatal. This means we will try another
                     # server, which implies that we don't need to bother
@@ -393,22 +513,30 @@ for my $h (keys %$dispatch) {
                     }
                 }
                 if ($s) {
+                    print "$cmd: non-fatal exit code $rc\n" if $verbose;
                     print "$dt $header retrying in ${s} s\n";
                     $tw+=$s;
                     sleep($s);
                 }
             }
             my $t1 = time;
-            my $kb = backtick("$ssh -q -n $h du -k $ldir/$base");
-            chomp($kb);
-            $kb =~ /^(\d+)/ or die "backtick says: $kb";
-            $kb=$1;
-            my $mb = $kb >> 10;
+            my $mb;
+            if (defined($filesize)) {
+                $mb = $filesize / 1048576;
+            } else {
+                my $kb = backtick("$ssh -q -n $h du -k $ldir/$base");
+                die unless $kb->{'rc'} == 0;
+                $kb = $kb->{'out'};
+                chomp($kb);
+                $kb =~ /^(\d+)/ or die "backtick says: $kb";
+                $kb=$1;
+                $mb = $kb / 1024;
+            }
             if ($rsync_output =~ /$base/) {
                 # if ($port == 8874) { printf "\n"; }
                 $dt = sprintf('%.1f',  time-$start_time);
-                printf("$dt $header ($mb MB): %.1f s [%.1f MB/s], %.1f total, %.1f w\n",
-                    ($u1-$u0), $mb/($u1-$u0), ($t1-$t0), $tw);
+                printf("$dt $header (%.1f MB): %.1f s [%.1f MB/s], %.1f total, %.1f w\n",
+                    $mb, ($u1-$u0), $mb/($u1-$u0), ($t1-$t0), $tw);
             }
             # Why ? Because it yields before other processes, thereby
             # improving fairness of the scheduling. It's mild, but

@@ -453,7 +453,7 @@ void allreduce_mulmod_mpz(mpz_ptr z, MPI_Comm comm, mpz_srcptr px)/*{{{*/
      * 3 : (1 2 3) --> (12 12 3) --> (123 12 123)
      * 
      * So we would need 3 rounds for a communicator of size 3, while the
-     * circular algortihm needs two rounds only.
+     * circular algorithm needs two rounds only.
      */
     int me;
     int s;
@@ -2675,6 +2675,7 @@ void reduce_poly_mod_rat_ptree(poly_ptr P, rat_ptree_t * T)/*{{{*/
     // of course this destroys P.
     // we assume that P is reduced mod the top-level T.
     if (T->p) {
+        // on leaves, we have ->p filled. Not much to be done.
         poly_swap(T->p->A, P);
         return;
     }
@@ -2736,6 +2737,8 @@ void * rational_reduction_child(struct subtask_info_t * info)
             poly_swap(info->P, foo);
             poly_free(foo);
         }
+        // This computes P mod p_i for all p_i, and stores it into the
+        // relevant field at the ptree leaves (->a)
         reduce_poly_mod_rat_ptree(temp, ptree);
         poly_free(temp);
     }
@@ -2949,6 +2952,8 @@ void multiply_all_shares(struct prime_data * primes, int i0, int i1, size_t * p_
         return ;
     }
 
+    // stupid -- this must be multithreaded
+    // XXX
     for(int i = i0 ; i < i1 ; i++) {
         mpz_srcptr px = power_lookup_const(primes[i].powers, glob.prec);
         for(int j = 0 ; j < glob.n ; j++) {

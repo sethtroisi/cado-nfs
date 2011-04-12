@@ -29,7 +29,7 @@ sub analyze_file {
                 @tcomms=();
             }
             if (/^\|/) {
-                while (s/(\d+\.\d+)@\d+%\+(\d+\.\d+)@\d+%//) {
+                while (s/(\d+\.\d+)@\d+%\+(\d+\.\d+)@\d+%?//) {
                     push @tcpus, $1;
                     push @tcomms, $2;
                 }
@@ -69,6 +69,9 @@ sub analyze_file {
             if (m{N=(\d+).*ETA\s.*\[(\d+\.\d+)\sms/iter\]}) {
                 $res->{'niter'}=$1;
                 $res->{'ttot'}=$2/1000.0;
+            }
+            if (m{^iteration (\d+)$}) {
+                $res->{'niter'}=$1;
             }
         }
         close F;

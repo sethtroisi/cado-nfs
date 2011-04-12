@@ -15,7 +15,8 @@ if [ "$1" = "--git-reference" ] ; then
 fi
 
 cd "$HOME/cado"
-git pull --force $reference
-git reset --hard HEAD
+while ! git reset --hard HEAD  ; do echo "waiting for git" ; sleep 1 ; done
+while ! git pull --force $reference ; do echo "waiting for git" ; sleep 1 ; done
+while ! git reset --hard HEAD ; do echo "waiting for git" ; sleep 1 ; done
 
 exec "$@"

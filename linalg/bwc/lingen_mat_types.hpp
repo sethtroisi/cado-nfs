@@ -1005,6 +1005,20 @@ int operator()(unsigned int m, unsigned int n, unsigned int p, unsigned int nbit
     static const unsigned int minbits = 12800;
     if (m < minsize || n < minsize || p < minsize || nbits < minbits) 
         return 0;
+#if 0
+    // not so much of a problem for the moment, and anyway it sould be
+    // smarter to do one top-level recursion with simple addmuls,
+    // avoiding extra temps, and then keep the possibility to descend to
+    // strassen mults
+    uint64_t temp_strassen = (n>>1)*(p>>1);
+    temp_strassen *= nbits >> 3;
+    if (temp_strassen >> 30) {
+        /* Avoid strassen multiplication when temporaries will lead to
+         * large extra memory requirements */
+        fprintf(stderr, "%u*%u*%u %u avoids Strassen\n", m,n,p,nbits);
+        return 0;
+    }
+#endif
     return 1;
 }
 

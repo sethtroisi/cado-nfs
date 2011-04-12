@@ -1044,7 +1044,7 @@ void m64pol_addmul_kara(m64pol_ptr r, m64pol_srcptr a1, m64pol_srcptr a2, unsign
     if (j) t /= j; else t = 0;						\
     char * unit = "s";							\
     if (t < 1.0e-7) { unit = "ns"; t *= 1.0e9;			        \
-    } else if (1 || t < 1.0e-4) { unit = "micros"; t *= 1.0e6;		\
+    } else if (t < 1.0e-4) { unit = "micros"; t *= 1.0e6;		\
     } else if (t < 1.0e-1) { unit = "ms"; t *= 1.0e3; }                 \
     do { } while (0)
 
@@ -2236,7 +2236,7 @@ int main()
 {
   unsigned int n = 2 * 1000 * 1000;
 
-    if (0) {
+    if (1) {
         uint64_t * r = (uint64_t *) malloc(64 * sizeof(uint64_t));
         uint64_t a = rand64();
         uint64_t w = rand64();
