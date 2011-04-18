@@ -11,7 +11,7 @@ install(TARGETS characters RUNTIME DESTINATION bin/linalg)
 # matmul libraries in bwc, which are dlopen'ed, it is necessary to tag it
 # as shared.
 add_library(mat_io SHARED readbuffer.c)
-install(TARGETS mat_io LIBRARY DESTINATION "lib/${package_basename}")
+install(TARGETS mat_io DESTINATION "lib/${package_basename}")
 
 # add_executable(transpose EXCLUDE_FROM_ALL transpose.c readmat.c)
 # target_link_libraries(transpose utils m)

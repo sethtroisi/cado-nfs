@@ -93,7 +93,7 @@ set(bwc_base_sources
 
 add_library(bwc_base ${bwc_base_sources})
 add_library(bwc_mpfq SHARED ${bwc_mpfq_sources})
-install(TARGETS bwc_mpfq LIBRARY DESTINATION "lib/${package_basename}")
+install(TARGETS bwc_mpfq DESTINATION "lib/${package_basename}")
 
 target_link_libraries(bwc_base balancing utils bwc_mpfq ${pthread_libs} dl)
 set_target_properties(bwc_base PROPERTIES
@@ -137,7 +137,7 @@ macro(configure_matmul_lib v i)
             COMPILE_FLAGS "--mpi -DSELECT_ABASE_${v} -DMM_IMPL=${i}"
             LINK_FLAGS "--mpi")
     set(all_matmul_libs ${all_matmul_libs} "matmul_${v}_${i}")
-    install(TARGETS matmul_${v}_${i} LIBRARY DESTINATION "lib/${package_basename}")
+    install(TARGETS matmul_${v}_${i} DESTINATION "lib/${package_basename}")
 endmacro(configure_matmul_lib)
 
 if(EXISTS ${CADO_NFS_SOURCE_DIR}/files.dist)

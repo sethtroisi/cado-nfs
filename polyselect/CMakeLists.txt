@@ -16,7 +16,7 @@ target_link_libraries (rotate_all polyselect_common utils m)
 target_link_libraries (polyselect2 polyselect_common utils m ${pthread_libs})
 target_link_libraries (polyopt polyselect_common utils m gmp)
 
-install(TARGETS polyselect_common LIBRARY DESTINATION lib/${package_basename})
+install(TARGETS polyselect_common DESTINATION lib/${package_basename})
 install(TARGETS polyselect rotate rotate_all polyselect2 RUNTIME
     DESTINATION bin/polyselect)
 include(CMakeLists-nodist.txt OPTIONAL)
