@@ -140,7 +140,7 @@ char ** filelist_from_file(const char * basepath, const char * filename)
 
         // skip leading blanks
         char *rfile = relfile;
-        while (isspace(rfile[0]))
+        while (isspace((int)(unsigned char)rfile[0]))
             rfile++;
         // if empty line or comment line, continue
         if ((rfile[0] == '#') || (rfile[0] == '\0') || (rfile[0] == '\n'))

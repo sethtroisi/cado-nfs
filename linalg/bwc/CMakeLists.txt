@@ -86,7 +86,6 @@ set(bwc_base_sources
     async.c
     debug.c
     rolling.c
-    worker-threads.c
     matmul.c
     matmul_top.c
 )
@@ -99,6 +98,8 @@ target_link_libraries(bwc_base balancing utils bwc_mpfq ${pthread_libs} dl)
 set_target_properties(bwc_base PROPERTIES
         COMPILE_FLAGS "--mpi"
         LINK_FLAGS "--mpi")
+
+target_link_libraries(bwc_mpfq gmp utils)
 set_target_properties(bwc_mpfq PROPERTIES
         COMPILE_FLAGS "--mpi"
         LINK_FLAGS "--mpi")
@@ -106,7 +107,7 @@ set_target_properties(bwc_mpfq PROPERTIES
 set(matmul_basic_sources    matmul-basic.c)
 set(matmul_sliced_sources   matmul-sliced.cpp)
 set(matmul_bucket_sources   matmul-bucket.cpp)
-set(matmul_threaded_sources matmul-threaded.c)
+set(matmul_threaded_sources matmul-threaded.c worker-threads.c)
 
 macro(configure_matmul_lib v i)
     string(COMPARE EQUAL "${v}" "u64k1" doing_u64)
@@ -175,7 +176,7 @@ add_library(matmul_mf matmul-mf.c)
 target_link_libraries(matmul_mf mf)
 bwc_program(build build.c)
 target_link_libraries(build matmul_mf)
-bwc_program(bench bench.c)
+bwc_program(bench bench.c worker-threads.c)
 target_link_libraries(bench matmul_mf)
 set_source_files_properties (../gauss.c COMPILE_FLAGS "-DMULTI_ROW=3 -DNO_MAIN")
 bwc_program(prep prep.c xymats.c ../gauss.c)

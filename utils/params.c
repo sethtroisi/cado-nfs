@@ -192,11 +192,11 @@ int param_list_read_stream(param_list pl, FILE *f)
 
         // trailing space
         int l = strlen(p);
-        for( ; l && isspace(p[l-1]) ; l--);
+        for( ; l && isspace((int)(unsigned char)p[l-1]) ; l--);
         p[l] = '\0';
 
         // leading space.
-        for( ; *p && isspace(*p) ; p++, l--);
+        for( ; *p && isspace((int)(unsigned char)*p) ; p++, l--);
 
         // empty ps are ignored.
         if (l == 0)
@@ -204,11 +204,11 @@ int param_list_read_stream(param_list pl, FILE *f)
 
         // look for a left-hand-side.
         l = 0;
-        if (!(isalpha(p[l]) || p[l] == '_' || p[l] == '-')) {
+        if (!(isalpha((int)(unsigned char)p[l]) || p[l] == '_' || p[l] == '-')) {
             param_list_add_key(pl, NULL, line, PARAMETER_FROM_FILE);
             continue;
         }
-        for( ; p[l] && (isalnum(p[l]) || p[l] == '_' || p[l] == '-') ; l++);
+        for( ; p[l] && (isalnum((int)(unsigned char)p[l]) || p[l] == '_' || p[l] == '-') ; l++);
 
         int lhs_length = l;
 
@@ -222,7 +222,7 @@ int param_list_read_stream(param_list pl, FILE *f)
         /* Now we can match (whitespace*)(separator)(whitespace*)(data)
          */
         char * q = p + lhs_length;
-        for( ; *q && isspace(*q) ; q++);
+        for( ; *q && isspace((int)(unsigned char)*q) ; q++);
 
         /* match separator, which is one of : = := */
         if (*q == '=') {
@@ -237,7 +237,7 @@ int param_list_read_stream(param_list pl, FILE *f)
             all_ok=0;
             continue;
         }
-        for( ; *q && isspace(*q) ; q++);
+        for( ; *q && isspace((int)(unsigned char)*q) ; q++);
 
         newkey = malloc(lhs_length + 1);
         memcpy(newkey, p, lhs_length);
@@ -422,9 +422,9 @@ int param_list_update_cmdline(param_list pl,
          * otherwise we suffer to distinguish immediate numerical
          * entries.
          */
-        if (!isalpha(a[x]))
+        if (!isalpha((int)(unsigned char)a[x]))
             return 0;
-        for( ; a[x] && (isalnum(a[x]) || a[x] == '_' || a[x] == '-') ; x++);
+        for( ; a[x] && (isalnum((int)(unsigned char)a[x]) || a[x] == '_' || a[x] == '-') ; x++);
         if (a[x] == '\0') {
             param_list_add_key(pl, a, (*p_argv)[1], PARAMETER_FROM_CMDLINE);
             (*p_argv)+=2;
@@ -434,7 +434,7 @@ int param_list_update_cmdline(param_list pl,
     } else {
         /* Check for <key>=<value> syntax */
         int x=0;
-        for( ; a[x] && (isalnum(a[x]) || a[x] == '_' || a[x] == '-') ; x++);
+        for( ; a[x] && (isalnum((int)(unsigned char)a[x]) || a[x] == '_' || a[x] == '-') ; x++);
         if (a[x] == '=' && a[x+1]) {
             char * newkey = malloc(x+1);
             memcpy(newkey, a, x);

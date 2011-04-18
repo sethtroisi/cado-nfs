@@ -198,7 +198,7 @@ int abase_u64k2_fscan(abase_u64k2_dst_field k, FILE * file, abase_u64k2_dst_elt 
         c = fgetc(file);
         if (c==EOF)
             break;
-        if (isspace(c)) {
+        if (isspace((int)(unsigned char)c)) {
             if (start==0)
                 continue;
             else
@@ -320,7 +320,7 @@ int abase_u64k2_vec_sscan(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_vec 
     // start with a clean vector
     abase_u64k2_vec_reinit(K, w, *n, 0);
     *n = 0;
-    while (isspace(str[0]))
+    while (isspace((int)(unsigned char)str[0]))
         str++;
     if (str[0] != '[')
         return 0;
@@ -343,16 +343,16 @@ int abase_u64k2_vec_sscan(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_vec 
             return 0;
         }
         i++;
-        while (isdigit(str[0]))
+        while (isdigit((int)(unsigned char)str[0]))
             str++;
-        while (isspace(str[0]))
+        while (isspace((int)(unsigned char)str[0]))
             str++;
         if (str[0] == ']')
             break;
         if (str[0] != ',')
             return 0;
         str++;
-        while (isspace(str[0]))
+        while (isspace((int)(unsigned char)str[0]))
             str++;
     }
     return 1;

@@ -1,4 +1,4 @@
-#define _POSIX_C_SOURCE 200112L
+#include "cado.h"
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -9,9 +9,10 @@
 #include <assert.h>
 #include <string.h>
 
-#include "cado_config.h"
 #include "macros.h"
+#ifdef  HAVE_CURL
 #include "balancing_curl_source.h"
+#endif
 #include "balancing_file_source.h"
 
 /* This is a stupid program for checking a matrix-times-vector product:

@@ -530,7 +530,7 @@ fb_read_addproj (const char *filename, const double log_scale,
       for (i = 0; i < linelen; i++) /* Skip comments */
         if (line[i] == '#')
           linelen = i;
-      while (linelen > 0 && isspace (line[linelen - 1]))
+      while (linelen > 0 && isspace((int)(unsigned char)line[linelen - 1]))
         linelen--; /* Skip whitespace at end of line */
       if (linelen == 0) /* Skip empty/comment lines */
 	continue;

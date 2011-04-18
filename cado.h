@@ -35,6 +35,12 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  * cado_config.h, which makes sense to include here as well).
  */
 
+#if defined(__CYGWIN__) && defined(__STRICT_ANSI__)
+/* The C library which comes with cygwin has no feature test macros. We do
+   something ugly then.  */
+#undef __STRICT_ANSI__
+#endif
+
 #if !(defined(__OpenBSD__) || defined(__FreeBSD__))
 #define _POSIX_C_SOURCE 200112L /* strtoumax */
 /* POSIX: popen/pclose with -std=c99, -pedantic or -ansi (requires

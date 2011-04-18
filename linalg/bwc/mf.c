@@ -66,7 +66,7 @@ int matrix_autodetect_input(struct mf_io_file * m_in, const char * mfile)
         int n = fread(test, 1, 1024, m_in->f);
         DIE_ERRNO_DIAG(n < 1024 && !feof(m_in->f), "fread", mfile);
         int k;
-        for(k = 0 ; k < n && (isdigit(test[k]) || isspace(test[k])) ; k++);
+        for(k = 0 ; k < n && (isdigit((int)(unsigned char)test[k]) || isspace((int)(unsigned char)test[k])) ; k++);
         if (k < n) {
             // assume binary.
             m_in->ascii = 0;
