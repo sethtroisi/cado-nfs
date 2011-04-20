@@ -139,7 +139,14 @@ macro(configure_matmul_lib v i)
             LINK_FLAGS "--mpi")
     set(all_matmul_libs ${all_matmul_libs} "matmul_${v}_${i}")
     install(TARGETS matmul_${v}_${i} DESTINATION "lib/${package_basename}")
+
 endmacro(configure_matmul_lib)
+
+set(MATMUL_LIBS_PREFIX ${CMAKE_SHARED_LIBRARY_PREFIX})
+set(MATMUL_LIBS_SUFFIX ${CMAKE_SHARED_LIBRARY_SUFFIX})
+
+configure_file(matmul-libnames.h.in matmul-libnames.h ESCAPE_QUOTES @ONLY)
+include_directories (${CMAKE_CURRENT_BINARY_DIR})
 
 if(EXISTS ${CADO_NFS_SOURCE_DIR}/files.dist)
 # We are a release build. Pick everything.

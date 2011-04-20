@@ -11,6 +11,7 @@
 
 #include "bwc_config.h"
 #include "matmul.h"
+#include "matmul-libnames.h"
 
 #define MATMUL_DEFAULT_IMPL "bucket"
 
@@ -22,7 +23,8 @@ matmul_ptr matmul_init(abase_vbase_ptr x, unsigned int nr, unsigned int nc, cons
     char solib[256];
     if (!impl) { impl = MATMUL_DEFAULT_IMPL; }
 
-    snprintf(solib, sizeof(solib), "libmatmul_%s_%s.so",
+    snprintf(solib, sizeof(solib),
+            MATMUL_LIBS_PREFIX "matmul_%s_%s" MATMUL_LIBS_SUFFIX,
             x->oo_impl_name(x), impl);
 
     void * handle = dlopen(solib, RTLD_NOW);
