@@ -2575,8 +2575,8 @@ factor_survivors (const unsigned char *rat_S, unsigned char *alg_S, int N,
     mpz_ui_pow_ui (BBrat, cpoly->rlim, 2);
     mpz_mul_ui (BBBalg, BBalg, cpoly->alim);
     mpz_mul_ui (BBBrat, BBrat, cpoly->rlim);
-    mpz_set_ui (BLPrat, cpoly->alim);
-    mpz_mul_2exp (BLPrat, BLPrat, cpoly->lpba); /* fb bound * lp bound */
+    mpz_set_ui (BLPrat, cpoly->rlim);
+    mpz_mul_2exp (BLPrat, BLPrat, cpoly->lpbr); /* fb bound * lp bound */
 
 #ifdef UNSIEVE_NOT_COPRIME
     unsieve_not_coprime (alg_S, N, si);
