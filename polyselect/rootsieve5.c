@@ -130,6 +130,8 @@
 /* Things for tuning */
 #define L1_SIZE 12288 // ~ l1 cache
 #define SIEVEARRAY_SIZE 134217728 // 2^27 (cmp l2 cache = 2097152)
+/* with SIEVEARRAY_SIZE=134217728, the memory usage is about 270Mb,
+   since each slot (int16_t) uses 2 bytes */
 #define MAX_SIEVEARRAY_SIZE SIEVEARRAY_SIZE
 #define TUNE_SIEVEARRAY_SIZE L1_SIZE / 2
 #define TOPALPHA_EACH_SIEVEARRAY 16 // For each "SIEVEARRAY_SIZE", record top 8 poly's alpha avalues.
