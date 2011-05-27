@@ -4211,9 +4211,11 @@ param_init ( param_t param )
 	 mpz_init (param->s2_u);
 	 mpz_init (param->s2_v);
 	 mpz_init (param->s2_mod);
+	 mpz_init (param->n);
 	 mpz_set_ui (param->s2_u, 0);
 	 mpz_set_ui (param->s2_v, 0);
 	 mpz_set_ui (param->s2_mod, 0);
+	 mpz_set_ui (param->n, 0);
 	 param->w_left_bound = 0;
 	 param->w_length = 0;
 	 param->s1_num_e_sl = 0;
@@ -4227,6 +4229,7 @@ param_init ( param_t param )
 	 int i;
 	 for (i = 0; i < LEN_SUBLATTICE_PRIMES; i ++)
 		  param->s1_e_sl[i] = 0;
+	 param->d = 0;
 }
 
 
@@ -4236,6 +4239,7 @@ param_clear ( param_t param )
 	 mpz_clear (param->s2_u);
 	 mpz_clear (param->s2_v);
 	 mpz_clear (param->s2_mod);
+	 mpz_clear (param->n);
 	 free (param->s1_e_sl);
 }
 
@@ -6128,7 +6132,7 @@ rootsieve_file ( FILE *file,
 		  else
 			   continue;
 
-		  if (flag == 1023UL) {
+		  if (flag == 1023UL || flag == 959UL) {
 
 			   /* pre-compute and setup rs */
 			   rsstr_setup (rs);
@@ -6158,6 +6162,138 @@ rootsieve_file ( FILE *file,
 	 }
 
 	 /* free */
+	 rsstr_free (rs);
+}
+
+
+/* From polyselect.c
+   Implements Lemma 2.1 from Kleinjung's paper.
+   If a[d] is non-zero, it is assumed it is already set, otherwise it is
+   determined as a[d] = N/m^d (mod p).
+*/
+void
+Lemma21 ( mpz_t *a,
+		  mpz_t N,
+		  int d,
+		  mpz_t p,
+		  mpz_t m )
+{
+	 mpz_t r, mi, invp;
+	 int i;
+
+	 mpz_init (r);
+	 mpz_init (mi);
+	 mpz_init (invp);
+	 mpz_set (r, N);
+	 mpz_pow_ui (mi, m, d);
+	 if (mpz_cmp_ui (a[d], 0) == 0)
+	 {
+		  mpz_invert (a[d], mi, p); /* 1/m^d mod p */
+		  mpz_mul (a[d], a[d], N);
+		  mpz_mod (a[d], a[d], p);
+	 }
+	 for (i = d - 1; i >= 0; i--)
+	 {
+		  /* invariant: mi = m^(i+1) */
+		  mpz_mul (a[i], a[i+1], mi);
+		  mpz_sub (r, r, a[i]);
+		  ASSERT (mpz_divisible_p (r, p));
+		  mpz_divexact (r, r, p);
+		  mpz_divexact (mi, mi, m); /* now mi = m^i */
+		  if (i == d - 1)
+		  {
+			   mpz_invert (invp, p, mi); /* 1/p mod m^i */
+			   mpz_sub (invp, mi, invp); /* -1/p mod m^i */
+		  }
+		  else
+			   mpz_mod (invp, invp, mi);
+		  mpz_mul (a[i], invp, r);
+		  mpz_mod (a[i], a[i], mi); /* -r/p mod m^i */
+		  /* round to nearest in [-m^i/2, m^i/2] */
+		  mpz_mul_2exp (a[i], a[i], 1);
+		  if (mpz_cmp (a[i], mi) >= 0)
+		  {
+			   mpz_div_2exp (a[i], a[i], 1);
+			   mpz_sub (a[i], a[i], mi);
+		  }
+		  else
+			   mpz_div_2exp (a[i], a[i], 1);
+		  mpz_mul (a[i], a[i], p);
+		  mpz_add (a[i], a[i], r);
+		  ASSERT (mpz_divisible_p (a[i], mi));
+		  mpz_divexact (a[i], a[i], mi);
+	 }
+	 mpz_clear (r);
+	 mpz_clear (mi);
+	 mpz_clear (invp);
+}
+
+
+/*
+  Do the root sieve on all polynomials in the file in msieve format.
+*/
+void
+rootsieve_file_msieve ( FILE *file,
+						param_t param )
+{
+	 unsigned count = 0;
+	 char str[MAX_LINE_LENGTH];
+
+	 /* rootsieve_struct */
+	 rsstr_t rs;
+	 rsstr_init (rs);
+
+	 mpz_t ad, l, m;
+	 mpz_init (ad);
+	 mpz_init (l);
+	 mpz_init (m);
+
+	 /* for each polynomial, do the root sieve. */
+	 while (1) {
+
+		  /* read poly */
+		  if (fgets(str, MAX_LINE_LENGTH, file) == NULL)
+			   break;
+		  gmp_sscanf (str, "%Zd %Zd %Zd", ad, l, m);
+
+		  /* set degree, n, ad, l, m */
+		  rs->d = param->d;
+		  mpz_set (rs->n, param->n);
+		  mpz_set (rs->f[rs->d], ad);
+		  Lemma21 (rs->f, rs->n, rs->d, l, m);
+		  mpz_set (rs->g[1], l);
+		  mpz_neg (rs->g[0], m);
+		  optimize (rs->f, rs->d, rs->g, 0, 1);
+
+		  fprintf (stderr, "\n# Polynomial (# %5d).\n", count);
+		  print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 2);
+
+		  rsstr_setup (rs);
+
+		  bestpoly_t bestpoly;
+		  bestpoly_init (bestpoly, rs->d);
+
+		  int i;
+		  for (i = 0; i <= rs->d; i++)
+		  {
+			   mpz_set (bestpoly->f[i], rs->f[i]);
+		  }
+		  mpz_set (bestpoly->g[0], rs->g[0]);
+		  mpz_set (bestpoly->g[1], rs->g[1]);
+
+		  fprintf (stderr, "\n# Polynomial (# %5d).\n", count);
+		  print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 2);
+
+		  rootsieve_main (rs, bestpoly, param, 2);
+		  bestpoly_free (bestpoly, rs->d);
+
+		  count += 1;
+	 }
+
+	 /* free */
+	 mpz_clear (ad);
+	 mpz_clear (l);
+	 mpz_clear (m);
 	 rsstr_free (rs);
 }
 

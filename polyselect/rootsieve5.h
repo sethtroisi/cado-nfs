@@ -180,7 +180,8 @@ typedef struct {
 	    flag == 1, use stage 1 params
 		flag == 2, use stage 2 params */
 	 char flag;
-
+	 mpz_t n;
+	 int d;
 } _param_t;
 typedef _param_t param_t[1];
 
