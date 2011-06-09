@@ -33,13 +33,19 @@ degree=5                # degree of the algebraic polynomial
 kjdelay=300             # time between two checks
 selectnice=4            # nice level for selection
 
+# on the test number
+# 163629801363886468228815743185411963754335833651755796835932883130344213030762233067562008991898453536122530423557
+# we get
+# lognorm: 35.74, alpha: -5.91 E=29.83
+# Murphy's E(Bf=10000000,Bg=5000000,area=1.00e+16)=5.29e-10
+
 ## Most important parameters of polyselect
 kjP=20000               # choose lc(g) with two prime factors in [P,2P]
-kjmaxnorm=36            # max. lognorm of polynomials (before rootsieve)
-kjadmax=5e6             # max value for lc(f)
-kjadrange=5e5           # individual tasks
+kjmaxnorm=36.2          # max. lognorm of polynomials (before rootsieve)
+kjadmax=1e7             # max value for lc(f)
+kjadrange=2e5           # individual tasks
 kjkmax=20               # rotation is bounded by 2^kmax
-kjincr=210             # forced divisor of lc(f)
+kjincr=210              # forced divisor of lc(f)
 
 ###########################################################################
 
@@ -61,12 +67,12 @@ lpbr=26
 lpba=26
 mfbr=52
 mfba=52
-rlambda=2.2
+rlambda=2.1
 alambda=2.2
 
 I=12                    # Sieving range in lattice siever
 qmin=4000000            # Start of the special-q range
-qrange=100000           # The size of an elementary sieving task
+qrange=50000            # The size of an elementary sieving task
 checkrange=1            # We check if we have enough after each step
                         # of that many relations found.
 sievenice=10
