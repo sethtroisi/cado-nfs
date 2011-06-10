@@ -2352,7 +2352,7 @@ trial_div (factor_list_t *fl, mpz_t norm, int x,
            factorbase_degn_t *fb, bucket_primes_t *primes,
 	   trialdiv_divisor_t *trialdiv_data, const unsigned long fbb)
 {
-    const int trial_div_very_verbose = 0; // (x == 30878);
+    const int trial_div_very_verbose = 0;
     int nr_factors;
     fl->n = 0; /* reset factor list */
 
