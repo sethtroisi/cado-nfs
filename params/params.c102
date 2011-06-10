@@ -41,9 +41,9 @@ selectnice=4            # nice level for selection
 
 ## Parameters of polyselect
 kjP=2000                # choose lc(g) with two prime factors in [P,2P]
-kjmaxnorm=35.5          # max. lognorm of polynomials (before rootsieve)
-kjadmax=1e7             # max value for lc(f)
-kjadrange=1e6           # individual tasks
+kjmaxnorm=35.3          # max. lognorm of polynomials (before rootsieve)
+kjadmax=2e7             # max value for lc(f)
+kjadrange=5e5           # individual tasks
 kjkmax=20               # rotation is bounded by 2^kmax
 kjincr=60               # forced divisor of lc(f)
 
@@ -70,8 +70,8 @@ alambda=2.2
 
 I=12                    # Sieving range in lattice siever
 qmin=4000000            # Start of the special-q range
-qrange=50000            # The size of an elementary sieving task
-firstcheck=5300000      # Try filtering only up from that many relations
+qrange=20000            # The size of an elementary sieving task
+firstcheck=4000000      # Try filtering only up from that many relations
 sievenice=10
 sieve_max_threads=2
 
