@@ -659,7 +659,7 @@ fb_root_in_qlattice (const fbprime_t p, const fbprime_t R,
 	if (UNLIKELY(!invmod_REDC(&u, p)))
           {
             fprintf (stderr, "Error, root in (i,j)-plane is projective\n");
-            exit (1); /* Should never happen! */
+            exit (EXIT_FAILURE); /* Should never happen! */
           }
 	add = p;
       }
@@ -2336,7 +2336,7 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const int x,
                        "# Error, p = %lu does not divide at x = %d\n",
                        (unsigned long) prime.p, x);
               pthread_mutex_unlock(&io_mutex);
-              continue;
+              exit (EXIT_FAILURE);
           }
           do {
               factor_list_add(fl, p);

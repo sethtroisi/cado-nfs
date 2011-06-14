@@ -549,7 +549,7 @@ fb_read_addproj (const char *filename, const double log_scale,
       else
 	ok = 1;
       if (!ok)
-	continue;
+	exit (EXIT_FAILURE);
 
       if (q <= maxprime)
 	{
@@ -632,8 +632,8 @@ fb_read_addproj (const char *filename, const double log_scale,
 	{
 	  if (fb_cur->nr_roots == MAXDEGREE)
             {
-              fprintf (stderr, "# Error, too many roots for " FBPRIME_FORMAT 
-                      "in factor base line %lu\n", fb_cur->p, linenr);
+              fprintf (stderr, "# Error, too many roots for prime " FBPRIME_FORMAT 
+                      " in factor base line %lu\n", fb_cur->p, linenr);
               ok = 0;
               break;
             }
@@ -648,6 +648,13 @@ fb_read_addproj (const char *filename, const double log_scale,
 	  if (*lineptr == ',')
 	    lineptr++;
 	}
+      
+      if (fb_cur->nr_roots == 0)
+        {
+          fprintf (stderr, "# Error, no root for prime " FBPRIME_FORMAT
+                   " in factor base line %lu\n", fb_cur->p, linenr - 1);
+          ok = 0;
+        }
 
       if (ok && proj_primes != NULL && fb_cur->p == proj_primes[0])
         {
@@ -671,8 +678,8 @@ fb_read_addproj (const char *filename, const double log_scale,
       if (!ok)
 	{
 	  fprintf (stderr, "# Incorrect format in factor base file line %lu\n",
-		   linenr);
-	  continue;
+		   linenr - 1);
+	  exit (EXIT_FAILURE);
 	}
 
       /* Sort the roots into ascending order. We assume that fbprime_t and 
