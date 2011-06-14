@@ -3129,7 +3129,9 @@ eval_fij (mpz_t v, const mpz_t *f, const unsigned int d, const long i,
 #define fits_int32_t(x) \
   ((double) INT32_MIN <= (x)) && ((x) <= (double) INT32_MAX)
 
-void
+/* return non-zero when the reduced lattice has entries that do not
+   fit into int32_t, otherwise return 0 */
+static int
 SkewGauss (sieve_info_t *si, double skewness)
 {
   double a[2], b[2], q, maxab0, maxab1;
@@ -3159,10 +3161,9 @@ SkewGauss (sieve_info_t *si, double skewness)
       a[1] -= q * a[0];
       b[1] -= q * b[0];
     }
-  ASSERT(fits_int32_t(a[0]));
-  ASSERT(fits_int32_t(b[0] / skewness));
-  ASSERT(fits_int32_t(a[1]));
-  ASSERT(fits_int32_t(b[1] / skewness));
+  if (!(fits_int32_t(a[0]) && fits_int32_t(b[0] / skewness) &&
+	fits_int32_t(a[1]) && fits_int32_t(b[1] / skewness)))
+    return 1;
   /* now b[0], b[1] should be of the form i*skewness, but this might not be
      exact due to rounding errors, thus we round them to the nearest integer */
   maxab0 = fabs (a[0]) > fabs (b[0]) ? fabs (a[0]) : fabs (b[0]);
@@ -3197,6 +3198,8 @@ SkewGauss (sieve_info_t *si, double skewness)
   uint32_t i = 1U << (LOG_BUCKET_REGION - si->logI);
   i *= si->nb_threads;  /* ensures nb of bucket regions divisible by nb_threads */
   si->J = ((si->J - 1U) / i + 1U) * i; /* Round up to multiple of i */
+
+  return 0;
 }
 
 /* return max(|a0|,|a1|)/min(|a0|,|a1|) */
@@ -3935,11 +3938,10 @@ main (int argc0, char *argv0[])
         si.rho = roots[--nroots];
         if (rho != 0 && si.rho != rho) /* if -rho, wait for wanted root */
           continue;
-        SkewGauss (&si, cpoly->skew);
+        if (SkewGauss (&si, cpoly->skew) != 0)
+	  continue;
         /* FIXME: maybe we can discard some special q's if a1/a0 is too large,
            see http://www.mersenneforum.org/showthread.php?p=130478 */
-        /* if (skewness (&si) > 32.0)
-           continue; */
 
         fprintf (output, "# Sieving q=%" PRIu64 "; rho=%" PRIu64
                  "; a0=%d; b0=%d; a1=%d; b1=%d\n",
