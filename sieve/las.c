@@ -2325,9 +2325,18 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const int x,
         }
       if (prime.x == x) {
           unsigned long p = prime.p;
-          while (p <= fbb && !mpz_divisible_ui_p (norm, p)) {
+          while (p <= fbb && !(mpz_divisible_ui_p (norm, p)
+                               && iscomposite (p) == 0)) {
               /* It may have been a case of incorrectly reconstructing p
-                 from bits 1...16, so let's try if a bigger prime works */
+                 from bits 1...16, so let's try if a bigger prime works.
+
+                 Warning: this strategy may fail, since we might find a
+                 composite p+k1*BUCKET_P_WRAP dividing the norm, while we
+                 really want a larger prime p+k2*BUCKET_P_WRAP. In that case,
+                 if a prime dividing p+k1*BUCKET_P_WRAP also divides the norm,
+                 it might lead to a bucket error (p = ... does not divide),
+                 moreover the wanted prime p+k2*BUCKET_P_WRAP will not be found
+                 and we might miss some relations. */
               p += BUCKET_P_WRAP;
           }
           if (p > fbb) {
