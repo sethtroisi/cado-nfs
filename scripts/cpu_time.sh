@@ -10,7 +10,7 @@
 #	       ps: only polyselect and sieve
 #		   ...
 
-name=$(grep '^name=' *.param | sed "s/^name=\(\S*\)$/\1/g")
+name=$(grep '^name=' *.param | cut -d"=" -f2)
 
 function f
 {
@@ -20,63 +20,73 @@ perl -e 'sub format_dhms {
   $d = int ( $sec / 86400 ); $sec = $sec % 86400;
   $h = int ($sec / 3600 ); $sec = $sec % 3600;
   $m = int ($sec / 60 ); $sec = $sec % 60;
-  return "$d"."d:$h"."h:$m"."m:$sec"."s";
+  if ($d!=0) {
+    return "${d}d${h}h${m}m${sec}s";
+  } else {
+    if ($h!=0) {
+      return "${h}h${m}m${sec}s";
+    } else {
+      if ($m!=0) {
+        return "${m}m${sec}s";
+      } else {
+        return "${sec}s";
+      }
+    }
+  }
 }
 my $var=<STDIN>; print format_dhms($var)."\n"'
 }
 
+
+# Polyselect
 if [[ -z $1 || $(expr $1 : '.*[p].*') != 0 ]]
-  then echo -n "CPU time for polyselect:      "
-    #if [ ! -f ${name}.kjout.* ] 2> /dev/null
-    #  then stty -echo; read c; stty echo
-    #    ls ${name}_$c.kjout.* | while read line; do new_line=$(echo $line | sed "s/^${name}_$c\.\(.*\)/${name}\.\1/g"); cp $line $new_line; done
-    #fi
-    grep phase ${name}.kjout.* | sed "s/^.*phase took \(\S*\)s.*$/\1/g" | tr "\n" "+" | sed "s/^\(.*\)+$/\1\n/" | bc | f
+  then  echo -n "CPU time for polyselect:      "
+    if [ ! -f ${name}.kjout.* ] 2> /dev/null
+      then echo "polynomial files were not found"
+      else grep phase ${name}.kjout.* | sed "s/^.*phase took \(\S*\)s.*$/\1/g" | tr "\n" "+" | sed "s/^\(.*\)+$/\1\n/" | bc | f
+    fi
 fi
 
+
+# Sieve
 if [[ -z $1 || $(expr $1 : '.*[s].*') != 0 ]]
   then echo -n "CPU time for sieve:           "
     if [ -f ${name}.rels ]
-      then b=${name}.rels
-      else b=$(ls -f ${name}.rels.*.gz)
+      then file=${name}.rels
+      else if [ ! -f ${name}.rels.*.gz ] 2> /dev/null
+        then echo "relations files were not found"
+        else file=$(ls -f ${name}.rels.*.gz)
+        fi
     fi
-  zgrep "time" $b | sed "s/^.*time \(\S*\)s.*$/\1/g" | tr "\n" "+" | sed "s/^\(.*\)+$/\1\n/" | bc | f
+    if [ ! -z "$file" ]
+      then zgrep "time" $file | sed "s/^.*time \(\S*\)s.*$/\1/g" | tr "\n" "+" | sed "s/^\(.*\)+$/\1\n/" | bc | f
+    fi
 fi
 
+
+# Linear Algebra
 if [[ -z $1 || $(expr $1 : '.*[l].*') != 0 ]]
-  then echo "CPU or real time for linear algebra"
-    num_lines=$(grep -n Done. ${name}.bwc.log | sed "s/^\([0-9]*\):Done./\1-1/g")
-    if [[ $(echo $num_lines | wc -w) == 2 ]]
-      then echo -n "        krylov [real time]:   "
-        num_line_v=$(echo $num_lines | cut -d' ' -f 1 | bc)
-        line_v=$(head -$num_line_v ${name}.bwc.log | tail -1)
-        v0=$(echo $line_v | sed "s/^.*ETA (N=\(\S*\)): .*/\1/g")
-        v1=$(echo $line_v | sed "s/^.*\[\(\S*\) s\/iter\]$/\1/g")
-        t=$(echo $v0*$v1 | bc | f)
-        echo "$t ($v1 s/iter)"
-        echo -n "        lingen:               "
-        grep "^Total computation took" ${name}.bwc.log | sed "s/^.*took \(\S*\)$/\1/g" | f
-        echo -n "        mksol [real time]:    "
-        num_line_s=$(echo $num_lines | cut -d' ' -f 2 | bc)
-        line_s=$(head -$num_line_s ${name}.bwc.log | tail -1)
-        s0=$(echo $line_s | sed "s/^.*ETA (N=\(\S*\)): .*/\1/g")
-        s1=$(echo $line_s | sed "s/^.*\[\(\S*\) s\/iter\]$/\1/g")
-        t=$(echo $s0*$s1 | bc | f)
-        echo "$t ($s1 s/iter)"
-      else echo "    mksol not ended or linalg has been rerun with checkpoints"
-    fi	
+  then echo -n "Real time for linear algebra: "
+  if [ ! -f ${name}.bwc.log ] 2> /dev/null
+    then echo "linear algebra logfile were not found"
+    else line=$(grep -n Done. ${name}.bwc.log | head -1 | cut -d':' -f1)
+    krylov=$(head -$line ${name}.bwc.log | grep 's/iter' | grep krylov | sed "s/^.* \[\(.*\) s\/iter\]$/\1/g" | tr "\n" "+" | sed "s/^\(.*\)+$/(\1)*1000\n/" | bc |f)
+    lingen=$(grep "^Total computation took" ${name}.bwc.log | cut -d' ' -f4 | f)
+    mksol=$(grep 's/iter' ${name}.bwc.log | grep mksol | sed "s/^.* \[\(.*\) s\/iter\]$/\1/g" | tr "\n" "+" | sed "s/^\(.*\)+$/(\1)*1000\n/" | bc |f)
+    echo "$krylov - $lingen - $mksol (krylov - lingen - mksol)"
+  fi	
 fi
 
+
+# Sqrt
 if [[ -z $1 || $(expr $1 : '.*[r].*') != 0 ]]
-  then echo "CPU time for sqrt (one root): "
-    echo -n "        ab pairs:             "
-    grep dependency ${name}.sqrt.log | head -1 | cut -d' ' -f 6 | f
-    echo -n "        ratsqrt:              "
+  then echo -n "CPU time for sqrt (one root): "
+    if [ ! -f ${name}.sqrt.log ] 2> /dev/null
+      then echo "sqrt logfile were not found"
+    else
     rat=$(grep Rational ${name}.sqrt.log | head -1 | sed "s/.* at \(\S*\)ms$/\1/g")
-    if [ "$rat" == "" ]
-      then rat=0
+    rat2=$(echo "scale=3; $rat/1000" | bc -l | f)
+    alg=$(grep Algebraic ${name}.sqrt.log | head -1 | cut -d' ' -f6 | f)
+    echo "${rat2} - ${alg}  (ratsqrt - algsqrt)"
     fi
-    echo "scale=3; $rat/1000" | bc -l | f
-    echo -n "        algsqrt:              "
-    grep Algebraic ${name}.sqrt.log | head -1 | cut -d' ' -f6 | f
 fi

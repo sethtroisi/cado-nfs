@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 
-# Usage: cadosieve.pl $polyfile $paramfile1 $paramfile2 ...
+# Usage: benchsievessh.pl $polyfile $paramfile1 $paramfile2 ...
 #        read polyfile and paramfiles and estimate time for sieve
 #        the paramfiles must contain: different name!, machines, params sieve...
 # note: - it's not necessary than the polyfile contain the parameters of sieve.
@@ -19,7 +19,7 @@ use strict;
 use warnings;
 
 my $range = 4000; # for Imin ($range = $range / 2 for Imin+1 ...)
-my $int_num = 2; # approximate interval numbers
+my $int_num = 10; # approximate interval numbers
 my $old_range = $range;
 
 # input
@@ -50,7 +50,8 @@ my %max_rels = ( # lpbr => [Imin, approximate total interval for Imin,
                  29 => [ 12,160000000, 52000000],
                  30 => [ 12,160000000,105000000],
                  31 => [ 13,200000000,210000000], 
-                 32 => [ 13,400000000,420000000]);
+                 32 => [ 14,1000000000,500000000],
+                 33 => [ 14,1000000000,1000000000]);
 my $file;
 while (@files) {
   $file = shift @files;

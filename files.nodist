@@ -42,9 +42,10 @@ polyselect/ROOTSIEVE_TODO
 polyselect/E.sage
 polyselect/MurphyE.sage
 polyselect/twoquadratics.sage
-scripts/cadopoly.pl
+scripts/benchpolyselect1.pl
+scripts/benchpolyselect2.pl
 scripts/benchsieve.pl
-scripts/cadosieve.pl
+scripts/benchsievessh.pl
 scripts/check_file_lists.pl
 scripts/dist.sh
 sieve/CMakeLists-nodist.txt

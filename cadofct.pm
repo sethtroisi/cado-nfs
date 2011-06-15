@@ -2645,15 +2645,10 @@ sub do_linalg {
             my $a = int ( sqrt($param{'mpi'}) );
             $a-- while ( $param{'mpi'} % $a != 0);
             my $b = $param{'mpi'} / $a;				
-            $cmd .= "mpi=$b"."x$a hosts=$param{'hosts'} ";
+            $cmd .= "mpi=$b"."x$a hosts=$param{'hosts'} ".
+                    "mpi_extra_args='--mca btl_tcp_if_exclude lo,virbr0' ";
             # TODO: Support other scheduling environments.
             # TODO: Support non-openmpi command lines.
-            if (exists($ENV{'OAR_JOBID'})) {
-                $cmd .= 
-                "mpi_extra_args='--mca btl_tcp_if_exclude lo,virbr0 --mca plm_rsh_agent oarsh' ";
-            } else {
-                $cmd .= "mpi_extra_args='--mca btl_tcp_if_exclude lo,virbr0' ";
-            }
         } else {
             $cmd .= "mpi=1x1 ";
         }
