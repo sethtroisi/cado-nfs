@@ -188,7 +188,7 @@ filterlastrels=0        # if 0, we do the merging with all the relations
 			# there. If non-zero, we incorporate all new relations
 			# in the current sieving jobs (which are killed), and
 			# do another filtering step with those relations.
-			# The default behaviour is non-zero.
+			# The default behaviour is 0.
 
 keep=160                # excess wanted after merge
     # This will force the linear system to be solved to have exactly this

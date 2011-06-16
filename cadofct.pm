@@ -205,7 +205,7 @@ my @default_param = (
     bwstrat      => 1,
     skip         => 32,
     nslices_log  => 1,
-    filterlastrels => 1,
+    filterlastrels => 0,
 
     # linalg
     linalg       => 'bwc',
