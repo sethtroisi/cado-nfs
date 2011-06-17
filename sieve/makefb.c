@@ -140,8 +140,8 @@ lift_root(const cado_poly cpoly, const unsigned long pk, unsigned long * r) {
 }
 
 /* This assumes that factor base primes always fit within a
- * long. If they ever grow beyond, then getprime() mmust be changed, and
- * the rootfinding routines must be expanded. */
+ * long. If they ever grow beyond, then getprime() must be changed, and
+ * the root finding routines must be expanded. */
 void
 makefb_with_powers(FILE *fp, cado_poly cpoly)
 {
