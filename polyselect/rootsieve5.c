@@ -412,6 +412,71 @@ print_poly_info ( mpz_t *f,
 }
 
 
+/*
+  Print ad, l, m and information as above
+*/
+static double
+print_poly_info_short ( mpz_t *f,
+						mpz_t *g,
+						int d,
+						mpz_t N )
+{
+	 /* print info about the polynomial */
+	 unsigned int nroots = 0;
+	 double skew, logmu, alpha, e, alpha_proj;
+	 int i;
+	 double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
+
+	 /* initlize cado_poly for Murphy E */
+	 cado_poly cpoly;
+	 cado_poly_init(cpoly);
+
+	 for (i = 0; i < (d + 1); i++) {
+		  mpz_set(cpoly->f[i], f[i]);
+	 }
+	 for (i = 0; i < 2; i++) {
+		  mpz_set(cpoly->g[i], g[i]);
+	 }
+
+
+	 /* output original poly */
+	 gmp_printf ("%Zd ", f[d]);
+	 mpz_neg (g[0], g[0]);
+	 for (i = 1; i >= 0; i --) {
+		  gmp_printf ("%Zd ", g[i]);
+	 }
+	 printf ("\n");
+	 mpz_neg (g[0], g[0]);
+
+	 /* compute skew, logmu, nroots */
+	 nroots = numberOfRealRoots (f, d, 0, 0);
+	 skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+	 logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
+	 alpha = get_alpha (f, d, ALPHA_BOUND);
+	 alpha_proj = get_biased_alpha_projective (f, d, ALPHA_BOUND);
+
+	 mpz_set (cpoly->n, N);
+	 cpoly->degree = d;
+	 cpoly->degreeg = 2;
+	 cpoly->skew = skew;
+	 e = MurphyE (cpoly, BOUND_F, BOUND_G, AREA, MURPHY_K);
+
+	 printf ("# lognorm: %.2f, alpha: %.2f, (alpha_proj: %.2f) E: %.2f, nr: %u, exp_E: %1.2f, MurphyE: %1.2e\n",
+			 logmu,
+			 alpha,
+			 alpha_proj,
+			 logmu + alpha,
+			 nroots,
+			 logmu - sqrt (2.0 * exp_rot[d] * log (skew) ),
+			 e );
+
+     fflush( stdout );
+	 cado_poly_clear (cpoly);
+
+	 return e;
+}
+
+
 /*-----------------------------*/
 /*   @Tree-related functions.  */
 /*-----------------------------*/
@@ -6232,6 +6297,7 @@ Lemma21 ( mpz_t *a,
 /*
   Do the root sieve on all polynomials in the file in msieve format.
 */
+#define SKIP_ROOTSIEVE_M 1
 void
 rootsieve_file_msieve ( FILE *file,
 						param_t param )
@@ -6264,15 +6330,16 @@ rootsieve_file_msieve ( FILE *file,
 		  mpz_set (rs->g[1], l);
 		  mpz_neg (rs->g[0], m);
 		  optimize (rs->f, rs->d, rs->g, 0, 1);
+		  fprintf (stderr, "# Polynomial (# %5d).\n", count);
 
-		  fprintf (stderr, "\n# Polynomial (# %5d).\n", count);
+#ifdef SKIP_ROOTSIEVE_M
+		  print_poly_info_short (rs->f, rs->g, rs->d, rs->n);
+#else
 		  print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 2);
 
 		  rsstr_setup (rs);
-
 		  bestpoly_t bestpoly;
 		  bestpoly_init (bestpoly, rs->d);
-
 		  int i;
 		  for (i = 0; i <= rs->d; i++)
 		  {
@@ -6281,12 +6348,9 @@ rootsieve_file_msieve ( FILE *file,
 		  mpz_set (bestpoly->g[0], rs->g[0]);
 		  mpz_set (bestpoly->g[1], rs->g[1]);
 
-		  fprintf (stderr, "\n# Polynomial (# %5d).\n", count);
-		  print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 2);
-
 		  rootsieve_main (rs, bestpoly, param, 2);
 		  bestpoly_free (bestpoly, rs->d);
-
+#endif
 		  count += 1;
 	 }
 
