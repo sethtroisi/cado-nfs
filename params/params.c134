@@ -33,18 +33,12 @@ degree=5                # degree of the algebraic polynomial
 kjdelay=300             # time between two checks
 selectnice=4            # nice level for selection
 
-# on the test number
-# 17114057691337765700039745459178101069923663682704647833433887373299199521783010975012797011232545451890010232241683605979064210099377
-# we get (for kjadmax=200000000)
-# lognorm: 42.16, alpha: -6.09 E=36.07
-# Murphy's E(Bf=10000000,Bg=5000000,area=1.00e+16)=3.94e-11
-
 ## Parameters of polyselect
 kjP=100000              # choose lc(g) with two prime factors in [P,2P]
-kjmaxnorm=43.3          # max. lognorm of polynomials (before rootsieve)
-kjadmax=8e8             # max value for lc(f)
-kjadrange=8e6           # individual tasks
-kjkmax=20               # rotation is bounded by 2^kmax
+kjmaxnorm=44.7          # max. lognorm of polynomials (before rootsieve)
+kjadmax=2e9             # max value for lc(f)
+kjadrange=2e7           # individual tasks
+kjkmax=22               # rotation is bounded by 2^kmax
 kjincr=30030            # forced divisor of lc(f)
 
 ###########################################################################
@@ -66,7 +60,7 @@ lpba=28
 mfbr=56
 mfba=84
 rlambda=2.1
-alambda=3.1
+alambda=3.2
 
 I=13                    # Sieving range in lattice siever
 qmin=16000000           # Start of the special-q range
@@ -79,7 +73,7 @@ sieve_max_threads=2
 # Filtering
 ###########################################################################
 
-excessratio=1.1         # minimal excess we want before pruning
+excessratio=1.01        # minimal excess we want before pruning
 keeppurge=160           # shrink in purge if excess exceeds keeppurge
 keep=160                # excess wanted after merge
 maxlevel=15             # ???
