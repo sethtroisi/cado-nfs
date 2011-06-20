@@ -138,6 +138,7 @@
 #define TOPE_EACH_SUBLATTICE 8 // For sublattice, record top 8 poly's E avalues.
 #define LEN_SUBLATTICE_PRIMES 10
 #define WANT_TUNE 0
+//#define SKIP_ROOTSIEVE_M 1
 
 /* Define primes, exp_alpha. */
 unsigned int primes[NP] = {
@@ -412,6 +413,7 @@ print_poly_info ( mpz_t *f,
 }
 
 
+#ifdef SKIP_ROOTSIEVE_M
 /*
   Print ad, l, m and information as above
 */
@@ -475,7 +477,7 @@ print_poly_info_short ( mpz_t *f,
 
 	 return e;
 }
-
+#endif
 
 /*-----------------------------*/
 /*   @Tree-related functions.  */
@@ -5826,13 +5828,28 @@ rootsieve_main_run ( rsstr_t rs,
 								 &(sub_alpha[i]) );
 
 		  if (verbose != 0) {
-			   gmp_fprintf ( stderr, "# Info: #%4d sublattice (w, u, v): (%d, %Zd, %Zd) (mod %Zd), alpha: %.2f\n",
+			   gmp_fprintf ( stderr, "# Info: %4d sublattice (w, u, v): (%d, %Zd, %Zd) (mod %Zd), alpha: %.2f\n",
 							 i + 1,
 							 w[i],
 							 u[i],
 							 v[i],
 							 mod[i],
 							 sub_alpha[i] );
+
+			   // This is only for pbs submission purpose.
+			   // Note: 1. Change N and path (appeared twice)
+			   //       2. Change sieve length -umax and -vmax
+			   /*
+			   fprintf (stderr, "#!/bin/bash\n#PBS -N rsa_%d\n#PBS -l nodes=1,walltime=160:00:00\n#PBS -q route\n#PBS -m ae\n", i);
+			   gmp_fprintf ( stderr, "/home/bai/cado-nfs/trunk/build/orac/polyselect/rootsieve5 -fm /home/bai/cado-nfs/trunk/build/orac/polyselect/rsa768.poly --s2 -n %Zd -d %d -w %d -u %Zd -v %Zd -umax 64 -vmax 317325312 -mod %Zd > /home/bai/cado-nfs/trunk/build/orac/polyselect/rsa704_%d.out 2>&1\n\n",
+							 rs->n,
+							 rs->d,
+							 w[i],
+							 u[i],
+							 v[i],
+							 mod[i],
+							 i );
+			   */
 		  }
 	 }
 	 /* free alpha queue */
@@ -6297,7 +6314,6 @@ Lemma21 ( mpz_t *a,
 /*
   Do the root sieve on all polynomials in the file in msieve format.
 */
-#define SKIP_ROOTSIEVE_M 1
 void
 rootsieve_file_msieve ( FILE *file,
 						param_t param )
