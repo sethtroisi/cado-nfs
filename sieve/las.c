@@ -2310,6 +2310,11 @@ void factor_list_fprint(FILE *f, factor_list_t fl) {
 }
 
 
+static const int bucket_prime_stats = 0;
+static long nr_bucket_primes = 0;
+static long nr_div_tests = 0;
+static long nr_composite_tests = 0;
+static long nr_wrap_was_composite = 0;
 /* The entries in BP must be sorted in order of increasing x */
 static void
 divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const int x,
@@ -2324,9 +2329,24 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const int x,
           break;
         }
       if (prime.x == x) {
+          if (bucket_prime_stats) nr_bucket_primes++;
           unsigned long p = prime.p;
-          while (p <= fbb && !(mpz_divisible_ui_p (norm, p)
-                               && iscomposite (p) == 0)) {
+          while (p <= fbb) {
+              if (bucket_prime_stats) nr_div_tests++;
+              if (mpz_divisible_ui_p (norm, p)) {
+                  int isprime;
+                  modulusul_t m; 
+                  modul_initmod_ul (m, (unsigned long) p);
+                  if (bucket_prime_stats) nr_composite_tests++;
+                  isprime = modul_isprime (m);
+                  modul_clearmod (m);
+                  if (isprime) {
+                      break;
+                  } else {
+                    if (bucket_prime_stats) nr_wrap_was_composite++;
+                  }
+              }
+
               /* It may have been a case of incorrectly reconstructing p
                  from bits 1...16, so let's try if a bigger prime works.
 
@@ -4122,6 +4142,17 @@ main (int argc0, char *argv0[])
         fprintf(output, "# Total (estimated): %lu reports in %1.1f s\n",
                 bench_tot_rep, bench_tot_time);
     }
+
+    if (bucket_prime_stats) 
+      {
+        printf ("# Number of bucket primes: %ld\n", nr_bucket_primes);
+        printf ("# Number of divisibility tests of bucket primes: %ld\n", 
+                nr_div_tests);
+        printf ("# Number of compositeness tests of bucket primes: %ld\n", 
+                nr_composite_tests);
+        printf ("# Number of wrapped composite values while dividing out "
+                "bucket primes: %ld\n", nr_wrap_was_composite);
+      }
 
     facul_clear_strategy (si.strategy);
     si.strategy = NULL;
