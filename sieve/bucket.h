@@ -7,11 +7,28 @@
 
 //#define SAFE_BUCKETS
 
-/* We store ((p-1)/2) % 2^16 in the bucket updates and reconstruct
-   p from that. In rare cases a wrap-around is missed and p does not 
-   divide the norm; in such a case we try p + P_WRAP to see if that
-   divides */
+/* If BUCKET_ENCODE3 is defined, we encode primes p as
+   (floor(p/6) * 2 + p%3-1) % 2^16,
+   i.e., we assume that p is odd and not divisible by 3,
+   and store the residue class modulo 3 in the LSB. */
+// #define BUCKET_ENCODE3
+
+/* We store ((p-1)/2) % 2^16 or (floor(p/6) * 2 + p%3-1) % 2^16 in the bucket 
+   updates and reconstruct p from that. In rare cases a wrap-around is 
+   missed and p does not divide the norm; in such a case we try 
+   p + k*P_WRAP for successive values of k until we find one that divides */
+#ifdef BUCKET_ENCODE3
+#define BUCKET_P_WRAP (3U*(1U<<16))
+#else
 #define BUCKET_P_WRAP (1U<<17)
+#endif
+
+/* If BUCKET_CAREFUL_DECODE is defined, purge_bucket() tests whether 
+   reconstructed primes are divisible by 3 (or 5 if BUCKET_ENCODE3 is 
+   defined) which indicates that a wrap-around was missed, and if so adds 
+   BUCKET_P_WRAP. This reduces the number of incorrectly reconstructed 
+   primes but is a bit slower. */
+// #define BUCKET_CAREFUL_DECODE
 
 /*
  * This bucket module provides a way to store elements (that are called
@@ -473,12 +490,26 @@ bucket_sortbucket (bucket_primes_t *BP)
 
 
 /* Remove some redundancy form the stored primes, e.g., remove the low
-   bit which is always 1. We might also store p/6 and one bit telling
-   whether it was 1 or 5 (mod 6). */
+   bit which is always 1, or if BUCKET_ENCODE3 is set store p/6*2 and 
+   the LSB telling whether it was 1 or 5 (mod 6). */
 static inline uint16_t
 bucket_encode_prime (uint32_t p)
 {
+#ifdef BUCKET_ENCODE3
+  return (uint16_t)(p/3U); /* This happens to work */
+#else
   return (uint16_t)(p/2U);
+#endif
+}
+
+static inline uint32_t
+bucket_decode_prime (uint16_t p)
+{
+#ifdef BUCKET_ENCODE3
+  return 3U * (uint32_t)p + 1U + ((uint32_t)p & 1U);
+#else
+  return 2U * (uint32_t)p + 1U;
+#endif
 }
 
 /* Copy only those bucket entries where x yields a sieve report.
@@ -499,15 +530,28 @@ purge_bucket (bucket_primes_t *BP, bucket_array_t BA,
 
   for (u = BA.bucket_start[i] ; u < BA.bucket_write[i]; u++)
     {
+      uint32_t decoded;
       if (u->p < last_p)
 	phigh += BUCKET_P_WRAP;
       last_p = u->p;
+      decoded = phigh + bucket_decode_prime(u->p);
+#ifdef BUCKET_CAREFUL_DECODE
+      if (
+#ifndef BUCKET_ENCODE3
+          decoded * 0xAAAAAAABU <= 0x55555555U /* Divisible by 3? */
+#else
+          decoded * 0xCCCCCCCDU <= 0x33333333U /* Divisible by 5? */
+#endif
+        ) {
+        decoded += BUCKET_P_WRAP;
+        phigh += BUCKET_P_WRAP;
+      }
+#endif
       if (S[u->x] != 255)
         {
-	  bp.p = phigh + (uint32_t)(u->p) * 2U + 1U; /* Reconstruct prime */
+	  bp.p = decoded;
           bp.x = u->x;
           push_bucket_prime (BP, bp);
 	}
     }
 }
-
