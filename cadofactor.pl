@@ -26,10 +26,10 @@
 # Preamble:
 # =========
 #
-# For a small factorization, it is possible to use the factor.sh script
-# (easier to use) which runs the factorization only on the local machine.
-# Using this script is recommended for larger factorizations involving
-# several machines.
+# For a small factorization (less than 100 digits), it is possible to use the
+# factor.sh script (easier to use) which runs the factorization only on the
+# local machine. Using this script is recommended for larger factorizations
+# and/or factorizations involving several machines.
 #
 # Usage:
 # ======

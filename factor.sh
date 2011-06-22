@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-# Run cadofactor.pl on the current machine
+# Run cadofactor.pl on the current machine. This script is recommended only
+# for small factorizations (less than 100 digits). For larger numbers, you
+# should use the cadofactor.pl script (see the documentation in that script).
 #
 # All partial data are put in a temp dir that is removed at the end in
 # case of success. The temp dir is left here in case of failure. If
