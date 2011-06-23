@@ -90,3 +90,34 @@ int nbits (uintmax_t p)
   return k;
 }
 
+/* q <- n/d rounded to nearest, assuming d <> 0
+   r <- n - q*d
+*/
+void
+mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, mpz_t d)
+{
+  int s;
+
+  ASSERT (mpz_cmp_ui (d, 0) != 0);
+  mpz_fdiv_qr (q, r, n, d); /* round towards -inf, r has same sign as d */
+  mpz_mul_2exp (r, r, 1);
+  s = mpz_cmpabs (r, d);
+  mpz_div_2exp (r, r, 1);
+  if (s > 0) /* |r| > |d|/2 */
+    {
+      mpz_add_ui (q, q, 1);
+      mpz_sub (r, r, d);
+    }
+}
+
+void
+mpz_ndiv_q (mpz_t q, mpz_t n, mpz_t d)
+{
+  mpz_t r;
+
+  mpz_init (r);
+  mpz_ndiv_qr (q, r, n, d);
+  mpz_clear (r);
+}
+
+
