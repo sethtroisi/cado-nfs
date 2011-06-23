@@ -43,8 +43,8 @@ selectnice=4            # nice level for selection
 kjP=100000              # choose lc(g) with two prime factors in [P,2P]
 kjmaxnorm=43.5          # max. lognorm of polynomials (before rootsieve)
 kjadmax=2e8             # max value for lc(f)
-kjadrange=2e7           # individual tasks
-kjkmax=20               # rotation is bounded by 2^kmax
+kjadrange=2e6           # individual tasks
+kjkmax=22               # rotation is bounded by 2^kmax
 kjincr=30030            # forced divisor of lc(f)
 
 ###########################################################################
@@ -64,9 +64,9 @@ alim=16000000
 lpbr=28
 lpba=28
 mfbr=56
-mfba=56
-rlambda=2.2
-alambda=2.2
+mfba=84
+rlambda=2.1
+alambda=3.2
 
 I=13                    # Sieving range in lattice siever
 qmin=16000000           # Start of the special-q range

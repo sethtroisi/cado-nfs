@@ -43,7 +43,7 @@ selectnice=4            # nice level for selection
 kjP=2000                # choose lc(g) with two prime factors in [P,2P]
 kjmaxnorm=36            # max. lognorm of polynomials (before rootsieve)
 kjadmax=2e7             # max value for lc(f)
-kjadrange=2e6           # individual tasks
+kjadrange=1e6           # individual tasks
 kjkmax=20               # rotation is bounded by 2^kmax
 kjincr=60               # forced divisor of lc(f)
 
