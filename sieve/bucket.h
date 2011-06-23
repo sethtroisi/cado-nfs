@@ -59,9 +59,12 @@
  * that can contain, for instance, the low bits of p.
  */
 
+/* define PRIME_HINT to uint32_t to use 32-bit prime hints */
+#define PRIME_HINT uint16_t
+
 typedef struct {
     uint16_t x;
-    uint16_t p;
+    PRIME_HINT p;
 } bucket_update_t;
 
 
@@ -490,25 +493,28 @@ bucket_sortbucket (bucket_primes_t *BP)
 
 
 /* Remove some redundancy form the stored primes, e.g., remove the low
-   bit which is always 1, or if BUCKET_ENCODE3 is set store p/6*2 and 
+   bit which is always 1, or if BUCKET_ENCODE3 is set store floor(p/6)*2 and 
    the LSB telling whether it was 1 or 5 (mod 6). */
-static inline uint16_t
+static inline PRIME_HINT
 bucket_encode_prime (uint32_t p)
 {
 #ifdef BUCKET_ENCODE3
-  return (uint16_t)(p/3U); /* This happens to work */
+  return (PRIME_HINT)(p/3U); /* This happens to work: if p=6k+1, we store
+                                2k; if p=6k+5, we store 2k+1 */
 #else
-  return (uint16_t)(p/2U);
+  return (PRIME_HINT)(p/2U);
 #endif
 }
 
 static inline uint32_t
-bucket_decode_prime (uint16_t p)
+bucket_decode_prime (PRIME_HINT h)
 {
 #ifdef BUCKET_ENCODE3
-  return 3U * (uint32_t)p + 1U + ((uint32_t)p & 1U);
+  return 3U * (uint32_t) h + 1U + ((uint32_t) h & 1U);
+  /* if p was 6k+1, we stored h=2k, thus we want 3h+1;
+     if p was 6k+5, we stored h=2k+1, thus we want 3h+2 */
 #else
-  return 2U * (uint32_t)p + 1U;
+  return 2U * (uint32_t) h + 1U;
 #endif
 }
 
