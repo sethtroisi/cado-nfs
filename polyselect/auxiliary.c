@@ -901,145 +901,6 @@ m_logmu_insert (m_logmu_t* M, unsigned long alloc, unsigned long *psize,
     }
 }
 
-/******************** base (p,m) decomposition *******************************/
-
-/* round to nearest, assume d > 0 */
-void
-mpz_ndiv_qr (mpz_t q, mpz_t r, mpz_t n, mpz_t d)
-{
-  int s;
-
-  ASSERT (mpz_cmp_ui (d, 0) != 0);
-  mpz_fdiv_qr (q, r, n, d); /* round towards -inf */
-  mpz_mul_2exp (r, r, 1);
-  s = mpz_cmp (r, d);
-  mpz_div_2exp (r, r, 1);
-  if (s > 0)
-    {
-      mpz_add_ui (q, q, 1);
-      mpz_sub (r, r, d);
-    }
-}
-
-#if 0
-/* Decompose p->n in base m/b, rounding to nearest
-   (linear polynomial is b*x-m).
-   For b=1, it suffices to check the coefficient f[d-1] is divisible by b,
-   then all successive coefficients will be.
-   Assumes b^2 fits in an unsigned long.
- */
-void
-generate_base_mb (cado_poly p, mpz_t m, mpz_t b)
-{
-  unsigned long i;
-  int d = p->degree;
-
-  ASSERT (d >= 0);
-
-  if (mpz_cmp_ui (b, 1) == 0)
-    {
-      mpz_ndiv_qr (p->f[1], p->f[0], p->n, m);
-      for (i = 1; i < (unsigned long) d; i++)
-        mpz_ndiv_qr (p->f[i+1], p->f[i], p->f[i], m);
-    }
-  else /* b >= 2 */
-    {
-      mpz_t powm, im, k, m_mod_b;
-      int s, tst;
-
-      mpz_init (powm);
-      mpz_init (im);
-      mpz_init (k);
-      mpz_init (m_mod_b);
-      
-      /* we need that m is invertible mod b */
-      do
-        {
-          mpz_gcd (powm, m, b);
-          if (mpz_cmp_ui (powm, 1) == 0)
-            break;
-          mpz_add_ui (m, m, 1);
-        }
-      while (1);
-
-      mpz_pow_ui (powm, m, d);
-      mpz_invert (im, powm, b); /* 1/m^d mod b */
-
-      mpz_ndiv_qr (p->f[d], p->f[d - 1], p->n, powm);
-      /* N = f[d] * m^d + f[d-1]. We want f[d-1] to be divisible by b,
-         which may need to consider f[d]+k instead of f[d], i.e., we want
-         f[d-1]-k*m^d = 0 (mod b), i.e., k = f[d-1]/m^d (mod b). */
-      mpz_fdiv_r (k, p->f[d - 1], b);   /* f[d-1] mod b */
-      mpz_mul (k, k, im);
-      mpz_mod (k, k, b);                /* k = f[d-1]/m^d (mod b) */
-      if (mpz_cmp_ui (k, 0) != 0)
-        {
-          int tst;
-
-          s = mpz_sgn (p->f[d - 1]);
-          /* if (s >= 0 and 2k >= b) or (s < 0 and 2k-2 >= b) then k <- k-b */
-          mpz_mul_2exp (k, k, 1);
-          if (s >= 0)
-            tst = mpz_cmp (k, b) >= 0;
-          else
-            {
-              mpz_sub_ui (k, k, 2);
-              tst = mpz_cmp (k, b) >= 0;
-              mpz_add_ui (k, k, 2);
-            }
-          mpz_div_2exp (k, k, 1);
-          if (tst)
-            mpz_sub (k, k, b);
-
-          /* f[d] -> f[d]+l, f[d-1] -> f[d-1]-l*m^d */
-          mpz_add (p->f[d], p->f[d], k);
-          mpz_submul (p->f[d - 1], powm, k);
-        }
-      /* now N = f[d] * m^d + f[d-1], with f[d-1] divisible by b */
-      mpz_fdiv_r (m_mod_b, m, b); /* m mod b */
-      mpz_divexact (p->f[d - 1], p->f[d - 1], b);
-      for (i = d - 1; i >= 1; i--)
-        {
-          /* p->f[i] is the current remainder */
-          mpz_divexact (powm, powm, m); /* m^i */
-          mpz_ndiv_qr (p->f[i], p->f[i - 1], p->f[i], powm);
-          /* f[i] = q*m^i + r: we want to write f[i] = (q+k) * m^i + (r-k*m^i)
-             with r-k*m^i divisible by b, i.e., k = r/m^i mod b */
-          mpz_fdiv_r (k, p->f[i - 1], b); /* r mod b */
-          mpz_mul (im, im, m_mod_b);
-          mpz_mod (im, im, b); /* 1/m^i mod b */
-          mpz_mul (k, k, im);
-          mpz_mod (k, k, b); /* r/m^i mod b */
-
-          s = mpz_sgn (p->f[i - 1]);
-          mpz_mul_2exp (k, k, 1);
-          if (s >= 0)
-            tst = mpz_cmp (k, b) >= 0;
-          else
-            {
-              mpz_sub_ui (k, k, 2);
-              tst = mpz_cmp (k, b) >= 0;
-              mpz_add_ui (k, k, 2);
-            }
-          mpz_div_2exp (k, k, 1);
-          if (tst)
-            mpz_sub (k, k, b);
-          mpz_add (p->f[i], p->f[i], k);
-          mpz_submul (p->f[i - 1], powm, k);
-          mpz_divexact (p->f[i - 1], p->f[i - 1], b);
-        }
-      mpz_clear (powm);
-      mpz_clear (im);
-      mpz_clear (k);
-      mpz_clear (m_mod_b);
-    }
-  mpz_neg (p->g[0], m);
-  mpz_set (p->g[1], b);
-  mpz_set (p->m, m);
-  p->skew = L2_skewness (p->f, d, SKEWNESS_DEFAULT_PREC, 0);
-}
-#endif
-
 /************************** polynomial arithmetic ****************************/
 
 /* g <- content(f) where deg(f)=d */
@@ -1405,6 +1266,7 @@ rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k, unsigned int t)
   return k;
 }
 
+/* add k*x^t*g to f */
 static void
 rotate_auxg_si (mpz_t *f, mpz_t *g, long k, unsigned int t)
 {
@@ -2289,7 +2151,7 @@ root_refine (mpz_t a, mpz_t b, mpz_t *h)
   mpz_clear (v);
 }
 
-/* puts in r[0], r[1], r[2] integer approximations of the real roots of
+/* put in r[0], r[1], r[2] integer approximations of the real roots of
    h[3]*x^3+...+h[0], and return the number of real roots */
 static int
 roots3 (mpz_t *r, mpz_t *h)
@@ -2415,6 +2277,7 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
       */
 #define LMAX 256
       for (l = -LMAX; l <= LMAX; l++) /* we consider f + l*x^(d-3)*g */
+#undef LMAX
         {
           for (i = 0; i < d; i++)
             mpz_set (f[i], f_copy[i]);
@@ -2434,13 +2297,13 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
               do_translate_z (f, d, g, k);
 
               /* now reduce coefficients f[0], f[1], f[2] using rotation */
-              mpz_tdiv_q (k, f[0], g[0]);
+              mpz_ndiv_q (k, f[0], g[0]);
               mpz_neg (k, k);
               rotate_auxg_z (f, g[1], g[0], k, 0);
-              mpz_tdiv_q (k, f[1], g[0]);
+              mpz_ndiv_q (k, f[1], g[0]);
               mpz_neg (k, k);
               rotate_auxg_z (f, g[1], g[0], k, 1);
-              mpz_tdiv_q (k, f[2], g[0]);
+              mpz_ndiv_q (k, f[2], g[0]);
               mpz_neg (k, k);
               rotate_auxg_z (f, g[1], g[0], k, 2);
 
@@ -2457,7 +2320,6 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
                  -sqrt(12*log(S)). */
               logmu -= sqrt (12.0 * log (skew));
 
-              // gmp_printf ("l=%ld k=%Zd logmu=%1.2f\n", l, r[j], logmu);
               if (logmu < best_logmu)
                 {
                   best_logmu = logmu;
@@ -2478,13 +2340,13 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
       do_translate_z (f, d, g, k);
 
       /* now reduce coefficients f[0], f[1], f[2] using rotation */
-      mpz_tdiv_q (k, f[0], g[0]);
+      mpz_ndiv_q (k, f[0], g[0]);
       mpz_neg (k, k);
       rotate_auxg_z (f, g[1], g[0], k, 0);
-      mpz_tdiv_q (k, f[1], g[0]);
+      mpz_ndiv_q (k, f[1], g[0]);
       mpz_neg (k, k);
       rotate_auxg_z (f, g[1], g[0], k, 1);
-      mpz_tdiv_q (k, f[2], g[0]);
+      mpz_ndiv_q (k, f[2], g[0]);
       mpz_neg (k, k);
       rotate_auxg_z (f, g[1], g[0], k, 2);
 
