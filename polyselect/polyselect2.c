@@ -697,31 +697,8 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
 	{
           /* only consider r[j] and r[j] - pp */
 	  ppl = (long) modul_getmod_ul (pp);
-#if 1
 	  hash_add (H, p, r[j], m0, ad, d, N, 1, 0);
 	  hash_add (H, p, r[j] - ppl, m0, ad, d, N, 1, 0);
-#else
-	  u = r[j];
-	  do
-	    {
-	      hash_add (H, p, u, m0, ad, d, N, 1, 0);
-	      if (u > M - ppl)
-		break;
-	      else
-		u += ppl; /* u <= M */
-	    }
-	  while (1);
-	  u = r[j] - ppl;
-	  do
-	    {
-	      hash_add (H, p, u, m0, ad, d, N, 1, 0);
-	      if (u < -M + ppl)
-		break;
-	      else
-		u -= ppl; /* u <= M */
-	    }
-	  while (1);
-#endif
 	}
       modul_clearmod (pp);
     }
@@ -1101,6 +1078,14 @@ main (int argc, char *argv[])
     best_logmu[i] = 999.9;
   
   P = atoi (argv[1]);
+  /* in newAlgo, we need that for each prime p in [P,2P], p^2 is representable
+     as a "long" */
+  if ((uint64_t) (2 * P) * (uint64_t) (2 * P) > LONG_MAX)
+    {
+      fprintf (stderr, "Error, two large value of P, maximum value is 23170 on a 32-bit machine\n");
+      exit (1);
+    }
+
   st = cputime ();
   initPrimes (P);
   printf ("# Initializing primes took %dms\n", cputime () - st);
