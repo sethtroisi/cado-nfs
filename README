@@ -203,3 +203,7 @@ Instructions about how to subscribe are available at
 If you find a bug, if you have a problem to compile, if you want to
 factor a large number and seek for advice for tuning the parameters, then
 the cado-nfs-discuss list is the right place to ask.
+
+On the https://gforge.inria.fr/projects/cado-nfs/ web page you will also find
+some forums and a tracker. We recommend *not to use* those, please use the
+cado-nfs-discuss list instead.
