@@ -9,6 +9,10 @@ using two cores:
 
 More details follow.
 
+Important note: For a larger factorization (distributed on several machines),
+please use directly the main script cadofactor.pl (doc included in the script)
+instead of factor.sh (doc see section "Run a factorization on current machine").
+
 Supported platforms:
 ====================
 
@@ -86,7 +90,10 @@ cores to use on the current machine (for sieving and linear algebra).
 ./factor.sh 353493749731236273014678071260920590602836471854359705356610427214806564110716801866803409 -t 4 -ssh
 
 If the number of cores is strictly greater than 2, it is more efficient
-to use ssh to distribute the polynomial selection and sieve on localhost.
+to use ssh to distribute the polynomial selection and sieve on the current
+machine.
+If the number of cores is strictly greater than 4, it is mandatory
+to use the option '-ssh'.
 To configure ssh, see the next section.
 
 Note: you might add the -v option at the end of the command line, to see more
