@@ -71,9 +71,9 @@ log2 (double x)
  *   (loglog(factor base bound) - loglog(bucket sieving threshold)) 
  *     * BUCKET_LIMIT_FACTOR * I * J + BUCKET_LIMIT_ADD 
  * We don't store updates where 2 divides gcd(i,j) which reduces the number 
- * of updates by about 1/4, so 0.8 should be safe.
- * If we don't store updates where 3 > gcd(i,j) either, their numher
- * is reduced by another factor of 0.11, then 0.7 should be ok
+ * of updates to about (1-1/4)=3/4, so 0.8 should be safe.
+ * If we don't store updates where 3 divides gcd(i,j) either, their number
+ * is reduced to about (1-1/4)*(1-1/9)=2/3, then 0.7 should be ok
  */
 
 #ifndef BUCKET_LIMIT_FACTOR
