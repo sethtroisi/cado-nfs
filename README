@@ -10,8 +10,9 @@ using two cores:
 More details follow.
 
 Important note: For a larger factorization (distributed on several machines),
-please use directly the main script cadofactor.pl (doc included in the script)
-instead of factor.sh (doc see section "Run a factorization on current machine").
+please use directly the main script cadofactor.pl (whose documentation is
+included in the script) instead of factor.sh (see section "Run a factorization
+on current machine").
 
 Supported platforms:
 ====================
