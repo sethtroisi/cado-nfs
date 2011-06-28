@@ -60,7 +60,7 @@ log2 (double x)
 #error "Too large LOG_BUCKET_REGION, please adapt bucket.h first"
 #endif
 
-/* Define SKIP_GCD3 to skip updates where 3|gcd(i,j) in the
+/* Define SKIP_GCD3 to skip updates where 3 divides gcd(i,j) in the
    bucket sieving phase. Slightly slower than not skipping them
    in single-thread mode, but might be useful for multi-threading,
    or when memory is tight */
@@ -70,10 +70,10 @@ log2 (double x)
  * The number of updates that a bucket can accumulate is estimated as
  *   (loglog(factor base bound) - loglog(bucket sieving threshold)) 
  *     * BUCKET_LIMIT_FACTOR * I * J + BUCKET_LIMIT_ADD 
- * We don't store updates where 2|gcd(i,j) which reduces the number 
+ * We don't store updates where 2 divides gcd(i,j) which reduces the number 
  * of updates by about 1/4, so 0.8 should be safe.
- * If we don't store updates where 3>gcd(i,j) either, their numher
- * is reduced by another factor 0f 0.11, then 0.7 should be ok
+ * If we don't store updates where 3 > gcd(i,j) either, their numher
+ * is reduced by another factor of 0.11, then 0.7 should be ok
  */
 
 #ifndef BUCKET_LIMIT_FACTOR
