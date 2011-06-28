@@ -93,8 +93,8 @@ cores to use on the current machine (for sieving and linear algebra).
 If the number of cores is strictly greater than 2, it is more efficient
 to use ssh to distribute the polynomial selection and sieve on the current
 machine.
-If the number of cores is strictly greater than 4, it is mandatory
-to use the option '-ssh'.
+If the number of cores is strictly greater than 4, it is very recommended
+(sometimes mandatory if the script crashes) to use the option '-ssh'.
 To configure ssh, see the next section.
 
 Note: you might add the -v option at the end of the command line, to see more
