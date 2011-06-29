@@ -70,6 +70,7 @@ sub clean_1file {
     my @lastq;
     my $pos = 0;
     while (<FILE>) {
+        last unless (/^[-#0-9]/);
         # Keep track of the last two special q's
         if (/^### q=(\d+): roots?/) {
             shift @lastq if scalar @lastq == 2;
