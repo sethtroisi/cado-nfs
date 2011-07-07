@@ -31,13 +31,13 @@ for (@files) {
     if ($rels_errors) {
         system "$wdir/bin/check_rels -poly $wdir/$name.poly -f ".
                "$wdir/merge_rels/$_ 2> $wdir/$_.log | gzip > $wdir/$_";
-        $rels_errors = `tail -1 "$wdir/$_.log" | cut -d" " -f7`;
+        $rels_errors = $1 if (`tail -1 "$wdir/$_.log"` =~ /([0-9]*) ERRORS/);
         chomp $rels_errors;
     } else {
         symlink "$wdir/merge_rels/$_", "$wdir/$_";
         $rels_errors = 0;
     }
-    $rels = `tail -1 "$wdir/$_.log" | cut -d" " -f3`;
+    $rels = $1 if (`tail -1 "$wdir/$_.log"` =~ /([0-9]*) ok/);
     chomp $rels;
         
     $nrels += $rels;
@@ -67,6 +67,9 @@ if (-e "$wdir/$name.nrels") {
     my $nfreerels = `gzip -dc "$wdir/$name.freerels.gz" | grep -v '#' | wc -l`;
     chomp $nfreerels;
     $total_rels += $nfreerels;
+    open FILE, ">> $newfilelist" or die "$newfilelist: $!";
+    print FILE "$name.freerels.gz";
+    close FILE;
 }
 
 open FILE, "> $wdir/$name.nrels"

@@ -64,7 +64,8 @@ NB : you can clean the files in the output_rels directories step-by-step
 - verify that you have enough of relations :
 $ $ldir/scripts/check_dup_purge.pl
   (execute check_rels, dup1, dup2 and purge)
-NB : don't kill the script during check_rels and dup1.
+NB : - don't kill the script during check_rels and dup1.
+     - if the file $name.purged exists then you have enough of relations 
 
 - if you have enough of relations : 
 $ touch $ldir/$name.polysel_done $ldir/$name.factbase_done $ldir/$name.freerels_done $ldir/$name.sieve_done $ldir/$name.dup_done $ldir/$name.purge_done
