@@ -20,7 +20,7 @@
 
 name=c113
 parallel=1           # do we use parallel computation?
-delay=300
+delay=60
 
 machines=mach_desc      # file describing available computers for parallel
                         # computation
@@ -35,7 +35,7 @@ selectnice=4            # nice level for selection
 
 ## Most important parameters of polyselect
 kjP=20000               # choose lc(g) with two prime factors in [P,2P]
-kjmaxnorm=36            # max. lognorm of polynomials (before rootsieve)
+kjmaxnorm=36.6          # max. lognorm of polynomials (before rootsieve)
 kjadmax=1e7             # max value for lc(f)
 kjadrange=1e5           # individual tasks
 kjkmax=20               # rotation is bounded by 2^kmax
@@ -64,7 +64,7 @@ alambda=2.2
 
 I=12                    # Sieving range in lattice siever
 qmin=4000000            # Start of the special-q range
-qrange=20000            # The size of an elementary sieving task
+qrange=50000            # The size of an elementary sieving task
 checkrange=1            # We check if we have enough after each step
                         # of that many relations found.
 sievenice=10
