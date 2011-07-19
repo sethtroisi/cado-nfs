@@ -85,7 +85,7 @@ log2 (double x)
 #endif
 
 #ifndef BUCKET_LIMIT_ADD
-#define BUCKET_LIMIT_ADD 1024
+#define BUCKET_LIMIT_ADD 0
 #endif
 
 #define LOG_SCALE 1.4426950408889634 /* 1/log(2) to 17 digits, rounded to
@@ -299,7 +299,10 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0,
   double limit_factor = log(log(MAX(cpoly->rlim, cpoly->alim))) - 
                         log(log(si->bucket_thresh));
   si->bucket_limit = limit_factor * si->bucket_region * BUCKET_LIMIT_FACTOR 
-                     + BUCKET_LIMIT_ADD; 
+                     + BUCKET_LIMIT_ADD;
+  /* an experimental study on the bucket fill with respect to the number of
+     threads shows that each new thread increases by about 1.15% the fill */
+  si->bucket_limit += (si->bucket_limit * (nb_threads - 1)) / 87;
 
   /* Store largest prime factor of k in si->lpf[k], 0 for k=0, 1 for k=1 */
   si->lpf = (unsigned int *) malloc (si->I * sizeof (unsigned int));
