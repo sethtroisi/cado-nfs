@@ -1183,7 +1183,7 @@ main (int argc, char *argv[])
   printf ("# Total phase took %.2fs\n", seconds () - st0);
 
   if (best_E == 0.0)
-    printf ("No polynomial found, please increase the ad range or decrease P\n");
+    printf ("No polynomial found, please increase the ad range or the maxnorm\n");
   else
     print_poly (stdout, best_poly, argc0, argv0, st0, 1 /* raw */);
 
