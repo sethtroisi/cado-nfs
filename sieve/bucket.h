@@ -7,7 +7,7 @@
 
 // #define SAFE_BUCKETS
 
-#define xxxONE_BIG_MALLOC  1  // single big malloc for all the bucket_start[i]
+#define ONE_BIG_MALLOC  1  // single big malloc for all the bucket_start[i]
 
 /* If BUCKET_ENCODE3 is defined, we encode primes p as
    (floor(p/6) * 2 + p%3-1) % 2^16,
