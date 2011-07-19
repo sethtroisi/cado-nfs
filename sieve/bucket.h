@@ -304,10 +304,10 @@ init_bucket_array(const int n_bucket, const int bucket_size)
 static inline void
 clear_bucket_array(bucket_array_t BA)
 {
-    int i;
 #ifdef  ONE_BIG_MALLOC
     free(BA.bucket_start[0]);
 #else
+    int i;
     for (i = 0; i < BA.n_bucket; ++i)
       free(BA.bucket_start[i]);
 #endif
