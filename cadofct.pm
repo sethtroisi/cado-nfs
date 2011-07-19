@@ -1751,7 +1751,7 @@ my $polysel_check = sub {
     while (<FILE>) {
         if (/^No polynomial found/) {
             warn "No polynomial in file `$f'.\n".
-			     "check [kj]P value.\n";
+			     "please increase the [kj]adrange or decrease [kj]P.\n";
             close FILE;
             return;
         }

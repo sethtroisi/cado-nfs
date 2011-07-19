@@ -185,9 +185,9 @@ excessratio=1.01        # minimal excess we want before pruning
 
 filterlastrels=0        # if 0, we do the merging with all the relations
 			# we have when the minimal excess (excessratio) is
-			# there. If non-zero, we incorporate all new relations
-			# in the current sieving jobs (which are killed), and
-			# do another filtering step with those relations.
+			# there. If non-zero (and parallel=1), we incorporate all
+			# new relations in the current sieving jobs (which are killed),
+			# and do another filtering step with those relations.
 			# The default behaviour is 0.
 
 keep=160                # excess wanted after merge
