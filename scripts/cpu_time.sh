@@ -70,9 +70,9 @@ if [[ -z $1 || $(expr $1 : '.*[l].*') != 0 ]]
   if [ ! -f ${name}.bwc.log ] 2> /dev/null
     then echo "linear algebra logfile were not found"
     else line=$(grep -n Done. ${name}.bwc.log | head -1 | cut -d':' -f1)
-    krylov=$(head -$line ${name}.bwc.log | grep 's/iter' | grep krylov | sed "s/^.* \[\(.*\) s\/iter\]$/\1/g" | tr "\n" "+" | sed "s/^\(.*\)+$/(\1)*1000\n/" | bc |f)
+    krylov=$(head -$line ${name}.bwc.log | grep 's/iter' | grep krylov | grep "000 " | sed "s/^.* \[\(.*\) s\/iter\]$/\1/g" | tr "\n" "+" | sed "s/^\(.*\)+$/(\1)*1000\n/" | bc | f)
     lingen=$(grep "^Total computation took" ${name}.bwc.log | cut -d' ' -f4 | f)
-    mksol=$(grep 's/iter' ${name}.bwc.log | grep mksol | sed "s/^.* \[\(.*\) s\/iter\]$/\1/g" | tr "\n" "+" | sed "s/^\(.*\)+$/(\1)*1000\n/" | bc |f)
+    mksol=$(grep 's/iter' ${name}.bwc.log | grep mksol | grep "000 " | sed "s/^.* \[\(.*\) s\/iter\]$/\1/g" | tr "\n" "+" | sed "s/^\(.*\)+$/(\1)*1000\n/" | bc | f)
     echo "$krylov - $lingen - $mksol (krylov - lingen - mksol)"
   fi	
 fi
@@ -84,9 +84,12 @@ if [[ -z $1 || $(expr $1 : '.*[r].*') != 0 ]]
     if [ ! -f ${name}.sqrt.log ] 2> /dev/null
       then echo "sqrt logfile were not found"
     else
-    rat=$(grep Rational ${name}.sqrt.log | head -1 | sed "s/.* at \(\S*\)ms$/\1/g")
-    rat2=$(echo "scale=3; $rat/1000" | bc -l | f)
-    alg=$(grep Algebraic ${name}.sqrt.log | head -1 | cut -d' ' -f6 | f)
-    echo "${rat2} - ${alg}  (ratsqrt - algsqrt)"
+      rat=$(grep Rational ${name}.sqrt.log | head -1 | sed "s/.* at \(\S*\)ms$/\1/g")
+      if [ ! -z $rat ]
+      then rat2=$(echo "scale=3; $rat/1000" | bc -l | f)
+           alg=$(grep Algebraic ${name}.sqrt.log | head -1 | cut -d' ' -f6 | f)
+           echo "${rat2} - ${alg}  (ratsqrt - algsqrt)"
+      else echo "sqrt not calculated"
+      fi
     fi
 fi

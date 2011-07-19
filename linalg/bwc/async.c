@@ -341,7 +341,7 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
             unsigned int s = strlen(eta_string);
             for( ; s && isspace((int)(unsigned char)eta_string[s-1]) ; eta_string[--s]='\0') ;
 
-            printf("%s: N=%d ; ETA (N=%d): %s [%.2f s/iter]\n",
+            printf("%s: N=%d ; ETA (N=%d): %s [%.3f s/iter]\n",
                    (stage == 0) ? "krylov" : "mksol",
                    iter, timing->end_mark, eta_string, dwct / di);
         }
