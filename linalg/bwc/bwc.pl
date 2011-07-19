@@ -614,9 +614,9 @@ sub obtain_bfile {
         return;
     }
     opendir(my $dh, $wdir);
-    my $foo = join(' ', @mpi_precmd_single) . ' ' . "find $wdir -name $x.${nh}x${nv}.????????.bin -printf '%f\\n'";
+    my $foo = join(' ', @mpi_precmd_single) . ' ' . "find $wdir -name $x.${nh}x${nv}.????????.bin";
     print "Running $foo\n";
-    $foo = `$foo`;
+    $foo = basename `$foo`;
     my @bfiles = split(' ', $foo);
     @bfiles = map { /^\s*(.*)\s*$/; $_=$1; } @bfiles;
     @bfiles = grep { /^$pat/ } @bfiles;

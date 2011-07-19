@@ -94,7 +94,18 @@ add_library(bwc_base ${bwc_base_sources})
 add_library(bwc_mpfq SHARED ${bwc_mpfq_sources})
 install(TARGETS bwc_mpfq DESTINATION "lib/${package_basename}")
 
+IF(UNIX)
+  FIND_PROGRAM(CMAKE_UNAME uname /bin /usr/bin /usr/local/bin )
+  IF(CMAKE_UNAME)
+    EXEC_PROGRAM(uname ARGS -s OUTPUT_VARIABLE CMAKE_SYSTEM_NAME)
+  ENDIF(CMAKE_UNAME)
+ENDIF(UNIX)
+IF(CMAKE_SYSTEM_NAME MATCHES BSD)
+target_link_libraries(bwc_base balancing utils bwc_mpfq ${pthread_libs})
+ELSE(CMAKE_SYSTEM_NAME MATCHES BSD)
 target_link_libraries(bwc_base balancing utils bwc_mpfq ${pthread_libs} dl)
+ENDIF(CMAKE_SYSTEM_NAME MATCHES BSD)
+
 set_target_properties(bwc_base PROPERTIES
         COMPILE_FLAGS "--mpi"
         LINK_FLAGS "--mpi")
