@@ -4019,7 +4019,17 @@ main (int argc0, char *argv0[])
             }
             si.bucket_limit += si.bucket_limit / 10;
             nroots++;   // ugly: redo the same ideal
-            abort();
+            // when doing one big malloc, there's some chance that the
+            // bucket overrun actually stepped over the next bucket. In
+            // this case, the freeing of buckets in the code above might
+            // have succeeded, so we can hope to resume with this special
+            // q. On the other hand, if we have one malloc per bucket,
+            // the free() calls above are guaranteed to crash.
+            // Thus it's okay to proceed, if we're lucky enough to reach
+            // here. Note that increasing bucket_limit will have a
+            // permanent effect on the rest of this run.
+            // abort();
+            max_full = 0.;
             continue;
         }
 

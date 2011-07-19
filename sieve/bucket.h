@@ -5,7 +5,9 @@
 #include <stdlib.h>   // for malloc and friends
 #include <stdint.h>
 
-//#define SAFE_BUCKETS
+// #define SAFE_BUCKETS
+
+#define xxxONE_BIG_MALLOC  1  // single big malloc for all the bucket_start[i]
 
 /* If BUCKET_ENCODE3 is defined, we encode primes p as
    (floor(p/6) * 2 + p%3-1) % 2^16,
@@ -276,13 +278,19 @@ init_bucket_array(const int n_bucket, const int bucket_size)
     BA.bucket_write = (bucket_update_t **)malloc_check(n_bucket*sizeof(bucket_update_t *));
     BA.bucket_read  = (bucket_update_t **)malloc_check(n_bucket*sizeof(bucket_update_t *));
 
+#ifdef  ONE_BIG_MALLOC
+    BA.bucket_start[0] = (bucket_update_t *)malloc_check(n_bucket * bucket_size*sizeof(bucket_update_t));
+#endif
+
     for (i = 0; i < n_bucket; ++i) {
         // TODO: shall we ensure here that those pointer do not differ by
         // a large power of 2, to take into account the associativity of
         // L1 cache ?
-        // TODO: would it be better to have a single big malloc for all
-        // the bucket_start[i] ?
+#ifdef  ONE_BIG_MALLOC
+        BA.bucket_start[i] = BA.bucket_start[0] + i * bucket_size;
+#else
         BA.bucket_start[i] = (bucket_update_t *)malloc_check(bucket_size*sizeof(bucket_update_t));
+#endif
         BA.bucket_write[i] = BA.bucket_start[i];
         BA.bucket_read[i] = BA.bucket_start[i];
     }
@@ -297,8 +305,12 @@ static inline void
 clear_bucket_array(bucket_array_t BA)
 {
     int i;
+#ifdef  ONE_BIG_MALLOC
+    free(BA.bucket_start[0]);
+#else
     for (i = 0; i < BA.n_bucket; ++i)
       free(BA.bucket_start[i]);
+#endif
     free_pagealigned(BA.bucket_start, BA.n_bucket*sizeof(bucket_update_t *));
     free(BA.bucket_write);
     BA.bucket_write = NULL;
