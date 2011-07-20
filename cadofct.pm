@@ -1751,7 +1751,7 @@ my $polysel_check = sub {
     while (<FILE>) {
         if (/^No polynomial found/) {
             warn "No polynomial in file `$f'.\n".
-			     "please increase the [kj]adrange or decrease [kj]P.\n";
+			     "please increase the [kj]adrange or [kj]maxnorm.\n";
             close FILE;
             return;
         }
@@ -1866,7 +1866,7 @@ sub do_polysel {
     }
 
     die "No polynomial was found in the given range!\n".
-        "Please increase the range or decrease the [kj]P value.\n"
+        "Please increase the range or [kj]maxnorm.\n"
       unless defined $Emax;
 
     # Copy the best polynomial

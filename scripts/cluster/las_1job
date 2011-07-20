@@ -127,7 +127,7 @@ checkbin "$SIEVER"
 
 until
   unset INFILE
-  INFILE=`ls -U ${INQUEUE_DIR} | sort -n | head -n 1`
+  INFILE=`ls -U ${INQUEUE_DIR} | sort -n -t, -k1n,1n | head -n 1`
   if [ -z "${INFILE}" ] ; then
       echo "${INQUEUE_DIR} is empty" >&2
       #if [ "${INQUEUE_DIR}" = "${COMMON_INQUEUE_DIR}" ] ; then
