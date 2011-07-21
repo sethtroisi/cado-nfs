@@ -33,21 +33,14 @@ degree=5                # degree of the algebraic polynomial
 kjdelay=300             # time between two checks
 selectnice=4            # nice level for selection
 
-## Most important parameters of polyselect
-kjM=8e26                # maximum norm allowed
-kjl=8                   # minimal number of primes in lc(g)
-kjadmin=1               # min value for lc(f)
-kjadmax=1e10            # max value for lc(f)
-kjadrange=1e8           # individual tasks
-
-## Other parameters of polyselect
-kjkeep=200              # number of preselected polynomials
-kjkmax=25               # rotation is bounded by 2^kmax
+## Parameters of polyselect
+# note: those parameters are just a guess, they might be far from optimal
+kjP=200000              # choose lc(g) with two prime factors in [P,2P]
+kjmaxnorm=60            # max. lognorm of polynomials (before rootsieve)
+kjadmax=1e9             # max value for lc(f)
+kjadrange=1e7           # individual tasks
+kjkmax=24               # rotation is bounded by 2^kmax
 kjincr=210              # forced divisor of lc(f)
-kjpb=1024               # bound on primes allowed in lc(g)
-kjp0max=100000          # bound on the additional factor in lc(g)
-
-# with the above parameters, we can expect lognorm: 55.79, alpha: -4.89 E=50.90
 
 ###########################################################################
 # Sieve

@@ -33,12 +33,6 @@ degree=5                # degree of the algebraic polynomial
 kjdelay=300             # time between two checks
 selectnice=4            # nice level for selection
 
-# on the test number
-# 343059697024815997378453036667807742368852705968453173558336352048885454124604689886006194816129993891844519113515353805534878131802117807307184366261257675011
-# we get
-# lognorm: 49.88, alpha: -7.76 E=42.12
-# Murphy's E(Bf=10000000,Bg=5000000,area=1.00e+16)=1.84e-12
-
 ## Parameters of polyselect
 kjP=200000              # choose lc(g) with two prime factors in [P,2P]
 kjmaxnorm=51            # max. lognorm of polynomials (before rootsieve)
