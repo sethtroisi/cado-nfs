@@ -89,13 +89,10 @@ keeppurge=160           # maximal excess wanted after purge
                         # (purge shrinks if needed)
 keep=160                # excess wanted after merge
 maxlevel=15             # ???
-cwmax=200               # ???
-rwmax=200               # ???
+cwmax=100
+rwmax=100
 ratio=1.1
 bwstrat=1
-#  maxpr=???
-#  maxpa=???
-#  nrels_dup=???ke
 
 ###########################################################################
 # Linear algebra
