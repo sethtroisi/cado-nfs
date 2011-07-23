@@ -35,7 +35,7 @@ selectnice=4            # nice level for selection
 
 ## Parameters of polyselect
 kjP=100000              # choose lc(g) with two prime factors in [P,2P]
-kjmaxnorm=43.0          # max. lognorm of polynomials (before rootsieve)
+kjmaxnorm=42.7          # max. lognorm of polynomials (before rootsieve)
 kjadmax=5e8             # max value for lc(f)
 kjadrange=5e6           # individual tasks
 kjkmax=23               # rotation is bounded by 2^kmax
