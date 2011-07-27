@@ -200,7 +200,7 @@ maxlevel=15             # perform up to <maxlevel>-way merges
 cwmax=100               # maximum column weight
 rwmax=100               # maximum row weight
 ratio=1.1               # used only when bwstrat=0 (see below)
-bwstrat=1               # bwstrat=0: stops the merge when the weight of
+bwstrat=3               # bwstrat=0: stops the merge when the weight of
                         #    the matrix multiplied by the number of rows c*N
                         #    exceeds ratio*min(c*N)
                         # bwstrat=1: stops when the product c*N is minimal

@@ -86,7 +86,7 @@ maxlevel=15
 cwmax=100
 rwmax=100
 ratio=1.1
-bwstrat=1               
+bwstrat=3               
 
 ###########################################################################
 # Linear algebra
