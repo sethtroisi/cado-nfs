@@ -15,7 +15,7 @@
 # General parameters
 ###########################################################################
 
-# Sample parameter file for a 128-digit gnfs input
+# Sample parameter file for a 127-digit gnfs input
 # Example: cadofactor.pl wdir=... name=... n=...
 
 name=c127
