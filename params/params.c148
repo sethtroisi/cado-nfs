@@ -38,7 +38,7 @@ kjP=200000              # choose lc(g) with two prime factors in [P,2P]
 kjmaxnorm=47.8          # max. lognorm of polynomials (before rootsieve)
 kjadmax=5e9             # max value for lc(f)
 kjadrange=25e7          # individual tasks
-kjkmax=20               # rotation is bounded by 2^kmax
+kjkmax=23               # rotation is bounded by 2^kmax
 kjincr=30030            # forced divisor of lc(f)
 
 ###########################################################################
@@ -64,7 +64,7 @@ alambda=3.2
 
 I=13                    # Sieving range in lattice siever
 qmin=20000000           # Start of the special-q range
-qrange=100000           # The size of an elementary sieving task
+qrange=500000           # The size of an elementary sieving task
 checkrange=500000       # We check if we have enough after each step
                         # of that many relations found.
 sievenice=10
