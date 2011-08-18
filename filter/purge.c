@@ -809,10 +809,11 @@ main (int argc, char **argv)
         usage();
     }
 
-    if (nrelmax == 0) {
-        fprintf (stderr, "Error, missing -nrels ... option\n");
-        usage();
-    }
+    if (nrelmax == 0)
+      {
+        fprintf (stderr, "Error, missing -nrels ... option (or nrels=0)\n");
+        usage ();
+      }
 
     /* On a 32-bit computer, even 1 << 32 would overflow. Well, we could set
        map[ra] = 2^32-1 in that case, but not sure we want to support 32-bit
