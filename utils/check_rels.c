@@ -40,7 +40,7 @@ check_relation (relation_t *rel, cado_poly_ptr cpoly)
   for (i = 0; i < rel->nb_ap; ++i)
     {
       int j;
-      for (j = 0; j < (rel->ap[i]).e; ++j) 
+      for (j = 0; j < (rel->ap[i]).e; ++j)
 	mpz_mul_ui (acc, acc, (rel->ap[i]).p);
     }
   if (mpz_cmp (acc, no) != 0)
