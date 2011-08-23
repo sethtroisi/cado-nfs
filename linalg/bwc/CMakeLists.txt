@@ -218,6 +218,10 @@ install(TARGETS lingen RUNTIME DESTINATION bin/linalg/bwc)
 target_link_libraries(lingen bwc_base utils gf2x-fft gf2x cantor128)
 add_dependencies(lingen gf2x-build)
 
+set_target_properties(lingen PROPERTIES
+        COMPILE_FLAGS "--mpi"
+        LINK_FLAGS "--mpi")
+
 add_executable(short_matmul ${EXCLUDE_FROM_RELEASE_BUILD} short_matmul.c)
 target_link_libraries(short_matmul balancing)
 
