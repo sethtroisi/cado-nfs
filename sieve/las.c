@@ -46,6 +46,17 @@ log2 (double x)
    (in particular by prime powers and bad primes). */
 // #define COFACTOR_TRICK
 
+/* This triggers code which fills bucket in several passes, one for each
+ * congruence class mod 2 (three such, the trivial one leading to
+ * spurious reports). It's currently only part of the story, and at the
+ * moment it is completely neutral in terms of efficiency.  But it's the
+ * way to go if one wants to support I=16. There are many other places
+ * where changes must be made. This particular flag affects only the
+ * treatment of the ``bucket sieved'' primes, not the pattern-sieved, or
+ * small-sieved.
+ */
+#define MOD2_CLASSES_BS 1
+
 /* default sieve region side is 2^DEFAULT_I */
 #define DEFAULT_I 12
 
@@ -677,10 +688,14 @@ fb_root_in_qlattice (const fbprime_t p, const fbprime_t R,
  * primes.
  */
 
+#define MOD2_CLASSES_BS     0       /* define to 0 or 1 */
+
 typedef struct {
-    int32_t alpha, beta, gamma, delta;  // coordinates of the basis
+#if MOD2_CLASSES_BS
+    int32_t a0,a1,b0,b1;
+#endif
     uint32_t a, c;       // sieving offsets in x-coordinate
-    uint32_t b0, b1;     // thresholds for the branch inside siever
+    uint32_t bound0, bound1;     // thresholds for the branch inside siever
 } plattice_info_t;
 
 // Proposition 1 of [FrKl05]:
@@ -708,88 +723,150 @@ typedef struct {
 //   yield (a0=g, b0=0) at some point --- or the converse --- and the loop
 //   while (|a0| >= I) a0 += b0 will loop forever.
 //
+//
+// Note that on a c166 example, this code alone accounts for almost 20%
+// of the computation time.
+
 NOPROFILE_INLINE int
-reduce_plattice (plattice_info_t *pli, const fbprime_t p, const fbprime_t r,
-                 const sieve_info_t * si)
+reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, const sieve_info_t * si)
 {
-    int32_t a0, a1, b0, b1, I, IJ, k;
-    int logI;
-
-    I = si->I;
-    a0 = -((int32_t)p); a1 = 0;
-    b0 = r;  b1 = 1;
-
+    int32_t I = si->I;
+    int32_t J = si->J;
+    int32_t a0=-(int32_t)p, a1=0, b0=r, b1=1;
+    int32_t hI = I;
+#if MOD2_CLASSES_BS
+    hI/=2;
+#endif
     /* subtractive variant of Euclid's algorithm */
-    while (b0 >= I)
-    {
-      /* a0 < 0 < b0 < -a0 */
-        do {
-            a0 += b0;
-            a1 += b1;
-        } while (a0 + b0 <= 0);
+    for(;;) {
+        /* a0 < 0 <= b0 < -a0 */
+        if (b0 < hI) break;
+        /* a0 < 0 < b0 < -a0 */
+        for( ; a0 += b0, a1 += b1, a0 + b0 <= 0 ; );
         /* -b0 < a0 <= 0 < b0 */
-        if (-a0 < I)
-          {
-            if (UNLIKELY(a0 == 0))
-              return 0;
-            /* Now that |a0| < I, we switch to classical division, since
-               if say |a0|=1 and b0 is large, the subtractive variant
-               will be very expensive.
-               We want b0 + k*a0 < I, i.e., b0 - I + 1 <= k*(-a0),
-               i.e., k = ceil((b0-I+1)/a0). */
-            k = 1 + (b0 - I) / (-a0);
-            b0 += k * a0;
-            b1 += k * a1;
-            goto case_even;
-          }
+        if (-a0 < hI) break;
         /* -b0 < a0 < 0 < b0 */
-        do {
-            b0 += a0;
-            b1 += a1;
-        } while (b0 + a0 >= 0);
+        for( ; b0 += a0, b1 += a1, b0 + a0 >= 0 ; );
         /* a0 < 0 <= b0 < -a0 */
     }
-    if (UNLIKELY(b0 == 0))
-      return 0;
-    /* we switch to the classical algorithm here too */
-    k = 1 + (-a0 - I) / b0;
-    a0 += k * b0;
-    a1 += k * b1;
+    if (b0 > -a0) {
+        if (UNLIKELY(a0 == 0)) return 0;
+        /* Now that |a0| < hI, we switch to classical division, since
+           if say |a0|=1 and b0 is large, the subtractive variant
+           will be very expensive.
+           We want b0 + k*a0 < hI, i.e., b0 - hI + 1 <= k*(-a0),
+           i.e., k = ceil((b0-hI+1)/a0). */
+        int32_t k = 1 + (b0 - hI) / (-a0);
+        b0 += k * a0;
+        b1 += k * a1;
+    } else {
+        if (UNLIKELY(b0 == 0)) return 0;
+        /* we switch to the classical algorithm here too */
+        int32_t k = 1 + (-a0 - hI) / b0;
+        a0 += k * b0;
+        a1 += k * b1;
+    }
+    ASSERT (a1 > 0);
+    ASSERT (b1 > 0);
+    ASSERT ((a0 <= 0) && (a0 > -hI));
+    ASSERT ((b0 >= 0) && (b0 < hI));
+    ASSERT (b0 - a0 >= hI);
 
- case_even:
-    pli->alpha = a0;
-    pli->beta =  a1;
-    pli->gamma = b0;
-    pli->delta = b1;
+#if MOD2_CLASSES_BS
+    pli->a0 = a0;
+    pli->a1 = a1;
+    pli->b0 = b0;
+    pli->b1 = b1;
 
-    ASSERT (pli->beta > 0);
-    ASSERT (pli->delta > 0);
-    ASSERT ((pli->alpha <= 0) && (pli->alpha > -I));
-    ASSERT ((pli->gamma >= 0) && (pli->gamma < I));
-    ASSERT (pli->gamma - pli->alpha >= I);
+    // left-shift everybody, since the following correspond to the
+    // lattice 2p.
+    a0 <<= 1; a1 <<= 1;
+    b0 <<= 1; b1 <<= 1;
+#endif
 
-    // WARNING: Here, we assume a lot on a bound on I,J
-    // TODO: clean these bound problems
-    logI = si->logI;
-    IJ = si->J << logI;
-    int64_t aa = ((int64_t)pli->beta << logI) + (int64_t)(pli->alpha);
-    if (aa > IJ)
-        pli->a = (uint32_t)(INT32_MAX/2);
-    else
-        pli->a = (uint32_t)aa;
-    int64_t cc = ((int64_t)pli->delta << logI) + (int64_t)(pli->gamma);
-    if (cc > IJ)
-        pli->c = (uint32_t)(INT32_MAX/2);
-    else
-        pli->c = (uint32_t)cc;
-    pli->b0 = -pli->alpha;
-    pli->b1 = I - pli->gamma;
+    pli->a = ((a1 << si->logI) + a0);
+    pli->c = ((b1 << si->logI) + b0);
+    if (a1 > J || (a1 == J && a0 > 0)) { pli->a = (uint32_t)(INT32_MAX/2); }
+    if (b1 > J || (b1 == J && b0 > 0)) { pli->c = (uint32_t)(INT32_MAX/2); }
+    pli->bound0 = -a0;
+    pli->bound1 = I - b0;
+    return 1;
+}
 
-    return 1; /* algorithm was ok */
+/* This is for working with congruence classes only */
+NOPROFILE_INLINE
+uint32_t plattice_starting_vector(const plattice_info_t * pli, const sieve_info_t * si, int par MAYBE_UNUSED)
+{
+    /* With MOD2_CLASSES_BS set up, we have computed by the function
+     * above an adapted basis for the band of total width I/2 (thus from
+     * -I/4 to I/4). This adapted basis is in the coefficients a0 a1 b0
+     *  b1 of the pli data structure.
+     *
+     * Now as per Proposition 1 of FrKl05 applied to I/2, any vector
+     * whose i-coordinates are within ]-I/2,I/2[ (FIXME: We would like a
+     * closed interval on the left) can actually be written as a
+     * combination with positive integer coefficients of these basis
+     * vectors a and b.
+     *
+     * We also know that the basis (a,b) has determinant p, thus odd. The
+     * congruence class mod 2 that we want to reach is thus accessible.
+     * It is even possible to find coefficients (k,l) in {0,1} such that
+     * ka+lb is within this congruence class. This means that we're going
+     * to consider either a,b,or a+b as a starting vector. The
+     * i-coordinates of these, as per the properties of Proposition 1, are
+     * within ]-I/2,I/2[. Now all other vectors with i-coordinates in
+     * ]-I/2,I/2[ which also belong to the same congruence class, can be
+     * written as (2k'+k)a+(2l'+l)b, with k' and l' necessarily
+     * nonnegative.
+     *
+     * The last ingredient is that (2a, 2b) forms an adapted basis for
+     * the band of width I with respect to the lattice 2p. It's just an
+     * homothety.
+     *
+     * To find (k,l), we proceed like this. First look at the (a,b)
+     * matrix mod 2:
+     *                 a0&1    a1&1
+     *                 b0&1    b1&1
+     * Its determinant is odd, thus the inverse mod 2 is:
+     *                 b1&1    a1&1
+     *                 b0&1    a0&1
+     * Now the congruence class is given by the parity argument. The
+     * vector is:
+     *                par&1,   par>>1
+     * Multiplying this vector by the inverse matrix above, we obtain the
+     * coordinates k,l, which are:
+     *            k = (b1&par&1)^(b0&(par>>1));
+     *            l = (a1&par&1)^(a0&(par>>1));
+     * Now our starting vector is ka+lb. Instead of multiplying by k and
+     * l with values in {0,1}, we mask with -k and -l, which both are
+     * either all zeroes or all ones in binary
+     *
+     */
+#if !MOD2_CLASSES_BS
+    /* In case we don't consider congruence classes at all, then there is
+     * nothing very particular to be done */
+    uint32_t x = (1 << (si->logI-1));
+    uint32_t i = x;
+    if (i >= pli->bound1) x += pli->a;
+    if (i <  pli->bound0) x += pli->c;
+    return x;
+#else
+    int32_t a0 = pli->a0;
+    int32_t a1 = pli->a1;
+    int32_t b0 = pli->b0;
+    int32_t b1 = pli->b1;
+
+    int k = -((b1&par&1)^(b0&(par>>1)));
+    int l = -((a1&par&1)^(a0&(par>>1)));
+    int32_t v[2]= { (a0&k)+(b0&l), (a1&k)+(b1&l)};
+
+    if (v[1] > (int32_t) si->J)
+        return UINT32_MAX;
+    return (v[1] << si->logI) + v[0] + (1 << (si->logI-1));
+#endif
 }
 
 /***************************************************************************/
-
 /********        Main bucket sieving functions                    **********/
 
 void
@@ -871,6 +948,11 @@ fill_in_buckets(bucket_array_t *BA_param, factorbase_degn_t *fb,
                 continue;
               }
 
+            /* If working with congruence classes, once the loop on the
+             * parity goes at the level above, this initialization
+             * should in fact either be done for each congruence class,
+             * or saved for later use within the factor base structure.
+             */
             plattice_info_t pli;
             if (reduce_plattice(&pli, p, r, si) == 0)
               {
@@ -883,71 +965,65 @@ fill_in_buckets(bucket_array_t *BA_param, factorbase_degn_t *fb,
                              FIXME: can we find the locations to sieve? */
               }
 
-            // Start sieving from (0,0) which is I/2 in x-coordinate
-            uint32_t x;
-            x = (I>>1);
-            // Skip (0,0), since this can not be a valid report.
-            {
-                uint32_t i = x;
-                if (i >= pli.b1)
-                    x += pli.a;
-                if (i < pli.b0)
-                    x += pli.c;
-            }
-            // TODO: check the generated assembly, in particular, the
-            // push function should be reduced to a very simple step.
-            bucket_update_t update;
-            update.p = bucket_encode_prime (p);
-            __asm__("## Inner bucket sieving loop starts here!!!\n");
-             while (x < IJ) {
-                uint32_t i;
-                i = x & maskI;   // x mod I
-                /* if both i = x % I and j = x / I are even, then
-                   both a, b are even, thus we can't have a valid relation */
-                /* i-coordinate = (x % I) - I/2
-                   (I/2) % 3 == (-I) % 3, hence
-                   3|i-coordinate iff (x%I+I) % 3 == 0 */
-                if ((x & even_mask) 
+            for(int parity = MOD2_CLASSES_BS ; parity < (MOD2_CLASSES_BS?4:1) ; parity++) {
+
+                // The sieving point (0,0) is I/2 in x-coordinate
+                uint32_t x = plattice_starting_vector(&pli, si, parity);
+                // TODO: check the generated assembly, in particular, the
+                // push function should be reduced to a very simple step.
+                bucket_update_t update;
+                update.p = bucket_encode_prime (p);
+                __asm__("## Inner bucket sieving loop starts here!!!\n");
+                while (x < IJ) {
+                    uint32_t i;
+                    i = x & maskI;   // x mod I
+                    /* if both i = x % I and j = x / I are even, then
+                       both a, b are even, thus we can't have a valid relation */
+                    /* i-coordinate = (x % I) - I/2
+                       (I/2) % 3 == (-I) % 3, hence
+                       3|i-coordinate iff (x%I+I) % 3 == 0 */
+                    if (MOD2_CLASSES_BS || (x & even_mask) 
 #ifdef SKIP_GCD3
-                    && (!is_divisible_3_u32 (i + I) ||
-                        !is_divisible_3_u32 (x >> logI))
+                            && (!is_divisible_3_u32 (i + I) ||
+                                !is_divisible_3_u32 (x >> logI))
 #endif
-                   )
-                  {
+                       )
+                    {
 #if defined(__x86_64__) && defined(__GNUC__)
-                    /* The x value in update can be set by a write to 
-                       the low word of the register, but gcc does not 
-                       do so - it writes the word to memory, then reads 
-                       the dword back again. */
-                    __asm__ (
-                      "movw %1, %w0\n\t"
-                      : "+r" (update)
-                      : "r" ((uint16_t) (x & maskbucket))
-                    );
+                        /* The x value in update can be set by a write to 
+                           the low word of the register, but gcc does not 
+                           do so - it writes the word to memory, then reads 
+                           the dword back again. */
+                        __asm__ (
+                                "movw %1, %w0\n\t"
+                                : "+r" (update)
+                                : "r" ((uint16_t) (x & maskbucket))
+                                );
 #else
-                    update.x = (uint16_t) (x & maskbucket);
+                        update.x = (uint16_t) (x & maskbucket);
 #endif
 #ifdef PROFILE
-		    /* To make it visible in profiler */
-		    *(BA.bucket_write[x >> shiftbucket])++ = update;
+                        /* To make it visible in profiler */
+                        *(BA.bucket_write[x >> shiftbucket])++ = update;
 #else
-		    push_bucket_update(BA, x >> shiftbucket, update);
+                        push_bucket_update(BA, x >> shiftbucket, update);
 #endif
-                  }
+                    }
 #ifdef TRACE_K
-                if (x == TRACE_K)
-                  fprintf (stderr, "Pushed (%u, %u) (%u) to BA[%u]\n",
-                           x & maskbucket, logp, p, x >> shiftbucket);
+                    if (x == TRACE_K)
+                        fprintf (stderr, "Pushed (%u, %u) (%u) to BA[%u]\n",
+                                x & maskbucket, logp, p, x >> shiftbucket);
 #endif
-                if (i >= pli.b1)
-                    x += pli.a;
-                if (i < pli.b0)
-                    x += pli.c;
+                    if (i >= pli.bound1) x += pli.a;
+                    if (i < pli.bound0)  x += pli.c;
+                }
+                __asm__("## Inner bucket sieving loop stops here!!!\n");
             }
-            __asm__("## Inner bucket sieving loop stops here!!!\n");
         }
         int i;
 next_fb:
+        /* XXX [ET] unimportant, but a packed fb list for each thread
+         * would be cleaner.  */
         for (i = 0; i < si->nb_threads; ++i) {
             fb = fb_next (fb);
             if (fb->p == FB_END || fb->p > pmax) {
@@ -3464,8 +3540,8 @@ process_regions_one_thread(process_bucket_region_arg_t *arg)
         if (si->nb_threads > 1) {
             const int nl = (si->bucket_region >> si->logI)*i;
             int use_offset = ((i == id)?0:1);
-            ssd_update_positions(lssd_rat, ssd_rat, si,    nl, use_offset);
-            ssd_update_positions(lssd_alg, ssd_alg, si,    nl, use_offset);
+            ssd_update_positions(lssd_rat,  ssd_rat,  si, nl, use_offset);
+            ssd_update_positions(lssd_alg,  ssd_alg,  si, nl, use_offset);
             ssd_update_positions(lsrsd_rat, rssd_rat, si, nl, use_offset);
             ssd_update_positions(lsrsd_alg, rssd_alg, si, nl, use_offset);
         }
