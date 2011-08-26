@@ -55,7 +55,7 @@ log2 (double x)
  * treatment of the ``bucket sieved'' primes, not the pattern-sieved, or
  * small-sieved.
  */
-#define MOD2_CLASSES_BS 1
+#define MOD2_CLASSES_BS 0       /* define to 0 or 1 */
 
 /* default sieve region side is 2^DEFAULT_I */
 #define DEFAULT_I 12
@@ -687,8 +687,6 @@ fb_root_in_qlattice (const fbprime_t p, const fbprime_t R,
  * Algorithm by Franke and Kleinjung for lattice sieving of largish
  * primes.
  */
-
-#define MOD2_CLASSES_BS     0       /* define to 0 or 1 */
 
 typedef struct {
 #if MOD2_CLASSES_BS
