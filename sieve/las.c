@@ -801,10 +801,10 @@ uint32_t plattice_starting_vector(const plattice_info_t * pli, const sieve_info_
      *  b1 of the pli data structure.
      *
      * Now as per Proposition 1 of FrKl05 applied to I/2, any vector
-     * whose i-coordinates are within ]-I/2,I/2[ (FIXME: We would like a
-     * closed interval on the left) can actually be written as a
-     * combination with positive integer coefficients of these basis
-     * vectors a and b.
+     * whose i-coordinates are within ]-I/2,I/2[ (<ugly>We would like a
+     * closed interval on the left. Read further on for that case</ugly>)
+     * can actually be written as a combination with positive integer
+     * coefficients of these basis vectors a and b.
      *
      * We also know that the basis (a,b) has determinant p, thus odd. The
      * congruence class mod 2 that we want to reach is thus accessible.
@@ -840,6 +840,34 @@ uint32_t plattice_starting_vector(const plattice_info_t * pli, const sieve_info_
      * either all zeroes or all ones in binary
      *
      */
+    /* Now for the extra nightmare. Above, we do not have the guarantee
+     * that a vector whose i-coordinate is precisely -I/2 has positive
+     * coefficients in our favorite basis. It's annoying, because it may
+     * well be that if such a vector also has positive j-coordinate, then
+     * it is in fact the first vector we will meet. An example is given
+     * by the following data:
+     *
+            f:=Polynomial(StringToIntegerSequence("
+                -1286837891385482936880099433527136908899552
+                55685111236629140623629786639929578
+                13214494134209131997428776417
+                -319664171270205889372
+                -17633182261156
+                40500"));
+
+            q:=165017009; rho:=112690811;
+            a0:=52326198; b0:=-1; a1:=60364613; b1:=2;
+            lI:=13; I:=8192; J:=5088;
+            p:=75583; r0:=54375;
+            > M;
+            [-2241    19]
+            [ 1855    18]
+            > M[1]-M[2];
+            (-4096     1)
+
+    * Clearly, above, for the congruence class (0,1), we must start with
+    * this vector, not with the sum.
+    */
 #if !MOD2_CLASSES_BS
     /* In case we don't consider congruence classes at all, then there is
      * nothing very particular to be done */
@@ -857,6 +885,12 @@ uint32_t plattice_starting_vector(const plattice_info_t * pli, const sieve_info_
     int k = -((b1&par&1)^(b0&(par>>1)));
     int l = -((a1&par&1)^(a0&(par>>1)));
     int32_t v[2]= { (a0&k)+(b0&l), (a1&k)+(b1&l)};
+
+    /* handle exceptional case as described above */
+    if (k && l && a0-b0 == -(1 << (si->logI-1)) && a1 > b1) {
+        v[0] = a0-b0;
+        v[1] = a1-b1;
+    }
 
     if (v[1] > (int32_t) si->J)
         return UINT32_MAX;
