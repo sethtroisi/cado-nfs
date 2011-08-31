@@ -39,7 +39,7 @@ hashInit (hashtable_t *H, unsigned int n, int verbose, int need64)
     H->size = sizeof(int32_t) /* hashcount */
       + ((need64) ? sizeof(int64_t) : sizeof(int32_t)) /* hashtab_p */
       + ((need64) ? sizeof(uint64_t) : sizeof(uint32_t)); /* hashtab_r */
-    H->hashmod = getHashMod((3*n)/2, verbose);
+    H->hashmod = getHashMod (2 * n, verbose);
     H->hashcount = (int *)malloc(H->hashmod * sizeof(int));
     if (H->need64)
       {
@@ -55,7 +55,7 @@ hashInit (hashtable_t *H, unsigned int n, int verbose, int need64)
       {
         fprintf (stderr, "Using %d-bit types\n",
                  (need64) ? 64 : 32);
-        fprintf (stderr, "Allocated hash tables of total size %"PRIu64"Mb\n",
+        fprintf (stderr, "Allocated hash table of total size %"PRIu64"Mb\n",
                  (H->hashmod * H->size) >> 20);
       }
     if(sizeof(unsigned long) == 8){
@@ -90,33 +90,22 @@ hashFree(hashtable_t *H)
 int
 getHashAddrAux (hashtable_t *H, long p, unsigned long r, unsigned int h)
 {
-    static unsigned int cptmax = 0;
-    unsigned int cpt = 0; /* number of iterations to find a free location */
-
 #if DEBUG >= 2
-    printf("H(%ld, %lu) = %d\n", p, r, h);
+  printf("H(%ld, %lu) = %d\n", p, r, h);
 #endif
 
-    while(1){
-	if(H->hashcount[h] == 0)
-	    break;
-	if((GET_HASH_P(H,h) == p) && (GET_HASH_R(H,h) == r))
-	    // (p, r) already known
-	    break;
-	h++;
-        cpt++;
-	if(h >= H->hashmod)
-	    h = 0;
+  while (1)
+    {
+      if (H->hashcount[h] == 0)
+        break;
+      if ((GET_HASH_P(H,h) == p) && (GET_HASH_R(H,h) == r))
+        // (p, r) already known
+        break;
+      h++;
+      if(h >= H->hashmod)
+        h = 0;
     }
-#if DEBUG >= 1
-    if(cpt >= 50)
-	printf("#W# cpt = %u >= 50\n", cpt);
-#endif
-    if(cpt > cptmax){
-	cptmax = cpt;
-	if(cptmax > 100) fprintf(stderr, "HASH: cptmax = %u\n", cptmax);
-    }
-    return h;
+  return h;
 }
 
 /* Map (p,r) into an hash address, find the corresponding entry in the hash

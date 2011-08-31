@@ -1,6 +1,6 @@
 /* purge --- remove singletons
 
-Copyright 2008 Francois Morain, Paul Zimmermann
+Copyright 2008, 2009, 2010, 2011 Francois Morain, Paul Zimmermann
 
 This file is part of CADO-NFS.
 
@@ -844,7 +844,7 @@ main (int argc, char **argv)
       Hsizea = approx_phi (1L << pol[0].lpba) - approx_phi (minpa);
       Hsize = Hsizer + Hsizea;
     }
-    fprintf (stderr, "initializing hash tables with Hsize=%d...\n", Hsize);
+    fprintf (stderr, "Estimated number of prime ideals: %d\n", Hsize);
     hashInit (&H, Hsize, 1, need64);
     tot_alloc0 = H.hashmod * H.size;
 
