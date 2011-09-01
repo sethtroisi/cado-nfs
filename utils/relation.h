@@ -97,6 +97,7 @@ extern void relation_stream_bind(relation_stream_ptr rs, FILE * f);
 extern void relation_stream_unbind(relation_stream_ptr rs);
 extern int relation_stream_disp_progress_now_p(relation_stream_ptr rs);
 extern int relation_stream_get(relation_stream_ptr rs, char * line, int force_read);
+extern int relation_stream_get_skip(relation_stream_ptr rs);
 extern void relation_stream_trigger_disp_progress(relation_stream_ptr rs);
 
 #ifdef __cplusplus

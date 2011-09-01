@@ -409,6 +409,43 @@ another_line:
     return nread;
 }
 
+/* Same as relation_stream_get, but for a skipped line,
+   with supplied_line=NULL and force_read=0.
+   Since this line was already read before, it is necessarily correct. */
+int
+relation_stream_get_skip (relation_stream_ptr rs)
+{
+    FILE *f = rs->source;
+    int c;
+    size_t nread;
+    
+another_line:
+    rs->lnum++;
+
+    c = fgetc (f);
+    nread = 1;
+
+    if (c == EOF)
+      {
+        rs->pos += nread;
+        return -1; /* end of file */
+      }
+
+    if (c == '#')
+      {
+        for( ; c != EOF && c != '\n' ; c = fgetc (f), nread++);
+        goto another_line;
+      }
+
+    /* read entire line */
+    for( ; c != EOF && c != '\n' ; c = fgetc (f), nread++);
+
+    rs->pos += nread;
+    rs->nrels++;
+
+    return 1;
+}
+
 void relation_stream_init(relation_stream_ptr rs)
 {
     memset(rs, 0, sizeof(relation_stream));

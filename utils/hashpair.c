@@ -39,7 +39,7 @@ hashInit (hashtable_t *H, unsigned int n, int verbose, int need64)
     H->size = sizeof(int32_t) /* hashcount */
       + ((need64) ? sizeof(int64_t) : sizeof(int32_t)) /* hashtab_p */
       + ((need64) ? sizeof(uint64_t) : sizeof(uint32_t)); /* hashtab_r */
-    H->hashmod = getHashMod (2 * n, verbose);
+    H->hashmod = getHashMod (3*(n/2), verbose);
     H->hashcount = (int *)malloc(H->hashmod * sizeof(int));
     if (H->need64)
       {

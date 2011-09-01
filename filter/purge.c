@@ -352,19 +352,25 @@ scan_relations (char **ficname, int *nprimes, hashtable_t *H,
         relation_stream_openfile(rs, *ficname);
         for ( ; ; ) {
             int irel = rs->nrels;
-            if (relation_stream_get(rs, NULL, 0) < 0)
-                break;
-            ASSERT_ALWAYS(rs->nrels <= nrelmax);
-            if (bit_vector_getbit(rel_used, irel)) {
+            if (bit_vector_getbit (rel_used, irel) == 0) /* skipped relation */
+              {
+                if (relation_stream_get_skip (rs) < 0)
+                  break; /* end of file */
+              }
+            else
+              {
+                if (relation_stream_get (rs, NULL, 0) < 0)
+                  break;
+                ASSERT_ALWAYS(rs->nrels <= nrelmax);
                 if (rs->rel.b > 0)
-                    insertNormalRelation (rel_compact, irel, nprimes,
-                            H, &(rs->rel), minpr, minpa, tot_alloc);
+                  insertNormalRelation (rel_compact, irel, nprimes,
+                                       H, &(rs->rel), minpr, minpa, tot_alloc);
                 else
-                    insertFreeRelation (rel_compact, irel, nprimes,
-                            H, &(rs->rel), minpr, minpa, tot_alloc);
-            }
+                  insertFreeRelation (rel_compact, irel, nprimes,
+                                      H, &(rs->rel), minpr, minpa, tot_alloc);
+              }
             if (!relation_stream_disp_progress_now_p(rs))
-                continue;
+              continue;
 
             fprintf(stderr, 
                     "read %d relations in %.1fs"
@@ -670,10 +676,16 @@ reread (const char *oname, char ** ficname,
       fprintf(stderr, "   %-70s\n", *ficname);
       for ( ; ; ) {
           int irel = rs->nrels;
-          if (relation_stream_get(rs, NULL, 0) < 0)
-              break;
-          // ASSERT_ALWAYS(rs->nrels <= nrelmax);
-          if (bit_vector_getbit(rel_used, irel)) {
+          if (bit_vector_getbit (rel_used, irel) == 0) /* skipped relation */
+            {
+              if (relation_stream_get_skip (rs) < 0)
+                break; /* end of file */
+            }
+          else
+            {
+              if (relation_stream_get(rs, NULL, 0) < 0)
+                break;
+              // ASSERT_ALWAYS(rs->nrels <= nrelmax);
               if (raw == 0)
               {
                   if (rs->rel.b > 0)
@@ -688,7 +700,7 @@ reread (const char *oname, char ** ficname,
               nr++;
               if (nr >= nrows)
                   ret = 0; /* we are done */
-          }
+            }
           if (!relation_stream_disp_progress_now_p(rs))
               continue;
 
@@ -728,12 +740,12 @@ usage (void)
   exit (1);
 }
 
-/* Estimate the number of primes <= B. The 0.85 factor accounts for the
-   fact that the combinatorial explosion happens before B/log(B). */
+/* estimate the number of primes <= B */
 static int
 approx_phi (long B)
 {
-  return (B <= 1) ? 0 : (int) (0.85 * (double) B / log ((double) B));
+  ASSERT_ALWAYS(B <= 53030236260); /* otherwise B/log(B) > 2^31 */
+  return (B <= 1) ? 0 : (int) ((double) B / log ((double) B));
 }
 
 int
