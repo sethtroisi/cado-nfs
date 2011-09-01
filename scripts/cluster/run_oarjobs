@@ -1,0 +1,28 @@
+#!/bin/bash
+# daemon to automatically start jobs and clean the relations files
+
+# params
+k=$1 # size of jobs package
+nb=$2 # number of jobs package (nnodes = k*nb)
+
+cdir=$(dirname `dirname $0`)
+name=`ls $cdir | grep "\.poly$" | sed "s/^\(.*\)\.poly/\1/g"`
+wtime=`expr 480 / $k`
+
+i=0
+while true; do
+  i=`expr $i + 1` 
+  njobk=`oarstat | grep $USER | grep ${name}_$k | wc -l`
+  while [ "$njobk" -lt "$nb" ]; do
+    oarsub "$cdir/scripts/dispatcher $cdir/scripts/las_loop" -l nodes=$k,walltime=$wtime -t besteffort -t idempotent -n ${name}_$k
+    njobk=`expr $njobk + 1` 
+  done
+  if [ "$i" -eq "10" ];
+    then $cdir/scripts/clean.pl;
+    i=0;
+  fi
+  sleep 300;
+done
+
+
+

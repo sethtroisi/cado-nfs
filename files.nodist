@@ -103,10 +103,14 @@ scripts/cluster/check_dup_purge.pl
 scripts/cluster/clean.pl
 scripts/cluster/cpu_time.pl
 scripts/cluster/dispatcher
+scripts/cluster/init_cdir
+scripts/cluster/init_ldir
 scripts/cluster/las_1job
 scripts/cluster/las_loop
 scripts/cluster/merge.pl
 scripts/cluster/oarsh_wrap.sh
+scripts/cluster/run_oarjobs
+scripts/cluster/trampoline-git.sh
 linalg/bwc/mf_twistvec.c
 linalg/bwc/test_hello.c
 linalg/bwc/shell.c

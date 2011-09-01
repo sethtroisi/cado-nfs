@@ -1,0 +1,28 @@
+#!/bin/bash 
+
+# params
+ldir=$1 # 'ldir' directory must contain $name.poly
+bindir=$2
+
+name=`ls $ldir | grep "\.poly$" | sed "s/^\(.*\)\.poly/\1/g"`
+prefix=$ldir/$name
+dir=$(dirname `dirname $bindir`)
+scriptdir=$dir/scripts/cluster
+
+
+if [ ! -d $bindir ]; then echo "the directory $bindir doesn't exist"; exit; fi
+if [ ! -f $prefix.poly ]; then echo "the file $prefix.poly doesn't exist"; exit; fi
+if [ ! -f $prefix.roots ]; 
+  then $bindir/sieve/makefb -poly $prefix.poly > $prefix.roots 2> $prefix.makefb.log
+fi
+if [ ! -f $prefix.freerels.gz ]; 
+  then $bindir/sieve/freerel -poly $prefix.poly -fb $prefix.roots > $prefix.freerels 2> $prefix.freerels.log
+       gzip $prefix.freerels
+fi
+
+cd $ldir
+mkdir output_rels merge_rels scripts bin
+# output_rels : as on a cluster.
+# merge_rels : relations files merged.
+cp $scriptdir/check_dup_purge.pl $scriptdir/merge.pl $scriptdir/cpu_time.pl $ldir/scripts/
+cp $bindir/utils/check_rels $bindir/utils/roots $bindir/filter/dup1 $bindir/filter/dup2 $bindir/filter/purge $ldir/bin/

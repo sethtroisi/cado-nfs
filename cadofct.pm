@@ -202,7 +202,8 @@ my @default_param = (
     cwmax        => 200,
     rwmax        => 200,
     ratio        => 1.5,
-    bwstrat      => 1,
+    bwstrat      => 3,
+    coverNmax    => 100,
     skip         => 32,
     nslices_log  => 1,
     filterlastrels => 0,
@@ -2539,6 +2540,7 @@ sub do_merge {
               "-out $param{'prefix'}.merge.his ".
               "-mat $param{'prefix'}.purged ".
               "-forbw $param{'bwstrat'} ".
+              "-coverNmax $param{'coverNmax'} ".
               "-keep $param{'keep'} ".
               "-maxlevel $param{'maxlevel'} ".
               "-cwmax $param{'cwmax'} ".

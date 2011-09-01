@@ -1,0 +1,32 @@
+#!/bin/bash 
+
+# params
+cdir=$1 # 'cdir' directory must contain $name.poly
+bindir=$2
+njobs=$3 # = $nb_cores_by_node / 2  with -mt 2 in las by default
+opt=$4 # example "-I 13", "-I 14 -ratq", "-mt 4 -I 15 -ratq" ... 
+
+name=`ls $cdir | grep "\.poly$" | sed "s/^\(.*\)\.poly/\1/g"`
+prefix=$cdir/$name
+dir=$(dirname `dirname $bindir`)
+scriptdir=$dir/scripts/cluster
+
+
+if [ ! -d $bindir ]; then echo "the directory $bindir doesn't exist"; exit; fi
+if [ ! -f $prefix.poly ]; then echo "the file $prefix.poly doesn't exist"; exit; fi
+if [ ! -f $prefix.roots ]; 
+  then $bindir/sieve/makefb -poly $prefix.poly > $prefix.roots 2> $prefix.makefb.log;
+fi
+
+cd $cdir
+mkdir inqueue inprogress working_rels results_rels output_rels log_oar scripts bin
+# inqueue : waiting list.
+# inprogress : list of progress jobs.
+# working_rels : relations files of progress jobs.
+# results_rels : relations files completed (no compressed).
+# output_rels : relations files ready to move to local machine.
+# log_oar : logfile oarsub cmd. 
+cp $scriptdir/las_loop $scriptdir/dispatcher $scriptdir/clean.pl $scriptdir/run_oardjobs $cdir/scripts/
+sed "{s/^NAME=.*$/NAME=${name}/g;s/^OPT=.*$/OPT=\"${opt}\"/g}" < $scriptdir/las_1job > $cdir/scripts/las_1_job
+sed "s/^nb_jobs_by_node=.*$/nb_jobs_by_node=${njobs}/g" < $scriptdir/dispatcher > $cdir/scripts/dispatcher
+cp $bindir/sieve/las $bindir/utils/cut_n_roots $cdir/bin/

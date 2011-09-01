@@ -18,7 +18,7 @@ use cadofct;
 use strict;
 use warnings;
 
-my $range = 4000; # for Imin ($range = $range / 2 for Imin+1 ...)
+my $range = 2000; # for Imin ($range = $range / 2 for Imin+1 ...)
 my $int_num = 10; # approximate interval numbers
 my $old_range = $range;
 
@@ -51,7 +51,8 @@ my %max_rels = ( # lpbr => [Imin, approximate total interval for Imin,
                  30 => [ 12,160000000,105000000],
                  31 => [ 13,200000000,210000000], 
                  32 => [ 14,1000000000,500000000],
-                 33 => [ 14,1000000000,1000000000]);
+                 33 => [ 14,10000000000,1000000000],
+                 34 => [ 14,10000000000,2000000000]);
 my $file;
 while (@files) {
   $file = shift @files;

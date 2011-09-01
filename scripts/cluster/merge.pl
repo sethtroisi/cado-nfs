@@ -32,6 +32,7 @@ Usage:
 Options:
     -s <number>         split in ranges of given width (default 1000000)
     --range <q0>-<q1>   treat only files within range <q0>-<q1>
+    -f                  allows no relation for one sq
 
 Note that existing files in the output directory which match the names of
 expected result files will result in the program doing a fast-forward
@@ -65,6 +66,7 @@ die "Need roots program ; could not find `$wdir/bin/roots'" unless -x $roots;
 my @input_dirs;
 my $output_dir;
 my $name;
+my $forced_read = 0;
 
 my $slice = 1000000;
 
@@ -95,6 +97,9 @@ while (defined(my $x = shift @ARGV)) {
         next;
     } elsif ($x eq '-n') {
         $name = shift @ARGV or die "$x needs an argument\n";
+        next;
+    } elsif ($x eq '-f') {
+        $forced_read = 1;
         next;
     } elsif (-d $x) {
         push @input_dirs, $x;
@@ -258,7 +263,7 @@ sub qr_checknext {
         $rs->{$qr1->[1]}=$qr1;
         pop_qr;
     }
-    if (scalar keys %$rs == 0) {
+    if ($forced_read == 0 && scalar keys %$rs == 0) {
         die "Unexpected q,r ($qr0->[0], $qr0->[1]). No more ideals above $qr0->[0]. Maybe a discarded ideal ?\n";
     }
 
@@ -267,11 +272,14 @@ sub qr_checknext {
         unshift @lookahead, values %$rs;
         return;
     } else {
-        die "Unexpected q,r : $qr0->[0],$qr0->[1])\n";
+        if ($forced_read) {
+          return;
+        } else {
+          die "Unexpected q,r : $qr0->[0],$qr0->[1])\n";
+        }
     }
     # (resume normal code). Never reached for the moment, since the
     # kludge takes over.
-    #
     my $qr1 = forthcoming_qr;
         if (qr_cmp($qr0, $qr1) == 0) {
         pop_qr;
@@ -544,8 +552,10 @@ while (defined(my $me = shift @$ranges)) {
             finish_qr;
 
             my $qr1 = forthcoming_qr;
-            die "Missing ($qr1->[0], $qr1->[1]) in $ifile"
-                if $qr1->[0] < $rmax;
+            if ( $forced_read == 0 ) {
+              die "Missing ($qr1->[0], $qr1->[1]) in $ifile"
+                 if $qr1->[0] < $rmax;
+            }
             last;
         }
 
@@ -652,7 +662,9 @@ finish_qr;
 print STDERR "\n";
 
 my $qr1 = forthcoming_qr;
-die "Unfinished files (want ($qr1->[0],$qr1->1) after ($last_done->[0],$last_done->[1]) )"
-    if $qr1->[0] < $q1;
+if ( $forced_read == 0 ) {
+  die "Unfinished files (want ($qr1->[0],$qr1->[1]) after ($last_done->[0],$last_done->[1]) )"
+     if $qr1->[0] < $q1;
+}
 
 close_current_files;
