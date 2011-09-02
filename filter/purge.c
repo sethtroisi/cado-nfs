@@ -744,7 +744,7 @@ usage (void)
 static int
 approx_phi (long B)
 {
-  ASSERT_ALWAYS(B <= 53030236260); /* otherwise B/log(B) > 2^31 */
+  ASSERT_ALWAYS((double) B <= 53030236260.0); /* otherwise B/log(B) > 2^31 */
   return (B <= 1) ? 0 : (int) ((double) B / log ((double) B));
 }
 
