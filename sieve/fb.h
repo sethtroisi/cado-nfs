@@ -23,17 +23,20 @@ typedef unsigned long largeprime_t; /* On IA32 they'll only get 32 bit
 /* Factor base entry with (possibly) several roots */
 typedef struct {
   fbprime_t p;            /* A prime or a prime power */
-  unsigned long invp;     /* -1/p (mod 2^wordsize) for REDC: although we need
-			     only a 32-bit inverse in say redc_32, we need a
-			     full-limb inverse on 64-bit machines for trial
-			     division */
-  unsigned char plog;     /* logarithm (to some suitable base) of this prime */
   unsigned char nr_roots; /* how many roots there are for this prime */
+  unsigned char plog;     /* logarithm (to some suitable base) of this prime */
   unsigned char size;     /* The length of the struct in bytes */
   unsigned char dummy[1]; /* For dword aligning the roots. In fact uneeded, C99
                              guarantees proper alignment of roots[]. It's only a
                              precaution against -fpack-struct or other
                              ABI-breaking behaviours */
+  unsigned long invp;     /* -1/p (mod 2^wordsize) for REDC: although we need
+			     only a 32-bit inverse in say redc_32, we need a
+			     full-limb inverse on 64-bit machines for trial
+			     division */
+  /* Note that invp has a stronger alignment constraint than p, thus must
+   * not appear before the tiny fields plog and nr_roots which can easily
+   * fit inbetween the two */
   fbroot_t roots[0];      /* the actual length of this array is determined
                              by nr_roots */
 } factorbase_degn_t;
