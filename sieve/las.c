@@ -49,11 +49,11 @@ log2 (double x)
 /* This triggers code which fills bucket in several passes, one for each
  * congruence class mod 2 (three such, the trivial one leading to
  * spurious reports). It's currently only part of the story, and at the
- * moment it is completely neutral in terms of efficiency.  But it's the
- * way to go if one wants to support I=16. There are many other places
- * where changes must be made. This particular flag affects only the
- * treatment of the ``bucket sieved'' primes, not the pattern-sieved, or
- * small-sieved.
+ * moment it is almost neutral in terms of efficiency (small slowdown
+ * because of access pattern).  But it's the way to go if one wants to
+ * support I=16. There are many other places where changes must be made.
+ * This particular flag affects only the treatment of the ``bucket
+ * sieved'' primes, not the pattern-sieved, or small-sieved.
  */
 #define MOD2_CLASSES_BS 0       /* define to 0 or 1 */
 
@@ -302,8 +302,11 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0,
   si->bucket_thresh = si->I; /* Default value */
   if (si->bucket_thresh < bucket_thresh)
     si->bucket_thresh = bucket_thresh;
-  ASSERT_ALWAYS(LOG_BUCKET_REGION > si->logI); /* so that we sieve an even
-                                                      number of rows */
+  /* If LOG_BUCKET_REGION == si->logI, then one bucket (whose size is the
+   * L1 cache size) is actually one line. This causes trouble for small
+   * sieves, where sometimes we sieve two rows simultaneously.
+   */
+  ASSERT_ALWAYS(LOG_BUCKET_REGION > si->logI);
   si->bucket_region = 1<<LOG_BUCKET_REGION;
   si->nb_buckets = 1 + (si->I * si->J - 1) / si->bucket_region;
 
@@ -374,6 +377,7 @@ sieve_info_update (sieve_info_t *si, const int verbose, FILE *output)
     fprintf (output, "# I=%u; J=%u\n", si->I, si->J);
 
   /* update number of buckets */
+  
   si->nb_buckets = 1 + (si->I * si->J - 1) / si->bucket_region;
   
   /* Update floating point version of algebraic poly */
@@ -1574,7 +1578,10 @@ typedef struct {
      i*v == j*u (mod p^k) 
    for some u,v in Z, but gcd(v, p^k) > 1.
    We may assume gcd(u,p)==1, or we divide the entire equation by p.
+   XXX [ET]: we should also assume that v is a prime power, and that u
+   XXX [ET]: is within [0..p^k/v-1[ ; 
    We store g = gcd(v, p^k), q = p^k / g, and U = u * (v/g)^(-1) (mod q).
+   XXX [ET]: which would then imply g==v, q=p^k/v, and U=u
 
    Then we have
      i*v == j*u (mod p^k)  <==>  i == (j/g)*U (mod q)
@@ -1602,6 +1609,10 @@ typedef struct {
    and update 
      next_position = (next_position - line_start + U) % q + line_start + g*I 
    to get the first position to sieve in the next suitable line. */
+
+/* FIXME: This next_position update above is similar to the offset field
+ * for typical primes, except that we have these larger jumps...
+ */
 
 typedef struct {
     fbprime_t g, q, U;
@@ -1639,6 +1650,7 @@ clone_small_sieve(small_sieve_data_t *r, const small_sieve_data_t *s) {
 }
 
 /* Assume q is a prime power p^k with k>=1, return p if k > 1, 0 otherwise. */
+/* This is cheap */
 static fbprime_t
 is_prime_power (fbprime_t q)
 {
@@ -1782,7 +1794,16 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
 	    {
 	      fbprime_t q, g;
 	      r -= p;
+              /* [ET] If my understanding is correct, a projective root
+               * (u:v) with v=p^k and u coprime to p is stored as r=p+u*v
+               * (which is <2p), so that recovering v is a gcd, and
+               * recovering u is a division.
+               */
 	      g = gcd_ul (p, r);
+              /* If g exceeds J, then the only reached locations in the
+               * sieving are will be on line (j=0), thus (1,0) only since
+               * the other are equivalent.
+               */
 	      if (do_bad_primes && g < si->J)
 		{
 		  // Fill in data for this bad prime
@@ -1804,6 +1825,8 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
 		      int rc;
 		      /* gcd(r / g, q) = 1 here */
 		      uint64_t U = r / g;
+                      /* XXX [ET]
+                       * This invmod is quite probably unnecessary */
 		      rc = invmod (&U, q);
 		      ASSERT_ALWAYS (rc != 0);
 		      ssd->bad_p[ssd->nb_bad_p].U = U;
@@ -1839,9 +1862,13 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
               // For typical primes, this jump can be easily precomputed:
               ssd->nice_p[n].offset=(ssd->nice_p[n].r*
                       (si->bucket_region >> si->logI)*(si->nb_threads-1))%p;
-	      /* For powers of 2, we sieve only odd lines and 
-	         next_position needs to point at line j=1. We assume
-	         that in this case (si->I/2) % p == 0 */
+	      /* For powers of 2, we sieve only odd lines (*) and 
+	       * next_position needs to point at line j=1. We assume
+	       * that in this case (si->I/2) % p == 0
+               * (*) for lines with j even, we have a root mod the prime
+               * power for i-j*r multiple of our power of 2, which means
+               * i even too. Thus a useless report.
+               */
 	      if (UNLIKELY(p % 2 == 0))
 	        {
 	          ASSERT (ssd->nice_p[n].next_position == 0);
@@ -1864,7 +1891,8 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
 // sieve region by nl lines 
 // This takes the position in ref_ssd as a reference.
 // For typical primes, and if use_offset is set to 1, one uses the
-// precomputed offset to jump without mod p reduction.
+// precomputed offset to jump without mod p reduction (yet still a
+// subtraction, though).
 void ssd_update_positions(small_sieve_data_t *ssd, 
         small_sieve_data_t *ref_ssd, sieve_info_t *si, int nl,
         int use_offset)
@@ -4009,6 +4037,56 @@ main (int argc0, char *argv0[])
         fprintf (output, "# Number of primes in rat factor base = %lu\n", nr);
     }
 
+#if 0
+    /* Counting the bucket-sieved primes per thread.
+     */
+    {
+        factorbase_degn_t *fb;
+        unsigned long * na_mt = (unsigned long *) malloc(si.nb_threads * sizeof(unsigned long));
+        unsigned long * nr_mt = (unsigned long *) malloc(si.nb_threads * sizeof(unsigned long));
+        double * da_mt = (double *) malloc(si.nb_threads * sizeof(double));
+        double * dr_mt = (double *) malloc(si.nb_threads * sizeof(double));
+        memset(na_mt, 0, si.nb_threads * sizeof(unsigned long));
+        memset(nr_mt, 0, si.nb_threads * sizeof(unsigned long));
+        memset(da_mt, 0, si.nb_threads * sizeof(double));
+        memset(dr_mt, 0, si.nb_threads * sizeof(double));
+        fb = fb_alg_mt[0];
+        for(int i = 0 ; fb->p != FB_END ; fb = fb_next (fb)) {
+            na_mt[i] += fb->nr_roots;
+            da_mt[i] += fb->nr_roots / (double) fb->p;
+            i++;
+            i %= si.nb_threads;
+        }
+        fb = fb_rat_mt[0];
+        for(int i = 0 ; fb->p != FB_END ; fb = fb_next (fb)) {
+            nr_mt[i] += fb->nr_roots;
+            dr_mt[i] += fb->nr_roots / (double) fb->p;
+            i++;
+            i %= si.nb_threads;
+        }
+        fprintf (output, "# Number of bucket-sieved primes in alg factor base per thread =");
+        for(int i = 0 ; i < si.nb_threads ; i++) {
+            fprintf (output, " %lu", na_mt[i]);
+        }
+        fprintf(output, "\n");
+        fprintf (output, "# Number of bucket-sieved primes in rat factor base per thread =");
+        for(int i = 0 ; i < si.nb_threads ; i++) {
+            fprintf (output, " %lu", nr_mt[i]);
+        }
+        fprintf(output, "\n");
+        fprintf (output, "# Inverse sum of bucket-sieved primes in alg factor base per thread =");
+        for(int i = 0 ; i < si.nb_threads ; i++) {
+            fprintf (output, " %.5f", da_mt[i]);
+        }
+        fprintf(output, " [hit jitter %.2f%%]\n", 100*(da_mt[0]/da_mt[si.nb_threads-1]-1));
+        fprintf (output, "# Inverse sum of bucket-sieved primes in rat factor base per thread =");
+        for(int i = 0 ; i < si.nb_threads ; i++) {
+            fprintf (output, " %.5f", dr_mt[i]);
+        }
+        fprintf(output, " [hit jitter %.2f%%]\n", 100*(dr_mt[0]/dr_mt[si.nb_threads-1]-1));
+    }
+#endif
+
     init_rat_norms (&si);
     init_alg_norms (&si);
 
@@ -4087,6 +4165,7 @@ main (int argc0, char *argv0[])
                  "; a0=%d; b0=%d; a1=%d; b1=%d\n",
                  si.q, si.rho, si.a0, si.b0, si.a1, si.b1);
         sq ++;
+
         /* precompute the skewed polynomials of f(x) and g(x) */
         fij_from_f (si.fij, &si, cpoly->f, cpoly->degree);
         fij_from_f (si.gij, &si, cpoly->g, 1);
@@ -4095,83 +4174,86 @@ main (int argc0, char *argv0[])
         sieve_info_update (&si, verbose, output);
         totJ += (double) si.J;
 
-        /* Allocate alg buckets */
-        ttsm -= seconds();
-        bucket_array_t alg_BA[si.nb_threads];
-        for (i = 0; i < si.nb_threads; ++i)
-            alg_BA[i] = init_bucket_array(si.nb_buckets, si.bucket_limit / si.nb_threads);
+            /* Allocate alg buckets */
+            ttsm -= seconds();
+            bucket_array_t alg_BA[si.nb_threads];
+            for (i = 0; i < si.nb_threads; ++i)
+                alg_BA[i] = init_bucket_array(si.nb_buckets, si.bucket_limit / si.nb_threads);
 
-        /* Allocate rational buckets */
-        bucket_array_t rat_BA[si.nb_threads];
-        for (i = 0; i < si.nb_threads; ++i)
-            rat_BA[i] = init_bucket_array(si.nb_buckets, si.bucket_limit / si.nb_threads);
+            /* Allocate rational buckets */
+            bucket_array_t rat_BA[si.nb_threads];
+            for (i = 0; i < si.nb_threads; ++i)
+                rat_BA[i] = init_bucket_array(si.nb_buckets, si.bucket_limit / si.nb_threads);
 
 
-        /* Fill in rat and alg buckets */
-        fill_in_buckets_mt(alg_BA, fb_alg_mt, alg_pmax,
-                rat_BA, fb_rat_mt, rat_pmax,
-                &si);
-        for (i = 0; i < si.nb_threads; ++i) {
-            if (buckets_max_full (alg_BA[i]) > max_full)
-                max_full = buckets_max_full (alg_BA[i]);
-            if (buckets_max_full (rat_BA[i]) > max_full)
-                max_full = buckets_max_full (rat_BA[i]);
-        }
-        if (max_full >= 1.0) {
-            fprintf(stderr, "maxfull=%f\n", max_full);
+            /* Fill in rat and alg buckets */
+            fill_in_buckets_mt(alg_BA, fb_alg_mt, alg_pmax,
+                    rat_BA, fb_rat_mt, rat_pmax,
+                    &si);
             for (i = 0; i < si.nb_threads; ++i) {
-                fprintf(stderr, "freeing [%d] max_full=%f %f\n",
-                        i, buckets_max_full (alg_BA[i]),buckets_max_full (rat_BA[i]));
+                if (buckets_max_full (alg_BA[i]) > max_full)
+                    max_full = buckets_max_full (alg_BA[i]);
+                if (buckets_max_full (rat_BA[i]) > max_full)
+                    max_full = buckets_max_full (rat_BA[i]);
+            }
+            if (max_full >= 1.0) {
+                fprintf(stderr, "maxfull=%f\n", max_full);
+                for (i = 0; i < si.nb_threads; ++i) {
+                    fprintf(stderr, "freeing [%d] max_full=%f %f\n",
+                            i, buckets_max_full (alg_BA[i]),buckets_max_full (rat_BA[i]));
+                    clear_bucket_array(alg_BA[i]);
+                    clear_bucket_array(rat_BA[i]);
+                }
+                si.bucket_limit += si.bucket_limit / 10;
+                nroots++;   // ugly: redo the same ideal
+                // when doing one big malloc, there's some chance that the
+                // bucket overrun actually stepped over the next bucket. In
+                // this case, the freeing of buckets in the code above might
+                // have succeeded, so we can hope to resume with this special
+                // q. On the other hand, if we have one malloc per bucket,
+                // the free() calls above are guaranteed to crash.
+                // Thus it's okay to proceed, if we're lucky enough to reach
+                // here. Note that increasing bucket_limit will have a
+                // permanent effect on the rest of this run.
+                // abort();
+                max_full = 0.;
+                continue;
+            }
+
+
+            ttsm += seconds();
+
+            /* Initialize data for sieving small primes */
+            small_sieve_data_t ssd_alg, ssd_rat;
+            init_small_sieve(&ssd_rat, fb_rat, &si, 'r', output);
+            init_small_sieve(&ssd_alg, fb_alg, &si, 'a', output);
+
+            /* Process bucket regions in parallel */
+            {
+                process_bucket_region_report_t rep;
+                rep = process_bucket_region_mt(alg_BA, rat_BA,
+                    &ssd_rat, &ssd_alg, fb_rat, fb_alg, cpoly, &si, output, verbose);
+                tot_reports += rep.reports;
+                tn_rat      += rep.tn_rat;
+                tn_alg      += rep.tn_alg;
+                ttsm        += rep.ttsm;
+                ttf         += rep.ttf;
+                rep_bench   += rep.reports;
+                for (i = 0; i < 256; ++i) {
+                    report_sizes_a[i] += rep.report_sizes_a[i];
+                    report_sizes_r[i] += rep.report_sizes_r[i];
+                }
+            }
+            
+            clear_small_sieve(ssd_rat);
+            clear_small_sieve(ssd_alg);
+
+
+            for (i = 0; i < si.nb_threads; ++i) {
                 clear_bucket_array(alg_BA[i]);
                 clear_bucket_array(rat_BA[i]);
             }
-            si.bucket_limit += si.bucket_limit / 10;
-            nroots++;   // ugly: redo the same ideal
-            // when doing one big malloc, there's some chance that the
-            // bucket overrun actually stepped over the next bucket. In
-            // this case, the freeing of buckets in the code above might
-            // have succeeded, so we can hope to resume with this special
-            // q. On the other hand, if we have one malloc per bucket,
-            // the free() calls above are guaranteed to crash.
-            // Thus it's okay to proceed, if we're lucky enough to reach
-            // here. Note that increasing bucket_limit will have a
-            // permanent effect on the rest of this run.
-            // abort();
-            max_full = 0.;
-            continue;
-        }
 
-
-        ttsm += seconds();
-
-        /* Initialize data for sieving small primes */
-        small_sieve_data_t ssd_alg, ssd_rat;
-        init_small_sieve(&ssd_rat, fb_rat, &si, 'r', output);
-        init_small_sieve(&ssd_alg, fb_alg, &si, 'a', output);
-
-        /* Process bucket regions in parallel */
-        {
-            process_bucket_region_report_t rep;
-            rep = process_bucket_region_mt(alg_BA, rat_BA,
-                &ssd_rat, &ssd_alg, fb_rat, fb_alg, cpoly, &si, output, verbose);
-            tot_reports += rep.reports;
-            tn_rat      += rep.tn_rat;
-            tn_alg      += rep.tn_alg;
-            ttsm        += rep.ttsm;
-            ttf         += rep.ttf;
-            rep_bench   += rep.reports;
-            for (i = 0; i < 256; ++i) {
-                report_sizes_a[i] += rep.report_sizes_a[i];
-                report_sizes_r[i] += rep.report_sizes_r[i];
-            }
-        }
-	
-        clear_small_sieve(ssd_rat);
-        clear_small_sieve(ssd_alg);
-        for (i = 0; i < si.nb_threads; ++i) {
-            clear_bucket_array(alg_BA[i]);
-            clear_bucket_array(rat_BA[i]);
-        }
         if (bench) {
             uint64_t newq0 = (uint64_t) (skip_factor*((double) q0));
             uint64_t savq0 = q0;
