@@ -118,9 +118,42 @@ log2 (double x)
    rounded to zero. */
 #define LOG_MAX (255.9 - (double) GUARD)
 
-/* define TRACE_K to -I/2+i+I*j to trace the sieve array entry corresponding
-   to (i,j), i.e., a = a0*i+a1*j, b = b0*i+b1*j */
-// #define TRACE_K 5418470
+/* define TRACE_K, and exactly one of the trace_* values to something
+ * non-zero, in order to get tracing information on a particular
+ * relation.  In particular this traces the sieve array entry
+ * corresponding to the relation. Upon startup, the three values below
+ * are reconciled.
+ *
+ * (see Coordinate systems further down in this file)
+ */
+#define xxxTRACE_K
+
+struct { unsigned int N; unsigned int x; } trace_Nx = { 0, UINT_MAX};
+struct { int64_t a; uint64_t b; } trace_ab = { -1430419,2652 };
+struct { int i; unsigned int j; } trace_ij = { 0, UINT_MAX, };
+
+static inline int trace_on_spot_Nx(unsigned int N, unsigned int x) {
+    if (trace_Nx.x == UINT_MAX) return 0;
+    return N == trace_Nx.N && x == trace_Nx.x;
+}
+
+static inline int trace_on_range_Nx(unsigned int N, unsigned int x0, unsigned int x1) {
+    if (trace_Nx.x == UINT_MAX) return 0;
+    return N == trace_Nx.N && x0 <= trace_Nx.x && trace_Nx.x < x1;
+}
+
+static inline int trace_on_spot_x(unsigned int x) {
+    return x == (trace_Nx.N << LOG_BUCKET_REGION) + trace_Nx.x;
+}
+
+static inline int trace_on_spot_ab(int a, unsigned int b) {
+    return a == trace_ab.a && b == trace_ab.b;
+}
+
+static inline int trace_on_spot_ij(int i, unsigned int j) {
+    return i == trace_ij.i && j == trace_ij.j;
+}
+
 
 /* Define CHECK_UNDERFLOW to check for underflow when subtracting
    the rounded log(p) from sieve array locations */
@@ -198,15 +231,20 @@ const char * sidenames[2] = {
     [RATIONAL_SIDE] = "rational",
     [ALGEBRAIC_SIDE] = "algebraic", };
 
-/* Forward declarations of functions */
-MAYBE_UNUSED 
-static void NxToIJ(int *, unsigned int *, const unsigned int, 
-                   const unsigned int, const sieve_info_t *);
-MAYBE_UNUSED 
-static void IJToAB(int64_t *, uint64_t *, const int, const unsigned int, 
-                   const sieve_info_t *);
-static void xToAB(int64_t *a, uint64_t *b, const unsigned int x,
-                  const sieve_info_t *si);
+/* {{{ Forward declarations of conversion functions */
+MAYBE_UNUSED static void xToIJ(int *i, unsigned int *j, const unsigned int X, const sieve_info_t * si);
+MAYBE_UNUSED static void NxToIJ(int *i, unsigned int *j, const unsigned int N, const unsigned int x, const sieve_info_t * si);
+
+MAYBE_UNUSED static void IJTox(unsigned int * x, int i, unsigned int j, const sieve_info_t * si);
+MAYBE_UNUSED static void IJToNx(unsigned int *N, unsigned int * x, int i, unsigned int j, const sieve_info_t * si);
+MAYBE_UNUSED static void IJToAB(int64_t *a, uint64_t *b, const int i, const unsigned int j, const sieve_info_t * si);
+MAYBE_UNUSED static void xToAB(int64_t *a, uint64_t *b, const unsigned int x, const sieve_info_t *si);
+MAYBE_UNUSED static void NxToAB(int64_t *a, uint64_t *b, const unsigned int N, const unsigned int x, const sieve_info_t *si);
+MAYBE_UNUSED static int ABToIJ(int *i, unsigned int *j, const int64_t a, const uint64_t b, const sieve_info_t * si);
+MAYBE_UNUSED static int ABTox(unsigned int *x, const int64_t a, const uint64_t b, const sieve_info_t * si);
+MAYBE_UNUSED static int ABToNx(unsigned int * N, unsigned int *x, const int64_t a, const uint64_t b, const sieve_info_t * si);
+/* }}} */
+
 /* Test if entry x in bucket region n is divisible by p */
 void test_divisible_x (const fbprime_t p, const unsigned long x, const int n,
 		       const sieve_info_t *si, const char side);
@@ -1360,9 +1398,10 @@ fill_in_buckets(thread_data_ptr th, int side)
 #endif
                     }
 #ifdef TRACE_K
-                    if (x == TRACE_K)
-                        fprintf (stderr, "Pushed (%u, %u) (%u) to BA[%u]\n",
-                                x & maskbucket, logp, p, x >> shiftbucket);
+                    if (trace_on_spot_x(x)) {
+                        fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
+                                (unsigned int) (x & maskbucket), logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
+                    }
 #endif
                     if (i >= bound1) x += inc_a;
                     if (i < bound0)  x += inc_c;
@@ -1430,10 +1469,11 @@ sieve_decrease (unsigned char *S, const unsigned char logp,
                 MAYBE_UNUSED const int caller)
 {
 #ifdef TRACE_K
-  if ((x + bucket_nr * bucket_region) == TRACE_K)
+  if (trace_on_spot_Nx(bucket_nr, x))
     fprintf(stderr, "# (%d) Subtract log(" FBPRIME_FORMAT ") = %u from "
             "S[%u] = %hhu, from BA[%u], ", 
-            caller, p, logp, TRACE_K, *S, bucket_nr);
+            caller, p, logp,
+            x, *S, bucket_nr);
 #endif
 
 #ifdef CHECK_UNDERFLOW
@@ -1463,7 +1503,7 @@ sieve_decrease (unsigned char *S, const unsigned char logp,
 #endif
 
 #ifdef TRACE_K
-  if ((x + bucket_nr * bucket_region) == TRACE_K)
+  if (trace_on_spot_Nx(bucket_nr, x))
     fprintf(stderr, "new value is %hhu\n", *S);
 #endif
 }
@@ -1799,12 +1839,10 @@ init_alg_norms_bucket_region (unsigned char *alg_S,
       for (i = -halfI; i < halfI; i += 1.0)
         {
 #ifdef TRACE_K
-	      if (N * bucket_region +  alg_S - orig_alg_S 
-		  == TRACE_K)
-		{
+	      if (trace_on_spot_Nx(N, alg_S - orig_alg_S )) {
 		  fprintf (stderr, "init_alg_norms_bucket_region: "
-			   "rat_S[%d] = %u, -log(prob) = %u\n",
-			   TRACE_K, 
+			   "rat_S[%zd] = %u, -log(prob) = %u\n",
+			   alg_S - orig_alg_S, 
 			   (unsigned int) *rat_S, 
 			   (unsigned int) rat->Bound[*rat_S]);
 		}
@@ -2332,6 +2370,19 @@ void sieve_small_bucket_region(unsigned char *S, const int bucket_nr,
             unsigned long *S_ptr = (unsigned long *) (S + j * I);
             const unsigned long *end = (unsigned long *)(S + j * I + I);
             
+#ifdef TRACE_K /* {{{ */
+            if (trace_on_range_Nx(bucket_nr, j*I, j*I+I)) {
+                unsigned int x = trace_Nx.x;
+                unsigned int k = x % I;
+                unsigned int v = (((unsigned char *)(pattern+((k/sizeof(unsigned long))&1)))[k%sizeof(unsigned long)]);
+                if (v) {
+                    fprintf(stderr, "# (2) Subtract log(powers of 2) = %u from "
+                            "S[%u] = %hhu, from BA[%u], new value is %hhu\n", 
+                            v, x, S[x], bucket_nr, S[x]-v);
+                }
+            }
+#endif /* }}} */
+
             while (S_ptr < end)
               {
                 *(S_ptr) -= pattern[0];
@@ -2501,6 +2552,19 @@ void sieve_small_bucket_region(unsigned char *S, const int bucket_nr,
 		  for (j = 0; j < sizeof (unsigned long); j += 2)
 		    ((unsigned char *)&logps2)[j] = 0;
                 }
+#ifdef TRACE_K
+              if (trace_on_range_Nx(bucket_nr, i0, i0 + I)) {
+                  unsigned int N = N;
+                  unsigned int x = trace_Nx.x;
+                  unsigned char lo = ((unsigned char *)&logps2)[(trace_Nx.x-i0)%sizeof (unsigned long)];
+                  if (1 || trace_Nx.x & 1) {
+                      fprintf(stderr, "# (3) Subtract log(" FBPRIME_FORMAT ") = %u[%c,bad] from "
+                              "S[%u] = %hhu, from BA[%u], new value is %u\n", 
+                              ssd.bad_p[n].g, lo, side,
+                              x, S[x], N, S[x] - lo);
+                  }
+              }
+#endif
               while (S_ptr < end)
                 {
                   *(S_ptr) -= logps2;
@@ -2871,6 +2935,13 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
 
     // remove primes in "primes" that map to x
     divide_primes_from_bucket (fl, norm, N, x, primes, fbb);
+#ifdef TRACE_K /* {{{ */
+    if (trace_on_spot_ab(a,b) && fl->n) {
+        fprintf(stderr, "# divided by 2 + primes from bucket that map to %u: ", x);
+        if (!factor_list_fprint(stderr, *fl)) fprintf(stderr, "(none)");
+        gmp_fprintf(stderr, ", remaining norm is %Zd\n", norm);
+    }
+#endif /* }}} */
     if (trial_div_very_verbose) {
         pthread_mutex_lock(&io_mutex);
         gmp_fprintf (stderr, "# x = %d, after dividing out bucket/resieved norm = %Zd\n",
@@ -3076,12 +3147,26 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
 
     unsigned char * alg_S = loc[ALGEBRAIC_SIDE]->S;
     unsigned char * rat_S = loc[RATIONAL_SIDE]->S;
+#ifdef TRACE_K /* {{{ */
+    if (trace_on_spot_Nx(N, trace_Nx.x)) {
+        fprintf(stderr, "# When entering factor_survivors for bucket %u, alg_S[%u]=%u, rat_S[%u]=%u\n",
+                trace_Nx.N, trace_Nx.x, alg_S[trace_Nx.x], trace_Nx.x, rat_S[trace_Nx.x]);
+    }
+#endif  /* }}} */
+
 #ifdef UNSIEVE_NOT_COPRIME
     unsieve_not_coprime (alg_S, N, si);
 #endif
     
     for (int x = 0; x < bucket_region; ++x)
       {
+#ifdef TRACE_K /* {{{ */
+          if (trace_on_spot_Nx(N, x)) {
+              fprintf(stderr, "# alg->Bound[%u]=%u, rat->Bound[%u]=%u\n",
+                      alg_S[trace_Nx.x], alg->Bound[alg_S[x]],
+                      rat_S[trace_Nx.x], rat->Bound[rat_S[x]]);
+          }
+#endif /* }}} */
         unsigned int X;
         unsigned int i, j;
 
@@ -3098,6 +3183,12 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
 #ifndef UNSIEVE_NOT_COPRIME
         if (bin_gcd_safe (i, j) != 1)
           {
+#ifdef TRACE_K
+            if (trace_on_spot_Nx(N, x)) {
+                fprintf(stderr, "# Slot [%u] in bucket %u has non coprime (i,j)=(%d,%u)\n",
+                        trace_Nx.x, trace_Nx.N, i, j);
+            }
+#endif
             alg_S[x] = 255;
             continue;
           }
@@ -3133,6 +3224,12 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
     /* Scan array one long word at a time. If any byte is <255, i.e. if
        the long word is != 0xFFFF...FF, examine the bytes */
     for (int xul = 0; xul < bucket_region; xul += sizeof (unsigned long)) {
+#ifdef TRACE_K
+        if ((unsigned int) N == trace_Nx.N && (unsigned int) xul <= trace_Nx.x && (unsigned int) xul + sizeof (unsigned long) > trace_Nx.x) {
+            fprintf(stderr, "# Slot [%u] in bucket %u has value %u\n",
+                    trace_Nx.x, trace_Nx.N, S[trace_Nx.x]);
+        }
+#endif
         if (*(unsigned long *)(S + xul) == (unsigned long)(-1L)) 
             continue;
         for (int x = xul; x < xul + (int) sizeof (unsigned long); ++x) {
@@ -3142,8 +3239,13 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
             uint64_t b;
 
             // Compute algebraic and rational norms.
-            xToAB (&a, &b, x + N*bucket_region, si);
+            NxToAB (&a, &b, N, x, si);
 
+#ifdef TRACE_K
+            if (trace_on_spot_ab(a, b)) {
+                fprintf(stderr, "# about to print relation for (%"PRId64",%"PRIu64")\n",a,b);
+            }
+#endif
             /* since a,b both even were not sieved, either a or b should be odd */
             // ASSERT((a | b) & 1);
             if (UNLIKELY(((a | b) & 1) == 0))
@@ -3189,6 +3291,11 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
                 eval_fij (norm[side], f, deg, a, b);
                 if (si->ratq == (side == RATIONAL_SIDE))
                     mpz_divexact_ui (norm[side], norm[side], si->q);
+#ifdef TRACE_K
+                if (trace_on_spot_ab(a, b)) {
+                    gmp_fprintf(stderr, "# start trial division for norm=%Zd on %s side for (%"PRId64",%"PRIu64")\n",norm[side],sidenames[side],a,b);
+                }
+#endif
                 trial_div (&factors[side], norm[side], N, x,
                         si->sides[side]->fb,
                         &primes[side], si->sides[side]->trialdiv_data,
@@ -3196,6 +3303,11 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
 
                 pass = check_leftover_norm (norm[side], lpb,
                             BB[side], BBB[side], mfb);
+#ifdef TRACE_K
+                if (trace_on_spot_ab(a, b)) {
+                    gmp_fprintf(stderr, "# checked leftover norm=%Zd on %s side for (%"PRId64",%"PRIu64"): %d\n",norm[side],sidenames[side],a,b,pass);
+                }
+#endif
             }
             if (!pass) continue;
 
@@ -3217,6 +3329,11 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
             ASSERT (bin_gcd_safe (a, b) == 1);
 #endif
 
+#ifdef TRACE_K
+            if (trace_on_spot_ab(a, b)) {
+                fprintf(stderr, "# Relation for (%"PRId64",%"PRIu64") printed\n", a, b);
+            }
+#endif
             if (!si->bench) {
                 pthread_mutex_lock(&io_mutex);
                 fprintf (si->output, "%" PRId64 ",%" PRIu64, a, b);
@@ -3268,34 +3385,51 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
 
 /****************************************************************************/
 
-// Conversions between different representations for sieve locations:
-//   N          is the number of the bucket region, N in [0, nr_buckets[
-//   x          is the index in the sieving array.
-//                      x is in [0,I*(J/nr_buckets)[ for NxToIJ
-//                       and in [0,I*J[ for xtoAB
-//   (i,j)      is the coordinates in the q-lattice. i in [-I/2,I/2[
-//                                                   j in [0,J[
-//   (a,b)      is the original coordinates. a is signed, b is unsigned.
-
-static void 
-NxToIJ(int *i, unsigned int *j, const unsigned int N, const unsigned int x, 
-       const sieve_info_t * si)
+/* {{{ Conversions between different representations for sieve locations:
+ *
+ * Coordinate systems for identifying an (a,b) pair.
+ *
+ * (a, b): This is the one from textbooks. We always have b>=0 (only free
+ *         relations have b=0, and we don't see them here).
+ * (i, j): For a give special q, this is a point in the q-lattice. Given
+ *         the lattice basis given by (a0 b0 a1 b1), this corresponds to
+ *         the (a,b) pair equal to i*(a0,b0)+j*(a1,b1). By construction
+ *         this should lead to one of the norms having si->q as a factor.
+ *         i is within [-I/2, I/2[, and j is within [1, J[
+ * (N, x): bucket number N, location x. N is within [0,si->nb_buckets[
+ *         and x within [0,bucket_region[ ; we have:
+ *         N*bucket_region+x == (I/2+i)+j*I
+ *
+ * There are some change of coordinate functions at the end of this file.
+ * The coordinate system (N, x) is almost always referred to as just x,
+ * where x is a 32-bit value equal to N*bucket_region+x. Thus from this
+ * wide x, it is possible te recover both N and (the short) x.
+ */
+static void xToIJ(int *i, unsigned int *j, const unsigned int X, const sieve_info_t * si)
 {
-    unsigned int X = x + N * bucket_region;
     *i = (X % (si->I)) - (si->I >> 1);
     *j = X / si->I;
 }
 
-#if 0
-static void
-IJTox(int *x, unsigned int *N, int i, int j, sieve_info_t * si)
+static void NxToIJ(int *i, unsigned int *j, const unsigned int N, const unsigned int x, const sieve_info_t * si)
+{
+    unsigned int X = x + N * bucket_region;
+    return xToIJ(i, j, X, si);
+}
+
+static void IJTox(unsigned int * x, int i, unsigned int j, const sieve_info_t * si)
 {
     *x = i + (si->I)*j + (si->I>>1);
 }
-#endif
 
-static void
-IJToAB(int64_t *a, uint64_t *b, const int i, const unsigned int j, 
+static void IJToNx(unsigned int *N, unsigned int * x, int i, unsigned int j, const sieve_info_t * si)
+{
+    IJTox(x, i, j, si);
+    *N = *x >> LOG_BUCKET_REGION;
+    *x &= (bucket_region - 1);
+}
+
+static void IJToAB(int64_t *a, uint64_t *b, const int i, const unsigned int j, 
        const sieve_info_t * si)
 {
     int64_t s, t;
@@ -3314,8 +3448,7 @@ IJToAB(int64_t *a, uint64_t *b, const int i, const unsigned int j,
 }
 
 /* Warning: b might be negative, in which case we return (-a,-b) */
-static void
-xToAB(int64_t *a, uint64_t *b, const unsigned int x, const sieve_info_t *si)
+static void xToAB(int64_t *a, uint64_t *b, const unsigned int x, const sieve_info_t *si)
 {
     int i, j;
     int64_t c;
@@ -3333,6 +3466,40 @@ xToAB(int64_t *a, uint64_t *b, const unsigned int x, const sieve_info_t *si)
         *b = -c;
       }
 }
+static void NxToAB(int64_t *a, uint64_t *b, const unsigned int N, const unsigned int x, const sieve_info_t *si)
+{
+    xToAB(a, b, N * bucket_region + x, si);
+}
+
+static int ABToIJ(int *i, unsigned int *j, const int64_t a, const uint64_t b, const sieve_info_t * si)
+{
+    int64_t ii =   a * (int64_t) si->b1 - b * (int64_t)si->a1;
+    int64_t jj = - a * (int64_t) si->b0 + b * (int64_t)si->a0;
+    if (ii % (int64_t) si->q) return 0; ii /= (int64_t) si->q;
+    if (jj % (int64_t) si->q) return 0; jj /= (int64_t) si->q;
+    if (jj < 0) { ii = -ii; jj = -jj; }
+    *i = ii;
+    *j = jj;
+    return 1;
+}
+static int ABTox(unsigned int *x, const int64_t a, const uint64_t b, const sieve_info_t * si)
+{
+    int i;
+    unsigned int j;
+    if (!ABToIJ(&i, &j, a, b, si)) return 0;
+    IJTox(x, a, b, si);
+    return 1;
+}
+
+MAYBE_UNUSED static int ABToNx(unsigned int * N, unsigned int *x, const int64_t a, const uint64_t b, const sieve_info_t * si)
+{
+    int i;
+    unsigned int j;
+    if (!ABToIJ(&i, &j, a, b, si)) return 0;
+    IJToNx(N, x, a, b, si);
+    return 1;
+}
+/* }}} */
 
 void test_divisible_x (const fbprime_t p, const unsigned long x, 
                        const int n, const sieve_info_t *si, const char side)
@@ -4299,6 +4466,37 @@ main (int argc0, char *argv0[])
         /* checks the value of J, updates floating-point fij(x) */
         sieve_info_update (&si);
         totJ += (double) si.J;
+
+#ifdef TRACE_K
+        if (trace_ab.a || trace_ab.b) {
+            if (!ABToIJ(&trace_ij.i, &trace_ij.j, trace_ab.a, trace_ab.b, &si)) {
+                fprintf(stderr, "# Relation (%"PRId64",%"PRIu64") to be traced is outside of the current q-lattice\n", trace_ab.a, trace_ab.b);
+                trace_ij.i=0;
+                trace_ij.j=UINT_MAX;
+                trace_Nx.N=0;
+                trace_Nx.x=UINT_MAX;
+            } else {
+                IJToNx(&trace_Nx.N, &trace_Nx.x, trace_ij.i, trace_ij.j, &si);
+            }
+        } else if (trace_ij.i || trace_ij.j < UINT_MAX) {
+            IJToAB(&trace_ab.a, &trace_ab.b, trace_ij.i, trace_ij.j, &si);
+            IJToNx(&trace_Nx.N, &trace_Nx.x, trace_ij.i, trace_ij.j, &si);
+        } else if (trace_Nx.N || trace_Nx.x < UINT_MAX) {
+            NxToIJ(&trace_ij.i, &trace_ij.j, trace_Nx.N, trace_Nx.x, &si);
+            IJToAB(&trace_ab.a, &trace_ab.b, trace_ij.i, trace_ij.j, &si);
+        }
+        if (trace_ij.j < UINT_MAX && trace_ij.j >= si.J) {
+            fprintf(stderr, "# Relation (%"PRId64",%"PRIu64") to be traced is outside of the current (i,j)-rectangle (j=%u)\n", trace_ab.a, trace_ab.b, trace_ij.j);
+            trace_ij.i=0;
+            trace_ij.j=UINT_MAX;
+            trace_Nx.N=0;
+            trace_Nx.x=UINT_MAX;
+        }
+        if (trace_ij.i || trace_ij.j < UINT_MAX) {
+            fprintf(stderr, "# Tracing relation (a,b)=(%"PRId64",%"PRIu64") (i,j)=(%d,%u), (N,x)=(%u,%u)\n",
+                    trace_ab.a, trace_ab.b, trace_ij.i, trace_ij.j, trace_Nx.N, trace_Nx.x);
+        }
+#endif
 
             report->ttsm -= seconds();
 
