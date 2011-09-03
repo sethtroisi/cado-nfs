@@ -693,11 +693,7 @@ fb_root_in_qlattice (const fbprime_t p, const fbprime_t R,
  */
 
 typedef struct {
-#if MOD2_CLASSES_BS
     int32_t a0,a1,b0,b1;
-#endif
-    uint32_t a, c;       // sieving offsets in x-coordinate
-    uint32_t bound0, bound1;     // thresholds for the branch inside siever
 } plattice_info_t;
 
 // Proposition 1 of [FrKl05]:
@@ -725,7 +721,6 @@ typedef struct {
 //   yield (a0=g, b0=0) at some point --- or the converse --- and the loop
 //   while (|a0| >= I) a0 += b0 will loop forever.
 //
-//
 // Note that on a c166 example, this code alone accounts for almost 20%
 // of the computation time.
 
@@ -733,7 +728,6 @@ NOPROFILE_INLINE int
 reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, const sieve_info_t * si)
 {
     int32_t I = si->I;
-    int32_t J = si->J;
     int32_t a0=-(int32_t)p, a1=0, b0=r, b1=1;
     int32_t hI = I;
 #if MOD2_CLASSES_BS
@@ -771,29 +765,77 @@ reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, cons
     ASSERT (a1 > 0);
     ASSERT (b1 > 0);
     ASSERT ((a0 <= 0) && (a0 > -hI));
-    ASSERT ((b0 >= 0) && (b0 < hI));
+    ASSERT ((b0 >= 0) && (b0 <  hI));
     ASSERT (b0 - a0 >= hI);
 
-#if MOD2_CLASSES_BS
     pli->a0 = a0;
     pli->a1 = a1;
     pli->b0 = b0;
     pli->b1 = b1;
 
+#if 0
+    int32_t J = si->J;
+#if MOD2_CLASSES_BS
+#if 1
+#endif
+
+#if 1 || !MOD2_CLASSES
     // left-shift everybody, since the following correspond to the
     // lattice 2p.
     a0 <<= 1; a1 <<= 1;
     b0 <<= 1; b1 <<= 1;
 #endif
+#endif
 
     pli->a = ((a1 << si->logI) + a0);
     pli->c = ((b1 << si->logI) + b0);
-    if (a1 > J || (a1 == J && a0 > 0)) { pli->a = (uint32_t)(INT32_MAX/2); }
-    if (b1 > J || (b1 == J && b0 > 0)) { pli->c = (uint32_t)(INT32_MAX/2); }
+    if (a1 > J || (a1 == J && a0 > 0)) { pli->a = INT32_MAX/2; }
+    if (b1 > J || (b1 == J && b0 > 0)) { pli->c = INT32_MAX/2; }
+
+    /* It's difficult to encode everybody in 32 bits, and still keep
+     * relevant information...
+     */
     pli->bound0 = -a0;
     pli->bound1 = I - b0;
+#endif
     return 1;
 }
+
+#if MOD2_CLASSES_BS
+#define PLI_COEFF(pli, ab01) (pli->ab01 << 1)
+#else
+#define PLI_COEFF(pli, ab01) (pli->ab01)
+#endif
+static inline uint32_t plattice_a(const plattice_info_t * pli, const sieve_info_t * si)
+{
+    int32_t a0 = PLI_COEFF(pli, a0);
+    int32_t a1 = PLI_COEFF(pli, a1);
+    if (a1 > (int32_t) si->J || (a1 == (int32_t) si->J && a0 > 0))
+        return INT32_MAX/2;
+    else
+        return (a1 << si->logI) + a0;
+}
+
+static inline uint32_t plattice_c(const plattice_info_t * pli, const sieve_info_t * si)
+{
+    int32_t b0 = PLI_COEFF(pli, b0);
+    int32_t b1 = PLI_COEFF(pli, b1);
+    if (b1 > (int32_t) si->J || (b1 == (int32_t) si->J && b0 > 0))
+        return INT32_MAX/2;
+    else
+        return (b1 << si->logI) + b0;
+}
+
+static inline uint32_t plattice_bound0(const plattice_info_t * pli, const sieve_info_t * si MAYBE_UNUSED)
+{
+    return - PLI_COEFF(pli, a0);
+}
+
+static inline uint32_t plattice_bound1(const plattice_info_t * pli, const sieve_info_t * si)
+{
+    return si->I - PLI_COEFF(pli, b0);
+}
+
 
 /* This is for working with congruence classes only */
 NOPROFILE_INLINE
@@ -877,8 +919,8 @@ uint32_t plattice_starting_vector(const plattice_info_t * pli, const sieve_info_
      * nothing very particular to be done */
     uint32_t x = (1 << (si->logI-1));
     uint32_t i = x;
-    if (i >= pli->bound1) x += pli->a;
-    if (i <  pli->bound0) x += pli->c;
+    if (i >= plattice_bound1(pli, si)) x += plattice_a(pli, si);
+    if (i <  plattice_bound0(pli, si)) x += plattice_c(pli, si);
     return x;
 #else
     int32_t a0 = pli->a0;
@@ -898,7 +940,7 @@ uint32_t plattice_starting_vector(const plattice_info_t * pli, const sieve_info_
 
     if (v[1] > (int32_t) si->J)
         return UINT32_MAX;
-    return (v[1] << si->logI) + v[0] + (1 << (si->logI-1));
+    return (v[1] << si->logI) | (v[0] + (1 << (si->logI-1)));
 #endif
 }
 
@@ -1001,6 +1043,11 @@ fill_in_buckets(bucket_array_t *BA_param, factorbase_degn_t *fb,
                              FIXME: can we find the locations to sieve? */
               }
 
+            uint32_t bound0 = plattice_bound0(&pli, si);
+            uint32_t bound1 = plattice_bound1(&pli, si);
+            // ASSERT_ALWAYS(bound0 == pli.bound0);
+            // ASSERT_ALWAYS(bound1 == pli.bound1);
+
             for(int parity = MOD2_CLASSES_BS ; parity < (MOD2_CLASSES_BS?4:1) ; parity++) {
 
                 // The sieving point (0,0) is I/2 in x-coordinate
@@ -1010,6 +1057,10 @@ fill_in_buckets(bucket_array_t *BA_param, factorbase_degn_t *fb,
                 bucket_update_t update;
                 update.p = bucket_encode_prime (p);
                 __asm__("## Inner bucket sieving loop starts here!!!\n");
+                uint32_t inc_a = plattice_a(&pli, si);
+                uint32_t inc_c = plattice_c(&pli, si);
+                // ASSERT_ALWAYS(inc_a == pli.a);
+                // ASSERT_ALWAYS(inc_c == pli.c);
                 while (x < IJ) {
                     uint32_t i;
                     i = x & maskI;   // x mod I
@@ -1050,8 +1101,8 @@ fill_in_buckets(bucket_array_t *BA_param, factorbase_degn_t *fb,
                         fprintf (stderr, "Pushed (%u, %u) (%u) to BA[%u]\n",
                                 x & maskbucket, logp, p, x >> shiftbucket);
 #endif
-                    if (i >= pli.bound1) x += pli.a;
-                    if (i < pli.bound0)  x += pli.c;
+                    if (i >= bound1) x += inc_a;
+                    if (i < bound0)  x += inc_c;
                 }
                 __asm__("## Inner bucket sieving loop stops here!!!\n");
             }
@@ -1059,7 +1110,8 @@ fill_in_buckets(bucket_array_t *BA_param, factorbase_degn_t *fb,
         int i;
 next_fb:
         /* XXX [ET] unimportant, but a packed fb list for each thread
-         * would be cleaner.  */
+         * would be cleaner. A small try shows no gain, so the code is
+         * not in...  */
         for (i = 0; i < si->nb_threads; ++i) {
             fb = fb_next (fb);
             if (fb->p == FB_END || fb->p > pmax) {
@@ -4037,9 +4089,7 @@ main (int argc0, char *argv0[])
         fprintf (output, "# Number of primes in rat factor base = %lu\n", nr);
     }
 
-#if 0
-    /* Counting the bucket-sieved primes per thread.
-     */
+    /* Counting the bucket-sieved primes per thread.  */
     {
         factorbase_degn_t *fb;
         unsigned long * na_mt = (unsigned long *) malloc(si.nb_threads * sizeof(unsigned long));
@@ -4085,7 +4135,6 @@ main (int argc0, char *argv0[])
         }
         fprintf(output, " [hit jitter %.2f%%]\n", 100*(dr_mt[0]/dr_mt[si.nb_threads-1]-1));
     }
-#endif
 
     init_rat_norms (&si);
     init_alg_norms (&si);
