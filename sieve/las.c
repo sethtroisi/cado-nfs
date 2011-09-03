@@ -1271,7 +1271,7 @@ fill_in_buckets(thread_data_ptr th, int side)
 #endif
                        )
                     {
-#if defined(__x86_64__) && defined(__GNUC__)
+#if LOG_BUCKET_REGION == 16 && defined(__x86_64__) && defined(__GNUC__)
                         /* The x value in update can be set by a write to 
                            the low word of the register, but gcc does not 
                            do so - it writes the word to memory, then reads 
