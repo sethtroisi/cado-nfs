@@ -56,6 +56,7 @@ factorbase_degn_t *     fb_read_addproj (const char *, const double, const int,
 fbprime_t	*fb_extract_bycost (const factorbase_degn_t *, 
                                     const fbprime_t, const fbprime_t costlim);
 size_t          fb_size (const factorbase_degn_t *);                   
+size_t          fb_nroots_total (const factorbase_degn_t *fb);
 
 /* Some inlined functions which need to be fast */
   

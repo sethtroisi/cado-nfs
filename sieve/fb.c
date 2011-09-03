@@ -763,6 +763,17 @@ fb_size (const factorbase_degn_t *fb)
   return mem;
 }
 
+/* return the total size (in number of roots) for this fb */
+size_t
+fb_nroots_total (const factorbase_degn_t *fb)
+{
+  size_t n = 0;
+  for( ; fb->p != FB_END ; fb = fb_next (fb))
+      n += fb->nr_roots;
+  return n;
+}
+
+
 factorbase_degn_t *
 fb_read (const char *filename, const double log_scale, const int verbose)
 {
