@@ -1,3 +1,6 @@
+#ifndef TRIALDIV_H_
+#define TRIALDIV_H_
+
 #include <gmp.h>
 #include "fb.h"
 
@@ -12,6 +15,10 @@ typedef struct {
   unsigned long plim; /* plim = (w-1)/p */
 } trialdiv_divisor_t;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Divides primes in d out of N and stores them (with multiplicity) in f */
 size_t trialdiv (unsigned long *, mpz_t, const trialdiv_divisor_t *,
 		 const size_t);
@@ -22,3 +29,9 @@ trialdiv_divisor_t *trialdiv_init (const fbprime_t *, const unsigned int);
 
 /* Frees the memory allocated by trialdiv_init() */
 void trialdiv_clear (trialdiv_divisor_t *d);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif	/* TRIALDIV_H_ */
