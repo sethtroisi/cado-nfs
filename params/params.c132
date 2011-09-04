@@ -20,7 +20,7 @@
 
 name=c132
 parallel=1           # do we use parallel computation?
-delay=300
+delay=60
 
 machines=mach_desc      # file describing available computers for parallel
                         # computation
@@ -35,10 +35,10 @@ selectnice=4            # nice level for selection
 
 ## Parameters of polyselect
 kjP=100000              # choose lc(g) with two prime factors in [P,2P]
-kjmaxnorm=43.5          # max. lognorm of polynomials (before rootsieve)
-kjadmax=2e8             # max value for lc(f)
-kjadrange=5e6           # individual tasks
-kjkmax=21               # rotation is bounded by 2^kmax
+kjmaxnorm=44.0          # max. lognorm of polynomials (before rootsieve)
+kjadmax=1e9             # max value for lc(f)
+kjadrange=1e7           # individual tasks
+kjkmax=22               # rotation is bounded by 2^kmax
 kjincr=30030            # forced divisor of lc(f)
 
 ###########################################################################
@@ -64,7 +64,7 @@ alambda=2.2
 
 I=13                    # Sieving range in lattice siever
 qmin=8000000            # Start of the special-q range
-qrange=100000           # The size of an elementary sieving task
+qrange=20000            # The size of an elementary sieving task
 checkrange=250000       # We check if we have enough after each step
                         # of that many relations found.
 sievenice=10
@@ -77,7 +77,7 @@ sieve_max_threads=2
 excessratio=1.01        # minimal excess we want before pruning
 keeppurge=160           # shrink in purge if excess exceeds keeppurge
 keep=160                # excess wanted after merge
-maxlevel=15
+maxlevel=20
 cwmax=100
 rwmax=100
 ratio=1.1
