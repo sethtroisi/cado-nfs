@@ -79,13 +79,17 @@
  * of updates to about (1-1/4)=3/4, so 0.8 should be safe.
  * If we don't store updates where 3 divides gcd(i,j) either, their number
  * is reduced to about (1-1/4)*(1-1/9)=2/3, then 0.7 should be ok
+ *
+ * A significant part of the inaccuracy in predicting the bucket sizes
+ * stems from the use of the Mertens estimate in lieu of proper sums. Now
+ * that we _do_ compute this sum, we gain some precision.
  */
 
 #ifndef BUCKET_LIMIT_FACTOR
 #ifdef SKIP_GCD3
-#define BUCKET_LIMIT_FACTOR 0.7
+#define BUCKET_LIMIT_FACTOR (2.0/3.0 * 1.05)
 #else
-#define BUCKET_LIMIT_FACTOR 0.8
+#define BUCKET_LIMIT_FACTOR (3.0/4.0 * 1.05)
 #endif
 #endif
 

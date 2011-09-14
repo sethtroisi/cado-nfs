@@ -151,65 +151,26 @@ static void sieve_info_init(sieve_info_ptr si, param_list pl)
     param_list_parse_int(pl, "bkthresh", &(si->bucket_thresh));
 
     /* Initialize the number of buckets */
-    /* XXX The logic used here has some acknowledges mishaps. Pending
-     * code updates replace the Mertens calculation by something much
-     * more accurate.
-     */
 
-
-    /* If LOG_BUCKET_REGION == si->logI, then one bucket (whose size is the
+    /* If LOG_BUCKET_REGION == (si->logI-1), then one bucket (whose size is the
      * L1 cache size) is actually one line. This changes some assumptions
      * in sieve_small_bucket_region and resieve_small_bucket_region, where
      * we want to differentiate on the parity on j.
      */
-    ASSERT_ALWAYS(LOG_BUCKET_REGION >= si->logI);
+    ASSERT_ALWAYS(LOG_BUCKET_REGION >= (si->logI - 1));
 
-#ifndef SUPPORT_I16
-    if (si->logI >= 16) {
-	fprintf(stderr,
-		"Error: -I 16 requires setting the SUPPORT_I16 flag at compile time\n");
-	abort();
+#ifndef SUPPORT_I17
+    if (si->logI >= 17) {
+        fprintf(stderr,
+                "Error: -I 17 requires setting the SUPPORT_I17 flag at compile time\n");
+        abort();
     }
 #endif
 
-    si->nb_buckets = 1 + (si->I * si->J - 1) / bucket_region;
-
-    double limit_factor = log(log(MAX(si->cpoly->rat->lim, si->cpoly->alg->lim))) -
-	log(log(si->bucket_thresh));
-    si->bucket_limit = limit_factor * bucket_region;
-    if (si->logI < LOG_BUCKET_REGION) {
-	/* If there's only one row per bucket, then on every other row
-	 * we can be sure that 2 cannot divide gcd(i,j), thus the 0.75
-	 * factor which accounts for the gcd is incorrect. OTOH, we can
-	 * imagine saving some memory: the global allocated space is still
-	 * correct, we merely have to accomodate the bucket sizes to be
-	 * possibly different across buckets. The better fix for this would
-	 * be to treat parity classes anyway.
-	 */
-	si->bucket_limit *= BUCKET_LIMIT_FACTOR;
-    }
-    si->bucket_limit += BUCKET_LIMIT_ADD;
-    /* an experimental study on the bucket fill with respect to the number of
-       threads shows that each new thread increases by about 1.15% the fill */
-    si->bucket_limit += (si->bucket_limit * (si->nb_threads - 1)) / 87;
-    if (si->logI == 16) {
-	/* This is just a temporary measure. Getting rid of the Mertens
-	 * estimate above, and making things only slightly more accurate
-	 * cures the difficulties which lead to this quirk.
-	 */
-	si->bucket_limit += si->bucket_limit / 20;
-    }
-#if LOG_BUCKET_REGION < 16
-    /* For debuggging purposes, we sometimes want to have very small
-     * buckets. However, these are also inherently unbalanced, so we have
-     * to compensate for this.
-     */
-    si->bucket_limit *= 2;
-#endif
-
+    si->nb_buckets = 1 + ((si->I / 2) * (si->J / 2) - 1) / bucket_region;
+    si->bucket_limit_multiplier = BUCKET_LIMIT_FACTOR;
     fprintf(si->output, "# bucket_region = %u\n", bucket_region);
     fprintf(si->output, "# nb_buckets = %u\n", si->nb_buckets);
-    fprintf(si->output, "# bucket_limit = %u\n", si->bucket_limit);
 
     sieve_info_init_unsieve_data(si);
 }
@@ -609,6 +570,7 @@ struct thread_side_data_s {
     fbprime_t pmax;          /* XXX seems to be currently unused */
     bucket_array_t BA;
     factorbase_degn_t *fb_bucket; /* in reality a pointer into a shared array */
+    double bucket_fill_ratio;     /* inverse sum of bucket-sieved primes */
 };
 typedef struct thread_side_data_s thread_side_data[1];
 typedef struct thread_side_data_s * thread_side_data_ptr;
@@ -2640,26 +2602,38 @@ static thread_data * thread_data_alloc(sieve_info_ptr si)
 
         /* Counting the bucket-sieved primes per thread.  */
         unsigned long * nn = (unsigned long *) malloc(si->nb_threads * sizeof(unsigned long));
-        double * dd = (double *) malloc(si->nb_threads * sizeof(double));
         memset(nn, 0, si->nb_threads * sizeof(unsigned long));
-        memset(dd, 0, si->nb_threads * sizeof(double));
+        for (int i = 0; i < si->nb_threads; ++i) {
+            thrs[i]->sides[side]->bucket_fill_ratio = 0;
+        }
+#ifdef SPLIT_BUCKET_FB_PER_THREAD
+        for (int i = 0; i < si->nb_threads; ++i) {
+            thrs[i]->sides[side]->bucket_fill_ratio = 0;
+            fb = thrs[i]->sides[side]->fb_bucket;
+            for (; fb->p != FB_END; fb = fb_next(fb)) {
+                nn[i] += fb->nr_roots;
+                thrs[i]->sides[side]->bucket_fill_ratio += fb->nr_roots / (double) fb->p;
+            }
+        }
+#else
         fb = thrs[0]->sides[side]->fb_bucket;
         for(int i = 0 ; fb->p != FB_END ; fb = fb_next (fb)) {
             nn[i] += fb->nr_roots;
-            dd[i] += fb->nr_roots / (double) fb->p;
+            thrs[i]->sides[side]->bucket_fill_ratio += fb->nr_roots / (double) fb->p;
             i++;
             i %= si->nb_threads;
         }
+#endif
         fprintf (si->output, "# Number of bucket-sieved primes in %s factor base per thread =", sidenames[side]);
         for(int i = 0 ; i < si->nb_threads ; i++)
             fprintf (si->output, " %lu", nn[i]);
         fprintf(si->output, "\n");
         fprintf (si->output, "# Inverse sum of bucket-sieved primes in %s factor base per thread =", sidenames[side]);
         for(int i = 0 ; i < si->nb_threads ; i++)
-            fprintf (si->output, " %.5f", dd[i]);
-        fprintf(si->output, " [hit jitter %.2f%%]\n", 100*(dd[0]/dd[si->nb_threads-1]-1));
+            fprintf (si->output, " %.5f", thrs[i]->sides[side]->bucket_fill_ratio);
+        fprintf(si->output, " [hit jitter %.2f%%]\n",
+                100 * (thrs[0]->sides[side]->bucket_fill_ratio / thrs[si->nb_threads-1]->sides[side]->bucket_fill_ratio- 1));
         free(nn);
-        free(dd);
     }
     return thrs;
 }
@@ -2672,9 +2646,27 @@ static void thread_data_free(thread_data * thrs)
 static void thread_buckets_alloc(thread_data * thrs)
 {
     sieve_info_ptr si = thrs[0]->si;
-    for(int side = 0 ; side < 2 ; side++) {
-        for (int i = 0; i < si->nb_threads; ++i) {
-            thrs[i]->sides[side]->BA = init_bucket_array(si->nb_buckets, si->bucket_limit / si->nb_threads);
+    for (int i = 0; i < si->nb_threads; ++i) {
+        thread_data_ptr th = thrs[i];
+        for(int side = 0 ; side < 2 ; side++) {
+            thread_side_data_ptr ts = th->sides[side];
+
+            int bucket_limit = ts->bucket_fill_ratio * bucket_region;
+            bucket_limit *= si->bucket_limit_multiplier;
+
+            ts->BA = init_bucket_array(si->nb_buckets, bucket_limit);
+
+            /*
+            double limit_factor =
+                log(log(si->cpoly->pols[side]->lim)) -
+                log(log(si->bucket_thresh));
+            int bucket_limit_base = limit_factor * bucket_region;
+            bucket_limit_base *= BUCKET_LIMIT_FACTOR;
+            bucket_limit_base /= si->nb_threads;
+
+
+            fprintf(si->output, "# (thread %d, %s) asymptotic bucket_limit = %d, choosing %d\n", th->id, sidenames[side], bucket_limit_base, bucket_limit);
+            */
         }
     }
 }
@@ -2963,10 +2955,8 @@ main (int argc0, char *argv0[])
                 }
                 thread_buckets_free(thrs); /* may crash. See below */
 
-                int old_bl = si->bucket_limit;
-                si->bucket_limit *= old_bl;
-                si->bucket_limit += si->bucket_limit / 10;
-                max_full *= (double) old_bl / si->bucket_limit;
+                si->bucket_limit_multiplier *= 1.1 * max_full;
+                max_full = 1.0/1.1;
                 nroots++;   // ugly: redo the same class
                 // when doing one big malloc, there's some chance that the
                 // bucket overrun actually stepped over the next bucket. In

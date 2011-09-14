@@ -60,7 +60,7 @@ struct sieve_info_s {
     // parameters for bucket sieving
     int bucket_thresh;    // bucket sieve primes >= bucket_thresh
     int nb_buckets;
-    int bucket_limit;   // maximal number of bucket_reports allowed in one bucket.
+    double bucket_limit_multiplier;
     // unsigned int degree;   /* polynomial degree */
     sieve_side_info sides[2];
     double B;         /* bound for the norm computation */
