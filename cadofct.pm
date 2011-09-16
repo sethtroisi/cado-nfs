@@ -1842,7 +1842,7 @@ sub do_polysel {
 
     opendir DIR, $param{'wdir'}
         or die "Cannot open directory `$param{'wdir'}': $!\n";
-    my @files = grep /\.kjout\.[\de.]+-[\de.]+$/,
+    my @files = grep /^$param{'name'}\.kjout\.[\de.]+-[\de.]+$/,
                      readdir DIR;
     closedir DIR;
 
