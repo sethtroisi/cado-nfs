@@ -25,7 +25,11 @@ my $trunc = 0;
 my $cpu_time = 0;
 my $count;
 my $line;
+my $rfile = 1;
+my $nfiles = scalar (@files);
 for (@files) {
+    print "Reading $_... ($rfile/$nfiles)\r";
+    $rfile++;
     $count = 0;
     open FILE, "gzip -dc $wdir/merge_rels/$_ |" or die "Cannot open `$_' for reading: $!.\n";
     while ($line = <FILE>) {

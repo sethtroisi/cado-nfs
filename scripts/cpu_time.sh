@@ -11,6 +11,7 @@
 #		   ...
 
 name=$(grep '^name=' *.param | cut -d"=" -f2)
+#name=$2
 
 function f
 {

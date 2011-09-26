@@ -34,8 +34,8 @@
 # Cluster name is like host name up to the first "." or  "-"
 #CLUSTER=${HOSTNAME%%[.-]*}
 NAME=snfs247
-OPT="-I 14"
-# OPT="-I 15 -ratq"
+OPT="-mt 2 -I 14"
+# OPT="-mt 3 -I 15 -ratq"
 WDIR=$(dirname `dirname $0`)
 GZIP=0
 
@@ -187,7 +187,7 @@ then
   ${RELATIONS_FILENAME}=${RELATIONS_FILENAME}.gz
 fi
 
-${TIME_CMD} ${SIEVER} ${OPT} -poly ${WDIR}/${NAME}.poly -fb ${WDIR}/${NAME}.roots -q0 "${START}" -q1 "${END}" -mt 2 -out "${WORKING_DIR}/${RELATIONS_FILENAME}" 2> /dev/null 2>&1
+${TIME_CMD} ${SIEVER} ${OPT} -poly ${WDIR}/${NAME}.poly -fb ${WDIR}/${NAME}.roots -q0 "${START}" -q1 "${END}" -out "${WORKING_DIR}/${RELATIONS_FILENAME}" 2> /dev/null 2>&1
 
 # If the siever terminated with an error code, quit
 if [ $? -ne 0 ]
