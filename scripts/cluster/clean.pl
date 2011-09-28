@@ -51,6 +51,7 @@ sub clean_1file {
         }
         $nlines = $nlines - 1;
         system "gzip -dc $f 2> /dev/null | head -$nlines > $f_new";
+        unlink $f;
         $f = $f_new;
     } else {
         my $nlines = `wc -l $f | cut -d" " -f1`;
@@ -84,7 +85,6 @@ sub clean_1file {
         warn "File `$f' contains no useable data. Deleting...\n";
         close FILE;
         unlink $f;
-        unlink "$f.gz" if ($is_gzip);
         basename($f) =~ /^.*\.rels\.(\d+)-(\d+)$/;
         $start = $1;
         $length = $2 - $start;
@@ -109,8 +109,6 @@ sub clean_1file {
     rename $f, "$wdir/output_rels/$name.rels.$r[0]-$r[1]";
 
     # Cleanup and moving
-    unlink $f;
-    unlink "$f.gz" if ($is_gzip);
     unlink "$wdir/inprogress/$r[0],$length";
     $f = "$wdir/output_rels/$name.rels.$r[0]-$r[1]";
     system "gzip $f";

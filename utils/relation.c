@@ -256,13 +256,13 @@ void relation_compress_alg_primes(relation_t * rel)
 /* sets a,b. Unless rs->parse_only_ab is set, also fill rs->rel with the
  * (sorted) relation which is read in the input file.
  * Returns the number of characters read in the line, -1 in case of end of
- * file, and 0 in case of an error (when force_read is non-zero).
+ * file, and 0 in case of an error (when forced_read is non-zero).
  * In case of an error:
- * - if force_read is zero, fails by an ASSERT
- * - if force_read is non-zero, return 0.
+ * - if forced_read is zero, fails by an ASSERT
+ * - if forced_read is non-zero, return 0.
  */
 int relation_stream_get(relation_stream_ptr rs, char * supplied_line,
-                        int force_read)
+                        int forced_read)
 {
     FILE * f = rs->source;
     char tbuf[RELATION_MAX_BYTES];
@@ -311,7 +311,7 @@ another_line:
     for( ; (v=ugly[(unsigned char) c]) >= 0 ; *p++ = (c=fgetc(f)))
         *pa=*pa*10+v;
     expected = ',';
-    if (force_read && c != expected)
+    if (forced_read && c != expected)
       return 0;
     else
       ASSERT_ALWAYS(c == expected);
@@ -320,7 +320,7 @@ another_line:
     for( ; (v=ugly[(unsigned char) c]) >= 0 ; *p++ = (c=fgetc(f)))
         *pb=*pb*10+v;
     expected = ':';
-    if (force_read && c != expected)
+    if (forced_read && c != expected)
       return 0;
     else
       ASSERT_ALWAYS(c == expected);
@@ -337,7 +337,7 @@ another_line:
         for (; c != EOF && c != '\n' && c != ':'; *p++ = (c = fgetc(f)))
             n += c == ',';
         expected = ':';
-        if (force_read && c != expected)
+        if (forced_read && c != expected)
           return 0;
         else
           ASSERT_ALWAYS(c == expected);
@@ -357,7 +357,7 @@ another_line:
         relation_compress_rat_primes(&rs->rel);
 
         expected = ':';
-        if (force_read && c != expected)
+        if (forced_read && c != expected)
           return 0;
         else
           ASSERT_ALWAYS(c == expected);
@@ -369,7 +369,7 @@ another_line:
         for (; c != EOF && c != '\n' && c != ':'; *p++ = (c = fgetc(f)))
             n += c == ',';
         expected = '\n';
-        if (force_read && c != expected)
+        if (forced_read && c != expected)
           return 0;
         else
           ASSERT_ALWAYS(c == expected);
@@ -389,7 +389,7 @@ another_line:
         relation_compress_alg_primes(&rs->rel);
 
         expected = '\n';
-        if (force_read && c != expected)
+        if (forced_read && c != expected)
           return 0;
         else
           ASSERT_ALWAYS(c == expected);
@@ -410,7 +410,7 @@ another_line:
 }
 
 /* Same as relation_stream_get, but for a skipped line,
-   with supplied_line=NULL and force_read=0.
+   with supplied_line=NULL and forced_read=0.
    Since this line was already read before, it is necessarily correct. */
 int
 relation_stream_get_skip (relation_stream_ptr rs)

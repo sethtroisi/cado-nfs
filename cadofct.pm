@@ -2232,34 +2232,6 @@ sub do_sieve {
             close TMP;
         }
 
-        # Check relations
-        my $ret = cmd("$param{'bindir'}/utils/check_rels ".
-                      "-poly $param{'prefix'}.poly $check > /dev/null 2>&1");
-        unlink "$check" unless $full;
-
-        # Remove invalid files
-        if ($ret->{'status'}) {
-            my $msg;
-            if ($ret->{'status'} == 1) {
-                $msg = "File `$f' is invalid (check_rels failed).";
-            } else {
-                # Non-zero, but not 1? Something's wrong, bail out
-                $msg = "check_rels exited with unknown error code $ret->{'status'}.";
-            }
-            if ($ENV{'CADO_DEBUG'}) {
-                my $nf = "$f.error";
-                $msg .= " Moving to $nf\n";
-                warn $msg;
-                rename $f, $nf;
-            } else {
-                $msg .= " Deleting.\n";
-                warn $msg;
-                unlink $f;
-            }
-            close FILE;
-            return;
-        }
-
         # If this is a partial (i.e. incomplete) file, we need to adjust
         # the range of covered special q's
         if (last_line($f) !~ /^# (Total \d+ reports|Warning: truncated)/) {
@@ -2267,10 +2239,24 @@ sub do_sieve {
                 # avoid gzip -d, since it fails on truncated files.
                 basename($f) =~ /^$param{'name'}\.rels\.([\de.]+)-([\de.]+)\.gz$/;
                 my $f_new = "$param{'prefix'}.rels.$1-$2";
-                my $ret = cmd ("gzip -dc $f >$f_new");
-                if (my $e = $ret->{'err'}) { warn $e; }
+                my $nlines = `gzip -dc $f 2> /dev/null | wc -l`;
+                #my $ret = cmd ("gzip -dc $f >$f_new");
+                #if (my $e = $ret->{'err'}) { warn $e; }
+                if ( $nlines == 0 ) {
+                    print basename($f)." corrupted, cleaned file...\n";
+                    unlink $f;
+                    return;
+                }
+                $nlines = $nlines - 1;
+                system "gzip -dc $f 2> /dev/null | head -$nlines > $f_new";
                 unlink $f;
                 $f = $f_new;
+            } else {
+                my $nlines = `wc -l $f | cut -d" " -f1`;
+                $nlines = $nlines - 1;
+                rename $f, "$f.tmp";
+                system "head -$nlines $f.tmp 2> /dev/null > $f";
+                unlink "$f.tmp";
             }
             open FILE, "+< $f"
                 or die "Cannot open `$f' for update: $!.\n";
@@ -2282,6 +2268,7 @@ sub do_sieve {
             my @lastq;
             my $pos = 0;
             while (<FILE>) {
+                last unless (/^[-#0-9]/);
                 # Keep track of the last two special q's
                 if (/^### q=(\d+): roots?/) {
                     shift @lastq if scalar @lastq == 2;
@@ -2309,13 +2296,41 @@ sub do_sieve {
             my @r = ($1, $lastq[0]->{'q'}+1);
             info "Truncating `".basename($f)."' to range $r[0]-$r[1]...\n";
             $tab_level++;
-            cmd("env mv -f $f $param{'prefix'}.rels.$r[0]-$r[1]", { kill => 1 });
+            rename $f, "$param{'prefix'}.rels.$r[0]-$r[1]";
             $f = "$param{'prefix'}.rels.$r[0]-$r[1]";
             if ($is_gzip) {
                 cmd ("gzip $f", { kill => 1});
                 $f .= ".gz";
             }
             $tab_level--;
+        }
+
+        # Check relations
+        my $ret = cmd("$param{'bindir'}/utils/check_rels ".
+                      "-poly $param{'prefix'}.poly $check > /dev/null 2>&1");
+        unlink "$check" unless $full;
+
+        # Remove invalid files
+        if ($ret->{'status'}) {
+            my $msg;
+            if ($ret->{'status'} == 1) {
+                $msg = "File `$f' is invalid (check_rels failed).";
+            } else {
+                # Non-zero, but not 1? Something's wrong, bail out
+                $msg = "check_rels exited with unknown error code $ret->{'status'}.";
+            }
+            if ($ENV{'CADO_DEBUG'}) {
+                my $nf = "$f.error";
+                $msg .= " Moving to $nf\n";
+                warn $msg;
+                rename $f, $nf;
+            } else {
+                $msg .= " Deleting.\n";
+                warn $msg;
+                unlink $f;
+            }
+            close FILE;
+            return;
         }
 
         # The file is clean: we can import the relations now
