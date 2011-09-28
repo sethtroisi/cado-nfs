@@ -380,8 +380,7 @@ static int param_list_update_cmdline_knob(param_list pl,
 {
     const char * a = (*p_argv[0]);
     if (strcmp(a, knob->knob) == 0) {
-        int r;
-        r = param_list_add_key(pl, knob->knob, NULL, PARAMETER_FROM_CMDLINE);
+        param_list_add_key(pl, knob->knob, NULL, PARAMETER_FROM_CMDLINE);
         (*p_argv)+=1;
         (*p_argc)-=1;
         if (knob->ptr) (*(knob->ptr))++;

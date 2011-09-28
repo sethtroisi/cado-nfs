@@ -54,7 +54,7 @@ int main(int argc, char * argv[])
         } else {
             fprintf(stderr, "Saving cache for vector-times-matrix\n");
         }
-        mm = matmul_init(xx, 0, 0, argv[1], argv[2], NULL, d);
+        mm = matmul_init(xx, 0, 0, argv[1], impl, NULL, d);
 
         ASSERT_ALWAYS(mm->store_transposed == !d);
         matrix_u32 m;

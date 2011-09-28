@@ -547,7 +547,7 @@ int
 modul_poly_roots(residueul_t *r, mpz_t *f, int d, modulusul_t p)
 {
   modul_poly_t fp, g, h;
-  int df, n;
+  int df;
 
   /* the number of roots is the degree of gcd(x^p-x,f) */
 
@@ -602,7 +602,7 @@ modul_poly_roots(residueul_t *r, mpz_t *f, int d, modulusul_t p)
    */
   if (r != NULL && df > 0)
     {
-      n = modul_poly_cantor_zassenhaus (r, fp, p, 0);
+      int n MAYBE_UNUSED = modul_poly_cantor_zassenhaus (r, fp, p, 0);
       ASSERT (n == df);
     }
 

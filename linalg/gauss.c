@@ -323,7 +323,10 @@ void gaussian_elimination(struct gaussian_elimination_data * G)
   mp_limb_t **ptr_current;
   int j_current, col_current;
   mp_limb_t mask1, mask2;
-  double st0 = seconds(), st;
+#if VERBOSE
+  double st0 = seconds();
+  double st;
+#endif
 
   // shut up.
 #if VERBOSE
@@ -459,8 +462,8 @@ void gaussian_elimination(struct gaussian_elimination_data * G)
     /* some verbosity... */
     if ((col_current % 128) == 0)
       {
-        st = (seconds () - st0); /* time in seconds */
 #if VERBOSE
+        st = (seconds () - st0); /* time in seconds */
         fprintf (stderr, "done %d pivots in %1.0fs (est. %1.0fs)\n",
 			col_current,
                  st, (double) NCOLS * st / (double) col_current);

@@ -658,7 +658,7 @@ int
 plain_poly_roots (plain_poly_coeff_t *r, mpz_t *f, int d, const plain_poly_coeff_t p)
 {
   plain_poly_t fp, g, h;
-  int df, n;
+  int df;
 
   if (plain_poly_fits (d, p) == 0)
     {
@@ -714,7 +714,7 @@ plain_poly_roots (plain_poly_coeff_t *r, mpz_t *f, int d, const plain_poly_coeff
    */
   if (r != NULL && df > 0)
     {
-      n = plain_poly_cantor_zassenhaus (r, fp, p, 0);
+      int n MAYBE_UNUSED = plain_poly_cantor_zassenhaus (r, fp, p, 0);
       ASSERT (n == df);
     }
 

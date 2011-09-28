@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include "cado.h"
+#include "macros.h"
 #include "prac_bc.h"
 
 
@@ -254,7 +256,7 @@ bytecoder (const literal_t c, bc_state_t *state)
       
       /* See if history[] still matches one of the dictionary entries */
       
-      int best;
+      int best MAYBE_UNUSED;
       size_t bestlen = 0;
       
       /* If all history[] matches some dictionary entry (possibly partially), 

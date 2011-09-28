@@ -74,9 +74,9 @@ double program_starttime;
 #define WCT     (wct_seconds() - program_starttime)
 
 #define STOPWATCH_DECL	        					\
-    double t0, t1;							\
-    double w0, w1;							\
-    double rate
+    double t0 MAYBE_UNUSED, t1 MAYBE_UNUSED;				\
+    double w0 MAYBE_UNUSED, w1 MAYBE_UNUSED;				\
+    double rate MAYBE_UNUSED
 
 #define STOPWATCH_GO()	        					\
     t0 = seconds();							\
@@ -747,7 +747,7 @@ int ab_openfile_internal(ab_source_ptr ab)
 int ab_source_next(ab_source_ptr ab, int64_t * a, uint64_t * b)
 {
     if (ab->f) {
-        int rc;
+        int rc MAYBE_UNUSED;
         char line[ABFILE_MAX_LINE_LENGTH];
         char * xx = fgets(line, sizeof(line), ab->f);
         size_t cpos = ftell(ab->f);

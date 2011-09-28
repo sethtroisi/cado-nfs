@@ -47,7 +47,7 @@ int split_relfile (relation_stream_ptr rs, const char *name,
     int p_in;
     const char * suffix_in;
 
-    int ok;
+    int ok MAYBE_UNUSED;
     char * oname[nslices];
     FILE * ofile[nslices];
     int p_out[nslices];

@@ -905,7 +905,7 @@ trialdiv_one_prime (const fbprime_t q, mpz_t C, unsigned int *nr_primes,
 
   while (mpz_divisible_ui_p (C, (unsigned long) q))
     {
-      unsigned long r;
+      unsigned long r MAYBE_UNUSED;
       nr_divide++;
       if (primes != NULL)
 	add_fbprime_to_list (primes, nr_primes, max_nr_primes, q);

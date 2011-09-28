@@ -1189,7 +1189,7 @@ void usage(const char * me)
 int main(int argc, char *argv[])
 {
     cado_poly pol;
-    int numdep = -1, ret, i;
+    int numdep = -1, ret MAYBE_UNUSED, i;
 
     char * me = *argv;
     /* print the command line */

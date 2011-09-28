@@ -5352,7 +5352,10 @@ rootsieve_main_stage1 ( rsstr_t rs,
 {
 	 int st, i, re;
 	 mpz_t *fuv;
-	 double alpha_lat, skew, logmu;
+	 double alpha_lat;
+#if DEBUG
+         double skew, logmu;
+#endif
 	 sublattice_pq *pqueue;
 
 	 /* fuv is f+(u*x+v)*g */
@@ -5395,10 +5398,9 @@ rootsieve_main_stage1 ( rsstr_t rs,
 		  compute_fuv_mp (fuv, rs->f, rs->g, rs->d, pqueue->u[i], pqueue->v[i]);
 		  //alpha_lat = get_biased_alpha_affine (fuv, rs->d, primes[rsparam->tlen_e_sl - 1]);
 		  alpha_lat = get_alpha (fuv, rs->d, 2000);
+#if DEBUG
 		  skew = L2_skewness (fuv, rs->d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
 		  logmu = L2_lognorm (fuv, rs->d, skew, DEFAULT_L2_METHOD);
-
-#if DEBUG
 		  gmp_fprintf ( stderr, "# Info: insert sublattice #%4d, (w, u, v): (%d, %Zd, %Zd), alpha: %.2f, logmu: %.2f\n",
 						i,
 						w,

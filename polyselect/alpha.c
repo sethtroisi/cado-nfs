@@ -63,10 +63,9 @@ void trivial_method (mpz_t *f, int d, mpz_t b, mpz_t m, unsigned long alim) {
 void rootsieve_method (mpz_t *f, int d, mpz_t b, mpz_t m, unsigned long alim, int verbose) {
   FILE * rs_alpha = fopen("rs_alpha.txt","w");
 	unsigned long p;
-  long J0, K0, J1, K1, k0, j0, k, j; 
+  long J0, K0, J1, K1, k, j; 
 // We must obtain the bounds, and declare the array.
   rotate_bounds(f, d, b, m, &K0, &K1, &J0, &J1, VERBOSE, DEFAULT_L2_METHOD);
-	j0 = k0 = 0;
   double * A = malloc((K1-K0+1)*sizeof(double));	
   double * P = malloc((K1-K0+1)*sizeof(double));
 

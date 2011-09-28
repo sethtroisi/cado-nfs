@@ -11,7 +11,7 @@ void debug_write(const void * v,
     va_list ap;
 
     va_start(ap, fmt);
-    int rc = vasprintf(&tmp, fmt, ap);
+    int rc MAYBE_UNUSED = vasprintf(&tmp, fmt, ap);
     FILE * f = fopen(tmp, "w");
     rc = fwrite(v, 1, n, f);
     fclose(f);

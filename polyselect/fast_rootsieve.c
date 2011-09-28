@@ -1029,9 +1029,6 @@ long rotation_inner(rootsieve_dictionary rdict, unsigned long p,poly_t ff,poly_t
 long add_lattice(rootsieve_dictionary rdict,long u0, long v0, long us, long vs, long skew, long U0, long U1, long V0, long V1, double contribution, unsigned long p) {
   long u,v;
   long q;
-  long hits;
-
-  hits=0;
 
   // We ensure that the lattice basis is positively oriented.
   if(vs<0)

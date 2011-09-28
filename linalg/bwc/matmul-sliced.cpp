@@ -323,7 +323,7 @@ int matmul_sliced_reload_cache(struct matmul_sliced_data_s * mm)
 
     fclose(f);
 
-    data_t::const_iterator q = mm->data.begin();
+    // data_t::const_iterator q = mm->data.begin();
 
     return 1;
 }

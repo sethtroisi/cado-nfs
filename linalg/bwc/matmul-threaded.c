@@ -512,8 +512,10 @@ void matmul_threaded_mul_sub_sparse(struct matmul_threaded_data_s * mm, void * x
     matmul_threaded_aux(mm, MATMUL_AUX_GET_READAHEAD, &(ra[1]));
     */
 
+    /*
     size_t sparse_readahead;
     sparse_readahead = mm->nthreads * MAX(mm->off1, mm->off2) * mm->blocksize;
+    */
 
     if (d == !mm->public_->store_transposed) {
         dst += mm->dense->n * MM_DGRP_SIZE;

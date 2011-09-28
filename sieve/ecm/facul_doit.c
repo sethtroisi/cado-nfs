@@ -34,10 +34,23 @@ facul_doit (unsigned long *factors, const modulus_t m,
 {
   residue_t r;
   modint_t n, f;
-  modulusredc2ul2_t fm_2ul2, cfm_2ul2; /* Modulus for factor and cofactor */
-  modulusredc15ul_t fm_15ul, cfm_15ul;
   modulusredcul_t fm_ul, cfm_ul;
-  int i, found = 0, bt, fprime, cfprime, f_arith = 0, cf_arith = 0;
+#if     MOD_MAXBITS > MODREDCUL_MAXBITS
+  modulusredc15ul_t fm_15ul, cfm_15ul;
+#endif
+#if     MOD_MAXBITS > MODREDC15UL_MAXBITS
+  modulusredc2ul2_t fm_2ul2, cfm_2ul2; /* Modulus for factor and cofactor */
+#endif
+  int i, found = 0, bt, fprime, cfprime;
+  enum {
+      CHOOSE_UL,
+#if     MOD_MAXBITS > MODREDCUL_MAXBITS
+      CHOOSE_15UL,
+#endif
+#if     MOD_MAXBITS > MODREDC15UL_MAXBITS
+      CHOOSE_2UL2,
+#endif
+  } f_arith = CHOOSE_UL, cf_arith = CHOOSE_UL;
   
   mod_getmod_uls (n, m);
   mod_intset_ul (f, 1UL);
@@ -175,22 +188,28 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	{
 	  if (mod_intbits (f) <= MODREDCUL_MAXBITS)
 	    {
-	      f_arith = 0;
+	      f_arith = CHOOSE_UL;
 	      modredcul_initmod_uls (fm_ul, f);
 	      fprime = primetest_ul (fm_ul);
             }
+#if     MOD_MAXBITS > MODREDCUL_MAXBITS
           else if (mod_intbits (f) <= MODREDC15UL_MAXBITS)
             {
-              f_arith = 1;
+              f_arith = CHOOSE_15UL;
 	      modredc15ul_initmod_uls (fm_15ul, f);
 	      fprime = primetest_15ul (fm_15ul);
             }
-          else
+#endif
+#if     MOD_MAXBITS > MODREDC15UL_MAXBITS
+	  else if (mod_intbits (f) <= MODREDC2UL2_MAXBITS)
             {
-              f_arith = 2;
+              f_arith = CHOOSE_2UL2;
 	      modredc2ul2_initmod_uls (fm_2ul2, f);
 	      fprime = primetest_2ul2 (fm_2ul2);
             }
+#endif
+          else
+              abort();
 
 	  if (fprime && mod_intcmp_ul (f, strategy->lpb) > 0)
 	    {
@@ -204,23 +223,26 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	{
 	  if (mod_intbits (n) <= MODREDCUL_MAXBITS)
 	    {
-	      cf_arith = 0;
+	      cf_arith = CHOOSE_UL;
 	      modredcul_initmod_uls (cfm_ul, n);
 	      cfprime = primetest_ul (cfm_ul);
             }
-	  else if (MOD_SIZE >= MODREDC15UL_SIZE && 
-	           mod_intbits (n) <= MODREDC15UL_MAXBITS)
+#if     MOD_MAXBITS > MODREDCUL_MAXBITS
+	  else if (mod_intbits (n) <= MODREDC15UL_MAXBITS)
 	    {
-	      cf_arith = 1;
+	      cf_arith = CHOOSE_15UL;
 	      modredc15ul_initmod_uls (cfm_15ul, n);
 	      cfprime = primetest_15ul (cfm_15ul);
             }
-          else if (MOD_SIZE >= MODREDC2UL2_SIZE)
+#endif
+#if     MOD_MAXBITS > MODREDC15UL_MAXBITS
+	  else if (mod_intbits (n) <= MODREDC2UL2_MAXBITS)
             {
-              cf_arith = 2;
+              cf_arith = CHOOSE_2UL2;
 	      modredc2ul2_initmod_uls (cfm_2ul2, n);
 	      cfprime = primetest_2ul2 (cfm_2ul2);
             }
+#endif
           else
             abort ();
 
@@ -238,15 +260,24 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	factors[found++] = f[0]; /* f < lp, so it fits in 1 unsigned long */
       else
 	{
-	  int f2;
+            int f2 = FACUL_NOT_SMOOTH;    /* placate gcc (!) */
 	  /* Factor the composite factor. Use the same method again so that
 	     backtracking can separate the factors */
-	  if (f_arith == 0)
-	    f2 = facul_doit_ul (factors + found, fm_ul, strategy, i);
-	  else if (f_arith == 1)
-	    f2 = facul_doit_15ul (factors + found, fm_15ul, strategy, i);
-          else
-            f2 = facul_doit_2ul2 (factors + found, fm_2ul2, strategy, i);
+          switch (f_arith) {
+              case CHOOSE_UL:
+                  f2 = facul_doit_ul (factors + found, fm_ul, strategy, i);
+                  break;
+#if     MOD_MAXBITS > MODREDCUL_MAXBITS
+              case CHOOSE_15UL:
+                  f2 = facul_doit_15ul (factors + found, fm_15ul, strategy, i);
+                  break;
+#endif
+#if     MOD_MAXBITS > MODREDC15UL_MAXBITS
+              case CHOOSE_2UL2:
+                  f2 = facul_doit_2ul2 (factors + found, fm_2ul2, strategy, i);
+                  break;
+#endif
+          }
           
 	  if (f2 == FACUL_NOT_SMOOTH)
 	    {
@@ -260,14 +291,23 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	factors[found++] = n[0]; /* n < lp, so it fits in 1 unsigned long */
       else
 	{
-	  int f2;
+	  int f2 = FACUL_NOT_SMOOTH;    /* placate gcc (!) */
 	  /* Factor the composite cofactor */
-	  if (cf_arith == 0)
-	    f2 = facul_doit_ul (factors + found, cfm_ul, strategy, i + 1);
-	  else if (cf_arith == 1)
-	    f2 = facul_doit_15ul (factors + found, cfm_15ul, strategy, i + 1);
-          else
-            f2 = facul_doit_2ul2 (factors + found, cfm_2ul2, strategy, i + 1);
+          switch(cf_arith) {
+              case CHOOSE_UL:
+                  f2 = facul_doit_ul (factors + found, cfm_ul, strategy, i + 1);
+                  break;
+#if     MOD_MAXBITS > MODREDCUL_MAXBITS
+              case CHOOSE_15UL:
+                  f2 = facul_doit_15ul (factors + found, cfm_15ul, strategy, i + 1);
+                  break;
+#endif    
+#if     MOD_MAXBITS > MODREDC15UL_MAXBITS
+              case CHOOSE_2UL2:
+                  f2 = facul_doit_2ul2 (factors + found, cfm_2ul2, strategy, i + 1);
+                  break;
+#endif
+          }
           
 	  if (f2 == FACUL_NOT_SMOOTH)
 	    {

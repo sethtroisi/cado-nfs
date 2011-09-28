@@ -2652,10 +2652,9 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
   for (int n = 0 ; n < ssd->nb_nice_p; ++n) 
   {
       const fbprime_t p = ssd->nice_p[n].p;
-      fbprime_t r, twop;
+      fbprime_t r;
       unsigned int i0;
 
-      twop = p + p;
       r = ssd->nice_p[n].r;
       i0 = ssd->nice_p[n].next_position;
       S_ptr = S;
@@ -4216,7 +4215,7 @@ main (int argc0, char *argv0[])
     const char *fbfilename = NULL;
     const char *polyfilename = NULL;
     cado_poly cpoly;
-    double t0, tfb, tq, tts;
+    double t0, tfb, tts;
     uint64_t q0 = 0, q1 = 0, rho = 0;
     uint64_t *roots;
     unsigned long nroots;
@@ -4443,7 +4442,6 @@ main (int argc0, char *argv0[])
               }
           }
         /* }}} */
-        tq = seconds ();
 
         /* computes a0, b0, a1, b1 from q, rho, and the skewness */
         si.rho = roots[--nroots];

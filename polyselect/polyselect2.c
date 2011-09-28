@@ -621,17 +621,26 @@ roots_lift (unsigned long *r, mpz_t N, unsigned long d, mpz_t m0,
   mpz_clear (lambda);
 }
 
+/* Avoids warning about unused variables elsewhere. The other is the
+ * version prior to svn commit 188 (may 22, 2010), but has never been
+ * exposed since then. */
+#define CONSIDER_ONLY_TWO_ROOTS
+
 static void
 newAlgo (mpz_t N, unsigned long d, unsigned long ad)
 {
   mpz_t *f, lambda, tmp, m0, Ntilde, ump;
-  unsigned long *r, *rq, i, j, k, p, nprimes, nr, q, nq = 0, qq, qmax;
+  unsigned long *r, *rq, i, j, k, p, nprimes, nr, q, nq = 0, qq;
   hash_t H;
   modulusul_t pp;
   roots_t R;
-  int st;
-  long M, u, ppl = 0, Mq;
-  double dM, pc1, pc2;
+  long u, ppl = 0;
+#ifndef CONSIDER_ONLY_TWO_ROOTS
+  unsigned long qmax;
+  long M;
+  double dM;
+#endif
+  double pc1, pc2;
   unsigned long Q[] = SPECIAL_Q;
 
   roots_init (R);
@@ -670,6 +679,7 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
   mpz_mul (Ntilde, Ntilde, N); /* d^d * ad^(d-1) * N */
   mpz_root (m0, Ntilde, d);
 
+#ifndef CONSIDER_ONLY_TWO_ROOTS
   qmax = 64;
   /* since the special-q variant gives values of i larger by q^2,
      we take as bound for i P^2*qmax^2 */
@@ -678,8 +688,8 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
     M = LONG_MAX;
   else
     M = (long) dM;
+#endif
 
-  st = cputime ();
   hash_init (H);
   for (nprimes = 0; (p = Primes[nprimes++]) != 0;)
     {
@@ -719,11 +729,12 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
       nq = poly_roots_ulong (rq, f, d, q);
       /* lift the roots mod q^2 */
       qq = q * q;
-      Mq = M / qq; /* since q^2 is implicit in m0 + u*q^2 below */
+#ifndef CONSIDER_ONLY_TWO_ROOTS
+      long Mq = M / qq; /* since q^2 is implicit in m0 + u*q^2 below */
+#endif
       roots_lift (rq, Ntilde, d, m0, q, nq);
       for (i = 0; i < nq; i++)
 	{
-	  st = cputime ();
 	  hash_init (H);
 	  for (nprimes = 0; nprimes < R->size; nprimes ++)
 	    {
@@ -756,7 +767,7 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
 	      
 		  /* only consider k and k - pp */
 		  u = (long) modul_get_ul (k, pp);
-#if 1
+#ifdef CONSIDER_ONLY_TWO_ROOTS
 		  hash_add (H, p, u, m0, ad, d, N, q, rq[i]);
 		  hash_add (H, p, u - ppl, m0, ad, d, N, q, rq[i]);
 #else

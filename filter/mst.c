@@ -271,13 +271,14 @@ minCostUsingMST(filter_matrix_t *mat, int m, int32_t *ind, double *tfill, double
 {
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
     int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
-    int father[MERGE_LEVEL_MAX], height[MERGE_LEVEL_MAX], hmax, w;
+    int father[MERGE_LEVEL_MAX], height[MERGE_LEVEL_MAX], w;
+    // int hmax;
 
     *tfill = seconds();
     fillRowAddMatrix(A, mat, m, ind);
     *tfill = seconds()-*tfill;
     *tMST = seconds();
-    hmax = minimalSpanningTree(&w, father, height, sons, m, A);
+    /* hmax = */ minimalSpanningTree(&w, father, height, sons, m, A);
     *tMST = seconds()-*tMST;
     return w;
 }

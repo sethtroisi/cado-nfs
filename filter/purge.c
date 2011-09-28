@@ -659,7 +659,7 @@ reread (const char *oname, char ** ficname,
         hashtable_t *H, bit_vector_srcptr rel_used, int nrows, int ncols, int raw)
 {
   FILE *ofile;
-  int ret, nr = 0;
+  int ret MAYBE_UNUSED, nr = 0;
   double W = 0.0; /* total weight */
   int pipe;
 
@@ -753,7 +753,7 @@ main (int argc, char **argv)
 {
     hashtable_t H;
     int **rel_compact = NULL;
-    int ret, k;
+    int ret MAYBE_UNUSED, k;
     int nrel, nprimes = 0;
     unsigned int nrelmax = 0;
     int nrel_new, nprimes_new, Hsize, Hsizer, Hsizea;
