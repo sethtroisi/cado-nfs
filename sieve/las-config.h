@@ -1,6 +1,8 @@
 #ifndef LAS_CONFIG_H_
 #define LAS_CONFIG_H_
 
+#include "cado_config.h"
+
 #ifdef HAVE_SSE2
 #define SSE_NORM_INIT
 #endif
@@ -109,6 +111,18 @@
 #else
 #define NOPROFILE_INLINE static inline
 #define NOPROFILE_STATIC static
+#endif
+
+#include <stdio.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+void las_display_config_flags(FILE * stream);
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif	/* LAS_CONFIG_H_ */

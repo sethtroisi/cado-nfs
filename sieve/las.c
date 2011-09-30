@@ -3828,10 +3828,7 @@ main (int argc0, char *argv0[])
     }
 
     param_list_print_command_line(si->output, pl);
-
-#ifdef SSE_NORM_INIT
-    fprintf (si->output, "# SSE_NORM_INIT is activated\n");
-#endif
+    las_display_config_flags(si->output);
 
     if (fbfilename == NULL) usage(argv0[0], "fb");
     if (q0 == 0) usage(argv0[0], "q0");
