@@ -278,6 +278,8 @@ sieve/freerel.c
 sieve/las.c
 sieve/las-config.h
 sieve/las-types.h
+sieve/las-coordinates.h
+sieve/las-coordinates.c
 sieve/makefb.c
 sieve/trialdiv.c
 sieve/trialdiv.h
