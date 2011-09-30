@@ -17,6 +17,7 @@
 #include "las-types.h"
 #include "las-coordinates.h"
 #include "las-debug.h"
+#include "las-report-stats.h"
 
 #define LOG_SCALE 1.4426950408889634 /* 1/log(2) to 17 digits, rounded to
                                         nearest. This is enough to uniquely
@@ -893,50 +894,6 @@ plattice_x_t plattice_starting_vector(const plattice_info_t * pli, sieve_info_sr
     return (v[1] << si->logI) | (v[0] + (1 << (si->logI-1)));
 #endif
 }
-
-/***************************************************************************/
-/* {{{ las_report: Structure for gathering reports on sieving */
-struct las_report_s {
-    unsigned long reports;
-    unsigned long survivors0;
-    unsigned long survivors1;
-    unsigned long survivors2;
-    double tn[2];
-    double ttsm;
-    double ttf;
-    unsigned long report_sizes[2][256];
-};
-typedef struct las_report_s las_report[1];
-typedef struct las_report_s * las_report_ptr;
-typedef const struct las_report_s * las_report_srcptr;
-
-static void las_report_init(las_report_ptr p)
-{
-    memset(p, 0, sizeof(las_report));
-}
-
-static void las_report_clear(las_report_ptr p)
-{
-    memset(p, 0, sizeof(las_report));
-}
-
-static void las_report_accumulate(las_report_ptr p, las_report_ptr q)
-{
-    p->reports += q->reports;
-    p->survivors0 += q->survivors0;
-    p->survivors1 += q->survivors1;
-    p->survivors2 += q->survivors2;
-    p->ttsm    += q->ttsm;
-    p->ttf     += q->ttf;
-    for(int side = 0 ; side < 2 ; side++) {
-        p->tn[side]  += q->tn[side];
-        for (int i = 0; i < 256; ++i) {
-            p->report_sizes[side][i] += q->report_sizes[side][i];
-        }
-    }
-    memset(q, 0, sizeof(las_report));
-}
-/* }}} */
 
 /***************************************************************************/
 /* {{{ Structures for small sieves */
