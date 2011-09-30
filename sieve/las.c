@@ -16,6 +16,7 @@
 #include "las-config.h"
 #include "las-types.h"
 #include "las-coordinates.h"
+#include "las-debug.h"
 
 #define LOG_SCALE 1.4426950408889634 /* 1/log(2) to 17 digits, rounded to
                                         nearest. This is enough to uniquely
@@ -29,47 +30,6 @@ MAYBE_UNUSED log2 (double x)
   return log (x) / log (2.0);
 }
 #endif
-
-/* define TRACE_K, and exactly one of the trace_* values to something
- * non-zero, in order to get tracing information on a particular
- * relation.  In particular this traces the sieve array entry
- * corresponding to the relation. Upon startup, the three values below
- * are reconciled.
- *
- * (see Coordinate systems further down in this file)
- */
-#define xxxTRACE_K
-
-struct { unsigned int N; unsigned int x; } trace_Nx = { 0, UINT_MAX};
-struct { int64_t a; uint64_t b; } trace_ab = { -1430419,2652 };
-struct { int i; unsigned int j; } trace_ij = { 0, UINT_MAX, };
-
-static inline int trace_on_spot_Nx(unsigned int N, unsigned int x) {
-    if (trace_Nx.x == UINT_MAX) return 0;
-    return N == trace_Nx.N && x == trace_Nx.x;
-}
-
-static inline int trace_on_range_Nx(unsigned int N, unsigned int x0, unsigned int x1) {
-    if (trace_Nx.x == UINT_MAX) return 0;
-    return N == trace_Nx.N && x0 <= trace_Nx.x && trace_Nx.x < x1;
-}
-
-static inline int trace_on_spot_x(unsigned int x) {
-    return x == (trace_Nx.N << LOG_BUCKET_REGION) + trace_Nx.x;
-}
-
-static inline int trace_on_spot_ab(int a, unsigned int b) {
-    return a == trace_ab.a && b == trace_ab.b;
-}
-
-static inline int trace_on_spot_ij(int i, unsigned int j) {
-    return i == trace_ij.i && j == trace_ij.j;
-}
-
-/* Define CHECK_UNDERFLOW to check for underflow when subtracting
-   the rounded log(p) from sieve array locations */
-//#define CHECK_UNDERFLOW
-
 
 /* uintmax_t is guaranteed to be larger or equal to uint64_t */
 #define strtouint64(nptr,endptr,base) (uint64_t) strtoumax(nptr,endptr,base)
@@ -4064,36 +4024,7 @@ main (int argc0, char *argv0[])
         sieve_info_update (si);
         totJ += (double) si->J;
 
-#ifdef TRACE_K
-        if (trace_ab.a || trace_ab.b) {
-            if (!ABToIJ(&trace_ij.i, &trace_ij.j, trace_ab.a, trace_ab.b, si)) {
-                fprintf(stderr, "# Relation (%"PRId64",%"PRIu64") to be traced is outside of the current q-lattice\n", trace_ab.a, trace_ab.b);
-                trace_ij.i=0;
-                trace_ij.j=UINT_MAX;
-                trace_Nx.N=0;
-                trace_Nx.x=UINT_MAX;
-            } else {
-                IJToNx(&trace_Nx.N, &trace_Nx.x, trace_ij.i, trace_ij.j, si);
-            }
-        } else if (trace_ij.i || trace_ij.j < UINT_MAX) {
-            IJToAB(&trace_ab.a, &trace_ab.b, trace_ij.i, trace_ij.j, si);
-            IJToNx(&trace_Nx.N, &trace_Nx.x, trace_ij.i, trace_ij.j, si);
-        } else if (trace_Nx.N || trace_Nx.x < UINT_MAX) {
-            NxToIJ(&trace_ij.i, &trace_ij.j, trace_Nx.N, trace_Nx.x, si);
-            IJToAB(&trace_ab.a, &trace_ab.b, trace_ij.i, trace_ij.j, si);
-        }
-        if (trace_ij.j < UINT_MAX && trace_ij.j >= si->J) {
-            fprintf(stderr, "# Relation (%"PRId64",%"PRIu64") to be traced is outside of the current (i,j)-rectangle (j=%u)\n", trace_ab.a, trace_ab.b, trace_ij.j);
-            trace_ij.i=0;
-            trace_ij.j=UINT_MAX;
-            trace_Nx.N=0;
-            trace_Nx.x=UINT_MAX;
-        }
-        if (trace_ij.i || trace_ij.j < UINT_MAX) {
-            fprintf(stderr, "# Tracing relation (a,b)=(%"PRId64",%"PRIu64") (i,j)=(%d,%u), (N,x)=(%u,%u)\n",
-                    trace_ab.a, trace_ab.b, trace_ij.i, trace_ij.j, trace_Nx.N, trace_Nx.x);
-        }
-#endif
+            trace_update_conditions(si);
 
             report->ttsm -= seconds();
 

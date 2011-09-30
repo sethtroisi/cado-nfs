@@ -280,6 +280,8 @@ sieve/las-config.h
 sieve/las-types.h
 sieve/las-coordinates.h
 sieve/las-coordinates.c
+sieve/las-debug.h
+sieve/las-debug.c
 sieve/makefb.c
 sieve/trialdiv.c
 sieve/trialdiv.h

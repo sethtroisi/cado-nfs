@@ -28,7 +28,7 @@ add_executable (makefb makefb.c)
 target_link_libraries (makefb utils m)
 
 add_executable (las las.c fb.c trialdiv.c
-    las-coordinates.c
+    las-coordinates.c las-debug.c
     )
 target_link_libraries (las facul utils m ${pthread_libs})
 
