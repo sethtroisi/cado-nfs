@@ -264,7 +264,7 @@ static void
 sieve_info_clear (sieve_info_ptr si)
 {
   if (si->outputname)
-      gzip_close(si->output, "");
+      gzip_close(si->output, si->outputname);
   sieve_info_clear_unsieve_data(si);
   cado_poly_clear(si->cpoly);
 }
