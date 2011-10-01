@@ -287,6 +287,8 @@ sieve/las-report-stats.h
 sieve/las-report-stats.c
 sieve/las-norms.h
 sieve/las-norms.c
+sieve/las-unsieve.h
+sieve/las-unsieve.c
 sieve/makefb.c
 sieve/trialdiv.c
 sieve/trialdiv.h

@@ -8,6 +8,12 @@
 #include "cado_poly.h"
 #include "ecm/facul.h"
 
+struct sieve_info_s;
+typedef struct sieve_info_s * sieve_info_ptr;
+typedef const struct sieve_info_s * sieve_info_srcptr;
+
+#include "las-unsieve.h"
+
 struct sieve_side_info_s {
     unsigned char Bound[256]; /* zero for good lognorms, 127 otherwise */
     fbprime_t *trialdiv_primes;
@@ -56,7 +62,7 @@ struct sieve_info_s {
     sieve_side_info sides[2];
     double B;         /* bound for the norm computation */
 
-    unsigned int *lpf; /* lpf[i] is largest prime factor of i, for i < I */
+    unsieve_aux_data us;
 
     facul_strategy_t *strategy;
 
@@ -66,8 +72,6 @@ struct sieve_info_s {
     unsigned int degree;
 };
 
-typedef struct sieve_info_s * sieve_info_ptr;
-typedef const struct sieve_info_s * sieve_info_srcptr;
 typedef struct sieve_info_s sieve_info[1];
 
 #endif	/* LAS_TYPES_H_ */
