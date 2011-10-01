@@ -289,6 +289,8 @@ sieve/las-norms.h
 sieve/las-norms.c
 sieve/las-unsieve.h
 sieve/las-unsieve.c
+sieve/las-arith.h
+sieve/las-arith.c
 sieve/makefb.c
 sieve/trialdiv.c
 sieve/trialdiv.h

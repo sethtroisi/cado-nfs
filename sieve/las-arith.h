@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include "fb.h"
 #include "utils.h"
 #include "las-config.h"
 
@@ -197,6 +198,8 @@ invmod_REDC(uint64_t *pa, uint64_t b) {
   *pa = u;
   return 1;
 }
+
+fbprime_t is_prime_power(fbprime_t q);
 
 #ifdef __cplusplus
 }
