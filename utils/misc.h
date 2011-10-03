@@ -2,6 +2,7 @@
 #define CADO_UTILS_MISC_H_
 
 #include <stddef.h>
+#include <stdint.h>
 #include <limits.h>
 #include "macros.h"
 #include <gmp.h>
@@ -9,6 +10,9 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* uintmax_t is guaranteed to be larger or equal to uint64_t */
+#define strtouint64(nptr,endptr,base) (uint64_t) strtoumax(nptr,endptr,base)
 
 static inline void* pointer_arith(void * a, ptrdiff_t q) {
     return (void*)(((char*)a)+q);

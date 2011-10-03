@@ -36,9 +36,6 @@ MAYBE_UNUSED log2 (double x)
 }
 #endif
 
-/* uintmax_t is guaranteed to be larger or equal to uint64_t */
-#define strtouint64(nptr,endptr,base) (uint64_t) strtoumax(nptr,endptr,base)
-
 
 
 /* This global mutex should be locked in multithreaded parts when a
@@ -1575,7 +1572,7 @@ void sieve_small_bucket_region(unsigned char *S, const int bucket_nr,
                   unsigned int x = trace_Nx.x;
                   unsigned char lo = ((unsigned char *)&logps2)[(trace_Nx.x-i0)%sizeof (unsigned long)];
                   if (1 || trace_Nx.x & 1) {
-                      fprintf(stderr, "# (3) Subtract log(" FBPRIME_FORMAT ") = %u[%c,bad] from "
+                      fprintf(stderr, "# (3) Subtract log(" FBPRIME_FORMAT ") = %u[%.3s,bad] from "
                               "S[%u] = %hhu, from BA[%u], new value is %u\n", 
                               ssd.bad_p[n].g, lo, sidenames[side],
                               x, S[x], N, S[x] - lo);
