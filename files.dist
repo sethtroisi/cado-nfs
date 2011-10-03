@@ -8,7 +8,7 @@ COPYING
 Makefile
 README
 AUTHORS
-NEWS
+NEWS_1.1
 cado.h
 cadofactor.pl
 cadofct.pm
@@ -431,6 +431,17 @@ linalg/blockmatrix.c
 linalg/blockmatrix.h
 config/sse41.c
 config/sse41.cmake
+scripts/cluster/README_LAS
+scripts/cluster/check_dup_purge.pl
+scripts/cluster/clean.pl
+scripts/cluster/cpu_time.pl
+scripts/cluster/dispatcher
+scripts/cluster/init_cdir
+scripts/cluster/init_ldir
+scripts/cluster/las_1job
+scripts/cluster/las_loop
+scripts/cluster/merge.pl
+scripts/cluster/run_oarjobs
 gf2x/AUTHORS
 gf2x/BUGS
 gf2x/COPYING

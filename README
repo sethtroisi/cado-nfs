@@ -28,8 +28,6 @@ Anything else than the primary platform perhaps works, perhaps does not work.
    been installed, notably for Leopard. ABI selection is sometimes
    tricky.
  - 32-bit linux with gcc-4.4 or later is supposed to work.
- - FreeBSD is currently not supported, pending at least a fix to the
-   missing log2() function in math.h.
  - Windows is not supported (see a longer note at the end of this file).
 
 Required software tools:
