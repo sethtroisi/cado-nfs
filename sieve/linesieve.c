@@ -1710,7 +1710,7 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 
   mpz_init (Fab);
   mpz_init (Gab);
-  for (i = 0; i <= (unsigned) poly->degree; i++)
+  for (i = 0; i <= (unsigned) poly->alg->degree; i++)
     mpz_init (scaled_poly_a[i]);
   mpz_init (scaled_poly_r[0]);
   mpz_init (scaled_poly_r[1]);
@@ -1718,20 +1718,20 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
   tsc1 = clock ();
 
   /* Multiply f_i (and g_i resp.) by b^(deg-i) and put in scaled_poly */
-  mp_poly_scale (scaled_poly_a, poly->f, poly->degree, b, -1); 
-  mp_poly_scale (scaled_poly_r, poly->g, 1, b, -1); 
+  mp_poly_scale (scaled_poly_a, poly->alg->f, poly->alg->degree, b, -1); 
+  mp_poly_scale (scaled_poly_r, poly->rat->f, poly->rat->degree, b, -1); 
 
   /* Factor primes with projective roots on algebraic side. Prime factors
      go in the proj_primes_a[] list, the number of prime factors in 
      nr_proj_primes_a, the product is kept in proj_divisor_a. */
   nr_proj_primes_a = 0;
-  proj_divisor_a = mpz_gcd_ui (NULL, poly->f[poly->degree], b);
+  proj_divisor_a = mpz_gcd_ui (NULL, poly->alg->f[poly->alg->degree], b);
   trialdiv_slow (proj_divisor_a, &nr_proj_primes_a, proj_primes_a, 
 		 max_nr_proj_primes);
 
   /* Same for rational side */
   nr_proj_primes_r = 0;
-  proj_divisor_r = mpz_gcd_ui (NULL, poly->g[1], b);
+  proj_divisor_r = mpz_gcd_ui (NULL, poly->rat->f[1], b);
   trialdiv_slow (proj_divisor_r, &nr_proj_primes_r, proj_primes_r, 
 		 max_nr_proj_primes);
 
@@ -1762,14 +1762,14 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 	      nr_primes_a = 0;
 	      if (have_a_reports)
 		{
-		  ok = trialdiv_one_side (Fab, scaled_poly_a, poly->degree, 
+		  ok = trialdiv_one_side (Fab, scaled_poly_a, poly->alg->degree, 
 					  a, b, 
 					  primes_a, &nr_primes_a, max_nr_primes,
 					  proj_divisor_a, nr_proj_primes_a, 
 					  proj_primes_a, fba, 
 					  reports_a, i, &stats_a,
-					  poly->alim, poly->lpba, poly->mfba, 
-					  poly->alambda, log_scale);
+					  poly->alg->lim, poly->alg->lpb, poly->alg->mfb, 
+					  poly->alg->lambda, log_scale);
 		  if (!ok) 
 		    goto nextreport;
 		}
@@ -1783,8 +1783,8 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
 					  proj_divisor_r, nr_proj_primes_r, 
 					  proj_primes_r, fbr, 
 					  reports_r, j, &stats_r,
-					  poly->rlim, poly->lpbr, poly->mfbr, 
-					  poly->rlambda, log_scale);
+					  poly->rat->lim, poly->rat->lpb, poly->rat->mfb, 
+					  poly->rat->lambda, log_scale);
 		  if (!ok) 
 		    goto nextreport;
 		}
@@ -1840,7 +1840,7 @@ trialdiv_and_print (cado_poly poly, const unsigned long b,
       print_stats (&stats_r);
     }
   
-  for (i = 0; i <= (unsigned)poly->degree; i++)
+  for (i = 0; i <= (unsigned)poly->alg->degree; i++)
     mpz_clear (scaled_poly_a[i]);
   mpz_clear (scaled_poly_r[0]);
   mpz_clear (scaled_poly_r[1]);
@@ -2032,22 +2032,22 @@ main (int argc, char **argv)
     }
 
   /* check that n divides Res(f,g) [might be useful to factor n...] */
-  check_polynomials (cpoly);
+  cado_poly_check (cpoly);
 
   if (verbose)
   {
       printf ("# Polynomials are:\n");
-      mp_poly_print (cpoly->f, cpoly->degree, "# f(x) =", 0);
+      mp_poly_print (cpoly->alg->f, cpoly->alg->degree, "# f(x) =", 0);
       printf ("\n");
-      mp_poly_print (cpoly->g, 1, "# g(x) =", 0);
+      mp_poly_print (cpoly->rat->f, cpoly->rat->degree, "# g(x) =", 0);
       printf ("\n");
   }
 
 #ifdef PARI
-  mp_poly_print (cpoly->f, cpoly->degree, "f(x) =");
+  mp_poly_print (cpoly->alg->f, cpoly->alg->degree, "f(x) =");
   printf (" /* PARI */\n");
   printf ("F(a,b) = f(a/b)*b^%d /* PARI */\n", cpoly->degree);
-  mp_poly_print (cpoly->g, 1, "g(x) =");
+  mp_poly_print (cpoly->rat->f, cpoly->rat->degree, "g(x) =");
   printf (" /* PARI */\n");
   printf ("G(a,b) = g(a/b)*b /* PARI */\n");
 #endif
@@ -2074,8 +2074,8 @@ main (int argc, char **argv)
   if (sieve_r)
     {
       /* Generate rational fb */
-      fbr->fullfb = fb_make_linear ((const mpz_t *) cpoly->g, 
-                                    (fbprime_t) cpoly->rlim, 0, log_scale, 
+      fbr->fullfb = fb_make_linear ((const mpz_t *) cpoly->rat->f, 
+                                    (fbprime_t) cpoly->rat->lim, 0, log_scale, 
                                     verbose, 0, stdout);
       if (fbr == NULL)
 	{
@@ -2116,15 +2116,15 @@ main (int argc, char **argv)
     }
 #endif
 
-  deg = cpoly->degree;
+  deg = cpoly->alg->degree;
   for (i = 0; i <= deg; i++)
-      dpoly_a[i] = mpz_get_d (cpoly->f[i]);
-  dpoly_r[0] = mpz_get_d (cpoly->g[0]);
-  dpoly_r[1] = mpz_get_d (cpoly->g[1]);
-  report_a_threshold = (unsigned char) ((double)(cpoly->lpba) * log(2.0) * 
-					cpoly->alambda * log_scale + 0.5);
-  report_r_threshold = (unsigned char) ((double)(cpoly->lpbr) * log(2.0) * 
-					cpoly->rlambda * log_scale + 0.5);
+      dpoly_a[i] = mpz_get_d (cpoly->alg->f[i]);
+  dpoly_r[0] = mpz_get_d (cpoly->rat->f[0]);
+  dpoly_r[1] = mpz_get_d (cpoly->rat->f[1]);
+  report_a_threshold = (unsigned char) ((double)(cpoly->alg->lpb) * log(2.0) * 
+					cpoly->alg->lambda * log_scale + 0.5);
+  report_r_threshold = (unsigned char) ((double)(cpoly->rat->lpb) * log(2.0) * 
+					cpoly->rat->lambda * log_scale + 0.5);
   if (verbose)
     {
       printf ("# Report threshold for algebraic side: %d, rational side: %d\n",
@@ -2212,7 +2212,7 @@ main (int argc, char **argv)
 
       if (sieve_a)
 	{
-	  proj_roots = mpz_gcd_ui (NULL, cpoly->f[deg], b);
+	  proj_roots = mpz_gcd_ui (NULL, cpoly->alg->f[deg], b);
 	  if (verbose)
 	    printf ("# Primes with projective roots for b = %lu on algebraic "
 		    "side divide %lu\n", b, proj_roots);
@@ -2221,7 +2221,7 @@ main (int argc, char **argv)
 	    printf ("# Sieving algebraic side\n");
 	  
 #ifdef PARI
-	  mp_poly_print (cpoly->f, cpoly->degree, "P(a,b) = ", 1);
+	  mp_poly_print (cpoly->alg->f, cpoly->alg->degree, "P(a,b) = ", 1);
 	  printf (" /* PARI */\n");
 #endif
 	  
@@ -2236,7 +2236,7 @@ main (int argc, char **argv)
 
       if (sieve_r)
 	{
-	  proj_roots = mpz_gcd_ui (NULL, cpoly->g[1], b);
+	  proj_roots = mpz_gcd_ui (NULL, cpoly->rat->f[1], b);
 	  if (verbose)
 	    printf ("# Primes with projective roots for b = %lu on rational "
 		    "side divide %lu\n", b, proj_roots);

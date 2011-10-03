@@ -358,10 +358,10 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 
       alpha = get_alpha (f, d, ALPHA_BOUND);
 
-      mpz_set (curr_poly->g[0], g[0]);
-      mpz_set (curr_poly->g[1], g[1]);
+      mpz_set (curr_poly->rat->f[0], g[0]);
+      mpz_set (curr_poly->rat->f[1], g[1]);
       for (j = d + 1; j -- != 0; )
-	mpz_set (curr_poly->f[j], f[j]);
+	mpz_set (curr_poly->alg->f[j], f[j]);
       curr_poly->skew = skew;
       E =  MurphyE (curr_poly, BOUND_F, BOUND_G, AREA, MURPHY_K);
 
@@ -1062,10 +1062,10 @@ main (int argc, char *argv[])
       fprintf (stderr, "Error, missing degree (-d option)\n");
       exit (1);
     }
-  best_poly->degree = d;
-  best_poly->degreeg = 1;
-  curr_poly->degree = d;
-  curr_poly->degreeg = 1;
+  best_poly->alg->degree = d;
+  best_poly->rat->degree = 1;
+  curr_poly->alg->degree = d;
+  curr_poly->rat->degree = 1;
 
   if (resume != NULL)
     {

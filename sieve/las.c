@@ -315,7 +315,7 @@ static void
 sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0,
 		 const int bucket_thresh, FILE *output, int nb_threads)
 {
-  unsigned int d = cpoly->degree;
+  unsigned int d = cpoly->alg->degree;
   unsigned int k;
   double r, scale;
   unsigned char alg_bound, rat_bound;
@@ -344,22 +344,22 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0,
 
   /* We want some margin, (see below), so that we can set 255 to discard
    * non-survivors.*/
-  scale = alg->logmax + cpoly->alambda * (double) cpoly->lpba;
+  scale = alg->logmax + cpoly->alg->lambda * (double) cpoly->alg->lpb;
 
   fprintf (output, "# Alg. side: log2(maxnorm)=%1.2f logbase=%1.6f",
            scale, exp2 (scale / LOG_MAX));
   // second guard, due to the 255 trick!
   scale = (LOG_MAX - GUARD) / scale;
-  alg_bound = (unsigned char) (cpoly->alambda * (double) cpoly->lpba *  scale)
+  alg_bound = (unsigned char) (cpoly->alg->lambda * (double) cpoly->alg->lpb *  scale)
             + GUARD;
   fprintf (output, " bound=%u\n", alg_bound);
-  sieve_info_init_lognorm (alg->Bound, alg_bound, cpoly->alim, cpoly->lpba,
+  sieve_info_init_lognorm (alg->Bound, alg_bound, cpoly->alg->lim, cpoly->alg->lpb,
                            scale);
   alg->scale = scale;
 
   /* similar bound on the rational size: |a| <= s*I*B and |b| <= I*B */
-  scale = fabs (mpz_get_d (cpoly->g[1])) * cpoly->skew
-        + fabs (mpz_get_d (cpoly->g[0]));
+  scale = fabs (mpz_get_d (cpoly->rat->f[1])) * cpoly->skew
+        + fabs (mpz_get_d (cpoly->rat->f[0]));
   scale *= si->B * (double) si->I;
   if (si->ratq)
       scale /= (double) q0;
@@ -368,7 +368,7 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0,
      side, which are set to 255, remain over the report bound R, even if
      the rational norm is totally smooth. For this, we simply add R to the
      maximal lognorm to compute the log base */
-  r = cpoly->rlambda * (double) cpoly->lpbr; /* base-2 logarithm of the
+  r = cpoly->rat->lambda * (double) cpoly->rat->lpb; /* base-2 logarithm of the
                                                 report bound */
   fprintf (output, "# Rat. side: log2(maxnorm)=%1.2f ", scale);
   fprintf (output, "logbase=%1.6f", exp2 (scale / LOG_MAX ));
@@ -377,7 +377,7 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0,
   rat->scale = LOG_MAX / scale;
   rat_bound = (unsigned char) (r * rat->scale) + GUARD;
   fprintf (output, " bound=%u\n", rat_bound);
-  sieve_info_init_lognorm (rat->Bound, rat_bound, cpoly->rlim, cpoly->lpbr,
+  sieve_info_init_lognorm (rat->Bound, rat_bound, cpoly->rat->lim, cpoly->rat->lpb,
                            rat->scale);
 
   // bucket info
@@ -401,7 +401,7 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0,
 
   si->nb_buckets = 1 + (si->I * si->J - 1) / bucket_region;
 
-  double limit_factor = log(log(MAX(cpoly->rlim, cpoly->alim))) - 
+  double limit_factor = log(log(MAX(cpoly->rat->lim, cpoly->alg->lim))) - 
                         log(log(si->bucket_thresh));
   si->bucket_limit = limit_factor * bucket_region;
   if (si->logI < LOG_BUCKET_REGION) {
@@ -1619,8 +1619,8 @@ init_rat_norms_bucket_region (unsigned char *S, int N, sieve_info_t *si)
        = gi * i + gj * j
     */
 
-    g1 = mpz_get_d (cpoly->g[1]);
-    g0 = mpz_get_d (cpoly->g[0]);
+    g1 = mpz_get_d (cpoly->rat->f[1]);
+    g0 = mpz_get_d (cpoly->rat->f[0]);
     gi = g1 * (double) si->a0 + g0 * (double) si->b0;
     gj = g1 * (double) si->a1 + g0 * (double) si->b1;
 
@@ -1766,7 +1766,7 @@ init_alg_norms_bucket_region (unsigned char *alg_S,
   cado_poly_ptr cpoly = si->cpoly;
   sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
   sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
-  unsigned int j, lastj, k, d = cpoly->degree;
+  unsigned int j, lastj, k, d = cpoly->alg->degree;
   double *t, *u, powj, i, halfI;
   int report = 0, l;
   uint64_t mask = (1 << NORM_BITS) - 1;
@@ -3101,14 +3101,14 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
         mpz_init (BB[side]);
         mpz_init (BBB[side]);
 
-        unsigned long lim = (side == RATIONAL_SIDE) ? cpoly->rlim : cpoly->alim;
+        unsigned long lim = (side == RATIONAL_SIDE) ? cpoly->rat->lim : cpoly->alg->lim;
         mpz_ui_pow_ui (BB[side], lim, 2);
         mpz_mul_ui (BBB[side], BB[side], lim);
     }
 
     mpz_init (BLPrat);
-    mpz_set_ui (BLPrat, cpoly->rlim);
-    mpz_mul_2exp (BLPrat, BLPrat, cpoly->lpbr); /* fb bound * lp bound */
+    mpz_set_ui (BLPrat, cpoly->rat->lim);
+    mpz_mul_2exp (BLPrat, BLPrat, cpoly->rat->lpb); /* fb bound * lp bound */
 
     unsigned char * alg_S = loc[ALGEBRAIC_SIDE]->S;
     unsigned char * rat_S = loc[RATIONAL_SIDE]->S;
@@ -3245,12 +3245,11 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
 
             for(int z = 0 ; pass && z < 2 ; z++) {
                 int side = RATIONAL_SIDE ^ z;   /* start with rational */
-                int rat = (side == RATIONAL_SIDE);
-                mpz_t * f = rat ? cpoly->g : cpoly->f;
-                int deg = rat ? cpoly->degreeg : cpoly->degree;
-                int lim = rat ? cpoly->rlim : cpoly->alim;
-                int lpb = rat ? cpoly->lpbr : cpoly->lpba;
-                int mfb = rat ? cpoly->mfbr : cpoly->mfba;
+                mpz_t * f = cpoly->pols[side]->f;
+                int deg = cpoly->pols[side]->degree;
+                int lim = cpoly->pols[side]->lim;
+                int lpb = cpoly->pols[side]->lpb;
+                int mfb = cpoly->pols[side]->mfb;
 
                 // Trial divide rational norm
                 mp_poly_homogeneous_eval_siui (norm[side], f, deg, a, b);
@@ -3285,7 +3284,7 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
             for(int z = 0 ; pass && z < 2 ; z++) {
                 int side = first ^ z;
                 int rat = (side == RATIONAL_SIDE);
-                int lpb = rat ? cpoly->lpbr : cpoly->lpba;
+                int lpb = rat ? cpoly->rat->lpb : cpoly->alg->lpb;
                 pass = factor_leftover_norm(norm[side], lpb, f[side], m[side], si->strategy);
             }
             if (!pass) continue;
@@ -3582,13 +3581,13 @@ get_maxnorm_aux (double *g, const unsigned int d, double s)
 static double
 get_maxnorm (cado_poly cpoly, sieve_info_t *si, uint64_t q0)
 {
-  unsigned int d = cpoly->degree, k;
+  unsigned int d = cpoly->alg->degree, k;
   double *fd; /* double-precision coefficients of f */
   double norm, max_norm, pows, tmp;
 
   fd = (double*) malloc ((d + 1) * sizeof (double));
   for (k = 0; k <= d; k++)
-    fd[k] = mpz_get_d (cpoly->f[k]);
+    fd[k] = mpz_get_d (cpoly->alg->f[k]);
 
   /* (b1) determine the maximum of |f(x)| for 0 <= x <= s */
   max_norm = get_maxnorm_aux (fd, d, cpoly->skew);
@@ -4160,14 +4159,14 @@ main (int argc0, char *argv0[])
     param_list_parse_double(pl, "skfact", &skip_factor);
     param_list_parse_double(pl, "percent", &bench_percent);
     int ok = 1;
-    ok = ok && param_list_parse_ulong(pl, "rlim", &cpoly->rlim);
-    ok = ok && param_list_parse_ulong(pl, "alim", &cpoly->alim);
-    ok = ok && param_list_parse_int(pl, "lpbr", &cpoly->lpbr);
-    ok = ok && param_list_parse_int(pl, "lpba", &cpoly->lpba);
-    ok = ok && param_list_parse_int(pl, "mfbr", &cpoly->mfbr);
-    ok = ok && param_list_parse_int(pl, "mfba", &cpoly->mfba);
-    ok = ok && param_list_parse_double(pl, "rlambda", &cpoly->rlambda);
-    ok = ok && param_list_parse_double(pl, "alambda", &cpoly->alambda);
+    ok = ok && param_list_parse_ulong(pl, "rlim", &cpoly->rat->lim);
+    ok = ok && param_list_parse_ulong(pl, "alim", &cpoly->alg->lim);
+    ok = ok && param_list_parse_int(pl, "lpbr", &cpoly->rat->lpb);
+    ok = ok && param_list_parse_int(pl, "lpba", &cpoly->alg->lpb);
+    ok = ok && param_list_parse_int(pl, "mfbr", &cpoly->rat->mfb);
+    ok = ok && param_list_parse_int(pl, "mfba", &cpoly->alg->mfb);
+    ok = ok && param_list_parse_double(pl, "rlambda", &cpoly->rat->lambda);
+    ok = ok && param_list_parse_double(pl, "alambda", &cpoly->alg->lambda);
 
     if (!ok) {
         fprintf(stderr, "Some parameters are missing among *lim lpb* mfb* *lambda\n");
@@ -4211,10 +4210,10 @@ main (int argc0, char *argv0[])
         exit (EXIT_FAILURE);
       }
 
-    fprintf (si.output, "# Sieving parameters: rlim=%lu alim=%lu lpbr=%d lpba=%d\n",
-             cpoly->rlim, cpoly->alim, cpoly->lpbr, cpoly->lpba);
-    fprintf (si.output, "#                     mfbr=%d mfba=%d rlambda=%1.1f alambda=%1.1f\n",
-             cpoly->mfbr, cpoly->mfba, cpoly->rlambda, cpoly->alambda);
+    fprintf (si.output, "# Sieving parameters: rat->lim=%lu alg->lim=%lu rat->lpb=%d alg->lpb=%d\n",
+             cpoly->rat->lim, cpoly->alg->lim, cpoly->rat->lpb, cpoly->alg->lpb);
+    fprintf (si.output, "#                     rat->mfb=%d alg->mfb=%d rat->lambda=%1.1f alg->lambda=%1.1f\n",
+             cpoly->rat->mfb, cpoly->alg->mfb, cpoly->rat->lambda, cpoly->alg->lambda);
     fprintf (si.output, "#                     skewness=%1.1f\n",
              cpoly->skew);
 
@@ -4243,7 +4242,7 @@ main (int argc0, char *argv0[])
     {
       fbprime_t *leading_div;
       tfb = seconds ();
-      leading_div = factor_small (cpoly->f[cpoly->degree], cpoly->alim);
+      leading_div = factor_small (cpoly->alg->f[cpoly->alg->degree], cpoly->alg->lim);
       alg->fb = fb_read_addproj (fbfilename, alg->scale * LOG_SCALE, 0,
 				leading_div);
       ASSERT_ALWAYS(alg->fb != NULL);
@@ -4262,7 +4261,7 @@ main (int argc0, char *argv0[])
             rpow_lim = si.bucket_thresh - 1;
             printf ("# rpowthresh reduced to %d\n", rpow_lim);
           }
-        rat->fb = fb_make_linear ((const mpz_t *) cpoly->g, (fbprime_t) cpoly->rlim,
+        rat->fb = fb_make_linear ((const mpz_t *) cpoly->rat->f, (fbprime_t) cpoly->rat->lim,
                                  rpow_lim, rat->scale * LOG_SCALE, 
                                  si.verbose, 1, si.output);
         tfb = seconds () - tfb;
@@ -4276,14 +4275,14 @@ main (int argc0, char *argv0[])
     init_norms (&si);
 
     sieve_info_init_trialdiv(&si, td_thresh); /* Init refactoring stuff */
-    si.strategy = facul_make_strategy (15, MIN(cpoly->rlim, cpoly->alim),
-                                       1UL << MIN(cpoly->lpbr, cpoly->lpba));
+    si.strategy = facul_make_strategy (15, MIN(cpoly->rat->lim, cpoly->alg->lim),
+                                       1UL << MIN(cpoly->rat->lpb, cpoly->alg->lpb));
 
     las_report report;
     las_report_init(report);
 
     /* special q (and root rho) */
-    roots = (uint64_t *) malloc (cpoly->degree * sizeof (uint64_t));
+    roots = (uint64_t *) malloc (cpoly->alg->degree * sizeof (uint64_t));
     q0 --; /* so that nextprime gives q0 if q0 is prime */
     nroots = 0;
 
@@ -4301,9 +4300,9 @@ main (int argc0, char *argv0[])
               goto end;  // breaks two whiles.
             si.q = q0;
             if (si.ratq)
-                nroots = poly_roots_uint64 (roots, cpoly->g, 1, q0);
+                nroots = poly_roots_uint64 (roots, cpoly->rat->f, 1, q0);
             else
-                nroots = poly_roots_uint64 (roots, cpoly->f, cpoly->degree, q0);
+                nroots = poly_roots_uint64 (roots, cpoly->alg->f, cpoly->alg->degree, q0);
             if (nroots > 0)
               {
                 fprintf (si.output, "### q=%" PRIu64 ": root%s", q0,
@@ -4331,8 +4330,8 @@ main (int argc0, char *argv0[])
 
         /* precompute the skewed polynomials of f(x) and g(x) */
         int32_t H[4] = { si.a0, si.b0, si.a1, si.b1 };
-        mp_poly_homography(si.fij, cpoly->f, cpoly->degree, H);
-        mp_poly_homography(si.gij, cpoly->g, 1, H);
+        mp_poly_homography(si.fij, cpoly->alg->f, cpoly->alg->degree, H);
+        mp_poly_homography(si.gij, cpoly->rat->f, cpoly->rat->degree, H);
 
         /* checks the value of J, updates floating-point fij(x) */
         sieve_info_update (&si);

@@ -13,64 +13,42 @@
 int
 check_relation (relation_t *rel, cado_poly_ptr cpoly)
 {
-  mpz_t no, acc;
-  int i;
+    int ok = 1;
+    for(int side = 0 ; ok && side < 2 ; side++) {
+        cado_poly_side_ptr ps = cpoly->pols[side];
+        mpz_t no, acc;
+        mpz_init (no);
+        mpz_init_set_ui(acc, 1);
+        mp_poly_homogeneous_eval_siui(no, ps->f, ps->degree, rel->a, rel->b);
 
-  mpz_init (no);
-  mpz_init (acc);
+        int n = side == RATIONAL_SIDE ? rel->nb_rp : rel->nb_ap;
+        for (int i = 0; i < n; ++i)
+        {
+            unsigned long p = side == RATIONAL_SIDE ? rel->rp[i].p : rel->ap[i].p;
+            int e = side == RATIONAL_SIDE ? rel->rp[i].e : rel->ap[i].e;
+            for (int j = 0; j < e; ++j)
+                mpz_mul_ui (acc, acc, p);
+        }
+        if (mpz_cmp (acc, no) != 0) {
+            ok = 0;
+            if (mpz_divisible_p (no, acc)) {
+                mpz_divexact (acc, no, acc);
+                gmp_fprintf (stderr, "Missing factor %Zd on %s side for (%ld, %lu)\n", acc, sidenames[side], rel->a, rel->b);
+            } else {
+                mpz_t g;
+                mpz_init (g);
+                mpz_gcd (g, acc, no);
+                mpz_divexact (acc, acc, g);
+                fprintf (stderr, "Wrong %s side for (%" PRId64 ", %" PRIu64 ")\n", sidenames[side], rel->a, rel->b);
+                gmp_fprintf (stderr, "Given factor %Zd does not divide norm\n", acc);
+                mpz_clear (g);
+            }
+        }
 
-  // algebraic side
-  mp_poly_homogeneous_eval_siui(no, cpoly->f, cpoly->degree, rel->a, rel->b);
-  mpz_set_ui (acc, 1);
-  for (i = 0; i < rel->nb_ap; ++i)
-    {
-      int j;
-      for (j = 0; j < (rel->ap[i]).e; ++j)
-	mpz_mul_ui (acc, acc, (rel->ap[i]).p);
+        mpz_clear (no);
+        mpz_clear (acc);
     }
-  if (mpz_cmp (acc, no) != 0)
-    {
-      if (mpz_divisible_p (no, acc))
-	{
-	  mpz_divexact (acc, no, acc);
-	  gmp_fprintf (stderr, "Missing factor %Zd on algebraic side for (%ld, %lu)\n", acc, rel->a, rel->b);
-	}
-      else
-	{
-	  mpz_t g;
-	  mpz_init (g);
-	  mpz_gcd (g, acc, no);
-	  mpz_divexact (acc, acc, g);
-	  fprintf (stderr,
-		   "Wrong algebraic side for (%" PRId64 ", %" PRIu64 ")\n",
-                   rel->a, rel->b);
-	  gmp_fprintf (stderr, "Given factor %Zd does not divide norm\n", acc);
-	  mpz_clear (g);
-	}
-      mpz_clear (no);
-      mpz_clear (acc);
-      return 0;
-    }
-
-    // rational side
-    mp_poly_homogeneous_eval_siui(no, cpoly->g, 1, rel->a, rel->b);
-    mpz_set_ui(acc, 1);
-    for(i = 0; i < rel->nb_rp; ++i) {
-        int j;
-        for (j = 0; j < (rel->rp[i]).e; ++j) 
-            mpz_mul_ui(acc, acc, (rel->rp[i]).p);
-    }
-    if (mpz_cmp(acc, no) != 0) {
-        fprintf (stderr,
-                 "Wrong rational side for (%" PRId64 ", %" PRIu64 ")\n",
-                 rel->a, rel->b);
-        mpz_clear(no);
-        mpz_clear(acc);
-        return 0;
-    }
-    mpz_clear(no);
-    mpz_clear(acc);
-    return 1;
+    return ok;
 }
 
 void usage_and_die(char *str) {

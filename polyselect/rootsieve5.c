@@ -359,10 +359,10 @@ print_poly_info ( mpz_t *f,
 	 cado_poly_init(cpoly);
 
 	 for (i = 0; i < (d + 1); i++) {
-		  mpz_set(cpoly->f[i], f[i]);
+		  mpz_set(cpoly->alg->f[i], f[i]);
 	 }
 	 for (i = 0; i < 2; i++) {
-		  mpz_set(cpoly->g[i], g[i]);
+		  mpz_set(cpoly->rat->f[i], g[i]);
 	 }
 
 	 if (verbose == 2) {
@@ -387,8 +387,8 @@ print_poly_info ( mpz_t *f,
 	 alpha_proj = get_biased_alpha_projective (f, d, ALPHA_BOUND);
 
 	 mpz_set (cpoly->n, N);
-	 cpoly->degree = d;
-	 cpoly->degreeg = 2;
+	 cpoly->alg->degree = d;
+	 cpoly->rat->degree = 1;
 	 cpoly->skew = skew;
 	 e = MurphyE (cpoly, BOUND_F, BOUND_G, AREA, MURPHY_K);
 
