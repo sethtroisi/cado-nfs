@@ -14,6 +14,7 @@
 #include <pthread.h>
 #include "mpz_poly.h"
 #include "las-config.h"
+#include "las-types.h"
 
 #define LOG_SCALE 1.4426950408889634 /* 1/log(2) to 17 digits, rounded to
                                         nearest. This is enough to uniquely
@@ -81,50 +82,6 @@ pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 const int bucket_region = 1 << LOG_BUCKET_REGION;
 
-struct sieve_side_info_s {
-    double scale;      /* norm scale used on the algebraic side */
-    double logmax;     /* norms on the alg-> side are < 2^alg->logmax */
-    unsigned char Bound[256]; /* zero for good lognorms, 127 otherwise */
-    fbprime_t *trialdiv_primes;
-    trialdiv_divisor_t *trialdiv_data;
-    unsigned char S[1 << NORM_BITS];
-    factorbase_degn_t * fb;
-};
-typedef struct sieve_side_info_s sieve_side_info[1];
-typedef struct sieve_side_info_s * sieve_side_info_ptr;
-typedef const struct sieve_side_info_s * sieve_side_info_srcptr;
-
-// General information about the siever
-typedef struct {
-    int bench;
-    // multithreading info
-    int nb_threads;
-    // sieving area
-    uint32_t I;
-    uint32_t J;
-    int logI; // such that I = 1<<logI
-    // description of the q-lattice
-    int ratq;   // 0 means special q on alg side, otherwise on rat side
-    uint64_t q;
-    uint64_t rho;
-    int32_t a0, b0, a1, b1;
-    // parameters for bucket sieving
-    int bucket_thresh;    // bucket sieve primes >= bucket_thresh
-    int nb_buckets;
-    int bucket_limit;   // maximal number of bucket_reports allowed in one bucket.
-    unsigned int degree;   /* polynomial degree */
-    cado_poly_ptr cpoly;
-    sieve_side_info sides[2];
-    mpz_t *fij, gij[2];    /* coefficients of F,G(a0*i+a1*j, b0*i+b1*j)  */
-    double *fijd;     /* coefficients of F_q/q */
-    double B;         /* bound for the norm computation */
-    unsigned int *lpf; /* lpf[i] is largest prime factor of i, for i < I */
-    facul_strategy_t *strategy;
-
-    FILE *output;
-    int verbose;
-} sieve_info_t;
-
 #define RATIONAL_SIDE   0
 #define ALGEBRAIC_SIDE   1
 const char * sidenames[2] = {
@@ -132,29 +89,29 @@ const char * sidenames[2] = {
     [ALGEBRAIC_SIDE] = "algebraic", };
 
 /* {{{ Forward declarations of conversion functions */
-MAYBE_UNUSED static void xToIJ(int *i, unsigned int *j, const unsigned int X, const sieve_info_t * si);
-MAYBE_UNUSED static void NxToIJ(int *i, unsigned int *j, const unsigned int N, const unsigned int x, const sieve_info_t * si);
+MAYBE_UNUSED static void xToIJ(int *i, unsigned int *j, const unsigned int X, sieve_info_srcptr si);
+MAYBE_UNUSED static void NxToIJ(int *i, unsigned int *j, const unsigned int N, const unsigned int x, sieve_info_srcptr si);
 
-MAYBE_UNUSED static void IJTox(unsigned int * x, int i, unsigned int j, const sieve_info_t * si);
-MAYBE_UNUSED static void IJToNx(unsigned int *N, unsigned int * x, int i, unsigned int j, const sieve_info_t * si);
-MAYBE_UNUSED static void IJToAB(int64_t *a, uint64_t *b, const int i, const unsigned int j, const sieve_info_t * si);
-MAYBE_UNUSED static void xToAB(int64_t *a, uint64_t *b, const unsigned int x, const sieve_info_t *si);
-MAYBE_UNUSED static void NxToAB(int64_t *a, uint64_t *b, const unsigned int N, const unsigned int x, const sieve_info_t *si);
-MAYBE_UNUSED static int ABToIJ(int *i, unsigned int *j, const int64_t a, const uint64_t b, const sieve_info_t * si);
-MAYBE_UNUSED static int ABTox(unsigned int *x, const int64_t a, const uint64_t b, const sieve_info_t * si);
-MAYBE_UNUSED static int ABToNx(unsigned int * N, unsigned int *x, const int64_t a, const uint64_t b, const sieve_info_t * si);
+MAYBE_UNUSED static void IJTox(unsigned int * x, int i, unsigned int j, sieve_info_srcptr si);
+MAYBE_UNUSED static void IJToNx(unsigned int *N, unsigned int * x, int i, unsigned int j, sieve_info_srcptr si);
+MAYBE_UNUSED static void IJToAB(int64_t *a, uint64_t *b, const int i, const unsigned int j, sieve_info_srcptr si);
+MAYBE_UNUSED static void xToAB(int64_t *a, uint64_t *b, const unsigned int x, sieve_info_srcptr si);
+MAYBE_UNUSED static void NxToAB(int64_t *a, uint64_t *b, const unsigned int N, const unsigned int x, sieve_info_srcptr si);
+MAYBE_UNUSED static int ABToIJ(int *i, unsigned int *j, const int64_t a, const uint64_t b, sieve_info_srcptr si);
+MAYBE_UNUSED static int ABTox(unsigned int *x, const int64_t a, const uint64_t b, sieve_info_srcptr si);
+MAYBE_UNUSED static int ABToNx(unsigned int * N, unsigned int *x, const int64_t a, const uint64_t b, sieve_info_srcptr si);
 /* }}} */
 
 /* Test if entry x in bucket region n is divisible by p */
 void test_divisible_x (const fbprime_t p, const unsigned long x, const int n,
-		       const sieve_info_t *si, int side);
+		       sieve_info_srcptr si, int side);
 int factor_leftover_norm (mpz_t n, unsigned int b, mpz_array_t* const factors,
 			  uint32_array_t* const multis,
 			  facul_strategy_t *strategy);
 
 /************************** sieve info stuff *********************************/
 
-static double get_maxnorm (cado_poly, sieve_info_t *, uint64_t);
+static double get_maxnorm (cado_poly, sieve_info_ptr, uint64_t);
 
 /* initialize array C[0..255]: C[i] is non-zero whenever the log-norm i
    is considered as a potential report.
@@ -184,7 +141,7 @@ sieve_info_init_lognorm (unsigned char *C, unsigned char threshold,
 #endif
 }
 
-static void sieve_info_init_trialdiv(sieve_info_t * si, int td_thresh)
+static void sieve_info_init_trialdiv(sieve_info_ptr si, int td_thresh)
 {
     /* Our trial division needs odd divisors, 2 is handled by mpz_even_p().
        If the FB primes to trial divide contain 2, we skip over it.
@@ -202,7 +159,7 @@ static void sieve_info_init_trialdiv(sieve_info_t * si, int td_thresh)
     }
 }
 
-static void sieve_info_clear_trialdiv(sieve_info_t * si)
+static void sieve_info_clear_trialdiv(sieve_info_ptr si)
 {
     for(int side = 0 ; side < 2 ; side++) {
         trialdiv_clear (si->sides[side]->trialdiv_data);
@@ -211,7 +168,7 @@ static void sieve_info_clear_trialdiv(sieve_info_t * si)
 }
 
 static void
-sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0,
+sieve_info_init (sieve_info_ptr si, cado_poly cpoly, int logI, uint64_t q0,
 		 const int bucket_thresh, FILE *output, int nb_threads)
 {
   unsigned int d = cpoly->alg->degree;
@@ -380,7 +337,7 @@ factor_small (mpz_t n, fbprime_t lim)
 }
 
 static void
-sieve_info_update (sieve_info_t *si)
+sieve_info_update (sieve_info_ptr si)
 {
   unsigned int k;
   double invq;
@@ -402,7 +359,7 @@ sieve_info_update (sieve_info_t *si)
 }
 
 static void
-sieve_info_clear (sieve_info_t *si)
+sieve_info_clear (sieve_info_ptr si)
 {
   unsigned int d = si->degree;
   unsigned int k;
@@ -629,7 +586,7 @@ is_divisible_3_u32 (uint32_t a)
 
 NOPROFILE_INLINE fbprime_t
 fb_root_in_qlattice (const fbprime_t p, const fbprime_t R,
-        const uint32_t invp, const sieve_info_t * si)
+        const uint32_t invp, sieve_info_srcptr si)
 {
   int64_t aux1, aux2;
   uint64_t u, v;
@@ -759,7 +716,7 @@ typedef uint32_t plattice_x_t;
 // of the computation time.
 
 NOPROFILE_INLINE int
-reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, const sieve_info_t * si)
+reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, sieve_info_srcptr si)
 {
     int32_t I = si->I;
     int32_t a0=-(int32_t)p, a1=0, b0=r, b1=1;
@@ -840,7 +797,7 @@ reduce_plattice(plattice_info_t *pli, const fbprime_t p, const fbprime_t r, cons
 #else
 #define PLI_COEFF(pli, ab01) (pli->ab01)
 #endif
-static inline plattice_x_t plattice_a(const plattice_info_t * pli, const sieve_info_t * si)
+static inline plattice_x_t plattice_a(const plattice_info_t * pli, sieve_info_srcptr si)
 {
     int32_t a0 = PLI_COEFF(pli, a0);
     uint32_t a1 = PLI_COEFF(pli, a1);
@@ -854,7 +811,7 @@ static inline plattice_x_t plattice_a(const plattice_info_t * pli, const sieve_i
         return (a1 << si->logI) + a0;
 }
 
-static inline plattice_x_t plattice_c(const plattice_info_t * pli, const sieve_info_t * si)
+static inline plattice_x_t plattice_c(const plattice_info_t * pli, sieve_info_srcptr si)
 {
     int32_t b0 = PLI_COEFF(pli, b0);
     uint32_t b1 = PLI_COEFF(pli, b1);
@@ -868,12 +825,12 @@ static inline plattice_x_t plattice_c(const plattice_info_t * pli, const sieve_i
         return (b1 << si->logI) + b0;
 }
 
-static inline uint32_t plattice_bound0(const plattice_info_t * pli, const sieve_info_t * si MAYBE_UNUSED)
+static inline uint32_t plattice_bound0(const plattice_info_t * pli, sieve_info_srcptr si MAYBE_UNUSED)
 {
     return - PLI_COEFF(pli, a0);
 }
 
-static inline uint32_t plattice_bound1(const plattice_info_t * pli, const sieve_info_t * si)
+static inline uint32_t plattice_bound1(const plattice_info_t * pli, sieve_info_srcptr si)
 {
     return si->I - PLI_COEFF(pli, b0);
 }
@@ -881,7 +838,7 @@ static inline uint32_t plattice_bound1(const plattice_info_t * pli, const sieve_
 
 /* This is for working with congruence classes only */
 NOPROFILE_INLINE
-plattice_x_t plattice_starting_vector(const plattice_info_t * pli, const sieve_info_t * si, int par MAYBE_UNUSED)
+plattice_x_t plattice_starting_vector(const plattice_info_t * pli, sieve_info_srcptr si, int par MAYBE_UNUSED)
 {
     /* With MOD2_CLASSES_BS set up, we have computed by the function
      * above an adapted basis for the band of total width I/2 (thus from
@@ -1082,7 +1039,7 @@ typedef const struct thread_side_data_s * thread_side_data_srcptr;
 struct thread_data_s {
     int id;
     thread_side_data sides[2];
-    sieve_info_t *si;
+    sieve_info_ptr si;
     las_report rep;
 };
 typedef struct thread_data_s thread_data[1];
@@ -1151,7 +1108,7 @@ fill_in_buckets(thread_data_ptr th, int side)
 {
     factorbase_degn_t * fb = th->sides[side]->fb_bucket;
     fbprime_t pmax = th->sides[side]->pmax;
-    const sieve_info_t * si = th->si;
+    sieve_info_srcptr si = th->si;
     bucket_array_t BA = th->sides[side]->BA;  /* local copy */
     // Loop over all primes in the factor base >= bucket_thresh
     // and up to FB_END or pmax (pmax included)
@@ -1330,7 +1287,7 @@ void * fill_in_buckets_both(thread_data_ptr th)
 
 void thread_do(thread_data * thrs, void * (*f) (thread_data_ptr))
 {
-    sieve_info_t * si = thrs[0]->si;
+    sieve_info_ptr si = thrs[0]->si;
     if (si->nb_threads == 1) {
         /* Then don't bother with pthread calls */
         (*f)(thrs[0]);
@@ -1361,7 +1318,7 @@ sieve_decrease (unsigned char *S, const unsigned char logp,
                 MAYBE_UNUSED const uint16_t x, 
                 MAYBE_UNUSED const unsigned int bucket_nr,
                 MAYBE_UNUSED const fbprime_t p,
-                MAYBE_UNUSED const sieve_info_t *si, 
+                MAYBE_UNUSED sieve_info_srcptr si, 
                 MAYBE_UNUSED const int caller)
 {
 #ifdef TRACE_K
@@ -1407,7 +1364,7 @@ sieve_decrease (unsigned char *S, const unsigned char logp,
 
 NOPROFILE_STATIC void
 apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
-                     sieve_info_t * si MAYBE_UNUSED)
+                     sieve_info_ptr si MAYBE_UNUSED)
 {
     int j = nb_of_updates(BA, i);
     int next_logp_j = 0;
@@ -1452,7 +1409,7 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
    lognorms approximations for k bits of exponent + NORM_BITS-k bits
    of mantissa */
 NOPROFILE_STATIC void
-init_norms (sieve_info_t *si)
+init_norms (sieve_info_ptr si)
 {
   for(int s = 0 ; s < 2 ; s++) {
       sieve_side_info_ptr sdata = si->sides[s];
@@ -1501,7 +1458,7 @@ init_norms (sieve_info_t *si)
  * not coprime, except for the line j=0.
  */
 NOPROFILE_STATIC void
-init_rat_norms_bucket_region (unsigned char *S, int N, sieve_info_t *si)
+init_rat_norms_bucket_region (unsigned char *S, int N, sieve_info_ptr si)
 {
     cado_poly_ptr cpoly = si->cpoly;
     sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
@@ -1660,7 +1617,7 @@ fpoly_eval_v2df(const __v2df *f, const __v2df x, int d)
 NOPROFILE_STATIC int
 init_alg_norms_bucket_region (unsigned char *alg_S, 
 			      const unsigned char *rat_S, const int N, 
-			      sieve_info_t *si)
+			      sieve_info_ptr si)
 {
   cado_poly_ptr cpoly = si->cpoly;
   sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
@@ -1936,7 +1893,7 @@ copy_small_sieve (small_sieve_data_t *r, const small_sieve_data_t *s,
 // relative to the start of the next bucket region to sieve. It may exceed I 
 // and even BUCKET_REGION
 void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
-                      const sieve_info_t *si, const char side)
+                      sieve_info_srcptr si, const char side)
 {
     const factorbase_degn_t *fb_sav = fb;
     int size = 0, n;
@@ -2076,7 +2033,7 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
 
 static void thread_data_init_small_sieve(thread_data * thrs)
 {
-    sieve_info_t * si = thrs[0]->si;
+    sieve_info_ptr si = thrs[0]->si;
     for(int i = 0 ; i < si->nb_threads ; i++) {
         for(int side = 0 ; side < 2 ; side++) {
             init_small_sieve(&(thrs[i]->sides[side]->ssd), si->sides[side]->fb, si, *sidenames[side]);
@@ -2086,7 +2043,7 @@ static void thread_data_init_small_sieve(thread_data * thrs)
 
 static void thread_data_clear_small_sieve(thread_data * thrs)
 {
-    sieve_info_t * si = thrs[0]->si;
+    sieve_info_ptr si = thrs[0]->si;
     for(int i = 0 ; i < si->nb_threads ; i++) {
         for(int side = 0 ; side < 2 ; side++) {
             clear_small_sieve(thrs[i]->sides[side]->ssd);
@@ -2101,7 +2058,7 @@ static void thread_data_clear_small_sieve(thread_data * thrs)
 // precomputed offset to jump without mod p reduction (yet still a
 // subtraction, though).
 void ssd_update_positions(small_sieve_data_t *ssd, 
-        small_sieve_data_t *ref_ssd, sieve_info_t *si, int nl,
+        small_sieve_data_t *ref_ssd, sieve_info_ptr si, int nl,
         int use_offset)
 {
     const int row0_is_oddj = nl & 1;
@@ -2172,7 +2129,7 @@ void ssd_update_positions(small_sieve_data_t *ssd,
 // next sieve region S.
 // Information about where we are is in ssd.
 void sieve_small_bucket_region(unsigned char *S, const int bucket_nr,
-			       small_sieve_data_t ssd, sieve_info_t *si,
+			       small_sieve_data_t ssd, sieve_info_ptr si,
 			       const int side)
 {
     const uint32_t I = si->I;
@@ -2503,7 +2460,7 @@ void sieve_small_bucket_region(unsigned char *S, const int bucket_nr,
 void
 resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
 			     small_sieve_data_t *ssd,
-			     const sieve_info_t *si)
+			     sieve_info_srcptr si)
 {
   const uint32_t I = si->I;
   unsigned char *S_ptr;
@@ -2876,7 +2833,7 @@ check_leftover_norm (mpz_t n, size_t lpb, mpz_t BB, mpz_t BBB, size_t mfb)
 #ifdef UNSIEVE_NOT_COPRIME
 static void
 unsieve_one_prime (unsigned char *line_start, const unsigned int p, 
-                   const unsigned int y, const sieve_info_t *si)
+                   const unsigned int y, sieve_info_srcptr si)
 {
   unsigned int x, np = p; /* if 2|y, np=2p, else np=p */
 
@@ -2894,7 +2851,7 @@ unsieve_one_prime (unsigned char *line_start, const unsigned int p,
 
 /* Set locations where gcd(i,j) != 1 to 255*/
 void 
-unsieve_not_coprime (unsigned char *S, const int N, const sieve_info_t *si)
+unsieve_not_coprime (unsigned char *S, const int N, sieve_info_srcptr si)
 {
   unsigned int y; /* Line coordinate within bucket region */
   for (y = 0U + (N == 0U ? 1U : 0U); 
@@ -2976,7 +2933,7 @@ typedef const struct local_sieve_data_s * local_sieve_data_srcptr;
 NOPROFILE_STATIC int
 factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
 {
-    sieve_info_t * si = th->si;
+    sieve_info_ptr si = th->si;
     cado_poly_ptr cpoly = si->cpoly;
     sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
     sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
@@ -3268,24 +3225,24 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
  * where x is a 32-bit value equal to N*bucket_region+x. Thus from this
  * wide x, it is possible te recover both N and (the short) x.
  */
-static void xToIJ(int *i, unsigned int *j, const unsigned int X, const sieve_info_t * si)
+static void xToIJ(int *i, unsigned int *j, const unsigned int X, sieve_info_srcptr si)
 {
     *i = (X % (si->I)) - (si->I >> 1);
     *j = X / si->I;
 }
 
-static void NxToIJ(int *i, unsigned int *j, const unsigned int N, const unsigned int x, const sieve_info_t * si)
+static void NxToIJ(int *i, unsigned int *j, const unsigned int N, const unsigned int x, sieve_info_srcptr si)
 {
     unsigned int X = x + N * bucket_region;
     return xToIJ(i, j, X, si);
 }
 
-static void IJTox(unsigned int * x, int i, unsigned int j, const sieve_info_t * si)
+static void IJTox(unsigned int * x, int i, unsigned int j, sieve_info_srcptr si)
 {
     *x = i + (si->I)*j + (si->I>>1);
 }
 
-static void IJToNx(unsigned int *N, unsigned int * x, int i, unsigned int j, const sieve_info_t * si)
+static void IJToNx(unsigned int *N, unsigned int * x, int i, unsigned int j, sieve_info_srcptr si)
 {
     IJTox(x, i, j, si);
     *N = *x >> LOG_BUCKET_REGION;
@@ -3293,7 +3250,7 @@ static void IJToNx(unsigned int *N, unsigned int * x, int i, unsigned int j, con
 }
 
 static void IJToAB(int64_t *a, uint64_t *b, const int i, const unsigned int j, 
-       const sieve_info_t * si)
+       sieve_info_srcptr si)
 {
     int64_t s, t;
     s = (int64_t)i * (int64_t) si->a0 + (int64_t)j * (int64_t)si->a1;
@@ -3311,7 +3268,7 @@ static void IJToAB(int64_t *a, uint64_t *b, const int i, const unsigned int j,
 }
 
 /* Warning: b might be negative, in which case we return (-a,-b) */
-static void xToAB(int64_t *a, uint64_t *b, const unsigned int x, const sieve_info_t *si)
+static void xToAB(int64_t *a, uint64_t *b, const unsigned int x, sieve_info_srcptr si)
 {
     int i, j;
     int64_t c;
@@ -3329,12 +3286,12 @@ static void xToAB(int64_t *a, uint64_t *b, const unsigned int x, const sieve_inf
         *b = -c;
       }
 }
-static void NxToAB(int64_t *a, uint64_t *b, const unsigned int N, const unsigned int x, const sieve_info_t *si)
+static void NxToAB(int64_t *a, uint64_t *b, const unsigned int N, const unsigned int x, sieve_info_srcptr si)
 {
     xToAB(a, b, N * bucket_region + x, si);
 }
 
-static int ABToIJ(int *i, unsigned int *j, const int64_t a, const uint64_t b, const sieve_info_t * si)
+static int ABToIJ(int *i, unsigned int *j, const int64_t a, const uint64_t b, sieve_info_srcptr si)
 {
     int64_t ii =   a * (int64_t) si->b1 - b * (int64_t)si->a1;
     int64_t jj = - a * (int64_t) si->b0 + b * (int64_t)si->a0;
@@ -3345,7 +3302,7 @@ static int ABToIJ(int *i, unsigned int *j, const int64_t a, const uint64_t b, co
     *j = jj;
     return 1;
 }
-static int ABTox(unsigned int *x, const int64_t a, const uint64_t b, const sieve_info_t * si)
+static int ABTox(unsigned int *x, const int64_t a, const uint64_t b, sieve_info_srcptr si)
 {
     int i;
     unsigned int j;
@@ -3354,7 +3311,7 @@ static int ABTox(unsigned int *x, const int64_t a, const uint64_t b, const sieve
     return 1;
 }
 
-MAYBE_UNUSED static int ABToNx(unsigned int * N, unsigned int *x, const int64_t a, const uint64_t b, const sieve_info_t * si)
+MAYBE_UNUSED static int ABToNx(unsigned int * N, unsigned int *x, const int64_t a, const uint64_t b, sieve_info_srcptr si)
 {
     int i;
     unsigned int j;
@@ -3366,7 +3323,7 @@ MAYBE_UNUSED static int ABToNx(unsigned int * N, unsigned int *x, const int64_t 
 
 /* DEBUG function only */
 void test_divisible_x (const fbprime_t p, const unsigned long x, 
-                       const int n, const sieve_info_t *si, const int side)
+                       const int n, sieve_info_srcptr si, const int side)
 {
   const unsigned long X = x + n * bucket_region;
   const long i = (long) (X & ((unsigned long) si->I - 1UL)) - (long) si->I / 2;
@@ -3462,7 +3419,7 @@ get_maxnorm_aux (double *g, const unsigned int d, double s)
    a = a0 * i + a1 * j, b = b0 * i + b1 * j and q >= q0,
    -I/2 <= i <= I/2, 0 <= j <= I/2*min(s*B/|a1|,B/|b1|)
    where B >= sqrt(2*q/s/sqrt(3)) for all special-q in the current range
-   (s is the skewness, and B = si.B, see lattice.tex).
+   (s is the skewness, and B = si->B, see lattice.tex).
 
    Since |a0| <= s*B and |b0| <= B, then
    |a0 * i + a1 * j| <= s*B*I and |b0 * i + b1 * j| <= B*I,
@@ -3478,7 +3435,7 @@ get_maxnorm_aux (double *g, const unsigned int d, double s)
        and is attained in (a) or (c).
 */
 static double
-get_maxnorm (cado_poly cpoly, sieve_info_t *si, uint64_t q0)
+get_maxnorm (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
 {
   unsigned int d = cpoly->alg->degree, k;
   double *fd; /* double-precision coefficients of f */
@@ -3535,12 +3492,12 @@ get_maxnorm (cado_poly cpoly, sieve_info_t *si, uint64_t q0)
 /* return non-zero when the reduced lattice has entries that do not
    fit into int32_t, otherwise return 0 */
 static int
-SkewGauss (sieve_info_t *si, double skewness)
+SkewGauss (sieve_info_ptr si, double skewness)
 {
   double a[2], b[2], q, maxab0, maxab1;
 
   a[0] = (double) si->q;
-  ASSERT_ALWAYS(a[0] < 9007199254740992.0); /* si.q should be less than 2^53
+  ASSERT_ALWAYS(a[0] < 9007199254740992.0); /* si->q should be less than 2^53
                                                so that a[0] is exact */
   b[0] = 0.0;
   a[1] = (double) si->rho;
@@ -3607,7 +3564,7 @@ SkewGauss (sieve_info_t *si, double skewness)
 
 /* return max(|a0|,|a1|)/min(|a0|,|a1|) */
 double
-skewness (sieve_info_t *si)
+skewness (sieve_info_ptr si)
 {
   double a0 = fabs ((double) si->a0);
   double a1 = fabs ((double) si->a1);
@@ -3732,7 +3689,7 @@ factor_leftover_norm (mpz_t n, unsigned int l,
 void *
 process_bucket_region(thread_data_ptr th)
 {
-    sieve_info_t *si            = th->si;
+    sieve_info_ptr si            = th->si;
 
     las_report_ptr rep = th->rep;
 
@@ -3846,7 +3803,7 @@ process_bucket_region(thread_data_ptr th)
     return NULL;
 }
 
-static thread_data * thread_data_alloc(sieve_info_t * si)
+static thread_data * thread_data_alloc(sieve_info_ptr si)
 {
     thread_data * thrs = (thread_data *) malloc(si->nb_threads * sizeof(thread_data));
     memset(thrs, 0, si->nb_threads * sizeof(thread_data));
@@ -3911,7 +3868,7 @@ static void thread_data_free(thread_data * thrs)
 
 static void thread_buckets_alloc(thread_data * thrs)
 {
-    sieve_info_t * si = thrs[0]->si;
+    sieve_info_ptr si = thrs[0]->si;
     for(int side = 0 ; side < 2 ; side++) {
         for (int i = 0; i < si->nb_threads; ++i) {
             thrs[i]->sides[side]->BA = init_bucket_array(si->nb_buckets, si->bucket_limit / si->nb_threads);
@@ -3921,7 +3878,7 @@ static void thread_buckets_alloc(thread_data * thrs)
 
 static void thread_buckets_free(thread_data * thrs)
 {
-    sieve_info_t * si = thrs[0]->si;
+    sieve_info_ptr si = thrs[0]->si;
     for(int side = 0 ; side < 2 ; side++) {
         for (int i = 0; i < si->nb_threads; ++i) {
             clear_bucket_array(thrs[i]->sides[side]->BA);
@@ -3931,7 +3888,7 @@ static void thread_buckets_free(thread_data * thrs)
 
 static double thread_buckets_max_full(thread_data * thrs)
 {
-    sieve_info_t * si = thrs[0]->si;
+    sieve_info_ptr si = thrs[0]->si;
     double mf, mf0 = 0;
     for (int i = 0; i < si->nb_threads; ++i) {
         mf = buckets_max_full (thrs[i]->sides[0]->BA);
@@ -3985,7 +3942,7 @@ usage (const char *argv0, const char * missing)
 int
 main (int argc0, char *argv0[])
 {
-    sieve_info_t si;
+    sieve_info si;
     const char *fbfilename = NULL;
     const char *polyfilename = NULL;
     cado_poly cpoly;
@@ -4012,13 +3969,13 @@ main (int argc0, char *argv0[])
     long bench_tot_rep = 0;
     double bench_tot_time = 0.0;
 
-    memset(&si, 0, sizeof(sieve_info_t));
+    memset(si, 0, sizeof(sieve_info));
 
     param_list pl;
     param_list_init(pl);
     cado_poly_init (cpoly);
-    param_list_configure_knob(pl, "-v", &si.verbose);
-    param_list_configure_knob(pl, "-ratq", &si.ratq);
+    param_list_configure_knob(pl, "-v", &si->verbose);
+    param_list_configure_knob(pl, "-ratq", &si->ratq);
     param_list_configure_knob(pl, "-bench", &bench);
     param_list_configure_knob(pl, "-bench2", &bench2);
     argv++, argc--;
@@ -4074,18 +4031,18 @@ main (int argc0, char *argv0[])
 
     outputname = param_list_lookup_string(pl, "out");
     /* Init output file */
-    si.output = stdout;
+    si->output = stdout;
     if (outputname) {
-        if (!(si.output = gzip_open (outputname, "w"))) {
+        if (!(si->output = gzip_open (outputname, "w"))) {
             fprintf (stderr, "Could not open %s for writing\n", outputname);
             exit (EXIT_FAILURE);
         }
     }
 
-    param_list_print_command_line(si.output, pl);
+    param_list_print_command_line(si->output, pl);
 
 #ifdef SSE_NORM_INIT
-    fprintf (si.output, "# SSE_NORM_INIT is activated\n");
+    fprintf (si->output, "# SSE_NORM_INIT is activated\n");
 #endif
 
     if (fbfilename == NULL) usage(argv0[0], "fb");
@@ -4109,11 +4066,11 @@ main (int argc0, char *argv0[])
         exit (EXIT_FAILURE);
       }
 
-    fprintf (si.output, "# Sieving parameters: rat->lim=%lu alg->lim=%lu rat->lpb=%d alg->lpb=%d\n",
+    fprintf (si->output, "# Sieving parameters: rat->lim=%lu alg->lim=%lu rat->lpb=%d alg->lpb=%d\n",
              cpoly->rat->lim, cpoly->alg->lim, cpoly->rat->lpb, cpoly->alg->lpb);
-    fprintf (si.output, "#                     rat->mfb=%d alg->mfb=%d rat->lambda=%1.1f alg->lambda=%1.1f\n",
+    fprintf (si->output, "#                     rat->mfb=%d alg->mfb=%d rat->lambda=%1.1f alg->lambda=%1.1f\n",
              cpoly->rat->mfb, cpoly->alg->mfb, cpoly->rat->lambda, cpoly->alg->lambda);
-    fprintf (si.output, "#                     skewness=%1.1f\n",
+    fprintf (si->output, "#                     skewness=%1.1f\n",
              cpoly->skew);
 
     if (cpoly->skew <= 0.0)
@@ -4129,13 +4086,13 @@ main (int argc0, char *argv0[])
         exit (EXIT_FAILURE);
       }
 
-    si.bench=bench + bench2;
+    si->bench=bench + bench2;
 
     /* this does not depend on the special-q */
-    sieve_info_init (&si, cpoly, I, q0, bucket_thresh, si.output, nb_threads);
+    sieve_info_init (si, cpoly, I, q0, bucket_thresh, si->output, nb_threads);
 
-    sieve_side_info_ptr rat = si.sides[RATIONAL_SIDE];
-    sieve_side_info_ptr alg = si.sides[ALGEBRAIC_SIDE];
+    sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
+    sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
 
     /* {{{ Read algebraic factor base */
     {
@@ -4146,7 +4103,7 @@ main (int argc0, char *argv0[])
 				leading_div);
       ASSERT_ALWAYS(alg->fb != NULL);
       tfb = seconds () - tfb;
-      fprintf (si.output, 
+      fprintf (si->output, 
                "# Reading algebraic factor base of %zuMb took %1.1fs\n", 
                fb_size (alg->fb) >> 20, tfb);
       free (leading_div);
@@ -4155,26 +4112,26 @@ main (int argc0, char *argv0[])
     /* {{{ Prepare rational factor base */
     {
         tfb = seconds ();
-        if (rpow_lim >= si.bucket_thresh)
+        if (rpow_lim >= si->bucket_thresh)
           {
-            rpow_lim = si.bucket_thresh - 1;
+            rpow_lim = si->bucket_thresh - 1;
             printf ("# rpowthresh reduced to %d\n", rpow_lim);
           }
         rat->fb = fb_make_linear ((const mpz_t *) cpoly->rat->f, (fbprime_t) cpoly->rat->lim,
                                  rpow_lim, rat->scale * LOG_SCALE, 
-                                 si.verbose, 1, si.output);
+                                 si->verbose, 1, si->output);
         tfb = seconds () - tfb;
-        fprintf (si.output, "# Creating rational factor base of %zuMb took %1.1fs\n",
+        fprintf (si->output, "# Creating rational factor base of %zuMb took %1.1fs\n",
                  fb_size (rat->fb) >> 20, tfb);
     }
     /* }}} */
 
-    thread_data * thrs = thread_data_alloc(&si);
+    thread_data * thrs = thread_data_alloc(si);
 
-    init_norms (&si);
+    init_norms (si);
 
-    sieve_info_init_trialdiv(&si, td_thresh); /* Init refactoring stuff */
-    si.strategy = facul_make_strategy (15, MIN(cpoly->rat->lim, cpoly->alg->lim),
+    sieve_info_init_trialdiv(si, td_thresh); /* Init refactoring stuff */
+    si->strategy = facul_make_strategy (15, MIN(cpoly->rat->lim, cpoly->alg->lim),
                                        1UL << MIN(cpoly->rat->lpb, cpoly->alg->lpb));
 
     las_report report;
@@ -4186,7 +4143,7 @@ main (int argc0, char *argv0[])
     nroots = 0;
 
     t0 = seconds ();
-    fprintf (si.output, "#\n");
+    fprintf (si->output, "#\n");
     int rep_bench = 0;
     int nbq_bench = 0;
     double t_bench = seconds();
@@ -4197,64 +4154,64 @@ main (int argc0, char *argv0[])
             q0 = uint64_nextprime (q0);
             if (q0 >= q1)
               goto end;  // breaks two whiles.
-            si.q = q0;
-            if (si.ratq)
+            si->q = q0;
+            if (si->ratq)
                 nroots = poly_roots_uint64 (roots, cpoly->rat->f, 1, q0);
             else
                 nroots = poly_roots_uint64 (roots, cpoly->alg->f, cpoly->alg->degree, q0);
             if (nroots > 0)
               {
-                fprintf (si.output, "### q=%" PRIu64 ": root%s", q0,
+                fprintf (si->output, "### q=%" PRIu64 ": root%s", q0,
                          (nroots == 1) ? "" : "s");
                 for (i = 1; i <= (int) nroots; i++)
-                  fprintf (si.output, " %" PRIu64, roots[nroots-i]);
-                fprintf (si.output, "\n");
+                  fprintf (si->output, " %" PRIu64, roots[nroots-i]);
+                fprintf (si->output, "\n");
               }
           }
         /* }}} */
 
         /* computes a0, b0, a1, b1 from q, rho, and the skewness */
-        si.rho = roots[--nroots];
-        if (rho != 0 && si.rho != rho) /* if -rho, wait for wanted root */
+        si->rho = roots[--nroots];
+        if (rho != 0 && si->rho != rho) /* if -rho, wait for wanted root */
           continue;
-        if (SkewGauss (&si, cpoly->skew) != 0)
+        if (SkewGauss (si, cpoly->skew) != 0)
 	  continue;
         /* FIXME: maybe we can discard some special q's if a1/a0 is too large,
            see http://www.mersenneforum.org/showthread.php?p=130478 */
 
-        fprintf (si.output, "# Sieving q=%" PRIu64 "; rho=%" PRIu64
+        fprintf (si->output, "# Sieving q=%" PRIu64 "; rho=%" PRIu64
                  "; a0=%d; b0=%d; a1=%d; b1=%d\n",
-                 si.q, si.rho, si.a0, si.b0, si.a1, si.b1);
+                 si->q, si->rho, si->a0, si->b0, si->a1, si->b1);
         sq ++;
 
         /* precompute the skewed polynomials of f(x) and g(x) */
-        int32_t H[4] = { si.a0, si.b0, si.a1, si.b1 };
-        mp_poly_homography(si.fij, cpoly->alg->f, cpoly->alg->degree, H);
-        mp_poly_homography(si.gij, cpoly->rat->f, cpoly->rat->degree, H);
+        int32_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
+        mp_poly_homography(si->fij, cpoly->alg->f, cpoly->alg->degree, H);
+        mp_poly_homography(si->gij, cpoly->rat->f, cpoly->rat->degree, H);
 
         /* checks the value of J, updates floating-point fij(x) */
-        sieve_info_update (&si);
-        totJ += (double) si.J;
+        sieve_info_update (si);
+        totJ += (double) si->J;
 
 #ifdef TRACE_K
         if (trace_ab.a || trace_ab.b) {
-            if (!ABToIJ(&trace_ij.i, &trace_ij.j, trace_ab.a, trace_ab.b, &si)) {
+            if (!ABToIJ(&trace_ij.i, &trace_ij.j, trace_ab.a, trace_ab.b, si)) {
                 fprintf(stderr, "# Relation (%"PRId64",%"PRIu64") to be traced is outside of the current q-lattice\n", trace_ab.a, trace_ab.b);
                 trace_ij.i=0;
                 trace_ij.j=UINT_MAX;
                 trace_Nx.N=0;
                 trace_Nx.x=UINT_MAX;
             } else {
-                IJToNx(&trace_Nx.N, &trace_Nx.x, trace_ij.i, trace_ij.j, &si);
+                IJToNx(&trace_Nx.N, &trace_Nx.x, trace_ij.i, trace_ij.j, si);
             }
         } else if (trace_ij.i || trace_ij.j < UINT_MAX) {
-            IJToAB(&trace_ab.a, &trace_ab.b, trace_ij.i, trace_ij.j, &si);
-            IJToNx(&trace_Nx.N, &trace_Nx.x, trace_ij.i, trace_ij.j, &si);
+            IJToAB(&trace_ab.a, &trace_ab.b, trace_ij.i, trace_ij.j, si);
+            IJToNx(&trace_Nx.N, &trace_Nx.x, trace_ij.i, trace_ij.j, si);
         } else if (trace_Nx.N || trace_Nx.x < UINT_MAX) {
-            NxToIJ(&trace_ij.i, &trace_ij.j, trace_Nx.N, trace_Nx.x, &si);
-            IJToAB(&trace_ab.a, &trace_ab.b, trace_ij.i, trace_ij.j, &si);
+            NxToIJ(&trace_ij.i, &trace_ij.j, trace_Nx.N, trace_Nx.x, si);
+            IJToAB(&trace_ab.a, &trace_ab.b, trace_ij.i, trace_ij.j, si);
         }
-        if (trace_ij.j < UINT_MAX && trace_ij.j >= si.J) {
+        if (trace_ij.j < UINT_MAX && trace_ij.j >= si->J) {
             fprintf(stderr, "# Relation (%"PRId64",%"PRIu64") to be traced is outside of the current (i,j)-rectangle (j=%u)\n", trace_ab.a, trace_ab.b, trace_ij.j);
             trace_ij.i=0;
             trace_ij.j=UINT_MAX;
@@ -4278,7 +4235,7 @@ main (int argc0, char *argv0[])
             max_full = thread_buckets_max_full(thrs);
             if (max_full >= 1.0) {
                 fprintf(stderr, "maxfull=%f\n", max_full);
-                for (i = 0; i < si.nb_threads; ++i) {
+                for (i = 0; i < si->nb_threads; ++i) {
                     fprintf(stderr, "intend to free [%d] max_full=%f %f\n",
                             i,
                             buckets_max_full (thrs[i]->sides[0]->BA),
@@ -4286,10 +4243,10 @@ main (int argc0, char *argv0[])
                 }
                 thread_buckets_free(thrs); /* may crash. See below */
 
-                int old_bl = si.bucket_limit;
-                si.bucket_limit *= old_bl;
-                si.bucket_limit += si.bucket_limit / 10;
-                max_full *= (double) old_bl / si.bucket_limit;
+                int old_bl = si->bucket_limit;
+                si->bucket_limit *= old_bl;
+                si->bucket_limit += si->bucket_limit / 10;
+                max_full *= (double) old_bl / si->bucket_limit;
                 nroots++;   // ugly: redo the same class
                 // when doing one big malloc, there's some chance that the
                 // bucket overrun actually stepped over the next bucket. In
@@ -4316,15 +4273,15 @@ main (int argc0, char *argv0[])
             {
                 las_report rep;
                 las_report_init(rep);
-                for (int i = 0; i < si.nb_threads; ++i) {
+                for (int i = 0; i < si->nb_threads; ++i) {
                     las_report_accumulate(rep, thrs[i]->rep);
                 }
-                if (si.verbose) {
-                    fprintf (si.output, "# %lu survivors after rational sieve,", rep->survivors0);
-                    fprintf (si.output, " %lu survivors after algebraic sieve, ", rep->survivors1);
-                    fprintf (si.output, "coprime: %lu\n", rep->survivors2);
+                if (si->verbose) {
+                    fprintf (si->output, "# %lu survivors after rational sieve,", rep->survivors0);
+                    fprintf (si->output, " %lu survivors after algebraic sieve, ", rep->survivors1);
+                    fprintf (si->output, "coprime: %lu\n", rep->survivors2);
                 }
-                fprintf (si.output, "# %lu relation(s) for (%" PRIu64 ",%" PRIu64")\n", rep->reports, si.q, si.rho);
+                fprintf (si->output, "# %lu relation(s) for (%" PRIu64 ",%" PRIu64")\n", rep->reports, si->q, si->rho);
                 rep_bench += rep->reports;
                 las_report_accumulate(report, rep);
                 las_report_clear(rep);
@@ -4347,16 +4304,16 @@ main (int argc0, char *argv0[])
             q0 = newq0;
             nroots=0;
             t_bench = seconds() - t_bench;
-            fprintf(si.output,
+            fprintf(si->output,
               "# Stats for q=%" PRIu64 ": %d reports in %1.1f s\n",
               savq0, rep_bench, t0);
-            fprintf(si.output,
+            fprintf(si->output,
               "# Estimates for next %d q's: %d reports in %1.0f s, %1.2f s/r\n",
               nb_q, nb_q*rep_bench, t0*nb_q, t0/((double)rep_bench));
             bench_tot_time += t0*nb_q;
             bench_tot_rep += nb_q*rep_bench;
             rep_bench = 0;
-            fprintf(si.output, "# Cumulative (estimated): %lu reports in %1.0f s, %1.2f s/r\n",
+            fprintf(si->output, "# Cumulative (estimated): %lu reports in %1.0f s, %1.2f s/r\n",
                     bench_tot_rep, bench_tot_time,
 		    (double) bench_tot_time / (double) bench_tot_rep);
             t_bench = seconds();
@@ -4368,7 +4325,7 @@ main (int argc0, char *argv0[])
             const int BENCH2 = 50;
             if (rep_bench >= BENCH2) {
                 t_bench = seconds() - t_bench;
-                fprintf(si.output,
+                fprintf(si->output,
                   "# Got %d reports in %1.1f s using %d specialQ\n",
                   rep_bench, t_bench, nbq_bench);
                 double relperq = (double)rep_bench / (double)nbq_bench;
@@ -4377,12 +4334,12 @@ main (int argc0, char *argv0[])
                     q0 = uint64_nextprime (q0);
                     est_rep += relperq;
                 } while (est_rep <= BENCH2 / bench_percent);
-                fprintf(si.output,
+                fprintf(si->output,
                   "# Extrapolate to %ld reports up to q = %" PRIu64 "\n",
                   (long) est_rep, q0);
                 bench_tot_time += t_bench / bench_percent;
                 bench_tot_rep += BENCH2 / bench_percent;
-                fprintf(si.output,
+                fprintf(si->output,
                   "# Cumulative (estimated): %lu reports in %1.0f s, %1.2f s/r\n",
                   bench_tot_rep, bench_tot_time,
                   (double) bench_tot_time / (double) bench_tot_rep);
@@ -4399,42 +4356,42 @@ main (int argc0, char *argv0[])
  end:
     /* {{{ stats */
     t0 = seconds () - t0;
-    fprintf (si.output, "# Average J=%1.0f for %lu special-q's, max bucket fill %f\n",
+    fprintf (si->output, "# Average J=%1.0f for %lu special-q's, max bucket fill %f\n",
              totJ / (double) sq, sq, max_full);
     tts = t0;
     tts -= report->tn[0];
     tts -= report->tn[1];
     tts -= report->ttf;
-    if (si.verbose)
-      facul_print_stats (si.output);
-    if (si.verbose)
+    if (si->verbose)
+      facul_print_stats (si->output);
+    if (si->verbose)
     {
-        fprintf (si.output, "# Histogram of sieve report values that led to "
+        fprintf (si->output, "# Histogram of sieve report values that led to "
                 "relations:\n");
         for(int side = 0 ; side < 2 ; side++) {
-            fprintf (si.output, "# %s side: ", sidenames[side]);
+            fprintf (si->output, "# %s side: ", sidenames[side]);
             for (i = 0; i < 256; i++) {
                 unsigned long r = report->report_sizes[side][i];
                 if (r>0)
-                    fprintf (si.output, "%d:%lu ", i, r);
+                    fprintf (si->output, "%d:%lu ", i, r);
             }
-            fprintf (si.output, "\n");
+            fprintf (si->output, "\n");
         }
       }
-    if (si.nb_threads > 1) 
-        fprintf (si.output, "# Total wct time %1.1fs [precise timings available only for mono-thread]\n", t0);
+    if (si->nb_threads > 1) 
+        fprintf (si->output, "# Total wct time %1.1fs [precise timings available only for mono-thread]\n", t0);
     else
-        fprintf (si.output, "# Total time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
+        fprintf (si->output, "# Total time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
             " (%1.1f + %1.1f),"
              " factor %1.1f]\n", t0,
              report->tn[RATIONAL_SIDE],
              report->tn[ALGEBRAIC_SIDE],
              tts, report->ttsm, tts-report->ttsm, report->ttf);
-    fprintf (si.output, "# Total %lu reports [%1.3fs/r, %1.1fr/sq]\n",
+    fprintf (si->output, "# Total %lu reports [%1.3fs/r, %1.1fr/sq]\n",
              report->reports, t0 / (double) report->reports,
              (double) report->reports / (double) sq);
     if (bench || bench2) {
-        fprintf(si.output, "# Total (estimated): %lu reports in %1.1f s\n",
+        fprintf(si->output, "# Total (estimated): %lu reports in %1.1f s\n",
                 bench_tot_rep, bench_tot_time);
     }
     /* }}} */
@@ -4452,21 +4409,21 @@ main (int argc0, char *argv0[])
       }
     /* }}} */
 
-    sieve_info_clear_trialdiv(&si);
-    facul_clear_strategy (si.strategy);
-    si.strategy = NULL;
+    sieve_info_clear_trialdiv(si);
+    facul_clear_strategy (si->strategy);
+    si->strategy = NULL;
 
     thread_data_free(thrs);
 
-    free(si.sides[0]->fb);
-    free(si.sides[1]->fb);
-    sieve_info_clear (&si);
+    free(si->sides[0]->fb);
+    free(si->sides[1]->fb);
+    sieve_info_clear (si);
     cado_poly_clear (cpoly);
     free (roots);
     las_report_clear(report);
 
     if (outputname)
-        gzip_close (si.output, "");
+        gzip_close (si->output, "");
 
     param_list_clear(pl);
 
