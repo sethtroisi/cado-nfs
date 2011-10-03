@@ -12,6 +12,7 @@
 #include "bucket.h"
 #include "trialdiv.h"
 #include <pthread.h>
+#include "mpz_poly.h"
 
 #ifdef HAVE_SSE2
 #define SSE_NORM_INIT
@@ -251,10 +252,6 @@ void test_divisible_x (const fbprime_t p, const unsigned long x, const int n,
 int factor_leftover_norm (mpz_t n, unsigned int b, mpz_array_t* const factors,
 			  uint32_array_t* const multis,
 			  facul_strategy_t *strategy);
-NOPROFILE_STATIC void
-eval_fij (mpz_t v, const mpz_t *f, const unsigned int d, const long i,
-	  const unsigned long j);
-
 
 /************************** sieve info stuff *********************************/
 
@@ -3249,14 +3246,14 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
             for(int z = 0 ; pass && z < 2 ; z++) {
                 int side = RATIONAL_SIDE ^ z;   /* start with rational */
                 int rat = (side == RATIONAL_SIDE);
-                const mpz_t * f = (const mpz_t *) (rat ? cpoly->g : cpoly->f);
+                mpz_t * f = rat ? cpoly->g : cpoly->f;
                 int deg = rat ? cpoly->degreeg : cpoly->degree;
                 int lim = rat ? cpoly->rlim : cpoly->alim;
                 int lpb = rat ? cpoly->lpbr : cpoly->lpba;
                 int mfb = rat ? cpoly->mfbr : cpoly->mfba;
 
                 // Trial divide rational norm
-                eval_fij (norm[side], f, deg, a, b);
+                mp_poly_homogeneous_eval_siui (norm[side], f, deg, a, b);
                 if (si->ratq == (side == RATIONAL_SIDE))
                     mpz_divexact_ui (norm[side], norm[side], si->q);
 #ifdef TRACE_K
@@ -3480,9 +3477,9 @@ void test_divisible_x (const fbprime_t p, const unsigned long x,
 
   mpz_init (v);
   if (side == ALGEBRAIC_SIDE)
-    eval_fij (v, (const mpz_t *) si->fij, si->degree, i, j);
+    mp_poly_homogeneous_eval_siui (v, si->fij, si->degree, i, j);
   else if (side == RATIONAL_SIDE)
-    eval_fij (v, (const mpz_t *) si->gij, 1, i, j);
+    mp_poly_homogeneous_eval_siui (v, (mpz_t*) si->gij, 1, i, j);
   else
     abort();
   
@@ -3496,78 +3493,6 @@ void test_divisible_x (const fbprime_t p, const unsigned long x,
 
 
 /*********************** norm computation ************************************/
-
-/* {{{ Homographic transform on polynomials */
-/* Put in fij[] the coefficients of f'(i) = F(a0*i+a1, b0*i+b1).
-   Assumes the coefficients of fij[] are initialized.
-   Put in fijd[] a double-precision approximation of fij[]/q.
-*/
-static void
-fij_from_f (mpz_t *fij, const sieve_info_t *si, mpz_t *f, const int d)
-{
-  int k, l;
-  mpz_t *g; /* will contain the coefficients of (b0*i+b1)^l */
-  mpz_t f0;
-
-  for (k = 0; k <= d; k++)
-    mpz_set (fij[k], f[k]);
-
-  g = malloc ((d + 1) * sizeof (mpz_t));
-  for (k = 0; k <= d; k++)
-    mpz_init (g[k]);
-  mpz_init (f0);
-
-  /* Let h(x) = quo(f(x), x), then F(x,y) = H(x,y)*x + f0*y^d, thus
-     F(a0*i+a1, b0*i+b1) = H(a0*i+a1, b0*i+b1)*(a0*i+a1) + f0*(b0*i+b1)^d.
-     We use that formula recursively. */
-
-  mpz_set_ui (g[0], 1); /* g = 1 */
-
-  for (k = d - 1; k >= 0; k--)
-    {
-      /* invariant: we have already translated coefficients of degree > k,
-         in f[k+1..d], and g = (b0*i+b1)^(d - (k+1)), with coefficients in
-         g[0..d - (k+1)]:
-         f[k]   <- f[k] + a1*f[k+1]
-         ...
-         f[l] <- a0*f[l]+a1*f[l+1] for k < l < d
-         ...
-         f[d] <- a0*f[d] */
-      mpz_swap (f0, fij[k]); /* save the new constant coefficient */
-      mpz_mul_si (fij[k], fij[k + 1], si->a1);
-      for (l = k + 1; l < d; l++)
-        {
-          mpz_mul_si (fij[l], fij[l], si->a0);
-          mpz_addmul_si (fij[l], fij[l + 1], si->a1);
-        }
-      mpz_mul_si (fij[d], fij[d], si->a0);
-
-      /* now compute (b0*i+b1)^(d-k) from the previous (b0*i+b1)^(d-k-1):
-         g[d-k] = b0*g[d-k-1]
-         ...
-         g[l] = b1*g[l]+b0*g[l-1] for 0 < l < d-k
-         ...
-         g[0] = b1*g[0]
-      */
-      mpz_mul_si (g[d - k], g[d - k - 1], si->b0);
-      for (l = d - k - 1; l > 0; l--)
-        {
-          mpz_mul_si (g[l], g[l], si->b1);
-          mpz_addmul_si (g[l], g[l-1], si->b0);
-        }
-      mpz_mul_si (g[0], g[0], si->b1);
-
-      /* now g has degree d-k, and we add f0*g */
-      for (l = k; l <= d; l++)
-        mpz_addmul (fij[l], g[l - k], f0);
-    }
-
-  mpz_clear (f0);
-  for (k = 0; k <= d; k++)
-    mpz_clear (g[k]);
-  free (g);
-}
-/* }}} */
 
 /* return max |g(x)| for 0 <= x <= s,
    where g(x) = g[d]*x^d + ... + g[1]*x + g[0] */
@@ -3704,27 +3629,6 @@ get_maxnorm (cado_poly cpoly, sieve_info_t *si, uint64_t q0)
       tmp /= (double) q0;
   return log2(tmp);
 }
-
-/* v <- |f(i,j)|, where f is of degree d */
-NOPROFILE_STATIC void
-eval_fij (mpz_t v, const mpz_t *f, const unsigned int d, const long i,
-	  const unsigned long j)
-{
-  unsigned int k;
-  mpz_t jpow;
-
-  mpz_init_set_ui (jpow, 1);
-  mpz_set (v, f[d]);
-  for (k = d; k-- > 0;)
-    {
-      mpz_mul_si (v, v, i);
-      mpz_mul_ui (jpow, jpow, j);
-      mpz_addmul (v, f[k], jpow);
-    }
-  mpz_abs (v, v); /* avoids problems with negative norms */
-  mpz_clear (jpow);
-}
-
 
 /* check that the double x fits into an int32_t */
 #define fits_int32_t(x) \
@@ -4426,8 +4330,9 @@ main (int argc0, char *argv0[])
         sq ++;
 
         /* precompute the skewed polynomials of f(x) and g(x) */
-        fij_from_f (si.fij, &si, cpoly->f, cpoly->degree);
-        fij_from_f (si.gij, &si, cpoly->g, 1);
+        int32_t H[4] = { si.a0, si.b0, si.a1, si.b1 };
+        mp_poly_homography(si.fij, cpoly->f, cpoly->degree, H);
+        mp_poly_homography(si.gij, cpoly->g, 1, H);
 
         /* checks the value of J, updates floating-point fij(x) */
         sieve_info_update (&si);

@@ -8,22 +8,7 @@
 #include <time.h>
 #include <gmp.h>
 #include "utils.h"
-
-void norm(mpz_t *f, int deg, mpz_t r, long a, unsigned long b)
-{
-    int i;
-
-    mpz_t tmp;
-    mpz_init_set_ui(tmp, 1);
-    mpz_set(r, f[deg]);
-    for (i = deg - 1; i >= 0; i--) {
-        mpz_mul_si(r, r, a);
-        mpz_mul_ui(tmp, tmp, b);
-        mpz_addmul(r, tmp, f[i]);
-    }
-    mpz_abs(r, r);
-    mpz_clear(tmp);
-}
+#include "mpz_poly.h"
 
 int
 check_relation (relation_t *rel, cado_poly_ptr cpoly)
@@ -35,7 +20,7 @@ check_relation (relation_t *rel, cado_poly_ptr cpoly)
   mpz_init (acc);
 
   // algebraic side
-  norm (cpoly->f, cpoly->degree, no, rel->a, rel->b);
+  mp_poly_homogeneous_eval_siui(no, cpoly->f, cpoly->degree, rel->a, rel->b);
   mpz_set_ui (acc, 1);
   for (i = 0; i < rel->nb_ap; ++i)
     {
@@ -68,7 +53,7 @@ check_relation (relation_t *rel, cado_poly_ptr cpoly)
     }
 
     // rational side
-    norm(cpoly->g, 1, no, rel->a, rel->b);
+    mp_poly_homogeneous_eval_siui(no, cpoly->g, 1, rel->a, rel->b);
     mpz_set_ui(acc, 1);
     for(i = 0; i < rel->nb_rp; ++i) {
         int j;

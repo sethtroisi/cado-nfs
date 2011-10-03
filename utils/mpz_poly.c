@@ -1,4 +1,6 @@
+#include <stdlib.h>
 #include "mpz_poly.h"
+#include "gmp_aux.h"
 
 static void mp_poly_evalz(mpz_t r, mpz_t * poly, int deg, mpz_srcptr a)
 {
@@ -109,4 +111,93 @@ mp_poly_cmp (mpz_t *f, mpz_t *g, int d)
     if (mpz_cmp (f[i], g[i]))
       return 1; /* f and g differ */
   return 0;
+}
+
+/* v <- |f(i,j)|, where f is of degree d */
+void mp_poly_homogeneous_eval_siui (mpz_t v, mpz_t *f, const unsigned int d, const long i, const unsigned long j)
+{
+  unsigned int k;
+  mpz_t jpow;
+
+  mpz_init_set_ui (jpow, 1);
+  mpz_set (v, f[d]);
+  for (k = d; k-- > 0;)
+    {
+      mpz_mul_si (v, v, i);
+      mpz_mul_ui (jpow, jpow, j);
+      mpz_addmul (v, f[k], jpow);
+    }
+  mpz_abs (v, v); /* avoids problems with negative norms */
+  mpz_clear (jpow);
+}
+
+/*  Homographic transform on polynomials */
+/* Put in fij[] the coefficients of f'(i) = F(a0*i+a1, b0*i+b1).
+   Assumes the coefficients of fij[] are initialized.
+   Put in fijd[] a double-precision approximation of fij[]/q.
+*/
+void
+mp_poly_homography (mpz_t *fij, mpz_t *f, const int d, int32_t H[4])
+{
+  int k, l;
+  mpz_t *g; /* will contain the coefficients of (b0*i+b1)^l */
+  mpz_t f0;
+
+  for (k = 0; k <= d; k++)
+    mpz_set (fij[k], f[k]);
+
+  g = malloc ((d + 1) * sizeof (mpz_t));
+  for (k = 0; k <= d; k++)
+    mpz_init (g[k]);
+  mpz_init (f0);
+
+  /* Let h(x) = quo(f(x), x), then F(x,y) = H(x,y)*x + f0*y^d, thus
+     F(a0*i+a1, b0*i+b1) = H(a0*i+a1, b0*i+b1)*(a0*i+a1) + f0*(b0*i+b1)^d.
+     We use that formula recursively. */
+
+  mpz_set_ui (g[0], 1); /* g = 1 */
+
+  for (k = d - 1; k >= 0; k--)
+    {
+      /* invariant: we have already translated coefficients of degree > k,
+         in f[k+1..d], and g = (b0*i+b1)^(d - (k+1)), with coefficients in
+         g[0..d - (k+1)]:
+         f[k]   <- f[k] + a1*f[k+1]
+         ...
+         f[l] <- a0*f[l]+a1*f[l+1] for k < l < d
+         ...
+         f[d] <- a0*f[d] */
+      mpz_swap (f0, fij[k]); /* save the new constant coefficient */
+      mpz_mul_si (fij[k], fij[k + 1], H[2]);
+      for (l = k + 1; l < d; l++)
+        {
+          mpz_mul_si (fij[l], fij[l], H[0]);
+          mpz_addmul_si (fij[l], fij[l + 1], H[2]);
+        }
+      mpz_mul_si (fij[d], fij[d], H[0]);
+
+      /* now compute (b0*i+b1)^(d-k) from the previous (b0*i+b1)^(d-k-1):
+         g[d-k] = b0*g[d-k-1]
+         ...
+         g[l] = b1*g[l]+b0*g[l-1] for 0 < l < d-k
+         ...
+         g[0] = b1*g[0]
+      */
+      mpz_mul_si (g[d - k], g[d - k - 1], H[1]);
+      for (l = d - k - 1; l > 0; l--)
+        {
+          mpz_mul_si (g[l], g[l], H[3]);
+          mpz_addmul_si (g[l], g[l-1], H[1]);
+        }
+      mpz_mul_si (g[0], g[0], H[3]);
+
+      /* now g has degree d-k, and we add f0*g */
+      for (l = k; l <= d; l++)
+        mpz_addmul (fij[l], g[l - k], f0);
+    }
+
+  mpz_clear (f0);
+  for (k = 0; k <= d; k++)
+    mpz_clear (g[k]);
+  free (g);
 }
