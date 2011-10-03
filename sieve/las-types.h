@@ -74,4 +74,33 @@ struct sieve_info_s {
 
 typedef struct sieve_info_s sieve_info[1];
 
+/* FIXME: This does not seem to work well */
+#ifdef  __GNUC__
+#define TYPE_MAYBE_UNUSED     __attribute__((unused));
+#else
+#define TYPE_MAYBE_UNUSED       /**/
+#endif
+
+struct where_am_I_s {
+#ifdef TRACK_CODE_PATH
+    fbprime_t p;        /* current prime or prime power, when applicable */
+    int fb_idx;         /* index into the factor base si->sides[side]->fb
+                           or into th->sides[side]->fb_bucket */
+    unsigned int j;     /* row number in bucket */
+    unsigned int x;     /* value in bucket */
+    unsigned int N;     /* bucket number */
+    int side;
+    sieve_info_srcptr si;
+#endif  /* TRACK_CODE_PATH */
+} TYPE_MAYBE_UNUSED;
+typedef struct where_am_I_s where_am_I[1];
+typedef struct where_am_I_s * where_am_I_ptr TYPE_MAYBE_UNUSED;
+typedef const struct where_am_I_s *where_am_I_srcptr TYPE_MAYBE_UNUSED;
+
+#ifdef TRACK_CODE_PATH
+#define WHERE_AM_I_UPDATE(w, field, value) (w)->field = (value)
+#else
+#define WHERE_AM_I_UPDATE(w, field, value) /**/
+#endif
+
 #endif	/* LAS_TYPES_H_ */

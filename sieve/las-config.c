@@ -32,6 +32,9 @@ void las_display_config_flags(FILE * stream)
 #ifdef TRACE_K
     fprintf(stream, " TRACE_K");
 #endif
+#ifdef TRACK_CODE_PATH
+    fprintf(stream, " TRACK_CODE_PATH");
+#endif
 #ifdef SUPPORT_I17
     fprintf(stream, " SUPPORT_I17");
 #endif

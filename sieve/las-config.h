@@ -23,6 +23,42 @@
    make them show up on profiler output */
 //#define PROFILE
 
+/* (for debugging only) define TRACE_K, and exactly one of the TRACE_*
+ * values to something non-zero, in order to get tracing information on a
+ * particular relation.  In particular this traces the sieve array entry
+ * corresponding to the relation. Upon startup, the three values below
+ * are reconciled.
+ *
+ * (see also las-coordinates.c)
+ */
+#define xxxTRACE_K
+#define TRACE_AB { 5046103,17827 }
+// #define TRACE_IJ
+// #define TRACE_Nx
+
+/* Define CHECK_UNDERFLOW to check for underflow when subtracting
+   the rounded log(p) from sieve array locations */
+//#define CHECK_UNDERFLOW
+
+/* Define TRACK_CODE_PATH in order to have the where_am_I structures
+ * propagate info on the current situation of the data being handled.
+ * This more or less makes the variables global, in that every function
+ * can then access the totality of the variables. But it's for debug and
+ * inspection purposes only.
+ *
+ * Note that WANT_ASSERT_EXPENSIVE, a flag which exists in broader
+ * context, augments the scope of the tracking here by performing a
+ * divisibility test on each sieve update. This is obviously very
+ * expensive, but provides nice checking.
+ */
+#ifndef NDEBUG
+#define TRACK_CODE_PATH
+#endif
+#define xxxWANT_ASSERT_EXPENSIVE
+#if defined(TRACE_K) && !defined(TRACK_CODE_PATH)
+#define TRACK_CODE_PATH
+#endif
+
 /* Trick to discard lognorms that will probably lead to non L-smooth
    cofactors. Disabled for now since it requires accurate sieving
    (in particular by prime powers and bad primes). */

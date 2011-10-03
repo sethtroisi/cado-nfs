@@ -10,25 +10,6 @@
 extern "C" {
 #endif
 
-/* Define CHECK_UNDERFLOW to check for underflow when subtracting
-   the rounded log(p) from sieve array locations */
-//#define CHECK_UNDERFLOW
-
-
-/* define TRACE_K, and exactly one of the TRACE_* values to something
- * non-zero, in order to get tracing information on a particular
- * relation.  In particular this traces the sieve array entry
- * corresponding to the relation. Upon startup, the three values below
- * are reconciled.
- *
- * (see Coordinate systems further down in this file)
- */
-#define xxxTRACE_K
-#define TRACE_AB { 2587866,6337 }
-// #define TRACE_IJ
-// #define TRACE_Nx
-
-
 struct trace_Nx_t { unsigned int N; unsigned int x; };
 struct trace_ab_t { int64_t a; uint64_t b; };
 struct trace_ij_t { int i; unsigned int j; };
@@ -62,6 +43,29 @@ static inline int trace_on_spot_ij(int i, unsigned int j) {
 extern void test_divisible_x (const fbprime_t p, const unsigned long x, const int n,
 		       sieve_info_srcptr si, int side);
 extern void trace_update_conditions(sieve_info_srcptr si);
+
+#if defined(TRACK_CODE_PATH) && defined(WANT_ASSERT_EXPENSIVE)
+extern int test_divisible(where_am_I_ptr w);
+#else
+static inline int test_divisible(where_am_I_ptr w MAYBE_UNUSED) { return 1; }
+#endif
+
+#ifdef TRACE_K
+void sieve_decrease_logging(unsigned char *S, const unsigned char logp, where_am_I_ptr w);
+void sieve_decrease(unsigned char *S, const unsigned char logp, where_am_I_ptr w);
+#else   /* TRACE_K */
+#ifdef CHECK_UNDERFLOW
+void sieve_decrease_underflow_trap(unsigned char *S, const unsigned char logp, where_am_I_ptr w);
+#endif  /* CHECK_UNDERFLOW */
+static inline void sieve_decrease(unsigned char *S, const unsigned char logp, where_am_I_ptr w MAYBE_UNUSED)
+{
+#ifdef CHECK_UNDERFLOW
+    if (*S < logp)
+    sieve_decrease_underflow_trap(S, logp, w);
+#endif  /* CHECK_UNDERFLOW */
+    *S -= logp;
+}
+#endif  /* TRACE_K */
 
 #ifdef __cplusplus
 }
