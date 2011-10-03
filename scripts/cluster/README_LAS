@@ -1,4 +1,4 @@
-TO SIEVE ON A CLUSTER IN MODE BESTEFFORT
+TO SIEVE ON A CLUSTER WITH OAR SCHEDULER IN MODE BESTEFFORT
 
 $cdir : working directory on the cluster (contains $name.poly)
 $ldir : working directory on the local machine (contains $name.poly)
