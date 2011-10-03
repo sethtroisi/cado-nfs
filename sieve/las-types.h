@@ -28,11 +28,12 @@ typedef struct sieve_side_info_s sieve_side_info[1];
 
 // General information about the siever
 struct sieve_info_s {
-    cado_poly_ptr cpoly;
+    cado_poly cpoly;
 
     // general operational flags
     int nb_threads;
     FILE *output;
+    const char * outputname; /* keep track of whether it's gzipped or not */
     int verbose;
     int bench;
     int ratq;   // 0 means special q on alg side, otherwise on rat side

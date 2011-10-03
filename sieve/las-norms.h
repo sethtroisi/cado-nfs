@@ -2,7 +2,6 @@
 #define LAS_NORMS_H_
 
 #include <stdint.h>
-#include "cado_poly.h"
 #include "las-types.h"
 
 #ifdef __cplusplus
@@ -36,16 +35,13 @@ int
 init_alg_norms_bucket_region (unsigned char *alg_S, 
                               const unsigned char *rat_S, const int N, 
                               sieve_info_ptr si);
-/*  */
 
-/* XXX These will be removed. Also remove cado_poly.h above, then ! */
-void
-sieve_info_init_lognorm (unsigned char *C, unsigned char threshold,
-                         unsigned long B MAYBE_UNUSED,
-                         unsigned long l MAYBE_UNUSED,
-                         double scale MAYBE_UNUSED);
-double
-get_maxnorm (cado_poly cpoly, sieve_info_ptr si, uint64_t q0);
+/* This prepares the auxiliary data which is used by
+ * init_rat_norms_bucket_region and init_alg_norms_bucket_region
+ */
+void sieve_info_init_norm_data(sieve_info_ptr si, unsigned long q0);
+
+void sieve_info_clear_norm_data(sieve_info_ptr si);
 
 #ifdef __cplusplus
 }

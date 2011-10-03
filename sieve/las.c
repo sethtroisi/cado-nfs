@@ -85,150 +85,151 @@ static void sieve_info_clear_trialdiv(sieve_info_ptr si)
     }
 }
 
-/* Some of this will go to las-norms */
-static void
-sieve_info_init (sieve_info_ptr si, cado_poly cpoly, int logI, uint64_t q0,
-		 const int bucket_thresh, FILE *output, int nb_threads)
+static void sieve_info_init(sieve_info_ptr si, param_list pl)
 {
-  unsigned int d = cpoly->alg->degree;
-  unsigned int k;
-  double r, scale;
-  unsigned char alg_bound, rat_bound;
+    memset(si, 0, sizeof(sieve_info));
 
-  /* Don't zero out *si, since some parameters may have been set directly
-   * from the command line. */
-  si->nb_threads = nb_threads;
-  si->degree = d;
-  si->cpoly = cpoly;
-  si->fij = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
-  si->fijd = (double*) malloc ((d + 1) * sizeof (double));
-  for (k = 0; k <= d; k++)
-    mpz_init (si->fij[k]);
-  mpz_init (si->gij[0]);
-  mpz_init (si->gij[1]);
-  si->logI = logI;
-  si->I = 1 << si->logI;
-  si->J = 1 << (si->logI - 1);
-
-  sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
-  sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
-
-  /* initialize bounds for the norm computation, see lattice.tex */
-  si->B = sqrt (2.0 * (double) q0 / (cpoly->skew * sqrt (3.0)));
-  alg->logmax = get_maxnorm (cpoly, si, q0); /* log2(max norm) */
-
-  /* We want some margin, (see below), so that we can set 255 to discard
-   * non-survivors.*/
-  scale = alg->logmax + cpoly->alg->lambda * (double) cpoly->alg->lpb;
-
-  fprintf (output, "# Alg. side: log2(maxnorm)=%1.2f logbase=%1.6f",
-           scale, exp2 (scale / LOG_MAX));
-  // second guard, due to the 255 trick!
-  scale = (LOG_MAX - GUARD) / scale;
-  alg_bound = (unsigned char) (cpoly->alg->lambda * (double) cpoly->alg->lpb *  scale)
-            + GUARD;
-  fprintf (output, " bound=%u\n", alg_bound);
-  sieve_info_init_lognorm (alg->Bound, alg_bound, cpoly->alg->lim, cpoly->alg->lpb,
-                           scale);
-  alg->scale = scale;
-
-  /* similar bound on the rational size: |a| <= s*I*B and |b| <= I*B */
-  scale = fabs (mpz_get_d (cpoly->rat->f[1])) * cpoly->skew
-        + fabs (mpz_get_d (cpoly->rat->f[0]));
-  scale *= si->B * (double) si->I;
-  if (si->ratq)
-      scale /= (double) q0;
-  rat->logmax = scale = log2 (scale);
-  /* on the rational side, we want that the non-reports on the algebraic
-     side, which are set to 255, remain over the report bound R, even if
-     the rational norm is totally smooth. For this, we simply add R to the
-     maximal lognorm to compute the log base */
-  r = cpoly->rat->lambda * (double) cpoly->rat->lpb; /* base-2 logarithm of the
-                                                report bound */
-  fprintf (output, "# Rat. side: log2(maxnorm)=%1.2f ", scale);
-  fprintf (output, "logbase=%1.6f", exp2 (scale / LOG_MAX ));
-  /* we subtract again GUARD to avoid that non-reports overlap the report
-     region due to roundoff errors */
-  rat->scale = LOG_MAX / scale;
-  rat_bound = (unsigned char) (r * rat->scale) + GUARD;
-  fprintf (output, " bound=%u\n", rat_bound);
-  sieve_info_init_lognorm (rat->Bound, rat_bound, cpoly->rat->lim, cpoly->rat->lpb,
-                           rat->scale);
-
-  // bucket info
-  // TODO: be more clever, here.
-  si->bucket_thresh = si->I; /* Default value */
-  if (si->bucket_thresh < bucket_thresh)
-    si->bucket_thresh = bucket_thresh;
-  /* If LOG_BUCKET_REGION == si->logI, then one bucket (whose size is the
-   * L1 cache size) is actually one line. This changes some assumptions
-   * in sieve_small_bucket_region and resieve_small_bucket_region, where
-   * we want to differentiate on the parity on j.
-   */
-  ASSERT_ALWAYS(LOG_BUCKET_REGION >= si->logI);
-
-#ifndef SUPPORT_I16
-  if (si->logI >= 16) {
-      fprintf(stderr, "Error: -I 16 requires setting the SUPPORT_I16 flag at compile time\n");
-      abort();
-  }
-#endif
-
-  si->nb_buckets = 1 + (si->I * si->J - 1) / bucket_region;
-
-  double limit_factor = log(log(MAX(cpoly->rat->lim, cpoly->alg->lim))) - 
-                        log(log(si->bucket_thresh));
-  si->bucket_limit = limit_factor * bucket_region;
-  if (si->logI < LOG_BUCKET_REGION) {
-      /* If there's only one row per bucket, then on every other row
-       * we can be sure that 2 cannot divide gcd(i,j), thus the 0.75
-       * factor which accounts for the gcd is incorrect. OTOH, we can
-       * imagine saving some memory: the global allocated space is still
-       * correct, we merely have to accomodate the bucket sizes to be
-       * possibly different across buckets. The better fix for this would
-       * be to treat parity classes anyway.
-       */
-      si->bucket_limit *= BUCKET_LIMIT_FACTOR;
-  }
-  si->bucket_limit += BUCKET_LIMIT_ADD;
-  /* an experimental study on the bucket fill with respect to the number of
-     threads shows that each new thread increases by about 1.15% the fill */
-  si->bucket_limit += (si->bucket_limit * (nb_threads - 1)) / 87;
-  if (si->logI == 16) {
-      /* FIXME: This is very odd. I just don't understand. */
-      si->bucket_limit += si->bucket_limit / 20;
-  }
-#if LOG_BUCKET_REGION < 16
-  /* For debuggging purposes, we sometimes want to have very small
-   * buckets. However, these are also inherently unbalanced, so we have
-   * to compensate for this.
-   */
-  si->bucket_limit *= 2;
-#endif
-
-  /* Store largest prime factor of k in si->lpf[k], 0 for k=0, 1 for k=1 */
-  si->lpf = (unsigned int *) malloc (si->I * sizeof (unsigned int));
-  ASSERT_ALWAYS (si->lpf != NULL);
-  si->lpf[0] = 0U;
-  si->lpf[1] = 1U;
-  for (k = 2U; k < si->I; k++)
-    {
-      unsigned int p, c = k;
-      for (p = 2U; p * p <= c; p += 1U + p % 2U)
-        {
-          while (c % p == 0U)
-            c /= p;
-          if (c == 1U)
-            break;
-        }
-      si->lpf[k] = (c == 1U) ? p : c;
+    si->outputname = param_list_lookup_string(pl, "out");
+    /* Init output file */
+    si->output = stdout;
+    if (si->outputname) {
+	if (!(si->output = gzip_open(si->outputname, "w"))) {
+	    fprintf(stderr, "Could not open %s for writing\n", si->outputname);
+	    exit(EXIT_FAILURE);
+	}
     }
 
-  fprintf(output, "# bucket_region = %u\n", bucket_region);
-  fprintf(output, "# nb_buckets = %u\n", si->nb_buckets);
-  fprintf(output, "# bucket_limit = %u\n", si->bucket_limit);
-}
+    param_list_print_command_line(si->output, pl);
+    las_display_config_flags(si->output);
 
+    si->verbose = param_list_parse_knob(pl, "-v");
+    si->ratq = param_list_parse_knob(pl, "-ratq");
+    si->nb_threads = 1;		/* default value */
+    param_list_parse_int(pl, "mt", &si->nb_threads);
+    if (si->nb_threads <= 0) {
+	fprintf(stderr,
+		"Error, please provide a positive number of threads\n");
+	exit(EXIT_FAILURE);
+    }
+
+    cado_poly_init(si->cpoly);
+    const char *tmp;
+    if ((tmp = param_list_lookup_string(pl, "poly")) != NULL) {
+	param_list_read_file(pl, tmp);
+    }
+
+    if (!cado_poly_set_plist(si->cpoly, pl)) {
+	fprintf(stderr, "Error reading polynomial file\n");
+	exit(EXIT_FAILURE);
+    }
+
+    if (si->cpoly->skew <= 0.0) {
+	fprintf(stderr, "Error, please provide a positive skewness\n");
+	exit(EXIT_FAILURE);
+    }
+
+    param_list_parse_int(pl, "I", &si->logI);
+    si->I = 1 << si->logI;
+    si->J = 1 << (si->logI - 1);
+
+
+    fprintf(si->output,
+	    "# Sieving parameters: rlim=%lu alim=%lu lpbr=%d lpba=%d\n",
+	    si->cpoly->rat->lim, si->cpoly->alg->lim, si->cpoly->rat->lpb,
+	    si->cpoly->alg->lpb);
+    fprintf(si->output,
+	    "#                     mfbr=%d mfba=%d rlambda=%1.1f alambda=%1.1f\n",
+	    si->cpoly->rat->mfb, si->cpoly->alg->mfb, si->cpoly->rat->lambda,
+	    si->cpoly->alg->lambda);
+    fprintf(si->output, "#                     skewness=%1.1f\n",
+	    si->cpoly->skew);
+
+    si->bucket_thresh = si->I;	/* default value */
+    /* overrides default only if parameter is given */
+    param_list_parse_int(pl, "bkthresh", &(si->bucket_thresh));
+
+    /* Initialize the number of buckets */
+    /* XXX The logic used here has some acknowledges mishaps. Pending
+     * code updates replace the Mertens calculation by something much
+     * more accurate.
+     */
+
+
+    /* If LOG_BUCKET_REGION == si->logI, then one bucket (whose size is the
+     * L1 cache size) is actually one line. This changes some assumptions
+     * in sieve_small_bucket_region and resieve_small_bucket_region, where
+     * we want to differentiate on the parity on j.
+     */
+    ASSERT_ALWAYS(LOG_BUCKET_REGION >= si->logI);
+
+#ifndef SUPPORT_I16
+    if (si->logI >= 16) {
+	fprintf(stderr,
+		"Error: -I 16 requires setting the SUPPORT_I16 flag at compile time\n");
+	abort();
+    }
+#endif
+
+    si->nb_buckets = 1 + (si->I * si->J - 1) / bucket_region;
+
+    double limit_factor = log(log(MAX(si->cpoly->rat->lim, si->cpoly->alg->lim))) -
+	log(log(si->bucket_thresh));
+    si->bucket_limit = limit_factor * bucket_region;
+    if (si->logI < LOG_BUCKET_REGION) {
+	/* If there's only one row per bucket, then on every other row
+	 * we can be sure that 2 cannot divide gcd(i,j), thus the 0.75
+	 * factor which accounts for the gcd is incorrect. OTOH, we can
+	 * imagine saving some memory: the global allocated space is still
+	 * correct, we merely have to accomodate the bucket sizes to be
+	 * possibly different across buckets. The better fix for this would
+	 * be to treat parity classes anyway.
+	 */
+	si->bucket_limit *= BUCKET_LIMIT_FACTOR;
+    }
+    si->bucket_limit += BUCKET_LIMIT_ADD;
+    /* an experimental study on the bucket fill with respect to the number of
+       threads shows that each new thread increases by about 1.15% the fill */
+    si->bucket_limit += (si->bucket_limit * (si->nb_threads - 1)) / 87;
+    if (si->logI == 16) {
+	/* This is just a temporary measure. Getting rid of the Mertens
+	 * estimate above, and making things only slightly more accurate
+	 * cures the difficulties which lead to this quirk.
+	 */
+	si->bucket_limit += si->bucket_limit / 20;
+    }
+#if LOG_BUCKET_REGION < 16
+    /* For debuggging purposes, we sometimes want to have very small
+     * buckets. However, these are also inherently unbalanced, so we have
+     * to compensate for this.
+     */
+    si->bucket_limit *= 2;
+#endif
+
+    fprintf(si->output, "# bucket_region = %u\n", bucket_region);
+    fprintf(si->output, "# nb_buckets = %u\n", si->nb_buckets);
+    fprintf(si->output, "# bucket_limit = %u\n", si->bucket_limit);
+
+
+    /* This stuff is used only for unsieving pairs which are not coprime.
+     * Since this has never hit production, the whole thing (including this
+     * code) will eventually be stowed to some other file.
+     */
+    /* Store largest prime factor of k in si->lpf[k], 0 for k=0, 1 for k=1 */
+    si->lpf = (unsigned int *) malloc(si->I * sizeof(unsigned int));
+    ASSERT_ALWAYS(si->lpf != NULL);
+    si->lpf[0] = 0U;
+    si->lpf[1] = 1U;
+    for (unsigned int k = 2U; k < si->I; k++) {
+	unsigned int p, c = k;
+	for (p = 2U; p * p <= c; p += 1U + p % 2U) {
+	    while (c % p == 0U)
+		c /= p;
+	    if (c == 1U)
+		break;
+	}
+	si->lpf[k] = (c == 1U) ? p : c;
+    }
+}
 
 /* Finds prime factors p < lim of n and returns a pointer to a zero-terminated
    list of those factors. Repeated factors are stored only once. */
@@ -280,16 +281,11 @@ sieve_info_update (sieve_info_ptr si)
 static void
 sieve_info_clear (sieve_info_ptr si)
 {
-  unsigned int d = si->degree;
-  unsigned int k;
-
-  for (k = 0; k <= d; k++)
-    mpz_clear (si->fij[k]);
-  free (si->fij);
-  mpz_clear (si->gij[0]);
-  mpz_clear (si->gij[1]);
-  free (si->fijd);
   free (si->lpf);
+
+  if (si->outputname)
+      gzip_close(si->output, "");
+  cado_poly_clear(si->cpoly);
 }
 
 /*****************************************************************************/
@@ -3240,8 +3236,6 @@ main (int argc0, char *argv0[])
 {
     sieve_info si;
     const char *fbfilename = NULL;
-    const char *polyfilename = NULL;
-    cado_poly cpoly;
     double t0, tfb, tts;
     uint64_t q0 = 0, q1 = 0, rho = 0;
     uint64_t *roots;
@@ -3249,15 +3243,13 @@ main (int argc0, char *argv0[])
     int td_thresh = 1024; /* cost threshold trialdiv/resieving */
     int bucket_thresh = 0;
     int rpow_lim = 0, apow_lim = 0;
-    int I = DEFAULT_I, i;
+    int i;
     unsigned long sq = 0;
     double totJ = 0.0;
     /* following command-line values override those in the polynomial file */
-    const char *outputname = NULL;
     int argc = argc0;
     char **argv = argv0;
     double max_full = 0.;
-    int nb_threads = 1;
     int bench = 0;
     int bench2 = 0;
     double skip_factor = 1.01;  /* next_q = q*skip_factor in bench mode */
@@ -3269,11 +3261,13 @@ main (int argc0, char *argv0[])
 
     param_list pl;
     param_list_init(pl);
-    cado_poly_init (cpoly);
+
     param_list_configure_knob(pl, "-v", &si->verbose);
     param_list_configure_knob(pl, "-ratq", &si->ratq);
     param_list_configure_knob(pl, "-bench", &bench);
     param_list_configure_knob(pl, "-bench2", &bench2);
+    param_list_configure_alias(pl, "skew", "S");
+
     argv++, argc--;
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
@@ -3289,55 +3283,25 @@ main (int argc0, char *argv0[])
         usage(argv0[0],NULL);
     }
 
-    polyfilename = param_list_lookup_string(pl, "poly");
-    if (polyfilename) param_list_read_file(pl, polyfilename);
     fbfilename = param_list_lookup_string(pl, "fb");
 
-    if (!cado_poly_set_plist (cpoly, pl)) {
-        fprintf (stderr, "Error reading polynomial file\n");
-        exit (EXIT_FAILURE);
-    }
-
-    param_list_parse_int(pl, "mt", &nb_threads);
-    param_list_parse_int(pl, "I", &I);
     param_list_parse_uint64(pl, "q0", &q0);
     param_list_parse_uint64(pl, "q1", &q1);
     param_list_parse_uint64(pl, "rho", &rho);
+
     param_list_parse_int(pl, "tdthresh", &td_thresh);
     param_list_parse_int(pl, "bkthresh", &bucket_thresh);
     param_list_parse_int(pl, "rpowlim", &rpow_lim);
     param_list_parse_int(pl, "apowlim", &apow_lim);
-    param_list_parse_double(pl, "S", &cpoly->skew);
+
+    // these are parsed in sieve_info_init (why them, and not the above ?)
+    // param_list_parse_int(pl, "mt", &nb_threads);
+    // param_list_parse_int(pl, "I", &I);
+
     param_list_parse_double(pl, "skfact", &skip_factor);
     param_list_parse_double(pl, "percent", &bench_percent);
-    int ok = 1;
-    ok = ok && param_list_parse_ulong(pl, "rlim", &cpoly->rat->lim);
-    ok = ok && param_list_parse_ulong(pl, "alim", &cpoly->alg->lim);
-    ok = ok && param_list_parse_int(pl, "lpbr", &cpoly->rat->lpb);
-    ok = ok && param_list_parse_int(pl, "lpba", &cpoly->alg->lpb);
-    ok = ok && param_list_parse_int(pl, "mfbr", &cpoly->rat->mfb);
-    ok = ok && param_list_parse_int(pl, "mfba", &cpoly->alg->mfb);
-    ok = ok && param_list_parse_double(pl, "rlambda", &cpoly->rat->lambda);
-    ok = ok && param_list_parse_double(pl, "alambda", &cpoly->alg->lambda);
 
-    if (!ok) {
-        fprintf(stderr, "Some parameters are missing among *lim lpb* mfb* *lambda\n");
-        usage(argv0[0],NULL);
-    }
-
-    outputname = param_list_lookup_string(pl, "out");
-    /* Init output file */
-    si->output = stdout;
-    if (outputname) {
-        if (!(si->output = gzip_open (outputname, "w"))) {
-            fprintf (stderr, "Could not open %s for writing\n", outputname);
-            exit (EXIT_FAILURE);
-        }
-    }
-
-    param_list_print_command_line(si->output, pl);
-    las_display_config_flags(si->output);
-
+    /* {{{ perform some basic checking */
     if (fbfilename == NULL) usage(argv0[0], "fb");
     if (q0 == 0) usage(argv0[0], "q0");
 
@@ -3358,31 +3322,15 @@ main (int argc0, char *argv0[])
         fprintf (stderr, "Error, q1=%" PRIu64 " exceeds ULONG_MAX\n", q1);
         exit (EXIT_FAILURE);
       }
-
-    fprintf (si->output, "# Sieving parameters: rat->lim=%lu alg->lim=%lu rat->lpb=%d alg->lpb=%d\n",
-             cpoly->rat->lim, cpoly->alg->lim, cpoly->rat->lpb, cpoly->alg->lpb);
-    fprintf (si->output, "#                     rat->mfb=%d alg->mfb=%d rat->lambda=%1.1f alg->lambda=%1.1f\n",
-             cpoly->rat->mfb, cpoly->alg->mfb, cpoly->rat->lambda, cpoly->alg->lambda);
-    fprintf (si->output, "#                     skewness=%1.1f\n",
-             cpoly->skew);
-
-    if (cpoly->skew <= 0.0)
-      {
-        fprintf (stderr, "Error, please provide a positive skewness\n");
-        exit (EXIT_FAILURE);
-      }
-
-    /* check that nb_threads (-mt nnn) is positive */
-    if (nb_threads <= 0)
-      {
-        fprintf (stderr, "Error, please provide a positive number of threads\n");
-        exit (EXIT_FAILURE);
-      }
-
-    si->bench=bench + bench2;
+    /* }}} */
 
     /* this does not depend on the special-q */
-    sieve_info_init (si, cpoly, I, q0, bucket_thresh, si->output, nb_threads);
+    sieve_info_init(si, pl);    /* side effects: prints cmdline and flags */
+
+    /* While obviously, this one does (but only mildly) */
+    sieve_info_init_norm_data(si, q0);
+
+    si->bench=bench + bench2;
 
     sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
     sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
@@ -3391,7 +3339,7 @@ main (int argc0, char *argv0[])
     {
       fbprime_t *leading_div;
       tfb = seconds ();
-      leading_div = factor_small (cpoly->alg->f[cpoly->alg->degree], cpoly->alg->lim);
+      leading_div = factor_small (si->cpoly->alg->f[si->cpoly->alg->degree], si->cpoly->alg->lim);
       alg->fb = fb_read_addproj (fbfilename, alg->scale * LOG_SCALE, 0,
 				leading_div);
       ASSERT_ALWAYS(alg->fb != NULL);
@@ -3410,7 +3358,7 @@ main (int argc0, char *argv0[])
             rpow_lim = si->bucket_thresh - 1;
             printf ("# rpowthresh reduced to %d\n", rpow_lim);
           }
-        rat->fb = fb_make_linear ((const mpz_t *) cpoly->rat->f, (fbprime_t) cpoly->rat->lim,
+        rat->fb = fb_make_linear ((const mpz_t *) si->cpoly->rat->f, (fbprime_t) si->cpoly->rat->lim,
                                  rpow_lim, rat->scale * LOG_SCALE, 
                                  si->verbose, 1, si->output);
         tfb = seconds () - tfb;
@@ -3424,14 +3372,14 @@ main (int argc0, char *argv0[])
     init_norms (si);
 
     sieve_info_init_trialdiv(si, td_thresh); /* Init refactoring stuff */
-    si->strategy = facul_make_strategy (15, MIN(cpoly->rat->lim, cpoly->alg->lim),
-                                       1UL << MIN(cpoly->rat->lpb, cpoly->alg->lpb));
+    si->strategy = facul_make_strategy (15, MIN(si->cpoly->rat->lim, si->cpoly->alg->lim),
+                                       1UL << MIN(si->cpoly->rat->lpb, si->cpoly->alg->lpb));
 
     las_report report;
     las_report_init(report);
 
     /* special q (and root rho) */
-    roots = (uint64_t *) malloc (cpoly->alg->degree * sizeof (uint64_t));
+    roots = (uint64_t *) malloc (si->cpoly->alg->degree * sizeof (uint64_t));
     q0 --; /* so that nextprime gives q0 if q0 is prime */
     nroots = 0;
 
@@ -3449,9 +3397,9 @@ main (int argc0, char *argv0[])
               goto end;  // breaks two whiles.
             si->q = q0;
             if (si->ratq)
-                nroots = poly_roots_uint64 (roots, cpoly->rat->f, 1, q0);
+                nroots = poly_roots_uint64 (roots, si->cpoly->rat->f, 1, q0);
             else
-                nroots = poly_roots_uint64 (roots, cpoly->alg->f, cpoly->alg->degree, q0);
+                nroots = poly_roots_uint64 (roots, si->cpoly->alg->f, si->cpoly->alg->degree, q0);
             if (nroots > 0)
               {
                 fprintf (si->output, "### q=%" PRIu64 ": root%s", q0,
@@ -3467,7 +3415,7 @@ main (int argc0, char *argv0[])
         si->rho = roots[--nroots];
         if (rho != 0 && si->rho != rho) /* if -rho, wait for wanted root */
           continue;
-        if (SkewGauss (si, cpoly->skew) != 0)
+        if (SkewGauss (si, si->cpoly->skew) != 0)
 	  continue;
         /* FIXME: maybe we can discard some special q's if a1/a0 is too large,
            see http://www.mersenneforum.org/showthread.php?p=130478 */
@@ -3479,8 +3427,8 @@ main (int argc0, char *argv0[])
 
         /* precompute the skewed polynomials of f(x) and g(x) */
         int32_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
-        mp_poly_homography(si->fij, cpoly->alg->f, cpoly->alg->degree, H);
-        mp_poly_homography(si->gij, cpoly->rat->f, cpoly->rat->degree, H);
+        mp_poly_homography(si->fij, si->cpoly->alg->f, si->cpoly->alg->degree, H);
+        mp_poly_homography(si->gij, si->cpoly->rat->f, si->cpoly->rat->degree, H);
 
         /* checks the value of J, updates floating-point fij(x) */
         sieve_info_update (si);
@@ -3674,6 +3622,8 @@ main (int argc0, char *argv0[])
     /* }}} */
 
     sieve_info_clear_trialdiv(si);
+    sieve_info_clear_norm_data(si);
+
     facul_clear_strategy (si->strategy);
     si->strategy = NULL;
 
@@ -3681,13 +3631,10 @@ main (int argc0, char *argv0[])
 
     free(si->sides[0]->fb);
     free(si->sides[1]->fb);
-    sieve_info_clear (si);
-    cado_poly_clear (cpoly);
     free (roots);
     las_report_clear(report);
 
-    if (outputname)
-        gzip_close (si->output, "");
+    sieve_info_clear (si);
 
     param_list_clear(pl);
 
