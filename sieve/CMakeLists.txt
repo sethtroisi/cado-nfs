@@ -29,7 +29,7 @@ target_link_libraries (makefb utils m)
 
 add_executable (las las.c fb.c trialdiv.c
     las-coordinates.c las-debug.c las-report-stats.c
-    las-config.c
+    las-config.c las-norms.c
     )
 target_link_libraries (las facul utils m ${pthread_libs})
 

@@ -285,6 +285,8 @@ sieve/las-debug.h
 sieve/las-debug.c
 sieve/las-report-stats.h
 sieve/las-report-stats.c
+sieve/las-norms.h
+sieve/las-norms.c
 sieve/makefb.c
 sieve/trialdiv.c
 sieve/trialdiv.h
