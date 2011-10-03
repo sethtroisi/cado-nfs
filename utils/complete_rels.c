@@ -11,25 +11,6 @@
 #include "utils.h"
 #include "mpz_poly.h"
 
-/* This is still strongly bound to the fact that the rational side is [0]
- * and the algebraic side is [1]
- */
-
-void
-add_prime (relation_t *rel, int side, unsigned long p)
-{
-    int prov[2] = {
-        [RATIONAL_SIDE] = rel->nb_rp,
-        [ALGEBRAIC_SIDE] = rel->nb_ap, };
-    prov[side]++;
-    relation_provision_for_primes(rel, prov[0], prov[1]);
-    if (side == RATIONAL_SIDE) {
-        rel->rp[rel->nb_rp++] = (rat_prime_t) { .p=p, .e=1 };
-    } else {
-        rel->ap[rel->nb_ap++] = (alg_prime_t) { .p=p, .e=1 };
-    }
-}
-
 int
 complete_relation (relation_t *rel, cado_poly_ptr cpoly)
 {
@@ -59,7 +40,7 @@ complete_relation (relation_t *rel, cado_poly_ptr cpoly)
       for (unsigned long p = 2; mpz_cmp_ui (no, 1) != 0; p = getprime(p)) {
           while (mpz_divisible_ui_p (no, p))
           {
-              add_prime (rel, side, p);
+              relation_add_prime (rel, side, p);
               mpz_divexact_ui (no, no, p);
           }
       }
@@ -91,7 +72,7 @@ int complete_relation_files(char ** files, cado_poly_ptr cpoly)
         for( ; relation_stream_get(rs, line, 0) >= 0 ; ) {
             unsigned long l = rs->lnum - l0;
             if (complete_relation(&rs->rel, cpoly)) {
-                fprint_relation (stdout, rs->rel);
+                fprint_relation (stdout, &rs->rel);
                 ok++;
                 continue;
             }

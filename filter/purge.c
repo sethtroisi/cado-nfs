@@ -696,7 +696,7 @@ reread (const char *oname, char ** ficname,
                   W += (double) fprint_rel_row (ofile, irel, rs->rel, H);
               }
               else
-                  fprint_relation_raw (ofile, rs->rel);
+                  fprint_relation_raw (ofile, &rs->rel);
               nr++;
               if (nr >= nrows)
                   ret = 0; /* we are done */

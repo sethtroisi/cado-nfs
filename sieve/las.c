@@ -2229,6 +2229,24 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc, where_am_I_
             ASSERT (bin_gcd_safe (a, b) == 1);
 #endif
 
+            relation_t rel[1];
+            memset(rel, 0, sizeof(rel));
+            rel->a = a;
+            rel->b = b; 
+            for (int side = 0; side < 2; side++) {
+                for(int i = 0 ; i < factors[side].n ; i++)
+                    relation_add_prime(rel, side, factors[side].fac[i]);
+                for (unsigned int i = 0; i < f[side]->length; ++i) {
+                    if (!mpz_fits_ulong_p(f[side]->data[i]))
+                        fprintf(stderr, "Warning: misprinted relation because of large prime at (%"PRId64",%"PRIu64")\n",a,b);
+                    for (unsigned int j = 0; j < m[side]->data[i]; j++) {
+                        relation_add_prime(rel, side, mpz_get_ui(f[side]->data[i]));
+                    }
+                }
+            }
+            relation_compress_rat_primes(rel);
+            relation_compress_alg_primes(rel);
+
 #ifdef TRACE_K
             if (trace_on_spot_ab(a, b)) {
                 fprintf(stderr, "# Relation for (%"PRId64",%"PRIu64") printed\n", a, b);
@@ -2236,6 +2254,15 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc, where_am_I_
 #endif
             if (!si->bench) {
                 pthread_mutex_lock(&io_mutex);
+#if 0
+                fprint_relation(si->output, rel);
+#else
+                /* This code will be dropped soon. The thing is
+                 * that las is a moving target for the moment, and
+                 * going through the fprint_relation code above changes
+                 * the order of factors in printed relations. It's not so
+                 * handy.
+                 */
                 fprintf (si->output, "%" PRId64 ",%" PRIu64, a, b);
                 for(int z = 0 ; z < 2 ; z++) {
                     int side = RATIONAL_SIDE ^ z;
@@ -2254,8 +2281,10 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc, where_am_I_
                 }
                 fprintf (si->output, "\n");
                 fflush (si->output);
+#endif
                 pthread_mutex_unlock(&io_mutex);
             }
+            clear_relation(rel);
             cpt++;
             /* Build histogram of lucky S[x] values */
             for(int side = 0 ; side < 2 ; side++)
