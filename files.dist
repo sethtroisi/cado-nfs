@@ -276,6 +276,7 @@ sieve/fb.c
 sieve/fb.h
 sieve/freerel.c
 sieve/las.c
+sieve/las-config.h
 sieve/makefb.c
 sieve/trialdiv.c
 sieve/trialdiv.h
