@@ -18,7 +18,7 @@ struct sieve_side_info_s {
     unsigned char Bound[256]; /* zero for good lognorms, 127 otherwise */
     fbprime_t *trialdiv_primes;
     trialdiv_divisor_t *trialdiv_data;
-    unsigned char S[1 << NORM_BITS];
+    unsigned char lognorm_table[1 << NORM_BITS];
     factorbase_degn_t * fb;
 
     /* These fields are used for the norm initialization essentially.
@@ -26,6 +26,9 @@ struct sieve_side_info_s {
      * determines the logp contributions for factor base primes */
     double scale;      /* norm scale used on the algebraic side */
     double logmax;     /* norms on the alg-> side are < 2^alg->logmax */
+
+    mpz_t *fij;       /* coefficients of F(a0*i+a1*j, b0*i+b1*j)  */
+    double *fijd;     /* coefficients of F_q (divided by q on the special q side) */
 };
 
 typedef struct sieve_side_info_s * sieve_side_info_ptr;
@@ -66,9 +69,6 @@ struct sieve_info_s {
 
     facul_strategy_t *strategy;
 
-    // these are meant to go away.
-    mpz_t *fij, gij[2];    /* coefficients of F,G(a0*i+a1*j, b0*i+b1*j)  */
-    double *fijd;     /* coefficients of F_q/q */
     unsigned int degree;
 };
 

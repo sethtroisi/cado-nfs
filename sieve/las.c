@@ -61,7 +61,6 @@ int factor_leftover_norm (mpz_t n, unsigned int b, mpz_array_t* const factors,
 			  uint32_array_t* const multis,
 			  facul_strategy_t *strategy);
 
-
 static void sieve_info_init_trialdiv(sieve_info_ptr si, int td_thresh)
 {
     /* Our trial division needs odd divisors, 2 is handled by mpz_even_p().
@@ -243,9 +242,6 @@ factor_small (mpz_t n, fbprime_t lim)
 static void
 sieve_info_update (sieve_info_ptr si)
 {
-  unsigned int k;
-  double invq;
-  
   if (si->verbose)
     fprintf (si->output, "# I=%u; J=%u\n", si->I, si->J);
 
@@ -253,13 +249,8 @@ sieve_info_update (sieve_info_ptr si)
   
   si->nb_buckets = 1 + (si->I * si->J - 1) / bucket_region;
   
-  /* Update floating point version of algebraic poly */
-  if (!si->ratq)
-      invq = 1.0 / (double) si->q;
-  else 
-      invq = 1.0;
-  for (k = 0; k <= si->degree; k++)
-    si->fijd[k] = mpz_get_d (si->fij[k]) * invq;
+  /* essentially update the fij polynomials */
+  sieve_info_update_norm_data(si);
 }
 
 static void
@@ -2372,12 +2363,9 @@ void test_divisible_x (const fbprime_t p, const unsigned long x,
   mpz_t v;
 
   mpz_init (v);
-  if (side == ALGEBRAIC_SIDE)
-    mp_poly_homogeneous_eval_siui (v, si->fij, si->degree, i, j);
-  else if (side == RATIONAL_SIDE)
-    mp_poly_homogeneous_eval_siui (v, (mpz_t*) si->gij, 1, i, j);
-  else
-    abort();
+
+  mp_poly_homogeneous_eval_siui(v,
+          si->sides[side]->fij, si->cpoly->pols[side]->degree, i, j);
   
   if (!mpz_divisible_ui_p (v, (unsigned long) p))
    gmp_fprintf (stderr, "# test_divisible_x (" FBPRIME_FORMAT 
@@ -2948,12 +2936,9 @@ main (int argc0, char *argv0[])
                  si->q, si->rho, si->a0, si->b0, si->a1, si->b1);
         sq ++;
 
-        /* precompute the skewed polynomials of f(x) and g(x) */
-        int32_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
-        mp_poly_homography(si->fij, si->cpoly->alg->f, si->cpoly->alg->degree, H);
-        mp_poly_homography(si->gij, si->cpoly->rat->f, si->cpoly->rat->degree, H);
-
-        /* checks the value of J, updates floating-point fij(x) */
+        /* checks the value of J,
+         * precompute the skewed polynomials of f(x) and g(x), and also
+         * their floating-point versions */
         sieve_info_update (si);
         totJ += (double) si->J;
 
