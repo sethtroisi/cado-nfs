@@ -291,6 +291,8 @@ sieve/las-unsieve.h
 sieve/las-unsieve.c
 sieve/las-arith.h
 sieve/las-arith.c
+sieve/las-qlattice.h
+sieve/las-qlattice.c
 sieve/makefb.c
 sieve/trialdiv.c
 sieve/trialdiv.h
