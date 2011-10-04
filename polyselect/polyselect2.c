@@ -19,6 +19,7 @@
 
 // #define DEBUG
 #define NEW_ROOTSIEVE
+/* if MAX_THREADS is not defined, multi-threads are not enabled */
 #define MAX_THREADS 16
 
 #define MAXQ 256
@@ -68,7 +69,9 @@ cado_poly best_poly, curr_poly;
 double best_E = 0.0; /* Murphy's E (the larger the better) */
 
 /* read-write global variables */
+#ifdef MAX_THREADS
 pthread_mutex_t lock; /* used as mutual exclusion lock for those variables */
+#endif
 int tot_found = 0; /* total number of polynomials */
 int found = 0; /* number of polynomials below maxnorm */
 double potential_collisions = 0.0, aver_lognorm = 0.0;
@@ -307,12 +310,16 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     best_logmu[i] = best_logmu[i-1];
   best_logmu[i] = logmu;
 
+#ifdef MAX_THREADS
   pthread_mutex_lock (&lock);
+#endif
   collisions ++;
   collisionsQ[q] ++;
   aver_lognorm += logmu;
   tot_found ++;
+#ifdef MAX_THREADS
   pthread_mutex_unlock (&lock);
+#endif
 
   /* rootsieve */
   if (logmu <= max_norm)
@@ -358,7 +365,9 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       curr_poly->skew = skew;
       E =  MurphyE (curr_poly, BOUND_F, BOUND_G, AREA, MURPHY_K);
 
+#ifdef MAX_THREADS
       pthread_mutex_lock (&lock);
+#endif
       if (E > best_E)
 	{
 	  best_E = E;
@@ -381,7 +390,9 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 	  fclose (fp);
 	}
       found ++;
+#ifdef MAX_THREADS
       pthread_mutex_unlock (&lock);
+#endif
 
       if (verbose >= 0)
 	{
@@ -802,9 +813,13 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
 	} /* loop over roots mod q */
     } /* loop over q */
 
+#ifdef MAX_THREADS
   pthread_mutex_lock (&lock);
+#endif
   potential_collisions += pc1 +  pc2;
+#ifdef MAX_THREADS
   pthread_mutex_unlock (&lock);
+#endif
 
   for (i = 0; i <= d; i++)
     mpz_clear (f[i]);
