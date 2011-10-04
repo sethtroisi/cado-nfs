@@ -8,7 +8,7 @@ COPYING
 Makefile
 README
 AUTHORS
-NEWS_1.1
+NEWS
 cado.h
 cadofactor.pl
 cadofct.pm
