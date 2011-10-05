@@ -11,9 +11,8 @@ set (sources
 # the utils library is used by some shared objects (prominently the
 # matmul shared libs in bwc), and therefore must be shared.
 add_library (utils SHARED ${sources})
-target_link_libraries(utils gmp m)
+target_link_libraries(utils gmp m ${pthread_libs})
 install(TARGETS utils DESTINATION lib/${package_basename})
-
 
 add_executable(check_rels check_rels.c)
 target_link_libraries(check_rels utils)
