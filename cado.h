@@ -41,7 +41,21 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #undef __STRICT_ANSI__
 #endif
 
-#if !(defined(__OpenBSD__) || defined(__FreeBSD__))
+/* OpenBSD and FreeBSD expose *all* functions by default, and feature
+ * macros are (apparently) used the other way around to restrict the
+ * exposed interfaces.
+ * FIXME: It's not entirely clear. Maybe it has been so in some version,
+ * but it could also well be that I wholly misunderstood the thing.
+ * OpenBSD 4.9 appears at least to grok _BSD_SOURCE as I expect (i.e.
+ * _do_ expose BSD prototypes as an _addition_ to the rest).
+ */
+#ifdef __OpenBSD__
+#define _BSD_SOURCE
+#elif defined(__FreeBSD__)
+/* XXX should check whether my former fear mentioned about turns out to
+ * be true.
+ */
+#else
 #define _POSIX_C_SOURCE 200112L /* strtoumax */
 /* POSIX: popen/pclose with -std=c99, -pedantic or -ansi (requires
  * _POSIX_C_SOURCE==2 ?) fileno */
@@ -51,12 +65,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #ifndef __cplusplus
 #define _GNU_SOURCE         /* asprintf vasprintf */
 #endif
-#define _DARWIN_C_SOURCE    /* asprintf ; getpagesize ; _ANSI_SOURCE must be undefined */
-#else
-/* OpenBSD and FreeBSD expose *all* functions by default, and feature
- * macros are (apparently) used the other way around to restrict the
- * exposed interfaces.
- */
+#define _DARWIN_C_SOURCE    /* asprintf ; _ANSI_SOURCE must be undefined */
 #endif
 
 #ifdef __cplusplus

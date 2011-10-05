@@ -1,4 +1,3 @@
-#define _POSIX_C_SOURCE 200112L
 #include "cado.h"       /* feature macros, no includes */
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -78,14 +77,14 @@ void free_aligned(void * p, size_t size MAYBE_UNUSED, size_t alignment MAYBE_UNU
 
 void *malloc_pagealigned(size_t sz)
 {
-    void *p = malloc_aligned(sz, getpagesize());
+    void *p = malloc_aligned(sz, sysconf(_SC_PAGESIZE));
     ASSERT_ALWAYS(p != NULL);
     return p;
 }
 
 void free_pagealigned(void * p, size_t sz)
 {
-    free_aligned(p, sz, getpagesize());
+    free_aligned(p, sz, sysconf(_SC_PAGESIZE));
 }
 
 int has_suffix(const char * path, const char * sfx)
