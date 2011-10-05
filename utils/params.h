@@ -22,7 +22,7 @@ typedef struct parameter_s * parameter_ptr;
 typedef struct parameter_s const * parameter_srcptr;
 
 struct param_list_alias_s {
-    const char * alias;
+    char * alias;
     const char * key;
 };
 

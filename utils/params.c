@@ -1,3 +1,5 @@
+#define _BSD_SOURCE     /* strdup */
+
 #include "cado.h"
 #include <stdlib.h>
 #include <string.h>
@@ -32,6 +34,9 @@ void param_list_clear(param_list pl)
         free(pl->p[i]->value);
     }
     free(pl->p);
+    for(int i = 0 ; i < pl->naliases ; i++) {
+        if (pl->aliases[i]->alias) free(pl->aliases[i]->alias);
+    }
     free(pl->aliases);
     for(int i = 0 ; i < pl->nknobs ; i++) {
         free(pl->knobs[i]->knob);
@@ -280,9 +285,9 @@ int param_list_configure_alias(param_list pl, const char * key, const char * ali
         char * tmp;
         tmp = malloc(len + 4);
         snprintf(tmp, len+4, "--%s", alias);
-        param_list_configure_alias(pl, key, strdup(tmp));
+        param_list_configure_alias(pl, key, tmp);
         snprintf(tmp, len+4, "%s=", alias);
-        param_list_configure_alias(pl, key, strdup(tmp));
+        param_list_configure_alias(pl, key, tmp);
         free(tmp);
         return 0;
     }
@@ -292,7 +297,7 @@ int param_list_configure_alias(param_list pl, const char * key, const char * ali
         pl->naliases_alloc <<= 1;
         pl->aliases = realloc(pl->aliases, pl->naliases_alloc * sizeof(param_list_alias));
     }
-    pl->aliases[pl->naliases]->alias = alias;
+    pl->aliases[pl->naliases]->alias = strdup(alias);
     pl->aliases[pl->naliases]->key = key;
     pl->naliases++;
     return 0;
