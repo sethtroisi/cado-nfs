@@ -18,7 +18,7 @@
 #  the Free Software Foundation, Inc., 51 Franklin St, Fifth Floor,
 #  Boston, MA 02110-1301, USA.
 
-AC_DEFUN([WORDSIZE_CODE],[
+AC_DEFUN([WORDSIZE_CODE],[AC_LANG_SOURCE([
 /* We check wraparound rather than zero, because that's the only thing
    the norm guarantees (C99) -- UINT_MAX isn't committed to being a power
    of two */
@@ -39,7 +39,7 @@ int main() {
     fclose(f);
     return 0;
 }
-])
+])])
 
 AC_DEFUN([RUNTIME_ULONG_BITS],[
     if test x$gf2x_cv_ulongbits = x ; then
@@ -72,11 +72,11 @@ AC_DEFUN([VERIFY_WORDSIZE],[
     esac
 ])
 
-AC_DEFUN([SSE2_EXAMPLE],[
+AC_DEFUN([SSE2_EXAMPLE],[AC_LANG_SOURCE([
 #include <emmintrin.h>
 __v2di x;
 int main() {}
-])
+])])
 
 # Check whether we need some flag such as -msse2 in order to enable sse-2
 # support
@@ -131,7 +131,7 @@ AC_DEFUN([CHECK_SSE2_SUPPORT],[
 
 
 
-AC_DEFUN([PCLMUL_EXAMPLE],[
+AC_DEFUN([PCLMUL_EXAMPLE],[AC_LANG_SOURCE([
 #include <wmmintrin.h>
 #include <assert.h>
 int main() {
@@ -144,7 +144,7 @@ yy = (__v2di) { 47, 0 };
 zz.s = _mm_clmulepi64_si128(xx, yy, 0);
 return zz.x[[0]] - 61;
 }
-])
+])])
 
 # Check whether we need some flag such as -mpclmul in order to enable pclmulqdq
 # support
