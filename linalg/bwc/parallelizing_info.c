@@ -288,7 +288,7 @@ static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
     {
         struct utsname u[1];
         uname(u);
-        memcpy(pi->nodename, u->nodename, MAX(PI_NAMELEN, sizeof(u->nodename)));
+        memcpy(pi->nodename, u->nodename, MIN(PI_NAMELEN, sizeof(u->nodename)));
         pi->nodename[PI_NAMELEN-1]='\0';
         char * p = strchr(pi->nodename, '.');
         if (p) *p='\0';
