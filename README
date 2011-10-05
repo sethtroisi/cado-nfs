@@ -185,7 +185,8 @@ under Windows:
 Known problems:
 ===============
 
-* under FreeBSD, GCC 4.2.1 is known to miscompile CADO-NFS (GCC 4.5.1 is ok)
+* under Debian Etch amd64, GCC 4.1.2 is known to miscompile CADO-NFS (Lenny and
+  Squeeze are ok)
 
 Contact, links:
 ===============
