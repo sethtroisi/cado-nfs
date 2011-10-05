@@ -12,10 +12,11 @@
 
 void param_list_init(param_list pl)
 {
-    pl->size = 0;
+    memset(pl, 0, sizeof(param_list));
     pl->alloc = 16;
     pl->p = (parameter *) malloc(pl->alloc * sizeof(parameter));
     pl->consolidated = 1;
+    pl->size = 0;
     pl->aliases = NULL;
     pl->naliases = 0;
     pl->naliases_alloc = 0;
@@ -330,8 +331,12 @@ int param_list_configure_knob(param_list pl, const char * knob, int * ptr)
 
 static int param_list_update_cmdline_alias(param_list pl,
         param_list_alias al,
-        int * p_argc, char const *** p_argv)
+        int * p_argc, char *** p_argv)
 {
+    if (!pl->cmdline_argv0) {
+        pl->cmdline_argv0 = *p_argv;
+        pl->cmdline_argc0 = *p_argc;
+    }
     const char * a = (*p_argv[0]);
     if (al->alias[strlen(al->alias)-1] == '=') {
         // since knobs are aliased only by knobs, we know we have a plain
@@ -354,9 +359,10 @@ static int param_list_update_cmdline_alias(param_list pl,
              * param_list_update_cmdline_knob at the proper time. This
              * means in particular not necessarily there. It's
              * considerably easier to simply change the value in the
-             * command line.
+             * command line. Except that it's a const cast, it's ugly.
+             * Okay, my apologies, blah blah.
              */
-            (*p_argv)[0] = al->key;
+            (*p_argv)[0] = (char*) al->key;
             /* leave argv and argc unchanged. */
             return 0;
         }
@@ -376,8 +382,12 @@ static int param_list_update_cmdline_alias(param_list pl,
 
 static int param_list_update_cmdline_knob(param_list pl,
         param_list_knob knob,
-        int * p_argc, char const *** p_argv)
+        int * p_argc, char *** p_argv)
 {
+    if (!pl->cmdline_argv0) {
+        pl->cmdline_argv0 = *p_argv;
+        pl->cmdline_argc0 = *p_argc;
+    }
     const char * a = (*p_argv[0]);
     if (strcmp(a, knob->knob) == 0) {
         param_list_add_key(pl, knob->knob, NULL, PARAMETER_FROM_CMDLINE);
@@ -390,9 +400,12 @@ static int param_list_update_cmdline_knob(param_list pl,
 }
 
 int param_list_update_cmdline(param_list pl,
-        int * p_argc, char *** pp_argv)
+        int * p_argc, char *** p_argv)
 {
-    char const *** p_argv = (char const ***) pp_argv;
+    if (!pl->cmdline_argv0) {
+        pl->cmdline_argv0 = *p_argv;
+        pl->cmdline_argc0 = *p_argc;
+    }
     if (*p_argc == 0)
         return 0;
 
@@ -794,4 +807,24 @@ int param_list_save_parameter(param_list pl, enum parameter_origin o,
     free(tmp);
 
     return rc;
+}
+
+void print_command_line(FILE * stream, int argc, char * argv[])
+{
+    /* print command line */
+    fprintf (stream, "# (%s) %s", CADO_REV, argv[0]);
+    for (int i = 1; i < argc; i++)
+        fprintf (stream, " %s", argv[i]);
+    fprintf (stream, "\n");
+#ifdef  __GNUC__
+    fprintf(stream, "# Compiled with gcc " __VERSION__ "\n");
+#endif
+    fprintf(stream, "# Compilation flags " CFLAGS "\n");
+}
+
+void param_list_print_command_line(FILE * stream, param_list pl)
+{
+    /* remember that the API for calling param_list functions mandates
+     * that the binary name $0 is stripped from the provided lists */
+    print_command_line(stream, pl->cmdline_argc0+1, pl->cmdline_argv0-1);
 }

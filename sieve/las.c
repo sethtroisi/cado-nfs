@@ -4308,11 +4308,8 @@ main (int argc0, char *argv0[])
         }
     }
 
-    /* Print command line to output */
-    fprintf (si.output, "# %s.r%s", argv0[0], CADO_REV);
-    for (i = 1; i < argc0; i++)
-      fprintf (si.output, " %s", argv0[i]);
-    fprintf (si.output, "\n");
+    param_list_print_command_line(si.output, pl);
+
 #ifdef SSE_NORM_INIT
     fprintf (si.output, "# SSE_NORM_INIT is activated\n");
 #endif

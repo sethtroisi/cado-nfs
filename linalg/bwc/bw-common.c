@@ -45,24 +45,8 @@ static int intcmp(const int * a, const int * b)
 int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, char *** p_argv)
 {
     if (bw->can_print) {
-        /* print command line */
-        fprintf (stderr, "# (%s) %s", CADO_REV, (*p_argv)[0]);
-        for (int i = 1; i < (*p_argc); i++)
-            fprintf (stderr, " %s", (*p_argv)[i]);
-        fprintf (stderr, "\n");
-#ifdef  __GNUC__
-        fprintf(stderr, "# Compiled with gcc " __VERSION__ "\n");
-#endif
-        fprintf(stderr, "# Compilation flags " CFLAGS "\n");
-
-        fprintf (stdout, "# (%s) %s", CADO_REV, (*p_argv)[0]);
-        for (int i = 1; i < (*p_argc); i++)
-            fprintf (stdout, " %s", (*p_argv)[i]);
-        fprintf (stdout, "\n");
-#ifdef  __GNUC__
-        fprintf(stdout, "# Compiled with gcc " __VERSION__ "\n");
-#endif
-        fprintf(stdout, "# Compilation flags " CFLAGS "\n");
+        print_command_line(stderr, *p_argc, *p_argv);
+        print_command_line(stdout, *p_argc, *p_argv);
     }
 
     (*p_argv)++, (*p_argc)--;
