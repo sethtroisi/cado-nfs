@@ -115,8 +115,8 @@ EXTRA_DIST += gen_bb_mul_code.c
 # difficult dependency.
 
 # -- begin generated code --
-tuning_undefs_1.h: tuning_undefs_pre.h ; sed -e s/@@SIZE@@/1/g < $< > $@
-tuneup_1.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/1/g < $< > $@
+tuning_undefs_1.h: $(srcdir)/tuning_undefs_pre.h ; sed -e s/@@SIZE@@/1/g < $(srcdir)/tuning_undefs_pre.h > tuning_undefs_1.h
+tuneup_1.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/1/g < $(srcdir)/tuneup_pre.c > tuneup_1.c
 tuneup_1.$(OBJEXT): tuning_undefs_1.h
 BUILT_SOURCES +=tuneup_1.c tuning_undefs_1.h
 EXTRA_LTLIBRARIES+=libtuneup-s1.la
@@ -125,8 +125,8 @@ libtuneup_s1_la_CPPFLAGS=-I$(top_builddir) -I$(top_srcdir)
 CLEANFILES+=tuning_undefs_1.h
 DISTCLEANFILES+=tuning_undefs_1.h
 
-tuning_undefs_2.h: tuning_undefs_pre.h ; sed -e s/@@SIZE@@/2/g < $< > $@
-tuneup_2.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/2/g < $< > $@
+tuning_undefs_2.h: $(srcdir)/tuning_undefs_pre.h ; sed -e s/@@SIZE@@/2/g < $(srcdir)/tuning_undefs_pre.h > tuning_undefs_2.h
+tuneup_2.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/2/g < $(srcdir)/tuneup_pre.c > tuneup_2.c
 tuneup_2.$(OBJEXT): tuning_undefs_2.h
 BUILT_SOURCES +=tuneup_2.c tuning_undefs_2.h
 EXTRA_LTLIBRARIES+=libtuneup-s2.la
@@ -135,8 +135,8 @@ libtuneup_s2_la_CPPFLAGS=-I$(top_builddir) -I$(top_srcdir)
 CLEANFILES+=tuning_undefs_2.h
 DISTCLEANFILES+=tuning_undefs_2.h
 
-tuning_undefs_3.h: tuning_undefs_pre.h ; sed -e s/@@SIZE@@/3/g < $< > $@
-tuneup_3.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/3/g < $< > $@
+tuning_undefs_3.h: $(srcdir)/tuning_undefs_pre.h ; sed -e s/@@SIZE@@/3/g < $(srcdir)/tuning_undefs_pre.h > tuning_undefs_3.h
+tuneup_3.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/3/g < $(srcdir)/tuneup_pre.c > tuneup_3.c
 tuneup_3.$(OBJEXT): tuning_undefs_3.h
 BUILT_SOURCES +=tuneup_3.c tuning_undefs_3.h
 EXTRA_LTLIBRARIES+=libtuneup-s3.la
@@ -145,8 +145,8 @@ libtuneup_s3_la_CPPFLAGS=-I$(top_builddir) -I$(top_srcdir)
 CLEANFILES+=tuning_undefs_3.h
 DISTCLEANFILES+=tuning_undefs_3.h
 
-tuning_undefs_4.h: tuning_undefs_pre.h ; sed -e s/@@SIZE@@/4/g < $< > $@
-tuneup_4.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/4/g < $< > $@
+tuning_undefs_4.h: $(srcdir)/tuning_undefs_pre.h ; sed -e s/@@SIZE@@/4/g < $(srcdir)/tuning_undefs_pre.h > tuning_undefs_4.h
+tuneup_4.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/4/g < $(srcdir)/tuneup_pre.c > tuneup_4.c
 tuneup_4.$(OBJEXT): tuning_undefs_4.h
 BUILT_SOURCES +=tuneup_4.c tuning_undefs_4.h
 EXTRA_LTLIBRARIES+=libtuneup-s4.la
@@ -155,8 +155,8 @@ libtuneup_s4_la_CPPFLAGS=-I$(top_builddir) -I$(top_srcdir)
 CLEANFILES+=tuning_undefs_4.h
 DISTCLEANFILES+=tuning_undefs_4.h
 
-tuning_undefs_5.h: tuning_undefs_pre.h ; sed -e s/@@SIZE@@/5/g < $< > $@
-tuneup_5.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/5/g < $< > $@
+tuning_undefs_5.h: $(srcdir)/tuning_undefs_pre.h ; sed -e s/@@SIZE@@/5/g < $(srcdir)/tuning_undefs_pre.h > tuning_undefs_5.h
+tuneup_5.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/5/g < $(srcdir)/tuneup_pre.c > tuneup_5.c
 tuneup_5.$(OBJEXT): tuning_undefs_5.h
 BUILT_SOURCES +=tuneup_5.c tuning_undefs_5.h
 EXTRA_LTLIBRARIES+=libtuneup-s5.la
@@ -165,8 +165,8 @@ libtuneup_s5_la_CPPFLAGS=-I$(top_builddir) -I$(top_srcdir)
 CLEANFILES+=tuning_undefs_5.h
 DISTCLEANFILES+=tuning_undefs_5.h
 
-tuning_undefs_6.h: tuning_undefs_pre.h ; sed -e s/@@SIZE@@/6/g < $< > $@
-tuneup_6.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/6/g < $< > $@
+tuning_undefs_6.h: $(srcdir)/tuning_undefs_pre.h ; sed -e s/@@SIZE@@/6/g < $(srcdir)/tuning_undefs_pre.h > tuning_undefs_6.h
+tuneup_6.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/6/g < $(srcdir)/tuneup_pre.c > tuneup_6.c
 tuneup_6.$(OBJEXT): tuning_undefs_6.h
 BUILT_SOURCES +=tuneup_6.c tuning_undefs_6.h
 EXTRA_LTLIBRARIES+=libtuneup-s6.la
@@ -175,8 +175,8 @@ libtuneup_s6_la_CPPFLAGS=-I$(top_builddir) -I$(top_srcdir)
 CLEANFILES+=tuning_undefs_6.h
 DISTCLEANFILES+=tuning_undefs_6.h
 
-tuning_undefs_7.h: tuning_undefs_pre.h ; sed -e s/@@SIZE@@/7/g < $< > $@
-tuneup_7.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/7/g < $< > $@
+tuning_undefs_7.h: $(srcdir)/tuning_undefs_pre.h ; sed -e s/@@SIZE@@/7/g < $(srcdir)/tuning_undefs_pre.h > tuning_undefs_7.h
+tuneup_7.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/7/g < $(srcdir)/tuneup_pre.c > tuneup_7.c
 tuneup_7.$(OBJEXT): tuning_undefs_7.h
 BUILT_SOURCES +=tuneup_7.c tuning_undefs_7.h
 EXTRA_LTLIBRARIES+=libtuneup-s7.la
@@ -185,8 +185,8 @@ libtuneup_s7_la_CPPFLAGS=-I$(top_builddir) -I$(top_srcdir)
 CLEANFILES+=tuning_undefs_7.h
 DISTCLEANFILES+=tuning_undefs_7.h
 
-tuning_undefs_8.h: tuning_undefs_pre.h ; sed -e s/@@SIZE@@/8/g < $< > $@
-tuneup_8.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/8/g < $< > $@
+tuning_undefs_8.h: $(srcdir)/tuning_undefs_pre.h ; sed -e s/@@SIZE@@/8/g < $(srcdir)/tuning_undefs_pre.h > tuning_undefs_8.h
+tuneup_8.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/8/g < $(srcdir)/tuneup_pre.c > tuneup_8.c
 tuneup_8.$(OBJEXT): tuning_undefs_8.h
 BUILT_SOURCES +=tuneup_8.c tuning_undefs_8.h
 EXTRA_LTLIBRARIES+=libtuneup-s8.la
@@ -195,8 +195,8 @@ libtuneup_s8_la_CPPFLAGS=-I$(top_builddir) -I$(top_srcdir)
 CLEANFILES+=tuning_undefs_8.h
 DISTCLEANFILES+=tuning_undefs_8.h
 
-tuning_undefs_9.h: tuning_undefs_pre.h ; sed -e s/@@SIZE@@/9/g < $< > $@
-tuneup_9.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/9/g < $< > $@
+tuning_undefs_9.h: $(srcdir)/tuning_undefs_pre.h ; sed -e s/@@SIZE@@/9/g < $(srcdir)/tuning_undefs_pre.h > tuning_undefs_9.h
+tuneup_9.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/9/g < $(srcdir)/tuneup_pre.c > tuneup_9.c
 tuneup_9.$(OBJEXT): tuning_undefs_9.h
 BUILT_SOURCES +=tuneup_9.c tuning_undefs_9.h
 EXTRA_LTLIBRARIES+=libtuneup-s9.la

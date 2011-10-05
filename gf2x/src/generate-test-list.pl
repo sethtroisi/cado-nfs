@@ -48,8 +48,8 @@ while (<>) {
         my @sizes = split(' ', $1);
         for my $x (@sizes) {
             $fragment .= <<EOF;
-tuning_undefs_$x.h: tuning_undefs_pre.h ; sed -e s/\@\@SIZE\@\@/$x/g < \$< > \$\@
-tuneup_$x.c: \$(srcdir)/tuneup_pre.c ; sed -e s/\@\@SIZE\@\@/$x/g < \$< > \$\@
+tuning_undefs_$x.h: \$(srcdir)/tuning_undefs_pre.h ; sed -e s/\@\@SIZE\@\@/$x/g < \$(srcdir)/tuning_undefs_pre.h > tuning_undefs_$x.h
+tuneup_$x.c: \$(srcdir)/tuneup_pre.c ; sed -e s/\@\@SIZE\@\@/$x/g < \$(srcdir)/tuneup_pre.c > tuneup_$x.c
 tuneup_$x.\$(OBJEXT): tuning_undefs_$x.h
 BUILT_SOURCES +=tuneup_$x.c tuning_undefs_$x.h
 EXTRA_LTLIBRARIES+=libtuneup-s$x.la
@@ -76,7 +76,7 @@ tune_${code}_CPPFLAGS=-I\$(top_builddir) -I\$(top_srcdir) -DTUNING=$size
 nodist_tune_${code}_SOURCES=$code.c tuning_undefs_$size.h
 $code.\$(OBJEXT): tuning_undefs_$size.h
 tune_${code}_LDADD=libtuneup-s$size.la libtiming.la ../libgf2x.la
-$code.c: gen_bb_mul_code\$(EXEEXT_FOR_BUILD) ; ./gen_bb_mul_code$(EXEEXT_FOR_BUILD) $w $k > \$@
+$code.c: gen_bb_mul_code\$(EXEEXT_FOR_BUILD) ; ./gen_bb_mul_code\$(EXEEXT_FOR_BUILD) $w $k > \$@
 BUILT_SOURCES+=$code.c
 EOF
             } else {

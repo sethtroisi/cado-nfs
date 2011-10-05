@@ -2069,40 +2069,40 @@ gen_bb_mul_code$(EXEEXT_FOR_BUILD): gen_bb_mul_code.c
 # difficult dependency.
 
 # -- begin generated code --
-tuning_undefs_1.h: tuning_undefs_pre.h ; sed -e s/@@SIZE@@/1/g < $< > $@
-tuneup_1.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/1/g < $< > $@
+tuning_undefs_1.h: $(srcdir)/tuning_undefs_pre.h ; sed -e s/@@SIZE@@/1/g < $(srcdir)/tuning_undefs_pre.h > tuning_undefs_1.h
+tuneup_1.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/1/g < $(srcdir)/tuneup_pre.c > tuneup_1.c
 tuneup_1.$(OBJEXT): tuning_undefs_1.h
 
-tuning_undefs_2.h: tuning_undefs_pre.h ; sed -e s/@@SIZE@@/2/g < $< > $@
-tuneup_2.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/2/g < $< > $@
+tuning_undefs_2.h: $(srcdir)/tuning_undefs_pre.h ; sed -e s/@@SIZE@@/2/g < $(srcdir)/tuning_undefs_pre.h > tuning_undefs_2.h
+tuneup_2.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/2/g < $(srcdir)/tuneup_pre.c > tuneup_2.c
 tuneup_2.$(OBJEXT): tuning_undefs_2.h
 
-tuning_undefs_3.h: tuning_undefs_pre.h ; sed -e s/@@SIZE@@/3/g < $< > $@
-tuneup_3.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/3/g < $< > $@
+tuning_undefs_3.h: $(srcdir)/tuning_undefs_pre.h ; sed -e s/@@SIZE@@/3/g < $(srcdir)/tuning_undefs_pre.h > tuning_undefs_3.h
+tuneup_3.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/3/g < $(srcdir)/tuneup_pre.c > tuneup_3.c
 tuneup_3.$(OBJEXT): tuning_undefs_3.h
 
-tuning_undefs_4.h: tuning_undefs_pre.h ; sed -e s/@@SIZE@@/4/g < $< > $@
-tuneup_4.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/4/g < $< > $@
+tuning_undefs_4.h: $(srcdir)/tuning_undefs_pre.h ; sed -e s/@@SIZE@@/4/g < $(srcdir)/tuning_undefs_pre.h > tuning_undefs_4.h
+tuneup_4.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/4/g < $(srcdir)/tuneup_pre.c > tuneup_4.c
 tuneup_4.$(OBJEXT): tuning_undefs_4.h
 
-tuning_undefs_5.h: tuning_undefs_pre.h ; sed -e s/@@SIZE@@/5/g < $< > $@
-tuneup_5.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/5/g < $< > $@
+tuning_undefs_5.h: $(srcdir)/tuning_undefs_pre.h ; sed -e s/@@SIZE@@/5/g < $(srcdir)/tuning_undefs_pre.h > tuning_undefs_5.h
+tuneup_5.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/5/g < $(srcdir)/tuneup_pre.c > tuneup_5.c
 tuneup_5.$(OBJEXT): tuning_undefs_5.h
 
-tuning_undefs_6.h: tuning_undefs_pre.h ; sed -e s/@@SIZE@@/6/g < $< > $@
-tuneup_6.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/6/g < $< > $@
+tuning_undefs_6.h: $(srcdir)/tuning_undefs_pre.h ; sed -e s/@@SIZE@@/6/g < $(srcdir)/tuning_undefs_pre.h > tuning_undefs_6.h
+tuneup_6.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/6/g < $(srcdir)/tuneup_pre.c > tuneup_6.c
 tuneup_6.$(OBJEXT): tuning_undefs_6.h
 
-tuning_undefs_7.h: tuning_undefs_pre.h ; sed -e s/@@SIZE@@/7/g < $< > $@
-tuneup_7.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/7/g < $< > $@
+tuning_undefs_7.h: $(srcdir)/tuning_undefs_pre.h ; sed -e s/@@SIZE@@/7/g < $(srcdir)/tuning_undefs_pre.h > tuning_undefs_7.h
+tuneup_7.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/7/g < $(srcdir)/tuneup_pre.c > tuneup_7.c
 tuneup_7.$(OBJEXT): tuning_undefs_7.h
 
-tuning_undefs_8.h: tuning_undefs_pre.h ; sed -e s/@@SIZE@@/8/g < $< > $@
-tuneup_8.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/8/g < $< > $@
+tuning_undefs_8.h: $(srcdir)/tuning_undefs_pre.h ; sed -e s/@@SIZE@@/8/g < $(srcdir)/tuning_undefs_pre.h > tuning_undefs_8.h
+tuneup_8.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/8/g < $(srcdir)/tuneup_pre.c > tuneup_8.c
 tuneup_8.$(OBJEXT): tuning_undefs_8.h
 
-tuning_undefs_9.h: tuning_undefs_pre.h ; sed -e s/@@SIZE@@/9/g < $< > $@
-tuneup_9.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/9/g < $< > $@
+tuning_undefs_9.h: $(srcdir)/tuning_undefs_pre.h ; sed -e s/@@SIZE@@/9/g < $(srcdir)/tuning_undefs_pre.h > tuning_undefs_9.h
+tuneup_9.c: $(srcdir)/tuneup_pre.c ; sed -e s/@@SIZE@@/9/g < $(srcdir)/tuneup_pre.c > tuneup_9.c
 tuneup_9.$(OBJEXT): tuning_undefs_9.h
 @GF2X_32BIT_SOURCES_TRUE@gen_mul1_w32k2.$(OBJEXT): tuning_undefs_1.h
 @GF2X_32BIT_SOURCES_TRUE@gen_mul1_w32k2.c: gen_bb_mul_code$(EXEEXT_FOR_BUILD) ; ./gen_bb_mul_code$(EXEEXT_FOR_BUILD) 32 2 > $@
