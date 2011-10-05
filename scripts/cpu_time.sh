@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # print cpu time of cadofactor 
 #
 # Usage: $ cd "wdir"
@@ -44,7 +44,7 @@ if [[ -z $1 || $(expr $1 : '.*[p].*') != 0 ]]
   then  echo -n "CPU time for polyselect:      "
     if [ ! -f ${name}.kjout.* ] 2> /dev/null
       then echo "polynomial files were not found"
-      else grep phase ${name}.kjout.* | sed "s/^.*phase took \(\S*\)s.*$/\1/g" | tr "\n" "+" | sed "s/^\(.*\)+$/\1\n/" | bc | f
+      else grep phase ${name}.kjout.* | sed "s/^.*phase took \([^s]*\).*$/+\1/g" | tr "\n" " " | cut -c2- | bc | f
     fi
 fi
 
@@ -60,7 +60,7 @@ if [[ -z $1 || $(expr $1 : '.*[s].*') != 0 ]]
         fi
     fi
     if [ ! -z "$file" ]
-      then zgrep "time" $file | sed "s/^.*time \(\S*\)s.*$/\1/g" | tr "\n" "+" | sed "s/^\(.*\)+$/\1\n/" | bc | f
+      then zgrep "time" $file | sed "s/^.*time \([^s]*\).*$/+\1/g" | tr "\n" " " | cut -c2- | bc | f
     fi
 fi
 
@@ -71,9 +71,9 @@ if [[ -z $1 || $(expr $1 : '.*[l].*') != 0 ]]
   if [ ! -f ${name}.bwc.log ] 2> /dev/null
     then echo "linear algebra logfile were not found"
     else line=$(grep -n Done. ${name}.bwc.log | head -1 | cut -d':' -f1)
-    krylov=$(head -$line ${name}.bwc.log | grep 's/iter' | grep krylov | grep "000 " | sed "s/^.* \[\(.*\) s\/iter\]$/\1/g" | tr "\n" "+" | sed "s/^\(.*\)+$/(\1)*1000\n/" | bc | f)
+    krylov=$(head -$line ${name}.bwc.log | grep 's/iter' | grep krylov | grep "000 " | sed "s/^.* \[\(.*\) s\/it.*$/+1000*\1/g" | tr "\n" " " | cut -c2- | bc | f)
     lingen=$(grep "^Total computation took" ${name}.bwc.log | cut -d' ' -f4 | f)
-    mksol=$(grep 's/iter' ${name}.bwc.log | grep mksol | grep "000 " | sed "s/^.* \[\(.*\) s\/iter\]$/\1/g" | tr "\n" "+" | sed "s/^\(.*\)+$/(\1)*1000\n/" | bc | f)
+    mksol=$(grep 's/iter' ${name}.bwc.log | grep mksol | grep "000 " | sed "s/^.* \[\(.*\) s\/it.*$/+1000*\1/g" | tr "\n" " " | cut -c2- | bc | f)
     echo "$krylov - $lingen - $mksol (krylov - lingen - mksol)"
   fi	
 fi
@@ -85,7 +85,7 @@ if [[ -z $1 || $(expr $1 : '.*[r].*') != 0 ]]
     if [ ! -f ${name}.sqrt.log ] 2> /dev/null
       then echo "sqrt logfile were not found"
     else
-      rat=$(grep Rational ${name}.sqrt.log | head -1 | sed "s/.* at \(\S*\)ms$/\1/g")
+      rat=$(grep Rational ${name}.sqrt.log | head -1 | sed "s/.* at \(.*\)ms$/\1/g")
       if [ ! -z $rat ]
       then rat2=$(echo "scale=3; $rat/1000" | bc -l | f)
            alg=$(grep Algebraic ${name}.sqrt.log | head -1 | cut -d' ' -f6 | f)
