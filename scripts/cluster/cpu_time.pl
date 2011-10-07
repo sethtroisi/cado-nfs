@@ -37,7 +37,7 @@ for (@files) {
             $cpu_time += $1;
             $compl += $count;
             $count = 0;
-        } elsif ($line =~ /trunc/) {
+        } elsif ($line =~ /truncated/) {
             $trunc += $count;
             $count = 0;
         }

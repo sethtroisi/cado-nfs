@@ -2,7 +2,7 @@
 project(CADO_NFS)
 
 set(CADO_VERSION_MAJOR  1)
-set(CADO_VERSION_MINOR  1)
+set(CADO_VERSION_MINOR  1-RC2)
 set(CADO_VERSION_STRING  "${CADO_VERSION_MAJOR}.${CADO_VERSION_MINOR}")
 
 # CADO_DIST_ARCHIVE_NAME may be overridden by environment.
@@ -203,6 +203,7 @@ add_custom_target(dist
 )
 
 install(PROGRAMS cadofactor.pl DESTINATION bin)
+install(FILES cadofct.pm DESTINATION bin)
 
 install(DIRECTORY params/ DESTINATION ${example_subdir} FILES_MATCHING PATTERN "params.*")
 
