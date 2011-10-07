@@ -119,7 +119,6 @@ check_relation_files (char ** files, cado_poly_ptr cpoly, int forced_read)
               }
             fprintf (stderr, "Failed at line %lu in %s: %s",
                     l, *files, line);
-            exit (1);
             bad++;
             had_error = 1;
         }

@@ -311,8 +311,10 @@ another_line:
     for( ; (v=ugly[(unsigned char) c]) >= 0 ; *p++ = (c=fgetc(f)))
         *pa=*pa*10+v;
     expected = ',';
-    if (forced_read && c != expected)
+    if (forced_read && c != expected) {
+      for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc(f))) ;
       return 0;
+    }
     else
       ASSERT_ALWAYS(c == expected);
     *p++ = (c=fgetc(f));
@@ -320,8 +322,10 @@ another_line:
     for( ; (v=ugly[(unsigned char) c]) >= 0 ; *p++ = (c=fgetc(f)))
         *pb=*pb*10+v;
     expected = ':';
-    if (forced_read && c != expected)
+    if (forced_read && c != expected) {
+      for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc(f))) ;
       return 0;
+    }
     else
       ASSERT_ALWAYS(c == expected);
 
@@ -337,8 +341,10 @@ another_line:
         for (; c != EOF && c != '\n' && c != ':'; *p++ = (c = fgetc(f)))
             n += c == ',';
         expected = ':';
-        if (forced_read && c != expected)
+        if (forced_read && c != expected) {
+          for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc(f))) ;
           return 0;
+        }
         else
           ASSERT_ALWAYS(c == expected);
 
@@ -357,8 +363,10 @@ another_line:
         relation_compress_rat_primes(&rs->rel);
 
         expected = ':';
-        if (forced_read && c != expected)
+        if (forced_read && c != expected) {
+          for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc(f))) ;
           return 0;
+        }
         else
           ASSERT_ALWAYS(c == expected);
         ASSERT_ALWAYS(q == p);
@@ -369,8 +377,10 @@ another_line:
         for (; c != EOF && c != '\n' && c != ':'; *p++ = (c = fgetc(f)))
             n += c == ',';
         expected = '\n';
-        if (forced_read && c != expected)
+        if (forced_read && c != expected) {
+          for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc(f))) ;
           return 0;
+        }
         else
           ASSERT_ALWAYS(c == expected);
 
@@ -389,8 +399,10 @@ another_line:
         relation_compress_alg_primes(&rs->rel);
 
         expected = '\n';
-        if (forced_read && c != expected)
+        if (forced_read && c != expected) {
+          for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc(f))) ;
           return 0;
+        }
         else
           ASSERT_ALWAYS(c == expected);
         ASSERT_ALWAYS(q == p);
