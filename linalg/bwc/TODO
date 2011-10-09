@@ -1,0 +1,26 @@
+
+This lists some acknowledged bugs that ought to be fixed.
+
+ * lingen is slow. Deserves a complete rewrite.
+
+ * Tuning for the assembly routines for the matrix multiplication has
+   never been done. Doing this properly should get a speed-up. Likewise,
+   the assembly code can certainly be improved. Perhaps auto-detect cache
+   sizes ?
+
+
+Also some done items.
+
+ [done] code in matops.c and abase-binary-dotprod-backends.h is sometimes
+        duplicated. This should be factored.
+        [abase-binary-dotprod-backends.h is dead now, and the
+        corresponding code has been factored in a layer inside mpfq which
+        automatically generates the required code]
+        [Mon Mar 21 15:54:53 2011, svn 749]
+
+ [done] prep.c supports some sort of seeding. Unfortunately, this is
+        ineffective in multithreaded context.
+        [we resort to saving a binary blob, which is uniquely determined
+        by the seed, and later on re-read it as a vector]
+        [Sun Nov 28 22:17:59 2010, svn 508]
+
