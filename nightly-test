@@ -92,9 +92,10 @@ make install
 if [ "`uname -s`" = Darwin ] ; then
     export DYLD_LIBRARY_PATH="$PREFIX/lib/$CADO_DIST_ARCHIVE_NAME"
     echo "Setting DYLD_LIBRARY_PATH=$PREFIX/lib/$CADO_DIST_ARCHIVE_NAME"
-    # TODO: For the moment it's does not completely work. Having to set
+    # TODO: For the moment it does not completely work. Having to set
     # an environment variable for dynamic libraries is a guaranteed
-    # failure situation. We should work around this issue.
+    # failure situation when using -ssh: the enviroment variable does not
+    # (cannot) propagate. We should work around this issue.
 fi
 
 echo -n "Starting factorization at: "
