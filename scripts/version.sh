@@ -37,7 +37,9 @@ else
                 echo -n "git $commit"
             fi
             # git diff --name-status is svn status -q
-            if [ "`git diff --name-status`" != "" ] ; then
+            # Note that checked out copies which have GIT_DIR set for
+            # some reason could end up triggering errors on git diff
+            if [ "`git diff --name-status 2>/dev/null`" != "" ] ; then
                 echo " +mods"
             else
                 echo
