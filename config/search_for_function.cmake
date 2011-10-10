@@ -19,7 +19,9 @@
 # uses.
 
 # If successful, VARIABLE is set to 1 and CMAKE_REQUIRED_LIBRARIES
-# contains the winning library set.
+# contains the winning library set. CMAKE_REQUIRED_LIBRARIES_EXTRA
+# contains the libraries which had to be added to the initial library
+# set.
 
 macro(search_for_function FUNCTION VARIABLE)
     message(STATUS "Looking for ${FUNCTION}")
@@ -58,14 +60,15 @@ macro(search_for_function FUNCTION VARIABLE)
             if(${VARIABLE})
               set(${VARIABLE} 1 CACHE INTERNAL "Have function ${FUNCTION}")
               if(sff_rl)
-                  message(STATUS "Looking for ${FUNCTION} - requires ${extra}")
+                  message(STATUS "Looking for ${FUNCTION} - requires ${sff_rl}")
               else(sff_rl)
                   message(STATUS "Looking for ${FUNCTION} - found")
               endif(sff_rl)
               file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeOutput.log 
                 "Determining if the function ${FUNCTION} exists passed with the following output:\n"
                 "${OUTPUT}\n\n")
-            set(CMAKE_REQUIRED_LIBRARIES ${sff_rl})
+              set(CMAKE_REQUIRED_LIBRARIES ${sff_rl})
+              set(CMAKE_REQUIRED_LIBRARIES_EXTRA ${extra})
               set(atwork 0)
             else(${VARIABLE})
               file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeError.log 

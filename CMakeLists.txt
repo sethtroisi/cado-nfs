@@ -96,8 +96,8 @@ include(${CADO_NFS_SOURCE_DIR}/config/sse41.cmake)
 include(${CADO_NFS_SOURCE_DIR}/config/gcc-assembly.cmake)
 include(${CADO_NFS_SOURCE_DIR}/config/curl.cmake)
 include(${CADO_NFS_SOURCE_DIR}/config/alloca.cmake)
-include(${CADO_NFS_SOURCE_DIR}/config/cabsl.cmake)
-include(${CADO_NFS_SOURCE_DIR}/config/log2.cmake)
+
+include("${CADO_NFS_SOURCE_DIR}/config/math.cmake")
 
 ######################################################################
 # Try to detect whether pthreads and/or MPI are available.
@@ -122,6 +122,8 @@ include(${CADO_NFS_SOURCE_DIR}/config/log2.cmake)
 
 include (${CADO_NFS_SOURCE_DIR}/config/pthreads.cmake)
 include (${CADO_NFS_SOURCE_DIR}/config/mpi.cmake)
+
+message(STATUS "Using libs: ${math_libs} (math) ${pthread_libs} (pthreads)")
 
 configure_file(cado_mpi_config_h.in cado_mpi_config.h ESCAPE_QUOTES @ONLY)
 
