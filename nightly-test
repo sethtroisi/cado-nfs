@@ -18,6 +18,12 @@
 #    in the .ssh/config file on the computer on which you run nightly-test, and
 #    to add the content of cle_gforge.pub in the authorized_keys on that computer.
 set -e
+
+if [ -x "$HOME/cmake/bin/cmake" ] ; then
+    echo "Using $HOME/cmake/bin for cmake search path"
+    PATH="$HOME/cmake/bin:$PATH"
+fi
+
 # If the DIR variable is set, then use it as the basename of the temp directory.
 if ! [ "$DIR" ] ; then
     DIR=`mktemp -d /tmp/cado-nightly.XXXXXXXX`
@@ -42,6 +48,21 @@ else
     SCM=scm
 fi
 
+# If the cado repository contains a local.sh for this machine, use it.
+# Note that this is mandatory even for make dist, since a missing gmp is
+# fatal to the cmake process !
+if [ -f "$SCM/local.sh.`hostname`" ] ; then
+    LOCALFILE="$SCM/local.sh.`hostname`"
+elif [ -f "$HOME/local.sh" ] ; then
+    LOCALFILE="$HOME/local.sh"
+else
+    echo "Could not find a relevant local.sh file" >&2
+    exit 1
+fi
+
+echo "Using $LOCALFILE"
+cp $LOCALFILE "$SCM/local.sh"
+
 CADO_DIST_ARCHIVE_NAME=cado-nfs-snapshot-`date +%Y%m%d%H%M`
 export CADO_DIST_ARCHIVE_NAME
 
@@ -51,14 +72,14 @@ make -C $SCM dist
 # now extract the tarball and test it
 tar zxf $SCM/$CADO_DIST_ARCHIVE_NAME.tar.gz
 
-# If the cado repository contains a local.sh for this machine, use it.
-h=`hostname`
-if [ -f "$SCM/local.sh.$h" ] ; then
-    echo "Using local.sh.$h"
-    cp -f $SCM/local.sh.$h  $CADO_DIST_ARCHIVE_NAME/local.sh
-fi
+cp -f $LOCALFILE $CADO_DIST_ARCHIVE_NAME/local.sh
 
 cd $CADO_DIST_ARCHIVE_NAME
+
+# Prepare a ``make install''-ed version. This is a stronger test on
+# shared libraries functionality.
+export PREFIX="$DIR/installed"
+
 echo -n "Starting compilation at: "
 date
 if [ "$CC" ] ; then
@@ -66,10 +87,20 @@ if [ "$CC" ] ; then
 else
     make "$@"
 fi
+make install
+
+if [ "`uname -s`" = Darwin ] ; then
+    export DYLD_LIBRARY_PATH="$PREFIX/lib/$CADO_DIST_ARCHIVE_NAME"
+    echo "Setting DYLD_LIBRARY_PATH=$PREFIX/lib/$CADO_DIST_ARCHIVE_NAME"
+    # TODO: For the moment it's does not completely work. Having to set
+    # an environment variable for dynamic libraries is a guaranteed
+    # failure situation. We should work around this issue.
+fi
+
 echo -n "Starting factorization at: "
 date
-CADO_COLOR=0 ./factor.sh 71641520761751435455133616475667090434063332228247871795429 -t 4 -ssh expected_factorization=200429218120815554269743635437,357440504101388365610785389017
-CADO_COLOR=0 ./factor.sh 90377629292003121684002147101760858109247336549001090677693 -t 2 expected_factorization=260938498861057,588120598053661,760926063870977,773951836515617
+CADO_COLOR=0 $PREFIX/bin/factor.sh 71641520761751435455133616475667090434063332228247871795429 -t 4 -ssh expected_factorization=200429218120815554269743635437,357440504101388365610785389017
+CADO_COLOR=0 $PREFIX/bin/factor.sh 90377629292003121684002147101760858109247336549001090677693 -t 2 expected_factorization=260938498861057,588120598053661,760926063870977,773951836515617
 
 rc=$?
 
