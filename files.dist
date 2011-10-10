@@ -19,6 +19,7 @@ linalg/bwc/CMakeLists.txt
 linalg/bwc/CMakeLists.txt
 linalg/bwc/README
 linalg/bwc/GUIDED_TOUR_OF_SOURCES
+linalg/bwc/TODO
 linalg/bwc/Makefile
 linalg/bwc/abase.h
 linalg/bwc/acollect.c
