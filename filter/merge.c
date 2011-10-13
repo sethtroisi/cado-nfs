@@ -211,14 +211,14 @@ main (int argc, char *argv[])
     mat->rwmax = rwmax;
     mat->mergelevelmax = maxlevel;
     mat->itermax = itermax;
-    
+
 #ifdef USE_MPI
     mpi_start_proc(outname,mat,purgedfile,purgedname,forbw,ratio,coverNmax,
 		   resumename);
     /* TODO: clean the mat data structure (?) */
     MPI_Finalize();
     return 0;
-#endif    
+#endif
     initMat (mat, 0, ps->ncols);
 
     tt = seconds ();
@@ -252,7 +252,7 @@ main (int argc, char *argv[])
     fprintf(stderr, "Markowitz version\n");
 #endif
     fillmat (mat);
-    
+
     tt = wct_seconds ();
     filter_matrix_read (mat, ps, verbose);
     fprintf (stderr, "Time for filter_matrix_read: %2.2lf\n", wct_seconds () - tt);
