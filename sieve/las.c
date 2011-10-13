@@ -83,7 +83,7 @@ log2 (double x)
    or when memory is tight */
 // #define SKIP_GCD3
 
-/* These parameters control the size of the buckets. 
+/* These parameters control the size of the buckets.
  * The number of updates that a bucket can accumulate is estimated as
  *   (loglog(factor base bound) - loglog(bucket sieving threshold)) 
  *     * BUCKET_LIMIT_FACTOR * I * J + BUCKET_LIMIT_ADD 
