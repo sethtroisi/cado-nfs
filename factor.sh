@@ -13,13 +13,18 @@
 # will fail.
 
 #CADO_DEBUG=1
-usage="Usage: $0 <integer> [options] [arguments cadofactor.pl]\n
-       \t <integer> \t \t - integer must be at least 60 digits [optimize for more than 85 digits] without small prime factors\n
-       \t options:\n
-       \t \t -t <integer> \t - numbers of cores\n
-       \t \t -ssh \t \t - use ssh (doc README) for distribute the polynomial selection and
-sieve on localhost. (on several machines, use the main script
-cadofactor.pl)"
+usage=<<EOF
+Usage: $0 <integer> [options] [arguments passed to cadofactor.pl]
+    <integer>     - integer to be factored. must be at least 60 digits,
+                    and free of small prime factors [parameters are
+                    optimized only for 85 digits and above].
+options:
+    -t <integer>  - numbers of cores to be used.
+    -ssh          - use ssh (see README) for distributing the polynomial
+                    selection and sieve steps on localhost. For broader
+                    use on several machines, use the advanced script
+                    cadofactor.pl
+EOF
 
 : ${t:=`mktemp -d /tmp/cado.XXXXXXXXXX`}
 chmod 755 $t
@@ -55,9 +60,6 @@ done
 a=`expr $cores / $b`
 bwmt=${a}x$b
 
-size=${#n}
-file="params.c$size"
-
 
 #########################################################################
 # Set paths properly.
@@ -65,41 +67,54 @@ cado_prefix="@CMAKE_INSTALL_PREFIX@"
 example_subdir="@example_subdir@"
 mpiexec="@MPIEXEC@"
 
+if [ "$0" -ef "$cado_prefix/bin/factor.sh" ] ; then
+    # We're called in the install tree.
+    paramdir="$cado_prefix/$example_subdir"
+    bindir="$cado_prefix/bin"
+    cadofactor="$bindir/cadofactor.pl"
+    cputime="$bindir/cpu_time.sh"
+elif [ "$0" -ef "@CADO_NFS_BINARY_DIR@/factor.sh" ] ; then
+    # We're called in the build tree.
+    paramdir="@CADO_NFS_SOURCE_DIR@/params/params.c$size"
+    cputime="@CADO_NFS_SOURCE_DIR@/scripts/cpu_time.sh"
+    cadofactor="@CADO_NFS_SOURCE_DIR@/cadofactor.pl"
+    # Make the path absolute.
+    bindir="@CADO_NFS_BINARY_DIR@"
+elif [ -f "`dirname $0`/cado_config_h.in" ] ; then
+    # Otherwise we're called from the source tree (or we hope so)
+    srcdir=$(cd "`dirname $0`" ; pwd)
+    call_cmake="`dirname $0`/scripts/call_cmake.sh"
+    if ! [ -x "$call_cmake" ] ; then
+        echo "I don't know where I am !" >&2
+    fi
+    eval `cd $srcdir ; $call_cmake show`
+    paramdir="${srcdir}/params/"
+    cputime="$srcdir/scripts/cpu_time.sh"
+    cadofactor="${srcdir}/cadofactor.pl"
+    # Make the path absolute.
+    bindir=`cd "$build_tree" ; pwd`
+else
+    echo "I don't know where I am !" >&2
+fi
+
+if ! [ -d "$paramdir" ] ; then
+    echo "Parameter dir $paramdir not found." >&2 ; exit 1
+elif ! [ -d "$bindir" ] ; then
+    echo "Binary dir $bindir not found." >&2 ; exit 1
+elif ! [ -x "$cadofactor" ] ; then
+    echo "Script $cadofactor not found." >&2 ; exit 1
+elif ! [ -x "$cputime" ] ; then
+    echo "Script $cputime not found." >&2 ; exit 1
+else
+    # Ok, everything looks good.
+    :
+fi
+
+size=${#n}
+
+# Try n, n+1, n-1, n+2...
 for ((i=1; i<=4; i=i+1)) ; do
-  if [ -d "$cado_prefix/$example_subdir" ] ; then
-      # We're called in the install tree.
-      if [ -f "$cado_prefix/$example_subdir/params.c$size" ] ; then
-          file="$cado_prefix/$example_subdir/params.c$size"
-      fi
-      bindir="$cado_prefix/bin"
-      cadofactor="$bindir/cadofactor.pl"
-      cputime="$bindir/cpu_time.sh"
-  elif [ -x "@CADO_NFS_SOURCE_DIR@/cadofactor.pl" ] ; then
-      # Otherwise we're called from the source tree (or we hope so)
-      if [ -f "@CADO_NFS_SOURCE_DIR@/params/params.c$size" ] ; then
-          file="@CADO_NFS_SOURCE_DIR@/params/params.c$size"
-          cputime="@CADO_NFS_SOURCE_DIR@/scripts/cpu_time.sh"
-      fi
-      cadofactor="@CADO_NFS_SOURCE_DIR@/cadofactor.pl"
-      # Make the path absolute.
-      bindir=$(cd "`dirname $0`" ; pwd)
-  else
-      # Otherwise we're called from the source tree (or we hope so)
-      call_cmake="`dirname $0`/scripts/call_cmake.sh"
-      if ! [ -x "$call_cmake" ] ; then
-          echo "I don't know where I am !" >&2
-      fi
-      eval `$call_cmake show`
-      if [ -f "${up_path}params/params.c$size" ] ; then
-          file="${up_path}params/params.c$size"
-          cwd=$(cd "`dirname $0`" ; pwd)
-          cputime="$cwd/scripts/cpu_time.sh"
-      fi
-      cadofactor="${up_path}cadofactor.pl"
-      # Make the path absolute.
-      build_tree=`cd "$build_tree" ; pwd`
-      bindir="$build_tree"
-  fi
+  file="$paramdir/params.c$size"
   if [ -f $file ] ; then 
     break
   fi
@@ -107,7 +122,7 @@ for ((i=1; i<=4; i=i+1)) ; do
 done
 
 if [ ! -f $file ] ; then
-    echo "$file not found" >&2
+    echo "no parameter file found for c${#n} (last tried was $file)" >&2
     echo -e $usage
     exit 1
 fi

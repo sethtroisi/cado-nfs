@@ -71,10 +71,46 @@ Compile:
 
 make
 
-It may or may not be relevant to do ``make install'' as well ; by default
-``make install'' will install binaries in installed/bin (with respect to
-current directory), thus replace ./factor.sh by installed/bin/factor.sh.
+Install:
+========
 
+The relevance of the ``make install'' step depends on the platform.
+Cado-nfs binaries link to shared libraries, and some do so dynamically.
+For this to work, we rely on some control logic by cmake and cooperation
+with the operating system's dynamic linker.
+
+Calling one of cado-nfs scripts (e.g. factor.sh) can be done in
+several ways. Here we assume that $SRCDIR is the source directory, that
+$BUILDDIR is the build tree for the local machine (typically
+$SRCDIR/`hostname`), and that $PREFIX is the installation prefix (by
+default, $SRCDIR/installed). We refer to these different ways, and later
+discuss how they work on different systems (which is mostly impacted by
+the shared library mechanism).
+
+(1) $SRCDIR/factor.sh
+    This deduces $BUILDDIR from the machine hostname, and amounts to
+    calling binaries from there. Parameter files are obtained from
+    $SRCDIR.
+
+(2) $BUILDDIR/factor.sh
+    This calls binaries from $BUILDDIR, and loads parameter files from
+    $SRCDIR
+
+(2) $PREFIX/bin/factor.sh
+    This calls binaries from $PREFIX/bin, and loads parameter files from
+    $PREFIX/share/cado-nfs-1.1/examples
+
+FIXME -- This should be completed and checked.
+
+Linux: All three methods work
+OpenBSD 4.9:
+MacOS X:
+    For any invocation to work, the LD_LIBRARY_PATH or DYLD_LIBRARY_PATH
+    variable must be set up properly. The easiest method is to do make
+    install, and include in these environment variables the directory
+    $PREFIX/lib/cado-nfs-1.1 This works, but does not work too well with
+    the -ssh argument, since (DY)LD_LIBRARY_PATH isn't propagated across
+    ssh.
 
 Run a factorization on current machine:
 =======================================
