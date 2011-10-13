@@ -1,9 +1,9 @@
 #include "cado.h"
-/* 
+/*
  * Program: replay
  * Author : F. Morain
  * Purpose: replaying history of merges to build the small matrix
- * 
+ *
  * Algorithm:
  *
  */
@@ -33,7 +33,7 @@ static void
 printOldRows(int **oldrows, int nrows)
 {
     int i;
-    
+
     // where oldrows intervene
     for(i = 0; i < nrows; i++)
 	if(oldrows[i][0] != 0){
