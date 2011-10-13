@@ -22,7 +22,7 @@ filter/debug.h
 filter/merge_mpi.c
 filter/merge_mpi.h
 misc/
-nightly-test
+scripts/nightly-test
 polyselect/alpha.mpl
 polyselect/alpha.sage
 polyselect/alpha.c
