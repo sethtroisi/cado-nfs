@@ -59,13 +59,14 @@ elif [ -f "$HOME/local.sh" ] ; then
     LOCALFILE="$HOME/local.sh"
 elif [ -f "$cwd/local.sh" ] ; then
     LOCALFILE="$cwd/local.sh"
-else 
-    echo "Could not find a relevant local.sh file" >&2
-    exit 1
 fi
 
-echo "Using $LOCALFILE"
-cp $LOCALFILE "$SCM/local.sh"
+if [ "$LOCALFILE" ] ; then
+    echo "Using $LOCALFILE"
+    cp $LOCALFILE "$SCM/local.sh"
+else
+    echo "Proceeding with no local.sh file"
+fi
 
 CADO_DIST_ARCHIVE_NAME=cado-nfs-snapshot-`date +%Y%m%d%H%M`
 export CADO_DIST_ARCHIVE_NAME
@@ -76,7 +77,9 @@ make -C $SCM dist
 # now extract the tarball and test it
 tar zxf $SCM/$CADO_DIST_ARCHIVE_NAME.tar.gz
 
-cp -f $LOCALFILE $CADO_DIST_ARCHIVE_NAME/local.sh
+if [ "$LOCALFILE" ] ; then
+    cp -f $LOCALFILE $CADO_DIST_ARCHIVE_NAME/local.sh
+fi
 
 cd $CADO_DIST_ARCHIVE_NAME
 
