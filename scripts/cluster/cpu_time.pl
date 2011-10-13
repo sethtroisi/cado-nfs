@@ -18,19 +18,20 @@ my $wdir = abs_path(dirname(dirname($0)));
 opendir DIR, "$wdir/merge_rels/"
     or die "Cannot open directory `$wdir/merge_rels/': $!\n";
 my @files = grep /\.rels\.\d+-\d+\.gz$/, readdir DIR;
+@files = sort { my @a = $a =~ /\.rels\.(\d+)-/;
+                my @b = $b =~ /\.rels\.(\d+)-/; $a[0] <=> $b[0] } @files;
 closedir DIR;
 
 my $compl = 0;
 my $trunc = 0;
 my $cpu_time = 0;
-my $count;
+my $count = 0;
 my $line;
 my $rfile = 1;
 my $nfiles = scalar (@files);
 for (@files) {
     print "Reading $_... ($rfile/$nfiles)\r";
     $rfile++;
-    $count = 0;
     open FILE, "gzip -dc $wdir/merge_rels/$_ |" or die "Cannot open `$_' for reading: $!.\n";
     while ($line = <FILE>) {
         if ($line =~ /cpu time (\S+)s \[/) {
@@ -46,7 +47,7 @@ for (@files) {
     close FILE;
 }
 
-my $total = $compl + $trunc;
+my $total = $compl + $trunc + $count;
 my $est = int ( $cpu_time * $total / $compl );
 print "completed: $compl, truncated: $trunc, total: $total.\n".
       "completed cpu time       : $cpu_time s\n".
