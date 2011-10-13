@@ -116,7 +116,7 @@ main (int argc, char **argv)
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
         fprintf (stderr, "Unknown option: %s\n", argv[0]);
-        abort(); 
+        abort();
     }
 
     const char * sosp = param_list_lookup_string(pl, "sosp");

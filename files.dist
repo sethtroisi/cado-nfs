@@ -16,7 +16,6 @@ scripts/install-cmake.sh
 linalg/CMakeLists.txt
 linalg/Makefile
 linalg/bwc/CMakeLists.txt
-linalg/bwc/CMakeLists.txt
 linalg/bwc/README
 linalg/bwc/GUIDED_TOUR_OF_SOURCES
 linalg/bwc/TODO
@@ -311,8 +310,6 @@ utils/getprime.h
 utils/gmp_aux.c
 utils/gmp_aux.h
 utils/gzip.c
-utils/gzip.c
-utils/gzip.h
 utils/gzip.h
 utils/hashpair.c
 utils/hashpair.h
@@ -603,7 +600,6 @@ gf2x/version.sh.in
 utils/fix-endianness.c
 utils/fix-endianness.h
 utils/cado-endian.h
-config/math.cmake
 linalg/bwc/bcast-file.c
 linalg/bwc/raw_matrix_u32.h
 linalg/bwc/mpfq/Makefile.mpfq
