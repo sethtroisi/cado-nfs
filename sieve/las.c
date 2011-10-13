@@ -12,6 +12,7 @@
 #include "bucket.h"
 #include "trialdiv.h"
 #include <pthread.h>
+#include "mpz_poly.h"
 
 #ifdef HAVE_SSE2
 #define SSE_NORM_INIT
@@ -247,14 +248,10 @@ MAYBE_UNUSED static int ABToNx(unsigned int * N, unsigned int *x, const int64_t 
 
 /* Test if entry x in bucket region n is divisible by p */
 void test_divisible_x (const fbprime_t p, const unsigned long x, const int n,
-		       const sieve_info_t *si, const char side);
+		       const sieve_info_t *si, int side);
 int factor_leftover_norm (mpz_t n, unsigned int b, mpz_array_t* const factors,
 			  uint32_array_t* const multis,
 			  facul_strategy_t *strategy);
-NOPROFILE_STATIC void
-eval_fij (mpz_t v, const mpz_t *f, const unsigned int d, const long i,
-	  const unsigned long j);
-
 
 /************************** sieve info stuff *********************************/
 
@@ -288,7 +285,7 @@ sieve_info_init_lognorm (unsigned char *C, unsigned char threshold,
 #endif
 }
 
-static void sieve_info_init_refactoring(sieve_info_t * si, int td_thresh)
+static void sieve_info_init_trialdiv(sieve_info_t * si, int td_thresh)
 {
     /* Our trial division needs odd divisors, 2 is handled by mpz_even_p().
        If the FB primes to trial divide contain 2, we skip over it.
@@ -306,7 +303,7 @@ static void sieve_info_init_refactoring(sieve_info_t * si, int td_thresh)
     }
 }
 
-static void sieve_info_clear_refactoring(sieve_info_t * si)
+static void sieve_info_clear_trialdiv(sieve_info_t * si)
 {
     for(int side = 0 ; side < 2 ; side++) {
         trialdiv_clear (si->sides[side]->trialdiv_data);
@@ -1556,77 +1553,46 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
    lognorms approximations for k bits of exponent + NORM_BITS-k bits
    of mantissa */
 NOPROFILE_STATIC void
-init_rat_norms (sieve_info_t *si)
+init_norms (sieve_info_t *si)
 {
-  double e, m, norm, h;
-  int i, j, k, l, K, L;
-  sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
+  for(int s = 0 ; s < 2 ; s++) {
+      sieve_side_info_ptr sdata = si->sides[s];
 
-  unsigned char *S = rat->S;
+      unsigned char *S = sdata->S;
 
-  k = (int) ceil (log2 (rat->logmax));
-  K = 1 << k;
-  l = NORM_BITS - k;
-  L = 1 << l;
+      int k = (int) ceil (log2 (sdata->logmax));
+      int K = 1 << k;
+      ASSERT_ALWAYS(NORM_BITS >= k);
+      int l = NORM_BITS - k;
+      int L = 1 << l;
 
-  /* extract k bits from the exponent, and l bits from the mantissa */
-  h = 1.0 / (double) L;
-  for (e = 1.0, i = 0; i < K; i++, e *= 2.0)
-    {
-      /* e = 2^i for 0 <= i < 2^k */
-      for (m = 1.0, j = 0; j < L; j++, m += h)
-        {
-          /* m = 1 + j/2^l for 0 <= j < 2^l */
-          norm = m * e;
-          /* Warning: since rat->logmax does not usually correspond to
-             a power a two, and we consider full binades here, we have to
-             take care that values > rat->logmax do not wrap around to 0 */
-          norm = log2 (norm);
-          if (norm >= rat->logmax)
-            S[(i << l) + j] = 255;
-          else
-            {
-              norm = norm * rat->scale;
-              S[(i << l) + j] = GUARD + (unsigned char) norm;
-            }
-        }
-    }
+      /* extract k bits from the exponent, and l bits from the mantissa */
+      double h = 1.0 / (double) L;
+      double e,m;
+      int i,j;
+      for (e = 1.0, i = 0; i < K; i++, e *= 2.0)
+      {
+          /* e = 2^i for 0 <= i < 2^k */
+          for (m = 1.0, j = 0; j < L; j++, m += h)
+          {
+              /* m = 1 + j/2^l for 0 <= j < 2^l */
+              double norm = m * e;
+              /* Warning: since sdata->logmax does not usually correspond to
+                 a power a two, and we consider full binades here, we have to
+                 take care that values > sdata->logmax do not wrap around to 0 */
+              norm = log2 (norm);
+              if (norm >= sdata->logmax)
+                  S[(i << l) + j] = 255;
+              else
+              {
+                  norm = norm * sdata->scale;
+                  S[(i << l) + j] = GUARD + (unsigned char) norm;
+              }
+          }
+      }
+  }
 }
 
-/* idem as init_rat_norms, but for the algebraic side */
-NOPROFILE_STATIC void
-init_alg_norms (sieve_info_t *si)
-{
-  double e, m, norm, h;
-  int i, j, k, l, K, L;
-  sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
-
-  unsigned char *S = alg->S;
-
-  k = (int) ceil (log2 (alg->logmax));
-  K = 1 << k;
-  ASSERT_ALWAYS(NORM_BITS >= k);
-  l = NORM_BITS - k;
-  L = 1 << l;
-
-  /* extract k bits from the exponent, and l bits from the mantissa */
-  h = 1.0 / (double) L;
-  for (e = 1.0, i = 0; i < K; i++, e *= 2.0)
-    {
-      for (m = 1.0, j = 0; j < L; j++, m += h)
-        {
-          norm = m * e;
-          norm = log2 (norm);
-          if (norm >= alg->logmax)
-            S[(i << l) + j] = 255;
-          else
-            {
-              norm = norm * alg->scale;
-              S[(i << l) + j] = GUARD + (unsigned char) norm;
-            }
-        }
-    }
-}
 /* }}} */
 
 /* {{{ initialize norms for bucket regions */
@@ -2308,7 +2274,7 @@ void ssd_update_positions(small_sieve_data_t *ssd,
 // Information about where we are is in ssd.
 void sieve_small_bucket_region(unsigned char *S, const int bucket_nr,
 			       small_sieve_data_t ssd, sieve_info_t *si,
-			       const unsigned char side)
+			       const int side)
 {
     const uint32_t I = si->I;
     const fbprime_t pattern2_size = 2 * sizeof(unsigned long);
@@ -2560,7 +2526,7 @@ void sieve_small_bucket_region(unsigned char *S, const int bucket_nr,
                   if (1 || trace_Nx.x & 1) {
                       fprintf(stderr, "# (3) Subtract log(" FBPRIME_FORMAT ") = %u[%c,bad] from "
                               "S[%u] = %hhu, from BA[%u], new value is %u\n", 
-                              ssd.bad_p[n].g, lo, side,
+                              ssd.bad_p[n].g, lo, sidenames[side],
                               x, S[x], N, S[x] - lo);
                   }
               }
@@ -3153,8 +3119,12 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
     }
 #endif  /* }}} */
 
+    /* XXX: Don't believe that resieve_start is easily changeable... */
+    const int resieve_start = RATIONAL_SIDE;
+    unsigned char * S = loc[resieve_start]->S;
+
 #ifdef UNSIEVE_NOT_COPRIME
-    unsieve_not_coprime (alg_S, N, si);
+    unsieve_not_coprime (S, N, si);
 #endif
     
     for (int x = 0; x < bucket_region; ++x)
@@ -3171,7 +3141,7 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
 
         if (alg->Bound[alg_S[x]] + rat->Bound[rat_S[x]] >= 127)
           {
-            alg_S[x] = 255;
+            S[x] = 255;
             continue;
           }
         surv++;
@@ -3188,7 +3158,7 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
                         trace_Nx.x, trace_Nx.N, i, j);
             }
 #endif
-            alg_S[x] = 255;
+            S[x] = 255;
             continue;
           }
 #endif
@@ -3197,10 +3167,6 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
     /* Copy those bucket entries that belong to sieving survivors and
        store them with the complete prime */
     /* FIXME: choose a sensible size here */
-
-    /* XXX: Don't believe that resieve_start is easily changeable... */
-    const int resieve_start = ALGEBRAIC_SIDE;
-    unsigned char * S = loc[resieve_start]->S;
 
     for(int z = 0 ; z < 2 ; z++) {
         int side = resieve_start ^ z;
@@ -3256,8 +3222,8 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
                         - (si->I >> 1),
                         (x + N*bucket_region) >> si->logI,
                         (long) a, (unsigned long) b);
+                abort();
                 pthread_mutex_unlock(&io_mutex);
-                continue;
             }
 
             /* Since the q-lattice is exactly those (a, b) with
@@ -3280,14 +3246,14 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
             for(int z = 0 ; pass && z < 2 ; z++) {
                 int side = RATIONAL_SIDE ^ z;   /* start with rational */
                 int rat = (side == RATIONAL_SIDE);
-                const mpz_t * f = (const mpz_t *) (rat ? cpoly->g : cpoly->f);
+                mpz_t * f = rat ? cpoly->g : cpoly->f;
                 int deg = rat ? cpoly->degreeg : cpoly->degree;
                 int lim = rat ? cpoly->rlim : cpoly->alim;
                 int lpb = rat ? cpoly->lpbr : cpoly->lpba;
                 int mfb = rat ? cpoly->mfbr : cpoly->mfba;
 
                 // Trial divide rational norm
-                eval_fij (norm[side], f, deg, a, b);
+                mp_poly_homogeneous_eval_siui (norm[side], f, deg, a, b);
                 if (si->ratq == (side == RATIONAL_SIDE))
                     mpz_divexact_ui (norm[side], norm[side], si->q);
 #ifdef TRACE_K
@@ -3500,8 +3466,9 @@ MAYBE_UNUSED static int ABToNx(unsigned int * N, unsigned int *x, const int64_t 
 }
 /* }}} */
 
+/* DEBUG function only */
 void test_divisible_x (const fbprime_t p, const unsigned long x, 
-                       const int n, const sieve_info_t *si, const char side)
+                       const int n, const sieve_info_t *si, const int side)
 {
   const unsigned long X = x + n * bucket_region;
   const long i = (long) (X & ((unsigned long) si->I - 1UL)) - (long) si->I / 2;
@@ -3509,10 +3476,10 @@ void test_divisible_x (const fbprime_t p, const unsigned long x,
   mpz_t v;
 
   mpz_init (v);
-  if (side == 'a')
-    eval_fij (v, (const mpz_t *) si->fij, si->degree, i, j);
-  else if (side == 'r')
-    eval_fij (v, (const mpz_t *) si->gij, 1, i, j);
+  if (side == ALGEBRAIC_SIDE)
+    mp_poly_homogeneous_eval_siui (v, si->fij, si->degree, i, j);
+  else if (side == RATIONAL_SIDE)
+    mp_poly_homogeneous_eval_siui (v, (mpz_t*) si->gij, 1, i, j);
   else
     abort();
   
@@ -3526,76 +3493,6 @@ void test_divisible_x (const fbprime_t p, const unsigned long x,
 
 
 /*********************** norm computation ************************************/
-
-/* Put in fij[] the coefficients of f'(i) = F(a0*i+a1, b0*i+b1).
-   Assumes the coefficients of fij[] are initialized.
-   Put in fijd[] a double-precision approximation of fij[]/q.
-*/
-static void
-fij_from_f (mpz_t *fij, const sieve_info_t *si, mpz_t *f, const int d)
-{
-  int k, l;
-  mpz_t *g; /* will contain the coefficients of (b0*i+b1)^l */
-  mpz_t f0;
-
-  for (k = 0; k <= d; k++)
-    mpz_set (fij[k], f[k]);
-
-  g = malloc ((d + 1) * sizeof (mpz_t));
-  for (k = 0; k <= d; k++)
-    mpz_init (g[k]);
-  mpz_init (f0);
-
-  /* Let h(x) = quo(f(x), x), then F(x,y) = H(x,y)*x + f0*y^d, thus
-     F(a0*i+a1, b0*i+b1) = H(a0*i+a1, b0*i+b1)*(a0*i+a1) + f0*(b0*i+b1)^d.
-     We use that formula recursively. */
-
-  mpz_set_ui (g[0], 1); /* g = 1 */
-
-  for (k = d - 1; k >= 0; k--)
-    {
-      /* invariant: we have already translated coefficients of degree > k,
-         in f[k+1..d], and g = (b0*i+b1)^(d - (k+1)), with coefficients in
-         g[0..d - (k+1)]:
-         f[k]   <- f[k] + a1*f[k+1]
-         ...
-         f[l] <- a0*f[l]+a1*f[l+1] for k < l < d
-         ...
-         f[d] <- a0*f[d] */
-      mpz_swap (f0, fij[k]); /* save the new constant coefficient */
-      mpz_mul_si (fij[k], fij[k + 1], si->a1);
-      for (l = k + 1; l < d; l++)
-        {
-          mpz_mul_si (fij[l], fij[l], si->a0);
-          mpz_addmul_si (fij[l], fij[l + 1], si->a1);
-        }
-      mpz_mul_si (fij[d], fij[d], si->a0);
-
-      /* now compute (b0*i+b1)^(d-k) from the previous (b0*i+b1)^(d-k-1):
-         g[d-k] = b0*g[d-k-1]
-         ...
-         g[l] = b1*g[l]+b0*g[l-1] for 0 < l < d-k
-         ...
-         g[0] = b1*g[0]
-      */
-      mpz_mul_si (g[d - k], g[d - k - 1], si->b0);
-      for (l = d - k - 1; l > 0; l--)
-        {
-          mpz_mul_si (g[l], g[l], si->b1);
-          mpz_addmul_si (g[l], g[l-1], si->b0);
-        }
-      mpz_mul_si (g[0], g[0], si->b1);
-
-      /* now g has degree d-k, and we add f0*g */
-      for (l = k; l <= d; l++)
-        mpz_addmul (fij[l], g[l - k], f0);
-    }
-
-  mpz_clear (f0);
-  for (k = 0; k <= d; k++)
-    mpz_clear (g[k]);
-  free (g);
-}
 
 /* return max |g(x)| for 0 <= x <= s,
    where g(x) = g[d]*x^d + ... + g[1]*x + g[0] */
@@ -3732,27 +3629,6 @@ get_maxnorm (cado_poly cpoly, sieve_info_t *si, uint64_t q0)
       tmp /= (double) q0;
   return log2(tmp);
 }
-
-/* v <- |f(i,j)|, where f is of degree d */
-NOPROFILE_STATIC void
-eval_fij (mpz_t v, const mpz_t *f, const unsigned int d, const long i,
-	  const unsigned long j)
-{
-  unsigned int k;
-  mpz_t jpow;
-
-  mpz_init_set_ui (jpow, 1);
-  mpz_set (v, f[d]);
-  for (k = d; k-- > 0;)
-    {
-      mpz_mul_si (v, v, i);
-      mpz_mul_ui (jpow, jpow, j);
-      mpz_addmul (v, f[k], jpow);
-    }
-  mpz_abs (v, v); /* avoids problems with negative norms */
-  mpz_clear (jpow);
-}
-
 
 /* check that the double x fits into an int32_t */
 #define fits_int32_t(x) \
@@ -4031,7 +3907,7 @@ process_bucket_region(thread_data_ptr th)
         rep->ttsm += seconds();
 
         /* Sieve small rational primes */
-        sieve_small_bucket_region(lrat->S, i, *lrat->lssd, si, 'r');
+        sieve_small_bucket_region(lrat->S, i, *lrat->lssd, si, RATIONAL_SIDE);
 	
 
         /* Init algebraic norms */
@@ -4049,7 +3925,7 @@ process_bucket_region(thread_data_ptr th)
         rep->ttsm += seconds();
 
         /* Sieve small algebraic primes */
-        sieve_small_bucket_region(lalg->S, i, *lalg->lssd, si, 'a');
+        sieve_small_bucket_region(lalg->S, i, *lalg->lssd, si, ALGEBRAIC_SIDE);
 
         /* Factor survivors */
         rep->ttf -= seconds ();
@@ -4397,10 +4273,9 @@ main (int argc0, char *argv0[])
 
     thread_data * thrs = thread_data_alloc(&si);
 
-    init_rat_norms (&si);
-    init_alg_norms (&si);
+    init_norms (&si);
 
-    sieve_info_init_refactoring(&si, td_thresh); /* Init refactoring stuff */
+    sieve_info_init_trialdiv(&si, td_thresh); /* Init refactoring stuff */
     si.strategy = facul_make_strategy (15, MIN(cpoly->rlim, cpoly->alim),
                                        1UL << MIN(cpoly->lpbr, cpoly->lpba));
 
@@ -4455,8 +4330,9 @@ main (int argc0, char *argv0[])
         sq ++;
 
         /* precompute the skewed polynomials of f(x) and g(x) */
-        fij_from_f (si.fij, &si, cpoly->f, cpoly->degree);
-        fij_from_f (si.gij, &si, cpoly->g, 1);
+        int32_t H[4] = { si.a0, si.b0, si.a1, si.b1 };
+        mp_poly_homography(si.fij, cpoly->f, cpoly->degree, H);
+        mp_poly_homography(si.gij, cpoly->g, 1, H);
 
         /* checks the value of J, updates floating-point fij(x) */
         sieve_info_update (&si);
@@ -4678,7 +4554,7 @@ main (int argc0, char *argv0[])
       }
     /* }}} */
 
-    sieve_info_clear_refactoring(&si);
+    sieve_info_clear_trialdiv(&si);
     facul_clear_strategy (si.strategy);
     si.strategy = NULL;
 
