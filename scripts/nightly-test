@@ -42,13 +42,9 @@ cd $DIR
 # the checkout.
 : ${USER=`whoami`}
 
-if [ "$GIT" ] ; then
-    git clone --depth 2 $GIT scm
-    SCM=scm/
-else
-    svn checkout -q svn://scm.gforge.inria.fr/svn/cado-nfs/trunk/ scm
-    SCM=scm
-fi
+# git clone --depth 2 $GIT scm
+git clone --depth 2 git://scm.gforge.inria.fr/cado-nfs/cado-nfs.git scm
+SCM=scm/
 
 # If the cado repository contains a local.sh for this machine, use it.
 # Note that this is mandatory even for make dist, since a missing gmp is
