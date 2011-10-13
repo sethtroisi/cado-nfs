@@ -602,8 +602,7 @@ gf2x/version.sh.in
 utils/fix-endianness.c
 utils/fix-endianness.h
 utils/cado-endian.h
-config/cabsl.cmake
-config/log2.cmake
+config/math.cmake
 linalg/bwc/bcast-file.c
 linalg/bwc/raw_matrix_u32.h
 linalg/bwc/mpfq/Makefile.mpfq
