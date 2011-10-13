@@ -27,7 +27,7 @@ double tmkzup, tmkzdown, tmkzupdown, tmkzcount;
 // Q[2*i] contains j-jmin = dj
 // Q[2*i+1] contains the Markowitz count for j
 
-// get r-th component of Q[i] 
+// get r-th component of Q[i]
 #define MkzGet(Q, i, r) (Q[((i)<<1)+(r)])
 #define MkzSet(Q, i, r, val) (Q[((i)<<1)+(r)] = (val))
 
@@ -79,7 +79,7 @@ MkzUpQueue(int32_t *Q, int32_t *A, int32_t k)
 {
     int32_t dj = MkzGet(Q, k, 0), count = MkzGet(Q, k, 1);
 #if MKZ_TIMINGS
-    double tt = seconds(); 
+    double tt = seconds();
 #endif
 
     while((k > 1) && (MkzGet(Q, k/2, 1) >= count)){
@@ -224,14 +224,14 @@ MkzIsHeap(int32_t *Q)
     for(k = 1; k <= Q[0]/2; k++){
 	// k has a left son
 	if(MkzGet(Q, k, 1) > MkzGet(Q, 2*k, 1)){
-	    fprintf(stderr, "Pb: father=%d > lson=%d\n", 
+	    fprintf(stderr, "Pb: father=%d > lson=%d\n",
 		    MkzGet(Q, k, 1), MkzGet(Q, 2*k, 1));
 	    return 0;
 	}
 	if(k < Q[0]/2){
 	    // k has a right son
 	    if(MkzGet(Q, k, 1) > MkzGet(Q, 2*k+1, 1)){
-		fprintf(stderr, "Pb: father=%d > rson=%d\n", 
+		fprintf(stderr, "Pb: father=%d > rson=%d\n",
 			MkzGet(Q, k, 1), MkzGet(Q, 2*k+1, 1));
 		return 0;
 	    }
@@ -388,7 +388,7 @@ MkzInit(filter_matrix_t *mat)
 void
 MkzClose(filter_matrix_t *mat)
 {
-    fprintf(stderr, "Max Markowitz count: %d\n", 
+    fprintf(stderr, "Max Markowitz count: %d\n",
 	    MkzGet(mat->MKZQ, mat->MKZQ[0], 1));
 #if MKZ_TIMINGS
     fprintf(stderr, "MKZT: up=%d down=%d updown=%d count=%d\n",
@@ -452,7 +452,7 @@ MkzUpdate(filter_matrix_t *mat, int32_t i MAYBE_UNUSED, int32_t j)
     }
 }
 
-/*    
+/*
    Updates:
    - mat->wt[j] (weight of column j)
 
