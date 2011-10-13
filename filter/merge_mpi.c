@@ -154,7 +154,7 @@ mpi_kill_slaves()
 {
     unsigned int imsg[1];
     int nprocs, rank;
-    
+
     printf("MPI# Stopping everybody\n");
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs);
     imsg[0] = 0;
@@ -236,7 +236,7 @@ mpi_load_rows_for_j(filter_matrix_t *mat, int m, int32_t j)
 	exit(0);
     }
 #if DEBUG >= 1
-    fprintf(stderr, "Ready to send R[%d]=%d // #i=%d\n", j, 
+    fprintf(stderr, "Ready to send R[%d]=%d // #i=%d\n", j,
 	    mat->R[GETJ(mat, j)][0], ibuf-2);
     fflush(stderr);
 #endif
@@ -279,7 +279,7 @@ mpi_load_rows_for_j(filter_matrix_t *mat, int m, int32_t j)
 	    // are positions in mat->rows[i]
 	    i = (int32_t)buf[2];
 	    if(isRowNull(mat, i)){
-		fprintf(stderr, "Can it really happen??? i=%d j=%u cnt=%d\n", 
+		fprintf(stderr, "Can it really happen??? i=%d j=%u cnt=%d\n",
 			i, buf[1], cnt);
 		fflush(stderr);
 	    }
@@ -327,7 +327,7 @@ mpi_send_inactive_rows(int i)
     // TODO_MPI: include the master?
     for(k = 1; k < mpi_size; k++)
 	if(k != mpi_rank)
-	    MPI_Send(buf, 2, MPI_UNSIGNED, k, 
+	    MPI_Send(buf, 2, MPI_UNSIGNED, k,
 		     MPI_INACTIVATE_ROWS_TAG, MPI_COMM_WORLD);
 }
 
@@ -413,7 +413,7 @@ mpi_MST(report_t *rep, filter_matrix_t *mat, int *njrem, unsigned int *buf)
 	    ind[ni++] = (int32_t)mat->R[GETJ(mat, j)][k];
 #if DEBUG >= 1
 	    fprintf(stderr, "ind[%d]=%d -> len=%d\n",
-		    ni-1, ind[ni-1], 
+		    ni-1, ind[ni-1],
 		    (isRowNull(mat,ind[ni-1]) ? 0 : lengthRow(mat,ind[ni-1])));
 #endif
 	    if(ni == m)
@@ -428,7 +428,7 @@ mpi_MST(report_t *rep, filter_matrix_t *mat, int *njrem, unsigned int *buf)
 	buf[r+2] = (unsigned int)ind[r];
     for(k = 1; k < mpi_size; k++)
 	if(k != mpi_rank)
-	    MPI_Send(buf, m+2, MPI_UNSIGNED, k, 
+	    MPI_Send(buf, m+2, MPI_UNSIGNED, k,
 		     MPI_ASK_MST_TAG, MPI_COMM_WORLD);
 #endif // FULL_MONTY
     // now, compute my own share
@@ -518,7 +518,7 @@ mpi_doOneMerge(report_t *rep, filter_matrix_t *mat, int *njdel, int *dw, unsigne
     while(!finished){
 	// we loop until we receive all new weights and then we exit
 #if DEBUG >= 1
-	fprintf(stderr, "[m_a_r] Proc %d waiting... nrecv=%d\n", 
+	fprintf(stderr, "[m_a_r] Proc %d waiting... nrecv=%d\n",
 		mpi_rank, nrecv);
 #endif
 	MPI_Recv(buf, MPI_BUF_SIZE, MPI_UNSIGNED, MPI_ANY_SOURCE,
@@ -654,7 +654,7 @@ mpi_replay_history(report_t *rep, filter_matrix_t *mat, unsigned int *send_buf, 
 		send_buf[isb] = (isRowNull(mat, i) ? 0 : lengthRow(mat, i));
 #endif
 		if(isRowNull(mat, i)){
-		    fprintf(stderr, "Row %d is null -- %p!!!!!\n", 
+		    fprintf(stderr, "Row %d is null -- %p!!!!!\n",
 			    i, mat->rows[i]);
 		    // just copy
 		    mat->rows[i] = copyRow(mat->rows[3]);
@@ -728,7 +728,7 @@ mpi_slave(report_t *rep, int mpi_rank, filter_matrix_t *mat, FILE *purgedfile, c
 	// FIXME: sometimes, only 0 has the right to send things
 	switch(status.MPI_TAG){
 	case MPI_DIE_TAG:
-	    mpi_err3("I was asked to die at %d: wct=%d wait=%d\n", 
+	    mpi_err3("I was asked to die at %d: wct=%d wait=%d\n",
 		     (int)seconds(),(int)(MPI_Wtime()-wctstart),(int)totwait);
 	    break;
 	case MPI_J_TAG:
@@ -802,7 +802,7 @@ mpi_slave(report_t *rep, int mpi_rank, filter_matrix_t *mat, FILE *purgedfile, c
 		fprintf(stderr, "At the end of inactivate\n");
 		fprint_report_aux(stderr, rep);
 	    }
-	    MPI_Send(buf, 1, MPI_UNSIGNED, 0, 
+	    MPI_Send(buf, 1, MPI_UNSIGNED, 0,
 		     MPI_INACTIVATE_ROWS_TAG, MPI_COMM_WORLD);
 	    break;
 #endif
@@ -867,7 +867,7 @@ mpi_start_slaves(int mpi_size, filter_matrix_t *mat)
 	for(jmax = jmin; jmax < mat->ncols; jmax++){
 	    kappa += abs(mat->wt[GETJ(mat, jmax)]);
 # if DEBUG >= 1
-	    fprintf(stderr, "wt=%d kappa=%d\n", 
+	    fprintf(stderr, "wt=%d kappa=%d\n",
 		    mat->wt[GETJ(mat, jmax)], kappa);
 # endif
 	    if(((unsigned long)kappa) > (mat->weight / ((unsigned long)((mpi_size-1)))))
@@ -892,7 +892,7 @@ mpi_start_slaves(int mpi_size, filter_matrix_t *mat)
 	    mpi_err1("Pb while reading matrix by processor %d\n", rk);
 	    exit(0); // TODO: one day, kill/restart procs?
 	}
-	mpi_err2("started processor %d at wct=%d\n", 
+	mpi_err2("started processor %d at wct=%d\n",
 		 rk, (int)(MPI_Wtime()-wctstart));
     }
     mpi_tab_j[mpi_size-1] = jmax;
@@ -925,8 +925,8 @@ mpi_get_minimal_m_proc(int *m, int *proc, int mpi_size, unsigned int index, int 
 #endif
 	if(status.MPI_TAG == MPI_MIN_M_TAG){
 	    if(buf[0] != index){
-		fprintf(stderr, 
-			"Should not happen: bad index %u instead of %u\n", 
+		fprintf(stderr,
+			"Should not happen: bad index %u instead of %u\n",
 			buf[0], index);
 	    }
 	    else
@@ -1002,7 +1002,7 @@ mpi_delete_superfluous_rows(report_t *rep, filter_matrix_t *mat, int *row_weight
 #if DEBUG >= 1
 	mpi_err1("Sending order to %d\n", k);
 #endif
-	MPI_Send(send_buf, r, MPI_UNSIGNED, k, 
+	MPI_Send(send_buf, r, MPI_UNSIGNED, k,
 		 MPI_INACTIVATE_ROWS_TAG, MPI_COMM_WORLD);
     }
     // this is kinda wait, no?
@@ -1040,7 +1040,7 @@ stop_merge(filter_matrix_t *mat, int forbw, double ratio, int coverNmax, int m)
 
 	// using c*N and stopping when too high
 	static unsigned long cNmin = 0;
-	unsigned long cN = 
+	unsigned long cN =
 	    ((unsigned long)mat->nrows) * ((unsigned long)mat->weight);
 	if(cNmin == 0)
 	    cNmin = cN;
@@ -1104,7 +1104,7 @@ mpi_master(report_t *rep, filter_matrix_t *mat, int mpi_size, FILE *purgedfile, 
 	totwait += (seconds()-tt);
 #if DEBUG >= 1
 	if(curr_ncols != mat->rem_ncols){
-	    fprintf(stderr, "index=%u cur=%d ncols=%d\n", 
+	    fprintf(stderr, "index=%u cur=%d ncols=%d\n",
 		    mpi_index, curr_ncols, mat->rem_ncols);
 # if 0
 	    sleep(5);
@@ -1119,10 +1119,10 @@ mpi_master(report_t *rep, filter_matrix_t *mat, int mpi_size, FILE *purgedfile, 
 	    threshold += 100000;
 	    fprintf(stderr, "R%u: wct=%2.2lf ",mpi_index,MPI_Wtime()-wctstart);
 	    fprintf(stderr,"maxm=%d N=%d nc=%d [%d] c=%ld c/N=%d\n",
-		    maxm, 
+		    maxm,
 		    mat->rem_nrows, mat->rem_ncols,
 		    mat->rem_nrows - mat->rem_ncols,
-		    mat->weight, 
+		    mat->weight,
 		    (int)(((double)mat->weight)/((double)mat->rem_nrows)));
 	    mpi_delete_superfluous_rows(rep, mat, row_weight, mpi_size);
 	}
@@ -1211,7 +1211,7 @@ mpi_master(report_t *rep, filter_matrix_t *mat, int mpi_size, FILE *purgedfile, 
 #if DEBUG >= 1
 			mpi_err1("Sending order to %d\n", k);
 #endif
-			MPI_Send(send_buf, ibuf, MPI_UNSIGNED, k, 
+			MPI_Send(send_buf, ibuf, MPI_UNSIGNED, k,
 				 MPI_INACTIVATE_ROWS_TAG, MPI_COMM_WORLD);
 		    }
 		    done = nrecv = 0;

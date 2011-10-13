@@ -11,7 +11,7 @@
    (it is possible to do both)
 
    If -rm is given, the input files are removed after having been treated.
-   This is also the case if -out . is given. 
+   This is also the case if -out . is given.
 
    By default, the output will be bzipped/gzipped according to the status
    of the input file.
@@ -131,7 +131,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt, ui
             }
 
             h = CA * (uint64_t) rs->rel.a + CB * rs->rel.b;
-            /* dup1 uses the high 5 bits of h to identify the slices 
+            /* dup1 uses the high 5 bits of h to identify the slices
                but now we use a different hash function, so we can keep these
                5 bits
                */
@@ -260,7 +260,7 @@ int main (int argc, char *argv[])
          * on unrecognized options */
         break;
         // fprintf (stderr, "Unknown option: %s\n", argv[0]);
-        // abort(); 
+        // abort();
     }
 
     const char * dirname = param_list_lookup_string(pl, "out");
