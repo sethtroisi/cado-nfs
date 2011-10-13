@@ -131,7 +131,7 @@ removeColumnAndUpdate(filter_matrix_t *mat, int j)
 }
 
 // The cell [i, j] may be incorporated to the data structure, at least
-// if j is not too heavy, etc. 
+// if j is not too heavy, etc.
 static void
 addCellAndUpdate(filter_matrix_t *mat, int i, int32_t j)
 {
@@ -377,7 +377,7 @@ addFatherToSonsRec(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 	// the usual trick not to destroy row
 	history[level0][itab++] = -(i2+1);
     for(k = 1; k <= sons[u][0]; k++){
-	i1 = addFatherToSonsRec(history, mat, m, ind, A, 
+	i1 = addFatherToSonsRec(history, mat, m, ind, A,
 				father, sons, sons[u][k], level+1);
 	if(i1 != -1)
 	    level = i1;
@@ -554,7 +554,7 @@ mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
 }
 
 #ifndef USE_MARKOWITZ
-// maxdo is 0 if we want to perform a non-bounded number of operations; 
+// maxdo is 0 if we want to perform a non-bounded number of operations;
 // an integer >= 1 otherwise.
 // Default for the monoproc version is 0.
 static int
@@ -610,10 +610,10 @@ merge_m_fast(report_t *rep, filter_matrix_t *mat, int m, int maxdo, int verbose)
     fprintf (stderr, "\n"); /* to keep last output on screen */
     tot = seconds()-tot;
     fprintf(stderr, "T=%d m=%d nj=%d", (int)seconds(), m, njproc);
-    fprintf(stderr, " findopt=%2.2lf (fill=%2.2lf mst=%2.2lf) tot=%2.2lf", 
+    fprintf(stderr, " findopt=%2.2lf (fill=%2.2lf mst=%2.2lf) tot=%2.2lf",
 	    totopt, totfill, totMST, tot);
     fprintf(stderr, " del=%2.2lf\n", totdel);
-	    
+	
 #if DEBUG >= 1
     fprintf(stderr, "Status at the end of the process\n");
     Sparse2Tex(mat);
@@ -672,13 +672,13 @@ inspectRowWeight(report_t *rep, filter_matrix_t *mat)
 	if(!isRowNull(mat, i)){
 	    if(lengthRow(mat, i) > mat->rwmax){
 #if DEBUG >= 1
-		fprintf(stderr, "Removing too heavy row[%d]: %d\n", 
+		fprintf(stderr, "Removing too heavy row[%d]: %d\n",
 			i, lengthRow(mat, i));
 #endif
 #if TRACE_ROW >= 0
 		if(i == TRACE_ROW)
-		    fprintf(stderr, 
-			    "TRACE_ROW: removing too heavy row[%d]: %d\n", 
+		    fprintf(stderr,
+			    "TRACE_ROW: removing too heavy row[%d]: %d\n",
 			    i, lengthRow(mat, i));
 #endif
 		removeRowDefinitely(rep, mat, i);
@@ -849,7 +849,7 @@ merge(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, int forbw)
     while(1){
 	cost = ((unsigned long)mat->rem_ncols) * ((unsigned long)mat->weight);
 	fprintf(stderr, "w(M)=%lu, w(M)*ncols=%lu", mat->weight, cost);
-	fprintf(stderr, " w(M)/ncols=%2.2lf\n", 
+	fprintf(stderr, " w(M)/ncols=%2.2lf\n",
 		((double)mat->weight)/((double)mat->rem_ncols));
 	if((bwcostmin == 0) || (cost < bwcostmin))
 	    bwcostmin = cost;
@@ -902,7 +902,7 @@ merge(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, int forbw)
     }
 #endif
 	fprintf(stderr, "=> nrows=%d ncols=%d (%d) njrem=%d\n",
-		mat->rem_nrows, mat->rem_ncols, 
+		mat->rem_nrows, mat->rem_ncols,
 		mat->rem_nrows - mat->rem_ncols, njrem);
 	inspectRowWeight(rep, mat);
 	deleteEmptyColumns(mat);
@@ -952,8 +952,8 @@ my_cost(unsigned long N, unsigned long c, int forbw)
 }
 
 static void
-mergeForColumn2(report_t *rep, filter_matrix_t *mat, int *njrem, 
-		double *totopt, double *totfill, double *totMST, 
+mergeForColumn2(report_t *rep, filter_matrix_t *mat, int *njrem,
+		double *totopt, double *totfill, double *totMST,
 		double *totdel, int useMST, int32_t j)
 {
     double tt, tfill, tMST;
@@ -998,7 +998,7 @@ int
 number_of_superfluous_rows(filter_matrix_t *mat)
 {
     int kappa = (mat->rem_nrows-mat->rem_ncols) / mat->keep, ni2rem;
-    
+
     if(kappa <= (1<<4))
 	ni2rem = mat->keep/2;
     else if(kappa <= (1<<5))
@@ -1090,7 +1090,7 @@ mergeOneByOne(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, in
 	}
 	else if(mat->wt[dj] > 0){
 	    m = mat->wt[dj]; // for deleteSuperfluousRows below
-	    mergeForColumn2(rep, mat, &njrem, 
+	    mergeForColumn2(rep, mat, &njrem,
 			    &totopt, &totfill, &totMST, &totdel, 1, j);
 	}
 # if 0
@@ -1126,19 +1126,19 @@ mergeOneByOne(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, in
 	    fprintf(stderr, "T=%d", (int)seconds());
 #ifndef USE_MARKOWITZ
 	    fprintf(stderr, " mmax=%d", mmax);
-#endif	    
+#endif	
 	    fprintf(stderr, " N=%d (%d) c=%lu",
 		    mat->rem_nrows, mat->rem_nrows - mat->rem_ncols,
 		    mat->weight);
 	    if(forbw == 2)
 		fprintf(stderr, " bw=%"PRIu64"", bwcost);
 	    else if(forbw == 3)
-		fprintf(stderr, " c*N=%"PRIu64"", 
+		fprintf(stderr, " c*N=%"PRIu64"",
 			((uint64_t)mat->rem_nrows)
 			*((uint64_t)mat->weight));
 	    else if(forbw <= 1)
 		fprintf(stderr, " c*N=%"PRIu64"", bwcost);
-	    fprintf(stderr, " c/N=%2.2lf\n", 
+	    fprintf(stderr, " c/N=%2.2lf\n",
 		    ((double)mat->weight)/((double)mat->rem_ncols));
 	    // njrem=%d at %2.2lf\n",
 	    if((forbw != 0) && (forbw != 3))
@@ -1205,7 +1205,7 @@ mergeOneByOne(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, in
 	    ncost = 0;
     }
     if(mat->itermax == 0)
-	deleteSuperfluousRows(rep, mat, mat->keep, 
+	deleteSuperfluousRows(rep, mat, mat->keep,
 			      mat->rem_nrows-mat->rem_ncols+mat->keep, -1);
     if((forbw != 0) && (forbw != 3)){
 	fprintf(rep->outfile, "BWCOSTMIN: %"PRIu64"\n", bwcostmin);
@@ -1214,7 +1214,7 @@ mergeOneByOne(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, in
 }
 
 //////////////////////////////////////////////////////////////////////
-// 
+//
 // Resume section: very much inspired by replay.c, of course...!
 //
 //////////////////////////////////////////////////////////////////////
