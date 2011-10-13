@@ -6,8 +6,14 @@ Important changes between cado-nfs-1.0 and cado-nfs-1.1:
 * las supports I=16 (useful for the integer greater than 200 digits), minor bug
   fix, small speedup in las and purge.
 * reorganization executable in the linear algebra step and acceleration
-  of computing time on many machines with mpi
-* adding scripts to execute the sieve on a cluster with OAR in the "besteffort"
-  mode (also exists scripts for linear algebra in developpement version)
-* adding of new parameter files and few new variables inside (cf params.c91)
+  of computing time on many machines with mpi.
+* addition of experimental scripts to execute the sieve on a cluster.
+  These scrips rely on the OAR job scheduler being used, and exploit its 
+  "besteffort" mode. Some even more exeprimental scripts for linear
+  algebra are in the development version.
+* addition of new parameter files and few new variables inside (cf
+  params.c91)
+* The linear algebra step now makes some use of dynamically loaded shared
+  libraries. This might result in configuration issues, which we hope the
+  scripts get right. See the README file.
 
