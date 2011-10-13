@@ -372,14 +372,14 @@ scan_relations (char **ficname, int *nprimes, hashtable_t *H,
             if (!relation_stream_disp_progress_now_p(rs))
               continue;
 
-            fprintf(stderr, 
+            fprintf(stderr,
                     "read %d relations in %.1fs"
                     " -- %.1f MB/s -- %.1f rels/s\n",
                     rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
         }
         relation_stream_closefile(rs);
     }
-    fprintf(stderr, 
+    fprintf(stderr,
             "read %d relations in %.1fs -- %.1f MB/s -- %.1f rels/s\n",
             rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
     if (rs->nrels != nrelmax) {
@@ -704,7 +704,7 @@ reread (const char *oname, char ** ficname,
           if (!relation_stream_disp_progress_now_p(rs))
               continue;
 
-          fprintf(stderr, 
+          fprintf(stderr,
                   "re-read %d relations in %.1fs"
                   " -- %.1f MB/s -- %.1f rels/s\n",
                   rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
@@ -712,7 +712,7 @@ reread (const char *oname, char ** ficname,
       relation_stream_closefile(rs);
   }
   relation_stream_trigger_disp_progress(rs);
-  fprintf(stderr, 
+  fprintf(stderr,
           "re-read %d relations in %.1fs"
           " -- %.1f MB/s -- %.1f rels/s\n",
           rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
@@ -788,7 +788,7 @@ main (int argc, char **argv)
             usage();
         break;
         // fprintf (stderr, "Unknown option: %s\n", argv[0]);
-        // abort(); 
+        // abort();
     }
 
     param_list_parse_uint(pl, "nrels", &nrelmax);
@@ -946,7 +946,7 @@ main (int argc, char **argv)
           }
         remove_singletons (&nrel_new, nrelmax, &nprimes_new, &H, rel_used,
                            rel_compact, keep, final);
-        
+
         fprintf (stderr, "   nrel=%d, nprimes=%d; excess=%d\n",
                  nrel_new, nprimes_new, nrel_new - nprimes_new);
 
