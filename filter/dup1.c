@@ -1,4 +1,4 @@
-/* dup1: 1st duplicate pass, split relation files into 'nslices' 
+/* dup1: 1st duplicate pass, split relation files into 'nslices'
          slices (adapted from check).
 
    Usage:
@@ -165,7 +165,7 @@ main (int argc, char * argv[])
          * on unrecognized options */
         break;
         // fprintf (stderr, "Unknown option: %s\n", argv[0]);
-        // abort(); 
+        // abort();
     }
 
     int nslices_log = 1;
