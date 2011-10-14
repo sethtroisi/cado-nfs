@@ -84,7 +84,7 @@ log2 (double x)
 
 /* These parameters control the size of the buckets.
  * The number of updates that a bucket can accumulate is estimated as
- *   (loglog(factor base bound) - loglog(bucket sieving threshold)) 
+ *   (loglog(factor base bound) - loglog(bucket sieving threshold))
  *     * BUCKET_LIMIT_FACTOR * I * J + BUCKET_LIMIT_ADD 
  * We don't store updates where 2 divides gcd(i,j) which reduces the number 
  * of updates to about (1-1/4)=3/4, so 0.8 should be safe.
