@@ -583,9 +583,7 @@ typedef struct thread_data_s thread_data[1];
 typedef struct thread_data_s * thread_data_ptr;
 typedef const struct thread_data_s * thread_data_srcptr;
 
-/* {{{ disabled dispatch_fb code. */
-#ifdef SPLIT_BUCKET_FB_PER_THREAD
-#error "disabled"
+/* {{{ dispatch_fb */
 static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_main, factorbase_degn_t * fb0, int nparts)
 {
     /* Given fb0, which is a pointer in the fb array * fb_main, allocates
@@ -637,7 +635,6 @@ static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_mai
     memset(fb0, 0, sizeof(factorbase_degn_t));
     fb0->p = FB_END;
 }
-#endif
 /* }}} */
 
 void
@@ -652,14 +649,13 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     // and up to FB_END or pmax (pmax included)
 
     /* Skip forward to first FB prime p >= si->bucket_thresh */
-    while (fb->p != FB_END && fb->p < (fbprime_t) si->bucket_thresh)
-        fb = fb_next (fb); // cannot do fb++, due to variable size !
+    ASSERT(fb->p == FB_END || fb->p >= (fbprime_t) si->bucket_thresh);
 
     /* Init first logp value */
     if (fb->p != FB_END && fb->p <= pmax)
       bucket_new_logp (&BA, fb->plog);
 
-    while (fb->p != FB_END && fb->p <= pmax) {
+    for ( ; fb->p != FB_END && fb->p <= pmax ; fb = fb_next (fb)) {
         unsigned char nr;
         fbprime_t p = fb->p;
         unsigned char logp = fb->plog;
@@ -672,7 +668,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
         /* If we sieve for special-q's smaller than the factor
            base bound, the prime p might equal the special-q prime q. */
         if (UNLIKELY(p == si->q))
-          goto next_fb;
+            continue;
 
         for (nr = 0; nr < fb->nr_roots; ++nr) {
             const uint32_t I = si->I;
@@ -808,17 +804,6 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
                     if (i < bound0)  x += inc_c;
                 }
                 __asm__("## Inner bucket sieving loop stops here!!!\n");
-            }
-        }
-        int i;
-next_fb:
-        /* XXX [ET] unimportant, but a packed fb list for each thread
-         * would be cleaner. A small try shows no gain, so the code is
-         * not in...  */
-        for (i = 0; i < si->nb_threads; ++i) {
-            fb = fb_next (fb);
-            if (fb->p == FB_END || fb->p > pmax) {
-                break;
             }
         }
     }
@@ -2575,18 +2560,13 @@ static thread_data * thread_data_alloc(sieve_info_ptr si)
         /* skip over small primes */
         while (fb->p != FB_END && fb->p < (fbprime_t) si->bucket_thresh)
             fb = fb_next (fb); 
-#ifdef SPLIT_BUCKET_FB_PER_THREAD
-        dispatch_fb(thrs, &fb_alg, fb, si->nb_threads);
-#else
-        ASSERT (fb->p != FB_END);
+        factorbase_degn_t *fb_bucket[si->nb_threads];
+        dispatch_fb(fb_bucket, &s->fb, fb, si->nb_threads);
         for (int i = 0; i < si->nb_threads; ++i) {
-            thrs[i]->sides[side]->fb_bucket = fb;
-            fb = fb_next(fb);
-            ASSERT (fb->p != FB_END);
+            thrs[i]->sides[side]->fb_bucket = fb_bucket[i];
             thrs[i]->sides[side]->pmax = FBPRIME_MAX;
         }
-#endif
-        fprintf (si->output, "# Number of primes in %s factor base = %zu\n", sidenames[side], fb_nroots_total(s->fb));
+        fprintf (si->output, "# Number of small-sieved primes in %s factor base = %zu\n", sidenames[side], fb_nroots_total(s->fb));
 
         /* Counting the bucket-sieved primes per thread.  */
         unsigned long * nn = (unsigned long *) malloc(si->nb_threads * sizeof(unsigned long));
@@ -2594,7 +2574,6 @@ static thread_data * thread_data_alloc(sieve_info_ptr si)
         for (int i = 0; i < si->nb_threads; ++i) {
             thrs[i]->sides[side]->bucket_fill_ratio = 0;
         }
-#ifdef SPLIT_BUCKET_FB_PER_THREAD
         for (int i = 0; i < si->nb_threads; ++i) {
             thrs[i]->sides[side]->bucket_fill_ratio = 0;
             fb = thrs[i]->sides[side]->fb_bucket;
@@ -2603,15 +2582,6 @@ static thread_data * thread_data_alloc(sieve_info_ptr si)
                 thrs[i]->sides[side]->bucket_fill_ratio += fb->nr_roots / (double) fb->p;
             }
         }
-#else
-        fb = thrs[0]->sides[side]->fb_bucket;
-        for(int i = 0 ; fb->p != FB_END ; fb = fb_next (fb)) {
-            nn[i] += fb->nr_roots;
-            thrs[i]->sides[side]->bucket_fill_ratio += fb->nr_roots / (double) fb->p;
-            i++;
-            i %= si->nb_threads;
-        }
-#endif
         fprintf (si->output, "# Number of bucket-sieved primes in %s factor base per thread =", sidenames[side]);
         for(int i = 0 ; i < si->nb_threads ; i++)
             fprintf (si->output, " %lu", nn[i]);
@@ -2628,6 +2598,12 @@ static thread_data * thread_data_alloc(sieve_info_ptr si)
 
 static void thread_data_free(thread_data * thrs)
 {
+    sieve_info_ptr si = thrs[0]->si;
+    for (int i = 0; i < si->nb_threads; ++i) {
+        for(int side = 0 ; side < 2 ; side++) {
+            free(thrs[i]->sides[side]->fb_bucket);
+        }
+    }
     free(thrs); /* nothing to do ! */
 }
 
