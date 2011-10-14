@@ -538,13 +538,13 @@ typedef struct {
     fbprime_t r;        // in [ 0, p [
     fbprime_t offset;   // in [ 0, p [
     int next_position;  // start of the sieve for next bucket_region
-    unsigned char logp;
+    // unsigned char logp;
 } small_typical_prime_data_t;
 
 typedef struct {
     fbprime_t g, q, U;
     int next_position;
-    unsigned char logp;
+    // unsigned char logp;
 } small_bad_prime_data_t;
 
 typedef struct {
@@ -554,6 +554,8 @@ typedef struct {
     small_bad_prime_data_t *bad_p;
     int nb_nice_p;
     int nb_bad_p;
+    unsigned char * nice_logp;
+    unsigned char * bad_logp;
 } small_sieve_data_t;
 
 /* }}} */
@@ -637,6 +639,7 @@ static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_mai
 }
 /* }}} */
 
+/* {{{ fill_in_buckets */
 void
 fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 {
@@ -819,6 +822,7 @@ void * fill_in_buckets_both(thread_data_ptr th)
     fill_in_buckets(th, RATIONAL_SIDE, w);
     return NULL;
 }
+/* }}} */
 
 void thread_do(thread_data * thrs, void * (*f) (thread_data_ptr))
 {
@@ -843,7 +847,7 @@ void thread_do(thread_data * thrs, void * (*f) (thread_data_ptr))
     free(th);
 }
 
-
+/* {{{ apply_buckets */
 NOPROFILE_STATIC void
 apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
         where_am_I_ptr w)
@@ -888,6 +892,7 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
        sieve_decrease (S + x, logp, w);
     }
 }
+/* }}} */
 
 /* {{{ small sieve and resieving */
 /* Small primes or powers of small primes p^k with projective root.
@@ -937,6 +942,8 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
 void clear_small_sieve(small_sieve_data_t ssd) {
     free(ssd.nice_p); ssd.nice_p = NULL;
     free(ssd.bad_p); ssd.bad_p = NULL;
+    free(ssd.nice_logp); ssd.nice_logp = NULL;
+    free(ssd.bad_logp); ssd.bad_logp = NULL;
 }
 
 void
@@ -944,12 +951,20 @@ clone_small_sieve(small_sieve_data_t *r, const small_sieve_data_t *s) {
     memcpy(r, s, sizeof(small_sieve_data_t));
     r->nice_p = malloc(r->nb_nice_p*sizeof(small_typical_prime_data_t));
     r->bad_p = malloc(r->nb_bad_p*sizeof(small_bad_prime_data_t));
+    r->nice_logp = malloc(r->nb_nice_p*sizeof(unsigned char));
+    r->bad_logp = malloc(r->nb_bad_p*sizeof(unsigned char));
     ASSERT(!r->nb_nice_p || r->nice_p);
     ASSERT(!r->nb_bad_p || r->bad_p);
+    ASSERT(!r->nb_nice_p || r->nice_logp);
+    ASSERT(!r->nb_bad_p || r->bad_logp);
     memcpy(r->nice_p, s->nice_p,
             r->nb_nice_p*sizeof(small_typical_prime_data_t));
     memcpy(r->bad_p, s->bad_p,
             r->nb_bad_p*sizeof(small_bad_prime_data_t));
+    memcpy(r->nice_logp, s->nice_logp,
+            r->nb_nice_p*sizeof(unsigned char));
+    memcpy(r->bad_logp, s->bad_logp,
+            r->nb_bad_p*sizeof(unsigned char));
 }
 
 /* Copy those primes in s to r that need to be resieved, i.e., those
@@ -961,12 +976,13 @@ copy_small_sieve (small_sieve_data_t *r, const small_sieve_data_t *s,
 {
   int i, j, td_idx;
 
-  r->nb_nice_p = 0;
-  r->nice_p = NULL;
+  r->nb_nice_p = 0; r->nice_p = NULL; r->nice_logp = NULL;
   if (s->nb_nice_p > 0)
     {
       const size_t size = s->nb_nice_p * sizeof (small_typical_prime_data_t);
       r->nice_p = (small_typical_prime_data_t *) malloc (size);
+      r->nice_logp = malloc (s->nb_nice_p);
+
       ASSERT (r->nice_p != NULL);
       
       td_idx = 0;
@@ -981,24 +997,27 @@ copy_small_sieve (small_sieve_data_t *r, const small_sieve_data_t *s,
 	    td_idx++;
 	  
 	  if (trialdiv_primes[td_idx] == FB_END || 
-	      trialdiv_primes[td_idx] !=s->nice_p[i].p)
-	    r->nice_p[j++] = s->nice_p[i];
+	      trialdiv_primes[td_idx] !=s->nice_p[i].p) {
+	    r->nice_p[j] = s->nice_p[i];
+	    r->nice_logp[j] = s->nice_logp[i];
+            j++;
+          }
 	}
       
       r->nb_nice_p = j;
       if (j == 0)
 	{
-	  free (r->nice_p);
-	  r->nice_p = NULL;
+	  free (r->nice_p); r->nice_p = NULL;
+	  free (r->nice_logp); r->nice_logp = NULL;
 	}
     }
   
-  r->nb_bad_p = 0;
-  r->bad_p = NULL;
+  r->nb_bad_p = 0; r->bad_p = NULL; r->bad_logp = NULL;
   if (s->nb_bad_p > 0)
     {
       const size_t size = s->nb_bad_p * sizeof (small_bad_prime_data_t);
       r->bad_p = (small_bad_prime_data_t *) malloc (size);
+      r->bad_logp = malloc (s->nb_bad_p);
       ASSERT (r->bad_p != NULL);
       
       td_idx = 0;
@@ -1014,15 +1033,18 @@ copy_small_sieve (small_sieve_data_t *r, const small_sieve_data_t *s,
 	    td_idx++;
 	  
 	  if ((trialdiv_primes[td_idx] == FB_END || 
-	       trialdiv_primes[td_idx] !=  s->bad_p[i].g))
-	    r->bad_p[j++] = s->bad_p[i];
+	       trialdiv_primes[td_idx] !=  s->bad_p[i].g)) {
+	    r->bad_p[j] = s->bad_p[i];
+	    r->bad_logp[j] = s->bad_logp[i];
+            j++;
+          }
 	}
       
       r->nb_bad_p = j;
       if (j == 0)
 	{
-	  free (r->bad_p);
-	  r->bad_p = NULL;
+	  free (r->bad_p); r->bad_p = NULL;
+	  free (r->bad_logp); r->bad_logp = NULL;
 	}
     }
 }
@@ -1057,6 +1079,8 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
     n = 0;
     ssd->nb_bad_p = 0;
     ssd->bad_p = NULL;
+    ssd->nice_logp = (unsigned char *) malloc(size);
+    ssd->bad_logp = NULL;
     // Do another pass on fb and badprimes, to fill in the data
     // while we have any regular primes or bad primes < thresh left
     while (fb->p != FB_END && fb->p < thresh) {
@@ -1096,6 +1120,8 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
 		  ssd->bad_p = (small_bad_prime_data_t *)
 		    realloc (ssd->bad_p, (ssd->nb_bad_p + 1) *
 			     sizeof (small_bad_prime_data_t));
+		  ssd->bad_logp = (unsigned char *)
+		    realloc (ssd->bad_logp, (ssd->nb_bad_p + 1));
 		  q = p / g;
 		  ssd->bad_p[ssd->nb_bad_p].g = g;
 		  ssd->bad_p[ssd->nb_bad_p].q = q;
@@ -1118,7 +1144,8 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
 		      ssd->bad_p[ssd->nb_bad_p].next_position = 
 			g * si->I + (si->I / 2 + U) % q;
 		    }
-		  ssd->bad_p[ssd->nb_bad_p].logp = fb->plog;
+		  // ssd->bad_p[ssd->nb_bad_p].logp = fb->plog;
+		  ssd->bad_logp[ssd->nb_bad_p] = fb->plog;
 		  ssd->nb_bad_p++;
 		} 
 	      else 
@@ -1139,7 +1166,7 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
 	      ASSERT (n < size);
 	      ssd->nice_p[n].p = p;
 	      ssd->nice_p[n].r = r;
-	      ssd->nice_p[n].logp = fb->plog;
+	      ssd->nice_logp[n] = fb->plog;
 	      ssd->nice_p[n].next_position = (si->I >> 1)%p;
               // The processing of bucket region by nb_threads is interleaved.
               // It means that the positions for the small sieve must jump
@@ -1315,7 +1342,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                   ASSERT (i0 < p);
                   ASSERT ((nj * N + j) % 2 == 1);
                   for (unsigned int i = i0; i < pattern2_size; i += p)
-                    ((unsigned char *)pattern)[i] += ssd.nice_p[n].logp;
+                    ((unsigned char *)pattern)[i] += ssd.nice_logp[n];
                   /* Skip two lines above, since we sieve only odd lines.
                    * Even lines would correspond to useless reports.
                    */
@@ -1380,7 +1407,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
               unsigned int i;
               ASSERT (i0 < p);
               for (i = i0; i < 3 * sizeof(unsigned long); i += p)
-                ((unsigned char *)pattern)[i] += ssd.nice_p[n].logp;
+                ((unsigned char *)pattern)[i] += ssd.nice_logp[n];
               i0 += ssd.nice_p[n].r;
               if (i0 >= p)
                 i0 -= p;
@@ -1424,7 +1451,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
         const fbprime_t p = ssd.nice_p[n].p;
         const fbprime_t r = ssd.nice_p[n].r;
         WHERE_AM_I_UPDATE(w, p, p);
-        const unsigned char logp = ssd.nice_p[n].logp;
+        const unsigned char logp = ssd.nice_logp[n];
         unsigned char *S_ptr = S;
         fbprime_t twop;
         unsigned int i, i0, linestart = 0;
@@ -1516,7 +1543,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
           ASSERT (i0 % I == 0);
           ASSERT (I % (4 * sizeof (unsigned long)) == 0);
 	  for (j = 0; j < sizeof (unsigned long); j++)
-	    ((unsigned char *)&logps)[j] = ssd.bad_p[n].logp;
+	    ((unsigned char *)&logps)[j] = ssd.bad_logp[n];
           while (i0 < (unsigned int) bucket_region)
             {
               unsigned long *S_ptr = (unsigned long *) (S + i0);
@@ -1532,7 +1559,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 #ifdef TRACE_K
               if (trace_on_range_Nx(w->N, i0, i0 + I)) {
                   WHERE_AM_I_UPDATE(w, x, trace_Nx.x);
-                  sieve_decrease_logging(S + w->x, ssd.bad_p[n].logp, w);
+                  sieve_decrease_logging(S + w->x, ssd.bad_logp[n], w);
               }
 #endif
               while (S_ptr < end)
@@ -1555,7 +1582,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 	  const fbprime_t q = ssd.bad_p[n].q;
           WHERE_AM_I_UPDATE(w, p, g*q);
 	  const fbprime_t U = ssd.bad_p[n].U;
-	  const unsigned char logp = ssd.bad_p[n].logp;
+	  const unsigned char logp = ssd.bad_logp[n];
 	  const fbprime_t evenq = (q % 2 == 0) ? q : 2 * q;
 	  unsigned int lineoffset = i0 & (I - 1U),
 	               linestart = i0 - lineoffset;
