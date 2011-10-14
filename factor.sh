@@ -75,7 +75,7 @@ if [ "$0" -ef "$cado_prefix/bin/factor.sh" ] ; then
     cputime="$bindir/cpu_time.sh"
 elif [ "$0" -ef "@CADO_NFS_BINARY_DIR@/factor.sh" ] ; then
     # We're called in the build tree.
-    paramdir="@CADO_NFS_SOURCE_DIR@/params/params.c$size"
+    paramdir="@CADO_NFS_SOURCE_DIR@/params"
     cputime="@CADO_NFS_SOURCE_DIR@/scripts/cpu_time.sh"
     cadofactor="@CADO_NFS_SOURCE_DIR@/cadofactor.pl"
     # Make the path absolute.
