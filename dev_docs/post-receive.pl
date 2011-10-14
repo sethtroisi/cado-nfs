@@ -53,7 +53,7 @@ my $subj_prefix=config_get('hooks.emailprefix', "[$repo-commits] ");
 sub commit_link {
     my $commit = shift;
     return $commit unless $gitweb;
-    my $url = $gitweb . "h=$commit";
+    my $url = $gitweb . "a=commitdiff;h=$commit";
     return "<a href=\"$url\">$commit</a>";
 }
 
