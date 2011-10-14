@@ -34,8 +34,9 @@ sub config_get {
     my $x = `git config $key 2>/dev/null`;
     if ($x =~ /^([^'`]*)$/) {
         # A positive answer with empty content still reaches here.
+        $x=$1;
         chomp($x);
-        return $1;
+        return $x;
     }
     my $default = shift;
     return '' unless $default;
@@ -52,7 +53,7 @@ my $subj_prefix=config_get('hooks.emailprefix', "[$repo-commits] ");
 sub commit_link {
     my $commit = shift;
     return $commit unless $gitweb;
-    my $url = $gitweb . "h=$commit";
+    my $url = $gitweb . "a=commitdiff;h=$commit";
     return "<a href=\"$url\">$commit</a>";
 }
 
@@ -68,7 +69,7 @@ my $mainbound = boundary();
 
 my $patches_mboxes='';
 
-while (<>) {
+while (defined($_=<STDIN>)) {
     chomp($_);
     s/^\s*//;
     next if /^$/;
@@ -76,6 +77,8 @@ while (<>) {
     my $old = $1;
     s/^([0-9a-f]{40})\s+// or die "Bad input line: $_";
     my $new = $1;
+    next if $old =~ /^0+$/;
+    next if $new =~ /^0+$/;
     my $ref = $_;
     $ref =~ s,^refs/heads/,,;
     push @branches_touched, $ref;
@@ -139,6 +142,8 @@ EOF
 
 my $refs = join(', ', @branches_touched);
 
+return unless $total_nc;
+
 my $subject = "$total_nc new commits";
 if ($total_nc == 1) {
     $subject = $last_subject;
@@ -179,8 +184,13 @@ EOF
 my $bodylength = length($body);
 my $bodylines = eval { @_=split(/^/m, $body);scalar @_; };
 
-
-open SMTP, "| exim '$recipient'";
+if (@ARGV && $ARGV[0] eq '-d') {
+    open SMTP, ">&STDOUT";
+    my $now=strftime("%a %b %d %H:%M:%S %Y", localtime);
+    print SMTP "From root $now\n";
+} else {
+    open SMTP, "| exim '$recipient'";
+}
 
 print SMTP <<EOF;
 $header
