@@ -32,17 +32,17 @@ else
             perl='while (<>) { /trunk@(\d+)/ && print "$1\n"; }'
             ver=`git show refs/remotes/trunk 2>/dev/null | perl -e "$perl"`
             if [ "$ver" ] ; then
-                echo -n "svn $ver -- git $commit"
+                commit="svn $ver -- git $commit"
             else
-                echo -n "git $commit"
+                commit="git $commit"
             fi
             # git diff --name-status is svn status -q
             # Note that checked out copies which have GIT_DIR set for
             # some reason could end up triggering errors on git diff
             if [ "`git diff --name-status 2>/dev/null`" != "" ] ; then
-                echo " +mods"
+                echo "$commit +mods"
             else
-                echo
+                echo "$commit"
             fi
         else
             echo "exported"
