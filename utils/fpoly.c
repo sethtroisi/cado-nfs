@@ -1,4 +1,5 @@
 /* arithmetic on polynomial with double-precision coefficients */
+#include "cado.h"
 
 #include <string.h>
 #include <stdio.h>

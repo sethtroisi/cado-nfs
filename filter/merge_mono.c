@@ -4,6 +4,7 @@
 /* If one wants to change the R data structure, please check the diff of
    revision 1568, which clearly identifies the places where R is used. */
 
+#include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <gmp.h>

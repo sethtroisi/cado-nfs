@@ -1,3 +1,4 @@
+#include "cado.h"
 #include <stdio.h>
 #include "modredc_2ul2_default.h"
 #include "modredc_2ul_common.c"

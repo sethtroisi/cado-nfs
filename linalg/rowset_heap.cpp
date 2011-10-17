@@ -1,3 +1,4 @@
+#include "cado.h"
 #include <stddef.h>     /* ptrdiff_t */
 #include <stdint.h>
 #include <algorithm>

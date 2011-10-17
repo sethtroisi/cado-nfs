@@ -1,3 +1,5 @@
+#include "cado.h"
+
 #include <string.h>
 
 #include "utils.h"

@@ -47,6 +47,7 @@
  *        - Initial version.
  */
 
+#include "cado.h"
 #include <stdlib.h>
 #include "mpz_array.h"
 

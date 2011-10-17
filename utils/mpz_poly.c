@@ -1,3 +1,4 @@
+#include "cado.h"
 #include "mpz_poly.h"
 
 static void mp_poly_evalz(mpz_t r, mpz_t * poly, int deg, mpz_srcptr a)

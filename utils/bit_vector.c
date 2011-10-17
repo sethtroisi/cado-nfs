@@ -1,3 +1,4 @@
+#include "cado.h"
 #include <stdlib.h>
 #include <string.h>
 #include "bit_vector.h"

@@ -1,5 +1,7 @@
 /* program to determine the size of the L1 cache */
 
+#include "cado.h"
+
 /* we assume the L1 cache has size 2^k */
 #define L1_NUM 11
 

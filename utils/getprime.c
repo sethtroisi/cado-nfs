@@ -21,6 +21,7 @@
   MA 02110-1301, USA.
 */
 
+#include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include "getprime.h"

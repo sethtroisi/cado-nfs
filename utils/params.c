@@ -1,5 +1,3 @@
-#define _BSD_SOURCE     /* strdup */
-
 #include "cado.h"
 #include <stdlib.h>
 #include <string.h>
