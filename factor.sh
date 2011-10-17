@@ -44,7 +44,7 @@ for ((i=1; i<=2; i=i+1)) ; do
   if [ "$1" = "-t" ]; then
     cores=$2
     if [ ! "$(grep "^[ [:digit:] ]*$" <<< $cores)" ]; then
-      echo -e $usage
+      usage
       exit 1
     fi
     shift 2
@@ -125,7 +125,7 @@ done
 
 if [ ! -f $file ] ; then
     echo "no parameter file found for c${#n} (last tried was $file)" >&2
-    echo -e $usage
+    usage
     exit 1
 fi
 
