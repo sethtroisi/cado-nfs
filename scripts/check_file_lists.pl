@@ -17,16 +17,10 @@ die "Please call $0 from the top of the source tree" unless -f "cado.h";
 
 my @files_scm;
 
-system "git rev-parse HEAD > /dev/null 2>/dev/null";
-if ($? == 0) {
-    open SCM, "git ls-files |";
-    @files_scm = <SCM>;
-    close SCM;
-} elsif (-d ".svn") {
-    open SCM, "svn list -R |";
-    @files_scm = grep { ! m{/$} } <SCM>;
-    close SCM;
-}
+open SCM, "git ls-files |";
+@files_scm = <SCM>;
+close SCM;
+die "where am I ?" unless @files_scm;
 
 chomp for @files_scm;
 

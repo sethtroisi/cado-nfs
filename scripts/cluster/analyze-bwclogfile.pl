@@ -37,7 +37,7 @@ sub analyze_file {
             if (/revision (?:svn \d+ -- )?git (\w+)$/) {
                 $res->{'rev'}=$1;
             }
-            if (/^# \((?:svn \d+ -- )?git (\w+)(\s\+mods)?\)/) {
+            if (/^# \((?:svn \d+ -- )?([0-9a-f]+)(\+)?\)/) {
                 $res->{'rev'}=$1;
                 $res->{'rev'}.='#M' if $2;
             }
