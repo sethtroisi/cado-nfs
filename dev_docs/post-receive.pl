@@ -153,7 +153,7 @@ if ($total_nc == 1) {
 my $header = <<EOF;
 To: $recipient
 From: $sender
-Subject: $subj_prefix($refs) $subject;
+Subject: $subj_prefix($refs) $subject
 EOF
 
 $header=~s/\n$//m;

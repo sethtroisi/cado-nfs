@@ -621,6 +621,11 @@ sub remote_cmd {
     # all the time (especially not in the middle of the night!)
     # use public-key authentification instead!
 
+    for my $prop (qw/LD_LIBRARY_PATH DYLD_LIBRARY_PATH/) {
+       my $v = $ENV{$prop} or next;
+       $cmd="$prop=$v $cmd";
+    }
+
     $cmd = "env $ssh -q ".
            "-o ConnectTimeout=$opt->{'timeout'} ".
            "-o ServerAliveInterval=".int($opt->{'timeout'}/3)." ".
