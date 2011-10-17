@@ -13,7 +13,8 @@
 # will fail.
 
 #CADO_DEBUG=1
-usage=<<EOF
+usage() {
+    cat >&2 <<EOF
 Usage: $0 <integer> [options] [arguments passed to cadofactor.pl]
     <integer>     - integer to be factored. must be at least 60 digits,
                     and free of small prime factors [parameters are
@@ -25,6 +26,7 @@ options:
                     use on several machines, use the advanced script
                     cadofactor.pl
 EOF
+}
 
 : ${t:=`mktemp -d /tmp/cado.XXXXXXXXXX`}
 chmod 755 $t
@@ -32,7 +34,7 @@ chmod 755 $t
 n=$1
 shift
 if [ ! "$(grep "^[ [:digit:] ]*$" <<< $n)" ]; then
-  echo -e $usage
+  usage
   exit 1
 fi
 
