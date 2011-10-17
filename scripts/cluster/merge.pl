@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 
 # This script has been taken from the rsa768 scripts, and mildly adapted.
 # Here is the readme from the cacao rsa768 fileset:

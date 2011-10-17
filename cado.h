@@ -66,6 +66,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #define _GNU_SOURCE         /* asprintf vasprintf */
 #endif
 #define _DARWIN_C_SOURCE    /* asprintf ; _ANSI_SOURCE must be undefined */
+#define _NETBSD_SOURCE      /* asprintf vasprintf */
 #endif
 
 #ifdef __cplusplus

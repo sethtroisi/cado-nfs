@@ -22,10 +22,16 @@
 #endif
 
 #ifndef HAVE_LOG2
-static double
-log2 (double x)
+static double log2 (double x)
 {
   return log (x) / log (2.0);
+}
+#endif
+
+#ifndef HAVE_EXP2
+static double exp2 (double x)
+{
+  return exp (x * log (2.0));
 }
 #endif
 

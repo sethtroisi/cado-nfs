@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 
 # This script makes sure that the files.dist and files.nodist cover the 
 # set of files in the source tree (as defined by the SCM system of course).
