@@ -326,7 +326,17 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0,
   si->degree = d;
   si->cpoly = cpoly;
   si->fij = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
+  if (si->fij == NULL)
+    {
+      fprintf (stderr, "Error, cannot allocate memory\n");
+      exit (EXIT_FAILURE);
+    }
   si->fijd = (double*) malloc ((d + 1) * sizeof (double));
+  if (si->fijd == NULL)
+    {
+      fprintf (stderr, "Error, cannot allocate memory\n");
+      exit (EXIT_FAILURE);
+    }
   for (k = 0; k <= d; k++)
     mpz_init (si->fij[k]);
   mpz_init (si->gij[0]);
@@ -433,7 +443,11 @@ sieve_info_init (sieve_info_t *si, cado_poly cpoly, int logI, uint64_t q0,
 
   /* Store largest prime factor of k in si->lpf[k], 0 for k=0, 1 for k=1 */
   si->lpf = (unsigned int *) malloc (si->I * sizeof (unsigned int));
-  ASSERT_ALWAYS (si->lpf != NULL);
+  if (si->lpf == NULL)
+    {
+      fprintf (stderr, "Error, cannot allocate memory\n");
+      exit (EXIT_FAILURE);
+    }
   si->lpf[0] = 0U;
   si->lpf[1] = 1U;
   for (k = 2U; k < si->I; k++)
@@ -466,12 +480,22 @@ factor_small (mpz_t n, fbprime_t lim)
 
   l = 0;
   f = (fbprime_t*) malloc (sizeof (fbprime_t));
+  if (f == NULL)
+    {
+      fprintf (stderr, "Error, cannot allocate memory\n");
+      exit (EXIT_FAILURE);
+    }
   for (p = 2; p <= lim; p = getprime (p))
     {
       if (mpz_divisible_ui_p (n, p))
         {
           l ++;
           f = (fbprime_t*) realloc (f, (l + 1) * sizeof (fbprime_t));
+          if (f == NULL)
+            {
+              fprintf (stderr, "Error, cannot reallocate memory\n");
+              exit (EXIT_FAILURE);
+            }
           f[l - 1] = p;
         }
     }
@@ -1202,8 +1226,13 @@ static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_mai
      * in the end.
      */
     /* Start by counting, unsurprisingly */
-    size_t * fb_sizes = (size_t *) malloc(nparts * sizeof(size_t));
-    memset(fb_sizes, 0, nparts * sizeof(size_t));
+    size_t * fb_sizes = (size_t *) malloc (nparts * sizeof(size_t));
+    if (fb_sizes == NULL)
+      {
+        fprintf (stderr, "Error, cannot allocate memory\n");
+        exit (EXIT_FAILURE);
+      }
+    memset (fb_sizes, 0, nparts * sizeof(size_t));
     size_t headsize = 0;
     int i = 0;
     for(factorbase_degn_t * fb = *fb_main ; fb < fb0 ; fb = fb_next (fb)) {
@@ -1216,11 +1245,22 @@ static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_mai
         i++;
         i %= nparts;
     }
-    factorbase_degn_t ** fbi = (factorbase_degn_t **) malloc(nparts * sizeof(factorbase_degn_t *));
+    factorbase_degn_t ** fbi = (factorbase_degn_t **)
+      malloc (nparts * sizeof(factorbase_degn_t *));
+    if (fbi == NULL)
+      {
+        fprintf (stderr, "Error, cannot allocate memory\n");
+        exit (EXIT_FAILURE);
+      }
     for(i = 0 ; i < nparts ; i++) {
         // add one for end marker
         fb_sizes[i] += sizeof(factorbase_degn_t);
-        fb_dst[i] = (factorbase_degn_t *) malloc(fb_sizes[i]);
+        fb_dst[i] = (factorbase_degn_t *) malloc (fb_sizes[i]);
+        if (fb_dst[i] == NULL)
+          {
+            fprintf (stderr, "Error, cannot allocate memory\n");
+            exit (EXIT_FAILURE);
+          }
         fbi[i] = fb_dst[i];
     }
     free(fb_sizes); fb_sizes = NULL;
@@ -1239,9 +1279,14 @@ static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_mai
         fbi[i]->p = FB_END;
     }
     free(fbi); fbi = NULL;
-    *fb_main = realloc(*fb_main, (headsize + sizeof(factorbase_degn_t)));
-    fb0 = fb_skip(*fb_main, headsize);
-    memset(fb0, 0, sizeof(factorbase_degn_t));
+    *fb_main = realloc (*fb_main, (headsize + sizeof(factorbase_degn_t)));
+    if (*fb_main == NULL)
+      {
+        fprintf (stderr, "Error, cannot reallocate memory\n");
+        exit (EXIT_FAILURE);
+      }
+    fb0 = fb_skip (*fb_main, headsize);
+    memset (fb0, 0, sizeof(factorbase_degn_t));
     fb0->p = FB_END;
 }
 #endif
@@ -1437,8 +1482,12 @@ void thread_do(thread_data * thrs, void * (*f) (thread_data_ptr))
         (*f)(thrs[0]);
         return;
     }
-    pthread_t * th = malloc(si->nb_threads*sizeof(pthread_t)); 
-    ASSERT_ALWAYS(th);
+    pthread_t * th = malloc (si->nb_threads * sizeof(pthread_t)); 
+    if (th == NULL)
+      {
+        fprintf (stderr, "Error, cannot allocate memory\n");
+        exit (EXIT_FAILURE);
+      }
     for (int i = 0; i < si->nb_threads; ++i) {
         int ret = pthread_create(&(th[i]), NULL, 
 		(void * (*)(void *)) f,
@@ -1781,7 +1830,11 @@ init_alg_norms_bucket_region (unsigned char *alg_S,
 
   t = si->fijd;
   u = (double*) malloc ((si->degree + 1) * sizeof (double));
-  ASSERT(u != NULL);
+  if (u == NULL)
+    {
+      fprintf (stderr, "Error, cannot allocate memory\n");
+      exit (EXIT_FAILURE);
+    }
 
   /* bucket_region is a multiple of I. Let's find the starting j
    * corresponding to N and the last j.
@@ -1927,15 +1980,23 @@ void clear_small_sieve(small_sieve_data_t ssd) {
 
 void
 clone_small_sieve(small_sieve_data_t *r, const small_sieve_data_t *s) {
-    memcpy(r, s, sizeof(small_sieve_data_t));
-    r->nice_p = malloc(r->nb_nice_p*sizeof(small_typical_prime_data_t));
-    r->bad_p = malloc(r->nb_bad_p*sizeof(small_bad_prime_data_t));
-    ASSERT(!r->nb_nice_p || r->nice_p);
-    ASSERT(!r->nb_bad_p || r->bad_p);
-    memcpy(r->nice_p, s->nice_p,
-            r->nb_nice_p*sizeof(small_typical_prime_data_t));
-    memcpy(r->bad_p, s->bad_p,
-            r->nb_bad_p*sizeof(small_bad_prime_data_t));
+    memcpy (r, s, sizeof(small_sieve_data_t));
+    r->nice_p = malloc (r->nb_nice_p * sizeof(small_typical_prime_data_t));
+    if (r->nb_nice_p > 0 && r->nice_p == NULL)
+      {
+        fprintf (stderr, "Error, cannot allocate memory\n");
+        exit (EXIT_FAILURE);
+      }
+    r->bad_p = malloc (r->nb_bad_p * sizeof(small_bad_prime_data_t));
+    if (r->nb_bad_p > 0 && r->bad_p == NULL)
+      {
+        fprintf (stderr, "Error, cannot allocate memory\n");
+        exit (EXIT_FAILURE);
+      }
+    memcpy (r->nice_p, s->nice_p,
+            r->nb_nice_p * sizeof(small_typical_prime_data_t));
+    memcpy (r->bad_p, s->bad_p,
+            r->nb_bad_p * sizeof(small_bad_prime_data_t));
 }
 
 /* Assume q is a prime power p^k with k>=1, return p if k > 1, 0 otherwise. */
@@ -1971,7 +2032,11 @@ copy_small_sieve (small_sieve_data_t *r, const small_sieve_data_t *s,
     {
       const size_t size = s->nb_nice_p * sizeof (small_typical_prime_data_t);
       r->nice_p = (small_typical_prime_data_t *) malloc (size);
-      ASSERT (r->nice_p != NULL);
+      if (r->nice_p == NULL)
+        {
+          fprintf (stderr, "Error, cannot allocate memory\n");
+          exit (EXIT_FAILURE);
+        }
       
       td_idx = 0;
       j = 0;
@@ -2003,7 +2068,11 @@ copy_small_sieve (small_sieve_data_t *r, const small_sieve_data_t *s,
     {
       const size_t size = s->nb_bad_p * sizeof (small_bad_prime_data_t);
       r->bad_p = (small_bad_prime_data_t *) malloc (size);
-      ASSERT (r->bad_p != NULL);
+      if (r->bad_p == NULL)
+        {
+          fprintf (stderr, "Error, cannot allocate memory\n");
+          exit (EXIT_FAILURE);
+        }
       
       td_idx = 0;
       j = 0;
@@ -2058,6 +2127,11 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
     // ideals might become special ones.
     ssd->nice_p = (small_typical_prime_data_t *)
       malloc(size * sizeof(small_typical_prime_data_t));
+    if (ssd->nice_p == NULL)
+      {
+        fprintf (stderr, "Error, cannot allocate memory\n");
+        exit (EXIT_FAILURE);
+      }
     n = 0;
     ssd->nb_bad_p = 0;
     ssd->bad_p = NULL;
@@ -2100,6 +2174,11 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
 		  ssd->bad_p = (small_bad_prime_data_t *)
 		    realloc (ssd->bad_p, (ssd->nb_bad_p + 1) *
 			     sizeof (small_bad_prime_data_t));
+                  if (ssd->bad_p == NULL)
+                    {
+                      fprintf (stderr, "Error, cannot reallocate memory\n");
+                      exit (EXIT_FAILURE);
+                    }
 		  q = p / g;
 		  ssd->bad_p[ssd->nb_bad_p].g = g;
 		  ssd->bad_p[ssd->nb_bad_p].q = q;
@@ -2769,7 +2848,11 @@ typedef struct {
 
 void factor_list_init(factor_list_t *fl) {
     fl->fac = (uint64_t *) malloc (FL_MAX_SIZE * sizeof(uint64_t));
-    ASSERT_ALWAYS(fl->fac != NULL);
+    if (fl->fac == NULL)
+      {
+        fprintf (stderr, "Error, cannot allocate memory\n");
+        exit (EXIT_FAILURE);
+      }
     fl->n = 0;
 }
 
@@ -3094,7 +3177,17 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
 
     for(int side = 0 ; side < 2 ; side++) {
         f[side] = alloc_mpz_array (8);
+        if (f[side] == NULL)
+          {
+            fprintf (stderr, "Error, cannot allocate memory\n");
+            exit (EXIT_FAILURE);
+          }
         m[side] = alloc_uint32_array (8);
+        if (m[side] == NULL)
+          {
+            fprintf (stderr, "Error, cannot allocate memory\n");
+            exit (EXIT_FAILURE);
+          }
 
         factor_list_init(&factors[side]);
         mpz_init (norm[side]);
@@ -3505,11 +3598,28 @@ get_maxnorm_aux (double *g, const unsigned int d, double s)
   double *roots, gmax;
 
   dg = (double**) malloc (d * sizeof (double*));
+  if (dg == NULL)
+    {
+      fprintf (stderr, "Error, cannot allocate memory\n");
+      exit (EXIT_FAILURE);
+    }
   dg[0] = g;
   for (k = 1; k < d; k++) /* dg[k] is the k-th derivative, thus has
                              degree d-k, i.e., d-k+1 coefficients */
-    dg[k] = (double*) malloc ((d - k + 1) * sizeof (double));
+    {
+      dg[k] = (double*) malloc ((d - k + 1) * sizeof (double));
+      if (dg[k] == NULL)
+        {
+          fprintf (stderr, "Error, cannot allocate memory\n");
+          exit (EXIT_FAILURE);
+        }
+    }
   roots = (double*) malloc (d * sizeof (double));
+  if (roots == NULL)
+    {
+      fprintf (stderr, "Error, cannot allocate memory\n");
+      exit (EXIT_FAILURE);
+    }
   for (k = 1; k < d; k++)
     for (l = 0; l <= d - k; l++)
       dg[k][l] = (l + 1) * dg[k - 1][l + 1];
@@ -3587,6 +3697,11 @@ get_maxnorm (cado_poly cpoly, sieve_info_t *si, uint64_t q0)
   double norm, max_norm, pows, tmp;
 
   fd = (double*) malloc ((d + 1) * sizeof (double));
+  if (fd == NULL)
+    {
+      fprintf (stderr, "Error, cannot allocate memory\n");
+      exit (EXIT_FAILURE);
+    }
   for (k = 0; k <= d; k++)
     fd[k] = mpz_get_d (cpoly->f[k]);
 
@@ -3852,7 +3967,13 @@ process_bucket_region(thread_data_ptr th)
         /* make copies of small sieve data: the "next_position" field is
          * specific to each thread.  */
         if (si->nb_threads > 1) {
-            lo->lssd= (small_sieve_data_t *)malloc(sizeof(small_sieve_data_t));
+            lo->lssd = (small_sieve_data_t *)
+              malloc (sizeof(small_sieve_data_t));
+            if (lo->lssd == NULL)
+              {
+                fprintf (stderr, "Error, cannot allocate memory\n");
+                exit (EXIT_FAILURE);
+              }
             clone_small_sieve (lo->lssd, &ts->ssd);
         } else {
             lo->lssd = &ts->ssd;
@@ -3866,15 +3987,25 @@ process_bucket_region(thread_data_ptr th)
          * TODO: come on! we should be able to do it with less copies 
          */
         if (si->nb_threads > 1) {
-            lo->rssd= (small_sieve_data_t *)malloc(sizeof(small_sieve_data_t));
+            lo->rssd = (small_sieve_data_t *)
+              malloc (sizeof(small_sieve_data_t));
+            if (lo->rssd == NULL)
+              {
+                fprintf (stderr, "Error, cannot allocate memory\n");
+                exit (EXIT_FAILURE);
+              }
             clone_small_sieve (lo->rssd, lo->lsrsd);
         } else {
             lo->rssd = lo->lsrsd;
         }
 
         /* local sieve region */
-        lo->S = (unsigned char *) malloc(bucket_region);
-        ASSERT_ALWAYS (lo->S != NULL);
+        lo->S = (unsigned char *) malloc (bucket_region);
+        if (lo->S == NULL)
+          {
+            fprintf (stderr, "Error, cannot allocate memory\n");
+            exit (EXIT_FAILURE);
+          }
     }
 
     /* loop over appropriate set of sieve regions */
@@ -3950,8 +4081,14 @@ process_bucket_region(thread_data_ptr th)
 
 static thread_data * thread_data_alloc(sieve_info_t * si)
 {
-    thread_data * thrs = (thread_data *) malloc(si->nb_threads * sizeof(thread_data));
-    memset(thrs, 0, si->nb_threads * sizeof(thread_data));
+    thread_data * thrs = (thread_data *)
+      malloc (si->nb_threads * sizeof(thread_data));
+    if (thrs == NULL)
+      {
+        fprintf (stderr, "Error, cannot allocate memory\n");
+        exit (EXIT_FAILURE);
+      }
+    memset (thrs, 0, si->nb_threads * sizeof(thread_data));
 
     for(int i = 0 ; i < si->nb_threads ; i++) {
         thrs[i]->id = i;
@@ -3981,10 +4118,16 @@ static thread_data * thread_data_alloc(sieve_info_t * si)
         fprintf (si->output, "# Number of primes in %s factor base = %zu\n", sidenames[side], fb_nroots_total(s->fb));
 
         /* Counting the bucket-sieved primes per thread.  */
-        unsigned long * nn = (unsigned long *) malloc(si->nb_threads * sizeof(unsigned long));
+        unsigned long * nn = (unsigned long *)
+          malloc (si->nb_threads * sizeof(unsigned long));
+        if (nn == NULL)
+          {
+            fprintf (stderr, "Error, cannot allocate memory\n");
+            exit (EXIT_FAILURE);
+          }
         double * dd = (double *) malloc(si->nb_threads * sizeof(double));
-        memset(nn, 0, si->nb_threads * sizeof(unsigned long));
-        memset(dd, 0, si->nb_threads * sizeof(double));
+        memset (nn, 0, si->nb_threads * sizeof(unsigned long));
+        memset (dd, 0, si->nb_threads * sizeof(double));
         fb = thrs[0]->sides[side]->fb_bucket;
         for(int i = 0 ; fb->p != FB_END ; fb = fb_next (fb)) {
             nn[i] += fb->nr_roots;
@@ -4271,7 +4414,7 @@ main (int argc0, char *argv0[])
     }
     /* }}} */
 
-    thread_data * thrs = thread_data_alloc(&si);
+    thread_data * thrs = thread_data_alloc (&si);
 
     init_norms (&si);
 
@@ -4284,6 +4427,11 @@ main (int argc0, char *argv0[])
 
     /* special q (and root rho) */
     roots = (uint64_t *) malloc (cpoly->degree * sizeof (uint64_t));
+    if (roots == NULL)
+      {
+        fprintf (stderr, "Error, cannot allocate memory\n");
+        exit (EXIT_FAILURE);
+      }
     q0 --; /* so that nextprime gives q0 if q0 is prime */
     nroots = 0;
 
@@ -4372,10 +4520,10 @@ main (int argc0, char *argv0[])
             report->ttsm -= seconds();
 
             /* Allocate buckets */
-            thread_buckets_alloc(thrs);
+            thread_buckets_alloc (thrs);
 
             /* Fill in rat and alg buckets */
-            thread_do(thrs, &fill_in_buckets_both);
+            thread_do (thrs, &fill_in_buckets_both);
 
             max_full = thread_buckets_max_full(thrs);
             if (max_full >= 1.0) {
