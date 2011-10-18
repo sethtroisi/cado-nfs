@@ -3,17 +3,16 @@ Important changes between cado-nfs-1.0 and cado-nfs-1.1:
 * the polynomial selection uses the new algorithm presented by Kleinjung at
   the 2008 CADO workshop (supports multithreading)
 * connecting rootsieve5 in the polynomial selection
-* las supports I=16 (useful for the integer greater than 200 digits), minor bug
-  fix, small speedup in las and purge.
-* reorganization executable in the linear algebra step and acceleration
-  of computing time on many machines with mpi.
+* las supports I=16 (useful for integers greater than 200 digits), minor bug
+  fixes, small speedup in las and purge.
+* reorganization of the executable in the linear algebra step and acceleration
+  of computing time on many machines with MPI.
 * addition of experimental scripts to execute the sieve on a cluster.
-  These scrips rely on the OAR job scheduler being used, and exploit its 
+  These scripts rely on the OAR job scheduler being used, and exploit its 
   "besteffort" mode. Some even more exeprimental scripts for linear
   algebra are in the development version.
-* addition of new parameter files and few new variables inside (cf
-  params.c91)
-* The linear algebra step now makes some use of dynamically loaded shared
+* addition of new parameter files and a few new parameters (cf params.c91)
+* The linear algebra step now makes use of dynamically loaded shared
   libraries. This might result in configuration issues, which we hope the
   scripts get right. See the README file.
 
