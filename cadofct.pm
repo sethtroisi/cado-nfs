@@ -1,7 +1,8 @@
 #!/usr/bin/env perl
 
-# Copyright 2008, 2009, 2010 Pierrick Gaudry, Emmanuel Thome, Paul Zimmermann,
-#                            Jeremie Detrey, Lionel Muller
+# Copyright 2008, 2009, 2010, 2011 Pierrick Gaudry, Emmanuel Thome,
+#                                  Paul Zimmermann, Jeremie Detrey,
+#                                  Lionel Muller
 #
 # This file is part of CADO-NFS.
 #
