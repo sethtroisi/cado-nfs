@@ -34,7 +34,7 @@
 #define xxxTRACE_K
 #define TRACE_AB { 5046103,17827 }
 // #define TRACE_IJ
-// #define TRACE_Nx
+#define TRACE_Nx { 0,4849 }
 
 /* Define CHECK_UNDERFLOW to check for underflow when subtracting
    the rounded log(p) from sieve array locations */

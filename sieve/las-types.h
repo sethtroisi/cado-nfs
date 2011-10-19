@@ -29,6 +29,8 @@ struct sieve_side_info_s {
 
     mpz_t *fij;       /* coefficients of F(a0*i+a1*j, b0*i+b1*j)  */
     double *fijd;     /* coefficients of F_q (divided by q on the special q side) */
+    int smallpow2[64];
+    int smallpow3[64];
 };
 
 typedef struct sieve_side_info_s * sieve_side_info_ptr;
@@ -58,6 +60,7 @@ struct sieve_info_s {
     int32_t a0, b0, a1, b1;
 
     // parameters for bucket sieving
+    unsigned int td_thresh;
     int bucket_thresh;    // bucket sieve primes >= bucket_thresh
     int nb_buckets;
     double bucket_limit_multiplier;
