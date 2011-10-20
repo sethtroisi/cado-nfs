@@ -3,7 +3,7 @@
 # This installs cmake if it is not found in the current system
 
 name=cmake
-version=2.8.3
+version=2.8.6
 package=${name}-${version}.tar.gz
 url=http://www.cmake.org/files/v2.8/${package}
 

@@ -1,3 +1,4 @@
+#include "cado.h"
 #include "facul_doit.h"
 #include "pm1.h"
 #include "pp1.h"

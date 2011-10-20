@@ -123,7 +123,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     mmt_vec xymats;
 
     if (tcan_print) {
-        printf("Each thread allocates %zu kb for the A matrices\n",
+        printf("Each thread allocates %zd kb for the A matrices\n",
                 A->vec_elt_stride(A, bw->m*bw->interval) >> 10);
     }
     vec_init_generic(pi->m, A, xymats, 0, bw->m*bw->interval);

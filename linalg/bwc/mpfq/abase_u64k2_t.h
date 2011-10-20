@@ -14,7 +14,7 @@
 /* Active handler: simd_flat */
 /* Active handler: simd_u64k */
 /* Automatically generated code  */
-/* Options used: k=2 tag=u64k2 choose_by_groupsize=CODE(0x2820cf8) prefix=abase_ family=[u64k1, u64k2] virtual_base={
+/* Options used: k=2 tag=u64k2 choose_by_groupsize=<code> prefix=abase_ family=[u64k1, u64k2] virtual_base={
                   'filebase' => 'abase_vbase',
                   'substitutions' => [
                                        [

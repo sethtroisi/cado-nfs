@@ -19,7 +19,7 @@ static const char *format_names[4] = {
   "CADO", "Franke-Kleinjung", "GGNFS", "CWI"
 };
 
-#include <cado.h>
+#include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h> /* for UINT32_MAX */

@@ -1,7 +1,7 @@
 /* Common header file for the CADO project
 
-Copyright 2007, 2008, 2009, 2010 Pierrick Gaudry, Alexander Kruppa,
-                                 Emmanuel Thome, Paul Zimmermann
+Copyright 2007, 2008, 2009, 2010, 2011 Pierrick Gaudry, Alexander Kruppa,
+                                       Emmanuel Thome, Paul Zimmermann
 
 This file is part of the CADO project.
 
@@ -66,6 +66,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #define _GNU_SOURCE         /* asprintf vasprintf */
 #endif
 #define _DARWIN_C_SOURCE    /* asprintf ; _ANSI_SOURCE must be undefined */
+#define _NETBSD_SOURCE      /* asprintf vasprintf */
 #endif
 
 #ifdef __cplusplus

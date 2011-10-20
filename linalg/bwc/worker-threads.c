@@ -1,3 +1,4 @@
+#include "cado.h"
 #include <stdlib.h>
 #include "worker-threads.h"
 #include "macros.h"

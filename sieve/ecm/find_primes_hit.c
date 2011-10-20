@@ -1,6 +1,7 @@
 /* Usage: find_primes_hit P B1 sigma - find all primes <= P that are found with
    ECM(B1,sigma) */
 
+#include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>

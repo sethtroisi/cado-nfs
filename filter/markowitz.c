@@ -1,3 +1,4 @@
+#include "cado.h"
 #include "utils.h"
 
 #include "merge_opts.h"

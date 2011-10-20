@@ -1,3 +1,4 @@
+#include "cado.h"
 #include "rootfinder.h"
 #include <stdio.h>
 #include <stdlib.h>

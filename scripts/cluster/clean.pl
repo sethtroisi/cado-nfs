@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 # usage: $0
 # cleanup files in working_rels no modified in the last 10 minutes.
 

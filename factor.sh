@@ -164,15 +164,13 @@ fi
 
 rc=$?
 
-# Print timings
-
-cd $t
-$cputime
-
 #########################################################################
 # Check result, clean up the mess afterwards.
 if [ "$rc" = 0 ] ; then
     echo OK
+    # Print timings
+    cd $t
+    $cputime
     if ! [ "$CADO_DEBUG" ] ; then
         rm -rf $t
     fi

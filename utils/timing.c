@@ -1,3 +1,4 @@
+#include "cado.h"
 #include <stdlib.h>
 #include <sys/types.h>		/* for cputime */
 #include <sys/resource.h>	/* for cputime */

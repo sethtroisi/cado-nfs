@@ -1,3 +1,4 @@
+#include "cado.h"
 #include "utils.h"
 
 /* This computes checksum or arbitrary data ranges. The data is piped

@@ -1,8 +1,5 @@
 This is the README file for the lattice siever (in construction).
 
-First, some ideas and algorithms used in the lattice siever are described
-in the lattice.tex document (svn/cado/papers/lattice.tex).
-
 The lattice siever (las) takes the following arguments/options:
 
 -checknorms    we want to completely factor the leftover norms

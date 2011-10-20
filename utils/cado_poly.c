@@ -55,7 +55,7 @@ cado_poly_set (cado_poly p, cado_poly q)
     for (i = 0; i <= q->degreeg; i++)
       mpz_set (p->g[i], q->g[i]);
     mpz_set (p->m, q->m);
-    strcpy (p->type, q->type);
+    memcpy (p->type, q->type, sizeof(p->type));
 }
 
 int cado_poly_set_plist(cado_poly poly, param_list pl)

@@ -20,7 +20,7 @@ static int abase_u64k1_impl_mpi_use_count;   /* several stacked init()/clear() p
 /* Active handler: simd_flat */
 /* Active handler: simd_u64k */
 /* Automatically generated code  */
-/* Options used: k=1 tag=u64k1 choose_by_groupsize=CODE(0x1581cf8) prefix=abase_ family=[u64k1, u64k2] virtual_base={
+/* Options used: k=1 tag=u64k1 choose_by_groupsize=<code> prefix=abase_ family=[u64k1, u64k2] virtual_base={
                   'filebase' => 'abase_vbase',
                   'substitutions' => [
                                        [
@@ -290,7 +290,7 @@ void abase_u64k1_vec_asprint(abase_u64k1_dst_field K MAYBE_UNUSED, char * * pstr
             alloc = len+ltmp+100;
             *pstr = (char *)realloc(*pstr, alloc*sizeof(char));
         }
-        strcpy(*pstr+len, tmp);
+        strncpy(*pstr+len, tmp, ltmp+4);
         len += ltmp;
         free(tmp);
     }

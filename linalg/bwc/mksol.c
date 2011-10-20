@@ -135,7 +135,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
      */
     mmt_vec fcoeffs;
     if (tcan_print) {
-        printf("Each thread allocates %zu kb for the F matrices\n",
+        printf("Each thread allocates %zd kb for the F matrices\n",
                 Ar->vec_elt_stride(Ar, A->groupsize(A)*bw->interval) >> 10);
     }
     vec_init_generic(pi->m, Ar, fcoeffs, 0, A->groupsize(A)*bw->interval);

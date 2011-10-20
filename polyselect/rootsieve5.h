@@ -1,3 +1,4 @@
+#include "cado.h"
 #include <gmp.h>
 
 /* Things you don't want to change */

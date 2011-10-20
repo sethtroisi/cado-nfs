@@ -2,6 +2,7 @@
    For given B2min, B2 determines which value of d and pairs (i,j) to use
    so that the id+-j values cover the primes in ]B2min, B2] */
 
+#include "cado.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
