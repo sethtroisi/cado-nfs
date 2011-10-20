@@ -35,8 +35,11 @@ log2 (double x)
    miss only about 7% to 8% relations wrt a more accurate estimation. */
 //#define UGLY_HACK
 
-/* number of bits used to estimate the norms */
-#define NORM_BITS 10
+/* Number of bits used to estimate the norms
+ * This should be large enough: it must be such that all norms are
+ * smaller than 2^NORM_BITS.
+ * This imposes NORM_BITS >= 8, or even >= 9 for large factorizations. */
+#define NORM_BITS 8
 
 /* define PROFILE to keep certain function from being inlined, in order to
    make them show up on profiler output */
@@ -1600,7 +1603,10 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
 /* {{{ initializing norms */
 /* Knowing the norm on the rational side is bounded by 2^(2^k), compute
    lognorms approximations for k bits of exponent + NORM_BITS-k bits
-   of mantissa */
+   of mantissa.
+   Do the same for the algebraic side (with the corresponding bound for
+   the norms.
+   */
 NOPROFILE_STATIC void
 init_norms (sieve_info_t *si)
 {
@@ -1704,18 +1710,35 @@ init_rat_norms_bucket_region (unsigned char *S, int N, sieve_info_t *si)
         gjj = gj * (double) j;
         zx->z = gjj - gi * (double) halfI;
         __asm__("### Begin rational norm loop\n");
-#if 0
+#if 1
         uint64_t y;
-        unsigned char n;
-        const int normstride=8; // must be a power of 2 dividing I.
+        unsigned char n, oldn = 0;
+        const int normstride=16; // must be a power of 2 dividing I.
         double gii = gi * normstride;
         for (i = 0; i < (int) si->I; i+=normstride) {
             y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
             n = rat->S[y & mask];
             ASSERT (n > 0);
+            if (i > 0 && oldn != n) {
+                // the lognorm has changed: recompute more precisely the
+                // previous stride.
+                zx->z -= gii;
+                S -= normstride;
+                for (int ii = 0; ii < normstride; ++ii) {
+                    y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
+                    n = rat->S[y & mask];
+                    ASSERT (n > 0);
+                    zx->z += gi;
+                    *S++ = n;
+                }
+                y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
+                n = rat->S[y & mask];
+                ASSERT (n > 0);
+            }
             for (int ii = 0; ii < normstride; ++ii)
                 *S++ = n; 
             zx->z += gii;
+            oldn = n;
         }
 #else
 #ifndef SSE_NORM_INIT
