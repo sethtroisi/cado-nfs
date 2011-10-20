@@ -1704,6 +1704,20 @@ init_rat_norms_bucket_region (unsigned char *S, int N, sieve_info_t *si)
         gjj = gj * (double) j;
         zx->z = gjj - gi * (double) halfI;
         __asm__("### Begin rational norm loop\n");
+#if 0
+        uint64_t y;
+        unsigned char n;
+        const int normstride=8; // must be a power of 2 dividing I.
+        double gii = gi * normstride;
+        for (i = 0; i < (int) si->I; i+=normstride) {
+            y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
+            n = rat->S[y & mask];
+            ASSERT (n > 0);
+            for (int ii = 0; ii < normstride; ++ii)
+                *S++ = n; 
+            zx->z += gii;
+        }
+#else
 #ifndef SSE_NORM_INIT
         uint64_t y;
         unsigned char n;
@@ -1772,9 +1786,10 @@ init_rat_norms_bucket_region (unsigned char *S, int N, sieve_info_t *si)
         }
 
 #endif
+#endif
+#endif
         __asm__("### End rational norm loop\n");
       }
-#endif
 }
 
 /* {{{ some utility stuff */
