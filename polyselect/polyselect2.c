@@ -71,7 +71,8 @@ double best_E = 0.0; /* Murphy's E (the larger the better) */
 
 /* read-write global variables */
 #ifdef MAX_THREADS
-pthread_mutex_t lock; /* used as mutual exclusion lock for those variables */
+pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER; /* used as mutual exclusion
+                                                lock for those variables */
 #endif
 int tot_found = 0; /* total number of polynomials */
 int found = 0; /* number of polynomials below maxnorm */
