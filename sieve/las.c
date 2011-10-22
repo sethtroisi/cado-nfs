@@ -176,6 +176,16 @@ static inline int trace_on_spot_ij(int i, unsigned int j) {
 #define NOPROFILE_STATIC static
 #endif
 
+/* Define STATS=1 to save cofactorization statistics in file STATS_DAT.
+   This file can be used with gnuplot, for example:
+   splot "stats.dat" u 1:2:3, "stats.dat" u 1:2:4
+   Define STATS=2 to read cofactorization statistics from file STATS_DAT.
+   If the success probability is less than STATS_PROB, we don't try the
+   cofactorization. */
+// #define STATS 2
+#define STATS_DAT "stats.dat"
+#define STATS_PROB 0.0
+
 /* uintmax_t is guaranteed to be larger or equal to uint64_t */
 #define strtouint64(nptr,endptr,base) (uint64_t) strtoumax(nptr,endptr,base)
 
@@ -237,6 +247,14 @@ typedef struct {
 const char * sidenames[2] = {
     [RATIONAL_SIDE] = "rational",
     [ALGEBRAIC_SIDE] = "algebraic", };
+
+#ifdef STATS
+uint32_t **cof_call; /* cof_call[r][a] is the number of calls of the
+                        cofactorization routine with a cofactor of r bits on
+                        the rational side, and a bits on the algebraic side */
+uint32_t **cof_succ; /* cof_succ[r][a] is the corresponding number of
+                        successes, i.e., of call that lead to a relation */
+#endif
 
 /* {{{ Forward declarations of conversion functions */
 MAYBE_UNUSED static void xToIJ(int *i, unsigned int *j, const unsigned int X, const sieve_info_t * si);
@@ -3040,26 +3058,44 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
 
 /* {{{ cofactoring area */
 
-/* Return 0 if the leftover norm n cannot yield a relation:
-   (a) if n > 2^mfb
-   (b) if L < n < B^2
-   (c) if L^2 < n < B^3
-
+/* Return 0 if the leftover norm n cannot yield a relation.
    FIXME: need to check L^k < n < B^(k+1) too.
+
+   Possible cases, where qj represents a prime in [B,L], and rj a prime > L:
+   (0) n >= 2^mfb
+   (a) n < L:           1 or q1
+   (b) L < n < B^2:     r1 -> cannot yield a relation
+   (c) B^2 < n < B*L:   r1 or q1*q2
+   (d) B*L < n < L^2:   r1 or q1*q2 or q1*r2
+   (e) L^2 < n < B^3:   r1 or q1*r2 or r1*r2 -> cannot yield a relation
+   (f) B^3 < n < B^2*L: r1 or q1*r2 or r1*r2 or q1*q2*q3
+   (g) B^2*L < n < L^3: r1 or q1*r2 or r1*r2
+   (h) L^3 < n < B^4:   r1 or q1*r2, r1*r2 or q1*q2*r3 or q1*r2*r3 or r1*r2*r3
 */
 static int
-check_leftover_norm (mpz_t n, size_t lpb, mpz_t BB, mpz_t BBB, size_t mfb)
+check_leftover_norm (mpz_t n, size_t lpb, mpz_t BB, mpz_t BBB, mpz_t BBBB,
+                     size_t mfb)
 {
   size_t s = mpz_sizeinbase (n, 2);
 
   if (s > mfb)
-    return 0;
-  if (lpb < s && mpz_cmp (n, BB) < 0)
-    return 0;
-  if (2 * lpb < s && mpz_cmp (n, BBB) < 0)
-    return 0;
-  if (lpb < s && mpz_probab_prime_p (n, 1))
-    return 0;
+    return 0; /* n has more than mfb bits, which is the given limit */
+  /* now n < 2^mfb */
+  if (s <= lpb)
+    return 1; /* case (a) */
+  /* now n >= L=2^lpb */
+  if (mpz_cmp (n, BB) < 0)
+    return 0; /* case (b) */
+  /* now n >= B^2 */
+  if (2 * lpb < s)
+    {
+      if (mpz_cmp (n, BBB) < 0)
+        return 0; /* case (e) */
+      if (3 * lpb < s && mpz_cmp (n, BBBB) < 0)
+        return 0; /* case (h) */
+    }
+  if (mpz_probab_prime_p (n, 1))
+    return 0; /* n is a pseudo-prime larger than L */
   return 1;
 }
 
@@ -3173,13 +3209,17 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
 
     int cpt = 0;
     int surv = 0, copr = 0;
-    mpz_t norm[2], BB[2], BBB[2];
+    mpz_t norm[2], BB[2], BBB[2], BBBB[2];
     factor_list_t factors[2];
     mpz_array_t *f[2] = { NULL, };
     uint32_array_t *m[2] = { NULL, }; /* corresponding multiplicities */
     bucket_primes_t primes[2];
 
     mpz_t BLPrat;       /* alone ? */
+
+#ifdef STATS
+    uint32_t cof_rat_bitsize, cof_alg_bitsize;
+#endif
 
     for(int side = 0 ; side < 2 ; side++) {
         f[side] = alloc_mpz_array (8);
@@ -3199,10 +3239,12 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
         mpz_init (norm[side]);
         mpz_init (BB[side]);
         mpz_init (BBB[side]);
+        mpz_init (BBBB[side]);
 
         unsigned long lim = (side == RATIONAL_SIDE) ? cpoly->rlim : cpoly->alim;
         mpz_ui_pow_ui (BB[side], lim, 2);
         mpz_mul_ui (BBB[side], BB[side], lim);
+        mpz_mul_ui (BBBB[side], BBB[side], lim);
     }
 
     mpz_init (BLPrat);
@@ -3366,7 +3408,7 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
                         lim, a, b);
 
                 pass = check_leftover_norm (norm[side], lpb,
-                            BB[side], BBB[side], mfb);
+                                         BB[side], BBB[side], BBBB[side], mfb);
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b)) {
                     gmp_fprintf(stderr, "# checked leftover norm=%Zd on %s side for (%"PRId64",%"PRIu64"): %d\n",norm[side],sidenames[side],a,b,pass);
@@ -3374,6 +3416,28 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
 #endif
             }
             if (!pass) continue;
+
+#ifdef STATS
+            cof_rat_bitsize = mpz_sizeinbase (norm[RATIONAL_SIDE], 2);
+            cof_alg_bitsize = mpz_sizeinbase (norm[ALGEBRAIC_SIDE], 2);
+            /* no need to use a mutex here: either we use one thread only
+               to compute the cofactorization data, and if several threads the
+               order is irrelevant. The only problem that can happen is when
+               two threads increase the value at the same time, and it is
+               increased by 1 instead of 2, but this should happen rarely. */
+#if STATS == 1
+            cof_call[cof_rat_bitsize][cof_alg_bitsize] ++;
+#else /* STATS == 2 */
+            /* we store the initial number of cofactorization calls in
+               cof_call[0][0], and the remaining number in cof_succ[0][0] */
+            cof_call[0][0] ++;
+            /* Warning: the <= also catches cases when succ=call=0 */
+            if ((double) cof_succ[cof_rat_bitsize][cof_alg_bitsize] <=
+                (double) cof_call[cof_rat_bitsize][cof_alg_bitsize] * STATS_PROB)
+              continue;
+            cof_succ[0][0] ++;
+#endif
+#endif
 
             /* if norm[RATIONAL_SIDE] is above BLPrat, then it might not
              * be smooth. We factor it first. Otherwise we factor it
@@ -3388,6 +3452,12 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
                 pass = factor_leftover_norm(norm[side], lpb, f[side], m[side], si->strategy);
             }
             if (!pass) continue;
+
+            /* youpee: we found a relation! */
+
+#if STATS == 1
+            cof_succ[cof_rat_bitsize][cof_alg_bitsize] ++;
+#endif
 
 #ifdef UNSIEVE_NOT_COPRIME
             ASSERT (bin_gcd_safe (a, b) == 1);
@@ -3434,6 +3504,7 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
 
     for(int side = 0 ; side < 2 ; side++) {
         clear_bucket_primes (&primes[side]);
+        mpz_clear (BBBB[side]);
         mpz_clear (BBB[side]);
         mpz_clear (BB[side]);
         mpz_clear(norm[side]);
@@ -4262,6 +4333,10 @@ main (int argc0, char *argv0[])
     double bench_percent = 1e-3; 
     long bench_tot_rep = 0;
     double bench_tot_time = 0.0;
+#ifdef STATS
+    FILE *stats_file;
+    int j;
+#endif
 
     memset(&si, 0, sizeof(sieve_info_t));
 
@@ -4440,6 +4515,44 @@ main (int argc0, char *argv0[])
       }
     q0 --; /* so that nextprime gives q0 if q0 is prime */
     nroots = 0;
+
+#ifdef STATS
+    cof_call = (uint32_t**) malloc ((cpoly->mfbr + 1) * sizeof(uint32_t*));
+    cof_succ = (uint32_t**) malloc ((cpoly->mfbr + 1) * sizeof(uint32_t*));
+    for (i = 0; i <= cpoly->mfbr; i++)
+      {
+        cof_call[i] = (uint32_t*) malloc ((cpoly->mfba + 1) * sizeof(uint32_t));
+        cof_succ[i] = (uint32_t*) malloc ((cpoly->mfba + 1) * sizeof(uint32_t));
+#if STATS == 1
+        for (j = 0; j <= cpoly->mfba; j++)
+          cof_call[i][j] = cof_succ[i][j] = 0;
+#else /* STATS == 2 */
+        cof_call[0][0] = cof_succ[0][0] = 0;
+#endif
+      }
+#if STATS == 2
+    stats_file = fopen (STATS_DAT, "r");
+    if (stats_file == NULL)
+      {
+        fprintf (stderr, "Error, cannot read %s\n", STATS_DAT);
+        exit (EXIT_FAILURE);
+      }
+    else
+      fprintf (si.output, "# Use statistics file %s\n", STATS_DAT);
+    while (!feof (stats_file))
+      {
+        uint32_t c, s;
+        if (fscanf (stats_file, "%u %u %u %u\n", &i, &j, &c, &s) != 4)
+          {
+            fprintf (stderr, "Error while reading file %s\n", STATS_DAT);
+            exit (EXIT_FAILURE);
+          }
+        cof_call[i][j] = c;
+        cof_succ[i][j] = s;
+      }
+    fclose (stats_file);
+#endif    
+#endif
 
     t0 = seconds ();
     fprintf (si.output, "#\n");
@@ -4706,6 +4819,9 @@ main (int argc0, char *argv0[])
         printf ("# Number of wrapped composite values while dividing out "
                 "bucket primes: %ld\n", nr_wrap_was_composite);
       }
+#if STATS == 2
+    fprintf (si.output, "# Rejected %u cofactorizations out of %u due to stats file\n", cof_call[0][0] - cof_succ[0][0], cof_call[0][0]);
+#endif
     /* }}} */
 
     sieve_info_clear_trialdiv(&si);
@@ -4725,6 +4841,27 @@ main (int argc0, char *argv0[])
         gzip_close (si.output, "");
 
     param_list_clear(pl);
+
+#ifdef STATS
+#if STATS == 1
+    stats_file = fopen (STATS_DAT, "w");
+#endif
+    for (i = 0; i <= cpoly->mfbr; i++)
+      {
+#if STATS == 1
+        for (j = 0; j <= cpoly->mfba; j++)
+          fprintf (stats_file, "%u %u %u %u\n", i, j, cof_call[i][j],
+                   cof_succ[i][j]);
+#endif
+        free (cof_call[i]);
+        free (cof_succ[i]);
+      }
+    free (cof_call);
+    free (cof_succ);
+#if STATS == 1
+    fclose (stats_file);
+#endif
+#endif
 
     return 0;
 }
