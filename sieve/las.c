@@ -22,6 +22,17 @@
 #include <emmintrin.h>
 #endif
 
+/* Lazy norm computation: compute only one norm per NORM_STRIDE on a
+ * line, and propagate up to VERT_NORM_STRIDE rows above it.
+ * These approximations speed-up the norm computation, but put more
+ * pressure on the cofactorisation step, since the useless
+ * cofactorisations are more frequent.
+ * Comment the first line to get an accurate, slower, norm computation.
+ */
+#define xxLAZY_NORMS
+#define VERT_NORM_STRIDE 4
+#define NORM_STRIDE 8
+
 #ifndef HAVE_LOG2
 static double log2 (double x)
 {
@@ -41,7 +52,10 @@ static double exp2 (double x)
    miss only about 7% to 8% relations wrt a more accurate estimation. */
 //#define UGLY_HACK
 
-/* number of bits used to estimate the norms */
+/* Number of bits used to estimate the norms
+ * This should be large enough: it must be such that all norms are
+ * smaller than 2^NORM_BITS.
+ * This imposes NORM_BITS >= 8, or even >= 9 for large factorizations. */
 #define NORM_BITS 10
 
 /* define PROFILE to keep certain function from being inlined, in order to
@@ -1606,7 +1620,10 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
 /* {{{ initializing norms */
 /* Knowing the norm on the rational side is bounded by 2^(2^k), compute
    lognorms approximations for k bits of exponent + NORM_BITS-k bits
-   of mantissa */
+   of mantissa.
+   Do the same for the algebraic side (with the corresponding bound for
+   the norms.
+   */
 NOPROFILE_STATIC void
 init_norms (sieve_info_t *si)
 {
@@ -1710,6 +1727,39 @@ init_rat_norms_bucket_region (unsigned char *S, int N, sieve_info_t *si)
         gjj = gj * (double) j;
         zx->z = gjj - gi * (double) halfI;
         __asm__("### Begin rational norm loop\n");
+/* LAZY_NORMS does not seem to be so interesting on the rational side,
+ * since wrong values generate a lot of additional work thereafter */
+#if 0   
+        uint64_t y;
+        unsigned char n, oldn = 0;
+        const int normstride=128; // must be a power of 2 dividing I.
+        double gii = gi * normstride;
+        for (i = 0; i < (int) si->I; i+=normstride) {
+            y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
+            n = rat->S[y & mask];
+            ASSERT (n > 0);
+            if (i > 0 && oldn != n) {
+                // the lognorm has changed: recompute more precisely the
+                // previous stride.
+                zx->z -= gii;
+                S -= normstride;
+                for (int ii = 0; ii < normstride; ++ii) {
+                    y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
+                    n = rat->S[y & mask];
+                    ASSERT (n > 0);
+                    zx->z += gi;
+                    *S++ = n;
+                }
+                y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
+                n = rat->S[y & mask];
+                ASSERT (n > 0);
+            }
+            for (int ii = 0; ii < normstride; ++ii)
+                *S++ = n; 
+            zx->z += gii;
+            oldn = n;
+        }
+#else
 #ifndef SSE_NORM_INIT
         uint64_t y;
         unsigned char n;
@@ -1778,6 +1828,7 @@ init_rat_norms_bucket_region (unsigned char *S, int N, sieve_info_t *si)
         }
 
 #endif
+#endif
         __asm__("### End rational norm loop\n");
       }
 #endif
@@ -1815,11 +1866,13 @@ fpoly_eval_v2df(const __v2df *f, const __v2df x, int d)
  */
 NOPROFILE_STATIC int
 init_alg_norms_bucket_region (unsigned char *alg_S, 
-			      const unsigned char *rat_S, const int N, 
-			      sieve_info_t *si)
+			      const unsigned char *rat_S MAYBE_UNUSED, 
+                              const int N, sieve_info_t *si)
 {
   cado_poly_ptr cpoly = si->cpoly;
+#ifndef LAZY_NORMS
   sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
+#endif
   sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
   unsigned int j, lastj, k, d = cpoly->degree;
   double *t, *u, powj, i, halfI;
@@ -1845,13 +1898,44 @@ init_alg_norms_bucket_region (unsigned char *alg_S,
   /* bucket_region is a multiple of I. Let's find the starting j
    * corresponding to N and the last j.
    */
-  j = (N*bucket_region) >> si->logI;
+  unsigned int firstj=(N*bucket_region) >> si->logI;
+  j = firstj;
   lastj = j + (bucket_region >> si->logI);
-  for (; j < lastj; j++)
-    {
+  for (; j < lastj; j++) {
+#ifdef LAZY_NORMS
+      unsigned int jmask = VERT_NORM_STRIDE - 1;
+      if (j > firstj && ((j & jmask) != 0)) {
+          // copy norms from the row below.
+          unsigned char *old_S;
+          old_S = alg_S - si->I;
+          for (unsigned int ii = 0; ii < si->I; ++ii) {
+              *alg_S++ = *old_S++;
+          }
+          continue;
+      }
+#endif
+
+
       /* scale by j^(d-k) the coefficients of fij */
       for (k = 0, powj = 1.0; k <= d; k++, powj *= (double) j)
         u[d - k] = t[d - k] * powj;
+
+#ifdef LAZY_NORMS
+      const int normstride=NORM_STRIDE;
+      const double fpnormstride=(double)NORM_STRIDE;
+      for (i = -halfI; i < halfI; i += fpnormstride) {
+          unsigned char n;
+          zx->z = fpoly_eval (u, d, i);
+          /* 4607182418800017408 = 1023*2^52 */
+          y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
+          report++;
+          n = T[y & mask];
+          ASSERT (n > 0);
+          for (int ii = 0; ii < normstride; ++ii)
+              *alg_S++ = n;
+      }
+  }
+#else  // full norm computation
 
 #ifdef SSE_NORM_INIT
       __v2df u_vec[d];
@@ -1928,6 +2012,8 @@ init_alg_norms_bucket_region (unsigned char *alg_S,
       }
 #endif
     }
+
+#endif  // LAZY_NORMS
 
   free(u);
   return report;
