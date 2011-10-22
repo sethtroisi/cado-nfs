@@ -4609,12 +4609,8 @@ main (int argc0, char *argv0[])
       {
         cof_call[i] = (uint32_t*) malloc ((cpoly->mfba + 1) * sizeof(uint32_t));
         cof_succ[i] = (uint32_t*) malloc ((cpoly->mfba + 1) * sizeof(uint32_t));
-#if STATS == 1
         for (j = 0; j <= cpoly->mfba; j++)
           cof_call[i][j] = cof_succ[i][j] = 0;
-#else /* STATS == 2 */
-        cof_call[0][0] = cof_succ[0][0] = 0;
-#endif
       }
 #if STATS == 2
     stats_file = fopen (STATS_DAT, "r");
@@ -4624,7 +4620,8 @@ main (int argc0, char *argv0[])
         exit (EXIT_FAILURE);
       }
     else
-      fprintf (si.output, "# Use statistics file %s\n", STATS_DAT);
+      fprintf (si.output, "# Use cofactorization statistics file %s\n",
+               STATS_DAT);
     while (!feof (stats_file))
       {
         uint32_t c, s;
@@ -4633,8 +4630,11 @@ main (int argc0, char *argv0[])
             fprintf (stderr, "Error while reading file %s\n", STATS_DAT);
             exit (EXIT_FAILURE);
           }
-        cof_call[i][j] = c;
-        cof_succ[i][j] = s;
+        if (i <= cpoly->mfbr && j <= cpoly->mfba)
+          {
+            cof_call[i][j] = c;
+            cof_succ[i][j] = s;
+          }
       }
     fclose (stats_file);
 #endif    
