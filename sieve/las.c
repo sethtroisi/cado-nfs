@@ -198,7 +198,7 @@ static inline int trace_on_spot_ij(int i, unsigned int j) {
    cofactorization. */
 // #define STATS 2
 #define STATS_DAT "stats.dat"
-#define STATS_PROB 0.0
+#define STATS_PROB 2e-4
 
 /* uintmax_t is guaranteed to be larger or equal to uint64_t */
 #define strtouint64(nptr,endptr,base) (uint64_t) strtoumax(nptr,endptr,base)
@@ -3518,7 +3518,7 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
                cof_call[0][0], and the remaining number in cof_succ[0][0] */
             cof_call[0][0] ++;
             /* Warning: the <= also catches cases when succ=call=0 */
-            if ((double) cof_succ[cof_rat_bitsize][cof_alg_bitsize] <=
+            if ((double) cof_succ[cof_rat_bitsize][cof_alg_bitsize] <
                 (double) cof_call[cof_rat_bitsize][cof_alg_bitsize] * STATS_PROB)
               continue;
             cof_succ[0][0] ++;
@@ -4632,8 +4632,13 @@ main (int argc0, char *argv0[])
           }
         if (i <= cpoly->mfbr && j <= cpoly->mfba)
           {
-            cof_call[i][j] = c;
-            cof_succ[i][j] = s;
+            /* When s=0 and c>0, whatever STATS_PROB, we will always have
+               s/c < STATS_PROB, thus (i,j) will be discarded. We allow
+               a small error by considering (s+1)/(c+1) instead. In case s=0,
+               (i,j) is discarded only when 1/(c+1) < STATS_PROB (always
+               discarded for c=0). */
+            cof_call[i][j] = c + 1;
+            cof_succ[i][j] = s + 1;
           }
       }
     fclose (stats_file);
