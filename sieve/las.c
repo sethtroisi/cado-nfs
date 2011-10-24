@@ -1070,8 +1070,10 @@ init_resieve (small_sieve_data_t *r, const small_sieve_data_t *s,
             continue;
         /* At this point q==1, so g==p */
         for( ; *td != FB_END && *td < ssp->g ; td++);
-        ASSERT(*td == FB_END || *td == ssp->g);
-        if (*td == FB_END) {
+        /* Note that we may have ``holes'' in the trialdiv_primes list.
+         * So we may jump from strictly below p to strictly above.
+         */
+        if (*td == FB_END || *td != ssp->g) {
             /* It's not a trial-div'ed prime, so we schedule it for
              * resieving */
             PUSH_SSP_MARKER(r, r_nmarkers, j, SSP_PROJ);
