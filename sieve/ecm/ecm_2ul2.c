@@ -1,3 +1,4 @@
+#include "cado.h"
 #include "modredc_2ul2_default.h"
 #define ecm ecm_2ul2
 #define ell_pointorder ell_pointorder_2ul2
