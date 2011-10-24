@@ -1369,7 +1369,6 @@ void sieve_small_bucket_region(unsigned char *S, int N,
     const uint32_t I = si->I;
     const fbprime_t pattern2_size = 2 * sizeof(unsigned long);
     unsigned long j;
-    int n;
     const int test_divisibility = 0; /* very slow, but nice for debugging */
     const unsigned long nj = bucket_region >> si->logI; /* Nr. of lines 
                                                            per bucket region */
@@ -1400,36 +1399,44 @@ void sieve_small_bucket_region(unsigned char *S, int N,
            2*sizeof(long) appear before any p > 2*sizeof(long) */
         int * smallpow2 = si->sides[side]->smallpow2;
         ssp_marker_t * next_marker = ssd->markers;
-        for ( ; (n=*smallpow2) != -1 && ssd->ssp[n].p <= pattern2_size; smallpow2++) {
-            for( ; next_marker->index < n ; next_marker++);
-            if (next_marker->index == n && (next_marker->event & SSP_PROJ))
-                continue;
-            const fbprime_t p = ssd->ssp[n].p;
-            unsigned int i0 = ssd->next_position[n];
-            if (i0 < I) {
-                ASSERT (i0 < p);
-                ASSERT ((nj * N + j) % 2 == 1);
-                for (unsigned int i = i0; i < pattern2_size; i += p)
-                    ((unsigned char *)pattern)[i] += ssd->logp[n];
-#ifdef UGLY_DEBUGGING
-                for (unsigned int j = i0; j < I ; j+= p) {
-                    WHERE_AM_I_UPDATE(w, x, (w->j << si->logI) + j);
-                    sieve_decrease(S + j, ssd->logp[n], w);
-                    /* cancel the above action */
-                    S[j] += ssd->logp[n];
-                }
-#endif
-                /* Skip two lines above, since we sieve only odd lines.
-                 * Even lines would correspond to useless reports.
-                 */
-                i0 = ((i0 + 2 * ssd->ssp[n].r) & (p - 1)) + 2 * I;
+        int fence = -1;
+        unsigned int event = 0;
+        for(int n ; (n=*smallpow2) != -1 ; smallpow2++) {
+            for( ; fence < n || event == SSP_POW2 ; next_marker++) {
+                event = next_marker->event;
+                fence = next_marker->index;
             }
-            /* In this loop, next_position gets updated to the first 
-               index to sieve relative to the start of the next line, 
-               but after all lines of this bucket region are processed, 
-               it will point the the first position to sieve relative  
-               to the start of the next bucket region, as required */
-            ssd->next_position[n] = i0 - I;
+            if (n < fence) {
+                const fbprime_t p = ssd->ssp[n].p;
+                unsigned int i0 = ssd->next_position[n];
+                if (i0 < I) {
+                    ASSERT (i0 < p);
+                    ASSERT ((nj * N + j) % 2 == 1);
+                    for (unsigned int i = i0; i < pattern2_size; i += p)
+                        ((unsigned char *)pattern)[i] += ssd->logp[n];
+#ifdef UGLY_DEBUGGING
+                    for (unsigned int j = i0; j < I ; j+= p) {
+                        WHERE_AM_I_UPDATE(w, x, (w->j << si->logI) + j);
+                        sieve_decrease(S + j, ssd->logp[n], w);
+                        /* cancel the above action */
+                        S[j] += ssd->logp[n];
+                    }
+#endif
+                    /* Skip two lines above, since we sieve only odd lines.
+                     * Even lines would correspond to useless reports.
+                     */
+                    i0 = ((i0 + 2 * ssd->ssp[n].r) & (p - 1)) + 2 * I;
+                }
+                /* In this loop, next_position gets updated to the first 
+                   index to sieve relative to the start of the next line, 
+                   but after all lines of this bucket region are processed, 
+                   it will point the the first position to sieve relative  
+                   to the start of the next bucket region, as required */
+                ssd->next_position[n] = i0 - I;
+            } else {
+                /* nothing. It's a (presumably) projective power of 2,
+                 * but for the moment these are not pattern-sieved. */
+            }
         }
 
         /* Apply the pattern */
@@ -1473,23 +1480,38 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 
         pattern[0] = pattern[1] = pattern[2] = 0UL;
 
-        ssp_marker_t * next_marker = ssd->markers;
         int * smallpow3 = si->sides[side]->smallpow3;
-        for ( ; (n=*smallpow3) != -1 && ssd->ssp[n].p <= 3; smallpow3++) {
-            for( ; next_marker->index < n ; next_marker++);
-            if (next_marker->index == n && (next_marker->event & SSP_PROJ))
-                continue;
-            const fbprime_t p = 3;
-            WHERE_AM_I_UPDATE(w, p, p);
-            unsigned int i0 = ssd->next_position[n];
-            unsigned int i;
-            ASSERT (i0 < p);
-            for (i = i0; i < 3 * sizeof(unsigned long); i += p)
-                ((unsigned char *)pattern)[i] += ssd->logp[n];
-            i0 += ssd->ssp[n].r;
-            if (i0 >= p)
-                i0 -= p;
-            ssd->next_position[n] = i0;
+        ssp_marker_t * next_marker = ssd->markers;
+        int fence = -1;
+        // unsigned int event = 0;
+        for(int n ; (n=*smallpow3) != -1 ; smallpow3++) {
+            for( ; fence < n ; next_marker++) {
+                // event = next_marker->event;
+                fence = next_marker->index;
+            }
+            if (n < fence) {
+                /* Presumably a nice prime */
+                if (ssd->ssp[n].p > 3)
+                    break;
+                const fbprime_t p = 3;
+                WHERE_AM_I_UPDATE(w, p, p);
+                unsigned int i0 = ssd->next_position[n];
+                unsigned int i;
+                ASSERT (i0 < p);
+                for (i = i0; i < 3 * sizeof(unsigned long); i += p)
+                    ((unsigned char *)pattern)[i] += ssd->logp[n];
+                i0 += ssd->ssp[n].r;
+                if (i0 >= p)
+                    i0 -= p;
+                ssd->next_position[n] = i0;
+            } else {
+                /* n points to a power of 3, and we have an exceptional
+                 * event. Sure it can neither be SSP_END nor SSP_POW2.
+                 * It's thus almost surely SSP_PROJ, although we could
+                 * conceivably have SSP_DISCARD as well
+                 */
+                /* We should / could do something, anyway */
+            }
         }
 
         if (pattern[0]) {
