@@ -190,20 +190,8 @@ static inline int trace_on_spot_ij(int i, unsigned int j) {
 #define NOPROFILE_STATIC static
 #endif
 
-/* Define STATS=1 to save cofactorization statistics in file STATS_DAT.
-   This file can be used with gnuplot, for example:
-   splot "stats.dat" u 1:2:3, "stats.dat" u 1:2:4
-   Define STATS=2 to read cofactorization statistics from file STATS_DAT.
-   If the success probability is less than STATS_PROB, we don't try the
-   cofactorization. */
-// #define STATS 2
-#define STATS_DAT "stats.dat"
-#define STATS_PROB 2e-4
-
 /* uintmax_t is guaranteed to be larger or equal to uint64_t */
 #define strtouint64(nptr,endptr,base) (uint64_t) strtoumax(nptr,endptr,base)
-
-
 
 /* This global mutex should be locked in multithreaded parts when a
  * thread does a read / write, especially on stdout, stderr...
@@ -262,13 +250,17 @@ const char * sidenames[2] = {
     [RATIONAL_SIDE] = "rational",
     [ALGEBRAIC_SIDE] = "algebraic", };
 
-#ifdef STATS
+/* for cofactorization statistics */
+int stats = 0; /* 0: nothing, 1: write stats file, 2: read stats file,
+                  the stats file can be used with gnuplot, for example:
+                  splot "stats.dat" u 1:2:3, "stats.dat" u 1:2:4 */
+double stats_prob = 2e-4;
+FILE *stats_file;
 uint32_t **cof_call; /* cof_call[r][a] is the number of calls of the
                         cofactorization routine with a cofactor of r bits on
                         the rational side, and a bits on the algebraic side */
 uint32_t **cof_succ; /* cof_succ[r][a] is the corresponding number of
                         successes, i.e., of call that lead to a relation */
-#endif
 
 /* {{{ Forward declarations of conversion functions */
 MAYBE_UNUSED static void xToIJ(int *i, unsigned int *j, const unsigned int X, const sieve_info_t * si);
@@ -3303,9 +3295,7 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
 
     mpz_t BLPrat;       /* alone ? */
 
-#ifdef STATS
     uint32_t cof_rat_bitsize, cof_alg_bitsize;
-#endif
 
     for(int side = 0 ; side < 2 ; side++) {
         f[side] = alloc_mpz_array (8);
@@ -3503,27 +3493,31 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
             }
             if (!pass) continue;
 
-#ifdef STATS
-            cof_rat_bitsize = mpz_sizeinbase (norm[RATIONAL_SIDE], 2);
-            cof_alg_bitsize = mpz_sizeinbase (norm[ALGEBRAIC_SIDE], 2);
-            /* no need to use a mutex here: either we use one thread only
-               to compute the cofactorization data, and if several threads the
-               order is irrelevant. The only problem that can happen is when
-               two threads increase the value at the same time, and it is
-               increased by 1 instead of 2, but this should happen rarely. */
-#if STATS == 1
-            cof_call[cof_rat_bitsize][cof_alg_bitsize] ++;
-#else /* STATS == 2 */
-            /* we store the initial number of cofactorization calls in
-               cof_call[0][0], and the remaining number in cof_succ[0][0] */
-            cof_call[0][0] ++;
-            /* Warning: the <= also catches cases when succ=call=0 */
-            if ((double) cof_succ[cof_rat_bitsize][cof_alg_bitsize] <
-                (double) cof_call[cof_rat_bitsize][cof_alg_bitsize] * STATS_PROB)
-              continue;
-            cof_succ[0][0] ++;
-#endif
-#endif
+            if (stats != 0)
+              {
+                cof_rat_bitsize = mpz_sizeinbase (norm[RATIONAL_SIDE], 2);
+                cof_alg_bitsize = mpz_sizeinbase (norm[ALGEBRAIC_SIDE], 2);
+                if (stats == 1) /* learning phase */
+                  /* no need to use a mutex here: either we use one thread only
+                     to compute the cofactorization data and if several threads
+                     the order is irrelevant. The only problem that can happen
+                     is when two threads increase the value at the same time,
+                     and it is increased by 1 instead of 2, but this should
+                     happen rarely. */
+                  cof_call[cof_rat_bitsize][cof_alg_bitsize] ++;
+                else /* stats == 2: we use the learning data */
+                  {
+                    /* we store the initial number of cofactorization calls in
+                       cof_call[0][0] and the remaining nb in cof_succ[0][0] */
+                    cof_call[0][0] ++;
+                    /* Warning: the <= also catches cases when succ=call=0 */
+                    if ((double) cof_succ[cof_rat_bitsize][cof_alg_bitsize] <
+                        (double) cof_call[cof_rat_bitsize][cof_alg_bitsize] *
+                        stats_prob)
+                      continue;
+                    cof_succ[0][0] ++;
+                  }
+              }
 
             /* if norm[RATIONAL_SIDE] is above BLPrat, then it might not
              * be smooth. We factor it first. Otherwise we factor it
@@ -3541,9 +3535,8 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
 
             /* youpee: we found a relation! */
 
-#if STATS == 1
-            cof_succ[cof_rat_bitsize][cof_alg_bitsize] ++;
-#endif
+            if (stats == 1) /* learning phase */
+              cof_succ[cof_rat_bitsize][cof_alg_bitsize] ++;
 
 #ifdef UNSIEVE_NOT_COPRIME
             ASSERT (bin_gcd_safe (a, b) == 1);
@@ -4384,6 +4377,8 @@ usage (const char *argv0, const char * missing)
   fprintf (stderr, "          -skfact   xxx   skip factor, default=1.01\n");
   fprintf (stderr, "          -bench2         activate alternate bench mode\n");
   fprintf (stderr, "          -percent   xxx  percentage of sieving, default=1e-3\n");
+  fprintf (stderr, "          -stats    xxx   write or read statistics file xxx\n");
+  fprintf (stderr, "          -stats_prob xxx use threshold xxx\n");
   if (missing) {
       fprintf(stderr, "\nError: missing parameter %s\n", missing);
   }
@@ -4419,12 +4414,10 @@ main (int argc0, char *argv0[])
     double bench_percent = 1e-3; 
     long bench_tot_rep = 0;
     double bench_tot_time = 0.0;
-#ifdef STATS
-    FILE *stats_file;
+    const char *statsfilename = NULL;
     int j;
-#endif
 
-    memset(&si, 0, sizeof(sieve_info_t));
+    memset (&si, 0, sizeof(sieve_info_t));
 
     param_list pl;
     param_list_init(pl);
@@ -4451,6 +4444,7 @@ main (int argc0, char *argv0[])
     polyfilename = param_list_lookup_string(pl, "poly");
     if (polyfilename) param_list_read_file(pl, polyfilename);
     fbfilename = param_list_lookup_string(pl, "fb");
+    statsfilename = param_list_lookup_string (pl, "stats");
 
     if (!cado_poly_set_plist (cpoly, pl)) {
         fprintf (stderr, "Error reading polynomial file\n");
@@ -4469,6 +4463,7 @@ main (int argc0, char *argv0[])
     param_list_parse_double(pl, "S", &cpoly->skew);
     param_list_parse_double(pl, "skfact", &skip_factor);
     param_list_parse_double(pl, "percent", &bench_percent);
+    param_list_parse_double (pl, "stats_prob", &stats_prob);
     int ok = 1;
     ok = ok && param_list_parse_ulong(pl, "rlim", &cpoly->rlim);
     ok = ok && param_list_parse_ulong(pl, "alim", &cpoly->alim);
@@ -4532,6 +4527,26 @@ main (int argc0, char *argv0[])
       {
         fprintf (stderr, "Error, please provide a positive skewness\n");
         exit (EXIT_FAILURE);
+      }
+
+    if (statsfilename != NULL) /* a file was given */
+      {
+        /* if the file exists, we open it in read-mode, otherwise we create
+           it */
+        stats_file = fopen (statsfilename, "r");
+        if (stats_file != NULL)
+          stats = 2;
+        else
+          {
+            stats_file = fopen (statsfilename, "w");
+            if (stats_file == NULL)
+              {
+                fprintf (stderr, "Error, cannot create file %s\n",
+                         statsfilename);
+                exit (EXIT_FAILURE);
+              }
+            stats = 1;
+          }
       }
 
     /* check that nb_threads (-mt nnn) is positive */
@@ -4602,48 +4617,45 @@ main (int argc0, char *argv0[])
     q0 --; /* so that nextprime gives q0 if q0 is prime */
     nroots = 0;
 
-#ifdef STATS
-    cof_call = (uint32_t**) malloc ((cpoly->mfbr + 1) * sizeof(uint32_t*));
-    cof_succ = (uint32_t**) malloc ((cpoly->mfbr + 1) * sizeof(uint32_t*));
-    for (i = 0; i <= cpoly->mfbr; i++)
+    if (stats != 0)
       {
-        cof_call[i] = (uint32_t*) malloc ((cpoly->mfba + 1) * sizeof(uint32_t));
-        cof_succ[i] = (uint32_t*) malloc ((cpoly->mfba + 1) * sizeof(uint32_t));
-        for (j = 0; j <= cpoly->mfba; j++)
-          cof_call[i][j] = cof_succ[i][j] = 0;
-      }
-#if STATS == 2
-    stats_file = fopen (STATS_DAT, "r");
-    if (stats_file == NULL)
-      {
-        fprintf (stderr, "Error, cannot read %s\n", STATS_DAT);
-        exit (EXIT_FAILURE);
-      }
-    else
-      fprintf (si.output, "# Use cofactorization statistics file %s\n",
-               STATS_DAT);
-    while (!feof (stats_file))
-      {
-        uint32_t c, s;
-        if (fscanf (stats_file, "%u %u %u %u\n", &i, &j, &c, &s) != 4)
+        cof_call = (uint32_t**) malloc ((cpoly->mfbr + 1) * sizeof(uint32_t*));
+        cof_succ = (uint32_t**) malloc ((cpoly->mfbr + 1) * sizeof(uint32_t*));
+        for (i = 0; i <= cpoly->mfbr; i++)
           {
-            fprintf (stderr, "Error while reading file %s\n", STATS_DAT);
-            exit (EXIT_FAILURE);
+            cof_call[i] = (uint32_t*) malloc ((cpoly->mfba + 1)
+                                              * sizeof(uint32_t));
+            cof_succ[i] = (uint32_t*) malloc ((cpoly->mfba + 1)
+                                              * sizeof(uint32_t));
+            for (j = 0; j <= cpoly->mfba; j++)
+              cof_call[i][j] = cof_succ[i][j] = 0;
           }
-        if (i <= cpoly->mfbr && j <= cpoly->mfba)
+        if (stats == 2)
           {
-            /* When s=0 and c>0, whatever STATS_PROB, we will always have
-               s/c < STATS_PROB, thus (i,j) will be discarded. We allow
-               a small error by considering (s+1)/(c+1) instead. In case s=0,
-               (i,j) is discarded only when 1/(c+1) < STATS_PROB (always
-               discarded for c=0). */
-            cof_call[i][j] = c + 1;
-            cof_succ[i][j] = s + 1;
+            fprintf (si.output, "# Use learning file %s with threshold %1.2e\n",
+                     statsfilename, stats_prob);
+            while (!feof (stats_file))
+              {
+                uint32_t c, s;
+                if (fscanf (stats_file, "%u %u %u %u\n", &i, &j, &c, &s) != 4)
+                  {
+                    fprintf (stderr, "Error while reading file %s\n",
+                             statsfilename);
+                    exit (EXIT_FAILURE);
+                  }
+                if (i <= cpoly->mfbr && j <= cpoly->mfba)
+                  {
+                    /* When s=0 and c>0, whatever STATS_PROB, we will always
+                       have s/c < STATS_PROB, thus (i,j) will be discarded.
+                       We allow a small error by considering (s+1)/(c+1)
+                       instead. In case s=0, (i,j) is discarded only when
+                       1/(c+1) < STATS_PROB (always discarded for c=0). */
+                    cof_call[i][j] = c + 1;
+                    cof_succ[i][j] = s + 1;
+                  }
+              }
           }
       }
-    fclose (stats_file);
-#endif    
-#endif
 
     t0 = seconds ();
     fprintf (si.output, "#\n");
@@ -4910,9 +4922,8 @@ main (int argc0, char *argv0[])
         printf ("# Number of wrapped composite values while dividing out "
                 "bucket primes: %ld\n", nr_wrap_was_composite);
       }
-#if STATS == 2
-    fprintf (si.output, "# Rejected %u cofactorizations out of %u due to stats file\n", cof_call[0][0] - cof_succ[0][0], cof_call[0][0]);
-#endif
+    if (stats == 2)
+      fprintf (si.output, "# Rejected %u cofactorizations out of %u due to stats file\n", cof_call[0][0] - cof_succ[0][0], cof_call[0][0]);
     /* }}} */
 
     sieve_info_clear_trialdiv(&si);
@@ -4933,26 +4944,21 @@ main (int argc0, char *argv0[])
 
     param_list_clear(pl);
 
-#ifdef STATS
-#if STATS == 1
-    stats_file = fopen (STATS_DAT, "w");
-#endif
-    for (i = 0; i <= cpoly->mfbr; i++)
+    if (stats != 0)
       {
-#if STATS == 1
-        for (j = 0; j <= cpoly->mfba; j++)
-          fprintf (stats_file, "%u %u %u %u\n", i, j, cof_call[i][j],
-                   cof_succ[i][j]);
-#endif
-        free (cof_call[i]);
-        free (cof_succ[i]);
+        for (i = 0; i <= cpoly->mfbr; i++)
+          {
+            if (stats == 1)
+              for (j = 0; j <= cpoly->mfba; j++)
+                fprintf (stats_file, "%u %u %u %u\n", i, j, cof_call[i][j],
+                         cof_succ[i][j]);
+            free (cof_call[i]);
+            free (cof_succ[i]);
+          }
+        free (cof_call);
+        free (cof_succ);
+        fclose (stats_file);
       }
-    free (cof_call);
-    free (cof_succ);
-#if STATS == 1
-    fclose (stats_file);
-#endif
-#endif
 
     return 0;
 }
