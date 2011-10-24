@@ -1758,7 +1758,8 @@ my $polysel_check = sub {
     while (<FILE>) {
         if (/^No polynomial found/) {
             warn "No polynomial in file `$f'.\n".
-			     "please increase the [kj]adrange or [kj]maxnorm.\n";
+			     "please increase the [kj]adrange or [kj]maxnorm.\n"
+               if ($ENV{'CADO_DEBUG'});
             close FILE;
             return;
         }

@@ -6,7 +6,7 @@ use File::Copy;
 
 
 my $tmpdir="/tmp";
-my $bindir="/users/caramel/gaudry/Recherche/cado/trunk/dist/src";
+my $bindir="$HOME/cado-nfs/build/$HOSTNAME";
 my $las="$bindir/sieve/las -checknorms";
 my $makefb="$bindir/sieve/makefb";
 
