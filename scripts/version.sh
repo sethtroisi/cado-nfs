@@ -16,5 +16,5 @@ if [ "$commit" != "" ] ; then
         echo $commit
     fi
 else
-    echo "exported"
+    head -1 ../.git_version
 fi
