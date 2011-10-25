@@ -1134,22 +1134,128 @@ init_resieve (small_sieve_data_t *r, const small_sieve_data_t *s,
     PUSH_SSP_MARKER(r, r_nmarkers, j, SSP_END);
 }
 
-void precompute_smallpow_indices(const factorbase_degn_t *fb,
-                      sieve_info_ptr si, int side)
+/* We can plan on splitting the small factor base in several
+ * non-overlapping, contiguous zones:
+ *
+ *      - powers of 2 (up until the pattern sieve limit)
+ *      - powers of 3 (up until the pattern sieve limit)
+ *      - trialdiv primes (not powers)
+ *      - resieved primes
+ *      (- powers of trialdiv primes)
+ *      - rest.
+ *
+ * Problem: bad primes may in fact be pattern sieved, and we might want
+ * to pattern-sieve more than just the ``do it always'' cases where p is
+ * below the pattern sieve limit.
+ *
+ * The answer to this is that such primes are expected to be very very
+ * rare, so we don't really bother. If we were to do something, we could
+ * imagine setting up a schedule list for projective primes -- e.g. a
+ * priority queue. But it feels way overkill.
+ *
+ * Note that the pre-treatment (splitting the factor base in chunks) can
+ * be done once and for all.
+ */
+
+void reorder_fb(sieve_info_ptr si, int side)
 {
-    const unsigned int thresh = si->bucket_thresh;
+    factorbase_degn_t * fb_pow2, * fb_pow2_base;
+    factorbase_degn_t * fb_pow3, * fb_pow3_base;
+    factorbase_degn_t * fb_td, * fb_td_base;
+    // factorbase_degn_t * fb_pow_td, * fb_pow_td_base;
+    factorbase_degn_t * fb_rs, * fb_rs_base;
+    factorbase_degn_t * fb_rest, * fb_rest_base;
 
-    int * n2 = si->sides[side]->smallpow2;
-    int * n3 = si->sides[side]->smallpow3;
+    factorbase_degn_t * fb_base = si->sides[side]->fb;
+    factorbase_degn_t * fb = fb_base;
 
-    for (int index = 0 ; fb->p != FB_END && fb->p < thresh ; fb = fb_next(fb)) {
-        for (int nr = 0; nr < fb->nr_roots; nr++, index++) {
-            if ((fb->p%2)==0) *n2++=index;
-            if ((fb->p%3)==0) *n3++=index;
+    size_t sz = fb_size(fb);
+
+    fb_pow2 = fb_pow2_base = (factorbase_degn_t *) malloc(sz);
+    fb_pow3 = fb_pow3_base = (factorbase_degn_t *) malloc(sz);
+    fb_td = fb_td_base = (factorbase_degn_t *) malloc(sz);
+    // fb_pow_td = fb_pow_td_base = (factorbase_degn_t *) malloc(sz);
+    fb_rs = fb_rs_base = (factorbase_degn_t *) malloc(sz);
+    fb_rest = fb_rest_base = (factorbase_degn_t *) malloc(sz);
+
+    fbprime_t plim = si->bucket_thresh;
+    fbprime_t costlim = si->td_thresh;
+
+#define PUSH_LIST(x) do {						\
+            memcpy(fb_## x, fb, fb_entrysize(fb));			\
+            fb_## x = fb_next(fb_## x);					\
+} while (0)
+
+    size_t pattern2_size = sizeof(unsigned long) * 2;
+    for( ; fb->p != FB_END ; fb = fb_next(fb)) {
+        /* The extra conditions on powers of 2 and 3 are related to how
+         * pattern-sieving is done.
+         */
+        if ((fb->p%2)==0 && fb->p <= pattern2_size) {
+            PUSH_LIST(pow2);
+        } else if (fb->p == 3) {
+            PUSH_LIST(pow3);
+        } else if (fb->p <= plim && fb->p <= costlim * fb->nr_roots) {
+            if (!is_prime_power(fb->p)) {
+                PUSH_LIST(td);
+            } else {
+                // PUSH_LIST(pow_td);
+                PUSH_LIST(rest);
+            }
+        } else {
+            if (!is_prime_power(fb->p)) {
+                PUSH_LIST(rs);
+            } else {
+                PUSH_LIST(rest);
+            }
         }
     }
-    *n2++=-1;
-    *n3++=-1;
+#undef PUSH_LIST
+
+#define APPEND_LIST(x) do {						\
+    char * pb = (char*) (void*) fb_ ## x ## _base;			\
+    char * p  = (char*) (void*) fb_ ## x;				\
+    si->sides[side]->fb_parts->x[0] = fb;                               \
+    si->sides[side]->fb_parts_x->x[0] = n;                              \
+    memcpy(fb, pb, p - pb);						\
+    fb = fb_skip(fb, p - pb);						\
+    n += fb_diff(fb_ ## x, fb_ ## x ## _base);                          \
+    si->sides[side]->fb_parts->x[1] = fb;                               \
+    si->sides[side]->fb_parts_x->x[1] = n;                              \
+} while (0)
+    int n = 0;
+    fb = fb_base;
+
+    APPEND_LIST(pow2);
+    APPEND_LIST(pow3);
+    APPEND_LIST(td);
+    APPEND_LIST(rs);
+    APPEND_LIST(rest);
+    fb->p = FB_END;
+
+    free(fb_pow2_base);
+    free(fb_pow3_base);
+    free(fb_td_base);
+    free(fb_rs_base);
+    free(fb_rest_base);
+
+#undef  APPEND_LIST
+
+    if (si->verbose) {
+        fprintf(si->output, "# small %s factor base", sidenames[side]);
+        factorbase_degn_t ** q;
+        q = si->sides[side]->fb_parts->pow2;
+        fprintf(si->output, ": %d pow2", fb_diff(q[1], q[0]));
+        q = si->sides[side]->fb_parts->pow3;
+        fprintf(si->output, ", %d pow3", fb_diff(q[1], q[0]));
+        q = si->sides[side]->fb_parts->td;
+        fprintf(si->output, ", %d td", fb_diff(q[1], q[0]));
+        q = si->sides[side]->fb_parts->rs;
+        fprintf(si->output, ", %d rs", fb_diff(q[1], q[0]));
+        q = si->sides[side]->fb_parts->rest;
+        fprintf(si->output, ", %d rest", fb_diff(q[1], q[0]));
+        fprintf(si->output, " (total %zu)\n", fb_nroots_total(fb_base));
+    }
 }
 
 // Prepare sieving of small primes: initialize a small_sieve_data_t
@@ -1539,14 +1645,11 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 
         /* Prepare the pattern */
 
-        /* This loop assumes that entries in ssd.ssp are in order of 
-           increasing p, or more accurately, that all powers of 2 up to
-           2*sizeof(long) appear before any p > 2*sizeof(long) */
-        int * smallpow2 = si->sides[side]->smallpow2;
         ssp_marker_t * next_marker = ssd->markers;
         int fence = -1;
         unsigned int event = 0;
-        for(int n ; (n=*smallpow2) != -1 ; smallpow2++) {
+        int * interval = si->sides[side]->fb_parts_x->pow2;
+        for(int n = interval[0] ; n < interval[1] ; n++) {
             for( ; fence < n || event == SSP_POW2 ; next_marker++) {
                 event = next_marker->event;
                 fence = next_marker->index;
@@ -1625,19 +1728,17 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 
         pattern[0] = pattern[1] = pattern[2] = 0UL;
 
-        int * smallpow3 = si->sides[side]->smallpow3;
         ssp_marker_t * next_marker = ssd->markers;
         int fence = -1;
         // unsigned int event = 0;
-        for(int n ; (n=*smallpow3) != -1 ; smallpow3++) {
+        int * interval = si->sides[side]->fb_parts_x->pow3;
+        for(int n = interval[0] ; n < interval[1] ; n++) {
             for( ; fence < n ; next_marker++) {
                 // event = next_marker->event;
                 fence = next_marker->index;
             }
-            if (n < fence) {
-                /* Presumably a nice prime */
-                if (ssd->ssp[n].p > 3)
-                    break;
+            if (n < fence) { /* a nice prime */
+                ASSERT_ALWAYS(ssd->ssp[n].p == 3);
                 const fbprime_t p = 3;
                 WHERE_AM_I_UPDATE(w, p, p);
                 unsigned int i0 = ssd->next_position[n];
@@ -1655,7 +1756,10 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                  * It's thus almost surely SSP_PROJ, although we could
                  * conceivably have SSP_DISCARD as well
                  */
-                /* We should / could do something, anyway */
+                /* We should / could do something, anyway. Given that at
+                 * this point, we have only 3 ulongs for the pattern,
+                 * we're certain that a projective prime is trivial*/
+                /* TODO */
             }
         }
 
@@ -1693,6 +1797,9 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 
     ssp_marker_t * next_marker = ssd->markers;
 
+    // sieve with everyone, since pattern-sieving may miss some of the
+    // small primes.
+
     for(int i = 0 ; i < ssd->nb_ssp ; i++) {
         int fence;
         unsigned int event;
@@ -1715,7 +1822,9 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 
             unsigned int i0 = ssd->next_position[i];
 
-            /* Don't sieve 3 again as it was pattern-sieved */
+            /* Don't sieve 3 again as it was pattern-sieved -- unless
+             * it's projective, but in this branch we have no projective
+             * primes. */
             if (p == 3)
                 continue;
 
@@ -3263,8 +3372,8 @@ main (int argc0, char *argv0[])
     where_am_I w MAYBE_UNUSED;
     WHERE_AM_I_UPDATE(w, si, si);
 
-    precompute_smallpow_indices(si->sides[0]->fb, si, 0);
-    precompute_smallpow_indices(si->sides[1]->fb, si, 1);
+    reorder_fb(si, 0);
+    reorder_fb(si, 1);
 
     while (q0 < q1)
       {

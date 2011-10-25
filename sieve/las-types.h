@@ -14,12 +14,32 @@ typedef const struct sieve_info_s * sieve_info_srcptr;
 
 #include "las-unsieve.h"
 
+typedef struct {
+    factorbase_degn_t * start;
+    factorbase_degn_t * end;
+} fb_interval;
+
 struct sieve_side_info_s {
     unsigned char Bound[256]; /* zero for good lognorms, 127 otherwise */
     fbprime_t *trialdiv_primes;
     trialdiv_divisor_t *trialdiv_data;
     unsigned char lognorm_table[1 << NORM_BITS];
     factorbase_degn_t * fb;
+    struct {
+        factorbase_degn_t * pow2[2];
+        factorbase_degn_t * pow3[2];
+        factorbase_degn_t * td[2];
+        factorbase_degn_t * rs[2];
+        factorbase_degn_t * rest[2];
+    } fb_parts[1];
+    struct {
+        int pow2[2];
+        int pow3[2];
+        int td[2];
+        int rs[2];
+        int rest[2];
+    } fb_parts_x[1];
+
 
     /* These fields are used for the norm initialization essentially.
      * Only the scale is also relevant to part of the rest, since it
