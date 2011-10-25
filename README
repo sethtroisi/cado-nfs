@@ -96,7 +96,7 @@ the shared library mechanism).
     This calls binaries from $BUILDDIR, and loads parameter files from
     $SRCDIR
 
-(2) $PREFIX/bin/factor.sh
+(3) $PREFIX/bin/factor.sh
     This calls binaries from $PREFIX/bin, and loads parameter files from
     $PREFIX/share/cado-nfs-1.1/examples
 
