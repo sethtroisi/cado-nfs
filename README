@@ -103,16 +103,12 @@ the shared library mechanism).
     This calls binaries from $PREFIX/bin, and loads parameter files from
     $PREFIX/share/cado-nfs-1.1/examples
 
-FIXME -- This should be completed and checked.
-
 Linux, BSD: All three methods work
 MacOS X:
     For any invocation to work, the LD_LIBRARY_PATH or DYLD_LIBRARY_PATH
     variable must be set up properly. The easiest method is to do make
     install, and include in these environment variables the directory
-    $PREFIX/lib/cado-nfs-1.1 This works, but does not work too well with
-    the -ssh argument, since (DY)LD_LIBRARY_PATH isn't propagated across
-    ssh.
+    $PREFIX/lib/cado-nfs-1.1.
 
 Run a factorization on current machine:
 =======================================
@@ -225,6 +221,8 @@ Known problems:
 
 * under Debian Etch amd64, GCC 4.1.2 is known to miscompile CADO-NFS (Lenny and
   Squeeze are ok)
+* under NetBSD 5.1 amd64, Pthreads in the linear algebra step seem not to
+  work, please use bwmt=1x1 option in factor.sh or cadofactor.pl.
 
 Contact, links:
 ===============

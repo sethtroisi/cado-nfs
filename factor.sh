@@ -12,7 +12,6 @@
 # And we need $t to be an absolute pathname, or else ./new_cadofactor.pl
 # will fail.
 
-#CADO_DEBUG=1
 usage() {
     cat >&2 <<EOF
 Usage: $0 <integer> [options] [arguments passed to cadofactor.pl]
