@@ -624,7 +624,6 @@ typedef struct {
 
 /* All of this exists _for each thread_ */
 struct thread_side_data_s {
-    fbprime_t pmax;          /* XXX seems to be currently unused */
     bucket_array_t BA;
     factorbase_degn_t *fb_bucket; /* in reality a pointer into a shared array */
     double bucket_fill_ratio;     /* inverse sum of bucket-sieved primes */
@@ -644,7 +643,7 @@ typedef struct thread_data_s * thread_data_ptr;
 typedef const struct thread_data_s * thread_data_srcptr;
 
 /* {{{ dispatch_fb */
-static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_main, factorbase_degn_t * fb0, int nparts)
+static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_main, factorbase_degn_t * fb0, int nparts, fbprime_t pmax)
 {
     /* Given fb0, which is a pointer in the fb array * fb_main, allocates
      * fb_dst[0] up to fb_dst[nparts-1] as independent fb arrays, each of
@@ -656,13 +655,9 @@ static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_mai
     size_t * fb_sizes = (size_t *) malloc(nparts * sizeof(size_t));
     FATAL_ERROR_CHECK(fb_sizes == NULL, "malloc failed");
     memset(fb_sizes, 0, nparts * sizeof(size_t));
-    size_t headsize = 0;
+    size_t headsize = fb_diff_bytes(fb0, *fb_main);
     int i = 0;
-    for(factorbase_degn_t * fb = *fb_main ; fb < fb0 ; fb = fb_next (fb)) {
-        size_t sz = fb_entrysize (fb); 
-        headsize += sz;
-    }
-    for(factorbase_degn_t * fb = fb0 ; fb->p != FB_END ; fb = fb_next (fb)) {
+    for(factorbase_degn_t * fb = fb0 ; fb->p != FB_END && fb->p <= pmax; fb = fb_next (fb)) {
         size_t sz = fb_entrysize (fb); 
         fb_sizes[i] += sz;
         i++;
@@ -679,7 +674,7 @@ static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_mai
     free(fb_sizes); fb_sizes = NULL;
     i = 0;
     int k = 0;
-    for(factorbase_degn_t * fb = fb0 ; fb->p != FB_END ; fb = fb_next (fb)) {
+    for(factorbase_degn_t * fb = fb0 ; fb->p != FB_END && fb->p <= pmax; fb = fb_next (fb)) {
         k++;
         size_t sz = fb_entrysize (fb); 
         memcpy(fbi[i], fb, sz);
@@ -705,24 +700,20 @@ void
 fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 {
     WHERE_AM_I_UPDATE(w, side, side);
-    factorbase_degn_t * fb = th->sides[side]->fb_bucket;
-    fbprime_t pmax = th->sides[side]->pmax;
     sieve_info_srcptr si = th->si;
     bucket_array_t BA = th->sides[side]->BA;  /* local copy */
-    // Loop over all primes in the factor base >= bucket_thresh
-    // and up to FB_END or pmax (pmax included)
+    // Loop over all primes in the factor base.
+    //
+    // Note that dispatch_fb already arranged so that all the primes
+    // which appear here are >= bucket_thresh and <= pmax (the latter
+    // being for the moment unconditionally set to FBPRIME_MAX by the
+    // caller of dispatch_fb).
 
-    /* Skip forward to first FB prime p >= si->bucket_thresh */
-    ASSERT(fb->p == FB_END || fb->p >= (fbprime_t) si->bucket_thresh);
-
-    /* Init first logp value */
-    if (fb->p != FB_END && fb->p <= pmax)
-      bucket_new_logp (&BA, fb->plog);
-
-    for ( ; fb->p != FB_END && fb->p <= pmax ; fb = fb_next (fb)) {
-        unsigned char nr;
-        fbprime_t p = fb->p;
-        unsigned char logp = fb->plog;
+    fb_iterator t;
+    fb_iterator_init_set_fb(t, th->sides[side]->fb_bucket);
+    for( ; !fb_iterator_over(t) ; fb_iterator_next(t)) {
+        fbprime_t p = t->fb->p;
+        unsigned char logp = t->fb->plog;
         ASSERT_ALWAYS (p % 2 == 1);
 
         WHERE_AM_I_UPDATE(w, p, p);
@@ -734,141 +725,139 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
         if (UNLIKELY(p == si->q))
             continue;
 
-        for (nr = 0; nr < fb->nr_roots; ++nr) {
-            const uint32_t I = si->I;
-            const int logI = si->logI;
-            const uint32_t even_mask = (1U << logI) | 1U;
-            const uint32_t maskI = I-1;
-            const uint32_t maskbucket = bucket_region - 1;
-            const int shiftbucket = LOG_BUCKET_REGION;
-            const uint32_t IJ = si->I * si->J;
-            fbprime_t r, R;
+        const uint32_t I = si->I;
+        const int logI = si->logI;
+        const uint32_t even_mask = (1U << logI) | 1U;
+        const uint32_t maskI = I-1;
+        const uint32_t maskbucket = bucket_region - 1;
+        const int shiftbucket = LOG_BUCKET_REGION;
+        const uint32_t IJ = si->I * si->J;
+        fbprime_t r, R;
 
-            R = fb->roots[nr];
-            r = fb_root_in_qlattice(p, R, fb->invp, si);
-            // TODO: should be line sieved in the non-bucket phase?
-            // Or should we have a bucket line siever?
-            if (UNLIKELY(r == 0))
-              {
-                /* If r == 0 (mod p), this prime hits for i == 0 (mod p),
-                   but since p > I, this implies i = 0 or i > I. We don't
-                   sieve i > I. Since gcd(i,j) | gcd(a,b), for i = 0 we
-                   only need to sieve j = 1 */
-                /* x = j*I + (i + I/2) = I + I/2 */
-                bucket_update_t update;
-                uint32_t x = I + I / 2;
-                update.x = (uint16_t) (x & maskbucket);
-                update.p = bucket_encode_prime (p);
-                WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);
-                WHERE_AM_I_UPDATE(w, x, update.x);
-                ASSERT(test_divisible(w));
-                push_bucket_update(BA, x >> shiftbucket, update);
-                continue;
-              }
-            if (UNLIKELY(r == p))
-              {
-                /* r == p means root at infinity, which hits for
-                   j == 0 (mod p). Since q > I > J, this implies j = 0
-                   or j > J. This means we sieve only (i,j) = (1,0) here.
-                   Since I < bucket_region, this always goes in bucket 0.
-                   FIXME: what about (-1,0)? It's the same (a,b) as (1,0)
-                   but which of these two (if any) do we sieve? */
-                bucket_update_t update;
-                update.x = (uint16_t) I / 2 + 1;
-                update.p = bucket_encode_prime (p);
-                WHERE_AM_I_UPDATE(w, N, 0);
-                WHERE_AM_I_UPDATE(w, x, update.x);
-                ASSERT(test_divisible(w));
-                push_bucket_update(BA, 0, update);
-                continue;
-              }
-            if (UNLIKELY(r > p))
-              {
-                continue;
-              }
+        R = fb_iterator_get_r(t);
+        r = fb_root_in_qlattice(p, R, t->fb->invp, si);
+        // TODO: should be line sieved in the non-bucket phase?
+        // Or should we have a bucket line siever?
+        if (UNLIKELY(r == 0))
+        {
+            /* If r == 0 (mod p), this prime hits for i == 0 (mod p),
+               but since p > I, this implies i = 0 or i > I. We don't
+               sieve i > I. Since gcd(i,j) | gcd(a,b), for i = 0 we
+               only need to sieve j = 1 */
+            /* x = j*I + (i + I/2) = I + I/2 */
+            bucket_update_t update;
+            uint32_t x = I + I / 2;
+            update.x = (uint16_t) (x & maskbucket);
+            update.p = bucket_encode_prime (p);
+            WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);
+            WHERE_AM_I_UPDATE(w, x, update.x);
+            ASSERT(test_divisible(w));
+            push_bucket_update(BA, x >> shiftbucket, update);
+            continue;
+        }
+        if (UNLIKELY(r == p))
+        {
+            /* r == p means root at infinity, which hits for
+               j == 0 (mod p). Since q > I > J, this implies j = 0
+               or j > J. This means we sieve only (i,j) = (1,0) here.
+               Since I < bucket_region, this always goes in bucket 0.
+FIXME: what about (-1,0)? It's the same (a,b) as (1,0)
+but which of these two (if any) do we sieve? */
+            bucket_update_t update;
+            update.x = (uint16_t) I / 2 + 1;
+            update.p = bucket_encode_prime (p);
+            WHERE_AM_I_UPDATE(w, N, 0);
+            WHERE_AM_I_UPDATE(w, x, update.x);
+            ASSERT(test_divisible(w));
+            push_bucket_update(BA, 0, update);
+            continue;
+        }
+        if (UNLIKELY(r > p))
+        {
+            continue;
+        }
 
-            /* If working with congruence classes, once the loop on the
-             * parity goes at the level above, this initialization
-             * should in fact either be done for each congruence class,
-             * or saved for later use within the factor base structure.
-             */
-            plattice_info_t pli;
-            if (reduce_plattice(&pli, p, r, si) == 0)
-              {
-                  pthread_mutex_lock(&io_mutex);
-                  fprintf (stderr, "# fill_in_buckets: reduce_plattice() "
-                          "returned 0 for p = " FBPRIME_FORMAT ", r = "
-                          FBPRIME_FORMAT "\n", p, r);
-                  pthread_mutex_unlock(&io_mutex);
-                  continue; /* Simply don't consider that (p,r) for now.
-                             FIXME: can we find the locations to sieve? */
-              }
+        /* If working with congruence classes, once the loop on the
+         * parity goes at the level above, this initialization
+         * should in fact either be done for each congruence class,
+         * or saved for later use within the factor base structure.
+         */
+        plattice_info_t pli;
+        if (reduce_plattice(&pli, p, r, si) == 0)
+        {
+            pthread_mutex_lock(&io_mutex);
+            fprintf (stderr, "# fill_in_buckets: reduce_plattice() "
+                    "returned 0 for p = " FBPRIME_FORMAT ", r = "
+                    FBPRIME_FORMAT "\n", p, r);
+            pthread_mutex_unlock(&io_mutex);
+            continue; /* Simply don't consider that (p,r) for now.
+FIXME: can we find the locations to sieve? */
+        }
 
-            uint32_t bound0 = plattice_bound0(&pli, si);
-            uint32_t bound1 = plattice_bound1(&pli, si);
+        uint32_t bound0 = plattice_bound0(&pli, si);
+        uint32_t bound1 = plattice_bound1(&pli, si);
 
-            for(int parity = MOD2_CLASSES_BS ; parity < (MOD2_CLASSES_BS?4:1) ; parity++) {
+        for(int parity = MOD2_CLASSES_BS ; parity < (MOD2_CLASSES_BS?4:1) ; parity++) {
 
-                // The sieving point (0,0) is I/2 in x-coordinate
-                plattice_x_t x = plattice_starting_vector(&pli, si, parity);
-                // TODO: check the generated assembly, in particular, the
-                // push function should be reduced to a very simple step.
-                bucket_update_t update;
-                update.p = bucket_encode_prime (p);
-                __asm__("## Inner bucket sieving loop starts here!!!\n");
-                plattice_x_t inc_a = plattice_a(&pli, si);
-                plattice_x_t inc_c = plattice_c(&pli, si);
-                // ASSERT_ALWAYS(inc_a == pli.a);
-                // ASSERT_ALWAYS(inc_c == pli.c);
-                while (x < IJ) {
-                    uint32_t i;
-                    i = x & maskI;   // x mod I
-                    /* if both i = x % I and j = x / I are even, then
-                       both a, b are even, thus we can't have a valid relation */
-                    /* i-coordinate = (x % I) - I/2
-                       (I/2) % 3 == (-I) % 3, hence
-                       3|i-coordinate iff (x%I+I) % 3 == 0 */
-                    if (MOD2_CLASSES_BS || (x & even_mask) 
+            // The sieving point (0,0) is I/2 in x-coordinate
+            plattice_x_t x = plattice_starting_vector(&pli, si, parity);
+            // TODO: check the generated assembly, in particular, the
+            // push function should be reduced to a very simple step.
+            bucket_update_t update;
+            update.p = bucket_encode_prime (p);
+            __asm__("## Inner bucket sieving loop starts here!!!\n");
+            plattice_x_t inc_a = plattice_a(&pli, si);
+            plattice_x_t inc_c = plattice_c(&pli, si);
+            // ASSERT_ALWAYS(inc_a == pli.a);
+            // ASSERT_ALWAYS(inc_c == pli.c);
+            while (x < IJ) {
+                uint32_t i;
+                i = x & maskI;   // x mod I
+                /* if both i = x % I and j = x / I are even, then
+                   both a, b are even, thus we can't have a valid relation */
+                /* i-coordinate = (x % I) - I/2
+                   (I/2) % 3 == (-I) % 3, hence
+                   3|i-coordinate iff (x%I+I) % 3 == 0 */
+                if (MOD2_CLASSES_BS || (x & even_mask) 
 #ifdef SKIP_GCD3
-                            && (!is_divisible_3_u32 (i + I) ||
-                                !is_divisible_3_u32 (x >> logI))
+                        && (!is_divisible_3_u32 (i + I) ||
+                            !is_divisible_3_u32 (x >> logI))
 #endif
-                       )
-                    {
+                   )
+                {
 #if LOG_BUCKET_REGION == 16 && defined(__x86_64__) && defined(__GNUC__)
-                        /* The x value in update can be set by a write to 
-                           the low word of the register, but gcc does not 
-                           do so - it writes the word to memory, then reads 
-                           the dword back again. */
-                        __asm__ (
-                                "movw %1, %w0\n\t"
-                                : "+r" (update)
-                                : "r" ((uint16_t) (x & maskbucket))
-                                );
+                    /* The x value in update can be set by a write to 
+                       the low word of the register, but gcc does not 
+                       do so - it writes the word to memory, then reads 
+                       the dword back again. */
+                    __asm__ (
+                            "movw %1, %w0\n\t"
+                            : "+r" (update)
+                            : "r" ((uint16_t) (x & maskbucket))
+                            );
 #else
-                        update.x = (uint16_t) (x & maskbucket);
+                    update.x = (uint16_t) (x & maskbucket);
 #endif
-                        WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);
-                        WHERE_AM_I_UPDATE(w, x, update.x);
-                        ASSERT(test_divisible(w));
+                    WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);
+                    WHERE_AM_I_UPDATE(w, x, update.x);
+                    ASSERT(test_divisible(w));
 #ifdef PROFILE
-                        /* To make it visible in profiler */
-                        *(BA.bucket_write[x >> shiftbucket])++ = update;
+                    /* To make it visible in profiler */
+                    *(BA.bucket_write[x >> shiftbucket])++ = update;
 #else
-                        push_bucket_update(BA, x >> shiftbucket, update);
+                    push_bucket_update(BA, x >> shiftbucket, update);
 #endif
-                    }
-#ifdef TRACE_K
-                    if (trace_on_spot_x(x)) {
-                        fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
-                                (unsigned int) (x & maskbucket), logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
-                    }
-#endif
-                    if (i >= bound1) x += inc_a;
-                    if (i < bound0)  x += inc_c;
                 }
-                __asm__("## Inner bucket sieving loop stops here!!!\n");
+#ifdef TRACE_K
+                if (trace_on_spot_x(x)) {
+                    fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
+                            (unsigned int) (x & maskbucket), logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
+                }
+#endif
+                if (i >= bound1) x += inc_a;
+                if (i < bound0)  x += inc_c;
             }
+            __asm__("## Inner bucket sieving loop stops here!!!\n");
         }
     }
     /* Write back BA so the nr_logp etc get copied to caller */
@@ -2897,10 +2886,9 @@ static thread_data * thread_data_alloc(sieve_info_ptr si)
         while (fb->p != FB_END && fb->p < (fbprime_t) si->bucket_thresh)
             fb = fb_next (fb); 
         factorbase_degn_t *fb_bucket[si->nb_threads];
-        dispatch_fb(fb_bucket, &s->fb, fb, si->nb_threads);
+        dispatch_fb(fb_bucket, &s->fb, fb, si->nb_threads, FBPRIME_MAX);
         for (int i = 0; i < si->nb_threads; ++i) {
             thrs[i]->sides[side]->fb_bucket = fb_bucket[i];
-            thrs[i]->sides[side]->pmax = FBPRIME_MAX;
         }
         fprintf (si->output, "# Number of small-sieved primes in %s factor base = %zu\n", sidenames[side], fb_nroots_total(s->fb));
 
