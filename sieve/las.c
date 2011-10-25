@@ -3295,7 +3295,7 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
 
     mpz_t BLPrat;       /* alone ? */
 
-    uint32_t cof_rat_bitsize, cof_alg_bitsize;
+    uint32_t cof_rat_bitsize = 0, cof_alg_bitsize = 0;
 
     for(int side = 0 ; side < 2 ; side++) {
         f[side] = alloc_mpz_array (8);

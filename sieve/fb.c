@@ -684,7 +684,7 @@ fb_read_addproj (const char *filename, const double log_scale,
 	}
 
       /* Sort the roots into ascending order. We assume that fbprime_t and 
-         fbroot_t are typecaste compatible. This is ugly. */
+         fbroot_t are typecast compatible. This is ugly. */
       ASSERT_ALWAYS (sizeof (fbprime_t) == sizeof (fbroot_t));
       fb_sortprimes ((fbprime_t *) fb_cur->roots, fb_cur->nr_roots);
       /* Eliminate duplicate roots. Pari's polrootsmod() can produce them */
