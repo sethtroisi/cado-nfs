@@ -34,7 +34,7 @@ wr should be one of the wiring inside pi.
   serialize(wr)         // Serializing stuff
   serialize_threads(wr)
 The most interesting example of using these is matmul_top.[ch] . Be
-carfeful: in these files, the pi's wirings are completed by others
+careful: in these files, the pi's wirings are completed by others
 wirings that links pieces of the matrix.
 
 The "abase" mechanism
@@ -71,7 +71,7 @@ Currently the following are implemented:
   abase-u64n    // block of n unint64_t, size not known at compile-time
 
 The main use of this type is for vectors to be multiplied by the binary
-matrix. We have for instance in matmul.[ch] a fonction called:
+matrix. We have for instance in matmul.[ch] a function called:
   void matmul_mul(matmul_ptr M , abt * B , abt const * A , int d)
 that computes B = M . A  (or transpose of d=1), where A and B are vectors
 of "abase".
@@ -118,7 +118,7 @@ use, and saved on disk
 
 [ Note that this single task can be benched separately of the bw
   infrastructure by the standalone bench program. Be aware though that
-  some of the difficuly performance-wise arises when all cpu cores are
+  some of the difficulty performance-wise arises when all cpu cores are
   trying to interact with memory simultaneously. ]
 
 (documentation to be continued).

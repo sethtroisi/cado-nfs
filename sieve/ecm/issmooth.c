@@ -20,6 +20,7 @@
      (which requires N|O).
 */
 
+#include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>

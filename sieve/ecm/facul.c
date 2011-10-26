@@ -2,6 +2,7 @@
    factors are unsigned long. Returns number of factors found, 
    or -1 in case of error. */
 
+#include "cado.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

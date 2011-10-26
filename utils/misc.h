@@ -48,9 +48,10 @@ next_multiple_of_powerof2(unsigned long n, unsigned long k)
     return ((n-1)|(k-1)) + 1;
 }
 /* those builtins seem to have appeared in 3.4 (April 2004) */
+#ifndef HAVE_clzl
 #if GNUC_VERSION_ATLEAST(3,4,0)
 #define clzl(x)         __builtin_clzl(x)
-#define ctzl(x)         __builtin_ctzl(x)
+#define HAVE_clzl
 #else
 /* provide slow fallbacks */
 static inline int clzl(unsigned long x)
@@ -68,7 +69,16 @@ static inline int clzl(unsigned long x)
         res = GMP_LIMB_BITS - 2 - a + t[x];
         return res;
 }
+#define HAVE_clzl
+#define HAVE_clzl_fallback
+#endif
+#endif  /* HAVE_clzl */
 
+#ifndef HAVE_ctzl
+#if GNUC_VERSION_ATLEAST(3,4,0)
+#define ctzl(x)         __builtin_ctzl(x)
+#define HAVE_ctzl
+#else
 /* the following code is correct because if x = 0...0abc10...0, then
    -x = ~x + 1, where ~x = 1...1(1-a)(1-b)(1-c)01...1, thus
    -x = 1...1(1-a)(1-b)(1-c)10...0, and x & (-x) = 0...000010...0 */
@@ -77,7 +87,10 @@ static inline int ctzl(unsigned long x)
   ASSERT(GMP_LIMB_BITS == sizeof(unsigned long) * CHAR_BIT);
   return (GMP_LIMB_BITS - 1) - clzl(x & - x);
 }
+#define HAVE_ctzl
+#define HAVE_ctzl_fallback
 #endif
+#endif  /* HAVE_ctzl */
 
 #ifdef __cplusplus
 }

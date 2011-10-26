@@ -34,11 +34,29 @@ extern "C" {
 
 #define BUILD_BITMASK(x) ((x) == GMP_LIMB_BITS ? ((mp_limb_t) - 1) : (~ - ((mp_limb_t) 1 << (x))))
 
+#define LEXGE2(X,Y,A,B) (X>A || (X == A && Y >= B))
+#define LEXGE3(X,Y,Z,A,B,C) (X>A || (X == A && LEXGE2(Y,Z,B,C)))
+#define LEXLE2(X,Y,A,B) LEXGE2(A,B,X,Y)
+#define LEXLE3(X,Y,Z,A,B,C) LEXGE3(A,B,C,X,Y,Z)
+
 #ifndef GNUC_VERSION
 #define GNUC_VERSION(X,Y,Z)     \
-    (defined(__GNUC__) &&        \
-    (__GNUC__ == X && __GNUC_MINOR__ == Y && __GNUC_PATCHLEVEL__ == Z))
+    defined(__GNUC__) &&        \
+(__GNUC__ == X && __GNUC_MINOR__ == Y && __GNUC_PATCHLEVEL__ == Z)
 #endif
+
+#ifndef GNUC_VERSION_ATLEAST
+#define GNUC_VERSION_ATLEAST(X,Y,Z)     \
+    defined(__GNUC__) &&        \
+LEXGE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
+#endif
+
+#ifndef GNUC_VERSION_ATMOST
+#define GNUC_VERSION_ATMOST(X,Y,Z)     \
+    defined(__GNUC__) &&        \
+LEXLE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
+#endif
+
 
 /* typedef unsigned long ulong; */
 
@@ -65,41 +83,57 @@ extern "C" {
 #define ABS(x) ((x) >= 0 ? (x) : -(x))
 #endif
 
-#ifdef  __GNUC__
-
+#if GNUC_VERSION_ATLEAST(3,4,0)
+/* according to
+ * http://gcc.gnu.org/onlinedocs/gcc-3.1.1/gcc/Variable-Attributes.html#Variable%20Attributes
+ * the 'unused' attribute already existed in 3.1.1 ; however the rules
+ * for its usage remained quirky until 3.4.0, so we prefer to stick to
+ * the more modern way of using the unused attribute, and recommend
+ * setting the -Wno-unused flag for pre-3.4 versions of gcc
+ */
 #ifndef	MAYBE_UNUSED
 #define	MAYBE_UNUSED	__attribute__((unused))
 #endif
+#endif
+
+#if GNUC_VERSION_ATLEAST(3,1,0) /* apparently */
 #ifndef MPFQ_EXPECT
 #define MPFQ_EXPECT(x,val)   __builtin_expect(x,val)
 #endif
+#endif
+
+#if GNUC_VERSION_ATLEAST(3,4,0)
+#define clzl(x)         __builtin_clzl(x)
+#define HAVE_clzl
+#endif
+
+#if GNUC_VERSION_ATLEAST(3,4,0)
+#define ctzl(x)         __builtin_ctzl(x)
+#define HAVE_ctzl
+#endif
+
+#if GNUC_VERSION_ATLEAST(3,4,0)
+#define parityl(x)      __builtin_parityl(x)
+#define HAVE_parityl
+#endif
+
+#ifndef	MAYBE_UNUSED
+#define	MAYBE_UNUSED	/**/
+#endif
+
+#ifndef MPFQ_EXPECT
+#define MPFQ_EXPECT(x,val)   (x)
+#endif
+
 #ifndef	MPFQ_UNLIKELY
 #define	MPFQ_UNLIKELY(x)	MPFQ_EXPECT(x, 0)
 #endif
 #ifndef	MPFQ_LIKELY
 #define	MPFQ_LIKELY(x)	MPFQ_EXPECT(x, 1)
 #endif
-#define clzl(x)         __builtin_clzl(x)
-#define ctzl(x)         __builtin_ctzl(x)
-#define parityl(x)      __builtin_parityl(x)
-
-#else
-
-#ifndef	MAYBE_UNUSED
-#define	MAYBE_UNUSED	/**/
-#endif
-#ifndef MPFQ_EXPECT
-#define MPFQ_EXPECT(x,val)   (x)
-#endif
-#ifndef	MPFQ_UNLIKELY
-#define	MPFQ_UNLIKELY(x)	(x)
-#endif
-#ifndef	MPFQ_LIKELY
-#define	MPFQ_LIKELY(x)	(x)
-#endif
 
 
-
+#ifndef HAVE_clzl
 /* provide slow fallbacks */
 static inline int clzl(unsigned long x)
 {
@@ -116,10 +150,20 @@ static inline int clzl(unsigned long x)
         res = GMP_LIMB_BITS - 2 - a + t[x];
         return res;
 }
+#define HAVE_clzl
+#define HAVE_clzl_fallback
+#endif
+
+#ifndef HAVE_ctzl
 static inline int ctzl(unsigned long x)
 {
 	return GMP_LIMB_BITS - clzl(x & - x);
 }
+#define HAVE_ctzl
+#define HAVE_ctzl_fallback
+#endif
+
+#ifndef HAVE_parityl
 static inline int parityl(unsigned long x)
 {
 	static const int t[4] = { 0, 1, 1, 0, };
@@ -132,8 +176,9 @@ static inline int parityl(unsigned long x)
 	x ^= (x >>  2);
 	return t[x & 3UL];
 }
-
-#endif	/* __GNUC__ */
+#define HAVE_parityl
+#define HAVE_parityl_fallback
+#endif
 
 static inline int clzlx(unsigned long * x, int n)
 {
@@ -143,6 +188,7 @@ static inline int clzlx(unsigned long * x, int n)
 	r += clzl(x[n-1]);
 	return r;
 }
+
 static inline int ctzlx(unsigned long * x, int n)
 {
 	int r = 0;
@@ -151,7 +197,6 @@ static inline int ctzlx(unsigned long * x, int n)
 	r += ctzl(*x);
 	return r;
 }
-
 
 #ifdef __cplusplus
 }

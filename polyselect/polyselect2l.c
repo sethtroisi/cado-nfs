@@ -16,6 +16,7 @@
   Please report bugs to shi.bai AT anu.edu.au.
 */
 
+#include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

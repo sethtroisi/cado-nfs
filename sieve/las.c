@@ -29,10 +29,16 @@
                                         double precision number */
 
 #ifndef HAVE_LOG2
-static double
-MAYBE_UNUSED log2 (double x)
+static double MAYBE_UNUSED log2 (double x)
 {
   return log (x) / log (2.0);
+}
+#endif
+
+#ifndef HAVE_EXP2
+static double MAYBE_UNUSED exp2 (double x)
+{
+  return exp (x * log (2.0));
 }
 #endif
 
@@ -185,12 +191,14 @@ factor_small (mpz_t n, fbprime_t lim)
 
   l = 0;
   f = (fbprime_t*) malloc (sizeof (fbprime_t));
+  FATAL_ERROR_CHECK(f == NULL, "malloc failed");
   for (p = 2; p <= lim; p = getprime (p))
     {
       if (mpz_divisible_ui_p (n, p))
         {
           l ++;
           f = (fbprime_t*) realloc (f, (l + 1) * sizeof (fbprime_t));
+          FATAL_ERROR_CHECK(f == NULL, "realloc failed");
           f[l - 1] = p;
         }
     }
@@ -616,6 +624,7 @@ static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_mai
      */
     /* Start by counting, unsurprisingly */
     size_t * fb_sizes = (size_t *) malloc(nparts * sizeof(size_t));
+    FATAL_ERROR_CHECK(fb_sizes == NULL, "malloc failed");
     memset(fb_sizes, 0, nparts * sizeof(size_t));
     size_t headsize = 0;
     int i = 0;
@@ -634,6 +643,7 @@ static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_mai
         // add one for end marker
         fb_sizes[i] += sizeof(factorbase_degn_t);
         fb_dst[i] = (factorbase_degn_t *) malloc(fb_sizes[i]);
+        FATAL_ERROR_CHECK(fb_dst[i] == NULL, "malloc failed");
         fbi[i] = fb_dst[i];
     }
     free(fb_sizes); fb_sizes = NULL;
@@ -653,6 +663,7 @@ static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_mai
     }
     free(fbi); fbi = NULL;
     *fb_main = realloc(*fb_main, (headsize + sizeof(factorbase_degn_t)));
+    FATAL_ERROR_CHECK(*fb_main == NULL, "realloc failed");
     fb0 = fb_skip(*fb_main, headsize);
     memset(fb0, 0, sizeof(factorbase_degn_t));
     fb0->p = FB_END;
@@ -970,6 +981,7 @@ void
 clone_small_sieve(small_sieve_data_t *r, const small_sieve_data_t *s) {
     memcpy(r, s, sizeof(small_sieve_data_t));
     r->next_position = malloc(r->nb_ssp*sizeof(int));
+    FATAL_ERROR_CHECK(r->next_position == NULL, "malloc failed");
     memcpy(r->next_position, s->next_position, r->nb_ssp * sizeof(int));
 }
 
@@ -1025,8 +1037,11 @@ init_resieve (small_sieve_data_t *r, const small_sieve_data_t *s,
 
     int j = 0;
     r->ssp = (ssp_t *) malloc (s->nb_ssp * sizeof (ssp_t));
+    FATAL_ERROR_CHECK(r->ssp == NULL, "malloc failed");
     r->logp = malloc (s->nb_ssp);
+    FATAL_ERROR_CHECK(r->logp == NULL, "malloc failed");
     r->next_position = (int *) malloc (s->nb_ssp * sizeof(int));
+    FATAL_ERROR_CHECK(r->next_position == NULL, "malloc failed");
     r->markers = NULL;
     int r_nmarkers = 0;
 
@@ -1129,7 +1144,9 @@ void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
     // allocate space for these. n is an upper bound, since some of the
     // ideals might become special ones.
     ssd->ssp = (ssp_t *) malloc(size * sizeof(ssp_t));
+    FATAL_ERROR_CHECK(ssd->ssp == NULL, "malloc failed");
     ssd->next_position = (int *) malloc(size * sizeof(int));
+    FATAL_ERROR_CHECK(ssd->next_position == NULL, "malloc failed");
     ssd->markers = NULL;
     int nmarkers = 0;
     ssd->logp = (unsigned char *) malloc(size);
@@ -2668,6 +2685,7 @@ process_bucket_region(thread_data_ptr th)
 static thread_data * thread_data_alloc(sieve_info_ptr si)
 {
     thread_data * thrs = (thread_data *) malloc(si->nb_threads * sizeof(thread_data));
+    ASSERT_ALWAYS(thrs);
     memset(thrs, 0, si->nb_threads * sizeof(thread_data));
 
     for(int i = 0 ; i < si->nb_threads ; i++) {
@@ -2694,6 +2712,7 @@ static thread_data * thread_data_alloc(sieve_info_ptr si)
 
         /* Counting the bucket-sieved primes per thread.  */
         unsigned long * nn = (unsigned long *) malloc(si->nb_threads * sizeof(unsigned long));
+        ASSERT_ALWAYS(nn);
         memset(nn, 0, si->nb_threads * sizeof(unsigned long));
         for (int i = 0; i < si->nb_threads; ++i) {
             thrs[i]->sides[side]->bucket_fill_ratio = 0;
@@ -2967,6 +2986,7 @@ main (int argc0, char *argv0[])
 
     /* special q (and root rho) */
     roots = (uint64_t *) malloc (si->cpoly->alg->degree * sizeof (uint64_t));
+    ASSERT_ALWAYS(roots);
     q0 --; /* so that nextprime gives q0 if q0 is prime */
     nroots = 0;
 

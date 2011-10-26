@@ -1,5 +1,6 @@
-#include "gmp.h"
-#include "stdio.h"
+#include "cado.h"
+#include <gmp.h>
+#include <stdio.h>
 
 int main(int argc, char **argv)
 {

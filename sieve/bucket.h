@@ -274,12 +274,21 @@ init_bucket_array(const int n_bucket, const int bucket_size)
     BA.bucket_size = bucket_size;
     BA.n_bucket = n_bucket;
 
-    BA.bucket_start = (bucket_update_t **)malloc_pagealigned(n_bucket*sizeof(bucket_update_t *));
-    BA.bucket_write = (bucket_update_t **)malloc_check(n_bucket*sizeof(bucket_update_t *));
-    BA.bucket_read  = (bucket_update_t **)malloc_check(n_bucket*sizeof(bucket_update_t *));
+    BA.bucket_start = (bucket_update_t **)
+      malloc_pagealigned (n_bucket * sizeof(bucket_update_t *));
+    if (BA.bucket_start == NULL)
+      {
+        fprintf (stderr, "Error, cannot allocate memory\n");
+        exit (EXIT_FAILURE);
+      }
+    BA.bucket_write = (bucket_update_t **)
+      malloc_check (n_bucket * sizeof(bucket_update_t *));
+    BA.bucket_read  = (bucket_update_t **)
+      malloc_check (n_bucket * sizeof(bucket_update_t *));
 
 #ifdef  ONE_BIG_MALLOC
-    BA.bucket_start[0] = (bucket_update_t *)malloc_check(n_bucket * bucket_size*sizeof(bucket_update_t));
+    BA.bucket_start[0] = (bucket_update_t *)
+      malloc_check (n_bucket * bucket_size * sizeof(bucket_update_t));
 #endif
 
     for (i = 0; i < n_bucket; ++i) {
@@ -289,7 +298,8 @@ init_bucket_array(const int n_bucket, const int bucket_size)
 #ifdef  ONE_BIG_MALLOC
         BA.bucket_start[i] = BA.bucket_start[0] + i * bucket_size;
 #else
-        BA.bucket_start[i] = (bucket_update_t *)malloc_check(bucket_size*sizeof(bucket_update_t));
+        BA.bucket_start[i] = (bucket_update_t *)
+          malloc_check (bucket_size * sizeof(bucket_update_t));
 #endif
         BA.bucket_write[i] = BA.bucket_start[i];
         BA.bucket_read[i] = BA.bucket_start[i];
@@ -305,11 +315,11 @@ static inline void
 clear_bucket_array(bucket_array_t BA)
 {
 #ifdef  ONE_BIG_MALLOC
-    free(BA.bucket_start[0]);
+    free (BA.bucket_start[0]);
 #else
     int i;
     for (i = 0; i < BA.n_bucket; ++i)
-      free(BA.bucket_start[i]);
+      free (BA.bucket_start[i]);
 #endif
     free_pagealigned(BA.bucket_start, BA.n_bucket*sizeof(bucket_update_t *));
     free(BA.bucket_write);
@@ -354,9 +364,19 @@ bucket_new_logp (bucket_array_t *BA, const unsigned char logp)
   BA->nr_logp++;
   BA->logp_val = (unsigned char *) realloc (BA->logp_val, 
                  BA->nr_logp * sizeof (unsigned char));
+  if (BA->logp_val == NULL)
+    {
+      fprintf (stderr, "Error, cannot reallocate memory\n");
+      exit (EXIT_FAILURE);
+    }
   BA->logp_idx = (bucket_update_t **) 
                  realloc (BA->logp_idx, BA->nr_logp * BA->n_bucket * 
                           sizeof (bucket_update_t *));
+  if (BA->logp_idx == NULL)
+    {
+      fprintf (stderr, "Error, cannot reallocate memory\n");
+      exit (EXIT_FAILURE);
+    }
   BA->logp_val[j] = logp;
   for (i = 0; i < BA->n_bucket; ++i)
     BA->logp_idx[j * BA->n_bucket + i] = BA->bucket_write[i];

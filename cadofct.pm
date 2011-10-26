@@ -1,7 +1,8 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 
-# Copyright 2008, 2009, 2010 Pierrick Gaudry, Emmanuel Thome, Paul Zimmermann,
-#                            Jeremie Detrey, Lionel Muller
+# Copyright 2008, 2009, 2010, 2011 Pierrick Gaudry, Emmanuel Thome,
+#                                  Paul Zimmermann, Jeremie Detrey,
+#                                  Lionel Muller
 #
 # This file is part of CADO-NFS.
 #
@@ -620,6 +621,11 @@ sub remote_cmd {
     # don't ask for a password: we don't want to fall into interactive mode
     # all the time (especially not in the middle of the night!)
     # use public-key authentification instead!
+
+    for my $prop (qw/LD_LIBRARY_PATH DYLD_LIBRARY_PATH/) {
+       my $v = $ENV{$prop} or next;
+       $cmd="$prop=$v $cmd";
+    }
 
     $cmd = "env $ssh -q ".
            "-o ConnectTimeout=$opt->{'timeout'} ".

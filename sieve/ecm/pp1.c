@@ -1,3 +1,4 @@
+#include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include "pp1.h"

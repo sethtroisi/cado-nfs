@@ -13,7 +13,8 @@
 # will fail.
 
 #CADO_DEBUG=1
-usage=<<EOF
+usage() {
+    cat >&2 <<EOF
 Usage: $0 <integer> [options] [arguments passed to cadofactor.pl]
     <integer>     - integer to be factored. must be at least 60 digits,
                     and free of small prime factors [parameters are
@@ -25,6 +26,7 @@ options:
                     use on several machines, use the advanced script
                     cadofactor.pl
 EOF
+}
 
 : ${t:=`mktemp -d /tmp/cado.XXXXXXXXXX`}
 chmod 755 $t
@@ -32,7 +34,7 @@ chmod 755 $t
 n=$1
 shift
 if [ ! "$(grep "^[ [:digit:] ]*$" <<< $n)" ]; then
-  echo -e $usage
+  usage
   exit 1
 fi
 
@@ -42,7 +44,7 @@ for ((i=1; i<=2; i=i+1)) ; do
   if [ "$1" = "-t" ]; then
     cores=$2
     if [ ! "$(grep "^[ [:digit:] ]*$" <<< $cores)" ]; then
-      echo -e $usage
+      usage
       exit 1
     fi
     shift 2
@@ -75,7 +77,7 @@ if [ "$0" -ef "$cado_prefix/bin/factor.sh" ] ; then
     cputime="$bindir/cpu_time.sh"
 elif [ "$0" -ef "@CADO_NFS_BINARY_DIR@/factor.sh" ] ; then
     # We're called in the build tree.
-    paramdir="@CADO_NFS_SOURCE_DIR@/params/params.c$size"
+    paramdir="@CADO_NFS_SOURCE_DIR@/params"
     cputime="@CADO_NFS_SOURCE_DIR@/scripts/cpu_time.sh"
     cadofactor="@CADO_NFS_SOURCE_DIR@/cadofactor.pl"
     # Make the path absolute.
@@ -123,7 +125,7 @@ done
 
 if [ ! -f $file ] ; then
     echo "no parameter file found for c${#n} (last tried was $file)" >&2
-    echo -e $usage
+    usage
     exit 1
 fi
 
@@ -162,15 +164,13 @@ fi
 
 rc=$?
 
-# Print timings
-
-cd $t
-$cputime
-
 #########################################################################
 # Check result, clean up the mess afterwards.
 if [ "$rc" = 0 ] ; then
     echo OK
+    # Print timings
+    cd $t
+    $cputime
     if ! [ "$CADO_DEBUG" ] ; then
         rm -rf $t
     fi

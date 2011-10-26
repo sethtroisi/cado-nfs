@@ -1,7 +1,7 @@
+#include "cado.h"
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
-#include "cado.h"
 #include "macros.h"
 #include "prac_bc.h"
 

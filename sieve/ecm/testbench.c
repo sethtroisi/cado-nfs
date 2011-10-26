@@ -17,6 +17,7 @@
    Total time: 3.10 s, per call: 39.472700 usec, per factor: 40.123899 usec
 */
 
+#include "cado.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

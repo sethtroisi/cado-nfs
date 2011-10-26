@@ -1,4 +1,5 @@
-#include <stdlib.h>
+#include "cado.h"
+#include <stdlib.h> /* for malloc and free */
 #include "mpz_poly.h"
 #include "gmp_aux.h"
 

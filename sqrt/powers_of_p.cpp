@@ -3,6 +3,7 @@
  * for primes of a power p. It must be given an opaque structure, which
  * in fact is of type power_lookup_table
  */
+#include "cado.h"
 #include <cstdlib>
 #include <cstdio>
 #include <map>

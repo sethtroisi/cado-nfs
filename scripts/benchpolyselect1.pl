@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 
 # Usage: benchpolyselect1.pl $paramfile1 $paramfile2 ...
 #        read paramfiles and run polyselect

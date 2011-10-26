@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env perl
 
 # Usage: benchsievessh.pl $polyfile $paramfile1 $paramfile2 ...
 #        read polyfile and paramfiles and estimate time for sieve

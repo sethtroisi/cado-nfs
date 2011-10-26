@@ -20,6 +20,7 @@
   MA 02111-1307, USA.
 */
 
+#include "cado.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>

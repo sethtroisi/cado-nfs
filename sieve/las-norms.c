@@ -276,7 +276,7 @@ init_alg_norms_bucket_region (unsigned char *alg_S,
 
   t = si->fijd;
   u = (double*) malloc ((si->degree + 1) * sizeof (double));
-  ASSERT(u != NULL);
+  FATAL_ERROR_CHECK(u == NULL, "malloc failed");
 
   /* bucket_region is a multiple of I. Let's find the starting j
    * corresponding to N and the last j.
@@ -660,11 +660,15 @@ get_maxnorm_aux (double *g, const unsigned int d, double s)
   double *roots, gmax;
 
   dg = (double**) malloc (d * sizeof (double*));
+  FATAL_ERROR_CHECK(dg == NULL, "malloc failed");
   dg[0] = g;
-  for (k = 1; k < d; k++) /* dg[k] is the k-th derivative, thus has
+  for (k = 1; k < d; k++) { /* dg[k] is the k-th derivative, thus has
                              degree d-k, i.e., d-k+1 coefficients */
     dg[k] = (double*) malloc ((d - k + 1) * sizeof (double));
+    FATAL_ERROR_CHECK(dg[k] == NULL, "malloc failed");
+  }
   roots = (double*) malloc (d * sizeof (double));
+  FATAL_ERROR_CHECK(roots == NULL, "malloc failed");
   for (k = 1; k < d; k++)
     for (l = 0; l <= d - k; l++)
       dg[k][l] = (l + 1) * dg[k - 1][l + 1];
@@ -742,6 +746,7 @@ get_maxnorm (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
   double norm, max_norm, pows, tmp;
 
   fd = (double*) malloc ((d + 1) * sizeof (double));
+  FATAL_ERROR_CHECK(fd == NULL, "malloc failed");
   for (k = 0; k <= d; k++)
     fd[k] = mpz_get_d (cpoly->alg->f[k]);
 
@@ -790,7 +795,9 @@ void sieve_info_init_norm_data(sieve_info_ptr si, unsigned long q0)
     for (int side = 0; side < 2; side++) {
         int d = si->cpoly->pols[side]->degree;
         si->sides[side]->fij = (mpz_t *) malloc((d + 1) * sizeof(mpz_t));
+        FATAL_ERROR_CHECK(si->sides[side]->fij == NULL, "malloc failed");
         si->sides[side]->fijd = (double *) malloc((d + 1) * sizeof(double));
+        FATAL_ERROR_CHECK(si->sides[side]->fijd == NULL, "malloc failed");
         for (int k = 0; k <= d; k++)
             mpz_init(si->sides[side]->fij[k]);
     }

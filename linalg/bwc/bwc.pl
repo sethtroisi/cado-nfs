@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 use warnings;
 use strict;
 
@@ -671,8 +671,11 @@ sub drive {
             print "find $wdir -name '[A-Z]*' | xargs -r rm";
             print "(cd $wdir ; rm -f bw.cfg)";
         } else {
-            system "find $wdir -name '[A-Z]*' | xargs -r rm";
-            system "rm -f bw.cfg";
+            opendir DIR, $wdir or die "Cannot open directory `$wdir': $!\n";
+            my @rmfiles= grep /^[A-Z]/, readdir DIR;
+            close DIR;
+            unlink "$wdir/$_" for (@rmfiles);
+            unlink "$wdir/bw.cfg";
         }
         chdir $pwd;
         return;

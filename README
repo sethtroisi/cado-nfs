@@ -102,8 +102,7 @@ the shared library mechanism).
 
 FIXME -- This should be completed and checked.
 
-Linux: All three methods work
-OpenBSD 4.9:
+Linux, BSD: All three methods work
 MacOS X:
     For any invocation to work, the LD_LIBRARY_PATH or DYLD_LIBRARY_PATH
     variable must be set up properly. The easiest method is to do make

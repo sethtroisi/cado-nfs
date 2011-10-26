@@ -27,6 +27,7 @@
  * hardware.
  */
 
+#include "cado.h"
 #include <string.h>
 #ifdef HAVE_SSE2
 #include <emmintrin.h>

@@ -1,7 +1,7 @@
 /* Common header file for the CADO project
  
-Copyright 2007, 2008, 2009, 2010 Pierrick Gaudry, Alexander Kruppa,
-                                 Emmanuel Thome, Paul Zimmermann
+Copyright 2007, 2008, 2009, 2010, 2011 Pierrick Gaudry, Alexander Kruppa,
+                                       Emmanuel Thome, Paul Zimmermann
 
 This file is part of the CADO project.
 

@@ -1,5 +1,6 @@
 #define VERBOSE 0
 
+#include "cado.h"
 #if VERBOSE
 #include <stdio.h>
 #endif

@@ -7,6 +7,7 @@
    http://cado.gforge.inria.fr/workshop/slides/kleinjung.pdf
 */
 
+#include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
