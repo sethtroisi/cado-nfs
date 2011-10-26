@@ -14,6 +14,44 @@ typedef const struct sieve_info_s * sieve_info_srcptr;
 
 #include "las-unsieve.h"
 
+/* {{{ Structures for small sieves (will go in a separate file soon) */
+
+typedef struct {
+    fbprime_t p;
+    fbprime_t r;        // in [ 0, p [
+    fbprime_t offset;   // in [ 0, p [
+} ssp_t;
+
+/* We currently *mandate* that this structure has the same size as ssp_t.
+ * It would be possible to make it work with only a requirement on
+ * identical alignment and smaller size. If extra fields are required, we
+ * need to store them with the ssp_marker_t structure.
+ */
+typedef struct {
+    fbprime_t g, q, U;
+} ssp_bad_t;
+
+#define SSP_POW2        (1u<<0)
+#define SSP_PROJ        (1u<<1)
+#define SSP_DISCARD     (1u<<30)
+#define SSP_END         (1u<<31)
+
+typedef struct {
+    int index;
+    unsigned int event;
+} ssp_marker_t;
+
+typedef struct {
+    ssp_marker_t * markers;
+    // primes with non-projective root
+    ssp_t *ssp;
+    // primes with projective root
+    int nb_ssp;
+    unsigned char * logp;
+} small_sieve_data_t;
+
+/* }}} */
+
 typedef struct {
     factorbase_degn_t * start;
     factorbase_degn_t * end;
@@ -49,8 +87,12 @@ struct sieve_side_info_s {
 
     mpz_t *fij;       /* coefficients of F(a0*i+a1*j, b0*i+b1*j)  */
     double *fijd;     /* coefficients of F_q (divided by q on the special q side) */
-    int smallpow2[64];
-    int smallpow3[64];
+
+    /* This updated by applying the special-q lattice transform to the
+     * factor base. */
+    small_sieve_data_t ssd[1];
+    /* And this is just created as an extraction of the above */
+    small_sieve_data_t rsd[1];
 };
 
 typedef struct sieve_side_info_s * sieve_side_info_ptr;
