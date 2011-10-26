@@ -300,10 +300,11 @@ init_alg_norms_bucket_region(unsigned char *S,
 
     const unsigned char * L = alg->lognorm_table;
 
+#ifndef LAZY_NORMS
     /* Used for checking the bound on the other side */
     const unsigned char * xB = si->sides[RATIONAL_SIDE]->Bound;
-
     const unsigned char * xS0 MAYBE_UNUSED = xS;
+#endif
 
     int32_t I = si->I;
     double halfI = I / 2;
@@ -324,9 +325,9 @@ init_alg_norms_bucket_region(unsigned char *S,
         if (j > j0 && ((j & jmask) != 0)) {
             // copy norms from the row below.
             unsigned char *old_S;
-            old_S = alg_S - si->I;
+            old_S = S - si->I;
             for (unsigned int ii = 0; ii < si->I; ++ii) {
-                *alg_S++ = *old_S++;
+                *S++ = *old_S++;
             }
             continue;
         }
@@ -337,16 +338,16 @@ init_alg_norms_bucket_region(unsigned char *S,
 #ifdef LAZY_NORMS
         const int normstride=NORM_STRIDE;
         const double fpnormstride=(double)NORM_STRIDE;
-        for (i = -halfI; i < halfI; i += fpnormstride) {
+        for (int i = -halfI; i < halfI; i += fpnormstride) {
             unsigned char n;
             zx->z = fpoly_eval (u, d, i);
             /* 4607182418800017408 = 1023*2^52 */
-            y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
+            uint64_t y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
             report++;
-            n = T[y & mask];
+            n = L[y & mask];
             ASSERT (n > 0);
             for (int ii = 0; ii < normstride; ++ii)
-                *alg_S++ = n;
+                *S++ = n;
         }
 #else  /* full norm computation */
 
