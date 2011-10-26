@@ -34,8 +34,8 @@ static void init_prime_powers() {
   uint32_t *ptr = &prime_powers[0];
 
   for (p = 2; p <= 65536; p = getprime(p)) {
-      unsigned long q = p*p;
-      while (q < 4294967296UL) {
+      uint64_t q = p*p;
+      while (q <= 4294967295UL) {
           *ptr++ = (uint32_t) q;
           q *= p;
       }
