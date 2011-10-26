@@ -31,7 +31,7 @@ gcc20 # ok
 # gcc35 Connection refused
 # gcc36 Connection refused
 # gcc37 Connection refused
-# gcc38 asks password
+gcc38 # ok
 # gcc40 Connection timed out
 # gcc41 Connection refused
 # gcc42 Connection refused
