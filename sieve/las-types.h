@@ -12,45 +12,12 @@ struct sieve_info_s;
 typedef struct sieve_info_s * sieve_info_ptr;
 typedef const struct sieve_info_s * sieve_info_srcptr;
 
+struct where_am_I_s;
+typedef struct where_am_I_s * where_am_I_ptr;
+typedef const struct where_am_I_s * where_am_I_srcptr;
+
 #include "las-unsieve.h"
-
-/* {{{ Structures for small sieves (will go in a separate file soon) */
-
-typedef struct {
-    fbprime_t p;
-    fbprime_t r;        // in [ 0, p [
-    fbprime_t offset;   // in [ 0, p [
-} ssp_t;
-
-/* We currently *mandate* that this structure has the same size as ssp_t.
- * It would be possible to make it work with only a requirement on
- * identical alignment and smaller size. If extra fields are required, we
- * need to store them with the ssp_marker_t structure.
- */
-typedef struct {
-    fbprime_t g, q, U;
-} ssp_bad_t;
-
-#define SSP_POW2        (1u<<0)
-#define SSP_PROJ        (1u<<1)
-#define SSP_DISCARD     (1u<<30)
-#define SSP_END         (1u<<31)
-
-typedef struct {
-    int index;
-    unsigned int event;
-} ssp_marker_t;
-
-typedef struct {
-    ssp_marker_t * markers;
-    // primes with non-projective root
-    ssp_t *ssp;
-    // primes with projective root
-    int nb_ssp;
-    unsigned char * logp;
-} small_sieve_data_t;
-
-/* }}} */
+#include "las-smallsieve.h"
 
 typedef struct {
     factorbase_degn_t * start;
@@ -160,8 +127,6 @@ struct where_am_I_s {
 #endif  /* TRACK_CODE_PATH */
 } TYPE_MAYBE_UNUSED;
 typedef struct where_am_I_s where_am_I[1];
-typedef struct where_am_I_s * where_am_I_ptr TYPE_MAYBE_UNUSED;
-typedef const struct where_am_I_s *where_am_I_srcptr TYPE_MAYBE_UNUSED;
 
 #ifdef TRACK_CODE_PATH
 #define WHERE_AM_I_UPDATE(w, field, value) (w)->field = (value)

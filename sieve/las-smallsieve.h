@@ -1,0 +1,75 @@
+#ifndef LAS_SMALLSIEVE_H_
+#define LAS_SMALLSIEVE_H_
+
+#include "fb.h"
+
+/* Structures for small sieves */
+
+typedef struct {
+    fbprime_t p;
+    fbprime_t r;        // in [ 0, p [
+    fbprime_t offset;   // in [ 0, p [
+} ssp_t;
+
+/* We currently *mandate* that this structure has the same size as ssp_t.
+ * It would be possible to make it work with only a requirement on
+ * identical alignment and smaller size. If extra fields are required, we
+ * need to store them with the ssp_marker_t structure.
+ */
+typedef struct {
+    fbprime_t g, q, U;
+} ssp_bad_t;
+
+#define SSP_POW2        (1u<<0)
+#define SSP_PROJ        (1u<<1)
+#define SSP_DISCARD     (1u<<30)
+#define SSP_END         (1u<<31)
+
+typedef struct {
+    int index;
+    unsigned int event;
+} ssp_marker_t;
+
+typedef struct {
+    ssp_marker_t * markers;
+    // primes with non-projective root
+    ssp_t *ssp;
+    // primes with projective root
+    int nb_ssp;
+    unsigned char * logp;
+} small_sieve_data_t;
+
+/* Include this only now, as there's a cross dependency between the two
+ * (our prototypes need sieve_info_t, which needs our datatypes...)
+ */
+#include "las-types.h"
+#include "bucket.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+extern void small_sieve_info(sieve_info_srcptr si, const char * what, int side, small_sieve_data_t * r);
+extern void small_sieve_clear(small_sieve_data_t * ssd);
+extern void small_sieve_extract_interval(small_sieve_data_t * r, small_sieve_data_t * s, int bounds[2]);
+extern void small_sieve_init(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
+                      sieve_info_srcptr si, int side);
+extern int * small_sieve_copy_start(int * base, int bounds[2]);
+extern int * small_sieve_start(small_sieve_data_t *ssd, unsigned int j0, sieve_info_srcptr si);
+extern void small_sieve_skip_stride(small_sieve_data_t *ssd, int * ssdpos, unsigned int skip, sieve_info_srcptr si);
+extern void sieve_small_bucket_region(unsigned char *S, int N,
+			       small_sieve_data_t * ssd, int * ssdpos, sieve_info_ptr si,
+                               int side,
+			       where_am_I_ptr w MAYBE_UNUSED);
+
+extern void
+resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
+        small_sieve_data_t *ssd, int * ssdpos,
+        sieve_info_srcptr si, where_am_I_ptr w MAYBE_UNUSED);
+
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif	/* LAS_SMALLSIEVE_H_ */
