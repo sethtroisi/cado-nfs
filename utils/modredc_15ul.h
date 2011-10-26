@@ -244,9 +244,20 @@ MAYBE_UNUSED
 static inline void
 modredc15ul_intshr (modintredc15ul_t r, const modintredc15ul_t s, const int i)
 {
+#if (__GNUC__ == 4 && __GNUC_MINOR__ <= 2)
+  /* gcc 4.2.1 on 32-bit Intel CPUs seems to get confused over register 
+     allocation when s == r, when using the shrd instruction via inline
+     assembly in ularith_shrd(), and when modredc15ul_intshr() itself gets 
+     inlined. This extra variable seems to fix it. */
+  unsigned long t = s[1];
+  r[0] = s[0];
+  ularith_shrd (&(r[0]), t, i);
+  r[1] = t >> i;
+#else
   r[0] = s[0];
   ularith_shrd (&(r[0]), s[1], i);
   r[1] = s[1] >> i;
+#endif
 }
 
 
@@ -1073,6 +1084,12 @@ modredc15ul_divn (residueredc15ul_t r, const residueredc15ul_t a,
   const unsigned long mn = ((m[0].m[1] % n)*w_mod_n + m[0].m[0] % n) % n;
   unsigned long k;
   residueredc15ul_t t;
+#ifdef WANT_ASSERT_EXPENSIVE
+  residueredc15ul_t a_backup;
+
+  modredc15ul_init_noset0 (a_backup, m);
+  modredc15ul_set (a_backup, a, m);
+#endif
   
   modredc15ul_init_noset0 (t, m);
   t[1] = a[1];
@@ -1094,6 +1111,7 @@ modredc15ul_divn (residueredc15ul_t r, const residueredc15ul_t a,
   /* Now t[1]:t[0] is divisible by n */
   ASSERT_EXPENSIVE (((t[1] % n)*w_mod_n + t[0] % n) % n == 0UL);
   
+  /* May overwrite a */
   r[1] = t[1] / n;
   r[0] = t[0] * c;
 
@@ -1103,7 +1121,8 @@ modredc15ul_divn (residueredc15ul_t r, const residueredc15ul_t a,
     modredc15ul_set (t, r, m);
     for (i = 1; i < n; i++)
       modredc15ul_add (t, t, r, m);
-    ASSERT_EXPENSIVE (modredc15ul_equal (t, a, m));
+    ASSERT_EXPENSIVE (modredc15ul_equal (t, a_backup, m));
+    modredc15ul_clear (a_backup, m);
   }
 #endif
 
