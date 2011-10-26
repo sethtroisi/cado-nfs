@@ -6,6 +6,7 @@
 #include <string.h>
 #include <errno.h>
 
+#include "cado_poly.h"
 #include "mod_ul.h"
 #include "relation.h"
 #include "gzip.h"
@@ -23,6 +24,23 @@ clear_relation (relation_t *rel)
 {
     free(rel->rp); rel->rp = NULL;
     free(rel->ap); rel->ap = NULL;
+}
+
+/* FIXME: The following interface still strongly relies on the fact that
+ * the rational side is [0] and the algebraic side is [1] */
+void
+relation_add_prime (relation_t *rel, int side, unsigned long p)
+{
+    int prov[2] = {
+        [RATIONAL_SIDE] = rel->nb_rp,
+        [ALGEBRAIC_SIDE] = rel->nb_ap, };
+    prov[side]++;
+    relation_provision_for_primes(rel, prov[0], prov[1]);
+    if (side == RATIONAL_SIDE) {
+        rel->rp[rel->nb_rp++] = (rat_prime_t) { .p=p, .e=1 };
+    } else {
+        rel->ap[rel->nb_ap++] = (alg_prime_t) { .p=p, .e=1 };
+    }
 }
 
 void skip_relations_in_file(FILE * f, int n)
@@ -98,53 +116,53 @@ computeroots (relation_t *rel)
 }
 
 void
-fprint_relation (FILE *file, relation_t rel)
+fprint_relation (FILE *file, relation_t * rel)
 {
   int i, j;
 
-  fprintf(file, "%" PRId64 ",%" PRIu64 ":", rel.a, rel.b);
-  for (i = 0; i < rel.nb_rp - 1; ++i)
-    for (j = 0; j < rel.rp[i].e; j++)
-      fprintf (file, "%lx,", rel.rp[i].p);
-  /* now i = rel.nb_rp - 1 */
-  for (j = 0; j < rel.rp[i].e - 1; j++)
-    fprintf (file, "%lx,", rel.rp[i].p);
-  fprintf (file, "%lx:", rel.rp[i].p);
-  for (i = 0; i < rel.nb_ap - 1; ++i)
-    for (j = 0; j < rel.ap[i].e; j++)
-      fprintf (file, "%lx,", rel.ap[i].p);
-  /* now i = rel.nb_ap - 1 */
-  for (j = 0; j < rel.ap[i].e - 1; j++)
-    fprintf (file, "%lx,", rel.ap[i].p);
-  fprintf (file, "%lx\n", rel.ap[i].p);
+  fprintf(file, "%" PRId64 ",%" PRIu64 ":", rel->a, rel->b);
+  for (i = 0; i < rel->nb_rp - 1; ++i)
+    for (j = 0; j < rel->rp[i].e; j++)
+      fprintf (file, "%lx,", rel->rp[i].p);
+  /* now i = rel->nb_rp - 1 */
+  for (j = 0; j < rel->rp[i].e - 1; j++)
+    fprintf (file, "%lx,", rel->rp[i].p);
+  fprintf (file, "%lx:", rel->rp[i].p);
+  for (i = 0; i < rel->nb_ap - 1; ++i)
+    for (j = 0; j < rel->ap[i].e; j++)
+      fprintf (file, "%lx,", rel->ap[i].p);
+  /* now i = rel->nb_ap - 1 */
+  for (j = 0; j < rel->ap[i].e - 1; j++)
+    fprintf (file, "%lx,", rel->ap[i].p);
+  fprintf (file, "%lx\n", rel->ap[i].p);
 }
 
 /* same as fprint_relation, but exponents > 1 are allowed */
 void
-fprint_relation_raw (FILE *file, relation_t rel)
+fprint_relation_raw (FILE *file, relation_t * rel)
 {
   int i, j;
 
-  fprintf (file, "%" PRId64 ",%" PRIu64 ":", rel.a, rel.b);
-  for (i = 0; i < rel.nb_rp; ++i)
+  fprintf (file, "%" PRId64 ",%" PRIu64 ":", rel->a, rel->b);
+  for (i = 0; i < rel->nb_rp; ++i)
     {
-      ASSERT (rel.rp[i].e >= 1);
-      for (j = 0; j < rel.rp[i].e; j++)
+      ASSERT (rel->rp[i].e >= 1);
+      for (j = 0; j < rel->rp[i].e; j++)
         {
-          fprintf (file, "%lx", rel.rp[i].p);
-          if (i + 1 != rel.nb_rp || j + 1 != rel.rp[i].e)
+          fprintf (file, "%lx", rel->rp[i].p);
+          if (i + 1 != rel->nb_rp || j + 1 != rel->rp[i].e)
             fprintf (file, ",");
           else
             fprintf (file, ":");
         }
     }
-  for (i = 0; i < rel.nb_ap; ++i)
+  for (i = 0; i < rel->nb_ap; ++i)
     {
-      ASSERT (rel.ap[i].e >= 1);
-      for (j = 0; j < rel.ap[i].e; j++)
+      ASSERT (rel->ap[i].e >= 1);
+      for (j = 0; j < rel->ap[i].e; j++)
         {
-          fprintf (file, "%lx", rel.ap[i].p);
-          if (i + 1 != rel.nb_ap || j + 1 != rel.ap[i].e)
+          fprintf (file, "%lx", rel->ap[i].p);
+          if (i + 1 != rel->nb_ap || j + 1 != rel->ap[i].e)
             fprintf (file, ",");
           else
             fprintf (file, "\n");

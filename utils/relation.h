@@ -71,9 +71,14 @@ extern void clear_relation(relation_t *rel);
 // extern int fread_relation(FILE *file, relation_t *rel);
 extern unsigned long findroot(long a, unsigned long b, unsigned long p);
 extern void computeroots(relation_t * rel);
-extern void fprint_relation(FILE *file, relation_t rel);
-extern void fprint_relation_raw (FILE *file, relation_t rel);
+extern void fprint_relation(FILE *file, relation_t * rel);
+extern void fprint_relation_raw (FILE *file, relation_t * rel);
 extern void reduce_exponents_mod2 (relation_t *rel);
+
+/* FIXME: The following interface still strongly relies on the fact that
+ * the rational side is [0] and the algebraic side is [1] */
+extern void relation_add_prime (relation_t *rel, int side, unsigned long p);
+
 
 /* reads over relations in a file, just discarding them */
 extern void skip_relations_in_file(FILE * file, int n) __attribute__((deprecated));

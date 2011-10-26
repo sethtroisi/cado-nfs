@@ -118,12 +118,12 @@ lift_root(const cado_poly cpoly, const unsigned long pk, unsigned long * r) {
   mpz_init(aux);
   mpz_init(aux2);
   mpz_init_set_ui(mp_p, pk);
-  mp_poly_eval_diff(aux, cpoly->f, cpoly->degree, *r);
+  mp_poly_eval_diff(aux, cpoly->alg->f, cpoly->alg->degree, *r);
   mpz_mod_ui(aux, aux, pk);
   if (!mpz_invert(aux, aux, mp_p)) {
     return 0;
   }
-  mp_poly_eval(aux2, cpoly->f, cpoly->degree, *r);
+  mp_poly_eval(aux2, cpoly->alg->f, cpoly->alg->degree, *r);
   mpz_mod(aux2, aux2, mp_p);
   mpz_mul(aux2, aux2, aux);
   mpz_neg(aux2, aux2);
@@ -146,17 +146,17 @@ void
 makefb_with_powers(FILE *fp, cado_poly cpoly)
 {
   unsigned long p;
-  int d = cpoly->degree;
+  int d = cpoly->alg->degree;
   unsigned long *roots;
   int nroots, i;
   unsigned long power_lim;
 
-  power_lim = (unsigned long)(floor(sqrt((double)(cpoly->alim))));
+  power_lim = (unsigned long)(floor(sqrt((double)(cpoly->alg->lim))));
 
-  check_polynomials (cpoly);
+  cado_poly_check (cpoly);
 
   fprintf (fp, "# Roots for polynomial ");
-  fprint_polynomial (fp, cpoly->f, d);
+  fprint_polynomial (fp, cpoly->alg->f, d);
 
   fprintf (fp, "# DEGREE: %d\n", d);
 
@@ -167,7 +167,7 @@ makefb_with_powers(FILE *fp, cado_poly cpoly)
   id_list.alloc = 0;
   id_list.ideals = NULL;
 
-  for (p = 2; p <= cpoly->alim; p = getprime (p))
+  for (p = 2; p <= cpoly->alg->lim; p = getprime (p))
     {
       /* Check if there is some power ideal to print before prime p
        * Lemma: there is a prime between a prime and its square.
@@ -184,7 +184,7 @@ makefb_with_powers(FILE *fp, cado_poly cpoly)
 
 	q = get_min_power_ideal(&id_list);
       }
-      nroots = poly_roots_ulong(roots, cpoly->f, d, p);
+      nroots = poly_roots_ulong(roots, cpoly->alg->f, d, p);
 
       if (nroots != 0)
         {
@@ -211,7 +211,7 @@ makefb_with_powers(FILE *fp, cado_poly cpoly)
 	    break;
 	  include_power_ideal(&id_list, &id);
   	  pk *= p;
-	} while (pk <= cpoly->alim);
+	} while (pk <= cpoly->alg->lim);
       }
     }
 
@@ -227,22 +227,22 @@ void
 makefb (FILE *fp, cado_poly cpoly)
 {
   unsigned long p;
-  int d = cpoly->degree;
+  int d = cpoly->alg->degree;
   unsigned long *roots;
   int nroots, i;
 
-  check_polynomials (cpoly);
+  cado_poly_check (cpoly);
 
   fprintf (fp, "# Roots for polynomial ");
-  fprint_polynomial (fp, cpoly->f, d);
+  fprint_polynomial (fp, cpoly->alg->f, d);
 
   fprintf (fp, "# DEGREE: %d\n", d);
 
   roots = (unsigned long*) malloc (d * sizeof (unsigned long));
 
-  for (p = 2; p <= cpoly->alim; p = getprime (p))
+  for (p = 2; p <= cpoly->alg->lim; p = getprime (p))
     {
-        nroots = poly_roots_ulong(roots, cpoly->f, d, p);
+        nroots = poly_roots_ulong(roots, cpoly->alg->f, d, p);
         // TODO: poly_roots_ulong returns 0 if f mod p is 0.
         // This corresponds to complicated roots that should maybe go to
         // the factor base (hum... maybe not!)

@@ -27,7 +27,11 @@ link_directories (${CMAKE_CURRENT_BINARY_DIR}/ecm)
 add_executable (makefb makefb.c)
 target_link_libraries (makefb utils m)
 
-add_executable (las las.c fb.c trialdiv.c)
+add_executable (las las.c fb.c trialdiv.c
+    las-coordinates.c las-debug.c las-report-stats.c
+    las-config.c las-norms.c las-unsieve.c las-arith.c
+    las-qlattice.c
+    )
 target_link_libraries (las facul utils m ${pthread_libs})
 
 #add_executable (las-copper las-copper.c fb.c trialdiv.c)

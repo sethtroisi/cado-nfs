@@ -268,21 +268,21 @@ fb_check (factorbase_t fb, cado_poly poly, int side)
 	  if (side == 0)
 	    {
 	      int j;
-	      modul_set_ul_reduced (val, mpz_fdiv_ui (poly->f[poly->degree], p), 
+	      modul_set_ul_reduced (val, mpz_fdiv_ui (poly->alg->f[poly->alg->degree], p), 
 				  m);
-	      for (j = 1; j <= poly->degree; j++)
+	      for (j = 1; j <= poly->alg->degree; j++)
 		{
 		  modul_mul (val, val, r, m);
 		  modul_set_ul_reduced 
-		    (c, mpz_fdiv_ui (poly->f[poly->degree - j], p), m);
+		    (c, mpz_fdiv_ui (poly->alg->f[poly->alg->degree - j], p), m);
 		  modul_add (val, val, c, m);
 		}
 	    }
 	  else
 	    {
-	      modul_set_ul (val, mpz_fdiv_ui (poly->g[1], p), m);
+	      modul_set_ul (val, mpz_fdiv_ui (poly->rat->f[1], p), m);
 	      modul_mul (val, val, r, m);
-	      modul_set_ul_reduced (c, mpz_fdiv_ui (poly->g[0], p), m);
+	      modul_set_ul_reduced (c, mpz_fdiv_ui (poly->rat->f[0], p), m);
 	      modul_add (val, val, c, m);
 	    }
 

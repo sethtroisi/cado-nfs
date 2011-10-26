@@ -696,7 +696,7 @@ reread (const char *oname, char ** ficname,
                   W += (double) fprint_rel_row (ofile, irel, rs->rel, H);
               }
               else
-                  fprint_relation_raw (ofile, rs->rel);
+                  fprint_relation_raw (ofile, &rs->rel);
               nr++;
               if (nr >= nrows)
                   ret = 0; /* we are done */
@@ -830,7 +830,7 @@ main (int argc, char **argv)
     /* On a 32-bit computer, even 1 << 32 would overflow. Well, we could set
        map[ra] = 2^32-1 in that case, but not sure we want to support 32-bit
        primes on a 32-bit computer... */
-    need64 = (pol[0].lpbr >= 32) || (pol[0].lpba >= 32);
+    need64 = (pol->rat->lpb >= 32) || (pol->alg->lpb >= 32);
 
     if (need64 && sizeof (long) < 8)
       {
@@ -841,9 +841,9 @@ main (int argc, char **argv)
     minus2 = (need64) ? 18446744073709551614UL : 4294967294UL;
 
     if (minpr == -1)
-      minpr = pol[0].rlim;
+      minpr = pol->rat->lim;
     if (minpa == -1)
-      minpa = pol[0].alim;
+      minpa = pol->alg->lim;
 
     fprintf (stderr, "Using minpr=%ld minpa=%ld\n", minpr, minpa);
     fprintf (stderr, "Number of relations is %u\n", nrelmax);
@@ -852,8 +852,8 @@ main (int argc, char **argv)
     else{
       /* Estimating the number of needed primes (remember that hashInit
          multiplies by a factor 1.5). */
-      Hsizer = approx_phi (1L << pol[0].lpbr) - approx_phi (minpr);
-      Hsizea = approx_phi (1L << pol[0].lpba) - approx_phi (minpa);
+      Hsizer = approx_phi (1L << pol->rat->lpb) - approx_phi (minpr);
+      Hsizea = approx_phi (1L << pol->alg->lpb) - approx_phi (minpa);
       Hsize = Hsizer + Hsizea;
     }
     fprintf (stderr, "Estimated number of prime ideals: %d\n", Hsize);

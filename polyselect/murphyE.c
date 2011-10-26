@@ -51,29 +51,30 @@ double
 MurphyE (cado_poly cpoly, double Bf, double Bg, double area, int K)
 {
   double E = 0, x, y, ti;
-  int i, deg_g = 1;
   double *f, *g, alpha_f, alpha_g, xi, yi, vf, vg;
   double one_over_logBf, one_over_logBg;
 
   x = sqrt (area * cpoly->skew);
   y = sqrt (area / cpoly->skew);
-  f = malloc ((cpoly->degree + 1) * sizeof (double));
+  int deg_f = cpoly->alg->degree;
+  int deg_g = 1;
+  f = malloc ((cpoly->alg->degree + 1) * sizeof (double));
   g = malloc ((deg_g + 1) * sizeof (double));
-  for (i = 0; i <= cpoly->degree; i++)
-    f[i] = mpz_get_d (cpoly->f[i]);
-  for (i = 0; i <= deg_g; i++)
-    g[i] = mpz_get_d (cpoly->g[i]);
-  alpha_f = get_alpha (cpoly->f, cpoly->degree, ALPHA_BOUND);
-  alpha_g = get_alpha (cpoly->g, deg_g, ALPHA_BOUND);
+  for (int i = 0; i <= deg_f; i++)
+    f[i] = mpz_get_d (cpoly->alg->f[i]);
+  for (int i = 0; i <= deg_g; i++)
+    g[i] = mpz_get_d (cpoly->rat->f[i]);
+  alpha_f = get_alpha (cpoly->alg->f, deg_f, ALPHA_BOUND);
+  alpha_g = get_alpha (cpoly->rat->f, deg_g, ALPHA_BOUND);
   one_over_logBf = 1.0 / log (Bf);
   one_over_logBg = 1.0 / log (Bg);
-  for (i = 0; i < K; i++)
+  for (int i = 0; i < K; i++)
     {
       ti = PI / (double) K * ((double) i + 0.5);
       xi = x * cos (ti);
       yi = y * sin (ti);
 
-      vf = fpoly_eval (f, cpoly->degree, xi / yi) * pow (yi, cpoly->degree);
+      vf = fpoly_eval (f, deg_f, xi / yi) * pow (yi, deg_f);
       vg = fpoly_eval (g, deg_g, xi / yi) * pow (yi, deg_g);
 
       vf = log (fabs (vf)) + alpha_f;
