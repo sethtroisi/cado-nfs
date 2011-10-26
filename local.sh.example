@@ -67,9 +67,9 @@
 #
 # Example values:
 # CFLAGS=-O2
+# CFLAGS="-O3 -g -fkeep-inline-functions"
 # CFLAGS=-g
 # CFLAGS="-O2 -DNDEBUG"
-# CFLAGS="-O3 -funroll-loops -DNDEBUG"
 #
 # Note that some flags, and some compile-time definitions are added
 # anyway and cannot be overridden. For example, one cannot remove
