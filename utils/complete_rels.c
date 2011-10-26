@@ -11,84 +11,43 @@
 #include "utils.h"
 #include "mpz_poly.h"
 
-void
-add_alg (relation_t *rel, unsigned long p)
-{
-  relation_provision_for_primes(rel, 0, rel->nb_ap + 1);
-  rel->ap[rel->nb_ap++] = (alg_prime_t) { .p=p, .e=1 };
-}
-
-void
-add_rat (relation_t *rel, unsigned long p)
-{
-  relation_provision_for_primes(rel, rel->nb_rp + 1, 0);
-  rel->rp[rel->nb_rp++] = (rat_prime_t) { .p=p, .e=1 };
-}
-
 int
 complete_relation (relation_t *rel, cado_poly_ptr cpoly)
 {
-  mpz_t no;
-  int i, j;
-  unsigned long p;
+  for(int side = 0 ; side < 2 ; side++) {
+      cado_poly_side_ptr ps = cpoly->pols[side];
+      mpz_t no;
+      mpz_init (no);
+      mp_poly_homogeneous_eval_siui(no, ps->f, ps->degree, rel->a, rel->b);
 
-  mpz_init (no);
+      int n = side == RATIONAL_SIDE ? rel->nb_rp : rel->nb_ap;
+      for (int i = 0; i < n; ++i)
+      {
+          unsigned long p = side == RATIONAL_SIDE ? rel->rp[i].p : rel->ap[i].p;
+          int e = side == RATIONAL_SIDE ? rel->rp[i].e : rel->ap[i].e;
+          for (int j = 0; j < e; ++j)
+              if (mpz_fdiv_q_ui (no, no, p) != 0)
+              {
+                  fprintf (stderr,
+                          "Wrong %s side for (%" PRId64 ", %" PRIu64 ")\n",
+                          sidenames[side], rel->a, rel->b);
+                  fprintf (stderr, "Given factor %lu does not divide norm\n", p);
+                  mpz_clear (no);
+                  return 0;
+              }
+      }
 
-  // algebraic side
-  mp_poly_homogeneous_eval_siui(no, cpoly->f, cpoly->degree, rel->a, rel->b);
-  for (i = 0; i < rel->nb_ap; ++i)
-    {
-      for (j = 0; j < (rel->ap[i]).e; ++j)
-	if (mpz_divisible_ui_p (no, (rel->ap[i]).p) == 0)
-	  {
-	    fprintf (stderr,
-                     "Wrong algebraic side for (%" PRId64 ", %" PRIu64 ")\n",
-		     rel->a, rel->b);
-	    fprintf (stderr, "Given factor %lu does not divide norm\n",
-		     (rel->ap[i]).p);
-	    mpz_clear (no);
-	    return 0;
-	  }
-	else
-	  mpz_divexact_ui (no, no, (rel->ap[i]).p);
-    }
+      for (unsigned long p = 2; mpz_cmp_ui (no, 1) != 0; p = getprime(p)) {
+          while (mpz_divisible_ui_p (no, p))
+          {
+              relation_add_prime (rel, side, p);
+              mpz_divexact_ui (no, no, p);
+          }
+      }
+      mpz_clear(no);
+  }
 
-  for (p = 2; mpz_cmp_ui (no, 1) != 0; p += 1 + (p != 2))
-    {
-      while (mpz_divisible_ui_p (no, p))
-	{
-	  add_alg (rel, p);
-	  mpz_divexact_ui (no, no, p);
-	}
-    }
-
-  // rational side
-  mp_poly_homogeneous_eval_siui(no, cpoly->g, 1, rel->a, rel->b);
-  for (i = 0; i < rel->nb_rp; ++i)
-    {
-      for (j = 0; j < (rel->rp[i]).e; ++j)
-	if (mpz_divisible_ui_p (no, (rel->rp[i]).p) == 0)
-	  {
-	    fprintf (stderr,
-                     "Wrong rational side for (%" PRId64 ", %" PRIu64 ")\n",
-		     rel->a, rel->b);
-	    fprintf (stderr, "Given factor %lu does not divide norm\n",
-		     (rel->rp[i]).p);
-	    mpz_clear (no);
-	    return 0;
-	  }
-	else
-	  mpz_divexact_ui (no, no, (rel->rp[i]).p);
-    }
-  for (p = 2; mpz_cmp_ui (no, 1) != 0; p += 1 + (p != 2))
-    {
-      while (mpz_divisible_ui_p (no, p))
-	{
-	  add_rat (rel, p);
-	  mpz_divexact_ui (no, no, p);
-	}
-    }
-
+  getprime(0);
   // were printing our output, thus we don't care about tidyness of the
   // internal structure.
   // relation_compress_rat_primes(rel);
@@ -113,7 +72,7 @@ int complete_relation_files(char ** files, cado_poly_ptr cpoly)
         for( ; relation_stream_get(rs, line, 0) >= 0 ; ) {
             unsigned long l = rs->lnum - l0;
             if (complete_relation(&rs->rel, cpoly)) {
-                fprint_relation (stdout, rs->rel);
+                fprint_relation (stdout, &rs->rel);
                 ok++;
                 continue;
             }

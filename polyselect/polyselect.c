@@ -1415,23 +1415,23 @@ main (int argc, char *argv[])
           Msize2 = Msize;
           break;
         }
-      mpz_set_ui (poly->f[degree], 0);
-      Lemma21 (poly->f, n, degree, Mt[i].b, Mt[i].m);
+      mpz_set_ui (poly->alg->f[degree], 0);
+      Lemma21 (poly->alg->f, n, degree, Mt[i].b, Mt[i].m);
       /* optimize norm before root properties */
-      mpz_set (poly->g[1], Mt[i].b);
-      mpz_neg (poly->g[0], Mt[i].m);
-      optimize (poly->f, degree, poly->g, verbose, 1);
-      ASSERT_ALWAYS (mpz_cmp (poly->g[1], Mt[i].b) == 0);
+      mpz_set (poly->rat->f[1], Mt[i].b);
+      mpz_neg (poly->rat->f[0], Mt[i].m);
+      optimize (poly->alg->f, degree, poly->rat->f, verbose, 1);
+      ASSERT_ALWAYS (mpz_cmp (poly->rat->f[1], Mt[i].b) == 0);
       /* Warning: we cannot use Mt[i].m since g[0] might have been changed
          by optimize */
-      mpz_neg (newm, poly->g[0]);
-      E = rotate (poly->f, degree, ALPHA_BOUND_SMALL, newm, Mt[i].b, &jmin,
+      mpz_neg (newm, poly->rat->f[0]);
+      E = rotate (poly->alg->f, degree, ALPHA_BOUND_SMALL, newm, Mt[i].b, &jmin,
                   &kmin, 1, verbose, DEFAULT_L2_METHOD);
       if (E < best_E)
         {
           best_E = E;
           gmp_fprintf (stderr, "# ad=%Zd p=%Zd m=%Zd E~%1.2f\n",
-                       poly->f[degree], Mt[i].b, Mt[i].m, E);
+                       poly->alg->f[degree], Mt[i].b, Mt[i].m, E);
           best_i = i;
         }
       m_logmu_insert (Mt, Malloc2, &Msize2, Mt[i].b, Mt[i].m, E, "E~");
@@ -1443,24 +1443,24 @@ main (int argc, char *argv[])
   st = seconds ();
   for (i = 0, best_E = DBL_MAX; i < Msize2; i++)
     {
-      mpz_set_ui (poly->f[degree], 0);
-      Lemma21 (poly->f, n, degree, Mt[i].b, Mt[i].m);
+      mpz_set_ui (poly->alg->f[degree], 0);
+      Lemma21 (poly->alg->f, n, degree, Mt[i].b, Mt[i].m);
       /* optimize norm before root properties */
-      mpz_set (poly->g[1], Mt[i].b);
-      mpz_neg (poly->g[0], Mt[i].m);
-      optimize (poly->f, degree, poly->g, verbose, 1);
-      ASSERT_ALWAYS (mpz_cmp (poly->g[1], Mt[i].b) == 0);
+      mpz_set (poly->rat->f[1], Mt[i].b);
+      mpz_neg (poly->rat->f[0], Mt[i].m);
+      optimize (poly->alg->f, degree, poly->rat->f, verbose, 1);
+      ASSERT_ALWAYS (mpz_cmp (poly->rat->f[1], Mt[i].b) == 0);
       /* Warning: we cannot use Mt[i].m since g[0] might have been changed
          by optimize */
-      mpz_neg (newm, poly->g[0]);
+      mpz_neg (newm, poly->rat->f[0]);
       if (multi <= 1) {
-          E = rotate (poly->f, degree, ALPHA_BOUND, newm, Mt[i].b, &jmin,
+          E = rotate (poly->alg->f, degree, ALPHA_BOUND, newm, Mt[i].b, &jmin,
                       &kmin, 1, verbose + 1, DEFAULT_L2_METHOD);
       } else {
           long *jjmin, *kkmin;
           jjmin = (long *)malloc(multi*sizeof(long));
           kkmin = (long *)malloc(multi*sizeof(long));
-          E = rotate (poly->f, degree, ALPHA_BOUND, newm, Mt[i].b, jjmin,
+          E = rotate (poly->alg->f, degree, ALPHA_BOUND, newm, Mt[i].b, jjmin,
                       kkmin, multi, verbose + 1, DEFAULT_L2_METHOD);
           jmin = jjmin[0];
           kmin = kkmin[0];
@@ -1472,7 +1472,7 @@ main (int argc, char *argv[])
         {
           best_E = E;
           gmp_fprintf (stderr, "# ad=%Zd p=%Zd m=%Zd E=%1.2f\n",
-                       poly->f[degree], Mt[i].b, newm, E);
+                       poly->alg->f[degree], Mt[i].b, newm, E);
           best_i = i;
           bestj = jmin;
           bestk = kmin;
@@ -1488,27 +1488,27 @@ main (int argc, char *argv[])
     }
 
   /* regenerate best polynomial */
-  mpz_set_ui (poly->f[degree], 0);
+  mpz_set_ui (poly->alg->f[degree], 0);
   i = best_i;
-  Lemma21 (poly->f, n, degree, Mt[i].b, Mt[i].m);
+  Lemma21 (poly->alg->f, n, degree, Mt[i].b, Mt[i].m);
   /* optimize again norm, to start from same polynomial before rotation */
-  mpz_set (poly->g[1], Mt[i].b);
-  mpz_neg (poly->g[0], Mt[i].m);
-  optimize (poly->f, degree, poly->g, 0, 1);
-  mpz_neg (Mt[i].m, poly->g[0]);
-  ASSERT_ALWAYS (mpz_cmp (Mt[i].b, poly->g[1]) == 0);
-  rotate_aux (poly->f, Mt[i].b, Mt[i].m, 0, bestk, 0);
-  rotate_aux (poly->f, Mt[i].b, Mt[i].m, 0, bestj, 1);
+  mpz_set (poly->rat->f[1], Mt[i].b);
+  mpz_neg (poly->rat->f[0], Mt[i].m);
+  optimize (poly->alg->f, degree, poly->rat->f, 0, 1);
+  mpz_neg (Mt[i].m, poly->rat->f[0]);
+  ASSERT_ALWAYS (mpz_cmp (Mt[i].b, poly->rat->f[1]) == 0);
+  rotate_aux (poly->alg->f, Mt[i].b, Mt[i].m, 0, bestk, 0);
+  rotate_aux (poly->alg->f, Mt[i].b, Mt[i].m, 0, bestj, 1);
   if (!notr)
-    translate (poly->f, degree, poly->g, Mt[i].m, Mt[i].b, verbose,
+    translate (poly->alg->f, degree, poly->rat->f, Mt[i].m, Mt[i].b, verbose,
                DEFAULT_L2_METHOD);
 
   mpz_set (poly->n, n);
-  poly->degree = degree;
-  ASSERT_ALWAYS (mpz_cmp (Mt[i].b, poly->g[1]) == 0);
+  poly->alg->degree = degree;
+  ASSERT_ALWAYS (mpz_cmp (Mt[i].b, poly->rat->f[1]) == 0);
   mpz_neg (newm, Mt[i].m);
-  ASSERT_ALWAYS (mpz_cmp (newm, poly->g[0]) == 0);
-  poly->skew = L2_skewness (poly->f, degree, 2 * SKEWNESS_DEFAULT_PREC,
+  ASSERT_ALWAYS (mpz_cmp (newm, poly->rat->f[0]) == 0);
+  poly->skew = L2_skewness (poly->alg->f, degree, 2 * SKEWNESS_DEFAULT_PREC,
                          DEFAULT_L2_METHOD);
   strncpy (poly->type, "gnfs", sizeof (poly->type));
   print_poly (stdout, poly, argc0, argv0, st0, raw);

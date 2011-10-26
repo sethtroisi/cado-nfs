@@ -359,10 +359,10 @@ print_poly_info ( mpz_t *f,
 	 cado_poly_init(cpoly);
 
 	 for (i = 0; i < (d + 1); i++) {
-		  mpz_set(cpoly->f[i], f[i]);
+		  mpz_set(cpoly->alg->f[i], f[i]);
 	 }
 	 for (i = 0; i < 2; i++) {
-		  mpz_set(cpoly->g[i], g[i]);
+		  mpz_set(cpoly->rat->f[i], g[i]);
 	 }
 
 	 if (verbose == 2) {
@@ -387,14 +387,14 @@ print_poly_info ( mpz_t *f,
 	 alpha_proj = get_biased_alpha_projective (f, d, ALPHA_BOUND);
 
 	 mpz_set (cpoly->n, N);
-	 cpoly->degree = d;
-	 cpoly->degreeg = 2;
+	 cpoly->alg->degree = d;
+	 cpoly->rat->degree = 1;
 	 cpoly->skew = skew;
 	 e = MurphyE (cpoly, BOUND_F, BOUND_G, AREA, MURPHY_K);
 
+	 printf ("skew: %.2f\n", skew);
 	 if (verbose == 2) {
-		  printf ("# skew: %.2f, ", skew);
-		  printf ("lognorm: %.2f, alpha: %.2f, (alpha_proj: %.2f) E: %.2f, nr: %u \n# MurphyE: %1.2e (Bf=%.0f, Bg=%.0f, area=%1.2e)\n",
+		  printf ("# lognorm: %.2f, alpha: %.2f, (alpha_proj: %.2f) E: %.2f, nr: %u \n# MurphyE: %1.2e (Bf=%.0f, Bg=%.0f, area=%1.2e)\n",
 				  logmu,
 				  alpha,
 				  alpha_proj,
@@ -5843,7 +5843,7 @@ rootsieve_main_run ( rsstr_t rs,
 			   //       2. Change sieve length -umax and -vmax
 			   /*
 			   fprintf (stderr, "#!/bin/bash\n#PBS -N rsa_%d\n#PBS -l nodes=1,walltime=160:00:00\n#PBS -q route\n#PBS -m ae\n", i);
-			   gmp_fprintf ( stderr, "/home/bai/cado-nfs/trunk/build/orac/polyselect/rootsieve5 -fm /home/bai/cado-nfs/trunk/build/orac/polyselect/rsa768.poly --s2 -n %Zd -d %d -w %d -u %Zd -v %Zd -umax 64 -vmax 317325312 -mod %Zd > /home/bai/cado-nfs/trunk/build/orac/polyselect/rsa704_%d.out 2>&1\n\n",
+			   gmp_fprintf ( stderr, "/home/bai/cado-nfs/build/orac/polyselect/rootsieve5 -fm /home/bai/cado-nfs/build/orac/polyselect/rsa768.poly --s2 -n %Zd -d %d -w %d -u %Zd -v %Zd -umax 64 -vmax 317325312 -mod %Zd > /home/bai/cado-nfs/build/orac/polyselect/rsa704_%d.out 2>&1\n\n",
 							 rs->n,
 							 rs->d,
 							 w[i],

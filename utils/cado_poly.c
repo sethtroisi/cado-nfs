@@ -5,37 +5,43 @@
 #include "params.h"
 #include "cado_poly.h"
 
+const char * sidenames[2] = {
+    [RATIONAL_SIDE] = "rational",
+    [ALGEBRAIC_SIDE] = "algebraic", };
+
 void cado_poly_init(cado_poly poly)
 {
     int i;
 
     /* ALL fields are zero upon init, EXCEPT the degree field (which is -1) */
     memset(poly, 0, sizeof(poly));
-    poly->f = (mpz_t *) malloc((MAXDEGREE + 1) * sizeof(mpz_t));
-    poly->g = (mpz_t *) malloc((MAXDEGREE + 1) * sizeof(mpz_t));
-    /* mpzs as well are zero */
-    for (i = 0; i < (MAXDEGREE + 1); i++) {
-	mpz_init_set_ui(poly->f[i], 0);
-	mpz_init_set_ui(poly->g[i], 0);
+    poly->rat = poly->pols[RATIONAL_SIDE];
+    poly->alg = poly->pols[ALGEBRAIC_SIDE];
+
+    for(int side = 0 ; side < 2 ; side++) {
+        cado_poly_side_ptr ps = poly->pols[side];
+        ps->f = (mpz_t *) malloc((MAXDEGREE + 1) * sizeof(mpz_t));
+        /* mpzs as well are zero */
+        for (i = 0; i < (MAXDEGREE + 1); i++) {
+            mpz_init_set_ui(ps->f[i], 0);
+            ps->degree = -1;
+        }
     }
     mpz_init_set_ui(poly->n, 0);
-    poly->degree = -1;
-    poly->degreeg = -1;
-    poly->type[0] = '\0';
     mpz_init_set_ui(poly->m, 0);
+    poly->type[0] = '\0';
 }
 
 void cado_poly_clear(cado_poly poly)
 {
-    int i;
-
-    for (i = 0; i < (MAXDEGREE + 1); i++) {
-	mpz_clear(poly->f[i]);
-	mpz_clear(poly->g[i]);
+    for(int side = 0 ; side < 2 ; side++) {
+        cado_poly_side_ptr ps = poly->pols[side];
+        for (int i = 0; i < (MAXDEGREE + 1); i++) {
+            mpz_clear(ps->f[i]);
+        }
+        free(ps->f);
     }
     mpz_clear(poly->n);
-    free(poly->f);
-    free(poly->g);
     mpz_clear(poly->m);
     memset(poly, 0, sizeof(poly));
 }
@@ -44,16 +50,15 @@ void cado_poly_clear(cado_poly poly)
 void
 cado_poly_set (cado_poly p, cado_poly q)
 {
-    int i;
-
     mpz_set (p->n, q->n);
     p->skew = q->skew;
-    p->degree = q->degree;
-    for (i = 0; i <= q->degree; i++)
-      mpz_set (p->f[i], q->f[i]);
-    p->degreeg = q->degreeg;
-    for (i = 0; i <= q->degreeg; i++)
-      mpz_set (p->g[i], q->g[i]);
+    for(int side = 0 ; side < 2 ; side++) {
+        cado_poly_side_ptr ps = p->pols[side];
+        cado_poly_side_ptr qs = q->pols[side];
+        ps->degree = qs->degree;
+        for (int i = 0; i <= qs->degree; i++)
+            mpz_set (ps->f[i], qs->f[i]);
+    }
     mpz_set (p->m, q->m);
     memcpy (p->type, q->type, sizeof(p->type));
 }
@@ -61,10 +66,8 @@ cado_poly_set (cado_poly p, cado_poly q)
 int cado_poly_set_plist(cado_poly poly, param_list pl)
 {
     int have_n = 0;
-    int have_f[(MAXDEGREE + 1)] = { 0, };
-    int have_g[(MAXDEGREE + 1)] = { 0, };
+    int have_f[2][(MAXDEGREE + 1)] = {{ 0, }, {0,}};
     int have_m = 0;
-    int degf, degg;
     int i;
     mpz_t tmp;
 
@@ -75,95 +78,70 @@ int cado_poly_set_plist(cado_poly poly, param_list pl)
     for (i = 0; i < (MAXDEGREE + 1); i++) {
         char tag[4];
         snprintf(tag, sizeof(tag), "c%d", i);
-        have_f[i] = param_list_parse_mpz(pl, tag, poly->f[i]);
-        if (!have_f[i]) {
+        have_f[ALGEBRAIC_SIDE][i] = param_list_parse_mpz(pl, tag, poly->alg->f[i]);
+        if (!have_f[ALGEBRAIC_SIDE][i]) {
             snprintf(tag, sizeof(tag), "X%d", i);
-            have_f[i] = param_list_parse_mpz(pl, tag, poly->f[i]);
+            have_f[ALGEBRAIC_SIDE][i] = param_list_parse_mpz(pl, tag, poly->alg->f[i]);
         }
         snprintf(tag, sizeof(tag), "Y%d", i);
-        have_g[i] = param_list_parse_mpz(pl, tag, poly->g[i]);
+        have_f[RATIONAL_SIDE][i] = param_list_parse_mpz(pl, tag, poly->rat->f[i]);
     }
     param_list_parse_string(pl, "type", poly->type, sizeof(poly->type));
-    param_list_parse_ulong(pl, "rlim", &(poly->rlim));
-    param_list_parse_ulong(pl, "alim", &(poly->alim));
-    param_list_parse_int(pl, "lpbr", &(poly->lpbr));
-    param_list_parse_int(pl, "lpba", &(poly->lpba));
-    param_list_parse_int(pl, "mfbr", &(poly->mfbr));
-    param_list_parse_int(pl, "mfba", &(poly->mfba));
-    param_list_parse_double(pl, "rlambda", &(poly->rlambda));
-    param_list_parse_double(pl, "alambda", &(poly->alambda));
+
+    param_list_parse_ulong(pl, "rlim", &(poly->rat->lim));
+    param_list_parse_int(pl, "lpbr", &(poly->rat->lpb));
+    param_list_parse_int(pl, "mfbr", &(poly->rat->mfb));
+    param_list_parse_double(pl, "rlambda", &(poly->rat->lambda));
+
+    param_list_parse_ulong(pl, "alim", &(poly->alg->lim));
+    param_list_parse_int(pl, "lpba", &(poly->alg->lpb));
+    param_list_parse_int(pl, "mfba", &(poly->alg->mfb));
+    param_list_parse_double(pl, "alambda", &(poly->alg->lambda));
+
     param_list_parse_int(pl, "qintsize", &(poly->qintsize));
     mpz_set_ui (poly->m, 0);
     param_list_parse_mpz(pl, "m", poly->m);
     have_m = mpz_cmp_ui (poly->m, 0);
 
-    for (degf = MAXDEGREE; degf >= 0 && !have_f[degf]; degf--) {
-	if (have_f[degf] && mpz_cmp_ui(poly->f[degf], 0) != 0)
-	    break;
-    }
-    for (degg = MAXDEGREE; degg >= 0 && !have_g[degg]; degg--) {
-	if (have_g[degg] && mpz_cmp_ui(poly->g[degg], 0) != 0)
-	    break;
+    for(int side = 0 ; side < 2 ; side++) {
+        cado_poly_side_ptr ps = poly->pols[side];
+        int d;
+        for (d = MAXDEGREE; d >= 0 && !have_f[side][d]; d--) {
+            if (have_f[side][d] && mpz_cmp_ui(ps->f[d], 0) != 0)
+                break;
+        }
+        ps->degree = d;
     }
 
     ASSERT_ALWAYS(have_n);
 
-    poly->degree = degf;
-    poly->degreeg = degg;
     // compute m, the common root of f and g mod n
-    mpz_init (tmp);
-    if (degg == 1)
-      {
-	mpz_invert (tmp, poly->g[1], poly->n);
-	mpz_mul (tmp, tmp, poly->g[0]);
-	mpz_mod (tmp, tmp, poly->n);
-	mpz_sub (tmp, poly->n, tmp);
-	mpz_mod (tmp, tmp, poly->n);
+    for(int side = 0 ; side < 2 ; side++) {
+        cado_poly_side_ptr ps = poly->pols[side];
+        if (ps->degree != 1) continue;
+        mpz_init (tmp);
+        mpz_invert (tmp, ps->f[1], poly->n);
+        mpz_mul (tmp, tmp, ps->f[0]);
+        mpz_mod (tmp, tmp, poly->n);
+        mpz_sub (tmp, poly->n, tmp);
+        mpz_mod (tmp, tmp, poly->n);
 
         if (have_m && (mpz_cmp (poly->m, tmp) != 0))
-          {
+        {
             fprintf (stderr, "m is not a root of g mod N\n");
             exit (EXIT_FAILURE);
-          }
-	mpz_set (poly->m, tmp);
-      }
-    else
-      {
-        if (have_m == 0)
-          {
-            fprintf (stderr, "must provide m for non-linear polynomials\n");
-            exit (EXIT_FAILURE);
-          }
+        }
+        have_m = 1;
+        mpz_set (poly->m, tmp);
+        mpz_clear(tmp);
+    }
 
-        /* check m is a root of f mod n */
-        mpz_set (tmp, poly->f[degf]);
-        for (i = degf - 1; i >= 0; i--)
-          {
-            mpz_mul (tmp, tmp, poly->m);
-            mpz_add (tmp, tmp, poly->f[i]);
-          }
-        mpz_mod (tmp, tmp, poly->n);
-        if (mpz_cmp_ui (tmp, 0) != 0)
-          {
-            fprintf (stderr, "m is not a root of f modulo n\n");
-            exit (EXIT_FAILURE);
-          }
+    if (!have_m) {
+        fprintf (stderr, "must provide m for non-linear polynomials\n");
+        exit (EXIT_FAILURE);
+    }
 
-        /* check m is a root of g mod n */
-        mpz_set (tmp, poly->g[degg]);
-        for (i = degg - 1; i >= 0; i--)
-          {
-            mpz_mul (tmp, tmp, poly->m);
-            mpz_add (tmp, tmp, poly->g[i]);
-          }
-        mpz_mod (tmp, tmp, poly->n);
-        if (mpz_cmp_ui (tmp, 0) != 0)
-          {
-            fprintf (stderr, "m is not a root of g modulo n\n");
-            exit (EXIT_FAILURE);
-          }
-      }
-    mpz_clear (tmp);
+    cado_poly_check(poly);
 
     return 1;
 }
@@ -223,30 +201,30 @@ void fprint_polynomial(FILE * fp, mpz_t * f, const int d)
     fprintf(fp, "\n");
 }
 
-/* check that n divides b^d*f(m/d), where g = b*x-m */
-void check_polynomials(cado_poly cpoly)
+/* check that m is a root of both f and g mod n */
+void cado_poly_check(cado_poly cpoly)
 {
-    mpz_t r, q;
-    int k;
-    int d = cpoly->degree;
+    mpz_t tmp;
 
-    mpz_init_set(r, cpoly->f[d]);
-    mpz_init_set_ui(q, 1);
+    mpz_init(tmp);
 
-    for (k = d - 1; k >= 0; k--) {
-	mpz_mul(q, q, cpoly->g[1]);
-	/* invariant: q = b^(d-k) */
-	mpz_mul(r, r, cpoly->g[0]);
-	mpz_neg(r, r);
-	mpz_addmul(r, q, cpoly->f[k]);
+    for(int side = 0 ; side < 2 ; side++) {
+        cado_poly_side_ptr ps = cpoly->pols[side];
+
+        /* check m is a root of f mod n */
+        mpz_set (tmp, ps->f[ps->degree]);
+        for (int i = ps->degree - 1; i >= 0; i--)
+        {
+            mpz_mul (tmp, tmp, cpoly->m);
+            mpz_add (tmp, tmp, ps->f[i]);
+        }
+        mpz_mod (tmp, tmp, cpoly->n);
+        if (mpz_cmp_ui (tmp, 0) != 0)
+        {
+            fprintf (stderr, "m is not a root of the %s polynomial modulo n\n", sidenames[side]);
+            exit (EXIT_FAILURE);
+        }
     }
 
-    if (mpz_divisible_p (r, cpoly->n) == 0)
-      {
-	fprintf (stderr, "Error, n does not divide Res(f,g)\n");
-	exit (EXIT_FAILURE);
-      }
-
-    mpz_clear (r);
-    mpz_clear (q);
+    mpz_clear(tmp);
 }

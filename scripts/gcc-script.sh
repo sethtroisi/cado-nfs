@@ -6,7 +6,7 @@
 set -e
 
 remote_cmake_path=/home/zimmerma/bin
-VERSION=1.1-RC5
+VERSION=1.2
 cado_tree=$HOME/cado-nfs-$VERSION
 
 if [ -x $remote_cmake_path/cmake ] ; then
@@ -22,7 +22,7 @@ if [ -d $cado_tree ] ; then
 fi
 
 echo "Checking out remote tree"
-#svn co -q svn://scm.gforge.inria.fr/svn/cado-nfs/trunk $cado_tree
+#git clone -q git://scm.gforge.inria.fr/cado-nfs/cado-nfs.git $cado_tree
 wget -q http://www.loria.fr/~zimmerma/cado-nfs-$VERSION.tar.gz -O- | tar xzf -
 
 cd $cado_tree

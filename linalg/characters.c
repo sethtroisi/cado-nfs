@@ -123,15 +123,15 @@ uint64_t eval_64chars(int64_t a, uint64_t b, alg_prime_t * chars, cado_poly_ptr 
 
 		/* FIXME: the code below only works for a rational g(x),
 		   extend it to non-linear g(x) */
-		ASSERT_ALWAYS(pol->degreeg == 1);
+		ASSERT_ALWAYS(pol->rat->degree == 1);
 
                 /* first perform a quick check */
-                res = (a > 0) ? mpz_sgn(pol->g[1]) : -mpz_sgn(pol->g[1]);
-                if (mpz_sgn(pol->g[0]) != res) {
+                res = (a > 0) ? mpz_sgn(pol->rat->f[1]) : -mpz_sgn(pol->rat->f[1]);
+                if (mpz_sgn(pol->rat->f[0]) != res) {
                     mpz_init(tmp1);
-                    mpz_mul_si(tmp1, pol->g[1], a);
+                    mpz_mul_si(tmp1, pol->rat->f[1], a);
                     mpz_init(tmp2);
-                    mpz_mul_ui(tmp2, pol->g[0], b);
+                    mpz_mul_ui(tmp2, pol->rat->f[0], b);
                     mpz_add(tmp1, tmp1, tmp2);
                     res = mpz_sgn(tmp1) < 0;
                     mpz_clear(tmp1);
@@ -204,8 +204,8 @@ static alg_prime_t * create_characters(int nchars, cado_poly pol)
     int nchars2 = iceildiv(nchars, 64) * 64;
 
     /* we want some prime beyond the (algebraic) large prime bound */
-    mpz_init_set_ui (pp, 1UL << pol->lpba);
-    roots = malloc(pol->degree * sizeof(unsigned long));
+    mpz_init_set_ui (pp, 1UL << pol->alg->lpb);
+    roots = malloc(pol->alg->degree * sizeof(unsigned long));
 
     alg_prime_t * chars = malloc(nchars2 * sizeof(alg_prime_t));
 
@@ -225,7 +225,7 @@ static alg_prime_t * create_characters(int nchars, cado_poly pol)
     for(int i = 3 ; i < nchars ; ) {
         mpz_nextprime(pp, pp);
         p = mpz_get_ui(pp);
-        ret = poly_roots_ulong(roots, pol->f, pol->degree, p);
+        ret = poly_roots_ulong(roots, pol->alg->f, pol->alg->degree, p);
         for(int j = 0 ; j < ret && i < nchars ; j++, i++) {
             chars[i].p = p;
             chars[i].r = roots[j];

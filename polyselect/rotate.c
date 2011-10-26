@@ -31,10 +31,10 @@ int main(int argc, char **argv) {
     j = strtol(argv[2], NULL, 10);
     k = strtol(argv[3], NULL, 10);
 
-    mpz_set (b, poly->g[1]);
-    mpz_neg (m, poly->g[0]);
-    rotate_aux (poly->f,  b, m, 0, k, 0);
-    rotate_aux (poly->f, b, m, 0, j, 1);
+    mpz_set (b, poly->rat->f[1]);
+    mpz_neg (m, poly->rat->f[0]);
+    rotate_aux (poly->alg->f, b, m, 0, k, 0);
+    rotate_aux (poly->alg->f, b, m, 0, j, 1);
     mpz_clear(b);
     mpz_clear(m);
 

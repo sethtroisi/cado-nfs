@@ -78,7 +78,7 @@ findFreeRelations(hashtable_t *H, cado_poly pol, int nprimes)
 	}
 	else{
 	    // new prime
-	    if(pdeg == pol[0].degree){
+	    if(pdeg == pol->alg->degree){
 		// a free relation
 		printf("%lu,0:%lx:", tmp[i], tmp[i]);
 		for(k = i; k < i+(pdeg<<1); k += 2){
@@ -120,14 +120,14 @@ largeFreeRelations (cado_poly pol, char **fic, int verbose)
 {
     hashtable_t H;
     int Hsizea, nprimes_alg = 0, nfree = 0;
-    int need64 = (pol->lpbr > 32) || (pol->lpba > 32);
+    int need64 = (pol->rat->lpb > 32) || (pol->alg->lpb > 32);
 
     ASSERT(fic != NULL);
     /* The number of algebraic large primes is about 1/2*L/log(L)
        where L is the algebraic large prime bound, i.e., L=2^lpba.
        However since we store separately primes p and the corresponding root r
        of f mod p, the number of (p,r) pairs is about L/log(L). */
-    Hsizea = (1 << pol[0].lpba) / ((int)((double) pol[0].lpba * log(2.0)));
+    Hsizea = (1 << pol->alg->lpb) / ((int)((double) pol->alg->lpb * log(2.0)));
     hashInit (&H, Hsizea, verbose, need64);
     if (verbose)
       fprintf (stderr, "Scanning relations\n");
@@ -296,7 +296,7 @@ main(int argc, char *argv[])
       }
 
     /* check that n divides Res(f,g) [might be useful to factor n...] */
-    check_polynomials (cpoly);
+    cado_poly_check (cpoly);
 
 #if 0
     if (mpz_cmp_ui (cpoly->g[1], 1) != 0)

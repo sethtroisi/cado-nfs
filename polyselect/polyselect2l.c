@@ -92,7 +92,8 @@ int lq = 1; /* default use a single prime as special-q */
 double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
 
 /* read-write global variables */
-pthread_mutex_t lock; /* used as mutual exclusion lock for those variables */
+pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER; /* used as mutual exclusion
+                                                lock for those variables */
 int tot_found = 0; /* total number of polynomials */
 int found = 0; /* number of polynomials below maxnorm */
 double potential_collisions = 0.0, aver_lognorm = 0.0;
@@ -416,10 +417,10 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 		  pthread_mutex_unlock (&lock);
 
 		  /* MurphyE */
-		  mpz_set (curr_poly->g[0], g[0]);
-		  mpz_set (curr_poly->g[1], g[1]);
+		  mpz_set (curr_poly->rat->f[0], g[0]);
+		  mpz_set (curr_poly->rat->f[1], g[1]);
 		  for (j = d + 1; j -- != 0; )
-			   mpz_set (curr_poly->f[j], f[j]);
+			   mpz_set (curr_poly->alg->f[j], f[j]);
 		  curr_poly->skew = skew;
 		  E =  MurphyE (curr_poly, BOUND_F, BOUND_G, AREA, MURPHY_K);
 
@@ -1445,10 +1446,10 @@ main (int argc, char *argv[])
 		  fprintf (stderr, "Error, missing degree (-d option)\n");
 		  exit (1);
 	 }
-	 best_poly->degree = d;
-	 best_poly->degreeg = 1;
-	 curr_poly->degree = d;
-	 curr_poly->degreeg = 1;
+	 best_poly->alg->degree = d;
+	 best_poly->rat->degree = 1;
+	 curr_poly->alg->degree = d;
+	 curr_poly->rat->degree = 1;
 
 	 if (resume != NULL)
 	 {

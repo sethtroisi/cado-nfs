@@ -29,4 +29,5 @@ mkdir inqueue inprogress working_rels results_rels output_rels log_oar scripts b
 cp $scriptdir/las_loop $scriptdir/dispatcher $scriptdir/clean.pl $scriptdir/run_oarjobs $cdir/scripts/
 sed -e "s/^NAME=.*$/NAME=${name}/g" -e "s/^OPT=.*$/OPT=\"${opt}\"/g" < $scriptdir/las_1job > $cdir/scripts/las_1job
 sed "s/^nb_jobs_by_node=.*$/nb_jobs_by_node=${njobs}/g" < $scriptdir/dispatcher > $cdir/scripts/dispatcher
+chmod +x $cdir/scripts/las_1job $cdir/scripts/dispatcher
 cp $bindir/sieve/las $bindir/utils/cut_n_roots $cdir/bin/
