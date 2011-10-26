@@ -711,7 +711,11 @@ modredc2ul2_div2 (residueredc2ul2_t r, const residueredc2ul2_t a,
 
 
 #ifdef WANT_ASSERT_EXPENSIVE
+#if defined(__x86_64__)
+#define ABORT_IF_CY "jnc 1f\n\tlea _GLOBAL_OFFSET_TABLE_(%%rip), %%rbx\n\tcall abort@plt\n1:\n\t"
+#elif defined(__i386__)
 #define ABORT_IF_CY "jnc 1f\n\tcall abort\n1:\n\t"
+#endif
 #else
 #define ABORT_IF_CY
 #endif
