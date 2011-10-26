@@ -1179,7 +1179,7 @@ struct las_report_s {
     double tn[2];
     double ttsm;
     double ttf;
-    unsigned long survivor_sizes[256][256]; /* First index: algebraic side */
+    unsigned long survivor_sizes[256][256]; /* First index: rational side */
     unsigned long report_sizes[256][256];
 };
 typedef struct las_report_s las_report[1];
@@ -3389,7 +3389,7 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
             S[x] = 255;
             continue;
           }
-        th->rep->survivor_sizes[alg_S[x]][rat_S[x]]++;
+        th->rep->survivor_sizes[rat_S[x]][alg_S[x]]++;
         surv++;
 
         X = x + (N << LOG_BUCKET_REGION);
@@ -3600,7 +3600,7 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
             }
             cpt++;
             /* Build histogram of lucky S[x] values */
-            th->rep->report_sizes[loc[ALGEBRAIC_SIDE]->S[x]][loc[RATIONAL_SIDE]->S[x]]++;
+            th->rep->report_sizes[loc[RATIONAL_SIDE]->S[x]][loc[ALGEBRAIC_SIDE]->S[x]]++;
         }
     }
 
@@ -4925,7 +4925,10 @@ main (int argc0, char *argv0[])
     {
         fprintf (sievestats_file, "# Number of sieve survivors and relations by sieve residue pair\n");
         fprintf (sievestats_file, "# Format: S1 S2 #relations #survivors ratio\n");
-        fprintf (sievestats_file, "# where S1 is the sieve residue on the algebraic side, S2 rational side\n");
+        fprintf (sievestats_file, "# where S1 is the sieve residue on the rational side, S2 rational side\n");
+        fprintf (sievestats_file, "# Make a pretty graph with gnuplot:\n");
+        fprintf (sievestats_file, "# splot \"sievestatsfile\" using 1:2:3 with pm3d\n");
+        fprintf (sievestats_file, "# plots histogram for relations, 1:2:4 for survivors, 1:2:($3/$4) for ratio\n");
         for(int i1 = 0 ; i1 < 256 ; i1++) {
             for (int i2 = 0; i2 < 256; i2++) {
                 unsigned long r1 = report->report_sizes[i1][i2];
@@ -4935,8 +4938,8 @@ main (int argc0, char *argv0[])
                           "sieve survivors (%lu) for (%d,%d)\n", r1, r2, i1, i2);
                 }
                 if (r2 > 0)
-                    fprintf (sievestats_file, "%d %d %lu %lu %f\n", 
-                             i1, i2, r1, r2, (double)r1/(double)r2);
+                    fprintf (sievestats_file, "%d %d %lu %lu\n", 
+                             i1, i2, r1, r2);
             }
             fprintf (sievestats_file, "\n");
         }
