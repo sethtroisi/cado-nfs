@@ -137,20 +137,30 @@ is_prime_power (uint32_t q)
 static uint32_t
 is_prime_power_fast (uint32_t q)
 {
-  int a = 0, b = 6948, c;
+  static int a = 1, b, c;
 
-  /* invariant: prime_powers[a] <= q < prime_powers[b] */
-  while (a + 1 < b)
+  /* assuming this routine is called with increasing q, we first try the last
+     interval [a, a+1] */
+  if (!(prime_powers[a] <= q && q < prime_powers[a+1]))
     {
-      c = (a + b) / 2;
-      if (q < prime_powers[c])
-        b = c;
-      else
-        a = c;
+      a = 0;
+      b = 6948;
+      /* invariant: prime_powers[a] <= q < prime_powers[b] */
+      while (a + 1 < b)
+        {
+          c = (a + b) / 2;
+          if (q < prime_powers[c])
+            b = c;
+          else
+            a = c;
+        }
     }
   /* now a+1 = b */
   if (q == prime_powers[a])
-    return is_prime_power (q);
+    {
+      a = a + 1; /* the next q will be larger */
+      return is_prime_power (q);
+    }
   else
     return 0;
 }
