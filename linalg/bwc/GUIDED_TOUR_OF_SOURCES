@@ -110,11 +110,12 @@ will be used for a single bwc run. All bwc binaries (well, the important ones:
 prep secure krylov mksol gather) accept the mm_impl= argument which selects
 the implementation to use.
 
-The primary on-disk matrix is in trivial, easy-to-read, ascii format. However,
-memory representation for fast computation is different. It depends on the
-implementation. For convenience, a ``cached'' matrix file matching the
-in-memory representation for a given implementation is generated on first
-use, and saved on disk
+The primary on-disk matrix is in trivial binary format (32-bit integer
+indices for non-zero coefficients, each row prefixed by its length).
+However, memory representation for fast computation is different. It
+depends on the implementation. For convenience, a ``cached'' matrix file
+matching the in-memory representation for a given implementation is
+generated on first use, and saved on disk
 
 [ Note that this single task can be benched separately of the bw
   infrastructure by the standalone bench program. Be aware though that
