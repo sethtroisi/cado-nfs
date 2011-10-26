@@ -12,9 +12,17 @@ mod_div3 (residue_t r, const residue_t a, const modulus_t m)
 		      a[0] % 256UL + a[0] / 256UL) % 3UL;
   const unsigned long m3 = (m[0].m[0] % 256UL + m[0].m[0] / 256UL +
 			    m[0].m[1] % 256UL + m[0].m[1] / 256UL) % 3UL;
+#ifdef WANT_ASSERT_EXPENSIVE
+  residue_t a_backup;
+#endif
 
   if (m3 == 0)
     return 0;
+
+#ifdef WANT_ASSERT_EXPENSIVE
+  mod_init_noset0 (a_backup, m);
+  mod_set (a_backup, a, m);
+#endif
 
   mod_init_noset0 (t, m);
   t[1] = a[1];
@@ -59,7 +67,8 @@ mod_div3 (residue_t r, const residue_t a, const modulus_t m)
 #ifdef WANT_ASSERT_EXPENSIVE
   mod_add (t, r, r, m);
   mod_add (t, t, r, m);
-  ASSERT_EXPENSIVE (mod_equal (a, t, m));
+  ASSERT_EXPENSIVE (mod_equal (a_backup, t, m));
+  mod_clear (a_backup, m);
 #endif
   mod_clear (t, m);
 

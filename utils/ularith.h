@@ -43,6 +43,10 @@
 #define ASSERT(x)	assert(x)
 #endif
 
+#ifndef WANT_ASSERT_EXPENSIVE
+#define WANT_ASSERT_EXPENSIVE
+#endif
+
 #ifdef WANT_ASSERT_EXPENSIVE
 #define ASSERT_EXPENSIVE(x) ASSERT(x)
 #else
@@ -469,12 +473,12 @@ ularith_div_2ul_ul_ul_r (unsigned long *r, unsigned long a1,
 
 
 /* Shift *r right by i bits, filling in the low bits from a into the high
-   bits of *r. Assumes i < LONG_BIT */
+   bits of *r. Assumes 0 <= i < LONG_BIT */
 MAYBE_UNUSED
 static inline void
 ularith_shrd (unsigned long *r, const unsigned long a, const int i)
 {
-  ASSERT_EXPENSIVE (i < LONG_BIT);
+  ASSERT_EXPENSIVE (0 <= i && i < LONG_BIT);
 #ifdef ULARITH_VERBOSE_ASM
   __asm__ ("# ularith_shrd (%0, %1, %2)\n" : : 
            "X" (*r), "X" (a), "X" (i));
@@ -499,12 +503,12 @@ ularith_shrd (unsigned long *r, const unsigned long a, const int i)
 }
 
 /* Shift *r left by i bits, filling in the high bits from a into the low
-   bits of *r. Assumes i < LONG_BIT */
+   bits of *r. Assumes 0 <= i < LONG_BIT */
 MAYBE_UNUSED
 static inline void
 ularith_shld (unsigned long *r, const unsigned long a, const int i)
 {
-  ASSERT_EXPENSIVE (i < LONG_BIT);
+  ASSERT_EXPENSIVE (0 <= i && i < LONG_BIT);
 #ifdef ULARITH_VERBOSE_ASM
   __asm__ ("# ularith_shld (%0, %1, %2)\n" : : 
            "X" (*r), "X" (a), "X" (i));

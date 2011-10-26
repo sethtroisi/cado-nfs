@@ -1044,10 +1044,17 @@ modredc2ul2_divn (residueredc2ul2_t r, const residueredc2ul2_t a,
 
   residueredc2ul2_t t, t2;
   unsigned long k;
+#ifdef WANT_ASSERT_EXPENSIVE
+  residueredc2ul2_t a_backup;
+#endif
   
   if (inv_n[mn] == 0)
     return 0;
 
+#ifdef WANT_ASSERT_EXPENSIVE
+  modredc2ul2_init_noset0 (a_backup, m);
+  modredc2ul2_set (a_backup, a, m);
+#endif
   modredc2ul2_init_noset0 (t, m);
   modredc2ul2_init_noset0 (t2, m);
   t[1] = a[1];
@@ -1063,6 +1070,7 @@ modredc2ul2_divn (residueredc2ul2_t r, const residueredc2ul2_t a,
 
   /* We want r = (a+km)/n. */
 
+  /* May overwrite a */
   r[0] = t[0] * c;
 
   /* r0 == (a+km)/n (mod w) 
@@ -1083,7 +1091,8 @@ modredc2ul2_divn (residueredc2ul2_t r, const residueredc2ul2_t a,
     modredc2ul2_set (t, r, m);
     for (i = 1; i < n; i++)
       modredc2ul2_add (t, t, r, m);
-    ASSERT_EXPENSIVE (modredc2ul2_equal (t, a, m));
+    ASSERT_EXPENSIVE (modredc2ul2_equal (t, a_backup, m));
+    modredc2ul2_clear (a_backup, m);
   }
 #endif
 
