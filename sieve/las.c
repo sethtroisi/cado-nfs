@@ -4925,7 +4925,7 @@ main (int argc0, char *argv0[])
     {
         fprintf (sievestats_file, "# Number of sieve survivors and relations by sieve residue pair\n");
         fprintf (sievestats_file, "# Format: S1 S2 #relations #survivors ratio\n");
-        fprintf (sievestats_file, "# where S1 is the sieve residue on the rational side, S2 rational side\n");
+        fprintf (sievestats_file, "# where S1 is the sieve residue on the rational side, S2 algebraic side\n");
         fprintf (sievestats_file, "# Make a pretty graph with gnuplot:\n");
         fprintf (sievestats_file, "# splot \"sievestatsfile\" using 1:2:3 with pm3d\n");
         fprintf (sievestats_file, "# plots histogram for relations, 1:2:4 for survivors, 1:2:($3/$4) for ratio\n");
