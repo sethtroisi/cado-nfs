@@ -44,8 +44,8 @@ Required software tools:
 *) GNU make and CMake for building (CMake is installed on the fly if missing
    (requires an Internet connection))
 *) Support for posix threads.
-*) The main cadofactor.pl script uses a lot of unix tools: perl, ssh, gzip
-   to mention but a few. 
+*) The main cadofactor.pl script uses a lot of unix tools: perl, ssh, rsync,
+   gzip to mention but a few.
 
 Optionally:
 *) Support for curl library.
