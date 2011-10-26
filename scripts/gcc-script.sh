@@ -6,7 +6,7 @@
 set -e
 
 remote_cmake_path=/home/zimmerma/bin
-VERSION=1.1-RC5
+VERSION=1.2
 cado_tree=$HOME/cado-nfs-$VERSION
 
 if [ -x $remote_cmake_path/cmake ] ; then
