@@ -256,6 +256,7 @@ int stats = 0; /* 0: nothing, 1: write stats file, 2: read stats file,
                   splot "stats.dat" u 1:2:3, "stats.dat" u 1:2:4 */
 double stats_prob = 2e-4;
 FILE *stats_file;
+FILE *sievestats_file;
 uint32_t **cof_call; /* cof_call[r][a] is the number of calls of the
                         cofactorization routine with a cofactor of r bits on
                         the rational side, and a bits on the algebraic side */
@@ -314,6 +315,29 @@ sieve_info_init_lognorm (unsigned char *C, unsigned char threshold,
   }
 #endif
 }
+
+
+/* Determine whether a sieve entry with sieve residue S1 on sieving side 1
+   and sieve residue S2 on sieving side 2 is likely smooth. 
+   The array entry C1[S1] is initialized by sieve_info_init_lognorm() 
+   to something similar to 
+   -log(Pr[norm on side 1 with sieve residue S1 is smooth]),
+   similar for C2, S2. Assuming the two probabilities are independent enough,
+   we can estimate the neg log of the probability that both sides are smooth 
+   by C1[S1] + C2[S2]. 
+   If that sum does not exceed a theshold, the corresponding sieve entry is 
+   a sieve survivor. 
+   Alternative: have a bit array telling whether (S1,S2) is likely smooth */
+static inline int 
+sieve_info_test_lognorm (const unsigned char *C1, 
+                         const unsigned char *C2, 
+                         const unsigned char S1,
+                         const unsigned char S2,
+                         const unsigned char threshold)
+{
+  return C1[S1] + C2[S2] <= threshold;
+}
+
 
 static void sieve_info_init_trialdiv(sieve_info_t * si, int td_thresh)
 {
@@ -1155,7 +1179,8 @@ struct las_report_s {
     double tn[2];
     double ttsm;
     double ttf;
-    unsigned long report_sizes[2][256];
+    unsigned long survivor_sizes[256][256]; /* First index: algebraic side */
+    unsigned long report_sizes[256][256];
 };
 typedef struct las_report_s las_report[1];
 typedef struct las_report_s * las_report_ptr;
@@ -1181,8 +1206,11 @@ static void las_report_accumulate(las_report_ptr p, las_report_ptr q)
     p->ttf     += q->ttf;
     for(int side = 0 ; side < 2 ; side++) {
         p->tn[side]  += q->tn[side];
-        for (int i = 0; i < 256; ++i) {
-            p->report_sizes[side][i] += q->report_sizes[side][i];
+    }
+    for (int i1 = 0; i1 < 256; i1++) {
+        for (int i2 = 0; i2 < 256; i2++) {
+            p->survivor_sizes[i1][i2] += q->survivor_sizes[i1][i2];
+            p->report_sizes[i1][i2] += q->report_sizes[i1][i2];
         }
     }
     memset(q, 0, sizeof(las_report));
@@ -3356,11 +3384,12 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
         unsigned int X;
         unsigned int i, j;
 
-        if (alg->Bound[alg_S[x]] + rat->Bound[rat_S[x]] >= 127)
+        if (!sieve_info_test_lognorm(alg->Bound, rat->Bound, alg_S[x], rat_S[x], 126))
           {
             S[x] = 255;
             continue;
           }
+        th->rep->survivor_sizes[alg_S[x]][rat_S[x]]++;
         surv++;
 
         X = x + (N << LOG_BUCKET_REGION);
@@ -3571,8 +3600,7 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
             }
             cpt++;
             /* Build histogram of lucky S[x] values */
-            for(int side = 0 ; side < 2 ; side++)
-                th->rep->report_sizes[side][loc[side]->S[x]]++;
+            th->rep->report_sizes[loc[ALGEBRAIC_SIDE]->S[x]][loc[RATIONAL_SIDE]->S[x]]++;
         }
     }
 
@@ -3617,7 +3645,7 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc)
  * There are some change of coordinate functions at the end of this file.
  * The coordinate system (N, x) is almost always referred to as just x,
  * where x is a 32-bit value equal to N*bucket_region+x. Thus from this
- * wide x, it is possible te recover both N and (the short) x.
+ * wide x, it is possible to recover both N and (the short) x.
  */
 static void xToIJ(int *i, unsigned int *j, const unsigned int X, const sieve_info_t * si)
 {
@@ -4379,6 +4407,7 @@ usage (const char *argv0, const char * missing)
   fprintf (stderr, "          -percent   xxx  percentage of sieving, default=1e-3\n");
   fprintf (stderr, "          -stats    xxx   write or read statistics file xxx\n");
   fprintf (stderr, "          -stats_prob xxx use threshold xxx\n");
+  fprintf (stderr, "          -sievestats xxx write sieve statistics to file xxx\n");
   if (missing) {
       fprintf(stderr, "\nError: missing parameter %s\n", missing);
   }
@@ -4415,6 +4444,7 @@ main (int argc0, char *argv0[])
     long bench_tot_rep = 0;
     double bench_tot_time = 0.0;
     const char *statsfilename = NULL;
+    const char *sievestatsfilename = NULL;
     int j;
 
     memset (&si, 0, sizeof(sieve_info_t));
@@ -4445,6 +4475,7 @@ main (int argc0, char *argv0[])
     if (polyfilename) param_list_read_file(pl, polyfilename);
     fbfilename = param_list_lookup_string(pl, "fb");
     statsfilename = param_list_lookup_string (pl, "stats");
+    sievestatsfilename = param_list_lookup_string (pl, "sievestats");
 
     if (!cado_poly_set_plist (cpoly, pl)) {
         fprintf (stderr, "Error reading polynomial file\n");
@@ -4549,6 +4580,17 @@ main (int argc0, char *argv0[])
           }
       }
 
+    if (sievestatsfilename != NULL) /* a file was given */
+      {
+        sievestats_file = fopen (sievestatsfilename, "w");
+        if (sievestats_file == NULL)
+          {
+            fprintf (stderr, "Error, cannot create file %s\n",
+                     sievestatsfilename);
+            exit (EXIT_FAILURE);
+          }
+      }
+    
     /* check that nb_threads (-mt nnn) is positive */
     if (nb_threads <= 0)
       {
@@ -4879,20 +4921,28 @@ main (int argc0, char *argv0[])
     tts -= report->ttf;
     if (si.verbose)
       facul_print_stats (si.output);
-    if (si.verbose)
+    if (sievestats_file != NULL)
     {
-        fprintf (si.output, "# Histogram of sieve report values that led to "
-                "relations:\n");
-        for(int side = 0 ; side < 2 ; side++) {
-            fprintf (si.output, "# %s side: ", sidenames[side]);
-            for (i = 0; i < 256; i++) {
-                unsigned long r = report->report_sizes[side][i];
-                if (r>0)
-                    fprintf (si.output, "%d:%lu ", i, r);
+        fprintf (sievestats_file, "# Number of sieve survivors and relations by sieve residue pair\n");
+        fprintf (sievestats_file, "# Format: S1 S2 #relations #survivors ratio\n");
+        fprintf (sievestats_file, "# where S1 is the sieve residue on the algebraic side, S2 rational side\n");
+        for(int i1 = 0 ; i1 < 256 ; i1++) {
+            for (int i2 = 0; i2 < 256; i2++) {
+                unsigned long r1 = report->report_sizes[i1][i2];
+                unsigned long r2 = report->survivor_sizes[i1][i2];
+                if (r1 > r2) {
+                  fprintf(stderr, "Error, statistics report more relations (%lu) than "
+                          "sieve survivors (%lu) for (%d,%d)\n", r1, r2, i1, i2);
+                }
+                if (r2 > 0)
+                    fprintf (sievestats_file, "%d %d %lu %lu %f\n", 
+                             i1, i2, r1, r2, (double)r1/(double)r2);
             }
-            fprintf (si.output, "\n");
+            fprintf (sievestats_file, "\n");
         }
-      }
+        fclose(sievestats_file);
+        sievestats_file = NULL;
+    }
     if (si.nb_threads > 1) 
         fprintf (si.output, "# Total wct time %1.1fs [precise timings available only for mono-thread]\n", t0);
     else
