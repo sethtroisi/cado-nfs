@@ -15,52 +15,48 @@
 # proper support in  ~/.ssh/config. For the gcc compile farm, e.g.:
 # GET http://gcc.gnu.org/wiki/CompileFarm | perl ~thome/.ssh/parse-cfarm.pl
 
+# results with cado-nfs-1.1-RC5.tar.gz
 gccs=(\
-# (/home/zimmerma not found) # gcc11
-# (/home/zimmerma not found) # gcc12
-# (/home/zimmerma not found) # gcc13
-# (/home/zimmerma not found) # gcc14
-# (/home/zimmerma not found) # gcc15
-# (/home/zimmerma not found) # gcc16
-# (/home/zimmerma not found) # gcc17
-gcc40
-# gcc42 # disabled 20101202 because the C++ compiler is non-functional
-# (ssh timeout) # gcc43
-# (ssh timeout) # gcc50
-gcc51
-# (ssh timeout) # gcc53
-gcc54
-# (ssh timeout) # gcc55
-# (ssh timeout) # gcc56
-# (/home/zimmerma not found) # gcc57
-gcc60
-gcc61
-gcc62
-gcc63
-gcc64
-# (ssh timeout) # gcc200
-# (ssh timeout) # gcc201
-# (ssh timeout) # gcc01
-# (ssh timeout) # gcc02
-# (ssh timeout) # gcc03
-# (ssh timeout) # gcc05
-# (ssh timeout) # gcc06
-# (ssh timeout) # gcc07
-# (ssh timeout) # gcc09
-# (/home/zimmerma not found) # gcc08
-# (dns failure) gcc30
-# (dns failure) gcc31
-# (ssh timeout) # gcc41
-# (/home/zimmerma not found) # gcc10
-gcc33
-gcc34
-# (ssh timeout) # gcc35
-# (ssh timeout) # gcc36
-gcc37
-gcc38
-# (/home/zimmerma not found) # gcc52
-# (/home/zimmerma not found) # gcc100
-# (/home/zimmerma not found) # gcc101
+gcc10 # ok
+gcc11 # ok
+gcc12 # ok
+gcc13 # ok
+gcc14 # ok
+gcc15 # ok
+gcc16 # ok
+gcc17 # ok
+gcc20 # ok
+# gcc33 Connection refused
+# gcc34 Connection refused
+# gcc35 Connection refused
+# gcc36 Connection refused
+# gcc37 Connection refused
+gcc38 # ok
+# gcc40 Connection timed out
+# gcc41 Connection refused
+# gcc42 Connection refused
+# gcc43 Connection refused
+# gcc45 Connection refused
+gcc46 # ok
+gcc47 # ok
+# gcc50 Connection timed out
+# gcc51 Connection refused
+# gcc52 Connection refused
+# gcc53 Connection timed out
+gcc54 # ok
+# gcc55 Connection refused
+# gcc56 Connection timed out
+# gcc57 Connection timed out
+gcc60 # ok
+gcc61 # ok
+# gcc62 Connection timed out
+gcc63 # ok
+gcc64 # compil ok, polyselect2 fails, can't load library 'libpolyselect_common.so' -> pb cmake?
+gcc70 # coredump in dispatch -> bug in pthreads?
+# gcc100 Connection timed out
+# gcc101 Connection timed out
+# gcc200 Connection timed out
+# gcc201 Connection timed out
 )
 
 tmpdir=`mktemp -d /tmp/XXXXXXXX`

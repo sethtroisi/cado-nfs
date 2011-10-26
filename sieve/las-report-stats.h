@@ -11,7 +11,8 @@ struct las_report_s {
     double tn[2];
     double ttsm;
     double ttf;
-    unsigned long report_sizes[2][256];
+    unsigned long survivor_sizes[256][256]; /* First index: rational side */
+    unsigned long report_sizes[256][256];
 };
 typedef struct las_report_s las_report[1];
 typedef struct las_report_s * las_report_ptr;

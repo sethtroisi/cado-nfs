@@ -44,8 +44,11 @@ sieve_info_init_lognorm (unsigned char *C, unsigned char threshold,
 
 /* {{{ initializing norms */
 /* Knowing the norm on the rational side is bounded by 2^(2^k), compute
-   lognorms approximations for k bits of exponent + NORM_BITS-k bits
-   of mantissa */
+ * lognorms approximations for k bits of exponent + NORM_BITS-k bits
+ * of mantissa.
+ * Do the same for the algebraic side (with the corresponding bound for
+ * the norms.
+ */
 void
 init_norms (sieve_info_ptr si)
 {
@@ -88,288 +91,6 @@ init_norms (sieve_info_ptr si)
 }
 
 /* }}} */
-
-#if 0
-/* {{{ initialize norms for bucket regions */
-/* Initialize lognorms on the rational side for the bucket_region
- * number N.
- * For the moment, nothing clever, wrt discarding (a,b) pairs that are
- * not coprime, except for the line j=0.
- */
-void
-init_rat_norms_bucket_region (unsigned char *S, int N, sieve_info_ptr si)
-{
-    cado_poly_ptr cpoly = si->cpoly;
-    sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
-    double g1, g0, gi, gj, norm MAYBE_UNUSED, gjj;
-    int i MAYBE_UNUSED, halfI MAYBE_UNUSED, l;
-    unsigned int j, lastj;
-    uint64_t mask = (1 << NORM_BITS) - 1;
-    union { double z; uint64_t x; } zx[1];
-
-    l = NORM_BITS - (int) ceil (log2 (rat->logmax));
-
-    /* G_q(i,j) = g1 * (a0*i+a1*j) + g0 * (b0*i+b1*j)
-       = (g1*a0+g0*b0) * i + (g1*a1+g0*b1) * j
-       = gi * i + gj * j
-    */
-
-    g1 = mpz_get_d (cpoly->rat->f[1]);
-    g0 = mpz_get_d (cpoly->rat->f[0]);
-    gi = g1 * (double) si->a0 + g0 * (double) si->b0;
-    gj = g1 * (double) si->a1 + g0 * (double) si->b1;
-
-    if (si->ratq) {
-        double invq = 1.0 / (double) si->q;
-        gi *= invq;
-        gj *= invq;
-    }
-
-    /* bucket_region is a multiple of I. Let's find the starting j
-     * corresponding to N and the last j.
-     */
-    halfI = si->I / 2;
-    j = N << (LOG_BUCKET_REGION - si->logI);
-    lastj = j + (1 << (LOG_BUCKET_REGION - si->logI));
-#ifdef UGLY_HACK
-    memset (S, 255, (lastj - j) * si->I);
-#else
-    /* if j = 0, it will be the first value */
-    if (j == 0)
-      {
-        // compute only the norm for i = 1. Everybody else is 255.
-        norm = log2 (fabs (gi));
-        norm = norm * rat->scale;
-        for (i = -halfI; i < halfI; i++)
-          *S++ = UCHAR_MAX;
-        S[-halfI + 1] = GUARD + (unsigned char) (norm);
-        ++j;
-      }
-    for (; j < lastj; ++j)
-      {
-        gjj = gj * (double) j;
-        zx->z = gjj - gi * (double) halfI;
-        __asm__("### Begin rational norm loop\n");
-#ifndef SSE_NORM_INIT
-        uint64_t y;
-        unsigned char n;
-        for (i = 0; i < (int) si->I; i++) {
-          /* the double precision number 1.0 has high bit 0 (sign),
-             then 11-bit biased exponent 1023, and 52-bit mantissa 0 */
-          /* the magic constant here is simply 1023*2^52, where
-             1023 is the exponent bias in binary64 */
-          y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
-          n = rat->S[y & mask];
-          ASSERT (n > 0);
-          *S++ = n;
-          zx->z += gi;
-        }
-#else
-        union { __v2df dble;
-            __v2di intg;
-            struct {uint64_t y0; uint64_t y1; } intpair;
-        } y_vec;
-        if ((j & 1) == 1) {
-            __v2df gi_vec = { 2*gi, 2*gi };
-            __v2di mask_vec = { mask, mask };
-            __v2di cst_vec = { (uint64_t) 0x3FF0000000000000,
-                (uint64_t) 0x3FF0000000000000 };
-
-            // in spite of the appearance, only the low word gives the shift
-            // count. The high word is ignored.
-            __v2di shift_value = { (uint64_t)(52 - l), (uint64_t)(52 - l) };
-            __v2df z_vec = { zx->z, zx->z+gi };
-
-            for (i = 0; i < halfI; ++i) {
-                y_vec.dble = z_vec;
-                y_vec.intg -= cst_vec;
-                y_vec.intg = _mm_srl_epi64(y_vec.intg, shift_value);
-                y_vec.intg &= mask_vec;
-                //            *S++ = rat->S[((uint32_t *)(&y_vec.intg))[0]];
-                //             *S++ = rat->S[((uint32_t *)(&y_vec.intg))[2]];
-                *S++ = rat->S[y_vec.intpair.y0];
-                *S++ = rat->S[y_vec.intpair.y1];
-                z_vec += gi_vec;
-            }
-        } else { // skip when i and j are both even
-            __v2df gi_vec = { 4*gi, 4*gi };
-            __v2di mask_vec = { mask, mask };
-            __v2di cst_vec = { (uint64_t) 0x3FF0000000000000,
-                (uint64_t) 0x3FF0000000000000 };
-
-            // in spite of the appearance, only the low word gives the shift
-            // count. The high word is ignored.
-            __v2di shift_value = { (uint64_t)(52 - l), (uint64_t)(52 - l) };
-            __v2df z_vec = { zx->z + gi, zx->z+3*gi };
-
-            for (i = 0; i < halfI; i+=2) {
-                y_vec.dble = z_vec;
-                y_vec.intg -= cst_vec;
-                y_vec.intg = _mm_srl_epi64(y_vec.intg, shift_value);
-                y_vec.intg &= mask_vec;
-                //            *S++ = rat->S[((uint32_t *)(&y_vec.intg))[0]];
-                //             *S++ = rat->S[((uint32_t *)(&y_vec.intg))[2]];
-                *S++ = 255;
-                *S++ = rat->S[y_vec.intpair.y0];
-                *S++ = 255;
-                *S++ = rat->S[y_vec.intpair.y1];
-                z_vec += gi_vec;
-            }
-        }
-
-#endif
-        __asm__("### End rational norm loop\n");
-      }
-#endif
-}
-
-/* {{{ some utility stuff */
-#ifdef SSE_NORM_INIT
-static inline void
-init_fpoly_v2df(__v2df *F, const double *f, const int deg)
-{
-    int i;
-    for (i = 0; i <= deg; ++i) {
-        __v2df tmp = { f[i], f[i] };
-        F[i] = tmp;
-    }
-}
-
-static inline __v2df
-fpoly_eval_v2df(const __v2df *f, const __v2df x, int d)
-{
-    __v2df r;
-    r = f[d--];
-    for (; d>=0; --d)
-        r = r * x + f[d];
-    return r;
-}
-#endif
-/* }}} */
-
-/* Initialize lognorms on the algebraic side for the bucket
- * number N.
- * Only the survivors of the rational sieve will be initialized, the
- * others are set to 255. Case GCD(i,j)!=1 also gets 255.
- * return the number of reports (= number of norm initialisations)
- */
-int
-init_alg_norms_bucket_region (unsigned char *alg_S, 
-			      const unsigned char *rat_S, const int N, 
-			      sieve_info_ptr si)
-{
-  cado_poly_ptr cpoly = si->cpoly;
-  sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
-  sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
-  unsigned int j, lastj, k, d = cpoly->alg->degree;
-  double *t, *u, powj, i, halfI;
-  int report = 0, l;
-  uint64_t mask = (1 << NORM_BITS) - 1;
-  union { double z; uint64_t x; } zx[1];
-  uint64_t y;
-  unsigned char *T = alg->S;
-#ifdef TRACE_K
-  unsigned char *orig_alg_S = alg_S;
-#endif
-  l = NORM_BITS - (int) ceil (log2 (alg->logmax));
-  halfI = (double) (si->I >> 1);
-
-  t = si->fijd;
-  u = (double*) malloc ((si->degree + 1) * sizeof (double));
-  FATAL_ERROR_CHECK(u == NULL, "malloc failed");
-
-  /* bucket_region is a multiple of I. Let's find the starting j
-   * corresponding to N and the last j.
-   */
-  j = N << (LOG_BUCKET_REGION - si->logI);
-  lastj = j + (1 << (LOG_BUCKET_REGION - si->logI));
-  for (; j < lastj; j++)
-    {
-      /* scale by j^(d-k) the coefficients of fij */
-      for (k = 0, powj = 1.0; k <= d; k++, powj *= (double) j)
-        u[d - k] = t[d - k] * powj;
-
-#ifdef SSE_NORM_INIT
-      __v2df u_vec[d];
-      init_fpoly_v2df(u_vec, u, d);
-      double i0 = 0.0 ;
-      unsigned char *S_ptr0 = NULL;
-      int cpt = 0;
-#endif
-      /* now compute norms */
-      for (i = -halfI; i < halfI; i += 1.0)
-        {
-#ifdef TRACE_K
-	      if (trace_on_spot_Nx(N, alg_S - orig_alg_S )) {
-		  fprintf (stderr, "init_alg_norms_bucket_region: "
-			   "rat_S[%zd] = %u, -log(prob) = %u\n",
-			   alg_S - orig_alg_S, 
-			   (unsigned int) *rat_S, 
-			   (unsigned int) rat->Bound[*rat_S]);
-		}
-#endif
-          if (rat->Bound[*rat_S] < 127)
-            {
-//  The SSE version seems to be slower on the algebraic side...
-//  Let's forget it for the moment.
-//  TODO: try with single precision.
-//#ifndef SSE_NORM_INIT
-#if 1
-              unsigned char n;
-              zx->z = fpoly_eval (u, d, i);
-              /* 4607182418800017408 = 1023*2^52 */
-              y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
-              report++;
-              n = T[y & mask];
-              ASSERT (n > 0);
-              *alg_S = n;
-#else
-              __v2di mask_vec = { mask, mask };
-              __v2di cst_vec = { (uint64_t) 0x3FF0000000000000,
-                  (uint64_t) 0x3FF0000000000000 };
-              __v2di shift_value = { (uint64_t)(52 - l), (uint64_t)(52 - l) };
-              report++;
-              if (cpt == 0) {
-                  i0 = i;
-                  cpt++;
-                  S_ptr0 = alg_S;
-              } else if (cpt == 1) {
-                  cpt--;
-                  __v2df i_vec = {i0, i};
-                  union { __v2df dble;
-                      __v2di intg;
-                      struct {uint64_t y0; uint64_t y1; } intpair;
-                  } fi_vec;
-                  fi_vec.dble = fpoly_eval_v2df(u_vec, i_vec, d);
-                  fi_vec.intg -= cst_vec;
-                  fi_vec.intg = _mm_srl_epi64(fi_vec.intg, shift_value);
-                  fi_vec.intg &= mask_vec;
-                  *S_ptr0 = T[fi_vec.intpair.y0];
-                  *alg_S = T[fi_vec.intpair.y1];
-              }
-#endif
-            }
-          else
-	    {
-	      *alg_S = UCHAR_MAX;
-	    }
-	  alg_S++;
-	  rat_S++;
-        }
-#ifdef SSE_NORM_INIT
-      if (cpt == 1) { // odd number of computations
-          zx->z = fpoly_eval (u, d, i0);
-          y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
-          *S_ptr0 = T[y & mask];
-      }
-#endif
-    }
-
-  free(u);
-  return report;
-}
-/* }}} */
-#endif
 
 /* {{{ initialize norms for bucket regions */
 /* Initialize lognorms on the rational side for the bucket_region
@@ -437,6 +158,39 @@ void init_rat_norms_bucket_region(unsigned char *S,
     for( ; j < j1 ; j++) {
 	zx->z = u[0] * (double) j - u[1] * (double) halfI;
 	__asm__("### Begin rational norm loop\n");
+/* LAZY_NORMS does not seem to be so interesting on the rational side,
+ * since wrong values generate a lot of additional work thereafter */
+#if 0   
+        uint64_t y;
+        unsigned char n, oldn = 0;
+        const int normstride=128; // must be a power of 2 dividing I.
+        double gii = gi * normstride;
+        for (i = 0; i < (int) si->I; i+=normstride) {
+            y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
+            n = rat->S[y & mask];
+            ASSERT (n > 0);
+            if (i > 0 && oldn != n) {
+                // the lognorm has changed: recompute more precisely the
+                // previous stride.
+                zx->z -= gii;
+                S -= normstride;
+                for (int ii = 0; ii < normstride; ++ii) {
+                    y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
+                    n = rat->S[y & mask];
+                    ASSERT (n > 0);
+                    zx->z += gi;
+                    *S++ = n;
+                }
+                y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
+                n = rat->S[y & mask];
+                ASSERT (n > 0);
+            }
+            for (int ii = 0; ii < normstride; ++ii)
+                *S++ = n; 
+            zx->z += gii;
+            oldn = n;
+        }
+#else
 #ifndef SSE_NORM_INIT
 	uint64_t y;
 	unsigned char n;
@@ -483,6 +237,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
             z_vec += gi_vec;
         }
 
+#endif
 #endif
 	__asm__("### End rational norm loop\n");
     }
@@ -533,7 +288,7 @@ static inline void fpoly_scale(double * u, const double * t, int d, double h)
  */
 int
 init_alg_norms_bucket_region(unsigned char *S,
-			     const unsigned char *xS, const int N,
+			     const unsigned char *xS MAYBE_UNUSED, const int N,
 			     sieve_info_ptr si)
 {
     sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
@@ -564,8 +319,37 @@ init_alg_norms_bucket_region(unsigned char *S,
      * corresponding to N and the last j.
      */
     for (unsigned int j = j0 ; j < j1 ; j++) {
-	/* scale by rj^(d-k) the coefficients of fij */
+#ifdef LAZY_NORMS
+        unsigned int jmask = VERT_NORM_STRIDE - 1;
+        if (j > j0 && ((j & jmask) != 0)) {
+            // copy norms from the row below.
+            unsigned char *old_S;
+            old_S = alg_S - si->I;
+            for (unsigned int ii = 0; ii < si->I; ++ii) {
+                *alg_S++ = *old_S++;
+            }
+            continue;
+        }
+#endif
+        /* scale by rj^(d-k) the coefficients of fij */
         fpoly_scale(u, alg->fijd, d, j);
+
+#ifdef LAZY_NORMS
+        const int normstride=NORM_STRIDE;
+        const double fpnormstride=(double)NORM_STRIDE;
+        for (i = -halfI; i < halfI; i += fpnormstride) {
+            unsigned char n;
+            zx->z = fpoly_eval (u, d, i);
+            /* 4607182418800017408 = 1023*2^52 */
+            y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
+            report++;
+            n = T[y & mask];
+            ASSERT (n > 0);
+            for (int ii = 0; ii < normstride; ++ii)
+                *alg_S++ = n;
+        }
+#else  /* full norm computation */
+
 
 #ifdef SSE_NORM_INIT
 	__v2df u_vec[d+1];
@@ -643,6 +427,7 @@ init_alg_norms_bucket_region(unsigned char *S,
 	    *previous_S = L[y & mask];
 	}
 #endif
+#endif  /* LAZY_NORMS */
     }
     return report;
 }

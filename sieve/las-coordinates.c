@@ -20,7 +20,7 @@
  * There are some change of coordinate functions at the end of this file.
  * The coordinate system (N, x) is almost always referred to as just x,
  * where x is a 32-bit value equal to N*bucket_region+x. Thus from this
- * wide x, it is possible te recover both N and (the short) x.
+ * wide x, it is possible to recover both N and (the short) x.
  */
 void xToIJ(int *i, unsigned int *j, const unsigned int X, sieve_info_srcptr si)
 {

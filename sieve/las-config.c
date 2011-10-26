@@ -38,6 +38,11 @@ void las_display_config_flags(FILE * stream)
 #ifdef SUPPORT_I17
     fprintf(stream, " SUPPORT_I17");
 #endif
+#ifdef LAZY_NORMS
+    fprintf(stream, " LAZY_NORMS");
+    fprintf(stream, " NORM_STRIDE=%u", NORM_STRIDE);
+    fprintf(stream, " VERT_NORM_STRIDE=%u", VERT_NORM_STRIDE);
+#endif
     fprintf(stream, " NORM_BITS=%u", NORM_BITS);
     fprintf(stream, " LOG_BUCKET_REGION=%u", LOG_BUCKET_REGION);
     fprintf(stream, " BUCKET_LIMIT_FACTOR=%.1f",

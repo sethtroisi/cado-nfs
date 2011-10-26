@@ -14,6 +14,40 @@
 #include "fb.h"
 #include "utils.h"
 
+/* sorted list of prime powers < 2^32, with 6947 entries, and two sentinel
+ entries 0 and 2^32-1 */
+static uint32_t prime_powers[6949] = {1}; // 1 in first pos means uninitialized
+
+int uint32_comp(const void *A, const void *B) {
+    uint32_t *a, *b;
+    a = (uint32_t *) A;
+    b = (uint32_t *) B;
+    if (a[0] < b[0]) 
+        return -1;
+    if (a[0] > b[0]) 
+        return 1;
+    return 0;
+}
+
+static void init_prime_powers() {
+  unsigned long p;
+  uint32_t *ptr = &prime_powers[0];
+
+  for (p = 2; p <= 65536; p = getprime(p)) {
+      uint64_t q = p*p;
+      while (q <= 4294967295UL) {
+          *ptr++ = (uint32_t) q;
+          q *= p;
+      }
+  }
+  getprime(0);
+  // put sentinels
+  *ptr++ = 0;
+  *ptr++ = 4294967295U;
+  // sort the entries
+  qsort((void *) &prime_powers[0], 6949, sizeof(uint32_t), uint32_comp);
+}
+
 
 void 
 fb_fprint_entry (FILE *fd, const factorbase_degn_t *fb)
@@ -111,7 +145,8 @@ fb_log (double n, double log_scale, double offset)
   return (unsigned char) floor (log (n) * log_scale + offset + 0.5);
 }
 
-/* Assume q is a prime power p^k with k>=1, return p if k > 1, 0 otherwise. */
+/* Assuming q is a prime or a prime power, let k be the largest integer with
+   q = p^k, return p if k > 1, 0 otherwise */
 static uint32_t
 is_prime_power (uint32_t q)
 {
@@ -128,6 +163,41 @@ is_prime_power (uint32_t q)
   return 0;
 }
 
+/* same as is_prime_power, but faster */
+static uint32_t
+is_prime_power_fast (uint32_t q)
+{
+  static int a = 1, b, c;
+
+  /* First time, precompute prime powers */
+  if (prime_powers[0] == 1)
+      init_prime_powers();
+
+  /* assuming this routine is called with increasing q, we first try the last
+     interval [a, a+1] */
+  if (!(prime_powers[a] <= q && q < prime_powers[a+1]))
+    {
+      a = 0;
+      b = 6948;
+      /* invariant: prime_powers[a] <= q < prime_powers[b] */
+      while (a + 1 < b)
+        {
+          c = (a + b) / 2;
+          if (q < prime_powers[c])
+            b = c;
+          else
+            a = c;
+        }
+    }
+  /* now a+1 = b */
+  if (q == prime_powers[a])
+    {
+      a = a + 1; /* the next q will be larger */
+      return is_prime_power (q);
+    }
+  else
+    return 0;
+}
 
 /* Make one factor base entry for a linear polynomial poly[1] * x + poly[0]
    and the prime (power) q. We assume that poly[0] and poly[1] are coprime.
@@ -562,7 +632,7 @@ fb_read_addproj (const char *filename, const double log_scale,
 	}
 
       /* we assume q is a prime or a prime power */
-      p = is_prime_power (q);
+      p = is_prime_power_fast (q);
       if (p != 0)
         {
           fbprime_t cof = q;
@@ -684,7 +754,7 @@ fb_read_addproj (const char *filename, const double log_scale,
 	}
 
       /* Sort the roots into ascending order. We assume that fbprime_t and 
-         fbroot_t are typecaste compatible. This is ugly. */
+         fbroot_t are typecast compatible. This is ugly. */
       ASSERT_ALWAYS (sizeof (fbprime_t) == sizeof (fbroot_t));
       fb_sortprimes ((fbprime_t *) fb_cur->roots, fb_cur->nr_roots);
       /* Eliminate duplicate roots. Pari's polrootsmod() can produce them */

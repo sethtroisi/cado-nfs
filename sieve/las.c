@@ -42,8 +42,6 @@ static double MAYBE_UNUSED exp2 (double x)
 }
 #endif
 
-
-
 /* This global mutex should be locked in multithreaded parts when a
  * thread does a read / write, especially on stdout, stderr...
  */
@@ -51,11 +49,19 @@ pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 const int bucket_region = 1 << LOG_BUCKET_REGION;
 
-#define RATIONAL_SIDE   0
-#define ALGEBRAIC_SIDE   1
-const char * sidenames[2] = {
-    [RATIONAL_SIDE] = "rational",
-    [ALGEBRAIC_SIDE] = "algebraic", };
+/* for cofactorization statistics */
+int stats = 0; /* 0: nothing, 1: write stats file, 2: read stats file,
+                  the stats file can be used with gnuplot, for example:
+                  splot "stats.dat" u 1:2:3, "stats.dat" u 1:2:4 */
+double stats_prob = 2e-4;
+FILE *stats_file;
+FILE *sievestats_file;
+uint32_t **cof_call; /* cof_call[r][a] is the number of calls of the
+                        cofactorization routine with a cofactor of r bits on
+                        the rational side, and a bits on the algebraic side */
+uint32_t **cof_succ; /* cof_succ[r][a] is the corresponding number of
+                        successes, i.e., of call that lead to a relation */
+
 
 /* Test if entry x in bucket region n is divisible by p */
 void test_divisible_x (const fbprime_t p, const unsigned long x, const int n,
@@ -63,6 +69,27 @@ void test_divisible_x (const fbprime_t p, const unsigned long x, const int n,
 int factor_leftover_norm (mpz_t n, unsigned int b, mpz_array_t* const factors,
 			  uint32_array_t* const multis,
 			  facul_strategy_t *strategy);
+
+/* Determine whether a sieve entry with sieve residue S1 on sieving side 1
+   and sieve residue S2 on sieving side 2 is likely smooth. 
+   The array entry C1[S1] is initialized by sieve_info_init_lognorm() 
+   to something similar to 
+   -log(Pr[norm on side 1 with sieve residue S1 is smooth]),
+   similar for C2, S2. Assuming the two probabilities are independent enough,
+   we can estimate the neg log of the probability that both sides are smooth 
+   by C1[S1] + C2[S2]. 
+   If that sum does not exceed a theshold, the corresponding sieve entry is 
+   a sieve survivor. 
+   Alternative: have a bit array telling whether (S1,S2) is likely smooth */
+static inline int 
+sieve_info_test_lognorm (const unsigned char *C1, 
+                         const unsigned char *C2, 
+                         const unsigned char S1,
+                         const unsigned char S2,
+                         const unsigned char threshold)
+{
+  return C1[S1] + C2[S2] <= threshold;
+}
 
 static void sieve_info_init_trialdiv(sieve_info_ptr si)
 {
@@ -143,7 +170,7 @@ static void sieve_info_init(sieve_info_ptr si, param_list pl)
 	    si->cpoly->rat->lim, si->cpoly->alg->lim, si->cpoly->rat->lpb,
 	    si->cpoly->alg->lpb);
     fprintf(si->output,
-	    "#                     mfbr=%d mfba=%d rlambda=%1.1f alambda=%1.1f\n",
+	    "#                     rat->mfb=%d alg->mfb=%d rlambda=%1.1f alambda=%1.1f\n",
 	    si->cpoly->rat->mfb, si->cpoly->alg->mfb, si->cpoly->rat->lambda,
 	    si->cpoly->alg->lambda);
     fprintf(si->output, "#                     skewness=%1.1f\n",
@@ -2110,26 +2137,44 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
 
 /* {{{ cofactoring area */
 
-/* Return 0 if the leftover norm n cannot yield a relation:
-   (a) if n > 2^mfb
-   (b) if L < n < B^2
-   (c) if L^2 < n < B^3
-
+/* Return 0 if the leftover norm n cannot yield a relation.
    FIXME: need to check L^k < n < B^(k+1) too.
+
+   Possible cases, where qj represents a prime in [B,L], and rj a prime > L:
+   (0) n >= 2^mfb
+   (a) n < L:           1 or q1
+   (b) L < n < B^2:     r1 -> cannot yield a relation
+   (c) B^2 < n < B*L:   r1 or q1*q2
+   (d) B*L < n < L^2:   r1 or q1*q2 or q1*r2
+   (e) L^2 < n < B^3:   r1 or q1*r2 or r1*r2 -> cannot yield a relation
+   (f) B^3 < n < B^2*L: r1 or q1*r2 or r1*r2 or q1*q2*q3
+   (g) B^2*L < n < L^3: r1 or q1*r2 or r1*r2
+   (h) L^3 < n < B^4:   r1 or q1*r2, r1*r2 or q1*q2*r3 or q1*r2*r3 or r1*r2*r3
 */
 static int
-check_leftover_norm (mpz_t n, size_t lpb, mpz_t BB, mpz_t BBB, size_t mfb)
+check_leftover_norm (mpz_t n, size_t lpb, mpz_t BB, mpz_t BBB, mpz_t BBBB,
+                     size_t mfb)
 {
   size_t s = mpz_sizeinbase (n, 2);
 
   if (s > mfb)
-    return 0;
-  if (lpb < s && mpz_cmp (n, BB) < 0)
-    return 0;
-  if (2 * lpb < s && mpz_cmp (n, BBB) < 0)
-    return 0;
-  if (lpb < s && mpz_probab_prime_p (n, 1))
-    return 0;
+    return 0; /* n has more than mfb bits, which is the given limit */
+  /* now n < 2^mfb */
+  if (s <= lpb)
+    return 1; /* case (a) */
+  /* now n >= L=2^lpb */
+  if (mpz_cmp (n, BB) < 0)
+    return 0; /* case (b) */
+  /* now n >= B^2 */
+  if (2 * lpb < s)
+    {
+      if (mpz_cmp (n, BBB) < 0)
+        return 0; /* case (e) */
+      if (3 * lpb < s && mpz_cmp (n, BBBB) < 0)
+        return 0; /* case (h) */
+    }
+  if (mpz_probab_prime_p (n, 1))
+    return 0; /* n is a pseudo-prime larger than L */
   return 1;
 }
 
@@ -2158,13 +2203,16 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc, where_am_I_
 
     int cpt = 0;
     int surv = 0, copr = 0;
-    mpz_t norm[2], BB[2], BBB[2];
+    mpz_t norm[2], BB[2], BBB[2], BBBB[2];
     factor_list_t factors[2];
     mpz_array_t *f[2] = { NULL, };
     uint32_array_t *m[2] = { NULL, }; /* corresponding multiplicities */
     bucket_primes_t primes[2];
 
     mpz_t BLPrat;       /* alone ? */
+
+    uint32_t cof_rat_bitsize = 0; /* placate gcc */
+    uint32_t cof_alg_bitsize = 0; /* placate gcc */
 
     for(int side = 0 ; side < 2 ; side++) {
         f[side] = alloc_mpz_array (8);
@@ -2174,10 +2222,12 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc, where_am_I_
         mpz_init (norm[side]);
         mpz_init (BB[side]);
         mpz_init (BBB[side]);
+        mpz_init (BBBB[side]);
 
         unsigned long lim = (side == RATIONAL_SIDE) ? cpoly->rat->lim : cpoly->alg->lim;
         mpz_ui_pow_ui (BB[side], lim, 2);
         mpz_mul_ui (BBB[side], BB[side], lim);
+        mpz_mul_ui (BBBB[side], BBB[side], lim);
     }
 
     mpz_init (BLPrat);
@@ -2213,11 +2263,12 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc, where_am_I_
         unsigned int X;
         unsigned int i, j;
 
-        if (alg->Bound[alg_S[x]] + rat->Bound[rat_S[x]] >= 127)
+        if (!sieve_info_test_lognorm(alg->Bound, rat->Bound, alg_S[x], rat_S[x], 126))
           {
             S[x] = 255;
             continue;
           }
+        th->rep->survivor_sizes[rat_S[x]][alg_S[x]]++;
         surv++;
 
         X = x + (N << LOG_BUCKET_REGION);
@@ -2341,7 +2392,7 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc, where_am_I_
                         lim, a, b);
 
                 pass = check_leftover_norm (norm[side], lpb,
-                            BB[side], BBB[side], mfb);
+                                         BB[side], BBB[side], BBBB[side], mfb);
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b)) {
                     gmp_fprintf(stderr, "# checked leftover norm=%Zd on %s side for (%"PRId64",%"PRIu64"): %d\n",norm[side],sidenames[side],a,b,pass);
@@ -2349,6 +2400,32 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc, where_am_I_
 #endif
             }
             if (!pass) continue;
+
+            if (stats != 0)
+              {
+                cof_rat_bitsize = mpz_sizeinbase (norm[RATIONAL_SIDE], 2);
+                cof_alg_bitsize = mpz_sizeinbase (norm[ALGEBRAIC_SIDE], 2);
+                if (stats == 1) /* learning phase */
+                  /* no need to use a mutex here: either we use one thread only
+                     to compute the cofactorization data and if several threads
+                     the order is irrelevant. The only problem that can happen
+                     is when two threads increase the value at the same time,
+                     and it is increased by 1 instead of 2, but this should
+                     happen rarely. */
+                  cof_call[cof_rat_bitsize][cof_alg_bitsize] ++;
+                else /* stats == 2: we use the learning data */
+                  {
+                    /* we store the initial number of cofactorization calls in
+                       cof_call[0][0] and the remaining nb in cof_succ[0][0] */
+                    cof_call[0][0] ++;
+                    /* Warning: the <= also catches cases when succ=call=0 */
+                    if ((double) cof_succ[cof_rat_bitsize][cof_alg_bitsize] <
+                        (double) cof_call[cof_rat_bitsize][cof_alg_bitsize] *
+                        stats_prob)
+                      continue;
+                    cof_succ[0][0] ++;
+                  }
+              }
 
             /* if norm[RATIONAL_SIDE] is above BLPrat, then it might not
              * be smooth. We factor it first. Otherwise we factor it
@@ -2363,6 +2440,11 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc, where_am_I_
                 pass = factor_leftover_norm(norm[side], lpb, f[side], m[side], si->strategy);
             }
             if (!pass) continue;
+
+            /* yippee: we found a relation! */
+
+            if (stats == 1) /* learning phase */
+              cof_succ[cof_rat_bitsize][cof_alg_bitsize] ++;
 
 #ifdef UNSIEVE_NOT_COPRIME
             ASSERT (bin_gcd_safe (a, b) == 1);
@@ -2426,8 +2508,7 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc, where_am_I_
             clear_relation(rel);
             cpt++;
             /* Build histogram of lucky S[x] values */
-            for(int side = 0 ; side < 2 ; side++)
-                th->rep->report_sizes[side][loc[side]->S[x]]++;
+            th->rep->report_sizes[loc[RATIONAL_SIDE]->S[x]][loc[ALGEBRAIC_SIDE]->S[x]]++;
         }
     }
 
@@ -2438,6 +2519,7 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc, where_am_I_
 
     for(int side = 0 ; side < 2 ; side++) {
         clear_bucket_primes (&primes[side]);
+        mpz_clear (BBBB[side]);
         mpz_clear (BBB[side]);
         mpz_clear (BB[side]);
         mpz_clear(norm[side]);
@@ -2821,8 +2903,8 @@ usage (const char *argv0, const char * missing)
   fprintf (stderr, "          -alim     nnn   algebraic factor base bound nnn\n");
   fprintf (stderr, "          -lpbr     nnn   rational large prime bound 2^nnn\n");
   fprintf (stderr, "          -lpba     nnn   algebraic large prime bound 2^nnn\n");
-  fprintf (stderr, "          -mfbr     nnn   rational cofactor bound 2^nnn\n");
-  fprintf (stderr, "          -mfba     nnn   algebraic cofactor bound 2^nnn\n");
+  fprintf (stderr, "          -rat->mfb     nnn   rational cofactor bound 2^nnn\n");
+  fprintf (stderr, "          -alg->mfb     nnn   algebraic cofactor bound 2^nnn\n");
   fprintf (stderr, "          -rlambda  nnn   rational lambda value is nnn\n");
   fprintf (stderr, "          -alambda  nnn   algebraic lambda value is nnn\n");
   fprintf (stderr, "          -S        xxx   skewness value is xxx\n");
@@ -2835,6 +2917,9 @@ usage (const char *argv0, const char * missing)
   fprintf (stderr, "          -skfact   xxx   skip factor, default=1.01\n");
   fprintf (stderr, "          -bench2         activate alternate bench mode\n");
   fprintf (stderr, "          -percent   xxx  percentage of sieving, default=1e-3\n");
+  fprintf (stderr, "          -stats    xxx   write or read statistics file xxx\n");
+  fprintf (stderr, "          -stats_prob xxx use threshold xxx\n");
+  fprintf (stderr, "          -sievestats xxx write sieve statistics to file xxx\n");
   if (missing) {
       fprintf(stderr, "\nError: missing parameter %s\n", missing);
   }
@@ -2864,6 +2949,9 @@ main (int argc0, char *argv0[])
     double bench_percent = 1e-3; 
     long bench_tot_rep = 0;
     double bench_tot_time = 0.0;
+    const char *statsfilename = NULL;
+    const char *sievestatsfilename = NULL;
+    int j;
 
     memset(si, 0, sizeof(sieve_info));
 
@@ -2892,6 +2980,8 @@ main (int argc0, char *argv0[])
     }
 
     fbfilename = param_list_lookup_string(pl, "fb");
+    statsfilename = param_list_lookup_string (pl, "stats");
+    sievestatsfilename = param_list_lookup_string (pl, "sievestats");
 
     param_list_parse_uint64(pl, "q0", &q0);
     param_list_parse_uint64(pl, "q1", &q1);
@@ -2899,6 +2989,7 @@ main (int argc0, char *argv0[])
 
     param_list_parse_int(pl, "rpowlim", &rpow_lim);
     param_list_parse_int(pl, "apowlim", &apow_lim);
+    param_list_parse_double (pl, "stats_prob", &stats_prob);
 
     // these are parsed in sieve_info_init (why them, and not the above ?)
     // param_list_parse_int(pl, "mt", &nb_threads);
@@ -2932,6 +3023,38 @@ main (int argc0, char *argv0[])
 
     /* this does not depend on the special-q */
     sieve_info_init(si, pl);    /* side effects: prints cmdline and flags */
+
+    if (statsfilename != NULL) /* a file was given */
+      {
+        /* if the file exists, we open it in read-mode, otherwise we create
+           it */
+        stats_file = fopen (statsfilename, "r");
+        if (stats_file != NULL)
+          stats = 2;
+        else
+          {
+            stats_file = fopen (statsfilename, "w");
+            if (stats_file == NULL)
+              {
+                fprintf (stderr, "Error, cannot create file %s\n",
+                         statsfilename);
+                exit (EXIT_FAILURE);
+              }
+            stats = 1;
+          }
+      }
+
+    if (sievestatsfilename != NULL) /* a file was given */
+      {
+        sievestats_file = fopen (sievestatsfilename, "w");
+        if (sievestats_file == NULL)
+          {
+            fprintf (stderr, "Error, cannot create file %s\n",
+                     sievestatsfilename);
+            exit (EXIT_FAILURE);
+          }
+      }
+    
 
     /* While obviously, this one does (but only mildly) */
     sieve_info_init_norm_data(si, q0);
@@ -2989,6 +3112,47 @@ main (int argc0, char *argv0[])
     ASSERT_ALWAYS(roots);
     q0 --; /* so that nextprime gives q0 if q0 is prime */
     nroots = 0;
+
+    if (stats != 0)
+      {
+        cof_call = (uint32_t**) malloc ((si->cpoly->rat->mfb + 1) * sizeof(uint32_t*));
+        cof_succ = (uint32_t**) malloc ((si->cpoly->rat->mfb + 1) * sizeof(uint32_t*));
+        for (i = 0; i <= si->cpoly->rat->mfb; i++)
+          {
+            cof_call[i] = (uint32_t*) malloc ((si->cpoly->alg->mfb + 1)
+                                              * sizeof(uint32_t));
+            cof_succ[i] = (uint32_t*) malloc ((si->cpoly->alg->mfb + 1)
+                                              * sizeof(uint32_t));
+            for (j = 0; j <= si->cpoly->alg->mfb; j++)
+              cof_call[i][j] = cof_succ[i][j] = 0;
+          }
+        if (stats == 2)
+          {
+            fprintf (si->output,
+                    "# Use learning file %s with threshold %1.2e\n",
+                     statsfilename, stats_prob);
+            while (!feof (stats_file))
+              {
+                uint32_t c, s;
+                if (fscanf (stats_file, "%u %u %u %u\n", &i, &j, &c, &s) != 4)
+                  {
+                    fprintf (stderr, "Error while reading file %s\n",
+                             statsfilename);
+                    exit (EXIT_FAILURE);
+                  }
+                if (i <= si->cpoly->rat->mfb && j <= si->cpoly->alg->mfb)
+                  {
+                    /* When s=0 and c>0, whatever STATS_PROB, we will always
+                       have s/c < STATS_PROB, thus (i,j) will be discarded.
+                       We allow a small error by considering (s+1)/(c+1)
+                       instead. In case s=0, (i,j) is discarded only when
+                       1/(c+1) < STATS_PROB (always discarded for c=0). */
+                    cof_call[i][j] = c + 1;
+                    cof_succ[i][j] = s + 1;
+                  }
+              }
+          }
+      }
 
     t0 = seconds ();
     fprintf (si->output, "#\n");
@@ -3185,20 +3349,32 @@ main (int argc0, char *argv0[])
     tts -= report->ttf;
     if (si->verbose)
       facul_print_stats (si->output);
-    if (si->verbose)
+    if (sievestats_file != NULL)
     {
-        fprintf (si->output, "# Histogram of sieve report values that led to "
-                "relations:\n");
-        for(int side = 0 ; side < 2 ; side++) {
-            fprintf (si->output, "# %s side: ", sidenames[side]);
-            for (i = 0; i < 256; i++) {
-                unsigned long r = report->report_sizes[side][i];
-                if (r>0)
-                    fprintf (si->output, "%d:%lu ", i, r);
+        fprintf (sievestats_file, "# Number of sieve survivors and relations by sieve residue pair\n");
+        fprintf (sievestats_file, "# Format: S1 S2 #relations #survivors ratio\n");
+        fprintf (sievestats_file, "# where S1 is the sieve residue on the rational side, S2 rational side\n");
+        fprintf (sievestats_file, "# Make a pretty graph with gnuplot:\n");
+        fprintf (sievestats_file, "# splot \"sievestatsfile\" using 1:2:3 with pm3d\n");
+        fprintf (sievestats_file, "# plots histogram for relations, 1:2:4 for survivors, 1:2:($3/$4) for ratio\n");
+        for(int i1 = 0 ; i1 < 256 ; i1++) {
+            for (int i2 = 0; i2 < 256; i2++) {
+                unsigned long r1 = report->report_sizes[i1][i2];
+                unsigned long r2 = report->survivor_sizes[i1][i2];
+                if (r1 > r2) {
+                  fprintf(stderr, "Error, statistics report more relations (%lu) than "
+                          "sieve survivors (%lu) for (%d,%d)\n", r1, r2, i1, i2)
+;
+                }
+                if (r2 > 0)
+                    fprintf (sievestats_file, "%d %d %lu %lu\n", 
+                             i1, i2, r1, r2);
             }
-            fprintf (si->output, "\n");
+            fprintf (sievestats_file, "\n");
         }
-      }
+        fclose(sievestats_file);
+        sievestats_file = NULL;
+    }
     if (si->nb_threads > 1) 
         fprintf (si->output, "# Total wct time %1.1fs [precise timings available only for mono-thread]\n", t0);
     else
@@ -3228,6 +3404,8 @@ main (int argc0, char *argv0[])
         printf ("# Number of wrapped composite values while dividing out "
                 "bucket primes: %ld\n", nr_wrap_was_composite);
       }
+    if (stats == 2)
+      fprintf (si->output, "# Rejected %u cofactorizations out of %u due to stats file\n", cof_call[0][0] - cof_succ[0][0], cof_call[0][0]);
     /* }}} */
 
     sieve_info_clear_trialdiv(si);
@@ -3246,6 +3424,22 @@ main (int argc0, char *argv0[])
     sieve_info_clear (si);
 
     param_list_clear(pl);
+
+    if (stats != 0)
+      {
+        for (i = 0; i <= si->cpoly->rat->mfb; i++)
+          {
+            if (stats == 1)
+              for (j = 0; j <= si->cpoly->alg->mfb; j++)
+                fprintf (stats_file, "%u %u %u %u\n", i, j, cof_call[i][j],
+                         cof_succ[i][j]);
+            free (cof_call[i]);
+            free (cof_succ[i]);
+          }
+        free (cof_call);
+        free (cof_succ);
+        fclose (stats_file);
+      }
 
     return 0;
 }

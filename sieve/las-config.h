@@ -16,9 +16,23 @@
    miss only about 7% to 8% relations wrt a more accurate estimation. */
 //#define UGLY_HACK
 
-/* number of bits used to estimate the norms */
+/* Number of bits used to estimate the norms
+ * This should be large enough: it must be such that all norms are
+ * smaller than 2^NORM_BITS.
+ * This imposes NORM_BITS >= 8, or even >= 9 for large factorizations. */
 #define NORM_BITS 10
 
+/* Lazy norm computation: compute only one norm per NORM_STRIDE on a 
+ * line, and propagate up to VERT_NORM_STRIDE rows above it. 
+ * These approximations speed-up the norm computation, but put more 
+ * pressure on the cofactorisation step, since the useless 
+ * cofactorisations are more frequent. 
+ * Comment the first line to get an accurate, slower, norm computation. 
+ */ 
+#define xxLAZY_NORMS 
+#define VERT_NORM_STRIDE 4 
+#define NORM_STRIDE 8 
+ 
 /* define PROFILE to keep certain function from being inlined, in order to
    make them show up on profiler output */
 //#define PROFILE
