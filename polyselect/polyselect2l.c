@@ -92,7 +92,8 @@ int lq = 1; /* default use a single prime as special-q */
 double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
 
 /* read-write global variables */
-pthread_mutex_t lock; /* used as mutual exclusion lock for those variables */
+pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER; /* used as mutual exclusion
+                                                lock for those variables */
 int tot_found = 0; /* total number of polynomials */
 int found = 0; /* number of polynomials below maxnorm */
 double potential_collisions = 0.0, aver_lognorm = 0.0;

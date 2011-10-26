@@ -7,7 +7,7 @@ I) on the cluster :
 - initialization of the working directory :
 $ ./init_cdir $cdir $bindir $nb_jobs_by_node $opt
   example with a cluster of 8 cores per node :
-  $ ./init_cdir $HOME/snfs250 $HOME/cado-nfs/trunk/build/$HOST 4 "-mt 2 -I 15 -ratq"
+  $ ./init_cdir $HOME/snfs250 $HOME/cado-nfs/build/$HOSTNAME 4 "-mt 2 -I 15 -ratq"
 
 - run cut_n_roots to create waiting list of jobs:
 $ cd $cdir/inqueue

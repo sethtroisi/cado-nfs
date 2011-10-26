@@ -75,7 +75,7 @@
 [caramel]
 # WARNING: $HOME is substituted locally!
 tmpdir=/localdisk/tmp
-bindir=$HOME/cado/trunk/dist/src
+bindir=$HOME/cado-nfs/build/$HOSTNAME
 
 cores=12
 poly_cores=9

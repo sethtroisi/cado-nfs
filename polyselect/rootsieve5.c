@@ -5843,7 +5843,7 @@ rootsieve_main_run ( rsstr_t rs,
 			   //       2. Change sieve length -umax and -vmax
 			   /*
 			   fprintf (stderr, "#!/bin/bash\n#PBS -N rsa_%d\n#PBS -l nodes=1,walltime=160:00:00\n#PBS -q route\n#PBS -m ae\n", i);
-			   gmp_fprintf ( stderr, "/home/bai/cado-nfs/trunk/build/orac/polyselect/rootsieve5 -fm /home/bai/cado-nfs/trunk/build/orac/polyselect/rsa768.poly --s2 -n %Zd -d %d -w %d -u %Zd -v %Zd -umax 64 -vmax 317325312 -mod %Zd > /home/bai/cado-nfs/trunk/build/orac/polyselect/rsa704_%d.out 2>&1\n\n",
+			   gmp_fprintf ( stderr, "/home/bai/cado-nfs/build/orac/polyselect/rootsieve5 -fm /home/bai/cado-nfs/build/orac/polyselect/rsa768.poly --s2 -n %Zd -d %d -w %d -u %Zd -v %Zd -umax 64 -vmax 317325312 -mod %Zd > /home/bai/cado-nfs/build/orac/polyselect/rsa704_%d.out 2>&1\n\n",
 							 rs->n,
 							 rs->d,
 							 w[i],

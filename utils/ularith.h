@@ -486,7 +486,8 @@ ularith_shrd (unsigned long *r, const unsigned long a, const int i)
            "r" (a), "cJ" (i) : /* i can be in %cx or a constant < 64 */
            "cc"
           );
-#elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
+#elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__) \
+      && (__GNUC__ > 4 || __GNUC__ == 4 && __GNUC_MINOR__ >= 3)
   __asm__ ("shrdl %b2, %1, %0\n": 
            "+rm" (*r) :
            "r" (a), "cI" (i) : /* i can be in %cx or a constant < 32 */
