@@ -1166,6 +1166,11 @@ get_alpha (mpz_t *f, const int d, unsigned long B)
   unsigned long p;
   mpz_t disc;
 
+  /* for F linear, we have q_p = 1 for all p, thus
+     alpha(F) = sum(prime p <= B, log(p)/(p^2-1)) ~ 0.569959993064325 */
+  if (d == 1)
+    return 0.569959993064325;
+
   mpz_init (disc);
   discriminant (disc, f, d);
 
