@@ -155,6 +155,10 @@ static void sieve_info_init(sieve_info_ptr si, param_list pl)
 	exit(EXIT_FAILURE);
     }
 
+    /* -skew (or -S) may override (or set) the skewness given in the
+     * polynomial file */
+    param_list_parse_double(pl, "skew", &(si->cpoly->skew));
+
     if (si->cpoly->skew <= 0.0) {
 	fprintf(stderr, "Error, please provide a positive skewness\n");
 	exit(EXIT_FAILURE);
@@ -2962,7 +2966,7 @@ main (int argc0, char *argv0[])
     param_list_configure_knob(pl, "-ratq", &si->ratq);
     param_list_configure_knob(pl, "-bench", &bench);
     param_list_configure_knob(pl, "-bench2", &bench2);
-    param_list_configure_alias(pl, "skew", "S");
+    param_list_configure_alias(pl, "-skew", "-S");
 
     argv++, argc--;
     for( ; argc ; ) {

@@ -392,9 +392,9 @@ print_poly_info ( mpz_t *f,
 	 cpoly->skew = skew;
 	 e = MurphyE (cpoly, BOUND_F, BOUND_G, AREA, MURPHY_K);
 
+	 printf ("skew: %.2f\n", skew);
 	 if (verbose == 2) {
-		  printf ("# skew: %.2f, ", skew);
-		  printf ("lognorm: %.2f, alpha: %.2f, (alpha_proj: %.2f) E: %.2f, nr: %u \n# MurphyE: %1.2e (Bf=%.0f, Bg=%.0f, area=%1.2e)\n",
+		  printf ("# lognorm: %.2f, alpha: %.2f, (alpha_proj: %.2f) E: %.2f, nr: %u \n# MurphyE: %1.2e (Bf=%.0f, Bg=%.0f, area=%1.2e)\n",
 				  logmu,
 				  alpha,
 				  alpha_proj,

@@ -1759,12 +1759,12 @@ print_poly (FILE *fp, cado_poly p, int argc, char *argv[], double st, int raw)
     fprintf (fp, "type: %s\n", p->type);
   if (raw == 0)
     {
-      fprintf (fp, "rat->rlim: %lu\n", p->rat->lim);
-      fprintf (fp, "alg->lim: %lu\n", p->alg->lim);
-      fprintf (fp, "rat->lpb: %d\n", p->rat->lpb);
-      fprintf (fp, "alg->lpb: %d\n", p->alg->lpb);
-      fprintf (fp, "rat->mfb: %d\n", p->rat->mfb);
-      fprintf (fp, "alg->mfb: %d\n", p->alg->mfb);
+      fprintf (fp, "rlim: %lu\n", p->rat->lim);
+      fprintf (fp, "alim: %lu\n", p->alg->lim);
+      fprintf (fp, "lpbr: %d\n", p->rat->lpb);
+      fprintf (fp, "lpba: %d\n", p->alg->lpb);
+      fprintf (fp, "mfbr: %d\n", p->rat->mfb);
+      fprintf (fp, "mfba: %d\n", p->alg->mfb);
       /* Warning: in CADO-NFS the lambda values are relative to the large
          prime bounds, whereas in the Franke-Kleinjung siever they are
          relative to the factor base bounds */
