@@ -43,10 +43,6 @@
 #define ASSERT(x)	assert(x)
 #endif
 
-#ifndef WANT_ASSERT_EXPENSIVE
-#define WANT_ASSERT_EXPENSIVE
-#endif
-
 #ifdef WANT_ASSERT_EXPENSIVE
 #define ASSERT_EXPENSIVE(x) ASSERT(x)
 #else
