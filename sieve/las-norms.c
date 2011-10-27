@@ -214,29 +214,53 @@ void init_rat_norms_bucket_region(unsigned char *S,
 		uint64_t y1;
 	    } intpair;
 	} y_vec;
-        __v2df gi_vec = { 2 * u[1], 2 * u[1] };
-        __v2di mask_vec = { mask, mask };
-        __v2di cst_vec = { (uint64_t) 0x3FF0000000000000,
-            (uint64_t) 0x3FF0000000000000
-        };
+        if ((j & 1) == 1) {
+            __v2df gi_vec = { 2*u[1], 2*u[1] };
+            __v2di mask_vec = { mask, mask };
+            __v2di cst_vec = { (uint64_t) 0x3FF0000000000000,
+                (uint64_t) 0x3FF0000000000000 };
+           
+            // in spite of the appearance, only the low word gives the shift
+            // count. The high word is ignored.
+            __v2di shift_value = { (uint64_t)(52 - l), (uint64_t)(52 - l) };
+            __v2df z_vec = { zx->z, zx->z+u[1] };
+             
+            for (i = 0; i < halfI; ++i) {
+                y_vec.dble = z_vec;
+                y_vec.intg -= cst_vec;
+                y_vec.intg = _mm_srl_epi64(y_vec.intg, shift_value);
+                y_vec.intg &= mask_vec;
+                //            *S++ = L[((uint32_t *)(&y_vec.intg))[0]];
+                //             *S++ = L[((uint32_t *)(&y_vec.intg))[2]];
+                *S++ = L[y_vec.intpair.y0];
+                *S++ = L[y_vec.intpair.y1];
+                z_vec += gi_vec;
+            }
+        } else { // skip when i and j are both even
+            __v2df gi_vec = { 4*u[1], 4*u[1] };
+            __v2di mask_vec = { mask, mask };
+            __v2di cst_vec = { (uint64_t) 0x3FF0000000000000,
+                (uint64_t) 0x3FF0000000000000 };
 
-        // in spite of the appearance, only the low word gives the shift
-        // count. The high word is ignored.
-        __v2di shift_value = { (uint64_t) (52 - l), (uint64_t) (52 - l) };
-        __v2df z_vec = { zx->z, zx->z + u[1] };
+            // in spite of the appearance, only the low word gives the shift
+            // count. The high word is ignored.
+            __v2di shift_value = { (uint64_t)(52 - l), (uint64_t)(52 - l) };
+            __v2df z_vec = { zx->z + u[1], zx->z+3*u[1] };
 
-        for (i = 0; i < halfI; ++i) {
-            y_vec.dble = z_vec;
-            y_vec.intg -= cst_vec;
-            y_vec.intg = _mm_srl_epi64(y_vec.intg, shift_value);
-            y_vec.intg &= mask_vec;
-            //            *S++ = L[((uint32_t *)(&y_vec.intg))[0]];
-            //            *S++ = L[((uint32_t *)(&y_vec.intg))[2]];
-            *S++ = L[y_vec.intpair.y0];
-            *S++ = L[y_vec.intpair.y1];
-            z_vec += gi_vec;
+            for (i = 0; i < halfI; i+=2) {
+                y_vec.dble = z_vec;
+                y_vec.intg -= cst_vec;
+                y_vec.intg = _mm_srl_epi64(y_vec.intg, shift_value);
+                y_vec.intg &= mask_vec;
+                //            *S++ = L[((uint32_t *)(&y_vec.intg))[0]];
+                //             *S++ = L[((uint32_t *)(&y_vec.intg))[2]];
+                *S++ = 255;
+                *S++ = L[y_vec.intpair.y0];
+                *S++ = 255;
+                *S++ = L[y_vec.intpair.y1];
+                z_vec += gi_vec;
+            }
         }
-
 #endif
 #endif
 	__asm__("### End rational norm loop\n");
