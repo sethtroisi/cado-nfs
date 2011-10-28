@@ -1848,6 +1848,7 @@ static thread_data * thread_data_alloc(sieve_info_ptr si)
     for(int i = 0 ; i < si->nb_threads ; i++) {
         thrs[i]->id = i;
         thrs[i]->si = si;
+        las_report_init(thrs[i]->rep);
     }
 
     for(int z = 0 ; z < 2 ; z++) {
@@ -1902,6 +1903,7 @@ static void thread_data_free(thread_data * thrs)
         for(int side = 0 ; side < 2 ; side++) {
             free(thrs[i]->sides[side]->fb_bucket);
         }
+        las_report_clear(thrs[i]->rep);
     }
     free(thrs); /* nothing to do ! */
 }
