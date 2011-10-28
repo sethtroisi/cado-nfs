@@ -243,6 +243,7 @@ sieve/CMakeLists.txt
 sieve/Makefile
 sieve/basicnt.h
 sieve/bucket.h
+sieve/bucket.c
 sieve/ecm/CMakeLists.txt
 sieve/ecm/Makefile
 sieve/ecm/ecm.c
@@ -281,6 +282,8 @@ sieve/las-config.c
 sieve/las-types.h
 sieve/las-coordinates.h
 sieve/las-coordinates.c
+sieve/las-smallsieve.h
+sieve/las-smallsieve.c
 sieve/las-debug.h
 sieve/las-debug.c
 sieve/las-report-stats.h

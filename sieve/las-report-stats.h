@@ -11,8 +11,8 @@ struct las_report_s {
     double tn[2];
     double ttsm;
     double ttf;
-    unsigned long survivor_sizes[256][256]; /* First index: rational side */
-    unsigned long report_sizes[256][256];
+    unsigned long (*survivor_sizes)[256]; /* First index: rational side */
+    unsigned long (*report_sizes)[256];
 };
 typedef struct las_report_s las_report[1];
 typedef struct las_report_s * las_report_ptr;
@@ -26,6 +26,7 @@ extern "C" {
 void las_report_init(las_report_ptr p);
 void las_report_clear(las_report_ptr p);
 void las_report_accumulate(las_report_ptr p, las_report_ptr q);
+void las_report_copy(las_report_ptr p, las_report_ptr q);
 
 #ifdef __cplusplus
 }

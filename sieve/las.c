@@ -22,6 +22,7 @@
 #include "las-unsieve.h"
 #include "las-arith.h"
 #include "las-qlattice.h"
+#include "las-smallsieve.h"
 
 #define LOG_SCALE 1.4426950408889634 /* 1/log(2) to 17 digits, rounded to
                                         nearest. This is enough to uniquely
@@ -47,7 +48,7 @@ static double MAYBE_UNUSED exp2 (double x)
  */
 pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER; 
 
-const int bucket_region = 1 << LOG_BUCKET_REGION;
+static const int bucket_region = 1 << LOG_BUCKET_REGION;
 
 /* for cofactorization statistics */
 int stats = 0; /* 0: nothing, 1: write stats file, 2: read stats file,
@@ -569,66 +570,19 @@ plattice_x_t plattice_starting_vector(const plattice_info_t * pli, sieve_info_sr
 }
 
 /***************************************************************************/
-/* {{{ Structures for small sieves */
-
-/* TODO: move the definition of these small_* structures closer to the
- * code for small sieves, to the extent possible */
-
-typedef struct {
-    fbprime_t p;
-    fbprime_t r;        // in [ 0, p [
-    fbprime_t offset;   // in [ 0, p [
-} ssp_t;
-
-/* We currently *mandate* that this structure has the same size as ssp_t.
- * It would be possible to make it work with only a requirement on
- * identical alignment.
- */
-typedef struct {
-    fbprime_t g, q, U;
-} ssp_bad_t;
-
-#define SSP_POW2        (1u<<0)
-#define SSP_PROJ        (1u<<1)
-#define SSP_DISCARD     (1u<<30)
-#define SSP_END         (1u<<31)
-
-typedef struct {
-    int index;
-    unsigned int event;
-} ssp_marker_t;
-
-typedef struct {
-    ssp_marker_t * markers;
-    // primes with non-projective root
-    ssp_t *ssp;
-    // primes with projective root
-    int nb_ssp;
-    unsigned char * logp;
-    int * next_position;
-} small_sieve_data_t;
-
-#define PUSH_SSP_MARKER(ssd, nmarkers, __index, __event) do {		\
-    ssd->markers = (ssp_marker_t *) realloc(ssd->markers,               \
-            (nmarkers + 1) * sizeof(ssp_marker_t));                     \
-    ssd->markers[nmarkers].index = __index;				\
-    ssd->markers[nmarkers].event = __event;				\
-    nmarkers++;								\
-} while (0)
-
-
-/* }}} */
 
 /***************************************************************************/
 /********        Main bucket sieving functions                    **********/
 
 /* All of this exists _for each thread_ */
 struct thread_side_data_s {
-    small_sieve_data_t ssd;  /* only for process_region */
-    fbprime_t pmax;          /* XXX seems to be currently unused */
     bucket_array_t BA;
     factorbase_degn_t *fb_bucket; /* in reality a pointer into a shared array */
     double bucket_fill_ratio;     /* inverse sum of bucket-sieved primes */
+
+    /* For small sieve */
+    int * ssdpos;
+    int * rsdpos;
 };
 typedef struct thread_side_data_s thread_side_data[1];
 typedef struct thread_side_data_s * thread_side_data_ptr;
@@ -645,7 +599,7 @@ typedef struct thread_data_s * thread_data_ptr;
 typedef const struct thread_data_s * thread_data_srcptr;
 
 /* {{{ dispatch_fb */
-static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_main, factorbase_degn_t * fb0, int nparts)
+static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_main, factorbase_degn_t * fb0, int nparts, fbprime_t pmax)
 {
     /* Given fb0, which is a pointer in the fb array * fb_main, allocates
      * fb_dst[0] up to fb_dst[nparts-1] as independent fb arrays, each of
@@ -657,13 +611,9 @@ static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_mai
     size_t * fb_sizes = (size_t *) malloc(nparts * sizeof(size_t));
     FATAL_ERROR_CHECK(fb_sizes == NULL, "malloc failed");
     memset(fb_sizes, 0, nparts * sizeof(size_t));
-    size_t headsize = 0;
+    size_t headsize = fb_diff_bytes(fb0, *fb_main);
     int i = 0;
-    for(factorbase_degn_t * fb = *fb_main ; fb < fb0 ; fb = fb_next (fb)) {
-        size_t sz = fb_entrysize (fb); 
-        headsize += sz;
-    }
-    for(factorbase_degn_t * fb = fb0 ; fb->p != FB_END ; fb = fb_next (fb)) {
+    for(factorbase_degn_t * fb = fb0 ; fb->p != FB_END && fb->p <= pmax; fb = fb_next (fb)) {
         size_t sz = fb_entrysize (fb); 
         fb_sizes[i] += sz;
         i++;
@@ -680,7 +630,7 @@ static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_mai
     free(fb_sizes); fb_sizes = NULL;
     i = 0;
     int k = 0;
-    for(factorbase_degn_t * fb = fb0 ; fb->p != FB_END ; fb = fb_next (fb)) {
+    for(factorbase_degn_t * fb = fb0 ; fb->p != FB_END && fb->p <= pmax; fb = fb_next (fb)) {
         k++;
         size_t sz = fb_entrysize (fb); 
         memcpy(fbi[i], fb, sz);
@@ -701,29 +651,154 @@ static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_mai
 }
 /* }}} */
 
+
+/* {{{ reordering of the small factor base
+ *
+ * We split the small factor base in several non-overlapping, contiguous
+ * zones:
+ *
+ *      - powers of 2 (up until the pattern sieve limit)
+ *      - powers of 3 (up until the pattern sieve limit)
+ *      - trialdiv primes (not powers)
+ *      - resieved primes
+ *      (- powers of trialdiv primes)
+ *      - rest.
+ *
+ * Problem: bad primes may in fact be pattern sieved, and we might want
+ * to pattern-sieve more than just the ``do it always'' cases where p is
+ * below the pattern sieve limit.
+ *
+ * The answer to this is that such primes are expected to be very very
+ * rare, so we don't really bother. If we were to do something, we could
+ * imagine setting up a schedule list for projective primes -- e.g. a
+ * priority queue. But it feels way overkill.
+ *
+ * Note that the pre-treatment (splitting the factor base in chunks) can
+ * be done once and for all.
+ */
+
+void reorder_fb(sieve_info_ptr si, int side)
+{
+    factorbase_degn_t * fb_pow2, * fb_pow2_base;
+    factorbase_degn_t * fb_pow3, * fb_pow3_base;
+    factorbase_degn_t * fb_td, * fb_td_base;
+    // factorbase_degn_t * fb_pow_td, * fb_pow_td_base;
+    factorbase_degn_t * fb_rs, * fb_rs_base;
+    factorbase_degn_t * fb_rest, * fb_rest_base;
+
+    factorbase_degn_t * fb_base = si->sides[side]->fb;
+    factorbase_degn_t * fb = fb_base;
+
+    size_t sz = fb_size(fb);
+
+    fb_pow2 = fb_pow2_base = (factorbase_degn_t *) malloc(sz);
+    fb_pow3 = fb_pow3_base = (factorbase_degn_t *) malloc(sz);
+    fb_td = fb_td_base = (factorbase_degn_t *) malloc(sz);
+    // fb_pow_td = fb_pow_td_base = (factorbase_degn_t *) malloc(sz);
+    fb_rs = fb_rs_base = (factorbase_degn_t *) malloc(sz);
+    fb_rest = fb_rest_base = (factorbase_degn_t *) malloc(sz);
+
+    fbprime_t plim = si->bucket_thresh;
+    fbprime_t costlim = si->td_thresh;
+
+#define PUSH_LIST(x) do {						\
+            memcpy(fb_## x, fb, fb_entrysize(fb));			\
+            fb_## x = fb_next(fb_## x);					\
+} while (0)
+
+    size_t pattern2_size = sizeof(unsigned long) * 2;
+    for( ; fb->p != FB_END ; fb = fb_next(fb)) {
+        /* The extra conditions on powers of 2 and 3 are related to how
+         * pattern-sieving is done.
+         */
+        if ((fb->p%2)==0 && fb->p <= pattern2_size) {
+            PUSH_LIST(pow2);
+        } else if (fb->p == 3) {
+            PUSH_LIST(pow3);
+        } else if (fb->p <= plim && fb->p <= costlim * fb->nr_roots) {
+            if (!is_prime_power(fb->p)) {
+                PUSH_LIST(td);
+            } else {
+                // PUSH_LIST(pow_td);
+                PUSH_LIST(rest);
+            }
+        } else {
+            if (!is_prime_power(fb->p)) {
+                PUSH_LIST(rs);
+            } else {
+                PUSH_LIST(rest);
+            }
+        }
+    }
+#undef PUSH_LIST
+
+#define APPEND_LIST(x) do {						\
+    char * pb = (char*) (void*) fb_ ## x ## _base;			\
+    char * p  = (char*) (void*) fb_ ## x;				\
+    si->sides[side]->fb_parts->x[0] = fb;                               \
+    si->sides[side]->fb_parts_x->x[0] = n;                              \
+    memcpy(fb, pb, p - pb);						\
+    fb = fb_skip(fb, p - pb);						\
+    n += fb_diff(fb_ ## x, fb_ ## x ## _base);                          \
+    si->sides[side]->fb_parts->x[1] = fb;                               \
+    si->sides[side]->fb_parts_x->x[1] = n;                              \
+} while (0)
+    unsigned int n = 0;
+    fb = fb_base;
+
+    APPEND_LIST(pow2);
+    APPEND_LIST(pow3);
+    APPEND_LIST(td);
+    APPEND_LIST(rs);
+    APPEND_LIST(rest);
+    fb->p = FB_END;
+
+    free(fb_pow2_base);
+    free(fb_pow3_base);
+    free(fb_td_base);
+    free(fb_rs_base);
+    free(fb_rest_base);
+
+#undef  APPEND_LIST
+
+    if (si->verbose) {
+        fprintf(si->output, "# small %s factor base", sidenames[side]);
+        factorbase_degn_t ** q;
+        q = si->sides[side]->fb_parts->pow2;
+        fprintf(si->output, ": %d pow2", fb_diff(q[1], q[0]));
+        q = si->sides[side]->fb_parts->pow3;
+        fprintf(si->output, ", %d pow3", fb_diff(q[1], q[0]));
+        q = si->sides[side]->fb_parts->td;
+        fprintf(si->output, ", %d td", fb_diff(q[1], q[0]));
+        q = si->sides[side]->fb_parts->rs;
+        fprintf(si->output, ", %d rs", fb_diff(q[1], q[0]));
+        q = si->sides[side]->fb_parts->rest;
+        fprintf(si->output, ", %d rest", fb_diff(q[1], q[0]));
+        fprintf(si->output, " (total %zu)\n", fb_nroots_total(fb_base));
+    }
+}
+
+/* }}} */
+
 /* {{{ fill_in_buckets */
 void
 fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 {
     WHERE_AM_I_UPDATE(w, side, side);
-    factorbase_degn_t * fb = th->sides[side]->fb_bucket;
-    fbprime_t pmax = th->sides[side]->pmax;
     sieve_info_srcptr si = th->si;
     bucket_array_t BA = th->sides[side]->BA;  /* local copy */
-    // Loop over all primes in the factor base >= bucket_thresh
-    // and up to FB_END or pmax (pmax included)
+    // Loop over all primes in the factor base.
+    //
+    // Note that dispatch_fb already arranged so that all the primes
+    // which appear here are >= bucket_thresh and <= pmax (the latter
+    // being for the moment unconditionally set to FBPRIME_MAX by the
+    // caller of dispatch_fb).
 
-    /* Skip forward to first FB prime p >= si->bucket_thresh */
-    ASSERT(fb->p == FB_END || fb->p >= (fbprime_t) si->bucket_thresh);
-
-    /* Init first logp value */
-    if (fb->p != FB_END && fb->p <= pmax)
-      bucket_new_logp (&BA, fb->plog);
-
-    for ( ; fb->p != FB_END && fb->p <= pmax ; fb = fb_next (fb)) {
-        unsigned char nr;
-        fbprime_t p = fb->p;
-        unsigned char logp = fb->plog;
+    fb_iterator t;
+    fb_iterator_init_set_fb(t, th->sides[side]->fb_bucket);
+    for( ; !fb_iterator_over(t) ; fb_iterator_next(t)) {
+        fbprime_t p = t->fb->p;
+        unsigned char logp = t->fb->plog;
         ASSERT_ALWAYS (p % 2 == 1);
 
         WHERE_AM_I_UPDATE(w, p, p);
@@ -735,141 +810,139 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
         if (UNLIKELY(p == si->q))
             continue;
 
-        for (nr = 0; nr < fb->nr_roots; ++nr) {
-            const uint32_t I = si->I;
-            const int logI = si->logI;
-            const uint32_t even_mask = (1U << logI) | 1U;
-            const uint32_t maskI = I-1;
-            const uint32_t maskbucket = bucket_region - 1;
-            const int shiftbucket = LOG_BUCKET_REGION;
-            const uint32_t IJ = si->I * si->J;
-            fbprime_t r, R;
+        const uint32_t I = si->I;
+        const int logI = si->logI;
+        const uint32_t even_mask = (1U << logI) | 1U;
+        const uint32_t maskI = I-1;
+        const uint32_t maskbucket = bucket_region - 1;
+        const int shiftbucket = LOG_BUCKET_REGION;
+        const uint32_t IJ = si->I * si->J;
+        fbprime_t r, R;
 
-            R = fb->roots[nr];
-            r = fb_root_in_qlattice(p, R, fb->invp, si);
-            // TODO: should be line sieved in the non-bucket phase?
-            // Or should we have a bucket line siever?
-            if (UNLIKELY(r == 0))
-              {
-                /* If r == 0 (mod p), this prime hits for i == 0 (mod p),
-                   but since p > I, this implies i = 0 or i > I. We don't
-                   sieve i > I. Since gcd(i,j) | gcd(a,b), for i = 0 we
-                   only need to sieve j = 1 */
-                /* x = j*I + (i + I/2) = I + I/2 */
-                bucket_update_t update;
-                uint32_t x = I + I / 2;
-                update.x = (uint16_t) (x & maskbucket);
-                update.p = bucket_encode_prime (p);
-                WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);
-                WHERE_AM_I_UPDATE(w, x, update.x);
-                ASSERT(test_divisible(w));
-                push_bucket_update(BA, x >> shiftbucket, update);
-                continue;
-              }
-            if (UNLIKELY(r == p))
-              {
-                /* r == p means root at infinity, which hits for
-                   j == 0 (mod p). Since q > I > J, this implies j = 0
-                   or j > J. This means we sieve only (i,j) = (1,0) here.
-                   Since I < bucket_region, this always goes in bucket 0.
-                   FIXME: what about (-1,0)? It's the same (a,b) as (1,0)
-                   but which of these two (if any) do we sieve? */
-                bucket_update_t update;
-                update.x = (uint16_t) I / 2 + 1;
-                update.p = bucket_encode_prime (p);
-                WHERE_AM_I_UPDATE(w, N, 0);
-                WHERE_AM_I_UPDATE(w, x, update.x);
-                ASSERT(test_divisible(w));
-                push_bucket_update(BA, 0, update);
-                continue;
-              }
-            if (UNLIKELY(r > p))
-              {
-                continue;
-              }
+        R = fb_iterator_get_r(t);
+        r = fb_root_in_qlattice(p, R, t->fb->invp, si);
+        // TODO: should be line sieved in the non-bucket phase?
+        // Or should we have a bucket line siever?
+        if (UNLIKELY(r == 0))
+        {
+            /* If r == 0 (mod p), this prime hits for i == 0 (mod p),
+               but since p > I, this implies i = 0 or i > I. We don't
+               sieve i > I. Since gcd(i,j) | gcd(a,b), for i = 0 we
+               only need to sieve j = 1 */
+            /* x = j*I + (i + I/2) = I + I/2 */
+            bucket_update_t update;
+            uint32_t x = I + I / 2;
+            update.x = (uint16_t) (x & maskbucket);
+            update.p = bucket_encode_prime (p);
+            WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);
+            WHERE_AM_I_UPDATE(w, x, update.x);
+            ASSERT(test_divisible(w));
+            push_bucket_update(BA, x >> shiftbucket, update);
+            continue;
+        }
+        if (UNLIKELY(r == p))
+        {
+            /* r == p means root at infinity, which hits for
+               j == 0 (mod p). Since q > I > J, this implies j = 0
+               or j > J. This means we sieve only (i,j) = (1,0) here.
+               Since I < bucket_region, this always goes in bucket 0.
+FIXME: what about (-1,0)? It's the same (a,b) as (1,0)
+but which of these two (if any) do we sieve? */
+            bucket_update_t update;
+            update.x = (uint16_t) I / 2 + 1;
+            update.p = bucket_encode_prime (p);
+            WHERE_AM_I_UPDATE(w, N, 0);
+            WHERE_AM_I_UPDATE(w, x, update.x);
+            ASSERT(test_divisible(w));
+            push_bucket_update(BA, 0, update);
+            continue;
+        }
+        if (UNLIKELY(r > p))
+        {
+            continue;
+        }
 
-            /* If working with congruence classes, once the loop on the
-             * parity goes at the level above, this initialization
-             * should in fact either be done for each congruence class,
-             * or saved for later use within the factor base structure.
-             */
-            plattice_info_t pli;
-            if (reduce_plattice(&pli, p, r, si) == 0)
-              {
-                  pthread_mutex_lock(&io_mutex);
-                  fprintf (stderr, "# fill_in_buckets: reduce_plattice() "
-                          "returned 0 for p = " FBPRIME_FORMAT ", r = "
-                          FBPRIME_FORMAT "\n", p, r);
-                  pthread_mutex_unlock(&io_mutex);
-                  continue; /* Simply don't consider that (p,r) for now.
-                             FIXME: can we find the locations to sieve? */
-              }
+        /* If working with congruence classes, once the loop on the
+         * parity goes at the level above, this initialization
+         * should in fact either be done for each congruence class,
+         * or saved for later use within the factor base structure.
+         */
+        plattice_info_t pli;
+        if (reduce_plattice(&pli, p, r, si) == 0)
+        {
+            pthread_mutex_lock(&io_mutex);
+            fprintf (stderr, "# fill_in_buckets: reduce_plattice() "
+                    "returned 0 for p = " FBPRIME_FORMAT ", r = "
+                    FBPRIME_FORMAT "\n", p, r);
+            pthread_mutex_unlock(&io_mutex);
+            continue; /* Simply don't consider that (p,r) for now.
+FIXME: can we find the locations to sieve? */
+        }
 
-            uint32_t bound0 = plattice_bound0(&pli, si);
-            uint32_t bound1 = plattice_bound1(&pli, si);
+        uint32_t bound0 = plattice_bound0(&pli, si);
+        uint32_t bound1 = plattice_bound1(&pli, si);
 
-            for(int parity = MOD2_CLASSES_BS ; parity < (MOD2_CLASSES_BS?4:1) ; parity++) {
+        for(int parity = MOD2_CLASSES_BS ; parity < (MOD2_CLASSES_BS?4:1) ; parity++) {
 
-                // The sieving point (0,0) is I/2 in x-coordinate
-                plattice_x_t x = plattice_starting_vector(&pli, si, parity);
-                // TODO: check the generated assembly, in particular, the
-                // push function should be reduced to a very simple step.
-                bucket_update_t update;
-                update.p = bucket_encode_prime (p);
-                __asm__("## Inner bucket sieving loop starts here!!!\n");
-                plattice_x_t inc_a = plattice_a(&pli, si);
-                plattice_x_t inc_c = plattice_c(&pli, si);
-                // ASSERT_ALWAYS(inc_a == pli.a);
-                // ASSERT_ALWAYS(inc_c == pli.c);
-                while (x < IJ) {
-                    uint32_t i;
-                    i = x & maskI;   // x mod I
-                    /* if both i = x % I and j = x / I are even, then
-                       both a, b are even, thus we can't have a valid relation */
-                    /* i-coordinate = (x % I) - I/2
-                       (I/2) % 3 == (-I) % 3, hence
-                       3|i-coordinate iff (x%I+I) % 3 == 0 */
-                    if (MOD2_CLASSES_BS || (x & even_mask) 
+            // The sieving point (0,0) is I/2 in x-coordinate
+            plattice_x_t x = plattice_starting_vector(&pli, si, parity);
+            // TODO: check the generated assembly, in particular, the
+            // push function should be reduced to a very simple step.
+            bucket_update_t update;
+            update.p = bucket_encode_prime (p);
+            __asm__("## Inner bucket sieving loop starts here!!!\n");
+            plattice_x_t inc_a = plattice_a(&pli, si);
+            plattice_x_t inc_c = plattice_c(&pli, si);
+            // ASSERT_ALWAYS(inc_a == pli.a);
+            // ASSERT_ALWAYS(inc_c == pli.c);
+            while (x < IJ) {
+                uint32_t i;
+                i = x & maskI;   // x mod I
+                /* if both i = x % I and j = x / I are even, then
+                   both a, b are even, thus we can't have a valid relation */
+                /* i-coordinate = (x % I) - I/2
+                   (I/2) % 3 == (-I) % 3, hence
+                   3|i-coordinate iff (x%I+I) % 3 == 0 */
+                if (MOD2_CLASSES_BS || (x & even_mask) 
 #ifdef SKIP_GCD3
-                            && (!is_divisible_3_u32 (i + I) ||
-                                !is_divisible_3_u32 (x >> logI))
+                        && (!is_divisible_3_u32 (i + I) ||
+                            !is_divisible_3_u32 (x >> logI))
 #endif
-                       )
-                    {
+                   )
+                {
 #if LOG_BUCKET_REGION == 16 && defined(__x86_64__) && defined(__GNUC__)
-                        /* The x value in update can be set by a write to 
-                           the low word of the register, but gcc does not 
-                           do so - it writes the word to memory, then reads 
-                           the dword back again. */
-                        __asm__ (
-                                "movw %1, %w0\n\t"
-                                : "+r" (update)
-                                : "r" ((uint16_t) (x & maskbucket))
-                                );
+                    /* The x value in update can be set by a write to 
+                       the low word of the register, but gcc does not 
+                       do so - it writes the word to memory, then reads 
+                       the dword back again. */
+                    __asm__ (
+                            "movw %1, %w0\n\t"
+                            : "+r" (update)
+                            : "r" ((uint16_t) (x & maskbucket))
+                            );
 #else
-                        update.x = (uint16_t) (x & maskbucket);
+                    update.x = (uint16_t) (x & maskbucket);
 #endif
-                        WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);
-                        WHERE_AM_I_UPDATE(w, x, update.x);
-                        ASSERT(test_divisible(w));
+                    WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);
+                    WHERE_AM_I_UPDATE(w, x, update.x);
+                    ASSERT(test_divisible(w));
 #ifdef PROFILE
-                        /* To make it visible in profiler */
-                        *(BA.bucket_write[x >> shiftbucket])++ = update;
+                    /* To make it visible in profiler */
+                    *(BA.bucket_write[x >> shiftbucket])++ = update;
 #else
-                        push_bucket_update(BA, x >> shiftbucket, update);
+                    push_bucket_update(BA, x >> shiftbucket, update);
 #endif
-                    }
-#ifdef TRACE_K
-                    if (trace_on_spot_x(x)) {
-                        fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
-                                (unsigned int) (x & maskbucket), logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
-                    }
-#endif
-                    if (i >= bound1) x += inc_a;
-                    if (i < bound0)  x += inc_c;
                 }
-                __asm__("## Inner bucket sieving loop stops here!!!\n");
+#ifdef TRACE_K
+                if (trace_on_spot_x(x)) {
+                    fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
+                            (unsigned int) (x & maskbucket), logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
+                }
+#endif
+                if (i >= bound1) x += inc_a;
+                if (i < bound0)  x += inc_c;
             }
+            __asm__("## Inner bucket sieving loop stops here!!!\n");
         }
     }
     /* Write back BA so the nr_logp etc get copied to caller */
@@ -896,6 +969,17 @@ void thread_do(thread_data * thrs, void * (*f) (thread_data_ptr))
     }
     pthread_t * th = malloc(si->nb_threads*sizeof(pthread_t)); 
     ASSERT_ALWAYS(th);
+
+#if 0
+    /* As a debug measure, it's possible to activate this branch instead
+     * of the latter. In effect, this causes las to run in a
+     * non-multithreaded way, albeit strictly following the code path of
+     * the multithreaded case.
+     */
+    for (int i = 0; i < si->nb_threads; ++i) {
+        (*f)(thrs[i]);
+    }
+#else
     for (int i = 0; i < si->nb_threads; ++i) {
         int ret = pthread_create(&(th[i]), NULL, 
 		(void * (*)(void *)) f,
@@ -906,6 +990,8 @@ void thread_do(thread_data * thrs, void * (*f) (thread_data_ptr))
         int ret = pthread_join(th[i], NULL);
         ASSERT_ALWAYS(ret == 0);
     }
+#endif
+
     free(th);
 }
 
@@ -952,999 +1038,6 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
        x = (read_ptr++)->x;
        WHERE_AM_I_UPDATE(w, x, x);
        sieve_decrease (S + x, logp, w);
-    }
-}
-/* }}} */
-
-/* {{{ small sieve and resieving */
-/* Small primes or powers of small primes p^k with projective root.
-   These hit at 
-     i*v == j*u (mod p^k) 
-   for some u,v in Z, but gcd(v, p^k) > 1.
-   We may assume gcd(u,p)==1, or we divide the entire equation by p.
-   XXX [ET]: we should also assume that v is a prime power, and that u
-   XXX [ET]: is within [0..p^k/v-1[ ; 
-   We store g = gcd(v, p^k), q = p^k / g, and U = u * (v/g)^(-1) (mod q).
-   XXX [ET]: which would then imply g==v, q=p^k/v, and U=u
-
-   Then we have
-     i*v == j*u (mod p^k)  <==>  i == (j/g)*U (mod q)
-   with g|j. 
-   
-   In other words, we can sieve this bad prime (powers) much like a 
-   normal prime (power) q with root U, except that after sieving a line 
-   we don't advance by one line, but by g lines.
-   The case where g = q^k and thus q = 1 can be sieved more efficiently,
-   of course, since every entry in each g-th line will be hit, so that
-   the sieving should use long word transfers.
-
-   Just like for normal primes, the next_position value points at the first
-   position to sieve relative to the start of the current sieve region.
-
-   Within a line that starts at index line_start, for array element of 
-   index x, we have x - line_start = i+I/2. 
-   We skip j=0, as it contains only the single possible relation 
-   (i,j) = (1,0). 
-   For j=1*g, we want i=U (mod q), so x - line_start == I/2+U (mod q),
-   so we initialise 
-     next_position = I*g + (I/2 + U) % q
-   to get the first array index in line j=g, 
-   then within a line sieve next_position + t*q < I, t in N,
-   and update 
-     next_position = (next_position - line_start + U) % q + line_start + g*I 
-   to get the first position to sieve in the next suitable line. */
-
-/* FIXME: This next_position update above is similar to the offset field
- * for typical primes, except that we have these larger jumps...
- */
-
-/* TODO: put back small_sieve_data_t structure once code movement is
- * finished.
- */
-void clear_small_sieve(small_sieve_data_t ssd) {
-    free(ssd.ssp); ssd.ssp = NULL;
-    free(ssd.logp); ssd.logp = NULL;
-    free(ssd.next_position); ssd.next_position = NULL;
-    free(ssd.markers); ssd.markers = NULL;
-}
-
-void
-clone_small_sieve(small_sieve_data_t *r, const small_sieve_data_t *s) {
-    memcpy(r, s, sizeof(small_sieve_data_t));
-    r->next_position = malloc(r->nb_ssp*sizeof(int));
-    FATAL_ERROR_CHECK(r->next_position == NULL, "malloc failed");
-    memcpy(r->next_position, s->next_position, r->nb_ssp * sizeof(int));
-}
-
-void
-clear_cloned_small_sieve(small_sieve_data_t *r) {
-    free(r->next_position);
-    memset(r, 0, sizeof(small_sieve_data_t));
-}
-
-static void ssd_print_contents(FILE * f, const char * prefix, small_sieve_data_t * ssd) /* {{{ */
-{
-    ssp_marker_t * next_marker = ssd->markers;
-    int nice=ssd->nb_ssp;
-    int nproj=0;
-    int npow2=0;
-    int ndiscard=0;
-    for( ; next_marker->event != SSP_END ; next_marker++) {
-        unsigned int event = next_marker->event;
-        nproj += ((event & SSP_PROJ) != 0);
-        npow2 += ((event & SSP_POW2) != 0);
-        ndiscard += ((event & SSP_DISCARD) != 0);
-        nice -= (nproj || npow2 || ndiscard) != 0;
-    }
-    ASSERT_ALWAYS(next_marker->index == ssd->nb_ssp);
-
-    fprintf (f, "# %s: %d nice primes", prefix, nice);
-    /* Primes may be both even and projective... */
-    if (npow2) fprintf (f, ", %d powers of 2", npow2);
-    if (nproj) fprintf (f, ", and %d projective primes", nproj);
-    fprintf (f, ".");
-    if (ndiscard) fprintf (f, " %d discarded.", ndiscard);
-    fprintf (f, "\n");
-} /* }}} */
-
-
-static void ssd_info(sieve_info_srcptr si, const char * what, int side, small_sieve_data_t * r)
-{
-    if (!si->verbose) return;
-    char * tmp;
-    int rc = asprintf(&tmp, "%s(%s side)", what, sidenames[side]);
-    ASSERT_ALWAYS(rc >= 0);
-    ssd_print_contents(si->output, tmp, r);
-    free(tmp);
-}
-
-/* Copy those primes in s to r that need to be resieved, i.e., those
-   that are not in trialdiv_primes and that are not prime powers */
-    static void
-init_resieve (small_sieve_data_t *r, const small_sieve_data_t *s, 
-        const fbprime_t *trialdiv_primes)
-{
-    const fbprime_t * td = trialdiv_primes;
-
-    int j = 0;
-    r->ssp = (ssp_t *) malloc (s->nb_ssp * sizeof (ssp_t));
-    FATAL_ERROR_CHECK(r->ssp == NULL, "malloc failed");
-    r->logp = malloc (s->nb_ssp);
-    FATAL_ERROR_CHECK(r->logp == NULL, "malloc failed");
-    r->next_position = (int *) malloc (s->nb_ssp * sizeof(int));
-    FATAL_ERROR_CHECK(r->next_position == NULL, "malloc failed");
-    r->markers = NULL;
-    int r_nmarkers = 0;
-
-    ssp_marker_t * next_marker = s->markers;
-
-    for(int i = 0 ; i < s->nb_ssp ; i++) {
-        int fence;
-        unsigned int event;
-        do {
-            event = next_marker->event;
-            fence = next_marker->index;
-            next_marker++;
-            /* Powers of two don't need any special treatment. Note also
-             * that 2 is never resieved obviously, so we don't have to pass
-             * the POW2 marker to the child ssd info struct */
-        } while ((event & (~SSP_POW2)) == 0);
-        for( ; i < fence ; i++) {
-            ssp_t * ssp = &(s->ssp[i]);
-            if (is_prime_power(ssp->p)) continue;
-            for( ; *td != FB_END && *td < ssp->p ; td++);
-            if (*td == FB_END || *td != ssp->p) {
-                r->ssp[j] = s->ssp[i];
-                r->logp[j] = s->logp[i];
-                r->next_position[j] = s->next_position[i];
-                j++;
-            }
-        }
-        if (event & SSP_END) {
-            ASSERT_ALWAYS(i == s->nb_ssp);
-            break;
-        }
-        /* Now prime number i in the list has something special */
-        if (event & SSP_DISCARD) continue;
-        /* We're restricted to the projective case here. So just convert
-         * the ssp data, and redo the reasoning based on the bad prime
-         * case.  */
-        ASSERT_ALWAYS(event & SSP_PROJ);
-        ssp_bad_t * ssp = (ssp_bad_t * ) &(s->ssp[i]);
-        /* p^k = q*g, g > 1, so k>1 if g is power or if q > 1 */
-        if (ssp->q > 1 || is_prime_power(ssp->g))
-            continue;
-        /* At this point q==1, so g==p */
-        for( ; *td != FB_END && *td < ssp->g ; td++);
-        /* Note that we may have ``holes'' in the trialdiv_primes list.
-         * So we may jump from strictly below p to strictly above.
-         */
-        if (*td == FB_END || *td != ssp->g) {
-            /* It's not a trial-div'ed prime, so we schedule it for
-             * resieving */
-            PUSH_SSP_MARKER(r, r_nmarkers, j, SSP_PROJ);
-            r->ssp[j] = s->ssp[i];
-            r->logp[j] = s->logp[i];
-            r->next_position[j] = s->next_position[i];
-            j++;
-        }
-    }
-    r->nb_ssp = j;
-    PUSH_SSP_MARKER(r, r_nmarkers, j, SSP_END);
-}
-
-void precompute_smallpow_indices(const factorbase_degn_t *fb,
-                      sieve_info_ptr si, int side)
-{
-    const unsigned int thresh = si->bucket_thresh;
-
-    int * n2 = si->sides[side]->smallpow2;
-    int * n3 = si->sides[side]->smallpow3;
-
-    for (int index = 0 ; fb->p != FB_END && fb->p < thresh ; fb = fb_next(fb)) {
-        for (int nr = 0; nr < fb->nr_roots; nr++, index++) {
-            if ((fb->p%2)==0) *n2++=index;
-            if ((fb->p%3)==0) *n3++=index;
-        }
-    }
-    *n2++=-1;
-    *n3++=-1;
-}
-
-// Prepare sieving of small primes: initialize a small_sieve_data_t
-// structure to be used thereafter during sieving each region.
-// next_position points at the next position that will be hit by sieving,
-// relative to the start of the next bucket region to sieve. It may exceed I 
-// and even BUCKET_REGION
-void init_small_sieve(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
-                      sieve_info_srcptr si, int side)
-{
-    const factorbase_degn_t *fb_sav = fb;
-    int size = 0;
-    const unsigned int thresh = si->bucket_thresh;
-    const int verbose = 0;
-    const int do_bad_primes = 1;
-
-    // Count prime ideals of factor base primes p < thresh
-    while (fb->p != FB_END && fb->p < thresh) {
-        size += fb->nr_roots;
-        fb = fb_next (fb); // cannot do fb++, due to variable size !
-    }
-    fb = fb_sav;
-
-    // allocate space for these. n is an upper bound, since some of the
-    // ideals might become special ones.
-    ssd->ssp = (ssp_t *) malloc(size * sizeof(ssp_t));
-    FATAL_ERROR_CHECK(ssd->ssp == NULL, "malloc failed");
-    ssd->next_position = (int *) malloc(size * sizeof(int));
-    FATAL_ERROR_CHECK(ssd->next_position == NULL, "malloc failed");
-    ssd->markers = NULL;
-    int nmarkers = 0;
-    ssd->logp = (unsigned char *) malloc(size);
-    // Do another pass on fb and badprimes, to fill in the data
-    // while we have any regular primes or bad primes < thresh left
-    ssp_t * tail = ssd->ssp;
-
-    int index;
-
-    for (index = 0 ; fb->p != FB_END && fb->p < thresh ; fb = fb_next(fb)) {
-        const fbprime_t p = fb->p;
-        int nr;
-        fbprime_t r;
-
-        for (nr = 0; nr < fb->nr_roots; nr++, index++) {
-            unsigned int event = 0;
-            if ((fb->p&1)==0) event |= SSP_POW2;
-
-            ssd->logp[index] = fb->plog;
-
-            r = fb_root_in_qlattice (p, fb->roots[nr], fb->invp, si);
-            /* If this root is somehow interesting (projective in (a,b) or
-               in (i,j) plane), print a message */
-            if (verbose && (fb->roots[nr] >= p || r >= p))
-                fprintf (si->output, "# init_small_sieve: %s side, prime " 
-                        FBPRIME_FORMAT " root " FBPRIME_FORMAT " -> " 
-                        FBPRIME_FORMAT "\n", sidenames[side], p, fb->roots[nr], r);
-
-            /* Handle projective roots */
-            if (r >= p) {
-                event |= SSP_PROJ;
-                fbprime_t q, g;
-                r -= p;
-                /* [ET] If my understanding is correct, a projective root
-                 * (u:v) with v=p^k and u coprime to p is stored as r=p+u*v
-                 * (which is <2p), so that recovering v is a gcd, and
-                 * recovering u is a division.
-                 */
-                g = gcd_ul (p, r);
-                /* If g exceeds J, then the only reached locations in the
-                 * sieving area will be on line (j=0), thus (1,0) only since
-                 * the other are equivalent.
-                 */
-                if (do_bad_primes && g < si->J) {
-                    ssp_bad_t ssp[1];
-                    q = p / g;
-                    ssp->g = g;
-                    ssp->q = q;
-                    if (q == 1) {
-                        ASSERT (r == 0);
-                        ssp->U = 0;
-                        ssd->next_position[index] = g * si->I;
-                    } else {
-                        int rc;
-                        /* gcd(r / g, q) = 1 here */
-                        uint64_t U = r / g;
-                        /* XXX [ET]
-                         * This invmod is quite probably unnecessary */
-                        rc = invmod (&U, q);
-                        ASSERT_ALWAYS (rc != 0);
-                        ssp->U = U;
-                        ssd->next_position[index] = 
-                            g * si->I + (si->I / 2 + U) % q;
-                    }
-                    memcpy(tail, ssp, sizeof(ssp_bad_t));
-                } else {
-                    if (verbose && !do_bad_primes)
-                        fprintf (si->output, "# init_small_sieve: not adding bad "
-                                "prime " FBPRIME_FORMAT " to small sieve because "
-                                "do_bad_primes = 0\n", g);
-                    else if (verbose && g >= si->J)
-                        fprintf (si->output, "# init_small_sieve: not adding bad "
-                                "prime g = " FBPRIME_FORMAT " to small sieve "
-                                " because  g >= si->J = %d\n", g, si->J);
-                    event |= SSP_DISCARD;
-                    memset(tail, 0, sizeof(ssp_bad_t));
-                }
-            } else {
-                ASSERT (index < size);
-                ssp_t * ssp = tail;
-                // Fill in data for this nice prime
-                ssp->p = p;
-                ssp->r = r;
-                ssd->next_position[index] = (si->I >> 1)%p;
-                // The processing of bucket region by nb_threads is interleaved.
-                // It means that the positions for the small sieve must jump
-                // over the (nb_threads - 1) regions after each region.
-                // For typical primes, this jump can be easily precomputed:
-                ssp->offset=(r*(bucket_region >> si->logI)*(si->nb_threads-1))%p;
-                /* For powers of 2, we sieve only odd lines (*) and 
-                 * next_position needs to point at line j=1. We assume
-                 * that in this case (si->I/2) % p == 0
-                 * (*) for lines with j even, we have a root mod the prime
-                 * power for i-j*r multiple of our power of 2, which means
-                 * i even too. Thus a useless report.
-                 */
-                if (UNLIKELY(p % 2 == 0)) {
-                    ASSERT (ssd->next_position[index] == 0);
-                    ssd->next_position[index] = r + si->I;
-                }
-            }
-            tail++;
-            if (event) {
-                PUSH_SSP_MARKER(ssd, nmarkers, index, event);
-            }
-        }
-    }
-    PUSH_SSP_MARKER(ssd, nmarkers, index, SSP_END);
-    ssd->nb_ssp = size;
-    ssd_info(si, "small sieve", side, ssd);
-}
-
-static void thread_data_init_small_sieve(thread_data * thrs)
-{
-    sieve_info_ptr si = thrs[0]->si;
-    for(int i = 0 ; i < si->nb_threads ; i++) {
-        for(int side = 0 ; side < 2 ; side++) {
-            init_small_sieve(&(thrs[i]->sides[side]->ssd), si->sides[side]->fb, si, side);
-        }
-    }
-}
-
-static void thread_data_clear_small_sieve(thread_data * thrs)
-{
-    sieve_info_ptr si = thrs[0]->si;
-    for(int i = 0 ; i < si->nb_threads ; i++) {
-        for(int side = 0 ; side < 2 ; side++) {
-            clear_small_sieve(thrs[i]->sides[side]->ssd);
-        }
-    }
-}
-
-// Update the positions in the small_sieve_data ssd for going up in the
-// sieve region by nl lines 
-// This takes the position in ref_ssd as a reference.
-// For typical primes, and if use_offset is set to 1, one uses the
-// precomputed offset to jump without mod p reduction (yet still a
-// subtraction, though).
-void ssd_update_positions(small_sieve_data_t *ssd, 
-        small_sieve_data_t *ref_ssd, sieve_info_ptr si, int nl,
-        int use_offset)
-{
-    const int row0_is_oddj = nl & 1;
-
-    ssp_marker_t * next_marker = ssd->markers;
-
-    for(int i = 0 ; i < ssd->nb_ssp ; i++) {
-        int fence;
-        unsigned int event;
-        event = next_marker->event;
-        fence = next_marker->index;
-        next_marker++;
-        for( ; i < fence ; i++) {
-            ssp_t * ssp = &(ssd->ssp[i]);
-            unsigned long i0;
-            fbprime_t p = ssp->p;
-            fbprime_t r = ssp->r;
-
-            /* We want to add nl*r to the offset *relative to the 
-               start of the line*, but next_position may be larger 
-               than I, so we treat the multiple-of-I and mod-I parts
-               separately */
-            /* XXX [ET] Hmmm. Can one give me a case, beyond 2, where
-             * next_position>I ?  */
-            ASSERT(p % 2 == 0 || ssd->next_position[i] < (int) si->I);
-            if (use_offset) {
-                i0 = ssd->next_position[i] & (si->I - 1);
-                ASSERT (i0 < p);
-                i0 += ssp->offset;
-                if (i0 >= p)
-                    i0 -= p;
-                ssd->next_position[i] = i0 + 
-                    (ssd->next_position[i] & (~(si->I - 1)));
-            } else {
-                i0 = ref_ssd->next_position[i] & (si->I - 1);
-                ASSERT (i0 < p);
-                i0 += nl*r;
-                i0 = i0 % p;
-                ssd->next_position[i] = i0 + 
-                    (ref_ssd->next_position[i] & (~(si->I - 1)));
-            }
-        }
-        if (event == SSP_END) {
-            ASSERT_ALWAYS(fence == ssd->nb_ssp);
-            break;
-        }
-        if (event & SSP_DISCARD)
-            continue;
-        if (event & SSP_PROJ) {
-            ssp_bad_t * ssp = (ssp_bad_t *) &(ssd->ssp[i]);
-            /* First line to sieve is the smallest j with g|j and j >= nl,
-               however, if nl == 0 we don't sieve j==0 since it contains
-               only one possible relation (i,j) = (1,0). */
-            unsigned int ng, x, j;
-            ng = iceildiv(nl, ssp->g);
-            if (ng == 0)
-                ng++;
-            x = (si->I / 2 + ng * ssp->U) % ssp->q;
-            j = ng * ssp->g;
-            ssd->next_position[i] = (j - nl) * si->I + x;
-        } else {
-            ASSERT_ALWAYS(event & SSP_POW2);
-            ssp_t * ssp = &(ssd->ssp[i]);
-            unsigned long i0;
-            fbprime_t p = ssp->p;
-            fbprime_t r = ssp->r;
-            if (p == 2) {
-                /* Make sure that next_position points to a location
-                   where i and j are not both even */
-                /* [ET] previous code was overly complicated. */
-                i0 = r;
-                if (!row0_is_oddj) i0 += si->I;
-                ssd->next_position[i] = i0;
-            } else {
-                if (row0_is_oddj) {
-                    i0 = (nl * r) & (p-1);
-                } else {
-                    i0 = (((nl + 1) * r) & (p-1)) + si->I;
-                }
-                ssd->next_position[i] = i0;
-            }
-        }
-    }
-}
-
-/* This adds extra logging for pattern sieving. Very slow.
- */
-#define xxxUGLY_DEBUGGING
-
-
-// Sieve small primes (up to p < bucket_thresh) of the factor base fb in the
-// next sieve region S.
-// Information about where we are is in ssd.
-void sieve_small_bucket_region(unsigned char *S, int N,
-			       small_sieve_data_t * ssd, sieve_info_ptr si,
-                               int side,
-			       where_am_I_ptr w MAYBE_UNUSED)
-{
-    const uint32_t I = si->I;
-    const fbprime_t pattern2_size = 2 * sizeof(unsigned long);
-    unsigned long j;
-    const int test_divisibility = 0; /* very slow, but nice for debugging */
-    const unsigned long nj = bucket_region >> si->logI; /* Nr. of lines 
-                                                           per bucket region */
-    /* In order to check whether a j coordinate is even, we need to take
-     * into account the bucket number, especially in case buckets are as
-     * large as the sieve region. The row number corresponding to a given
-     * i0 is i0/I, but we also need to add bucket_nr*bucket_size/I to
-     * this, which is what this flag is for.
-     */
-    const int row0_is_oddj = (N << (LOG_BUCKET_REGION - si->logI)) & 1;
-
-
-    /* Handle powers of 2 up to 2 * sizeof(long) separately. 
-     * TODO: use SSE2 */
-    WHERE_AM_I_UPDATE(w, p, 2);
-    /* First collect updates for powers of two in a pattern,
-       then apply pattern to sieve line.
-       Repeat for each line in bucket region. */
-    for (j = 0; j < nj; j++)
-    {
-        WHERE_AM_I_UPDATE(w, j, j);
-        unsigned long pattern[2] = {0,0};
-
-        /* Prepare the pattern */
-
-        /* This loop assumes that entries in ssd.ssp are in order of 
-           increasing p, or more accurately, that all powers of 2 up to
-           2*sizeof(long) appear before any p > 2*sizeof(long) */
-        int * smallpow2 = si->sides[side]->smallpow2;
-        ssp_marker_t * next_marker = ssd->markers;
-        int fence = -1;
-        unsigned int event = 0;
-        for(int n ; (n=*smallpow2) != -1 ; smallpow2++) {
-            for( ; fence < n || event == SSP_POW2 ; next_marker++) {
-                event = next_marker->event;
-                fence = next_marker->index;
-            }
-            if (n < fence) {
-                const fbprime_t p = ssd->ssp[n].p;
-                unsigned int i0 = ssd->next_position[n];
-                if (i0 < I) {
-                    ASSERT (i0 < p);
-                    ASSERT ((nj * N + j) % 2 == 1);
-                    for (unsigned int i = i0; i < pattern2_size; i += p)
-                        ((unsigned char *)pattern)[i] += ssd->logp[n];
-#ifdef UGLY_DEBUGGING
-                    for (unsigned int j = i0; j < I ; j+= p) {
-                        WHERE_AM_I_UPDATE(w, x, (w->j << si->logI) + j);
-                        sieve_decrease(S + j, ssd->logp[n], w);
-                        /* cancel the above action */
-                        S[j] += ssd->logp[n];
-                    }
-#endif
-                    /* Skip two lines above, since we sieve only odd lines.
-                     * Even lines would correspond to useless reports.
-                     */
-                    i0 = ((i0 + 2 * ssd->ssp[n].r) & (p - 1)) + 2 * I;
-                }
-                /* In this loop, next_position gets updated to the first 
-                   index to sieve relative to the start of the next line, 
-                   but after all lines of this bucket region are processed, 
-                   it will point the the first position to sieve relative  
-                   to the start of the next bucket region, as required */
-                ssd->next_position[n] = i0 - I;
-            } else {
-                /* nothing. It's a (presumably) projective power of 2,
-                 * but for the moment these are not pattern-sieved. */
-            }
-        }
-
-        /* Apply the pattern */
-        if (pattern[0] || pattern[1]) {
-            unsigned long *S_ptr = (unsigned long *) (S + j * I);
-            const unsigned long *end = (unsigned long *)(S + j * I + I);
-
-#ifdef TRACE_K /* {{{ */
-            if (trace_on_range_Nx(w->N, w->j*I, w->j*I+I)) {
-                unsigned int x = trace_Nx.x;
-                unsigned int k = x % I;
-                unsigned int v = (((unsigned char *)(pattern+((k/sizeof(unsigned long))&1)))[k%sizeof(unsigned long)]);
-                if (v) {
-                    WHERE_AM_I_UPDATE(w, x, x);
-                    sieve_decrease_logging(S + x, v, w);
-                }
-            }
-#endif /* }}} */
-
-            while (S_ptr < end)
-            {
-                *(S_ptr) -= pattern[0];
-                *(S_ptr + 1) -= pattern[1];
-                *(S_ptr + 2) -= pattern[0];
-                *(S_ptr + 3) -= pattern[1];
-                S_ptr += 4;
-            }
-        }
-    }
-
-
-    /* Handle 3 */
-    WHERE_AM_I_UPDATE(w, p, 3);
-    /* First collect updates for powers of two in a pattern,
-       then apply pattern to sieve line.
-       Repeat for each line in bucket region. */
-    for (j = 0; j < nj; j++)
-    {
-        WHERE_AM_I_UPDATE(w, j, j);
-        unsigned long pattern[3];
-
-        pattern[0] = pattern[1] = pattern[2] = 0UL;
-
-        int * smallpow3 = si->sides[side]->smallpow3;
-        ssp_marker_t * next_marker = ssd->markers;
-        int fence = -1;
-        // unsigned int event = 0;
-        for(int n ; (n=*smallpow3) != -1 ; smallpow3++) {
-            for( ; fence < n ; next_marker++) {
-                // event = next_marker->event;
-                fence = next_marker->index;
-            }
-            if (n < fence) {
-                /* Presumably a nice prime */
-                if (ssd->ssp[n].p > 3)
-                    break;
-                const fbprime_t p = 3;
-                WHERE_AM_I_UPDATE(w, p, p);
-                unsigned int i0 = ssd->next_position[n];
-                unsigned int i;
-                ASSERT (i0 < p);
-                for (i = i0; i < 3 * sizeof(unsigned long); i += p)
-                    ((unsigned char *)pattern)[i] += ssd->logp[n];
-                i0 += ssd->ssp[n].r;
-                if (i0 >= p)
-                    i0 -= p;
-                ssd->next_position[n] = i0;
-            } else {
-                /* n points to a power of 3, and we have an exceptional
-                 * event. Sure it can neither be SSP_END nor SSP_POW2.
-                 * It's thus almost surely SSP_PROJ, although we could
-                 * conceivably have SSP_DISCARD as well
-                 */
-                /* We should / could do something, anyway */
-            }
-        }
-
-        if (pattern[0]) {
-            unsigned long *S_ptr = (unsigned long *) (S + j * I);
-            const unsigned long *end = (unsigned long *)(S + j * I + I) - 2;
-            
-#ifdef TRACE_K /* {{{ */
-            if (trace_on_range_Nx(w->N, w->j*I, w->j*I+I)) {
-                unsigned int x = trace_Nx.x;
-                unsigned int k = x % I;
-                unsigned int v = (((unsigned char *)(pattern+((k/sizeof(unsigned long))%3)))[k%sizeof(unsigned long)]);
-                if (v) {
-                    WHERE_AM_I_UPDATE(w, x, x);
-                    sieve_decrease_logging(S + x, v, w);
-                }
-            }
-#endif /* }}} */
-
-            while (S_ptr < end)
-            {
-                *(S_ptr) -= pattern[0];
-                *(S_ptr + 1) -= pattern[1];
-                *(S_ptr + 2) -= pattern[2];
-                S_ptr += 3;
-            }
-
-            end += 2;
-            if (S_ptr < end)
-                *(S_ptr++) -= pattern[0];
-            if (S_ptr < end)
-                *(S_ptr) -= pattern[1];
-        }
-    }
-
-    ssp_marker_t * next_marker = ssd->markers;
-
-    for(int i = 0 ; i < ssd->nb_ssp ; i++) {
-        int fence;
-        unsigned int event;
-        event = next_marker->event;
-        fence = next_marker->index;
-        next_marker++;
-        for( ; i < fence ; i++) {
-            ssp_t * ssp = &(ssd->ssp[i]);
-            const fbprime_t p = ssp->p;
-            const fbprime_t r = ssp->r;
-            WHERE_AM_I_UPDATE(w, p, p);
-            const unsigned char logp = ssd->logp[i];
-            unsigned char *S_ptr = S;
-            fbprime_t twop;
-            unsigned int linestart = 0;
-            /* Always S_ptr = S + linestart. S_ptr is used for the actual array
-               updates, linestart keeps track of position relative to start of
-               bucket region and is used only for computing i,j-coordinates
-               in overflow and divisibility checking, and relation tracing. */
-
-            unsigned int i0 = ssd->next_position[i];
-
-            /* Don't sieve 3 again as it was pattern-sieved */
-            if (p == 3)
-                continue;
-
-            ASSERT(i0 < p);
-            for (j = 0; j < nj; j++) {
-                WHERE_AM_I_UPDATE(w, j, j);
-                twop = p;
-                unsigned int i = i0;
-                if ((((nj & N) ^ j) & 1) == 0) { /* (nj*N+j)%2 */
-                    /* for j even, we sieve only odd i. */
-                    twop += p;
-                    i += (i0 & 1) ? 0 : p;
-                }
-                for ( ; i < I; i += twop) {
-                    WHERE_AM_I_UPDATE(w, x, j * I + i);
-                    sieve_decrease (S_ptr + i, logp, w);
-                }
-                i0 += r;
-                if (i0 >= p)
-                    i0 -= p;
-                S_ptr += I;
-                linestart += I;
-            }
-            ssd->next_position[i] = i0;
-        }
-        if (event == SSP_END) {
-            ASSERT_ALWAYS(fence == ssd->nb_ssp);
-            break;
-        }
-        if (event & SSP_DISCARD)
-            continue;
-        if (event & SSP_PROJ) {
-            ssp_bad_t * ssp = (ssp_bad_t *) &(ssd->ssp[i]);
-            const fbprime_t g = ssp->g;
-            const fbprime_t q = ssp->q;
-            const fbprime_t U = ssp->U;
-            const fbprime_t p MAYBE_UNUSED = g * q;
-            WHERE_AM_I_UPDATE(w, p, p);
-            const unsigned char logp = ssd->logp[i];
-            /* Sieve the bad primes. We have p^k | fij(i,j) for i,j such
-             * that i * g == j * U (mod p^k) where g = p^l and gcd(U, p)
-             * = 1.  This hits only for g|j, then j = j' * g, and i == j'
-             * * U (mod p^(k-l)).  In every g-th line, we sieve the
-             * entries with i == (j/g)*U (mod q).  In ssd we have stored
-             * g, q = p^(k-l), U, and next_position so that S +
-             * next_position is the next sieve entry that needs to be
-             * sieved.  So if S + next_position is in the current bucket
-             * region, we update all  S + next_position + n*q  where
-             * next_position + n*q < I, then set next_position =
-             * ((next_position % I) + U) % q) + I * g.  */
-            if (!test_divisibility && ssp->q == 1)
-            {
-                /* q = 1, therefore U = 0, and we sieve all entries in lines
-                   with g|j, beginning with the line starting at S[next_position] */
-                unsigned long logps;
-                unsigned int i0 = ssd->next_position[i];
-                ASSERT (ssp->U == 0);
-                ASSERT (i0 % I == 0);
-                ASSERT (I % (4 * sizeof (unsigned long)) == 0);
-                for (j = 0; j < sizeof (unsigned long); j++)
-                    ((unsigned char *)&logps)[j] = logp;
-                while (i0 < (unsigned int) bucket_region)
-                {
-                    unsigned long *S_ptr = (unsigned long *) (S + i0);
-                    unsigned long *end = S_ptr + I / sizeof (unsigned long);
-                    unsigned long logps2 = logps;
-                    /* Check whether the j coordinate is even. */
-                    if (((i0 & I) == 0) ^ row0_is_oddj) {
-                        /* Yes, j is even. We update only odd i-coordinates */
-                        /* Use array indexing to avoid endianness issues. */
-                        for (j = 0; j < sizeof (unsigned long); j += 2)
-                            ((unsigned char *)&logps2)[j] = 0;
-                    }
-#ifdef TRACE_K
-                    if (trace_on_range_Nx(w->N, i0, i0 + I)) {
-                        WHERE_AM_I_UPDATE(w, x, trace_Nx.x);
-                        sieve_decrease_logging(S + w->x, logp, w);
-                    }
-#endif
-                    while (S_ptr < end)
-                    {
-                        *(S_ptr) -= logps2;
-                        *(S_ptr + 1) -= logps2;
-                        *(S_ptr + 2) -= logps2;
-                        *(S_ptr + 3) -= logps2;
-                        S_ptr += 4;
-                    }
-                    i0 += ssp->g * I;
-                }
-                ssd->next_position[i] = i0 - (1U << LOG_BUCKET_REGION);
-            } else {
-                /* q > 1, more general sieving code. */
-                const unsigned int i0 = ssd->next_position[i];
-                const fbprime_t evenq = (q % 2 == 0) ? q : 2 * q;
-                unsigned int lineoffset = i0 & (I - 1U),
-                             linestart = i0 - lineoffset;
-                ASSERT (U < q);
-                while (linestart < (1U << LOG_BUCKET_REGION))
-                {
-                    WHERE_AM_I_UPDATE(w, j, linestart / I);
-                    unsigned int i = lineoffset;
-                    if (((linestart & I) == 0) ^ row0_is_oddj) /* Is j even? */
-                    {
-                        /* Yes, sieve only odd i values */
-                        if (i % 2 == 0) /* Make i odd */
-                            i += q;
-                        if (i % 2 == 1) /* If not both i,q are even */
-                            for ( ; i < I; i += evenq)
-                            {
-                                WHERE_AM_I_UPDATE(w, x, linestart + i);
-                                sieve_decrease (S + linestart + i, logp, w);
-                            }
-                    }
-                    else
-                    {
-                        for ( ; i < I; i += q)
-                        {
-                            WHERE_AM_I_UPDATE(w, x, linestart + i);
-                            sieve_decrease (S + linestart + i, logp, w);
-                        }
-                    }
-
-                    linestart += g * I;
-                    lineoffset += U;
-                    if (lineoffset >= q)
-                        lineoffset -= q;
-                }
-                ssd->next_position[i] = linestart + lineoffset - 
-                    (1U << LOG_BUCKET_REGION);
-            }
-        } else if (event & SSP_POW2) {
-            /* Powers of 2 are treated separately */
-            /* Don't sieve powers of 2 again that were pattern-sieved */
-            ssp_t * ssp = &(ssd->ssp[i]);
-            const fbprime_t p = ssp->p;
-            const fbprime_t r = ssp->r;
-            WHERE_AM_I_UPDATE(w, p, p);
-
-            if (p <= pattern2_size)
-                continue;
-
-            const unsigned char logp = ssd->logp[i];
-            unsigned char *S_ptr = S;
-            unsigned int linestart = 0;
-
-            unsigned int i0 = ssd->next_position[i];
-            for (j = 0; j < nj; j++) {
-                WHERE_AM_I_UPDATE(w, j, j);
-                if (i0 < I) {
-                    ASSERT(i0 < p);
-                    ASSERT ((nj * N + j) % 2 == 1);
-                    for (unsigned int i = i0; i < I; i += p) {
-                        WHERE_AM_I_UPDATE(w, x, j * I + i);
-                        sieve_decrease (S_ptr + i, logp, w);
-                    }
-                    // odd lines only.
-                    i0 = ((i0 + 2 * r) & (p - 1)) + 2 * I;
-                }
-                i0 -= I;
-                linestart += I;
-                S_ptr += I;
-            }
-            ssd->next_position[i] = i0;
-        }
-    }
-}
-
-/* Sieve small primes (p < I, p not in trialdiv_primes list) of the factor
-   base fb in the next sieve region S, and add primes and the x position
-   where they divide and where there's a sieve report to a bucket (rather
-   than subtracting the log norm from S, as during sieving).
-   Information about where we are is in ssd.
-   Primes in trialdiv_primes must be in increasing order. */
-void
-resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
-        small_sieve_data_t *ssd,
-        sieve_info_srcptr si, where_am_I_ptr w MAYBE_UNUSED)
-{
-    const uint32_t I = si->I;
-    unsigned char *S_ptr;
-    unsigned long j, nj;
-    const int resieve_very_verbose = 0, resieve_very_verbose_bad = 0;
-    /* See comment above about the variable of the same name */
-    const int row0_is_oddj = (N << (LOG_BUCKET_REGION - si->logI)) & 1;
-
-    nj = (bucket_region >> si->logI);
-
-    ssp_marker_t * next_marker = ssd->markers;
-
-    for(int i = 0 ; i < ssd->nb_ssp ; i++) {
-        int fence;
-        unsigned int event;
-        event = next_marker->event;
-        fence = next_marker->index;
-        next_marker++;
-        for( ; i < fence ; i++) {
-            ssp_t * ssp = &(ssd->ssp[i]);
-            const fbprime_t p = ssp->p;
-            fbprime_t r = ssp->r;
-            WHERE_AM_I_UPDATE(w, p, p);
-            unsigned int i0 = ssd->next_position[i];
-            S_ptr = S;
-            ASSERT(i0 < p);
-            /* for j even, we sieve only odd i. This translates into loops
-             * which look as follows:
-             *
-             * j even: (sieve only odd i)
-             *   for(i = i0 + (p & -!(i0&1)) ; i < I ; i += p+p)
-             *   (where (p & -!(i0&1)) is 0 if i0 is odd, and p otherwise)
-             * j odd: (sieve all values of i)
-             *   for(i = i0                  ; i < I ; i += p)
-             *
-             * we may merge the two by setting q=p&-!((j&1)^row0_is_oddj)
-             *
-             * which, when (j+row0_is_oddj) is even, is p, and is 0
-             * otherwise.
-             *
-             * In turn, since q changes for each j, 1 xor within the loop
-             * is enough to make it alternate between 0 and p, once the
-             * starting value is correct.
-             */
-            unsigned int q = p&-!row0_is_oddj;
-            for (j = 0; j < nj; j ++) {
-                WHERE_AM_I_UPDATE(w, j, j);
-                for (unsigned int i = i0 + (q& -!(i0&1)) ; i < I; i += p+q) {
-                    if (S_ptr[i] == 255) continue;
-                    bucket_prime_t prime;
-                    unsigned int x = (j << (si->logI)) + i;
-                    if (resieve_very_verbose) {
-                        pthread_mutex_lock(&io_mutex);
-                        fprintf (stderr, "resieve_small_bucket_region: root "
-                                FBPRIME_FORMAT ",%d divides at x = "
-                                "%d = %lu * %u + %d\n",
-                                p, r, x, j, 1 << si->logI, i);
-                        pthread_mutex_unlock(&io_mutex);
-                    }
-                    prime.p = p;
-                    prime.x = x;
-                    ASSERT(prime.p >= si->td_thresh);
-                    push_bucket_prime (BP, prime);
-                }
-                i0 += r;
-                if (i0 >= p)
-                    i0 -= p;
-                S_ptr += I;
-                q ^= p;
-            }
-            ssd->next_position[i] = i0;
-        }
-        if (event == SSP_END) {
-            break;
-        }
-        if (event == SSP_DISCARD) {
-            continue;
-        }
-        if (event == SSP_PROJ) {
-            ssp_bad_t * ssp = (ssp_bad_t * ) &(ssd->ssp[i]);
-            const fbprime_t g = ssp->g;
-
-            WHERE_AM_I_UPDATE(w, p, ssp->g * ssp->q);
-
-            /* Test every p-th line, starting at S[next_position] */
-            unsigned int i0 = ssd->next_position[i];
-            unsigned int ii;
-            ASSERT (i0 % I == 0); /* make sure next_position points at start
-                                     of line */
-            if (resieve_very_verbose_bad) {
-                pthread_mutex_lock(&io_mutex);
-                fprintf (stderr, "# resieving bad prime " FBPRIME_FORMAT
-                        ", i0 = %u\n", g, i0);
-                pthread_mutex_unlock(&io_mutex);
-            }
-            while (i0 < (unsigned int) bucket_region) {
-                unsigned char *S_ptr = S + i0;
-                if ((i0 >> si->logI) % 2 == 0) { /* Even j coordinate? */
-                    /* Yes, test only odd ii-coordinates */
-                    for (ii = 1; ii < I; ii += 2) {
-                        if (S_ptr[ii] != 255) {
-                            bucket_prime_t prime;
-                            const unsigned int x = i0 + ii;
-                            if (resieve_very_verbose_bad) {
-                                pthread_mutex_lock(&io_mutex);
-                                fprintf (stderr, "resieve_small_bucket_region even j: root "
-                                        FBPRIME_FORMAT ",inf divides at x = %u\n",
-                                        g, x);
-                                pthread_mutex_unlock(&io_mutex);
-                            }
-                            prime.p = g;
-                            prime.x = x;
-                            ASSERT(prime.p >= si->td_thresh);
-                            push_bucket_prime (BP, prime);
-                        }
-                    }
-                } else {
-                    /* No, test all ii-coordinates */
-                    for (ii = 0; ii < I; ii++) {
-                        if (S_ptr[ii] != 255) {
-                            bucket_prime_t prime;
-                            const unsigned int x = i0 + ii;
-                            if (resieve_very_verbose_bad) {
-                                pthread_mutex_lock(&io_mutex);
-                                fprintf (stderr, "resieve_small_bucket_region odd j: root "
-                                        FBPRIME_FORMAT ",inf divides at x = %u\n",
-                                        g, x);
-                                pthread_mutex_unlock(&io_mutex);
-                            }
-                            prime.p = g;
-                            prime.x = x;
-                            ASSERT(prime.p >= si->td_thresh);
-                            push_bucket_prime (BP, prime);
-                        }
-                    }
-                }
-                i0 += g * I;
-            }
-            ssd->next_position[i] = i0 - bucket_region;
-            if (resieve_very_verbose_bad) {
-                pthread_mutex_lock(&io_mutex);
-                fprintf (stderr, "# resieving: new i0 = %u, bucket_region = %d, "
-                        "new next_position = %d\n",
-                        i0, bucket_region, ssd->next_position[i]);
-                pthread_mutex_unlock(&io_mutex);
-            }
-        }
     }
 }
 /* }}} */
@@ -2182,23 +1275,11 @@ check_leftover_norm (mpz_t n, size_t lpb, mpz_t BB, mpz_t BBB, mpz_t BBBB,
   return 1;
 }
 
-struct local_sieve_data_s {
-    unsigned char * S;      /* local sieve array */
-    small_sieve_data_t lsrsd[1];
-    /* extra copies */
-    small_sieve_data_t lssd[1];
-    small_sieve_data_t rssd[1];
-};
-typedef struct local_sieve_data_s local_sieve_data[1];
-typedef struct local_sieve_data_s * local_sieve_data_ptr;
-typedef const struct local_sieve_data_s * local_sieve_data_srcptr;
-
-
 /* Adds the number of sieve reports to *survivors,
    number of survivors with coprime a, b to *coprimes */
 
 NOPROFILE_STATIC int
-factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc, where_am_I_ptr w MAYBE_UNUSED)
+factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_ptr w MAYBE_UNUSED)
 {
     sieve_info_ptr si = th->si;
     cado_poly_ptr cpoly = si->cpoly;
@@ -2238,8 +1319,8 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc, where_am_I_
     mpz_set_ui (BLPrat, cpoly->rat->lim);
     mpz_mul_2exp (BLPrat, BLPrat, cpoly->rat->lpb); /* fb bound * lp bound */
 
-    unsigned char * alg_S = loc[ALGEBRAIC_SIDE]->S;
-    unsigned char * rat_S = loc[RATIONAL_SIDE]->S;
+    unsigned char * alg_S = S[ALGEBRAIC_SIDE];
+    unsigned char * rat_S = S[RATIONAL_SIDE];
 #ifdef TRACE_K /* {{{ */
     if (trace_on_spot_Nx(N, trace_Nx.x)) {
         fprintf(stderr, "# When entering factor_survivors for bucket %u, alg_S[%u]=%u, rat_S[%u]=%u\n",
@@ -2249,10 +1330,12 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc, where_am_I_
 
     /* XXX: Don't believe that resieve_start is easily changeable... */
     const int resieve_start = RATIONAL_SIDE;
-    unsigned char * S = loc[resieve_start]->S;
+
+    /* This is the one which gets the merged information in the end */
+    unsigned char * SS = S[resieve_start];
 
 #ifdef UNSIEVE_NOT_COPRIME
-    unsieve_not_coprime (S, N, si);
+    unsieve_not_coprime (SS, N, si);
 #endif
     
     for (int x = 0; x < bucket_region; ++x)
@@ -2269,7 +1352,7 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc, where_am_I_
 
         if (!sieve_info_test_lognorm(alg->Bound, rat->Bound, alg_S[x], rat_S[x], 126))
           {
-            S[x] = 255;
+            SS[x] = 255;
             continue;
           }
         th->rep->survivor_sizes[rat_S[x]][alg_S[x]]++;
@@ -2287,7 +1370,7 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc, where_am_I_
                         trace_Nx.x, trace_Nx.N, i, j);
             }
 #endif
-            S[x] = 255;
+            SS[x] = 255;
             continue;
           }
 #endif
@@ -2304,12 +1387,12 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc, where_am_I_
 
         for (int i = 0; i < si->nb_threads; ++i) {
             thread_data_ptr other = th + i - th->id;
-            purge_bucket (&primes[side], other->sides[side]->BA, N, S);
+            purge_bucket (&primes[side], other->sides[side]->BA, N, SS);
         }
 
         /* Resieve small primes for this bucket region and store them 
            together with the primes recovered from the bucket updates */
-        resieve_small_bucket_region (&primes[side], N, S, loc[side]->lsrsd, si, w);
+        resieve_small_bucket_region (&primes[side], N, SS, th->si->sides[side]->rsd, th->sides[side]->rsdpos, si, w);
 
         /* Sort the entries to avoid O(n^2) complexity when looking for
            primes during trial division */
@@ -2322,13 +1405,13 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc, where_am_I_
 #ifdef TRACE_K
         if ((unsigned int) N == trace_Nx.N && (unsigned int) xul <= trace_Nx.x && (unsigned int) xul + sizeof (unsigned long) > trace_Nx.x) {
             fprintf(stderr, "# Slot [%u] in bucket %u has value %u\n",
-                    trace_Nx.x, trace_Nx.N, S[trace_Nx.x]);
+                    trace_Nx.x, trace_Nx.N, SS[trace_Nx.x]);
         }
 #endif
-        if (*(unsigned long *)(S + xul) == (unsigned long)(-1L)) 
+        if (*(unsigned long *)(SS + xul) == (unsigned long)(-1L)) 
             continue;
         for (int x = xul; x < xul + (int) sizeof (unsigned long); ++x) {
-            if (S[x] == 255) continue;
+            if (SS[x] == 255) continue;
 
             int64_t a;
             uint64_t b;
@@ -2512,7 +1595,7 @@ factor_survivors (thread_data_ptr th, int N, local_sieve_data * loc, where_am_I_
             clear_relation(rel);
             cpt++;
             /* Build histogram of lucky S[x] values */
-            th->rep->report_sizes[loc[RATIONAL_SIDE]->S[x]][loc[ALGEBRAIC_SIDE]->S[x]]++;
+            th->rep->report_sizes[S[RATIONAL_SIDE][x]][S[ALGEBRAIC_SIDE][x]]++;
         }
     }
 
@@ -2663,108 +1746,104 @@ process_bucket_region(thread_data_ptr th)
 
     las_report_ptr rep = th->rep;
 
-    local_sieve_data loc[2];
-    memset(loc, 0, sizeof(loc));
     WHERE_AM_I_UPDATE(w, N, th->id);
 
-    local_sieve_data_ptr lrat = loc[RATIONAL_SIDE];
-    local_sieve_data_ptr lalg = loc[ALGEBRAIC_SIDE];
+    unsigned char * S[2];
 
+    unsigned int my_row0 = (bucket_region >> si->logI) * th->id;
+    unsigned int skiprows = (bucket_region >> si->logI)*(si->nb_threads-1);
+
+
+    /* This is local to this thread */
     for(int side = 0 ; side < 2 ; side++) {
-        local_sieve_data_ptr lo = loc[side];
         sieve_side_info_ptr s = si->sides[side];
         thread_side_data_ptr ts = th->sides[side];
 
-        /* make copies of small sieve data: the "next_position" field is
-         * specific to each thread.  */
-        clone_small_sieve (lo->lssd, &ts->ssd);
-
-        /* Yet another copy: used in factor_survivors for resieving small
-         * primes */
-        init_resieve (lo->lsrsd, lo->lssd, s->trialdiv_primes);
-        ssd_info(si, "resieve", side, lo->lsrsd);
-
-        /* A third copy? 
-         * TODO: come on! we should be able to do it with less copies 
-         */
-        clone_small_sieve (lo->rssd, lo->lsrsd);
+        ts->ssdpos = small_sieve_start(s->ssd, my_row0, si);
+        ts->rsdpos = small_sieve_copy_start(ts->ssdpos, s->fb_parts_x->rs);
 
         /* local sieve region */
-        lo->S = (unsigned char *) malloc(bucket_region);
-        ASSERT_ALWAYS (lo->S != NULL);
+        S[side] = (unsigned char *) malloc(bucket_region);
+        ASSERT_ALWAYS (S != NULL);
     }
 
     /* loop over appropriate set of sieve regions */
     for (int i = th->id; i < si->nb_buckets; i += si->nb_threads) 
       {
-        /* update the positions */
-        if (si->nb_threads > 1) {
-            const int nl = (bucket_region >> si->logI)*i;
-            int use_offset = i > th->id;
-            for(int side = 0 ; side < 2 ; side++) {
-                WHERE_AM_I_UPDATE(w, side, side);
-
-                local_sieve_data_ptr lo = loc[side];
-                thread_side_data_ptr ts = th->sides[side];
-
-                ssd_update_positions(lo->lssd, &(ts->ssd), si, nl, use_offset);
-                ssd_update_positions(lo->lsrsd, lo->rssd, si, nl, use_offset);
-            }
-        }
-
-        WHERE_AM_I_UPDATE(w, side, RATIONAL_SIDE);
         WHERE_AM_I_UPDATE(w, N, i);
 
-        /* Init rational norms */
-        rep->tn[RATIONAL_SIDE] -= seconds ();
-        init_rat_norms_bucket_region(lrat->S, i, si);
-        rep->tn[RATIONAL_SIDE] += seconds ();
+        {
+            const int side = RATIONAL_SIDE;
+            WHERE_AM_I_UPDATE(w, side, side);
 
-        /* Apply rational buckets */
-        rep->ttsm -= seconds();
-        for (int j = 0; j < si->nb_threads; ++j)  {
-            thread_data_ptr ot = th + j - th->id;
-            apply_one_bucket(lrat->S, ot->sides[RATIONAL_SIDE]->BA, i, w);
+            sieve_side_info_ptr s = si->sides[side];
+            thread_side_data_ptr ts = th->sides[side];
+        
+            /* Init rational norms */
+            rep->tn[side] -= seconds ();
+            init_rat_norms_bucket_region(S[side], i, si);
+            rep->tn[side] += seconds ();
+
+            /* Apply rational buckets */
+            rep->ttsm -= seconds();
+            for (int j = 0; j < si->nb_threads; ++j)  {
+                thread_data_ptr ot = th + j - th->id;
+                apply_one_bucket(S[side], ot->sides[side]->BA, i, w);
+            }
+            rep->ttsm += seconds();
+
+            /* Sieve small rational primes */
+            sieve_small_bucket_region(S[side], i, s->ssd, ts->ssdpos, si, side, w);
         }
-        rep->ttsm += seconds();
 
-        /* Sieve small rational primes */
-        sieve_small_bucket_region(lrat->S, i, lrat->lssd, si, RATIONAL_SIDE, w);
-	
+        {
+            const int side = ALGEBRAIC_SIDE;
+            WHERE_AM_I_UPDATE(w, side, side);
 
-        WHERE_AM_I_UPDATE(w, side, ALGEBRAIC_SIDE);
+            sieve_side_info_ptr s = si->sides[side];
+            thread_side_data_ptr ts = th->sides[side];
 
-        /* Init algebraic norms */
-        rep->tn[ALGEBRAIC_SIDE] -= seconds ();
-        /* XXX Only the survivors of the rational sieve are initialized */
-        rep->survivors0 += init_alg_norms_bucket_region(lalg->S, lrat->S, i, si);
-        rep->tn[ALGEBRAIC_SIDE] += seconds ();
+            /* Init algebraic norms */
+            rep->tn[side] -= seconds ();
+            /* XXX Only the survivors of the other sieve are initialized */
+            unsigned char * xS = S[side ^ 1];
+            rep->survivors0 += init_alg_norms_bucket_region(S[side], xS, i, si);
+            rep->tn[side] += seconds ();
 
-        /* Apply algebraic buckets */
-        rep->ttsm -= seconds();
-        for (int j = 0; j < si->nb_threads; ++j) {
-            thread_data_ptr ot = th + j - th->id;
-            apply_one_bucket(lalg->S, ot->sides[ALGEBRAIC_SIDE]->BA, i, w);
+            /* Apply algebraic buckets */
+            rep->ttsm -= seconds();
+            for (int j = 0; j < si->nb_threads; ++j) {
+                thread_data_ptr ot = th + j - th->id;
+                apply_one_bucket(S[side], ot->sides[side]->BA, i, w);
+            }
+            rep->ttsm += seconds();
+
+            /* Sieve small algebraic primes */
+            sieve_small_bucket_region(S[side], i, s->ssd, ts->ssdpos, si, side, w);
         }
-        rep->ttsm += seconds();
-
-        /* Sieve small algebraic primes */
-        sieve_small_bucket_region(lalg->S, i, lalg->lssd, si, ALGEBRAIC_SIDE, w);
 
         /* Factor survivors */
         rep->ttf -= seconds ();
-        rep->reports += factor_survivors (th, i, loc, w);
+        rep->reports += factor_survivors (th, i, S, w);
         rep->ttf += seconds ();
+
+        for(int side = 0 ; side < 2 ; side++) {
+            sieve_side_info_ptr s = si->sides[side];
+            thread_side_data_ptr ts = th->sides[side];
+            small_sieve_skip_stride(s->ssd, ts->ssdpos, skiprows, si);
+            int * b = s->fb_parts_x->rs;
+            memcpy(ts->rsdpos, ts->ssdpos + b[0], (b[1]-b[0]) * sizeof(int));
+        }
       }
 
-    /* clear */
     for(int side = 0 ; side < 2 ; side++) {
-        local_sieve_data_ptr lo = loc[side];
-        free(lo->S);
-        clear_small_sieve(*lo->lsrsd);
-        clear_cloned_small_sieve(lo->lssd);
-        clear_cloned_small_sieve(lo->rssd);
+        thread_side_data_ptr ts = th->sides[side];
+        free(ts->ssdpos);
+        free(ts->rsdpos);
+        free(S[side]);
     }
+
+
     return NULL;
 }
 
@@ -2777,6 +1856,7 @@ static thread_data * thread_data_alloc(sieve_info_ptr si)
     for(int i = 0 ; i < si->nb_threads ; i++) {
         thrs[i]->id = i;
         thrs[i]->si = si;
+        las_report_init(thrs[i]->rep);
     }
 
     for(int z = 0 ; z < 2 ; z++) {
@@ -2789,10 +1869,9 @@ static thread_data * thread_data_alloc(sieve_info_ptr si)
         while (fb->p != FB_END && fb->p < (fbprime_t) si->bucket_thresh)
             fb = fb_next (fb); 
         factorbase_degn_t *fb_bucket[si->nb_threads];
-        dispatch_fb(fb_bucket, &s->fb, fb, si->nb_threads);
+        dispatch_fb(fb_bucket, &s->fb, fb, si->nb_threads, FBPRIME_MAX);
         for (int i = 0; i < si->nb_threads; ++i) {
             thrs[i]->sides[side]->fb_bucket = fb_bucket[i];
-            thrs[i]->sides[side]->pmax = FBPRIME_MAX;
         }
         fprintf (si->output, "# Number of small-sieved primes in %s factor base = %zu\n", sidenames[side], fb_nroots_total(s->fb));
 
@@ -2832,6 +1911,7 @@ static void thread_data_free(thread_data * thrs)
         for(int side = 0 ; side < 2 ; side++) {
             free(thrs[i]->sides[side]->fb_bucket);
         }
+        las_report_clear(thrs[i]->rep);
     }
     free(thrs); /* nothing to do ! */
 }
@@ -3167,8 +2247,8 @@ main (int argc0, char *argv0[])
     where_am_I w MAYBE_UNUSED;
     WHERE_AM_I_UPDATE(w, si, si);
 
-    precompute_smallpow_indices(si->sides[0]->fb, si, 0);
-    precompute_smallpow_indices(si->sides[1]->fb, si, 1);
+    reorder_fb(si, 0);
+    reorder_fb(si, 1);
 
     while (q0 < q1)
       {
@@ -3252,11 +2332,26 @@ main (int argc0, char *argv0[])
 
             report->ttsm += seconds();
 
-            /* Initialize data for sieving small primes */
-            thread_data_init_small_sieve(thrs);
+            /* This can now be factored out ! */
+            for(int side = 0 ; side < 2 ; side++) {
+                sieve_side_info_ptr s = si->sides[side];
+
+                small_sieve_init(s->ssd, s->fb, si, side);
+                small_sieve_info(si, "small sieve", side, s->ssd);
+
+                small_sieve_extract_interval(s->rsd, s->ssd, s->fb_parts_x->rs);
+                small_sieve_info(si, "resieve", side, s->rsd);
+            }
 
             /* Process bucket regions in parallel */
             thread_do(thrs, &process_bucket_region);
+
+            /* clear */
+            for(int side = 0 ; side < 2 ; side++) {
+                small_sieve_clear(si->sides[side]->ssd);
+                small_sieve_clear(si->sides[side]->rsd);
+            }
+
 
             /* Display results for this special q */
             {
@@ -3276,8 +2371,6 @@ main (int argc0, char *argv0[])
                 las_report_clear(rep);
             }
             
-            thread_data_clear_small_sieve(thrs);
-
             thread_buckets_free(thrs);
 
         /* {{{ bench stats */

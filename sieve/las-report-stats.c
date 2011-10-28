@@ -1,18 +1,37 @@
+#include "cado.h"
+#include <stdlib.h>
 #include <string.h>
 #include "las-report-stats.h"
 
 void las_report_init(las_report_ptr p)
 {
     memset(p, 0, sizeof(las_report));
+    p->report_sizes = malloc(sizeof(unsigned long) << 16);
+    p->survivor_sizes = malloc(sizeof(unsigned long) << 16);
 }
 
 void las_report_clear(las_report_ptr p)
 {
+    free(p->report_sizes);
+    free(p->survivor_sizes);
     memset(p, 0, sizeof(las_report));
+}
+
+void las_report_copy(las_report_ptr p, las_report_ptr q)
+{
+    unsigned long (*ss)[256] = p->survivor_sizes;
+    unsigned long (*rs)[256] = p->report_sizes;
+    memcpy(p, q, sizeof(las_report_ptr));
+    p->survivor_sizes = ss;
+    p->report_sizes = rs;
+    memcpy(p->survivor_sizes, q->survivor_sizes, sizeof(unsigned long) << 16);
+    memcpy(p->report_sizes, q->report_sizes, sizeof(unsigned long) << 16);
 }
 
 void las_report_accumulate(las_report_ptr p, las_report_ptr q)
 {
+    unsigned long (*ss)[256] = q->survivor_sizes;
+    unsigned long (*rs)[256] = q->report_sizes;
     p->reports += q->reports;
     p->survivors0 += q->survivors0;
     p->survivors1 += q->survivors1;
@@ -29,4 +48,6 @@ void las_report_accumulate(las_report_ptr p, las_report_ptr q)
         }
     }
     memset(q, 0, sizeof(las_report));
+    q->survivor_sizes = ss;
+    q->report_sizes = rs;
 }
