@@ -1836,6 +1836,14 @@ process_bucket_region(thread_data_ptr th)
         }
       }
 
+    for(int side = 0 ; side < 2 ; side++) {
+        thread_side_data_ptr ts = th->sides[side];
+        free(ts->ssdpos);
+        free(ts->rsdpos);
+        free(S[side]);
+    }
+
+
     return NULL;
 }
 
