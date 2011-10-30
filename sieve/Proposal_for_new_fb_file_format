@@ -1,0 +1,41 @@
+Rationale:
+----------
+
+The current file format is the following:
+p: r1,r2,r3
+...
+
+This is fine for typical primes, but does not carry enough information
+for powers or multiple roots.
+
+
+New format:
+-----------
+
+An entry is of the form:
+
+q:n: r1,r2,r3
+
+In the (frequent) case where n=1, this can be abridged with:
+
+q: r1,r2,r3
+
+Here, q is a prime or a prime power, ri are the corresponding roots and n
+is the number of times log p must be subtracted at these positions
+(assuming smaller powers of this prime have alredy be taken care of).
+By position, we mean (a,b) such that a - b*ri = 0 mod q.
+
+The roots ri must be sorted.  If a root ri is greater or equal to q, it
+means that this is a projective root: subtracting q gives a root for the
+reciprocal polynomial (or equivalently, (1:(ri-q)) is the projective
+root).
+
+It is allowed to have several lines with the same q, but there must be
+only one line for a given (q,n) pair. 
+
+Lines starting with a # are comments.
+
+
+
+
+
