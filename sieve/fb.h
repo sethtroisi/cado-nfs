@@ -53,6 +53,7 @@ factorbase_degn_t * 	fb_make_linear (const mpz_t *, const fbprime_t,
 					const fbprime_t, const double, 
 					const int, const int, FILE *);
 factorbase_degn_t *	fb_read (const char *, const double, const int);
+factorbase_degn_t *	new_fb_read (const char *, const double, const int);
 factorbase_degn_t *     fb_read_addproj (const char *, const double, const int,
 					 const fbprime_t *);
 fbprime_t	*fb_extract_bycost (const factorbase_degn_t *, 

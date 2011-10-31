@@ -2153,8 +2153,9 @@ main (int argc0, char *argv0[])
       fbprime_t *leading_div;
       tfb = seconds ();
       leading_div = factor_small (si->cpoly->alg->f[si->cpoly->alg->degree], si->cpoly->alg->lim);
-      alg->fb = fb_read_addproj (fbfilename, alg->scale * LOG_SCALE, 0,
-				leading_div);
+//      alg->fb = fb_read_addproj (fbfilename, alg->scale * LOG_SCALE, 0,
+//				leading_div);
+      alg->fb = new_fb_read(fbfilename, alg->scale * LOG_SCALE, 0);
       ASSERT_ALWAYS(alg->fb != NULL);
       tfb = seconds () - tfb;
       fprintf (si->output, 
