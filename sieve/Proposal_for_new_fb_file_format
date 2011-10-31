@@ -14,14 +14,14 @@ New format:
 
 An entry is of the form:
 
-q:n: r1,r2,r3
+q:n1,n2: r1,r2,r3
 
-In the (frequent) case where n=1, this can be abridged with:
+In the (frequent) case where n1,n2=1,0 this can be abridged with:
 
 q: r1,r2,r3
 
-Here, q is a prime or a prime power, ri are the corresponding roots and n
-is the number of times log p must be subtracted at these positions
+Here, q is a prime or a prime power, ri are the corresponding roots and
+the contribution that must be subtracted at these positions is (n1-n2)*logp 
 (assuming smaller powers of this prime have alredy be taken care of).
 By position, we mean (a,b) such that a - b*ri = 0 mod q.
 
@@ -31,11 +31,12 @@ reciprocal polynomial (or equivalently, (1:(ri-q)) is the projective
 root).
 
 It is allowed to have several lines with the same q, but there must be
-only one line for a given (q,n) pair. 
+only one line for a given (q,n1,n2) triple. 
 
 Lines starting with a # are comments.
 
-
+Be careful with the spaces: they are significant, in order to help the
+parser (could be changed at some point!)
 
 
 

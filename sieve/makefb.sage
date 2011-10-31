@@ -81,23 +81,25 @@ def rewrite_roots(lr):
             roo = r[1]
         else:   # projective root, encoded as p^k + 1/r.
             roo = r[0] + ((r[2]/r[1]) % r[0])
-        rr.append((r[0], r[3]-r[4], roo))
+        rr.append((r[0], r[3], r[4], roo))
     rr.sort()
-    # merge lines with identical first two entries
+    # merge lines with identical first three entries
     ss = []
     old0 = 1
     old1 = 0
+    old2 = 0
     lr = []
     for r in rr:
-        if r[0] == old0 and r[1] == old1:
-            lr.append(r[2])
+        if r[0] == old0 and r[1] == old1 and r[2] == old2:
+            lr.append(r[3])
         else:
             if lr != []:
-                ss.append((old0, old1, lr))
+                ss.append((old0, old1, old2, lr))
             old0 = r[0]
             old1 = r[1]
-            lr = [r[2]]
-    ss.append((old0, old1, lr))
+            old2 = r[2]
+            lr = [r[3]]
+    ss.append((old0, old1, old2, lr))
     return ss
 
 x=PolynomialRing(Integers(),['x']).gen()
@@ -107,31 +109,26 @@ x=PolynomialRing(Integers(),['x']).gen()
 f=69042960*x^5 -150777388929552*x^4 +129632089360584232586*x^3 +263540073072166885859228735*x^2 -48947696216829079528262929524278*x -32290899357812757163668740209282119536
 
 #f=1008593880*x^5 - 47389790327*x^4 - 84256212127259029352*x^3 + 3474222647711706240332297*x^2 + 76764659243128790828718944401*x + 62435925692971697863740890240
-alim=40000000
-#alim=100
+#alim=40000000
+alim=100
 powerlim=12    # in bits
 
 
-
-p = 2
-roo=[]
-while p <= alim:
-    xx = all_roots(f, p, powerlim)
-    xx = rewrite_roots(xx)
-    roo += xx;
-    p = p.next_prime()
 
 
 print "# f={0}".format(f)
 print "# alim={0}".format(alim)
 print "# powerlim={0}".format(powerlim)
-
-for r in roo:
-    if r[1] > 1:
-        stri = "{0}:{1}: ".format(r[0],r[1]) + r[2][0].str()
-    else:
-        stri = "{0}: ".format(r[0]) + r[2][0].str()
-    for i in range(1,len(r[2])):
-        stri = stri + ",{0}".format(r[2][i])
-    print stri
-
+p = 2
+while p <= alim:
+    xx = all_roots(f, p, powerlim)
+    xx = rewrite_roots(xx)
+    for r in xx:
+        if (r[1] != 1) or (r[2] != 0):
+            stri = "{0}:{1},{2}: ".format(r[0],r[1],r[2]) + r[3][0].str()
+        else:
+            stri = "{0}: ".format(r[0]) + r[3][0].str()
+        for i in range(1,len(r[3])):
+            stri = stri + ",{0}".format(r[3][i])
+        print stri
+    p = p.next_prime()
