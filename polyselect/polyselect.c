@@ -1511,7 +1511,7 @@ main (int argc, char *argv[])
   poly->skew = L2_skewness (poly->alg->f, degree, 2 * SKEWNESS_DEFAULT_PREC,
                          DEFAULT_L2_METHOD);
   strncpy (poly->type, "gnfs", sizeof (poly->type));
-  print_poly (stdout, poly, argc0, argv0, st0, raw);
+  print_cadopoly_extra (stdout, poly, argc0, argv0, st0, raw);
 
  end:
   m_logmu_clear (Mt, Malloc);

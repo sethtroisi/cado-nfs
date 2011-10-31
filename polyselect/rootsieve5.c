@@ -215,9 +215,6 @@ static inline unsigned long solve_lineq ( unsigned long a,
 										  unsigned long b,
 										  unsigned long c,
 										  unsigned long p );
-static double get_biased_alpha_projective ( mpz_t *f,
-											const int d,
-											unsigned long B );
 
 /*-----------------------------*/
 /*   @Input-output functions.  */
@@ -318,97 +315,39 @@ read_ggnfs ( mpz_t N,
 }
 
 
-/* Care: poly_print, print_poly are defined elsewhere. */
-static void
-print_poly2 ( mpz_t *f,
-			  mpz_t *g,
-			  int deg,
-			  mpz_t N )
-{
-	 int i;
-	 gmp_printf ("\nn: %Zd\n", N);
-	 for (i = deg; i >= 0; i --)
-	 {
-		  gmp_printf ("c%d: %Zd\n", i, f[i]);
-	 }
-	 for (i = 1; i >= 0; i --)
-	 {
-		  gmp_printf ("Y%d: %Zd\n", i, g[i]);
-	 }
-}
-
-
 /*
-  Print polynomial and info: lognorm, skew, alpha.
+  Call print_poly, given f, g.
 */
-static double
-print_poly_info ( mpz_t *f,
-				  mpz_t *g,
-				  int d,
-				  mpz_t N,
-				  mpz_t M,
-				  int verbose )
+double
+print_poly_fg ( mpz_t *f,
+				mpz_t *g,
+				int d,
+				mpz_t N,
+				int verbose )
 {
-	 /* print info about the polynomial */
-	 unsigned int nroots = 0;
-	 double skew, logmu, alpha, e, alpha_proj;
+	 double e;
 	 int i;
 
-	 /* initlize cado_poly for Murphy E */
 	 cado_poly cpoly;
 	 cado_poly_init(cpoly);
-
-	 for (i = 0; i < (d + 1); i++) {
+	 for (i = 0; i < (d + 1); i++)
 		  mpz_set(cpoly->alg->f[i], f[i]);
-	 }
-	 for (i = 0; i < 2; i++) {
+	 for (i = 0; i < 2; i++)
 		  mpz_set(cpoly->rat->f[i], g[i]);
-	 }
-
-	 if (verbose == 2) {
-
-		  /* output original poly */
-		  gmp_printf ("\nn: %Zd\n", N);
-		  for (i = d; i >= 0; i --) {
-			   gmp_printf ("c%d: %Zd\n", i, f[i]);
-		  }
-		  for (i = 1; i >= 0; i --) {
-			   gmp_printf ("Y%d: %Zd\n", i, g[i]);
-		  }
-		  if (verbose == 3) // don't want m in general, and this m might be wrong
-			   gmp_printf ("m: %Zd\n", M);
-	 }
-
-	 /* compute skew, logmu, nroots */
-	 nroots = numberOfRealRoots (f, d, 0, 0);
-	 skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-	 logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
-	 alpha = get_alpha (f, d, ALPHA_BOUND);
-	 alpha_proj = get_biased_alpha_projective (f, d, ALPHA_BOUND);
-
-	 mpz_set (cpoly->n, N);
+	 mpz_set(cpoly->n, N);
+	 cpoly->skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
 	 cpoly->alg->degree = d;
 	 cpoly->rat->degree = 1;
-	 cpoly->skew = skew;
-	 e = MurphyE (cpoly, BOUND_F, BOUND_G, AREA, MURPHY_K);
 
-	 printf ("skew: %.2f\n", skew);
 	 if (verbose == 2) {
-		  printf ("# lognorm: %.2f, alpha: %.2f, (alpha_proj: %.2f) E: %.2f, nr: %u \n# MurphyE: %1.2e (Bf=%.0f, Bg=%.0f, area=%1.2e)\n",
-				  logmu,
-				  alpha,
-				  alpha_proj,
-				  logmu + alpha,
-				  nroots,
-				  e,
-				  BOUND_F,
-				  BOUND_G,
-				  AREA );
+		  e = print_cadopoly (stdout, cpoly, 1);
+		  fflush(stdout);
+	 }
+	 else {
+		  e = MurphyE (cpoly, BOUND_F, BOUND_G, AREA, MURPHY_K);
 	 }
 
-     fflush( stdout );
 	 cado_poly_clear (cpoly);
-
 	 return e;
 }
 
@@ -417,7 +356,7 @@ print_poly_info ( mpz_t *f,
 /*
   Print ad, l, m and information as above
 */
-static double
+double
 print_poly_info_short ( mpz_t *f,
 						mpz_t *g,
 						int d,
@@ -1679,7 +1618,6 @@ crt_pair_mp ( mpz_t a,
 }
 
 
-
 /*-----------------------------*/
 /*   @Some arithmetics.        */
 /*-----------------------------*/
@@ -1720,193 +1658,6 @@ solve_lineq ( unsigned long a,
 	 modul_clearmod (mod);
 	 return tmp;
 }
-
-
-/*
-  Affine part of the special valution for polynomial f over p.
-*/
-static double
-special_valuation_affine ( mpz_t * f,
-						   int d,
-						   unsigned long p,
-						   mpz_t disc )
-{
-	 double v;
-	 int pvaluation_disc = 0;
-	 double pd = (double) p;
-
-	 if (mpz_divisible_ui_p(disc, p)) {
-		  mpz_t t;
-		  pvaluation_disc++;
-		  mpz_init(t);
-		  mpz_divexact_ui(t, disc, p);
-		  if (mpz_divisible_ui_p(t, p))
-			   pvaluation_disc++;
-		  mpz_clear(t);
-	 }
-
-	 if (pvaluation_disc == 0) {
-		  /* case 1: root must be simple*/
-		  int e = 0;
-		  e = poly_roots_ulong(NULL, f, d, p);
-
-		  return (pd * e) / (pd * pd - 1);
-	 }
-	 /* else if (pvaluation_disc == 1) { */
-	 /* 	  /\* case 2: special case where p^2 does not divide disc *\/ */
-	 /* 	  int e = 0; */
-	 /* 	  e = poly_roots_ulong(NULL, f, d, p); */
-
-	 /* 	  /\* something special here. *\/ */
-	 /* 	  return (pd * e - 1) / (pd * pd - 1); */
-
-	 /* } */
-	 else {
-		  v = special_val0(f, d, p) * pd;
-		  v /= pd + 1.0;
-		  return v;
-	 }
-}
-
-
-/*
-  Find biased alpha_projective for a poly f. It uses
-  some hacks here which need to be changed in future.
-  Until now, since this will only be done several
-  times, hence the speed is not critical.
-
-  Note that, the returned alpha is the  -val * log(p)
-  biased part in the alpha. Hence, we can just add
-  this to our affine part.
-*/
-double
-get_biased_alpha_projective ( mpz_t *f,
-							  const int d,
-							  unsigned long B )
-{
-	 double alpha, e;
-	 unsigned long p;
-	 mpz_t disc;
-
-	 mpz_init (disc);
-	 discriminant (disc, f, d);
-
-	 /* prime p=2 */
-	 e = special_valuation (f, d, 2, disc) - special_valuation_affine (f, d, 2, disc);
-
-	 /* 1/(p-1) is counted in the affine part */
-	 alpha =  (- e) * log (2.0);
-
-	 /* FIXME: generate all primes up to B and pass them to get_alpha */
-	 for (p = 3; p <= B; p += 2)
-		  if (isprime (p)) {
-			   e = special_valuation(f, d, p, disc) - special_valuation_affine (f, d, p, disc);
-			   alpha += (- e) * log ((double) p);
-		  }
-
-	 mpz_clear (disc);
-
-	 return alpha;
-}
-
-#if 0
-/*
-  Similar to above, but for affine part.
-*/
-static double
-get_biased_alpha_affine ( mpz_t *f,
-						  const int d,
-						  unsigned long B )
-{
-	 double alpha, e;
-	 unsigned long p;
-	 mpz_t disc;
-
-	 mpz_init (disc);
-	 discriminant (disc, f, d);
-
-	 /* prime p=2 */
-	 e = special_valuation_affine (f, d, 2, disc);
-	 alpha =  (1.0 - e) * log (2.0);
-
-	 //printf ("\np: %u, val: %f, alpha: %f\n", 2, e, alpha);
-
-	 /* FIXME: generate all primes up to B and pass them to get_alpha */
-	 for (p = 3; p <= B; p += 2)
-		  if (isprime (p)) {
-			   e = special_valuation_affine (f, d, p, disc);
-			   alpha += (1.0 / (double) (p - 1) - e) * log ((double) p);
-			   //printf ("\np: %u, val: %f, alpha: %f\n", p, e, alpha);
-
-		  }
-	 mpz_clear (disc);
-	 return alpha;
-}
-
-
-/*
-  Contribution from a particular multiple root r of the polynomial f
-  over p. Note, r must also be a double root of f mod p.
-*/
-static double
-average_valuation_affine_root ( mpz_t *f,
-								int d,
-								unsigned long p,
-								unsigned long r )
-{
-	 unsigned long v = 0UL;
-	 int i, j;
-	 mpz_t c, *fv;
-	 double val;
-
-	 mpz_init (c);
-
-	 /* init fv */
-	 fv = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
-	 if (fv == NULL) {
-		  fprintf (stderr, "Error, cannot allocate memory in average_valuation_affine_root.\n");
-		  exit (1);
-	 }
-
-	 for (i = 0; i <= d; i++)
-		  mpz_init_set (fv[i], f[i]);
-
-	 /* remove the p-valuations from fv */
-	 content_poly (c, f, d);
-	 while (mpz_divisible_ui_p(c, p)) {
-		  v += 1;
-		  for (i = 0; i <= d; i ++) {
-			   mpz_fdiv_q_ui (fv[i], f[i], p);
-		  }
-	 }
-
-	 /* first translate, then scale */
-	 for (i = d - 1; i >= 0; i--)
-		  for (j = i; j < d; j++)
-			   mpz_addmul_ui (fv[j], fv[j+1], r);
-	 /* t is p^i */
-	 mpz_set_ui(c, 1);
-	 for (i = 0; i <= d; i++) {
-		  mpz_mul(fv[i], fv[i], c);
-		  mpz_mul_ui(c, c, p);
-	 }
-
-	 /* now c is disc. */
-	 discriminant (c, fv, d);
-	 val = special_valuation_affine (fv, d, p, c);
-	 val = val / (double) p;
-
-	 /* clear */
-	 for (i = 0; i <= d; i++) {
-		  mpz_clear (fv[i]);
-	 }
-
-	 /* !!! REMEMBER THIS !!! */
-	 free (fv);
-	 mpz_clear(c);
-	 return val;
-}
-#endif
 
 
 /*
@@ -3603,7 +3354,7 @@ rsstr_setup ( rsstr_t rs )
 	 if (mpz_cmp_ui (t, 0) != 0)
 	 {
 		  fprintf (stderr, "ERROR: The following polynomial have no common root. \n");
-		  print_poly2 (rs->f, rs->g, rs->d, rs->n);
+		  print_poly_fg_bare (stderr, rs->f, rs->g, rs->d, rs->n);
 		  exit (1);
 	 }
 
@@ -5176,7 +4927,7 @@ rootsieve_uv ( rsstr_t rs,
 							 l, tmpu, tmpv );
 #endif
 
-			   MurphyE = print_poly_info (fuv, guv, rs->d, rs->n, rs->m, 0);
+			   MurphyE = print_poly_fg (fuv, guv, rs->d, rs->n, 0);
 			   insert_MurphyE_pq ( E_pqueue, w, tmpu, tmpv, MurphyE );
 		  }
 
@@ -5213,7 +4964,7 @@ rootsieve_uv ( rsstr_t rs,
 		  mpz_set (guv[0], rs->g[0]);
 		  mpz_set (guv[1], rs->g[1]);
 		  optimize_aux (fuv, rs->d, guv, 0, 0, CIRCULAR);
-		  MurphyE += print_poly_info (fuv, guv, rs->d, rs->n, rs->m, verbose);
+		  MurphyE += print_poly_fg (fuv, guv, rs->d, rs->n, verbose);
 	 }
 
 	 MurphyE = MurphyE / (double) (E_pqueue->used - 1);
@@ -5712,7 +5463,7 @@ rootsieve_main_run_bestpoly ( rsstr_t rs,
 
 		  compute_fuv_mp (fuv, rs->f, rs->g, rs->d, global_E_pqueue->u[i], global_E_pqueue->v[i]);
 		  optimize_aux (fuv, rs->d, guv, 0, 0, CIRCULAR);
-		  ave_MurphyE = print_poly_info (fuv, guv, rs->d, rs->n, rs->m, 0); // only output when verbose == 2.
+		  ave_MurphyE = print_poly_fg (fuv, guv, rs->d, rs->n, 0); // only output when verbose == 2.
 
 		  if (ave_MurphyE > best_E) {
 			   best_E = ave_MurphyE;
@@ -5890,7 +5641,7 @@ rootsieve_main_run ( rsstr_t rs,
 		  rsstr_setup (rs);
 		  rsparam_reset_bounds (rsparam, rs, param, verbose);
 
-		  //print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 1);
+		  //print_poly_fg (rs->f, rs->g, rs->d, rs->n, rs->m, 1);
 		  ave_MurphyE = rootsieve_main_stage2_prepare ( rs,
 														rsparam,
 														param,
@@ -5917,7 +5668,7 @@ rootsieve_main_run ( rsstr_t rs,
 
 		  if (verbose == 2) {
 			   fprintf (stderr, "\n# Info: Best E is:\n");
-			   print_poly_info (bestpoly->f, bestpoly->g, rs->d, rs->n, rs->m, 2);
+			   print_poly_fg (bestpoly->f, bestpoly->g, rs->d, rs->n, 2);
 		  }
 	 }
 
@@ -5986,7 +5737,7 @@ rootsieve_main_run_stage2only ( rsstr_t rs,
 				   rs->alpha_proj,
 				   rsparam->exp_min_alpha_rs );
 
-     //print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 2);
+     //print_poly_fg (rs->f, rs->g, rs->d, rs->n, 2);
 	 MurphyE_pq *global_E_pqueue;
 	 new_MurphyE_pq (&global_E_pqueue, 4);
 
@@ -6019,7 +5770,7 @@ rootsieve_main_run_stage2only ( rsstr_t rs,
 								   bestpoly );
 
 	 fprintf (stderr, "\n# Info: Best E is:\n");
-	 print_poly_info (bestpoly->f, bestpoly->g, rs->d, rs->n, rs->m, 2);
+	 print_poly_fg (bestpoly->f, bestpoly->g, rs->d, rs->n, 2);
 
 	 bestpoly_free (bestpoly, rs->d);
 	 rsparam_free (rsparam);
@@ -6234,7 +5985,7 @@ rootsieve_file ( FILE *file,
 			   mpz_set (bestpoly->g[1], rs->g[1]);
 
 			   fprintf (stderr, "\n# Polynomial (# %5d).\n", count);
-			   print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 2);
+			   print_poly_fg (rs->f, rs->g, rs->d, rs->n, 2);
 
 			   /* start main rootsieve function */
 			   rootsieve_main (rs, bestpoly, param, 2);
@@ -6353,7 +6104,7 @@ rootsieve_file_msieve ( FILE *file,
 #ifdef SKIP_ROOTSIEVE_M
 		  print_poly_info_short (rs->f, rs->g, rs->d, rs->n);
 #else
-		  print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 2);
+		  print_poly_fg (rs->f, rs->g, rs->d, rs->n, 2);
 
 		  rsstr_setup (rs);
 		  bestpoly_t bestpoly;
@@ -6410,7 +6161,7 @@ rootsieve_stdin ( param_t param )
 	 mpz_set (bestpoly->g[1], rs->g[1]);
 
 	 fprintf (stderr, "\n# Polynomial (# 0).\n");
-	 print_poly_info (rs->f, rs->g, rs->d, rs->n, rs->m, 2);
+	 print_poly_fg (rs->f, rs->g, rs->d, rs->n, 2);
 
 	 /* start main rootsieve function */
 	 rootsieve_main (rs, bestpoly, param, 2);

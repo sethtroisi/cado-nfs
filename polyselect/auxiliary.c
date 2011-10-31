@@ -1193,6 +1193,191 @@ get_alpha (mpz_t *f, const int d, unsigned long B)
   return alpha;
 }
 
+/* affine part of the special valution for polynomial f over p. */
+double
+special_valuation_affine ( mpz_t * f,
+						   int d,
+						   unsigned long p,
+						   mpz_t disc )
+{
+	 double v;
+	 int pvaluation_disc = 0;
+	 double pd = (double) p;
+
+	 if (mpz_divisible_ui_p(disc, p)) {
+		  mpz_t t;
+		  pvaluation_disc++;
+		  mpz_init(t);
+		  mpz_divexact_ui(t, disc, p);
+		  if (mpz_divisible_ui_p(t, p))
+			   pvaluation_disc++;
+		  mpz_clear(t);
+	 }
+
+	 if (pvaluation_disc == 0) {
+		  /* case 1: root must be simple*/
+		  int e = 0;
+		  e = poly_roots_ulong(NULL, f, d, p);
+
+		  return (pd * e) / (pd * pd - 1);
+	 }
+	 /* else if (pvaluation_disc == 1) { */
+	 /* 	  /\* case 2: special case where p^2 does not divide disc *\/ */
+	 /* 	  int e = 0; */
+	 /* 	  e = poly_roots_ulong(NULL, f, d, p); */
+
+	 /* 	  /\* something special here. *\/ */
+	 /* 	  return (pd * e - 1) / (pd * pd - 1); */
+
+	 /* } */
+	 else {
+		  v = special_val0(f, d, p) * pd;
+		  v /= pd + 1.0;
+		  return v;
+	 }
+}
+
+
+/*
+  Find biased alpha_projective for a poly f. It uses
+  some hacks here which need to be changed in future.
+  Until now, since this will only be done several
+  times, hence the speed is not critical.
+
+  Note that, the returned alpha is the  -val * log(p)
+  biased part in the alpha. Hence, we can just add
+  this to our affine part.
+*/
+double
+get_biased_alpha_projective ( mpz_t *f,
+							  const int d,
+							  unsigned long B )
+{
+	 double alpha, e;
+	 unsigned long p;
+	 mpz_t disc;
+
+	 mpz_init (disc);
+	 discriminant (disc, f, d);
+
+	 /* prime p=2 */
+	 e = special_valuation (f, d, 2, disc) - special_valuation_affine (f, d, 2, disc);
+
+	 /* 1/(p-1) is counted in the affine part */
+	 alpha =  (- e) * log (2.0);
+
+	 /* FIXME: generate all primes up to B and pass them to get_alpha */
+	 for (p = 3; p <= B; p += 2)
+		  if (isprime (p)) {
+			   e = special_valuation(f, d, p, disc) - special_valuation_affine (f, d, p, disc);
+			   alpha += (- e) * log ((double) p);
+		  }
+
+	 mpz_clear (disc);
+
+	 return alpha;
+}
+
+#if 0
+/*
+  Similar to above, but for affine part.
+*/
+double
+get_biased_alpha_affine ( mpz_t *f,
+						  const int d,
+						  unsigned long B )
+{
+	 double alpha, e;
+	 unsigned long p;
+	 mpz_t disc;
+
+	 mpz_init (disc);
+	 discriminant (disc, f, d);
+
+	 /* prime p=2 */
+	 e = special_valuation_affine (f, d, 2, disc);
+	 alpha =  (1.0 - e) * log (2.0);
+
+	 //printf ("\np: %u, val: %f, alpha: %f\n", 2, e, alpha);
+
+	 /* FIXME: generate all primes up to B and pass them to get_alpha */
+	 for (p = 3; p <= B; p += 2)
+		  if (isprime (p)) {
+			   e = special_valuation_affine (f, d, p, disc);
+			   alpha += (1.0 / (double) (p - 1) - e) * log ((double) p);
+			   //printf ("\np: %u, val: %f, alpha: %f\n", p, e, alpha);
+
+		  }
+	 mpz_clear (disc);
+	 return alpha;
+}
+
+
+/*
+  Contribution from a particular multiple root r of the polynomial f
+  over p. Note, r must also be a double root of f mod p.
+*/
+static double
+average_valuation_affine_root ( mpz_t *f,
+								int d,
+								unsigned long p,
+								unsigned long r )
+{
+	 unsigned long v = 0UL;
+	 int i, j;
+	 mpz_t c, *fv;
+	 double val;
+
+	 mpz_init (c);
+
+	 /* init fv */
+	 fv = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
+	 if (fv == NULL) {
+		  fprintf (stderr, "Error, cannot allocate memory in average_valuation_affine_root.\n");
+		  exit (1);
+	 }
+
+	 for (i = 0; i <= d; i++)
+		  mpz_init_set (fv[i], f[i]);
+
+	 /* remove the p-valuations from fv */
+	 content_poly (c, f, d);
+	 while (mpz_divisible_ui_p(c, p)) {
+		  v += 1;
+		  for (i = 0; i <= d; i ++) {
+			   mpz_fdiv_q_ui (fv[i], f[i], p);
+		  }
+	 }
+
+	 /* first translate, then scale */
+	 for (i = d - 1; i >= 0; i--)
+		  for (j = i; j < d; j++)
+			   mpz_addmul_ui (fv[j], fv[j+1], r);
+	 /* t is p^i */
+	 mpz_set_ui(c, 1);
+	 for (i = 0; i <= d; i++) {
+		  mpz_mul(fv[i], fv[i], c);
+		  mpz_mul_ui(c, c, p);
+	 }
+
+	 /* now c is disc. */
+	 discriminant (c, fv, d);
+	 val = special_valuation_affine (fv, d, p, c);
+	 val = val / (double) p;
+
+	 /* clear */
+	 for (i = 0; i <= d; i++) {
+		  mpz_clear (fv[i]);
+	 }
+
+	 /* !!! REMEMBER THIS !!! */
+	 free (fv);
+	 mpz_clear(c);
+	 return val;
+}
+#endif
+
+
 /**************************** rotation ***************************************/
 
 /* D <- discriminant (f+k*g), which has degree d */
@@ -1706,76 +1891,162 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
   }
 }
 
+
 /*****************************************************************************/
 
-/* st is the initial value cputime() at the start of the program */
+/* backend for print poly itselft */
 void
-print_poly (FILE *fp, cado_poly p, int argc, char *argv[], double st, int raw)
+print_poly_fg_bare ( FILE *fp,
+					 mpz_t *f,
+					 mpz_t *g,
+					 int deg,
+					 mpz_t n )
 {
-  int i;
-  double alpha, logmu;
+	 int i;
 
-  fprintf (fp, "n: ");
-  mpz_out_str (fp, 10, p->n);
-  fprintf (fp, "\n");
-  fprintf (fp, "skew: %1.3f\n", p->skew);
-  logmu = L2_lognorm (p->alg->f, p->alg->degree, p->skew, DEFAULT_L2_METHOD);
-  alpha = get_alpha (p->alg->f, p->alg->degree, ALPHA_BOUND);
-  fprintf (fp, "# lognorm: %1.2f, alpha: %1.2f E=%1.2f\n", logmu, alpha,
-           logmu + alpha);
-  fprintf (fp, "# Murphy's E(Bf=%.0f,Bg=%.0f,area=%.2e)=%1.2e\n",
-	   BOUND_F, BOUND_G, AREA,
-	   MurphyE (p, BOUND_F, BOUND_G, AREA, MURPHY_K));
-  for (i = p->alg->degree; i >= 0; i--)
-    {
-      fprintf (fp, "c%d: ", i);
-      mpz_out_str (fp, 10, p->alg->f[i]);
-      fprintf (fp, "\n");
-    }
-#ifdef DEBUG
-  fprintf (fp, "# ");
-  fprint_polynomial (fp, p->alg->f, p->alg->degree);
-#endif
-  fprintf (fp, "Y1: ");
-  mpz_out_str (fp, 10, p->rat->f[1]);
-  fprintf (fp, "\n");
-  fprintf (fp, "Y0: ");
-  mpz_out_str (fp, 10, p->rat->f[0]);
-  fprintf (fp, "\n");
-  fprintf (fp, "m: ");
-  /* if f[1]<>1, then m = -f[0]/f[1] mod n */
-  if (mpz_cmp_ui (p->rat->f[1], 1) != 0)
-    {
-      mpz_invert (p->m, p->rat->f[1], p->n);
-      mpz_neg (p->m, p->m);
-      mpz_mul (p->m, p->m, p->rat->f[0]);
-      mpz_mod (p->m, p->m, p->n);
-    }
-  else
-    mpz_neg (p->m, p->rat->f[0]);
-  mpz_out_str (fp, 10, p->m);
-  fprintf (fp, "\n");
-  if (strlen (p->type) != 0)
-    fprintf (fp, "type: %s\n", p->type);
-  if (raw == 0)
-    {
-      fprintf (fp, "rlim: %lu\n", p->rat->lim);
-      fprintf (fp, "alim: %lu\n", p->alg->lim);
-      fprintf (fp, "lpbr: %d\n", p->rat->lpb);
-      fprintf (fp, "lpba: %d\n", p->alg->lpb);
-      fprintf (fp, "mfbr: %d\n", p->rat->mfb);
-      fprintf (fp, "mfba: %d\n", p->alg->mfb);
-      /* Warning: in CADO-NFS the lambda values are relative to the large
-         prime bounds, whereas in the Franke-Kleinjung siever they are
-         relative to the factor base bounds */
-      fprintf (fp, "rlambda: %1.1f\n", p->rat->lambda);
-      fprintf (fp, "alambda: %1.1f\n", p->alg->lambda);
-    }
-  fprintf (fp, "# generated by %s: %s", CADO_REV, argv[0]);
-  for (i = 1; i < argc; i++)
-    fprintf (fp, " %s", argv[i]);
-  fprintf (fp, " in %.2fs\n", (seconds () - st));
+	 /* n */
+	 fprintf (fp, "\nn: ");
+	 mpz_out_str (fp, 10, n);
+	 fprintf (fp, "\n");
+
+	 /* Y[i] */
+	 fprintf (fp, "Y1: ");
+	 mpz_out_str (fp, 10, g[1]);
+	 fprintf (fp, "\n");
+	 fprintf (fp, "Y0: ");
+	 mpz_out_str (fp, 10, g[0]);
+	 fprintf (fp, "\n");
+
+	 /* c[i] */
+	 for (i = deg; i >= 0; i--)
+	 {
+		  fprintf (fp, "c%d: ", i);
+		  mpz_out_str (fp, 10, f[i]);
+		  fprintf (fp, "\n");
+	 }
 }
+
+
+/* backend for print poly information */
+double
+print_cadopoly (FILE *fp, cado_poly p, int raw)
+{
+	 unsigned int nroots = 0;
+	 double alpha, alpha_proj, logmu, e;
+
+	 /* print f, g only*/
+	 print_poly_fg_bare (fp, p->alg->f, p->rat->f, p->alg->degree, p->n);
+
+#ifdef DEBUG
+	 fprintf (fp, "# ");
+	 fprint_polynomial (fp, p->alg->f, p->alg->degree);
+#endif
+
+	 /* m and type */
+	 fprintf (fp, "m: ");
+	 /* if f[1]<>1, then m = -f[0]/f[1] mod n */
+	 if (mpz_cmp_ui (p->rat->f[1], 1) != 0)
+	 {
+		  mpz_invert (p->m, p->rat->f[1], p->n);
+		  mpz_neg (p->m, p->m);
+		  mpz_mul (p->m, p->m, p->rat->f[0]);
+		  mpz_mod (p->m, p->m, p->n);
+	 }
+	 else
+		  mpz_neg (p->m, p->rat->f[0]);
+	 mpz_out_str (fp, 10, p->m);
+	 fprintf (fp, "\n");
+
+	 if (strlen (p->type) != 0)
+		  fprintf (fp, "type: %s\n", p->type);
+	 fprintf (fp, "skew: %1.3f\n", p->skew);
+
+	 logmu = L2_lognorm (p->alg->f, p->alg->degree, p->skew, DEFAULT_L2_METHOD);
+	 alpha = get_alpha (p->alg->f, p->alg->degree, ALPHA_BOUND);
+	 alpha_proj = get_biased_alpha_projective (p->alg->f, p->alg->degree, ALPHA_BOUND);
+	 nroots = numberOfRealRoots (p->alg->f, p->alg->degree, 0, 0);
+	 e = MurphyE (p, BOUND_F, BOUND_G, AREA, MURPHY_K);
+	 
+	 fprintf (fp, "# lognorm: %1.2f, alpha: %1.2f (proj: %1.2f), E: %1.2f, nr: %u\n",
+			  logmu,
+			  alpha,
+			  alpha_proj,
+			  logmu + alpha,
+			  nroots);
+
+	 fprintf (fp, "# MurphyE(Bf=%.0f,Bg=%.0f,area=%.2e)=%1.2e\n",
+			  BOUND_F, BOUND_G, AREA, e);
+
+	 if (raw == 0)
+	 {
+		  fprintf (fp, "rlim: %lu\n", p->rat->lim);
+		  fprintf (fp, "alim: %lu\n", p->alg->lim);
+		  fprintf (fp, "lpbr: %d\n", p->rat->lpb);
+		  fprintf (fp, "lpba: %d\n", p->alg->lpb);
+		  fprintf (fp, "mfbr: %d\n", p->rat->mfb);
+		  fprintf (fp, "mfba: %d\n", p->alg->mfb);
+		  /* Warning: in CADO-NFS the lambda values are relative to the large
+			 prime bounds, whereas in the Franke-Kleinjung siever they are
+			 relative to the factor base bounds */
+		  fprintf (fp, "rlambda: %1.1f\n", p->rat->lambda);
+		  fprintf (fp, "alambda: %1.1f\n", p->alg->lambda);
+	 }
+	 return e;
+}
+
+
+/* print_cadopoly with extra information such as REV and duration */
+void
+print_cadopoly_extra (FILE *fp, cado_poly cpoly, int argc, char *argv[], double st, int raw)
+{
+	 int i;
+	 double e;
+	 e = print_cadopoly (fp, cpoly, raw);
+
+	 /* extra info */
+	 fprintf (fp, "# generated by %s: %s", CADO_REV, argv[0]);
+	 for (i = 1; i < argc; i++)
+		  fprintf (fp, " %s", argv[i]);
+	 fprintf (fp, " in %.2fs\n", (seconds () - st));
+}
+
+
+/*
+  Call print_poly, given f, g.
+*/
+double
+print_poly_fg ( mpz_t *f,
+				mpz_t *g,
+				int d,
+				mpz_t N,
+				int verbose )
+{
+	 double e;
+	 int i;
+
+	 cado_poly cpoly;
+	 cado_poly_init(cpoly);
+	 for (i = 0; i < (d + 1); i++)
+		  mpz_set(cpoly->alg->f[i], f[i]);
+	 for (i = 0; i < 2; i++)
+		  mpz_set(cpoly->rat->f[i], g[i]);
+	 mpz_set(cpoly->n, N);
+	 cpoly->skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+	 cpoly->alg->degree = d;
+	 cpoly->rat->degree = 1;
+
+	 if (verbose == 2) {
+		  e = print_cadopoly (stdout, cpoly, 1);
+		  fflush(stdout);
+	 }
+	 else {
+		  e = MurphyE (cpoly, BOUND_F, BOUND_G, AREA, MURPHY_K);
+	 }
+
+	 cado_poly_clear (cpoly);
+	 return e;
+}
+
 
 /* Returns k such that f(x+k) has the smallest 1-norm, with the corresponding
    skewness.
