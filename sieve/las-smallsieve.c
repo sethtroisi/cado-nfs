@@ -521,7 +521,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 
     /* Handle 3 */
     WHERE_AM_I_UPDATE(w, p, 3);
-    /* First collect updates for powers of two in a pattern,
+    /* First collect updates for powers of three in a pattern,
        then apply pattern to sieve line.
        Repeat for each line in bucket region. */
     for (j = 0; j < nj; j++)

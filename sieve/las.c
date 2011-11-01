@@ -1805,7 +1805,8 @@ process_bucket_region(thread_data_ptr th)
 
             /* Init algebraic norms */
             rep->tn[side] -= seconds ();
-            /* XXX Only the survivors of the other sieve are initialized */
+            /* Only the survivors of the other sieve are initialized,
+             * unless LAZY_NORMS is activated */
             unsigned char * xS = S[side ^ 1];
             rep->survivors0 += init_alg_norms_bucket_region(S[side], xS, i, si);
             rep->tn[side] += seconds ();
@@ -2251,40 +2252,37 @@ main (int argc0, char *argv0[])
     reorder_fb(si, 0);
     reorder_fb(si, 1);
 
-    while (q0 < q1)
-      {
-        while (nroots == 0) /* {{{ go to next prime and generate roots */
-          {
+    while (q0 < q1) {
+        while (nroots == 0) { /* {{{ go to next prime and generate roots */
             q0 = uint64_nextprime (q0);
             if (q0 >= q1)
-              goto end;  // breaks two whiles.
+                goto end;  // breaks two whiles.
             si->q = q0;
             if (si->ratq)
                 nroots = poly_roots_uint64 (roots, si->cpoly->rat->f, 1, q0);
             else
                 nroots = poly_roots_uint64 (roots, si->cpoly->alg->f, si->cpoly->alg->degree, q0);
-            if (nroots > 0)
-              {
+            if (nroots > 0) {
                 fprintf (si->output, "### q=%" PRIu64 ": root%s", q0,
-                         (nroots == 1) ? "" : "s");
+                        (nroots == 1) ? "" : "s");
                 for (i = 1; i <= (int) nroots; i++)
-                  fprintf (si->output, " %" PRIu64, roots[nroots-i]);
+                    fprintf (si->output, " %" PRIu64, roots[nroots-i]);
                 fprintf (si->output, "\n");
-              }
-          }
+            }
+        }
         /* }}} */
 
         /* computes a0, b0, a1, b1 from q, rho, and the skewness */
         si->rho = roots[--nroots];
         if (rho != 0 && si->rho != rho) /* if -rho, wait for wanted root */
-          continue;
+            continue;
         if (SkewGauss (si, si->cpoly->skew) != 0)
-	  continue;
+            continue;
         /* FIXME: maybe we can discard some special q's if a1/a0 is too large,
            see http://www.mersenneforum.org/showthread.php?p=130478 */
 
         fprintf (si->output, "# Sieving q=%" PRIu64 "; rho=%" PRIu64
-                 "; a0=%d; b0=%d; a1=%d; b1=%d\n",
+                "; a0=%d; b0=%d; a1=%d; b1=%d\n",
                  si->q, si->rho, si->a0, si->b0, si->a1, si->b1);
         sq ++;
 
@@ -2294,85 +2292,85 @@ main (int argc0, char *argv0[])
         sieve_info_update (si);
         totJ += (double) si->J;
 
-            trace_update_conditions(si);
+        trace_update_conditions(si);
 
-            report->ttsm -= seconds();
+        report->ttsm -= seconds();
 
-            /* Allocate buckets */
-            thread_buckets_alloc(thrs);
+        /* Allocate buckets */
+        thread_buckets_alloc(thrs);
 
-            /* Fill in rat and alg buckets */
-            thread_do(thrs, &fill_in_buckets_both);
+        /* Fill in rat and alg buckets */
+        thread_do(thrs, &fill_in_buckets_both);
 
-            max_full = thread_buckets_max_full(thrs);
-            if (max_full >= 1.0) {
-                fprintf(stderr, "maxfull=%f\n", max_full);
-                for (i = 0; i < si->nb_threads; ++i) {
-                    fprintf(stderr, "intend to free [%d] max_full=%f %f\n",
-                            i,
-                            buckets_max_full (thrs[i]->sides[0]->BA),
-                            buckets_max_full (thrs[i]->sides[1]->BA));
-                }
-                thread_buckets_free(thrs); /* may crash. See below */
-
-                si->bucket_limit_multiplier *= 1.1 * max_full;
-                max_full = 1.0/1.1;
-                nroots++;   // ugly: redo the same class
-                // when doing one big malloc, there's some chance that the
-                // bucket overrun actually stepped over the next bucket. In
-                // this case, the freeing of buckets in the code above might
-                // have succeeded, so we can hope to resume with this special
-                // q. On the other hand, if we have one malloc per bucket,
-                // the free() calls above are guaranteed to crash.
-                // Thus it's okay to proceed, if we're lucky enough to reach
-                // here. Note that increasing bucket_limit will have a
-                // permanent effect on the rest of this run.
-                // abort();
-                continue;
+        max_full = thread_buckets_max_full(thrs);
+        if (max_full >= 1.0) {
+            fprintf(stderr, "maxfull=%f\n", max_full);
+            for (i = 0; i < si->nb_threads; ++i) {
+                fprintf(stderr, "intend to free [%d] max_full=%f %f\n",
+                        i,
+                        buckets_max_full (thrs[i]->sides[0]->BA),
+                        buckets_max_full (thrs[i]->sides[1]->BA));
             }
+            thread_buckets_free(thrs); /* may crash. See below */
 
-            report->ttsm += seconds();
+            si->bucket_limit_multiplier *= 1.1 * max_full;
+            max_full = 1.0/1.1;
+            nroots++;   // ugly: redo the same class
+            // when doing one big malloc, there's some chance that the
+            // bucket overrun actually stepped over the next bucket. In
+            // this case, the freeing of buckets in the code above might
+            // have succeeded, so we can hope to resume with this special
+            // q. On the other hand, if we have one malloc per bucket,
+            // the free() calls above are guaranteed to crash.
+            // Thus it's okay to proceed, if we're lucky enough to reach
+            // here. Note that increasing bucket_limit will have a
+            // permanent effect on the rest of this run.
+            // abort();
+            continue;
+        }
 
-            /* This can now be factored out ! */
-            for(int side = 0 ; side < 2 ; side++) {
-                sieve_side_info_ptr s = si->sides[side];
+        report->ttsm += seconds();
 
-                small_sieve_init(s->ssd, s->fb, si, side);
-                small_sieve_info(si, "small sieve", side, s->ssd);
+        /* This can now be factored out ! */
+        for(int side = 0 ; side < 2 ; side++) {
+            sieve_side_info_ptr s = si->sides[side];
 
-                small_sieve_extract_interval(s->rsd, s->ssd, s->fb_parts_x->rs);
-                small_sieve_info(si, "resieve", side, s->rsd);
+            small_sieve_init(s->ssd, s->fb, si, side);
+            small_sieve_info(si, "small sieve", side, s->ssd);
+
+            small_sieve_extract_interval(s->rsd, s->ssd, s->fb_parts_x->rs);
+            small_sieve_info(si, "resieve", side, s->rsd);
+        }
+
+        /* Process bucket regions in parallel */
+        thread_do(thrs, &process_bucket_region);
+
+        /* clear */
+        for(int side = 0 ; side < 2 ; side++) {
+            small_sieve_clear(si->sides[side]->ssd);
+            small_sieve_clear(si->sides[side]->rsd);
+        }
+
+
+        /* Display results for this special q */
+        {
+            las_report rep;
+            las_report_init(rep);
+            for (int i = 0; i < si->nb_threads; ++i) {
+                las_report_accumulate(rep, thrs[i]->rep);
             }
-
-            /* Process bucket regions in parallel */
-            thread_do(thrs, &process_bucket_region);
-
-            /* clear */
-            for(int side = 0 ; side < 2 ; side++) {
-                small_sieve_clear(si->sides[side]->ssd);
-                small_sieve_clear(si->sides[side]->rsd);
+            if (si->verbose) {
+                fprintf (si->output, "# %lu survivors after rational sieve,", rep->survivors0);
+                fprintf (si->output, " %lu survivors after algebraic sieve, ", rep->survivors1);
+                fprintf (si->output, "coprime: %lu\n", rep->survivors2);
             }
+            fprintf (si->output, "# %lu relation(s) for (%" PRIu64 ",%" PRIu64")\n", rep->reports, si->q, si->rho);
+            rep_bench += rep->reports;
+            las_report_accumulate(report, rep);
+            las_report_clear(rep);
+        }
 
-
-            /* Display results for this special q */
-            {
-                las_report rep;
-                las_report_init(rep);
-                for (int i = 0; i < si->nb_threads; ++i) {
-                    las_report_accumulate(rep, thrs[i]->rep);
-                }
-                if (si->verbose) {
-                    fprintf (si->output, "# %lu survivors after rational sieve,", rep->survivors0);
-                    fprintf (si->output, " %lu survivors after algebraic sieve, ", rep->survivors1);
-                    fprintf (si->output, "coprime: %lu\n", rep->survivors2);
-                }
-                fprintf (si->output, "# %lu relation(s) for (%" PRIu64 ",%" PRIu64")\n", rep->reports, si->q, si->rho);
-                rep_bench += rep->reports;
-                las_report_accumulate(report, rep);
-                las_report_clear(rep);
-            }
-            
-            thread_buckets_free(thrs);
+        thread_buckets_free(thrs);
 
         /* {{{ bench stats */
         if (bench) {
@@ -2388,17 +2386,17 @@ main (int argc0, char *argv0[])
             nroots=0;
             t_bench = seconds() - t_bench;
             fprintf(si->output,
-              "# Stats for q=%" PRIu64 ": %d reports in %1.1f s\n",
-              savq0, rep_bench, t0);
+                    "# Stats for q=%" PRIu64 ": %d reports in %1.1f s\n",
+                    savq0, rep_bench, t0);
             fprintf(si->output,
-              "# Estimates for next %d q's: %d reports in %1.0f s, %1.2f s/r\n",
-              nb_q, nb_q*rep_bench, t0*nb_q, t0/((double)rep_bench));
+                    "# Estimates for next %d q's: %d reports in %1.0f s, %1.2f s/r\n",
+                    nb_q, nb_q*rep_bench, t0*nb_q, t0/((double)rep_bench));
             bench_tot_time += t0*nb_q;
             bench_tot_rep += nb_q*rep_bench;
             rep_bench = 0;
             fprintf(si->output, "# Cumulative (estimated): %lu reports in %1.0f s, %1.2f s/r\n",
                     bench_tot_rep, bench_tot_time,
-		    (double) bench_tot_time / (double) bench_tot_rep);
+                    (double) bench_tot_time / (double) bench_tot_rep);
             t_bench = seconds();
         }
         /* }}} */
@@ -2409,8 +2407,8 @@ main (int argc0, char *argv0[])
             if (rep_bench >= BENCH2) {
                 t_bench = seconds() - t_bench;
                 fprintf(si->output,
-                  "# Got %d reports in %1.1f s using %d specialQ\n",
-                  rep_bench, t_bench, nbq_bench);
+                        "# Got %d reports in %1.1f s using %d specialQ\n",
+                        rep_bench, t_bench, nbq_bench);
                 double relperq = (double)rep_bench / (double)nbq_bench;
                 double est_rep = (double)rep_bench;
                 do {
@@ -2418,14 +2416,14 @@ main (int argc0, char *argv0[])
                     est_rep += relperq;
                 } while (est_rep <= BENCH2 / bench_percent);
                 fprintf(si->output,
-                  "# Extrapolate to %ld reports up to q = %" PRIu64 "\n",
-                  (long) est_rep, q0);
+                        "# Extrapolate to %ld reports up to q = %" PRIu64 "\n",
+                        (long) est_rep, q0);
                 bench_tot_time += t_bench / bench_percent;
                 bench_tot_rep += BENCH2 / bench_percent;
                 fprintf(si->output,
-                  "# Cumulative (estimated): %lu reports in %1.0f s, %1.2f s/r\n",
-                  bench_tot_rep, bench_tot_time,
-                  (double) bench_tot_time / (double) bench_tot_rep);
+                        "# Cumulative (estimated): %lu reports in %1.0f s, %1.2f s/r\n",
+                        bench_tot_rep, bench_tot_time,
+                        (double) bench_tot_time / (double) bench_tot_rep);
                 // reinit for next slice of bench:
                 t_bench = seconds();
                 nbq_bench = 0;
@@ -2436,17 +2434,17 @@ main (int argc0, char *argv0[])
         /* }}} */
       } // end of loop over special q ideals.
 
- end:
+end:
     /* {{{ stats */
     t0 = seconds () - t0;
     fprintf (si->output, "# Average J=%1.0f for %lu special-q's, max bucket fill %f\n",
-             totJ / (double) sq, sq, max_full);
+            totJ / (double) sq, sq, max_full);
     tts = t0;
     tts -= report->tn[0];
     tts -= report->tn[1];
     tts -= report->ttf;
     if (si->verbose)
-      facul_print_stats (si->output);
+        facul_print_stats (si->output);
     if (sievestats_file != NULL)
     {
         fprintf (sievestats_file, "# Number of sieve survivors and relations by sieve residue pair\n");
@@ -2460,13 +2458,13 @@ main (int argc0, char *argv0[])
                 unsigned long r1 = report->report_sizes[i1][i2];
                 unsigned long r2 = report->survivor_sizes[i1][i2];
                 if (r1 > r2) {
-                  fprintf(stderr, "Error, statistics report more relations (%lu) than "
-                          "sieve survivors (%lu) for (%d,%d)\n", r1, r2, i1, i2)
-;
+                    fprintf(stderr, "Error, statistics report more relations (%lu) than "
+                            "sieve survivors (%lu) for (%d,%d)\n", r1, r2, i1, i2)
+                        ;
                 }
                 if (r2 > 0)
                     fprintf (sievestats_file, "%d %d %lu %lu\n", 
-                             i1, i2, r1, r2);
+                            i1, i2, r1, r2);
             }
             fprintf (sievestats_file, "\n");
         }
@@ -2477,14 +2475,14 @@ main (int argc0, char *argv0[])
         fprintf (si->output, "# Total wct time %1.1fs [precise timings available only for mono-thread]\n", t0);
     else
         fprintf (si->output, "# Total time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
-            " (%1.1f + %1.1f),"
-             " factor %1.1f]\n", t0,
-             report->tn[RATIONAL_SIDE],
-             report->tn[ALGEBRAIC_SIDE],
-             tts, report->ttsm, tts-report->ttsm, report->ttf);
+                " (%1.1f + %1.1f),"
+                " factor %1.1f]\n", t0,
+                report->tn[RATIONAL_SIDE],
+                report->tn[ALGEBRAIC_SIDE],
+                tts, report->ttsm, tts-report->ttsm, report->ttf);
     fprintf (si->output, "# Total %lu reports [%1.3fs/r, %1.1fr/sq]\n",
-             report->reports, t0 / (double) report->reports,
-             (double) report->reports / (double) sq);
+            report->reports, t0 / (double) report->reports,
+            (double) report->reports / (double) sq);
     if (bench || bench2) {
         fprintf(si->output, "# Total (estimated): %lu reports in %1.1f s\n",
                 bench_tot_rep, bench_tot_time);
@@ -2493,7 +2491,7 @@ main (int argc0, char *argv0[])
 
     /* {{{ stats */
     if (bucket_prime_stats) 
-      {
+    {
         printf ("# Number of bucket primes: %ld\n", nr_bucket_primes);
         printf ("# Number of divisibility tests of bucket primes: %ld\n", 
                 nr_div_tests);
