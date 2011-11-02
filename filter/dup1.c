@@ -52,9 +52,6 @@ int split_relfile (relation_stream_ptr rs, const char *name,
     FILE * ofile[nslices];
     int p_out[nslices];
 
-    //unsigned long count[nslices] = {0,};
-    unsigned long count[nslices];
-    count[0] = 0;
     uint64_t h;
 
     f_in = fopen_compressed_r(name, &p_in, &suffix_in);
@@ -113,7 +110,6 @@ int split_relfile (relation_stream_ptr rs, const char *name,
                 }
             }
         }
-        count[i] ++;
 
         if (relation_stream_disp_progress_now_p(rs)) {
             fprintf (stderr,
@@ -129,13 +125,10 @@ int split_relfile (relation_stream_ptr rs, const char *name,
       if (do_slice[i])
         {
           if (p_out[i]) pclose (ofile[i]); else fclose(ofile[i]);
-          fprintf (stderr, "%d:%lu ", i, count[i]);
         }
       free(oname[i]);
     }
-    fprintf (stderr, " %s\n", name);
-
-
+    fprintf (stderr, "# done %s\n", name);
 
     if (p_in) pclose(f_in); else fclose(f_in);
     return 0;
