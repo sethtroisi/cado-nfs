@@ -75,6 +75,10 @@ void poly_alloc(poly_t f, int d) {
     mpz_init(f->coeff[i]);
 }
 
+void poly_set_zero(poly_t f) {
+    f->deg = -1;
+}
+
 void poly_free(poly_t f) {
   int i;
   for (i = 0; i < f->alloc; ++i)
@@ -555,6 +559,15 @@ mod_base_minus_1 (mpz_t z)
 void poly_mul(poly_t f, const poly_t g, const poly_t h) {
   int i, maxdeg;
   poly_t prd;
+
+  if(f==h || f==g) {
+    poly_t aux;
+    poly_alloc(aux,-1);
+    poly_mul(aux,g,h);
+    poly_copy(f,aux);
+    poly_free(aux);
+    return;
+  }
 
   if ((g->deg == -1) || (h->deg == -1)) {
     f->deg = -1;

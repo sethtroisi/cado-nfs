@@ -52,6 +52,7 @@ void poly_alloc(poly_t f, int d);
 void poly_free(poly_t f);
 void poly_print(const poly_t f);
 void cleandeg(poly_t f, int deg);
+void poly_set_zero(poly_t f);
 void poly_setcoeff(poly_t f, int i, const mpz_t z);
 void poly_setcoeff_str(poly_t f, int i,char *str, int base);
 void poly_set(poly_t f, mpz_t * coeffs, int d);
