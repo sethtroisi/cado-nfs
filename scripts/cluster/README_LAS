@@ -32,12 +32,13 @@ $ ./init_ldir $ldir $bindir
 $ rsync -av $name_cluster:$cdir/output_rels/ $ldir/output_rels/
 
 - merges the relations files:
-$ $ldir/scripts/merge.pl $ldir/output_rels/ -o $ldir/merge_rels/ -n $name --range $q0-$q1
+$ $ldir/scripts/merge.pl $ldir/output_rels/ -o $ldir/merge_rels/ -n $name --range $q0-$q1 -s 10000000
   (merge the relations files between $q0 and $q1 by interval of 1 million)
-NB : you can clean the files in the output_rels directories step-by-step 
+NB: you can clean the files in the output_rels directories step-by-step 
      to avoid that they contain a lot of files.
+NB2: you might need to add the -f option to merge.pl
 
-- verify that you have enough of relations :
+- verify that you have enough relations:
 $ $ldir/scripts/check_dup_purge.pl
   (execute check_rels, dup1, dup2 and purge)
 NB : - don't kill the script during check_rels and dup1.
@@ -49,3 +50,7 @@ then run cadofactor.pl.
 
 - run cpu_time.pl to estimate the total cpu time for sieving.
 $ $ldir/cpu_time.pl
+
+Note: if some files are corrupted, you can start from scratch the purge
+process as follows: remove the files $name.filelist, $name.nrels,
+$name..subdirlist in $ldir, and all symbolic links $name.rels.*
