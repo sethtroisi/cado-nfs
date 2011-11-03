@@ -1,0 +1,45 @@
+Benchmark of CADO-NFS
+=====================
+
+Machine used: chorizo.loria.fr (Intel L5640 with 12 cores, 2.27GHz)
+
+GCC 4.4.5
+
+Polynomial: rsa155.poly (see below)
+
+Parameters of las: -I 13 -q0 16777216 -q1 16778216
+
+CADO-NFS 1.0 (best of 3 runs):
+# Total time 109.1s [norm 9.70+5.3, sieving 64.7 (50.9 + 13.8), factor 29.4]
+# Total 1041 reports [0.105s/r, 21.7r/sq]
+
+CADO-NFS 1.1 (best of 3 runs):
+# Total time 100.8s [norm 1.85+5.0, sieving 60.5 (48.1 + 12.4), factor 33.5]
+# Total 1041 reports [0.097s/r, 21.7r/sq]
+
+CADO-NFS master (0f6a4f71f3471cdeeb5cf5949f42bd32454a19e3, best of 3 runs):
+# Total time 106.5s [norm 1.81+5.1, sieving 65.4 (51.0 + 14.4), factor 34.2]
+# Total 1041 reports [0.102s/r, 21.7r/sq]
+
+---------------------------------- rsa155.poly --------------------------------
+
+n: 10941738641570527421809707322040357612003732945449205990913842131476349984288934784717997257891267332497625752899781833797076537244027146743531593354333897
+type: gnfs
+skew: 10800.0
+c5: 119377138320
+c4: -80168937284997582
+c3: -66269852234118574445
+c2: 11816848430079521880356852
+c1: 7459661580071786443919743056
+c0: -40679843542362159361913708405064
+Y1: 1
+Y0: -39123079721168000771313449081
+rlim: 16777216
+alim: 16777216
+lpbr: 30
+lpba: 30
+mfbr: 60
+mfba: 86
+rlambda: 2.1
+alambda: 3.2
+
