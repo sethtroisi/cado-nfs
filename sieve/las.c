@@ -1129,7 +1129,7 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N M
                  and we might miss some relations. */
               p += BUCKET_P_WRAP;
           }
-          if (p > fbb) {
+          if (UNLIKELY(p > fbb)) {
               pthread_mutex_lock(&io_mutex);
               fprintf (stderr,
                        "# Error, p = %lu does not divide at (N,x) = (%u,%d)\n",
