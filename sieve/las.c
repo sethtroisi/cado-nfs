@@ -1103,14 +1103,14 @@ divide_primes_from_bucket (factor_list_t *fl, mpz_t norm, const unsigned int N M
           unsigned long p = prime.p;
           while (p <= fbb) {
               if (bucket_prime_stats) nr_div_tests++;
-              if (mpz_divisible_ui_p (norm, p)) {
+              if (LIKELY(mpz_divisible_ui_p (norm, p))) {
                   int isprime;
                   modulusul_t m; 
-                  modul_initmod_ul (m, (unsigned long) p);
+                  modul_initmod_ul (m, p);
                   if (bucket_prime_stats) nr_composite_tests++;
                   isprime = modul_isprime (m);
                   modul_clearmod (m);
-                  if (isprime) {
+                  if (LIKELY(isprime)) {
                       break;
                   } else {
                     if (bucket_prime_stats) nr_wrap_was_composite++;
