@@ -965,19 +965,20 @@ new_fb_read (const char *filename, const double log_scale, const int verbose)
         if (!ok)
             exit (EXIT_FAILURE);
         lineptr++; /* Skip colon after q */
-
-#if 0
-        if (q <= maxprime) {
-            fprintf (stderr, "# Error, primes in factor base file are "
-                    "not in increasing order\n");
-            free (fb);
-            fb = NULL;
-            break;
-        }
-#endif
+        int longversion;
+        if (strchr(lineptr, ':') == NULL)
+            longversion = 0;
+        else 
+            longversion = 1;
 
         /* we assume q is a prime or a prime power */
-        p = is_prime_power (q);  // TODO: use the fast version, if sorted.
+        /* NB: a short version is not possible for a prime power, so we
+         * do the test only for !longversion */
+        if (longversion) {
+            p = is_prime_power (q); 
+        } else {
+            p = 0;
+        }
         if (p != 0) {
             fbprime_t cof = q;
             while (cof % p == 0)
