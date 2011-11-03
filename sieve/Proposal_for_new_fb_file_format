@@ -35,8 +35,3 @@ only one line for a given (q,n1,n2) triple.
 
 Lines starting with a # are comments.
 
-Be careful with the spaces: they are significant, in order to help the
-parser (could be changed at some point!)
-
-
-

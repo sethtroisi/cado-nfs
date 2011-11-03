@@ -1000,7 +1000,7 @@ new_fb_read (const char *filename, const double log_scale, const int verbose)
         /* if the information is not present, it means q:1,0: ... */
         nlogp = 1;
         oldlogp = 0;
-        if (!isspace(*lineptr)) {
+        if (longversion) {
             nlogp = strtoul (lineptr, &lineptr, 10);
             /*
             if (nlogp == 0) {
@@ -1039,32 +1039,33 @@ new_fb_read (const char *filename, const double log_scale, const int verbose)
             fb_cur->plog = fb_log (pk, log_scale, - ol);
         }
 
-        ok = 1;
         fb_cur->nr_roots = 0;
         /* Read roots */
-        while (ok && *lineptr != '\0')
+        while (*lineptr != '\0')
         {
             if (fb_cur->nr_roots == MAXDEGREE) {
                 fprintf (stderr, 
                         "# Error, too many roots for prime " FBPRIME_FORMAT 
                         " in factor base line %lu\n", fb_cur->p, linenr);
-                ok = 0;
-                break;
+                exit(EXIT_FAILURE);
             }
             fbroot_t root = strtoul (lineptr, &lineptr, 10);
-            /*
+            
             if (fb_cur->nr_roots > 0
                     && root <= fb_cur->roots[fb_cur->nr_roots-1]) {
                 fprintf (stderr,
                     "# Error, roots must be sorted in the fb file, line %lu\n",
                     linenr);
-                ok = 0;
-                break;
+                exit(EXIT_FAILURE);
             }
-            */
+            
             fb_cur->roots[fb_cur->nr_roots++] = root;
-            if (*lineptr != '\0' && *lineptr != ',')
-                ok = 0;
+            if (*lineptr != '\0' && *lineptr != ',') {
+                fprintf(stderr,
+                        "# Incorrect format in factor base file line %lu\n",
+                        linenr);
+                exit(EXIT_FAILURE);
+            }
             if (*lineptr == ',')
                 lineptr++;
         }
@@ -1072,19 +1073,8 @@ new_fb_read (const char *filename, const double log_scale, const int verbose)
         if (fb_cur->nr_roots == 0) {
             fprintf (stderr, "# Error, no root for prime " FBPRIME_FORMAT
                     " in factor base line %lu\n", fb_cur->p, linenr - 1);
-            ok = 0;
-        }
-
-        if (!ok) {
-            fprintf(stderr, "# Incorrect format in factor base file line %lu\n",
-		   linenr - 1);
             exit(EXIT_FAILURE);
-	}
-      
-      /* Sort the roots into ascending order. We assume that fbprime_t and 
-         fbroot_t are typecast compatible. This is ugly. */
-      ASSERT_ALWAYS (sizeof (fbprime_t) == sizeof (fbroot_t));
-      fb_sortprimes ((fbprime_t *) fb_cur->roots, fb_cur->nr_roots);
+        }
 
         /* Compute invp */
         if (fb_cur->p % 2 != 0) {
