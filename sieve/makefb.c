@@ -269,6 +269,10 @@ void all_roots_affine(entry_list *L, mpz_t *f, int d, unsigned long p,
  * ???
  */
 
+/*
+ * See makefb.sage for details on this function
+ */
+
 entry_list all_roots(mpz_t *f, int d, unsigned long p, int maxbits) {
     int kmax;
     entry_list L;
@@ -278,10 +282,52 @@ entry_list all_roots(mpz_t *f, int d, unsigned long p, int maxbits) {
     // Furthermore, it costs something. Should be fixed.
     if (kmax < 2)
         kmax = 2;
-    all_roots_affine(&L, f, d, p, kmax, 0, 0, 1, 0);
 
-    // TODO: add the projective part here
-    // XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+    {
+        mpz_t *fh;
+        mpz_t pk;
+        fh = (mpz_t *)malloc ((d+1)*sizeof(mpz_t));
+        mpz_init(pk);
+        mpz_set_ui(pk, 1);
+        for (int i = 0; i <= d; ++i) {
+            mpz_init(fh[i]);
+            mpz_mul(fh[i], f[d-i], pk);
+            if (i < d)
+                mpz_mul_ui(pk, pk, p);
+        }
+        int v = mp_poly_p_val_of_content(fh, d, p);
+        if (v > 0) { // We have projective roots only in that case
+            { 
+                entry E;
+                E.q = p;
+                E.r = p;
+                E.n1 = v;
+                E.n0 = 0;
+                push_entry(&L, E);
+            }
+            mpz_set_ui(pk, p);
+            for (int i = 1; i < v; ++i)
+                mpz_mul_ui(pk, pk, p);
+            for (int i = 0; i <= d; ++i)
+                mpz_tdiv_q(fh[i], fh[i], pk);
+
+            all_roots_affine(&L, fh, d, p, kmax-1, 0, 0, 1, 0);
+            // convert back the roots
+            for (int i = 1; i < L.len; ++i) {
+                entry E = L.list[i];
+                E.q *= p;
+                E.n1 += v;
+                E.n0 += v;
+                E.r = E.r*p + E.q;
+                L.list[i] = E;
+            }
+        }
+        for (int i = 0; i <= d; ++i) 
+            mpz_clear(fh[i]);
+        mpz_clear(pk);
+        free(fh);
+    }
+    all_roots_affine(&L, f, d, p, kmax, 0, 0, 1, 0);
 
     qsort((void *)(&L.list[0]), L.len, sizeof(entry), cmp_entry);
     return L;
@@ -415,7 +461,7 @@ main (int argc, char *argv[])
 
   if (use_powers) {
       makefb_with_powers(cpoly->alg->f, cpoly->alg->degree, 
-             cpoly->alg->lim, 12);
+              cpoly->alg->lim, 12);
   } else {
       makefb (stdout, cpoly);
   }
