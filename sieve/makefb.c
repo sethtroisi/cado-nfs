@@ -417,7 +417,8 @@ makefb (FILE *fp, cado_poly cpoly)
 
 static void usage()
 {
-    fprintf (stderr, "Usage: makefb [-v] [-powers] [-poly file]\n");
+    fprintf (stderr,
+            "Usage: makefb [-v] [-maxbits nnn] [-powers] [-poly file]\n");
     exit (1);
 }
 
@@ -429,6 +430,7 @@ main (int argc, char *argv[])
   param_list pl;
   cado_poly cpoly;
   FILE * f;
+  int maxbits = 12;
 
   param_list_init(pl);
   cado_poly_init(cpoly);
@@ -457,6 +459,8 @@ main (int argc, char *argv[])
       param_list_read_file(pl, filename);
   }
 
+  param_list_parse_int(pl, "maxbits", &maxbits);
+
   if (!cado_poly_set_plist (cpoly, pl))
     {
       fprintf (stderr, "Error reading polynomial file\n");
@@ -466,7 +470,7 @@ main (int argc, char *argv[])
 
   if (use_powers) {
       makefb_with_powers(cpoly->alg->f, cpoly->alg->degree, 
-              cpoly->alg->lim, 12);
+              cpoly->alg->lim, maxbits);
   } else {
       makefb (stdout, cpoly);
   }
