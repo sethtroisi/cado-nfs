@@ -35,7 +35,7 @@ void mp_poly_linear_comp(mpz_t *g, mpz_t *f, int d, long a, long b) {
         if (i < d)
             poly_mul(aXpbi, aXpbi, aXpb);
     }
-    for (int i = 0; i < d; ++i)
+    for (int i = 0; i <= d; ++i)
         poly_getcoeff(g[i], i, G);
     poly_free(aXpb);
     poly_free(aXpbi);
@@ -72,31 +72,29 @@ int mp_poly_p_val_of_content(mpz_t *f, int d, unsigned long p) {
 }
 
 
-// TODO:
-// Stolen from sieve.c. Should be shared, at some point.
 void
-mp_poly_eval (mpz_t r, mpz_t *poly, int deg, long a)
+mp_poly_eval (mpz_t r, mpz_t *poly, int deg, mpz_t a)
 {
   int i;
 
   mpz_set (r, poly[deg]);
   for (i = deg - 1; i >= 0; i--)
     {
-      mpz_mul_si (r, r, a);
+      mpz_mul (r, r, a);
       mpz_add (r, r, poly[i]);
     }
 }
 
 // Evaluate the derivative of poly at a.
 void
-mp_poly_eval_diff (mpz_t r, mpz_t *poly, int deg, long a)
+mp_poly_eval_diff (mpz_t r, mpz_t *poly, int deg, mpz_t a)
 {
   int i;
 
   mpz_mul_ui (r, poly[deg], (unsigned long)deg);
   for (i = deg - 1; i >= 1; i--)
     {
-      mpz_mul_si (r, r, a);
+      mpz_mul (r, r, a);
       mpz_addmul_ui (r, poly[i], (unsigned long)i);
     }
 }
@@ -105,31 +103,35 @@ mp_poly_eval_diff (mpz_t r, mpz_t *poly, int deg, long a)
 unsigned long
 lift_root_unramified(mpz_t *f, int d, unsigned long r, 
         unsigned long p,int kmax) {
-    mpz_t aux, aux2, mp_p;
+    mpz_t aux, aux2, mp_p, mp_r;
     int k = 1;
     mpz_init(aux);
     mpz_init(aux2);
+    mpz_init_set_ui(mp_r, r);
     mpz_init_set_ui(mp_p, p);
     while (k < kmax) {
-        mpz_mul(mp_p, mp_p, mp_p); // p^2k
-        // Everything should always fit in a long, at least on a 64-bit
-        // machine.
-        ASSERT(mpz_sizeinbase(mp_p, 2) < 8*sizeof(unsigned long));
-        mp_poly_eval(aux, f, d, r);
-        mp_poly_eval_diff(aux2, f, d, r);
+        if (2*k <= kmax)
+            mpz_mul(mp_p, mp_p, mp_p); // p^2k
+        else {
+            for (int i = k+1; i <= kmax; ++i)
+                mpz_mul_ui(mp_p, mp_p, p);
+        }
+        mp_poly_eval(aux, f, d, mp_r);
+        mp_poly_eval_diff(aux2, f, d, mp_r);
         if (!mpz_invert(aux2, aux2, mp_p)) {
             fprintf(stderr, "Error in lift_root_unramified: multiple root mod %lu\n", p);
             exit(EXIT_FAILURE);
         }
         mpz_mul(aux, aux, aux2);
-        mpz_ui_sub(aux, r, aux);
-        mpz_mod(aux, aux, mp_p);
-        r = mpz_get_ui(aux);
-        k *= 2;
+        mpz_sub(aux, mp_r, aux);
+        mpz_mod(mp_r, aux, mp_p);
+        k *= 2; 
     }
+    r = mpz_get_ui(mp_r);
     mpz_clear(aux);
     mpz_clear(aux2);
     mpz_clear(mp_p);
+    mpz_clear(mp_r);
     return r;
 }
 
@@ -203,7 +205,12 @@ void all_roots_affine(entry_list *L, mpz_t *f, int d, unsigned long p,
     nroots = poly_roots_ulong(roots, f, d, p);
     for (int i = 0; i < nroots; ++i) {
         unsigned long r = roots[i];
-        mp_poly_eval_diff(aux, f, d, r);
+        {
+            mpz_t mp_r;
+            mpz_init_set_ui(mp_r, r);
+            mp_poly_eval_diff(aux, f, d, mp_r);
+            mpz_clear(mp_r);
+        }
         unsigned long dfr = mpz_mod_ui(aux, aux, p);
         if (dfr != 0) {
             unsigned long rr = lift_root_unramified(f, d, r, p, kmax-k0);
@@ -211,7 +218,7 @@ void all_roots_affine(entry_list *L, mpz_t *f, int d, unsigned long p,
             unsigned long pml = 1;
             for (int j = 0; j < m; ++j)
                 pml *= p;
-            for (int l = 1; l < kmax-k0; ++l) {
+            for (int l = 1; l <= kmax-k0; ++l) {
                 pml *= p;
                 unsigned long phirr = phir % pml;
                 entry E;
@@ -277,13 +284,10 @@ entry_list all_roots(mpz_t *f, int d, unsigned long p, int maxbits) {
     int kmax;
     entry_list L;
     entry_list_init(&L);
-    kmax = (int)ceil(maxbits*log(2)/log(p));
-    // FIXME: Hum... this is inelegant, to say the least...
-    // Furthermore, it costs something. Should be fixed.
-    if (kmax < 2)
-        kmax = 2;
-
-    {
+    kmax = (int)floor(maxbits*log(2)/log(p));
+    if (kmax == 0)
+        kmax = 1;
+    { // handle projective roots first.
         mpz_t *fh;
         mpz_t pk;
         fh = (mpz_t *)malloc ((d+1)*sizeof(mpz_t));
@@ -327,6 +331,7 @@ entry_list all_roots(mpz_t *f, int d, unsigned long p, int maxbits) {
         mpz_clear(pk);
         free(fh);
     }
+    // affine roots are easier.
     all_roots_affine(&L, f, d, p, kmax, 0, 0, 1, 0);
 
     qsort((void *)(&L.list[0]), L.len, sizeof(entry), cmp_entry);
