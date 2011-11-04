@@ -14,6 +14,7 @@
 #include "fb.h"
 #include "utils.h"
 
+#if 0
 /* sorted list of prime powers < 2^32, with 6947 entries, and two sentinel
  entries 0 and 2^32-1 */
 static uint32_t prime_powers[6949] = {1}; // 1 in first pos means uninitialized
@@ -47,7 +48,7 @@ static void init_prime_powers() {
   // sort the entries
   qsort((void *) &prime_powers[0], 6949, sizeof(uint32_t), uint32_comp);
 }
-
+#endif
 
 void 
 fb_fprint_entry (FILE *fd, const factorbase_degn_t *fb)
@@ -163,6 +164,7 @@ is_prime_power (uint32_t q)
   return 0;
 }
 
+#if 0
 /* same as is_prime_power, but faster */
 static uint32_t
 is_prime_power_fast (uint32_t q)
@@ -198,6 +200,7 @@ is_prime_power_fast (uint32_t q)
   else
     return 0;
 }
+#endif
 
 /* Make one factor base entry for a linear polynomial poly[1] * x + poly[0]
    and the prime (power) q. We assume that poly[0] and poly[1] are coprime.
@@ -551,7 +554,6 @@ fb_make_linear_powers (mpz_t *poly, const fbprime_t bound, const double log_scal
 
   return fb;
 }
-#endif
 
 factorbase_degn_t *
 fb_read_addproj (const char *filename, const double log_scale, 
@@ -818,6 +820,7 @@ fb_read_addproj (const char *filename, const double log_scale,
   free (fb_cur);
   return fb;
 }
+#endif
 
 /* return the total size (in bytes) used by fb */
 size_t
@@ -844,12 +847,6 @@ fb_nroots_total (const factorbase_degn_t *fb)
   return n;
 }
 
-
-factorbase_degn_t *
-fb_read (const char *filename, const double log_scale, const int verbose)
-{
-  return fb_read_addproj (filename, log_scale, verbose, NULL);
-}
 
 /* For all primes p that divide b, disable p and powers of p in fb */
 /* Extracts primes (not prime powers) p <= plim with 
@@ -897,7 +894,7 @@ fb_extract_bycost (const factorbase_degn_t *fb, const fbprime_t plim,
 }
 
 factorbase_degn_t *
-new_fb_read (const char *filename, const double log_scale, const int verbose)
+fb_read (const char *filename, const double log_scale, const int verbose)
 {
     factorbase_degn_t *fb = NULL, *fb_cur, *fb_new;
     FILE *fbfile;
