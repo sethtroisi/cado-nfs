@@ -1122,9 +1122,7 @@ main (int argc, char *argv[])
 		  exit (1);
 	 }
 
-	 st = cputime ();
 	 initPrimes (P);
-	 printf ("# Initializing primes took %dms\n", cputime () - st);
 	 T = malloc (nthreads * sizeof (tab_t));
 	 if (T == NULL)
 	 {
