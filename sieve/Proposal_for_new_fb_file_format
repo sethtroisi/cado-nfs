@@ -34,4 +34,8 @@ It is allowed to have several lines with the same q, but there must be
 only one line for a given (q,n1,n2) triple. 
 
 Lines starting with a # are comments.
+For freerels.c, it is currently mandatory to have one line in the header
+of the form:
+# DEGREE: 5
+(yes, this is a bit strange to rely on a comment...)
 
