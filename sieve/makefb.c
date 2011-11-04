@@ -418,25 +418,26 @@ makefb (FILE *fp, cado_poly cpoly)
 static void usage()
 {
     fprintf (stderr,
-            "Usage: makefb [-v] [-maxbits nnn] [-powers] [-poly file]\n");
+            "Usage: makefb [-maxbits nnn] [-nopowers] -poly file\n"
+            "    -poly file   : given polynomial\n"
+            "    -maxbits nnn : maximal number of bits of powers\n"
+            "    -nopowers    : switch to old fb format, without powers\n");
     exit (1);
 }
 
 int
 main (int argc, char *argv[])
 {
-  int verbose = 0;
-  int use_powers = 0;
+  int no_powers = 0;
   param_list pl;
   cado_poly cpoly;
   FILE * f;
-  int maxbits = 12;
+  int maxbits = 1;  // disable powers by default
 
   param_list_init(pl);
   cado_poly_init(cpoly);
 
-  param_list_configure_knob(pl, "-v", &verbose);
-  param_list_configure_knob(pl, "-powers", &use_powers);
+  param_list_configure_knob(pl, "-nopowers", &no_powers);
 
   argv++, argc--;
   for( ; argc ; ) {
@@ -468,7 +469,7 @@ main (int argc, char *argv[])
     }
   param_list_clear(pl);
 
-  if (use_powers) {
+  if (!no_powers) {
       makefb_with_powers(cpoly->alg->f, cpoly->alg->degree, 
               cpoly->alg->lim, maxbits);
   } else {

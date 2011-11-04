@@ -29,7 +29,7 @@
  * cofactorisations are more frequent. 
  * Comment the first line to get an accurate, slower, norm computation. 
  */ 
-#define xxLAZY_NORMS 
+#define LAZY_NORMS 
 #define VERT_NORM_STRIDE 4 
 #define NORM_STRIDE 8 
  
