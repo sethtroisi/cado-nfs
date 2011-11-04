@@ -194,10 +194,12 @@ countFreeRelations(int *deg, char *roots)
     while(1){
 	if(!fgets(str, 1024, ifile))
             break;
-	// format is "11: 2,6,10"
-	sscanf(str, "%s %s", str0, str1);
+	// format is "11: 2,6,10" or "11:1,0: 2,6,11"
+        t = strrchr(str, ':');
+        if (t == NULL)
+            continue;
 	nroots = 1;
-	for(t = str1; *t != '\0'; t++)
+	for(; *t != '\0'; t++)
 	    if(*t == ',')
 		nroots++;
 	if(nroots == *deg)
@@ -205,6 +207,26 @@ countFreeRelations(int *deg, char *roots)
     }
     fclose(ifile);
     return nfree;
+}
+
+
+/* Assuming q is a prime or a prime power, let k be the largest integer with
+   q = p^k, return p if k > 1, 0 otherwise */
+// TODO: stolen from fb.c, maybe share it ? 
+static uint32_t
+is_prime_power (uint32_t q)
+{
+    unsigned int maxk, k;
+    uint32_t p;
+
+    for (maxk = 0, p = q; p > 1; p /= 2, maxk ++);
+    for (k = maxk; k >= 2; k--)
+    {
+        p = (uint32_t) (pow ((double) q, 1.0 / (double) k) + 0.5);
+        if (q % p == 0)
+            return p;
+    }
+    return 0;
 }
 
 void
@@ -217,6 +239,8 @@ addFreeRelations(char *roots, int deg)
     for(fbptr = fb; fbptr->p != FB_END; fbptr = fb_next(fbptr)){
 	p = fbptr->p;
 	if(fbptr->nr_roots == deg){
+            if (is_prime_power(p))
+                continue;
 	    // free relation, add it!
 	    // (p, 0) -> p-0*m
 	    printf("%d,0:%lx:", p, (long)p);
