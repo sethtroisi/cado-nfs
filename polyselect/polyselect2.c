@@ -910,7 +910,7 @@ main (int argc, char *argv[])
 	 mpz_t N;
 	 unsigned int d = 0;
 	 unsigned long P, admin = 0, admax = ULONG_MAX;
-	 int tries = 0, i, nthreads = 1, st, target_time = TARGET_TIME;
+	 int tries = 0, i, nthreads = 1, target_time = TARGET_TIME;
 	 tab_t *T;
 	 FILE *fp;
 #ifdef MAX_THREADS
