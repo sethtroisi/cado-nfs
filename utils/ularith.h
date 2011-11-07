@@ -54,7 +54,7 @@
    must be 32 bit. */
 #if defined(__i386__) && defined(__GNUC__)
 #define ULARITH_CONSTRAINT_G "g"
-#elif defined(__x86_64__) && defined(__GNUC__)
+#elif defined(HAVE_GCC_STYLE_AMD64_ASM)
 #define ULARITH_CONSTRAINT_G "rme"
 #endif
 
@@ -66,7 +66,7 @@ ularith_inc_nz (unsigned long *r, const unsigned long a)
 #ifdef ULARITH_VERBOSE_ASM
   __asm__ ("# ularith_inc_nz (%0, %1)\n" : : "X" (*r), "X" (a));
 #endif
-#if !defined (ULARITH_NO_ASM) && defined(__x86_64__) && defined(__GNUC__)
+#if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_ASM)
   __asm__ ( "cmpq $1, %1\n\t"
             "sbbq $-1, %0\n\t"
     : "+r" (*r)
@@ -95,7 +95,7 @@ ularith_add_ul_2ul (unsigned long *r1, unsigned long *r2,
   __asm__ ("# ularith_add_ul_2ul (%0, %1, %2)\n" : : 
            "X" (*r1), "X" (*r2), "X" (a));
 #endif
-#if !defined (ULARITH_NO_ASM) && defined(__x86_64__) && defined(__GNUC__)
+#if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_ASM)
   __asm__ ( "addq %2, %0\n\t"
             "adcq $0, %1\n"
             : "+&r" (*r1), "+r" (*r2) 
@@ -127,7 +127,7 @@ ularith_add_2ul_2ul (unsigned long *r1, unsigned long *r2,
   __asm__ ("# ularith_add_2ul_2ul (%0, %1, %2, %3)\n" : : 
            "X" (*r1), "X" (*r2), "X" (a1), "X" (a2));
 #endif
-#if !defined (ULARITH_NO_ASM) && defined(__x86_64__) && defined(__GNUC__)
+#if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_ASM)
   __asm__ ( "addq %2, %0\n\t"
             "adcq %3, %1\n"
             : "+&r" (*r1), "+r" (*r2)
@@ -158,7 +158,7 @@ ularith_add_2ul_2ul_cy (unsigned long *r1, unsigned long *r2,
   __asm__ ("# ularith_add_2ul_2ul_cy (%0, %1, %2, %3)\n" : : 
            "X" (*r1), "X" (*r2), "X" (a1), "X" (a2));
 #endif
-#if !defined (ULARITH_NO_ASM) && defined(__x86_64__) && defined(__GNUC__)
+#if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_ASM)
   __asm__ ( "addq %3, %0\n\t"
             "adcq %4, %1\n\t"
 	    "setc %2\n"
@@ -195,7 +195,7 @@ ularith_sub_ul_2ul (unsigned long *r1, unsigned long *r2,
   __asm__ ("# ularith_sub_ul_2ul  (%0, %1, %2)\n" : : 
            "X" (*r1), "X" (*r2), "X" (a));
 #endif
-#if !defined (ULARITH_NO_ASM) && defined(__x86_64__) && defined(__GNUC__)
+#if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_ASM)
   __asm__ ( "subq %2, %0\n\t"
             "sbbq $0, %1\n"
             : "+&r" (*r1), "+r" (*r2)
@@ -228,7 +228,7 @@ ularith_sub_2ul_2ul (unsigned long *r1, unsigned long *r2,
   __asm__ ("# ularith_sub_2ul_2ul (%0, %1, %2, %3)\n" : : 
            "X" (*r1), "X" (*r2), "X" (a1), "X" (a2));
 #endif
-#if !defined (ULARITH_NO_ASM) && defined(__x86_64__) && defined(__GNUC__)
+#if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_ASM)
   __asm__ ( "subq %2, %0\n\t"
             "sbbq %3, %1\n"
             : "+&r" (*r1), "+r" (*r2)
@@ -262,7 +262,7 @@ ularith_sub_2ul_2ul_cy (unsigned long *r1, unsigned long *r2,
   __asm__ ("# ularith_sub_2ul_2ul_cy (%0, %1, %2, %3)\n" : : 
            "X" (*r1), "X" (*r2), "X" (a1), "X" (a2));
 #endif
-#if !defined (ULARITH_NO_ASM) && defined(__x86_64__) && defined(__GNUC__)
+#if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_ASM)
   __asm__ ( "subq %3, %0\n\t"
             "sbbq %4, %1\n\t"
 	    "setc %2\n"
@@ -298,7 +298,7 @@ ularith_sub_2ul_2ul_ge (unsigned long *r1, unsigned long *r2,
   __asm__ ("# ularith_sub_2ul_2ul_ge (%0, %1, %2, %3)\n" : : 
            "X" (*r1), "X" (*r2), "X" (a1), "X" (a2));
 #endif
-#if !defined (ULARITH_NO_ASM) && defined(__x86_64__) && defined(__GNUC__)
+#if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_ASM)
   __asm__ ( "subq %4, %0\n\t" /* r1 -= a1 */
             "sbbq %5, %1\n\t" /* r2 -= a2 + cy */
 	    "cmovc %2, %0\n\t" /* If there's a borrow, restore r1 from t1 */
@@ -337,7 +337,7 @@ ularith_mul_ul_ul_2ul (unsigned long *r1, unsigned long *r2,
   __asm__ ("# ularith_mul_ul_ul_2ul (%0, %1, %2, %3)\n" : : 
            "X" (*r1), "X" (*r2), "X" (a), "X" (b));
 #endif
-#if !defined (ULARITH_NO_ASM) && defined(__x86_64__) && defined(__GNUC__)
+#if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_ASM)
   __asm__ ( "mulq %3"
 	    : "=a" (*r1), "=d" (*r2)
 	    : "%0" (a), "rm" (b)
@@ -377,7 +377,7 @@ ularith_sqr_ul_2ul (unsigned long *r1, unsigned long *r2,
   __asm__ ("# ularith_mul_ul_ul_2ul (%0, %1, %2)\n" : : 
            "X" (*r1), "X" (*r2), "X" (a));
 #endif
-#if !defined (ULARITH_NO_ASM) && defined(__x86_64__) && defined(__GNUC__)
+#if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_ASM)
   __asm__ ( "mulq %%rax"
 	    : "=a" (*r1), "=d" (*r2)
 	    : "0" (a)
@@ -419,7 +419,7 @@ ularith_div_2ul_ul_ul (unsigned long *q, unsigned long *r,
   __asm__ ("# ularith_div_2ul_ul_ul (%0, %1, %2, %3, %4)\n" : : 
            "X" (*q), "X" (*r), "X" (a1), "X" (a2), "X" (b));
 #endif
-#if defined(__x86_64__) && defined(__GNUC__)
+#ifdef HAVE_GCC_STYLE_AMD64_ASM
   __asm__ ( "divq %4"
             : "=a" (*q), "=d" (*r)
             : "0" (a1), "1" (a2), "rm" (b)
@@ -450,7 +450,7 @@ ularith_div_2ul_ul_ul_r (unsigned long *r, unsigned long a1,
   __asm__ ("# ularith_div_2ul_ul_ul_r (%0, %1, %2, %3)\n" : : 
            "X" (*r), "X" (a1), "X" (a2), "X" (b));
 #endif
-#if defined(__x86_64__) && defined(__GNUC__)
+#ifdef HAVE_GCC_STYLE_AMD64_ASM
   __asm__ ( "divq %3"
             : "+a" (a1), "=d" (*r)
             : "1" (a2), "rm" (b)
@@ -479,7 +479,7 @@ ularith_shrd (unsigned long *r, const unsigned long a, const int i)
   __asm__ ("# ularith_shrd (%0, %1, %2)\n" : : 
            "X" (*r), "X" (a), "X" (i));
 #endif
-#if !defined (ULARITH_NO_ASM) && defined(__x86_64__) && defined(__GNUC__)
+#if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_ASM)
   __asm__ ("shrdq %b2, %1, %0\n": 
   /* the b modifier makes gcc print the byte part of the register (%cl) */
            "+rm" (*r) :
@@ -509,7 +509,7 @@ ularith_shld (unsigned long *r, const unsigned long a, const int i)
   __asm__ ("# ularith_shld (%0, %1, %2)\n" : : 
            "X" (*r), "X" (a), "X" (i));
 #endif
-#if !defined (ULARITH_NO_ASM) && defined(__x86_64__) && defined(__GNUC__)
+#if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_ASM)
   __asm__ ("shldq %b2, %1, %0\n": 
   /* the b modifier makes gcc print the byte part of the register (%cl) */
            "+rm" (*r) :

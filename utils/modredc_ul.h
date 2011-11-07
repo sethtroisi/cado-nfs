@@ -111,7 +111,7 @@ modredcul_add_semi (residueredcul_t r, const residueredcul_t a,
 {
   ASSERT_EXPENSIVE (a[0] < m[0].m);
 
-#if (defined(__i386__) || defined(__x86_64__)) && defined(__GNUC__)
+#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_ASM)
   {
     unsigned long t = a[0] - m[0].m, tr = a[0] + b[0];
     
@@ -519,7 +519,7 @@ modredcul_add (residueredcul_t r, const residueredcul_t a,
   printf ("modul_add: a = %lu, b = %lu", a[0], b[0]);
 #endif
 
-#if (defined(__i386__) || defined(__x86_64__)) && defined(__GNUC__)
+#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_ASM)
   {
     unsigned long t = a[0] + b[0], tr = a[0] - m[0].m;
   
@@ -570,7 +570,7 @@ modredcul_sub (residueredcul_t r, const residueredcul_t a,
   printf ("submod_ul: a = %lu, b = %lu", a[0], b[0]);
 #endif
 
-#if (defined(__i386__) || defined(__x86_64__)) && defined(__GNUC__)
+#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_ASM)
   {
     unsigned long tr, t = a[0];
     __asm__ (
@@ -646,7 +646,7 @@ modredcul_mul (residueredcul_t r, const residueredcul_t a,
   
   ularith_mul_ul_ul_2ul (&plow, &phigh, a[0], b[0]);
 
-#if defined(__x86_64__) && defined(__GNUC__)
+#ifdef HAVE_GCC_STYLE_AMD64_ASM
 
   /* TODO: are the register constraints watertight? 
      %rax gets modified but putting tlow as an output constraint with "+"
@@ -687,7 +687,7 @@ modredcul_sqr (residueredcul_t r, const residueredcul_t a,
   ASSERT_EXPENSIVE (a[0] < m[0].m);
 
   ularith_sqr_ul_2ul (&plow, &phigh, a[0]);
-#if defined(__x86_64__) && defined(__GNUC__)
+#ifdef HAVE_GCC_STYLE_AMD64_ASM
 
   /* TODO: are the register constraints watertight? 
      %rax gets modified but putting tlow as an output constraint with "+"
@@ -718,7 +718,7 @@ static inline void
 modredcul_div2 (residueredcul_t r, const residueredcul_t a, 
                 const modulusredcul_t m)
 {
-#if (defined(__i386__) || defined(__x86_64__)) && defined(__GNUC__)
+#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_ASM)
   unsigned long s = a[0], t = m[0].m;
   ASSERT_EXPENSIVE (m[0].m % 2UL != 0UL);
 
