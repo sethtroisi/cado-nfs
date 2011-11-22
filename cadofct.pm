@@ -37,6 +37,7 @@ use File::Copy;
 use Cwd qw(abs_path);
 use List::Util qw[min];
 use POSIX qw(ceil);
+use POSIX ":sys_wait_h";
 use Math::BigInt;
 use IPC::Open3;
 
@@ -267,7 +268,7 @@ sub read_param {
         my $secondary = $_->[1];
         my $origin = $_->[2];
         $_=$_->[0];
-        if (/^-v$/) { $verbose=1; next; }
+        if (/^-v$/) { $verbose++; next; }
         if (/^-y$/) { $assume_yes='y'; next; }
         if (/^-l$/) { $assume_yes='l'; next; }
         next if $files_read{$_};
@@ -402,6 +403,8 @@ sub read_machines {
 
     my %vars = ();
 	
+    # There are several steps for checking jobs.
+    my $dir_check_commands={};
     while (<FILE>) {
         s/^\s+//; s/\s*(#.*)?$//;
         next if /^$/;
@@ -432,18 +435,17 @@ sub read_machines {
 					if !$desc{$k};
             }
             $desc{'tmpdir'} =~ s/%s/$param{'name'}/g;
-            die "the directory tmpdir=$desc{'tmpdir'} or bindir=$desc{'bindir'} don't exist on $host.\n"
-            if ( remote_cmd($host, "env test -d $desc{'tmpdir'} " .
-                " && test -d $desc{'bindir'}")->{'status'} );
             $desc{'cores'}  = 1 unless defined $desc{'cores'};
             $desc{'poly_cores'} = $desc{'cores'} 
                     unless defined $desc{'poly_cores'};
             $desc{'mpi'} = 0 unless defined $desc{'mpi'};
-            if ( $desc{'mpi'} ) {
-                    die "the directory wdir don't exist on $host.\n"
-                    if ( remote_cmd($host,
-                            "env test -d $param{'wdir'} ")->{'status'} );
-            }
+
+            my @dirs=($desc{'tmpdir'}, $desc{'bindir'});
+            push @dirs, $param{'wdir'} if $desc{'mpi'};
+            # We store auxiliary data for later retrieval.
+            $dir_check_commands->{$host}=
+                [ "env " . join(" && ", map { "test -d $_" } @dirs),
+                    \@dirs ];
             while ( $desc{'mpi'} ) {
                     $desc{'mpi'}--;
                     $param{'mpi'}++;
@@ -456,8 +458,20 @@ sub read_machines {
             die "Cannot parse line `$_' in file `$param{'machines'}'.\n";
         }
     }
-
     close FILE;
+
+    info "Probing remote nodes\n";
+
+    my $res = parallel_remote_cmd($dir_check_commands);
+
+    for my $k (keys %$res) {
+        if ($res->{$k}->{'status'}) {
+            my @dirs = @{$dir_check_commands->{$k}->[1]};
+            die "One of the directories " .
+                join(" ", @dirs) .
+                " does not exist on $k.\n"
+        }
+    }
 
     if ( $param{'mpi'} ) {
         chop $param{'hosts'};
@@ -640,6 +654,95 @@ sub remote_cmd {
         if $ret->{'status'} == 255;
 
     return $ret;
+}
+
+# As of 20111122, cadofactor can't deal with large clusters properly.
+# Okay, the cluster scripts are more adapted to this, but OTOH a simple
+# illustrating example _should_ work, and not take ages pinging jobs.
+# 
+# The parallel_remote_cmd mechanism offers some advantages. At the moment
+# only the initial probe uses it, but it eliminates the associated delay
+# completely. It also has a downside, is that it's limited by the OS
+# maximum number of open files (typically 1024). So more than
+# 1024-epsilon sub-jobs are a no-go here. 
+sub parallel_remote_cmd {
+    my $h = shift(@_);
+    my $res = {};
+    my $kids={};
+    # Start jobs.
+    for my $k (keys %$h) {
+        my $fh;
+        my $cmd=$h->{$k}->[0];
+        my $pid = open($fh, "-|");
+        die "fork: $!" unless defined $pid;
+        if ($pid) {     # parent
+            $kids->{$pid}=[$k, $fh, ''];
+        } else {
+            info "Running $cmd on $k\n" if $verbose > 1;
+            my $x=remote_cmd($k, $cmd);
+            print $x->{'out'};
+            exit $x->{'status'};
+        }
+    }
+    my $nj = scalar keys %$kids;
+    info "Checking for completion of $nj remote jobs\n";
+    my $out_statuses={};
+    while(scalar keys %$kids) {
+        my $rin='';
+        my $ein='';
+        my ($rout, $eout);
+        for my $pid (keys %$kids) {
+            my $fh=$kids->{$pid}->[1];
+            vec($rin, fileno($fh), 1) = 1;
+            vec($ein, fileno($fh), 1) = 1;
+        }
+        my $timeout = 10.0;
+        my ($nfound,$timeleft) = select($rout=$rin, undef, $eout=$ein, $timeout);
+        if (!$nfound) {
+            info "Select() loop returned with no FDs after $timeout s\n";
+            next;
+        }
+        my @reap=();
+        for my $pid (keys %$kids) {
+            my $h=$kids->{$pid};
+            my $fh = $h->[1];
+            my $n = fileno($fh);
+            next unless vec($rout, $n, 1) || vec($eout, $n, 1);
+            sysread($fh, my $x, 1024);
+            $h->[2] .= $x;
+            if (vec($eout, $n, 1)) {
+                my $rc = waitpid($pid, WNOHANG);
+                if ($rc == -1) {
+                    warn "waitpid($pid) [$h->[0]]: no such process\n";
+                    push @reap, [ $pid, -1 ];
+                } elsif ($rc > 0) {
+                    warn "waitpid($pid) [$h->[0]]: returns $rc ???\n";
+                    push @reap, [ $pid, $? ];
+                    push @reap, [ $rc, $? ];
+                } elsif ($rc == 0) {
+                    warn "waitpid($pid) [$h->[0]]: still running after exceptional event ?\n";
+                }
+            }
+        }
+        while ((my $rc = waitpid(-1, WNOHANG)) > 0) {
+            push @reap, [ $rc, $? ];
+        }
+        for my $x (@reap) {
+            my ($pid, $status) = @$x;
+            my $h = $kids->{$pid}->[0];
+            $out_statuses->{$status>>8}++;
+            $res->{$h} = {  status=> $status>>8,
+                            out=>$kids->{$pid}->[2],
+                            signal => $status & 255, # core dump info as well
+                        };
+            info "remote command on $h completed\n" if $verbose > 1;
+            delete $kids->{$pid};
+        }
+    }
+    my $stat = join(", ", map { "$_^^$out_statuses->{$_}" } sort keys
+        %$out_statuses);
+    info "Completed $nj remote jobs [$stat]\n";
+    return $res;
 }
 
 ###############################################################################
