@@ -208,7 +208,7 @@ my @default_param = (
     coverNmax    => 100,
     skip         => 32,
     nslices_log  => 1,
-    filterlastrels => 0,
+    filterlastrels => 1,
 
     # linalg
     linalg       => 'bwc',
