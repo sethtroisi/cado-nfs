@@ -37,6 +37,8 @@ deviation=0
 
 ##### Norm computations.
 
+PRECISION=53
+
 def deskew_polynomial(f,s):
     """Utility function. Returns a polynomial over the reals."""
     d=f.degree()
@@ -46,7 +48,7 @@ def deskew_polynomial(f,s):
         g.append(float(f[i])*ss)
         ss*=float(s)
     g.append(f[d]*ss)
-    return RealField()['x'](g), ss
+    return RealField(PRECISION)['x'](g), ss
 
 def supnorm(f,s):
     g,ss=deskew_polynomial(f,s)
@@ -92,7 +94,7 @@ def l2norm_tk_circular(f,s):
       n = 231 * (a6 * a6 + a0 * a0) + 42 * (a6 * a4 + a2 * a0) + 21 * (a5 * a5 + a1 * a1) + 7 * (a4 * a4 + a2 * a2) + 14 * (a6 * a2 + a5 * a3 + a4 * a0 + a3 * a1) + 10 * (a6 * a0 + a5 * a1 + a4 * a2) + 5 * a3 * a3
       n = n * pi / 7168
       # return float(1/2 * log(n / (s * s * s * s * s * s)))
-      return RealField(128)(1/2 * log(n / (s * s * s * s * s * s)))
+      return RealField(PRECISION)(1/2 * log(n / (s * s * s * s * s * s)))
    else:
       raise ValueError, "circular norm not yet implemented for this degree"
 
@@ -193,7 +195,7 @@ def best_l2norm_tk_circular(f):
 
 def skew_l2norm_tk_circular(f):
    if f.degree()==6:
-      R.<s> = RDF[]
+      R.<s> = RealField(PRECISION)[]
       a0 = f[0]
       a1 = f[1] * s
       a2 = f[2] * s^2
@@ -208,7 +210,7 @@ def skew_l2norm_tk_circular(f):
          raise ValueError, "number of positive roots <> 1"
       return root_pos[0]
    elif f.degree()==5:
-      R.<s> = RDF[]
+      R.<s> = RealField(PRECISION)[]
       a0 = f[0]
       a1 = f[1] * s
       a2 = f[2] * s^2
@@ -305,7 +307,7 @@ def flog10(x): return float(log(abs(float(x)))/log(10))
 def fexp10(x): return float(exp(float(x*log(10))))
 
 def change_ccoeff(f,a0):
-    return PolynomialRing(RealField(),'x')(f-f[0])+a0
+    return PolynomialRing(RealField(PRECISION),'x')(f-f[0])+a0
 
 
 
@@ -425,7 +427,7 @@ def lognorm_plus_alpha_rot(f,g,normfunc,w):
     separated from the mean by as many standard deviations as given by
     the global ``deviation'' parameter.
     """
-    RP=PolynomialRing(RealField(),'z');
+    RP=PolynomialRing(RealField(PRECISION),'z');
     E=[fexp10(w), -fexp10(w)]
     lognorm=min([flog(normfunc(RP(f)+e*RP(g))) for e in E])
     alpha=eval_dichotomy(reduced_alpha_affine_table,10.0*(w))
@@ -440,7 +442,7 @@ def lognorm_plus_alpha_rot_scons(f,g,normfunc,skew,w):
     separated from the mean by as many standard deviations as given by
     the global ``deviation'' parameter.
     """
-    RP=PolynomialRing(RealField(),'z');
+    RP=PolynomialRing(RealField(PRECISION),'z');
     E=[fexp10(w), -fexp10(w)]
     lognorm=min([flog(normfunc(RP(f)+e*RP(g), skew)) for e in E])
     alpha=eval_dichotomy(reduced_alpha_affine_table,10.0*(w))
@@ -457,7 +459,7 @@ def lognorm_plus_alpha_rot_scons_linear(f,g,normfunc,skew,w):
     s=flog(skew)
     logb=(w*flog(10)+s)/2
     loga=(w*flog(10)-s)/2
-    RP=PolynomialRing(RealField(),'z');
+    RP=PolynomialRing(RealField(PRECISION),'z');
     z=RP.gen()
     Ea=fexp(loga); Eb=fexp(logb)
     E=[ Ea*z+Eb, Ea*z-Eb, -Ea*z+Eb, -Ea*z-Eb ];
@@ -478,7 +480,7 @@ def lognorm_plus_alpha_rot_linear(f,g,normfunc,skew,w):
     s=flog(skew)
     logb=(w*flog(10)+s)/2
     loga=(w*flog(10)-s)/2
-    RP=PolynomialRing(RealField(),'z');
+    RP=PolynomialRing(RealField(PRECISION),'z');
     z=RP.gen()
     Ea=fexp(loga); Eb=fexp(logb)
     E=[ Ea*z+Eb, Ea*z-Eb, -Ea*z+Eb, -Ea*z-Eb ];
@@ -499,7 +501,7 @@ def lognorm_plus_alpha_rot_linear_sopt(f,g,normfunc,w):
     """
     cands=[]
     nsteps=20
-    RP=PolynomialRing(RealField(),'z');
+    RP=PolynomialRing(RealField(PRECISION),'z');
     z=RP.gen()
     for s in [(k+1)/nsteps for k in range(nsteps)]:
         #+ [ flog(skew_l2norm_tk(f)) ]:
