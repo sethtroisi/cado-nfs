@@ -33,6 +33,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 
 #define NEW_ROOTSIEVE
 //#define OPTIMIZE_MP
+//#define DEBUG_OPTIMIZE_AUX
 
 /* for the rotation, we try (j*x+k) for |k| <= 2^MAX_k */
 int MAX_k = 16;
@@ -2462,6 +2463,9 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
       logmu = L2_lognorm (f, d, skew, method);
       if (logmu < logmu0)
         {
+#ifdef DEBUG_OPTIMIZE_AUX
+          gmp_fprintf (stderr, "%.10f (logmu) < %.10f (logmu0),\t ktot=%Zd\n", logmu, logmu0, ktot);
+#endif
           changedt = 1;
           logmu0 = logmu;
         }
@@ -2473,7 +2477,10 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
           skew = L2_skewness (f, d, prec, method);
           logmu = L2_lognorm (f, d, skew, method);
           if (logmu < logmu0)
-            {
+          {
+#ifdef DEBUG_OPTIMIZE_AUX
+            gmp_fprintf (stderr, "%.10f (logmu) < %.10f (logmu0),\t ktot=%Zd\n", logmu, logmu0, ktot);
+#endif
               changedt = 1;
               logmu0 = logmu;
             }
@@ -2496,6 +2503,9 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
           logmu = L2_lognorm (f, d, skew, method);
           if (logmu < logmu0)
             {
+#ifdef DEBUG_OPTIMIZE_AUX
+              gmp_fprintf (stderr, "%.10f (logmu) < %.10f (logmu0),\t khitot=%Zd\n", logmu, logmu0, khitot);
+#endif
               changed2 = 1;
               logmu0 = logmu;
             }
@@ -2511,6 +2521,9 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
               logmu = L2_lognorm (f, d, skew, method);
               if (logmu < logmu0)
                 {
+#ifdef DEBUG_OPTIMIZE_AUX
+                  gmp_fprintf (stderr, "%.10f (logmu) < %.10f (logmu0),\t khitot=%Zd\n", logmu, logmu0, khitot);
+#endif
                   changed2 = 1;
                   logmu0 = logmu;
                 }
@@ -2535,6 +2548,9 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
           logmu = L2_lognorm (f, d, skew, method);
           if (logmu < logmu0)
             {
+#ifdef DEBUG_OPTIMIZE_AUX
+              gmp_fprintf (stderr, "%.10f (logmu) < %.10f (logmu0),\t lamtot=%Zd\n", logmu, logmu0, lamtot);
+#endif
               changed1 = 1;
               logmu0 = logmu;
             }
@@ -2548,6 +2564,9 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
               logmu = L2_lognorm (f, d, skew, method);
               if (logmu < logmu0)
                 {
+#ifdef DEBUG_OPTIMIZE_AUX
+                  gmp_fprintf (stderr, "%.10f (logmu) < %.10f (logmu0),\t lamtot=%Zd\n", logmu, logmu0, lamtot);
+#endif
                   changed1 = 1;
                   logmu0 = logmu;
                 }
@@ -2566,6 +2585,9 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
           logmu = L2_lognorm (f, d, skew, method);
           if (logmu < logmu0)
             {
+#ifdef DEBUG_OPTIMIZE_AUX
+              gmp_fprintf (stderr, "%.10f (logmu) < %.10f (logmu0),\t mutot=%Zd\n", logmu, logmu0, mutot);
+#endif
               changed = 1;
               logmu0 = logmu;
             }
@@ -2578,6 +2600,9 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
               logmu = L2_lognorm (f, d, skew, method);
               if (logmu < logmu0)
                 {
+#ifdef DEBUG_OPTIMIZE_AUX
+                  gmp_fprintf (stderr, "%.10f (logmu) < %.10f (logmu0),\t mutot=%Zd\n", logmu, logmu0, mutot);
+#endif
                   changed = 1;
                   logmu0 = logmu;
                 }
