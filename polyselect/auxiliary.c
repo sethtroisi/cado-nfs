@@ -3208,13 +3208,14 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
                                    DEFAULT_L2_METHOD, skew);
         L2_lognorm_mp (f, d, skew, DEFAULT_L2_METHOD, logmu);
 
-        double logmud = 0.0, skewd = 0.0;
+        double logmud = 0.0, skewd = 0.0, skewf = 0.0;
         logmud = mpz_get_d (logmu);
+        skewf = mpz_get_d (skew);
         mpz_pow_ui (skew, skew, d); // s^6
         skewd = mpz_get_d (skew);
         logmud = logmud / skewd * 0.00043828022511018320850; /* Pi/7168 */
         logmud = 0.5 * log(logmud);
-        logmud -= sqrt (SKEW_FACTOR * log (skewd));
+        logmud -= sqrt (SKEW_FACTOR * log (skewf));
 
         if (logmud < best_logmud) {
           best_logmud = logmud;
