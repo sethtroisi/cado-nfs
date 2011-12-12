@@ -610,7 +610,7 @@ merge_m_fast(report_t *rep, filter_matrix_t *mat, int m, int maxdo, int verbose)
     }
     fprintf (stderr, "\n"); /* to keep last output on screen */
     tot = seconds()-tot;
-    fprintf(stderr, "T=%d m=%d nj=%d", (int)seconds(), m, njproc);
+    fprintf(stderr, "m=%d nj=%d", m, njproc);
     fprintf(stderr, " findopt=%2.2lf (fill=%2.2lf mst=%2.2lf) tot=%2.2lf",
 	    totopt, totfill, totMST, tot);
     fprintf(stderr, " del=%2.2lf\n", totdel);
@@ -937,18 +937,18 @@ merge(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, int forbw)
 #endif
 
 static uint64_t
-my_cost(unsigned long N, unsigned long c, int forbw)
+my_cost(unsigned long N, unsigned long w, int forbw)
 {
     if(forbw == 2){
 	double K1 = .19e-9, K2 = 3.4e-05, K3 = 1.4e-10; // kinda average
-	double dN = (double)N, dc = (double)c;
+	double dN = (double)N, dw = (double) w;
 
-	return (uint64_t)((K1+K3)*dN*dc+K2*dN*log(dN)*log(dN));
+	return (uint64_t)((K1+K3)*dN*dw+K2*dN*log(dN)*log(dN));
     }
     else if(forbw == 3)
-	return (uint64_t)(c/N);
+	return (uint64_t)(w/N);
     else if(forbw <= 1)
-	return ((uint64_t)N)*((uint64_t)c);
+	return ((uint64_t)N)*((uint64_t)w);
     return (uint64_t)0;
 }
 
@@ -1124,22 +1124,21 @@ mergeOneByOne(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, in
 	    ni2rem = number_of_superfluous_rows(mat);
 	    deleteSuperfluousRows(rep, mat, mat->keep, ni2rem, m);
 	    inspectRowWeight(rep, mat);
-	    fprintf(stderr, "T=%d", (int)seconds());
 #ifndef USE_MARKOWITZ
-	    fprintf(stderr, " mmax=%d", mmax);
+	    fprintf(stderr, "mmax=%d ", mmax);
 #endif	
-	    fprintf(stderr, " N=%d (%d) c=%lu",
+	    fprintf(stderr, "N=%d (%d) w=%lu",
 		    mat->rem_nrows, mat->rem_nrows - mat->rem_ncols,
 		    mat->weight);
 	    if(forbw == 2)
 		fprintf(stderr, " bw=%"PRIu64"", bwcost);
 	    else if(forbw == 3)
-		fprintf(stderr, " c*N=%"PRIu64"",
+		fprintf(stderr, " w*N=%"PRIu64"",
 			((uint64_t)mat->rem_nrows)
 			*((uint64_t)mat->weight));
 	    else if(forbw <= 1)
-		fprintf(stderr, " c*N=%"PRIu64"", bwcost);
-	    fprintf(stderr, " c/N=%2.2lf\n",
+		fprintf(stderr, " w*N=%"PRIu64"", bwcost);
+	    fprintf(stderr, " w/N=%2.2lf\n",
 		    ((double)mat->weight)/((double)mat->rem_ncols));
 	    // njrem=%d at %2.2lf\n",
 	    if((forbw != 0) && (forbw != 3))
@@ -1174,7 +1173,7 @@ mergeOneByOne(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, in
 	}
 	else if(forbw == 3){
 	    if(bwcost > (uint64_t)coverNmax){
-		fprintf(stderr, "c/N too high, stopping [%"PRIu64"]\n", bwcost);
+		fprintf(stderr, "w/N too high, stopping [%"PRIu64"]\n", bwcost);
 		break;
 	    }
 	}
