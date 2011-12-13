@@ -80,6 +80,8 @@ def l2norm_tk(f,s):
     coeffs=[4/(2*i+1)/(2*(d-i)+1) for i in [0..d]]
     return sqrt(vector(g2.coeffs())*vector(coeffs)/ss)
 
+PRECISION=53
+
 def l2norm_tk_circular(f,s):
    if f.degree()==6:
       a0 = f[0]
@@ -92,7 +94,7 @@ def l2norm_tk_circular(f,s):
       n = 231 * (a6 * a6 + a0 * a0) + 42 * (a6 * a4 + a2 * a0) + 21 * (a5 * a5 + a1 * a1) + 7 * (a4 * a4 + a2 * a2) + 14 * (a6 * a2 + a5 * a3 + a4 * a0 + a3 * a1) + 10 * (a6 * a0 + a5 * a1 + a4 * a2) + 5 * a3 * a3
       n = n * pi / 7168
       # return float(1/2 * log(n / (s * s * s * s * s * s)))
-      return RealField(128)(1/2 * log(n / (s * s * s * s * s * s)))
+      return RealField(PRECISION)(1/2 * log(n / (s * s * s * s * s * s)))
    else:
       raise ValueError, "circular norm not yet implemented for this degree"
 
@@ -193,7 +195,8 @@ def best_l2norm_tk_circular(f):
 
 def skew_l2norm_tk_circular(f):
    if f.degree()==6:
-      R.<s> = RDF[]
+      # R.<s> = RDF[]
+      R.<s> = RealField(PRECISION)[]
       a0 = f[0]
       a1 = f[1] * s
       a2 = f[2] * s^2
@@ -205,6 +208,7 @@ def skew_l2norm_tk_circular(f):
       r = e.real_roots()
       root_pos=[s for s in r if s > 0]
       if len(root_pos) <> 1:
+         print e, r
          raise ValueError, "number of positive roots <> 1"
       return root_pos[0]
    elif f.degree()==5:
