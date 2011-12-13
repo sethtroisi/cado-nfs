@@ -1115,8 +1115,8 @@ mergeOneByOne(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, in
 	    }
 	}
 #endif
-	bwcost = my_cost((unsigned long)mat->rem_nrows,
-			 (unsigned long)mat->weight, forbw);
+	bwcost = my_cost ((unsigned long) mat->rem_nrows,
+                          (unsigned long) mat->weight, forbw);
 	if(njproc >= target){ // somewhat arbitrary...!
 #ifdef USE_MARKOWITZ
 	    njrem = removeSingletons(rep, mat);
@@ -1139,7 +1139,7 @@ mergeOneByOne(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, in
 	    else if(forbw <= 1)
 		fprintf(stderr, " w*N=%"PRIu64"", bwcost);
 	    fprintf(stderr, " w/N=%2.2lf\n",
-		    ((double)mat->weight)/((double)mat->rem_ncols));
+		    ((double)mat->weight)/((double)mat->rem_nrows));
 	    // njrem=%d at %2.2lf\n",
 	    if((forbw != 0) && (forbw != 3))
 		// what a trick!!!!
@@ -1171,12 +1171,15 @@ mergeOneByOne(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, in
 		}
 	    }
 	}
-	else if(forbw == 3){
-	    if(bwcost > (uint64_t)coverNmax){
-		fprintf(stderr, "w/N too high, stopping [%"PRIu64"]\n", bwcost);
+	else if(forbw == 3)
+          {
+            if (bwcost >= (uint64_t) coverNmax)
+              {
+		fprintf (stderr, "w/N too high (%"PRIu64"), stopping\n",
+                         bwcost);
 		break;
-	    }
-	}
+              }
+          }
 	if((forbw != 0) && (oldbwcost != 0) && (bwcost > oldbwcost)){
 	    ncost++;
 #if 0
