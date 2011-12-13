@@ -23,10 +23,11 @@ char *cado_strndup(const char *a, size_t n)
     return r;
 }
 
-void *malloc_check(const size_t x)
+void
+*malloc_check (const size_t x)
 {
     void *p;
-    p = malloc(x);
+    p = malloc (x);
     ASSERT_ALWAYS(p != NULL);
     return p;
 }

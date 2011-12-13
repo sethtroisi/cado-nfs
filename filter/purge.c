@@ -933,10 +933,10 @@ main (int argc, char **argv)
         fprintf (stderr, "   Starting singleton removal...\n");
         nrel_new = nrel;
         nprimes_new = nprimes;
-        if (final && (nrel_new < nprimes_new * excess))
+        if (final && ((double) nrel_new < (double) nprimes_new * excess))
           {
             fprintf (stderr, "Initial excess is below requested %ld, stopping.\n",
-                     (long int)(nprimes_new * (excess - 1)));
+                     (long int)((double) nprimes_new * (excess - 1.0)));
             exit (1); /* initial excess is too small */
           }
         if (final && noclique)
