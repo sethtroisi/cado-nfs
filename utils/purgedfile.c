@@ -87,6 +87,7 @@ void purgedfile_stream_rewind(purgedfile_stream_ptr ps)
     /* re-parse header */
     rc = fscanf (ps->source, "%d %d\n", &ps->nrows, &ps->ncols);
     ASSERT_ALWAYS(rc == 2);
+    ps->rrows = 0;
 }
 
 
