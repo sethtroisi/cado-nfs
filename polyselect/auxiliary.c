@@ -2421,6 +2421,172 @@ do_translate_z (mpz_t *f, int d, mpz_t *g, mpz_t k)
   mpz_addmul (g[0], g[1], k);
 }
 
+/* translate and rotate */
+double
+optimize_dir_aux_aux ( mpz_t *f, mpz_t *g, int d, int method,
+                      mpz_t kt, mpz_t k2, mpz_t k1, mpz_t k )
+{
+  int prec = SKEWNESS_DEFAULT_PREC;
+
+  do_translate_z (f, d, g, kt);
+  rotate_auxg_z (f, g[1], g[0], k2, 2);
+  rotate_auxg_z (f, g[1], g[0], k1, 1);
+  rotate_auxg_z (f, g[1], g[0], k, 0);
+  double skew = L2_skewness (f, d, prec, method);
+  double logmu = L2_lognorm (f, d, skew, method);
+
+  return logmu;
+}
+
+/* Use rotation and translation to find a polynomial with smaller norm
+   (local minimum). Modify f and g accordingly.
+*/
+void
+optimize_dir_aux (mpz_t *f, int d, mpz_t *g, int verbose, int method)
+{
+  int i, ct, c2, c1, c0, count = 0;
+  int changedt, changed2, changed1, changed0;
+  double logmu00, logmu0, logmu, skew;
+  int prec = SKEWNESS_DEFAULT_PREC;
+  mpz_t kt, k2, k1, k0, kttmp, k2tmp, k1tmp, k0tmp; /* current offset */
+  mpz_t ftmp[d], gtmp[2], f0[d], g0[2];;
+
+  mpz_init_set_ui (k0, 1);
+  mpz_init_set_ui (k2, 1);
+  mpz_init_set_ui (k1, 1);
+  mpz_init_set_ui (kt, 1);
+  mpz_init (k0tmp);
+  mpz_init (k2tmp);
+  mpz_init (k1tmp);
+  mpz_init (kttmp);
+  for (i = 0; i <= d; i++) {
+    mpz_init_set (f0[i], f[i]);
+    mpz_init_set (ftmp[i], f[i]);
+  }
+  mpz_init_set (gtmp[0], g[0]);
+  mpz_init_set (gtmp[1], g[1]);
+  mpz_init_set (g0[0], g[0]);
+  mpz_init_set (g0[1], g[1]);
+
+  skew = L2_skewness (f, d, prec, method);
+  logmu00 = logmu0 = L2_lognorm (f, d, skew, method);
+
+  while (1)
+  {
+
+    /* at this point, kt, k, k1, k2 are fixed. we find the best direction (3^4 such trials). */
+    changed0 = changedt = changed2 = changed1 = 0;
+
+    for (ct = 0; ct <= 2; ct ++) {
+      for (c2 = 0; c2 <= 2; c2 ++) {
+        for (c1 = 0; c1 <= 2; c1 ++) {
+          for (c0 = 0; c0 <= 2; c0 ++) {
+
+            mpz_set (gtmp[0], g[0]);
+            mpz_set (gtmp[1], g[1]);
+            for (i = 0; i <= d; i++)
+              mpz_set (ftmp[i], f[i]);
+
+            mpz_set (kttmp, kt);
+            mpz_submul_ui (kttmp, kt, ct);
+            mpz_set (k2tmp, k2);
+            mpz_submul_ui (k2tmp, k2, c2);
+            mpz_set (k1tmp, k1);
+            mpz_submul_ui (k1tmp, k1, c1);
+            mpz_set (k0tmp, k0);
+            mpz_submul_ui (k0tmp, k0, c0);
+
+            /* do the translation and rotation */
+            logmu = optimize_dir_aux_aux ( ftmp, gtmp, d, method,
+                                           kttmp, k2tmp, k1tmp, k0tmp );
+
+            if (logmu < logmu0) {
+
+              logmu0 = logmu;
+              mpz_set (g0[0], gtmp[0]);
+              mpz_set (g0[1], gtmp[1]);
+              for (i = 0; i <= d; i++)
+                mpz_set (f0[i], ftmp[i]);
+
+              if (ct != 1)
+                changedt = 1;
+              if (c2 != 1)
+                changed2 = 1;
+              if (c1 != 1)
+                changed1 = 1;
+              if (c0 != 1)
+                changed0 = 1;
+
+            }
+          }
+        }
+      }
+    }
+
+    /* move f, g to the best point. */
+    mpz_set (g[0], g0[0]);
+    mpz_set (g[1], g0[1]);
+    for (i = 0; i <= d; i++)
+      mpz_set (f[i], f0[i]);
+
+    if (changedt == 1)
+      mpz_mul_2exp (kt, kt, 1);
+    else if (mpz_cmp_ui (kt, 1) > 0)
+      mpz_div_2exp (kt, kt, 1);
+    if (changed0 == 1)
+      mpz_mul_2exp (k0, k0, 1);
+    else if (mpz_cmp_ui (k0, 1) > 0)
+      mpz_div_2exp (k0, k0, 1);
+    if (changed2 == 1)
+      mpz_mul_2exp (k2, k2, 1);
+    else if (mpz_cmp_ui (k2, 1) > 0)
+      mpz_div_2exp (k2, k2, 1);
+    if (changed1 == 1)
+      mpz_mul_2exp (k1, k1, 1);
+    else if (mpz_cmp_ui (k1, 1) > 0)
+      mpz_div_2exp (k1, k1, 1);
+
+    /* shall we stop? */
+    if (changedt == 0 && changed0 == 0 && changed2 == 0 && changed1 == 0 &&
+        mpz_cmp_ui (kt, 1) == 0 && mpz_cmp_ui (k0, 1) == 0 &&
+        mpz_cmp_ui (k2, 1) == 0 && mpz_cmp_ui (k1, 1) == 0)
+      break;
+
+    if (count++ > 10000) /* avoid an infinite loop due to the random
+                            choices when logmu=logmu0 */
+      break;
+  }
+
+  if (verbose > 0)
+  {
+    gmp_fprintf (stderr, "# ad=%Zd: optimized lognorm from %.2f to %.2f\n",
+                 f[d], logmu00, logmu0);
+    if (verbose > 1)
+    {
+      fprintf (stderr, "# "); fprint_polynomial (stderr, f, d);
+      fprintf (stderr, "# "); fprint_polynomial (stderr, g, 1);
+    }
+  }
+
+  mpz_clear (kt);
+  mpz_clear (k2);
+  mpz_clear (k1);
+  mpz_clear (k0);
+  mpz_clear (k0tmp);
+  mpz_clear (k2tmp);
+  mpz_clear (k1tmp);
+  mpz_clear (kttmp);
+  for (i = 0; i <= d; i++) {
+    mpz_clear (f0[i]);
+    mpz_clear (ftmp[i]);
+  }
+  mpz_clear (gtmp[0]);
+  mpz_clear (gtmp[1]);
+  mpz_clear (g0[0]);
+  mpz_clear (g0[1]);
+}
+
+
 /* Use rotation and translation to find a polynomial with smaller norm
    (local minimum). Modify f and g accordingly.
    If use_rotation is non zero, use also rotation.
@@ -2648,7 +2814,7 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
       if (verbose > 1)
         {
           fprintf (stderr, "# "); fprint_polynomial (stderr, f, d);
-          fprintf (stderr, "# "); fprint_polynomial (stderr, g, d);
+          fprintf (stderr, "# "); fprint_polynomial (stderr, g, 1);
         }
     }
 
@@ -3224,7 +3390,7 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
         }
 #else
         optimize_aux (f, d, g, verbose, use_rotation, CIRCULAR);
-
+        //optimize_dir_aux (f, d, g, verbose, CIRCULAR);
         skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC,
                             DEFAULT_L2_METHOD);
         logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
@@ -3232,7 +3398,6 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
 
         if (logmu < best_logmu)
         {
-          //fprintf (stdout, "changed: %f %f\n", best_logmu, logmu);
           best_logmu = logmu;
           best_l = l;
           mpz_set (best_k, r[j]);
@@ -3286,6 +3451,7 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
   optimize_aux_mp (f, d, g, verbose, use_rotation, CIRCULAR);
 #else
   optimize_aux (f, d, g, verbose, use_rotation, CIRCULAR);
+  //optimize_dir_aux (f, d, g, verbose, CIRCULAR);
 #endif
 
   /* if we want to optimize for the rectangular method, it seems better to
