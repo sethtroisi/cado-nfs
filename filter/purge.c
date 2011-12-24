@@ -933,7 +933,11 @@ main (int argc, char **argv)
         fprintf (stderr, "   Starting singleton removal...\n");
         nrel_new = nrel;
         nprimes_new = nprimes;
-        if (final && ((double) nrel_new < (double) nprimes_new * excess))
+        /* if one pass only (minpa=minpr=0), usually the initial excess is
+           negative, but after a few steps of removing singletons, we get a
+           positive excess */
+        if (final && ((double) nrel_new < (double) nprimes_new * excess) &&
+            pass >= 2)
           {
             fprintf (stderr, "Initial excess is below requested %ld, stopping.\n",
                      (long int)((double) nprimes_new * (excess - 1.0)));
