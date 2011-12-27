@@ -569,10 +569,12 @@ static void
 remove_singletons (int *nrel, int nrelmax, int *nprimes, hashtable_t *H,
                    bit_vector_ptr rel_used, int **rel_compact, int keep, int final)
 {
-  int old, newnrel = *nrel, newnprimes = *nprimes;
+  int old, newnrel = *nrel, newnprimes = *nprimes, oldexcess, excess;
 
+  excess = newnrel - newnprimes;
     do{
 	old = newnrel;
+        oldexcess = excess;
         if (final) /* otherwise the excess is wrong */
           deleteHeavierRows (H, &newnrel, &newnprimes, rel_used, rel_compact,
                              nrelmax, keep);
@@ -581,8 +583,12 @@ remove_singletons (int *nrel, int nrelmax, int *nprimes, hashtable_t *H,
                      newnrel, newnprimes, seconds ());
 	onepass_singleton_removal (nrelmax, &newnrel, &newnprimes, H,
                                    rel_used, rel_compact);
+        excess = newnrel - newnprimes;
 	fprintf (stderr, "   new_nrows=%d new_ncols=%d (%d) at %2.2lf\n",
-		newnrel, newnprimes, newnrel-newnprimes, seconds());
+		newnrel, newnprimes, excess, seconds());
+        if (final && oldexcess > excess)
+          fprintf (stderr, "   [each excess row deleted %2.2lf rows]\n",
+                   (double) (old - newnrel) / (double) (oldexcess - excess));
     } while(newnrel != old);
 
     /* Warning: we might have empty rows, i.e., empty rel_compact[i] lists,
@@ -936,11 +942,10 @@ main (int argc, char **argv)
         /* if one pass only (minpa=minpr=0), usually the initial excess is
            negative, but after a few steps of removing singletons, we get a
            positive excess */
-        if (final && ((double) nrel_new < (double) nprimes_new * excess) &&
-            pass >= 2)
+        if (final && (nrel_new < nprimes_new * excess) && pass >= 2)
           {
             fprintf (stderr, "Initial excess is below requested %ld, stopping.\n",
-                     (long int)((double) nprimes_new * (excess - 1.0)));
+                     (long int)(nprimes_new * (excess - 1)));
             exit (1); /* initial excess is too small */
           }
         if (final && noclique)
