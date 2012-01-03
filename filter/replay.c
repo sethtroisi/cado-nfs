@@ -125,6 +125,7 @@ addrel(int **sparsemat, int *colweight, int *buf, int ibuf, int i)
     }
 }
 
+// Fills in sparsemat and colweight
 static void
 makeSparse(int **sparsemat, int *colweight, purgedfile_stream ps,
            int jmin, int jmax, int **oldrows, int verbose, int nslices)
@@ -371,7 +372,8 @@ makeIndexFile(const char *indexname, int nrows, int **newrows, int small_nrows, 
 }
 
 // on input, colweight[j] contains the weight; on exit, colweight[j]
-// contains the new index for j.
+// contains the new index for j. Heavier columns are in front of the new
+// matrix.
 static void
 renumber(const char * sosname, int *small_ncols, int *colweight, int ncols)
 {
@@ -471,13 +473,14 @@ doAllAdds(int **newrows, char *str)
 
 #define STRLENMAX 2048
 
+// Fills in sparsemat and colweight via makeSparse.
 static int
-oneFile(const char *sparsename, const char * sosname, int **sparsemat, int *colweight, purgedfile_stream_ptr ps, int **oldrows, int ncols, int small_nrows, int verbose, int skip, int bin)
+oneFile(const char *sparsename, const char * sosname, int **sparsemat, int *colweight, purgedfile_stream_ptr ps, int **whichrows, int ncols, int small_nrows, int verbose, int skip, int bin)
 {
     unsigned long W;
     int small_ncols;
 
-    makeSparse(sparsemat, colweight, ps, 0, ncols, oldrows, verbose,0);
+    makeSparse(sparsemat, colweight, ps, 0, ncols, whichrows, verbose, 0);
 
     fprintf(stderr, "Renumbering columns (including sorting w.r.t. weight)\n");
     renumber(sosname, &small_ncols, colweight, ncols);
@@ -494,7 +497,7 @@ oneFile(const char *sparsename, const char * sosname, int **sparsemat, int *colw
 }
 
 static int
-manyFiles(const char *sparsename, int **sparsemat, int *colweight, purgedfile_stream_ptr ps, int **oldrows, int ncols, int small_nrows, int verbose, int skip, int bin, int nslices)
+manyFiles(const char *sparsename, int **sparsemat, int *colweight, purgedfile_stream_ptr ps, int **whichrows, int ncols, int small_nrows, int verbose, int skip, int bin, int nslices)
 {
     char *name;
     int small_ncols = 1; // always the +1 trick
@@ -523,7 +526,7 @@ manyFiles(const char *sparsename, int **sparsemat, int *colweight, purgedfile_st
 	snprintf(name, namelen, "%s.%02d", sparsename, slice);
 	fprintf(stderr, "Dealing with M[%d..%d[ -> %s\n", jmin, jmax, name);
         purgedfile_stream_rewind(ps);
-	makeSparse(sparsemat,colweight,ps,jmin,jmax,oldrows,verbose,
+	makeSparse(sparsemat,colweight,ps,jmin,jmax,whichrows,verbose,
 		   nslices);
 	// colweight[jmin..jmax[ contains the new weights of the
 	// corresponding columns
@@ -631,10 +634,10 @@ int
 main(int argc, char *argv[])
 {
     FILE *hisfile, *fromfile;
-    uint64_t bwcostmin = 0;
+    uint64_t bwcostmin = 0, wrs = 0;
     int nrows, ncols, nslices = 0;
-    int **newrows, i, j, nb, *nbrels, **oldrows, *colweight;
-    int ind, small_nrows, small_ncols, **sparsemat;
+    int **newrows, **whichrows, **sparsemat, *nbrels, *colweight;
+    int i, j, nb, ind, small_nrows, small_ncols;
     int verbose = 0, writeindex;
     char str[STRLENMAX];
     int bin=0;
@@ -691,12 +694,20 @@ main(int argc, char *argv[])
     ASSERT_ALWAYS(ncols == ps->ncols);
 
     fprintf(stderr, "Original matrix has size %d x %d\n", nrows, ncols);
+
+    // at the end of the following operations, newrows[i] is either
+    // NULL
+    // or k i_1 ... i_k which means that M_small will contain a row formed
+    // of the addition of the rows of indices i_1 ... i_k in the original
+    // matrix
     newrows = (int **)malloc(nrows * sizeof(int *));
 
     if(fromname == NULL){
+	// generic case
 	writeindex = 1;
 	build_newrows_from_file(newrows, nrows, hisfile, bwcostmin);
     } else {
+	// rare case, probably very very rare
 	writeindex = 0;
 	fromfile = fopen(fromname, "r");
 	ASSERT(fromfile != NULL);
@@ -704,10 +715,10 @@ main(int argc, char *argv[])
     }
     fclose(hisfile);
 
+    // nbrels[oldi] will contain the number of new relations in which
+    // M_purged[oldi] takes part
     nbrels = (int *) malloc(nrows * sizeof(int));
     memset (nbrels, 0, nrows * sizeof(int));
-    // nbrels[oldi] contains the number of new relations in which old
-    // relation of index oldi takes part
     small_nrows = 0;
     for(i = 0; i < nrows; i++)
 	if(newrows[i] != NULL){
@@ -725,44 +736,59 @@ main(int argc, char *argv[])
 	    fprintf(stderr, "\n");
 #endif
 	}
-    fprintf(stderr, "Allocating oldrows\n");
-    oldrows = (int **)malloc(nrows * sizeof(int *));
+    fprintf(stderr, "Allocating whichrows\n");
+    // we create whichrows[i] = k i_1 ... i_k which means that
+    // M_purged[i] is used in the rows i_1 ... i_k of M_small
+    whichrows = (int **)malloc(nrows * sizeof(int *));
     for(i = 0; i < nrows; i++){
-	oldrows[i] = (int *)malloc((nbrels[i]+1) * sizeof(int));
-	oldrows[i][0] = 0;
+	whichrows[i] = (int *)malloc((nbrels[i]+1) * sizeof(int));
+	whichrows[i][0] = 0;
+	wrs += (nbrels[i]+1);
     }
+    fprintf(stderr, "wrs = %"PRIu64"\n", wrs);
     free (nbrels);
-    fprintf(stderr, "Filling oldrows\n");
+    fprintf(stderr, "Filling whichrows\n");
     for(i = 0, nb = 0; i < nrows; i++)
         if(newrows[i] != NULL){
 	    // this is row of index nb in the new matrix
 	    for(j = 1; j <= newrows[i][0]; j++){
 		ind = newrows[i][j];
-		oldrows[ind][0]++;
-		oldrows[ind][oldrows[ind][0]] = nb;
+		whichrows[ind][0]++;
+		whichrows[ind][whichrows[ind][0]] = nb;
 	    }
 	    nb++;
 	}
 #if DEBUG >= 1
-    printOldRows(oldrows, nrows);
+    printOldRows(whichrows, nrows);
 #endif
     colweight = (int *)malloc(ncols * sizeof(int *));
     memset(colweight, 0, ncols * sizeof(int *));
+
+    // we build sparsemat before flushing it
     fprintf(stderr, "Building sparse representation\n");
     sparsemat = (int **)malloc(small_nrows * sizeof(int *));
     for(i = 0; i < small_nrows; i++)
 	sparsemat[i] = NULL;
     if(nslices == 0) {
+	// generic case
 	small_ncols = oneFile(sparsename, sosname, sparsemat, colweight, ps,
-			      oldrows, ncols, small_nrows, verbose, skip, bin);
+			      whichrows, ncols, small_nrows, verbose,
+			      skip, bin);
     } else {
+	// desperate case?
 	small_ncols = manyFiles(sparsename, sparsemat, colweight, ps,
-				oldrows, ncols, small_nrows, verbose, skip, bin,
-				nslices);
+				whichrows, ncols, small_nrows, verbose, 
+				skip, bin, nslices);
 	exit(0);
     }
+
+    for(i = 0; i < small_nrows; i++)
+	if(sparsemat[i] != NULL)
+	    free(sparsemat[i]);
+    free(sparsemat);
+
     if(writeindex){
-	// this part depends on newrows only
+	// this part depends on newrows only, but for small_ncols
 	double tt = wct_seconds();
 	fprintf(stderr, "Writing index file\n");
 	makeIndexFile(indexname, nrows, newrows, small_nrows, small_ncols);
@@ -772,20 +798,15 @@ main(int argc, char *argv[])
     purgedfile_stream_closefile(ps);
     purgedfile_stream_clear(ps);
 
-    for(i = 0; i < small_nrows; i++)
-	if(sparsemat[i] != NULL)
-	    free(sparsemat[i]);
-    free(sparsemat);
-
     for(i = 0; i < nrows; i++){
 	if(newrows[i] != NULL)
 	    free(newrows[i]);
-	if(oldrows[i] != NULL)
-	    free(oldrows[i]);
+	if(whichrows[i] != NULL)
+	    free(whichrows[i]);
     }
     param_list_clear(pl);
     free(newrows);
-    free(oldrows);
+    free(whichrows);
     free(colweight);
     return 0;
 }
