@@ -494,14 +494,11 @@ doAllAdds(int **newrows, char *str)
 
 #define STRLENMAX 2048
 
-// Fills in sparsemat and colweight via makeSparse.
 static int
-oneFile(const char *sparsename, const char * sosname, int **sparsemat, int *colweight, purgedfile_stream_ptr ps, int **whichrows, int ncols, int small_nrows, int verbose, int skip, int bin)
+toFlush(const char *sparsename, const char * sosname, int **sparsemat, int *colweight, int ncols, int small_nrows, int skip, int bin)
 {
     unsigned long W;
     int small_ncols;
-
-    makeSparse(sparsemat, colweight, ps, 0, ncols, whichrows, verbose, 0);
 
     fprintf(stderr, "Renumbering columns (including sorting w.r.t. weight)\n");
     renumber(sosname, &small_ncols, colweight, ncols);
@@ -515,6 +512,15 @@ oneFile(const char *sparsename, const char * sosname, int **sparsemat, int *colw
     fprintf(stderr, "# Weight(M_small) = %lu\n", W);
 
     return small_ncols;
+}
+
+// Fills in sparsemat and colweight via makeSparse.
+static int
+oneFile(const char *sparsename, const char * sosname, int **sparsemat, int *colweight, purgedfile_stream_ptr ps, int **whichrows, int ncols, int small_nrows, int verbose, int skip, int bin)
+{
+    makeSparse(sparsemat, colweight, ps, 0, ncols, whichrows, verbose, 0);
+    return toFlush(sparsename, sosname, sparsemat, colweight, ncols, 
+		   small_nrows, skip, bin);
 }
 
 static int
@@ -582,21 +588,14 @@ manyFiles(const char *sparsename, int **sparsemat, int *colweight, purgedfile_st
 }
 
 static void
-build_newrows_from_file(int **newrows, int nrows, FILE *hisfile, uint64_t bwcostmin)
+build_newrows_from_file(int **newrows, FILE *hisfile, uint64_t bwcostmin)
 {
     uint64_t bwcost;
     unsigned long addread = 0;
-    int i;
     char str[STRLENMAX];
 
-    for(i = 0; i < nrows; i++){
-	newrows[i] = (int *)malloc(2 * sizeof(int));
-	ASSERT_ALWAYS(newrows[i] != NULL);
-	newrows[i][0] = 1;
-	newrows[i][1] = i;
-    }
     fprintf(stderr, "Reading row additions\n");
-	double tt = wct_seconds();
+    double tt = wct_seconds();
     while(fgets(str, STRLENMAX, hisfile)){
 	addread++;
 	if((addread % 100000) == 0)
@@ -751,7 +750,15 @@ main(int argc, char *argv[])
     if(fromname == NULL){
 	// generic case
 	writeindex = 1;
-	build_newrows_from_file(newrows, nrows, hisfile, bwcostmin);
+	// allocate
+	for(int i = 0; i < nrows; i++){
+	    newrows[i] = (int *)malloc(2 * sizeof(int));
+	    ASSERT_ALWAYS(newrows[i] != NULL);
+	    newrows[i][0] = 1;
+	    newrows[i][1] = i;
+	}
+	// perform all additions
+	build_newrows_from_file(newrows, hisfile, bwcostmin);
     } else {
 	// rare case, probably very very rare
 	writeindex = 0;
@@ -869,6 +876,17 @@ main(int argc, char *argv[])
     // read M_purged
     readPurged(newrows, ps, 1);
     // directly replay additions
+    build_newrows_from_file(newrows, hisfile, bwcostmin);
+    // compute weights of columns
+    colweight = (int *)malloc(ncols * sizeof(int *));
+    ASSERT_ALWAYS(colweight != NULL);
+    memset(colweight, 0, ncols * sizeof(int *));
+    for(int i = 0; i < nrows; i++)
+	if(newrows[i] != NULL)
+	    for(int k = 1; k <= newrows[i][0]; k++)
+		colweight[newrows[i][k]] += 1;
+    small_ncols = toFlush(sparsename, sosname, sparsemat, colweight, ncols,
+			  small_nrows, skip, bin);
 #endif // REPLAY_VERSION
 
     purgedfile_stream_closefile(ps);
