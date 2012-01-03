@@ -290,8 +290,10 @@ main (int argc, char *argv[])
 	     PRIu64"\n", mat->rem_nrows, mat->rem_ncols,
 	     mat->rem_nrows - mat->rem_ncols, mat->weight,
 	    (uint64_t) mat->rem_nrows * (uint64_t) mat->weight);
+#if BURIED_MODEL == 1
     fprintf (stderr, "(estimated density of buried part is %1.6f)\n",
              mat->bdensity);
+#endif
 #ifndef USE_MARKOWITZ
     closeSWAR (mat);
 #else
