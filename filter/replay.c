@@ -761,6 +761,21 @@ main(int argc, char *argv[])
 #if DEBUG >= 1
     printOldRows(whichrows, nrows);
 #endif
+    // once we have built whichrows, newrows is useless, but
+    // for writing the index
+    if(writeindex){
+	// this part depends on newrows only, but for small_ncols
+	double tt = wct_seconds();
+	fprintf(stderr, "Writing index file\n");
+	// WARNING: small_ncols is not used and put to 0...!
+	makeIndexFile(indexname, nrows, newrows, small_nrows, 0);
+	fprintf(stderr, "#T# writing index file: %2.2lf\n", wct_seconds()-tt);
+    }
+    for(i = 0; i < nrows; i++)
+	if(newrows[i] != NULL)
+	    free(newrows[i]);
+    free(newrows);
+
     colweight = (int *)malloc(ncols * sizeof(int *));
     memset(colweight, 0, ncols * sizeof(int *));
 
@@ -787,25 +802,13 @@ main(int argc, char *argv[])
 	    free(sparsemat[i]);
     free(sparsemat);
 
-    if(writeindex){
-	// this part depends on newrows only, but for small_ncols
-	double tt = wct_seconds();
-	fprintf(stderr, "Writing index file\n");
-	makeIndexFile(indexname, nrows, newrows, small_nrows, small_ncols);
-	fprintf(stderr, "#T# writing index file: %2.2lf\n", wct_seconds()-tt);
-    }
-
     purgedfile_stream_closefile(ps);
     purgedfile_stream_clear(ps);
 
-    for(i = 0; i < nrows; i++){
-	if(newrows[i] != NULL)
-	    free(newrows[i]);
+    for(i = 0; i < nrows; i++)
 	if(whichrows[i] != NULL)
 	    free(whichrows[i]);
-    }
     param_list_clear(pl);
-    free(newrows);
     free(whichrows);
     free(colweight);
     return 0;
