@@ -292,6 +292,9 @@ sub read_param {
                     # wins. Presently early wins. late wins would be:
                     # $param->{$p} = $v;
                     # $count_args++;
+		    # WARNING: if a factorization is restarted, we don't want
+		    # to just issue a warning if some parameters are changed
+		    # on the command line!!!
                     next ARGS;
                 }
 
