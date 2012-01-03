@@ -887,6 +887,11 @@ main(int argc, char *argv[])
 		colweight[newrows[i][k]] += 1;
     small_ncols = toFlush(sparsename, sosname, sparsemat, colweight, ncols,
 			  small_nrows, skip, bin);
+    // TODO: index file!!!!!
+    for(i = 0; i < nrows; i++)
+	if(newrows[i] != NULL)
+	    free(newrows[i]);
+    free(newrows);
 #endif // REPLAY_VERSION
 
     purgedfile_stream_closefile(ps);
