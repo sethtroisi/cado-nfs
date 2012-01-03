@@ -60,6 +60,7 @@ printBuf(FILE *file, int *buf, int ibuf)
 }
 #endif
 
+#if REPLAY_VERSION == 0
 // add buf[0..ibuf[ to row i of sparsemat
 static void
 addrel(int **sparsemat, int *colweight, int *buf, int ibuf, int i)
@@ -175,6 +176,7 @@ makeSparse(int **sparsemat, int *colweight, purgedfile_stream ps,
 	}
     }
 }
+#endif
 
 static unsigned long
 flushSparse(const char *sparsename, int **sparsemat, int small_nrows, int small_ncols, int *code, int skip, int bin)
@@ -419,7 +421,7 @@ renumber(const char * sosname, int *small_ncols, int *colweight, int ncols)
 	colweight[tmp[j+1]] = k++; // always this +1 trick
 #else
     // useful for BW + skipping heavy part only...
-    fprintf (stderr, "Sorting columns by decreasing weight\n");
+    fprintf(stderr, "Sorting %d columns by decreasing weight\n", *small_ncols);
     for(j = nb-1, k = 1; j >= 0; j -= 2)
 	colweight[tmp[j]] = k++; // always this +1 trick
     if (sosname) {
@@ -464,7 +466,7 @@ doAllAdds(int **newrows, char *str)
     if(!destroy)
 	i--; // what a trick, man!
 #if DEBUG >= 1
-    fprintf(stderr, "first i is %d\n", i);
+    fprintf(stderr, "first i is %d in %s", i, str);
 #endif
     if(*t != '\n'){
 	++t;
@@ -514,6 +516,7 @@ toFlush(const char *sparsename, const char * sosname, int **sparsemat, int *colw
     return small_ncols;
 }
 
+#if REPLAY_VERSION == 0
 // Fills in sparsemat and colweight via makeSparse.
 static int
 oneFile(const char *sparsename, const char * sosname, int **sparsemat, int *colweight, purgedfile_stream_ptr ps, int **whichrows, int ncols, int small_nrows, int verbose, int skip, int bin)
@@ -586,6 +589,7 @@ manyFiles(const char *sparsename, int **sparsemat, int *colweight, purgedfile_st
     free(Wslice);
     return small_ncols;
 }
+#endif // REPLAY_VERSION
 
 static void
 build_newrows_from_file(int **newrows, FILE *hisfile, uint64_t bwcostmin)
@@ -659,10 +663,12 @@ readPurged(int **sparsemat, purgedfile_stream ps, int verbose)
 	if (verbose && purgedfile_stream_disp_progress_now_p(ps))
 	    fprintf(stderr, "Treating old rel #%d at %2.2lf\n",
                     ps->rrows,ps->dt);
+	qsort(ps->cols, ps->nc, sizeof(int), cmp);
+	sparsemat[i] = (int *)malloc((ps->nc+1) * sizeof(int));
+	ASSERT_ALWAYS(sparsemat[i] != NULL);
 	sparsemat[i][0] = ps->nc;
-        for(int k = 0; k < ps->nc; k++){
+        for(int k = 0; k < ps->nc; k++)
 	    sparsemat[i][k+1] = ps->cols[k];
-	}
     }
 }
 #endif
@@ -677,11 +683,16 @@ int
 main(int argc, char *argv[])
 {
     FILE *hisfile, *fromfile;
-    uint64_t bwcostmin = 0, wrs = 0;
+    uint64_t bwcostmin = 0;
     int nrows, ncols, nslices = 0;
-    int **newrows, **whichrows, **sparsemat, *nbrels, *colweight;
-    int i, j, nb, ind, small_nrows, small_ncols;
-    int verbose = 0, writeindex, unused = 0;
+    int **newrows, *colweight;
+    int small_nrows = 0, small_ncols;
+    int verbose = 0, writeindex;
+#if REPLAY_VERSION == 0
+    uint64_t wrs = 0;
+    int **whichrows, *nbrels, **sparsemat;
+    int unused = 0;
+#endif
     char str[STRLENMAX];
     int bin=0;
     char * rp;
@@ -692,7 +703,7 @@ main(int argc, char *argv[])
 
     // printing the arguments as everybody does these days
     fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
-    for (i = 1; i < argc; i++)
+    for (int i = 1; i < argc; i++)
       fprintf (stderr, " %s", argv[i]);
     fprintf (stderr, "\n");
 
@@ -741,7 +752,6 @@ main(int argc, char *argv[])
     newrows = (int **)malloc(nrows * sizeof(int *));
     ASSERT_ALWAYS(newrows != NULL);
 
-#if REPLAY_VERSION == 0
     // at the end of the following operations, newrows[i] is either
     // NULL
     // or k i_1 ... i_k which means that M_small will contain a row formed
@@ -750,6 +760,7 @@ main(int argc, char *argv[])
     if(fromname == NULL){
 	// generic case
 	writeindex = 1;
+#if REPLAY_VERSION == 0
 	// allocate
 	for(int i = 0; i < nrows; i++){
 	    newrows[i] = (int *)malloc(2 * sizeof(int));
@@ -759,6 +770,8 @@ main(int argc, char *argv[])
 	}
 	// perform all additions
 	build_newrows_from_file(newrows, hisfile, bwcostmin);
+	fclose(hisfile);
+#endif
     } else {
 	// rare case, probably very very rare
 	writeindex = 0;
@@ -766,8 +779,8 @@ main(int argc, char *argv[])
 	ASSERT(fromfile != NULL);
 	read_newrows_from_file(newrows, nrows, fromfile);
     }
-    fclose(hisfile);
 
+#if REPLAY_VERSION == 0
 #if DEBUG >= 1
     fprintf (stderr, "Total number of row additions: %lu\n", row_additions);
 #endif
@@ -778,13 +791,13 @@ main(int argc, char *argv[])
     ASSERT_ALWAYS(nbrels != NULL);
     memset (nbrels, 0, nrows * sizeof(int));
     small_nrows = 0;
-    for(i = 0; i < nrows; i++)
+    for(int i = 0; i < nrows; i++)
 	if(newrows[i] != NULL){
 	    small_nrows++;
 #if DEBUG >= 1
 	    fprintf(stderr, "New row %d:", small_nrows-1);
 #endif
-	    for(j = 1; j <= newrows[i][0]; j++){
+	    for(int j = 1; j <= newrows[i][0]; j++){
 #if DEBUG >= 1
 		fprintf(stderr, " %d", newrows[i][j]);
 #endif
@@ -799,8 +812,7 @@ main(int argc, char *argv[])
     // M_purged[i] is used in the rows i_1 ... i_k of M_small
     whichrows = (int **)malloc(nrows * sizeof(int *));
     ASSERT_ALWAYS(whichrows != NULL);
-    for(i = 0; i < nrows; i++){
-	// TODO: do not allocate unused rows?
+    for(int i = 0; i < nrows; i++){
 	whichrows[i] = (int *)malloc((nbrels[i]+1) * sizeof(int));
 	ASSERT_ALWAYS(whichrows[i] != NULL);
 	whichrows[i][0] = 0;
@@ -811,11 +823,11 @@ main(int argc, char *argv[])
     fprintf(stderr, "wrs = %"PRIu64" unused=%d\n", wrs, unused);
     free (nbrels);
     fprintf(stderr, "Filling whichrows\n");
-    for(i = 0, nb = 0; i < nrows; i++)
+    for(int i = 0, nb = 0; i < nrows; i++)
         if(newrows[i] != NULL){
 	    // this is row of index nb in the new matrix
-	    for(j = 1; j <= newrows[i][0]; j++){
-		ind = newrows[i][j];
+	    for(int j = 1; j <= newrows[i][0]; j++){
+		int ind = newrows[i][j];
 		whichrows[ind][0]++;
 		whichrows[ind][whichrows[ind][0]] = nb;
 	    }
@@ -834,7 +846,7 @@ main(int argc, char *argv[])
 	makeIndexFile(indexname, nrows, newrows, small_nrows, 0);
 	fprintf(stderr, "#T# writing index file: %2.2lf\n", wct_seconds()-tt);
     }
-    for(i = 0; i < nrows; i++)
+    for(int i = 0; i < nrows; i++)
 	if(newrows[i] != NULL)
 	    free(newrows[i]);
     free(newrows);
@@ -847,7 +859,7 @@ main(int argc, char *argv[])
     fprintf(stderr, "Building sparse representation\n");
     sparsemat = (int **)malloc(small_nrows * sizeof(int *));
     ASSERT_ALWAYS(sparsemat != NULL);
-    for(i = 0; i < small_nrows; i++)
+    for(int i = 0; i < small_nrows; i++)
 	sparsemat[i] = NULL;
     if(nslices == 0) {
 	// generic case
@@ -862,21 +874,64 @@ main(int argc, char *argv[])
 	exit(0);
     }
 
-    for(i = 0; i < small_nrows; i++)
+    for(int i = 0; i < small_nrows; i++)
 	if(sparsemat[i] != NULL)
 	    free(sparsemat[i]);
     free(sparsemat);
 
-    for(i = 0; i < nrows; i++)
+    for(int i = 0; i < nrows; i++)
 	if(whichrows[i] != NULL)
 	    free(whichrows[i]);
     free(whichrows);
     free(colweight);
 #elif REPLAY_VERSION == 1
+    fprintf(stderr, "Using more direct replay version\n");
+    if(writeindex){
+	// first pass
+	// allocate
+	for(int i = 0; i < nrows; i++){
+	    newrows[i] = (int *)malloc(2 * sizeof(int));
+	    ASSERT_ALWAYS(newrows[i] != NULL);
+	    newrows[i][0] = 1;
+	    newrows[i][1] = i;
+	}
+	// read hisfile once
+	build_newrows_from_file(newrows, hisfile, bwcostmin);
+	// rewind
+	rewind(hisfile);
+	rp = fgets(str, STRLENMAX, hisfile);
+	ASSERT_ALWAYS(rp);
+	// determining small_nrows
+	small_nrows = 0;
+	for(int i = 0; i < nrows; i++)
+	    if(newrows[i] != NULL)
+		small_nrows++;
+	// now, make index
+	double tt = wct_seconds();
+	fprintf(stderr, "Writing index file\n");
+	// WARNING: small_ncols is not used and put to 0...!
+	makeIndexFile(indexname, nrows, newrows, small_nrows, 0);
+	fprintf(stderr, "#T# writing index file: %2.2lf\n", wct_seconds()-tt);
+	// clear newrows for next use
+	for(int i = 0; i < nrows; i++)
+	    if(newrows[i] != NULL){
+		free(newrows[i]);
+		newrows[i] = NULL;
+	    }
+    }
     // read M_purged
     readPurged(newrows, ps, 1);
+#if DEBUG >= 1
+    for(int i = 0; i < nrows; i++){
+	printf("row[%d]=", i);
+	for(int k = 1; k <= newrows[i][0]; k++)
+	    printf(" %d", newrows[i][k]);
+	printf("\n");
+    }
+#endif
     // directly replay additions
     build_newrows_from_file(newrows, hisfile, bwcostmin);
+    fclose(hisfile);
     // compute weights of columns
     colweight = (int *)malloc(ncols * sizeof(int *));
     ASSERT_ALWAYS(colweight != NULL);
@@ -885,10 +940,9 @@ main(int argc, char *argv[])
 	if(newrows[i] != NULL)
 	    for(int k = 1; k <= newrows[i][0]; k++)
 		colweight[newrows[i][k]] += 1;
-    small_ncols = toFlush(sparsename, sosname, sparsemat, colweight, ncols,
+    small_ncols = toFlush(sparsename, sosname, newrows, colweight, ncols,
 			  small_nrows, skip, bin);
-    // TODO: index file!!!!!
-    for(i = 0; i < nrows; i++)
+    for(int i = 0; i < nrows; i++)
 	if(newrows[i] != NULL)
 	    free(newrows[i]);
     free(newrows);
