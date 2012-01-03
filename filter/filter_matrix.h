@@ -58,8 +58,6 @@ typedef struct {
 extern "C" {
 #endif
 
-#define weightRow(mat, i) (mat->rows[(i)][0] + mat->wburied[(i)])
-
 #ifdef USE_MPI
 #define GETJ(mat, j) ((j)-(mat)->jmin)
 #else
