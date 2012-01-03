@@ -34,6 +34,11 @@
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #endif
 
+#if DEBUG >= 1
+/* total number of row additions in merge */
+static unsigned long row_additions = 0;
+#endif
+
 // not mallocing to speed up(?).
 static int
 findBestIndex(filter_matrix_t *mat, int m, int32_t *ind)
@@ -236,6 +241,13 @@ deleteAllColsFromStack(report_t *rep, filter_matrix_t *mat, int iS)
 //////////////////////////////////////////////////////////////////////
 // now, these guys are generic...!
 
+/* weight of buried columns for row i */
+#if BURIED_MODEL == 0
+#define BURIEDROWWEIGHT(mat,i) mat->wburied[i]
+#else
+#define BURIEDROWWEIGHT(mat,i) (int) (mat->bdensity * (double) mat->nburied + 0.5)
+#endif
+
 // for all j in row[i], removes j and update data
 static void
 removeRowAndUpdate(filter_matrix_t *mat, int i)
@@ -246,7 +258,7 @@ removeRowAndUpdate(filter_matrix_t *mat, int i)
     if(i == TRACE_ROW)
 	fprintf(stderr, "TRACE_ROW: removeRowAndUpdate i=%d\n", i);
 #endif
-    mat->weight -= lengthRow(mat, i) + mat->wburied[i];
+    mat->weight -= lengthRow(mat, i) + BURIEDROWWEIGHT(mat, i);
     for(k = 1; k <= lengthRow(mat, i); k++){
 #if TRACE_COL >= 0
 	if(cell(mat, i, k) == TRACE_COL){
@@ -264,7 +276,7 @@ addOneRowAndUpdate(filter_matrix_t *mat, int i)
 {
     int k;
 
-    mat->weight += lengthRow(mat, i) + mat->wburied[i];
+    mat->weight += lengthRow(mat, i) + BURIEDROWWEIGHT(mat,i);
     for(k = 1; k <= lengthRow(mat, i); k++)
 	addCellAndUpdate(mat, i, cell(mat, i, k));
 }
@@ -386,10 +398,7 @@ addFatherToSonsRec(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 	// add u to its son
 #if 1
 	// recover true length of non-buried part for R[i1]+R[i2]
-	len = mat->wburied[i1] + mat->wburied[i2];
-	if(len > mat->nburied)
-	    len = mat->nburied;
-	len = A[sons[u][k]][u] - len;
+	len = A[sons[u][k]][u] - buriedRowsWeight (mat, i1, i2);
 	addRowsAndUpdate(mat, i1, i2, len);
 #else
 	addRowsAndUpdate(mat, i1, i2, -1);
@@ -497,6 +506,25 @@ mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
 {
     int32_t ind[MERGE_LEVEL_MAX];
     int ni, k;
+
+    /* each m-merge leads to m-1 additions of rows */
+#if DEBUG >= 1
+    row_additions += m - 1;
+#endif
+#if BURIED_MODEL == 1
+    /* Let c be the average density. When we add a row j to a row i:
+       (a) either i has 0 and j has 1 with probability c*(1-c),
+           the weight of row i increases by 1
+       (b) both i and j have 1 with probablity c^2
+           the weight of row i decreases by 1
+       (c) in the remaining cases, the weight of row i remains unchanged
+       Thus the number of non-zero elements in the column increases by
+       c*(1-c) - c^2 = c - 2c^2, and the average density increases by
+       (c - 2c^2) / nrows */
+    for (k = 0; k < m - 1; k++)
+      mat->bdensity += mat->bdensity * (1.0 - 2.0 * mat->bdensity)
+        / (double) mat->nrows;
+#endif
 
     if(m > MERGE_LEVEL_MAX){
 	fprintf(stderr, "PB: m=%d > MERGE_LEVEL_MAX=%d\n", m, MERGE_LEVEL_MAX);
@@ -1214,6 +1242,9 @@ mergeOneByOne(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, in
 	fprintf(rep->outfile, "BWCOSTMIN: %"PRIu64"\n", bwcostmin);
 	fprintf(stderr, "Minimal bwcost found: %"PRIu64"\n", bwcostmin);
     }
+#if DEBUG >= 1
+    fprintf(stderr, "Total number of row additions: %lu\n", row_additions);
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////

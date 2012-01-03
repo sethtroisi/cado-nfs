@@ -9,6 +9,11 @@
 #define TRACE_COL -1 // 253224 // 231 // put to -1 if not...!
 #define TRACE_ROW -1 // 59496 // put to -1 if not...!
 
+/* model used to estimate weight of buried columns:
+   0 : constant weight per row
+   1 : average density */
+#define BURIED_MODEL 0
+
 /* rows correspond to relations, and columns to primes (or prime ideals) */
 typedef struct {
   int nrows;
@@ -20,10 +25,16 @@ typedef struct {
   int *wt;           /* weight w of column j, if w <= cwmax,
                         else <= 1 for a deleted column
                         (trick: we store -w if w > cwmax) */
-  int *wburied;     /* wburied[i] counts the estimated weight of buried
-			columns */
   int nburied;     /* the number of buried columns, hence an upper
 			bound for wburied[i] */
+#if BURIED_MODEL == 0
+  int *wburied;     /* wburied[i] counts the estimated weight of buried
+			columns */
+#elif BURIED_MODEL == 1
+  double bdensity;   /* estimation of the density of the buried part */
+#else
+#error "invalid BURIED_MODEL"
+#endif
   unsigned long *ad;
   unsigned long weight;
   int cwmax;         /* bound on weight of j to enter the SWAR structure */
@@ -57,8 +68,6 @@ typedef struct {
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#define weightRow(mat, i) (mat->rows[(i)][0] + mat->wburied[(i)])
 
 #ifdef USE_MPI
 #define GETJ(mat, j) ((j)-(mat)->jmin)
@@ -95,6 +104,7 @@ extern int weightSum(filter_matrix_t *mat, int i1, int i2);
 extern void fillTabWithRowsForGivenj(int32_t *ind, filter_matrix_t *mat, int32_t j);
 extern void checkData(filter_matrix_t *mat);
 extern void destroyRow(filter_matrix_t *mat, int i);
+  extern int buriedRowsWeight (filter_matrix_t *mat, int i1, int i2);
 
 #ifdef __cplusplus
 }

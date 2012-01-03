@@ -22,6 +22,10 @@
 
 #define TRACE_COL -1 // 231 // put to -1 if not...!
 
+#if DEBUG >= 1
+static unsigned long row_additions = 0;
+#endif
+
 // newrows[i] contains a new row formed of old rows that correspond to
 // true original relations (and not multirelations).
 //
@@ -451,6 +455,7 @@ doAllAdds(int **newrows, char *str)
 	    if((*t == '\n') || (*t == ' ')){
 #if DEBUG >= 1
 		fprintf(stderr, "next ii is %d\n", ii);
+                row_additions ++;
 #endif
 		addRows(newrows, ii, i, -1);
 		ii = 0;
@@ -704,6 +709,10 @@ main(int argc, char *argv[])
     }
     fclose(hisfile);
 
+#if DEBUG >= 1
+    fprintf (stderr, "Total number of row additions: %lu\n", row_additions);
+#endif
+
     nbrels = (int *) malloc(nrows * sizeof(int));
     memset (nbrels, 0, nrows * sizeof(int));
     // nbrels[oldi] contains the number of new relations in which old
@@ -787,5 +796,6 @@ main(int argc, char *argv[])
     free(newrows);
     free(oldrows);
     free(colweight);
+
     return 0;
 }
