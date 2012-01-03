@@ -166,15 +166,17 @@ filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps, int verbose)
 
     int bmin = mat->nrows, bmax = 0, wmax;
 
-    /* don't consider heavy columns of density > 1/2000, this roughly
-       corresponds to primes < 2000 or ideals of norm < 2000 */
-    wmax = -(mat->nrows / 2000);
+    /* Bury heavy columns of density > 1/2000, this roughly
+       corresponds to primes < 2000 or ideals of norm < 2000.
+       Those columns should contribute to the average weight by
+       sum(2/p, p prime < 2000) ~ 4.58 */
+    wmax = mat->nrows / 2000;
     /* heavy columns already have wt < 0 */
     tooheavy = (char *) malloc (mat->ncols * sizeof(char));
     memset (tooheavy, 0, mat->ncols * sizeof(char));
     for(j = 0; j < mat->ncols; j++){
-        if(mat->wt[j] < wmax){
-            int wc = -mat->wt[j];
+      int wc = -mat->wt[j];
+        if(wc > wmax){
 #if DEBUG >= 1
             fprintf(stderr, "Burying j=%d (wt=%d)\n", j, wc);
 #endif
@@ -185,7 +187,7 @@ filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps, int verbose)
         }
     }
     fprintf(stderr, "# Number of buried columns is %d", mat->nburied);
-    fprintf(stderr, " (min=%d max=%d)\n", bmin, bmax);
+    fprintf(stderr, " (min weight=%d, max weigth=%d)\n", bmin, bmax);
 
     for (int i = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; i++) {
         ASSERT_ALWAYS(i < mat->nrows);
