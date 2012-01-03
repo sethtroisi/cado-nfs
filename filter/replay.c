@@ -253,6 +253,9 @@ flushSparse(const char *sparsename, int **sparsemat, int small_nrows, int small_
 
     for(int i = 0; i < small_nrows; i++){
 	if(sparsemat[i] == NULL) {
+          /* this should not happen, unless the corresponding combination of
+             relations yields a square, thus we have found a dependency in the
+             merge process */
             if (bin) {
                 const uint32_t x = 0;
                 fwrite32_little(&x, 1, smatfile);
