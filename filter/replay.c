@@ -1,4 +1,3 @@
-#include "cado.h"
 /*
  * Program: replay
  * Author : F. Morain
@@ -21,6 +20,9 @@
 #define DEBUG 0
 
 #define TRACE_COL -1 // 231 // put to -1 if not...!
+
+#define REPLAY_VERSION 0 // 0 for old
+                         // 1 for new (in place building)
 
 #if DEBUG >= 1
 static unsigned long row_additions = 0;
@@ -645,6 +647,24 @@ read_newrows_from_file(int **newrows, int nrows, FILE *file)
 	newrows[i] = NULL;
 }
 
+#if REPLAY_VERSION == 1
+// Feed sparsemat with M_purged
+static void
+readPurged(int **sparsemat, purgedfile_stream ps, int verbose)
+{
+    fprintf(stderr, "Reading sparse matrix from purged file\n");
+    for(int i = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; i++) {
+	if (verbose && purgedfile_stream_disp_progress_now_p(ps))
+	    fprintf(stderr, "Treating old rel #%d at %2.2lf\n",
+                    ps->rrows,ps->dt);
+	sparsemat[i][0] = ps->nc;
+        for(int k = 0; k < ps->nc; k++){
+	    sparsemat[i][k+1] = ps->cols[k];
+	}
+    }
+}
+#endif
+
 // We start from M_purged which is nrows x ncols;
 // we build M_small which is small_nrows x small_ncols.
 // newrows[i] if != NULL, contains a list of the indices of the rows in
@@ -716,14 +736,15 @@ main(int argc, char *argv[])
 
     fprintf(stderr, "Original matrix has size %d x %d\n", nrows, ncols);
 
+    newrows = (int **)malloc(nrows * sizeof(int *));
+    ASSERT_ALWAYS(newrows != NULL);
+
+#if REPLAY_VERSION == 0
     // at the end of the following operations, newrows[i] is either
     // NULL
     // or k i_1 ... i_k which means that M_small will contain a row formed
     // of the addition of the rows of indices i_1 ... i_k in the original
     // matrix
-    newrows = (int **)malloc(nrows * sizeof(int *));
-    ASSERT_ALWAYS(newrows != NULL);
-
     if(fromname == NULL){
 	// generic case
 	writeindex = 1;
@@ -836,15 +857,21 @@ main(int argc, char *argv[])
 	    free(sparsemat[i]);
     free(sparsemat);
 
-    purgedfile_stream_closefile(ps);
-    purgedfile_stream_clear(ps);
-
     for(i = 0; i < nrows; i++)
 	if(whichrows[i] != NULL)
 	    free(whichrows[i]);
-    param_list_clear(pl);
     free(whichrows);
     free(colweight);
+#elif REPLAY_VERSION == 1
+    // read M_purged
+    readPurged(newrows, ps, 1);
+    // directly replay additions
+#endif // REPLAY_VERSION
+
+    purgedfile_stream_closefile(ps);
+    purgedfile_stream_clear(ps);
+
+    param_list_clear(pl);
 
     return 0;
 }
