@@ -21,7 +21,7 @@
 
 #define TRACE_COL -1 // 231 // put to -1 if not...!
 
-#define REPLAY_VERSION 0 // 0 for old
+#define REPLAY_VERSION 1 // 0 for old
                          // 1 for new (in place building)
 
 #if DEBUG >= 1
@@ -496,6 +496,8 @@ doAllAdds(int **newrows, char *str)
 
 #define STRLENMAX 2048
 
+// sparsemat is small_nrows x small_ncols, after small_ncols is found using
+// renumbering.
 static int
 toFlush(const char *sparsename, const char * sosname, int **sparsemat, int *colweight, int ncols, int small_nrows, int skip, int bin)
 {
@@ -518,6 +520,7 @@ toFlush(const char *sparsename, const char * sosname, int **sparsemat, int *colw
 
 #if REPLAY_VERSION == 0
 // Fills in sparsemat and colweight via makeSparse.
+// sparsemat is small_nrows x small_ncols.
 static int
 oneFile(const char *sparsename, const char * sosname, int **sparsemat, int *colweight, purgedfile_stream_ptr ps, int **whichrows, int ncols, int small_nrows, int verbose, int skip, int bin)
 {
@@ -663,6 +666,8 @@ readPurged(int **sparsemat, purgedfile_stream ps, int verbose)
 	if (verbose && purgedfile_stream_disp_progress_now_p(ps))
 	    fprintf(stderr, "Treating old rel #%d at %2.2lf\n",
                     ps->rrows,ps->dt);
+	if(ps->nc == 0)
+	    fprintf(stderr, "Hard to believe: row[%d] is NULL\n", i);
 	qsort(ps->cols, ps->nc, sizeof(int), cmp);
 	sparsemat[i] = (int *)malloc((ps->nc+1) * sizeof(int));
 	ASSERT_ALWAYS(sparsemat[i] != NULL);
@@ -940,6 +945,12 @@ main(int argc, char *argv[])
 	if(newrows[i] != NULL)
 	    for(int k = 1; k <= newrows[i][0]; k++)
 		colweight[newrows[i][k]] += 1;
+    // crunch matrix
+    for(int i = 0, ii = 0; i < nrows; i++)
+	if(newrows[i] != NULL){
+	    newrows[ii++] = newrows[i];
+	    newrows[i] = NULL;
+	}
     small_ncols = toFlush(sparsename, sosname, newrows, colweight, ncols,
 			  small_nrows, skip, bin);
     for(int i = 0; i < nrows; i++)
