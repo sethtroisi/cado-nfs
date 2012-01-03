@@ -40,10 +40,10 @@ machines=mach_desc      # file describing available computers for parallel
     # The cadofactor.pl script has the ability to spawn jobs on many
     # machines using ssh, in a master/slave manner. For this to work, a
     # machines description file is mandatory.
-    # It is not mandatory for all the slave machines to be able to access
-    # the <wdir> directory. Rather, slave jobs put their temporary data
-    # in the <tmpdir> specified on a per-(group of)machine basis in the
-    # machines description file.
+    # This is only used in the polynomial selection and sieving steps.
+    # Only the master machine needs access to the <wdir> directory.
+    # Slave machines put their temporary data in the <tmpdir> specified on a
+    # per-(group of)machine basis in the machines description file.
     
 ###########################################################################
 # Polynomial selection with Kleinjung's algorithm (2008)
