@@ -63,6 +63,7 @@ addrel(int **sparsemat, int *colweight, int *buf, int ibuf, int i)
     if(rowi == NULL){
 	// first time, dump buf
 	rowi = (int *)malloc((ibuf+1) * sizeof(int));
+	ASSERT_ALWAYS(rowi != NULL);
 	rowi[0] = ibuf;
 	memcpy(rowi+1, buf, ibuf * sizeof(int));
 	sparsemat[i] = rowi;
@@ -84,6 +85,7 @@ addrel(int **sparsemat, int *colweight, int *buf, int ibuf, int i)
 	// overestimate tmp_len
 	tmp_len = rowi[0] + ibuf + 1;
 	tmp = (int *)malloc(tmp_len * sizeof(int));
+	ASSERT_ALWAYS(tmp != NULL);
 	k1 = 1;
 	k2 = 0;
 	k = 1;
@@ -204,6 +206,7 @@ flushSparse(const char *sparsename, int **sparsemat, int small_nrows, int small_
     unsigned long DW = 0;
     char * zip = has_suffix(sparsename, ".gz") ? ".gz" : NULL;
     uint32_t * weights = malloc(small_ncols * sizeof(uint32_t));
+    ASSERT_ALWAYS(weights != NULL);
     memset(weights, 0, small_ncols * sizeof(uint32_t));
 
     char * base = strdup(sparsename);
@@ -387,6 +390,7 @@ renumber(const char * sosname, int *small_ncols, int *colweight, int ncols)
     int j, k, nb, *tmp;
 
     tmp = (int *)malloc((ncols<<1) * sizeof(int));
+    ASSERT_ALWAYS(tmp != NULL);
     memset(tmp, 0, (ncols<<1) * sizeof(int));
     for(j = 0, nb = 0; j < ncols; j++)
 	if(colweight[j] > 0){
@@ -514,10 +518,13 @@ manyFiles(const char *sparsename, int **sparsemat, int *colweight, purgedfile_st
     // to add ".00" or to add ".infos"
     size_t namelen = strlen(sparsename)+7;
     name = (char *)malloc(namelen * sizeof(char));
+    ASSERT_ALWAYS(name != NULL);
     jmin = jmax = 0;
     // tabnc[slice] = number of columns in slice
     tabnc = (int *)malloc(nslices * sizeof(int));
+    ASSERT_ALWAYS(tabnc != NULL);
     Wslice = (unsigned long *)malloc(nslices * sizeof(unsigned long));
+    ASSERT_ALWAYS(Wslice != NULL);
     // we want nslices always
     if((ncols % nslices) == 0)
 	jstep = ncols/nslices;
@@ -574,6 +581,7 @@ build_newrows_from_file(int **newrows, int nrows, FILE *hisfile, uint64_t bwcost
 
     for(i = 0; i < nrows; i++){
 	newrows[i] = (int *)malloc(2 * sizeof(int));
+	ASSERT_ALWAYS(newrows[i] != NULL);
 	newrows[i][0] = 1;
 	newrows[i][1] = i;
     }
@@ -619,6 +627,7 @@ read_newrows_from_file(int **newrows, int nrows, FILE *file)
         ASSERT_ALWAYS(rc == 1);
 
 	tmp = (int *)malloc((1+nc) * sizeof(int));
+	ASSERT_ALWAYS(tmp != NULL);
 	tmp[0] = nc;
 	for(k = 0; k < nc; k++) {
 	    rc = fscanf(file, PURGE_INT_FORMAT, tmp+k+1);
@@ -645,7 +654,7 @@ main(int argc, char *argv[])
     int nrows, ncols, nslices = 0;
     int **newrows, **whichrows, **sparsemat, *nbrels, *colweight;
     int i, j, nb, ind, small_nrows, small_ncols;
-    int verbose = 0, writeindex;
+    int verbose = 0, writeindex, unused = 0;
     char str[STRLENMAX];
     int bin=0;
     char * rp;
@@ -708,6 +717,7 @@ main(int argc, char *argv[])
     // of the addition of the rows of indices i_1 ... i_k in the original
     // matrix
     newrows = (int **)malloc(nrows * sizeof(int *));
+    ASSERT_ALWAYS(newrows != NULL);
 
     if(fromname == NULL){
 	// generic case
@@ -725,6 +735,7 @@ main(int argc, char *argv[])
     // nbrels[oldi] will contain the number of new relations in which
     // M_purged[oldi] takes part
     nbrels = (int *) malloc(nrows * sizeof(int));
+    ASSERT_ALWAYS(nbrels != NULL);
     memset (nbrels, 0, nrows * sizeof(int));
     small_nrows = 0;
     for(i = 0; i < nrows; i++)
@@ -747,12 +758,17 @@ main(int argc, char *argv[])
     // we create whichrows[i] = k i_1 ... i_k which means that
     // M_purged[i] is used in the rows i_1 ... i_k of M_small
     whichrows = (int **)malloc(nrows * sizeof(int *));
+    ASSERT_ALWAYS(whichrows != NULL);
     for(i = 0; i < nrows; i++){
+	// TODO: do not allocate unused rows?
 	whichrows[i] = (int *)malloc((nbrels[i]+1) * sizeof(int));
+	ASSERT_ALWAYS(whichrows[i] != NULL);
 	whichrows[i][0] = 0;
 	wrs += (nbrels[i]+1);
+	if(nbrels[i] == 0)
+	    unused++;
     }
-    fprintf(stderr, "wrs = %"PRIu64"\n", wrs);
+    fprintf(stderr, "wrs = %"PRIu64" unused=%d\n", wrs, unused);
     free (nbrels);
     fprintf(stderr, "Filling whichrows\n");
     for(i = 0, nb = 0; i < nrows; i++)
@@ -784,11 +800,13 @@ main(int argc, char *argv[])
     free(newrows);
 
     colweight = (int *)malloc(ncols * sizeof(int *));
+    ASSERT_ALWAYS(colweight != NULL);
     memset(colweight, 0, ncols * sizeof(int *));
 
     // we build sparsemat before flushing it
     fprintf(stderr, "Building sparse representation\n");
     sparsemat = (int **)malloc(small_nrows * sizeof(int *));
+    ASSERT_ALWAYS(sparsemat != NULL);
     for(i = 0; i < small_nrows; i++)
 	sparsemat[i] = NULL;
     if(nslices == 0) {
