@@ -81,6 +81,7 @@ addrel(int **sparsemat, int *colweight, int *buf, int ibuf, int i)
 #endif
 	// rowi is bound to disappear
 	removeWeight(sparsemat, colweight, i);
+	// overestimate tmp_len
 	tmp_len = rowi[0] + ibuf + 1;
 	tmp = (int *)malloc(tmp_len * sizeof(int));
 	k1 = 1;
@@ -114,8 +115,14 @@ addrel(int **sparsemat, int *colweight, int *buf, int ibuf, int i)
 	    colweight[buf[k2]]++;
 	}
 	tmp[0] = k-1;
-	free(rowi);
+#if 0
+	// wasting memory is our pride
 	sparsemat[i] = tmp;
+#else
+	// yes, we care about memory!
+	sparsemat[i] = (int *) realloc(tmp, k * sizeof(int));
+#endif
+	free(rowi);
 #if DEBUG >= 1
 	fprintRow(stderr, tmp); fprintf(stderr, "\n");
 	//	if(tmp[0] != (tmp_len-1))
@@ -128,7 +135,7 @@ addrel(int **sparsemat, int *colweight, int *buf, int ibuf, int i)
 // Fills in sparsemat and colweight
 static void
 makeSparse(int **sparsemat, int *colweight, purgedfile_stream ps,
-           int jmin, int jmax, int **oldrows, int verbose, int nslices)
+           int jmin, int jmax, int **whichrows, int verbose, int nslices)
 {
     fprintf(stderr, "Reading and treating relations from purged file\n");
 
@@ -137,7 +144,7 @@ makeSparse(int **sparsemat, int *colweight, purgedfile_stream ps,
 	    fprintf(stderr, "Treating old rel #%d at %2.2lf\n",
                     ps->rrows,ps->dt);
 
-        // take only the primes within the requested interval.
+        // take only the column indices within the requested interval.
         int ibuf = 0;
         for(int k = 0; k < ps->nc; k++) {
             int j = ps->cols[k];
@@ -150,13 +157,13 @@ makeSparse(int **sparsemat, int *colweight, purgedfile_stream ps,
 	    qsort(ps->cols, ps->nc, sizeof(int), cmp);
 	    // now, we "add" relation [a, b] in all new relations in which it
 	    // participates
-	    for(int k = 1; k <= oldrows[i][0]; k++)
-		addrel(sparsemat, colweight, ps->cols, ps->nc, oldrows[i][k]);
+	    for(int k = 1; k <= whichrows[i][0]; k++)
+		addrel(sparsemat, colweight, ps->cols, ps->nc, whichrows[i][k]);
 	}
 	if(nslices == 0){
 	    // free space just in case
-	    free(oldrows[i]);
-	    oldrows[i] = NULL;
+	    free(whichrows[i]);
+	    whichrows[i] = NULL;
 	}
     }
 }
