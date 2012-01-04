@@ -76,13 +76,7 @@ if [[ -z $1 || $(expr $1 : '.*[f].*') != 0 ]]
     echo -n "CPU time for dup2:      "
     if [ ! -f ${name}.dup2_*.log ] 2> /dev/null
       then echo "dup2 files were not found"
-      else
-        echo "" > /tmp/foo
-        for foo in ${name}.dup2_*.log
-        do
-           grep MB $foo | tail -1 | sed "s/^.* in \([^s]*\).*$/+\1/g" >> /tmp/foo
-        done
-        cat /tmp/foo | tr "\n" " " | cut -c2- | sed "s/^+//g" | bc | f
+      else awk '/MB/ {x=$8;} /remaining/ {y+=x;} END {print y}' ${name}.dup2_*.log | f
     fi
     echo -n "CPU time for purge:     "
     if [ ! -f ${name}.purge.log ] 2> /dev/null
