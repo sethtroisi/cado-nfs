@@ -21,7 +21,7 @@
 
 #define TRACE_COL -1 // 231 // put to -1 if not...!
 
-#define REPLAY_VERSION 0 // 0 for old
+#define REPLAY_VERSION 1 // 0 for old
                          // 1 for new (in place building)
 
 #if DEBUG >= 1
