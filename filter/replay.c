@@ -21,7 +21,7 @@
 
 #define TRACE_COL -1 // 231 // put to -1 if not...!
 
-#define REPLAY_VERSION 0 // 0 for old
+#define REPLAY_VERSION 1 // 0 for old
                          // 1 for new (in place building)
 
 #if DEBUG >= 1
@@ -808,6 +808,42 @@ readPurged(int **sparsemat, purgedfile_stream ps, int verbose)
 }
 
 static void
+toIndex(int **newrows, const char *indexname, FILE *hisfile,
+	uint64_t bwcostmin, int nrows, int small_nrows, int small_ncols)
+{
+    char *rp, str[STRLENMAX];
+    int small_nrows2;
+
+    // rewind
+    rewind(hisfile);
+    rp = fgets(str, STRLENMAX, hisfile);
+    ASSERT_ALWAYS(rp);
+    // reallocate
+    for(int i = 0; i < nrows; i++){
+	if(newrows[i] != NULL)
+	    free(newrows[i]);
+	newrows[i] = (int *)malloc(2 * sizeof(int));
+	ASSERT_ALWAYS(newrows[i] != NULL);
+	newrows[i][0] = 1;
+	newrows[i][1] = i;
+    }
+    // replay hisfile
+    build_newrows_from_file(newrows, hisfile, bwcostmin);
+    // re-determining small_nrows to check
+    small_nrows2 = 0;
+    for(int i = 0; i < nrows; i++)
+	if(newrows[i] != NULL)
+	    small_nrows2++;
+    ASSERT_ALWAYS(small_nrows2 == small_nrows);
+    // now, make index
+    double tt = wct_seconds();
+    fprintf(stderr, "Writing index file\n");
+    // WARNING: small_ncols is not used, but...
+    makeIndexFile(indexname, nrows, newrows, small_nrows, small_ncols);
+    fprintf(stderr, "#T# writing index file: %2.2lf\n", wct_seconds()-tt);
+}
+
+static void
 fasterVersion(int **newrows, 
 	      const char *sparsename, const char *sosname, 
 	      const char *indexname, 
@@ -815,8 +851,6 @@ fasterVersion(int **newrows,
 	      uint64_t bwcostmin, int nrows, int ncols,
 	      int skip, int bin, int writeindex)
 {
-    char str[STRLENMAX];
-    char *rp;
     int *colweight;
     int small_nrows, small_ncols;
 
@@ -856,35 +890,9 @@ fasterVersion(int **newrows,
     small_ncols = toFlush(sparsename, sosname, newrows, colweight, ncols,
 			  small_nrows, skip, bin);
     free(colweight);
-    if(writeindex){
-	// rewind
-	rewind(hisfile);
-	rp = fgets(str, STRLENMAX, hisfile);
-	ASSERT_ALWAYS(rp);
-	// reallocate
-	for(int i = 0; i < nrows; i++){
-	    if(newrows[i] != NULL)
-		free(newrows[i]);
-	    newrows[i] = (int *)malloc(2 * sizeof(int));
-	    ASSERT_ALWAYS(newrows[i] != NULL);
-	    newrows[i][0] = 1;
-	    newrows[i][1] = i;
-	}
-	// replay hisfile
-	build_newrows_from_file(newrows, hisfile, bwcostmin);
-	// re-determining small_nrows
-	small_nrows = 0;
-	for(int i = 0; i < nrows; i++)
-	    if(newrows[i] != NULL)
-		small_nrows++;
-	printf("2nd small_nrows=%d\n", small_nrows);
-	// now, make index
-	double tt = wct_seconds();
-	fprintf(stderr, "Writing index file\n");
-	// WARNING: small_ncols is not used, but...
-	makeIndexFile(indexname, nrows, newrows, small_nrows, small_ncols);
-	fprintf(stderr, "#T# writing index file: %2.2lf\n", wct_seconds()-tt);
-    }
+    if(writeindex)
+	toIndex(newrows, indexname, hisfile, bwcostmin, nrows,
+		small_nrows, small_ncols);
     for(int i = 0; i < nrows; i++)
 	if(newrows[i] != NULL)
 	    free(newrows[i]);
