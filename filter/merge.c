@@ -300,5 +300,8 @@ main (int argc, char *argv[])
     MkzClose (mat);
 #endif
     clearMat (mat);
+
+    fprintf (stderr, "Total merge time: %1.0f seconds\n", seconds ());
+
     return 0;
 }

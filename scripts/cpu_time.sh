@@ -5,6 +5,7 @@
 #		 $ cpu_time [OPTIONS]
 # OPTIONS: p: only polyselect
 #		   s: only sieve (long time of computation)
+#                  f: only filtering
 #		   l: only linalg
 #		   r: only sqrt
 #	       ps: only polyselect and sieve
@@ -64,6 +65,36 @@ if [[ -z $1 || $(expr $1 : '.*[s].*') != 0 ]]
     fi
 fi
 
+
+# Filtering
+if [[ -z $1 || $(expr $1 : '.*[f].*') != 0 ]]
+  then echo -n "CPU time for dup1:      "
+    if [ ! -f ${name}.dup1.log ] 2> /dev/null
+      then echo "dup1 file was not found"
+      else grep split ${name}.dup1.log | tail -1 | sed "s/^.*relations in \([^s]*\).*$/+\1/g" | tr "\n" " " | cut -c2- | bc | f
+    fi
+    echo -n "CPU time for dup2:      "
+    if [ ! -f ${name}.dup2_*.log ] 2> /dev/null
+      then echo "dup2 files were not found"
+      else
+        echo "" > /tmp/foo
+        for foo in ${name}.dup2_*.log
+        do
+           grep MB $foo | tail -1 | sed "s/^.* in \([^s]*\).*$/+\1/g" >> /tmp/foo
+        done
+        cat /tmp/foo | tr "\n" " " | cut -c2- | sed "s/^+//g" | bc | f
+    fi
+    echo -n "CPU time for purge:     "
+    if [ ! -f ${name}.purge.log ] 2> /dev/null
+      then echo "purge file was not found"
+      else grep MB ${name}.purge.log | tail -1 | sed "s/^.*relations in \([^s]*\).*$/+\1/g" | tr "\n" " " | cut -c2- | bc | f
+    fi
+    echo -n "CPU time for merge:     "
+    if [ ! -f ${name}.merge.log ] 2> /dev/null
+      then echo "merge file was not found"
+      else grep "Total merge time" ${name}.merge.log | sed "s/^.*time: \([^s]*\).*$/\1/g" | f
+    fi
+fi
 
 # Linear Algebra
 if [[ -z $1 || $(expr $1 : '.*[l].*') != 0 ]]
