@@ -820,8 +820,9 @@ toIndex(int **newrows, const char *indexname, FILE *hisfile,
     ASSERT_ALWAYS(rp);
     // reallocate
     for(int i = 0; i < nrows; i++){
-	if(newrows[i] != NULL)
-	    free(newrows[i]);
+      /* we only need to free the "crunched" part */
+        if (i < small_nrows)
+          free(newrows[i]);
 	newrows[i] = (int *)malloc(2 * sizeof(int));
 	ASSERT_ALWAYS(newrows[i] != NULL);
 	newrows[i][0] = 1;
@@ -872,31 +873,26 @@ fasterVersion(int **newrows,
     colweight = (int *)malloc(ncols * sizeof(int *));
     ASSERT_ALWAYS(colweight != NULL);
     memset(colweight, 0, ncols * sizeof(int *));
-    small_nrows = 0;
-    for(int i = 0; i < nrows; i++)
-	if(newrows[i] != NULL){
-	    small_nrows++;
+
+    /* compute column weights and crunch empty rows */
+    for (int i = small_nrows = 0; i < nrows; i++)
+      {
+	if (newrows[i] != NULL)
+          {
 	    for(int k = 1; k <= newrows[i][0]; k++)
-		colweight[newrows[i][k]] += 1;
-	}
-    // crunch matrix
-    for(int i = 0, ii = 0; i < nrows; i++)
-	if(newrows[i] != NULL){
-	    if(i > ii){
-		newrows[ii] = newrows[i];
-		newrows[i] = NULL;
-	    }
-	    ii++;
-	}
+              colweight[newrows[i][k]] += 1;
+            newrows[small_nrows++] = newrows[i];
+          }
+      }
     small_ncols = toFlush(sparsename, sosname, newrows, colweight, ncols,
 			  small_nrows, skip, bin);
     free(colweight);
     if(writeindex)
-	toIndex(newrows, indexname, hisfile, bwcostmin, nrows,
-		small_nrows, small_ncols);
+        toIndex(newrows, indexname, hisfile, bwcostmin, nrows,
+                small_nrows, small_ncols);
     for(int i = 0; i < nrows; i++)
-	if(newrows[i] != NULL)
-	    free(newrows[i]);
+       if(newrows[i] != NULL)
+        free (newrows[i]);
     free(newrows);
 }
 #endif
