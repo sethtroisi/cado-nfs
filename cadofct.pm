@@ -2704,9 +2704,9 @@ sub do_replay {
     my $cmd = "$param{'bindir'}/filter/replay ".
               "--binary " .
               "-skip $param{'skip'} " .
+              "-purged $param{'prefix'}.purged ".
               "-his $param{'prefix'}.merge.his ".
               "-index $param{'prefix'}.index ".
-              "-purged $param{'prefix'}.purged ".
               "-out $param{'prefix'}.small.bin ".
               (defined $bwcostmin ? "-costmin $bwcostmin " : "");
 
