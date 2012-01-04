@@ -21,7 +21,7 @@
 
 #define TRACE_COL -1 // 231 // put to -1 if not...!
 
-#define REPLAY_VERSION 1 // 0 for old
+#define REPLAY_VERSION 0 // 0 for old
                          // 1 for new (in place building)
 
 #if DEBUG >= 1
@@ -656,139 +656,33 @@ read_newrows_from_file(int **newrows, int nrows, FILE *file)
 	newrows[i] = NULL;
 }
 
-#if REPLAY_VERSION == 1
-// Feed sparsemat with M_purged
+#if REPLAY_VERSION == 0
+
 static void
-readPurged(int **sparsemat, purgedfile_stream ps, int verbose)
+originalVersion(int **newrows, 
+		const char *sparsename, const char *sosname, 
+		const char *indexname, 
+		FILE *hisfile, purgedfile_stream ps,
+		uint64_t bwcostmin, int nrows, int ncols,
+		int nslices, int skip, int bin, int verbose, int writeindex)
 {
-    fprintf(stderr, "Reading sparse matrix from purged file\n");
-    for(int i = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; i++) {
-	if (verbose && purgedfile_stream_disp_progress_now_p(ps))
-	    fprintf(stderr, "Treating old rel #%d at %2.2lf\n",
-                    ps->rrows,ps->dt);
-	if(ps->nc == 0)
-	    fprintf(stderr, "Hard to believe: row[%d] is NULL\n", i);
-	qsort(ps->cols, ps->nc, sizeof(int), cmp);
-	sparsemat[i] = (int *)malloc((ps->nc+1) * sizeof(int));
-	ASSERT_ALWAYS(sparsemat[i] != NULL);
-	sparsemat[i][0] = ps->nc;
-        for(int k = 0; k < ps->nc; k++)
-	    sparsemat[i][k+1] = ps->cols[k];
-    }
-}
-#endif
-
-// We start from M_purged which is nrows x ncols;
-// we build M_small which is small_nrows x small_ncols.
-// newrows[i] if != NULL, contains a list of the indices of the rows in
-// M_purged that were added together to form this new row in M_small.
-// TODO: replace this index by the index to rels directly to skip one
-// indirection???
-int
-main(int argc, char *argv[])
-{
-    FILE *hisfile, *fromfile;
-    uint64_t bwcostmin = 0;
-    int nrows, ncols, nslices = 0;
-    int **newrows, *colweight;
-    int small_nrows = 0, small_ncols;
-    int verbose = 0, writeindex;
-#if REPLAY_VERSION == 0
     uint64_t wrs = 0;
-    int **whichrows, *nbrels, **sparsemat;
-    int unused = 0;
-#endif
-    char str[STRLENMAX];
-    int bin=0;
-    char * rp;
-    int skip=0;
+    int **whichrows, *nbrels, **sparsemat, *colweight;
+    int small_nrows, small_ncols, unused = 0;
 
-    setbuf(stdout, NULL);
-    setbuf(stderr, NULL);
-
-    // printing the arguments as everybody does these days
-    fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
-    for (int i = 1; i < argc; i++)
-      fprintf (stderr, " %s", argv[i]);
-    fprintf (stderr, "\n");
-
-    param_list pl;
-
-    param_list_init(pl);
-    argv++,argc--;
-    param_list_configure_knob(pl, "--verbose", &verbose);
-    param_list_configure_knob(pl, "--binary", &bin);
-    param_list_configure_alias(pl, "--verbose", "-v");
-
-    for( ; argc ; ) {
-        if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
-        fprintf (stderr, "Unknown option: %s\n", argv[0]);
-        abort();
-    }
-    const char * purgedname = param_list_lookup_string(pl, "purged");
-    const char * hisname = param_list_lookup_string(pl, "his");
-    const char * sparsename = param_list_lookup_string(pl, "out");
-    const char * indexname = param_list_lookup_string(pl, "index");
-    const char * fromname = param_list_lookup_string(pl, "from");
-    const char * sosname = param_list_lookup_string(pl, "sos");
-    param_list_parse_int(pl, "binary", &bin);
-    param_list_parse_int(pl, "nslices", &nslices);
-    param_list_parse_int(pl, "skip", &skip);
-    param_list_parse_uint64(pl, "bwcostmin", &bwcostmin);
-    if (has_suffix(sparsename, ".bin") || has_suffix(sparsename, ".bin.gz"))
-        bin=1;
-
-    purgedfile_stream ps;
-    purgedfile_stream_init(ps);
-    purgedfile_stream_openfile(ps, purgedname);
-
-    hisfile = fopen(hisname, "r");
-    ASSERT(hisfile != NULL);
-    rp = fgets(str, STRLENMAX, hisfile);
-    ASSERT_ALWAYS(rp);
-
-    // read parameters that should be the same as in purgedfile!
-    sscanf(str, "%d %d", &nrows, &ncols);
-    ASSERT_ALWAYS(nrows == ps->nrows);
-    ASSERT_ALWAYS(ncols == ps->ncols);
-
-    fprintf(stderr, "Original matrix has size %d x %d\n", nrows, ncols);
-
-    newrows = (int **)malloc(nrows * sizeof(int *));
-    ASSERT_ALWAYS(newrows != NULL);
-
-    // at the end of the following operations, newrows[i] is either
-    // NULL
-    // or k i_1 ... i_k which means that M_small will contain a row formed
-    // of the addition of the rows of indices i_1 ... i_k in the original
-    // matrix
-    if(fromname == NULL){
-	// generic case
-	writeindex = 1;
-#if REPLAY_VERSION == 0
-	// allocate
-	for(int i = 0; i < nrows; i++){
-	    newrows[i] = (int *)malloc(2 * sizeof(int));
-	    ASSERT_ALWAYS(newrows[i] != NULL);
-	    newrows[i][0] = 1;
-	    newrows[i][1] = i;
-	}
-	// perform all additions
-	build_newrows_from_file(newrows, hisfile, bwcostmin);
-	fclose(hisfile);
-#endif
-    } else {
-	// rare case, probably very very rare
-	writeindex = 0;
-	fromfile = fopen(fromname, "r");
-	ASSERT(fromfile != NULL);
-	read_newrows_from_file(newrows, nrows, fromfile);
-    }
-
-#if REPLAY_VERSION == 0
 #if DEBUG >= 1
     fprintf (stderr, "Total number of row additions: %lu\n", row_additions);
 #endif
+
+    // allocate
+    for(int i = 0; i < nrows; i++){
+	newrows[i] = (int *)malloc(2 * sizeof(int));
+	ASSERT_ALWAYS(newrows[i] != NULL);
+	newrows[i][0] = 1;
+	newrows[i][1] = i;
+    }
+    // perform all additions
+    build_newrows_from_file(newrows, hisfile, bwcostmin);
 
     // nbrels[oldi] will contain the number of new relations in which
     // M_purged[oldi] takes part
@@ -889,41 +783,47 @@ main(int argc, char *argv[])
 	    free(whichrows[i]);
     free(whichrows);
     free(colweight);
-#elif REPLAY_VERSION == 1
-    fprintf(stderr, "Using more direct replay version\n");
-    if(writeindex){
-	// first pass
-	// allocate
-	for(int i = 0; i < nrows; i++){
-	    newrows[i] = (int *)malloc(2 * sizeof(int));
-	    ASSERT_ALWAYS(newrows[i] != NULL);
-	    newrows[i][0] = 1;
-	    newrows[i][1] = i;
-	}
-	// read hisfile once
-	build_newrows_from_file(newrows, hisfile, bwcostmin);
-	// rewind
-	rewind(hisfile);
-	rp = fgets(str, STRLENMAX, hisfile);
-	ASSERT_ALWAYS(rp);
-	// determining small_nrows
-	small_nrows = 0;
-	for(int i = 0; i < nrows; i++)
-	    if(newrows[i] != NULL)
-		small_nrows++;
-	// now, make index
-	double tt = wct_seconds();
-	fprintf(stderr, "Writing index file\n");
-	// WARNING: small_ncols is not used and put to 0...!
-	makeIndexFile(indexname, nrows, newrows, small_nrows, 0);
-	fprintf(stderr, "#T# writing index file: %2.2lf\n", wct_seconds()-tt);
-	// clear newrows for next use
-	for(int i = 0; i < nrows; i++)
-	    if(newrows[i] != NULL){
-		free(newrows[i]);
-		newrows[i] = NULL;
-	    }
+}
+
+#else
+
+// Feed sparsemat with M_purged
+static void
+readPurged(int **sparsemat, purgedfile_stream ps, int verbose)
+{
+    fprintf(stderr, "Reading sparse matrix from purged file\n");
+    for(int i = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; i++) {
+	if (verbose && purgedfile_stream_disp_progress_now_p(ps))
+	    fprintf(stderr, "Treating old rel #%d at %2.2lf\n",
+                    ps->rrows,ps->dt);
+	if(ps->nc == 0)
+	    fprintf(stderr, "Hard to believe: row[%d] is NULL\n", i);
+	qsort(ps->cols, ps->nc, sizeof(int), cmp);
+	sparsemat[i] = (int *)malloc((ps->nc+1) * sizeof(int));
+	ASSERT_ALWAYS(sparsemat[i] != NULL);
+	sparsemat[i][0] = ps->nc;
+        for(int k = 0; k < ps->nc; k++)
+	    sparsemat[i][k+1] = ps->cols[k];
     }
+}
+
+static void
+fasterVersion(int **newrows, 
+	      const char *sparsename, const char *sosname, 
+	      const char *indexname, 
+	      FILE *hisfile, purgedfile_stream ps,
+	      uint64_t bwcostmin, int nrows, int ncols,
+	      int skip, int bin, int writeindex)
+{
+    char str[STRLENMAX];
+    char *rp;
+    int *colweight;
+    int small_nrows, small_ncols;
+
+    fprintf(stderr, "Using more direct replay version\n");
+
+    // 1st pass
+
     // read M_purged
     readPurged(newrows, ps, 1);
 #if DEBUG >= 1
@@ -934,17 +834,19 @@ main(int argc, char *argv[])
 	printf("\n");
     }
 #endif
-    // directly replay additions
+    // replay additions
     build_newrows_from_file(newrows, hisfile, bwcostmin);
-    fclose(hisfile);
     // compute weights of columns
     colweight = (int *)malloc(ncols * sizeof(int *));
     ASSERT_ALWAYS(colweight != NULL);
     memset(colweight, 0, ncols * sizeof(int *));
+    small_nrows = 0;
     for(int i = 0; i < nrows; i++)
-	if(newrows[i] != NULL)
+	if(newrows[i] != NULL){
+	    small_nrows++;
 	    for(int k = 1; k <= newrows[i][0]; k++)
 		colweight[newrows[i][k]] += 1;
+	}
     // crunch matrix
     for(int i = 0, ii = 0; i < nrows; i++)
 	if(newrows[i] != NULL){
@@ -953,11 +855,142 @@ main(int argc, char *argv[])
 	}
     small_ncols = toFlush(sparsename, sosname, newrows, colweight, ncols,
 			  small_nrows, skip, bin);
+    free(colweight);
+    if(writeindex){
+	// rewind
+	rewind(hisfile);
+	rp = fgets(str, STRLENMAX, hisfile);
+	ASSERT_ALWAYS(rp);
+	// reallocate
+	for(int i = 0; i < nrows; i++){
+	    if(newrows[i] != NULL)
+		free(newrows[i]);
+	    newrows[i] = (int *)malloc(2 * sizeof(int));
+	    ASSERT_ALWAYS(newrows[i] != NULL);
+	    newrows[i][0] = 1;
+	    newrows[i][1] = i;
+	}
+	// replay hisfile
+	build_newrows_from_file(newrows, hisfile, bwcostmin);
+	// re-determining small_nrows
+	small_nrows = 0;
+	for(int i = 0; i < nrows; i++)
+	    if(newrows[i] != NULL)
+		small_nrows++;
+	printf("2nd small_nrows=%d\n", small_nrows);
+	// now, make index
+	double tt = wct_seconds();
+	fprintf(stderr, "Writing index file\n");
+	// WARNING: small_ncols is not used, but...
+	makeIndexFile(indexname, nrows, newrows, small_nrows, small_ncols);
+	fprintf(stderr, "#T# writing index file: %2.2lf\n", wct_seconds()-tt);
+    }
     for(int i = 0; i < nrows; i++)
 	if(newrows[i] != NULL)
 	    free(newrows[i]);
     free(newrows);
+}
+#endif
+
+// We start from M_purged which is nrows x ncols;
+// we build M_small which is small_nrows x small_ncols.
+// newrows[i] if != NULL, contains a list of the indices of the rows in
+// M_purged that were added together to form this new row in M_small.
+// TODO: replace this index by the index to rels directly to skip one
+// indirection???
+int
+main(int argc, char *argv[])
+{
+    FILE *hisfile, *fromfile;
+    uint64_t bwcostmin = 0;
+    int nrows, ncols, nslices = 0;
+    int **newrows;
+    int verbose = 0, writeindex;
+    int bin=0;
+    int skip=0;
+    char *rp, str[STRLENMAX];
+
+    setbuf(stdout, NULL);
+    setbuf(stderr, NULL);
+
+    // printing the arguments as everybody does these days
+    fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
+    for (int i = 1; i < argc; i++)
+      fprintf (stderr, " %s", argv[i]);
+    fprintf (stderr, "\n");
+
+    param_list pl;
+
+    param_list_init(pl);
+    argv++,argc--;
+    param_list_configure_knob(pl, "--verbose", &verbose);
+    param_list_configure_knob(pl, "--binary", &bin);
+    param_list_configure_alias(pl, "--verbose", "-v");
+
+    for( ; argc ; ) {
+        if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
+        fprintf (stderr, "Unknown option: %s\n", argv[0]);
+        abort();
+    }
+    const char * purgedname = param_list_lookup_string(pl, "purged");
+    const char * hisname = param_list_lookup_string(pl, "his");
+    const char * sparsename = param_list_lookup_string(pl, "out");
+    const char * indexname = param_list_lookup_string(pl, "index");
+    const char * fromname = param_list_lookup_string(pl, "from");
+    const char * sosname = param_list_lookup_string(pl, "sos");
+    param_list_parse_int(pl, "binary", &bin);
+    param_list_parse_int(pl, "nslices", &nslices);
+    param_list_parse_int(pl, "skip", &skip);
+    param_list_parse_uint64(pl, "bwcostmin", &bwcostmin);
+    if (has_suffix(sparsename, ".bin") || has_suffix(sparsename, ".bin.gz"))
+        bin=1;
+
+    purgedfile_stream ps;
+    purgedfile_stream_init(ps);
+    purgedfile_stream_openfile(ps, purgedname);
+
+    hisfile = fopen(hisname, "r");
+    ASSERT(hisfile != NULL);
+    rp = fgets(str, STRLENMAX, hisfile);
+    ASSERT_ALWAYS(rp);
+
+    // read parameters that should be the same as in purgedfile!
+    sscanf(str, "%d %d", &nrows, &ncols);
+    ASSERT_ALWAYS(nrows == ps->nrows);
+    ASSERT_ALWAYS(ncols == ps->ncols);
+
+    fprintf(stderr, "Original matrix has size %d x %d\n", nrows, ncols);
+
+    newrows = (int **)malloc(nrows * sizeof(int *));
+    ASSERT_ALWAYS(newrows != NULL);
+
+    // at the end of the following operations, newrows[i] is either
+    // NULL
+    // or k i_1 ... i_k which means that M_small will contain a row formed
+    // of the addition of the rows of indices i_1 ... i_k in the original
+    // matrix
+    if(fromname == NULL){
+	// generic case
+	writeindex = 1;
+    } else {
+	// rare case, probably very very rare
+	abort(); // to be clarified before use...!
+	writeindex = 0;
+	fromfile = fopen(fromname, "r");
+	ASSERT(fromfile != NULL);
+	read_newrows_from_file(newrows, nrows, fromfile);
+    }
+
+#if REPLAY_VERSION == 0
+    originalVersion(newrows, sparsename, sosname, indexname, hisfile, ps,
+		    bwcostmin, nrows, ncols, nslices, 
+		    skip, bin, verbose, writeindex);
+#elif REPLAY_VERSION == 1
+    fasterVersion(newrows, sparsename, sosname, indexname, hisfile, ps,
+		  bwcostmin, nrows, ncols, skip, bin, writeindex);
 #endif // REPLAY_VERSION
+
+    fclose(hisfile);
 
     purgedfile_stream_closefile(ps);
     purgedfile_stream_clear(ps);
