@@ -1,14 +1,11 @@
 #include "cado.h"
-#include <stdio.h>
 #include <stdlib.h>
 #include <gmp.h>
 #include <string.h>
 #include <inttypes.h>
 #include <math.h> /* for log */
-#include <sys/types.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <errno.h>
 
 #include "utils.h"
@@ -26,98 +23,6 @@ static int verbose = 0;
 #include "plain_poly.h"
 
 /********** RATSQRT **********/
-
-/* Returns memory usage, in KB 
- * This is the VmSize field in the status file of /proc/pid/ dir
- * This is highly non portable.
- * Return -1 in case of failure.
- */
-static long Memusage() {
-  pid_t pid = getpid();
-
-  char str[1024];
-  char *truc;
-  snprintf(str, 1024, "/proc/%d/status", pid);
-
-  FILE *file;
-  file = fopen(str, "r");
-  if (file == NULL)
-    return -1;
-
-  long mem;
-  for(;;) {
-    truc = fgets(str, 1023, file);
-    if (truc == NULL) {
-      fclose(file);
-      return -1;
-    }
-    int ret = sscanf(str, "VmSize: %ld", &mem);
-    if (ret == 1) {
-      fclose(file);
-      return mem;
-    }
-  }
-}
-
-/* same as above, for resident memory (column RES of top) */
-static long Memusage2() {
-  pid_t pid = getpid();
-
-  char str[1024];
-  char *truc;
-  snprintf(str, 1024, "/proc/%d/status", pid);
-
-  FILE *file;
-  file = fopen(str, "r");
-  if (file == NULL)
-    return -1;
-
-  long mem;
-  for(;;) {
-    truc = fgets(str, 1023, file);
-    if (truc == NULL) {
-      fclose(file);
-      return -1;
-    }
-    int ret = sscanf(str, "VmRSS: %ld", &mem);
-    if (ret == 1) {
-      fclose(file);
-      return mem;
-    }
-  }
-}
-
-/* Returns peak memory usage, in KB 
- * This is the VmPeak field in the status file of /proc/pid/ dir
- * This is highly non portable.
- * Return -1 in case of failure.
- */
-static long PeakMemusage() {
-  pid_t pid = getpid();
-
-  char str[1024];
-  char *truc;
-  snprintf(str, 1024, "/proc/%d/status", pid);
-
-  FILE *file;
-  file = fopen(str, "r");
-  if (file == NULL)
-    return -1;
-
-  long mem;
-  for(;;) {
-    truc = fgets(str, 1023, file);
-    if (truc == NULL) {
-      fclose(file);
-      return -1;
-    }
-    int ret = sscanf(str, "VmPeak: %ld", &mem);
-    if (ret == 1) {
-      fclose(file);
-      return mem;
-    }
-  }
-}
 
 static void
 my_mpz_mul (mpz_t a, mpz_t b, mpz_t c)

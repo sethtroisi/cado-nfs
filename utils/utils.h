@@ -39,5 +39,6 @@
 #include "purgedfile.h"
 #include "bit_vector.h"
 #include "fix-endianness.h"
+#include "memusage.h"
 
 #endif	/* CADO_UTILS_H_ */

@@ -1003,5 +1003,8 @@ main(int argc, char *argv[])
 
     param_list_clear(pl);
 
+    fprintf (stderr, "Memory usage: VIRT %luM (peak %luM)\n",
+             Memusage () >> 10, PeakMemusage () >> 10);
+
     return 0;
 }

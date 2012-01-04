@@ -5,7 +5,7 @@ set (sources
         mpz_poly.c fpoly.c rootfinder.c params.c gcd_int64.c gcd_uint64.c
         discriminant.c random_generation.c mpz_array.c gzip.c misc.c
         hashpair.c poly.c crc.c purgedfile.c bit_vector.c
-        barrier.c usp.c fix-endianness.c cut_n_roots.c 
+        barrier.c usp.c fix-endianness.c cut_n_roots.c memusage.c
 )
 
 # the utils library is used by some shared objects (prominently the
