@@ -882,8 +882,11 @@ fasterVersion(int **newrows,
     // crunch matrix
     for(int i = 0, ii = 0; i < nrows; i++)
 	if(newrows[i] != NULL){
-	    newrows[ii++] = newrows[i];
-	    newrows[i] = NULL;
+	    if(i > ii){
+		newrows[ii] = newrows[i];
+		newrows[i] = NULL;
+	    }
+	    ii++;
 	}
     small_ncols = toFlush(sparsename, sosname, newrows, colweight, ncols,
 			  small_nrows, skip, bin);
