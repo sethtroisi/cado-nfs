@@ -854,8 +854,6 @@ fasterVersion(int **newrows,
     int *colweight;
     int small_nrows, small_ncols;
 
-    fprintf(stderr, "Using more direct replay version\n");
-
     // 1st pass
 
     // read M_purged
@@ -989,6 +987,7 @@ main(int argc, char *argv[])
 	read_newrows_from_file(newrows, nrows, fromfile);
     }
 
+    fprintf (stderr, "Using REPLAY_VERSION=%d\n", REPLAY_VERSION);
 #if REPLAY_VERSION == 0
     originalVersion(newrows, sparsename, sosname, indexname, hisfile, ps,
 		    bwcostmin, nrows, ncols, nslices, 
