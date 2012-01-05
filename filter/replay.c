@@ -914,6 +914,7 @@ main(int argc, char *argv[])
     int bin=0;
     int skip=0;
     char *rp, str[STRLENMAX];
+    double wct0 = wct_seconds ();
 
     setbuf(stdout, NULL);
     setbuf(stderr, NULL);
@@ -1003,7 +1004,7 @@ main(int argc, char *argv[])
 
     param_list_clear(pl);
 
-    print_timing_and_memory ();
+    print_timing_and_memory (wct0);
 
     return 0;
 }

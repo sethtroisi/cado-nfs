@@ -12,7 +12,7 @@ extern int cputime (void);
 extern double seconds (void);
 extern void seconds_user_sys (double *);
 extern double wct_seconds (void);
-extern void print_timing_and_memory (void);
+extern void print_timing_and_memory (double);
 
 #ifdef __cplusplus
 }

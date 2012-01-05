@@ -42,6 +42,9 @@ seconds_user_sys (double * res)
     res[1] = ru->ru_stime.tv_sec +  (double) ru->ru_stime.tv_usec / 1.0e6;
 }
 
+/* returns the number of seconds since the Epoch (1970-01-01 00:00:00 +0000).
+   Thus we have to call it twice and subtract to get the wall clock time of
+   a given program. */
 double
 wct_seconds (void)
 {
@@ -51,11 +54,11 @@ wct_seconds (void)
 }
 
 void
-print_timing_and_memory (void)
+print_timing_and_memory (double wct0)
 {
-  fprintf (stderr, "Memory usage: VIRT %luM (peak %luM)\n",
+  fprintf (stderr, "Total usage: time %1.0fs (cpu), %1.0fs (wct) ; "
+           "memory %luM, peak %luM\n",
+           seconds (), wct_seconds () - wct0,
            Memusage () >> 10, PeakMemusage () >> 10);
-  fprintf (stderr, "Total time: %1.0f seconds (cpu), %1.0f seconds (real)\n",
-           seconds (), wct_seconds ());
 }
 
