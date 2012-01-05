@@ -1003,10 +1003,7 @@ main(int argc, char *argv[])
 
     param_list_clear(pl);
 
-    fprintf (stderr, "Memory usage: VIRT %luM (peak %luM)\n",
-             Memusage () >> 10, PeakMemusage () >> 10);
-
-    fprintf (stderr, "Total replay time: %1.0f seconds\n", seconds ());
+    print_timing_and_memory ();
 
     return 0;
 }
