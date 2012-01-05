@@ -1,4 +1,5 @@
 #include "cado.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include <gmp.h>
 #include <string.h>
