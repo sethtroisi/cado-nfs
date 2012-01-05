@@ -483,6 +483,34 @@ compute_connected_component (bit_vector_ptr T, uint32_t i, hashtable_t *H,
   return n;
 }
 
+/* Delete connected component of row i, assuming the bit-vector is set.
+   Warning: we might have some H->hashcount[h] = 3, which is decreased
+   to 2, but we don't want to treat that case. Thus we check in addition
+   that sum[h] <> 0, which only occurs when H->hashcount[h] = 2 initially. */
+static int
+delete_connected_component (bit_vector_ptr T, uint32_t i, hashtable_t *H,
+                            int **rel_compact, uint32_t *sum, int *nprimes,
+                            bit_vector_ptr rel_used)
+{
+  int j, h, w = 1;
+  uint32_t k;
+
+  bit_vector_clearbit(T, i); /* mark row as visited */
+  bit_vector_clearbit(rel_used, i);
+  for (j = 0; (h = rel_compact[i][j]) != -1; j++)
+    {
+      if (H->hashcount[h] == 2 && sum[h] != 0)
+        { /* first row that contains ideal of index h */
+          k = sum[h] - i; /* other row where prime of index h appears */
+          if (bit_vector_getbit(T, k) == 1) /* row k was not visited yet */
+            w += delete_connected_component (T, k, H, rel_compact, sum,
+                                             nprimes, rel_used);
+        }
+    }
+  delete_relation (i, nprimes, H, rel_used, rel_compact);
+  return w;
+}
+
 typedef struct {
   float w;
   uint32_t i;
@@ -522,7 +550,7 @@ deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes, bit_vector_ptr rel_u
   bit_vector_init_set(T, nrelmax, 0);
 
   for (i = 0; i < nrelmax; i++)
-    if (bit_vector_getbit(rel_used, i) && bit_vector_getbit(T,i) == 0)
+    if (bit_vector_getbit(rel_used, i) && bit_vector_getbit(T, i) == 0)
       {
         w = 0;
         n = compute_connected_component (T, i, H, &w, rel_compact, sum);
@@ -540,10 +568,11 @@ deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes, bit_vector_ptr rel_u
   target = (*nrel - *nprimes + keep) / 2;
   for (i = 0; i < ltmp && (*nrel) - (*nprimes) > target; i ++)
     {
-      /* it suffices to remove one relation per component, the other ones
-         will be removed by onepass_singleton_removal */
-      delete_relation (tmp[i].i, nprimes, H, rel_used, rel_compact);
-      *nrel -= 1;
+      /* we could remove only one row from the current connected component,
+         the other would be removed by onepass_singleton_removal(),
+         but this would take more passes, and would thus be less efficient */
+      *nrel -= delete_connected_component (T, tmp[i].i, H, rel_compact, sum,
+                                           nprimes, rel_used);
     }
 
   bit_vector_clear(T);
