@@ -1,6 +1,6 @@
 /* purge --- remove singletons
 
-Copyright 2008, 2009, 2010, 2011 Francois Morain, Paul Zimmermann
+Copyright 2008, 2009, 2010, 2011, 2012 Francois Morain, Paul Zimmermann
 
 This file is part of CADO-NFS.
 
@@ -70,6 +70,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "gzip.h"
 
 #define MAX_FILES 1000000
+#define MAX_STEPS 10 /* maximal number of steps in each pass */
 
 /********************** own memory allocation routines ***********************/
 
@@ -527,6 +528,7 @@ deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes, bit_vector_ptr rel_u
   double N = 0.0; /* numebr of rows */
   comp_t *tmp = NULL; /* (weight, index) */
   int target;
+  static int count = 0;
 
   if ((*nrel - *nprimes) <= keep)
     return;
@@ -566,6 +568,8 @@ deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes, bit_vector_ptr rel_u
      we remove only half of the excess at each call of deleteHeavierRows,
      hoping to get "better" components to remove at the next call. */
   target = (*nrel - *nprimes + keep) / 2;
+  if (++count >= MAX_STEPS)
+    target = keep; /* enough steps */
   for (i = 0; i < ltmp && (*nrel) - (*nprimes) > target; i ++)
     {
       /* we could remove only one row from the current connected component,
@@ -596,35 +600,50 @@ onepass_singleton_removal (int nrelmax, int *nrel, int *nprimes,
 
 static void
 remove_singletons (int *nrel, int nrelmax, int *nprimes, hashtable_t *H,
-                   bit_vector_ptr rel_used, int **rel_compact, int keep, int final)
+                   bit_vector_ptr rel_used, int **rel_compact, int keep,
+                   int final)
 {
   int old, newnrel = *nrel, newnprimes = *nprimes, oldexcess, excess;
+  int count = 0;
 
   excess = newnrel - newnprimes;
-    do{
-	old = newnrel;
-        oldexcess = excess;
-        if (final) /* otherwise the excess is wrong */
-          deleteHeavierRows (H, &newnrel, &newnprimes, rel_used, rel_compact,
-                             nrelmax, keep);
-	if(newnrel != old)
-	    fprintf (stderr, "deleted heavier relations: %d %d at %2.2lf\n",
-                     newnrel, newnprimes, seconds ());
-	onepass_singleton_removal (nrelmax, &newnrel, &newnprimes, H,
+  do
+    {
+      old = newnrel;
+      oldexcess = excess;
+
+      /* for the final pass, delete heavy rows */
+      if (final)
+        deleteHeavierRows (H, &newnrel, &newnprimes, rel_used, rel_compact,
+                           nrelmax, keep);
+      if (newnrel != old)
+        fprintf (stderr, "deleted heavier relations: %d %d at %2.2lf\n",
+                 newnrel, newnprimes, seconds ());
+
+      onepass_singleton_removal (nrelmax, &newnrel, &newnprimes, H,
                                    rel_used, rel_compact);
-        excess = newnrel - newnprimes;
-	fprintf (stderr, "   new_nrows=%d new_ncols=%d (%d) at %2.2lf\n",
-		newnrel, newnprimes, excess, seconds());
-        if (final && oldexcess > excess)
-          fprintf (stderr, "   [each excess row deleted %2.2lf rows]\n",
-                   (double) (old - newnrel) / (double) (oldexcess - excess));
-    } while(newnrel != old);
 
-    /* Warning: we might have empty rows, i.e., empty rel_compact[i] lists,
-       if all primes in a relation are less then minpr or minpa. */
+      excess = newnrel - newnprimes;
+      fprintf (stderr, "   new_nrows=%d new_ncols=%d (%d) at %2.2lf\n",
+               newnrel, newnprimes, excess, seconds());
 
-    *nrel = newnrel;
-    *nprimes = newnprimes;
+      if (final && oldexcess > excess)
+        fprintf (stderr, "   [each excess row deleted %2.2lf rows]\n",
+                 (double) (old - newnrel) / (double) (oldexcess - excess));
+
+      count ++;
+      if (final == 0 && count >= MAX_STEPS) /* for the final pass we want
+                                               to remove all singletons
+                                               to avoid warnings */
+        break;
+    }
+  while (newnrel != old);
+
+  /* Warning: we might have empty rows, i.e., empty rel_compact[i] lists,
+     if all primes in a relation are less then minpr or minpa. */
+
+  *nrel = newnrel;
+  *nprimes = newnprimes;
 }
 
 /* This function renumbers used primes (those with H->hashcount[i] > 1)
@@ -758,6 +777,7 @@ reread (const char *oname, char ** ficname,
   if (raw == 0)
     printf ("WEIGHT: %1.0f WEIGHT*NROWS=%1.2e\n", W, W * (double) nr);
   printf ("EXCESS: %d\n", nrows - ncols);
+  fflush (stdout);
 }
 
 static void
@@ -802,6 +822,7 @@ main (int argc, char **argv)
     int raw = 0;
     char ** fic;
     int noclique = 0;
+    double wct0 = wct_seconds ();
 
     fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
     for (k = 1; k < argc; k++)
@@ -1022,6 +1043,8 @@ main (int argc, char **argv)
     if (filelist) filelist_clear(fic);
 
     param_list_clear(pl);
+
+    print_timing_and_memory (wct0);
 
     return 0;
 }
