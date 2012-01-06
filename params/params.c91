@@ -41,7 +41,8 @@ machines=mach_desc      # file describing available computers for parallel
     # machines using ssh, in a master/slave manner. For this to work, a
     # machines description file is mandatory.
     # This is only used in the polynomial selection and sieving steps.
-    # Only the master machine needs access to the <wdir> directory.
+    # Only the master machine needs access to the <wdir> directory
+    # (unless MPI is used for the linear algebra step).
     # Slave machines put their temporary data in the <tmpdir> specified on a
     # per-(group of)machine basis in the machines description file.
     
