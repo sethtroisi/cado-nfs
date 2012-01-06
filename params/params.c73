@@ -34,18 +34,13 @@ degree=4                # degree of the algebraic polynomial
 kjdelay=30              # time between two checks
 selectnice=4            # nice level for selection
 
-# on the test number
-# 3162277660168399394247258440509119607036845624823044397839530934342266357
-# we get
-# lognorm: 24.55, alpha: -3.08 E=21.47
-# Murphy's E(Bf=10000000,Bg=5000000,area=1.00e+16)=4.45e-07
-
 ## Parameters of polyselect
 kjadmax=8000            # max value for lc(f)
 kjadrange=2000          # individual tasks
 kjkmax=17               # rotation is bounded by 2^kmax
 kjincr=60               # forced divisor of lc(f)
 kjP=5000                # choose lc(g) with two prime factors in [P,2P]
+kjmaxnorm=26.5          # maximal lognorm before rootsieve
 
 ###########################################################################
 # Sieve
