@@ -13,6 +13,8 @@
    0 : constant weight per row
    1 : average density */
 #define BURIED_MODEL 0
+/* we bury all ideals of density > 1/BURIED_MAX_DENSITY */
+#define BURIED_MAX_DENSITY 2000
 
 /* rows correspond to relations, and columns to primes (or prime ideals) */
 typedef struct {

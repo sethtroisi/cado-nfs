@@ -170,11 +170,13 @@ filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps, int verbose)
 
     int bmin = mat->nrows, bmax = 0, wmax;
 
-    /* Bury heavy columns of density > 1/2000, this roughly
-       corresponds to primes < 2000 or ideals of norm < 2000.
+    /* Bury heavy columns of density > 1/BURIED_MAX_DENSITY, this roughly
+       corresponds to primes < BURIED_MAX_DENSITY or ideals of
+       norm < BURIED_MAX_DENSITY.
        Those columns should contribute to the average weight by
-       sum(2/p, p prime < 2000) ~ 4.58 */
-    wmax = mat->nrows / 2000;
+       sum(2/p, p prime < BURIED_MAX_DENSITY), which is ~ 4.58
+       for BURIED_MAX_DENSITY=2000. */
+    wmax = mat->nrows / BURIED_MAX_DENSITY;
     /* heavy columns already have wt < 0 */
     tooheavy = (char *) malloc (mat->ncols * sizeof(char));
     memset (tooheavy, 0, mat->ncols * sizeof(char));

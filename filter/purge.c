@@ -65,9 +65,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <string.h>
 
 #include "utils.h"
-
 #include "hashpair.h"
 #include "gzip.h"
+#include "filter_matrix.h" /* for BURIED_MAX_DENSITY */
 
 #define MAX_FILES 1000000
 #define MAX_STEPS 10 /* maximal number of steps in each pass */
@@ -441,15 +441,20 @@ delete_relation (int i, int *nprimes, hashtable_t *H,
    W (double) is the total matrix weight, n (int) is the number of rows of the
    component, and N (double) is the number of rows of the matrix. This macro
    must return a double. */
-#if 0
+#define COST_MODEL 0
+
+#if COST_MODEL == 0
 /* optimize the decrease of W*N */
 #define COST(w,W,n,N) ((double) (w) / (W) + (double) (n) / (N))
+#elif COST_MODEL == 1
 /* optimize the decrease of W */
 #define COST(w,W,n,N) ((double) (w) / (W))
-#endif
-
+#elif COST_MODEL == 2
 /* optimize the decrease of N */
 #define COST(w,W,n,N) ((double) (n) / (N))
+#else
+#error "Invalid cost model"
+#endif
 
 static int
 compare (const void *v1, const void *v2)
@@ -466,7 +471,7 @@ compare (const void *v1, const void *v2)
 static int
 compute_connected_component (bit_vector_ptr T, uint32_t i, hashtable_t *H,
                              unsigned long *w, int **rel_compact,
-                             uint32_t *sum)
+                             uint32_t *sum, int *rel_weight)
 {
   int j, h, n;
   uint32_t k;
@@ -478,9 +483,10 @@ compute_connected_component (bit_vector_ptr T, uint32_t i, hashtable_t *H,
       {
         k = sum[h] - i; /* other row where prime of index h appears */
         if (!bit_vector_getbit(T, k)) /* row k was not visited yet */
-          n += compute_connected_component (T, k, H, w, rel_compact, sum);
+          n += compute_connected_component (T, k, H, w, rel_compact, sum,
+                                            rel_weight);
       }
-  *w += j; /* add weight of current row */
+  *w += rel_weight[i]; /* add weight of non-buried ideals in current row */
   return n;
 }
 
@@ -518,8 +524,9 @@ typedef struct {
 } comp_t;
 
 static void
-deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes, bit_vector_ptr rel_used,
-                   int **rel_compact, int nrelmax, int keep)
+deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes,
+                   bit_vector_ptr rel_used, int **rel_compact, int nrelmax,
+                   int keep, int *rel_weight)
 {
   uint32_t *sum; /* sum of row indices for primes with weight 2 */
   int i, j, h, n, ltmp = 0;
@@ -542,7 +549,7 @@ deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes, bit_vector_ptr rel_u
           if (H->hashcount[h] == 2)
             sum[h] += i;
         N += 1.0;
-        W += (double) j;
+        W += rel_weight[i]; /* weight of non-buried ideals */
       }
   fprintf (stderr, "Matrix has %1.0f rows and weight %1.0f\n", N, W);
   ASSERT_ALWAYS(N == (double) *nrel);
@@ -555,7 +562,8 @@ deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes, bit_vector_ptr rel_u
     if (bit_vector_getbit(rel_used, i) && bit_vector_getbit(T, i) == 0)
       {
         w = 0;
-        n = compute_connected_component (T, i, H, &w, rel_compact, sum);
+        n = compute_connected_component (T, i, H, &w, rel_compact, sum,
+                                         rel_weight);
         ltmp ++;
         tmp = (comp_t*) realloc (tmp, ltmp * sizeof (comp_t));
         tmp[ltmp - 1].w = (float) COST(w,W,n,N);
@@ -605,6 +613,26 @@ remove_singletons (int *nrel, int nrelmax, int *nprimes, hashtable_t *H,
 {
   int old, newnrel = *nrel, newnprimes = *nprimes, oldexcess, excess;
   int count = 0;
+  int *rel_weight = NULL;
+
+  if (final) /* we compute the weight of non-buried columns */
+    {
+      int i, j, h, w = 0, wsmall = 0;
+      rel_weight = (int*) malloc (nrelmax * sizeof (int));
+      for (i = 0; i < nrelmax; i++)
+        if (bit_vector_getbit (rel_used, i) == 1) /* active relation */
+          {
+            rel_weight[i] = 0;
+            for (j = 0; (h = rel_compact[i][j]) != -1; j++)
+              {
+                w ++;
+                if ((double) H->hashcount[h] / (double) nrelmax < 1.0 / 
+                    (double) BURIED_MAX_DENSITY)
+                  rel_weight[i] ++;
+              }
+            wsmall += rel_weight[i];
+          }
+    }
 
   excess = newnrel - newnprimes;
   do
@@ -615,7 +643,7 @@ remove_singletons (int *nrel, int nrelmax, int *nprimes, hashtable_t *H,
       /* for the final pass, delete heavy rows */
       if (final)
         deleteHeavierRows (H, &newnrel, &newnprimes, rel_used, rel_compact,
-                           nrelmax, keep);
+                           nrelmax, keep, rel_weight);
       if (newnrel != old)
         fprintf (stderr, "deleted heavier relations: %d %d at %2.2lf\n",
                  newnrel, newnprimes, seconds ());
@@ -644,6 +672,7 @@ remove_singletons (int *nrel, int nrelmax, int *nprimes, hashtable_t *H,
 
   *nrel = newnrel;
   *nprimes = newnprimes;
+  free (rel_weight);
 }
 
 /* This function renumbers used primes (those with H->hashcount[i] > 1)
@@ -709,8 +738,8 @@ renumber (int *nprimes, hashtable_t *H, const char *sos)
    (otherwise in format used by merge).
 */
 static void
-reread (const char *oname, char ** ficname,
-        hashtable_t *H, bit_vector_srcptr rel_used, int nrows, int ncols, int raw)
+reread (const char *oname, char ** ficname, hashtable_t *H,
+        bit_vector_srcptr rel_used, int nrows, int ncols, int raw)
 {
   FILE *ofile;
   int ret MAYBE_UNUSED, nr = 0;
@@ -775,7 +804,8 @@ reread (const char *oname, char ** ficname,
 
   /* write excess to stdout */
   if (raw == 0)
-    printf ("WEIGHT: %1.0f WEIGHT*NROWS=%1.2e\n", W, W * (double) nr);
+    printf ("NROWS:%d WEIGHT:%1.0f WEIGHT*NROWS=%1.2e\n",
+            nr, W, W * (double) nr);
   printf ("EXCESS: %d\n", nrows - ncols);
   fflush (stdout);
 }
