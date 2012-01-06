@@ -137,7 +137,6 @@ addrel(int **sparsemat, int *colweight, int *buf, int ibuf, int i)
 	//	if(tmp[0] != (tmp_len-1))
 	//	    printf("#W# shorter length\n"); // who cares, really?
 #endif
-	//	fprintf(stderr, "W: 231 -> %d\n", colweight[231]);
     }
 }
 
