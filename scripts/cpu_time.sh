@@ -45,7 +45,14 @@ if [[ -z $1 || $(expr $1 : '.*[p].*') != 0 ]]
   then  echo -n "CPU time for polyselect:      "
     if [ ! -f ${name}.kjout.* ] 2> /dev/null
       then echo "polynomial files were not found"
-      else grep phase ${name}.kjout.* | sed "s/^.*phase took \([^s]*\).*$/+\1/g" | tr "\n" " " | cut -c2- | bc | f
+      else
+         grep phase ${name}.kjout.* | sed "s/^.*phase took \([^s]*\).*$/+\1/g" | tr "\n" " " | cut -c2- | bc | f
+         echo -n "   # of polyselect files:   "
+         ls ${name}.kjout.* | wc -l
+         echo -n "   # of found polynomials:  "
+         grep Tried ${name}.kjout.* | sed "s/^.*found \([^p]*\).*$/+\1/g" | tr "\n" " " | cut -c2- | bc
+         echo -n "   # below maxnorm:         "
+         grep Tried ${name}.kjout.* | sed "s/^.*, \([0-9]*\) below.*$/+\1/g" | tr "\n" " " | cut -c2- | bc
     fi
 fi
 
