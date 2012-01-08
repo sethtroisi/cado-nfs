@@ -411,16 +411,24 @@ renumber(const char * sosname, int *small_ncols, int *colweight, int ncols)
 	    tmp[nb++] = j;
 	}
     *small_ncols = nb>>1;
+    fprintf (stderr, "Sorting %d columns by decreasing weight\n",
+             *small_ncols);
     qsort(tmp, nb>>1, 2*sizeof(int), cmp);
+    for (k = 0, j = 2; j <= 4000 && j <= nb; j += 2)
+      {
+        k += tmp[nb - j];
+        if ((j & 63) == 0)
+          fprintf (stderr, "Total weight of heaviest %d columns is %d\n",
+                   j >> 1, k);
+      }
     memset(colweight, 0, ncols * sizeof(int));
 #if 0
     // useful for Gauss only...
-    fprintf(stderr, "Sorting in INcreasing weight order of j\n");
+    fprintf(stderr, "Sorting in Increasing weight order of j\n");
     for(j = 0, k = 1; j < nb; j += 2)
 	colweight[tmp[j+1]] = k++; // always this +1 trick
 #else
     // useful for BW + skipping heavy part only...
-    fprintf(stderr, "Sorting %d columns by decreasing weight\n", *small_ncols);
     for(j = nb-1, k = 1; j >= 0; j -= 2)
 	colweight[tmp[j]] = k++; // always this +1 trick
     if (sosname) {
