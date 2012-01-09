@@ -1,6 +1,9 @@
 
-m:=64;
-n:=64;
+// I'm updating this script so as to go softly for a check of m=n=128. Commit
+// bf225ce125bc21c5ae5f4c3b2f8acc652e248f46 has the untouched file which
+// handles m=n=64
+m:=128;
+n:=128;
 
 load "/tmp/bwc/t.m"; M:=Matrix(GF(2),Matrix(var));
 nr:=Nrows(M);
@@ -125,19 +128,25 @@ function vblock(nr,var, nc)
 end function;
 
 
-load "/tmp/bwc/Y.0.m";     Y0:=vblock(nc, var, n);
-load "/tmp/bwc/V0-64.0.m"; V0:=vblock(nc, var, n);
-load "/tmp/bwc/V0-64.1.m"; V1:=vblock(nc, var, n);
-load "/tmp/bwc/V0-64.2.m"; V2:=vblock(nc, var, n);
-load "/tmp/bwc/V0-64.3.m"; V3:=vblock(nc, var, n);
-load "/tmp/bwc/V0-64.4.m"; V4:=vblock(nc, var, n);
-load "/tmp/bwc/V0-64.5.m"; V5:=vblock(nc, var, n);
-load "/tmp/bwc/V0-64.6.m"; V6:=vblock(nc, var, n);
-load "/tmp/bwc/V0-64.7.m"; V7:=vblock(nc, var, n);
-load "/tmp/bwc/V0-64.8.m"; V8:=vblock(nc, var, n);
-load "/tmp/bwc/V0-64.9.m"; V9:=vblock(nc, var, n);
-load "/tmp/bwc/V0-64.10.m"; V10:=vblock(nc, var, n);
-load "/tmp/bwc/V0-64.20.m"; V20:=vblock(nc, var, n);
+load "/tmp/bwc/Y.0.m";      Y0:= vblock(nc, var, n);
+load "/tmp/bwc/V0-64.0.m";  V0:= vblock(nc, var, 64);
+// load "/tmp/bwc/V0-64.1.m";  V1:= vblock(nc, var, 64);
+// load "/tmp/bwc/V0-64.2.m";  V2:= vblock(nc, var, 64);
+// load "/tmp/bwc/V0-64.3.m";  V3:= vblock(nc, var, 64);
+// load "/tmp/bwc/V0-64.4.m";  V4:= vblock(nc, var, 64);
+// load "/tmp/bwc/V0-64.5.m";  V5:= vblock(nc, var, 64);
+// load "/tmp/bwc/V0-64.6.m";  V6:= vblock(nc, var, 64);
+// load "/tmp/bwc/V0-64.7.m";  V7:= vblock(nc, var, 64);
+// load "/tmp/bwc/V0-64.8.m";  V8:= vblock(nc, var, 64);
+// load "/tmp/bwc/V0-64.9.m";  V9:= vblock(nc, var, 64);
+load "/tmp/bwc/V0-64.10.m"; V10:=vblock(nc, var, 64);
+load "/tmp/bwc/V0-64.20.m"; V20:=vblock(nc, var, 64);
+
+load "/tmp/bwc/V64-128.0.m";  V0b:= vblock(nc, var, 64);
+load "/tmp/bwc/V64-128.10.m"; V10b:=vblock(nc, var, 64);
+load "/tmp/bwc/V64-128.20.m"; V20b:=vblock(nc, var, 64);
+
+
 // load "/tmp/bwc/V0-64.12.m"; V12:=vblock(nc, var, n);
 // load "/tmp/bwc/V0-64.13.m"; V13:=vblock(nc, var, n);
 // load "/tmp/bwc/V0-64.14.m"; V14:=vblock(nc, var, n);
@@ -155,7 +164,8 @@ var:=[(p div j+q*j) mod 2^64:j in [1..nc]]
 H0:=vblock(nc, var, 64);
 assert M*Q0*H0 eq H1;
 
-v0z:=[Seqint(ChangeUniverse((Eltseq(V0[i])),Integers()),2):i in [1..nr]];
+// v0z:=[Seqint(ChangeUniverse((Eltseq(V0[i])),Integers()),2):i in [1..nr]];
+// v0bz:=[Seqint(ChangeUniverse((Eltseq(V0b[i])),Integers()),2):i in [1..nr]];
 
 // it's somewhat misleading sometimes.
 // [Index(Rows(Mt*V0),r):r in Rows(V1)];
@@ -209,6 +219,7 @@ TM*V1 eq V2; assert TM*V1 eq V2;
 TM*V2 eq V3; assert TM*V2 eq V3;
 TM*V3 eq V4; assert TM*V3 eq V4;
 TM^10*V0 eq V10; assert TM^10*V0 eq V10;
+TM^10*V0b eq V10b; assert TM^10*V0b eq V10b;
 
 // (Pr^-1*Mt)^10*C0 eq C10;
 //
@@ -216,21 +227,24 @@ TM^10*V0 eq V10; assert TM^10*V0 eq V10;
 // Pr*(Pr^-1*Mt)^10*Pr^-1*C0 eq C10;
 //
 print "check vectors:";
-C0 eq Xt;
-C10 eq Transpose(TM)^10*Xt;
+C0 eq Submatrix(Xt,1,1,Nrows(Xt),64); 
+C10 eq Submatrix(Transpose(TM)^10*Xt,1,1,Nrows(Xt),64);
+
 Transpose(TM)^10*C0 eq C10;
 
 
 Transpose(V0)*C10 eq Transpose(V10)*C0;
 Transpose(C10)*V0 eq Transpose(C0)*V10;
+Transpose(C10)*V0b eq Transpose(C0)*V10b;
 
 print "Done checking krylov stuff";
 
-load "/tmp/bwc/A0-64.0-50.m";   // suited for matrix t100b
+load "/tmp/bwc/A0-128.0-30.m";   // suited for matrix t100b
 
 stride:=m*n div 64;
-for i in [0..50-1] do
-    vblock(m,var[i*stride+1..i*stride+stride],n) eq Transpose(Xt)*TM^i*V0;
+for i in [0..30-1] do
+    vblock(m,var[i*stride+1..i*stride+stride],n) eq
+    Transpose(Xt)*TM^i*Y0;
 end for;
 
 K:=GF(2);
@@ -258,7 +272,7 @@ end function;
 // beware -- we're using the sequence starting at 1.
 // A_sequence:=&+[x^(i-1)*KRmn!(Transpose(Xt)*TM^i*V0):i in [1..100]];
 A_sequence:=KRmn!0;
-z:=V0;
+z:=Y0;
 for i in [1..100] do
     A_sequence +:= x^(i-1)*KRmn!(Transpose(Xt)*z);
     z:=TM*z;
@@ -266,7 +280,7 @@ end for;
 // assert A_sequence eq &+[x^(i-1)*KRmn!(Transpose(Xt)*TM^(i-1)*V0):i in [1..100]];
 
 
-load "/tmp/bwc/F0-64.m";
+load "/tmp/bwc/F.m";
 
 degf:=#var div stride - 1;
 
@@ -283,13 +297,13 @@ not IsZero(mycoeff(A_sequence*Transpose(F),degf-1));
 
 excess:=10;
 
-V_sequence:=&+[x^i*KRNn!(TM^i*V0):i in [0..degf+excess]];
+V_sequence:=&+[x^i*KRNn!(TM^i*Y0):i in [0..degf+excess]];
 
 assert IsZero(Transpose(Xt)*mycoeff(V_sequence*Transpose(F),degf+1));
 
 // Transpose(Xt)*(KRN!TM)^4*(KRN!TM*V_sequence) eq mycoeff(A_sequence,3);
 
-IsZero(mycoeff(Transpose(KRNm!Xt)*(&+[x^(i-1)*KRNn!(TM^(i-1)*V0):i in [1..10\
+IsZero(mycoeff(Transpose(KRNm!Xt)*(&+[x^(i-1)*KRNn!(TM^(i-1)*Y0):i in [1..10\
 0]])*Transpose(F),degf+1));
 
 
@@ -298,13 +312,15 @@ for i in [0..excess-1] do
     IsZero(TM*mycoeff(V_sequence*Transpose(F),degf + i));
 end for;
 
-S:=&+[TM^i*V0*mycoeff(Transpose(Fr),i):i in [0..degf]];
+S:=&+[TM^i*Y0*mycoeff(Transpose(Fr),i):i in [0..degf]];
 IsZero(TM*S);
 
 // S:=&+[TM^i*V0*mycoeff(Transpose(F),i):i in [0..2]];
 
 load "/tmp/bwc/S0-64.10.m"; S10:=vblock(nc, var, n);
 load "/tmp/bwc/S0-64.20.m"; S20:=vblock(nc, var, n);
+load "/tmp/bwc/S64-128.10.m"; S10b:=vblock(nc, var, n);
+load "/tmp/bwc/S64-128.20.m"; S20b:=vblock(nc, var, n);
 load "/tmp/bwc/K.0.m";    K0:=vblock(nc, var, 64);
 
 S eq S10+S20;

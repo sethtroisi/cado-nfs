@@ -340,6 +340,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         ASSERT_ALWAYS(rstride % stride == 0);
         int npasses = rstride / stride;
         for(int i = 0 ; i < npasses ; i++) {
+            serialize(pi->m);
             A->vec_set_zero(A, mcol->v->v, mcol->i1 - mcol->i0);
             serialize(pi->m);
             /* Each job/thread copies its data share to mcol->v */
