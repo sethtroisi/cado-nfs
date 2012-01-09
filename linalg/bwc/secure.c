@@ -20,7 +20,7 @@ static void xvec_to_vec(matmul_top_data_ptr mmt, uint32_t * gxvecs, int m, unsig
     abase_vbase_ptr A = mcol->v->abase;
     if (!shared || picol->trank == 0) {
         A->vec_set_zero(A, mcol->v->v, mcol->i1 - mcol->i0);
-        for(int j = 0 ; j < m ; j++) {
+        for(int j = 0 ; j < MIN(NCHECKS_CHECK_VECTOR, m) ; j++) {
             for(unsigned int k = 0 ; k < nx ; k++) {
                 uint32_t i = gxvecs[j*nx+k];
                 // set bit j of entry i to 1.

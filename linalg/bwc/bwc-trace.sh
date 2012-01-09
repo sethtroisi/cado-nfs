@@ -18,6 +18,7 @@ wdir=/tmp/bwc
 if [ -d $wdir ] ; then rm -rf $wdir 2>/dev/null ; fi
 mkdir $wdir
 
+mn=128
 
 Mh=1; Mv=1;
 Th=2; Tv=2;
@@ -37,7 +38,7 @@ thr=${Th}x${Tv}
 matrix=$mats/t1009.bin
 # matrix=$HOME/Local/mats/c59.small.bin
 nullspace=left
-shuffle=0
+shuffle=1
 
 
 # Note that it's better to look for a kernel which is not trivial. Thus
@@ -61,7 +62,7 @@ checksum=`basename $checksum .bin`
 
 # $bins/mf_dobal --matrix /local/rsa768/mats/c72.bin mpi=2x3 /local/rsa768/mats/c72.2x3.6e90c700.bin
 
-common="matrix=$matrix mpi=$mpi thr=$thr balancing=$bfile mn=64 wdir=$wdir"
+common="matrix=$matrix mpi=$mpi thr=$thr balancing=$bfile mn=$mn wdir=$wdir"
 if [ "$nullspace" = left ] ; then
     common="$common nullspace=left"
     transpose_if_left="Transpose"
@@ -72,17 +73,37 @@ fi
 
 set +e
 
-$bins/bwc.pl dispatch sanity_check_vector=H1   $common save_submatrices=1
+all_splits=0
+j0=0
+while [ $j0 -lt $mn ] ; do
+    let j0=$j0+64
+    all_splits=$all_splits,$j0
+done
+
+
+# ys=0..64 here is really a hack. It merely has to match the version
+# which is used in production.
+$bins/bwc.pl dispatch sanity_check_vector=H1   $common save_submatrices=1 ys=0..64
 [ "$?" = 0 ] && $bins/bwc.pl prep   $common
 [ "$?" = 0 ] && $bins/bwc.pl secure  $common interval=10
-[ "$?" = 0 ] && $bins/bwc.pl :ysplit     $common
-[ "$?" = 0 ] && $bins/bwc.pl krylov  $common interval=1 end=10 skip_online_checks=1
+[ "$?" = 0 ] && $bins/bwc.pl :ysplit $common splits=$all_splits
+[ "$?" = 0 ] && $bins/bwc.pl krylov  $common interval=10 end=10 skip_online_checks=1 ys=0..64
 [ "$?" = 0 ] && rm -f $wdir/A*
-[ "$?" = 0 ] && $bins/bwc.pl krylov  $common interval=10
+j0=0
+while [ $j0 -lt $mn ] ; do
+    let j1=$j0+64
+    [ "$?" = 0 ] && $bins/bwc.pl krylov  $common interval=10 ys=$j0..$j1
+    j0=$j1
+done
 [ "$?" = 0 ] && $bins/bwc.pl acollect    $common -- --remove-old
 [ "$?" = 0 ] && $bins/bwc.pl lingen      $common lingen_threshold=64
-[ "$?" = 0 ] && $bins/bwc.pl :fsplit     $common
-[ "$?" = 0 ] && $bins/bwc.pl mksol   $common interval=10 ys=0..64
+[ "$?" = 0 ] && $bins/bwc.pl :fsplit     $common splits=$all_splits
+j0=0
+while [ $j0 -lt $mn ] ; do
+    let j1=$j0+64
+    [ "$?" = 0 ] && $bins/bwc.pl mksol  $common interval=10 ys=$j0..$j1
+    j0=$j1
+done
 [ "$?" = 0 ] && $bins/bwc.pl gather $common interval=10
 [ "$?" = 0 ] && $bins/cleanup --ncols 64 --out $wdir/W $wdir/K.0
 

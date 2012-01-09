@@ -42,7 +42,13 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     Ac->set_groupsize(Ac, NCHECKS_CHECK_VECTOR);
 
     abase_vbase Ar;
-    abase_vbase_oo_field_init_byname(Ar, "u64k1");
+    switch(bw->n) {
+        case 64: abase_vbase_oo_field_init_byname(Ar, "u64k1"); break;
+        case 128: abase_vbase_oo_field_init_byname(Ar, "u64k2"); break;
+        default:
+        fprintf(stderr, "Please include code for dealing with %d-bit wide vectors\n", bw->n);
+        exit(1);
+    }
     Ar->set_groupsize(Ac, bw->n);
     if (pi->m->trank == 0) Ar->mpi_ops_init(Ar);
 
