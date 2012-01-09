@@ -6,6 +6,7 @@ use POSIX qw/getcwd/;
 use File::Basename;
 use File::Temp qw/tempdir/;
 use List::Util qw[max];
+use Data::Dumper;
 
 # This companion program serves as a helper for running bwc programs.
 
@@ -374,10 +375,16 @@ if ((!defined($m) || !defined($n)) && $main !~ /^:wipeout$/) {
     usage "The parameters m and n must be set";
 }
 if (!defined($param->{'splits'})) {
+    @splits=(0);
+    my $x=0;
+    while ($x<$n) {
+        $x+=64;
+        push @splits, $x;
+    }
     if ($param->{'interleaving'}) {
+        die "Interleaving is on the bad track here" unless ((scalar
+                @splits)&1)==0 && $splits[1] == 64;
         @splits=(0,int($n/2),$n);
-    } else {
-        @splits=(0,$n);
     }
     push @main_args, "splits=" . join(",", @splits);
 }
@@ -636,6 +643,10 @@ sub obtain_bfile {
 sub last_cp {
     my $pat;
     return undef if $force_complete;
+    # Sorry, but I'd like to expand what is returned as a last checkpoint
+    # indication if there are more than two sequences (e.g. a sequence
+    # number, followed by a checkpoint value).
+    return undef if $n != 64;
     if ($_[0] eq 'krylov') {
         $pat = qr/^V/;
     } elsif ($_[0] eq 'mksol') {
@@ -688,6 +699,7 @@ sub drive {
 
 
     if ($program eq ':complete') {
+        print Dumper(\@_);
         my $cp;
         &drive(":wipeout", @_) if $force_complete;
         unless (defined($cp = last_cp('mksol'))) {
@@ -698,12 +710,28 @@ sub drive {
                 &drive("mf_bal", @mfbal);
                 obtain_bfile();
                 push @_, "balancing=$balancing";
-                &drive("dispatch", @_, "sequential_cache_build=1", "sanity_check_vector=H1");
+                # Note the ys=0..64 below. It's here only to match the
+                # width which is used in the main krylov/mksol programs.
+                # Actually, a match isn't even needed. It's just that
+                # dispatch does a sanity check, and uses arithmetic of
+                # this width to do the sanity check.
+                &drive("dispatch", @_, "sequential_cache_build=1", "sanity_check_vector=H1", "ys=0..64");
                 &drive("prep", @_);
                 &drive("secure", @_) unless $param->{'skip_online_checks'};
                 &drive("./split", @_, "--split-y");
-                &drive("krylov", @_);
+                # despicable ugly hack.
+                my @ka=@_;
+                if ($n == 128) {
+                    @ka = grep !/^ys=/, @_;
+                    &drive("krylov", @ka, "ys=0..64");
+                    &drive("krylov", @ka, "ys=64..128");
+                } else {
+                    &drive("krylov", @ka);
+                }
             } else {
+                # Given that I've forbidden this in last_cp, we should
+                # never reach here.
+                die if $n == 128;
                 obtain_bfile();
                 push @_, "balancing=$balancing";
                 &drive("krylov", @_, "start=$cp");
@@ -711,8 +739,19 @@ sub drive {
             &drive("./acollect", @_, "--remove-old");
             &drive("./lingen", @_, "--lingen-threshold", 64);
             &drive("./split", @_, "--split-f");
-            &drive("mksol", @_);
+            # same ugly hack already seen above.
+            my @ka=@_;
+            if ($n == 128) {
+                @ka = grep !/^ys=/, @_;
+                &drive("mksol", @ka, "ys=0..64");
+                &drive("mksol", @ka, "ys=64..128");
+            } else {
+                &drive("mksol", @ka);
+            }
         } else {
+            # Given that I've forbidden this in last_cp, we should
+            # never reach here.
+            die if $n == 128;
             obtain_bfile();
             push @_, "balancing=$balancing";
             &drive("mksol", @_, "start=$cp");
