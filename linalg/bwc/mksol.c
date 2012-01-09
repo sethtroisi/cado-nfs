@@ -366,18 +366,16 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             /* untwist the result */
             matmul_top_untwist_vector(mmt, bw->dir);
 
-            Ar->vec_set_zero(Ar, sum->v, ii1 - ii0);
             serialize_threads(pi->m);
             dst = pointer_arith(sum->v, i * stride);
             src = pointer_arith_const(mcol->v->v, (ii0 - mcol->i0) * stride);
             for(unsigned int ii = ii0 ; ii < ii1 ; ii++) {
                 memcpy(dst, src, stride);
                 dst = pointer_arith(dst, rstride);
-                src = pointer_arith_const(src, rstride);
+                src = pointer_arith_const(src, stride);
             }
-
-            pi_save_file_2d(pi, bw->dir, s_name, s+bw->interval, sum->v, Ar->vec_elt_stride(Ar, ii1 - ii0), Ar->vec_elt_stride(Ar, unpadded));
         }
+        pi_save_file_2d(pi, bw->dir, s_name, s+bw->interval, sum->v, Ar->vec_elt_stride(Ar, ii1 - ii0), Ar->vec_elt_stride(Ar, unpadded));
         serialize(pi->m);
 
         /* recover the vector */
