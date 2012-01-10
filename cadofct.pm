@@ -218,6 +218,7 @@ my @default_param = (
     bwc_interval => 1000,
     bwc_mm_impl => 'bucket',
     bwc_interleaving => 0,
+    bwc_mn       => 64,
     # shuffled product is expected to be better in most cases, at least
     # when we use MPI. Since it is the preferred communication algorithm
     # for large runs, we prefer to force its use also for mid-range
@@ -2785,7 +2786,7 @@ sub do_linalg {
                "mm_impl=$param{'bwc_mm_impl'} ".
                "interleaving=$param{'bwc_interleaving'} ".
                "interval=$param{'bwc_interval'} ".
-               "mn=64 ".
+               "mn=$param{'bwc_mn'} ".
                "wdir=$param{'prefix'}.bwc " .
                "shuffled_product=$param{'bwc_shuffled_product'} " .
                "bwc_bindir=$bwc_bindir ";
