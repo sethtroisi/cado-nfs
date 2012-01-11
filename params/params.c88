@@ -76,7 +76,6 @@ excessratio=1.01        # minimal excess we want before pruning
                         # (don't start merge otherwise)
 keeppurge=160           # maximal excess wanted after purge
                         # (purge shrinks if needed)
-keep=160                # excess wanted after merge
 maxlevel=15
 cwmax=100
 rwmax=100

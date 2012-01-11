@@ -1,8 +1,8 @@
 #!/usr/bin/env perl
 
-# Copyright 2008, 2009, 2010, 2011 Pierrick Gaudry, Emmanuel Thome,
-#                                  Paul Zimmermann, Jeremie Detrey,
-#                                  Lionel Muller
+# Copyright 2008, 2009, 2010, 2011, 2012 Pierrick Gaudry, Emmanuel Thome,
+#                                        Paul Zimmermann, Jeremie Detrey,
+#                                        Lionel Muller
 #
 # This file is part of CADO-NFS.
 #
@@ -197,7 +197,8 @@ my @default_param = (
     ratq	 => 0,
 
     # filtering
-    keep         => 160, # should be 128+skip
+    skip         => -1, # should be about bwc_mn - 32
+    keep         => -1, # should be 128 + skip
     excessratio  => 1.01,
     keeppurge    => 160,
     maxlevel     => 15,
@@ -206,7 +207,6 @@ my @default_param = (
     ratio        => 1.5,
     bwstrat      => 3,
     coverNmax    => 100,
-    skip         => 32,
     nslices_log  => 1,
     filterlastrels => 1,
 
@@ -370,6 +370,16 @@ sub read_param {
 
     if ($param{'bwc_mn'} != 64 && $param{'bwc_mn'} != 128) {
 	die "The parameter bwc_mn should be 64 or 128.\n";
+    }
+
+    # adjust skip if undefined to bwc_mn - 32
+    if ($param->{'skip'} == -1) {
+	$param->{'skip'} = $param->{'bwc_mn'} - 32;
+    }
+
+    # adjust keep if undefined to 128 + skip
+    if ($param->{'keep'} == -1) {
+	$param->{'keep'} = 128 + $param->{'skip'};
     }
 }
 

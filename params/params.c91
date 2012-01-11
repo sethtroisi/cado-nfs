@@ -191,10 +191,6 @@ filterlastrels=0        # if 0, we do the merging with all the relations
 			# and do another filtering step with those relations.
 			# The default behaviour is 0.
 
-keep=160                # excess wanted after merge
-    # This will force the linear system to be solved to have exactly this
-    # dimension
- 
 keeppurge=160           # maximal excess wanted after purge
                         # (purge shrinks if needed)
 maxlevel=15             # perform up to <maxlevel>-way merges
