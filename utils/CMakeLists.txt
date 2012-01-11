@@ -31,6 +31,7 @@ add_executable(test_modredc_15ul ${EXCLUDE_FROM_RELEASE_BUILD} test_modredc_15ul
 add_executable(test_modredc_2ul2 ${EXCLUDE_FROM_RELEASE_BUILD} test_modredc_2ul2.c)
 add_executable(gmp_prob_prime gmp_prob_prime.c)
 add_executable(gmp_nextprime gmp_nextprime.c)
+add_executable(random_integer random_integer.c)
 
 target_link_libraries(test_mod_ul utils)
 target_link_libraries(test_modredc_ul utils)
@@ -38,6 +39,7 @@ target_link_libraries(test_modredc_15ul utils)
 target_link_libraries(test_modredc_2ul2 utils)
 target_link_libraries(gmp_prob_prime gmp)
 target_link_libraries(gmp_nextprime gmp)
+target_link_libraries(random_integer gmp)
 
 include(CMakeLists-nodist.txt OPTIONAL)
 
