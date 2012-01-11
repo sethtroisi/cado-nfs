@@ -347,7 +347,7 @@ void abase_u64k2_random(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_dst_el
 static inline
 void abase_u64k2_add(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_dst_elt r, abase_u64k2_src_elt s1, abase_u64k2_src_elt s2)
 {
-        for(unsigned int i = 0 ; i < 1 ; i++) {
+        for(unsigned int i = 0 ; i < sizeof(abase_u64k2_elt)/sizeof(*r) ; i++) {
             r[i] = s1[i] ^ s2[i];
         }
 }
@@ -363,7 +363,7 @@ void abase_u64k2_elt_ur_set(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_ds
 static inline
 void abase_u64k2_elt_ur_add(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_dst_elt_ur r, abase_u64k2_src_elt_ur s1, abase_u64k2_src_elt_ur s2)
 {
-        for(unsigned int i = 0 ; i < 1 ; i++) {
+        for(unsigned int i = 0 ; i < sizeof(abase_u64k2_elt)/sizeof(*r) ; i++) {
             r[i] = s1[i] ^ s2[i];
         }
 }
@@ -545,7 +545,7 @@ void abase_u64k2_set_ui_at(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_dst
 static inline
 void abase_u64k2_set_ui_all(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_dst_elt r, unsigned long v)
 {
-        for(unsigned int i = 0 ; i < 1 ; i++) {
+        for(unsigned int i = 0 ; i < sizeof(abase_u64k2_elt)/sizeof(*r) ; i++) {
             r[i] = ~v;
         }
 }
@@ -564,7 +564,7 @@ void abase_u64k2_elt_ur_set_ui_at(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u6
 static inline
 void abase_u64k2_elt_ur_set_ui_all(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_dst_elt r, unsigned long v)
 {
-        for(unsigned int i = 0 ; i < 1 ; i++) {
+        for(unsigned int i = 0 ; i < sizeof(abase_u64k2_elt)/sizeof(*r) ; i++) {
             r[i] = ~v;
         }
 }
