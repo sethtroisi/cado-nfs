@@ -43,5 +43,5 @@ target_link_libraries(random_integer gmp)
 
 include(CMakeLists-nodist.txt OPTIONAL)
 
-install(TARGETS check_rels gmp_prob_prime RUNTIME DESTINATION bin/utils)
+install(TARGETS check_rels gmp_prob_prime random_integer RUNTIME DESTINATION bin/utils)
 install(TARGETS cut_n_roots roots gmp_nextprime RUNTIME DESTINATION bin/utils)
