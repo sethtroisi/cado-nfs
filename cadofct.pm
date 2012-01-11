@@ -218,6 +218,7 @@ my @default_param = (
     bwc_interval => 1000,
     bwc_mm_impl => 'bucket',
     bwc_interleaving => 0,
+    # bwc_mn should be 64 or 128
     bwc_mn       => 64,
     # shuffled product is expected to be better in most cases, at least
     # when we use MPI. Since it is the preferred communication algorithm
@@ -366,6 +367,10 @@ sub read_param {
 
     # `prefix' is a shorthand for `$param->{'wdir'}/$param->{'name'}'
     $param->{'prefix'} = "$param->{'wdir'}/$param->{'name'}";
+
+    if ($param{'bwc_mn'} != 64 && $param{'bwc_mn'} != 128) {
+	die "The parameter bwc_mn should be 64 or 128.\n";
+    }
 }
 
 # Dumps the list of parameters to a file
