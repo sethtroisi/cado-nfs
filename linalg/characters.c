@@ -416,13 +416,14 @@ read_heavyblock_matrix_ascii(const char * heavyblockname)
 }
 
 static blockmatrix
-read_heavyblock_matrix(const char * heavyblockname)
+read_heavyblock_matrix (const char * heavyblockname)
 {
-    if (has_suffix(heavyblockname, ".bin")) {
-        return read_heavyblock_matrix_binary(heavyblockname);
-    } else {
-        return read_heavyblock_matrix_ascii(heavyblockname);
-    }
+  if (heavyblockname == NULL)
+    return blockmatrix_alloc (0, 0);
+  else if (has_suffix(heavyblockname, ".bin"))
+    return read_heavyblock_matrix_binary(heavyblockname);
+  else
+    return read_heavyblock_matrix_ascii(heavyblockname);
 }
 
 int compute_transpose_of_blockmatrix_kernel(blockmatrix kb, blockmatrix t)

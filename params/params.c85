@@ -33,13 +33,8 @@ degree=4                # degree of the algebraic polynomial
 kjdelay=30              # time between two checks
 selectnice=4            # nice level for selection
 
-# on the test number
-# 3162277660168379048465356390064001099861990434946593644073512326034855222096148038391
-# we get
-# lognorm: 28.43, alpha: -2.46 E=25.97
-# Murphy's E(Bf=10000000,Bg=5000000,area=1.00e+16)=7.72e-08
-
 ## Parameters of polyselect
+kjmaxnorm=32.0
 kjadmax=40000           # max value for lc(f)
 kjadrange=4000          # individual tasks
 kjkmax=18               # rotation is bounded by 2^kmax
@@ -82,7 +77,6 @@ excessratio=1.01        # minimal excess we want before pruning
                         # (don't start merge otherwise)
 keeppurge=160           # maximal excess wanted after purge
                         # (purge shrinks if needed)
-keep=160                # excess wanted after merge
 maxlevel=15
 cwmax=100
 rwmax=100
