@@ -192,7 +192,7 @@ void eval_64chars_batch(uint64_t * W, int64_t * A, uint64_t *B, alg_prime_t * ch
     worker_threads_do(g, eval_64chars_batch_thread, &ss);
 }
 
-static alg_prime_t * create_characters(int nchars, cado_poly pol)
+static alg_prime_t * create_characters(int nchars, int nratchars, cado_poly pol)
 {
     unsigned long p;
     int ret;
@@ -203,8 +203,6 @@ static alg_prime_t * create_characters(int nchars, cado_poly pol)
 
     int nchars2 = iceildiv(nchars, 64) * 64;
 
-    /* we want some prime beyond the (algebraic) large prime bound */
-    mpz_init_set_ui (pp, 1UL << pol->alg->lpb);
     roots = malloc(pol->alg->degree * sizeof(unsigned long));
 
     alg_prime_t * chars = malloc(nchars2 * sizeof(alg_prime_t));
@@ -222,7 +220,22 @@ static alg_prime_t * create_characters(int nchars, cado_poly pol)
      * to put this in chars[1] if needed (and add the appropriate stuff above
      * of course).  */
 
-    for(int i = 3 ; i < nchars ; ) {
+    /* Rational characters. Normally we have none. But the -nratchars
+     * option inserts some */
+    /* we want some prime beyond the (rational) large prime bound */
+    mpz_init_set_ui (pp, 1UL << pol->rat->lpb);
+    for(int i = 3 ; i < 3 + nratchars && i < nchars ; ) {
+        mpz_nextprime(pp, pp);
+        p = mpz_get_ui(pp);
+        ret = poly_roots_ulong(roots, pol->rat->f, pol->rat->degree, p);
+        for(int j = 0 ; j < ret && i < 3 + nratchars && i < nchars ; j++, i++) {
+            chars[i].p = p;
+            chars[i].r = roots[j];
+        }
+    }
+    /* we want some prime beyond the (algebraic) large prime bound */
+    mpz_init_set_ui (pp, 1UL << pol->alg->lpb);
+    for(int i = 3 + nratchars ; i < nchars ; ) {
         mpz_nextprime(pp, pp);
         p = mpz_get_ui(pp);
         ret = poly_roots_ulong(roots, pol->alg->f, pol->alg->degree, p);
@@ -529,6 +542,7 @@ int main(int argc, char **argv)
 {
     const char * heavyblockname = NULL;
     int nchars;
+    int nratchars = 0;
     alg_prime_t *chars;
     cado_poly pol;
     const char *purgedname = NULL;
@@ -567,6 +581,8 @@ int main(int argc, char **argv)
     cado_poly_read(pol, tmp);
 
     ASSERT_ALWAYS(param_list_parse_int(pl, "nchar", &nchars));
+
+    param_list_parse_int(pl, "nratchars", &nratchars);
     param_list_parse_int(pl, "t", &nthreads);
 
     if (param_list_warn_unused(pl))
@@ -576,7 +592,7 @@ int main(int argc, char **argv)
     ASSERT_ALWAYS(indexname != NULL);
 
     struct worker_threads_group * g = worker_threads_init (nthreads);
-    chars = create_characters (nchars, pol);
+    chars = create_characters (nchars, nratchars, pol);
     int nchars2 = iceildiv(nchars, 64) * 64;
     double tt=wct_seconds();
     blockmatrix bcmat = big_character_matrix(chars, nchars2, purgedname, pol, g);
