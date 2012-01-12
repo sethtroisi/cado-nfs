@@ -536,6 +536,12 @@ int main(int argc, char **argv)
     const char *outname = NULL;
     int nthreads = 1;
 
+    /* print the command line */
+    fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
+    for (int i = 1; i < argc; i++)
+      fprintf (stderr, " %s", argv[i]);
+    fprintf (stderr, "\n");
+
     param_list pl;
     param_list_init(pl);
     argc--,argv++;
