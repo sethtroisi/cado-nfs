@@ -53,6 +53,8 @@ get_override(CC                   CMAKE_C_COMPILER)
 get_override(CXX                  CMAKE_CXX_COMPILER)
 get_override(CADO_DIST_ARCHIVE_NAME         CADO_DIST_ARCHIVE_NAME)
 get_override(MPI                  MPI)
+get_override(LDFLAGS              CMAKE_EXE_LINKER_FLAGS)
+get_override(LDFLAGS              CMAKE_SHARED_LINKER_FLAGS)
 
 if(EXISTS ${CADO_NFS_SOURCE_DIR}/files.dist)
     set(EXCLUDE_FROM_RELEASE_BUILD )

@@ -59,11 +59,12 @@ fi
 # results to scripts. This is done by cmake substitutions, but the
 # corresponding names need not match the ones below).
 
-export PREFIX
-export CFLAGS
-export CXXFLAGS
 export CC
 export CXX
+export CFLAGS
+export CXXFLAGS
+export LDFLAGS
+export PREFIX
 export CADO_DIST_ARCHIVE_NAME
 export MPI
 export GF2X_CONFIGURE_EXTRA
@@ -88,10 +89,11 @@ if [ "$1" = "show" ] ; then
     echo "called_from=\"$called_from\""
     echo "absolute_path_of_source=\"$absolute_path_of_source\""
     echo "relative_path_of_cwd=\"$relative_path_of_cwd\""
-    echo "CFLAGS=\"$CFLAGS\""
-    echo "CXXFLAGS=\"$CXXFLAGS\""
     echo "CC=\"$CC\""
     echo "CXX=\"$CXX\""
+    echo "CFLAGS=\"$CFLAGS\""
+    echo "CXXFLAGS=\"$CXXFLAGS\""
+    echo "LDFLAGS=\"$CFLAGS\""
     echo "PREFIX=\"$PREFIX\""
     echo "CADO_DIST_ARCHIVE_NAME=\"$CADO_DIST_ARCHIVE_NAME\""
     echo "MPI=\"$MPI\""
