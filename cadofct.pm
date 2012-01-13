@@ -2834,6 +2834,10 @@ sub do_chars {
               "-poly $param{'prefix'}.poly ".
               "-purged $param{'prefix'}.purged ".
               "-index $param{'prefix'}.index ".
+              # Note: one can omit the -heavyblock option, but in that case
+              # one should add -nratchars nnn (with nnn=16 for example) to fix
+              # the rational characters, since -nchar only fixes the algebraic
+              # characters
               "-heavyblock $param{'prefix'}.small.dense.bin ".
               "-nchar $param{'nchar'} ".
               "-t $param{'nthchar'} ".
