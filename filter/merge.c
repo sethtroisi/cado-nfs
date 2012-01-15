@@ -49,7 +49,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #endif
 
 #define CWMAX_DEFAULT 100
-#define RWMAX_DEFAULT 100
+#define RWMAX_DEFAULT INT_MAX
 #define MAXLEVEL_DEFAULT 10
 #define KEEP_DEFAULT 128
 #define FORBW_DEFAULT 0
