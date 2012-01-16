@@ -353,6 +353,11 @@ MkzPopQueue(int32_t *dj, int32_t *mkz,  filter_matrix_t *mat)
     {
       if (mat->wt[*dj] > mat->mergelevelmax)
         MkzDelete (Q, A, 1);
+      if (MkzQueueCardinality(mat->MKZQ) == 0)
+        {
+          fprintf (stderr, "Empty merge queue: please increase maxlevel\n");
+          exit (1);
+        }
       MkzSet(Q, 1, 1, cost);    /* update cost */
       MkzDownQueue(Q, A, 1);    /* reorder heap structure */
       *dj = MkzGet(Q, 1, 0);
