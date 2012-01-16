@@ -101,7 +101,7 @@ main (int argc, char *argv[])
 #ifdef USE_MARKOWITZ
     int wmstmax = 7; /* use real MST minimum for wt[j] <= wmstmax */
     int mkzrnd = 0;
-    int mkztype = 2;
+    int mkztype = 1; /* pure Markowitz */
 #endif
     int itermax = 0;
 

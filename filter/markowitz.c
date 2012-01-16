@@ -13,7 +13,7 @@
 #include "markowitz.h"
 
 #define MKZ_DEBUG 0
-#define MKZ_TIMINGS 1
+// #define MKZ_TIMINGS 1
 
 #if MKZ_TIMINGS
 double tmkzup, tmkzdown, tmkzupdown, tmkzcount;
@@ -108,7 +108,8 @@ MkzInsert(int32_t *Q, int32_t *A, int32_t dj, int32_t count)
     MkzUpQueue(Q, A, Q[0]);
 }
 
-// Move Q[k] down.
+// Move Q[k] down, by keeping the structure of Q as a heap, i.e.,
+// each node has a smaller cost than its two left and right nodes
 static void
 MkzDownQueue(int32_t *Q, int32_t *A, int32_t k)
 {
@@ -124,7 +125,7 @@ MkzDownQueue(int32_t *Q, int32_t *A, int32_t k)
 	    // k has a right son
 	    if(MkzGet(Q, j, 1) > MkzGet(Q, j+1, 1))
 		j++;
-	// at this point, Q[j] is the largest son
+	// at this point, Q[j] is the son with the smallest "count"
 	if(count <= MkzGet(Q, j, 1))
 	    break;
 	else{
@@ -337,14 +338,21 @@ MkzPopQueue(int32_t *dj, int32_t *mkz,  filter_matrix_t *mat)
 {
   int32_t *Q = mat->MKZQ;
   int32_t *A = mat->MKZA;
+  int32_t cost;
 
-    *dj = MkzGet(Q, 1, 0);
-    *mkz = MkzGet(Q, 1, 1);
-    if (MkzCount (mat, *dj) != *mkz)
-      {
-        fprintf (stderr, "Error, cost do not match for j=%d, expected %d, got %d\n", *dj, MkzCount (mat, *dj), *mkz);
-        exit (1);
-      }
+  /* Q[0] contains the number of items in Q[], thus the first element is
+     stored in Q[2..3] */
+  *dj = MkzGet(Q, 1, 0);
+  *mkz = MkzGet(Q, 1, 1);
+  cost = MkzCount (mat, mat->jmin + *dj);
+  while (cost != *mkz)
+    {
+      MkzSet(Q, 1, 1, cost);    /* update cost */
+      MkzDownQueue(Q, A, 1);    /* reorder heap structure */
+      *dj = MkzGet(Q, 1, 0);
+      *mkz = MkzGet(Q, 1, 1);
+      cost = MkzCount (mat, mat->jmin + *dj);
+    }
 #if 0 // to see what happens
     {
 	int i;
@@ -356,9 +364,9 @@ MkzPopQueue(int32_t *dj, int32_t *mkz,  filter_matrix_t *mat)
     }
 #endif
     A[*dj] = MKZ_INF;
-    MkzAssign(Q, A, 1, Q[0]);
-    Q[0]--;
-    MkzDownQueue(Q, A, 1);
+    MkzAssign(Q, A, 1, Q[0]); /* move entry of index Q[0] in Q,A to index 1 */
+    Q[0]--;                   /* decrease number of entries in Q,A */
+    MkzDownQueue(Q, A, 1);    /* reorder heap structure */
 }
 
 void
