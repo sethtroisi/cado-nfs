@@ -151,7 +151,8 @@ fillmat (filter_matrix_t *mat)
    when skipheavycols will be activated.
 */
 int
-filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps, int verbose)
+filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
+                    int verbose MAYBE_UNUSED)
 {
     int lbuf = 100, *buf;
 #if !defined(USE_MPI)
