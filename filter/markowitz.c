@@ -13,7 +13,7 @@
 #include "markowitz.h"
 
 #define MKZ_DEBUG 0
-#define MKZ_TIMINGS 1
+// #define MKZ_TIMINGS 1
 
 #if MKZ_TIMINGS
 double tmkzup, tmkzdown, tmkzupdown, tmkzcount;
@@ -108,7 +108,8 @@ MkzInsert(int32_t *Q, int32_t *A, int32_t dj, int32_t count)
     MkzUpQueue(Q, A, Q[0]);
 }
 
-// Move Q[k] down.
+// Move Q[k] down, by keeping the structure of Q as a heap, i.e.,
+// each node has a smaller cost than its two left and right nodes
 static void
 MkzDownQueue(int32_t *Q, int32_t *A, int32_t k)
 {
@@ -124,7 +125,7 @@ MkzDownQueue(int32_t *Q, int32_t *A, int32_t k)
 	    // k has a right son
 	    if(MkzGet(Q, j, 1) > MkzGet(Q, j+1, 1))
 		j++;
-	// at this point, Q[j] is the largest son
+	// at this point, Q[j] is the son with the smallest "count"
 	if(count <= MkzGet(Q, j, 1))
 	    break;
 	else{
@@ -140,27 +141,6 @@ MkzDownQueue(int32_t *Q, int32_t *A, int32_t k)
 #if MKZ_TIMINGS
     tmkzdown += (seconds()-tt);
 #endif
-}
-
-void
-MkzPopQueue(int32_t *dj, int32_t *mkz, int32_t *Q, int32_t *A)
-{
-    *dj = MkzGet(Q, 1, 0);
-    *mkz = MkzGet(Q, 1, 1);
-#if 0 // to see what happens
-    {
-	int i;
-
-	for(i = 2; i <= Q[0]; i++)
-	    if(MkzGet(Q, i, 1) != *mkz)
-		break;
-	printf("N(mkz=%d)=%d\n", *mkz, i);
-    }
-#endif
-    A[*dj] = MKZ_INF;
-    MkzAssign(Q, A, 1, Q[0]);
-    Q[0]--;
-    MkzDownQueue(Q, A, 1);
 }
 
 // (Q, A)[k] has just arrived, but we have to move it in the heap, so that
@@ -262,28 +242,36 @@ static int
 pureMkz(filter_matrix_t *mat, int32_t j)
 {
     int mkz, k, i;
-    int32_t ind[MERGE_LEVEL_MAX];
 
 #if MKZ_TIMINGS
     double tt = seconds();
 #endif
     // trick to be sure that columns with wt <= 2 are treated asap
     if(mat->wt[GETJ(mat, j)] == 1)
-	return 1-2*mat->ncols;
-    else if(mat->wt[GETJ(mat, j)] == 2){
+      mkz = 1 - 2 * mat->ncols;
+#if 0 /* do not treat columns of weight 2 specially for the moment */
+    else if(mat->wt[GETJ(mat, j)] == 2)
+      {
+        int32_t ind[MERGE_LEVEL_MAX];
 	fillTabWithRowsForGivenj(ind, mat, j);
 	// the more this is < 0, the less the weight is
-	return weightSum(mat, ind[0], ind[1])-2*mat->ncols;
-    }
-    // real traditional Markowitz count
-    mkz = mat->nrows;
-    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
-	if((i = mat->R[GETJ(mat, j)][k]) != -1){
+	mkz = weightSum(mat, ind[0], ind[1])-2*mat->ncols;
+      }
+#endif
+    else
+      {
+        // real traditional Markowitz count
+        mkz = mat->nrows;
+        for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
+          if((i = mat->R[GETJ(mat, j)][k]) != -1){
 	    // this should be the weight of row i
 	    if(mat->rows[i][0] < mkz)
-		mkz = mat->rows[i][0];
-	}
-    mkz = (mkz-1) * (mat->wt[GETJ(mat, j)]-1);
+              mkz = mat->rows[i][0];
+          }
+        /* the lightest row has weight mkz, we add wt-1 times mkz-1,
+           remove once mkz-1, and remove wt entries in the jth column */
+        mkz = (mkz - 2) * (mat->wt[GETJ(mat, j)] - 2) - 2;
+      }
 #if MKZ_TIMINGS
     tmkzcount += (seconds()-tt);
 #endif
@@ -343,6 +331,42 @@ MkzCount(filter_matrix_t *mat, int32_t j)
     default:
 	return Cavallar(mat, j);
     }
+}
+
+void
+MkzPopQueue(int32_t *dj, int32_t *mkz,  filter_matrix_t *mat)
+{
+  int32_t *Q = mat->MKZQ;
+  int32_t *A = mat->MKZA;
+  int32_t cost;
+
+  /* Q[0] contains the number of items in Q[], thus the first element is
+     stored in Q[2..3] */
+  *dj = MkzGet(Q, 1, 0);
+  *mkz = MkzGet(Q, 1, 1);
+  cost = MkzCount (mat, mat->jmin + *dj);
+  while (cost != *mkz)
+    {
+      MkzSet(Q, 1, 1, cost);    /* update cost */
+      MkzDownQueue(Q, A, 1);    /* reorder heap structure */
+      *dj = MkzGet(Q, 1, 0);
+      *mkz = MkzGet(Q, 1, 1);
+      cost = MkzCount (mat, mat->jmin + *dj);
+    }
+#if 0 // to see what happens
+    {
+	int i;
+
+	for(i = 2; i <= Q[0]; i++)
+	    if(MkzGet(Q, i, 1) != *mkz)
+		break;
+	printf("N(mkz=%d)=%d\n", *mkz, i);
+    }
+#endif
+    A[*dj] = MKZ_INF;
+    MkzAssign(Q, A, 1, Q[0]); /* move entry of index Q[0] in Q,A to index 1 */
+    Q[0]--;                   /* decrease number of entries in Q,A */
+    MkzDownQueue(Q, A, 1);    /* reorder heap structure */
 }
 
 void

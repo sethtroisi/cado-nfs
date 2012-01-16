@@ -151,7 +151,8 @@ fillmat (filter_matrix_t *mat)
    when skipheavycols will be activated.
 */
 int
-filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps, int verbose)
+filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
+                    int verbose MAYBE_UNUSED)
 {
     int lbuf = 100, *buf;
 #if !defined(USE_MPI)
@@ -176,7 +177,7 @@ filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps, int verbose)
        Those columns should contribute to the average weight by
        sum(2/p, p prime < BURIED_MAX_DENSITY), which is ~ 4.58
        for BURIED_MAX_DENSITY=2000. */
-    wmax = mat->nrows / BURIED_MAX_DENSITY;
+    wmax = (int) ((double) mat->nrows / BURIED_MAX_DENSITY);
     /* heavy columns already have wt < 0 */
     tooheavy = (char *) malloc (mat->ncols * sizeof(char));
     memset (tooheavy, 0, mat->ncols * sizeof(char));

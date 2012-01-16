@@ -1027,7 +1027,8 @@ mpi_delete_superfluous_rows(report_t *rep, filter_matrix_t *mat, int *row_weight
 // TODO: when debugged, transfer this to merge_mono.c
 //
 int
-stop_merge(filter_matrix_t *mat, int forbw, double ratio, int coverNmax, int m)
+stop_merge(filter_matrix_t *mat, int forbw, double ratio, double coverNmax,
+           int m)
 {
     if(m > mat->mergelevelmax){
 	// a stopping criterion whatever forbw is...!
@@ -1054,10 +1055,11 @@ stop_merge(filter_matrix_t *mat, int forbw, double ratio, int coverNmax, int m)
     }
     else if(forbw == 3){
 	double coverN = ((double)mat->weight)/((double)mat->rem_nrows);
-	if(((int)coverN) > coverNmax){
-	    fprintf(stderr, "Breaking, since c/N > c/N_max\n");
+	if (coverN > coverNmax)
+          {
+	    fprintf (stderr, "Breaking, since c/N > c/N_max\n");
 	    return 1;
-	}
+          }
     }
     return 0;
 }
@@ -1065,7 +1067,7 @@ stop_merge(filter_matrix_t *mat, int forbw, double ratio, int coverNmax, int m)
 // actually, mat is rather empty, since it does not use too much fancy things.
 // So we just need to init the row weights.
 void
-mpi_master(report_t *rep, filter_matrix_t *mat, int mpi_size, FILE *purgedfile, int forbw, double ratio, int coverNmax, int first)
+mpi_master(report_t *rep, filter_matrix_t *mat, int mpi_size, FILE *purgedfile, int forbw, double ratio, double coverNmax, int first)
 {
     MPI_Status status;
     double totwait = 0.0, tt, wctstart = MPI_Wtime();
@@ -1248,7 +1250,7 @@ mpi_master(report_t *rep, filter_matrix_t *mat, int mpi_size, FILE *purgedfile, 
 }
 
 void
-mpi_start_proc(char *outname, filter_matrix_t *mat, FILE *purgedfile, char *purgedname, int forbw, double ratio, int coverNmax, char *resumename)
+mpi_start_proc(char *outname, filter_matrix_t *mat, FILE *purgedfile, char *purgedname, int forbw, double ratio, double coverNmax, char *resumename)
 {
     report_t rep;
     char *str;
@@ -1296,7 +1298,7 @@ mpi_start_proc(char *outname, filter_matrix_t *mat, FILE *purgedfile, char *purg
 	    fclose(resumefile);
 	}
 	mpi_start_slaves(mpi_size, mat);
-	if(coverNmax == 0){
+	if(coverNmax == 0.0){
 	    mpi_err("#W# Forcing forbw=4: stopping when m too large\n");
 	    forbw = 4;
 	}
