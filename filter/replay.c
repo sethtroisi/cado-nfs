@@ -398,6 +398,7 @@ static void
 renumber(const char * sosname, int *small_ncols, int *colweight, int ncols)
 {
     int j, k, nb, *tmp;
+    uint64_t w;
 
     tmp = (int *)malloc((ncols<<1) * sizeof(int));
     ASSERT_ALWAYS(tmp != NULL);
@@ -414,12 +415,12 @@ renumber(const char * sosname, int *small_ncols, int *colweight, int ncols)
     fprintf (stderr, "Sorting %d columns by decreasing weight\n",
              *small_ncols);
     qsort(tmp, nb>>1, 2*sizeof(int), cmp);
-    for (k = 0, j = 2; j <= 4000 && j <= nb; j += 2)
+    for (w = 0, j = 2; j <= 4000 && j <= nb; j += 2)
       {
-        k += tmp[nb - j];
+        w += (uint64_t) tmp[nb - j];
         if ((j & 63) == 0)
-          fprintf (stderr, "Total weight of heaviest %d columns is %d\n",
-                   j >> 1, k);
+          fprintf (stderr, "Total weight of heaviest %d columns is %"
+                   PRIu64 "\n", j >> 1, w);
       }
     memset(colweight, 0, ncols * sizeof(int));
 #if 0

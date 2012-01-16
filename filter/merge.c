@@ -49,7 +49,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #endif
 
 #define CWMAX_DEFAULT 100
-#define RWMAX_DEFAULT 100
+#define RWMAX_DEFAULT INT_MAX
 #define MAXLEVEL_DEFAULT 10
 #define KEEP_DEFAULT 128
 #define FORBW_DEFAULT 0
@@ -250,7 +250,7 @@ main (int argc, char *argv[])
     fprintf (stderr, "SWAR version\n");
     initSWAR (mat);
 #else
-    fprintf(stderr, "Markowitz version\n");
+    fprintf(stderr, "Markowitz version (strategy %d)\n", M_STRATEGY);
 #endif
     fillmat (mat);
 
