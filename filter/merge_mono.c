@@ -1055,12 +1055,14 @@ deleteEmptyColumns(filter_matrix_t *mat)
 }
 
 void
-mergeOneByOne(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, int forbw, double ratio, int coverNmax)
+mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
+               int forbw, double ratio, int coverNmax)
 {
     double totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;
     uint64_t bwcostmin = 0, oldbwcost = 0, bwcost = 0;
     int old_nrows, old_ncols, m = 2, njrem = 0, ncost = 0, ncostmax, njproc;
     int target = 10000, ni2rem;
+    int *nb_merges;
 #ifndef USE_MARKOWITZ
     int mmax = 0;
 #else
@@ -1070,6 +1072,9 @@ mergeOneByOne(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, in
     njrem = removeSingletons(rep, mat);
 #endif
 
+    nb_merges = (int*) malloc ((maxlevel + 1) * sizeof (int));
+    for (m = 1; m <= maxlevel; m++)
+      nb_merges[m] = 0;
     fprintf(stderr, "Using mergeOneByOne\n");
     ncostmax = 20; // was 5
     njproc = 0;
@@ -1095,6 +1100,7 @@ mergeOneByOne(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, in
 	}
 	doOneMerge(rep, mat, &njrem, &totopt, &totfill, &totMST, &totdel,
 		   m, 0, 1, verbose);
+        nb_merges[m] ++;
 #else
 	if(MkzQueueCardinality(mat->MKZQ) <= 1){
 	    // rare event, I must say!
@@ -1245,6 +1251,10 @@ mergeOneByOne(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, in
 #if DEBUG >= 1
     fprintf(stderr, "Total number of row additions: %lu\n", row_additions);
 #endif
+    for (m = 1; m <= maxlevel; m++)
+      if (nb_merges[m] > 0)
+        fprintf (stderr, "Number of %d-merges: %d\n", m, nb_merges[m]);
+    free (nb_merges);
 }
 
 //////////////////////////////////////////////////////////////////////
