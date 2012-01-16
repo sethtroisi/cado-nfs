@@ -249,7 +249,7 @@ main (int argc, char *argv[])
     fprintf (stderr, "SWAR version\n");
     initSWAR (mat);
 #else
-    fprintf(stderr, "Markowitz version\n");
+    fprintf(stderr, "Markowitz version (strategy %d)\n", M_STRATEGY);
 #endif
     fillmat (mat);
 
