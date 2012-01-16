@@ -1102,8 +1102,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
 	}
 	doOneMerge(rep, mat, &njrem, &totopt, &totfill, &totMST, &totdel,
 		   m, 0, 1, verbose);
-        nb_merges[m] ++;
-#else
+#else /* ifndef USE_MARKOWITZ */
 	if(MkzQueueCardinality(mat->MKZQ) <= 1){
 	    // rare event, I must say!
 	    fprintf(stderr, "Q is almost empty: rare!!!\n");
@@ -1114,30 +1113,29 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
 	else
 	    MkzRemove(&dj, &mkz, mat->MKZQ, mat->MKZA, mat->mkzrnd);
 	j = dj + mat->jmin;
-# if DEBUG >= 1
+#if DEBUG >= 1
 	fprintf(stderr, "I popped j=%d wt=%d mkz=%d (#Q=%d)",
 		j, mat->wt[dj], mkz, mat->MKZQ[0]);
 	fprintf(stderr, " nrows=%d ncols=%d\n",mat->rem_nrows,mat->rem_ncols);
-# endif
-	if(mat->wt[dj] == 1){
-# if DEBUG >= 1
-	    fprintf(stderr,"Popped j=%d with w=%d\n", j, mat->wt[dj]);
+#endif
+        m = mat->wt[dj];
+	if (m == 1){
+#if DEBUG >= 1
+	    fprintf(stderr,"Popped j=%d with w=%d\n", j, m);
 #endif
 	    removeColDefinitely(rep, mat, j);
 	}
-	else if(mat->wt[dj] > 0){
-	    m = mat->wt[dj]; // for deleteSuperfluousRows below
-	    mergeForColumn2(rep, mat, &njrem,
-			    &totopt, &totfill, &totMST, &totdel, 1, j);
-	}
-# if 0
+	else if (m > 0)
+          mergeForColumn2(rep, mat, &njrem,
+                          &totopt, &totfill, &totMST, &totdel, 1, j);
+#if 0
 	else{
-	    int w = mat->wt[dj];
 	    removeColumnAndUpdate(mat, j);
-	    mat->wt[dj] = w;
+	    mat->wt[dj] = m;
 	}
-# endif
 #endif
+#endif /* ifndef USE_MARKOWITZ */
+        nb_merges[m] ++;
 	// number of columns removed
 	njproc += old_ncols - mat->rem_ncols;
 	deleteEmptyColumns(mat);

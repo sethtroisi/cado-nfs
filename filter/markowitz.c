@@ -28,6 +28,8 @@ double tmkzup, tmkzdown, tmkzupdown, tmkzcount;
 // Q[2*i] contains j-jmin = dj
 // Q[2*i+1] contains the Markowitz count for j
 
+// A[j] gives u s.t. Q[2*u] = j
+
 // get r-th component of Q[i]
 #define MkzGet(Q, i, r) (Q[((i)<<1)+(r)])
 #define MkzSet(Q, i, r, val) (Q[((i)<<1)+(r)] = (val))
@@ -225,11 +227,13 @@ static void
 MkzCheck(filter_matrix_t *mat)
 {
     int32_t dj;
+    int maxlevel = mat->mergelevelmax;
 
     for(dj = 0; dj < mat->jmax - mat->jmin; dj++)
-	if(mat->wt[dj] > 0)
+      if (0 < mat->wt[dj] && mat->wt[dj] <= maxlevel)
 	    if(MkzGet(mat->MKZQ, mat->MKZA[dj], 0) != dj)
-		fprintf(stderr, "GASP: %d in MkzCheck\n", dj);
+		fprintf(stderr, "GASP: %d <> %d in MkzCheck\n",
+                        MkzGet(mat->MKZQ, mat->MKZA[dj], 0), dj);
 }
 
 static int
@@ -345,8 +349,10 @@ MkzPopQueue(int32_t *dj, int32_t *mkz,  filter_matrix_t *mat)
   *dj = MkzGet(Q, 1, 0);
   *mkz = MkzGet(Q, 1, 1);
   cost = MkzCount (mat, mat->jmin + *dj);
-  while (cost != *mkz)
+  while (cost != *mkz || mat->wt[*dj] > mat->mergelevelmax)
     {
+      if (mat->wt[*dj] > mat->mergelevelmax)
+        MkzDelete (Q, A, 1);
       MkzSet(Q, 1, 1, cost);    /* update cost */
       MkzDownQueue(Q, A, 1);    /* reorder heap structure */
       *dj = MkzGet(Q, 1, 0);
@@ -374,6 +380,7 @@ MkzInit(filter_matrix_t *mat)
 {
     int32_t j, mkz;
     int sz = 0;
+    int maxlevel = mat->mergelevelmax;
 
 #if MKZ_TIMINGS
     tmkzup = tmkzdown = tmkzupdown = tmkzcount = 0.0;
@@ -383,7 +390,7 @@ MkzInit(filter_matrix_t *mat)
     fprintf(stderr, ", type=%d)\n", mat->mkztype);
     // compute number of elligible columns in the heap
     for(j = mat->jmin; j < mat->jmax; j++)
-	if(mat->wt[GETJ(mat, j)] > 0)
+      if(0 < mat->wt[GETJ(mat, j)] && mat->wt[GETJ(mat, j)] <= maxlevel)
 	    sz++;
     fprintf(stderr, "Allocating heap for %d columns\n", sz);
     mat->MKZQ = (int32_t *)malloc((sz+1) * 2 * sizeof(int32_t));
@@ -392,7 +399,8 @@ MkzInit(filter_matrix_t *mat)
     // every j needs a pointer
     mat->MKZA = (int32_t *)malloc((mat->jmax - mat->jmin + 1) * sizeof(int32_t));
     for(j = mat->jmin; j < mat->jmax; j++)
-	if(mat->wt[GETJ(mat, j)] > 0){
+      if (0 < mat->wt[GETJ(mat, j)] && mat->wt[GETJ(mat, j)] <= maxlevel)
+        {
 	    mkz = MkzCount(mat, j);
 #if MKZ_DEBUG >= 1
 	    printf("j=%d wt=%d", j, mat->wt[GETJ(mat, j)]);
@@ -469,12 +477,13 @@ MkzUpdate(filter_matrix_t *mat, int32_t i MAYBE_UNUSED, int32_t j)
 	    MkzGet(mat->MKZQ, adr, 1), mkz);
 #endif
     // nothing to do if new count == old count
-    if(mkz < MkzGet(mat->MKZQ, adr, 1)){
-	// add new count
-	MkzSet(mat->MKZQ, adr, 1, mkz);
-	// a variant of delete is needed...!
-	MkzMoveUpOrDown(mat->MKZQ, mat->MKZA, adr);
-    }
+    if (mkz > MkzGet(mat->MKZQ, adr, 1))
+      {
+        // add new count
+        MkzSet(mat->MKZQ, adr, 1, mkz);
+        // a variant of delete is needed...!
+        MkzMoveUpOrDown(mat->MKZQ, mat->MKZA, adr);
+      }
 }
 
 /*
