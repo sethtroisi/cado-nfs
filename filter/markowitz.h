@@ -13,7 +13,7 @@ extern void MkzClose(filter_matrix_t *mat);
 
 extern int MkzIsAlive(int32_t *A, int32_t dj);
 
-extern void MkzPopQueue(int32_t *dj, int32_t *mkz, int32_t *Q, int32_t *A);
+extern void MkzPopQueue(int32_t *dj, int32_t *mkz, filter_matrix_t *mat);
 extern void MkzRemove(int32_t *dj, int32_t *mkz, int32_t *Q, int32_t *A, int32_t k);
 extern int MkzIncrCol(filter_matrix_t *mat, int32_t j);
 extern void MkzUpdate(filter_matrix_t *mat, int32_t i, int32_t j);

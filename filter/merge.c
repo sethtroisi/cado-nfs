@@ -54,7 +54,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #define KEEP_DEFAULT 128
 #define FORBW_DEFAULT 0
 #define RATIO_DEFAULT 1.1
-#define COVERNMAX_DEFAULT 100
+#define COVERNMAX_DEFAULT 100.0
 
 static void
 usage (void)
@@ -73,7 +73,7 @@ usage (void)
 	   FORBW_DEFAULT);
   fprintf (stderr, "   -ratio rrr     - maximal ratio cN(final)/cN(min) with forbw=0 (default %1.1f)\n",
 	   RATIO_DEFAULT);
-  fprintf (stderr, "   -coverNmax nnn - with forbw=3, stop when c/N exceeds nnn (default %u)\n", COVERNMAX_DEFAULT);
+  fprintf (stderr, "   -coverNmax nnn - with forbw=3, stop when c/N exceeds nnn (default %1.2f)\n", COVERNMAX_DEFAULT);
   fprintf (stderr, "   -itermax nnn   - if non-zero, stop when nnn columns have been removed (cf -resume)\n");
   fprintf (stderr, "   -resume xxx    - resume from history file xxx (cf -itermax)\n");
   fprintf (stderr, "\nThe different optimization functions are, where c is the total matrix weight\n");
@@ -96,7 +96,8 @@ main (int argc, char *argv[])
     int verbose = 0; /* default verbose level */
     double tt;
     double ratio = RATIO_DEFAULT; /* bound on cN_new/cN to stop the merge */
-    int i, forbw = FORBW_DEFAULT, coverNmax = COVERNMAX_DEFAULT;
+    int i, forbw = FORBW_DEFAULT;
+    double coverNmax = COVERNMAX_DEFAULT;
 #ifdef USE_MARKOWITZ
     int wmstmax = 7; /* use real MST minimum for wt[j] <= wmstmax */
     int mkzrnd = 0;
@@ -155,7 +156,7 @@ main (int argc, char *argv[])
 	    argv += 2;
 	}
 	else if (argc > 2 && strcmp (argv[1], "-coverNmax") == 0){
-	    coverNmax = atoi(argv[2]);
+	    coverNmax = atof (argv[2]);
 	    argc -= 2;
 	    argv += 2;
 	}

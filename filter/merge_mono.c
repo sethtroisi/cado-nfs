@@ -469,7 +469,7 @@ findOptimalCombination(report_t *rep, filter_matrix_t *mat, int m,
 	useMinimalSpanningTree(rep, mat, m, ind, tfill, tMST);
 }
 
-#if DEBUG >= 1
+#if 0
 static void
 checkWeight(filter_matrix_t *mat, int32_t j)
 {
@@ -484,18 +484,6 @@ checkWeight(filter_matrix_t *mat, int32_t j)
 	    }
     fprintf(stderr, "\n");
     ASSERT(w == (mat->wt[GETJ(mat, j)] >= 0 ? mat->wt[GETJ(mat, j)] : -mat->wt[GETJ(mat, j)]));
-}
-
-static void
-checkMatrixWeight(filter_matrix_t *mat)
-{
-    unsigned long w = 0;
-    int i;
-
-    for(i = 0; i < mat->nrows; i++)
-	if(!isRowNull(mat, i))
-	    w += lengthRow(mat, i);
-    ASSERT(w == mat->weight);
 }
 #endif
 
@@ -583,6 +571,20 @@ mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
 }
 
 #ifndef USE_MARKOWITZ
+#if DEBUG >= 1
+static void
+checkMatrixWeight(filter_matrix_t *mat)
+{
+    unsigned long w = 0;
+    int i;
+
+    for(i = 0; i < mat->nrows; i++)
+	if(!isRowNull(mat, i))
+	    w += lengthRow(mat, i);
+    ASSERT(w == mat->weight);
+}
+#endif
+
 // maxdo is 0 if we want to perform a non-bounded number of operations;
 // an integer >= 1 otherwise.
 // Default for the monoproc version is 0.
@@ -594,7 +596,7 @@ merge_m_fast(report_t *rep, filter_matrix_t *mat, int m, int maxdo, int verbose)
     int njproc = 0, njrem = 0;
     int32_t j;
     dclist dcl;
-    int report = (verbose == 0) ? 10000 : 1000;
+    int report = (verbose == 0) ? REPORT : REPORT / 10;
 
 #if DEBUG >= 1
     fprintf(stderr, "Weight %d:", m);
@@ -712,7 +714,7 @@ inspectRowWeight(report_t *rep, filter_matrix_t *mat)
 #endif
 		removeRowDefinitely(rep, mat, i);
 		nirem++;
-		if(!(nirem % 10000))
+		if(!(nirem % REPORT))
 		    fprintf(stderr, "#removed_rows=%d at %2.2lf\n",
 			    nirem, seconds());
 		if(nirem > niremmax)
@@ -868,27 +870,28 @@ deleteSuperfluousRows(report_t *rep, filter_matrix_t *mat, int keep, int niremma
 
 #ifndef USE_MARKOWITZ
 void
-merge(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, int forbw)
+merge (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
+       int forbw)
 {
-    unsigned long bwcostmin = 0, oldcost = 0, cost;
+    double bwcostmin = 0.0, oldcost = 0.0, cost;
     int old_nrows, old_ncols, m, mm, njrem = 0, ncost = 0, ncostmax;
 
     ncostmax = 20; // was 5
     m = 2;
     while(1){
-	cost = ((unsigned long)mat->rem_ncols) * ((unsigned long)mat->weight);
-	fprintf(stderr, "w(M)=%lu, w(M)*ncols=%lu", mat->weight, cost);
+	cost = (double) mat->rem_ncols * (double) mat->weight;
+	fprintf(stderr, "w(M)=%lu, w(M)*ncols=%.2e", mat->weight, cost);
 	fprintf(stderr, " w(M)/ncols=%2.2lf\n",
 		((double)mat->weight)/((double)mat->rem_ncols));
-	if((bwcostmin == 0) || (cost < bwcostmin))
+	if((bwcostmin == 0.0) || (cost < bwcostmin))
 	    bwcostmin = cost;
 	if(forbw)
 	    // what a trick!!!!
-	    fprintf(rep->outfile, "BWCOST: %lu\n", cost);
-	if(forbw && (oldcost != 0) && (cost > oldcost)){
+	    fprintf(rep->outfile, "BWCOST: %1.0f\n", cost);
+	if ((forbw == 1) && (oldcost != 0.0) && (cost > oldcost)){
 	    ncost++;
 	    fprintf(stderr, "WARNING: New cost > old cost (%2.6e) [%d/%d]\n",
-		    ((double)cost)-((double)oldcost), ncost, ncostmax);
+		    cost - oldcost, ncost, ncostmax);
 	    if(ncost >= ncostmax){
 		int nirem;
 
@@ -958,26 +961,25 @@ merge(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, int forbw)
 #endif
     }
     if(forbw){
-	fprintf(rep->outfile, "BWCOSTMIN: %lu\n", bwcostmin);
-	fprintf(stderr, "Minimal bwcost found: %lu\n", bwcostmin);
+	fprintf(rep->outfile, "BWCOSTMIN: %1.0f\n", bwcostmin);
+	fprintf(stderr, "Minimal bwcost found: %1.0f\n", bwcostmin);
     }
 }
 #endif
 
-static uint64_t
-my_cost(unsigned long N, unsigned long w, int forbw)
+static double
+my_cost (double N, double w, int forbw)
 {
-    if(forbw == 2){
-	double K1 = .19e-9, K2 = 3.4e-05, K3 = 1.4e-10; // kinda average
-	double dN = (double)N, dw = (double) w;
-
-	return (uint64_t)((K1+K3)*dN*dw+K2*dN*log(dN)*log(dN));
+  if (forbw == 2)
+    {
+      double K1 = .19e-9, K2 = 3.4e-05, K3 = 1.4e-10; // kinda average
+      return (K1+K3)*N*w+K2*N*log(N)*log(N);
     }
-    else if(forbw == 3)
-	return (uint64_t)(w/N);
-    else if(forbw <= 1)
-	return ((uint64_t)N)*((uint64_t)w);
-    return (uint64_t)0;
+  else if (forbw == 3)
+    return w / N;
+  else if (forbw <= 1)
+    return N * w;
+  return 0.0;
 }
 
 static void
@@ -1055,12 +1057,13 @@ deleteEmptyColumns(filter_matrix_t *mat)
 }
 
 void
-mergeOneByOne(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, int forbw, double ratio, int coverNmax)
+mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
+               int forbw, double ratio, double coverNmax)
 {
     double totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;
-    uint64_t bwcostmin = 0, oldbwcost = 0, bwcost = 0;
+    double bwcostmin = 0.0, oldbwcost = 0.0, bwcost = 0.0;
     int old_nrows, old_ncols, m = 2, njrem = 0, ncost = 0, ncostmax, njproc;
-    int target = 10000, ni2rem;
+    int target = REPORT, ni2rem;
 #ifndef USE_MARKOWITZ
     int mmax = 0;
 #else
@@ -1102,7 +1105,7 @@ mergeOneByOne(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, in
 	    break;
 	}
 	if((mat->mkzrnd == 0) || (mat->mkzrnd > mat->MKZQ[0]))
-	    MkzPopQueue(&dj, &mkz, mat->MKZQ, mat->MKZA);
+          MkzPopQueue(&dj, &mkz, mat);
 	else
 	    MkzRemove(&dj, &mkz, mat->MKZQ, mat->MKZA, mat->mkzrnd);
 	j = dj + mat->jmin;
@@ -1143,8 +1146,8 @@ mergeOneByOne(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, in
 	    }
 	}
 #endif
-	bwcost = my_cost ((unsigned long) mat->rem_nrows,
-                          (unsigned long) mat->weight, forbw);
+	bwcost = my_cost ((double) mat->rem_nrows, (double) mat->weight,
+                          forbw);
 	if(njproc >= target){ // somewhat arbitrary...!
 #ifdef USE_MARKOWITZ
 	    njrem = removeSingletons(rep, mat);
@@ -1159,30 +1162,30 @@ mergeOneByOne(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, in
 		    mat->rem_nrows, mat->rem_nrows - mat->rem_ncols,
 		    mat->weight);
 	    if(forbw == 2)
-		fprintf(stderr, " bw=%"PRIu64"", bwcost);
+		fprintf(stderr, " bw=%e", bwcost);
 	    else if(forbw == 3)
 		fprintf(stderr, " w*N=%"PRIu64"",
 			((uint64_t)mat->rem_nrows)
 			*((uint64_t)mat->weight));
 	    else if(forbw <= 1)
-		fprintf(stderr, " w*N=%"PRIu64"", bwcost);
+		fprintf(stderr, " w*N=%e", bwcost);
 	    fprintf(stderr, " w/N=%2.2lf\n",
 		    ((double)mat->weight)/((double)mat->rem_nrows));
 	    // njrem=%d at %2.2lf\n",
 	    if((forbw != 0) && (forbw != 3))
 		// what a trick!!!!
-		fprintf(rep->outfile, "BWCOST: %"PRIu64"\n", bwcost);
-	    target = njproc + 10000;
+		fprintf(rep->outfile, "BWCOST: %1.0f\n", bwcost);
+	    target = njproc + REPORT;
 	}
-	if((bwcostmin == 0) || (bwcost < bwcostmin)){
+	if((bwcostmin == 0.0) || (bwcost < bwcostmin)){
 	    bwcostmin = bwcost;
 	    if((forbw != 0) && (forbw != 3))
 		// what a trick!!!!
-		fprintf(rep->outfile, "BWCOST: %"PRIu64"\n", bwcost);
+		fprintf(rep->outfile, "BWCOST: %1.0f\n", bwcost);
 	}
 	// to be cleaned one day...
 	if((forbw == 0) || (forbw == 2)){
-	    double r = ((double)bwcost)/((double)bwcostmin);
+          double r = bwcost / bwcostmin;
 	    if(r > ratio){
 		if(mat->rem_nrows-mat->rem_ncols > mat->keep){
 		    // drop all remaining columns at once
@@ -1201,18 +1204,17 @@ mergeOneByOne(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, in
 	}
 	else if(forbw == 3)
           {
-            if (bwcost >= (uint64_t) coverNmax)
+            if (bwcost >= coverNmax)
               {
-		fprintf (stderr, "w/N too high (%"PRIu64"), stopping\n",
-                         bwcost);
+		fprintf (stderr, "w/N too high (%1.2f), stopping\n", bwcost);
 		break;
               }
           }
-	if((forbw != 0) && (oldbwcost != 0) && (bwcost > oldbwcost)){
+	if((forbw == 1) && (oldbwcost != 0.0) && (bwcost > oldbwcost)){
 	    ncost++;
 #if 0
-	    fprintf(stderr, "New cost > old cost (%2.6e) [%d/%d]\n",
-		    ((double)bwcost)-((double)oldbwcost), ncost, ncostmax);
+	    fprintf(stderr, "New cost > old cost (%.16e > %.16e) [%d/%d]\n",
+		    bwcost, oldbwcost, ncost, ncostmax);
 #endif
 	    if(ncost >= ncostmax){
 		int nirem;
@@ -1239,8 +1241,8 @@ mergeOneByOne(report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose, in
 	deleteSuperfluousRows(rep, mat, mat->keep,
 			      mat->rem_nrows-mat->rem_ncols+mat->keep, -1);
     if((forbw != 0) && (forbw != 3)){
-	fprintf(rep->outfile, "BWCOSTMIN: %"PRIu64"\n", bwcostmin);
-	fprintf(stderr, "Minimal bwcost found: %"PRIu64"\n", bwcostmin);
+	fprintf(rep->outfile, "BWCOSTMIN: %1.0f\n", bwcostmin);
+	fprintf(stderr, "Minimal bwcost found: %1.0f\n", bwcostmin);
     }
 #if DEBUG >= 1
     fprintf(stderr, "Total number of row additions: %lu\n", row_additions);
@@ -1325,7 +1327,7 @@ resume(report_t *rep, filter_matrix_t *mat, char *resumename)
     fprintf(stderr, "Reading row additions\n");
     while(fgets(str, RELATION_MAX_BYTES, resumefile)){
 	addread++;
-	if((addread % 100000) == 0)
+	if((addread % (10 * REPORT)) == 0)
 	    fprintf(stderr, "%lu lines read at %2.2lf\n", addread, seconds());
 	if(str[strlen(str)-1] != '\n'){
 	    fprintf(stderr, "Gasp: not a complete a line!");
