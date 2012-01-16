@@ -2,7 +2,7 @@
 #define MERGE_MONO_H_
 
 /* controls frequency of reports */
-#define REPORT 100
+#define REPORT 10000
 
 #ifdef __cplusplus
 extern "C" {
