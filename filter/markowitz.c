@@ -268,9 +268,9 @@ pureMkz(filter_matrix_t *mat, int32_t j)
 	    if(mat->rows[i][0] < mkz)
               mkz = mat->rows[i][0];
           }
-        /* the lightest row has weight mkz, we add it (wt-1) times,
-           remove it once, and remove wt entries in the jth column */
-        mkz = (mkz - 1) * (mat->wt[GETJ(mat, j)] - 2);
+        /* the lightest row has weight mkz, we add wt-1 times mkz-1,
+           remove once mkz-1, and remove wt entries in the jth column */
+        mkz = (mkz - 2) * (mat->wt[GETJ(mat, j)] - 2) - 2;
       }
 #if MKZ_TIMINGS
     tmkzcount += (seconds()-tt);
