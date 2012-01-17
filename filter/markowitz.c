@@ -337,8 +337,9 @@ MkzCount(filter_matrix_t *mat, int32_t j)
     }
 }
 
-void
-MkzPopQueue(int32_t *dj, int32_t *mkz,  filter_matrix_t *mat)
+/* pop the top element from the heap, return 0 iff heap is empty */
+int
+MkzPopQueue(int32_t *dj, int32_t *mkz, filter_matrix_t *mat)
 {
   int32_t *Q = mat->MKZQ;
   int32_t *A = mat->MKZA;
@@ -354,10 +355,7 @@ MkzPopQueue(int32_t *dj, int32_t *mkz,  filter_matrix_t *mat)
       if (mat->wt[*dj] > mat->mergelevelmax)
         MkzDelete (Q, A, 1);
       if (MkzQueueCardinality(mat->MKZQ) == 0)
-        {
-          fprintf (stderr, "Empty merge queue: please increase maxlevel\n");
-          exit (1);
-        }
+        return 0;
       MkzSet(Q, 1, 1, cost);    /* update cost */
       MkzDownQueue(Q, A, 1);    /* reorder heap structure */
       *dj = MkzGet(Q, 1, 0);
@@ -378,6 +376,7 @@ MkzPopQueue(int32_t *dj, int32_t *mkz,  filter_matrix_t *mat)
     MkzAssign(Q, A, 1, Q[0]); /* move entry of index Q[0] in Q,A to index 1 */
     Q[0]--;                   /* decrease number of entries in Q,A */
     MkzDownQueue(Q, A, 1);    /* reorder heap structure */
+    return 1;
 }
 
 void
@@ -391,8 +390,7 @@ MkzInit(filter_matrix_t *mat)
     tmkzup = tmkzdown = tmkzupdown = tmkzcount = 0.0;
 #endif
     fprintf(stderr, "Entering initMarkowitz");
-    fprintf(stderr, " (wmstmax=%d, rnd=%d", mat->wmstmax, mat->mkzrnd);
-    fprintf(stderr, ", type=%d)\n", mat->mkztype);
+    fprintf(stderr, " (wmstmax=%d, type=%d)\n", mat->wmstmax, mat->mkztype);
     // compute number of elligible columns in the heap
     for(j = mat->jmin; j < mat->jmax; j++)
       if(0 < mat->wt[GETJ(mat, j)] && mat->wt[GETJ(mat, j)] <= maxlevel)

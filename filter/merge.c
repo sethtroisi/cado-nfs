@@ -100,7 +100,6 @@ main (int argc, char *argv[])
     double coverNmax = COVERNMAX_DEFAULT;
 #ifdef USE_MARKOWITZ
     int wmstmax = 7; /* use real MST minimum for wt[j] <= wmstmax */
-    int mkzrnd = 0;
     int mkztype = 1; /* pure Markowitz */
 #endif
     int itermax = 0;
@@ -175,11 +174,6 @@ main (int argc, char *argv[])
 #ifdef USE_MARKOWITZ
 	else if (argc > 2 && strcmp (argv[1], "-wmstmax") == 0){
 	    wmstmax = atoi(argv[2]);
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-mkzrnd") == 0){
-	    mkzrnd = atoi(argv[2]);
 	    argc -= 2;
 	    argv += 2;
 	}
@@ -269,7 +263,6 @@ main (int argc, char *argv[])
 
 #ifdef USE_MARKOWITZ
     mat->wmstmax = wmstmax;
-    mat->mkzrnd = mkzrnd;
     mat->mkztype = mkztype;
     tt = seconds();
     MkzInit (mat);

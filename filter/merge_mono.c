@@ -1103,15 +1103,11 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
 	doOneMerge(rep, mat, &njrem, &totopt, &totfill, &totMST, &totdel,
 		   m, 0, 1, verbose);
 #else /* ifndef USE_MARKOWITZ */
-	if(MkzQueueCardinality(mat->MKZQ) <= 1){
-	    // rare event, I must say!
-	    fprintf(stderr, "Q is almost empty: rare!!!\n");
-	    break;
-	}
-	if((mat->mkzrnd == 0) || (mat->mkzrnd > mat->MKZQ[0]))
-          MkzPopQueue(&dj, &mkz, mat);
-	else
-	    MkzRemove(&dj, &mkz, mat->MKZQ, mat->MKZA, mat->mkzrnd);
+        if (MkzPopQueue(&dj, &mkz, mat) == 0)
+          {
+            fprintf (stderr, "Warning: heap is empty, increase maxlevel\n");
+            break;
+          }
 	j = dj + mat->jmin;
 #if DEBUG >= 1
 	fprintf(stderr, "I popped j=%d wt=%d mkz=%d (#Q=%d)",
@@ -1135,7 +1131,8 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
 	}
 #endif
 #endif /* ifndef USE_MARKOWITZ */
-        nb_merges[m] ++;
+        if (nb_merges[m]++ == 0)
+          fprintf (stderr, "First %d-merge\n", m);
 	// number of columns removed
 	njproc += old_ncols - mat->rem_ncols;
 	deleteEmptyColumns(mat);
