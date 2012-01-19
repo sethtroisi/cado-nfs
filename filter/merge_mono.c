@@ -124,15 +124,16 @@ removeColDefinitely(report_t *rep, filter_matrix_t *mat, int32_t j)
 #endif
 }
 
+/* remove column j and update matrix */
 static void
 removeColumnAndUpdate(filter_matrix_t *mat, int j)
 {
 #ifndef USE_MARKOWITZ
     remove_j_from_SWAR(mat, j);
-#else
-    MkzRemoveJ(mat, j);
-#endif
     mat->wt[GETJ(mat, j)] = 0;
+#else
+    MkzRemoveJ (mat, j);
+#endif
     freeRj(mat, j);
 }
 
@@ -154,7 +155,7 @@ addCellAndUpdate(filter_matrix_t *mat, int i, int32_t j)
     int w = MkzIncrCol(mat, j);
     if(w >= 0){
 	if(w > mat->cwmax){
-	    // first time...
+	    // the weight of column w exceeds cwmax, thus we remove it
 	    removeColumnAndUpdate(mat, j);
 	    mat->wt[j] = -w;
 	}
@@ -169,8 +170,9 @@ addCellAndUpdate(filter_matrix_t *mat, int i, int32_t j)
 }
 
 // remove the cell (i,j), and updates matrix correspondingly.
+// if final, also update the Markowitz counts
 static void
-removeCellAndUpdate(filter_matrix_t *mat, int i, int32_t j)
+removeCellAndUpdate(filter_matrix_t *mat, int i, int32_t j, int final)
 {
 #if TRACE_ROW >= 0
     if(i == TRACE_ROW){
@@ -189,6 +191,10 @@ removeCellAndUpdate(filter_matrix_t *mat, int i, int32_t j)
 #endif
     // update R[j] by removing i
     remove_i_from_Rj(mat, i, j);
+#ifdef USE_MARKOWITZ
+    if (final)
+      MkzUpdateDown (mat, i, j);
+#endif
 }
 
 // These columns are simply removed from the current squeleton matrix, but
@@ -242,15 +248,12 @@ deleteAllColsFromStack(report_t *rep, filter_matrix_t *mat, int iS)
 // now, these guys are generic...!
 
 /* weight of buried columns for row i */
-#if BURIED_MODEL == 0
 #define BURIEDROWWEIGHT(mat,i) mat->wburied[i]
-#else
-#define BURIEDROWWEIGHT(mat,i) (int) (mat->bdensity * (double) mat->nburied + 0.5)
-#endif
 
 // for all j in row[i], removes j and update data
+// if final, also update the Markowitz counts
 static void
-removeRowAndUpdate(filter_matrix_t *mat, int i)
+removeRowAndUpdate(filter_matrix_t *mat, int i, int final)
 {
     int k;
 
@@ -266,7 +269,7 @@ removeRowAndUpdate(filter_matrix_t *mat, int i)
 		    TRACE_COL, i);
 	}
 #endif
-	removeCellAndUpdate(mat, i, cell(mat, i, k));
+	removeCellAndUpdate(mat, i, cell(mat, i, k), final);
     }
 }
 
@@ -288,7 +291,7 @@ addRowsAndUpdate(filter_matrix_t *mat, int i1, int i2, int len)
 {
     // cleaner one, that shares addRowsData() to prepare the next move...!
     // i1 is to disappear, replaced by a new one
-    removeRowAndUpdate(mat, i1);
+    removeRowAndUpdate(mat, i1, 0);
     // we know the length of row[i1]+row[i2]
     addRows(mat->rows, i1, i2, len);
     addOneRowAndUpdate(mat, i1);
@@ -325,7 +328,7 @@ deleteHeavyColumns(report_t *rep, filter_matrix_t *mat)
 void
 removeRowDefinitely(report_t *rep, filter_matrix_t *mat, int32_t i)
 {
-    removeRowAndUpdate(mat, i);
+    removeRowAndUpdate(mat, i, 1);
     destroyRow(mat, i);
     report1(rep, i);
     mat->rem_nrows--;
@@ -354,6 +357,7 @@ tryAllCombinations(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind)
 	}
     if(i > 0){
 	// put ind[i] in front
+        // FIXME: can we simply swap ind[0] and ind[i]?
 	int itmp = ind[i];
 	for(k = i; k > 0; k--)
 	    ind[k] = ind[k-1];
@@ -363,7 +367,7 @@ tryAllCombinations(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind)
     fprintf(stderr, "=> new_ind: %d %d\n", ind[0], ind[1]);
 #endif
     reportn(rep, ind, m);
-    removeRowAndUpdate(mat, ind[0]);
+    removeRowAndUpdate(mat, ind[0], 1);
     destroyRow(mat, ind[0]);
 }
 
@@ -441,7 +445,7 @@ MSTWithA(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind, double *tMST,
 #else
         reportn(rep, history[i]+1, history[i][0]);
 #endif
-    removeRowAndUpdate(mat, ind[0]);
+    removeRowAndUpdate(mat, ind[0], 1);
     destroyRow(mat, ind[0]);
 }
 
@@ -461,12 +465,13 @@ static void
 findOptimalCombination(report_t *rep, filter_matrix_t *mat, int m,
 		       int32_t *ind, double *tfill, double *tMST, int useMST)
 {
-    if((m <= 2) || !useMST){
-	*tfill = *tMST = 0;
-	tryAllCombinations(rep, mat, m, ind);
+  if ((m <= 2) || (useMST == 0))
+    {
+      *tfill = *tMST = 0;
+      tryAllCombinations (rep, mat, m, ind);
     }
-    else
-	useMinimalSpanningTree(rep, mat, m, ind, tfill, tMST);
+  else
+    useMinimalSpanningTree (rep, mat, m, ind, tfill, tMST);
 }
 
 #if 0
@@ -489,35 +494,12 @@ checkWeight(filter_matrix_t *mat, int32_t j)
 
 // j has weight m, which should coherent with mat->wt[j] == m
 static void
-mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
-	       filter_matrix_t *mat, int m, int32_t j, int useMST)
+mergeForColumn (report_t *rep, double *tt, double *tfill, double *tMST,
+                filter_matrix_t *mat, int m, int32_t j, int useMST)
 {
     int32_t ind[MERGE_LEVEL_MAX];
     int ni, k;
 
-    /* each m-merge leads to m-1 additions of rows */
-#if DEBUG >= 1
-    row_additions += m - 1;
-#endif
-#if BURIED_MODEL == 1
-    /* Let c be the average density. When we add a row j to a row i:
-       (a) either i has 0 and j has 1 with probability c*(1-c),
-           the weight of row i increases by 1
-       (b) both i and j have 1 with probablity c^2
-           the weight of row i decreases by 1
-       (c) in the remaining cases, the weight of row i remains unchanged
-       Thus the number of non-zero elements in the column increases by
-       c*(1-c) - c^2 = c - 2c^2, and the average density increases by
-       (c - 2c^2) / nrows */
-    for (k = 0; k < m - 1; k++)
-      mat->bdensity += mat->bdensity * (1.0 - 2.0 * mat->bdensity)
-        / (double) mat->nrows;
-#endif
-
-    if(m > MERGE_LEVEL_MAX){
-	fprintf(stderr, "PB: m=%d > MERGE_LEVEL_MAX=%d\n", m, MERGE_LEVEL_MAX);
-	exit(-1);
-    }
 #ifdef USE_MARKOWITZ
 # if 0
     // let's be cautious...
@@ -527,31 +509,39 @@ mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
 # endif
 #endif
 
+    /* each m-merge leads to m-1 additions of rows */
 #if DEBUG >= 1
+    row_additions += m - 1;
+    if (m > MERGE_LEVEL_MAX)
+      {
+	fprintf (stderr, "Error: m=%d > MERGE_LEVEL_MAX=%d\n",
+                 m, MERGE_LEVEL_MAX);
+	exit(1);
+      }
     fprintf(stderr, "Treating column %d of weight %d",j,mat->wt[GETJ(mat, j)]);
     fprintf(stderr, "\n");
-#endif
 #if DEBUG >= 2
     fprintf(stderr, "Status before next j=%d to start\n", j);
     printSWAR(mat, mat->ncols);
-#endif
     // the corresponding rows are in R[j], skipping 1st cell and -1's
-#if DEBUG >= 2
     checkCoherence(mat, m, j);
 #endif
-    ni = 0;
+#endif
+
 #ifndef USE_COMPACT_R
-    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++){
+    for(ni = 0, k = 1; k <= mat->R[GETJ(mat, j)][0]; k++){
 	if(mat->R[GETJ(mat, j)][k] != -1){
 	    ind[ni++] = mat->R[GETJ(mat, j)][k];
-	    if(ni == m)
-		break;
+	    if (ni == m)
+              break; /* earky abort, since we know there are m rows */
 	}
     }
+    /* now ind[0], ..., ind[m-1] are the m rows containing j */
 #else
     fprintf(stderr, "R: NYI in mergeForColumn\n");
     exit(1);
 #endif
+
 #if DEBUG >= 1
     fprintf(stderr, " %d", j);
     fprintf(stderr, " => the %d rows are:\n", m);
@@ -562,12 +552,13 @@ mergeForColumn(report_t *rep, double *tt, double *tfill, double *tMST,
     }
     fprintf(stderr, "\n");
 #endif
+
     *tt = seconds();
-    findOptimalCombination(rep, mat, m, ind, tfill, tMST, useMST);
+    findOptimalCombination (rep, mat, m, ind, tfill, tMST, useMST);
     *tt = seconds()-(*tt);
     mat->rem_nrows--;
     mat->rem_ncols--;
-    removeColumnAndUpdate(mat, j);
+    removeColumnAndUpdate (mat, j);
 }
 
 #ifndef USE_MARKOWITZ
@@ -729,7 +720,7 @@ inspectRowWeight(report_t *rep, filter_matrix_t *mat)
 # if DEBUG >= 1
 	    fprintf(stderr, "Row %d is no longer useful in merge\n", i);
 # endif
-	    removeRowAndUpdate(mat, i);
+	    removeRowAndUpdate(mat, i, 1);
 	    destroyRow(mat, i);
 	    useless++;
 	}
@@ -1063,12 +1054,13 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
     double totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;
     double bwcostmin = 0.0, oldbwcost = 0.0, bwcost = 0.0;
     int old_nrows, old_ncols, m = 2, njrem = 0, ncost = 0, ncostmax, njproc;
-    int target = REPORT, ni2rem;
+    int ni2rem;
     int *nb_merges;
 #ifndef USE_MARKOWITZ
     int mmax = 0;
 #else
     int32_t dj, j, mkz;
+    int useMST = 1; /* non-zero if we use minimal spanning tree */
 
     // clean things
     njrem = removeSingletons(rep, mat);
@@ -1123,7 +1115,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
 	}
 	else if (m > 0)
           mergeForColumn2(rep, mat, &njrem,
-                          &totopt, &totfill, &totMST, &totdel, 1, j);
+                          &totopt, &totfill, &totMST, &totdel, useMST, j);
 #if 0
 	else{
 	    removeColumnAndUpdate(mat, j);
@@ -1132,7 +1124,8 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
 #endif
 #endif /* ifndef USE_MARKOWITZ */
         if (nb_merges[m]++ == 0)
-          fprintf (stderr, "First %d-merge\n", m);
+          fprintf (stderr, "First %d-merge, cost %d (#Q=%d)\n", m, mkz,
+                   MkzQueueCardinality(mat->MKZQ));
 	// number of columns removed
 	njproc += old_ncols - mat->rem_ncols;
 	deleteEmptyColumns(mat);
@@ -1148,7 +1141,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
 #endif
 	bwcost = my_cost ((double) mat->rem_nrows, (double) mat->weight,
                           forbw);
-	if(njproc >= target){ // somewhat arbitrary...!
+	if (mat->rem_nrows % REPORT == 0){
 #ifdef USE_MARKOWITZ
 	    njrem = removeSingletons(rep, mat);
 #endif
@@ -1175,7 +1168,6 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
 	    if((forbw != 0) && (forbw != 3))
 		// what a trick!!!!
 		fprintf(rep->outfile, "BWCOST: %1.0f\n", bwcost);
-	    target = njproc + REPORT;
 	}
 	if((bwcostmin == 0.0) || (bwcost < bwcostmin)){
 	    bwcostmin = bwcost;
@@ -1297,14 +1289,14 @@ doAllAdds(report_t *rep, filter_matrix_t *mat, char *str)
 	sg = 1;
     }
     for(k = 1; k < ni; k++)
-	addRowsAndUpdate(mat, ind[k], i0, -1);
+      addRowsAndUpdate(mat, ind[k], i0, -1);
     reportn(rep, ind, ni);
     if(sg > 0){
 	// when ni == 1, then the corresponding row was too heavy and dropped
 	// unless m = 1 was used, in which case S[1] will contain j and
 	// can dispensed of next time (?) In the case of S[0], it'll be done
 	// later on also (?)
-	removeRowAndUpdate(mat, i0);
+        removeRowAndUpdate(mat, i0, 1);
 	destroyRow(mat, i0);
 	mat->rem_nrows--;
 	// the number of active j's is recomputed, anyway, later on

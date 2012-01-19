@@ -141,6 +141,7 @@ remove_j_from_S(filter_matrix_t *mat, int j)
 #endif
 }
 
+/* remove column j and update matrix */
 void
 remove_j_from_SWAR(filter_matrix_t *mat, int j)
 {

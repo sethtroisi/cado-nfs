@@ -19,7 +19,7 @@
 double tmkzup, tmkzdown, tmkzupdown, tmkzcount;
 #endif
 
-#define MKZ_INF -1
+#define MKZ_INF -1 /* mat->MKZA[j] becomes MKZ_INF when column j is deleted */
 
 // Again, a priority queue as a heap...!
 // Q[0] contains the number of items in Q[], so that useful part of Q
@@ -88,7 +88,7 @@ MkzUpQueue(int32_t *Q, int32_t *A, int32_t k)
     while((k > 1) && (MkzGet(Q, k/2, 1) >= count)){
 	// we are at level > 0 and the father is >= son
 	// the father replaces the son
-	MkzAssign(Q, A, k, k/2);
+      MkzAssign(Q, A, k, k/2);
 	k /= 2;
     }
     // we found the place of (dj, count)
@@ -120,19 +120,17 @@ MkzDownQueue(int32_t *Q, int32_t *A, int32_t k)
     double tt = seconds();
 #endif
 
-    while(k <= Q[0]/2){
-	// k has at least a left son
-	j = 2*k;
+    while ((j = 2*k) <= Q[0]){ /* node k has at least one left son 2k */
 	if(j < Q[0])
-	    // k has a right son
+	    // node k has also a right son
 	    if(MkzGet(Q, j, 1) > MkzGet(Q, j+1, 1))
 		j++;
 	// at this point, Q[j] is the son with the smallest "count"
-	if(count <= MkzGet(Q, j, 1))
+	if(count <= MkzGet(Q, j, 1)) /* Q[k] has smaller cost than both sons */
 	    break;
 	else{
-	    // the father takes the place of the son
-	    MkzAssign(Q, A, k, j);
+	    // the father takes the place of the "smaller" son
+          MkzAssign(Q, A, k, j);
 	    k = j;
 	}
     }
@@ -180,7 +178,7 @@ MkzDelete(int32_t *Q, int32_t *A, int32_t k)
 	    MkzGet(Q, k, 0), MkzGet(Q, k, 1));
 #endif
     // we put Q[Q[0]] in Q[k]
-    MkzAssign(Q, A, k, Q[0]);
+    MkzAssign (Q, A, k, Q[0]);
     Q[0]--;
     MkzMoveUpOrDown(Q, A, k);
 }
@@ -232,8 +230,11 @@ MkzCheck(filter_matrix_t *mat)
     for(dj = 0; dj < mat->jmax - mat->jmin; dj++)
       if (0 < mat->wt[dj] && mat->wt[dj] <= maxlevel)
 	    if(MkzGet(mat->MKZQ, mat->MKZA[dj], 0) != dj)
+              {
 		fprintf(stderr, "GASP: %d <> %d in MkzCheck\n",
                         MkzGet(mat->MKZQ, mat->MKZA[dj], 0), dj);
+                exit (1);
+              }
 }
 
 static int
@@ -246,22 +247,15 @@ static int
 pureMkz(filter_matrix_t *mat, int32_t j)
 {
     int mkz, k, i;
+    int w = mat->wt[GETJ(mat, j)];
 
-#if MKZ_TIMINGS
-    double tt = seconds();
-#endif
-    // trick to be sure that columns with wt <= 2 are treated asap
-    if(mat->wt[GETJ(mat, j)] == 1)
-      mkz = 1 - 2 * mat->ncols;
-#if 0 /* do not treat columns of weight 2 specially for the moment */
-    else if(mat->wt[GETJ(mat, j)] == 2)
+    if (w == 1)
       {
-        int32_t ind[MERGE_LEVEL_MAX];
-	fillTabWithRowsForGivenj(ind, mat, j);
-	// the more this is < 0, the less the weight is
-	mkz = weightSum(mat, ind[0], ind[1])-2*mat->ncols;
+        i = mat->R[GETJ(mat, j)][1]; /* unique row containing j */
+        return -(int) mat->rows[i][0];
       }
-#endif
+    else if (w == 2)
+      return -2;
     else
       {
         // real traditional Markowitz count
@@ -274,12 +268,8 @@ pureMkz(filter_matrix_t *mat, int32_t j)
           }
         /* the lightest row has weight mkz, we add wt-1 times mkz-1,
            remove once mkz-1, and remove wt entries in the jth column */
-        mkz = (mkz - 2) * (mat->wt[GETJ(mat, j)] - 2) - 2;
+        return (mkz - 2) * (mat->wt[GETJ(mat, j)] - 2) - 2;
       }
-#if MKZ_TIMINGS
-    tmkzcount += (seconds()-tt);
-#endif
-    return mkz;
 }
 
 // forcing lighter columns first.
@@ -323,6 +313,7 @@ lightColAndMkz(filter_matrix_t *mat, int32_t j)
     return mkz;
 }
 
+/* return the cost of merging column j (the smaller, the better) */
 static int
 MkzCount(filter_matrix_t *mat, int32_t j)
 {
@@ -343,36 +334,25 @@ MkzPopQueue(int32_t *dj, int32_t *mkz, filter_matrix_t *mat)
 {
   int32_t *Q = mat->MKZQ;
   int32_t *A = mat->MKZA;
-  int32_t cost;
 
   /* Q[0] contains the number of items in Q[], thus the first element is
      stored in Q[2..3] */
   *dj = MkzGet(Q, 1, 0);
   *mkz = MkzGet(Q, 1, 1);
-  cost = MkzCount (mat, mat->jmin + *dj);
-  while (cost != *mkz || mat->wt[*dj] > mat->mergelevelmax)
+  while (mat->wt[*dj] > mat->mergelevelmax)
     {
-      if (mat->wt[*dj] > mat->mergelevelmax)
-        MkzDelete (Q, A, 1);
+       /* remove heavy column */
+      MkzDelete (Q, A, 1);
+      A[*dj] = MKZ_INF;
+
       if (MkzQueueCardinality(mat->MKZQ) == 0)
         return 0;
-      MkzSet(Q, 1, 1, cost);    /* update cost */
-      MkzDownQueue(Q, A, 1);    /* reorder heap structure */
+
       *dj = MkzGet(Q, 1, 0);
       *mkz = MkzGet(Q, 1, 1);
-      cost = MkzCount (mat, mat->jmin + *dj);
     }
-#if 0 // to see what happens
-    {
-	int i;
-
-	for(i = 2; i <= Q[0]; i++)
-	    if(MkzGet(Q, i, 1) != *mkz)
-		break;
-	printf("N(mkz=%d)=%d\n", *mkz, i);
-    }
-#endif
-    A[*dj] = MKZ_INF;
+    A[*dj] = MKZ_INF; /* already done in MkzRemoveJ, but if we don't do it,
+                         we get A[j1]=A[j2] for some j1 <> j2 */
     MkzAssign(Q, A, 1, Q[0]); /* move entry of index Q[0] in Q,A to index 1 */
     Q[0]--;                   /* decrease number of entries in Q,A */
     MkzDownQueue(Q, A, 1);    /* reorder heap structure */
@@ -434,6 +414,7 @@ MkzClose(filter_matrix_t *mat)
     free(mat->MKZA);
 }
 
+/* increment the weight of column j (in absolute value) */
 int
 MkzIncrCol(filter_matrix_t *mat, int32_t j)
 {
@@ -480,13 +461,34 @@ MkzUpdate(filter_matrix_t *mat, int32_t i MAYBE_UNUSED, int32_t j)
 	    MkzGet(mat->MKZQ, adr, 1), mkz);
 #endif
     // nothing to do if new count == old count
-    if (mkz > MkzGet(mat->MKZQ, adr, 1))
+    if (mkz != MkzGet(mat->MKZQ, adr, 1))
       {
         // add new count
         MkzSet(mat->MKZQ, adr, 1, mkz);
         // a variant of delete is needed...!
         MkzMoveUpOrDown(mat->MKZQ, mat->MKZA, adr);
       }
+}
+
+// Row[i] has been removed for column j, so that we need to update
+// the Markowitz count.
+void
+MkzUpdateDown (filter_matrix_t *mat, int32_t i MAYBE_UNUSED, int32_t j)
+{
+  int32_t adr = mat->MKZA[GETJ(mat, j)];
+  int mkz;
+
+  if (adr == -1) /* column too heavy or already removed */
+    return;
+
+  mkz = MkzCount(mat, j);
+  if (mkz != MkzGet(mat->MKZQ, adr, 1))
+    {
+      // update count
+      MkzSet(mat->MKZQ, adr, 1, mkz);
+      // a variant of delete is needed...!
+      MkzMoveUpOrDown(mat->MKZQ, mat->MKZA, adr);
+    }
 }
 
 /*
@@ -507,23 +509,25 @@ MkzDecreaseColWeight(filter_matrix_t *mat, int32_t j)
     mat->wt[dj] = decrS(mat->wt[dj]);
 }
 
+/* remove column j from and update matrix */
 void
 MkzRemoveJ(filter_matrix_t *mat, int32_t j)
 {
     int32_t dj = GETJ(mat, j);
 
-    if(mat->MKZA[dj] == MKZ_INF){
-#if MKZ_DEBUG >= 1
-	fprintf(stderr, "Prevented use of adr[%d]=-1 in MkzRemoveJ\n", j);
-#endif
+    mat->wt[dj] = 0;
+
+    /* This can happen when maxlevel < weight[dj] <= cwmax initially, thus
+       A[dj] was initialized to MKZ_INF, but because of a merge if becomes
+       larger than cwmax. FIXME: should we have maxlevel = cwmax? */
+    if (mat->MKZA[dj] == MKZ_INF)
 	return;
-    }
+
 #if MKZ_DEBUG >= 1
     fprintf(stderr, "Removing col %d of weight %d\n", j, mat->wt[dj]);
 #endif
-    mat->wt[dj] = 0;
     // remove j from the QA structure
-    MkzDelete(mat->MKZQ, mat->MKZA, mat->MKZA[dj]);
+    MkzDelete (mat->MKZQ, mat->MKZA, mat->MKZA[dj]);
     mat->MKZA[dj] = MKZ_INF;
 #if MKZ_DEBUG >= 1
     MkzIsHeap(mat->MKZQ);

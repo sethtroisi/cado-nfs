@@ -9,10 +9,6 @@
 #define TRACE_COL -1 // 253224 // 231 // put to -1 if not...!
 #define TRACE_ROW -1 // 59496 // put to -1 if not...!
 
-/* model used to estimate weight of buried columns:
-   0 : constant weight per row
-   1 : average density */
-#define BURIED_MODEL 0
 /* we bury all ideals of density > 1/BURIED_MAX_DENSITY */
 #define BURIED_MAX_DENSITY 2000.0
 
@@ -29,23 +25,17 @@ typedef struct {
                         (trick: we store -w if w > cwmax) */
   int nburied;     /* the number of buried columns, hence an upper
 			bound for wburied[i] */
-#if BURIED_MODEL == 0
   int *wburied;     /* wburied[i] counts the estimated weight of buried
 			columns */
-#elif BURIED_MODEL == 1
-  double bdensity;   /* estimation of the density of the buried part */
-#else
-#error "invalid BURIED_MODEL"
-#endif
   unsigned long *ad;
   unsigned long weight;
   int cwmax;         /* bound on weight of j to enter the SWAR structure */
   int rwmax;         /* if a weight(row) > rwmax, kill that row */
   int keep;          /* target for nrows-ncols */
   int mergelevelmax; /* says it */
-  int32_t **R;           /* R[j][k] contains the rows of the non-empty elements
-                        of column j, 0 <= j < ncols, 1 <= k <= R[j][0], for
-                        weight(j) <= cwmax.
+  int32_t **R;           /* R[j][k] contains the indices of the rows containing
+                            the ideal of index j, 0 <= j < ncols,
+                            1 <= k <= R[j][0], for weight(j) <= cwmax.
                         R[j][k] = -1 if the corresponding row has been deleted.
                         R[j]=NULL for weight(j) > cwmax. */
 #ifndef USE_MARKOWITZ
@@ -59,7 +49,10 @@ typedef struct {
                         w > cwmax. */
 #else
   int32_t *MKZQ;         /* priority queue for Markowitz stuff */    
-  int32_t *MKZA;         /* MKZA[j] gives u s.t. MKZQ[u] = j */ 
+  int32_t *MKZA;         /* MKZA[j] gives u s.t. MKZQ[2*u] = j and
+                            MKZQ[2*u+1] is the Markowitz cost of column j,
+                            otherwise it is MKZ_INF if the colum is inactive
+                            (either too heavy initially or deleted) */
   int wmstmax;
   int mkztype;       /* which type of count */
 #endif

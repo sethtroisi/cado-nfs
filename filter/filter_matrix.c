@@ -21,6 +21,7 @@ decrS (int w)
   return (w >= 0 ? w - 1 : w + 1);
 }
 
+/* increment the absolute value of a signed number */
 int
 incrS (int w)
 {
@@ -41,10 +42,8 @@ initMat (filter_matrix_t *mat, int32_t jmin, int32_t jmax)
     ASSERT_ALWAYS (mat->rows != NULL);
     mat->wt = (int*) malloc ((mat->jmax - mat->jmin) * sizeof (int));
     memset (mat->wt, 0, (mat->jmax - mat->jmin) * sizeof (int));
-#if BURIED_MODEL == 0
     mat->wburied = (int*) malloc (mat->nrows * sizeof (int));
     memset (mat->wburied, 0, mat->nrows * sizeof (int));
-#endif
     R = (int32_t **) malloc ((mat->jmax - mat->jmin) * sizeof(int32_t *));
     ASSERT_ALWAYS(R != NULL);
     mat->R = R;
@@ -59,9 +58,7 @@ clearMat (filter_matrix_t *mat)
     free (mat->rows[i]);
   free (mat->rows);
   free (mat->wt);
-#if BURIED_MODEL == 0
   free (mat->wburied);
-#endif
   for (j = 0; j < mat->jmax - mat->jmin; j++)
     free (mat->R[j]);
   free (mat->R);
@@ -181,9 +178,6 @@ filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
     /* heavy columns already have wt < 0 */
     tooheavy = (char *) malloc (mat->ncols * sizeof(char));
     memset (tooheavy, 0, mat->ncols * sizeof(char));
-#if BURIED_MODEL == 1
-    mat->bdensity = 0.0;
-#endif
     for(j = 0; j < mat->ncols; j++){
       int wc = -mat->wt[j];
         if(wc > wmax){
@@ -194,18 +188,10 @@ filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
             mat->nburied += 1;
             if(wc > bmax) bmax = wc;
             if(wc < bmin) bmin = wc;
-#if BURIED_MODEL == 1
-            mat->bdensity += (double) wc;
-#endif
         }
     }
     fprintf(stderr, "# Number of buried columns is %d", mat->nburied);
     fprintf(stderr, " (min weight=%d, max weigth=%d)\n", bmin, bmax);
-#if BURIED_MODEL == 1
-    mat->bdensity /= (double) mat->nburied;
-    mat->bdensity /= (double) mat->nrows;
-    fprintf (stderr, "mat->bdensity = %1.6f\n", mat->bdensity);
-#endif
 
     for (int i = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; i++) {
         ASSERT_ALWAYS(i < mat->nrows);
@@ -240,9 +226,7 @@ filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
                     // this will be the weight in the current slice
                     mat->weight++; 
                     if ((tooheavy != NULL) && (tooheavy[j] != 0)) {
-#if BURIED_MODEL == 0
                         mat->wburied[i] += 1;
-#endif
                     } else {
                         buf[ibuf++] = j;
                         if(mat->wt[GETJ(mat, j)] > 0){ // redundant test?
@@ -433,11 +417,7 @@ buriedRowsWeight (filter_matrix_t *mat, int i1 MAYBE_UNUSED,
                   int i2 MAYBE_UNUSED)
 {
   int w;
-#if BURIED_MODEL == 0
   w = mat->wburied[i1] + mat->wburied[i2];
-#else
-  w = (int) (2.0 * mat->bdensity * (double) mat->nburied + 0.5);
-#endif
   if (w > mat->nburied)
     w = mat->nburied;
   return w;
