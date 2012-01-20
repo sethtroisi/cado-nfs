@@ -250,10 +250,7 @@ pureMkz(filter_matrix_t *mat, int32_t j)
     int w = mat->wt[GETJ(mat, j)];
 
     if (w == 1)
-      {
-        i = mat->R[GETJ(mat, j)][1]; /* unique row containing j */
-        return -(int) mat->rows[i][0];
-      }
+      return -4; /* ensures that singletons are removed earlier */
     else if (w == 2)
       return -2;
     else
