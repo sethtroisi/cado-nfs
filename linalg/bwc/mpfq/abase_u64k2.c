@@ -361,7 +361,8 @@ int abase_u64k2_vec_sscan(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_vec 
 /* *Mpfq::defaults::vec::io::code_for_vec_fscan */
 int abase_u64k2_vec_fscan(abase_u64k2_dst_field K MAYBE_UNUSED, FILE * file, abase_u64k2_vec * w, unsigned int * n)
 {
-    char *tmp, c;
+    char *tmp;
+    int c;
     int allocated, len=0;
     allocated=100;
     tmp = (char *)malloc(allocated*sizeof(char));

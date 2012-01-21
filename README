@@ -68,6 +68,31 @@ gives documentation on the recognized environment variables and their effect.
 Note that tweaks in local.sh are global (relevant to all sub-directories
 of the cado-nfs tree, not to a particular directory).
 
+As a rule of thumb, whenever you happen to modify the local.sh script, it
+is advised to trigger re-configuration of the build system, by the
+special command ``make cmake''. Another way to achieve the same goal is
+to remove the build tree, which is below build/ (normally named as the
+hostname of the current machine).
+
+Optional (alternative): configure using cmake directly
+======================================================
+
+cado-nfs includes a top-level Makefile which builds the binary objects in
+a special build directory which is below build/ (normally named as the
+hostname of the current machine). This way, parralel builds for different
+machines may coexist on one shared directory. This is sort of a magic
+``out-of-source'' build.
+
+Another way to do ``out-of-source'' build is to create a separate build
+directory and build from there, by calling cmake directly for the
+configuration. This proceeds as follows:
+
+mkdir /some/build/directory
+cd /some/build/directory
+cmake /path/to/cado-nfs/source/tree
+
+Note however that in this case, the local.sh file found in the source
+tree is not read (but you may elect to do so before calling cmake).
 
 Compile:
 ========
