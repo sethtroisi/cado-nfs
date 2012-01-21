@@ -373,10 +373,10 @@ print_poly_info_short ( mpz_t *f,
 	 cado_poly_init(cpoly);
 
 	 for (i = 0; i < (d + 1); i++) {
-		  mpz_set(cpoly->f[i], f[i]);
+		  mpz_set(cpoly->alg->f[i], f[i]);
 	 }
 	 for (i = 0; i < 2; i++) {
-		  mpz_set(cpoly->g[i], g[i]);
+		  mpz_set(cpoly->rat->f[i], g[i]);
 	 }
 
 
@@ -397,8 +397,8 @@ print_poly_info_short ( mpz_t *f,
 	 alpha_proj = get_biased_alpha_projective (f, d, ALPHA_BOUND);
 
 	 mpz_set (cpoly->n, N);
-	 cpoly->degree = d;
-	 cpoly->degreeg = 2;
+	 cpoly->alg->degree = d;
+	 cpoly->rat->degree = 1;
 	 cpoly->skew = skew;
 	 e = MurphyE (cpoly, BOUND_F, BOUND_G, AREA, MURPHY_K);
 
@@ -6086,10 +6086,12 @@ rootsieve_file_msieve ( FILE *file,
 	 /* for each polynomial, do the root sieve. */
 	 while (1) {
 
-		  /* read poly */
+		  /* read poly */   
 		  if (fgets(str, MAX_LINE_LENGTH, file) == NULL)
 			   break;
-		  gmp_sscanf (str, "%Zd %Zd %Zd", ad, l, m);
+		  int ret = gmp_sscanf (str, "%Zd %Zd %Zd", ad, l, m);
+      if (ret != 3)
+        continue;
 
 		  /* set degree, n, ad, l, m */
 		  rs->d = param->d;
