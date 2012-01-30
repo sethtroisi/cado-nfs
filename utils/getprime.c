@@ -62,7 +62,7 @@ getprime (unsigned long pp)
 
   if (pp == 0) /* free the tables, and reinitialize */
     {
-      offset = 0.0;
+      offset = 0;
       current = -1;
       free (primes);
       primes = NULL;
@@ -121,12 +121,12 @@ getprime (unsigned long pp)
                                        sizeof(unsigned char)); /* len=1 here */
 	    /* assume this "small" malloc will not fail in normal usage */
 	    ASSERT(sieve != NULL);
-	    offset = 5.0;
+	    offset = 5;
 	    sieve[0] = 1; /* corresponding to 5 */
 	    primes[0] = 3;
 	    moduli[0] = 1; /* next odd multiple of 3 is 7, i.e. next to 5 */
 	    current = -1;
-	    return 3.0;
+	    return 3;
 	  }
 	else
 	  {
