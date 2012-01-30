@@ -54,11 +54,11 @@ getprime (unsigned long pp)
 {
   static unsigned long offset = 0;     /* offset for current primes */
   static long current = -1;            /* index of previous prime */
-  static unsigned *primes = NULL;      /* small primes up to sqrt(p) */
+  static unsigned int *primes = NULL;  /* small primes up to sqrt(p) */
   static unsigned long nprimes = 0;    /* length of primes[] */
   static unsigned char *sieve = NULL;  /* sieving table */
   static long len = 0;                 /* length of sieving table */
-  static unsigned long *moduli = NULL; /* offset for small primes */
+  static unsigned int *moduli = NULL;  /* offset for small primes */
 
   if (pp == 0) /* free the tables, and reinitialize */
     {
@@ -104,16 +104,16 @@ getprime (unsigned long pp)
 
   /* now enlarge small prime table if too small */
   if ((nprimes == 0) ||
-      (primes[nprimes - 1] * primes[nprimes - 1] < offset + len))
+      ((unsigned long) primes[nprimes - 1] * (unsigned long)
+       primes[nprimes - 1] < offset + len))
       {
 	if (nprimes == 0) /* initialization */
 	  {
 	    nprimes = 1;
-	    primes = (unsigned *) malloc (nprimes * sizeof(unsigned long));
+	    primes = (unsigned int*) malloc (nprimes * sizeof(unsigned int));
 	    /* assume this "small" malloc will not fail in normal usage */
 	    ASSERT(primes != NULL);
-	    moduli = (long unsigned int *) malloc (nprimes *
-                                                   sizeof(unsigned long));
+	    moduli = (unsigned int*) malloc (nprimes * sizeof(unsigned int));
 	    /* assume this "small" malloc will not fail in normal usage */
 	    ASSERT(moduli != NULL);
 	    len = 1;
@@ -134,10 +134,10 @@ getprime (unsigned long pp)
 
 	    i = nprimes;
 	    nprimes *= 2;
-	    primes = (unsigned *) realloc (primes, nprimes *
-                                           sizeof(unsigned long));
-	    moduli = (unsigned long*) realloc (moduli, nprimes *
-                                                    sizeof(unsigned long));
+	    primes = (unsigned int*) realloc (primes, nprimes *
+                                           sizeof(unsigned int));
+	    moduli = (unsigned int*) realloc (moduli, nprimes *
+                                              sizeof(unsigned int));
 	    /* assume those "small" realloc's will not fail in normal usage */
 	    ASSERT(primes != NULL && moduli != NULL);
 	    for (p = primes[i-1]; i < nprimes; i++)
@@ -196,7 +196,7 @@ main (int argc, char *argv[])
       exit (EXIT_FAILURE);
     }
 
-  B = atoi (argv[1]);
+  B = strtoul (argv[1], NULL, 0);
   
   for (pi = 0, p = 2; p <= B; p = getprime (p), pi++);
   printf ("pi(%lu)=%lu\n", B, pi);
