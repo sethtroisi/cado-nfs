@@ -70,7 +70,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "filter_matrix.h" /* for BURIED_MAX_DENSITY */
 
 #define MAX_FILES 1000000
-#define MAX_STEPS 10 /* maximal number of steps in each pass */
+#define MAX_STEPS 10   /* maximal number of steps in each pass */
+#define FINAL_BOUND 50 /* final bound for rational and algebraic ideals */
 
 /********************** own memory allocation routines ***********************/
 
@@ -241,7 +242,7 @@ static void
 insertNormalRelation (int **rel_compact, int irel,
                       int *nprimes, hashtable_t *H, relation_t *rel,
                       unsigned long minpr, unsigned long minpa,
-                      unsigned long *tot_alloc)
+                      unsigned long *tot_alloc, int final)
 {
     int *tmp = NULL, ltmp = 0, i, j, h;
 
@@ -263,28 +264,36 @@ insertNormalRelation (int **rel_compact, int irel,
        primes, but use a fake root -2 for rational primes, which
        ensures there is no collision with algebraic primes */
     for (j = 0; j < rel->nb_rp; j++)
-      if (rel->rp[j].p >= minpr)
-        {
-          /* we only insert 'considered' primes, since we cannot get
-             a correct count of the other ones when we delete a relation */
+      {
+        if ((rel->rp[j].p >= minpr) || final)
+          /* in the final pass, we need to insert all ideals, since we need
+             to renumber them in the output file */
           h = hashInsert (H, rel->rp[j].p, minus2);
-          *nprimes += (H->hashcount[h] == 1); /* new prime */
-          tmp[i++] = h;
-        }
+        if (rel->rp[j].p >= minpr)
+          {
+            *nprimes += (H->hashcount[h] == 1); /* new prime */
+            tmp[i++] = h;
+          }
+      }
 
     for (j = 0; j < rel->nb_ap; j++)
-      if (rel->ap[j].p >= minpa)
-        {
-          /* FIXME: instead of computing r = a/b mod p, we could
-             first search for a potential match (p,r) in the hash table,
-             then check that a = r*b mod b, and only compute a/b mod p
-             for new entries, thus trading a modular inverse by a modular
-             multiplication for all but the first occurrences of that ideal */
-          rel->ap[j].r = findroot (rel->a, rel->b, rel->ap[j].p);
-          h = hashInsert (H, rel->ap[j].p, rel->ap[j].r);
-          *nprimes += (H->hashcount[h] == 1); /* new prime */
-          tmp[i++] = h;
-        }
+      {
+        if ((rel->ap[j].p >= minpa) || final)
+          {
+            rel->ap[j].r = findroot (rel->a, rel->b, rel->ap[j].p);
+            h = hashInsert (H, rel->ap[j].p, rel->ap[j].r);
+          }
+        if (rel->ap[j].p >= minpa)
+          {
+            /* FIXME: instead of computing r = a/b mod p, we could
+               first search for a potential match (p,r) in the hash table,
+               then check that a = r*b mod b, and only compute a/b mod p
+               for new entries, thus trading a modular inverse by a modular
+               multiplication for all but the first occurrences of that ideal */
+            *nprimes += (H->hashcount[h] == 1); /* new prime */
+            tmp[i++] = h;
+          }
+      }
 
     tmp[i] = -1; /* sentinel */
     rel_compact[irel] = tmp;
@@ -297,7 +306,7 @@ static void
 insertFreeRelation (int **rel_compact, int irel, int *nprimes,
                     hashtable_t *H, relation_t *rel,
                     unsigned long minpr, unsigned long minpa,
-                    unsigned long *tot_alloc)
+                    unsigned long *tot_alloc, int final)
 {
     unsigned long p = rel->a; /* rel->b == 0 */
     int j, h, *tmp = NULL, itmp, ltmp;
@@ -310,19 +319,23 @@ insertFreeRelation (int **rel_compact, int irel, int *nprimes,
     tmp = my_malloc_int (ltmp);
     *tot_alloc += ltmp * sizeof (int);
     itmp = 0;
+    if ((p >= minpr) || final)
+      h = hashInsert (H, p, minus2);
     if (p >= minpr)
       {
-        h = hashInsert (H, p, minus2);
         *nprimes += (H->hashcount[h] == 1); /* new prime */
         tmp[itmp++] = h;
       }
     for (j = 0; j < rel->nb_ap; j++)
-      if (p >= minpa)
-        {
+      {
+        if ((p >= minpa) || final)
           h = hashInsert(H, p, rel->ap[j].p);
-          *nprimes += (H->hashcount[h] == 1); /* new ideal */
-          tmp[itmp++] = h;
-        }
+        if (p >= minpa)
+          {
+            *nprimes += (H->hashcount[h] == 1); /* new ideal */
+            tmp[itmp++] = h;
+          }
+      }
     tmp[itmp++] = -1;
     rel_compact[irel] = tmp;
 }
@@ -339,7 +352,7 @@ insertFreeRelation (int **rel_compact, int irel, int *nprimes,
 static int
 scan_relations (char **ficname, int *nprimes, hashtable_t *H,
                 bit_vector_srcptr rel_used, int nrelmax, int **rel_compact,
-		long minpr, long minpa, unsigned long *tot_alloc)
+		long minpr, long minpa, unsigned long *tot_alloc, int final)
 {
     *nprimes = 0;
 
@@ -365,10 +378,10 @@ scan_relations (char **ficname, int *nprimes, hashtable_t *H,
                 ASSERT_ALWAYS(rs->nrels <= nrelmax);
                 if (rs->rel.b > 0)
                   insertNormalRelation (rel_compact, irel, nprimes,
-                                       H, &(rs->rel), minpr, minpa, tot_alloc);
+                                H, &(rs->rel), minpr, minpa, tot_alloc, final);
                 else
                   insertFreeRelation (rel_compact, irel, nprimes,
-                                      H, &(rs->rel), minpr, minpa, tot_alloc);
+                                H, &(rs->rel), minpr, minpa, tot_alloc, final);
               }
             if (!relation_stream_disp_progress_now_p(rs))
               continue;
@@ -844,7 +857,8 @@ main (int argc, char **argv)
     int nrel_new, nprimes_new, Hsize, Hsizer, Hsizea;
     double excess = 1.01;    /* minimum initial excess */
     long keep = 160;    /* maximum final excess */
-    long minpr = -1, minpa = -1; /* -1 means use minpr=rlim, minpa=alim */
+    long minpr = -1, minpa = -1; /* negative values mean use minpr=rlim and
+                                    minpa=alim in first pass */
     cado_poly pol;
     unsigned long tot_alloc, tot_alloc0;
     int need64 = 0; /* non-zero if large primes are > 2^32 */
@@ -926,12 +940,11 @@ main (int argc, char **argv)
 
     minus2 = (need64) ? 18446744073709551614UL : 4294967294UL;
 
-    if (minpr == -1)
+    if (minpr < 0)
       minpr = pol->rat->lim;
-    if (minpa == -1)
+    if (minpa < 0)
       minpa = pol->alg->lim;
 
-    fprintf (stderr, "Using minpr=%ld minpa=%ld\n", minpr, minpa);
     fprintf (stderr, "Number of relations is %u\n", nrelmax);
     if (nprimes > 0)
 	Hsize = nprimes;
@@ -1005,12 +1018,13 @@ main (int argc, char **argv)
     nrel = nrelmax;
     while (1)
       {
-        final = minpr <= 0 && minpa <= 0;
+        final = minpr <= FINAL_BOUND && minpa <= FINAL_BOUND;
         tot_alloc = tot_alloc0;
 
-        fprintf (stderr, "Pass %d:\n", ++pass);
+        fprintf (stderr, "Pass %d, filtering ideals >= %ld on rat. side and "
+                 "%ld on alg. side:\n", ++pass, minpr, minpa);
         ret = scan_relations (fic, &nprimes, &H, rel_used, nrelmax,
-                              rel_compact, minpr, minpa, &tot_alloc);
+                              rel_compact, minpr, minpa, &tot_alloc, final);
         ASSERT (ret);
 
         fprintf (stderr, "   nrels=%d, nprimes=%d; excess=%d\n",
@@ -1019,9 +1033,8 @@ main (int argc, char **argv)
         fprintf (stderr, "   Starting singleton removal...\n");
         nrel_new = nrel;
         nprimes_new = nprimes;
-        /* if one pass only (minpa=minpr=0), usually the initial excess is
-           negative, but after a few steps of removing singletons, we get a
-           positive excess */
+        /* if one pass only, usually the initial excess is negative, but after
+           a few steps of removing singletons, we get a positive excess */
         if (final && (nrel_new < nprimes_new * excess) && pass >= 2)
           {
             fprintf (stderr, "Initial excess is below requested %ld, stopping.\n",
@@ -1047,7 +1060,7 @@ main (int argc, char **argv)
         if (final)
           break;
         else
-          minpr = minpa = 0;
+          minpr = minpa = FINAL_BOUND;
         hashClear (&H); /* Reset all tables to 0. FIXME: in the 2nd pass,
                            we might reuse some of the information computed
                            in the 1st pass (roots of primes, etc). */

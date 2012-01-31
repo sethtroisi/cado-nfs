@@ -51,7 +51,7 @@ gcc60 # ok
 gcc61 # ok
 # gcc62 Connection timed out
 gcc63 # ok
-gcc64 # compil ok, polyselect2 fails, can't load library 'libpolyselect_common.so' -> pb cmake? (same problem with egcc/eg++)
+gcc64 # ok with egcc 4.2.4 (GMP compiled with egcc too)
 gcc66 # ok
 gcc70 # coredump in dispatch -> bug in pthreads?
 # gcc100 Connection timed out
