@@ -244,7 +244,7 @@ insertNormalRelation (int **rel_compact, int irel,
                       unsigned long minpr, unsigned long minpa,
                       unsigned long *tot_alloc, int final)
 {
-    int *tmp = NULL, ltmp = 0, i, j;
+  int *tmp = NULL, ltmp = 0, i, j, h, ok;
 
     reduce_exponents_mod2 (rel);
 
@@ -265,13 +265,12 @@ insertNormalRelation (int **rel_compact, int irel,
        ensures there is no collision with algebraic primes */
     for (j = 0; j < rel->nb_rp; j++)
       {
-        int h;
-
-        if ((rel->rp[j].p >= minpr) || final)
+        ok = rel->rp[j].p >= minpr;
+        if (ok || final)
           /* in the final pass, we need to insert all ideals, since we need
              to renumber them in the output file */
           h = hashInsert (H, rel->rp[j].p, minus2);
-        if (rel->rp[j].p >= minpr)
+        if (ok)
           {
             *nprimes += (H->hashcount[h] == 1); /* new prime */
             tmp[i++] = h;
@@ -280,14 +279,13 @@ insertNormalRelation (int **rel_compact, int irel,
 
     for (j = 0; j < rel->nb_ap; j++)
       {
-        int h;
-
-        if ((rel->ap[j].p >= minpa) || final)
+        ok = rel->ap[j].p >= minpa;
+        if (ok || final)
           {
             rel->ap[j].r = findroot (rel->a, rel->b, rel->ap[j].p);
             h = hashInsert (H, rel->ap[j].p, rel->ap[j].r);
           }
-        if (rel->ap[j].p >= minpa)
+        if (ok)
           {
             *nprimes += (H->hashcount[h] == 1); /* new prime */
             tmp[i++] = h;
