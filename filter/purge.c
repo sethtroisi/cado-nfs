@@ -244,7 +244,7 @@ insertNormalRelation (int **rel_compact, int irel,
                       unsigned long minpr, unsigned long minpa,
                       unsigned long *tot_alloc, int final)
 {
-    int *tmp = NULL, ltmp = 0, i, j, h;
+    int *tmp = NULL, ltmp = 0, i, j;
 
     reduce_exponents_mod2 (rel);
 
@@ -265,6 +265,8 @@ insertNormalRelation (int **rel_compact, int irel,
        ensures there is no collision with algebraic primes */
     for (j = 0; j < rel->nb_rp; j++)
       {
+        int h;
+
         if ((rel->rp[j].p >= minpr) || final)
           /* in the final pass, we need to insert all ideals, since we need
              to renumber them in the output file */
@@ -278,6 +280,8 @@ insertNormalRelation (int **rel_compact, int irel,
 
     for (j = 0; j < rel->nb_ap; j++)
       {
+        int h;
+
         if ((rel->ap[j].p >= minpa) || final)
           {
             rel->ap[j].r = findroot (rel->a, rel->b, rel->ap[j].p);
