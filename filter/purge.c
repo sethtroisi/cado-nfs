@@ -285,11 +285,6 @@ insertNormalRelation (int **rel_compact, int irel,
           }
         if (rel->ap[j].p >= minpa)
           {
-            /* FIXME: instead of computing r = a/b mod p, we could
-               first search for a potential match (p,r) in the hash table,
-               then check that a = r*b mod b, and only compute a/b mod p
-               for new entries, thus trading a modular inverse by a modular
-               multiplication for all but the first occurrences of that ideal */
             *nprimes += (H->hashcount[h] == 1); /* new prime */
             tmp[i++] = h;
           }
