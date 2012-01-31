@@ -200,7 +200,7 @@ my @default_param = (
     skip         => -1, # should be about bwc_mn - 32
     keep         => -1, # should be 128 + skip
     excessratio  => 1.01,
-    keeppurge    => 160,
+    keeppurge    => 208, # should be 160 + #ideals <= FINAL_BOUND (cf purge.c)
     maxlevel     => 15,
     cwmax        => 200,
     rwmax        => 200,
