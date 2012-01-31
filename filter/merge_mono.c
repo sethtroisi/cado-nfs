@@ -1053,11 +1053,11 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
 {
     double totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;
     double bwcostmin = 0.0, oldbwcost = 0.0, bwcost = 0.0;
-    int old_nrows, old_ncols, m = 2, njrem = 0, ncost = 0, ncostmax, njproc;
+    int old_ncols, m = 2, njrem = 0, ncost = 0, ncostmax, njproc;
     int ni2rem;
     int *nb_merges;
 #ifndef USE_MARKOWITZ
-    int mmax = 0;
+    int mmax = 0, old_nrows;
 #else
     int32_t dj, j, mkz;
     int useMST = 1; /* non-zero if we use minimal spanning tree */
@@ -1078,9 +1078,9 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
 	    break;
 	}
 	oldbwcost = bwcost;
-	old_nrows = mat->rem_nrows;
 	old_ncols = mat->rem_ncols;
 #ifndef USE_MARKOWITZ
+	old_nrows = mat->rem_nrows;
 	m = minColWeight(mat);
 	if(m > mmax)
 	    mmax = m;
