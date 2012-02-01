@@ -70,6 +70,11 @@ if [[ -z $1 || $(expr $1 : '.*[s].*') != 0 ]]
     if [ ! -z "$file" ]
       then zgrep "time" $file | sed "s/^.*time \([^s]*\).*$/+\1/g" | tr "\n" " " | cut -c2- | bc | f
     fi
+    first=`ls ${name}.rels.*.gz | sed "s/^.*rels.\([0-9]*\)\-[0-9]*.gz$/\1/g" | sort -n | head -1`
+    last=`ls ${name}.rels.*.gz | sed "s/^.*.rels.[0-9]*-\([0-9]*\).gz$/\1/g" | sort -n | tail -1`
+    echo "   special-q range: ${first}-${last}"
+    echo -n "   # of sieve files: "
+    ls ${name}.rels.*.gz | wc -l
 fi
 
 
