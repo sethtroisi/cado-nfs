@@ -1257,7 +1257,7 @@ void estimate_nbits_sqrt(size_t * sbits, ab_source_ptr ab) // , int guess)
             s *= eval_points[i];
             s += double_coeffs[j] * j;
         }
-        evaluations[i] += 2 * clog(s);
+        evaluations[i] += 2 * creal(clog(s));
     }
     fprintf(stderr, "# [%2.2lf] Log_2(A)", WCT);
     for(int i = 0 ; i < rs ; i++) {
