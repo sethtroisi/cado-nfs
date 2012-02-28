@@ -1,0 +1,73 @@
+function BuildFactorBases(f, g, ba, br)
+/*
+    FBr := &cat[ SetToSequence(AllIrreduciblePolynomials(GF(2), d)) :
+       d in [1..br] ];
+    Sort(~FBr);
+*/
+    Ba := &cat[ SetToSequence(AllIrreduciblePolynomials(GF(2), d)) :
+       d in [1..ba] ];
+    Sort(~Ba);
+    FBa := [];
+    for p in Ba do
+        F2p := ext<GF(2) | p>;
+        PF2p := PolynomialRing(F2p);
+        x := PF2p.1;
+        fp := Evaluate(f, [x, PF2p!F2p.1]);
+        roo := Roots(fp);
+        for rr in roo do
+            Append(~FBa, [p, Parent(p)!Eltseq(rr[1])]);
+            if rr[2] ne 1 then return [], []; end if;
+        end for;
+    end for;
+    
+    Br := &cat[ SetToSequence(AllIrreduciblePolynomials(GF(2), d)) :
+       d in [1..br] ];
+    Sort(~Br);
+    FBr := [];
+    for p in Br do
+        F2p := ext<GF(2) | p>;
+        PF2p := PolynomialRing(F2p);
+        x := PF2p.1;
+        fp := Evaluate(f, [x, PF2p!F2p.1]);
+        roo := Roots(fp);
+        for rr in roo do
+            Append(~FBr, [p, Parent(p)!Eltseq(rr[1])]);
+            if rr[2] ne 1 then return [], []; end if;
+        end for;
+    end for;
+
+    return FBa, FBr;
+end function;
+
+function UP2Int(f)
+    return Seqint([Integers()!x : x in Eltseq(f)], 2);
+end function;
+
+ba := 8;
+br := 8;
+UP<t> := PolynomialRing(GF(2));
+MP<x,t> := PolynomialRing(GF(2), 2);
+F := x^5 + x*t + x + t^2;
+G :=  x*t^25 + x*t^24 + x*t^22 + x*t^20 + x*t^19 + x*t^15 + x*t^14 + x*t^13 + x*t^12 + x*t^11 + x*t^10 + x*t^9 + x*t^7 + x*t^5 + x*t^2 + x*t + x + t^26 + t^21 + t^18 + t^16 + t^15 + t^13 + t^10 + t^9 + t^8 + t^7 + t^6;
+
+FBa, FBr := BuildFactorBases(F, G, ba, br);
+
+fil := Open("Aroots", "w");
+for p in FBa do
+    str1 := IntegerToString(UP2Int(p[1]), 16);
+    str2 := IntegerToString(UP2Int(p[2]), 16);
+    fprintf fil, "%o: %o\n", str1, str2;
+end for;
+delete fil;
+
+fil := Open("Rroots", "w");
+for p in FBr do
+    str1 := IntegerToString(UP2Int(p[1]), 16);
+    str2 := IntegerToString(UP2Int(p[2]), 16);
+    fprintf fil, "%o: %o\n", str1, str2;
+end for;
+delete fil;
+
+
+
+
