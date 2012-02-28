@@ -87,9 +87,9 @@ void fppol_mul(fppol_ptr r, fppol_srcptr p, fppol_srcptr q)
 #define __DEF_FPPOL_MUL_xxxyy(sp, sq)                                    \
   void fppol_mul_##sp##x##sq(fppol_ptr          r,                       \
                              fppol##sp##_srcptr p, fppol##sq##_srcptr q) \
-  { CAT(CAT(fppol,  __MUL_SIZE(sp, sq)), _t) t;                          \
-    CAT(CAT(fppol,  __MUL_SIZE(sp, sq)), _mul_##sp##x##sq)(t, p, q);     \
-    CAT(fppol_set_, __MUL_SIZE(sp, sq))(r, t); }
+  { CAT(CAT(fppol,  __MUL_SIZE(sp, sq, )), _t) t;                        \
+    CAT(CAT(fppol,  __MUL_SIZE(sp, sq, )), _mul_##sp##x##sq)(t, p, q);   \
+    CAT(fppol_set_, __MUL_SIZE(sp, sq, ))(r, t); }
 
 
 // Multiplication of 64 x <sq>-term polynomials.

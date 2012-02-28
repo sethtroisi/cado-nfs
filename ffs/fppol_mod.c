@@ -27,6 +27,26 @@
   }
 
 
+// Modular multiplication.
+// /!\ Assume that m is monic and that p is reduced modulo m.
+#define __DEF_FPPOLxx_MULMOD(sz)                                            \
+  void fppol##sz##_mulmod(fppol##sz##_ptr    r, fppol##sz##_srcptr p,       \
+                          fppol##sz##_srcptr q, fppol##sz##_srcptr m)       \
+  {                                                                         \
+    IF(sz, EMPTY,                                                           \
+       fppol_mul(r, p, q);                                                  \
+       fppol_rem(r, r, m);                                                  \
+    ,                                                                       \
+       CAT(CAT(fppol, __MUL_SIZE(sz, sz, )), _t)              rr;           \
+       CAT(CAT(fppol, __MUL_SIZE(sz, sz, )), _t)              mm;           \
+       CAT(CAT(fppol, __MUL_SIZE(sz, sz, )), _mul_##sz##x##sz)(rr, p, q);   \
+       CAT(CAT(fppol, __MUL_SIZE(sz, sz, )), _set_##sz)       (mm, m);      \
+       CAT(CAT(fppol, __MUL_SIZE(sz, sz, )), _rem)            (rr, rr, mm); \
+       CAT(fppol##sz##_set_, __MUL_SIZE(sz, sz, mp))          (r, rr);      \
+    )                                                                       \
+  }
+
+
 // Modular inverse.
 // Return a boolean, telling whether the inverse exists or not.
 // /!\ Assume that m is monic and that p is reduced modulo m.
@@ -104,6 +124,7 @@
 // All declarations bundled up into a single macro.
 #define __DEF_FPPOLxx_MOD_ALL(sz) \
         __DEF_FPPOLxx_SHL1MOD(sz) \
+        __DEF_FPPOLxx_MULMOD (sz) \
         __DEF_FPPOLxx_INVMOD (sz)
 
 __DEF_FPPOLxx_MOD_ALL(16)
@@ -115,48 +136,3 @@ __DEF_FPPOLxx_MOD_ALL()
 #undef __DEF_FPPOLxx_MULMOD
 #undef __DEF_FPPOLxx_INVMOD
 #undef __DEF_FPPOLxx_MOD_ALL
-
-
-// r = p mod q
-// Specific to charac 2.
-void fppol32_mod_64(fppol32_ptr r, fppol64_srcptr p, fppol32_srcptr q)
-{
-    ASSERT_ALWAYS(FP_CHAR == 2);
-    int degq = fppol32_deg(q);
-    uint64_t mask = ((uint64_t)1U)<<63;
-    uint64_t pp = p[0];
-    uint64_t qq = ((uint64_t)q[0]) << (63-degq);
-    for (int i = 63; i >= degq; --i) {
-        pp ^= (pp & mask) ? qq : 0;
-        mask >>= 1;
-        qq >>= 1;
-    }
-    r[0] = pp;
-}
-
-// r = p*q mod m
-void fppol32_mulmod(fppol32_ptr r, fppol32_srcptr p, fppol32_srcptr q,
-        fppol32_srcptr m)
-{
-    fppol64_t rr;
-    fppol64_mul_32x32(rr, p, q);
-    fppol32_mod_64(r, rr, m);
-}
-
-
-void fppol64_mulmod(fppol64_ptr r, fppol64_srcptr p, fppol64_srcptr q,
-                fppol64_srcptr m)
-{
-    fppol_t pp, mm;
-    fppol_init(pp);
-    fppol_init(mm);
-
-    fppol_set_64(pp, p);
-    fppol_set_64(mm, m);
-    fppol_mul_64(pp, pp, q);
-    fppol_rem(pp, pp, mm);
-    fppol64_set_mp(r, pp);
-    
-    fppol_clear(pp);
-    fppol_clear(mm);
-}

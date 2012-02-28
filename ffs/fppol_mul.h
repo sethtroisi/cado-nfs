@@ -18,7 +18,7 @@
 #define __MUL_16x16_SIZE ,  32
 #define __MUL_32x16_SIZE ,  64
 #define __MUL_32x32_SIZE ,  64
-#define __MUL_SIZE(sp, sq) SWITCH(MUL_##sp##x##sq, SIZE, 128)
+#define __MUL_SIZE(sp, sq, else) SWITCH(MUL_##sp##x##sq, SIZE, else)
 
 
 
