@@ -5,13 +5,7 @@
 #include "utils.h"
 #include "merge_opts.h"
 #include "sparse.h"
-#ifndef USE_MARKOWITZ
-# include "dclist.h"
-#endif
 #include "filter_matrix.h"
-#ifndef USE_MARKOWITZ
-# include "swar.h"
-#endif
 
 #define DEBUG 0
 
@@ -109,29 +103,13 @@ fillmat (filter_matrix_t *mat)
     for(j = jmin; j < jmax; j++){
         wj = mat->wt[GETJ(mat, j)];
 	if (wj <= mat->cwmax){
-#ifndef USE_MARKOWITZ
-            mat->A[GETJ(mat, j)] = dclistInsert(mat->S[wj], j);
-#endif
-#ifndef USE_COMPACT_R
 	    Rj = (int32_t *) malloc((wj + 1) * sizeof(int32_t));
 	    Rj[0] = 0; /* last index used */
 	    mat->R[GETJ(mat, j)] = Rj;
-#else
-	    fprintf(stderr, "R: NYI in fillSWAR\n");
-	    exit(1);
-#endif
 	}
 	else{ /* weight is larger than cwmax */
 	    mat->wt[GETJ(mat, j)] = -mat->wt[GETJ(mat, j)]; // trick!!!
-#ifndef USE_MARKOWITZ
-	    mat->A[GETJ(mat, j)] = NULL; // TODO: renumber j's?????
-#endif
-#ifndef USE_COMPACT_R
 	    mat->R[GETJ(mat, j)] = NULL;
-#else
-            fprintf(stderr, "R: NYI2 in fillSWAR\n");
-            exit(1);
-#endif
 	}
     }
 }
@@ -230,13 +208,8 @@ filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
                     } else {
                         buf[ibuf++] = j;
                         if(mat->wt[GETJ(mat, j)] > 0){ // redundant test?
-#ifndef USE_COMPACT_R
                             mat->R[GETJ(mat, j)][0]++;
                             mat->R[GETJ(mat, j)][mat->R[GETJ(mat, j)][0]] = i;
-#else
-                            fprintf(stderr, "R: NYI in readmat\n");
-                            exit(1);
-#endif
                         }
                     }
                 }
@@ -274,10 +247,6 @@ filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
     // we need to keep informed of what really happens; this will be an upper
     // bound on the number of active columns, I guess
     mat->rem_ncols = mat->ncols;
-#ifndef USE_MARKOWITZ
-    if (verbose)
-        printStatsSWAR (mat);
-#endif
     free (buf);
     if (tooheavy != NULL)
         free (tooheavy);
@@ -300,13 +269,8 @@ destroyRow(filter_matrix_t *mat, int i)
 void
 freeRj(filter_matrix_t *mat, int j)
 {
-#ifndef USE_COMPACT_R
     free(mat->R[GETJ(mat, j)]);
     mat->R[GETJ(mat, j)] = NULL;
-#else
-    fprintf(stderr, "R: NYI in freeRj\n");
-    exit(1);
-#endif
 }
 
 // Don't touch to R[j][0]!!!!
@@ -316,7 +280,6 @@ remove_i_from_Rj(filter_matrix_t *mat, int i, int j)
     // be dumb for a while
     int k;
 
-#ifndef USE_COMPACT_R
     if(mat->R[GETJ(mat, j)] == NULL){
 	fprintf(stderr, "Row %d already empty\n", j);
 	return;
@@ -329,10 +292,6 @@ remove_i_from_Rj(filter_matrix_t *mat, int i, int j)
 	    mat->R[GETJ(mat, j)][k] = -1;
 	    break;
 	}
-#else
-    fprintf(stderr, "R: NYI in remove_i_from_Rj\n");
-    exit(1);
-#endif
 }
 
 // cell M[i, j] is incorporated in the data structure. It is used
@@ -346,7 +305,6 @@ add_i_to_Rj(filter_matrix_t *mat, int i, int j)
 #if DEBUG >= 1
     fprintf(stderr, "Adding row %d to R[%d]\n", i, j);
 #endif
-#ifndef USE_COMPACT_R
     for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
 	if(mat->R[GETJ(mat, j)][k] == -1)
 	    break;
@@ -363,10 +321,6 @@ add_i_to_Rj(filter_matrix_t *mat, int i, int j)
 	mat->R[GETJ(mat, j)][l-1] = i;
 	mat->R[GETJ(mat, j)][0] = l-1;
     }
-#else
-    fprintf(stderr, "R: NYI in add_i_to_Rj\n");
-    exit(1);
-#endif
 }
 
 // Remove j from R[i] and crunch R[i].

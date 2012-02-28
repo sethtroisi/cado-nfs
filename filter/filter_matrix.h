@@ -38,16 +38,6 @@ typedef struct {
                             1 <= k <= R[j][0], for weight(j) <= cwmax.
                         R[j][k] = -1 if the corresponding row has been deleted.
                         R[j]=NULL for weight(j) > cwmax. */
-#ifndef USE_MARKOWITZ
-  dclist *S;         /* S[w] is a doubly-chained list with columns of weight w,
-                        for w <= cwmax. For technical reasons (to avoid NULL
-                        arguments that we can't modify), S[w] always contains
-                        a first cell with value -1, thus the real list is
-                        S[w]->next. */
-  dclist *A;         /* A[j] points to the unique cell in S[w] containing j,
-                        where w = weight(j), for w <= cwmax. A[j]=NULL for
-                        w > cwmax. */
-#else
   int32_t *MKZQ;         /* priority queue for Markowitz stuff */    
   int32_t *MKZA;         /* MKZA[j] gives u s.t. MKZQ[2*u] = j and
                             MKZQ[2*u+1] is the Markowitz cost of column j,
@@ -55,7 +45,6 @@ typedef struct {
                             (either too heavy initially or deleted) */
   int wmstmax;
   int mkztype;       /* which type of count */
-#endif
   int itermax;       /* used for performing some sampling */
 } filter_matrix_t;
 

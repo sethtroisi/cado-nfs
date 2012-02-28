@@ -71,7 +71,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 
 #define MAX_FILES 1000000
 #define MAX_STEPS 10   /* maximal number of steps in each pass */
-#define FINAL_BOUND 50 /* final bound for rational and algebraic ideals */
+#define FINAL_BOUND 0  /* final bound for rational and algebraic ideals */
 
 /********************** own memory allocation routines ***********************/
 

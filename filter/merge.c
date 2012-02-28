@@ -33,14 +33,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 
 #include "utils.h" /* for gzip_open */
 
-#include "merge_opts.h" /* for USE_MARKOWITZ */
+#include "merge_opts.h"
 #include "filter_matrix.h" /* for filter_matrix_t */
 #include "report.h"     /* for report_t */
-#ifndef USE_MARKOWITZ
-# include "swar.h"      /* for initSWAR */
-#else
-# include "markowitz.h" /* for MkzInit */
-#endif
+#include "markowitz.h" /* for MkzInit */
 #include "merge_mono.h" /* for mergeOneByOne */
 
 #ifdef USE_MPI
@@ -98,10 +94,8 @@ main (int argc, char *argv[])
     double ratio = RATIO_DEFAULT; /* bound on cN_new/cN to stop the merge */
     int i, forbw = FORBW_DEFAULT;
     double coverNmax = COVERNMAX_DEFAULT;
-#ifdef USE_MARKOWITZ
     int wmstmax = 7; /* use real MST minimum for wt[j] <= wmstmax */
     int mkztype = 1; /* pure Markowitz */
-#endif
     int itermax = 0;
 
     /* print comand-line arguments */
@@ -171,7 +165,6 @@ main (int argc, char *argv[])
 	    argc -= 2;
 	    argv += 2;
 	}
-#ifdef USE_MARKOWITZ
 	else if (argc > 2 && strcmp (argv[1], "-wmstmax") == 0){
 	    wmstmax = atoi(argv[2]);
 	    argc -= 2;
@@ -182,7 +175,6 @@ main (int argc, char *argv[])
 	    argc -= 2;
 	    argv += 2;
 	}
-#endif
 	/* -itermax can be used with -resume, for example:
 	   merge -itermax 1000 -out his.tmp
            merge -resume his.tmp -out his.final */
@@ -240,12 +232,6 @@ main (int argc, char *argv[])
       free (nbm);
     }
 
-#ifndef USE_MARKOWITZ
-    fprintf (stderr, "SWAR version\n");
-    initSWAR (mat);
-#else
-    fprintf(stderr, "Markowitz version (strategy %d)\n", M_STRATEGY);
-#endif
     fillmat (mat);
 
     tt = wct_seconds ();
@@ -261,34 +247,20 @@ main (int argc, char *argv[])
     if (resumename != NULL)
       resume (rep, mat, resumename);
 
-#ifdef USE_MARKOWITZ
     mat->wmstmax = wmstmax;
     mat->mkztype = mkztype;
     tt = seconds();
     MkzInit (mat);
     fprintf (stderr, "Time for MkzInit: %2.2lf\n", seconds()-tt);
-#endif
 
-#if M_STRATEGY <= 2
-# ifdef USE_MARKOWITZ
-    fprintf(stderr, "merge NYI for Markowitz\n");
-    return 1;
-# endif
-    merge (mat, maxlevel, verbose, forbw);
-#else
     mergeOneByOne (rep, mat, maxlevel, verbose, forbw, ratio, coverNmax);
-#endif /* M_STRATEGY <= 2 */
 
     gzip_close (rep->outfile, outname);
     fprintf (stderr, "Final matrix has N=%d nc=%d (%d) w(M)=%lu N*w(M)=%"
 	     PRIu64"\n", mat->rem_nrows, mat->rem_ncols,
 	     mat->rem_nrows - mat->rem_ncols, mat->weight,
 	    (uint64_t) mat->rem_nrows * (uint64_t) mat->weight);
-#ifndef USE_MARKOWITZ
-    closeSWAR (mat);
-#else
     MkzClose (mat);
-#endif
     clearMat (mat);
 
     fprintf (stderr, "Total merge time: %1.0f seconds\n", seconds ());

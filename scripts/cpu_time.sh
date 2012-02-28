@@ -103,7 +103,7 @@ if [[ -z $1 || $(expr $1 : '.*[f].*') != 0 ]]
     echo -n "CPU time for replay:    "
     if [ ! -f ${name}.replay.log ] 2> /dev/null
       then echo "replay file was not found"
-      else grep "Total time" ${name}.replay.log | sed "s/^.*time: \([^s]*\).*$/\1/g" | f
+      else grep "Total usage" ${name}.replay.log | sed "s/^.*time \([^s]*\).*$/\1/g" | f
     fi
 fi
 

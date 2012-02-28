@@ -3,8 +3,6 @@
 
 #include "merge_opts.h"
 
-#ifdef USE_MARKOWITZ
-
 #include "sparse.h"
 #include "dclist.h"
 #include "filter_matrix.h"
@@ -556,5 +554,3 @@ MkzDeleteHeavyColumns(report_t *rep MAYBE_UNUSED, filter_matrix_t *mat MAYBE_UNU
     return njmax;
 #endif
 }
-
-#endif /* USE_MARKOWITZ */

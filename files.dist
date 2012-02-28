@@ -110,8 +110,6 @@ macros.h
 filter/CMakeLists.txt
 filter/explain.c
 filter/Makefile
-filter/dclist.c
-filter/dclist.h
 filter/dup1.c
 filter/dup2.c
 filter/markowitz.c
@@ -131,8 +129,6 @@ filter/sparse.c
 filter/sparse.h
 filter/filter_matrix.c
 filter/filter_matrix.h
-filter/swar.c
-filter/swar.h
 params/mach_desc
 params/params.c59
 params/params.c61
