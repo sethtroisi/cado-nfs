@@ -1,4 +1,5 @@
 #include "fppol_mod.h"
+#include "fppol_internal.h"
 #include "macros.h"
 
 
@@ -52,72 +53,74 @@
 // /!\ Assume that m is monic and that p is reduced modulo m.
 // TODO: if need be, in the case where the inverse does not exist, r
 // could be set to a strict factor of q (or 0 if p = 0).
-#define __DEF_FPPOLxx_INVMOD(sz)                                        \
-  int fppol##sz##_invmod(fppol##sz##_ptr    r, fppol##sz##_srcptr p,    \
-                         fppol##sz##_srcptr m)                          \
-  {                                                                     \
-    /* We will see later if these requirements are a burden to       */ \
-    /* the caller or not.                                            */ \
-    ASSERT_ALWAYS(fppol##sz##_is_monic(m));                             \
-    ASSERT_ALWAYS(fppol##sz##_deg(p) < fppol##sz##_deg(m));             \
-    /* Right now, we never bother with non-monic polynomials         */ \
-    /* Let's assert that we are in characteristic 2.                 */ \
-    /* TODO: implement for characteristic 3.                         */ \
-    ASSERT_ALWAYS(FP_CHAR == 2);                                        \
-                                                                        \
-    /* Let's be deterministic and fix 1/0 = 0. */                       \
-    if (UNLIKELY(fppol##sz##_is_zero(p))) {                             \
-      fppol##sz##_set_zero(r);                                          \
-      return 0;                                                         \
-    }                                                                   \
-                                                                        \
-    fppol##sz##_t a, b, c, v, vp, nv;                                   \
-    IF(sz, EMPTY, fppol_inits(a, b, c, v, vp, nv, NULL);, )             \
-                                                                        \
-    /* Euclide-reduce (a,b) and maintain the following:              */ \
-    /*   u *m +  v*p = a    <- not computed!                         */ \
-    /*   up*m + vp*p = b                                             */ \
-    fppol##sz##_set(a, m);                                              \
-    fppol##sz##_set(b, p);                                              \
-    fppol##sz##_set_zero(v);                                            \
-    fppol##sz##_set_one(vp);                                            \
-    for (int dega = fppol##sz##_deg(a), degb = fppol##sz##_deg(b); ;) { \
-      for (int d; (d = dega-degb) >= 0; ) {                             \
-        fppol##sz##_shl(c, b, d); /* TODO: make monic. */               \
-        fppol##sz##_sub(c, a, c);                                       \
-        fppol##sz##_set(a, b);                                          \
-        fppol##sz##_set(b, c);                                          \
-        dega = degb;                                                    \
-        degb = fppol##sz##_deg(b);                                      \
-                                                                        \
-        fppol##sz##_shl(nv, vp, d);                                     \
-        fppol##sz##_sub(nv, v,  nv);                                    \
-        fppol##sz##_set(v,  vp);                                        \
-        fppol##sz##_set(vp, nv);                                        \
-                                                                        \
-        if (degb <= 0) {                                                \
-          fppol##sz##_set(r, vp);                                       \
-          IF(sz, EMPTY, fppol_clears(a, b, c, v, vp, nv, NULL);, )      \
-          return !degb;                                                 \
-        }                                                               \
-      }                                                                 \
-                                                                        \
-      for (int d; (d = dega-degb) <= 0; ) {                             \
-        fppol##sz##_shl(c, a, -d); /* TODO: make monic. */              \
-        fppol##sz##_sub(b, b,  c);                                      \
-        degb = fppol##sz##_deg(b);                                      \
-                                                                        \
-        fppol##sz##_shl(nv, v,  -d);                                    \
-        fppol##sz##_sub(vp, vp, nv);                                    \
-                                                                        \
-        if (degb <= 0) {                                                \
-          fppol##sz##_set(r, vp);                                       \
-          IF(sz, EMPTY, fppol_clears(a, b, c, v, vp, nv, NULL);, )      \
-          return !degb;                                                 \
-        }                                                               \
-      }                                                                 \
-    }                                                                   \
-    ASSERT_ALWAYS(0); /* Should never go there. */                      \
+#define __DEF_FPPOLxx_INVMOD(sz)                                     \
+  int fppol##sz##_invmod(fppol##sz##_ptr    r, fppol##sz##_srcptr p, \
+                         fppol##sz##_srcptr m)                       \
+  {                                                                  \
+    /* We will see later if these requirements are a burden to    */ \
+    /* the caller or not.                                         */ \
+    ASSERT_ALWAYS(fppol##sz##_is_monic(m));                          \
+    ASSERT_ALWAYS(fppol##sz##_deg(p) < fppol##sz##_deg(m));          \
+                                                                     \
+    /* Let's be deterministic and fix 1/0 = 0. */                    \
+    if (UNLIKELY(fppol##sz##_is_zero(p))) {                          \
+      fppol##sz##_set_zero(r);                                       \
+      return 0;                                                      \
+    }                                                                \
+                                                                     \
+    fppol##sz##_t r0, r1, v0, v1, t;                                 \
+    IF(sz, EMPTY, fppol_inits(r0, r1, v0, v1, t, NULL);, )           \
+                                                                     \
+    /* Euclid-reduce (r0, r1) and maintain the following:         */ \
+    /*   u0*m + v0*p = r0   (u0, u1 not computed!)                */ \
+    /*   u1*m + v1*p = r1                                         */ \
+    fppol##sz##_set(r0, m);                                          \
+    fppol##sz##_set(r1, p);                                          \
+    fppol##sz##_set_zero(v0);                                        \
+    fppol##sz##_set_one (v1);                                        \
+    int d0 = fppol##sz##_deg(r0);                                    \
+    int d1 = fppol##sz##_deg(r1);                                    \
+    IF(CMP(FP_SIZE, 2), EQ, ,                                        \
+       fp_t lc0; fp_t lc1; fp_t lc;                                  \
+       fppol##sz##_get_coeff(lc0, r0, d0);                           \
+       fppol##sz##_get_coeff(lc1, r1, d1);                           \
+    )                                                                \
+    for (int d = d0 - d1; ; ) {                                      \
+      fppol##sz##_shl(t, r1, d);                                     \
+      IF(CMP(FP_SIZE, 2), EQ, ,                                      \
+         fp_div(lc, lc0, lc1);                                       \
+         fppol##sz##_smul(t, t, lc);                                 \
+      )                                                              \
+      fppol##sz##_sub(r0, r0, t);                                    \
+      fppol##sz##_shl(t, v1, d);                                     \
+      IF(CMP(FP_SIZE, 2), EQ, ,                                      \
+         fppol##sz##_smul(t, t, lc);                                 \
+      )                                                              \
+      fppol##sz##_sub(v0, v0, t);                                    \
+      d0 = fppol##sz##_deg(r0);                                      \
+      IF(CMP(FP_SIZE, 2), EQ, ,                                      \
+         if (d0 >= 0) fppol##sz##_get_coeff(lc0, r0, d0);            \
+      )                                                              \
+                                                                     \
+      if (d0 <= 0) {                                                 \
+        IF(CMP(FP_SIZE, 2), EQ,                                      \
+           fppol##sz##_set (r, v0);,                                 \
+           fppol##sz##_sdiv(r, v0, lc0);                             \
+        )                                                            \
+        IF(sz, EMPTY, fppol_clears(r0, r1, v0, v1, t, NULL);, )      \
+        return !d0;                                                  \
+      }                                                              \
+                                                                     \
+      d = d0 - d1;                                                   \
+      if (d <= 0) {                                                  \
+        __fppol##sz##_swap(r0, r1);                                  \
+        __fppol##sz##_swap(v0, v1);                                  \
+        IF(CMP(FP_SIZE, 2), EQ, , __fp_swap(lc0, lc1);)              \
+        int dt = d0; d0 = d1; d1 = dt;                               \
+        d = -d;                                                      \
+      }                                                              \
+    }                                                                \
+    ASSERT_ALWAYS(0); /* Should never go there. */                   \
   }
 
 

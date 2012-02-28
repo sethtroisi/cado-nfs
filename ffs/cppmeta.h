@@ -41,6 +41,7 @@
 // Useful conditions.
 #define ___EMPTY       ,
 
+#define __CMP_2_2_EQ   ,
 #define __CMP_16_16_EQ ,
 #define __CMP_32_32_EQ ,
 #define __CMP_64_64_EQ ,
