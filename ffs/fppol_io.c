@@ -103,7 +103,7 @@ static const unsigned char __digit_val[] = {
   {                                                   \
     static __thread char buf[__FP_BITS*(sz>>2)+1];    \
     fppol##sz##_get_str(buf, p);                      \
-    fprintf(f, "%s", buf);                            \
+    fprintf(f == NULL ? stdout : f, "%s", buf);       \
   }
 
 
@@ -115,6 +115,7 @@ static const unsigned char __digit_val[] = {
     static __thread char buf[__FP_BITS*(sz>>2)+1];              \
     int c;                                                      \
     unsigned n;                                                 \
+    if (f == NULL) f = stdin;                                   \
     for (; isspace(c = getc(f)); );                             \
     if (c == EOF) return 0;                                     \
     for (; c == '0'; c = getc(f));                              \
