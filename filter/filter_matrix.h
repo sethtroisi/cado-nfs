@@ -2,7 +2,6 @@
 #define SPARSE_MAT_H_
 
 #include "purgedfile.h"
-#include "dclist.h"
 
 #define USE_TAB 1 // 1 for compact rows...
 
