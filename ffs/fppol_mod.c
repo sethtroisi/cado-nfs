@@ -41,10 +41,12 @@
     ,                                                                       \
        CAT(CAT(fppol, __MUL_SIZE(sz, sz, )), _t)              rr;           \
        CAT(CAT(fppol, __MUL_SIZE(sz, sz, )), _t)              mm;           \
+       IF(__MUL_SIZE(sz, sz, ), EMPTY, fppol_inits(rr, mm, NULL);, )        \
        CAT(CAT(fppol, __MUL_SIZE(sz, sz, )), _mul_##sz##x##sz)(rr, p, q);   \
        CAT(CAT(fppol, __MUL_SIZE(sz, sz, )), _set_##sz)       (mm, m);      \
        CAT(CAT(fppol, __MUL_SIZE(sz, sz, )), _rem)            (rr, rr, mm); \
        CAT(fppol##sz##_set_, __MUL_SIZE(sz, sz, mp))          (r, rr);      \
+       IF(__MUL_SIZE(sz, sz, ), EMPTY, fppol_clears(rr, mm, NULL);, )       \
     )                                                                       \
   }
 

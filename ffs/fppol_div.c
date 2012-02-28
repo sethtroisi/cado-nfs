@@ -68,6 +68,7 @@
       fppol##sz##_sub(rr, rr, tmp);                                        \
       degr = fppol##sz##_deg(rr);                                          \
     }                                                                      \
+    IF(sz, EMPTY, fppol_clear(tmp);, )                                     \
                                                                            \
     /* If input were aliases, do the final copy. */                        \
     if (q == a || q == b) {                                                \
