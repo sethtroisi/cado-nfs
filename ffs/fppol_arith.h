@@ -2,8 +2,8 @@
 // order.
 #include "fppol.h"
 
-#ifndef __FPPOL_ARTIH_H__
-#define __FPPOL_ARTIH_H__
+#ifndef __FPPOL_ARITH_H__
+#define __FPPOL_ARITH_H__
 
 #include "macros.h"
 
@@ -404,4 +404,4 @@ static inline
 int fppol_deg(fppol_srcptr p)
 { return p->deg; }
 
-#endif  /* __FPPOL_ARTIH_H__ */
+#endif  /* __FPPOL_ARITH_H__ */
