@@ -3,6 +3,7 @@
 #include <ctype.h>
 
 #include "fppol_io.h"
+#include "fppol_internal.h"
 
 
 
@@ -144,3 +145,81 @@ __DEF_FPPOLxx_IO_ALL(64)
 #undef __DEF_FPPOLxx_OUT
 #undef __DEF_FPPOLxx_INP
 #undef __DEF_FPPOLxx_IO_ALL
+
+
+
+/* Multiprecision polynomials.
+ *****************************************************************************/
+
+// Conversion to string.
+char *fppol_get_str(char *str, fppol_srcptr p)
+{
+  static __thread char buf[__FP_BITS*16+1];
+  int      d = fppol_deg(p);
+  unsigned l = d < 0 ? 1 : (__FP_BITS*(d+1)+3)>>2, ll;
+  if (str == NULL) str = malloc(l+1);
+  memset(str, '0', l); str[l] = '\0';
+  for (int k = 0; k <= d>>6; ++k, l -= __FP_BITS*16) {
+    fppol64_get_str(buf, p->limb[k]);
+    ll = strlen(buf);
+    memcpy(str+l-ll, buf, ll);
+  }
+  return str;
+}
+
+
+// Conversion from string.
+// Return 1 if successful.
+int fppol_set_str(fppol_ptr r, const char *str)
+{
+  static __thread char buf[__FP_BITS*16+1];
+  unsigned n        = 0;
+  buf[__FP_BITS*16] = '\0';
+  __fppol_realloc_lazy(r, (strlen(str)*4+__FP_BITS-1) / __FP_BITS);
+  for (unsigned i = strlen(str), j; i; ) {
+    for (j = __FP_BITS*16; i && j; ) {
+      if (isspace(str[--i])) continue;
+      buf[--j] = str[i];
+    }
+    if (j < __FP_BITS*16) {
+      if (!fppol64_set_str(r->limb[n++], buf+j))
+        return 0;
+    }
+  }
+  r->deg = (n<<6) - 1;
+  __fppol_update_degree(r);
+  return 1;
+}
+
+
+// Output to stream.
+void fppol_out(FILE *f, fppol_srcptr p)
+{
+  char *buf = fppol_get_str(NULL, p);
+  fprintf(f == NULL ? stdout : f, "%s", buf);
+  free(buf);
+}
+
+
+// Input from stream.
+// Return 1 if successful.
+int fppol_inp(fppol_ptr r, FILE *f)
+{
+  unsigned  alloc = __FP_SIZE*16, n;
+  char     *buf;
+  int       c;
+  if (f == NULL) f = stdin;
+  for (; isspace(c = getc(f)); );
+  if (c == EOF || __digit_val[c] > 0xf) return 0;
+  buf = malloc(alloc+1);
+  for (; c == '0'; c = getc(f));
+  for (n = 0; c != EOF && __digit_val[c] <= 0xf; c = getc(f)) {
+    if (n >= alloc) buf = realloc(buf, (alloc *= 2) + 1);
+    buf[n++] = (char)c;
+  }
+  ungetc(c, f);
+  buf[n] = '\0';
+  int rc = fppol_set_str(r, buf);
+  free(buf);
+  return rc;
+}

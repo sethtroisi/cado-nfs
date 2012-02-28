@@ -159,7 +159,6 @@ int main(int argc, char **argv)
   fppol64_sub(r, p, q);
   printf("p - q  = "); fppol64_out(stdout, r); printf("\n");
 
-#ifdef USE_F2
   if (fppol64_deg(p) < fppol64_deg(q)) {
     fppol64_shl1mod(r, p, q);
     printf("p*t mod q  = "); 
@@ -174,17 +173,10 @@ int main(int argc, char **argv)
       printf("N/A\n");
     else {
       fppol64_out(stdout, r); printf("\n");
-      // remultiply by p to check inverse.
-      fppol32_t pp, qq, rr, ss;
-      fppol32_set_64(rr, r);
-      fppol32_set_64(pp, p);
-      fppol32_set_64(qq, q);
-      fppol32_mulmod(ss, pp, rr, qq);
-      printf("mulmod o invmod = "); fppol32_out(stdout, ss);
-      printf("\n");
+      fppol64_mulmod(s, p, r, q);
+      printf("mulmod o invmod = "); fppol64_out(stdout, s); printf("\n");
     }
   }
-#endif
 
   __FP_MUL_128_64x64(r, s, p, q, );
   printf("p * q  = ");
@@ -206,103 +198,62 @@ int main(int argc, char **argv)
   }
 
   fppol_t mp, mq, mr, ms, ma, mb;
-  fppol_init(mp); fppol_set_64(mp, p);
-  fppol_init(mq); fppol_set_64(mq, q);
+  fppol_init(mp);
+  fppol_init(mq);
   fppol_init(mr);
   fppol_init(ms);
   fppol_init(ma);
   fppol_init(mb);
 
+  ret = fppol_set_str(mp, *++argv);
+  if (!ret) {
+      fprintf(stderr, "p is not valid\n");
+      exit(EXIT_FAILURE);
+  }
+  ret = fppol_set_str(mq, *++argv);
+  if (!ret) {
+      fprintf(stderr, "q is not valid\n");
+      exit(EXIT_FAILURE);
+  }
+
   printf("deg(p) = %d\n", fppol_deg(mp));
   printf("deg(q) = %d\n", fppol_deg(mq));
   fppol_add(mr, mp, mq);
-  printf("p + q  = "); fppol64_out(stdout, mr->limb[0]); printf(" [%d]\n", fppol_deg(mr));
+  printf("p + q  = "); fppol_out(stdout, mr); printf(" [%d]\n", fppol_deg(mr));
   fppol_sub(mr, mp, mq);
-  printf("p - q  = "); fppol64_out(stdout, mr->limb[0]); printf(" [%d]\n", fppol_deg(mr));
-
+  printf("p - q  = "); fppol_out(stdout, mr); printf(" [%d]\n", fppol_deg(mr));
   fppol_mul(ms, mp, mq);
-  printf("p * q  = ");
-  for (int i = ms->deg>>6; i >= 0; --i)
-  { fppol64_out(stdout, ms->limb[i]); printf(" "); }
-  printf("[%d]\n", fppol_deg(ms));
-
+  printf("p * q  = "); fppol_out(stdout, ms); printf(" [%d]\n", fppol_deg(ms));
   fppol_mul(ms, ms, mp);
-  printf("p^2*q  = ");
-  for (int i = ms->deg>>6; i >= 0; --i)
-  { fppol64_out(stdout, ms->limb[i]); printf(" "); }
-  printf("[%d]\n", fppol_deg(ms));
-
+  printf("p^2*q  = "); fppol_out(stdout, ms); printf(" [%d]\n", fppol_deg(ms));
   fppol_mul(ms, mq, ms);
-  printf("p^2*q^2= ");
-  for (int i = ms->deg>>6; i >= 0; --i)
-  { fppol64_out(stdout, ms->limb[i]); printf(" "); }
-  printf("[%d]\n", fppol_deg(ms));
+  printf("p^2*q^2= "); fppol_out(stdout, ms); printf(" [%d]\n", fppol_deg(ms));
 
   fppol_divrem(ma, mb, ms, mr);
-  printf("s / r  = ");
-  for (int i = ma->deg>>6; i >= 0; --i)
-  { fppol64_out(stdout, ma->limb[i]); printf(" "); }
-  printf("[%d]\n", fppol_deg(ma));
-  printf("s %% r  = ");
-  for (int i = mb->deg>>6; i >= 0; --i)
-  { fppol64_out(stdout, mb->limb[i]); printf(" "); }
-  printf("[%d]\n", fppol_deg(mb));
-
+  printf("s / r  = "); fppol_out(stdout, ma); printf(" [%d]\n", fppol_deg(ma));
+  printf("s %% r  = ");fppol_out(stdout, mb); printf(" [%d]\n", fppol_deg(mb));
   fppol_mul(ma, ma, mr);
   fppol_add(ma, ma, mb);
   fppol_sub(ma, ms, ma);
-  printf("check  = ");
-  for (int i = ma->deg>>6; i >= 0; --i)
-  { fppol64_out(stdout, ma->limb[i]); printf(" "); }
-  printf("[%d]\n", fppol_deg(ma));
+  printf("check  = "); fppol_out(stdout, ma); printf(" [%d]\n", fppol_deg(ma));
 
-#ifdef USE_F2
   ret = fppol_invmod(ma, mr, ms);
-  printf("1/r mod s = ");
-  if (!ret)
-    printf("N/A\n");
-  else {
-    for (int i = ma->deg>>6; i >= 0; --i)
-    { fppol64_out(stdout, ma->limb[i]); printf(" "); }
-    printf("[%d]\n", fppol_deg(ma));
-  }
-#endif
+  printf("1/r %%s = ");
+  if (!ret) printf("N/A\n");
+  else      fppol_out(stdout, ma), printf(" [%d]\n", fppol_deg(ma));
 
   fppol_shl(mr, mp, 1);
-  printf("p << 1 = ");
-  for (int i = mr->deg>>6; i >= 0; --i)
-  { fppol64_out(stdout, mr->limb[i]); printf(" "); }
-  printf("[%d]\n", fppol_deg(mr));
-
+  printf("p << 1 = "); fppol_out(stdout, mr); printf(" [%d]\n", fppol_deg(mr));
   fppol_shl(mr, mp, 2);
-  printf("p << 2 = ");
-  for (int i = mr->deg>>6; i >= 0; --i)
-  { fppol64_out(stdout, mr->limb[i]); printf(" "); }
-  printf("[%d]\n", fppol_deg(mr));
-
+  printf("p << 2 = "); fppol_out(stdout, mr); printf(" [%d]\n", fppol_deg(mr));
   fppol_shl(mr, mp, 127);
-  printf("p <<127= ");
-  for (int i = mr->deg>>6; i >= 0; --i)
-  { fppol64_out(stdout, mr->limb[i]); printf(" "); }
-  printf("[%d]\n", fppol_deg(mr));
-
+  printf("p <<127= "); fppol_out(stdout, mr); printf(" [%d]\n", fppol_deg(mr));
   fppol_shr(mr, ms, 1);
-  printf("s >> 1 = ");
-  for (int i = mr->deg>>6; i >= 0; --i)
-  { fppol64_out(stdout, mr->limb[i]); printf(" "); }
-  printf("[%d]\n", fppol_deg(mr));
-
+  printf("s >> 1 = "); fppol_out(stdout, mr); printf(" [%d]\n", fppol_deg(mr));
   fppol_shr(mr, ms, 2);
-  printf("s >> 2 = ");
-  for (int i = mr->deg>>6; i >= 0; --i)
-  { fppol64_out(stdout, mr->limb[i]); printf(" "); }
-  printf("[%d]\n", fppol_deg(mr));
-
+  printf("s >> 2 = "); fppol_out(stdout, mr); printf(" [%d]\n", fppol_deg(mr));
   fppol_shr(mr, ms, 127);
-  printf("s >>127= ");
-  for (int i = mr->deg>>6; i >= 0; --i)
-  { fppol64_out(stdout, mr->limb[i]); printf(" "); }
-  printf("[%d]\n", fppol_deg(mr));
+  printf("s >>127= "); fppol_out(stdout, mr); printf(" [%d]\n", fppol_deg(mr));
 
   fppol_clear(mp);
   fppol_clear(mq);
