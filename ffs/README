@@ -6,6 +6,6 @@ Current authors: Jérémie Detrey, Pierrick Gaudry, Marion Videau.
 Some code (not much) is stolen from CADO-NFS (in that case it is visible
 in the header of the file).
 
-Currently no licence -> you are not allow to redistribute.
+Currently no licence -> you are not allowed to redistribute.
 We expect this code to become LGPL.
 
