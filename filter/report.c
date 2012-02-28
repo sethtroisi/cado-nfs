@@ -23,7 +23,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "utils.h"
 #include "gzip.h"
 #include "sparse.h"
-#include "dclist.h"
 #include "filter_matrix.h"
 #include "report.h"
 
