@@ -117,7 +117,7 @@ static const unsigned char __digit_val[] = {
     unsigned n;                                                 \
     if (f == NULL) f = stdin;                                   \
     for (; isspace(c = getc(f)); );                             \
-    if (c == EOF) return 0;                                     \
+    if (c == EOF || __digit_val[c] > 0xf) return 0;             \
     for (; c == '0'; c = getc(f));                              \
     for (n = 0; c != EOF && __digit_val[c] <= 0xf; c = getc(f)) \
       if (n < sizeof(buf)) buf[n++] = (char)c;                  \
