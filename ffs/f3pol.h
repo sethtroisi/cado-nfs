@@ -27,64 +27,52 @@
 #define __FP_OPP_0(p0, p1) (p1)
 #define __FP_OPP_1(p0, p1) (p0)
 
-#define __FP_OPP(sz, r, p)                              \
-  do { uint##sz##_t __t[] = { __FP_OPP_0(p[0], p[1]),   \
-                              __FP_OPP_1(p[0], p[1]) }; \
-       r[0] = __t[0]; r[1] = __t[1]; } while (0)
-
-
 // Addition.
 #define __FP_ADD_0(p0, p1, q0, q1) (((p1)&(q1)) | (~((p1)|(q1)) & ((p0)^(q0))))
 #define __FP_ADD_1(p0, p1, q0, q1) (((p0)&(q0)) | (~((p0)|(q0)) & ((p1)^(q1))))
 
-#define __FP_ADD(sz, r, p, q)                                       \
-  do { uint##sz##_t __t[] = { __FP_ADD_0(p[0], p[1], q[0], q[1]),   \
-                              __FP_ADD_1(p[0], p[1], q[0], q[1]) }; \
-       r[0] = __t[0]; r[1] = __t[1]; } while (0)
-
-
 // Subtraction.
-#define __FP_SUB_0(p0, p1, q0, q1) __FP_ADD_0(p0, p1, __FP_OPP_0(q0, q1), \
-                                                      __FP_OPP_1(q0, q1))
-#define __FP_SUB_1(p0, p1, q0, q1) __FP_ADD_1(p0, p1, __FP_OPP_0(q0, q1), \
-                                                      __FP_OPP_1(q0, q1))
-
-#define __FP_SUB(sz, r, p, q)                                       \
-  do { uint##sz##_t __t[] = { __FP_SUB_0(p[0], p[1], q[0], q[1]),   \
-                              __FP_SUB_1(p[0], p[1], q[0], q[1]) }; \
-       r[0] = __t[0]; r[1] = __t[1]; } while (0)
-
+#define __FP_SUB_0(p0, p1, q0, q1) \
+        __FP_ADD_0(p0, p1, __FP_OPP_0(q0, q1), __FP_OPP_1(q0, q1))
+#define __FP_SUB_1(p0, p1, q0, q1) \
+        __FP_ADD_1(p0, p1, __FP_OPP_0(q0, q1), __FP_OPP_1(q0, q1))
 
 // Coefficient-wise inverse.
 #define __FP_SINV_0(p0, p1) (p0)
 #define __FP_SINV_1(p0, p1) (p1)
 
-#define __FP_SINV(sz, r, p)                              \
-  do { uint##sz##_t __t[] = { __FP_SINV_0(p[0], p[1]),   \
-                              __FP_SINV_1(p[0], p[1]) }; \
-       r[0] = __t[0]; r[1] = __t[1]; } while (0)
-
-
 // Coefficient-wise multiplication.
 #define __FP_SMUL_0(p0, p1, q0, q1) (((p0)&(q0)) | ((p1)&(q1)))
 #define __FP_SMUL_1(p0, p1, q0, q1) (((p0)&(q1)) | ((p1)&(q0)))
 
-#define __FP_SMUL(sz, r, p, q)                                       \
-  do { uint##sz##_t __t[] = { __FP_SMUL_0(p[0], p[1], q[0], q[1]),   \
-                              __FP_SMUL_1(p[0], p[1], q[0], q[1]) }; \
-       r[0] = __t[0]; r[1] = __t[1]; } while (0)
-
-
 // Coefficient-wise division.
-#define __FP_SDIV_0(p0, p1, q0, q1) __FP_SMUL_0(p0, p1, __FP_SINV_0(q0, q1), \
-                                                        __FP_SINV_1(q0, q1))
-#define __FP_SDIV_1(p0, p1, q0, q1) __FP_SMUL_1(p0, p1, __FP_SINV_0(q0, q1), \
-                                                        __FP_SINV_1(q0, q1))
+#define __FP_SDIV_0(p0, p1, q0, q1) \
+        __FP_SMUL_0(p0, p1, __FP_SINV_0(q0, q1), __FP_SINV_1(q0, q1))
+#define __FP_SDIV_1(p0, p1, q0, q1) \
+        __FP_SMUL_1(p0, p1, __FP_SINV_0(q0, q1), __FP_SINV_1(q0, q1))
 
-#define __FP_SDIV(sz, r, p, q)                                       \
-  do { uint##sz##_t __t[] = { __FP_SDIV_0(p[0], p[1], q[0], q[1]),   \
-                              __FP_SDIV_1(p[0], p[1], q[0], q[1]) }; \
+
+// Generic unary operation.
+#define __FP_UOP(op, sz, r, p)                        \
+  do { uint##sz##_t __t[] = {                         \
+         (uint##sz##_t)(__FP_##op##_0(p[0], p[1])),   \
+         (uint##sz##_t)(__FP_##op##_1(p[0], p[1])) }; \
        r[0] = __t[0]; r[1] = __t[1]; } while (0)
+
+// Generic binary operation.
+#define __FP_BOP(op, sz, r, p, q)                                 \
+  do { uint##sz##_t __t[] = {                                     \
+         (uint##sz##_t)(__FP_##op##_0(p[0], p[1], q[0], q[1])),   \
+         (uint##sz##_t)(__FP_##op##_1(p[0], p[1], q[0], q[1])) }; \
+       r[0] = __t[0]; r[1] = __t[1]; } while (0)
+
+// Definition of all coefficient-wise operations.
+#define __FP_OPP( sz, r, p)    __FP_UOP(OPP,  sz, r, p)
+#define __FP_ADD( sz, r, p, q) __FP_BOP(ADD,  sz, r, p, q)
+#define __FP_SUB( sz, r, p, q) __FP_BOP(SUB,  sz, r, p, q)
+#define __FP_SINV(sz, r, p)    __FP_UOP(SINV, sz, r, p)
+#define __FP_SMUL(sz, r, p, q) __FP_BOP(SMUL, sz, r, p, q)
+#define __FP_SDIV(sz, r, p, q) __FP_BOP(SDIV, sz, r, p, q)
 
 
 

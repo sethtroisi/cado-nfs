@@ -26,43 +26,37 @@
 // Opposite.
 #define __FP_OPP_0(p0) (p0)
 
-#define __FP_OPP(sz, r, p)                  \
-  do { r[0] = __FP_OPP_0(p[0]); } while (0)
-
-
 // Addition.
 #define __FP_ADD_0(p0, q0) ((p0) ^ (q0))
-
-#define __FP_ADD(sz, r, p, q)                     \
-  do { r[0] = __FP_ADD_0(p[0], q[0]); } while (0)
-
 
 // Subtraction.
 #define __FP_SUB_0(p0, q0) __FP_ADD_0(p0, __FP_OPP_0(q0))
 
-#define __FP_SUB(sz, r, p, q)                     \
-  do { r[0] = __FP_SUB_0(p[0], q[0]); } while (0)
-
-
 // Coefficient-wise inverse.
 #define __FP_SINV_0(p0) (p0)
-
-#define __FP_SINV(sz, r, p)                  \
-  do { r[0] = __FP_SINV_0(p[0]); } while (0)
-
 
 // Coefficient-wise multiplication.
 #define __FP_SMUL_0(p0, q0) ((p0) & (q0))
 
-#define __FP_SMUL(sz, r, p, q)                     \
-  do { r[0] = __FP_SMUL_0(p[0], q[0]); } while (0)
-
-
 // Coefficient-wise division.
 #define __FP_SDIV_0(p0, q0) __FP_SMUL_0(p0, __FP_SINV_0(q0))
 
-#define __FP_SDIV(sz, r, p, q)                     \
-  do { r[0] = __FP_SDIV_0(p[0], q[0]); } while (0)
+
+// Generic unary operation.
+#define __FP_UOP(op, sz, r, p) \
+  do { r[0] = __FP_##op##_0(p[0]); } while (0)
+
+// Generic binary operation.
+#define __FP_BOP(op, sz, r, p, q) \
+  do { r[0] = __FP_##op##_0(p[0], q[0]); } while (0)
+
+// Definition of all coefficient-wise operations.
+#define __FP_OPP( sz, r, p)    __FP_UOP(OPP,  sz, r, p)
+#define __FP_ADD( sz, r, p, q) __FP_BOP(ADD,  sz, r, p, q)
+#define __FP_SUB( sz, r, p, q) __FP_BOP(SUB,  sz, r, p, q)
+#define __FP_SINV(sz, r, p)    __FP_UOP(SINV, sz, r, p)
+#define __FP_SMUL(sz, r, p, q) __FP_BOP(SMUL, sz, r, p, q)
+#define __FP_SDIV(sz, r, p, q) __FP_BOP(SDIV, sz, r, p, q)
 
 
 
