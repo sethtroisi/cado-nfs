@@ -39,6 +39,14 @@ int fp_is_zero(fp_srcptr p)
   return !t; }
 
 
+// Test if one.
+static inline
+int fp_is_one(fp_srcptr p)
+{ uint8_t t = 0;
+  for (unsigned k = 1; k < __FP_BITS; ++k) t |= p[k];
+  return p[0] == 1 && !t; }
+
+
 // Inverse.
 static inline
 void fp_inv(fp_ptr r, fp_srcptr p)
@@ -205,6 +213,19 @@ __DECL_FPPOLxx_ARITH_ALL(64)
     return rc; }
 
 
+// Test if monic.
+// Generic prototype:
+//   int fppol<sz>_is_monic(fppol<sz>_srcptr p);
+#define __DEF_FPPOLxx_IS_MONIC(sz)               \
+  static inline                                  \
+  int fppol##sz##_is_monic(fppol##sz##_srcptr p) \
+  { int d = fppol##sz##_deg(p);                  \
+    if (UNLIKELY(d == -1)) return 0;             \
+    fp_t lc;                                     \
+    fppol##sz##_get_coeff(lc, p, d);             \
+    return fp_is_one(lc); }
+
+
 // Test if valid representation.
 // Generic prototype:
 //   int fppol<sz>_is_valid(fppol<sz>_srcptr p);
@@ -306,6 +327,7 @@ __DECL_FPPOLxx_ARITH_ALL(64)
         __DEF_FPPOLxx_FOLD_OR  (sz)     \
         __DEF_FPPOLxx_IS_ZERO  (sz)     \
         __DEF_FPPOLxx_EQ       (sz)     \
+        __DEF_FPPOLxx_IS_MONIC (sz)     \
         __DEF_FPPOLxx_IS_VALID (sz)     \
         __DEF_FPPOLxx_OPP      (sz)     \
         __DEF_FPPOLxx_ADD      (sz)     \
@@ -332,6 +354,7 @@ __DEF_FPPOLxx_ARITH_ALL(64)
 #undef __DEF_FPPOLxx_FOLD_OR
 #undef __DEF_FPPOLxx_IS_ZERO
 #undef __DEF_FPPOLxx_EQ
+#undef __DEF_FPPOLxx_IS_MONIC
 #undef __DEF_FPPOLxx_IS_VALID
 #undef __DEF_FPPOLxx_OPP
 #undef __DEF_FPPOLxx_ADD
@@ -390,6 +413,9 @@ int fppol_is_zero(fppol_srcptr p)
 
 // Test if equal.
 int fppol_eq(fppol_srcptr p, fppol_srcptr q);
+
+// Test if monic.
+int fppol_is_monic(fppol_srcptr p);
 
 // Test if valid representation.
 int fppol_is_valid(fppol_srcptr p);

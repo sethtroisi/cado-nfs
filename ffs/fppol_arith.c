@@ -124,6 +124,16 @@ int fppol_eq(fppol_srcptr p, fppol_srcptr q)
 }
 
 
+// Test if monic.
+int fppol_is_monic(fppol_srcptr p)
+{
+  if (UNLIKELY(p->deg == -1)) return 0;
+  fp_t lc;
+  fppol_get_coeff(lc, p, p->deg);
+  return fp_is_one(lc);
+}
+
+
 // Test if valid representation.
 int fppol_is_valid(fppol_srcptr p)
 {

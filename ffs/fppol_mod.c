@@ -38,7 +38,7 @@
   {                                                                     \
     /* We will see later if these requirements are a burden to       */ \
     /* the caller or not.                                            */ \
-    /* ASSERT_ALWAYS(fppol##sz##_is_monic(m)); */                       \
+    ASSERT_ALWAYS(fppol##sz##_is_monic(m));                             \
     ASSERT_ALWAYS(fppol##sz##_deg(p) < fppol##sz##_deg(m));             \
     /* Right now, we never bother with non-monic polynomials         */ \
     /* Let's assert that we are in characteristic 2.                 */ \
