@@ -27,7 +27,7 @@ define BUILD_template
 
   all: $$($(1)_BIN)
 
-  $$(filter fppol%.$(1).o, $$(1)_OBJ): $(1)pol.h
+  $$(filter fppol%.$(1).o, $$($(1)_OBJ)): $(1)pol.h
 
   $$($(1)_OBJ): %.$(1).o: Makefile
 	$$(CC) $$(CFLAGS) $$(CPPFLAGS) $$($(1)_CPPFLAGS) $$(TARGET_ARCH) \
