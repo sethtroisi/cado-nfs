@@ -103,8 +103,8 @@
 
 // All declarations bundled up into a single macro.
 #define __DEF_FPPOLxx_MOD_ALL(sz) \
-  __DEF_FPPOLxx_SHL1MOD      (sz) \
-  __DEF_FPPOLxx_INVMOD       (sz)
+        __DEF_FPPOLxx_SHL1MOD(sz) \
+        __DEF_FPPOLxx_INVMOD (sz)
 
 __DEF_FPPOLxx_MOD_ALL(16)
 __DEF_FPPOLxx_MOD_ALL(32)

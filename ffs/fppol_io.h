@@ -45,11 +45,11 @@
 
 
 // All declarations bundled up into a single macro.
-#define __DECL_FPPOLxx_IO_ALL(sz) \
-  __DECL_FPPOLxx_GET_STR     (sz) \
-  __DECL_FPPOLxx_SET_STR     (sz) \
-  __DECL_FPPOLxx_OUT         (sz) \
-  __DECL_FPPOLxx_INP         (sz)
+#define __DECL_FPPOLxx_IO_ALL(sz)  \
+        __DECL_FPPOLxx_GET_STR(sz) \
+        __DECL_FPPOLxx_SET_STR(sz) \
+        __DECL_FPPOLxx_OUT    (sz) \
+        __DECL_FPPOLxx_INP    (sz)
 
 __DECL_FPPOLxx_IO_ALL(16)
 __DECL_FPPOLxx_IO_ALL(32)

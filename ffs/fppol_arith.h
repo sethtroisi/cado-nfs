@@ -64,24 +64,37 @@ void fp_div(fp_ptr r, fp_srcptr p, fp_srcptr q)
 // Bitwise OR of all bit vectors: coefficient-wise non-zero test.
 // Generic prototype:
 //   uint<sz>_t fppol<sz>_fold_or(fppol<sz>_srcptr p);
-#define __DECL_FPPOLxx_FOLD_OR(sz)                       \
-  static inline                                          \
-  uint##sz##_t fppol##sz##_fold_or(fppol##sz##_srcptr p) \
-  { uint##sz##_t t = p[0];                               \
-    for (unsigned k = 1; k < __FP_BITS; ++k) t |= p[k];  \
-    return t; }
+#define __DECL_FPPOLxx_FOLD_OR(sz)                        \
+  static inline                                           \
+  uint##sz##_t fppol##sz##_fold_or(fppol##sz##_srcptr p);
 
-__DECL_FPPOLxx_FOLD_OR(16)
-__DECL_FPPOLxx_FOLD_OR(32)
-__DECL_FPPOLxx_FOLD_OR(64)
+
+// Degree.
+// By convention, deg(0) = -1.
+// Generic prototype:
+//   int fppol<sz>_deg(fppol<sz>_srcptr p);
+#define __DECL_FPPOLxx_DEG(sz)               \
+  int fppol##sz##_deg(fppol##sz##_srcptr p);
+
+
+// All declarations bundled up into a single macro.
+#define __DECL_FPPOLxx_ARITH_ALL(sz) \
+        __DECL_FPPOLxx_FOLD_OR  (sz) \
+        __DECL_FPPOLxx_DEG      (sz)
+
+__DECL_FPPOLxx_ARITH_ALL(16)
+__DECL_FPPOLxx_ARITH_ALL(32)
+__DECL_FPPOLxx_ARITH_ALL(64)
 
 #undef __DECL_FPPOLxx_FOLD_OR
+#undef __DECL_FPPOLxx_DEG
+#undef __DECL_FPPOLxx_ARITH_ALL
 
 
 // Set to zero.
 // Generic prototype:
 //   void fppol<sz>_set_zero(fppol<sz>_ptr r);
-#define __DECL_FPPOLxx_SET_ZERO(sz)                      \
+#define __DEF_FPPOLxx_SET_ZERO(sz)                       \
   static inline                                          \
   void fppol##sz##_set_zero(fppol##sz##_ptr r)           \
   { for (unsigned k = 0; k < __FP_BITS; ++k) r[k] = 0; }
@@ -90,7 +103,7 @@ __DECL_FPPOLxx_FOLD_OR(64)
 // Set to one.
 // Generic prototype:
 //   void fppol<sz>_set_one(fppol<sz>_ptr r);
-#define __DECL_FPPOLxx_SET_ONE(sz)                       \
+#define __DEF_FPPOLxx_SET_ONE(sz)                        \
   static inline                                          \
   void fppol##sz##_set_one(fppol##sz##_ptr r)            \
   { r[0] = 1;                                            \
@@ -100,7 +113,7 @@ __DECL_FPPOLxx_FOLD_OR(64)
 // Set to t^i.
 // Generic prototype:
 //   void fppol<sz>_set_ti(fppol<sz>_ptr r, unsigned i);
-#define __DECL_FPPOLxx_SET_TI(sz)                        \
+#define __DEF_FPPOLxx_SET_TI(sz)                         \
   static inline                                          \
   void fppol##sz##_set_ti(fppol##sz##_ptr r, unsigned i) \
   { r[0] = (uint##sz##_t)1 << i;                         \
@@ -110,7 +123,7 @@ __DECL_FPPOLxx_FOLD_OR(64)
 // Set to another polynomial.
 // Generic prototype:
 //   void fppol<sz>_set(fppol<sz>_ptr r, fppol<sz>_srcptr p);
-#define __DECL_FPPOLxx_SET(sz)                                  \
+#define __DEF_FPPOLxx_SET(sz)                                   \
   static inline                                                 \
   void fppol##sz##_set(fppol##sz##_ptr r, fppol##sz##_srcptr p) \
   { for (unsigned k = 0; k < __FP_BITS; ++k) r[k] = p[k]; }
@@ -120,7 +133,7 @@ __DECL_FPPOLxx_FOLD_OR(64)
 // Return 1 if successful.
 // Generic prototype:
 //   int fppol<sz>_set_<sp>(fppol<sz>_ptr r, fppol<sp>_srcptr p);
-#define __DECL_FPPOLxx_SET_yy(sz, sp)                               \
+#define __DEF_FPPOLxx_SET_yy(sz, sp)                                \
   static inline                                                     \
   int fppol##sz##_set_##sp(fppol##sz##_ptr r, fppol##sp##_srcptr p) \
   { for (unsigned k = 0; k < __FP_BITS; ++k)                        \
@@ -132,7 +145,7 @@ __DECL_FPPOLxx_FOLD_OR(64)
 // Return 1 if successful.
 // Generic prototype:
 //   int fppol<sz>_set_mp(fppol<sz>_ptr r, fppol_srcptr p);
-#define __DECL_FPPOLxx_SET_MP(sz)                           \
+#define __DEF_FPPOLxx_SET_MP(sz)                            \
   static inline                                             \
   int fppol##sz##_set_mp(fppol##sz##_ptr r, fppol_srcptr p) \
   { fppol##sz##_set_64(r, p->limb[0]);                      \
@@ -142,7 +155,7 @@ __DECL_FPPOLxx_FOLD_OR(64)
 // Get degree-i coefficient.
 // Generic prototype:
 //   void fppol<sz>_get_coeff(fp_ptr r, fppol<sz>_srcptr p, unsigned i);
-#define __DECL_FPPOLxx_GET_COEFF(sz)                                     \
+#define __DEF_FPPOLxx_GET_COEFF(sz)                                      \
   static inline                                                          \
   void fppol##sz##_get_coeff(fp_ptr r, fppol##sz##_srcptr p, unsigned i) \
   { for (unsigned k = 0; k < __FP_BITS; ++k)                             \
@@ -152,7 +165,7 @@ __DECL_FPPOLxx_FOLD_OR(64)
 // Set degree-i coefficient.
 // Generic prototype:
 //   void fppol<sz>_set_coeff(fppol<sz>_ptr r, fp_srcptr x, unsigned i);
-#define __DECL_FPPOLxx_SET_COEFF(sz)                                     \
+#define __DEF_FPPOLxx_SET_COEFF(sz)                                      \
   static inline                                                          \
   void fppol##sz##_set_coeff(fppol##sz##_ptr r, fp_srcptr x, unsigned i) \
   { uint##sz##_t m = ~(1ul<<i);                                          \
@@ -160,10 +173,21 @@ __DECL_FPPOLxx_FOLD_OR(64)
       r[k] = (r[k] & m) | ((uint##sz##_t)x[k] << i); }
 
 
+// Bitwise OR of all bit vectors: coefficient-wise non-zero test.
+// Generic prototype:
+//   uint<sz>_t fppol<sz>_fold_or(fppol<sz>_srcptr p);
+#define __DEF_FPPOLxx_FOLD_OR(sz)                        \
+  static inline                                          \
+  uint##sz##_t fppol##sz##_fold_or(fppol##sz##_srcptr p) \
+  { uint##sz##_t t = p[0];                               \
+    for (unsigned k = 1; k < __FP_BITS; ++k) t |= p[k];  \
+    return t; }
+
+
 // Test if zero.
 // Generic prototype:
 //   int fppol<sz>_is_zero(fppol<sz>_srcptr p);
-#define __DECL_FPPOLxx_IS_ZERO(sz)              \
+#define __DEF_FPPOLxx_IS_ZERO(sz)               \
   static inline                                 \
   int fppol##sz##_is_zero(fppol##sz##_srcptr p) \
   { return !fppol##sz##_fold_or(p); }
@@ -172,7 +196,7 @@ __DECL_FPPOLxx_FOLD_OR(64)
 // Test if equal.
 // Generic prototype:
 //   int fppol<sz>_eq(fppol<sz>_srcptr p, fppol<sz>_srcptr q);
-#define __DECL_FPPOLxx_EQ(sz)                                    \
+#define __DEF_FPPOLxx_EQ(sz)                                     \
   static inline                                                  \
   int fppol##sz##_eq(fppol##sz##_srcptr p, fppol##sz##_srcptr q) \
   { int rc = p[0] == q[0];                                       \
@@ -184,7 +208,7 @@ __DECL_FPPOLxx_FOLD_OR(64)
 // Test if valid representation.
 // Generic prototype:
 //   int fppol<sz>_is_valid(fppol<sz>_srcptr p);
-#define __DECL_FPPOLxx_IS_VALID(sz)                           \
+#define __DEF_FPPOLxx_IS_VALID(sz)                            \
   static inline                                               \
   int fppol##sz##_is_valid(MAYBE_UNUSED fppol##sz##_srcptr p) \
   { return __FP_IS_VALID(sz, p); }
@@ -193,7 +217,7 @@ __DECL_FPPOLxx_FOLD_OR(64)
 // Opposite.
 // Generic prototype:
 //   void fppol<sz>_opp(fppol<sz>_ptr r, fppol<sz>_srcptr p);
-#define __DECL_FPPOLxx_OPP(sz)                                  \
+#define __DEF_FPPOLxx_OPP(sz)                                   \
   static inline                                                 \
   void fppol##sz##_opp(fppol##sz##_ptr r, fppol##sz##_srcptr p) \
   { __FP_OPP(sz, r, p); }
@@ -203,7 +227,7 @@ __DECL_FPPOLxx_FOLD_OR(64)
 // Generic prototype:
 //   void fppol<sz>_add(fppol<sz>_ptr    r,
 //                      fppol<sz>_srcptr p, fppol<sz>_srcptr q);
-#define __DECL_FPPOLxx_ADD(sz)                                     \
+#define __DEF_FPPOLxx_ADD(sz)                                      \
   static inline                                                    \
   void fppol##sz##_add(fppol##sz##_ptr    r,                       \
                        fppol##sz##_srcptr p, fppol##sz##_srcptr q) \
@@ -214,7 +238,7 @@ __DECL_FPPOLxx_FOLD_OR(64)
 // Generic prototype:
 //   void fppol<sz>_sub(fppol<sz>_ptr    r,
 //                      fppol<sz>_srcptr p, fppol<sz>_srcptr q);
-#define __DECL_FPPOLxx_SUB(sz)                                     \
+#define __DEF_FPPOLxx_SUB(sz)                                      \
   static inline                                                    \
   void fppol##sz##_sub(fppol##sz##_ptr    r,                       \
                        fppol##sz##_srcptr p, fppol##sz##_srcptr q) \
@@ -225,7 +249,7 @@ __DECL_FPPOLxx_FOLD_OR(64)
 // Generic prototype:
 //   void fppol<sz>_smul(fppol<sz>_ptr    r,
 //                       fppol<sz>_srcptr p, fp_srcptr x);
-#define __DECL_FPPOLxx_SMUL(sz)                            \
+#define __DEF_FPPOLxx_SMUL(sz)                             \
   static inline                                            \
   void fppol##sz##_smul(fppol##sz##_ptr r,                 \
                         fppol##sz##_srcptr p, fp_srcptr x) \
@@ -239,7 +263,7 @@ __DECL_FPPOLxx_FOLD_OR(64)
 // Generic prototype:
 //   void fppol<sz>_sdiv(fppol<sz>_ptr r,
 //                       fppol<sz>_srcptr p, fp_srcptr x);
-#define __DECL_FPPOLxx_SDIV(sz)                            \
+#define __DEF_FPPOLxx_SDIV(sz)                             \
   static inline                                            \
   void fppol##sz##_sdiv(fppol##sz##_ptr    r,              \
                         fppol##sz##_srcptr p, fp_srcptr x) \
@@ -252,7 +276,7 @@ __DECL_FPPOLxx_FOLD_OR(64)
 // Left shift.
 // Generic prototype:
 //   void fppol<sz>_shl(fppol<sz>_ptr r, fppol<sz>_srcptr p, unsigned i);
-#define __DECL_FPPOLxx_SHL(sz)                                                \
+#define __DEF_FPPOLxx_SHL(sz)                                                 \
   static inline                                                               \
   void fppol##sz##_shl(fppol##sz##_ptr r, fppol##sz##_srcptr p, unsigned i)   \
   { for (unsigned k = 0; k < __FP_BITS; ++k) r[k] = i < sz ? p[k] << i : 0; }
@@ -261,70 +285,62 @@ __DECL_FPPOLxx_FOLD_OR(64)
 // Right shift.
 // Generic prototype:
 //   void fppol<sz>_shr(fppol<sz>_ptr r, fppol<sz>_srcptr p, unsigned i);
-#define __DECL_FPPOLxx_SHR(sz)                                                \
+#define __DEF_FPPOLxx_SHR(sz)                                                 \
   static inline                                                               \
   void fppol##sz##_shr(fppol##sz##_ptr r, fppol##sz##_srcptr p, unsigned i)   \
   { for (unsigned k = 0; k < __FP_BITS; ++k) r[k] = i < sz ? p[k] >> i : 0; }
 
 
-// Degree.
-// By convention, deg(0) = -1.
-// Generic prototype:
-//   int fppol<sz>_deg(fppol<sz>_srcptr p);
-#define __DECL_FPPOLxx_DEG(sz)               \
-  int fppol##sz##_deg(fppol##sz##_srcptr p);
+// All definitions bundled up into a single macro.
+#define __DEF_FPPOLxx_ARITH_ALL(sz)     \
+        __DEF_FPPOLxx_SET_ZERO (sz)     \
+        __DEF_FPPOLxx_SET_ONE  (sz)     \
+        __DEF_FPPOLxx_SET_TI   (sz)     \
+        __DEF_FPPOLxx_SET      (sz)     \
+        __DEF_FPPOLxx_SET_yy   (sz, 16) \
+        __DEF_FPPOLxx_SET_yy   (sz, 32) \
+        __DEF_FPPOLxx_SET_yy   (sz, 64) \
+        __DEF_FPPOLxx_SET_MP   (sz)     \
+        __DEF_FPPOLxx_GET_COEFF(sz)     \
+        __DEF_FPPOLxx_SET_COEFF(sz)     \
+        __DEF_FPPOLxx_FOLD_OR  (sz)     \
+        __DEF_FPPOLxx_IS_ZERO  (sz)     \
+        __DEF_FPPOLxx_EQ       (sz)     \
+        __DEF_FPPOLxx_IS_VALID (sz)     \
+        __DEF_FPPOLxx_OPP      (sz)     \
+        __DEF_FPPOLxx_ADD      (sz)     \
+        __DEF_FPPOLxx_SUB      (sz)     \
+        __DEF_FPPOLxx_SMUL     (sz)     \
+        __DEF_FPPOLxx_SDIV     (sz)     \
+        __DEF_FPPOLxx_SHL      (sz)     \
+        __DEF_FPPOLxx_SHR      (sz)
 
+__DEF_FPPOLxx_ARITH_ALL(16)
+__DEF_FPPOLxx_ARITH_ALL(32)
+__DEF_FPPOLxx_ARITH_ALL(64)
 
-// All declarations bundled up into a single macro.
-#define __DECL_FPPOLxx_ARITH_ALL(sz)     \
-  __DECL_FPPOLxx_SET_ZERO       (sz)     \
-  __DECL_FPPOLxx_SET_ONE        (sz)     \
-  __DECL_FPPOLxx_SET_TI         (sz)     \
-  __DECL_FPPOLxx_SET            (sz)     \
-  __DECL_FPPOLxx_SET_yy         (sz, 16) \
-  __DECL_FPPOLxx_SET_yy         (sz, 32) \
-  __DECL_FPPOLxx_SET_yy         (sz, 64) \
-  __DECL_FPPOLxx_SET_MP         (sz)     \
-  __DECL_FPPOLxx_GET_COEFF      (sz)     \
-  __DECL_FPPOLxx_SET_COEFF      (sz)     \
-  __DECL_FPPOLxx_IS_ZERO        (sz)     \
-  __DECL_FPPOLxx_EQ             (sz)     \
-  __DECL_FPPOLxx_IS_VALID       (sz)     \
-  __DECL_FPPOLxx_OPP            (sz)     \
-  __DECL_FPPOLxx_ADD            (sz)     \
-  __DECL_FPPOLxx_SUB            (sz)     \
-  __DECL_FPPOLxx_SMUL           (sz)     \
-  __DECL_FPPOLxx_SDIV           (sz)     \
-  __DECL_FPPOLxx_SHL            (sz)     \
-  __DECL_FPPOLxx_SHR            (sz)     \
-  __DECL_FPPOLxx_DEG            (sz)
-
-__DECL_FPPOLxx_ARITH_ALL(16)
-__DECL_FPPOLxx_ARITH_ALL(32)
-__DECL_FPPOLxx_ARITH_ALL(64)
-
-#undef __DECL_FPPOLxx_SET_ZERO
-#undef __DECL_FPPOLxx_SET_ONE
-#undef __DECL_FPPOLxx_SET_TI
-#undef __DECL_FPPOLxx_SET
-#undef __DECL_FPPOLxx_SET_yy
-#undef __DECL_FPPOLxx_SET_yy
-#undef __DECL_FPPOLxx_SET_yy
-#undef __DECL_FPPOLxx_SET_MP
-#undef __DECL_FPPOLxx_GET_COEFF
-#undef __DECL_FPPOLxx_SET_COEFF
-#undef __DECL_FPPOLxx_IS_ZERO
-#undef __DECL_FPPOLxx_EQ
-#undef __DECL_FPPOLxx_IS_VALID
-#undef __DECL_FPPOLxx_OPP
-#undef __DECL_FPPOLxx_ADD
-#undef __DECL_FPPOLxx_SUB
-#undef __DECL_FPPOLxx_SMUL
-#undef __DECL_FPPOLxx_SDIV
-#undef __DECL_FPPOLxx_SHL
-#undef __DECL_FPPOLxx_SHR
-#undef __DECL_FPPOLxx_DEG
-#undef __DECL_FPPOLxx_ARITH_ALL
+#undef __DEF_FPPOLxx_SET_ZERO
+#undef __DEF_FPPOLxx_SET_ONE
+#undef __DEF_FPPOLxx_SET_TI
+#undef __DEF_FPPOLxx_SET
+#undef __DEF_FPPOLxx_SET_yy
+#undef __DEF_FPPOLxx_SET_yy
+#undef __DEF_FPPOLxx_SET_yy
+#undef __DEF_FPPOLxx_SET_MP
+#undef __DEF_FPPOLxx_GET_COEFF
+#undef __DEF_FPPOLxx_SET_COEFF
+#undef __DEF_FPPOLxx_FOLD_OR
+#undef __DEF_FPPOLxx_IS_ZERO
+#undef __DEF_FPPOLxx_EQ
+#undef __DEF_FPPOLxx_IS_VALID
+#undef __DEF_FPPOLxx_OPP
+#undef __DEF_FPPOLxx_ADD
+#undef __DEF_FPPOLxx_SUB
+#undef __DEF_FPPOLxx_SMUL
+#undef __DEF_FPPOLxx_SDIV
+#undef __DEF_FPPOLxx_SHL
+#undef __DEF_FPPOLxx_SHR
+#undef __DEF_FPPOLxx_ARITH_ALL
 
 
 

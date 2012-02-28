@@ -114,5 +114,3 @@ __DEF_FPPOL_MUL_64xxx(64)
 #undef __DEF_FPPOL_MUL_xx
 #undef __DEF_FPPOL_MUL_xxxyy
 #undef __DEF_FPPOL_MUL_64xxx
-#undef __MUL_16x16_SIZE
-#undef __MUL_SIZE

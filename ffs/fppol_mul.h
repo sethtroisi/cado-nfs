@@ -30,7 +30,7 @@
 //   void fppol<sz>_<op>mul(fppol<sz>_ptr    r,
 //                          fppol<sz>_srcptr p,
 //                          fppol<sz>_srcptr q);
-#define __DECL_FPPOLxx_opMUL(sz, op)               \
+#define __DEF_FPPOLxx_opMUL(sz, op)                \
   static inline                                    \
   void fppol##sz##_##op##mul(fppol##sz##_ptr    r, \
                              fppol##sz##_srcptr p, \
@@ -43,7 +43,7 @@
 //   void fppol<sz>_<op>mul_<sq>(fppol<sz>_ptr    r,
 //                               fppol<sz>_srcptr p,
 //                               fppol<sq>_srcptr q);
-#define __DECL_FPPOLxx_opMUL_yy(sz, sq, op)             \
+#define __DEF_FPPOLxx_opMUL_yy(sz, sq, op)              \
   static inline                                         \
   void fppol##sz##_##op##mul_##sq(fppol##sz##_ptr    r, \
                                   fppol##sz##_srcptr p, \
@@ -57,7 +57,7 @@
 //   void fppol<sz>_<op>mul_<sp>x<sq>(fppol<sz>_ptr    r,
 //                                    fppol<sp>_srcptr p,
 //                                    fppol<sq>_srcptr q);
-#define __DECL_FPPOLxx_opMUL_yyxzz(sz, sp, sq, op)             \
+#define __DEF_FPPOLxx_opMUL_yyxzz(sz, sp, sq, op)              \
   static inline                                                \
   void fppol##sz##_##op##mul_##sp##x##sq(fppol##sz##_ptr    r, \
                                          fppol##sp##_srcptr p, \
@@ -71,7 +71,7 @@
 //   void fppol<sz>_<op>mul_<sp>x<sq>(fppol<sz>_ptr    r,
 //                                    fppol<sp>_srcptr p,
 //                                    fppol<sq>_srcptr q);
-#define __DECL_FPPOLxx_opMUL_zzxyy(sz, sp, sq, op)             \
+#define __DEF_FPPOLxx_opMUL_zzxyy(sz, sp, sq, op)              \
   static inline                                                \
   void fppol##sz##_##op##mul_##sp##x##sq(fppol##sz##_ptr    r, \
                                          fppol##sp##_srcptr p, \
@@ -79,40 +79,40 @@
   { fppol##sz##_##op##mul_##sq##x##sp(r, q, p); }
 
 
-// All declarations bundled up into a single macro.
-#define __DECL_FPPOLxx_opMUL_ALL(op)         \
-  __DECL_FPPOLxx_opMUL      (16,         op) \
-  __DECL_FPPOLxx_opMUL      (32,         op) \
-  __DECL_FPPOLxx_opMUL      (64,         op) \
-  __DECL_FPPOLxx_opMUL_yy   (16, 16,     op) \
-  __DECL_FPPOLxx_opMUL_yy   (32, 16,     op) \
-  __DECL_FPPOLxx_opMUL_yy   (32, 32,     op) \
-  __DECL_FPPOLxx_opMUL_yy   (64, 16,     op) \
-  __DECL_FPPOLxx_opMUL_yy   (64, 32,     op) \
-  __DECL_FPPOLxx_opMUL_yy   (64, 64,     op) \
-  __DECL_FPPOLxx_opMUL_yyxzz(16, 16, 16, op) \
-  __DECL_FPPOLxx_opMUL_yyxzz(32, 16, 16, op) \
-  __DECL_FPPOLxx_opMUL_yyxzz(32, 32, 16, op) \
-  __DECL_FPPOLxx_opMUL_yyxzz(32, 32, 32, op) \
-  __DECL_FPPOLxx_opMUL_yyxzz(64, 32, 16, op) \
-  __DECL_FPPOLxx_opMUL_yyxzz(64, 32, 32, op) \
-  __DECL_FPPOLxx_opMUL_yyxzz(64, 64, 16, op) \
-  __DECL_FPPOLxx_opMUL_yyxzz(64, 64, 32, op) \
-  __DECL_FPPOLxx_opMUL_yyxzz(64, 64, 64, op) \
-  __DECL_FPPOLxx_opMUL_zzxyy(32, 16, 32, op) \
-  __DECL_FPPOLxx_opMUL_zzxyy(64, 16, 32, op) \
-  __DECL_FPPOLxx_opMUL_zzxyy(64, 16, 64, op) \
-  __DECL_FPPOLxx_opMUL_zzxyy(64, 32, 64, op)
+// All definitions bundled up into a single macro.
+#define __DEF_FPPOLxx_opMUL_ALL(op)               \
+        __DEF_FPPOLxx_opMUL      (16,         op) \
+        __DEF_FPPOLxx_opMUL      (32,         op) \
+        __DEF_FPPOLxx_opMUL      (64,         op) \
+        __DEF_FPPOLxx_opMUL_yy   (16, 16,     op) \
+        __DEF_FPPOLxx_opMUL_yy   (32, 16,     op) \
+        __DEF_FPPOLxx_opMUL_yy   (32, 32,     op) \
+        __DEF_FPPOLxx_opMUL_yy   (64, 16,     op) \
+        __DEF_FPPOLxx_opMUL_yy   (64, 32,     op) \
+        __DEF_FPPOLxx_opMUL_yy   (64, 64,     op) \
+        __DEF_FPPOLxx_opMUL_yyxzz(16, 16, 16, op) \
+        __DEF_FPPOLxx_opMUL_yyxzz(32, 16, 16, op) \
+        __DEF_FPPOLxx_opMUL_yyxzz(32, 32, 16, op) \
+        __DEF_FPPOLxx_opMUL_yyxzz(32, 32, 32, op) \
+        __DEF_FPPOLxx_opMUL_yyxzz(64, 32, 16, op) \
+        __DEF_FPPOLxx_opMUL_yyxzz(64, 32, 32, op) \
+        __DEF_FPPOLxx_opMUL_yyxzz(64, 64, 16, op) \
+        __DEF_FPPOLxx_opMUL_yyxzz(64, 64, 32, op) \
+        __DEF_FPPOLxx_opMUL_yyxzz(64, 64, 64, op) \
+        __DEF_FPPOLxx_opMUL_zzxyy(32, 16, 32, op) \
+        __DEF_FPPOLxx_opMUL_zzxyy(64, 16, 32, op) \
+        __DEF_FPPOLxx_opMUL_zzxyy(64, 16, 64, op) \
+        __DEF_FPPOLxx_opMUL_zzxyy(64, 32, 64, op)
 
-__DECL_FPPOLxx_opMUL_ALL()
-__DECL_FPPOLxx_opMUL_ALL(add)
-__DECL_FPPOLxx_opMUL_ALL(sub)
+__DEF_FPPOLxx_opMUL_ALL()
+__DEF_FPPOLxx_opMUL_ALL(add)
+__DEF_FPPOLxx_opMUL_ALL(sub)
 
-#undef __DECL_FPPOLxx_opMUL
-#undef __DECL_FPPOLxx_opMUL_yy
-#undef __DECL_FPPOLxx_opMUL_yyxzz
-#undef __DECL_FPPOLxx_opMUL_zzxyy
-#undef __DECL_FPPOLxx_opMUL_ALL
+#undef __DEF_FPPOLxx_opMUL
+#undef __DEF_FPPOLxx_opMUL_yy
+#undef __DEF_FPPOLxx_opMUL_yyxzz
+#undef __DEF_FPPOLxx_opMUL_zzxyy
+#undef __DEF_FPPOLxx_opMUL_ALL
 
 
 
@@ -165,23 +165,23 @@ __DECL_FPPOLxx_opMUL_ALL(sub)
 
 
 // All declarations bundled up into a single macro.
-#define __DECL_FPPOL_opMUL_ALL(op)     \
-  __DECL_FPPOL_opMUL      (        op) \
-  __DECL_FPPOL_opMUL_xx   (16,     op) \
-  __DECL_FPPOL_opMUL_xx   (32,     op) \
-  __DECL_FPPOL_opMUL_xx   (64,     op) \
-  __DECL_FPPOL_opMUL_xx   (16,     op) \
-  __DECL_FPPOL_opMUL_xx   (32,     op) \
-  __DECL_FPPOL_opMUL_xx   (64,     op) \
-  __DECL_FPPOL_opMUL_xxxyy(16, 16, op) \
-  __DECL_FPPOL_opMUL_xxxyy(32, 16, op) \
-  __DECL_FPPOL_opMUL_xxxyy(32, 32, op) \
-  __DECL_FPPOL_opMUL_xxxyy(64, 16, op) \
-  __DECL_FPPOL_opMUL_xxxyy(64, 32, op) \
-  __DECL_FPPOL_opMUL_xxxyy(64, 64, op) \
-  __DECL_FPPOL_opMUL_zzxyy(16, 32, op) \
-  __DECL_FPPOL_opMUL_zzxyy(16, 64, op) \
-  __DECL_FPPOL_opMUL_zzxyy(32, 64, op)
+#define __DECL_FPPOL_opMUL_ALL(op)           \
+        __DECL_FPPOL_opMUL      (        op) \
+        __DECL_FPPOL_opMUL_xx   (16,     op) \
+        __DECL_FPPOL_opMUL_xx   (32,     op) \
+        __DECL_FPPOL_opMUL_xx   (64,     op) \
+        __DECL_FPPOL_opMUL_xx   (16,     op) \
+        __DECL_FPPOL_opMUL_xx   (32,     op) \
+        __DECL_FPPOL_opMUL_xx   (64,     op) \
+        __DECL_FPPOL_opMUL_xxxyy(16, 16, op) \
+        __DECL_FPPOL_opMUL_xxxyy(32, 16, op) \
+        __DECL_FPPOL_opMUL_xxxyy(32, 32, op) \
+        __DECL_FPPOL_opMUL_xxxyy(64, 16, op) \
+        __DECL_FPPOL_opMUL_xxxyy(64, 32, op) \
+        __DECL_FPPOL_opMUL_xxxyy(64, 64, op) \
+        __DECL_FPPOL_opMUL_zzxyy(16, 32, op) \
+        __DECL_FPPOL_opMUL_zzxyy(16, 64, op) \
+        __DECL_FPPOL_opMUL_zzxyy(32, 64, op)
 
 __DECL_FPPOL_opMUL_ALL()
 __DECL_FPPOL_opMUL_ALL(add)

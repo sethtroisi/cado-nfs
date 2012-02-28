@@ -128,11 +128,11 @@ static const unsigned char __digit_val[] = {
 
 
 // All definitions bundled up into a single macro.
-#define __DEF_FPPOLxx_IO_ALL(sz) \
-  __DEF_FPPOLxx_GET_STR     (sz) \
-  __DEF_FPPOLxx_SET_STR     (sz) \
-  __DEF_FPPOLxx_OUT         (sz) \
-  __DEF_FPPOLxx_INP         (sz)
+#define __DEF_FPPOLxx_IO_ALL(sz)  \
+        __DEF_FPPOLxx_GET_STR(sz) \
+        __DEF_FPPOLxx_SET_STR(sz) \
+        __DEF_FPPOLxx_OUT    (sz) \
+        __DEF_FPPOLxx_INP    (sz)
 
 __DEF_FPPOLxx_IO_ALL(16)
 __DEF_FPPOLxx_IO_ALL(32)

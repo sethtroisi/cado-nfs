@@ -40,9 +40,9 @@
 
 // All declarations bundled up into a single macro.
 #define __DECL_FPPOLxx_DIV_ALL(sz) \
-  __DECL_FPPOLxx_DIVREM       (sz) \
-  __DECL_FPPOLxx_DIV          (sz) \
-  __DECL_FPPOLxx_REM          (sz)
+        __DECL_FPPOLxx_DIVREM (sz) \
+        __DECL_FPPOLxx_DIV    (sz) \
+        __DECL_FPPOLxx_REM    (sz)
 
 __DECL_FPPOLxx_DIV_ALL(16)
 __DECL_FPPOLxx_DIV_ALL(32)
