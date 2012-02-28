@@ -16,7 +16,6 @@
 
 #include "merge_opts.h"
 #include "sparse.h"
-#include "dclist.h"
 #include "filter_matrix.h"
 #include "mst.h"
 #include "report.h"
