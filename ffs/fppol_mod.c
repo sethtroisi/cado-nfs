@@ -1,5 +1,6 @@
 #include "fppol_mod.h"
 #include "fppol_internal.h"
+#include "cppmeta.h"
 #include "macros.h"
 
 

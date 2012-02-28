@@ -5,6 +5,8 @@
 #ifndef __FPPOL_MUL_H__
 #define __FPPOL_MUL_H__
 
+#include "cppmeta.h"
+
 
 
 /* Macros for internal use.
