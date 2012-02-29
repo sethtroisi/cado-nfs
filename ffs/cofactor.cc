@@ -7,7 +7,32 @@ NTL_CLIENT
 #include "types.h"
 #include "macros.h"
 #include "norm.h"
+#include "string.h"
 
+void GF2x2fppol(fppol_t r, GF2X & p)
+{
+    if (p == 0) {
+        fppol_set_zero(r);
+        return;
+    }
+    unsigned char *pbytes;
+    int degp = deg(p);
+    int n = 1 + degp/8;  // number of bytes.
+    pbytes = (unsigned char *) malloc (n*sizeof(unsigned char));
+    ASSERT_ALWAYS(pbytes != NULL);
+    BytesFromGF2X(pbytes, p, n);
+    unsigned int alloc = 1 + degp/64;
+    if (r[0].alloc < alloc) {
+        r[0].limb = (fppol64_t *) realloc(r[0].limb, alloc*sizeof(fppol64_t));
+        r[0].alloc = alloc;
+        ASSERT_ALWAYS(r[0].limb != NULL);
+    }
+    memset(r[0].limb, 0, alloc*sizeof(fppol64_t));
+    for (int i = 0; i < n; ++i)
+        r[0].limb[i/8][0] |= ((uint64_t)pbytes[i]) << (8*(i%8));
+    r[0].deg = degp;
+    free(pbytes);
+}
 
 void fppol2GF2x(GF2X & r, fppol_t p)
 {
@@ -66,7 +91,7 @@ int factor_survivor(fppol_t a, fppol_t b, ffspol_t* F, int *B)
 
     // Yeah... we've got a relation!
     fppol_out(stdout, a); printf(",");
-    fppol_out(stdout, b); printf(": ");
+    fppol_out(stdout, b); printf(":");
 
     vec_pair_GF2X_long factors;
     for (int twice = 0; twice < 2; twice++) {
@@ -74,8 +99,17 @@ int factor_survivor(fppol_t a, fppol_t b, ffspol_t* F, int *B)
         fppol2GF2x(NN, Nab);
         CanZass(factors, NN);
         // print factors.
-        GF2X::HexOutput = 1;
-        cout << factors;
+        fppol_t toprint;
+        fppol_init(toprint);
+        for (int i = 0; i < factors.length(); ++i) {
+            GF2x2fppol(toprint, factors[i].a);
+            for (int j = 0; j < factors[i].b; ++j) {
+                fppol_out(stdout, toprint); 
+                if ((i < factors.length()-1) || (j < factors[i].b-1))
+                    printf(",");
+            }
+        }
+        fppol_clear(toprint);
         if (twice == 0)
             printf(":");
     }
