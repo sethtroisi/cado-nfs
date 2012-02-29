@@ -22,8 +22,8 @@ int fillin_basis(ijvec_t *V, fbprime_t i, fbprime_t j, int degI,
     fbprime_set(ii, i);
     fbprime_set(jj, j);
     while( (fbprime_deg(ii) < degI) && (fbprime_deg(jj) < degJ)) {
-        ij_set_fbprime(V->i, ii);
-        ij_set_fbprime(V->j, jj);
+        ij_set_fbprime(V[0]->i, ii);
+        ij_set_fbprime(V[0]->j, jj);
         k++;
         V++;
         fbprime_shl(ii, ii, 1);
@@ -44,6 +44,7 @@ void sieveFB(unsigned char *S, factorbase_t FB, int I, int J,
         fbideal_t gothp = FB.elts[ii];
         fbprime_t lambda_p;
         int L = gothp.degp;
+        //printf("%u %u\n", gothp.p[0], gothp.r[0]);
         
         //******************************************************************
         // compute the p-lattice, in the form of a basis of a Fp-vector space
@@ -57,6 +58,7 @@ void sieveFB(unsigned char *S, factorbase_t FB, int I, int J,
             fbprime_rem(t0, t0, gothp.p);
             if (fbprime_is_zero(t0)) {
                 // This is a projective root! Yurk!
+                //printf("\n");
                 continue;
             }
             fbprime_invmod(t0, t0, gothp.p);
@@ -65,23 +67,24 @@ void sieveFB(unsigned char *S, factorbase_t FB, int I, int J,
             fbprime_rem(t1, t1, gothp.p);
             fbprime_mulmod(lambda_p, t0, t1, gothp.p);
         }
+        //printf("%u\n", lambda_p[0]);
 
         // The form of the basis is different for small p and for large p.
         if (L < I) {
             // Basis is { (t^k*p, 0) : k in [0..I-L-1] } join
             //          { (lambda*t^k mod p, t^k) : k in [0..J-1] }.
             bas.dim = I+J - L;
-            ij_set_fbprime(bas.vec[0].i, gothp.p);
-            ij_set_zero(bas.vec[0].j);
+            ij_set_fbprime(bas.vec[0]->i, gothp.p);
+            ij_set_zero(bas.vec[0]->j);
             for (int jj = 1; jj < I-L; ++jj) {
-                ij_shl(bas.vec[jj].i, bas.vec[jj-1].i, 1);
-                ij_set_zero(bas.vec[jj].j);
+                ij_shl(bas.vec[jj]->i, bas.vec[jj-1]->i, 1);
+                ij_set_zero(bas.vec[jj]->j);
             }
-            ij_set_fbprime(bas.vec[I-L].i, lambda_p);
-            ij_set_one(bas.vec[I-L].j);
+            ij_set_fbprime(bas.vec[I-L]->i, lambda_p);
+            ij_set_one(bas.vec[I-L]->j);
             for (int jj = I-L+1; jj < I-L+J; ++jj) {
-                ij_shl1mod(bas.vec[jj].i, bas.vec[jj-1].i, gothp.p);
-                ij_set_ti(bas.vec[jj].j, jj - (I-L));
+                ij_shl1mod(bas.vec[jj]->i, bas.vec[jj-1]->i, gothp.p);
+                ij_set_ti(bas.vec[jj]->j, jj - (I-L));
             }
         } else {
             int dim = 0;
@@ -108,13 +111,24 @@ void sieveFB(unsigned char *S, factorbase_t FB, int I, int J,
                 fbprime_set(alpha1, alpha2);
                 fbprime_set(beta1, beta2);
                 ff = fillin_basis(bas.vec+dim, alpha1, beta1, 
-                        fbprime_deg(alpha0), J);
+                        MIN(fbprime_deg(alpha0), I), J);
                 dim += ff;
             }
             // Conjecture: the final dimension is I+J-L
-            ASSERT_ALWAYS(dim == I+J-L);
+            //ASSERT_ALWAYS(dim == I+J-L);
             bas.dim=dim;
         }
+
+        // Print basis
+#if 0
+        for (int i = 0; i < bas.dim; ++i) {
+            printf("vec %d: ", i);
+            ij_out(stdout, bas.vec[i]->i);
+            printf(" ");
+            ij_out(stdout, bas.vec[i]->j);
+            printf("\n");
+        }
+#endif
 
         //******************************************************************
         // visit this vector space and subtract the contribution of
@@ -124,13 +138,23 @@ void sieveFB(unsigned char *S, factorbase_t FB, int I, int J,
         for (unsigned int k = 0; k < (1U<<bas.dim); ++k) {
             // at some point, we might deal with *affine* spaces.
             // In that case, just change the initial value of V.
-            ijvec_t V = { {0}, {0}};  
-            unsigned l = k;
+            ijvec_t V = {{ {0}, {0}}};  
+            unsigned int l = k;
             for (int i = 0; i < bas.dim; ++i, l>>= 1)
-                if (l & 1UL)
+                if (l & 1U)
                     ijvec_add(V, V, bas.vec[i]);
+            /*
+            printf("vec %u: ", k);
+            ij_out(stdout, V->i);
+            printf(" ");
+            ij_out(stdout, V->j);
+            printf("\n"); */
+
             ijpos_t pos = ijvec2pos(V, I, J);
-            ASSERT(S[pos] > gothp.degp); 
+            if (pos != 0 && (S[pos] < gothp.degp)) {
+                fprintf(stderr, "faulty pos is %u\n", pos);
+            }
+            ASSERT(pos == 0 || (S[pos] > gothp.degp)); 
             S[pos] -= gothp.degp;
         }
     }

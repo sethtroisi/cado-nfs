@@ -211,6 +211,7 @@ typedef struct {
     ai_t a1;
     ai_t b0;
     ai_t b1;
+    int side;
 } qlat_struct_t;
 
 typedef qlat_struct_t qlat_t[1];
@@ -229,11 +230,13 @@ typedef struct {
 typedef struct {
     ij_t i;
     ij_t j;
-} ijvec_t;
+} ijvec_struct;
+
+typedef ijvec_struct ijvec_t[1];
 
 static inline void ijvec_add(ijvec_t W, ijvec_t V, ijvec_t U) {
-    ij_add(W.i, V.i, U.i);
-    ij_add(W.j, V.j, U.j);
+    ij_add(W->i, V->i, U->i);
+    ij_add(W->j, V->j, U->j);
 }
 
 // corresponding position in S. (might return 2 integers at some point)
@@ -242,14 +245,12 @@ typedef unsigned int ijpos_t;
 // conversion: to be adapted for each case.
 static inline ijpos_t ijvec2pos(ijvec_t V,
         MAYBE_UNUSED int I, MAYBE_UNUSED int J) {
-    return (ijpos_t)(V.i[0])*(1U<<I) + (ijpos_t)V.j[0];
+    return (ijpos_t)(V->i[0])*(1U<<I) + (ijpos_t)V->j[0];
 }
-static inline ijvec_t ijpos2vec(ijpos_t P, 
+static inline void ijpos2vec(ijvec_t V, ijpos_t P, 
         MAYBE_UNUSED int I, MAYBE_UNUSED int J) {
-    ijvec_t V;
-    V.i[0] = (P) / (1U<<I);    // TODO: bit-fiddling, here
-    V.j[0] = (P) % (1U<<I);
-    return V;
+    V->i[0] = (P) / (1U<<I);    // TODO: bit-fiddling, here
+    V->j[0] = (P) % (1U<<I);
 }
 
 
