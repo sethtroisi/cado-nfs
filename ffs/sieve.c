@@ -24,7 +24,7 @@ int main(int argc, char **argv)
     int I, J;  // strict bound on the degrees of the (i,j)
     unsigned char threshold[2] = { 50, 50};  // should not be fixed here.
     int lpb[2] = { 25, 25};  // should not be fixed here.
-    I = 8; J = 8;
+    I = 9; J = 9;
     int noerr;
 
     // Hardcoded GF(2^127) example.
@@ -134,8 +134,8 @@ int main(int argc, char **argv)
 
         // mark survivors
         unsigned char *Sptr = S;
-        for (unsigned int i = 0; i < (1U<<I); ++i)
-            for (unsigned int j = 0; j < (1U<<J); ++j, ++Sptr)
+        for (unsigned int j = 0; j < (1U<<J); ++j)
+            for (unsigned int i = 0; i < (1U<<I); ++i, ++Sptr)
             {
                 if (*Sptr > threshold[side])
                     *Sptr = 255; 
@@ -151,11 +151,11 @@ int main(int argc, char **argv)
         ij_t ii, jj;
         fppol_init(a);
         fppol_init(b);
-        for (unsigned int i = 0; i < (1U<<I); ++i)
-            for (unsigned int j = 0; j < (1U<<J); ++j, ++Sptr)
+        for (unsigned int j = 0; j < (1U<<J); ++j)
+            for (unsigned int i = 0; i < (1U<<I); ++i, ++Sptr)
             {
                 if (*Sptr != 255) {
-                    printf("i,j = %u %u\n", i, j);
+    //                printf("i,j = %u %u\n", i, j);
                     ii[0] = i;
                     jj[0] = j;
                     ij2ab(a, b, ii, jj, qlat);

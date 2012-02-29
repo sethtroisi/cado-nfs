@@ -8,7 +8,7 @@ OPTFLAGS =
 WARNFLAGS = -Wall -Wextra -pedantic
 
 CPPFLAGS    =
-CFLAGS      = $(OPTFLAGS) $(WARNFLAGS) -std=c99 -g
+CFLAGS      = $(OPTFLAGS) $(WARNFLAGS) -std=c99 -g # -DTRACE_POS=49755
 CXXFLAGS    = $(OPTFLAGS) $(WARNFLAGS) -std=c++0x -g
 TARGET_ARCH = -mtune=native -march=native 
 LDFLAGS     = 

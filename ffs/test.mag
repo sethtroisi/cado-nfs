@@ -44,3 +44,8 @@ function Normf(i,j)
     a,b := ij2ab(i,j);
     return Numerator(Evaluate(F, a/b)*b^Degree(F));
 end function;
+
+function Normg(i,j)
+    a,b := ij2ab(i,j);
+    return Numerator(Evaluate(G, a/b)*b^Degree(G));
+end function;

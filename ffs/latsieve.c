@@ -151,10 +151,19 @@ void sieveFB(unsigned char *S, factorbase_t FB, int I, int J,
             printf("\n"); */
 
             ijpos_t pos = ijvec2pos(V, I, J);
+#ifdef TRACE_POS
+            if (pos == TRACE_POS) {
+                fprintf(stderr, "TRACE_POS(%d): ", pos);
+                fbprime_out(stderr, gothp.p); fprintf(stderr, " ");
+                fbprime_out(stderr, gothp.r); fprintf(stderr, "\n");
+                fprintf(stderr, "TRACE_POS(%d): degnorm is now %d\n", pos,
+                        S[pos]-gothp.degp);
+            }
+#endif
             if (pos != 0 && (S[pos] < gothp.degp)) {
                 fprintf(stderr, "faulty pos is %u\n", pos);
             }
-            ASSERT(pos == 0 || (S[pos] > gothp.degp)); 
+            ASSERT(pos == 0 || (S[pos] >= gothp.degp)); 
             S[pos] -= gothp.degp;
         }
     }

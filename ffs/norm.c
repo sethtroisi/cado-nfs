@@ -149,11 +149,29 @@ void init_norms(unsigned char *S, ffspol_t ffspol, int I, int J, qlat_t qlat,
   if (sqside)
       degq = sq_deg(qlat->q);
   
+  // TODO: exchange those 2 loops to preserve locality.
   for (unsigned int ii = 0; ii < (1u << I); ii++) {
     i[0] = ii;
     for (unsigned int jj = 0; jj < (1u << J); jj++) {	  
       int position = ii + (1u << I)*jj;
       j[0] = jj;	  
+#ifdef TRACE_POS
+      if (position == TRACE_POS) {
+          fprintf(stderr, "TRACE_POS(%d): (i,j) = (", position);
+          ij_out(stderr, i); fprintf(stderr, " ");
+          ij_out(stderr, j); fprintf(stderr, ")\n");
+          fprintf(stderr, "TRACE_POS(%d): norm = ", position);
+          fppol_t norm;
+          fppol_init(norm);
+          ij2ab(a, b, i, j, qlat);
+          ffspol_norm(norm, &ffspol, a, b);
+          fppol_out(stderr, norm);
+          fppol_clear(norm);
+          fprintf(stderr, "\n");
+          fprintf(stderr, "TRACE_POS(%d): degnorm - deg(sq) = %d\n",
+                  position, fppol_deg(norm)-degq);
+      }
+#endif
       if (S[position] != 255) {
 	ij2ab(a, b, i, j, qlat);
 	int deg = deg_norm(&ffspol, a, b);
