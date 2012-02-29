@@ -157,7 +157,7 @@ int main(int argc, char **argv)
     {
         unsigned char *Sptr = S;
         fppol_t a, b;
-        ij_t ii, jj;
+        ij_t ii, jj, gg;
         fppol_init(a);
         fppol_init(b);
         for (unsigned int j = 0; j < (1U<<J); ++j)
@@ -167,6 +167,9 @@ int main(int argc, char **argv)
     //                printf("i,j = %u %u\n", i, j);
                     ii[0] = i;
                     jj[0] = j;
+                    ij_gcd(gg, ii, jj);
+                    if (ij_deg(gg) != 0)
+                        continue;
                     ij2ab(a, b, ii, jj, qlat);
                     factor_survivor(a, b, ffspol, lpb);
                 }

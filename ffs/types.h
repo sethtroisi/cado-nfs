@@ -178,6 +178,8 @@ __DECL_ALIAS_TYPE(ij)
   __DECL_ALIAS_FUN (void, type, mulmod,         type##_ptr,    type##_srcptr, \
                                                 type##_srcptr, type##_srcptr) \
   __DECL_ALIAS_FUN (int,  type, invmod,         type##_ptr,                   \
+                                                type##_srcptr, type##_srcptr) \
+  __DECL_ALIAS_FUN (void, type, gcd,            type##_ptr,                   \
                                                 type##_srcptr, type##_srcptr)
 
 __DECL_ALIAS_ALL(sq)

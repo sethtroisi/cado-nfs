@@ -109,6 +109,7 @@ void fppol_trim(fppol_ptr r);
 #include "fppol_mul.h"
 #include "fppol_div.h"
 #include "fppol_mod.h"
+#include "fppol_gcd.h"
 #include "fppol_io.h"
 
 #ifdef __cplusplus

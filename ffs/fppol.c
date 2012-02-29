@@ -197,6 +197,10 @@ int main(int argc, char **argv)
     printf("p - (q*r+s) = "); fppol64_out(stdout, r); printf("\n");
   }
 
+  fppol64_gcd(r, p, q);
+  printf("gcd(p, q)  = "); fppol64_out(stdout, r); printf("\n");
+
+
   fppol_t mp, mq, mr, ms, ma, mb;
   fppol_init(mp);
   fppol_init(mq);
@@ -236,6 +240,10 @@ int main(int argc, char **argv)
   fppol_add(ma, ma, mb);
   fppol_sub(ma, ms, ma);
   printf("check  = "); fppol_out(stdout, ma); printf(" [%d]\n", fppol_deg(ma));
+  
+  fppol_gcd(mr, mp, mq);
+  printf("gcd(p, q)  = "); fppol_out(stdout, mr);
+  printf(" [%d]\n", fppol_deg(mr));
 
   ret = fppol_invmod(ma, mr, ms);
   printf("1/r %%s = ");
