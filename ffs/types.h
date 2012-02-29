@@ -146,6 +146,7 @@ __DECL_ALIAS_TYPE(ij)
                                                 fp_srcptr,     unsigned)      \
   __DECL_ALIAS_FUN (int,  type, is_zero,        type##_srcptr)                \
   __DECL_ALIAS_FUN (int,  type, eq,             type##_srcptr, type##_srcptr) \
+  __DECL_ALIAS_FUN (int,  type, is_monic,       type##_srcptr)                \
   __DECL_ALIAS_FUN (int,  type, is_valid,       type##_srcptr)                \
   __DECL_ALIAS_FUN (void, type, opp,            type##_ptr,    type##_srcptr) \
   __DECL_ALIAS_FUN (void, type, add,            type##_ptr,                   \
