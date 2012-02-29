@@ -101,7 +101,14 @@ int deg_norm(ffspol_t *ffspol, fppol_t a, fppol_t b)
 {
   int deg, max_deg = -1;
   int repeated = 1;
+  static int c_deg = 0;
+  static int c_tot = 0;
 
+#if 0
+  if ((c_tot & 0xFFF) == 1)
+    fprintf(stderr, "deg_norm stat: %d / %d\n", c_deg, c_tot);
+#endif
+  c_tot++;
   for (int i = 0; i < ffspol->deg + 1; i++) {
     deg = fppol_deg(ffspol->coeffs[i]) + i * fppol_deg(a) + (ffspol->deg - i) * fppol_deg(b);
     max_deg = max_special(max_deg, deg, &repeated);
@@ -109,8 +116,10 @@ int deg_norm(ffspol_t *ffspol, fppol_t a, fppol_t b)
   /* For characteristic p */
   /* if (repeated == 1) */
   /* For characteristic 2 only */
-  if (repeated & 1u)
-    return max_deg;
+  if (repeated & 1u) {
+      c_deg++;
+      return max_deg;
+  }
   else {
     /* We should think about a cheaper way to compute this degree
        otherwise */
