@@ -131,14 +131,23 @@ int deg_norm(ffspol_t *ffspol, fppol_t a, fppol_t b)
    unsigned char.
    For the moment i and j are assumed to be unsigned int for their
    limb part 
-   Enumerating i, j the following way only works for charac. 2 */
+   Enumerating i, j the following way only works for charac. 2 
+   
+   The last parameter is a boolean that tells whether we are on the
+   side of the special q. If so, then the degree of q must be subtracted
+   from the norm.
+   */
 
-void init_norms(unsigned char *S, ffspol_t ffspol, int I, int J, qlat_t qlat)
+void init_norms(unsigned char *S, ffspol_t ffspol, int I, int J, qlat_t qlat,
+        int sqside)
 {
   fppol_t a, b;
   fppol_init(a);
   fppol_init(b);
   ij_t i, j;
+  int degq = 0;
+  if (sqside)
+      degq = sq_deg(qlat->q);
   
   for (unsigned int ii = 0; ii < (1u << I); ii++) {
     i[0] = ii;
@@ -150,10 +159,10 @@ void init_norms(unsigned char *S, ffspol_t ffspol, int I, int J, qlat_t qlat)
 	int deg = deg_norm(&ffspol, a, b);
 	if (deg > 0) {
 	  ASSERT_ALWAYS(deg < 255);
-	  S[position] = deg;
+	  S[position] = deg - degq;
 	}
 	else
-	  S[position] = 0;
+	  S[position] = 255;
       }
     }
   }
