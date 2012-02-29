@@ -28,7 +28,7 @@ function BuildFactorBases(f, g, ba, br)
         F2p := ext<GF(2) | p>;
         PF2p := PolynomialRing(F2p);
         x := PF2p.1;
-        fp := Evaluate(f, [x, PF2p!F2p.1]);
+        fp := Evaluate(g, [x, PF2p!F2p.1]);
         roo := Roots(fp);
         for rr in roo do
             Append(~FBr, [p, Parent(p)!Eltseq(rr[1])]);
@@ -43,8 +43,8 @@ function UP2Int(f)
     return Seqint([Integers()!x : x in Eltseq(f)], 2);
 end function;
 
-ba := 8;
-br := 8;
+ba := 12;
+br := 12;
 UP<t> := PolynomialRing(GF(2));
 MP<x,t> := PolynomialRing(GF(2), 2);
 F := x^5 + x*t + x + t^2;
