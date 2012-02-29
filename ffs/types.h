@@ -162,6 +162,12 @@ __DECL_ALIAS_TYPE(ij)
   __DECL_ALIAS_FUN (int,      type, set_str,    type##_ptr,    const char *)  \
   __DECL_ALIAS_FUN (void,     type, out,        FILE *,        type##_srcptr) \
   __DECL_ALIAS_FUN (int,      type, inp,        type##_ptr,    FILE *)        \
+  __DECL_ALIAS_FUN (uint64_t, type, get_ui,       type##_srcptr, unsigned)    \
+  __DECL_ALIAS_FUN (int,      type, set_ui,       type##_ptr,    uint64_t,    \
+                                                  unsigned)                   \
+  __DECL_ALIAS_FUN (uint64_t, type, monic_get_ui, type##_srcptr, unsigned)    \
+  __DECL_ALIAS_FUN (int,      type, monic_set_ui, type##_ptr,    uint64_t,    \
+                                                  unsigned)                   \
   __DECL_ALIAS_MUL      (type)                                                \
   __DECL_ALIAS_MUL_yy   (fppol, type)                                         \
   __DECL_ALIAS_MUL_yyxzz(fppol, type, sq)                                     \
