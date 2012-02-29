@@ -65,7 +65,9 @@ int factor_survivor(fppol_t a, fppol_t b, ffspol_t* F, int *B)
     }
 
     // Yeah... we've got a relation!
-    printf("a b:"); 
+    fppol_out(stdout, a); printf(",");
+    fppol_out(stdout, b); printf(": ");
+
     vec_pair_GF2X_long factors;
     for (int twice = 0; twice < 2; twice++) {
         ffspol_norm(Nab, &F[twice], a, b);

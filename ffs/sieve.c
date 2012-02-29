@@ -12,8 +12,9 @@
 #include "latsieve.h"
 #include "norm.h"
 #include "cofactor.hh"
+#include "timing.h"
 
-#define EXPENSIVE_CHECK
+// #define EXPENSIVE_CHECK
 
 // usage: ./a.out q rho
 int main(int argc, char **argv)
@@ -81,6 +82,10 @@ int main(int argc, char **argv)
     S = (unsigned char *) malloc ((1<<I)*(1<<J)*sizeof(unsigned char));
     ASSERT_ALWAYS(S != NULL);
     memset(S, 0, (1<<I)*(1<<J));
+    S[0] = 255;
+    double t_norms = 0;
+    double t_sieve = 0;
+    double t_cofact = 0;
     
     for (int twice = 0; twice < 2; twice++) {
         int side = twice; // put 1-twice here, to do the rational side first.
@@ -88,7 +93,9 @@ int main(int argc, char **argv)
         // Norm initialization.
         // convention: if a position contains 255, it must stay like
         // this. It means that the other side is hopeless.
+        t_norms -= seconds();
         init_norms(S, ffspol[side], I, J, qlat, qlat->side == side);
+        t_norms += seconds();
 
 #ifdef EXPENSIVE_CHECK
         // Check special-q divides the norm
@@ -130,7 +137,9 @@ int main(int argc, char **argv)
 #endif
 
         // sieve
+        t_sieve -= seconds();
         sieveFB(S, FB[side], I, J, qlat);
+        t_sieve += seconds();
 
         // mark survivors
         unsigned char *Sptr = S;
@@ -142,8 +151,8 @@ int main(int argc, char **argv)
             }
     }
 
-    S[0] = 255;
 
+    t_cofact -= seconds();
     // survivors cofactorization
     {
         unsigned char *Sptr = S;
@@ -165,6 +174,9 @@ int main(int argc, char **argv)
         fppol_clear(a);
         fppol_clear(b);
     }
+    t_cofact += seconds();
+
+    fprintf(stderr, "Time spent: %1.1f s (norms); %1.1f s (sieve); %1.1f s (cofact)\n", t_norms, t_sieve, t_cofact);
 
     return EXIT_SUCCESS;
 }
