@@ -270,6 +270,29 @@ int main(int argc, char **argv)
   fppol_clear(ma);
   fppol_clear(mb);
 
+  unsigned n = 0;
+  for (uint64_t i = 0, j; i < 243<<8; ++i) {
+    if (!fppol64_set_ui(r, i, 6))
+      continue;
+    if ((j = fppol64_get_ui(r, 6)) != i) {
+      ++n;
+      printf("%lu: ", i);
+      fppol64_out(stdout, r);
+      printf(" != %lu\n", j);
+    }
+  }
+  for (uint64_t i = 0, j; i < 122<<8; ++i) {
+    if (!fppol64_monic_set_ui(r, i, 6))
+      continue;
+    if ((j = fppol64_monic_get_ui(r, 6)) != i) {
+      ++n;
+      printf("%lu: ", i);
+      fppol64_out(stdout, r);
+      printf(" != %lu\n", j);
+    }
+  }
+  printf("%u conversion errors\n", n);
+
   return EXIT_SUCCESS;
 }
 

@@ -312,30 +312,79 @@ __DECL_FPPOLxx_ARITH_ALL(64)
   { for (unsigned k = 0; k < __FP_BITS; ++k) r[k] = i < sz ? p[k] >> i : 0; }
 
 
+// Conversion of an n-term polynomial to uint64_t.
+// Generic prototype:
+//   uint64_t fppol<sz>_get_ui(fppol<sz>_srcptr p, unsigned n);
+#define __DEF_FPPOLxx_GET_UI(sz)                                             \
+  static inline                                                              \
+  uint64_t fppol##sz##_get_ui(fppol##sz##_srcptr p, MAYBE_UNUSED unsigned n) \
+  { uint64_t r; __FP_GET_UI(sz, r, p, n); return r; }
+
+
+// Conversion of an n-term polynomial from uint64_t.
+// Return 1 if successful.
+// /!\ Note however that the degree is not checked: if the resulting
+//     polynomial has more than n terms, no error is reported.
+// Generic prototype:
+//   int fppol<sz>_set_ui(fppol<sz>_ptr r, uint64_t x, unsigned n);
+#define __DEF_FPPOLxx_SET_UI(sz)                        \
+  static inline                                         \
+  int fppol##sz##_set_ui(fppol##sz##_ptr r, uint64_t x, \
+                         MAYBE_UNUSED unsigned n)       \
+  { __FP_SET_UI(sz, r, x, n); return 1; }
+
+
+// Conversion of an n-term monic polynomial to uint64_t.
+// Generic prototype:
+//   uint64_t fppol<sz>_monic_get_ui(fppol<sz>_srcptr p, unsigned n);
+#define __DEF_FPPOLxx_MONIC_GET_UI(sz)                       \
+  static inline                                              \
+  uint64_t fppol##sz##_monic_get_ui(fppol##sz##_srcptr p,    \
+                                    MAYBE_UNUSED unsigned n) \
+  { uint64_t r; __FP_MONIC_GET_UI(sz, r, p, n); return r; }
+
+
+// Conversion of an n-term monic polynomial from uint64_t.
+// Return 1 if successful.
+// /!\ Note however that the degree is not checked: if the resulting
+//     polynomial has more than n terms, no error is reported.
+// Generic prototype:
+//   int fppol<sz>_monic_set_ui(fppol<sz>_ptr r, uint64_t x, unsigned n);
+#define __DEF_FPPOLxx_MONIC_SET_UI(sz)                        \
+  static inline                                               \
+  int fppol##sz##_monic_set_ui(fppol##sz##_ptr r, uint64_t x, \
+                               MAYBE_UNUSED unsigned n)       \
+  { __FP_MONIC_SET_UI(sz, r, x, n); return 1; }
+
+
 // All definitions bundled up into a single macro.
-#define __DEF_FPPOLxx_ARITH_ALL(sz)     \
-        __DEF_FPPOLxx_SET_ZERO (sz)     \
-        __DEF_FPPOLxx_SET_ONE  (sz)     \
-        __DEF_FPPOLxx_SET_TI   (sz)     \
-        __DEF_FPPOLxx_SET      (sz)     \
-        __DEF_FPPOLxx_SET_yy   (sz, 16) \
-        __DEF_FPPOLxx_SET_yy   (sz, 32) \
-        __DEF_FPPOLxx_SET_yy   (sz, 64) \
-        __DEF_FPPOLxx_SET_MP   (sz)     \
-        __DEF_FPPOLxx_GET_COEFF(sz)     \
-        __DEF_FPPOLxx_SET_COEFF(sz)     \
-        __DEF_FPPOLxx_FOLD_OR  (sz)     \
-        __DEF_FPPOLxx_IS_ZERO  (sz)     \
-        __DEF_FPPOLxx_EQ       (sz)     \
-        __DEF_FPPOLxx_IS_MONIC (sz)     \
-        __DEF_FPPOLxx_IS_VALID (sz)     \
-        __DEF_FPPOLxx_OPP      (sz)     \
-        __DEF_FPPOLxx_ADD      (sz)     \
-        __DEF_FPPOLxx_SUB      (sz)     \
-        __DEF_FPPOLxx_SMUL     (sz)     \
-        __DEF_FPPOLxx_SDIV     (sz)     \
-        __DEF_FPPOLxx_SHL      (sz)     \
-        __DEF_FPPOLxx_SHR      (sz)
+#define __DEF_FPPOLxx_ARITH_ALL(sz)        \
+        __DEF_FPPOLxx_SET_ZERO    (sz)     \
+        __DEF_FPPOLxx_SET_ONE     (sz)     \
+        __DEF_FPPOLxx_SET_TI      (sz)     \
+        __DEF_FPPOLxx_SET         (sz)     \
+        __DEF_FPPOLxx_SET_yy      (sz, 16) \
+        __DEF_FPPOLxx_SET_yy      (sz, 32) \
+        __DEF_FPPOLxx_SET_yy      (sz, 64) \
+        __DEF_FPPOLxx_SET_MP      (sz)     \
+        __DEF_FPPOLxx_GET_COEFF   (sz)     \
+        __DEF_FPPOLxx_SET_COEFF   (sz)     \
+        __DEF_FPPOLxx_FOLD_OR     (sz)     \
+        __DEF_FPPOLxx_IS_ZERO     (sz)     \
+        __DEF_FPPOLxx_EQ          (sz)     \
+        __DEF_FPPOLxx_IS_MONIC    (sz)     \
+        __DEF_FPPOLxx_IS_VALID    (sz)     \
+        __DEF_FPPOLxx_OPP         (sz)     \
+        __DEF_FPPOLxx_ADD         (sz)     \
+        __DEF_FPPOLxx_SUB         (sz)     \
+        __DEF_FPPOLxx_SMUL        (sz)     \
+        __DEF_FPPOLxx_SDIV        (sz)     \
+        __DEF_FPPOLxx_SHL         (sz)     \
+        __DEF_FPPOLxx_SHR         (sz)     \
+        __DEF_FPPOLxx_GET_UI      (sz)     \
+        __DEF_FPPOLxx_SET_UI      (sz)     \
+        __DEF_FPPOLxx_MONIC_GET_UI(sz)     \
+        __DEF_FPPOLxx_MONIC_SET_UI(sz)
 
 __DEF_FPPOLxx_ARITH_ALL(16)
 __DEF_FPPOLxx_ARITH_ALL(32)
@@ -363,6 +412,10 @@ __DEF_FPPOLxx_ARITH_ALL(64)
 #undef __DEF_FPPOLxx_SDIV
 #undef __DEF_FPPOLxx_SHL
 #undef __DEF_FPPOLxx_SHR
+#undef __DEF_FPPOLxx_GET_UI
+#undef __DEF_FPPOLxx_SET_UI
+#undef __DEF_FPPOLxx_MONIC_GET_UI
+#undef __DEF_FPPOLxx_MONIC_SET_UI
 #undef __DEF_FPPOLxx_ARITH_ALL
 
 

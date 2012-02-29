@@ -21,7 +21,8 @@ f3_DEF = USE_F3
 .PHONY: all clean
 
 define BUILD_template
-  $(1)_OBJ      = $$(OBJ:.o=.$(1).o)
+  $(1)_OBJ      = $$(filter-out $$(foreach f,$$(FIELDS),$$(f)pol.$(1).o), \
+                     $$(OBJ:.o=.$(1).o)) $(1)pol.$(1).o
   $(1)_BIN      = $$(BIN:=.$(1))
   $(1)_CPPFLAGS = -D$$($(1)_DEF)
 

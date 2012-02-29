@@ -60,6 +60,23 @@
 
 
 
+/* Integer conversions.
+ *****************************************************************************/
+
+// Conversion of an n-term polynomial to uint64_t.
+#define __FP_GET_UI(sz, r, p, n) \
+  do { r = (uint64_t)p[0]; } while (0)
+
+// Conversion of an n-term polynomial from uint64_t.
+#define __FP_SET_UI(sz, r, x, n) \
+  do { r[0] = (uint##sz##_t)x; } while (0)
+
+// Conversions to/from uint64_t in the case of monic polynomials.
+#define __FP_MONIC_GET_UI __FP_GET_UI
+#define __FP_MONIC_SET_UI __FP_SET_UI
+
+
+
 /* Multiplications.
  *****************************************************************************/
 
