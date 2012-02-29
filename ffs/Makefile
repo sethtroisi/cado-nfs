@@ -49,7 +49,7 @@ clean::
 	rm -f .depend
 
 .depend: $(SRC) $(INC) cofactor.cc cofactor.hh Makefile
-	$(CC) $(CPPFLAGS) $(CFLAGS) -MM $(SRC)                       \
+	$(CC) $(CPPFLAGS) $(CFLAGS) -MM $(SRC) cofactor.cc           \
 	  | sed "s+\(.*\)\.o+$(foreach f,$(FIELDS),\1.$(f).o )+" >$@
 
 -include .depend
