@@ -47,6 +47,7 @@ void print_qlat_info(qlat_t qlat)
     printf("#   a1 = ");  ai_out(stdout, qlat->a1); printf("\n");
     printf("#   b0 = ");  ai_out(stdout, qlat->b0); printf("\n");
     printf("#   b1 = ");  ai_out(stdout, qlat->b1); printf("\n");
+    printf("#   side = %d\n", qlat->side);
 }
 
 

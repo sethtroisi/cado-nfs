@@ -1,3 +1,5 @@
+load "skewgauss.mag";
+
 PP<t> := PolynomialRing(GF(2));
 MP<x> := PolynomialRing(PP);
 F := x^5 + x*t + x + t^2  ;
@@ -28,5 +30,17 @@ rho := t^23 + t^16 + t^11 + t^10 + t^9 + t^6 + t^3 + t;
 IntegerToString(Seqint([ Integers()!x : x in  Eltseq(q) ], 2), 16),
 IntegerToString(Seqint([ Integers()!x : x in  Eltseq(rho) ], 2), 16);
 
+a0, b0, a1, b1 := skewgauss(q, rho, 0);
 
+function hex2pol(x)
+    return PP!Intseq(StringToInteger(x, 16), 2);
+end function;
 
+function ij2ab(i,j)
+    return i*a0+j*a1, i*b0+j*b1;
+end function;
+
+function Normf(i,j)
+    a,b := ij2ab(i,j);
+    return Numerator(Evaluate(F, a/b)*b^Degree(F));
+end function;

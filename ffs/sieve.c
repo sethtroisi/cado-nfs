@@ -13,6 +13,8 @@
 #include "norm.h"
 #include "cofactor.hh"
 
+#define EXPENSIVE_CHECK
+
 // usage: ./a.out q rho
 int main(int argc, char **argv)
 {
@@ -20,9 +22,9 @@ int main(int argc, char **argv)
     qlat_t qlat;
     factorbase_t FB[2];
     int I, J;  // strict bound on the degrees of the (i,j)
-    unsigned char threshold[2] = { 40, 40};  // should not be fixed here.
-    int lpb[2] = { 22, 22};  // should not be fixed here.
-    I = 7; J = 7;
+    unsigned char threshold[2] = { 50, 50};  // should not be fixed here.
+    int lpb[2] = { 25, 25};  // should not be fixed here.
+    I = 8; J = 8;
     int noerr;
 
     // Hardcoded GF(2^127) example.
@@ -61,6 +63,8 @@ int main(int argc, char **argv)
     noerr = sq_set_str(qlat->rho, argv[2]);
     ASSERT_ALWAYS(noerr);
 
+    qlat->side = 0; // assume that the special-q is on the algebraic side.
+
     // Reduce the q-lattice
     noerr = skewGauss(qlat, 0);
     assert (noerr);
@@ -84,7 +88,46 @@ int main(int argc, char **argv)
         // Norm initialization.
         // convention: if a position contains 255, it must stay like
         // this. It means that the other side is hopeless.
-        init_norms(S, ffspol[side], I, J, qlat);
+        init_norms(S, ffspol[side], I, J, qlat, qlat->side == side);
+
+#ifdef EXPENSIVE_CHECK
+        // Check special-q divides the norm
+        // if (side == qlat->side) {
+        if (1) {
+            ij_t i, j;
+            fppol_t a, b;
+            fppol_init(a);
+            fppol_init(b);
+            fppol_t norm, bigq, rem;
+            fppol_init(norm);
+            fppol_init(bigq);
+            fppol_init(rem);
+            fppol_set_sq(bigq, qlat->q);
+            for (unsigned int ii = 0; ii < (1u << I); ii++) {
+                i[0] = ii;
+                for (unsigned int jj = 0; jj < (1u << J); jj++) {
+                    int position = ii + (1u << I)*jj;
+                    if (position == 0)
+                        continue;
+                    j[0] = jj;
+                    if (S[position] != 255) {
+                        ij2ab(a, b, i, j, qlat);
+                        ffspol_norm(norm, &ffspol[side], a, b);
+                        //ASSERT_ALWAYS(fppol_deg(norm) == S[position]);
+                        if (side == qlat->side) {
+                            fppol_rem(rem, norm, bigq);
+                            ASSERT_ALWAYS(fppol_is_zero(rem));
+                        }
+                    }
+                }
+            }
+            fppol_clear(a);
+            fppol_clear(b);
+            fppol_clear(norm);
+            fppol_clear(bigq);
+            fppol_clear(rem);
+        }
+#endif
 
         // sieve
         sieveFB(S, FB[side], I, J, qlat);
@@ -99,6 +142,8 @@ int main(int argc, char **argv)
             }
     }
 
+    S[0] = 255;
+
     // survivors cofactorization
     {
         unsigned char *Sptr = S;
@@ -110,6 +155,7 @@ int main(int argc, char **argv)
             for (unsigned int j = 0; j < (1U<<J); ++j, ++Sptr)
             {
                 if (*Sptr != 255) {
+                    printf("i,j = %u %u\n", i, j);
                     ii[0] = i;
                     jj[0] = j;
                     ij2ab(a, b, ii, jj, qlat);
