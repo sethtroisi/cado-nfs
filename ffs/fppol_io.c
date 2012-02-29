@@ -49,8 +49,10 @@ static const unsigned char __digit_val[] = {
   char *fppol##sz##_get_str(char *str, fppol##sz##_srcptr p)  \
   {                                                           \
     int d = fppol##sz##_deg(p);                               \
-    if (str == NULL)                                          \
+    if (str == NULL) {                                        \
       str = malloc((d < 0 ? 1 : (__FP_BITS*(d+1)+3)>>2) + 1); \
+      ASSERT_ALWAYS(str != NULL);                             \
+    }                                                         \
     char *ptr = str;                                          \
     if (d < 0) { sprintf(ptr, "0"); return str; }             \
     for (unsigned i = (d>>4)+1, n = 0; i--; n = 1) {          \
@@ -157,7 +159,10 @@ char *fppol_get_str(char *str, fppol_srcptr p)
   static __thread char buf[__FP_BITS*16+1];
   int      d = fppol_deg(p);
   unsigned l = d < 0 ? 1 : (__FP_BITS*(d+1)+3)>>2, ll;
-  if (str == NULL) str = malloc(l+1);
+  if (str == NULL) {
+    str = malloc(l+1);
+    ASSERT_ALWAYS(str != NULL);
+  }
   memset(str, '0', l); str[l] = '\0';
   for (int k = 0; k <= d>>6; ++k, l -= __FP_BITS*16) {
     fppol64_get_str(buf, p->limb[k]);
@@ -212,6 +217,7 @@ int fppol_inp(fppol_ptr r, FILE *f)
   for (; isspace(c = getc(f)); );
   if (c == EOF || __digit_val[c] > 0xf) return 0;
   buf = malloc(alloc+1);
+  ASSERT_ALWAYS(buf != NULL);
   for (; c == '0'; c = getc(f));
   for (n = 0; c != EOF && __digit_val[c] <= 0xf; c = getc(f)) {
     if (n >= alloc) buf = realloc(buf, (alloc *= 2) + 1);
