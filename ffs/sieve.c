@@ -25,37 +25,44 @@ int main(int argc, char **argv)
     int I, J;  // strict bound on the degrees of the (i,j)
     unsigned char threshold[2] = { 50, 50};  // should not be fixed here.
     int lpb[2] = { 25, 25};  // should not be fixed here.
-    I = 6; J = 6;
+    I = 9; J = 9;
     int noerr;
 
-    // Hardcoded GF(2^127) example.
-    
-    // F = x^5 + x^4 + x^3 + x^2 + x + t^2
-    ffspol[0].deg = 5;
-    ffspol[0].alloc = 6;
-    ffspol[0].coeffs = (fppol_t *)malloc(6*sizeof(fppol_t));
-    ASSERT_ALWAYS(ffspol[0].coeffs != NULL);
-    for(int i = 0; i < 6; ++i)
-        fppol_init(ffspol[0].coeffs[i]);
-    fppol_set_ui(ffspol[0].coeffs[0], 4);
-    fppol_set_ui(ffspol[0].coeffs[1], 1);
-    fppol_set_ui(ffspol[0].coeffs[2], 1);
-    fppol_set_ui(ffspol[0].coeffs[3], 1);
-    fppol_set_ui(ffspol[0].coeffs[4], 1);
-    fppol_set_ui(ffspol[0].coeffs[5], 1);
+    ffspol_init(ffspol[0]);
+    ffspol_init(ffspol[1]);
 
-    // G =  x*t^25 + x*t^24 + x*t^23 + x*t^21 + x*t^17 + x*t^16 + x*t^15
-    // + x*t^13 + x*t^10 + x*t^9 + x*t^7 + x*t^5 + x*t^3 + x + t^26 +
-    // t^25 + t^24 + t^23 + t^21 + t^20 + t^17 + t^14 + t^13 + t^11 + t^9
-    // + t^6 + t^4 + t^3 + t^2
-    ffspol[1].deg = 1;
-    ffspol[1].alloc = 2;
-    ffspol[1].coeffs = (fppol_t *)malloc(2*sizeof(fppol_t));
-    ASSERT_ALWAYS(ffspol[1].coeffs != NULL);
-    for(int i = 0; i < 2; ++i)
-        fppol_init(ffspol[1].coeffs[i]);
-    fppol_set_ui(ffspol[1].coeffs[0], 129133148);
-    fppol_set_ui(ffspol[1].coeffs[1], 61056681);
+#ifdef USE_F2
+    // Hardcoded GF(2^127) example.
+    /*
+       F = x^5 + x^4 + x^3 + x^2 + x + t^2
+       G =  x*t^25 + x*t^24 + x*t^23 + x*t^21 + x*t^17 + x*t^16 + x*t^15
+       + x*t^13 + x*t^10 + x*t^9 + x*t^7 + x*t^5 + x*t^3 + x + t^26 +
+       t^25 + t^24 + t^23 + t^21 + t^20 + t^17 + t^14 + t^13 + t^11 + t^9
+       + t^6 + t^4 + t^3 + t^2
+       Typical special q: 3f29c8d 1e3dc3
+    */
+    ffspol_set_str(ffspol[0], "4,1,1,1,1,1");
+    ffspol_set_str(ffspol[1], "7b26a5c,3a3a6a9");
+#else
+#ifdef USE_F3
+    // Hardcoded GF(3^97) example.
+    /*
+       F = x^5 + x*t + x + t^2;
+       G = x*t^25 + x*t^23 + 2*x*t^22 + 2*x*t^21 + 2*x*t^20 + x*t^18 +
+       2*x*t^17 + x*t^16 + 2*x*t^14 + 2*x*t^13 + 2*x*t^11 + x*t^10 +
+       2*x*t^9 + 2*x*t^8 + x*t^7 + 2*x*t^6 + x*t^5 + x*t^4 + 2*x*t^2 +
+       x*t + 2*x + t^26 + 2*t^25 + t^23 + t^22 + 2*t^20 + t^19 + t^18 +
+       2*t^17 + t^16 + t^12 + t^11 + 2*t^10 + t^8 + t^7 + 2*t^6 + t^4 +
+       2*t^3 + t + 2;
+       Typical special q: 41409965 2aaa4696
+     */
+    ffspol_set_str(ffspol[0], "10,5,0,0,0,1");
+    ffspol_set_str(ffspol[1], "18525901616186,46a19289a6526");
+#else
+// USE_F3 or USE_F2 must be defined
+    ASSERT_ALWAYS(0);
+#endif
+#endif
 
     // Read q, rho on command line:
     ASSERT_ALWAYS(argc == 3);
@@ -184,6 +191,8 @@ int main(int argc, char **argv)
     fprintf(stdout, "# Time spent: %1.1f s (norms); %1.1f s (sieve); %1.1f s (cofact)\n", t_norms, t_sieve, t_cofact);
     fprintf(stdout, "# Rate: %1.4f s/rel\n", (t_norms+t_sieve+t_cofact)/nrels);
 
+    ffspol_clear(ffspol[0]);
+    ffspol_clear(ffspol[1]);
     free(S);
 
     return EXIT_SUCCESS;

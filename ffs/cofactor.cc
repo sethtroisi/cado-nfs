@@ -81,7 +81,7 @@ int factor_survivor(fppol_t a, fppol_t b, ffspol_t* F, int *B)
     GF2X NN;
     fppol_init(Nab);
     for (int twice = 0; twice < 2; twice++) {
-        ffspol_norm(Nab, &F[twice], a, b);
+        ffspol_norm(Nab, F[twice], a, b);
         fppol2GF2x(NN, Nab);
         if (!isBsmooth(NN, B[twice])) {
             fppol_clear(Nab);
@@ -95,7 +95,7 @@ int factor_survivor(fppol_t a, fppol_t b, ffspol_t* F, int *B)
 
     vec_pair_GF2X_long factors;
     for (int twice = 0; twice < 2; twice++) {
-        ffspol_norm(Nab, &F[twice], a, b);
+        ffspol_norm(Nab, F[twice], a, b);
         fppol2GF2x(NN, Nab);
         CanZass(factors, NN);
         // print factors.
