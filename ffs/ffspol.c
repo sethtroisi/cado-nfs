@@ -1,8 +1,12 @@
 #include <stdlib.h>
+#include <stdarg.h>
 
 #include "ffspol.h"
 
 
+
+/* Initialization/destruction.
+ *****************************************************************************/
 
 // Reallocate memory with space for n coefficients.
 void __ffspol_realloc(ffspol_ptr r, unsigned n)
@@ -44,9 +48,9 @@ void ffspol_inits(ffspol_ptr r, ...)
 // Initialize polynomial with space for n coefficients.
 void ffspol_init2(ffspol_ptr r, unsigned n)
 {
-  r->alloc = n;
-  r->limbs = malloc(r->alloc * sizeof(fppol_t));
-  ASSERT_ALWAYS(!n || r->limbs != NULL);
+  r->alloc  = n;
+  r->coeffs = malloc(r->alloc * sizeof(fppol_t));
+  ASSERT_ALWAYS(!n || r->coeffs != NULL);
 }
 
 
