@@ -1,0 +1,99 @@
+/*  Use this checker like this:
+ 
+load "checker.mag";
+
+I := 9; J := 9;
+lpb := [25, 25];
+threshold := [50, 50];
+fbb := [12, 12];
+
+q := hex2pol("3468B8B");
+rho := hex2pol("810E4A");
+
+PrintAllRelations(q, rho, I, J, fbb, threshold, lpb);
+
+*/
+
+load "skewgauss.mag";
+
+p := 2;
+PP<t> := PolynomialRing(GF(p));
+MP<x> := PolynomialRing(PP);
+F := x^5 + x*t + x + t^2  ;
+G := x*t^25 + x*t^24 + x*t^22 + x*t^20 + x*t^19 + x*t^15 + x*t^14 + x*t^13 + x*t^12 + x*t^11 + x*t^10 + x*t^9 + x*t^7 + x*t^5 + x*t^2 + x*t + x + t^26 + t^21 + t^18 + t^16 + t^15 + t^13 + t^10 + t^9 + t^8 + t^7 + t^6;
+
+function hex2pol(x)
+    return PP!Intseq(StringToInteger(x, 16), 2);
+end function;
+
+function pol2hex(x)
+    return IntegerToString(Seqint([Integers()!xx : xx in Eltseq(x)], 2), 16);
+end function;
+
+
+function AllRelations(q, rho, I, J, fbb, threshold, lpb)
+    Rels := [];
+    a0, b0, a1, b1 := skewgauss(q, rho, 0);
+
+    ij2ab := function(i,j)
+        return i*a0+j*a1, i*b0+j*b1;
+    end function;
+    Normf := function(i,j)
+        a,b := ij2ab(i,j);
+        return Numerator(Evaluate(F, a/b)*b^Degree(F));
+    end function;
+    Normg := function(i,j)
+        a,b := ij2ab(i,j);
+        return Numerator(Evaluate(G, a/b)*b^Degree(G));
+    end function;
+
+    IsSmooth := function(f, B, th, L)
+        ff := Factorization(f);
+        // no prime larger than the large prime bound?
+        if Degree(ff[#ff][1]) gt L then return false; end if;
+
+        // count the degree acculumated by the sieve part
+        // and check the threshold:
+        deg := 0;
+        for i in [1..#ff] do
+            if Degree(ff[i][1]) le B then
+                deg +:= Degree(ff[i][1]);
+            end if;
+        end for;
+        if Degree(f)-deg gt th then return false; end if;
+
+        return true;
+    end function;
+
+    Nrels := 0;
+    for jj in [1..p^I-1] do
+        j := PP ! Intseq(jj, p);
+        for ii in [1..p^I-1] do
+            i := PP ! Intseq(ii, p);
+            if not IsMonic(j) then continue; end if;
+            if Degree(GCD(i,j)) ne 0 then continue; end if;
+
+            Nf := Normf(i,j);
+            Nf div:= q;
+            if not IsSmooth(Nf, fbb[1], threshold[1], lpb[1]) then continue; end if;
+            if not IsSmooth(Normg(i,j), fbb[1], threshold[2], lpb[2]) then continue; end if;
+
+            a,b := ij2ab(i,j);
+            Append(~Rels, [a,b]);
+            Nrels +:= 1;
+        end for;
+    end for;
+    return Rels;
+end function;
+
+procedure PrintAllRelations(q, rho, I, J, fbb, threshold, lpb)
+    Rels := AllRelations(q, rho, I, J, fbb, threshold, lpb);
+    for r in Rels do
+        printf "%o,%o\n", pol2hex(r[1]), pol2hex(r[2]);
+    end for;
+    printf "Total: %o relations found\n", #Rels;
+end procedure;
+
+
+
+

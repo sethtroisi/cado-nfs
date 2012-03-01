@@ -25,7 +25,7 @@ int main(int argc, char **argv)
     int I, J;  // strict bound on the degrees of the (i,j)
     unsigned char threshold[2] = { 50, 50};  // should not be fixed here.
     int lpb[2] = { 25, 25};  // should not be fixed here.
-    I = 9; J = 9;
+    I = 6; J = 6;
     int noerr;
 
     // Hardcoded GF(2^127) example.
@@ -86,6 +86,7 @@ int main(int argc, char **argv)
     double t_norms = 0;
     double t_sieve = 0;
     double t_cofact = 0;
+    int nrels = 0;
     
     for (int twice = 0; twice < 2; twice++) {
         int side = twice; // put 1-twice here, to do the rational side first.
@@ -168,10 +169,10 @@ int main(int argc, char **argv)
                     ii[0] = i;
                     jj[0] = j;
                     ij_gcd(gg, ii, jj);
-                    if (ij_deg(gg) != 0)
+                    if (ij_deg(gg) != 0 && i != 1 && j != 1)
                         continue;
                     ij2ab(a, b, ii, jj, qlat);
-                    factor_survivor(a, b, ffspol, lpb);
+                    nrels += factor_survivor(a, b, ffspol, lpb);
                 }
             }
         fppol_clear(a);
@@ -179,7 +180,11 @@ int main(int argc, char **argv)
     }
     t_cofact += seconds();
 
-    fprintf(stderr, "Time spent: %1.1f s (norms); %1.1f s (sieve); %1.1f s (cofact)\n", t_norms, t_sieve, t_cofact);
+    fprintf(stdout, "# Total: %d relations found\n", nrels);
+    fprintf(stdout, "# Time spent: %1.1f s (norms); %1.1f s (sieve); %1.1f s (cofact)\n", t_norms, t_sieve, t_cofact);
+    fprintf(stdout, "# Rate: %1.4f s/rel\n", (t_norms+t_sieve+t_cofact)/nrels);
+
+    free(S);
 
     return EXIT_SUCCESS;
 }

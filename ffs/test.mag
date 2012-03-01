@@ -40,6 +40,16 @@ function ij2ab(i,j)
     return i*a0+j*a1, i*b0+j*b1;
 end function;
 
+function ab2ij(a,b)
+    return ((a*b1 - b*a1) div q), ((-a*b0 + b*a0) div q);
+end function;
+
+function ij2pos(i,j, I)
+    ii := Seqint([Integers()!xx : xx in Eltseq(i)], 2);
+    jj := Seqint([Integers()!xx : xx in Eltseq(j)], 2);
+    return ii + 2^I*jj;
+end function;
+
 function Normf(i,j)
     a,b := ij2ab(i,j);
     return Numerator(Evaluate(F, a/b)*b^Degree(F));
