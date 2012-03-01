@@ -23,13 +23,13 @@ void GF2x2fppol(fppol_t r, GF2X & p)
     BytesFromGF2X(pbytes, p, n);
     unsigned int alloc = 1 + degp/64;
     if (r[0].alloc < alloc) {
-        r[0].limb = (fppol64_t *) realloc(r[0].limb, alloc*sizeof(fppol64_t));
+        r[0].limbs = (fppol64_t *) realloc(r[0].limbs, alloc*sizeof(fppol64_t));
         r[0].alloc = alloc;
-        ASSERT_ALWAYS(r[0].limb != NULL);
+        ASSERT_ALWAYS(r[0].limbs != NULL);
     }
-    memset(r[0].limb, 0, alloc*sizeof(fppol64_t));
+    memset(r[0].limbs, 0, alloc*sizeof(fppol64_t));
     for (int i = 0; i < n; ++i)
-        r[0].limb[i/8][0] |= ((uint64_t)pbytes[i]) << (8*(i%8));
+        r[0].limbs[i/8][0] |= ((uint64_t)pbytes[i]) << (8*(i%8));
     r[0].deg = degp;
     free(pbytes);
 }
@@ -43,14 +43,14 @@ void fppol2GF2x(GF2X & r, fppol_t p)
     int numbytes = num64*8;
     pp = (unsigned char *)malloc(numbytes*sizeof(unsigned char));
     for (int i = 0; i < num64; ++i) {
-        pp[8*i  ] = p->limb[i][0];
-        pp[8*i+1] = p->limb[i][0] >> 8;
-        pp[8*i+2] = p->limb[i][0] >> 16;
-        pp[8*i+3] = p->limb[i][0] >> 24;
-        pp[8*i+4] = p->limb[i][0] >> 32;
-        pp[8*i+5] = p->limb[i][0] >> 40;
-        pp[8*i+6] = p->limb[i][0] >> 48;
-        pp[8*i+7] = p->limb[i][0] >> 56;
+        pp[8*i  ] = p->limbs[i][0];
+        pp[8*i+1] = p->limbs[i][0] >> 8;
+        pp[8*i+2] = p->limbs[i][0] >> 16;
+        pp[8*i+3] = p->limbs[i][0] >> 24;
+        pp[8*i+4] = p->limbs[i][0] >> 32;
+        pp[8*i+5] = p->limbs[i][0] >> 40;
+        pp[8*i+6] = p->limbs[i][0] >> 48;
+        pp[8*i+7] = p->limbs[i][0] >> 56;
     }
     GF2XFromBytes(r, pp, numbytes);
     trunc(r, r, d+1); // just in case the top limb of p was not "clean".

@@ -15,7 +15,7 @@
 void fppol_init(fppol_ptr r)
 {
   r->alloc = 0;
-  r->limb  = NULL;
+  r->limbs = NULL;
 }
 
 
@@ -33,15 +33,15 @@ void fppol_inits(fppol_ptr r, ...)
 void fppol_init2(fppol_ptr r, unsigned n)
 {
   r->alloc = (n+63)>>6;
-  r->limb  = malloc(r->alloc * sizeof(fppol64_t));
-  ASSERT_ALWAYS(!n || r->limb != NULL);
+  r->limbs = malloc(r->alloc * sizeof(fppol64_t));
+  ASSERT_ALWAYS(!n || r->limbs != NULL);
 }
 
 
 // Free polynomial.
 void fppol_clear(fppol_ptr r)
 {
-  free(r->limb);
+  free(r->limbs);
 }
 
 

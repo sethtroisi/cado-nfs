@@ -44,7 +44,7 @@ void fppol_set_zero(fppol_ptr r)
 void fppol_set_one(fppol_ptr r)
 {
   __fppol_realloc_lazy(r, 1);
-  fppol64_set_one(r->limb[0]);
+  fppol64_set_one(r->limbs[0]);
   r->deg = 0;
 }
 
@@ -53,8 +53,8 @@ void fppol_set_one(fppol_ptr r)
 void fppol_set_ti(fppol_ptr r, unsigned i)
 {
   __fppol_realloc_lazy(r, i+1);
-  memset(r->limb, 0, (i>>6) * sizeof(fppol64_t));
-  fppol64_set_ti(r->limb[i>>6], i&0x3f);
+  memset(r->limbs, 0, (i>>6) * sizeof(fppol64_t));
+  fppol64_set_ti(r->limbs[i>>6], i&0x3f);
   r->deg = i;
 }
 
@@ -64,7 +64,7 @@ void fppol_set(fppol_ptr r, fppol_srcptr p)
 {
   __fppol_realloc_lazy(r, p->deg+1);
   for (int k = 0; k <= p->deg>>6; ++k)
-    fppol64_set(r->limb[k], p->limb[k]);
+    fppol64_set(r->limbs[k], p->limbs[k]);
   r->deg = p->deg;
 }
 
@@ -73,7 +73,7 @@ void fppol_set(fppol_ptr r, fppol_srcptr p)
 #define __DEF_FPPOL_SET_xx(sz)                           \
   void fppol_set_##sz(fppol_ptr r, fppol##sz##_srcptr p) \
   { __fppol_realloc_lazy(r, sz);                         \
-    fppol64_set_##sz(r->limb[0], p);                     \
+    fppol64_set_##sz(r->limbs[0], p);                    \
     r->deg = fppol##sz##_deg(p); }
 
 __DEF_FPPOL_SET_xx(16)
@@ -88,10 +88,10 @@ __DEF_FPPOL_SET_xx(64)
 void fppol_set_ui(fppol_ptr r, uint64_t x)
 {
   __fppol_realloc_lazy(r, 1);
-  // fppol64_set_ui(r->limb[0], ui);
-  fppol64_set_zero(r->limb[0]);
-  r->limb[0][0] = x;
-  r->deg = fppol64_deg(r->limb[0]);
+  // fppol64_set_ui(r->limbs[0], ui);
+  fppol64_set_zero(r->limbs[0]);
+  r->limbs[0][0] = x;
+  r->deg = fppol64_deg(r->limbs[0]);
 }
 
 
@@ -102,10 +102,10 @@ void fppol_set_coeff(fppol_ptr r, fp_srcptr x, unsigned i)
   if (ii > r->deg && fp_is_zero(x)) return;
   if (ii>>6 > r->deg>>6) {
     __fppol_realloc_lazy(r, ii+1);
-    memset(&r->limb[(r->deg>>6)+1], 0,
+    memset(&r->limbs[(r->deg>>6)+1], 0,
            ((ii>>6)-(r->deg>>6)) * sizeof(fppol64_t));
   }
-  fppol64_set_coeff(r->limb[i>>6], x, i&0x3f);
+  fppol64_set_coeff(r->limbs[i>>6], x, i&0x3f);
   if (ii > r->deg)
     r->deg = ii;
   else if (fp_is_zero(x) && ii == r->deg)
@@ -119,7 +119,7 @@ int fppol_eq(fppol_srcptr p, fppol_srcptr q)
   if (p->deg != q->deg)
     return 0;
   int k;
-  for (k = p->deg>>6; k >= 0 && fppol64_eq(p->limb[k], q->limb[k]); --k);
+  for (k = p->deg>>6; k >= 0 && fppol64_eq(p->limbs[k], q->limbs[k]); --k);
   return k < 0;
 }
 
@@ -138,7 +138,7 @@ int fppol_is_monic(fppol_srcptr p)
 int fppol_is_valid(fppol_srcptr p)
 {
   int k;
-  for (k = p->deg>>6; k >= 0 && fppol64_is_valid(p->limb[k]); --k);
+  for (k = p->deg>>6; k >= 0 && fppol64_is_valid(p->limbs[k]); --k);
   return k < 0;
 }
 
@@ -148,7 +148,7 @@ void fppol_opp(fppol_ptr r, fppol_srcptr p)
 {
   __fppol_realloc_lazy(r, p->deg+1);
   for (int k = 0; k <= p->deg>>6; ++k)
-    fppol64_opp(r->limb[k], p->limb[k]);
+    fppol64_opp(r->limbs[k], p->limbs[k]);
   r->deg = p->deg;
 }
 
@@ -165,9 +165,9 @@ void fppol_add(fppol_ptr r, fppol_srcptr p, fppol_srcptr q)
 
   __fppol_realloc_lazy(r, qq->deg+1);
   for (k = 0; k <= pp->deg>>6; ++k)
-    fppol64_add(r->limb[k], pp->limb[k], qq->limb[k]);
+    fppol64_add(r->limbs[k], pp->limbs[k], qq->limbs[k]);
   for (; k <= qq->deg>>6; ++k)
-    fppol64_set(r->limb[k], qq->limb[k]);
+    fppol64_set(r->limbs[k], qq->limbs[k]);
   r->deg = qq->deg;
   if (need_update)
     __fppol_update_degree(r);
@@ -186,10 +186,10 @@ void fppol_sub(fppol_ptr r, fppol_srcptr p, fppol_srcptr q)
 
   __fppol_realloc_lazy(r, qq->deg+1);
   for (k = 0; k <= pp->deg>>6; ++k)
-    fppol64_sub(r->limb[k], p->limb[k], q->limb[k]);
+    fppol64_sub(r->limbs[k], p->limbs[k], q->limbs[k]);
   for (; k <= qq->deg>>6; ++k) {
-    if (opp) fppol64_set(r->limb[k], qq->limb[k]);
-    else     fppol64_opp(r->limb[k], qq->limb[k]);
+    if (opp) fppol64_set(r->limbs[k], qq->limbs[k]);
+    else     fppol64_opp(r->limbs[k], qq->limbs[k]);
   }
   r->deg = qq->deg;
   if (need_update)
@@ -206,7 +206,7 @@ void fppol_smul(fppol_ptr r, fppol_srcptr p, fp_srcptr x)
   }
   __fppol_realloc_lazy(r, p->deg+1);
   for (int k = 0; k <= p->deg>>6; ++k)
-    fppol64_smul(r->limb[k], p->limb[k], x);
+    fppol64_smul(r->limbs[k], p->limbs[k], x);
   r->deg = p->deg;
 }
 
@@ -220,7 +220,7 @@ void fppol_sdiv(fppol_ptr r, fppol_srcptr p, fp_srcptr x)
   }
   __fppol_realloc_lazy(r, p->deg+1);
   for (int k = 0; k <= p->deg>>6; ++k)
-    fppol64_sdiv(r->limb[k], p->limb[k], x);
+    fppol64_sdiv(r->limbs[k], p->limbs[k], x);
   r->deg = p->deg;
 }
 
@@ -247,13 +247,13 @@ void fppol_shl(fppol_ptr r, fppol_srcptr p, unsigned i)
   int kp = p->deg>>6, d = i>>6;
   fppol64_t t;
   __fppol_realloc_lazy(r, (kp+d+2)<<6);
-  fppol64_set_zero(r->limb[kp+d+1]);
+  fppol64_set_zero(r->limbs[kp+d+1]);
   for (int k = kp; k >= 0; --k) {
-      fppol64_shr(t,              p->limb[k], 64-(i&0x3f));
-    __fppol64_or (r->limb[k+d+1], r->limb[k+d+1], t);
-      fppol64_shl(r->limb[k+d],   p->limb[k],     i&0x3f);
+      fppol64_shr(t,              p->limbs[k], 64-(i&0x3f));
+    __fppol64_or (r->limbs[k+d+1], r->limbs[k+d+1], t);
+      fppol64_shl(r->limbs[k+d],   p->limbs[k],     i&0x3f);
   }
-  memset(r->limb, 0, d * sizeof(fppol64_t));
+  memset(r->limbs, 0, d * sizeof(fppol64_t));
   r->deg = p->deg+i;
 }
 
@@ -271,11 +271,11 @@ void fppol_shr(fppol_ptr r, fppol_srcptr p, unsigned i)
   int kp = p->deg>>6, d = i>>6;
   fppol64_t t;
   __fppol_realloc_lazy(r, (kp-d+1)<<6);
-  fppol64_shr(r->limb[0], p->limb[d], i&0x3f);
+  fppol64_shr(r->limbs[0], p->limbs[d], i&0x3f);
   for (int k = d+1; k <= kp; ++k) {
-      fppol64_shl(t,              p->limb[k], 64-(i&0x3f));
-    __fppol64_or (r->limb[k-d-1], r->limb[k-d-1], t);
-      fppol64_shr(r->limb[k-d],   p->limb[k],     i&0x3f);
+      fppol64_shl(t,              p->limbs[k], 64-(i&0x3f));
+    __fppol64_or (r->limbs[k-d-1], r->limbs[k-d-1], t);
+      fppol64_shr(r->limbs[k-d],   p->limbs[k],     i&0x3f);
   }
   r->deg = p->deg-i;
 }

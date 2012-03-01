@@ -67,11 +67,11 @@ __DECL_FPPOLxx_T(64)
 // By convention, deg(0) = -1.
 // All the exported functions must ensure that they return fppol such
 // that "deg" contains the true degree of the polynomial represented
-// by "limb".
+// by "limbs".
 typedef struct {
   int        deg;
   unsigned   alloc;
-  fppol64_t *limb;
+  fppol64_t *limbs;
 } __fppol_struct;
 
 // Type and pointer shorthands.

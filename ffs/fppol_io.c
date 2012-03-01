@@ -165,7 +165,7 @@ char *fppol_get_str(char *str, fppol_srcptr p)
   }
   memset(str, '0', l); str[l] = '\0';
   for (int k = 0; k <= d>>6; ++k, l -= __FP_BITS*16) {
-    fppol64_get_str(buf, p->limb[k]);
+    fppol64_get_str(buf, p->limbs[k]);
     ll = strlen(buf);
     memcpy(str+l-ll, buf, ll);
   }
@@ -187,7 +187,7 @@ int fppol_set_str(fppol_ptr r, const char *str)
       buf[--j] = str[i];
     }
     if (j < __FP_BITS*16) {
-      if (!fppol64_set_str(r->limb[n++], buf+j))
+      if (!fppol64_set_str(r->limbs[n++], buf+j))
         return 0;
     }
   }

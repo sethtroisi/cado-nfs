@@ -156,7 +156,7 @@ __DECL_FPPOLxx_ARITH_ALL(64)
 #define __DEF_FPPOLxx_SET_MP(sz)                            \
   static inline                                             \
   int fppol##sz##_set_mp(fppol##sz##_ptr r, fppol_srcptr p) \
-  { fppol##sz##_set_64(r, p->limb[0]);                      \
+  { fppol##sz##_set_64(r, p->limbs[0]);                     \
     return p->deg < sz; }
 
 
@@ -454,7 +454,7 @@ void fppol_set_ui(fppol_ptr r, uint64_t x);
 static inline
 void fppol_get_coeff(fp_ptr r, fppol_srcptr p, unsigned i)
 { if ((int)i > p->deg) fp_set_zero(r);
-  else                 fppol64_get_coeff(r, p->limb[i>>6], i&0x3f); }
+  else                 fppol64_get_coeff(r, p->limbs[i>>6], i&0x3f); }
 
 // Set degree-i coefficient.
 void fppol_set_coeff(fppol_ptr r, fp_srcptr x, unsigned i);

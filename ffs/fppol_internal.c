@@ -8,8 +8,8 @@
 void __fppol_realloc(fppol_ptr r, unsigned n)
 {
   r->alloc = (n+63)>>6;
-  r->limb  = realloc(r->limb, r->alloc * sizeof(fppol64_t));
-  ASSERT_ALWAYS(!n || r->limb != NULL);
+  r->limbs = realloc(r->limbs, r->alloc * sizeof(fppol64_t));
+  ASSERT_ALWAYS(!n || r->limbs != NULL);
 }
 
 
@@ -19,6 +19,6 @@ void __fppol_realloc(fppol_ptr r, unsigned n)
 void __fppol_update_degree(fppol_ptr r)
 {
   int k;
-  for (k = r->deg>>6; k >= 0 && fppol64_is_zero(r->limb[k]); --k);
-  r->deg = k >= 0 ? (k<<6) + fppol64_deg(r->limb[k]) : -1;
+  for (k = r->deg>>6; k >= 0 && fppol64_is_zero(r->limbs[k]); --k);
+  r->deg = k >= 0 ? (k<<6) + fppol64_deg(r->limbs[k]) : -1;
 }

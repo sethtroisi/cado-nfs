@@ -31,11 +31,11 @@ void fppol_mul(fppol_ptr r, fppol_srcptr p, fppol_srcptr q)
   int kp = p->deg>>6;
   int kq = q->deg>>6;
   __fppol_realloc_lazy(rr, (kp+kq+2)<<6);
-  memset(rr->limb, 0, (kp+kq+2) * sizeof(fppol64_t));
+  memset(rr->limbs, 0, (kp+kq+2) * sizeof(fppol64_t));
   for (int i = 0; i <= kp; ++i)
     for (int j = 0; j <= kq; ++j)
-      __FP_MUL_128_64x64(rr->limb[i+j+1], rr->limb[i+j],
-                         p->limb[i], q->limb[j], add);
+      __FP_MUL_128_64x64(rr->limbs[i+j+1], rr->limbs[i+j],
+                         p ->limbs[i],     q ->limbs[j], add);
   rr->deg = p->deg + q->deg;
 
   // If input were aliases, do the final copy.
@@ -69,10 +69,10 @@ void fppol_mul(fppol_ptr r, fppol_srcptr p, fppol_srcptr q)
     /* Do the multiplication. */                                         \
     int kp = p->deg>>6;                                                  \
     __fppol_realloc_lazy(rr, (kp+2)<<6);                                 \
-    memset(rr->limb, 0, (kp+2) * sizeof(fppol64_t));                     \
+    memset(rr->limbs, 0, (kp+2) * sizeof(fppol64_t));                    \
     for (int i = 0; i <= kp; ++i)                                        \
-      __FP_MUL_128_64x##sq(rr->limb[i+1], rr->limb[i],                   \
-                           p->limb[i], q, add);                          \
+      __FP_MUL_128_64x##sq(rr->limbs[i+1], rr->limbs[i],                 \
+                           p ->limbs[i],   q, add);                      \
     rr->deg = p->deg + fppol##sq##_deg(q);                               \
                                                                          \
     /* If input were aliases, do the final copy. */                      \
@@ -96,7 +96,7 @@ void fppol_mul(fppol_ptr r, fppol_srcptr p, fppol_srcptr q)
 #define __DEF_FPPOL_MUL_64xxx(sq)                                             \
   void fppol_mul_64x##sq(fppol_ptr r, fppol64_srcptr p, fppol##sq##_srcptr q) \
   { __fppol_realloc_lazy(r, 128);                                             \
-    __FP_MUL_128_64x##sq(r->limb[1], r->limb[0], p, q, );                     \
+    __FP_MUL_128_64x##sq(r->limbs[1], r->limbs[0], p, q, );                   \
     r->deg = 63 + sq-1;                                                       \
     __fppol_update_degree(r); }
 
