@@ -201,6 +201,15 @@ __DECL_FPPOLxx_ARITH_ALL(64)
   { return !fppol##sz##_fold_or(p); }
 
 
+// Test if in GF(p) (i.e., deg <= 0).
+// Generic prototype:
+//   int fppol<sz>_in_fp(fppol<sz>_srcptr p);
+#define __DEF_FPPOLxx_IN_FP(sz)               \
+  static inline                               \
+  int fppol##sz##_in_fp(fppol##sz##_srcptr p) \
+  { return !(fppol##sz##_fold_or(p) >> 1); }
+
+
 // Test if equal.
 // Generic prototype:
 //   int fppol<sz>_eq(fppol<sz>_srcptr p, fppol<sz>_srcptr q);
@@ -294,6 +303,15 @@ __DECL_FPPOLxx_ARITH_ALL(64)
     __FP_SDIV(sz, r, p, t); }
 
 
+// Coefficient-wise inversion.
+// Generic prototype:
+//   void fppol<sz>_sinv(fppol<sz>_ptr r, fppol<sz>_srcptr p);
+#define __DEF_FPPOLxx_SINV(sz)                                   \
+  static inline                                                  \
+  void fppol##sz##_sinv(fppol##sz##_ptr r, fppol##sz##_srcptr p) \
+  { __FP_SINV(sz, r, p); }
+
+
 // Left shift.
 // Generic prototype:
 //   void fppol<sz>_shl(fppol<sz>_ptr r, fppol<sz>_srcptr p, unsigned i);
@@ -371,6 +389,7 @@ __DECL_FPPOLxx_ARITH_ALL(64)
         __DEF_FPPOLxx_SET_COEFF   (sz)     \
         __DEF_FPPOLxx_FOLD_OR     (sz)     \
         __DEF_FPPOLxx_IS_ZERO     (sz)     \
+        __DEF_FPPOLxx_IN_FP       (sz)     \
         __DEF_FPPOLxx_EQ          (sz)     \
         __DEF_FPPOLxx_IS_MONIC    (sz)     \
         __DEF_FPPOLxx_IS_VALID    (sz)     \
@@ -379,6 +398,7 @@ __DECL_FPPOLxx_ARITH_ALL(64)
         __DEF_FPPOLxx_SUB         (sz)     \
         __DEF_FPPOLxx_SMUL        (sz)     \
         __DEF_FPPOLxx_SDIV        (sz)     \
+        __DEF_FPPOLxx_SINV        (sz)     \
         __DEF_FPPOLxx_SHL         (sz)     \
         __DEF_FPPOLxx_SHR         (sz)     \
         __DEF_FPPOLxx_GET_UI      (sz)     \
@@ -402,6 +422,7 @@ __DEF_FPPOLxx_ARITH_ALL(64)
 #undef __DEF_FPPOLxx_SET_COEFF
 #undef __DEF_FPPOLxx_FOLD_OR
 #undef __DEF_FPPOLxx_IS_ZERO
+#undef __DEF_FPPOLxx_IN_FP
 #undef __DEF_FPPOLxx_EQ
 #undef __DEF_FPPOLxx_IS_MONIC
 #undef __DEF_FPPOLxx_IS_VALID
@@ -410,6 +431,7 @@ __DEF_FPPOLxx_ARITH_ALL(64)
 #undef __DEF_FPPOLxx_SUB
 #undef __DEF_FPPOLxx_SMUL
 #undef __DEF_FPPOLxx_SDIV
+#undef __DEF_FPPOLxx_SINV
 #undef __DEF_FPPOLxx_SHL
 #undef __DEF_FPPOLxx_SHR
 #undef __DEF_FPPOLxx_GET_UI
@@ -461,6 +483,11 @@ static inline
 int fppol_is_zero(fppol_srcptr p)
 { return p->deg == -1; }
 
+// Test if in GF(p) (i.e., deg <= 0).
+static inline
+int fppol_in_fp(fppol_srcptr p)
+{ return p->deg <= 0; }
+
 // Test if equal.
 int fppol_eq(fppol_srcptr p, fppol_srcptr q);
 
@@ -484,6 +511,9 @@ void fppol_smul(fppol_ptr r, fppol_srcptr p, fp_srcptr x);
 
 // Scalar division.
 void fppol_sdiv(fppol_ptr r, fppol_srcptr p, fp_srcptr x);
+
+// Coefficient-wise inversion.
+void fppol_sinv(fppol_ptr r, fppol_srcptr p);
 
 // Left shift.
 void fppol_shl(fppol_ptr r, fppol_srcptr p, unsigned i);

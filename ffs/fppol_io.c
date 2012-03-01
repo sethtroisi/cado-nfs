@@ -45,27 +45,27 @@ static const unsigned char __digit_val[] = {
 
 
 // Conversion to string.
-#define __DEF_FPPOLxx_GET_STR(sz)                             \
-  char *fppol##sz##_get_str(char *str, fppol##sz##_srcptr p)  \
-  {                                                           \
-    int d = fppol##sz##_deg(p);                               \
-    if (str == NULL) {                                        \
-      str = malloc((d < 0 ? 1 : (__FP_BITS*(d+1)+3)>>2) + 1); \
-      ASSERT_ALWAYS(str != NULL);                             \
-    }                                                         \
-    char *ptr = str;                                          \
-    if (d < 0) { sprintf(ptr, "0"); return str; }             \
-    for (unsigned i = (d>>4)+1, n = 0; i--; n = 1) {          \
-      uint64_t w = 0, t;                                      \
-      for (unsigned k = 0; k < __FP_BITS; ++k) {              \
-        t = (p[k] >> (i<<4)) & 0xfffful;                      \
-        for (unsigned i = 4, j = __FP_BITS-1; j && i--; )     \
-          t = (t | (t << (j<<i))) & __mask[j-1][i];           \
-        w |= t << k;                                          \
-      }                                                       \
-      ptr += sprintf(ptr, "%0*lx", n ? __FP_BITS<<2 : 0, w);  \
-    }                                                         \
-    return str;                                               \
+#define __DEF_FPPOLxx_GET_STR(sz)                                     \
+  char *fppol##sz##_get_str(char *str, fppol##sz##_srcptr p)          \
+  {                                                                   \
+    int d = fppol##sz##_deg(p);                                       \
+    if (str == NULL) {                                                \
+      str = (char *)malloc((fppol##sz##_strlen(p)+1) * sizeof(char)); \
+      ASSERT_ALWAYS(str != NULL);                                     \
+    }                                                                 \
+    char *ptr = str;                                                  \
+    if (d < 0) { sprintf(ptr, "0"); return str; }                     \
+    for (unsigned i = (d>>4)+1, n = 0; i--; n = 1) {                  \
+      uint64_t w = 0, t;                                              \
+      for (unsigned k = 0; k < __FP_BITS; ++k) {                      \
+        t = (p[k] >> (i<<4)) & 0xfffful;                              \
+        for (unsigned i = 4, j = __FP_BITS-1; j && i--; )             \
+          t = (t | (t << (j<<i))) & __mask[j-1][i];                   \
+        w |= t << k;                                                  \
+      }                                                               \
+      ptr += sprintf(ptr, "%0*lx", n ? __FP_BITS<<2 : 0, w);          \
+    }                                                                 \
+    return str;                                                       \
   }
 
 
@@ -158,9 +158,9 @@ char *fppol_get_str(char *str, fppol_srcptr p)
 {
   static __thread char buf[__FP_BITS*16+1];
   int      d = fppol_deg(p);
-  unsigned l = d < 0 ? 1 : (__FP_BITS*(d+1)+3)>>2, ll;
+  unsigned l = fppol_strlen(p), ll;
   if (str == NULL) {
-    str = malloc(l+1);
+    str = (char *)malloc((l+1) * sizeof(char));
     ASSERT_ALWAYS(str != NULL);
   }
   memset(str, '0', l); str[l] = '\0';
@@ -216,11 +216,14 @@ int fppol_inp(fppol_ptr r, FILE *f)
   if (f == NULL) f = stdin;
   for (; isspace(c = getc(f)); );
   if (c == EOF || __digit_val[c] > 0xf) return 0;
-  buf = malloc(alloc+1);
+  buf = (char *)malloc((alloc+1) * sizeof(char));
   ASSERT_ALWAYS(buf != NULL);
   for (; c == '0'; c = getc(f));
   for (n = 0; c != EOF && __digit_val[c] <= 0xf; c = getc(f)) {
-    if (n >= alloc) buf = realloc(buf, (alloc *= 2) + 1);
+    if (n >= alloc) {
+      alloc *= 2;
+      buf    = (char *)realloc(buf, (alloc+1) * sizeof(char));
+    }
     buf[n++] = (char)c;
   }
   ungetc(c, f);

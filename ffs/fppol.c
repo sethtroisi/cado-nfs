@@ -33,7 +33,7 @@ void fppol_inits(fppol_ptr r, ...)
 void fppol_init2(fppol_ptr r, unsigned n)
 {
   r->alloc = (n+63)>>6;
-  r->limbs = malloc(r->alloc * sizeof(fppol64_t));
+  r->limbs = (fppol64_t *)malloc(r->alloc * sizeof(fppol64_t));
   ASSERT_ALWAYS(!n || r->limbs != NULL);
 }
 
@@ -240,11 +240,11 @@ int main(int argc, char **argv)
   fppol_add(ma, ma, mb);
   fppol_sub(ma, ms, ma);
   printf("check  = "); fppol_out(stdout, ma); printf(" [%d]\n", fppol_deg(ma));
-  
-  fppol_gcd(mr, mp, mq);
-  printf("gcd(p, q)  = "); fppol_out(stdout, mr);
-  printf(" [%d]\n", fppol_deg(mr));
-
+ 
+  fppol_gcd(ma, mp, mq);
+  printf("gcd(p, q)  = "); fppol_out(stdout, ma);
+  printf(" [%d]\n", fppol_deg(ma));
+ 
   ret = fppol_invmod(ma, mr, ms);
   printf("1/r %%s = ");
   if (!ret) printf("N/A\n");

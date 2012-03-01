@@ -71,6 +71,11 @@
       return 0;                                                      \
     }                                                                \
                                                                      \
+    if (UNLIKELY(fppol##sz##_in_fp(p))) {                            \
+      fppol##sz##_sinv(r, p);                                        \
+      return 1;                                                      \
+    }                                                                \
+                                                                     \
     fppol##sz##_t r0, r1, v0, v1, t;                                 \
     IF(sz, EMPTY, fppol_inits(r0, r1, v0, v1, t, NULL);, )           \
                                                                      \

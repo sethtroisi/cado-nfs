@@ -83,18 +83,6 @@ __DEF_FPPOL_SET_xx(64)
 #undef __DEF_FPPOL_SET_xx
 
 
-// Set to something coded in an uint64_t.
-// Not sure this is meaningful. Will probably disappear soon.
-void fppol_set_ui(fppol_ptr r, uint64_t x)
-{
-  __fppol_realloc_lazy(r, 1);
-  // fppol64_set_ui(r->limbs[0], ui);
-  fppol64_set_zero(r->limbs[0]);
-  r->limbs[0][0] = x;
-  r->deg = fppol64_deg(r->limbs[0]);
-}
-
-
 // Set degree-i coefficient.
 void fppol_set_coeff(fppol_ptr r, fp_srcptr x, unsigned i)
 {
@@ -225,6 +213,16 @@ void fppol_sdiv(fppol_ptr r, fppol_srcptr p, fp_srcptr x)
 }
 
 
+// Scalar inversion.
+void fppol_sinv(fppol_ptr r, fppol_srcptr p)
+{
+  __fppol_realloc_lazy(r, p->deg+1);
+  for (int k = 0; k <= p->deg>>6; ++k)
+    fppol64_sinv(r->limbs[k], p->limbs[k]);
+  r->deg = p->deg;
+}
+
+
 // Coefficient-wise OR.
 static inline
 void __fppol64_or(fppol64_ptr r, fppol64_srcptr p, fppol64_srcptr q)
@@ -249,7 +247,7 @@ void fppol_shl(fppol_ptr r, fppol_srcptr p, unsigned i)
   __fppol_realloc_lazy(r, (kp+d+2)<<6);
   fppol64_set_zero(r->limbs[kp+d+1]);
   for (int k = kp; k >= 0; --k) {
-      fppol64_shr(t,              p->limbs[k], 64-(i&0x3f));
+      fppol64_shr(t,               p->limbs[k], 64-(i&0x3f));
     __fppol64_or (r->limbs[k+d+1], r->limbs[k+d+1], t);
       fppol64_shl(r->limbs[k+d],   p->limbs[k],     i&0x3f);
   }

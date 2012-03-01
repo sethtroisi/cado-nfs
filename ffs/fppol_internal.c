@@ -8,7 +8,7 @@
 void __fppol_realloc(fppol_ptr r, unsigned n)
 {
   r->alloc = (n+63)>>6;
-  r->limbs = realloc(r->limbs, r->alloc * sizeof(fppol64_t));
+  r->limbs = (fppol64_t *)realloc(r->limbs, r->alloc * sizeof(fppol64_t));
   ASSERT_ALWAYS(!n || r->limbs != NULL);
 }
 
