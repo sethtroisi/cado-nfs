@@ -213,6 +213,16 @@ void fppol_sdiv(fppol_ptr r, fppol_srcptr p, fp_srcptr x)
 }
 
 
+// Scalar inversion.
+void fppol_sinv(fppol_ptr r, fppol_srcptr p)
+{
+  __fppol_realloc_lazy(r, p->deg+1);
+  for (int k = 0; k <= p->deg>>6; ++k)
+    fppol64_sinv(r->limbs[k], p->limbs[k]);
+  r->deg = p->deg;
+}
+
+
 // Coefficient-wise OR.
 static inline
 void __fppol64_or(fppol64_ptr r, fppol64_srcptr p, fppol64_srcptr q)
