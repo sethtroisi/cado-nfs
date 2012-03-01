@@ -29,7 +29,7 @@ void fppol_pow(fppol_t res, fppol_t in, int power)
 /* Function computing the norm of ffspol at (a,b)
    norm = b^d * ffspol(a/b), d = deg(ffspol) */
 
-void ffspol_norm(fppol_t norm, ffspol_t *ffspol, fppol_t a, fppol_t b)
+void ffspol_norm(fppol_t norm, ffspol_ptr ffspol, fppol_t a, fppol_t b)
 {
   fppol_t *pow_b;
   fppol_t pow_a;
@@ -97,7 +97,7 @@ static int max_special(int prev_max, int j, int *repeated)
    If during computation of pol_norm_i, only one pol_norm_i has
    maximal degree then deg_norm is equal to this degree otherwise, we
    have to compute the norm and call the fppol_deg function on it */
-int deg_norm(ffspol_t *ffspol, fppol_t a, fppol_t b)
+int deg_norm(ffspol_ptr ffspol, fppol_t a, fppol_t b)
 {
   int deg, max_deg = -1;
   int repeated = 1;
@@ -147,7 +147,7 @@ int deg_norm(ffspol_t *ffspol, fppol_t a, fppol_t b)
    from the norm.
    */
 
-void init_norms(unsigned char *S, ffspol_t ffspol, int I, int J, qlat_t qlat,
+void init_norms(unsigned char *S, ffspol_ptr ffspol, int I, int J, qlat_t qlat,
         int sqside)
 {
   fppol_t a, b;
@@ -183,7 +183,7 @@ void init_norms(unsigned char *S, ffspol_t ffspol, int I, int J, qlat_t qlat,
 #endif
       if (S[position] != 255) {
 	ij2ab(a, b, i, j, qlat);
-	int deg = deg_norm(&ffspol, a, b);
+	int deg = deg_norm(ffspol, a, b);
 	if (deg > 0) {
 	  ASSERT_ALWAYS(deg < 255);
 	  S[position] = deg - degq;
