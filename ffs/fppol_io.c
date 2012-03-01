@@ -50,7 +50,7 @@ static const unsigned char __digit_val[] = {
   {                                                           \
     int d = fppol##sz##_deg(p);                               \
     if (str == NULL) {                                        \
-      str = malloc((d < 0 ? 1 : (__FP_BITS*(d+1)+3)>>2) + 1); \
+      str = malloc(fppol##sz##_strlen(p) + 1);                \
       ASSERT_ALWAYS(str != NULL);                             \
     }                                                         \
     char *ptr = str;                                          \
@@ -158,7 +158,7 @@ char *fppol_get_str(char *str, fppol_srcptr p)
 {
   static __thread char buf[__FP_BITS*16+1];
   int      d = fppol_deg(p);
-  unsigned l = d < 0 ? 1 : (__FP_BITS*(d+1)+3)>>2, ll;
+  unsigned l = fppol_strlen(p), ll;
   if (str == NULL) {
     str = malloc(l+1);
     ASSERT_ALWAYS(str != NULL);
