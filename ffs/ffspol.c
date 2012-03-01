@@ -15,7 +15,7 @@ void __ffspol_realloc(ffspol_ptr r, unsigned n)
 {
   for (unsigned i = n; i < r->alloc; ++i)
     fppol_clear(r->coeffs[i]);
-  r->coeffs = realloc(r->coeffs, n * sizeof(fppol_t));
+  r->coeffs = (fppol_t *)realloc(r->coeffs, n * sizeof(fppol_t));
   ASSERT_ALWAYS(!n || r->coeffs != NULL);
   for (unsigned i = r->alloc; i < n; ++i)
     fppol_init(r->coeffs[i]);
@@ -63,7 +63,7 @@ void ffspol_inits(ffspol_ptr r, ...)
 void ffspol_init2(ffspol_ptr r, unsigned n)
 {
   r->alloc  = n;
-  r->coeffs = malloc(r->alloc * sizeof(fppol_t));
+  r->coeffs = (fppol_t *)malloc(r->alloc * sizeof(fppol_t));
   ASSERT_ALWAYS(!n || r->coeffs != NULL);
 }
 

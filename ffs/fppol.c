@@ -33,7 +33,7 @@ void fppol_inits(fppol_ptr r, ...)
 void fppol_init2(fppol_ptr r, unsigned n)
 {
   r->alloc = (n+63)>>6;
-  r->limbs = malloc(r->alloc * sizeof(fppol64_t));
+  r->limbs = (fppol64_t *)malloc(r->alloc * sizeof(fppol64_t));
   ASSERT_ALWAYS(!n || r->limbs != NULL);
 }
 
