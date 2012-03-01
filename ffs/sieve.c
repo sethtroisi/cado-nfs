@@ -23,10 +23,17 @@ int main(int argc, char **argv)
     qlat_t qlat;
     factorbase_t FB[2];
     int I, J;  // strict bound on the degrees of the (i,j)
+    unsigned int II, JJ; // corresponding maximum integer
     unsigned char threshold[2] = { 50, 50};  // should not be fixed here.
     int lpb[2] = { 25, 25};  // should not be fixed here.
     I = 9; J = 9;
     int noerr;
+    
+    II = 1; JJ = 1;
+    for (int i = 0; i < I; ++i)
+        II *= FP_SIZE;
+    for (int i = 0; i < J; ++i)
+        JJ *= FP_SIZE;
 
     ffspol_init(ffspol[0]);
     ffspol_init(ffspol[1]);
@@ -86,9 +93,9 @@ int main(int argc, char **argv)
 
     // Allocate and init the sieve space
     unsigned char *S;
-    S = (unsigned char *) malloc ((1<<I)*(1<<J)*sizeof(unsigned char));
+    S = (unsigned char *) malloc((II*JJ)*sizeof(unsigned char));
     ASSERT_ALWAYS(S != NULL);
-    memset(S, 0, (1<<I)*(1<<J));
+    memset(S, 0, (II*JJ));
     S[0] = 255;
     double t_norms = 0;
     double t_sieve = 0;
@@ -118,13 +125,15 @@ int main(int argc, char **argv)
             fppol_init(bigq);
             fppol_init(rem);
             fppol_set_sq(bigq, qlat->q);
-            for (unsigned int ii = 0; ii < (1u << I); ii++) {
-                i[0] = ii;
-                for (unsigned int jj = 0; jj < (1u << J); jj++) {
-                    int position = ii + (1u << I)*jj;
+            for (unsigned int ii = 0; ii < II; ii++) {
+                if (!ij_set_ui(i, ii))
+                    continue;
+                for (unsigned int jj = 0; jj < JJ; jj++) {
+                    int position = ii + II*jj;
                     if (position == 0)
                         continue;
-                    j[0] = jj;
+                    if (!ij_set_ui(j, jj))
+                        continue;
                     if (S[position] != 255) {
                         ij2ab(a, b, i, j, qlat);
                         ffspol_norm(norm, &ffspol[side], a, b);
@@ -150,9 +159,10 @@ int main(int argc, char **argv)
         t_sieve += seconds();
 
         // mark survivors
+        // no need to check if this is a valid position
         unsigned char *Sptr = S;
-        for (unsigned int j = 0; j < (1U<<J); ++j)
-            for (unsigned int i = 0; i < (1U<<I); ++i, ++Sptr)
+        for (unsigned int j = 0; j < JJ; ++j)
+            for (unsigned int i = 0; i < II; ++i, ++Sptr)
             {
                 if (*Sptr > threshold[side])
                     *Sptr = 255; 
@@ -168,13 +178,15 @@ int main(int argc, char **argv)
         ij_t ii, jj, gg;
         fppol_init(a);
         fppol_init(b);
-        for (unsigned int j = 0; j < (1U<<J); ++j)
-            for (unsigned int i = 0; i < (1U<<I); ++i, ++Sptr)
+        for (unsigned int j = 0; j < JJ; ++j) {
+            if (!ij_set_ui(jj, j))
+                continue;
+            for (unsigned int i = 0; i < II; ++i, ++Sptr)
             {
+                if (!ij_set_ui(ii, i))
+                    continue;
                 if (*Sptr != 255) {
     //                printf("i,j = %u %u\n", i, j);
-                    ii[0] = i;
-                    jj[0] = j;
                     ij_gcd(gg, ii, jj);
                     if (ij_deg(gg) != 0 && i != 1 && j != 1)
                         continue;

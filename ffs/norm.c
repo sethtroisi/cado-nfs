@@ -101,6 +101,8 @@ int deg_norm(ffspol_ptr ffspol, fppol_t a, fppol_t b)
 {
   int deg, max_deg = -1;
   int repeated = 1;
+  int dega = fppol_deg(a);
+  int degb = fppol_deg(b);
   static int c_deg = 0;
   static int c_tot = 0;
 
@@ -110,13 +112,15 @@ int deg_norm(ffspol_ptr ffspol, fppol_t a, fppol_t b)
 #endif
   c_tot++;
   for (int i = 0; i < ffspol->deg + 1; i++) {
-    deg = fppol_deg(ffspol->coeffs[i]) + i * fppol_deg(a) + (ffspol->deg - i) * fppol_deg(b);
+    deg = fppol_deg(ffspol->coeffs[i]) + i * dega + (ffspol->deg - i) * degb;
     max_deg = max_special(max_deg, deg, &repeated);
   }
-  /* For characteristic p */
-  /* if (repeated == 1) */
-  /* For characteristic 2 only */
+
+#if FP_SIZE == 2
   if (repeated & 1u) {
+#else
+  if (repeated == 1) {
+#endif
       c_deg++;
       return max_deg;
   }
