@@ -237,7 +237,7 @@ void fppol_shl(fppol_ptr r, fppol_srcptr p, unsigned i)
   __fppol_realloc_lazy(r, (kp+d+2)<<6);
   fppol64_set_zero(r->limbs[kp+d+1]);
   for (int k = kp; k >= 0; --k) {
-      fppol64_shr(t,              p->limbs[k], 64-(i&0x3f));
+      fppol64_shr(t,               p->limbs[k], 64-(i&0x3f));
     __fppol64_or (r->limbs[k+d+1], r->limbs[k+d+1], t);
       fppol64_shl(r->limbs[k+d],   p->limbs[k],     i&0x3f);
   }
