@@ -30,7 +30,7 @@ int main(int argc, char **argv)
 
     // Hardcoded GF(2^127) example.
     
-    // F = x^5 + x*t + x + t^2  
+    // F = x^5 + x^4 + x^3 + x^2 + x + t^2
     ffspol[0].deg = 5;
     ffspol[0].alloc = 6;
     ffspol[0].coeffs = (fppol_t *)malloc(6*sizeof(fppol_t));
@@ -38,24 +38,24 @@ int main(int argc, char **argv)
     for(int i = 0; i < 6; ++i)
         fppol_init(ffspol[0].coeffs[i]);
     fppol_set_ui(ffspol[0].coeffs[0], 4);
-    fppol_set_ui(ffspol[0].coeffs[1], 3);
-    fppol_set_ui(ffspol[0].coeffs[2], 0);
-    fppol_set_ui(ffspol[0].coeffs[3], 0);
-    fppol_set_ui(ffspol[0].coeffs[4], 0);
+    fppol_set_ui(ffspol[0].coeffs[1], 1);
+    fppol_set_ui(ffspol[0].coeffs[2], 1);
+    fppol_set_ui(ffspol[0].coeffs[3], 1);
+    fppol_set_ui(ffspol[0].coeffs[4], 1);
     fppol_set_ui(ffspol[0].coeffs[5], 1);
 
-    // G = x*t^25 + x*t^24 + x*t^22 + x*t^20 + x*t^19 + x*t^15 + x*t^14 +
-    // x*t^13 + x*t^12 + x*t^11 + x*t^10 + x*t^9 + x*t^7 + x*t^5 + x*t^2
-    // + x*t + x + t^26 + t^21 + t^18 + t^16 + t^15 + t^13 + t^10 + t^9 +
-    // t^8 + t^7 + t^6
+    // G =  x*t^25 + x*t^24 + x*t^23 + x*t^21 + x*t^17 + x*t^16 + x*t^15
+    // + x*t^13 + x*t^10 + x*t^9 + x*t^7 + x*t^5 + x*t^3 + x + t^26 +
+    // t^25 + t^24 + t^23 + t^21 + t^20 + t^17 + t^14 + t^13 + t^11 + t^9
+    // + t^6 + t^4 + t^3 + t^2
     ffspol[1].deg = 1;
     ffspol[1].alloc = 2;
     ffspol[1].coeffs = (fppol_t *)malloc(2*sizeof(fppol_t));
     ASSERT_ALWAYS(ffspol[1].coeffs != NULL);
     for(int i = 0; i < 2; ++i)
         fppol_init(ffspol[1].coeffs[i]);
-    fppol_set_ui(ffspol[1].coeffs[0], 69576640);
-    fppol_set_ui(ffspol[1].coeffs[1], 56164007);
+    fppol_set_ui(ffspol[1].coeffs[0], 129133148);
+    fppol_set_ui(ffspol[1].coeffs[1], 61056681);
 
     // Read q, rho on command line:
     ASSERT_ALWAYS(argc == 3);
