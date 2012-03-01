@@ -447,9 +447,6 @@ __DECL_FPPOL_SET_xx(64)
 
 #undef __DECL_FPPOL_SET_xx
 
-// Set to something coded in an uint64_t.
-void fppol_set_ui(fppol_ptr r, uint64_t x);
-
 // Get degree-i coefficient.
 static inline
 void fppol_get_coeff(fp_ptr r, fppol_srcptr p, unsigned i)
