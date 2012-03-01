@@ -28,8 +28,8 @@
 #define __FP_OPP_1(p0, p1) (p0)
 
 // Addition.
-#define __FP_ADD_0(p0, p1, q0, q1) (((p1)&(q1)) | (~((p1)|(q1)) & ((p0)^(q0))))
-#define __FP_ADD_1(p0, p1, q0, q1) (((p0)&(q0)) | (~((p0)|(q0)) & ((p1)^(q1))))
+#define __FP_ADD_0(p0, p1, q0, q1) (((p0)|(q0)) ^ (((p0)|(p1)) & ((q0)|(q1))))
+#define __FP_ADD_1(p0, p1, q0, q1) (((p1)|(q1)) ^ (((p0)|(p1)) & ((q0)|(q1))))
 
 // Subtraction.
 #define __FP_SUB_0(p0, p1, q0, q1) \
