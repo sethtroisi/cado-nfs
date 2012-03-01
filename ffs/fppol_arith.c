@@ -83,18 +83,6 @@ __DEF_FPPOL_SET_xx(64)
 #undef __DEF_FPPOL_SET_xx
 
 
-// Set to something coded in an uint64_t.
-// Not sure this is meaningful. Will probably disappear soon.
-void fppol_set_ui(fppol_ptr r, uint64_t x)
-{
-  __fppol_realloc_lazy(r, 1);
-  // fppol64_set_ui(r->limbs[0], ui);
-  fppol64_set_zero(r->limbs[0]);
-  r->limbs[0][0] = x;
-  r->deg = fppol64_deg(r->limbs[0]);
-}
-
-
 // Set degree-i coefficient.
 void fppol_set_coeff(fppol_ptr r, fp_srcptr x, unsigned i)
 {
