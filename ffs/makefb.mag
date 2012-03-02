@@ -1,16 +1,18 @@
+p2 := 2;  // put 3 to work in caracteristic 3
+
 function BuildFactorBases(f, g, ba, br)
-    Ba := &cat[ SetToSequence(AllIrreduciblePolynomials(GF(2), d)) :
+    Ba := &cat[ SetToSequence(AllIrreduciblePolynomials(GF(p2), d)) :
        d in [1..ba] ];
     Sort(~Ba);
     FBa := [];
     for p in Ba do
         if Degree(p) eq 1 then
             p0 := -Coefficient(p, 0);
-            PF2p := PolynomialRing(GF(2));
+            PF2p := PolynomialRing(GF(p2));
             x := PF2p.1;
             fp := Evaluate(f, [x, p0]);
         else
-            F2p := ext<GF(2) | p>;
+            F2p := ext<GF(p2) | p>;
             PF2p := PolynomialRing(F2p);
             x := PF2p.1;
             fp := Evaluate(f, [x, PF2p!F2p.1]);
@@ -18,22 +20,22 @@ function BuildFactorBases(f, g, ba, br)
         roo := Roots(fp);
         for rr in roo do
             Append(~FBa, [p, Parent(p)!Eltseq(rr[1])]);
-            if rr[2] ne 1 then return [], []; end if;
+//            if rr[2] ne 1 then print p; return [], []; end if;
         end for;
     end for;
     
-    Br := &cat[ SetToSequence(AllIrreduciblePolynomials(GF(2), d)) :
+    Br := &cat[ SetToSequence(AllIrreduciblePolynomials(GF(p2), d)) :
        d in [1..br] ];
     Sort(~Br);
     FBr := [];
     for p in Br do
         if Degree(p) eq 1 then
             p0 := -Coefficient(p, 0);
-            PF2p := PolynomialRing(GF(2));
+            PF2p := PolynomialRing(GF(p2));
             x := PF2p.1;
             fp := Evaluate(g, [x, p0]);
         else
-            F2p := ext<GF(2) | p>;
+            F2p := ext<GF(p2) | p>;
             PF2p := PolynomialRing(F2p);
             x := PF2p.1;
             fp := Evaluate(g, [x, PF2p!F2p.1]);
@@ -41,7 +43,7 @@ function BuildFactorBases(f, g, ba, br)
         roo := Roots(fp);
         for rr in roo do
             Append(~FBr, [p, Parent(p)!Eltseq(rr[1])]);
-            if rr[2] ne 1 then return [], []; end if;
+            if rr[2] ne 1 then print p; return [], []; end if;
         end for;
     end for;
 
@@ -54,26 +56,43 @@ end function;
 
 ba := 12;
 br := 12;
-UP<t> := PolynomialRing(GF(2));
-MP<x,t> := PolynomialRing(GF(2), 2);
-F := x^5 + x^4 + x^3 + x^2 + x + t^2;
-G := x*t^25 + x*t^24 + x*t^23 + x*t^21 + x*t^17 + x*t^16 + x*t^15 + x*t^13 + x*t^10 + x*t^9 + x*t^7 + x*t^5 + x*t^3 + x + t^26 + t^25 + t^24 + t^23 + t^21 + t^20 + t^17 + t^14 + t^13 + t^11 + t^9 + t^6 + t^4 + t^3 + t^2;
+UP<t> := PolynomialRing(GF(p2));
+MP<x,t> := PolynomialRing(GF(p2), 2);
+
+if p2 eq 2 then
+  // Example in charac 2
+  F := x^5 + x^4 + x^3 + x^2 + x + t^2;
+  G := x*t^25 + x*t^24 + x*t^23 + x*t^21 + x*t^17 + x*t^16 + x*t^15 + x*t^13 + x*t^10 + x*t^9 + x*t^7 + x*t^5 + x*t^3 + x + t^26 + t^25 + t^24 + t^23 + t^21 + t^20 + t^17 + t^14 + t^13 + t^11 + t^9 + t^6 + t^4 + t^3 + t^2;
+else
+  // Example in charac 3
+  F := x^5 + x*t + x + t^2;
+  G := x*t^25 + x*t^23 + 2*x*t^22 + 2*x*t^21 + 2*x*t^20 + x*t^18 + 2*x*t^17 + x*t^16 + 2*x*t^14 + 2*x*t^13 + 2*x*t^11 + x*t^10 + 2*x*t^9 + 2*x*t^8 + x*t^7 + 2*x*t^6 + x*t^5 + x*t^4 + 2*x*t^2 + x*t + 2*x + t^26 + 2*t^25 + t^23 + t^22 + 2*t^20 + t^19 + t^18 + 2*t^17 + t^16 + t^12 + t^11 + 2*t^10 + t^8 + t^7 + 2*t^6 + t^4 + 2*t^3 + t + 2;
+end if;
 
 FBa, FBr := BuildFactorBases(F, G, ba, br);
 
+
+if p2 eq 2 then 
+    pol2hex := function (x)
+      return IntegerToString(Seqint([Integers()!xx : xx in Eltseq(x)], 2), 16);
+    end function;
+else
+    pol2hex := function(p)
+      xx := Seqint([ Integers()!x : x in Eltseq(p) ], 4);
+      return IntegerToString(xx, 16);
+    end function;
+end if;
+
+
 fil := Open("Aroots", "w");
 for p in FBa do
-    str1 := IntegerToString(UP2Int(p[1]), 16);
-    str2 := IntegerToString(UP2Int(p[2]), 16);
-    fprintf fil, "%o: %o\n", str1, str2;
+    fprintf fil, "%o: %o\n", pol2hex(p[1]), pol2hex(p[2]);
 end for;
 delete fil;
 
 fil := Open("Rroots", "w");
 for p in FBr do
-    str1 := IntegerToString(UP2Int(p[1]), 16);
-    str2 := IntegerToString(UP2Int(p[2]), 16);
-    fprintf fil, "%o: %o\n", str1, str2;
+    fprintf fil, "%o: %o\n", pol2hex(p[1]), pol2hex(p[2]);
 end for;
 delete fil;
 
