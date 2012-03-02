@@ -3,54 +3,70 @@ INC = $(wildcard *.h)
 OBJ = $(SRC:.c=.o)
 BIN = sieve
 
-#OPTFLAGS = -O3
-OPTFLAGS =
+BUILDDIR = ./build
+DIRCLEAN =
+
+OPTFLAGS  =
 WARNFLAGS = -Wall -Wextra -pedantic
 
 CPPFLAGS    =
-CFLAGS      = $(OPTFLAGS) $(WARNFLAGS) -std=c99 -g # -DTRACE_POS=49755
+CFLAGS      = $(OPTFLAGS) $(WARNFLAGS) -std=c99   -g
 CXXFLAGS    = $(OPTFLAGS) $(WARNFLAGS) -std=c++0x -g
 TARGET_ARCH = -mtune=native -march=native 
 LDFLAGS     = 
 LDLIBS      = -lntl -lstdc++
 
+-include Makefile.local
+
 FIELDS = f2 f3
 f2_DEF = USE_F2
 f3_DEF = USE_F3
 
-.PHONY: all clean
+.PHONY: all $(FIELDS) clean
+
+all: $(FIELDS)
 
 define BUILD_template
-  $(1)_OBJ      = $$(filter-out $$(foreach f,$$(FIELDS),$$(f)pol.$(1).o), \
-                     $$(OBJ:.o=.$(1).o)) $(1)pol.$(1).o
-  $(1)_BIN      = $$(BIN:=.$(1))
+  $(1)_BUILDDIR = $$(BUILDDIR)/$(1)
+  $(1)_DEP      = $$($(1)_BUILDDIR)/.depend
+  $(1)_OBJ      = $$(addprefix $$($(1)_BUILDDIR)/,$$(filter-out $$(foreach f,\
+                     $$(filter-out $(1),$$(FIELDS)),$$(f)pol.o), $$(OBJ)))
+  $(1)_BIN      = $$(addprefix $$($(1)_BUILDDIR)/,$$(BIN))
   $(1)_CPPFLAGS = -D$$($(1)_DEF)
 
-  all: $$($(1)_BIN)
+  $(1): $$($(1)_BIN)
 
-  $$(filter fppol%.$(1).o, $$($(1)_OBJ)): $(1)pol.h
+  $$($(1)_BUILDDIR):
+	mkdir -p $$@
 
-  $$($(1)_OBJ): %.$(1).o: Makefile
+  $$($(1)_OBJ): $$($(1)_BUILDDIR)/%.o: Makefile | $$($(1)_BUILDDIR)
 	$$(CC) $$(CFLAGS) $$(CPPFLAGS) $$($(1)_CPPFLAGS) $$(TARGET_ARCH) \
 	  -c -o $$@ $$*.c
 
-  cofactor.$(1).o: Makefile
+  $$($(1)_BUILDDIR)/cofactor.o: Makefile | $$($(1)_BUILDDIR)
 	$$(CXX) $$(CXXFLAGS) $$(CPPFLAGS) $$($(1)_CPPFLAGS) $$(TARGET_ARCH) \
 	  -c -o $$@ cofactor.cc
 
-  $$($(1)_BIN): $$($(1)_OBJ) cofactor.$(1).o
+  $$($(1)_BIN): $$($(1)_OBJ) $$($(1)_BUILDDIR)/cofactor.o
+
+  $$($(1)_DEP): $$(SRC) $$(INC) cofactor.cc cofactor.hh Makefile | $$($(1)_BUILDDIR)
+	$$(CC) $$(CFLAGS) $$(CPPFLAGS) $$($(1)_CPPFLAGS) -MM $$(SRC) cofactor.cc \
+	  | sed -e "s+^.*\.o:+$$($(1)_BUILDDIR)/&+" >$$@
+
+  -include $$($(1)_DEP)
 
   clean::
-	rm -f $$($(1)_OBJ) cofactor.$(1).o $$($(1)_BIN)
+  ifeq ($(DIRCLEAN), 1)
+	rm -rf $$($(1)_BUILDDIR)
+  else
+	rm -f $$($(1)_DEP) $$($(1)_OBJ) $$($(1)_BUILDDIR)/cofactor.o $$($(1)_BIN)
+	[ -z "`find $$($(1)_BUILDDIR) -maxdepth 0 -empty`" ] \
+	  || rmdir $$($(1)_BUILDDIR)
+  endif
+
 endef
 
 $(foreach f,$(FIELDS),$(eval $(call BUILD_template,$(f))))
 
 clean::
-	rm -f .depend
-
-.depend: $(SRC) $(INC) cofactor.cc cofactor.hh Makefile
-	$(CC) $(CPPFLAGS) $(CFLAGS) -MM $(SRC) cofactor.cc           \
-	  | sed "s+\(.*\)\.o+$(foreach f,$(FIELDS),\1.$(f).o )+" >$@
-
--include .depend
+	[ -z "`find $(BUILDDIR) -maxdepth 0 -empty`" ] || rmdir $(BUILDDIR)
