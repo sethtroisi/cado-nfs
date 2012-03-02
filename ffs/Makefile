@@ -4,7 +4,6 @@ OBJ = $(SRC:.c=.o)
 BIN = sieve
 
 BUILDDIR = ./build
-DIRCLEAN =
 
 OPTFLAGS  =
 WARNFLAGS = -Wall -Wextra -pedantic
@@ -16,13 +15,14 @@ TARGET_ARCH = -mtune=native -march=native
 LDFLAGS     = 
 LDLIBS      = -lntl -lstdc++
 
+# Override variables in here!
 -include Makefile.local
 
 FIELDS = f2 f3
 f2_DEF = USE_F2
 f3_DEF = USE_F3
 
-.PHONY: all $(FIELDS) clean
+.PHONY: all $(FIELDS) clean dirclean
 
 all: $(FIELDS)
 
@@ -53,20 +53,19 @@ define BUILD_template
 	$$(CC) $$(CFLAGS) $$(CPPFLAGS) $$($(1)_CPPFLAGS) -MM $$(SRC) cofactor.cc \
 	  | sed -e "s+^.*\.o:+$$($(1)_BUILDDIR)/&+" >$$@
 
-  -include $$($(1)_DEP)
-
   clean::
-  ifeq ($(DIRCLEAN), 1)
-	rm -rf $$($(1)_BUILDDIR)
-  else
 	rm -f $$($(1)_DEP) $$($(1)_OBJ) $$($(1)_BUILDDIR)/cofactor.o $$($(1)_BIN)
 	[ -z "`find $$($(1)_BUILDDIR) -maxdepth 0 -empty`" ] \
 	  || rmdir $$($(1)_BUILDDIR)
-  endif
+
+  dirclean::
+	rm -rf $$($(1)_BUILDDIR)
+
+  -include $$($(1)_DEP)
 
 endef
 
 $(foreach f,$(FIELDS),$(eval $(call BUILD_template,$(f))))
 
-clean::
+clean dirclean::
 	[ -z "`find $(BUILDDIR) -maxdepth 0 -empty`" ] || rmdir $(BUILDDIR)
