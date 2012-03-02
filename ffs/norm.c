@@ -155,6 +155,7 @@ void init_norms(unsigned char *S, ffspol_ptr ffspol, int I, int J, qlat_t qlat,
         int sqside)
 {
   fppol_t a, b;
+  unsigned int II = 1, JJ = 1;
   fppol_init(a);
   fppol_init(b);
   ij_t i, j;
@@ -162,12 +163,18 @@ void init_norms(unsigned char *S, ffspol_ptr ffspol, int I, int J, qlat_t qlat,
   if (sqside)
       degq = sq_deg(qlat->q);
   
-  // TODO: exchange those 2 loops to preserve locality.
-  for (unsigned int ii = 0; ii < (1u << I); ii++) {
-    i[0] = ii;
-    for (unsigned int jj = 0; jj < (1u << J); jj++) {	  
-      int position = ii + (1u << I)*jj;
-      j[0] = jj;	  
+  for (int k = 0; k < I; ++k)
+      II *= FP_SIZE;
+  for (int k = 0; k < J; ++k)
+      JJ *= FP_SIZE;
+
+  for (unsigned int jj = 0; jj < JJ; jj++) {	  
+    if (!ij_set_ui(j, jj, J))
+      continue;
+    for (unsigned int ii = 0; ii < II; ii++) {
+      if (!ij_set_ui(i, ii, I))
+        continue;
+      int position = ii + II*jj;
 #ifdef TRACE_POS
       if (position == TRACE_POS) {
           fprintf(stderr, "TRACE_POS(%d): (i,j) = (", position);

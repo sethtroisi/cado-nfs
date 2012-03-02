@@ -179,11 +179,10 @@ int main(int argc, char **argv)
         fppol_init(a);
         fppol_init(b);
         for (unsigned int j = 0; j < JJ; ++j) {
-            if (!ij_set_ui(jj, j))
+            if (!ij_set_ui(jj, j, J))
                 continue;
-            for (unsigned int i = 0; i < II; ++i, ++Sptr)
-            {
-                if (!ij_set_ui(ii, i))
+            for (unsigned int i = 0; i < II; ++i, ++Sptr) {
+                if (!ij_set_ui(ii, i, I))
                     continue;
                 if (*Sptr != 255) {
     //                printf("i,j = %u %u\n", i, j);
@@ -194,6 +193,7 @@ int main(int argc, char **argv)
                     nrels += factor_survivor(a, b, ffspol, lpb);
                 }
             }
+        }
         fppol_clear(a);
         fppol_clear(b);
     }
