@@ -86,18 +86,18 @@ extern const uint8_t  __f3_monic_get_ui_conv[];
 extern const uint16_t __f3_monic_set_ui_conv[];
 
 
-// Conversion of an n-term polynomial to uint64_t.
+// Conversion of an n-term polynomial to an unsigned int.
 #define __FP_GET_UI(sz, r, p, n)                                        \
   do {                                                                  \
     r = 0;                                                              \
     for (unsigned __i = 0, __j = 0, __w; __i < n; __i += 5, __j += 8) { \
       __w = ((p[0] >> __i) & 0x1f) | (((p[1] >> __i) & 0x1f) << 5);     \
-      r |= (uint64_t)__f3_get_ui_conv[__w] << __j;                      \
+      r |= (unsigned)__f3_get_ui_conv[__w] << __j;                      \
     }                                                                   \
   } while (0)
 
 
-// Conversion of an n-term polynomial from uint64_t.
+// Conversion of an n-term polynomial from an unsigned int.
 // Return 0 in case of an invalid representation.
 // /!\ Note however that the degree is not checked: if the resulting
 //     polynomial has more than n terms, no error is reported.
@@ -114,17 +114,17 @@ extern const uint16_t __f3_monic_set_ui_conv[];
   } while (0)
 
 
-// Conversions to uint64_t in the case of monic polynomials.
+// Conversions to an unsigned int in the case of monic polynomials.
 #define __FP_MONIC_GET_UI(sz, r, p, n)                            \
   do {                                                            \
     __FP_GET_UI(sz, r, p, ((n-1)/5)*5);                           \
     unsigned __i = ((n-1)/5)*5, __j = ((n-1)/5)*8, __w;           \
     __w = ((p[0] >> __i) & 0x1f) | (((p[1] >> __i) & 0x1f) << 5); \
-    r |= (uint64_t)__f3_monic_get_ui_conv[__w] << __j;            \
+    r |= (unsigned)__f3_monic_get_ui_conv[__w] << __j;            \
   } while (0)
 
 
-// Conversions from uint64_t in the case of monic polynomials.
+// Conversions from an unsigned int in the case of monic polynomials.
 // Return 0 in case of an invalid representation.
 // /!\ Note however that the degree is not checked: if the resulting
 //     polynomial has more than n terms, no error is reported.

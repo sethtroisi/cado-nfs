@@ -330,47 +330,47 @@ __DECL_FPPOLxx_ARITH_ALL(64)
   { for (unsigned k = 0; k < __FP_BITS; ++k) r[k] = i < sz ? p[k] >> i : 0; }
 
 
-// Conversion of an n-term polynomial to uint64_t.
+// Conversion of an n-term polynomial to an unsigned int.
 // Generic prototype:
-//   uint64_t fppol<sz>_get_ui(fppol<sz>_srcptr p, unsigned n);
+//   unsigned fppol<sz>_get_ui(fppol<sz>_srcptr p, unsigned n);
 #define __DEF_FPPOLxx_GET_UI(sz)                                             \
   static inline                                                              \
-  uint64_t fppol##sz##_get_ui(fppol##sz##_srcptr p, MAYBE_UNUSED unsigned n) \
-  { uint64_t r; __FP_GET_UI(sz, r, p, n); return r; }
+  unsigned fppol##sz##_get_ui(fppol##sz##_srcptr p, MAYBE_UNUSED unsigned n) \
+  { unsigned r; __FP_GET_UI(sz, r, p, n); return r; }
 
 
-// Conversion of an n-term polynomial from uint64_t.
+// Conversion of an n-term polynomial from an unsigned int.
 // Return 1 if successful.
 // /!\ Note however that the degree is not checked: if the resulting
 //     polynomial has more than n terms, no error is reported.
 // Generic prototype:
-//   int fppol<sz>_set_ui(fppol<sz>_ptr r, uint64_t x, unsigned n);
+//   int fppol<sz>_set_ui(fppol<sz>_ptr r, unsigned x, unsigned n);
 #define __DEF_FPPOLxx_SET_UI(sz)                        \
   static inline                                         \
-  int fppol##sz##_set_ui(fppol##sz##_ptr r, uint64_t x, \
+  int fppol##sz##_set_ui(fppol##sz##_ptr r, unsigned x, \
                          MAYBE_UNUSED unsigned n)       \
   { __FP_SET_UI(sz, r, x, n); return 1; }
 
 
-// Conversion of an n-term monic polynomial to uint64_t.
+// Conversion of an n-term monic polynomial to an unsigned int.
 // Generic prototype:
-//   uint64_t fppol<sz>_monic_get_ui(fppol<sz>_srcptr p, unsigned n);
+//   unsigned fppol<sz>_monic_get_ui(fppol<sz>_srcptr p, unsigned n);
 #define __DEF_FPPOLxx_MONIC_GET_UI(sz)                       \
   static inline                                              \
-  uint64_t fppol##sz##_monic_get_ui(fppol##sz##_srcptr p,    \
+  unsigned fppol##sz##_monic_get_ui(fppol##sz##_srcptr p,    \
                                     MAYBE_UNUSED unsigned n) \
-  { uint64_t r; __FP_MONIC_GET_UI(sz, r, p, n); return r; }
+  { unsigned r; __FP_MONIC_GET_UI(sz, r, p, n); return r; }
 
 
-// Conversion of an n-term monic polynomial from uint64_t.
+// Conversion of an n-term monic polynomial from an unsigned int.
 // Return 1 if successful.
 // /!\ Note however that the degree is not checked: if the resulting
 //     polynomial has more than n terms, no error is reported.
 // Generic prototype:
-//   int fppol<sz>_monic_set_ui(fppol<sz>_ptr r, uint64_t x, unsigned n);
+//   int fppol<sz>_monic_set_ui(fppol<sz>_ptr r, unsigned x, unsigned n);
 #define __DEF_FPPOLxx_MONIC_SET_UI(sz)                        \
   static inline                                               \
-  int fppol##sz##_monic_set_ui(fppol##sz##_ptr r, uint64_t x, \
+  int fppol##sz##_monic_set_ui(fppol##sz##_ptr r, unsigned x, \
                                MAYBE_UNUSED unsigned n)       \
   { __FP_MONIC_SET_UI(sz, r, x, n); return 1; }
 
