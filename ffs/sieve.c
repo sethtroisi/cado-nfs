@@ -24,9 +24,15 @@ int main(int argc, char **argv)
     factorbase_t FB[2];
     int I, J;  // strict bound on the degrees of the (i,j)
     unsigned int II, JJ; // corresponding maximum integer
+#ifdef USE_F2
     unsigned char threshold[2] = { 50, 50};  // should not be fixed here.
     int lpb[2] = { 25, 25};  // should not be fixed here.
     I = 9; J = 9;
+#else
+    unsigned char threshold[2] = { 30, 30};  // should not be fixed here.
+    int lpb[2] = { 15, 15};  // should not be fixed here.
+    I = 5; J = 5;
+#endif
     int noerr;
     
     II = 1; JJ = 1;
