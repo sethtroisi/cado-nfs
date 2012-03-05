@@ -360,7 +360,7 @@ __DECL_FPPOLxx_ARITH_ALL(64)
   { unsigned r; __FP_GET_UI(sz, r, p, n); return r; }
 
 
-// Conversion of an n-term polynomial from an unsigned int.int
+// Conversion of an n-term polynomial from an unsigned int.
 // Return 1 if successful.
 // /!\ Note however that the degree is not checked: if the resulting
 //     polynomial has more than n terms, no error is reported.
