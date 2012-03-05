@@ -23,18 +23,31 @@ int main(int argc, char **argv)
     qlat_t qlat;
     factorbase_t FB[2];
     int I, J;  // strict bound on the degrees of the (i,j)
-    unsigned int II, JJ; // corresponding maximum integer
+    // Corresponding maximum integers. These are used for:
+    //   - bounds on integer loops allowing to visit the sieve space
+    //   - II comes into play in the position computation.
+    unsigned int II, JJ; 
+
+#ifdef USE_F2
     unsigned char threshold[2] = { 50, 50};  // should not be fixed here.
     int lpb[2] = { 25, 25};  // should not be fixed here.
     I = 9; J = 9;
-    int noerr;
-    
-    II = 1; JJ = 1;
-    for (int i = 0; i < I; ++i)
-        II *= FP_SIZE;
-    for (int i = 0; i < J; ++i)
-        JJ *= FP_SIZE;
+    II = 1u<<I;
+    JJ = 1u<<J;
+#else
+    unsigned char threshold[2] = { 30, 30};  // should not be fixed here.
+    int lpb[2] = { 15, 15};  // should not be fixed here.
+    I = 5; J = 5;
+    {
+        ij_t max;
+        ij_set_ti(max, I);
+        II = ij_get_ui(max, I+1);
+        ij_set_ti(max, J);
+        JJ = ij_monic_get_ui(max, J+1);
+    }
+#endif
 
+    int noerr;
     ffspol_init(ffspol[0]);
     ffspol_init(ffspol[1]);
 
@@ -125,14 +138,14 @@ int main(int argc, char **argv)
             fppol_init(bigq);
             fppol_init(rem);
             fppol_set_sq(bigq, qlat->q);
-            for (unsigned int ii = 0; ii < II; ii++) {
-                if (!ij_set_ui(i, ii))
+            for (unsigned int jj = 0; jj < JJ; jj++) {
+                if (!ij_monic_set_ui(j, jj, J))
                     continue;
-                for (unsigned int jj = 0; jj < JJ; jj++) {
-                    int position = ii + II*jj;
-                    if (position == 0)
+                for (unsigned int ii = 0; ii < II; ii++) {
+                    if (!ij_set_ui(i, ii, I))
                         continue;
-                    if (!ij_set_ui(j, jj))
+                    ijpos_t position = i + II*j;
+                    if (position == 0)
                         continue;
                     if (S[position] != 255) {
                         ij2ab(a, b, i, j, qlat);
@@ -155,7 +168,7 @@ int main(int argc, char **argv)
 
         // sieve
         t_sieve -= seconds();
-        sieveFB(S, FB[side], I, J, qlat);
+        sieveFB(S, FB[side], I, J, II, qlat);
         t_sieve += seconds();
 
         // mark survivors

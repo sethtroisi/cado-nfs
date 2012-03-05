@@ -251,17 +251,16 @@ static inline void ijvec_add(ijvec_t W, ijvec_t V, ijvec_t U) {
 // corresponding position in S. (might return 2 integers at some point)
 typedef unsigned int ijpos_t;
 
-// conversion: to be adapted for each case.
-static inline ijpos_t ijvec2pos(ijvec_t V,
-        MAYBE_UNUSED int I, MAYBE_UNUSED int J) {
-    return (ijpos_t)(V->j[0])*(1U<<I) + (ijpos_t)V->i[0];
-}
-static inline void ijpos2vec(ijvec_t V, ijpos_t P, 
-        MAYBE_UNUSED int I, MAYBE_UNUSED int J) {
-    V->i[0] = (P) % (1U<<I);    // TODO: bit-fiddling, here
-    V->j[0] = (P) / (1U<<I);
+static inline ijpos_t ijvec2pos(ijvec_t V, unsigned int II, int I, int J) {
+    return ij_monic_get_ui(V->j, J)*II + ij_get_ui(V->i, I);
 }
 
+// Warning, this function might be expensive in charac 3! 
+static inline void ijpos2vec(ijvec_t V, ijpos_t P,
+        unsigned int II, int I, int J) {
+    ij_set_ui(V->i, (P % II), I);
+    ij_monic_set_ui(V->j, (P / II), J);
+}
 
 
 #endif   /* __TYPES_H__ */

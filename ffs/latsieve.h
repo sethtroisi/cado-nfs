@@ -7,7 +7,7 @@
 // this will probably be split into 2 or more functions once the bucket
 // sieving is operational.
 void sieveFB(unsigned char *S, factorbase_t FB, int I, int J, 
-        qlat_t qlat);
+        unsigned int II, qlat_t qlat);
 
 
 

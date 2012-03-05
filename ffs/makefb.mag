@@ -1,4 +1,12 @@
-p2 := 2;  // put 3 to work in caracteristic 3
+if false then 
+  p2 := 2;  // put 3 to work in caracteristic 3 
+  ba := 12;
+  br := 12;
+else
+  p2 := 3;
+  ba := 8;
+  br := 8;
+end if;
 
 function BuildFactorBases(f, g, ba, br)
     Ba := &cat[ SetToSequence(AllIrreduciblePolynomials(GF(p2), d)) :
@@ -54,8 +62,6 @@ function UP2Int(f)
     return Seqint([Integers()!x : x in Eltseq(f)], 2);
 end function;
 
-ba := 12;
-br := 12;
 UP<t> := PolynomialRing(GF(p2));
 MP<x,t> := PolynomialRing(GF(p2), 2);
 
