@@ -99,9 +99,9 @@ int main(int argc, char **argv)
     print_qlat_info(qlat);
 
     // Read the factor bases
-    noerr = fbread(&FB[0], "Aroots");
+    noerr = fbread(&FB[0], "Aroots", qlat);
     assert (noerr);
-    noerr = fbread(&FB[1], "Rroots");
+    noerr = fbread(&FB[1], "Rroots", qlat);
     assert (noerr);
 
     // Allocate and init the sieve space
