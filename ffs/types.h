@@ -239,32 +239,4 @@ typedef struct {
     unsigned char degp;
 } fbideal_t;
 
-// a vector of (i,j) polynomials in the sieve.
-typedef struct {
-    ij_t i;
-    ij_t j;
-} ijvec_struct;
-
-typedef ijvec_struct ijvec_t[1];
-
-static inline void ijvec_add(ijvec_t W, ijvec_t V, ijvec_t U) {
-    ij_add(W->i, V->i, U->i);
-    ij_add(W->j, V->j, U->j);
-}
-
-// corresponding position in S. (might return 2 integers at some point)
-typedef unsigned int ijpos_t;
-
-static inline ijpos_t ijvec2pos(ijvec_t V, unsigned int II, int I, int J) {
-    return ij_monic_get_ui(V->j, J)*II + ij_get_ui(V->i, I);
-}
-
-// Warning, this function might be expensive in charac 3! 
-static inline void ijpos2vec(ijvec_t V, ijpos_t P,
-        unsigned int II, int I, int J) {
-    ij_set_ui(V->i, (P % II), I);
-    ij_monic_set_ui(V->j, (P / II), J);
-}
-
-
 #endif   /* __TYPES_H__ */
