@@ -26,25 +26,39 @@
 #define __BUCKET_UPDATE_BITS     (BUCKET_UPDATE_POS_BITS + \
                                   BUCKET_UPDATE_HINT_BITS)
 
-// In memory, a bucket update will just be an array of bytes.
-typedef struct {
-  uint8_t __d[(__BUCKET_UPDATE_BITS+7) / 8];
-} bucket_update_t;
-
 // Smallest unsigned integer in which a bucket update will fit.
 #if   __BUCKET_UPDATE_BITS <= 16
-typedef uint16_t __bucket_update_ui_t;
+typedef uint16_t bucket_update_t;
 #elif __BUCKET_UPDATE_BITS <= 32
-typedef uint32_t __bucket_update_ui_t;
+typedef uint32_t bucket_update_t;
 #else
-typedef uint64_t __bucket_update_ui_t;
+typedef uint64_t bucket_update_t;
 #endif
 
-// Internal type for accessing the fields of a bucket update.
-typedef union {
-    bucket_update_t    data;
-  __bucket_update_ui_t ui;
+// In memory, a bucket update will be packed into an array of bytes.
+typedef struct {
+  uint8_t d[(__BUCKET_UPDATE_BITS+7) / 8];
 } __bucket_update_t;
+
+// Internal type for converting between normal and packed representations
+// of bucket updates.
+typedef union {
+    bucket_update_t update;
+  __bucket_update_t packed;
+} __bucket_update_conv_t;
+
+// Pack a bucket update.
+static inline
+__bucket_update_t __bucket_update_pack(bucket_update_t update)
+{ __bucket_update_conv_t conv = { .update = update };
+  return conv.packed; }
+
+// Unpack a bucket update.
+static inline
+bucket_update_t __bucket_update_unpack(__bucket_update_t packed)
+{ __bucket_update_conv_t conv = { .packed = packed };
+  return conv.update; }
+
 
 // Types for positions and hints as exported by the functions.
 typedef unsigned pos_t;
@@ -53,20 +67,18 @@ typedef unsigned hint_t;
 // Construct a bucket update from a position and a prime hint.
 static inline
 bucket_update_t bucket_update_set(pos_t pos, hint_t hint)
-{ __bucket_update_t t = { .ui = pos | (hint << BUCKET_UPDATE_POS_BITS) };
-  return t.data; }
+{ return (bucket_update_t)pos |
+        ((bucket_update_t)hint << BUCKET_UPDATE_POS_BITS) };
 
 // Retrieve the position from a bucket update.
 static inline
 pos_t  bucket_update_get_pos (bucket_update_t update)
-{ __bucket_update_t t = { .data = update };
-  return t.ui & (((pos_t)1<<BUCKET_UPDATE_POS_BITS)-1); }
+{ return update & (((pos_t)1<<BUCKET_UPDATE_POS_BITS)-1); }
 
 // Retrieve the prime hint from a bucket update.
 static inline
 hint_t bucket_update_get_hint(bucket_update_t update)
-{ __bucket_update_t t = { .data = update };
-  return (t.ui >> BUCKET_UPDATE_POS_BITS) &
+{ return (update >> BUCKET_UPDATE_POS_BITS) &
          (((hint_t)1<<BUCKET_UPDATE_HINT_BITS)-1); }
 
 
@@ -75,11 +87,11 @@ hint_t bucket_update_get_hint(bucket_update_t update)
  *****************************************************************************/
 
 typedef struct {
-  unsigned          n;
-  unsigned          size;
-  bucket_update_t **begin;
-  bucket_update_t **iter;
-  bucket_update_t **end;
+  unsigned            n;
+  unsigned            size;
+  __bucket_update_t **begin;
+  __bucket_update_t **iter;
+  __bucket_update_t **end;
 } __bucket_array_struct;
 
 typedef       __bucket_array_struct  bucket_array_t[1];
@@ -91,15 +103,18 @@ void bucket_array_init(bucket_array_ptr buckets, unsigned n, unsigned size)
 {
   buckets->n     = n;
   buckets->size  = size;
-  buckets->begin = (bucket_update_t **)malloc(n * sizeof(bucket_update_t *));
-  buckets->iter  = (bucket_update_t **)malloc(n * sizeof(bucket_update_t *));
-  buckets->end   = (bucket_update_t **)malloc(n * sizeof(bucket_update_t *));
+  buckets->begin =
+    (__bucket_update_t **)malloc(n * sizeof(__bucket_update_t *));
+  buckets->iter  =
+    (__bucket_update_t **)malloc(n * sizeof(__bucket_update_t *));
+  buckets->end   =
+    (__bucket_update_t **)malloc(n * sizeof(__bucket_update_t *));
   ASSERT_ALWAYS(buckets->begin != NULL);
   ASSERT_ALWAYS(buckets->iter  != NULL);
   ASSERT_ALWAYS(buckets->end   != NULL);
   for (unsigned i = 0; i < n; ++i) {
     buckets->begin[i] = buckets->iter[i] = buckets->end[i] = 
-      (bucket_update_t *)malloc(size * sizeof(bucket_update_t));
+      (__bucket_update_t *)malloc(size * sizeof(__bucket_update_t));
     ASSERT_ALWAYS(buckets->begin[i] != NULL);
   }
 }
@@ -125,10 +140,10 @@ int bucket_is_done(bucket_array_srcptr buckets, unsigned i)
 static inline
 void bucket_push(bucket_array_ptr buckets, unsigned i,
                  const bucket_update_t update)
-{ *buckets->end[i]++ = update; }
+{ *buckets->end[i]++ = __bucket_update_pack(update); }
 
 static inline
 bucket_update_t bucket_next(bucket_array_ptr buckets, unsigned i)
-{ return *buckets->iter[i]++; }
+{ return __bucket_update_unpack(*buckets->iter[i]++); }
 
 #endif  /* __BUCKETS_H__ */
