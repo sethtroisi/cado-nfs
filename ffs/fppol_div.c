@@ -64,7 +64,7 @@
       fp_mul(cq, lcr, ilcb);                                               \
       fppol##sz##_set_coeff(qq, cq, degr-degb);                            \
       fppol##sz##_smul(tmp, b, cq);                                        \
-      fppol##sz##_shl(tmp, tmp, degr-degb);                                \
+      fppol##sz##_mul_ti(tmp, tmp, degr-degb);                             \
       fppol##sz##_sub(rr, rr, tmp);                                        \
       degr = fppol##sz##_deg(rr);                                          \
     }                                                                      \

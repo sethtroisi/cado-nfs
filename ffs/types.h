@@ -153,10 +153,14 @@ __DECL_ALIAS_TYPE(ij)
                                                 type##_srcptr, type##_srcptr) \
   __DECL_ALIAS_FUN (void, type, sub,            type##_ptr,                   \
                                                 type##_srcptr, type##_srcptr) \
-  __DECL_ALIAS_FUN (void, type, shl,            type##_ptr,                   \
+  __DECL_ALIAS_FUN (void, type, mul_ti,         type##_ptr,                   \
                                                 type##_srcptr, unsigned)      \
-  __DECL_ALIAS_FUN (void, type, shr,            type##_ptr,                   \
+  __DECL_ALIAS_FUN (void, type, div_ti,         type##_ptr,                   \
                                                 type##_srcptr, unsigned)      \
+  __DECL_ALIAS_FUN (void, type, mod_ti,         type##_ptr,                   \
+                                                type##_srcptr, unsigned)      \
+  __DECL_ALIAS_FUN (void, type, add_disjoint,   type##_ptr,                   \
+                                                type##_srcptr, type##_srcptr) \
   __DECL_ALIAS_FUN (int,      type, deg,        type##_srcptr)                \
   __DECL_ALIAS_FUN (char_ptr, type, get_str,    char *,        type##_srcptr) \
   __DECL_ALIAS_FUN (int,      type, set_str,    type##_ptr,    const char *)  \
@@ -180,7 +184,7 @@ __DECL_ALIAS_TYPE(ij)
                                                 type##_srcptr, type##_srcptr) \
   __DECL_ALIAS_FUN (int,  type, rem,            type##_ptr,                   \
                                                 type##_srcptr, type##_srcptr) \
-  __DECL_ALIAS_FUN (void, type, shl1mod,        type##_ptr,                   \
+  __DECL_ALIAS_FUN (void, type, multmod,        type##_ptr,                   \
                                                 type##_srcptr, type##_srcptr) \
   __DECL_ALIAS_FUN (void, type, mulmod,         type##_ptr,    type##_srcptr, \
                                                 type##_srcptr, type##_srcptr) \

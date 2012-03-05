@@ -30,8 +30,8 @@ int skewGauss(qlat_t qlat, unsigned int skewness)
     } while (sq_deg(a[0]) > sq_deg(b[0]));
 
     // Compensate for the skewness
-    sq_shr(b[0], b[0], skewness);
-    sq_shr(b[1], b[1], skewness);
+    sq_div_ti(b[0], b[0], skewness);
+    sq_div_ti(b[1], b[1], skewness);
 
     // cast and check that the result fits!
     return (ai_set_sq(qlat->a0, a[0]) && ai_set_sq(qlat->a1, a[1])

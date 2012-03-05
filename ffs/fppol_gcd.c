@@ -46,7 +46,7 @@
        fppol##sz##_get_coeff(lc1, r1, d1);                           \
     )                                                                \
     for (int d = d0 - d1; ; ) {                                      \
-      fppol##sz##_shl(t, r1, d);                                     \
+      fppol##sz##_mul_ti(t, r1, d);                                  \
       IF(CMP(FP_SIZE, 2), EQ, ,                                      \
          fp_div(lc, lc0, lc1);                                       \
          fppol##sz##_smul(t, t, lc);                                 \

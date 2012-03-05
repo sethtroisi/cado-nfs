@@ -10,10 +10,10 @@
 // Modular left shift by one (i.e., multiplication by t).
 // /!\ Assume that m is monic and that p is reduced modulo m.
 // Generic prototype:
-//   void fppol<sz>_shl1mod(fppol<sz>_ptr    r, fppol<sz>_srcptr p,
+//   void fppol<sz>_multmod(fppol<sz>_ptr    r, fppol<sz>_srcptr p,
 //                          fppol<sz>_srcptr m);
-#define __DECL_FPPOLxx_SHL1MOD(sz)                                     \
-  void fppol##sz##_shl1mod(fppol##sz##_ptr    r, fppol##sz##_srcptr p, \
+#define __DECL_FPPOLxx_MULTMOD(sz)                                     \
+  void fppol##sz##_multmod(fppol##sz##_ptr    r, fppol##sz##_srcptr p, \
                            fppol##sz##_srcptr m);
 
 
@@ -40,7 +40,7 @@
 
 // All declarations bundled up into a single macro.
 #define __DECL_FPPOLxx_MOD_ALL(sz) \
-        __DECL_FPPOLxx_SHL1MOD(sz) \
+        __DECL_FPPOLxx_MULTMOD(sz) \
         __DECL_FPPOLxx_MULMOD (sz) \
         __DECL_FPPOLxx_INVMOD (sz)
 
@@ -49,7 +49,7 @@ __DECL_FPPOLxx_MOD_ALL(32)
 __DECL_FPPOLxx_MOD_ALL(64)
 __DECL_FPPOLxx_MOD_ALL()
 
-#undef __DECL_FPPOLxx_SHL1MOD
+#undef __DECL_FPPOLxx_MULTMOD
 #undef __DECL_FPPOLxx_MULMOD
 #undef __DECL_FPPOLxx_INVMOD
 #undef __DECL_FPPOLxx_MOD_ALL

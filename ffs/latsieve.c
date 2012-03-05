@@ -122,8 +122,8 @@ int fillin_basis(ijvec_t *V, fbprime_t i, fbprime_t j, int degI,
         ij_set_fbprime(V[0]->j, jj);
         k++;
         V++;
-        fbprime_shl(ii, ii, 1);
-        fbprime_shl(jj, jj, 1);
+        fbprime_mul_ti(ii, ii, 1);
+        fbprime_mul_ti(jj, jj, 1);
     }
     return k;
 }
@@ -173,13 +173,13 @@ void sieveFB(unsigned char *S, factorbase_t FB, int I, int J,
             ij_set_fbprime(bas.vec[0]->i, gothp.p);
             ij_set_zero(bas.vec[0]->j);
             for (int jj = 1; jj < I-L; ++jj) {
-                ij_shl(bas.vec[jj]->i, bas.vec[jj-1]->i, 1);
+                ij_mul_ti(bas.vec[jj]->i, bas.vec[jj-1]->i, 1);
                 ij_set_zero(bas.vec[jj]->j);
             }
             ij_set_fbprime(bas.vec[I-L]->i, lambda_p);
             ij_set_one(bas.vec[I-L]->j);
             for (int jj = I-L+1; jj < I-L+J; ++jj) {
-                ij_shl1mod(bas.vec[jj]->i, bas.vec[jj-1]->i, gothp.p);
+                ij_multmod(bas.vec[jj]->i, bas.vec[jj-1]->i, gothp.p);
                 ij_set_ti(bas.vec[jj]->j, jj - (I-L));
             }
         } else {

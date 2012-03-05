@@ -8,13 +8,13 @@
 // Modular left shift by one (i.e., multiplication by t).
 // /!\ Assume that m is monic and that p is reduced modulo m.
 #define __DEF_FPPOLxx_SHL1MOD(sz)                                      \
-  void fppol##sz##_shl1mod(fppol##sz##_ptr    r, fppol##sz##_srcptr p, \
+  void fppol##sz##_multmod(fppol##sz##_ptr    r, fppol##sz##_srcptr p, \
                            fppol##sz##_srcptr m)                       \
   {                                                                    \
     int degp = fppol##sz##_deg(p);                                     \
     ASSERT(fppol##sz##_deg(m) > degp);                                 \
     if (degp+1 < fppol##sz##_deg(m)) {                                 \
-      fppol##sz##_shl(r, p, 1);                                        \
+      fppol##sz##_mul_ti(r, p, 1);                                     \
       return;                                                          \
     }                                                                  \
                                                                        \
@@ -22,9 +22,9 @@
     fppol##sz##_t t;                                                   \
     IF(sz, EMPTY, fppol_init(t);, )                                    \
     fppol##sz##_get_coeff(lc, p, degp);                                \
-    fppol##sz##_shl (t, p, 1);                                         \
-    fppol##sz##_smul(r, m, lc);                                        \
-    fppol##sz##_sub (r, t, r);                                         \
+    fppol##sz##_mul_ti(t, p, 1);                                       \
+    fppol##sz##_smul  (r, m, lc);                                      \
+    fppol##sz##_sub   (r, t, r);                                       \
     IF(sz, EMPTY, fppol_clear(t);, )                                   \
   }
 
@@ -94,13 +94,13 @@
        fppol##sz##_get_coeff(lc1, r1, d1);                           \
     )                                                                \
     for (int d = d0 - d1; ; ) {                                      \
-      fppol##sz##_shl(t, r1, d);                                     \
+      fppol##sz##_mul_ti(t, r1, d);                                  \
       IF(CMP(FP_SIZE, 2), EQ, ,                                      \
          fp_div(lc, lc0, lc1);                                       \
          fppol##sz##_smul(t, t, lc);                                 \
       )                                                              \
       fppol##sz##_sub(r0, r0, t);                                    \
-      fppol##sz##_shl(t, v1, d);                                     \
+      fppol##sz##_mul_ti(t, v1, d);                                  \
       IF(CMP(FP_SIZE, 2), EQ, ,                                      \
          fppol##sz##_smul(t, t, lc);                                 \
       )                                                              \

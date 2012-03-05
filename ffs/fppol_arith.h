@@ -312,22 +312,43 @@ __DECL_FPPOLxx_ARITH_ALL(64)
   { __FP_SINV(sz, r, p); }
 
 
-// Left shift.
+// Addition without overlapping coefficients (i.e., coefficient-wise OR).
 // Generic prototype:
-//   void fppol<sz>_shl(fppol<sz>_ptr r, fppol<sz>_srcptr p, unsigned i);
-#define __DEF_FPPOLxx_SHL(sz)                                                 \
+//   void fppol<sz>_add_disjoint(fppol<sz>_ptr    r,
+//                               fppol<sz>_srcptr p, fppol<sz>_srcptr q);
+#define __DEF_FPPOLxx_ADD_DISJOINT(sz)                                      \
+  static inline                                                             \
+  void fppol##sz##_add_disjoint(fppol##sz##_ptr r,                          \
+                                fppol##sz##_srcptr p, fppol##sz##_srcptr q) \
+  { for (unsigned k = 0; k < __FP_BITS; ++k) r[k] = p[k] | q[k]; }
+
+
+// Multiplication by t^i (i.e., left shift).
+// Generic prototype:
+//   void fppol<sz>_mul_ti(fppol<sz>_ptr r, fppol<sz>_srcptr p, unsigned i);
+#define __DEF_FPPOLxx_MUL_TI(sz)                                              \
   static inline                                                               \
-  void fppol##sz##_shl(fppol##sz##_ptr r, fppol##sz##_srcptr p, unsigned i)   \
+  void fppol##sz##_mul_ti(fppol##sz##_ptr r, fppol##sz##_srcptr p, unsigned i)\
   { for (unsigned k = 0; k < __FP_BITS; ++k) r[k] = i < sz ? p[k] << i : 0; }
 
 
-// Right shift.
+// Quotient of division by t^i (i.e., right shift).
 // Generic prototype:
 //   void fppol<sz>_shr(fppol<sz>_ptr r, fppol<sz>_srcptr p, unsigned i);
-#define __DEF_FPPOLxx_SHR(sz)                                                 \
+#define __DEF_FPPOLxx_DIV_TI(sz)                                              \
   static inline                                                               \
-  void fppol##sz##_shr(fppol##sz##_ptr r, fppol##sz##_srcptr p, unsigned i)   \
+  void fppol##sz##_div_ti(fppol##sz##_ptr r, fppol##sz##_srcptr p, unsigned i)\
   { for (unsigned k = 0; k < __FP_BITS; ++k) r[k] = i < sz ? p[k] >> i : 0; }
+
+
+// Remainder modulo t^i (i.e., i first coefficients).
+// Generic prototype:
+//   void fppol<sz>_mod_ti(fppol<sz>_ptr r, fppol<sz>_srcptr p, unsigned i);
+#define __DEF_FPPOLxx_MOD_TI(sz)                                              \
+  static inline                                                               \
+  void fppol##sz##_mod_ti(fppol##sz##_ptr r, fppol##sz##_srcptr p, unsigned i)\
+  { uint##sz##_t m = ((uint##sz##_t)1 << i) - 1;                              \
+    for (unsigned k = 0; k < __FP_BITS; ++k) r[k] = p[k] & m; }
 
 
 // Conversion of an n-term polynomial to an unsigned int.
@@ -339,7 +360,7 @@ __DECL_FPPOLxx_ARITH_ALL(64)
   { unsigned r; __FP_GET_UI(sz, r, p, n); return r; }
 
 
-// Conversion of an n-term polynomial from an unsigned int.
+// Conversion of an n-term polynomial from an unsigned int.int
 // Return 1 if successful.
 // /!\ Note however that the degree is not checked: if the resulting
 //     polynomial has more than n terms, no error is reported.
@@ -399,8 +420,10 @@ __DECL_FPPOLxx_ARITH_ALL(64)
         __DEF_FPPOLxx_SMUL        (sz)     \
         __DEF_FPPOLxx_SDIV        (sz)     \
         __DEF_FPPOLxx_SINV        (sz)     \
-        __DEF_FPPOLxx_SHL         (sz)     \
-        __DEF_FPPOLxx_SHR         (sz)     \
+        __DEF_FPPOLxx_ADD_DISJOINT(sz)     \
+        __DEF_FPPOLxx_MUL_TI      (sz)     \
+        __DEF_FPPOLxx_DIV_TI      (sz)     \
+        __DEF_FPPOLxx_MOD_TI      (sz)     \
         __DEF_FPPOLxx_GET_UI      (sz)     \
         __DEF_FPPOLxx_SET_UI      (sz)     \
         __DEF_FPPOLxx_MONIC_GET_UI(sz)     \
@@ -432,8 +455,10 @@ __DEF_FPPOLxx_ARITH_ALL(64)
 #undef __DEF_FPPOLxx_SMUL
 #undef __DEF_FPPOLxx_SDIV
 #undef __DEF_FPPOLxx_SINV
-#undef __DEF_FPPOLxx_SHL
-#undef __DEF_FPPOLxx_SHR
+#undef __DEF_FPPOLxx_ADD_DISJOINT
+#undef __DEF_FPPOLxx_MUL_TI
+#undef __DEF_FPPOLxx_DIV_TI
+#undef __DEF_FPPOLxx_MOD_TI
 #undef __DEF_FPPOLxx_GET_UI
 #undef __DEF_FPPOLxx_SET_UI
 #undef __DEF_FPPOLxx_MONIC_GET_UI
@@ -515,11 +540,17 @@ void fppol_sdiv(fppol_ptr r, fppol_srcptr p, fp_srcptr x);
 // Coefficient-wise inversion.
 void fppol_sinv(fppol_ptr r, fppol_srcptr p);
 
-// Left shift.
-void fppol_shl(fppol_ptr r, fppol_srcptr p, unsigned i);
+// Addition without overlapping coefficients (i.e., coefficient-wise OR).
+void fppol_add_disjoint(fppol_ptr r, fppol_srcptr p, fppol_srcptr q);
 
-// Right shift.
-void fppol_shr(fppol_ptr r, fppol_srcptr p, unsigned i);
+// Multiplication by t^i (i.e., left shift).
+void fppol_mul_ti(fppol_ptr r, fppol_srcptr p, unsigned i);
+
+// Quotient of division by t^i (i.e., right shift).
+void fppol_div_ti(fppol_ptr r, fppol_srcptr p, unsigned i);
+
+// Remainder modulo t^i (i.e., i first coefficients).
+void fppol_mod_ti(fppol_ptr r, fppol_srcptr p, unsigned i);
 
 // Degree.
 static inline
