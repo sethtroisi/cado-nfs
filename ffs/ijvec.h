@@ -39,8 +39,8 @@ typedef struct {
 // Conversion to a pair of unsigned ints.
 static inline
 ijpos2_t ijvec_get_pos2(ijvec_srcptr u, int I, int J)
-{ ijpos2_t pos = { .i = ij_get_ui      (i, I),
-                   .j = ij_monic_get_ui(j, J) };
+{ ijpos2_t pos = { .i = ij_get_ui      (u->i, I),
+                   .j = ij_monic_get_ui(u->j, J) };
   return pos; }
 
 // Conversion from a pair of unsigned ints.
@@ -48,7 +48,7 @@ ijpos2_t ijvec_get_pos2(ijvec_srcptr u, int I, int J)
 static inline
 int ijvec_set_pos2(ijvec_ptr r, ijpos2_t pos, int I, int J)
 { return  ij_set_ui      (r->i, pos.i, I) &&
-          ij_monic_set_ui(r->j, pos.j, J);
+          ij_monic_set_ui(r->j, pos.j, J); }
 
 
 // Corresponding position as an unsigned int.
@@ -61,13 +61,13 @@ ijpos_t ijvec_get_pos(ijvec_srcptr u, int I, int J)
   ij_t t;
   ij_mul_ti      (t, u->j, I);
   ij_add_disjoint(t, t, u->i);
-  return ij_monic_get_ui(t, I+J);
+  return  ij_monic_get_ui(t, I+J);
 }
 
 // Conversion from an unsigned int.
 // Return 1 if successful.
 static inline
-int ijvec_set_pos(ijvec_ptr r, ijpos_t pos, int I, int J)
+int ijvec_set_pos(ijvec_ptr u, ijpos_t pos, int I, int J)
 {
   ij_t t;
   if (!ij_monic_set_ui(t, pos, I+J)) return 0;
