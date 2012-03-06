@@ -21,8 +21,7 @@ int skip_spaces(FILE *file)
 // Initialize a factor base, reading the ideals from a file and computing
 // the corresponding lambda using the basis of the given q-lattice.
 // Return 1 if successful.
-int factor_base_init(factor_base_ptr FB, const char *filename,
-                     qlat_srcptr qlat)
+int factor_base_init(factor_base_ptr FB, const char *filename)
 {
     FILE *file;
     file = fopen(filename, "r");
@@ -50,7 +49,8 @@ int factor_base_init(factor_base_ptr FB, const char *filename,
             fclose(file);
             return 0;
         }
-        
+        elt->degp = fbprime_deg(elt->p);
+
         // remove spaces
         if (skip_spaces(file) == EOF) {
             fprintf(stderr, "Error parsing factor base %s.\n", filename);
@@ -74,30 +74,34 @@ int factor_base_init(factor_base_ptr FB, const char *filename,
             fclose(file);
             return 0;
         }
-
-        // Compute lambda = - (a1 - r*b1) / (a0 - r*b0) mod p.
-        fbprime_t t0, t1;
-        fbprime_mulmod(t0, qlat->b0, elt->r, elt->p);
-        fbprime_sub   (t0, qlat->a0, t0);
-        fbprime_rem   (t0, t0, elt->p);
-        if (fbprime_is_zero(t0)) {
-          // This is a projective root! Yurk!
-          // TODO: We'll have to handle these, someday.
-          elt->degp = 0;
-          continue;
-        }
-        fbprime_invmod(t0, t0, elt->p);
-        fbprime_mulmod(t1, qlat->b1, elt->r, elt->p);
-        fbprime_sub   (t1, t1, qlat->a1);
-        fbprime_rem   (t1, t1, elt->p);
-        fbprime_mulmod(elt->lambda, t0, t1, elt->p);
-        elt->degp = fbprime_deg(elt->p);
     }
 
     FB->elts = (fbideal_t *)realloc(FB->elts, FB->n*sizeof(fbideal_t));
     ASSERT_ALWAYS(FB->elts != NULL);
     fclose(file);
     return 1;
+}
+
+
+// Precompute lambda for each element of the factor base.
+void factor_base_precomp_lambda(factor_base_ptr FB, qlat_srcptr qlat)
+{
+    for (fbideal_t *elt = FB->elts; elt != FB->elts+FB->n; ++elt) {
+        fbprime_t t0, t1;
+        fbprime_mulmod(t0, qlat->b0, elt->r, elt->p);
+        fbprime_sub   (t0, qlat->a0, t0);
+        fbprime_rem   (t0, t0, elt->p);
+        if ((elt->proj = fbprime_is_zero(t0))) {
+            // This is a projective root! Yurk!
+            // TODO: We'll have to handle these, someday.
+            continue;
+        }
+        fbprime_invmod(t0, t0, elt->p);
+        fbprime_mulmod(t1, qlat->b1, elt->r, elt->p);
+        fbprime_sub   (t1, t1, qlat->a1);
+        fbprime_rem   (t1, t1, elt->p);
+        fbprime_mulmod(elt->lambda, t0, t1, elt->p);
+    }
 }
 
 

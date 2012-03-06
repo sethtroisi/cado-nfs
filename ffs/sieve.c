@@ -99,14 +99,16 @@ int main(int argc, char **argv)
     print_qlat_info(qlat);
 
     // Read the factor bases
-    noerr = fbread(&FB[0], "Aroots", qlat);
-    assert (noerr);
-    noerr = fbread(&FB[1], "Rroots", qlat);
-    assert (noerr);
+    ASSERT_ALWAYS(factor_base_init(FB[0], "Aroots"));
+    ASSERT_ALWAYS(factor_base_init(FB[1], "Rroots"));
+
+    // Precompute lambda for each element of the factor bases.
+    factor_base_precomp_lambda(FB[0], qlat);
+    factor_base_precomp_lambda(FB[1], qlat);
 
     // Allocate and init the sieve space
-    unsigned char *S;
-    S = (unsigned char *) malloc((II*JJ)*sizeof(unsigned char));
+    uint8_t *S;
+    S = (uint8_t *)malloc((II*JJ)*sizeof(uint8_t));
     ASSERT_ALWAYS(S != NULL);
     memset(S, 0, (II*JJ));
     S[0] = 255;
