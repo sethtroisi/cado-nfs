@@ -7,6 +7,7 @@
 #include "ffspol.h"
 #include "norm.h"
 #include "qlat.h"
+#include "ijvec.h"
 
 
 
@@ -155,35 +156,41 @@ void init_norms(unsigned char *S, ffspol_ptr ffspol, int I, int J, qlat_t qlat,
         int sqside)
 {
   fppol_t a, b;
-  unsigned int II = 1, JJ = 1;
+  unsigned int II, JJ;
   fppol_init(a);
   fppol_init(b);
-  ij_t i, j;
   int degq = 0;
   if (sqside)
       degq = sq_deg(qlat->q);
   
-  for (int k = 0; k < I; ++k)
-      II *= FP_SIZE;
-  for (int k = 0; k < J; ++k)
-      JJ *= FP_SIZE;
+  {
+      ij_t max;
+      ij_set_ti(max, I);
+      II = ij_get_ui(max, I+1);
+      ij_set_ti(max, J);
+      JJ = ij_monic_get_ui(max, J+1);
+  }
 
-  for (unsigned int jj = 0; jj < JJ; jj++) {	  
-    if (!ij_set_ui(j, jj, J))
+
+  ijvec_t V;
+  for (unsigned int j = 0; j < JJ; ++j) {
+    if (!ij_monic_set_ui(V->j, j, J))
       continue;
-    for (unsigned int ii = 0; ii < II; ii++) {
-      if (!ij_set_ui(i, ii, I))
+    ij_set_zero(V->i);
+    unsigned int j0 = ijvec_get_pos(V, I, J);
+    for (unsigned int i = 0; i < II; ++i) {
+      if (!ij_set_ui(V->i, i, I))
         continue;
-      int position = ii + II*jj;
+      unsigned int position = i + j0;
 #ifdef TRACE_POS
       if (position == TRACE_POS) {
           fprintf(stderr, "TRACE_POS(%d): (i,j) = (", position);
-          ij_out(stderr, i); fprintf(stderr, " ");
-          ij_out(stderr, j); fprintf(stderr, ")\n");
+          ij_out(stderr, V->i); fprintf(stderr, " ");
+          ij_out(stderr, V->j); fprintf(stderr, ")\n");
           fprintf(stderr, "TRACE_POS(%d): norm = ", position);
           fppol_t norm;
           fppol_init(norm);
-          ij2ab(a, b, i, j, qlat);
+          ij2ab(a, b, V->i, V->j, qlat);
           ffspol_norm(norm, &ffspol, a, b);
           fppol_out(stderr, norm);
           fppol_clear(norm);
@@ -193,14 +200,14 @@ void init_norms(unsigned char *S, ffspol_ptr ffspol, int I, int J, qlat_t qlat,
       }
 #endif
       if (S[position] != 255) {
-	ij2ab(a, b, i, j, qlat);
-	int deg = deg_norm(ffspol, a, b);
-	if (deg > 0) {
-	  ASSERT_ALWAYS(deg < 255);
-	  S[position] = deg - degq;
-	}
-	else
-	  S[position] = 255;
+        ij2ab(a, b, V->i, V->j, qlat);
+        int deg = deg_norm(ffspol, a, b);
+        if (deg > 0) {
+          ASSERT_ALWAYS(deg < 255);
+          S[position] = deg - degq;
+        }
+        else
+          S[position] = 255;
       }
     }
   }

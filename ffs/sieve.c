@@ -13,6 +13,7 @@
 #include "norm.h"
 #include "cofactor.hh"
 #include "timing.h"
+#include "ijvec.h"
 
 // #define EXPENSIVE_CHECK
 
@@ -25,8 +26,8 @@ int main(int argc, char **argv)
     int I, J;  // strict bound on the degrees of the (i,j)
     // Corresponding maximum integers. These are used for:
     //   - bounds on integer loops allowing to visit the sieve space
-    //   - II comes into play in the position computation.
-    unsigned int II, JJ; 
+    //   - IIJJ is the allocated size of the sieve array.
+    unsigned int II, JJ, IIJJ; 
 
 #ifdef USE_F2
     unsigned char threshold[2] = { 50, 50};  // should not be fixed here.
@@ -34,6 +35,7 @@ int main(int argc, char **argv)
     I = 9; J = 9;
     II = 1u<<I;
     JJ = 1u<<J;
+    IIJJ = 1u<<(I+J);
 #else
     unsigned char threshold[2] = { 30, 30};  // should not be fixed here.
     int lpb[2] = { 15, 15};  // should not be fixed here.
@@ -44,6 +46,8 @@ int main(int argc, char **argv)
         II = ij_get_ui(max, I+1);
         ij_set_ti(max, J);
         JJ = ij_monic_get_ui(max, J+1);
+        ij_set_ti(max, I+J);
+        IIJJ = ij_monic_get_ui(max, I+J+1);
     }
 #endif
 
@@ -106,9 +110,9 @@ int main(int argc, char **argv)
 
     // Allocate and init the sieve space
     unsigned char *S;
-    S = (unsigned char *) malloc((II*JJ)*sizeof(unsigned char));
+    S = (unsigned char *) malloc((IIJJ)*sizeof(unsigned char));
     ASSERT_ALWAYS(S != NULL);
-    memset(S, 0, (II*JJ));
+    memset(S, 0, (IIJJ));
     S[0] = 255;
     double t_norms = 0;
     double t_sieve = 0;
@@ -129,7 +133,6 @@ int main(int argc, char **argv)
         // Check special-q divides the norm
         // if (side == qlat->side) {
         if (1) {
-            ij_t i, j;
             fppol_t a, b;
             fppol_init(a);
             fppol_init(b);
@@ -138,17 +141,21 @@ int main(int argc, char **argv)
             fppol_init(bigq);
             fppol_init(rem);
             fppol_set_sq(bigq, qlat->q);
+
+            ijvec_t V;
             for (unsigned int jj = 0; jj < JJ; jj++) {
-                if (!ij_monic_set_ui(j, jj, J))
+                if (!ij_monic_set_ui(V->j, jj, J))
                     continue;
+                ij_set_zero(V->i);
+                unsigned int jj0 = ijvec_get_pos(V, I, J);
                 for (unsigned int ii = 0; ii < II; ii++) {
-                    if (!ij_set_ui(i, ii, I))
+                    if (!ij_set_ui(V->i, ii, I))
                         continue;
-                    ijpos_t position = i + II*j;
+                    position = ii + jj0;
                     if (position == 0)
                         continue;
                     if (S[position] != 255) {
-                        ij2ab(a, b, i, j, qlat);
+                        ij2ab(a, b, V->i, V->j, qlat);
                         ffspol_norm(norm, &ffspol[side], a, b);
                         //ASSERT_ALWAYS(fppol_deg(norm) == S[position]);
                         if (side == qlat->side) {
@@ -168,41 +175,42 @@ int main(int argc, char **argv)
 
         // sieve
         t_sieve -= seconds();
-        sieveFB(S, FB[side], I, J, II, qlat);
+        sieveFB(S, FB[side], I, J, qlat);
         t_sieve += seconds();
 
         // mark survivors
         // no need to check if this is a valid position
         unsigned char *Sptr = S;
-        for (unsigned int j = 0; j < JJ; ++j)
-            for (unsigned int i = 0; i < II; ++i, ++Sptr)
-            {
-                if (*Sptr > threshold[side])
-                    *Sptr = 255; 
-            }
+        for (unsigned int k = 0; k < IIJJ; ++k, ++Sptr) {
+            if (*Sptr > threshold[side])
+                *Sptr = 255; 
+        }
     }
 
 
     t_cofact -= seconds();
     // survivors cofactorization
     {
-        unsigned char *Sptr = S;
         fppol_t a, b;
-        ij_t ii, jj, gg;
+        ij_t gg;
         fppol_init(a);
         fppol_init(b);
+        ijvec_t V;
         for (unsigned int j = 0; j < JJ; ++j) {
-            if (!ij_set_ui(jj, j, J))
+            if (!ij_monic_set_ui(V->j, j, J))
                 continue;
-            for (unsigned int i = 0; i < II; ++i, ++Sptr) {
-                if (!ij_set_ui(ii, i, I))
+            ij_set_zero(V->i);
+            unsigned int j0 = ijvec_get_pos(V, I, J);
+            for (unsigned int i = 0; i < II; ++i) {
+                if (!ij_set_ui(V->i, i, I))
                     continue;
-                if (*Sptr != 255) {
+                unsigned int position = i + j0;
+                if (S[position] != 255) {
     //                printf("i,j = %u %u\n", i, j);
-                    ij_gcd(gg, ii, jj);
+                    ij_gcd(gg, V->i, V->j);
                     if (ij_deg(gg) != 0 && i != 1 && j != 1)
                         continue;
-                    ij2ab(a, b, ii, jj, qlat);
+                    ij2ab(a, b, V->i, V->j, qlat);
                     nrels += factor_survivor(a, b, ffspol, lpb);
                 }
             }
