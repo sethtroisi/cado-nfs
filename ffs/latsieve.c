@@ -25,7 +25,7 @@ typedef struct {
 
 
 static inline void handle_V(vvs_param_t *vvsp) {
-    if (!ij_is_monic(vvsp->V->j))
+    if (!ij_is_monic(vvsp->V->j) && vvsp->V->j!=0)
         return;
     ijpos_t pos = ijvec_get_pos(vvsp->V, vvsp->I, vvsp->J);
 #ifdef TRACE_POS

@@ -146,7 +146,7 @@ int main(int argc, char **argv)
             for (unsigned int jj = 0; jj < JJ; jj++) {
                 if (!ij_monic_set_ui(V->j, jj, J))
                     continue;
-                if (!ij_is_monic(V->j))
+                if (!ij_is_monic(V->j) && j!=0)
                     continue;
                 ij_set_zero(V->i);
                 unsigned int jj0 = ijvec_get_pos(V, I, J);
@@ -201,7 +201,7 @@ int main(int argc, char **argv)
         for (unsigned int j = 0; j < JJ; ++j) {
             if (!ij_monic_set_ui(V->j, j, J))
                 continue;
-            if (!ij_is_monic(V->j))
+            if (!ij_is_monic(V->j) && j!=0)
                 continue;
             ij_set_zero(V->i);
             unsigned int j0 = ijvec_get_pos(V, I, J);
