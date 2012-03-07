@@ -191,7 +191,7 @@ void init_norms(unsigned char *S, ffspol_ptr ffspol, int I, int J, qlat_t qlat,
           fppol_t norm;
           fppol_init(norm);
           ij2ab(a, b, V->i, V->j, qlat);
-          ffspol_norm(norm, &ffspol, a, b);
+          ffspol_norm(norm, ffspol, a, b);
           fppol_out(stderr, norm);
           fppol_clear(norm);
           fprintf(stderr, "\n");
