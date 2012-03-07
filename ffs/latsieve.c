@@ -25,7 +25,7 @@ typedef struct {
 
 
 static inline void handle_V(vvs_param_t *vvsp) {
-    if (!ij_is_monic(vvsp->V->j))
+    if (!ij_is_monic(vvsp->V->j) && vvsp->V->j!=0)
         return;
     ijpos_t pos = ijvec_get_pos(vvsp->V, vvsp->I, vvsp->J);
 #ifdef TRACE_POS
@@ -53,45 +53,33 @@ void visit_vector_space(vvs_param_t *vvsp, unsigned int k) {
     
     // Unrolled small cases
     if (k == 3) {
-        handle_V(vvsp);
-        for (int i = 1; i < FP_SIZE; ++i) {
-            ijvec_add(vvsp->V, vvsp->V, vvsp->bas.vec[2]);
-            handle_V(vvsp);
-            for (int i = 1; i < FP_SIZE; ++i) {
-                ijvec_add(vvsp->V, vvsp->V, vvsp->bas.vec[1]);
-                handle_V(vvsp);
-                for (int i = 1; i < FP_SIZE; ++i) {
-                    ijvec_add(vvsp->V, vvsp->V, vvsp->bas.vec[0]);
+        for (int i = 0; i < FP_SIZE; ++i) {
+            for (int i = 0; i < FP_SIZE; ++i) {
+                for (int i = 0; i < FP_SIZE; ++i) {
                     handle_V(vvsp);
+                    ijvec_add(vvsp->V, vvsp->V, vvsp->bas.vec[0]);
                 }
-                ijvec_add(vvsp->V, vvsp->V, vvsp->bas.vec[0]);
+                ijvec_add(vvsp->V, vvsp->V, vvsp->bas.vec[1]);
             }
-            ijvec_add(vvsp->V, vvsp->V, vvsp->bas.vec[1]);
+            ijvec_add(vvsp->V, vvsp->V, vvsp->bas.vec[2]);
         }
-        ijvec_add(vvsp->V, vvsp->V, vvsp->bas.vec[2]);
         return;
     }
     if (k == 2) {
-        handle_V(vvsp);
-        for (int i = 1; i < FP_SIZE; ++i) {
-            ijvec_add(vvsp->V, vvsp->V, vvsp->bas.vec[1]);
-            handle_V(vvsp);
-            for (int i = 1; i < FP_SIZE; ++i) {
-                ijvec_add(vvsp->V, vvsp->V, vvsp->bas.vec[0]);
+        for (int i = 0; i < FP_SIZE; ++i) {
+            for (int i = 0; i < FP_SIZE; ++i) {
                 handle_V(vvsp);
+                ijvec_add(vvsp->V, vvsp->V, vvsp->bas.vec[0]);
             }
-            ijvec_add(vvsp->V, vvsp->V, vvsp->bas.vec[0]);
+            ijvec_add(vvsp->V, vvsp->V, vvsp->bas.vec[1]);
         }
-        ijvec_add(vvsp->V, vvsp->V, vvsp->bas.vec[1]);
         return;
     }
     if (k == 1) {
-        handle_V(vvsp);
-        for (int i = 1; i < FP_SIZE; ++i) {
-            ijvec_add(vvsp->V, vvsp->V, vvsp->bas.vec[0]);
+        for (int i = 0; i < FP_SIZE; ++i) {
             handle_V(vvsp);
+            ijvec_add(vvsp->V, vvsp->V, vvsp->bas.vec[0]);
         }
-        ijvec_add(vvsp->V, vvsp->V, vvsp->bas.vec[0]);
         return;
     }
     if (k == 0)
@@ -219,12 +207,17 @@ void sieveFB(uint8_t *S, factorbase_t FB, int I, int J, qlat_t qlat)
 
         // Print basis
 #if 0
-        for (int i = 0; i < bas.dim; ++i) {
-            printf("vec %d: ", i);
-            ij_out(stdout, bas.vec[i]->i);
-            printf(" ");
-            ij_out(stdout, bas.vec[i]->j);
+        if (gothp.p[0] == 64 && gothp.p[1] == 11) {
+            printf("gothp = "); fbprime_out(stdout, gothp.p);
+            printf(" ");        fbprime_out(stdout, gothp.r);
             printf("\n");
+            for (int i = 0; i < bas.dim; ++i) {
+                printf("vec %d: ", i);
+                ij_out(stdout, bas.vec[i]->i);
+                printf(" ");
+                ij_out(stdout, bas.vec[i]->j);
+                printf("\n");
+            }
         }
 #endif
 

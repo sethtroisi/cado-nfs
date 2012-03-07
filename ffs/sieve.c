@@ -39,7 +39,7 @@ int main(int argc, char **argv)
 #else
     unsigned char threshold[2] = { 30, 30};  // should not be fixed here.
     int lpb[2] = { 15, 15};  // should not be fixed here.
-    I = 5; J = 5;
+    I = 6; J = 6;
     {
         ij_t max;
         ij_set_ti(max, I);
@@ -148,6 +148,8 @@ int main(int argc, char **argv)
             for (unsigned int jj = 0; jj < JJ; jj++) {
                 if (!ij_monic_set_ui(V->j, jj, J))
                     continue;
+                if (!ij_is_monic(V->j) && j!=0)
+                    continue;
                 ij_set_zero(V->i);
                 unsigned int jj0 = ijvec_get_pos(V, I, J);
                 for (unsigned int ii = 0; ii < II; ii++) {
@@ -198,19 +200,28 @@ int main(int argc, char **argv)
         fppol_init(a);
         fppol_init(b);
         ijvec_t V;
-        for (unsigned int j = 0; j < JJ; ++j) {
+        for (unsigned int j = 1; j < JJ; ++j) {
             if (!ij_monic_set_ui(V->j, j, J))
+                continue;
+            if (!ij_is_monic(V->j) && j!=0)
                 continue;
             ij_set_zero(V->i);
             unsigned int j0 = ijvec_get_pos(V, I, J);
-            for (unsigned int i = 0; i < II; ++i) {
+            for (unsigned int i = 1; i < II; ++i) {
                 if (!ij_set_ui(V->i, i, I))
                     continue;
                 unsigned int position = i + j0;
+#ifdef TRACE_POS
+                if (position == TRACE_POS) {
+                    fprintf(stderr, "TRACE_POS(%d): ", position);
+                    fprintf(stderr, "entering cofactorization, S[pos] = %d\n",
+                            S[position]);
+                }
+#endif 
                 if (S[position] != 255) {
     //                printf("i,j = %u %u\n", i, j);
                     ij_gcd(gg, V->i, V->j);
-                    if (ij_deg(gg) != 0 && i != 1 && j != 1)
+                    if (ij_deg(gg) != 0 && ij_deg(V->i)>0  && ij_deg(V->j)>0)
                         continue;
                     ij2ab(a, b, V->i, V->j, qlat);
                     nrels += factor_survivor(a, b, ffspol, lpb);

@@ -176,6 +176,8 @@ void init_norms(uint8_t *S, ffspol_ptr ffspol, int I, int J, qlat_t qlat,
   for (unsigned int j = 0; j < JJ; ++j) {
     if (!ij_monic_set_ui(V->j, j, J))
       continue;
+    if (!ij_is_monic(V->j) && j!=0)
+        continue;
     ij_set_zero(V->i);
     unsigned int j0 = ijvec_get_pos(V, I, J);
     for (unsigned int i = 0; i < II; ++i) {
