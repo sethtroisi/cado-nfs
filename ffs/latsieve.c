@@ -83,6 +83,7 @@ void visit_vector_space(vvs_param_t *vvsp, unsigned int k) {
             ijvec_add(vvsp->V, vvsp->V, vvsp->bas.vec[0]);
         }
         ijvec_add(vvsp->V, vvsp->V, vvsp->bas.vec[1]);
+        return;
     }
     if (k == 1) {
         handle_V(vvsp);
