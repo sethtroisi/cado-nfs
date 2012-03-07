@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include "macros.h"
 #include "cppmeta.h"
 
 
@@ -22,6 +23,14 @@
 // Test if valid representation.
 #define __FP_IS_VALID(sz, p) (!(p[0] & p[1]))
 
+
+// One.
+#define __FP_ONE_0 1
+#define __FP_ONE_1 0
+
+// Largest element in the base field.
+#define __FP_MAX_0 0
+#define __FP_MAX_1 1
 
 // Opposite.
 #define __FP_OPP_0(p0, p1) (p1)
@@ -52,6 +61,12 @@
         __FP_SMUL_1(p0, p1, __FP_SINV_0(q0, q1), __FP_SINV_1(q0, q1))
 
 
+// Generic constant definition.
+#define __FP_CST(cst, sz, r)                                  \
+  do { uint##sz##_t __t[] = { (uint##sz##_t)__FP_##cst##_0,   \
+                              (uint##sz##_t)__FP_##cst##_1 }; \
+       r[0] = __t[0]; r[1] = __t[1]; } while (0)
+
 // Generic unary operation.
 #define __FP_UOP(op, sz, r, p)                        \
   do { uint##sz##_t __t[] = {                         \
@@ -67,6 +82,8 @@
        r[0] = __t[0]; r[1] = __t[1]; } while (0)
 
 // Definition of all coefficient-wise operations.
+#define __FP_ONE( sz, r)       __FP_CST(ONE,  sz, r)
+#define __FP_MAX( sz, r)       __FP_CST(MAX,  sz, r)
 #define __FP_OPP( sz, r, p)    __FP_UOP(OPP,  sz, r, p)
 #define __FP_ADD( sz, r, p, q) __FP_BOP(ADD,  sz, r, p, q)
 #define __FP_SUB( sz, r, p, q) __FP_BOP(SUB,  sz, r, p, q)
@@ -97,24 +114,7 @@ extern const uint16_t __f3_monic_set_ui_conv[];
   } while (0)
 
 
-// Conversion of an n-term polynomial from an unsigned int.
-// Return 0 in case of an invalid representation.
-// /!\ Note however that the degree is not checked: if the resulting
-//     polynomial has more than n terms, no error is reported.
-#define __FP_SET_UI(sz, r, x, n)                                        \
-  do {                                                                  \
-    r[0] = r[1] = 0;                                                    \
-    for (unsigned __i = 0, __j = 0, __w; __i < n; __i += 5, __j += 8) { \
-      __w = (x >> __j) & 0xff;                                          \
-      if (__w >= 243) return 0; /* 243 = 3^5 */                         \
-      __w = __f3_set_ui_conv[__w];                                      \
-      r[0] |= ((uint##sz##_t)( __w       & 0x1f) << __i);               \
-      r[1] |= ((uint##sz##_t)((__w >> 5) & 0x1f) << __i);               \
-    }                                                                   \
-  } while (0)
-
-
-// Conversions to an unsigned int in the case of monic polynomials.
+// Conversion of an n-term monic polynomial to an unsigned int.
 #define __FP_MONIC_GET_UI(sz, r, p, n)                            \
   do {                                                            \
     __FP_GET_UI(sz, r, p, ((n-1)/5)*5);                           \
@@ -124,19 +124,37 @@ extern const uint16_t __f3_monic_set_ui_conv[];
   } while (0)
 
 
-// Conversions from an unsigned int in the case of monic polynomials.
-// Return 0 in case of an invalid representation.
-// /!\ Note however that the degree is not checked: if the resulting
-//     polynomial has more than n terms, no error is reported.
-#define __FP_MONIC_SET_UI(sz, r, x, n)                  \
-  do {                                                  \
-    __FP_SET_UI(sz, r, x, ((n-1)/5)*5);                 \
-    unsigned __i = ((n-1)/5)*5, __j = ((n-1)/5)*8, __w; \
-    __w = (x >> __j) & 0xff;                            \
-    if (__w >= 122) return 0; /* 122 = (3^5-1)/2 + 1 */ \
-    __w = __f3_monic_set_ui_conv[__w];                  \
-    r[0] |= ((uint##sz##_t)( __w       & 0x1f) << __i); \
-    r[1] |= ((uint##sz##_t)((__w >> 5) & 0x1f) << __i); \
+// Conversion of an n-term polynomial from an unsigned int.
+#define __FP_SET_UI(sz, next, r, x, n)                                  \
+  do {                                                                  \
+    SWITCH(next, EMPTY, ++x;)                                           \
+    r[0] = r[1] = 0;                                                    \
+    for (unsigned __i = 0, __j = 0, __w; __i < n; __i += 5, __j += 8) { \
+      __w = (x >> __j) & 0xff;                                          \
+      if (UNLIKELY(__w >= 243))                         /* 243 = 3^5 */ \
+        IF(next, EMPTY, return 0, x += (256-__w) << __j);               \
+      else {                                                            \
+        __w = __f3_set_ui_conv[__w];                                    \
+        r[0] |= ((uint##sz##_t)( __w       & 0x1f) << __i);             \
+        r[1] |= ((uint##sz##_t)((__w >> 5) & 0x1f) << __i);             \
+      }                                                                 \
+    }                                                                   \
+  } while (0)
+
+
+// Conversion of an n-term monic polynomial from an unsigned int.
+#define __FP_MONIC_SET_UI(sz, next, r, x, n)              \
+  do {                                                    \
+    __FP_SET_UI(sz, next, r, x, ((n-1)/5)*5);             \
+    unsigned __i = ((n-1)/5)*5, __j = ((n-1)/5)*8, __w;   \
+    __w = (x >> __j) & 0x7f;                              \
+    if (UNLIKELY(__w >= 122))   /* 122 = (3^5-1)/2 + 1 */ \
+      IF(next, EMPTY, return 0, x += (128-__w) << __j);   \
+    else {                                                \
+      __w = __f3_monic_set_ui_conv[__w];                  \
+      r[0] |= ((uint##sz##_t)( __w       & 0x1f) << __i); \
+      r[1] |= ((uint##sz##_t)((__w >> 5) & 0x1f) << __i); \
+    }                                                     \
   } while (0)
 
 

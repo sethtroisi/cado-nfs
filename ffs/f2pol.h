@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include "macros.h"
 #include "cppmeta.h"
 
 
@@ -23,6 +24,12 @@
 #define __FP_IS_VALID(sz, p) 1
 
 
+// One.
+#define __FP_ONE_0 1
+
+// Largest element in the base field.
+#define __FP_MAX_0 1
+
 // Opposite.
 #define __FP_OPP_0(p0) (p0)
 
@@ -42,6 +49,10 @@
 #define __FP_SDIV_0(p0, q0) __FP_SMUL_0(p0, __FP_SINV_0(q0))
 
 
+// Generic constant definition.
+#define __FP_CST(cst, sz, r) \
+  do { r[0] = __FP_##cst##_0; } while (0)
+
 // Generic unary operation.
 #define __FP_UOP(op, sz, r, p) \
   do { r[0] = __FP_##op##_0(p[0]); } while (0)
@@ -51,6 +62,8 @@
   do { r[0] = __FP_##op##_0(p[0], q[0]); } while (0)
 
 // Definition of all coefficient-wise operations.
+#define __FP_ONE( sz, r)       __FP_CST(ONE,  sz, r)
+#define __FP_MAX( sz, r)       __FP_CST(MAX,  sz, r)
 #define __FP_OPP( sz, r, p)    __FP_UOP(OPP,  sz, r, p)
 #define __FP_ADD( sz, r, p, q) __FP_BOP(ADD,  sz, r, p, q)
 #define __FP_SUB( sz, r, p, q) __FP_BOP(SUB,  sz, r, p, q)
@@ -68,8 +81,9 @@
   do { r = (unsigned)p[0]; } while (0)
 
 // Conversion of an n-term polynomial from an unsigned int.
-#define __FP_SET_UI(sz, r, x, n) \
-  do { r[0] = (uint##sz##_t)x; } while (0)
+#define __FP_SET_UI(sz, next, r, x, n) \
+  do { SWITCH(next, EMPTY, ++x;)       \
+       r[0] = (uint##sz##_t)x; } while (0)
 
 // Conversions to/from an unsigned int in the case of monic polynomials.
 #define __FP_MONIC_GET_UI __FP_GET_UI
