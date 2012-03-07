@@ -109,8 +109,8 @@ int main(int argc, char **argv)
     assert (noerr);
 
     // Allocate and init the sieve space
-    unsigned char *S;
-    S = (unsigned char *) malloc((IIJJ)*sizeof(unsigned char));
+    uint8_t *S;
+    S = (uint8_t *) malloc((IIJJ)*sizeof(uint8_t));
     ASSERT_ALWAYS(S != NULL);
     memset(S, 0, (IIJJ));
     S[0] = 255;
@@ -180,7 +180,7 @@ int main(int argc, char **argv)
 
         // mark survivors
         // no need to check if this is a valid position
-        unsigned char *Sptr = S;
+        uint8_t *Sptr = S;
         for (unsigned int k = 0; k < IIJJ; ++k, ++Sptr) {
             if (*Sptr > threshold[side])
                 *Sptr = 255; 

@@ -11,7 +11,7 @@ extern "C" {
 #include "types.h"
 
 void ffspol_norm(fppol_t norm, ffspol_ptr ffspol, fppol_t a, fppol_t b);
-void init_norms(unsigned char *S, ffspol_ptr ffspol, int I, int J, qlat_t qlat,
+void init_norms(uint8_t *S, ffspol_ptr ffspol, int I, int J, qlat_t qlat,
         int sqside);
 
 #ifdef __cplusplus
