@@ -18,7 +18,7 @@ typedef struct {
     ijvec_t V;
     int I;
     int J;
-    unsigned char *S;
+    uint8_t *S;
     Fpbasis_t bas;
     fbideal_t gothp;
 } vvs_param_t;
@@ -131,7 +131,7 @@ int fillin_basis(ijvec_t *V, fbprime_t i, fbprime_t j, int degI,
     return k;
 }
 
-void sieveFB(unsigned char *S, factorbase_t FB, int I, int J, qlat_t qlat)
+void sieveFB(uint8_t *S, factorbase_t FB, int I, int J, qlat_t qlat)
 {
     Fpbasis_t bas;
     // allocate more than enough space for the basis: I+J.

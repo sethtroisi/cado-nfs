@@ -142,7 +142,7 @@ int deg_norm(ffspol_ptr ffspol, fppol_t a, fppol_t b)
    For each (i,j), it compute the corresponding (a,b) using ij2ab from
    qlat.h. Then it computes deg_norm(ffspol, a, b).
    In a first approximation, we will assume that it fits in an
-   unsigned char.
+   uint8_t.
    For the moment i and j are assumed to be unsigned int for their
    limb part 
    Enumerating i, j the following way only works for charac. 2 
@@ -152,7 +152,7 @@ int deg_norm(ffspol_ptr ffspol, fppol_t a, fppol_t b)
    from the norm.
    */
 
-void init_norms(unsigned char *S, ffspol_ptr ffspol, int I, int J, qlat_t qlat,
+void init_norms(uint8_t *S, ffspol_ptr ffspol, int I, int J, qlat_t qlat,
         int sqside)
 {
   fppol_t a, b;
