@@ -4,8 +4,8 @@ if false then
   br := 12;
 else
   p2 := 3;
-  ba := 8;
-  br := 8;
+  ba := 9;
+  br := 9;
 end if;
 
 function BuildFactorBases(f, g, ba, br)
