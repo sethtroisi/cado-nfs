@@ -39,7 +39,7 @@ int main(int argc, char **argv)
 #else
     unsigned char threshold[2] = { 30, 30};  // should not be fixed here.
     int lpb[2] = { 15, 15};  // should not be fixed here.
-    I = 5; J = 5;
+    I = 6; J = 6;
     {
         ij_t max;
         ij_set_ti(max, I);
@@ -146,6 +146,8 @@ int main(int argc, char **argv)
             for (unsigned int jj = 0; jj < JJ; jj++) {
                 if (!ij_monic_set_ui(V->j, jj, J))
                     continue;
+                if (!ij_is_monic(V->j))
+                    continue;
                 ij_set_zero(V->i);
                 unsigned int jj0 = ijvec_get_pos(V, I, J);
                 for (unsigned int ii = 0; ii < II; ii++) {
@@ -198,6 +200,8 @@ int main(int argc, char **argv)
         ijvec_t V;
         for (unsigned int j = 0; j < JJ; ++j) {
             if (!ij_monic_set_ui(V->j, j, J))
+                continue;
+            if (!ij_is_monic(V->j))
                 continue;
             ij_set_zero(V->i);
             unsigned int j0 = ijvec_get_pos(V, I, J);
