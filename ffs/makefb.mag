@@ -1,11 +1,18 @@
-if false then 
-  p2 := 2;  // put 3 to work in caracteristic 3 
+// When entering this file, the global value p must be defined to 2 or 3.
+// It is supposed to be used by a command like:
+//    echo "p:=3; load \"makefb.mag\";" | magma
+
+p2 := p; // two many p in the code, let's save p for polynomials
+
+// The factor base bounds are hardcoded here, feel free to change those.
+if p2 eq 2  then 
   ba := 12;
   br := 12;
-else
-  p2 := 3;
+elif p2 eq 3 then
   ba := 9;
   br := 9;
+else
+  error "Error: p must be 2 or 3\n";
 end if;
 
 function BuildFactorBases(f, g, ba, br)

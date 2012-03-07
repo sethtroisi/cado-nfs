@@ -1,29 +1,35 @@
-Recipe to run an example (as of end of Feb 2012).
--------------------------------------------------
-
-/!\ Only for characteristic 2.
+Recipe to run an example (as of end of Mar 7, 2012).
+----------------------------------------------------
 
 - compile:
   
-  make sieve.f2
+  make 
 
 - prepare:
   Some polynomials are hardcoded in sieve.c. They correspond to a
-  GF(2^127) example.
+  GF(2^127) and a GF(3^97) example.
   The same polynomials and some bounds are hardcoded as well in a magma
   script to create he factor base files. Just run:
 
-  magma < makefb.mag
+  echo "p:=2; load \"makefb.mag\";" | magma -b
+  or
+  echo "p:=3; load \"makefb.mag\";" | magma -b
+
 
   This will create two files Aroots and Rroots.
+  NB: these file names are absolute names. 
 
 - run:
 
-  ./sieve.f2 <q> <rho>
+  build/f2/sieve <q> <rho>
+  or 
+  build/f3/sieve <q> <rho>
 
   For example:
 
-  ./sieve.f2 3468B8B 810E4A
+  build/f2/sieve 3468B8B 810E4A
+
+  build/f3/sieve 41409965 2AAA4696
 
   This should output relations for this special q.
 
