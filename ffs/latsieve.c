@@ -2,6 +2,7 @@
 
 #include "latsieve.h"
 #include "types.h"
+#include "ijvec.h"
 
 
 typedef struct {
@@ -15,17 +16,18 @@ typedef struct {
 
 typedef struct {
     ijvec_t V;
-    unsigned int II;
     int I;
     int J;
-    unsigned char *S;
+    uint8_t *S;
     Fpbasis_t bas;
     fbideal_t gothp;
 } vvs_param_t;
 
 
-void handle_V(vvs_param_t *vvsp) {
-    ijpos_t pos = ijvec2pos(vvsp->V, vvsp->II, vvsp->I, vvsp->J);
+static inline void handle_V(vvs_param_t *vvsp) {
+    if (!ij_is_monic(vvsp->V->j))
+        return;
+    ijpos_t pos = ijvec_get_pos(vvsp->V, vvsp->I, vvsp->J);
 #ifdef TRACE_POS
     if (pos == TRACE_POS) {
         fprintf(stderr, "TRACE_POS(%d): ", pos);
@@ -81,6 +83,7 @@ void visit_vector_space(vvs_param_t *vvsp, unsigned int k) {
             ijvec_add(vvsp->V, vvsp->V, vvsp->bas.vec[0]);
         }
         ijvec_add(vvsp->V, vvsp->V, vvsp->bas.vec[1]);
+        return;
     }
     if (k == 1) {
         handle_V(vvsp);
@@ -128,8 +131,7 @@ int fillin_basis(ijvec_t *V, fbprime_t i, fbprime_t j, int degI,
     return k;
 }
 
-void sieveFB(unsigned char *S, factorbase_t FB, int I, int J, 
-        unsigned int II, qlat_t qlat)
+void sieveFB(uint8_t *S, factorbase_t FB, int I, int J, qlat_t qlat)
 {
     Fpbasis_t bas;
     // allocate more than enough space for the basis: I+J.
@@ -216,7 +218,7 @@ void sieveFB(unsigned char *S, factorbase_t FB, int I, int J,
         }
 
         // Print basis
-#if 1
+#if 0
         for (int i = 0; i < bas.dim; ++i) {
             printf("vec %d: ", i);
             ij_out(stdout, bas.vec[i]->i);
@@ -246,7 +248,7 @@ void sieveFB(unsigned char *S, factorbase_t FB, int I, int J,
             ij_out(stdout, V->j);
             printf("\n"); */
 
-            ijpos_t pos = ijvec2pos(V, II, I, J);
+            ijpos_t pos = ijvec_get_pos(V, I, J);
 #ifdef TRACE_POS
             if (pos == TRACE_POS) {
                 fprintf(stderr, "TRACE_POS(%d): ", pos);
@@ -269,7 +271,6 @@ void sieveFB(unsigned char *S, factorbase_t FB, int I, int J,
         vvs.S = S;
         vvs.bas = bas;
         vvs.gothp = gothp;
-        vvs.II = II;
         ij_set_zero(vvs.V->i);
         ij_set_zero(vvs.V->j);
         visit_vector_space(&vvs, bas.dim);
