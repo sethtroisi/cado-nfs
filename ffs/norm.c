@@ -163,26 +163,19 @@ void init_norms(uint8_t *S, ffspol_ptr ffspol, int I, int J, qlat_t qlat,
   if (sqside)
       degq = sq_deg(qlat->q);
   
-  {
-      ij_t max;
-      ij_set_ti(max, I);
-      II = ij_get_ui(max, I+1);
-      ij_set_ti(max, J);
-      JJ = ij_monic_get_ui(max, J+1);
-  }
-
+  II = ij_get_ui_max(I);
+  JJ = ij_get_ui_max(J);
 
   ijvec_t V;
-  for (unsigned int j = 0; j < JJ; ++j) {
-    if (!ij_monic_set_ui(V->j, j, J))
-      continue;
-    if (!ij_is_monic(V->j) && j!=0)
-        continue;
+
+  for (unsigned int j = ij_monic_set_next_ui(V->j, 0, J) ;
+      j <= JJ;
+      j = ij_monic_set_next_ui(V->j, j, J)) {
     ij_set_zero(V->i);
     unsigned int j0 = ijvec_get_pos(V, I, J);
-    for (unsigned int i = 0; i < II; ++i) {
-      if (!ij_set_ui(V->i, i, I))
-        continue;
+    for (unsigned int i = ij_set_next_ui(V->i, 0, I);
+        i <= II;
+        i = ij_set_next_ui(V->i, i, I)) {
       unsigned int position = i + j0;
 #ifdef TRACE_POS
       if (position == TRACE_POS) {

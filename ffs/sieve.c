@@ -15,8 +15,6 @@
 #include "timing.h"
 #include "ijvec.h"
 
-// #define EXPENSIVE_CHECK
-
 // usage: ./a.out q rho
 int main(int argc, char **argv)
 {
@@ -33,23 +31,16 @@ int main(int argc, char **argv)
     unsigned char threshold[2] = { 50, 50};  // should not be fixed here.
     int lpb[2] = { 25, 25};  // should not be fixed here.
     I = 9; J = 9;
-    II = 1u<<I;
-    JJ = 1u<<J;
-    IIJJ = 1u<<(I+J);
 #else
     unsigned char threshold[2] = { 30, 30};  // should not be fixed here.
     int lpb[2] = { 15, 15};  // should not be fixed here.
-    I = 6; J = 6;
-    {
-        ij_t max;
-        ij_set_ti(max, I);
-        II = ij_get_ui(max, I+1);
-        ij_set_ti(max, J);
-        JJ = ij_monic_get_ui(max, J+1);
-        ij_set_ti(max, I+J);
-        IIJJ = ij_monic_get_ui(max, I+J+1);
-    }
+    I = 5; J = 5;
 #endif
+
+    // Maybe unused ?
+    II = ij_get_ui_max(I);
+    JJ = ij_get_ui_max(J);
+    IIJJ = ij_monic_get_ui_max(I+J);
 
     int noerr;
     ffspol_init(ffspol[0]);
@@ -110,10 +101,27 @@ int main(int argc, char **argv)
 
     // Allocate and init the sieve space
     uint8_t *S;
-    S = (uint8_t *) malloc((IIJJ)*sizeof(uint8_t));
+    S = (uint8_t *) malloc((IIJJ+1)*sizeof(uint8_t));
     ASSERT_ALWAYS(S != NULL);
-    memset(S, 0, (IIJJ));
-    S[0] = 255;
+    memset(S, 0, (IIJJ+1));
+    // Kill the lines with i = 0 or j = 0
+    {
+        S[0] = 255;
+        ijvec_t V;
+        ij_set_zero(V->i);
+        for (unsigned int j = ij_monic_set_next_ui(V->j, 0, J) ;
+                j <= JJ;
+                j = ij_monic_set_next_ui(V->j, j, J)) {
+            S[ijvec_get_pos(V, I, J)] = 255;
+        }
+        ij_set_zero(V->j);
+        for (unsigned int i = ij_set_next_ui(V->i, 0, I) ;
+                i <= II;
+                i = ij_set_next_ui(V->i, i, I)) {
+            S[ijvec_get_pos(V, I, J)] = 255;
+        }
+    }
+
     double t_norms = 0;
     double t_sieve = 0;
     double t_cofact = 0;
@@ -129,52 +137,6 @@ int main(int argc, char **argv)
         init_norms(S, ffspol[side], I, J, qlat, qlat->side == side);
         t_norms += seconds();
 
-#ifdef EXPENSIVE_CHECK
-        // Check special-q divides the norm
-        // if (side == qlat->side) {
-        if (1) {
-            fppol_t a, b;
-            fppol_init(a);
-            fppol_init(b);
-            fppol_t norm, bigq, rem;
-            fppol_init(norm);
-            fppol_init(bigq);
-            fppol_init(rem);
-            fppol_set_sq(bigq, qlat->q);
-
-            ijvec_t V;
-            for (unsigned int jj = 0; jj < JJ; jj++) {
-                if (!ij_monic_set_ui(V->j, jj, J))
-                    continue;
-                if (!ij_is_monic(V->j) && j!=0)
-                    continue;
-                ij_set_zero(V->i);
-                unsigned int jj0 = ijvec_get_pos(V, I, J);
-                for (unsigned int ii = 0; ii < II; ii++) {
-                    if (!ij_set_ui(V->i, ii, I))
-                        continue;
-                    position = ii + jj0;
-                    if (position == 0)
-                        continue;
-                    if (S[position] != 255) {
-                        ij2ab(a, b, V->i, V->j, qlat);
-                        ffspol_norm(norm, &ffspol[side], a, b);
-                        //ASSERT_ALWAYS(fppol_deg(norm) == S[position]);
-                        if (side == qlat->side) {
-                            fppol_rem(rem, norm, bigq);
-                            ASSERT_ALWAYS(fppol_is_zero(rem));
-                        }
-                    }
-                }
-            }
-            fppol_clear(a);
-            fppol_clear(b);
-            fppol_clear(norm);
-            fppol_clear(bigq);
-            fppol_clear(rem);
-        }
-#endif
-
         // sieve
         t_sieve -= seconds();
         sieveFB(S, FB[side], I, J, qlat);
@@ -183,7 +145,7 @@ int main(int argc, char **argv)
         // mark survivors
         // no need to check if this is a valid position
         uint8_t *Sptr = S;
-        for (unsigned int k = 0; k < IIJJ; ++k, ++Sptr) {
+        for (unsigned int k = 0; k <=IIJJ; ++k, ++Sptr) {
             if (*Sptr > threshold[side])
                 *Sptr = 255; 
         }
@@ -197,17 +159,16 @@ int main(int argc, char **argv)
         ij_t gg;
         fppol_init(a);
         fppol_init(b);
+
         ijvec_t V;
-        for (unsigned int j = 1; j < JJ; ++j) {
-            if (!ij_monic_set_ui(V->j, j, J))
-                continue;
-            if (!ij_is_monic(V->j) && j!=0)
-                continue;
+        for (unsigned int j = ij_monic_set_next_ui(V->j, 0, J) ;
+                j <= JJ;
+                j = ij_monic_set_next_ui(V->j, j, J)) {
             ij_set_zero(V->i);
             unsigned int j0 = ijvec_get_pos(V, I, J);
-            for (unsigned int i = 1; i < II; ++i) {
-                if (!ij_set_ui(V->i, i, I))
-                    continue;
+            for (unsigned int i = ij_set_next_ui(V->i, 0, I);
+                    i <= II; 
+                    i = ij_set_next_ui(V->i, i, I)) {
                 unsigned int position = i + j0;
 #ifdef TRACE_POS
                 if (position == TRACE_POS) {
@@ -233,7 +194,7 @@ int main(int argc, char **argv)
 
     fprintf(stdout, "# Total: %d relations found\n", nrels);
     fprintf(stdout, "# Time spent: %1.1f s (norms); %1.1f s (sieve); %1.1f s (cofact)\n", t_norms, t_sieve, t_cofact);
-    fprintf(stdout, "# Rate: %1.4f s/rel\n", (t_norms+t_sieve+t_cofact)/nrels);
+    fprintf(stdout, "# Rate: %1.5f s/rel\n", (t_norms+t_sieve+t_cofact)/nrels);
 
     ffspol_clear(ffspol[0]);
     ffspol_clear(ffspol[1]);
