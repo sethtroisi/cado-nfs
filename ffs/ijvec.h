@@ -1,14 +1,13 @@
 #ifndef __IJVEC_H__
 #define __IJVEC_H__
 
-#include "fppol.h"
 #include "types.h"
+#include "fb.h"
 
 
 
 /* Vector in the reduced q-lattice as a pair of polynomials (i,j).
- *
- * Note that, by convension, j should be kept monic.
+ * Note that, by convention, j should be kept monic.
  *****************************************************************************/
 
 // Structure definition.
@@ -75,5 +74,31 @@ int ijvec_set_pos(ijvec_ptr u, ijpos_t pos, int I, int J)
   ij_div_ti(u->j, t, I);
   return 1;
 }
+
+
+
+/* Basis of the p-lattice seen as a GF(p)-vector space of (i,j)-vectors.
+ *****************************************************************************/
+
+// Structure definition.
+typedef struct {
+  unsigned I, J;
+  unsigned dim;
+  ijvec_t *v;
+} __ijbasis_struct;
+
+// Type and pointer shorthands.
+typedef       __ijbasis_struct  ijbasis_t[1];
+typedef       __ijbasis_struct *ijbasis_ptr;
+typedef const __ijbasis_struct *ijbasis_srcptr;
+
+// Allocate memory for an (i,j)-basis of degrees bounded by I and J.
+void ijbasis_init(ijbasis_ptr basis, unsigned I, unsigned J);
+
+// Compute the (i,j)-basis of a given p-lattice.
+void ijbasis_compute(ijbasis_ptr basis, fbideal_srcptr gothp);
+
+// Clean up memory.
+void ijbasis_clear(ijbasis_ptr basis);
 
 #endif  /* __IJVEC_H__ */

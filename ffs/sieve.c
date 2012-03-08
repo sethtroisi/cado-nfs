@@ -22,7 +22,7 @@ int main(int argc, char **argv)
 {
     ffspol_t ffspol[2]; 
     qlat_t qlat;
-    factorbase_t FB[2];
+    factor_base_t FB[2];
     int I, J;  // strict bound on the degrees of the (i,j)
     // Corresponding maximum integers. These are used for:
     //   - bounds on integer loops allowing to visit the sieve space
@@ -179,7 +179,7 @@ int main(int argc, char **argv)
 
         // sieve
         t_sieve -= seconds();
-        sieveFB(S, FB[side], I, J, qlat);
+        sieveFB(S, FB[side], I, J);
         t_sieve += seconds();
 
         // mark survivors
