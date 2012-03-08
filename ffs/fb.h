@@ -5,7 +5,7 @@
 
 
 
-// Element of the factor base as an ideal (p, r).
+// Element of the factor base as an ideal gothp = (p, r).
 // Given the two vectors (a0, b0) and (a1, b1) of the reduced q-lattice,
 // lambda is precomputed as lambda = - (a1 - r*b1) / (a0 - r*b0) mod p.
 // In the case of a projective root (i.e., a0 - r*b0 = 0 mod p),
@@ -18,7 +18,11 @@ typedef struct {
   fbprime_t lambda;
   uint8_t   degp;
   _Bool     proj;
-} fbideal_t;
+} __fbideal_struct;
+
+typedef       __fbideal_struct  fbideal_t[1];
+typedef       __fbideal_struct *fbideal_ptr;
+typedef const __fbideal_struct *fbideal_srcptr;
 
 typedef struct {
   unsigned   n;  // nb of entries in the factor base
