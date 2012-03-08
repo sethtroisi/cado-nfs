@@ -421,9 +421,10 @@ __DECL_FPPOLxx_ARITH_ALL(64)
 // Conversion of an n-term (monic) polynomial from the next valid unsigned int
 // representation directly following x.
 // Return the unsigned int representation used for the conversion.
+// The behavior is undefined if the next valid representation is out of bounds.
 // Generic prototype:
-//   int fppol<sz>_<monic>_set_next_ui(fppol<sz>_ptr r, unsigned x,
-//                                     unsigned n);
+//   unsigned fppol<sz>_<monic>_set_next_ui(fppol<sz>_ptr r, unsigned x,
+//                                          unsigned n);
 #define __DEF_FPPOLxx_SET_NEXT_UI(sz, monic)                               \
   static inline                                                            \
   unsigned CAT(CAT(fppol##sz, SWITCH(monic, EMPTY, _monic)), _set_next_ui) \
