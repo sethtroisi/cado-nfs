@@ -140,6 +140,7 @@ __DECL_ALIAS_TYPE(ij)
   __DECL_ALIAS_FUN1(int,  type, set,    ij,     type##_ptr,    ij_srcptr)     \
   __DECL_ALIAS_FUN (int,  type, set_mp,         type##_ptr,    fppol_srcptr)  \
   __DECL_ALIAS_FUN1(void, fppol,set,    type,   fppol_ptr,     type##_srcptr) \
+  __DECL_ALIAS_FUN (void, type, swap,           type##_ptr,    type##_ptr)    \
   __DECL_ALIAS_FUN (void, type, get_coeff,      fp_ptr,                       \
                                                 type##_srcptr, unsigned)      \
   __DECL_ALIAS_FUN (void, type, set_coeff,      type##_ptr,                   \
@@ -230,13 +231,5 @@ typedef struct {
 typedef qlat_struct_t qlat_t[1];
 typedef qlat_struct_t* qlat_ptr;
 typedef const qlat_struct_t* qlat_srcptr;
-
-// TODO: with alignements, we loose a lot of space
-// See the types in cado-nfs and try to imitate ?
-typedef struct {
-    fbprime_t p;
-    fbprime_t r;
-    unsigned char degp;
-} fbideal_t;
 
 #endif   /* __TYPES_H__ */

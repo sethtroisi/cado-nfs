@@ -1,5 +1,4 @@
 #include "fppol_mod.h"
-#include "fppol_internal.h"
 #include "cppmeta.h"
 #include "macros.h"
 
@@ -121,9 +120,9 @@
                                                                      \
       d = d0 - d1;                                                   \
       if (d <= 0) {                                                  \
-        __fppol##sz##_swap(r0, r1);                                  \
-        __fppol##sz##_swap(v0, v1);                                  \
-        IF(CMP(FP_SIZE, 2), EQ, , __fp_swap(lc0, lc1);)              \
+        fppol##sz##_swap(r0, r1);                                    \
+        fppol##sz##_swap(v0, v1);                                    \
+        IF(CMP(FP_SIZE, 2), EQ, , fp_swap(lc0, lc1);)                \
         int dt = d0; d0 = d1; d1 = dt;                               \
         d = -d;                                                      \
       }                                                              \

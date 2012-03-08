@@ -37,6 +37,12 @@ void fp_set(fp_ptr r, fp_srcptr p)
 { for (unsigned k = 0; k < __FP_BITS; ++k) r[k] = p[k]; }
 
 
+// Swap two base field elements.
+static inline
+void fp_swap(fp_ptr x, fp_ptr y)
+{ fp_t t; fp_set(t, x); fp_set(x, y); fp_set(y, t); }
+
+
 // Test if zero.
 static inline
 int fp_is_zero(fp_srcptr p)
@@ -186,6 +192,16 @@ __DECL_FPPOLxx_ARITH_ALL(64)
   int fppol##sz##_set_mp(fppol##sz##_ptr r, fppol_srcptr p) \
   { fppol##sz##_set_64(r, p->limbs[0]);                     \
     return p->deg < sz; }
+
+
+// Swap two polynomials.
+// Generic prototype:
+//   void fppol<sz>_swap(fppol<sz>_ptr p, fppol<sz>_ptr q);
+#define __DEF_FPPOLxx_SWAP(sz)                                \
+  static inline                                               \
+  void fppol##sz##_swap(fppol##sz##_ptr p, fppol##sz##_ptr q) \
+  { fppol##sz##_t t;       fppol##sz##_set(t, p);             \
+    fppol##sz##_set(p, q); fppol##sz##_set(q, t); }
 
 
 // Get degree-i coefficient.
@@ -444,6 +460,7 @@ __DECL_FPPOLxx_ARITH_ALL(64)
         __DEF_FPPOLxx_SET_yy       (sz, 32) \
         __DEF_FPPOLxx_SET_yy       (sz, 64) \
         __DEF_FPPOLxx_SET_MP       (sz)     \
+        __DEF_FPPOLxx_SWAP         (sz)     \
         __DEF_FPPOLxx_GET_COEFF    (sz)     \
         __DEF_FPPOLxx_SET_COEFF    (sz)     \
         __DEF_FPPOLxx_FOLD_OR      (sz)     \
@@ -485,6 +502,7 @@ __DEF_FPPOLxx_ARITH_ALL(64)
 #undef __DEF_FPPOLxx_SET_yy
 #undef __DEF_FPPOLxx_SET_yy
 #undef __DEF_FPPOLxx_SET_MP
+#undef __DEF_FPPOLxx_SWAP
 #undef __DEF_FPPOLxx_GET_COEFF
 #undef __DEF_FPPOLxx_SET_COEFF
 #undef __DEF_FPPOLxx_FOLD_OR
@@ -537,6 +555,12 @@ __DECL_FPPOL_SET_xx(32)
 __DECL_FPPOL_SET_xx(64)
 
 #undef __DECL_FPPOL_SET_xx
+
+// Swap two polynomials.
+// /!\ Shallow copy only.
+static inline
+void fppol_swap(fppol_ptr p, fppol_ptr q)
+{ __fppol_struct t = *p; *p = *q; *q = t; }
 
 // Get degree-i coefficient.
 static inline
