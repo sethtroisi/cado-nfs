@@ -379,16 +379,28 @@ __DECL_FPPOLxx_ARITH_ALL(64)
     for (unsigned k = 0; k < __FP_BITS; ++k) r[k] = p[k] & m; }
 
 
-// Conversion of an n-term (monic) polynomial to an unsigned int.
+// Conversion of a (monic) polynomial to an unsigned int, after a preliminary
+// multiplication by t^i.
 // Generic prototype:
-//   unsigned fppol<sz>_<monic>_get_ui(fppol<sz>_srcptr p, unsigned n);
-#define __DEF_FPPOLxx_GET_UI(sz, monic)                                 \
-  static inline                                                         \
-  unsigned CAT(CAT(fppol##sz, SWITCH(monic, EMPTY, _monic)), _get_ui)   \
-    (fppol##sz##_srcptr p, MAYBE_UNUSED unsigned n)                     \
-  { unsigned r;                                                         \
-    CAT(CAT(__FP, SWITCH(monic, EMPTY, _MONIC)), _GET_UI)(sz, r, p, n); \
+//   unsigned fppol<sz>_<monic>_get_ui_mul_ti(fppol<sz>_srcptr p, unsigned i);
+#define __DEF_FPPOLxx_GET_UI_MUL_TI(sz, monic)                               \
+  static inline                                                              \
+  unsigned CAT(CAT(fppol##sz, SWITCH(monic, EMPTY, _monic)), _get_ui_mul_ti) \
+    (fppol##sz##_srcptr p, unsigned i)                                       \
+  { unsigned r;                                                              \
+    CAT(CAT(__FP, SWITCH(monic, EMPTY, _MONIC)), _GET_UI)(sz, r, p, i);      \
     return r; }
+
+
+// Conversion of a (monic) polynomial to an unsigned int.
+// Generic prototype:
+//   unsigned fppol<sz>_<monic>_get_ui(fppol<sz>_srcptr p);
+#define __DEF_FPPOLxx_GET_UI(sz, monic)                                       \
+  static inline                                                               \
+  unsigned CAT(CAT(fppol##sz, SWITCH(monic, EMPTY, _monic)), _get_ui)         \
+    (fppol##sz##_srcptr p)                                                    \
+  { return                                                                    \
+    CAT(CAT(fppol##sz, SWITCH(monic, EMPTY, _monic)), _get_ui_mul_ti)(p, 0); }
 
 
 // Return the largest unsigned int corresponding to an n-term (monic)
@@ -401,35 +413,32 @@ __DECL_FPPOLxx_ARITH_ALL(64)
     (unsigned n)                                                              \
   { fppol##sz##_t t;                                                          \
     CAT(CAT(       fppol##sz, SWITCH(monic, EMPTY, _monic)), _set_max)(t, n); \
-    return CAT(CAT(fppol##sz, SWITCH(monic, EMPTY, _monic)), _get_ui) (t, n); }
+    return CAT(CAT(fppol##sz, SWITCH(monic, EMPTY, _monic)), _get_ui) (t); }
 
 
-// Conversion of an n-term (monic) polynomial from an unsigned int.
+// Conversion of a (monic) polynomial from an unsigned int.
 // Return 1 if successful.
-// /!\ Note however that the degree is not checked: if the resulting
-//     polynomial has more than n terms, no error is reported.
 // Generic prototype:
-//   int fppol<sz>_<monic>_set_ui(fppol<sz>_ptr r, unsigned x, unsigned n);
-#define __DEF_FPPOLxx_SET_UI(sz, monic)                                   \
-  static inline                                                           \
-  int CAT(CAT(fppol##sz, SWITCH(monic, EMPTY, _monic)), _set_ui)          \
-    (fppol##sz##_ptr r, unsigned x, MAYBE_UNUSED unsigned n)              \
-  { CAT(CAT(__FP, SWITCH(monic, EMPTY, _MONIC)), _SET_UI)(sz, , r, x, n); \
+//   int fppol<sz>_<monic>_set_ui(fppol<sz>_ptr r, unsigned x);
+#define __DEF_FPPOLxx_SET_UI(sz, monic)                                \
+  static inline                                                        \
+  int CAT(CAT(fppol##sz, SWITCH(monic, EMPTY, _monic)), _set_ui)       \
+    (fppol##sz##_ptr r, unsigned x)                                    \
+  { CAT(CAT(__FP, SWITCH(monic, EMPTY, _MONIC)), _SET_UI)(sz, , r, x); \
     return 1; }
 
 
-// Conversion of an n-term (monic) polynomial from the next valid unsigned int
+// Conversion of a (monic) polynomial from the next valid unsigned int
 // representation directly following x.
 // Return the unsigned int representation used for the conversion.
 // The behavior is undefined if the next valid representation is out of bounds.
 // Generic prototype:
-//   unsigned fppol<sz>_<monic>_set_next_ui(fppol<sz>_ptr r, unsigned x,
-//                                          unsigned n);
+//   unsigned fppol<sz>_<monic>_set_next_ui(fppol<sz>_ptr r, unsigned x);
 #define __DEF_FPPOLxx_SET_NEXT_UI(sz, monic)                               \
   static inline                                                            \
   unsigned CAT(CAT(fppol##sz, SWITCH(monic, EMPTY, _monic)), _set_next_ui) \
-    (fppol##sz##_ptr r, unsigned x, MAYBE_UNUSED unsigned n)               \
-  { CAT(CAT(__FP, SWITCH(monic, EMPTY, _MONIC)), _SET_UI)(sz, 1, r, x, n); \
+    (fppol##sz##_ptr r, unsigned x)                                        \
+  { CAT(CAT(__FP, SWITCH(monic, EMPTY, _MONIC)), _SET_UI)(sz, 1, r, x);    \
     return x; }
 
 
@@ -463,6 +472,8 @@ __DECL_FPPOLxx_ARITH_ALL(64)
         __DEF_FPPOLxx_MUL_TI       (sz)     \
         __DEF_FPPOLxx_DIV_TI       (sz)     \
         __DEF_FPPOLxx_MOD_TI       (sz)     \
+        __DEF_FPPOLxx_GET_UI_MUL_TI(sz,  )  \
+        __DEF_FPPOLxx_GET_UI_MUL_TI(sz, 1)  \
         __DEF_FPPOLxx_GET_UI       (sz,  )  \
         __DEF_FPPOLxx_GET_UI       (sz, 1)  \
         __DEF_FPPOLxx_GET_UI_MAX   (sz,  )  \

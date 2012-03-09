@@ -103,58 +103,81 @@ extern const uint8_t  __f3_monic_get_ui_conv[];
 extern const uint16_t __f3_monic_set_ui_conv[];
 
 
-// Conversion of an n-term polynomial to an unsigned int.
-#define __FP_GET_UI(sz, r, p, n)                                        \
-  do {                                                                  \
-    r = 0;                                                              \
-    for (unsigned __i = 0, __j = 0, __w; __i < n; __i += 5, __j += 8) { \
-      __w = ((p[0] >> __i) & 0x1f) | (((p[1] >> __i) & 0x1f) << 5);     \
-      r |= (unsigned)__f3_get_ui_conv[__w] << __j;                      \
-    }                                                                   \
+// Conversion of a polynomial to an unsigned int, after a preliminary
+// multiplication by t^i.
+#define __FP_GET_UI(sz, r, p, i)                        \
+  do {                                                  \
+    r = 0;                                              \
+    unsigned __t[2] = { p[0] << (i%5), p[1] << (i%5) }; \
+    unsigned __i = (i/5)*8, __w;                        \
+    while (__t[0] | __t[1]) {                           \
+      __w = (__t[0] & 0x1f) | ((__t[1] & 0x1f) << 5);   \
+      r |= (unsigned)__f3_get_ui_conv[__w] << __i;      \
+      __i += 8; __t[0] >>= 5; __t[1] >>= 5;             \
+    }                                                   \
   } while (0)
 
 
-// Conversion of an n-term monic polynomial to an unsigned int.
-#define __FP_MONIC_GET_UI(sz, r, p, n)                            \
-  do {                                                            \
-    __FP_GET_UI(sz, r, p, ((n-1)/5)*5);                           \
-    unsigned __i = ((n-1)/5)*5, __j = ((n-1)/5)*8, __w;           \
-    __w = ((p[0] >> __i) & 0x1f) | (((p[1] >> __i) & 0x1f) << 5); \
-    r |= (unsigned)__f3_monic_get_ui_conv[__w] << __j;            \
+// Conversion of a monic polynomial to an unsigned int, after a preliminary
+// multiplication by t^i.
+#define __FP_MONIC_GET_UI(sz, r, p, i)                  \
+  do {                                                  \
+    r = 0;                                              \
+    unsigned __t[2] = { p[0] << (i%5), p[1] << (i%5) }; \
+    unsigned __i = (i/5)*8, __w;                        \
+    while ((__t[0] | __t[1]) >> 5) {                    \
+      __w = (__t[0] & 0x1f) | ((__t[1] & 0x1f) << 5);   \
+      r |= (unsigned)__f3_get_ui_conv[__w] << __i;      \
+      __i += 8; __t[0] >>= 5; __t[1] >>= 5;             \
+    }                                                   \
+    __w = (__t[0] & 0x1f) | ((__t[1] & 0x1f) << 5);     \
+    r |= (unsigned)__f3_monic_get_ui_conv[__w] << __i;  \
   } while (0)
 
 
-// Conversion of an n-term polynomial from an unsigned int.
-#define __FP_SET_UI(sz, next, r, x, n)                                  \
-  do {                                                                  \
-    SWITCH(next, EMPTY, ++x;)                                           \
-    r[0] = r[1] = 0;                                                    \
-    for (unsigned __i = 0, __j = 0, __w; __i < n; __i += 5, __j += 8) { \
-      __w = (x >> __j) & 0xff;                                          \
-      if (UNLIKELY(__w >= 243))                         /* 243 = 3^5 */ \
-        IF(next, EMPTY, return 0, x += (256-__w) << __j);               \
-      else {                                                            \
-        __w = __f3_set_ui_conv[__w];                                    \
-        r[0] |= ((uint##sz##_t)( __w       & 0x1f) << __i);             \
-        r[1] |= ((uint##sz##_t)((__w >> 5) & 0x1f) << __i);             \
-      }                                                                 \
-    }                                                                   \
+// Conversion of a polynomial from an unsigned int.
+#define __FP_SET_UI(sz, next, r, x)                         \
+  do {                                                      \
+    SWITCH(next, EMPTY, ++x;)                               \
+    r[0] = r[1] = 0;                                        \
+    unsigned __i = 0, __j = 0, __w;                         \
+    for (; x >> __i; __i += 8, __j += 5) {                  \
+      __w = (x >> __i) & 0xff;                              \
+      if (UNLIKELY(__w >= 243))             /* 243 = 3^5 */ \
+        IF(next, EMPTY, return 0, x += (256-__w) << __i);   \
+      else {                                                \
+        __w = __f3_set_ui_conv[__w];                        \
+        r[0] |= ((uint##sz##_t)( __w       & 0x1f) << __j); \
+        r[1] |= ((uint##sz##_t)((__w >> 5) & 0x1f) << __j); \
+      }                                                     \
+    }                                                       \
   } while (0)
 
 
-// Conversion of an n-term monic polynomial from an unsigned int.
-#define __FP_MONIC_SET_UI(sz, next, r, x, n)              \
-  do {                                                    \
-    __FP_SET_UI(sz, next, r, x, ((n-1)/5)*5);             \
-    unsigned __i = ((n-1)/5)*5, __j = ((n-1)/5)*8, __w;   \
-    __w = (x >> __j) & 0x7f;                              \
-    if (UNLIKELY(__w >= 122))   /* 122 = (3^5-1)/2 + 1 */ \
-      IF(next, EMPTY, return 0, x += (128-__w) << __j);   \
-    else {                                                \
-      __w = __f3_monic_set_ui_conv[__w];                  \
-      r[0] |= ((uint##sz##_t)( __w       & 0x1f) << __i); \
-      r[1] |= ((uint##sz##_t)((__w >> 5) & 0x1f) << __i); \
-    }                                                     \
+// Conversion of a monic polynomial from an unsigned int.
+#define __FP_MONIC_SET_UI(sz, next, r, x)                   \
+  do {                                                      \
+    SWITCH(next, EMPTY, ++x;)                               \
+    r[0] = r[1] = 0;                                        \
+    unsigned __i = 0, __j = 0, __w;                         \
+    for (; x >> (__i+8); __i += 8, __j += 5) {              \
+      __w = (x >> __i) & 0xff;                              \
+      if (UNLIKELY(__w >= 243))             /* 243 = 3^5 */ \
+        IF(next, EMPTY, return 0, x += (256-__w) << __i);   \
+      else {                                                \
+        __w = __f3_set_ui_conv[__w];                        \
+        r[0] |= ((uint##sz##_t)( __w       & 0x1f) << __j); \
+        r[1] |= ((uint##sz##_t)((__w >> 5) & 0x1f) << __j); \
+      }                                                     \
+    }                                                       \
+    __w = (x >> __i) & 0xff;                                \
+    if (UNLIKELY(__w >= 122))     /* 122 = (3^5-1)/2 + 1 */ \
+      IF(next, EMPTY, return 0, x += (128-__w) << __i);     \
+    else {                                                  \
+      __w = __f3_monic_set_ui_conv[__w];                    \
+      r[0] |= ((uint##sz##_t)( __w       & 0x1f) << __j);   \
+      r[1] |= ((uint##sz##_t)((__w >> 5) & 0x1f) << __j);   \
+    }                                                       \
   } while (0)
 
 

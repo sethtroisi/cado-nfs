@@ -81,13 +81,14 @@
 /* Integer conversions.
  *****************************************************************************/
 
-// Conversion of an n-term polynomial to an unsigned int.
-#define __FP_GET_UI(sz, r, p, n) \
-  do { r = (unsigned)p[0]; } while (0)
+// Conversion of a polynomial to an unsigned int, after a preliminary
+// multiplication by t^i.
+#define __FP_GET_UI(sz, r, p, i) \
+  do { r = (unsigned)p[0] << i; } while (0)
 
-// Conversion of an n-term polynomial from an unsigned int.
-#define __FP_SET_UI(sz, next, r, x, n) \
-  do { SWITCH(next, EMPTY, ++x;)       \
+// Conversion of a polynomial from an unsigned int.
+#define __FP_SET_UI(sz, next, r, x) \
+  do { SWITCH(next, EMPTY, ++x;)    \
        r[0] = (uint##sz##_t)x; } while (0)
 
 // Conversions to/from an unsigned int in the case of monic polynomials.
