@@ -30,27 +30,6 @@ void ijvec_add(ijvec_ptr r, ijvec_srcptr u, ijvec_srcptr v) {
 }
 
 
-// Corresponding position as a pair of unsigned ints.
-typedef struct {
-  unsigned i;
-  unsigned j;
-} ijpos2_t;
-
-// Conversion to a pair of unsigned ints.
-static inline
-ijpos2_t ijvec_get_pos2(ijvec_srcptr u, int I, int J)
-{ ijpos2_t pos = { .i = ij_get_ui      (u->i, I),
-                   .j = ij_monic_get_ui(u->j, J) };
-  return pos; }
-
-// Conversion from a pair of unsigned ints.
-// Return 1 if successful.
-static inline
-int ijvec_set_pos2(ijvec_ptr r, ijpos2_t pos, int I, int J)
-{ return  ij_set_ui      (r->i, pos.i, I) &&
-          ij_monic_set_ui(r->j, pos.j, J); }
-
-
 // Corresponding position as an unsigned int.
 typedef unsigned ijpos_t;
 
