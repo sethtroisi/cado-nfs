@@ -89,6 +89,7 @@ cado_poly best_poly, curr_poly;
 double best_E = 0.0; /* Murphy's E (the larger the better) */
 int nq = LEN_SPECIAL_Q; /* default has 54 primes as special-q */
 int lq = 1; /* default use a single prime as special-q */
+int seed = 0; /* seed */
 double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
 
 /* read-write global variables */
@@ -1119,9 +1120,7 @@ return_q_rq ( roots_t SQ_R,
 	 for (i = 0; i < k; i ++) {
 		  idv_q[i] = SQ_R->p[idx_q[i]];
 		  q = q * idv_q[i];
-		  srand (time(NULL));
 		  j = rand() % SQ_R->nr[idx_q[i]];
-		  // j = 0;
 		  idv_rq[i] = SQ_R->roots[idx_q[i]][j];
 	 }
 
@@ -1184,6 +1183,10 @@ collision_on_sq ( header_t header,
 		  /* 	   fprintf (stderr, "%lu ", i); */
 
 		  q = return_q_rq (SQ_R, idx_q, k, qqz, rqqz);
+
+      if (q != 210304523619527)
+        continue;
+
 		  collision_on_each_sq ( header,
 								 R,
 								 q,
@@ -1239,6 +1242,7 @@ usage (char *argv)
 	 fprintf (stderr, "-degree nnn  --- wanted polynomial degree\n");
 	 fprintf (stderr, "-nq nnn      --- number of special-q's considered for each ad\n");
 	 fprintf (stderr, "-lq nnn      --- number of factors in the special-q\n");
+	 fprintf (stderr, "-seed nnn    --- seed for srand()\n");
 	 fprintf (stderr, "-kmax nnn    --- rotation bound (default %d)\n",
 			  default_MAX_k);
 	 fprintf (stderr, "-save xxx    --- save state in file xxx\n");
@@ -1356,6 +1360,12 @@ main (int argc, char *argv[])
 			   argv += 2;
 			   argc -= 2;
 		  }
+		  else if (argc >= 3 && strcmp (argv[1], "-seed") == 0)
+		  {
+			   seed = atoi (argv[2]);
+			   argv += 2;
+			   argc -= 2;
+		  }
 		  else if (argc >= 3 && strcmp (argv[1], "-save") == 0)
 		  {
 			   save = argv[2];
@@ -1416,6 +1426,14 @@ main (int argc, char *argv[])
 		  fprintf (stderr, "Error, number of factors in special-q should >= 1 and/or number of special-q's should >=1\n");
 		  exit (1);
 	 }
+
+	 if (seed < 1) {
+     seed = time(NULL);
+     srand(seed);
+   }
+   else
+     srand(seed);
+
 	 if (lq == 1)
 	 {
 		  nq = LEN_SPECIAL_Q;
@@ -1474,7 +1492,7 @@ main (int argc, char *argv[])
 	 P = atoi (argv[1]);
 	 st = cputime ();
 	 initPrimes (P);
-	 printf ("# Initializing primes took %dms\n", cputime () - st);
+	 printf ("# Initializing primes took %dms, seed=%d\n", cputime () - st, seed);
 	 T = malloc (nthreads * sizeof (tab_t));
 	 if (T == NULL)
 	 {
