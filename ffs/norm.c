@@ -277,7 +277,7 @@ void init_norms(uint8_t *S, ffspol_ptr ffspol, int I, int J, qlat_t qlat,
       degq = sq_deg(qlat->q);
   
   II = ij_get_ui_max(I);
-  JJ = ij_get_ui_max(J);
+  JJ = ij_monic_get_ui_max(J);
 
   ijvec_t V;
 

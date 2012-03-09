@@ -152,7 +152,7 @@ int main(int argc, char **argv)
  
     // Maybe unused ?
     II = ij_get_ui_max(I);
-    JJ = ij_get_ui_max(J);
+    JJ = ij_monic_get_ui_max(J);
     IIJJ = ij_monic_get_ui_max(I+J);
 
     qlat->side = 0; // assume that the special-q is on the algebraic side.
