@@ -153,7 +153,7 @@ __DECL_FPPOLxx_ARITH_ALL(64)
   { fppol##sz##_set_max(r, n-1);                                \
     fp_t t; fp_set_one(t);                                      \
     for (unsigned k = 0; k < __FP_BITS; ++k)                    \
-      r[k] |= (uint##sz##_t)t[k] << n; }
+      r[k] |= (uint##sz##_t)t[k] << (n-1); }
 
 
 // Set to another polynomial.
