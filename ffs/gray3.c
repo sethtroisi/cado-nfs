@@ -53,7 +53,9 @@ void gray3_rec(int k, int way) {
     gray3_rec(k-1, way);
 }
 
+#ifdef GRAY3_MAIN
 int main() {
     printC(); printf("\n");
     rec(4, 1);
 }
+#endif
