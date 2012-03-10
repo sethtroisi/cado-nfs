@@ -69,6 +69,119 @@ void ffspol_norm(fppol_t norm, ffspol_ptr ffspol, fppol_t a, fppol_t b)
   free(pow_b);
 }
 
+/* Function computing ffspol_ij, a polynomial such that
+   norm(ffspol,a,b) = norm(ffspol_ij, i, j), i.e.
+   it is possible to apply the function norm directly on (i,j)
+   with the transformed polynomial ffspol_ij, without having 
+   to compute a and b with ij2ab().
+   Nevertheless, due to type considerations, it should be necessary
+   to make a new function norm taking as imput i and j and using the
+   appropriate multiplication function.
+*/
+
+void ffspol_2ij(ffspol_ptr ffspol_ij, ffspol_ptr ffspol_ab, qlat_t qlat)
+{
+  fppol_t *pow_a0;
+  fppol_t *pow_a1;
+  fppol_t *pow_b0;
+  fppol_t *pow_b1;
+  fppol_t tmp, tmp1;
+  
+  /* Table containing binomial coefficients binom[n][k] for k and n
+     between 0 and degree of ffspol_ab.
+     It uses Lucas' theorem : binom[n][k] = prod binom[n_i][k_i] mod(p)
+     where n_i and k_i are the coefficients of the p-adic representation
+     of n and k.
+     We need the coefficients to be constant polynomials so that
+     it would be possible to multiply them with polynomials */
+
+  /* For the moment it only works for characteristic 2 */
+  fppol_t **binom;
+  binom = (fppol_t **)malloc((ffspol_ab->deg + 1) * sizeof(fppol_t*));
+  for (int n = 0; n < ffspol_ab->deg + 1; ++n) {
+    binom[n] = (fppol_t *)malloc((n + 1) * sizeof(fppol_t));
+    for(int k = 0; k < n + 1; ++k) {
+      fppol_init(binom[n][k]);
+      if ((n & k) == n)
+	fppol_set_one(binom[n][k]);
+      else
+	fppol_set_zero(binom[n][k]);
+    }
+  }
+	    
+  /* 4 tables containing the powers between 0 and the degree of
+     ffspol_ab of the basis vector of the q-lattice */
+  pow_a0 = (fppol_t *)malloc((ffspol_ab->alloc) *
+     sizeof(fppol_t)); fppol_init(pow_a0[0]);
+     fppol_set_one(pow_a0[0]);
+
+  pow_a1 = (fppol_t *)malloc((ffspol_ab->alloc) * sizeof(fppol_t));
+  fppol_init(pow_a1[0]);
+  fppol_set_one(pow_a1[0]);
+
+  pow_b0 = (fppol_t *)malloc((ffspol_ab->alloc) * sizeof(fppol_t));
+  fppol_init(pow_b0[0]);
+  fppol_set_one(pow_b0[0]);
+  
+  pow_b1 = (fppol_t *)malloc((ffspol_ab->alloc) * sizeof(fppol_t));
+  fppol_init(pow_b1[0]);
+  fppol_set_one(pow_b1[0]);
+  
+  for (int n = 0; n < ffspol_ab->deg + 1; ++n) {
+    fppol_init(pow_a0[n]);
+    fppol_init(pow_a1[n]);
+    fppol_init(pow_b0[n]);
+    fppol_init(pow_b1[n]);
+    fppol_mul_ai(pow_a0[n+1], pow_a0[n], qlat->a0);
+    fppol_mul_ai(pow_a1[n+1], pow_a1[n], qlat->a1);
+    fppol_mul_ai(pow_b0[n+1], pow_b0[n], qlat->b0);
+    fppol_mul_ai(pow_b1[n+1], pow_b1[n], qlat->b1);
+  }
+
+  /* Computation of the transformed polynomial ffspol_ij */
+  
+  fppol_init(tmp);
+  fppol_init(tmp1);
+  
+  for (int w = 0; w < ffspol_ab->deg + 1; ++w) {
+    for (int k = 0; k < ffspol_ab->deg + 1; ++k) {
+      fppol_set_zero(tmp);
+      for (int u = 0; u < k + 1; ++u) {
+	if ((u < k + 1) && (w - u < ffspol_ab->deg - k + 1)) {
+	  fppol_set_one(tmp1);
+	  fppol_mul(tmp1, tmp1, binom[k][u]);
+	  fppol_mul(tmp1, tmp1, binom[ffspol_ab->deg - k][w-u]);
+	  fppol_mul(tmp1, tmp1, pow_a0[u]);
+	  fppol_mul(tmp1, tmp1, pow_a1[k-u]);
+	  fppol_mul(tmp1, tmp1, pow_b0[w-u]);
+	  fppol_mul(tmp1, tmp1, pow_b1[ffspol_ab->deg - k-w-u]);
+	  fppol_add(tmp, tmp, tmp1);
+	}
+      }
+      fppol_mul(tmp, tmp, ffspol_ab->coeffs[k]);
+    }
+    fppol_add(ffspol_ij->coeffs[w], ffspol_ij->coeffs[w], tmp);
+  } 
+ 
+  /* Freeing everyone */
+  for (int n = 0; n < ffspol_ab->deg + 1; ++n) {
+    for(int k = 0; k < n + 1; ++k) 
+      fppol_clear(binom[n][k]);
+    free(binom[n]);
+    fppol_clear(pow_a0[n]);
+    fppol_clear(pow_a1[n]);
+    fppol_clear(pow_b0[n]);
+    fppol_clear(pow_b1[n]);
+  }
+  fppol_clear(tmp1);
+  fppol_clear(tmp);
+  free(binom);
+  free(pow_a0);
+  free(pow_a1);
+  free(pow_b0);
+  free(pow_b1);
+}
+
 /* max_special(prev_max, j, &repeated) returns the maximum of prev_max
    and j
    The value repeated should be initialized to 1
