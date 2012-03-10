@@ -6,6 +6,11 @@
 #include "macros.h"
 #include "cppmeta.h"
 
+#ifdef HAVE_GF2X
+#include <gf2x/gf2x_mul1.h>
+#endif
+
+
 
 
 /* Basic bitsliced arithmetic.
@@ -147,19 +152,52 @@
 #define __FP_MUL_128_64x64_NAIVE(    rh, rl, p, q, op) \
         __FP_MUL_128_64xxx_NAIVE(64, rh, rl, p, q, op)
 
+#ifdef HAVE_GF2X
+#define __FP_MUL_128_64x64_GF2X(rh,rl,p,q,op)  \
+do {    \
+    fppol64_t c[2];\
+    gf2x_mul1((unsigned long *)&c[0], p[0], q[0]);\
+    CAT(fppol64_, SWITCH(op, OP(rh, c[1]), set(rh, c[1])));\
+    CAT(fppol64_, SWITCH(op, OP(rl, c[0]), set(rl, c[0])));\
+} while (0)
+
+#define __FP_MUL_64_32x32_GF2X(r,p,q,op)  \
+do {    \
+    fppol64_t c[2];\
+    unsigned long a = p[0], b = q[0]; \
+    gf2x_mul1((unsigned long *)&c[0], a, b);\
+    CAT(fppol64_, SWITCH(op, OP(r, c[0]), set(r, c[0])));\
+} while (0)
+
+#define __FP_MUL_32_32x32_GF2X(r,p,q,op)  \
+do {    \
+    fppol64_t c[2];\
+    unsigned long a = p[0], b = q[0]; \
+    gf2x_mul1((unsigned long *)&c[0], a, b);\
+    fppol32_t cc; \
+    fppol32_set_64(cc, c[0]); \
+    CAT(fppol32_, SWITCH(op, OP(r, cc), set(r, cc)));\
+} while (0)
+#endif
 
 // Select multiplication algorithms.
 #define __FP_MUL_16_16x16  __FP_MUL_16_16x16_NAIVE
 #define __FP_MUL_32_16x16  __FP_MUL_32_16x16_NAIVE
 #define __FP_MUL_32_32x16  __FP_MUL_32_32x16_NAIVE
-#define __FP_MUL_32_32x32  __FP_MUL_32_32x32_NAIVE
 #define __FP_MUL_64_32x16  __FP_MUL_64_32x16_NAIVE
-#define __FP_MUL_64_32x32  __FP_MUL_64_32x32_NAIVE
 #define __FP_MUL_64_64x16  __FP_MUL_64_64x16_NAIVE
 #define __FP_MUL_64_64x32  __FP_MUL_64_64x32_NAIVE
 #define __FP_MUL_64_64x64  __FP_MUL_64_64x64_NAIVE
 #define __FP_MUL_128_64x16 __FP_MUL_128_64x16_NAIVE
 #define __FP_MUL_128_64x32 __FP_MUL_128_64x32_NAIVE
+#ifdef HAVE_GF2X
+#define __FP_MUL_128_64x64 __FP_MUL_128_64x64_GF2X
+#define __FP_MUL_64_32x32  __FP_MUL_64_32x32_GF2X
+#define __FP_MUL_32_32x32  __FP_MUL_32_32x32_GF2X
+#else
 #define __FP_MUL_128_64x64 __FP_MUL_128_64x64_NAIVE
+#define __FP_MUL_64_32x32  __FP_MUL_64_32x32_NAIVE
+#define __FP_MUL_32_32x32  __FP_MUL_32_32x32_NAIVE
+#endif
 
 #endif  /* __F2POL_H__ */

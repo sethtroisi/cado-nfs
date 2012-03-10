@@ -10,12 +10,14 @@ WARNFLAGS = -Wall -Wextra -pedantic
 
 FFSREV = `./version.sh`
 
+GF2XPREFIX = #   /usr/local
+
 CPPFLAGS    =
-CFLAGS      = $(OPTFLAGS) $(WARNFLAGS) -std=c99   -g -DFFSREV=\"$(FFSREV)\"
+CFLAGS      = $(OPTFLAGS) $(WARNFLAGS) -std=c99   -g -DFFSREV=\"$(FFSREV)\" # -I$(GF2XPREFIX)/include -DHAVE_GF2X -mpclmul
 CXXFLAGS    = $(OPTFLAGS) $(WARNFLAGS) -std=c++0x -g
 TARGET_ARCH = -mtune=native -march=native 
-LDFLAGS     = 
-LDLIBS      = -lntl -lstdc++
+LDFLAGS     =  #-L$(GF2XPREFIX)/lib
+LDLIBS      = -lntl -lstdc++ # -lgf2x
 
 # Override variables in here!
 -include Makefile.local

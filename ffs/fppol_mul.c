@@ -3,6 +3,9 @@
 #include "fppol_mul.h"
 #include "fppol_internal.h"
 
+#if defined(USE_F2) && defined(HAVE_GF2X)
+#include <gf2x.h>
+#endif
 
 
 /* Multiprecision polynomials.
@@ -32,10 +35,17 @@ void fppol_mul(fppol_ptr r, fppol_srcptr p, fppol_srcptr q)
   int kq = q->deg>>6;
   __fppol_realloc_lazy(rr, (kp+kq+2)<<6);
   memset(rr->limbs, 0, (kp+kq+2) * sizeof(fppol64_t));
+#if defined(USE_F2) && defined(HAVE_GF2X)
+  int cc = (sizeof(unsigned long) == sizeof(uint64_t))?1:2;
+  gf2x_mul((unsigned long *)rr->limbs, 
+           (unsigned long *)p->limbs, cc*(kp+1),
+           (unsigned long *)q->limbs, cc*(kq+1));
+#else
   for (int i = 0; i <= kp; ++i)
     for (int j = 0; j <= kq; ++j)
       __FP_MUL_128_64x64(rr->limbs[i+j+1], rr->limbs[i+j],
                          p ->limbs[i],     q ->limbs[j], add);
+#endif
   rr->deg = p->deg + q->deg;
 
   // If input were aliases, do the final copy.
