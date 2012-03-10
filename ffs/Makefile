@@ -5,11 +5,13 @@ BIN = sieve
 
 BUILDDIR = ./build
 
-OPTFLAGS  =
+OPTFLAGS  = 
 WARNFLAGS = -Wall -Wextra -pedantic
 
+FFSREV = `./version.sh`
+
 CPPFLAGS    =
-CFLAGS      = $(OPTFLAGS) $(WARNFLAGS) -std=c99   -g
+CFLAGS      = $(OPTFLAGS) $(WARNFLAGS) -std=c99   -g -DFFSREV=\"$(FFSREV)\"
 CXXFLAGS    = $(OPTFLAGS) $(WARNFLAGS) -std=c++0x -g
 TARGET_ARCH = -mtune=native -march=native 
 LDFLAGS     = 

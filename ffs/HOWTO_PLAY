@@ -5,33 +5,40 @@ Recipe to run an example (as of end of Mar 7, 2012).
   
   make 
 
-- prepare:
-  Some polynomials are hardcoded in sieve.c. They correspond to a
-  GF(2^127) and a GF(3^97) example.
-  The same polynomials and some bounds are hardcoded as well in a magma
-  script to create he factor base files. Just run:
+- create the factor base:
 
+  At the moment, the polynomials are hardcoded and correspond to those in
+  param.2.127 and param.3.97.
+  
+  Tune the factor base bounds by editing makefb.mag and then create the
+  files:
   echo "p:=2; load \"makefb.mag\";" | magma -b
   or
   echo "p:=3; load \"makefb.mag\";" | magma -b
 
-
   This will create two files Aroots and Rroots.
   NB: these file names are absolute names. 
 
+- rename the factor base files to specific names, so that they are not
+  overriden by the next call to makefb.mag:
+
+  The default names given in the param file are:
+  mv Aroots Aroots.2.127
+  mv Rroots Rroots.2.127
+  (adapt for charac 3)
+
 - run:
 
-  build/f2/sieve <q> <rho>
+  build/f2/sieve param.2.127
   or 
-  build/f3/sieve <q> <rho>
+  build/f3/sieve param.3.97
 
-  For example:
+  This should output relations for the special q specified in the param
+  files.
+  Parameters (including q,rho) can be changed on the command-line, for
+  instance:
 
-  build/f2/sieve 3468B8B 810E4A
-
-  build/f3/sieve 41409965 2AAA4696
-
-  This should output relations for this special q.
+  build/f2/sieve param.2.127 -I 12 -lpb0 24 
 
 - debug! ;-)
 
