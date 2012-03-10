@@ -27,6 +27,8 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "  pol1 *           function field polynomial on side 1\n");
     fprintf(stderr, "  fb0  *           factor base file on side 0\n");
     fprintf(stderr, "  fb1  *           factor base file on side 1\n");
+    fprintf(stderr, "  fbb0             factor base bound on side 0\n");
+    fprintf(stderr, "  fbb1             factor base bound on side 1\n");
     fprintf(stderr, "  I    *           degree bound for i\n");
     fprintf(stderr, "  J    *           degree bound for j\n");
     fprintf(stderr, "  lpb0 *           large prime bound on side 0\n");
@@ -47,8 +49,9 @@ int main(int argc, char **argv)
     ffspol_t ffspol[2]; 
     qlat_t qlat;
     factorbase_t FB[2];
+    int fbb[2] = {0, 0};
     int I=0, J=0;  
-    int lpb[2] = { 0, 0};  
+    int lpb[2] = {0, 0};  
     unsigned int threshold[2] = {0, 0};  
     char *argv0 = argv[0];
 
@@ -88,6 +91,8 @@ int main(int argc, char **argv)
     param_list_parse_int(pl, "J", &J); 
     param_list_parse_int(pl, "lpb0", &lpb[0]);
     param_list_parse_int(pl, "lpb1", &lpb[1]);
+    param_list_parse_int(pl, "fbb0", &fbb[0]);
+    param_list_parse_int(pl, "fbb1", &fbb[1]);
     param_list_parse_uint(pl, "thresh0", &threshold[0]);
     param_list_parse_uint(pl, "thresh1", &threshold[1]);
     if (I == 0) usage(argv0, "I");
@@ -127,13 +132,17 @@ int main(int argc, char **argv)
                 param[2] = '1';
             filename = param_list_lookup_string(pl, param);
             if (filename == NULL) usage(argv0, param);
-            noerr = fbread(&FB[i], filename);
+            noerr = fbread(&FB[i], filename, fbb[i]);
             if (!noerr) {
                 fprintf(stderr, "Could not read %s: %s\n", param, filename);
                 exit(EXIT_FAILURE);
             }
         }
     }
+
+    param_list_print_command_line(stderr, pl);
+
+
     param_list_clear(pl);
 
     // Corresponding maximum integers. These are used for:

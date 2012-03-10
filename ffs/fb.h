@@ -9,7 +9,9 @@ typedef struct {
 } factorbase_t;
 
 // Read a factor base from file. Return 1 iff success.
-int fbread(factorbase_t * FB, const char *file);
+// If maxdeg!=0, when reaching an ideal of degree > maxdeg, stop reading
+// and return.
+int fbread(factorbase_t * FB, const char *file, int maxdeg);
 
 
 #endif   /* __FB_H__ */

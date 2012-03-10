@@ -28,7 +28,7 @@ int advance_to_non_space(FILE *file)
 
 
 
-int fbread(factorbase_t * FB, const char *filename)
+int fbread(factorbase_t * FB, const char *filename, int maxdeg)
 {
     FILE *file;
     file = fopen(filename, "r");
@@ -82,6 +82,8 @@ int fbread(factorbase_t * FB, const char *filename)
             return 0;
         }
         unsigned char degp = fbprime_deg(p);
+        if (maxdeg!=0 && degp > maxdeg) 
+            break;
         n++;
         elts = (fbideal_t *) realloc(elts, n*sizeof(fbideal_t));
         ASSERT_ALWAYS(elts != NULL);
