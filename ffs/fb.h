@@ -35,7 +35,8 @@ typedef const __factor_base_struct *factor_base_srcptr;
 
 // Initialize a factor base, reading the ideals from a file.
 // Return 1 if successful.
-int factor_base_init(factor_base_ptr FB, const char *filename);
+int factor_base_init(factor_base_ptr FB, const char *filename,
+                     unsigned maxdeg);
 
 // Precompute lambda for each element of the factor base.
 void factor_base_precomp_lambda(factor_base_ptr FB, qlat_srcptr qlat);

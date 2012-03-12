@@ -38,7 +38,8 @@
 # define      __ij_SIZE 32
 #endif
 
-// Multiprecision has no fixed size.
+// Known sizes.
+#define __fppol64_SIZE 64
 #define __fppol_SIZE
 
 
@@ -134,12 +135,14 @@ __DECL_ALIAS_TYPE(ij)
   __DECL_ALIAS_FUN (void, type, set_one,        type##_ptr)                   \
   __DECL_ALIAS_FUN (void, type, set_ti,         type##_ptr,    unsigned)      \
   __DECL_ALIAS_FUN (void, type, set,            type##_ptr,    type##_srcptr) \
+  __DECL_ALIAS_FUN (int,  type, set_64,         type##_ptr,    fppol64_srcptr)\
   __DECL_ALIAS_FUN1(int,  type, set,    sq,     type##_ptr,    sq_srcptr)     \
   __DECL_ALIAS_FUN1(int,  type, set,    ai,     type##_ptr,    ai_srcptr)     \
   __DECL_ALIAS_FUN1(int,  type, set,    fbprime,type##_ptr,    fbprime_srcptr)\
   __DECL_ALIAS_FUN1(int,  type, set,    ij,     type##_ptr,    ij_srcptr)     \
   __DECL_ALIAS_FUN (int,  type, set_mp,         type##_ptr,    fppol_srcptr)  \
-  __DECL_ALIAS_FUN1(void, fppol,set,    type,   fppol_ptr,     type##_srcptr) \
+  __DECL_ALIAS_FUN1(void, fppol64,set,  type,   fppol64_ptr,   type##_srcptr) \
+  __DECL_ALIAS_FUN1(void, fppol,  set,  type,   fppol_ptr,     type##_srcptr) \
   __DECL_ALIAS_FUN (void, type, swap,           type##_ptr,    type##_ptr)    \
   __DECL_ALIAS_FUN (void, type, get_coeff,      fp_ptr,                       \
                                                 type##_srcptr, unsigned)      \
@@ -167,12 +170,14 @@ __DECL_ALIAS_TYPE(ij)
   __DECL_ALIAS_FUN (int,      type, set_str,    type##_ptr,    const char *)  \
   __DECL_ALIAS_FUN (void,     type, out,        FILE *,        type##_srcptr) \
   __DECL_ALIAS_FUN (int,      type, inp,        type##_ptr,    FILE *)        \
-  __DECL_ALIAS_FUN (uint64_t, type, get_ui,       type##_srcptr, unsigned)    \
-  __DECL_ALIAS_FUN (int,      type, set_ui,       type##_ptr,    uint64_t,    \
-                                                  unsigned)                   \
-  __DECL_ALIAS_FUN (uint64_t, type, monic_get_ui, type##_srcptr, unsigned)    \
-  __DECL_ALIAS_FUN (int,      type, monic_set_ui, type##_ptr,    uint64_t,    \
-                                                  unsigned)                   \
+  __DECL_ALIAS_FUN (int,      type,       set_next, type##_ptr, type##_srcptr,\
+                                                    unsigned)                 \
+  __DECL_ALIAS_FUN (int,      type, monic_set_next, type##_ptr, type##_srcptr,\
+                                                    unsigned)                 \
+  __DECL_ALIAS_FUN (unsigned, type,       get_ui,   type##_srcptr,            \
+                                                    unsigned, unsigned)       \
+  __DECL_ALIAS_FUN (int,      type,       set_ui,   type##_ptr, unsigned,     \
+                                                    unsigned, unsigned)       \
   __DECL_ALIAS_MUL      (type)                                                \
   __DECL_ALIAS_MUL_yy   (fppol, type)                                         \
   __DECL_ALIAS_MUL_yyxzz(fppol, type, sq)                                     \

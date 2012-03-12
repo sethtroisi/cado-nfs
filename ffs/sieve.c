@@ -14,8 +14,34 @@
 #include "cofactor.hh"
 #include "timing.h"
 #include "ijvec.h"
+#include "params.h"
 
-// #define EXPENSIVE_CHECK
+
+void usage(const char *argv0, const char * missing)
+{
+    fprintf(stderr, "Usage: %s [options | optionfile] \n", argv0);
+    fprintf(stderr, "  Command line options have the form '-optname optval'\n");
+    fprintf(stderr, "  and take the form 'optname=optval' in the optionfile\n");
+    fprintf(stderr, "List of options (a * means mandatory, default value in []):\n");
+    fprintf(stderr, "  pol0 *           function field polynomial on side 0\n");
+    fprintf(stderr, "  pol1 *           function field polynomial on side 1\n");
+    fprintf(stderr, "  fb0  *           factor base file on side 0\n");
+    fprintf(stderr, "  fb1  *           factor base file on side 1\n");
+    fprintf(stderr, "  fbb0             factor base bound on side 0\n");
+    fprintf(stderr, "  fbb1             factor base bound on side 1\n");
+    fprintf(stderr, "  I    *           degree bound for i\n");
+    fprintf(stderr, "  J    *           degree bound for j\n");
+    fprintf(stderr, "  lpb0 *           large prime bound on side 0\n");
+    fprintf(stderr, "  lpb1 *           large prime bound on side 1\n");
+    fprintf(stderr, "  thresh0 [2*lpb0] survivor threshold on side 0\n");
+    fprintf(stderr, "  thresh1 [2*lpb1] survivor threshold on side 1\n");
+    fprintf(stderr, "  q    *           q-poly of the special-q\n");
+    fprintf(stderr, "  rho  *           rho-poly of the special-q\n");
+ 
+    if (missing != NULL)
+        fprintf(stderr, "Missing parameter: %s\n", missing);
+    exit(1);
+}
 
 // usage: ./a.out q rho
 int main(int argc, char **argv)
@@ -23,99 +49,131 @@ int main(int argc, char **argv)
     ffspol_t ffspol[2]; 
     qlat_t qlat;
     factor_base_t FB[2];
-    int I, J;  // strict bound on the degrees of the (i,j)
-    // Corresponding maximum integers. These are used for:
-    //   - bounds on integer loops allowing to visit the sieve space
-    //   - IIJJ is the allocated size of the sieve array.
-    unsigned int II, JJ, IIJJ; 
+    int fbb[2] = {0, 0};
+    int I=0, J=0;  
+    int lpb[2] = {0, 0};  
+    unsigned int threshold[2] = {0, 0};  
+    char *argv0 = argv[0];
 
-#ifdef USE_F2
-    unsigned char threshold[2] = { 50, 50};  // should not be fixed here.
-    int lpb[2] = { 25, 25};  // should not be fixed here.
-    I = 9; J = 9;
-    II = 1u<<I;
-    JJ = 1u<<J;
-    IIJJ = 1u<<(I+J);
-#else
-    unsigned char threshold[2] = { 30, 30};  // should not be fixed here.
-    int lpb[2] = { 15, 15};  // should not be fixed here.
-    I = 6; J = 6;
-    {
-        ij_t max;
-        ij_set_ti(max, I);
-        II = ij_get_ui(max, I+1);
-        ij_set_ti(max, J);
-        JJ = ij_monic_get_ui(max, J+1);
-        ij_set_ti(max, I+J);
-        IIJJ = ij_monic_get_ui(max, I+J+1);
+    param_list pl;
+    param_list_init(pl);
+    argv++, argc--;
+    for (; argc;) {
+        if (param_list_update_cmdline(pl, &argc, &argv)) {
+            continue;
+        }
+        /* Could also be a parameter file */
+        FILE *f;
+        if ((f = fopen(argv[0], "r")) != NULL) {
+            param_list_read_stream(pl, f);
+            fclose(f);
+            argv++, argc--;
+            continue;
+        }
+        fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
+        usage(argv0, NULL);
     }
-#endif
 
-    int noerr;
-    ffspol_init(ffspol[0]);
-    ffspol_init(ffspol[1]);
+    // read function field polynomials
+    {
+        const char * polstr;
+        ffspol_init(ffspol[0]);
+        ffspol_init(ffspol[1]);
+        polstr = param_list_lookup_string(pl, "pol0");
+        if (polstr == NULL) usage(argv0, "pol0");
+        ffspol_set_str(ffspol[0], polstr);
+        polstr = param_list_lookup_string(pl, "pol1");
+        if (polstr == NULL) usage(argv0, "pol1");
+        ffspol_set_str(ffspol[1], polstr);
+    }
+    // read various bounds
+    param_list_parse_int(pl, "I", &I); 
+    param_list_parse_int(pl, "J", &J); 
+    param_list_parse_int(pl, "lpb0", &lpb[0]);
+    param_list_parse_int(pl, "lpb1", &lpb[1]);
+    param_list_parse_int(pl, "fbb0", &fbb[0]);
+    param_list_parse_int(pl, "fbb1", &fbb[1]);
+    param_list_parse_uint(pl, "thresh0", &threshold[0]);
+    param_list_parse_uint(pl, "thresh1", &threshold[1]);
+    if (I == 0) usage(argv0, "I");
+    if (J == 0) usage(argv0, "J");
+    if (lpb[0] == 0) usage(argv0, "lpb0");
+    if (lpb[1] == 0) usage(argv0, "lpb1");
+    if (threshold[0] == 0) 
+        threshold[0] = 2*lpb[0];
+    if (threshold[1] == 0) 
+        threshold[1] = 2*lpb[1];
+    // read q, rho
+    {
+        const char *sqstr;
+        int noerr;
+        sqstr = param_list_lookup_string(pl, "q");
+        if (sqstr == NULL) usage(argv0, "q");
+        noerr = sq_set_str(qlat->q, sqstr);
+        if (!noerr) {
+            fprintf(stderr, "Could not parse q: %s\n", sqstr);
+            exit(EXIT_FAILURE);
+        }
+        sqstr = param_list_lookup_string(pl, "rho");
+        if (sqstr == NULL) usage(argv0, "rho");
+        noerr = sq_set_str(qlat->rho, sqstr);
+        if (!noerr) {
+            fprintf(stderr, "Could not parse rho: %s\n", sqstr);
+            exit(EXIT_FAILURE);
+        }
+    }
+    // Read the factor bases
+    {
+        const char *filename;
+        int noerr;
+        for (int i = 0; i < 2; ++i) {
+            char param[4] = {'f', 'b', '0', '\0'};
+            if (i == 1) 
+                param[2] = '1';
+            filename = param_list_lookup_string(pl, param);
+            if (filename == NULL) usage(argv0, param);
+            noerr = factor_base_init(FB[i], filename, fbb[i]);
+            if (!noerr) {
+                fprintf(stderr, "Could not read %s: %s\n", param, filename);
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
 
-#ifdef USE_F2
-    // Hardcoded GF(2^127) example.
-    /*
-       F = x^5 + x^4 + x^3 + x^2 + x + t^2
-       G =  x*t^25 + x*t^24 + x*t^23 + x*t^21 + x*t^17 + x*t^16 + x*t^15
-       + x*t^13 + x*t^10 + x*t^9 + x*t^7 + x*t^5 + x*t^3 + x + t^26 +
-       t^25 + t^24 + t^23 + t^21 + t^20 + t^17 + t^14 + t^13 + t^11 + t^9
-       + t^6 + t^4 + t^3 + t^2
-       Typical special q: 3f29c8d 1e3dc3
-    */
-    ffspol_set_str(ffspol[0], "4,1,1,1,1,1");
-    ffspol_set_str(ffspol[1], "7b26a5c,3a3a6a9");
-#else
-#ifdef USE_F3
-    // Hardcoded GF(3^97) example.
-    /*
-       F = x^5 + x*t + x + t^2;
-       G = x*t^25 + x*t^23 + 2*x*t^22 + 2*x*t^21 + 2*x*t^20 + x*t^18 +
-       2*x*t^17 + x*t^16 + 2*x*t^14 + 2*x*t^13 + 2*x*t^11 + x*t^10 +
-       2*x*t^9 + 2*x*t^8 + x*t^7 + 2*x*t^6 + x*t^5 + x*t^4 + 2*x*t^2 +
-       x*t + 2*x + t^26 + 2*t^25 + t^23 + t^22 + 2*t^20 + t^19 + t^18 +
-       2*t^17 + t^16 + t^12 + t^11 + 2*t^10 + t^8 + t^7 + 2*t^6 + t^4 +
-       2*t^3 + t + 2;
-       Typical special q: 41409965 2aaa4696
-     */
-    ffspol_set_str(ffspol[0], "10,5,0,0,0,1");
-    ffspol_set_str(ffspol[1], "18525901616186,46a19289a6526");
-#else
-// USE_F3 or USE_F2 must be defined
-    ASSERT_ALWAYS(0);
-#endif
-#endif
+    param_list_print_command_line(stderr, pl);
 
-    // Read q, rho on command line:
-    ASSERT_ALWAYS(argc == 3);
-    noerr = sq_set_str(qlat->q, argv[1]);
-    ASSERT_ALWAYS(noerr);
-    noerr = sq_set_str(qlat->rho, argv[2]);
-    ASSERT_ALWAYS(noerr);
+
+    param_list_clear(pl);
+
+    // Allocated size of the sieve array.
+    unsigned IIJJ = ijvec_get_max_pos(I, J);
 
     qlat->side = 0; // assume that the special-q is on the algebraic side.
 
     // Reduce the q-lattice
-    noerr = skewGauss(qlat, 0);
+    int noerr = skewGauss(qlat, 0);
     assert (noerr);
     print_qlat_info(qlat);
 
-    // Read the factor bases
-    ASSERT_ALWAYS(factor_base_init(FB[0], "Aroots"));
-    ASSERT_ALWAYS(factor_base_init(FB[1], "Rroots"));
-
     // Precompute lambda for each element of the factor bases.
-    factor_base_precomp_lambda(FB[0], qlat);
-    factor_base_precomp_lambda(FB[1], qlat);
+    for (int i = 0; i < 2; ++i)
+        factor_base_precomp_lambda(FB[i], qlat);
 
     // Allocate and init the sieve space
     uint8_t *S;
-    S = (uint8_t *) malloc((IIJJ)*sizeof(uint8_t));
+    S = (uint8_t *) malloc(IIJJ*sizeof(uint8_t));
     ASSERT_ALWAYS(S != NULL);
-    memset(S, 0, (IIJJ));
-    S[0] = 255;
+    memset(S, 0, IIJJ*sizeof(uint8_t));
+    // Kill the lines with i = 0 or j = 0
+    {
+        S[0] = 255;
+        ij_t i, j;
+        for (ij_set_zero(j); ij_monic_set_next(j, j, J); )
+            S[ijvec_get_start_pos(j, I, J)] = 255;
+        for (ij_set_zero(i); ij_set_next(i, i, I); )
+            S[ijvec_get_offset(i, I)] = 255;
+    }
+
     double t_norms = 0;
     double t_sieve = 0;
     double t_cofact = 0;
@@ -131,52 +189,6 @@ int main(int argc, char **argv)
         init_norms(S, ffspol[side], I, J, qlat, qlat->side == side);
         t_norms += seconds();
 
-#ifdef EXPENSIVE_CHECK
-        // Check special-q divides the norm
-        // if (side == qlat->side) {
-        if (1) {
-            fppol_t a, b;
-            fppol_init(a);
-            fppol_init(b);
-            fppol_t norm, bigq, rem;
-            fppol_init(norm);
-            fppol_init(bigq);
-            fppol_init(rem);
-            fppol_set_sq(bigq, qlat->q);
-
-            ijvec_t V;
-            for (unsigned int jj = 0; jj < JJ; jj++) {
-                if (!ij_monic_set_ui(V->j, jj, J))
-                    continue;
-                if (!ij_is_monic(V->j) && j!=0)
-                    continue;
-                ij_set_zero(V->i);
-                unsigned int jj0 = ijvec_get_pos(V, I, J);
-                for (unsigned int ii = 0; ii < II; ii++) {
-                    if (!ij_set_ui(V->i, ii, I))
-                        continue;
-                    position = ii + jj0;
-                    if (position == 0)
-                        continue;
-                    if (S[position] != 255) {
-                        ij2ab(a, b, V->i, V->j, qlat);
-                        ffspol_norm(norm, &ffspol[side], a, b);
-                        //ASSERT_ALWAYS(fppol_deg(norm) == S[position]);
-                        if (side == qlat->side) {
-                            fppol_rem(rem, norm, bigq);
-                            ASSERT_ALWAYS(fppol_is_zero(rem));
-                        }
-                    }
-                }
-            }
-            fppol_clear(a);
-            fppol_clear(b);
-            fppol_clear(norm);
-            fppol_clear(bigq);
-            fppol_clear(rem);
-        }
-#endif
-
         // sieve
         t_sieve -= seconds();
         sieveFB(S, FB[side], I, J);
@@ -191,39 +203,31 @@ int main(int argc, char **argv)
         }
     }
 
-
     t_cofact -= seconds();
     // survivors cofactorization
     {
         fppol_t a, b;
-        ij_t gg;
+        ij_t i, j, g;
         fppol_init(a);
         fppol_init(b);
-        ijvec_t V;
-        for (unsigned int j = 1; j < JJ; ++j) {
-            if (!ij_monic_set_ui(V->j, j, J))
-                continue;
-            if (!ij_is_monic(V->j) && j!=0)
-                continue;
-            ij_set_zero(V->i);
-            unsigned int j0 = ijvec_get_pos(V, I, J);
-            for (unsigned int i = 1; i < II; ++i) {
-                if (!ij_set_ui(V->i, i, I))
-                    continue;
-                unsigned int position = i + j0;
+
+        for (ij_set_zero(j); ij_monic_set_next(j, j, J); ) {
+            ijpos_t start = ijvec_get_start_pos(j, I, J);
+            for (ij_set_zero(i); ij_set_next(i, i, I); ) {
+                ijpos_t pos = start + ijvec_get_offset(i, I);
 #ifdef TRACE_POS
-                if (position == TRACE_POS) {
-                    fprintf(stderr, "TRACE_POS(%d): ", position);
+                if (pos == TRACE_POS) {
+                    fprintf(stderr, "TRACE_POS(%d): ", pos);
                     fprintf(stderr, "entering cofactorization, S[pos] = %d\n",
-                            S[position]);
+                            S[pos]);
                 }
 #endif 
-                if (S[position] != 255) {
+                if (S[pos] != 255) {
     //                printf("i,j = %u %u\n", i, j);
-                    ij_gcd(gg, V->i, V->j);
-                    if (ij_deg(gg) != 0 && ij_deg(V->i)>0  && ij_deg(V->j)>0)
+                    ij_gcd(g, i, j);
+                    if (ij_deg(g) != 0 && ij_deg(i)>0  && ij_deg(j)>0)
                         continue;
-                    ij2ab(a, b, V->i, V->j, qlat);
+                    ij2ab(a, b, i, j, qlat);
                     nrels += factor_survivor(a, b, ffspol, lpb);
                 }
             }
@@ -235,7 +239,7 @@ int main(int argc, char **argv)
 
     fprintf(stdout, "# Total: %d relations found\n", nrels);
     fprintf(stdout, "# Time spent: %1.1f s (norms); %1.1f s (sieve); %1.1f s (cofact)\n", t_norms, t_sieve, t_cofact);
-    fprintf(stdout, "# Rate: %1.4f s/rel\n", (t_norms+t_sieve+t_cofact)/nrels);
+    fprintf(stdout, "# Rate: %1.5f s/rel\n", (t_norms+t_sieve+t_cofact)/nrels);
 
     ffspol_clear(ffspol[0]);
     ffspol_clear(ffspol[1]);

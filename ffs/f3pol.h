@@ -28,9 +28,9 @@
 #define __FP_ONE_0 1
 #define __FP_ONE_1 0
 
-// Largest element in the base field.
-#define __FP_MAX_0 0
-#define __FP_MAX_1 1
+// Conversion from integer.
+#define __FP_SET_Z_0(x) ( (x)     & 0x1)
+#define __FP_SET_Z_1(x) (((x)>>1) & 0x1)
 
 // Opposite.
 #define __FP_OPP_0(p0, p1) (p1)
@@ -61,99 +61,101 @@
         __FP_SMUL_1(p0, p1, __FP_SINV_0(q0, q1), __FP_SINV_1(q0, q1))
 
 
-// Generic constant definition.
-#define __FP_CST(cst, sz, r)                                  \
-  do { uint##sz##_t __t[] = { (uint##sz##_t)__FP_##cst##_0,   \
-                              (uint##sz##_t)__FP_##cst##_1 }; \
-       r[0] = __t[0]; r[1] = __t[1]; } while (0)
-
-// Generic unary operation.
-#define __FP_UOP(op, sz, r, p)                        \
-  do { uint##sz##_t __t[] = {                         \
-         (uint##sz##_t)(__FP_##op##_0(p[0], p[1])),   \
-         (uint##sz##_t)(__FP_##op##_1(p[0], p[1])) }; \
-       r[0] = __t[0]; r[1] = __t[1]; } while (0)
-
-// Generic binary operation.
-#define __FP_BOP(op, sz, r, p, q)                                 \
-  do { uint##sz##_t __t[] = {                                     \
-         (uint##sz##_t)(__FP_##op##_0(p[0], p[1], q[0], q[1])),   \
-         (uint##sz##_t)(__FP_##op##_1(p[0], p[1], q[0], q[1])) }; \
+// Generic operation.
+#define __FP_OP(op, sz, r, args)                                    \
+  do { uint##sz##_t __t[] = { (uint##sz##_t)(__FP_##op##_0 args),   \
+                              (uint##sz##_t)(__FP_##op##_1 args) }; \
        r[0] = __t[0]; r[1] = __t[1]; } while (0)
 
 // Definition of all coefficient-wise operations.
-#define __FP_ONE( sz, r)       __FP_CST(ONE,  sz, r)
-#define __FP_MAX( sz, r)       __FP_CST(MAX,  sz, r)
-#define __FP_OPP( sz, r, p)    __FP_UOP(OPP,  sz, r, p)
-#define __FP_ADD( sz, r, p, q) __FP_BOP(ADD,  sz, r, p, q)
-#define __FP_SUB( sz, r, p, q) __FP_BOP(SUB,  sz, r, p, q)
-#define __FP_SINV(sz, r, p)    __FP_UOP(SINV, sz, r, p)
-#define __FP_SMUL(sz, r, p, q) __FP_BOP(SMUL, sz, r, p, q)
-#define __FP_SDIV(sz, r, p, q) __FP_BOP(SDIV, sz, r, p, q)
+#define __FP_ONE(  sz, r)       __FP_OP(ONE,   sz, r, )
+#define __FP_SET_Z(sz, r, x)    __FP_OP(SET_Z, sz, r, (x))
+#define __FP_OPP(  sz, r, p)    __FP_OP(OPP,   sz, r, (p[0], p[1]))
+#define __FP_ADD(  sz, r, p, q) __FP_OP(ADD,   sz, r, (p[0], p[1], q[0], q[1]))
+#define __FP_SUB(  sz, r, p, q) __FP_OP(SUB,   sz, r, (p[0], p[1], q[0], q[1]))
+#define __FP_SINV( sz, r, p)    __FP_OP(SINV,  sz, r, (p[0], p[1]))
+#define __FP_SMUL( sz, r, p, q) __FP_OP(SMUL,  sz, r, (p[0], p[1], q[0], q[1]))
+#define __FP_SDIV( sz, r, p, q) __FP_OP(SDIV,  sz, r, (p[0], p[1], q[0], q[1]))
 
 
 
-/* Integer conversions.
+/* Iteration and integer conversions.
  *****************************************************************************/
 
+// Next polynomial, in lexicographical order.
+#define __FP_SET_NEXT(sz, r, p, n)   \
+  do {                               \
+    uint##sz##_t __t0 = p[1] + 1;    \
+    uint##sz##_t __t1 = p[1] ^ __t0; \
+    __t1 = (__t1 >> 1) ^ __t1;       \
+    r[0] =  p[0] ^ __t1;             \
+    r[1] = (r[0] & __t1) ^ __t0;     \
+  } while (0)
+
+// Next monic polynomial, in lexicographical order.
+#define __FP_MONIC_SET_NEXT(sz, r, p, n)     \
+  do {                                       \
+    uint##sz##_t __t0 = p[1] + 1;            \
+    uint##sz##_t __t1 = p[1] ^ __t0;         \
+    if (~__t1 & p[0]) { /* Not last coeff */ \
+      __t1 = (__t1 >> 1) ^ __t1;             \
+      r[0] =  p[0] ^ __t1;                   \
+      r[1] = (r[0] & __t1) ^ __t0;           \
+    }                                        \
+    else {                  /* Last coeff */ \
+      r[0] = p[0] ? __t1 + 1 : 1;            \
+      r[1] = 0;                              \
+    }                                        \
+  } while (0)
+
+
 // Internal look-up tables for conversion.
-extern const uint8_t  __f3_get_ui_conv[];
-extern const uint16_t __f3_set_ui_conv[];
+extern const uint8_t        __f3_get_ui_conv[];
 extern const uint8_t  __f3_monic_get_ui_conv[];
+extern const uint16_t       __f3_set_ui_conv[];
 extern const uint16_t __f3_monic_set_ui_conv[];
 
-
-// Conversion of an n-term polynomial to an unsigned int.
-#define __FP_GET_UI(sz, r, p, n)                                        \
-  do {                                                                  \
-    r = 0;                                                              \
-    for (unsigned __i = 0, __j = 0, __w; __i < n; __i += 5, __j += 8) { \
-      __w = ((p[0] >> __i) & 0x1f) | (((p[1] >> __i) & 0x1f) << 5);     \
-      r |= (unsigned)__f3_get_ui_conv[__w] << __j;                      \
-    }                                                                   \
+// Conversion of an (n+m)-term polynomial, whose m most significant
+// coefficients form a monic polynomial, to an unsigned int.
+#define __FP_GET_UI(sz, r, p, n, m)                      \
+  do {                                                   \
+    r = 0;                                               \
+    uint##sz##_t __t[2] = { p[0], p[1] };                \
+    unsigned __i = 0, __j = 0, __b = MAX(n, n+m-4), __w; \
+    while (__j < __b && __t[0] | __t[1]) {               \
+      __w = (__t[0] & 0x1f) | ((__t[1] & 0x1f) << 5);    \
+      r |= (unsigned)__f3_get_ui_conv[__w] << __i;       \
+      __i += 8; __j += 5; __t[0] >>= 5; __t[1] >>= 5;    \
+    }                                                    \
+    if (__t[0] | __t[1]) {                               \
+      __w = (__t[0] & 0x1f) | ((__t[1] & 0x1f) << 5);    \
+      r |= (unsigned)__f3_monic_get_ui_conv[__w] << __i; \
+    }                                                    \
   } while (0)
 
-
-// Conversion of an n-term monic polynomial to an unsigned int.
-#define __FP_MONIC_GET_UI(sz, r, p, n)                            \
-  do {                                                            \
-    __FP_GET_UI(sz, r, p, ((n-1)/5)*5);                           \
-    unsigned __i = ((n-1)/5)*5, __j = ((n-1)/5)*8, __w;           \
-    __w = ((p[0] >> __i) & 0x1f) | (((p[1] >> __i) & 0x1f) << 5); \
-    r |= (unsigned)__f3_monic_get_ui_conv[__w] << __j;            \
-  } while (0)
-
-
-// Conversion of an n-term polynomial from an unsigned int.
-#define __FP_SET_UI(sz, next, r, x, n)                                  \
-  do {                                                                  \
-    SWITCH(next, EMPTY, ++x;)                                           \
-    r[0] = r[1] = 0;                                                    \
-    for (unsigned __i = 0, __j = 0, __w; __i < n; __i += 5, __j += 8) { \
-      __w = (x >> __j) & 0xff;                                          \
-      if (UNLIKELY(__w >= 243))                         /* 243 = 3^5 */ \
-        IF(next, EMPTY, return 0, x += (256-__w) << __j);               \
-      else {                                                            \
-        __w = __f3_set_ui_conv[__w];                                    \
-        r[0] |= ((uint##sz##_t)( __w       & 0x1f) << __i);             \
-        r[1] |= ((uint##sz##_t)((__w >> 5) & 0x1f) << __i);             \
-      }                                                                 \
-    }                                                                   \
-  } while (0)
-
-
-// Conversion of an n-term monic polynomial from an unsigned int.
-#define __FP_MONIC_SET_UI(sz, next, r, x, n)              \
+// Conversion of an (n+m)-term polynomial, whose m most significant
+// coefficients form a monic polynomial, from an unsigned int.
+#define __FP_SET_UI(sz, r, x, n, m)                       \
   do {                                                    \
-    __FP_SET_UI(sz, next, r, x, ((n-1)/5)*5);             \
-    unsigned __i = ((n-1)/5)*5, __j = ((n-1)/5)*8, __w;   \
-    __w = (x >> __j) & 0x7f;                              \
-    if (UNLIKELY(__w >= 122))   /* 122 = (3^5-1)/2 + 1 */ \
-      IF(next, EMPTY, return 0, x += (128-__w) << __j);   \
-    else {                                                \
+    r[0] = r[1] = 0;                                      \
+    unsigned __i = 0, __j = 0, __b = MAX(n, n+m-4), __w;  \
+    while (__j < __b && x) {                              \
+      __w = (x >> 8) & 0xff;                              \
+      if (UNLIKELY(__w >= 243))           /* 243 = 3^5 */ \
+        return 0;                                         \
+      __w = __f3_set_ui_conv[__w];                        \
+      r[0] |= ((uint##sz##_t)(__w & 0x1f) << __j);        \
+      r[1] |= ((uint##sz##_t)(__w >> 5  ) << __j);        \
+      __i += 8; __j += 5; x >>= 8;                        \
+    }                                                     \
+    if (x) {                                              \
+      __w = (x >> 8) & 0xff;                              \
+      if (UNLIKELY(__w >= 122)) /* 122 = (3^5-1)/2 + 1 */ \
+        return 0;                                         \
       __w = __f3_monic_set_ui_conv[__w];                  \
-      r[0] |= ((uint##sz##_t)( __w       & 0x1f) << __i); \
-      r[1] |= ((uint##sz##_t)((__w >> 5) & 0x1f) << __i); \
+      r[0] |= ((uint##sz##_t)(__w & 0x1f) << __j);        \
+      r[1] |= ((uint##sz##_t)(__w >> 5  ) << __j);        \
+      __i += 8; __j += 5; x >>= 8;                        \
     }                                                     \
   } while (0)
 

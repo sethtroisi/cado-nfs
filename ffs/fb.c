@@ -21,7 +21,7 @@ int skip_spaces(FILE *file)
 // Initialize a factor base, reading the ideals from a file and computing
 // the corresponding lambda using the basis of the given q-lattice.
 // Return 1 if successful.
-int factor_base_init(factor_base_ptr FB, const char *filename)
+int factor_base_init(factor_base_ptr FB, const char *filename, unsigned maxdeg)
 {
   FILE *file;
   file = fopen(filename, "r");
@@ -50,6 +50,10 @@ int factor_base_init(factor_base_ptr FB, const char *filename)
       return 0;
     }
     gothp->degp = fbprime_deg(gothp->p);
+    if (maxdeg && gothp->degp > maxdeg) {
+      --FB->n;
+      break;
+    }
 
     // Remove spaces.
     if (skip_spaces(file) == EOF) {

@@ -69,6 +69,119 @@ void ffspol_norm(fppol_t norm, ffspol_ptr ffspol, fppol_t a, fppol_t b)
   free(pow_b);
 }
 
+/* Function computing ffspol_ij, a polynomial such that
+   norm(ffspol,a,b) = norm(ffspol_ij, i, j), i.e.
+   it is possible to apply the function norm directly on (i,j)
+   with the transformed polynomial ffspol_ij, without having 
+   to compute a and b with ij2ab().
+   Nevertheless, due to type considerations, it should be necessary
+   to make a new function norm taking as imput i and j and using the
+   appropriate multiplication function.
+*/
+
+void ffspol_2ij(ffspol_ptr ffspol_ij, ffspol_ptr ffspol_ab, qlat_t qlat)
+{
+  fppol_t *pow_a0;
+  fppol_t *pow_a1;
+  fppol_t *pow_b0;
+  fppol_t *pow_b1;
+  fppol_t tmp, tmp1;
+  
+  /* Table containing binomial coefficients binom[n][k] for k and n
+     between 0 and degree of ffspol_ab.
+     It uses Lucas' theorem : binom[n][k] = prod binom[n_i][k_i] mod(p)
+     where n_i and k_i are the coefficients of the p-adic representation
+     of n and k.
+     We need the coefficients to be constant polynomials so that
+     it would be possible to multiply them with polynomials */
+
+  /* For the moment it only works for characteristic 2 */
+  fppol_t **binom;
+  binom = (fppol_t **)malloc((ffspol_ab->deg + 1) * sizeof(fppol_t*));
+  for (int n = 0; n < ffspol_ab->deg + 1; ++n) {
+    binom[n] = (fppol_t *)malloc((n + 1) * sizeof(fppol_t));
+    for(int k = 0; k < n + 1; ++k) {
+      fppol_init(binom[n][k]);
+      if ((n & k) == n)
+	fppol_set_one(binom[n][k]);
+      else
+	fppol_set_zero(binom[n][k]);
+    }
+  }
+	    
+  /* 4 tables containing the powers between 0 and the degree of
+     ffspol_ab of the basis vector of the q-lattice */
+  pow_a0 = (fppol_t *)malloc((ffspol_ab->alloc) *
+     sizeof(fppol_t)); fppol_init(pow_a0[0]);
+     fppol_set_one(pow_a0[0]);
+
+  pow_a1 = (fppol_t *)malloc((ffspol_ab->alloc) * sizeof(fppol_t));
+  fppol_init(pow_a1[0]);
+  fppol_set_one(pow_a1[0]);
+
+  pow_b0 = (fppol_t *)malloc((ffspol_ab->alloc) * sizeof(fppol_t));
+  fppol_init(pow_b0[0]);
+  fppol_set_one(pow_b0[0]);
+  
+  pow_b1 = (fppol_t *)malloc((ffspol_ab->alloc) * sizeof(fppol_t));
+  fppol_init(pow_b1[0]);
+  fppol_set_one(pow_b1[0]);
+  
+  for (int n = 0; n < ffspol_ab->deg + 1; ++n) {
+    fppol_init(pow_a0[n]);
+    fppol_init(pow_a1[n]);
+    fppol_init(pow_b0[n]);
+    fppol_init(pow_b1[n]);
+    fppol_mul_ai(pow_a0[n+1], pow_a0[n], qlat->a0);
+    fppol_mul_ai(pow_a1[n+1], pow_a1[n], qlat->a1);
+    fppol_mul_ai(pow_b0[n+1], pow_b0[n], qlat->b0);
+    fppol_mul_ai(pow_b1[n+1], pow_b1[n], qlat->b1);
+  }
+
+  /* Computation of the transformed polynomial ffspol_ij */
+  
+  fppol_init(tmp);
+  fppol_init(tmp1);
+  
+  for (int w = 0; w < ffspol_ab->deg + 1; ++w) {
+    for (int k = 0; k < ffspol_ab->deg + 1; ++k) {
+      fppol_set_zero(tmp);
+      for (int u = 0; u < k + 1; ++u) {
+	if ((u < k + 1) && (w - u < ffspol_ab->deg - k + 1)) {
+	  fppol_set_one(tmp1);
+	  fppol_mul(tmp1, tmp1, binom[k][u]);
+	  fppol_mul(tmp1, tmp1, binom[ffspol_ab->deg - k][w-u]);
+	  fppol_mul(tmp1, tmp1, pow_a0[u]);
+	  fppol_mul(tmp1, tmp1, pow_a1[k-u]);
+	  fppol_mul(tmp1, tmp1, pow_b0[w-u]);
+	  fppol_mul(tmp1, tmp1, pow_b1[ffspol_ab->deg - k-w-u]);
+	  fppol_add(tmp, tmp, tmp1);
+	}
+      }
+      fppol_mul(tmp, tmp, ffspol_ab->coeffs[k]);
+    }
+    fppol_add(ffspol_ij->coeffs[w], ffspol_ij->coeffs[w], tmp);
+  } 
+ 
+  /* Freeing everyone */
+  for (int n = 0; n < ffspol_ab->deg + 1; ++n) {
+    for(int k = 0; k < n + 1; ++k) 
+      fppol_clear(binom[n][k]);
+    free(binom[n]);
+    fppol_clear(pow_a0[n]);
+    fppol_clear(pow_a1[n]);
+    fppol_clear(pow_b0[n]);
+    fppol_clear(pow_b1[n]);
+  }
+  fppol_clear(tmp1);
+  fppol_clear(tmp);
+  free(binom);
+  free(pow_a0);
+  free(pow_a1);
+  free(pow_b0);
+  free(pow_b1);
+}
+
 /* max_special(prev_max, j, &repeated) returns the maximum of prev_max
    and j
    The value repeated should be initialized to 1
@@ -156,43 +269,26 @@ void init_norms(uint8_t *S, ffspol_ptr ffspol, int I, int J, qlat_t qlat,
         int sqside)
 {
   fppol_t a, b;
-  unsigned int II, JJ;
   fppol_init(a);
   fppol_init(b);
   int degq = 0;
   if (sqside)
       degq = sq_deg(qlat->q);
-  
-  {
-      ij_t max;
-      ij_set_ti(max, I);
-      II = ij_get_ui(max, I+1);
-      ij_set_ti(max, J);
-      JJ = ij_monic_get_ui(max, J+1);
-  }
 
-
-  ijvec_t V;
-  for (unsigned int j = 0; j < JJ; ++j) {
-    if (!ij_monic_set_ui(V->j, j, J))
-      continue;
-    if (!ij_is_monic(V->j) && j!=0)
-        continue;
-    ij_set_zero(V->i);
-    unsigned int j0 = ijvec_get_pos(V, I, J);
-    for (unsigned int i = 0; i < II; ++i) {
-      if (!ij_set_ui(V->i, i, I))
-        continue;
-      unsigned int position = i + j0;
+  ij_t i, j;
+  for (ij_set_zero(j); ij_monic_set_next(j, j, J); ) {
+    ijpos_t start = ijvec_get_start_pos(j, I, J);
+    for (ij_set_zero(i); ij_set_next(i, i, I); ) {
+      ijpos_t pos = start + ijvec_get_offset(i, I);
 #ifdef TRACE_POS
-      if (position == TRACE_POS) {
-          fprintf(stderr, "TRACE_POS(%d): (i,j) = (", position);
-          ij_out(stderr, V->i); fprintf(stderr, " ");
-          ij_out(stderr, V->j); fprintf(stderr, ")\n");
-          fprintf(stderr, "TRACE_POS(%d): norm = ", position);
+      if (pos == TRACE_POS) {
+          fprintf(stderr, "TRACE_POS(%d): (i,j) = (", pos);
+          ij_out(stderr, i); fprintf(stderr, " ");
+          ij_out(stderr, j); fprintf(stderr, ")\n");
+          fprintf(stderr, "TRACE_POS(%d): norm = ", pos);
           fppol_t norm;
           fppol_init(norm);
-          ij2ab(a, b, V->i, V->j, qlat);
+          ij2ab(a, b, i, j, qlat);
           ffspol_norm(norm, ffspol, a, b);
           fppol_out(stderr, norm);
           fppol_clear(norm);
@@ -201,18 +297,19 @@ void init_norms(uint8_t *S, ffspol_ptr ffspol, int I, int J, qlat_t qlat,
                   position, fppol_deg(norm)-degq);
       }
 #endif
-      if (S[position] != 255) {
-        ij2ab(a, b, V->i, V->j, qlat);
+      if (S[pos] != 255) {
+        ij2ab(a, b, i, j, qlat);
         int deg = deg_norm(ffspol, a, b);
         if (deg > 0) {
           ASSERT_ALWAYS(deg < 255);
-          S[position] = deg - degq;
+          S[pos] = deg - degq;
         }
         else
-          S[position] = 255;
+          S[pos] = 255;
       }
     }
   }
+
   fppol_clear(a);
   fppol_clear(b);
 }
