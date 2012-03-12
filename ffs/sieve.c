@@ -145,15 +145,8 @@ int main(int argc, char **argv)
 
     param_list_clear(pl);
 
-    // Corresponding maximum integers. These are used for:
-    //   - bounds on integer loops allowing to visit the sieve space
-    //   - IIJJ is the allocated size of the sieve array.
-    unsigned int II, JJ, IIJJ; 
- 
-    // Maybe unused ?
-    II = ij_get_ui_max(I);
-    JJ = ij_monic_get_ui_max(J);
-    IIJJ = ij_monic_get_ui_max(I+J);
+    // Allocated size of the sieve array.
+    unsigned IIJJ = ijvec_get_max_pos(I, J);
 
     qlat->side = 0; // assume that the special-q is on the algebraic side.
 
@@ -164,25 +157,17 @@ int main(int argc, char **argv)
 
     // Allocate and init the sieve space
     uint8_t *S;
-    S = (uint8_t *) malloc((IIJJ+1)*sizeof(uint8_t));
+    S = (uint8_t *) malloc(IIJJ*sizeof(uint8_t));
     ASSERT_ALWAYS(S != NULL);
-    memset(S, 0, (IIJJ+1));
+    memset(S, 0, IIJJ*sizeof(uint8_t));
     // Kill the lines with i = 0 or j = 0
     {
         S[0] = 255;
-        ijvec_t V;
-        ij_set_zero(V->i);
-        for (unsigned int j = ij_monic_set_next_ui(V->j, 0, J) ;
-                j <= JJ;
-                j = ij_monic_set_next_ui(V->j, j, J)) {
-            S[ijvec_get_pos(V, I, J)] = 255;
-        }
-        ij_set_zero(V->j);
-        for (unsigned int i = ij_set_next_ui(V->i, 0, I) ;
-                i <= II;
-                i = ij_set_next_ui(V->i, i, I)) {
-            S[ijvec_get_pos(V, I, J)] = 255;
-        }
+        ij_t i, j;
+        for (ij_set_zero(j); ij_monic_set_next(j, j, J); )
+            S[ijvec_get_start_pos(j, I, J)] = 255;
+        for (ij_set_zero(i); ij_set_next(i, i, I); )
+            S[ijvec_get_offset(i, I)] = 255;
     }
 
     double t_norms = 0;
@@ -208,44 +193,37 @@ int main(int argc, char **argv)
         // mark survivors
         // no need to check if this is a valid position
         uint8_t *Sptr = S;
-        for (unsigned int k = 0; k <=IIJJ; ++k, ++Sptr) {
+        for (unsigned int k = 0; k < IIJJ; ++k, ++Sptr) {
             if (*Sptr > threshold[side])
                 *Sptr = 255; 
         }
     }
 
-
     t_cofact -= seconds();
     // survivors cofactorization
     {
         fppol_t a, b;
-        ij_t gg;
+        ij_t i, j, g;
         fppol_init(a);
         fppol_init(b);
 
-        ijvec_t V;
-        for (unsigned int j = ij_monic_set_next_ui(V->j, 0, J) ;
-                j <= JJ;
-                j = ij_monic_set_next_ui(V->j, j, J)) {
-            ij_set_zero(V->i);
-            unsigned int j0 = ijvec_get_pos(V, I, J);
-            for (unsigned int i = ij_set_next_ui(V->i, 0, I);
-                    i <= II; 
-                    i = ij_set_next_ui(V->i, i, I)) {
-                unsigned int position = i + j0;
+        for (ij_set_zero(j); ij_monic_set_next(j, j, J); ) {
+            ijpos_t start = ijvec_get_start_pos(j, I, J);
+            for (ij_set_zero(i); ij_set_next(i, i, I); ) {
+                ijpos_t pos = start + ijvec_get_offset(i, I);
 #ifdef TRACE_POS
-                if (position == TRACE_POS) {
-                    fprintf(stderr, "TRACE_POS(%d): ", position);
+                if (pos == TRACE_POS) {
+                    fprintf(stderr, "TRACE_POS(%d): ", pos);
                     fprintf(stderr, "entering cofactorization, S[pos] = %d\n",
-                            S[position]);
+                            S[pos]);
                 }
 #endif 
-                if (S[position] != 255) {
+                if (S[pos] != 255) {
     //                printf("i,j = %u %u\n", i, j);
-                    ij_gcd(gg, V->i, V->j);
-                    if (ij_deg(gg) != 0 && ij_deg(V->i)>0  && ij_deg(V->j)>0)
+                    ij_gcd(g, i, j);
+                    if (ij_deg(g) != 0 && ij_deg(i)>0  && ij_deg(j)>0)
                         continue;
-                    ij2ab(a, b, V->i, V->j, qlat);
+                    ij2ab(a, b, i, j, qlat);
                     nrels += factor_survivor(a, b, ffspol, lpb);
                 }
             }

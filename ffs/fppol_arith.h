@@ -25,12 +25,6 @@ void fp_set_one(fp_ptr r)
 { __FP_ONE(8, r); }
 
 
-// Set to largest element.
-static inline
-void fp_set_max(fp_ptr r)
-{ __FP_MAX(8, r); }
-
-
 // Set to another element.
 static inline
 void fp_set(fp_ptr r, fp_srcptr p)
@@ -137,29 +131,6 @@ __DECL_FPPOLxx_ARITH_ALL(64)
   void fppol##sz##_set_ti(fppol##sz##_ptr r, unsigned i)   \
   { __FP_ONE(sz, r);                                       \
     for (unsigned k = 0; k < __FP_BITS; ++k) r[k] <<= i; }
-
-
-// Set to largest n-term polynomial.
-// Generic prototype:
-//   void fppol<sz>_set_max(fppol<sz>_ptr r, unsigned n);
-#define __DEF_FPPOLxx_SET_MAX(sz)                                  \
-  static inline                                                    \
-  void fppol##sz##_set_max(fppol##sz##_ptr r, unsigned n)          \
-  { uint##sz##_t m = ((uint##sz##_t)1 << n) - 1;                   \
-    __FP_MAX(sz, r);                                               \
-    for (unsigned k = 0; k < __FP_BITS; ++k) r[k] = (-r[k]) & m; }
-
-
-// Set to largest n-term monic polynomial.
-// Generic prototype:
-//   void fppol<sz>_monic_set_max(fppol<sz>_ptr r, unsigned n);
-#define __DEF_FPPOLxx_MONIC_SET_MAX(sz)                         \
-  static inline                                                 \
-  void fppol##sz##_monic_set_max(fppol##sz##_ptr r, unsigned n) \
-  { fppol##sz##_set_max(r, n-1);                                \
-    fp_t t; fp_set_one(t);                                      \
-    for (unsigned k = 0; k < __FP_BITS; ++k)                    \
-      r[k] |= (uint##sz##_t)t[k] << (n-1); }
 
 
 // Set to another polynomial.
@@ -385,67 +356,42 @@ __DECL_FPPOLxx_ARITH_ALL(64)
     for (unsigned k = 0; k < __FP_BITS; ++k) r[k] = p[k] & m; }
 
 
-// Conversion of a (monic) polynomial to an unsigned int, after a preliminary
-// multiplication by t^i.
+// Set to next n-term (monic) polynomial, in lexicographical order.
+// Return zero in case of overflow.
 // Generic prototype:
-//   unsigned fppol<sz>_<monic>_get_ui_mul_ti(fppol<sz>_srcptr p, unsigned i);
-#define __DEF_FPPOLxx_GET_UI_MUL_TI(sz, monic)                               \
+//   int fppol<sz>_<monic>_set_next(fppol<sz>_ptr r, fppol<sz>_srcptr p,
+//                                  unsigned n);
+#define __DEF_FPPOLxx_SET_NEXT(sz, monic)                                 \
+  static inline                                                           \
+  int CAT(CAT(fppol##sz, SWITCH(monic, EMPTY, _monic)), _set_next)        \
+    (fppol##sz##_ptr r, fppol##sz##_srcptr p, unsigned n)                 \
+  { CAT(CAT(__FP, SWITCH(monic, EMPTY, _MONIC)), _SET_NEXT)(sz, r, p, n); \
+    return fppol##sz##_fold_or(r) & (((uint##sz##_t)1 << n) - 1); }
+
+
+// Conversion of an (n+m)-term polynomial, whose m most significant
+// coefficients form a monic polynomial, to an unsigned int.
+// /!\ Assume that deg(p) < n+m.
+// Generic prototype:
+//   unsigned fppol<sz>_get_ui(fppol<sz>_srcptr p, unsigned n, unsigned m);
+#define __DEF_FPPOLxx_GET_UI(sz)                                             \
   static inline                                                              \
-  unsigned CAT(CAT(fppol##sz, SWITCH(monic, EMPTY, _monic)), _get_ui_mul_ti) \
-    (fppol##sz##_srcptr p, unsigned i)                                       \
-  { unsigned r;                                                              \
-    CAT(CAT(__FP, SWITCH(monic, EMPTY, _MONIC)), _GET_UI)(sz, r, p, i);      \
-    return r; }
+  unsigned fppol##sz##_get_ui(fppol##sz##_srcptr p, MAYBE_UNUSED unsigned n, \
+                                                    MAYBE_UNUSED unsigned m) \
+  { unsigned r; __FP_GET_UI(sz, r, p, n, m); return r; }
 
 
-// Conversion of a (monic) polynomial to an unsigned int.
-// Generic prototype:
-//   unsigned fppol<sz>_<monic>_get_ui(fppol<sz>_srcptr p);
-#define __DEF_FPPOLxx_GET_UI(sz, monic)                                       \
-  static inline                                                               \
-  unsigned CAT(CAT(fppol##sz, SWITCH(monic, EMPTY, _monic)), _get_ui)         \
-    (fppol##sz##_srcptr p)                                                    \
-  { return                                                                    \
-    CAT(CAT(fppol##sz, SWITCH(monic, EMPTY, _monic)), _get_ui_mul_ti)(p, 0); }
-
-
-// Return the largest unsigned int corresponding to an n-term (monic)
-// polynomial.
-// Generic prototype:
-//   unsigned fppol<sz>_<monic>_get_ui_max(unsigned n);
-#define __DEF_FPPOLxx_GET_UI_MAX(sz, monic)                                   \
-  static inline                                                               \
-  unsigned CAT(CAT(fppol##sz, SWITCH(monic, EMPTY, _monic)), _get_ui_max)     \
-    (unsigned n)                                                              \
-  { fppol##sz##_t t;                                                          \
-    CAT(CAT(       fppol##sz, SWITCH(monic, EMPTY, _monic)), _set_max)(t, n); \
-    return CAT(CAT(fppol##sz, SWITCH(monic, EMPTY, _monic)), _get_ui) (t); }
-
-
-// Conversion of a (monic) polynomial from an unsigned int.
+// Conversion of an (n+m)-term polynomial, whose m most significant
+// coefficients form a monic polynomial, from an unsigned int.
 // Return 1 if successful.
+// /!\ Assume that deg(p) < n+m.
 // Generic prototype:
-//   int fppol<sz>_<monic>_set_ui(fppol<sz>_ptr r, unsigned x);
-#define __DEF_FPPOLxx_SET_UI(sz, monic)                                \
-  static inline                                                        \
-  int CAT(CAT(fppol##sz, SWITCH(monic, EMPTY, _monic)), _set_ui)       \
-    (fppol##sz##_ptr r, unsigned x)                                    \
-  { CAT(CAT(__FP, SWITCH(monic, EMPTY, _MONIC)), _SET_UI)(sz, , r, x); \
-    return 1; }
-
-
-// Conversion of a (monic) polynomial from the next valid unsigned int
-// representation directly following x.
-// Return the unsigned int representation used for the conversion.
-// The behavior is undefined if the next valid representation is out of bounds.
-// Generic prototype:
-//   unsigned fppol<sz>_<monic>_set_next_ui(fppol<sz>_ptr r, unsigned x);
-#define __DEF_FPPOLxx_SET_NEXT_UI(sz, monic)                               \
+//   int fppol<sz>_set_ui(fppol<sz>_ptr r, unsigned x, unsigned n, unsigned m);
+#define __DEF_FPPOLxx_SET_UI(sz)                                           \
   static inline                                                            \
-  unsigned CAT(CAT(fppol##sz, SWITCH(monic, EMPTY, _monic)), _set_next_ui) \
-    (fppol##sz##_ptr r, unsigned x)                                        \
-  { CAT(CAT(__FP, SWITCH(monic, EMPTY, _MONIC)), _SET_UI)(sz, 1, r, x);    \
-    return x; }
+  int fppol##sz##_set_ui(fppol##sz##_ptr r, unsigned x,                    \
+                         MAYBE_UNUSED unsigned n, MAYBE_UNUSED unsigned m) \
+  { __FP_SET_UI(sz, r, x, n, m); return 1; }
 
 
 // All definitions bundled up into a single macro.
@@ -453,8 +399,6 @@ __DECL_FPPOLxx_ARITH_ALL(64)
         __DEF_FPPOLxx_SET_ZERO     (sz)     \
         __DEF_FPPOLxx_SET_ONE      (sz)     \
         __DEF_FPPOLxx_SET_TI       (sz)     \
-        __DEF_FPPOLxx_SET_MAX      (sz)     \
-        __DEF_FPPOLxx_MONIC_SET_MAX(sz)     \
         __DEF_FPPOLxx_SET          (sz)     \
         __DEF_FPPOLxx_SET_yy       (sz, 16) \
         __DEF_FPPOLxx_SET_yy       (sz, 32) \
@@ -478,16 +422,10 @@ __DECL_FPPOLxx_ARITH_ALL(64)
         __DEF_FPPOLxx_MUL_TI       (sz)     \
         __DEF_FPPOLxx_DIV_TI       (sz)     \
         __DEF_FPPOLxx_MOD_TI       (sz)     \
-        __DEF_FPPOLxx_GET_UI_MUL_TI(sz,  )  \
-        __DEF_FPPOLxx_GET_UI_MUL_TI(sz, 1)  \
-        __DEF_FPPOLxx_GET_UI       (sz,  )  \
-        __DEF_FPPOLxx_GET_UI       (sz, 1)  \
-        __DEF_FPPOLxx_GET_UI_MAX   (sz,  )  \
-        __DEF_FPPOLxx_GET_UI_MAX   (sz, 1)  \
-        __DEF_FPPOLxx_SET_UI       (sz,  )  \
-        __DEF_FPPOLxx_SET_UI       (sz, 1)  \
-        __DEF_FPPOLxx_SET_NEXT_UI  (sz,  )  \
-        __DEF_FPPOLxx_SET_NEXT_UI  (sz, 1)
+        __DEF_FPPOLxx_SET_NEXT     (sz,  )  \
+        __DEF_FPPOLxx_SET_NEXT     (sz, 1)  \
+        __DEF_FPPOLxx_GET_UI       (sz)     \
+        __DEF_FPPOLxx_SET_UI       (sz)
 
 __DEF_FPPOLxx_ARITH_ALL(16)
 __DEF_FPPOLxx_ARITH_ALL(32)
@@ -496,8 +434,6 @@ __DEF_FPPOLxx_ARITH_ALL(64)
 #undef __DEF_FPPOLxx_SET_ZERO
 #undef __DEF_FPPOLxx_SET_ONE
 #undef __DEF_FPPOLxx_SET_TI
-#undef __DEF_FPPOLxx_SET_MAX
-#undef __DEF_FPPOLxx_MONIC_SET_MAX
 #undef __DEF_FPPOLxx_SET
 #undef __DEF_FPPOLxx_SET_yy
 #undef __DEF_FPPOLxx_SET_yy
@@ -521,10 +457,9 @@ __DEF_FPPOLxx_ARITH_ALL(64)
 #undef __DEF_FPPOLxx_MUL_TI
 #undef __DEF_FPPOLxx_DIV_TI
 #undef __DEF_FPPOLxx_MOD_TI
+#undef __DEF_FPPOLxx_SET_NEXT
 #undef __DEF_FPPOLxx_GET_UI
-#undef __DEF_FPPOLxx_GET_UI_MAX
 #undef __DEF_FPPOLxx_SET_UI
-#undef __DEF_FPPOLxx_SET_NEXT_UI
 #undef __DEF_FPPOLxx_ARITH_ALL
 
 

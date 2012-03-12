@@ -32,9 +32,6 @@
 // One.
 #define __FP_ONE_0 1
 
-// Largest element in the base field.
-#define __FP_MAX_0 1
-
 // Conversion from integer.
 #define __FP_SET_Z_0(x) ((x) & 0x1)
 
@@ -63,7 +60,6 @@
 
 // Definition of all coefficient-wise operations.
 #define __FP_ONE(  sz, r)       __FP_OP(ONE,   sz, r, )
-#define __FP_MAX(  sz, r)       __FP_OP(MAX,   sz, r, )
 #define __FP_SET_Z(sz, r, x)    __FP_OP(SET_Z, sz, r, (x))
 #define __FP_OPP(  sz, r, p)    __FP_OP(OPP,   sz, r, (p[0]))
 #define __FP_ADD(  sz, r, p, q) __FP_OP(ADD,   sz, r, (p[0], q[0]))
@@ -74,22 +70,26 @@
 
 
 
-/* Integer conversions.
+/* Iteration and integer conversions.
  *****************************************************************************/
 
-// Conversion of a polynomial to an unsigned int, after a preliminary
-// multiplication by t^i.
-#define __FP_GET_UI(sz, r, p, i) \
-  do { r = (unsigned)p[0] << i; } while (0)
+// Next polynomial, in lexicographical order.
+#define __FP_SET_NEXT(sz, r, p, n) \
+  do { r[0] = p[0] + 1; } while (0)
 
-// Conversion of a polynomial from an unsigned int.
-#define __FP_SET_UI(sz, next, r, x) \
-  do { SWITCH(next, EMPTY, ++x;)    \
-       r[0] = (uint##sz##_t)x; } while (0)
+// Next monic polynomial, in lexicographical order.
+#define __FP_MONIC_SET_NEXT __FP_SET_NEXT
 
-// Conversions to/from an unsigned int in the case of monic polynomials.
-#define __FP_MONIC_GET_UI __FP_GET_UI
-#define __FP_MONIC_SET_UI __FP_SET_UI
+
+// Conversion of an (n+m)-term polynomial, whose m most significant
+// coefficients form a monic polynomial, to an unsigned int.
+#define __FP_GET_UI(sz, r, p, n, m) \
+  do { r = (unsigned)p[0]; } while (0)
+
+// Conversion of an (n+m)-term polynomial, whose m most significant
+// coefficients form a monic polynomial, from an unsigned int.
+#define __FP_SET_UI(sz, r, x, n, m) \
+  do { r[0] = (uint##sz##_t)x; } while (0)
 
 
 
