@@ -37,6 +37,12 @@ void fp_set(fp_ptr r, fp_srcptr p)
 { for (unsigned k = 0; k < __FP_BITS; ++k) r[k] = p[k]; }
 
 
+// Set from an integer.
+static inline
+void fp_set_z(fp_ptr r, int x)
+{ x %= __FP_CHAR; if (x < 0) x += __FP_CHAR; __FP_SET_Z(8, r, x); }
+
+
 // Test if zero.
 static inline
 int fp_is_zero(fp_srcptr p)
