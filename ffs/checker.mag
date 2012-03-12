@@ -121,9 +121,9 @@ function AllRelations(q, rho, I, J, fbb, threshold, lpb)
     Nrels := 0;
     for jj in [1..p^I-1] do
         j := PP ! Intseq(jj, p);
+        if not IsMonic(j) then continue; end if;
         for ii in [1..p^I-1] do
             i := PP ! Intseq(ii, p);
-            if not IsMonic(j) then continue; end if;
             if Degree(GCD(i,j)) ne 0 then continue; end if;
 
             Nf := Normf(i,j);
