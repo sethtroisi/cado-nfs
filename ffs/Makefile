@@ -10,17 +10,23 @@ WARNFLAGS = -Wall -Wextra -pedantic
 
 FFSREV = `./version.sh`
 
-GF2XPREFIX = #   /usr/local
-
-CPPFLAGS    =
-CFLAGS      = $(OPTFLAGS) $(WARNFLAGS) -std=c99   -g -DFFSREV=\"$(FFSREV)\" # -I$(GF2XPREFIX)/include -DHAVE_GF2X -mpclmul
+CPPFLAGS    = -DFFSREV=\"$(FFSREV)\"
+CFLAGS      = $(OPTFLAGS) $(WARNFLAGS) -std=c99   -g
 CXXFLAGS    = $(OPTFLAGS) $(WARNFLAGS) -std=c++0x -g
 TARGET_ARCH = -mtune=native -march=native 
-LDFLAGS     =  #-L$(GF2XPREFIX)/lib
-LDLIBS      = -lntl -lstdc++ # -lgf2x
+LDFLAGS     = 
+LDLIBS      = -lntl -lstdc++
 
 # Override variables in here!
 -include Makefile.local
+
+# Use GF2X?
+ifdef GF2XPREFIX
+  CPPFLAGS    += -I$(GF2XPREFIX)/include -DHAVE_GF2X
+  TARGET_ARCH += -mpclmul
+  LDFLAGS     += -L$(GF2XPREFIX)/lib
+  LDLIBS      += -lgf2x
+endif
 
 FIELDS = f2 f3
 f2_DEF = USE_F2
@@ -54,8 +60,8 @@ define BUILD_template
   $$($(1)_BIN): $$($(1)_OBJ) $$($(1)_BUILDDIR)/cofactor.o
 
   $$($(1)_DEP): $$(SRC) $$(INC) cofactor.cc cofactor.hh Makefile | $$($(1)_BUILDDIR)
-	$$(CC) $$(CFLAGS) $$(CPPFLAGS) $$($(1)_CPPFLAGS) -MM $$(SRC) cofactor.cc \
-	  | sed -e "s+^.*\.o:+$$($(1)_BUILDDIR)/&+" >$$@
+	$$(CC) $$(CFLAGS) $$(CPPFLAGS) $$($(1)_CPPFLAGS) $$(TARGET_ARCH) \
+	  -MM $$(SRC) cofactor.cc | sed -e "s+^.*\.o:+$$($(1)_BUILDDIR)/&+" >$$@
 
   clean::
 	rm -f $$($(1)_DEP) $$($(1)_OBJ) $$($(1)_BUILDDIR)/cofactor.o $$($(1)_BIN)
