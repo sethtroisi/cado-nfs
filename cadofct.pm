@@ -1005,6 +1005,12 @@ sub count_lines {
 # Returns the first line of a file.
 sub first_line {
     my ($f) = @_;
+    my $last = "";
+    if ($f =~ /\.gz$/) {
+            $last= cmd ("gzip -dc $f | tail -n 1" )->{'out'};
+            chomp $last;
+            return $last;
+    }
     open FILE, "< $f" or die "Cannot open `$f' for reading: $!.\n";
     $_ = <FILE>;
     close FILE;
@@ -1504,7 +1510,7 @@ my %tasks = (
 
     purge     => { name   => "singletons and cliques",
                    dep    => ['dup'],
-                   files  => ['purged', 'purge\.log'] },
+                   files  => ['purged\.gz', 'purge\.log'] },
 
     merge     => { name   => "merge",
                    dep    => ['purge'],
@@ -2266,7 +2272,7 @@ sub purge {
     my $cmd = cmd("$param{'bindir'}/filter/purge ".
                   "-poly $param{'prefix'}.poly -keep $param{'keeppurge'} ".
                   "-excess $param{'excessratio'} ".
-                  "-nrels $nbrels -out $param{'prefix'}.purged ".
+                  "-nrels $nbrels -out $param{'prefix'}.purged.gz ".
                   "-basepath $param{'wdir'} " .
                   "-subdirlist $param{'prefix'}.subdirlist ".
                   "-filelist $param{'prefix'}.filelist ".
@@ -2284,8 +2290,8 @@ sub do_purge {
     } else {
         info "Purge has already been done\n";
     }
-    # Get the number of rows and columns from the .purged file
-    my ($nrows, $ncols) = split / /, first_line("$param{'prefix'}.purged");
+    # Get the number of rows and columns from the .purged.gz file
+    my ($nrows, $ncols) = split / /, first_line("$param{'prefix'}.purged.gz");
     my $excess = $nrows - $ncols;
     $tab_level++;
     info "Nrows: $nrows; Ncols: $ncols; Excess: $excess.\n";
@@ -2680,7 +2686,7 @@ sub do_merge {
 
     my $cmd = "$param{'bindir'}/filter/merge ".
               "-out $param{'prefix'}.merge.his ".
-              "-mat $param{'prefix'}.purged ".
+              "-mat $param{'prefix'}.purged.gz ".
               "-forbw $param{'bwstrat'} ".
               "-coverNmax $param{'coverNmax'} ".
               "-keep $param{'keep'} ".
@@ -2718,7 +2724,7 @@ sub do_replay {
     my $cmd = "$param{'bindir'}/filter/replay ".
               "--binary " .
               "-skip $param{'skip'} " .
-              "-purged $param{'prefix'}.purged ".
+              "-purged $param{'prefix'}.purged.gz ".
               "-his $param{'prefix'}.merge.his ".
               "-index $param{'prefix'}.index ".
               "-out $param{'prefix'}.small.bin ".
@@ -2832,7 +2838,7 @@ sub do_chars {
 
     my $cmd = "$param{'bindir'}/linalg/characters ".
               "-poly $param{'prefix'}.poly ".
-              "-purged $param{'prefix'}.purged ".
+              "-purged $param{'prefix'}.purged.gz ".
               "-index $param{'prefix'}.index ".
               # Note: one can omit the -heavyblock option, but in that case
               # one should add -nratchars nnn (with nnn=16 for example) to fix
@@ -2897,7 +2903,7 @@ sub do_sqrt {
             "-poly $param{'prefix'}.poly ".
             "-prefix $param{'prefix'}.dep " .
             "-ab " .
-            "-purged $param{'prefix'}.purged ".
+            "-purged $param{'prefix'}.purged.gz ".
             "-index $param{'prefix'}.index ".
             "-ker $param{'prefix'}.ker ";
 
@@ -2917,7 +2923,7 @@ sub do_sqrt {
             "-prefix $param{'prefix'}.dep " .
             "-dep $numdep " .
             "-rat -alg -gcd " .
-            "-purged $param{'prefix'}.purged ".
+            "-purged $param{'prefix'}.purged.gz ".
             "-index $param{'prefix'}.index ".
             "-ker $param{'prefix'}.ker ".
             "> $f";
