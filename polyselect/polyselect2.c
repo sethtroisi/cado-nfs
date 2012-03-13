@@ -17,6 +17,7 @@
 #include "utils.h"
 #include "auxiliary.h"
 #include "murphyE.h"
+#include "ropt.h"
 
 // #define DEBUG
 #define NEW_ROOTSIEVE
@@ -27,7 +28,6 @@
 #define SPECIAL_Q {1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173, 179, 181, 191, 193, 197, 199, 211, 223, 227, 229, 233, 239, 241, 251, ULONG_MAX}
 
 extern int MAX_k;
-void rootsieve_polyselect ( mpz_t *f, int d, mpz_t m, mpz_t l, mpz_t N, int max_k, int verbose );
 
 /* hash table structure */
 typedef struct
@@ -336,7 +336,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 
 #ifdef NEW_ROOTSIEVE
 		  if (d > 4) {
-			   rootsieve_polyselect (f, d, m, g[1], N, MAX_k, 0); // verbose = 2 to see details.
+			   ropt_polyselect (f, d, m, g[1], N, MAX_k, 0); // verbose = 2 to see details.
 			   mpz_neg (g[0], m);
 		  }
 		  else {
