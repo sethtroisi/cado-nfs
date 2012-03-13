@@ -39,7 +39,7 @@ int factor_base_init(factor_base_ptr FB, const char *filename, unsigned maxdeg)
       alloc = alloc ? alloc * 2 : 256;
       FB->elts = (fbideal_t *)realloc(FB->elts, alloc*sizeof(fbideal_t));
       ASSERT_ALWAYS(FB->elts != NULL);
-      gothp = FB->elts + FB->n;
+      gothp = FB->elts[FB->n];
     }
 
     // Get p.
