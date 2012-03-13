@@ -69,6 +69,9 @@ int is_supported_compression_format(const char * s)
     return 0;
 }
 
+/* The pipe capacity is 2^16 by default, we can increase it, but it does not
+   seem to make a difference, thus we don't change it by default (patch from
+   Alain Filbois). */
 #define PIPE_CAPACITY 1UL << 20
 
 FILE*
@@ -88,9 +91,8 @@ fopen_compressed_r (const char * name, int* p_pipeflag, char const ** suf)
             f = popen(command, "r");
             free(command);
             if (p_pipeflag) *p_pipeflag = 1;
-#ifdef F_SETPIPE_SZ
-            /* increase the pipe capacity (2^16 by default), thanks to
-               Alain Filbois */
+            /* remove the 'xxx' to change the pipe capacity */
+#ifdef F_SETPIPE_SZxxx
             fcntl (fileno (f), F_SETPIPE_SZ, PIPE_CAPACITY);
 #endif
             return f;
@@ -120,7 +122,8 @@ fopen_compressed_w(const char * name, int* p_pipeflag, char const ** suf)
             f = popen(command, "w");
             free(command);
             if (p_pipeflag) *p_pipeflag = 1;
-#ifdef F_SETPIPE_SZ
+            /* remove the 'xxx' to change the pipe capacity */
+#ifdef F_SETPIPE_SZxxx
             /* increase the pipe capacity (2^16 by default), thanks to
                Alain Filbois */
             fcntl (fileno (f), F_SETPIPE_SZ, PIPE_CAPACITY);
