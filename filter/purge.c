@@ -832,6 +832,7 @@ usage (void)
   fprintf (stderr, "       -nprimes nnn - expected number of prime ideals\n");
   fprintf (stderr, "       -sos sosfile - to keep track of the renumbering\n");
   fprintf (stderr, "       -raw         - output relations in CADO format\n");
+  fprintf (stderr, "       -noclique n  - if n <> 0, don't do clique removal\n");
   exit (1);
 }
 
@@ -884,8 +885,6 @@ main (int argc, char **argv)
         if (strcmp(*argv, "--help") == 0)
             usage();
         break;
-        // fprintf (stderr, "Unknown option: %s\n", argv[0]);
-        // abort();
     }
 
     param_list_parse_uint(pl, "nrels", &nrelmax);
