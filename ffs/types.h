@@ -38,183 +38,196 @@
 # define      __ij_SIZE 32
 #endif
 
-// Known sizes.
-#define __fppol64_SIZE 64
-#define __fppol_SIZE
-
 
 
 /* Type aliases for sieve-related types.
  *****************************************************************************/
 
-#define __DECL_ALIAS_TYPE(type)                                    \
+#define __ALIAS_TYPE(type)                                         \
   typedef CAT(CAT(fppol, __##type##_SIZE), _t)      type##_t;      \
   typedef CAT(CAT(fppol, __##type##_SIZE), _ptr)    type##_ptr;    \
   typedef CAT(CAT(fppol, __##type##_SIZE), _srcptr) type##_srcptr;
 
-__DECL_ALIAS_TYPE(sq)
-__DECL_ALIAS_TYPE(ai)
-__DECL_ALIAS_TYPE(fbprime)
-__DECL_ALIAS_TYPE(ij)
+__ALIAS_TYPE(sq)
+__ALIAS_TYPE(ai)
+__ALIAS_TYPE(fbprime)
+__ALIAS_TYPE(ij)
 
-#undef __DECL_ALIAS_TYPE
+#undef __ALIAS_TYPE
 
 
 
 /* Function aliases for sieve-related types.
  *****************************************************************************/
 
-// Helper constants for tests.
+// Size of know polynomial types.
+#define __fppol16_SIZE 16
+#define __fppol32_SIZE 32
+#define __fppol64_SIZE 64
+#define   __fppol_SIZE
+
+// Get type and size for function arguments.
+#undef  IS_NUM
+#undef  IS_MP
+#define __16_IS_NUM ,
+#define __32_IS_NUM ,
+#define __64_IS_NUM ,
+#define __mp_IS_MP  ,
+#define __ARG_TYPE(t) IF(t, IS_MP, fppol, IF(t, IS_NUM, fppol##t, t))
+#define __ARG_SIZE(t) IF(t, IS_MP, mp,    IF(t, IS_NUM, t, __##t##_SIZE))
+
+// No return statement when return type is void.
+#undef  NO_RETURN
 #define __void_NO_RETURN ,
-#define __char_ptr_TYPE  , char *
+
+// Make type name out of some common abbreviations.
+#undef  TYPE
+#define    __FILE_ptr_TYPE(...)   , FILE *
+#define    __char_ptr_TYPE(...)   , char *
+#define __char_srcptr_TYPE(...)   , const char *
+#define    ___ptr_TYPE(t, ...)    ,  t##_ptr
+#define ___srcptr_TYPE(t, ...)    ,  t##_srcptr
+#define     ___tp_TYPE(t, tp, tq) , tp##_srcptr
+#define     ___tq_TYPE(t, tp, tq) , tq##_srcptr
+#define __GET_TYPE(type, ...) SWITCH(type, TYPE(__VA_ARGS__), type)
 
 // Helper macros for lists of arguments.
-#define __ARGS_PROTO(type, n) type arg##n
-#define __ARGS_CALL( type, n) arg##n
+#define __ARGS_PROTO(ctx, type, n) __GET_TYPE(type, EXPAND(ctx)) arg##n
+#define __ARGS_CALL( ctx, type, n) arg##n
 
 
 // Generic alias for fppol<sz>_<fun> functions.
-#define __DECL_ALIAS_FUN(ret, type, fun, ...)           \
-  static inline                                         \
-  SWITCH(ret, TYPE, ret)                                \
-  type##_##fun(FOR_ALL_ARGS(__ARGS_PROTO, __VA_ARGS__)) \
-  { IF(ret, NO_RETURN, , return)                        \
-    CAT(CAT(fppol, __##type##_SIZE), _##fun)            \
-    (FOR_ALL_ARGS(__ARGS_CALL, __VA_ARGS__)); }
-
+#define __ALIAS_FUN(ret, type, fun, ...)                       \
+  static inline                                                \
+  __GET_TYPE(ret, type, )                                      \
+  type##_##fun(FOR_ALL(__ARGS_PROTO, (type, , ), __VA_ARGS__)) \
+  { IF(ret, NO_RETURN, , return)                               \
+    CAT(CAT(fppol, __##type##_SIZE), _##fun)                   \
+      (FOR_ALL(__ARGS_CALL, , __VA_ARGS__)); }
 
 // Generic alias for fppol<sz>_<fun>_<sp> functions.
-#define __DECL_ALIAS_FUN1(ret, type, fun, tp, ...)                  \
-  static inline                                                     \
-  SWITCH(ret, TYPE, ret)                                            \
-  type##_##fun##_##tp(FOR_ALL_ARGS(__ARGS_PROTO, __VA_ARGS__))      \
-  { IF(ret, NO_RETURN, , return)                                    \
-    CAT(CAT(fppol, __##type##_SIZE), CAT(_##fun##_, __##tp##_SIZE)) \
-    (FOR_ALL_ARGS(__ARGS_CALL, __VA_ARGS__)); }
-
+#define __ALIAS_FUN1(ret, type, fun, tp, ...)                        \
+  static inline                                                      \
+  __GET_TYPE(ret, type, __ARG_TYPE(tp), )                            \
+  type##_##fun##_##tp                                                \
+    (FOR_ALL(__ARGS_PROTO, (type, __ARG_TYPE(tp), ), __VA_ARGS__))   \
+  { IF(ret, NO_RETURN, , return)                                     \
+    CAT(CAT(fppol, __##type##_SIZE), CAT(_##fun##_, __ARG_SIZE(tp))) \
+      (FOR_ALL(__ARGS_CALL, , __VA_ARGS__)); }
 
 // Generic alias for fppol<sz>_<fun>_<sp>x<sq> functions.
-#define __DECL_ALIAS_FUN2(ret, type, fun, tp, tq, ...)                \
-  static inline                                                       \
-  SWITCH(ret, TYPE, ret)                                              \
-  type##_##fun##_##tp##x##tq(FOR_ALL_ARGS(__ARGS_PROTO, __VA_ARGS__)) \
-  { IF(ret, NO_RETURN, , return)                                      \
-    CAT(CAT(fppol, __##type##_SIZE),                                  \
-        CAT(CAT(_##fun##_, __##tp##_SIZE), CAT(x, __##tq##_SIZE)))    \
-    (FOR_ALL_ARGS(__ARGS_CALL, __VA_ARGS__)); }
+#define __ALIAS_FUN2(ret, type, fun, tp, tq, ...)                    \
+  static inline                                                      \
+  __GET_TYPE(ret, type, __ARG_TYPE(tp), __ARG_TYPE(tq))              \
+  type##_##fun##_##tp##x##tq                                         \
+    (FOR_ALL(__ARGS_PROTO, (type, __ARG_TYPE(tp), __ARG_TYPE(tq)),   \
+             __VA_ARGS__))                                           \
+  { IF(ret, NO_RETURN, , return)                                     \
+    CAT(CAT(fppol, __##type##_SIZE),                                 \
+        CAT(CAT(_##fun##_, __ARG_SIZE(tp)), CAT(x, __ARG_SIZE(tq)))) \
+      (FOR_ALL(__ARGS_CALL, , __VA_ARGS__)); }
 
+// Aliases for multiplication.
+#define __ALIAS_MUL(type)                                    \
+    __ALIAS_FUN (void, type, mul,    _ptr, _srcptr, _srcptr) \
+    __ALIAS_FUN (void, type, addmul, _ptr, _srcptr, _srcptr) \
+    __ALIAS_FUN (void, type, submul, _ptr, _srcptr, _srcptr)
 
-#define __DECL_ALIAS_MUL(type)                                          \
-    __DECL_ALIAS_FUN (void, type, mul,    type##_ptr,                   \
-                                          type##_srcptr, type##_srcptr) \
-    __DECL_ALIAS_FUN (void, type, addmul, type##_ptr,                   \
-                                          type##_srcptr, type##_srcptr) \
-    __DECL_ALIAS_FUN (void, type, submul, type##_ptr,                   \
-                                          type##_srcptr, type##_srcptr)
+#define __ALIAS_MUL1(type, tp)                               \
+    __ALIAS_FUN1(void, type, mul,    tp, _ptr, _srcptr, _tp) \
+    __ALIAS_FUN1(void, type, addmul, tp, _ptr, _srcptr, _tp) \
+    __ALIAS_FUN1(void, type, submul, tp, _ptr, _srcptr, _tp)
 
-#define __DECL_ALIAS_MUL_yy(type, tp)                                     \
-    __DECL_ALIAS_FUN1(void, type, mul,    tp, type##_ptr,                 \
-                                              type##_srcptr, tp##_srcptr) \
-    __DECL_ALIAS_FUN1(void, type, addmul, tp, type##_ptr,                 \
-                                              type##_srcptr, tp##_srcptr) \
-    __DECL_ALIAS_FUN1(void, type, submul, tp, type##_ptr,                 \
-                                              type##_srcptr, tp##_srcptr)
-
-#define __DECL_ALIAS_MUL_yyxzz(type, tp, tq)                                \
-    __DECL_ALIAS_FUN2(void, type, mul,    tp, tq, type##_ptr,               \
-                                                  tp##_srcptr, tq##_srcptr) \
-    __DECL_ALIAS_FUN2(void, type, addmul, tp, tq, type##_ptr,               \
-                                                  tp##_srcptr, tq##_srcptr) \
-    __DECL_ALIAS_FUN2(void, type, submul, tp, tq, type##_ptr,               \
-                                                  tp##_srcptr, tq##_srcptr)
+#define __ALIAS_MUL2(type, tp, tq)                           \
+    __ALIAS_FUN2(void, type, mul,    tp, tq, _ptr, _tp, _tq) \
+    __ALIAS_FUN2(void, type, addmul, tp, tq, _ptr, _tp, _tq) \
+    __ALIAS_FUN2(void, type, submul, tp, tq, _ptr, _tp, _tq)
 
 
 // All function aliases bundled up into a single macro.
-#define __DECL_ALIAS_ALL(type)                                                \
-  __DECL_ALIAS_FUN (void, type, set_zero,       type##_ptr)                   \
-  __DECL_ALIAS_FUN (void, type, set_one,        type##_ptr)                   \
-  __DECL_ALIAS_FUN (void, type, set_ti,         type##_ptr,    unsigned)      \
-  __DECL_ALIAS_FUN (void, type, set,            type##_ptr,    type##_srcptr) \
-  __DECL_ALIAS_FUN (int,  type, set_64,         type##_ptr,    fppol64_srcptr)\
-  __DECL_ALIAS_FUN1(int,  type, set,    sq,     type##_ptr,    sq_srcptr)     \
-  __DECL_ALIAS_FUN1(int,  type, set,    ai,     type##_ptr,    ai_srcptr)     \
-  __DECL_ALIAS_FUN1(int,  type, set,    fbprime,type##_ptr,    fbprime_srcptr)\
-  __DECL_ALIAS_FUN1(int,  type, set,    ij,     type##_ptr,    ij_srcptr)     \
-  __DECL_ALIAS_FUN (int,  type, set_mp,         type##_ptr,    fppol_srcptr)  \
-  __DECL_ALIAS_FUN1(void, fppol64,set,  type,   fppol64_ptr,   type##_srcptr) \
-  __DECL_ALIAS_FUN1(void, fppol,  set,  type,   fppol_ptr,     type##_srcptr) \
-  __DECL_ALIAS_FUN (void, type, swap,           type##_ptr,    type##_ptr)    \
-  __DECL_ALIAS_FUN (void, type, get_coeff,      fp_ptr,                       \
-                                                type##_srcptr, unsigned)      \
-  __DECL_ALIAS_FUN (void, type, set_coeff,      type##_ptr,                   \
-                                                fp_srcptr,     unsigned)      \
-  __DECL_ALIAS_FUN (int,  type, is_zero,        type##_srcptr)                \
-  __DECL_ALIAS_FUN (int,  type, eq,             type##_srcptr, type##_srcptr) \
-  __DECL_ALIAS_FUN (int,  type, is_monic,       type##_srcptr)                \
-  __DECL_ALIAS_FUN (int,  type, is_valid,       type##_srcptr)                \
-  __DECL_ALIAS_FUN (void, type, opp,            type##_ptr,    type##_srcptr) \
-  __DECL_ALIAS_FUN (void, type, add,            type##_ptr,                   \
-                                                type##_srcptr, type##_srcptr) \
-  __DECL_ALIAS_FUN (void, type, sub,            type##_ptr,                   \
-                                                type##_srcptr, type##_srcptr) \
-  __DECL_ALIAS_FUN (void, type, mul_ti,         type##_ptr,                   \
-                                                type##_srcptr, unsigned)      \
-  __DECL_ALIAS_FUN (void, type, div_ti,         type##_ptr,                   \
-                                                type##_srcptr, unsigned)      \
-  __DECL_ALIAS_FUN (void, type, mod_ti,         type##_ptr,                   \
-                                                type##_srcptr, unsigned)      \
-  __DECL_ALIAS_FUN (void, type, add_disjoint,   type##_ptr,                   \
-                                                type##_srcptr, type##_srcptr) \
-  __DECL_ALIAS_FUN (int,      type, deg,        type##_srcptr)                \
-  __DECL_ALIAS_FUN (char_ptr, type, get_str,    char *,        type##_srcptr) \
-  __DECL_ALIAS_FUN (int,      type, set_str,    type##_ptr,    const char *)  \
-  __DECL_ALIAS_FUN (void,     type, out,        FILE *,        type##_srcptr) \
-  __DECL_ALIAS_FUN (int,      type, inp,        type##_ptr,    FILE *)        \
-  __DECL_ALIAS_FUN (int,      type,       set_next, type##_ptr, type##_srcptr,\
-                                                    unsigned)                 \
-  __DECL_ALIAS_FUN (int,      type, monic_set_next, type##_ptr, type##_srcptr,\
-                                                    unsigned)                 \
-  __DECL_ALIAS_FUN (unsigned, type,       get_ui,   type##_srcptr,            \
-                                                    unsigned, unsigned)       \
-  __DECL_ALIAS_FUN (int,      type,       set_ui,   type##_ptr, unsigned,     \
-                                                    unsigned, unsigned)       \
-  __DECL_ALIAS_MUL      (type)                                                \
-  __DECL_ALIAS_MUL_yy   (fppol, type)                                         \
-  __DECL_ALIAS_MUL_yyxzz(fppol, type, sq)                                     \
-  __DECL_ALIAS_MUL_yyxzz(fppol, type, ai)                                     \
-  __DECL_ALIAS_MUL_yyxzz(fppol, type, fbprime)                                \
-  __DECL_ALIAS_MUL_yyxzz(fppol, type, ij)                                     \
-  __DECL_ALIAS_FUN (int,  type, divrem,         type##_ptr,    type##_ptr,    \
-                                                type##_srcptr, type##_srcptr) \
-  __DECL_ALIAS_FUN (int,  type, div,            type##_ptr,                   \
-                                                type##_srcptr, type##_srcptr) \
-  __DECL_ALIAS_FUN (int,  type, rem,            type##_ptr,                   \
-                                                type##_srcptr, type##_srcptr) \
-  __DECL_ALIAS_FUN (void, type, multmod,        type##_ptr,                   \
-                                                type##_srcptr, type##_srcptr) \
-  __DECL_ALIAS_FUN (void, type, mulmod,         type##_ptr,    type##_srcptr, \
-                                                type##_srcptr, type##_srcptr) \
-  __DECL_ALIAS_FUN (int,  type, invmod,         type##_ptr,                   \
-                                                type##_srcptr, type##_srcptr) \
-  __DECL_ALIAS_FUN (void, type, gcd,            type##_ptr,                   \
-                                                type##_srcptr, type##_srcptr)
+#define __ALIAS_FUN_ALL(type)                                                 \
+  __ALIAS_FUN (void,     type, set_zero,       _ptr)                          \
+  __ALIAS_FUN (void,     type, set_one,        _ptr)                          \
+  __ALIAS_FUN (void,     type, set_ti,         _ptr, unsigned)                \
+  __ALIAS_FUN (void,     type, set,            _ptr, _srcptr)                 \
+  __ALIAS_FUN1(int,      type, set, sq,        _ptr, _tp)                     \
+  __ALIAS_FUN1(int,      type, set, ai,        _ptr, _tp)                     \
+  __ALIAS_FUN1(int,      type, set, fbprime,   _ptr, _tp)                     \
+  __ALIAS_FUN1(int,      type, set, ij,        _ptr, _tp)                     \
+  __ALIAS_FUN1(int,      type, set, 16,        _ptr, _tp)                     \
+  __ALIAS_FUN1(int,      type, set, 32,        _ptr, _tp)                     \
+  __ALIAS_FUN1(int,      type, set, 64,        _ptr, _tp)                     \
+  __ALIAS_FUN1(int,      type, set, mp,        _ptr, _tp)                     \
+  __ALIAS_FUN1(int,   fppol16, set, type,      _ptr, _tp)                     \
+  __ALIAS_FUN1(int,   fppol32, set, type,      _ptr, _tp)                     \
+  __ALIAS_FUN1(int,   fppol64, set, type,      _ptr, _tp)                     \
+  __ALIAS_FUN1(void,    fppol, set, type,      _ptr, _tp)                     \
+  __ALIAS_FUN (void,     type, swap,           _ptr, _ptr)                    \
+  __ALIAS_FUN (void,     type, get_coeff,      fp_ptr, _srcptr, unsigned)     \
+  __ALIAS_FUN (void,     type, set_coeff,      _ptr, fp_srcptr, unsigned)     \
+  __ALIAS_FUN (int,      type, is_zero,        _srcptr)                       \
+  __ALIAS_FUN (int,      type, eq,             _srcptr, _srcptr)              \
+  __ALIAS_FUN (int,      type, is_monic,       _srcptr)                       \
+  __ALIAS_FUN (int,      type, is_valid,       _srcptr)                       \
+  __ALIAS_FUN (void,     type, opp,            _ptr, _srcptr)                 \
+  __ALIAS_FUN (void,     type, add,            _ptr, _srcptr, _srcptr)        \
+  __ALIAS_FUN (void,     type, sub,            _ptr, _srcptr, _srcptr)        \
+  __ALIAS_FUN (void,     type, mul_ti,         _ptr, _srcptr, unsigned)       \
+  __ALIAS_FUN (void,     type, div_ti,         _ptr, _srcptr, unsigned)       \
+  __ALIAS_FUN (void,     type, mod_ti,         _ptr, _srcptr, unsigned)       \
+  __ALIAS_FUN (void,     type, add_disjoint,   _ptr, _srcptr, _srcptr)        \
+  __ALIAS_FUN (int,      type, divrem,   _ptr, _ptr, _srcptr, _srcptr)        \
+  __ALIAS_FUN (int,      type, div,            _ptr, _srcptr, _srcptr)        \
+  __ALIAS_FUN (int,      type, rem,            _ptr, _srcptr, _srcptr)        \
+  __ALIAS_FUN (void,     type, multmod,        _ptr, _srcptr, _srcptr)        \
+  __ALIAS_FUN (void,     type, mulmod,         _ptr, _srcptr, _srcptr,_srcptr)\
+  __ALIAS_FUN (int,      type, invmod,         _ptr, _srcptr, _srcptr)        \
+  __ALIAS_FUN (void,     type, gcd,            _ptr, _srcptr, _srcptr)        \
+  __ALIAS_FUN (int,      type, deg,            _srcptr)                       \
+  __ALIAS_FUN (int,      type, set_next,       _ptr, _srcptr, unsigned)       \
+  __ALIAS_FUN (int,      type, monic_set_next, _ptr, _srcptr, unsigned)       \
+  __ALIAS_FUN (unsigned, type, get_ui,         _srcptr,  unsigned, unsigned)  \
+  __ALIAS_FUN (int,      type, set_ui,   _ptr, unsigned, unsigned, unsigned)  \
+  __ALIAS_FUN (char_ptr, type, get_str,        char_ptr, _srcptr)             \
+  __ALIAS_FUN (int,      type, set_str,        _ptr,     char_srcptr)         \
+  __ALIAS_FUN (void,     type, out,            FILE_ptr, _srcptr)             \
+  __ALIAS_FUN (int,      type, inp,            _ptr,     FILE_ptr)            \
+  __ALIAS_MUL (          type)                                                \
+  __ALIAS_MUL1(         fppol, type)                                          \
+  __ALIAS_MUL2(         fppol, type, sq)                                      \
+  __ALIAS_MUL2(         fppol, type, ai)                                      \
+  __ALIAS_MUL2(         fppol, type, fbprime)                                 \
+  __ALIAS_MUL2(         fppol, type, ij)
 
-__DECL_ALIAS_ALL(sq)
-__DECL_ALIAS_ALL(ai)
-__DECL_ALIAS_ALL(fbprime)
-__DECL_ALIAS_ALL(ij)
+__ALIAS_FUN_ALL(sq)
+__ALIAS_FUN_ALL(ai)
+__ALIAS_FUN_ALL(fbprime)
+__ALIAS_FUN_ALL(ij)
 
+#undef __16_IS_NUM
+#undef __32_IS_NUM
+#undef __64_IS_NUM
+#undef __mp_IS_MP
 #undef __void_NO_RETURN
-#undef __char_ptr_TYPE
+#undef    __FILE_ptr_TYPE
+#undef    __char_ptr_TYPE
+#undef __char_srcptr_TYPE
+#undef    ___ptr_TYPE
+#undef ___srcptr_TYPE
+#undef     ___tp_TYPE
+#undef     ___tq_TYPE
+#undef __ARG_TYPE
+#undef __ARG_SIZE
+#undef __GET_TYPE
 #undef __ARGS_PROTO
 #undef __ARGS_CALL
-#undef __DECL_ALIAS_FUN
-#undef __DECL_ALIAS_FUN1
-#undef __DECL_ALIAS_FUN2
-#undef __DECL_ALIAS_MUL_yy
-#undef __DECL_ALIAS_MUL_yyxzz
-#undef __DECL_ALIAS_ALL
-
+#undef __ALIAS_FUN
+#undef __ALIAS_FUN1
+#undef __ALIAS_FUN2
+#undef __ALIAS_MUL
+#undef __ALIAS_MUL1
+#undef __ALIAS_MUL2
+#undef __ALIAS_FUN_ALL
 
 
 

@@ -8,21 +8,26 @@
 #define   CAT(x, y) __CAT(x, y)
 
 
+// Expand a tuple.
+#define __EXPAND(...) __VA_ARGS__
+#define   EXPAND(l)   __EXPAND l
+
+
 // Count the number of arguments (up to 4).
 #define __NUM_ARGS(x4, x3, x2, x1, n, ...) n
 #define   NUM_ARGS(...) __NUM_ARGS(__VA_ARGS__, 4, 3, 2, 1, 0, )
 
 
 // Apply macro <f> to a list of arguments.
-#define __FOR_ALL_ARGS_0(f)
-#define __FOR_ALL_ARGS_1(f, a)      f(a, 1)
-#define __FOR_ALL_ARGS_2(f, a, ...) f(a, 2), __FOR_ALL_ARGS_1(f, __VA_ARGS__)
-#define __FOR_ALL_ARGS_3(f, a, ...) f(a, 3), __FOR_ALL_ARGS_2(f, __VA_ARGS__)
-#define __FOR_ALL_ARGS_4(f, a, ...) f(a, 4), __FOR_ALL_ARGS_3(f, __VA_ARGS__)
-#define __FOR_ALL_ARGS2(n, f, ...)  __FOR_ALL_ARGS_##n(f, __VA_ARGS__)
-#define __FOR_ALL_ARGS1(n, f, ...)  __FOR_ALL_ARGS2(n, f, __VA_ARGS__)
-#define   FOR_ALL_ARGS(f, ...)      __FOR_ALL_ARGS1(NUM_ARGS(__VA_ARGS__), \
-                                                    f, __VA_ARGS__)
+#define __FOR_ALL_0(f, a)
+#define __FOR_ALL_1(f, a, x)      f(a, x, 1)
+#define __FOR_ALL_2(f, a, x, ...) f(a, x, 2), __FOR_ALL_1(f, a, __VA_ARGS__)
+#define __FOR_ALL_3(f, a, x, ...) f(a, x, 3), __FOR_ALL_2(f, a, __VA_ARGS__)
+#define __FOR_ALL_4(f, a, x, ...) f(a, x, 4), __FOR_ALL_3(f, a, __VA_ARGS__)
+#define __FOR_ALL2(n, f, a, ...)  __FOR_ALL_##n(f, a, __VA_ARGS__)
+#define __FOR_ALL1(n, f, a, ...)  __FOR_ALL2(n, f, a, __VA_ARGS__)
+#define   FOR_ALL(f, a, ...)      __FOR_ALL1(NUM_ARGS(__VA_ARGS__), \
+                                             f, a, __VA_ARGS__)
 
 
 // Return <then> if __<var>_<cond> is defined to "," (a single comma),
@@ -39,8 +44,11 @@
 
 
 // Useful conditions.
+#undef  EMPTY
 #define ___EMPTY       ,
 
+#undef  EQ
+#undef  LE
 #define __CMP_2_2_EQ   ,
 #define __CMP_16_16_EQ ,
 #define __CMP_32_32_EQ ,

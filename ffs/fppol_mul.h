@@ -13,10 +13,12 @@
  *****************************************************************************/
 
 // Operations for addmul and submul variants.
+#undef  OP
 #define __add_OP(r, p) , add(r, r, p)
 #define __sub_OP(r, p) , sub(r, r, p)
 
 // Size of multiplication.
+#undef  SIZE
 #define __MUL_16x16_SIZE ,  32
 #define __MUL_32x16_SIZE ,  64
 #define __MUL_32x32_SIZE ,  64
