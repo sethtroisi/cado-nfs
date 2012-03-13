@@ -190,7 +190,7 @@ main (int argc, char *argv[])
 
     purgedfile_stream ps;
     purgedfile_stream_init(ps);
-    purgedfile_stream_openfile(ps, purgedname);
+    purgedfile_stream_openfile (ps, purgedname);
 
     mat->nrows = ps->nrows;
     mat->ncols = ps->ncols;
@@ -212,7 +212,10 @@ main (int argc, char *argv[])
     tt = seconds ();
     filter_matrix_read_weights (mat, ps);
     fprintf (stderr, "Getting column weights took %2.2lf\n", seconds () - tt);
-    purgedfile_stream_rewind(ps);
+    /* note: we can't use purgedfile_stream_rewind on a compressed file,
+       thus we close and reopen */
+    purgedfile_stream_closefile (ps);
+    purgedfile_stream_openfile (ps, purgedname);
 
     /* print weight counts */
     {
@@ -263,6 +266,8 @@ main (int argc, char *argv[])
 	    (uint64_t) mat->rem_nrows * (uint64_t) mat->weight);
     MkzClose (mat);
     clearMat (mat);
+    purgedfile_stream_closefile (ps);
+    purgedfile_stream_clear (ps);
 
     fprintf (stderr, "Total merge time: %1.0f seconds\n", seconds ());
 
