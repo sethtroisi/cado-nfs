@@ -97,6 +97,7 @@ main (int argc, char *argv[])
     int wmstmax = 7; /* use real MST minimum for wt[j] <= wmstmax */
     int mkztype = 1; /* pure Markowitz */
     int itermax = 0;
+    double wct0 = wct_seconds ();
 
     /* print comand-line arguments */
     fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
@@ -264,6 +265,8 @@ main (int argc, char *argv[])
     clearMat (mat);
 
     fprintf (stderr, "Total merge time: %1.0f seconds\n", seconds ());
+
+    print_timing_and_memory (wct0);
 
     return 0;
 }
