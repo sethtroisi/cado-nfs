@@ -22,10 +22,9 @@ LDLIBS      = -lntl -lstdc++
 
 # Use GF2X?
 ifdef GF2XPREFIX
-  CPPFLAGS    += -I$(GF2XPREFIX)/include -DHAVE_GF2X
-  TARGET_ARCH += -mpclmul
-  LDFLAGS     += -L$(GF2XPREFIX)/lib
-  LDLIBS      += -lgf2x
+  CPPFLAGS += -I$(GF2XPREFIX)/include -DHAVE_GF2X
+  LDFLAGS  += -L$(GF2XPREFIX)/lib
+  LDLIBS   += -lgf2x
 endif
 
 FIELDS = f2 f3
