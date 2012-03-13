@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+
 
 #include "macros.h"
 #include "gzip.h"
@@ -66,21 +69,30 @@ int is_supported_compression_format(const char * s)
     return 0;
 }
 
-FILE * fopen_compressed_r(const char * name, int* p_pipeflag, char const ** suf)
+#define PIPE_CAPACITY 1UL << 20
+
+FILE*
+fopen_compressed_r (const char * name, int* p_pipeflag, char const ** suf)
 {
     const struct suffix_handler * r = supported_compression_formats;
     FILE * f;
+
     for( ; r->suffix ; r++) {
         if (!has_suffix(name, r->suffix))
             continue;
         if (suf) *suf = r->suffix;
-        if (r->pfmt_in) {
+        if (r->pfmt_in) { /* this suffix has an associated deflate command */
             char * command;
             int ret = asprintf(&command, r->pfmt_in, name);
             ASSERT_ALWAYS(ret >= 0);
             f = popen(command, "r");
             free(command);
             if (p_pipeflag) *p_pipeflag = 1;
+#ifdef F_SETPIPE_SZ
+            /* increase the pipe capacity (2^16 by default), thanks to
+               Alain Filbois */
+            fcntl (fileno (f), F_SETPIPE_SZ, PIPE_CAPACITY);
+#endif
             return f;
         } else {
             f = fopen(name, "r");
@@ -91,21 +103,28 @@ FILE * fopen_compressed_r(const char * name, int* p_pipeflag, char const ** suf)
     return NULL;
 }
 
-FILE * fopen_compressed_w(const char * name, int* p_pipeflag, char const ** suf)
+FILE*
+fopen_compressed_w(const char * name, int* p_pipeflag, char const ** suf)
 {
     const struct suffix_handler * r = supported_compression_formats;
     FILE * f;
+
     for( ; r->suffix ; r++) {
         if (!has_suffix(name, r->suffix))
             continue;
         if (suf) *suf = r->suffix;
-        if (r->pfmt_out) {
+        if (r->pfmt_out) { /* suffix has an associated compression command */
             char * command;
             int ret = asprintf(&command, r->pfmt_out, name);
             ASSERT_ALWAYS(ret >= 0);
             f = popen(command, "w");
             free(command);
             if (p_pipeflag) *p_pipeflag = 1;
+#ifdef F_SETPIPE_SZ
+            /* increase the pipe capacity (2^16 by default), thanks to
+               Alain Filbois */
+            fcntl (fileno (f), F_SETPIPE_SZ, PIPE_CAPACITY);
+#endif
             return f;
         } else {
             f = fopen(name, "w");
