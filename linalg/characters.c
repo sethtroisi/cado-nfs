@@ -203,6 +203,7 @@ static alg_prime_t * create_characters(int nchars, int nratchars, cado_poly pol)
 
     int nchars2 = iceildiv(nchars, 64) * 64;
 
+    mpz_init (pp);
     roots = malloc(pol->alg->degree * sizeof(unsigned long));
 
     alg_prime_t * chars = malloc(nchars2 * sizeof(alg_prime_t));
@@ -223,7 +224,7 @@ static alg_prime_t * create_characters(int nchars, int nratchars, cado_poly pol)
     /* Rational characters. Normally we have none. But the -nratchars
      * option inserts some */
     /* we want some prime beyond the (rational) large prime bound */
-    mpz_init_set_ui (pp, 1UL << pol->rat->lpb);
+    mpz_set_ui (pp, 1UL << pol->rat->lpb);
     for(int i = 3 ; i < 3 + nratchars && i < nchars ; ) {
         mpz_nextprime(pp, pp);
         p = mpz_get_ui(pp);
@@ -234,7 +235,7 @@ static alg_prime_t * create_characters(int nchars, int nratchars, cado_poly pol)
         }
     }
     /* we want some prime beyond the (algebraic) large prime bound */
-    mpz_init_set_ui (pp, 1UL << pol->alg->lpb);
+    mpz_set_ui (pp, 1UL << pol->alg->lpb);
     for(int i = 3 + nratchars ; i < nchars ; ) {
         mpz_nextprime(pp, pp);
         p = mpz_get_ui(pp);
