@@ -1079,6 +1079,7 @@ void create_dependencies(const char * prefix, const char * indexname, const char
         fclose(dep_files[i]);
         free(dep_names[i]);
     }
+    free (abs);
 }
 
 
