@@ -4,7 +4,7 @@ add_definitions(-DWITH_MPI)
 endif (${WITH_MPI})
 
 add_executable(sqrt sqrt.c)
-target_link_libraries(sqrt utils m)
+target_link_libraries(sqrt utils)
 
 install(TARGETS sqrt RUNTIME DESTINATION bin/sqrt)
 
@@ -20,7 +20,7 @@ add_definitions(-DWITH_PTHREADS)
 if (HAVE_CABSL)
 add_executable(crtalgsqrt ${EXCLUDE_FROM_RELEASE_BUILD} crtalgsqrt.c powers_of_p.cpp
     polyroots.c knapsack.c)
-target_link_libraries(crtalgsqrt utils m ${pthread_libs})
+target_link_libraries(crtalgsqrt utils ${pthread_libs})
 
 set_target_properties(crtalgsqrt PROPERTIES
     COMPILE_FLAGS "--mpi"

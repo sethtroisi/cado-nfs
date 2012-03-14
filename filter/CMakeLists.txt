@@ -1,14 +1,15 @@
+# the utils library is already linked with -lgmp and -lm
 add_executable(dup1 dup1.c)
-target_link_libraries(dup1 utils m)
+target_link_libraries(dup1 utils)
 
 add_executable(dup2 dup2.c)
-target_link_libraries(dup2 utils m)
+target_link_libraries(dup2 utils)
 
 add_executable(purge purge.c)
-target_link_libraries(purge utils m)
+target_link_libraries(purge utils)
 
 add_executable(merge merge.c markowitz.c mst.c report.c merge_mono.c filter_matrix.c sparse.c)
-target_link_libraries(merge utils m)
+target_link_libraries(merge utils)
 
 add_executable(replay replay.c sparse.c)
 target_link_libraries(replay utils)

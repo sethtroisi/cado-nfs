@@ -10,14 +10,15 @@ add_executable (polyselect2l polyselect2l.c rootsieve5.c)
 add_executable (twoquadratics twoquadratics.c)
 add_executable (polyopt polyopt.c)
 
-target_link_libraries (polyselect_common utils gmp)
-target_link_libraries (polyselect polyselect_common utils m)
-target_link_libraries (twoquadratics polyselect_common utils m gmp)
-target_link_libraries (rotate polyselect_common utils m)
-target_link_libraries (rotate_all polyselect_common utils m)
-target_link_libraries (polyselect2 polyselect_common utils m ${pthread_libs})
-target_link_libraries (polyselect2l polyselect_common utils m ${pthread_libs})
-target_link_libraries (polyopt polyselect_common utils m gmp)
+# the utils library already includes -lgmp and -lm
+target_link_libraries (polyselect_common utils)
+target_link_libraries (polyselect polyselect_common utils)
+target_link_libraries (twoquadratics polyselect_common utils)
+target_link_libraries (rotate polyselect_common utils)
+target_link_libraries (rotate_all polyselect_common utils)
+target_link_libraries (polyselect2 polyselect_common utils ${pthread_libs})
+target_link_libraries (polyselect2l polyselect_common utils ${pthread_libs})
+target_link_libraries (polyopt polyselect_common utils)
 
 install(TARGETS polyselect_common DESTINATION lib/${package_basename})
 install(TARGETS polyselect rotate rotate_all polyselect2 RUNTIME
