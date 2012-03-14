@@ -59,6 +59,24 @@ int fp_is_one(fp_srcptr p)
   return p[0] == 1 && !t; }
 
 
+// Opposite.
+static inline
+void fp_opp(fp_ptr r, fp_srcptr p)
+{ __FP_OPP(8, r, p); }
+
+
+// Addition.
+static inline
+void fp_add(fp_ptr r, fp_srcptr p, fp_srcptr q)
+{ __FP_ADD(8, r, p, q); }
+
+
+// Subtraction.
+static inline
+void fp_sub(fp_ptr r, fp_srcptr p, fp_srcptr q)
+{ __FP_SUB(8, r, p, q); }
+
+
 // Inverse.
 static inline
 void fp_inv(fp_ptr r, fp_srcptr p)
