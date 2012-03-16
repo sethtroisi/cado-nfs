@@ -149,7 +149,7 @@ rsbound_setup_AB_bound ( rsbound_t rsbound,
       mpz_set_ui (q, rsparam->global_u_bound_rs);
       mpz_fdiv_q (q, q, mod);
       len =  mpz_get_ui (q);
-      rsbound->Amax = ( (len > 128) ? 128 : (long) len);
+      rsbound->Amax = ( (len > 8) ? 8 : (long) len);
       mpz_clear (q);
     }
   }
@@ -772,7 +772,7 @@ rsparam_setup ( rsparam_t rsparam,
   size += (int) (log ( (double) rsparam->global_u_bound_rs ) * 1.442695);
   rsparam->exp_min_alpha_rs = exp_alpha[size-1];
 
-  if (verbose == 0) {
+  if (verbose == 2) {
     gmp_fprintf ( stderr, "# Info: Bounds (%lu, %lu, %Zd) gives:\n",
                   rsparam->global_w_bound_rs,
                   rsparam->global_u_bound_rs,
@@ -816,48 +816,48 @@ rsparam_setup ( rsparam_t rsparam,
     rsparam->e_sl[3] = 0;
   }
   else if (rsparam->global_u_bound_rs <= 2048) {
-    rsparam->e_sl[0] = 3;
+    rsparam->e_sl[0] = 2;
     rsparam->e_sl[1] = 1;
-    rsparam->e_sl[2] = 0;
+    rsparam->e_sl[2] = 1;
     rsparam->e_sl[3] = 0;
   }
   else if (rsparam->global_u_bound_rs <= 4096) {
-    rsparam->e_sl[0] = 4;
+    rsparam->e_sl[0] = 3;
     rsparam->e_sl[1] = 1;
     rsparam->e_sl[2] = 1;
     rsparam->e_sl[3] = 0;
   }
   else if (rsparam->global_u_bound_rs <= 8192) {
-    rsparam->e_sl[0] = 5;
-    rsparam->e_sl[1] = 2;
-    rsparam->e_sl[2] = 2;
-    rsparam->e_sl[3] = 1;
-  }
-  else if (rsparam->global_u_bound_rs <= 16384) {
-    rsparam->e_sl[0] = 5;
-    rsparam->e_sl[1] = 2;
-    rsparam->e_sl[2] = 2;
-    rsparam->e_sl[3] = 1;
-  }
-  else if (rsparam->global_u_bound_rs <= 32768) {
-    rsparam->e_sl[0] = 6;
+    rsparam->e_sl[0] = 3;
     rsparam->e_sl[1] = 2;
     rsparam->e_sl[2] = 1;
+    rsparam->e_sl[3] = 0;
+  }
+  else if (rsparam->global_u_bound_rs <= 16384) {
+    rsparam->e_sl[0] = 3;
+    rsparam->e_sl[1] = 2;
+    rsparam->e_sl[2] = 2;
+    rsparam->e_sl[3] = 0;
+  }
+  else if (rsparam->global_u_bound_rs <= 32768) {
+    rsparam->e_sl[0] = 4;
+    rsparam->e_sl[1] = 2;
+    rsparam->e_sl[2] = 2;
     rsparam->e_sl[3] = 1;
   }
   else if (rsparam->global_u_bound_rs <= 327680) {
-    rsparam->e_sl[0] = 6;
-    rsparam->e_sl[1] = 3;
-    rsparam->e_sl[2] = 1;
-    rsparam->e_sl[3] = 0;
+    rsparam->e_sl[0] = 5;
+    rsparam->e_sl[1] = 2;
+    rsparam->e_sl[2] = 2;
+    rsparam->e_sl[3] = 1;
     rsparam->e_sl[4] = 0;
   }
   else if (rsparam->global_u_bound_rs <= 3276800) {
-    rsparam->e_sl[0] = 6;
-    rsparam->e_sl[1] = 3;
+    rsparam->e_sl[0] = 5;
+    rsparam->e_sl[1] = 2;
     rsparam->e_sl[2] = 2;
-    rsparam->e_sl[3] = 0;
-    rsparam->e_sl[4] = 0;
+    rsparam->e_sl[3] = 1;
+    rsparam->e_sl[4] = 1;
   }
   else {
     rsparam->e_sl[0] = 6;
@@ -921,7 +921,7 @@ rsparam_reset_bounds ( rsparam_t rsparam,
   size += (int) (log ( (double) rsparam->global_u_bound_rs ) * 1.442695);
   rsparam->exp_min_alpha_rs = exp_alpha[size-1];
 
-  if (verbose == 0) {
+  if (verbose == 2) {
     gmp_fprintf ( stderr, "# Info: Reset (U, V) to (%lu, %Zd) gives:\n",
                   rsparam->global_u_bound_rs,
                   rsparam->global_v_bound_rs );
@@ -931,7 +931,6 @@ rsparam_reset_bounds ( rsparam_t rsparam,
                   rsparam->lognorm_bound );
   }
 }
-
 
 
 /*

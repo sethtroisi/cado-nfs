@@ -8,21 +8,20 @@
 #define SUP_ALPHA 4.843
 #define MAX_LINE_LENGTH 4096
 #define MAX_DEGREE 6
+#define TUNE_FIND_SUBLATTICE 0 // short test sieving to choose sublattice parameters, i.e. those p_i^{e_i}.
+#define TUNE_RANK_SUBLATTICE 1 // short test sieving to rank found sublattices, i.e. those (w, u, v).
+#define DEBUG_FIND_SUBLATTICE 0
+#define SKIP_ROOTSIEVE_M 0
+#define DEBUG 0
 
 /* possible to change */
 #define L1_SIZE 12288 // ~ l1 cache.
-#define SIEVEARRAY_SIZE 134217728 // 2^27 of int16_t uses about 270Mb memory.
+#define SIEVEARRAY_SIZE 1342177 // 2^27 of int16_t uses about 270Mb memory.
 #define MAX_SIEVEARRAY_SIZE SIEVEARRAY_SIZE
 #define TUNE_SIEVEARRAY_SIZE L1_SIZE / 2
 #define TOPALPHA_EACH_SIEVEARRAY 16 // for each "SIEVEARRAY_SIZE", record top N poly's alpha avalues.
 #define TOPE_EACH_SUBLATTICE 8 // for sublattice, record top 8 poly's E avalues.
 #define LEN_SUBLATTICE_PRIMES 10
-
-/* for debug purpose */
-#define WANT_TUNE 0
-#define DEBUG_FIND_SUBLATTICE 0
-#define SKIP_ROOTSIEVE_M 0
-#define DEBUG 0
 
 /* Some structs for parameters */
 typedef struct {

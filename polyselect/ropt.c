@@ -6,12 +6,12 @@
 #include "ropt.h"
 
 /* 
-   Record best poly
+   Find best poly. This is somehow redundant.
 */
 static inline void
 ropt_main_run_bestpoly ( rsstr_t rs,
-                              MurphyE_pq *global_E_pqueue,
-                              bestpoly_t bestpoly )
+                         MurphyE_pq *global_E_pqueue,
+                         bestpoly_t bestpoly )
 {
   double ave_MurphyE = 0.0, best_E = 0.0;
   int i, old_i, k;
@@ -70,15 +70,15 @@ ropt_main_run_bestpoly ( rsstr_t rs,
 /*
   Run: find good sublattices and then sieve.
 */
-static inline double
+static double
 ropt_main_run ( rsstr_t rs,
                 bestpoly_t bestpoly,
                 param_t param,
                 int verbose )
 {
-  int i, k, old_i, re, used;
-  double ave_MurphyE, ave2_MurphyE = 0.0;
-  mpz_t m;
+  int i, k, old_i, re, used, *w;
+  double ave_MurphyE, ave2_MurphyE = 0.0, *score;
+  mpz_t m, *u, *v, *mod;
   rsparam_t rsparam;
   sub_alpha_pq *alpha_pqueue;
 
@@ -88,13 +88,13 @@ ropt_main_run ( rsstr_t rs,
   rsparam_setup (rsparam, rs, param, verbose);
   new_sub_alpha_pq (&alpha_pqueue, rsparam->nbest_sl);
 
-  /* read e_sl from input */
+  // if needed, read e_sl from input.
   if (param->flag == 1) {
     for (i = 0; i < LEN_SUBLATTICE_PRIMES; i ++)
       rsparam->e_sl[i] = param->s1_e_sl[i];
   }
 
-  /* For each qudratic rotation i, find sublattice */
+  /* STAGE 1: for each qudratic rotation i, find sublattice */
   re = 0;
   old_i = 0;
   for (i = param->w_left_bound; i < param->w_length + param->w_left_bound; i++) {
@@ -105,15 +105,13 @@ ropt_main_run ( rsstr_t rs,
     old_i = rotate_aux (rs->f, rs->g[1], m, old_i, i, 2);
     rsstr_setup (rs);
 
-    verbose = 0;
-    /* either use input e_sl[] or tune only once */
+    // either use input e_sl[] or tune only once.
     rsparam_reset_bounds (rsparam, rs, param, verbose);
-    verbose = 2;
       
-#if WANT_TUNE
+#if TUNE_FIND_SUBLATTICE
     if (re == 0) {
-      /* do we really want to tune? slow */
-      rsparam_tune (rs, rsparam, param, 6, i, verbose);
+      // tune sublattice parameters?
+      rsparam_tune_findlat (rs, rsparam, param, 6, i, verbose);
     }
 #endif
 
@@ -124,7 +122,7 @@ ropt_main_run ( rsstr_t rs,
                       verbose,
                       i );
     if (k == -1) {
-      /* rotate back */
+      // rotate back
       rotate_aux (rs->f, rs->g[1], m, old_i, 0, 2);
       old_i = 0;
       rsparam_free (rsparam);
@@ -133,36 +131,103 @@ ropt_main_run ( rsstr_t rs,
       return -1;
     }
   }
-
-  /* rotate back */
+  // rotate back.
   rotate_aux (rs->f, rs->g[1], m, old_i, 0, 2);
   old_i = 0;
 
-  /* use another array to save the priority queue */
+  // use another array to save the priority queue.
   used = alpha_pqueue->used - 1;
-  mpz_t *u, *v, *mod;
-  int *w;
-  double *sub_alpha;
-  w = (int *) malloc ( used * sizeof (int));
-  sub_alpha = (double *) malloc ( used * sizeof (double));
-  u = (mpz_t *) malloc ( used * sizeof (mpz_t));
-  v = (mpz_t *) malloc ( used * sizeof (mpz_t));
-  mod = (mpz_t *) malloc ( used * sizeof (mpz_t));
+
+  w = (int *) malloc ( used * sizeof (int) );
+  score = (double *) malloc ( used * sizeof (double) );
+  u = (mpz_t *) malloc ( used * sizeof (mpz_t) );
+  v = (mpz_t *) malloc ( used * sizeof (mpz_t) );
+  mod = (mpz_t *) malloc ( used * sizeof (mpz_t) );
   for (i = 0; i < used; i ++) {
     mpz_init (u[i]);
     mpz_init (v[i]);
     mpz_init (mod[i]);
   }
 
-  /* put all sublattices into another array */
-  for (i = 0; i < used; i ++) {
+/* --------------------------------------- */
+/* rank found sublattices by test sieving. */
+/* --------------------------------------- */
+#if TUNE_RANK_SUBLATTICE
 
+  sub_alpha_pq *tsieve_MurphyE_pqueue;
+  new_sub_alpha_pq ( &tsieve_MurphyE_pqueue,
+                     rsparam->nbest_sl );
+  rsparam_tune_ranklat ( rs,
+                         rsparam,
+                         param,
+                         alpha_pqueue,
+                         used,
+                         tsieve_MurphyE_pqueue,
+                         verbose );
+  for (i = 0; i < used; i ++) {
+    // put all sublattices into another array.
+    extract_sub_alpha_pq ( tsieve_MurphyE_pqueue,
+                           &(w[i]),
+                           u[i],
+                           v[i],
+                           mod[i],
+                           &(score[i]) );
+    if (verbose != 0) {
+      gmp_fprintf ( stderr, "# Info: %4d sublattice (w, u, v): (%d, %Zd, %Zd) (mod %Zd), tsieve E: %.2e\n",
+                    i + 1,
+                    w[i],
+                    u[i],
+                    v[i],
+                    mod[i],
+                    -score[i] );
+    }
+  }
+  free_sub_alpha_pq (&tsieve_MurphyE_pqueue);
+
+  // re-detect sublattices with the best qudratic roation.
+  i = used - 1;
+  old_i = 0;
+  if (verbose == 2)
+    fprintf (stderr, "# Info: Found best quadratic rotation by %d*x^2\n", w[i]);
+  old_i = rotate_aux (rs->f, rs->g[1], m, old_i, w[i], 2);
+  rsstr_setup (rs);
+
+  rsparam_reset_bounds (rsparam, rs, param, verbose);
+  //verbose = 2; // TBR
+
+  k = ropt_stage1 ( rs,
+                    rsparam,
+                    alpha_pqueue,
+                    verbose,
+                    w[i] );
+  // if failed in ropt_stage1, return.
+  if (k == -1) {
+    rotate_aux (rs->f, rs->g[1], m, old_i, 0, 2);
+    old_i = 0;
+    rsparam_free (rsparam);
+    mpz_clear (m);
+    free_sub_alpha_pq (&alpha_pqueue);
+    return -1;
+  }
+  // rotate back.
+  rotate_aux (rs->f, rs->g[1], m, old_i, 0, 2);
+
+  old_i = 0;
+  // use another array to save the priority queue.
+  used = alpha_pqueue->used - 1;
+#endif
+
+  /* ----------------------------------------------- */
+  /* rank found sublattices by partial alpha values. */
+  /* ----------------------------------------------- */
+  for (i = 0; i < used; i ++) {
+    // put all sublattices into another array.
     extract_sub_alpha_pq ( alpha_pqueue,
                            &(w[i]),
                            u[i],
                            v[i],
                            mod[i],
-                           &(sub_alpha[i]) );
+                           &(score[i]));
 
     if (verbose != 0) {
       gmp_fprintf ( stderr, "# Info: %4d sublattice (w, u, v): (%d, %Zd, %Zd) (mod %Zd), alpha: %.2f\n",
@@ -171,38 +236,37 @@ ropt_main_run ( rsstr_t rs,
                     u[i],
                     v[i],
                     mod[i],
-                    sub_alpha[i] );
+                    score[i] );
 
-      // This is only for pbs submission purpose.
-      // Note: 1. Change N and path (appeared twice)
-      //       2. Change sieve length -umax and -vmax
-      /*
-        fprintf (stderr, "#!/bin/bash\n#PBS -N rsa_%d\n#PBS -l nodes=1,walltime=160:00:00\n#PBS -q route\n#PBS -m ae\n", i);
-        gmp_fprintf ( stderr, "/home/bai/cado-nfs/build/orac/polyselect/ropt -fm /home/bai/cado-nfs/build/orac/polyselect/rsa768.poly --s2 -n %Zd -d %d -w %d -u %Zd -v %Zd -umax 64 -vmax 317325312 -mod %Zd > /home/bai/cado-nfs/build/orac/polyselect/rsa704_%d.out 2>&1\n\n",
-        rs->n,
-        rs->d,
-        w[i],
-        u[i],
-        v[i],
-        mod[i],
-        i );
-      */
+      /* This is only for pbs submission purpose.
+         Note: 1. Change N and path (appeared twice)
+         2. Change sieve length -umax and -vmax
+         fprintf (stderr, "#!/bin/bash\n#PBS -N rsa_%d\n#PBS -l nodes=1,walltime=160:00:00\n#PBS -q route\n#PBS -m ae\n", i);
+         gmp_fprintf ( stderr, "/home/bai/cado-nfs/build/orac/polyselect/ropt -fm /home/bai/cado-nfs/build/orac/polyselect/rsa768.poly --s2 -n %Zd -d %d -w %d -u %Zd -v %Zd -umax 64 -vmax 317325312 -mod %Zd > /home/bai/cado-nfs/build/orac/polyselect/rsa704_%d.out 2>&1\n\n",
+         rs->n,
+         rs->d,
+         w[i],
+         u[i],
+         v[i],
+         mod[i],
+         i );      */
     }
   }
-  /* free alpha queue */
-  free_sub_alpha_pq (&alpha_pqueue);
 
-  /* E priority queue for all sublattice, only consider the top three polynomials */
+  free_sub_alpha_pq (&alpha_pqueue); // free alpha queue.
+
+  // E priority queue for all sublattice, we rank
+  // the top three polynomials from each sublattice.
   MurphyE_pq *global_E_pqueue;
   new_MurphyE_pq (&global_E_pqueue, 4);
 
-  /* For each sublattice, do the root sieve */
+  /* STAGE2: for each sublattice, do the root sieve */
   re = 0;
   for (i = used - 1; i >= 0; i --) {
 
     /* for polyselect2.c */
     if (verbose == 0) {
-      if (re > 3)
+      if (re > 8)
         break;
     }
 
@@ -215,17 +279,17 @@ ropt_main_run ( rsstr_t rs,
                     u[i],
                     v[i],
                     mod[i],
-                    sub_alpha[i],
+                    score[i],
                     rs->alpha_proj,
                     rsparam->exp_min_alpha_rs );
     }
 
-    /* rotate polynomial by f + rot*x^2 for various rot */
+    // rotate polynomial by f + rot*x^2 for various rot.
     old_i = rotate_aux (rs->f, rs->g[1], m, old_i, w[i], 2);
     rsstr_setup (rs);
     rsparam_reset_bounds (rsparam, rs, param, verbose);
 
-    //print_poly_fg (rs->f, rs->g, rs->d, rs->n, rs->m, 1);
+    // print_poly_fg (rs->f, rs->g, rs->d, rs->n, rs->m, 1);
     ave_MurphyE = ropt_stage2 ( rs,
                                 rsparam,
                                 param,
@@ -239,16 +303,16 @@ ropt_main_run ( rsstr_t rs,
     re ++;
   }
 
-  /* rotate back */
+  // rotate back.
   rotate_aux (rs->f, rs->g[1], m, old_i, 0, 2);
   old_i = 0;
   rsparam_free (rsparam);
 
-  /* Record the best polynomial */
+  // record the best polynomial.
   if (verbose == 0 || verbose == 2) {
     ropt_main_run_bestpoly ( rs,
-                                  global_E_pqueue,
-                                  bestpoly );
+                             global_E_pqueue,
+                             bestpoly );
 
     if (verbose == 2) {
       fprintf (stderr, "\n# Info: Best E is:\n");
@@ -258,6 +322,7 @@ ropt_main_run ( rsstr_t rs,
 
   free_MurphyE_pq (&global_E_pqueue);
   mpz_clear (m);
+
   for (i = 0; i < used; i ++) {
     mpz_clear (u[i]);
     mpz_clear (v[i]);
@@ -267,7 +332,7 @@ ropt_main_run ( rsstr_t rs,
   free (v);
   free (mod);
   free (w);
-  free (sub_alpha);
+  free (score);
 
   ave2_MurphyE /= (double) re;
   return ave2_MurphyE;
@@ -350,8 +415,8 @@ ropt_main_run_stage2only ( rsstr_t rs,
   mpz_set (bestpoly->g[1], rs->g[1]);
 
   ropt_main_run_bestpoly ( rs,
-                                global_E_pqueue,
-                                bestpoly );
+                           global_E_pqueue,
+                           bestpoly );
 
   fprintf (stderr, "\n# Info: Best E is:\n");
   print_poly_fg (bestpoly->f, bestpoly->g, rs->d, rs->n, 2);
@@ -436,8 +501,8 @@ ropt_polyselect ( mpz_t *f,
 
   /* this should be fast to tune */
   if (d == 6) {
-    param->w_left_bound = 1;
-    param->w_length = 1;
+    param->w_left_bound = -32;
+    param->w_length = 64;
   }
 
   /* bestpoly for return */

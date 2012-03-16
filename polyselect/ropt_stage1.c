@@ -900,17 +900,18 @@ ropt_stage1 ( rsstr_t rs,
 }
 
 
-#if WANT_TUNE
+
+#if TUNE_FIND_SUBLATTICE
 /*
-  auxiliary for tune
+  auxiliary for rsparam_tune_findlat
 */
 static inline double
-rsparam_tune_aux ( rsstr_t rs,
-                   rsparam_t rsparam,
-                   param_t param,
-                   sub_alpha_pq *alpha_pqueue,
-                   int nbest_sl_tunecut,
-                   int rot_w )
+rsparam_tune_findlat_aux ( rsstr_t rs,
+                           rsparam_t rsparam,
+                           param_t param,
+                           sub_alpha_pq *alpha_pqueue,
+                           int nbest_sl_tunecut,
+                           int rot_w )
 {
   int i, re;
   double ave_MurphyE, ave2_MurphyE = 0.0;
@@ -919,10 +920,10 @@ rsparam_tune_aux ( rsstr_t rs,
   alpha_pqueue->used = 1;
 
   re = ropt_stage1 ( rs,
-                               rsparam,
-                               alpha_pqueue,
-                               0,
-                               rot_w );
+                     rsparam,
+                     alpha_pqueue,
+                     0,
+                     rot_w );
   if (re == -1) {
     return -1;
   }
@@ -1018,15 +1019,16 @@ rsparam_tune_aux ( rsstr_t rs,
 
 
 /*
-  Tune parameters for find_sublattice().
+  Find parameters for defining the sublattices by test sieving. 
+  This fixes the actual p_i^{e_i}.
 */
 double
-rsparam_tune ( rsstr_t rs,
-               rsparam_t rsparam,
-               param_t param,
-               int num_trials,
-               int w,
-               int verbose )
+rsparam_tune_findlat ( rsstr_t rs,
+                       rsparam_t rsparam,
+                       param_t param,
+                       int num_trials,
+                       int w,
+                       int verbose )
 {
   unsigned short i, j, best_j = 0, tmp_e_sl[rsparam->len_e_sl], k;
   unsigned int p, pearr[rsparam->len_e_sl];
@@ -1053,12 +1055,12 @@ rsparam_tune ( rsstr_t rs,
   sub_alpha_pq *alpha_pqueue;
   new_sub_alpha_pq (&alpha_pqueue, rsparam->nbest_sl);
 
-  best_MurphyE = rsparam_tune_aux ( rs,
-                                    rsparam,
-                                    param,
-                                    alpha_pqueue,
-                                    3, // nbest_sl_tunecut
-                                    w );
+  best_MurphyE = rsparam_tune_findlat_aux ( rs,
+                                            rsparam,
+                                            param,
+                                            alpha_pqueue,
+                                            3, // nbest_sl_tunecut
+                                            w );
   alpha_pqueue->used = 1;
 
   if (verbose != 0) {
@@ -1098,7 +1100,7 @@ rsparam_tune ( rsstr_t rs,
       }
     }
     /* test sieve */
-    ave_MurphyE = rsparam_tune_aux ( rs,
+    ave_MurphyE = rsparam_tune_findlat_aux ( rs,
                                      rsparam,
                                      param,
                                      alpha_pqueue,
@@ -1140,6 +1142,122 @@ rsparam_tune ( rsstr_t rs,
     fprintf (stderr, "\n");
   }
   return best_MurphyE;
+}
+#endif
+
+
+#if TUNE_RANK_SUBLATTICE
+/*
+  Rank found sublattices by test sieving. Note that, there is already
+  a ranking of sublattices by partial alpha(F). However, this is often
+  not accurate due to the omit of size.
+*/
+void
+rsparam_tune_ranklat ( rsstr_t rs,
+                       rsparam_t rsparam,
+                       param_t param,
+                       sub_alpha_pq *alpha_pqueue,
+                       int used,
+                       sub_alpha_pq *tsieve_MurphyE_pqueue,
+                       int verbose )
+{
+  int i, old_i, *w;
+  double *score, ave_MurphyE;
+  mpz_t m, *u, *v, *mod;
+
+  mpz_init_set (m, rs->g[0]);
+  mpz_neg (m, m);
+  w = (int *) malloc ( used * sizeof (int) );
+  score = (double *) malloc ( used * sizeof (double) );
+  u = (mpz_t *) malloc ( used * sizeof (mpz_t) );
+  v = (mpz_t *) malloc ( used * sizeof (mpz_t) );
+  mod = (mpz_t *) malloc ( used * sizeof (mpz_t) );
+  for (i = 0; i < used; i ++) {
+    mpz_init (u[i]);
+    mpz_init (v[i]);
+    mpz_init (mod[i]);
+  }
+
+  /* retrieve all found sublattices and record them to w, u, v arrays. */
+  for (i = 0; i < used; i ++) {
+    extract_sub_alpha_pq ( alpha_pqueue,
+                           &(w[i]),
+                           u[i],
+                           v[i],
+                           mod[i],
+                           &(score[i]) );
+
+    if (verbose != 0) {
+      gmp_fprintf ( stderr, "# Info: %4d sublattice (w, u, v): (%d, %Zd, %Zd) (mod %Zd), alpha: %.2f\n",
+                    i + 1,
+                    w[i],
+                    u[i],
+                    v[i],
+                    mod[i],
+                    score[i] );
+    }
+  }
+
+  if (verbose != 0)
+    fprintf (stderr, "# Info: re-ranking above found sublattices by test sieving\n");
+  
+  /* test eiving */
+  MurphyE_pq *global_E_pqueue;
+  new_MurphyE_pq (&global_E_pqueue, 4);
+  old_i = 0;
+  for (i = used - 1; i >= 0; i --) {
+
+    // rotate polynomial by f + rot*x^2 for various rot.
+    old_i = rotate_aux (rs->f, rs->g[1], m, old_i, w[i], 2);
+    rsstr_setup (rs);
+    rsparam_reset_bounds (rsparam, rs, param, verbose);
+
+    // print_poly_fg (rs->f, rs->g, rs->d, rs->n, rs->m, 1);
+    ave_MurphyE = ropt_stage2 ( rs,
+                                rsparam,
+                                param,
+                                global_E_pqueue,
+                                w[i],
+                                u[i],
+                                v[i],
+                                mod[i],
+                                1 ); // tune mode for shorter sieving range.
+
+    insert_sub_alpha_pq ( tsieve_MurphyE_pqueue,
+                          w[i],
+                          u[i],
+                          v[i],
+                          mod[i],
+                          -ave_MurphyE );
+
+    /*
+    if (verbose != 0) {
+      gmp_fprintf ( stderr, "# Info: %4d sublattice (w, u, v): (%d, %Zd, %Zd) (mod %Zd), \t tsieve E: %.2e\n",
+                    i + 1,
+                    w[i],
+                    u[i],
+                    v[i],
+                    mod[i],
+                    ave_MurphyE );
+    }
+    */
+  }
+  free_MurphyE_pq (&global_E_pqueue);
+
+  // rotate back.
+  rotate_aux (rs->f, rs->g[1], m, old_i, 0, 2);
+
+  for (i = 0; i < used; i ++) {
+    mpz_clear (u[i]);
+    mpz_clear (v[i]);
+    mpz_clear (mod[i]);
+  }
+  mpz_clear (m);
+  free (u);
+  free (v);
+  free (mod);
+  free (w);
+  free (score);
 }
 
 #endif
