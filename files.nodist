@@ -35,7 +35,7 @@ polyselect/kleinjung-list-of-lattices.sage
 polyselect/linear_interpolation.sage
 polyselect/fast_rootsieve.h
 polyselect/fast_rootsieve.c
-polyselect/rootsieve5_main.c
+polyselect/ropt_main.c
 polyselect/play.c
 polyselect/rotation_bound.sage
 polyselect/ROOTSIEVE_TODO
