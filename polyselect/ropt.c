@@ -93,7 +93,7 @@ ropt_main_run ( rsstr_t rs,
     for (i = 0; i < LEN_SUBLATTICE_PRIMES; i ++)
       rsparam->e_sl[i] = param->s1_e_sl[i];
   }
-
+  
   /* STAGE 1: for each qudratic rotation i, find sublattice */
   re = 0;
   old_i = 0;
@@ -107,7 +107,7 @@ ropt_main_run ( rsstr_t rs,
 
     // either use input e_sl[] or tune only once.
     rsparam_reset_bounds (rsparam, rs, param, verbose);
-      
+    
 #if TUNE_FIND_SUBLATTICE
     if (re == 0) {
       // tune sublattice parameters?
@@ -116,6 +116,8 @@ ropt_main_run ( rsstr_t rs,
 #endif
 
     re ++;
+    
+    // stage 1. rs is already rotated, i here is only for book-keeping purpose.
     k = ropt_stage1 ( rs,
                       rsparam,
                       alpha_pqueue,
@@ -172,7 +174,7 @@ ropt_main_run ( rsstr_t rs,
                            v[i],
                            mod[i],
                            &(score[i]) );
-    if (verbose != 0) {
+    if (verbose == 2) {
       gmp_fprintf ( stderr, "# Info: %4d sublattice (w, u, v): (%d, %Zd, %Zd) (mod %Zd), tsieve E: %.2e\n",
                     i + 1,
                     w[i],
@@ -193,7 +195,6 @@ ropt_main_run ( rsstr_t rs,
   rsstr_setup (rs);
 
   rsparam_reset_bounds (rsparam, rs, param, verbose);
-  //verbose = 2; // TBR
 
   k = ropt_stage1 ( rs,
                     rsparam,
@@ -229,7 +230,7 @@ ropt_main_run ( rsstr_t rs,
                            mod[i],
                            &(score[i]));
 
-    if (verbose != 0) {
+    if (verbose == 2) {
       gmp_fprintf ( stderr, "# Info: %4d sublattice (w, u, v): (%d, %Zd, %Zd) (mod %Zd), alpha: %.2f\n",
                     i + 1,
                     w[i],
@@ -264,14 +265,14 @@ ropt_main_run ( rsstr_t rs,
   re = 0;
   for (i = used - 1; i >= 0; i --) {
 
-    /* for polyselect2.c */
+    /* for polyselect2.c, we don't want to spent too much time. */
     if (verbose == 0) {
-      if (re > 8)
+      if (re > SHORT_NUM_SIEVE_SUBLATTICE)
         break;
     }
 
     /* don't output in tune mode */
-    if (verbose != 0) {
+    if (verbose == 2) {
       gmp_fprintf ( stderr,
                     "\n# Info: Sieve on sublattice (# %2d), (w, u, v): (%d, %Zd, %Zd) (mod %Zd) \n# Info: alpha: %.2f, proj_alpha: %.2f, exp_min_alpha: %.2f\n",
                     i + 1,
@@ -287,6 +288,7 @@ ropt_main_run ( rsstr_t rs,
     // rotate polynomial by f + rot*x^2 for various rot.
     old_i = rotate_aux (rs->f, rs->g[1], m, old_i, w[i], 2);
     rsstr_setup (rs);
+
     rsparam_reset_bounds (rsparam, rs, param, verbose);
 
     // print_poly_fg (rs->f, rs->g, rs->d, rs->n, rs->m, 1);
@@ -498,12 +500,6 @@ ropt_polyselect ( mpz_t *f,
   mpz_set (rs->n, N);
   rsstr_setup (rs);
   param_init (param);
-
-  /* this should be fast to tune */
-  if (d == 6) {
-    param->w_left_bound = -32;
-    param->w_length = 64;
-  }
 
   /* bestpoly for return */
   bestpoly_t bestpoly;

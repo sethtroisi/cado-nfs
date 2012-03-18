@@ -16,12 +16,23 @@
 
 /* possible to change */
 #define L1_SIZE 12288 // ~ l1 cache.
-#define SIEVEARRAY_SIZE 1342177 // 2^27 of int16_t uses about 270Mb memory.
-#define MAX_SIEVEARRAY_SIZE SIEVEARRAY_SIZE
-#define TUNE_SIEVEARRAY_SIZE L1_SIZE / 2
 #define TOPALPHA_EACH_SIEVEARRAY 16 // for each "SIEVEARRAY_SIZE", record top N poly's alpha avalues.
 #define TOPE_EACH_SUBLATTICE 8 // for sublattice, record top 8 poly's E avalues.
 #define LEN_SUBLATTICE_PRIMES 10
+
+// "LONG_" parameters are used for sopt_main.c inputs.
+#define MAX_LONG_SIEVEARRAY_SIZE 268435456 // at most, use 2^28 of int16_t uses about 256M memory.
+#define LONG_SIEVEARRAY_V_SIZE 67108864 // If actual U*V > MAX, the sieving range is blocked for several passes.
+#define LONG_SIEVEARRAY_U_SIZE 128
+
+// "SHORT_" parameters are used for polyselect2*.inputs.
+#define MAX_SHORT_SIEVEARRAY_SIZE 67108864 // at most, use 2^26 of int16_t uses about 64M memory.
+#define SHORT_SIEVEARRAY_V_SIZE 16777216
+#define SHORT_SIEVEARRAY_U_SIZE 16
+#define SHORT_NUM_SIEVE_SUBLATTICE 16 // only sieve for top 16 sublattices.
+
+// "TUNE_" parameters are used for test sieving.
+#define TUNE_SIEVEARRAY_SIZE L1_SIZE / 2
 
 /* Some structs for parameters */
 typedef struct {

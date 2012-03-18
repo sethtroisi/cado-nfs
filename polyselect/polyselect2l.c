@@ -1183,8 +1183,8 @@ collision_on_sq ( header_t header,
 		  /* 	   fprintf (stderr, "%lu ", i); */
 
 		  q = return_q_rq (SQ_R, idx_q, k, qqz, rqqz);
-      if (q != 210304523619527)
-        continue;
+//      if (q != 210304523619527)
+//        continue;
 
 		  collision_on_each_sq ( header,
 								 R,

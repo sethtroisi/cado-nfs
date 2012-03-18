@@ -127,29 +127,31 @@ rsbound_setup_AB_bound ( rsbound_t rsbound,
     mpz_init (q);
     mpz_fdiv_q (q, rsparam->global_v_bound_rs, mod);
     len =  mpz_get_ui (q);
-    rsbound->Bmax = ( (len > MAX_SIEVEARRAY_SIZE) ? MAX_SIEVEARRAY_SIZE : (long) len);
+    rsbound->Bmax = ( (len > SHORT_SIEVEARRAY_V_SIZE) ? SHORT_SIEVEARRAY_V_SIZE : (long) len);
     mpz_set_ui (q, rsparam->global_u_bound_rs);
     mpz_fdiv_q (q, q, mod);
     len =  mpz_get_ui (q);
-    rsbound->Amax = ( (len > 128) ? 128 : (long) len);
+    rsbound->Amax = ( (len > SHORT_SIEVEARRAY_U_SIZE) ? SHORT_SIEVEARRAY_U_SIZE : (long) len);
     mpz_clear (q);
   }
   else if (verbose == 2) {
+    // read -umax, -vmax from input
     if (param->s2_Amax >= 0 && param->s2_Bmax > 0) {
       rsbound->Amax = param->s2_Amax;
       rsbound->Bmax = param->s2_Bmax;
     }
+    // or compute -umax, -vmax
     else {
       unsigned long len;
       mpz_t q;
       mpz_init (q);
       mpz_fdiv_q (q, rsparam->global_v_bound_rs, mod);
       len =  mpz_get_ui (q);
-      rsbound->Bmax = ( (len > MAX_SIEVEARRAY_SIZE) ? MAX_SIEVEARRAY_SIZE : (long) len);
+      rsbound->Bmax = ( (len > LONG_SIEVEARRAY_V_SIZE) ? LONG_SIEVEARRAY_V_SIZE : (long) len);
       mpz_set_ui (q, rsparam->global_u_bound_rs);
       mpz_fdiv_q (q, q, mod);
       len =  mpz_get_ui (q);
-      rsbound->Amax = ( (len > 8) ? 8 : (long) len);
+      rsbound->Amax = ( (len > LONG_SIEVEARRAY_U_SIZE) ? LONG_SIEVEARRAY_U_SIZE : (long) len);
       mpz_clear (q);
     }
   }
@@ -353,9 +355,12 @@ rsparam_init ( rsparam_t rsparam,
 
   /* "rsparam->sizebound_ratio_rs"
      the higher, the more margin in computing the sieving bound
-     u and v, hence the larger the sieving bound, and hence
-     larger e_sl[] in rsparam_setup(). */
-  rsparam->sizebound_ratio_rs = 1.01;
+     w, u and v, hence the larger the sieving bound, and hence
+     larger e_sl[] in rsparam_setup(). This should be large 
+     enough since it is individual bound for w, u, v. If all w,
+     u, v reach their upper bound, the effect is about 1.07^3 ~ 1.225.
+     For instance, L_2 norm 70*1.07 = 74.8. 70*1.225=85.75 */
+  rsparam->sizebound_ratio_rs = 1.07;
   mpz_init (rsparam->modulus);
   mpz_init_set_ui (rsparam->global_v_bound_rs, 0UL);
 
@@ -371,7 +376,7 @@ rsparam_init ( rsparam_t rsparam,
   else {
     double skewness = L2_skewness (rs->f, rs->d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
     rsparam->init_lognorm = L2_lognorm (rs->f, rs->d, skewness, DEFAULT_L2_METHOD);
-    rsparam->lognorm_bound = rsparam->init_lognorm * 1.07;
+    rsparam->lognorm_bound = rsparam->init_lognorm * rsparam->sizebound_ratio_rs;
   }
 }
 
@@ -630,7 +635,8 @@ rotate_bounds_U_lu ( rsstr_t rs,
 /* find bound W for qudratic rotation*/
 static inline void
 rotate_bounds_W_lu ( rsstr_t rs,
-                     rsparam_t rsparam )
+                     rsparam_t rsparam,
+                     param_t param )
 {
   int i, j;
   double skewness, lognorm;
@@ -647,7 +653,7 @@ rotate_bounds_W_lu ( rsstr_t rs,
 
   /* look for positive w: , ... 0, 1, 2 */
   long w0 = 0, w = 0;
-  for (i = 0; i < 2048; i++, w += 1)
+  for (i = 0; i < 2048; i++, w++)
   {
     /* rotate by w*x */
     w0 = rotate_aux (rs->f, b, m, w0, w, 2);
@@ -672,10 +678,10 @@ rotate_bounds_W_lu ( rsstr_t rs,
   rotate_aux (rs->f, b, m, w0, 0, 2);
   rsparam->global_w_bound_rs = (unsigned long) w;
 
-  /* look for positive w: , ... 0, -1, -2 */
+  /* look for negative w: , ... 0, -1, -2 */
   w0 = 0;
   w = 0;
-  for (i = 0; i < 2048; i++, w -= 1)
+  for (i = 0; i < 2048; i++, w--)
   {
     /* rotate by w*x */
     w0 = rotate_aux (rs->f, b, m, w0, w, 2);
@@ -699,8 +705,9 @@ rotate_bounds_W_lu ( rsstr_t rs,
   /* go back to w=0 */
   rotate_aux (rs->f, b, m, w0, 0, 2);
 
-  if ( (unsigned long) labs(w) > rsparam->global_w_bound_rs )
-    rsparam->global_w_bound_rs = (unsigned long) labs(w);
+  // pass w to param.
+  param->w_left_bound = (int) w;
+  param->w_length =  (int) (rsparam->global_w_bound_rs + (unsigned long) labs(w) + 1);
 
   for (i = 0; i <= rs->d; i ++)
     mpz_clear (f[i]);
@@ -732,28 +739,33 @@ rsparam_setup ( rsparam_t rsparam,
   mpz_t q;
   mpz_init (q);
 
-  /* polyselect2 mode, pass v bounds from param */
+  /* polyselect2 mode */
   if (verbose == 0) {
-    mpz_ui_pow_ui (q, 2UL, (unsigned long) param->s2_Vmax);
-    mpz_set (rsparam->global_v_bound_rs, q);
-  }
-  /* compute bounds v */
-  else {
-    /* "global_w_bound_rs" */
+
+    // w bound, passed to param.
     if (rs->d == 6)
       rotate_bounds_W_lu ( rs,
-                           rsparam );
-    else
+                           rsparam,
+                           param );
+    else {
       rsparam->global_w_bound_rs = 0;
+      param->w_left_bound = 0;
+      param->w_length = 1;
+    }
+    
+    // v bound
+    mpz_ui_pow_ui (q, 2UL, (unsigned long) param->s2_Vmax);
+    mpz_set (rsparam->global_v_bound_rs, q);
 
-    /* "global_v_bound_rs" */
-    rotate_bounds_V_mpz ( rs,
-                          rsparam );
+  }
+  /* hands-input w */
+  else {
+    // v bound
+    rotate_bounds_V_mpz ( rs, rsparam );
   }
 
-  /* "global_u_bound_rs" */
-  rotate_bounds_U_lu ( rs,
-                       rsparam );
+  // u bound
+  rotate_bounds_U_lu ( rs, rsparam );
 
   /* repair if u is too large:
      -- global_u_bound will be used to identify good sublattice and decide e[],
@@ -761,7 +773,7 @@ rsparam_setup ( rsparam_t rsparam,
   double skewness = L2_skewness (rs->f, rs->d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
   mpz_fdiv_q_ui (q, rsparam->global_v_bound_rs, lround (skewness));
   if (mpz_cmpabs_ui (q, rsparam->global_u_bound_rs) < 0)
-    rsparam->global_u_bound_rs = mpz_get_ui (q);
+  rsparam->global_u_bound_rs = mpz_get_ui (q);
   mpz_clear (q);
 
   /* "rsparam->exp_min_alpha_rs" */
@@ -773,14 +785,16 @@ rsparam_setup ( rsparam_t rsparam,
   rsparam->exp_min_alpha_rs = exp_alpha[size-1];
 
   if (verbose == 2) {
-    gmp_fprintf ( stderr, "# Info: Bounds (%lu, %lu, %Zd) gives:\n",
-                  rsparam->global_w_bound_rs,
+    gmp_fprintf ( stderr, "# Info: Global bounds (%d:%d, %lu, %Zd) gives:\n",
+                  param->w_left_bound,
+                  param->w_left_bound + param->w_length - 1,
                   rsparam->global_u_bound_rs,
                   rsparam->global_v_bound_rs );
     gmp_fprintf ( stderr,
-                  "# Info: exp_alpha: %.3f, bound: %.3f\n",
+                  "# Info: exp_alpha: %.3f, L2 bound: %.3f, initial L2: %.3f\n",
                   exp_alpha[size-1],
-                  rsparam->lognorm_bound );
+                  rsparam->lognorm_bound,
+                  rsparam->init_lognorm );
   }
 
   /* "rsparam->nbest_sl" and "rsparam->ncrts_sl" */
@@ -793,12 +807,11 @@ rsparam_setup ( rsparam_t rsparam,
   rsparam->tlen_e_sl = rsparam->len_e_sl;
 
   if (rsparam->len_p_rs < rsparam->len_e_sl) {
-    fprintf (stderr, "# Warning: number of primes considered in the root sieve is smaller than that in find_sublattice(). This might not be accurate. \n");
+    fprintf (stderr, "# Warning: number of primes considered in the root sieve is smaller than that in find_sublattice(). The result hence is not accurate. \n");
   }
 
   rsparam->e_sl = (unsigned short*)
     malloc ( rsparam->len_e_sl * sizeof (unsigned short) );
-
   if (rsparam->e_sl == NULL) {
     fprintf (stderr, "Error, cannot allocate memory in rsparam_setup().\n");
     exit (1);
@@ -881,36 +894,34 @@ rsparam_reset_bounds ( rsparam_t rsparam,
   mpz_t q;
   mpz_init (q);
 
-  /* polyselect2 mode, pass v bounds from param */
+  /* polyselect2 mode */
   if (verbose == 0) {
-    mpz_ui_pow_ui (q, 2UL, (unsigned long) param->s2_Vmax);
-    mpz_set (rsparam->global_v_bound_rs, q);
-  }
-  /* compute bounds v */
-  else {
-    /* "global_w_bound_rs" */
+
+    // w bound, passed to param.
     if (rs->d == 6)
       rotate_bounds_W_lu ( rs,
-                           rsparam );
-    else
+                           rsparam,
+                           param );
+    else {
       rsparam->global_w_bound_rs = 0;
+      param->w_left_bound = 0;
+      param->w_length = 1;
+    }
+    
+    // v bound
+    mpz_ui_pow_ui (q, 2UL, (unsigned long) param->s2_Vmax);
+    mpz_set (rsparam->global_v_bound_rs, q);
 
-    /* "global_v_bound_rs" */
-    rotate_bounds_V_mpz ( rs,
-                          rsparam );
+  }
+  /* hands-input w */
+  else {
+    // v bound
+    rotate_bounds_V_mpz ( rs, rsparam );
   }
 
-  /* "global_u_bound_rs" */
-  rotate_bounds_U_lu ( rs,
-                       rsparam );
+  // u bound
+  rotate_bounds_U_lu ( rs, rsparam );
 
-  /* repair if u is too large:
-     -- global_u_bound will be used to identify good sublattice and decide e[],
-     -- global_v_bound will be used to identify sieving bound */
-  double skewness = L2_skewness (rs->f, rs->d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
-  mpz_fdiv_q_ui (q, rsparam->global_v_bound_rs, lround (skewness));
-  if (mpz_cmpabs_ui (q, rsparam->global_u_bound_rs) < 0)
-    rsparam->global_u_bound_rs = mpz_get_ui (q);
   mpz_clear (q);
 
   /* "rsparam->exp_min_alpha_rs" */
@@ -922,13 +933,16 @@ rsparam_reset_bounds ( rsparam_t rsparam,
   rsparam->exp_min_alpha_rs = exp_alpha[size-1];
 
   if (verbose == 2) {
-    gmp_fprintf ( stderr, "# Info: Reset (U, V) to (%lu, %Zd) gives:\n",
+    gmp_fprintf ( stderr, "# Info: Reset bounds to (%d:%d, %lu, %Zd) gives:\n",
+                  param->w_left_bound,
+                  param->w_left_bound + param->w_length - 1,
                   rsparam->global_u_bound_rs,
                   rsparam->global_v_bound_rs );
     gmp_fprintf ( stderr,
-                  "# Info: exp_alpha: %.3f, bound: %.3f\n",
+                  "# Info: exp_alpha: %.3f, L2 bound: %.3f, initial L2: %.3f\n",
                   exp_alpha[size-1],
-                  rsparam->lognorm_bound );
+                  rsparam->lognorm_bound,
+                  rsparam->init_lognorm );
   }
 }
 

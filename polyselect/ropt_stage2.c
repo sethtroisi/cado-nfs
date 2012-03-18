@@ -817,14 +817,22 @@ rootsieve_uv ( rsstr_t rs,
   len_A = (unsigned long) (rsbound->Amax - rsbound->Amin + 1);
   len_B = (unsigned long) (rsbound->Bmax - rsbound->Bmin + 1);
 
-  /* test sieve in tune mode ? */
+  /* tune sieve mode */
   if (verbose == 1) {
-    array_mem_size = TUNE_SIEVEARRAY_SIZE; // len_A should == 1;
+    array_mem_size = TUNE_SIEVEARRAY_SIZE; // len_A should == 1, see ropt_param.c
   }
+  /* polyselect2* mode */
+  else if (verbose == 0) {
+    array_mem_size = MAX_SHORT_SIEVEARRAY_SIZE;
+    /* if this is all ready too long */
+    if ( len_B < (double) array_mem_size / len_A ) {
+      array_mem_size = len_B * len_A;
+    }
+  }
+  /* ropt_main mode */
   else {
-    array_mem_size = SIEVEARRAY_SIZE;
-
-    /* if SIEVEARRAY_SIZE is all ready too long */
+    array_mem_size = MAX_LONG_SIEVEARRAY_SIZE;
+    /* if this is all ready too long */
     if ( len_B < (double) array_mem_size / len_A ) {
       array_mem_size = len_B * len_A;
     }
