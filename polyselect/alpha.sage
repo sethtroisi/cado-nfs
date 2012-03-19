@@ -63,6 +63,11 @@ def average_valuation_homogeneous_coprime(f,p):
     returns the average p-valuation of f(a,b) for a,b coprime. Projective
     roots are counted as well.
     """
+    if disc(f) % p > 0:
+        # Then we know that the average valuation is
+        # number_of_roots/(p-1), multiplied by p/(p+1) so as to take into
+        # account the non-coprime pairs.
+        return number_of_roots(f,p)/(p-1)*p/(p+1)
     # modulo p^n, roots touch one class having p^n*(1-1/p) representatives,
     # amongst the p^2n*(1-1/p^2) coprime representative pairs for
     # P^1(Z/p^n). So the contribution is, for p^n, p/(p+1) * p^-n
@@ -80,14 +85,7 @@ def alpha_p(f,disc,p):
     """
     Computes the contribution at p of the alpha value of f
     """
-    if disc % p == 0:
-        s = float((1/(p-1)-average_valuation_homogeneous_coprime(f,p))*log(p))
-    else:
-        # Then we know that the average valuation is
-        # number_of_roots/(p-1), multiplied by p/(p+1) so as to take into
-        # account the non-coprime pairs.
-        s = float((1-number_of_roots(f,p)*p/(p+1))*log(p)/(p-1))
-    return s
+    return float((1/(p-1)-average_valuation_homogeneous_coprime(f,p))*log(p))
 
 def alpha_p_nodisc(f,p):
     """
