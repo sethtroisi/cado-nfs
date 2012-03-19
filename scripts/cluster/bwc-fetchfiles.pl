@@ -395,7 +395,7 @@ for my $h (keys %$dispatch) {
                         print STDERR "All servers failed\n";
                         for my $k (keys %failed_storehosts) {
                             my $v = $failed_storehosts{$k};
-                            my $out = $v->[1];
+                            my $out = $v->[1] || '';
                             $out =~ s/^/\t/mg;
                             print STDERR "$k : status $v->[0]:\n$out";
                         }

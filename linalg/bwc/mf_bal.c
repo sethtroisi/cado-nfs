@@ -369,7 +369,7 @@ int main(int argc, char * argv[])
         fprintf(stderr, "%s: %" PRIu32 " rows %" PRIu32 " cols\n",
                 mfile, bal->h->nrows, bal->h->ncols);
         fprintf(stderr,
-                "%s: main input file not present, total weight unknown\n", mfile);
+                "%s: main input file not present locally, total weight unknown\n", mfile);
         bal->h->ncoeffs = 0;
     } else {
         bal->h->ncoeffs = sbuf_mat->st_size / sizeof(uint32_t) - bal->h->nrows;
