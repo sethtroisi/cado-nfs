@@ -50,7 +50,7 @@ static MAYBE_UNUSED sublat_t no_sublat = {{
 
 // The following sublattice repartition is valid only in charac 2
 #ifdef USE_F2
-static sublat_t nine_sublat = {{
+static MAYBE_UNUSED sublat_t nine_sublat = {{
     9,
     2,
     0,

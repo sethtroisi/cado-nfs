@@ -3,6 +3,7 @@
 #include "latsieve.h"
 #include "types.h"
 #include "ijvec.h"
+#include "sublat.h"
 
 
 
@@ -92,7 +93,8 @@ void visit_vector_space(vvs_param_t *vvsp, unsigned int k) {
 
 
 
-void sieveFB(uint8_t *S, factor_base_srcptr FB, unsigned I, unsigned J)
+void sieveFB(uint8_t *S, factor_base_srcptr FB, unsigned I, unsigned J,
+        sublat_ptr sublat)
 {
   ijbasis_t basis;
   ijbasis_init(basis, I, J);

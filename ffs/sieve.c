@@ -178,91 +178,121 @@ int main(int argc, char **argv)
     for (int i = 0; i < 2; ++i)
         factor_base_precomp_lambda(FB[i], qlat);
 
-    // Allocate and init the sieve space
-    uint8_t *S;
-    S = (uint8_t *) malloc(IIJJ*sizeof(uint8_t));
-    ASSERT_ALWAYS(S != NULL);
-    memset(S, 0, IIJJ*sizeof(uint8_t));
-    // Kill the lines with i = 0 or j = 0
-    {
-        S[0] = 255;
-        ij_t i, j;
-        for (ij_set_zero(j); ij_monic_set_next(j, j, J); )
-            S[ijvec_get_start_pos(j, I, J)] = 255;
-        for (ij_set_zero(i); ij_set_next(i, i, I); )
-            S[ijvec_get_offset(i, I)] = 255;
-    }
-
     double t_norms = 0;
     double t_sieve = 0;
     double t_cofact = 0;
     int nrels = 0;
-    
-    for (int twice = 0; twice < 2; twice++) {
-        int side = twice; // put 1-twice here, to do the rational side first.
 
-        // Norm initialization.
-        // convention: if a position contains 255, it must stay like
-        // this. It means that the other side is hopeless.
-        t_norms -= seconds();
-        init_norms(S, ffspol[side], I, J, qlat, qlat->side == side, sublat);
-        t_norms += seconds();
-
-        // sieve
-        t_sieve -= seconds();
-        sieveFB(S, FB[side], I, J);
-        t_sieve += seconds();
-
-        // mark survivors
-        // no need to check if this is a valid position
-        uint8_t *Sptr = S;
-        for (unsigned int k = 0; k < IIJJ; ++k, ++Sptr) {
-            if (*Sptr > threshold[side])
-                *Sptr = 255; 
+    // Loop on all sublattices
+    // In the no_sublat case, this loops degenerates into one pass, since
+    // nb = 1.
+    for (sublat->n = 0; sublat->n < sublat->nb; sublat->n++) {
+        if (use_sublat(sublat)) {
+            fprintf(stderr, "# Sublattice (");
+            fppol16_out(stderr, sublat->lat[sublat->n][0]);
+            fprintf(stderr, ", ");
+            fppol16_out(stderr, sublat->lat[sublat->n][1]);
+            fprintf(stderr, ") :\n");
         }
-    }
 
-    t_cofact -= seconds();
-    // survivors cofactorization
-    {
-        fppol_t a, b;
-        ij_t i, j, g;
-        fppol_init(a);
-        fppol_init(b);
+        // Allocate and init the sieve space
+        uint8_t *S;
+        S = (uint8_t *) malloc(IIJJ*sizeof(uint8_t));
+        ASSERT_ALWAYS(S != NULL);
+        memset(S, 0, IIJJ*sizeof(uint8_t));
 
-        for (ij_set_zero(j); ij_monic_set_next(j, j, J); ) {
-            ijpos_t start = ijvec_get_start_pos(j, I, J);
-            for (ij_set_zero(i); ij_set_next(i, i, I); ) {
-                ijpos_t pos = start + ijvec_get_offset(i, I);
-#ifdef TRACE_POS
-                if (pos == TRACE_POS) {
-                    fprintf(stderr, "TRACE_POS(%d): ", pos);
-                    fprintf(stderr, "entering cofactorization, S[pos] = %d\n",
-                            S[pos]);
-                }
-#endif 
-                if (S[pos] != 255) {
-    //                printf("i,j = %u %u\n", i, j);
-                    ij_gcd(g, i, j);
-                    if (ij_deg(g) != 0 && ij_deg(i)>0  && ij_deg(j)>0)
-                        continue;
-                    ij2ab(a, b, i, j, qlat);
-                    nrels += factor_survivor(a, b, ffspol, lpb);
-                }
+        // Kill trivial positions.
+        // When there are no sublattices:
+        //   (i,0) for i != 1
+        //   (0,j) for j != 1
+        // When using sublattices, just the position (0,0)
+        {
+            S[0] = 255;  // that's (0,0)
+            if (!use_sublat(sublat)) {
+                ij_t i, j;
+                for (ij_set_zero(j), ij_monic_set_next(j, j, J);
+                        ij_monic_set_next(j, j, J); )
+                    S[ijvec_get_start_pos(j, I, J)] = 255;
+                for (ij_set_zero(i), ij_set_next(i, i, I);
+                        ij_set_next(i, i, I); )
+                    S[ijvec_get_offset(i, I)] = 255;
             }
         }
-        fppol_clear(a);
-        fppol_clear(b);
-    }
-    t_cofact += seconds();
+
+        for (int twice = 0; twice < 2; twice++) {
+            // This variable allows to change in which order we handle
+            // the polynomials.
+            // Put side = 1 - twice, to do the "rational" side first.
+            int side = twice;
+
+            // Norm initialization.
+            // convention: if a position contains 255, it must stay like
+            // this. It means that the other side is hopeless.
+            t_norms -= seconds();
+            init_norms(S, ffspol[side], I, J, qlat, qlat->side == side, sublat);
+            t_norms += seconds();
+
+            // sieve
+            t_sieve -= seconds();
+            sieveFB(S, FB[side], I, J, sublat);
+            t_sieve += seconds();
+
+            // mark survivors
+            // no need to check if this is a valid position
+            uint8_t *Sptr = S;
+            for (unsigned int k = 0; k < IIJJ; ++k, ++Sptr) {
+                if (*Sptr > threshold[side])
+                    *Sptr = 255; 
+            }
+        }
+
+        t_cofact -= seconds();
+        // survivors cofactorization
+        {
+            fppol_t a, b;
+            ij_t i, j, g;
+            fppol_init(a);
+            fppol_init(b);
+
+            int rci, rcj = 1;
+            for (ij_set_zero(j); rcj; rcj = ij_monic_set_next(j, j, J)) {
+                ijpos_t start = ijvec_get_start_pos(j, I, J);
+                rci = 1;
+                for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
+                    ijpos_t pos = start + ijvec_get_offset(i, I);
+
+                    if (S[pos] != 255) {
+#ifdef TRACE_POS
+                        if (pos == TRACE_POS) {
+                            fprintf(stderr, "TRACE_POS(%d): ", pos);
+                            fprintf(stderr,
+                                    "entering cofactorization, S[pos] = %d\n",
+                                    S[pos]);
+                        }
+#endif 
+                        ij_gcd(g, i, j);
+                        if (ij_deg(g) != 0 && ij_deg(i)>0  && ij_deg(j)>0)
+                            continue;
+                        ij2ab(a, b, i, j, qlat);
+                        nrels += factor_survivor(a, b, ffspol, lpb);
+                    }
+                }
+            }
+            fppol_clear(a);
+            fppol_clear(b);
+        }
+        t_cofact += seconds();
+        
+        free(S);
+    }  // End of loop on sublattices.
 
     fprintf(stdout, "# Total: %d relations found\n", nrels);
-    fprintf(stdout, "# Time spent: %1.1f s (norms); %1.1f s (sieve); %1.1f s (cofact)\n", t_norms, t_sieve, t_cofact);
+    fprintf(stdout, "# Time spent: %1.1f s (norms); %1.1f s"
+            " (sieve); %1.1f s (cofact)\n", t_norms, t_sieve, t_cofact);
     fprintf(stdout, "# Rate: %1.5f s/rel\n", (t_norms+t_sieve+t_cofact)/nrels);
 
     ffspol_clear(ffspol[0]);
     ffspol_clear(ffspol[1]);
-    free(S);
 
     return EXIT_SUCCESS;
 }
