@@ -15,6 +15,7 @@
 #include "timing.h"
 #include "ijvec.h"
 #include "params.h"
+#include "sublat.h"
 
 
 void usage(const char *argv0, const char * missing)
@@ -37,6 +38,7 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "  thresh1 [2*lpb1] survivor threshold on side 1\n");
     fprintf(stderr, "  q    *           q-poly of the special-q\n");
     fprintf(stderr, "  rho  *           rho-poly of the special-q\n");
+    fprintf(stderr, "  sublat           toggle the sublattice sieving\n");
  
     if (missing != NULL)
         fprintf(stderr, "Missing parameter: %s\n", missing);
@@ -54,9 +56,11 @@ int main(int argc, char **argv)
     int lpb[2] = {0, 0};  
     unsigned int threshold[2] = {0, 0};  
     char *argv0 = argv[0];
+    int want_sublat = 0;
 
     param_list pl;
     param_list_init(pl);
+    param_list_configure_knob(pl, "-sublat", &want_sublat);
     argv++, argc--;
     for (; argc;) {
         if (param_list_update_cmdline(pl, &argc, &argv)) {
@@ -141,9 +145,24 @@ int main(int argc, char **argv)
     }
 
     param_list_print_command_line(stderr, pl);
-
-
     param_list_clear(pl);
+
+#ifdef USE_F2
+    sublat_ptr sublat;
+    if (want_sublat)
+        sublat = &nine_sublat[0];
+    else
+        sublat = &no_sublat[0];
+#else
+    if (want_sublat)
+        fprintf(stderr, "# Sorry, no sublattices in characteristic > 2. Ignoring the 'sublat' option\n");
+    sublat_ptr sublat = &no_sublat[0];
+#endif
+
+    // Most of what we do is at the sublattice level. 
+    // So we fix I and J accordingly.
+    I -= sublat->deg;
+    J -= sublat->deg;
 
     // Allocated size of the sieve array.
     unsigned IIJJ = ijvec_get_max_pos(I, J);
