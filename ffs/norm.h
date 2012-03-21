@@ -9,10 +9,11 @@ extern "C" {
 #include "fppol.h"
 #include "ffspol.h"
 #include "types.h"
+#include "sublat.h"
 
 void ffspol_norm(fppol_t norm, ffspol_ptr ffspol, fppol_t a, fppol_t b);
 void init_norms(uint8_t *S, ffspol_ptr ffspol, int I, int J, qlat_t qlat,
-        int sqside);
+        int sqside, sublat_ptr sublat);
 
 #ifdef __cplusplus
 }

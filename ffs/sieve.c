@@ -205,7 +205,7 @@ int main(int argc, char **argv)
         // convention: if a position contains 255, it must stay like
         // this. It means that the other side is hopeless.
         t_norms -= seconds();
-        init_norms(S, ffspol[side], I, J, qlat, qlat->side == side);
+        init_norms(S, ffspol[side], I, J, qlat, qlat->side == side, sublat);
         t_norms += seconds();
 
         // sieve

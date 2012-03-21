@@ -29,7 +29,7 @@ typedef sublat_struct_t * sublat_ptr;
 #error "Please define FPPOL16_ZERO for your field"
 #endif
 
-static sublat_t no_sublat = {{
+static MAYBE_UNUSED sublat_t no_sublat = {{
     1,
     0,
     0,
@@ -76,30 +76,40 @@ static inline int use_sublat(sublat_ptr sublat)
 // The conversion to (a,b) is then the usual ij2ab() function.
 //   hati = i*modulus + i0
 //   hatj = j*modulus + j0
+
 static inline
-void ij_convert_sublat(ijvec_t W, ijvec_t V, sublat_ptr sublat)
+void ij_convert_sublat(ij_t hati, ij_t hatj, ij_t i, ij_t j,
+        sublat_ptr sublat)
 {
     if (use_sublat(sublat)) {
 #ifdef USE_F2
         // Implemented only for the case t*(t+1) in char 2.
-        ASSERT(sublat == &nine_sublat[0]);
+        ASSERT(sublat->modulus[0] == 6);
         ij_t tmp0, tmp1;
-        ij_mul_ti(tmp0, V->i, 1);
-        ij_mul_ti(tmp1, V->i, 2);
+        ij_mul_ti(tmp0, i, 1);
+        ij_mul_ti(tmp1, i, 2);
         ij_add(tmp0, tmp0, tmp1);
         ij_set_16(tmp1, sublat->lat[sublat->n][0]);
-        ij_add(W->i, tmp0, tmp1);
-        ij_mul_ti(tmp0, V->j, 1);
-        ij_mul_ti(tmp1, V->j, 2);
+        ij_add(hati, tmp0, tmp1);
+        ij_mul_ti(tmp0, j, 1);
+        ij_mul_ti(tmp1, j, 2);
         ij_add(tmp0, tmp0, tmp1);
         ij_set_16(tmp1, sublat->lat[sublat->n][1]);
-        ij_add(W->j, tmp0, tmp1);
+        ij_add(hatj, tmp0, tmp1);
 #else
         ASSERT(0);
 #endif
     } else {
-        ijvec_set(W, V);
+        ij_set(hati, i);
+        ij_set(hatj, j);
     }
+}
+
+// the same for ijvec_t's.
+static inline
+void ijvec_convert_sublat(ijvec_t W, ijvec_t V, sublat_ptr sublat)
+{
+    ij_convert_sublat(W->i, W->j, V->i, V->j, sublat);
 }
 
 

@@ -8,6 +8,7 @@
 #include "norm.h"
 #include "qlat.h"
 #include "ijvec.h"
+#include "sublat.h"
 
 
 
@@ -266,7 +267,7 @@ int deg_norm(ffspol_ptr ffspol, fppol_t a, fppol_t b)
    */
 
 void init_norms(uint8_t *S, ffspol_ptr ffspol, int I, int J, qlat_t qlat,
-        int sqside)
+        int sqside, sublat_ptr sublat)
 {
   fppol_t a, b;
   fppol_init(a);
@@ -276,29 +277,35 @@ void init_norms(uint8_t *S, ffspol_ptr ffspol, int I, int J, qlat_t qlat,
       degq = sq_deg(qlat->q);
 
   ij_t i, j;
-  for (ij_set_zero(j); ij_monic_set_next(j, j, J); ) {
+  ij_t hati, hatj;
+  int rci, rcj = 1;
+  for (ij_set_zero(j); rcj; rcj = ij_monic_set_next(j, j, J)) {
     ijpos_t start = ijvec_get_start_pos(j, I, J);
-    for (ij_set_zero(i); ij_set_next(i, i, I); ) {
+    rci = 1;
+    for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
       ijpos_t pos = start + ijvec_get_offset(i, I);
+ 
+      if (S[pos] != 255) {
+        // If we have sublattices, have to convert (i,j) to (hat i, hat j)
+        ij_convert_sublat(hati, hatj, i, j, sublat);
 #ifdef TRACE_POS
-      if (pos == TRACE_POS) {
-          fprintf(stderr, "TRACE_POS(%d): (i,j) = (", pos);
-          ij_out(stderr, i); fprintf(stderr, " ");
-          ij_out(stderr, j); fprintf(stderr, ")\n");
+        if (pos == TRACE_POS) {
+          fprintf(stderr, "TRACE_POS(%d): (hat i, hat j) = (", pos);
+          ij_out(stderr, hati); fprintf(stderr, " ");
+          ij_out(stderr, hatj); fprintf(stderr, ")\n");
           fprintf(stderr, "TRACE_POS(%d): norm = ", pos);
           fppol_t norm;
           fppol_init(norm);
-          ij2ab(a, b, i, j, qlat);
+          ij2ab(a, b, hati, hatj, qlat);
           ffspol_norm(norm, ffspol, a, b);
           fppol_out(stderr, norm);
           fppol_clear(norm);
           fprintf(stderr, "\n");
           fprintf(stderr, "TRACE_POS(%d): degnorm - deg(sq) = %d\n",
                   position, fppol_deg(norm)-degq);
-      }
+        }
 #endif
-      if (S[pos] != 255) {
-        ij2ab(a, b, i, j, qlat);
+        ij2ab(a, b, hati, hatj, qlat);
         int deg = deg_norm(ffspol, a, b);
         if (deg > 0) {
           ASSERT_ALWAYS(deg < 255);

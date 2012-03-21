@@ -5,6 +5,10 @@
 
 NTL_CLIENT
 
+// Yurk, that's ugly.
+// Anyway, this piece of C++ is not supposed to stay for long.
+#define _Bool int
+
 #include "fppol.h"
 #include "types.h"
 #include "macros.h"
