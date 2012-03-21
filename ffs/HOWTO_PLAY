@@ -38,7 +38,7 @@ Recipe to run an example (as of end of Mar 7, 2012).
   Parameters (including q,rho) can be changed on the command-line, for
   instance:
 
-  build/f2/sieve param.2.127 -I 12 -lpb1 24 param.2.127
+  build/f2/sieve param.2.127 -I 12 -lpb1 24
 
 - debug! ;-)
 
