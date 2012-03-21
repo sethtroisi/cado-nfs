@@ -250,4 +250,67 @@ typedef qlat_struct_t qlat_t[1];
 typedef qlat_struct_t* qlat_ptr;
 typedef const qlat_struct_t* qlat_srcptr;
 
+
+/* Vector in the reduced q-lattice as a pair of polynomials (i,j).
+ * Note that, by convention, j should be kept monic.
+ *****************************************************************************/
+
+// Structure definition.
+typedef struct {
+  ij_t i;
+  ij_t j;
+} __ijvec_struct;
+
+// Type and pointer shorthands.
+typedef       __ijvec_struct  ijvec_t[1];
+typedef       __ijvec_struct *ijvec_ptr;
+typedef const __ijvec_struct *ijvec_srcptr;
+
+
+/* Basis of the p-lattice seen as a GF(p)-vector space of (i,j)-vectors.
+ *****************************************************************************/
+
+// Structure definition.
+typedef struct {
+  unsigned I, J;
+  unsigned dim;
+  ijvec_t *v;
+} __ijbasis_struct;
+
+// Type and pointer shorthands.
+typedef       __ijbasis_struct  ijbasis_t[1];
+typedef       __ijbasis_struct *ijbasis_ptr;
+typedef const __ijbasis_struct *ijbasis_srcptr;
+
+
+// Element of the factor base as an ideal gothp = (p, r).
+// Given the two vectors (a0, b0) and (a1, b1) of the reduced q-lattice,
+// lambda is precomputed as lambda = - (a1 - r*b1) / (a0 - r*b0) mod p.
+// In the case of a projective root (i.e., a0 - r*b0 = 0 mod p),
+// proj is set to 1.
+// TODO: with alignements, we loose a lot of space
+// See the types in cado-nfs and try to imitate ?
+typedef struct {
+  fbprime_t p;
+  fbprime_t r;
+  fbprime_t lambda;
+  ij_t      tildep;    // 1/p mod sublat_info.modulus
+  uint8_t   degp;
+  _Bool     proj;
+} __fbideal_struct;
+
+typedef       __fbideal_struct  fbideal_t[1];
+typedef       __fbideal_struct *fbideal_ptr;
+typedef const __fbideal_struct *fbideal_srcptr;
+
+typedef struct {
+  unsigned   n;  // nb of entries in the factor base
+  fbideal_t *elts;
+} __factor_base_struct;
+
+typedef       __factor_base_struct  factor_base_t[1];
+typedef       __factor_base_struct *factor_base_ptr;
+typedef const __factor_base_struct *factor_base_srcptr;
+
+
 #endif   /* __TYPES_H__ */

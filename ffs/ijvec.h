@@ -2,24 +2,11 @@
 #define __IJVEC_H__
 
 #include "types.h"
-#include "fb.h"
-
 
 
 /* Vector in the reduced q-lattice as a pair of polynomials (i,j).
  * Note that, by convention, j should be kept monic.
  *****************************************************************************/
-
-// Structure definition.
-typedef struct {
-  ij_t i;
-  ij_t j;
-} __ijvec_struct;
-
-// Type and pointer shorthands.
-typedef       __ijvec_struct  ijvec_t[1];
-typedef       __ijvec_struct *ijvec_ptr;
-typedef const __ijvec_struct *ijvec_srcptr;
 
 // Vector assignement, addition, mul_by_t^i, ...
 static inline
@@ -111,23 +98,12 @@ int ijvec_set_pos(ijvec_ptr v, ijpos_t pos, unsigned I, unsigned J)
 /* Basis of the p-lattice seen as a GF(p)-vector space of (i,j)-vectors.
  *****************************************************************************/
 
-// Structure definition.
-typedef struct {
-  unsigned I, J;
-  unsigned dim;
-  ijvec_t *v;
-} __ijbasis_struct;
-
-// Type and pointer shorthands.
-typedef       __ijbasis_struct  ijbasis_t[1];
-typedef       __ijbasis_struct *ijbasis_ptr;
-typedef const __ijbasis_struct *ijbasis_srcptr;
-
 // Allocate memory for an (i,j)-basis of degrees bounded by I and J.
 void ijbasis_init(ijbasis_ptr basis, unsigned I, unsigned J);
 
 // Compute the (i,j)-basis of a given p-lattice.
-void ijbasis_compute(ijbasis_ptr basis, fbideal_srcptr gothp);
+void ijbasis_compute(ijbasis_ptr euclid, ijbasis_ptr basis,
+        fbideal_srcptr gothp);
 
 // Clean up memory.
 void ijbasis_clear(ijbasis_ptr basis);
