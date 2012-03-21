@@ -21,7 +21,7 @@ typedef       __ijvec_struct  ijvec_t[1];
 typedef       __ijvec_struct *ijvec_ptr;
 typedef const __ijvec_struct *ijvec_srcptr;
 
-// Vector addition.
+// Vector assignement, addition, mul_by_t^i, ...
 static inline
 void ijvec_add(ijvec_ptr r, ijvec_srcptr u, ijvec_srcptr v)
 {
@@ -29,6 +29,23 @@ void ijvec_add(ijvec_ptr r, ijvec_srcptr u, ijvec_srcptr v)
   ij_add(r->j, u->j, v->j);
 }
 
+static inline
+void ijvec_set_zero(ijvec_ptr r) {
+  ij_set_zero(r->i);
+  ij_set_zero(r->j);
+}
+
+static inline
+void ijvec_set(ijvec_ptr r, ijvec_srcptr u) {
+  ij_set(r->i, u->i);
+  ij_set(r->j, u->j);
+}
+
+static inline
+void ijvec_mul_ti(ijvec_ptr r, ijvec_srcptr u, unsigned i) {
+  ij_mul_ti(r->i, u->i, i);
+  ij_mul_ti(r->j, u->j, i);
+}
 
 // Corresponding position as an unsigned int.
 typedef unsigned ijpos_t;
