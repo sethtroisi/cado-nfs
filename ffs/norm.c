@@ -302,7 +302,7 @@ void init_norms(uint8_t *S, ffspol_ptr ffspol, int I, int J, qlat_t qlat,
           fppol_clear(norm);
           fprintf(stderr, "\n");
           fprintf(stderr, "TRACE_POS(%d): degnorm - deg(sq) = %d\n",
-                  position, fppol_deg(norm)-degq);
+                  pos, fppol_deg(norm)-degq);
         }
 #endif
         ij2ab(a, b, hati, hatj, qlat);
