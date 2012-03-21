@@ -125,7 +125,7 @@ int main(int argc, char **argv)
             fprintf(stderr, "Could not parse rho: %s\n", sqstr);
             exit(EXIT_FAILURE);
         }
-        if (sq_deg(qlat->q) > lpb0) {
+        if (sq_deg(qlat->q) > lpb[0]) {
             fprintf(stderr, "WARNING: not a good idea to have a special-q beyond the large prime bound!\n");
         }
     }
