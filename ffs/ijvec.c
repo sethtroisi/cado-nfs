@@ -34,9 +34,22 @@ unsigned fill_gap(ijvec_t *v, fbprime_t i, fbprime_t j, unsigned I, unsigned J)
   return n;
 }
 
+static inline
+unsigned fill_euclid(ijvec_t *v, fbprime_t i, fbprime_t j, 
+        int degI, int degJ)
+{
+    if ((fbprime_deg(i) < degI) && (fbprime_deg(j) < degJ)) {
+        ij_set_fbprime(v[0]->i, i);
+        ij_set_fbprime(v[0]->j, j);
+        return 1;
+    }
+    return 0;
+}
+
 
 // Compute the (i,j)-basis of a given p-lattice.
-void ijbasis_compute(ijbasis_ptr basis, fbideal_srcptr gothp)
+void ijbasis_compute(ijbasis_ptr euclid, ijbasis_ptr basis,
+        fbideal_srcptr gothp)
 {
   unsigned I = basis->I;
   unsigned J = basis->J;
@@ -44,6 +57,7 @@ void ijbasis_compute(ijbasis_ptr basis, fbideal_srcptr gothp)
 
   // The form of the basis is different for small p and for large p.
   if (L < I) {
+    euclid = NULL;  // not needed in that case
     // Basis is { (     p*t^k,       0  ) : k in [0..I-L-1] } join
     //          { (lambda*t^k mod p, t^k) : k in [0..J-1]   }.
     basis->dim = I+J-L;
@@ -64,12 +78,16 @@ void ijbasis_compute(ijbasis_ptr basis, fbideal_srcptr gothp)
   else {
     // Basis is obtained from an Euclidian algorithm on
     // (p, 0) and (lambda, 1). See tex file.
+    unsigned hatI = euclid->I;
+    unsigned hatJ = euclid->J;
     fbprime_t alpha0, beta0, alpha1, beta1, q;
     fbprime_set     (alpha0, gothp->p);
     fbprime_set_zero(beta0);
     fbprime_set     (alpha1, gothp->lambda);
     fbprime_set_one (beta1);
     basis->dim = fill_gap(basis->v, alpha1, beta1, I, J);
+    euclid->dim = fill_euclid(euclid->v, alpha1, beta1, hatI, hatJ);
+
     while ((unsigned)fbprime_deg(beta1) < J && !fbprime_is_zero(alpha1)) {
       fbprime_divrem(q, alpha0, alpha0, alpha1);
       fbprime_submul(beta0, beta1, q);
@@ -77,6 +95,8 @@ void ijbasis_compute(ijbasis_ptr basis, fbideal_srcptr gothp)
       fbprime_swap  (beta0,  beta1);
       basis->dim += fill_gap(basis->v+basis->dim, alpha1, beta1,
                              MIN((unsigned)fbprime_deg(alpha0), I), J);
+      euclid->dim += fill_euclid(euclid->v + euclid->dim, alpha1, beta1,
+              hatI, hatJ);
     }
   }
 }

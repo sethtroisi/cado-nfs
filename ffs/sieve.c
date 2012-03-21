@@ -179,7 +179,7 @@ int main(int argc, char **argv)
 
     // Precompute lambda for each element of the factor bases.
     for (int i = 0; i < 2; ++i)
-        factor_base_precomp_lambda(FB[i], qlat);
+        factor_base_precomp_lambda(FB[i], qlat, sublat);
 
     double t_norms = 0;
     double t_sieve = 0;
@@ -254,6 +254,7 @@ int main(int argc, char **argv)
         {
             fppol_t a, b;
             ij_t i, j, g;
+            ij_t hati, hatj;
             fppol_init(a);
             fppol_init(b);
 
@@ -273,10 +274,11 @@ int main(int argc, char **argv)
                                     S[pos]);
                         }
 #endif 
-                        ij_gcd(g, i, j);
-                        if (ij_deg(g) != 0 && ij_deg(i)>0  && ij_deg(j)>0)
+                        ij_convert_sublat(hati, hatj, i, j, sublat);
+                        ij_gcd(g, hati, hatj);
+                        if (ij_deg(g) != 0 && ij_deg(hati)>0  && ij_deg(hatj)>0)
                             continue;
-                        ij2ab(a, b, i, j, qlat);
+                        ij2ab(a, b, hati, hatj, qlat);
                         nrels += factor_survivor(a, b, ffspol, lpb);
                     }
                 }

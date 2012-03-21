@@ -88,8 +88,13 @@ int factor_base_init(factor_base_ptr FB, const char *filename, unsigned maxdeg)
 
 
 // Precompute lambda for each element of the factor base.
-void factor_base_precomp_lambda(factor_base_ptr FB, qlat_srcptr qlat)
+void factor_base_precomp_lambda(factor_base_ptr FB, qlat_srcptr qlat,
+        sublat_ptr sublat)
 {
+  ij_t ijmod;
+  if (use_sublat(sublat))
+    ij_set_16(ijmod, sublat->modulus);
+
   for (fbideal_ptr gothp = *FB->elts; gothp != FB->elts[FB->n]; ++gothp) {
     fbprime_t t0, t1;
     fbprime_mulmod(t0, qlat->b0, gothp->r, gothp->p);
@@ -105,6 +110,17 @@ void factor_base_precomp_lambda(factor_base_ptr FB, qlat_srcptr qlat)
     fbprime_sub   (t1, t1, qlat->a1);
     fbprime_rem   (t1, t1, gothp->p);
     fbprime_mulmod(gothp->lambda, t0, t1, gothp->p);
+
+    // In case we are using sublattices, precompute 1/p mod modulus
+    if (use_sublat(sublat)) {
+      int ret;
+      ij_t tmp;
+      ij_set_fbprime(tmp, gothp->p);
+      ij_rem(tmp, tmp, ijmod);
+      ret = ij_invmod(gothp->tildep, tmp, ijmod);
+      if (!ret)
+        ij_set_zero(gothp->tildep);
+    }
   }
 }
 
