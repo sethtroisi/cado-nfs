@@ -41,16 +41,18 @@ sub analyze_file {
                 $res->{'rev'}=$1;
                 $res->{'rev'}.='#M' if $2;
             }
-            if (/^Total (\d+) rows (\d+) cols .* (\d+) coeffs$/) {
+            if (/^(?:Total|.*?:) (\d+) rows (\d+) cols .*?\s*(\d+) coeffs$/) {
                 my $N = int($1/1.0e6);
                 my $w = int($3/$1 + 0.5);
-                if ($1 != 55229198 || $2 != 55229006 || $3 != 4525926812) {
-                    $res->{'tail'}=" ! ${N}M_$w";
-                }
+                $res->{'matdesc'}="${N}M_$w";
             }
             if (m{^(\d+) nodes on (\w+)}) {
                 $res->{'cluster'}=sprintf('%-10s', $2);
                 $res->{'nodes'}=$1;
+            }
+            if (m{^Running on (\w+), (\d+) nodes}) {
+                $res->{'cluster'}=sprintf('%-10s', $1);
+                $res->{'nodes'}=$2;
             }
             if (m{^(\d+) nodes, no common name prefix}) {
                 $res->{'cluster'}=sprintf('%-10s', "<no prefix>");
@@ -96,7 +98,7 @@ sub analyze_file {
     for my $k qw/cluster nodes mpi thr/ {
         if (!defined($res->{$k})) {
             print STDERR "$f : missing info for \"$k\"\n";
-            exit;
+            return;
         }
     }
     for my $k qw/jobid tcpu tcomm ttot niter/ {
@@ -108,23 +110,35 @@ sub analyze_file {
     return $res;
 }
 
+my $matrices={};
 my @a=();
 for my $f (@ARGV) {
     my $res = analyze_file($f);
     next unless $res;
-    my $text="$res->{'nodes'}" .
-            " $res->{'cluster'}\t($res->{'mpi'} $res->{'thr'})" .
-            "\t$res->{'tcpu'}+$res->{'tcomm'}=$res->{'ttot'}" .
-            "  [$res->{'rev'} \@$res->{'niter'} $res->{'jobid'}]$res->{'tail'}\n";
     my $score;
     if ($res->{'ttot'} ne '???') {
         $score=$res->{'nodes'}*$res->{'ttot'};
     } else {
         $score=9999;
     }
-    push @a, [$score, $text];
+    $matrices->{$res->{'matdesc'}}++;   # autovivify
+    push @a, [$score, $res];
 }
 @a = sort { $a->[0] <=> $b->[0] } @a;
-for (@a) {
-    print "$_->[1]";
+
+for my $m (sort { $matrices->{$b} <=> $matrices->{$a} } (keys %$matrices)) {
+
+    my $t = "Matrix: $m ($matrices->{$m})";
+    my $l = int((80-length($t)-4)/2);
+    print '-' x $l, " $t ", '-' x $l, "\n";
+
+    for (@a) {
+        my $res = $_->[1];
+        next if $res->{'matdesc'} ne $m;
+        my $text="$res->{'nodes'}" .
+        " $res->{'cluster'}\t($res->{'mpi'} $res->{'thr'})" .
+        "\t$res->{'tcpu'}+$res->{'tcomm'}=$res->{'ttot'}" .
+        "  [$res->{'rev'} \@$res->{'niter'} $res->{'jobid'}]$res->{'tail'}";
+        print "$text\n";
+    }
 }
