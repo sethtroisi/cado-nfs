@@ -16,6 +16,21 @@
 #include "ijvec.h"
 #include "params.h"
 #include "sublat.h"
+#include "smoothness.h"
+
+int my_factor_survivor(fppol_t a, fppol_t b, ffspol_t* F, int *B) 
+{
+    fppol_t Nab;
+    fppol_init(Nab);
+    for (int twice = 0; twice < 2; twice++) {
+        ffspol_norm(Nab, F[twice], a, b);
+        if (!fppol_is_smooth(Nab, B[twice])) {
+            fppol_clear(Nab);
+            return 0;
+        }
+    }
+    return factor_survivor(a, b, F, B);
+}
 
 
 void usage(const char *argv0, const char * missing)
@@ -279,7 +294,8 @@ int main(int argc, char **argv)
                         if (ij_deg(g) != 0 && ij_deg(hati)>0  && ij_deg(hatj)>0)
                             continue;
                         ij2ab(a, b, hati, hatj, qlat);
-                        nrels += factor_survivor(a, b, ffspol, lpb);
+                        nrels += my_factor_survivor(a, b, ffspol, lpb);
+                  //      nrels += factor_survivor(a, b, ffspol, lpb);
                     }
                 }
             }
