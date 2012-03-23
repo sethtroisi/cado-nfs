@@ -15,7 +15,6 @@
 #define DEBUG 0
 
 /* possible to change */
-#define L1_SIZE 12288 // ~ l1 cache.
 #define TOPALPHA_EACH_SIEVEARRAY 16 // for each "SIEVEARRAY_SIZE", record top N poly's alpha avalues.
 #define TOPE_EACH_SUBLATTICE 8 // for sublattice, record top 8 poly's E avalues.
 #define LEN_SUBLATTICE_PRIMES 10
@@ -30,9 +29,6 @@
 #define SHORT_SIEVEARRAY_V_SIZE 16777216
 #define SHORT_SIEVEARRAY_U_SIZE 16
 #define SHORT_NUM_SIEVE_SUBLATTICE 16 // only sieve for top 16 sublattices.
-
-// "TUNE_" parameters are used for test sieving.
-#define TUNE_SIEVEARRAY_SIZE L1_SIZE / 2
 
 /* Some structs for parameters */
 typedef struct {
@@ -128,6 +124,10 @@ typedef _rsbound_t rsbound_t[1];
 
 
 /* --- declarations --- */
+
+extern unsigned int L1_CACHESIZE;
+
+extern unsigned int TUNE_SIEVEARRAY_SIZE;
 
 extern const unsigned int primes[];
 

@@ -636,6 +636,8 @@ utils/fix-endianness.h
 utils/cado-endian.h
 utils/memusage.c
 utils/memusage.h
+utils/cachesize_cpuid.c
+utils/cachesize_guess.c
 linalg/bwc/bcast-file.c
 linalg/bwc/raw_matrix_u32.h
 linalg/bwc/mpfq/Makefile.mpfq

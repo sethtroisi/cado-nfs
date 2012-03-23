@@ -448,7 +448,23 @@ ropt_main ( rsstr_t rs,
             param_t param,
             int verbose )
 {
+  /* L1 cache size */
+  int ret = cachesize_cpuid (0);
+  if ( (2048 <= ret)  || (ret <= (1 << 20)) ) {
+    L1_CACHESIZE = ret / 2;
+    TUNE_SIEVEARRAY_SIZE = L1_CACHESIZE / 2;
+  }
+  else {
+    ret = cachesize_guess (0);
+    if ( (2048 <= ret)  || (ret <= (1 << 20)) ) {
+      L1_CACHESIZE = ret / 2;
+      TUNE_SIEVEARRAY_SIZE = L1_CACHESIZE / 2;
+    }
+  }
 
+  if (verbose == 2)
+    fprintf (stderr, "# Info: L1_CACHESIZE/2: %d, TUNE_SIEVEARRAY_SIZE: %d.\n", L1_CACHESIZE, TUNE_SIEVEARRAY_SIZE);
+  
   /* stage 2 (sieve) only */
   if (param->flag == 2) {
     if (rs->d == 5) {
