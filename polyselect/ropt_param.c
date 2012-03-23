@@ -5,6 +5,11 @@
 
 #include "ropt_param.h"
 
+/* "TUNE_" parameters are used for test sieving. 
+   L1 size will then be auto-determined. */
+unsigned int L1_CACHESIZE = 12288;
+unsigned int TUNE_SIEVEARRAY_SIZE = 6144;
+
 /* Define primes, exp_alpha. */
 const unsigned int primes[NP] = {
   2, 3, 5, 7, 11, 13, 17, 19, 23, 29,

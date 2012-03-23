@@ -5,6 +5,11 @@
 #include "ropt_stage2.h"
 
 /* -- declarations -- */
+
+int cachesize_cpuid(int verbose);
+
+int cachesize_guess(int verbose);
+
 void ropt_main ( rsstr_t rs,
                  bestpoly_t bestpoly,
                  param_t param,

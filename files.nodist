@@ -72,7 +72,6 @@ sqrt/allsqrt.c
 sqrt/algsqrt.c
 utils/README_POLYNOMIALS
 utils/CMakeLists-nodist.txt
-utils/cache.c
 utils/cachesize.c
 utils/build-testcases-rootfinder.m
 linalg/bwc/CMakeLists-nodist.txt

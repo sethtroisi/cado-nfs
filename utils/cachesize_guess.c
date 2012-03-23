@@ -1,10 +1,8 @@
 /* program to determine the size of the L1 cache */
-
 #include "cado.h"
 
 /* we assume the L1 cache has size 2^k */
 #define L1_NUM 11
-
 #define N 1000000000
 
 #include <stdio.h>
@@ -13,7 +11,7 @@
 #include "utils.h"
 
 int
-main ()
+cachesize_guess (int verbose)
 {
   unsigned long T[L1_NUM][2] = {{10, 1021}, {11, 2039}, {12, 4093},
                                 {13, 8191}, {14, 16381}, {15, 32749},
@@ -48,12 +46,15 @@ main ()
         mintime = t;
       /* we consider that if the time increases by more than 50% with respect
          to the minimum, we have exceeded the cache size */
-      if (t < mintime + (mintime / 2))
+      /* changed to 25% as 50% gives wrong result for my computer - Shi */
+      if (t < mintime + (mintime / 4))
         L1 = n;
-      fprintf (stderr, "size=%lu time=%" PRIu64 "(%1.2f)\n", n, t,
-               (double) t / (double) mintime);
+      if (verbose)
+        fprintf (stderr, "size=%lu time=%" PRIu64 "(%1.2f)\n", n, t,
+                 (double) t / (double) mintime);
       free (s0);
     }
-  printf ("#define L1_CACHE_SIZE %lu\n", L1);
+  if (verbose)
+    printf ("#define L1_CACHE_SIZE %lu\n", L1);
   return 0;
 }

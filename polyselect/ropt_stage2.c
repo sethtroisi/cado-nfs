@@ -563,7 +563,7 @@ rootsieve_run_multroot ( sievearray_t sa,
 /*
   Root sieve for f + u*x*g(x) + v*g(x)
 */
-static void
+static inline void
 rootsieve_uv_oneblock ( sievearray_t sa,
                         rsstr_t rs,
                         rsbound_t rsbound,
@@ -579,7 +579,7 @@ rootsieve_uv_oneblock ( sievearray_t sa,
   long j_idx[primes[rsparam->len_p_rs]], j_idx_i0[primes[rsparam->len_p_rs]];
   int16_t subsgl[rsparam->len_p_rs], submul[rsparam->len_p_rs];
   char roottype_flag[rsparam->len_p_rs];
-  bblock_size = L1_SIZE;
+  bblock_size = L1_CACHESIZE;
   totnbb = (unsigned int) ((rsbound->Bmax - rsbound->Bmin + 1) / bblock_size);
 
 #if DEBUG_ROOTSIEVE_UV_ONEBLOCK
