@@ -224,7 +224,6 @@ polyselect/CMakeLists.txt
 polyselect/Makefile
 polyselect/auxiliary.c
 polyselect/auxiliary.h
-polyselect/polyselect.c
 polyselect/polyselect2.c
 polyselect/polyselect2l.c
 polyselect/rotate.c
