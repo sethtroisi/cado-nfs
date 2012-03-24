@@ -17,7 +17,7 @@ cachesize_guess (int verbose)
                                 {13, 8191}, {14, 16381}, {15, 32749},
                                 {16, 65521}, {17, 131071}, {18, 262139},
                                 {19, 524287}, {20, 1048573}};
-  unsigned long i, j, k, p, q, n, mask, L1 = 0;
+  unsigned long i, j, k, q, n, mask, L1 = 0;
   uint64_t t, mintime = ~((uint64_t) 0);
   char *s, *s0;
 
@@ -25,7 +25,6 @@ cachesize_guess (int verbose)
     {
       n = 1 << T[i][0];
       mask = n - 1;
-      p = T[i][1];
       s0 = malloc (2 * n * sizeof (char));
       /* align s on a multiple of n */
       s = s0 + (n - ((unsigned long) s0 & mask));
