@@ -82,6 +82,7 @@ unsigned long collisionsQ[MAXQ];
 double total_adminus2[MAXQ];
 double total_lognorm[MAXQ];
 double best_logmu[11];
+double rootsieve_time = 0.0;
 
 void
 roots_init (roots_t R)
@@ -334,10 +335,11 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 
 		  mpz_neg (m, g[0]);
 
+                  rootsieve_time -= seconds ();
 #ifdef NEW_ROOTSIEVE
 		  if (d > 4) {
-			   ropt_polyselect (f, d, m, g[1], N, MAX_k, 0); // verbose = 2 to see details.
-			   mpz_neg (g[0], m);
+                    ropt_polyselect (f, d, m, g[1], N, MAX_k, 0); // verbose = 2 to see details.
+                    mpz_neg (g[0], m);
 		  }
 		  else {
 			   unsigned long alim = 2000;
@@ -352,7 +354,8 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 		  mpz_neg (g[0], m);
 		  /* optimize again, but only translation */
 		  optimize_aux (f, d, g, 0, 0, CIRCULAR);
-#endif
+#endif /* NEW_ROOTSIEVE */
+                  rootsieve_time += seconds ();
 
 		  nroots = numberOfRealRoots (f, d, 0, 0);
 		  skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
@@ -1215,6 +1218,7 @@ main (int argc, char *argv[])
 
 	 /* print total time (format for cpu_time.sh) */
 	 printf ("# Total phase took %.2fs\n", seconds () - st0);
+         printf ("# Rootsieve took %.2fs\n", rootsieve_time);
 
 	 if (best_E == 0.0)
 		  printf ("No polynomial found, please increase the ad range or the maxnorm\n");
