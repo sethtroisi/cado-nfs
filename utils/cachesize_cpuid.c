@@ -445,8 +445,10 @@ cachesize_cpuid (int verbose)
     ret = print_intel_cache (verbose);
   else
     {
-      fprintf (stderr, "Error, unknown architecture\n");
-      exit (1);
+      if (verbose) {
+        fprintf (stderr, "Warn, unknown architecture in cachesize_cpuid()\n");
+      }
+      return -1; // continue here.
     }
   return ret * 1024;
 }

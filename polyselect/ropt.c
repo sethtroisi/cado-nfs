@@ -456,7 +456,7 @@ ropt_main ( rsstr_t rs,
   }
   else {
     ret = cachesize_guess (0);
-    if ( (2048 <= ret)  || (ret <= (1 << 20)) ) {
+    if ( (2048 <= ret)  && (ret <= (1 << 20)) ) {
       L1_CACHESIZE = ret / 2;
       TUNE_SIEVEARRAY_SIZE = L1_CACHESIZE / 2;
     }
