@@ -47,15 +47,31 @@
 #endif  /* HAVE_SSE41 */
 
 
+
 /* Define this to check these functions against the m4ri library */
 #define xxxHAVE_M4RI
 #ifdef  HAVE_M4RI
-#include "m4ri/m4ri.h"
+#include "m4ri.h"
 #endif  /* HAVE_M4RI */
+#ifdef  HAVE_M4RIE
+#include "finite_field_givaro.h"
+#include "m4rie.h"
+using namespace M4RIE;
+#endif  /* HAVE_M4RIE */
+
+/* Some older versions of m4ri had limbs in the wrong order. It's now
+ * fixed, as of version 20111203 at least (possibly has been fixed
+ * already for quite a while, no recent check of this was done).
+ */
+#define sometimes_bitrev(x)     (x)
 #include "gauss.h"
 #include "macros.h"
 
-/* This is **only** for 64 * 64 matrices */
+
+#include "mpfq/mpfq_2_64.h"
+#include "mpfq/mpfq_2_128.h"
+
+/* The following is **only** for 64 * 64 matrices */
 
 #define WBITS   64
 typedef uint64_t mat64[64];
@@ -760,7 +776,7 @@ static inline void mul_N64_6464_transB(uint64_t *C,
                    const uint64_t *A,
                    const uint64_t *B, unsigned long m)
 {
-    uint64_t *tb = malloc(64 * sizeof(uint64_t));
+    uint64_t *tb = (uint64_t *) malloc(64 * sizeof(uint64_t));
     transp_6464(tb, B);
     mul_N64_T6464(C, A, tb, m);
     free(tb);
@@ -770,7 +786,7 @@ static inline void mul_N64_T6464_transB(uint64_t *C,
                    const uint64_t *A,
                    const uint64_t *B, unsigned long m)
 {
-    uint64_t *tb = malloc(64 * sizeof(uint64_t));
+    uint64_t *tb = (uint64_t *) malloc(64 * sizeof(uint64_t));
     transp_6464(tb, B);
     mul_N64_6464(C, A, tb, m);
     free(tb);
@@ -997,6 +1013,8 @@ void m64pol_mul_kara(m64pol_ptr r, m64pol_srcptr a1, m64pol_srcptr a2, unsigned 
     assert(r != a1 && r != a2);
     assert(n1 == n2);
     assert((n1 & (n1 - 1)) == 0);
+    /* As is certainly not surprising, karatsuba wins as early on as one
+     * can imagine */
     if (n1 == 1) {
         m64pol_mul(r, a1, a2, n1, n2);
         return;
@@ -1026,6 +1044,203 @@ void m64pol_addmul_kara(m64pol_ptr r, m64pol_srcptr a1, m64pol_srcptr a2, unsign
     free(t);
 }
 
+void m64pol_mul_gf2_64_bitslice(m64pol_ptr r, m64pol_srcptr a1, m64pol_srcptr a2)
+{
+    unsigned int n1 = 64;
+    unsigned int n2 = 64;
+    mat64 * t = (mat64 *) malloc((n1 + n2 -1) * sizeof(mat64));
+    m64pol_mul_kara(t, a1, a2, n1, n2);
+    /* This reduces modulo the polynomial x^64+x^4+x^3+x+1 */
+    for(unsigned int i = 64 ; i-- > 0 ; ) {
+        add_6464_6464(t[i+4], t[i+4], t[i+64]);
+        add_6464_6464(t[i+3], t[i+3], t[i+64]);
+        add_6464_6464(t[i+1], t[i+1], t[i+64]);
+        add_6464_6464(t[i  ], t[i  ], t[i+64]);
+    }
+    memcpy(r, t, 64 * sizeof(mat64));
+    free(t);
+}
+
+void m64pol_scalmul_gf2_64_bitslice(m64pol_ptr r, m64pol_srcptr a, unsigned long * s)
+{
+    unsigned int n1 = 64;
+    unsigned int n2 = 64;
+    mat64 * t = (mat64 *) malloc((n1 + n2 -1) * sizeof(mat64));
+    memset(t, 0, (n1 + n2 -1) * sizeof(mat64));
+    for(unsigned int i = 0 ; i < 64 ; i++) {
+        if (((s[0]>>i)&1UL)==0) continue;
+        m64pol_add(t+i, t+i, a, 64);
+        // for(unsigned int j = 0 ; j < 64 ; j++) { add_6464_6464(t[i+j], t[i+j], a[j]); }
+    }
+    /* This reduces modulo the polynomial x^64+x^4+x^3+x+1 */
+    for(unsigned int i = 64 ; i-- > 0 ; ) {
+        add_6464_6464(t[i+4], t[i+4], t[i+64]);
+        add_6464_6464(t[i+3], t[i+3], t[i+64]);
+        add_6464_6464(t[i+1], t[i+1], t[i+64]);
+        add_6464_6464(t[i  ], t[i  ], t[i+64]);
+    }
+    memcpy(r, t, 64 * sizeof(mat64));
+    free(t);
+}
+
+void m64pol_scalmul_gf2_64_bitslice2(m64pol_ptr r, m64pol_srcptr a, unsigned long * s)
+{
+    /* Now try with precomputation of multiples. We'll do only four of
+     * them to start with. */
+    unsigned int n1 = 64;
+    unsigned int n2 = 64;
+    mat64 * t = (mat64 *) malloc((n1 + n2 -1) * sizeof(mat64));
+    memset(t, 0, (n1 + n2 -1) * sizeof(mat64));
+
+    /* Precompute multiples of a */
+    /* The best value for NMULTS depends of course on the cache size. 2
+     * and 4 ain't bad choices. Support for non-power-of-2 NMULTS should
+     * be looked at (since presently 4 wins over 2).
+     */
+#define NMULTS  2
+    mat64 * am_area = (mat64 *) malloc((1 << NMULTS) * (64 + NMULTS - 1) * sizeof(mat64));
+    mat64 * am[1 << NMULTS];
+
+    for(unsigned int i = 0 ; i < (1 << NMULTS) ; i++) {
+        am[i] = am_area + i * (64 + NMULTS - 1);
+    }
+
+    memset(am_area, 0, (1 << NMULTS) * (64 + NMULTS - 1) * sizeof(mat64));
+    memcpy(am[1], a, 64 * sizeof(mat64));
+    for(unsigned int j = 1 ; j < NMULTS ; j++) {
+        /* Duplicate all stuff having msb set from level below */
+        for(unsigned int i = (1 << (j-1)) ; i < (1 << j) ; i++) {
+            memcpy(am[(i<<1)] + 1, am[i], (64 + j - 1) * sizeof(mat64));
+            m64pol_add(am[(i<<1)+1], am[(i<<1)+1], am[1], 64);
+        }
+    }
+
+    unsigned long v = *s;
+    for(unsigned int i = 0 ; i < 64 ; i+=NMULTS, v>>=NMULTS) {
+        m64pol_add(t + i, t + i, am[v & ((1<<NMULTS)-1)], 64+(NMULTS-1));
+    }
+    free(am_area);
+
+    /* This reduces modulo the polynomial x^64+x^4+x^3+x+1 */
+    for(unsigned int i = 64 ; i-- > 0 ; ) {
+        add_6464_6464(t[i+4], t[i+4], t[i+64]);
+        add_6464_6464(t[i+3], t[i+3], t[i+64]);
+        add_6464_6464(t[i+1], t[i+1], t[i+64]);
+        add_6464_6464(t[i  ], t[i  ], t[i+64]);
+    }
+    memcpy(r, t, 64 * sizeof(mat64));
+    free(t);
+}
+
+void m64pol_mul_gf2_64_nobitslice(unsigned long * r, unsigned long * a1, unsigned long * a2)
+{
+    /* WARNING: We are not considering the data in the same order as the
+     * function above */
+    for(unsigned int i = 0 ; i < 64 ; i++) {
+        unsigned long * a1row = a1 + 64 * i;
+        unsigned long * rrow = r + 64 * i;
+        for(unsigned int j = 0 ; j < 64 ; j++) {
+            unsigned long * a2col = a2 + j;
+            unsigned long dst[2] = {0,};
+            unsigned long sdst[2] = {0,};
+            for(unsigned int k = 0 ; k < 64 ; k++) {
+                mpfq_2_64_mul_ur(0, dst, a1row + k, a2col + 64*k);
+                mpfq_2_64_elt_ur_add(0, sdst, sdst, dst);
+            }
+            mpfq_2_64_reduce(0, rrow + j, sdst);
+        }
+    }
+}
+
+void m64pol_scalmul_gf2_64_nobitslice(unsigned long * r, unsigned long * a, unsigned long * scalar)
+{
+    /* WARNING: We are not considering the data in the same order as the
+     * function above */
+    for(unsigned int i = 0 ; i < 64 ; i++) {
+        unsigned long * arow = a + 64 * i;
+        unsigned long * rrow = r + 64 * i;
+        for(unsigned int j = 0 ; j < 64 ; j++) {
+            mpfq_2_64_mul(0, rrow+j, arow + j, scalar);
+        }
+    }
+}
+
+
+void m64pol_mul_gf2_128_bitslice(m64pol_ptr r, m64pol_srcptr a1, m64pol_srcptr a2)
+{
+    unsigned int n1 = 128;
+    unsigned int n2 = 128;
+    mat64 * t = (mat64 *) malloc((n1 + n2 -1) * sizeof(mat64));
+    m64pol_mul_kara(t, a1, a2, n1, n2);
+    /* This reduces modulo the polynomial x^128+x^7+x^2+x+1 */
+    for(unsigned int i = 128 ; i-- > 0 ; ) {
+        add_6464_6464(t[i+7], t[i+7], t[i+128]);
+        add_6464_6464(t[i+2], t[i+2], t[i+128]);
+        add_6464_6464(t[i+1], t[i+1], t[i+128]);
+        add_6464_6464(t[i  ], t[i  ], t[i+128]);
+    }
+    memcpy(r, t, 128 * sizeof(mat64));
+    free(t);
+}
+
+void m64pol_scalmul_gf2_128_bitslice(m64pol_ptr r, m64pol_srcptr a, unsigned long * s)
+{
+    unsigned int n1 = 128;
+    unsigned int n2 = 128;
+    mat64 * t = (mat64 *) malloc((n1 + n2 -1) * sizeof(mat64));
+    memset(t, 0, (n1 + n2 -1) * sizeof(mat64));
+    for(unsigned int i = 0 ; i < 128 ; i++) {
+        if (((s[i/64]>>(i&63))&1UL)==0) continue;
+        for(unsigned int j = 0 ; j < 64 ; j++) {
+            add_6464_6464(t[i+j], t[i+j], a[j]);
+        }
+    }
+    /* This reduces modulo the polynomial x^128+x^7+x^2+x+1 */
+    for(unsigned int i = 128 ; i-- > 0 ; ) {
+        add_6464_6464(t[i+7], t[i+7], t[i+128]);
+        add_6464_6464(t[i+2], t[i+2], t[i+128]);
+        add_6464_6464(t[i+1], t[i+1], t[i+128]);
+        add_6464_6464(t[i  ], t[i  ], t[i+128]);
+    }
+    memcpy(r, t, 128 * sizeof(mat64));
+    free(t);
+}
+
+
+void m64pol_mul_gf2_128_nobitslice(unsigned long * r, unsigned long * a1, unsigned long * a2)
+{
+    /* WARNING: We are not considering the data in the same order as the
+     * function above */
+    for(unsigned int i = 0 ; i < 64 ; i++) {
+        unsigned long * a1row = a1 + 64 * i;
+        unsigned long * rrow = r + 64 * i;
+        for(unsigned int j = 0 ; j < 64 ; j++) {
+            unsigned long * a2col = a2 + j;
+            unsigned long dst[4] = {0,};
+            unsigned long sdst[4] = {0,};
+            for(unsigned int k = 0 ; k < 64 ; k++) {
+                mpfq_2_128_mul_ur(0, dst, a1row + k, a2col + 64*k);
+                mpfq_2_128_elt_ur_add(0, sdst, sdst, dst);
+            }
+            mpfq_2_128_reduce(0, rrow + j, sdst);
+        }
+    }
+}
+
+void m64pol_scalmul_gf2_128_nobitslice(unsigned long * r, unsigned long * a, unsigned long * scalar)
+{
+    /* WARNING: We are not considering the data in the same order as the
+     * function above */
+    for(unsigned int i = 0 ; i < 64 ; i++) {
+        unsigned long * arow = a + 64 * i;
+        unsigned long * rrow = r + 64 * i;
+        for(unsigned int j = 0 ; j < 64 ; j++) {
+            mpfq_2_128_mul(0, rrow+j, arow + j, scalar);
+        }
+    }
+}
+
+
 
 // 2.11 -- 512 512 based on basecase @ 512
 // 1.49 -- 512 512 based on basecase @ 256
@@ -1042,7 +1257,7 @@ void m64pol_addmul_kara(m64pol_ptr r, m64pol_srcptr a1, m64pol_srcptr a2, unsign
     double t = t1;							\
     t /= CLOCKS_PER_SEC;						\
     if (j) t /= j; else t = 0;						\
-    char * unit = "s";							\
+    const char * unit = "s";						\
     if (t < 1.0e-7) { unit = "ns"; t *= 1.0e9;			        \
     } else if (t < 1.0e-4) { unit = "micros"; t *= 1.0e6;		\
     } else if (t < 1.0e-1) { unit = "ms"; t *= 1.0e3; }                 \
@@ -1105,6 +1320,8 @@ void m64pol_addmul_kara(m64pol_ptr r, m64pol_srcptr a1, m64pol_srcptr a2, unsign
 
 /* Same spirit, but treat multiplication of 64K by 64K matrices (of
  * polynomials).
+ *
+ * That is, we consider a K*K matrix of polynomials of 64*64 matrices.
  * 
  * We assume that there is no pointer aliasing, and that matrices are
  * stored row-major, with all polynomials contiguous (and of fixed
@@ -1165,7 +1382,7 @@ void mzd_set_mem(mzd_t * M, const uint64_t * s, unsigned int n)
     assert(M->nrows == n);
     for(size_t i = 0 ; i < M->nrows ; i++) {
         uint64_t * ptr = (uint64_t *) M->rows[i];
-        ptr[0] = bitrev(s[i]);
+        ptr[0] = sometimes_bitrev(s[i]);
     }
 }
 
@@ -1181,9 +1398,9 @@ void mzd_check_mem(mzd_t * M, uint64_t * s, unsigned int n)
     assert(M->nrows == n);
     for(size_t i = 0 ; i < M->nrows ; i++) {
         uint64_t * ptr = (uint64_t *) M->rows[i];
-        if (ptr[0] != bitrev(s[i])) {
+        if (ptr[0] != sometimes_bitrev(s[i])) {
             fprintf(stderr, "Rows %zu differ: %016"PRIx64" != %016"PRIx64"\n",
-                    i, bitrev(ptr[0]), s[i]);
+                    i, sometimes_bitrev(ptr[0]), s[i]);
             abort();
         }
     }
@@ -1805,7 +2022,7 @@ typedef const struct pmat_s * pmat_srcptr;
 void pmat_init(pmat_ptr x, int n)
 {
     x->n=n;
-    x->v=malloc(n*sizeof(int));
+    x->v=(int*) malloc(n*sizeof(int));
     for(int i = 0 ; i < n ; i++) x->v[i]=i;
 }
 void pmat_clear(pmat_ptr x)
@@ -1973,7 +2190,7 @@ int PLUQ64_n(int * phi, mat64 l, mat64 * u, mat64 * a, int n)
     int rank = 0;
     int b = 0;
 #ifdef ALLOC_LS
-    mat64 ** ls = malloc(nb * sizeof(mat64*));
+    mat64 ** ls = (mat64**) malloc(nb * sizeof(mat64*));
 #else
     mat64 ls[nb];
 #endif
@@ -1984,7 +2201,7 @@ int PLUQ64_n(int * phi, mat64 l, mat64 * u, mat64 * a, int n)
         rank += PLUQ64_inner(phi, tl, u[b], ta, b*m);
         mul_6464_6464(l, tl, l);
 #ifdef  ALLOC_LS
-        ls[b]=malloc(sizeof(mat64));
+        ls[b]=(mat64*) malloc(sizeof(mat64));
         mat64_copy(*ls[b], tl);
 #else
         mat64_copy(ls[b], tl);
@@ -2213,7 +2430,7 @@ void level3_gauss_tests_N(int n __attribute__((unused)))
     M = mzd_init(n, n);
 #if 0
     mzd_set_mem(M, m, n);
-    uint64_t m = malloc((n*n/64)*sizeof(uint64_t));
+    uint64_t * m = (uint64_t *) malloc((n*n/64)*sizeof(uint64_t));
     rand64_mem(m, 64);
     free(m);
 #else
@@ -2236,7 +2453,7 @@ int main()
 {
   unsigned int n = 2 * 1000 * 1000;
 
-    if (1) {
+    if (0) {
         uint64_t * r = (uint64_t *) malloc(64 * sizeof(uint64_t));
         uint64_t a = rand64();
         uint64_t w = rand64();
@@ -2257,7 +2474,7 @@ int main()
         free(r);
     }
 
-    if (1) {
+    if (0) {
         uint64_t * r = (uint64_t *) malloc(64 * sizeof(uint64_t));
         uint64_t * a = (uint64_t *) malloc(n * sizeof(uint64_t));
         uint64_t * w = (uint64_t *) malloc(n * sizeof(uint64_t));
@@ -2273,7 +2490,7 @@ int main()
         free(r); free(a); free(w);
     }
 
-    if (1) {
+    if (0) {
         mat64 m[4],l[4],u[4];
         srand(1728);
 
@@ -2331,7 +2548,7 @@ int main()
 #endif
     }
 
-    if (1) {
+    if (0) {
         mat64 m;
         mat64 e;
         mat64 mm;
@@ -2373,7 +2590,7 @@ int main()
     }
 
     if (0) {
-        size_t n = 512;
+        size_t n = 64;
         mat64 * A = (mat64 *) malloc(n * sizeof(mat64));
         mat64 * B = (mat64 *) malloc(n * sizeof(mat64));
         mat64 * C = (mat64 *) malloc(2 *n * sizeof(mat64));
@@ -2386,17 +2603,106 @@ int main()
     }
 
     if (0) {
-        size_t n = 512;
-        mat64 * A = (mat64 *) malloc(2 * 2 * n * sizeof(mat64));
-        mat64 * B = (mat64 *) malloc(2 * 2 * n * sizeof(mat64));
-        mat64 * C = (mat64 *) malloc(2 * 2 * 2 *n * sizeof(mat64));
-        printf("-- polynomials, larger matrices (N=%zu) --\n", n);
+        size_t n = 64;
+        unsigned int K = 2;
+        mat64 * A = (mat64 *) malloc(K * K * n * sizeof(mat64));
+        mat64 * B = (mat64 *) malloc(K * K * n * sizeof(mat64));
+        mat64 * C = (mat64 *) malloc(K * K * 2 *n * sizeof(mat64));
+        printf("-- polynomials, larger matrices (K=%u, N=%zu) --\n", K, n);
         TIME1(5, m64polblock_mul, (C,A,B,n,n,2));
-        TIME1(5, m64polblock_mul_kara, (C,A,B,n,n,2));
+        TIME1(5, m64polblock_mul_kara, (C,A,B,n,n,K));
         free(A);
         free(B);
         free(C);
     }
+
+    if (0) {
+        size_t n = 128;
+        mat64 * A = (mat64 *) malloc(n * sizeof(mat64));
+        mat64 * B = (mat64 *) malloc(n * sizeof(mat64));
+        mat64 * C = (mat64 *) malloc(n * sizeof(mat64));
+        unsigned long * Al = (unsigned long *) A;
+        unsigned long * Bl = (unsigned long *) B;
+        unsigned long * Cl = (unsigned long *) C;
+        printf("-- 64x64 matrices over GF(2^64) --\n");
+        TIME1(5, m64pol_mul_gf2_64_bitslice, (C,A,B));
+        TIME1(5, m64pol_mul_gf2_64_nobitslice, (Cl,Al,Bl));
+        printf("-- 64x64 matrices over GF(2^128) --\n");
+        TIME1(5, m64pol_mul_gf2_128_bitslice, (C,A,B));
+        TIME1(5, m64pol_mul_gf2_128_nobitslice, (Cl,Al,Bl));
+        free(A);
+        free(B);
+        free(C);
+        /* On Core i5 (magret), it's almost a tie between the two
+         * options... */
+#if 0
+-- 64x64 matrices over GF(2^64) --
+m64pol_mul_gf2_64_bitslice       6351 times in 0.7889 ms each
+m64pol_mul_gf2_64_nobitslice    4773 times in 1.0497 ms each
+-- 64x64 matrices over GF(2^128) --
+m64pol_mul_gf2_128_bitslice      2067 times in 2.4238 ms each
+m64pol_mul_gf2_128_nobitslice   1521 times in 3.2939 ms each
+#endif
+        /* Without pclmul, of course the situation is more clear (truffe,
+         * Core2 Duo U9400 */
+#if 0
+-- 64x64 matrices over GF(2^64) --
+m64pol_mul_gf2_64_bitslice       2695 times in 1.8590 ms each
+m64pol_mul_gf2_64_nobitslice    435 times in 11.5172 ms each
+-- 64x64 matrices over GF(2^128) --
+m64pol_mul_gf2_128_bitslice      871 times in 5.7520 ms each
+m64pol_mul_gf2_128_nobitslice   158 times in 31.8354 ms each
+
+#endif
+    }
+
+
+    if (1) {
+        /* Now multiplication by a scalar. We'll do both GF(2^64) and
+         * GF(2^128), so let's allocate room for both */
+        size_t n = 128;
+        /* random values with average hamming weight. */
+        unsigned long scalar[2] = { 0x8d5511cbd7f0d885, 0x2073a477a8b5dd8a };
+        mat64 * A = (mat64 *) malloc(n * sizeof(mat64));
+        mat64 * B = (mat64 *) malloc(n * sizeof(mat64));
+        unsigned long * Al = (unsigned long *) A;
+        unsigned long * Bl = (unsigned long *) B;
+        printf("-- 64x64 matrix over GF(2^64), multiplication by scalar --\n");
+        TIME1(5, m64pol_scalmul_gf2_64_bitslice, (B,A,scalar));
+        TIME1(5, m64pol_scalmul_gf2_64_bitslice2, (B,A,scalar));
+        TIME1(5, m64pol_scalmul_gf2_64_nobitslice, (Bl,Al,scalar));
+        printf("-- 64x64 matrix over GF(2^128), multiplication by scalar --\n");
+        TIME1(5, m64pol_scalmul_gf2_128_bitslice, (B,A,scalar));
+        TIME1(5, m64pol_scalmul_gf2_128_nobitslice, (Bl,Al,scalar));
+        free(A);
+        free(B);
+        /* The bitsliced version sucks. Really.
+         * TODO: See if we can do something. Abandon L1 cache focus, and
+         * be content with L2 ? */
+    }
+#ifdef HAVE_M4RIE
+    if (0) {
+        printf("-- 64x64 matrices over GF(2^64) using M4RIE --\n");
+        /* Now try to see if m4rie can improve these timings */
+        /* Unfortunately as of version 20111203, m4rie supporst only
+         * GF(2^n) up until n==10. Which cleary won't do, for our
+         * objectives. So the following code aborts with segmentation
+         * fault. */
+        GFqDom<int> GF = GFqDom<int>(2,64);
+        FiniteField *F = (FiniteField*)&GF;
+        gf2e * ff = gf2e_init_givgfq(F);
+        mzed_t *Az = mzed_init(ff, 64, 64);
+        mzed_t *Bz = mzed_init(ff, 64, 64);
+        mzed_t *Cz = mzed_init(ff, 64, 64);
+        mzed_randomize(Az);
+        mzed_randomize(Bz);
+        TIME1(5, mzed_mul, (Cz, Az, Bz));
+        mzed_free(Az);
+        mzed_free(Bz);
+        mzed_free(Cz);
+        gf2e_free(ff);
+    }
+#endif /* HAVE_M4RIE */
 
     return 0;
 }
