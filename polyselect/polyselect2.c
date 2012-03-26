@@ -18,7 +18,7 @@
 #include "auxiliary.h"
 #include "murphyE.h"
 
-// #define DEBUG
+// #define DEBUG_POLYSELECT2
 #define NEW_ROOTSIEVE
 /* if MAX_THREADS is not defined, multi-threads are not enabled */
 #define MAX_THREADS 16
@@ -169,7 +169,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 	 /* the expected rotation space is S^6 for degree 6, S^4.5 for degree 5,
 		S^3 for degree 4, S^2 for degree 3, S for degree 2, S^0.5 for degree 1 */
 
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2
 	 printf ("Found match: (%lu,%ld) (%lu,%ld) for ad=%lu, q=%lu, rq=%lu\n",
 			 p1, i, p2, i, ad, q, rq);
 	 gmp_printf ("m0=%Zd\n", m0);
@@ -213,7 +213,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 	 mpz_mod (adm1, adm1, m);
 	 mpz_mul (m, adm1, l);
 	 mpz_sub (m, mtilde, m);
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2
 	 if (mpz_divisible_ui_p (m, d) == 0)
 	 {
 		  fprintf (stderr, "Error: m-a_{d-1}*l not divisible by d\n");
@@ -221,7 +221,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 	 }
 #endif
 	 mpz_divexact_ui (m, m, d);
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2
 	 if (mpz_divisible_ui_p (m, ad) == 0)
 	 {
 		  fprintf (stderr, "Error: (m-a_{d-1}*l)/d not divisible by ad\n");
@@ -229,7 +229,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 	 }
 #endif
 	 mpz_divexact_ui (m, m, ad);
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2
 	 printf ("Raw polynomial:\n");
 	 gmp_printf ("Y1: %Zd\nY0: -%Zd\n", l, m);
 #endif
@@ -240,7 +240,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 	 mpz_mul_ui (t, t, ad);
 	 mpz_sub (t, N, t);
 	 mpz_set (f[d-1], adm1);
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2
 	 if (mpz_divisible_p (t, l) == 0)
 	 {
 		  fprintf (stderr, "Error: t not divisible by l\n");
@@ -253,7 +253,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 	 mpz_sub (t, t, mtilde);
 	 for (j = d - 2; j > 0; j--)
 	 {
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2
 		  if (mpz_divisible_p (t, l) == 0)
 		  {
 			   fprintf (stderr, "Error: t not divisible by l\n");
@@ -280,7 +280,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 		  /* subtract adm1*m^j */
 		  mpz_submul (t, mtilde, adm1);
 	 }
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2
 	 if (mpz_divisible_p (t, l) == 0)
 	 {
 		  fprintf (stderr, "Error: t not divisible by l\n");
@@ -293,7 +293,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 	 total_adminus2[q] += (double) mpz_sizeinbase (f[d-2], 2);
 	 //  gmp_printf ("# a_{d-2}=%Zd\n", f[d-2]);
 
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2
 	 for (j = d + 1; j -- != 0; )
 		  gmp_printf ("c%u: %Zd\n", j, f[j]);
 	 nroots = numberOfRealRoots (f, d, 0, 0);
@@ -864,7 +864,7 @@ one_thread (void* args)
 static void
 stats_sq (void)
 {
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2
 	 unsigned long sq[] = SPECIAL_Q;
 	 int i;
 	 printf ("Hits:");
