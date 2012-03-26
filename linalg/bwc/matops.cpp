@@ -2490,7 +2490,7 @@ int main()
         free(r); free(a); free(w);
     }
 
-    if (1) {
+    if (0) {
         mat64 m[4],l[4],u[4];
         srand(1728);
 
@@ -2589,7 +2589,7 @@ int main()
         level3_gauss_tests_N(1024);
     }
 
-    if (1) {
+    if (0) {
         size_t n = 64;
         mat64 * A = (mat64 *) malloc(n * sizeof(mat64));
         mat64 * B = (mat64 *) malloc(n * sizeof(mat64));
@@ -2616,7 +2616,7 @@ int main()
         free(C);
     }
 
-    if (1) {
+    if (0) {
         size_t n = 128;
         mat64 * A = (mat64 *) malloc(n * sizeof(mat64));
         mat64 * B = (mat64 *) malloc(n * sizeof(mat64));
