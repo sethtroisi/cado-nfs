@@ -18,16 +18,19 @@
 #include "auxiliary.h"
 #include "murphyE.h"
 
-// #define DEBUG
+// #define DEBUG_POLYSELECT2
 #define NEW_ROOTSIEVE
 /* if MAX_THREADS is not defined, multi-threads are not enabled */
 #define MAX_THREADS 16
+
+#ifdef NEW_ROOTSIEVE
+#include "ropt.h"
+#endif
 
 #define MAXQ 256
 #define SPECIAL_Q {1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173, 179, 181, 191, 193, 197, 199, 211, 223, 227, 229, 233, 239, 241, 251, ULONG_MAX}
 
 extern int MAX_k;
-void ropt_polyselect (mpz_t*, int, mpz_t, mpz_t, mpz_t, int, int);
 
 /* hash table structure */
 typedef struct
@@ -82,6 +85,7 @@ unsigned long collisionsQ[MAXQ];
 double total_adminus2[MAXQ];
 double total_lognorm[MAXQ];
 double best_logmu[11];
+double rootsieve_time = 0.0;
 
 void
 roots_init (roots_t R)
@@ -165,7 +169,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 	 /* the expected rotation space is S^6 for degree 6, S^4.5 for degree 5,
 		S^3 for degree 4, S^2 for degree 3, S for degree 2, S^0.5 for degree 1 */
 
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2
 	 printf ("Found match: (%lu,%ld) (%lu,%ld) for ad=%lu, q=%lu, rq=%lu\n",
 			 p1, i, p2, i, ad, q, rq);
 	 gmp_printf ("m0=%Zd\n", m0);
@@ -209,7 +213,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 	 mpz_mod (adm1, adm1, m);
 	 mpz_mul (m, adm1, l);
 	 mpz_sub (m, mtilde, m);
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2
 	 if (mpz_divisible_ui_p (m, d) == 0)
 	 {
 		  fprintf (stderr, "Error: m-a_{d-1}*l not divisible by d\n");
@@ -217,7 +221,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 	 }
 #endif
 	 mpz_divexact_ui (m, m, d);
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2
 	 if (mpz_divisible_ui_p (m, ad) == 0)
 	 {
 		  fprintf (stderr, "Error: (m-a_{d-1}*l)/d not divisible by ad\n");
@@ -225,7 +229,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 	 }
 #endif
 	 mpz_divexact_ui (m, m, ad);
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2
 	 printf ("Raw polynomial:\n");
 	 gmp_printf ("Y1: %Zd\nY0: -%Zd\n", l, m);
 #endif
@@ -236,7 +240,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 	 mpz_mul_ui (t, t, ad);
 	 mpz_sub (t, N, t);
 	 mpz_set (f[d-1], adm1);
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2
 	 if (mpz_divisible_p (t, l) == 0)
 	 {
 		  fprintf (stderr, "Error: t not divisible by l\n");
@@ -249,7 +253,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 	 mpz_sub (t, t, mtilde);
 	 for (j = d - 2; j > 0; j--)
 	 {
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2
 		  if (mpz_divisible_p (t, l) == 0)
 		  {
 			   fprintf (stderr, "Error: t not divisible by l\n");
@@ -276,7 +280,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 		  /* subtract adm1*m^j */
 		  mpz_submul (t, mtilde, adm1);
 	 }
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2
 	 if (mpz_divisible_p (t, l) == 0)
 	 {
 		  fprintf (stderr, "Error: t not divisible by l\n");
@@ -289,7 +293,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 	 total_adminus2[q] += (double) mpz_sizeinbase (f[d-2], 2);
 	 //  gmp_printf ("# a_{d-2}=%Zd\n", f[d-2]);
 
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2
 	 for (j = d + 1; j -- != 0; )
 		  gmp_printf ("c%u: %Zd\n", j, f[j]);
 	 nroots = numberOfRealRoots (f, d, 0, 0);
@@ -334,10 +338,11 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 
 		  mpz_neg (m, g[0]);
 
+                  rootsieve_time -= seconds ();
 #ifdef NEW_ROOTSIEVE
 		  if (d > 4) {
-			   ropt_polyselect (f, d, m, g[1], N, MAX_k, 0); // verbose = 2 to see details.
-			   mpz_neg (g[0], m);
+                    ropt_polyselect (f, d, m, g[1], N, MAX_k, 0); // verbose = 2 to see details.
+                    mpz_neg (g[0], m);
 		  }
 		  else {
 			   unsigned long alim = 2000;
@@ -352,7 +357,8 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 		  mpz_neg (g[0], m);
 		  /* optimize again, but only translation */
 		  optimize_aux (f, d, g, 0, 0, CIRCULAR);
-#endif
+#endif /* NEW_ROOTSIEVE */
+                  rootsieve_time += seconds ();
 
 		  nroots = numberOfRealRoots (f, d, 0, 0);
 		  skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
@@ -858,7 +864,7 @@ one_thread (void* args)
 static void
 stats_sq (void)
 {
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2
 	 unsigned long sq[] = SPECIAL_Q;
 	 int i;
 	 printf ("Hits:");
@@ -1215,6 +1221,7 @@ main (int argc, char *argv[])
 
 	 /* print total time (format for cpu_time.sh) */
 	 printf ("# Total phase took %.2fs\n", seconds () - st0);
+         printf ("# Rootsieve took %.2fs\n", rootsieve_time);
 
 	 if (best_E == 0.0)
 		  printf ("No polynomial found, please increase the ad range or the maxnorm\n");
