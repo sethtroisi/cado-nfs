@@ -338,7 +338,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 
 		  mpz_neg (m, g[0]);
 
-                  rootsieve_time -= seconds ();
+                  rootsieve_time -= seconds_thread ();
 #ifdef NEW_ROOTSIEVE
 		  if (d > 4) {
                     ropt_polyselect (f, d, m, g[1], N, MAX_k, 0); // verbose = 2 to see details.
@@ -358,7 +358,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 		  /* optimize again, but only translation */
 		  optimize_aux (f, d, g, 0, 0, CIRCULAR);
 #endif /* NEW_ROOTSIEVE */
-                  rootsieve_time += seconds ();
+                  rootsieve_time += seconds_thread ();
 
 		  nroots = numberOfRealRoots (f, d, 0, 0);
 		  skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
