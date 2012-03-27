@@ -318,8 +318,9 @@ one_thread (void* args)
  */
 static int
 scan_relations (char **ficname, int *nprimes, hashtable_t *H,
-                bit_vector_srcptr rel_used, int nrelmax, int **rel_compact,
-		long minpr, long minpa, unsigned long *tot_alloc, int final)
+                bit_vector_srcptr rel_used, unsigned long nrelmax,
+                int **rel_compact, long minpr, long minpa,
+                unsigned long *tot_alloc, int final)
 {
   int i = 0;
   tab_t *T;
@@ -362,6 +363,13 @@ scan_relations (char **ficname, int *nprimes, hashtable_t *H,
   free (T);
   
   fprintf (stderr, "Read a total of %lu relations\n", nrels);
+
+  if (nrels != nrelmax)
+    {
+      fprintf (stderr, "Error, expected %lu relations, got %lu\n",
+               nrelmax, nrels);
+      exit (1);
+    }
   
   return 1;
 }
@@ -429,7 +437,7 @@ main (int argc, char **argv)
     int **rel_compact = NULL;
     int ret MAYBE_UNUSED, k;
     int nprimes = 0;
-    unsigned int nrelmax = 0;
+    unsigned long nrelmax = 0;
     int Hsize, Hsizer, Hsizea;
     double excess = 1.01;    /* minimum initial excess */
     long keep = 160;    /* maximum final excess */
@@ -465,7 +473,7 @@ main (int argc, char **argv)
         break;
     }
 
-    param_list_parse_uint(pl, "nrels", &nrelmax);
+    param_list_parse_ulong(pl, "nrels", &nrelmax);
     param_list_parse_int(pl, "nprimes", &nprimes);
     param_list_parse_long(pl, "minpr", &minpr);
     param_list_parse_long(pl, "minpa", &minpa);
@@ -513,7 +521,7 @@ main (int argc, char **argv)
     if (minpa < 0)
       minpa = pol->alg->lim;
 
-    fprintf (stderr, "Number of relations is %u\n", nrelmax);
+    fprintf (stderr, "Number of relations is %lu\n", nrelmax);
     if (nprimes > 0)
 	Hsize = nprimes;
     else{
@@ -530,7 +538,7 @@ main (int argc, char **argv)
     bit_vector rel_used;
     bit_vector_init_set(rel_used, nrelmax, 1);
     tot_alloc0 += nrelmax;
-    fprintf (stderr, "Allocated rel_used of %uMb (total %luMb so far)\n",
+    fprintf (stderr, "Allocated rel_used of %luMb (total %luMb so far)\n",
              nrelmax >> 20,
              tot_alloc0 >> 20);
 
