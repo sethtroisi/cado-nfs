@@ -239,9 +239,54 @@ void relation_provision_for_primes(relation_t * rel, int nr, int na)
     }
 }
 
+/* assumes all the exponents are initially 1 */
+static void
+sort_rat_primes (rat_prime_t *rp, int nb_rp)
+{
+  int i, j;
+  unsigned long pi;
+
+  /* insertion sort */
+  for (i = 1; i < nb_rp; i++)
+    {
+      pi = rp[i].p;
+      for (j = i - 1; (j >= 0) && (pi < rp[j].p); j--)
+        rp[j+1].p = rp[j].p;
+      /* the prime pi should go at index j+1 */
+      rp[j+1].p = pi;
+    }
+}
+
+/* assumes all the exponents are 1 */
+static void
+sort_alg_primes (alg_prime_t *ap, int nb_ap)
+{
+  int i, j;
+  unsigned long pi, ri;
+
+  /* insertion sort: for a given relation (a,b), r is uniquely determined
+     by (a,b), thus we only need to compare p */
+  for (i = 1; i < nb_ap; i++)
+    {
+      pi = ap[i].p;
+      ri = ap[i].r;
+      for (j = i - 1; (j >= 0) && (pi < ap[j].p); j--)
+        {
+          ap[j+1].p = ap[j].p;
+          ap[j+1].r = ap[j].r;
+        }
+      ap[j+1].p = pi;
+      ap[j+1].r = ri;
+    }
+}
+
 void relation_compress_rat_primes(relation_t * rel)
 {
-    qsort(rel->rp, rel->nb_rp, sizeof(rat_prime_t), (sortfunc_t) &rat_prime_cmp);
+#if 0
+  qsort(rel->rp, rel->nb_rp, sizeof(rat_prime_t), (sortfunc_t) &rat_prime_cmp);
+#else
+  sort_rat_primes (rel->rp, rel->nb_rp);
+#endif
     int j = 0;
     for(int i = 0 ; i < rel->nb_rp ; j++) {
         if (i-j) memcpy(rel->rp + j, rel->rp + i, sizeof(rat_prime_t));
@@ -255,11 +300,15 @@ void relation_compress_rat_primes(relation_t * rel)
 
 void relation_compress_alg_primes(relation_t * rel)
 {
+#if 0
     /* We're considering the list as containing possibly distinct (p,r)
      * pairs, although in reality it cannot happen. I doubt this causes
      * any performance hit though.
      */
-    qsort(rel->ap, rel->nb_ap, sizeof(alg_prime_t), (sortfunc_t) &alg_prime_cmp);
+  qsort(rel->ap, rel->nb_ap, sizeof(alg_prime_t), (sortfunc_t) &alg_prime_cmp);
+#else
+  sort_alg_primes (rel->ap, rel->nb_ap);
+#endif
     int j = 0;
     for(int i = 0 ; i < rel->nb_ap ; j++) {
         if (i-j) memcpy(rel->ap + j, rel->ap + i, sizeof(alg_prime_t));
@@ -314,10 +363,10 @@ another_line:
 
     p = line;
 
-    *p++ = (c = fgetc(f));
+    *p++ = (c = fgetc_unlocked(f));
     if (c == EOF) return -1;
     if (c == '#') {
-        for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc(f))) ;
+        for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f))) ;
         goto another_line;
     }
 
@@ -325,23 +374,23 @@ another_line:
     *pb = 0;
     int s = 1;
     int v;
-    if (c == '-') { s=-1; *p++ = (c=fgetc(f)); }
-    for( ; (v=ugly[(unsigned char) c]) >= 0 ; *p++ = (c=fgetc(f)))
+    if (c == '-') { s=-1; *p++ = (c=fgetc_unlocked(f)); }
+    for( ; (v=ugly[(unsigned char) c]) >= 0 ; *p++ = (c=fgetc_unlocked(f)))
         *pa=*pa*10+v;
     expected = ',';
     if (forced_read && c != expected) {
-      for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc(f))) ;
+      for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f))) ;
       return 0;
     }
     else
       ASSERT_ALWAYS(c == expected);
-    *p++ = (c=fgetc(f));
+    *p++ = (c=fgetc_unlocked(f));
     *pa*=s;
-    for( ; (v=ugly[(unsigned char) c]) >= 0 ; *p++ = (c=fgetc(f)))
+    for( ; (v=ugly[(unsigned char) c]) >= 0 ; *p++ = (c=fgetc_unlocked(f)))
         *pb=*pb*10+v;
     expected = ':';
     if (forced_read && c != expected) {
-      for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc(f))) ;
+      for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f))) ;
       return 0;
     }
     else
@@ -355,12 +404,12 @@ another_line:
 
         base = p;
         n = 1;
-        *p++ = (c = fgetc(f));
-        for (; c != EOF && c != '\n' && c != ':'; *p++ = (c = fgetc(f)))
+        *p++ = (c = fgetc_unlocked(f));
+        for (; c != EOF && c != '\n' && c != ':'; *p++ = (c = fgetc_unlocked(f)))
             n += c == ',';
         expected = ':';
         if (forced_read && c != expected) {
-          for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc(f))) ;
+          for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f))) ;
           return 0;
         }
         else
@@ -382,7 +431,7 @@ another_line:
 
         expected = ':';
         if (forced_read && c != expected) {
-          for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc(f))) ;
+          for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f))) ;
           return 0;
         }
         else
@@ -391,12 +440,12 @@ another_line:
 
         base = p;
         n = 1;
-        *p++ = (c = fgetc(f));
-        for (; c != EOF && c != '\n' && c != ':'; *p++ = (c = fgetc(f)))
+        *p++ = (c = fgetc_unlocked(f));
+        for (; c != EOF && c != '\n' && c != ':'; *p++ = (c = fgetc_unlocked(f)))
             n += c == ',';
         expected = '\n';
         if (forced_read && c != expected) {
-          for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc(f))) ;
+          for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f))) ;
           return 0;
         }
         else
@@ -418,7 +467,7 @@ another_line:
 
         expected = '\n';
         if (forced_read && c != expected) {
-          for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc(f))) ;
+          for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f))) ;
           return 0;
         }
         else
@@ -428,7 +477,7 @@ another_line:
 
     /* skip rest of line -- a no-op if we've been told to parse
      * everything. */
-    for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc(f)));
+    for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f)));
 
     size_t nread =  p-line;
     *p++='\0';

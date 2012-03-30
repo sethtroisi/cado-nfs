@@ -670,9 +670,9 @@ remove_singletons (int *nrel, int nrelmax, int *nprimes, hashtable_t *H,
                  (double) (old - newnrel) / (double) (oldexcess - excess));
 
       count ++;
-      if (final == 0 && count >= MAX_STEPS) /* for the final pass we want
-                                               to remove all singletons
-                                               to avoid warnings */
+      if ((final == 0) && (count >= MAX_STEPS))
+        /* for the final pass we want to remove all singletons
+           to avoid warnings */
         break;
     }
   while (newnrel != old);
@@ -1031,7 +1031,7 @@ main (int argc, char **argv)
         nprimes_new = nprimes;
         /* if one pass only, usually the initial excess is negative, but after
            a few steps of removing singletons, we get a positive excess */
-        if (final && (nrel_new < nprimes_new * excess) && pass >= 2)
+        if (final && (nrel_new < nprimes_new * excess) && (pass >= 2))
           {
             fprintf (stderr, "Initial excess is below requested %ld, stopping.\n",
                      (long int)(nprimes_new * (excess - 1)));
