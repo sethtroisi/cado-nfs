@@ -526,18 +526,22 @@ void relation_stream_unbind(relation_stream_ptr rs)
 int relation_stream_disp_progress_now_p(relation_stream_ptr rs)
 {
   static unsigned long change;
+  double t;
+
   if ((rs->nrels >> 18) == (change >> 18))
     return 0;
-    double t = wct_seconds();
-    change = rs->nrels;
-    if (t >= rs->t1 + 1) {
-        rs->dt = t - rs->t0;
-        rs->mb_s = rs->dt > 0.01 ? (rs->pos/rs->dt * 1.0e-6) : 0;
-        rs->rels_s = rs->dt > 0.01 ? rs->nrels/rs->dt : 0;
-        rs->t1 = t;
-        return 1;
+
+  t = wct_seconds();
+  change = rs->nrels;
+  if (t >= rs->t1 + 1)
+    {
+      rs->dt = t - rs->t0;
+      rs->mb_s = rs->dt > 0.01 ? (rs->pos/rs->dt * 1.0e-6) : 0;
+      rs->rels_s = rs->dt > 0.01 ? rs->nrels/rs->dt : 0;
+      rs->t1 = t;
+      return 1;
     }
-    return 0;
+  return 0;
 }
 
 void relation_stream_trigger_disp_progress(relation_stream_ptr rs)

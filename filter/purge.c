@@ -1254,7 +1254,8 @@ prempt_scan_relations () {
   pthread_attr_destroy(&attr);
   free(prempt_data->buf); prempt_data->buf = NULL;
   
-  fprintf(stderr, "read %lu relations in %.1fs -- %.1f MB/s -- %.1f rels/s\n", rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
+  fprintf (stderr, "read %lu relations in %.1fs -- %.1f MB/s -- %.1f rels/s\n",
+           rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
   if (rs->nrels != nrelmax) {
     fprintf (stderr, "Error, -nrels value should match the number of scanned relations\nexpected %lu relations, found %lu\n", nrelmax, rs->nrels);
     exit (EXIT_FAILURE);
