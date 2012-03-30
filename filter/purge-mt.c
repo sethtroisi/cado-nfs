@@ -264,7 +264,7 @@ scan_files_mod (char **ficname, bit_vector_srcptr rel_used, int **rel_compact,
       }
       for (c = ficname[0] + strlen (ficname[0]); (c > ficname[0]) &&
              (c[-1] != '/'); c--);
-      fprintf (stderr, "%d: %-50s %d relations\n", thread, c, rs->nrels);
+      fprintf (stderr, "%d: %-50s %lu relations\n", thread, c, rs->nrels);
       relation_stream_closefile (rs);
       relation_stream_clear (rs);
 

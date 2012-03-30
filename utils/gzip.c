@@ -4,7 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
-
+#include <errno.h>
 
 #include "macros.h"
 #include "gzip.h"
@@ -41,8 +41,8 @@ const char * path_remove_suffix(char * name)
 #endif
 
 struct suffix_handler supported_compression_formats[] = {
-    { ".gz", "gzip -dc %s", "gzip -c --best > %s", },
-    { ".bz2", "bzip2 -dc %s", "bzip2 -c --best > %s", },
+    { ".gz", "gzip -dc %s", "gzip -c --fast > %s", },
+    { ".bz2", "bzip2 -dc %s", "bzip2 -c --fast > %s", },
     /* These two have to be present */
     { "", NULL, NULL },
     { NULL, NULL, NULL },
@@ -67,6 +67,64 @@ int is_supported_compression_format(const char * s)
             return 1;
     }
     return 0;
+}
+
+/* Return a unix commands list. Exemple :
+   cat file_relation1
+   gzip -dc file_relation2.gz file_relation3.gz
+   bzip2 -dc file_relation4.gz file_relation5.gz
+   [empty string]
+*/
+char **
+prempt_open_compressed_rs (char **ficname)
+{
+  const struct suffix_handler *cp_r = NULL, *r = supported_compression_formats;
+  char **cmd;
+  size_t s_cmds = 2;
+  size_t p_cmds = 0;
+  int suffix_choice = 0;
+
+  if (!(cmd = calloc (s_cmds, sizeof(unsigned char *)))) {
+    fprintf (stderr, "fopen_compressed_rs: calloc erreur : %s\n", strerror(errno));
+    exit (1);
+  }
+  while (*ficname)
+    if (!suffix_choice) {
+      if (p_cmds + 1 >= s_cmds) {
+	if (!(cmd = realloc (cmd, sizeof(unsigned char *) * (s_cmds<<1)))) {
+	  fprintf (stderr, "fopen_compressed_rs: realloc erreur : %s\n", strerror(errno));
+	  exit (1);
+	}
+	memset(&cmd[s_cmds], 0, sizeof(unsigned char *) * s_cmds);
+	s_cmds <<= 1;
+      }
+      if (!(cmd[p_cmds] = malloc(PREMPT_S_CMD))) {
+	fprintf (stderr, "fopen_compressed_rs: malloc erreur : %s\n", strerror(errno));
+	exit (1);
+      }
+      for (cp_r = r ; cp_r->suffix ; cp_r++)
+	if (has_suffix (*ficname, cp_r->suffix)) break;
+      strcpy (cmd[p_cmds], cp_r->pfmt_in ? cp_r->pfmt_in : "cat %s");
+      cmd[p_cmds][strlen(cmd[p_cmds]) - 2] = 0; /* "%s" suppress */
+      suffix_choice = 1;
+      if (strlen (*ficname) + strlen (cmd[p_cmds]) >= PREMPT_S_CMD) {
+	fprintf(stderr, "fopen_compressed_rs: PREMPT_S_CMD (%d) too small. Please * 2\n", PREMPT_S_CMD);
+	exit (1);
+      }
+      strcat (cmd[p_cmds], *ficname++);
+    }
+    else {
+      if (has_suffix (*ficname, cp_r->suffix) &&
+	  (strlen (*ficname) + strlen (cmd[p_cmds]) + 1 < PREMPT_S_CMD)) {
+	strcat (cmd[p_cmds], " ");
+	strcat (cmd[p_cmds], *ficname++);
+      }
+      else {
+	suffix_choice = 0;
+	p_cmds++;
+      }
+    }
+  return cmd;
 }
 
 /* The pipe capacity is 2^16 by default, we can increase it, but it does not

@@ -57,7 +57,7 @@ main (int argc, char **argv)
         for( ; rn < ps->nodup_index ; rn++) {
             ASSERT_ALWAYS(relation_stream_get(rs, NULL, 0));
             if (relation_stream_disp_progress_now_p(rs)) {
-                fprintf(stderr, "Read %d relations in %.1f s -- %.1f MB/s\n",
+                fprintf(stderr, "Read %lu relations in %.1f s -- %.1f MB/s\n",
                         rs->nrels, rs->dt, rs->mb_s);
             }
         }

@@ -191,7 +191,7 @@ reduce_exponents_mod2 (relation_t *rel)
         }
     }
   if(j == 0)
-      fprintf(stderr, "WARNING: j_rp=0 in reduce_exponents_mod2\n");
+    fprintf(stderr, "WARNING: j_rp=0 in reduce_exponents_mod2. k=%d\n", rel->nb_rp);
   rel->nb_rp = j;
 
   if(rel->nb_ap == 0)
@@ -203,7 +203,7 @@ reduce_exponents_mod2 (relation_t *rel)
       if (rel->ap[i].e != 0)
         {
           rel->ap[j].p = rel->ap[i].p;
-          rel->ap[j].r = rel->ap[i].r;  // in fact useless at this point.
+          /* rel->ap[j].r = rel->ap[i].r;  */ // in fact useless at this point.
           rel->ap[j].e = 1;
           j ++;
         }
@@ -574,17 +574,23 @@ void relation_stream_unbind(relation_stream_ptr rs)
 
 int relation_stream_disp_progress_now_p(relation_stream_ptr rs)
 {
-    if (rs->nrels % 100)
-        return 0;
-    double t = wct_seconds();
-    if (rs->nrels % 1000000 == 0 || t >= rs->t1 + 1) {
-        rs->dt = t - rs->t0;
-        rs->mb_s = rs->dt > 0.01 ? (rs->pos/rs->dt * 1.0e-6) : 0;
-        rs->rels_s = rs->dt > 0.01 ? rs->nrels/rs->dt : 0;
-        rs->t1 = t;
-        return 1;
-    }
+  static unsigned long change;
+  double t;
+
+  if ((rs->nrels >> 18) == (change >> 18))
     return 0;
+
+  t = wct_seconds();
+  change = rs->nrels;
+  if (t >= rs->t1 + 1)
+    {
+      rs->dt = t - rs->t0;
+      rs->mb_s = rs->dt > 0.01 ? (rs->pos/rs->dt * 1.0e-6) : 0;
+      rs->rels_s = rs->dt > 0.01 ? rs->nrels/rs->dt : 0;
+      rs->t1 = t;
+      return 1;
+    }
+  return 0;
 }
 
 void relation_stream_trigger_disp_progress(relation_stream_ptr rs)
