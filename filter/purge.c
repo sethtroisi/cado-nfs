@@ -1118,7 +1118,8 @@ void insertRelation() {
 }
 
 static int
-prempt_scan_relations () {
+prempt_scan_relations ()
+{
   char *pcons, *pcons_old, *pcons_max, *p;
   pthread_attr_t attr;
   pthread_t thread_load, thread_relation;
@@ -1130,19 +1131,25 @@ prempt_scan_relations () {
   static int pass1 = 1;
 
   end_insertRelation = 0;
-  if (((buf_rel->num_rel  = malloc (sizeof(*(buf_rel->num_rel))  * T_REL)) == NULL) ||
-      ((buf_rel->ltmp_rel = malloc (sizeof(*(buf_rel->ltmp_rel)) * T_REL)) == NULL) ||
-      ((buf_rel->rel      = malloc (sizeof(*(buf_rel->rel))      * T_REL)) == NULL)) {
-    fprintf (stderr, "prempt_scan_relations: malloc error. %s\n", strerror (errno));
-    exit (1);
-  }
-  memset(buf_rel->rel, 0, sizeof(*(buf_rel->rel)) * T_REL);
-  for (i = T_REL ; i ; relation_provision_for_primes(&(buf_rel->rel[--i]), RELATION_MAX_BYTES>>2, RELATION_MAX_BYTES>>2));
+  if (((buf_rel->num_rel  = malloc (sizeof(*(buf_rel->num_rel))  * T_REL))
+                          == NULL) ||
+      ((buf_rel->ltmp_rel = malloc (sizeof(*(buf_rel->ltmp_rel)) * T_REL))
+                          == NULL) ||
+      ((buf_rel->rel      = malloc (sizeof(*(buf_rel->rel))      * T_REL))
+                          == NULL))
+    {
+      fprintf (stderr, "prempt_scan_relations: malloc error. %s\n",
+               strerror (errno));
+      exit (1);
+    }
+  memset (buf_rel->rel, 0, sizeof(*(buf_rel->rel)) * T_REL);
+  for (i = T_REL ; i ; relation_provision_for_primes(&(buf_rel->rel[--i]),
+                            RELATION_MAX_BYTES >> 2, RELATION_MAX_BYTES >> 2));
   cpt_rel_a = cpt_rel_b = 0;
   cpy_cpt_rel_a = cpt_rel_a;
   nprimes = 0;
   ASSERT(rel_compact != NULL);
-  relation_stream_init(rs);
+  relation_stream_init (rs);
   rs->pipe = 1;
   length_line = 0;
   
@@ -1252,8 +1259,10 @@ prempt_scan_relations () {
     pthread_cancel(thread_load);
   pthread_join(thread_load, NULL);
   pthread_attr_destroy(&attr);
-  free(prempt_data->buf); prempt_data->buf = NULL;
-  
+  free (prempt_data->buf);
+  prempt_data->buf = NULL;
+  free (prempt_data->files);
+
   fprintf (stderr, "read %lu relations in %.1fs -- %.1f MB/s -- %.1f rels/s\n",
            rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
   if (rs->nrels != nrelmax) {
@@ -1261,7 +1270,7 @@ prempt_scan_relations () {
     exit (EXIT_FAILURE);
   }
   
-  for (i = T_REL ; i ; free(buf_rel->rel[--i].rp));
+  for (i = T_REL ; i ; free(buf_rel->rel[--i].rp), free(buf_rel->rel[i].ap));
   free (buf_rel->rel);      buf_rel->rel      = NULL;
   free (buf_rel->num_rel);  buf_rel->num_rel  = NULL;
   free (buf_rel->ltmp_rel); buf_rel->ltmp_rel = NULL;

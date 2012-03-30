@@ -227,15 +227,20 @@ static int alg_prime_cmp(alg_prime_t * a, alg_prime_t * b)
 
 typedef int (*sortfunc_t) (const void *, const void *);
 
-void relation_provision_for_primes(relation_t * rel, int nr, int na)
+void
+relation_provision_for_primes (relation_t * rel, int nr, int na)
 {
-    if (nr > 0 && rel->nb_rp_alloc < nr) {
-        rel->nb_rp_alloc = nr + nr / 2;
-        rel->rp = (rat_prime_t *) realloc(rel->rp, rel->nb_rp_alloc * sizeof(rat_prime_t));
+  if (nr > 0 && rel->nb_rp_alloc < nr)
+    {
+      rel->nb_rp_alloc = nr + nr / 2;
+      rel->rp = (rat_prime_t *) realloc (rel->rp,
+                                       rel->nb_rp_alloc * sizeof(rat_prime_t));
     }
-    if (na > 0 && rel->nb_ap_alloc < na) {
-        rel->nb_ap_alloc = na + na / 2;
-        rel->ap = (alg_prime_t *) realloc(rel->ap, rel->nb_ap_alloc * sizeof(alg_prime_t));
+  if (na > 0 && rel->nb_ap_alloc < na)
+    {
+      rel->nb_ap_alloc = na + na / 2;
+      rel->ap = (alg_prime_t *) realloc (rel->ap,
+                                       rel->nb_ap_alloc * sizeof(alg_prime_t));
     }
 }
 
