@@ -6,7 +6,7 @@ add_executable(dup2 dup2.c)
 target_link_libraries(dup2 utils)
 
 add_executable(purge purge.c)
-target_link_libraries(purge utils)
+target_link_libraries(purge utils pthread)
 
 add_executable(merge merge.c markowitz.c mst.c report.c merge_mono.c filter_matrix.c sparse.c)
 target_link_libraries(merge utils)
