@@ -55,5 +55,5 @@ cachesize_guess (int verbose)
     }
   if (verbose)
     printf ("#define L1_CACHE_SIZE %lu\n", L1);
-  return 0;
+  return L1;
 }

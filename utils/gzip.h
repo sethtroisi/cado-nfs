@@ -2,6 +2,7 @@
 #define GZIP_H_
 
 #include <stdio.h>
+#include "prempt.h"
 
 #ifdef __cplusplus
 extern "C" {

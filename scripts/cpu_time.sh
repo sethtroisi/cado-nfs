@@ -47,6 +47,8 @@ if [[ -z $1 || $(expr $1 : '.*[p].*') != 0 ]]
       then echo "polynomial files were not found"
       else
          grep phase ${name}.kjout.* | sed "s/^.*phase took \([^s]*\).*$/+\1/g" | tr "\n" " " | cut -c2- | bc | f
+         echo -n "   # rootsieve time:        "
+         grep Rootsieve ${name}.kjout.* | sed "s/^.*Rootsieve took \([^s]*\).*$/+\1/g" | tr "\n" " " | cut -c2- | bc | f
          echo -n "   # of polyselect files:   "
          ls ${name}.kjout.* | wc -l
          echo -n "   # of found polynomials:  "

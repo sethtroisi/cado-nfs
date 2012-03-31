@@ -46,7 +46,7 @@ struct relation_stream_s {
     
     // various stats stuff. May be used by the caller.
     size_t pos;
-    int nrels;
+    unsigned long nrels;
     unsigned long lnum;
     // only valid after relation_stream_trigger_disp_progress
     // of relation_stream_disp_progress_now_p

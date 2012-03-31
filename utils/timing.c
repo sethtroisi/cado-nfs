@@ -7,6 +7,7 @@
 #include "timing.h"
 #include "memusage.h"
 
+/* return total user time (all threads) */
 uint64_t
 microseconds (void)
 {
@@ -19,6 +20,19 @@ microseconds (void)
     return r;
 }
 
+/* only consider user time of the current thread */
+uint64_t
+microseconds_thread (void)
+{
+    struct rusage res[1];
+    uint64_t r;
+
+    getrusage (RUSAGE_THREAD, res);
+    r = (uint64_t) res->ru_utime.tv_sec;
+    r *= (uint64_t) 1000000UL;
+    r += (uint64_t) res->ru_utime.tv_usec;
+    return r;
+}
 
 /* cputime */
 int
@@ -31,6 +45,12 @@ double
 seconds (void)
 {
     return (double) microseconds() / 1.0e6;
+}
+
+double
+seconds_thread (void)
+{
+    return (double) microseconds_thread () / 1.0e6;
 }
 
 void

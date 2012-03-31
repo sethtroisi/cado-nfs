@@ -62,16 +62,101 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <unistd.h>
 #include <string.h>
+#include <time.h>
+#include <pthread.h>
+#include <errno.h>
 
 #include "utils.h"
-#include "hashpair.h"
-#include "gzip.h"
 #include "filter_matrix.h" /* for BURIED_MAX_DENSITY */
 
 #define MAX_FILES 1000000
 #define MAX_STEPS 10   /* maximal number of steps in each pass */
 #define FINAL_BOUND 0  /* final bound for rational and algebraic ideals */
+
+/* Main variables */
+static hashtable_t H;
+static int **rel_compact = NULL;
+static int ret MAYBE_UNUSED;
+static int nrel, nprimes = 0;
+static unsigned long nrelmax = 0;
+static int nrel_new, nprimes_new, Hsize, Hsizer, Hsizea;
+static double excess = 1.01;    /* minimum initial excess */
+static long keep = 160;    /* maximum final excess */
+static long minpr = -1, minpa = -1; /* negative values mean use minpr=rlim and
+				       minpa=alim in first pass */
+static cado_poly pol;
+static unsigned long tot_alloc, tot_alloc0;
+static int need64 = 0; /* non-zero if large primes are > 2^32 */
+static int final, pass = 0;
+static int raw = 0;
+static char ** fic;
+static int noclique = 0;
+static double wct0;
+static bit_vector rel_used;
+static relation_stream rs;
+/* Size of relations buffer between parsing & insertRelation.
+   VERY IMPORTANT. Seems best for 1<<7; try 1<<8 for possible
+   light speedup if your CPU is faster than a Nehalem 3.6 Ghz.
+   1<<7 -> about 10MB of buffering (only ~2% is really used) 
+*/
+#define T_REL (1<<7) 
+			
+static volatile unsigned long cpt_rel_a;
+static volatile unsigned long cpt_rel_b;
+static volatile unsigned int end_insertRelation = 0;
+typedef struct {
+  relation_t *rel;
+  unsigned long *num_rel;
+  unsigned int *ltmp_rel;
+} __buf_rel_t;
+static __buf_rel_t buf_rel[1];
+
+
+/* I suppose the max speed is about 120MB/s. So to load 1 byte, I need 8ns.
+   The block in file loading is PREMPT_ONE_READ, the block in others is
+   the average sentence, about ~100 bytes -> ~800 ns.
+   BUT it seems the minimal useful time for nanosleep is about 50-80
+   micro seconds... with nanosleep (0,1<<13).
+   With PREMPT_ONE_READ = 64K, PREMPT_ONE_READ<<3 = 512K, so the delai is
+   about 500 µs. OK for nanosleep(0,PREMPT_ONE_READ<<3).
+   For others, if I use nanosleep to keep minimal CPU, I have to wait at
+   least 80 µs -> 100 sentences.
+   So T_REL is 1<<7 to avoid an empty buffer!
+   1<<6 is possible, because 120MB/s is optimistic.
+*/
+static const struct timespec 
+wait_load = { 0, (PREMPT_ONE_READ<<3) }, wait_classical = { 0, 1<<13 };
+
+/* Be careful. 1<<13 = 8µs; in fact, about 50-80 µs */
+inline void attente_minimale_passive ()
+{
+  static const struct timespec wait_min = { 0, 1<<13 };
+  nanosleep(&wait_min, NULL);
+}
+
+inline void attente_minimale_active ()
+{
+  /* about 1 (for a nehalem 3 Ghz) to 5 µs */
+  unsigned int i = (1<<6);
+  while (i--) 
+    __asm__ volatile ( "\
+nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
+nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
+nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
+nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
+nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
+nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
+nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
+nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
+nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
+nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
+nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
+nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
+nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
+" : : );
+}
 
 /********************** own memory allocation routines ***********************/
 
@@ -80,37 +165,36 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
    of every memory blocks. Instead, we allocate memory in big blocks of size
    BLOCK_SIZE. */
 
-#define BLOCK_SIZE 1000000 /* memory blocks are allocated of that # of int's */
-
+#define BLOCK_SIZE (1<<20)  /* memory blocks are allocated of that # of int's */
 /* relcompact_list is a list of blocks, each one of BLOCK_SIZE ints */
-int **relcompact_list = NULL;
-int relcompact_current = -1; /* index of current block */
-unsigned long relcompact_used = BLOCK_SIZE; /* usage of current block */
+static int **relcompact_list = NULL;
+static unsigned long relcompact_used = BLOCK_SIZE; /* usage of current block */
+static unsigned int relcompact_size = 0;  /* minimal size of relcompact_list */
+static int relcompact_current = -1; /* index of current block */
 
 /* return a pointer to an array of n ints */
 static int*
 my_malloc_int (unsigned long n)
 {
   int *ptr;
-
-  if (relcompact_used + n > BLOCK_SIZE)
-    {
-#if 0
-        /* NEVER EVER rely on the fact that a shrinking something by
-         * realloc does not change the pointer !
-         */
-      /* first shrink current block */
-      if (relcompact_current >= 0)
-        relcompact_list[relcompact_current] = (int*) realloc (relcompact_list[relcompact_current], relcompact_used * sizeof (int));
-#endif
-      /* allocate a new block */
-      relcompact_current ++;
-      relcompact_list = (int**) realloc (relcompact_list, (relcompact_current + 1) * sizeof (int*));
-      relcompact_list[relcompact_current] = (int*) malloc (BLOCK_SIZE * sizeof (int));
-      relcompact_used = 0;
+  
+  if (relcompact_used + n > BLOCK_SIZE) {
+    relcompact_used = 0;
+    if (((unsigned int) (++relcompact_current)) == relcompact_size) {
+      relcompact_size = ((relcompact_size) ? (relcompact_size << 1) : (1<<16));
+      if ((relcompact_list = (int **) realloc(relcompact_list, relcompact_size * sizeof(int *))) == NULL) {
+	  fprintf (stderr, "my_malloc_int: realloc error : %s\n", strerror (errno));
+	  exit (1);
+	}
+      }
+    if ((relcompact_list[relcompact_current] = (int *) malloc (BLOCK_SIZE * sizeof (int))) == NULL) {
+      fprintf (stderr, "my_malloc_int: malloc error : %s\n", strerror (errno));
+      exit (1);
     }
+  }
   ptr = relcompact_list[relcompact_current] + relcompact_used;
   relcompact_used += n;
+  tot_alloc += n * sizeof (int);
   return ptr;
 }
 
@@ -122,6 +206,7 @@ my_malloc_free_all (void)
   free (relcompact_list);
   relcompact_list = NULL;
   relcompact_used = BLOCK_SIZE;
+  relcompact_size = 0;
 }
 
 /*****************************************************************************/
@@ -238,103 +323,99 @@ fprint_rel_row (FILE *file, int irel, relation_t rel, hashtable_t *H)
                  rational (resp. algebraic) side. This means that the output
                  might contain ideals <= minpr or minpa appearing only once.
 */
-static void
-insertNormalRelation (int **rel_compact, int irel,
-                      int *nprimes, hashtable_t *H, relation_t *rel,
-                      unsigned long minpr, unsigned long minpa,
-                      unsigned long *tot_alloc, int final)
+static inline void
+insertNormalRelation (relation_t *rel, unsigned long num_rel, int *tmp)
 {
-  int *tmp = NULL, ltmp = 0, i, j, h, ok;
+  int itmp, j, h, ok;
 
+#if 0
     reduce_exponents_mod2 (rel);
 
     /* first count number of "large" primes */
     for (j = 0; j < rel->nb_rp; j++)
-      ltmp += (rel->rp[j].p >= minpr); /* only consider primes >= minpr */
+      ltmp += ((long) rel->rp[j].p >= minpr); /* only consider primes >= minpr */
     for (j = 0; j < rel->nb_ap; j++)
-      ltmp += (rel->ap[j].p >= minpa); /* only consider primes >= minpa */
+      ltmp += ((long) rel->ap[j].p >= minpa); /* only consider primes >= minpa */
 
     /* ltmp is the number of considered primes in the relation.
        We might have ltmp=0 if all primes are less than minpr, maxpr. */
     tmp = my_malloc_int (ltmp + 1);
-    *tot_alloc += (ltmp + 1) * sizeof (int);
-    i = 0; /* number of entries in tmp */
+#endif
+    itmp = 0; /* number of entries in tmp */
 
     /* trick: we use the same hash table for rational and algebraic
        primes, but use a fake root -2 for rational primes, which
        ensures there is no collision with algebraic primes */
     for (j = 0; j < rel->nb_rp; j++)
       {
-        ok = rel->rp[j].p >= minpr;
+        ok = (((long) rel->rp[j].p) >= minpr);
         if (ok || final)
           /* in the final pass, we need to insert all ideals, since we need
              to renumber them in the output file */
-          h = hashInsert (H, rel->rp[j].p, minus2);
+          h = hashInsert (&H, rel->rp[j].p, minus2);
         if (ok)
           {
-            *nprimes += (H->hashcount[h] == 1); /* new prime */
-            tmp[i++] = h;
+            nprimes += (H.hashcount[h] == 1); /* new prime */
+            tmp[itmp++] = h;
           }
       }
 
     for (j = 0; j < rel->nb_ap; j++)
       {
-        ok = rel->ap[j].p >= minpa;
+        ok = (((long) rel->ap[j].p) >= minpa);
         if (ok || final)
           {
             rel->ap[j].r = findroot (rel->a, rel->b, rel->ap[j].p);
-            h = hashInsert (H, rel->ap[j].p, rel->ap[j].r);
+            h = hashInsert (&H, rel->ap[j].p, rel->ap[j].r);
           }
         if (ok)
           {
-            *nprimes += (H->hashcount[h] == 1); /* new prime */
-            tmp[i++] = h;
+            nprimes += (H.hashcount[h] == 1); /* new prime */
+            tmp[itmp++] = h;
           }
       }
 
-    tmp[i] = -1; /* sentinel */
-    rel_compact[irel] = tmp;
+    tmp[itmp] = -1; /* sentinel */
+    rel_compact[num_rel] = tmp;
 }
 
 /* The information is stored in the ap[].p part, which is odd, but convenient.
    rel->ap.p[0..deg[ contains the deg roots of f(x) mod p, leading to deg
    ideals for the factorization of (p). */
-static void
-insertFreeRelation (int **rel_compact, int irel, int *nprimes,
-                    hashtable_t *H, relation_t *rel,
-                    unsigned long minpr, unsigned long minpa,
-                    unsigned long *tot_alloc, int final)
+static inline void
+insertFreeRelation (relation_t *rel, unsigned long num_rel, int *tmp)
 {
-    unsigned long p = rel->a; /* rel->b == 0 */
-    int j, h, *tmp = NULL, itmp, ltmp;
+  long p = (long) rel->a; /* rel->b == 0 */
+    int j, h, itmp;
 
     /* the prime on the rational side is rel->a
        the prime ideal on the algebraic side are (rel->a, rel->ap[j].p) */
+#if 0
     ltmp = 1 + (p >= minpr);
     if (p >= minpa)
       ltmp += rel->nb_ap;
     tmp = my_malloc_int (ltmp);
-    *tot_alloc += ltmp * sizeof (int);
+#endif
     itmp = 0;
     if ((p >= minpr) || final)
-      h = hashInsert (H, p, minus2);
+      h = hashInsert (&H, p, minus2);
     if (p >= minpr)
       {
-        *nprimes += (H->hashcount[h] == 1); /* new prime */
+        nprimes += (H.hashcount[h] == 1); /* new prime */
         tmp[itmp++] = h;
       }
     for (j = 0; j < rel->nb_ap; j++)
       {
         if ((p >= minpa) || final)
-          h = hashInsert(H, p, rel->ap[j].p);
+          h = hashInsert(&H, p, rel->ap[j].p);
         if (p >= minpa)
           {
-            *nprimes += (H->hashcount[h] == 1); /* new ideal */
+            nprimes += (H.hashcount[h] == 1); /* new ideal */
             tmp[itmp++] = h;
           }
       }
     tmp[itmp++] = -1;
-    rel_compact[irel] = tmp;
+    rel_compact[num_rel] = tmp;
 }
 
 /* Read all relations from file, and fills the rel_used and rel_compact arrays
@@ -346,6 +427,7 @@ insertFreeRelation (int **rel_compact, int irel, int *nprimes,
 
      Trick: we only read relations for which rel_used[i]=1.
  */
+#if 0
 static int
 scan_relations (char **ficname, int *nprimes, hashtable_t *H,
                 bit_vector_srcptr rel_used, int nrelmax, int **rel_compact,
@@ -355,7 +437,6 @@ scan_relations (char **ficname, int *nprimes, hashtable_t *H,
 
     ASSERT(rel_compact != NULL);
 
-    relation_stream rs;
     relation_stream_init(rs);
 
     for( ; *ficname ; ficname++) {
@@ -404,6 +485,7 @@ scan_relations (char **ficname, int *nprimes, hashtable_t *H,
 
     return 1;
 }
+#endif
 
 /* Return a non-zero value iff some prime (ideal) in the array tab[] is single
    (tab[j] is the index in the hash table of the corresponding prime ideal).
@@ -670,9 +752,9 @@ remove_singletons (int *nrel, int nrelmax, int *nprimes, hashtable_t *H,
                  (double) (old - newnrel) / (double) (oldexcess - excess));
 
       count ++;
-      if (final == 0 && count >= MAX_STEPS) /* for the final pass we want
-                                               to remove all singletons
-                                               to avoid warnings */
+      if ((final == 0) && (count >= MAX_STEPS))
+        /* for the final pass we want to remove all singletons
+           to avoid warnings */
         break;
     }
   while (newnrel != old);
@@ -761,7 +843,6 @@ reread (const char *oname, char ** ficname, hashtable_t *H,
     fprintf (ofile, "%d %d\n", nrows, ncols);
   fprintf (stderr, "Final pass:\n");
 
-  relation_stream rs;
   relation_stream_init(rs);
 
   for ( ; *ficname ; ficname++) {
@@ -798,7 +879,7 @@ reread (const char *oname, char ** ficname, hashtable_t *H,
               continue;
 
           fprintf(stderr,
-                  "re-read %d relations in %.1fs"
+                  "re-read %lu relations in %.1fs"
                   " -- %.1f MB/s -- %.1f rels/s\n",
                   rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
       }
@@ -806,7 +887,7 @@ reread (const char *oname, char ** ficname, hashtable_t *H,
   }
   relation_stream_trigger_disp_progress(rs);
   fprintf(stderr,
-          "re-read %d relations in %.1fs"
+          "re-read %lu relations in %.1fs"
           " -- %.1f MB/s -- %.1f rels/s\n",
           rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
   relation_stream_clear(rs);
@@ -818,6 +899,385 @@ reread (const char *oname, char ** ficname, hashtable_t *H,
             nr, W, W * (double) nr);
   printf ("EXCESS: %d\n", nrows - ncols);
   fflush (stdout);
+}
+
+static void
+prempt_load (prempt_t prempt_data) {
+  char **p_files = prempt_data->files, *pprod;
+  FILE *f;
+  size_t try_load, load;
+  char *p, *l, *pmax = &(prempt_data->buf[PREMPT_BUF]);
+
+  pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+  pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+
+  while (*p_files) {
+    if (!(f = popen (*p_files, "r"))) {
+      fprintf (stderr, "prempt_load: popen error. %s\n", strerror (errno));
+      exit (1);
+    }
+    p = strstr(*p_files, "/");
+    if (p) {
+      *p = 0;
+      fprintf (stderr, "%s\n", *p_files);
+      *p = '/';
+      for ( ; ; ) {
+	l = strstr(p, " ");
+	if (l) {
+	  *l = 0;
+	  fprintf(stderr, "   %-70s\n", p);
+	  *l = ' ';
+	  p = strstr(&(l[1]), "/");
+	}
+	else {
+	  fprintf(stderr, "   %-70s\n", p);
+	  break;
+	}
+      }
+    }
+    pprod = (char *) prempt_data->pprod;
+    for ( ; ; )
+      if ((pprod != prempt_data->pcons) &&
+	  (((((PREMPT_BUF + ((size_t) prempt_data->pcons))) - ((size_t) pprod)) &
+	    (PREMPT_BUF - 1)) <= PREMPT_ONE_READ)) {
+	nanosleep(&wait_load, NULL);
+      }
+      else {
+	try_load = MIN((PREMPT_BUF + ((size_t)prempt_data->buf)) - ((size_t) pprod), PREMPT_ONE_READ);
+	if ((load = fread (pprod, 1, try_load, f))) {
+	  pprod += load;
+	  if (pprod == pmax) pprod = prempt_data->buf;
+	  prempt_data->pprod = pprod;
+	}
+	else
+	  if (feof(f)) {
+	    pclose(f);
+	    free(*p_files);
+	    *p_files++ = NULL;
+	    break;
+	  }
+	  else {
+	    fprintf (stderr, "prempt_load: load error (%s) from\n%s\n", strerror (errno), *p_files);
+	    exit (1);
+	  }
+      }
+  }
+  prempt_data->end = 1;
+  pthread_exit (NULL);
+}
+
+static inline
+unsigned int relation_stream_get_fast (prempt_t prempt_data, relation_t *rel)
+{
+  static const unsigned char ugly[256] = {
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+      0,   1,   2,   3,   4,   5,   6,   7,   8,   9, 255, 255, 255, 255, 255, 255,
+    255,  10,  11,  12,  13,  14,  15, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255,  10,  11,  12,  13,  14,  15, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255 };
+  int64_t n;
+  char *p, *pmax, *pmin;
+  unsigned int k, i;
+  unsigned long pr;
+  unsigned char c, v;
+  unsigned int ltmp;
+  
+#define LOAD_ONE(P) { c = *(P)++; if ((P) == pmax) (P) = pmin; }
+  
+  ltmp = 0;
+
+  pmin = prempt_data->buf;
+  p = (char *) prempt_data->pcons;
+  pmax = &(prempt_data->buf[PREMPT_BUF]);
+
+  LOAD_ONE(p);
+  if (c == '-') {
+    rel->a = -1;
+    LOAD_ONE(p);
+  }
+  else
+    rel->a = 1;
+  for (n = 0 ; (v = ugly[c]) < 10 ; ) {
+    n = n * 10 + v;
+    LOAD_ONE(p);
+  }
+  ASSERT_ALWAYS(c == ',');
+  rel->a *= n;
+  
+  n = 0;
+  LOAD_ONE(p);
+  for ( ; (v = ugly[c]) < 10 ; ) {
+    n = n * 10 + v;
+    LOAD_ONE(p);
+  }
+  ASSERT_ALWAYS(c == ':');
+  rel->b = n;
+  
+  if (!rs->parse_only_ab) {
+    /* Do something if we're also interested in primes */
+    ltmp = 1;
+
+    for ( k = 0, c = 0 ; ; ) {
+    next_rat:
+      if (c == ':') break;
+      LOAD_ONE(p);
+      for (pr = 0 ; (v = ugly[c]) < 16 ; ) {
+	pr <<= 4;
+	pr += v;
+	LOAD_ONE(p);
+      }
+      ASSERT_ALWAYS(c == ',' || c == ':');
+      if (pr) {
+	for (i = k; i--; ) {
+	  if (rel->rp[i].p == pr) {
+	    rel->rp[i].e++;
+	    goto next_rat;
+	  }
+	}
+	rel->rp[k++] = (rat_prime_t) { .p = pr,.e = 1};
+      }
+    }
+    rel->nb_rp = k;
+    
+    for ( k = 0 ; ; ) {
+    next_alg:
+      if (c == '\n') break;
+      LOAD_ONE(p);
+      for (pr = 0 ; (v = ugly[c]) < 16 ; ) {
+	pr <<= 4;
+	pr += v;
+	LOAD_ONE(p);
+      }
+      ASSERT_ALWAYS(c == ',' || c == '\n');
+      if (pr) {
+	for (i = k; i--; ) {
+	  if (rel->ap[i].p == pr) {
+	    rel->ap[i].e++;
+	    goto next_alg;
+	  }
+	}
+	rel->ap[k++] = (alg_prime_t) { .p = pr,.r = -1,.e = 1};
+      }
+    }
+    rel->nb_ap = k;
+
+    if (rel->b > 0) {
+      reduce_exponents_mod2 (rel);
+      for (i = rel->nb_rp; i ; ltmp += ((long) rel->rp[--i].p >= minpr));
+      for (i = rel->nb_ap; i ; ltmp += ((long) rel->ap[--i].p >= minpa));
+    }
+    else {
+      ltmp += (long) rel->a >= minpr;
+      if ((long) rel->a >= minpa) ltmp += rel->nb_ap;
+    }
+  }
+  return ltmp;
+}
+
+void insertRelation() {
+  unsigned int n;
+  unsigned long cpy_cpt_rel_b;
+  int *tmp;
+
+  /*
+  pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+  pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+  */
+  cpy_cpt_rel_b = cpt_rel_b;
+  while (cpt_rel_a == cpy_cpt_rel_b) nanosleep (&wait_classical, NULL);
+  for ( ; ; ) {
+    n = (unsigned int) (cpy_cpt_rel_b & (T_REL - 1));
+    tmp = my_malloc_int(buf_rel->ltmp_rel[n]);
+    if (buf_rel->rel[n].b > 0)
+      insertNormalRelation (&(buf_rel->rel[n]), buf_rel->num_rel[n], tmp);
+    else
+      insertFreeRelation (&(buf_rel->rel[n]), buf_rel->num_rel[n], tmp);
+    cpy_cpt_rel_b++;
+    cpt_rel_b = cpy_cpt_rel_b;
+    if (relation_stream_disp_progress_now_p(rs))
+      fprintf(stderr,
+	      "read useful %lu relations in %.1fs"
+	      " -- %.1f MB/s -- %.1f rels/s\n",
+	      rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
+    while (cpt_rel_a == cpy_cpt_rel_b) {
+      if (!end_insertRelation) nanosleep (&wait_classical, NULL);
+      else if (cpt_rel_a == cpy_cpt_rel_b) pthread_exit(NULL);
+    }
+  }
+}
+
+static int
+prempt_scan_relations ()
+{
+  char *pcons, *pcons_old, *pcons_max, *p;
+  pthread_attr_t attr;
+  pthread_t thread_load, thread_relation;
+  prempt_t prempt_data;
+  unsigned long cpy_cpt_rel_a;
+  unsigned int dispo, length_line, i;
+  int err;
+  char c;
+  static int pass1 = 1;
+
+  end_insertRelation = 0;
+  if (((buf_rel->num_rel  = malloc (sizeof(*(buf_rel->num_rel))  * T_REL))
+                          == NULL) ||
+      ((buf_rel->ltmp_rel = malloc (sizeof(*(buf_rel->ltmp_rel)) * T_REL))
+                          == NULL) ||
+      ((buf_rel->rel      = malloc (sizeof(*(buf_rel->rel))      * T_REL))
+                          == NULL))
+    {
+      fprintf (stderr, "prempt_scan_relations: malloc error. %s\n",
+               strerror (errno));
+      exit (1);
+    }
+  memset (buf_rel->rel, 0, sizeof(*(buf_rel->rel)) * T_REL);
+  for (i = T_REL ; i ; relation_provision_for_primes(&(buf_rel->rel[--i]),
+                            RELATION_MAX_BYTES >> 2, RELATION_MAX_BYTES >> 2));
+  cpt_rel_a = cpt_rel_b = 0;
+  cpy_cpt_rel_a = cpt_rel_a;
+  nprimes = 0;
+  ASSERT(rel_compact != NULL);
+  relation_stream_init (rs);
+  rs->pipe = 1;
+  length_line = 0;
+  
+  prempt_data->files = prempt_open_compressed_rs (fic);
+  if (!(prempt_data->buf = malloc (PREMPT_BUF))) {
+    fprintf (stderr, "prempt_scan_relations: malloc error. %s\n", strerror (errno));
+    exit (1);
+  }
+  prempt_data->pcons = prempt_data->buf;
+  prempt_data->pprod = prempt_data->buf;
+  pcons_max = &(prempt_data->buf[PREMPT_BUF]);
+  prempt_data->end = 0;
+  pthread_attr_init (&attr);
+  pthread_attr_setstacksize (&attr, 1<<16);
+  pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_JOINABLE);
+  if ((err = pthread_create (&thread_load, &attr, (void *) prempt_load, prempt_data))) {
+    fprintf (stderr, "prempt_scan_relations: pthread_create erreur 1: %d. %s\n", err, strerror (errno)); 
+    exit (1);
+  }
+  if ((err = pthread_create (&thread_relation, &attr, (void *) insertRelation, NULL))) {
+    fprintf (stderr, "prempt_scan_relations: pthread_create erreur 2: %d. %s\n", err, strerror (errno)); 
+    exit (1);
+  }
+  
+  pcons = (char *) prempt_data->pcons;
+  for ( ; ; ) {
+    ASSERT_ALWAYS(length_line <= ((unsigned int) RELATION_MAX_BYTES));
+    rs->pos += length_line;
+    length_line = 0;
+    prempt_data->pcons = pcons;
+
+    while (pcons == prempt_data->pprod) {						
+      if (prempt_data->end) if (pcons == prempt_data->pprod) goto end_of_files;
+      nanosleep (&wait_classical, NULL);
+    }
+    if (*pcons == '#')                           goto goto_endline;
+    if (pass1)                                   goto valid_line;
+    if (bit_vector_getbit (rel_used, rs->nrels)) goto valid_line;
+    rs->nrels++;
+
+  goto_endline:
+    do {
+      while (pcons == prempt_data->pprod) {
+	if (prempt_data->end)
+	  if (pcons == prempt_data->pprod) {
+	    fprintf (stderr, "prempt_scan_relations: at the end of files, a line without \\n ?\n");
+	    exit (1); 
+	  }
+	nanosleep (&wait_classical, NULL);
+      }
+      p = ((pcons <= prempt_data->pprod) ? (char *) prempt_data->pprod : pcons_max) - 1;
+      c = *p;
+      *p = '\n';
+      pcons_old = pcons;
+      while (*pcons++ != '\n');
+      *p = c;
+      length_line += (pcons - pcons_old);
+      err = (pcons > p && c != '\n');
+      if (pcons == pcons_max) pcons = prempt_data->buf;
+    } while (err);
+    rs->lnum++;
+    continue;
+
+  valid_line:
+    /* Here, the next line is useful. But we have to read a complete line (with \n). So,
+       we try to load >= RELATION_MAX_BYTES. After, we search the number of caracters,
+       and write at the MIN(nb_caracters, PREMPT_BUF) '\n' to speed up the research. */
+    while ((dispo = ((PREMPT_BUF + ((size_t) prempt_data->pprod)) - ((size_t) pcons)) & (PREMPT_BUF - 1)) <= ((unsigned int) RELATION_MAX_BYTES)) {
+      if (prempt_data->end) {
+	dispo = ((PREMPT_BUF + ((size_t) prempt_data->pprod)) - ((size_t) pcons)) & (PREMPT_BUF - 1);
+	break;
+      }
+      nanosleep(&wait_classical, NULL);
+    }
+    do {
+      if (pcons == prempt_data->pprod) {
+	fprintf (stderr, "prempt_scan_relations: relation line size is greater than RELATION_MAX_BYTES (%d)\n", RELATION_MAX_BYTES);
+	exit(1);
+      }
+      p = ((pcons < prempt_data->pprod) ? (char *) prempt_data->pprod : pcons_max) - 1;
+      c = *p;
+      *p = '\n';
+      pcons_old = pcons;
+      while (*pcons++ != '\n');
+      *p = c;
+      length_line += (pcons - pcons_old);
+      err = (pcons > p && c != '\n');
+      if (pcons == pcons_max) pcons = prempt_data->buf;
+    } while (err);
+    /* Ok, we have a complete line */
+    while (cpy_cpt_rel_a > cpt_rel_b+T_REL-1) {
+      nanosleep(&wait_classical, NULL);
+    }
+    buf_rel->num_rel [cpy_cpt_rel_a & (T_REL - 1)] = rs->nrels;
+    buf_rel->ltmp_rel[cpy_cpt_rel_a & (T_REL - 1)] =
+      relation_stream_get_fast (prempt_data, &(buf_rel->rel[cpy_cpt_rel_a & (T_REL - 1)]));
+    cpy_cpt_rel_a++;
+    cpt_rel_a = cpy_cpt_rel_a;
+    rs->nrels++;
+    rs->lnum++;
+  }
+ end_of_files:
+  while (cpy_cpt_rel_a != cpt_rel_b) nanosleep(&wait_classical, NULL);
+  end_insertRelation = 1;
+  pthread_join(thread_relation, NULL);
+  if (pthread_tryjoin_np (thread_load, NULL))
+    pthread_cancel(thread_load);
+  pthread_join(thread_load, NULL);
+  pthread_attr_destroy(&attr);
+  free (prempt_data->buf);
+  prempt_data->buf = NULL;
+  free (prempt_data->files);
+
+  fprintf (stderr, "read %lu relations in %.1fs -- %.1f MB/s -- %.1f rels/s\n",
+           rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
+  if (rs->nrels != nrelmax) {
+    fprintf (stderr, "Error, -nrels value should match the number of scanned relations\nexpected %lu relations, found %lu\n", nrelmax, rs->nrels);
+    exit (EXIT_FAILURE);
+  }
+  
+  for (i = T_REL ; i ; free(buf_rel->rel[--i].rp), free(buf_rel->rel[i].ap));
+  free (buf_rel->rel);      buf_rel->rel      = NULL;
+  free (buf_rel->num_rel);  buf_rel->num_rel  = NULL;
+  free (buf_rel->ltmp_rel); buf_rel->ltmp_rel = NULL;
+
+  pass1 = 0;
+  
+  return 1;
 }
 
 static void
@@ -847,243 +1307,228 @@ approx_phi (long B)
 int
 main (int argc, char **argv)
 {
-    hashtable_t H;
-    int **rel_compact = NULL;
-    int ret MAYBE_UNUSED, k;
-    int nrel, nprimes = 0;
-    unsigned int nrelmax = 0;
-    int nrel_new, nprimes_new, Hsize, Hsizer, Hsizea;
-    double excess = 1.01;    /* minimum initial excess */
-    long keep = 160;    /* maximum final excess */
-    long minpr = -1, minpa = -1; /* negative values mean use minpr=rlim and
-                                    minpa=alim in first pass */
-    cado_poly pol;
-    unsigned long tot_alloc, tot_alloc0;
-    int need64 = 0; /* non-zero if large primes are > 2^32 */
-    int final, pass = 0;
-    int raw = 0;
-    char ** fic;
-    int noclique = 0;
-    double wct0 = wct_seconds ();
+  int k;
+  
+  wct0 = wct_seconds ();
+  fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
+  for (k = 1; k < argc; k++)
+    fprintf (stderr, " %s", argv[k]);
+  fprintf (stderr, "\n");
+  
+  param_list pl;
+  param_list_init(pl);
+  
+  param_list_configure_knob(pl, "raw", &raw);
+  
+  argv++,argc--;
+  
+  for( ; argc ; ) {
+    if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
+    /* Since we accept file names freeform, we decide to never abort
+     * on unrecognized options */
+    if (strcmp(*argv, "--help") == 0)
+      usage();
+    break;
+  }
+  
+  param_list_parse_ulong(pl, "nrels", &nrelmax);
+  param_list_parse_int(pl, "nprimes", &nprimes);
+  param_list_parse_long(pl, "minpr", &minpr);
+  param_list_parse_long(pl, "minpa", &minpa);
+  param_list_parse_double(pl, "excess", &excess);
+  param_list_parse_long(pl, "keep", &keep);
+  param_list_parse_int(pl, "noclique", &noclique);
 
-    fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
-    for (k = 1; k < argc; k++)
-      fprintf (stderr, " %s", argv[k]);
-    fprintf (stderr, "\n");
-
-    param_list pl;
-    param_list_init(pl);
-
-    param_list_configure_knob(pl, "raw", &raw);
-
-    argv++,argc--;
-
-    for( ; argc ; ) {
-        if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
-        /* Since we accept file names freeform, we decide to never abort
-         * on unrecognized options */
-        if (strcmp(*argv, "--help") == 0)
-            usage();
-        break;
+  const char * filelist = param_list_lookup_string(pl, "filelist");
+  const char * basepath = param_list_lookup_string(pl, "basepath");
+  const char * subdirlist = param_list_lookup_string(pl, "subdirlist");
+  const char * purgedname = param_list_lookup_string(pl, "out");
+  const char * sos = param_list_lookup_string(pl, "sos");
+  
+  cado_poly_init (pol);
+  
+  const char * tmp;
+  
+  ASSERT_ALWAYS((tmp = param_list_lookup_string(pl, "poly")) != NULL);
+  cado_poly_read(pol, tmp);
+  
+  if (param_list_warn_unused(pl)) {
+    usage();
+  }
+  
+  if ((basepath || subdirlist) && !filelist) {
+    fprintf(stderr, "-basepath / -subdirlist only valid with -filelist\n");
+    usage();
+  }
+  
+  if (nrelmax == 0)
+    {
+      fprintf (stderr, "Error, missing -nrels ... option (or nrels=0)\n");
+      usage ();
     }
-
-    param_list_parse_uint(pl, "nrels", &nrelmax);
-    param_list_parse_int(pl, "nprimes", &nprimes);
-    param_list_parse_long(pl, "minpr", &minpr);
-    param_list_parse_long(pl, "minpa", &minpa);
-    param_list_parse_double(pl, "excess", &excess);
-    param_list_parse_long(pl, "keep", &keep);
-    param_list_parse_int(pl, "noclique", &noclique);
-
-    const char * filelist = param_list_lookup_string(pl, "filelist");
-    const char * basepath = param_list_lookup_string(pl, "basepath");
-    const char * subdirlist = param_list_lookup_string(pl, "subdirlist");
-    const char * purgedname = param_list_lookup_string(pl, "out");
-    const char * sos = param_list_lookup_string(pl, "sos");
-
-    cado_poly_init (pol);
-
-    const char * tmp;
-
-    ASSERT_ALWAYS((tmp = param_list_lookup_string(pl, "poly")) != NULL);
-    cado_poly_read(pol, tmp);
-
-    if (param_list_warn_unused(pl)) {
-        usage();
+  
+  /* On a 32-bit computer, even 1 << 32 would overflow. Well, we could set
+     map[ra] = 2^32-1 in that case, but not sure we want to support 32-bit
+     primes on a 32-bit computer... */
+  need64 = (pol->rat->lpb >= 32) || (pol->alg->lpb >= 32);
+  
+  if (need64 && sizeof (long) < 8)
+    {
+      fprintf (stderr, "Error, too large LPBs for a 32-bit computer\n");
+      usage();
     }
-
-    if ((basepath || subdirlist) && !filelist) {
-        fprintf(stderr, "-basepath / -subdirlist only valid with -filelist\n");
-        usage();
-    }
-
-    if (nrelmax == 0)
-      {
-        fprintf (stderr, "Error, missing -nrels ... option (or nrels=0)\n");
-        usage ();
+  
+  minus2 = (need64) ? 18446744073709551614UL : 4294967294UL;
+  
+  if (minpr < 0)
+    minpr = pol->rat->lim;
+  if (minpa < 0)
+    minpa = pol->alg->lim;
+  
+  fprintf (stderr, "Number of relations is %lu\n", nrelmax);
+  if (nprimes > 0)
+    Hsize = nprimes;
+  else{
+    /* Estimating the number of needed primes (remember that hashInit
+       multiplies by a factor 1.5). */
+    Hsizer = approx_phi (1L << pol->rat->lpb) - approx_phi (minpr);
+    Hsizea = approx_phi (1L << pol->alg->lpb) - approx_phi (minpa);
+    Hsize = Hsizer + Hsizea;
+  }
+  fprintf (stderr, "Estimated number of prime ideals: %d\n", Hsize);
+  hashInit (&H, Hsize, 1, need64);
+  tot_alloc0 = H.hashmod * H.size;
+  
+  bit_vector_init_set(rel_used, nrelmax, 1);
+  tot_alloc0 += nrelmax;
+  fprintf (stderr, "Allocated rel_used of %luMb (total %luMb so far)\n",
+	   nrelmax >> 20,
+	   tot_alloc0 >> 20);
+  
+  /* FIXME: we could allocate rel_compact[] at each pass according to the
+     number of *remaining* relations. We could also manage so that it takes
+     only 32 bits per entry on a 64-bit machine. */
+  rel_compact = (int **) malloc (nrelmax * sizeof (int *));
+  tot_alloc0 += nrelmax * sizeof (int*);
+  /* %zu is the C99 modifier for size_t */
+  fprintf (stderr, "Allocated rel_compact of %zuMb (total %luMb so far)\n",
+	   (nrelmax * sizeof (int *)) >> 20,
+	   tot_alloc0 >> 20);
+  
+  /* Build the file list (ugly). It is the concatenation of all
+   *  b s p
+   * where:
+   *    b is the basepath (empty if not given)
+   *    s ranges over all subdirs listed in the subdirlist (empty if no
+   *    such list)
+   *    p ranges over all paths listed in the filelist.
+   *
+   * If files are provided directly on the command line, the basepath
+   * and subdirlist arguments are ignored.
+   */
+  
+  if (!filelist) {
+    fic = argv;
+  } else if (!subdirlist) {
+    fic = filelist_from_file(basepath, filelist);
+  } else {
+    /* count the number of files in the filelist */
+    int nfiles = 0;
+    int nsubdirs = 0;
+    char ** fl = filelist_from_file(NULL, filelist);
+    for(char ** p = fl ; *p ; p++, nfiles++);
+    
+    char ** sl = filelist_from_file(basepath, subdirlist);
+    for(char ** p = sl ; *p ; p++, nsubdirs++);
+    
+    fic = malloc((nsubdirs * nfiles + 1) * sizeof(char*));
+    char ** full = fic;
+    for(char ** f = fl ; *f ; f++) {
+      for(char ** s = sl ; *s ; s++, full++) {
+	int ret = asprintf(full, "%s/%s", *s, *f);
+	ASSERT_ALWAYS(ret >= 0);
       }
-
-    /* On a 32-bit computer, even 1 << 32 would overflow. Well, we could set
-       map[ra] = 2^32-1 in that case, but not sure we want to support 32-bit
-       primes on a 32-bit computer... */
-    need64 = (pol->rat->lpb >= 32) || (pol->alg->lpb >= 32);
-
-    if (need64 && sizeof (long) < 8)
-      {
-        fprintf (stderr, "Error, too large LPBs for a 32-bit computer\n");
-        usage();
-      }
-
-    minus2 = (need64) ? 18446744073709551614UL : 4294967294UL;
-
-    if (minpr < 0)
-      minpr = pol->rat->lim;
-    if (minpa < 0)
-      minpa = pol->alg->lim;
-
-    fprintf (stderr, "Number of relations is %u\n", nrelmax);
-    if (nprimes > 0)
-	Hsize = nprimes;
-    else{
-      /* Estimating the number of needed primes (remember that hashInit
-         multiplies by a factor 1.5). */
-      Hsizer = approx_phi (1L << pol->rat->lpb) - approx_phi (minpr);
-      Hsizea = approx_phi (1L << pol->alg->lpb) - approx_phi (minpa);
-      Hsize = Hsizer + Hsizea;
     }
-    fprintf (stderr, "Estimated number of prime ideals: %d\n", Hsize);
-    hashInit (&H, Hsize, 1, need64);
-    tot_alloc0 = H.hashmod * H.size;
-
-    bit_vector rel_used;
-    bit_vector_init_set(rel_used, nrelmax, 1);
-    tot_alloc0 += nrelmax;
-    fprintf (stderr, "Allocated rel_used of %uMb (total %luMb so far)\n",
-             nrelmax >> 20,
-             tot_alloc0 >> 20);
-
-    /* FIXME: we could allocate rel_compact[] at each pass according to the
-       number of *remaining* relations. We could also manage so that it takes
-       only 32 bits per entry on a 64-bit machine. */
-    rel_compact = (int **) malloc (nrelmax * sizeof (int *));
-    tot_alloc0 += nrelmax * sizeof (int*);
-    /* %zu is the C99 modifier for size_t */
-    fprintf (stderr, "Allocated rel_compact of %zuMb (total %luMb so far)\n",
-             (nrelmax * sizeof (int *)) >> 20,
-             tot_alloc0 >> 20);
-
-    /* Build the file list (ugly). It is the concatenation of all
-     *  b s p
-     * where:
-     *    b is the basepath (empty if not given)
-     *    s ranges over all subdirs listed in the subdirlist (empty if no
-     *    such list)
-     *    p ranges over all paths listed in the filelist.
-     *
-     * If files are provided directly on the command line, the basepath
-     * and subdirlist arguments are ignored.
-     */
-
-    if (!filelist) {
-        fic = argv;
-    } else if (!subdirlist) {
-        fic = filelist_from_file(basepath, filelist);
-    } else {
-        /* count the number of files in the filelist */
-        int nfiles = 0;
-        int nsubdirs = 0;
-        char ** fl = filelist_from_file(NULL, filelist);
-        for(char ** p = fl ; *p ; p++, nfiles++);
-
-        char ** sl = filelist_from_file(basepath, subdirlist);
-        for(char ** p = sl ; *p ; p++, nsubdirs++);
-
-        fic = malloc((nsubdirs * nfiles + 1) * sizeof(char*));
-        char ** full = fic;
-        for(char ** f = fl ; *f ; f++) {
-            for(char ** s = sl ; *s ; s++, full++) {
-                int ret = asprintf(full, "%s/%s", *s, *f);
-                ASSERT_ALWAYS(ret >= 0);
-            }
-        }
-        *full=NULL;
-        filelist_clear(fl);
-        filelist_clear(sl);
-    }
-
-    nrel = nrelmax;
-    while (1)
-      {
-        final = minpr <= FINAL_BOUND && minpa <= FINAL_BOUND;
-        tot_alloc = tot_alloc0;
-
-        fprintf (stderr, "Pass %d, filtering ideals >= %ld on rat. side and "
-                 "%ld on alg. side:\n", ++pass, minpr, minpa);
+    *full=NULL;
+    filelist_clear(fl);
+    filelist_clear(sl);
+  }
+  
+  nrel = nrelmax;
+  for ( ; ; )
+    {
+      final = minpr <= FINAL_BOUND && minpa <= FINAL_BOUND;
+      tot_alloc = tot_alloc0;
+      
+      fprintf (stderr, "Pass %d, filtering ideals >= %ld on rat. side and "
+	       "%ld on alg. side:\n", ++pass, minpr, minpa);
+      /*
         ret = scan_relations (fic, &nprimes, &H, rel_used, nrelmax,
-                              rel_compact, minpr, minpa, &tot_alloc, final);
-        ASSERT (ret);
-
-        fprintf (stderr, "   nrels=%d, nprimes=%d; excess=%d\n",
-                 nrel, nprimes, nrel - nprimes);
-
-        fprintf (stderr, "   Starting singleton removal...\n");
-        nrel_new = nrel;
-        nprimes_new = nprimes;
-        /* if one pass only, usually the initial excess is negative, but after
-           a few steps of removing singletons, we get a positive excess */
-        if (final && (nrel_new < nprimes_new * excess) && pass >= 2)
-          {
-            fprintf (stderr, "Initial excess is below requested %ld, stopping.\n",
-                     (long int)(nprimes_new * (excess - 1)));
-            exit (1); /* initial excess is too small */
-          }
-        if (final && noclique)
-          {
-            fprintf (stderr, "Initial excess is attained, purge will be completed at the next filtering.\n");
-            return 0;
-          }
-        remove_singletons (&nrel_new, nrelmax, &nprimes_new, &H, rel_used,
-                           rel_compact, keep, final);
-
-        fprintf (stderr, "   nrel=%d, nprimes=%d; excess=%d\n",
-                 nrel_new, nprimes_new, nrel_new - nprimes_new);
-
-        if (nrel_new <= nprimes_new) /* covers case nrel = nprimes = 0 */
-          exit (1); /* if the excess is <= here, it will be more negative
-                       when we decrease minpr and minpa in the next pass */
-
-        my_malloc_free_all ();
-        if (final)
-          break;
-        else
-          minpr = minpa = FINAL_BOUND;
-        hashClear (&H); /* Reset all tables to 0. FIXME: in the 2nd pass,
-                           we might reuse some of the information computed
-                           in the 1st pass (roots of primes, etc). */
-        nrel = nrel_new;
-      }
-
-    fprintf (stderr, "Freeing rel_compact array...\n");
-    /* we do not use it anymore */
-    free (rel_compact);
-
-    /* we renumber the primes in order of apparition in the hashtable */
-    fprintf (stderr, "Renumbering primes...\n");
-    renumber (&nprimes_new, &H, sos);
-
-    /* reread the relation files and convert them to the new coding */
-    fprintf (stderr, "Storing remaining relations...\n");
-    reread (purgedname, fic, &H, rel_used, nrel_new, nprimes_new, raw);
-
-    hashFree (&H);
-    bit_vector_clear(rel_used);
-    cado_poly_clear (pol);
-
-    if (filelist) filelist_clear(fic);
-
-    param_list_clear(pl);
-
-    print_timing_and_memory (wct0);
-
-    return 0;
+	rel_compact, minpr, minpa, &tot_alloc, final);
+      */
+      prempt_scan_relations ();
+      
+      fprintf (stderr, "   nrels=%d, nprimes=%d; excess=%d\n",
+	       nrel, nprimes, nrel - nprimes);
+      
+      fprintf (stderr, "   Starting singleton removal...\n");
+      nrel_new = nrel;
+      nprimes_new = nprimes;
+      /* if one pass only, usually the initial excess is negative, but after
+	 a few steps of removing singletons, we get a positive excess */
+      if (final && (nrel_new < nprimes_new * excess) && pass >= 2)
+	{
+	  fprintf (stderr, "Initial excess is below requested %ld, stopping.\n",
+		   (long int)(nprimes_new * (excess - 1)));
+	  exit (1); /* initial excess is too small */
+	}
+      if (final && noclique)
+	{
+	  fprintf (stderr, "Initial excess is attained, purge will be completed at the next filtering.\n");
+	  return 0;
+	}
+      remove_singletons (&nrel_new, nrelmax, &nprimes_new, &H, rel_used,
+			 rel_compact, keep, final);
+      
+      fprintf (stderr, "   nrel=%d, nprimes=%d; excess=%d\n",
+	       nrel_new, nprimes_new, nrel_new - nprimes_new);
+      
+      if (nrel_new <= nprimes_new) /* covers case nrel = nprimes = 0 */
+	exit (1); /* if the excess is <= here, it will be more negative
+		     when we decrease minpr and minpa in the next pass */
+      
+      my_malloc_free_all ();
+      if (final)
+	break;
+      else
+	minpr = minpa = FINAL_BOUND;
+      hashClear (&H); /* Reset all tables to 0. FIXME: in the 2nd pass,
+			 we might reuse some of the information computed
+			 in the 1st pass (roots of primes, etc). */
+      nrel = nrel_new;
+    }
+  
+  fprintf (stderr, "Freeing rel_compact array...\n");
+  /* we do not use it anymore */
+  free (rel_compact);
+  
+  /* we renumber the primes in order of apparition in the hashtable */
+  fprintf (stderr, "Renumbering primes...\n");
+  renumber (&nprimes_new, &H, sos);
+  
+  /* reread the relation files and convert them to the new coding */
+  fprintf (stderr, "Storing remaining relations...\n");
+  reread (purgedname, fic, &H, rel_used, nrel_new, nprimes_new, raw);
+  
+  hashFree (&H);
+  bit_vector_clear(rel_used);
+  cado_poly_clear (pol);
+  
+  if (filelist) filelist_clear(fic);
+  
+  param_list_clear(pl);
+  
+  print_timing_and_memory (wct0);
+  
+  return 0;
 }

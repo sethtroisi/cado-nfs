@@ -1007,7 +1007,7 @@ sub first_line {
     my ($f) = @_;
     my $last = "";
     if ($f =~ /\.gz$/) {
-            $last= cmd ("gzip -dc $f | tail -n 1" )->{'out'};
+            $last= cmd ("gzip -dc $f | head -n 1" )->{'out'};
             chomp $last;
             return $last;
     }

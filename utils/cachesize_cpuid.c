@@ -128,8 +128,9 @@ void print_cache_data(cache_data_t *data) {
 
 
 // Taken from Table 3-25 in Intel ref manual number 253666
-// pages: 3-198, 3-199, 3-200.
-void update_intel_byte(uint32_t c, cache_data_t *data) {
+// pages: 3-198 and following, in particular Table 3-22.
+void
+update_intel_byte (uint32_t c, cache_data_t *data) {
   if (c == 0)
     return;
   switch (c) {
@@ -357,8 +358,11 @@ void update_intel_byte(uint32_t c, cache_data_t *data) {
 }
 
 
-int print_intel_cache(int verbose) {
+int
+print_intel_cache (int verbose)
+{
   uint32_t res[4];
+
   cpuid(res, 0);
   if (res[0] < 2) {
     if (verbose)
@@ -384,8 +388,8 @@ int print_intel_cache(int verbose) {
   }
 
   if (verbose)
-    print_cache_data(&data);
-  
+    print_cache_data (&data);
+
   return ((&data)->L1Data_size);  	
 }
 
@@ -429,13 +433,22 @@ int print_amd_cache(int verbose) {
 }
 
 
-int cachesize_cpuid(int verbose) {
+int
+cachesize_cpuid (int verbose)
+{
   int brd, ret = -1;
-  brd = brand();
-  if (brd == AMD) {
-    ret = print_amd_cache(verbose) * 1024;
-  } else if (brd == INTEL) {
-    ret = print_intel_cache(verbose) * 1024;
-  }
-  return ret;
+
+  brd = brand ();
+  if (brd == AMD)
+    ret = print_amd_cache (verbose);
+  else if (brd == INTEL)
+    ret = print_intel_cache (verbose);
+  else
+    {
+      if (verbose) {
+        fprintf (stderr, "Warn, unknown architecture in cachesize_cpuid()\n");
+      }
+      return -1; // continue here.
+    }
+  return ret * 1024;
 }
