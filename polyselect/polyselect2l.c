@@ -22,7 +22,11 @@
 #define NEW_ROOTSIEVE
 #define MAX_THREADS 16
 #define SQ_BATCH_SIZE 10
-//#define DEBUG
+//#define DEBUG_POLYSELECT2L
+
+#ifdef NEW_ROOTSIEVE
+#include "ropt.h"
+#endif
 
 /* Read-Only */
 uint32_t *Primes = NULL;
@@ -47,6 +51,7 @@ unsigned long collisions = 0;
 unsigned long collisions_good = 0;
 double total_adminus2;
 double best_logmu[11];
+double rootsieve_time = 0.0;
 
 
 /* crt, set r and qqz */
@@ -128,7 +133,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   double skew, logmu, E;
   /* the expected rotation space is S^5 for degree 6 */
 
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2L
   gmp_printf ("Found match: (%lu,%ld) (%lu,%ld) for ad=%lu, q=%lu, rq=%Zd\n",
               p1, i, p2, i, ad, q, rq);
   gmp_printf ("m0=%Zd\n", m0);
@@ -180,7 +185,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_mod (adm1, adm1, m);
   mpz_mul (m, adm1, l);
   mpz_sub (m, mtilde, m);
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2L
   if (mpz_divisible_ui_p (m, d) == 0)
   {
     fprintf (stderr, "Error: m-a_{d-1}*l not divisible by d\n");
@@ -188,7 +193,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   }
 #endif
   mpz_divexact_ui (m, m, d);
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2L
   if (mpz_divisible_ui_p (m, ad) == 0)
   {
     fprintf (stderr, "Error: (m-a_{d-1}*l)/d not divisible by ad\n");
@@ -203,7 +208,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_mul_ui (t, t, ad);
   mpz_sub (t, N, t);
   mpz_set (f[d-1], adm1);
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2L
   if (mpz_divisible_p (t, l) == 0)
   {
     fprintf (stderr, "Error: t not divisible by l\n");
@@ -217,7 +222,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_sub (t, t, mtilde);
   for (j = d - 2; j > 0; j--)
   {
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2L
     if (mpz_divisible_p (t, l) == 0)
     {
       fprintf (stderr, "Error: t not divisible by l\n");
@@ -244,7 +249,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     /* subtract adm1*m^j */
     mpz_submul (t, mtilde, adm1);
   }
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2L
   if (mpz_divisible_p (t, l) == 0)
   {
     fprintf (stderr, "Error: t not divisible by l\n");
@@ -275,7 +280,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   if (logmu <= max_norm)
   {
 
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2L
     /* unoptimized poly */
     printf ("# Raw polynomial:\n");
     print_poly_info (fold, d, gold);
@@ -290,6 +295,8 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     long jmin, kmin;
 #endif
     mpz_neg (m, g[0]);
+
+    rootsieve_time -= seconds_thread ();
 
 #ifdef NEW_ROOTSIEVE
     if (d > 4) {
@@ -310,6 +317,8 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     /* optimize again, but only translation */
     optimize_aux (f, d, g, 0, 0, CIRCULAR);
 #endif
+
+    rootsieve_time += seconds_thread ();
 
     skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
     logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
@@ -360,7 +369,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     pthread_mutex_unlock (&lock);
 
     /* print optimized polynomial */
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2L
     gmp_printf ("# Optimized polynomial:\n");
 #endif
 
@@ -425,7 +434,7 @@ collision_on_p ( header_t header,
   hash_t H;
   hash_init (H, 2.2 * lenPrimes);
 
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2L
   int st = cputime();
 #endif
 
@@ -456,7 +465,7 @@ collision_on_p ( header_t header,
     }
   }
 
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2L
   fprintf (stderr, "# collision_on_p took %dms\n", cputime () - st);
   fprintf (stderr, "# p hash_size: %u for ad = %lu\n", H->size, header->ad);
 #endif
@@ -493,7 +502,7 @@ collision_on_each_sq ( header_t header,
 
   mpz_init (rppz);
 
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2L
   mpz_t tmp_debug, tmp_debug2;
   mpz_init_set (tmp_debug, header->Ntilde);
   mpz_mod (tmp_debug, tmp_debug, qqz);
@@ -509,7 +518,7 @@ collision_on_each_sq ( header_t header,
   mpz_clear (tmp_debug2);
 #endif
 
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2L
   int st = cputime();
 #endif
 
@@ -534,7 +543,7 @@ collision_on_each_sq ( header_t header,
       mpz_mul_ui (rppz, rppz, inv_qq[nprimes]);
       u = (long) mpz_fdiv_ui (rppz, pp);
 
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2L
       mpz_t Ntmp, m0tmp, tmp, qqz;
       mpz_init_set_ui (qqz, q);
       mpz_mul_ui (qqz, qqz, q);
@@ -572,7 +581,7 @@ collision_on_each_sq ( header_t header,
 
   } // next p
 
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2L
   fprintf (stderr, "# collision_on_each_sq took %dms\n", cputime () - st);
   fprintf (stderr, "# - q hash_size (q=%lu): %u\n", q, H->size);
 #endif
@@ -620,7 +629,7 @@ collision_on_batch_sq ( header_t header,
   for (i = 0; i < size; i++)
     mpz_init (qprod[i]);
 
-#ifdef DEBUG  // check roots
+#ifdef DEBUG_POLYSELECT2L  // check roots
   for (i = 0; i < size; i ++) {
     mpz_t tmp_debug, tmp_debug2;
     mpz_init_set (tmp_debug, header->Ntilde);
@@ -671,7 +680,7 @@ collision_on_batch_sq ( header_t header,
     }
     invqq[0][nprimes] = tmpul;
 
-#ifdef DEBUG // check inversions
+#ifdef DEBUG_POLYSELECT2L // check inversions
     for (i = 0; i < size; i ++) {
       mpz_t tmp_debug, tmp_debug2;
       mpz_init_set_ui (tmp_debug, invqq[i][nprimes]);
@@ -768,7 +777,7 @@ collision_on_sq ( header_t header,
       }
     }
 
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2L
     for (j = 0; j < SQ_BATCH_SIZE; j++)
       gmp_fprintf (stderr, "q: %lu, qq: %Zd, rqq: %Zd\n", q[j], qqz[j], rqqz[j]);
 #endif
@@ -789,7 +798,7 @@ collision_on_sq ( header_t header,
     next_comb (N, K, idx_q);
     q[l] = return_q_rq (SQ_R, idx_q, K, qqz[l], rqqz[l]);
 
-#ifdef DEBUG
+#ifdef DEBUG_POLYSELECT2L
     gmp_fprintf (stderr, "q: %lu, qq: %Zd, rqq: %Zd\n", q[l], qqz[l], rqqz[l]);
 #endif
 
@@ -1220,6 +1229,8 @@ main (int argc, char *argv[])
 
   /* print total time (format for cpu_time.sh) */
   printf ("# Total phase took %.2fs\n", seconds () - st0);
+  printf ("# Rootsieve took %.2fs\n", rootsieve_time);
+
 
   if (best_E == 0.0)
     printf ("No polynomial found, please increase the ad range or decrease P\n");

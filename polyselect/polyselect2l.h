@@ -6,6 +6,5 @@
 
 /* declarations for ropt */
 extern int MAX_k;
-void ropt_polyselect (mpz_t*, int, mpz_t, mpz_t, mpz_t, int, int);
 
 #endif
