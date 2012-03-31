@@ -227,6 +227,11 @@ polyselect/auxiliary.h
 polyselect/polyselect.c
 polyselect/polyselect2.c
 polyselect/polyselect2l.c
+polyselect/polyselect2l.h
+polyselect/polyselect2l_arith.c
+polyselect/polyselect2l_arith.h
+polyselect/polyselect2l_str.c
+polyselect/polyselect2l_str.h
 polyselect/rotate.c
 polyselect/rootsieve.c
 polyselect/rootsieve.h
