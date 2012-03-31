@@ -1219,7 +1219,7 @@ main (int argc, char *argv[])
   printf ("# potential collisions=%1.2e (%1.2e/s)\n",
           potential_collisions, 1000.0 * potential_collisions
           / (double) cputime ());
-  printf (" av. adm2:%1.0f", total_adminus2 / (double) collisions);
+  printf ("# av. adm2:%1.0f", total_adminus2 / (double) collisions);
 
   /* print best 10 values of logmu */
   printf ("# best logmu:");
