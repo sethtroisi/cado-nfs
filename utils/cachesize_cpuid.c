@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <string.h>
 
+//#define DEBUG_CACHESIZE_CPUID
 
 static const int UNKNOWN=1;
 static const int INTEL=1;
@@ -13,6 +14,9 @@ static const uint32_t mask0 = 0xFF;
 static const uint32_t mask1 = 0xFF00;
 static const uint32_t mask2 = 0xFF0000;
 static const uint32_t mask3 = 0xFF000000;
+static const uint32_t mask_31_22 = 0xFFC00000;
+static const uint32_t mask_21_12 = 0x3FF000;
+static const uint32_t mask_11_0 = 0xFFF;
 
 static inline uint32_t byte0(uint32_t x) {
   return (x & mask0);
@@ -25,6 +29,15 @@ static inline uint32_t byte2(uint32_t x) {
 }
 static inline uint32_t byte3(uint32_t x) {
   return (x & mask3)>>24;
+}
+static inline uint32_t bits_31_22(uint32_t x) {
+  return (x & mask_31_22)>>22;
+}
+static inline uint32_t bits_21_12(uint32_t x) {
+  return (x & mask_21_12)>>12;
+}
+static inline uint32_t bits_11_0(uint32_t x) {
+  return (x & mask_11_0);
 }
 
 
@@ -352,6 +365,22 @@ update_intel_byte (uint32_t c, cache_data_t *data) {
    case 0xF1:
     // for prefetching
     break;
+   case 0xFF:
+   {
+     // cpuid 4
+     uint32_t res[4];
+     cpuid(res, 4);
+#ifdef DEBUG_CACHESIZE_CPUID
+     int j = 0;
+     for (j = 0; j < 4; j ++)
+       printf ("res[%d]: %08X\n", j, res[j]);
+     exit(1);
+#endif
+     // (EBX[31:22] + 1) * (EBX[21:12] + 1) * (EBX[11:0] + 1) * (ECX + 1)
+     data->L1Data_size = (bits_31_22(res[1]) + 1) *
+       (bits_21_12(res[1]) + 1) * (bits_11_0(res[1]) + 1) * (res[2] + 1) / 1024;
+     break;
+   }
    default:
     break;
   }

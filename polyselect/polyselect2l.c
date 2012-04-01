@@ -432,7 +432,7 @@ collision_on_p ( header_t header,
   }
 
   hash_t H;
-  hash_init (H, 2.2 * lenPrimes);
+  hash_init (H,  (unsigned long) (2.2 * (double) lenPrimes));
 
 #ifdef DEBUG_POLYSELECT2L
   int st = cputime();
@@ -523,7 +523,7 @@ collision_on_each_sq ( header_t header,
 #endif
 
   hash_t H;
-  hash_init (H,  2.2 * lenPrimes);
+  hash_init (H,  (unsigned long) (2.2 * (double) lenPrimes));
 
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
 
@@ -585,7 +585,6 @@ collision_on_each_sq ( header_t header,
   fprintf (stderr, "# collision_on_each_sq took %dms\n", cputime () - st);
   fprintf (stderr, "# - q hash_size (q=%lu): %u\n", q, H->size);
 #endif
-
   double pc2 = 0.5 * pow ((double) H->size / (double) Primes[nprimes-1],
                           2.0);
 
@@ -668,7 +667,6 @@ collision_on_batch_sq ( header_t header,
     mpz_mod_ui (tmp, tmp, pp);
     tmpul =  mpz_get_ui (tmp);
     tmpul = invert (tmpul, pp);
-
     //gmp_fprintf (stderr, "primes[%lu]: %lu, %Zd, %lu\n", nprimes, p, qqz, size);
 
     // for each (q, r) \in a batch
@@ -750,6 +748,9 @@ collision_on_sq ( header_t header,
   tot =  binom (N, K);
   //fprintf (stderr, "n=%lu, k=%lu, (n,k)=%lu, nq:%d\n", N, K, tot, nq);
 
+  // if nq too small, let it equal SQ_BATCH_SIZE
+  if (nq < SQ_BATCH_SIZE)
+    nq = SQ_BATCH_SIZE;
   // if tot (n, k) < wanted, use tot as wanted
   if (tot > (unsigned long) nq)
     tot = (unsigned long) nq;
