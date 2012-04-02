@@ -52,7 +52,7 @@ unsigned long collisions_good = 0;
 double total_adminus2;
 double best_logmu[11];
 double rootsieve_time = 0.0;
-
+int raw = 0;
 
 /* crt, set r and qqz */
 void
@@ -116,7 +116,7 @@ print_poly_info ( mpz_t *f,
   alpha = get_alpha (f, d, ALPHA_BOUND);
   printf ("# lognorm %1.2f, skew %1.2f, alpha %1.2f, E %1.2f,  exp_E %1.2f, %u rroots\n",
           logmu, skew, alpha, logmu + alpha,
-          logmu - sqrt (2.0 * exp_rot[d] * log (skew)),
+          logmu - 0.824 * sqrt (2.0 * exp_rot[d] * log (skew)),
           nroots);
 }
 
@@ -280,14 +280,17 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   if (logmu <= max_norm)
   {
 
-#ifdef DEBUG_POLYSELECT2L
+    /* optimize size */
+    optimize (f, d, g, 0, 1);
+
+#ifndef DEBUG_POLYSELECT2L
     /* unoptimized poly */
     printf ("# Raw polynomial:\n");
+    gmp_printf ("n: %Zd\n", N);
     print_poly_info (fold, d, gold);
 #endif
 
-    /* optimize size */
-    optimize (f, d, g, 0, 1);
+    if (!raw) {
 
 /* root sieve */
 #ifndef NEW_ROOTSIEVE
@@ -319,6 +322,8 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 #endif
 
     rootsieve_time += seconds_thread ();
+
+    } // raw and sopt only ?
 
     skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
     logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
@@ -859,6 +864,7 @@ usage (char *argv)
   fprintf (stderr, "                 two prime factors in [P,2P]\n");
   fprintf (stderr, "-v           --- verbose mode\n");
   fprintf (stderr, "-q           --- quiet mode\n");
+  fprintf (stderr, "-r           --- output raw/size-optimized polynomial only (no ropt)\n");
   fprintf (stderr, "-t nnn       --- use n threads (default 1)\n");
   fprintf (stderr, "-admin nnn   --- start from ad=nnn (default 0)\n");
   fprintf (stderr, "-admax nnn   --- stop at ad=nnn\n");
@@ -1029,6 +1035,12 @@ main (int argc, char *argv[])
       argv += 1;
       argc -= 1;
     }
+    else if (strcmp (argv[1], "-r") == 0)
+    {
+      raw = 1;
+      argv += 1;
+      argc -= 1;
+    }
     else
     {
       fprintf (stderr, "Invalid option: %s\n", argv[1]);
@@ -1124,10 +1136,11 @@ main (int argc, char *argv[])
   st = cputime ();
   lenPrimes = initPrimes (P, &Primes);
 
-  printf ( "# Info: initializing %lu P primes took %dms, seed=%d\n",
+  printf ( "# Info: initializing %lu P primes took %dms, seed=%d, rawonly=%d\n",
            lenPrimes,
            cputime () - st,
-           seed );
+           seed,
+           raw );
   printf ( "# Info: estimated peak memory=%.2fMB (%d threads, batch %d inversions)\n",
            (double) (nthreads * SQ_BATCH_SIZE * lenPrimes * (sizeof(uint32_t) + sizeof(uint64_t)) / 1024 / 1024),
            nthreads,
