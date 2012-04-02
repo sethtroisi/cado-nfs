@@ -3,16 +3,36 @@
 
 #include <stdint.h>
 
+#define TYPE_HASHCOUNT uint8_t
+#define HASHCOUNT_MAX  255UL /* maximal value of TYPE_HASHCOUNT */
+
 typedef struct {
     int need64;
     int size; /* size in bytes for one entry */
     uint64_t hashmod, HC0, HC1;
-    int32_t *hashcount;
+    TYPE_HASHCOUNT *hashcount;
     int32_t *hashtab32_p;
     int64_t *hashtab64_p;
     uint32_t *hashtab32_r;
     uint64_t *hashtab64_r;
+    int32_t *renumber; /* only used in last pass of purge */
 } hashtable_t;
+
+#define INCR_HASHCOUNT(x)                       \
+  do                                            \
+    {                                           \
+      if ((x) < HASHCOUNT_MAX)                  \
+        (x) ++;                                 \
+    }                                           \
+  while (0)
+
+#define DECR_HASHCOUNT(x)                       \
+  do                                            \
+    {                                           \
+      if ((x) < HASHCOUNT_MAX)                  \
+        (x) --;                                 \
+    }                                           \
+  while (0)
 
 #define GET_HASH_P(H,h) \
   (((H)->need64) ? (H)->hashtab64_p[h] : (H)->hashtab32_p[h])

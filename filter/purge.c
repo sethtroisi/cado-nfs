@@ -52,8 +52,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
   GET_HASH_P(H,h) - prime corresponding to index h
   GET_HASH_R(H,h) - root  corresponding to index h (-2 for rational prime)
   H->hashcount[h] - number of occurrences of (p, r) in current relations
-                   (in the last pass, H->hashcount[] stores the index of the
-                    prime ideal).
 */
 
 #include "cado.h"
@@ -89,7 +87,7 @@ static long minpr = -1, minpa = -1; /* negative values mean use minpr=rlim and
 static cado_poly pol;
 static unsigned long tot_alloc, tot_alloc0;
 static int need64 = 0; /* non-zero if large primes are > 2^32 */
-static int final, pass = 0;
+static int final, pass;
 static int raw = 0;
 static char ** fic;
 static int noclique = 0;
@@ -221,11 +219,11 @@ static unsigned long minus2;
 static void
 fprint_rat (int *table_ind, int *nb_coeff, relation_t *rel, hashtable_t *H)
 {
-    int i, nbc = *nb_coeff;
+  int i, nbc = *nb_coeff;
 
-    for (i = 0; i < rel->nb_rp; i++)
-      table_ind[nbc++] = H->hashcount[getHashAddr (H, rel->rp[i].p, minus2)];
-    *nb_coeff = nbc;
+  for (i = 0; i < rel->nb_rp; i++)
+    table_ind[nbc++] = H->renumber[getHashAddr (H, rel->rp[i].p, minus2)];
+  *nb_coeff = nbc;
 }
 
 /* Adds in table_ind[] the indices of the algebraic primes in 'rel'.
@@ -233,33 +231,35 @@ fprint_rat (int *table_ind, int *nb_coeff, relation_t *rel, hashtable_t *H)
    nb_coeff is the current index in table_ind[] (input and output).
  */
 static void
-fprint_alg (int *table_ind, int *nb_coeff, relation_t rel, hashtable_t *H)
+fprint_alg (int *table_ind, int *nb_coeff, relation_t *rel, hashtable_t *H)
 {
-    int i, nbc = *nb_coeff;
+  int i, nbc = *nb_coeff;
 
-    for (i = 0; i < rel.nb_ap; i++)
-      table_ind[nbc++] = H->hashcount[getHashAddr (H, rel.ap[i].p,
-                                                      rel.ap[i].r)];
-    *nb_coeff = nbc;
+  for (i = 0; i < rel->nb_ap; i++, nbc++)
+    table_ind[nbc] = H->renumber[getHashAddr (H, rel->ap[i].p, rel->ap[i].r)];
+  *nb_coeff = nbc;
 }
 
 /* Adds a free relation in table_ind[]: a is the corresponding prime */
 static void
-fprint_free (int *table_ind, int *nb_coeff, relation_t rel, hashtable_t *H)
+fprint_free (int *table_ind, int *nb_coeff, relation_t *rel, hashtable_t *H)
 {
-    long p = rel.a;
-    int i, nbc = *nb_coeff, index;
+  long p = rel->a;
+  int i, nbc = *nb_coeff, index;
+  int32_t j;
 
-    index = getHashAddr (H, p, minus2);
-    ASSERT(H->hashcount[index] >= 0);
-    table_ind[nbc++] = H->hashcount[index];
-    for(i = 0; i < rel.nb_ap; i++)
-      {
-	index = getHashAddr (H, p, rel.ap[i].p);
-        ASSERT_ALWAYS(H->hashcount[index] >= 0);
-        table_ind[nbc++] = H->hashcount[index];
+  index = getHashAddr (H, p, minus2);
+  j = H->renumber[index];
+  ASSERT(j >= 0);
+  table_ind[nbc++] = j;
+  for(i = 0; i < rel->nb_ap; i++)
+    {
+      index = getHashAddr (H, p, rel->ap[i].p);
+      j = H->renumber[index];
+      ASSERT(j >= 0);
+      table_ind[nbc++] = j;
     }
-    *nb_coeff = nbc;
+  *nb_coeff = nbc;
 }
 
 /* Print the relation 'rel' in matrix format, i.e., a line of the form:
@@ -291,14 +291,14 @@ fprint_rel_row (FILE *file, int irel, relation_t rel, hashtable_t *H)
   nb_coeff = 0;
 
   if (rel.b == 0) /* free relation */
-      fprint_free (table_ind, &nb_coeff, rel, H);
+    fprint_free (table_ind, &nb_coeff, &rel, H);
   else
     {
       /* adds rational primes in table_ind */
       fprint_rat (table_ind, &nb_coeff, &rel, H);
 
       /* adds algebraic primes in table_ind */
-      fprint_alg (table_ind, &nb_coeff, rel, H);
+      fprint_alg (table_ind, &nb_coeff, &rel, H);
     }
 
   fprintf (file, "%d %"PRId64" %"PRIu64" %d",
@@ -370,7 +370,7 @@ insertNormalRelation (relation_t *rel, unsigned long num_rel, int *tmp)
           }
         if (ok)
           {
-            nprimes += (H.hashcount[h] == 1); /* new prime */
+            nprimes += (H.hashcount[h] == 1); /* new ideal */
             tmp[itmp++] = h;
           }
       }
@@ -514,7 +514,7 @@ delete_relation (int i, int *nprimes, hashtable_t *H,
 
   for (j = 0; tab[j] != -1; j++)
     {
-      H->hashcount[tab[j]]--; /* remove one occurrence of prime 'j' */
+      DECR_HASHCOUNT(H->hashcount[tab[j]]); /* remove one occurrence of 'j' */
       *nprimes -= (H->hashcount[tab[j]] == 0);
     }
   rel_compact[i] = NULL;
@@ -782,6 +782,8 @@ renumber (int *nprimes, hashtable_t *H, const char *sos)
     unsigned int i;
     int nb = 1; /* we start at 1 here, but subtract 1 in fprint_rel_row */
 
+    H->renumber = (int32_t*) malloc (H->hashmod * sizeof(int32_t));
+
     if (sos != NULL)
       {
 	fprintf (stderr, "Output renumber table in file %s\n", sos);
@@ -791,9 +793,12 @@ renumber (int *nprimes, hashtable_t *H, const char *sos)
         fprintf (fsos, "# p is the corresponding prime\n");
         fprintf (fsos, "# r is the corresponding root (-2=fffffffe on the rational side)\n");
       }
-    for(i = 0; i < H->hashmod; i++)
+    for (i = 0; i < H->hashmod; i++)
       if (H->hashcount[i] == 0)
-        H->hashcount[i] = -1;
+        {
+          H->hashcount[i] = (TYPE_HASHCOUNT) -1; /* for getHashAddrAux */
+          H->renumber[i] = (int32_t) -1;
+        }
       else
         {
           /* Since we consider only primes >= minpr or minpa,
@@ -812,10 +817,10 @@ renumber (int *nprimes, hashtable_t *H, const char *sos)
                         PRIu64",%"PRIu64")\n",
                          GET_HASH_P(H,i), GET_HASH_R(H,i));
             }
-          H->hashcount[i] = nb++;
           if (fsos != NULL)
-            fprintf(fsos, "%x %" PRIx64 " %" PRIx64 "\n",
-                    H->hashcount[i] - 1, GET_HASH_P(H,i), GET_HASH_R(H,i));
+            fprintf(fsos, "%x %" PRIx64 " %" PRIx64 "\n", nb - 1,
+                    GET_HASH_P(H,i), GET_HASH_R(H,i));
+          H->renumber[i] = nb++;
 	}
     if (fsos != NULL)
       gzip_close (fsos, sos);
@@ -1396,7 +1401,6 @@ main (int argc, char **argv)
     Hsize = Hsizer + Hsizea;
   }
   fprintf (stderr, "Estimated number of prime ideals: %d\n", Hsize);
-  hashInit (&H, Hsize, 1, need64);
   tot_alloc0 = H.hashmod * H.size;
   
   bit_vector_init_set(rel_used, nrelmax, 1);
@@ -1455,17 +1459,31 @@ main (int argc, char **argv)
   }
   
   nrel = nrelmax;
-  for ( ; ; )
+  /* we make 3 passes:
+     - pass 1 only considers ideals >= minpr on the rational side and >= minpa
+       on the algebraic side;
+     - pass 2 considers all ideals, and performs "clique removal";
+     - pass 3 (after the for loop) renumbers ideals and prints the matrix
+  */
+  for (pass = 1 ; ; pass++)
     {
+      if (pass > 1)
+        {
+          /* the remaining ideals are those above the 1st pass threshold
+             which remain active at the end of the 1st pass, plus those
+             which were not considered in the 1st pass */
+          Hsize = nprimes + approx_phi (minpr) + approx_phi (minpa);
+          minpr = minpa = FINAL_BOUND;
+        }
+
       final = minpr <= FINAL_BOUND && minpa <= FINAL_BOUND;
       tot_alloc = tot_alloc0;
       
       fprintf (stderr, "Pass %d, filtering ideals >= %ld on rat. side and "
-	       "%ld on alg. side:\n", ++pass, minpr, minpa);
-      /*
-        ret = scan_relations (fic, &nprimes, &H, rel_used, nrelmax,
-	rel_compact, minpr, minpa, &tot_alloc, final);
-      */
+	       "%ld on alg. side:\n", pass, minpr, minpa);
+
+      hashInit (&H, Hsize, 1, need64);
+
       prempt_scan_relations ();
       
       fprintf (stderr, "   nrels=%d, nprimes=%d; excess=%d\n",
@@ -1497,15 +1515,24 @@ main (int argc, char **argv)
 	exit (1); /* if the excess is <= here, it will be more negative
 		     when we decrease minpr and minpa in the next pass */
       
+      {
+        uint32_t count = 0;
+        for (uint32_t i = 0; i < H.hashmod; i++)
+          count += (H.hashtab32_p[i] != 0);
+        fprintf (stderr, "Hash table has %u non-zero entries out of %lu\n",
+                count, H.hashmod);
+      }
+
       my_malloc_free_all ();
+
       if (final)
 	break;
-      else
-	minpr = minpa = FINAL_BOUND;
-      hashClear (&H); /* Reset all tables to 0. FIXME: in the 2nd pass,
-			 we might reuse some of the information computed
-			 in the 1st pass (roots of primes, etc). */
+
       nrel = nrel_new;
+      nprimes = nprimes_new;
+
+      hashClear (&H);
+      hashFree (&H);
     }
   
   fprintf (stderr, "Freeing rel_compact array...\n");
