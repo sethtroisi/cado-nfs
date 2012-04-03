@@ -99,7 +99,7 @@ static relation_stream rs;
    light speedup if your CPU is faster than a Nehalem 3.6 Ghz.
    1<<7 -> about 10MB of buffering (only ~2% is really used) 
 */
-#define T_REL (1<<7) 
+#define T_REL (1<<6) 
 			
 static volatile unsigned long cpt_rel_a;
 static volatile unsigned long cpt_rel_b;
@@ -326,57 +326,73 @@ fprint_rel_row (FILE *file, int irel, relation_t rel, hashtable_t *H)
 static inline void
 insertNormalRelation (relation_t *rel, unsigned long num_rel, int *tmp)
 {
-  int itmp, j, h, ok;
+  int *my_tmp, h;
+  unsigned int i, k, itmp, ltmp;
 
-#if 0
-    reduce_exponents_mod2 (rel);
-
-    /* first count number of "large" primes */
-    for (j = 0; j < rel->nb_rp; j++)
-      ltmp += ((long) rel->rp[j].p >= minpr); /* only consider primes >= minpr */
-    for (j = 0; j < rel->nb_ap; j++)
-      ltmp += ((long) rel->ap[j].p >= minpa); /* only consider primes >= minpa */
-
-    /* ltmp is the number of considered primes in the relation.
-       We might have ltmp=0 if all primes are less than minpr, maxpr. */
-    tmp = my_malloc_int (ltmp + 1);
-#endif
-    itmp = 0; /* number of entries in tmp */
-
+  itmp = 0; /* number of entries in my_tmp */
+  if (pass == 1) {
+    ltmp = 1;
+    for (k = 0, i = 0; i < (unsigned int) rel->nb_rp; i++)
+      if (rel->rp[i].e & 1) {
+	rel->rp[k] = (rat_prime_t) { .p = rel->rp[i].p, .e = 1 };
+	ltmp += ((long) rel->rp[k].p >= minpr);
+	k++;
+      }
+    rel->nb_rp = k;
+    for (k = 0, i = 0; i < (unsigned int) rel->nb_ap; i++)
+      if (rel->ap[i].e & 1) {
+	rel->ap[k] = (alg_prime_t) { .p = rel->ap[i].p, .e = 1 };
+	if (final) {
+	  rel->ap[k].r = findroot (rel->a, rel->b, rel->ap[k].p);
+	  ltmp += ((long) rel->ap[k].p >= minpa);
+	} else if ((long) rel->ap[k].p >= minpa) {
+	  rel->ap[k].r = findroot (rel->a, rel->b, rel->ap[k].p);
+	  ltmp++;
+	}
+	k++;
+      }
+    rel->nb_ap = k;
+    my_tmp = my_malloc_int (ltmp + 1);
+    for (i = 0; i < (unsigned int) rel->nb_rp; i++) {
+      if (((long) rel->rp[i].p) >= minpr) {
+	h = hashInsert (&H, rel->rp[i].p, minus2);
+	nprimes += (H.hashcount[h] == 1); /* new prime */
+	my_tmp[itmp++] = h;
+      }
+    }
+    for (i = 0; i < (unsigned int) rel->nb_ap; i++) {
+      if (((long) rel->ap[i].p) >= minpa) {
+	h = hashInsert (&H, rel->ap[i].p, rel->ap[i].r);
+	nprimes += (H.hashcount[h] == 1); /* new ideal */
+	my_tmp[itmp++] = h;
+      }
+    }
+  }
+  else {
+    my_tmp = tmp;
     /* trick: we use the same hash table for rational and algebraic
        primes, but use a fake root -2 for rational primes, which
        ensures there is no collision with algebraic primes */
-    for (j = 0; j < rel->nb_rp; j++)
-      {
-        ok = (((long) rel->rp[j].p) >= minpr);
-        if (ok || final)
-          /* in the final pass, we need to insert all ideals, since we need
-             to renumber them in the output file */
-          h = hashInsert (&H, rel->rp[j].p, minus2);
-        if (ok)
-          {
-            nprimes += (H.hashcount[h] == 1); /* new prime */
-            tmp[itmp++] = h;
-          }
+    for (i = 0; i < (unsigned int) rel->nb_rp; i++) {
+      /* in the final pass, we need to insert all ideals, since we need
+	 to renumber them in the output file */
+      h = hashInsert (&H, rel->rp[i].p, minus2);
+      if (((long) rel->rp[i].p) >= minpr) {
+	nprimes += (H.hashcount[h] == 1); /* new prime */
+	my_tmp[itmp++] = h;
       }
-
-    for (j = 0; j < rel->nb_ap; j++)
-      {
-        ok = (((long) rel->ap[j].p) >= minpa);
-        if (ok || final)
-          {
-            rel->ap[j].r = findroot (rel->a, rel->b, rel->ap[j].p);
-            h = hashInsert (&H, rel->ap[j].p, rel->ap[j].r);
-          }
-        if (ok)
-          {
-            nprimes += (H.hashcount[h] == 1); /* new ideal */
-            tmp[itmp++] = h;
-          }
+    }
+    for (i = 0; i < (unsigned int) rel->nb_ap; i++) {
+      /* rel->ap[i].r = findroot (rel->a, rel->b, rel->ap[i].p); */
+      h = hashInsert (&H, rel->ap[i].p, rel->ap[i].r);
+      if (((long) rel->ap[i].p) >= minpa) {
+	nprimes += (H.hashcount[h] == 1); /* new ideal */
+	my_tmp[itmp++] = h;
       }
-
-    tmp[itmp] = -1; /* sentinel */
-    rel_compact[num_rel] = tmp;
+    }
+  }
+  my_tmp[itmp] = -1; /* sentinel */
+  rel_compact[num_rel] = my_tmp;
 }
 
 /* The information is stored in the ap[].p part, which is odd, but convenient.
@@ -385,37 +401,47 @@ insertNormalRelation (relation_t *rel, unsigned long num_rel, int *tmp)
 static inline void
 insertFreeRelation (relation_t *rel, unsigned long num_rel, int *tmp)
 {
-  long p = (long) rel->a; /* rel->b == 0 */
-    int j, h, itmp;
+  int *my_tmp, h;
+  unsigned int i, itmp, ltmp;
 
-    /* the prime on the rational side is rel->a
-       the prime ideal on the algebraic side are (rel->a, rel->ap[j].p) */
-#if 0
-    ltmp = 1 + (p >= minpr);
-    if (p >= minpa)
-      ltmp += rel->nb_ap;
-    tmp = my_malloc_int (ltmp);
-#endif
-    itmp = 0;
-    if ((p >= minpr) || final)
-      h = hashInsert (&H, p, minus2);
-    if (p >= minpr)
-      {
-        nprimes += (H.hashcount[h] == 1); /* new prime */
-        tmp[itmp++] = h;
+
+  /* the prime on the rational side is rel->a
+     the prime ideal on the algebraic side are (rel->a, rel->ap[i].p) */
+  
+  itmp = 0;
+  if (pass == 1) {
+    ltmp = 1 + (((long) rel->a) >= minpr);
+    if (((long) rel->a) >= minpa) ltmp += rel->nb_ap;
+    my_tmp = my_malloc_int (ltmp);
+    if (((long) rel->a) >= minpr) {
+      h = hashInsert (&H, ((long) rel->a), minus2);
+      nprimes += (H.hashcount[h] == 1); /* new prime */
+      my_tmp[itmp++] = h;
+    }
+    if (((long) rel->a) >= minpa)
+      for (i = 0; i < (unsigned int) rel->nb_ap; i++) {
+	h = hashInsert(&H, ((long) rel->a), rel->ap[i].p);
+	nprimes += (H.hashcount[h] == 1); /* new ideal */
+	my_tmp[itmp++] = h;
       }
-    for (j = 0; j < rel->nb_ap; j++)
-      {
-        if ((p >= minpa) || final)
-          h = hashInsert(&H, p, rel->ap[j].p);
-        if (p >= minpa)
-          {
-            nprimes += (H.hashcount[h] == 1); /* new ideal */
-            tmp[itmp++] = h;
-          }
+  }
+  else {
+    my_tmp = tmp;
+    h = hashInsert (&H, ((long) rel->a), minus2);
+    if (((long) rel->a) >= minpr) {
+      nprimes += (H.hashcount[h] == 1); /* new prime */
+      my_tmp[itmp++] = h;
+    }
+    for (i = 0; i < (unsigned int) rel->nb_ap; i++) {
+      h = hashInsert(&H, ((long) rel->a), rel->ap[i].p);
+      if (((long) rel->a) >= minpa) {
+	nprimes += (H.hashcount[h] == 1); /* new ideal */
+	my_tmp[itmp++] = h;
       }
-    tmp[itmp++] = -1;
-    rel_compact[num_rel] = tmp;
+    }
+  }
+  my_tmp[itmp++] = -1;
+  rel_compact[num_rel] = my_tmp;
 }
 
 /* Read all relations from file, and fills the rel_used and rel_compact arrays
@@ -694,7 +720,7 @@ onepass_singleton_removal (int nrelmax, int *nrel, int *nprimes,
     if (bit_vector_getbit(rel_used, i) && has_singleton (rel_compact[i], H))
       {
         delete_relation (i, nprimes, H, rel_used, rel_compact);
-        *nrel -= 1;
+        (*nrel)--;
       }
 }
 
@@ -992,19 +1018,19 @@ unsigned int relation_stream_get_fast (prempt_t prempt_data, relation_t *rel)
     255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
     255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255 };
   int64_t n;
-  char *p, *pmax, *pmin;
+  char *p, *pmin, *pminlessone;
   unsigned int k, i;
   unsigned long pr;
   unsigned char c, v;
   unsigned int ltmp;
   
-#define LOAD_ONE(P) { c = *(P)++; if ((P) == pmax) (P) = pmin; }
+#define LOAD_ONE(P) { c = *P; P = ((size_t) (P - pminlessone) & (PREMPT_BUF - 1)) + pmin; }
   
   ltmp = 0;
 
   pmin = prempt_data->buf;
+  pminlessone = pmin - 1;
   p = (char *) prempt_data->pcons;
-  pmax = &(prempt_data->buf[PREMPT_BUF]);
 
   LOAD_ONE(p);
   if (c == '-') {
@@ -1050,7 +1076,7 @@ unsigned int relation_stream_get_fast (prempt_t prempt_data, relation_t *rel)
 	    goto next_rat;
 	  }
 	}
-	rel->rp[k++] = (rat_prime_t) { .p = pr,.e = 1};
+	rel->rp[k++] = (rat_prime_t) { .p = pr, .e = 1};
       }
     }
     rel->nb_rp = k;
@@ -1072,19 +1098,39 @@ unsigned int relation_stream_get_fast (prempt_t prempt_data, relation_t *rel)
 	    goto next_alg;
 	  }
 	}
-	rel->ap[k++] = (alg_prime_t) { .p = pr,.r = -1,.e = 1};
+	rel->ap[k++] = (alg_prime_t) { .p = pr,.r = -1, .e = 1};
       }
     }
     rel->nb_ap = k;
 
-    if (rel->b > 0) {
-      reduce_exponents_mod2 (rel);
-      for (i = rel->nb_rp; i ; ltmp += ((long) rel->rp[--i].p >= minpr));
-      for (i = rel->nb_ap; i ; ltmp += ((long) rel->ap[--i].p >= minpa));
-    }
-    else {
-      ltmp += (long) rel->a >= minpr;
-      if ((long) rel->a >= minpa) ltmp += rel->nb_ap;
+    if (pass != 1) {
+      /* Job is done here to light the 2nd thread (insertRelation) */
+      if (rel->b > 0) {
+	for (k = 0, i = 0; i < (unsigned int) rel->nb_rp; i++)
+	  if (rel->rp[i].e & 1) {
+	    rel->rp[k] = (rat_prime_t) { .p = rel->rp[i].p, .e = 1 };
+	    ltmp += ((long) rel->rp[k].p >= minpr);
+	    k++;
+	  }
+	rel->nb_rp = k;
+	for (k = 0, i = 0; i < (unsigned int) rel->nb_ap; i++)
+	  if (rel->ap[i].e & 1) {
+	    rel->ap[k] = (alg_prime_t) { .p = rel->ap[i].p, .e = 1 };
+	    if (final) {
+	      rel->ap[k].r = findroot (rel->a, rel->b, rel->ap[k].p);
+	      ltmp += ((long) rel->ap[k].p >= minpa);
+	    } else if ((long) rel->ap[k].p >= minpa) {
+	      rel->ap[k].r = findroot (rel->a, rel->b, rel->ap[k].p);
+	      ltmp++;
+	    }
+	    k++;
+	  }
+	rel->nb_ap = k;
+      }
+      else {
+	ltmp += ((long) rel->a >= minpr);
+	if ((long) rel->a >= minpa) ltmp += rel->nb_ap;
+      }
     }
   }
   return ltmp;
@@ -1100,10 +1146,11 @@ void insertRelation() {
   pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
   */
   cpy_cpt_rel_b = cpt_rel_b;
+  tmp = NULL;
   while (cpt_rel_a == cpy_cpt_rel_b) nanosleep (&wait_classical, NULL);
   for ( ; ; ) {
     n = (unsigned int) (cpy_cpt_rel_b & (T_REL - 1));
-    tmp = my_malloc_int(buf_rel->ltmp_rel[n]);
+    if (pass != 1) tmp = my_malloc_int(buf_rel->ltmp_rel[n]);
     if (buf_rel->rel[n].b > 0)
       insertNormalRelation (&(buf_rel->rel[n]), buf_rel->num_rel[n], tmp);
     else
@@ -1133,7 +1180,6 @@ prempt_scan_relations ()
   unsigned int dispo, length_line, i;
   int err;
   char c;
-  static int pass1 = 1;
 
   end_insertRelation = 0;
   if (((buf_rel->num_rel  = malloc (sizeof(*(buf_rel->num_rel))  * T_REL))
@@ -1159,8 +1205,8 @@ prempt_scan_relations ()
   length_line = 0;
   
   prempt_data->files = prempt_open_compressed_rs (fic);
-  if (!(prempt_data->buf = malloc (PREMPT_BUF))) {
-    fprintf (stderr, "prempt_scan_relations: malloc error. %s\n", strerror (errno));
+  if ((err = posix_memalign ((void **) &(prempt_data->buf), PREMPT_BUF, PREMPT_BUF))) {
+    fprintf (stderr, "prempt_scan_relations: posix_memalign error (%d): %s\n", err, strerror (errno));
     exit (1);
   }
   prempt_data->pcons = prempt_data->buf;
@@ -1191,7 +1237,7 @@ prempt_scan_relations ()
       nanosleep (&wait_classical, NULL);
     }
     if (*pcons == '#')                           goto goto_endline;
-    if (pass1)                                   goto valid_line;
+    if (pass == 1)                               goto valid_line;
     if (bit_vector_getbit (rel_used, rs->nrels)) goto valid_line;
     rs->nrels++;
 
@@ -1275,13 +1321,14 @@ prempt_scan_relations ()
     exit (EXIT_FAILURE);
   }
   
-  for (i = T_REL ; i ; free(buf_rel->rel[--i].rp), free(buf_rel->rel[i].ap));
+  for (i = T_REL ; i ; ) {
+    free(buf_rel->rel[--i].rp);
+    free(buf_rel->rel[i].ap);
+  }
   free (buf_rel->rel);      buf_rel->rel      = NULL;
   free (buf_rel->num_rel);  buf_rel->num_rel  = NULL;
   free (buf_rel->ltmp_rel); buf_rel->ltmp_rel = NULL;
 
-  pass1 = 0;
-  
   return 1;
 }
 
