@@ -870,9 +870,7 @@ collision_on_batch_sq ( header_t header,
       continue;
 
     // the inversion, also reduce qprod[size-1] (mod pp).
-    mpz_set (tmp, qprod[size-1]);
-    mpz_mod_ui (tmp, tmp, pp);
-    tmpul =  mpz_get_ui (tmp);
+    tmpul = mpz_fdiv_ui (qprod[size-1], pp);
     tmpul = invert (tmpul, pp);
     //gmp_fprintf (stderr, "primes[%lu]: %lu, %Zd, %lu\n", nprimes, p, qqz, size);
 
