@@ -10,17 +10,17 @@
 void
 hashClear(hashtable_t *H)
 {
-    memset(H->hashcount, 0, H->hashmod * sizeof(int32_t));
-    if (H->need64)
-      {
-        memset(H->hashtab64_p, 0, H->hashmod * sizeof(int64_t));
-        memset(H->hashtab64_r, 0, H->hashmod * sizeof(int64_t));
-      }
-    else
-      {
-        memset(H->hashtab32_p, 0, H->hashmod * sizeof(int32_t));
-        memset(H->hashtab32_r, 0, H->hashmod * sizeof(int32_t));
-      }
+  memset (H->hashcount, 0, H->hashmod * sizeof(TYPE_HASHCOUNT));
+  if (H->need64)
+    {
+      memset (H->hashtab64_p, 0, H->hashmod * sizeof(int64_t));
+      memset (H->hashtab64_r, 0, H->hashmod * sizeof(int64_t));
+    }
+  else
+    {
+      memset (H->hashtab32_p, 0, H->hashmod * sizeof(int32_t));
+      memset (H->hashtab32_r, 0, H->hashmod * sizeof(int32_t));
+    }
 }
 
 unsigned long
@@ -37,11 +37,12 @@ void
 hashInit (hashtable_t *H, unsigned int n, int verbose, int need64)
 {
     H->need64 = need64;
-    H->size = sizeof(int32_t) /* hashcount */
+    H->size = sizeof(TYPE_HASHCOUNT)
       + ((need64) ? sizeof(int64_t) : sizeof(int32_t)) /* hashtab_p */
       + ((need64) ? sizeof(uint64_t) : sizeof(uint32_t)); /* hashtab_r */
     H->hashmod = getHashMod (3*(n/2), verbose);
-    H->hashcount = (int *)malloc(H->hashmod * sizeof(int));
+    H->hashcount = (TYPE_HASHCOUNT*) malloc (H->hashmod *
+                                             sizeof(TYPE_HASHCOUNT));
     if (H->need64)
       {
         H->hashtab64_p = (int64_t*) malloc (H->hashmod * sizeof(int64_t));
@@ -67,13 +68,14 @@ hashInit (hashtable_t *H, unsigned int n, int verbose, int need64)
 	H->HC0 = 3141592653UL;
 	H->HC1 = 2718281828UL;
     }
-    hashClear(H);
+    H->renumber = NULL;
+    hashClear (H);
 }
 
 void
-hashFree(hashtable_t *H)
+hashFree (hashtable_t *H)
 {
-    free(H->hashcount);
+    free (H->hashcount);
     if (H->need64)
       {
         free (H->hashtab64_p);
@@ -81,9 +83,10 @@ hashFree(hashtable_t *H)
       }
     else
       {
-      free (H->hashtab32_p);
-      free (H->hashtab32_r);
+        free (H->hashtab32_p);
+        free (H->hashtab32_r);
       }
+    free (H->renumber);
 }
 
 // Returns a new address or the one already containing (p, r), starting from
@@ -133,7 +136,7 @@ hashInsert(hashtable_t *H, long p, unsigned long r)
         SET_HASH_P(H,h,p);
         SET_HASH_R(H,h,r);
     }
-    H->hashcount[h]++;
+    INCR_HASHCOUNT(H->hashcount[h]);
     return h;
 }
 
