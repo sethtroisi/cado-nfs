@@ -139,6 +139,48 @@ static void fppol_derivative(fppol_ptr r, fppol_srcptr p) {
 }
 
 
+void fppol_msb_preinverse(fppol_ptr invf, fppol_srcptr f, int k)
+{
+    int i = 1;
+    fppol_t g, tmp;
+    fppol_init(g);
+    fppol_init(tmp);
+    fppol_set_ti(g, 0);
+    while (i <= k) {
+        i *= 2;
+#ifdef USE_F2
+        fppol_sqr(tmp, g);
+        fppol_mul(g, tmp, f);
+        fppol_div_ti(g, g, fppol_deg(g)-i);
+#else
+        fppol_mul(tmp, g, g);
+        fppol_mul(tmp, tmp, f);
+        fppol_sub(tmp, tmp, g);
+        fppol_sub(g, g, tmp);
+        fppol_div_ti(g, g, fppol_deg(g)-i);
+#endif
+    }
+    fppol_div_ti(invf, g, fppol_deg(g)-k);
+    fppol_clear(g);
+    fppol_clear(tmp);
+}
+
+void fppol_rem_precomp(fppol_ptr r, fppol_srcptr pq, 
+        fppol_srcptr m, fppol_srcptr invm)
+{
+    fppol_t pqt;
+    int d = fppol_deg(m);
+    ASSERT_ALWAYS(fppol_deg(pq) <= 2*d-2);
+    fppol_init(pqt);
+    fppol_div_ti(pqt, pq, d-2);
+    fppol_mul(pqt, pqt, invm);
+    fppol_div_ti(pqt, pqt, d);
+    fppol_mul(pqt, pqt, m);
+    fppol_sub(r, pq, pqt);
+    fppol_clear(pqt);
+}
+
+
 // The return value is 
 //   - 0 if P is not smooth
 //   - an upper bound on the degree of the largest factor otherwise
@@ -156,10 +198,14 @@ int fppol_is_smooth(fppol_srcptr P, int B)
     fppol_derivative(dP, P);
     
     fppol_t tqi, acc, t, tmp;
+    fppol_t invP;
     fppol_init(tqi);
     fppol_init(t);
     fppol_init(tmp);
     fppol_init(acc);
+    fppol_init(invP);
+
+    fppol_msb_preinverse(invP, P, fppol_deg(P)-2);
 
     fppol_set_ti(t, 1);
 
@@ -171,7 +217,7 @@ int fppol_is_smooth(fppol_srcptr P, int B)
         i++;
     }
     fppol_set_ti(tqi, qi);
-    fppol_rem(tqi, tqi, P);
+    fppol_rem_precomp(tqi, tqi, P, invP);
 
     while (i < B2) {
         fppol_qpow(tqi, tqi);
@@ -182,14 +228,14 @@ int fppol_is_smooth(fppol_srcptr P, int B)
     int smooth = 0;
     fppol_sub(acc, tqi, t);
     fppol_mul(acc, acc, dP);
-    fppol_rem(acc, acc, P);
+    fppol_rem_precomp(acc, acc, P, invP);
     while (i < B) {
         fppol_qpow(tqi, tqi);
-        fppol_rem(tqi, tqi, P);
+        fppol_rem_precomp(tqi, tqi, P, invP);
         i++;
         fppol_sub(tmp, tqi, t);
         fppol_mul(acc, acc, tmp);
-        fppol_rem(acc, acc, P);
+        fppol_rem_precomp(acc, acc, P, invP);
         if (fppol_is_zero(acc)) {
             smooth = 1;
             break;
@@ -201,6 +247,7 @@ int fppol_is_smooth(fppol_srcptr P, int B)
     fppol_clear(t);
     fppol_clear(tmp);
     fppol_clear(acc);
+    fppol_clear(invP);
     if (!smooth)
         return 0;
     else
