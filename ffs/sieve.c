@@ -18,12 +18,20 @@
 #include "sublat.h"
 #include "smoothness.h"
 
-int my_factor_survivor(fppol_t a, fppol_t b, ffspol_t* F, int *B) 
+int my_factor_survivor(fppol_t a, fppol_t b, ffspol_t* F, int *B, sq_t q,
+        int side) 
 {
     fppol_t Nab;
     fppol_init(Nab);
     for (int twice = 0; twice < 2; twice++) {
         ffspol_norm(Nab, F[twice], a, b);
+        if (side == twice) {
+            fppol_t qq;
+            fppol_init(qq);
+            fppol_set_sq(qq, q);
+            fppol_div(Nab, Nab, qq);
+            fppol_clear(qq);
+        }
         if (!fppol_is_smooth(Nab, B[twice])) {
             fppol_clear(Nab);
             return 0;
@@ -294,7 +302,8 @@ int main(int argc, char **argv)
                         if (ij_deg(g) != 0 && ij_deg(hati)>0  && ij_deg(hatj)>0)
                             continue;
                         ij2ab(a, b, hati, hatj, qlat);
-                        nrels += my_factor_survivor(a, b, ffspol, lpb);
+                        nrels += my_factor_survivor(a, b, ffspol, lpb,
+                                qlat->q, qlat->side);
                   //      nrels += factor_survivor(a, b, ffspol, lpb);
                     }
                 }
