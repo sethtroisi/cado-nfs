@@ -17,6 +17,7 @@
 #include "params.h"
 #include "sublat.h"
 #include "smoothness.h"
+#include "buckets.h"
 
 int my_factor_survivor(fppol_t a, fppol_t b, ffspol_t* F, int *B, sq_t q,
         int side) 
@@ -276,6 +277,9 @@ int main(int argc, char **argv)
 #endif
         t_initS += seconds();
 
+        buckets_t buckets;
+        // FIXME: The bucket capacity is hardcoded for the moment.
+        buckets_init(buckets, I, J, 1<<16);
         for (int twice = 0; twice < 2; twice++) {
             // This variable allows to change in which order we handle
             // the polynomials.
@@ -292,11 +296,19 @@ int main(int argc, char **argv)
             // sieve
             t_sieve -= seconds();
             sieveFB(S, FB[side], I, J, sublat);
+
+            buckets_reset(buckets);
+            buckets_fill(buckets, FB[side], sublat, I, J);
+            uint8_t *Sptr = S;
+            for (unsigned k = 0; k < buckets->n; ++k) {
+              bucket_apply(Sptr, buckets, k);
+              Sptr += bucket_region_size();
+            }
             t_sieve += seconds();
 
             // mark survivors
             // no need to check if this is a valid position
-            uint8_t *Sptr = S;
+            Sptr = S;
             for (unsigned int k = 0; k < IIJJ; ++k, ++Sptr) {
                 if (*Sptr > threshold[side])
                     *Sptr = 255; 
@@ -305,6 +317,7 @@ int main(int argc, char **argv)
             // have been clobbered.
             S[0] = 255;
         }
+        buckets_clear(buckets);
 
         t_cofact -= seconds();
         // survivors cofactorization

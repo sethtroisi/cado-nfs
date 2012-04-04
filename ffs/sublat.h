@@ -15,10 +15,11 @@ typedef struct {
     int n;              // the index of the current sublattice (in .lat)
     fppol16_t modulus;  // the modulus used for sublatticing
     fppol16_t lat[MAX_SUBLAT][2]; // a description of all sublattices.
-} sublat_struct_t;
+} __sublat_struct;
 
-typedef sublat_struct_t   sublat_t[1];
-typedef sublat_struct_t * sublat_ptr;
+typedef       __sublat_struct  sublat_t[1];
+typedef       __sublat_struct *sublat_ptr;
+typedef const __sublat_struct *sublat_srcptr;
 
 static MAYBE_UNUSED sublat_t no_sublat = {{
     1,
@@ -46,7 +47,7 @@ static MAYBE_UNUSED sublat_t nine_sublat = {{
 #endif
 
 // One-liner that tells whether sublattices are active.
-static inline int use_sublat(sublat_ptr sublat)
+static inline int use_sublat(sublat_srcptr sublat)
 {
     return (sublat->nb > 1);
 }
