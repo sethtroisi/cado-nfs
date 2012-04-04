@@ -239,6 +239,7 @@ int main(int argc, char **argv)
 
     double t_norms = 0;
     double t_sieve = 0;
+    double t_buckets = 0;
     double t_cofact = 0;
     double t_initS = 0;
     int nrels = 0;
@@ -302,7 +303,7 @@ int main(int argc, char **argv)
 
         buckets_t buckets;
         // FIXME: The bucket capacity is hardcoded for the moment.
-        buckets_init(buckets, I, J, 1<<16);
+        buckets_init(buckets, I, J, 1<<20);
         for (int twice = 0; twice < 2; twice++) {
             // This variable allows to change in which order we handle
             // the polynomials.
@@ -319,7 +320,9 @@ int main(int argc, char **argv)
             // sieve
             t_sieve -= seconds();
             sieveFB(S, FB[side], I, J, sublat);
+            t_sieve += seconds();
 
+            t_buckets -= seconds();
             buckets_reset(buckets);
             buckets_fill(buckets, FB[side], sublat, I, J);
             uint8_t *Sptr = S;
@@ -327,7 +330,7 @@ int main(int argc, char **argv)
               bucket_apply(Sptr, buckets, k);
               Sptr += bucket_region_size();
             }
-            t_sieve += seconds();
+            t_buckets += seconds();
 
             // mark survivors
             // no need to check if this is a valid position
@@ -389,9 +392,10 @@ int main(int argc, char **argv)
 
     fprintf(stdout, "# Total: %d relations found\n", nrels);
     fprintf(stdout, "# Time spent: %1.1f s (initS); %1.1f s (norms); %1.1f s"
-          " (sieve); %1.1f s (cofact)\n", t_initS, t_norms, t_sieve, t_cofact);
+            " (sieve); %1.1f s (buckets); %1.1f s (cofact)\n",
+            t_initS, t_norms, t_sieve, t_buckets, t_cofact);
     fprintf(stdout, "# Total: %1.1f s (sum of previous: %1.1f s)\n",
-            t_tot, t_initS+t_norms+t_sieve+t_cofact);
+            t_tot, t_initS+t_norms+t_sieve+t_buckets+t_cofact);
     fprintf(stdout, "# Rate: %1.5f s/rel\n", t_tot/nrels);
 
     ffspol_clear(ffspol[0]);
