@@ -64,6 +64,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <string.h>
 #include <time.h>
 #include <pthread.h>
+#include <emmintrin.h>
 #include <errno.h>
 
 #include "utils.h"
@@ -106,8 +107,8 @@ static volatile unsigned long cpt_rel_b;
 static volatile unsigned int end_insertRelation = 0;
 typedef struct {
   relation_t *rel;
-  unsigned long *num_rel;
   unsigned int *ltmp_rel;
+  unsigned long *num_rel;
 } __buf_rel_t;
 static __buf_rel_t buf_rel[1];
 
@@ -155,6 +156,8 @@ nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
 nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
 " : : );
 }
+
+#define OPTIMISER_BARRIER { __asm__ __volatile__ ("" : : : "memory"); }
 
 /********************** own memory allocation routines ***********************/
 
@@ -324,35 +327,35 @@ fprint_rel_row (FILE *file, int irel, relation_t rel, hashtable_t *H)
                  might contain ideals <= minpr or minpa appearing only once.
 */
 static inline void
-insertNormalRelation (relation_t *rel, unsigned long num_rel, int *tmp)
+insertNormalRelation (relation_t *rel, unsigned long num_rel, int *tmp, unsigned int realltmp)
 {
   int *my_tmp, h;
   unsigned int i, k, itmp, ltmp;
 
   itmp = 0; /* number of entries in my_tmp */
   if (pass == 1) {
-    ltmp = 1;
+    ltmp = 0;
     for (k = 0, i = 0; i < (unsigned int) rel->nb_rp; i++)
       if (rel->rp[i].e & 1) {
-	rel->rp[k] = (rat_prime_t) { .p = rel->rp[i].p, .e = 1 };
+	rel->rp[k].p = rel->rp[i].p;
+	rel->rp[k].e = 1;
 	ltmp += ((long) rel->rp[k].p >= minpr);
 	k++;
       }
     rel->nb_rp = k;
     for (k = 0, i = 0; i < (unsigned int) rel->nb_ap; i++)
       if (rel->ap[i].e & 1) {
-	rel->ap[k] = (alg_prime_t) { .p = rel->ap[i].p, .e = 1 };
-	if (final) {
-	  rel->ap[k].r = findroot (rel->a, rel->b, rel->ap[k].p);
-	  ltmp += ((long) rel->ap[k].p >= minpa);
-	} else if ((long) rel->ap[k].p >= minpa) {
+	rel->ap[k].p = rel->ap[i].p;
+	rel->ap[k].e = 1;
+	if ((long) rel->ap[k].p >= minpa) {
 	  rel->ap[k].r = findroot (rel->a, rel->b, rel->ap[k].p);
 	  ltmp++;
-	}
+	} else
+	  rel->ap[k].r = -1;
 	k++;
       }
     rel->nb_ap = k;
-    my_tmp = my_malloc_int (ltmp + 1);
+    my_tmp = my_malloc_int (++ltmp);
     for (i = 0; i < (unsigned int) rel->nb_rp; i++) {
       if (((long) rel->rp[i].p) >= minpr) {
 	h = hashInsert (&H, rel->rp[i].p, minus2);
@@ -369,6 +372,7 @@ insertNormalRelation (relation_t *rel, unsigned long num_rel, int *tmp)
     }
   }
   else {
+    ltmp = realltmp;
     my_tmp = tmp;
     /* trick: we use the same hash table for rational and algebraic
        primes, but use a fake root -2 for rational primes, which
@@ -391,7 +395,9 @@ insertNormalRelation (relation_t *rel, unsigned long num_rel, int *tmp)
       }
     }
   }
-  my_tmp[itmp] = -1; /* sentinel */
+  my_tmp[itmp++] = -1; /* sentinel */
+  if (itmp != ltmp) { fprintf (stderr, "%d %d\n", itmp, ltmp); rel->ap[10000000000].p = 0; }
+  ASSERT_ALWAYS(ltmp == itmp);
   rel_compact[num_rel] = my_tmp;
 }
 
@@ -399,7 +405,7 @@ insertNormalRelation (relation_t *rel, unsigned long num_rel, int *tmp)
    rel->ap.p[0..deg[ contains the deg roots of f(x) mod p, leading to deg
    ideals for the factorization of (p). */
 static inline void
-insertFreeRelation (relation_t *rel, unsigned long num_rel, int *tmp)
+insertFreeRelation (relation_t *rel, unsigned long num_rel, int *tmp, unsigned int realltmp)
 {
   int *my_tmp, h;
   unsigned int i, itmp, ltmp;
@@ -410,9 +416,9 @@ insertFreeRelation (relation_t *rel, unsigned long num_rel, int *tmp)
   
   itmp = 0;
   if (pass == 1) {
-    ltmp = 1 + (((long) rel->a) >= minpr);
+    ltmp = (((long) rel->a) >= minpr);
     if (((long) rel->a) >= minpa) ltmp += rel->nb_ap;
-    my_tmp = my_malloc_int (ltmp);
+    my_tmp = my_malloc_int (++ltmp);
     if (((long) rel->a) >= minpr) {
       h = hashInsert (&H, ((long) rel->a), minus2);
       nprimes += (H.hashcount[h] == 1); /* new prime */
@@ -426,6 +432,7 @@ insertFreeRelation (relation_t *rel, unsigned long num_rel, int *tmp)
       }
   }
   else {
+    ltmp = realltmp;
     my_tmp = tmp;
     h = hashInsert (&H, ((long) rel->a), minus2);
     if (((long) rel->a) >= minpr) {
@@ -441,6 +448,7 @@ insertFreeRelation (relation_t *rel, unsigned long num_rel, int *tmp)
     }
   }
   my_tmp[itmp++] = -1;
+  ASSERT_ALWAYS(itmp == ltmp);
   rel_compact[num_rel] = my_tmp;
 }
 
@@ -974,10 +982,13 @@ prempt_load (prempt_t prempt_data) {
 	nanosleep(&wait_load, NULL);
       }
       else {
+	/* __mm_lfence(); */
 	try_load = MIN((PREMPT_BUF + ((size_t)prempt_data->buf)) - ((size_t) pprod), PREMPT_ONE_READ);
 	if ((load = fread (pprod, 1, try_load, f))) {
 	  pprod += load;
 	  if (pprod == pmax) pprod = prempt_data->buf;
+	  OPTIMISER_BARRIER;
+	  /* _mm_sfence (); */
 	  prempt_data->pprod = pprod;
 	}
 	else
@@ -997,8 +1008,8 @@ prempt_load (prempt_t prempt_data) {
   pthread_exit (NULL);
 }
 
-static inline
-unsigned int relation_stream_get_fast (prempt_t prempt_data, relation_t *rel)
+static inline void
+relation_stream_get_fast (prempt_t prempt_data, unsigned int nbufrel)
 {
   static const unsigned char ugly[256] = {
     255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
@@ -1023,6 +1034,7 @@ unsigned int relation_stream_get_fast (prempt_t prempt_data, relation_t *rel)
   unsigned long pr;
   unsigned char c, v;
   unsigned int ltmp;
+  relation_t *rel =  &(buf_rel->rel[nbufrel]);
   
 #define LOAD_ONE(P) { c = *P; P = ((size_t) (P - pminlessone) & (PREMPT_BUF - 1)) + pmin; }
   
@@ -1057,8 +1069,6 @@ unsigned int relation_stream_get_fast (prempt_t prempt_data, relation_t *rel)
   
   if (!rs->parse_only_ab) {
     /* Do something if we're also interested in primes */
-    ltmp = 1;
-
     for ( k = 0, c = 0 ; ; ) {
     next_rat:
       if (c == ':') break;
@@ -1108,32 +1118,31 @@ unsigned int relation_stream_get_fast (prempt_t prempt_data, relation_t *rel)
       if (rel->b > 0) {
 	for (k = 0, i = 0; i < (unsigned int) rel->nb_rp; i++)
 	  if (rel->rp[i].e & 1) {
-	    rel->rp[k] = (rat_prime_t) { .p = rel->rp[i].p, .e = 1 };
-	    ltmp += ((long) rel->rp[k].p >= minpr);
-	    k++;
+	    rel->rp[k] = (rat_prime_t) {
+	      .p = rel->rp[i].p,
+	      .e = 1
+	    };
+	    ltmp += ((long) rel->rp[k++].p >= minpr);
 	  }
 	rel->nb_rp = k;
 	for (k = 0, i = 0; i < (unsigned int) rel->nb_ap; i++)
 	  if (rel->ap[i].e & 1) {
-	    rel->ap[k] = (alg_prime_t) { .p = rel->ap[i].p, .e = 1 };
-	    if (final) {
-	      rel->ap[k].r = findroot (rel->a, rel->b, rel->ap[k].p);
-	      ltmp += ((long) rel->ap[k].p >= minpa);
-	    } else if ((long) rel->ap[k].p >= minpa) {
-	      rel->ap[k].r = findroot (rel->a, rel->b, rel->ap[k].p);
-	      ltmp++;
-	    }
-	    k++;
+	    rel->ap[k] = (alg_prime_t) {
+	      .p = rel->ap[i].p,
+	      .r = findroot (rel->a, rel->b, rel->ap[i].p),
+	      .e = 1
+	    };
+	    ltmp += ((long) rel->ap[k++].p >= minpa);
 	  }
 	rel->nb_ap = k;
       }
       else {
-	ltmp += ((long) rel->a >= minpr);
+	ltmp = ((long) rel->a >= minpr);
 	if ((long) rel->a >= minpa) ltmp += rel->nb_ap;
       }
     }
   }
-  return ltmp;
+  buf_rel->ltmp_rel[nbufrel] = ltmp;
 }
 
 void insertRelation() {
@@ -1147,27 +1156,33 @@ void insertRelation() {
   */
   cpy_cpt_rel_b = cpt_rel_b;
   tmp = NULL;
-  while (cpt_rel_a == cpy_cpt_rel_b) nanosleep (&wait_classical, NULL);
   for ( ; ; ) {
+    while (cpt_rel_a == cpy_cpt_rel_b)
+      if (!end_insertRelation)
+	nanosleep (&wait_classical, NULL);
+      else
+	if (cpt_rel_a == cpy_cpt_rel_b)
+	  pthread_exit(NULL);
+    /* _mm_lfence(); */
     n = (unsigned int) (cpy_cpt_rel_b & (T_REL - 1));
-    if (pass != 1) tmp = my_malloc_int(buf_rel->ltmp_rel[n]);
+    if (pass != 1)
+      tmp = my_malloc_int(++(buf_rel->ltmp_rel[n]));
     if (buf_rel->rel[n].b > 0)
-      insertNormalRelation (&(buf_rel->rel[n]), buf_rel->num_rel[n], tmp);
+      insertNormalRelation (&(buf_rel->rel[n]), buf_rel->num_rel[n], tmp, buf_rel->ltmp_rel[n]);
     else
-      insertFreeRelation (&(buf_rel->rel[n]), buf_rel->num_rel[n], tmp);
-    cpy_cpt_rel_b++;
-    cpt_rel_b = cpy_cpt_rel_b;
+      insertFreeRelation (&(buf_rel->rel[n]), buf_rel->num_rel[n], tmp, buf_rel->ltmp_rel[n]);
     if (relation_stream_disp_progress_now_p(rs))
       fprintf(stderr,
 	      "read useful %lu relations in %.1fs"
 	      " -- %.1f MB/s -- %.1f rels/s\n",
 	      rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
-    while (cpt_rel_a == cpy_cpt_rel_b) {
-      if (!end_insertRelation) nanosleep (&wait_classical, NULL);
-      else if (cpt_rel_a == cpy_cpt_rel_b) pthread_exit(NULL);
-    }
+    cpy_cpt_rel_b++;
+    OPTIMISER_BARRIER;
+    /* _mm_sfence(); */
+    cpt_rel_b = cpy_cpt_rel_b;
   }
 }
+
 
 static int
 prempt_scan_relations ()
@@ -1230,12 +1245,15 @@ prempt_scan_relations ()
     ASSERT_ALWAYS(length_line <= ((unsigned int) RELATION_MAX_BYTES));
     rs->pos += length_line;
     length_line = 0;
+    OPTIMISER_BARRIER;
+    /* _mm_sfence(); */
     prempt_data->pcons = pcons;
 
     while (pcons == prempt_data->pprod) {						
       if (prempt_data->end) if (pcons == prempt_data->pprod) goto end_of_files;
       nanosleep (&wait_classical, NULL);
     }
+    /* _mm_lfence(); */
     if (*pcons == '#')                           goto goto_endline;
     if (pass == 1)                               goto valid_line;
     if (bit_vector_getbit (rel_used, rs->nrels)) goto valid_line;
@@ -1251,6 +1269,7 @@ prempt_scan_relations ()
 	  }
 	nanosleep (&wait_classical, NULL);
       }
+      /* _mm_lfence(); */
       p = ((pcons <= prempt_data->pprod) ? (char *) prempt_data->pprod : pcons_max) - 1;
       c = *p;
       *p = '\n';
@@ -1262,6 +1281,7 @@ prempt_scan_relations ()
       if (pcons == pcons_max) pcons = prempt_data->buf;
     } while (err);
     rs->lnum++;
+    /* _mm_sfence(); */
     continue;
 
   valid_line:
@@ -1275,6 +1295,7 @@ prempt_scan_relations ()
       }
       nanosleep(&wait_classical, NULL);
     }
+    /* _mm_lfence(); */
     do {
       if (pcons == prempt_data->pprod) {
 	fprintf (stderr, "prempt_scan_relations: relation line size is greater than RELATION_MAX_BYTES (%d)\n", RELATION_MAX_BYTES);
@@ -1290,17 +1311,19 @@ prempt_scan_relations ()
       err = (pcons > p && c != '\n');
       if (pcons == pcons_max) pcons = prempt_data->buf;
     } while (err);
+    /* _mm_sfence(); */
     /* Ok, we have a complete line */
-    while (cpy_cpt_rel_a > cpt_rel_b+T_REL-1) {
+    while (cpy_cpt_rel_a == cpt_rel_b + T_REL) {
       nanosleep(&wait_classical, NULL);
     }
-    buf_rel->num_rel [cpy_cpt_rel_a & (T_REL - 1)] = rs->nrels;
-    buf_rel->ltmp_rel[cpy_cpt_rel_a & (T_REL - 1)] =
-      relation_stream_get_fast (prempt_data, &(buf_rel->rel[cpy_cpt_rel_a & (T_REL - 1)]));
-    cpy_cpt_rel_a++;
-    cpt_rel_a = cpy_cpt_rel_a;
-    rs->nrels++;
+    /* _mm_lfence(); */
+    buf_rel->num_rel [(unsigned int) (cpy_cpt_rel_a & (T_REL - 1))] = rs->nrels++;
+    relation_stream_get_fast (prempt_data, (unsigned int) (cpy_cpt_rel_a & (T_REL - 1)));
     rs->lnum++;
+    cpy_cpt_rel_a++;
+    OPTIMISER_BARRIER;
+    /* _mm_sfence(); */
+    cpt_rel_a = cpy_cpt_rel_a;
   }
  end_of_files:
   while (cpy_cpt_rel_a != cpt_rel_b) nanosleep(&wait_classical, NULL);
@@ -1326,8 +1349,8 @@ prempt_scan_relations ()
     free(buf_rel->rel[i].ap);
   }
   free (buf_rel->rel);      buf_rel->rel      = NULL;
-  free (buf_rel->num_rel);  buf_rel->num_rel  = NULL;
   free (buf_rel->ltmp_rel); buf_rel->ltmp_rel = NULL;
+  free (buf_rel->num_rel);  buf_rel->num_rel  = NULL;
 
   return 1;
 }
