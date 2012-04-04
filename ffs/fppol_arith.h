@@ -362,6 +362,17 @@ __DECL_FPPOLxx_ARITH_ALL(64)
   { for (unsigned k = 0; k < __FP_BITS; ++k) r[k] = p[k] | q[k]; }
 
 
+// Difference between two polynomials (i.e., coefficient-wise XOR).
+// Generic prototype:
+//   void fppol<sz>_diff(fppol<sz>_ptr    r,
+//                       fppol<sz>_srcptr p, fppol<sz>_srcptr q);
+#define __DEF_FPPOLxx_DIFF(sz)                                      \
+  static inline                                                     \
+  void fppol##sz##_diff(fppol##sz##_ptr r,                          \
+                        fppol##sz##_srcptr p, fppol##sz##_srcptr q) \
+  { for (unsigned k = 0; k < __FP_BITS; ++k) r[k] = p[k] ^ q[k]; }
+
+
 // Multiplication by t^i (i.e., left shift).
 // Generic prototype:
 //   void fppol<sz>_mul_ti(fppol<sz>_ptr r, fppol<sz>_srcptr p, unsigned i);
@@ -454,6 +465,7 @@ __DECL_FPPOLxx_ARITH_ALL(64)
         __DEF_FPPOLxx_SDIV         (sz)     \
         __DEF_FPPOLxx_SINV         (sz)     \
         __DEF_FPPOLxx_ADD_DISJOINT (sz)     \
+        __DEF_FPPOLxx_DIFF         (sz)     \
         __DEF_FPPOLxx_MUL_TI       (sz)     \
         __DEF_FPPOLxx_DIV_TI       (sz)     \
         __DEF_FPPOLxx_MOD_TI       (sz)     \
@@ -490,6 +502,7 @@ __DEF_FPPOLxx_ARITH_ALL(64)
 #undef __DEF_FPPOLxx_SDIV
 #undef __DEF_FPPOLxx_SINV
 #undef __DEF_FPPOLxx_ADD_DISJOINT
+#undef __DEF_FPPOLxx_DIFF
 #undef __DEF_FPPOLxx_MUL_TI
 #undef __DEF_FPPOLxx_DIV_TI
 #undef __DEF_FPPOLxx_MOD_TI

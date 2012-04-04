@@ -176,6 +176,7 @@ __ALIAS_TYPE(ij)
   __ALIAS_FUN (void,     type, div_ti,         _ptr, _srcptr, unsigned)       \
   __ALIAS_FUN (void,     type, mod_ti,         _ptr, _srcptr, unsigned)       \
   __ALIAS_FUN (void,     type, add_disjoint,   _ptr, _srcptr, _srcptr)        \
+  __ALIAS_FUN (void,     type, diff,           _ptr, _srcptr, _srcptr)        \
   __ALIAS_FUN (int,      type, divrem,   _ptr, _ptr, _srcptr, _srcptr)        \
   __ALIAS_FUN (int,      type, div,            _ptr, _srcptr, _srcptr)        \
   __ALIAS_FUN (int,      type, rem,            _ptr, _srcptr, _srcptr)        \
