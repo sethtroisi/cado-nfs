@@ -22,7 +22,7 @@
     int degp = fppol##sz##_deg(p);                                   \
     int degq = fppol##sz##_deg(q);                                   \
     if (UNLIKELY(degp == 0 || degq == 0)) {                          \
-      fppol##sz##_set_ti(r, 1);                                      \
+      fppol##sz##_set_ti(r, 0);                                      \
       return;                                                        \
     }                                                                \
     fppol##sz##_t r0, r1, t;                                         \
