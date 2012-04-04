@@ -1,5 +1,12 @@
 #!/bin/bash
 
+notify() {
+    LD_LIBRARY_PATH= \
+    /usr/bin/curl -kni \
+        https://api.grid5000.fr/sid/notifications        \
+        -XPOST  \
+        -d "to[]=xmpp:$USER@jabber.grid5000.fr&body=$*"
+}
 
 if [[ "$*" =~ --debug ]] ; then
     debug=1
@@ -462,6 +469,8 @@ http_head_somewhere() {
 
 autodetect_scheduler_and_set_dependent_vars
 
+notify "`date`: start $OAR_JOBID $cluster/$nnodes mpi=$mpi thr=$thr, leader=$leader"
+
 echo "Running on $cluster, $nnodes nodes, leader is $leader"
 
 check_mandatory_definitions
@@ -678,27 +687,61 @@ if ! [ -f "$wdir/C.$interval" ] ; then
     checkpoint_mode="skip_online_checks=1"
 fi
 
+# Wakes up bwc.pl with SIGHUP if jobs should be restarted
+watch_server_progress() {
+    new_best=$start
+    while sleep 300 ; do
+        my_best=$(cd $wdir ; ls V* | perl -ne 'm{\.(\d+)$} && print "$1\n";' | sort -n | tail -1)
+        tmp_best=`get_last $slot`
+        if [ "$tmp_best" -gt "$new_best" ] ; then
+            new_best=$tmp_best
+            echo "`date` *** Central data reaches iteration $tmp_best (here: $my_best)"
+        fi
+        if [ $my_best -lt $((new_best - 2*interval)) ] ; then
+            echo "`date` *** Central data has already reached iteration $new_best, restarting ***"
+            $fetch --on $leader "X $slot/V0-64.${new_best}"
+            pkill -1 -f bwc.pl
+            pkill -1 -f mpiexec
+        fi
+    done
+}
+
 # Now that we fork, we avoid -e, since it does not dismiss children !
 set +e
 backlog &
 backlog_pid=$!
-    
-if [ "$mksol" ] ; then
-    if [[ "$slot" =~ ^([0-9]+),([0-9]+)$ ]] ; then
-        n1=${BASH_REMATCH[1]}
-        n2=$((n1+64))
-        slotbase=${BASH_REMATCH[2]}
-        slotend=$((slotbase + slotlength))
+
+watch_server_progress &
+watch_server_progress_pid=$!
+
+ 
+while true ; do
+    start=`get_last $slot`
+    if [ "$mksol" ] ; then
+        if [[ "$slot" =~ ^([0-9]+),([0-9]+)$ ]] ; then
+            n1=${BASH_REMATCH[1]}
+            n2=$((n1+64))
+            slotbase=${BASH_REMATCH[2]}
+            slotend=$((slotbase + slotlength))
+        else
+            echo "$slot: bad slot" >&2 ; exit 1
+        fi
+        # This is fairly stupid. F contains too much information in reality
+        $fetch --on $leader "F${n1}-${n2}"
+        bwc mksol interval=${interval} $checkpoint_mode start=${start} end=$slotend 2>&1
     else
-        echo "$slot: bad slot" >&2 ; exit 1
+        bwc krylov interval=${interval} $checkpoint_mode start=${start} 2>&1
     fi
-    # This is fairly stupid. F contains too much information in reality
-    $fetch --on $leader "F${n1}-${n2}"
-    bwc mksol interval=${interval} $checkpoint_mode start=${start} end=$slotend 2>&1
-else
-    bwc krylov interval=${interval} $checkpoint_mode start=${start} 2>&1
-fi
+    rc=$?
+    if [ $rc -ge 128 ] && ( [ $((rc & 127)) = 1 ] ||  [ $((rc & 127)) = 10 ] ) ; then
+        echo "*** bwc process aborted with SIGHUP/SIGUSR1, resuming ***"
+    else
+        break
+    fi
+done
 
 kill -9 $backlog_pid
+kill -9 $watch_server_progress_pid
+
 save_once
 echo bye
