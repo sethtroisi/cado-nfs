@@ -100,6 +100,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
         usage(argv0, NULL);
     }
+    param_list_print_command_line(stderr, pl);
 
     // read function field polynomials
     {
@@ -162,7 +163,10 @@ int main(int argc, char **argv)
                 param[2] = '1';
             filename = param_list_lookup_string(pl, param);
             if (filename == NULL) usage(argv0, param);
+            double tm = seconds();
             noerr = factor_base_init(FB[i], filename, fbb[i]);
+            fprintf(stderr, "# Reading factor base %d took %1.1f s\n", 
+                    i, seconds()-tm);
             if (!noerr) {
                 fprintf(stderr, "Could not read %s: %s\n", param, filename);
                 exit(EXIT_FAILURE);
@@ -170,7 +174,6 @@ int main(int argc, char **argv)
         }
     }
 
-    param_list_print_command_line(stderr, pl);
     param_list_clear(pl);
 
 #ifdef USE_F2
@@ -184,6 +187,8 @@ int main(int argc, char **argv)
         fprintf(stderr, "# Sorry, no sublattices in characteristic > 2. Ignoring the 'sublat' option\n");
     sublat_ptr sublat = &no_sublat[0];
 #endif
+
+    double t_tot = seconds();
 
     // Most of what we do is at the sublattice level. 
     // So we fix I and J accordingly.
@@ -201,12 +206,17 @@ int main(int argc, char **argv)
     print_qlat_info(qlat);
 
     // Precompute lambda for each element of the factor bases.
-    for (int i = 0; i < 2; ++i)
+    for (int i = 0; i < 2; ++i) {
+        double tm = seconds();
         factor_base_precomp_lambda(FB[i], qlat, sublat);
+        fprintf(stderr, "# Precomputing lambda on side %d took %1.1f s\n",
+                i, seconds()-tm);
+    }
 
     double t_norms = 0;
     double t_sieve = 0;
     double t_cofact = 0;
+    double t_initS = 0;
     int nrels = 0;
 
     // Loop on all sublattices
@@ -221,6 +231,7 @@ int main(int argc, char **argv)
             fprintf(stderr, ") :\n");
         }
 
+        t_initS -= seconds();
         // Allocate and init the sieve space
         uint8_t *S;
         S = (uint8_t *) malloc(IIJJ*sizeof(uint8_t));
@@ -244,6 +255,26 @@ int main(int argc, char **argv)
                     S[ijvec_get_offset(i, I)] = 255;
             }
         }
+#if 0
+        // Kill positions where gcd(hat i, hat j) != 1
+        {
+            ij_t i, j;
+            ij_t hati, hatj, g;
+            int rci, rcj = 1;
+            for (ij_set_zero(j); rcj; rcj = ij_monic_set_next(j, j, J)) {
+                ijpos_t start = ijvec_get_start_pos(j, I, J);
+                rci = 1;
+                for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
+                    ijpos_t pos = start + ijvec_get_offset(i, I);
+                    ij_convert_sublat(hati, hatj, i, j, sublat);
+                    ij_gcd(g, hati, hatj);
+                    if (ij_deg(g) != 0 && ij_deg(hati)>0  && ij_deg(hatj)>0)
+                        S[pos] = 255;
+                }
+            }
+        }
+#endif
+        t_initS += seconds();
 
         for (int twice = 0; twice < 2; twice++) {
             // This variable allows to change in which order we handle
@@ -270,6 +301,9 @@ int main(int argc, char **argv)
                 if (*Sptr > threshold[side])
                     *Sptr = 255; 
             }
+            // since (0,0) is divisible by everyone, its position might
+            // have been clobbered.
+            S[0] = 255;
         }
 
         t_cofact -= seconds();
@@ -316,10 +350,14 @@ int main(int argc, char **argv)
         free(S);
     }  // End of loop on sublattices.
 
+    t_tot = seconds()-t_tot;
+
     fprintf(stdout, "# Total: %d relations found\n", nrels);
-    fprintf(stdout, "# Time spent: %1.1f s (norms); %1.1f s"
-            " (sieve); %1.1f s (cofact)\n", t_norms, t_sieve, t_cofact);
-    fprintf(stdout, "# Rate: %1.5f s/rel\n", (t_norms+t_sieve+t_cofact)/nrels);
+    fprintf(stdout, "# Time spent: %1.1f s (initS); %1.1f s (norms); %1.1f s"
+          " (sieve); %1.1f s (cofact)\n", t_initS, t_norms, t_sieve, t_cofact);
+    fprintf(stdout, "# Total: %1.1f s (sum of previous: %1.1f s)\n",
+            t_tot, t_initS+t_norms+t_sieve+t_cofact);
+    fprintf(stdout, "# Rate: %1.5f s/rel\n", t_tot/nrels);
 
     ffspol_clear(ffspol[0]);
     ffspol_clear(ffspol[1]);
