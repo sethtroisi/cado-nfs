@@ -77,7 +77,7 @@ sieve_max_threads=2
 
 excessratio=1.01        # minimal excess we want before pruning
 keeppurge=160           # shrink in purge if excess exceeds keeppurge
-maxlevel=20
+maxlevel=25             # maximal merge level
 cwmax=100
 rwmax=100
 ratio=1.1
