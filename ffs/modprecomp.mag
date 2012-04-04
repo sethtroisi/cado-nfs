@@ -1,0 +1,86 @@
+/* Attempt to have a Newton-based preinverse based on most-significant bits.
+ * 
+ * See Gathen-Gerhard, algorithms 9.3 and 9.5.
+ * The goal is to remove all the "reverse", which seem artificial.
+ * Just have to replace "rem" by "div".
+ */
+
+PP<t> := PolynomialRing(GF(3));
+
+
+function revpol(p, m)
+  PP := Parent(p);
+  ps := Eltseq(p);
+  assert Degree(p) le m;
+  for i := Degree(p)+1 to m do
+    Append(~ps, 0);
+  end for;
+  return PP!Reverse(ps);
+end function;
+
+function NewmsbModinv(f, m)
+  g := PP!1;
+  i := 1;
+  while i le m do
+    i *:= 2;
+    g := 2*g*t^(Degree(g)+Degree(f)) - f*g^2;
+    g := g div t^(Degree(g) - i);
+  end while;
+
+  g := g div t^(Degree(g) - m);
+  return g;
+end function;
+ 
+
+function msbModinv(f, m)
+  revf := revpol(f, Degree(f));
+  g := PP!1;
+  i := 1;
+
+  //  Maintain g*f = 1 mod t^i
+  while i le m do
+    i *:= 2;
+    g := 2*g - revf*g^2;
+    g := g mod t^i;
+  end while;
+
+  g := g mod t^(m+1);
+  g := revpol(g, m);
+  return g;
+end function;
+ 
+
+function mymulmod(p, q, f)
+  pq := p*q;
+  d := Degree(f);
+  m := Degree(pq) - d;
+  PP := Parent(f);
+  revf := revpol(f, d);
+  invrevf := Modinv(revf, t^(m+1));
+  revinvrevf := revpol(invrevf, m);
+  revinvrevf := msbModinv(f, m);
+//  revpq := revpol(pq, Degree(pq));
+//  a := (revpq*invrevf) mod t^(m+1);
+//  aa := revpol(a, m);
+  pqt := pq div t^(d-2);
+  aa := (pqt*revinvrevf) div t^(m+2);
+  rr := pq-aa*f;
+  return rr;
+end function;
+
+
+function pol2hex(p)
+    xx := Seqint([ Integers()!x : x in Eltseq(p) ], 4);
+    return IntegerToString(xx, 16);
+end function;
+
+function hex2pol(x)
+    return PP!Intseq(StringToInteger(x, 16), 4);
+end function;
+
+repeat 
+  f := Random(PP, 10);
+until Coefficient(f, 0) eq 1;
+
+
+
