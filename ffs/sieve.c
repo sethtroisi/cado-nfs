@@ -17,6 +17,7 @@
 #include "params.h"
 #include "sublat.h"
 #include "smoothness.h"
+#include "polyfactor.h"
 
 int my_factor_survivor(fppol_t a, fppol_t b, ffspol_t* F, int *B, sq_t q,
         int side) 
@@ -37,7 +38,29 @@ int my_factor_survivor(fppol_t a, fppol_t b, ffspol_t* F, int *B, sq_t q,
             return 0;
         }
     }
-    return factor_survivor(a, b, F, B);
+
+    // OK. Now we know that we have a relation.
+    // Let's factor it completely and print it.
+
+    // In the case of char != 2, we still rely on NTL
+    if (FP_SIZE != 2)
+      return factor_survivor(a, b, F, B);
+
+    fppol_fact_t factors;
+    fppol_fact_init(factors);
+    fppol_out(stdout, a); printf(",");
+    fppol_out(stdout, b); printf(":");
+    for (int twice = 0; twice < 2; twice++) {
+        ffspol_norm(Nab, F[twice], a, b);
+        fppol_factor(factors, Nab);
+        fppol_fact_out(stdout, factors);
+        if (!twice)
+            printf(":");
+    }
+    printf("\n");
+    fppol_fact_clear(factors);
+    fppol_clear(Nab);
+    return 1;
 }
 
 
@@ -338,7 +361,6 @@ int main(int argc, char **argv)
                         ij2ab(a, b, hati, hatj, qlat);
                         nrels += my_factor_survivor(a, b, ffspol, lpb,
                                 qlat->q, qlat->side);
-                  //      nrels += factor_survivor(a, b, ffspol, lpb);
                     }
                 }
             }
