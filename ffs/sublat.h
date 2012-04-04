@@ -6,45 +6,27 @@
 #include "types.h"
 #include "ijvec.h"
 
+#define MAX_SUBLAT 9
+
 typedef struct {
     int nb;             // the number of valid sublattices
     int deg;            // the degree of the modulus
     // The following fields are meaningless if nb = 1, deg = 0.
     int n;              // the index of the current sublattice (in .lat)
     fppol16_t modulus;  // the modulus used for sublatticing
-    fppol16_t lat[9][2];        // a description of all sublattices.
-} sublat_struct_t;
+    fppol16_t lat[MAX_SUBLAT][2]; // a description of all sublattices.
+} __sublat_struct;
 
-// Rem: we have hardcoded the constant 9. Changing it requires changing
-// the initializers below, but that's the only thing to do.
-
-typedef sublat_struct_t   sublat_t[1];
-typedef sublat_struct_t * sublat_ptr;
-
-#ifdef USE_F2
-#define FPPOL16_ZERO {0}
-#elif USE_F3
-#define FPPOL16_ZERO {0,0}
-#else
-#error "Please define FPPOL16_ZERO for your field"
-#endif
+typedef       __sublat_struct  sublat_t[1];
+typedef       __sublat_struct *sublat_ptr;
+typedef const __sublat_struct *sublat_srcptr;
 
 static MAYBE_UNUSED sublat_t no_sublat = {{
     1,
     0,
     0,
-    FPPOL16_ZERO,
-    {
-        {FPPOL16_ZERO, FPPOL16_ZERO},
-        {FPPOL16_ZERO, FPPOL16_ZERO},
-        {FPPOL16_ZERO, FPPOL16_ZERO},
-        {FPPOL16_ZERO, FPPOL16_ZERO},
-        {FPPOL16_ZERO, FPPOL16_ZERO},
-        {FPPOL16_ZERO, FPPOL16_ZERO},
-        {FPPOL16_ZERO, FPPOL16_ZERO},
-        {FPPOL16_ZERO, FPPOL16_ZERO},
-        {FPPOL16_ZERO, FPPOL16_ZERO}
-    }
+    {0},
+    {{{0},{0}}}
 }};
 
 
@@ -65,7 +47,7 @@ static MAYBE_UNUSED sublat_t nine_sublat = {{
 #endif
 
 // One-liner that tells whether sublattices are active.
-static inline int use_sublat(sublat_ptr sublat)
+static inline int use_sublat(sublat_srcptr sublat)
 {
     return (sublat->nb > 1);
 }

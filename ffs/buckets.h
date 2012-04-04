@@ -1,149 +1,47 @@
 #ifndef __BUCKETS_H__
 #define __BUCKETS_H__
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdint.h>
-
-
-
-/* Bucket updates.
- *
- * Each bucket update contains:
- * - pos:  the position (i, j) of the update, represented using an unsigned
- *         integer of BUCKET_UPDATE_POS_BITS bits.
- * - hint: the most significant coefficients of the prime p corresponding to
- *         the update, represented using an unsigned integer of
- *         BUCKET_UPDATE_HINT_BITS bits.
- *
- * The actual size in memory of a bucket update is BUCKET_UPDATE_POS_BITS +
- * BUCKET_UPDATE_HINT_BITS, rounded up to a multiple of 8 bits.
- *****************************************************************************/
-
-// Size of the two fields and of a bucket update, in bits.
-#define   BUCKET_UPDATE_POS_BITS  17
-#define   BUCKET_UPDATE_HINT_BITS  7
-#define __BUCKET_UPDATE_BITS     (BUCKET_UPDATE_POS_BITS + \
-                                  BUCKET_UPDATE_HINT_BITS)
-
-// Smallest unsigned integer in which a bucket update will fit.
-#if   __BUCKET_UPDATE_BITS <= 16
-typedef uint16_t bucket_update_t;
-#elif __BUCKET_UPDATE_BITS <= 32
-typedef uint32_t bucket_update_t;
-#else
-typedef uint64_t bucket_update_t;
-#endif
-
-// In memory, a bucket update will be packed into an array of bytes.
-typedef struct {
-  uint8_t d[(__BUCKET_UPDATE_BITS+7) / 8];
-} __bucket_update_t;
-
-// Internal type for converting between normal and packed representations
-// of bucket updates.
-typedef union {
-    bucket_update_t update;
-  __bucket_update_t packed;
-} __bucket_update_conv_t;
-
-// Pack a bucket update.
-static inline
-__bucket_update_t __bucket_update_pack(bucket_update_t update)
-{ __bucket_update_conv_t conv = { .update = update };
-  return conv.packed; }
-
-// Unpack a bucket update.
-static inline
-bucket_update_t __bucket_update_unpack(__bucket_update_t packed)
-{ __bucket_update_conv_t conv = { .packed = packed };
-  return conv.update; }
-
-
-// Types for positions and hints as exported by the functions.
-typedef unsigned pos_t;
-typedef unsigned hint_t;
-
-// Construct a bucket update from a position and a prime hint.
-static inline
-bucket_update_t bucket_update_set(pos_t pos, hint_t hint)
-{ return (bucket_update_t)pos |
-        ((bucket_update_t)hint << BUCKET_UPDATE_POS_BITS) };
-
-// Retrieve the position from a bucket update.
-static inline
-pos_t  bucket_update_get_pos (bucket_update_t update)
-{ return update & (((pos_t)1<<BUCKET_UPDATE_POS_BITS)-1); }
-
-// Retrieve the prime hint from a bucket update.
-static inline
-hint_t bucket_update_get_hint(bucket_update_t update)
-{ return (update >> BUCKET_UPDATE_POS_BITS) &
-         (((hint_t)1<<BUCKET_UPDATE_HINT_BITS)-1); }
+#include "types.h"
+#include "fb.h"
 
 
 
 /* Array of buckets.
  *****************************************************************************/
 
+// Forward declaration of bucket updates.
+typedef struct __update_packed_struct update_packed_t;
+
 typedef struct {
-  unsigned            n;
-  unsigned            size;
-  __bucket_update_t **begin;
-  __bucket_update_t **iter;
-  __bucket_update_t **end;
-} __bucket_array_struct;
+  unsigned          n;
+  unsigned          size;
+  update_packed_t **begin;
+  update_packed_t **iter;
+  update_packed_t **end;
+} __buckets_struct;
 
-typedef       __bucket_array_struct  bucket_array_t[1];
-typedef       __bucket_array_struct *bucket_array_ptr;
-typedef const __bucket_array_struct *bucket_array_srcptr;
+typedef       __buckets_struct  buckets_t[1];
+typedef       __buckets_struct *buckets_ptr;
+typedef const __buckets_struct *buckets_srcptr;
 
-static inline
-void bucket_array_init(bucket_array_ptr buckets, unsigned n, unsigned size)
-{
-  buckets->n     = n;
-  buckets->size  = size;
-  buckets->begin =
-    (__bucket_update_t **)malloc(n * sizeof(__bucket_update_t *));
-  buckets->iter  =
-    (__bucket_update_t **)malloc(n * sizeof(__bucket_update_t *));
-  buckets->end   =
-    (__bucket_update_t **)malloc(n * sizeof(__bucket_update_t *));
-  ASSERT_ALWAYS(buckets->begin != NULL);
-  ASSERT_ALWAYS(buckets->iter  != NULL);
-  ASSERT_ALWAYS(buckets->end   != NULL);
-  for (unsigned i = 0; i < n; ++i) {
-    buckets->begin[i] = buckets->iter[i] = buckets->end[i] = 
-      (__bucket_update_t *)malloc(size * sizeof(__bucket_update_t));
-    ASSERT_ALWAYS(buckets->begin[i] != NULL);
-  }
-}
+// Initialize structure and allocate buckets.
+void buckets_init(buckets_ptr buckets, unsigned I, unsigned J, unsigned size);
 
-static inline
-void bucket_array_clear(bucket_array_ptr buckets)
-{
-  for (unsigned i = 0; i < buckets->n; ++i)
-    free(buckets->begin[i]);
-  free(buckets->begin);
-  free(buckets->iter);
-  free(buckets->end);
-}
+// Re-initialize the bucket pointers so as to start with empty buckets.
+void buckets_reset(buckets_ptr buckets);
 
-static inline
-unsigned bucket_size(bucket_array_srcptr buckets, unsigned i)
-{ return buckets->end[i] - buckets->begin[i]; }
+// Clean up memory.
+void buckets_clear(buckets_ptr buckets);
 
-static inline
-int bucket_is_done(bucket_array_srcptr buckets, unsigned i)
-{ return buckets->iter[i] == buckets->end[i]; }
+// Return the size of a bucket region.
+unsigned bucket_region_size();
 
-static inline
-void bucket_push(bucket_array_ptr buckets, unsigned i,
-                 const bucket_update_t update)
-{ *buckets->end[i]++ = __bucket_update_pack(update); }
+// Fill the buckets with updates corresponding to divisibility by elements of
+// the factor base.
+void buckets_fill(buckets_ptr buckets, factor_base_srcptr FB,
+                  sublat_srcptr sublat, unsigned I, unsigned J);
 
-static inline
-bucket_update_t bucket_next(bucket_array_ptr buckets, unsigned i)
-{ return __bucket_update_unpack(*buckets->iter[i]++); }
+// Apply all the updates from a given bucket to the sieve region S.
+void bucket_apply(uint8_t *S, buckets_ptr buckets, unsigned k);
 
 #endif  /* __BUCKETS_H__ */
