@@ -24,13 +24,17 @@ microseconds (void)
 uint64_t
 microseconds_thread (void)
 {
-    struct rusage res[1];
+    struct rusage ru[1];
     uint64_t r;
 
-    getrusage (RUSAGE_THREAD, res);
-    r = (uint64_t) res->ru_utime.tv_sec;
+#ifdef HAVE_RUSAGE_THREAD
+    getrusage (RUSAGE_THREAD, ru);
+#else
+    getrusage (RUSAGE_SELF, ru);
+#endif
+    r = (uint64_t) ru->ru_utime.tv_sec;
     r *= (uint64_t) 1000000UL;
-    r += (uint64_t) res->ru_utime.tv_usec;
+    r += (uint64_t) ru->ru_utime.tv_usec;
     return r;
 }
 
@@ -57,7 +61,8 @@ void
 seconds_user_sys (double * res)
 {
     struct rusage ru[1];
-    getrusage(RUSAGE_SELF, ru);
+
+    getrusage (RUSAGE_SELF, ru);
     res[0] = ru->ru_utime.tv_sec +  (double) ru->ru_utime.tv_usec / 1.0e6;
     res[1] = ru->ru_stime.tv_sec +  (double) ru->ru_stime.tv_usec / 1.0e6;
 }

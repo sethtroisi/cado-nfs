@@ -98,8 +98,8 @@ include(${CADO_NFS_SOURCE_DIR}/config/sse41.cmake)
 include(${CADO_NFS_SOURCE_DIR}/config/gcc-assembly.cmake)
 include(${CADO_NFS_SOURCE_DIR}/config/curl.cmake)
 include(${CADO_NFS_SOURCE_DIR}/config/alloca.cmake)
-
 include("${CADO_NFS_SOURCE_DIR}/config/math.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/rusage_thread.cmake")
 
 ######################################################################
 # Try to detect whether pthreads and/or MPI are available.
