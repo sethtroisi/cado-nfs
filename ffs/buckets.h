@@ -44,4 +44,7 @@ void buckets_fill(buckets_ptr buckets, factor_base_srcptr FB,
 // Apply all the updates from a given bucket to the sieve region S.
 void bucket_apply(uint8_t *S, buckets_ptr buckets, unsigned k);
 
+// Print information about the buckets
+void print_bucket_info(buckets_ptr buckets);
+
 #endif  /* __BUCKETS_H__ */
