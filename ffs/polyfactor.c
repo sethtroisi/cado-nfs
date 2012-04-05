@@ -2,6 +2,7 @@
 #include "types.h"
 #include "polyfactor.h"
 #include "fppol_facttools.h"
+#include <stdlib.h>  // for lrand48
 
 // TODO: should be part of the fppol_ interface, and have a better
 // implementation.
@@ -17,11 +18,17 @@ static void fppol_set_random(fppol_ptr f, int deg) {
 #ifdef USE_F2
     if (deg == 0)
         return;
-    ij_t r;
-    r[0] = rand();
-    int bits = MIN(deg+1, 16);
-    r[0] &= (1u << bits)-1;
-    fppol_set_ij(f, r);
+    // k-bit random is enough to separate irreducible factors of degree
+    // up to k. We will build a 62-bit random, which should be enough
+    // (this is a limit on the large primes).
+    // lrand48() gives 31 bits. With two calls, that's ok.
+    fppol64_t r;
+    do {
+        r[0] = ((uint64_t)lrand48()) | (((uint64_t)lrand48())<<31);
+        int bits = MIN(deg+1, 62);
+        r[0] &= (((uint64_t)1) << bits)-1;
+    } while (r[0] == 0 || r[0] == 1); // 0 and 1 are bad for factorisation.
+    fppol_set_64(f, r);
 #else
     static int first_time = 1;
     static ij_t state;
