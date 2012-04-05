@@ -165,6 +165,11 @@ __ALIAS_TYPE(ij)
   __ALIAS_FUN (void,     type, swap,           _ptr, _ptr)                    \
   __ALIAS_FUN (void,     type, get_coeff,      fp_ptr, _srcptr, unsigned)     \
   __ALIAS_FUN (void,     type, set_coeff,      _ptr, fp_srcptr, unsigned)     \
+  __ALIAS_FUN (int,      type, set_next,       _ptr, _srcptr, unsigned)       \
+  __ALIAS_FUN (int,      type, monic_set_next, _ptr, _srcptr, unsigned)       \
+  __ALIAS_FUN (unsigned, type, get_ui,         _srcptr,  unsigned, unsigned)  \
+  __ALIAS_FUN (int,      type, set_ui,   _ptr, unsigned, unsigned, unsigned)  \
+  __ALIAS_FUN (int,      type, deg,            _srcptr)                       \
   __ALIAS_FUN (int,      type, is_zero,        _srcptr)                       \
   __ALIAS_FUN (int,      type, eq,             _srcptr, _srcptr)              \
   __ALIAS_FUN (int,      type, is_monic,       _srcptr)                       \
@@ -184,11 +189,6 @@ __ALIAS_TYPE(ij)
   __ALIAS_FUN (void,     type, mulmod,         _ptr, _srcptr, _srcptr,_srcptr)\
   __ALIAS_FUN (int,      type, invmod,         _ptr, _srcptr, _srcptr)        \
   __ALIAS_FUN (void,     type, gcd,            _ptr, _srcptr, _srcptr)        \
-  __ALIAS_FUN (int,      type, deg,            _srcptr)                       \
-  __ALIAS_FUN (int,      type, set_next,       _ptr, _srcptr, unsigned)       \
-  __ALIAS_FUN (int,      type, monic_set_next, _ptr, _srcptr, unsigned)       \
-  __ALIAS_FUN (unsigned, type, get_ui,         _srcptr,  unsigned, unsigned)  \
-  __ALIAS_FUN (int,      type, set_ui,   _ptr, unsigned, unsigned, unsigned)  \
   __ALIAS_FUN (char_ptr, type, get_str,        char_ptr, _srcptr)             \
   __ALIAS_FUN (int,      type, set_str,        _ptr,     char_srcptr)         \
   __ALIAS_FUN (void,     type, out,            FILE_ptr, _srcptr)             \

@@ -102,9 +102,12 @@ void fppol_trim(fppol_ptr r);
 
 
 
-/* Include the other fppol_* headers.
+/* Include fp.h for base field elements, along with the other fppol_* headers.
  *****************************************************************************/
 
+#include "fp.h"
+#include "fppol_test.h"
+#include "fppol_set.h"
 #include "fppol_arith.h"
 #include "fppol_mul.h"
 #include "fppol_div.h"
