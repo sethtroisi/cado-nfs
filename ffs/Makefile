@@ -5,6 +5,7 @@ BIN = sieve
 
 BUILDDIR = ./build
 
+# GF2XPREFIX = <path_to_gf2x>
 OPTFLAGS  = 
 WARNFLAGS = -Wall -Wextra -pedantic
 
@@ -12,10 +13,9 @@ FFSREV = `./version.sh`
 
 CPPFLAGS    = -DFFSREV=\"$(FFSREV)\"
 CFLAGS      = $(OPTFLAGS) $(WARNFLAGS) -std=c99   -g
-CXXFLAGS    = $(OPTFLAGS) $(WARNFLAGS) -std=c++0x -g
-TARGET_ARCH = -mtune=native -march=native 
+TARGET_ARCH = -mtune=native -march=native
 LDFLAGS     = 
-LDLIBS      = -lntl -lstdc++
+LDLIBS      =
 
 # Override variables in here!
 -include Makefile.local
@@ -52,18 +52,14 @@ define BUILD_template
 	$$(CC) $$(CFLAGS) $$(CPPFLAGS) $$($(1)_CPPFLAGS) $$(TARGET_ARCH) \
 	  -c -o $$@ $$*.c
 
-  $$($(1)_BUILDDIR)/cofactor.o: Makefile | $$($(1)_BUILDDIR)
-	$$(CXX) $$(CXXFLAGS) $$(CPPFLAGS) $$($(1)_CPPFLAGS) $$(TARGET_ARCH) \
-	  -c -o $$@ cofactor.cc
+  $$($(1)_BIN): $$($(1)_OBJ) 
 
-  $$($(1)_BIN): $$($(1)_OBJ) $$($(1)_BUILDDIR)/cofactor.o
-
-  $$($(1)_DEP): $$(SRC) $$(INC) cofactor.cc cofactor.hh Makefile | $$($(1)_BUILDDIR)
+  $$($(1)_DEP): $$(SRC) $$(INC) Makefile | $$($(1)_BUILDDIR)
 	$$(CC) $$(CFLAGS) $$(CPPFLAGS) $$($(1)_CPPFLAGS) $$(TARGET_ARCH) \
-	  -MM $$(SRC) cofactor.cc | sed -e "s+^.*\.o:+$$($(1)_BUILDDIR)/&+" >$$@
+	  -MM $$(SRC) | sed -e "s+^.*\.o:+$$($(1)_BUILDDIR)/&+" >$$@
 
   clean::
-	rm -f $$($(1)_DEP) $$($(1)_OBJ) $$($(1)_BUILDDIR)/cofactor.o $$($(1)_BIN)
+	rm -f $$($(1)_DEP) $$($(1)_OBJ) $$($(1)_BIN)
 	[ -z "`find $$($(1)_BUILDDIR) -maxdepth 0 -empty`" ] \
 	  || rmdir $$($(1)_BUILDDIR)
 

@@ -11,7 +11,6 @@
 #include "fb.h"
 #include "latsieve.h"
 #include "norm.h"
-#include "cofactor.hh"
 #include "timing.h"
 #include "ijvec.h"
 #include "params.h"
