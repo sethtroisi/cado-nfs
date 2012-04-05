@@ -95,13 +95,28 @@ static int noclique = 0;
 static double wct0;
 static bit_vector rel_used;
 static relation_stream rs;
+
 /* Size of relations buffer between parsing & insertRelation.
-   VERY IMPORTANT. Seems best for 1<<7; try 1<<8 for possible
-   light speedup if your CPU is faster than a Nehalem 3.6 Ghz.
-   1<<7 -> about 10MB of buffering (only ~2% is really used) 
+   VERY IMPORTANT. The minimum is 1<<6; try 1<<8 to 1<<12 for possible
+   speedup if your CPU is faster than a Nehalem 3.6 Ghz or if your
+   media (NFS, disk) has a erratic bandwidth/big latency.
+
+   I suppose the max speed is about 100MB/s. So to load 1 byte, I need 10ns.
+   The block in file loading is PREMPT_ONE_READ, the block in others is
+   the average sentence, about ~100 bytes -> 1µs.
+   BUT it seems the minimal useful time for nanosleep is about 50-80 µs
+   with nanosleep (0,1<<13) (nanosleep (0,1) is about 45 µs on my 3.6 Ghz)
+   - With PREMPT_ONE_READ = 64K, the delai is about 600 µs;  OK for
+     nanosleep(0,PREMPT_ONE_READ<<3).
+   - For others, if I use nanosleep to keep minimal CPU, I have to wait at
+     least 60 µs -> 60 sentences.
+   So the minimal T_REL is 1<<6 (=64) to avoid an empty buffer; 1<<7 seems
+   comfortable with constant bandwidth.
 */
 #define T_REL (1<<6) 
-			
+static const struct timespec 
+wait_load = { 0, (PREMPT_ONE_READ<<3) }, wait_classical = { 0, 1<<13 };
+
 static volatile unsigned long cpt_rel_a;
 static volatile unsigned long cpt_rel_b;
 static volatile unsigned int end_insertRelation = 0;
@@ -112,21 +127,6 @@ typedef struct {
 } __buf_rel_t;
 static __buf_rel_t buf_rel[1];
 
-
-/* I suppose the max speed is about 120MB/s. So to load 1 byte, I need 8ns.
-   The block in file loading is PREMPT_ONE_READ, the block in others is
-   the average sentence, about ~100 bytes -> ~800 ns.
-   BUT it seems the minimal useful time for nanosleep is about 50-80
-   micro seconds... with nanosleep (0,1<<13).
-   With PREMPT_ONE_READ = 64K, PREMPT_ONE_READ<<3 = 512K, so the delai is
-   about 500 µs. OK for nanosleep(0,PREMPT_ONE_READ<<3).
-   For others, if I use nanosleep to keep minimal CPU, I have to wait at
-   least 80 µs -> 100 sentences.
-   So T_REL is 1<<7 to avoid an empty buffer!
-   1<<6 is possible, because 120MB/s is optimistic.
-*/
-static const struct timespec 
-wait_load = { 0, (PREMPT_ONE_READ<<3) }, wait_classical = { 0, 1<<13 };
 
 /* Be careful. 1<<13 = 8µs; in fact, about 50-80 µs */
 inline void attente_minimale_passive ()
@@ -156,8 +156,6 @@ nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
 nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
 " : : );
 }
-
-#define OPTIMISER_BARRIER { __asm__ __volatile__ ("" : : : "memory"); }
 
 /********************** own memory allocation routines ***********************/
 
@@ -982,13 +980,10 @@ prempt_load (prempt_t prempt_data) {
 	nanosleep(&wait_load, NULL);
       }
       else {
-	/* __mm_lfence(); */
 	try_load = MIN((PREMPT_BUF + ((size_t)prempt_data->buf)) - ((size_t) pprod), PREMPT_ONE_READ);
 	if ((load = fread (pprod, 1, try_load, f))) {
 	  pprod += load;
 	  if (pprod == pmax) pprod = prempt_data->buf;
-	  OPTIMISER_BARRIER;
-	  /* _mm_sfence (); */
 	  prempt_data->pprod = pprod;
 	}
 	else
@@ -1086,6 +1081,10 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int nbufrel)
 	    goto next_rat;
 	  }
 	}
+	if ((unsigned int) rel->nb_rp_alloc <= k) {
+	  rel->nb_rp_alloc = rel->nb_rp_alloc ? rel->nb_rp_alloc + (rel->nb_rp_alloc>>1) : 8;
+	  rel->rp = (rat_prime_t *) realloc (rel->rp, rel->nb_rp_alloc * sizeof(rat_prime_t));
+	}
 	rel->rp[k++] = (rat_prime_t) { .p = pr, .e = 1};
       }
     }
@@ -1107,6 +1106,10 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int nbufrel)
 	    rel->ap[i].e++;
 	    goto next_alg;
 	  }
+	}
+	if ((unsigned int) rel->nb_ap_alloc <= k) {
+	  rel->nb_ap_alloc = rel->nb_ap_alloc ? rel->nb_ap_alloc + (rel->nb_ap_alloc>>1) : 16;
+	  rel->ap = (alg_prime_t *) realloc (rel->ap, rel->nb_ap_alloc * sizeof(alg_prime_t));
 	}
 	rel->ap[k++] = (alg_prime_t) { .p = pr,.r = -1, .e = 1};
       }
@@ -1163,7 +1166,13 @@ void insertRelation() {
       else
 	if (cpt_rel_a == cpy_cpt_rel_b)
 	  pthread_exit(NULL);
-    /* _mm_lfence(); */
+    /* We don't used memory barrier for portability. So, if the ring
+       buffer is empty, one problem exists if the producter produces one
+       case and the consumer takes it immediatly: the case might be not
+       complety written. So, if only one case exists for consumer, the
+       consumer waits fews microseconds before use it.
+    */
+    if (cpt_rel_a == cpy_cpt_rel_b + 1) nanosleep (&wait_classical, NULL);
     n = (unsigned int) (cpy_cpt_rel_b & (T_REL - 1));
     if (pass != 1)
       tmp = my_malloc_int(++(buf_rel->ltmp_rel[n]));
@@ -1177,8 +1186,6 @@ void insertRelation() {
 	      " -- %.1f MB/s -- %.1f rels/s\n",
 	      rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
     cpy_cpt_rel_b++;
-    OPTIMISER_BARRIER;
-    /* _mm_sfence(); */
     cpt_rel_b = cpy_cpt_rel_b;
   }
 }
@@ -1209,8 +1216,10 @@ prempt_scan_relations ()
       exit (1);
     }
   memset (buf_rel->rel, 0, sizeof(*(buf_rel->rel)) * T_REL);
+  /*
   for (i = T_REL ; i ; relation_provision_for_primes(&(buf_rel->rel[--i]),
                             RELATION_MAX_BYTES >> 2, RELATION_MAX_BYTES >> 2));
+  */
   cpt_rel_a = cpt_rel_b = 0;
   cpy_cpt_rel_a = cpt_rel_a;
   nprimes = 0;
@@ -1245,15 +1254,14 @@ prempt_scan_relations ()
     ASSERT_ALWAYS(length_line <= ((unsigned int) RELATION_MAX_BYTES));
     rs->pos += length_line;
     length_line = 0;
-    OPTIMISER_BARRIER;
-    /* _mm_sfence(); */
     prempt_data->pcons = pcons;
-
     while (pcons == prempt_data->pprod) {						
       if (prempt_data->end) if (pcons == prempt_data->pprod) goto end_of_files;
       nanosleep (&wait_classical, NULL);
     }
-    /* _mm_lfence(); */
+    /* No problem for producter/consumer because the case in the ring buffer
+       is atomic (only one char) AND producted by a system call (fread).
+    */
     if (*pcons == '#')                           goto goto_endline;
     if (pass == 1)                               goto valid_line;
     if (bit_vector_getbit (rel_used, rs->nrels)) goto valid_line;
@@ -1269,7 +1277,6 @@ prempt_scan_relations ()
 	  }
 	nanosleep (&wait_classical, NULL);
       }
-      /* _mm_lfence(); */
       p = ((pcons <= prempt_data->pprod) ? (char *) prempt_data->pprod : pcons_max) - 1;
       c = *p;
       *p = '\n';
@@ -1281,7 +1288,6 @@ prempt_scan_relations ()
       if (pcons == pcons_max) pcons = prempt_data->buf;
     } while (err);
     rs->lnum++;
-    /* _mm_sfence(); */
     continue;
 
   valid_line:
@@ -1295,7 +1301,6 @@ prempt_scan_relations ()
       }
       nanosleep(&wait_classical, NULL);
     }
-    /* _mm_lfence(); */
     do {
       if (pcons == prempt_data->pprod) {
 	fprintf (stderr, "prempt_scan_relations: relation line size is greater than RELATION_MAX_BYTES (%d)\n", RELATION_MAX_BYTES);
@@ -1311,18 +1316,13 @@ prempt_scan_relations ()
       err = (pcons > p && c != '\n');
       if (pcons == pcons_max) pcons = prempt_data->buf;
     } while (err);
-    /* _mm_sfence(); */
-    /* Ok, we have a complete line */
     while (cpy_cpt_rel_a == cpt_rel_b + T_REL) {
       nanosleep(&wait_classical, NULL);
     }
-    /* _mm_lfence(); */
     buf_rel->num_rel [(unsigned int) (cpy_cpt_rel_a & (T_REL - 1))] = rs->nrels++;
     relation_stream_get_fast (prempt_data, (unsigned int) (cpy_cpt_rel_a & (T_REL - 1)));
     rs->lnum++;
     cpy_cpt_rel_a++;
-    OPTIMISER_BARRIER;
-    /* _mm_sfence(); */
     cpt_rel_a = cpy_cpt_rel_a;
   }
  end_of_files:
