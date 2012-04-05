@@ -27,15 +27,15 @@ static inline void handle_V(vvs_param_t *vvsp) {
     ijpos_t pos = ijvec_get_pos(vvsp->V, vvsp->I, vvsp->J);
 #ifdef TRACE_POS
     if (pos == TRACE_POS) {
-        fprintf(stderr, "TRACE_POS(%d): ", pos);
+        fprintf(stderr, "TRACE_POS(%lu): ", pos);
         fbprime_out(stderr, vvsp->gothp->p); fprintf(stderr, " ");
         fbprime_out(stderr, vvsp->gothp->r); fprintf(stderr, "\n");
-        fprintf(stderr, "TRACE_POS(%d): degnorm is now %d\n", pos,
+        fprintf(stderr, "TRACE_POS(%lu): degnorm is now %d\n", pos,
                 vvsp->S[pos]-vvsp->gothp->degp);
     }
 #endif
     if (pos != 0 && (vvsp->S[pos] < vvsp->gothp->degp)) {
-        fprintf(stderr, "faulty pos is %u\n", pos);
+        fprintf(stderr, "faulty pos is %lu\n", pos);
     }
     ASSERT(pos == 0 || (vvsp->S[pos] >= vvsp->gothp->degp));
     vvsp->S[pos] -= vvsp->gothp->degp;
@@ -272,15 +272,15 @@ void sieveFB(uint8_t *S, factor_base_srcptr FB, unsigned I, unsigned J,
             ijpos_t pos = ijvec_get_pos(V, I, J);
 #ifdef TRACE_POS
             if (pos == TRACE_POS) {
-                fprintf(stderr, "TRACE_POS(%d): ", pos);
+                fprintf(stderr, "TRACE_POS(%lu): ", pos);
                 fbprime_out(stderr, gothp->p); fprintf(stderr, " ");
                 fbprime_out(stderr, gothp->r); fprintf(stderr, "\n");
-                fprintf(stderr, "TRACE_POS(%d): degnorm is now %d\n", pos,
+                fprintf(stderr, "TRACE_POS(%lu): degnorm is now %d\n", pos,
                         S[pos]-gothp->degp);
             }
 #endif
             if (pos != 0 && (S[pos] < gothp->degp)) {
-                fprintf(stderr, "faulty pos is %u\n", pos);
+                fprintf(stderr, "faulty pos is %lu\n", pos);
             }
             ASSERT(pos == 0 || (S[pos] >= gothp->degp)); 
             S[pos] -= gothp->degp;

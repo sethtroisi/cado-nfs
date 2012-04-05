@@ -124,12 +124,12 @@ extern const uint16_t __f3_monic_set_ui_conv[];
     unsigned __i = 0, __j = 0, __b = MAX(n, n+m-4), __w; \
     while (__j < __b && __t[0] | __t[1]) {               \
       __w = (__t[0] & 0x1f) | ((__t[1] & 0x1f) << 5);    \
-      r |= (unsigned)__f3_get_ui_conv[__w] << __i;       \
+      r |= (uint64_t)__f3_get_ui_conv[__w] << __i;       \
       __i += 8; __j += 5; __t[0] >>= 5; __t[1] >>= 5;    \
     }                                                    \
     if (__t[0] | __t[1]) {                               \
       __w = (__t[0] & 0x1f) | ((__t[1] & 0x1f) << 5);    \
-      r |= (unsigned)__f3_monic_get_ui_conv[__w] << __i; \
+      r |= (uint64_t)__f3_monic_get_ui_conv[__w] << __i; \
     }                                                    \
   } while (0)
 

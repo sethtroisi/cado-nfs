@@ -167,8 +167,8 @@ __ALIAS_TYPE(ij)
   __ALIAS_FUN (void,     type, set_coeff,      _ptr, fp_srcptr, unsigned)     \
   __ALIAS_FUN (int,      type, set_next,       _ptr, _srcptr, unsigned)       \
   __ALIAS_FUN (int,      type, monic_set_next, _ptr, _srcptr, unsigned)       \
-  __ALIAS_FUN (unsigned, type, get_ui,         _srcptr,  unsigned, unsigned)  \
-  __ALIAS_FUN (int,      type, set_ui,   _ptr, unsigned, unsigned, unsigned)  \
+  __ALIAS_FUN (uint64_t, type, get_ui,         _srcptr,  unsigned, unsigned)  \
+  __ALIAS_FUN (int,      type, set_ui,   _ptr, uint64_t, unsigned, unsigned)  \
   __ALIAS_FUN (int,      type, deg,            _srcptr)                       \
   __ALIAS_FUN (int,      type, is_zero,        _srcptr)                       \
   __ALIAS_FUN (int,      type, eq,             _srcptr, _srcptr)              \

@@ -1,6 +1,8 @@
 #ifndef __IJVEC_H__
 #define __IJVEC_H__
 
+#include <stdint.h>
+
 #include "types.h"
 
 
@@ -35,7 +37,7 @@ void ijvec_mul_ti(ijvec_ptr r, ijvec_srcptr u, unsigned i) {
 }
 
 // Corresponding position as an unsigned int.
-typedef unsigned ijpos_t;
+typedef uint64_t ijpos_t;
 
 // Return a strict higher bound on the position, given the degree bounds
 // I and J.

@@ -5,6 +5,8 @@
 #ifndef __FPPOL_SET_H__
 #define __FPPOL_SET_H__
 
+#include <stdint.h>
+
 #include "cppmeta.h"
 
 
@@ -141,12 +143,12 @@ __DECL_FPPOLxx_ARITH_ALL(64)
 // coefficients form a monic polynomial, to an unsigned int.
 // /!\ Assume that deg(p) < n+m.
 // Generic prototype:
-//   unsigned fppol<sz>_get_ui(fppol<sz>_srcptr p, unsigned n, unsigned m);
+//   uint64_t fppol<sz>_get_ui(fppol<sz>_srcptr p, unsigned n, unsigned m);
 #define __DEF_FPPOLxx_GET_UI(sz)                                             \
   static inline                                                              \
-  unsigned fppol##sz##_get_ui(fppol##sz##_srcptr p, MAYBE_UNUSED unsigned n, \
+  uint64_t fppol##sz##_get_ui(fppol##sz##_srcptr p, MAYBE_UNUSED unsigned n, \
                                                     MAYBE_UNUSED unsigned m) \
-  { unsigned r; __FP_GET_UI(sz, r, p, n, m); return r; }
+  { uint64_t r; __FP_GET_UI(sz, r, p, n, m); return r; }
 
 
 // Conversion of an (n+m)-term polynomial, whose m most significant
@@ -154,10 +156,10 @@ __DECL_FPPOLxx_ARITH_ALL(64)
 // Return 1 if successful.
 // /!\ Assume that deg(p) < n+m.
 // Generic prototype:
-//   int fppol<sz>_set_ui(fppol<sz>_ptr r, unsigned x, unsigned n, unsigned m);
+//   int fppol<sz>_set_ui(fppol<sz>_ptr r, uint64_t x, unsigned n, unsigned m);
 #define __DEF_FPPOLxx_SET_UI(sz)                                           \
   static inline                                                            \
-  int fppol##sz##_set_ui(fppol##sz##_ptr r, unsigned x,                    \
+  int fppol##sz##_set_ui(fppol##sz##_ptr r, uint64_t x,                    \
                          MAYBE_UNUSED unsigned n, MAYBE_UNUSED unsigned m) \
   { __FP_SET_UI(sz, r, x, n, m); return 1; }
 

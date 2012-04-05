@@ -12,7 +12,6 @@
 
 
 
-
 /* Basic bitsliced arithmetic.
  *****************************************************************************/
 
@@ -84,7 +83,7 @@
 // Conversion of an (n+m)-term polynomial, whose m most significant
 // coefficients form a monic polynomial, to an unsigned int.
 #define __FP_GET_UI(sz, r, p, n, m) \
-  do { r = (unsigned)p[0]; } while (0)
+  do { r = (uint64_t)p[0]; } while (0)
 
 // Conversion of an (n+m)-term polynomial, whose m most significant
 // coefficients form a monic polynomial, from an unsigned int.
