@@ -139,10 +139,10 @@ void buckets_init(buckets_ptr buckets, unsigned I, unsigned J, unsigned size)
 void print_bucket_info(buckets_ptr buckets)
 {
   printf("# bucket info:\n");
+  printf("#   nb of buckets   = %u\n", buckets->n);
   printf("#   size of buckets = %u\n", buckets->size);
   printf("#   size of bucket-region (aka 1<<UPDATE_POS_BITS) = %d\n",
           1<<UPDATE_POS_BITS);
-  printf("#   nb of buckets   = %u\n", buckets->n);
   printf("#   number of bits for the hint = %d\n", UPDATE_HINT_BITS);
   printf("#   bit-size of a bucket-update = %d\n", UPDATE_BITS);
 }

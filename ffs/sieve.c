@@ -42,11 +42,6 @@ int my_factor_survivor(fppol_t a, fppol_t b, ffspol_t* F, int *B, sq_t q,
 
     // OK. Now we know that we have a relation.
     // Let's factor it completely and print it.
-
-    // In the case of char != 2, we still rely on NTL
-    if (FP_SIZE != 2)
-      return factor_survivor(a, b, F, B);
-
     fppol_fact_t factors;
     fppol_fact_init(factors);
     fppol_out(stdout, a); printf(",");

@@ -3,7 +3,13 @@
 #include "polyfactor.h"
 #include "fppol_facttools.h"
 
-
+// TODO: should be part of the fppol_ interface, and have a better
+// implementation.
+static void fppol_sqrmod(fppol_ptr r, fppol_srcptr p, fppol_srcptr f)
+{
+    fppol_mul(r, p, p);
+    fppol_rem(r, r, f);
+}
 
 // For lack of a better solution, use deterministic random: take
 // polynomials in lex order (maybe random enough for an edf).
@@ -86,23 +92,60 @@ void fppol_fact_out(FILE *out, fppol_fact_ptr F)
     }
 }
 
+// TODO: Maybe should go into the fppol_t interface.
+static void MAYBE_UNUSED fppol_powmod(fppol_ptr r, fppol_srcptr p, 
+        uint64_t power, fppol_srcptr f)
+{
+    ASSERT_ALWAYS(fppol_deg(p) < fppol_deg(f));
+    if (power == 0) {
+        fppol_set_ti(r, 0);
+        return;
+    }
+    if (power == 1) {
+        fppol_set(r, p);
+        return;
+    }
+    // select msb:
+    uint64_t mask = ((uint64_t)1)<<63;
+    while ((power & mask) == 0)
+        mask >>= 1;
+    mask >>= 1;
+    // horner:
+    fppol_t res;
+    fppol_init(res);
+    fppol_set(res, p);
+    while (mask != 0) {
+        fppol_sqrmod(res, res, f);
+        if (power & mask)
+            fppol_mulmod(res, res, p, f);
+        mask >>= 1;
+    }
+    fppol_set(r, res);
+    fppol_clear(res);
+}
 
 
-
+// The EDF step is different in characteristic 2 and in other
+// characteristics. See for instance Gathen-Gerhard, algo 14.8 and
+// exercise 14.16.
 static void fppol_edf(fppol_fact_ptr factors, fppol_t f, int d)
 {
-    fppol_t a, tra;
     if (fppol_deg(f) == d) {
         fppol_fact_push(factors, f);
         return;
     }
     ASSERT(fppol_deg(f) % d == 0);
 
+    fppol_t a, tra;
     fppol_init(a);
     fppol_init(tra);
 
+    // TODO: the first candidate for a is t, since the caller knows
+    // already the q-powers of t and the trace / norm would be much
+    // faster.
+#ifdef USE_F2
     do {
-        fppol_set_random(a, fppol_deg(f)-1); // like in textbooks !
+        fppol_set_random(a, fppol_deg(f)-1); 
         fppol_set_zero(tra);
         for (int i = 0; i < d-1; ++i) {
             fppol_add(tra, tra, a);
@@ -113,7 +156,22 @@ static void fppol_edf(fppol_fact_ptr factors, fppol_t f, int d)
 
         fppol_gcd(tra, tra, f);
     } while (fppol_deg(tra) == 0 || fppol_deg(tra) == fppol_deg(f));
-
+#else
+    uint64_t power = FP_SIZE;
+    for (int i = 1; i < d; ++i)
+        power *= FP_SIZE;
+    power = (power - 1) >> 1;
+    fppol_t one;
+    fppol_init(one);
+    fppol_set_ti(one, 0);
+    do {
+        fppol_set_random(a, fppol_deg(f)-1);
+        fppol_powmod(tra, a, power, f);
+        fppol_sub(tra, tra, one);
+        fppol_gcd(tra, tra, f);
+    } while (fppol_deg(tra) == 0 || fppol_deg(tra) == fppol_deg(f));
+    fppol_clear(one);
+#endif
     ASSERT(fppol_deg(tra) % d == 0);
 
     if (fppol_deg(tra) == d) {
