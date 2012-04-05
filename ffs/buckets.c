@@ -20,8 +20,8 @@
  *****************************************************************************/
 
 // Size of the two fields and of an update, in bits.
-#define UPDATE_POS_BITS  12
-#define UPDATE_HINT_BITS  4
+#define UPDATE_POS_BITS  14
+#define UPDATE_HINT_BITS  6
 #define UPDATE_BITS     (UPDATE_POS_BITS + UPDATE_HINT_BITS)
 
 // Smallest unsigned integer in which an update will fit.
@@ -132,6 +132,19 @@ void buckets_init(buckets_ptr buckets, unsigned I, unsigned J, unsigned size)
       (update_packed_t *)malloc(size * sizeof(update_packed_t));
     ASSERT_ALWAYS(buckets->begin[k] != NULL);
   }
+}
+
+
+// Print information about the buckets
+void print_bucket_info(buckets_ptr buckets)
+{
+  printf("# bucket info:\n");
+  printf("#   size of buckets = %u\n", buckets->size);
+  printf("#   size of bucket-region (aka 1<<UPDATE_POS_BITS) = %d\n",
+          1<<UPDATE_POS_BITS);
+  printf("#   nb of buckets   = %u\n", buckets->n);
+  printf("#   number of bits for the hint = %d\n", UPDATE_HINT_BITS);
+  printf("#   bit-size of a bucket-update = %d\n", UPDATE_BITS);
 }
 
 

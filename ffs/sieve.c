@@ -302,7 +302,9 @@ int main(int argc, char **argv)
 
         buckets_t buckets;
         // FIXME: The bucket capacity is hardcoded for the moment.
-        buckets_init(buckets, I, J, 1<<16);
+        buckets_init(buckets, I, J, 1<<19);
+        if (sublat->n == 0)
+            print_bucket_info(buckets);
         for (int twice = 0; twice < 2; twice++) {
             // This variable allows to change in which order we handle
             // the polynomials.
