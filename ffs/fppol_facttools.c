@@ -70,6 +70,10 @@ static void fppol64_sqr(fppol64_ptr rh, fppol64_ptr rl, fppol64_srcptr p)
 
 static void fppol_sqr(fppol_ptr r, fppol_srcptr p)
 {
+    if (fppol_is_zero(p)) {
+        fppol_set_zero(r);
+        return;
+    }
     fppol64_t rl, rh;
     __fppol_realloc_lazy(r, (1+(p->deg>>6))<<7);
     for (int k = p->deg>>6; k>=0; --k) {
