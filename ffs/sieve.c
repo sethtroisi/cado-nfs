@@ -220,7 +220,7 @@ int main(int argc, char **argv)
 
     // Reduce the q-lattice
     int noerr = skewGauss(qlat, 0);
-    assert (noerr);
+    ASSERT_ALWAYS(noerr);
     print_qlat_info(qlat);
 
     // Precompute lambda for each element of the factor bases.

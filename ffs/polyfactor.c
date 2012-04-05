@@ -2,7 +2,7 @@
 #include "types.h"
 #include "polyfactor.h"
 #include "fppol_facttools.h"
-#include <stdlib.h>  // for lrand48
+#include <stdlib.h>  // for rand
 
 // TODO: should be part of the fppol_ interface, and have a better
 // implementation.
@@ -12,6 +12,10 @@ static void fppol_sqrmod(fppol_ptr r, fppol_srcptr p, fppol_srcptr f)
     fppol_rem(r, r, f);
 }
 
+
+// FIXME: These random are not reentrant: should be fixed when going
+// multithreaded.
+//
 // For lack of a better solution, use deterministic random: take
 // polynomials in lex order (maybe random enough for an edf).
 static void fppol_set_random(fppol_ptr f, int deg) {
@@ -19,13 +23,24 @@ static void fppol_set_random(fppol_ptr f, int deg) {
     if (deg == 0)
         return;
     // k-bit random is enough to separate irreducible factors of degree
-    // up to k. We will build a 62-bit random, which should be enough
+    // up to k. We will build a 60-bit random, which should be enough
     // (this is a limit on the large primes).
-    // lrand48() gives 31 bits. With two calls, that's ok.
+    // rand() gives RAND_MAX bits. We call it several times.
+    // RAND_MAX is at least 32767, so at most 4 calls.
+#if (RAND_MAX == 2147483647)
+#define BITS_RAND  31
+#else 
+#define BITS_RAND  15 
+#endif
     fppol64_t r;
     do {
-        r[0] = ((uint64_t)lrand48()) | (((uint64_t)lrand48())<<31);
-        int bits = MIN(deg+1, 62);
+        r[0] = (uint64_t)rand();
+        r[0] |= ((uint64_t)rand()) << BITS_RAND;
+#if (2*BITS_RAND < 60)
+            r[0] |= ((uint64_t)rand()) << (2*BITS_RAND);
+            r[0] |= ((uint64_t)rand()) << (3*BITS_RAND);
+#endif
+        int bits = MIN(deg+1, 60);
         r[0] &= (((uint64_t)1) << bits)-1;
     } while (r[0] == 0 || r[0] == 1); // 0 and 1 are bad for factorisation.
     fppol_set_64(f, r);
