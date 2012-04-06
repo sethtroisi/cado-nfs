@@ -1475,74 +1475,106 @@ main (int argc, char **argv)
      - pass 2 considers all ideals, and performs "clique removal";
      - pass 3 (after the for loop) renumbers ideals and prints the matrix
   */
-  for (pass = 1 ; ; pass++)
+
+
+  /************************** first pass *************************************/
+
+  pass = 1;
+  final = 0;
+  tot_alloc = tot_alloc0;
+      
+  fprintf (stderr, "Pass %d, filtering ideals >= %ld on rat. side and "
+           "%ld on alg. side:\n", pass, minpr, minpa);
+
+  hashInit (&H, Hsize, 1, need64);
+
+  prempt_scan_relations ();
+      
+  fprintf (stderr, "   nrels=%d, nprimes=%d; excess=%d\n",
+           nrel, nprimes, nrel - nprimes);
+      
+  fprintf (stderr, "   Starting singleton removal...\n");
+  nrel_new = nrel;
+  nprimes_new = nprimes;
+
+  remove_singletons (&nrel_new, nrelmax, &nprimes_new, &H, rel_used,
+                     rel_compact, keep, final);
+      
+  fprintf (stderr, "   nrel=%d, nprimes=%d; excess=%d\n",
+           nrel_new, nprimes_new, nrel_new - nprimes_new);
+      
+  if (nrel_new <= nprimes_new) /* covers case nrel = nprimes = 0 */
+    exit (1); /* if the excess is <= here, it will be more negative
+                 when we decrease minpr and minpa in the second pass */
+
+  hashCheck (&H);
+
+  my_malloc_free_all ();
+
+  nrel = nrel_new;
+  nprimes = nprimes_new;
+
+  hashClear (&H);
+  hashFree (&H);
+
+  /************************** second pass ************************************/
+
+  pass = 2;
+  /* the remaining ideals are those above the 1st pass threshold
+     which remain active at the end of the 1st pass, plus those
+     which were not considered in the 1st pass */
+  Hsize = nprimes + approx_phi (minpr) + approx_phi (minpa);
+  minpr = minpa = FINAL_BOUND;
+
+  final = 1;
+  tot_alloc = tot_alloc0;
+
+  fprintf (stderr, "Pass %d, filtering ideals >= %ld on rat. side and "
+           "%ld on alg. side:\n", pass, minpr, minpa);
+
+  hashInit (&H, Hsize, 1, need64);
+
+  prempt_scan_relations ();
+
+  fprintf (stderr, "   nrels=%d, nprimes=%d; excess=%d\n",
+           nrel, nprimes, nrel - nprimes);
+
+  fprintf (stderr, "   Starting singleton removal...\n");
+  nrel_new = nrel;
+  nprimes_new = nprimes;
+
+  /* if the initial excess in pass 2 is below what was requested, we stop */
+  if (nrel_new < nprimes_new * excess)
     {
-      if (pass > 1)
-        {
-          /* the remaining ideals are those above the 1st pass threshold
-             which remain active at the end of the 1st pass, plus those
-             which were not considered in the 1st pass */
-          Hsize = nprimes + approx_phi (minpr) + approx_phi (minpa);
-          minpr = minpa = FINAL_BOUND;
-        }
-
-      final = minpr <= FINAL_BOUND && minpa <= FINAL_BOUND;
-      tot_alloc = tot_alloc0;
-      
-      fprintf (stderr, "Pass %d, filtering ideals >= %ld on rat. side and "
-	       "%ld on alg. side:\n", pass, minpr, minpa);
-
-      hashInit (&H, Hsize, 1, need64);
-
-      prempt_scan_relations ();
-      
-      fprintf (stderr, "   nrels=%d, nprimes=%d; excess=%d\n",
-	       nrel, nprimes, nrel - nprimes);
-      
-      fprintf (stderr, "   Starting singleton removal...\n");
-      nrel_new = nrel;
-      nprimes_new = nprimes;
-      /* if one pass only, usually the initial excess is negative, but after
-	 a few steps of removing singletons, we get a positive excess */
-      if (final && (nrel_new < nprimes_new * excess) && pass >= 2)
-	{
-	  fprintf (stderr, "Initial excess is below requested %ld, stopping.\n",
-		   (long int)(nprimes_new * (excess - 1)));
-	  exit (1); /* initial excess is too small */
-	}
-      if (final && noclique)
-	{
-	  fprintf (stderr, "Initial excess is attained, purge will be completed at the next filtering.\n");
-	  return 0;
-	}
-      remove_singletons (&nrel_new, nrelmax, &nprimes_new, &H, rel_used,
-			 rel_compact, keep, final);
-      
-      fprintf (stderr, "   nrel=%d, nprimes=%d; excess=%d\n",
-	       nrel_new, nprimes_new, nrel_new - nprimes_new);
-      
-      if (nrel_new <= nprimes_new) /* covers case nrel = nprimes = 0 */
-	exit (1); /* if the excess is <= here, it will be more negative
-		     when we decrease minpr and minpa in the next pass */
-
-      hashCheck (&H);
-
-      my_malloc_free_all ();
-
-      if (final)
-	break;
-
-      nrel = nrel_new;
-      nprimes = nprimes_new;
-
-      hashClear (&H);
-      hashFree (&H);
+      fprintf (stderr, "Initial excess is below requested %ld, stopping.\n",
+               (long int) (nprimes_new * (excess - 1.0)));
+      exit (1); /* initial excess is too small */
     }
   
+  /* if noclique, we stop here */
+  if (noclique)
+    {
+      fprintf (stderr, "Initial excess is attained, purge will be completed"
+               " at the next filtering.\n");
+      return 0;
+    }
+
+  remove_singletons (&nrel_new, nrelmax, &nprimes_new, &H, rel_used,
+                     rel_compact, keep, final);
+
+  fprintf (stderr, "   nrel=%d, nprimes=%d; excess=%d\n",
+           nrel_new, nprimes_new, nrel_new - nprimes_new);
+
+  hashCheck (&H);
+
+  my_malloc_free_all ();
+
   fprintf (stderr, "Freeing rel_compact array...\n");
   /* we do not use it anymore */
   free (rel_compact);
   
+  /*************************** third pass ************************************/
+
   /* we renumber the primes in order of apparition in the hashtable */
   fprintf (stderr, "Renumbering primes...\n");
   renumber (&nprimes_new, &H, sos);
