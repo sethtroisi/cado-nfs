@@ -1074,7 +1074,7 @@ usage (char *argv)
   fprintf (stderr, "-incr nnn    --- forced factor of ad (default 60)\n");
   fprintf (stderr, "-N nnn       --- input number\n");
   fprintf (stderr, "-degree nnn  --- wanted polynomial degree\n");
-  fprintf (stderr, "-nq nnn      --- number of special-q's considered for each coefficient a_d\n");
+  fprintf (stderr, "-nq nnn      --- number of special-q's considered for each coefficient a_d (default %d)\n", LEN_SPECIAL_Q);
   fprintf (stderr, "-lq nnn      --- number of factors in the special-q\n");
   fprintf (stderr, "-seed nnn    --- seed for srand()\n");
   fprintf (stderr, "-kmax nnn    --- rotation bound (default %d)\n",
