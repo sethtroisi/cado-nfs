@@ -440,7 +440,8 @@ int main(int argc, char **argv)
 
     } while (!end_list_of_sq); // End of loop over special-q's
     
-    fclose(sqFile);
+    if (sqFile)
+        fclose(sqFile);
 
     tot_time = seconds()-tot_time;
     fprintf(stdout, "###### General statistics ######\n");
