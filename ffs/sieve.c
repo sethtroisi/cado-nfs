@@ -79,6 +79,7 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "  thresh1 [2*lpb1] survivor threshold on side 1\n");
     fprintf(stderr, "  q    *           q-poly of the special-q\n");
     fprintf(stderr, "  rho  *           rho-poly of the special-q\n");
+    fprintf(stderr, "  sqfile *         file of special-q's\n");
     fprintf(stderr, "  sublat           toggle the sublattice sieving\n");
  
     if (missing != NULL)
@@ -98,6 +99,8 @@ int main(int argc, char **argv)
     unsigned int threshold[2] = {0, 0};  
     char *argv0 = argv[0];
     int want_sublat = 0;
+    const char *sqfile = NULL;
+    FILE *sqFile = NULL;
 
     param_list pl;
     param_list_init(pl);
@@ -149,8 +152,20 @@ int main(int argc, char **argv)
         threshold[0] = 2*lpb[0];
     if (threshold[1] == 0) 
         threshold[1] = 2*lpb[1];
-    // read q, rho
+    // check if there is an sqfile
     {
+        sqfile = param_list_lookup_string(pl, "sqfile");
+        if (sqfile != NULL) {
+            sqFile = fopen(sqfile, "r");
+            if (sqFile == NULL) {
+                fprintf(stderr, "Could not open sqfile %s for reading\n",
+                        sqfile);
+                exit (EXIT_FAILURE);
+            }
+        }
+    }
+    // read q, rho
+    if (!sqfile) {
         const char *sqstr;
         int noerr;
         sqstr = param_list_lookup_string(pl, "q");
@@ -206,7 +221,6 @@ int main(int argc, char **argv)
     sublat_ptr sublat = &no_sublat[0];
 #endif
 
-    double t_tot = seconds();
 
     // Most of what we do is at the sublattice level. 
     // So we fix I and J accordingly.
@@ -218,181 +232,224 @@ int main(int argc, char **argv)
 
     qlat->side = 0; // assume that the special-q is on the algebraic side.
 
-    // Reduce the q-lattice
-    int noerr = skewGauss(qlat, 0);
-    ASSERT_ALWAYS(noerr);
-    print_qlat_info(qlat);
+    double tot_time = seconds();
+    int tot_nrels = 0;
+    int tot_sq = 0;
+    
+    //
+    // Begin of loop over special-q's
+    //
+    int end_list_of_sq = 0;
+    do {
+        // Select next special-q
+        if (sqfile) {
+            int noerr;
+            noerr = sq_inp(qlat->q, sqFile);
+            if (!noerr) break;
+            noerr = sq_inp(qlat->rho, sqFile);
+            if (!noerr) break;
+            printf("#######################################\n");
+            printf("# Have read next special q from sqfile.\n");
+        } else // in the case where there is no file, we take the one that is
+               // given on command line.
+            end_list_of_sq = 1;
+        tot_sq++;
 
-    // Precompute lambda for each element of the factor bases.
-    for (int i = 0; i < 2; ++i) {
-        double tm = seconds();
-        factor_base_precomp_lambda(FB[i], qlat, sublat);
-        fprintf(stderr, "# Precomputing lambda on side %d took %1.1f s\n",
-                i, seconds()-tm);
-    }
+        double t_tot = seconds();
 
-    double t_norms = 0;
-    double t_sieve = 0;
-    double t_buckets = 0;
-    double t_cofact = 0;
-    double t_initS = 0;
-    int nrels = 0;
+        // Reduce the q-lattice
+        int noerr = skewGauss(qlat, 0);
+        ASSERT_ALWAYS(noerr);
+        print_qlat_info(qlat);
 
-    // Loop on all sublattices
-    // In the no_sublat case, this loops degenerates into one pass, since
-    // nb = 1.
-    for (sublat->n = 0; sublat->n < sublat->nb; sublat->n++) {
-        if (use_sublat(sublat)) {
-            fprintf(stderr, "# Sublattice (");
-            fppol16_out(stderr, sublat->lat[sublat->n][0]);
-            fprintf(stderr, ", ");
-            fppol16_out(stderr, sublat->lat[sublat->n][1]);
-            fprintf(stderr, ") :\n");
+        // Precompute lambda for each element of the factor bases.
+        for (int i = 0; i < 2; ++i) {
+            double tm = seconds();
+            factor_base_precomp_lambda(FB[i], qlat, sublat);
+            fprintf(stderr, "# Precomputing lambda on side %d took %1.1f s\n",
+                    i, seconds()-tm);
         }
 
-        t_initS -= seconds();
-        // Allocate and init the sieve space
-        uint8_t *S;
-        S = (uint8_t *) malloc(IIJJ*sizeof(uint8_t));
-        ASSERT_ALWAYS(S != NULL);
-        memset(S, 0, IIJJ*sizeof(uint8_t));
+        double t_norms = 0;
+        double t_sieve = 0;
+        double t_buckets = 0;
+        double t_cofact = 0;
+        double t_initS = 0;
+        int nrels = 0;
 
-        // Kill trivial positions.
-        // When there are no sublattices:
-        //   (i,0) for i != 1
-        //   (0,j) for j != 1
-        // When using sublattices, just the position (0,0)
-        {
-            S[0] = 255;  // that's (0,0)
-            if (!use_sublat(sublat)) {
-                ij_t i, j;
-                for (ij_set_zero(j), ij_monic_set_next(j, j, J);
-                        ij_monic_set_next(j, j, J); )
-                    S[ijvec_get_start_pos(j, I, J)] = 255;
-                for (ij_set_zero(i), ij_set_next(i, i, I);
-                        ij_set_next(i, i, I); )
-                    S[ijvec_get_offset(i, I)] = 255;
+        // Loop on all sublattices
+        // In the no_sublat case, this loops degenerates into one pass, since
+        // nb = 1.
+        for (sublat->n = 0; sublat->n < sublat->nb; sublat->n++) {
+            if (use_sublat(sublat)) {
+                fprintf(stderr, "# Sublattice (");
+                fppol16_out(stderr, sublat->lat[sublat->n][0]);
+                fprintf(stderr, ", ");
+                fppol16_out(stderr, sublat->lat[sublat->n][1]);
+                fprintf(stderr, ") :\n");
             }
-        }
-#if 0
-        // Kill positions where gcd(hat i, hat j) != 1
-        {
-            ij_t i, j;
-            ij_t hati, hatj, g;
-            int rci, rcj = 1;
-            for (ij_set_zero(j); rcj; rcj = ij_monic_set_next(j, j, J)) {
-                ijpos_t start = ijvec_get_start_pos(j, I, J);
-                rci = 1;
-                for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
-                    ijpos_t pos = start + ijvec_get_offset(i, I);
-                    ij_convert_sublat(hati, hatj, i, j, sublat);
-                    ij_gcd(g, hati, hatj);
-                    if (ij_deg(g) != 0 && ij_deg(hati)>0  && ij_deg(hatj)>0)
-                        S[pos] = 255;
+
+            t_initS -= seconds();
+            // Allocate and init the sieve space
+            uint8_t *S;
+            S = (uint8_t *) malloc(IIJJ*sizeof(uint8_t));
+            ASSERT_ALWAYS(S != NULL);
+            memset(S, 0, IIJJ*sizeof(uint8_t));
+
+            // Kill trivial positions.
+            // When there are no sublattices:
+            //   (i,0) for i != 1
+            //   (0,j) for j != 1
+            // When using sublattices, just the position (0,0)
+            {
+                S[0] = 255;  // that's (0,0)
+                if (!use_sublat(sublat)) {
+                    ij_t i, j;
+                    for (ij_set_zero(j), ij_monic_set_next(j, j, J);
+                            ij_monic_set_next(j, j, J); )
+                        S[ijvec_get_start_pos(j, I, J)] = 255;
+                    for (ij_set_zero(i), ij_set_next(i, i, I);
+                            ij_set_next(i, i, I); )
+                        S[ijvec_get_offset(i, I)] = 255;
                 }
             }
-        }
-#endif
-        t_initS += seconds();
-
-        buckets_t buckets;
-        // FIXME: The bucket capacity is hardcoded for the moment.
-        buckets_init(buckets, I, J, 1<<20);
-        if (sublat->n == 0)
-            print_bucket_info(buckets);
-        for (int twice = 0; twice < 2; twice++) {
-            // This variable allows to change in which order we handle
-            // the polynomials.
-            // Put side = 1 - twice, to do the "rational" side first.
-            int side = twice;
-
-            // Norm initialization.
-            // convention: if a position contains 255, it must stay like
-            // this. It means that the other side is hopeless.
-            t_norms -= seconds();
-            init_norms(S, ffspol[side], I, J, qlat, qlat->side == side, sublat);
-            t_norms += seconds();
-
-            // sieve
-            t_sieve -= seconds();
-            sieveFB(S, FB[side], I, J, sublat);
-            t_sieve += seconds();
-
-            t_buckets -= seconds();
-            buckets_reset(buckets);
-            buckets_fill(buckets, FB[side], sublat, I, J);
-            uint8_t *Sptr = S;
-            for (unsigned k = 0; k < buckets->n; ++k) {
-              bucket_apply(Sptr, buckets, k);
-              Sptr += bucket_region_size();
-            }
-            t_buckets += seconds();
-
-            // mark survivors
-            // no need to check if this is a valid position
-            Sptr = S;
-            for (unsigned int k = 0; k < IIJJ; ++k, ++Sptr) {
-                if (*Sptr > threshold[side])
-                    *Sptr = 255; 
-            }
-            // since (0,0) is divisible by everyone, its position might
-            // have been clobbered.
-            S[0] = 255;
-        }
-        buckets_clear(buckets);
-
-        t_cofact -= seconds();
-        // survivors cofactorization
-        {
-            fppol_t a, b;
-            ij_t i, j, g;
-            ij_t hati, hatj;
-            fppol_init(a);
-            fppol_init(b);
-
-            int rci, rcj = 1;
-            for (ij_set_zero(j); rcj; rcj = ij_monic_set_next(j, j, J)) {
-                ijpos_t start = ijvec_get_start_pos(j, I, J);
-                rci = 1;
-                for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
-                    ijpos_t pos = start + ijvec_get_offset(i, I);
-
-                    if (S[pos] != 255) {
-#ifdef TRACE_POS
-                        if (pos == TRACE_POS) {
-                            fprintf(stderr, "TRACE_POS(%d): ", pos);
-                            fprintf(stderr,
-                                    "entering cofactorization, S[pos] = %d\n",
-                                    S[pos]);
-                        }
-#endif 
+// If the norm computation is too expensive, it might pay to activate
+// this block.
+#if 0
+            // Kill positions where gcd(hat i, hat j) != 1
+            {
+                ij_t i, j;
+                ij_t hati, hatj, g;
+                int rci, rcj = 1;
+                for (ij_set_zero(j); rcj; rcj = ij_monic_set_next(j, j, J)) {
+                    ijpos_t start = ijvec_get_start_pos(j, I, J);
+                    rci = 1;
+                    for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
+                        ijpos_t pos = start + ijvec_get_offset(i, I);
                         ij_convert_sublat(hati, hatj, i, j, sublat);
                         ij_gcd(g, hati, hatj);
                         if (ij_deg(g) != 0 && ij_deg(hati)>0  && ij_deg(hatj)>0)
-                            continue;
-                        ij2ab(a, b, hati, hatj, qlat);
-                        nrels += my_factor_survivor(a, b, ffspol, lpb,
-                                qlat->q, qlat->side);
+                            S[pos] = 255;
                     }
                 }
             }
-            fppol_clear(a);
-            fppol_clear(b);
-        }
-        t_cofact += seconds();
-        
-        free(S);
-    }  // End of loop on sublattices.
+#endif
+            t_initS += seconds();
 
-    t_tot = seconds()-t_tot;
+            buckets_t buckets;
+            // FIXME: The bucket capacity is hardcoded for the moment.
+            buckets_init(buckets, I, J, 1<<20);
+            if (sublat->n == 0)
+                print_bucket_info(buckets);
+            for (int twice = 0; twice < 2; twice++) {
+                // This variable allows to change in which order we handle
+                // the polynomials.
+                // Put side = 1 - twice, to do the "rational" side first.
+                int side = twice;
 
-    fprintf(stdout, "# Total: %d relations found\n", nrels);
-    fprintf(stdout, "# Time spent: %1.1f s (initS); %1.1f s (norms); %1.1f s"
-            " (sieve); %1.1f s (buckets); %1.1f s (cofact)\n",
-            t_initS, t_norms, t_sieve, t_buckets, t_cofact);
-    fprintf(stdout, "# Total: %1.1f s (sum of previous: %1.1f s)\n",
-            t_tot, t_initS+t_norms+t_sieve+t_buckets+t_cofact);
-    fprintf(stdout, "# Rate: %1.5f s/rel\n", t_tot/nrels);
+                // Norm initialization.
+                // convention: if a position contains 255, it must stay like
+                // this. It means that the other side is hopeless.
+                t_norms -= seconds();
+                init_norms(S, ffspol[side], I, J, qlat, qlat->side == side,
+                        sublat);
+                t_norms += seconds();
+
+                // sieve
+                t_sieve -= seconds();
+                sieveFB(S, FB[side], I, J, sublat);
+                t_sieve += seconds();
+
+                t_buckets -= seconds();
+                buckets_reset(buckets);
+                buckets_fill(buckets, FB[side], sublat, I, J);
+                uint8_t *Sptr = S;
+                for (unsigned k = 0; k < buckets->n; ++k) {
+                    bucket_apply(Sptr, buckets, k);
+                    Sptr += bucket_region_size();
+                }
+                t_buckets += seconds();
+
+                // mark survivors
+                // no need to check if this is a valid position
+                Sptr = S;
+                for (unsigned int k = 0; k < IIJJ; ++k, ++Sptr) {
+                    if (*Sptr > threshold[side])
+                        *Sptr = 255; 
+                }
+                // since (0,0) is divisible by everyone, its position might
+                // have been clobbered.
+                S[0] = 255;
+            }
+            buckets_clear(buckets);
+
+            t_cofact -= seconds();
+            // survivors cofactorization
+            {
+                fppol_t a, b;
+                ij_t i, j, g;
+                ij_t hati, hatj;
+                fppol_init(a);
+                fppol_init(b);
+
+                int rci, rcj = 1;
+                for (ij_set_zero(j); rcj; rcj = ij_monic_set_next(j, j, J)) {
+                    ijpos_t start = ijvec_get_start_pos(j, I, J);
+                    rci = 1;
+                    for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
+                        ijpos_t pos = start + ijvec_get_offset(i, I);
+
+                        if (S[pos] != 255) {
+#ifdef TRACE_POS
+                            if (pos == TRACE_POS) {
+                                fprintf(stderr, "TRACE_POS(%d): ", pos);
+                                fprintf(stderr,
+                                   "entering cofactorization, S[pos] = %d\n",
+                                   S[pos]);
+                            }
+#endif 
+                            ij_convert_sublat(hati, hatj, i, j, sublat);
+                            ij_gcd(g, hati, hatj);
+                            if (ij_deg(g) != 0 && ij_deg(hati)>0  && ij_deg(hatj)>0)
+                                continue;
+                            ij2ab(a, b, hati, hatj, qlat);
+                            nrels += my_factor_survivor(a, b, ffspol, lpb,
+                                    qlat->q, qlat->side);
+                        }
+                    }
+                }
+                fppol_clear(a);
+                fppol_clear(b);
+            }
+            t_cofact += seconds();
+
+            free(S);
+        }  // End of loop on sublattices.
+
+        t_tot = seconds()-t_tot;
+        fprintf(stdout, "# Total: %d relations found\n", nrels);
+        fprintf(stdout, "# Time spent: %1.1f s (initS); "
+                "%1.1f s (norms); "
+                "%1.1f s (sieve); "
+                "%1.1f s (buckets); "
+                "%1.1f s (cofact)\n",
+                t_initS, t_norms, t_sieve, t_buckets, t_cofact);
+        fprintf(stdout, "# Total: %1.1f s (sum of previous: %1.1f s)\n",
+                t_tot, t_initS+t_norms+t_sieve+t_buckets+t_cofact);
+        fprintf(stdout, "# Rate: %1.5f s/rel\n", t_tot/nrels);
+        tot_nrels += nrels;
+
+    } while (!end_list_of_sq); // End of loop over special-q's
+    
+    fclose(sqFile);
+
+    tot_time = seconds()-tot_time;
+    printf("%f \n", tot_time);
+    fprintf(stdout, "###### General statistics ######\n");
+    fprintf(stdout, "#   Computed %d special-q\n", tot_sq);
+    fprintf(stdout, "#   %d relations found (%1.1f rel/sq)\n",
+            tot_nrels, (double)tot_nrels / (double)tot_sq);
+    fprintf(stdout, "#   Yield: %1.5f s/rel\n", tot_time/tot_nrels);
 
     ffspol_clear(ffspol[0]);
     ffspol_clear(ffspol[1]);
