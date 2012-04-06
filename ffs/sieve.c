@@ -79,7 +79,9 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "  thresh1 [2*lpb1] survivor threshold on side 1\n");
     fprintf(stderr, "  q    *           q-poly of the special-q\n");
     fprintf(stderr, "  rho  *           rho-poly of the special-q\n");
-    fprintf(stderr, "  sqfile *         file of special-q's\n");
+    fprintf(stderr, "  sqfile *         file of special-q's. This option, disable the two previous\n");
+    fprintf(stderr, "  sqside           side (0 or 1) of the special-q\n");
+    fprintf(stderr, "  firstsieve       side (0 or 1) to sieve first\n");
     fprintf(stderr, "  sublat           toggle the sublattice sieving\n");
  
     if (missing != NULL)
@@ -101,6 +103,8 @@ int main(int argc, char **argv)
     int want_sublat = 0;
     const char *sqfile = NULL;
     FILE *sqFile = NULL;
+    int sqside = 0;
+    int firstsieve = 0;
 
     param_list pl;
     param_list_init(pl);
@@ -186,6 +190,17 @@ int main(int argc, char **argv)
             fprintf(stderr, "WARNING: not a good idea to have a special-q beyond the large prime bound!\n");
         }
     }
+    param_list_parse_int(pl, "sqside", &sqside);
+    if (sqside != 0 && sqside != 1) {
+        fprintf(stderr, "sqside must be 0 or 1\n");
+        exit(EXIT_FAILURE);
+    }
+    param_list_parse_int(pl, "firstsieve", &firstsieve);
+    if (firstsieve != 0 && firstsieve != 1) {
+        fprintf(stderr, "firstsieve must be 0 or 1\n");
+        exit(EXIT_FAILURE);
+    }
+   
     // Read the factor bases
     {
         const char *filename;
@@ -230,7 +245,7 @@ int main(int argc, char **argv)
     // Allocated size of the sieve array.
     unsigned IIJJ = ijvec_get_max_pos(I, J);
 
-    qlat->side = 0; // assume that the special-q is on the algebraic side.
+    qlat->side = sqside; 
 
     double tot_time = seconds();
     int tot_nrels = 0;
@@ -342,10 +357,8 @@ int main(int argc, char **argv)
             if (sublat->n == 0)
                 print_bucket_info(buckets);
             for (int twice = 0; twice < 2; twice++) {
-                // This variable allows to change in which order we handle
-                // the polynomials.
-                // Put side = 1 - twice, to do the "rational" side first.
-                int side = twice;
+                // Select the side to be sieved
+                int side = (firstsieve)?(1-twice):twice;
 
                 // Norm initialization.
                 // convention: if a position contains 255, it must stay like
