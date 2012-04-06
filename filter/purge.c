@@ -444,75 +444,6 @@ insertFreeRelation (relation_t *rel, unsigned long num_rel, int *tmp)
   rel_compact[num_rel] = my_tmp;
 }
 
-/* Read all relations from file, and fills the rel_used and rel_compact arrays
-   for each relation i:
-   - rel_used[i] = 0 if the relation i is deleted
-     rel_used[i] = 1 if the relation i is kept (so far)
-   - rel_compact is an array, terminated by -1, of pointers to the entries
-     in the hash table for the considered primes
-
-     Trick: we only read relations for which rel_used[i]=1.
- */
-#if 0
-static int
-scan_relations (char **ficname, int *nprimes, hashtable_t *H,
-                bit_vector_srcptr rel_used, int nrelmax, int **rel_compact,
-		long minpr, long minpa, unsigned long *tot_alloc, int final)
-{
-    *nprimes = 0;
-
-    ASSERT(rel_compact != NULL);
-
-    relation_stream_init(rs);
-
-    for( ; *ficname ; ficname++) {
-	fprintf(stderr, "   %-70s\n", *ficname);
-        relation_stream_openfile(rs, *ficname);
-        for ( ; ; ) {
-            int irel = rs->nrels;
-            if (bit_vector_getbit (rel_used, irel) == 0) /* skipped relation */
-              {
-                if (relation_stream_get_skip (rs) < 0)
-                  break; /* end of file */
-              }
-            else
-              {
-                if (relation_stream_get (rs, NULL, 0) < 0)
-                  break;
-                ASSERT_ALWAYS(rs->nrels <= nrelmax);
-                if (rs->rel.b > 0)
-                  insertNormalRelation (rel_compact, irel, nprimes,
-                                H, &(rs->rel), minpr, minpa, tot_alloc, final);
-                else
-                  insertFreeRelation (rel_compact, irel, nprimes,
-                                H, &(rs->rel), minpr, minpa, tot_alloc, final);
-              }
-            if (!relation_stream_disp_progress_now_p(rs))
-              continue;
-
-            fprintf(stderr,
-                    "read %d relations in %.1fs"
-                    " -- %.1f MB/s -- %.1f rels/s\n",
-                    rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
-        }
-        relation_stream_closefile(rs);
-    }
-    fprintf(stderr,
-            "read %d relations in %.1fs -- %.1f MB/s -- %.1f rels/s\n",
-            rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
-    if (rs->nrels != nrelmax) {
-        fprintf (stderr, "Error, -nrels value should match the number of scanned relations\n");
-        fprintf (stderr, "expected %d relations, found %d\n", nrelmax,
-                 rs->nrels);
-        exit (EXIT_FAILURE);
-    }
-
-    relation_stream_clear(rs);
-
-    return 1;
-}
-#endif
-
 /* Return a non-zero value iff some prime (ideal) in the array tab[] is single
    (tab[j] is the index in the hash table of the corresponding prime ideal).
 */
@@ -621,7 +552,7 @@ delete_connected_component (bit_vector_ptr T, uint32_t i, hashtable_t *H,
   uint32_t k;
 
   bit_vector_clearbit(T, i); /* mark row as visited */
-  bit_vector_clearbit(rel_used, i);
+  /* bit i of rel_used is cleared in delete_relation below */
   for (j = 0; (h = rel_compact[i][j]) != -1; j++)
     {
       if (H->hashcount[h] == 2 && sum[h] != 0)
@@ -712,7 +643,8 @@ deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes,
 
 static void
 onepass_singleton_removal (int nrelmax, int *nrel, int *nprimes,
-                           hashtable_t *H, bit_vector_ptr rel_used, int **rel_compact)
+                           hashtable_t *H, bit_vector_ptr rel_used,
+                           int **rel_compact)
 {
   int i;
 
@@ -1169,6 +1101,15 @@ void insertRelation() {
   }
 }
 
+/* Read all relations from file, and fills the rel_used and rel_compact arrays
+   for each relation i:
+   - rel_used[i] = 0 if the relation i is deleted
+     rel_used[i] = 1 if the relation i is kept (so far)
+   - rel_compact is an array, terminated by -1, of pointers to the entries
+     in the hash table for the considered primes
+
+     Trick: we only read relations for which rel_used[i]=1.
+ */
 static int
 prempt_scan_relations ()
 {
@@ -1561,14 +1502,8 @@ main (int argc, char **argv)
       if (nrel_new <= nprimes_new) /* covers case nrel = nprimes = 0 */
 	exit (1); /* if the excess is <= here, it will be more negative
 		     when we decrease minpr and minpa in the next pass */
-      
-      {
-        uint32_t count = 0;
-        for (uint32_t i = 0; i < H.hashmod; i++)
-          count += (H.hashtab32_p[i] != 0);
-        fprintf (stderr, "Hash table has %u non-zero entries out of %lu\n",
-                count, H.hashmod);
-      }
+
+      hashCheck (&H);
 
       my_malloc_free_all ();
 
