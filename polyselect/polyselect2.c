@@ -1221,7 +1221,11 @@ main (int argc, char *argv[])
 
 	 /* print total time (format for cpu_time.sh) */
 	 printf ("# Total phase took %.2fs\n", seconds () - st0);
-         printf ("# Rootsieve took %.2fs\n", rootsieve_time);
+#ifndef HAVE_RUSAGE_THREAD /* rootsieve_time is correct only if RUSAGE_THREAD
+                              works or in mono-thread mode */
+         if (nthreads == 1)
+#endif
+           printf ("# Rootsieve took %.2fs\n", rootsieve_time);
 
 	 if (best_E == 0.0)
 		  printf ("No polynomial found, please increase the ad range or the maxnorm\n");

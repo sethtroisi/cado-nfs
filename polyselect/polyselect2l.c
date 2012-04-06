@@ -950,7 +950,6 @@ collision_on_sq ( header_t header,
     return;
 
   tot =  binom (N, K);
-  //fprintf (stderr, "n=%lu, k=%lu, (n,k)=%lu, nq:%d\n", N, K, tot, nq);
 
   // if nq too small, let it equal BATCH_SIZE
   if (nq < BATCH_SIZE)
@@ -958,6 +957,11 @@ collision_on_sq ( header_t header,
   // if tot (n, k) < wanted, use tot as wanted
   if (tot > (unsigned long) nq)
     tot = (unsigned long) nq;
+
+  if (tot < BATCH_SIZE)
+    tot = BATCH_SIZE;
+
+  // fprintf (stderr, "n=%lu, k=%lu, (n,k)=%lu, nq:%d\n", N, K, tot, nq);
 
   i = 0;
   while ( i <= (tot-BATCH_SIZE) ) {
@@ -967,7 +971,7 @@ collision_on_sq ( header_t header,
 
       // enumerate first combination
       first_comb (K, idx_q);
-      // print_comb (k, idx_q);
+      //print_comb (K, idx_q);
       q[l] = return_q_rq (SQ_R, idx_q, K, qqz[l], rqqz[l]);
 
       for (l = 1; l < BATCH_SIZE; l++) {
@@ -1454,7 +1458,11 @@ main (int argc, char *argv[])
 
   /* print total time (format for cpu_time.sh) */
   printf ("# Total phase took %.2fs\n", seconds () - st0);
-  printf ("# Rootsieve took %.2fs\n", rootsieve_time);
+#ifndef HAVE_RUSAGE_THREAD /* rootsieve_time is correct only if RUSAGE_THREAD
+                              works or in mono-thread mode */
+  if (nthreads == 1)
+#endif
+    printf ("# Rootsieve took %.2fs\n", rootsieve_time);
 
   if (best_E == 0.0)
     printf ("No polynomial found, please increase the ad range or decrease P\n");

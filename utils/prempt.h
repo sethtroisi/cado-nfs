@@ -15,6 +15,13 @@ typedef struct {
 } __prempt_t;
 typedef __prempt_t prempt_t[1];
 
+typedef struct {
+  char *cmd, *fics;
+  int pipefd[2];
+  char *pt_fin;
+} __pfic_t;
+typedef __pfic_t pfic_t[1];
+
 /* Return a unix commands list. Example:
    cat file_relation1
    gzip -dc file_relation2.gz file_relation3.gz
@@ -22,3 +29,9 @@ typedef __prempt_t prempt_t[1];
    [empty string]
 */
 extern char ** prempt_open_compressed_rs (char ** ficname);
+
+/* Return a special structure with the names of data files,
+   the command to decompress them, a pipe to write them,
+   and a end pointer of the compressed files in the antebuffer.
+*/
+extern __pfic_t *prempt_open_files_compressed_rs (char ** ficname);

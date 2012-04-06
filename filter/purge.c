@@ -64,6 +64,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <string.h>
 #include <time.h>
 #include <pthread.h>
+#include <emmintrin.h>
 #include <errno.h>
 
 #include "utils.h"
@@ -94,38 +95,38 @@ static int noclique = 0;
 static double wct0;
 static bit_vector rel_used;
 static relation_stream rs;
+
 /* Size of relations buffer between parsing & insertRelation.
-   VERY IMPORTANT. Seems best for 1<<7; try 1<<8 for possible
-   light speedup if your CPU is faster than a Nehalem 3.6 Ghz.
-   1<<7 -> about 10MB of buffering (only ~2% is really used) 
+   VERY IMPORTANT. The minimum is 1<<6; try 1<<8 to 1<<12 for possible
+   speedup if your CPU is faster than a Nehalem 3.6 Ghz or if your
+   media (NFS, disk) has a erratic bandwidth/big latency.
+
+   I suppose the max speed is about 100MB/s. So to load 1 byte, I need 10ns.
+   The block in file loading is PREMPT_ONE_READ, the block in others is
+   the average sentence, about ~100 bytes -> 1µs.
+   BUT it seems the minimal useful time for nanosleep is about 50-80 µs
+   with nanosleep (0,1<<13) (nanosleep (0,1) is about 45 µs on my 3.6 Ghz)
+   - With PREMPT_ONE_READ = 64K, the delai is about 600 µs;  OK for
+     nanosleep(0,PREMPT_ONE_READ<<3).
+   - For others, if I use nanosleep to keep minimal CPU, I have to wait at
+     least 60 µs -> 60 sentences.
+   So the minimal T_REL is 1<<6 (=64) to avoid an empty buffer; 1<<7 seems
+   comfortable with constant bandwidth.
 */
 #define T_REL (1<<6) 
-			
+static const struct timespec 
+wait_load = { 0, (PREMPT_ONE_READ<<3) }, wait_classical = { 0, 1<<13 };
+
 static volatile unsigned long cpt_rel_a;
 static volatile unsigned long cpt_rel_b;
 static volatile unsigned int end_insertRelation = 0;
 typedef struct {
   relation_t *rel;
-  unsigned long *num_rel;
   unsigned int *ltmp_rel;
+  unsigned long *num_rel;
 } __buf_rel_t;
 static __buf_rel_t buf_rel[1];
 
-
-/* I suppose the max speed is about 120MB/s. So to load 1 byte, I need 8ns.
-   The block in file loading is PREMPT_ONE_READ, the block in others is
-   the average sentence, about ~100 bytes -> ~800 ns.
-   BUT it seems the minimal useful time for nanosleep is about 50-80
-   micro seconds... with nanosleep (0,1<<13).
-   With PREMPT_ONE_READ = 64K, PREMPT_ONE_READ<<3 = 512K, so the delai is
-   about 500 µs. OK for nanosleep(0,PREMPT_ONE_READ<<3).
-   For others, if I use nanosleep to keep minimal CPU, I have to wait at
-   least 80 µs -> 100 sentences.
-   So T_REL is 1<<7 to avoid an empty buffer!
-   1<<6 is possible, because 120MB/s is optimistic.
-*/
-static const struct timespec 
-wait_load = { 0, (PREMPT_ONE_READ<<3) }, wait_classical = { 0, 1<<13 };
 
 /* Be careful. 1<<13 = 8µs; in fact, about 50-80 µs */
 inline void attente_minimale_passive ()
@@ -324,35 +325,35 @@ fprint_rel_row (FILE *file, int irel, relation_t rel, hashtable_t *H)
                  might contain ideals <= minpr or minpa appearing only once.
 */
 static inline void
-insertNormalRelation (relation_t *rel, unsigned long num_rel, int *tmp)
+insertNormalRelation (relation_t *rel, unsigned long num_rel, int *tmp, unsigned int realltmp)
 {
   int *my_tmp, h;
   unsigned int i, k, itmp, ltmp;
 
   itmp = 0; /* number of entries in my_tmp */
   if (pass == 1) {
-    ltmp = 1;
+    ltmp = 0;
     for (k = 0, i = 0; i < (unsigned int) rel->nb_rp; i++)
       if (rel->rp[i].e & 1) {
-	rel->rp[k] = (rat_prime_t) { .p = rel->rp[i].p, .e = 1 };
+	rel->rp[k].p = rel->rp[i].p;
+	rel->rp[k].e = 1;
 	ltmp += ((long) rel->rp[k].p >= minpr);
 	k++;
       }
     rel->nb_rp = k;
     for (k = 0, i = 0; i < (unsigned int) rel->nb_ap; i++)
       if (rel->ap[i].e & 1) {
-	rel->ap[k] = (alg_prime_t) { .p = rel->ap[i].p, .e = 1 };
-	if (final) {
-	  rel->ap[k].r = findroot (rel->a, rel->b, rel->ap[k].p);
-	  ltmp += ((long) rel->ap[k].p >= minpa);
-	} else if ((long) rel->ap[k].p >= minpa) {
+	rel->ap[k].p = rel->ap[i].p;
+	rel->ap[k].e = 1;
+	if ((long) rel->ap[k].p >= minpa) {
 	  rel->ap[k].r = findroot (rel->a, rel->b, rel->ap[k].p);
 	  ltmp++;
-	}
+	} else
+	  rel->ap[k].r = -1;
 	k++;
       }
     rel->nb_ap = k;
-    my_tmp = my_malloc_int (ltmp + 1);
+    my_tmp = my_malloc_int (++ltmp);
     for (i = 0; i < (unsigned int) rel->nb_rp; i++) {
       if (((long) rel->rp[i].p) >= minpr) {
 	h = hashInsert (&H, rel->rp[i].p, minus2);
@@ -369,6 +370,7 @@ insertNormalRelation (relation_t *rel, unsigned long num_rel, int *tmp)
     }
   }
   else {
+    ltmp = realltmp;
     my_tmp = tmp;
     /* trick: we use the same hash table for rational and algebraic
        primes, but use a fake root -2 for rational primes, which
@@ -391,7 +393,9 @@ insertNormalRelation (relation_t *rel, unsigned long num_rel, int *tmp)
       }
     }
   }
-  my_tmp[itmp] = -1; /* sentinel */
+  my_tmp[itmp++] = -1; /* sentinel */
+  if (itmp != ltmp) { fprintf (stderr, "%d %d\n", itmp, ltmp); rel->ap[10000000000].p = 0; }
+  ASSERT_ALWAYS(ltmp == itmp);
   rel_compact[num_rel] = my_tmp;
 }
 
@@ -399,7 +403,7 @@ insertNormalRelation (relation_t *rel, unsigned long num_rel, int *tmp)
    rel->ap.p[0..deg[ contains the deg roots of f(x) mod p, leading to deg
    ideals for the factorization of (p). */
 static inline void
-insertFreeRelation (relation_t *rel, unsigned long num_rel, int *tmp)
+insertFreeRelation (relation_t *rel, unsigned long num_rel, int *tmp, unsigned int realltmp)
 {
   int *my_tmp, h;
   unsigned int i, itmp, ltmp;
@@ -410,9 +414,9 @@ insertFreeRelation (relation_t *rel, unsigned long num_rel, int *tmp)
   
   itmp = 0;
   if (pass == 1) {
-    ltmp = 1 + (((long) rel->a) >= minpr);
+    ltmp = (((long) rel->a) >= minpr);
     if (((long) rel->a) >= minpa) ltmp += rel->nb_ap;
-    my_tmp = my_malloc_int (ltmp);
+    my_tmp = my_malloc_int (++ltmp);
     if (((long) rel->a) >= minpr) {
       h = hashInsert (&H, ((long) rel->a), minus2);
       nprimes += (H.hashcount[h] == 1); /* new prime */
@@ -426,6 +430,7 @@ insertFreeRelation (relation_t *rel, unsigned long num_rel, int *tmp)
       }
   }
   else {
+    ltmp = realltmp;
     my_tmp = tmp;
     h = hashInsert (&H, ((long) rel->a), minus2);
     if (((long) rel->a) >= minpr) {
@@ -441,6 +446,7 @@ insertFreeRelation (relation_t *rel, unsigned long num_rel, int *tmp)
     }
   }
   my_tmp[itmp++] = -1;
+  ASSERT_ALWAYS(itmp == ltmp);
   rel_compact[num_rel] = my_tmp;
 }
 
@@ -929,8 +935,8 @@ prempt_load (prempt_t prempt_data) {
   pthread_exit (NULL);
 }
 
-static inline
-unsigned int relation_stream_get_fast (prempt_t prempt_data, relation_t *rel)
+static inline void
+relation_stream_get_fast (prempt_t prempt_data, unsigned int nbufrel)
 {
   static const unsigned char ugly[256] = {
     255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
@@ -955,6 +961,7 @@ unsigned int relation_stream_get_fast (prempt_t prempt_data, relation_t *rel)
   unsigned long pr;
   unsigned char c, v;
   unsigned int ltmp;
+  relation_t *rel =  &(buf_rel->rel[nbufrel]);
   
 #define LOAD_ONE(P) { c = *P; P = ((size_t) (P - pminlessone) & (PREMPT_BUF - 1)) + pmin; }
   
@@ -989,8 +996,6 @@ unsigned int relation_stream_get_fast (prempt_t prempt_data, relation_t *rel)
   
   if (!rs->parse_only_ab) {
     /* Do something if we're also interested in primes */
-    ltmp = 1;
-
     for ( k = 0, c = 0 ; ; ) {
     next_rat:
       if (c == ':') break;
@@ -1007,6 +1012,10 @@ unsigned int relation_stream_get_fast (prempt_t prempt_data, relation_t *rel)
 	    rel->rp[i].e++;
 	    goto next_rat;
 	  }
+	}
+	if ((unsigned int) rel->nb_rp_alloc <= k) {
+	  rel->nb_rp_alloc = rel->nb_rp_alloc ? rel->nb_rp_alloc + (rel->nb_rp_alloc>>1) : 8;
+	  rel->rp = (rat_prime_t *) realloc (rel->rp, rel->nb_rp_alloc * sizeof(rat_prime_t));
 	}
 	rel->rp[k++] = (rat_prime_t) { .p = pr, .e = 1};
       }
@@ -1030,6 +1039,10 @@ unsigned int relation_stream_get_fast (prempt_t prempt_data, relation_t *rel)
 	    goto next_alg;
 	  }
 	}
+	if ((unsigned int) rel->nb_ap_alloc <= k) {
+	  rel->nb_ap_alloc = rel->nb_ap_alloc ? rel->nb_ap_alloc + (rel->nb_ap_alloc>>1) : 16;
+	  rel->ap = (alg_prime_t *) realloc (rel->ap, rel->nb_ap_alloc * sizeof(alg_prime_t));
+	}
 	rel->ap[k++] = (alg_prime_t) { .p = pr,.r = -1, .e = 1};
       }
     }
@@ -1040,32 +1053,31 @@ unsigned int relation_stream_get_fast (prempt_t prempt_data, relation_t *rel)
       if (rel->b > 0) {
 	for (k = 0, i = 0; i < (unsigned int) rel->nb_rp; i++)
 	  if (rel->rp[i].e & 1) {
-	    rel->rp[k] = (rat_prime_t) { .p = rel->rp[i].p, .e = 1 };
-	    ltmp += ((long) rel->rp[k].p >= minpr);
-	    k++;
+	    rel->rp[k] = (rat_prime_t) {
+	      .p = rel->rp[i].p,
+	      .e = 1
+	    };
+	    ltmp += ((long) rel->rp[k++].p >= minpr);
 	  }
 	rel->nb_rp = k;
 	for (k = 0, i = 0; i < (unsigned int) rel->nb_ap; i++)
 	  if (rel->ap[i].e & 1) {
-	    rel->ap[k] = (alg_prime_t) { .p = rel->ap[i].p, .e = 1 };
-	    if (final) {
-	      rel->ap[k].r = findroot (rel->a, rel->b, rel->ap[k].p);
-	      ltmp += ((long) rel->ap[k].p >= minpa);
-	    } else if ((long) rel->ap[k].p >= minpa) {
-	      rel->ap[k].r = findroot (rel->a, rel->b, rel->ap[k].p);
-	      ltmp++;
-	    }
-	    k++;
+	    rel->ap[k] = (alg_prime_t) {
+	      .p = rel->ap[i].p,
+	      .r = findroot (rel->a, rel->b, rel->ap[i].p),
+	      .e = 1
+	    };
+	    ltmp += ((long) rel->ap[k++].p >= minpa);
 	  }
 	rel->nb_ap = k;
       }
       else {
-	ltmp += ((long) rel->a >= minpr);
+	ltmp = ((long) rel->a >= minpr);
 	if ((long) rel->a >= minpa) ltmp += rel->nb_ap;
       }
     }
   }
-  return ltmp;
+  buf_rel->ltmp_rel[nbufrel] = ltmp;
 }
 
 void insertRelation() {
@@ -1079,25 +1091,34 @@ void insertRelation() {
   */
   cpy_cpt_rel_b = cpt_rel_b;
   tmp = NULL;
-  while (cpt_rel_a == cpy_cpt_rel_b) nanosleep (&wait_classical, NULL);
   for ( ; ; ) {
+    while (cpt_rel_a == cpy_cpt_rel_b)
+      if (!end_insertRelation)
+	nanosleep (&wait_classical, NULL);
+      else
+	if (cpt_rel_a == cpy_cpt_rel_b)
+	  pthread_exit(NULL);
+    /* We don't used memory barrier for portability. So, if the ring
+       buffer is empty, one problem exists if the producter produces one
+       case and the consumer takes it immediatly: the case might be not
+       complety written. So, if only one case exists for consumer, the
+       consumer waits fews microseconds before use it.
+    */
+    if (cpt_rel_a == cpy_cpt_rel_b + 1) nanosleep (&wait_classical, NULL);
     n = (unsigned int) (cpy_cpt_rel_b & (T_REL - 1));
-    if (pass != 1) tmp = my_malloc_int(buf_rel->ltmp_rel[n]);
+    if (pass != 1)
+      tmp = my_malloc_int(++(buf_rel->ltmp_rel[n]));
     if (buf_rel->rel[n].b > 0)
-      insertNormalRelation (&(buf_rel->rel[n]), buf_rel->num_rel[n], tmp);
+      insertNormalRelation (&(buf_rel->rel[n]), buf_rel->num_rel[n], tmp, buf_rel->ltmp_rel[n]);
     else
-      insertFreeRelation (&(buf_rel->rel[n]), buf_rel->num_rel[n], tmp);
-    cpy_cpt_rel_b++;
-    cpt_rel_b = cpy_cpt_rel_b;
+      insertFreeRelation (&(buf_rel->rel[n]), buf_rel->num_rel[n], tmp, buf_rel->ltmp_rel[n]);
     if (relation_stream_disp_progress_now_p(rs))
       fprintf(stderr,
 	      "read useful %lu relations in %.1fs"
 	      " -- %.1f MB/s -- %.1f rels/s\n",
 	      rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
-    while (cpt_rel_a == cpy_cpt_rel_b) {
-      if (!end_insertRelation) nanosleep (&wait_classical, NULL);
-      else if (cpt_rel_a == cpy_cpt_rel_b) pthread_exit(NULL);
-    }
+    cpy_cpt_rel_b++;
+    cpt_rel_b = cpy_cpt_rel_b;
   }
 }
 
@@ -1135,8 +1156,10 @@ prempt_scan_relations ()
       exit (1);
     }
   memset (buf_rel->rel, 0, sizeof(*(buf_rel->rel)) * T_REL);
+  /*
   for (i = T_REL ; i ; relation_provision_for_primes(&(buf_rel->rel[--i]),
                             RELATION_MAX_BYTES >> 2, RELATION_MAX_BYTES >> 2));
+  */
   cpt_rel_a = cpt_rel_b = 0;
   cpy_cpt_rel_a = cpt_rel_a;
   nprimes = 0;
@@ -1172,11 +1195,13 @@ prempt_scan_relations ()
     rs->pos += length_line;
     length_line = 0;
     prempt_data->pcons = pcons;
-
     while (pcons == prempt_data->pprod) {						
       if (prempt_data->end) if (pcons == prempt_data->pprod) goto end_of_files;
       nanosleep (&wait_classical, NULL);
     }
+    /* No problem for producter/consumer because the case in the ring buffer
+       is atomic (only one char) AND producted by a system call (fread).
+    */
     if (*pcons == '#')                           goto goto_endline;
     if (pass == 1)                               goto valid_line;
     if (bit_vector_getbit (rel_used, rs->nrels)) goto valid_line;
@@ -1231,17 +1256,14 @@ prempt_scan_relations ()
       err = (pcons > p && c != '\n');
       if (pcons == pcons_max) pcons = prempt_data->buf;
     } while (err);
-    /* Ok, we have a complete line */
-    while (cpy_cpt_rel_a > cpt_rel_b+T_REL-1) {
+    while (cpy_cpt_rel_a == cpt_rel_b + T_REL) {
       nanosleep(&wait_classical, NULL);
     }
-    buf_rel->num_rel [cpy_cpt_rel_a & (T_REL - 1)] = rs->nrels;
-    buf_rel->ltmp_rel[cpy_cpt_rel_a & (T_REL - 1)] =
-      relation_stream_get_fast (prempt_data, &(buf_rel->rel[cpy_cpt_rel_a & (T_REL - 1)]));
+    buf_rel->num_rel [(unsigned int) (cpy_cpt_rel_a & (T_REL - 1))] = rs->nrels++;
+    relation_stream_get_fast (prempt_data, (unsigned int) (cpy_cpt_rel_a & (T_REL - 1)));
+    rs->lnum++;
     cpy_cpt_rel_a++;
     cpt_rel_a = cpy_cpt_rel_a;
-    rs->nrels++;
-    rs->lnum++;
   }
  end_of_files:
   while (cpy_cpt_rel_a != cpt_rel_b) nanosleep(&wait_classical, NULL);
@@ -1267,8 +1289,8 @@ prempt_scan_relations ()
     free(buf_rel->rel[i].ap);
   }
   free (buf_rel->rel);      buf_rel->rel      = NULL;
-  free (buf_rel->num_rel);  buf_rel->num_rel  = NULL;
   free (buf_rel->ltmp_rel); buf_rel->ltmp_rel = NULL;
+  free (buf_rel->num_rel);  buf_rel->num_rel  = NULL;
 
   return 1;
 }

@@ -420,6 +420,8 @@ config/search_for_function.cmake
 config/pthreads.cmake
 config/mpi.cmake
 config/math.cmake
+config/rusage_thread.cmake
+config/rusage_thread.c
 scripts/fixup_params_file.sh.in
 linalg/bwc/matmul-sub-large-fbd.S
 linalg/bwc/matmul-sub-large-fbd.h
