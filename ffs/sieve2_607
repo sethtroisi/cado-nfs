@@ -1,0 +1,2 @@
+sed "s/q=3b05191/q=$1/g" param.2.607 | sed "s/rho=1122e39/rho=$2/g" > /tmp/param.2.607
+build/f2/sieve /tmp/param.2.607 >> rels.2.607
