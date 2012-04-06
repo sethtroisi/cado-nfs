@@ -427,16 +427,15 @@ int main(int argc, char **argv)
         }  // End of loop on sublattices.
 
         t_tot = seconds()-t_tot;
-        fprintf(stdout, "# Total: %d relations found\n", nrels);
-        fprintf(stdout, "# Time spent: %1.1f s (initS); "
+        fprintf(stdout, "# Total for this special-q: %d relations found "
+                "in %1.1f s\n", nrels, t_tot);
+        fprintf(stdout, "# Time of main steps: %1.1f s (initS); "
                 "%1.1f s (norms); "
                 "%1.1f s (sieve); "
                 "%1.1f s (buckets); "
                 "%1.1f s (cofact)\n",
                 t_initS, t_norms, t_sieve, t_buckets, t_cofact);
-        fprintf(stdout, "# Total: %1.1f s (sum of previous: %1.1f s)\n",
-                t_tot, t_initS+t_norms+t_sieve+t_buckets+t_cofact);
-        fprintf(stdout, "# Rate: %1.5f s/rel\n", t_tot/nrels);
+        fprintf(stdout, "# Yield: %1.5f s/rel\n", t_tot/nrels);
         tot_nrels += nrels;
 
     } while (!end_list_of_sq); // End of loop over special-q's
@@ -444,7 +443,6 @@ int main(int argc, char **argv)
     fclose(sqFile);
 
     tot_time = seconds()-tot_time;
-    printf("%f \n", tot_time);
     fprintf(stdout, "###### General statistics ######\n");
     fprintf(stdout, "#   Computed %d special-q\n", tot_sq);
     fprintf(stdout, "#   %d relations found (%1.1f rel/sq)\n",
