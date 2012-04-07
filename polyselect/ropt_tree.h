@@ -93,6 +93,20 @@ void insert_sub_alpha_pq ( sub_alpha_pq *pqueue,
                            mpz_t modulus,
                            double alpha );
 
+void insert_sub_alpha_pq_up ( sub_alpha_pq *pqueue,
+                              int w,
+                              mpz_t u,
+                              mpz_t v,
+                              mpz_t modulus,
+                              double alpha );
+
+void insert_sub_alpha_pq_down ( sub_alpha_pq *pqueue,
+                                int w,
+                                mpz_t u,
+                                mpz_t v,
+                                mpz_t modulus,
+                                double alpha );
+
 void extract_sub_alpha_pq ( sub_alpha_pq *pqueue,
                             int *w,
                             mpz_t u,
@@ -110,6 +124,18 @@ void insert_MurphyE_pq ( MurphyE_pq *pqueue,
                          mpz_t u,
                          mpz_t v,
                          double E );
+
+void insert_MurphyE_pq_up ( MurphyE_pq *pqueue,
+                            int w,
+                            mpz_t u,
+                            mpz_t v,
+                            double E );
+
+void insert_MurphyE_pq_down ( MurphyE_pq *pqueue,
+                              int w,
+                              mpz_t u,
+                              mpz_t v,
+                              double E );
 
 void free_MurphyE_pq ( MurphyE_pq **ppqueue );
 
@@ -149,9 +175,20 @@ void insert_rootscore_pq ( rootscore_pq *pqueue,
                            long j,
                            int16_t alpha );
 
+void insert_rootscore_pq_down ( rootscore_pq *pqueue,
+                                long i,
+                                long j,
+                                int16_t alpha );
+
+void insert_rootscore_pq_up ( rootscore_pq *pqueue,
+                              long i,
+                              long j,
+                              int16_t alpha );
 
 void reset_rootscore_pq ( rootscore_pq *pqueue );
 
 void free_rootscore_pq ( rootscore_pq **ppqueue );
+
+int pq_parent ( int i );
 
 #endif /* ROPT_TREE_H */
