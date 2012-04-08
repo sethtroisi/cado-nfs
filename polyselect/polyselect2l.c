@@ -30,7 +30,7 @@
    seems faster, but need more memory. Use the latter by default. */
 //#define BATCH_P 
 #ifdef BATCH_P
-#define BATCH_SIZE 32 /* batch 8 p */
+#define BATCH_SIZE 8 /* batch 8 p */
 #else
 #define BATCH_SIZE 10
 #endif
@@ -38,7 +38,7 @@
 /* Read-Only */
 uint32_t *Primes = NULL;
 unsigned long lenPrimes = 1; // length of Primes[]
-int nq = LEN_SPECIAL_Q;
+int nq = INT_MAX;
 int lq = 1;
 double max_norm = DBL_MAX; /* maximal wanted norm (before rotation) */
 const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
@@ -946,22 +946,20 @@ collision_on_sq ( header_t header,
   }
 
   // less than lq special primes having roots for this ad
-  if (N == 0 || N < K)
+  if (N == 0 || N < K) {
+    fprintf (stderr, "# Info: binomial(%lu, %lu) error in collision_on_sq(). ad=%lu.\n", N, K, header->ad);
     return;
-
+  }
+  
   tot =  binom (N, K);
 
-  // if nq too small, let it equal BATCH_SIZE
-  if (nq < BATCH_SIZE)
-    nq = BATCH_SIZE;
-  // if tot (n, k) < wanted, use tot as wanted
   if (tot > (unsigned long) nq)
     tot = (unsigned long) nq;
 
   if (tot < BATCH_SIZE)
     tot = BATCH_SIZE;
 
-  // fprintf (stderr, "n=%lu, k=%lu, (n,k)=%lu, nq:%d\n", N, K, tot, nq);
+  // fprintf (stderr, "# Info: n=%lu, k=%lu, (n,k)=%lu, maxnq=%d, nq=%lu\n", N, K, binom(N, K), nq, tot);
 
   i = 0;
   while ( i <= (tot-BATCH_SIZE) ) {
@@ -1066,21 +1064,22 @@ static void
 usage (char *argv)
 {
   fprintf (stderr, "Usage: %s [options] P\n", argv);
-  fprintf (stderr, "Parameters and options:\n");
+  fprintf (stderr, "Required parameters and options:\n");
   fprintf (stderr, "P            --- degree-1 coefficient of g(x) has\n");
   fprintf (stderr, "                 two prime factors in [P,2P]\n");
   fprintf (stderr, "-v           --- verbose mode\n");
   fprintf (stderr, "-q           --- quiet mode\n");
-  fprintf (stderr, "-r           --- output raw/size-optimized polynomial only (skip ropt)\n");
+  fprintf (stderr, "-r           --- size-optimize polynomial only (skip ropt)\n");
   fprintf (stderr, "-t nnn       --- use n threads (default 1)\n");
   fprintf (stderr, "-admin nnn   --- start from ad=nnn (default 0)\n");
   fprintf (stderr, "-admax nnn   --- stop at ad=nnn\n");
   fprintf (stderr, "-incr nnn    --- forced factor of ad (default 60)\n");
   fprintf (stderr, "-N nnn       --- input number\n");
   fprintf (stderr, "-degree nnn  --- wanted polynomial degree\n");
-  fprintf (stderr, "-nq nnn      --- number of special-q's considered for each coefficient a_d (default %d)\n", LEN_SPECIAL_Q);
+  fprintf (stderr, "-nq nnn      --- maximum number of special-q's considered\n");
+  fprintf (stderr, "                 for each ad (default %d)\n", INT_MAX);
   fprintf (stderr, "-lq nnn      --- number of factors in the special-q\n");
-  fprintf (stderr, "-seed nnn    --- seed for srand()\n");
+  fprintf (stderr, "-seed nnn    --- seed for srand (default by time(NULL))\n");
   fprintf (stderr, "-kmax nnn    --- rotation bound (default %d)\n",
            default_MAX_k);
   fprintf (stderr, "-save xxx    --- save state in file xxx\n");
@@ -1281,11 +1280,6 @@ main (int argc, char *argv[])
   else
     srand(seed);
 
-  if (lq == 1)
-  {
-    nq = LEN_SPECIAL_Q;
-  }
-
   /* set cpoly */
   mpz_set (best_poly->n, N);
   mpz_set (curr_poly->n, N);
@@ -1343,11 +1337,12 @@ main (int argc, char *argv[])
   st = cputime ();
   lenPrimes = initPrimes (P, &Primes);
 
-  printf ( "# Info: initializing %lu P primes took %dms, seed=%d, rawonly=%d\n",
+  printf ( "# Info: initializing %lu P primes took %dms, seed=%d, rawonly=%d, nq=%d\n",
            lenPrimes,
            cputime () - st,
            seed,
-           raw );
+           raw,
+           nq );
 
 #ifdef BATCH_P
   printf ( "# Info: estimated peak memory=%.2fMB (%d threads, batch %d inversions on P)\n",
