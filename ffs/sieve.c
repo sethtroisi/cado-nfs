@@ -224,6 +224,10 @@ int main(int argc, char **argv)
 
     param_list_clear(pl);
 
+    if (want_sublat) {
+        fprintf(stderr, "# WARNING: sublattices seem to be broken, and won't be fixed soon.\n");
+    }
+
 #ifdef USE_F2
     sublat_ptr sublat;
     if (want_sublat)
