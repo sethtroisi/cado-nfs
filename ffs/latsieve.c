@@ -216,6 +216,56 @@ static int compute_starting_point(ijvec_ptr V0, ijbasis_ptr euclid,
     }
 }
 
+void sieve_projective_root(uint8_t *S, fbideal_srcptr gothp,
+        unsigned I, unsigned J, sublat_ptr sublat)
+{
+    ASSERT(gothp->degp < I);
+    ij_t i, j, j0, jj, p;
+    ij_set_fbprime(p, gothp->p);
+    // Find the first line to fill
+    if (use_sublat(sublat)) {
+        // take the first multiple of p that is congruent to y.
+        ij_t tmp, y;
+        ij_set_16(tmp, sublat->modulus);
+        ij_set_16(y, sublat->lat[sublat->n][1]);
+        ij_mulmod(j0, y, gothp->tildep, tmp);
+        ij_mul(j0, j0, p);
+        // map it into the sublattice.
+        ij_sub(j0, j0, y);
+        ij_div(j0, j0, tmp);
+    } else {
+        ij_set_zero(j0);
+    }
+
+    int rci, rcj = 1;
+    for(ij_set_zero(jj); rcj; rcj = ij_monic_set_next(jj, jj, J-gothp->degp)) {
+        ij_mul(j, jj, p);
+        if (use_sublat(sublat))
+            ij_add(j, j, j0);
+        ijpos_t start = ijvec_get_start_pos(j, I, J);
+        rci = 1;
+        for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
+            ijpos_t pos = start + ijvec_get_offset(i, I);
+#ifdef TRACE_POS
+            if (pos == TRACE_POS) {
+                fprintf(stderr, "TRACE_POS(%lu): ", pos);
+                fbprime_out(stderr, gothp->p); fprintf(stderr, " ");
+                fbprime_out(stderr, gothp->r); fprintf(stderr, "\n");
+                fprintf(stderr, "TRACE_POS(%lu): degnorm is now %d\n", pos,
+                        S[pos]-gothp->degp);
+            }
+#endif
+#ifndef NDEBUG
+            if (pos != 0 && (S[pos] < gothp->degp)) {
+                fprintf(stderr, "faulty pos is %lu\n", pos);
+            }
+            ASSERT(pos == 0 || (S[pos] >= gothp->degp)); 
+#endif
+            S[pos] -= gothp->degp;
+
+        }
+    }
+}
 
 void sieveFB(uint8_t *S, factor_base_srcptr FB, unsigned I, unsigned J,
         sublat_ptr sublat)
@@ -235,8 +285,14 @@ void sieveFB(uint8_t *S, factor_base_srcptr FB, unsigned I, unsigned J,
         // Larger primes are left to the bucket sieve.
         if ((unsigned)L >= I) break;
         // List of cases that are not handled yet:
-        if (gothp->proj) continue;
         if (use_sublat(sublat) && L == 1) continue;
+
+        // projective roots are handled differently
+        if (gothp->proj) {
+            sieve_projective_root(S, gothp, I, J, sublat);
+            continue;
+        }
+
 
         ijbasis_compute(euclid, basis, gothp);
         ijvec_t V0;
