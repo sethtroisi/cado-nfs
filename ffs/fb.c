@@ -96,19 +96,34 @@ void factor_base_precomp_lambda(factor_base_ptr FB, qlat_srcptr qlat,
     ij_set_16(ijmod, sublat->modulus);
 
   for (fbideal_ptr gothp = *FB->elts; gothp != FB->elts[FB->n]; ++gothp) {
-    fbprime_t t0, t1;
-    fbprime_mulmod(t0, qlat->b0, gothp->r, gothp->p);
-    fbprime_sub   (t0, qlat->a0, t0);
-    fbprime_rem   (t0, t0, gothp->p);
+    fbprime_t t0, t1, r;
+    int was_proj = fbprime_deg(gothp->r) == fbprime_deg(gothp->p);
+
+    if (was_proj) {
+        fbprime_sub(r, gothp->r, gothp->p);
+        fbprime_mulmod(t0, qlat->a0, r, gothp->p);
+        fbprime_sub   (t0, t0, qlat->b0);
+        fbprime_rem   (t0, t0, gothp->p);
+    } else {
+        fbprime_mulmod(t0, qlat->b0, gothp->r, gothp->p);
+        fbprime_sub   (t0, qlat->a0, t0);
+        fbprime_rem   (t0, t0, gothp->p);
+    }
     if ((gothp->proj = fbprime_is_zero(t0))) {
-      // This is a projective root! Yurk!
-      // TODO: We'll have to handle these, someday.
+      // This is a projective root in the q-lattice.
+      // Since we don't have powers yet, there is nothing to do.
       continue;
     }
     fbprime_invmod(t0, t0, gothp->p);
-    fbprime_mulmod(t1, qlat->b1, gothp->r, gothp->p);
-    fbprime_sub   (t1, t1, qlat->a1);
-    fbprime_rem   (t1, t1, gothp->p);
+    if (was_proj) {
+        fbprime_mulmod(t1, qlat->a1, r, gothp->p);
+        fbprime_sub   (t1, qlat->b1, t1);
+        fbprime_rem   (t1, t1, gothp->p);
+    } else {
+        fbprime_mulmod(t1, qlat->b1, gothp->r, gothp->p);
+        fbprime_sub   (t1, t1, qlat->a1);
+        fbprime_rem   (t1, t1, gothp->p);
+    }
     fbprime_mulmod(gothp->lambda, t0, t1, gothp->p);
 
     // In case we are using sublattices, precompute 1/p mod modulus
