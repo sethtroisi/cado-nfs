@@ -272,6 +272,16 @@ int main(int argc, char **argv)
 
         double t_tot = seconds();
 
+        // Check the given special-q
+        if (!is_valid_sq(qlat, ffspol[sqside])) {
+            fprintf(stderr, "Error: the rho = ");
+            sq_out(stderr, qlat->rho);
+            fprintf(stderr, " is not a root modulo ");
+            sq_out(stderr, qlat->q);
+            fprintf(stderr, " of the polynomial %d\n", sqside);
+            exit(EXIT_FAILURE);
+        }
+
         // Reduce the q-lattice
         int noerr = skewGauss(qlat, 0);
         ASSERT_ALWAYS(noerr);

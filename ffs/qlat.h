@@ -5,6 +5,7 @@
 
 int skewGauss(qlat_t qlat, unsigned int skewness);
 void print_qlat_info(qlat_t qlat);
+int is_valid_sq(qlat_t qlat, ffspol_srcptr F);
 
 
 

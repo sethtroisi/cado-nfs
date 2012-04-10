@@ -1,4 +1,5 @@
 #include "types.h"
+#include "norm.h"
 #include "qlat.h"
 
 // The skewness is a (difference of) degree -> an unsigned int.
@@ -49,6 +50,28 @@ void print_qlat_info(qlat_t qlat)
     printf("#   b1 = ");  ai_out(stdout, qlat->b1); printf("\n");
     printf("#   side = %d\n", qlat->side);
 }
+
+int is_valid_sq(qlat_t qlat, ffspol_srcptr F)
+{
+    // F(rho) = Norm_F(rho, 1)
+    fppol_t q, rho, one, norm;
+    fppol_init(q);
+    fppol_init(rho);
+    fppol_init(one);
+    fppol_init(norm);
+    fppol_set_sq(rho, qlat->rho);
+    fppol_set_sq(q, qlat->q);
+    fppol_set_ti(one, 0);
+    ffspol_norm(norm, F, rho, one);
+    fppol_rem(norm, norm, q);
+    int ret = fppol_is_zero(norm);
+    fppol_clear(norm);
+    fppol_clear(q);
+    fppol_clear(rho);
+    fppol_clear(one);
+    return ret;
+}
+
 
 
 // a = i*a0 + j*a1
