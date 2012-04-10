@@ -125,7 +125,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "Unhandled parameter %s\n", argv[0]);
         usage(argv0, NULL);
     }
-    param_list_print_command_line(stderr, pl);
+    param_list_print_command_line(stdout, pl);
 
     // read function field polynomials
     {
@@ -213,7 +213,7 @@ int main(int argc, char **argv)
             if (filename == NULL) usage(argv0, param);
             double tm = seconds();
             noerr = factor_base_init(FB[i], filename, fbb[i]);
-            fprintf(stderr, "# Reading factor base %d took %1.1f s\n", 
+            fprintf(stdout, "# Reading factor base %d took %1.1f s\n", 
                     i, seconds()-tm);
             if (!noerr) {
                 fprintf(stderr, "Could not read %s: %s\n", param, filename);
@@ -291,7 +291,7 @@ int main(int argc, char **argv)
         for (int i = 0; i < 2; ++i) {
             double tm = seconds();
             factor_base_precomp_lambda(FB[i], qlat, sublat);
-            fprintf(stderr, "# Precomputing lambda on side %d took %1.1f s\n",
+            fprintf(stdout, "# Precomputing lambda on side %d took %1.1f s\n",
                     i, seconds()-tm);
         }
 
@@ -307,11 +307,11 @@ int main(int argc, char **argv)
         // nb = 1.
         for (sublat->n = 0; sublat->n < sublat->nb; sublat->n++) {
             if (use_sublat(sublat)) {
-                fprintf(stderr, "# Sublattice (");
-                fppol16_out(stderr, sublat->lat[sublat->n][0]);
-                fprintf(stderr, ", ");
-                fppol16_out(stderr, sublat->lat[sublat->n][1]);
-                fprintf(stderr, ") :\n");
+                fprintf(stdout, "# Sublattice (");
+                fppol16_out(stdout, sublat->lat[sublat->n][0]);
+                fprintf(stdout, ", ");
+                fppol16_out(stdout, sublat->lat[sublat->n][1]);
+                fprintf(stdout, ") :\n");
             }
 
             t_initS -= seconds();
