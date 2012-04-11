@@ -291,7 +291,7 @@ int main(int argc, char **argv)
             filename = param_list_lookup_string(pl, param);
             if (filename == NULL) usage(argv0, param);
             double tm = seconds();
-            noerr = factor_base_init(FB[i], filename, fbb[i]);
+            noerr = factor_base_init(FB[i], filename, I, fbb[i]);
             fprintf(stdout, "# Reading factor base %d took %1.1f s\n", 
                     i, seconds()-tm);
             if (!noerr) {
@@ -493,7 +493,9 @@ int main(int argc, char **argv)
 
             buckets_t buckets;
             // FIXME: The bucket capacity is hardcoded for the moment.
-            buckets_init(buckets, I, J, 1<<20);
+            buckets_init(buckets, I, J, 1<<20, I,
+                         1+MAX(factor_base_max_degp(FB[0]),
+                               factor_base_max_degp(FB[1])));
             if (sublat->n == 0)
                 print_bucket_info(buckets);
             for (int twice = 0; twice < 2; twice++) {
@@ -514,7 +516,6 @@ int main(int argc, char **argv)
                 t_sieve += seconds();
 
                 t_buckets -= seconds();
-                buckets_reset(buckets);
                 buckets_fill(buckets, FB[side], sublat, I, J);
                 uint8_t *Sptr = S;
                 for (unsigned k = 0; k < buckets->n; ++k) {

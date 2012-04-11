@@ -18,10 +18,15 @@ int skip_spaces(FILE *file)
 }
 
 
-// Initialize a factor base, reading the ideals from a file and computing
-// the corresponding lambda using the basis of the given q-lattice.
+// Initialize a factor base, reading the ideals from a file.
+// The factor base should be sorted by increasing degree, starting at degree
+// sorted_min_degp; ideals of lower degree don't have to be sorted.
+// If max_degp is nonzero, the factor base is read until reaching ideals of
+// degree max_degp.
+// FIXME: fix max_degp so that this bound is exclusive, not inclusive!
 // Return 1 if successful.
-int factor_base_init(factor_base_ptr FB, const char *filename, unsigned maxdeg)
+int factor_base_init(factor_base_ptr FB, const char *filename,
+                     unsigned sorted_min_degp, unsigned max_degp)
 {
   FILE *file;
   file = fopen(filename, "r");
@@ -32,7 +37,8 @@ int factor_base_init(factor_base_ptr FB, const char *filename, unsigned maxdeg)
 
   FB->n    = 0;
   FB->elts = NULL;
-  unsigned alloc = 0;
+  unsigned last_degp = 0;
+  unsigned alloc     = 0;
   for (fbideal_ptr gothp = NULL; skip_spaces(file) != EOF; ++FB->n, ++gothp) {
     // Need realloc?
     if (alloc <= FB->n) {
@@ -50,10 +56,12 @@ int factor_base_init(factor_base_ptr FB, const char *filename, unsigned maxdeg)
       return 0;
     }
     gothp->degp = fbprime_deg(gothp->p);
-    if (maxdeg && gothp->degp > maxdeg) {
+    if (max_degp && gothp->degp > max_degp) {
       --FB->n;
       break;
     }
+    ASSERT_ALWAYS(last_degp < sorted_min_degp || last_degp <= gothp->degp);
+    last_degp = gothp->degp;
 
     // Remove spaces.
     if (skip_spaces(file) == EOF) {
@@ -137,6 +145,17 @@ void factor_base_precomp_lambda(factor_base_ptr FB, qlat_srcptr qlat,
         ij_set_zero(gothp->tildep);
     }
   }
+}
+
+
+// Return the largest degree of the ideals in the factor base.
+// /!\ Assume that the factor base is sorted, at least for the ideals higher
+//     degree. The highest degree should thus be the degree of the last
+//     ideal in the factor base.
+// FIXME: should this be inclusive or exclusive?
+unsigned factor_base_max_degp(factor_base_srcptr FB)
+{
+  return FB->elts[FB->n-1]->degp;
 }
 
 
