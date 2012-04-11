@@ -17,6 +17,8 @@ int fppol_fact_pop(fppol_ptr p, fppol_fact_ptr F);
 void fppol_fact_out(FILE * out, fppol_fact_ptr F);
 
 void fppol_factor(fppol_fact_ptr factors, fppol_t f);
+int fppol_is_irreducible(fppol_srcptr f);
+
 
 
 

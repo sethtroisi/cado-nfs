@@ -289,3 +289,52 @@ void fppol_factor(fppol_fact_ptr factors, fppol_t f)
 
     fppol_fact_clear(fact);
 }
+
+
+int fppol_is_irreducible(fppol_srcptr f)
+{
+    if (f->deg <= 0)
+        return 0;
+    if (f->deg == 1)
+        return 1;
+
+    fppol_t F;
+    fppol_t tqi;
+    fppol_t t;
+    fppol_t g;
+
+    fppol_init(F);
+    fppol_init(t);
+    fppol_init(tqi);
+    fppol_init(g);
+
+    // Work with a (monic) copy of f.
+    {
+        fp_t lc;
+        fppol_get_coeff(lc, f, fppol_deg(f));
+        fppol_sdiv(F, f, lc);
+    }
+
+    int i = 0, irred = 1;
+    fppol_set_ti(t, 1);
+    fppol_set(tqi, t);
+
+    while (2*i < f->deg) {
+        i++;
+        fppol_qpow(tqi, tqi);
+        fppol_rem(tqi, tqi, F);
+        fppol_sub(g, tqi, t);
+        fppol_gcd(g, g, F);
+        if (fppol_deg(g) > 0) {
+            irred = 0;
+            break;
+        }
+    }
+
+    fppol_clear(F);
+    fppol_clear(t);
+    fppol_clear(tqi);
+    fppol_clear(g);
+
+    return irred;
+}

@@ -18,6 +18,8 @@
 #include "smoothness.h"
 #include "polyfactor.h"
 #include "buckets.h"
+#include "fq.h"
+#include "fqpol.h"
 
 int my_factor_survivor(fppol_t a, fppol_t b, ffspol_t* F, int *B, sq_t q,
         int side) 
@@ -59,6 +61,42 @@ int my_factor_survivor(fppol_t a, fppol_t b, ffspol_t* F, int *B, sq_t q,
 }
 
 
+int sq_roots(sq_t * roots, sq_srcptr q, ffspol_srcptr F) {
+    fq_info_t Fq;
+    fq_info_init(Fq, q);
+
+    fqpol_t f;
+    fqpol_init(f);
+    fqpol_set_ffspol(f, F, Fq);
+
+    int nr = fqpol_roots(roots, f, Fq);
+    fqpol_clear(f);
+    fq_info_clear(Fq);
+    return nr;
+}
+
+int sq_is_irreducible(sq_srcptr p) {
+    fppol_t P;
+    fppol_init(P);
+    fppol_set_sq(P, p);
+    int ret = fppol_is_irreducible(P);
+    fppol_clear(P);
+    return ret;
+}
+
+int sq_cmp(sq_srcptr p, sq_srcptr q) {
+    if (sq_eq(p, q))
+        return 0;
+    uint64_t ip, iq;
+    ip = sq_get_ui(p, 64, 0);
+    iq = sq_get_ui(q, 64, 0);
+    if (ip < iq)
+        return -1;
+    else
+        return 1;
+}
+
+
 void usage(const char *argv0, const char * missing)
 {
     fprintf(stderr, "Usage: %s [options | optionfile] \n", argv0);
@@ -79,7 +117,9 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "  thresh1 [2*lpb1] survivor threshold on side 1\n");
     fprintf(stderr, "  q    *           q-poly of the special-q\n");
     fprintf(stderr, "  rho  *           rho-poly of the special-q\n");
-    fprintf(stderr, "  sqfile *         file of special-q's. This option, disable the two previous\n");
+    fprintf(stderr, "  q0   *           lower bound for special-q range\n");
+    fprintf(stderr, "  q1   *           lower bound for special-q range\n");
+    fprintf(stderr, "    Note: giving (q0,q1) is exclusive to giving (q,rho). In the latter case,\n" "    rho is optional.\n");
     fprintf(stderr, "  sqside           side (0 or 1) of the special-q\n");
     fprintf(stderr, "  firstsieve       side (0 or 1) to sieve first\n");
     fprintf(stderr, "  sublat           toggle the sublattice sieving\n");
@@ -101,10 +141,10 @@ int main(int argc, char **argv)
     unsigned int threshold[2] = {0, 0};  
     char *argv0 = argv[0];
     int want_sublat = 0;
-    const char *sqfile = NULL;
-    FILE *sqFile = NULL;
     int sqside = 0;
     int firstsieve = 0;
+    sq_t q0, q1;
+    int rho_given = 0;
 
     param_list pl;
     param_list_init(pl);
@@ -156,40 +196,71 @@ int main(int argc, char **argv)
         threshold[0] = 2*lpb[0];
     if (threshold[1] == 0) 
         threshold[1] = 2*lpb[1];
-    // check if there is an sqfile
+
+    // read q0, q1
     {
-        sqfile = param_list_lookup_string(pl, "sqfile");
-        if (sqfile != NULL) {
-            sqFile = fopen(sqfile, "r");
-            if (sqFile == NULL) {
-                fprintf(stderr, "Could not open sqfile %s for reading\n",
-                        sqfile);
-                exit (EXIT_FAILURE);
+        const char *sqstr;
+        int noerr;
+        sqstr = param_list_lookup_string(pl, "q0");
+        if (sqstr != NULL) {
+            noerr = sq_set_str(q0, sqstr);
+            if (!noerr) {
+                fprintf(stderr, "Could not parse q0: %s\n", sqstr);
+                exit(EXIT_FAILURE);
             }
+            sqstr = param_list_lookup_string(pl, "q1");
+            if (sqstr == NULL) usage(argv0, "q1");
+            noerr = sq_set_str(q1, sqstr);
+            if (!noerr) {
+                fprintf(stderr, "Could not parse q1: %s\n", sqstr);
+                exit(EXIT_FAILURE);
+            }
+            if (sq_deg(q1) > lpb[0]) {
+                fprintf(stderr, "WARNING: not a good idea to have special-q beyond the large prime bound!\n");
+            }
+        } else {
+            sq_set_zero(q0);
+            sq_set_zero(q1);
         }
     }
-    // read q, rho
-    if (!sqfile) {
+
+    // read q, rho 
+    // We store them in qlat for convenience, but these will be moved
+    // away before the main loop.
+    {
         const char *sqstr;
         int noerr;
         sqstr = param_list_lookup_string(pl, "q");
-        if (sqstr == NULL) usage(argv0, "q");
-        noerr = sq_set_str(qlat->q, sqstr);
-        if (!noerr) {
-            fprintf(stderr, "Could not parse q: %s\n", sqstr);
-            exit(EXIT_FAILURE);
-        }
-        sqstr = param_list_lookup_string(pl, "rho");
-        if (sqstr == NULL) usage(argv0, "rho");
-        noerr = sq_set_str(qlat->rho, sqstr);
-        if (!noerr) {
-            fprintf(stderr, "Could not parse rho: %s\n", sqstr);
-            exit(EXIT_FAILURE);
-        }
-        if (sq_deg(qlat->q) > lpb[0]) {
-            fprintf(stderr, "WARNING: not a good idea to have a special-q beyond the large prime bound!\n");
+        if (sq_is_zero(q0) && (sqstr == NULL)) usage(argv0, "q");
+        if (sqstr != NULL) {
+            if (!sq_is_zero(q0)) {
+                fprintf(stderr, "You can not provide both (q0,q1) and q\n");
+                exit(EXIT_FAILURE);
+            }
+            noerr = sq_set_str(qlat->q, sqstr);
+            if (!noerr) {
+                fprintf(stderr, "Could not parse q: %s\n", sqstr);
+                exit(EXIT_FAILURE);
+            }
+            if (!sq_is_irreducible(qlat->q)) {
+                fprintf(stderr, "Error, q is not irreducible: %s\n", sqstr);
+                exit(EXIT_FAILURE);
+            }
+            sqstr = param_list_lookup_string(pl, "rho");
+            if (sqstr != NULL) {
+                rho_given = 1;
+                noerr = sq_set_str(qlat->rho, sqstr);
+                if (!noerr) {
+                    fprintf(stderr, "Could not parse rho: %s\n", sqstr);
+                    exit(EXIT_FAILURE);
+                }
+                if (sq_deg(qlat->q) > lpb[0]) {
+                    fprintf(stderr, "WARNING: not a good idea to have a special-q beyond the large prime bound!\n");
+                }
+            }
         }
     }
+
     param_list_parse_int(pl, "sqside", &sqside);
     if (sqside != 0 && sqside != 1) {
         fprintf(stderr, "sqside must be 0 or 1\n");
@@ -255,23 +326,69 @@ int main(int argc, char **argv)
     int tot_nrels = 0;
     int tot_sq = 0;
     
+    sq_t * roots;
+    roots = (sq_t *) malloc (ffspol[sqside]->deg * sizeof(sq_t));
+    ASSERT_ALWAYS(roots != NULL);
+    int nroots = 0; // number of roots still to work on for current q.
+
+    if (sq_is_zero(q0)) {
+        sq_set(q0, qlat->q);
+        sq_set(q1, qlat->q);
+    }
+    if (rho_given) {
+        nroots = 1;
+        sq_set(roots[0], qlat->rho);
+    } else {
+        if (sq_is_irreducible(q0)) {
+            nroots = sq_roots(roots, q0, ffspol[sqside]);
+            sq_set(qlat->q, q0);
+            printf("############################################\n");
+            printf("# Roots for q = "); 
+            sq_out(stdout, q0);
+            printf(":");
+            for (int i = 0; i < nroots; ++i) {
+                printf(" ");
+                sq_out(stdout, roots[i]);
+            }
+            printf("\n");
+        }
+    }
+
+
     //
     // Begin of loop over special-q's
     //
-    int end_list_of_sq = 0;
     do {
         // Select next special-q
-        if (sqfile) {
-            int noerr;
-            noerr = sq_inp(qlat->q, sqFile);
-            if (!noerr) break;
-            noerr = sq_inp(qlat->rho, sqFile);
-            if (!noerr) break;
-            printf("#######################################\n");
-            printf("# Have read next special q from sqfile.\n");
-        } else // in the case where there is no file, we take the one that is
-               // given on command line.
-            end_list_of_sq = 1;
+        if (nroots == 0) { // find next q
+            do {
+                do {
+                    sq_monic_set_next(q0, q0, 64);
+                } while (!sq_is_irreducible(q0));
+                nroots = sq_roots(roots, q0, ffspol[sqside]);
+            } while (nroots == 0);
+
+            if (sq_cmp(q0, q1) >= 0)
+                break;
+
+            printf("############################################\n");
+            printf("# Roots for q = "); 
+            sq_out(stdout, q0);
+            printf(":");
+            for (int i = 0; i < nroots; ++i) {
+                printf(" ");
+                sq_out(stdout, roots[i]);
+            }
+            printf("\n");
+
+            sq_set(qlat->q, q0);
+            sq_set(qlat->rho, roots[nroots-1]);
+            nroots--;
+        } else {
+            sq_set(qlat->rho, roots[nroots-1]);
+            nroots--;
+        }
+
         tot_sq++;
 
         double t_tot = seconds();
@@ -289,6 +406,7 @@ int main(int argc, char **argv)
         // Reduce the q-lattice
         int noerr = skewGauss(qlat, 0);
         ASSERT_ALWAYS(noerr);
+        printf("############################################\n");
         print_qlat_info(qlat);
 
         // Precompute lambda for each element of the factor bases.
@@ -465,10 +583,9 @@ int main(int argc, char **argv)
         fprintf(stdout, "# Yield: %1.5f s/rel\n", t_tot/nrels);
         tot_nrels += nrels;
 
-    } while (!end_list_of_sq); // End of loop over special-q's
+    } while (1); // End of loop over special-q's
     
-    if (sqFile)
-        fclose(sqFile);
+    free(roots);
 
     tot_time = seconds()-tot_time;
     fprintf(stdout, "###### General statistics ######\n");
