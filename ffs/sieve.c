@@ -493,7 +493,7 @@ int main(int argc, char **argv)
 
             buckets_t buckets;
             // FIXME: The bucket capacity is hardcoded for the moment.
-            buckets_init(buckets, I, J, 1<<20, I,
+            buckets_init(buckets, I, J, 1<<16, I,
                          1+MAX(factor_base_max_degp(FB[0]),
                                factor_base_max_degp(FB[1])));
             if (sublat->n == 0)

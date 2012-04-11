@@ -80,6 +80,7 @@ void ijbasis_compute(ijbasis_ptr euclid, ijbasis_ptr basis,
     // (p, 0) and (lambda, 1). See tex file.
     unsigned hatI = euclid->I;
     unsigned hatJ = euclid->J;
+    fp_t lc;
     fbprime_t alpha0, beta0, alpha1, beta1, q;
     fbprime_set     (alpha0, gothp->p);
     fbprime_set_zero(beta0);
@@ -93,6 +94,10 @@ void ijbasis_compute(ijbasis_ptr euclid, ijbasis_ptr basis,
       fbprime_submul(beta0, beta1, q);
       fbprime_swap  (alpha0, alpha1);
       fbprime_swap  (beta0,  beta1);
+      // Keep beta1 monic.
+      fbprime_get_coeff(lc, beta1, fbprime_deg(beta1));
+      fbprime_sdiv  (alpha1, alpha1, lc);
+      fbprime_sdiv  (beta1,  beta1,  lc);
       basis->dim += fill_gap(basis->v+basis->dim, alpha1, beta1,
                              MIN((unsigned)fbprime_deg(alpha0), I), J);
       euclid->dim += fill_euclid(euclid->v + euclid->dim, alpha1, beta1,

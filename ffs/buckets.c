@@ -4,6 +4,7 @@
 #include "buckets.h"
 #include "ijvec.h"
 #include "macros.h"
+#include "gray.h"
 
 
 
@@ -255,6 +256,19 @@ static int compute_starting_point(ijvec_ptr V0, ijbasis_ptr euclid,
 }
 
 
+// Push an update into the corresponding bucket.
+static inline
+void buckets_push_update(buckets_ptr buckets, update_packed_t **ptr,
+                         ijvec_srcptr v, unsigned I, unsigned J)
+{
+  ijpos_t  pos = ijvec_get_pos(v, I, J);
+  unsigned k   = pos >> UPDATE_POS_BITS;
+  pos_t    p   = pos & (((pos_t)1<<UPDATE_POS_BITS)-1);
+  ASSERT(ptr[k] - buckets->start[k] < buckets->max_size);
+  *ptr[k]++ = update_pack(update_set(p, 0));
+}
+
+
 // Fill the buckets with updates corresponding to divisibility by elements of
 // the factor base.
 void buckets_fill(buckets_ptr buckets, factor_base_srcptr FB,
@@ -301,44 +315,46 @@ void buckets_fill(buckets_ptr buckets, factor_base_srcptr FB,
       else
         ijvec_set_zero(v);
 
+      // Size of Gray codes to use for the inner loop.
+#     if   defined(USE_F2)
+#       define ENUM_LATTICE_UNROLL 8
+#     elif defined(USE_F3)
+#       define ENUM_LATTICE_UNROLL 5
+#     endif
 
-      // Enumeration of the p-lattice is done via:
-      // - nested for loops for the first ENUM_LATTICE_NESTED coordinates, and
-      // - p-ary Gray codes for the remaining coordinates.
-#     define ENUM_LATTICE_NESTED 8
-#     define ENUM_LATTICE(ctx, n)                              \
-        for (int i = 0; (!i || basis->dim > n) && i < FP_SIZE; \
-             ++i, ijvec_add(v, v, basis->v[n]))
+      // Unrolled p-ary Gray code of size ENUM_LATTICE_UNROLL.
+      static const uint8_t gray[] = { GRAY(ENUM_LATTICE_UNROLL) };
+      unsigned             ngray  = GRAY_LENGTH(ENUM_LATTICE_UNROLL);
+
+      // We only need the "monic" Gray code for the first iteration. Jump
+      // directly there in the array.
+      unsigned gray_dim = MIN(basis->dim, ENUM_LATTICE_UNROLL);
+      unsigned i0       = ngray - GRAY_LENGTH(gray_dim) / (__FP_SIZE-1);
 
       ij_t s, t;
       ij_set_zero(t);
-      int rc = basis->dim > ENUM_LATTICE_NESTED;
+      int rc = basis->dim > ENUM_LATTICE_UNROLL;
       do {
-
-        // Nested enumeration on ENUM_LATTICE_NESTED levels.
-        FOR(ENUM_LATTICE, , ENUM_LATTICE_NESTED) {
-          if (ij_is_monic(v->j) || ij_is_zero(v->j)) {
-            ijpos_t  pos = ijvec_get_pos(v, I, J);
-            unsigned k   = pos >> UPDATE_POS_BITS;
-            pos_t    p   = pos & (((pos_t)1<<UPDATE_POS_BITS)-1);
-            ASSERT(ptr[k] - buckets->start[k] < buckets->max_size);
-            *ptr[k]++ = update_pack(update_set(p, 0));
-          }
+        // Inner-level Gray code enumeration: just go through the Gray code
+        // array, each time adding the indicated basis vector.
+        for (unsigned i = i0; i < ngray; ++i) {
+          ijvec_add(v, v, basis->v[gray[i]]);
+          buckets_push_update(buckets, ptr, v, I, J);
         }
+        i0 = 0;
 
-        // Gray code enumeration: using ij_set_next, the degree of the difference
-        // with the previous one indicates which basis vector should be added to
-        // the current lattice point.
+        // Outer-level Gray code enumeration: using ij_monic_set_next, the
+        // degree of the difference with the previous one indicates which basis
+        // vector should be added to the current lattice point.
         // rc is set to 0 when all vectors have been enumerated.
         ij_set(s, t);
-        rc = rc && ij_set_next(t, t, basis->dim-ENUM_LATTICE_NESTED);
+        rc = rc && ij_monic_set_next(t, t, basis->dim-ENUM_LATTICE_UNROLL);
         if (rc) {
           ij_diff(s, s, t);
-          ijvec_add(v, v, basis->v[ij_deg(s)+ENUM_LATTICE_NESTED]);
+          ijvec_add(v, v, basis->v[ij_deg(s)+ENUM_LATTICE_UNROLL]);
+          buckets_push_update(buckets, ptr, v, I, J);
         }
       } while (rc);
-
-#     undef ENUM_LATTICE
     }
 
     // Mark the last position for this degree in the degp_end array.
@@ -347,7 +363,7 @@ void buckets_fill(buckets_ptr buckets, factor_base_srcptr FB,
   }
 
   //for (unsigned k = 0; k < buckets->n; ++k)
-  //  printf("# #updates[%u] = %u\n", k, bucket_size(buckets, k));
+  //  printf("# #updates[%u] = %u\n", k, ptr[k]-buckets->start[k]);
 
   ijbasis_clear(euclid);
   ijbasis_clear(basis);
@@ -367,7 +383,7 @@ void bucket_apply(uint8_t *S, buckets_srcptr buckets, unsigned k)
     while (ptr != *end) {
       update_t update = update_unpack(*ptr++);
       pos_t    p      = update_get_pos(update);
-      ASSERT((k == 0 && p == 0) || S[p] >= degp);
+      ASSERT(S[p] >= degp);
       S[p] -= degp;
     }
   }

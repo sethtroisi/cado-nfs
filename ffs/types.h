@@ -177,6 +177,8 @@ __ALIAS_TYPE(ij)
   __ALIAS_FUN (void,     type, opp,            _ptr, _srcptr)                 \
   __ALIAS_FUN (void,     type, add,            _ptr, _srcptr, _srcptr)        \
   __ALIAS_FUN (void,     type, sub,            _ptr, _srcptr, _srcptr)        \
+  __ALIAS_FUN (void,     type, smul,           _ptr, _srcptr, fp_srcptr)      \
+  __ALIAS_FUN (void,     type, sdiv,           _ptr, _srcptr, fp_srcptr)      \
   __ALIAS_FUN (void,     type, mul_ti,         _ptr, _srcptr, unsigned)       \
   __ALIAS_FUN (void,     type, div_ti,         _ptr, _srcptr, unsigned)       \
   __ALIAS_FUN (void,     type, mod_ti,         _ptr, _srcptr, unsigned)       \
