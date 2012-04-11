@@ -91,7 +91,8 @@ __DECL_FPPOLxx_ARITH_ALL(64)
 #define __DEF_FPPOLxx_SET_MP(sz)                            \
   static inline                                             \
   int fppol##sz##_set_mp(fppol##sz##_ptr r, fppol_srcptr p) \
-  { fppol##sz##_set_64(r, p->limbs[0]);                     \
+  { if (p->deg == -1) {fppol##sz##_set_zero(r); return 1;}  \
+    fppol##sz##_set_64(r, p->limbs[0]);                     \
     return p->deg < sz; }
 
 
