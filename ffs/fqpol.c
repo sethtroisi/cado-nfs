@@ -388,7 +388,7 @@ static void fqpol_powmod(fqpol_ptr r, fqpol_srcptr p,
         fqpol_sqr(res, res, Fq);
         fqpol_rem(res, res, f, Fq);
         if (power & mask) {
-            fqpol_mul(res, res, f, Fq);
+            fqpol_mul(res, res, p, Fq);
             fqpol_rem(res, res, f, Fq);
         }
         mask >>= 1;

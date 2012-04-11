@@ -319,7 +319,7 @@ int fppol_is_irreducible(fppol_srcptr f)
     fppol_set_ti(t, 1);
     fppol_set(tqi, t);
 
-    while (2*i < f->deg) {
+    while (2*i < F->deg) {
         i++;
         fppol_qpow(tqi, tqi);
         fppol_rem(tqi, tqi, F);
