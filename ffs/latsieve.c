@@ -307,41 +307,6 @@ void sieveFB(uint8_t *S, factor_base_srcptr FB, unsigned I, unsigned J,
         //******************************************************************
         // visit this vector space and subtract the contribution of
         // gothp in the corresponding position in S.
-#if FP_SIZE == 2
-        // TODO: quadratic version, specific to char 2. Please improve!
-        for (unsigned int k = 0; k < (1U<<basis->dim); ++k) {
-            // at some point, we might deal with *affine* spaces.
-            // In that case, just change the initial value of V.
-            ijvec_t V;
-            ijvec_set(V, V0);
-            unsigned int l = k;
-            for (unsigned i = 0; i < basis->dim; ++i, l>>= 1)
-                if (l & 1U)
-                    ijvec_add(V, V, basis->v[i]);
-            /*
-            printf("vec %u: ", k);
-            ij_out(stdout, V->i);
-            printf(" ");
-            ij_out(stdout, V->j);
-            printf("\n"); */
-
-            ijpos_t pos = ijvec_get_pos(V, I, J);
-#ifdef TRACE_POS
-            if (pos == TRACE_POS) {
-                fprintf(stderr, "TRACE_POS(%lu): ", pos);
-                fbprime_out(stderr, gothp->p); fprintf(stderr, " ");
-                fbprime_out(stderr, gothp->r); fprintf(stderr, "\n");
-                fprintf(stderr, "TRACE_POS(%lu): degnorm is now %d\n", pos,
-                        S[pos]-gothp->degp);
-            }
-#endif
-            if (pos != 0 && (S[pos] < gothp->degp)) {
-                fprintf(stderr, "faulty pos is %lu\n", pos);
-            }
-            ASSERT(pos == 0 || (S[pos] >= gothp->degp)); 
-            S[pos] -= gothp->degp;
-        }
-#else   // FP_SIZE != 2
         vvs_param_t vvs;
         vvs.I = I;
         vvs.J = J;
@@ -350,7 +315,6 @@ void sieveFB(uint8_t *S, factor_base_srcptr FB, unsigned I, unsigned J,
         vvs.gothp = gothp;
         ijvec_set(vvs.V, V0);
         visit_vector_space(&vvs, basis->dim);
-#endif
     }
 
     ijbasis_clear(euclid);
