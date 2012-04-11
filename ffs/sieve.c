@@ -208,6 +208,10 @@ int main(int argc, char **argv)
                 fprintf(stderr, "Could not parse q0: %s\n", sqstr);
                 exit(EXIT_FAILURE);
             }
+            if (!sq_is_monic(q0)) {
+                fprintf(stderr, "Error: given q0 is not monic: %s\n", sqstr);
+                exit(EXIT_FAILURE);
+            }
             sqstr = param_list_lookup_string(pl, "q1");
             if (sqstr == NULL) usage(argv0, "q1");
             noerr = sq_set_str(q1, sqstr);
@@ -244,6 +248,10 @@ int main(int argc, char **argv)
             }
             if (!sq_is_irreducible(qlat->q)) {
                 fprintf(stderr, "Error, q is not irreducible: %s\n", sqstr);
+                exit(EXIT_FAILURE);
+            }
+            if (!sq_is_monic(qlat->q)) {
+                fprintf(stderr, "Error, q is not monic: %s\n", sqstr);
                 exit(EXIT_FAILURE);
             }
             sqstr = param_list_lookup_string(pl, "rho");
