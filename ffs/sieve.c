@@ -426,20 +426,20 @@ int main(int argc, char **argv)
         printf("############################################\n");
         print_qlat_info(qlat);
 
-        // Precompute lambda for each element of the factor bases.
-        for (int i = 0; i < 2; ++i) {
-            double tm = seconds();
-            factor_base_precomp_lambda(FB[i], qlat, sublat);
-            fprintf(stdout, "# Precomputing lambda on side %d took %1.1f s\n",
-                    i, seconds()-tm);
-        }
-
         double t_norms = 0;
         double t_sieve = 0;
         double t_buckets = 0;
         double t_cofact = 0;
         double t_initS = 0;
+        double t_lambda = 0;
         int nrels = 0;
+
+        // Precompute lambda for each element of the factor bases.
+        t_lambda -= seconds();
+        for (int i = 0; i < 2; ++i) 
+            factor_base_precomp_lambda(FB[i], qlat, sublat);
+        t_lambda += seconds();
+
 
         // Loop on all sublattices
         // In the no_sublat case, this loops degenerates into one pass, since
@@ -592,12 +592,16 @@ int main(int argc, char **argv)
         t_tot = seconds()-t_tot;
         fprintf(stdout, "# Total for this special-q: %d relations found "
                 "in %1.1f s\n", nrels, t_tot);
-        fprintf(stdout, "# Time of main steps: %1.1f s (initS); "
-                "%1.1f s (norms); "
-                "%1.1f s (sieve); "
+        fprintf(stdout,
+                "# Time of main steps: "
+                "%1.1f s (lambda); "
+                "%1.1f s (initS);   "
+                "%1.1f s (norms);\n"
+                "#                     "
+                "%1.1f s (sieve);  "
                 "%1.1f s (buckets); "
-                "%1.1f s (cofact)\n",
-                t_initS, t_norms, t_sieve, t_buckets, t_cofact);
+                "%1.1f s (cofact).\n",
+                t_lambda, t_initS, t_norms, t_sieve, t_buckets, t_cofact);
         fprintf(stdout, "# Yield: %1.5f s/rel\n", t_tot/nrels);
         tot_nrels += nrels;
 
