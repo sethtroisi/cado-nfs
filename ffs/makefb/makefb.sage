@@ -49,7 +49,7 @@ def all_roots(f,p,powerlim):
     A=f.base_ring();
     ZP=f.parent()
     x=ZP.gen()
-    kmax=floor(powerlim/p.degree())
+    kmax=floor(powerlim/p.degree())+1
     #print f,p
     aff=all_roots_affine(f,p,kmax,0,0,x)
     final=[]
@@ -142,8 +142,8 @@ def makefb(f,dlim,powerlim,filename="",typo="cado"):
 			return format(ri)
 		F=A.base_ring()
 		q=F.cardinality()
-	for p in Primes(A,q^min(dlim,powerlim)):
-		#print 'ok'
+	for p in Primes(A,q^min(dlim+1,powerlim+1)):
+		#print p
 		xx = all_roots(f, p, powerlim)
 		xx = rewrite_roots(xx)
 		for r in xx:
