@@ -154,5 +154,14 @@ def makefb(f,dlim,powerlim,filename="",typo="cado"):
 			for i in range(1,len(r[3])):
 				stri = stri + ","+hexify(r[3][i])
 			gd.write(stri+"\n")
-
-
+	for p in Primes(A,q^(dlim+1),q^min(dlim+1,powerlim+1)):
+		xx = all_roots(f, p, dlim+1)
+		xx = rewrite_roots(xx)
+		for r in xx:
+			if (r[1] != 1) or (r[2] != 0):
+				stri =hexify(r[0])+":"+format(r[1])+","+format(r[2])+": "+hexify(r[3][0])
+			else:
+				stri = hexify(r[0])+": "+hexify(r[3][0])
+			for i in range(1,len(r[3])):
+				stri = stri + ","+hexify(r[3][i])
+			gd.write(stri+"\n")
