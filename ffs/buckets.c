@@ -22,7 +22,7 @@
  *****************************************************************************/
 
 // Size of the two fields and of a bucket update, in bits.
-#define UPDATE_POS_BITS  14
+#define UPDATE_POS_BITS  16
 #define UPDATE_HINT_BITS  0
 #define UPDATE_BITS     (UPDATE_POS_BITS + UPDATE_HINT_BITS)
 
@@ -105,6 +105,25 @@ hint_t update_get_hint(update_t update)
 void buckets_init(buckets_ptr buckets, unsigned I, unsigned J,
                   unsigned max_size, unsigned min_degp, unsigned max_degp)
 {
+  // FIXME: Everything breaks in characteristic 3 if bucket regions are not of
+  // size 2^8 or 2^16. This would indeed imply that bucket regions would not
+  // be aligned with complete lines of the sieving area. Someday, we'll have to
+  // fix this, but for the time being, let's leave it as is.
+  // A way to fix this would be to allow for unaligned bucket regions:
+  //    _____ ..........
+  //   |     |__________: <- line j1
+  //   |                |
+  //   |  bucket region |
+  //   |_________       |
+  //   :.........|______| <- line j0
+  //
+  // Norm initialization and line sieving would be applied to complete lines
+  // (overshooting the end of the bucket region, as in line j1), and lines
+  // overlapping two bucket regions (such as line j1) will have to be copied
+  // and bucket-sieved with the following bucket region (such as what is
+  // happening with line j0 here).
+  ASSERT(__FP_CHAR == 2 || UPDATE_POS_BITS == 16);
+
   unsigned n        = 1 + ((ijvec_get_max_pos(I, J)-1) >> UPDATE_POS_BITS);
   buckets->n        = n;
   buckets->max_size = max_size;
