@@ -337,6 +337,14 @@ int main(int argc, char **argv)
     // Allocated size of the sieve array.
     unsigned IIJJ = ijvec_get_max_pos(I, J);
 
+    // Allocate storage space for the buckets.
+    // FIXME: The bucket capacity is hardcoded for the moment.
+    buckets_t buckets;
+    buckets_init(buckets, I, J, 1<<16, I,
+                 1+MAX(factor_base_max_degp(FB[0]),
+                       factor_base_max_degp(FB[1])));
+    print_bucket_info(buckets);
+
     qlat->side = sqside; 
 
     double tot_time = seconds();
@@ -500,13 +508,6 @@ int main(int argc, char **argv)
 #endif
             t_initS += seconds();
 
-            buckets_t buckets;
-            // FIXME: The bucket capacity is hardcoded for the moment.
-            buckets_init(buckets, I, J, 1<<16, I,
-                         1+MAX(factor_base_max_degp(FB[0]),
-                               factor_base_max_degp(FB[1])));
-            if (sublat->n == 0)
-                print_bucket_info(buckets);
             for (int twice = 0; twice < 2; twice++) {
                 // Select the side to be sieved
                 int side = (firstsieve)?(1-twice):twice;
@@ -544,7 +545,6 @@ int main(int argc, char **argv)
                 // have been clobbered.
                 S[0] = 255;
             }
-            buckets_clear(buckets);
 
             t_cofact -= seconds();
             // survivors cofactorization
@@ -606,7 +606,10 @@ int main(int argc, char **argv)
         tot_nrels += nrels;
 
     } while (1); // End of loop over special-q's
-    
+
+    factor_base_clear(FB[0]);
+    factor_base_clear(FB[1]);
+    buckets_clear(buckets);
     free(roots);
 
     tot_time = seconds()-tot_time;
