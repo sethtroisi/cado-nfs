@@ -49,7 +49,7 @@ def all_roots(f,p,powerlim):
     A=f.base_ring();
     ZP=f.parent()
     x=ZP.gen()
-    kmax=ceil(powerlim*log(2)/log_norm(p))
+    kmax=floor(powerlim/p.degree())
     #print f,p
     aff=all_roots_affine(f,p,kmax,0,0,x)
     final=[]
@@ -117,16 +117,16 @@ def rewrite_roots(lr):
     ss.append((old0, old1, old2, lr))
     return ss
 
-#alim= size of the sieving domain
-#powerlim=maximal size in bits of the irreducibles powers we consider
+#dlim= max degree on the sieving domain
+#powerlim=maximal degree of the irreducibles powers we consider
 
-def makefb(f,alim,powerlim,filename="",typo="cado"): 
+def makefb(f,dlim,powerlim,filename="",typo="cado"): 
 	if filename == "":
 		gd=sys.stdout
 	else:
 		gd=open(filename,"w")
 	gd.write("# f={0}\n".format(f))
-	gd.write("# alim={0}\n".format(alim))
+	gd.write("# dlim={0}\n".format(dlim))
 	gd.write("# powerlim={0}\n".format(powerlim))
 	A=f.base_ring()
 	if A!=ZZ and A!=QQ:
@@ -140,32 +140,19 @@ def makefb(f,alim,powerlim,filename="",typo="cado"):
 			return hex(Zt(ri)(dummy))
 		else:
 			return format(ri)
-	if A==ZZ:
-		p = 2
-		while p <= alim:
-			xx = all_roots(f, p, powerlim)
-			xx = rewrite_roots(xx)
-			for r in xx:
-				if (r[1] != 1) or (r[2] != 0):
-					stri = "{0}:{1},{2}: ".format(r[0],r[1],r[2]) + r[3][0].str()
-				else:
-					stri = "{0}: ".format(r[0]) + r[3][0].str()
-				for i in range(1,len(r[3])):
-					stri = stri + ",{0}".format(r[3][i])
-				print stri
-	    	p = p.next_prime()
-	else:
-		for p in Primes(A,alim):
-			#print 'ok'
-			xx = all_roots(f, p, powerlim)
-			xx = rewrite_roots(xx)
-			for r in xx:
-				if (r[1] != 1) or (r[2] != 0):
-					stri =hexify(r[0])+":"+format(r[1])+","+format(r[2])+": "+hexify(r[3][0])
-				else:
-					stri = hexify(r[0])+": "+hexify(r[3][0])
-				for i in range(1,len(r[3])):
-					stri = stri + ","+hexify(r[3][i])
-				gd.write(stri+"\n")
+		F=A.base_ring()
+		q=F.cardinality()
+	for p in Primes(A,q^min(dlim,powerlim)):
+		#print 'ok'
+		xx = all_roots(f, p, powerlim)
+		xx = rewrite_roots(xx)
+		for r in xx:
+			if (r[1] != 1) or (r[2] != 0):
+				stri =hexify(r[0])+":"+format(r[1])+","+format(r[2])+": "+hexify(r[3][0])
+			else:
+				stri = hexify(r[0])+": "+hexify(r[3][0])
+			for i in range(1,len(r[3])):
+				stri = stri + ","+hexify(r[3][i])
+			gd.write(stri+"\n")
 
 
