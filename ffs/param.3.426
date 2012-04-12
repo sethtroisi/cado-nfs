@@ -24,7 +24,6 @@ J=8
 
 fbb0=14
 fbb1=14
-
 lpb0=17
 lpb1=16
 thresh0=53
@@ -33,5 +32,5 @@ thresh1=50
 fb0=Aroots.3.426
 fb1=Rroots.3.426
 
-q=4a1a560a
-rho=2260158
+q0=40000000
+q1=40000080

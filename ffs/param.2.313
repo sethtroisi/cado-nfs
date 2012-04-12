@@ -11,16 +11,18 @@
 
 pol0=7,1,1,1,1,1
 pol1=c18ee2f3ac15c0f1,b45a8852c772037f
-I=11
-J=11
+I=10
+J=10
 
-lpb0=25
-lpb1=23
-thresh0=52
-thresh1=48
+fbb0=18
+fbb1=18
+lpb0=20
+lpb1=20
+thresh0=43
+thresh1=43
 
 fb0=Aroots.2.313
 fb1=Rroots.2.313
 
-q=741a09
-rho=137277
+q0=80000
+q1=80100

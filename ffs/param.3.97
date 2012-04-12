@@ -5,16 +5,18 @@
 
 pol0=10,5,0,0,0,1
 pol1=18525901616186,46a19289a6526
-I=6
-J=6
+I=5
+J=5
 
-lpb0=15
-lpb1=15
-thresh0=30
-thresh1=30
+fbb0=9
+fbb1=9
+lpb0=11
+lpb1=11
+thresh0=24
+thresh1=24
 
 fb0=Aroots.3.97
 fb1=Rroots.3.97
 
-q=41409965
-rho=2aaa4696
+q0=400000
+q1=400100

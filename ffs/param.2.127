@@ -11,13 +11,15 @@ pol1=7b26a5c,3a3a6a9
 I=9
 J=9
 
-lpb0=25
-lpb1=25
-thresh0=50
-thresh1=50
+fbb0=12
+fbb1=12
+lpb0=15
+lpb1=15
+thresh0=18
+thresh1=18
 
 fb0=Aroots.2.127
 fb1=Rroots.2.127
 
-q=3f29c8d
-rho=1e3dc3
+q0=4000
+q1=4100
