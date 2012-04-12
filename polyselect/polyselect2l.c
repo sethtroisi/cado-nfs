@@ -21,6 +21,7 @@
 #define TARGET_TIME 10000000 /* print stats every TARGET_TIME milliseconds */
 #define NEW_ROOTSIEVE
 #define MAX_THREADS 16
+#define INIT_FACTOR 4
 //#define DEBUG_POLYSELECT2L
 #ifdef NEW_ROOTSIEVE
 #include "ropt.h"
@@ -28,11 +29,17 @@
 
 /* Two modes: batch P (default) or batch SQ. The latter 
    seems faster, but need more memory. Use the latter by default. */
-//#define BATCH_P 
+//#define BATCH_P
 #ifdef BATCH_P
 #define BATCH_SIZE 8 /* batch 8 p */
 #else
-#define BATCH_SIZE 10
+#define BATCH_SIZE 10  /* batch 10 sq */
+#endif
+
+/* consider only two roots or more */
+#define CONSIDER_ONLY_TWO_ROOTS
+#ifndef CONSIDER_ONLY_TWO_ROOTS
+#define NUMBER_CONSIDERED_ROOTS 2
 #endif
 
 /* Read-Only */
@@ -53,10 +60,10 @@ pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER; /* used as mutual exclusion
                                                    lock for those variables */
 int tot_found = 0; /* total number of polynomials */
 int found = 0; /* number of polynomials below maxnorm */
-double potential_collisions = 0.0, aver_lognorm = 0.0;
+double potential_collisions = 0.0, aver_lognorm = 0.0, aver_raw_lognorm = 0.0;;
 unsigned long collisions = 0;
 unsigned long collisions_good = 0;
-double total_adminus2;
+double total_adminus2 = 0.0;
 double best_logmu[11];
 double rootsieve_time = 0.0;
 int raw = 0;
@@ -266,13 +273,6 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_divexact (t, t, l);
   mpz_set (f[0], t);
 
-  /* information on all polynomials */
-  pthread_mutex_lock (&lock);
-  total_adminus2 += (double) mpz_sizeinbase (f[d-2], 2);
-  collisions ++;
-  pthread_mutex_unlock (&lock);
-  // gmp_printf ("# a_{d-2}=%Zd\n", f[d-2]);
-
   /* save unoptimized polynomial to fold */
   for (i = d + 1; i -- != 0; )
     mpz_set (fold[i], f[i]);
@@ -282,6 +282,22 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   /* old lognorm */
   skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
   logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
+
+  double g0 = mpz_get_d (g[0]);
+  g0 /= mpz_get_d (f[d-2]);
+  g0 = (g0 > 0)? g0 : -g0;
+  
+#ifdef MAX_THREADS
+  pthread_mutex_lock (&lock);
+#endif
+  /* information on all polynomials */
+  total_adminus2 += g0;
+  collisions ++;
+  tot_found ++;
+  aver_raw_lognorm += logmu;
+#ifdef MAX_THREADS
+  pthread_mutex_unlock (&lock);
+#endif
 
   /* if the polynomial has norm < "-maxnorm", we optimize it */
   if (logmu <= max_norm)
@@ -332,11 +348,14 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       best_logmu[i] = best_logmu[i-1];
     best_logmu[i] = logmu;
 
+#ifdef MAX_THREADS
     pthread_mutex_lock (&lock);
+#endif
     collisions_good ++;
     aver_lognorm += logmu;
-    tot_found ++;
+#ifdef MAX_THREADS
     pthread_mutex_unlock (&lock);
+#endif
 
     /* MurphyE */
     mpz_set (curr_poly->rat->f[0], g[0]);
@@ -348,7 +367,9 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 
     mpz_neg (m, g[0]);
 
-    pthread_mutex_lock (&lock);
+#ifdef MAX_THREADS
+		  pthread_mutex_lock (&lock);
+#endif
     if (E > best_E)
     {
       best_E = E;
@@ -371,7 +392,9 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       fclose (fp);
     }
     found ++;
-    pthread_mutex_unlock (&lock);
+#ifdef MAX_THREADS
+		  pthread_mutex_unlock (&lock);
+#endif
 
     /* raw poly */
     if (raw) {
@@ -441,7 +464,7 @@ collision_on_p ( header_t header,
   }
 
   hash_t H;
-  hash_init (H,  (unsigned long) (2.2 * (double) lenPrimes));
+  hash_init (H,  (unsigned long) (INIT_FACTOR * (double) lenPrimes));
 
 #ifdef DEBUG_POLYSELECT2L
   int st = cputime();
@@ -535,7 +558,12 @@ collision_on_each_sq ( header_t header,
 #endif
 
   hash_t H;
-  hash_init (H,  (unsigned long) (2.2 * (double) lenPrimes));
+
+#ifdef CONSIDER_ONLY_TWO_ROOTS
+  hash_init (H,  (unsigned long) (INIT_FACTOR * (double) lenPrimes));
+#else
+  hash_init (H,  (unsigned long) (INIT_FACTOR * NUMBER_CONSIDERED_ROOTS * (double) lenPrimes));
+#endif
 
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
 
@@ -586,8 +614,20 @@ collision_on_each_sq ( header_t header,
       mpz_clear (qqz);
 #endif
 
+#ifdef CONSIDER_ONLY_TWO_ROOTS
       hash_add (H, p, u, header->m0, header->ad, header->d, header->N, q, rqqz);
       hash_add (H, p, u - ppl, header->m0, header->ad, header->d, header->N, q, rqqz);
+#else
+      int i;
+      long h = u - ppl;
+      for (i = 0; i < NUMBER_CONSIDERED_ROOTS; i ++) {
+        hash_add (H, p, u, header->m0, header->ad, header->d, header->N, q, rqqz);
+        hash_add (H, p, h, header->m0, header->ad, header->d, header->N, q, rqqz);
+        u += ppl;
+        h -= ppl;
+      }
+
+#endif
 
     }  // next rp
 
@@ -597,6 +637,7 @@ collision_on_each_sq ( header_t header,
   fprintf (stderr, "# collision_on_each_sq took %dms\n", cputime () - st);
   fprintf (stderr, "# - q hash_size (q=%lu): %u\n", q, H->size);
 #endif
+
   double pc2 = 0.5 * pow ((double) H->size / (double) Primes[nprimes-1],
                           2.0);
 
@@ -1057,8 +1098,6 @@ one_thread (void* args)
   return NULL;
 }
 
-#define TARGET_TIME 10000000 /* print stats every TARGET_TIME milliseconds */
-
 
 static void
 usage (char *argv)
@@ -1351,7 +1390,7 @@ main (int argc, char *argv[])
            BATCH_SIZE );
 #else
   printf ( "# Info: estimated peak memory=%.2fMB (%d threads, batch %d inversions on SQ)\n",
-           (double) (nthreads * BATCH_SIZE * lenPrimes * (sizeof(uint32_t) + sizeof(uint64_t)) / 1024 / 1024),
+           (double) (nthreads * (BATCH_SIZE + INIT_FACTOR) * lenPrimes * (sizeof(uint32_t) + sizeof(uint64_t)) / 1024 / 1024),
            nthreads,
            BATCH_SIZE );
 #endif
@@ -1425,39 +1464,40 @@ main (int argc, char *argv[])
 
     if (cputime () > target_time || verbose > 0)
     {
-      printf ("# ad=%lu time=%dms exp. coll.=%1.1f, got %lu (%0.3f/s) with %lu good ones, av. lognorm=%1.2f\n",
+      printf ("# Stat: ad=%lu, exp. coll.=%1.1f, got %lu (%0.3f/s) with %lu good ones, av. lognorm=%1.2f, av. raw. lognorm=%1.2f, time=%dms\n",
               admin,
-              cputime (),
               potential_collisions,
               collisions,
               1000.0 * (double) collisions / cputime (),
               collisions_good,
-              aver_lognorm / collisions );
+              aver_lognorm / collisions_good,
+              aver_raw_lognorm / collisions,
+              cputime () );
       fflush (stdout);
       target_time += TARGET_TIME;
     }
   }
 
-  printf ("# Tried %d ad-value(s), found %d polynomial(s), %d below maxnorm\n",
+  printf ("# Stat: tried %d ad-value(s), found %d polynomial(s), %d below maxnorm\n",
           tries, tot_found, found);
-  printf ("# potential collisions=%1.2e (%1.2e/s)\n",
+  printf ("# Stat: potential collisions=%1.2e (%1.2e/s)\n",
           potential_collisions, 1000.0 * potential_collisions
           / (double) cputime ());
-  printf ("# av. adm2:%1.0f", total_adminus2 / (double) collisions);
+  printf ("# Stat: av. g0/adm2 ratio: %.3e\n", total_adminus2 / (double) collisions);
 
   /* print best 10 values of logmu */
-  printf ("# best logmu:");
+  printf ("# Stat: best logmu:");
   for (i = 0; i < 10; i++)
     printf (" %1.2f", best_logmu[i]);
   printf ("\n");
 
   /* print total time (format for cpu_time.sh) */
-  printf ("# Total phase took %.2fs\n", seconds () - st0);
+  printf ("# Stat: total phase took %.2fs\n", seconds () - st0);
 #ifndef HAVE_RUSAGE_THREAD /* rootsieve_time is correct only if RUSAGE_THREAD
                               works or in mono-thread mode */
   if (nthreads == 1)
 #endif
-    printf ("# Rootsieve took %.2fs\n", rootsieve_time);
+    printf ("# Stat: rootsieve took %.2fs\n", rootsieve_time);
 
   if (best_E == 0.0)
     printf ("No polynomial found, please increase the ad range or decrease P\n");
