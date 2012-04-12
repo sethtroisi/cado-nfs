@@ -512,6 +512,11 @@ int main(int argc, char **argv)
                 // Select the side to be sieved
                 int side = (firstsieve)?(1-twice):twice;
 
+                // Fill the buckets.
+                t_buckets -= seconds();
+                buckets_fill(buckets, FB[side], sublat, I, J);
+                t_buckets += seconds();
+
                 // Norm initialization.
                 // convention: if a position contains 255, it must stay like
                 // this. It means that the other side is hopeless.
@@ -525,25 +530,24 @@ int main(int argc, char **argv)
                 sieveFB(S, FB[side], I, J, sublat);
                 t_sieve += seconds();
 
-                t_buckets -= seconds();
-                buckets_fill(buckets, FB[side], sublat, I, J);
                 uint8_t *Sptr = S;
                 for (unsigned k = 0; k < buckets->n; ++k) {
-                    bucket_apply(Sptr, buckets, k);
-                    Sptr += bucket_region_size();
-                }
-                t_buckets += seconds();
+                  // Apply the updates from the corresponding bucket.
+                  t_buckets -= seconds();
+                  bucket_apply(Sptr, buckets, k);
+                  t_buckets += seconds();
 
-                // mark survivors
-                // no need to check if this is a valid position
-                Sptr = S;
-                for (unsigned int k = 0; k < IIJJ; ++k, ++Sptr) {
+                  // since (0,0) is divisible by everyone, its position might
+                  // have been clobbered.
+                  if (!k) *Sptr = 255;
+
+                  // mark survivors
+                  // no need to check if this is a valid position
+                  for (unsigned i = 0; i < bucket_region_size(); ++i, ++Sptr) {
                     if (*Sptr > threshold[side])
-                        *Sptr = 255; 
+                      *Sptr = 255; 
+                  }
                 }
-                // since (0,0) is divisible by everyone, its position might
-                // have been clobbered.
-                S[0] = 255;
             }
 
             t_cofact -= seconds();
