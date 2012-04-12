@@ -517,20 +517,31 @@ int main(int argc, char **argv)
                 buckets_fill(buckets, FB[side], sublat, I, J);
                 t_buckets += seconds();
 
-                // Norm initialization.
-                // convention: if a position contains 255, it must stay like
-                // this. It means that the other side is hopeless.
-                t_norms -= seconds();
-                init_norms(S, ffspol[side], I, J, qlat, qlat->side == side,
-                        sublat);
-                t_norms += seconds();
+                uint8_t *Sptr = S;
+                ij_t j;
+                ij_set_zero(j);
+                for (unsigned k = 0, pos = 0; k < buckets->n; ++k) {
+                  // Norm initialization.
+                  // convention: if a position contains 255, it must stay like
+                  // this. It means that the other side is hopeless.
+                  t_norms -= seconds();
+                  init_norms(Sptr, ffspol[side], I, J, j, pos,
+                             bucket_region_size(),
+                             qlat, qlat->side == side, sublat);
+                  t_norms += seconds();
+
+                  Sptr += bucket_region_size();
+                  pos  += bucket_region_size();
+                  while (ij_monic_set_next(j, j, J) &&
+                         ijvec_get_start_pos(j, I, J) < pos);
+                }
 
                 // sieve
                 t_sieve -= seconds();
                 sieveFB(S, FB[side], I, J, sublat);
                 t_sieve += seconds();
 
-                uint8_t *Sptr = S;
+                Sptr = S;
                 for (unsigned k = 0; k < buckets->n; ++k) {
                   // Apply the updates from the corresponding bucket.
                   t_buckets -= seconds();

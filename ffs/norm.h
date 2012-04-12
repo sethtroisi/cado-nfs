@@ -12,8 +12,9 @@ extern "C" {
 #include "sublat.h"
 
 void ffspol_norm(fppol_t norm, ffspol_srcptr ffspol, fppol_t a, fppol_t b);
-void init_norms(uint8_t *S, ffspol_srcptr ffspol, int I, int J, qlat_t qlat,
-        int sqside, sublat_ptr sublat);
+void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
+                ij_t j0, ijpos_t pos0, ijpos_t size, qlat_t qlat,
+                int sqside, sublat_ptr sublat);
 
 #ifdef __cplusplus
 }

@@ -266,8 +266,9 @@ int deg_norm(ffspol_srcptr ffspol, fppol_t a, fppol_t b)
    from the norm.
    */
 
-void init_norms(uint8_t *S, ffspol_srcptr ffspol, int I, int J, qlat_t qlat,
-        int sqside, sublat_ptr sublat)
+void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
+                ij_t j0, ijpos_t pos0, ijpos_t size, qlat_t qlat,
+                int sqside, sublat_ptr sublat)
 {
   fppol_t a, b;
   fppol_init(a);
@@ -279,8 +280,10 @@ void init_norms(uint8_t *S, ffspol_srcptr ffspol, int I, int J, qlat_t qlat,
   ij_t i, j;
   ij_t hati, hatj;
   int rci, rcj = 1;
-  for (ij_set_zero(j); rcj; rcj = ij_monic_set_next(j, j, J)) {
-    ijpos_t start = ijvec_get_start_pos(j, I, J);
+  for (ij_set(j, j0); rcj; rcj = ij_monic_set_next(j, j, J)) {
+    ijpos_t start = ijvec_get_start_pos(j, I, J) - pos0;
+    if (start >= size)
+      break;
     rci = 1;
     for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
       ijpos_t pos = start + ijvec_get_offset(i, I);
