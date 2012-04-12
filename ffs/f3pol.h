@@ -140,7 +140,7 @@ extern const uint16_t __f3_monic_set_ui_conv[];
     r[0] = r[1] = 0;                                      \
     unsigned __i = 0, __j = 0, __b = MAX(n, n+m-4), __w;  \
     while (__j < __b && x) {                              \
-      __w = (x >> 8) & 0xff;                              \
+      __w = x & 0xff;                                     \
       if (UNLIKELY(__w >= 243))           /* 243 = 3^5 */ \
         return 0;                                         \
       __w = __f3_set_ui_conv[__w];                        \
@@ -149,13 +149,12 @@ extern const uint16_t __f3_monic_set_ui_conv[];
       __i += 8; __j += 5; x >>= 8;                        \
     }                                                     \
     if (x) {                                              \
-      __w = (x >> 8) & 0xff;                              \
+      __w = x & 0xff;                                     \
       if (UNLIKELY(__w >= 122)) /* 122 = (3^5-1)/2 + 1 */ \
         return 0;                                         \
       __w = __f3_monic_set_ui_conv[__w];                  \
       r[0] |= ((uint##sz##_t)(__w & 0x1f) << __j);        \
       r[1] |= ((uint##sz##_t)(__w >> 5  ) << __j);        \
-      __i += 8; __j += 5; x >>= 8;                        \
     }                                                     \
   } while (0)
 
