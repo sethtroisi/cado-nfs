@@ -6,8 +6,8 @@ To construct a factor base, type the following in sage:
 
 where the parameters are:
   f        = the FFS polynomial
-  dlim     = max degree of the factor base
-  powerlim = max degree of the irreducible powers which occur in makefb
+  dlim     = max degree of the irreducible ideals
+  powerlim = max degree of the powers of ideals
   filename =[optional] name of the output file, put "" or no parameter for
                        standard output
   typo     =[optional] output format: "human" for human readable,
