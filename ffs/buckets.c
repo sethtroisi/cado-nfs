@@ -151,7 +151,7 @@ void print_bucket_info(buckets_srcptr buckets)
          bucket_region_size());
   printf("#   number of bits for the hint = %d\n", UPDATE_HINT_BITS);
   printf("#   bit-size of a bucket-update = %d (rounded to %lu)\n",
-      UPDATE_BITS, 8*sizeof(update_packed_t));
+         UPDATE_BITS, 8*sizeof(update_packed_t));
 }
 
 
@@ -258,8 +258,9 @@ static int compute_starting_point(ijvec_ptr V0, ijbasis_ptr euclid,
 
 // Push an update into the corresponding bucket.
 static inline
-void buckets_push_update(buckets_ptr buckets, update_packed_t **ptr,
-                         ijvec_srcptr v, unsigned I, unsigned J)
+void buckets_push_update(MAYBE_UNUSED buckets_ptr buckets,
+                         update_packed_t **ptr, ijvec_srcptr v,
+                         unsigned I, unsigned J)
 {
   ijpos_t  pos = ijvec_get_pos(v, I, J);
   unsigned k   = pos >> UPDATE_POS_BITS;
@@ -279,6 +280,10 @@ void buckets_fill(buckets_ptr buckets, factor_base_srcptr FB,
   unsigned  hatI, hatJ;
   hatI = I + sublat->deg;
   hatJ = J + sublat->deg;
+
+  // The bucket sieve requires all considered ideals to be of degree larger
+  // that I.
+  ASSERT_ALWAYS(buckets->min_degp >= I);
 
   ijbasis_init(basis,     I,    J);
   ijbasis_init(euclid, hatI, hatJ);
