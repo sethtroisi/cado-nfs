@@ -43,6 +43,15 @@ int my_factor_survivor(fppol_t a, fppol_t b, ffspol_t* F, int *B, sq_t q,
 
     // OK. Now we know that we have a relation.
     // Let's factor it completely and print it.
+    // But first, ensure that b is monic (destructively, but who
+    // cares...)
+
+    if (!fppol_is_monic(b)) {
+        fp_t lc;
+        fppol_get_coeff(lc, b, fppol_deg(b));
+        fppol_sdiv(b, b, lc);
+        fppol_sdiv(a, a, lc);
+    }
     fppol_fact_t factors;
     fppol_fact_init(factors);
     fppol_out(stdout, a); printf(",");
