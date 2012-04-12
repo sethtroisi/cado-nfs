@@ -1,9 +1,9 @@
-def Primes(A,alim):
+def Primes(A,alim,astart=0):
 	if A==ZZ:
-		return primes(alim)
+		return primes(astart,alim)
 	else:
 		res=[]
-		for a in element_list(A,alim):
+		for a in element_list(A,alim,astart):
 			if (not a.is_zero()) and (a.is_irreducible()) and (a.is_monic()):
 				res.append(a)
 	return res
@@ -39,16 +39,26 @@ def log_norm(p):
         res=p.degree()*log(q)
     return res
 
-def element_list(A,alim):
+def Norm(p):
+    A=p.parent()
+    if A==ZZ:
+        res=abs(p)
+    else:
+        F=A.base_ring()
+	q=len(F)
+        res=q^p.degree()
+    return res
+
+def element_list(A,alim,astart=0):
 	if A==ZZ:
-		return range(alim)
+		return range(astart,alim)
 	else:
 		q=len(A.base_ring())
 		F=A.base_ring()
 		t=A.gen()
 		l=F.list()
 		res=[]
-		for i in range(alim):
+		for i in range(astart,alim):
 			iPol=A(0)			
 			k=0
 			dig=ZZ(i).digits(q)
