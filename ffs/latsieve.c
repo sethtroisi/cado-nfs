@@ -104,13 +104,11 @@ static int compute_starting_point(ijvec_ptr V0, fbideal_srcptr gothp,
     }
     // TODO: Way too expensive!
     // xi and yi have degree 2
-    ij_t xi, yi, xip, yip;
+    ij_t xi, xip, yip;
     ij_set_16(xi, sublat->lat[sublat->n][0]);
-    ij_set_16(yi, sublat->lat[sublat->n][1]);
-    ij_set(V0->j, yi);
     fbprime_t tmp0;
     ij_t tmp1;
-    fbprime_set_ij(tmp0, yi);
+    fbprime_set_16(tmp0, sublat->lat[sublat->n][1]);
     fbprime_mulmod(tmp0, gothp->lambda, tmp0, gothp->p);
     ij_set_fbprime(yip, tmp0);
     ij_add(xip, xi, yip);
@@ -124,8 +122,7 @@ static int compute_starting_point(ijvec_ptr V0, fbideal_srcptr gothp,
     ij_set_16(ijmod, sublat->modulus);
     ij_sub(V0->i, V0->i, xi);
     ij_div(V0->i, V0->i, ijmod);
-    ij_sub(V0->j, V0->j, yi);
-    ij_div(V0->j, V0->j, ijmod);
+    ij_set_zero(V0->j);
     return 1;
 }
 
