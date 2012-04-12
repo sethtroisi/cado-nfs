@@ -97,7 +97,6 @@ void visit_vector_space(vvs_param_t *vvsp, unsigned int k) {
 static int compute_starting_point(ijvec_ptr V0, fbideal_srcptr gothp,
                                   sublat_ptr sublat)
 {
-    ASSERT(gothp->degp < I);
     if (!use_sublat(sublat)) {
         ijvec_set_zero(V0);
         return 1;
