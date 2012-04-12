@@ -537,8 +537,11 @@ int main(int argc, char **argv)
                 }
 
                 // sieve
+                // TODO: split this into bucket regions!
+                ij_set_zero(j);
                 t_sieve -= seconds();
-                sieveFB(S, FB[side], I, J, sublat);
+                sieveFB(S, FB[side], I, J, j, 0, buckets->n*bucket_region_size(),
+                        sublat);
                 t_sieve += seconds();
 
                 Sptr = S;

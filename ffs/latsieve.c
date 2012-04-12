@@ -17,7 +17,7 @@ typedef struct {
     int J;
     uint8_t *S;
     ijbasis_srcptr basis;
-    fbideal_srcptr gothp;
+    fbideal_ptr    gothp;
 } vvs_param_t;
 
 
@@ -125,33 +125,50 @@ static int compute_starting_point(ijvec_ptr V0, fbideal_srcptr gothp,
     return 1;
 }
 
-void sieve_projective_root(uint8_t *S, fbideal_srcptr gothp,
-        unsigned I, unsigned J, sublat_ptr sublat)
+// FIXME: Multiplication is not compatible with lexicographical order, so there
+// is no guarantee that we visit lines by increasing j's.
+// However, since the positive-j part of the basis of the GF(p)-vector-space is
+// (0, p*t^k) for 0 <= k < J-deg(p), and since this basis is independent from
+// the special-Q or the sublattice, we can precompute a reduced row-echelon
+// form of this basis for all small primes while reading the factor bases.
+// Then, a simple enumeration via a p-ary monic Gray code should nicely do the
+// trick (TODO!).
+#if 0
+void sieve_projective_root(uint8_t *S, fbideal_ptr gothp, unsigned I,
+                           unsigned J, ijpos_t pos0, ijpos_t size,
+                           sublat_ptr sublat)
 {
     ASSERT(gothp->degp < I);
-    ij_t i, j, j0, jj, p;
+    ij_t i, j, jj, p;
     ij_set_fbprime(p, gothp->p);
-    // Find the first line to fill
-    if (use_sublat(sublat)) {
+
+    // First time round?
+    if (UNLIKELY(!pos0)) {
+      // Find the first line to fill
+      if (use_sublat(sublat)) {
         // take the first multiple of p that is congruent to y.
         ij_t tmp, y;
         ij_set_16(tmp, sublat->modulus);
         ij_set_16(y, sublat->lat[sublat->n][1]);
-        ij_mulmod(j0, y, gothp->tildep, tmp);
-        ij_mul(j0, j0, p);
+        ij_mulmod(gothp->j0, y, gothp->tildep, tmp);
+        ij_mul   (gothp->j0, gothp->j0, p);
         // map it into the sublattice.
-        ij_sub(j0, j0, y);
-        ij_div(j0, j0, tmp);
-    } else {
-        ij_set_zero(j0);
+        ij_sub(gothp->j0, gothp->j0, y);
+        ij_div(gothp->j0, gothp->j0, tmp);
+      } else {
+        ij_set_zero(gothp->j0);
+      }
+      ij_set_zero(gothp->j);
     }
 
     int rci, rcj = 1;
-    for(ij_set_zero(jj); rcj; rcj = ij_monic_set_next(jj, jj, J-gothp->degp)) {
+    for(ij_set(jj, gothp->j); rcj;
+        rcj = ij_monic_set_next(jj, jj, J-gothp->degp)) {
         ij_mul(j, jj, p);
         if (use_sublat(sublat))
-            ij_add(j, j, j0);
-        ijpos_t start = ijvec_get_start_pos(j, I, J);
+            ij_add(j, j, gothp->j0);
+        if (start >= size)
+          break;
         rci = 1;
         for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
             ijpos_t pos = start + ijvec_get_offset(i, I);
@@ -174,10 +191,12 @@ void sieve_projective_root(uint8_t *S, fbideal_srcptr gothp,
 
         }
     }
+    ij_set(gothp->j, jj);
 }
+#endif
 
 void sieveFB(uint8_t *S, factor_base_srcptr FB, unsigned I, unsigned J,
-        sublat_ptr sublat)
+             ij_t j0, ijpos_t pos0, ijpos_t size, sublat_ptr sublat)
 {
   ijbasis_t basis;
   ijbasis_t euclid;
@@ -189,7 +208,7 @@ void sieveFB(uint8_t *S, factor_base_srcptr FB, unsigned I, unsigned J,
   ijbasis_init(euclid, hatI, hatJ);
 
     for (unsigned int ii = 0; ii < FB->n; ++ii) {
-        fbideal_srcptr gothp = FB->elts[ii];
+        fbideal_ptr gothp = FB->elts[ii];
         int L = gothp->degp;
         // Larger primes are left to the bucket sieve.
         if ((unsigned)L >= I) break;
@@ -198,7 +217,9 @@ void sieveFB(uint8_t *S, factor_base_srcptr FB, unsigned I, unsigned J,
 
         // projective roots are handled differently
         if (gothp->proj) {
-            sieve_projective_root(S, gothp, I, J, sublat);
+            // FIXME: For the time being, projective-root sieving is disabled.
+            // See above for an explanation why.
+            // sieve_projective_root(S, gothp, I, J, pos0, size, sublat);
             continue;
         }
 
