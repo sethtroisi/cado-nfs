@@ -94,126 +94,39 @@ void visit_vector_space(vvs_param_t *vvsp, unsigned int k) {
 // In the case of sublattices, compute the starting point for the sieve
 // by gothp for the current sublattice.
 // If there is no starting point return 0.
-static int compute_starting_point(ijvec_ptr V0, ijbasis_ptr euclid,
-        ijbasis_ptr basis, fbideal_srcptr gothp, sublat_ptr sublat)
+static int compute_starting_point(ijvec_ptr V0, fbideal_srcptr gothp,
+                                  sublat_ptr sublat)
 {
+    ASSERT(gothp->degp < I);
     if (!use_sublat(sublat)) {
         ijvec_set_zero(V0);
         return 1;
     }
-    int hatI = euclid->I;
-    int hatJ = euclid->J;
-    unsigned int L = gothp->degp;
-    if (L < basis->I) {
-        // TODO: Way too expensive!
-        // xi and yi have degree 2
-        ij_t xi, yi, xip, yip;
-        ij_set_16(xi, sublat->lat[sublat->n][0]);
-        ij_set_16(yi, sublat->lat[sublat->n][1]);
-        ij_set(V0->j, yi);
-        fbprime_t tmp0;
-        ij_t tmp1;
-        fbprime_set_ij(tmp0, yi);
-        fbprime_mulmod(tmp0, gothp->lambda, tmp0, gothp->p);
-        ij_set_fbprime(yip, tmp0);
-        ij_add(xip, xi, yip);
-        ij_set_16(tmp1, sublat->modulus);
-        ij_mulmod(xip, xip, gothp->tildep, tmp1);
-        ij_set_fbprime(tmp1, gothp->p);
-        ij_mul(V0->i, xip, tmp1);
-        ij_add(V0->i, V0->i, yip);
+    // TODO: Way too expensive!
+    // xi and yi have degree 2
+    ij_t xi, yi, xip, yip;
+    ij_set_16(xi, sublat->lat[sublat->n][0]);
+    ij_set_16(yi, sublat->lat[sublat->n][1]);
+    ij_set(V0->j, yi);
+    fbprime_t tmp0;
+    ij_t tmp1;
+    fbprime_set_ij(tmp0, yi);
+    fbprime_mulmod(tmp0, gothp->lambda, tmp0, gothp->p);
+    ij_set_fbprime(yip, tmp0);
+    ij_add(xip, xi, yip);
+    ij_set_16(tmp1, sublat->modulus);
+    ij_mulmod(xip, xip, gothp->tildep, tmp1);
+    ij_set_fbprime(tmp1, gothp->p);
+    ij_mul(V0->i, xip, tmp1);
+    ij_add(V0->i, V0->i, yip);
 
-        ij_t ijmod;
-        ij_set_16(ijmod, sublat->modulus);
-        ij_sub(V0->i, V0->i, xi);
-        ij_div(V0->i, V0->i, ijmod);
-        ij_sub(V0->j, V0->j, yi);
-        ij_div(V0->j, V0->j, ijmod);
-        return 1;
-    } else {
-        // TODO: FIXME: WARNING: this whole block is to be rewritten
-        // completely!
-
-        // There must be some Thm that says that a combination of
-        // the first two or of the second two basis vectors is
-        // enough to find a valid starting point (assuming that
-        // the basis is sorted in increasing order for deg j).
-        // Cf a .tex that is to be written.
-        // If p is too large, then the code below is broken (and
-        // anyway, this is a weird idea to sieve with such
-        // parameters).
-
-        // Try with the first 2 fundamental vectors and if this does not
-        // work, try with the second 2 vectors.
-        // TODO: question: does it ensures that vectors will be
-        // visited in increasing order of j ?
-        // FIXME: What if there are only 2 fundamental vectors?
-        //
-        //
-
-        // Naive approach: check all combinations.
-        ij_t ijmod, xi, yi;
-        ij_set_16(ijmod, sublat->modulus);
-        ij_set_16(xi, sublat->lat[sublat->n][0]);
-        ij_set_16(yi, sublat->lat[sublat->n][1]);
-        int found = 0;
-
-        // case of just one vector in euclid.vec
-        if (euclid->dim == 1) {
-            ij_t rem;
-            ij_rem(rem, euclid->v[0]->i, ijmod);
-            if (ij_eq(rem, xi)) {
-                ij_rem(rem, euclid->v[0]->j, ijmod);
-                if (ij_eq(rem, yi)) {
-                    // Got a valid point!
-                    ij_sub(V0->i, euclid->v[0]->i, xi);
-                    ij_div(V0->i, V0->i, ijmod);
-                    ij_sub(V0->j, euclid->v[0]->j, yi);
-                    ij_div(V0->j, V0->j, ijmod);
-                    found = 1;
-                }
-            }
-        }
-
-        for (unsigned int ind = 0; (!found) && ind < euclid->dim-1; ++ind) {
-            for (int i0 = 0; (!found) && i0 < 2; ++i0)
-                for (int i1 = 0; (!found) && i1 < 2; ++i1)
-                    for (int i2 = 0; (!found) && i2 < 2; ++i2)
-                        for (int i3 = 0; (!found) && i3 < 2; ++i3){
-                            ijvec_t W, tmp;
-                            ijvec_set_zero(W);
-                            int i01 = i0 ^ i1;
-                            int i23 = i2 ^ i3;
-                            if (i0) ijvec_add(W,W,euclid->v[ind]);
-                            if (i2) ijvec_add(W,W,euclid->v[ind+1]);
-                            if (i01) {
-                                ijvec_mul_ti(tmp,euclid->v[ind],1);
-                                ijvec_add(W, W, tmp);
-                            }
-                            if (i23) {
-                                ijvec_mul_ti(tmp,euclid->v[ind+1],1);
-                                ijvec_add(W, W, tmp);
-                            }
-                            if ((ij_deg(W->i) >= hatI)
-                                    || (ij_deg(W->j) >= hatJ))
-                                continue;
-                            ij_t rem;
-                            ij_rem(rem, W->i, ijmod);
-                            if (!ij_eq(rem, xi))
-                                continue;
-                            ij_rem(rem, W->j, ijmod);
-                            if (!ij_eq(rem, yi))
-                                continue;
-                            // Got a valid point!
-                            ij_sub(W->i, W->i, xi);
-                            ij_div(V0->i, W->i, ijmod);
-                            ij_sub(W->j, W->j, yi);
-                            ij_div(V0->j, W->j, ijmod);
-                            found = 1;
-                        }
-        }
-        return found;
-    }
+    ij_t ijmod;
+    ij_set_16(ijmod, sublat->modulus);
+    ij_sub(V0->i, V0->i, xi);
+    ij_div(V0->i, V0->i, ijmod);
+    ij_sub(V0->j, V0->j, yi);
+    ij_div(V0->j, V0->j, ijmod);
+    return 1;
 }
 
 void sieve_projective_root(uint8_t *S, fbideal_srcptr gothp,
@@ -297,7 +210,7 @@ void sieveFB(uint8_t *S, factor_base_srcptr FB, unsigned I, unsigned J,
         ijbasis_compute(euclid, basis, gothp);
         ijvec_t V0;
         if (use_sublat(sublat)) {
-            int st = compute_starting_point(V0, euclid, basis, gothp, sublat);
+            int st = compute_starting_point(V0, gothp, sublat);
             if (!st)
                 continue; // next factor base prime.
         } else {
