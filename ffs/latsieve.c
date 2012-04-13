@@ -78,6 +78,29 @@ void sieve_projective_root(uint8_t *S, fbideal_ptr gothp, unsigned I,
 }
 #endif
 
+
+static inline
+void sieve_hit(uint8_t *S, fbideal_srcptr gothp,
+               MAYBE_UNUSED ijpos_t pos0, ijpos_t pos)
+{
+#ifdef TRACE_POS
+  if (pos0+pos == TRACE_POS) {
+    fprintf(stderr, "TRACE_POS(%lu): ", pos0+pos);
+    fbprime_out(stderr, gothp->p); fprintf(stderr, " ");
+    fbprime_out(stderr, gothp->r); fprintf(stderr, "\n");
+    fprintf(stderr, "TRACE_POS(%lu): degnorm is now %d\n",
+            pos0+pos, S[pos]-gothp->degp);
+  }
+#endif
+#ifndef NDEBUG
+  if (S[pos] < gothp->degp)
+    fprintf(stderr, "faulty pos is %lu\n", pos0+pos);
+  ASSERT(S[pos] >= gothp->degp);
+#endif
+  S[pos] -= gothp->degp;
+}
+
+
 // TODO: This code is completely under-efficient. Fix this!
 void sieveFB(uint8_t *S, factor_base_srcptr FB, unsigned I, unsigned J,
              ij_t j0, ijpos_t pos0, ijpos_t size, sublat_ptr sublat)
@@ -154,10 +177,8 @@ void sieveFB(uint8_t *S, factor_base_srcptr FB, unsigned I, unsigned J,
             break;
           ij_set(i, gothp->i0);
           ijpos_t pos = start + ijvec_get_offset(i, I);
-          if (LIKELY(pos0 || pos)) {
-            ASSERT(S[pos] >= L);
-            S[pos] -= L;
-          }
+          if (LIKELY(pos0 || pos))
+            sieve_hit(S, gothp, pos0, pos);
 
           // Size of Gray codes to use for the inner loop.
 #         if   defined(USE_F2)
@@ -184,8 +205,7 @@ void sieveFB(uint8_t *S, factor_base_srcptr FB, unsigned I, unsigned J,
             for (unsigned k = k0; k < ngray; ++k) {
               ij_add(i, i, basis->v[gray[k]]->i);
               pos = start + ijvec_get_offset(i, I);
-              ASSERT(S[pos] >= L);
-              S[pos] -= L;
+              sieve_hit(S, gothp, pos0, pos);
             }
             k0 = 0;
 
@@ -199,8 +219,7 @@ void sieveFB(uint8_t *S, factor_base_srcptr FB, unsigned I, unsigned J,
               ij_diff(s, s, t);
               ij_add(i, i, basis->v[ij_deg(s)+ENUM_LATTICE_UNROLL]->i);
               pos = start + ijvec_get_offset(i, I);
-              ASSERT(S[pos] >= L);
-              S[pos] -= L;
+              sieve_hit(S, gothp, pos0, pos);
             }
           } while (rc);
 

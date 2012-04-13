@@ -400,15 +400,29 @@ void bucket_apply(uint8_t *S, buckets_srcptr buckets, unsigned k)
   // Pointer to the current reading position in the bucket.
   update_packed_t *ptr = buckets->start[k];
 
+  // For debugging purposes.
+  MAYBE_UNUSED ijpos_t pos0 = k*bucket_region_size();
+
   // Iterate through each group of updates having same deg(gothp).
   update_packed_t **end = buckets->degp_end+k;
   for (unsigned degp = buckets->min_degp; degp < buckets->max_degp;
        ++degp, end += buckets->n) {
     while (ptr != *end) {
       update_t update = update_unpack(*ptr++);
-      pos_t    p      = update_get_pos(update);
-      ASSERT(S[p] >= degp);
-      S[p] -= degp;
+      pos_t    pos    = update_get_pos(update);
+#ifdef TRACE_POS
+      if (pos0+pos == TRACE_POS) {
+        fprintf(stderr, "TRACE_POS(%lu): [%u]\n", pos0+pos, degp);
+        fprintf(stderr, "TRACE_POS(%lu): degnorm is now %d\n",
+                pos0+pos, S[pos]-degp);
+      }
+#endif
+#ifndef NDEBUG
+      if (S[pos] < degp)
+        fprintf(stderr, "faulty pos is %lu\n", pos0+pos);
+      ASSERT(S[pos] >= degp);
+#endif
+      S[pos] -= degp;
     }
   }
 }
