@@ -354,6 +354,13 @@ int main(int argc, char **argv)
     qlat->side = sqside; 
 
     double tot_time = seconds();
+    double tot_norms = 0;
+    double tot_sieve = 0;
+    double tot_buckets = 0;
+    double tot_cofact = 0;
+    double tot_initS = 0;
+    double tot_lambda = 0;
+
     int tot_nrels = 0;
     int tot_sq = 0;
     
@@ -625,18 +632,23 @@ int main(int argc, char **argv)
                 "in %1.1f s\n", nrels, t_tot);
         fprintf(stdout,
                 "# Time of main steps: "
-                "%1.1f s (lambda); "
-                "%1.1f s (initS);   "
-                "%1.1f s (norms);\n"
+                "%1.2f s (lambda); "
+                "%1.2f s (initS);   "
+                "%1.2f s (norms);\n"
                 "#                     "
-                "%1.1f s (sieve);  "
-                "%1.1f s (buckets); "
-                "%1.1f s (cofact).\n",
+                "%1.2f s (sieve);  "
+                "%1.2f s (buckets); "
+                "%1.2f s (cofact).\n",
                 t_lambda, t_initS, t_norms, t_sieve, t_buckets, t_cofact);
         fprintf(stdout, "# Yield: %1.5f s/rel\n", t_tot/nrels);
         fflush(stdout);
         tot_nrels += nrels;
-
+        tot_norms   += t_norms;
+        tot_sieve   += t_sieve;
+        tot_buckets += t_buckets;
+        tot_cofact  += t_cofact;
+        tot_initS   += t_initS;
+        tot_lambda  += t_lambda;
     } while (1); // End of loop over special-q's
 
     free(S);
@@ -648,6 +660,17 @@ int main(int argc, char **argv)
 
     tot_time = seconds()-tot_time;
     fprintf(stdout, "###### General statistics ######\n");
+    fprintf(stdout, "#   Total time: %1.1f s\n", tot_time);
+    fprintf(stdout, "#   Main steps: "
+                    "%1.2f s (lambda); "
+                    "%1.2f s (initS);   "
+                    "%1.2f s (norms);\n"
+                    "#               "
+                    "%1.2f s (sieve);  "
+                    "%1.2f s (buckets); "
+                    "%1.2f s (cofact).\n",
+        tot_lambda, tot_initS, tot_norms, tot_sieve, tot_buckets, tot_cofact);
+ 
     fprintf(stdout, "#   Computed %d special-q\n", tot_sq);
     fprintf(stdout, "#   %d relations found (%1.1f rel/sq)\n",
             tot_nrels, (double)tot_nrels / (double)tot_sq);
