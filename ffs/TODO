@@ -1,0 +1,60 @@
+- Norm initialization speed-up.
+  Use a floating-point arithmetic for computing the degree of the norm
+  with only low precision polynomial arithmetic.
+  From the knowledge of the behaviour at one position, deduce the degree
+  of the norm for many other positions (typically when the degree of i
+  does not change).
+
+- Organize the line-sieving and norm-init by bucket-region.
+  This should finally save the big area allocation.
+
+- Make the projective roots work by increasing value of j.
+  This is necessary to make them compatible with the bucket-region
+  sieving. It is also a good thing for locality.
+  This implies to transform the F_p-basis { p, t*p, t^2*p, ... }
+  into a basis where the coefficients of degree more than deg(p) form a
+  diagonal matrix (and not only a triangular one).
+
+- Provide more fixed sizes in fppol*_ arithmetic.
+  This is important for cofactorization. 
+  It should take advantage of SSE/AVX, so that a bit of rewriting of
+  lowlevel structures in necessary.
+  When we are at it, having 8-bit and 4-bit arithmetic would be nice
+  (especially for norm computations in characteristic 3).
+
+- Cleaning type declaration/definition.
+  It is convenient to *declare* types in a unique .h file.
+  However, it is interesting to keep the struct definitions in the .h
+  file that also declares all the associated functions.
+  -> one file fppol_types.h that contains the CPP-craziness for fppol
+  types.
+  -> one file types.h that contains all other type declarations (ijvec_t,
+  fbideal_t, ...)
+  -> the __toto_struct definition should go to the .h file that provide
+  also function to work on toto_t.
+
+- Fix sublat.
+  Sublat are broken.
+  Also, they are way too slow. It is necessary to have a few specific
+  function for arithmetic involving the t^2+t polynomial.
+
+- Deal with powers.
+  This should work more or less automatically, but this has to be tested.
+
+- Add the fppol*_set_random() and fppol*_cmp() functions.
+  set_random() is not so simple if we want uniformity in characteristic 3.
+  Since it is used only for EDF, we don't really need it and can live
+  with strongly biased randomness.
+  At some point we might want to use random for automatic tests of the
+  polynomial arithmetic.
+
+- Uniformization of the upper bounds
+  It would make sense to ensure that all the upper bounds on degree
+  involved in the code are *strict* upper bounds. This is currently not
+  the case for fbb/lpb for instance.
+
+- Split factor bases.
+  Small factor base primes and large factor base primes are not handled
+  in the same way, so they do not need the same kind of precomputation. 
+  It will be easier to have two separate data structures. 
+
