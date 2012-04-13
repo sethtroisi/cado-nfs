@@ -87,12 +87,14 @@ int fppol_is_smooth(fppol_srcptr PP, int B)
     fppol_init(invP2);  // to reduce a product of 2
     fppol_init(invPq);  // to reduce the result of q-power.
 
-    // TODO: the first one can be deduced from the second one.
+#ifdef USE_F2
     fppol_msb_preinverse(invP2, P, fppol_deg(P)-2);
-#ifndef USE_F2
-    fppol_msb_preinverse(invPq, P, 2*fppol_deg(P)-3);
-#else
     fppol_set(invPq, invP2);
+#elif defined(USE_F3)
+    fppol_msb_preinverse(invPq, P, 2*fppol_deg(P)-3);
+    fppol_div_ti(invP2, invPq, fppol_deg(P)-1);
+#else
+#error "This part of the code supports only GF(2) and GF(3)."
 #endif
 
     fppol_set_ti(t, 1);
