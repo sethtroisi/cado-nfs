@@ -532,8 +532,8 @@ int main(int argc, char **argv)
 
                   Sptr += bucket_region_size();
                   pos  += bucket_region_size();
-                  while (ij_monic_set_next(j, j, J) &&
-                         ijvec_get_start_pos(j, I, J) < pos);
+                  while (ijvec_get_start_pos(j, I, J) < pos &&
+                         ij_monic_set_next(j, j, J));
                 }
 
                 // sieve
