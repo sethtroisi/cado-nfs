@@ -164,7 +164,10 @@ extern const uint16_t __f3_monic_set_ui_conv[];
  *****************************************************************************/
 
 // Naive <sr> <- <sp> x <sq> multiplication.
-#define __FP_MUL_xx_yyxzz_NAIVE(sr, sp, sq, r, p, q, op)                 \
+// This is unused code.
+// We keep this version as a reference code, although it is now
+// superseded by the following implementation.
+#define __FP_MUL_xx_yyxzz_NAIVE0(sr, sp, sq, r, p, q, op)                \
   do {                                                                   \
     fppol##sp##_t __m;                                                   \
     fppol##sr##_t __t = {0,0}, __s;                                      \
@@ -179,6 +182,29 @@ extern const uint16_t __f3_monic_set_ui_conv[];
     }                                                                    \
     CAT(fppol##sr##_, SWITCH(op, OP(r, __t), set(r, __t)));              \
   } while (0)
+
+// Naive <sr> <- <sp> x <sq> multiplication.
+// Coefficients of q are handled one by one.
+// 2*p is precomputed.
+#define __FP_MUL_xx_yyxzz_NAIVE(sr, sp, sq, r, p, q, op)                  \
+  do {                                                                    \
+    fppol##sr##_t __t = {0,0};                                            \
+    fppol##sp##_t pp[3];                                                  \
+    pp[0][0] = 0;    pp[0][1] = 0;                                        \
+    pp[1][0] = p[0]; pp[1][1] = p[1];                                     \
+    pp[2][0] = __FP_ADD_0(p[0], p[1], p[0], p[1]);                        \
+    pp[2][1] = __FP_ADD_1(p[0], p[1], p[0], p[1]);                        \
+    unsigned __degq = fppol##sq##_deg(q);                                 \
+    for (unsigned __i = __degq+1; __i--; ) {                              \
+      __t[0] <<= 1; __t[1] <<= 1;                                         \
+      unsigned __m = ((q[0] >> __i) & 1) + (((q[1] >> __i) & 1)<<1);      \
+      uint64_t __t0 = __FP_ADD_0(__t[0], __t[1], pp[__m][0], pp[__m][1]); \
+      __t[1] = __FP_ADD_1(__t[0], __t[1], pp[__m][0], pp[__m][1]);        \
+      __t[0] = __t0;                                                      \
+    }                                                                     \
+    CAT(fppol##sr##_, SWITCH(op, OP(r, __t), set(r, __t)));               \
+  } while (0)
+
 
 #define __FP_MUL_16_16x16_NAIVE(            r, p, q, op) \
         __FP_MUL_xx_yyxzz_NAIVE(16, 16, 16, r, p, q, op)
