@@ -59,7 +59,7 @@ def element_list(A,alim,astart=0):
 		l=F.list()
 		res=[]
 		for i in range(astart,alim):
-			iPol=int2pol(q,ZZ(i).digits(),l,Q)			
+			iPol=int2pol(q,ZZ(i).digits(q),l,A)			
 			res+=[iPol]
 		return res			
 
@@ -68,6 +68,7 @@ def int2pol(q,dig,l,A):
 # l =list of elements of GF(q)
 # ring where belongs the result
    res=A(0)
+   t=A.gen()
    k=0
    for j in dig:
        res+=l[j]*t^k
@@ -160,3 +161,14 @@ def fmodp_roots(fcoeffs,p,K,Ky):
         g=A(K(ri).polynomial())
         r_pol_format.append(g(phi(t)) % p)
     return r_pol_format
+
+def sigma(hexpol,q=2,A=None):
+    if A==None:
+        A.<t>=GF(q)['t']
+    else:
+        t=A.gen()
+    l=A.base_ring().list()
+    return int2pol(2,ZZ(int(hexpol,16)).digits(2),l,A)
+
+
+
