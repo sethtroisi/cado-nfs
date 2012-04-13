@@ -18,6 +18,7 @@ def lift_root_unramified(f,df,r,p,kmax):
     return r
 
 
+
 # The roots are of the form phi(x), and phi is now to constrain roots mod
 # p^m ; the content of original_f(phi(x)) is known to be equal to k0
 def all_roots_affine(f,p,kmax,k0,m,phi):
@@ -27,10 +28,12 @@ def all_roots_affine(f,p,kmax,k0,m,phi):
     A=f.base_ring()
     ZP=f.parent()
     x=ZP.gen()
+    q=A.base_ring().cardinality()
+    K.<w0>=GF(q^p.degree())
+    Ky.<y>=K['y']
     df = f.derivative()
     res=[]
-    for r in bar(f,p).roots():
-        r=A(r[0].polynomial())
+    for r in fmodp_roots(f.coeffs(),p,K,Ky):
         if df(r) % p != 0:
             rr = lift_root_unramified(f,df,r,p,kmax-k0)
             for l in range(1,kmax-k0):
@@ -50,7 +53,6 @@ def all_roots(f,p,powerlim):
     ZP=f.parent()
     x=ZP.gen()
     kmax=ceil(powerlim/p.degree())
-    #print f,p
     aff=all_roots_affine(f,p,kmax,0,0,x)
     final=[]
     # affine
@@ -128,40 +130,49 @@ def makefb(f,dlim,powerlim,filename="",typo="cado"):
 	gd.write("# f={0}\n".format(f))
 	gd.write("# dlim={0}\n".format(dlim))
 	gd.write("# powerlim={0}\n".format(powerlim))
-	A=f.base_ring()
-	if A!=ZZ and A!=QQ:
-		F=A.base_ring()
-		q=len(F.list())
-		dummy=2^ceil(log(q)/log(2))
-		t=A.gen()
-		Zt.<t0>=ZZ['t']
-	def hexify(ri):
+	def hexify(Zt,dummy,ri):
 		if typo=="cado":
 			return hex(Zt(ri)(dummy))
 		else:
 			return format(ri)
-		F=A.base_ring()
-		q=F.cardinality()
-	for p in Primes(A,q^(min(dlim,powerlim)+1)):
-		#print p
+	A=f.base_ring()
+	F=A.base_ring()
+	l=F.list()
+        q=len(l)
+	dummy=2^ceil(log(q)/log(2))
+	t=A.gen()
+	Zt.<t0>=ZZ['t']
+	for intp in range(q^(min(dlim,powerlim)+1)):
+                p=int2pol(q,ZZ(intp).digits(q),l,A)
+                if not p.is_irreducible():
+                    continue
 		xx = all_roots(f, p, powerlim+1)
 		xx = rewrite_roots(xx)
 		for r in xx:
 			if (r[1] != 1) or (r[2] != 0):
-				stri =hexify(r[0])+":"+format(r[1])+","+format(r[2])+": "+hexify(r[3][0])
+				stri=hexify(Zt,dummy,r[0])+":"+format(r[1])+","+format(r[2])+":"+hexify(Zt,dummy,r[3][0])
 			else:
-				stri = hexify(r[0])+": "+hexify(r[3][0])
+				stri = hexify(Zt,dummy,r[0])+":"+hexify(Zt,dummy,r[3][0])
 			for i in range(1,len(r[3])):
-				stri = stri + ","+hexify(r[3][i])
+				stri = stri + ","+hexify(Zt,dummy,r[3][i])
 			gd.write(stri+"\n")
-	for p in Primes(A,q^(dlim+1),q^min(dlim+1,powerlim+1)):
-		xx = all_roots(f, p, p.degree()+1)
+                        del stri
+                del xx
+                del p
+	for intp in range(q^min(dlim+1,powerlim+1),q^(dlim+1)):
+                p=int2pol(q,ZZ(intp).digits(q),l,A)
+                if not p.is_irreducible():
+                    continue
+                xx = all_roots(f, p, p.degree()+1)
 		xx = rewrite_roots(xx)
 		for r in xx:
 			if (r[1] != 1) or (r[2] != 0):
-				stri =hexify(r[0])+":"+format(r[1])+","+format(r[2])+": "+hexify(r[3][0])
+				stri=hexify(Zt,dummy,r[0])+":"+format(r[1])+","+format(r[2])+":"+hexify(Zt,dummy,r[3][0])
 			else:
-				stri = hexify(r[0])+": "+hexify(r[3][0])
+				stri = hexify(Zt,dummy,r[0])+":"+hexify(Zt,dummy,r[3][0])
 			for i in range(1,len(r[3])):
-				stri = stri + ","+hexify(r[3][i])
+				stri = stri + ","+hexify(Zt,dummy,r[3][i])
 			gd.write(stri+"\n")
+                        del stri
+                del xx
+                del p
