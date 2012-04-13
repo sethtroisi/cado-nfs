@@ -298,6 +298,7 @@ typedef struct {
   fbprime_t r;
   fbprime_t lambda;
   ij_t      tildep;    // 1/p mod sublat_info.modulus
+  ij_t      i0;
   //ij_t      j0, j;   // FIXME: projective-root sieving.
   uint8_t   degp;
   _Bool     proj;
