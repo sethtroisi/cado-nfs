@@ -522,7 +522,12 @@ int main(int argc, char **argv)
                 uint8_t *Sptr = S;
                 ij_t j;
                 ij_set_zero(j);
-                for (unsigned k = 0, pos = 0; k < buckets->n; ++k) {
+                for (unsigned k = 0, pos = 0; k < buckets->n;
+                     ++k, pos += bucket_region_size()) {
+                  // Skip to next j.
+                  while (ijvec_get_start_pos(j, I, J) < pos &&
+                         ij_monic_set_next(j, j, J));
+
                   // Norm initialization.
                   // convention: if a position contains 255, it must stay like
                   // this. It means that the other side is hopeless.
@@ -532,22 +537,12 @@ int main(int argc, char **argv)
                              qlat, qlat->side == side, sublat);
                   t_norms += seconds();
 
-                  Sptr += bucket_region_size();
-                  pos  += bucket_region_size();
-                  while (ijvec_get_start_pos(j, I, J) < pos &&
-                         ij_monic_set_next(j, j, J));
-                }
+                  // Line sieve.
+                  t_sieve -= seconds();
+                  sieveFB(Sptr, FB[side], I, J, j, pos, bucket_region_size(),
+                          sublat);
+                  t_sieve += seconds();
 
-                // sieve
-                // TODO: split this into bucket regions!
-                ij_set_zero(j);
-                t_sieve -= seconds();
-                sieveFB(S, FB[side], I, J, j, 0, buckets->n*bucket_region_size(),
-                        sublat);
-                t_sieve += seconds();
-
-                Sptr = S;
-                for (unsigned k = 0; k < buckets->n; ++k) {
                   // Apply the updates from the corresponding bucket.
                   t_buckets -= seconds();
                   bucket_apply(Sptr, buckets, k);
@@ -618,7 +613,7 @@ int main(int argc, char **argv)
                 "%1.1f s (initS);   "
                 "%1.1f s (norms);\n"
                 "#                     "
-                "%1.1f s (sieve);  "
+                "%1.3f s (sieve);  "
                 "%1.1f s (buckets); "
                 "%1.1f s (cofact).\n",
                 t_lambda, t_initS, t_norms, t_sieve, t_buckets, t_cofact);
