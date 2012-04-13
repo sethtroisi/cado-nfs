@@ -59,14 +59,21 @@ def element_list(A,alim,astart=0):
 		l=F.list()
 		res=[]
 		for i in range(astart,alim):
-			iPol=A(0)			
-			k=0
-			dig=ZZ(i).digits(q)
-			for j in dig:
-				iPol+=l[j]*t^k
-				k+=1
+			iPol=int2pol(q,ZZ(i).digits(),l,Q)			
 			res+=[iPol]
 		return res			
+
+def int2pol(q,dig,l,A):
+# dig =list of digits of an integer in base q
+# l =list of elements of GF(q)
+# ring where belongs the result
+   res=A(0)
+   k=0
+   for j in dig:
+       res+=l[j]*t^k
+       k+=1
+   return res
+
 
 def cast(d,A,q): # GF(q) to ZZ for small q
 	l=element_list(A,q)
@@ -106,4 +113,50 @@ def parse_line(l,A=ZZ):
 		r=[A(ri) for ri in words[1].split(',')]
 	return q,n,r 	
 
+def homogenize(f):
+    A=f.parent()
+    R.<X,Y>=A['X,Y']
+    res=R(0)
+    cl=f.coeffs()
+    d=f.degree()
+    i=0
+    for i in range(d+1):
+        res+=X^i*Y^(d-i)*cl[i]
+    return res
+    
 
+
+#def clearall():
+#   all = [var for var in globals() if (var[:2], var[-2:]) != ("__", "__")] 
+#   for var in all:
+#        del globals()[var]
+
+
+def fmodp_roots(fcoeffs,p,K,Ky):
+    A=p.parent()
+    t=A.gen()
+    q=p.base_ring().cardinality()
+    c=K.cardinality()
+    w0=K.gen()
+    assert c==q^p.degree()
+    y=Ky.gen()
+    w=p.roots(K)[0][0]
+    l=[c(t=w) for c in fcoeffs]
+    res=Ky(0)
+    for i in range(len(l)):
+        res+=l[i]*y^i
+    r=res.roots()
+    if p.degree()==1:
+        return [el[0] for el in r]
+    matrix=Matrix([K(w^i).vector() for i in range(p.degree())]).transpose()
+    l=list(matrix^(-1)*vector([0,1]+[0]*(p.degree()-2)))
+    phi=A(0)   # w0=phi(w)
+    for i in range(len(l)):
+        phi+=t^i*l[i]
+    assert w0==phi.base_extend(K)(w) 
+    r_pol_format=[]
+    for el in r:
+        ri=el[0]
+        g=A(K(ri).polynomial())
+        r_pol_format.append(g(phi(t)) % p)
+    return r_pol_format
