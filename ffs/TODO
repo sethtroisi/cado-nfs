@@ -5,9 +5,6 @@
   of the norm for many other positions (typically when the degree of i
   does not change).
 
-- Organize the line-sieving and norm-init by bucket-region.
-  This should finally save the big area allocation.
-
 - Make the projective roots work by increasing value of j.
   This is necessary to make them compatible with the bucket-region
   sieving. It is also a good thing for locality.
