@@ -11,7 +11,8 @@ void fppol_msb_preinverse(fppol_ptr invf, fppol_srcptr f, int k)
 {
     ASSERT_ALWAYS(fppol_is_monic(f));
     int i = 1;
-    fppol_t g, tmp;
+    fppol_t ff, g, tmp;
+    fppol_init(ff);
     fppol_init(g);
     fppol_init(tmp);
     fppol_set_ti(g, 0);
@@ -19,18 +20,21 @@ void fppol_msb_preinverse(fppol_ptr invf, fppol_srcptr f, int k)
         i *= 2;
 #ifdef USE_F2
         fppol_qpow(tmp, g);
-        fppol_mul(g, tmp, f);
+        fppol_div_ti(ff, f, MAX(0, fppol_deg(f)-i)); 
+        fppol_mul(g, tmp, ff);    
         fppol_div_ti(g, g, fppol_deg(g)-i);
 #else
         fppol_mul(tmp, g, g);
-        fppol_mul(tmp, tmp, f);
+        fppol_div_ti(ff, f, MAX(0, fppol_deg(f)-i)); 
+        fppol_mul(tmp, tmp, ff);
         fppol_add(g, g, g);
-        fppol_mul_ti(g, g, fppol_deg(g)+fppol_deg(f));
+        fppol_mul_ti(g, g, fppol_deg(g)+fppol_deg(ff));
         fppol_sub(g, g, tmp);
         fppol_div_ti(g, g, fppol_deg(g)-i);
 #endif
     }
     fppol_div_ti(invf, g, fppol_deg(g)-k);
+    fppol_clear(ff);
     fppol_clear(g);
     fppol_clear(tmp);
 }
