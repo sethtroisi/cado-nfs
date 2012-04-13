@@ -3,34 +3,52 @@
 #include "fppol_facttools.h"
 
 
+// TODO: This recursive computation of indices is probably very cheap,
+// but if there is a way to get the Newton indices with bit-fiddling,
+// that would be nice.
+static
+int newton_indices(int *ind, int k)
+{
+    if (k == 1)
+        return 0;
+    ind[0] = k;
+    return 1+newton_indices(ind+1, (1+k)/2);
+}
+
+
+
 /*
  Iteration formula:
     g <- ( 2*g*t^(deg(g)+deg(f)) - f*g^2 ) div t^xxx
 */
 void fppol_msb_preinverse(fppol_ptr invf, fppol_srcptr f, int k)
 {
-    ASSERT_ALWAYS(fppol_is_monic(f));
-    int i = 1;
+    ASSERT(fppol_is_monic(f));
+    ASSERT(k < 1024);
+    int indices[10]; // 2^10 = 1024. More than enough.
+    int l = newton_indices(indices, k+1);
+    ASSERT(indices[l-1] == 2);
+    ASSERT(indices[0] == k+1);
     fppol_t ff, g, tmp;
     fppol_init(ff);
     fppol_init(g);
     fppol_init(tmp);
     fppol_set_ti(g, 0);
-    while (i <= k) {
-        i *= 2;
+    for (int i = l-1; i >= 0; --i) {
+        int ind = indices[i];
 #ifdef USE_F2
         fppol_qpow(tmp, g);
-        fppol_div_ti(ff, f, MAX(0, fppol_deg(f)-i)); 
+        fppol_div_ti(ff, f, MAX(0, fppol_deg(f)-ind)); 
         fppol_mul(g, tmp, ff);    
-        fppol_div_ti(g, g, fppol_deg(g)-i);
+        fppol_div_ti(g, g, fppol_deg(g)-ind);
 #else
         fppol_mul(tmp, g, g);
-        fppol_div_ti(ff, f, MAX(0, fppol_deg(f)-i)); 
+        fppol_div_ti(ff, f, MAX(0, fppol_deg(f)-ind)); 
         fppol_mul(tmp, tmp, ff);
         fppol_add(g, g, g);
         fppol_mul_ti(g, g, fppol_deg(g)+fppol_deg(ff));
         fppol_sub(g, g, tmp);
-        fppol_div_ti(g, g, fppol_deg(g)-i);
+        fppol_div_ti(g, g, fppol_deg(g)-ind);
 #endif
     }
     fppol_div_ti(invf, g, fppol_deg(g)-k);
