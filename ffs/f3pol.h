@@ -169,7 +169,8 @@ extern const uint16_t __f3_monic_set_ui_conv[];
   do {                                                                   \
     fppol##sp##_t __m;                                                   \
     fppol##sr##_t __t = {0,0}, __s;                                      \
-    for (unsigned __i = sq; __i--; ) {                                   \
+    unsigned __degq = fppol##sq##_deg(q);                                \
+    for (unsigned __i = __degq+1; __i--; ) {                             \
       __m[0] = -(uint##sp##_t)((q[0] >> __i) & 1); __t[0] <<= 1;         \
       __m[1] = -(uint##sp##_t)((q[1] >> __i) & 1); __t[1] <<= 1;         \
       __s[0] = __FP_ADD_0(__t[0], __t[1], __m[0] & p[0], __m[0] & p[1]); \
