@@ -27,6 +27,7 @@
 // By convention, deg(0) = -1.
 // Generic prototype:
 //   int fppol<sz>_deg(fppol<sz>_srcptr p);
+#ifndef __GNUC__
 #define __DEF_FPPOLxx_DEG(sz)                \
   static inline                              \
   int fppol##sz##_deg(fppol##sz##_srcptr p)  \
@@ -38,7 +39,27 @@
       if (t >> k) d += k, t >>= k;           \
     return d;                                \
   }
-
+#else
+// GCC provides useful builtins that translate into the BSF asm instructions
+// on Intel / AMD cpus.
+#define __DEF_FPPOLxx_DEG(sz)                               \
+  static inline                                             \
+  int fppol##sz##_deg(fppol##sz##_srcptr p)                 \
+  {                                                         \
+    uint##sz##_t t = fppol##sz##_fold_or(p);                \
+    if (!t) return -1;                                      \
+    if (sizeof(uint##sz##_t) <= sizeof(unsigned int))       \
+      return sz-1-__builtin_clz(t);                         \
+    if (sizeof(uint##sz##_t) == sizeof(unsigned long))      \
+      return sz-1-__builtin_clzl(t);                        \
+    if (sizeof(uint##sz##_t) == sizeof(unsigned long long)) \
+      return sz-1-__builtin_clzll(t);                       \
+    int d = 0;                                              \
+    for (unsigned k = sz; k >>= 1; )                        \
+      if (t >> k) d += k, t >>= k;                          \
+    return d;                                               \
+  }
+#endif
 
 // Test if zero.
 // Generic prototype:
