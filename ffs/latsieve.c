@@ -82,10 +82,6 @@ void sieve_projective_root(uint8_t *S, fbideal_ptr gothp, unsigned I,
 void sieveFB(uint8_t *S, factor_base_srcptr FB, unsigned I, unsigned J,
              ij_t j0, ijpos_t pos0, ijpos_t size, sublat_ptr sublat)
 {
-  // Do nothing if this bucket region is empty.
-  if (ijvec_get_start_pos(j0, I, J) - pos0 >= size)
-    return;
-
   ijbasis_t basis;
   ijbasis_init(basis, I, J);
 

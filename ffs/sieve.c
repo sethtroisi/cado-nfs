@@ -334,17 +334,22 @@ int main(int argc, char **argv)
     I -= sublat->deg;
     J -= sublat->deg;
 
-    // Allocated size of the sieve array.
-    unsigned IIJJ = ijvec_get_max_pos(I, J);
-
     // Allocate storage space for the buckets.
     // FIXME: The bucket capacity is hardcoded for the moment.
-    buckets_t buckets;
-    buckets_init(buckets, I, J, 1<<16, I,
-                 1+MAX(factor_base_max_degp(FB[0]),
-                       factor_base_max_degp(FB[1])));
-    print_bucket_info(buckets);
+    buckets_t buckets[2];
+    buckets_init(buckets[0], I, J, 1<<16, I, 1+factor_base_max_degp(FB[0]));
+    buckets_init(buckets[1], I, J, 1<<16, I, 1+factor_base_max_degp(FB[1]));
+    ASSERT_ALWAYS(buckets[0]->n == buckets[1]->n);
+    print_bucket_info(buckets[0]);
     fflush(stdout);
+
+    // Size of a bucket region.
+    unsigned size = bucket_region_size();
+
+    // Allocate space for a bucket region.
+    uint8_t *S;
+    S = (uint8_t *) malloc(size*sizeof(uint8_t));
+    ASSERT_ALWAYS(S != NULL);
 
     qlat->side = sqside; 
 
@@ -463,40 +468,65 @@ int main(int argc, char **argv)
                 fprintf(stdout, ") :\n");
             }
 
-            t_initS -= seconds();
-            // Allocate and init the sieve space
-            uint8_t *S;
-            S = (uint8_t *) malloc(IIJJ*sizeof(uint8_t));
-            ASSERT_ALWAYS(S != NULL);
-            memset(S, 0, IIJJ*sizeof(uint8_t));
+            // Fill the buckets.
+            t_buckets -= seconds();
+            buckets_fill(buckets[0], FB[0], sublat, I, J);
+            buckets_fill(buckets[1], FB[1], sublat, I, J);
+            t_buckets += seconds();
 
-            // Kill trivial positions.
-            // When there are no sublattices:
-            //   (i,0) for i != 1
-            //   (0,j) for j != 1
-            // When using sublattices, just the position (0,0)
-            {
-                S[0] = 255;  // that's (0,0)
-                if (!use_sublat(sublat)) {
-                    ij_t i, j;
-                    for (ij_set_zero(j), ij_monic_set_next(j, j, J);
-                            ij_monic_set_next(j, j, J); )
-                        S[ijvec_get_start_pos(j, I, J)] = 255;
-                    for (ij_set_zero(i), ij_set_next(i, i, I);
-                            ij_set_next(i, i, I); )
-                        S[ijvec_get_offset(i, I)] = 255;
+            // j0 is the first valid line in the current bucket region.
+            ij_t j0;
+            ij_set_zero(j0);
+            for (unsigned k = 0, pos0 = 0; k < buckets[0]->n;
+                 ++k, pos0 += size) {
+              // Skip empty bucket regions.
+              if (ijvec_get_start_pos(j0, I, J) >= pos0+size)
+                continue;
+
+              t_initS -= seconds();
+              // Init the bucket region.
+              memset(S, 0, size*sizeof(uint8_t));
+
+              // Kill trivial positions.
+              // When there are no sublattices:
+              //   (i,0) for i != 1
+              //   (0,j) for j != 1
+              // When using sublattices, just the position (0,0)
+              {
+                if (UNLIKELY(!k)) {
+                  S[0] = 255;  // that's (0,0)
+                  if (!use_sublat(sublat)) {
+                    ij_t i;
+                    for (ij_set_one(i); ij_set_next(i, i, I); )
+                      S[ijvec_get_offset(i, I)] = 255;
+                  }
                 }
-            }
-// If the norm computation is too expensive, it might pay to activate
-// this block.
+                if (!use_sublat(sublat)) {
+                  ij_t j;
+                  ij_set(j, j0);
+                  for (int rc = 1; rc; rc = ij_monic_set_next(j, j, J)) {
+                    if (UNLIKELY(ij_in_fp(j)))
+                      continue;
+                    unsigned pos = ijvec_get_start_pos(j, I, J) - pos0;
+                    if (pos >= size)
+                      break;
+                    S[pos] = 255;
+                  }
+                }
+              }
+
+              // If the norm computation is too expensive, it might pay to
+              // activate this block.
 #if 0
-            // Kill positions where gcd(hat i, hat j) != 1
-            {
+              // Kill positions where gcd(hat i, hat j) != 1
+              {
                 ij_t i, j;
                 ij_t hati, hatj, g;
                 int rci, rcj = 1;
-                for (ij_set_zero(j); rcj; rcj = ij_monic_set_next(j, j, J)) {
-                    ijpos_t start = ijvec_get_start_pos(j, I, J);
+                for (ij_set(j, j0); rcj; rcj = ij_monic_set_next(j, j, J)) {
+                    ijpos_t start = ijvec_get_start_pos(j, I, J) - pos0;
+                    if (start >= size)
+                      break;
                     rci = 1;
                     for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
                         ijpos_t pos = start + ijvec_get_offset(i, I);
@@ -506,64 +536,47 @@ int main(int argc, char **argv)
                             S[pos] = 255;
                     }
                 }
-            }
+              }
 #endif
-            t_initS += seconds();
+              t_initS += seconds();
 
-            for (int twice = 0; twice < 2; twice++) {
+              for (int twice = 0; twice < 2; twice++) {
                 // Select the side to be sieved
                 int side = (firstsieve)?(1-twice):twice;
 
-                // Fill the buckets.
+                // Norm initialization.
+                // convention: if a position contains 255, it must stay like
+                // this. It means that the other side is hopeless.
+                t_norms -= seconds();
+                init_norms(S, ffspol[side], I, J, j0, pos0, size,
+                           qlat, qlat->side == side, sublat);
+                t_norms += seconds();
+
+                // Line sieve.
+                t_sieve -= seconds();
+                sieveFB(S, FB[side], I, J, j0, pos0, size, sublat);
+                t_sieve += seconds();
+
+                // Apply the updates from the corresponding bucket.
                 t_buckets -= seconds();
-                buckets_fill(buckets, FB[side], sublat, I, J);
+                bucket_apply(S, buckets[side], k);
                 t_buckets += seconds();
 
-                uint8_t *Sptr = S;
-                ij_t j;
-                ij_set_zero(j);
-                for (unsigned k = 0, pos = 0; k < buckets->n;
-                     ++k, pos += bucket_region_size()) {
-                  // Skip to next j.
-                  while (ijvec_get_start_pos(j, I, J) < pos &&
-                         ij_monic_set_next(j, j, J));
+                // since (0,0) is divisible by everyone, its position might
+                // have been clobbered.
+                if (!k) S[0] = 255;
 
-                  // Norm initialization.
-                  // convention: if a position contains 255, it must stay like
-                  // this. It means that the other side is hopeless.
-                  t_norms -= seconds();
-                  init_norms(Sptr, ffspol[side], I, J, j, pos,
-                             bucket_region_size(),
-                             qlat, qlat->side == side, sublat);
-                  t_norms += seconds();
-
-                  // Line sieve.
-                  t_sieve -= seconds();
-                  sieveFB(Sptr, FB[side], I, J, j, pos, bucket_region_size(),
-                          sublat);
-                  t_sieve += seconds();
-
-                  // Apply the updates from the corresponding bucket.
-                  t_buckets -= seconds();
-                  bucket_apply(Sptr, buckets, k);
-                  t_buckets += seconds();
-
-                  // since (0,0) is divisible by everyone, its position might
-                  // have been clobbered.
-                  if (!k) *Sptr = 255;
-
-                  // mark survivors
-                  // no need to check if this is a valid position
-                  for (unsigned i = 0; i < bucket_region_size(); ++i, ++Sptr) {
-                    if (*Sptr > threshold[side])
-                      *Sptr = 255; 
-                  }
+                // mark survivors
+                // no need to check if this is a valid position
+                for (unsigned i = 0; i < size; ++i) {
+                  if (S[i] > threshold[side])
+                    S[i] = 255; 
                 }
-            }
+              }
 
-            t_cofact -= seconds();
-            // survivors cofactorization
-            {
+              t_cofact -= seconds();
+              // survivors cofactorization
+              {
                 fppol_t a, b;
                 ij_t i, j, g;
                 ij_t hati, hatj;
@@ -571,8 +584,10 @@ int main(int argc, char **argv)
                 fppol_init(b);
 
                 int rci, rcj = 1;
-                for (ij_set_zero(j); rcj; rcj = ij_monic_set_next(j, j, J)) {
-                    ijpos_t start = ijvec_get_start_pos(j, I, J);
+                for (ij_set(j, j0); rcj; rcj = ij_monic_set_next(j, j, J)) {
+                    ijpos_t start = ijvec_get_start_pos(j, I, J) - pos0;
+                    if (start >= size)
+                      break;
                     rci = 1;
                     for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
                         ijpos_t pos = start + ijvec_get_offset(i, I);
@@ -596,12 +611,13 @@ int main(int argc, char **argv)
                         }
                     }
                 }
+                ij_set(j0, j);
                 fppol_clear(a);
                 fppol_clear(b);
+              }
+              t_cofact += seconds();
             }
-            t_cofact += seconds();
 
-            free(S);
         }  // End of loop on sublattices.
 
         t_tot = seconds()-t_tot;
@@ -613,7 +629,7 @@ int main(int argc, char **argv)
                 "%1.1f s (initS);   "
                 "%1.1f s (norms);\n"
                 "#                     "
-                "%1.3f s (sieve);  "
+                "%1.1f s (sieve);  "
                 "%1.1f s (buckets); "
                 "%1.1f s (cofact).\n",
                 t_lambda, t_initS, t_norms, t_sieve, t_buckets, t_cofact);
@@ -623,9 +639,11 @@ int main(int argc, char **argv)
 
     } while (1); // End of loop over special-q's
 
+    free(S);
     factor_base_clear(FB[0]);
     factor_base_clear(FB[1]);
-    buckets_clear(buckets);
+    buckets_clear(buckets[0]);
+    buckets_clear(buckets[1]);
     free(roots);
 
     tot_time = seconds()-tot_time;
