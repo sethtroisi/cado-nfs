@@ -344,6 +344,7 @@ int main(int argc, char **argv)
                  1+MAX(factor_base_max_degp(FB[0]),
                        factor_base_max_degp(FB[1])));
     print_bucket_info(buckets);
+    fflush(stdout);
 
     qlat->side = sqside; 
 
@@ -433,6 +434,7 @@ int main(int argc, char **argv)
         ASSERT_ALWAYS(noerr);
         printf("############################################\n");
         print_qlat_info(qlat);
+        fflush(stdout);
 
         double t_norms = 0;
         double t_sieve = 0;
@@ -621,6 +623,7 @@ int main(int argc, char **argv)
                 "%1.1f s (cofact).\n",
                 t_lambda, t_initS, t_norms, t_sieve, t_buckets, t_cofact);
         fprintf(stdout, "# Yield: %1.5f s/rel\n", t_tot/nrels);
+        fflush(stdout);
         tot_nrels += nrels;
 
     } while (1); // End of loop over special-q's
