@@ -93,19 +93,6 @@ int sq_is_irreducible(sq_srcptr p) {
     return ret;
 }
 
-int sq_cmp(sq_srcptr p, sq_srcptr q) {
-    if (sq_eq(p, q))
-        return 0;
-    uint64_t ip, iq;
-    ip = sq_get_ui(p, 64, 0);
-    iq = sq_get_ui(q, 64, 0);
-    if (ip < iq)
-        return -1;
-    else
-        return 1;
-}
-
-
 void usage(const char *argv0, const char * missing)
 {
     fprintf(stderr, "Usage: %s [options | optionfile] \n", argv0);

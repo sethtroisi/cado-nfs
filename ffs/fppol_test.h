@@ -1,6 +1,7 @@
 // Always include "fppol.h" first so that everything gets loaded in the correct
 // order.
 #include "fppol.h"
+#include "fppol_set.h"  // for fppolxx_get_ui, needed by fppolxx_cmp
 
 #ifndef __FPPOL_TEST_H__
 #define __FPPOL_TEST_H__
@@ -117,6 +118,21 @@
   { return __FP_IS_VALID(sz, p); }
 
 
+// Compare two polynomials.
+// Return an integer less than, equal to, or greater than zero
+// if p is respectively less than, equal or greater than q.
+// The ordering is compatible with the set_next family.
+// Generic prototype:
+//   int fppol<sz>_cmp(fppol<sz>_srcptr p, fppol<sz>_srcptr q);
+#define __DEF_FPPOLxx_CMP(sz)                                     \
+  static inline                                                   \
+  int fppol##sz##_cmp(fppol##sz##_srcptr p, fppol##sz##_srcptr q) \
+  { if (fppol##sz##_eq(p, q)) return 0;                           \
+    uint64_t ip = fppol##sz##_get_ui(p, 64, 0);                   \
+    uint64_t iq = fppol##sz##_get_ui(q, 64, 0);                   \
+    return (ip < iq) ? -1: 1; }
+
+
 // All definitions bundled up into a single macro.
 #define __DEF_FPPOLxx_TEST_ALL(sz) \
         __DEF_FPPOLxx_FOLD_OR (sz) \
@@ -124,6 +140,7 @@
         __DEF_FPPOLxx_IS_ZERO (sz) \
         __DEF_FPPOLxx_IN_FP   (sz) \
         __DEF_FPPOLxx_EQ      (sz) \
+        __DEF_FPPOLxx_CMP     (sz) \
         __DEF_FPPOLxx_IS_MONIC(sz) \
         __DEF_FPPOLxx_IS_VALID(sz)
 
@@ -136,6 +153,7 @@ __DEF_FPPOLxx_TEST_ALL(64)
 #undef __DEF_FPPOLxx_IS_ZERO
 #undef __DEF_FPPOLxx_IN_FP
 #undef __DEF_FPPOLxx_EQ
+#undef __DEF_FPPOLxx_CMP
 #undef __DEF_FPPOLxx_IS_MONIC
 #undef __DEF_FPPOLxx_IS_VALID
 #undef __DEF_FPPOLxx_TEST_ALL
@@ -162,6 +180,9 @@ int fppol_in_fp(fppol_srcptr p)
 
 // Test if equal.
 int fppol_eq(fppol_srcptr p, fppol_srcptr q);
+
+// Comparison.
+int fppol_cmp(fppol_srcptr p, fppol_srcptr q);
 
 // Test if monic.
 int fppol_is_monic(fppol_srcptr p);

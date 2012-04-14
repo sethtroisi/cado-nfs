@@ -38,7 +38,7 @@
 - Deal with powers.
   This should work more or less automatically, but this has to be tested.
 
-- Add the fppol*_set_random() and fppol*_cmp() functions.
+- Add the fppol*_set_random() functions.
   set_random() is not so simple if we want uniformity in characteristic 3.
   Since it is used only for EDF, we don't really need it and can live
   with strongly biased randomness.

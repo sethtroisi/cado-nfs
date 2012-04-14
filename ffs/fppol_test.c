@@ -17,6 +17,19 @@ int fppol_eq(fppol_srcptr p, fppol_srcptr q)
 }
 
 
+// Comparison.
+int fppol_cmp(fppol_srcptr p, fppol_srcptr q)
+{
+  if (p->deg != q->deg)
+    return (p->deg < q->deg) ? -1 : 1;
+  int c;
+  for (int k = p->deg>>6; k >= 0; --k) 
+    if ((c = fppol64_cmp(p->limbs[k], q->limbs[k])) != 0)
+        return c;
+  return 0;
+}
+
+
 // Test if monic.
 int fppol_is_monic(fppol_srcptr p)
 {
