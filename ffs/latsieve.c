@@ -237,5 +237,6 @@ void sieveFB(uint8_t *S, factor_base_srcptr FB, unsigned I, unsigned J,
         }
     }
 
+    free(tmp);
     ijbasis_clear(basis);
 }

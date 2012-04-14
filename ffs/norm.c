@@ -65,7 +65,7 @@ void ffspol_norm(fppol_t norm, ffspol_srcptr ffspol, fppol_t a, fppol_t b)
   fppol_clear(pow_a);
   fppol_clear(pol_norm_i);
   fppol_clear(tmp_norm);
-  for (int i = 0; i < ffspol->deg; i++)
+  for (int i = 0; i <= ffspol->deg; i++)
     fppol_clear(pow_b[i]);
   free(pow_b);
 }
