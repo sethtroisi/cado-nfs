@@ -93,6 +93,9 @@ int sq_is_irreducible(sq_srcptr p) {
     return ret;
 }
 
+#define SQSIDE_DEFAULT 0
+#define FIRSTSIEVE_DEFAULT 0
+
 void usage(const char *argv0, const char * missing)
 {
     fprintf(stderr, "Usage: %s [options | optionfile] \n", argv0);
@@ -116,8 +119,8 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "  q0   *           lower bound for special-q range\n");
     fprintf(stderr, "  q1   *           lower bound for special-q range\n");
     fprintf(stderr, "    Note: giving (q0,q1) is exclusive to giving (q,rho). In the latter case,\n" "    rho is optional.\n");
-    fprintf(stderr, "  sqside           side (0 or 1) of the special-q\n");
-    fprintf(stderr, "  firstsieve       side (0 or 1) to sieve first\n");
+    fprintf(stderr, "  sqside           side (0 or 1) of the special-q (default %d)\n", SQSIDE_DEFAULT);
+    fprintf(stderr, "  firstsieve       side (0 or 1) to sieve first (default %d)\n", FIRSTSIEVE_DEFAULT);
     fprintf(stderr, "  sublat           toggle the sublattice sieving\n");
  
     if (missing != NULL)
@@ -137,8 +140,8 @@ int main(int argc, char **argv)
     unsigned int threshold[2] = {0, 0};  
     char *argv0 = argv[0];
     int want_sublat = 0;
-    int sqside = 0;
-    int firstsieve = 0;
+    int sqside = SQSIDE_DEFAULT;
+    int firstsieve = FIRSTSIEVE_DEFAULT;
     sq_t q0, q1;
     int rho_given = 0;
 
