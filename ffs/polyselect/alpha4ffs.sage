@@ -37,6 +37,7 @@ def average_valuation_affine(f,p,depth=0):
     fv = ZP(f/p^v)
     Q = bar(fv,p).derivative()
     for r in bar(fv,p).roots():
+        assert fv(A(r[0].polynomial())) % p ==0
         if Q(r[0]) != 0:
             v += QQ(1/(Norm(p)-1))
         else:
