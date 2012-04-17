@@ -68,6 +68,12 @@ def alpha_p(f,p):
     """
     return float((1/(Norm(p)-1)-average_valuation_homogeneous_coprime(f,p))*p.degree())
 
+def Estimate_alpha_p(f,p,nt):
+    """
+    Same as alpha_p(f,p), but experimentally.  Only for debugging.
+    """
+    return float((1/(Norm(p)-1)-estimate_average_valuation_homogeneous_coprime(f,p,nt))*p.degree())
+
 
 def alpha(f,B):
     """
@@ -75,6 +81,13 @@ def alpha(f,B):
     """
     A=f.base_ring()
     return sum([alpha_p(f, p) for p in Primes(A,B+1)])
+
+def estimate_alpha(f,B,nt):
+    """
+    Same as alpha(f,B), but experimentally.  Only for debugging.
+    """
+    A=f.base_ring()
+    return sum([Estimate_alpha_p(f, p, nt) for p in Primes(A,B+1)])
 
 
 
