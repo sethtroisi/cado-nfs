@@ -3,34 +3,56 @@
 #include "fppol_facttools.h"
 
 
+// TODO: This recursive computation of indices is probably very cheap,
+// but if there is a way to get the Newton indices with bit-fiddling,
+// that would be nice.
+static
+int newton_indices(int *ind, int k)
+{
+    if (k == 1)
+        return 0;
+    ind[0] = k;
+    return 1+newton_indices(ind+1, (1+k)/2);
+}
+
+
+
 /*
  Iteration formula:
     g <- ( 2*g*t^(deg(g)+deg(f)) - f*g^2 ) div t^xxx
 */
 void fppol_msb_preinverse(fppol_ptr invf, fppol_srcptr f, int k)
 {
-    ASSERT_ALWAYS(fppol_is_monic(f));
-    int i = 1;
-    fppol_t g, tmp;
+    ASSERT(fppol_is_monic(f));
+    ASSERT(k < 1024);
+    int indices[10]; // 2^10 = 1024. More than enough.
+    int l = newton_indices(indices, k+1);
+    ASSERT(indices[l-1] == 2);
+    ASSERT(indices[0] == k+1);
+    fppol_t ff, g, tmp;
+    fppol_init(ff);
     fppol_init(g);
     fppol_init(tmp);
     fppol_set_ti(g, 0);
-    while (i <= k) {
-        i *= 2;
+    for (int i = l-1; i >= 0; --i) {
+        int ind = indices[i];
 #ifdef USE_F2
         fppol_qpow(tmp, g);
-        fppol_mul(g, tmp, f);
-        fppol_div_ti(g, g, fppol_deg(g)-i);
+        fppol_div_ti(ff, f, MAX(0, fppol_deg(f)-ind)); 
+        fppol_mul(g, tmp, ff);    
+        fppol_div_ti(g, g, fppol_deg(g)-ind);
 #else
         fppol_mul(tmp, g, g);
-        fppol_mul(tmp, tmp, f);
+        fppol_div_ti(ff, f, MAX(0, fppol_deg(f)-ind)); 
+        fppol_mul(tmp, tmp, ff);
         fppol_add(g, g, g);
-        fppol_mul_ti(g, g, fppol_deg(g)+fppol_deg(f));
+        fppol_mul_ti(g, g, fppol_deg(g)+fppol_deg(ff));
         fppol_sub(g, g, tmp);
-        fppol_div_ti(g, g, fppol_deg(g)-i);
+        fppol_div_ti(g, g, fppol_deg(g)-ind);
 #endif
     }
     fppol_div_ti(invf, g, fppol_deg(g)-k);
+    fppol_clear(ff);
     fppol_clear(g);
     fppol_clear(tmp);
 }
@@ -43,9 +65,9 @@ void fppol_rem_precomp(fppol_ptr r, fppol_srcptr pq,
     ASSERT_ALWAYS(fppol_deg(pq) <= fppol_deg(m) + fppol_deg(invm));
     fppol_init(pqt);
     fppol_div_ti(pqt, pq, d-2);
-    fppol_mul(pqt, pqt, invm);
+    fppol_mul(pqt, pqt, invm);  // should be a mul-high
     fppol_div_ti(pqt, pqt, fppol_deg(invm)+2);
-    fppol_mul(pqt, pqt, m);
+    fppol_mul(pqt, pqt, m);     // should be a mul-low
     fppol_sub(r, pq, pqt);
     ASSERT_ALWAYS(fppol_deg(r) < fppol_deg(m));
     fppol_clear(pqt);
@@ -87,12 +109,14 @@ int fppol_is_smooth(fppol_srcptr PP, int B)
     fppol_init(invP2);  // to reduce a product of 2
     fppol_init(invPq);  // to reduce the result of q-power.
 
-    // TODO: the first one can be deduced from the second one.
+#ifdef USE_F2
     fppol_msb_preinverse(invP2, P, fppol_deg(P)-2);
-#ifndef USE_F2
-    fppol_msb_preinverse(invPq, P, 2*fppol_deg(P)-3);
-#else
     fppol_set(invPq, invP2);
+#elif defined(USE_F3)
+    fppol_msb_preinverse(invPq, P, 2*fppol_deg(P)-3);
+    fppol_div_ti(invP2, invPq, fppol_deg(P)-1);
+#else
+#error "This part of the code supports only GF(2) and GF(3)."
 #endif
 
     fppol_set_ti(t, 1);

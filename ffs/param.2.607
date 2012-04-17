@@ -25,8 +25,9 @@ fbb0=22
 fbb1=22
 lpb0=27
 lpb1=26
-thresh0=76
-thresh1=90
+thresh0=79
+thresh1=76
+sqside=1
 
 fb0=Aroots.2.607
 fb1=Rroots.2.607

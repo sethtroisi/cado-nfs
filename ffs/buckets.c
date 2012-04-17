@@ -147,7 +147,8 @@ void buckets_init(buckets_ptr buckets, unsigned I, unsigned J,
 // Clean up memory.
 void buckets_clear(buckets_ptr buckets)
 {
-  free(buckets->start[0]);
+  for (unsigned k = 0; k < buckets->n; ++k)
+    free(buckets->start[k]);
   free(buckets->start);
   free(buckets->degp_end);
 }
@@ -389,6 +390,7 @@ void buckets_fill(buckets_ptr buckets, factor_base_srcptr FB,
   //for (unsigned k = 0; k < buckets->n; ++k)
   //  printf("# #updates[%u] = %u\n", k, ptr[k]-buckets->start[k]);
 
+  free(ptr);
   ijbasis_clear(euclid);
   ijbasis_clear(basis);
 }

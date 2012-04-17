@@ -173,6 +173,7 @@ __ALIAS_TYPE(ij)
   __ALIAS_FUN (int,      type, is_zero,        _srcptr)                       \
   __ALIAS_FUN (int,      type, in_fp,          _srcptr)                       \
   __ALIAS_FUN (int,      type, eq,             _srcptr, _srcptr)              \
+  __ALIAS_FUN (int,      type, cmp,            _srcptr, _srcptr)              \
   __ALIAS_FUN (int,      type, is_monic,       _srcptr)                       \
   __ALIAS_FUN (int,      type, is_valid,       _srcptr)                       \
   __ALIAS_FUN (void,     type, opp,            _ptr, _srcptr)                 \

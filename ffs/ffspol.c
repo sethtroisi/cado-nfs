@@ -129,6 +129,7 @@ int ffspol_set_str(ffspol_ptr r, const char *str)
     if (!fppol_set_str(r->coeffs[++r->deg], buf)) return 0;
     j = i+1;
   }
+  free(buf);
   __ffspol_update_degree(r);
   return 1;
 }
