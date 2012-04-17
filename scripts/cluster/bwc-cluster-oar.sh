@@ -700,8 +700,8 @@ watch_server_progress() {
         if [ $my_best -lt $((new_best - 2*interval)) ] ; then
             echo "`date` *** Central data has already reached iteration $new_best, restarting ***"
             $fetch --on $leader "X $slot/V0-64.${new_best}"
-            pkill -1 -f bwc.pl
-            pkill -1 -f mpiexec
+            pkill -USR1 -f bwc.pl
+            pkill -USR1 -f mpiexec
         fi
     done
 }
@@ -735,6 +735,7 @@ while true ; do
     rc=$?
     if [ $rc -ge 128 ] && ( [ $((rc & 127)) = 1 ] ||  [ $((rc & 127)) = 10 ] ) ; then
         echo "*** bwc process aborted with SIGHUP/SIGUSR1, resuming ***"
+        pkill -9 -f mpiexec
     else
         break
     fi
