@@ -34,11 +34,11 @@ kjdelay=300             # time between two checks
 selectnice=4            # nice level for selection
 
 ## Parameters of polyselect
-kjP=1000000             # choose lc(g) with two prime factors in [P,2P]
-kjmaxnorm=48.0          # max. lognorm of polynomials (before rootsieve)
-kjadmax=5e9             # max value for lc(f)
-kjadrange=5e7           # individual tasks
-kjkmax=23               # rotation is bounded by 2^kmax
+kjP=2000000             # choose lc(g) with two prime factors in [P,2P]
+kjmaxnorm=47.9          # max. lognorm of polynomials (before rootsieve)
+kjadmax=2e9             # max value for lc(f)
+kjadrange=2e7           # individual tasks
+kjkmax=24               # rotation is bounded by 2^kmax
 kjincr=30030            # forced divisor of lc(f)
 
 ###########################################################################
