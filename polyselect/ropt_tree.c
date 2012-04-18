@@ -439,7 +439,7 @@ insert_listnode ( listnode **top,
 /*
   Some indices, note the queue is shifted by 1.
 */
-int
+inline int
 pq_parent ( int i )
 {
   return (i>>1);
@@ -700,7 +700,7 @@ free_rootscore_pq ( rootscore_pq **ppqueue )
 /*
   Sift-up to add, if the queue is not full.
 */
-void
+inline void
 insert_rootscore_pq_up ( rootscore_pq *pqueue,
                          long i,
                          long j,
@@ -728,7 +728,7 @@ insert_rootscore_pq_up ( rootscore_pq *pqueue,
 /*
   Sift-down, if the heap is full.
 */
-void
+inline void
 insert_rootscore_pq_down ( rootscore_pq *pqueue,
                            long i,
                            long j,
@@ -865,7 +865,7 @@ free_MurphyE_pq ( MurphyE_pq **ppqueue )
 /*
   Sift-up to add, if the queue is not full.
 */
-void
+inline void
 insert_MurphyE_pq_up ( MurphyE_pq *pqueue,
                        int w,
                        mpz_t u,
@@ -897,7 +897,7 @@ insert_MurphyE_pq_up ( MurphyE_pq *pqueue,
 /*
   Sift-down, if the heap is full.
 */
-void
+inline void
 insert_MurphyE_pq_down ( MurphyE_pq *pqueue,
                          int w,
                          mpz_t u,
@@ -1042,7 +1042,7 @@ free_sub_alpha_pq ( sub_alpha_pq **ppqueue )
 /*
   Sift-up to add, if the queue is not full.
 */
-void
+inline void
 insert_sub_alpha_pq_up ( sub_alpha_pq *pqueue,
                          int w,
                          mpz_t u,
@@ -1076,7 +1076,7 @@ insert_sub_alpha_pq_up ( sub_alpha_pq *pqueue,
 /*
   Sift-down, if the heap is full.
 */
-void
+inline void
 insert_sub_alpha_pq_down ( sub_alpha_pq *pqueue,
                            int w,
                            mpz_t u,

@@ -1,7 +1,6 @@
 /* Data struct used for polyselect2l */
 #include "polyselect2l_str.h"
 
-
 /* LEN_SPECIAL_Q in the header */
 const unsigned int SPECIAL_Q[LEN_SPECIAL_Q] = {
   2, 3, 5, 7, 11, 13, 17, 19, 23, 29,
@@ -304,10 +303,12 @@ hash_add (hash_t H, unsigned long p, int64_t i, mpz_t m0, unsigned long ad,
   if (H->size >= H->alloc)
     hash_grow (H);
   if (i >= 0)
-    h = i % H->alloc;
+    // h = i % H->alloc;
+    h = ((int)i) % H->alloc;
   else
   {
-    h = H->alloc - ((-i) % H->alloc);
+    // h = H->alloc - ( (-i) % H->alloc );
+    h = H->alloc - ( ((int)(-i)) % H->alloc);
     if (h == H->alloc)
       h = 0;
   }
