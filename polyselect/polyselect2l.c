@@ -39,7 +39,7 @@
 /* consider only two roots or more */
 #define CONSIDER_ONLY_TWO_ROOTS
 #ifndef CONSIDER_ONLY_TWO_ROOTS
-#define NUMBER_CONSIDERED_ROOTS 2
+#define NUMBER_CONSIDERED_ROOTS 16
 #endif
 
 /* Read-Only */
@@ -464,7 +464,11 @@ collision_on_p ( header_t header,
   }
 
   hash_t H;
+#ifdef CONSIDER_ONLY_TWO_ROOTS
   hash_init (H,  (unsigned long) (INIT_FACTOR * (double) lenPrimes));
+#else
+  hash_init (H,  (unsigned long) (INIT_FACTOR * NUMBER_CONSIDERED_ROOTS * (double) lenPrimes));
+#endif
 
 #ifdef DEBUG_POLYSELECT2L
   int st = cputime();
@@ -531,6 +535,11 @@ collision_on_each_sq ( header_t header,
   unsigned long nprimes, p, rp, pp;
   long ppl, u;
   mpz_t rppz;
+
+#ifndef CONSIDER_ONLY_TWO_ROOTS
+  int i;
+  long h;
+#endif  
 
   mpz_init (rppz);
 
@@ -618,8 +627,7 @@ collision_on_each_sq ( header_t header,
       hash_add (H, p, u, header->m0, header->ad, header->d, header->N, q, rqqz);
       hash_add (H, p, u - ppl, header->m0, header->ad, header->d, header->N, q, rqqz);
 #else
-      int i;
-      long h = u - ppl;
+      h = u - ppl;
       for (i = 0; i < NUMBER_CONSIDERED_ROOTS; i ++) {
         hash_add (H, p, u, header->m0, header->ad, header->d, header->N, q, rqqz);
         hash_add (H, p, h, header->m0, header->ad, header->d, header->N, q, rqqz);
@@ -1383,9 +1391,11 @@ main (int argc, char *argv[])
            raw,
            nq );
 
+#ifdef CONSIDER_ONLY_TWO_ROOTS
+
 #ifdef BATCH_P
   printf ( "# Info: estimated peak memory=%.2fMB (%d threads, batch %d inversions on P)\n",
-           (double) (nthreads * lenPrimes * (sizeof(uint32_t) + sizeof(uint64_t)) / 1024 / 1024),
+           (double) (nthreads * INIT_FACTOR * lenPrimes * (sizeof(uint32_t) + sizeof(uint64_t)) / 1024 / 1024),
            nthreads,
            BATCH_SIZE );
 #else
@@ -1393,6 +1403,23 @@ main (int argc, char *argv[])
            (double) (nthreads * (BATCH_SIZE + INIT_FACTOR) * lenPrimes * (sizeof(uint32_t) + sizeof(uint64_t)) / 1024 / 1024),
            nthreads,
            BATCH_SIZE );
+#endif
+
+#else
+
+#ifdef BATCH_P
+  printf ( "# Info: estimated peak memory=%.2fMB (%d threads, batch %d inversions on P)\n",
+           (double) (nthreads * INIT_FACTOR * NUMBER_CONSIDERED_ROOTS * lenPrimes * (sizeof(uint32_t) + sizeof(uint64_t)) / 1024 / 1024),
+           nthreads,
+           BATCH_SIZE );
+#else
+  printf ( "# Info: estimated peak memory=%.2fMB (%d threads, batch %d inversions on SQ)\n",
+           (double) (nthreads * (BATCH_SIZE + INIT_FACTOR * NUMBER_CONSIDERED_ROOTS) * lenPrimes * (sizeof(uint32_t) + sizeof(uint64_t)) / 1024 / 1024),
+           nthreads,
+           BATCH_SIZE );
+#endif
+
+
 #endif
 
   //printPrimes (Primes, lenPrimes);
