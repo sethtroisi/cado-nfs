@@ -94,7 +94,7 @@ void hash_add (hash_t, unsigned long, int64_t, mpz_t, unsigned long,
 void hash_grow (hash_t);
 void hash_clear (hash_t);
 
-void print_poly_info (mpz_t *, unsigned int d, mpz_t *);
+void print_poly_info (mpz_t *, unsigned int d, mpz_t *, int);
 
 void match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
             unsigned long ad, unsigned int d, mpz_t N, unsigned long q,
