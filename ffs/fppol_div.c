@@ -119,6 +119,7 @@
         __DEF_FPPOLxx_DIV    (sz) \
         __DEF_FPPOLxx_REM    (sz)
 
+__DEF_FPPOLxx_DIV_ALL( 8)
 __DEF_FPPOLxx_DIV_ALL(16)
 __DEF_FPPOLxx_DIV_ALL(32)
 __DEF_FPPOLxx_DIV_ALL(64)

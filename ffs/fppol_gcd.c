@@ -77,6 +77,7 @@
   }
 
 
+__DEF_FPPOLxx_GCD( 8)
 __DEF_FPPOLxx_GCD(16)
 __DEF_FPPOLxx_GCD(32)
 __DEF_FPPOLxx_GCD(64)

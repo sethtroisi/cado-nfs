@@ -59,6 +59,7 @@
         __DECL_FPPOLxx_OUT    (sz) \
         __DECL_FPPOLxx_INP    (sz)
 
+__DECL_FPPOLxx_IO_ALL( 8)
 __DECL_FPPOLxx_IO_ALL(16)
 __DECL_FPPOLxx_IO_ALL(32)
 __DECL_FPPOLxx_IO_ALL(64)
