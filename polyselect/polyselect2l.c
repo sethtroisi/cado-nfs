@@ -406,7 +406,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       gmp_printf ("# Optimized polynomial:\n");
     }
 
-    /* print optimized (mayb size-optimized or size-root optimized) polynomial */
+    /* print optimized (maybe size-optimized or size-root optimized) polynomial */
     gmp_printf ("n: %Zd\n", N);
     print_poly_info ( f, d, g );
     printf ("# Murphy's E(Bf=%.0f,Bg=%.0f,area=%.2e)=%1.2e (best so far %1.2e)\n",
@@ -978,7 +978,7 @@ collision_on_each_sq ( header_t header,
                        unsigned long *inv_qq )
 {
   unsigned int nr, j;
-  unsigned long nprimes, p, rp, pp, c = 0;
+  unsigned long nprimes, p, rp MAYBE_UNUSED, pp, c = 0;
   long ppl, u;
 
 #ifndef CONSIDER_ONLY_TWO_ROOTS
@@ -1671,12 +1671,12 @@ main (int argc, char *argv[])
 #ifdef CONSIDER_ONLY_TWO_ROOTS
 
 #ifdef BATCH_P
-  printf ( "# Info: estimated peak memory=%.2fMB (%d threads, batch %d inversions on P)\n",
+  printf ( "# Info: estimated peak memory=%.2fMB (%d thread(s), batch %d inversions on P)\n",
            (double) (nthreads * INIT_FACTOR * lenPrimes * (sizeof(uint32_t) + sizeof(uint64_t)) / 1024 / 1024),
            nthreads,
            BATCH_SIZE );
 #else
-  printf ( "# Info: estimated peak memory=%.2fMB (%d threads, batch %d inversions on SQ)\n",
+  printf ( "# Info: estimated peak memory=%.2fMB (%d thread(s), batch %d inversions on SQ)\n",
            (double) (nthreads * (BATCH_SIZE + INIT_FACTOR) * lenPrimes * (sizeof(uint32_t) + sizeof(uint64_t)) / 1024 / 1024),
            nthreads,
            BATCH_SIZE );
