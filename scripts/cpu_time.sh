@@ -39,15 +39,9 @@ perl -e 'sub format_dhms {
 my $var=<STDIN>; print format_dhms($var)."\n"'
 }
 
-echo -n "Number of relations found: "
-cat ${name}.nrels
-
-echo -n "Number on non-duplicate relations: "
-grep -h remaining ${name}.dup2*.log | sed "s/^[ ]*\([0-9]*\) remaining.*/+\1/g" | tr "\n" " " | cut -c1- | sed "s/^+//g" | bc
-
 # Polyselect
 if [[ -z $1 || $(expr $1 : '.*[p].*') != 0 ]]
-  then  echo -n "CPU time for polyselect:      "
+  then  echo -n "CPU time for polyselect:    "
     if [ ! -f ${name}.kjout.* ] 2> /dev/null
       then echo "polynomial files were not found"
       else
@@ -63,10 +57,13 @@ if [[ -z $1 || $(expr $1 : '.*[p].*') != 0 ]]
     fi
 fi
 
+echo -n "   "
+grep MurphyE ${name}.poly
+
 
 # Sieve
 if [[ -z $1 || $(expr $1 : '.*[s].*') != 0 ]]
-  then echo -n "CPU time for sieve:           "
+  then echo -n "CPU time for sieve:         "
     if [ -f ${name}.rels ]
       then file=${name}.rels
       else if [ ! -f ${name}.rels.*.gz ] 2> /dev/null
@@ -79,11 +76,14 @@ if [[ -z $1 || $(expr $1 : '.*[s].*') != 0 ]]
     fi
     first=`ls ${name}.rels.*.gz | sed "s/^.*rels.\([0-9]*\)\-[0-9]*.gz$/\1/g" | sort -n | head -1`
     last=`ls ${name}.rels.*.gz | sed "s/^.*.rels.[0-9]*-\([0-9]*\).gz$/\1/g" | sort -n | tail -1`
-    echo "   special-q range: ${first}-${last}"
-    echo -n "   # of sieve files: "
+    echo "   special-q range:         ${first}-${last}"
+    echo -n "   # of sieve files:        "
     ls ${name}.rels.*.gz | wc -l
 fi
 
+
+echo -n "   # of relations found:    "
+cat ${name}.nrels
 
 # Filtering
 if [[ -z $1 || $(expr $1 : '.*[f].*') != 0 ]]
@@ -97,6 +97,8 @@ if [[ -z $1 || $(expr $1 : '.*[f].*') != 0 ]]
       then echo "dup2 files were not found"
       else awk '/MB/ {x=$8;} /remaining/ {y+=x;} END {print y}' ${name}.dup2_*.log | f
     fi
+    echo -n "   # of unique relations: "
+    grep -h remaining ${name}.dup2*.log | sed "s/^[ ]*\([0-9]*\) remaining.*/+\1/g" | tr "\n" " " | cut -c1- | sed "s/^+//g" | bc
     echo -n "CPU time for purge:     "
     if [ ! -f ${name}.purge.log ] 2> /dev/null
       then echo "purge file was not found"
