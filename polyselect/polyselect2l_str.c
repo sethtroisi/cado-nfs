@@ -10,6 +10,7 @@ const unsigned int SPECIAL_Q[LEN_SPECIAL_Q] = {
   179, 181, 191, 193, 197, 199, 211, 223, 227, 229,
   233, 239, 241, 251, 0 };
 
+//#define LESS_P
 
 /* init prime array */
 unsigned long
@@ -17,8 +18,14 @@ initPrimes ( unsigned long P,
              uint32_t **primes )
 {
   unsigned long p, nprimes = 0;
+
+#ifdef LESS_P // if impatient for root finding
+  unsigned long maxprimes = (unsigned long) (1.2 * (double) P) /
+    log (1.2 * (double) P) - (double) P / log ((double) P);
+#else
   unsigned long maxprimes = (unsigned long) 2.0 * (double) P /
     log (2.0 * (double) P) - (double) P / log ((double) P);
+#endif
 
   *primes = (uint32_t*) malloc (maxprimes * sizeof (uint32_t));
   if ( (*primes) == NULL) {
@@ -27,7 +34,12 @@ initPrimes ( unsigned long P,
   }
 
   for (p = 2; p < P; p = getprime (p));
+
+#ifdef LESS_P
+  while (p <= (P + P/5)) {
+#else
   while (p <= 2 * P) {
+#endif
     if (nprimes + 1 >= maxprimes) {
       maxprimes += maxprimes / 10;
       *primes = (uint32_t*) realloc (*primes, maxprimes * sizeof (uint32_t));
