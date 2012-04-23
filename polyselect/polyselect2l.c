@@ -422,16 +422,21 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       gmp_printf ("# Optimized polynomial:\n");
     }
 
-    /* print optimized (maybe size-optimized or size-root optimized) polynomial */
-    gmp_printf ("n: %Zd\n", N);
-    print_poly_info (f, d, g, 0);
-    printf ("# Murphy's E(Bf=%.0f,Bg=%.0f,area=%.2e)=%1.2e (best so far %1.2e)\n",
-            BOUND_F, BOUND_G, AREA, E, best_E);
-    printf ("\n");
-    fflush (stdout);
+    /* print optimized (maybe size- or size-root- optimized) polynomial */
+    if (verbose >= 0)
+      {
+        gmp_printf ("n: %Zd\n", N);
+        print_poly_info (f, d, g, 0);
+        printf ("# Murphy's E(Bf=%.0f,Bg=%.0f,area=%.2e)=%1.2e (best so far %1.2e)\n",
+                BOUND_F, BOUND_G, AREA, E, best_E);
+        printf ("\n");
+        fflush (stdout);
+      }
   }
   else {
-    gmp_fprintf (stderr, "# Skip polynomial: %.2f, ad: %lu, l: %Zd, m: %Zd\n", logmu, ad, l, m);
+    if (verbose >= 0)
+      gmp_printf ("# Skip polynomial: %.2f, ad: %lu, l: %Zd, m: %Zd\n",
+                  logmu, ad, l, m);
   }
 
   mpz_clear (l);
@@ -1847,16 +1852,21 @@ main (int argc, char *argv[])
     }
   }
 
-  printf ("# Stat: tried %d ad-value(s), found %d polynomial(s), %d below maxnorm\n",
-          tries, tot_found, found);
-  printf ("# Raw lognorm (min/av/max): %1.2f/%1.2f/%1.2f\n",
-          min_raw_lognorm, aver_raw_lognorm / collisions, max_raw_lognorm);
-  printf ("# Optimized lognorm (min/av/max): %1.2f/%1.2f/%1.2f\n",
-         min_opt_lognorm, aver_opt_lognorm / collisions_good, max_opt_lognorm);
-  printf ("# Stat: potential collisions=%1.2e (%1.2e/s)\n",
-          potential_collisions, 1000.0 * potential_collisions
-          / (double) cputime ());
-  printf ("# Stat: av. g0/adm2 ratio: %.3e\n", total_adminus2 / (double) collisions);
+  if (verbose >= 0)
+    {
+      printf ("# Stat: tried %d ad-value(s), found %d polynomial(s), %d below maxnorm\n",
+              tries, tot_found, found);
+      printf ("# Raw lognorm (min/av/max): %1.2f/%1.2f/%1.2f\n",
+              min_raw_lognorm, aver_raw_lognorm / collisions, max_raw_lognorm);
+      printf ("# Optimized lognorm (min/av/max): %1.2f/%1.2f/%1.2f\n",
+              min_opt_lognorm, aver_opt_lognorm / collisions_good,
+              max_opt_lognorm);
+      printf ("# Stat: potential collisions=%1.2e (%1.2e/s)\n",
+              potential_collisions, 1000.0 * potential_collisions
+              / (double) cputime ());
+      printf ("# Stat: av. g0/adm2 ratio: %.3e\n",
+              total_adminus2 / (double) collisions);
+    }
 
   /* print best 10 values of logmu */
   printf ("# Stat: best logmu:");

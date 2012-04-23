@@ -1910,7 +1910,7 @@ my $polysel_check = sub {
 my $polysel_cmd = sub {
     my ($a, $b, $m, $nthreads, $gzip) = @_;
     return "env nice -$param{'selectnice'} ".
-           "$m->{'bindir'}/polyselect/polyselect2 -q ".
+           "$m->{'bindir'}/polyselect/polyselect2l -q ".
            "-kmax $param{'kjkmax'} ".
            "-incr $param{'kjincr'} ".
            "-admin $a ".
