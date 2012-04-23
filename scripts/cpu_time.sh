@@ -39,6 +39,11 @@ perl -e 'sub format_dhms {
 my $var=<STDIN>; print format_dhms($var)."\n"'
 }
 
+echo -n "Number of relations found: "
+cat ${name}.nrels
+
+echo -n "Number on non-duplicate relations: "
+grep -h remaining ${name}.dup2*.log | sed "s/^[ ]*\([0-9]*\) remaining.*/+\1/g" | tr "\n" " " | cut -c1- | sed "s/^+//g" | bc
 
 # Polyselect
 if [[ -z $1 || $(expr $1 : '.*[p].*') != 0 ]]
