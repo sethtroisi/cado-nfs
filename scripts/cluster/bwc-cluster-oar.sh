@@ -467,6 +467,8 @@ http_head_somewhere() {
 
 ### Go !
 
+ln -sf OAR.$OAR_JOB_NAME.$OAR_JOBID.stdout OAR.$OAR_JOB_NAME.current.stdout
+
 autodetect_scheduler_and_set_dependent_vars
 
 notify "`date`: start $OAR_JOBID $cluster/$nnodes mpi=$mpi thr=$thr, leader=$leader"
