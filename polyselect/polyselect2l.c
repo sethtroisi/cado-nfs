@@ -33,7 +33,7 @@
 #ifdef BATCH_P
 #define BATCH_SIZE 8 /* batch 8 p */
 #else
-#define BATCH_SIZE 20  /* batch 10 sq */
+#define BATCH_SIZE 10  /* batch 10 sq */
 #endif
 
 /* consider only two roots or more */
@@ -117,7 +117,8 @@ crt_sq ( mpz_t qqz,
 void
 print_poly_info ( mpz_t *f,
                   unsigned int d,
-                  mpz_t g[2] )
+                  mpz_t g[2],
+                  int raw )
 {
   unsigned int i, nroots;
   double skew, logmu, alpha;
@@ -130,7 +131,11 @@ print_poly_info ( mpz_t *f,
   skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
   logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
   alpha = get_alpha (f, d, ALPHA_BOUND);
-  printf ("# lognorm %1.2f, skew %1.2f, alpha %1.2f, E %1.2f,  exp_E %1.2f, %u rroots\n",
+  if (raw == 1)
+    printf ("# raw lognorm ");
+  else
+    printf ("# lognorm ");
+  printf ("%1.2f, skew %1.2f, alpha %1.2f, E %1.2f,  exp_E %1.2f, %u rroots\n",
           logmu, skew, alpha, logmu + alpha,
           logmu - 0.824 * sqrt (2.0 * exp_rot[d] * log (skew)),
           nroots);
@@ -402,13 +407,13 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     if (raw) {
       printf ("# Raw polynomial:\n");
       gmp_printf ("n: %Zd\n", N);
-      print_poly_info (fold, d, gold);
+      print_poly_info (fold, d, gold, 1);
       gmp_printf ("# Optimized polynomial:\n");
     }
 
     /* print optimized (maybe size-optimized or size-root optimized) polynomial */
     gmp_printf ("n: %Zd\n", N);
-    print_poly_info ( f, d, g );
+    print_poly_info (f, d, g, 0);
     printf ("# Murphy's E(Bf=%.0f,Bg=%.0f,area=%.2e)=%1.2e (best so far %1.2e)\n",
             BOUND_F, BOUND_G, AREA, E, best_E);
     printf ("\n");
@@ -1159,6 +1164,7 @@ collision_on_batch_sq ( header_t header,
 
       // for each rp, compute (rp-rq)*1/q^2 (mod p^2)
       for (j = 0; j < nr; j ++, c++) {
+
         rp = R->roots[nprimes][j];
         modredcul_set_ul (res_rp, rp, modpp);
         modredcul_sub_ul (res_rp, res_rp, mpz_fdiv_ui (rqqz[i], pp), modpp);
@@ -1174,14 +1180,14 @@ collision_on_batch_sq ( header_t header,
         mpz_init_set (m0tmp, header->m0);
         mpz_add (m0tmp, m0tmp, rqqz[i]); // m0 + rq
         mpz_init_set_ui (tmp, invqq[i][c]);
-        mpz_mul (tmp, tmp, qqz[i]); // i*q^2
+        mpz_mul (tmp, tmp, qqz); // i*q^2
         mpz_add (m0tmp, m0tmp, tmp); // m0 + rq + i*q^2
         mpz_pow_ui (m0tmp, m0tmp, header->d);
         mpz_mod_ui (m0tmp, m0tmp, pp);
         if (mpz_cmp (m0tmp, Ntmp) != 0) {
           fprintf (stderr, "Error: u computation is wrong in"
                    "collision_on_each_sq, i: %d\n", i);
-          gmp_printf ("Details: (p=%lu, i(mod p^2)=%ld) for"
+          gmp_printf ("Details: (p=%lu, i(mod p^2)=%ld) for "
                       "ad=%lu, q=%lu, rq=%Zd, rp=%lu, invqq=%lu\n",
                       p, invqq[i][c], header->ad, q[i], rqqz[i], rp, tmp2_modul[0]);
           gmp_printf ("m0=%Zd\n", header->m0);
@@ -1207,8 +1213,56 @@ collision_on_batch_sq ( header_t header,
       rp = R->roots[nprimes][j];
       modredcul_set_ul (res_rp, rp, modpp);
       modredcul_sub_ul (res_rp, res_rp, mpz_fdiv_ui (rqqz[0], pp), modpp);
-      modredcul_mul (tmp_modul, res_rp, tmp_modul, modpp);
-      invqq[0][c] = modredcul_get_ul (tmp_modul, modpp);
+      modredcul_mul (tmp2_modul, res_rp, tmp_modul, modpp); // tmp_modul should be retained!
+      invqq[0][c] = modredcul_get_ul (tmp2_modul, modpp);
+
+#ifdef DEBUG_POLYSELECT2L /* check if batch inversions correct */
+      unsigned long tmp_1 = modredcul_get_ul (tmp_modul, modpp);
+      mpz_t tmp_debug, tmp_debug2, qqz1;
+      mpz_init_set_ui (qqz1, q[0]);
+      mpz_mul_ui (qqz1, qqz1, q[0]);
+      mpz_init_set_ui (tmp_debug, tmp_1);
+      mpz_init (tmp_debug2);
+      mpz_mul (tmp_debug2, tmp_debug, qqz1);
+      tmp_1 = mpz_fdiv_ui (tmp_debug2, pp);
+      if (tmp_1 != 1) {
+        fprintf (stderr, "Error, batch inversion is wrong in %s, iter: %d\n",
+                 __FUNCTION__, i);
+        exit (1);
+      }
+      mpz_clear (qqz1);
+      mpz_clear (tmp_debug);
+      mpz_clear (tmp_debug2);
+#endif
+
+#ifdef DEBUG_POLYSELECT2L  /* check if u is correct */
+      mpz_t Ntmp, m0tmp, tmp, qqz;
+      mpz_init_set_ui (qqz, q[0]);
+      mpz_mul_ui (qqz, qqz, q[0]);
+      mpz_init_set (Ntmp, header->Ntilde);
+      mpz_mod_ui (Ntmp, Ntmp, pp); // tildeN (mod p^2)
+      mpz_init_set (m0tmp, header->m0);
+      mpz_add (m0tmp, m0tmp, rqqz[0]); // m0 + rq
+      mpz_init_set_ui (tmp, invqq[0][c]);
+      mpz_mul (tmp, tmp, qqz); // i*q^2
+      mpz_add (m0tmp, m0tmp, tmp); // m0 + rq + i*q^2
+      mpz_pow_ui (m0tmp, m0tmp, header->d);
+      mpz_mod_ui (m0tmp, m0tmp, pp);
+      if (mpz_cmp (m0tmp, Ntmp) != 0) {
+        fprintf (stderr, "Error: u computation is wrong in"
+                 "collision_on_each_sq, i: %d\n", i);
+        gmp_printf ("Details: (p=%lu, i(mod p^2)=%ld) for "
+                    "ad=%lu, q=%lu, rq=%Zd, rp=%lu, invqq=%lu\n",
+                    p, invqq[0][c], header->ad, q[0], rqqz[0], rp, tmp_modul[0]);
+        gmp_printf ("m0=%Zd\n", header->m0);
+        gmp_printf ("Ntilde=%Zd\n", header->Ntilde);
+        exit (1);
+      }
+      mpz_clear (Ntmp);
+      mpz_clear (m0tmp);
+      mpz_clear (tmp);
+      mpz_clear (qqz);
+#endif
     }
 
     modredcul_clear (res_rp, modpp);
