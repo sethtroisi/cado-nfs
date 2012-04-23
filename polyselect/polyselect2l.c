@@ -60,7 +60,10 @@ pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER; /* used as mutual exclusion
                                                    lock for those variables */
 int tot_found = 0; /* total number of polynomials */
 int found = 0; /* number of polynomials below maxnorm */
-double potential_collisions = 0.0, aver_lognorm = 0.0, aver_raw_lognorm = 0.0;;
+double potential_collisions = 0.0, aver_opt_lognorm = 0.0,
+       aver_raw_lognorm = 0.0;
+double min_raw_lognorm = DBL_MAX, max_raw_lognorm = 0.0;
+double min_opt_lognorm = DBL_MAX, max_opt_lognorm = 0.0;
 unsigned long collisions = 0;
 unsigned long collisions_good = 0;
 double total_adminus2 = 0.0;
@@ -302,6 +305,10 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   collisions ++;
   tot_found ++;
   aver_raw_lognorm += logmu;
+  if (logmu < min_raw_lognorm)
+      min_raw_lognorm = logmu;
+  if (logmu > max_raw_lognorm)
+    max_raw_lognorm = logmu;
 #ifdef MAX_THREADS
   pthread_mutex_unlock (&lock);
 #endif
@@ -359,7 +366,11 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     pthread_mutex_lock (&lock);
 #endif
     collisions_good ++;
-    aver_lognorm += logmu;
+    aver_opt_lognorm += logmu;
+    if (logmu < min_opt_lognorm)
+      min_opt_lognorm = logmu;
+    if (logmu > max_opt_lognorm)
+      max_opt_lognorm = logmu;
 #ifdef MAX_THREADS
     pthread_mutex_unlock (&lock);
 #endif
@@ -1828,7 +1839,7 @@ main (int argc, char *argv[])
               collisions,
               1000.0 * (double) collisions / cputime (),
               collisions_good,
-              aver_lognorm / collisions_good,
+              aver_opt_lognorm / collisions_good,
               aver_raw_lognorm / collisions,
               cputime () );
       fflush (stdout);
@@ -1838,6 +1849,10 @@ main (int argc, char *argv[])
 
   printf ("# Stat: tried %d ad-value(s), found %d polynomial(s), %d below maxnorm\n",
           tries, tot_found, found);
+  printf ("# Raw lognorm (min/av/max): %1.2f/%1.2f/%1.2f\n",
+          min_raw_lognorm, aver_raw_lognorm / collisions, max_raw_lognorm);
+  printf ("# Optimized lognorm (min/av/max): %1.2f/%1.2f/%1.2f\n",
+         min_opt_lognorm, aver_opt_lognorm / collisions_good, max_opt_lognorm);
   printf ("# Stat: potential collisions=%1.2e (%1.2e/s)\n",
           potential_collisions, 1000.0 * potential_collisions
           / (double) cputime ());
