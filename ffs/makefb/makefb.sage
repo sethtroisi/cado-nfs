@@ -150,9 +150,9 @@ def makefb(f,dlim,powerlim,filename="",typo="cado"):
 		xx = rewrite_roots(xx)
 		for r in xx:
 			if (r[1] != 1) or (r[2] != 0):
-				stri=hexify(Zt,dummy,r[0])+":"+format(r[1])+","+format(r[2])+":"+hexify(Zt,dummy,r[3][0])
+				stri=hexify(Zt,dummy,r[0])+":"+format(r[1])+","+format(r[2])+": "+hexify(Zt,dummy,r[3][0])
 			else:
-				stri = hexify(Zt,dummy,r[0])+":"+hexify(Zt,dummy,r[3][0])
+				stri = hexify(Zt,dummy,r[0])+": "+hexify(Zt,dummy,r[3][0])
 			for i in range(1,len(r[3])):
 				stri = stri + ","+hexify(Zt,dummy,r[3][i])
 			gd.write(stri+"\n")
@@ -167,9 +167,9 @@ def makefb(f,dlim,powerlim,filename="",typo="cado"):
 		xx = rewrite_roots(xx)
 		for r in xx:
 			if (r[1] != 1) or (r[2] != 0):
-				stri=hexify(Zt,dummy,r[0])+":"+format(r[1])+","+format(r[2])+":"+hexify(Zt,dummy,r[3][0])
+				stri=hexify(Zt,dummy,r[0])+":"+format(r[1])+","+format(r[2])+": "+hexify(Zt,dummy,r[3][0])
 			else:
-				stri = hexify(Zt,dummy,r[0])+":"+hexify(Zt,dummy,r[3][0])
+				stri = hexify(Zt,dummy,r[0])+": "+hexify(Zt,dummy,r[3][0])
 			for i in range(1,len(r[3])):
 				stri = stri + ","+hexify(Zt,dummy,r[3][i])
 			gd.write(stri+"\n")
