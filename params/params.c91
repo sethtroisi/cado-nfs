@@ -56,6 +56,9 @@ kjP=20000               # choose lc(g) with two prime factors in [P,2P]
     # but the number of found polynomials will be smaller.
     # As a rule of thumb, we want at least 100 found polynomials in total
     # (without norm limitation, see below).
+kjlq=2                  # special-q in lc(g) has such many factors
+    # Setting a large value will enumerate/check more potential polynomials
+    # for each ad, which however will also increase the size of lc(g).
 kjmaxnorm=32.6          # max. lognorm of polynomials (before rootsieve)
     # If not set, a default value of 1e9 (in practice infinity) is used.
     # Setting this value right might speed up a lot the polynomial
@@ -79,7 +82,7 @@ kjkmax=18               # rotation is bounded by 2^kmax
     # This controls the computational effort put into the rotation step.
     # The higher this value is, the better the found polynomial will be,
     # but it will take more time.
-
+     
 # - runtime environment parameters for polyselect -
 kjdelay=60              # time between two checks
     # The existence of result files from polyselect jobs is checked at
@@ -94,6 +97,10 @@ selectnice=4            # nice level for polyselect
 # we get
 # lognorm: 32.47, alpha: -4.31 E=28.17
 # Murphy's E(Bf=10000000,Bg=5000000,area=1.00e+16)=3.46e-08
+# Updated Apr, 24:
+# with -lq 2 we get
+# lognorm: 27.24, alpha: -0.76 (proj: -1.52), E: 26.47, nr: 0
+# MurphyE(Bf=10000000,Bg=5000000,area=1.00e+16)=3.76e-08
 
 ###########################################################################
 # Sieve

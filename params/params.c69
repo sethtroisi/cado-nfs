@@ -41,6 +41,7 @@ kjkmax=17               # rotation is bounded by 2^kmax
 kjincr=60               # forced divisor of lc(f)
 kjP=5000                # choose lc(g) with two prime factors in [P,2P]
 kjmaxnorm=24.5          # maximal lognorm before rootsieve
+kjlq=1                  # special-q in lc(g) has such many factors
 
 ###########################################################################
 # Sieve

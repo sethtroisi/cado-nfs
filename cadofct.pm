@@ -165,6 +165,7 @@ my @default_param = (
     # polyselect using Kleinjung's (kj) algorithm
     degree       => 5,
     kjkmax       => 10,
+    kjlq         => 1,
     kjincr       => 60,
     kjadmin      => 0,
     kjadmax      => undef,
@@ -1480,7 +1481,7 @@ my %tasks = (
     polysel   => { name   => "polynomial selection",
                    dep    => ['init'],
                    param  => ['degree', 'kjkmax', 'kjincr', 'kjadmin',
-                              'kjadmax'],
+                              'kjadmax', 'kjlq'],
                    files  => ['kjout\.[\de.]+-[\de.]+', 'poly', 'poly_tmp'],
                    resume => 1,
                    dist   => 1 },
@@ -1911,6 +1912,7 @@ my $polysel_cmd = sub {
     my ($a, $b, $m, $nthreads, $gzip) = @_;
     return "env nice -$param{'selectnice'} ".
            "$m->{'bindir'}/polyselect/polyselect2l -q ".
+           "-lq $param{'kjlq'} ".
            "-kmax $param{'kjkmax'} ".
            "-incr $param{'kjincr'} ".
            "-admin $a ".
