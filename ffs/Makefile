@@ -1,7 +1,12 @@
-SRC = $(wildcard *.c)
-INC = $(wildcard *.h)
-OBJ = $(SRC:.c=.o)
 BIN = sieve
+
+fppol_OBJ = f2pol.o f3pol.o fppol.o fppol_test.o fppol_set.o  \
+	    fppol_arith.o fppol_mul.o fppol_div.o fppol_mod.o \
+	    fppol_gcd.o fppol_io.o fppol_facttools.o fppol_internal.o
+
+sieve_OBJ = $(fppol_OBJ) ffspol.o fqpol.o ijvec.o params.o fb.o qlat.o    \
+	    buckets.o norm.o latsieve.o polyfactor.o smoothness.o sieve.o \
+	    memusage.o timing.o
 
 BUILDDIR = ./build
 
@@ -27,6 +32,10 @@ ifdef GF2XPREFIX
   LDLIBS   += -lgf2x
 endif
 
+SRC = $(wildcard *.c)
+INC = $(wildcard *.h)
+OBJ = $(SRC:.c=.o)
+
 FIELDS = f2 f3
 f2_DEF = USE_F2
 f3_DEF = USE_F3
@@ -35,15 +44,28 @@ f3_DEF = USE_F3
 
 all: $(FIELDS)
 
-define BUILD_template
+define BIN_template
+  $(1)_$(2)_OBJ = $$(filter $$($(1)_OBJ), \
+                     $$(addprefix $$($(1)_BUILDDIR)/, $$($(2)_OBJ)))
+  $(1)_$(2)_BIN = $$($(1)_BUILDDIR)/$(2)
+
+  $(1): $$($(1)_$(2)_BIN)
+
+  $$($(1)_$(2)_BIN): $$($(1)_$(2)_OBJ)
+
+  clean::
+	rm -f $$($(1)_$(2)_BIN)
+
+endef
+
+define FIELD_template
   $(1)_BUILDDIR = $$(BUILDDIR)/$(1)
   $(1)_DEP      = $$($(1)_BUILDDIR)/.depend
   $(1)_OBJ      = $$(addprefix $$($(1)_BUILDDIR)/,$$(filter-out $$(foreach f,\
                      $$(filter-out $(1),$$(FIELDS)),$$(f)pol.o), $$(OBJ)))
-  $(1)_BIN      = $$(addprefix $$($(1)_BUILDDIR)/,$$(BIN))
   $(1)_CPPFLAGS = -D$$($(1)_DEF)
 
-  $(1): $$($(1)_BIN)
+  $$(foreach bin,$$(BIN),$$(eval $$(call BIN_template,$(1),$$(bin))))
 
   $$($(1)_BUILDDIR):
 	mkdir -p $$@
@@ -52,14 +74,12 @@ define BUILD_template
 	$$(CC) $$(CFLAGS) $$(CPPFLAGS) $$($(1)_CPPFLAGS) $$(TARGET_ARCH) \
 	  -c -o $$@ $$*.c
 
-  $$($(1)_BIN): $$($(1)_OBJ) 
-
   $$($(1)_DEP): $$(SRC) $$(INC) Makefile | $$($(1)_BUILDDIR)
 	$$(CC) $$(CFLAGS) $$(CPPFLAGS) $$($(1)_CPPFLAGS) $$(TARGET_ARCH) \
 	  -MM $$(SRC) | sed -e "s+^.*\.o:+$$($(1)_BUILDDIR)/&+" >$$@
 
   clean::
-	rm -f $$($(1)_DEP) $$($(1)_OBJ) $$($(1)_BIN)
+	rm -f $$($(1)_DEP) $$($(1)_OBJ) # $$($(1)_BIN)
 	[ -z "`find $$($(1)_BUILDDIR) -maxdepth 0 -empty`" ] \
 	  || rmdir $$($(1)_BUILDDIR)
 
@@ -70,7 +90,7 @@ define BUILD_template
 
 endef
 
-$(foreach f,$(FIELDS),$(eval $(call BUILD_template,$(f))))
+$(foreach f,$(FIELDS),$(eval $(call FIELD_template,$(f))))
 
 clean dirclean::
 	[ -z "`find $(BUILDDIR) -maxdepth 0 -empty`" ] || rmdir $(BUILDDIR)

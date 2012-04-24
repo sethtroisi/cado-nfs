@@ -26,12 +26,12 @@
 #define __DECL_FPPOLxx_ARITH_ALL(sz) \
         __DECL_FPPOLxx_FOLD_OR  (sz) \
 
+__DECL_FPPOLxx_ARITH_ALL( 8)
 __DECL_FPPOLxx_ARITH_ALL(16)
 __DECL_FPPOLxx_ARITH_ALL(32)
 __DECL_FPPOLxx_ARITH_ALL(64)
 
 #undef __DECL_FPPOLxx_FOLD_OR
-#undef __DECL_FPPOLxx_DEG
 #undef __DECL_FPPOLxx_ARITH_ALL
 
 
@@ -171,6 +171,7 @@ __DECL_FPPOLxx_ARITH_ALL(64)
         __DEF_FPPOLxx_SET_ONE  (sz)     \
         __DEF_FPPOLxx_SET_TI   (sz)     \
         __DEF_FPPOLxx_SET      (sz)     \
+        __DEF_FPPOLxx_SET_yy   (sz,  8) \
         __DEF_FPPOLxx_SET_yy   (sz, 16) \
         __DEF_FPPOLxx_SET_yy   (sz, 32) \
         __DEF_FPPOLxx_SET_yy   (sz, 64) \
@@ -183,6 +184,7 @@ __DECL_FPPOLxx_ARITH_ALL(64)
         __DEF_FPPOLxx_GET_UI   (sz)     \
         __DEF_FPPOLxx_SET_UI   (sz)
 
+__DEF_FPPOLxx_SET_ALL( 8)
 __DEF_FPPOLxx_SET_ALL(16)
 __DEF_FPPOLxx_SET_ALL(32)
 __DEF_FPPOLxx_SET_ALL(64)
@@ -226,6 +228,7 @@ void fppol_set(fppol_ptr r, fppol_srcptr p);
 #define __DECL_FPPOL_SET_xx(sz)                           \
   void fppol_set_##sz(fppol_ptr r, fppol##sz##_srcptr p);
 
+__DECL_FPPOL_SET_xx( 8)
 __DECL_FPPOL_SET_xx(16)
 __DECL_FPPOL_SET_xx(32)
 __DECL_FPPOL_SET_xx(64)

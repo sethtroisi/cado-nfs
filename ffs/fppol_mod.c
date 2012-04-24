@@ -137,6 +137,7 @@
         __DEF_FPPOLxx_MULMOD (sz) \
         __DEF_FPPOLxx_INVMOD (sz)
 
+__DEF_FPPOLxx_MOD_ALL( 8)
 __DEF_FPPOLxx_MOD_ALL(16)
 __DEF_FPPOLxx_MOD_ALL(32)
 __DEF_FPPOLxx_MOD_ALL(64)

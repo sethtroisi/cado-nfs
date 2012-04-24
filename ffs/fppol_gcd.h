@@ -11,6 +11,7 @@
   void fppol##sz##_gcd(fppol##sz##_ptr    r, fppol##sz##_srcptr p,  \
                        fppol##sz##_srcptr q);
 
+__DECL_FPPOLxx_GCD( 8)
 __DECL_FPPOLxx_GCD(16)
 __DECL_FPPOLxx_GCD(32)
 __DECL_FPPOLxx_GCD(64)

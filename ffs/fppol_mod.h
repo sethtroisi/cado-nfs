@@ -44,6 +44,7 @@
         __DECL_FPPOLxx_MULMOD (sz) \
         __DECL_FPPOLxx_INVMOD (sz)
 
+__DECL_FPPOLxx_MOD_ALL( 8)
 __DECL_FPPOLxx_MOD_ALL(16)
 __DECL_FPPOLxx_MOD_ALL(32)
 __DECL_FPPOLxx_MOD_ALL(64)

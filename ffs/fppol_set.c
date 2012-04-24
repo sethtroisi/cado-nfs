@@ -52,6 +52,7 @@ void fppol_set(fppol_ptr r, fppol_srcptr p)
     fppol64_set_##sz(r->limbs[0], p);                    \
     r->deg = fppol##sz##_deg(p); }
 
+__DEF_FPPOL_SET_xx( 8)
 __DEF_FPPOL_SET_xx(16)
 __DEF_FPPOL_SET_xx(32)
 __DEF_FPPOL_SET_xx(64)
