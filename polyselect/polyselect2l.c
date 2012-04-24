@@ -42,11 +42,13 @@
 #define NUMBER_CONSIDERED_ROOTS 16
 #endif
 
+#define LQ_DEFAULT 1 /* default number of factors in special-q part */
+
 /* Read-Only */
 uint32_t *Primes = NULL;
 unsigned long lenPrimes = 1; // length of Primes[]
 int nq = INT_MAX;
-int lq = -1; /* -1 means non-initialized */
+int lq = LQ_DEFAULT;
 double max_norm = DBL_MAX; /* maximal wanted norm (before rotation) */
 const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
 static int verbose = 0, incr = DEFAULT_INCR, default_MAX_k;
@@ -1462,7 +1464,8 @@ usage (char *argv)
   fprintf (stderr, "-degree nnn  --- wanted polynomial degree\n");
   fprintf (stderr, "-nq nnn      --- maximum number of special-q's considered\n");
   fprintf (stderr, "                 for each ad (default %d)\n", INT_MAX);
-  fprintf (stderr, "-lq nnn      --- number of factors in the special-q\n");
+  fprintf (stderr, "-lq nnn      --- number of factors in the special-q"
+           " (default %d)\n", LQ_DEFAULT);
   fprintf (stderr, "-seed nnn    --- seed for srand (default by time(NULL))\n");
   fprintf (stderr, "-kmax nnn    --- rotation bound (default %d)\n",
            default_MAX_k);
@@ -1659,21 +1662,6 @@ main (int argc, char *argv[])
       exit (1);
     }
   }
-
-  /* set default value of lq if not given */
-  if (lq == -1)
-    {
-      size_t d = mpz_sizeinbase (N, 10);
-
-      if (d < 80)
-        lq = 1;
-      else if (d < 90)
-        lq = 2;
-      else if (d < 100)
-        lq = 3;
-      else
-        lq = 4;
-    }
 
   if (lq < 1 || nq < 1)
   {
