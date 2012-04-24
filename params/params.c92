@@ -41,6 +41,7 @@ kjadmax=3e5             # max value for lc(f)
 kjadrange=1e4           # individual tasks
 kjkmax=19               # rotation is bounded by 2^kmax
 kjincr=60               # forced divisor of lc(f)
+kjlq=2                  # special-q in lc(g) has such many factors
 
 ###########################################################################
 # Sieve
