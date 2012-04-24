@@ -30,17 +30,17 @@ machines=mach_desc      # file describing available computers for parallel
 ###########################################################################
 
 degree=5                # degree of the algebraic polynomial
-kjdelay=60              # time between two checks
-selectnice=4            # nice level for selection
+polsel_delay=60              # time between two checks
+polsel_nice=4            # nice level for selection
 
 ## Parameters of polyselect
-kjP=10000               # choose lc(g) with two prime factors in [P,2P]
-kjmaxnorm=34.6          # max. lognorm of polynomials (before rootsieve)
-kjadmax=1e8             # max value for lc(f)
-kjadrange=2e6           # individual tasks
-kjkmax=20               # rotation is bounded by 2^kmax
-kjincr=30030            # forced divisor of lc(f)
-kjlq=3                  # special-q in lc(g) has such many factors
+polsel_P=10000               # choose lc(g) with two prime factors in [P,2P]
+polsel_maxnorm=34.6          # max. lognorm of polynomials (before rootsieve)
+polsel_admax=1e8             # max value for lc(f)
+polsel_adrange=2e6           # individual tasks
+polsel_kmax=20               # rotation is bounded by 2^kmax
+polsel_incr=30030            # forced divisor of lc(f)
+polsel_lq=3                  # special-q in lc(g) has such many factors
 
 ###########################################################################
 # Sieve

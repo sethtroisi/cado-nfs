@@ -58,9 +58,9 @@ while (@files) {
   $old_prefix = $param{'prefix'};
 }
 
-# info kjout
-banner "Info kjout";
-my @kjout_files;
+# info polsel_out
+banner "Info polsel_out";
+my @polsel_out_files;
 my $time;
 my $phase;
 my $npoly;
@@ -73,12 +73,12 @@ foreach my $name (sort keys %link_name_params) {
 
   opendir DIR, "."
     or die "Cannot open directory `.': $!\n";
-  @kjout_files = grep /^$name\.kjout\.[\de.]+-[\de.]+$/, readdir DIR;
+  @polsel_out_files = grep /^$name\.polsel_out\.[\de.]+-[\de.]+$/, readdir DIR;
   closedir DIR;
-  my $size = scalar(@kjout_files);
+  my $size = scalar(@polsel_out_files);
   $npoly = 0;
 
-  foreach my $f (@kjout_files) {
+  foreach my $f (@polsel_out_files) {
     open FILE, "< $f"
       or die "Cannot open `$f' for reading: $!.\n";
     my $murphy;
@@ -123,18 +123,18 @@ foreach my $name (sort keys %link_name_params) {
   my $ampl = $Emax[0]-$Emin;
   $file = $link_name_params{"$name"};
   read_param(\%param, { strict => 1 }, "$file");
-  my $size_expect = ceil (($param{'kjadmax'} -  $param{'kjadmin'} ) /
-                          $param{'kjadrange'});
-  die "kjout missing for configuration $name! ($size on $size_expect)\n"
+  my $size_expect = ceil (($param{'polsel_admax'} -  $param{'polsel_admin'} ) /
+                          $param{'polsel_adrange'});
+  die "polsel_out missing for configuration $name! ($size on $size_expect)\n"
     if ( $size != $size_expect );
   warn "No polynomial found in some files! (only $npoly poly on $size files)\n"
     if ( $size != $npoly );
 
   # print infos
-  info "Params: P $param{'kjP'} maxnorm $param{'kjmaxnorm'} kmax $param{'kjkmax'} ".
+  info "Params: P $param{'polsel_P'} maxnorm $param{'polsel_maxnorm'} kmax $param{'polsel_kmax'} ".
        "degree $param{'degree'}\n".
-       "        adrange $param{'kjadrange'} admax $param{'kjadmax'} ".
-       "incr $param{'kjincr'}\n";
+       "        adrange $param{'polsel_adrange'} admax $param{'polsel_admax'} ".
+       "incr $param{'polsel_incr'}\n";
   $tab_level++;
   info "The best polynomial for $name is from `".basename($best)."'\n".
        "Emax = $Emax[0] - Emax2 = $Emax[1] - Emax3 = $Emax[2]\n".

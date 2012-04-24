@@ -30,8 +30,8 @@ machines=mach_desc      # file describing available computers for parallel
 ###########################################################################
 
 degree=5                # degree of the algebraic polynomial
-kjdelay=300             # time between two checks
-selectnice=4            # nice level for selection
+polsel_delay=300             # time between two checks
+polsel_nice=4            # nice level for selection
 
 # on the test number
 # 2178801510284538198583287343584434450819019843421652036909187142202423933326877872217364246676795731450361112348246574394557063827
@@ -40,13 +40,13 @@ selectnice=4            # nice level for selection
 # Murphy's E(Bf=10000000,Bg=5000000,area=1.00e+16)=5.11e-11
 
 ## Parameters of polyselect
-kjP=100000              # choose lc(g) with two prime factors in [P,2P]
-kjmaxnorm=43.5          # max. lognorm of polynomials (before rootsieve)
-kjadmax=5e8             # max value for lc(f)
-kjadrange=5e6           # individual tasks
-kjkmax=25               # rotation is bounded by 2^kmax
-kjincr=30030            # forced divisor of lc(f)
-kjlq=3                  # special-q in lc(g) has such many factors
+polsel_P=100000              # choose lc(g) with two prime factors in [P,2P]
+polsel_maxnorm=43.5          # max. lognorm of polynomials (before rootsieve)
+polsel_admax=5e8             # max value for lc(f)
+polsel_adrange=5e6           # individual tasks
+polsel_kmax=25               # rotation is bounded by 2^kmax
+polsel_incr=30030            # forced divisor of lc(f)
+polsel_lq=3                  # special-q in lc(g) has such many factors
 
 ###########################################################################
 # Sieve

@@ -162,18 +162,18 @@ my @default_param = (
     n            => undef,
     parallel     => 0,
 
-    # polyselect using Kleinjung's (kj) algorithm
-    degree       => 5,
-    kjkmax       => 10,
-    kjlq         => 1,
-    kjincr       => 60,
-    kjadmin      => 0,
-    kjadmax      => undef,
-    kjadrange    => 1e7,
-    kjdelay      => 120,
-    kjP          => undef,
-    kjmaxnorm    => 1e9,
-    selectnice   => 10,
+    # polyselect using Kleinjung's algorithm
+    degree         => 5,
+    polsel_kmax    => 10,
+    polsel_lq      => 1,
+    polsel_incr    => 60,
+    polsel_admin   => 0,
+    polsel_admax   => undef,
+    polsel_adrange => 1e7,
+    polsel_delay   => 120,
+    polsel_P       => undef,
+    polsel_maxnorm => 1e9,
+    polsel_nice    => 10,
 
     # sieve
     rlim         => 8000000,
@@ -351,7 +351,7 @@ sub read_param {
     if ($opt->{'strict'}) {
         die "The paramater `n' must be an integer larger than 1.\n"
           if ($param->{'n'} < 2);
-        for my $k ("wdir", "name", "kjadmax", "kjP") {
+        for my $k ("wdir", "name", "polsel_admax", "polsel_P") {
             die "The parameter `$k' is mandatory.\n" if !$param->{$k};
         }
         die "The parameter `machines' is mandatory for parallel mode.\n"
@@ -1152,7 +1152,7 @@ sub find_hole {
 #                 name job status files;
 #  - `title'      is the title of the task, to be displayed in a flashy banner;
 #  - `suffix'     is the common suffix of the job output files of the task
-#                 (i.e. "kjout" for polynomial selection, or "rels" for
+#                 (i.e. "polsel_out" for polynomial selection, or "rels" for
 #                 sieving);
 #  - `extra'      is an optional suffix, to match extra files when recovering
 #                 job output files (i.e. "freerels" for sieving);
@@ -1480,9 +1480,9 @@ my %tasks = (
 
     polysel   => { name   => "polynomial selection",
                    dep    => ['init'],
-                   param  => ['degree', 'kjkmax', 'kjincr', 'kjadmin',
-                              'kjadmax', 'kjlq'],
-                   files  => ['kjout\.[\de.]+-[\de.]+', 'poly', 'poly_tmp'],
+                   param  => ['degree', 'polsel_kmax', 'polsel_incr',
+			      'polsel_admin', 'polsel_admax', 'polsel_lq'],
+                   files  => ['polsel_out\.[\de.]+-[\de.]+', 'poly', 'poly_tmp'],
                    resume => 1,
                    dist   => 1 },
 
@@ -1885,7 +1885,7 @@ my $polysel_check = sub {
     while (<FILE>) {
         if (/^No polynomial found/) {
             warn "No polynomial in file `$f'.\n".
-			     "please increase the [kj]adrange or [kj]maxnorm.\n"
+	     "please increase [polsel_]adrange or [polsel_]maxnorm.\n"
                if ($ENV{'CADO_DEBUG'});
             close FILE;
             return;
@@ -1910,19 +1910,19 @@ my $polysel_check = sub {
 
 my $polysel_cmd = sub {
     my ($a, $b, $m, $nthreads, $gzip) = @_;
-    return "env nice -$param{'selectnice'} ".
+    return "env nice -$param{'polsel_nice'} ".
            "$m->{'bindir'}/polyselect/polyselect2l -q ".
-           "-lq $param{'kjlq'} ".
-           "-kmax $param{'kjkmax'} ".
-           "-incr $param{'kjincr'} ".
+           "-lq $param{'polsel_lq'} ".
+           "-kmax $param{'polsel_kmax'} ".
+           "-incr $param{'polsel_incr'} ".
            "-admin $a ".
            "-admax $b ".
            "-degree $param{'degree'} ".
-           "-maxnorm $param{'kjmaxnorm'} ".
+           "-maxnorm $param{'polsel_maxnorm'} ".
            "-t $nthreads ".
-           "$param{'kjP'} ".
+           "$param{'polsel_P'} ".
            "< $m->{'prefix'}.n ".
-           "> $m->{'prefix'}.kjout.$a-$b ".
+           "> $m->{'prefix'}.polsel_out.$a-$b ".
            "2>&1";
 };
 
@@ -1931,17 +1931,17 @@ sub do_polysel {
         shift;
         my ($ranges) = @_;
         for (@$ranges) {
-            next     if $_->[1] <  $param{'kjadmax'};
-            last     if $_->[0] >  $param{'kjadmin'};
-            return 1 if $_->[0] <= $param{'kjadmin'} &&
-                        $_->[1] >= $param{'kjadmax'};
+            next     if $_->[1] <  $param{'polsel_admax'};
+            last     if $_->[0] >  $param{'polsel_admin'};
+            return 1 if $_->[0] <= $param{'polsel_admin'} &&
+                        $_->[1] >= $param{'polsel_admax'};
         }
         return 0;
     };
 
     my $polysel_progress = sub {
         my ($ranges) = @_;
-        my ($min, $max) = ($param{'kjadmin'}, $param{'kjadmax'});
+        my ($min, $max) = ($param{'polsel_admin'}, $param{'polsel_admax'});
 
         my $total = 0;
         for (@$ranges) {
@@ -1956,13 +1956,13 @@ sub do_polysel {
 
     distribute_task({ task     => "polysel",
                       title    => "Polynomial selection",
-                      suffix   => "kjout",
+                      suffix   => "polsel_out",
                       files    => ["$param{'name'}.n"],
                       pattern  => '^(# generated|No polynomial found)',
-                      min      => $param{'kjadmin'},
-                      max      => $param{'kjadmax'},
-                      len      => $param{'kjadrange'},
-                      delay    => $param{'kjdelay'},
+                      min      => $param{'polsel_admin'},
+                      max      => $param{'polsel_admax'},
+                      len      => $param{'polsel_adrange'},
+                      delay    => $param{'polsel_delay'},
                       check    => $polysel_check,
                       progress => $polysel_progress,
                       is_done  => $polysel_is_done,
@@ -1977,7 +1977,7 @@ sub do_polysel {
 
     opendir DIR, $param{'wdir'}
         or die "Cannot open directory `$param{'wdir'}': $!\n";
-    my @files = grep /^$param{'name'}\.kjout\.[\de.]+-[\de.]+$/,
+    my @files = grep /^$param{'name'}\.polsel_out\.[\de.]+-[\de.]+$/,
                      readdir DIR;
     closedir DIR;
 
@@ -2002,7 +2002,7 @@ sub do_polysel {
     }
 
     die "No polynomial was found in the given range!\n".
-        "Please increase the range or [kj]maxnorm.\n"
+        "Please increase the range or [polsel_]maxnorm.\n"
       unless defined $Emax;
 
     # Copy the best polynomial
@@ -2026,7 +2026,7 @@ sub do_polysel_bench {
     my $polysel_is_done = sub {
         shift;
         my ($ranges) = @_;
-        my ($min, $max) = ($param{'kjadmin'}, $param{'kjadmax'});
+        my ($min, $max) = ($param{'polsel_admin'}, $param{'polsel_admax'});
 
         my $total = 0;
         for (@$ranges) {
@@ -2034,13 +2034,13 @@ sub do_polysel_bench {
                      $_->[1] > $max ? $max : $_->[1]);
             $total += $r[1] - $r[0] if $r[0] < $r[1];
         }
-        $total = ceil ($total / $param{'kjadrange'});
+        $total = ceil ($total / $param{'polsel_adrange'});
 		my $total_cores=0;
 		foreach (keys %machines) {
 			$total_cores += $machines{$_}{'poly_cores'};
 		}
         my $size = count_lines("$param{'prefix'}.polysel_jobs", "$param{'name'}\.");
-		my $total_jobs = ceil (($max-$min)/$param{'kjadrange'});
+		my $total_jobs = ceil (($max-$min)/$param{'polsel_adrange'});
 		if ($last) {
 			return 1 if $total >= $total_jobs + $size;
 		} else {
@@ -2051,13 +2051,13 @@ sub do_polysel_bench {
 
     distribute_task({ task     => "polysel",
                       title    => "Polynomial selection",
-                      suffix   => "kjout",
+                      suffix   => "polsel_out",
                       files    => ["$param{'name'}.n"],
                       pattern  => '^(# generated|No polynomial found)',
-                      min      => $param{'kjadmin'},
-                      max      => $param{'kjadmax'},
-                      len      => $param{'kjadrange'},
-                      delay    => $param{'kjdelay'},
+                      min      => $param{'polsel_admin'},
+                      max      => $param{'polsel_admax'},
+                      len      => $param{'polsel_adrange'},
+                      delay    => $param{'polsel_delay'},
                       check    => $polysel_check,
                       is_done  => $polysel_is_done,
                       cmd      => $polysel_cmd,

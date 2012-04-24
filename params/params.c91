@@ -51,44 +51,44 @@ machines=mach_desc      # file describing available computers for parallel
 ###########################################################################
 
 degree=4                # degree of the algebraic polynomial
-kjP=20000               # choose lc(g) with two prime factors in [P,2P]
+polsel_P=20000               # choose lc(g) with two prime factors in [P,2P]
     # Setting a large value will most likely find better polynomials,
     # but the number of found polynomials will be smaller.
     # As a rule of thumb, we want at least 100 found polynomials in total
     # (without norm limitation, see below).
-kjlq=2                  # special-q in lc(g) has such many factors
+polsel_lq=2                  # special-q in lc(g) has such many factors
     # Setting a large value will enumerate/check more potential polynomials
     # for each ad, which however will also increase the size of lc(g).
-kjmaxnorm=32.6          # max. lognorm of polynomials (before rootsieve)
+polsel_maxnorm=32.6          # max. lognorm of polynomials (before rootsieve)
     # If not set, a default value of 1e9 (in practice infinity) is used.
     # Setting this value right might speed up a lot the polynomial
     # selection, by discarding right away polynomials which are not
     # promising. As a rule of thumb, we want at least 10 polynomials
     # in total below this bound.
-kjadmin=0               # min value for lc(f)
+polsel_admin=0               # min value for lc(f)
     # If not set, the default is 0.
-kjadmax=100000          # max value for lc(f)
+polsel_admax=100000          # max value for lc(f)
     # The polynomial selection search time is proportional to the
-    # length of the interval [kjadmin,kjadmax]
-kjadrange=10000         # individual tasks
+    # length of the interval [polsel_admin,polsel_admax]
+polsel_adrange=10000         # individual tasks
     # Polynomial selection is split into several individual tasks. The
-    # complete range from kjadmin to kjadmax has to be covered for the
+    # complete range from polsel_admin to polsel_admax has to be covered for the
     # polynomial selection to complete. The number of individual tasks is
-    # obviously (kjadmax-kjadmin)/kjadrange. 
-kjincr=60               # forced divisor of lc(f)
+    # obviously (polsel_admax-polsel_admin)/polsel_adrange. 
+polsel_incr=60               # forced divisor of lc(f)
     # This factor is usually a smooth number, which forces roots in the
     # algebraic polynomial. 60 is a good start, 210 is popular as well.
-kjkmax=18               # rotation is bounded by 2^kmax
+polsel_kmax=18               # rotation is bounded by 2^kmax
     # This controls the computational effort put into the rotation step.
     # The higher this value is, the better the found polynomial will be,
     # but it will take more time.
      
 # - runtime environment parameters for polyselect -
-kjdelay=60              # time between two checks
+polsel_delay=60              # time between two checks
     # The existence of result files from polyselect jobs is checked at
     # regular intervals. Tune this parameter to check more/less
     # frequently.
-selectnice=4            # nice level for polyselect
+polsel_nice=4            # nice level for polyselect
     # This sets the posix ``nice level'' for polyselect jobs. If you
     # don't know what it is, you may leave as is, or set to 0.
 

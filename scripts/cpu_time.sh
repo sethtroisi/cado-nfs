@@ -42,18 +42,18 @@ my $var=<STDIN>; print format_dhms($var)."\n"'
 # Polyselect
 if [[ -z $1 || $(expr $1 : '.*[p].*') != 0 ]]
   then  echo -n "CPU time for polyselect:    "
-    if [ ! -f ${name}.kjout.* ] 2> /dev/null
+    if [ ! -f ${name}.polsel_out.* ] 2> /dev/null
       then echo "polynomial files were not found"
       else
-         grep phase ${name}.kjout.* | sed "s/^.*phase took \([^s]*\).*$/+\1/g" | tr "\n" " " | cut -c2- | bc | f
+         grep phase ${name}.polsel_out.* | sed "s/^.*phase took \([^s]*\).*$/+\1/g" | tr "\n" " " | cut -c2- | bc | f
          echo -n "   # rootsieve time:        "
-         grep Rootsieve ${name}.kjout.* | sed "s/^.*Rootsieve took \([^s]*\).*$/+\1/g" | tr "\n" " " | cut -c2- | bc | f
+         grep Rootsieve ${name}.polsel_out.* | sed "s/^.*Rootsieve took \([^s]*\).*$/+\1/g" | tr "\n" " " | cut -c2- | bc | f
          echo -n "   # of polyselect files:   "
-         ls ${name}.kjout.* | wc -l
+         ls ${name}.polsel_out.* | wc -l
          echo -n "   # of found polynomials:  "
-         grep Tried ${name}.kjout.* | sed "s/^.*found \([^p]*\).*$/+\1/g" | tr "\n" " " | cut -c2- | bc
+         grep Tried ${name}.polsel_out.* | sed "s/^.*found \([^p]*\).*$/+\1/g" | tr "\n" " " | cut -c2- | bc
          echo -n "   # below maxnorm:         "
-         grep Tried ${name}.kjout.* | sed "s/^.*, \([0-9]*\) below.*$/+\1/g" | tr "\n" " " | cut -c2- | bc
+         grep Tried ${name}.polsel_out.* | sed "s/^.*, \([0-9]*\) below.*$/+\1/g" | tr "\n" " " | cut -c2- | bc
     fi
 fi
 

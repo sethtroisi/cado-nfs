@@ -58,9 +58,9 @@ while (@files) {
   $old_prefix = $param{'prefix'};
 }
 
-# info kjout
-banner "Info kjout";
-my @kjout_files;
+# info polsel_out
+banner "Info polsel_out";
+my @polsel_out_files;
 my $time;
 my $phase;
 my $npoly;
@@ -75,12 +75,12 @@ foreach my $name (sort keys %link_name_params) {
 
   opendir DIR, "."
     or die "Cannot open directory `.': $!\n";
-  @kjout_files = grep /^$name\.kjout\.[\de.]+-[\de.]+$/, readdir DIR;
+  @polsel_out_files = grep /^$name\.polsel_out\.[\de.]+-[\de.]+$/, readdir DIR;
   closedir DIR;
-  my $size = scalar(@kjout_files);
+  my $size = scalar(@polsel_out_files);
   $npoly = 0;
 
-  foreach my $f (@kjout_files) {
+  foreach my $f (@polsel_out_files) {
     open FILE, "< $f"
       or die "Cannot open `$f' for reading: $!.\n";
     my $murphy;
@@ -125,18 +125,18 @@ foreach my $name (sort keys %link_name_params) {
   my $ampl = $Emax[0]-$Emin;
   $file = $link_name_params{"$name"};
   read_param(\%param, { strict => 1 }, "$file");
-  my $size_expect = ceil (($param{'kjadmax'} -  $param{'kjadmin'} ) /
-                          $param{'kjadrange'});
-  die "kjout missing for configuration $name! ($size on $size_expect)\n"
+  my $size_expect = ceil (($param{'polsel_admax'} -  $param{'polsel_admin'} ) /
+                          $param{'polsel_adrange'});
+  die "polsel_out missing for configuration $name! ($size on $size_expect)\n"
     if ( $size != $size_expect );
   warn "No polynomial found in some files! (only $npoly poly on $size files)\n"
     if ( $size != $npoly );
 
   # print infos
-  info "Params: M $param{'kjM'} l $param{'kjl'} kmax $param{'kjkmax'} ".
-       "adrange $param{'kjadrange'} admin $param{'kjadmin'} admax $param{'kjadmax'}\n".
-       "        degree $param{'degree'} p0max $param{'kjp0max'} ".
-       "keep $param{'kjkeep'} incr $param{'kjincr'} pb $param{'kjpb'}\n";
+  info "Params: M $param{'polsel_M'} l $param{'polsel_l'} kmax $param{'polsel_kmax'} ".
+       "adrange $param{'polsel_adrange'} admin $param{'polsel_admin'} admax $param{'polsel_admax'}\n".
+       "        degree $param{'degree'} p0max $param{'polsel_p0max'} ".
+       "keep $param{'polsel_keep'} incr $param{'polsel_incr'} pb $param{'polsel_pb'}\n";
   $tab_level++;
   info "The best polynomial for $name is from `".basename($best)."'\n".
        "Emax = $Emax[0] - Emax2 = $Emax[1] - Emax3 = $Emax[2]\n".
