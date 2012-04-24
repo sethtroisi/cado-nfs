@@ -9,10 +9,20 @@
 
 // Return the last character read, or EOF.
 static
-int skip_spaces(FILE *file)
+int skip_spaces_and_comments(FILE *file)
 {
   int c;
-  while (isspace(c = getc(file)));
+  
+  for (;;) {
+    while (isspace(c = getc(file)));
+    if (c == '#') {
+      // skip the end of the line
+      do {
+        c = fgetc(file);
+      } while ((c != '\n') && (c != EOF));
+    } else
+      break;
+  }
   return ungetc(c, file);
 }
 
@@ -39,7 +49,9 @@ int factor_base_init(factor_base_ptr FB, const char *filename,
   unsigned last_degp = 0;
   unsigned alloc     = 0;
   int previous_prime_degp = -1;
-  for (fbideal_ptr gothp = NULL; skip_spaces(file) != EOF; ++FB->n, ++gothp) {
+  for (fbideal_ptr gothp = NULL;
+      skip_spaces_and_comments(file) != EOF;
+      ++FB->n, ++gothp) {
     // Need realloc?
     if (alloc <= FB->n) {
       alloc = alloc ? alloc * 2 : 256;
@@ -114,7 +126,7 @@ int factor_base_init(factor_base_ptr FB, const char *filename,
 
 
     // Remove spaces.
-    if (skip_spaces(file) == EOF) {
+    if (skip_spaces_and_comments(file) == EOF) {
       fprintf(stderr, "Error parsing factor base %s.\n", filename);
       fprintf(stderr, "  The error occured at the %u-th ideal.\n", FB->n);
       fclose(file);
