@@ -219,16 +219,19 @@ main (int argc, char *argv[])
 
     /* print weight counts */
     {
-      unsigned long j, *nbm;
+      unsigned long j, *nbm, total_weight = 0;
       int w;
+
       nbm = (unsigned long*) malloc ((maxlevel + 1) * sizeof (unsigned long));
       memset (nbm, 0, (maxlevel + 1) * sizeof (unsigned long));
       for (j = 0; j < (unsigned long) mat->ncols; j++)
         {
           w = mat->wt[GETJ(mat, j)];
+          total_weight += w;
           if (w <= maxlevel)
             nbm[w] ++;
         }
+      fprintf (stderr, "Total matrix weight: %lu\n", total_weight);
       for (j = 0; j <= (unsigned long) maxlevel; j++)
         if (nbm[j] != 0)
           fprintf (stderr, "There are %lu column(s) of weight %lu\n",
