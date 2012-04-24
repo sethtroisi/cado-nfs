@@ -512,7 +512,7 @@ MkzRemoveJ(filter_matrix_t *mat, int32_t j)
     mat->wt[dj] = 0;
 
     /* This can happen when maxlevel < weight[dj] <= cwmax initially, thus
-       A[dj] was initialized to MKZ_INF, but because of a merge if becomes
+       A[dj] was initialized to MKZ_INF, but because of a merge it becomes
        larger than cwmax. FIXME: should we have maxlevel = cwmax? */
     if (mat->MKZA[dj] == MKZ_INF)
 	return;

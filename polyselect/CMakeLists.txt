@@ -26,5 +26,5 @@ target_link_libraries (polyselect2l polyselect_common utils ${pthread_libs})
 target_link_libraries (sopt polyselect_common utils)
 
 install(TARGETS polyselect_common DESTINATION lib/${package_basename})
-install(TARGETS rotate rotate_all polyselect2 RUNTIME DESTINATION bin/polyselect)
+install(TARGETS rotate rotate_all polyselect2 polyselect2l RUNTIME DESTINATION bin/polyselect)
 include(CMakeLists-nodist.txt OPTIONAL)
