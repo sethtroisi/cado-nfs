@@ -52,15 +52,14 @@ def average_valuation_homogeneous_coprime(f,p):
     returns the average p-valuation of f(a,b) for a,b coprime. Projective
     roots are counted as well.
     """
-    r = average_valuation_affine(f, p) * Norm(p)
     ZP= f.parent()
     x = ZP.gen()
-    # Infinity expands as 0 when swapped. So we already know the
-    # first-order term. For this reason, we we may drop one p, since it's
-    # already counting one order ahead.
-    r += QQ(average_valuation_affine((f.reverse())(p*x), p))
-    r /= QQ(Norm(p)+1)
-    return r
+    affine_average=average_valuation_affine(f, p)
+    proj_average=QQ(average_valuation_affine((f.reverse())(p*x), p))
+    if proj_average ==0:
+        return affine_average
+    else:
+        return (affine_average*(Norm(p)-1)/Norm(p)+proj_average/(Norm(p)))
 
 
 def alpha_p(f,p):
