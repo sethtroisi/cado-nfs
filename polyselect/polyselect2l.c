@@ -46,7 +46,7 @@
 uint32_t *Primes = NULL;
 unsigned long lenPrimes = 1; // length of Primes[]
 int nq = INT_MAX;
-int lq = 1;
+int lq = -1; /* -1 means non-initialized */
 double max_norm = DBL_MAX; /* maximal wanted norm (before rotation) */
 const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
 static int verbose = 0, incr = DEFAULT_INCR, default_MAX_k;
@@ -1660,6 +1660,21 @@ main (int argc, char *argv[])
     }
   }
 
+  /* set default value of lq if not given */
+  if (lq == -1)
+    {
+      size_t d = mpz_sizeinbase (N, 10);
+
+      if (d < 80)
+        lq = 1;
+      else if (d < 90)
+        lq = 2;
+      else if (d < 100)
+        lq = 3;
+      else
+        lq = 4;
+    }
+
   if (lq < 1 || nq < 1)
   {
     fprintf (stderr, "Error, number of factors in special-q should >= 1 and/or number of special-q's should >=1\n");
@@ -1867,6 +1882,9 @@ main (int argc, char *argv[])
       printf ("# Stat: av. g0/adm2 ratio: %.3e\n",
               total_adminus2 / (double) collisions);
     }
+
+  printf ("# Tried %d ad-value(s), found %d polynomial(s), %d below maxnorm\n",
+          tries, tot_found, found);
 
   /* print best 10 values of logmu */
   printf ("# Stat: best logmu:");
