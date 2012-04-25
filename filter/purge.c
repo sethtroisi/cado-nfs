@@ -634,7 +634,7 @@ remove_singletons (int *nrel, int nrelmax, int *nprimes, hashtable_t *H,
 
       count ++;
 
-      if (newnrel == old && excess == keep)
+      if (newnrel == old && excess <= keep)
         break;
     }
 
@@ -1378,7 +1378,7 @@ main (int argc, char **argv)
   hashInit (&H, Hsize, 1, need64);
 
   prempt_scan_relations ();
-      
+
   fprintf (stderr, "   nrels=%d, nprimes=%d; excess=%d\n",
            nrel, nprimes, nrel - nprimes);
       
