@@ -37,6 +37,8 @@ polsel_nice=4            # nice level for selection
 
 # for a c57 we can expect:
 # MurphyE(Bf=10000000,Bg=5000000,area=1.00e+16)=3.38e-06
+# for a c58 we can expect:
+# MurphyE(Bf=10000000,Bg=5000000,area=1.00e+16)=3.15e-06
 
 ## Parameters of polyselect
 polsel_admin=2000            # min value for lc(f) [default 0]
