@@ -546,7 +546,7 @@ int main(int argc, char **argv)
                 // this. It means that the other side is hopeless.
                 t_norms -= seconds();
                 init_norms(S, ffspol[side], I, J, j0, pos0, size,
-                           qlat, qlat->side == side, sublat);
+                           qlat, qlat->side == side, sublat, side);
                 t_norms += seconds();
 
                 // Line sieve.
@@ -665,6 +665,9 @@ int main(int argc, char **argv)
     fprintf(stdout, "#   %d relations found (%1.1f rel/sq)\n",
             tot_nrels, (double)tot_nrels / (double)tot_sq);
     fprintf(stdout, "#   Yield: %1.5f s/rel\n", tot_time/tot_nrels);
+#ifdef WANT_NORM_STATS
+    norm_stats_print();
+#endif
 
     ffspol_clear(ffspol[0]);
     ffspol_clear(ffspol[1]);

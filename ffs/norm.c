@@ -11,6 +11,25 @@
 #include "sublat.h"
 
 
+#ifdef WANT_NORM_STATS
+static uint64_t norm_stats_n[2]   = {0, 0};
+static int norm_stats_min[2] = {0, 0};
+static uint64_t norm_stats_sum[2] = {0, 0};
+static int norm_stats_max[2] = {0, 0};
+
+void norm_stats_print() {
+  printf("# Statistics on the sizes of the norms:\n");
+  for (int i = 0; i < 2; ++i) {
+    printf("#   Side %d: min = %u ; avg = %1.1f ; max = %u\n",
+            i,
+            norm_stats_min[i],
+            (double)norm_stats_sum[i] / (double)norm_stats_n[i],
+            norm_stats_max[i]);
+  }
+}
+
+#endif
+
 
 /* Function fppol_pow computes the power-th power of a polynomial
    should power be an unsigned int?  
@@ -268,7 +287,7 @@ int deg_norm(ffspol_srcptr ffspol, fppol_t a, fppol_t b)
 
 void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
                 ij_t j0, ijpos_t pos0, ijpos_t size, qlat_t qlat,
-                int sqside, sublat_ptr sublat)
+                int sqside, sublat_ptr sublat, MAYBE_UNUSED int side)
 {
   fppol_t a, b;
   fppol_init(a);
@@ -313,6 +332,14 @@ void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
         if (deg > 0) {
           ASSERT_ALWAYS(deg < 255);
           S[pos] = deg - degq;
+#ifdef WANT_NORM_STATS
+          norm_stats_n[side]++;
+          norm_stats_sum[side] += deg;
+          if ((deg < norm_stats_min[side]) || (norm_stats_min[side] == 0))
+              norm_stats_min[side] = deg;
+          if (deg > norm_stats_max[side])
+              norm_stats_max[side] = deg;
+#endif
         }
         else
           S[pos] = 255;
