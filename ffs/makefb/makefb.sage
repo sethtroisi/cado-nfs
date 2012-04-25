@@ -159,9 +159,6 @@ def makefb(f,dlim,powerlim,filename="",typo="cado"):
                 stri = stri + ","+hexify(Zt,dummy,r[3][i])
             gd.write(stri+"\n")
             gd.flush()
-            del stri
-            del xx
-            del p
     for intp in range(q^min(dlim+1,powerlim+1),q^(dlim+1)):
         p=int2pol(q,ZZ(intp).digits(q),l,A)
         if not p.is_irreducible():
@@ -177,6 +174,3 @@ def makefb(f,dlim,powerlim,filename="",typo="cado"):
                 stri = stri + ","+hexify(Zt,dummy,r[3][i])
             gd.write(stri+"\n")
             gd.flush()
-            del stri
-            del xx
-            del p
