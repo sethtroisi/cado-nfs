@@ -170,5 +170,10 @@ def sigma(hexpol,q=2,A=None):
     l=A.base_ring().list()
     return int2pol(2,ZZ(int(hexpol,16)).digits(2),l,A)
 
-
+def base_m_expansion(f,m,x):
+    if f.degree()<m.degree():
+        return f
+    s=ZZ(f.degree()/m.degree())
+    q,r=f.quo_rem(f,m^s)
+    return q*x^d+base_m_expansion(r,m,x)
 
