@@ -123,56 +123,56 @@ def rewrite_roots(lr):
 #powerlim=maximal degree of the irreducibles powers we consider
 
 def makefb(f,dlim,powerlim,filename="",typo="cado"): 
-	if filename == "":
-		gd=sys.stdout
-	else:
-		gd=open(filename,"w")
-	gd.write("# f={0}\n".format(f))
-	gd.write("# dlim={0}\n".format(dlim))
-	gd.write("# powerlim={0}\n".format(powerlim))
-	def hexify(Zt,dummy,ri):
-		if typo=="cado":
-			return hex(Zt(ri)(dummy))
-		else:
-			return format(ri)
-	A=f.base_ring()
-	F=A.base_ring()
-	l=F.list()
-        q=len(l)
-	dummy=2^ceil(log(q)/log(2))
-	t=A.gen()
-	Zt.<t0>=ZZ['t']
-	for intp in range(q^(min(dlim,powerlim)+1)):
-                p=int2pol(q,ZZ(intp).digits(q),l,A)
-                if not p.is_irreducible():
-                    continue
-		xx = all_roots(f, p, powerlim+1)
-		xx = rewrite_roots(xx)
-		for r in xx:
-			if (r[1] != 1) or (r[2] != 0):
-				stri=hexify(Zt,dummy,r[0])+":"+format(r[1])+","+format(r[2])+": "+hexify(Zt,dummy,r[3][0])
-			else:
-				stri = hexify(Zt,dummy,r[0])+": "+hexify(Zt,dummy,r[3][0])
-			for i in range(1,len(r[3])):
-				stri = stri + ","+hexify(Zt,dummy,r[3][i])
-			gd.write(stri+"\n")
-                        del stri
-                del xx
-                del p
-	for intp in range(q^min(dlim+1,powerlim+1),q^(dlim+1)):
-                p=int2pol(q,ZZ(intp).digits(q),l,A)
-                if not p.is_irreducible():
-                    continue
-                xx = all_roots(f, p, p.degree()+1)
-		xx = rewrite_roots(xx)
-		for r in xx:
-			if (r[1] != 1) or (r[2] != 0):
-				stri=hexify(Zt,dummy,r[0])+":"+format(r[1])+","+format(r[2])+": "+hexify(Zt,dummy,r[3][0])
-			else:
-				stri = hexify(Zt,dummy,r[0])+": "+hexify(Zt,dummy,r[3][0])
-			for i in range(1,len(r[3])):
-				stri = stri + ","+hexify(Zt,dummy,r[3][i])
-			gd.write(stri+"\n")
-                        del stri
-                del xx
-                del p
+    if filename == "":
+        gd=sys.stdout
+    else:
+        gd=open(filename,"w")
+    #gd.write("# f={0}\n".format(f))
+	#gd.write("# dlim={0}\n".format(dlim))
+	#gd.write("# powerlim={0}\n".format(powerlim))
+    def hexify(Zt,dummy,ri):
+        if typo=="cado":
+            return hex(Zt(ri)(dummy))
+        else:
+            return format(ri)
+    A=f.base_ring()
+    F=A.base_ring()
+    l=F.list()
+    q=len(l)
+    dummy=2^ceil(log(q)/log(2))
+    t=A.gen()
+    Zt.<t0>=ZZ['t']
+    for intp in range(1,q^(min(dlim,powerlim)+1)):
+        p=int2pol(q,ZZ(intp).digits(q),l,A)
+        if not p.is_irreducible() or not p.is_monic():
+            continue
+        xx = all_roots(f, p, powerlim+1)
+        xx = rewrite_roots(xx)
+        for r in xx:
+            if (r[1] != 1) or (r[2] != 0):
+                stri=hexify(Zt,dummy,r[0])+":"+format(r[1])+","+format(r[2])+": "+hexify(Zt,dummy,r[3][0])
+            else:
+                stri = hexify(Zt,dummy,r[0])+": "+hexify(Zt,dummy,r[3][0])
+            for i in range(1,len(r[3])):
+                stri = stri + ","+hexify(Zt,dummy,r[3][i])
+            gd.write(stri+"\n")
+            del stri
+            del xx
+            del p
+    for intp in range(q^min(dlim+1,powerlim+1),q^(dlim+1)):
+        p=int2pol(q,ZZ(intp).digits(q),l,A)
+        if not p.is_irreducible():
+            continue
+        xx = all_roots(f, p, p.degree()+1)
+        xx = rewrite_roots(xx)
+        for r in xx:
+            if (r[1] != 1) or (r[2] != 0):
+                stri=hexify(Zt,dummy,r[0])+":"+format(r[1])+","+format(r[2])+": "+hexify(Zt,dummy,r[3][0])
+            else:
+                stri = hexify(Zt,dummy,r[0])+": "+hexify(Zt,dummy,r[3][0])
+            for i in range(1,len(r[3])):
+                stri = stri + ","+hexify(Zt,dummy,r[3][i])
+            gd.write(stri+"\n")
+            del stri
+            del xx
+            del p

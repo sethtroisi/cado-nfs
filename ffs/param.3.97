@@ -15,8 +15,8 @@ lpb1=11
 thresh0=24
 thresh1=24
 
-fb0=Aroots.3.97
-fb1=Rroots.3.97
+fb0=Aroots.3.97-sage
+fb1=Rroots.3.97-sage
 
 q0=400000
 q1=400100
