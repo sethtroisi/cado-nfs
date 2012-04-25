@@ -130,6 +130,7 @@ def makefb(f,dlim,powerlim,filename="",typo="cado"):
 	gd.write("# f={0}\n".format(f))
 	gd.write("# dlim={0}\n".format(dlim))
 	gd.write("# powerlim={0}\n".format(powerlim))
+        gd.flush()
 	def hexify(Zt,dummy,ri):
 		if typo=="cado":
 			return hex(Zt(ri)(dummy))
@@ -156,6 +157,7 @@ def makefb(f,dlim,powerlim,filename="",typo="cado"):
 			for i in range(1,len(r[3])):
 				stri = stri + ","+hexify(Zt,dummy,r[3][i])
 			gd.write(stri+"\n")
+                        gd.flush()
                         del stri
                 del xx
                 del p
@@ -173,6 +175,7 @@ def makefb(f,dlim,powerlim,filename="",typo="cado"):
 			for i in range(1,len(r[3])):
 				stri = stri + ","+hexify(Zt,dummy,r[3][i])
 			gd.write(stri+"\n")
+                        gd.flush()
                         del stri
                 del xx
                 del p
