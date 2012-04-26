@@ -21,7 +21,7 @@
 #include "fq.h"
 #include "fqpol.h"
 
-int my_factor_survivor(fppol_t a, fppol_t b, ffspol_t* F, int *B, sq_t q,
+int factor_survivor(fppol_t a, fppol_t b, ffspol_t* F, int *B, sq_t q,
         int side) 
 {
     fppol_t Nab;
@@ -606,7 +606,7 @@ int main(int argc, char **argv)
                             if (ij_deg(g) != 0 && ij_deg(hati)>0  && ij_deg(hatj)>0)
                                 continue;
                             ij2ab(a, b, hati, hatj, qlat);
-                            nrels += my_factor_survivor(a, b, ffspol, lpb,
+                            nrels += factor_survivor(a, b, ffspol, lpb,
                                     qlat->q, qlat->side);
                         }
                     }
