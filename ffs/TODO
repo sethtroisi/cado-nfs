@@ -55,3 +55,8 @@
   in the same way, so they do not need the same kind of precomputation. 
   It will be easier to have two separate data structures. 
 
+- Add basic smoothness tests based on degree.
+  If after sieving irreducibles up to degree (say) 22, we get a
+  result of degree less than 46, then it is necessarily prime.
+  It is not clear that we can use it reliably right now, because we do
+  not do resieving. 
