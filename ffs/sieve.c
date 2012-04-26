@@ -121,6 +121,7 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "    Note: giving (q0,q1) is exclusive to giving (q,rho). In the latter case,\n" "    rho is optional.\n");
     fprintf(stderr, "  sqside           side (0 or 1) of the special-q (default %d)\n", SQSIDE_DEFAULT);
     fprintf(stderr, "  firstsieve       side (0 or 1) to sieve first (default %d)\n", FIRSTSIEVE_DEFAULT);
+    fprintf(stderr, "  S                skewness, i.e. deg(a)-deg(b)\n");
     fprintf(stderr, "  sublat           toggle the sublattice sieving\n");
  
     if (missing != NULL)
@@ -144,6 +145,7 @@ int main(int argc, char **argv)
     int firstsieve = FIRSTSIEVE_DEFAULT;
     sq_t q0, q1;
     int rho_given = 0;
+    int skewness = 0;
 
     param_list pl;
     param_list_init(pl);
@@ -179,6 +181,7 @@ int main(int argc, char **argv)
         ffspol_set_str(ffspol[1], polstr);
     }
     // read various bounds
+    param_list_parse_int(pl, "S", &skewness); 
     param_list_parse_int(pl, "I", &I); 
     param_list_parse_int(pl, "J", &J); 
     param_list_parse_int(pl, "lpb0", &lpb[0]);
@@ -432,7 +435,7 @@ int main(int argc, char **argv)
         }
 
         // Reduce the q-lattice
-        int noerr = skewGauss(qlat, 0);
+        int noerr = skewGauss(qlat, skewness);
         ASSERT_ALWAYS(noerr);
         printf("############################################\n");
         print_qlat_info(qlat);
