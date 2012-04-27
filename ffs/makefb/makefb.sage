@@ -1,5 +1,9 @@
-#!/usr/bin/env sage
+#!/usr/bin/env sage 
+
+import sys
+
 load tools.sage
+load readparam.sage
 
 def inverse_mod(a,pk):
     g,_,u=xgcd(pk,a)
@@ -122,60 +126,81 @@ def rewrite_roots(lr):
 #dlim= max degree on the sieving domain
 #powerlim=maximal degree of the irreducibles powers we consider
 
-def makefb(f,dlim,powerlim,filename="",typo="cado"): 
-	if filename == "":
-		gd=sys.stdout
-	else:
-		gd=open(filename,"w")
-	gd.write("# f={0}\n".format(f))
-	gd.write("# dlim={0}\n".format(dlim))
-	gd.write("# powerlim={0}\n".format(powerlim))
-        gd.flush()
-	def hexify(Zt,dummy,ri):
-		if typo=="cado":
-			return hex(Zt(ri)(dummy))
-		else:
-			return format(ri)
-	A=f.base_ring()
-	F=A.base_ring()
-	l=F.list()
-        q=len(l)
-	dummy=2^ceil(log(q)/log(2))
-	t=A.gen()
-	Zt.<t0>=ZZ['t']
-	for intp in range(q^(min(dlim,powerlim)+1)):
-                p=int2pol(q,ZZ(intp).digits(q),l,A)
-                if not p.is_irreducible():
-                    continue
-		xx = all_roots(f, p, powerlim+1)
-		xx = rewrite_roots(xx)
-		for r in xx:
-			if (r[1] != 1) or (r[2] != 0):
-				stri=hexify(Zt,dummy,r[0])+":"+format(r[1])+","+format(r[2])+": "+hexify(Zt,dummy,r[3][0])
-			else:
-				stri = hexify(Zt,dummy,r[0])+": "+hexify(Zt,dummy,r[3][0])
-			for i in range(1,len(r[3])):
-				stri = stri + ","+hexify(Zt,dummy,r[3][i])
-			gd.write(stri+"\n")
-                        gd.flush()
-                        del stri
-                del xx
-                del p
-	for intp in range(q^min(dlim+1,powerlim+1),q^(dlim+1)):
-                p=int2pol(q,ZZ(intp).digits(q),l,A)
-                if not p.is_irreducible():
-                    continue
-                xx = all_roots(f, p, p.degree()+1)
-		xx = rewrite_roots(xx)
-		for r in xx:
-			if (r[1] != 1) or (r[2] != 0):
-				stri=hexify(Zt,dummy,r[0])+":"+format(r[1])+","+format(r[2])+": "+hexify(Zt,dummy,r[3][0])
-			else:
-				stri = hexify(Zt,dummy,r[0])+": "+hexify(Zt,dummy,r[3][0])
-			for i in range(1,len(r[3])):
-				stri = stri + ","+hexify(Zt,dummy,r[3][i])
-			gd.write(stri+"\n")
-                        gd.flush()
-                        del stri
-                del xx
-                del p
+def makefb_(f,dlim,powerlim,filename="",typo="cado"): 
+
+    if filename == "":
+        gd=sys.stdout
+    else:
+        gd=open(filename,"w")
+    #gd.write("# f={0}\n".format(f))
+	#gd.write("# dlim={0}\n".format(dlim))
+	#gd.write("# powerlim={0}\n".format(powerlim))
+    gd.flush()
+    def hexify(Zt,dummy,ri):
+        if typo=="cado":
+            return hex(Zt(ri)(dummy))
+        else:
+            return format(ri)
+    A=f.base_ring()
+    F=A.base_ring()
+    l=F.list()
+    q=len(l)
+    dummy=2^ceil(log(q)/log(2))
+    t=A.gen()
+    Zt.<t0>=ZZ['t']
+    for intp in range(1,q^(min(dlim,powerlim)+1)):
+        p=int2pol(q,ZZ(intp).digits(q),l,A)
+        if not p.is_irreducible() or not p.is_monic():
+            continue
+        xx = all_roots(f, p, powerlim+1)
+        xx = rewrite_roots(xx)
+        for r in xx:
+            if (r[1] != 1) or (r[2] != 0):
+                stri=hexify(Zt,dummy,r[0])+":"+format(r[1])+","+format(r[2])+": "+hexify(Zt,dummy,r[3][0])
+            else:
+                stri = hexify(Zt,dummy,r[0])+": "+hexify(Zt,dummy,r[3][0])
+            for i in range(1,len(r[3])):
+                stri = stri + ","+hexify(Zt,dummy,r[3][i])
+            gd.write(stri+"\n")
+            gd.flush()
+    for intp in range(q^min(dlim+1,powerlim+1),q^(dlim+1)):
+        p=int2pol(q,ZZ(intp).digits(q),l,A)
+        if not p.is_irreducible():
+            continue
+        xx = all_roots(f, p, p.degree()+1)
+        xx = rewrite_roots(xx)
+        for r in xx:
+            if (r[1] != 1) or (r[2] != 0):
+                stri=hexify(Zt,dummy,r[0])+":"+format(r[1])+","+format(r[2])+": "+hexify(Zt,dummy,r[3][0])
+            else:
+                stri = hexify(Zt,dummy,r[0])+": "+hexify(Zt,dummy,r[3][0])
+            for i in range(1,len(r[3])):
+                stri = stri + ","+hexify(Zt,dummy,r[3][i])
+            gd.write(stri+"\n")
+            gd.flush()
+
+
+def makefb(paramfile, side, outputfile=""):
+    readparam(paramfile)
+    if not globals().has_key('powerlim0'):
+        powerlim0 = 1;
+    if not globals().has_key('powerlim1'):
+        powerlim1 = 1;
+    if side == 0:
+        if outputfile == "":
+            outputfile = fb0
+        makefb_(pol0, fbb0, powerlim0, filename=outputfile)
+    if side == 1:
+        if outputfile == "":
+            outputfile = fb1
+        makefb_(pol1, fbb1, powerlim1, filename=outputfile)
+
+if len(sys.argv) != 2:
+    print "Usage: %s <paramfile>"%sys.argv[0]
+    sys.exit(1)
+
+print "Constructing factor base for side 0...\n"
+makefb(sys.argv[1], 0)
+print "Constructing factor base for side 1...\n"
+makefb(sys.argv[1], 1)
+

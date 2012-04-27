@@ -11,6 +11,71 @@
 #include "sublat.h"
 
 
+#ifdef WANT_NORM_STATS
+static uint64_t norm_stats_n[2]   = {0, 0};
+static int norm_stats_min[2] = {0, 0};
+static uint64_t norm_stats_sum[2] = {0, 0};
+static int norm_stats_max[2] = {0, 0};
+
+void norm_stats_print() {
+  printf("# Statistics on the sizes of the norms:\n");
+  for (int i = 0; i < 2; ++i) {
+    printf("#   Side %d: min = %u ; avg = %1.1f ; max = %u\n",
+            i,
+            norm_stats_min[i],
+            (double)norm_stats_sum[i] / (double)norm_stats_n[i],
+            norm_stats_max[i]);
+  }
+}
+
+#endif
+
+
+/*
+  Take the N less significant bits of p and the N less significant bits of q,
+  multiply them, and put the N most significant bits of the result in the low
+  part of r.
+  NB: in fact, it is a good practice to give p and q of degree at most N-1,
+  so that all the bits of the input are indeed used.
+  Then this function puts zeroes in the high part of r.
+  For the moment, we put asserts to check that the input are well formed.
+*/
+static void fppol64_mul_high(fppol64_ptr r,
+        fppol64_srcptr p, fppol64_srcptr q,
+        unsigned int N)
+{
+  ASSERT(N <= 32);
+  ASSERT(N > 0);
+  ASSERT(fppol64_deg(p) < N);
+  ASSERT(fppol64_deg(q) < N);
+  if (N <= 8) {         // N in [0,8]
+    fppol8_t pp, qq;
+    fppol16_t rr;
+    fppol8_set_64(pp, p);
+    fppol8_set_64(qq, q);
+    fppol16_mul_8x8(rr, pp, qq);
+    fppol16_div_ti(rr, rr, N-1);
+    fppol64_set_16(r, rr);
+  } else if (N <= 16) { // N in ]8,16]
+    fppol16_t pp, qq;
+    fppol32_t rr;
+    fppol16_set_64(pp, p);
+    fppol16_set_64(qq, q);
+    fppol32_mul_16x16(rr, pp, qq);
+    fppol32_div_ti(rr, rr, N-1);
+    fppol64_set_32(r, rr);
+  } else {              // N in ]16,32]
+    fppol32_t pp, qq;
+    fppol64_t rr;
+    fppol32_set_64(pp, p);
+    fppol32_set_64(qq, q);
+    fppol64_mul_32x32(rr, pp, qq);
+    fppol64_div_ti(r, rr, N-1);
+  }
+  ASSERT(fppol64_deg(r) < N);
+}
+
+
 /* Function fppol_pow computes the power-th power of a polynomial
    should power be an unsigned int?  
    Should this function survive? 
@@ -331,7 +396,7 @@ int deg_norm_ij(ffspol_ptr ffspol_ij, ij_t i, ij_t j)
 
 void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
                 ij_t j0, ijpos_t pos0, ijpos_t size, qlat_t qlat,
-                int sqside, sublat_ptr sublat)
+                int sqside, sublat_ptr sublat, MAYBE_UNUSED int side)
 {
   fppol_t a, b;
   fppol_init(a);
@@ -379,6 +444,14 @@ void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
         if (deg > 0) {
           ASSERT_ALWAYS(deg < 255);
           S[pos] = deg - degq;
+#ifdef WANT_NORM_STATS
+          norm_stats_n[side]++;
+          norm_stats_sum[side] += deg;
+          if ((deg < norm_stats_min[side]) || (norm_stats_min[side] == 0))
+              norm_stats_min[side] = deg;
+          if (deg > norm_stats_max[side])
+              norm_stats_max[side] = deg;
+#endif
         }
         else
           S[pos] = 255;

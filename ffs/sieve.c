@@ -21,7 +21,7 @@
 #include "fq.h"
 #include "fqpol.h"
 
-int my_factor_survivor(fppol_t a, fppol_t b, ffspol_t* F, int *B, sq_t q,
+int factor_survivor(fppol_t a, fppol_t b, ffspol_t* F, int *B, sq_t q,
         int side) 
 {
     fppol_t Nab;
@@ -121,6 +121,7 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "    Note: giving (q0,q1) is exclusive to giving (q,rho). In the latter case,\n" "    rho is optional.\n");
     fprintf(stderr, "  sqside           side (0 or 1) of the special-q (default %d)\n", SQSIDE_DEFAULT);
     fprintf(stderr, "  firstsieve       side (0 or 1) to sieve first (default %d)\n", FIRSTSIEVE_DEFAULT);
+    fprintf(stderr, "  S                skewness, i.e. deg(a)-deg(b)\n");
     fprintf(stderr, "  sublat           toggle the sublattice sieving\n");
  
     if (missing != NULL)
@@ -144,6 +145,7 @@ int main(int argc, char **argv)
     int firstsieve = FIRSTSIEVE_DEFAULT;
     sq_t q0, q1;
     int rho_given = 0;
+    int skewness = 0;
 
     param_list pl;
     param_list_init(pl);
@@ -179,6 +181,7 @@ int main(int argc, char **argv)
         ffspol_set_str(ffspol[1], polstr);
     }
     // read various bounds
+    param_list_parse_int(pl, "S", &skewness); 
     param_list_parse_int(pl, "I", &I); 
     param_list_parse_int(pl, "J", &J); 
     param_list_parse_int(pl, "lpb0", &lpb[0]);
@@ -432,7 +435,7 @@ int main(int argc, char **argv)
         }
 
         // Reduce the q-lattice
-        int noerr = skewGauss(qlat, 0);
+        int noerr = skewGauss(qlat, skewness);
         ASSERT_ALWAYS(noerr);
         printf("############################################\n");
         print_qlat_info(qlat);
@@ -546,7 +549,7 @@ int main(int argc, char **argv)
                 // this. It means that the other side is hopeless.
                 t_norms -= seconds();
                 init_norms(S, ffspol[side], I, J, j0, pos0, size,
-                           qlat, qlat->side == side, sublat);
+                           qlat, qlat->side == side, sublat, side);
                 t_norms += seconds();
 
                 // Line sieve.
@@ -603,7 +606,7 @@ int main(int argc, char **argv)
                             if (ij_deg(g) != 0 && ij_deg(hati)>0  && ij_deg(hatj)>0)
                                 continue;
                             ij2ab(a, b, hati, hatj, qlat);
-                            nrels += my_factor_survivor(a, b, ffspol, lpb,
+                            nrels += factor_survivor(a, b, ffspol, lpb,
                                     qlat->q, qlat->side);
                         }
                     }
@@ -665,6 +668,9 @@ int main(int argc, char **argv)
     fprintf(stdout, "#   %d relations found (%1.1f rel/sq)\n",
             tot_nrels, (double)tot_nrels / (double)tot_sq);
     fprintf(stdout, "#   Yield: %1.5f s/rel\n", tot_time/tot_nrels);
+#ifdef WANT_NORM_STATS
+    norm_stats_print();
+#endif
 
     ffspol_clear(ffspol[0]);
     ffspol_clear(ffspol[1]);
