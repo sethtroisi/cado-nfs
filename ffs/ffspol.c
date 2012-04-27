@@ -65,6 +65,10 @@ void ffspol_init2(ffspol_ptr r, unsigned n)
   r->alloc  = n;
   r->coeffs = (fppol_t *)malloc(r->alloc * sizeof(fppol_t));
   ASSERT_ALWAYS(!n || r->coeffs != NULL);
+  for (unsigned i = 0; i < r->alloc; ++i) {
+    fppol_init(r->coeffs[i]);
+    ASSERT_ALWAYS(r->coeffs[i] != NULL);
+  }
 }
 
 
