@@ -402,8 +402,6 @@ void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
   fppol_init(a);
   fppol_init(b);
 
-  printf("dans init_norms : %d, %d\n", ffspol->deg, ffspol->alloc);
-
   int degq = 0;
   if (sqside)
       degq = sq_deg(qlat->q);
@@ -465,17 +463,12 @@ void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
 
 void init_norms_ij(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
                 ij_t j0, ijpos_t pos0, ijpos_t size, qlat_t qlat,
-                int sqside, sublat_ptr sublat)
+                int sqside, sublat_ptr sublat, MAYBE_UNUSED int side)
 {
   ffspol_t ffspol_ij;
-  
   ffspol_init2(ffspol_ij, ffspol->alloc);
-  for (int w = 0; w < ffspol_ij->alloc; ++w)
-    fppol_init(ffspol_ij->coeffs[w]);
 
   ffspol_2ij(ffspol_ij, ffspol, qlat);  
-
-  printf("dans init_norms : %d, %d, %d, %d\n", ffspol_ij->deg, ffspol_ij->alloc, ffspol->deg, ffspol->alloc);
 
   int degq = 0;
   if (sqside)
@@ -521,7 +514,5 @@ void init_norms_ij(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
       }
     }
   }
-  for (int w = 0; w < ffspol->alloc; ++w)
-    fppol_clear(ffspol_ij->coeffs[w]);
   ffspol_clear(ffspol_ij); 
 }

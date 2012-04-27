@@ -548,7 +548,7 @@ int main(int argc, char **argv)
                 // convention: if a position contains 255, it must stay like
                 // this. It means that the other side is hopeless.
                 t_norms -= seconds();
-                init_norms(S, ffspol[side], I, J, j0, pos0, size,
+                init_norms_ij(S, ffspol[side], I, J, j0, pos0, size,
                            qlat, qlat->side == side, sublat, side);
                 t_norms += seconds();
 
