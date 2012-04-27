@@ -1,5 +1,9 @@
-#!/usr/bin/env sage
+#!/usr/bin/env sage 
+
+import sys
+
 load tools.sage
+load readparam.sage
 
 def inverse_mod(a,pk):
     g,_,u=xgcd(pk,a)
@@ -122,7 +126,7 @@ def rewrite_roots(lr):
 #dlim= max degree on the sieving domain
 #powerlim=maximal degree of the irreducibles powers we consider
 
-def makefb(f,dlim,powerlim,filename="",typo="cado"): 
+def makefb_(f,dlim,powerlim,filename="",typo="cado"): 
 
     if filename == "":
         gd=sys.stdout
@@ -174,3 +178,29 @@ def makefb(f,dlim,powerlim,filename="",typo="cado"):
                 stri = stri + ","+hexify(Zt,dummy,r[3][i])
             gd.write(stri+"\n")
             gd.flush()
+
+
+def makefb(paramfile, side, outputfile=""):
+    readparam(paramfile)
+    if not globals().has_key('powerlim0'):
+        powerlim0 = 1;
+    if not globals().has_key('powerlim1'):
+        powerlim1 = 1;
+    if side == 0:
+        if outputfile == "":
+            outputfile = fb0
+        makefb_(pol0, fbb0, powerlim0, filename=outputfile)
+    if side == 1:
+        if outputfile == "":
+            outputfile = fb1
+        makefb_(pol1, fbb1, powerlim1, filename=outputfile)
+
+if len(sys.argv) != 2:
+    print "Usage: %s <paramfile>"%sys.argv[0]
+    sys.exit(1)
+
+print "Constructing factor base for side 0...\n"
+makefb(sys.argv[1], 0)
+print "Constructing factor base for side 1...\n"
+makefb(sys.argv[1], 1)
+

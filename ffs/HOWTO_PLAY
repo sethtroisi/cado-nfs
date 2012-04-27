@@ -1,24 +1,24 @@
-Recipe to run an example (as of end of Mar 7, 2012).
+Recipe to run an example (as of end of April 27, 2012).
 ----------------------------------------------------
 
 - compile:
   
   make 
 
-- create the factor base:
+- construct a parameter file:
 
-  At the moment, the polynomials are hardcoded and correspond to those in
-  param.2.127 and param.3.97.
+  Examples are given in param.2.607 , param.3.426 .
+
+- create the factor bases:
+
+  cd makefb; ./makefb.sage ../param.2.127; cd ..
   
-  Tune the factor base bounds by editing makefb.mag and then create the
-  files:
-  echo "p:=2; load \"makefb.mag\";" | magma -b
-  or
-  echo "p:=3; load \"makefb.mag\";" | magma -b
+  This will take some time... (see below for using the faster magma version).
+  In the end, the files are written in the makefb/ subdir, so you should
+  move them back:
 
-  This will create two files Aroots and Rroots.
-  NB: these file names are absolute names. 
-
+  mv makefb/*roots* .
+  
 - rename the factor base files to specific names, so that they are not
   overriden by the next call to makefb.mag:
 
@@ -33,12 +33,28 @@ Recipe to run an example (as of end of Mar 7, 2012).
   or 
   build/f3/sieve param.3.97
 
-  This should output relations for the special q specified in the param
+  This should output relations for the special-q range specified in the param
   files.
-  Parameters (including q,rho) can be changed on the command-line, for
-  instance:
+  Parameters can be changed on the command-line, for instance:
 
-  build/f2/sieve param.2.127 -I 12 -lpb1 24
+  build/f2/sieve param.2.127 -I 12 -lpb1 24 -q1 200000
 
 - debug! ;-)
 
+
+
+---------------------------------------------------------
+
+Old way of building the factor base:
+
+  At the moment, the polynomials are hardcoded and correspond to those in
+  param.2.127 and param.3.97.
+  
+  Tune the factor base bounds by editing makefb.mag and then create the
+  files:
+  echo "p:=2; load \"makefb.mag\";" | magma -b
+  or
+  echo "p:=3; load \"makefb.mag\";" | magma -b
+
+  This will create two files Aroots and Rroots.
+  NB: these file names are absolute names. 
