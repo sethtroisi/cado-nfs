@@ -163,7 +163,7 @@ mp_poly_homography (mpz_t *fij, mpz_t *f, const int d, int32_t H[4])
       /* invariant: we have already translated coefficients of degree > k,
          in f[k+1..d], and g = (b0*i+b1)^(d - (k+1)), with coefficients in
          g[0..d - (k+1)]:
-         f[k]   <- f[k] + a1*f[k+1]
+         f[k] <- a1*f[k+1]
          ...
          f[l] <- a0*f[l]+a1*f[l+1] for k < l < d
          ...
