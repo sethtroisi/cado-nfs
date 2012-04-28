@@ -27,7 +27,6 @@ void norm_stats_print() {
             norm_stats_max[i]);
   }
 }
-
 #endif
 
 
@@ -40,14 +39,14 @@ void norm_stats_print() {
   Then this function puts zeroes in the high part of r.
   For the moment, we put asserts to check that the input are well formed.
 */
-static void fppol64_mul_high(fppol64_ptr r,
+static MAYBE_UNUSED void fppol64_mul_high(fppol64_ptr r,
         fppol64_srcptr p, fppol64_srcptr q,
         unsigned int N)
 {
   ASSERT(N <= 32);
   ASSERT(N > 0);
-  ASSERT(fppol64_deg(p) < N);
-  ASSERT(fppol64_deg(q) < N);
+  ASSERT(fppol64_deg(p) < (int)N);
+  ASSERT(fppol64_deg(q) < (int)N);
   if (N <= 8) {         // N in [0,8]
     fppol8_t pp, qq;
     fppol16_t rr;
@@ -72,16 +71,17 @@ static void fppol64_mul_high(fppol64_ptr r,
     fppol64_mul_32x32(rr, pp, qq);
     fppol64_div_ti(r, rr, N-1);
   }
-  ASSERT(fppol64_deg(r) < N);
+  ASSERT(fppol64_deg(r) < (int)N);
 }
 
 
+#if 0   // This is no longer used.
 /* Function fppol_pow computes the power-th power of a polynomial
    should power be an unsigned int?  
    Should this function survive? 
    Will anyone use it ?  
    Does it have its place here? */
-void fppol_pow(fppol_t res, fppol_t in, int power)
+static void fppol_pow(fppol_t res, fppol_t in, int power)
 {
   fppol_t tmp;
   fppol_init(tmp);
@@ -91,6 +91,7 @@ void fppol_pow(fppol_t res, fppol_t in, int power)
   fppol_set(res, tmp);
   fppol_clear(tmp);
 }  
+#endif
 
 /* Function computing the norm of ffspol at (a,b)
    norm = b^d * ffspol(a/b), d = deg(ffspol) */
@@ -180,7 +181,8 @@ void ffspol_norm(fppol_t norm, ffspol_srcptr ffspol, fppol_t a, fppol_t b)
    Warning: l and k for the iterations in the function definition are taken in reverse order 
    compared to this comment.
 */
-void ffspol_2ij(ffspol_ptr ffspol_ij, ffspol_srcptr ffspol_ab, qlat_t qlat)
+static void ffspol_2ij(ffspol_ptr ffspol_ij, ffspol_srcptr ffspol_ab,
+        qlat_t qlat)
 {
   int d = ffspol_ab->deg;
   fppol_t *powb_ij;
@@ -232,45 +234,6 @@ void ffspol_2ij(ffspol_ptr ffspol_ij, ffspol_srcptr ffspol_ab, qlat_t qlat)
   fppol_clear(tmp2);
 }
 
-
-/* Function computing the norm of ffspol_ij at (i,j)
-   norm_ij = j^d * ffspol(i/j), d = deg(ffspol_ij) */
-
-void ffspol_norm_ij(fppol_t norm, ffspol_ptr ffspol_ij, ij_t i, ij_t j)
-{
-  ij_t *pow_j;
-  ij_t pow_i;
-  fppol_t pol_norm_k;
-  fppol_t tmp_norm;
-  
-  fppol_init(pol_norm_k);
-  fppol_init(tmp_norm);
-
-  fppol_set_zero(pol_norm_k);
-  fppol_set_zero(tmp_norm);
-  ij_set_one(pow_i);
-
-  /* pow_j contains j^d, j^{d-1}, ... , j^2, j, 1 */
-  pow_j = (ij_t *)malloc((ffspol_ij->alloc) * sizeof(ij_t));
-  ij_set_one(pow_j[ffspol_ij->deg]);
-
-  for (int k = ffspol_ij->deg - 1; k > -1; k--) 
-    ij_mul(pow_j[k], pow_j[k+1], j);
-  
-  for (int k = 0; k < ffspol_ij->deg + 1; k++) {
-    fppol_mul_ij(pol_norm_k, ffspol_ij->coeffs[k], pow_j[k]);
-    fppol_mul_ij(pol_norm_k, pol_norm_k, pow_i);
-    fppol_add(tmp_norm, tmp_norm, pol_norm_k);
-    ij_mul(pow_i, pow_i, i);
-  }
-  fppol_set(norm, tmp_norm);
-  fppol_clear(pol_norm_k);
-  fppol_clear(tmp_norm);
-
-  free(pow_j);
-}
-
-
 /* max_special(prev_max, j, &repeated) returns the maximum of prev_max
    and j
    The value repeated should be initialized to 1
@@ -295,65 +258,13 @@ static int max_special(int prev_max, int j, int *repeated)
   }
 }
 
-     
-/* deg_norm returns the degree of the norm. 
-   If during computation of pol_norm_i, only one pol_norm_i has
-   maximal degree then deg_norm is equal to this degree otherwise, we
-   have to compute the norm and call the fppol_deg function on it */
-int deg_norm(ffspol_srcptr ffspol, fppol_t a, fppol_t b)
-{
-  int deg, max_deg = -1;
-  int repeated = 1;
-  int dega = fppol_deg(a);
-  int degb = fppol_deg(b);
-  static int c_deg = 0;
-  static int c_tot = 0;
-
-#if 0
-  if ((c_tot & 0xFFF) == 1)
-    fprintf(stderr, "deg_norm stat: %d / %d\n", c_deg, c_tot);
-#endif
-  c_tot++;
-  for (int i = 0; i < ffspol->deg + 1; i++) {
-    deg = fppol_deg(ffspol->coeffs[i]) + i * dega + (ffspol->deg - i) * degb;
-    max_deg = max_special(max_deg, deg, &repeated);
-  }
-
-#if FP_SIZE == 2
-  if (repeated & 1u) {
-#else
-  if (repeated == 1) {
-#endif
-      c_deg++;
-      return max_deg;
-  }
-  else {
-    /* We should think about a cheaper way to compute this degree
-       otherwise */
-    fppol_t norm;
-    fppol_init(norm);
-    ffspol_norm(norm, ffspol, a, b);
-    deg = fppol_deg(norm);
-    fppol_clear(norm);
-    return deg;
-  }
-}
-
-
-int deg_norm_ij(ffspol_ptr ffspol_ij, ij_t i, ij_t j)
+static int deg_norm_ij(ffspol_ptr ffspol_ij, ij_t i, ij_t j)
 {
   int deg, max_deg = -1;
   int repeated = 1;
   int degi = ij_deg(i);
   int degj = ij_deg(j);
-  static int c_deg = 0;
-  static int c_tot = 0;
 
-#if 0
-  if ((c_tot & 0xFFF) == 1)
-    fprintf(stderr, "deg_norm stat: %d / %d\n", c_deg, c_tot);
-#endif
-  c_tot++;
   for (int k = 0; k < ffspol_ij->deg + 1; k++) {
     deg = fppol_deg(ffspol_ij->coeffs[k]) + k * degi + (ffspol_ij->deg - k) * degj;
     max_deg = max_special(max_deg, deg, &repeated);
@@ -364,17 +275,22 @@ int deg_norm_ij(ffspol_ptr ffspol_ij, ij_t i, ij_t j)
 #else
   if (repeated == 1) {
 #endif
-      c_deg++;
       return max_deg;
   }
   else {
     /* We should think about a cheaper way to compute this degree
        otherwise */
-    fppol_t norm;
+    fppol_t norm, ii, jj;
     fppol_init(norm);
-    ffspol_norm_ij(norm, ffspol_ij, i, j);
+    fppol_init(ii);
+    fppol_init(jj);
+    fppol_set_ij(ii, i);
+    fppol_set_ij(jj, j);
+    ffspol_norm(norm, ffspol_ij, ii, jj);
     deg = fppol_deg(norm);
     fppol_clear(norm);
+    fppol_clear(ii);
+    fppol_clear(jj);
     return deg;
   }
 }
@@ -385,89 +301,19 @@ int deg_norm_ij(ffspol_ptr ffspol_ij, ij_t i, ij_t j)
    qlat.h. Then it computes deg_norm(ffspol, a, b).
    In a first approximation, we will assume that it fits in an
    uint8_t.
-   For the moment i and j are assumed to be unsigned int for their
-   limb part 
-   Enumerating i, j the following way only works for charac. 2 
    
-   The last parameter is a boolean that tells whether we are on the
+   The sqside parameter is a boolean that tells whether we are on the
    side of the special q. If so, then the degree of q must be subtracted
    from the norm.
    */
-
 void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
-                ij_t j0, ijpos_t pos0, ijpos_t size, qlat_t qlat,
-                int sqside, sublat_ptr sublat, MAYBE_UNUSED int side)
-{
-  fppol_t a, b;
-  fppol_init(a);
-  fppol_init(b);
-
-  int degq = 0;
-  if (sqside)
-      degq = sq_deg(qlat->q);
-
-  ij_t i, j;
-  ij_t hati, hatj;
-  int rci, rcj = 1;
-  for (ij_set(j, j0); rcj; rcj = ij_monic_set_next(j, j, J)) {
-    ijpos_t start = ijvec_get_start_pos(j, I, J) - pos0;
-    if (start >= size)
-      break;
-    rci = 1;
-    for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
-      ijpos_t pos = start + ijvec_get_offset(i, I);
- 
-      if (S[pos] != 255) {
-        // If we have sublattices, have to convert (i,j) to (hat i, hat j)
-        ij_convert_sublat(hati, hatj, i, j, sublat);
-#ifdef TRACE_POS
-        if (pos == TRACE_POS) {
-          fprintf(stderr, "TRACE_POS(%d): (hat i, hat j) = (", pos);
-          ij_out(stderr, hati); fprintf(stderr, " ");
-          ij_out(stderr, hatj); fprintf(stderr, ")\n");
-          fprintf(stderr, "TRACE_POS(%d): norm = ", pos);
-          fppol_t norm;
-          fppol_init(norm);
-          ij2ab(a, b, hati, hatj, qlat);
-          ffspol_norm(norm, ffspol, a, b);
-          fppol_out(stderr, norm);
-          fppol_clear(norm);
-          fprintf(stderr, "\n");
-          fprintf(stderr, "TRACE_POS(%d): degnorm - deg(sq) = %d\n",
-                  pos, fppol_deg(norm)-degq);
-        }
-#endif
-        ij2ab(a, b, hati, hatj, qlat);
-        int deg = deg_norm(ffspol, a, b);
-        if (deg > 0) {
-          ASSERT_ALWAYS(deg < 255);
-          S[pos] = deg - degq;
-#ifdef WANT_NORM_STATS
-          norm_stats_n[side]++;
-          norm_stats_sum[side] += deg;
-          if ((deg < norm_stats_min[side]) || (norm_stats_min[side] == 0))
-              norm_stats_min[side] = deg;
-          if (deg > norm_stats_max[side])
-              norm_stats_max[side] = deg;
-#endif
-        }
-        else
-          S[pos] = 255;
-      }
-    }
-  }
-
-  fppol_clear(a);
-  fppol_clear(b);
-}
-
-void init_norms_ij(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
                 ij_t j0, ijpos_t pos0, ijpos_t size, qlat_t qlat,
                 int sqside, sublat_ptr sublat, MAYBE_UNUSED int side)
 {
   ffspol_t ffspol_ij;
   ffspol_init2(ffspol_ij, ffspol->alloc);
 
+  // TODO: this could be precomputed once for all and stored in qlat
   ffspol_2ij(ffspol_ij, ffspol, qlat);  
 
   int degq = 0;
@@ -508,6 +354,14 @@ void init_norms_ij(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
         if (deg > 0) {
           ASSERT_ALWAYS(deg < 255);
           S[pos] = deg - degq;
+#ifdef WANT_NORM_STATS
+          norm_stats_n[side]++;
+          norm_stats_sum[side] += deg;
+          if ((deg < norm_stats_min[side]) || (norm_stats_min[side] == 0))
+              norm_stats_min[side] = deg;
+          if (deg > norm_stats_max[side])
+              norm_stats_max[side] = deg;
+#endif
         }
         else
           S[pos] = 255;
