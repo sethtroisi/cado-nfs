@@ -1,3 +1,5 @@
+load tools.sage
+
 def inverse_mod(a,pk):
     g,_,u=xgcd(pk,a)
     assert (not g.is_zero())

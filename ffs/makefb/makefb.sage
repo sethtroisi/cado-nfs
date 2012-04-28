@@ -2,7 +2,6 @@
 
 import sys
 
-load tools.sage
 load readparam.sage
 load makefb0.sage
 
