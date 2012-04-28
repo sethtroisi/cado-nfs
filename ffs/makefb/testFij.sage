@@ -40,3 +40,35 @@ C = pol0.coeffs()
 d = len(C)-1
 for k in range(0, len(C)):
     Fij += C[k]*a^k*b^(d-k)
+
+def int2pol(i):
+   l = ZZ(i).bits()
+   T = t.parent()
+   return T(sum([l[k]*t^k for k in range(len(l))]))
+
+# check for cancellations in the evaluation of Fij for i < 2^I, j < 2^J
+# return the number of times each coefficients gives the degree of the sum
+# example: check_cancellation(Fij,9,9)
+def check_cancellation(Fij, I, J, verbose=False):
+   fij = Fij.coefficients()
+   one = t//t
+   # precompute polynomials
+   L = [int2pol(i) for i in range(1,2^max(I,J))]
+   maxi = [0 for k in range(d+1)]
+   for ti in L:
+      # precompute fij[k]*ti^k
+      a = [fij[k]*ti^k for k in range(d+1)]
+      for tj in L:
+	 if ti.gcd(tj) == one:
+	    dij = [a[k]*tj^(d-k) for k in range(d+1)]
+	    dijs = [dij[k].degree() for k in range(d+1)]
+	    s = sum(dij)
+            m = max(dijs)
+            if verbose:
+               print dijs, s.degree()
+            for k in range(d+1):
+               if dijs[k] == m:
+                  maxi[k] += 1
+	    if s.degree() <> m:
+	       print "cancellation for i=", i, "j=", j, m - s.degree()
+   return maxi

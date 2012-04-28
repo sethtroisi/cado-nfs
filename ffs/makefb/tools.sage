@@ -134,6 +134,10 @@ def homogenize(f):
 
 
 def fmodp_roots(fcoeffs,p,K,Ky):
+    if len(fcoeffs)==2: # degree 1 polynomial
+       den = fcoeffs[1] % p
+       if den <> 0: # we let the code below deal with projective roots
+          return [(-fcoeffs[0] * den.xgcd(p)[1]) % p]
     A=p.parent()
     t=A.gen()
     q=p.base_ring().cardinality()
@@ -149,7 +153,7 @@ def fmodp_roots(fcoeffs,p,K,Ky):
     r=res.roots()
     if p.degree()==1:
         return [el[0] for el in r]
-    matrix=Matrix([K(w^i).vector() for i in range(p.degree())]).transpose()
+    matrix=Matrix([K(w^i)._vector_() for i in range(p.degree())]).transpose()
     l=list(matrix^(-1)*vector([0,1]+[0]*(p.degree()-2)))
     phi=A(0)   # w0=phi(w)
     for i in range(len(l)):
