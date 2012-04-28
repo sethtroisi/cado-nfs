@@ -94,7 +94,7 @@ ropt_main_run ( rsstr_t rs,
       rsparam->e_sl[i] = param->s1_e_sl[i];
   }
   
-  /* STAGE 1: for each qudratic rotation i, find sublattice */
+  /* STAGE 1: for each quadratic rotation i, find sublattice */
   re = 0;
   old_i = 0;
   for (i = param->w_left_bound; i < param->w_length + param->w_left_bound; i++) {
@@ -186,7 +186,7 @@ ropt_main_run ( rsstr_t rs,
   }
   free_sub_alpha_pq (&tsieve_MurphyE_pqueue);
 
-  // re-detect sublattices with the best qudratic roation.
+  // re-detect sublattices with the best quadratic roation.
   i = used - 1;
   old_i = 0;
   if (verbose == 2)
@@ -475,7 +475,7 @@ ropt_main ( rsstr_t rs,
   }
   else {
     if (rs->d == 5 || rs->d == 4) {
-      /* not qudratci rot for deg 5 polynomial */
+      /* not quadratic rot for deg 5 polynomial */
       param->w_left_bound = 0;
       param->w_length = 1;
       ropt_main_run (rs, bestpoly, param, verbose);

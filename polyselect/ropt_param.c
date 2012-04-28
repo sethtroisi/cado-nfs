@@ -192,7 +192,7 @@ rsbound_setup_sublattice ( rsbound_t rsbound,
   mpz_set (rsbound->A, sl_A);
   mpz_set (rsbound->B, sl_B);
   /* the rsparam->modulus might be not true since rsparam might be
-     changed for different qudratic rotations. Instead, the true mod
+     changed for different quadratic rotations. Instead, the true mod
      is recorded in the priority queue */
   mpz_set (rsbound->MOD, mod);
   ab2uv (rsbound->A, rsbound->MOD, rsbound->Amax, rsbound->Umax);
@@ -637,7 +637,7 @@ rotate_bounds_U_lu ( rsstr_t rs,
 }
 
 
-/* find bound W for qudratic rotation*/
+/* find bound W for quadratic rotation */
 static inline void
 rotate_bounds_W_lu ( rsstr_t rs,
                      rsparam_t rsparam,

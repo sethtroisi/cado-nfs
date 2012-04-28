@@ -10,7 +10,7 @@
   ropt -f POLY -w 0 -l 8 > OUTPUT 2> ERRINFO
 
   If deg=5, quadratic rotations "-w" and "-l" will be ignored.
-  If deg=6, "-w" is the leftmost of a qudratic rotation and 
+  If deg=6, "-w" is the leftmost of a quadratic rotation and 
   "-l" is the step from the "-w".
 
   [2. Algorithm]
@@ -37,7 +37,7 @@
 
   For degree 6 polynomial, the following processes are called in order,
 
-  (a) - For each qudratic rotation w;
+  (a) - For each quadratic rotation w;
   (b) -- Tune parameters; ("WANT_TUNE" in "ropt_param.h".)
   (c) -- Find good sublattices (w, u, v)
   (d) - Compare (priority queue) all good sublattices and pick up top ones.
@@ -49,13 +49,13 @@
 
   ropt < POLY -w 0 -l 8
 
-  "-w" defines the leftmost point of qudratic rotation.
+  "-w" defines the leftmost point of quadratic rotation.
   f'(x) = f(x) + w*x^2*g(x)
 
   "-l" defines the steps for quadratic rotation, (w+l-1)
 
   (b, c)
-  The code starts by looking each qudratic rotation, say
+  The code starts by looking each quadratic rotation, say
   [w, \cdots, w+l-1]. For each rotated polynomial, we will
   have to find a suitable set of parameters (p1^e1 * p2^e2*
   \cdots *pn^en) to produce the sublattice. Note that, if it 
@@ -364,8 +364,8 @@ usage (char **argv)
   fprintf (stderr, "\nRequired options\n");
   fprintf (stderr, " -f F                   F is the poly file in CADO format\n");
   fprintf (stderr, " -fm F                  F is the poly file in msieve format, must also have parameters -n and -d\n");
-  fprintf (stderr, " -w W                   W is the lower bound of the qudratic rotation\n");
-  fprintf (stderr, " -l L                   L is the length of the qudratic rotation\n");
+  fprintf (stderr, " -w W                   W is the lower bound of the quadratic rotation\n");
+  fprintf (stderr, " -l L                   L is the length of the quadratic rotation\n");
   fprintf (stderr, "\nOther options:\n");
   fprintf (stderr, " -e N E_1 E_2 ... E_N   N is the number of small primes in finding sublattices\n");
   fprintf (stderr, "                        E_1 to E_N are the prime powers in finding sublattices\n");
@@ -378,7 +378,7 @@ usage (char **argv)
 
   fprintf (stderr, "\nExample 1: %s -f rsa768.poly -w -512 -l 1024  -norm 70\n", argv[0]);
 
-  fprintf (stderr, "Rootsieve with qudratic rotation between -512 and 512 and within\nthe sieving region bounded by norm 70.\n");
+  fprintf (stderr, "Rootsieve with quadratic rotation between -512 and 512 and within\nthe sieving region bounded by norm 70.\n");
 
   fprintf (stderr, "\nExample 2: %s -f rsa768.poly -w -512 -l 1024 -e 5 7 4 3 2 2 -umax 16 -vmax 10000000\n", argv[0]);
 
