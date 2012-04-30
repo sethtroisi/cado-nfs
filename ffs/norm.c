@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <inttypes.h>
 #include "macros.h"
 
 #include "types.h"
@@ -336,17 +337,23 @@ void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
         ij_convert_sublat(hati, hatj, i, j, sublat);
 #ifdef TRACE_POS
         if (pos == TRACE_POS) {
-          fprintf(stderr, "TRACE_POS(%d): (hat i, hat j) = (", pos);
+          fprintf(stderr, "TRACE_POS(%" PRIu64 "): (hat i, hat j) = (", pos);
           ij_out(stderr, hati); fprintf(stderr, " ");
           ij_out(stderr, hatj); fprintf(stderr, ")\n");
-          fprintf(stderr, "TRACE_POS(%d): norm = ", pos);
-          fppol_t norm;
+          fprintf(stderr, "TRACE_POS(%" PRIu64 "): norm = ", pos);
+          fppol_t norm, ii, jj;
           fppol_init(norm);
-          ffspol_norm_ij(norm, ffspol_ij, hati, hatj);
+          fppol_init(ii);
+          fppol_init(jj);
+          fppol_set_ij(ii, hati);
+          fppol_set_ij(jj, hatj);
+          ffspol_norm(norm, ffspol_ij, ii, jj);
           fppol_out(stderr, norm);
           fppol_clear(norm);
+          fppol_clear(ii);
+          fppol_clear(jj);
           fprintf(stderr, "\n");
-          fprintf(stderr, "TRACE_POS(%d): degnorm - deg(sq) = %d\n",
+          fprintf(stderr, "TRACE_POS(%" PRIu64 "): degnorm - deg(sq) = %d\n",
                   pos, fppol_deg(norm)-degq);
         }
 #endif

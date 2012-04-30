@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <inttypes.h>
 #include "macros.h"
 
 #include "types.h"
@@ -595,7 +596,7 @@ int main(int argc, char **argv)
                         if (S[pos] != 255) {
 #ifdef TRACE_POS
                             if (pos == TRACE_POS) {
-                                fprintf(stderr, "TRACE_POS(%d): ", pos);
+                                fprintf(stderr, "TRACE_POS(%" PRIu64 "): ", pos);
                                 fprintf(stderr,
                                    "entering cofactorization, S[pos] = %d\n",
                                    S[pos]);
