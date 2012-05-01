@@ -848,15 +848,14 @@ rootsieve_uv ( rsstr_t rs,
   /* E priority queue for each sublattice */
   MurphyE_pq *E_pqueue;
   new_MurphyE_pq (&E_pqueue, TOPE);
-
   rootscore_pq *alpha_pqueue;
   new_rootscore_pq (&alpha_pqueue, TOPALPHA);
-
   sievearray_t sa;
   sievearray_init (sa, len_A, B_block_size);
   /* get the correct value */
   array_mem_size = len_A * B_block_size;
 
+  
   /* for each i -> each u = A + MOD * i */
   tmpBmax = rsbound->Bmax;
   tmpBmin = rsbound->Bmin;
@@ -865,7 +864,8 @@ rootsieve_uv ( rsstr_t rs,
   int st = cputime ();
   do {
     k ++;
-    /* for each block of size B_block_size */
+
+    /* fo reach block of size B_block_size */
     rsbound->Bmax = rsbound->Bmin + B_block_size - 1;
     if (rsbound->Bmax > tmpBmax)
       rsbound->Bmax = tmpBmax;

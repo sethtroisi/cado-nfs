@@ -5,7 +5,7 @@
 
 #include "ropt_tree.h"
 
-#if 0
+#if 1
 /*
   Print the info for the node
 */
@@ -239,7 +239,7 @@ insert_node ( node *parent,
       }
 
 #if DEBUG_INSERT_NODE
-      if (pe == 7)
+      if (pe == 3)
         fprintf ( stderr, "add to (u: %u, v: %u), nr: %u, r: %u, e: %d, val: %f\n",
                   u, v, nextnode->nr, nextnode->r[nextnode->nr-1], curr_e, nextnode->val );
 #endif
@@ -282,14 +282,16 @@ insert_node ( node *parent,
     }
 
 #if DEBUG_INSERT_NODE
-    if (pe == 7)
+    if (pe == 3)
       fprintf ( stderr, "creating (u: %u, v: %u), nr: %u, r: %u, e: %d, val: %f\n", u, v,
                 (*currnode)->nr, (*currnode)->r[0], curr_e, (*currnode)->val );
 #endif
   }
-  //print_tree(parent, 0);
+  // print_tree(parent, 0);
 }
 
+
+#if 0
 /*
   Initialise new list for (u, v) p-valuations.
 */
@@ -328,8 +330,6 @@ free_list ( listnode **pptop )
   }
 }
 
-
-#if 0
 /*
   Print the info for the listnode
 */
@@ -356,85 +356,6 @@ print_list ( listnode *ptop )
 }
 #endif
 
-/*
-  Return the length of the list.
-*/
-unsigned long
-count_list ( listnode *ptop)
-{
-  unsigned long s = 0UL;
-  if (ptop) {
-    while ( ptop->next ) {
-      ptop = ptop->next;
-      s ++;
-    }
-    //print_listnode (ptop);
-    s ++;
-  }
-  return s;
-}
-
-
-/*
-  Create new empty listnode.
-*/
-listnode *
-new_listnode ( unsigned int u,
-               unsigned int v,
-               double val,
-               char e )
-{
-  listnode *plistnode = NULL;
-  plistnode = (listnode *) malloc (sizeof(listnode));
-  if (plistnode == NULL) {
-    fprintf(stderr,"Error: malloc failed in new_listnode()\n");
-    exit(1);
-  }
-  plistnode->u = u;
-  plistnode->v = v;
-  plistnode->val = val;
-  plistnode->e = e;
-  plistnode->next = NULL;
-  return plistnode;
-}
-
-
-/*
-  Insert a listnode to current list <- top, only record best one.
-*/
-void
-insert_listnode ( listnode **top,
-                  unsigned int u,
-                  unsigned int v,
-                  double val,
-                  char e )
-{
-  listnode *newlistnode;
-
-  /* if empty, create node */
-  if ( (*top) == NULL ) {
-    newlistnode = new_listnode (u, v, val, e);
-    (*top) = newlistnode;
-    (*top)->next = NULL;
-  }
-  else {
-    /* if income has better val, delete and add */
-    if ( (*top)->val < val) {
-      newlistnode = new_listnode (u, v, val, e);
-      free_list (top);
-      (*top) = newlistnode;
-      (*top)->next = NULL;
-    }
-    /* if income has equal val, add */
-    else if ( (*top)->val == val) {
-      newlistnode = new_listnode (u, v, val, e);
-      newlistnode->next = (*top);
-      (*top) = newlistnode;
-    }
-  }
-  newlistnode = NULL;
-}
-
 
 /*
   Some indices, note the queue is shifted by 1.
@@ -456,6 +377,164 @@ pq_rightchild ( int i )
 {
   return ( (i << 1) + 1 );
 }
+
+
+// TAG
+
+/*
+  Create priority queue for 
+*/
+void
+new_single_sub_alpha_pq ( single_sub_alpha_pq **ppqueue,
+                          unsigned long len )
+{
+  if ( len < 1 ) {
+    fprintf(stderr,"Error: len < 1 in new_single_sub_alpha_pq()\n");
+    exit(1);
+  }
+
+  (*ppqueue) = (single_sub_alpha_pq *) malloc ( sizeof(single_sub_alpha_pq) );
+  if ( (*ppqueue) == NULL) {
+    fprintf(stderr,"Error: malloc failed in new_single_sub_alpha_pq()\n");
+    exit(1);
+  }
+
+  (*ppqueue)->len = len;
+  (*ppqueue)->u = (unsigned int *) malloc (len* sizeof (unsigned int));
+  (*ppqueue)->v = (unsigned int *) malloc (len* sizeof (unsigned int));
+  (*ppqueue)->e = (char *) malloc (len* sizeof (char));
+  (*ppqueue)->val = (double *) malloc (len* sizeof (double));
+
+  if ( (*ppqueue)->u == NULL ||
+       (*ppqueue)->v == NULL ||
+       (*ppqueue)->e == NULL ||
+       (*ppqueue)->val == NULL ) {
+    fprintf(stderr,"Error: malloc failed in new_single_sub_alpha_pq()\n");
+    exit(1);
+  }
+
+  /* u[0] and v[0] are null elements */
+  (*ppqueue)->u[0] = 0;
+  (*ppqueue)->v[0] = 0;
+  (*ppqueue)->e[0] = 0;
+  (*ppqueue)->val[0] = -DBL_MAX;
+  (*ppqueue)->used = 1;
+}
+
+
+/*
+  Free
+*/
+void
+free_single_sub_alpha_pq ( single_sub_alpha_pq **ppqueue )
+{
+  free ( (*ppqueue)->u );
+  free ( (*ppqueue)->v );
+  free ( (*ppqueue)->e );
+  free ( (*ppqueue)->val );
+  free ( *ppqueue );
+}
+
+
+/*
+  Sift-up to add, if the queue is not full.
+*/
+inline void
+insert_single_sub_alpha_pq_up ( single_sub_alpha_pq *pqueue,
+                                unsigned int u,
+                                unsigned int v,
+                                double val,
+                                char e )
+{
+  int k;
+
+  for ( k = pqueue->used;
+        val < pqueue->val[pq_parent(k)];
+        k /= 2 )
+  {
+    pqueue->u[k] = pqueue->u[pq_parent(k)];
+    pqueue->v[k] = pqueue->v[pq_parent(k)];
+    pqueue->e[k] = pqueue->e[pq_parent(k)];
+    pqueue->val[k] = pqueue->val[pq_parent(k)];
+  }
+
+  pqueue->u[k] = u;
+  pqueue->v[k] = v;
+  pqueue->e[k] = e;
+  pqueue->val[k] = val;
+
+  pqueue->used ++;
+}
+
+
+/*
+  Sift-down, if the heap is full.
+*/
+inline void
+insert_single_sub_alpha_pq_down ( single_sub_alpha_pq *pqueue,
+                                unsigned int u,
+                                unsigned int v,
+                                double val,
+                                char e )
+{
+  int k, l;
+
+  for (k = 1; k*2 < pqueue->used; k = l) {
+
+    l = (k << 1);
+
+    /* right < left ? */
+    if ( (l+1) < pqueue->used &&
+         (pqueue->val[l+1] < pqueue->val[l]) )
+      l ++;
+
+    /* switch smaller child with parent */
+    if ( pqueue->val[l] < val ) {
+
+      pqueue->u[k] = pqueue->u[l];
+      pqueue->v[k] = pqueue->v[l];
+      pqueue->e[k] = pqueue->e[l];
+      pqueue->val[k] = pqueue->val[l];
+    }
+    else
+      break;
+  }
+  pqueue->u[k] = u;
+  pqueue->v[k] = v;
+  pqueue->e[k] = e;
+  pqueue->val[k] = val;
+}
+
+
+/*
+  Insert to the priority queue.
+*/
+void
+insert_single_sub_alpha_pq ( single_sub_alpha_pq *pqueue,
+                             unsigned int u,
+                             unsigned int v,
+                             double val,
+                             char e )
+{
+
+  /* queue is full,  */
+  if (pqueue->len == pqueue->used) {
+    if ( val > pqueue->val[1] ) {
+      insert_single_sub_alpha_pq_down (pqueue, u, v, val, e);
+    }
+  }
+  /* queue is not full, sift-up */
+  else if (pqueue->len > pqueue->used) {
+    insert_single_sub_alpha_pq_up (pqueue, u, v, val, e);
+  }
+  else {
+    fprintf(stderr,"Error: error (pqueue->len < pqueue->used) in insert_single_sub_alpha_pq()\n");
+    exit(1);
+  }
+}
+
+
+// TAG
 
 
 /*

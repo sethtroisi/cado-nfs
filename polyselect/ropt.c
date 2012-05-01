@@ -187,36 +187,37 @@ ropt_main_run ( rsstr_t rs,
   free_sub_alpha_pq (&tsieve_MurphyE_pqueue);
 
   // re-detect sublattices with the best quadratic roation.
-  i = used - 1;
-  old_i = 0;
-  if (verbose == 2)
-    fprintf (stderr, "# Info: Found best quadratic rotation by %d*x^2\n", w[i]);
-  old_i = rotate_aux (rs->f, rs->g[1], m, old_i, w[i], 2);
-  rsstr_setup (rs);
-
-  rsparam_reset_bounds (rsparam, rs, param, verbose);
-
-  k = ropt_stage1 ( rs,
-                    rsparam,
-                    alpha_pqueue,
-                    verbose,
-                    w[i] );
-  // if failed in ropt_stage1, return.
-  if (k == -1) {
-    rotate_aux (rs->f, rs->g[1], m, old_i, 0, 2);
+  if (param->w_length > 1) {
+    
+    i = used - 1;
     old_i = 0;
-    rsparam_free (rsparam);
-    mpz_clear (m);
-    free_sub_alpha_pq (&alpha_pqueue);
-    return -1;
-  }
-  // rotate back.
-  rotate_aux (rs->f, rs->g[1], m, old_i, 0, 2);
+    if (verbose == 2)
+      fprintf (stderr, "# Info: Found best quadratic rotation by %d*x^2\n", w[i]);
+    old_i = rotate_aux (rs->f, rs->g[1], m, old_i, w[i], 2);
+    rsstr_setup (rs);
+    rsparam_reset_bounds (rsparam, rs, param, verbose);
+    k = ropt_stage1 ( rs,
+                      rsparam,
+                      alpha_pqueue,
+                      verbose,
+                      w[i] );
+    // if failed in ropt_stage1, return.
+    if (k == -1) {
+      rotate_aux (rs->f, rs->g[1], m, old_i, 0, 2);
+      old_i = 0;
+      rsparam_free (rsparam);
+      mpz_clear (m);
+      free_sub_alpha_pq (&alpha_pqueue);
+      return -1;
+    }
+    // rotate back.
+    rotate_aux (rs->f, rs->g[1], m, old_i, 0, 2);
 
-  old_i = 0;
-  // use another array to save the priority queue.
-  used = alpha_pqueue->used - 1;
-#endif
+    old_i = 0;
+    // use another array to save the priority queue.
+    used = alpha_pqueue->used - 1;
+  }
+#else
 
   /* ----------------------------------------------- */
   /* rank found sublattices by partial alpha values. */
@@ -253,8 +254,9 @@ ropt_main_run ( rsstr_t rs,
          i );      */
     }
   }
-
   free_sub_alpha_pq (&alpha_pqueue); // free alpha queue.
+#endif
+
 
   // E priority queue for all sublattice, we rank
   // the top three polynomials from each sublattice.

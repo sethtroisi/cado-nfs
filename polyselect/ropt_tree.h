@@ -3,6 +3,24 @@
 
 #include "auxiliary.h"
 
+/* Struct for the lift. Note we could rely on stack
+   in the recursive calls. But this is more convenient
+   as long as the memory is not a problem. */
+typedef struct node_t {
+  unsigned int u;
+  unsigned int v;
+  unsigned int *r;
+  char *roottype;
+  unsigned int alloc;
+  unsigned int nr;
+  char e;
+  float val;
+  struct node_t *firstchild;
+  struct node_t *nextsibling;
+  // might remove parent in future.
+  struct node_t *parent;
+} node;
+
 /* Priority queue to record sublattices (u, v) */
 typedef struct sublattice_pq_t {
   mpz_t *u;
@@ -11,17 +29,6 @@ typedef struct sublattice_pq_t {
   int len;
   int used;
 } sublattice_pq;
-
-/* Priority queue to record sublattices (w, u, v)'s alpha's */
-typedef struct sub_alpha_pq_t {
-  int *w;
-  mpz_t *u;
-  mpz_t *v;
-  mpz_t *modulus;
-  double *sub_alpha;
-  int len;
-  int used;
-} sub_alpha_pq;
 
 /* Priority queue to record alpha values */
 typedef struct rootscore_pq_t {
@@ -42,37 +49,48 @@ typedef struct MurphyE_pq_t {
   int used;
 } MurphyE_pq;
 
-/* Struct for the lift. Note we could rely on stack
-   in the recursive calls. But this is more convenient
-   as long as the memory is not a problem. */
-typedef struct node_t {
-  unsigned int u;
-  unsigned int v;
-  unsigned int *r;
-  char *roottype;
-  unsigned int alloc;
-  unsigned int nr;
-  char e;
-  float val;
-  struct node_t *firstchild;
-  struct node_t *nextsibling;
-  // might remove parent in future.
-  struct node_t *parent;
-} node;
+/* Priority queue to record sublattices (w, u, v)'s alpha's */
+typedef struct sub_alpha_pq_t {
+  int *w;
+  mpz_t *u;
+  mpz_t *v;
+  mpz_t *modulus;
+  double *sub_alpha;
+  int len;
+  int used;
+} sub_alpha_pq;
 
-/* List struct for the (u, v) with valuations;
-   it is similar to a stack but different in
-   permittable operations. */
-typedef struct listnode_t {
-  unsigned int u;
-  unsigned int v;
-  char e;
-  double val; // don't actually need this. TBD
-  struct listnode_t *next;
-} listnode;
+/* Priority queue for the (u, v) with e */
+typedef struct single_sub_alpha_pq_t {
+  unsigned int *u;
+  unsigned int *v;
+  char *e;
+  double *val;
+  int used;
+  int len;
+} single_sub_alpha_pq;
 
 
 /* --- declarations --- */
+
+void new_tree ( node **root );
+
+node* new_node ( void );
+
+void insert_node ( node *parent,
+                   node **currnode,
+                   unsigned int u,
+                   unsigned int v,
+                   unsigned int r,
+                   char curr_e,
+                   unsigned int p,
+                   unsigned int pe,
+                   char k );
+
+void free_node ( node **ptr );
+
+
+/* sublattice_pq */
 void new_sublattice_pq ( sublattice_pq **ppqueue,
                          unsigned long len );
 
@@ -83,10 +101,12 @@ void insert_sublattice_pq ( sublattice_pq *pqueue,
 
 void free_sublattice_pq ( sublattice_pq **ppqueue );
 
+
+/* sub_alpha_pq */
 void new_sub_alpha_pq ( sub_alpha_pq **ppqueue,
                         unsigned long len );
 
-void insert_sub_alpha_pq ( sub_alpha_pq *pqueue,
+void insert_sub_alpha_pq ( sub_alpha_pq *pqueue, 
                            int w,
                            mpz_t u,
                            mpz_t v,
@@ -116,6 +136,8 @@ void extract_sub_alpha_pq ( sub_alpha_pq *pqueue,
 
 void free_sub_alpha_pq ( sub_alpha_pq **ppqueue );
 
+
+/* MurphyE_pq */
 void new_MurphyE_pq ( MurphyE_pq **ppqueue,
                       unsigned long len );
 
@@ -139,34 +161,32 @@ void insert_MurphyE_pq_down ( MurphyE_pq *pqueue,
 
 void free_MurphyE_pq ( MurphyE_pq **ppqueue );
 
-void new_tree ( node **root );
 
-node* new_node ( void );
+/* single_sub_alpha_pq */
+void new_single_sub_alpha_pq ( single_sub_alpha_pq **top,
+                               unsigned long len );
 
-void insert_node ( node *parent,
-                   node **currnode,
-                   unsigned int u,
-                   unsigned int v,
-                   unsigned int r,
-                   char curr_e,
-                   unsigned int p,
-                   unsigned int pe,
-                   char k );
+void insert_single_sub_alpha_pq ( single_sub_alpha_pq *top,
+                                  unsigned int u,
+                                  unsigned int v,
+                                  double val,
+                                  char e );
 
-void free_node ( node **ptr );
+void insert_single_sub_alpha_pq_up ( single_sub_alpha_pq *top,
+                                     unsigned int u,
+                                     unsigned int v,
+                                     double val,
+                                     char e );
 
-void new_list ( listnode **top );
+void insert_single_sub_alpha_down ( single_sub_alpha_pq *top,
+                                    unsigned int u,
+                                    unsigned int v,
+                                    double val,
+                                    char e );
 
-void insert_listnode ( listnode **top,
-                       unsigned int u,
-                       unsigned int v,
-                       double val,
-                       char e );
+void free_single_sub_alpha_pq ( single_sub_alpha_pq **top );
 
-unsigned long count_list ( listnode *ptop);
-
-void free_list ( listnode **pptop );
-
+/* rootscore_pq */
 void new_rootscore_pq ( rootscore_pq **ppqueue,
                         unsigned long len );
 

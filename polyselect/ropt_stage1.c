@@ -10,7 +10,7 @@
 */
 static inline void
 find_sublattice_lift ( node *firstchild,
-                       listnode **top,
+                       single_sub_alpha_pq *top,
                        unsigned int * f_ui,
                        unsigned int * g_ui,
                        unsigned int * fuv_ui,
@@ -139,7 +139,7 @@ find_sublattice_lift ( node *firstchild,
     if (curr_e == e) {
       tmpnode = currnode->firstchild;
       while (tmpnode != NULL) {
-        insert_listnode (top, tmpnode->u, tmpnode->v, tmpnode->val, e);
+        insert_single_sub_alpha_pq (top, tmpnode->u, tmpnode->v, tmpnode->val, e);
         tmpnode2 = tmpnode;
         tmpnode = tmpnode->nextsibling;
 
@@ -175,7 +175,7 @@ find_sublattice_lift ( node *firstchild,
   pairs, we consider all the simple + multi roots.
 */
 static inline void
-find_sublattice ( listnode **top,
+find_sublattice ( single_sub_alpha_pq *top,
                   rsstr_t rs,
                   unsigned int p,
                   char e )
@@ -218,7 +218,6 @@ find_sublattice ( listnode **top,
 
       /* simple root */
       if (mpz_divisible_ui_p(tmp, p) == 0) {
-
         insert_node (root, &currnode, u, v, r, 1, p, p, 1);
       }
       else {
@@ -232,7 +231,7 @@ find_sublattice ( listnode **top,
     node *tmpnode;
     currnode = root->firstchild;
     while (currnode != NULL) {
-      insert_listnode (top, currnode->u, currnode->v, currnode->val, 1);
+      insert_single_sub_alpha_pq (top, currnode->u, currnode->v, currnode->val, 1);
       tmpnode = currnode;
       currnode = currnode->nextsibling;
       free_node (&tmpnode);
@@ -256,7 +255,7 @@ find_sublattice ( listnode **top,
       /* case when (u, v) only has single roots */
       if (c == 1) {
 
-        insert_listnode (top, currnode->u, currnode->v, currnode->nr / ( (double) p - 1), 1);
+        insert_single_sub_alpha_pq (top, currnode->u, currnode->v, currnode->nr / ( (double) p - 1), 1);
 
         /* delete this node */
         tmpnode = currnode;
@@ -498,7 +497,7 @@ return_all_sublattices ( rsstr_t rs,
   unsigned int j, size[rsparam->tlen_e_sl], tsize[rsparam->tlen_e_sl],
     ind[rsparam->tlen_e_sl], ***individual_sublattices;
   unsigned long count;
-  listnode *top, *tmp;
+  single_sub_alpha_pq *top, *tmp;
 
   /* Sublattice[i][length][] save (u, v) for prime[i] */
   individual_sublattices = (unsigned int ***)
@@ -513,12 +512,12 @@ return_all_sublattices ( rsstr_t rs,
      and return (u, v) with best score. */
   for (i = 0; i < rsparam->tlen_e_sl; i ++) {
 
-    new_list (&top);
+    new_single_sub_alpha_pq (&top, 32);
     /* find individual sublattices */
-    find_sublattice ( &top, rs,
+    find_sublattice ( top, rs,
                       primes[i], rsparam->e_sl[i] );
 
-    tsize[i] = count_list (top);
+    tsize[i] = top->used - 1;
 
     /* If individual list has 0 len, this set of parameters fails. */
     if (tsize[i] == 0) {
@@ -541,15 +540,15 @@ return_all_sublattices ( rsstr_t rs,
     tmp_e_sl = rsparam->e_sl[i];
     while (tsize[i] > rsparam->ncrts_sl) {
 
-      free_list (&top);
-      new_list (&top);
+      free_single_sub_alpha_pq (&top);
+      new_single_sub_alpha_pq (&top, 32);
       tmp_e_sl --;
 
       /* find individual sublattices */
-      find_sublattice ( &top, rs,
+      find_sublattice ( top, rs,
                         primes[i], tmp_e_sl );
 
-      tsize[i] = count_list (top);
+      tsize[i] = top->used - 1;
     }
 
     /* now, tsize[i] must be <= rsparam->ncrts_sl and >0 */
@@ -572,10 +571,9 @@ return_all_sublattices ( rsstr_t rs,
         fprintf (stderr, "Error, cannot allocate memory in return_all_sublattices(). \n");
         exit (1);
       }
-      individual_sublattices[i][j][0] = tmp->u;
-      individual_sublattices[i][j][1] = tmp->v;
-      individual_sublattices[i][j][2] = (unsigned int) tmp->e;
-      tmp = tmp->next;
+      individual_sublattices[i][j][0] = tmp->u[j];
+      individual_sublattices[i][j][1] = tmp->v[j];
+      individual_sublattices[i][j][2] = (unsigned int) tmp->e[j];
       //fprintf (stderr, "SUBLATTICE: #%lu, (%lu, %lu)\n", j, individual_sublattices[i][j][0], individual_sublattices[i][j][1]);
     }
 
@@ -586,7 +584,8 @@ return_all_sublattices ( rsstr_t rs,
                 "# Info: p: %2u, max_e: %2u (old_e: %2u), list_size: %6u, size_cutoff: %6u\n",
                 primes[i], tmp_e_sl, rsparam->e_sl[i], tsize[i], size[i] );
 
-    free_list (&top);
+    free_single_sub_alpha_pq (&top);
+    tmp = NULL;
   }
 
   /* Loop over combinations of all arrays. This is awkward.
@@ -1211,7 +1210,7 @@ rsparam_tune_ranklat ( rsstr_t rs,
     // rotate polynomial by f + rot*x^2 for various rot.
     old_i = rotate_aux (rs->f, rs->g[1], m, old_i, w[i], 2);
     rsstr_setup (rs);
-    rsparam_reset_bounds (rsparam, rs, param, verbose);
+    rsparam_reset_bounds (rsparam, rs, param, 1); // avoid verbose
 
     // print_poly_fg (rs->f, rs->g, rs->d, rs->n, rs->m, 1);
     ave_MurphyE = ropt_stage2 ( rs,
@@ -1231,7 +1230,6 @@ rsparam_tune_ranklat ( rsstr_t rs,
                           mod[i],
                           -ave_MurphyE );
 
-    /*
     if (verbose != 0) {
       gmp_fprintf ( stderr, "# Info: %4d sublattice (w, u, v): (%d, %Zd, %Zd) (mod %Zd), \t tsieve E: %.2e\n",
                     i + 1,
@@ -1241,7 +1239,6 @@ rsparam_tune_ranklat ( rsstr_t rs,
                     mod[i],
                     ave_MurphyE );
     }
-    */
   }
   free_MurphyE_pq (&global_E_pqueue);
 

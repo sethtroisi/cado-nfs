@@ -162,14 +162,14 @@ rsbound_setup_AB_bound ( rsbound_t rsbound,
   }
   /* Tune mode. For speed purpose, choose smaller sieving range (compared to TUNE_SIEVEARRAY_SIZE). */
   else {
-    rsbound->Amax = 0;
+    rsbound->Amax = 16;
     unsigned long len;
     mpz_t q, v;
     mpz_init (q);
     mpz_init (v);
     mpz_fdiv_q (q, rsparam->global_v_bound_rs, mod);
     len =  mpz_get_ui (q);
-    rsbound->Bmax = ( (len > TUNE_SIEVEARRAY_SIZE) ? TUNE_SIEVEARRAY_SIZE : (long) len);
+    rsbound->Bmax =  256;//( (len > TUNE_SIEVEARRAY_SIZE) ? TUNE_SIEVEARRAY_SIZE : (long) len);
     mpz_clear (q);
     mpz_clear (v);
   }
@@ -804,7 +804,7 @@ rsparam_setup ( rsparam_t rsparam,
 
   /* "rsparam->nbest_sl" and "rsparam->ncrts_sl" */
   /* there could be too much individual sublattices to do crts. We restrict the num.*/
-  rsparam->nbest_sl = 128;
+  rsparam->nbest_sl = 1024;
   rsparam->ncrts_sl = 64;
 
   /* "rsparam->len_e_sl" and "rsparam->e_sl" */
