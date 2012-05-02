@@ -178,11 +178,11 @@ void insert_single_sub_alpha_pq_up ( single_sub_alpha_pq *top,
                                      double val,
                                      char e );
 
-void insert_single_sub_alpha_down ( single_sub_alpha_pq *top,
-                                    unsigned int u,
-                                    unsigned int v,
-                                    double val,
-                                    char e );
+void insert_single_sub_alpha_pq_down ( single_sub_alpha_pq *top,
+                                       unsigned int u,
+                                       unsigned int v,
+                                       double val,
+                                       char e );
 
 void free_single_sub_alpha_pq ( single_sub_alpha_pq **top );
 

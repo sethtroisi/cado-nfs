@@ -163,13 +163,13 @@ rsbound_setup_AB_bound ( rsbound_t rsbound,
   /* Tune mode. For speed purpose, choose smaller sieving range (compared to TUNE_SIEVEARRAY_SIZE). */
   else {
     rsbound->Amax = 16;
-    unsigned long len;
+    // unsigned long len;
     mpz_t q, v;
     mpz_init (q);
     mpz_init (v);
     mpz_fdiv_q (q, rsparam->global_v_bound_rs, mod);
-    len =  mpz_get_ui (q);
-    rsbound->Bmax =  256;//( (len > TUNE_SIEVEARRAY_SIZE) ? TUNE_SIEVEARRAY_SIZE : (long) len);
+    // len =  mpz_get_ui (q);
+    rsbound->Bmax =  256; // ( (len > TUNE_SIEVEARRAY_SIZE) ? TUNE_SIEVEARRAY_SIZE : (long) len);
     mpz_clear (q);
     mpz_clear (v);
   }

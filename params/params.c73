@@ -15,7 +15,7 @@
 # General parameters
 ###########################################################################
 
-# Sample parameter file for a 72/73-digit gnfs input
+# Sample parameter file for a 73-digit gnfs input
 # Warning: the parameters here are not claimed to be optimal!
 # Example: cadofactor.pl wdir=... name=... n=...
 
@@ -34,13 +34,16 @@ degree=4                # degree of the algebraic polynomial
 polsel_delay=30              # time between two checks
 polsel_nice=4            # nice level for selection
 
+# one can expect:
+# MurphyE(Bf=10000000,Bg=5000000,area=1.00e+16)=4.03e-07..4.64e-07
+
 ## Parameters of polyselect
 polsel_admax=8000            # max value for lc(f)
 polsel_adrange=2000          # individual tasks
 polsel_kmax=17               # rotation is bounded by 2^kmax
 polsel_incr=60               # forced divisor of lc(f)
 polsel_P=5000                # choose lc(g) with two prime factors in [P,2P]
-polsel_maxnorm=26.5          # maximal lognorm before rootsieve
+polsel_maxnorm=26.6          # maximal lognorm before rootsieve
 polsel_lq=1                  # special-q in lc(g) has such many factors
 
 ###########################################################################

@@ -15,7 +15,7 @@
 # General parameters
 ###########################################################################
 
-# Sample parameter file for a 70/71-digit gnfs input
+# Sample parameter file for a 71-digit gnfs input
 # Warning: the parameters here are not claimed to be optimal!
 # Example: cadofactor.pl wdir=... name=... n=...
 
@@ -34,11 +34,8 @@ degree=4                # degree of the algebraic polynomial
 polsel_delay=30              # time between two checks
 polsel_nice=4            # nice level for selection
 
-# on test number
-# 31622776601686009387372539247324574004309006958538311855230331719254317
-# we get
-# lognorm: 23.52, alpha: -2.78 E=20.75
-# Murphy's E(Bf=10000000,Bg=5000000,area=1.00e+16)=5.79e-07
+# one can expect
+# MurphyE(Bf=10000000,Bg=5000000,area=1.00e+16)=5.40e-07
 
 ## Parameters of polyselect
 polsel_admax=5000            # max value for lc(f)

@@ -34,6 +34,9 @@ degree=4                # degree of the algebraic polynomial
 polsel_delay=30              # time between two checks
 polsel_nice=4            # nice level for selection
 
+# for a c64 we can expect:
+# MurphyE(Bf=10000000,Bg=5000000,area=1.00e+16)=1.23e-06
+
 ## Parameters of polyselect
 polsel_admax=2000            # max value for lc(f)
 polsel_adrange=500           # individual tasks

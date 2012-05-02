@@ -1841,11 +1841,11 @@ main (int argc, char *argv[])
 
     if (cputime () > target_time || verbose > 0)
     {
-      printf ("# Stat: ad=%lu, exp. coll.=%1.1f, got %lu (%0.3f/s) with %lu good ones, av. lognorm=%1.2f, av. raw. lognorm=%1.2f, time=%dms\n",
+      printf ("# Stat: ad=%lu, exp. coll.=%1.1f (%0.3f/s), got %lu with %lu good ones, av. lognorm=%1.2f, av. raw. lognorm=%1.2f, time=%dms\n",
               admin,
               potential_collisions,
+              1000.0 * (double) potential_collisions / cputime (),
               collisions,
-              1000.0 * (double) collisions / cputime (),
               collisions_good,
               aver_opt_lognorm / collisions_good,
               aver_raw_lognorm / collisions,
