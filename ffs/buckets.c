@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
 
 #include "buckets.h"
 #include "ijvec.h"
@@ -13,9 +14,13 @@
  * Each update contains:
  * - pos:  the position (i, j) of the update, represented using an unsigned
  *         integer of UPDATE_POS_BITS bits.
- * - hint: a prime hint, to quickly recover the degree of the corresponding
- *         prime ideal when applying the update. The hint is represented using
- *         an unsigned integer of UPDATE_HINT_BITS bits.
+ * - hint: a prime hint, to quickly recover the irreducible polynomnial of
+ *         the corresponding prime ideal. It is used for resieving survivors.
+ *         If BUCKET_RESIEVE is not defined, then this hint is nothing,
+ *         otherwise, it is the index of the ideal in the factor base
+ *         (stored as a difference of index with previous).
+ *         The hint is represented using an unsigned integer
+ *         of UPDATE_HINT_BITS bits.
  *
  * The actual size in memory of a bucket update is UPDATE_POS_BITS +
  * UPDATE_HINT_BITS, rounded up to a multiple of UPDATE_ALIGN bytes.
@@ -23,7 +28,11 @@
 
 // Size of the two fields and of a bucket update, in bits.
 #define UPDATE_POS_BITS  16
+#ifdef BUCKET_RESIEVE
+#define UPDATE_HINT_BITS  16
+#else
 #define UPDATE_HINT_BITS  0
+#endif
 #define UPDATE_BITS     (UPDATE_POS_BITS + UPDATE_HINT_BITS)
 
 // Memory alignment of bucket updates, in bytes.
@@ -141,6 +150,16 @@ void buckets_init(buckets_ptr buckets, unsigned I, unsigned J,
   buckets->degp_end =
     (update_packed_t **)malloc(ndegp * n * sizeof(update_packed_t *));
   ASSERT_ALWAYS(buckets->degp_end);
+#ifdef BUCKET_RESIEVE
+  buckets->first_hint   = (unsigned *)malloc(n * sizeof(unsigned));
+  buckets->current_hint = (unsigned *)malloc(n * sizeof(unsigned));
+  ASSERT_ALWAYS(buckets->first_hint);
+  ASSERT_ALWAYS(buckets->current_hint);
+  for (unsigned i = 0; i < n; ++i) {
+    buckets->first_hint[i] = 0;
+    buckets->current_hint[i] = 0;
+  }
+#endif
 }
 
 
@@ -151,6 +170,10 @@ void buckets_clear(buckets_ptr buckets)
     free(buckets->start[k]);
   free(buckets->start);
   free(buckets->degp_end);
+#ifdef BUCKET_RESIEVE
+  free(buckets->first_hint);
+  free(buckets->current_hint);
+#endif
 }
 
 
@@ -278,15 +301,28 @@ static int compute_starting_point(ijvec_ptr V0, ijbasis_ptr euclid,
 
 // Push an update into the corresponding bucket.
 static inline
-void buckets_push_update(MAYBE_UNUSED buckets_ptr buckets,
-                         update_packed_t **ptr, ijvec_srcptr v,
-                         unsigned I, unsigned J)
+void buckets_push_update(MAYBE_UNUSED buckets_ptr buckets, 
+                         update_packed_t **ptr, hint_t hint,
+                         ijvec_srcptr v, unsigned I, unsigned J)
 {
   ijpos_t  pos = ijvec_get_pos(v, I, J);
   unsigned k   = pos >> UPDATE_POS_BITS;
   pos_t    p   = pos & (((pos_t)1<<UPDATE_POS_BITS)-1);
   ASSERT(ptr[k] - buckets->start[k] < buckets->max_size);
-  *ptr[k]++ = update_pack(update_set(p, 0));
+#ifdef BUCKET_RESIEVE
+  // TODO: this is a very critical loop. Can we afford this branch???
+  if (buckets->first_hint[k] == 0) {
+      buckets->first_hint[k] = hint;
+      buckets->current_hint[k] = hint;
+      hint = 0;   // putting 0 allows to add it to the current_hint.
+  } else {
+      unsigned h = hint;
+      hint = hint - buckets->current_hint[k];
+      ASSERT(hint < (1U<<UPDATE_HINT_BITS));
+      buckets->current_hint[k] = h;
+  }
+#endif
+  *ptr[k]++ = update_pack(update_set(p, hint));
 }
 
 
@@ -356,15 +392,19 @@ void buckets_fill(buckets_ptr buckets, factor_base_srcptr FB,
       unsigned gray_dim = MIN(basis->dim, ENUM_LATTICE_UNROLL);
       unsigned i0       = ngray - GRAY_LENGTH(gray_dim) / (__FP_SIZE-1);
 
+      hint_t hint = 0;
+#ifdef BUCKET_RESIEVE
+      hint = i;
+#endif
       ij_t s, t;
       ij_set_zero(t);
       int rc = basis->dim > ENUM_LATTICE_UNROLL;
       do {
         // Inner-level Gray code enumeration: just go through the Gray code
         // array, each time adding the indicated basis vector.
-        for (unsigned i = i0; i < ngray; ++i) {
-          ijvec_add(v, v, basis->v[gray[i]]);
-          buckets_push_update(buckets, ptr, v, I, J);
+        for (unsigned ii = i0; ii < ngray; ++ii) {
+          ijvec_add(v, v, basis->v[gray[ii]]);
+          buckets_push_update(buckets, ptr, hint, v, I, J);
         }
         i0 = 0;
 
@@ -377,7 +417,7 @@ void buckets_fill(buckets_ptr buckets, factor_base_srcptr FB,
         if (rc) {
           ij_diff(s, s, t);
           ijvec_add(v, v, basis->v[ij_deg(s)+ENUM_LATTICE_UNROLL]);
-          buckets_push_update(buckets, ptr, v, I, J);
+          buckets_push_update(buckets, ptr, hint, v, I, J);
         }
       } while (rc);
     }
@@ -428,3 +468,83 @@ void bucket_apply(uint8_t *S, buckets_srcptr buckets, unsigned k)
     }
   }
 }
+
+#ifdef BUCKET_RESIEVE
+
+static int mycmp(const void *p1, const void *p2) {
+  __replayable_update_struct const * r1 = (__replayable_update_struct const *) p1;
+  __replayable_update_struct const * r2 = (__replayable_update_struct const *) p2;
+  if (r1->pos < r2->pos)
+      return -1;
+  if (r1->pos > r2->pos)
+      return 1;
+  return 0;
+}
+
+void bucket_prepare_replay(replayable_bucket_ptr bb,
+        buckets_srcptr buckets, uint8_t *S, unsigned k)
+{
+  // Pointer to the current reading position in the bucket.
+  update_packed_t *ptr = buckets->start[k];
+  unsigned current_hint = buckets->first_hint[k];
+
+  bb->n = 0;
+
+  // Iterate through each group of updates having same deg(gothp).
+  update_packed_t **end = buckets->degp_end+k;
+  for (unsigned degp = buckets->min_degp; degp < buckets->max_degp;
+       ++degp, end += buckets->n) {
+    while (ptr != *end) {
+      update_t update = update_unpack(*ptr++);
+      pos_t    pos    = update_get_pos(update);
+      hint_t   hint   = update_get_hint(update);
+      current_hint += hint;
+      if (S[pos] == 255)
+        continue;
+      bb->b[bb->n].pos = pos;
+      bb->b[bb->n].hint = current_hint;
+      bb->n++;
+    }
+  }
+
+  // sort according to position to facilitate search
+  qsort((void *)bb->b, bb->n, sizeof(__replayable_update_struct), mycmp);
+
+  // reset buckets for next turn
+  buckets->first_hint[k] = 0;
+}
+
+void bucket_apply_at_pos(fppol_ptr norm, ijpos_t pp, 
+        replayable_bucket_srcptr buckets, factor_base_srcptr FB)
+{
+  // Find first occurence, if it exists:
+  __replayable_update_struct key;
+  key.pos = pp;
+  __replayable_update_struct *found;
+  found = bsearch((void *)&key, (void *)buckets->b, buckets->n,
+          sizeof(__replayable_update_struct), mycmp);
+  if (found == NULL)
+    return;
+  // There is no guarantee that bsearch returns the first one, so we have
+  // to adjust.
+  while (found > buckets->b) {
+    __replayable_update_struct *nfound = found -1;
+    if (nfound->pos == pp)
+      found = nfound;
+    else
+      break;
+  }
+
+  while (found < buckets->b+buckets->n) {
+    if (found->pos != pp)
+      return;
+    fppol_t r;
+    fppol_init(r);
+    fppol_set_fbprime(r, FB->elts[found->hint]->p);
+    fppol_divrem(norm, r, norm, r);
+    ASSERT_ALWAYS(fppol_is_zero(r));
+    fppol_clear(r);
+    found++;
+  }
+}
+#endif
