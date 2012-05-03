@@ -166,6 +166,7 @@ my @default_param = (
     degree         => 5,
     polsel_kmax    => 10,
     polsel_lq      => 1,
+    polsel_nq      => 1000,
     polsel_incr    => 60,
     polsel_admin   => 0,
     polsel_admax   => undef,
@@ -1481,7 +1482,8 @@ my %tasks = (
     polysel   => { name   => "polynomial selection",
                    dep    => ['init'],
                    param  => ['degree', 'polsel_kmax', 'polsel_incr',
-			      'polsel_admin', 'polsel_admax', 'polsel_lq'],
+			      'polsel_admin', 'polsel_admax', 'polsel_lq',
+		              'polsel_nq'],
                    files  => ['polsel_out\.[\de.]+-[\de.]+', 'poly', 'poly_tmp'],
                    resume => 1,
                    dist   => 1 },
@@ -1913,6 +1915,7 @@ my $polysel_cmd = sub {
     return "env nice -$param{'polsel_nice'} ".
            "$m->{'bindir'}/polyselect/polyselect2l -q ".
            "-lq $param{'polsel_lq'} ".
+           "-nq $param{'polsel_nq'} ".
            "-kmax $param{'polsel_kmax'} ".
            "-incr $param{'polsel_incr'} ".
            "-admin $a ".
