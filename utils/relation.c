@@ -334,7 +334,7 @@ void relation_compress_alg_primes(relation_t * rel)
  * - if forced_read is non-zero, return 0.
  */
 int relation_stream_get(relation_stream_ptr rs, char * supplied_line,
-                        int forced_read)
+                        int forced_read, unsigned int ab_base)
 {
     FILE * f = rs->source;
     char tbuf[RELATION_MAX_BYTES];
@@ -381,7 +381,7 @@ another_line:
     int v;
     if (c == '-') { s=-1; *p++ = (c=fgetc_unlocked(f)); }
     for( ; (v=ugly[(unsigned char) c]) >= 0 ; *p++ = (c=fgetc_unlocked(f)))
-        *pa=*pa*10+v;
+        *pa=*pa*ab_base+v;
     expected = ',';
     if (forced_read && c != expected) {
       for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f))) ;
@@ -392,7 +392,7 @@ another_line:
     *p++ = (c=fgetc_unlocked(f));
     *pa*=s;
     for( ; (v=ugly[(unsigned char) c]) >= 0 ; *p++ = (c=fgetc_unlocked(f)))
-        *pb=*pb*10+v;
+        *pb=*pb*ab_base+v;
     expected = ':';
     if (forced_read && c != expected) {
       for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f))) ;

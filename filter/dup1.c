@@ -41,7 +41,8 @@ static int only_ab = 0;
 /* output relations in dirname/0/name, ..., dirname/31/name */
 int split_relfile (relation_stream_ptr rs, const char *name,
                    const char *dirname, const char * outfmt,
-                   int *do_slice, int nslices_log, int nslices)
+                   int *do_slice, int nslices_log, int nslices, 
+                   unsigned int ab_base)
 {
     FILE * f_in;
     int p_in;
@@ -81,7 +82,7 @@ int split_relfile (relation_stream_ptr rs, const char *name,
         char line[RELATION_MAX_BYTES];
         size_t rpos = rs->pos - pos0;
 
-        if (relation_stream_get(rs, line, 0) < 0)
+        if (relation_stream_get(rs, line, 0, ab_base) < 0)
             break;
 
 	ok = 1;
@@ -149,8 +150,10 @@ main (int argc, char * argv[])
     argv++,argc--;
 
     int bz = 0;
+    int ab_hexa = 0;
     param_list_configure_knob(pl, "bz", &bz);
     param_list_configure_knob(pl, "ab", &only_ab);
+    param_list_configure_knob(pl, "abhexa", &ab_hexa);
 
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
@@ -216,7 +219,7 @@ main (int argc, char * argv[])
     relation_stream_init(rs);
     for (char ** fp = files ; *fp ; fp++) {
         had_error |= split_relfile (rs, *fp, dirname, outfmt, do_slice,
-                                    nslices_log, nslices);
+                                    nslices_log, nslices, (ab_hexa)?16:10);
     }
     relation_stream_trigger_disp_progress(rs);
     fprintf (stderr,

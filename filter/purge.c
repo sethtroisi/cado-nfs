@@ -740,7 +740,7 @@ reread (const char *oname, char ** ficname, hashtable_t *H,
             }
           else
             {
-              if (relation_stream_get(rs, NULL, 0) < 0)
+              if (relation_stream_get(rs, NULL, 0, 10) < 0)
                 break;
               // ASSERT_ALWAYS(rs->nrels <= nrelmax);
               if (raw == 0)

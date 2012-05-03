@@ -61,7 +61,8 @@ int rm = 0;
 /* infile is the input file
    if dirname is NULL, no output is done */
 unsigned long
-remove_dup_in_files (char ** files, const char *dirname, const char * outfmt, uint32_t * H, unsigned long K)
+remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
+uint32_t * H, unsigned long K, unsigned int ab_base)
 {
     FILE * f_in;
     int p_in;
@@ -126,7 +127,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt, ui
                 rs->rel.a = desc.a;
                 rs->rel.b = desc.b;
             } else {
-                if (relation_stream_get(rs, line, 0) < 0)
+                if (relation_stream_get(rs, line, 0, ab_base) < 0)
                     break;
             }
 
@@ -251,8 +252,10 @@ int main (int argc, char *argv[])
     argv++,argc--;
 
     int bz = 0;
+    int ab_hexa = 0;
     param_list_configure_knob(pl, "bz", &bz);
     param_list_configure_knob(pl, "rm", &rm);
+    param_list_configure_knob(pl, "abhexa", &ab_hexa);
 
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
@@ -323,7 +326,8 @@ int main (int argc, char *argv[])
   }
 
   char ** files = filelist ? filelist_from_file(basepath, filelist) : argv;
-  unsigned long rread = remove_dup_in_files (files, dirname, outfmt, H, K);
+  unsigned long rread = remove_dup_in_files (files, dirname, outfmt, H, K, 
+                                                               (ab_hexa)?16:10);
   if (filelist) filelist_clear(files);
 
 

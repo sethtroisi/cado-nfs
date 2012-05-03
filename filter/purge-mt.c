@@ -252,7 +252,7 @@ scan_files_mod (char **ficname, bit_vector_srcptr rel_used, int **rel_compact,
           }
         else
           {
-            if (relation_stream_get (rs, NULL, 0) < 0)
+            if (relation_stream_get (rs, NULL, 0, 10) < 0)
               break;
             if (rs->rel.b > 0)
               insertNormalRelation (rel_compact, irel, nprimes,
