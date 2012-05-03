@@ -1020,7 +1020,7 @@ prempt_scan_relations ()
   pthread_t thread_load, thread_relation;
   prempt_t prempt_data;
   unsigned long cpy_cpt_rel_a;
-  unsigned int dispo, length_line, i;
+  unsigned int length_line, i, k;
   int err;
   char c;
 
@@ -1037,10 +1037,7 @@ prempt_scan_relations ()
       exit (1);
     }
   memset (buf_rel->rel, 0, sizeof(*(buf_rel->rel)) * T_REL);
-  /*
-  for (i = T_REL ; i ; relation_provision_for_primes(&(buf_rel->rel[--i]),
-                            RELATION_MAX_BYTES >> 2, RELATION_MAX_BYTES >> 2));
-  */
+
   cpt_rel_a = cpt_rel_b = 0;
   cpy_cpt_rel_a = cpt_rel_a;
   nprimes = 0;
@@ -1073,97 +1070,105 @@ prempt_scan_relations ()
   pcons = (char *) prempt_data->pcons;
   for ( ; ; )
     {
-      ASSERT_ALWAYS(length_line <= ((unsigned int) RELATION_MAX_BYTES));
       rs->pos += length_line;
       length_line = 0;
       prempt_data->pcons = pcons;
+
       while (pcons == prempt_data->pprod)
         {
-          if (prempt_data->end)
+          if (!prempt_data->end)
+	    nanosleep (&wait_classical, NULL);
+	  else
             if (pcons == prempt_data->pprod)
               goto end_of_files;
-          nanosleep (&wait_classical, NULL);
         }
-      /* No problem for producter/consumer because the case in the ring buffer
-         is atomic (only one char) AND producted by a system call (fread).
-      */
-    if (*pcons == '#')
-      {
-        do {
-          while (pcons == prempt_data->pprod)
-            {
-              if (prempt_data->end)
-                if (pcons == prempt_data->pprod)
-                  {
-                    fprintf (stderr, "prempt_scan_relations: at the end of"
-                             " files, a line without \\n ?\n");
-                    exit (1); 
-                  }
-              nanosleep (&wait_classical, NULL);
-            }
-          p = ((pcons <= prempt_data->pprod) ? (char *) prempt_data->pprod
-               : pcons_max) - 1;
-          c = *p;
-          *p = '\n';
-          pcons_old = pcons;
-          while (*pcons++ != '\n');
-          *p = c;
-          length_line += (pcons - pcons_old);
-          err = (pcons > p && c != '\n');
-          if (pcons == pcons_max) pcons = prempt_data->buf;
-        }
-        while (err);
-        rs->lnum++;
-        continue;
-      }
 
-    /* Here, the next line is useful. But we have to read a complete line
-       (with \n). So, we try to load >= RELATION_MAX_BYTES. After, we search
-       the number of caracters, and write at the MIN(nb_caracters, PREMPT_BUF)
-       '\n' to speed up the search. */
-    while ((dispo = ((PREMPT_BUF + ((size_t) prempt_data->pprod)) -
-  ((size_t) pcons)) & (PREMPT_BUF - 1)) <= ((unsigned int) RELATION_MAX_BYTES))
-      {
-      if (prempt_data->end)
-        {
-          dispo = ((PREMPT_BUF + ((size_t) prempt_data->pprod))
-                   - ((size_t) pcons)) & (PREMPT_BUF - 1);
-          break;
-        }
-      nanosleep(&wait_classical, NULL);
-      }
-    do
-      {
-        if (pcons == prempt_data->pprod)
-          {
-            fprintf (stderr, "prempt_scan_relations: relation line size is"
-                     " greater than RELATION_MAX_BYTES (%d)\n",
-                     RELATION_MAX_BYTES);
-            exit(1);
-          }
-        p = ((pcons < prempt_data->pprod) ? (char *) prempt_data->pprod
-             : pcons_max) - 1;
-        c = *p;
-        *p = '\n';
-        pcons_old = pcons;
-        while (*pcons++ != '\n');
-        *p = c;
-        length_line += (pcons - pcons_old);
-        err = (pcons > p && c != '\n');
-        if (pcons == pcons_max) pcons = prempt_data->buf;
-      }
-    while (err);
-    while (cpy_cpt_rel_a == cpt_rel_b + T_REL)
-      nanosleep(&wait_classical, NULL);
-    buf_rel->num_rel [(unsigned int) (cpy_cpt_rel_a & (T_REL - 1))] =
-      rs->nrels++;
-    relation_stream_get_fast (prempt_data,
-                              (unsigned int) (cpy_cpt_rel_a & (T_REL - 1)));
-    rs->lnum++;
-    cpy_cpt_rel_a++;
-    cpt_rel_a = cpy_cpt_rel_a;
-  }
+      rs->lnum++;
+      if (*pcons != '#')
+	{
+	  while ((((PREMPT_BUF + ((size_t) prempt_data->pprod)) -
+		   ((size_t) pcons)) & (PREMPT_BUF - 1)) <= ((unsigned int) RELATION_MAX_BYTES) &&
+		 !prempt_data->end)
+	    {
+	      nanosleep(&wait_classical, NULL);
+	    }
+	  if (pcons > prempt_data->pprod)
+	    {
+	      p = &(pcons_max[-1]);
+	      c = *p;
+	      *p = '\n';
+	      pcons_old = pcons;
+	      while (*pcons++ != '\n');
+	      *p = c;
+	      length_line = (pcons - pcons_old);
+	      if (pcons <= p)
+		goto testendline;
+	      pcons = prempt_data->buf;
+	      if (c == '\n')
+		goto testendline;
+	    }
+	  p = &(((char *) prempt_data->pprod)[-1]);
+	  c = *p;
+	  *p = '\n';
+	  pcons_old = pcons;
+	  while (*pcons++ != '\n');
+	  *p = c;
+	  length_line += (pcons - pcons_old);
+	testendline:
+	  if (c != '\n' && pcons == prempt_data->pprod)
+	    {
+	      fprintf (stderr, "prempt_scan_relations: "
+		       "the last line has not a carriage return\n");
+	      exit(1);
+	    }
+	  if (length_line > ((unsigned int) RELATION_MAX_BYTES))
+	    {
+	      fprintf (stderr, "prempt_scan_relations: relation line size (%u) is "
+		       "greater than RELATION_MAX_BYTES (%d)\n",
+		       length_line, RELATION_MAX_BYTES);
+	      exit(1);
+	    }
+	  
+	  while (cpy_cpt_rel_a == cpt_rel_b + T_REL)
+	    nanosleep(&wait_classical, NULL);
 
+	  k = (unsigned int) (cpy_cpt_rel_a & (T_REL - 1));
+	  buf_rel->num_rel [k] = rs->nrels++;
+	  relation_stream_get_fast (prempt_data, k);
+	  cpy_cpt_rel_a++;
+	  cpt_rel_a = cpy_cpt_rel_a;
+	}
+      else
+	{
+	  do
+	    {
+	      while (pcons == prempt_data->pprod)
+		{
+		  if (!prempt_data->end)
+		    nanosleep (&wait_classical, NULL);
+		  else
+		    if (pcons == prempt_data->pprod)
+		      {
+			fprintf (stderr, "prempt_scan_relations: at the end of"
+				 " files, a line without \\n ?\n");
+			exit (1); 
+		      }
+		}
+	      p = ((pcons <= prempt_data->pprod) ? (char *) prempt_data->pprod
+		   : pcons_max) - 1;
+	      c = *p;
+	      *p = '\n';
+	      pcons_old = pcons;
+	      while (*pcons++ != '\n');
+	      *p = c;
+	      length_line += (pcons - pcons_old);
+	      err = (pcons > p && c != '\n');
+	      if (pcons == pcons_max) pcons = prempt_data->buf;
+	    }
+	  while (err);
+	}
+    }
+  
  end_of_files:
   while (cpy_cpt_rel_a != cpt_rel_b) nanosleep(&wait_classical, NULL);
   end_insertRelation = 1;
