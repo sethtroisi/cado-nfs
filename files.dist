@@ -146,6 +146,7 @@ params/params.c75
 params/params.c77
 params/params.c78
 params/params.c79
+params/params.c80
 params/params.c81
 params/params.c83
 params/params.c85
@@ -225,6 +226,7 @@ params/params.c168
 params/params.c171
 params/params.c180
 params/params.c190
+params/params.c204
 polyselect/CMakeLists.txt
 polyselect/Makefile
 polyselect/auxiliary.c
