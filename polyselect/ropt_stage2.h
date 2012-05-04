@@ -16,8 +16,8 @@ typedef _sievearray_t sievearray_t[1];
 
 /* -- declarations -- */
 
-double ropt_stage2 ( rsstr_t rs,
-                     rsparam_t rsparam,
+double ropt_stage2 ( ropt_poly_t rs,
+                     ropt_param_t rsparam,
                      param_t param,
                      MurphyE_pq *global_E_pqueue,
                      int w,

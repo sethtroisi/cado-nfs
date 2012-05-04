@@ -30,6 +30,30 @@
 #define SHORT_SIEVEARRAY_U_SIZE 16
 #define SHORT_NUM_SIEVE_SUBLATTICE 16 // only sieve for top 16 sublattices.
 
+
+
+/**
+ * Struct for the polynomial currently being ropt-ed.
+ */
+/* Polynomial information */
+typedef struct {
+  mpz_t n;
+  mpz_t m;
+  mpz_t *f;
+  mpz_t *g;
+  mpz_t *fx;
+  mpz_t *gx;
+  mpz_t *numerator;
+  double skew;
+  double alpha_proj;
+  int d;
+} _ropt_poly_t;
+typedef _ropt_poly_t ropt_poly_t[1];
+
+
+/**
+ * Struct for the polynomial currently being ropt-ed.
+ */
 /* Some structs for parameters */
 typedef struct {
   /* regarding find_sublattice() functions. */
@@ -52,8 +76,8 @@ typedef struct {
   double init_lognorm;
   double lognorm_bound;
   mpz_t modulus;
-} _rsparam_t;
-typedef _rsparam_t rsparam_t[1];
+} _ropt_param_t;
+typedef _ropt_param_t ropt_param_t[1];
 
 /* Sieving data struct */
 typedef struct {
@@ -88,20 +112,6 @@ typedef struct {
 } _param_t;
 typedef _param_t param_t[1];
 
-/* Sieving data struct */
-typedef struct {
-  mpz_t n;
-  mpz_t m;
-  mpz_t *f;
-  mpz_t *g;
-  mpz_t *fx;
-  mpz_t *gx;
-  mpz_t *numerator;
-  double skew;
-  double alpha_proj;
-  int d;
-} _rsstr_t;
-typedef _rsstr_t rsstr_t[1];
 
 /* Sieve bound for (A + MOD*i)*x + (B + MOD*j), mainly
    used for stage 2 */
@@ -139,35 +149,35 @@ void param_init ( param_t param );
 
 void param_clear ( param_t param );
 
-void rsparam_init ( rsparam_t rsparam,
-                    rsstr_t rs,
+void rsparam_init ( ropt_param_t rsparam,
+                    ropt_poly_t rs,
                     param_t param );
 
-void rsparam_setup ( rsparam_t rsparam,
-                     rsstr_t rs,
+void rsparam_setup ( ropt_param_t rsparam,
+                     ropt_poly_t rs,
                      param_t param,
                      int verbose );
 
-void rsparam_reset_bounds ( rsparam_t rsparam,
-                            rsstr_t rs,
+void rsparam_reset_bounds ( ropt_param_t rsparam,
+                            ropt_poly_t rs,
                             param_t param,
                             int verbose );
 
-void rsparam_free ( rsparam_t rsparam );
+void rsparam_free ( ropt_param_t rsparam );
 
 void bestpoly_init ( bestpoly_t bestpoly,
                      int d );
 void bestpoly_free ( bestpoly_t bestpoly,
                      int d );
 
-void rsstr_init ( rsstr_t rs );
+void rsstr_init ( ropt_poly_t rs );
 
-void rsstr_setup ( rsstr_t rs );
+void rsstr_setup ( ropt_poly_t rs );
 
-void rsstr_free ( rsstr_t rs );
+void rsstr_free ( ropt_poly_t rs );
 
 void rsbound_setup_AB_bound ( rsbound_t rsbound,
-                              rsparam_t rsparam,
+                              ropt_param_t rsparam,
                               param_t param,
                               mpz_t mod,
                               int verbose );

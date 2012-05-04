@@ -144,7 +144,7 @@ ropt_file_cado ( FILE *file,
   char str[MAX_LINE_LENGTH];
 
   /* rootsieve_struct */
-  rsstr_t rs;
+  ropt_poly_t rs;
   rsstr_init (rs);
 
   /* for each polynomial, do the root sieve. */
@@ -232,7 +232,7 @@ ropt_file_cado ( FILE *file,
       print_poly_fg (rs->f, rs->g, rs->d, rs->n, 2);
 
       /* start main rootsieve function */
-      ropt_main (rs, bestpoly, param, 2);
+      ropt (rs, bestpoly, param, 2);
       bestpoly_free (bestpoly, rs->d);
 
       count += 1;
@@ -255,7 +255,7 @@ ropt_file_msieve ( FILE *file,
   char str[MAX_LINE_LENGTH];
 
   /* rootsieve_struct */
-  rsstr_t rs;
+  ropt_poly_t rs;
   rsstr_init (rs);
 
   mpz_t ad, l, m;
@@ -299,7 +299,7 @@ ropt_file_msieve ( FILE *file,
     mpz_set (bestpoly->g[0], rs->g[0]);
     mpz_set (bestpoly->g[1], rs->g[1]);
 
-    ropt_main (rs, bestpoly, param, 2);
+    ropt (rs, bestpoly, param, 2);
     bestpoly_free (bestpoly, rs->d);
 #endif
     count += 1;
@@ -320,7 +320,7 @@ void
 ropt_stdin ( param_t param )
 {
   /* rootsieve_struct */
-  rsstr_t rs;
+  ropt_poly_t rs;
   rsstr_init (rs);
 
   /* read poly to rs */
@@ -345,7 +345,7 @@ ropt_stdin ( param_t param )
   print_poly_fg (rs->f, rs->g, rs->d, rs->n, 2);
 
   /* start main rootsieve function */
-  ropt_main (rs, bestpoly, param, 2);
+  ropt (rs, bestpoly, param, 2);
 
   rsstr_free (rs);
   bestpoly_free (bestpoly, rs->d);

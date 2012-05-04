@@ -4,8 +4,8 @@
 
 # Root OPTimization sources.
 set (ropt_sources 
-  ropt.c ropt_param.c ropt_tree.c ropt_arith.c
-  ropt_io.c ropt_stage1.c ropt_stage2.c
+  ropt.c ropt_linear.c ropt_quadratic.c ropt_param.c ropt_tree.c
+  ropt_arith.c ropt_io.c ropt_stage1.c ropt_stage2.c
   )
 
 add_library(polyselect_common SHARED auxiliary.c rootsieve.c rho.c murphyE.c)

@@ -1,7 +1,5 @@
 add_executable(alpha alpha.c fast_rootsieve.c)
-add_executable(ropt ropt_main.c ropt.c ropt_param.c
-               ropt_tree.c ropt_arith.c ropt_io.c
-               ropt_stage1.c ropt_stage2.c)
+add_executable(ropt ropt_main.c ${ropt_sources})
 
 target_link_libraries(alpha polyselect_common utils m gmp)
 target_link_libraries(ropt polyselect_common utils m ${pthread_libs})

@@ -461,7 +461,7 @@ rootsieve_run_multroot_lift ( node *currnode,
 */
 static inline void
 rootsieve_run_multroot ( sievearray_t sa,
-                         rsstr_t rs,
+                         ropt_poly_t rs,
                          rsbound_t rsbound,
                          unsigned int u,
                          unsigned int i,
@@ -565,9 +565,9 @@ rootsieve_run_multroot ( sievearray_t sa,
 */
 static inline void
 rootsieve_uv_oneblock ( sievearray_t sa,
-                        rsstr_t rs,
+                        ropt_poly_t rs,
                         rsbound_t rsbound,
-                        rsparam_t rsparam )
+                        ropt_param_t rsparam )
 {
   unsigned int nbb, p, r, u, v, k, max_e, totnbb, fr_ui, gr_ui, pe = 1;
   unsigned short np;
@@ -793,9 +793,9 @@ rootsieve_uv_oneblock ( sievearray_t sa,
   Rootsieve for f + (u*x +v)*g for each sublattice
 */
 static inline double
-rootsieve_uv ( rsstr_t rs,
+rootsieve_uv ( ropt_poly_t rs,
                rsbound_t rsbound,
-               rsparam_t rsparam,
+               ropt_param_t rsparam,
                MurphyE_pq *global_E_pqueue,
                mpz_t *fuv,
                mpz_t *guv,
@@ -975,9 +975,9 @@ rootsieve_uv ( rsstr_t rs,
   For each sublattice, call rootsieve_uv().
 */
 static inline double
-ropt_stage2_run ( rsstr_t rs,
+ropt_stage2_run ( ropt_poly_t rs,
                   rsbound_t rsbound,
-                  rsparam_t rsparam,
+                  ropt_param_t rsparam,
                   MurphyE_pq *global_E_pqueue,
                   int w,
                   int verbose )
@@ -1026,8 +1026,8 @@ ropt_stage2_run ( rsstr_t rs,
   Stage 2: root sieve on the sublattice points.
 */
 double
-ropt_stage2 ( rsstr_t rs,
-              rsparam_t rsparam,
+ropt_stage2 ( ropt_poly_t rs,
+              ropt_param_t rsparam,
               param_t param,
               MurphyE_pq *global_E_pqueue,
               int w,

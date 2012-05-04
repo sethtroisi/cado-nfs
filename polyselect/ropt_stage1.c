@@ -176,7 +176,7 @@ find_sublattice_lift ( node *firstchild,
 */
 static inline void
 find_sublattice ( single_sub_alpha_pq *top,
-                  rsstr_t rs,
+                  ropt_poly_t rs,
                   unsigned int p,
                   char e )
 {
@@ -378,7 +378,7 @@ quick_sort_2d_ld ( long **array,
   Compute crt and add (u, v) to queue.
 */
 static inline void
-return_all_sublattices_crt ( rsparam_t rsparam,
+return_all_sublattices_crt ( ropt_param_t rsparam,
                              unsigned int *ind,
                              unsigned int ***individual_sublattices,
                              sublattice_pq *pqueue )
@@ -470,7 +470,7 @@ return_all_sublattices_crt ( rsparam_t rsparam,
 /*
   static void
   SORT ( listnode **top,
-  rsstr_t rs,
+  ropt_poly_t rs,
   unsigned int p,
   unsigned int e )
 */
@@ -481,8 +481,8 @@ return_all_sublattices_crt ( rsparam_t rsparam,
   the seperate (mod p) valuations are the best.
 */
 static int
-return_all_sublattices ( rsstr_t rs,
-                         rsparam_t rsparam,
+return_all_sublattices ( ropt_poly_t rs,
+                         ropt_param_t rsparam,
                          sublattice_pq *pqueue,
                          int verbose )
 {
@@ -746,8 +746,8 @@ return_all_sublattices ( rsstr_t rs,
   by the size of u.
 */
 static inline int
-return_best_sublattice ( rsstr_t rs,
-                         rsparam_t rsparam,
+return_best_sublattice ( ropt_poly_t rs,
+                         ropt_param_t rsparam,
                          sublattice_pq *pqueue,
                          int verbose )
 {
@@ -813,8 +813,8 @@ return_best_sublattice ( rsstr_t rs,
   Stage 1: record good sublattices in "alpha_pqueue".
 */
 int
-ropt_stage1 ( rsstr_t rs,
-              rsparam_t rsparam,
+ropt_stage1 ( ropt_poly_t rs,
+              ropt_param_t rsparam,
               sub_alpha_pq *alpha_pqueue,
               int verbose,
               int w )
@@ -903,11 +903,11 @@ ropt_stage1 ( rsstr_t rs,
 
 #if TUNE_FIND_SUBLATTICE
 /*
-  auxiliary for rsparam_tune_findlat
+  auxiliary for ropt_param_tune_findlat
 */
 static inline double
-rsparam_tune_findlat_aux ( rsstr_t rs,
-                           rsparam_t rsparam,
+ropt_param_tune_findlat_aux ( ropt_poly_t rs,
+                           ropt_param_t rsparam,
                            param_t param,
                            sub_alpha_pq *alpha_pqueue,
                            int nbest_sl_tunecut,
@@ -1023,8 +1023,8 @@ rsparam_tune_findlat_aux ( rsstr_t rs,
   This fixes the actual p_i^{e_i}.
 */
 double
-rsparam_tune_findlat ( rsstr_t rs,
-                       rsparam_t rsparam,
+ropt_param_tune_findlat ( ropt_poly_t rs,
+                       ropt_param_t rsparam,
                        param_t param,
                        int num_trials,
                        int w,
@@ -1055,7 +1055,7 @@ rsparam_tune_findlat ( rsstr_t rs,
   sub_alpha_pq *alpha_pqueue;
   new_sub_alpha_pq (&alpha_pqueue, rsparam->nbest_sl);
 
-  best_MurphyE = rsparam_tune_findlat_aux ( rs,
+  best_MurphyE = ropt_param_tune_findlat_aux ( rs,
                                             rsparam,
                                             param,
                                             alpha_pqueue,
@@ -1100,7 +1100,7 @@ rsparam_tune_findlat ( rsstr_t rs,
       }
     }
     /* test sieve */
-    ave_MurphyE = rsparam_tune_findlat_aux ( rs,
+    ave_MurphyE = ropt_param_tune_findlat_aux ( rs,
                                      rsparam,
                                      param,
                                      alpha_pqueue,
@@ -1153,8 +1153,8 @@ rsparam_tune_findlat ( rsstr_t rs,
   not accurate due to the omit of size.
 */
 void
-rsparam_tune_ranklat ( rsstr_t rs,
-                       rsparam_t rsparam,
+ropt_param_tune_ranklat ( ropt_poly_t rs,
+                       ropt_param_t rsparam,
                        param_t param,
                        sub_alpha_pq *alpha_pqueue,
                        int used,

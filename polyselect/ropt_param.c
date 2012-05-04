@@ -119,7 +119,7 @@ rsbound_free ( rsbound_t rsbound )
 */
 void
 rsbound_setup_AB_bound ( rsbound_t rsbound,
-                         rsparam_t rsparam,
+                         ropt_param_t rsparam,
                          param_t param,
                          mpz_t mod,
                          int verbose )
@@ -225,10 +225,10 @@ rsbound_print ( rsbound_t rsbound )
 
 
 /*
-  Init rsstr_t with.
+  Init ropt_poly_t with.
 */
 void
-rsstr_init ( rsstr_t rs )
+rsstr_init ( ropt_poly_t rs )
 {
   unsigned int i;
   /* init */
@@ -266,11 +266,11 @@ rsstr_init ( rsstr_t rs )
 
 
 /*
-  Precompute fx, gx and numerator in rsstr_t.
+  Precompute fx, gx and numerator in ropt_poly_t.
   Note, rs->f, etc must be set already.
 */
 void
-rsstr_setup ( rsstr_t rs )
+rsstr_setup ( ropt_poly_t rs )
 {
   int i;
   mpz_t t;
@@ -311,10 +311,10 @@ rsstr_setup ( rsstr_t rs )
 
 
 /*
-  Free rsstr_t.
+  Free ropt_poly_t.
 */
 void
-rsstr_free ( rsstr_t rs )
+rsstr_free ( ropt_poly_t rs )
 {
   unsigned int i;
   /* free fl, gl */
@@ -344,8 +344,8 @@ rsstr_free ( rsstr_t rs )
   them. The real customisation happens in rsparam_setup() function.
 */
 void
-rsparam_init ( rsparam_t rsparam,
-               rsstr_t rs,
+rsparam_init ( ropt_param_t rsparam,
+               ropt_poly_t rs,
                param_t param )
 {
   /* will be set in rsparam_setup */
@@ -456,8 +456,8 @@ rotate_aux_mpz ( mpz_t *f,
   increasing, then the optimal v corresponds to the minimum of that function.
 */
 static inline void
-rotate_bounds_V_mpz ( rsstr_t rs,
-                      rsparam_t rsparam )
+rotate_bounds_V_mpz ( ropt_poly_t rs,
+                      ropt_param_t rsparam )
 {
   int i, j;
   double skewness, lognorm;
@@ -550,8 +550,8 @@ rotate_bounds_V_mpz ( rsstr_t rs,
 
 /* find bound U for linear rotation */
 static inline void
-rotate_bounds_U_lu ( rsstr_t rs,
-                     rsparam_t rsparam )
+rotate_bounds_U_lu ( ropt_poly_t rs,
+                     ropt_param_t rsparam )
 {
   unsigned int i;
   int j;
@@ -639,8 +639,8 @@ rotate_bounds_U_lu ( rsstr_t rs,
 
 /* find bound W for quadratic rotation */
 static inline void
-rotate_bounds_W_lu ( rsstr_t rs,
-                     rsparam_t rsparam,
+rotate_bounds_W_lu ( ropt_poly_t rs,
+                     ropt_param_t rsparam,
                      param_t param )
 {
   int i, j;
@@ -736,8 +736,8 @@ rotate_bounds_W_lu ( rsstr_t rs,
   Then it will set e_sl[];
 */
 void
-rsparam_setup ( rsparam_t rsparam,
-                rsstr_t rs,
+rsparam_setup ( ropt_param_t rsparam,
+                ropt_poly_t rs,
                 param_t param,
                 int verbose )
 {
@@ -891,8 +891,8 @@ rsparam_setup ( rsparam_t rsparam,
   For existing rsparam and when rs is changed,
 */
 void
-rsparam_reset_bounds ( rsparam_t rsparam,
-                       rsstr_t rs,
+rsparam_reset_bounds ( ropt_param_t rsparam,
+                       ropt_poly_t rs,
                        param_t param,
                        int verbose )
 {
@@ -956,7 +956,7 @@ rsparam_reset_bounds ( rsparam_t rsparam,
   Free root sieve parameters.
 */
 void
-rsparam_free ( rsparam_t rsparam )
+rsparam_free ( ropt_param_t rsparam )
 {
   free(rsparam->e_sl);
   mpz_clear (rsparam->global_v_bound_rs);
