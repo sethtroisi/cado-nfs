@@ -2,7 +2,7 @@
 #define PREMPT_S_CMD (1<<16)
 
 /* Length of prempt buffer. Must be a power of 2. */
-#define PREMPT_BUF (1<<18)
+#define PREMPT_BUF (1<<22)
 
 /* Length of one write in prempt buffer. Between 64 and 1024 Ko
    seems the best. */
