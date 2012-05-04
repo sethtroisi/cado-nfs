@@ -138,6 +138,7 @@ static const unsigned char __digit_val[] = {
         __DEF_FPPOLxx_OUT    (sz) \
         __DEF_FPPOLxx_INP    (sz)
 
+__DEF_FPPOLxx_IO_ALL( 8)
 __DEF_FPPOLxx_IO_ALL(16)
 __DEF_FPPOLxx_IO_ALL(32)
 __DEF_FPPOLxx_IO_ALL(64)

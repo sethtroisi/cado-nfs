@@ -14,7 +14,11 @@ extern "C" {
 void ffspol_norm(fppol_t norm, ffspol_srcptr ffspol, fppol_t a, fppol_t b);
 void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
                 ij_t j0, ijpos_t pos0, ijpos_t size, qlat_t qlat,
-                int sqside, sublat_ptr sublat);
+                int sqside, sublat_ptr sublat, MAYBE_UNUSED int side);
+
+#ifdef WANT_NORM_STATS
+void norm_stats_print();
+#endif
 
 #ifdef __cplusplus
 }

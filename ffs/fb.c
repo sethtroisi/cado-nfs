@@ -7,13 +7,22 @@
 #include "fb.h"
 
 
-
 // Return the last character read, or EOF.
 static
-int skip_spaces(FILE *file)
+int skip_spaces_and_comments(FILE *file)
 {
   int c;
-  while (isspace(c = getc(file)));
+  
+  for (;;) {
+    while (isspace(c = getc(file)));
+    if (c == '#') {
+      // skip the end of the line
+      do {
+        c = fgetc(file);
+      } while ((c != '\n') && (c != EOF));
+    } else
+      break;
+  }
   return ungetc(c, file);
 }
 
@@ -39,7 +48,10 @@ int factor_base_init(factor_base_ptr FB, const char *filename,
   FB->elts = NULL;
   unsigned last_degp = 0;
   unsigned alloc     = 0;
-  for (fbideal_ptr gothp = NULL; skip_spaces(file) != EOF; ++FB->n, ++gothp) {
+  int previous_prime_degp = -1;
+  for (fbideal_ptr gothp = NULL;
+      skip_spaces_and_comments(file) != EOF;
+      ++FB->n, ++gothp) {
     // Need realloc?
     if (alloc <= FB->n) {
       alloc = alloc ? alloc * 2 : 256;
@@ -63,17 +75,59 @@ int factor_base_init(factor_base_ptr FB, const char *filename,
     ASSERT_ALWAYS(last_degp < sorted_min_degp || last_degp <= gothp->degp);
     last_degp = gothp->degp;
 
-    // Remove spaces.
-    if (skip_spaces(file) == EOF) {
-      fprintf(stderr, "Error parsing factor base %s.\n", filename);
+    // Read ":".
+    if (getc(file) != ':') {
+      fprintf(stderr, "Error parsing ':' in factor base %s.\n", filename);
       fprintf(stderr, "  The error occured at the %u-th ideal.\n", FB->n);
       fclose(file);
       return 0;
     }
 
-    // Read ":".
-    if (getc(file) != ':') {
-      fprintf(stderr, "Error parsing ':' in factor base %s.\n", filename);
+    int longversion;
+    int c;
+    if ((c = getc(file)) == ' ') {
+      longversion = 0;
+    } else {
+      longversion = 1;
+      ungetc(c, file);
+    }
+
+    // Read the number of deg p to subtract (longversion)
+    if (longversion) { 
+      int ret, n0, n1;
+      ret = fscanf(file, "%d,%d", &n1, &n0);
+      if (ret != 2) {
+        fprintf(stderr, "Error parsing n1,n0 in fb %s.\n", filename);
+        fprintf(stderr, "  The error occured at the %u-th ideal.\n", FB->n);
+        fclose(file);
+        return 0;
+      }
+      if (getc(file) != ':') {
+        fprintf(stderr, "Error parsing ':' in factor base %s.\n", filename);
+        fprintf(stderr, "  The error occured at the %u-th ideal.\n", FB->n);
+        fclose(file);
+        return 0;
+      }
+      // n0 != 0  iff  we have a power. In that case, we should use the
+      // degree of the corresponding prime. We assume that it is the last
+      // non-power that we met.
+      if (n0 == 0) {
+        gothp->degp = (n1-n0)*fbprime_deg(gothp->p);
+        previous_prime_degp = fbprime_deg(gothp->p);
+      } else {
+        gothp->degp = (n1-n0)*previous_prime_degp;
+        ASSERT_ALWAYS (previous_prime_degp != -1);
+        ASSERT_ALWAYS (fbprime_deg(gothp->p) % previous_prime_degp == 0);
+      }
+    } else { 
+      // short version is always prime
+      previous_prime_degp = fbprime_deg(gothp->p);
+    }
+
+
+    // Remove spaces.
+    if (skip_spaces_and_comments(file) == EOF) {
+      fprintf(stderr, "Error parsing factor base %s.\n", filename);
       fprintf(stderr, "  The error occured at the %u-th ideal.\n", FB->n);
       fclose(file);
       return 0;
@@ -86,6 +140,31 @@ int factor_base_init(factor_base_ptr FB, const char *filename,
       fclose(file);
       return 0;
     }
+
+    // Other r's ?
+    while ((c = getc(file)) == ',') {
+      fbprime_t r;
+      if (!fbprime_inp(r, file)) {
+        fprintf(stderr, "Error parsing factor base %s.\n", filename);
+        fprintf(stderr, "  The error occured at the %u-th ideal.\n", FB->n);
+        fclose(file);
+        return 0;
+      }
+      fbideal_ptr oldgothp = gothp;
+      FB->n++;
+      gothp++;
+      // Need realloc?
+      if (alloc <= FB->n) {
+        alloc = alloc ? alloc * 2 : 256;
+        FB->elts = (fbideal_t *)realloc(FB->elts, alloc*sizeof(fbideal_t));
+        ASSERT_ALWAYS(FB->elts != NULL);
+        gothp = FB->elts[FB->n];
+      }
+      fbprime_set(gothp->p, oldgothp->p);
+      gothp->degp = oldgothp->degp;
+      fbprime_set(gothp->r, r);
+    }
+    ungetc(c, file);
   }
 
   FB->elts = (fbideal_t *)realloc(FB->elts, FB->n*sizeof(fbideal_t));

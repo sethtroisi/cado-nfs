@@ -142,6 +142,7 @@
         __DEF_FPPOLxx_DIV_TI      (sz) \
         __DEF_FPPOLxx_MOD_TI      (sz)
 
+__DEF_FPPOLxx_ARITH_ALL( 8)
 __DEF_FPPOLxx_ARITH_ALL(16)
 __DEF_FPPOLxx_ARITH_ALL(32)
 __DEF_FPPOLxx_ARITH_ALL(64)

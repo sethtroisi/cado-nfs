@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <inttypes.h>
 #include "macros.h"
 
 #include "types.h"
@@ -21,8 +22,11 @@
 #include "fq.h"
 #include "fqpol.h"
 
-int my_factor_survivor(fppol_t a, fppol_t b, ffspol_t* F, int *B, sq_t q,
-        int side) 
+int factor_survivor(fppol_t a, fppol_t b,
+        MAYBE_UNUSED ijpos_t pos, 
+        MAYBE_UNUSED replayable_bucket_t *buckets,
+        MAYBE_UNUSED factor_base_t *FB,
+        ffspol_t* F, int *B, sq_t q, int side) 
 {
     fppol_t Nab;
     fppol_init(Nab);
@@ -35,6 +39,9 @@ int my_factor_survivor(fppol_t a, fppol_t b, ffspol_t* F, int *B, sq_t q,
             fppol_div(Nab, Nab, qq);
             fppol_clear(qq);
         }
+#ifdef BUCKET_RESIEVE
+        bucket_apply_at_pos(Nab, pos, buckets[twice], FB[twice]);
+#endif
         if (!fppol_is_smooth(Nab, B[twice])) {
             fppol_clear(Nab);
             return 0;
@@ -121,6 +128,7 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "    Note: giving (q0,q1) is exclusive to giving (q,rho). In the latter case,\n" "    rho is optional.\n");
     fprintf(stderr, "  sqside           side (0 or 1) of the special-q (default %d)\n", SQSIDE_DEFAULT);
     fprintf(stderr, "  firstsieve       side (0 or 1) to sieve first (default %d)\n", FIRSTSIEVE_DEFAULT);
+    fprintf(stderr, "  S                skewness, i.e. deg(a)-deg(b)\n");
     fprintf(stderr, "  sublat           toggle the sublattice sieving\n");
  
     if (missing != NULL)
@@ -144,6 +152,7 @@ int main(int argc, char **argv)
     int firstsieve = FIRSTSIEVE_DEFAULT;
     sq_t q0, q1;
     int rho_given = 0;
+    int skewness = 0;
 
     param_list pl;
     param_list_init(pl);
@@ -179,6 +188,7 @@ int main(int argc, char **argv)
         ffspol_set_str(ffspol[1], polstr);
     }
     // read various bounds
+    param_list_parse_int(pl, "S", &skewness); 
     param_list_parse_int(pl, "I", &I); 
     param_list_parse_int(pl, "J", &J); 
     param_list_parse_int(pl, "lpb0", &lpb[0]);
@@ -333,6 +343,19 @@ int main(int argc, char **argv)
     print_bucket_info(buckets[0]);
     fflush(stdout);
 
+#ifdef BUCKET_RESIEVE
+    replayable_bucket_t replayable_bucket[2];
+    // FIXME: we copy the hardcoded capacity of buckets
+    replayable_bucket[0]->b = (__replayable_update_struct *)
+        malloc((1<<16) * sizeof(__replayable_update_struct));
+    replayable_bucket[1]->b = (__replayable_update_struct *)
+        malloc((1<<16) * sizeof(__replayable_update_struct));
+    ASSERT_ALWAYS(replayable_bucket[0]->b != NULL);
+    ASSERT_ALWAYS(replayable_bucket[1]->b != NULL);
+#else
+    void * replayable_bucket = NULL;
+#endif
+
     // Size of a bucket region.
     unsigned size = bucket_region_size();
 
@@ -432,7 +455,7 @@ int main(int argc, char **argv)
         }
 
         // Reduce the q-lattice
-        int noerr = skewGauss(qlat, 0);
+        int noerr = skewGauss(qlat, skewness);
         ASSERT_ALWAYS(noerr);
         printf("############################################\n");
         print_qlat_info(qlat);
@@ -546,7 +569,7 @@ int main(int argc, char **argv)
                 // this. It means that the other side is hopeless.
                 t_norms -= seconds();
                 init_norms(S, ffspol[side], I, J, j0, pos0, size,
-                           qlat, qlat->side == side, sublat);
+                           qlat, qlat->side == side, sublat, side);
                 t_norms += seconds();
 
                 // Line sieve.
@@ -571,6 +594,12 @@ int main(int argc, char **argv)
                 }
               }
 
+#ifdef BUCKET_RESIEVE
+              // prepare replayable buckets
+              bucket_prepare_replay(replayable_bucket[0], buckets[0], S, k);
+              bucket_prepare_replay(replayable_bucket[1], buckets[1], S, k);
+#endif
+
               t_cofact -= seconds();
               // survivors cofactorization
               {
@@ -582,31 +611,31 @@ int main(int argc, char **argv)
 
                 int rci, rcj = 1;
                 for (ij_set(j, j0); rcj; rcj = ij_monic_set_next(j, j, J)) {
-                    ijpos_t start = ijvec_get_start_pos(j, I, J) - pos0;
-                    if (start >= size)
-                      break;
-                    rci = 1;
-                    for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
-                        ijpos_t pos = start + ijvec_get_offset(i, I);
+                  ijpos_t start = ijvec_get_start_pos(j, I, J) - pos0;
+                  if (start >= size)
+                    break;
+                  rci = 1;
+                  for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
+                    ijpos_t pos = start + ijvec_get_offset(i, I);
 
-                        if (S[pos] != 255) {
+                    if (S[pos] != 255) {
 #ifdef TRACE_POS
-                            if (pos == TRACE_POS) {
-                                fprintf(stderr, "TRACE_POS(%d): ", pos);
-                                fprintf(stderr,
-                                   "entering cofactorization, S[pos] = %d\n",
-                                   S[pos]);
-                            }
-#endif 
-                            ij_convert_sublat(hati, hatj, i, j, sublat);
-                            ij_gcd(g, hati, hatj);
-                            if (ij_deg(g) != 0 && ij_deg(hati)>0  && ij_deg(hatj)>0)
-                                continue;
-                            ij2ab(a, b, hati, hatj, qlat);
-                            nrels += my_factor_survivor(a, b, ffspol, lpb,
-                                    qlat->q, qlat->side);
+                      if (pos + pos0 == TRACE_POS) {
+                        fprintf(stderr, "TRACE_POS(%" PRIu64 "): ", pos);
+                        fprintf(stderr,
+                           "entering cofactorization, S[pos] = %d\n",
+                           S[pos]);
                         }
+#endif 
+                      ij_convert_sublat(hati, hatj, i, j, sublat);
+                      ij_gcd(g, hati, hatj);
+                      if (ij_deg(g) != 0 && ij_deg(hati)>0  && ij_deg(hatj)>0)
+                        continue;
+                      ij2ab(a, b, hati, hatj, qlat);
+                      nrels += factor_survivor(a, b, pos, replayable_bucket,
+                              FB, ffspol, lpb, qlat->q, qlat->side);
                     }
+                  }
                 }
                 ij_set(j0, j);
                 fppol_clear(a);
@@ -647,6 +676,10 @@ int main(int argc, char **argv)
     buckets_clear(buckets[0]);
     buckets_clear(buckets[1]);
     free(roots);
+#ifdef BUCKET_RESIEVE
+    free(replayable_bucket[0]->b);
+    free(replayable_bucket[1]->b);
+#endif
 
     tot_time = seconds()-tot_time;
     fprintf(stdout, "###### General statistics ######\n");
@@ -665,6 +698,9 @@ int main(int argc, char **argv)
     fprintf(stdout, "#   %d relations found (%1.1f rel/sq)\n",
             tot_nrels, (double)tot_nrels / (double)tot_sq);
     fprintf(stdout, "#   Yield: %1.5f s/rel\n", tot_time/tot_nrels);
+#ifdef WANT_NORM_STATS
+    norm_stats_print();
+#endif
 
     ffspol_clear(ffspol[0]);
     ffspol_clear(ffspol[1]);

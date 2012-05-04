@@ -19,7 +19,10 @@
 
 // Size of multiplication.
 #undef  SIZE
+#define __MUL_8x8_SIZE   ,  16
+#define __MUL_16x8_SIZE  ,  32
 #define __MUL_16x16_SIZE ,  32
+#define __MUL_32x8_SIZE  ,  64
 #define __MUL_32x16_SIZE ,  64
 #define __MUL_32x32_SIZE ,  64
 #define __MUL_SIZE(sp, sq, else) SWITCH(MUL_##sp##x##sq, SIZE, else)
@@ -85,25 +88,42 @@
 
 // All definitions bundled up into a single macro.
 #define __DEF_FPPOLxx_opMUL_ALL(op)               \
+        __DEF_FPPOLxx_opMUL      ( 8,         op) \
         __DEF_FPPOLxx_opMUL      (16,         op) \
         __DEF_FPPOLxx_opMUL      (32,         op) \
         __DEF_FPPOLxx_opMUL      (64,         op) \
+        __DEF_FPPOLxx_opMUL_yy   ( 8,  8,     op) \
+        __DEF_FPPOLxx_opMUL_yy   (16,  8,     op) \
         __DEF_FPPOLxx_opMUL_yy   (16, 16,     op) \
+        __DEF_FPPOLxx_opMUL_yy   (32,  8,     op) \
         __DEF_FPPOLxx_opMUL_yy   (32, 16,     op) \
         __DEF_FPPOLxx_opMUL_yy   (32, 32,     op) \
+        __DEF_FPPOLxx_opMUL_yy   (64,  8,     op) \
         __DEF_FPPOLxx_opMUL_yy   (64, 16,     op) \
         __DEF_FPPOLxx_opMUL_yy   (64, 32,     op) \
         __DEF_FPPOLxx_opMUL_yy   (64, 64,     op) \
+        __DEF_FPPOLxx_opMUL_yyxzz( 8,  8,  8, op) \
+        __DEF_FPPOLxx_opMUL_yyxzz(16,  8,  8, op) \
+        __DEF_FPPOLxx_opMUL_yyxzz(16, 16,  8, op) \
         __DEF_FPPOLxx_opMUL_yyxzz(16, 16, 16, op) \
+        __DEF_FPPOLxx_opMUL_yyxzz(32, 16,  8, op) \
         __DEF_FPPOLxx_opMUL_yyxzz(32, 16, 16, op) \
+        __DEF_FPPOLxx_opMUL_yyxzz(32, 32,  8, op) \
         __DEF_FPPOLxx_opMUL_yyxzz(32, 32, 16, op) \
         __DEF_FPPOLxx_opMUL_yyxzz(32, 32, 32, op) \
+        __DEF_FPPOLxx_opMUL_yyxzz(64, 32,  8, op) \
         __DEF_FPPOLxx_opMUL_yyxzz(64, 32, 16, op) \
         __DEF_FPPOLxx_opMUL_yyxzz(64, 32, 32, op) \
+        __DEF_FPPOLxx_opMUL_yyxzz(64, 64,  8, op) \
         __DEF_FPPOLxx_opMUL_yyxzz(64, 64, 16, op) \
         __DEF_FPPOLxx_opMUL_yyxzz(64, 64, 32, op) \
         __DEF_FPPOLxx_opMUL_yyxzz(64, 64, 64, op) \
+        __DEF_FPPOLxx_opMUL_zzxyy(16,  8, 16, op) \
+        __DEF_FPPOLxx_opMUL_zzxyy(32,  8, 16, op) \
+        __DEF_FPPOLxx_opMUL_zzxyy(32,  8, 32, op) \
         __DEF_FPPOLxx_opMUL_zzxyy(32, 16, 32, op) \
+        __DEF_FPPOLxx_opMUL_zzxyy(64,  8, 32, op) \
+        __DEF_FPPOLxx_opMUL_zzxyy(64,  8, 64, op) \
         __DEF_FPPOLxx_opMUL_zzxyy(64, 16, 32, op) \
         __DEF_FPPOLxx_opMUL_zzxyy(64, 16, 64, op) \
         __DEF_FPPOLxx_opMUL_zzxyy(64, 32, 64, op)
@@ -171,18 +191,23 @@ __DEF_FPPOLxx_opMUL_ALL(sub)
 // All declarations bundled up into a single macro.
 #define __DECL_FPPOL_opMUL_ALL(op)           \
         __DECL_FPPOL_opMUL      (        op) \
+        __DECL_FPPOL_opMUL_xx   ( 8,     op) \
         __DECL_FPPOL_opMUL_xx   (16,     op) \
         __DECL_FPPOL_opMUL_xx   (32,     op) \
         __DECL_FPPOL_opMUL_xx   (64,     op) \
-        __DECL_FPPOL_opMUL_xx   (16,     op) \
-        __DECL_FPPOL_opMUL_xx   (32,     op) \
-        __DECL_FPPOL_opMUL_xx   (64,     op) \
+        __DECL_FPPOL_opMUL_xxxyy( 8,  8, op) \
+        __DECL_FPPOL_opMUL_xxxyy(16,  8, op) \
         __DECL_FPPOL_opMUL_xxxyy(16, 16, op) \
+        __DECL_FPPOL_opMUL_xxxyy(32,  8, op) \
         __DECL_FPPOL_opMUL_xxxyy(32, 16, op) \
         __DECL_FPPOL_opMUL_xxxyy(32, 32, op) \
+        __DECL_FPPOL_opMUL_xxxyy(64,  8, op) \
         __DECL_FPPOL_opMUL_xxxyy(64, 16, op) \
         __DECL_FPPOL_opMUL_xxxyy(64, 32, op) \
         __DECL_FPPOL_opMUL_xxxyy(64, 64, op) \
+        __DECL_FPPOL_opMUL_zzxyy( 8, 16, op) \
+        __DECL_FPPOL_opMUL_zzxyy( 8, 32, op) \
+        __DECL_FPPOL_opMUL_zzxyy( 8, 64, op) \
         __DECL_FPPOL_opMUL_zzxyy(16, 32, op) \
         __DECL_FPPOL_opMUL_zzxyy(16, 64, op) \
         __DECL_FPPOL_opMUL_zzxyy(32, 64, op)

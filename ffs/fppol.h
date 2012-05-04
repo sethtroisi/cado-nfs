@@ -53,6 +53,7 @@ typedef const uint8_t *fp_srcptr;
   typedef       uint##sz##_t *fppol##sz##_ptr;          \
   typedef const uint##sz##_t *fppol##sz##_srcptr;
 
+__DECL_FPPOLxx_T( 8)
 __DECL_FPPOLxx_T(16)
 __DECL_FPPOLxx_T(32)
 __DECL_FPPOLxx_T(64)

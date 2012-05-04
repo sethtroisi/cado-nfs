@@ -44,6 +44,7 @@
         __DECL_FPPOLxx_DIV    (sz) \
         __DECL_FPPOLxx_REM    (sz)
 
+__DECL_FPPOLxx_DIV_ALL( 8)
 __DECL_FPPOLxx_DIV_ALL(16)
 __DECL_FPPOLxx_DIV_ALL(32)
 __DECL_FPPOLxx_DIV_ALL(64)

@@ -69,6 +69,7 @@ __ALIAS_TYPE(ij)
 // Get type and size for function arguments.
 #undef  IS_NUM
 #undef  IS_MP
+#define  __8_IS_NUM ,
 #define __16_IS_NUM ,
 #define __32_IS_NUM ,
 #define __64_IS_NUM ,
@@ -154,6 +155,7 @@ __ALIAS_TYPE(ij)
   __ALIAS_FUN1(int,      type, set, ai,        _ptr, _tp)                     \
   __ALIAS_FUN1(int,      type, set, fbprime,   _ptr, _tp)                     \
   __ALIAS_FUN1(int,      type, set, ij,        _ptr, _tp)                     \
+  __ALIAS_FUN1(int,      type, set,  8,        _ptr, _tp)                     \
   __ALIAS_FUN1(int,      type, set, 16,        _ptr, _tp)                     \
   __ALIAS_FUN1(int,      type, set, 32,        _ptr, _tp)                     \
   __ALIAS_FUN1(int,      type, set, 64,        _ptr, _tp)                     \
@@ -209,6 +211,7 @@ __ALIAS_FUN_ALL(ai)
 __ALIAS_FUN_ALL(fbprime)
 __ALIAS_FUN_ALL(ij)
 
+#undef  __8_IS_NUM
 #undef __16_IS_NUM
 #undef __32_IS_NUM
 #undef __64_IS_NUM

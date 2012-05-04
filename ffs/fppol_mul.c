@@ -111,12 +111,17 @@ void fppol_mul(fppol_ptr r, fppol_srcptr p, fppol_srcptr q)
     __fppol_update_degree(r); }
 
 
+__DEF_FPPOL_MUL_xx   ( 8)
 __DEF_FPPOL_MUL_xx   (16)
 __DEF_FPPOL_MUL_xx   (32)
 __DEF_FPPOL_MUL_xx   (64)
+__DEF_FPPOL_MUL_xxxyy( 8,  8)
+__DEF_FPPOL_MUL_xxxyy(16,  8)
 __DEF_FPPOL_MUL_xxxyy(16, 16)
+__DEF_FPPOL_MUL_xxxyy(32,  8)
 __DEF_FPPOL_MUL_xxxyy(32, 16)
 __DEF_FPPOL_MUL_xxxyy(32, 32)
+__DEF_FPPOL_MUL_64xxx( 8)
 __DEF_FPPOL_MUL_64xxx(16)
 __DEF_FPPOL_MUL_64xxx(32)
 __DEF_FPPOL_MUL_64xxx(64)

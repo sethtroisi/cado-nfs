@@ -206,18 +206,32 @@ extern const uint16_t __f3_monic_set_ui_conv[];
   } while (0)
 
 
+#define __FP_MUL_8_8x8_NAIVE(               r, p, q, op) \
+        __FP_MUL_xx_yyxzz_NAIVE( 8,  8,  8, r, p, q, op)
+#define __FP_MUL_16_8x8_NAIVE(              r, p, q, op) \
+        __FP_MUL_xx_yyxzz_NAIVE(16,  8,  8, r, p, q, op)
+#define __FP_MUL_16_16x8_NAIVE(             r, p, q, op) \
+        __FP_MUL_xx_yyxzz_NAIVE(16, 16,  8, r, p, q, op)
 #define __FP_MUL_16_16x16_NAIVE(            r, p, q, op) \
         __FP_MUL_xx_yyxzz_NAIVE(16, 16, 16, r, p, q, op)
+#define __FP_MUL_32_16x8_NAIVE(             r, p, q, op) \
+        __FP_MUL_xx_yyxzz_NAIVE(32, 16,  8, r, p, q, op)
 #define __FP_MUL_32_16x16_NAIVE(            r, p, q, op) \
         __FP_MUL_xx_yyxzz_NAIVE(32, 16, 16, r, p, q, op)
+#define __FP_MUL_32_32x8_NAIVE(             r, p, q, op) \
+        __FP_MUL_xx_yyxzz_NAIVE(32, 32,  8, r, p, q, op)
 #define __FP_MUL_32_32x16_NAIVE(            r, p, q, op) \
         __FP_MUL_xx_yyxzz_NAIVE(32, 32, 16, r, p, q, op)
 #define __FP_MUL_32_32x32_NAIVE(            r, p, q, op) \
         __FP_MUL_xx_yyxzz_NAIVE(32, 32, 32, r, p, q, op)
+#define __FP_MUL_64_32x8_NAIVE(             r, p, q, op) \
+        __FP_MUL_xx_yyxzz_NAIVE(64, 32,  8, r, p, q, op)
 #define __FP_MUL_64_32x16_NAIVE(            r, p, q, op) \
         __FP_MUL_xx_yyxzz_NAIVE(64, 32, 16, r, p, q, op)
 #define __FP_MUL_64_32x32_NAIVE(            r, p, q, op) \
         __FP_MUL_xx_yyxzz_NAIVE(64, 32, 32, r, p, q, op)
+#define __FP_MUL_64_64x8_NAIVE(             r, p, q, op) \
+        __FP_MUL_xx_yyxzz_NAIVE(64, 64,  8, r, p, q, op)
 #define __FP_MUL_64_64x16_NAIVE(            r, p, q, op) \
         __FP_MUL_xx_yyxzz_NAIVE(64, 64, 16, r, p, q, op)
 #define __FP_MUL_64_64x32_NAIVE(            r, p, q, op) \
@@ -245,6 +259,8 @@ extern const uint16_t __f3_monic_set_ui_conv[];
     CAT(fppol64_, SWITCH(op, OP(rl, __l), set(rl, __l)));                \
   } while (0)
 
+#define __FP_MUL_128_64x8_NAIVE(     rh, rl, p, q, op) \
+        __FP_MUL_128_64xxx_NAIVE( 8, rh, rl, p, q, op)
 #define __FP_MUL_128_64x16_NAIVE(    rh, rl, p, q, op) \
         __FP_MUL_128_64xxx_NAIVE(16, rh, rl, p, q, op)
 #define __FP_MUL_128_64x32_NAIVE(    rh, rl, p, q, op) \
@@ -254,15 +270,23 @@ extern const uint16_t __f3_monic_set_ui_conv[];
 
 
 // Select multiplication algorithms.
+#define __FP_MUL_8_8x8     __FP_MUL_8_8x8_NAIVE
+#define __FP_MUL_16_8x8    __FP_MUL_16_8x8_NAIVE
+#define __FP_MUL_16_16x8   __FP_MUL_16_16x8_NAIVE
 #define __FP_MUL_16_16x16  __FP_MUL_16_16x16_NAIVE
+#define __FP_MUL_32_16x8   __FP_MUL_32_16x8_NAIVE
 #define __FP_MUL_32_16x16  __FP_MUL_32_16x16_NAIVE
+#define __FP_MUL_32_32x8   __FP_MUL_32_32x8_NAIVE
 #define __FP_MUL_32_32x16  __FP_MUL_32_32x16_NAIVE
 #define __FP_MUL_32_32x32  __FP_MUL_32_32x32_NAIVE
+#define __FP_MUL_64_32x8   __FP_MUL_64_32x8_NAIVE
 #define __FP_MUL_64_32x16  __FP_MUL_64_32x16_NAIVE
 #define __FP_MUL_64_32x32  __FP_MUL_64_32x32_NAIVE
+#define __FP_MUL_64_64x8   __FP_MUL_64_64x8_NAIVE
 #define __FP_MUL_64_64x16  __FP_MUL_64_64x16_NAIVE
 #define __FP_MUL_64_64x32  __FP_MUL_64_64x32_NAIVE
 #define __FP_MUL_64_64x64  __FP_MUL_64_64x64_NAIVE
+#define __FP_MUL_128_64x8  __FP_MUL_128_64x8_NAIVE
 #define __FP_MUL_128_64x16 __FP_MUL_128_64x16_NAIVE
 #define __FP_MUL_128_64x32 __FP_MUL_128_64x32_NAIVE
 #define __FP_MUL_128_64x64 __FP_MUL_128_64x64_NAIVE
