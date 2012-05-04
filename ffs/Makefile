@@ -62,7 +62,7 @@ endef
 define LIB_template
   $(1)_$(2)_OBJ = $$(filter $$($(1)_OBJ), \
                      $$(addprefix $$($(1)_BUILDDIR)/, $$($(2)_OBJ)))
-  $(1)_$(2)_LIB = $$($(1)_BUILDDIR)/lib$(2).a
+  $(1)_$(2)_LIB = $$($(1)_BUILDDIR)/lib$(2)-$(1).a
 
   $(1): $$($(1)_$(2)_LIB)
 
