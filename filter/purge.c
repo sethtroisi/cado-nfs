@@ -878,7 +878,11 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j)
   else
     buf_rel[j].rel.a = 1;
   for (n = 0 ; (v = ugly[c]) < 10 ; ) {
+#ifdef FOR_FFS
+    n = (n << 4) + v;
+#else
     n = n * 10 + v;
+#endif
     LOAD_ONE(p);
   }
   ASSERT_ALWAYS(c == ',');
@@ -887,7 +891,11 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j)
   n = 0;
   LOAD_ONE(p);
   for ( ; (v = ugly[c]) < 10 ; ) {
+#ifdef FOR_FFS
+    n = (n << 4) + v;
+#else
     n = n * 10 + v;
+#endif
     LOAD_ONE(p);
   }
   ASSERT_ALWAYS(c == ':');
