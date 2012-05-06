@@ -722,6 +722,11 @@ reread (const char *oname, char ** ficname, hashtable_t *H,
   int ret MAYBE_UNUSED, nr = 0;
   double W = 0.0; /* total weight */
   int pipe;
+#ifdef FOR_FFS
+  unsigned int ab_base = 16; 
+#else
+  unsigned int ab_base = 10; 
+#endif
 
   ofile = fopen_compressed_w(oname, &pipe, NULL);
   if (raw == 0)
@@ -742,7 +747,7 @@ reread (const char *oname, char ** ficname, hashtable_t *H,
             }
           else
             {
-              if (relation_stream_get(rs, NULL, 0, 10) < 0)
+              if (relation_stream_get(rs, NULL, 0, ab_base) < 0)
                 break;
               // ASSERT_ALWAYS(rs->nrels <= nrelmax);
               if (raw == 0)
@@ -873,7 +878,11 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j)
   else
     buf_rel[j].rel.a = 1;
   for (n = 0 ; (v = ugly[c]) < 10 ; ) {
+#ifdef FOR_FFS
+    n = (n << 4) + v;
+#else
     n = n * 10 + v;
+#endif
     LOAD_ONE(p);
   }
   ASSERT_ALWAYS(c == ',');
@@ -882,7 +891,11 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j)
   n = 0;
   LOAD_ONE(p);
   for ( ; (v = ugly[c]) < 10 ; ) {
+#ifdef FOR_FFS
+    n = (n << 4) + v;
+#else
     n = n * 10 + v;
+#endif
     LOAD_ONE(p);
   }
   ASSERT_ALWAYS(c == ':');
