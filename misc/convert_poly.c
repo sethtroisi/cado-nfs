@@ -174,11 +174,12 @@ read_ggnfs (mpz_t N, mpz_t *X, mpz_t *Y, mpz_t M)
               exit (1);
             }
         }
-      else if (strncmp (s, "# M", 3) == 0 || strncmp (s, "m:", 2) == 0)
+      else if (strncmp (s, "# M ", 4) == 0 || strncmp (s, "m:", 2) == 0)
         {
           if (mpz_set_str (M, s + 2 + (s[0] == '#'), 0) != 0)
             {
-              fprintf (stderr, "Error while reading M or m");
+              fprintf (stderr, "Error while reading M or m:\n");
+              fprintf (stderr, "%s\n", s);
               exit (1);
             }
         }
