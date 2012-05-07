@@ -58,7 +58,6 @@ len_merge (uint32_t **row, uint8_t *len_row, uint32_t i, uint32_t j)
       else
         ki++, kj++;
     }
-  /* only one of the following loops is non-empty */
   return ltmp + (li - ki) + (lj - kj);
 }
 
@@ -118,7 +117,7 @@ sub_relation (uint32_t **transpose, uint8_t *len_transpose, uint32_t j,
    (a) each relation only in i appears once more in j
    (b) each relation only in j appears with the same count
    (c) each relation in both i and j appears once less in j */
-static void
+static uint8_t
 add_row (uint32_t **row, uint8_t *len_row, uint32_t j, uint32_t i,
          uint32_t **transpose, uint8_t *len_transpose)
 {
@@ -160,6 +159,7 @@ add_row (uint32_t **row, uint8_t *len_row, uint32_t j, uint32_t i,
   row[j] = tmp;
   ASSERT_ALWAYS(ltmp <= 255);
   len_row[j] = ltmp;
+  return ltmp;
 }
 
 /* try a merge from the relation-sets containing relation k */
@@ -198,9 +198,12 @@ try_merge (uint32_t **row, uint8_t *len_row, uint32_t **transpose,
 
   if (gain_max > 0) /* perform the best merge, len_row[imax]>=len_row[jmax] */
     {
+      uint32_t l0, l;
       fprintf (fp, "-%u %u\n", tk[jmax] + 1, tk[imax]);
-      add_row (row, len_row, tk[imax], tk[jmax], transpose, len_transpose);
+      l0 = len_row[tk[imax]];
+      l = add_row (row, len_row, tk[imax], tk[jmax], transpose, len_transpose);
       /* update the transpose matrix */
+      ASSERT_ALWAYS(gain_max == (int32_t) l0 - (int32_t) l);
       total_weight -= gain_max;
     }
 }
@@ -246,8 +249,7 @@ optimize (FILE *hisfile, FILE *optfile)
   res = sscanf (*lineptr, "%u %u", &nrows, &ncols);
   ASSERT_ALWAYS(res == 2);
 
-  fprintf (stderr, "Optimizing %u relation-sets over %u relations\n",
-           nrows, ncols);
+  fprintf (stderr, "Optimizing matrix of %u relation-sets\n", nrows);
 
   /* initialize the ith relation-set to the single relation i */
   len_row = (uint8_t*) malloc (nrows * sizeof (uint8_t));
@@ -315,6 +317,23 @@ optimize (FILE *hisfile, FILE *optfile)
   free (*lineptr);
 
   printf ("Read %u merges\n", line_number - 1);
+
+#if 0
+  { /* dump relation-set matrix */
+    FILE *fp;
+
+    fp = fopen ("matrix.txt", "w");
+    for (i = 0; i < nrows; i++)
+      if (row[i] != NULL)
+        {
+          for (j = 0; j < len_row[i]; j++)
+            fprintf (fp, "%u ", row[i][j]);
+          fprintf (fp, "\n");
+        }
+    fclose (fp);
+    exit (1);
+  }
+#endif
 
   /* now count frequency of each relation */
   count = (uint8_t*) malloc ((nrows + 1) * sizeof (uint8_t));

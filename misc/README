@@ -30,6 +30,9 @@
       N <number to be factored>
       <all the relations in GGNFS/CADO format>
 
+      (Do not include free relations, since the CADO-NFS format is not
+       recognized by msieve, and msieve includes them in the filtering.)
+
    c) then run "msieve -nc -v <number to be factored>"
       The msieve output goes into msieve.log.
       You can add the "-t 4" option to use 4 threads.   
