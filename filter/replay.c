@@ -454,33 +454,6 @@ build_newrows_from_file(int **newrows, FILE *hisfile, uint64_t bwcostmin)
     }
 }
 
-static void
-read_newrows_from_file(int **newrows, int nrows, FILE *file)
-{
-    int small_nrows, small_ncols, i, nc, k, *tmp;
-    int rc;
-
-    rc = fscanf(file, "%d %d", &small_nrows, &small_ncols);
-    ASSERT_ALWAYS(rc == 2);
-
-    for(i = 0; i < small_nrows; i++){
-	rc = fscanf(file, "%d", &nc);
-        ASSERT_ALWAYS(rc == 1);
-
-	tmp = (int *)malloc((1+nc) * sizeof(int));
-	ASSERT_ALWAYS(tmp != NULL);
-	tmp[0] = nc;
-	for(k = 0; k < nc; k++) {
-	    rc = fscanf(file, PURGE_INT_FORMAT, tmp+k+1);
-            ASSERT_ALWAYS(rc == 1);
-        }
-
-	newrows[i] = tmp;
-    }
-    for( ; i < nrows; i++)
-	newrows[i] = NULL;
-}
-
 // Feed sparsemat with M_purged
 static void
 readPurged(int **sparsemat, purgedfile_stream ps, int verbose)
@@ -599,11 +572,11 @@ fasterVersion(int **newrows,
 int
 main(int argc, char *argv[])
 {
-    FILE *hisfile, *fromfile;
+    FILE *hisfile;
     uint64_t bwcostmin = 0;
     int nrows, ncols, nslices = 0;
     int **newrows;
-    int verbose = 0, writeindex;
+    int verbose = 0;
     int bin=0;
     int skip=0;
     char *rp, str[STRLENMAX];
@@ -635,7 +608,6 @@ main(int argc, char *argv[])
     const char * hisname = param_list_lookup_string(pl, "his");
     const char * sparsename = param_list_lookup_string(pl, "out");
     const char * indexname = param_list_lookup_string(pl, "index");
-    const char * fromname = param_list_lookup_string(pl, "from");
     const char * sosname = param_list_lookup_string(pl, "sos");
     param_list_parse_int(pl, "binary", &bin);
     param_list_parse_int(pl, "nslices", &nslices);
@@ -668,20 +640,9 @@ main(int argc, char *argv[])
     // or k i_1 ... i_k which means that M_small will contain a row formed
     // of the addition of the rows of indices i_1 ... i_k in the original
     // matrix
-    if(fromname == NULL){
-	// generic case
-	writeindex = 1;
-    } else {
-	// rare case, probably very very rare
-	abort(); // to be clarified before use...!
-	writeindex = 0;
-	fromfile = fopen(fromname, "r");
-	ASSERT(fromfile != NULL);
-	read_newrows_from_file(newrows, nrows, fromfile);
-    }
 
     fasterVersion(newrows, sparsename, sosname, indexname, hisfile, ps,
-		  bwcostmin, nrows, ncols, skip, bin, writeindex);
+                  bwcostmin, nrows, ncols, skip, bin, 1);
 
     fclose(hisfile);
 
