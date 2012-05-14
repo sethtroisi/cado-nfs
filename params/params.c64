@@ -15,32 +15,35 @@
 # General parameters
 ###########################################################################
 
-# Sample parameter file for a 100-digit gnfs input
+# Sample parameter file for a 64-digit gnfs input
+# Warning: the parameters here are not claimed to be optimal!
 # Example: cadofactor.pl wdir=... name=... n=...
 
-name=c100
-parallel=1           # do we use parallel computation?
-delay=120
+name=c64
+parallel=1              # do we use parallel computation?
+delay=30                # time in seconds between two checks
 
 machines=mach_desc      # file describing available computers for parallel
                         # computation
 
 ###########################################################################
-# Polynomial selection
+# Polynomial selection with Kleinjung's algorithm
 ###########################################################################
 
 degree=4                # degree of the algebraic polynomial
-polsel_delay=120             # time between two checks
+polsel_delay=30              # time between two checks
 polsel_nice=4            # nice level for selection
 
+# one can expect:
+# MurphyE(Bf=10000000,Bg=5000000,area=1.00e+16)=1.23e-06
+
 ## Parameters of polyselect
-polsel_P=50000               # choose lc(g) with two prime factors in [P,2P]
-polsel_maxnorm=34.8          # max. lognorm of polynomials (before rootsieve)
-polsel_admax=5e5             # max value for lc(f)
-polsel_adrange=2e4           # individual tasks
-polsel_kmax=20               # rotation is bounded by 2^kmax
+polsel_admax=2000            # max value for lc(f)
+polsel_adrange=500           # individual tasks
+polsel_kmax=16               # rotation is bounded by 2^kmax
 polsel_incr=60               # forced divisor of lc(f)
-polsel_lq=3                  # special-q in lc(g) has such many factors
+polsel_P=2000                # choose lc(g) with two prime factors in [P,2P]
+polsel_lq=1                  # special-q in lc(g) has such many factors
 
 ###########################################################################
 # Sieve
@@ -54,38 +57,44 @@ polsel_lq=3                  # special-q in lc(g) has such many factors
 # rlambda/alambda is the early-abort ratio: if after sieving the
 #                                      approximate norm is more than
 #                                      lambda times lpb, we reject.
-rlim=1000000
-alim=2000000
-lpbr=25
-lpba=25
-mfbr=50
-mfba=50
-rlambda=2.1
-alambda=2.2
+rlim=100000
+alim=200000
+lpbr=22
+lpba=22
+mfbr=24
+mfba=24
+rlambda=1.2
+alambda=1.2
 
 I=11                    # Sieving range in lattice siever
-qmin=2000000            # Start of the special-q range
-qrange=20000            # The size of an elementary sieving task
-firstcheck=2000000      # try filtering only up from that many relations
-sievenice=10
+qmin=200000             # Start of the special-q range
+qrange=5000             # The size of an elementary sieving task
+firstcheck=227000       # Try filtering only up from that many relations
+sievenice=10            # nice level for the sieving jobs
 sieve_max_threads=2
 
 ###########################################################################
 # Filtering
 ###########################################################################
 
-keeppurge=160           # shrink in purge if excess exceeds keeppurge
-maxlevel=20
+                        # (don't start merge otherwise)
+keeppurge=160           # maximal excess wanted after purge
+                        # (purge shrinks if needed)
+maxlevel=15
 cwmax=100
 rwmax=100
 ratio=1.1
-bwstrat=3               
+bwstrat=3
 
 ###########################################################################
 # Linear algebra
 ###########################################################################
 
-bwmt=2x2                # Multithreading level of Block-Wiedemann
+bwmt=2x2                # Multithreading level of Block-Wiedemann ; Use
+                        # <m>x<n> for bwc, or only one integer for bw.
+                        # Note that this will be substituted with 1x1
+                        # unless PTHREADS have been enabled.
+bwc_interval=100        # checkpointing interval for bwc.
 
 ###########################################################################
 # Characters
@@ -93,3 +102,4 @@ bwmt=2x2                # Multithreading level of Block-Wiedemann
 
 nkermax=30              # maximal size of computed kernel
 nchar=50                # number of characters
+

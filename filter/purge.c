@@ -77,7 +77,6 @@ static int ret MAYBE_UNUSED;
 static int nrel, nprimes = 0;
 static unsigned long nrelmax = 0;
 static int nrel_new, nprimes_new, Hsize, Hsizer, Hsizea;
-static double excess = 1.01;    /* minimum initial excess */
 static long keep = 160;         /* default maximum final excess */
 static long minpr = -1, minpa = -1; /* negative values mean use minpr=rlim and
 				       minpa=alim */
@@ -86,7 +85,6 @@ static unsigned long tot_alloc, tot_alloc0;
 static int need64 = 0; /* non-zero if large primes are > 2^32 */
 static int raw = 0;
 static char ** fic;
-static int noclique = 0;
 static double wct0;
 static bit_vector rel_used;
 static relation_stream rs;
@@ -1281,14 +1279,12 @@ usage (void)
 {
   fprintf (stderr, "Usage: purge [options] -poly polyfile -out purgedfile -nrels nnn [-basepath <path>] [-subdirlist <sl>] [-filelist <fl>] file1 ... filen\n");
   fprintf (stderr, "Options:\n");
-  fprintf (stderr, "       -excess  nnn - initial excess (default 1.01)\n");
   fprintf (stderr, "       -keep    nnn - prune if excess > nnn (default 160)\n");
   fprintf (stderr, "       -minpa   nnn - purge alg. primes >= nnn (default alim)\n");
   fprintf (stderr, "       -minpr   nnn - purge rat. primes >= nnn (default rlim)\n");
   fprintf (stderr, "       -nprimes nnn - expected number of prime ideals\n");
   fprintf (stderr, "       -sos sosfile - to keep track of the renumbering\n");
   fprintf (stderr, "       -raw         - output relations in CADO format\n");
-  fprintf (stderr, "       -noclique n  - if n <> 0, don't do clique removal\n");
   exit (1);
 }
 
@@ -1331,9 +1327,7 @@ main (int argc, char **argv)
   param_list_parse_int(pl, "nprimes", &nprimes);
   param_list_parse_long(pl, "minpr", &minpr);
   param_list_parse_long(pl, "minpa", &minpa);
-  param_list_parse_double(pl, "excess", &excess);
   param_list_parse_long(pl, "keep", &keep);
-  param_list_parse_int(pl, "noclique", &noclique);
 
   const char * filelist = param_list_lookup_string(pl, "filelist");
   const char * basepath = param_list_lookup_string(pl, "basepath");

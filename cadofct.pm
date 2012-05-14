@@ -201,7 +201,6 @@ my @default_param = (
     # filtering
     skip         => -1, # should be about bwc_mn - 32
     keep         => -1, # should be 128 + skip
-    excessratio  => 1.01,
     keeppurge    => 208, # should be 160 + #ideals <= FINAL_BOUND (cf purge.c)
     maxlevel     => 15,
     cwmax        => 200,
@@ -2276,12 +2275,10 @@ sub purge {
     $tab_level++;
     my $cmd = cmd("$param{'bindir'}/filter/purge ".
                   "-poly $param{'prefix'}.poly -keep $param{'keeppurge'} ".
-                  "-excess $param{'excessratio'} ".
                   "-nrels $nbrels -out $param{'prefix'}.purged.gz ".
                   "-basepath $param{'wdir'} " .
                   "-subdirlist $param{'prefix'}.subdirlist ".
-                  "-filelist $param{'prefix'}.filelist ".
-                  "-noclique $noclique ",
+                  "-filelist $param{'prefix'}.filelist ",
                   { cmdlog => 1,
                     logfile => "$param{'prefix'}.purge.log"
                  });
