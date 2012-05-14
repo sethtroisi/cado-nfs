@@ -135,6 +135,7 @@ params/mach_desc
 params/params.c59
 params/params.c61
 params/params.c63
+params/params.c64
 params/params.c65
 params/params.c66
 params/params.c67

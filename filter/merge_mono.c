@@ -164,9 +164,6 @@ removeCellAndUpdate(filter_matrix_t *mat, int i, int32_t j, int final)
 //////////////////////////////////////////////////////////////////////
 // now, these guys are generic...!
 
-/* weight of buried columns for row i */
-#define BURIEDROWWEIGHT(mat,i) mat->wburied[i]
-
 // for all j in row[i], removes j and update data
 // if final, also update the Markowitz counts
 static void
@@ -178,7 +175,7 @@ removeRowAndUpdate(filter_matrix_t *mat, int i, int final)
     if(i == TRACE_ROW)
 	fprintf(stderr, "TRACE_ROW: removeRowAndUpdate i=%d\n", i);
 #endif
-    mat->weight -= lengthRow(mat, i) + BURIEDROWWEIGHT(mat, i);
+    mat->weight -= lengthRow(mat, i);
     for(k = 1; k <= lengthRow(mat, i); k++){
 #if TRACE_COL >= 0
 	if(cell(mat, i, k) == TRACE_COL){
@@ -196,7 +193,7 @@ addOneRowAndUpdate(filter_matrix_t *mat, int i)
 {
     int k;
 
-    mat->weight += lengthRow(mat, i) + BURIEDROWWEIGHT(mat,i);
+    mat->weight += lengthRow(mat, i);
     for(k = 1; k <= lengthRow(mat, i); k++)
 	addCellAndUpdate(mat, i, cell(mat, i, k));
 }
@@ -291,7 +288,7 @@ addFatherToSonsRec(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 		   int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 		   int u, int level0)
 {
-    int k, itab = 1, i1, i2, level = level0, len;
+    int k, itab = 1, i1, i2, level = level0;
 
     if(sons[u][0] == 0)
 	// nothing to do for a leaf...!
@@ -309,13 +306,7 @@ addFatherToSonsRec(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 	    level = i1;
 	i1 = ind[sons[u][k]];
 	// add u to its son
-#if 1
-	// recover true length of non-buried part for R[i1]+R[i2]
-	len = A[sons[u][k]][u] - buriedRowsWeight (mat, i1, i2);
-	addRowsAndUpdate(mat, i1, i2, len);
-#else
 	addRowsAndUpdate(mat, i1, i2, -1);
-#endif
 	history[level0][itab++] = i1;
     }
     history[level0][0] = itab-1;
