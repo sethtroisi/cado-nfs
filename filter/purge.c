@@ -61,6 +61,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <errno.h>
 
 #include "utils.h"
+#ifdef FOR_FFS
+#include "utils_ffs.h"
+#endif
 
 #define MAX_FILES 1000000
 #define MAX_STEPS 10   /* maximal number of singleton removal steps */
@@ -360,8 +363,15 @@ insertNormalRelation (unsigned int j)
     {
       /* Hack to equilibrate the two threads works */
       if (!(equi_th[i & (LG_EQUI_TH - 1)]))
-	buf_rel[j].rel.ap[i].r = 
-	  findroot (buf_rel[j].rel.a, buf_rel[j].rel.b, buf_rel[j].rel.ap[i].p);
+        {
+#ifndef FOR_FFS
+	        buf_rel[j].rel.ap[i].r = findroot (buf_rel[j].rel.a, 
+                                   buf_rel[j].rel.b, buf_rel[j].rel.ap[i].p);
+#else
+	       buf_rel[j].rel.ap[i].r = findroot_ffs (buf_rel[j].rel.a, 
+                                  buf_rel[j].rel.b, buf_rel[j].rel.ap[i].p);
+#endif
+        }
       h = hashInsert (&H, buf_rel[j].rel.ap[i].p, buf_rel[j].rel.ap[i].r);
       nprimes += (H.hashcount[h] == 1); /* new ideal */
       if (((long) buf_rel[j].rel.ap[i].p) >= minpa)
@@ -754,8 +764,12 @@ reread (const char *oname, char ** ficname, hashtable_t *H,
               {
                   if (rs->rel.b > 0)
                   {
+#ifndef FOR_FFS
                       reduce_exponents_mod2 (&rs->rel);
                       computeroots (&rs->rel);
+#else
+                      computeroots_ffs (&rs->rel);
+#endif
                   }
                   W += (double) fprint_rel_row (ofile, irel, rs->rel, H);
               }
@@ -865,6 +879,11 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j)
   unsigned long pr;
   unsigned char c, v;
   unsigned int ltmp;
+#ifdef FOR_FFS
+  unsigned int basis_ab = 16;
+#else
+  unsigned int basis_ab = 10;
+#endif
   
 #define LOAD_ONE(P) { c = *P; P = ((size_t) (P - pminlessone) & (PREMPT_BUF - 1)) + pmin; }
   
@@ -877,7 +896,7 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j)
   }
   else
     buf_rel[j].rel.a = 1;
-  for (n = 0 ; (v = ugly[c]) < 10 ; ) {
+  for (n = 0 ; (v = ugly[c]) < basis_ab ; ) {
 #ifdef FOR_FFS
     n = (n << 4) + v;
 #else
@@ -890,7 +909,7 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j)
   
   n = 0;
   LOAD_ONE(p);
-  for ( ; (v = ugly[c]) < 10 ; ) {
+  for ( ; (v = ugly[c]) < basis_ab ; ) {
 #ifdef FOR_FFS
     n = (n << 4) + v;
 #else
@@ -957,33 +976,57 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j)
     }
     buf_rel[j].rel.nb_ap = k;
 
-    if (buf_rel[j].rel.b > 0) {
+    if (buf_rel[j].rel.b > 0) 
+     {
       ltmp = 1;
       for (k = 0, i = 0; i < (unsigned int) buf_rel[j].rel.nb_rp; i++)
-	if (buf_rel[j].rel.rp[i].e & 1)
-	  {
-	    buf_rel[j].rel.rp[k] = (rat_prime_t) { .p = buf_rel[j].rel.rp[i].p, .e = 1 };
-	    ltmp += ((long) buf_rel[j].rel.rp[k].p >= minpr);
-	    k++;
-	  }
+       {
+#ifndef FOR_FFS
+        if (buf_rel[j].rel.rp[i].e & 1)
+#else
+        if (buf_rel[j].rel.rp[i].e >= 1)
+#endif
+         {
+          buf_rel[j].rel.rp[k] = (rat_prime_t) { .p = buf_rel[j].rel.rp[i].p, 
+                                                 .e = 1 };
+          ltmp += ((long) buf_rel[j].rel.rp[k].p >= minpr);
+          k++;
+         }
+       }
       buf_rel[j].rel.nb_rp = k;
       for (k = 0, i = 0; i < (unsigned int) buf_rel[j].rel.nb_ap; i++)
-	if (buf_rel[j].rel.ap[i].e & 1) {
-	  buf_rel[j].rel.ap[k].p = buf_rel[j].rel.ap[i].p;
-	  buf_rel[j].rel.ap[k].e = 1;
-	  /* Hack to equilibrate the two threads works */
-	  if (equi_th[k & (LG_EQUI_TH - 1)])
-	    buf_rel[j].rel.ap[k].r = 
-	      findroot (buf_rel[j].rel.a, buf_rel[j].rel.b, buf_rel[j].rel.ap[k].p);
-	  ltmp += ((long) buf_rel[j].rel.ap[k].p >= minpa);
-	  k++;
-	}
+       {
+#ifndef FOR_FFS
+        if (buf_rel[j].rel.ap[i].e & 1) 
+#else
+        if (buf_rel[j].rel.rp[i].e >= 1)
+#endif
+         {
+          buf_rel[j].rel.ap[k].p = buf_rel[j].rel.ap[i].p;
+          buf_rel[j].rel.ap[k].e = 1;
+          /* Hack to equilibrate the two threads works */
+          if (equi_th[k & (LG_EQUI_TH - 1)])
+           {
+#ifndef FOR_FFS
+            buf_rel[j].rel.ap[k].r = findroot (buf_rel[j].rel.a,
+                                     buf_rel[j].rel.b, buf_rel[j].rel.ap[k].p);
+#else
+            buf_rel[j].rel.ap[k].r = findroot_ffs (buf_rel[j].rel.a,
+                                     buf_rel[j].rel.b, buf_rel[j].rel.ap[k].p);
+#endif
+           }
+          ltmp += ((long) buf_rel[j].rel.ap[k].p >= minpa);
+          k++;
+         }
+       }
       buf_rel[j].rel.nb_ap = k;
-    }
-    else {
+     }
+    else 
+     {
       ltmp = ((long) buf_rel[j].rel.a >= minpr) + 1;
-      if ((long) buf_rel[j].rel.a >= minpa) ltmp += buf_rel[j].rel.nb_ap;
-    }
+      if ((long) buf_rel[j].rel.a >= minpa) 
+        ltmp += buf_rel[j].rel.nb_ap;
+     }
     buf_rel[j].ltmp = ltmp;
   }
 }
@@ -1323,7 +1366,11 @@ main (int argc, char **argv)
   /* On a 32-bit computer, even 1 << 32 would overflow. Well, we could set
      map[ra] = 2^32-1 in that case, but not sure we want to support 32-bit
      primes on a 32-bit computer... */
+#ifdef FOR_FFS
+  need64 = 1;
+#else
   need64 = (pol->rat->lpb >= 32) || (pol->alg->lpb >= 32);
+#endif
   
   if (need64 && sizeof (long) < 8)
     {
@@ -1420,6 +1467,18 @@ main (int argc, char **argv)
 
   fprintf (stderr, "   nrels=%d, nprimes=%d; excess=%d\n",
            nrel, nprimes, nrel - nprimes);
+
+  for (unsigned int it=0; it < nrelmax; it++)
+    {
+      unsigned it2 = 0;
+      while (rel_compact[it][it2] != -1)
+        {
+          int t = rel_compact[it][it2];
+          fprintf(stderr, "%d(%d) ", t, H.hashcount[t]);
+          it2++;
+        }
+      fprintf(stderr, "\n");
+    }
       
   fprintf (stderr, "   Starting singleton removal...\n");
   nrel_new = nrel;
