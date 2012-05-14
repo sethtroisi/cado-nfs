@@ -34,7 +34,7 @@ degree=4                # degree of the algebraic polynomial
 polsel_delay=30              # time between two checks
 polsel_nice=4            # nice level for selection
 
-# we can expect:
+# one can expect:
 # MurphyE(Bf=10000000,Bg=5000000,area=1.00e+16)=1.79e-06-2.40e-06
 
 ## Parameters of polyselect

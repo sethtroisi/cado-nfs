@@ -36,8 +36,6 @@ initMat (filter_matrix_t *mat, int32_t jmin, int32_t jmax)
     ASSERT_ALWAYS (mat->rows != NULL);
     mat->wt = (int*) malloc ((mat->jmax - mat->jmin) * sizeof (int));
     memset (mat->wt, 0, (mat->jmax - mat->jmin) * sizeof (int));
-    mat->wburied = (int*) malloc (mat->nrows * sizeof (int));
-    memset (mat->wburied, 0, mat->nrows * sizeof (int));
     R = (int32_t **) malloc ((mat->jmax - mat->jmin) * sizeof(int32_t *));
     ASSERT_ALWAYS(R != NULL);
     mat->R = R;
@@ -52,7 +50,6 @@ clearMat (filter_matrix_t *mat)
     free (mat->rows[i]);
   free (mat->rows);
   free (mat->wt);
-  free (mat->wburied);
   for (j = 0; j < mat->jmax - mat->jmin; j++)
     free (mat->R[j]);
   free (mat->R);
@@ -127,14 +124,15 @@ fillmat (filter_matrix_t *mat)
 */
 int
 filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
-                    int verbose MAYBE_UNUSED)
+                    int verbose MAYBE_UNUSED, int skip)
 {
     int lbuf = 100, *buf;
 #if !defined(USE_MPI)
     int nh = 0;
 #endif
-    int32_t ibuf, j, jmin = mat->jmin, jmax = mat->jmax;
+    int32_t ibuf, j, k, jmin = mat->jmin, jmax = mat->jmax;
     char *tooheavy = NULL;
+    int *wskip, wc;
 
     mat->nburied = 0;
     buf = (int *) malloc(lbuf * sizeof(int));
@@ -144,30 +142,38 @@ filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
     mat->rem_nrows = mat->nrows;
     mat->weight = 0;
 
-    int bmin = mat->nrows, bmax = 0, wmax;
+    int bmin = mat->nrows, bmax = 0;
 
-    /* Bury heavy columns of density > 1/BURIED_MAX_DENSITY, this roughly
-       corresponds to primes < BURIED_MAX_DENSITY or ideals of
-       norm < BURIED_MAX_DENSITY.
-       Those columns should contribute to the average weight by
-       sum(2/p, p prime < BURIED_MAX_DENSITY), which is ~ 4.58
-       for BURIED_MAX_DENSITY=2000. */
-    wmax = (int) ((double) mat->nrows / BURIED_MAX_DENSITY);
     /* heavy columns already have wt < 0 */
     tooheavy = (char *) malloc (mat->ncols * sizeof(char));
     memset (tooheavy, 0, mat->ncols * sizeof(char));
-    for(j = 0; j < mat->ncols; j++){
-      int wc = -mat->wt[j];
-        if(wc > wmax){
+
+    /* find the skip heaviest columns */
+    wskip = (int*) malloc ((skip + 1) * sizeof(int));
+    memset (wskip, 0, skip * sizeof(int));
+    for(j = 0; j < mat->ncols; j++)
+      {
+        wc = -mat->wt[j];
+        k = skip;
+        while ((k > 0) && (wc > wskip[k - 1]))
+          wskip[k] = wskip[k - 1], k--;
+        wskip[k] = wc;
+      }
+    for (j = 0; j < mat->ncols; j++)
+      {
+        wc = -mat->wt[j];
+        if ((skip > 0) && (wc >= wskip[skip - 1]))
+          {
 #if DEBUG >= 1
             fprintf(stderr, "Burying j=%d (wt=%d)\n", j, wc);
 #endif
             tooheavy[j] = 1;
             mat->nburied += 1;
-            if(wc > bmax) bmax = wc;
-            if(wc < bmin) bmin = wc;
-        }
-    }
+            if (wc > bmax) bmax = wc;
+            if (wc < bmin) bmin = wc;
+          }
+      }
+    free (wskip);
     fprintf(stderr, "# Number of buried columns is %d", mat->nburied);
     fprintf(stderr, " (min weight=%d, max weigth=%d)\n", bmin, bmax);
 
@@ -202,10 +208,8 @@ filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
                 // always store j in the right interval...!
                 if((j >= jmin) && (j < jmax)){
                     // this will be the weight in the current slice
-                    mat->weight++; 
-                    if ((tooheavy != NULL) && (tooheavy[j] != 0)) {
-                        mat->wburied[i] += 1;
-                    } else {
+                    if ((tooheavy == NULL) || (tooheavy[j] == 0)) {
+                        mat->weight++;
                         buf[ibuf++] = j;
                         if(mat->wt[GETJ(mat, j)] > 0){ // redundant test?
                             mat->R[GETJ(mat, j)][0]++;
@@ -229,6 +233,7 @@ filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
             memcpy(mat->rows[i]+1, buf, ibuf * sizeof(int32_t));
             // sort indices in val to ease row merges
             qsort(mat->rows[i]+1, ibuf, sizeof(int32_t), cmp);
+#if DEBUG >= 1
             /* check all indices are distinct, otherwise this is a bug of
                purge */
             for (int k = 1; k < ibuf; k++)
@@ -238,6 +243,7 @@ filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
                             mat->rows[i][k], i);
                     exit (1);
                 }
+#endif
         }
     }
     fprintf (stderr, "\n"); /* to keep last output on screen */
@@ -365,32 +371,19 @@ remove_j_from_row(filter_matrix_t *mat, int i, int j)
 #endif
 }
 
-/* estimated combined weight of buried columns in rows i1 and i2 */
-int
-buriedRowsWeight (filter_matrix_t *mat, int i1 MAYBE_UNUSED,
-                  int i2 MAYBE_UNUSED)
-{
-  int w;
-  w = mat->wburied[i1] + mat->wburied[i2];
-  if (w > mat->nburied)
-    w = mat->nburied;
-  return w;
-}
-
 // what is the weight of the sum of Ra and Rb? Works even in the partial
 // scenario of MPI.
-// New: uses the estimated wburied stuff. TODO: what about MPI???
 int
 weightSum(filter_matrix_t *mat, int i1, int i2)
 {
     int k1, k2, w, len1, len2;
 
-    w = buriedRowsWeight (mat, i1, i2);
     len1 = (isRowNull(mat, i1) ? 0 : lengthRow(mat, i1));
     len2 = (isRowNull(mat, i2) ? 0 : lengthRow(mat, i2));
     if((len1 == 0) || (len2 == 0))
 	fprintf(stderr, "i1=%d i2=%d len1=%d len2=%d\n", i1, i2, len1, len2);
     k1 = k2 = 1;
+    w = 0;
     while((k1 <= len1) && (k2 <= len2)){
 	if(cell(mat, i1, k1) < cell(mat, i2, k2)){
 	    k1++;
@@ -404,9 +397,7 @@ weightSum(filter_matrix_t *mat, int i1, int i2)
 	    k1++; k2++;
 	}
     }
-    w += (k1 > len1 ? 0 : len1-k1+1);
-    w += (k2 > len2 ? 0 : len2-k2+1);
-    return w;
+    return w + ((len1 + 1) - k1) + ((len2 + 1) - k2);
 }
 
 void

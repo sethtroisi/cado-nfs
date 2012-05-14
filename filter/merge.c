@@ -48,6 +48,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #define RWMAX_DEFAULT INT_MAX
 #define MAXLEVEL_DEFAULT 10
 #define KEEP_DEFAULT 128
+#define SKIP_DEFAULT 32
 #define FORBW_DEFAULT 0
 #define RATIO_DEFAULT 1.1
 #define COVERNMAX_DEFAULT 100.0
@@ -65,6 +66,8 @@ usage (void)
 	   MAXLEVEL_DEFAULT);
   fprintf (stderr, "   -keep nnn      - keep an excess of nnn (default %u)\n",
 	   KEEP_DEFAULT);
+  fprintf (stderr, "   -skip nnn      - bury the nnn heaviest columns (default %u)\n",
+	   SKIP_DEFAULT);
   fprintf (stderr, "   -forbw nnn     - controls the optimization function (default %u, see below)\n",
 	   FORBW_DEFAULT);
   fprintf (stderr, "   -ratio rrr     - maximal ratio cN(final)/cN(min) with forbw=0 (default %1.1f)\n",
@@ -88,7 +91,7 @@ main (int argc, char *argv[])
     char *purgedname = NULL, *outname = NULL;
     char *resumename = NULL;
     int cwmax = CWMAX_DEFAULT, rwmax = RWMAX_DEFAULT;
-    int maxlevel = MAXLEVEL_DEFAULT, keep = KEEP_DEFAULT;
+    int maxlevel = MAXLEVEL_DEFAULT, keep = KEEP_DEFAULT, skip = SKIP_DEFAULT;
     int verbose = 0; /* default verbose level */
     double tt;
     double ratio = RATIO_DEFAULT; /* bound on cN_new/cN to stop the merge */
@@ -131,6 +134,11 @@ main (int argc, char *argv[])
 	}
 	else if (argc > 2 && strcmp (argv[1], "-keep") == 0){
 	    keep = atoi(argv[2]);
+	    argc -= 2;
+	    argv += 2;
+	}
+	else if (argc > 2 && strcmp (argv[1], "-skip") == 0){
+	    skip = atoi(argv[2]);
 	    argc -= 2;
 	    argv += 2;
 	}
@@ -242,7 +250,7 @@ main (int argc, char *argv[])
     fillmat (mat);
 
     tt = wct_seconds ();
-    filter_matrix_read (mat, ps, verbose);
+    filter_matrix_read (mat, ps, verbose, skip);
     fprintf (stderr, "Time for filter_matrix_read: %2.2lf\n", wct_seconds () - tt);
 
     /* initialize rep, i.e., mostly opens outname */

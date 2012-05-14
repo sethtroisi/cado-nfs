@@ -486,12 +486,14 @@ return_all_sublattices ( rsstr_t rs,
                          sublattice_pq *pqueue,
                          int verbose )
 {
-  /* At least consider three primes */
+#if 0
+  /* At least consider two primes */
   if (rsparam->tlen_e_sl < 2) {
     fprintf ( stderr,
               "Error: At least consider two primes (2, 3) in return_all_sublattice. \n" );
     exit(1);
   }
+#endif
 
   unsigned short i, k, tmp_e_sl;
   unsigned int j, size[rsparam->tlen_e_sl], tsize[rsparam->tlen_e_sl],
@@ -709,9 +711,16 @@ return_all_sublattices ( rsstr_t rs,
                                      individual_sublattices,
                                      pqueue );
   }
+  else if (rsparam->tlen_e_sl == 1) {
+    for (ind[0] = 0; ind[0] < size[0]; ind[0] ++)
+      return_all_sublattices_crt ( rsparam,
+                                   ind,
+                                   individual_sublattices,
+                                   pqueue );
+  }
   /* too aggressive */
   else {
-    fprintf (stderr, "Error, number of primes in \"-e\" (len_e_sl) should be between 2 to 10\n");
+    fprintf (stderr, "Error, number of primes in \"-e\" (len_e_sl) should be between 1 and 10\n");
     exit (1);
   }
 

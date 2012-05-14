@@ -200,6 +200,7 @@ add_subdirectory (sqrt)
 add_subdirectory (linalg)
 add_subdirectory (filter)
 add_subdirectory (linalg/bwc)
+add_subdirectory (misc)
 
 add_custom_target(dist
     COMMAND scripts/dist.sh ${package_basename}

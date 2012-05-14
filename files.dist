@@ -123,6 +123,7 @@ filter/mst.c
 filter/mst.h
 filter/purge.c
 filter/purge-mt.c
+filter/optimize.c
 filter/replay.c
 filter/report.c
 filter/report.h
@@ -134,15 +135,18 @@ params/mach_desc
 params/params.c59
 params/params.c61
 params/params.c63
+params/params.c64
 params/params.c65
 params/params.c66
 params/params.c67
+params/params.c68
 params/params.c69
 params/params.c70
 params/params.c71
 params/params.c72
 params/params.c73
 params/params.c75
+params/params.c76
 params/params.c77
 params/params.c78
 params/params.c79
@@ -670,3 +674,5 @@ linalg/bwc/mpfq/mpfq.h
 linalg/bwc/mpfq/mpfq_name_ab.h
 linalg/bwc/matmul_facade.c
 linalg/bwc/matmul-libnames.h.in
+misc/CMakeLists.txt
+misc/convert_poly.c
