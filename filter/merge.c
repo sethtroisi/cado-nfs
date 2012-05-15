@@ -44,8 +44,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "merge_mpi.h"
 #endif
 
-#define CWMAX_DEFAULT 100
-#define RWMAX_DEFAULT INT_MAX
 #define MAXLEVEL_DEFAULT 10
 #define KEEP_DEFAULT 128
 #define SKIP_DEFAULT 32
@@ -60,8 +58,6 @@ usage (void)
   fprintf (stderr, "   -v             - print some extra information\n");
   fprintf (stderr, "   -mat   xxx     - input (purged) file is xxx\n");
   fprintf (stderr, "   -out   xxx     - output (history) file is xxx\n");
-  fprintf (stderr, "   -cwmax nnn     - merge columns of weight <= nnn only (default %u)\n", CWMAX_DEFAULT);
-  fprintf (stderr, "   -rwmax nnn     - merge rows of weight <= nnn only (default %u)\n", RWMAX_DEFAULT);
   fprintf (stderr, "   -maxlevel nnn  - merge up to nnn rows (default %u)\n",
 	   MAXLEVEL_DEFAULT);
   fprintf (stderr, "   -keep nnn      - keep an excess of nnn (default %u)\n",
@@ -90,7 +86,6 @@ main (int argc, char *argv[])
     report_t rep[1];
     char *purgedname = NULL, *outname = NULL;
     char *resumename = NULL;
-    int cwmax = CWMAX_DEFAULT, rwmax = RWMAX_DEFAULT;
     int maxlevel = MAXLEVEL_DEFAULT, keep = KEEP_DEFAULT, skip = SKIP_DEFAULT;
     int verbose = 0; /* default verbose level */
     double tt;
@@ -114,16 +109,6 @@ main (int argc, char *argv[])
     while(argc > 1 && argv[1][0] == '-'){
         if (argc > 2 && strcmp (argv[1], "-mat") == 0){
 	    purgedname = argv[2];
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-cwmax") == 0){
-	    cwmax = atoi(argv[2]);
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-rwmax") == 0){
-	    rwmax = atoi(argv[2]);
 	    argc -= 2;
 	    argv += 2;
 	}
@@ -203,8 +188,8 @@ main (int argc, char *argv[])
     mat->nrows = ps->nrows;
     mat->ncols = ps->ncols;
     mat->keep  = keep;
-    mat->cwmax = cwmax;
-    mat->rwmax = rwmax;
+    mat->cwmax = maxlevel;
+    mat->rwmax = INT_MAX;
     mat->mergelevelmax = maxlevel;
     mat->itermax = itermax;
 

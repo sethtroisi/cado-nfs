@@ -454,6 +454,7 @@ mergeForColumn (report_t *rep, double *tt, double *tfill, double *tMST,
 }
 
 #if !defined(USE_MPI)
+/* a row is to be deleted if all its ideals are heavy (negative wt) */
 static int
 isRowToBeDeleted(filter_matrix_t *mat, int i)
 {
@@ -471,6 +472,9 @@ isRowToBeDeleted(filter_matrix_t *mat, int i)
 }
 #endif
 
+/* Remove too heavy rows (at most niremmax = 128) from matrix,
+   as long as the excess is >= mat->keep.
+   Return the number of removed rows. */
 static int
 inspectRowWeight(report_t *rep, filter_matrix_t *mat)
 {
@@ -482,7 +486,7 @@ inspectRowWeight(report_t *rep, filter_matrix_t *mat)
     for(i = 0; i < mat->nrows; i++){
 	if((mat->rem_nrows - mat->rem_ncols) <= mat->keep)
 	    return nirem;
-	if(!isRowNull(mat, i)){
+	if(!isRowNull(mat, i)){ /* remaining relation-set */
 	    if(lengthRow(mat, i) > mat->rwmax){
 #if DEBUG >= 1
 		fprintf(stderr, "Removing too heavy row[%d]: %d\n",
@@ -515,7 +519,8 @@ inspectRowWeight(report_t *rep, filter_matrix_t *mat)
 	    destroyRow(mat, i);
 	    useless++;
 	}
-    fprintf(stderr, "#useless rows=%d\n", useless);
+    if (useless > 0)
+      printf ("#useless rows=%d\n", useless);
 #endif
     return nirem;
 }

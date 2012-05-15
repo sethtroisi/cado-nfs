@@ -105,7 +105,7 @@ fillmat (filter_matrix_t *mat)
 	    mat->R[GETJ(mat, j)] = Rj;
 	}
 	else{ /* weight is larger than cwmax */
-	    mat->wt[GETJ(mat, j)] = -mat->wt[GETJ(mat, j)]; // trick!!!
+            mat->wt[GETJ(mat, j)] = -mat->wt[GETJ(mat, j)]; // trick!!!
 	    mat->R[GETJ(mat, j)] = NULL;
 	}
     }
