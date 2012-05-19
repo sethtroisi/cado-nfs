@@ -292,11 +292,17 @@ static void to_prec_N(fppol64_ptr r, fppol_t p, unsigned int N)
 {
   ASSERT(N <= 32);
   ASSERT(N > 0);
-  fppol_t tmp;
-  fppol_init2(tmp, N);
-  fppol_div_ti(tmp, p, fppol_deg(p) - N + 1);
-  /* as 0 < N <= 32, we can set it in a fppol64_t */
-  fppol64_set_mp(r, tmp);
+  int shift = fppol_deg(p) - N + 1;
+  if (shift >= 0) {
+    fppol_t tmp;
+    fppol_init2(tmp, N);
+    fppol_div_ti(tmp, p, (unsigned int) shift);
+    /* as 0 < N <= 32, we can set it in a fppol64_t */
+    fppol64_set_mp(r, tmp);
+  }
+  else { /* it means that to_prec_N is zero */
+    fppol64_set_zero(r);
+  }
 }
 
 static int deg_norm_prec_N(ffspol_t ffspol_ij, int degi, fppol_t *pow_i, int degj, fppol_t *pow_j, int *gap, int max_deg)
@@ -402,6 +408,7 @@ static int deg_norm_prec_N(ffspol_t ffspol_ij, int degi, fppol_t *pow_i, int deg
 }
 
 
+
 static int deg_norm_full(ffspol_t ffspol_ij, fppol_t *pow_i, fppol_t *pow_j, int *gap, int max_deg)
 {
   fppol_t pol_norm_k;
@@ -474,7 +481,7 @@ static MAYBE_UNUSED int deg_norm_ij_v2(ffspol_ptr ffspol_ij, ij_t i, ij_t j, int
 
     /* pow_i contains the powers of i in INCREASING order */
     pow_i = (fppol_t *)malloc((ffspol_ij->deg + 1) * sizeof(fppol_t));
-    fppol_init(pow_i[ffspol_ij->deg]);
+    fppol_init(pow_i[0]);
     fppol_set_one(pow_i[0]);
 
     for (int k = 1; k < ffspol_ij->deg + 1; ++k) {
@@ -495,7 +502,6 @@ static MAYBE_UNUSED int deg_norm_ij_v2(ffspol_ptr ffspol_ij, ij_t i, ij_t j, int
     free(pow_i);
     free(pow_j);
     return deg_norm;
-
   }
 }
 
@@ -599,7 +605,7 @@ void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
         }
 #endif
         int deg = deg_norm_ij(ffspol_ij, hati, hatj);
-	/* int gap = -1;
+        /* int gap = -1;
 	   int deg = deg_norm_ij_v2(ffspol_ij, hati, hatj, &gap); */
         if (deg > 0) {
           ASSERT_ALWAYS(deg < 255);
