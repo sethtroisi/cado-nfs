@@ -1,4 +1,5 @@
 BIN = sieve
+LIB = fppol
 
 fppol_OBJ = f2pol.o f3pol.o fppol.o fppol_test.o fppol_set.o  \
 	    fppol_arith.o fppol_mul.o fppol_div.o fppol_mod.o \
@@ -58,6 +59,21 @@ define BIN_template
 
 endef
 
+define LIB_template
+  $(1)_$(2)_OBJ = $$(filter $$($(1)_OBJ), \
+                     $$(addprefix $$($(1)_BUILDDIR)/, $$($(2)_OBJ)))
+  $(1)_$(2)_LIB = $$($(1)_BUILDDIR)/lib$(2)-$(1).a
+
+  $(1): $$($(1)_$(2)_LIB)
+
+  $$($(1)_$(2)_LIB): $$($(1)_$(2)_OBJ)
+	$$(AR) rcs $$@ $$^
+
+  clean::
+	rm -f $$($(1)_$(2)_LIB)
+
+endef
+
 define FIELD_template
   $(1)_BUILDDIR = $$(BUILDDIR)/$(1)
   $(1)_DEP      = $$($(1)_BUILDDIR)/.depend
@@ -66,6 +82,8 @@ define FIELD_template
   $(1)_CPPFLAGS = -D$$($(1)_DEF)
 
   $$(foreach bin,$$(BIN),$$(eval $$(call BIN_template,$(1),$$(bin))))
+
+  $$(foreach lib,$$(LIB),$$(eval $$(call LIB_template,$(1),$$(lib))))
 
   $$($(1)_BUILDDIR):
 	mkdir -p $$@

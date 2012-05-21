@@ -7,6 +7,24 @@
 #include "fb.h"
 
 
+#ifdef BUCKET_RESIEVE
+typedef struct {
+    unsigned pos;
+    unsigned hint;
+} __replayable_update_struct;
+
+typedef struct {
+    __replayable_update_struct *b;
+    unsigned n;
+} __replayable_bucket_struct;
+
+typedef       __replayable_bucket_struct  replayable_bucket_t[1];
+typedef       __replayable_bucket_struct *replayable_bucket_ptr;
+typedef const __replayable_bucket_struct *replayable_bucket_srcptr;
+#else
+typedef void *replayable_bucket_t;
+#endif
+
 
 /* Array of buckets.
  *****************************************************************************/
@@ -18,6 +36,10 @@ typedef struct {
   unsigned          n;
   unsigned          max_size;
   unsigned          min_degp, max_degp;
+#ifdef BUCKET_RESIEVE
+  unsigned         *first_hint;
+  unsigned         *current_hint;
+#endif
   update_packed_t **start;
   update_packed_t **degp_end;
 } __buckets_struct;
@@ -46,5 +68,13 @@ void buckets_fill(buckets_ptr buckets, factor_base_srcptr FB,
 
 // Apply all the updates from a given bucket to the sieve region S.
 void bucket_apply(uint8_t *S, buckets_srcptr buckets, unsigned k);
+
+#ifdef BUCKET_RESIEVE
+void bucket_prepare_replay(replayable_bucket_ptr bb,
+        buckets_srcptr buckets, uint8_t *S, unsigned k);
+void bucket_apply_at_pos(fppol_ptr norm, ijpos_t pp, 
+        replayable_bucket_srcptr buckets, factor_base_srcptr FB);
+#endif
+
 
 #endif  /* __BUCKETS_H__ */
