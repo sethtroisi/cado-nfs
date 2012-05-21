@@ -262,7 +262,7 @@ filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
 void
 print_row(filter_matrix_t *mat, int i)
 {
-    fprintRow(stderr, mat->rows[i]);
+    fprintRow (stdout, mat->rows[i]);
 }
 
 void

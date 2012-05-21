@@ -495,11 +495,7 @@ mpi_doOneMerge(report_t *rep, filter_matrix_t *mat, int *njdel, int *dw, unsigne
 		   &totdel, m, 10, 0, verbose); // 10 is rather arbitrary...!
     else
 	mpi_MST(rep, mat, &njrem, buf);
-    *njdel = deleteEmptyColumns(mat);
-#if DEBUG >= 1
-    if(*njdel > 0)
-	mpi_err1("I deleted %d empty columns\n", *njdel);
-#endif
+    *njdel = 0; /* number of empty columns deleted */
     // the sub-master must store its history file...
     fprint_report(rep);
     // ... and must force other procs to perform the operations

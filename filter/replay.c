@@ -872,6 +872,7 @@ fasterVersion(int **newrows, const char *sparsename, const char *indexname,
         for(int k = 1; k <= newrows[i][0]; k++)
           colweight[newrows[i][k]] += 1;
 
+    /* comment out the following line to disable cycle optimization */
     optimize (newrows, nrows, colweight, ncols, skip, hisname);
 
     /* crunch empty rows */
