@@ -237,8 +237,16 @@ fprint_rat (int *table_ind, int *nb_coeff, relation_t *rel, hashtable_t *H)
 {
   int i, nbc = *nb_coeff;
 
+#ifndef FOR_FFS
   for (i = 0; i < rel->nb_rp; i++)
     table_ind[nbc++] = H->renumber[getHashAddr (H, rel->rp[i].p, minus2)];
+#else
+  int j;
+  for (i = 0; i < rel->nb_rp; i++)
+    for (j = 0; j < rel->rp[i].e; j++)
+      table_ind[nbc++] = H->renumber[getHashAddr (H, rel->rp[i].p, minus2)];
+#endif
+ 
   *nb_coeff = nbc;
 }
 
@@ -251,8 +259,22 @@ fprint_alg (int *table_ind, int *nb_coeff, relation_t *rel, hashtable_t *H)
 {
   int i, nbc = *nb_coeff;
 
+#ifndef FOR_FFS
   for (i = 0; i < rel->nb_ap; i++, nbc++)
     table_ind[nbc] = H->renumber[getHashAddr (H, rel->ap[i].p, rel->ap[i].r)];
+#else
+  int j;
+  for (i = 0; i < rel->nb_ap; i++)
+   {
+    for (j = 0; j < rel->ap[i].e; j++)
+     {
+      int tmp= getHashAddr (H, rel->ap[i].p, rel->ap[i].r);
+      int tmp2= H->renumber[tmp];
+      table_ind[nbc++]=tmp2;
+     }
+   }
+#endif
+
   *nb_coeff = nbc;
 }
 
@@ -302,7 +324,13 @@ fprint_rel_row (FILE *file, int irel, relation_t rel, hashtable_t *H)
   int *table_ind;
   int nb_coeff;
 
+#ifndef FOR_FFS
   table_ind = (int*) malloc ((rel.nb_rp + rel.nb_ap) * sizeof (int));
+#else
+  /*For FFS, the exponents can be different from 1.*/
+  /*FIXME do better than 2x */
+  table_ind = (int*) malloc (3 * (rel.nb_rp + rel.nb_ap) * sizeof (int));
+#endif
 
   nb_coeff = 0;
 
@@ -997,7 +1025,7 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j)
 #ifndef FOR_FFS
         if (buf_rel[j].rel.ap[i].e & 1) 
 #else
-        if (buf_rel[j].rel.rp[i].e >= 1)
+        if (buf_rel[j].rel.ap[i].e >= 1)
 #endif
          {
           buf_rel[j].rel.ap[k].p = buf_rel[j].rel.ap[i].p;
@@ -1288,6 +1316,7 @@ usage (void)
   exit (1);
 }
 
+#ifndef FOR_FFS
 /* estimate the number of primes <= B */
 static int
 approx_phi (long B)
@@ -1295,6 +1324,22 @@ approx_phi (long B)
   ASSERT_ALWAYS((double) B <= 53030236260.0); /* otherwise B/log(B) > 2^31 */
   return (B <= 1) ? 0 : (int) ((double) B / log ((double) B));
 }
+#else
+/* estimate the number of ideals of degree <= B */
+static int
+approx_ffs (int d)
+{
+#ifdef USE_F2 
+  ASSERT_ALWAYS(d <= 36); /* otherwise the result is > 2^31 */
+  return (d < 0) ? 0 : (int) ((double) pow (2.0, (double) d)/((double) d));
+#elif USE_F3
+  ASSERT_ALWAYS(d <= 22); /* otherwise the result is > 2^31 */
+  return (d < 0) ? 0 : (int) ((double) pow (3.0, (double) d)/((double) d));
+#else
+  ASSERT_ALWAYS(0);
+#endif
+}
+#endif
 
 int
 main (int argc, char **argv)
@@ -1340,8 +1385,13 @@ main (int argc, char **argv)
   const char * tmp;
   
   ASSERT_ALWAYS((tmp = param_list_lookup_string(pl, "poly")) != NULL);
+#ifndef FOR_FFS
   cado_poly_read(pol, tmp);
-  
+#else
+  fprintf (stderr, "Test\n");
+  ffs_poly_read(pol, tmp);
+#endif
+
   if (param_list_warn_unused(pl)) {
     usage();
   }
@@ -1357,11 +1407,25 @@ main (int argc, char **argv)
       usage ();
     }
   
+#ifdef FOR_FFS /* For FFS we need to remember the renumbering of primes*/
+  if (sos == NULL)
+    {
+      fprintf (stderr, "Error, missing -sos option.\n");
+      exit(1);
+    }
+#endif
+
   /* On a 32-bit computer, even 1 << 32 would overflow. Well, we could set
      map[ra] = 2^32-1 in that case, but not sure we want to support 32-bit
      primes on a 32-bit computer... */
 #ifdef FOR_FFS
-  need64 = 1;
+#ifdef USE_F2 
+  need64 = (pol->rat->lpb >= 32) || (pol->alg->lpb >= 32);
+#elif USE_F3
+  need64 = (pol->rat->lpb >= 16) || (pol->alg->lpb >= 16);
+#else
+  ASSERT_ALWAYS(0);
+#endif
 #else
   need64 = (pol->rat->lpb >= 32) || (pol->alg->lpb >= 32);
 #endif
@@ -1386,8 +1450,13 @@ main (int argc, char **argv)
     {
       /* Estimating the number of needed primes (remember that hashInit
          multiplies by a factor 1.5). */
+#ifndef FOR_FFS
       Hsizer = approx_phi (1L << pol->rat->lpb);
       Hsizea = approx_phi (1L << pol->alg->lpb);
+#else
+      Hsizer = approx_ffs (pol->rat->lpb);
+      Hsizea = approx_ffs (pol->alg->lpb);
+#endif
       Hsize = Hsizer + Hsizea;
     }
   fprintf (stderr, "Estimated number of prime ideals: %d\n", Hsize);
@@ -1452,8 +1521,22 @@ main (int argc, char **argv)
 
   tot_alloc = tot_alloc0;
       
+#ifndef FOR_FFS
   fprintf (stderr, "Pass 1, filtering ideals >= %ld on rat. side and "
            "%ld on alg. side:\n", minpr, minpa);
+#else
+  fprintf (stderr, "Pass 1, filtering ideals of degree >= %ld on rat. side "
+           "and %ld on alg. side:\n", minpr, minpa);
+#ifdef USE_F2 
+  minpr = 1 << minpr;
+  minpa = 1 << minpa;
+#elif USE_F3
+  minpr = 1 << (2*minpr);
+  minpa = 1 << (2*minpa);
+#else
+  ASSERT_ALWAYS(0);
+#endif
+#endif
 
   hashInit (&H, Hsize, 1, need64);
 
@@ -1462,19 +1545,6 @@ main (int argc, char **argv)
   fprintf (stderr, "   nrels=%d, nprimes=%d; excess=%d\n",
            nrel, nprimes, nrel - nprimes);
 
-  for (unsigned int it=0; it < nrelmax; it++)
-    {
-      unsigned it2 = 0;
-      while (rel_compact[it][it2] != -1)
-        {
-          int t = rel_compact[it][it2];
-          fprintf(stderr, "%d(%d) ", t, H.hashcount[t]);
-          it2++;
-        }
-      fprintf(stderr, "\n");
-    }
-      
-  fprintf (stderr, "   Starting singleton removal...\n");
   nrel_new = nrel;
   nprimes_new = nprimes;
 
@@ -1501,7 +1571,6 @@ main (int argc, char **argv)
   /*************************** second pass ***********************************/
 
   /* we renumber the primes in order of apparition in the hashtable */
-  fprintf (stderr, "Renumbering primes...\n");
   renumber (&nprimes_new, &H, sos);
   
   /* reread the relation files and convert them to the new coding */

@@ -47,3 +47,36 @@ computeroots_ffs (relation_t *rel)
   }
 }
 
+int ffs_poly_set_plist(cado_poly poly, param_list pl)
+{
+  param_list_parse_ulong(pl, "fbb0", &(poly->rat->lim));
+  param_list_parse_int(pl, "lpb0", &(poly->rat->lpb));
+  param_list_parse_ulong(pl, "fbb1", &(poly->alg->lim));
+  param_list_parse_int(pl, "lpb1", &(poly->alg->lpb));
+
+  return 1;
+}
+
+// returns 0 on failure, 1 on success.
+int ffs_poly_read(cado_poly poly, const char *filename)
+{
+    FILE *file;
+    int r;
+    param_list pl;
+
+    file = fopen(filename, "r");
+    if (file == NULL) 
+      {
+	      fprintf(stderr, "read_polynomial: could not open %s\n", filename);
+	      return 0;
+      }
+    
+    param_list_init(pl);
+    param_list_read_stream(pl, file);
+    r = ffs_poly_set_plist(poly, pl);
+
+    param_list_clear(pl);
+    fclose(file);
+    return r;
+}
+
