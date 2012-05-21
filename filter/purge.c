@@ -616,11 +616,13 @@ remove_singletons (int *nrel, int nrelmax, int *nprimes, hashtable_t *H,
       oldexcess = excess;
 
       /* delete heavy rows */
-      deleteHeavierRows (H, &newnrel, &newnprimes, nrelmax, keep);
-
-      if (newnrel != old)
-        fprintf (stderr, "deleted heavier relations: %d %d at %2.2lf\n",
-                 newnrel, newnprimes, seconds ());
+      if (count >= MAX_STEPS/2)
+        {
+          deleteHeavierRows (H, &newnrel, &newnprimes, nrelmax, keep);
+          if (newnrel != old)
+            fprintf (stderr, "deleted heavier relations: %d %d at %2.2lf\n",
+                     newnrel, newnprimes, seconds ());
+        }
 
       onepass_singleton_removal (nrelmax, &newnrel, &newnprimes, H);
 
