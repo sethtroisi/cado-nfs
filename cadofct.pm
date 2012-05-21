@@ -203,8 +203,6 @@ my @default_param = (
     keep         => -1, # should be 128 + skip
     keeppurge    => 208, # should be 160 + #ideals <= FINAL_BOUND (cf purge.c)
     maxlevel     => 15,
-    cwmax        => 200,
-    rwmax        => 200,
     ratio        => 1.5,
     bwstrat      => 3,
     coverNmax    => 100,
@@ -1516,8 +1514,7 @@ my %tasks = (
 
     merge     => { name   => "merge",
                    dep    => ['purge'],
-                   param  => ['keep', 'maxlevel', 'cwmax', 'rwmax',
-                              'ratio', 'bwstrat'],
+                   param  => ['keep', 'maxlevel', 'ratio', 'bwstrat'],
                    files  => ['merge\.his', 'merge\.log'] },
 
     # replay shouldn't appear as a step in its own right. It's a bug.
@@ -2693,8 +2690,6 @@ sub do_merge {
               "-coverNmax $param{'coverNmax'} ".
               "-keep $param{'keep'} ".
               "-maxlevel $param{'maxlevel'} ".
-              "-cwmax $param{'cwmax'} ".
-              "-rwmax $param{'rwmax'} ".
               "-ratio $param{'ratio'} ";
 
     cmd($cmd, { cmdlog => 1, kill => 1, logfile =>
