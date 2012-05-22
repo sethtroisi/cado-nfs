@@ -482,14 +482,15 @@ toIndex(int **newrows, const char *indexname, FILE *hisfile,
     fprintf(stderr, "#T# writing index file: %2.2lf\n", wct_seconds()-tt);
 }
 
+#if DEBUG >= 1
 /* weight of merge of row i and row k */
 static uint32_t
 weight_merge (int **newrows, int i, int k, int skip)
 {
   uint32_t w, li, lk, ix, kx;
 
-  ASSERT_ALWAYS(newrows[i] != NULL);
-  ASSERT_ALWAYS(newrows[k] != NULL);
+  ASSERT(newrows[i] != NULL);
+  ASSERT(newrows[k] != NULL);
   li = newrows[i][0];
   lk = newrows[k][0];
   for (w = 0, ix = 1, kx = 1; ix <= li && kx <= lk; )
@@ -507,6 +508,7 @@ weight_merge (int **newrows, int i, int k, int skip)
     w += newrows[k][kx++] >= skip;
   return w;
 }
+#endif
 
 void
 add_relation (int **cols, int *len_col, int j, int i)
@@ -597,7 +599,7 @@ weight_row (int **newrows, int i, int skip)
 {
   int w = 0, k;
 
-  ASSERT_ALWAYS(newrows[i] != NULL);
+  ASSERT(newrows[i] != NULL);
   for (k = 1; k <= newrows[i][0]; k++)
     w += newrows[i][k] >= skip;
   return w;
@@ -614,12 +616,11 @@ do_merge (int **newrows, int **cols, int *len_col, int j, int i, int k,
   kk = cols[j][k];
   fprintf (hisfile, "-%u %u\n", kk + 1, ii);
   fflush (hisfile);
-  ASSERT_ALWAYS(newrows[ii] != NULL);
-  ASSERT_ALWAYS(newrows[kk] != NULL);
+  ASSERT(newrows[ii] != NULL);
+  ASSERT(newrows[kk] != NULL);
   li = newrows[ii][0];
   lk = newrows[kk][0];
-  ASSERT_ALWAYS(weight_row (newrows, ii, skip) >=
-                weight_row (newrows, kk, skip));
+  ASSERT(weight_row (newrows, ii, skip) >= weight_row (newrows, kk, skip));
   tmp = (int*) malloc ((1 + li + lk) * sizeof(int));
   for (ni = 1, nk = 1, ltmp = 0; ni <= li && nk <= lk;)
     {
@@ -662,33 +663,92 @@ static int
 try_merge (int **newrows, int **cols, int *len_col, int j, int skip,
            FILE *hisfile)
 {
-  int i, k, wi, wk, wik, gain, gain_max = 0, imax, kmax, wimax, wkmax;
+  int i, k, gain, gain_max, imax, kmax, *W, ii, kk, *J, s, t;
+  mpz_t *M, and;
 
-  for (i = 0; i < len_col[j]; i++)
+  /* compute weights of rows containing the ideal j */
+  W = (int*) malloc (len_col[j] * sizeof(int));
+  for (i = 0, s = 0; i < len_col[j]; i++)
     {
-      wi = weight_row (newrows, cols[j][i], skip);
+      W[i] = weight_row (newrows, cols[j][i], skip);
+      s += W[i];
+    }
+
+  /* compute all ideals appearing in the rows containing j */
+  if (j >= skip)
+    s -= len_col[j];
+  J = (int*) malloc (s * sizeof(int));
+  for (ii = 0, t = 0; ii < len_col[j]; ii++)
+    {
+      i = cols[j][ii];
+      for (k = 1; k <= newrows[i][0]; k++)
+        if ((newrows[i][k] >= skip) && (newrows[i][k] != j))
+          J[t++] = newrows[i][k];
+    }
+  ASSERT(t == s);
+  qsort (J, t, sizeof(int), cmp);
+
+  /* extract ideals appearing at least twice */
+  for (i = 1, k = 0; i < t; i++)
+    if ((J[i-1] == J[i]) && (k == 0 || (J[k-1] != J[i])))
+      J[k++] = J[i];
+  J[k++] = INT_MAX;
+  t = k;
+
+  /* compute bit vectors for ideals appearing at least twice */
+  M = (mpz_t*) malloc (len_col[j] * sizeof(mpz_t));
+  mpz_init (and);
+  for (ii = 0; ii < len_col[j]; ii++)
+    {
+      mpz_init (M[ii]);
+      mpz_realloc2 (M[ii], t - 1);
+      i = cols[j][ii];
+      for (s = 0, k = 1; k <= newrows[i][0]; k++)
+        {
+          while (J[s] < newrows[i][k])
+            s++;
+          /* now J[s] >= newrows[i][k] */
+          if (J[s] == newrows[i][k])
+            mpz_setbit (M[ii], s++);
+        }
+    }
+  for (gain_max = 0, i = 0; i < len_col[j]; i++)
+    {
       for (k = i + 1; k < len_col[j]; k++)
         {
-          wk = weight_row (newrows, cols[j][k], skip);
-          wik = weight_merge (newrows, cols[j][i], cols[j][k], skip);
-          gain = ((wi > wk) ? wi : wk) - wik;
+          if (W[i] >= W[k])
+            ii = i, kk = k;
+          else
+            ii = k, kk = i;
+          /* we need wmin > gain_max since the maximum gain is wmin */
+          if (W[kk] <= gain_max)
+            continue;
+          mpz_and (and, M[ii], M[kk]);
+          /* the +2 accounts for the ideal j */
+          gain = 2 * mpz_popcount (and) + 2 - W[kk];
+#if DEBUG >= 1
+          {
+            int wik;
+            wik = weight_merge (newrows, cols[j][ii], cols[j][kk], skip);
+            ASSERT_ALWAYS (gain == W[ii] - wik);
+          }
+#endif
           if (gain > gain_max)
             {
               gain_max = gain;
-              imax = i;
-              kmax = k;
-              wimax = wi;
-              wkmax = wk;
+              imax = ii;
+              kmax = kk;
             }
         }
     }
+  mpz_clear (and);
+  for (i = 0; i < len_col[j]; i++)
+    mpz_clear (M[i]);
+  free (M);
+  free (J);
+  free (W);
   if (gain_max > 0)
-    {
-      if (wimax >= wkmax)
-        do_merge (newrows, cols, len_col, j, imax, kmax, skip, hisfile);
-      else
-        do_merge (newrows, cols, len_col, j, kmax, imax, skip, hisfile);
-    }
+    do_merge (newrows, cols, len_col, j, imax, kmax, skip, hisfile);
   return gain_max;
 }
 
@@ -708,7 +768,7 @@ optimize (int **newrows, int nrows, int *colweight, int ncols, int skip,
 {
   int **cols, *len_col, i, j, k, small_ncols, pass = 0, *perm_cols,
     small_nrows;
-  uint64_t total_weight, old_total_weight;
+  uint64_t total_weight;
   FILE *hisfile;
 
   hisfile = fopen (hisname, "a");
@@ -722,8 +782,10 @@ optimize (int **newrows, int nrows, int *colweight, int ncols, int skip,
       perm_cols[2*j+1] = j;
     }
   qsort (perm_cols, ncols, 2*sizeof(int), cmp_ge);
+#if DEBUG >= 1
   for (j = 1; j < ncols; j++)
     ASSERT_ALWAYS(perm_cols[2*(j-1)] >= perm_cols[2*j]);
+#endif
   printf ("Skip %d heaviest columns\n", skip);
   for (j = 0; j < ncols && perm_cols[2*j] != 0; j++);
   small_ncols = j;
@@ -746,8 +808,10 @@ optimize (int **newrows, int nrows, int *colweight, int ncols, int skip,
             newrows[i][k] = colweight[j];
           }
         qsort (newrows[i] + 1, newrows[i][0], sizeof(int), cmp);
+#if DEBUG >= 1
         for (k = 2; k <= newrows[i][0]; k++)
           ASSERT_ALWAYS(newrows[i][k-1] <= newrows[i][k]);
+#endif
       }
   /* update colweight */
   for (j = 0; j < ncols; j++)
@@ -783,7 +847,7 @@ optimize (int **newrows, int nrows, int *colweight, int ncols, int skip,
             if (k > 1 && newrows[i][k-1] > j)
               printf ("i=%d k=%d newrows[i][k-1]=%d j=%d\n", i, k,
                       newrows[i][k-1], j);
-            ASSERT_ALWAYS(k == 1 || newrows[i][k-1] <= j);
+            ASSERT(k == 1 || newrows[i][k-1] <= j);
             if (j >= skip)
               {
                 cols[j][len_col[j]] = i;
@@ -795,25 +859,39 @@ optimize (int **newrows, int nrows, int *colweight, int ncols, int skip,
   printf ("Computed transpose matrix\n");
   fflush (stdout);
 
+#if DEBUG >= 1
   for (j = skip; j < ncols; j++)
     ASSERT_ALWAYS(len_col[j] == colweight[j]);
+#endif
 
+  bit_vector active;
+  bit_vector_init_set (active, ncols, 1);
   do
     {
+      int gain;
+
       printf ("Pass %d: decrease total weight to ", ++pass);
       fflush (stdout);
-      old_total_weight = total_weight;
       for (j = skip; j < ncols; j++)
-        if (2 <= len_col[j] && len_col[j] <= 20)
-          total_weight -= try_merge (newrows, cols, len_col, j, skip, hisfile);
+        if (len_col[j] <= pass + 1 && bit_vector_getbit (active, j))
+          {
+            gain = try_merge (newrows, cols, len_col, j, skip, hisfile);
+            if (gain == 0) /* we assume a column which does not give any
+                              gain will never give a gain in the future */
+              bit_vector_clearbit (active, j);
+            total_weight -= gain;
+          }
       printf ("%lu (%1.2f per row)\n", total_weight,
               (double) total_weight / (double) small_nrows);
       fflush (stdout);
     }
-  while (total_weight < old_total_weight);
+  while (pass < 20);
+  bit_vector_clear (active);
 
+#if DEBUG >= 1
   for (j = 0; j < skip; j++)
     ASSERT_ALWAYS(len_col[j] == 0);
+#endif
 
   /* recompute colweight[] since it is wrong for heavy columns */
   memset (colweight, 0, skip * sizeof(int));
