@@ -372,6 +372,7 @@ findOptimalCombination(report_t *rep, filter_matrix_t *mat, int m,
     useMinimalSpanningTree (rep, mat, m, ind, tfill, tMST);
 }
 
+#if DEBUG >= 1
 static void
 checkWeights (filter_matrix_t *mat)
 {
@@ -426,6 +427,7 @@ checkWeights (filter_matrix_t *mat)
   printf ("Minimum non-zero column weight: %d\n", minw);
   free (W);
 }
+#endif
 
 #if 0
 static void
