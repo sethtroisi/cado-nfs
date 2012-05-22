@@ -335,7 +335,7 @@ MkzPopQueue(int32_t *dj, int32_t *mkz, filter_matrix_t *mat)
   *mkz = MkzGet(Q, 1, 1);
   while (mat->wt[*dj] > mat->mergelevelmax)
     {
-       /* remove heavy column */
+      /* remove heavy column */
       MkzDelete (Q, A, 1);
       A[*dj] = MKZ_INF;
 
@@ -345,14 +345,14 @@ MkzPopQueue(int32_t *dj, int32_t *mkz, filter_matrix_t *mat)
       *dj = MkzGet(Q, 1, 0);
       *mkz = MkzGet(Q, 1, 1);
     }
-    A[*dj] = MKZ_INF; /* already done in MkzRemoveJ, but if we don't do it,
-                         we get A[j1]=A[j2] for some j1 <> j2 */
-    if (MkzQueueCardinality(mat->MKZQ) <= 0)
-      return 0;
-    MkzAssign(Q, A, 1, Q[0]); /* move entry of index Q[0] in Q,A to index 1 */
-    Q[0]--;                   /* decrease number of entries in Q,A */
-    MkzDownQueue(Q, A, 1);    /* reorder heap structure */
-    return 1;
+  A[*dj] = MKZ_INF; /* already done in MkzRemoveJ, but if we don't do it,
+                       we get A[j1]=A[j2] for some j1 <> j2 */
+  if (MkzQueueCardinality(mat->MKZQ) <= 0)
+    return 0;
+  MkzAssign(Q, A, 1, Q[0]); /* move entry of index Q[0] in Q,A to index 1 */
+  Q[0]--;                   /* decrease number of entries in Q,A */
+  MkzDownQueue(Q, A, 1);    /* reorder heap structure */
+  return 1;
 }
 
 void

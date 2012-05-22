@@ -98,10 +98,10 @@ main (int argc, char *argv[])
     double wct0 = wct_seconds ();
 
     /* print comand-line arguments */
-    fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
+    printf ("%s.r%s", argv[0], CADO_REV);
     for (i = 1; i < argc; i++)
-      fprintf (stderr, " %s", argv[i]);
-    fprintf (stderr, "\n");
+      printf (" %s", argv[i]);
+    printf ("\n");
 #ifdef USE_MPI
     MPI_Init(&argc, &argv);
 #endif
@@ -188,7 +188,7 @@ main (int argc, char *argv[])
     mat->nrows = ps->nrows;
     mat->ncols = ps->ncols;
     mat->keep  = keep;
-    mat->cwmax = maxlevel;
+    mat->cwmax = 2 * maxlevel;
     mat->rwmax = INT_MAX;
     mat->mergelevelmax = maxlevel;
     mat->itermax = itermax;
@@ -204,7 +204,7 @@ main (int argc, char *argv[])
 
     tt = seconds ();
     filter_matrix_read_weights (mat, ps);
-    fprintf (stderr, "Getting column weights took %2.2lf\n", seconds () - tt);
+    printf ("Getting column weights took %2.2lf\n", seconds () - tt);
     /* note: we can't use purgedfile_stream_rewind on a compressed file,
        thus we close and reopen */
     purgedfile_stream_closefile (ps);
@@ -224,11 +224,10 @@ main (int argc, char *argv[])
           if (w <= maxlevel)
             nbm[w] ++;
         }
-      fprintf (stderr, "Total matrix weight: %lu\n", total_weight);
+      printf ("Total matrix weight: %lu\n", total_weight);
       for (j = 0; j <= (unsigned long) maxlevel; j++)
         if (nbm[j] != 0)
-          fprintf (stderr, "There are %lu column(s) of weight %lu\n",
-                   nbm[j], j);
+          printf ("There are %lu column(s) of weight %lu\n", nbm[j], j);
       free (nbm);
     }
 
@@ -236,7 +235,7 @@ main (int argc, char *argv[])
 
     tt = wct_seconds ();
     filter_matrix_read (mat, ps, verbose, skip);
-    fprintf (stderr, "Time for filter_matrix_read: %2.2lf\n", wct_seconds () - tt);
+    printf ("Time for filter_matrix_read: %2.2lf\n", wct_seconds () - tt);
 
     /* initialize rep, i.e., mostly opens outname */
     init_rep (rep, outname, mat, 0, MERGE_LEVEL_MAX);
@@ -251,21 +250,22 @@ main (int argc, char *argv[])
     mat->mkztype = mkztype;
     tt = seconds();
     MkzInit (mat);
-    fprintf (stderr, "Time for MkzInit: %2.2lf\n", seconds()-tt);
+    printf ("Time for MkzInit: %2.2lf\n", seconds()-tt);
 
     mergeOneByOne (rep, mat, maxlevel, verbose, forbw, ratio, coverNmax);
 
     gzip_close (rep->outfile, outname);
-    fprintf (stderr, "Final matrix has N=%d nc=%d (%d) w(M)=%lu N*w(M)=%"
-	     PRIu64"\n", mat->rem_nrows, mat->rem_ncols,
-	     mat->rem_nrows - mat->rem_ncols, mat->weight,
+    printf ("Final matrix has N=%d nc=%d (%d) w(M)=%lu N*w(M)=%"
+            PRIu64"\n", mat->rem_nrows, mat->rem_ncols,
+            mat->rem_nrows - mat->rem_ncols, mat->weight,
 	    (uint64_t) mat->rem_nrows * (uint64_t) mat->weight);
+    fflush (stdout);
     MkzClose (mat);
     clearMat (mat);
     purgedfile_stream_closefile (ps);
     purgedfile_stream_clear (ps);
 
-    fprintf (stderr, "Total merge time: %1.0f seconds\n", seconds ());
+    printf ("Total merge time: %1.0f seconds\n", seconds ());
 
     print_timing_and_memory (wct0);
 
