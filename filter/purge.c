@@ -328,8 +328,8 @@ fprint_rel_row (FILE *file, int irel, relation_t rel, hashtable_t *H)
   table_ind = (int*) malloc ((rel.nb_rp + rel.nb_ap) * sizeof (int));
 #else
   /*For FFS, the exponents can be different from 1.*/
-  /*FIXME do better than 2x */
-  table_ind = (int*) malloc (3 * (rel.nb_rp + rel.nb_ap) * sizeof (int));
+  /*FIXME do better than 4x */
+  table_ind = (int*) malloc (4 * (rel.nb_rp + rel.nb_ap) * sizeof (int));
 #endif
 
   nb_coeff = 0;
@@ -354,7 +354,11 @@ fprint_rel_row (FILE *file, int irel, relation_t rel, hashtable_t *H)
 
   free (table_ind);
 
+#ifndef FOR_FFS
   return nb_coeff;
+#else
+  return weight_ffs (rel);
+#endif
 }
 
 /* First we count the number of large primes; then we store all primes in
@@ -405,8 +409,12 @@ insertNormalRelation (unsigned int j)
     }
   my_tmp[itmp++] = -1; /* sentinel */
   ASSERT_ALWAYS(itmp == buf_rel[j].ltmp);
-  rel_weight[buf_rel[j].num] = buf_rel[j].rel.nb_rp + buf_rel[j].rel.nb_ap;
   /* total relation weight */
+#ifndef FOR_FFS
+  rel_weight[buf_rel[j].num] = buf_rel[j].rel.nb_rp + buf_rel[j].rel.nb_ap;
+#else
+  rel_weight[buf_rel[j].num] = weight_ffs (buf_rel[j].rel);
+#endif
   rel_compact[buf_rel[j].num] = my_tmp;
 }
 
@@ -438,7 +446,12 @@ insertFreeRelation (unsigned int j)
     }
   my_tmp[itmp++] = -1;
   ASSERT_ALWAYS(itmp == buf_rel[j].ltmp);
-  rel_weight[buf_rel[j].num] = 1 + buf_rel[j].rel.nb_ap; /* relation weight */
+  /* total relation weight */
+#ifndef FOR_FFS
+  rel_weight[buf_rel[j].num] = 1 + buf_rel[j].rel.nb_ap;
+#else
+  rel_weight[buf_rel[j].num] = weight_ffs (buf_rel[j].rel);
+#endif
   rel_compact[buf_rel[j].num] = my_tmp;
 }
 
@@ -749,12 +762,19 @@ renumber (int *nprimes, hashtable_t *H, const char *sos)
 /* Read again the relation files ficname[0], ..., ficname[nbfic-1],
    and output remaining relations (those with rel_used[i] <> 0) in ofile.
 
+   For FFS ouput deleted relations (those with rel_used[i] == 0) in ofile2
+
    If raw is non-zero, output relations in CADO format
    (otherwise in format used by merge).
 */
 static void
+#ifndef FOR_FFS
 reread (const char *oname, char ** ficname, hashtable_t *H,
         bit_vector_srcptr rel_used, int nrows, int ncols, int raw)
+#else
+reread (const char *oname, const char *oname2, char ** ficname, hashtable_t *H,
+        bit_vector_srcptr rel_used, int nrows, int ncols, int raw)
+#endif
 {
   FILE *ofile;
   int ret MAYBE_UNUSED, nr = 0;
@@ -762,11 +782,16 @@ reread (const char *oname, char ** ficname, hashtable_t *H,
   int pipe;
 #ifdef FOR_FFS
   unsigned int ab_base = 16; 
+  FILE *ofile2;
+  int pipe2;
 #else
   unsigned int ab_base = 10; 
 #endif
 
   ofile = fopen_compressed_w(oname, &pipe, NULL);
+#ifdef FOR_FFS
+  ofile2 = fopen_compressed_w(oname2, &pipe2, NULL);
+#endif
   if (raw == 0)
     fprintf (ofile, "%d %d\n", nrows, ncols);
   fprintf (stderr, "Final pass:\n");
@@ -780,8 +805,21 @@ reread (const char *oname, char ** ficname, hashtable_t *H,
           int irel = rs->nrels;
           if (bit_vector_getbit (rel_used, irel) == 0) /* skipped relation */
             {
+#ifndef FOR_FFS
               if (relation_stream_get_skip (rs) < 0)
                 break; /* end of file */
+#else
+              if (relation_stream_get(rs, NULL, 0, ab_base) < 0)
+                break;
+              if (raw == 0)
+              {
+                  if (rs->rel.b > 0)
+                      computeroots_ffs (&rs->rel);
+                  fprint_rel_row (ofile2, irel, rs->rel, H);
+              }
+              else
+                  fprint_relation_raw (ofile2, &rs->rel);
+#endif
             }
           else
             {
@@ -824,6 +862,10 @@ reread (const char *oname, char ** ficname, hashtable_t *H,
           rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
   relation_stream_clear(rs);
   if (pipe) pclose(ofile); else fclose(ofile);
+  
+#ifdef FOR_FFS
+  if (pipe2) pclose(ofile2); else fclose(ofile2);
+#endif
 
   /* write excess to stdout */
   if (raw == 0)
@@ -1381,7 +1423,10 @@ main (int argc, char **argv)
   const char * subdirlist = param_list_lookup_string(pl, "subdirlist");
   const char * purgedname = param_list_lookup_string(pl, "out");
   const char * sos = param_list_lookup_string(pl, "sos");
-  
+#ifdef FOR_FFS
+  const char * deletedname = param_list_lookup_string(pl, "outdel");
+#endif
+
   cado_poly_init (pol);
   
   const char * tmp;
@@ -1390,7 +1435,6 @@ main (int argc, char **argv)
 #ifndef FOR_FFS
   cado_poly_read(pol, tmp);
 #else
-  fprintf (stderr, "Test\n");
   ffs_poly_read(pol, tmp);
 #endif
 
@@ -1413,6 +1457,11 @@ main (int argc, char **argv)
   if (sos == NULL)
     {
       fprintf (stderr, "Error, missing -sos option.\n");
+      exit(1);
+    }
+  if (deletedname == NULL)
+    {
+      fprintf (stderr, "Error, missing -outdel option.\n");
       exit(1);
     }
 #endif
@@ -1577,8 +1626,13 @@ main (int argc, char **argv)
   
   /* reread the relation files and convert them to the new coding */
   fprintf (stderr, "Storing remaining relations...\n");
+#ifndef FOR_FFS
   reread (purgedname, fic, &H, rel_used, nrel_new, nprimes_new, raw);
-  
+#else
+  reread (purgedname, deletedname, fic, &H, rel_used, nrel_new, nprimes_new, 
+                                                                raw);
+#endif
+
   hashFree (&H);
   bit_vector_clear(rel_used);
   cado_poly_clear (pol);
