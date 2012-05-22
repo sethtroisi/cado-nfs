@@ -4,6 +4,20 @@
 #include "utils.h"
 #include "utils_ffs.h"
 
+unsigned int weight_ffs (relation_t rel)
+{
+  int i;
+  unsigned int w = 0;
+
+  for (i = 0; i < rel.nb_rp; i++)
+    w++; /* w should depend on rel.nb_rp[i].e, for now just constant */
+
+  for (i = 0; i < rel.nb_ap; i++)
+    w++; /* w should depend on rel.nb_ap[i].e, for now just constant */
+
+  return w;
+}
+
 unsigned long 
 findroot_ffs (long a, unsigned long b, unsigned long p)
 {
