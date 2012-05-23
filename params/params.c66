@@ -38,7 +38,7 @@ polsel_nice=4            # nice level for selection
 # MurphyE(Bf=10000000,Bg=5000000,area=1.00e+16)=1.00e-06-1.19e-06
 
 ## Parameters of polyselect
-polsel_admax=4000            # max value for lc(f)
+polsel_admax=10000           # max value for lc(f)
 polsel_adrange=2000          # individual tasks
 polsel_kmax=16               # rotation is bounded by 2^kmax
 polsel_incr=60               # forced divisor of lc(f)
@@ -58,7 +58,7 @@ polsel_lq=1                  # special-q in lc(g) has such many factors
 #                                      approximate norm is more than
 #                                      lambda times lpb, we reject.
 rlim=100000
-alim=200000
+alim=100000
 lpbr=22
 lpba=22
 mfbr=24
@@ -67,7 +67,7 @@ rlambda=1.2
 alambda=1.2
 
 I=11                    # Sieving range in lattice siever
-qmin=200000             # Start of the special-q range
+qmin=100000             # Start of the special-q range
 qrange=5000             # The size of an elementary sieving task
 firstcheck=227000       # Try filtering only up from that many relations
 sievenice=10            # nice level for the sieving jobs

@@ -133,6 +133,7 @@ filter/filter_matrix.c
 filter/filter_matrix.h
 params/mach_desc
 params/params.c59
+params/params.c60
 params/params.c61
 params/params.c63
 params/params.c64
@@ -217,6 +218,7 @@ params/params.c152
 params/params.c153
 params/params.c154
 params/params.c155
+params/params.c156
 params/params.c157
 params/params.c158
 params/params.c159

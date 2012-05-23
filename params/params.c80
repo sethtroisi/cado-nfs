@@ -34,15 +34,16 @@ polsel_delay=30              # time between two checks
 polsel_nice=4            # nice level for selection
 
 # one can expect
-# MurphyE(Bf=10000000,Bg=5000000,area=1.00e+16)=1.96e-07
+# MurphyE(Bf=10000000,Bg=5000000,area=1.00e+16)=1.94e-07-1.96e-07
 
 ## Parameters of polyselect
-polsel_admax=1e4             # max value for lc(f)
-polsel_adrange=1e3           # individual tasks
-polsel_kmax=17               # rotation is bounded by 2^kmax
+polsel_admax=5000            # max value for lc(f)
+polsel_adrange=500           # individual tasks
+polsel_kmax=18               # rotation is bounded by 2^kmax
 polsel_incr=60               # forced divisor of lc(f)
 polsel_P=5000                # choose lc(g) with two prime factors in [P,2P]
 polsel_lq=2                  # special-q in lc(g) has such many factors
+polsel_maxnorm=32.0          # maximal lognorm before rootsieve
 
 ###########################################################################
 # Sieve
