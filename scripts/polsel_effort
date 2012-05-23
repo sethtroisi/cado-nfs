@@ -1,0 +1,47 @@
+#!/bin/csh
+# this script prints for each parameter file the corresponding effort which is
+# obtained as (admax-admin)/incr * nbq, where nbq is the number of special-q
+# tried for each ad value:
+# - nbq <= 42 for lq=1
+# - nbq <= binomial(42,2) = 861 for lq=2 
+# - nbq = 1000 otherwise since the default nq value is 1000
+@ n = 59
+while ("$n" != "205")
+   set lq=`grep '^polsel_lq=' params.c$n | sed 's/=/ /g' | cut -d" " -f2`
+   if ($lq == 1) then
+      set nq=42
+   else if ($lq == 2) then
+      set nq=861
+   else
+      set nq=1000
+   endif
+   grep polsel_admin params.c$n > /dev/null
+   if ($status == 0) then
+      set admin=`grep '^polsel_admin=' params.c$n | sed 's/=/ /g' | cut -d" " -f2`
+   else
+      set admin=0
+   endif
+   set admin=`echo $admin | sed 's/e7/0000000/g'`
+   set admax=`grep '^polsel_admax=' params.c$n | sed 's/=/ /g' | cut -d" " -f2`
+   set admax=`echo $admax | sed 's/e4/0000/g'`
+   set admax=`echo $admax | sed 's/e5/00000/g'`
+   set admax=`echo $admax | sed 's/e6/000000/g'`
+   set admax=`echo $admax | sed 's/e7/0000000/g'`
+   set admax=`echo $admax | sed 's/e8/00000000/g'`
+   set admax=`echo $admax | sed 's/e9/000000000/g'`
+   set admax=`echo $admax | sed 's/e10/0000000000/g'`
+   @ adrange = $admax - $admin
+   set incr=`grep '^polsel_incr=' params.c$n | sed 's/=/ /g' | cut -d" " -f2`
+   @ nad = $adrange / $incr
+   @ nadall = $nad * $nq
+   echo $n $nadall
+   if ("$n" == "171") then
+      @ n = 180
+   else if ("$n" == "180") then
+      @ n = 190
+   else if ("$n" == "190") then
+      @ n = 204
+   else
+      @ n = $n + 1
+   endif
+end
