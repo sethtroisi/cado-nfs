@@ -43,7 +43,7 @@ polsel_adrange=1000          # individual tasks
 polsel_kmax=17               # rotation is bounded by 2^kmax
 polsel_incr=60               # forced divisor of lc(f)
 polsel_P=5000                # choose lc(g) with two prime factors in [P,2P]
-polsel_maxnorm=25            # maximal lognorm before rootsieve
+polsel_maxnorm=26.2          # maximal lognorm before rootsieve
 polsel_lq=1                  # special-q in lc(g) has such many factors
 
 ###########################################################################

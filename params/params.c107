@@ -33,12 +33,8 @@ degree=5                # degree of the algebraic polynomial
 polsel_delay=60              # time between two checks
 polsel_nice=4            # nice level for selection
 
-# on the test number
-# 31622776601683793319988935444327185337195551393252204971841305116913038543947531062536158777317324832951921
-# we get
-
 ## Parameters of polyselect
-polsel_P=10000               # choose lc(g) with two prime factors in [P,2P]
+polsel_P=50000               # choose lc(g) with two prime factors in [P,2P]
 polsel_maxnorm=36            # max. lognorm of polynomials (before rootsieve)
 polsel_admax=1e8             # max value for lc(f)
 polsel_adrange=2e6           # individual tasks
