@@ -741,7 +741,8 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
 		  modul_clearmod (pp);
 	 }
 	 /* if the hash table contains n entries, each one smaller than (2P)^2,
-		the number of potential collisions is about 1/2n^2/(2P)^2 */
+            the number of potential collisions is about 0.5*n^2/(2P)^2.
+            We use Primes[nprimes - 2] since Primes[nprimes-1] = 0. */
 	 pc1 = 0.5 * pow ((double) H->size / (double) Primes[nprimes - 2], 2.0);
 	 hash_clear (H);
 
