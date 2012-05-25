@@ -208,7 +208,13 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     exit (1);
   }
   mpz_mul (adm1, adm1, mtilde);
-  mpz_mod (adm1, adm1, m);
+  mpz_mod (adm1, adm1, m); /* m is d*ad here */
+
+  /* we make -d*ad/2 <= adm1 < d*ad/2 */
+  mpz_mul_2exp (t, adm1, 1);
+  if (mpz_cmp (t, m) >= 0)
+    mpz_sub (adm1, adm1, m);
+
   mpz_mul (m, adm1, l);
   mpz_sub (m, mtilde, m);
 #ifdef DEBUG_POLYSELECT2L
