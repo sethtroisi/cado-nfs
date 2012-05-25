@@ -351,7 +351,7 @@ fprint_rel_row (FILE *file, int irel, relation_t rel, hashtable_t *H)
 #ifndef FOR_FFS
   return nb_coeff;
 #else
-  return weight_ffs (rel);
+  return weight_rel_ffs (rel);
 #endif
 }
 
@@ -407,7 +407,7 @@ insertNormalRelation (unsigned int j)
 #ifndef FOR_FFS
   rel_weight[buf_rel[j].num] = buf_rel[j].rel.nb_rp + buf_rel[j].rel.nb_ap;
 #else
-  rel_weight[buf_rel[j].num] = weight_ffs (buf_rel[j].rel);
+  rel_weight[buf_rel[j].num] = weight_rel_ffs (buf_rel[j].rel);
 #endif
   rel_compact[buf_rel[j].num] = my_tmp;
 }
@@ -444,7 +444,7 @@ insertFreeRelation (unsigned int j)
 #ifndef FOR_FFS
   rel_weight[buf_rel[j].num] = 1 + buf_rel[j].rel.nb_ap;
 #else
-  rel_weight[buf_rel[j].num] = weight_ffs (buf_rel[j].rel);
+  rel_weight[buf_rel[j].num] = weight_rel_ffs (buf_rel[j].rel);
 #endif
   rel_compact[buf_rel[j].num] = my_tmp;
 }

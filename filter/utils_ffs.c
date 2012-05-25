@@ -6,18 +6,22 @@
 #include "sparse.h"
 #include "utils_ffs.h"
 
-unsigned int weight_ffs (relation_t rel)
+unsigned int weight_ffs (int e)
+{
+  /* Should depend on e, for now jsut constant*/
+  return 1;
+}
+
+unsigned int weight_rel_ffs (relation_t rel)
 {
   int i;
   unsigned int w = 0;
 
   for (i = 0; i < rel.nb_rp; i++)
-    w++; /* w should depend on rel.nb_rp[i].e, for now just constant */
-    //w += rel.rp[i].e;
+    w += weight_ffs (rel.rp[i].e);
 
   for (i = 0; i < rel.nb_ap; i++)
-    w++; /* w should depend on rel.nb_ap[i].e, for now just constant */
-    //w += rel.ap[i].e;
+    w += weight_ffs (rel.ap[i].e);
 
   return w;
 }
