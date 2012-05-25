@@ -39,7 +39,7 @@ polsel_maxnorm=39.8          # max. lognorm of polynomials (before rootsieve)
 polsel_admax=5e8             # max value for lc(f)
 polsel_adrange=5e6           # individual tasks
 polsel_kmax=23               # rotation is bounded by 2^kmax
-polsel_incr=30030            # forced divisor of lc(f)
+polsel_incr=27720            # forced divisor of lc(f)
 polsel_lq=3                  # special-q in lc(g) has such many factors
 
 ###########################################################################
