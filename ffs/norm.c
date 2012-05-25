@@ -227,7 +227,7 @@ static void ffspol_2ij(ffspol_ptr ffspol_ij, ffspol_srcptr ffspol_ab,
   for (int k = 0; k <= d; ++k)
     fppol_clear(powb_ij[k]);
   free(powb_ij);
-
+  
   fppol_clear(tmp1);
   fppol_clear(tmp2);
 }
@@ -293,15 +293,20 @@ static void to_prec_N(fppol64_ptr r, fppol_t p, unsigned int N)
   ASSERT(N <= 32);
   ASSERT(N > 0);
   int shift = fppol_deg(p) - N + 1;
-  if (shift >= 0) {
+  if (shift == 0) { 
+    fppol64_set_mp(r, p);
+    }
+  else {
     fppol_t tmp;
     fppol_init2(tmp, N);
-    fppol_div_ti(tmp, p, (unsigned int) shift);
-    /* as 0 < N <= 32, we can set it in a fppol64_t */
-    fppol64_set_mp(r, tmp);
-  }
-  else {
-    fppol64_set_mp(r, p);
+    if (shift > 0) {
+      fppol_div_ti(tmp, p, (unsigned int) shift);
+      fppol64_set_mp(r, tmp);
+    }
+    else { /* we need to align the most significant bit on the left */
+      fppol_mul_ti(tmp, p, (unsigned int) -shift);
+      fppol64_set_mp(r,tmp);
+    }
   }
 }
 
@@ -353,14 +358,18 @@ static int deg_norm_prec_N(ffspol_t ffspol_ij, int degi, fppol_t *pow_i, int deg
     
     /* Computing the sum of all monomials of maximal degree until we
        find only one monomial of maximal degree */
+    
+    fppol64_t sum;
+    int max_deg_prec;
+    int deg_sum_prec; 
+    unsigned int deg_drop; 
+    /* deg_drop = max_deg_prec - deg_sum will be the drop in degree
+       due to cancellations if deg_sum is >= 0.
+
+       If deg_sum == -1, it means that the precision is insufficient
+       to know precisely the degree of the sum. */
+    
     do {
-      fppol64_t sum;
-      int max_deg_prec;
-      int deg_sum_prec; 
-      unsigned int deg_drop; 
-      /* deg_drop = max_deg_prec - deg_sum will be the drop in
-	 degree due to cancellations */
-      
       fppol64_set(sum, monomials[tab_size]);
       max_deg_prec = fppol64_deg(monomials[tab_size]);
       
@@ -370,10 +379,13 @@ static int deg_norm_prec_N(ffspol_t ffspol_ij, int degi, fppol_t *pow_i, int deg
 	 that is degrees[tab_size - 1] will not be evaluated if tab_size == 0 */
 	--tab_size;
 	fppol64_add(sum, sum, monomials[tab_size]);
+	/* TODO : PB in this sum. The drop in precision has not been handled properly */
       }
       
       deg_sum_prec = fppol64_deg(sum);
       deg_drop = max_deg_prec - deg_sum_prec;
+      /* TODO : potential PB in this deg_drop. It does not give an
+	 exact value for the new degree if deg_sum == -1 */
       
       /* If the drop in degree is smaller than the precision, we put 
 	 sum in monomials[] and degree in degrees[] and keep the tables sorted */
@@ -393,15 +405,14 @@ static int deg_norm_prec_N(ffspol_t ffspol_ij, int degi, fppol_t *pow_i, int deg
       else {
 	--tab_size;
       }
-    } /* We do this until there is only one monomial of maximal degree */ 
-    while (tab_size > 0 && degrees[tab_size] == degrees[tab_size - 1]);
+      /* We do this until there is only one monomial of maximal degree */
+    } while (tab_size > 0 && degrees[tab_size] == degrees[tab_size - 1]);
     if ((tab_size > 0 && degrees[tab_size] != degrees[tab_size - 1]) || tab_size == 0) {
       deg_norm = degrees[tab_size];
       *gap = max_deg - deg_norm;
       break;
     }
-  }
-  while (tab_size < 0 && N <= 32);
+  } while (tab_size < 0 && N <= 32);
   free(degrees);
   free (monomials);
   return deg_norm;
@@ -490,7 +501,7 @@ static MAYBE_UNUSED int deg_norm_ij_v2(ffspol_ptr ffspol_ij, ij_t i, ij_t j, int
     }
     
     deg_norm = deg_norm_prec_N(ffspol_ij, degi, pow_i, degj, pow_j, gap, max_deg);
-       if (*gap == max_deg + 1)
+    if (*gap == max_deg + 1)
       deg_norm = deg_norm_full(ffspol_ij, pow_i, pow_j, gap, max_deg);
     
     fppol_clear(ii);
@@ -543,8 +554,9 @@ static int deg_norm_ij(ffspol_ptr ffspol_ij, ij_t i, ij_t j)
   }
 }
 
+
 /* Function init_norms 
-   For each (i,j), it computes the corresponding (a,b) using ij2ab from
+   For each (i,j), it compute the corresponding (a,b) using ij2ab from
    qlat.h. Then it computes deg_norm(ffspol, a, b).
    In a first approximation, we will assume that it fits in an
    uint8_t.
@@ -603,7 +615,7 @@ void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
                   pos, fppol_deg(norm)-degq);
         }
 #endif
-        int deg = deg_norm_ij(ffspol_ij, hati, hatj); 
+        int deg = deg_norm_ij(ffspol_ij, hati, hatj);
         /* int gap = -1;
 	   int deg = deg_norm_ij_v2(ffspol_ij, hati, hatj, &gap); */
         if (deg > 0) {
