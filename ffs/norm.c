@@ -227,7 +227,7 @@ static void ffspol_2ij(ffspol_ptr ffspol_ij, ffspol_srcptr ffspol_ab,
   for (int k = 0; k <= d; ++k)
     fppol_clear(powb_ij[k]);
   free(powb_ij);
-  
+
   fppol_clear(tmp1);
   fppol_clear(tmp2);
 }
@@ -543,9 +543,8 @@ static int deg_norm_ij(ffspol_ptr ffspol_ij, ij_t i, ij_t j)
   }
 }
 
-
 /* Function init_norms 
-   For each (i,j), it compute the corresponding (a,b) using ij2ab from
+   For each (i,j), it computes the corresponding (a,b) using ij2ab from
    qlat.h. Then it computes deg_norm(ffspol, a, b).
    In a first approximation, we will assume that it fits in an
    uint8_t.
