@@ -174,14 +174,14 @@ removeRowAndUpdate(filter_matrix_t *mat, int i, int final)
     if(i == TRACE_ROW)
 	printf ("TRACE_ROW: removeRowAndUpdate i=%d\n", i);
 #endif
-    mat->weight -= lengthRow(mat, i);
-    for(k = 1; k <= lengthRow(mat, i); k++){
+    mat->weight -= matLengthRow(mat, i);
+    for(k = 1; k <= matLengthRow(mat, i); k++){
 #if TRACE_COL >= 0
 	if(cell(mat, i, k) == TRACE_COL){
 	    printf ("removeRowAndUpdate removes %d from R_%d\n", TRACE_COL, i);
 	}
 #endif
-	removeCellAndUpdate(mat, i, cell(mat, i, k), final);
+	removeCellAndUpdate(mat, i, matCell(mat, i, k), final);
     }
 }
 
@@ -191,21 +191,21 @@ addOneRowAndUpdate(filter_matrix_t *mat, int i)
 {
     int k;
 
-    mat->weight += lengthRow(mat, i);
-    for(k = 1; k <= lengthRow(mat, i); k++)
-	addCellAndUpdate(mat, i, cell(mat, i, k));
+    mat->weight += matLengthRow(mat, i);
+    for(k = 1; k <= matLengthRow(mat, i); k++)
+	addCellAndUpdate(mat, i, matCell(mat, i, k));
 }
 
 // realize mat[i1] += mat[i2] and update the data structure.
 // len could be the real length of row[i1]+row[i2] or -1.
 void
-addRowsAndUpdate(filter_matrix_t *mat, int i1, int i2, int len)
+addRowsAndUpdate(filter_matrix_t *mat, int i1, int i2, int32_t j)
 {
     // cleaner one, that shares addRowsData() to prepare the next move...!
     // i1 is to disappear, replaced by a new one
     removeRowAndUpdate(mat, i1, 0);
     // we know the length of row[i1]+row[i2]
-    addRows(mat->rows, i1, i2, len);
+    addRows(mat->rows, i1, i2, j);
     addOneRowAndUpdate(mat, i1);
 }
 
@@ -240,7 +240,8 @@ removeRowDefinitely(report_t *rep, filter_matrix_t *mat, int32_t i)
 
 // try all combinations to find the smaller one; resists to m==1
 static void
-tryAllCombinations(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind)
+tryAllCombinations(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind,
+                   int32_t j)
 {
     int i, k;
 
@@ -252,7 +253,7 @@ tryAllCombinations(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind)
 #endif
     for(k = 0; k < m; k++)
 	if(k != i){
-	    addRowsAndUpdate(mat, ind[k], ind[i], -1);
+	    addRowsAndUpdate(mat, ind[k], ind[i], j);
 #if DEBUG >= 1
 	    printf ("new row[%d]=", ind[k]);
 	    print_row (mat, ind[k]);
@@ -280,7 +281,7 @@ tryAllCombinations(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind)
 // A[i][j] contains the estimated weight/length of R[ind[i]]+R[ind[j]].
 static int
 addFatherToSonsRec(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
-		   filter_matrix_t *mat, int m, int *ind,
+		   filter_matrix_t *mat, int m, int *ind, int32_t j,
 		   int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX],
 		   int *father,
 		   int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
@@ -298,13 +299,13 @@ addFatherToSonsRec(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 	// the usual trick not to destroy row
 	history[level0][itab++] = -(i2+1);
     for(k = 1; k <= sons[u][0]; k++){
-	i1 = addFatherToSonsRec(history, mat, m, ind, A,
+	i1 = addFatherToSonsRec(history, mat, m, ind, j, A,
 				father, sons, sons[u][k], level+1);
 	if(i1 != -1)
 	    level = i1;
 	i1 = ind[sons[u][k]];
 	// add u to its son
-	addRowsAndUpdate(mat, i1, i2, -1);
+	addRowsAndUpdate(mat, i1, i2, j);
 	history[level0][itab++] = i1;
     }
     history[level0][0] = itab-1;
@@ -313,18 +314,18 @@ addFatherToSonsRec(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 
 int
 addFatherToSons(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
-		filter_matrix_t *mat, int m, int *ind,
+		filter_matrix_t *mat, int m, int *ind, int32_t j,
 		int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX],
 		int *father,
                 int *height MAYBE_UNUSED, int hmax MAYBE_UNUSED,
 		int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1])
 {
-    return addFatherToSonsRec(history, mat, m, ind, A, father, sons, 0, 0);
+    return addFatherToSonsRec(history, mat, m, ind, j, A, father, sons, 0, 0);
 }
 
 void
-MSTWithA(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind, double *tMST,
-	 int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX])
+MSTWithA(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind, int32_t j, 
+         double *tMST, int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX])
 {
     int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
     int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
@@ -336,7 +337,7 @@ MSTWithA(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind, double *tMST,
 #if DEBUG >= 1
     printMST(father, sons, m);
 #endif
-    hmax = addFatherToSons(history, mat, m, ind, A, father, height, hmax,sons);
+    hmax = addFatherToSons(history, mat, m, ind, j,A, father, height, hmax,sons);
     for(i = hmax; i >= 0; i--)
 #if 0
 	reporthis(rep, history, i);
@@ -348,28 +349,28 @@ MSTWithA(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind, double *tMST,
 }
 
 static void
-useMinimalSpanningTree(report_t *rep, filter_matrix_t *mat, int m,
-		       int32_t *ind, double *tfill, double *tMST)
+useMinimalSpanningTree(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind,
+                       int32_t j, double *tfill, double *tMST)
 {
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
 
     *tfill = seconds();
     fillRowAddMatrix(A, mat, m, ind);
     *tfill = seconds()-*tfill;
-    MSTWithA(rep, mat, m, ind, tMST, A);
+    MSTWithA(rep, mat, m, ind, j, tMST, A);
 }
 
 static void
-findOptimalCombination(report_t *rep, filter_matrix_t *mat, int m,
-		       int32_t *ind, double *tfill, double *tMST, int useMST)
+findOptimalCombination(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind,
+                       int32_t j, double *tfill, double *tMST, int useMST)
 {
   if ((m <= 2) || (useMST == 0))
     {
       *tfill = *tMST = 0;
-      tryAllCombinations (rep, mat, m, ind);
+      tryAllCombinations (rep, mat, m, ind, j);
     }
   else
-    useMinimalSpanningTree (rep, mat, m, ind, tfill, tMST);
+    useMinimalSpanningTree (rep, mat, m, ind, j, tfill, tMST);
 }
 
 #if DEBUG >= 1
@@ -482,7 +483,7 @@ mergeForColumn (report_t *rep, double *tt, double *tfill, double *tMST,
     for(ni = 0, k = 1; k <= mat->R[GETJ(mat, j)][0]; k++){
 	if(mat->R[GETJ(mat, j)][k] != -1){
 	    ind[ni++] = mat->R[GETJ(mat, j)][k];
-	    if (ni == m)
+      if (ni == m)
               break; /* earky abort, since we know there are m rows */
 	}
     }
@@ -500,7 +501,7 @@ mergeForColumn (report_t *rep, double *tt, double *tfill, double *tMST,
 #endif
 
     *tt = seconds();
-    findOptimalCombination (rep, mat, m, ind, tfill, tMST, useMST);
+    findOptimalCombination (rep, mat, m, ind, j, tfill, tMST, useMST);
     *tt = seconds()-(*tt);
     mat->rem_nrows--;
     mat->rem_ncols--;
@@ -517,7 +518,7 @@ deleteScore(filter_matrix_t *mat, int32_t i)
 {
 #if 1
     // plain weight to remove heaviest rows
-    return lengthRow(mat, i);
+    return matLengthRow(mat, i);
 #endif
 #if 0
     // -plain weight to remove lightest rows
@@ -620,7 +621,7 @@ mergeForColumn2(report_t *rep, filter_matrix_t *mat, int *njrem,
 		double *totdel, int useMST, int32_t j)
 {
     double tt, tfill, tMST;
-
+    
     mergeForColumn(rep, &tt, &tfill, &tMST, mat, mat->wt[j], j, useMST);
     *totopt += tt;
     *totfill += tfill;
@@ -848,6 +849,10 @@ indicesFromString(int32_t *ind, char *str)
 static void
 doAllAdds(report_t *rep, filter_matrix_t *mat, char *str)
 {
+/* FIXME for FFS we need to know for which ideal we are doing the merge */
+/* Can't be used for FFS until it is fixed */
+    int32_t j = 42;
+
     int32_t ind[MERGE_LEVEL_MAX], i0;
     int ni, sg, k;
 
@@ -861,7 +866,7 @@ doAllAdds(report_t *rep, filter_matrix_t *mat, char *str)
 	sg = 1;
     }
     for(k = 1; k < ni; k++)
-      addRowsAndUpdate(mat, ind[k], i0, -1);
+      addRowsAndUpdate(mat, ind[k], i0, j);
     reportn(rep, ind, ni);
     if(sg > 0){
 	// when ni == 1, then the corresponding row was too heavy and dropped

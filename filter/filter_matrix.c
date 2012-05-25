@@ -6,6 +6,9 @@
 #include "merge_opts.h"
 #include "sparse.h"
 #include "filter_matrix.h"
+#ifdef FOR_FFS
+#include "utils_ffs.h"
+#endif
 
 #define DEBUG 0
 
@@ -32,7 +35,7 @@ initMat (filter_matrix_t *mat, int32_t jmin, int32_t jmax)
 
     mat->jmin = jmin;
     mat->jmax = jmax;
-    mat->rows = (int32_t **) malloc (mat->nrows * sizeof (int32_t *));
+    mat->rows = (typerow_t **) malloc (mat->nrows * sizeof (typerow_t *));
     ASSERT_ALWAYS (mat->rows != NULL);
     mat->wt = (int*) malloc ((mat->jmax - mat->jmin) * sizeof (int));
     memset (mat->wt, 0, (mat->jmax - mat->jmin) * sizeof (int));
@@ -82,13 +85,27 @@ void
 filter_matrix_read_weights(filter_matrix_t * mat, purgedfile_stream_ptr ps)
 {
     int32_t jmin = mat->jmin, jmax = mat->jmax;
-    for (; purgedfile_stream_get(ps,NULL) >= 0;) {
-	for (int k = 0; k < ps->nc; k++) {
-	    int32_t j = ps->cols[k];
-	    if (LIKELY((j >= jmin) && (j < jmax)))
-		mat->wt[GETJ(mat, j)]++;
-	}
-    }
+    for (; purgedfile_stream_get(ps,NULL) >= 0;) 
+      {
+#ifdef FOR_FFS
+            int32_t previousj = -1;
+#endif
+        for (int k = 0; k < ps->nc; k++) 
+          {
+            int32_t j = ps->cols[k];
+            if (LIKELY((j >= jmin) && (j < jmax)))
+              {
+#ifdef FOR_FFS
+                /* For FFS we do not want to count multiplicity here*/
+                if (j != previousj)
+                    mat->wt[GETJ(mat, j)]++;
+                previousj = j;
+#else
+                mat->wt[GETJ(mat, j)]++;
+#endif
+              }
+          }
+      }
 }
 
 /* initialize Rj[j] for light columns, i.e., for those of weight <= cwmax */
@@ -126,7 +143,8 @@ int
 filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
                     int verbose MAYBE_UNUSED, int skip)
 {
-    int lbuf = 100, *buf;
+    int lbuf = 100; 
+    typerow_t *buf;
 #if !defined(USE_MPI)
     int nh = 0;
 #endif
@@ -135,7 +153,7 @@ filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
     int *wskip, wc;
 
     mat->nburied = 0;
-    buf = (int *) malloc(lbuf * sizeof(int));
+    buf = (typerow_t *) malloc(lbuf * sizeof(typerow_t));
 
     fprintf(stderr, "Reading matrix of %d rows and %d columns: excess is %d\n",
             mat->nrows, mat->ncols, mat->nrows - mat->ncols);
@@ -195,9 +213,12 @@ filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
                 fprintf(stderr, "Warning: doubling lbuf in readmat;");
                 fprintf(stderr, " new value is %d\n", lbuf);
                 free(buf);
-                buf = (int *)malloc(lbuf * sizeof(int));
+                buf = (typerow_t *)malloc(lbuf * sizeof(typerow_t));
             }
             ibuf = 0;
+#ifdef FOR_FFS
+            int32_t previousj = -1;
+#endif
             for(int k = 0 ; k < ps->nc; k++) {
                 int32_t j = ps->cols[k];
                 ASSERT_ALWAYS (0 <= j && j < mat->ncols);
@@ -206,17 +227,33 @@ filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
                     nb_heavy_j++;
 #endif
                 // always store j in the right interval...!
-                if((j >= jmin) && (j < jmax)){
+#ifdef FOR_FFS
+                if((j >= jmin) && (j < jmax) && j != previousj)
+#else
+                if((j >= jmin) && (j < jmax))
+#endif
+                {
                     // this will be the weight in the current slice
                     if ((tooheavy == NULL) || (tooheavy[j] == 0)) {
                         mat->weight++;
+#ifdef FOR_FFS
+                        buf[ibuf++] = (typerow_t) { .id = j, .e = 1};
+#else
                         buf[ibuf++] = j;
+#endif
                         if(mat->wt[GETJ(mat, j)] > 0){ // redundant test?
                             mat->R[GETJ(mat, j)][0]++;
                             mat->R[GETJ(mat, j)][mat->R[GETJ(mat, j)][0]] = i;
                         }
                     }
+#ifdef FOR_FFS
+                    previousj = j ;
+#endif
                 }
+#ifdef FOR_FFS
+                else if  (previousj == j && ibuf != 0)
+                    buf[ibuf-1].e++;
+#endif
             }
 #if !defined(USE_MPI)
             if(nb_heavy_j == ps->nc){
@@ -228,24 +265,31 @@ filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
 #endif
             // TODO: do not store rows not having at least one light
             // column, but do not decrease mat->nrows!
-            mat->rows[i] = (int32_t*) malloc ((ibuf+1) * sizeof (int32_t));
+            mat->rows[i] = (typerow_t*) malloc ((ibuf+1) * sizeof (typerow_t));
+#ifdef FOR_FFS
+            mat->rows[i][0].id = ibuf;
+            mat->rows[i][0].e = ibuf;
+#else
             mat->rows[i][0] = ibuf;
-            memcpy(mat->rows[i]+1, buf, ibuf * sizeof(int32_t));
+#endif
+            memcpy(mat->rows[i]+1, buf, ibuf * sizeof(typerow_t));
             // sort indices in val to ease row merges
-            qsort(mat->rows[i]+1, ibuf, sizeof(int32_t), cmp);
+            qsort(mat->rows[i]+1, ibuf, sizeof(typerow_t), cmp);
 #if DEBUG >= 1
             /* check all indices are distinct, otherwise this is a bug of
                purge */
             for (int k = 1; k < ibuf; k++)
-                if (mat->rows[i][k] == mat->rows[i][k+1])
+                if (matCell(mat, i, k) == matCell(mat, i, k+1))
                 {
                     fprintf (stderr, "Error, duplicate ideal %x in row %i\n",
-                            mat->rows[i][k], i);
+                            matCell(mat, i, k), i);
                     exit (1);
                 }
 #endif
         }
     }
+    fprintf(stderr, "read %d rows in %.1f s (%.1f MB/s, %.1f rows/s)\n", 
+                    ps->rrows, ps->dt, ps->mb_s, ps->rows_s);
     fprintf (stderr, "\n"); /* to keep last output on screen */
 #if !defined(USE_MPI)
     fprintf(stderr, "Number of heavy rows: %d\n", nh);
@@ -253,7 +297,7 @@ filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
     // we need to keep informed of what really happens; this will be an upper
     // bound on the number of active columns, I guess
     mat->rem_ncols = mat->ncols;
-    free (buf);
+    free (buf); 
     if (tooheavy != NULL)
         free (tooheavy);
     return 1;
@@ -345,24 +389,14 @@ remove_j_from_row(filter_matrix_t *mat, int i, int j)
     print_row(mat, i);
     fprintf(stderr, "\n");
 #endif
-#if USE_TAB == 0
-    for(k = 0; k < lengthRow(mat, i); k++)
-	if(cell(mat, i, k) == j)
+    for(k = 1; k <= matLengthRow(mat, i); k++)
+	if(matCell(mat, i, k) == j)
 	    break;
-    ASSERT(k < lengthRow(mat, i));
+    ASSERT(k <= matLengthRow(mat, i));
     // crunch
-    for(++k; k < lengthRow(mat, i); k++)
-	cell(mat, i, k-1) = cell(mat, i, k);
-#else
-    for(k = 1; k <= lengthRow(mat, i); k++)
-	if(cell(mat, i, k) == j)
-	    break;
-    ASSERT(k <= lengthRow(mat, i));
-    // crunch
-    for(++k; k <= lengthRow(mat, i); k++)
-	cell(mat, i, k-1) = cell(mat, i, k);
-#endif
-    lengthRow(mat, i) -= 1;
+    for(++k; k <= matLengthRow(mat, i); k++)
+        matCell(mat, i, k-1) = matCell(mat, i, k);
+    matLengthRow(mat, i) -= 1;
     mat->weight--;
 #if DEBUG >= 2
     fprintf(stderr, "row[%d]_a=", i);
@@ -378,24 +412,32 @@ weightSum(filter_matrix_t *mat, int i1, int i2)
 {
     int k1, k2, w, len1, len2;
 
-    len1 = (isRowNull(mat, i1) ? 0 : lengthRow(mat, i1));
-    len2 = (isRowNull(mat, i2) ? 0 : lengthRow(mat, i2));
+    len1 = (isRowNull(mat, i1) ? 0 : matLengthRow(mat, i1));
+    len2 = (isRowNull(mat, i2) ? 0 : matLengthRow(mat, i2));
     if((len1 == 0) || (len2 == 0))
-	fprintf(stderr, "i1=%d i2=%d len1=%d len2=%d\n", i1, i2, len1, len2);
+        fprintf(stderr, "i1=%d i2=%d len1=%d len2=%d\n", i1, i2, len1, len2);
     k1 = k2 = 1;
     w = 0;
-    while((k1 <= len1) && (k2 <= len2)){
-	if(cell(mat, i1, k1) < cell(mat, i2, k2)){
-	    k1++;
-	    w++;
-	}
-	else if(cell(mat, i1, k1) > cell(mat, i2, k2)){
-	    k2++;
-	    w++;
-	}
-	else{
-	    k1++; k2++;
-	}
+    while((k1 <= len1) && (k2 <= len2))
+    {
+        if(matCell(mat, i1, k1) < matCell(mat, i2, k2))
+        {
+            k1++;
+            w++;
+        }
+        else if(matCell(mat, i1, k1) > matCell(mat, i2, k2))
+        {
+            k2++;
+            w++;
+        }
+        else
+        {
+            k1++; 
+            k2++;
+#ifdef FOR_FFS
+            w++;
+#endif
+        }
     }
     return w + ((len1 + 1) - k1) + ((len2 + 1) - k2);
 }

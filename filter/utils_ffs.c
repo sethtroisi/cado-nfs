@@ -2,6 +2,8 @@
 
 #include "fppol.h"
 #include "utils.h"
+#include "filter_matrix.h"
+#include "sparse.h"
 #include "utils_ffs.h"
 
 unsigned int weight_ffs (relation_t rel)
@@ -11,9 +13,11 @@ unsigned int weight_ffs (relation_t rel)
 
   for (i = 0; i < rel.nb_rp; i++)
     w++; /* w should depend on rel.nb_rp[i].e, for now just constant */
+    //w += rel.rp[i].e;
 
   for (i = 0; i < rel.nb_ap; i++)
     w++; /* w should depend on rel.nb_ap[i].e, for now just constant */
+    //w += rel.ap[i].e;
 
   return w;
 }
@@ -93,4 +97,29 @@ int ffs_poly_read(cado_poly poly, const char *filename)
     fclose(file);
     return r;
 }
+/*
+void sort_ffs (filter_matrix_t *mat, int i, int32_t size)
+{
+  ideal_merge_ffs_t *tmp_array;
+  int k;
+  
+  //malloc
+  tmp_array = (ideal_merge_ffs_t*) malloc (size * sizeof (ideal_merge_ffs_t));
 
+  for (k = 0; k < size; k++)
+    {
+      tmp_array[k].id = mat->rows[i][k+1]; 
+      tmp_array[k].e = mat->coeff[i][k+1];
+    }
+
+  qsort(tmp_array, size, sizeof(ideal_merge_ffs_t), cmp);
+
+  for (k = 0; k < size; k++)
+    {
+      mat->rows[i][k+1] = tmp_array[k].id;
+      mat->coeff[i][k+1] = tmp_array[k].e; 
+    }
+
+  free (tmp_array);
+}
+*/

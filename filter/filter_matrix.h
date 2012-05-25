@@ -3,10 +3,19 @@
 
 #include "purgedfile.h"
 
-#define USE_TAB 1 // 1 for compact rows...
+#ifdef FOR_FFS
+#include "utils_ffs.h"
+#endif
 
 #define TRACE_COL -1 // 253224 // 231 // put to -1 if not...!
 #define TRACE_ROW -1 // 59496 // put to -1 if not...!
+
+#ifndef FOR_FFS
+#define typerow_t int32_t
+#else
+#define typerow_t ideal_merge_ffs_t
+#endif
+
 
 /* rows correspond to relations, and columns to primes (or prime ideals) */
 typedef struct {
@@ -15,7 +24,9 @@ typedef struct {
   int rem_nrows;     /* number of remaining rows */
   int rem_ncols;     /* number of remaining columns */
   int32_t jmin, jmax;    /* we are interested in columns [jmin..jmax[ */
-  int32_t **rows;
+  typerow_t **rows;     /* rows[i][k] contains indices of an ideal of row[i] 
+                         with 1 <= k <= rows[i][0] */
+                        /* FOR_FFS: struct containing also the exponent */
   int *wt;           /* weight w of column j, if w <= cwmax,
                         else <= 1 for a deleted column
                         (trick: we store -w if w > cwmax) */
@@ -61,17 +72,16 @@ extern int filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr,
 extern void remove_j_from_row(filter_matrix_t *mat, int i, int j);
 extern void print_row(filter_matrix_t *mat, int i);
 
-#if USE_TAB == 0
-#define isRowNull(mat, i) ((mat)->data[(i)].val == NULL)
-#define lengthRow(mat, i) (mat)->data[(i)].len
-#define cell(mat, i, k) (mat)->data[(i)].val[(k)]
-#define SPARSE_ITERATE(mat, i, k) for((k)=0; (k)<lengthRow((mat),(i)); (k)++)
-#else
 #define isRowNull(mat, i) ((mat)->rows[(i)] == NULL)
-#define lengthRow(mat, i) (mat)->rows[(i)][0]
-#define cell(mat, i, k) (mat)->rows[(i)][(k)]
-#define SPARSE_ITERATE(mat, i, k) for((k)=1; (k)<=lengthRow((mat),(i)); (k)++)
+#ifdef FOR_FFS
+#define matLengthRow(mat, i) (mat)->rows[(i)][0].id
+#define matCell(mat, i, k) (mat)->rows[(i)][(k)].id
+#else
+#define matLengthRow(mat, i) (mat)->rows[(i)][0]
+#define matCell(mat, i, k) (mat)->rows[(i)][(k)]
 #endif
+#define SPARSE_ITERATE(mat, i, k) for((k)=1; (k)<=lengthRow((mat),(i)); (k)++)
+
 extern void freeRj(filter_matrix_t *mat, int j);
 extern void remove_i_from_Rj(filter_matrix_t *mat, int i, int j);
 extern void add_i_to_Rj(filter_matrix_t *mat, int i, int j);
