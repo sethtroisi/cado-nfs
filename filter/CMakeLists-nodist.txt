@@ -18,4 +18,10 @@ add_executable(purge-ffs-f3 EXCLUDE_FROM_ALL purge.c utils_ffs.c)
 target_link_libraries(purge-ffs-f3 utils pthread libfppol-f3.a)
 set_property(TARGET purge-ffs-f3 APPEND PROPERTY COMPILE_FLAGS "-DFOR_FFS -DUSE_F3")
 
+add_executable(merge-ffs EXCLUDE_FROM_ALL merge.c markowitz.c mst.c report.c merge_mono.c filter_matrix.c sparse.c utils_ffs.c)
+#here we do not care about the characteristic because we only use non specific
+#functions
+target_link_libraries(merge-ffs utils libfppol-f2.a) 
+set_property(TARGET merge-ffs APPEND PROPERTY COMPILE_FLAGS "-DFOR_FFS -DUSE_F2")
+
 # vim: ft=cmake:

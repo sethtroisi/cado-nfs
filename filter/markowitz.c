@@ -257,8 +257,13 @@ pureMkz(filter_matrix_t *mat, int32_t j)
         for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
           if((i = mat->R[GETJ(mat, j)][k]) != -1){
 	    // this should be the weight of row i
+#ifdef FOR_FFS
+	    if(mat->rows[i][0].id < mkz)
+              mkz = mat->rows[i][0].id;
+#else
 	    if(mat->rows[i][0] < mkz)
               mkz = mat->rows[i][0];
+#endif
           }
         /* the lightest row has weight mkz, we add wt-1 times mkz-1,
            remove once mkz-1, and remove wt entries in the jth column */
@@ -297,8 +302,13 @@ lightColAndMkz(filter_matrix_t *mat, int32_t j)
     for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
 	if((i = mat->R[GETJ(mat, j)][k]) != -1){
 	    // this should be the weight of row i
-	    if(mat->rows[i][0] < mkz)
-		mkz = mat->rows[i][0];
+#ifdef FOR_FFS
+      if(mat->rows[i][0].id < mkz)
+          mkz = mat->rows[i][0].id;
+#else
+      if(mat->rows[i][0] < mkz)
+          mkz = mat->rows[i][0];
+#endif
 	}
     mkz = wj * cte + (mkz-1) * (wj-1);
 #if MKZ_TIMINGS
