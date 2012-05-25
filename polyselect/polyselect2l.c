@@ -1101,7 +1101,7 @@ collision_on_batch_sq ( header_t header,
     exit (1);
   }
 
-#ifdef DEBUG_POLYSELECT2L  /* check if crt roots correct */
+#ifdef DEBUG_POLYSELECT2L  /* check if crt roots are correct */
   for (i = 0; i < size; i ++) {
     mpz_t tmp_debug, tmp_debug2, qqz;
     mpz_init_set_ui (qqz, q[i]);
@@ -1115,6 +1115,11 @@ collision_on_batch_sq ( header_t header,
     if (mpz_cmp (tmp_debug, tmp_debug2) != 0) {
       fprintf (stderr, "Error: crt root is wrong in %s, iter: %d\n",
                __FUNCTION__, i);
+      fprintf (stderr, "We should have Ntilde = (m0+r)^d mod q^2\n");
+      gmp_fprintf (stderr, "Ntilde=%Zd m0=%Zd r=%Zd d=%d q=%lu\n",
+                   header->Ntilde, header->m0, rqqz[i], header->d, q[i]);
+      gmp_fprintf (stderr, "Ntilde mod q^2=%Zd\n", tmp_debug);
+      gmp_fprintf (stderr, "(m0+r)^d mod q^2=%Zd\n", tmp_debug2);
       exit (1);
     }
     mpz_clear (tmp_debug);
