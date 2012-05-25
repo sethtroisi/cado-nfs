@@ -32,8 +32,8 @@ machines=mach_desc      # file describing available computers for parallel
 ###########################################################################
 
 degree=4                # degree of the algebraic polynomial
-polsel_delay=30              # time between two checks
-polsel_nice=4            # nice level for selection
+polsel_delay=30         # time between two checks
+polsel_nice=4           # nice level for selection
 
 # one can expect
 # MurphyE(Bf=10000000,Bg=5000000,area=1.00e+16)=2.21e-06-2.44e-06
