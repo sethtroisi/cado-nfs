@@ -79,7 +79,7 @@ int factor_leftover_norm (mpz_t n, unsigned int b, mpz_array_t* const factors,
    similar for C2, S2. Assuming the two probabilities are independent enough,
    we can estimate the neg log of the probability that both sides are smooth 
    by C1[S1] + C2[S2]. 
-   If that sum does not exceed a theshold, the corresponding sieve entry is 
+   If that sum does not exceed a threshold, the corresponding sieve entry is
    a sieve survivor. 
    Alternative: have a bit array telling whether (S1,S2) is likely smooth */
 static inline int 

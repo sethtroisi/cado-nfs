@@ -23,6 +23,7 @@ filter/merge_mpi.c
 filter/merge_mpi.h
 misc/
 scripts/nightly-test
+scripts/polsel_effort
 polyselect/alpha.mpl
 polyselect/alpha.sage
 polyselect/alpha.c

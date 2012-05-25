@@ -33,17 +33,11 @@ degree=4                # degree of the algebraic polynomial
 polsel_delay=60              # time between two checks
 polsel_nice=4            # nice level for selection
 
-# on the test number
-# 136960567477911232827085375704850747150376015831973445877837593876746854479714821885706519161251
-# we get
-# lognorm: 33.34, alpha: -4.22 E=29.13
-# Murphy's E(Bf=10000000,Bg=5000000,area=1.00e+16)=1.92e-08
-
 ## Parameters of polyselect
-polsel_P=20000               # choose lc(g) with two prime factors in [P,2P]
+polsel_P=50000               # choose lc(g) with two prime factors in [P,2P]
 polsel_maxnorm=34.7          # max. lognorm of polynomials (before rootsieve)
-polsel_admax=1e6             # max value for lc(f)
-polsel_adrange=2e4           # individual tasks
+polsel_admax=1e5             # max value for lc(f)
+polsel_adrange=1e4           # individual tasks
 polsel_kmax=20               # rotation is bounded by 2^kmax
 polsel_incr=60               # forced divisor of lc(f)
 polsel_lq=2                  # special-q in lc(g) has such many factors

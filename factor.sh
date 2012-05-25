@@ -153,7 +153,7 @@ EOF
 
 if [ $ssh -eq 0 ]; then
   $cadofactor $t/param n=$n bindir=$bindir parallel=0 \
-  sieve_max_threads=$cores poly_max_threads=$cores nthchar=$cores\
+  sieve_max_threads=$cores nthchar=$cores\
   bwmt=$bwmt wdir=$t sievenice=0 polsel_nice=0 logfile=$t/out "$@"
 else
   $cadofactor $t/param n=$n bindir=$bindir parallel=1 \
