@@ -363,33 +363,36 @@ static int deg_norm_prec_N(ffspol_t ffspol_ij, int degi, fppol_t *pow_i, int deg
     int max_deg_prec;
     int deg_sum_prec; 
     unsigned int deg_drop; 
-    /* deg_drop = max_deg_prec - deg_sum will be the drop in degree
+    /* deg_drop = max_deg_prec - deg_sum_prec will be the drop in degree
        due to cancellations if deg_sum is >= 0.
 
        If deg_sum == -1, it means that the precision is insufficient
-       to know precisely the degree of the sum. */
+       to know precisely the degree of the sum, then deg_drop > max_deg_prec */
     
     do {
       fppol64_set(sum, monomials[tab_size]);
       max_deg_prec = fppol64_deg(monomials[tab_size]);
+      if (max_deg_prec != (int) (N - 1))
+	fprintf(stderr, "N = %u, max_deg_prec = %d \t", N, max_deg_prec);
       
       /* we make the sum of all monomials of maximal degree */
       while (tab_size > 0 && degrees[tab_size] == degrees[tab_size - 1]) {
 	/* I have to make sure that the syntax of the condition is valid 
 	 that is degrees[tab_size - 1] will not be evaluated if tab_size == 0 */
 	--tab_size;
+	if (max_deg_prec != (int) (N - 1)) {
+	  int shift = fppol64_deg(monomials[tab_size]) - max_deg_prec + 1;  
+	  fppol64_div_ti(monomials[tab_size], monomials[tab_size], (unsigned int) shift);
+	}
 	fppol64_add(sum, sum, monomials[tab_size]);
-	/* TODO : PB in this sum. The drop in precision has not been handled properly */
       }
       
       deg_sum_prec = fppol64_deg(sum);
       deg_drop = max_deg_prec - deg_sum_prec;
-      /* TODO : potential PB in this deg_drop. It does not give an
-	 exact value for the new degree if deg_sum == -1 */
       
       /* If the drop in degree is smaller than the precision, we put 
 	 sum in monomials[] and degree in degrees[] and keep the tables sorted */
-      if (deg_drop <= N) {
+      if ((int) deg_drop <= max_deg_prec) {
 	degree = degrees[tab_size] - deg_drop;
 	int l = tab_size;
 	while (l > 0 && degrees[l - 1] > degree) {
