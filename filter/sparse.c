@@ -137,7 +137,6 @@ addRows(typerow_t **rows, int i1, int i2, MAYBE_UNUSED int32_t j)
 #else
 #ifdef FOR_FFS
         tmp[0].id = k-1;
-        tmp[0].e = k-1;
 #else
         tmp[0] = k-1;
 #endif

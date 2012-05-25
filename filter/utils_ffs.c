@@ -8,8 +8,10 @@
 
 unsigned int weight_ffs (int e)
 {
-  /* Should depend on e, for now jsut constant*/
-  return 1;
+  if (e == 0)
+      return 0;
+  else
+      return 1; /* Should depend on e, for now jsut constant*/
 }
 
 unsigned int weight_rel_ffs (relation_t rel)

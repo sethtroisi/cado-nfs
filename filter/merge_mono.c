@@ -34,14 +34,14 @@ static unsigned long row_additions = 0;
 
 // not mallocing to speed up(?).
 static int
-findBestIndex(filter_matrix_t *mat, int m, int32_t *ind)
+findBestIndex(filter_matrix_t *mat, int m, int32_t *ind, int32_t ideal)
 {
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], i, j, imin, wmin, w;
 
     ASSERT(m <= MERGE_LEVEL_MAX);
     if(m == 2)
 	return 0;
-    fillRowAddMatrix(A, mat, m, ind);
+    fillRowAddMatrix(A, mat, m, ind, ideal);
     // iterate over all vertices
     imin = -1;
     wmin = 0;
@@ -247,7 +247,7 @@ tryAllCombinations(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind,
 
     if(m == 1)
       printf ("Warning: m=1 in tryAllCombinations\n");
-    i = findBestIndex(mat, m, ind);
+    i = findBestIndex(mat, m, ind, j);
 #if DEBUG >= 1
     printf ("Minimal is i=%d (%d %d)\n", i, ind[0], ind[1]);
 #endif
@@ -355,7 +355,7 @@ useMinimalSpanningTree(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind,
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
 
     *tfill = seconds();
-    fillRowAddMatrix(A, mat, m, ind);
+    fillRowAddMatrix(A, mat, m, ind, j);
     *tfill = seconds()-*tfill;
     MSTWithA(rep, mat, m, ind, j, tMST, A);
 }
