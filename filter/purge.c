@@ -265,14 +265,8 @@ fprint_alg (int *table_ind, int *nb_coeff, relation_t *rel, hashtable_t *H)
 #else
   int j;
   for (i = 0; i < rel->nb_ap; i++)
-   {
-    for (j = 0; j < rel->ap[i].e; j++)
-     {
-      int tmp= getHashAddr (H, rel->ap[i].p, rel->ap[i].r);
-      int tmp2= H->renumber[tmp];
-      table_ind[nbc++]=tmp2;
-     }
-   }
+   for (j = 0; j < rel->ap[i].e; j++)
+    table_ind[nbc++] = H->renumber[getHashAddr (H, rel->ap[i].p, rel->ap[i].r)];
 #endif
 
   *nb_coeff = nbc;
@@ -811,14 +805,8 @@ reread (const char *oname, const char *oname2, char ** ficname, hashtable_t *H,
 #else
               if (relation_stream_get(rs, NULL, 0, ab_base) < 0)
                 break;
-              if (raw == 0)
-              {
-                  if (rs->rel.b > 0)
-                      computeroots_ffs (&rs->rel);
-                  fprint_rel_row (ofile2, irel, rs->rel, H);
-              }
-              else
-                  fprint_relation_raw (ofile2, &rs->rel);
+
+              fprint_relation_raw (ofile2, &rs->rel);
 #endif
             }
           else
@@ -1357,6 +1345,9 @@ usage (void)
   fprintf (stderr, "       -nprimes nnn - expected number of prime ideals\n");
   fprintf (stderr, "       -sos sosfile - to keep track of the renumbering\n");
   fprintf (stderr, "       -raw         - output relations in CADO format\n");
+#ifdef FOR_FFS
+  fprintf (stderr, "       -outdel file - output file for deleted relations\n");
+#endif
   exit (1);
 }
 
