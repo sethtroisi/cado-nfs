@@ -300,8 +300,8 @@ static void to_prec_N(fppol64_ptr r, fppol_t p, unsigned int N)
     /* as 0 < N <= 32, we can set it in a fppol64_t */
     fppol64_set_mp(r, tmp);
   }
-  else { /* it means that to_prec_N is zero */
-    fppol64_set_zero(r);
+  else {
+    fppol64_set_mp(r, p);
   }
 }
 
@@ -486,11 +486,11 @@ static MAYBE_UNUSED int deg_norm_ij_v2(ffspol_ptr ffspol_ij, ij_t i, ij_t j, int
 
     for (int k = 1; k < ffspol_ij->deg + 1; ++k) {
       fppol_init(pow_i[k]);
-      fppol_mul(pow_i[k], pow_j[k - 1], ii);
+      fppol_mul(pow_i[k], pow_i[k - 1], ii);
     }
     
     deg_norm = deg_norm_prec_N(ffspol_ij, degi, pow_i, degj, pow_j, gap, max_deg);
-    if (*gap == max_deg + 1)
+       if (*gap == max_deg + 1)
       deg_norm = deg_norm_full(ffspol_ij, pow_i, pow_j, gap, max_deg);
     
     fppol_clear(ii);
@@ -604,7 +604,7 @@ void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
                   pos, fppol_deg(norm)-degq);
         }
 #endif
-        int deg = deg_norm_ij(ffspol_ij, hati, hatj);
+        int deg = deg_norm_ij(ffspol_ij, hati, hatj); 
         /* int gap = -1;
 	   int deg = deg_norm_ij_v2(ffspol_ij, hati, hatj, &gap); */
         if (deg > 0) {
