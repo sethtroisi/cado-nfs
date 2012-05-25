@@ -136,6 +136,14 @@ binom ( unsigned long n,
   return tot;
 }
 
+static int
+compare (const void *v1, const void *v2)
+{
+  unsigned long *w1 = (unsigned long*) v1;
+  unsigned long *w2 = (unsigned long*) v2;
+
+  return (*w1 >= *w2) ? -1 : 1;
+}
 
 /* prepare special-q's roots */
 void
@@ -173,6 +181,8 @@ comp_sq_roots ( header_t header,
     mpz_mod_ui (f[0], header->Ntilde, q);
     mpz_neg (f[0], f[0]); /* f = x^d - N */
     nrq = poly_roots_ulong (rq, f, header->d, q);
+    /* sort the roots to get reproducible results */
+    qsort (rq, nrq, sizeof(unsigned long), compare);
     roots_lift (rq, header->Ntilde, header->d, header->m0, q, nrq);
     qroots_add (SQ_R, q, nrq, rq);
     modul_clearmod (qq);
