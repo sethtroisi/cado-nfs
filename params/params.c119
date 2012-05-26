@@ -39,7 +39,7 @@ polsel_maxnorm=39            # max. lognorm of polynomials (before rootsieve)
 polsel_admax=5e8             # max value for lc(f)
 polsel_adrange=5e6           # individual tasks
 polsel_kmax=22               # rotation is bounded by 2^kmax
-polsel_incr=30030            # forced divisor of lc(f)
+polsel_incr=27720            # forced divisor of lc(f)
 polsel_lq=3                  # special-q in lc(g) has such many factors
 
 ###########################################################################
@@ -74,11 +74,8 @@ sieve_max_threads=2
 # Filtering
 ###########################################################################
 
-excessratio=1.01        # minimal excess we want before pruning
 keeppurge=160           # shrink in purge if excess exceeds keeppurge
 maxlevel=20
-cwmax=100
-rwmax=100
 ratio=1.1
 bwstrat=3
 

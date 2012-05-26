@@ -68,7 +68,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "utils.h"
 #include "hashpair.h"
 #include "gzip.h"
-#include "filter_matrix.h" /* for BURIED_MAX_DENSITY */
 
 #define MAX_FILES 1000000
 #define MAX_STEPS 10   /* maximal number of steps in each pass */

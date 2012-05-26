@@ -61,6 +61,9 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <errno.h>
 
 #include "utils.h"
+#ifdef FOR_FFS
+#include "utils_ffs.h"
+#endif
 
 #define MAX_FILES 1000000
 #define MAX_STEPS 10   /* maximal number of singleton removal steps */
@@ -74,7 +77,6 @@ static int ret MAYBE_UNUSED;
 static int nrel, nprimes = 0;
 static unsigned long nrelmax = 0;
 static int nrel_new, nprimes_new, Hsize, Hsizer, Hsizea;
-static double excess = 1.01;    /* minimum initial excess */
 static long keep = 160;         /* default maximum final excess */
 static long minpr = -1, minpa = -1; /* negative values mean use minpr=rlim and
 				       minpa=alim */
@@ -83,7 +85,6 @@ static unsigned long tot_alloc, tot_alloc0;
 static int need64 = 0; /* non-zero if large primes are > 2^32 */
 static int raw = 0;
 static char ** fic;
-static int noclique = 0;
 static double wct0;
 static bit_vector rel_used;
 static relation_stream rs;
@@ -236,8 +237,16 @@ fprint_rat (int *table_ind, int *nb_coeff, relation_t *rel, hashtable_t *H)
 {
   int i, nbc = *nb_coeff;
 
+#ifndef FOR_FFS
   for (i = 0; i < rel->nb_rp; i++)
     table_ind[nbc++] = H->renumber[getHashAddr (H, rel->rp[i].p, minus2)];
+#else
+  int j;
+  for (i = 0; i < rel->nb_rp; i++)
+    for (j = 0; j < rel->rp[i].e; j++)
+      table_ind[nbc++] = H->renumber[getHashAddr (H, rel->rp[i].p, minus2)];
+#endif
+ 
   *nb_coeff = nbc;
 }
 
@@ -250,8 +259,16 @@ fprint_alg (int *table_ind, int *nb_coeff, relation_t *rel, hashtable_t *H)
 {
   int i, nbc = *nb_coeff;
 
+#ifndef FOR_FFS
   for (i = 0; i < rel->nb_ap; i++, nbc++)
     table_ind[nbc] = H->renumber[getHashAddr (H, rel->ap[i].p, rel->ap[i].r)];
+#else
+  int j;
+  for (i = 0; i < rel->nb_ap; i++)
+   for (j = 0; j < rel->ap[i].e; j++)
+    table_ind[nbc++] = H->renumber[getHashAddr (H, rel->ap[i].p, rel->ap[i].r)];
+#endif
+
   *nb_coeff = nbc;
 }
 
@@ -301,7 +318,13 @@ fprint_rel_row (FILE *file, int irel, relation_t rel, hashtable_t *H)
   int *table_ind;
   int nb_coeff;
 
+#ifndef FOR_FFS
   table_ind = (int*) malloc ((rel.nb_rp + rel.nb_ap) * sizeof (int));
+#else
+  /*For FFS, the exponents can be different from 1.*/
+  /*FIXME do better than 4x */
+  table_ind = (int*) malloc (4 * (rel.nb_rp + rel.nb_ap) * sizeof (int));
+#endif
 
   nb_coeff = 0;
 
@@ -325,7 +348,11 @@ fprint_rel_row (FILE *file, int irel, relation_t rel, hashtable_t *H)
 
   free (table_ind);
 
+#ifndef FOR_FFS
   return nb_coeff;
+#else
+  return weight_ffs (rel);
+#endif
 }
 
 /* First we count the number of large primes; then we store all primes in
@@ -360,8 +387,15 @@ insertNormalRelation (unsigned int j)
     {
       /* Hack to equilibrate the two threads works */
       if (!(equi_th[i & (LG_EQUI_TH - 1)]))
-	buf_rel[j].rel.ap[i].r = 
-	  findroot (buf_rel[j].rel.a, buf_rel[j].rel.b, buf_rel[j].rel.ap[i].p);
+        {
+#ifndef FOR_FFS
+	        buf_rel[j].rel.ap[i].r = findroot (buf_rel[j].rel.a, 
+                                   buf_rel[j].rel.b, buf_rel[j].rel.ap[i].p);
+#else
+	       buf_rel[j].rel.ap[i].r = findroot_ffs (buf_rel[j].rel.a, 
+                                  buf_rel[j].rel.b, buf_rel[j].rel.ap[i].p);
+#endif
+        }
       h = hashInsert (&H, buf_rel[j].rel.ap[i].p, buf_rel[j].rel.ap[i].r);
       nprimes += (H.hashcount[h] == 1); /* new ideal */
       if (((long) buf_rel[j].rel.ap[i].p) >= minpa)
@@ -369,8 +403,12 @@ insertNormalRelation (unsigned int j)
     }
   my_tmp[itmp++] = -1; /* sentinel */
   ASSERT_ALWAYS(itmp == buf_rel[j].ltmp);
-  rel_weight[buf_rel[j].num] = buf_rel[j].rel.nb_rp + buf_rel[j].rel.nb_ap;
   /* total relation weight */
+#ifndef FOR_FFS
+  rel_weight[buf_rel[j].num] = buf_rel[j].rel.nb_rp + buf_rel[j].rel.nb_ap;
+#else
+  rel_weight[buf_rel[j].num] = weight_ffs (buf_rel[j].rel);
+#endif
   rel_compact[buf_rel[j].num] = my_tmp;
 }
 
@@ -402,7 +440,12 @@ insertFreeRelation (unsigned int j)
     }
   my_tmp[itmp++] = -1;
   ASSERT_ALWAYS(itmp == buf_rel[j].ltmp);
-  rel_weight[buf_rel[j].num] = 1 + buf_rel[j].rel.nb_ap; /* relation weight */
+  /* total relation weight */
+#ifndef FOR_FFS
+  rel_weight[buf_rel[j].num] = 1 + buf_rel[j].rel.nb_ap;
+#else
+  rel_weight[buf_rel[j].num] = weight_ffs (buf_rel[j].rel);
+#endif
   rel_compact[buf_rel[j].num] = my_tmp;
 }
 
@@ -618,11 +661,13 @@ remove_singletons (int *nrel, int nrelmax, int *nprimes, hashtable_t *H,
       oldexcess = excess;
 
       /* delete heavy rows */
-      deleteHeavierRows (H, &newnrel, &newnprimes, nrelmax, keep);
-
-      if (newnrel != old)
-        fprintf (stderr, "deleted heavier relations: %d %d at %2.2lf\n",
-                 newnrel, newnprimes, seconds ());
+      if (count >= MAX_STEPS/2)
+        {
+          deleteHeavierRows (H, &newnrel, &newnprimes, nrelmax, keep);
+          if (newnrel != old)
+            fprintf (stderr, "deleted heavier relations: %d %d at %2.2lf\n",
+                     newnrel, newnprimes, seconds ());
+        }
 
       onepass_singleton_removal (nrelmax, &newnrel, &newnprimes, H);
 
@@ -711,12 +756,19 @@ renumber (int *nprimes, hashtable_t *H, const char *sos)
 /* Read again the relation files ficname[0], ..., ficname[nbfic-1],
    and output remaining relations (those with rel_used[i] <> 0) in ofile.
 
+   For FFS ouput deleted relations (those with rel_used[i] == 0) in ofile2
+
    If raw is non-zero, output relations in CADO format
    (otherwise in format used by merge).
 */
 static void
+#ifndef FOR_FFS
 reread (const char *oname, char ** ficname, hashtable_t *H,
         bit_vector_srcptr rel_used, int nrows, int ncols, int raw)
+#else
+reread (const char *oname, const char *oname2, char ** ficname, hashtable_t *H,
+        bit_vector_srcptr rel_used, int nrows, int ncols, int raw)
+#endif
 {
   FILE *ofile;
   int ret MAYBE_UNUSED, nr = 0;
@@ -724,11 +776,16 @@ reread (const char *oname, char ** ficname, hashtable_t *H,
   int pipe;
 #ifdef FOR_FFS
   unsigned int ab_base = 16; 
+  FILE *ofile2;
+  int pipe2;
 #else
   unsigned int ab_base = 10; 
 #endif
 
   ofile = fopen_compressed_w(oname, &pipe, NULL);
+#ifdef FOR_FFS
+  ofile2 = fopen_compressed_w(oname2, &pipe2, NULL);
+#endif
   if (raw == 0)
     fprintf (ofile, "%d %d\n", nrows, ncols);
   fprintf (stderr, "Final pass:\n");
@@ -742,8 +799,15 @@ reread (const char *oname, char ** ficname, hashtable_t *H,
           int irel = rs->nrels;
           if (bit_vector_getbit (rel_used, irel) == 0) /* skipped relation */
             {
+#ifndef FOR_FFS
               if (relation_stream_get_skip (rs) < 0)
                 break; /* end of file */
+#else
+              if (relation_stream_get(rs, NULL, 0, ab_base) < 0)
+                break;
+
+              fprint_relation_raw (ofile2, &rs->rel);
+#endif
             }
           else
             {
@@ -754,8 +818,12 @@ reread (const char *oname, char ** ficname, hashtable_t *H,
               {
                   if (rs->rel.b > 0)
                   {
+#ifndef FOR_FFS
                       reduce_exponents_mod2 (&rs->rel);
                       computeroots (&rs->rel);
+#else
+                      computeroots_ffs (&rs->rel);
+#endif
                   }
                   W += (double) fprint_rel_row (ofile, irel, rs->rel, H);
               }
@@ -782,6 +850,10 @@ reread (const char *oname, char ** ficname, hashtable_t *H,
           rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
   relation_stream_clear(rs);
   if (pipe) pclose(ofile); else fclose(ofile);
+  
+#ifdef FOR_FFS
+  if (pipe2) pclose(ofile2); else fclose(ofile2);
+#endif
 
   /* write excess to stdout */
   if (raw == 0)
@@ -865,6 +937,11 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j)
   unsigned long pr;
   unsigned char c, v;
   unsigned int ltmp;
+#ifdef FOR_FFS
+  unsigned int basis_ab = 16;
+#else
+  unsigned int basis_ab = 10;
+#endif
   
 #define LOAD_ONE(P) { c = *P; P = ((size_t) (P - pminlessone) & (PREMPT_BUF - 1)) + pmin; }
   
@@ -877,7 +954,7 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j)
   }
   else
     buf_rel[j].rel.a = 1;
-  for (n = 0 ; (v = ugly[c]) < 10 ; ) {
+  for (n = 0 ; (v = ugly[c]) < basis_ab ; ) {
 #ifdef FOR_FFS
     n = (n << 4) + v;
 #else
@@ -890,7 +967,7 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j)
   
   n = 0;
   LOAD_ONE(p);
-  for ( ; (v = ugly[c]) < 10 ; ) {
+  for ( ; (v = ugly[c]) < basis_ab ; ) {
 #ifdef FOR_FFS
     n = (n << 4) + v;
 #else
@@ -957,33 +1034,57 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j)
     }
     buf_rel[j].rel.nb_ap = k;
 
-    if (buf_rel[j].rel.b > 0) {
+    if (buf_rel[j].rel.b > 0) 
+     {
       ltmp = 1;
       for (k = 0, i = 0; i < (unsigned int) buf_rel[j].rel.nb_rp; i++)
-	if (buf_rel[j].rel.rp[i].e & 1)
-	  {
-	    buf_rel[j].rel.rp[k] = (rat_prime_t) { .p = buf_rel[j].rel.rp[i].p, .e = 1 };
-	    ltmp += ((long) buf_rel[j].rel.rp[k].p >= minpr);
-	    k++;
-	  }
+       {
+#ifndef FOR_FFS
+        if (buf_rel[j].rel.rp[i].e & 1)
+#else
+        if (buf_rel[j].rel.rp[i].e >= 1)
+#endif
+         {
+          buf_rel[j].rel.rp[k] = (rat_prime_t) { .p = buf_rel[j].rel.rp[i].p, 
+                                                 .e = 1 };
+          ltmp += ((long) buf_rel[j].rel.rp[k].p >= minpr);
+          k++;
+         }
+       }
       buf_rel[j].rel.nb_rp = k;
       for (k = 0, i = 0; i < (unsigned int) buf_rel[j].rel.nb_ap; i++)
-	if (buf_rel[j].rel.ap[i].e & 1) {
-	  buf_rel[j].rel.ap[k].p = buf_rel[j].rel.ap[i].p;
-	  buf_rel[j].rel.ap[k].e = 1;
-	  /* Hack to equilibrate the two threads works */
-	  if (equi_th[k & (LG_EQUI_TH - 1)])
-	    buf_rel[j].rel.ap[k].r = 
-	      findroot (buf_rel[j].rel.a, buf_rel[j].rel.b, buf_rel[j].rel.ap[k].p);
-	  ltmp += ((long) buf_rel[j].rel.ap[k].p >= minpa);
-	  k++;
-	}
+       {
+#ifndef FOR_FFS
+        if (buf_rel[j].rel.ap[i].e & 1) 
+#else
+        if (buf_rel[j].rel.ap[i].e >= 1)
+#endif
+         {
+          buf_rel[j].rel.ap[k].p = buf_rel[j].rel.ap[i].p;
+          buf_rel[j].rel.ap[k].e = 1;
+          /* Hack to equilibrate the two threads works */
+          if (equi_th[k & (LG_EQUI_TH - 1)])
+           {
+#ifndef FOR_FFS
+            buf_rel[j].rel.ap[k].r = findroot (buf_rel[j].rel.a,
+                                     buf_rel[j].rel.b, buf_rel[j].rel.ap[k].p);
+#else
+            buf_rel[j].rel.ap[k].r = findroot_ffs (buf_rel[j].rel.a,
+                                     buf_rel[j].rel.b, buf_rel[j].rel.ap[k].p);
+#endif
+           }
+          ltmp += ((long) buf_rel[j].rel.ap[k].p >= minpa);
+          k++;
+         }
+       }
       buf_rel[j].rel.nb_ap = k;
-    }
-    else {
+     }
+    else 
+     {
       ltmp = ((long) buf_rel[j].rel.a >= minpr) + 1;
-      if ((long) buf_rel[j].rel.a >= minpa) ltmp += buf_rel[j].rel.nb_ap;
-    }
+      if ((long) buf_rel[j].rel.a >= minpa) 
+        ltmp += buf_rel[j].rel.nb_ap;
+     }
     buf_rel[j].ltmp = ltmp;
   }
 }
@@ -1238,17 +1339,19 @@ usage (void)
 {
   fprintf (stderr, "Usage: purge [options] -poly polyfile -out purgedfile -nrels nnn [-basepath <path>] [-subdirlist <sl>] [-filelist <fl>] file1 ... filen\n");
   fprintf (stderr, "Options:\n");
-  fprintf (stderr, "       -excess  nnn - initial excess (default 1.01)\n");
   fprintf (stderr, "       -keep    nnn - prune if excess > nnn (default 160)\n");
   fprintf (stderr, "       -minpa   nnn - purge alg. primes >= nnn (default alim)\n");
   fprintf (stderr, "       -minpr   nnn - purge rat. primes >= nnn (default rlim)\n");
   fprintf (stderr, "       -nprimes nnn - expected number of prime ideals\n");
   fprintf (stderr, "       -sos sosfile - to keep track of the renumbering\n");
   fprintf (stderr, "       -raw         - output relations in CADO format\n");
-  fprintf (stderr, "       -noclique n  - if n <> 0, don't do clique removal\n");
+#ifdef FOR_FFS
+  fprintf (stderr, "       -outdel file - output file for deleted relations\n");
+#endif
   exit (1);
 }
 
+#ifndef FOR_FFS
 /* estimate the number of primes <= B */
 static int
 approx_phi (long B)
@@ -1256,6 +1359,22 @@ approx_phi (long B)
   ASSERT_ALWAYS((double) B <= 53030236260.0); /* otherwise B/log(B) > 2^31 */
   return (B <= 1) ? 0 : (int) ((double) B / log ((double) B));
 }
+#else
+/* estimate the number of ideals of degree <= B */
+static int
+approx_ffs (int d)
+{
+#ifdef USE_F2 
+  ASSERT_ALWAYS(d <= 36); /* otherwise the result is > 2^31 */
+  return (d < 0) ? 0 : (int) ((double) pow (2.0, (double) d)/((double) d));
+#elif USE_F3
+  ASSERT_ALWAYS(d <= 22); /* otherwise the result is > 2^31 */
+  return (d < 0) ? 0 : (int) ((double) pow (3.0, (double) d)/((double) d));
+#else
+  ASSERT_ALWAYS(0);
+#endif
+}
+#endif
 
 int
 main (int argc, char **argv)
@@ -1288,23 +1407,28 @@ main (int argc, char **argv)
   param_list_parse_int(pl, "nprimes", &nprimes);
   param_list_parse_long(pl, "minpr", &minpr);
   param_list_parse_long(pl, "minpa", &minpa);
-  param_list_parse_double(pl, "excess", &excess);
   param_list_parse_long(pl, "keep", &keep);
-  param_list_parse_int(pl, "noclique", &noclique);
 
   const char * filelist = param_list_lookup_string(pl, "filelist");
   const char * basepath = param_list_lookup_string(pl, "basepath");
   const char * subdirlist = param_list_lookup_string(pl, "subdirlist");
   const char * purgedname = param_list_lookup_string(pl, "out");
   const char * sos = param_list_lookup_string(pl, "sos");
-  
+#ifdef FOR_FFS
+  const char * deletedname = param_list_lookup_string(pl, "outdel");
+#endif
+
   cado_poly_init (pol);
   
   const char * tmp;
   
   ASSERT_ALWAYS((tmp = param_list_lookup_string(pl, "poly")) != NULL);
+#ifndef FOR_FFS
   cado_poly_read(pol, tmp);
-  
+#else
+  ffs_poly_read(pol, tmp);
+#endif
+
   if (param_list_warn_unused(pl)) {
     usage();
   }
@@ -1320,10 +1444,33 @@ main (int argc, char **argv)
       usage ();
     }
   
+#ifdef FOR_FFS /* For FFS we need to remember the renumbering of primes*/
+  if (sos == NULL)
+    {
+      fprintf (stderr, "Error, missing -sos option.\n");
+      exit(1);
+    }
+  if (deletedname == NULL)
+    {
+      fprintf (stderr, "Error, missing -outdel option.\n");
+      exit(1);
+    }
+#endif
+
   /* On a 32-bit computer, even 1 << 32 would overflow. Well, we could set
      map[ra] = 2^32-1 in that case, but not sure we want to support 32-bit
      primes on a 32-bit computer... */
+#ifdef FOR_FFS
+#ifdef USE_F2 
   need64 = (pol->rat->lpb >= 32) || (pol->alg->lpb >= 32);
+#elif USE_F3
+  need64 = (pol->rat->lpb >= 16) || (pol->alg->lpb >= 16);
+#else
+  ASSERT_ALWAYS(0);
+#endif
+#else
+  need64 = (pol->rat->lpb >= 32) || (pol->alg->lpb >= 32);
+#endif
   
   if (need64 && sizeof (long) < 8)
     {
@@ -1345,8 +1492,13 @@ main (int argc, char **argv)
     {
       /* Estimating the number of needed primes (remember that hashInit
          multiplies by a factor 1.5). */
+#ifndef FOR_FFS
       Hsizer = approx_phi (1L << pol->rat->lpb);
       Hsizea = approx_phi (1L << pol->alg->lpb);
+#else
+      Hsizer = approx_ffs (pol->rat->lpb);
+      Hsizea = approx_ffs (pol->alg->lpb);
+#endif
       Hsize = Hsizer + Hsizea;
     }
   fprintf (stderr, "Estimated number of prime ideals: %d\n", Hsize);
@@ -1411,8 +1563,22 @@ main (int argc, char **argv)
 
   tot_alloc = tot_alloc0;
       
+#ifndef FOR_FFS
   fprintf (stderr, "Pass 1, filtering ideals >= %ld on rat. side and "
            "%ld on alg. side:\n", minpr, minpa);
+#else
+  fprintf (stderr, "Pass 1, filtering ideals of degree >= %ld on rat. side "
+           "and %ld on alg. side:\n", minpr, minpa);
+#ifdef USE_F2 
+  minpr = 1 << minpr;
+  minpa = 1 << minpa;
+#elif USE_F3
+  minpr = 1 << (2*minpr);
+  minpa = 1 << (2*minpa);
+#else
+  ASSERT_ALWAYS(0);
+#endif
+#endif
 
   hashInit (&H, Hsize, 1, need64);
 
@@ -1420,8 +1586,7 @@ main (int argc, char **argv)
 
   fprintf (stderr, "   nrels=%d, nprimes=%d; excess=%d\n",
            nrel, nprimes, nrel - nprimes);
-      
-  fprintf (stderr, "   Starting singleton removal...\n");
+
   nrel_new = nrel;
   nprimes_new = nprimes;
 
@@ -1448,13 +1613,17 @@ main (int argc, char **argv)
   /*************************** second pass ***********************************/
 
   /* we renumber the primes in order of apparition in the hashtable */
-  fprintf (stderr, "Renumbering primes...\n");
   renumber (&nprimes_new, &H, sos);
   
   /* reread the relation files and convert them to the new coding */
   fprintf (stderr, "Storing remaining relations...\n");
+#ifndef FOR_FFS
   reread (purgedname, fic, &H, rel_used, nrel_new, nprimes_new, raw);
-  
+#else
+  reread (purgedname, deletedname, fic, &H, rel_used, nrel_new, nprimes_new, 
+                                                                raw);
+#endif
+
   hashFree (&H);
   bit_vector_clear(rel_used);
   cado_poly_clear (pol);

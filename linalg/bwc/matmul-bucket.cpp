@@ -128,7 +128,7 @@ using namespace std;
  * horizontal strips. The buffers corresponding to the densest horizontal
  * strip are flushed after each vstrip processing. Those which are twice
  * sparser are flushed twice less often. Thus the next vstrip occupies
- * some more buffer shape. This pattern goes until the sparsest block,
+ * some more buffer space. This pattern goes until the sparsest block,
  * which is probably flushed only once. The total amount of buffer space
  * needed is proportional to the number of coefficients in an area having
  * a staircase shape. Assume we have N vstrips of width W. Assume

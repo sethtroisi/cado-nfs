@@ -288,10 +288,9 @@ makeIndexFile(const char *indexname, int nrows, int **newrows, int small_nrows, 
 // contains the new index for j. Heavier columns are in front of the new
 // matrix.
 static void
-renumber(const char * sosname, int *small_ncols, int *colweight, int ncols)
+renumber (int *small_ncols, int *colweight, int ncols)
 {
     int j, k, nb, *tmp;
-    uint64_t w;
 
     tmp = (int *)malloc((ncols<<1) * sizeof(int));
     ASSERT_ALWAYS(tmp != NULL);
@@ -308,39 +307,10 @@ renumber(const char * sosname, int *small_ncols, int *colweight, int ncols)
     fprintf (stderr, "Sorting %d columns by decreasing weight\n",
              *small_ncols);
     qsort(tmp, nb>>1, 2*sizeof(int), cmp);
-    for (w = 0, j = 2; j <= 4000 && j <= nb; j += 2)
-      {
-        w += (uint64_t) tmp[nb - j];
-        if ((j & 63) == 0)
-          fprintf (stderr, "Total weight of heaviest %d columns is %"
-                   PRIu64 "\n", j >> 1, w);
-      }
     memset(colweight, 0, ncols * sizeof(int));
-#if 0
-    // useful for Gauss only...
-    fprintf(stderr, "Sorting in Increasing weight order of j\n");
-    for(j = 0, k = 1; j < nb; j += 2)
-	colweight[tmp[j+1]] = k++; // always this +1 trick
-#else
     // useful for BW + skipping heavy part only...
     for(j = nb-1, k = 1; j >= 0; j -= 2)
 	colweight[tmp[j]] = k++; // always this +1 trick
-    if (sosname) {
-        fprintf(stderr, "Saving ideal renumbering info to %s\n", sosname);
-        FILE * f = fopen(sosname, "w");
-        ASSERT_ALWAYS(f);
-        for(j = nb-1, k = 0; j >= 0; j -= 2) {
-            // column number k in the output matrix corresponds to ideal
-            // number tmp[j] (whose meaning can be fetched from the sos
-            // file produced by purge)
-            uint32_t z = tmp[j];
-            int r = fwrite32_little(&z, 1, f);
-            ASSERT_ALWAYS(r == 1);
-        }
-        fclose(f);
-    }
-
-#endif
     free(tmp);
 }
 
@@ -400,13 +370,14 @@ doAllAdds(int **newrows, char *str)
 // sparsemat is small_nrows x small_ncols, after small_ncols is found using
 // renumbering.
 static int
-toFlush(const char *sparsename, const char * sosname, int **sparsemat, int *colweight, int ncols, int small_nrows, int skip, int bin)
+toFlush (const char *sparsename, int **sparsemat, int *colweight, int ncols,
+         int small_nrows, int skip, int bin)
 {
     unsigned long W;
     int small_ncols;
 
     fprintf(stderr, "Renumbering columns (including sorting w.r.t. weight)\n");
-    renumber(sosname, &small_ncols, colweight, ncols);
+    renumber (&small_ncols, colweight, ncols);
 
     fprintf(stderr, "small_nrows=%d small_ncols=%d\n",small_nrows,small_ncols);
 
@@ -511,20 +482,452 @@ toIndex(int **newrows, const char *indexname, FILE *hisfile,
     fprintf(stderr, "#T# writing index file: %2.2lf\n", wct_seconds()-tt);
 }
 
-static void
-fasterVersion(int **newrows, 
-	      const char *sparsename, const char *sosname, 
-	      const char *indexname, 
-	      FILE *hisfile, purgedfile_stream ps,
-	      uint64_t bwcostmin, int nrows, int ncols,
-	      int skip, int bin, int writeindex)
+#if DEBUG >= 1
+/* weight of merge of row i and row k */
+static uint32_t
+weight_merge (int **newrows, int i, int k, int skip)
 {
+  uint32_t w, li, lk, ix, kx;
+
+  ASSERT(newrows[i] != NULL);
+  ASSERT(newrows[k] != NULL);
+  li = newrows[i][0];
+  lk = newrows[k][0];
+  for (w = 0, ix = 1, kx = 1; ix <= li && kx <= lk; )
+    {
+      if (newrows[i][ix] < newrows[k][kx])
+        w += newrows[i][ix++] >= skip;
+      else if (newrows[i][ix] == newrows[k][kx])
+        ix++, kx++;
+      else
+        w += newrows[k][kx++] >= skip;
+    }
+  while (ix <= li)
+    w += newrows[i][ix++] >= skip;
+  while (kx <= lk)
+    w += newrows[k][kx++] >= skip;
+  return w;
+}
+#endif
+
+void
+add_relation (int **cols, int *len_col, int j, int i)
+{
+  len_col[j] ++;
+  cols[j] = (int*) realloc (cols[j], len_col[j] * sizeof(int));
+  cols[j][len_col[j]-1] = i;
+}
+
+void
+sub_relation (int **cols, int *len_col, int j, int i)
+{
+  int k;
+
+  for (k = 0; k < len_col[j]; k++)
+    if (cols[j][k] == i)
+      break;
+  if (k >= len_col[j])
+    {
+      fprintf (stderr, "Error, row i=%d not found in column j=%d\n", i, j);
+      exit (1);
+    }
+  len_col[j] --;
+  cols[j][k] = cols[j][len_col[j]];
+  cols[j] = (int*) realloc (cols[j], len_col[j] * sizeof(int));
+}
+
+#if DEBUG >= 1
+static void
+print_row (int **newrows, int i)
+{
+  int j;
+
+  printf ("%d:", newrows[i][0]);
+  for (j = 1; j <= newrows[i][0]; j++)
+    printf (" %d", newrows[i][j]);
+  printf ("\n");
+}
+
+static void
+print_col (int **cols, int *len_col, int j)
+{
+  int i;
+
+  for (i = 0; i < len_col[j]; i++)
+    printf ("%d ", cols[j][i]);
+  printf ("\n");
+}
+
+static void
+check_row (int **newrows, int i, int **cols, int *len_col)
+{
+  int j, k, l;
+
+  for (k = 1; k <= newrows[i][0]; k++)
+    {
+      /* check that newrows[i][k] is in the tranpose matrix */
+      j = newrows[i][k];
+      for (l = 0; l < len_col[j]; l++)
+        if (cols[j][l] == i)
+          break;
+      if (l >= len_col[j])
+        {
+          fprintf (stderr, "Error, row %d contains column %d but column %d does not contain row %d\n", i, j, j, i);
+          exit (1);
+        }
+    }
+}
+
+static void
+check_col (int **cols, int *len_col, int j, int **newrows)
+{
+  int i, k, l;
+
+  for (l = 0; l < len_col[j]; l++)
+    {
+      i = cols[j][l];
+      for (k = 1; k <= newrows[i][0]; k++)
+        if (newrows[i][k] == j)
+          break;
+      ASSERT_ALWAYS (k <= newrows[i][0]);
+    }
+}
+#endif
+
+static int
+weight_row (int **newrows, int i, int skip)
+{
+  int w = 0, k;
+
+  ASSERT(newrows[i] != NULL);
+  for (k = 1; k <= newrows[i][0]; k++)
+    w += newrows[i][k] >= skip;
+  return w;
+}
+
+/* row cols[j][i] += cols[j][k] */
+static void
+do_merge (int **newrows, int **cols, int *len_col, int j, int i, int k,
+          int skip, FILE *hisfile)
+{
+  int ii, kk, li, lk, *tmp, ni, nk, ltmp;
+
+  ii = cols[j][i];
+  kk = cols[j][k];
+  fprintf (hisfile, "-%u %u\n", kk + 1, ii);
+  fflush (hisfile);
+  ASSERT(newrows[ii] != NULL);
+  ASSERT(newrows[kk] != NULL);
+  li = newrows[ii][0];
+  lk = newrows[kk][0];
+  ASSERT(weight_row (newrows, ii, skip) >= weight_row (newrows, kk, skip));
+  tmp = (int*) malloc ((1 + li + lk) * sizeof(int));
+  for (ni = 1, nk = 1, ltmp = 0; ni <= li && nk <= lk;)
+    {
+      if (newrows[ii][ni] < newrows[kk][nk])
+        {
+          /* newrows[ii][ni] is already in row ii */
+          tmp[++ltmp] = newrows[ii][ni++];
+        }
+      else if (newrows[ii][ni] > newrows[kk][nk])
+        {
+          /* newrows[kk][nk] is new in row ii */
+          if (newrows[kk][nk] >=  skip)
+            add_relation (cols, len_col, newrows[kk][nk], ii);
+          tmp[++ltmp] = newrows[kk][nk++];
+        }
+      else
+        {
+          /* newrows[ii][ni] disappears in row ii */
+          if (newrows[ii][ni] >= skip)
+            sub_relation (cols, len_col, newrows[ii][ni], ii);
+          ni++, nk++;
+        }
+    }
+  /* only one of the following loops is non-empty */
+  while (ni <= li)
+    tmp[++ltmp] = newrows[ii][ni++];
+  while (nk <= lk)
+    {
+      if (newrows[kk][nk] >= skip)
+        add_relation (cols, len_col, newrows[kk][nk], ii);
+      tmp[++ltmp] = newrows[kk][nk++];
+    }
+  free (newrows[ii]);
+  tmp = (int*) realloc (tmp, (1 + ltmp) * sizeof(int));
+  tmp[0] = ltmp;
+  newrows[ii] = tmp;
+}
+
+static int
+try_merge (int **newrows, int **cols, int *len_col, int j, int skip,
+           FILE *hisfile)
+{
+  int i, k, gain, gain_max, imax, kmax, *W, ii, kk, *J, s, t;
+  mpz_t *M, and;
+
+  /* compute weights of rows containing the ideal j */
+  W = (int*) malloc (len_col[j] * sizeof(int));
+  for (i = 0, s = 0; i < len_col[j]; i++)
+    {
+      W[i] = weight_row (newrows, cols[j][i], skip);
+      s += W[i];
+    }
+
+  /* compute all ideals appearing in the rows containing j */
+  if (j >= skip)
+    s -= len_col[j];
+  J = (int*) malloc (s * sizeof(int));
+  for (ii = 0, t = 0; ii < len_col[j]; ii++)
+    {
+      i = cols[j][ii];
+      for (k = 1; k <= newrows[i][0]; k++)
+        if ((newrows[i][k] >= skip) && (newrows[i][k] != j))
+          J[t++] = newrows[i][k];
+    }
+  ASSERT(t == s);
+  qsort (J, t, sizeof(int), cmp);
+
+  /* extract ideals appearing at least twice */
+  for (i = 1, k = 0; i < t; i++)
+    if ((J[i-1] == J[i]) && (k == 0 || (J[k-1] != J[i])))
+      J[k++] = J[i];
+  J[k++] = INT_MAX;
+  t = k;
+
+  /* compute bit vectors for ideals appearing at least twice */
+  M = (mpz_t*) malloc (len_col[j] * sizeof(mpz_t));
+  mpz_init (and);
+  for (ii = 0; ii < len_col[j]; ii++)
+    {
+      mpz_init (M[ii]);
+      mpz_realloc2 (M[ii], t - 1);
+      i = cols[j][ii];
+      for (s = 0, k = 1; k <= newrows[i][0]; k++)
+        {
+          while (J[s] < newrows[i][k])
+            s++;
+          /* now J[s] >= newrows[i][k] */
+          if (J[s] == newrows[i][k])
+            mpz_setbit (M[ii], s++);
+        }
+    }
+  for (gain_max = 0, i = 0; i < len_col[j]; i++)
+    {
+      for (k = i + 1; k < len_col[j]; k++)
+        {
+          if (W[i] >= W[k])
+            ii = i, kk = k;
+          else
+            ii = k, kk = i;
+          /* we need wmin > gain_max since the maximum gain is wmin */
+          if (W[kk] <= gain_max)
+            continue;
+          mpz_and (and, M[ii], M[kk]);
+          /* the +2 accounts for the ideal j */
+          gain = 2 * mpz_popcount (and) + 2 - W[kk];
+#if DEBUG >= 1
+          {
+            int wik;
+            wik = weight_merge (newrows, cols[j][ii], cols[j][kk], skip);
+            ASSERT_ALWAYS (gain == W[ii] - wik);
+          }
+#endif
+          if (gain > gain_max)
+            {
+              gain_max = gain;
+              imax = ii;
+              kmax = kk;
+            }
+        }
+    }
+  mpz_clear (and);
+  for (i = 0; i < len_col[j]; i++)
+    mpz_clear (M[i]);
+  free (M);
+  free (J);
+  free (W);
+  if (gain_max > 0)
+    do_merge (newrows, cols, len_col, j, imax, kmax, skip, hisfile);
+  return gain_max;
+}
+
+static int
+cmp_ge (const void *p, const void *q)
+{
+  int x = *((int *)p);
+  int y = *((int *)q);
+  return (x >= y ? -1 : 1);
+}
+
+/* we append the new merges in file 'hisname', so that they are considered
+   when writing the index file afterwards */
+static void
+optimize (int **newrows, int nrows, int *colweight, int ncols, int skip,
+          const char *hisname)
+{
+  int **cols, *len_col, i, j, k, small_ncols, pass = 0, *perm_cols,
+    small_nrows;
+  uint64_t total_weight;
+  FILE *hisfile;
+
+  hisfile = fopen (hisname, "a");
+  ASSERT_ALWAYS(hisfile != NULL);
+
+  /* first permute columns to get heavier columns first */
+  perm_cols = (int*) malloc (2 * ncols * sizeof(int));
+  for (j = 0; j < ncols; j++)
+    {
+      perm_cols[2*j] = colweight[j];
+      perm_cols[2*j+1] = j;
+    }
+  qsort (perm_cols, ncols, 2*sizeof(int), cmp_ge);
+#if DEBUG >= 1
+  for (j = 1; j < ncols; j++)
+    ASSERT_ALWAYS(perm_cols[2*(j-1)] >= perm_cols[2*j]);
+#endif
+  printf ("Skip %d heaviest columns\n", skip);
+  for (j = 0; j < ncols && perm_cols[2*j] != 0; j++);
+  small_ncols = j;
+  printf ("New number of columns: %d\n", small_ncols);
+
+  /* compute the inverse permutation in colweight[] */
+  for (j = 0; j < ncols; j++)
+    colweight[perm_cols[2*j+1]] = j;
+
+  ncols = j;
+
+  /* renumber the direct matrix */
+  for (i = 0, small_nrows = 0; i < nrows; i++)
+    if (newrows[i] != NULL)
+      {
+        small_nrows ++;
+        for (k = 1; k <= newrows[i][0]; k++)
+          {
+            j = newrows[i][k];
+            newrows[i][k] = colweight[j];
+          }
+        qsort (newrows[i] + 1, newrows[i][0], sizeof(int), cmp);
+#if DEBUG >= 1
+        for (k = 2; k <= newrows[i][0]; k++)
+          ASSERT_ALWAYS(newrows[i][k-1] <= newrows[i][k]);
+#endif
+      }
+  /* update colweight */
+  for (j = 0; j < ncols; j++)
+    colweight[j] = perm_cols[2*j];
+  free (perm_cols);
+
+  cols = (int**) malloc (ncols * sizeof(int*));
+  len_col = (int*) malloc (ncols * sizeof(int));
+  for (j = 0, total_weight = 0; j < ncols; j++)
+    {
+      if (j < skip)
+        cols[j] = NULL;
+      else
+        {
+          cols[j] = (int*) malloc (colweight[j] * sizeof(int));
+          total_weight += colweight[j];
+        }
+      len_col[j] = 0;
+    }
+
+  printf ("Optimize: small_nrows=%d small_ncols=%d weight=%lu (av. %1.2f)\n",
+          small_nrows, small_ncols, total_weight,
+          (double) total_weight / (double) small_nrows);
+
+  /* compute transpose matrix */
+  for (i = 0; i < nrows; i++)
+    if (newrows[i] != NULL)
+      {
+        for (k = 1; k <= newrows[i][0]; k++)
+          {
+            j = newrows[i][k];
+            /* we assume the row elements are sorted by increasing order */
+            if (k > 1 && newrows[i][k-1] > j)
+              printf ("i=%d k=%d newrows[i][k-1]=%d j=%d\n", i, k,
+                      newrows[i][k-1], j);
+            ASSERT(k == 1 || newrows[i][k-1] <= j);
+            if (j >= skip)
+              {
+                cols[j][len_col[j]] = i;
+                len_col[j]++;
+              }
+          }
+      }
+
+  printf ("Computed transpose matrix\n");
+  fflush (stdout);
+
+#if DEBUG >= 1
+  for (j = skip; j < ncols; j++)
+    ASSERT_ALWAYS(len_col[j] == colweight[j]);
+#endif
+
+  bit_vector active;
+  bit_vector_init_set (active, ncols, 1);
+  do
+    {
+      int gain;
+
+      printf ("Pass %d: decrease total weight to ", ++pass);
+      fflush (stdout);
+      for (j = skip; j < ncols; j++)
+        if (len_col[j] <= pass + 1 && bit_vector_getbit (active, j))
+          {
+            gain = try_merge (newrows, cols, len_col, j, skip, hisfile);
+            if (gain == 0) /* we assume a column which does not give any
+                              gain will never give a gain in the future */
+              bit_vector_clearbit (active, j);
+            total_weight -= gain;
+          }
+      printf ("%lu (%1.2f per row)\n", total_weight,
+              (double) total_weight / (double) small_nrows);
+      fflush (stdout);
+    }
+  while (pass < 20);
+  bit_vector_clear (active);
+
+#if DEBUG >= 1
+  for (j = 0; j < skip; j++)
+    ASSERT_ALWAYS(len_col[j] == 0);
+#endif
+
+  /* recompute colweight[] since it is wrong for heavy columns */
+  memset (colweight, 0, skip * sizeof(int));
+  for (i = 0; i < nrows; i++)
+    if (newrows[i] != NULL)
+      for (k = 1; k <= newrows[i][0]; k++)
+        {
+          j = newrows[i][k];
+          if (j >= skip)
+            break;
+          colweight[j] ++;
+        }
+
+  for (j = 0; j < ncols; j++)
+    free (cols[j]);
+  free (len_col);
+  free (cols);
+  fclose (hisfile);
+}
+
+static void
+fasterVersion(int **newrows, const char *sparsename, const char *indexname,
+	      const char *hisname, purgedfile_stream ps, uint64_t bwcostmin,
+              int nrows, int ncols, int skip, int bin, int writeindex)
+{
+    FILE *hisfile;
     int *colweight;
     int small_nrows, small_ncols;
+    char str[STRLENMAX], *rp MAYBE_UNUSED;
 
-    // 1st pass
+    hisfile = fopen (hisname, "r");
+    ASSERT_ALWAYS(hisfile != NULL);
+    /* read first line */
+    rp = fgets (str, STRLENMAX, hisfile);
 
-    // read M_purged
+    // 1st pass: read the relations in *.purged and put them in newrows[][]
     readPurged(newrows, ps, 1);
 #if DEBUG >= 1
     for(int i = 0; i < nrows; i++){
@@ -534,26 +937,31 @@ fasterVersion(int **newrows,
 	printf("\n");
     }
 #endif
-    // replay additions
-    build_newrows_from_file(newrows, hisfile, bwcostmin);
-    // compute weights of columns
-    colweight = (int *)malloc(ncols * sizeof(int *));
-    ASSERT_ALWAYS(colweight != NULL);
-    memset(colweight, 0, ncols * sizeof(int *));
 
-    /* compute column weights and crunch empty rows */
+    // read merges in the *.merge.his file and replay them
+    build_newrows_from_file(newrows, hisfile, bwcostmin);
+
+    /* compute column weights */
+    colweight = (int*) malloc (ncols * sizeof(int *));
+    ASSERT_ALWAYS(colweight != NULL);
+    memset (colweight, 0, ncols * sizeof(int *));
+    for (int i = 0; i < nrows; i++)
+      if (newrows[i] != NULL)
+        for(int k = 1; k <= newrows[i][0]; k++)
+          colweight[newrows[i][k]] += 1;
+
+    /* comment out the following line to disable cycle optimization */
+    optimize (newrows, nrows, colweight, ncols, skip, hisname);
+
+    /* crunch empty rows */
     for (int i = small_nrows = 0; i < nrows; i++)
-      {
-	if (newrows[i] != NULL)
-          {
-	    for(int k = 1; k <= newrows[i][0]; k++)
-              colweight[newrows[i][k]] += 1;
-            newrows[small_nrows++] = newrows[i];
-          }
-      }
-    small_ncols = toFlush(sparsename, sosname, newrows, colweight, ncols,
+      if (newrows[i] != NULL)
+        newrows[small_nrows++] = newrows[i];
+
+    /* renumber columns after sorting them by decreasing weight */
+    small_ncols = toFlush(sparsename, newrows, colweight, ncols,
 			  small_nrows, skip, bin);
-    free(colweight);
+    free (colweight);
     if(writeindex)
         toIndex(newrows, indexname, hisfile, bwcostmin, nrows,
                 small_nrows, small_ncols);
@@ -561,6 +969,8 @@ fasterVersion(int **newrows,
        if(newrows[i] != NULL)
         free (newrows[i]);
     free(newrows);
+
+    fclose (hisfile);
 }
 
 // We start from M_purged which is nrows x ncols;
@@ -608,7 +1018,6 @@ main(int argc, char *argv[])
     const char * hisname = param_list_lookup_string(pl, "his");
     const char * sparsename = param_list_lookup_string(pl, "out");
     const char * indexname = param_list_lookup_string(pl, "index");
-    const char * sosname = param_list_lookup_string(pl, "sos");
     param_list_parse_int(pl, "binary", &bin);
     param_list_parse_int(pl, "nslices", &nslices);
     param_list_parse_int(pl, "skip", &skip);
@@ -620,10 +1029,11 @@ main(int argc, char *argv[])
     purgedfile_stream_init(ps);
     purgedfile_stream_openfile(ps, purgedname);
 
-    hisfile = fopen(hisname, "r");
-    ASSERT(hisfile != NULL);
+    hisfile = fopen (hisname, "r");
+    ASSERT_ALWAYS(hisfile != NULL);
     rp = fgets(str, STRLENMAX, hisfile);
     ASSERT_ALWAYS(rp);
+    fclose (hisfile);
 
     // read parameters that should be the same as in purgedfile!
     sscanf(str, "%d %d", &nrows, &ncols);
@@ -641,10 +1051,9 @@ main(int argc, char *argv[])
     // of the addition of the rows of indices i_1 ... i_k in the original
     // matrix
 
-    fasterVersion(newrows, sparsename, sosname, indexname, hisfile, ps,
-                  bwcostmin, nrows, ncols, skip, bin, 1);
+    fasterVersion (newrows, sparsename, indexname, hisname, ps,
+                   bwcostmin, nrows, ncols, skip, bin, 1);
 
-    fclose(hisfile);
 
     purgedfile_stream_closefile(ps);
     purgedfile_stream_clear(ps);

@@ -33,19 +33,13 @@ degree=5                # degree of the algebraic polynomial
 polsel_delay=300             # time between two checks
 polsel_nice=4            # nice level for selection
 
-# on the test number
-# 163629801363886468228815743185411963754335833651755796835932883130344213030762233067562008991898453536122530423557
-# we get
-# lognorm: 35.74, alpha: -5.91 E=29.83
-# Murphy's E(Bf=10000000,Bg=5000000,area=1.00e+16)=5.29e-10
-
 ## Most important parameters of polyselect
-polsel_P=20000               # choose lc(g) with two prime factors in [P,2P]
-polsel_maxnorm=36.2          # max. lognorm of polynomials (before rootsieve)
-polsel_admax=1e7             # max value for lc(f)
-polsel_adrange=2e5           # individual tasks
+polsel_P=50000               # choose lc(g) with two prime factors in [P,2P]
+polsel_maxnorm=36.8          # max. lognorm of polynomials (before rootsieve)
+polsel_admax=4e8             # max value for lc(f)
+polsel_adrange=4e6           # individual tasks
 polsel_kmax=20               # rotation is bounded by 2^kmax
-polsel_incr=210              # forced divisor of lc(f)
+polsel_incr=27720            # forced divisor of lc(f)
 polsel_lq=3                  # special-q in lc(g) has such many factors
 
 ###########################################################################
@@ -83,11 +77,8 @@ sieve_max_threads=2
 # Filtering
 ###########################################################################
 
-excessratio=1.01        # minimal excess we want before pruning
 keeppurge=160           # shrink in purge if excess exceeds keeppurge
 maxlevel=20
-cwmax=100
-rwmax=100
 ratio=1.1
 bwstrat=3               
 

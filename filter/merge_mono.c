@@ -52,7 +52,7 @@ findBestIndex(filter_matrix_t *mat, int m, int32_t *ind)
 	    // note A[i][i] = 0
 	    w += A[i][j];
 #if DEBUG >= 1
-	fprintf(stderr, "W[%d]=%d\n", i, w);
+	printf ("W[%d]=%d\n", i, w);
 #endif
 	if((imin == -1) || (w < wmin)){
 	    imin = i;
@@ -75,10 +75,9 @@ checkCoherence(filter_matrix_t *mat, int m, int j)
     ASSERT(nchk == (mat->wt[GETJ(mat, j)] >= 0 ? mat->wt[GETJ(mat, j)] : -mat->wt[GETJ(mat, j)]));
     if(m != -1){
 	if(nchk != m){
-	    fprintf(stderr, "HYPERCHECK:");
-	    fprintf(stderr, "mat->R[%d][0]=%ld, m=%d\n", j,
-                    (long int) mat->R[GETJ(mat, j)][0], m);
-	    fprintf(stderr, "Gasp: nchk=%d\n", nchk);
+	    printf ("HYPERCHECK: mat->R[%d][0]=%ld, m=%d\n", j,
+                     (long int) mat->R[GETJ(mat, j)][0], m);
+	    printf ("Gasp: nchk=%d\n", nchk);
 	}
 	ASSERT(nchk == m);
     }
@@ -98,7 +97,7 @@ removeColDefinitely(report_t *rep, filter_matrix_t *mat, int32_t j)
 	if(mat->R[GETJ(mat, j)][k] != -1){
 # if TRACE_COL >= 0
 	    if(j == TRACE_COL)
-		fprintf(stderr, "deleteAllCols: row is %d\n",mat->R[GETJ(mat, j)][k]);
+		printf ("deleteAllCols: row is %d\n",mat->R[GETJ(mat, j)][k]);
 # endif
 	    remove_j_from_row(mat, mat->R[GETJ(mat, j)][k], j);
 	    removeRowDefinitely(rep, mat, mat->R[GETJ(mat, j)][k]);
@@ -146,7 +145,7 @@ removeCellAndUpdate(filter_matrix_t *mat, int i, int32_t j, int final)
 {
 #if TRACE_ROW >= 0
     if(i == TRACE_ROW){
-	fprintf(stderr, "TRACE_ROW: removeCellAndUpdate i=%d j=%d\n", i, j);
+	printf ("TRACE_ROW: removeCellAndUpdate i=%d j=%d\n", i, j);
     }
 #endif
     if(mat->wt[GETJ(mat, j)] < 0){
@@ -164,9 +163,6 @@ removeCellAndUpdate(filter_matrix_t *mat, int i, int32_t j, int final)
 //////////////////////////////////////////////////////////////////////
 // now, these guys are generic...!
 
-/* weight of buried columns for row i */
-#define BURIEDROWWEIGHT(mat,i) mat->wburied[i]
-
 // for all j in row[i], removes j and update data
 // if final, also update the Markowitz counts
 static void
@@ -176,17 +172,16 @@ removeRowAndUpdate(filter_matrix_t *mat, int i, int final)
 
 #if TRACE_ROW >= 0
     if(i == TRACE_ROW)
-	fprintf(stderr, "TRACE_ROW: removeRowAndUpdate i=%d\n", i);
+	printf ("TRACE_ROW: removeRowAndUpdate i=%d\n", i);
 #endif
-    mat->weight -= lengthRow(mat, i) + BURIEDROWWEIGHT(mat, i);
-    for(k = 1; k <= lengthRow(mat, i); k++){
+    mat->weight -= matLengthRow(mat, i);
+    for(k = 1; k <= matLengthRow(mat, i); k++){
 #if TRACE_COL >= 0
 	if(cell(mat, i, k) == TRACE_COL){
-	    fprintf(stderr, "removeRowAndUpdate removes %d from R_%d\n",
-		    TRACE_COL, i);
+	    printf ("removeRowAndUpdate removes %d from R_%d\n", TRACE_COL, i);
 	}
 #endif
-	removeCellAndUpdate(mat, i, cell(mat, i, k), final);
+	removeCellAndUpdate(mat, i, matCell(mat, i, k), final);
     }
 }
 
@@ -196,21 +191,21 @@ addOneRowAndUpdate(filter_matrix_t *mat, int i)
 {
     int k;
 
-    mat->weight += lengthRow(mat, i) + BURIEDROWWEIGHT(mat,i);
-    for(k = 1; k <= lengthRow(mat, i); k++)
-	addCellAndUpdate(mat, i, cell(mat, i, k));
+    mat->weight += matLengthRow(mat, i);
+    for(k = 1; k <= matLengthRow(mat, i); k++)
+	addCellAndUpdate(mat, i, matCell(mat, i, k));
 }
 
 // realize mat[i1] += mat[i2] and update the data structure.
 // len could be the real length of row[i1]+row[i2] or -1.
 void
-addRowsAndUpdate(filter_matrix_t *mat, int i1, int i2, int len)
+addRowsAndUpdate(filter_matrix_t *mat, int i1, int i2, int32_t j)
 {
     // cleaner one, that shares addRowsData() to prepare the next move...!
     // i1 is to disappear, replaced by a new one
     removeRowAndUpdate(mat, i1, 0);
     // we know the length of row[i1]+row[i2]
-    addRows(mat->rows, i1, i2, len);
+    addRows(mat->rows, i1, i2, j);
     addOneRowAndUpdate(mat, i1);
 }
 
@@ -245,23 +240,24 @@ removeRowDefinitely(report_t *rep, filter_matrix_t *mat, int32_t i)
 
 // try all combinations to find the smaller one; resists to m==1
 static void
-tryAllCombinations(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind)
+tryAllCombinations(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind,
+                   int32_t j)
 {
     int i, k;
 
     if(m == 1)
-	fprintf(stderr, "Warning: m==1 in tryAllCombinations\n");
+      printf ("Warning: m=1 in tryAllCombinations\n");
     i = findBestIndex(mat, m, ind);
 #if DEBUG >= 1
-    fprintf(stderr, "Minimal is i=%d (%d %d)\n", i, ind[0], ind[1]);
+    printf ("Minimal is i=%d (%d %d)\n", i, ind[0], ind[1]);
 #endif
     for(k = 0; k < m; k++)
 	if(k != i){
-	    addRowsAndUpdate(mat, ind[k], ind[i], -1);
+	    addRowsAndUpdate(mat, ind[k], ind[i], j);
 #if DEBUG >= 1
-	    fprintf(stderr, "new row[%d]=", ind[k]);
-	    print_row(mat, ind[k]);
-	    fprintf(stderr, "\n");
+	    printf ("new row[%d]=", ind[k]);
+	    print_row (mat, ind[k]);
+	    printf ("\n");
 #endif
 	}
     if(i > 0){
@@ -273,7 +269,7 @@ tryAllCombinations(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind)
 	ind[0] = itmp;
     }
 #if DEBUG >= 1
-    fprintf(stderr, "=> new_ind: %d %d\n", ind[0], ind[1]);
+    printf ("=> new_ind: %d %d\n", ind[0], ind[1]);
 #endif
     reportn(rep, ind, m);
     removeRowAndUpdate(mat, ind[0], 1);
@@ -285,13 +281,13 @@ tryAllCombinations(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind)
 // A[i][j] contains the estimated weight/length of R[ind[i]]+R[ind[j]].
 static int
 addFatherToSonsRec(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
-		   filter_matrix_t *mat, int m, int *ind,
+		   filter_matrix_t *mat, int m, int *ind, int32_t j,
 		   int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX],
 		   int *father,
 		   int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 		   int u, int level0)
 {
-    int k, itab = 1, i1, i2, level = level0, len;
+    int k, itab = 1, i1, i2, level = level0;
 
     if(sons[u][0] == 0)
 	// nothing to do for a leaf...!
@@ -303,19 +299,13 @@ addFatherToSonsRec(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 	// the usual trick not to destroy row
 	history[level0][itab++] = -(i2+1);
     for(k = 1; k <= sons[u][0]; k++){
-	i1 = addFatherToSonsRec(history, mat, m, ind, A,
+	i1 = addFatherToSonsRec(history, mat, m, ind, j, A,
 				father, sons, sons[u][k], level+1);
 	if(i1 != -1)
 	    level = i1;
 	i1 = ind[sons[u][k]];
 	// add u to its son
-#if 1
-	// recover true length of non-buried part for R[i1]+R[i2]
-	len = A[sons[u][k]][u] - buriedRowsWeight (mat, i1, i2);
-	addRowsAndUpdate(mat, i1, i2, len);
-#else
-	addRowsAndUpdate(mat, i1, i2, -1);
-#endif
+	addRowsAndUpdate(mat, i1, i2, j);
 	history[level0][itab++] = i1;
     }
     history[level0][0] = itab-1;
@@ -324,18 +314,18 @@ addFatherToSonsRec(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
 
 int
 addFatherToSons(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
-		filter_matrix_t *mat, int m, int *ind,
+		filter_matrix_t *mat, int m, int *ind, int32_t j,
 		int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX],
 		int *father,
                 int *height MAYBE_UNUSED, int hmax MAYBE_UNUSED,
 		int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1])
 {
-    return addFatherToSonsRec(history, mat, m, ind, A, father, sons, 0, 0);
+    return addFatherToSonsRec(history, mat, m, ind, j, A, father, sons, 0, 0);
 }
 
 void
-MSTWithA(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind, double *tMST,
-	 int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX])
+MSTWithA(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind, int32_t j, 
+         double *tMST, int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX])
 {
     int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
     int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
@@ -347,7 +337,7 @@ MSTWithA(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind, double *tMST,
 #if DEBUG >= 1
     printMST(father, sons, m);
 #endif
-    hmax = addFatherToSons(history, mat, m, ind, A, father, height, hmax,sons);
+    hmax = addFatherToSons(history, mat, m, ind, j,A, father, height, hmax,sons);
     for(i = hmax; i >= 0; i--)
 #if 0
 	reporthis(rep, history, i);
@@ -359,29 +349,86 @@ MSTWithA(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind, double *tMST,
 }
 
 static void
-useMinimalSpanningTree(report_t *rep, filter_matrix_t *mat, int m,
-		       int32_t *ind, double *tfill, double *tMST)
+useMinimalSpanningTree(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind,
+                       int32_t j, double *tfill, double *tMST)
 {
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
 
     *tfill = seconds();
     fillRowAddMatrix(A, mat, m, ind);
     *tfill = seconds()-*tfill;
-    MSTWithA(rep, mat, m, ind, tMST, A);
+    MSTWithA(rep, mat, m, ind, j, tMST, A);
 }
 
 static void
-findOptimalCombination(report_t *rep, filter_matrix_t *mat, int m,
-		       int32_t *ind, double *tfill, double *tMST, int useMST)
+findOptimalCombination(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind,
+                       int32_t j, double *tfill, double *tMST, int useMST)
 {
   if ((m <= 2) || (useMST == 0))
     {
       *tfill = *tMST = 0;
-      tryAllCombinations (rep, mat, m, ind);
+      tryAllCombinations (rep, mat, m, ind, j);
     }
   else
-    useMinimalSpanningTree (rep, mat, m, ind, tfill, tMST);
+    useMinimalSpanningTree (rep, mat, m, ind, j, tfill, tMST);
 }
+
+#if DEBUG >= 1
+static void
+checkWeights (filter_matrix_t *mat)
+{
+  int *W, j, i, k, minw = INT_MAX;
+
+  W = (int*) malloc (mat->jmax * sizeof(int));
+  for (j = mat->jmin; j < mat->jmax; j++)
+    W[j] = 0;
+  for(i = 0; i < mat->nrows; i++)
+    if(!isRowNull(mat, i))
+      {
+        for(k = 1; k <= lengthRow(mat, i); k++)
+          {
+            j = cell(mat, i, k);
+            ASSERT_ALWAYS(mat->jmin <= j && j < mat->jmax);
+            W[j] ++;
+          }
+      }
+  for (j = mat->jmin; j < mat->jmax; j++)
+    {
+      static int count = 0;
+      if (W[j] != mat->wt[j])
+        {
+          if (mat->wt[j] >= 0)
+            {
+              fprintf (stderr, "Wrong weight for column %d: expected %d, got %d\n",
+                       j, mat->wt[j], W[j]);
+              exit (1);
+            }
+          else if (W[j] <= mat->mergelevelmax)
+            {
+              if (count++ <= 10)
+                fprintf (stderr, "Warning, column %d: wt=%d W=%d\n",
+                         j, mat->wt[j], W[j]);
+            }
+        }
+      if (W[j] == 1 && mat->wt[j] == 1)
+        {
+          fprintf (stderr, "Error, weight=1 for column %d\n", j);
+          exit (1);
+        }
+      if (W[j] != 0 && mat->wt[j] >= 0 && W[j] < minw)
+        minw = W[j];
+      if (W[j] == 2 && mat->wt[j] == 2)
+        {
+          static int count = 0;
+          if (count ++ <= 10)
+            fprintf (stderr, "Warning, column %d: wt=%d W=%d\n",
+                     j, mat->wt[j], W[j]);
+        }
+    }
+  printf ("Minimum non-zero column weight: %d\n", minw);
+  free (W);
+}
+#endif
 
 #if 0
 static void
@@ -389,14 +436,14 @@ checkWeight(filter_matrix_t *mat, int32_t j)
 {
     int i, w = 0;
 
-    fprintf(stderr, "Rows containing %ld:", (long int) j);
+    printf ("Rows containing %ld:", (long int) j);
     for(i = 0; i < mat->nrows; i++)
 	if(!isRowNull(mat, i))
 	    if(hasCol(mat->rows, i, j)){
-		fprintf(stderr, " %d", i);
+		printf (" %d", i);
 		w++;
 	    }
-    fprintf(stderr, "\n");
+    printf ("\n");
     ASSERT(w == (mat->wt[GETJ(mat, j)] >= 0 ? mat->wt[GETJ(mat, j)] : -mat->wt[GETJ(mat, j)]));
 }
 #endif
@@ -412,7 +459,7 @@ mergeForColumn (report_t *rep, double *tt, double *tfill, double *tMST,
 # if 0
     // let's be cautious...
     if(mat->wt[GETJ(mat, j)] != m){
-	fprintf(stderr, "GASP: wt[%d]=%d != %d\n", j, mat->wt[j], m);
+	printf ("GASP: wt[%d]=%d != %d\n", j, mat->wt[j], m);
     }
 # endif
 
@@ -425,10 +472,9 @@ mergeForColumn (report_t *rep, double *tt, double *tfill, double *tMST,
                  m, MERGE_LEVEL_MAX);
 	exit(1);
       }
-    fprintf(stderr, "Treating column %d of weight %d",j,mat->wt[GETJ(mat, j)]);
-    fprintf(stderr, "\n");
+    printf ("Treating column %d of weight %d\n",j,mat->wt[GETJ(mat, j)]);
 #if DEBUG >= 2
-    fprintf(stderr, "Status before next j=%d to start\n", j);
+    printf ("Status before next j=%d to start\n", j);
     // the corresponding rows are in R[j], skipping 1st cell and -1's
     checkCoherence(mat, m, j);
 #endif
@@ -437,96 +483,29 @@ mergeForColumn (report_t *rep, double *tt, double *tfill, double *tMST,
     for(ni = 0, k = 1; k <= mat->R[GETJ(mat, j)][0]; k++){
 	if(mat->R[GETJ(mat, j)][k] != -1){
 	    ind[ni++] = mat->R[GETJ(mat, j)][k];
-	    if (ni == m)
+      if (ni == m)
               break; /* earky abort, since we know there are m rows */
 	}
     }
     /* now ind[0], ..., ind[m-1] are the m rows containing j */
 
 #if DEBUG >= 1
-    fprintf(stderr, " %d", j);
-    fprintf(stderr, " => the %d rows are:\n", m);
+    printf (" %d", j);
+    printf (" => the %d rows are:\n", m);
     for(k = 0; k < m; k++){
-	fprintf(stderr, "row[%d]=", ind[k]);
-	print_row(mat, ind[k]);
-	fprintf(stderr, "\n");
+	printf ("row[%d]=", ind[k]);
+	print_row (mat, ind[k]);
+	printf ("\n");
     }
-    fprintf(stderr, "\n");
+    printf ("\n");
 #endif
 
     *tt = seconds();
-    findOptimalCombination (rep, mat, m, ind, tfill, tMST, useMST);
+    findOptimalCombination (rep, mat, m, ind, j, tfill, tMST, useMST);
     *tt = seconds()-(*tt);
     mat->rem_nrows--;
     mat->rem_ncols--;
     removeColumnAndUpdate (mat, j);
-}
-
-#if !defined(USE_MPI)
-static int
-isRowToBeDeleted(filter_matrix_t *mat, int i)
-{
-    int heavy = 0;
-
-    int k;
-
-    heavy = 1;
-    for(k = 1; k <= lengthRow(mat, i); k++)
-	if((cell(mat,i,k) != -1) && (mat->wt[GETJ(mat, cell(mat,i,k))] >= 0)){
-	    heavy = 0;
-	    break;
-	}
-    return heavy;
-}
-#endif
-
-static int
-inspectRowWeight(report_t *rep, filter_matrix_t *mat)
-{
-    int i, nirem = 0, niremmax = 128;
-#if !defined(USE_MPI)
-    int useless = 0;
-#endif
-
-    for(i = 0; i < mat->nrows; i++){
-	if((mat->rem_nrows - mat->rem_ncols) <= mat->keep)
-	    return nirem;
-	if(!isRowNull(mat, i)){
-	    if(lengthRow(mat, i) > mat->rwmax){
-#if DEBUG >= 1
-		fprintf(stderr, "Removing too heavy row[%d]: %d\n",
-			i, lengthRow(mat, i));
-#endif
-#if TRACE_ROW >= 0
-		if(i == TRACE_ROW)
-		    fprintf(stderr,
-			    "TRACE_ROW: removing too heavy row[%d]: %d\n",
-			    i, lengthRow(mat, i));
-#endif
-		removeRowDefinitely(rep, mat, i);
-		nirem++;
-		if(!(nirem % REPORT))
-		    fprintf(stderr, "#removed_rows=%d at %2.2lf\n",
-			    nirem, seconds());
-		if(nirem > niremmax)
-		    break;
-	    }
-	}
-    }
-#if !defined(USE_MPI)
-    /* only activated rarely...! */
-    for(i = 0; i < mat->nrows; i++)
-	if(!isRowNull(mat, i) && isRowToBeDeleted(mat, i)){
-# if DEBUG >= 1
-	    fprintf(stderr, "Row %d is no longer useful in merge\n", i);
-# endif
-	    removeRowAndUpdate(mat, i, 1);
-	    destroyRow(mat, i);
-	    useless++;
-	}
-    fprintf(stderr, "#useless rows=%d\n", useless);
-#endif
-    return nirem;
 }
 
 // It could be fun to find rows s.t. at least one j is of small weight.
@@ -539,7 +518,7 @@ deleteScore(filter_matrix_t *mat, int32_t i)
 {
 #if 1
     // plain weight to remove heaviest rows
-    return lengthRow(mat, i);
+    return matLengthRow(mat, i);
 #endif
 #if 0
     // -plain weight to remove lightest rows
@@ -572,27 +551,12 @@ deleteScore(filter_matrix_t *mat, int32_t i)
 #endif
 }
 
-// locate columns of weight 3 and delete one of the rows, but just one!
-static int
-findSuperfluousRowsFor2(int *tmp, int ntmp, filter_matrix_t *mat)
-{
-# if DEBUG >= 1
-    fprintf(stderr, "What's the use of findSuperfluousRowsFor2 for MKZ?\n");
-# endif
-    return 0;
-}
-
 // this guy is linear => total is quadratic, be careful!
 static int
-findSuperfluousRows(int *tmp, int ntmp, filter_matrix_t *mat, int m)
+findSuperfluousRows(int *tmp, int ntmp, filter_matrix_t *mat)
 {
     int i, itmp;
 
-    if(m == 2){
-	itmp = findSuperfluousRowsFor2(tmp, ntmp, mat);
-	if(itmp != 0)
-	    return itmp;
-    }
     for(i = 0, itmp = 0; i < mat->nrows; i++)
         if(!isRowNull(mat, i)){
 	    tmp[itmp++] = deleteScore(mat, i);
@@ -603,32 +567,37 @@ findSuperfluousRows(int *tmp, int ntmp, filter_matrix_t *mat, int m)
     return itmp;
 }
 
-// Delete superfluous rows s.t. nrows-ncols >= keep.
-// Let's say we are at "step" m.
+// Delete at most niremmax superfluous rows such that nrows-ncols >= keep.
+// Let's say we are at merge-level m.
+// Return the number of removed rows.
 static int
-deleteSuperfluousRows(report_t *rep, filter_matrix_t *mat, int keep, int niremmax, int m)
+deleteSuperfluousRows (report_t *rep, filter_matrix_t *mat,
+                       int niremmax, int m)
 {
-    int nirem = 0, *tmp, ntmp, i;
+  int keep = mat->keep;
+  int nirem = 0, *tmp, ntmp, i;
 
-    if((mat->rem_nrows - mat->rem_ncols) <= keep)
-	return 0;
-    ntmp = mat->rem_nrows << 1;
-    tmp = (int *)malloc(ntmp * sizeof(int));
-    ntmp = findSuperfluousRows(tmp, ntmp, mat, m);
-#if 0
-    fprintf(stderr, "Number of removable rows[%d]: %d\n", m, ntmp>>1);
-#endif
-    // remove rows with largest score
-    for(i = ntmp-1; i >= 0; i -= 2){
-	if((nirem >= niremmax) || (mat->rem_nrows - mat->rem_ncols) <= keep)
-	    break;
-	if(mat->rows[tmp[i]] != NULL){
-	    removeRowDefinitely(rep, mat, tmp[i]);
-	    nirem++;
-	}
-    }
-    free(tmp);
-    return nirem;
+  if (m <= 2)
+    return 0; /* it is not worth removing rows during level-2 merges */
+
+  if ((mat->rem_nrows - mat->rem_ncols) <= keep)
+    return 0;
+
+  if (niremmax > (mat->rem_nrows - mat->rem_ncols) - keep)
+    niremmax = (mat->rem_nrows - mat->rem_ncols) - keep;
+
+  ntmp = mat->rem_nrows << 1;
+  tmp = (int *) malloc (ntmp * sizeof(int));
+  ntmp = findSuperfluousRows (tmp, ntmp, mat);
+  // remove rows with largest score
+  for (i = ntmp - 1; i >= 0 && nirem < niremmax; i -= 2)
+    if (mat->rows[tmp[i]] != NULL)
+      {
+        removeRowDefinitely(rep, mat, tmp[i]);
+        nirem++;
+      }
+  free (tmp);
+  return nirem;
 }
 
 static double
@@ -652,7 +621,7 @@ mergeForColumn2(report_t *rep, filter_matrix_t *mat, int *njrem,
 		double *totdel, int useMST, int32_t j)
 {
     double tt, tfill, tMST;
-
+    
     mergeForColumn(rep, &tt, &tfill, &tMST, mat, mat->wt[j], j, useMST);
     *totopt += tt;
     *totfill += tfill;
@@ -668,7 +637,7 @@ number_of_superfluous_rows(filter_matrix_t *mat)
     int kappa = (mat->rem_nrows-mat->rem_ncols) / mat->keep, ni2rem;
 
     if(kappa <= (1<<4))
-	ni2rem = mat->keep/2;
+      ni2rem = mat->keep / 2;
     else if(kappa <= (1<<5))
 	ni2rem = mat->keep * (kappa/4);
     else if(kappa <= (1<<10))
@@ -682,13 +651,6 @@ number_of_superfluous_rows(filter_matrix_t *mat)
     return ni2rem;
 }
 
-int
-deleteEmptyColumns(filter_matrix_t *mat)
-{
-    // nothing to do; the pb has to be solved elsewhere...!
-    return 0;
-}
-
 void
 mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
                int forbw, double ratio, double coverNmax)
@@ -700,6 +662,9 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
     int *nb_merges;
     int32_t dj, j, mkz;
     int useMST = 1; /* non-zero if we use minimal spanning tree */
+    int REPORT; /* controls frequency of reports */
+
+    REPORT = mat->rem_nrows / 100;
 
     // clean things
     njrem = removeSingletons(rep, mat);
@@ -707,73 +672,54 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
     nb_merges = (int*) malloc ((maxlevel + 1) * sizeof (int));
     for (m = 1; m <= maxlevel; m++)
       nb_merges[m] = 0;
-    fprintf(stderr, "Using mergeOneByOne\n");
+    printf ("Using mergeOneByOne\n");
     ncostmax = 20; // was 5
     njproc = 0;
     while(1){
 	if(mat->itermax && (njproc >= mat->itermax)){
-	    fprintf(stderr, "itermax=%d reached, stopping!\n", mat->itermax);
+	    printf ("itermax=%d reached, stopping!\n", mat->itermax);
 	    break;
 	}
 	oldbwcost = bwcost;
 	old_ncols = mat->rem_ncols;
         if (MkzPopQueue(&dj, &mkz, mat) == 0)
           {
-            fprintf (stderr, "Warning: heap is empty, increase maxlevel\n");
+            printf ("Warning: heap is empty, increase maxlevel\n");
             break;
           }
 	j = dj + mat->jmin;
-#if DEBUG >= 1
-	fprintf(stderr, "I popped j=%d wt=%d mkz=%d (#Q=%d)",
-		j, mat->wt[dj], mkz, mat->MKZQ[0]);
-	fprintf(stderr, " nrows=%d ncols=%d\n",mat->rem_nrows,mat->rem_ncols);
-#endif
         m = mat->wt[dj];
-	if (m == 1){
-#if DEBUG >= 1
-	    fprintf(stderr,"Popped j=%d with w=%d\n", j, m);
-#endif
-	    removeColDefinitely(rep, mat, j);
-	}
-	else if (m > 0)
+	if (m == 1) /* singleton ideal */
+          removeColDefinitely(rep, mat, j);
+	else if (m > 0) /* m=0 can happen for already merged ideals */
           mergeForColumn2(rep, mat, &njrem,
                           &totopt, &totfill, &totMST, &totdel, useMST, j);
-#if 0
-	else{
-	    removeColumnAndUpdate(mat, j);
-	    mat->wt[dj] = m;
-	}
-#endif
-        if (nb_merges[m]++ == 0)
-          fprintf (stderr, "First %d-merge, cost %d (#Q=%d)\n", m, mkz,
-                   MkzQueueCardinality(mat->MKZQ));
+        if (nb_merges[m]++ == 0 && m > 1)
+          printf ("First %d-merge, cost %d (#Q=%d)\n", m, mkz,
+                  MkzQueueCardinality(mat->MKZQ));
 	// number of columns removed
 	njproc += old_ncols - mat->rem_ncols;
-	deleteEmptyColumns(mat);
 	bwcost = my_cost ((double) mat->rem_nrows, (double) mat->weight,
                           forbw);
 	if (mat->rem_nrows % REPORT == 0){
-	    njrem = removeSingletons(rep, mat);
-	    ni2rem = number_of_superfluous_rows(mat);
-	    deleteSuperfluousRows(rep, mat, mat->keep, ni2rem, m);
-	    inspectRowWeight(rep, mat);
-	    fprintf(stderr, "N=%d (%d) w=%lu",
-		    mat->rem_nrows, mat->rem_nrows - mat->rem_ncols,
-		    mat->weight);
-	    if(forbw == 2)
-		fprintf(stderr, " bw=%e", bwcost);
-	    else if(forbw == 3)
-		fprintf(stderr, " w*N=%"PRIu64"",
-			((uint64_t)mat->rem_nrows)
-			*((uint64_t)mat->weight));
-	    else if(forbw <= 1)
-		fprintf(stderr, " w*N=%e", bwcost);
-	    fprintf(stderr, " w/N=%2.2lf\n",
+	    njrem = removeSingletons (rep, mat);
+	    ni2rem = number_of_superfluous_rows (mat);
+	    deleteSuperfluousRows (rep, mat, ni2rem, m);
+	    printf ("N=%d (%d) w=%lu", mat->rem_nrows,
+                    mat->rem_nrows - mat->rem_ncols, mat->weight);
+	    if (forbw == 2)
+              printf (" bw=%e", bwcost);
+	    else if (forbw == 3)
+              printf (" w*N=%"PRIu64"", ((uint64_t)mat->rem_nrows)
+                      * ((uint64_t)mat->weight));
+	    else if (forbw <= 1)
+		printf (" w*N=%e", bwcost);
+	    printf (" w/N=%2.2lf\n",
 		    ((double)mat->weight)/((double)mat->rem_nrows));
-	    // njrem=%d at %2.2lf\n",
 	    if((forbw != 0) && (forbw != 3))
 		// what a trick!!!!
-		fprintf(rep->outfile, "BWCOST: %1.0f\n", bwcost);
+		fprintf (rep->outfile, "BWCOST: %1.0f\n", bwcost);
+            fflush (stdout);
 	}
 	if((bwcostmin == 0.0) || (bwcost < bwcostmin)){
 	    bwcostmin = bwcost;
@@ -788,45 +734,55 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
 		if(mat->rem_nrows-mat->rem_ncols > mat->keep){
 		    // drop all remaining columns at once
 		    ni2rem = mat->rem_nrows-mat->rem_ncols+mat->keep;
-		    fprintf(stderr, "Dropping %d rows at once\n", ni2rem);
-		    deleteSuperfluousRows(rep, mat, mat->keep, ni2rem, -1);
+		    printf ("Dropping %d rows at once\n", ni2rem);
+		    deleteSuperfluousRows(rep, mat, ni2rem, INT_MAX);
 		}
 		else{
 		    if(forbw == 0)
-			fprintf(stderr, "cN too high, stopping [%2.2lf]\n", r);
+			printf ("cN too high, stopping [%2.2lf]\n", r);
 		    else
-			fprintf(stderr, "bw too high, stopping [%2.2lf]\n", r);
+			printf ("bw too high, stopping [%2.2lf]\n", r);
 		    break;
 		}
 	    }
 	}
-	else if(forbw == 3)
+	else if (forbw == 3 && bwcost >= coverNmax)
           {
-            if (bwcost >= coverNmax)
+            int nrows = mat->rem_nrows;
+
+            /* if the excess is still larger than what is wanted,
+               remove the heaviest rows and loop again */
+            printf ("remains %d rows\n", mat->rem_nrows);
+            deleteSuperfluousRows (rep, mat,
+                       (mat->rem_nrows - mat->rem_ncols) - mat->keep, INT_MAX);
+            printf ("after deleteSuperfluousRows, remains %d rows\n",
+                    mat->rem_nrows);
+            removeSingletons (rep, mat);
+            printf ("after removeSingletons, remains %d rows\n",
+                    mat->rem_nrows);
+            if (mat->rem_nrows == nrows)
               {
-		fprintf (stderr, "w/N too high (%1.2f), stopping\n", bwcost);
-		break;
+                printf ("w/N too high (%1.2f), stopping\n", bwcost);
+                break;
               }
           }
 	if((forbw == 1) && (oldbwcost != 0.0) && (bwcost > oldbwcost)){
 	    ncost++;
 #if 0
-	    fprintf(stderr, "New cost > old cost (%.16e > %.16e) [%d/%d]\n",
+	    printf ("New cost > old cost (%.16e > %.16e) [%d/%d]\n",
 		    bwcost, oldbwcost, ncost, ncostmax);
 #endif
 	    if(ncost >= ncostmax){
 		int nirem;
 
-		fprintf(stderr, "New cost > old cost %d times", ncost);
-		fprintf(stderr, " in a row:");
-		nirem = deleteSuperfluousRows(rep, mat, mat->keep, 128, m);
+		printf ("New cost > old cost %d times in a row:", ncost);
+		nirem = deleteSuperfluousRows(rep, mat, 128, m);
 		if(nirem == 0){
-		    fprintf(stderr, " stopping\n");
+		    printf (" stopping\n");
 		    break;
 		}
 		else{
-		    fprintf(stderr, " try again after removing %d rows!\n",
-			    nirem);
+		    printf (" try again after removing %d rows!\n", nirem);
 		    njproc += nirem; // humf: odd name for njproc...!
 		    continue;
 		}
@@ -835,19 +791,30 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
 	else
 	    ncost = 0;
     }
-    if(mat->itermax == 0)
-	deleteSuperfluousRows(rep, mat, mat->keep,
-			      mat->rem_nrows-mat->rem_ncols+mat->keep, -1);
+    if (mat->itermax == 0)
+      {
+        printf ("Removing final excess, nrows=%d\n", mat->rem_nrows);
+	deleteSuperfluousRows(rep, mat,
+			      (mat->rem_nrows - mat->rem_ncols) - mat->keep,
+                              INT_MAX);
+        printf ("Removing singletons, nrows=%d\n", mat->rem_nrows);
+        removeSingletons (rep, mat);
+      }
+
+#if DEBUG >= 1
+    checkWeights (mat);
+#endif
+
     if((forbw != 0) && (forbw != 3)){
 	fprintf(rep->outfile, "BWCOSTMIN: %1.0f\n", bwcostmin);
-	fprintf(stderr, "Minimal bwcost found: %1.0f\n", bwcostmin);
+	printf ("Minimal bwcost found: %1.0f\n", bwcostmin);
     }
 #if DEBUG >= 1
-    fprintf(stderr, "Total number of row additions: %lu\n", row_additions);
+    printf ("Total number of row additions: %lu\n", row_additions);
 #endif
     for (m = 1; m <= maxlevel; m++)
       if (nb_merges[m] > 0)
-        fprintf (stderr, "Number of %d-merges: %d\n", m, nb_merges[m]);
+        printf ("Number of %d-merges: %d\n", m, nb_merges[m]);
     free (nb_merges);
 }
 
@@ -882,6 +849,10 @@ indicesFromString(int32_t *ind, char *str)
 static void
 doAllAdds(report_t *rep, filter_matrix_t *mat, char *str)
 {
+/* FIXME for FFS we need to know for which ideal we are doing the merge */
+/* Can't be used for FFS until it is fixed */
+    int32_t j = 42;
+
     int32_t ind[MERGE_LEVEL_MAX], i0;
     int ni, sg, k;
 
@@ -895,7 +866,7 @@ doAllAdds(report_t *rep, filter_matrix_t *mat, char *str)
 	sg = 1;
     }
     for(k = 1; k < ni; k++)
-      addRowsAndUpdate(mat, ind[k], i0, -1);
+      addRowsAndUpdate(mat, ind[k], i0, j);
     reportn(rep, ind, ni);
     if(sg > 0){
 	// when ni == 1, then the corresponding row was too heavy and dropped
@@ -920,20 +891,21 @@ resume(report_t *rep, filter_matrix_t *mat, char *resumename)
     int nactivej;
     int32_t j;
     char * rp;
+    int REPORT = 10000;
 
-    fprintf(stderr, "Resuming computations from %s\n", resumename);
+    printf ("Resuming computations from %s\n", resumename);
     // skip first line containing nrows ncols
     rp = fgets(str, RELATION_MAX_BYTES, resumefile);
     ASSERT_ALWAYS(rp);
 
-    fprintf(stderr, "Reading row additions\n");
+    printf ("Reading row additions\n");
     while(fgets(str, RELATION_MAX_BYTES, resumefile)){
 	addread++;
 	if((addread % (10 * REPORT)) == 0)
-	    fprintf(stderr, "%lu lines read at %2.2lf\n", addread, seconds());
+	    printf ("%lu lines read at %2.2lf\n", addread, seconds());
 	if(str[strlen(str)-1] != '\n'){
-	    fprintf(stderr, "Gasp: not a complete a line!");
-	    fprintf(stderr, " I stop reading and go to the next phase\n");
+	    printf ("Gasp: not a complete a line!");
+	    printf (" I stop reading and go to the next phase\n");
 	    break;
 	}
 	if(strncmp(str, "BWCOST", 6) != 0)
@@ -949,7 +921,7 @@ resume(report_t *rep, filter_matrix_t *mat, char *resumename)
 	if(mat->wt[GETJ(mat, j)] != 0)
 	    nactivej++;
     mat->rem_ncols = nactivej;
-    fprintf(stderr, "At the end of resume, we have");
-    fprintf(stderr, " nrows=%d ncols=%d (%d)\n",
+    printf ("At the end of resume, we have");
+    printf (" nrows=%d ncols=%d (%d)\n",
 	    mat->rem_nrows, mat->rem_ncols, mat->rem_nrows-mat->rem_ncols);
 }

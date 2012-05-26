@@ -144,7 +144,7 @@ macro(configure_matmul_lib v i)
     endif(doing_u64 AND doing_bucket)
 
     add_library(matmul_${v}_${i} SHARED ${sources})
-    target_link_libraries(matmul_${v}_${i} bwc_mpfq mat_io)
+    target_link_libraries(matmul_${v}_${i} bwc_mpfq)
     set_target_properties(matmul_${v}_${i} PROPERTIES
             COMPILE_FLAGS "--mpi -DSELECT_ABASE_${v} -DMM_IMPL=${i}"
             LINK_FLAGS "--mpi")

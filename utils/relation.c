@@ -506,7 +506,7 @@ relation_stream_get_skip (relation_stream_ptr rs)
 another_line:
     rs->lnum++;
 
-    c = fgetc (f);
+    c = fgetc_unlocked (f);
     nread = 1;
 
     if (c == EOF)
@@ -517,12 +517,12 @@ another_line:
 
     if (c == '#')
       {
-        for( ; c != EOF && c != '\n' ; c = fgetc (f), nread++);
+        for( ; c != EOF && c != '\n' ; c = fgetc_unlocked (f), nread++);
         goto another_line;
       }
 
     /* read entire line */
-    for( ; c != EOF && c != '\n' ; c = fgetc (f), nread++);
+    for( ; c != EOF && c != '\n' ; c = fgetc_unlocked (f), nread++);
 
     rs->pos += nread;
     rs->nrels++;

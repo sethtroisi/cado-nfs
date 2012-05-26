@@ -13,11 +13,7 @@ dumpSparse(FILE *ofile, filter_matrix_t *mat)
 	w += lengthRow(mat, i);
 	new_nrows++;
 	ibuf = 0;
-#if USE_TAB == 0
-	for(k = 0; k < lengthRow(mat, i); k++)
-#else
 	for(k = 1; k <= lengthRow(mat, i); k++)
-#endif
 	    buf[ibuf++] = cell(mat, i, k);
 	fprintf(ofile, "%d", ibuf);
 	for(k = 0; k < ibuf; k++)

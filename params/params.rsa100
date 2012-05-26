@@ -62,8 +62,6 @@ excesspurge=20000       # minimal excess we want before pruning
 keeppurge=160           # maximal excess wanted after purge
                         # (purge shrinks if needed)
 maxlevel=10
-cwmax=100
-rwmax=100
 ratio=1.1
 bwstrat=3
 

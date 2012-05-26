@@ -257,8 +257,13 @@ pureMkz(filter_matrix_t *mat, int32_t j)
         for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
           if((i = mat->R[GETJ(mat, j)][k]) != -1){
 	    // this should be the weight of row i
+#ifdef FOR_FFS
+	    if(mat->rows[i][0].id < mkz)
+              mkz = mat->rows[i][0].id;
+#else
 	    if(mat->rows[i][0] < mkz)
               mkz = mat->rows[i][0];
+#endif
           }
         /* the lightest row has weight mkz, we add wt-1 times mkz-1,
            remove once mkz-1, and remove wt entries in the jth column */
@@ -297,8 +302,13 @@ lightColAndMkz(filter_matrix_t *mat, int32_t j)
     for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
 	if((i = mat->R[GETJ(mat, j)][k]) != -1){
 	    // this should be the weight of row i
-	    if(mat->rows[i][0] < mkz)
-		mkz = mat->rows[i][0];
+#ifdef FOR_FFS
+      if(mat->rows[i][0].id < mkz)
+          mkz = mat->rows[i][0].id;
+#else
+      if(mat->rows[i][0] < mkz)
+          mkz = mat->rows[i][0];
+#endif
 	}
     mkz = wj * cte + (mkz-1) * (wj-1);
 #if MKZ_TIMINGS
@@ -335,22 +345,24 @@ MkzPopQueue(int32_t *dj, int32_t *mkz, filter_matrix_t *mat)
   *mkz = MkzGet(Q, 1, 1);
   while (mat->wt[*dj] > mat->mergelevelmax)
     {
-       /* remove heavy column */
+      /* remove heavy column */
       MkzDelete (Q, A, 1);
       A[*dj] = MKZ_INF;
 
-      if (MkzQueueCardinality(mat->MKZQ) == 0)
+      if (MkzQueueCardinality(mat->MKZQ) <= 0)
         return 0;
 
       *dj = MkzGet(Q, 1, 0);
       *mkz = MkzGet(Q, 1, 1);
     }
-    A[*dj] = MKZ_INF; /* already done in MkzRemoveJ, but if we don't do it,
-                         we get A[j1]=A[j2] for some j1 <> j2 */
-    MkzAssign(Q, A, 1, Q[0]); /* move entry of index Q[0] in Q,A to index 1 */
-    Q[0]--;                   /* decrease number of entries in Q,A */
-    MkzDownQueue(Q, A, 1);    /* reorder heap structure */
-    return 1;
+  A[*dj] = MKZ_INF; /* already done in MkzRemoveJ, but if we don't do it,
+                       we get A[j1]=A[j2] for some j1 <> j2 */
+  if (MkzQueueCardinality(mat->MKZQ) <= 0)
+    return 0;
+  MkzAssign(Q, A, 1, Q[0]); /* move entry of index Q[0] in Q,A to index 1 */
+  Q[0]--;                   /* decrease number of entries in Q,A */
+  MkzDownQueue(Q, A, 1);    /* reorder heap structure */
+  return 1;
 }
 
 void

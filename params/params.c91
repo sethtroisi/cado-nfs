@@ -51,7 +51,7 @@ machines=mach_desc      # file describing available computers for parallel
 ###########################################################################
 
 degree=4                # degree of the algebraic polynomial
-polsel_P=20000               # choose lc(g) with two prime factors in [P,2P]
+polsel_P=50000               # choose lc(g) with two prime factors in [P,2P]
     # Setting a large value will most likely find better polynomials,
     # but the number of found polynomials will be smaller.
     # As a rule of thumb, we want at least 100 found polynomials in total
@@ -59,7 +59,7 @@ polsel_P=20000               # choose lc(g) with two prime factors in [P,2P]
 polsel_lq=2                  # special-q in lc(g) has such many factors
     # Setting a large value will enumerate/check more potential polynomials
     # for each ad, which however will also increase the size of lc(g).
-polsel_maxnorm=32.6          # max. lognorm of polynomials (before rootsieve)
+polsel_maxnorm=33.4          # max. lognorm of polynomials (before rootsieve)
     # If not set, a default value of 1e9 (in practice infinity) is used.
     # Setting this value right might speed up a lot the polynomial
     # selection, by discarding right away polynomials which are not
@@ -67,17 +67,17 @@ polsel_maxnorm=32.6          # max. lognorm of polynomials (before rootsieve)
     # in total below this bound.
 polsel_admin=0               # min value for lc(f)
     # If not set, the default is 0.
-polsel_admax=100000          # max value for lc(f)
+polsel_admax=50000           # max value for lc(f)
     # The polynomial selection search time is proportional to the
     # length of the interval [polsel_admin,polsel_admax]
-polsel_adrange=10000         # individual tasks
+polsel_adrange=5000          # individual tasks
     # Polynomial selection is split into several individual tasks. The
     # complete range from polsel_admin to polsel_admax has to be covered for the
     # polynomial selection to complete. The number of individual tasks is
     # obviously (polsel_admax-polsel_admin)/polsel_adrange. 
 polsel_incr=60               # forced divisor of lc(f)
-    # This factor is usually a smooth number, which forces roots in the
-    # algebraic polynomial. 60 is a good start, 210 is popular as well.
+    # This factor is usually a smooth number, which forces projective roots in
+    # the algebraic polynomial. 60 is a good start, 210 is popular as well.
 polsel_kmax=18               # rotation is bounded by 2^kmax
     # This controls the computational effort put into the rotation step.
     # The higher this value is, the better the found polynomial will be,
@@ -91,16 +91,6 @@ polsel_delay=60              # time between two checks
 polsel_nice=4            # nice level for polyselect
     # This sets the posix ``nice level'' for polyselect jobs. If you
     # don't know what it is, you may leave as is, or set to 0.
-
-# on the test number
-# 3162277660168379331998893544432718533719555265930689508199398508902378895852672407128275763
-# we get
-# lognorm: 32.47, alpha: -4.31 E=28.17
-# Murphy's E(Bf=10000000,Bg=5000000,area=1.00e+16)=3.46e-08
-# Updated Apr, 24:
-# with -lq 2 we get
-# lognorm: 27.24, alpha: -0.76 (proj: -1.52), E: 26.47, nr: 0
-# MurphyE(Bf=10000000,Bg=5000000,area=1.00e+16)=3.76e-08
 
 ###########################################################################
 # Sieve
@@ -187,12 +177,7 @@ sievenice=10            # nice level for the sieving jobs
 # Filtering
 ###########################################################################
 
-excessratio=1.01        # minimal excess we want before pruning
-    # This parameter also controls at which moment we choose to stop
-    # sieving before entering the filtering step.
-
 filterlastrels=0        # if 0, we do the merging with all the relations
-			# we have when the minimal excess (excessratio) is
 			# there. If non-zero (and parallel=1), we incorporate all
 			# new relations in the current sieving jobs (which are killed),
 			# and do another filtering step with those relations.
@@ -201,8 +186,6 @@ filterlastrels=0        # if 0, we do the merging with all the relations
 keeppurge=160           # maximal excess wanted after purge
                         # (purge shrinks if needed)
 maxlevel=15             # perform up to <maxlevel>-way merges
-cwmax=100               # maximum column weight
-rwmax=100               # maximum row weight
 ratio=1.1               # used only when bwstrat=0 (see below)
 bwstrat=3               # bwstrat=0: stops the merge when the weight of
                         #    the matrix multiplied by the number of rows c*N

@@ -212,6 +212,12 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 	 }
 	 mpz_mul (adm1, adm1, mtilde);
 	 mpz_mod (adm1, adm1, m);
+
+         /* we make -d*ad/2 <= adm1 < d*ad/2 */
+         mpz_mul_2exp (t, adm1, 1);
+         if (mpz_cmp (t, m) >= 0)
+           mpz_sub (adm1, adm1, m);
+
 	 mpz_mul (m, adm1, l);
 	 mpz_sub (m, mtilde, m);
 #ifdef DEBUG_POLYSELECT2
@@ -741,7 +747,8 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
 		  modul_clearmod (pp);
 	 }
 	 /* if the hash table contains n entries, each one smaller than (2P)^2,
-		the number of potential collisions is about 1/2n^2/(2P)^2 */
+            the number of potential collisions is about 0.5*n^2/(2P)^2.
+            We use Primes[nprimes - 2] since Primes[nprimes-1] = 0. */
 	 pc1 = 0.5 * pow ((double) H->size / (double) Primes[nprimes - 2], 2.0);
 	 hash_clear (H);
 

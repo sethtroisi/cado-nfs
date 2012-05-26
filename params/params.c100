@@ -35,11 +35,11 @@ polsel_nice=4            # nice level for selection
 
 ## Parameters of polyselect
 polsel_P=50000               # choose lc(g) with two prime factors in [P,2P]
-polsel_maxnorm=34.8          # max. lognorm of polynomials (before rootsieve)
-polsel_admax=5e5             # max value for lc(f)
-polsel_adrange=2e4           # individual tasks
+polsel_maxnorm=35.0          # max. lognorm of polynomials (before rootsieve)
+polsel_admax=1e6             # max value for lc(f)
+polsel_adrange=1e4           # individual tasks
 polsel_kmax=20               # rotation is bounded by 2^kmax
-polsel_incr=60               # forced divisor of lc(f)
+polsel_incr=210              # forced divisor of lc(f)
 polsel_lq=3                  # special-q in lc(g) has such many factors
 
 ###########################################################################
@@ -74,11 +74,8 @@ sieve_max_threads=2
 # Filtering
 ###########################################################################
 
-excessratio=1.01        # minimal excess we want before pruning
 keeppurge=160           # shrink in purge if excess exceeds keeppurge
 maxlevel=20
-cwmax=100
-rwmax=100
 ratio=1.1
 bwstrat=3               
 

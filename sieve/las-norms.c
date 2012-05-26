@@ -14,8 +14,8 @@
 
 /************************** sieve info stuff *********************************/
 
-/* initialize array C[0..255]: C[i] is non-zero whenever the log-norm i
-   is considered as a potential report.
+/* initialize array C[0..255]: C[i] is zero whenever the log-norm i
+   is considered as a potential report, and 127 otherwise.
    The large prime bound is L = 2^l.
 */
 static void
@@ -32,12 +32,22 @@ sieve_info_init_lognorm (unsigned char *C, unsigned char threshold,
 #ifdef COFACTOR_TRICK
   {
     unsigned char k0, k1;
-    /* for L < R <= B^2, R cannot be L-smooth (see lattice.tex) */
-    k0 = (unsigned char) ((double) l * scale + 0.5) + GUARD;
-    k1 = (unsigned char) (2.0 * log2 ((double) B) * scale + 0.5)
-      + GUARD;
-    for (k = k0 + GUARD; k + GUARD <= k1 && k < 256; k++)
-      C[k] = 0;
+    double lost = 6.0; /* maximal number of bits lost due to prime powers */
+
+    /* for L < R < B^2, a cofactor R cannot be L-smooth, since then it should
+       have at least two prime factors in [B,L], and then should be >= B^2.
+       Note:
+       - the lognorms S[] are GUARD larger than the real values, thus the
+         interval [L,R^2] corresponds to [k0+GUARD,k1+GUARD], but to take into
+         account the roundoff errors we consider [k0+2*GUARD,k1]
+       - 'lost' takes into account the error because we do not sieve
+         prime powers; it applies only to the lower bound, and has to be scaled
+       - the additional guard value takes into account additional errors
+    */
+    k0 = (unsigned char) (((double) l + lost) * scale) + 2 * GUARD + 2;
+    k1 = (unsigned char) (2.0 * log2 ((double) B) * scale) - 2;
+    for (k = k0; k <= k1 && k < 256; k++)
+      C[k] = 127;
   }
 #endif
 }

@@ -47,7 +47,7 @@ if [[ -z $1 || $(expr $1 : '.*[p].*') != 0 ]]
       else
          grep phase ${name}.polsel_out.* | sed "s/^.*phase took \([^s]*\).*$/+\1/g" | tr "\n" " " | cut -c2- | bc | f
          echo -n "   # rootsieve time:        "
-         grep Rootsieve ${name}.polsel_out.* | sed "s/^.*Rootsieve took \([^s]*\).*$/+\1/g" | tr "\n" " " | cut -c2- | bc | f
+         grep -h rootsieve ${name}.polsel_out.* | sed "s/^.*rootsieve took \([^s]*\).*$/+\1/g" | tr "\n" " " | cut -c2- | bc | f
          echo -n "   # of polyselect files:   "
          ls ${name}.polsel_out.* | wc -l
          echo -n "   # of found polynomials:  "
