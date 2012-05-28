@@ -6,11 +6,11 @@
 #include "ropt_stage2.h"
 
 /* -- declarations -- */
-double ropt_quadratic ( ropt_poly_t rs,
-                        bestpoly_t bestpoly,
-                        param_t param,
-                        int verbose );
 
+void ropt_quadratic ( ropt_poly_t rs,
+                      ropt_bestpoly_t bestpoly,
+                      ropt_param_t param,
+                      ropt_info_t info );
 
 
 #endif /* ROPT_QUADRATIC_H */

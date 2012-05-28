@@ -1,78 +1,98 @@
 #ifndef ROPT_TREE_H
 #define ROPT_TREE_H
 
+
 #include "auxiliary.h"
 
-/* Struct for the lift. Note we could rely on stack
-   in the recursive calls. But this is more convenient
-   as long as the memory is not a problem. */
+
+/**
+ * Struct for the nodes in the lift.
+ */
 typedef struct node_t {
-  unsigned int u;
-  unsigned int v;
-  unsigned int *r;
-  char *roottype;
-  unsigned int alloc;
-  unsigned int nr;
   char e;
   float val;
+  unsigned int nr;
+  unsigned int u;
+  unsigned int v;
+  unsigned int alloc;
+  unsigned int *r;
+  char *roottype;
   struct node_t *firstchild;
   struct node_t *nextsibling;
-  // might remove parent in future.
   struct node_t *parent;
-} node;
+} node; // sizeof = 64
 
-/* Priority queue to record sublattices (u, v) */
+
+/**
+ * Priority queue for sublattices over a single p^e.
+ */
+typedef struct single_sublattice_pq_t {
+  unsigned int *u;
+  unsigned int *v;
+  char *e;
+  float *val;
+  int used;
+  int len;
+} single_sublattice_pq;
+
+
+/**
+ * Priority queue for sublattices over a product of p^e.
+ */
 typedef struct sublattice_pq_t {
   mpz_t *u;
   mpz_t *v;
   mpz_t *modulus;
+  float *val;
   int len;
   int used;
 } sublattice_pq;
 
-/* Priority queue to record alpha values */
-typedef struct rootscore_pq_t {
+
+/**
+ * Priority queue to record sublattices (w, u, v)'s alpha's.
+ */
+typedef struct alpha_pq_t {
+  int *w;
+  mpz_t *u;
+  mpz_t *v;
+  mpz_t *modulus;
+  float *alpha;
+  int len;
+  int used;
+} alpha_pq;
+
+
+/**
+ * Priority queue to record alpha values.
+ */
+typedef struct sievescore_pq_t {
   long *i;
   long *j;
   int16_t *alpha;
   int len;
   int used;
-} rootscore_pq;
+} sievescore_pq;
 
-/* Priority queue to record E */
+
+/**
+ * Priority queue to record E.
+ */
 typedef struct MurphyE_pq_t {
   int *w;
   mpz_t *u;
   mpz_t *v;
+  mpz_t *modulus;
   double *E;
   int len;
   int used;
 } MurphyE_pq;
 
-/* Priority queue to record sublattices (w, u, v)'s alpha's */
-typedef struct sub_alpha_pq_t {
-  int *w;
-  mpz_t *u;
-  mpz_t *v;
-  mpz_t *modulus;
-  double *sub_alpha;
-  int len;
-  int used;
-} sub_alpha_pq;
-
-/* Priority queue for the (u, v) with e */
-typedef struct single_sub_alpha_pq_t {
-  unsigned int *u;
-  unsigned int *v;
-  char *e;
-  double *val;
-  int used;
-  int len;
-} single_sub_alpha_pq;
-
 
 /* --- declarations --- */
 
+
+/* tree, used in ropt_stage1.c */
 void new_tree ( node **root );
 
 node* new_node ( void );
@@ -89,55 +109,72 @@ void insert_node ( node *parent,
 
 void free_node ( node **ptr );
 
-
-/* sublattice_pq */
+/* sublattice_pq, used in ropt_stage1.c */
 void new_sublattice_pq ( sublattice_pq **ppqueue,
                          unsigned long len );
 
 void insert_sublattice_pq ( sublattice_pq *pqueue,
                             mpz_t u,
                             mpz_t v,
-                            mpz_t mod );
+                            mpz_t mod, 
+                            float val );
 
 void free_sublattice_pq ( sublattice_pq **ppqueue );
 
+/* single_sublattice_pq, used in ropt_stage1.c */
+void new_single_sublattice_pq ( single_sublattice_pq **top,
+                                unsigned long len );
 
-/* sub_alpha_pq */
-void new_sub_alpha_pq ( sub_alpha_pq **ppqueue,
-                        unsigned long len );
+void insert_single_sublattice_pq ( single_sublattice_pq *top,
+                                   unsigned int u,
+                                   unsigned int v,
+                                   float val,
+                                   char e );
 
-void insert_sub_alpha_pq ( sub_alpha_pq *pqueue, 
-                           int w,
-                           mpz_t u,
-                           mpz_t v,
-                           mpz_t modulus,
-                           double alpha );
+void extract_single_sublattice_pq ( single_sublattice_pq *pqueue,
+                                    unsigned int *u,
+                                    unsigned int *v,
+                                    float *val,
+                                    char *e );
 
-void insert_sub_alpha_pq_up ( sub_alpha_pq *pqueue,
-                              int w,
-                              mpz_t u,
-                              mpz_t v,
-                              mpz_t modulus,
-                              double alpha );
+void free_single_sublattice_pq ( single_sublattice_pq **top );
 
-void insert_sub_alpha_pq_down ( sub_alpha_pq *pqueue,
-                                int w,
-                                mpz_t u,
-                                mpz_t v,
-                                mpz_t modulus,
-                                double alpha );
+/* alpha_pq, used in ropt_stage1.c */
+void new_alpha_pq ( alpha_pq **ppqueue,
+                    unsigned long len );
 
-void extract_sub_alpha_pq ( sub_alpha_pq *pqueue,
-                            int *w,
-                            mpz_t u,
-                            mpz_t v,
-                            mpz_t modulus,
-                            double *alpha );
+void insert_alpha_pq ( alpha_pq *pqueue, 
+                       int w,
+                       mpz_t u,
+                       mpz_t v,
+                       mpz_t modulus,
+                       double alpha );
 
-void free_sub_alpha_pq ( sub_alpha_pq **ppqueue );
+void extract_alpha_pq ( alpha_pq *pqueue,
+                        int *w,
+                        mpz_t u,
+                        mpz_t v,
+                        mpz_t modulus,
+                        double *alpha );
 
+void reset_alpha_pq ( alpha_pq *pqueue );
 
-/* MurphyE_pq */
+void free_alpha_pq ( alpha_pq **ppqueue );
+
+/* sievescore_pq, used in ropt_stage2.c */
+void new_sievescore_pq ( sievescore_pq **ppqueue,
+                         unsigned long len );
+
+void reset_sievescore_pq ( sievescore_pq *pqueue );
+
+void insert_sievescore_pq ( sievescore_pq *pqueue,
+                            long i,
+                            long j,
+                            int16_t alpha );
+
+void free_sievescore_pq ( sievescore_pq **ppqueue );
+
+/* MurphyE_pq, used in ropt_stage2.c */
 void new_MurphyE_pq ( MurphyE_pq **ppqueue,
                       unsigned long len );
 
@@ -145,70 +182,17 @@ void insert_MurphyE_pq ( MurphyE_pq *pqueue,
                          int w,
                          mpz_t u,
                          mpz_t v,
+                         mpz_t modulus,
                          double E );
 
-void insert_MurphyE_pq_up ( MurphyE_pq *pqueue,
-                            int w,
-                            mpz_t u,
-                            mpz_t v,
-                            double E );
-
-void insert_MurphyE_pq_down ( MurphyE_pq *pqueue,
-                              int w,
-                              mpz_t u,
-                              mpz_t v,
-                              double E );
+void extract_MurphyE_pq ( MurphyE_pq *pqueue,
+                          int *w,
+                          mpz_t u,
+                          mpz_t v,
+                          mpz_t modulus,
+                          double *E );
 
 void free_MurphyE_pq ( MurphyE_pq **ppqueue );
 
-
-/* single_sub_alpha_pq */
-void new_single_sub_alpha_pq ( single_sub_alpha_pq **top,
-                               unsigned long len );
-
-void insert_single_sub_alpha_pq ( single_sub_alpha_pq *top,
-                                  unsigned int u,
-                                  unsigned int v,
-                                  double val,
-                                  char e );
-
-void insert_single_sub_alpha_pq_up ( single_sub_alpha_pq *top,
-                                     unsigned int u,
-                                     unsigned int v,
-                                     double val,
-                                     char e );
-
-void insert_single_sub_alpha_pq_down ( single_sub_alpha_pq *top,
-                                       unsigned int u,
-                                       unsigned int v,
-                                       double val,
-                                       char e );
-
-void free_single_sub_alpha_pq ( single_sub_alpha_pq **top );
-
-/* rootscore_pq */
-void new_rootscore_pq ( rootscore_pq **ppqueue,
-                        unsigned long len );
-
-void insert_rootscore_pq ( rootscore_pq *pqueue,
-                           long i,
-                           long j,
-                           int16_t alpha );
-
-void insert_rootscore_pq_down ( rootscore_pq *pqueue,
-                                long i,
-                                long j,
-                                int16_t alpha );
-
-void insert_rootscore_pq_up ( rootscore_pq *pqueue,
-                              long i,
-                              long j,
-                              int16_t alpha );
-
-void reset_rootscore_pq ( rootscore_pq *pqueue );
-
-void free_rootscore_pq ( rootscore_pq **ppqueue );
-
-int pq_parent ( int i );
 
 #endif /* ROPT_TREE_H */

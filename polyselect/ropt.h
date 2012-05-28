@@ -3,29 +3,29 @@
 
 #include "ropt_linear.h"
 #include "ropt_quadratic.h"
+#include "ropt_param.h"
+#include "ropt_arith.h"
+#include "ropt_io.h"
+#include "ropt_str.h"
+
 
 /* -- declarations -- */
 
-int cachesize_cpuid(int verbose);
 
-int cachesize_guess(int verbose);
+void ropt ( ropt_poly_t poly,
+            ropt_bestpoly_t bestpoly,
+            ropt_param_t param,
+            ropt_info_t info );
 
-void ropt ( ropt_poly_t rs,
-            bestpoly_t bestpoly,
-            param_t param,
-            int verbose );
+void ropt_get_bestpoly ( ropt_poly_t poly,
+                         MurphyE_pq *global_E_pqueue,
+                         ropt_bestpoly_t bestpoly );
 
 void ropt_polyselect ( mpz_t *f,
                        int d,
                        mpz_t m,
                        mpz_t l,
                        mpz_t N,
-                       int max_k,
                        int verbose );
-
-void ropt_return_bestpoly ( ropt_poly_t rs,
-                            MurphyE_pq *global_E_pqueue,
-                            bestpoly_t bestpoly );
-
 
 #endif /* ROPT_H */
