@@ -164,7 +164,6 @@ my @default_param = (
 
     # polyselect using Kleinjung's algorithm
     degree         => 5,
-    polsel_kmax    => 10,
     polsel_lq      => 1,
     polsel_nq      => 1000,
     polsel_incr    => 60,
@@ -1478,7 +1477,7 @@ my %tasks = (
 
     polysel   => { name   => "polynomial selection",
                    dep    => ['init'],
-                   param  => ['degree', 'polsel_kmax', 'polsel_incr',
+                   param  => ['degree', 'polsel_incr',
 			      'polsel_admin', 'polsel_admax', 'polsel_lq',
 		              'polsel_nq'],
                    files  => ['polsel_out\.[\de.]+-[\de.]+', 'poly', 'poly_tmp'],
@@ -1912,7 +1911,6 @@ my $polysel_cmd = sub {
            "$m->{'bindir'}/polyselect/polyselect2l -q ".
            "-lq $param{'polsel_lq'} ".
            "-nq $param{'polsel_nq'} ".
-           "-kmax $param{'polsel_kmax'} ".
            "-incr $param{'polsel_incr'} ".
            "-admin $a ".
            "-admax $b ".
