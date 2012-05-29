@@ -860,7 +860,7 @@ ropt_stage1 ( ropt_poly_t poly,
   sublattice_pq *pqueue;
 
   /* size-cutoff of top sublattices */
-  new_sublattice_pq (&pqueue, s1param->nbest_sl);
+  new_sublattice_pq (&pqueue, s1param->nbest_sl * 4);
 
   /* return the nbest sublattices to pqueue ranked by the size of u */
   if (param->verbose >= 2)
@@ -890,6 +890,9 @@ ropt_stage1 ( ropt_poly_t poly,
   for (i = 0; i <= poly->d; i++)
     mpz_init_set (fuv[i], poly->f[i]);
 
+  if (param->verbose >= 2)
+    st = cputime ();
+  
   /* put pqueue into the global alpha_pqueue ranked by parial alpha */
   for (i = 1; i < pqueue->used; i ++) {
 
@@ -930,6 +933,10 @@ ropt_stage1 ( ropt_poly_t poly,
                       pqueue->modulus[i],
                       alpha_lat );
   }
+
+  if (param->verbose >= 2)
+    gmp_fprintf ( stderr, "# Info: rank above sublattices took %dms\n",
+                  cputime () - st );
 
   /* free priority queue */
   free_sublattice_pq (&pqueue);
