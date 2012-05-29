@@ -51,7 +51,7 @@ int nq = INT_MAX;
 int lq = LQ_DEFAULT;
 double max_norm = DBL_MAX; /* maximal wanted norm (before rotation) */
 const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
-static int verbose = 0, incr = DEFAULT_INCR, default_MAX_k;
+static int verbose = 0, incr = DEFAULT_INCR;
 char *out = NULL; /* output file for msieve input (msieve.dat.m) */
 cado_poly best_poly, curr_poly;
 double best_E = 0.0; /* Murphy's E (the larger the better) */
@@ -340,8 +340,8 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       rootsieve_time -= seconds_thread ();
 
 #ifdef NEW_ROOTSIEVE
-      if (d > 4) {
-        ropt_polyselect (f, d, m, g[1], N, MAX_k, 0); // verbose = 2 to see details.
+      if (d > 3) {
+        ropt_polyselect (f, d, m, g[1], N, 0); // verbose = 2 to see details.
         mpz_neg (g[0], m);
       }
       else {
@@ -1101,7 +1101,7 @@ collision_on_batch_sq ( header_t header,
     exit (1);
   }
 
-#ifdef DEBUG_POLYSELECT2L  /* check if crt roots correct */
+#ifdef DEBUG_POLYSELECT2L  /* check if crt roots are correct */
   for (i = 0; i < size; i ++) {
     mpz_t tmp_debug, tmp_debug2, qqz;
     mpz_init_set_ui (qqz, q[i]);
@@ -1113,8 +1113,13 @@ collision_on_batch_sq ( header_t header,
     mpz_pow_ui (tmp_debug2, tmp_debug2, header->d);
     mpz_mod (tmp_debug2, tmp_debug2, qqz);
     if (mpz_cmp (tmp_debug, tmp_debug2) != 0) {
-      fprintf (stderr, "Error: crt root is wrong in %s, iter: %d\n",
-               __FUNCTION__, i);
+      fprintf (stderr, "Error: crt root is wrong in %s, iter: %d, ad: %lu\n",
+               __FUNCTION__, i, header->ad);
+      fprintf (stderr, "We should have Ntilde = (m0+r)^d mod q^2\n");
+      gmp_fprintf (stderr, "Ntilde=%Zd m0=%Zd r=%Zd d=%d q=%lu\n",
+                   header->Ntilde, header->m0, rqqz[i], header->d, q[i]);
+      gmp_fprintf (stderr, "Ntilde mod q^2=%Zd\n", tmp_debug);
+      gmp_fprintf (stderr, "(m0+r)^d mod q^2=%Zd\n", tmp_debug2);
       exit (1);
     }
     mpz_clear (tmp_debug);
@@ -1355,7 +1360,9 @@ collision_on_sq ( header_t header,
   if (tot < BATCH_SIZE)
     tot = BATCH_SIZE;
 
-  // fprintf (stderr, "# Info: n=%lu, k=%lu, (n,k)=%lu, maxnq=%d, nq=%lu\n", N, K, binom(N, K), nq, tot);
+#ifdef DEBUG_POLYSELECT2L
+  fprintf (stderr, "# Info: n=%lu, k=%lu, (n,k)=%lu, maxnq=%d, nq=%lu\n", N, K, binom(N, K), nq, tot);
+#endif
 
   i = 0;
   while ( i <= (tot-BATCH_SIZE) ) {
@@ -1473,8 +1480,6 @@ usage (char *argv)
   fprintf (stderr, "-lq nnn      --- number of factors in the special-q"
            " (default %d)\n", LQ_DEFAULT);
   fprintf (stderr, "-seed nnn    --- seed for srand (default by time(NULL))\n");
-  fprintf (stderr, "-kmax nnn    --- rotation bound (default %d)\n",
-           default_MAX_k);
   fprintf (stderr, "-save xxx    --- save state in file xxx\n");
   fprintf (stderr, "-resume xxx  --- resume state from file xxx\n");
   fprintf (stderr, "-maxnorm xxx --- only optimize polynomials with norm <= xxx\n");
@@ -1510,7 +1515,6 @@ main (int argc, char *argv[])
   fflush (stdout);
 
   mpz_init (N);
-  default_MAX_k = MAX_k;
   cado_poly_init (best_poly);
   cado_poly_init (curr_poly);
 
@@ -1615,12 +1619,6 @@ main (int argc, char *argv[])
     else if (argc >= 3 && strcmp (argv[1], "-out") == 0)
     {
       out = argv[2];
-      argv += 2;
-      argc -= 2;
-    }
-    else if (argc >= 3 && strcmp (argv[1], "-kmax") == 0)
-    {
-      MAX_k = atoi (argv[2]);
       argv += 2;
       argc -= 2;
     }

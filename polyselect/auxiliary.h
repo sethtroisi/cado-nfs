@@ -76,10 +76,10 @@ double get_alpha (mpz_t*, const int, unsigned long);
 double get_biased_alpha_projective ( mpz_t *f, const int d, unsigned long B );
 
 /* poly info, being called in order */
-void print_poly_fg_bare (FILE*, mpz_t*, mpz_t*, int, mpz_t);
+void print_cadopoly_fg (FILE*, mpz_t*, mpz_t*, int, mpz_t);
 double print_cadopoly (FILE*, cado_poly, int);
 void print_cadopoly_extra (FILE*, cado_poly, int, char**, double, int);
-double print_poly_fg ( mpz_t *f, mpz_t *g, int d, mpz_t N, int verbose );
+double print_poly_fg ( mpz_t*, mpz_t*, int, mpz_t, int);
 
 void discriminant (mpz_t, mpz_t*, const int);
 long rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k, unsigned int t);

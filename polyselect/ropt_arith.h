@@ -25,9 +25,9 @@ void compute_fuv_ui ( unsigned int *fuv_ui,
                       unsigned int p );
 
 unsigned int eval_poly_ui_mod ( unsigned int *f,
-                                              int d,
-                                              unsigned int r,
-                                              unsigned int pe );
+                                int d,
+                                unsigned int r,
+                                unsigned int pe );
 
 void Lemma21 ( mpz_t *a,
                mpz_t N,
