@@ -31,8 +31,6 @@
 #define MAXQ 256
 #define SPECIAL_Q {1, 2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173, 179, 181, 191, 193, 197, 199, 211, 223, 227, 229, 233, 239, 241, 251, ULONG_MAX}
 
-extern int MAX_k;
-
 /* hash table structure */
 typedef struct
 {
@@ -66,7 +64,7 @@ typedef struct
 typedef _roots_struct roots_t[1];
 
 /* read-only global variables */
-static int verbose = 0, incr = DEFAULT_INCR, default_MAX_k;
+static int verbose = 0, incr = DEFAULT_INCR;
 double max_norm = DBL_MAX; /* maximal wanted norm (before rotation) */
 uint32_t *Primes;
 char *out = NULL; /* output file for msieve input (msieve.dat.m) */
@@ -347,8 +345,8 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 
                   rootsieve_time -= seconds_thread ();
 #ifdef NEW_ROOTSIEVE
-		  if (d > 4) {
-                    ropt_polyselect (f, d, m, g[1], N, MAX_k, 0); // verbose = 2 to see details.
+		  if (d > 3) {
+                    ropt_polyselect (f, d, m, g[1], N, 0); // verbose = 2 to see details.
                     mpz_neg (g[0], m);
 		  }
 		  else {
@@ -905,8 +903,6 @@ usage (char *argv)
 	 fprintf (stderr, "-incr nnn    --- forced factor of ad (default 60)\n");
 	 fprintf (stderr, "-N nnn       --- input number\n");
 	 fprintf (stderr, "-degree nnn  --- wanted polynomial degree\n");
-	 fprintf (stderr, "-kmax nnn    --- rotation bound (default %d)\n",
-			  default_MAX_k);
 	 fprintf (stderr, "-save xxx    --- save state in file xxx\n");
 	 fprintf (stderr, "-resume xxx  --- resume state from file xxx\n");
 	 fprintf (stderr, "-maxnorm xxx --- only print polynomials with norm <= xxx\n");
@@ -939,7 +935,6 @@ main (int argc, char *argv[])
 	 fflush (stdout);
 
 	 mpz_init (N);
-	 default_MAX_k = MAX_k;
 	 cado_poly_init (best_poly);
 	 cado_poly_init (curr_poly);
 
@@ -1022,12 +1017,6 @@ main (int argc, char *argv[])
 		  else if (argc >= 3 && strcmp (argv[1], "-out") == 0)
 		  {
 			   out = argv[2];
-			   argv += 2;
-			   argc -= 2;
-		  }
-		  else if (argc >= 3 && strcmp (argv[1], "-kmax") == 0)
-		  {
-			   MAX_k = atoi (argv[2]);
 			   argv += 2;
 			   argc -= 2;
 		  }

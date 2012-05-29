@@ -136,14 +136,6 @@ binom ( unsigned long n,
   return tot;
 }
 
-static int
-compare (const void *v1, const void *v2)
-{
-  unsigned long *w1 = (unsigned long*) v1;
-  unsigned long *w2 = (unsigned long*) v2;
-
-  return (*w1 >= *w2) ? -1 : 1;
-}
 
 /* prepare special-q's roots */
 void
@@ -177,13 +169,40 @@ comp_sq_roots ( header_t header,
     if ((header->d * header->ad) % q == 0)
       continue;
 
+    if ( mpz_fdiv_ui (header->Ntilde, q) == 0 )
+      continue;
+
     modul_initmod_ul (qq, q * q);
     mpz_mod_ui (f[0], header->Ntilde, q);
     mpz_neg (f[0], f[0]); /* f = x^d - N */
     nrq = poly_roots_ulong (rq, f, header->d, q);
-    /* sort the roots to get reproducible results */
-    qsort (rq, nrq, sizeof(unsigned long), compare);
     roots_lift (rq, header->Ntilde, header->d, header->m0, q, nrq);
+
+#if 0
+    unsigned int j = 0;
+    mpz_t r1, r2;
+    mpz_init (r1);
+    mpz_init (r2);
+    mpz_set (r1, header->Ntilde);
+    mpz_mod_ui (r1, r1, q*q);
+    gmp_fprintf (stderr, "Ntilde: %Zd, Ntilde (mod %u): %Zd\n", 
+                header->Ntilde, q*q, r1);
+    for (j = 0; j < nrq; j ++) {
+      mpz_set (r2, header->m0);
+      mpz_add_ui (r2, r2, rq[j]);
+      mpz_pow_ui (r2, r2, header->d);
+      mpz_mod_ui (r2, r2, q*q);
+
+      if (mpz_cmp (r1, r2) != 0) {
+        fprintf (stderr, "Root computation wrong in comp_sq_roots().\n");
+        fprintf (stderr, "q: %lu, rq: %lu\n", q, rq[j]);
+        exit(1);
+      }
+    }
+    mpz_clear (r1);
+    mpz_clear (r2);
+#endif
+
     qroots_add (SQ_R, q, nrq, rq);
     modul_clearmod (qq);
   }

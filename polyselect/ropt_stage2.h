@@ -1,11 +1,15 @@
 #ifndef ROPT_STAGE2_H
 #define ROPT_STAGE2_H
 
+
 #include "ropt_param.h"
 #include "ropt_tree.h"
 #include "ropt_arith.h"
 
-/* Sieving array */
+
+/**
+ * Sieving array 
+ */
 typedef struct {
   int16_t *array;
   unsigned int len_i;
@@ -16,15 +20,13 @@ typedef _sievearray_t sievearray_t[1];
 
 /* -- declarations -- */
 
-double ropt_stage2 ( rsstr_t rs,
-                     rsparam_t rsparam,
-                     param_t param,
-                     MurphyE_pq *global_E_pqueue,
-                     int w,
-                     mpz_t u,
-                     mpz_t v,
-                     mpz_t mod,
-                     int verbose );
+void
+ropt_stage2 ( ropt_poly_t poly,
+              ropt_s2param_t s2param,
+              ropt_param_t param,
+              ropt_info_t info,
+              MurphyE_pq *global_E_pqueue,
+              int w );
 
 #if DEBUG
 void print_sievearray ( double **A,

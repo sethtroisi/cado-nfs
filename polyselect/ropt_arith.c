@@ -3,30 +3,13 @@
  * Some arithmetics used in ropt.
  */
 
+
 #include "ropt_arith.h"
 
-void
-crt_pair_mp ( mpz_t a,
-              mpz_t p1,
-              mpz_t b,
-              mpz_t p2,
-              mpz_t re )
-{
-  mpz_t tmp;
-  mpz_init (tmp);
-  /* 1/p1 (mod p2) */
-  mpz_invert (tmp, p1, p2);
-  mpz_sub (re, b, a);
-  mpz_mul (re, re, tmp);
-  mpz_mod (re, re, p2);
-  mpz_mul (re, re, p1);
-  mpz_add (re, re, a);
-  mpz_clear (tmp);
-}
 
-/*
-  Solve x in a + b*x = c (mod p)
-*/
+/**
+ * Solve x in a + b*x = c (mod p)
+ */
 unsigned long
 solve_lineq ( unsigned long a,
               unsigned long b,
@@ -61,10 +44,10 @@ solve_lineq ( unsigned long a,
 }
 
 
-/*
-  Change coordinate from (a, b) to (u, v),
-  where A + MOD*a = u.
-*/
+/**
+ * Change coordinate from (a, b) to (u, v),
+ * where A + MOD*a = u.
+ */
 void
 ab2uv ( mpz_t A,
         mpz_t MOD,
@@ -76,11 +59,11 @@ ab2uv ( mpz_t A,
 }
 
 
-/*
-  Change coordinate from (a, b) to the index of
-  the sieving array, where index = a - Amin,
-  where Amin is negative.
-*/
+/**
+ * Change coordinate from (a, b) to the index of
+ * the sieving array, where index = a - Amin,
+ * where Amin is negative.
+ */
 long
 ab2ij ( long Amin,
         long a )
@@ -89,9 +72,9 @@ ab2ij ( long Amin,
 }
 
 
-/*
-  Change coordinate from (i, j) to (a, b).
-*/
+/**
+ * Change coordinate from (i, j) to (a, b).
+ */
 long
 ij2ab ( long Amin,
         long i )
@@ -100,9 +83,9 @@ ij2ab ( long Amin,
 }
 
 
-/*
-  Change coordinate from (i, j) to (u, v).
-*/
+/**
+ * Change coordinate from (i, j) to (u, v).
+ */
 void
 ij2uv ( mpz_t A,
         mpz_t MOD,
@@ -114,10 +97,10 @@ ij2uv ( mpz_t A,
 }
 
 
-/*
-  Find coordinate a such that
-  A + MOD*a = u (mod p).
-*/
+/**
+ * Find coordinate a such that
+ * A + MOD*a = u (mod p).
+ */
 unsigned int
 uv2ab_mod ( mpz_t A,
             mpz_t MOD,
@@ -132,10 +115,10 @@ uv2ab_mod ( mpz_t A,
 }
 
 
-/*
-  Same as above, but return the
-  position of a in the array.
-*/
+/**
+ * Same as above, but return the
+ * position of a in the array.
+ */
 long
 uv2ij_mod ( mpz_t A,
             long Amin,
@@ -156,10 +139,11 @@ uv2ij_mod ( mpz_t A,
   return i;
 }
 
-/*
-  Given numerator = f(x)*g'(x) - f'(x)*g(x) and g(x),
-  compute special_u = numerator/g^2(x) (mod p).
-*/
+
+/**
+ * Given numerator = f(x)*g'(x) - f'(x)*g(x) and g(x),
+ * compute special_u = numerator/g^2(x) (mod p).
+ */
 static inline unsigned long
 compute_special_u ( unsigned long numerator,
                     unsigned long gx,
@@ -187,11 +171,11 @@ compute_special_u ( unsigned long numerator,
 }
 
 
-/*
-  Similar to above, but test whether r is a multiple root.
-  Given numerator = f(x)*g'(x) - f'(x)*g(x) and g(x),
-  test  u*g^2(x) == numerator (mod p).
-*/
+/**
+ * Similar to above, but test whether r is a multiple root.
+ * Given numerator = f(x)*g'(x) - f'(x)*g(x) and g(x),
+ * test  u*g^2(x) == numerator (mod p).
+ */
 static inline unsigned long
 test_special_u ( unsigned long numerator,
                  unsigned long gx,
@@ -218,11 +202,11 @@ test_special_u ( unsigned long numerator,
 }
 
 
-/*
-  Compute fuv = f+(u*x+v)*g,
-  f(r) + u*r*g(r) + v*g(r) = 0
-  The inputs for f and g are mpz.
-*/
+/**
+ * Compute fuv = f+(u*x+v)*g,
+ * f(r) + u*r*g(r) + v*g(r) = 0
+ * The inputs for f and g are mpz.
+ */
 void
 compute_fuv_mp ( mpz_t *fuv,
                  mpz_t *f,
@@ -263,11 +247,11 @@ compute_fuv_mp ( mpz_t *fuv,
 }
 
 
-/*
-  Compute fuv = f+(u*x+v)*g,
-  f(r) + u*r*g(r) + v*g(r) = 0
-  The inputs for f and g are mpz.
-*/
+/**
+ * Compute fuv = f+(u*x+v)*g,
+ * f(r) + u*r*g(r) + v*g(r) = 0
+ * The inputs for f and g are mpz.
+ */
 static inline void
 compute_fuv ( mpz_t *fuv,
               mpz_t *f,
@@ -308,12 +292,12 @@ compute_fuv ( mpz_t *fuv,
 }
 
 
-/*
-  Compute fuv = f+(u*x+v)*g,
-  The inputs for f and g are unsigne long.
-  Note, u, v are unsigned int.
-  So they should be reduce (mod p) if necessary.
-*/
+/**
+ * Compute fuv = f+(u*x+v)*g,
+ * The inputs for f and g are unsigne long.
+ * Note, u, v are unsigned int.
+ * So they should be reduce (mod p) if necessary.
+ */
 void
 compute_fuv_ui ( unsigned int *fuv_ui,
                  unsigned int *f_ui,
@@ -368,11 +352,11 @@ compute_fuv_ui ( unsigned int *fuv_ui,
 }
 
 
-/*
-  Compute v (mod p) by
-  f(r) + u*r*g(r) + v*g(r) = 0 (mod p).
-  The inputs for f(r) and g(r) are unsigned int.
-*/
+/**
+ * Compute v (mod p) by
+ * f(r) + u*r*g(r) + v*g(r) = 0 (mod p).
+ * The inputs for f(r) and g(r) are unsigned int.
+ */
 unsigned int
 compute_v_ui ( unsigned int fx,
                unsigned int gx,
@@ -407,46 +391,10 @@ compute_v_ui ( unsigned int fx,
 }
 
 
-/*
-  Evaluation polynomials at many points.
-*/
-void
-eval_polys ( mpz_t *f,
-             mpz_t *g,
-             mpz_t *fr,
-             mpz_t *gr,
-             mpz_t *numerator,
-             const unsigned int *primes,
-             int d )
-{
-  unsigned long k;
-  mpz_t tmp;
-  mpz_init (tmp);
-
-  for ( k = 0; k <= primes[NP-1]; k ++ ) {
-    mpz_set_ui (fr[k], 0);
-    mpz_set_ui (gr[k], 0);
-    eval_poly_ui (fr[k], f, d, k);
-    eval_poly_ui (gr[k], g, 1, k);
-    eval_poly_diff_ui (numerator[k], f, d, k);
-    mpz_mul (numerator[k], numerator[k], gr[k]);
-    mpz_neg (numerator[k], numerator[k]);
-    mpz_mul (tmp, fr[k], g[1]);
-    mpz_add (numerator[k], tmp, numerator[k]);
-    /* if (DEBUG) { */
-    /* 	   gmp_printf ("numerator[%d]: %Zd\n", k, numerator[k]); */
-    /* 	   gmp_printf ("gr[%d]: %Zd", k, gr[k]); */
-    /* } */
-  }
-
-  mpz_clear (tmp);
-}
-
-
-/*
-  Compute v = f(r) (mod pe), where f is of degree d.
-  The input f should be unsigned int.
-*/
+/**
+ * Compute v = f(r) (mod pe), where f is of degree d.
+ * The input f should be unsigned int.
+ */
 unsigned int
 eval_poly_ui_mod ( unsigned int *f,
                    int d,
@@ -483,10 +431,10 @@ eval_poly_ui_mod ( unsigned int *f,
 }
 
 
-/*
-  Compute v = f'(r) (mod pe), where f is of degree d.
-  The input f should be unsigned long.
-*/
+/**
+ * Compute v = f'(r) (mod pe), where f is of degree d.
+ * The input f should be unsigned long.
+ */
 static inline unsigned long
 eval_poly_diff_ui_mod ( unsigned long *f,
                         int d,
@@ -530,17 +478,17 @@ eval_poly_diff_ui_mod ( unsigned long *f,
 }
 
 
-/*
-  Test whether r is a root for f(r) + g(r)*(u*x+v) = 0 (mod p^e);
-  Note that, the condition to call this function is that, r is a root
-  for f(r) + g(r)*(u*x+v) = 0 (mod p^(e-1)).
-
-  (1) If it can be lifted, then it could be single or multiple root
-  -- single root return 1, -- note, the lifted root is not r in general.
-  Hence, we need to compute the lifted root and save it in r_lifted.
-  -- multiple root return 2.
-  (2) If it is can not be lifted, return 0;
-*/
+/**
+ * Test whether r is a root for f(r) + g(r)*(u*x+v) = 0 (mod p^e);
+ * Note that, the condition to call this function is that, r is a root
+ * for f(r) + g(r)*(u*x+v) = 0 (mod p^(e-1)).
+ *
+ * (1) If it can be lifted, then it could be single or multiple root
+ * -- single root return 1, -- note, the lifted root is not r in general.
+ * Hence, we need to compute the lifted root and save it in r_lifted.
+ * -- multiple root return 2.
+ * (2) If it is can not be lifted, return 0;
+ */
 static inline int
 isroot_fuv ( mpz_t *f,
              mpz_t *g,
@@ -575,7 +523,8 @@ isroot_fuv ( mpz_t *f,
   eval_poly_ui (gr, g, 1, r);
   mpz_mul_ui (gr, gr, u);
   mpz_add (gr, gr, tmp);
-  eval_poly_diff_ui (fr, f, d, r); // keep fr unchanged for further reference.
+  /* keep fr unchanged for further reference */
+  eval_poly_diff_ui (fr, f, d, r);
   mpz_add (tmp, fr, gr); // tmp is f'_uv(r)
 
   /* cmpute f(x) + g(x)*(ux + v) */
@@ -631,12 +580,13 @@ isroot_fuv ( mpz_t *f,
   return type;
 }
 
-/*
-  Given f (mod pe) and (u, v) (mod pe) pair.
-  Lift a single root r (mod pe/p) to r (mod p)
-  Please ensure that f_{u, v}(r) = 0 (mod pe/p)
-  when call this function.
-*/
+
+/**
+ * Given f (mod pe) and (u, v) (mod pe) pair.
+ * Lift a single root r (mod pe/p) to r (mod p)
+ * Please ensure that f_{u, v}(r) = 0 (mod pe/p)
+ * when call this function.
+ */
 static inline void
 liftroot_fuv_ul ( unsigned long *f,
                   int d,
@@ -655,7 +605,8 @@ liftroot_fuv_ul ( unsigned long *f,
   /* f'(x) */
   fr = eval_poly_diff_ui_mod (f, d, r, p);
   modul_set_ul (tmp1, fr, mod);
-  modul_add (tmp, tmp, tmp1, mod); // tmp should be kept unchanged from now on.
+  /* tmp should be kept unchanged from now on */
+  modul_add (tmp, tmp, tmp1, mod); 
 
   /* 1/f'(r) (mod p) */
   modul_inv (tmp, tmp, mod);
@@ -675,10 +626,10 @@ liftroot_fuv_ul ( unsigned long *f,
 }
 
 
-/*
-  Reduce mpz_t *f to unsigned int *f_mod;
-  Given modulus pe, return f (mod pe).
-*/
+/**
+ * Reduce mpz_t *f to unsigned int *f_mod;
+ * Given modulus pe, return f (mod pe).
+ */
 inline void
 reduce_poly_ul ( unsigned int *f_ui,
                  mpz_t *f,
@@ -691,11 +642,13 @@ reduce_poly_ul ( unsigned int *f_ui,
   }
 }
 
-/* From polyselect.c
-   Implements Lemma 2.1 from Kleinjung's paper.
-   If a[d] is non-zero, it is assumed it is already set, otherwise it is
-   determined as a[d] = N/m^d (mod p).
-*/
+
+/**
+ * From polyselect.c
+ * Implements Lemma 2.1 from Kleinjung's paper.
+ * If a[d] is non-zero, it is assumed it is already set, otherwise it is
+ * determined as a[d] = N/m^d (mod p).
+ */
 void
 Lemma21 ( mpz_t *a,
           mpz_t N,

@@ -2157,11 +2157,12 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
 }
 
 
-/*****************************************************************************/
-
-/* backend for print poly itselft */
+/*
+   Print f, g only.
+   Note: it's a backend for print_cadopoly().
+*/
 void
-print_poly_fg_bare ( FILE *fp,
+print_cadopoly_fg ( FILE *fp,
            mpz_t *f,
            mpz_t *g,
            int deg,
@@ -2192,7 +2193,10 @@ print_poly_fg_bare ( FILE *fp,
 }
 
 
-/* backend for print poly information */
+/*
+   Print f, g only, lognorm, skew, alpha, MurphyE.
+   Note:  it's a backend for print_cadopoly_extra().
+*/
 double
 print_cadopoly (FILE *fp, cado_poly p, int raw)
 {
@@ -2200,7 +2204,7 @@ print_cadopoly (FILE *fp, cado_poly p, int raw)
    double alpha, alpha_proj, logmu, e;
 
    /* print f, g only*/
-   print_poly_fg_bare (fp, p->alg->f, p->rat->f, p->alg->degree, p->n);
+   print_cadopoly_fg (fp, p->alg->f, p->rat->f, p->alg->degree, p->n);
 
 #ifdef DEBUG
    fprintf (fp, "# ");
@@ -2260,7 +2264,9 @@ print_cadopoly (FILE *fp, cado_poly p, int raw)
 }
 
 
-/* print_cadopoly with extra information such as REV and duration */
+/* 
+   Print f, g, lognorm, skew, alpha, MurphyE, REV, time duration.
+*/
 void
 print_cadopoly_extra (FILE *fp, cado_poly cpoly, int argc, char *argv[], double st, int raw)
 {
@@ -2276,14 +2282,14 @@ print_cadopoly_extra (FILE *fp, cado_poly cpoly, int argc, char *argv[], double 
 
 
 /*
-  Call print_poly, given f, g.
+  Call print_cadopoly, given f, g and return MurphyE.
 */
 double
 print_poly_fg ( mpz_t *f,
         mpz_t *g,
         int d,
         mpz_t N,
-        int verbose )
+        int mode )
 {
    double e;
    int i;
@@ -2299,7 +2305,7 @@ print_poly_fg ( mpz_t *f,
    cpoly->alg->degree = d;
    cpoly->rat->degree = 1;
 
-   if (verbose == 2) {
+   if (mode == 1) {
       e = print_cadopoly (stdout, cpoly, 1);
       fflush(stdout);
    }
