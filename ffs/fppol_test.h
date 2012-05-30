@@ -49,8 +49,10 @@
   {                                                         \
     uint##sz##_t t = fppol##sz##_fold_or(p);                \
     if (!t) return -1;                                      \
-    if (sizeof(uint##sz##_t) <= sizeof(unsigned int))       \
-      return sz-1-__builtin_clz(t);                         \
+    if (sizeof(uint##sz##_t) <= sizeof(unsigned int)) {     \
+      unsigned int tt = (unsigned int)t;                    \
+      return 8*sizeof(unsigned int)-1-__builtin_clz(tt);    \
+    }                                                       \
     if (sizeof(uint##sz##_t) == sizeof(unsigned long))      \
       return sz-1-__builtin_clzl(t);                        \
     if (sizeof(uint##sz##_t) == sizeof(unsigned long long)) \
