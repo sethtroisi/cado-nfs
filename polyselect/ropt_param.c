@@ -69,9 +69,9 @@ default_sublattice_prod[NUM_DEFAULT_SUBLATTICE] = {
  */
 const unsigned int size_total_sublattices[7][2] = {
   // {digits, num_of_sublattices} 
-  {80, 4},
-  {100, 8},
-  {140, 16},
+  {80, 4},   /* for up to 79 digits */
+  {100, 8},  /* up to 99 digits */
+  {140, 32}, /* up to 139 digits */
   {180, 16},
   {220, 16},
   {260, 32},
