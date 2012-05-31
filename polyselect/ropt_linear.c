@@ -524,9 +524,9 @@ ropt_linear ( ropt_poly_t poly,
               ropt_param_t param,
               ropt_info_t info )
 {
-  if (poly->d == 5)
+  if (poly->d == 4)
     ropt_linear_deg4 (poly, bestpoly, param, info);
-  else if (poly->d == 4)
+  else if (poly->d == 5)
     ropt_linear_deg5 (poly, bestpoly, param, info);
   else 
     fprintf (stderr, "Error: ropt_linear() only support deg 4 and 5.");
