@@ -13,7 +13,7 @@ Main changes between cado-nfs-1.0 and cado-nfs-1.1:
 * reorganization of the binaries in the linear algebra step and speedup
   when using many machines with MPI
 * new experimental scripts to execute the sieve on a cluster.
-  These scripts rely on the OAR job scheduler being used, and exploit its 
+  These scripts rely on the OAR job scheduler being used, and exploit its
   "besteffort" mode. Some even more experimental scripts for linear
   algebra are in the development version.
 * addition of new parameter files and a few new parameters (cf params.c91)
