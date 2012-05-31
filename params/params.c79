@@ -38,7 +38,7 @@ polsel_nice=4            # nice level for selection
 # MurphyE(Bf=10000000,Bg=5000000,area=1.00e+16)=1.51e-07-1.86e-07
 
 ## Parameters of polyselect
-polsel_admax=5000            # max value for lc(f)
+polsel_admax=7000            # max value for lc(f)
 polsel_adrange=1000          # individual tasks
 polsel_incr=60               # forced divisor of lc(f)
 polsel_P=10000               # choose lc(g) with two prime factors in [P,2P]
