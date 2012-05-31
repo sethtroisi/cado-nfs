@@ -34,13 +34,13 @@ unsigned int size_tune_sievearray = 6144;
  */
 const unsigned int size_total_sublattices[7][2] = {
   // {digits, num_of_sublattices} 
-  {80, 4},
-  {100, 8},
-  {140, 16},
-  {180, 16},
-  {220, 16},
-  {260, 32},
-  {300, 128}
+  {80, 4},   /* for up to 79 digits */
+  {100, 8},  /* up to 99 digits */
+  {140, 32}, /* up to 139 digits */
+  {180, 32}, /* up to 179 digits */
+  {220, 32}, /* up to 219 digits */
+  {260, 32}, /* up to 259 digits */
+  {300, 128} /* up to 299 digits */
 };
 
 
@@ -128,54 +128,6 @@ default_sublattice_prod[NUM_DEFAULT_SUBLATTICE] = {
 
 
 /**
-<<<<<<< HEAD
-=======
- * Total number of top sublattices (ranked by the size of integers
- * to be factored).
- */
-const unsigned int size_total_sublattices[7][2] = {
-  // {digits, num_of_sublattices} 
-  {80, 4},   /* for up to 79 digits */
-  {100, 8},  /* up to 99 digits */
-  {140, 32}, /* up to 139 digits */
-  {180, 16},
-  {220, 16},
-  {260, 32},
-  {300, 64}
-};
-
-
-/**
- * Number of top sublattice for each primes[i] 
- * where i < NUM_SUBLATTICE_PRIMES. This only
- * depends on the num of primes in sublattices.
- * Purposed to prevent too much crt computations.
- */
-const unsigned int
-size_each_sublattice[NUM_SUBLATTICE_PRIMES][NUM_SUBLATTICE_PRIMES] = {
-  { 64,  0,  0,  0,  0,  0,  0,  0,  0 }, // tlen_e_sl = 1
-  { 64, 64,  0,  0,  0,  0,  0,  0,  0 }, // tlen_e_sl = 2
-  { 64, 64, 64,  0,  0,  0,  0,  0,  0 }, // tlen_e_sl = 3
-  { 64, 32, 32, 32,  0,  0,  0,  0,  0 }, // tlen_e_sl = 4
-  { 32, 32, 16,  8,  8,  0,  0,  0,  0 }, // tlen_e_sl = 5
-  { 32, 16, 16,  8,  8,  4,  0,  0,  0 }, // tlen_e_sl = 6 (current bound)
-  { 32, 16,  8,  8,  4,  4,  4,  0,  0 }, // tlen_e_sl = 7
-  { 32, 16,  8,  8,  4,  4,  4,  2,  0 }, // tlen_e_sl = 8
-  { 32, 16,  8,  8,  4,  4,  4,  2,  2 }, // tlen_e_sl = 9
-};
-
-
-/**
- * As above, but for tunning good w in 'ropt_quadratic.c'.
- */
-const unsigned int
-size_each_sublattice_tune[NUM_SUBLATTICE_PRIMES] = {
-  8,  8,  4,  4,  4,  2,  2,  2,  2
-};
-
-
-/**
->>>>>>> origin/master
  * Primes.
  */
 const unsigned int primes[NP] = {
