@@ -37,10 +37,10 @@ const unsigned int size_total_sublattices[8][2] = {
   {80, 4},   /* for up to 79 digits */
   {100, 8},  /* up to 99 digits */
   {140, 32}, /* up to 139 digits */
-  {170, 32}, /* up to 179 digits */
+  {170, 32}, /* up to 169 digits */
   {180, 64}, /* up to 179 digits */
-  {220, 32}, /* up to 219 digits */
-  {260, 32}, /* up to 259 digits */
+  {220, 128}, /* up to 219 digits */
+  {260, 128}, /* up to 259 digits */
   {300, 128} /* up to 299 digits */
 };
 
