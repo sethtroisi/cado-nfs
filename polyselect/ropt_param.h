@@ -74,7 +74,7 @@ extern const unsigned char next_prime_idx[];
 
 extern const double exp_alpha[];
 
-extern const unsigned int default_sublattice[NUM_DEFAULT_SUBLATTICE][NUM_SUBLATTICE_PRIMES];
+extern const unsigned int default_sublattice_pe[NUM_DEFAULT_SUBLATTICE][NUM_SUBLATTICE_PRIMES];
 
 const unsigned long default_sublattice_prod[NUM_DEFAULT_SUBLATTICE];
 

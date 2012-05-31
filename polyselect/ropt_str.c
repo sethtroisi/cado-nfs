@@ -648,7 +648,7 @@ ropt_bound_reset ( ropt_poly_t poly,
   /* set exp_min_alpha */
   ropt_bound_setup_others (bound);
 
-  if (param->verbose >= 1) {
+  if (param->verbose >= 2) {
     gmp_fprintf ( stderr, "# Info: reset bounds (%d:%d, %ld:%ld, %Zd:%Zd)"
                   " gives:\n",
                   bound->global_w_boundl,
@@ -763,7 +763,7 @@ ropt_s1param_setup_e_sl ( ropt_poly_t poly,
 
   /* set e_sl[] from default array */
   for (j = 0; j < NUM_SUBLATTICE_PRIMES; j++) {
-    s1param->e_sl[j] = default_sublattice[i][j];
+    s1param->e_sl[j] = default_sublattice_pe[i][j];
   }
 
   /* overwrite e_sl[] from from stdin, if needed */
@@ -953,6 +953,10 @@ ropt_s2param_setup_range ( ropt_bound_t bound,
     /* upper bound */
     s2param->Bmax = ( (len > SIZE_SIEVEARRAY_V_MAX) ?
                       SIZE_SIEVEARRAY_V_MAX : (long) len );
+
+    /* fix if len is too small */
+    if (s2param->Bmax == 0)
+      s2param->Bmax = 128;
 
     mpz_clear (q);
   }

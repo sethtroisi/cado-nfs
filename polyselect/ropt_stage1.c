@@ -860,7 +860,7 @@ ropt_stage1 ( ropt_poly_t poly,
   sublattice_pq *pqueue;
 
   /* size-cutoff of top sublattices */
-  new_sublattice_pq (&pqueue, s1param->nbest_sl * 4);
+  new_sublattice_pq (&pqueue, s1param->nbest_sl);
 
   /* return the nbest sublattices to pqueue ranked by the size of u */
   if (param->verbose >= 2)
@@ -912,15 +912,17 @@ ropt_stage1 ( ropt_poly_t poly,
 #endif
 
 #if DEBUG_ROPT_STAGE1
-    double skew = L2_skewness ( fuv, poly->d, SKEWNESS_DEFAULT_PREC,
+     skew = L2_skewness ( fuv, poly->d, SKEWNESS_DEFAULT_PREC,
                                 DEFAULT_L2_METHOD );
     double logmu = L2_lognorm (fuv, poly->d, skew, DEFAULT_L2_METHOD);
     gmp_fprintf ( stderr, "# Info: insert sublattice #%4d, (w, u, v): "
-                  "(%d, %Zd, %Zd), partial_alpha: %.2f, lognorm: %.2f\n",
+                  "(%d, %Zd, %Zd) (mod %Zd), partial_alpha: %.2f,"
+                  "lognorm: %.2f\n",
                   i,
                   current_w,
                   pqueue->u[i],
                   pqueue->v[i],
+                  pqueue->modulus[i],
                   alpha_lat,
                   logmu );
 #endif
