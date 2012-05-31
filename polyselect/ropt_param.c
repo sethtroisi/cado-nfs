@@ -32,12 +32,13 @@ unsigned int size_tune_sievearray = 6144;
  * sieve. In that case, more sublattices are checked (e.g. double/quad
  * the following valeus).
  */
-const unsigned int size_total_sublattices[7][2] = {
+const unsigned int size_total_sublattices[8][2] = {
   // {digits, num_of_sublattices} 
   {80, 4},   /* for up to 79 digits */
   {100, 8},  /* up to 99 digits */
   {140, 32}, /* up to 139 digits */
-  {180, 32}, /* up to 179 digits */
+  {170, 32}, /* up to 179 digits */
+  {180, 64}, /* up to 179 digits */
   {220, 32}, /* up to 219 digits */
   {260, 32}, /* up to 259 digits */
   {300, 128} /* up to 299 digits */

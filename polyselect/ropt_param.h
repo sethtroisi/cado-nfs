@@ -82,6 +82,6 @@ const unsigned int size_each_sublattice[NUM_SUBLATTICE_PRIMES][NUM_SUBLATTICE_PR
 
 const unsigned int size_each_sublattice_tune[NUM_SUBLATTICE_PRIMES];
 
-const unsigned int size_total_sublattices[7][2];
+const unsigned int size_total_sublattices[8][2];
 
 #endif

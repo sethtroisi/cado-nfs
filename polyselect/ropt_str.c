@@ -817,7 +817,7 @@ ropt_s1param_setup ( ropt_poly_t poly,
 
   /* Set 2: "nbest_sl", depending on the size of n */
   j = mpz_sizeinbase (poly->n, 10);
-  for (i = 0; i < 6; i ++)
+  for (i = 0; i < 7; i ++)
     if (size_total_sublattices[i][0] > j)
       break;
   
