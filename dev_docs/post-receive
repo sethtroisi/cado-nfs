@@ -71,7 +71,7 @@ my $patches_mboxes='';
 
 while (defined($_=<STDIN>)) {
     chomp($_);
-	print STDERR "INPUT: $_\n";
+	# print STDERR "INPUT: $_\n";
     s/^\s*//;
     next if /^$/;
     s/^([0-9a-f]{40})\s+// or die "Bad input line: $_";
@@ -83,7 +83,7 @@ while (defined($_=<STDIN>)) {
     # was branched from.
     # next if $old =~ /^0+$/;
     if ($new =~ /^0+$/) {
-	print STDERR "Deleted branch $_ ?\n";
+	# print STDERR "Deleted branch $_ ?\n";
 	next;
     }
     m{^(refs/heads/[\w/.-]*)$} or die "$_ ?"; $_=$1;
@@ -102,7 +102,7 @@ while (defined($_=<STDIN>)) {
 		next if $h eq $fullref;
 		$cmd .= " ^$1";
 	}
-	print STDERR "Command: $cmd\n";
+	# print STDERR "Command: $cmd\n";
 	open F, "$cmd |";
     } else {
     	open F, "git log --pretty=\"$format\" --abbrev $old..$new |";
@@ -113,7 +113,7 @@ while (defined($_=<STDIN>)) {
     my $nc=0;
     my @newbranch_commits=();
     while (defined(my $line = <F>)) {
-print STDERR "Got: $line\n";
+# print STDERR "Got: $line\n";
         my ($commit, $who, $subject) = split(' ', $line, 3);
 	$commit=~/^([0-9a-f]+)$/ or die;
 	$commit=$1;
