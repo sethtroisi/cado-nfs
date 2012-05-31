@@ -272,7 +272,7 @@ static int deg_norm_prec_0(ffspol_t ffspol_ij, int degi, int degj, int *gap)
   /* If there is only one monomial of maximal degree */
   if (repeated == 1) 
     *gap = -1;
- #if FP_SIZE == 2
+#if FP_SIZE == 2
   /* In characteristic 2, we can use the parity of the number of monomials of
      maximal degree to find cancellations */
   else if (repeated != 1 && (repeated & 1u))
@@ -307,6 +307,7 @@ static void to_prec_N(fppol64_ptr r, fppol_t p, unsigned int N)
       fppol_mul_ti(tmp, p, (unsigned int) -shift);
       fppol64_set_mp(r,tmp);
     }
+    fppol_clear(tmp);
   }
 }
 
@@ -318,82 +319,78 @@ static int deg_norm_prec_N(ffspol_t ffspol_ij, int degi, fppol_t *pow_i, int deg
 
   int deg_norm = -1;
   unsigned int N = 0;
-  int tab_size = ffspol_ij->deg + 1;
+  const int d = ffspol_ij->deg;
+  int tab_size;
   
   int degree;
   int *degrees;
-  degrees = (int *)malloc((tab_size) * sizeof(int));
+  degrees = (int *)malloc((d+1) * sizeof(int));
 
   fppol64_t monomial;
   fppol64_t *monomials;
-  monomials = (fppol64_t *)malloc((tab_size) * sizeof(fppol64_t));
+  monomials = (fppol64_t *)malloc((d+1) * sizeof(fppol64_t));
   
   fppol64_t coeff_prec_N;
   fppol64_t pow_i_prec_N;
   fppol64_t pow_j_prec_N;
         
   do{
-    N = N + 4;
-    /* Computing and sorting the degrees and the monomials in precision N */   
-    for (int k = 0; k < tab_size; ++k) {
-      degree = fppol_deg(ffspol_ij->coeffs[k]) + k * degi + (ffspol_ij->deg - k) * degj;
+    N = N + 8;
+    /* Computing and sorting the degrees and the monomials in precision N.
+       Also align the truncated monomials to be able to add them without
+       further shifts. */   
+    tab_size = 0;
+    for (int k = 0; k < d+1; ++k) {
+      degree = fppol_deg(ffspol_ij->coeffs[k]) + k * degi
+        + (d - k) * degj;
+      if (degree <= max_deg - (int)N) 
+        continue;
       to_prec_N(coeff_prec_N, ffspol_ij->coeffs[k], N);
       to_prec_N(pow_i_prec_N, pow_i[k], N);
       to_prec_N(pow_j_prec_N, pow_j[k], N);
       fppol64_mul_high(monomial, pow_i_prec_N, pow_j_prec_N, N);
       fppol64_mul_high(monomial, monomial, coeff_prec_N, N);
       
-      int l = k;
+      // insertion sort
+      int l = tab_size;
       while (l > 0 && degrees[l - 1] > degree) {
 	degrees[l] = degrees[l - 1];
 	fppol64_set(monomials[l], monomials[l - 1]);
 	--l;
       }
       degrees[l] = degree;
-      fppol64_set(monomials[l], monomial); 
+      fppol64_div_ti(monomials[l], monomial, (max_deg - degree));
+      tab_size++;
     }
+    ASSERT(tab_size >= 2); // otherwise, we shouldn't be here!
 
-    /* We set tab_size to the index of the last value in degrees[] and monomials[] */
+    /* We set tab_size to the index of the last value in degrees[]
+       and monomials[]. This will always be the case until the end 
+       of this loop. */
     --tab_size;
     
     /* Computing the sum of all monomials of maximal degree until we
        find only one monomial of maximal degree */
     
     fppol64_t sum;
-    int max_deg_prec;
     int deg_sum_prec; 
-    unsigned int deg_drop; 
-    /* deg_drop = max_deg_prec - deg_sum_prec will be the drop in degree
-       due to cancellations if deg_sum is >= 0.
-
-       If deg_sum == -1, it means that the precision is insufficient
-       to know precisely the degree of the sum, then deg_drop > max_deg_prec */
-    
     do {
       fppol64_set(sum, monomials[tab_size]);
-      max_deg_prec = fppol64_deg(monomials[tab_size]);
-      if (max_deg_prec != (int) (N - 1))
-	fprintf(stderr, "N = %u, max_deg_prec = %d \t", N, max_deg_prec);
+//      if (max_deg_prec != (int) (N - 1))
+//	fprintf(stderr, "N = %u, max_deg_prec = %d \t", N, max_deg_prec);
       
       /* we make the sum of all monomials of maximal degree */
       while (tab_size > 0 && degrees[tab_size] == degrees[tab_size - 1]) {
-	/* I have to make sure that the syntax of the condition is valid 
-	 that is degrees[tab_size - 1] will not be evaluated if tab_size == 0 */
 	--tab_size;
-	if (max_deg_prec != (int) (N - 1)) {
-	  int shift = fppol64_deg(monomials[tab_size]) - max_deg_prec + 1;  
-	  fppol64_div_ti(monomials[tab_size], monomials[tab_size], (unsigned int) shift);
-	}
 	fppol64_add(sum, sum, monomials[tab_size]);
       }
       
       deg_sum_prec = fppol64_deg(sum);
-      deg_drop = max_deg_prec - deg_sum_prec;
-      
-      /* If the drop in degree is smaller than the precision, we put 
-	 sum in monomials[] and degree in degrees[] and keep the tables sorted */
-      if ((int) deg_drop <= max_deg_prec) {
-	degree = degrees[tab_size] - deg_drop;
+      /* If the we still have information, we put the 
+	 sum in monomials[] and degree in degrees[] and keep
+         the tables sorted */
+      if (deg_sum_prec >= 0) {
+	degree = deg_sum_prec + 1 + max_deg - N;  // exact degree of the sum.
 	int l = tab_size;
 	while (l > 0 && degrees[l - 1] > degree) {
 	  degrees[l] = degrees[l - 1];
@@ -402,22 +399,30 @@ static int deg_norm_prec_N(ffspol_t ffspol_ij, int degi, fppol_t *pow_i, int deg
 	}
 	degrees[l] = degree;
 	fppol64_set(monomials[l], sum); 
-      }
-      /* If the drop in degree is greater than the precision, we throw away the
-       new monomial sum */
-      else {
+      } else {
+        /* If the drop in degree is greater than the precision, we throw
+           away the new monomial sum */
 	--tab_size;
       }
       /* We do this until there is only one monomial of maximal degree */
     } while (tab_size > 0 && degrees[tab_size] == degrees[tab_size - 1]);
-    if ((tab_size > 0 && degrees[tab_size] != degrees[tab_size - 1]) || tab_size == 0) {
+
+    /* Finished or have to increase the precision ? */
+    if ((tab_size > 0 && degrees[tab_size] != degrees[tab_size - 1])
+        || tab_size == 0) {
       deg_norm = degrees[tab_size];
       *gap = max_deg - deg_norm;
-      break;
+      free(degrees);
+      free(monomials);
+      return deg_norm;
     }
+
   } while (tab_size < 0 && N <= 32);
+
+  // Failed, even at maximum allowed precision. Mark it in gap.
+  *gap = max_deg + 1;
   free(degrees);
-  free (monomials);
+  free(monomials);
   return deg_norm;
 }
 
@@ -465,6 +470,12 @@ static MAYBE_UNUSED int deg_norm_ij_v2(ffspol_ptr ffspol_ij, ij_t i, ij_t j, int
   int degj = ij_deg(j);
   int max_deg;
   int deg_norm = -1;
+
+  if (degi == -1)
+    return (ffspol_ij->deg)*degj + fppol_deg(ffspol_ij->coeffs[0]);
+  if (degj == -1)
+    return (ffspol_ij->deg)*degi + fppol_deg(ffspol_ij->coeffs[ffspol_ij->deg]);
+
   
   /* Computation of the degree of the norm for precision 0 
    i.e. the computation works only if deg_norm is the maximal degree
@@ -504,8 +515,17 @@ static MAYBE_UNUSED int deg_norm_ij_v2(ffspol_ptr ffspol_ij, ij_t i, ij_t j, int
     }
     
     deg_norm = deg_norm_prec_N(ffspol_ij, degi, pow_i, degj, pow_j, gap, max_deg);
-    if (*gap == max_deg + 1)
+    if (*gap == max_deg + 1) {
       deg_norm = deg_norm_full(ffspol_ij, pow_i, pow_j, gap, max_deg);
+      ASSERT_ALWAYS(0); // I'd like to see a case where we enter this branch.
+    } else {
+#if 0   // this is a very expensive check
+#ifndef NDEBUG
+      int deg_norm2 = deg_norm_full(ffspol_ij, pow_i, pow_j, gap, max_deg);
+      ASSERT(deg_norm2 == deg_norm);
+#endif
+#endif
+    }
     
     fppol_clear(ii);
     fppol_clear(jj);
@@ -618,9 +638,9 @@ void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
                   pos, fppol_deg(norm)-degq);
         }
 #endif
-        int deg = deg_norm_ij(ffspol_ij, hati, hatj);
-        /* int gap = -1;
-	   int deg = deg_norm_ij_v2(ffspol_ij, hati, hatj, &gap); */
+//       int deg = deg_norm_ij(ffspol_ij, hati, hatj);
+         int gap = -1;
+       int deg = deg_norm_ij_v2(ffspol_ij, hati, hatj, &gap); 
         if (deg > 0) {
           ASSERT_ALWAYS(deg < 255);
           S[pos] = deg - degq;
