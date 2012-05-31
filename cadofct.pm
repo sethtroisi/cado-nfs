@@ -139,7 +139,7 @@ $SIG{__WARN__} = sub {
 
 # Error hook
 $SIG{__DIE__}  = sub {
-    die @_ if $^S; 
+    die @_ if $^S;
     my $text=shift;
     print $log_fh format_message("Error:", $text) if defined($log_fh);
     die          format_message("\033[01;31mError\033[01;00m:", $text);
@@ -451,7 +451,7 @@ sub read_machines {
             }
             $desc{'tmpdir'} =~ s/%s/$param{'name'}/g;
             $desc{'cores'}  = 1 unless defined $desc{'cores'};
-            $desc{'poly_cores'} = $desc{'cores'} 
+            $desc{'poly_cores'} = $desc{'cores'}
                     unless defined $desc{'poly_cores'};
             $desc{'mpi'} = 0 unless defined $desc{'mpi'};
 
@@ -497,7 +497,7 @@ sub read_machines {
                 die "CADO-NFS has not been compiled with MPI flag.\n".
                 "Please add the path of the MPI library in the file local.sh ".
                 "(for example: MPI=/usr/lib64/openmpi) and recompile.\n";
-        } 
+        }
         close FILE;
     }
     # We used to reconstruct a mach_desc file here based on e.g.
@@ -552,19 +552,19 @@ sub cmd {
     open NULL, "</dev/null" or die;
     my $pid = open3(*NULL,\*CHLD_OUT, \*CHLD_ERR, $cmd);
     close NULL;
-    
+
     my $fds = {
         'out' => [ *CHLD_OUT{IO}, "", 1, "" ],
         'err' => [ *CHLD_ERR{IO}, "", 1, "" ],
     };
-    
+
     while (scalar grep { $_->[2] } values %$fds) {
         my $rin = '';
         for my $v (values %$fds) {
-            next if !$v->[2]; 
+            next if !$v->[2];
             vec($rin, fileno($v->[0]), 1) = 1;
         }
-        
+
         my $rc;
         my $rout;
         while ($rc = select($rout=$rin, undef, undef, 1.0) == 0) {}
@@ -572,11 +572,11 @@ sub cmd {
             print STDERR "Left select with $!\n";
             last;
         }
-    
+
         for my $k (keys %$fds) {
             my $v = $fds->{$k};
             next unless vec($rout, fileno($v->[0]), 1);
-            if (sysread $v->[0], my $x, 1024) { 
+            if (sysread $v->[0], my $x, 1024) {
                 $v->[1] .= $x;
                 while ($v->[1]=~s/^(.*(?:\n|\r))//) {
                     print $logfh $1 if $logfh;
@@ -674,12 +674,12 @@ sub remote_cmd {
 # As of 20111122, cadofactor can't deal with large clusters properly.
 # Okay, the cluster scripts are more adapted to this, but OTOH a simple
 # illustrating example _should_ work, and not take ages pinging jobs.
-# 
+#
 # The parallel_remote_cmd mechanism offers some advantages. At the moment
 # only the initial probe uses it, but it eliminates the associated delay
 # completely. It also has a downside, is that it's limited by the OS
 # maximum number of open files (typically 1024). So more than
-# 1024-epsilon sub-jobs are a no-go here. 
+# 1024-epsilon sub-jobs are a no-go here.
 sub parallel_remote_cmd {
     my $h = shift(@_);
     my $res = {};
@@ -817,7 +817,7 @@ sub write_jobs {
 sub job_string {
     my ($job) = @_;
     my @name = split (/\./, basename($job->{'file'}));
-    my $str = "$name[0] ";  
+    my $str = "$name[0] ";
     $str .= pad($job->{'host'}, 16);
     $str .= " ".pad($_, 8) for @{$job->{'param'}};
     return $str;
@@ -1069,16 +1069,16 @@ sub local_time {
     print CMDLOG "# Starting $job on " . localtime() . "\n";
     close CMDLOG;
 }
-    
+
 sub format_dhms {
     my $sec = shift;
     my ($d, $h, $m);
     $d = int ( $sec / 86400 ); $sec = $sec % 86400;
     $h = int ($sec / 3600 ); $sec = $sec % 3600;
     $m = int ($sec / 60 ); $sec = $sec % 60;
-    return "$d"."d:$h"."h:$m"."m:$sec"."s"; 
+    return "$d"."d:$h"."h:$m"."m:$sec"."s";
 }
-    
+
 ###############################################################################
 # Distributed tasks ###########################################################
 ###############################################################################
@@ -1306,7 +1306,7 @@ sub distribute_task {
             HOST : for my $h (keys %machines) {
                 my $m = $machines{$h};
                 my $cores= $m->{'cores'};
-                $cores = $m->{'poly_cores'} if ($opt->{'task'} eq "polysel"); 
+                $cores = $m->{'poly_cores'} if ($opt->{'task'} eq "polysel");
 				
                 # How many free cores on this host?
                 my $busy_cores = 0;
@@ -1495,8 +1495,8 @@ my %tasks = (
     sieve     => { name   => "sieve and purge",
                    dep    => ['polysel'],
                    req    => ['factbase', 'freerels'],
-                   files  => ['rels\.[\de.]+-[\de.]+(|\.gz)', 
-                              'rels\.tmp', 'nrels'], 
+                   files  => ['rels\.[\de.]+-[\de.]+(|\.gz)',
+                              'rels\.tmp', 'nrels'],
                    resume => 1,
                    dist   => 1 },
 
@@ -1890,7 +1890,7 @@ my $polysel_check = sub {
         $poly{$1} = $2 if /^(\w+):\s*([\w\-.]+)$/;
     }
     close FILE;
-        
+
     # Remove invalid files
     for (qw(n skew Y1 Y0), map "c$_", (0 .. $param{'degree'})) {
         if (!defined $poly{$_}) {
@@ -2172,7 +2172,7 @@ sub dup {
         while (<FILE>) {
            if ( $_ =~ /^# (Number of primes in \S+ factor base = \d+)$/ ) {
                 $i++;
-                last if $i==2; 
+                last if $i==2;
             }
         }
         close FILE;
@@ -2214,7 +2214,7 @@ sub dup {
                   logfile=>"$param{'prefix'}.dup1.log" });
         }
     }
-    
+
     $name="$param{'prefix'}.subdirlist";
     open FILE, "> $name" or die "$name: $!";
     print FILE join("\n", map { "$param{'name'}.nodup/$_"; } (0..$nslices-1));
@@ -2489,13 +2489,13 @@ sub do_sieve {
                 or die "Cannot open `$param{'prefix'}.nrels' for writing: $!.\n";
             print FILE "$nrels\n";
             close FILE;
-        
+
             # Remove duplicates
             dup();
             $force_purge++;
             return 0 if ($nrels > 20000000);
-        } 
-        
+        }
+
         $force_purge = 0;
         $$delay = 0  if ($nrels > 10000000);
         # Remove singletons and cliques
@@ -2509,7 +2509,7 @@ sub do_sieve {
 
         return 1;
     };
-    
+
     distribute_task({ task     => "sieve",
                       title    => "Sieve",
                       suffix   => "rels",
@@ -2605,7 +2605,7 @@ sub do_sieve_bench {
             return;
         } elsif ($ret->{'status'}) {
             # Non-zero, but not 1? Something's wrong, bail out
-            die "check_rels exited with unknown error code ", 
+            die "check_rels exited with unknown error code ",
                  $ret->{'status'}, ", aborting."
         }
         # The file is clean: we can import the relations now
@@ -2766,7 +2766,7 @@ sub do_linalg {
         # Note: $param{'bindir'} is not expanded yet. So if we get it as
         # a variable from the mach_desc file, it won't do. It's better to
         # pass it as a command-line argument to bwc.pl
-        
+
         my $bwc_bindir = "$param{'bindir'}/linalg/bwc";
 
         # XXX NOTE: This is a despair-mode fallback. It's really not
@@ -2934,7 +2934,7 @@ sub do_sqrt {
         cmd("env cp -f $f $param{'prefix'}.fact", { kill => 1 });
 
         my @factors_thisdep=();
-        open FILE, "< $f" 
+        open FILE, "< $f"
             or die "Cannot open `$f' for reading: $!.\n";
         while (<FILE>) {
             chomp($_);
@@ -2945,7 +2945,7 @@ sub do_sqrt {
         for my $p (@factors_thisdep) {
             info(primetest_print($p) ."\n");
         }
-            
+
         info "Doing gcds with previously known composite factors\n";
 
         my @kcomp = keys %composite_factors;
@@ -2971,7 +2971,7 @@ sub do_sqrt {
                     }
                     # m /= gcd(m, a)
                     my $za = Math::BigInt->new($a);
-                    my $zg = Math::BigInt::bgcd($zm,$za); 
+                    my $zg = Math::BigInt::bgcd($zm,$za);
                     $zm->bdiv($zg);
                 }
             }
