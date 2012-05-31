@@ -141,46 +141,58 @@ void
 usage (char **argv)
 {
   fprintf (stderr, "Error: Unexpected argument: %s\n", argv[1]);
+  fprintf (stderr, "\n");
   fprintf (stderr, "Usage: %s -f fname [options]\n", argv[0]);
+  fprintf (stderr, "       %s -f fname --s2 [options]\n", argv[0]);
   fprintf (stderr, "       %s -fm fname [options]\n", argv[0]);
+  fprintf (stderr, "       %s -fm fname --s2 [options]\n", argv[0]);
   fprintf (stderr, "       %s [options]\n", argv[0]);
+  fprintf (stderr, "       %s --s2 [options]\n", argv[0]);
+  fprintf (stderr, "\n");
   fprintf (stderr, "Options:\n");
   fprintf (stderr, " -f fname      Read polynomials in CADO format in file 'fname'.\n");
-  fprintf (stderr, " -fm fname     Read polynomials in msieve format in file 'fname'.\n");
-  fprintf (stderr, "               It also needs options -n and -d.\n");
-  fprintf (stderr, " -n N          N is the integer (only in -fm mode).\n");
-  fprintf (stderr, " -d D          D is the degree of polynomial (only in -fm mode).\n");
-  fprintf (stderr, " -w W          W is the lower bound of the quadratic rotation.\n");
-  fprintf (stderr, " -l L          L is the length of the quadratic rotation.\n");
+  fprintf (stderr, " -fm fname     Read polynomials in msieve format in file 'fname'. Use together\n");
+  fprintf (stderr, "               with options -n and -d.\n");
+  fprintf (stderr, " -n N          N is the integer to be factored (only in -fm mode).\n");
+  fprintf (stderr, " -d D          D is the degree of the polynomial (only in -fm mode).\n");
+  fprintf (stderr, " -amin L       L is the lower bound for quadratic rotation.\n");
+  fprintf (stderr, " -amax R       R is the upper bound for quadratic rotation.\n");
+  fprintf (stderr, " -bmax U       U and -U are the sieving length for linear rotation.\n");
+  fprintf (stderr, " -cmax V       V and -V are the sieving length for constant rotation.\n");
   fprintf (stderr, " -e N E_1 E_2 ... E_N   N is the number of small primes in finding sublattice.\n");
   fprintf (stderr, "                        E_1 to E_N are the prime powers in finding sublattices.\n");
-  fprintf (stderr, " -umax U       U and -U are the sieving bounds for linear rotation.\n");
-  fprintf (stderr, " -vmax V       V and -V are the sieving bounds for constant rotation.\n");
   fprintf (stderr, " -norm M       M is the (estimated) lognorm upper bound in ropt.\n");
-  fprintf (stderr, " -i N          Verbose levels {0, 1, 2, 3} (default 0).\n");
-  fprintf (stderr, " --s2          Sieve-only mode. See Example 5.\n");
+  fprintf (stderr, " -v            Number of occurrences defines verbose level {0, 1, 2, 3} (default 0).\n");
+  fprintf (stderr, " --s2          Sieve-only mode (e.g. Example 5). Use together with the following\n");
+  fprintf (stderr, "               four options: -a, -b, -c and -mod.\n");
+  fprintf (stderr, " -a A          Fix the quadratic rotation of the sublattice by A.\n");
+  fprintf (stderr, " -b B          Fix the linear rotation of the sublattice by B.\n");
+  fprintf (stderr, " -c C          Fix the constant rotation of the sublattice by C.\n");
+  fprintf (stderr, " -mod M        M is the sublattice modulus.\n");
+
+
 
   fprintf (stderr, "\nExample 1: %s -f fname\n", argv[0]);
   fprintf (stderr, "Root optimization for all CADO-formatted polynomials in 'fname'.\n");
 
-  fprintf (stderr, "\nExample 2: %s -f fname -w -512 -l 1024  -norm 70\n", argv[0]);
+  fprintf (stderr, "\nExample 2: %s -f fname -amin -512 -amax 512  -norm 70\n", argv[0]);
   fprintf (stderr, "As above, but restricts the quadratic rotation between -512\n"
            "and 512 and the sieving region by norm 70.\n");
 
-  fprintf (stderr, "\nExample 3: %s -f fname -w -512 -l 1024 -e 5 7 4 3 2 2 -umax 16 -vmax 10000000\n", argv[0]);
+  fprintf (stderr, "\nExample 3: %s -f fname -amin -512 -amax 512 -e 5 7 4 3 2 2 -bmax 16 -cmax 10000000\n", argv[0]);
   fprintf (stderr, "As above, but uses five prime factors (2, 3, 5, 7, 11) in the\n"
            "sublattice with powers (7, 4, 3, 2, 2). It also tells ropt to\n"
            "root sieve a region of 16 by 10000000.\n");
 
-  fprintf (stderr, "\nExample 4: %s -fm rsa768.poly -w -512 -l 1024 -e 5 7 4 3 2 2 -umax 16 -vmax 10000000 -n N -d 6\n", argv[0]);
+  fprintf (stderr, "\nExample 4: %s -fm rsa768.poly -amin -512 -amax 512 -e 5 7 4 3 2 2 -bmax 16 -cmax 10000000 -n $N -d 6\n", argv[0]);
   fprintf (stderr, "As above, but reads msieve format where each line contains\n"
-           "'c_d Y1 Y0'. It also needs parameters -n and -d.\n");
+           "'c_d Y1 Y0'. The parameters -n and -d are compulsory.\n");
 
-  fprintf (stderr, "\nExample 5: %s -f fname --s2 -w 12 -u 345 -v 6789 -mod 1814400 -umax 16 -vmax 10000000\n", argv[0]);
+  fprintf (stderr, "\nExample 5: %s -f fname --s2 -a 12 -b 345 -c 6789 -mod 1814400 -bmax 16 -cmax 10000000\n", argv[0]);
   fprintf (stderr, "Sieve-only mode. Assume that we know the polynomial has good\n"
            "root property at rotation (12*x^2 + 345*x + 6789), we want to\n"
            "search 12*x^2 + (345 + 1814400*i)*x + (6789 + 1814400*j) where\n"
-           "i, j are bounded by -umax and -vmax.\n");
+           "i, j are bounded by -bmax and -cmax.\n");
   exit(1);
 }
 
@@ -223,7 +235,9 @@ main (int argc, char **argv)
 
     /* parse parameters */
     ropt_parse_param (argc, argv, param);
-    
+
+    fprintf(stderr, "# verbose level: %d\n", param->verbose);;
+
     /* call ropt_on_cadopoly() */
     ropt_on_cadopoly (file, param);
 

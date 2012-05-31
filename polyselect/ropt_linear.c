@@ -510,6 +510,7 @@ ropt_linear_deg4 ( ropt_poly_t poly,
   mpz_clear (mod);  
   free_MurphyE_pq (&global_E_pqueue);
   ropt_s1param_free (s1param);
+  ropt_s2param_free (poly, s2param);
   ropt_bound_free (bound);
 }
 
@@ -523,9 +524,9 @@ ropt_linear ( ropt_poly_t poly,
               ropt_param_t param,
               ropt_info_t info )
 {
-  if (poly->d == 4)
+  if (poly->d == 5)
     ropt_linear_deg4 (poly, bestpoly, param, info);
-  else if (poly->d == 5)
+  else if (poly->d == 4)
     ropt_linear_deg5 (poly, bestpoly, param, info);
   else 
     fprintf (stderr, "Error: ropt_linear() only support deg 4 and 5.");
