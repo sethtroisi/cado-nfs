@@ -76,24 +76,6 @@ static MAYBE_UNUSED void fppol64_mul_high(fppol64_ptr r,
 }
 
 
-#if 0   // This is no longer used.
-/* Function fppol_pow computes the power-th power of a polynomial
-   should power be an unsigned int?  
-   Should this function survive? 
-   Will anyone use it ?  
-   Does it have its place here? */
-static void fppol_pow(fppol_t res, fppol_t in, int power)
-{
-  fppol_t tmp;
-  fppol_init(tmp);
-  fppol_set(tmp, in);
-  for (int i = 0; i < power; i++)
-    fppol_mul(tmp, tmp, in);
-  fppol_set(res, tmp);
-  fppol_clear(tmp);
-}  
-#endif
-
 /* Function computing the norm of ffspol at (a,b)
    norm = b^d * ffspol(a/b), d = deg(ffspol) */
 
@@ -453,7 +435,7 @@ static int deg_norm_full(ffspol_t ffspol_ij, fppol_t *pow_i, fppol_t *pow_j, int
   return deg_norm;
 }
 
-/* Function deg_norm_ij_v2 which computes the degree of the norm
+/* Function deg_norm_ij which computes the degree of the norm
    using some kind of floating point representation of polynomials
    fppol.
    We also want the function to update an integer value called gap
@@ -464,7 +446,7 @@ static int deg_norm_full(ffspol_t ffspol_ij, fppol_t *pow_i, fppol_t *pow_j, int
    the monomials in the norm computation are distinct. The gap value
    zero means there are several monomials of higher degree but no cancellation */
 
-static MAYBE_UNUSED int deg_norm_ij_v2(ffspol_ptr ffspol_ij, ij_t i, ij_t j, int *gap)
+static int deg_norm_ij(ffspol_ptr ffspol_ij, ij_t i, ij_t j, int *gap)
 {
   int degi = ij_deg(i);
   int degj = ij_deg(j);
@@ -540,44 +522,6 @@ static MAYBE_UNUSED int deg_norm_ij_v2(ffspol_ptr ffspol_ij, ij_t i, ij_t j, int
 }
 
 
-static int deg_norm_ij(ffspol_ptr ffspol_ij, ij_t i, ij_t j)
-{
-  int deg, max_deg = -1;
-  int repeated = 1;
-  int degi = ij_deg(i);
-  int degj = ij_deg(j);
-  
-  for (int k = 0; k < ffspol_ij->deg + 1; ++k) {
-    deg = fppol_deg(ffspol_ij->coeffs[k]) + k * degi + (ffspol_ij->deg - k) * degj;
-    max_deg = max_special(max_deg, deg, &repeated);
-  }
-  
-#if FP_SIZE == 2
-  if (repeated & 1u) {
-#else
-  if (repeated == 1) {
-#endif
-    return max_deg;
-  }
-  else {
-    /* We should think about a cheaper way to compute this degree
-       otherwise */
-    fppol_t norm, ii, jj;
-    fppol_init(norm);
-    fppol_init(ii);
-    fppol_init(jj);
-    fppol_set_ij(ii, i);
-    fppol_set_ij(jj, j);
-    ffspol_norm(norm, ffspol_ij, ii, jj);
-    deg = fppol_deg(norm);
-    fppol_clear(norm);
-    fppol_clear(ii);
-    fppol_clear(jj);
-    return deg;
-  }
-}
-
-
 /* Function init_norms 
    For each (i,j), it compute the corresponding (a,b) using ij2ab from
    qlat.h. Then it computes deg_norm(ffspol, a, b).
@@ -603,13 +547,18 @@ void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
       degq = sq_deg(qlat->q);
 
   ij_t i, j;
-  ij_t hati, hatj;
+  ij_t hati, hati0, hatj;
+  int deghati0, gap, normdeg0;
   int rci, rcj = 1;
   for (ij_set(j, j0); rcj; rcj = ij_monic_set_next(j, j, J)) {
     ijpos_t start = ijvec_get_start_pos(j, I, J) - pos0;
     if (start >= size)
       break;
     rci = 1;
+    ij_set_zero(hati0);
+    deghati0 = -1;
+    gap = 0;
+    normdeg0 = -1;
     for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
       ijpos_t pos = start + ijvec_get_offset(i, I);
  
@@ -638,9 +587,36 @@ void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
                   pos, fppol_deg(norm)-degq);
         }
 #endif
-//       int deg = deg_norm_ij(ffspol_ij, hati, hatj);
-         int gap = -1;
-       int deg = deg_norm_ij_v2(ffspol_ij, hati, hatj, &gap); 
+        int deg = -10; // means uncomputed.
+        int deghati = ij_deg(hati);
+
+        // Cases where we can guess the degree of the norm.
+        if (gap == -1) {
+          // gap = -1 encodes the case where all monomials have distinct
+          // degrees. If degree of i does not change, ok.
+          if (deghati == deghati0)
+            deg = normdeg0;
+        } else {
+          ij_t Delta_i;
+          ij_sub(Delta_i, hati, hati0);
+          int degDeltai = ij_deg(Delta_i); // TODO: use diff instead of sub
+          if (degDeltai < deghati0 - gap) {
+            // In that case, the degree computed for i0 is still valid.
+            deg = normdeg0;
+          }
+        }
+
+        // Guessing failed.
+        if (deg == -10) {
+          // i is too different from i0. We have to recompute.
+          // And i becomes i0 for next turn.
+          deg = deg_norm_ij(ffspol_ij, hati, hatj, &gap); 
+          normdeg0 = deg;
+          ij_set(hati0, hati);
+          deghati0 = ij_deg(hati0);
+        }
+          
+        // Put the degree of the norm in sieve array.
         if (deg > 0) {
           ASSERT_ALWAYS(deg < 255);
           S[pos] = deg - degq;
