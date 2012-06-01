@@ -159,6 +159,7 @@ int factor_base_init(factor_base_ptr FB, const char *filename,
         FB->elts = (fbideal_t *)realloc(FB->elts, alloc*sizeof(fbideal_t));
         ASSERT_ALWAYS(FB->elts != NULL);
         gothp = FB->elts[FB->n];
+        oldgothp = FB->elts[FB->n-1];
       }
       fbprime_set(gothp->p, oldgothp->p);
       gothp->degp = oldgothp->degp;
