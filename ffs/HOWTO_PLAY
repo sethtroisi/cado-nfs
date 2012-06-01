@@ -1,5 +1,5 @@
-Recipe to run an example (as of end of April 27, 2012).
-----------------------------------------------------
+Recipe to run an example (as of June 1st, 2012)
+-----------------------------------------------
 
 - compile:
   
@@ -11,27 +11,15 @@ Recipe to run an example (as of end of April 27, 2012).
 
 - create the factor bases:
 
-  cd makefb; ./makefb.sage ../param.2.127; cd ..
+  build/f2/makefb param.2.607
+  or
+  build/f3/makefb param.3.426
   
-  This will take some time... (see below for using the faster magma version).
-  In the end, the files are written in the makefb/ subdir, so you should
-  move them back:
-
-  mv makefb/*roots* .
-  
-- rename the factor base files to specific names, so that they are not
-  overriden by the next call to makefb.mag:
-
-  The default names given in the param file are:
-  mv Aroots Aroots.2.127
-  mv Rroots Rroots.2.127
-  (adapt for charac 3)
-
 - run:
 
-  build/f2/sieve param.2.127
+  build/f2/sieve param.2.607
   or 
-  build/f3/sieve param.3.97
+  build/f3/sieve param.3.426
 
   This should output relations for the special-q range specified in the param
   files.
@@ -42,19 +30,3 @@ Recipe to run an example (as of end of April 27, 2012).
 - debug! ;-)
 
 
-
----------------------------------------------------------
-
-Old way of building the factor base:
-
-  At the moment, the polynomials are hardcoded and correspond to those in
-  param.2.127 and param.3.97.
-  
-  Tune the factor base bounds by editing makefb.mag and then create the
-  files:
-  echo "p:=2; load \"makefb.mag\";" | magma -b
-  or
-  echo "p:=3; load \"makefb.mag\";" | magma -b
-
-  This will create two files Aroots and Rroots.
-  NB: these file names are absolute names. 
