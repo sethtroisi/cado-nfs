@@ -52,4 +52,12 @@ void ffspol_out(FILE *f, ffspol_srcptr p);
 // Return 1 if successful.
 int ffspol_inp(ffspol_ptr r, FILE *f);
 
+
+void ffspol_eval(fppol_ptr z, ffspol_srcptr f, fppol_srcptr x);
+void ffspol_eval_diff(fppol_ptr z, ffspol_srcptr f, fppol_srcptr x);
+void ffspol_mul(ffspol_ptr z, ffspol_srcptr x, ffspol_srcptr y);
+void ffspol_add(ffspol_ptr r, ffspol_srcptr p, ffspol_srcptr q);
+void ffspol_smul(ffspol_ptr z, ffspol_srcptr x, fppol_srcptr p);
+
+
 #endif   /* __FFSPOL_H__ */

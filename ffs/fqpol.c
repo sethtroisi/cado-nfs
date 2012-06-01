@@ -516,3 +516,53 @@ int fqpol_roots(fq_t * roots, fqpol_srcptr f, fq_info_srcptr Fq)
     fqpol_clear(F);
     return ret;
 }
+
+// Horner scheme
+void fqpol_eval(fq_ptr z, fqpol_srcptr f, fq_srcptr x, fq_info_srcptr Fq)
+{
+    int d = fqpol_deg(f, Fq);
+    if (d == -1) {
+        fq_set_zero(z, Fq);
+        return;
+    }
+    if (d == 0) {
+        fqpol_get_coeff(z, f, 0, Fq);
+        return;
+    }
+    fq_t r;
+    fq_mul(r, x, f->coeffs[d], Fq);
+    for (int k = d-1; k > 0; --k) {
+        fq_add(r, r, f->coeffs[k], Fq);
+        fq_mul(r, r, x, Fq);
+    }
+    fq_add(z, r, f->coeffs[0], Fq);
+}
+
+int fqpol_root_multiplicity(fqpol_srcptr f, fq_srcptr root, fq_info_srcptr Fq)
+{
+    fqpol_t xmroot, ff;
+    fqpol_init(xmroot);
+    fqpol_init(ff);
+    
+    // xmroot := x - root
+    fqpol_set_ti(xmroot, 1, Fq);
+    fq_t mroot;
+    fq_opp(mroot, root, Fq);
+    fqpol_set_coeff(xmroot, mroot, 0, Fq); 
+    
+    int res = 0;
+    fq_t z;
+    fqpol_set(ff, f, Fq);
+    do {
+        res++;
+        // ff := ff / (x-root)
+        fqpol_div(ff, ff, xmroot, Fq);
+
+        // z = ff(root)
+        fqpol_eval(z, ff, root, Fq);
+    } while (fq_is_zero(z, Fq) && fqpol_deg(ff, Fq) > 0);
+
+    fqpol_clear(xmroot);
+    fqpol_clear(ff);
+    return res;
+}

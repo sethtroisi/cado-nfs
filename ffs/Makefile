@@ -1,4 +1,4 @@
-BIN = sieve
+BIN = sieve makefb
 LIB = fppol
 
 fppol_OBJ = f2pol.o f3pol.o fppol.o fppol_test.o fppol_set.o  \
@@ -8,6 +8,9 @@ fppol_OBJ = f2pol.o f3pol.o fppol.o fppol_test.o fppol_set.o  \
 sieve_OBJ = $(fppol_OBJ) ffspol.o fqpol.o ijvec.o params.o fb.o qlat.o    \
 	    buckets.o norm.o latsieve.o polyfactor.o smoothness.o sieve.o \
 	    memusage.o timing.o
+
+makefb_OBJ = $(fppol_OBJ) ffspol.o fqpol.o polyfactor.o smoothness.o \
+	     memusage.o timing.o params.o
 
 BUILDDIR = ./build
 
