@@ -60,3 +60,7 @@
   result of degree less than 46, then it is necessarily prime.
   It is not clear that we can use it reliably right now, because we do
   not do resieving. 
+
+- Factorize / clean-up the fq_t part.
+  Right now, fq_t relies on sq_t. It made sense for enumerating the
+  special-qs. But now, it is also used in makefb...
