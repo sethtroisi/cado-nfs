@@ -92,6 +92,7 @@ int factor_base_init(factor_base_ptr FB, const char *filename,
       ungetc(c, file);
     }
 
+    gothp->power = 0;
     // Read the number of deg p to subtract (longversion)
     if (longversion) { 
       int ret, n0, n1;
@@ -116,6 +117,7 @@ int factor_base_init(factor_base_ptr FB, const char *filename,
         previous_prime_degp = fbprime_deg(gothp->p);
       } else {
         gothp->degp = (n1-n0)*previous_prime_degp;
+        gothp->power = 1;
         ASSERT_ALWAYS (previous_prime_degp != -1);
         ASSERT_ALWAYS (fbprime_deg(gothp->p) % previous_prime_degp == 0);
       }
@@ -199,10 +201,14 @@ void factor_base_precomp_lambda(factor_base_ptr FB, qlat_srcptr qlat,
     }
     if ((gothp->proj = fbprime_is_zero(t0))) {
       // This is a projective root in the q-lattice.
-      // Since we don't have powers yet, there is nothing to do.
       continue;
     }
-    fbprime_invmod(t0, t0, gothp->p);
+    int ret = fbprime_invmod(t0, t0, gothp->p);
+    if (!ret) { // this can happen for powers
+        // FIXME: is this condition correct ?
+        gothp->proj = 1;
+        continue;
+    }
     if (was_proj) {
         fbprime_mulmod(t1, qlat->a1, r, gothp->p);
         fbprime_sub   (t1, qlat->b1, t1);

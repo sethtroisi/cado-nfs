@@ -54,6 +54,8 @@ void ijbasis_compute(ijbasis_ptr euclid, ijbasis_ptr basis,
   unsigned I = basis->I;
   unsigned J = basis->J;
   unsigned L = gothp->degp;
+  if (UNLIKELY(gothp->power))
+      L = fbprime_deg(gothp->p);
 
   // The form of the basis is different for small p and for large p.
   if (L < I) {

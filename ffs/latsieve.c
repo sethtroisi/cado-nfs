@@ -118,6 +118,8 @@ void sieveFB(uint8_t *S, factor_base_srcptr FB, unsigned I, unsigned J,
     for (unsigned int ii = 0; ii < FB->n; ++ii) {
         fbideal_ptr gothp = FB->elts[ii];
         int L = gothp->degp;
+        if (UNLIKELY(gothp->power))
+            L = fbprime_deg(gothp->p);
         // Larger primes are left to the bucket sieve.
         if ((unsigned)L >= I) break;
         // List of cases that are not handled yet:

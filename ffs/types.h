@@ -307,6 +307,7 @@ typedef struct {
   //ij_t      j0, j;   // FIXME: projective-root sieving.
   uint8_t   degp;
   _Bool     proj;
+  _Bool     power;
 } __fbideal_struct;
 
 typedef       __fbideal_struct  fbideal_t[1];
