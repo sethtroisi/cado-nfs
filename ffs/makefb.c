@@ -251,20 +251,24 @@ int all_roots_affine(entry_list_ptr E, ffspol_srcptr F,
     for (int i = 0; i < nr; ++i) {
         int nmult = fqpol_root_multiplicity(Fbar, roots[i], Fq);
         if (nmult == 1) {
-            // TODO: the typical case if kmax=1, k0=0.
+            // the typical case if kmax=1, k0=0.
             // In that case, no lift is needed.
-            sq_t rr, phir, pml;
-            lift_root_unramified(rr, F, roots[i], p, kmax-k0);
-            sq_mul(phir, phi1, rr);
-            sq_add(phir, phir, phi0);
-            sq_set_ti(pml, 0);
-            for (int j = 0; j < m; ++j)
-                sq_mul(pml, pml, p);
-            for (int l = 1; l <= kmax-k0; ++l) {
-                sq_mul(pml, pml, p);
-                sq_t phirr;
-                sq_rem(phirr, phir, pml);
-                push_entry(E, pml, phirr, k0+l, k0+l-1);
+            if (LIKELY(kmax == 1 && k0 == 0))
+                push_entry(E, p, roots[i], 1, 0);
+            else {
+                sq_t rr, phir, pml;
+                lift_root_unramified(rr, F, roots[i], p, kmax-k0);
+                sq_mul(phir, phi1, rr);
+                sq_add(phir, phir, phi0);
+                sq_set_ti(pml, 0);
+                for (int j = 0; j < m; ++j)
+                    sq_mul(pml, pml, p);
+                for (int l = 1; l <= kmax-k0; ++l) {
+                    sq_mul(pml, pml, p);
+                    sq_t phirr;
+                    sq_rem(phirr, phir, pml);
+                    push_entry(E, pml, phirr, k0+l, k0+l-1);
+                }
             }
         } else {
             sq_t r;
