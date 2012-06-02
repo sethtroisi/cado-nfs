@@ -598,8 +598,8 @@ void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
             deg = normdeg0;
         } else {
           ij_t Delta_i;
-          ij_sub(Delta_i, hati, hati0);
-          int degDeltai = ij_deg(Delta_i); // TODO: use diff instead of sub
+          ij_diff(Delta_i, hati, hati0); // diff is enough for degree 
+          int degDeltai = ij_deg(Delta_i);
           if (degDeltai < deghati0 - gap) {
             // In that case, the degree computed for i0 is still valid.
             deg = normdeg0;
