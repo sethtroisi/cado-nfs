@@ -228,7 +228,7 @@ if (@ARGV && $ARGV[0] eq '-d') {
     my $now=strftime("%a %b %d %H:%M:%S %Y", localtime);
     print SMTP "From root $now\n";
 } else {
-    open SMTP, "| exim '$recipient'";
+    open SMTP, "| exim -f '$sender' '$recipient'";
 }
 
 print SMTP <<EOF;
