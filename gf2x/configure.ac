@@ -29,7 +29,7 @@ AC_SUBST([gf2x_lib_version], [1:0:0])
 
 AM_INIT_AUTOMAKE
 
-LT_INIT
+LT_INIT()
 
 AC_ARG_ENABLE([ntl-checks],
               [AS_HELP_STRING([--enable-ntl-checks],
