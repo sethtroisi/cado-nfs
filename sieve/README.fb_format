@@ -11,7 +11,7 @@ q: r1,r2,r3
 
 Here, q is a prime or a prime power, ri are the corresponding roots and
 the contribution that must be subtracted at these positions is (n1-n2)*logp 
-(assuming smaller powers of this prime have alredy be taken care of).
+(assuming smaller powers of this prime have already be taken care of).
 By position, we mean (a,b) such that a - b*ri = 0 mod q.
 
 The roots ri must be sorted in increasing order.  If a root ri is greater
