@@ -624,8 +624,8 @@ sub obtain_bfile {
     my $foo = join(' ', @mpi_precmd_single) . ' ' . "find $wdir -name $x.${nh}x${nv}.????????.bin";
     print "Running $foo\n";
     # $foo = basename `$foo`;
-    my @bfiles = split(' ', $foo);
-    @bfiles = map { /^\s*(.*)\s*$/; $_=basename($1); } @bfiles;
+    my @bfiles = split(' ', `$foo`);
+    @bfiles = map { /^\s*(.*)\s*$/; $_=basename($1); $_; } @bfiles;
     @bfiles = grep { /^$pat/ } @bfiles;
     if (scalar @bfiles != 1) {
         print STDERR "Expected 1 bfile, found ", scalar @bfiles, ":\n";
