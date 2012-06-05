@@ -1,9 +1,8 @@
 - Norm initialization speed-up.
-  Use a floating-point arithmetic for computing the degree of the norm
-  with only low precision polynomial arithmetic.
-  From the knowledge of the behaviour at one position, deduce the degree
-  of the norm for many other positions (typically when the degree of i
-  does not change).
+  There is still time to save in norm init. For instance, the
+  bit-fiddling to check if we have to recompute the norm is probably too
+  costly. Also, the fix-prec computation has not yet been carefully
+  optimized.
 
 - Make the projective roots work by increasing value of j.
   This is necessary to make them compatible with the bucket-region
@@ -34,9 +33,6 @@
   Sublat are broken.
   Also, they are way too slow. It is necessary to have a few specific
   function for arithmetic involving the t^2+t polynomial.
-
-- Deal with powers.
-  This should work more or less automatically, but this has to be tested.
 
 - Add the fppol*_set_random() functions.
   set_random() is not so simple if we want uniformity in characteristic 3.
