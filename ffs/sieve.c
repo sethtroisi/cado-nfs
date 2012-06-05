@@ -130,6 +130,7 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "  firstsieve       side (0 or 1) to sieve first (default %d)\n", FIRSTSIEVE_DEFAULT);
     fprintf(stderr, "  S                skewness, i.e. deg(a)-deg(b)\n");
     fprintf(stderr, "  sublat           toggle the sublattice sieving\n");
+    fprintf(stderr, "  gf               indicate the base field for sanity check\n");
  
     if (missing != NULL)
         fprintf(stderr, "Missing parameter: %s\n", missing);
@@ -153,6 +154,7 @@ int main(int argc, char **argv)
     sq_t q0, q1;
     int rho_given = 0;
     int skewness = 0;
+    int gf = 0;
 
     param_list pl;
     param_list_init(pl);
@@ -174,6 +176,16 @@ int main(int argc, char **argv)
         usage(argv0, NULL);
     }
     param_list_print_command_line(stdout, pl);
+
+    param_list_parse_int(pl, "gf", &gf);
+    if (gf) {
+        if (gf != FP_SIZE) {
+            fprintf(stderr, "Error: base field mismatch.\n");
+            fprintf(stderr, "  The binary is compiled for GF(%d)\n", FP_SIZE);
+            fprintf(stderr, "  The parameters are for GF(%d)\n", gf);
+            exit(EXIT_FAILURE);
+        }
+    }
 
     // read function field polynomials
     {

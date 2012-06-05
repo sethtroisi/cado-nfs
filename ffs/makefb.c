@@ -404,6 +404,7 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "  fbb1             factor base bound on side 1\n");
     fprintf(stderr, "  side             compute fb only for given side\n");
     fprintf(stderr, "  powerlim [1]     put powers up to given degree\n");
+    fprintf(stderr, "  gf               indicate the base field for sanity check\n");
 
     if (missing != NULL)
         fprintf(stderr, "Missing parameter: %s\n", missing);
@@ -412,6 +413,7 @@ void usage(const char *argv0, const char * missing)
 
 int main(int argc, char **argv)
 {
+    int gf = 0;
     int powerlim = 1;
     char *argv0 = argv[0];
     param_list pl;
@@ -433,6 +435,16 @@ int main(int argc, char **argv)
         usage(argv0, NULL);
     }
 //    param_list_print_command_line(stdout, pl);
+
+    param_list_parse_int(pl, "gf", &gf);
+    if (gf) {
+        if (gf != FP_SIZE) {
+            fprintf(stderr, "Error: base field mismatch.\n");
+            fprintf(stderr, "  The binary is compiled for GF(%d)\n", FP_SIZE);
+            fprintf(stderr, "  The parameters are for GF(%d)\n", gf);
+            exit(EXIT_FAILURE);
+        }
+    }
 
     param_list_parse_int(pl, "powerlim", &powerlim);
 
