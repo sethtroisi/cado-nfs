@@ -1635,9 +1635,10 @@ void builder_do_all_small_slices(builder * mb, uint32_t * p_i0, uint32_t imax, u
     unsigned int s;
     uint32_t i00 = *p_i0;
     unsigned int nslices = iceildiv(imax - i00, npack);
+    uint32_t done = 0;
     for(s = 0 ; s < nslices ; s++) {
-        uint32_t i0 = i00 +  s    * (imax - i00) / nslices;
-        uint32_t i1 = i00 + (s+1) * (imax - i00) / nslices;
+        uint32_t i0 = i00 +  s    * (uint64_t) (imax - i00) / nslices;
+        uint32_t i1 = i00 + (s+1) * (uint64_t) (imax - i00) / nslices;
 
         small_slice_t S[1];
 
@@ -1657,8 +1658,9 @@ void builder_do_all_small_slices(builder * mb, uint32_t * p_i0, uint32_t imax, u
         }
         builder_push_small_slice(mb->mm, S);
         // transfer(Sq, S);
+        done += i1 - i0;
     }
-    *p_i0 = i00 + s * (imax - i00) / nslices;
+    *p_i0 += done;
 }
 /* }}} */
 
@@ -1670,8 +1672,8 @@ void builder_do_all_large_slices(builder * mb, uint32_t * p_i0, unsigned int ima
     uint32_t done = 0;
     for(unsigned int s = 0 ; s < nlarge_slices ; s++) {
         large_slice_t L[1];
-        uint32_t i0 = * p_i0 +  s      * rem_nrows / nlarge_slices;
-        uint32_t i1 = * p_i0 + (s + 1) * rem_nrows / nlarge_slices;
+        uint32_t i0 = * p_i0 +  s      * (uint64_t) rem_nrows / nlarge_slices;
+        uint32_t i1 = * p_i0 + (s + 1) * (uint64_t) rem_nrows / nlarge_slices;
 
         printf("Lsl%u %ss %u+%u", s, mb->rowname, i0, i1-i0);
         fflush(stdout);
@@ -1699,8 +1701,8 @@ void builder_do_all_huge_slices(builder * mb, uint32_t * p_i0, unsigned int imax
     uint32_t done = 0;
     for(unsigned int s = 0 ; s < nhuge_slices ; s++) {
         huge_slice_t H[1];
-        uint32_t i0 = * p_i0 +  s      * rem_nrows / nhuge_slices;
-        uint32_t i1 = * p_i0 + (s + 1) * rem_nrows / nhuge_slices;
+        uint32_t i0 = * p_i0 +  s      * (uint64_t) rem_nrows / nhuge_slices;
+        uint32_t i1 = * p_i0 + (s + 1) * (uint64_t) rem_nrows / nhuge_slices;
 
         printf("Hsl%u %ss %u+%u", s, mb->rowname, i0, i1-i0);
         fflush(stdout);
