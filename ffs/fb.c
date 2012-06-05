@@ -165,6 +165,7 @@ int factor_base_init(factor_base_ptr FB, const char *filename,
       }
       fbprime_set(gothp->p, oldgothp->p);
       gothp->degp = oldgothp->degp;
+      gothp->power = oldgothp->power;
       fbprime_set(gothp->r, r);
     }
     ungetc(c, file);
