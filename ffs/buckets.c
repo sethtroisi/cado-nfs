@@ -338,7 +338,7 @@ void buckets_fill(buckets_ptr buckets, factor_base_srcptr FB,
   hatJ = J + sublat->deg;
 
   // The bucket sieve requires all considered ideals to be of degree larger
-  // that I.
+  // than I.
   ASSERT_ALWAYS(buckets->min_degp >= I);
 
   ijbasis_init(basis,     I,    J);
