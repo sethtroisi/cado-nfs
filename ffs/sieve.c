@@ -143,6 +143,8 @@ int main(int argc, char **argv)
     ffspol_t ffspol[2]; 
     qlat_t qlat;
     factor_base_t FB[2];
+    large_factor_base_t LFB[2];
+    small_factor_base_t SFB[2];
     int fbb[2] = {0, 0};
     int I=0, J=0;  
     int lpb[2] = {0, 0};  
@@ -319,6 +321,16 @@ int main(int argc, char **argv)
                 fprintf(stderr, "Could not read %s: %s\n", param, filename);
                 exit(EXIT_FAILURE);
             }
+            
+            tm = seconds();
+            noerr = factor_base_init2(LFB[i], SFB[i], filename, I, fbb[i]);
+            fprintf(stdout, "# Reading factor base %d took %1.1f s\n", 
+                    i, seconds()-tm);
+            if (!noerr) {
+                fprintf(stderr, "Could not read %s: %s\n", param, filename);
+                exit(EXIT_FAILURE);
+            }
+
         }
     }
 
@@ -326,6 +338,8 @@ int main(int argc, char **argv)
 
     if (want_sublat) {
         fprintf(stderr, "# WARNING: sublattices seem to be broken, and won't be fixed soon.\n");
+
+        // TODO: init tildep in the factor bases, here.
     }
 
 #ifdef USE_F2
@@ -685,6 +699,8 @@ int main(int argc, char **argv)
     free(S);
     factor_base_clear(FB[0]);
     factor_base_clear(FB[1]);
+    factor_base_clear2(LFB[0], SFB[0]);
+    factor_base_clear2(LFB[1], SFB[1]);
     buckets_clear(buckets[0]);
     buckets_clear(buckets[1]);
     free(roots);

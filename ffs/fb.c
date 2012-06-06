@@ -466,3 +466,9 @@ void factor_base_clear(factor_base_ptr FB)
 {
   free(FB->elts);
 }
+
+void factor_base_clear2(large_factor_base_ptr LFB, small_factor_base_ptr SFB)
+{
+  free(LFB->elts);
+  free(SFB->elts);
+}
