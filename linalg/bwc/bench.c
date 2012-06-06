@@ -287,6 +287,8 @@ int main(int argc, char * argv[])
     }
 
     param_list_lookup_string(ba->pl, "matmul_bucket_methods");
+    param_list_lookup_string(ba->pl, "l1_cache_size");
+    param_list_lookup_string(ba->pl, "l2_cache_size");
 
     double tmax = 100.0;
     param_list_parse_double(ba->pl, "tmax", &tmax);

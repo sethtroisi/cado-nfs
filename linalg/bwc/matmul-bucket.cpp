@@ -398,6 +398,21 @@ struct matmul_bucket_methods {
         ASSERT_ALWAYS(small1||!small2);
         ASSERT_ALWAYS(small1||small2||large||vsc||huge);
     }
+    inline bool operator<(matmul_bucket_methods const& o) {
+        if (vsc != o.vsc) return vsc < o.vsc;
+        if (huge != o.huge) return huge < o.huge;
+        if (large != o.large) return large < o.large;
+        if (small1 != o.small1) return small1 < o.small1;
+        if (small2 != o.small2) return small2 < o.small2;
+        return false;
+    }
+    inline bool something_beyond(const char * s) const {
+        matmul_bucket_methods o(s);
+        if (o.huge || o.vsc) return false;
+        if (o.large) return huge || vsc;
+        if (o.small1 || o.small2) return large || huge || vsc;
+        return true;
+    }
 };
 
 struct matmul_bucket_data_s {
@@ -605,11 +620,24 @@ int builder_do_small_slice(builder * mb, struct small_slice_t * S, uint32_t i0, 
      * Either the max dj is too large -- larger than 16 bits -- or the
      * average dj is too large -- larger than some guessed value.
      */
-    int keep1 = S->dj_max < (1UL << 16) && S->dj_avg < DJ_CUTOFF1;
-    int keep2 = S->dj_max < (1 << SMALL_SLICES_DJ_BITS) && S->dj_avg < DJ_CUTOFF1;
+    /* Now that we're splitting in vblocks anyway, it's not important to
+     * constrain dj below 2^16 for small1 */
+    int keep1 = 1; // S->dj_max < (1UL << 16);
+    int keep2 = S->dj_max < (1 << SMALL_SLICES_DJ_BITS);
 
     if ((i1-i0) >> SMALL_SLICES_I_BITS) keep2=0;
+
+    if (!keep1) printf(" [cannot be small1, beyond impl limits]");
+    if (!keep2) printf(" [cannot be small2, beyond impl limits]");
+
     if (!mb->mm->methods.small2) keep2=0;
+
+    if (mb->mm->methods.something_beyond("small1,small2")) {
+        /* Then we have more than just small slices. So we're enforcing
+         * our separation criterion based on DJ */
+        keep1 = keep1 && S->dj_avg < DJ_CUTOFF1;
+        keep2 = keep2 && S->dj_avg < DJ_CUTOFF1;
+    }
 
     S->is_small2 = keep2;
 
@@ -876,15 +904,18 @@ int builder_do_large_slice(builder * mb, struct large_slice_t * L, uint32_t i0, 
     printf(" w=%"PRIu64", avg dj=%.1f, max dj=%u, bucket hit=1/%.1f",
             L->hdr->ncoeffs, L->dj_avg, L->dj_max, LSL_NBUCKETS_MAX * L->dj_avg);
 
-    if (L->dj_avg > DJ_CUTOFF2) {
-        printf("-> too sparse");
-        if (imax - i0 < HUGE_MPLEX_MIN * LSL_NBUCKETS_MAX * 256) {
-            printf("; kept because of short tail\n");
-        } else {
-            /* We won't keep this slice */
-            printf("\n");
-            mb->rowhead = ptr0;
-            return 0;
+    if (mb->mm->methods.something_beyond("large")) {
+        /* Then we may enforce our separation criterion */
+        if (L->dj_avg > DJ_CUTOFF2) {
+            printf("-> too sparse");
+            if (imax - i0 < HUGE_MPLEX_MIN * LSL_NBUCKETS_MAX * 256) {
+                printf("; kept because of short tail\n");
+            } else {
+                /* We won't keep this slice */
+                printf("\n");
+                mb->rowhead = ptr0;
+                return 0;
+            }
         }
     }
 
@@ -1961,6 +1992,11 @@ void matmul_bucket_build_cache(struct matmul_bucket_data_s * mm, uint32_t * data
     if (mm->methods.huge && main_i0 < fence) {
         builder_do_all_huge_slices(mb, &main_i0, fence, mm->scratch2size);
     }
+    if (main_i0 < fence) {
+        fprintf(stderr, "ARGH ! only created a submatrix (%"PRIu32" < %"PRIu32") !!\n", main_i0, fence);
+        exit(1);
+    }
+
 
     /* done, at last ! */
 
@@ -3095,7 +3131,7 @@ void matmul_bucket_mul(struct matmul_bucket_data_s * mm, void * xdst, void const
     mm->public_->iteration[d]++;
 }
 
-void matmul_bucket_report_vsc(struct matmul_bucket_data_s * mm, double scale, vector<slice_header_t>::iterator & hdr)
+void matmul_bucket_report_vsc(struct matmul_bucket_data_s * mm, double scale, vector<slice_header_t>::iterator & hdr, double * p_t_total)
 {
     uint64_t scale0;
     scale0 = (mm->public_->iteration[0] + mm->public_->iteration[1]);
@@ -3151,15 +3187,16 @@ void matmul_bucket_report_vsc(struct matmul_bucket_data_s * mm, double scale, ve
         nc = dtime[l].first;
         t = dtime[l].second / scale0;
         a = 1.0e9 * t / nc;
-        printf("defer\t%.2fs ; n=%-9"PRIu64" ; %5.2f ns/c ;"
+        printf("defer\t%.2fs        ; n=%-9"PRIu64" ; %5.2f ns/c ;"
             " scaled*%.2f : %5.2f/c\n",
             t, nc, a, scale, a * scale);
         nc = ctime[l].first;
         t = ctime[l].second / scale0;
         a = 1.0e9 * t / nc;
-        printf("      + %.2fs ; n=%-9"PRIu64" ; %5.2f ns/c ;"
+        *p_t_total += t;
+        printf("      + %.2fs [%.2fs] ; n=%-9"PRIu64" ; %5.2f ns/c ;"
             " scaled*%.2f : %5.2f/c\n",
-            t, nc, a, scale, a * scale);
+            t, *p_t_total, nc, a, scale, a * scale);
     }
     hdr--;
 }
@@ -3174,19 +3211,21 @@ void matmul_bucket_report(struct matmul_bucket_data_s * mm, double scale)
 
     vector<slice_header_t>::iterator hdr;
 
+    double t_total = 0;
     for(hdr = mm->headers.begin() ; hdr != mm->headers.end() ; hdr++) {
         if (hdr->t == SLICE_TYPE_SMALL1_VBLOCK) continue;
         if (hdr->t == SLICE_TYPE_DEFER_ENVELOPE) {
-            matmul_bucket_report_vsc(mm, scale, hdr);
+            matmul_bucket_report_vsc(mm, scale, hdr, &t_total);
             continue;
         }
         double t = mm->slice_timings[hdr - mm->headers.begin()].t;
         uint64_t nc = hdr->ncoeffs;
         t /= scale0;
+        t_total += t;
         double a = 1.0e9 * t / nc;
-        printf("%s\t%.2fs ; n=%-9"PRIu64" ; %5.2f ns/c ;"
+        printf("%s\t%.2fs [%.2fs] ; n=%-9"PRIu64" ; %5.2f ns/c ;"
             " scaled*%.2f : %5.2f/c\n",
-            slice_name(hdr->t), t,
+            slice_name(hdr->t), t, t_total,
             nc, a, scale, a * scale);
     }
     for(int i = 0 ; i < 40 ; i++) putchar('-');
