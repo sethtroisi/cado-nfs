@@ -260,6 +260,7 @@ int factor_base_init2(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
   unsigned last_degp = 0;
   int previous_prime_degp = -1;
   int cpt = 0;
+  int fbb_ok = 0;
 
   while(skip_spaces_and_comments(file) != EOF) {
     fbprime_t p, r;
@@ -275,6 +276,8 @@ int factor_base_init2(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
       return 0;
     }
     degp = fbprime_deg(p);
+    if (degp == max_degp)
+      fbb_ok = 1;
     if (max_degp && degp > max_degp) {
       break;
     }
@@ -376,6 +379,16 @@ int factor_base_init2(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
   ASSERT_ALWAYS(SFB->elts != NULL);
 
   fclose(file);
+  
+  // Sanity check: if we did not read any ideal of the maximum degree,
+  // there is probably a problem with the factor base file.
+  if (!fbb_ok) {
+    fprintf(stderr, "Warning: the factor base file %s does not contain any ideal of maximu allowed\n"
+        "  degree. The file might be corrupted, or was prepared for a smaller factor\n"
+        "  base bound. Running again 'makefb' is recommended.\n",
+        filename);
+  }
+
   return 1;
 }
 
