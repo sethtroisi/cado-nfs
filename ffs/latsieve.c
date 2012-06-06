@@ -7,6 +7,88 @@
 #include "gray.h"
 
 
+/* 
+ * Compute a basis of the vector space of polynomials that are multiples
+ * of p and of degree less than J.
+ * The basis is echelon on the monomial basis, starting with high
+ * degree. This echelon form is normalized in the sense that it is lower
+ * triangular, full of ones.
+ *
+ * p must be monic.
+ *
+ * The "basis" parameter must be preallocated to contain at least
+ * J-degp-1 elements.
+ */
+static MAYBE_UNUSED
+void normalized_echelon_multiples(ij_t *basis, fbprime_t p, int degp, int J)
+{
+    ASSERT(fbprime_deg(p) == degp);
+    ASSERT(fbprime_is_monic(p));
+    if (degp >= J)
+        return;
+
+    // Make it diagonal (classical reduced-echelon form).
+    ij_set_fbprime(basis[0], p);
+    for (int i = 1; i < J-degp-1; ++i) {
+        fbprime_t tip;
+        fbprime_mul_ti(tip, p, i);
+        ij_set_fbprime(basis[i], tip);
+        for (int j = i-1; j >= 0; --j) {
+            fp_t c;
+            ij_t aux;
+            ij_get_coeff(c, basis[i], degp + j);
+            ij_smul(aux, basis[j], c);
+            ij_sub(basis[i], basis[i], aux);
+        }
+    }
+
+    // Put 1's in the lower triangle.
+    for (int i = 1; i < J-degp-1; ++i)
+        for (int j = 0; j < i; ++j)
+            ij_add(basis[i], basis[i], basis[j]);
+}
+
+
+/*
+ * Given j is a multiple of p. 
+ * Compute the next multiple of p, in lex order. 
+ * The output is of degree less than J. If failure because this bound is
+ * reached, return 0, otherwise return 1.
+ *
+ * For that, make us of the given basis of multiples of p, as precomputed
+ * in the normalized_echelon_multiples() function.
+ */
+static MAYBE_UNUSED
+int next_projective_j(ij_t rj, ij_t j, ij_t *basis, int degp, int J)
+{
+    // First use monic_set_next() on the high part of j.
+    ij_t jhi, njhi;
+    ij_div_ti(jhi, j, degp);
+    int rc = ij_monic_set_next(njhi, jhi, J-degp);
+    if (!rc)
+        return 0;
+    // The degree of the difference between in and out of set_next gives
+    // the basis-element to add. (magic!)
+    ij_diff(njhi, njhi, jhi);
+    int d = ij_deg(njhi);
+    ij_add(rj, j, basis[d]);
+    // There is an adjustment to do in the case where the degree of rj is
+    // larger than the degree of j, due to the fact that we deal with
+    // monic polynomials.
+    if (d >= ij_deg(jhi)) {
+        ASSERT(d > ij_deg(jhi)); // monic case
+        // Have to kill the bit d-1, which is currently 2, without
+        // touching lower bits.
+        for (int k = 2; k < FP_CHAR; ++k) {
+            if (d > 0)
+                ij_add(rj, rj, basis[d-1]);
+            if (d > 1)
+                ij_add(rj, rj, basis[d-2]);
+        }
+    }
+    return 1;
+}
+
 
 // FIXME: Multiplication is not compatible with lexicographical order, so there
 // is no guarantee that we visit lines by increasing j's.
