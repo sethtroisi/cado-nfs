@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <string.h>
 
+#ifdef HAVE_GCC_STYLE_AMD64_ASM
+
 //#define DEBUG_CACHESIZE_CPUID
 
 static const int UNKNOWN=1;
@@ -43,7 +45,6 @@ static inline uint32_t bits_11_0(uint32_t x) {
 
 void cpuid(uint32_t res[4], uint32_t op) {
   uint32_t saved[4];
-#ifdef	__GNUC__
   __asm__ __volatile__(
     "movl %%eax, 0(%[src])\n"
     "movl %%ebx, 4(%[src])\n"
@@ -63,9 +64,6 @@ void cpuid(uint32_t res[4], uint32_t op) {
     : [op]"m"(op), [res]"D"(res), [src]"S"(saved)
     : "memory"
     );
-#else
-#error "Please teach your compiler how to call cpuid"
-#endif
 }
 
 
@@ -92,14 +90,20 @@ void vendor(char *str) {
 }
 
 int brand() {
-  char str[13];
+  char *str = malloc(sizeof(char) * 13);
   vendor(str);
-  if (strcmp(str, "AuthenticAMD")==0) 
+  if (strcmp(str, "AuthenticAMD")==0) {
+    free(str);
     return AMD;
-  if (strcmp(str, "GenuineIntel")==0) 
+  }
+  if (strcmp(str, "GenuineIntel")==0) {
+    free(str);
     return INTEL;
+  }
+  free(str);
   return UNKNOWN;
 }
+
 typedef struct {
   int L1Data_size;  		// in KB
   int L1Data_assoc;
@@ -474,9 +478,12 @@ int print_amd_cache(int verbose) {
 }
 
 
+/* return -1 if cpuid() failed, you need to seek for alternative
+   ways to probe it */
 int
 cachesize_cpuid (int verbose)
 {
+
   int brd, ret = -1;
 
   brd = brand ();
@@ -493,3 +500,14 @@ cachesize_cpuid (int verbose)
     }
   return ret * 1024;
 }
+
+#else
+
+int
+cachesize_cpuid (int verbose)
+{
+  verbose = 0;
+  return -1;
+}
+
+#endif
