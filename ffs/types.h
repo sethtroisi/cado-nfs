@@ -291,6 +291,8 @@ typedef       __ijbasis_struct *ijbasis_ptr;
 typedef const __ijbasis_struct *ijbasis_srcptr;
 
 
+/* Factor bases
+ ****************************************************************************/
 
 // Element of the factor base as an ideal gothp = (p, r).
 // There are two different types: one for small ideals and another for
@@ -305,6 +307,8 @@ typedef const __ijbasis_struct *ijbasis_srcptr;
 //   - deg(p),   5 bits   (degree won't be more than 31)
 //   - tildep,   2 bits   (1/p mod t*(t+1), in case of sublattices)
 //   - ispower,  1 bit    (maybe, just do not allow powers in buckets)
+// TODO: not 100% sure that degp is really mandatory here.
+// This could be recomputed on the fly when filling the buckets.
 typedef struct {
     fbprime_t p;
     fbprime_t r;
@@ -314,6 +318,16 @@ typedef struct {
 typedef       __large_fbideal_struct  large_fbideal_t[1];
 typedef       __large_fbideal_struct *large_fbideal_ptr;
 typedef const __large_fbideal_struct *large_fbideal_srcptr;
+
+typedef struct {
+  unsigned   alloc;
+  unsigned   n;  // nb of entries in the factor base
+  large_fbideal_t *elts;
+} __large_factor_base_struct;
+
+typedef       __large_factor_base_struct  large_factor_base_t[1];
+typedef       __large_factor_base_struct *large_factor_base_ptr;
+typedef const __large_factor_base_struct *large_factor_base_srcptr;
 
 
 // Small ideals:
@@ -341,9 +355,20 @@ typedef struct {
     _Bool     power;
 } __small_fbideal_struct;
 
-typedef       __small_fbideal_struct  bucket_fbideal_t[1];
-typedef       __small_fbideal_struct *bucket_fbideal_ptr;
-typedef const __small_fbideal_struct *bucket_fbideal_srcptr;
+typedef       __small_fbideal_struct  small_fbideal_t[1];
+typedef       __small_fbideal_struct *small_fbideal_ptr;
+typedef const __small_fbideal_struct *small_fbideal_srcptr;
+
+typedef struct {
+  unsigned   alloc;
+  unsigned   n;
+  small_fbideal_t *elts;
+} __small_factor_base_struct;
+
+typedef       __small_factor_base_struct  small_factor_base_t[1];
+typedef       __small_factor_base_struct *small_factor_base_ptr;
+typedef const __small_factor_base_struct *small_factor_base_srcptr;
+
 
 
 // Element of the factor base as an ideal gothp = (p, r).
