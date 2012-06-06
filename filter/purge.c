@@ -57,7 +57,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <string.h>
 #include <time.h>
 #include <pthread.h>
-#include <emmintrin.h>
 #include <errno.h>
 
 #include "utils.h"
@@ -67,6 +66,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 
 #define MAX_FILES 1000000
 #define MAX_STEPS 10   /* maximal number of singleton removal steps */
+
+typedef struct {
+  volatile unsigned int ok;
+  unsigned int num;
+  unsigned int end;
+} fr_t;
 
 /* Main variables */
 static hashtable_t H;
@@ -108,6 +113,15 @@ static const unsigned char ugly[256] = {
   255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
   255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255 };
 
+/* 1<<NFR = Number of find root threads;
+   if you have 2 cores or less: NFR=0;
+   if you have 4 cores : NFR=1;
+   if you have 4 + hyperthread, or better: NFR=2 */
+#define NFR (1)
+/* 1<<NNFR = Number of find root computed in one pass; NNFR=8 to 16, the greatest
+   is the fastest. */
+#define NNFR (16)
+
 /* Size of relations buffer between parsing & insertRelation.
    VERY IMPORTANT. The minimum is 1<<6; try 1<<8 to 1<<12 for possible
    speedup if your CPU is faster than a Nehalem 3.6 Ghz or if your
@@ -124,8 +138,11 @@ static const unsigned char ugly[256] = {
      least 60 µs -> 60 sentences.
    So the minimal T_REL is 1<<6 (=64) to avoid an empty buffer; 1<<7 seems
    comfortable with constant bandwidth.
+
+   CAREFUL! T_REL must be greater (at least double) than
+   (1<<(NFR+NNFR+(NFR==0))).
 */
-#define T_REL (1<<6) 
+#define T_REL MAX((1<<(NFR+NNFR+1+(NFR==0))),(1<<6))
 static const struct timespec 
 wait_load = { 0, (PREMPT_ONE_READ<<3) }, wait_classical = { 0, 1<<13 };
 
@@ -138,10 +155,6 @@ typedef struct {
   unsigned int ltmp;
 } __buf_rel_t;
 static __buf_rel_t *buf_rel;
-
-/* Trick to equilibrate findroot computation in two threads */
-#define LG_EQUI_TH (1<<3)
-static const unsigned int equi_th[]  = { 1,1,0,1,0,1,0,1 };
 
 /* Be careful. 1<<13 = 8µs; in fact, about 50-80 µs */
 inline void attente_minimale_passive ()
@@ -385,17 +398,6 @@ insertNormalRelation (unsigned int j)
     }
   for (i = 0; i < (unsigned int) buf_rel[j].rel.nb_ap; i++)
     {
-      /* Hack to equilibrate the two threads works */
-      if (!(equi_th[i & (LG_EQUI_TH - 1)]))
-        {
-#ifndef FOR_FFS
-	        buf_rel[j].rel.ap[i].r = findroot (buf_rel[j].rel.a, 
-                                   buf_rel[j].rel.b, buf_rel[j].rel.ap[i].p);
-#else
-	       buf_rel[j].rel.ap[i].r = findroot_ffs (buf_rel[j].rel.a, 
-                                  buf_rel[j].rel.b, buf_rel[j].rel.ap[i].p);
-#endif
-        }
       h = hashInsert (&H, buf_rel[j].rel.ap[i].p, buf_rel[j].rel.ap[i].r);
       nprimes += (H.hashcount[h] == 1); /* new ideal */
       if (((long) buf_rel[j].rel.ap[i].p) >= minpa)
@@ -806,7 +808,9 @@ reread (const char *oname, const char *oname2, char ** ficname, hashtable_t *H,
               if (relation_stream_get(rs, NULL, 0, ab_base) < 0)
                 break;
 
+#if 0
               fprint_relation_raw (ofile2, &rs->rel);
+#endif
 #endif
             }
           else
@@ -819,10 +823,10 @@ reread (const char *oname, const char *oname2, char ** ficname, hashtable_t *H,
                   if (rs->rel.b > 0)
                   {
 #ifndef FOR_FFS
-                      reduce_exponents_mod2 (&rs->rel);
-                      computeroots (&rs->rel);
+		    reduce_exponents_mod2 (&rs->rel);
+                    computeroots (&rs->rel);
 #else
-                      computeroots_ffs (&rs->rel);
+		    computeroots_ffs (&rs->rel);
 #endif
                   }
                   W += (double) fprint_rel_row (ofile, irel, rs->rel, H);
@@ -1045,8 +1049,8 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j)
         if (buf_rel[j].rel.rp[i].e >= 1)
 #endif
          {
-          buf_rel[j].rel.rp[k] = (rat_prime_t) { .p = buf_rel[j].rel.rp[i].p, 
-                                                 .e = 1 };
+          buf_rel[j].rel.rp[k] =
+	    (rat_prime_t) { .p = buf_rel[j].rel.rp[i].p, .e = 1 };
           ltmp += ((long) buf_rel[j].rel.rp[k].p >= minpr);
           k++;
          }
@@ -1060,19 +1064,9 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j)
         if (buf_rel[j].rel.ap[i].e >= 1)
 #endif
          {
-          buf_rel[j].rel.ap[k].p = buf_rel[j].rel.ap[i].p;
-          buf_rel[j].rel.ap[k].e = 1;
-          /* Hack to equilibrate the two threads works */
-          if (equi_th[k & (LG_EQUI_TH - 1)])
-           {
-#ifndef FOR_FFS
-            buf_rel[j].rel.ap[k].r = findroot (buf_rel[j].rel.a,
-                                     buf_rel[j].rel.b, buf_rel[j].rel.ap[k].p);
-#else
-            buf_rel[j].rel.ap[k].r = findroot_ffs (buf_rel[j].rel.a,
-                                     buf_rel[j].rel.b, buf_rel[j].rel.ap[k].p);
-#endif
-           }
+	  /* Spurious set of ap[k].r : it be computed later with another threads */
+	   buf_rel[j].rel.ap[k] =
+	     (alg_prime_t) { .p = buf_rel[j].rel.ap[i].p, .e = 1, .r = 0xffffffff };
           ltmp += ((long) buf_rel[j].rel.ap[k].p >= minpa);
           k++;
          }
@@ -1103,21 +1097,23 @@ void insertRelation() {
       if (!end_insertRelation)
 	{
 	  nanosleep (&wait_classical, NULL);
-	  /* fprintf (stderr, "iE "); */
 	}
       else
 	if (cpt_rel_a == cpy_cpt_rel_b)
 	  pthread_exit(NULL);
-    /* We don't used memory barrier for portability. So, if the ring
+    /* We don't use memory barrier for portability. So, if the ring
        buffer is empty, one problem exists if the producter produces one
        case and the consumer takes it immediatly: the case might be not
-       complety written. So, if only one case exists for consumer, the
+       complety written.
+       It's NOT a bug code, but the instructions reordonnancing of the
+       optimiser compiler, which may increase the producter counter
+       BEFORE the end of the complete writing of the case. 
+       So, if only one case exists for consumer, the
        consumer waits fews microseconds before use it.
     */
     if (cpt_rel_a == cpy_cpt_rel_b + 1)
       {
       nanosleep (&wait_classical, NULL);
-      /* fprintf (stderr, "ie "); */
       }
     j = (unsigned int) (cpy_cpt_rel_b & (T_REL - 1));
     
@@ -1135,6 +1131,40 @@ void insertRelation() {
   }
 }
 
+static void threadfindroot(fr_t *mfr) {
+  unsigned int i, j;
+  for (;;) 
+    switch(mfr->ok) { 
+    case 0:
+      nanosleep (&wait_classical, NULL);
+      break;
+    case 1 :
+      for (j = mfr->num; j <= mfr->end; j++)
+	{
+	  if (buf_rel[j].rel.b > 0) 
+	    {
+	      for (i = 0; i < (unsigned int) buf_rel[j].rel.nb_ap; i++)
+		{
+#ifndef FOR_FFS
+		  buf_rel[j].rel.ap[i].r =
+		    findroot (buf_rel[j].rel.a, 
+			      buf_rel[j].rel.b, buf_rel[j].rel.ap[i].p);
+#else
+		  buf_rel[j].rel.ap[i].r =
+		    findroot_ffs (buf_rel[j].rel.a, 
+				  buf_rel[j].rel.b, buf_rel[j].rel.ap[i].p);
+#endif
+		}
+	    }
+	}
+      mfr->ok = 0;
+      break;
+    case 2:
+      mfr->ok = 3;
+      pthread_exit(NULL);
+    }
+}
+
 /* Read all relations from file, and fills the rel_used and rel_compact arrays
    for each relation i:
    - rel_used[i] = 0 if the relation i is deleted
@@ -1149,13 +1179,15 @@ prempt_scan_relations ()
 {
   char *pcons, *pcons_old, *pcons_max, *p;
   pthread_attr_t attr;
-  pthread_t thread_load, thread_relation;
+  pthread_t thread_load, thread_relation, thread_fr[(1<<NFR)];
+  fr_t fr[(1<<NFR)];
   prempt_t prempt_data;
   unsigned long cpy_cpt_rel_a;
   unsigned int length_line, i, k;
   int err;
   char c;
-
+    
+  memset (fr, 0, (1<<NFR) * sizeof(*fr));
   end_insertRelation = 0;
   if (!(buf_rel = malloc (sizeof(*(buf_rel)) * T_REL)))
     {
@@ -1174,10 +1206,11 @@ prempt_scan_relations ()
   length_line = 0;
   
   prempt_data->files = prempt_open_compressed_rs (fic);
-  if ((err = posix_memalign ((void **) &(prempt_data->buf), PREMPT_BUF, PREMPT_BUF))) {
+  if ((err = posix_memalign ((void **) &(prempt_data->buf), PREMPT_BUF, PREMPT_BUF)))
+    {
     fprintf (stderr, "prempt_scan_relations: posix_memalign error (%d): %s\n", err, strerror (errno));
     exit (1);
-  }
+    }
   pmin = prempt_data->buf;
   pminlessone = pmin - 1;
   prempt_data->pcons = pmin;
@@ -1187,14 +1220,22 @@ prempt_scan_relations ()
   pthread_attr_init (&attr);
   pthread_attr_setstacksize (&attr, 1<<16);
   pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_JOINABLE);
-  if ((err = pthread_create (&thread_load, &attr, (void *) prempt_load, prempt_data))) {
-    fprintf (stderr, "prempt_scan_relations: pthread_create erreur 1: %d. %s\n", err, strerror (errno)); 
+  if ((err = pthread_create (&thread_load, &attr, (void *) prempt_load, prempt_data)))
+    {
+    fprintf (stderr, "prempt_scan_relations: pthread_create error 1: %d. %s\n", err, strerror (errno)); 
     exit (1);
-  }
-  if ((err = pthread_create (&thread_relation, &attr, (void *) insertRelation, NULL))) {
-    fprintf (stderr, "prempt_scan_relations: pthread_create erreur 2: %d. %s\n", err, strerror (errno)); 
+    }
+  if ((err = pthread_create (&thread_relation, &attr, (void *) insertRelation, NULL)))
+    {
+    fprintf (stderr, "prempt_scan_relations: pthread_create error 2: %d. %s\n", err, strerror (errno)); 
     exit (1);
-  }
+    }
+  for (i = 0; i < (1<<NFR); i++)
+    if ((err = pthread_create (&(thread_fr[i]), &attr, (void *) threadfindroot, &(fr[i]))))
+      {
+    fprintf (stderr, "prempt_scan_relations: pthread_create error 3: %d. %s\n", err, strerror (errno)); 
+    exit (1);
+      }
   
   pcons = (char *) prempt_data->pcons;
   for ( ; ; )
@@ -1208,7 +1249,6 @@ prempt_scan_relations ()
           if (!prempt_data->end)
 	    {
 	      nanosleep (&wait_classical, NULL);
-	      /* fprintf (stderr, "pE "); */
 	    }
 	  else
             if (pcons == prempt_data->pprod)
@@ -1222,7 +1262,6 @@ prempt_scan_relations ()
 		   ((size_t) pcons)) & (PREMPT_BUF - 1)) <= ((unsigned int) RELATION_MAX_BYTES) &&
 		 !prempt_data->end)
 	    {
-	      /* fprintf (stderr, "pe "); */
 	      nanosleep(&wait_classical, NULL);
 	    }
 	  if (pcons > prempt_data->pprod)
@@ -1265,13 +1304,31 @@ prempt_scan_relations ()
 	  while (cpy_cpt_rel_a == cpt_rel_b + T_REL)
 	    {
 	      nanosleep(&wait_classical, NULL);
-	      /* fprintf (stderr, "pV "); */
 	    }
 	  k = (unsigned int) (cpy_cpt_rel_a & (T_REL - 1));
 	  buf_rel[k].num = rs->nrels++;
 	  relation_stream_get_fast (prempt_data, k);
+
+	  /* Delayed find root computation by block of 1<<NNFR */
+	  if (cpy_cpt_rel_a && !(k & ((1<<NNFR)-1)))
+	    {
+	    i = (k>>NNFR) & ((1<<NFR)-1);
+	    while (fr[i].ok) nanosleep(&wait_classical, NULL);
+	    if (k)
+	      {
+		fr[i].num = k - (1<<NNFR);
+		fr[i].end = k - 1;
+	      }
+	    else
+	      {
+		fr[i].num = T_REL - (1<<NNFR);
+		fr[i].end = T_REL - 1;
+	      }
+	    fr[i].ok = 1;
+	    if (cpy_cpt_rel_a > (1<<(NFR+NNFR)))
+	      cpt_rel_a = cpy_cpt_rel_a - (1<<(NFR+NNFR));
+	    }
 	  cpy_cpt_rel_a++;
-	  cpt_rel_a = cpy_cpt_rel_a;
 	}
       else
 	{
@@ -1305,8 +1362,25 @@ prempt_scan_relations ()
     }
   
  end_of_files:
+  if (cpy_cpt_rel_a) {
+    k = (unsigned int) ((cpy_cpt_rel_a - 1) & (T_REL - 1));
+    if (k & ((1<<NNFR)-1)) {
+      i = ((k>>NNFR)+1) & ((1<<NFR)-1);
+      while (fr[i].ok) nanosleep(&wait_classical, NULL);
+      fr[i].num = k & ~((1<<NNFR)-1);
+      fr[i].end = k;
+      fr[i].ok = 1;
+    }
+  }
+  for (i = 0; i < (1<<NFR); i++) {
+    while (fr[i].ok) nanosleep(&wait_classical, NULL);
+    fr[i].ok = 2;
+    pthread_join(thread_fr[i], NULL);
+  }
+  cpt_rel_a = cpy_cpt_rel_a;
   while (cpy_cpt_rel_a != cpt_rel_b)
     nanosleep(&wait_classical, NULL);
+
   end_insertRelation = 1;
   pthread_join(thread_relation, NULL);
   if (pthread_tryjoin_np (thread_load, NULL))
@@ -1596,7 +1670,10 @@ main (int argc, char **argv)
            nrel_new, nprimes_new, nrel_new - nprimes_new);
       
   if (nrel_new <= nprimes_new) /* covers case nrel = nprimes = 0 */
-    exit (1);
+    {
+      fprintf(stderr, "nrel_new <= nprimes_new\n");
+      exit (1);
+    }
 
   hashCheck (&H);
 
