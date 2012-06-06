@@ -16,7 +16,7 @@
  * effect, bypasses matmul_common_read_stupid_data, which is no longer
  * used.
  */
-void mf_prepare_matrix_u32(matmul_ptr mm, matrix_u32_ptr m, const char * file)
+void mf_prepare_matrix_u32(matmul_ptr mm, matrix_u32_ptr m, const char * file, int withcoeffs)
 {
     struct mf_io_file mf[1];
     struct mf_io_file rw[1];
@@ -41,7 +41,7 @@ void mf_prepare_matrix_u32(matmul_ptr mm, matrix_u32_ptr m, const char * file)
         exit(1);
     }
     fclose(f);
-    matrix_read_pass(mf, NULL, rw, cw, 0, 0, 1);
+    matrix_read_pass(mf, NULL, rw, cw, 0, 0, 1, withcoeffs);
 
     memset(m, 0, sizeof(matrix_u32));
     m->mfile = file;

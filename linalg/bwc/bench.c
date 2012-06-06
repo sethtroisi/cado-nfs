@@ -48,6 +48,7 @@ struct bench_args {
     int transpose;
     int nchecks;
     int rebuild;
+    int withcoeffs;
     double freq;
     char ** mfiles;
     const char * source_vec;
@@ -79,7 +80,7 @@ void init_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct b
         pthread_mutex_unlock(&tg->mu);
         ASSERT_ALWAYS(p->mm->store_transposed == ba->transpose);
         matrix_u32 m;
-        mf_prepare_matrix_u32(p->mm, m, ba->mfiles[tnum]);
+        mf_prepare_matrix_u32(p->mm, m, ba->mfiles[tnum], ba->withcoeffs);
         matmul_build_cache(p->mm, m);
         pthread_mutex_lock(&tg->mu);
         fprintf(stderr, "T%d Cache build time %.2fs cpu\n",
@@ -233,6 +234,7 @@ int main(int argc, char * argv[])
     argv++,argc--;
     param_list_configure_knob(ba->pl, "--transpose", &ba->transpose);
     param_list_configure_knob(ba->pl, "--rebuild", &ba->rebuild);
+    param_list_configure_knob(ba->pl, "--withcoeffs", &ba->withcoeffs);
     param_list_configure_knob(ba->pl, "--nocheck", &nocheck);
     param_list_configure_alias(ba->pl, "--transpose", "-t");
     param_list_configure_alias(ba->pl, "--rebuild", "-r");
@@ -301,6 +303,8 @@ int main(int argc, char * argv[])
     }
 
     unsigned int nbys = 64;
+
+    param_list_parse_uint(ba->pl, "nbys", &nbys);
 
     abase_vbase_ptr A = ba->xx;
 

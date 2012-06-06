@@ -30,7 +30,7 @@
 /* Active handler: simd_flat */
 /* Active handler: simd_u64k */
 /* Automatically generated code  */
-/* Options used: k=2 tag=u64k2 choose_by_groupsize=<code> prefix=abase_ family=[u64k1, u64k2] virtual_base={
+/* Options used: k=2 tag=u64k2 choose_by_groupsize=<code> prefix=abase_ virtual_base={
                   'filebase' => 'abase_vbase',
                   'substitutions' => [
                                        [
@@ -116,7 +116,7 @@
                                      ],
                   'name' => 'abase_vbase'
                 };
- */
+ family=[u64k1, u64k2] */
 
 typedef void * abase_u64k2_field[1];
 typedef void * abase_u64k2_dst_field;
@@ -200,6 +200,8 @@ void abase_u64k2_add(abase_u64k2_dst_field, abase_u64k2_dst_elt, abase_u64k2_src
 #define abase_u64k2_elt_ur_clear(f, px)	/**/
 static inline
 void abase_u64k2_elt_ur_set(abase_u64k2_dst_field, abase_u64k2_dst_elt_ur, abase_u64k2_src_elt_ur);
+static inline
+void abase_u64k2_elt_ur_set_zero(abase_u64k2_dst_field, abase_u64k2_dst_elt_ur);
 /* missing elt_ur_set_ui */
 static inline
 void abase_u64k2_elt_ur_add(abase_u64k2_dst_field, abase_u64k2_dst_elt_ur, abase_u64k2_src_elt_ur, abase_u64k2_src_elt_ur);
@@ -357,6 +359,13 @@ static inline
 void abase_u64k2_elt_ur_set(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_dst_elt_ur r, abase_u64k2_src_elt_ur s)
 {
     if (r != s) memcpy(r,s,sizeof(abase_u64k2_elt_ur));
+}
+
+/* *Mpfq::defaults::flatdata::code_for_elt_ur_set_zero */
+static inline
+void abase_u64k2_elt_ur_set_zero(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_dst_elt_ur r)
+{
+    memset(r, 0, sizeof(abase_u64k2_elt_ur));
 }
 
 /* *simd_flat::code_for_elt_ur_add */

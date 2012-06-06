@@ -86,6 +86,8 @@ int main(int argc, char * argv[])
     int ascii_freq = 0;
     int binary_freq = 0;
 
+    int withcoeffs = 0;
+
     param_list_init(pl);
     argv++,argc--;
 
@@ -98,6 +100,7 @@ int main(int argc, char * argv[])
     param_list_configure_knob(pl, "--binary-freq", &binary_freq);
     param_list_configure_knob(pl, "--nofreq", &nofreq);
     param_list_configure_knob(pl, "--freq", &freq);
+    param_list_configure_knob(pl, "--withcoeffs", &withcoeffs);
 
     for(;argc;) {
         if (param_list_update_cmdline(pl, &argc, &argv)) continue;
@@ -226,7 +229,8 @@ int main(int argc, char * argv[])
             cw->f ? cw : NULL,
             rskip,
             cskip,
-            !quiet);
+            !quiet,
+            withcoeffs);
 
     if (rwfile) fclose(rw->f);
     if (cwfile) fclose(cw->f);

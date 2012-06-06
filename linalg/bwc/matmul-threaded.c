@@ -90,7 +90,7 @@ void matmul_threaded_clear(struct matmul_threaded_data_s * mm)
     free(mm);
 }
 
-struct matmul_threaded_data_s * matmul_threaded_init(abdst_field xx MAYBE_UNUSED, param_list pl, int optimized_direction)
+struct matmul_threaded_data_s * matmul_threaded_init(void * xx MAYBE_UNUSED, param_list pl, int optimized_direction)
 {
     struct matmul_threaded_data_s * mm;
     mm = malloc(sizeof(struct matmul_threaded_data_s));

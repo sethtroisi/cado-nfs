@@ -15,10 +15,13 @@
 #elif defined(SELECT_ABASE_u128)
 #error "argh"
 #include "mpfq/abase_u128.h"
+#elif defined(SELECT_ABASE_p16) /* This is really the first non-gf2 try */
+#define NOT_OVER_GF2
+#include "mpfq/abase_p16.h"
 #else
 #warning "Using default selection for abase"
 #error "argh"
-#include "mpfq/abase_u64.h"
+// #include "mpfq/abase_u64.h"
 #endif
 
 /* This is used as a shorthand throughout in order to ease the access to

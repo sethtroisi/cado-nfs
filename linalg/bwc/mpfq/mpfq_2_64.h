@@ -189,6 +189,8 @@ unsigned long mpfq_2_64_trace(mpfq_2_64_dst_field, mpfq_2_64_src_elt);
 static inline
 void mpfq_2_64_elt_ur_set(mpfq_2_64_dst_field, mpfq_2_64_dst_elt_ur, mpfq_2_64_src_elt_ur);
 static inline
+void mpfq_2_64_elt_ur_set_zero(mpfq_2_64_dst_field, mpfq_2_64_dst_elt_ur);
+static inline
 void mpfq_2_64_elt_ur_set_ui(mpfq_2_64_dst_field, mpfq_2_64_dst_elt_ur, unsigned long);
 static inline
 void mpfq_2_64_elt_ur_add(mpfq_2_64_dst_field, mpfq_2_64_dst_elt_ur, mpfq_2_64_src_elt_ur, mpfq_2_64_src_elt_ur);
@@ -855,6 +857,13 @@ static inline
 void mpfq_2_64_elt_ur_set(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_elt_ur r, mpfq_2_64_src_elt_ur s)
 {
     if (r != s) memcpy(r,s,sizeof(mpfq_2_64_elt_ur));
+}
+
+/* *Mpfq::defaults::flatdata::code_for_elt_ur_set_zero */
+static inline
+void mpfq_2_64_elt_ur_set_zero(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_elt_ur r)
+{
+    memset(r, 0, sizeof(mpfq_2_64_elt_ur));
 }
 
 /* *Mpfq::gf2n::trivialities::code_for_elt_ur_set_ui */

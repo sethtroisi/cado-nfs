@@ -1,106 +1,103 @@
-#ifndef ABASE_U64K1_T_H_
-#define ABASE_U64K1_T_H_
+#ifndef ABASE_P16_T_H_
+#define ABASE_P16_T_H_
 
 /* MPFQ generated file -- do not edit */
 
-#include "abase_u64k1.h"
-#include "abase_u64k2.h"
+#include "abase_p16.h"
 /* Active handler: Mpfq::defaults::vec */
 /* Active handler: Mpfq::defaults */
 /* Active handler: Mpfq::engine::defaults::mpi_flat */
-/* Active handler: simd_dotprod */
-/* Active handler: io */
-/* Active handler: trivialities */
 /* Active handler: simd_flat */
-/* Active handler: simd_u64k */
+/* Active handler: io */
+/* Active handler: simd_p16 */
 /* Automatically generated code  */
-/* Options used: k=1 tag=u64k1 choose_by_groupsize=<code> prefix=abase_ virtual_base={
+/* Options used: vtag=p16 tag=p16 choose_by_groupsize=<code> prefix=abase_ virtual_base={
                   'filebase' => 'abase_vbase',
                   'substitutions' => [
                                        [
-                                         qr/(?-xism:abase_u64k1_elt \*)/,
+                                         qr/(?-xism:abase_p16_elt \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_src_elt\b)/,
+                                         qr/(?-xism:abase_p16_src_elt\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_elt\b)/,
+                                         qr/(?-xism:abase_p16_elt\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_dst_elt\b)/,
+                                         qr/(?-xism:abase_p16_dst_elt\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_elt_ur \*)/,
+                                         qr/(?-xism:abase_p16_elt_ur \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_src_elt_ur\b)/,
+                                         qr/(?-xism:abase_p16_src_elt_ur\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_elt_ur\b)/,
+                                         qr/(?-xism:abase_p16_elt_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_dst_elt_ur\b)/,
+                                         qr/(?-xism:abase_p16_dst_elt_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_vec \*)/,
+                                         qr/(?-xism:abase_p16_vec \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_src_vec\b)/,
+                                         qr/(?-xism:abase_p16_src_vec\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_vec\b)/,
+                                         qr/(?-xism:abase_p16_vec\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_dst_vec\b)/,
+                                         qr/(?-xism:abase_p16_dst_vec\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_vec_ur \*)/,
+                                         qr/(?-xism:abase_p16_vec_ur \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_src_vec_ur\b)/,
+                                         qr/(?-xism:abase_p16_src_vec_ur\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_vec_ur\b)/,
+                                         qr/(?-xism:abase_p16_vec_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_dst_vec_ur\b)/,
+                                         qr/(?-xism:abase_p16_dst_vec_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_poly \*)/,
+                                         qr/(?-xism:abase_p16_poly \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_src_poly\b)/,
+                                         qr/(?-xism:abase_p16_src_poly\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_poly\b)/,
+                                         qr/(?-xism:abase_p16_poly\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_dst_poly\b)/,
+                                         qr/(?-xism:abase_p16_dst_poly\b)/,
                                          'void *'
                                        ]
                                      ],
                   'name' => 'abase_vbase'
                 };
- family=[u64k1, u64k2] */
+ family=[p16] */
 
 
 /* Functions operating on the field structure */
@@ -128,13 +125,10 @@
 /* MPI interface */
 
 /* Object-oriented interface */
-void abase_u64k1_u64k1_dotprod(abase_u64k1_dst_field, abase_u64k1_dst_field, abase_u64k1_dst_vec, abase_u64k1_src_vec, abase_u64k1_src_vec, unsigned int);
-void abase_u64k1_u64k2_dotprod(abase_u64k1_dst_field, abase_u64k2_dst_field, abase_u64k1_dst_vec, abase_u64k2_src_vec, abase_u64k1_src_vec, unsigned int);
-void abase_u64k1_u64k1_addmul_tiny(abase_u64k1_dst_field, abase_u64k1_dst_field, abase_u64k1_dst_vec, abase_u64k1_src_vec, abase_u64k1_dst_vec, unsigned int);
-void abase_u64k1_u64k2_addmul_tiny(abase_u64k1_dst_field, abase_u64k2_dst_field, abase_u64k2_dst_vec, abase_u64k1_src_vec, abase_u64k2_dst_vec, unsigned int);
-void abase_u64k1_u64k1_transpose(abase_u64k1_dst_field, abase_u64k1_dst_field, abase_u64k1_dst_vec, abase_u64k1_src_vec);
-void abase_u64k1_u64k2_transpose(abase_u64k1_dst_field, abase_u64k2_dst_field, abase_u64k1_dst_vec, abase_u64k2_src_vec);
+void abase_p16_p16_dotprod(abase_p16_dst_field, abase_p16_dst_field, abase_p16_dst_vec, abase_p16_src_vec, abase_p16_src_vec, unsigned int);
+void abase_p16_p16_addmul_tiny(abase_p16_dst_field, abase_p16_dst_field, abase_p16_dst_vec, abase_p16_src_vec, abase_p16_dst_vec, unsigned int);
+void abase_p16_p16_transpose(abase_p16_dst_field, abase_p16_dst_field, abase_p16_dst_vec, abase_p16_src_vec);
 
-#endif  /* ABASE_U64K1_T_H_ */
+#endif  /* ABASE_P16_T_H_ */
 
 /* vim:set ft=cpp: */

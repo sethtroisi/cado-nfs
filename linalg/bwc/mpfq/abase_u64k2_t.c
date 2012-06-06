@@ -13,7 +13,7 @@
 /* Active handler: simd_flat */
 /* Active handler: simd_u64k */
 /* Automatically generated code  */
-/* Options used: k=2 tag=u64k2 choose_by_groupsize=<code> prefix=abase_ family=[u64k1, u64k2] virtual_base={
+/* Options used: k=2 tag=u64k2 choose_by_groupsize=<code> prefix=abase_ virtual_base={
                   'filebase' => 'abase_vbase',
                   'substitutions' => [
                                        [
@@ -99,7 +99,7 @@
                                      ],
                   'name' => 'abase_vbase'
                 };
- */
+ family=[u64k1, u64k2] */
 
 
 /* Functions operating on the field structure */

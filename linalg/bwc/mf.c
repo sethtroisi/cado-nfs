@@ -88,7 +88,9 @@ void matrix_read_pass(
         struct mf_io_file * cw_out,
         unsigned int rskip,
         unsigned int cskip,
-        int progress)
+        int progress,
+        int withcoeffs
+        )
 {
     /* This temp buffer is used only if skipping columns and outputting a
      * matrix file -- and even then, we can avoid it if the matrix rows are
@@ -168,6 +170,8 @@ void matrix_read_pass(
         }
         /* }}} */
 
+        uint32_t ww = w + withcoeffs * w;
+
         /* reading the row weight to the rw file is deferred to after the
          * point where we've cleaned the columns to be skipped. */
 
@@ -176,12 +180,12 @@ void matrix_read_pass(
             if (m_in->f) {
                 if (!m_in->ascii) {
                     if (can_seek) {
-                        rc = fseek(m_in->f, w * sizeof(uint32_t), SEEK_CUR);
+                        rc = fseek(m_in->f, ww * sizeof(uint32_t), SEEK_CUR);
                         if (rc != 0)
                             can_seek = 0;
                     }
                     if (!can_seek) {
-                        for(j = 0 ; j < w ; j++) {
+                        for(j = 0 ; j < ww ; j++) {
                             uint32_t c;
                             rc = fread32_little(&c, 1, m_in->f);
                             if (!rc) abort_unexpected_eof();
@@ -193,6 +197,12 @@ void matrix_read_pass(
                         uint32_t c;
                         rc = fscanf(m_in->f, "%" SCNu32, &c);
                         if (rc == EOF) abort_unexpected_eof();
+                        if (withcoeffs) {
+                            /* XXX Can probably be more tolerant on how
+                             * coeffs are presented */
+                            rc = fscanf(m_in->f, "%" SCNd32, (int32_t *) &c);
+                            if (rc == EOF) abort_unexpected_eof();
+                        }
                     }
                 }
             } else {
@@ -215,8 +225,8 @@ void matrix_read_pass(
                 }
                 /* Otherwise we have to defer */
             } else {
-                if (m_out->size + w >= m_out->alloc) {
-                    expand(m_out, (1 << 20) + (m_out->size+w) * 3/2);
+                if (m_out->size + ww >= m_out->alloc) {
+                    expand(m_out, (1 << 20) + (m_out->size + ww) * 1.05);
                 }
                 ptr_w = &(m_out->p[m_out->size]);
                 *ptr_w = w;
@@ -226,31 +236,46 @@ void matrix_read_pass(
 
         uint32_t real_weight = 0;
 
-        if (m_out && cskip && temp->alloc < w) {
-            expand(temp, w + w/2);
+        if (m_out && cskip && temp->alloc < ww) {
+            expand(temp, ww + ww/2);
         }
 
         for(j = 0 ; j < w ; j++) {
             /* {{{ read this column index */
             uint32_t c;
+            int32_t coeff=0;
             if (m_in->f) {
                 if (m_in->ascii) {
                     rc = fscanf(m_in->f, "%" SCNu32, &c);
                     if (rc == EOF) abort_unexpected_eof();
+                    if (withcoeffs) {
+                        rc = fscanf(m_in->f, "%" SCNd32, (int32_t*) &coeff);
+                        if (rc == EOF) abort_unexpected_eof();
+                    }
                 } else {
                     rc = fread32_little(&c, 1, m_in->f);
                     if (!rc) abort_unexpected_eof();
+                    if (withcoeffs) {
+                        rc = fread32_little(&w, 1, m_in->f);
+                        if (!rc) abort_unexpected_eof();
+                    }
                 }
             } else {
                 c = *ptr++;
+                if (withcoeffs) {
+                    coeff = *ptr++;
+                }
             }
             /* }}} */
             if (cskip) {
                 if (c < cskip) {
-                    continue;
+                    continue;   /* next coefficient */
                 } else {
                     if (m_out) {
-                        temp->p[real_weight] = c - cskip;
+                        temp->p[(1 + withcoeffs) * real_weight] = c - cskip;
+                    }
+                    if (withcoeffs) {
+                        temp->p[2 * real_weight + 1] = coeff;
                     }
                     real_weight++;
                 }
@@ -263,13 +288,22 @@ void matrix_read_pass(
                     if (!cskip) {
                         if (m_out->ascii) {
                             fprintf(m_out->f, " %"PRIu32, c);
+                            if (withcoeffs) {
+                                fprintf(m_out->f, " %"PRId32, coeff);
+                            }
                         } else {
                             rc = fwrite32_little(&c, 1, m_out->f);
+                            if (withcoeffs) {
+                                rc = fwrite32_little((uint32_t*)&coeff, 1, m_out->f);
+                            }
                         }
                     }
                     // otherwise it's too early, size hasn't been written yet.
                 } else {
                     m_out->p[m_out->size++] = c-cskip;
+                    if (withcoeffs) {
+                        m_out->p[m_out->size++] = coeff;
+                    }
                 }
             }/*}}}*/
 
@@ -287,17 +321,25 @@ void matrix_read_pass(
             }
         }
         w = real_weight;
+        ww = w + withcoeffs * w;
 
         if (m_out && cskip) {/* {{{ start row for matrix file */
             if (m_out->f) {
                 if (m_out->ascii) {
                     fprintf(m_out->f, "%" PRIu32, w);
-                    for(j = 0 ; j < w ; j++) {
-                        fprintf(m_out->f, " %"PRIu32, temp->p[j]);
+                    if (withcoeffs) {
+                        for(j = 0 ; j < ww ; ) {
+                            fprintf(m_out->f, " %"PRIu32, temp->p[j++]);
+                            fprintf(m_out->f, " %"PRId32, temp->p[j++]);
+                        }
+                    } else {
+                        for(j = 0 ; j < w ; j++) {
+                            fprintf(m_out->f, " %"PRIu32, temp->p[j]);
+                        }
                     }
                 } else {
                     rc = fwrite32_little(&w, 1, m_out->f);
-                    rc = fwrite32_little(temp->p, w, m_out->f);
+                    rc = fwrite32_little(temp->p, ww, m_out->f);
                 }
             } else {
                 // fix this up. It's the only thing we have to do.

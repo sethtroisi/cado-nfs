@@ -20,7 +20,7 @@ static int abase_u64k2_impl_mpi_use_count;   /* several stacked init()/clear() p
 /* Active handler: simd_flat */
 /* Active handler: simd_u64k */
 /* Automatically generated code  */
-/* Options used: k=2 tag=u64k2 choose_by_groupsize=<code> prefix=abase_ family=[u64k1, u64k2] virtual_base={
+/* Options used: k=2 tag=u64k2 choose_by_groupsize=<code> prefix=abase_ virtual_base={
                   'filebase' => 'abase_vbase',
                   'substitutions' => [
                                        [
@@ -106,7 +106,7 @@ static int abase_u64k2_impl_mpi_use_count;   /* several stacked init()/clear() p
                                      ],
                   'name' => 'abase_vbase'
                 };
- */
+ family=[u64k1, u64k2] */
 
 
 /* Functions operating on the field structure */
@@ -623,6 +623,12 @@ static void abase_u64k2_wrapper_elt_ur_set(abase_vbase_ptr vbase MAYBE_UNUSED, a
     abase_u64k2_elt_ur_set(vbase->obj, r, s);
 }
 
+static void abase_u64k2_wrapper_elt_ur_set_zero(abase_vbase_ptr, abase_u64k2_dst_elt_ur);
+static void abase_u64k2_wrapper_elt_ur_set_zero(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k2_dst_elt_ur r MAYBE_UNUSED)
+{
+    abase_u64k2_elt_ur_set_zero(vbase->obj, r);
+}
+
 static void abase_u64k2_wrapper_elt_ur_add(abase_vbase_ptr, abase_u64k2_dst_elt_ur, abase_u64k2_src_elt_ur, abase_u64k2_src_elt_ur);
 static void abase_u64k2_wrapper_elt_ur_add(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k2_dst_elt_ur r MAYBE_UNUSED, abase_u64k2_src_elt_ur s1 MAYBE_UNUSED, abase_u64k2_src_elt_ur s2 MAYBE_UNUSED)
 {
@@ -1007,6 +1013,7 @@ void abase_u64k2_oo_field_init(abase_vbase_ptr vbase)
     vbase->elt_ur_init = (void (*) (abase_vbase_ptr, void *)) abase_u64k2_wrapper_elt_ur_init;
     vbase->elt_ur_clear = (void (*) (abase_vbase_ptr, void *)) abase_u64k2_wrapper_elt_ur_clear;
     vbase->elt_ur_set = (void (*) (abase_vbase_ptr, void *, const void *)) abase_u64k2_wrapper_elt_ur_set;
+    vbase->elt_ur_set_zero = (void (*) (abase_vbase_ptr, void *)) abase_u64k2_wrapper_elt_ur_set_zero;
     /* missing elt_ur_set_ui */
     vbase->elt_ur_add = (void (*) (abase_vbase_ptr, void *, const void *, const void *)) abase_u64k2_wrapper_elt_ur_add;
     vbase->elt_ur_neg = (void (*) (abase_vbase_ptr, void *, const void *)) abase_u64k2_wrapper_elt_ur_neg;

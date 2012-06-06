@@ -58,7 +58,8 @@ int main(int argc, char * argv[])
 
         ASSERT_ALWAYS(mm->store_transposed == !d);
         matrix_u32 m;
-        mf_prepare_matrix_u32(mm, m, argv[1]);
+        /* This excludes the with-coefficients case for now */
+        mf_prepare_matrix_u32(mm, m, argv[1], 0);
         matmul_build_cache(mm, m);
         matmul_save_cache(mm);
         matmul_clear(mm);

@@ -1,7 +1,7 @@
 #ifndef MPFQ_GF2N_COMMON_H_
 #define MPFQ_GF2N_COMMON_H_
 
-#include "mpfq/mpfq.h"
+#include "mpfq.h"
 
 #ifdef __cplusplus
 extern "C" {

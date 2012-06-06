@@ -57,7 +57,7 @@
  *     balancing to perform, compute the row and column permutation which
  *     must be applied to the original matrix. Note that this step does
  *     _NOT_ require the original matrix to be read ! It is performed by
- *     mf_dobal (but could optionally be called from here as well).
+ *     mf_bal (but could optionally be called from here as well).
  * 
  * The code here handles the two remaining steps. Precisions are given
  * later on.
