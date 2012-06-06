@@ -42,18 +42,30 @@ static inline uint32_t bits_11_0(uint32_t x) {
 
 
 void cpuid(uint32_t res[4], uint32_t op) {
-  uint32_t eax, ebx, ecx, edx;
+  uint32_t saved[4];
 #ifdef	__GNUC__
-  __asm__ ("cpuid"
-      : "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
-      : "a" (op));
+  __asm__ __volatile__(
+    "movl %%eax, 0(%[src])\n"
+    "movl %%ebx, 4(%[src])\n"
+    "movl %%ecx, 8(%[src])\n"
+    "movl %%edx, 12(%[src])\n"
+    "movl %[op], %%eax\n"
+    "cpuid\n"
+    "movl %%eax, 0(%[res])\n"
+    "movl %%ebx, 4(%[res])\n"
+    "movl %%ecx, 8(%[res])\n"
+    "movl %%edx, 12(%[res])\n"
+    "movl 0(%[src]), %%eax\n"
+    "movl 4(%[src]), %%ebx\n"
+    "movl 8(%[src]), %%ecx\n"
+    "movl 12(%[src]), %%edx\n"
+    :
+    : [op]"m"(op), [res]"D"(res), [src]"S"(saved)
+    : "memory"
+    );
 #else
 #error "Please teach your compiler how to call cpuid"
 #endif
-  res[0] = eax;
-  res[1] = ebx;
-  res[2] = ecx;
-  res[3] = edx;
 }
 
 
