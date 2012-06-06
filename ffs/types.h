@@ -280,7 +280,7 @@ typedef const __ijvec_struct *ijvec_srcptr;
 
 // Structure definition.
 typedef struct {
-  unsigned I, J;
+  unsigned I, J;  // TODO: do I and J really belongs to this structure ?
   unsigned dim;
   ijvec_t *v;
 } __ijbasis_struct;
@@ -289,6 +289,61 @@ typedef struct {
 typedef       __ijbasis_struct  ijbasis_t[1];
 typedef       __ijbasis_struct *ijbasis_ptr;
 typedef const __ijbasis_struct *ijbasis_srcptr;
+
+
+
+// Element of the factor base as an ideal gothp = (p, r).
+// There are two different types: one for small ideals and another for
+// the large ones taht are bucket sieved.
+// The number of small ideals is tiny, so that we can have a heavy
+// structure, whereas for bucket ideals, there is a lot of memory
+// pressure.
+
+// Large ideals:
+//
+// In the 8-bit "data" field, we suggest to store:
+//   - deg(p),   5 bits   (degree won't be more than 31)
+//   - tildep,   2 bits   (1/p mod t*(t+1), in case of sublattices)
+//   - ispower,  1 bit    (maybe, just do not allow powers in buckets)
+typedef struct {
+    fbprime_t p;
+    fbprime_t r;
+    uint8_t data;
+} __large_fbideal_struct;
+
+typedef       __large_fbideal_struct  large_fbideal_t[1];
+typedef       __large_fbideal_struct *large_fbideal_ptr;
+typedef const __large_fbideal_struct *large_fbideal_srcptr;
+
+
+// Small ideals:
+// 
+// Field description:
+//   - basis,   an F_p-basis of the intersection of the
+//              gothp-lattice with the (I,J)-rectangle.
+//   - current, some information to keep track of where we are
+//              when jumping from a bucket-region to another.
+//   - degq,    the real degree of q
+//   - degp,    the contribution that is subtracted to the norm.
+//              When we deal with a power, this is not degq.
+//              (and actually, this is not always deg(p)).
+//   - proj,    indicate a projective root.
+//   - power,   indicate a power.
+typedef struct {
+    fbprime_t q;
+    fbprime_t r;
+    ijbasis_t basis;
+    ij_t      current;
+    ij_t      tildep;
+    int       degp;
+    int       degq;
+    _Bool     proj;
+    _Bool     power;
+} __small_fbideal_struct;
+
+typedef       __small_fbideal_struct  bucket_fbideal_t[1];
+typedef       __small_fbideal_struct *bucket_fbideal_ptr;
+typedef const __small_fbideal_struct *bucket_fbideal_srcptr;
 
 
 // Element of the factor base as an ideal gothp = (p, r).
