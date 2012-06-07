@@ -131,3 +131,47 @@ void ab2ij(ij_t i, ij_t j, fppol_t a, fppol_t b, qlat_t qlat)
     fppol_clear(tmp2);
     fppol_clear(tmpq);
 }
+
+
+// Compute lambda for an element of the factor base.
+// If the result is projective, the set lambda to p.
+void compute_lambda(fbprime_ptr lambda,
+    fbprime_srcptr p, fbprime_srcptr r, qlat_srcptr qlat)
+{
+    fbprime_t t0, t1;
+
+    int was_proj = fbprime_deg(r) == fbprime_deg(p);
+
+    if (was_proj) {
+        fbprime_sub(t0, r, p);
+        fbprime_mulmod(t0, qlat->a0, t0, p);
+        fbprime_sub   (t0, t0, qlat->b0);
+        fbprime_rem   (t0, t0, p);
+    } else {
+        fbprime_mulmod(t0, qlat->b0, r, p);
+        fbprime_sub   (t0, qlat->a0, t0);
+        fbprime_rem   (t0, t0, p);
+    }
+    if (fbprime_is_zero(t0)) {
+      fbprime_set(lambda, p);
+      return;
+    }
+    int ret = fbprime_invmod(t0, t0, p);
+    if (!ret) { // this can happen for powers
+        // FIXME: is this condition correct ?
+        fbprime_set(lambda, p);
+        return;
+    }
+    if (was_proj) {
+        fbprime_mulmod(t1, qlat->a1, r, p);
+        fbprime_sub   (t1, qlat->b1, t1);
+        fbprime_rem   (t1, t1, p);
+    } else {
+        fbprime_mulmod(t1, qlat->b1, r, p);
+        fbprime_sub   (t1, t1, qlat->a1);
+        fbprime_rem   (t1, t1, p);
+    }
+    fbprime_mulmod(lambda, t0, t1, p);
+}
+
+

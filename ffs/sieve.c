@@ -25,7 +25,7 @@
 int factor_survivor(fppol_t a, fppol_t b,
         MAYBE_UNUSED ijpos_t pos, 
         MAYBE_UNUSED replayable_bucket_t *buckets,
-        MAYBE_UNUSED factor_base_t *FB,
+        MAYBE_UNUSED large_factor_base_t *FB,
         ffspol_t* F, int *B, sq_t q, int side) 
 {
     fppol_t Nab;
@@ -142,7 +142,8 @@ int main(int argc, char **argv)
 {
     ffspol_t ffspol[2]; 
     qlat_t qlat;
-    factor_base_t FB[2];
+    large_factor_base_t LFB[2];
+    small_factor_base_t SFB[2];
     int fbb[2] = {0, 0};
     int I=0, J=0;  
     int lpb[2] = {0, 0};  
@@ -312,13 +313,14 @@ int main(int argc, char **argv)
             filename = param_list_lookup_string(pl, param);
             if (filename == NULL) usage(argv0, param);
             double tm = seconds();
-            noerr = factor_base_init(FB[i], filename, I, fbb[i]);
+            noerr = factor_base_init(LFB[i], SFB[i], filename, I, fbb[i], J);
             fprintf(stdout, "# Reading factor base %d took %1.1f s\n", 
                     i, seconds()-tm);
             if (!noerr) {
                 fprintf(stderr, "Could not read %s: %s\n", param, filename);
                 exit(EXIT_FAILURE);
             }
+
         }
     }
 
@@ -326,6 +328,8 @@ int main(int argc, char **argv)
 
     if (want_sublat) {
         fprintf(stderr, "# WARNING: sublattices seem to be broken, and won't be fixed soon.\n");
+
+        // TODO: init tildep in the factor bases, here.
     }
 
 #ifdef USE_F2
@@ -349,8 +353,8 @@ int main(int argc, char **argv)
     // Allocate storage space for the buckets.
     // FIXME: The bucket capacity is hardcoded for the moment.
     buckets_t buckets[2];
-    buckets_init(buckets[0], I, J, 1<<16, I, 1+factor_base_max_degp(FB[0]));
-    buckets_init(buckets[1], I, J, 1<<16, I, 1+factor_base_max_degp(FB[1]));
+    buckets_init(buckets[0], I, J, 1<<16, I, 1+factor_base_max_degp(LFB[0]));
+    buckets_init(buckets[1], I, J, 1<<16, I, 1+factor_base_max_degp(LFB[1]));
     ASSERT_ALWAYS(buckets[0]->n == buckets[1]->n);
     print_bucket_info(buckets[0]);
     fflush(stdout);
@@ -383,8 +387,7 @@ int main(int argc, char **argv)
     double tot_sieve = 0;
     double tot_buckets = 0;
     double tot_cofact = 0;
-    double tot_initS = 0;
-    double tot_lambda = 0;
+    double tot_init = 0;
 
     int tot_nrels = 0;
     int tot_sq = 0;
@@ -456,6 +459,14 @@ int main(int argc, char **argv)
 
         double t_tot = seconds();
 
+        double t_norms = 0;
+        double t_sieve = 0;
+        double t_buckets = 0;
+        double t_cofact = 0;
+        double t_init = 0;
+        int nrels = 0;
+
+        t_init -= seconds();
         // Check the given special-q
         if (!is_valid_sq(qlat, ffspol[sqside])) {
             fprintf(stderr, "Error: the rho = ");
@@ -473,20 +484,10 @@ int main(int argc, char **argv)
         print_qlat_info(qlat);
         fflush(stdout);
 
-        double t_norms = 0;
-        double t_sieve = 0;
-        double t_buckets = 0;
-        double t_cofact = 0;
-        double t_initS = 0;
-        double t_lambda = 0;
-        int nrels = 0;
-
-        // Precompute lambda for each element of the factor bases.
-        t_lambda -= seconds();
-        for (int i = 0; i < 2; ++i) 
-            factor_base_precomp_lambda(FB[i], qlat, sublat);
-        t_lambda += seconds();
-
+        // Precompute all the data for small factor base elements.
+        for (int i = 0; i < 2; ++i)
+            small_factor_base_precomp(SFB[i], qlat, sublat, I, J);
+        t_init += seconds();
 
         // Loop on all sublattices
         // In the no_sublat case, this loops degenerates into one pass, since
@@ -502,8 +503,8 @@ int main(int argc, char **argv)
 
             // Fill the buckets.
             t_buckets -= seconds();
-            buckets_fill(buckets[0], FB[0], sublat, I, J);
-            buckets_fill(buckets[1], FB[1], sublat, I, J);
+            buckets_fill(buckets[0], LFB[0], sublat, I, J, qlat);
+            buckets_fill(buckets[1], LFB[1], sublat, I, J, qlat);
             t_buckets += seconds();
 
             // j0 is the first valid line in the current bucket region.
@@ -515,7 +516,7 @@ int main(int argc, char **argv)
               if (ijvec_get_start_pos(j0, I, J) >= pos0+size)
                 continue;
 
-              t_initS -= seconds();
+              t_init -= seconds();
               // Init the bucket region.
               memset(S, 0, size*sizeof(uint8_t));
 
@@ -546,31 +547,7 @@ int main(int argc, char **argv)
                   }
                 }
               }
-
-              // If the norm computation is too expensive, it might pay to
-              // activate this block.
-#if 0
-              // Kill positions where gcd(hat i, hat j) != 1
-              {
-                ij_t i, j;
-                ij_t hati, hatj, g;
-                int rci, rcj = 1;
-                for (ij_set(j, j0); rcj; rcj = ij_monic_set_next(j, j, J)) {
-                    ijpos_t start = ijvec_get_start_pos(j, I, J) - pos0;
-                    if (start >= size)
-                      break;
-                    rci = 1;
-                    for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
-                        ijpos_t pos = start + ijvec_get_offset(i, I);
-                        ij_convert_sublat(hati, hatj, i, j, sublat);
-                        ij_gcd(g, hati, hatj);
-                        if (ij_deg(g) != 0 && ij_deg(hati)>0  && ij_deg(hatj)>0)
-                            S[pos] = 255;
-                    }
-                }
-              }
-#endif
-              t_initS += seconds();
+              t_init += seconds();
 
               for (int twice = 0; twice < 2; twice++) {
                 // Select the side to be sieved
@@ -586,7 +563,7 @@ int main(int argc, char **argv)
 
                 // Line sieve.
                 t_sieve -= seconds();
-                sieveFB(S, FB[side], I, J, j0, pos0, size, sublat);
+                sieveFB(S, SFB[side], I, J, j0, pos0, size, sublat);
                 t_sieve += seconds();
 
                 // Apply the updates from the corresponding bucket.
@@ -633,7 +610,7 @@ int main(int argc, char **argv)
                     if (S[pos] != 255) {
 #ifdef TRACE_POS
                       if (pos + pos0 == TRACE_POS) {
-                        fprintf(stderr, "TRACE_POS(%" PRIu64 "): ", pos);
+                        fprintf(stderr, "TRACE_POS(%" PRIu64 "): ", pos+pos0);
                         fprintf(stderr,
                            "entering cofactorization, S[pos] = %d\n",
                            S[pos]);
@@ -645,7 +622,7 @@ int main(int argc, char **argv)
                         continue;
                       ij2ab(a, b, hati, hatj, qlat);
                       nrels += factor_survivor(a, b, pos, replayable_bucket,
-                              FB, ffspol, lpb, qlat->q, qlat->side);
+                              LFB, ffspol, lpb, qlat->q, qlat->side);
                     }
                   }
                 }
@@ -663,14 +640,13 @@ int main(int argc, char **argv)
                 "in %1.1f s\n", nrels, t_tot);
         fprintf(stdout,
                 "# Time of main steps: "
-                "%1.2f s (lambda); "
-                "%1.2f s (initS);   "
+                "%1.2f s (init);   "
                 "%1.2f s (norms);\n"
                 "#                     "
                 "%1.2f s (sieve);  "
                 "%1.2f s (buckets); "
                 "%1.2f s (cofact).\n",
-                t_lambda, t_initS, t_norms, t_sieve, t_buckets, t_cofact);
+                t_init, t_norms, t_sieve, t_buckets, t_cofact);
         fprintf(stdout, "# Yield: %1.5f s/rel\n", t_tot/nrels);
         fflush(stdout);
         tot_nrels += nrels;
@@ -678,13 +654,12 @@ int main(int argc, char **argv)
         tot_sieve   += t_sieve;
         tot_buckets += t_buckets;
         tot_cofact  += t_cofact;
-        tot_initS   += t_initS;
-        tot_lambda  += t_lambda;
+        tot_init   += t_init;
     } while (1); // End of loop over special-q's
 
     free(S);
-    factor_base_clear(FB[0]);
-    factor_base_clear(FB[1]);
+    factor_base_clear(LFB[0], SFB[0]);
+    factor_base_clear(LFB[1], SFB[1]);
     buckets_clear(buckets[0]);
     buckets_clear(buckets[1]);
     free(roots);
@@ -697,14 +672,13 @@ int main(int argc, char **argv)
     fprintf(stdout, "###### General statistics ######\n");
     fprintf(stdout, "#   Total time: %1.1f s\n", tot_time);
     fprintf(stdout, "#   Main steps: "
-                    "%1.2f s (lambda); "
-                    "%1.2f s (initS);   "
+                    "%1.2f s (init);   "
                     "%1.2f s (norms);\n"
                     "#               "
                     "%1.2f s (sieve);  "
                     "%1.2f s (buckets); "
                     "%1.2f s (cofact).\n",
-        tot_lambda, tot_initS, tot_norms, tot_sieve, tot_buckets, tot_cofact);
+        tot_init, tot_norms, tot_sieve, tot_buckets, tot_cofact);
  
     fprintf(stdout, "#   Computed %d special-q\n", tot_sq);
     fprintf(stdout, "#   %d relations found (%1.1f rel/sq)\n",

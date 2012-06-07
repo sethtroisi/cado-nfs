@@ -4,13 +4,6 @@
   costly. Also, the fix-prec computation has not yet been carefully
   optimized.
 
-- Make the projective roots work by increasing value of j.
-  This is necessary to make them compatible with the bucket-region
-  sieving. It is also a good thing for locality.
-  This implies to transform the F_p-basis { p, t*p, t^2*p, ... }
-  into a basis where the coefficients of degree more than deg(p) form a
-  diagonal matrix (and not only a triangular one).
-
 - Provide more fixed sizes in fppol*_ arithmetic.
   This is important for cofactorization. 
   It should take advantage of SSE/AVX, so that a bit of rewriting of
@@ -30,7 +23,7 @@
   also function to work on toto_t.
 
 - Fix sublat.
-  Sublat are broken.
+  Sublat are completely broken.
   Also, they are way too slow. It is necessary to have a few specific
   function for arithmetic involving the t^2+t polynomial.
 
@@ -46,11 +39,6 @@
   involved in the code are *strict* upper bounds. This is currently not
   the case for fbb/lpb for instance.
 
-- Split factor bases.
-  Small factor base primes and large factor base primes are not handled
-  in the same way, so they do not need the same kind of precomputation. 
-  It will be easier to have two separate data structures. 
-
 - Add basic smoothness tests based on degree.
   If after sieving irreducibles up to degree (say) 22, we get a
   result of degree less than 46, then it is necessarily prime.
@@ -60,3 +48,8 @@
 - Factorize / clean-up the fq_t part.
   Right now, fq_t relies on sq_t. It made sense for enumerating the
   special-qs. But now, it is also used in makefb...
+
+- Projective roots 
+  We do not sieve projective roots for large ideals.
+  This is probably of very little effect, but we might want to give it
+  a try.

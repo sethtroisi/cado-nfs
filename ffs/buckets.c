@@ -1,9 +1,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <inttypes.h>
+#include <limits.h>
 
 #include "buckets.h"
 #include "ijvec.h"
+#include "qlat.h"
 #include "macros.h"
 #include "gray.h"
 
@@ -156,8 +158,8 @@ void buckets_init(buckets_ptr buckets, unsigned I, unsigned J,
   ASSERT_ALWAYS(buckets->first_hint);
   ASSERT_ALWAYS(buckets->current_hint);
   for (unsigned i = 0; i < n; ++i) {
-    buckets->first_hint[i] = 0;
-    buckets->current_hint[i] = 0;
+    buckets->first_hint[i] = UINT_MAX;
+    buckets->current_hint[i] = UINT_MAX;
   }
 #endif
 }
@@ -311,7 +313,7 @@ void buckets_push_update(MAYBE_UNUSED buckets_ptr buckets,
   ASSERT(ptr[k] - buckets->start[k] < buckets->max_size);
 #ifdef BUCKET_RESIEVE
   // TODO: this is a very critical loop. Can we afford this branch???
-  if (buckets->first_hint[k] == 0) {
+  if (buckets->first_hint[k] == UINT_MAX) {
       buckets->first_hint[k] = hint;
       buckets->current_hint[k] = hint;
       hint = 0;   // putting 0 allows to add it to the current_hint.
@@ -328,8 +330,8 @@ void buckets_push_update(MAYBE_UNUSED buckets_ptr buckets,
 
 // Fill the buckets with updates corresponding to divisibility by elements of
 // the factor base.
-void buckets_fill(buckets_ptr buckets, factor_base_srcptr FB,
-                  sublat_srcptr sublat, unsigned I, unsigned J)
+void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
+        sublat_srcptr sublat, unsigned I, unsigned J, qlat_srcptr qlat)
 {
   ijbasis_t basis;
   ijbasis_t euclid;
@@ -350,23 +352,31 @@ void buckets_fill(buckets_ptr buckets, factor_base_srcptr FB,
   ASSERT_ALWAYS(ptr != NULL);
   for (unsigned k = 0; k < buckets->n; ++k)
     ptr[k] = buckets->start[k];
+#ifdef BUCKET_RESIEVE
+  for (unsigned k = 0; k < buckets->n; ++k)
+    buckets->first_hint[k] = UINT_MAX;
+#endif
 
-  // Skip prime ideals of degree less than min_degp.
-  unsigned i;
-  for (i = 0; i < FB->n && FB->elts[i]->degp < buckets->min_degp; ++i);
-
-  fbideal_srcptr gothp = FB->elts[i];
   // Go through the factor base by successive deg(gothp).
+  // We should have no small prime in this factor base.
+  large_fbideal_srcptr gothp = FB->elts[0];
+  ASSERT_ALWAYS(fbideal_deg(gothp) >= buckets->min_degp);
+  unsigned i = 0;
   for (unsigned degp = buckets->min_degp; degp < buckets->max_degp; ++degp) {
     // Not supported yet.
     if (use_sublat(sublat) && degp == 1) continue;
 
     // Go through each prime ideal of degree degp.
-    for (; i < FB->n && gothp->degp == degp; ++i, ++gothp) {
-      // Not supported yet.
-      if (gothp->proj) continue;
+    for (; i < FB->n && fbideal_deg(gothp) == degp; ++i, ++gothp) {
+      fbprime_t lambda;
+      compute_lambda(lambda, gothp->p, gothp->r, qlat);
 
-      ijbasis_compute(euclid, basis, gothp);
+      if (fbprime_eq(lambda, gothp->p)) {
+          // This is a projective root. For the moment, we skip them.
+          continue;
+      }
+
+      ijbasis_compute_large(euclid, basis, gothp, lambda);
       ijvec_t v;
       if (use_sublat(sublat)) {
         int st = compute_starting_point(v, euclid, sublat);
@@ -434,7 +444,6 @@ void buckets_fill(buckets_ptr buckets, factor_base_srcptr FB,
   ijbasis_clear(euclid);
   ijbasis_clear(basis);
 }
-
 
 // Apply all the updates from a given bucket to the sieve region S.
 void bucket_apply(uint8_t *S, buckets_srcptr buckets, unsigned k)
@@ -515,7 +524,7 @@ void bucket_prepare_replay(replayable_bucket_ptr bb,
 }
 
 void bucket_apply_at_pos(fppol_ptr norm, ijpos_t pp, 
-        replayable_bucket_srcptr buckets, factor_base_srcptr FB)
+        replayable_bucket_srcptr buckets, large_factor_base_srcptr FB)
 {
   // Find first occurence, if it exists:
   __replayable_update_struct key;
