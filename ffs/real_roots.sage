@@ -1,6 +1,9 @@
 # Usage: count_real_roots(f,true) for number of real roots.
-# Also count_real_roots(f,false) is a slower, but more reliable estimation
-# which counts the number of roots modulo a small power of t.
+# Option true stays for "with multiplicities", i.e. a double root counts 2.
+# The option count_real_roots(f,false) has both a different algorithm and 
+# output: it is a slower and counts the total number of polynomials r such
+# that for a/b \approx r the degree of N(a,b) is less than its raw value,
+# i.e. def_t(f)+max(deg(b),deg(a))^deg_x(f).
 
 
 
@@ -42,7 +45,7 @@ def naive_lift(f,r,prec,R):
     for e in roots_mod_t(f_new):
         r_new=r+t^v * e
         assert f(r_new) % t^(v+1) == 0
-        final.append(r+t^v * e)
+        final.append(r_new)
     return final
 
 def all_roots(f,prec,R):
