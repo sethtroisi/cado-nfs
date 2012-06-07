@@ -566,11 +566,11 @@ void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
         // If we have sublattices, have to convert (i,j) to (hat i, hat j)
         ij_convert_sublat(hati, hatj, i, j, sublat);
 #ifdef TRACE_POS
-        if (pos == TRACE_POS) {
-          fprintf(stderr, "TRACE_POS(%" PRIu64 "): (hat i, hat j) = (", pos);
+        if (pos + pos0 == TRACE_POS) {
+          fprintf(stderr, "TRACE_POS(%" PRIu64 "): (hat i, hat j) = (", pos + pos0);
           ij_out(stderr, hati); fprintf(stderr, " ");
           ij_out(stderr, hatj); fprintf(stderr, ")\n");
-          fprintf(stderr, "TRACE_POS(%" PRIu64 "): norm = ", pos);
+          fprintf(stderr, "TRACE_POS(%" PRIu64 "): norm = ", pos + pos0);
           fppol_t norm, ii, jj;
           fppol_init(norm);
           fppol_init(ii);
@@ -584,7 +584,7 @@ void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
           fppol_clear(jj);
           fprintf(stderr, "\n");
           fprintf(stderr, "TRACE_POS(%" PRIu64 "): degnorm - deg(sq) = %d\n",
-                  pos, fppol_deg(norm)-degq);
+                  pos + pos0, fppol_deg(norm)-degq);
         }
 #endif
         int deg = -10; // means uncomputed.

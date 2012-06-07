@@ -145,6 +145,7 @@ void ijbasis_compute_small(ijbasis_ptr basis, ijbasis_ptr adjustment_basis,
   }
   for (unsigned i = I-L+1; i < basis->dim; ++i)
     ijvec_add(basis->v[i], basis->v[i], basis->v[i-1]);
+  adjustment_basis->dim = J;
 }
 
 

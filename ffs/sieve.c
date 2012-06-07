@@ -495,16 +495,9 @@ int main(int argc, char **argv)
         double t_lambda = 0;
         int nrels = 0;
 
-        // Precompute lambda for each element of the factor bases.
-        t_lambda -= seconds();
-        for (int i = 0; i < 2; ++i) 
-            factor_base_precomp_lambda(FB[i], qlat, sublat);
-        t_lambda += seconds();
-
         // Precompute all the data for small factor base elements.
         for (int i = 0; i < 2; ++i)
             small_factor_base_precomp(SFB[i], qlat, sublat, I, J);
-
 
         // Loop on all sublattices
         // In the no_sublat case, this loops degenerates into one pass, since
@@ -627,7 +620,7 @@ int main(int argc, char **argv)
                     if (S[pos] != 255) {
 #ifdef TRACE_POS
                       if (pos + pos0 == TRACE_POS) {
-                        fprintf(stderr, "TRACE_POS(%" PRIu64 "): ", pos);
+                        fprintf(stderr, "TRACE_POS(%" PRIu64 "): ", pos+pos0);
                         fprintf(stderr,
                            "entering cofactorization, S[pos] = %d\n",
                            S[pos]);
