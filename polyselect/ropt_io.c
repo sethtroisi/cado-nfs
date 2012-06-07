@@ -343,7 +343,6 @@ ropt_parse_param ( int argc,
                    char **argv,
                    ropt_param_t param )
 {
-  printf ("argc: %d, argv[1]: %s\n", argc, argv[1]);
 
   /* filename only */
   if (argc > 1) {
@@ -353,31 +352,26 @@ ropt_parse_param ( int argc,
       param->stage_flag = 2;
       argv += 1;
       argc -= 1;
-      while (argc >= 3 && argv[1][0] == '-') {
-
-        if (argc >= 3 && strcmp (argv[1], "-i") == 0)
+      while (argc >= 2 && argv[1][0] == '-') {
+        if (strcmp (argv[1], "-v") == 0)
         {
-          param->verbose = atoi (argv[2]);
-          if (param->verbose > 3)
-            param->verbose = 3;
-          if (param->verbose < 0)
-            param->verbose = 0;
-          argv += 2;
-          argc -= 2;
+          param->verbose ++;
+          argv += 1;
+          argc -= 1;
         }
-        else if (argc >= 3 && strcmp (argv[1], "-w") == 0)
+        else if (argc >= 3 && strcmp (argv[1], "-a") == 0)
         {
           param->s2_w = atoi (argv[2]);
           argv += 2;
           argc -= 2;
         }
-        else if (argc >= 3 && strcmp (argv[1], "-u") == 0)
+        else if (argc >= 3 && strcmp (argv[1], "-b") == 0)
         {
           mpz_set_str (param->s2_u, argv[2], 10);
           argv += 2;
           argc -= 2;
         }
-        else if (argc >= 3 && strcmp (argv[1], "-v") == 0)
+        else if (argc >= 3 && strcmp (argv[1], "-c") == 0)
         {
           mpz_set_str (param->s2_v, argv[2], 10);
           argv += 2;
@@ -389,13 +383,13 @@ ropt_parse_param ( int argc,
           argv += 2;
           argc -= 2;
         }
-        else if (argc >= 3 && strcmp (argv[1], "-umax") == 0)
+        else if (argc >= 3 && strcmp (argv[1], "-bmax") == 0)
         {
           param->s2_Amax = atol (argv[2]);
           argv += 2;
           argc -= 2;
         }
-        else if (argc >= 3 && strcmp (argv[1], "-vmax") == 0)
+        else if (argc >= 3 && strcmp (argv[1], "-cmax") == 0)
         {
           param->s2_Bmax = atol (argv[2]);
           argv += 2;
@@ -426,36 +420,36 @@ ropt_parse_param ( int argc,
     }
     /* stage 1 and stage 2 parameters */
     else {
-      while (argc >= 3 && argv[1][0] == '-') {
-        if (argc >= 3 && strcmp (argv[1], "-i") == 0)
+      while (argc >= 2 && argv[1][0] == '-') {
+        if (strcmp (argv[1], "-v") == 0)
         {
-          param->verbose = atoi (argv[2]);
-          if (param->verbose > 3)
-            param->verbose = 3;
-          if (param->verbose < 0)
-            param->verbose = 0;
-          argv += 2;
-          argc -= 2;
+          param->verbose ++;
+          argv += 1;
+          argc -= 1;
         }
-        else if (argc >= 3 && strcmp (argv[1], "-w") == 0)
+        else if (argc >= 3 && strcmp (argv[1], "-amin") == 0)
         {
           param->w_left_bound = atoi (argv[2]);
           argv += 2;
           argc -= 2;
         }
-        else if (argc >= 3 && strcmp (argv[1], "-l") == 0)
+        else if (argc >= 3 && strcmp (argv[1], "-amax") == 0)
         {
-          param->w_length = atoi (argv[2]);
+          param->w_length = atoi (argv[2]) - param->w_left_bound + 1;
+          if (param->w_length < 0) {
+            fprintf (stderr, "Error in options -amin and/or -amax.\n");
+            exit(1);
+          }
           argv += 2;
           argc -= 2;
         }
-        else if (argc >= 3 && strcmp (argv[1], "-umax") == 0)
+        else if (argc >= 3 && strcmp (argv[1], "-bmax") == 0)
         {
           param->s2_Amax = atol (argv[2]);
           argv += 2;
           argc -= 2;
         }
-        else if (argc >= 3 && strcmp (argv[1], "-vmax") == 0)
+        else if (argc >= 3 && strcmp (argv[1], "-cmax") == 0)
         {
           param->s2_Bmax = atol (argv[2]);
           argv += 2;

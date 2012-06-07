@@ -66,7 +66,7 @@ ropt_linear_tune ( ropt_poly_t poly,
     /* detect positive good u (may also detect good mod with more time) */
     mpz_set (tmpu, u);
     j = 0;
-    while (mpz_cmp_si(tmpu, bound->global_u_boundr) < 0) {
+    while (mpz_cmp_si(tmpu, bound->global_u_boundr) <= 0) {
 
       if (j > 32) break;
 
@@ -78,6 +78,7 @@ ropt_linear_tune ( ropt_poly_t poly,
 
         ropt_s2param_setup_tune (s1param, s2param, tmpu, v, mod,
                                  0, size_tune_sievearray, NP-1);
+
         ropt_stage2 (poly, s2param, param, info, global_E_pqueue, w);
 
         if (old_MurphyE > info->best_MurphyE)
@@ -113,12 +114,12 @@ ropt_linear_tune ( ropt_poly_t poly,
                        -info->ave_MurphyE);
 
       if (param->verbose >= 3) {
-        gmp_fprintf (stderr, "# Info: ave. E: %.2e, best E: %.2e on "
+        gmp_fprintf (stderr, "# Info: Have. E: %.2e, best E: %.2e on "
                      "sublattice (%d, %Zd, %Zd) (mod %Zd) (%d, %d)\n",
                      info->ave_MurphyE, info->best_MurphyE,
                      w, tmpu, v, mod, i + 1, j);
       }
-
+      
 #endif
 
       mpz_add (tmpu, tmpu, mod); // consider original u itself.
@@ -190,8 +191,7 @@ ropt_linear_tune ( ropt_poly_t poly,
 
     }
   }
-
-
+  
   /* Step 2: slight larger range sieve on best sublattices */
   reset_alpha_pq (alpha_pqueue);
   used =  tmp_alpha_pqueue->used - 1;
@@ -372,19 +372,11 @@ ropt_linear_sieve ( ropt_poly_t poly,
 
 
   /* Step3, final root sieve */
-  mpz_t m;
-  int old_i = 0;
-  mpz_init_set (m, poly->g[0]);
-  mpz_neg (m, m);
   used = tmp_E_pqueue->used - 1;
   for (i = 0; i < used; i ++) {
 
     extract_MurphyE_pq (tmp_E_pqueue, &w, u, v, mod,
                         &score);
-
-    /* rotate */
-    old_i = rotate_aux (poly->f, poly->g[1], m, old_i, w, 2);
-    ropt_poly_setup (poly);
 
     if (param->verbose >= 2) {
       gmp_fprintf (stderr, "# Info: Sieve sublattice (# %2d), "
@@ -410,41 +402,11 @@ ropt_linear_sieve ( ropt_poly_t poly,
                                0, size_tune_sievearray * 2, NP - 1);
       ropt_stage2 (poly, s2param, param, info, global_E_pqueue, w);
     }
-
-#if 0
-    /* a bit longer for the top 3 sublattices */
-    if ( used <= (i + 3) ) {
-      int j = 0;
-      double old_MurphyE = 0.0;
-      while (j < 8) {
-
-        mpz_set_ui (mod, default_sublattice_prod[j]);
-
-        if (param->verbose >= 2) {
-          gmp_fprintf (stderr, "# Info: Re-sieve sublattice (# %2d) "
-                       "for mod=%Zd\n", i + 1, mod);
-        }
-        ropt_s2param_setup (bound, s1param, s2param, param,
-                            u, v, mod);
-
-        ropt_stage2 (poly, s2param, param, info, global_E_pqueue, w);
-
-        if (old_MurphyE > info->best_MurphyE)
-          break;
-        else
-          old_MurphyE = info->best_MurphyE;
-        j ++;
-      }
-    }
-#endif
   }
-  rotate_aux (poly->f, poly->g[1], m, old_i, 0, 2);
-  ropt_poly_setup (poly);
 
   /* free */
   free_MurphyE_pq (&tmp_E_pqueue);
   ropt_s2param_free (poly, s2param);
-  mpz_clear (m);
   mpz_clear (u);
   mpz_clear (v);
   mpz_clear (mod);
@@ -455,13 +417,13 @@ ropt_linear_sieve ( ropt_poly_t poly,
 
 
 /**
- * Linear rotation.
+ * Linear rotation: deg 5.
  */
 void
-ropt_linear ( ropt_poly_t poly,
-              ropt_bestpoly_t bestpoly,
-              ropt_param_t param,
-              ropt_info_t info )
+ropt_linear_deg5 ( ropt_poly_t poly,
+                   ropt_bestpoly_t bestpoly,
+                   ropt_param_t param,
+                   ropt_info_t info )
 {
   int r;
   ropt_bound_t bound;
@@ -469,7 +431,7 @@ ropt_linear ( ropt_poly_t poly,
   alpha_pq *alpha_pqueue;
   MurphyE_pq *global_E_pqueue;
 
-  /* setup bound, s1param, alpha_pqueue, tsieve_E_pqueue */
+  /* setup bound, s1param, alpha_pqueue, global_E_pqueue */
   ropt_bound_init (bound);
   ropt_bound_setup (poly, bound, param);
   ropt_s1param_init (s1param);
@@ -497,4 +459,75 @@ ropt_linear ( ropt_poly_t poly,
   free_alpha_pq (&alpha_pqueue);
   ropt_s1param_free (s1param);
   ropt_bound_free (bound);
+}
+
+
+/**
+ * Linear rotation: deg 4.
+ */
+void
+ropt_linear_deg4 ( ropt_poly_t poly,
+                   ropt_bestpoly_t bestpoly,
+                   ropt_param_t param,
+                   ropt_info_t info )
+{
+  unsigned long ub, vb;
+  ropt_bound_t bound;
+  ropt_s1param_t s1param;
+  ropt_s2param_t s2param;
+  MurphyE_pq *global_E_pqueue;
+  mpz_t u, v, mod;
+
+  mpz_init_set_ui (u, 0);
+  mpz_init_set_ui (v, 0);
+  mpz_init_set_ui (mod, 1);
+  
+  /* setup bound, s1param */
+  ropt_bound_init (bound);
+  ropt_bound_setup (poly, bound, param);
+  ropt_s1param_init (s1param);
+  ropt_s1param_setup (poly, s1param, bound, param);
+  new_MurphyE_pq (&global_E_pqueue, s1param->nbest_sl);
+  ropt_s2param_init (poly, s2param);
+  
+  /* Step 1, set up lattice (0, 0) (mod 1) and run root sieve */
+  ub = (bound->global_u_boundr > 0) ?
+    bound->global_u_boundr : (-bound->global_u_boundr);
+  vb = mpz_get_ui (bound->global_v_boundr);
+  if (vb < 128) vb = 128;
+  
+  ropt_s2param_setup_tune (s1param, s2param, u, v, mod,
+                           ub, vb, NP - 1);
+
+  ropt_stage2 (poly, s2param, param, info, global_E_pqueue, 0);
+
+  /* Step 2, return best poly */
+  ropt_get_bestpoly (poly, global_E_pqueue, bestpoly);
+
+  /* free */
+  mpz_clear (u);
+  mpz_clear (v);
+  mpz_clear (mod);  
+  free_MurphyE_pq (&global_E_pqueue);
+  ropt_s1param_free (s1param);
+  ropt_s2param_free (poly, s2param);
+  ropt_bound_free (bound);
+}
+
+
+/**
+ * Linear rotation: for deg 4 and deg 5
+ */
+void
+ropt_linear ( ropt_poly_t poly,
+              ropt_bestpoly_t bestpoly,
+              ropt_param_t param,
+              ropt_info_t info )
+{
+  if (poly->d == 4)
+    ropt_linear_deg4 (poly, bestpoly, param, info);
+  else if (poly->d == 5)
+    ropt_linear_deg5 (poly, bestpoly, param, info);
+  else 
+    fprintf (stderr, "Error: ropt_linear() only support deg 4 and 5.");
 }

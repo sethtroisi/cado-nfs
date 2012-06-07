@@ -890,6 +890,9 @@ ropt_stage1 ( ropt_poly_t poly,
   for (i = 0; i <= poly->d; i++)
     mpz_init_set (fuv[i], poly->f[i]);
 
+  if (param->verbose >= 2)
+    st = cputime ();
+  
   /* put pqueue into the global alpha_pqueue ranked by parial alpha */
   for (i = 1; i < pqueue->used; i ++) {
 
@@ -909,15 +912,17 @@ ropt_stage1 ( ropt_poly_t poly,
 #endif
 
 #if DEBUG_ROPT_STAGE1
-    double skew = L2_skewness ( fuv, poly->d, SKEWNESS_DEFAULT_PREC,
+     skew = L2_skewness ( fuv, poly->d, SKEWNESS_DEFAULT_PREC,
                                 DEFAULT_L2_METHOD );
     double logmu = L2_lognorm (fuv, poly->d, skew, DEFAULT_L2_METHOD);
     gmp_fprintf ( stderr, "# Info: insert sublattice #%4d, (w, u, v): "
-                  "(%d, %Zd, %Zd), partial_alpha: %.2f, lognorm: %.2f\n",
+                  "(%d, %Zd, %Zd) (mod %Zd), partial_alpha: %.2f,"
+                  "lognorm: %.2f\n",
                   i,
                   current_w,
                   pqueue->u[i],
                   pqueue->v[i],
+                  pqueue->modulus[i],
                   alpha_lat,
                   logmu );
 #endif
@@ -930,6 +935,10 @@ ropt_stage1 ( ropt_poly_t poly,
                       pqueue->modulus[i],
                       alpha_lat );
   }
+
+  if (param->verbose >= 2)
+    gmp_fprintf ( stderr, "# Info: rank above sublattices took %dms\n",
+                  cputime () - st );
 
   /* free priority queue */
   free_sublattice_pq (&pqueue);

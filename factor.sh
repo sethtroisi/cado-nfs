@@ -53,7 +53,7 @@ for ((i=1; i<=2; i=i+1)) ; do
     shift
   fi
 done
-    
+
 b=$(perl -e '{print int(sqrt(<STDIN>))."\n"}' <<< $cores)
 until [ `expr $cores % $b` -eq  0 ]; do
       b=`expr $b - 1`
@@ -116,7 +116,7 @@ size=${#n}
 # Try n, n+1, n-1, n+2...
 for ((i=1; i<=4; i=i+1)) ; do
   file="$paramdir/params.c$size"
-  if [ -f $file ] ; then 
+  if [ -f $file ] ; then
     break
   fi
   size=`expr $size + \( 2 \* \( $i % 2 \) - 1 \) \* $i`

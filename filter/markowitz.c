@@ -252,17 +252,32 @@ pureMkz(filter_matrix_t *mat, int32_t j)
       return -2;
     else
       {
-        // real traditional Markowitz count
-        mkz = mat->nrows;
+	int i0 = 0, w0;
+        /* approximate traditional Markowitz count: we assume we add the
+	   lightest row to all other rows */
+        w0 = mat->nrows;
         for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
           if((i = mat->R[GETJ(mat, j)][k]) != -1){
 	    // this should be the weight of row i
-      if(matLengthRow(mat, i) < mkz)
-          mkz = matLengthRow(mat, i);
+      if(matLengthRow(mat, i) < w0)
+          w0 = matLengthRow(mat, i), i0 = i;
           }
-        /* the lightest row has weight mkz, we add wt-1 times mkz-1,
-           remove once mkz-1, and remove wt entries in the jth column */
-        return (mkz - 2) * (mat->wt[GETJ(mat, j)] - 2) - 2;
+#if 0   /* here we assume there is no cancellation other than for ideal j:
+	   the lightest row has weight w0, we add wt-1 times w0-1,
+	   remove once w0-1, and remove wt entries in the jth column */
+        mkz = (w0 - 2) * (mat->wt[GETJ(mat, j)] - 2) - 2;
+#else   /* we compute the real weight obtained when adding the lightest row.
+	   This is more expensive but gives a slightly sparser matrix. */
+	mkz = 0;
+	for (k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
+          if ((i = mat->R[GETJ(mat, j)][k]) != -1)
+	    {
+	      if (i != i0)
+		mkz += weightSum (mat, i, i0); /* merge i and i0 */
+	      mkz -= mat->rows[i][0];          /* remove row i */
+	    }
+#endif
+	return mkz;
       }
 }
 

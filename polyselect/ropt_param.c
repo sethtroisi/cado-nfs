@@ -9,19 +9,84 @@
 
 
 /**
- * Default values.
- * The code will also auto-detecto these, hopefully.
+ * Default values for L1 cache size and tune sieve length. The code
+ * will also try to auto-detect them.
  */
 unsigned int L1_cachesize = 12288;
 unsigned int size_tune_sievearray = 6144;
 
 
+/* ------------------
+   possible to change
+   ------------------ */
+
+
 /**
- * Default parameters for sublattice length.
+ * Total number of sublattices to be root-sieved in the final step.
+ * If with the default parametes (SIZE_SIEVEARRAY_V_MAX 4194304),
+ * each root sieve takes about 2-4 seconds. The left column is 
+ * ranked by the digits of integers to be factored and the right
+ * column is the number (actually number+1).
+ *
+ * Usually, there is one or more tunning steps before the final root
+ * sieve. In that case, more sublattices are checked (e.g. double/quad
+ * the following valeus).
+ */
+const unsigned int size_total_sublattices[8][2] = {
+  // {digits, num_of_sublattices} 
+  {80, 4},   /* for up to 79 digits */
+  {100, 8},  /* up to 99 digits */
+  {140, 32}, /* up to 139 digits */
+  {170, 32}, /* up to 169 digits */
+  {180, 64}, /* up to 179 digits */
+  {220, 128}, /* up to 219 digits */
+  {260, 128}, /* up to 259 digits */
+  {300, 128} /* up to 299 digits */
+};
+
+
+/**
+ * Number of top sublattice for individual primes[i] in stage 1,
+ * where i < NUM_SUBLATTICE_PRIMES. The constrcution should depends
+ * on the total num of primes in s1param->e_sl[]. 
+ * 
+ * The main purpose is to prevent too much crt computations in stage 1.
+ */
+const unsigned int
+size_each_sublattice[NUM_SUBLATTICE_PRIMES][NUM_SUBLATTICE_PRIMES] = {
+  { 64,  0,  0,  0,  0,  0,  0,  0,  0 }, // tlen_e_sl = 1
+  { 64, 64,  0,  0,  0,  0,  0,  0,  0 }, // tlen_e_sl = 2
+  { 64, 64, 64,  0,  0,  0,  0,  0,  0 }, // tlen_e_sl = 3
+  { 64, 32, 32, 32,  0,  0,  0,  0,  0 }, // tlen_e_sl = 4
+  { 32, 32, 16,  8,  8,  0,  0,  0,  0 }, // tlen_e_sl = 5
+  { 32, 16, 16,  8,  8,  4,  0,  0,  0 }, // tlen_e_sl = 6 (current bound)
+  { 32, 16,  8,  8,  4,  4,  4,  0,  0 }, // tlen_e_sl = 7
+  { 32, 16,  8,  8,  4,  4,  4,  2,  0 }, // tlen_e_sl = 8
+  { 32, 16,  8,  8,  4,  4,  4,  2,  2 }, // tlen_e_sl = 9
+};
+
+
+/**
+ * As above, but it's only used for tunning good w in 'ropt_quadratic.c'.
+ * Therefore, the values are much smaller than above.
+ */
+const unsigned int
+size_each_sublattice_tune[NUM_SUBLATTICE_PRIMES] = {
+  8,  8,  4,  4,  4,  2,  2,  2,  2
+};
+
+
+/* -------------------------
+   perhaps no need to change
+   ------------------------- */
+
+
+/**
+ * Default parameters for sublattice p_i^e^i.
  * Non-decreasing due to ropt_s1param_setup() in ropt_str.c
  */
 const unsigned int 
-default_sublattice[NUM_DEFAULT_SUBLATTICE][NUM_SUBLATTICE_PRIMES] = {
+default_sublattice_pe[NUM_DEFAULT_SUBLATTICE][NUM_SUBLATTICE_PRIMES] = {
   /* 2, 3, 5, 7, 11, 13, 17, 19, 23 */
   { 1, 0, 0, 0, 0, 0, 0, 0, 0 }, // 2
   { 2, 0, 0, 0, 0, 0, 0, 0, 0 }, // 4
@@ -53,58 +118,13 @@ default_sublattice[NUM_DEFAULT_SUBLATTICE][NUM_SUBLATTICE_PRIMES] = {
 
 
 /**
- * Hard-coded product for default_sublattice.
+ * Hard-coded product for above default_sublattice_pe.
  */
 const unsigned long
 default_sublattice_prod[NUM_DEFAULT_SUBLATTICE] = {
   2, 4, 12, 24, 48, 72, 120, 144, 240, 288, 360, 480,
   720, 1440, 4320, 10080, 20160, 21600, 50400, 100800,
   302400, 3326400, 6652800, 13305600, 19958400, 43243200,
-};
-
-
-/**
- * Total number of top sublattices (ranked by the size of integers
- * to be factored).
- */
-const unsigned int size_total_sublattices[7][2] = {
-  // {digits, num_of_sublattices} 
-  {80, 4},
-  {100, 8},
-  {140, 16},
-  {180, 16},
-  {220, 16},
-  {260, 32},
-  {300, 64}
-};
-
-
-/**
- * Number of top sublattice for each primes[i] 
- * where i < NUM_SUBLATTICE_PRIMES. This only
- * depends on the num of primes in sublattices.
- * Purposed to prevent too much crt computations.
- */
-const unsigned int
-size_each_sublattice[NUM_SUBLATTICE_PRIMES][NUM_SUBLATTICE_PRIMES] = {
-  { 64,  0,  0,  0,  0,  0,  0,  0,  0 }, // tlen_e_sl = 1
-  { 64, 64,  0,  0,  0,  0,  0,  0,  0 }, // tlen_e_sl = 2
-  { 64, 64, 64,  0,  0,  0,  0,  0,  0 }, // tlen_e_sl = 3
-  { 64, 32, 32, 32,  0,  0,  0,  0,  0 }, // tlen_e_sl = 4
-  { 32, 32, 16,  8,  8,  0,  0,  0,  0 }, // tlen_e_sl = 5
-  { 32, 16, 16,  8,  8,  4,  0,  0,  0 }, // tlen_e_sl = 6 (current bound)
-  { 32, 16,  8,  8,  4,  4,  4,  0,  0 }, // tlen_e_sl = 7
-  { 32, 16,  8,  8,  4,  4,  4,  2,  0 }, // tlen_e_sl = 8
-  { 32, 16,  8,  8,  4,  4,  4,  2,  2 }, // tlen_e_sl = 9
-};
-
-
-/**
- * As above, but for tunning good w in 'ropt_quadratic.c'.
- */
-const unsigned int
-size_each_sublattice_tune[NUM_SUBLATTICE_PRIMES] = {
-  8,  8,  4,  4,  4,  2,  2,  2,  2
 };
 
 

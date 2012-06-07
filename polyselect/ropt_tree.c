@@ -499,11 +499,12 @@ insert_sublattice_pq_down ( sublattice_pq *pqueue,
 
     /* right > left ? */
     if ( (l+1) < pqueue->used &&
-         pqueue->val[l+1] < pqueue->val[l] )
+         pqueue->val[l+1] <= pqueue->val[l] )
       l ++;
     
     /* switch larger child with parent */
-    if ( pqueue->val[l] < val ) {
+    if ( (pqueue->val[l] < val) ||
+         (pqueue->val[l] == val && mpz_cmp (pqueue->u[l], u) > 0) ) {
       mpz_set (pqueue->u[i], pqueue->u[l]);
       mpz_set (pqueue->v[i], pqueue->v[l]);
       mpz_set (pqueue->modulus[i], pqueue->modulus[l]);
@@ -537,7 +538,7 @@ insert_sublattice_pq ( sublattice_pq *pqueue,
   */
   /* queue is full,  */
   if (pqueue->len == pqueue->used) {
-    if ( val > pqueue->val[1] ) {
+    if ( val >= pqueue->val[1] ) {
       insert_sublattice_pq_down (pqueue, u, v, mod, val);
     }
   }

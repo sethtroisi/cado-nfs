@@ -34,7 +34,7 @@ macro(search_for_function FUNCTION VARIABLE)
         endif(extra AND atwork)
         if(testing_this)
             set(sff_rl ${sff_rl} ${extra})
-            set(MACRO_CHECK_FUNCTION_DEFINITIONS 
+            set(MACRO_CHECK_FUNCTION_DEFINITIONS
               "-DCHECK_FUNCTION_EXISTS=${FUNCTION} ${CMAKE_REQUIRED_FLAGS}")
             if(sff_rl)
               set(sff_ADD_LIBRARIES "-DLINK_LIBRARIES:STRING=${sff_rl}")
@@ -56,7 +56,7 @@ macro(search_for_function FUNCTION VARIABLE)
               "${sff_ADD_LIBRARIES}"
               "${sff_ADD_INCLUDES}"
               OUTPUT_VARIABLE OUTPUT)
-          
+
             if(${VARIABLE})
               set(${VARIABLE} 1 CACHE INTERNAL "Have function ${FUNCTION}")
               if(sff_rl)
@@ -64,14 +64,14 @@ macro(search_for_function FUNCTION VARIABLE)
               else(sff_rl)
                   message(STATUS "Looking for ${FUNCTION} - found")
               endif(sff_rl)
-              file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeOutput.log 
+              file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeOutput.log
                 "Determining if the function ${FUNCTION} exists passed with the following output:\n"
                 "${OUTPUT}\n\n")
               set(CMAKE_REQUIRED_LIBRARIES ${sff_rl})
               set(CMAKE_REQUIRED_LIBRARIES_EXTRA ${extra})
               set(atwork 0)
             else(${VARIABLE})
-              file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeError.log 
+              file(APPEND ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeError.log
                 "Determining if the function ${FUNCTION} exists failed with the following output:\n"
                 "${OUTPUT}\n\n")
             endif(${VARIABLE})

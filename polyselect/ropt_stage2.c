@@ -594,20 +594,27 @@ rootsieve_one_block ( sievearray_t sa,
                       ropt_poly_t poly,
                       ropt_s2param_t s2param )
 {
-  unsigned int p, r, u, v, k, np,
-    nbb, max_e, totnbb, fr_ui, gr_ui, pe = 1;
-  long i, bblock_size, i_idx;
+  char *roottype_flag;
+  unsigned int p, r, u, v, k, np, nbb, max_e, totnbb, fr_ui, gr_ui, pe = 1;
+  int16_t *subsgl, *submul;
+  long i, bblock_size, i_idx, *j_idx, *j_idx_i0;
+  float subf;
   mpz_t tmp;
+
   mpz_init (tmp);
+  subsgl = (int16_t *) malloc (s2param->len_p_rs * sizeof(int16_t));
+  submul = (int16_t *) malloc (s2param->len_p_rs * sizeof(int16_t));
+  j_idx = (long *) malloc (primes[s2param->len_p_rs] * sizeof(long));
+  j_idx_i0 = (long *) malloc (primes[s2param->len_p_rs] * sizeof(long));
+  roottype_flag = (char *) malloc (primes[s2param->len_p_rs]
+                                   * sizeof(char));
 
-  /* arrays for holding index */
-  long j_idx[primes[s2param->len_p_rs]],
-    j_idx_i0[primes[s2param->len_p_rs]];
-
-  int16_t subsgl[s2param->len_p_rs], 
-    submul[s2param->len_p_rs];
-
-  char roottype_flag[s2param->len_p_rs];
+  if ( subsgl == NULL || submul == NULL || j_idx == NULL ||
+       j_idx_i0 == NULL || roottype_flag == NULL ) {
+    fprintf ( stderr, "Error, cannot allocate memory in "
+              "rootsieve_one_block().\n" );
+    exit (1);
+  }
 
   bblock_size = L1_cachesize;
 
@@ -623,7 +630,6 @@ rootsieve_one_block ( sievearray_t sa,
 #endif
 
   /* Init index array */
-  float subf;
   for ( np = 0; np < s2param->len_p_rs; np ++ ) {
     p = primes[np];
     subf = (float) p * log ( (float) p) / ((float) p * (float) p - 1.0);
@@ -679,7 +685,7 @@ rootsieve_one_block ( sievearray_t sa,
       while (i_idx < (long) sa->len_i) {
         
         /* For each j block on a i-line */
-        for (nbb = 0; nbb < totnbb + 1; nbb ++) {
+        for (nbb = 0; nbb < totnbb; nbb ++) {
 
           /* For each r < p_bound */
           for (r = 0; r < p; r++) {
@@ -769,7 +775,7 @@ rootsieve_one_block ( sievearray_t sa,
                  this happends since the last j-block could too 
                  short and the previous sieve jump out of this block
                  and hence % wind back to the beginning */
-              if ((j_idx[r] > sa->len_j) && (nbb == totnbb))
+              if ((j_idx[r] > sa->len_j) && (nbb == (totnbb-1)))
                   j_idx[r] = sa->len_j;
               else
                 j_idx[r] %= sa->len_j;
@@ -790,7 +796,7 @@ rootsieve_one_block ( sievearray_t sa,
             /* r is a simple root for current (u, v, p). Then r
                is simple root for (u, v+i*p, p) for all i. */
             if (mpz_divisible_ui_p(tmp, p) == 0) {
-              if (nbb != totnbb) {
+              if (nbb != (totnbb-1)) {
                 j_idx[r] = rootsieve_run_line (
                   sa->array,
                   i_idx * sa->len_j + bblock_size * (nbb + 1),
@@ -832,6 +838,12 @@ rootsieve_one_block ( sievearray_t sa,
       } // next i-block
     } // next u
   } // next p
+
+  free (subsgl);
+  free (submul);
+  free (j_idx);
+  free (j_idx_i0);
+  free (roottype_flag);
   mpz_clear (tmp);
 }
 
@@ -915,15 +927,19 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
                              (j - j % (size_B_block)) / size_B_block,
                              j % (size_B_block),
                              sa->array[j] );
-      /*
-      // LEAVE THIS FOR DEBUG
-      if (MAT[j] < -2900) {
-      ij2uv (s2param->A, s2param->MOD, s2param->Amin, i, tmpu);
-      ij2uv (s2param->B, s2param->MOD, s2param->Bmin, j, tmpv);
+
+#if 0
+      ij2uv (s2param->A, s2param->MOD, s2param->Amin,
+             (j - j % (size_B_block)) / size_B_block,
+             tmpu);
+      ij2uv (s2param->B, s2param->MOD, s2param->Bmin,
+             j % (size_B_block),
+             tmpv);
       gmp_fprintf (stderr, "MAT[]: %d, u: %Zd, v: %Zd, i: %lu, "
-      "j: %lu\n", MAT[j], tmpu, tmpv, i, j); 
-      }
-      */
+                   "j: %lu\n", sa->array[j], tmpu, tmpv,
+                   (j - j % (size_B_block)) / size_B_block,
+                   j % (size_B_block) );
+#endif
     }
 
     /* put sievescore into the MurphyE priority queue */
@@ -933,6 +949,12 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
              tmpu);
       ij2uv (s2param->B, s2param->MOD, s2param->Bmin, sievescore->j[i],
              tmpv);
+
+#if 0
+      gmp_fprintf (stderr, "(i: %lu, j: %lu) -> (u: %Zd, v: %Zd), "
+                   "score: %d\n", sievescore->i[i], sievescore->j[i],
+                   tmpu, tmpv, sievescore->alpha[i]);
+#endif
 
       compute_fuv_mp (s2param->f, poly->f, poly->g, poly->d, tmpu, tmpv);
 
@@ -957,12 +979,6 @@ rootsieve_one_sublattice ( ropt_poly_t poly,
                          s2param->MOD,
                          - (MurphyE + alpha));
       */
-
-#if DEBUG
-      gmp_fprintf ( stderr,
-                    "\n# Found #%2d (u=%Zd, v=%Zd)",
-                    i, tmpu, tmpv );
-#endif
 
     }
 

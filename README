@@ -147,7 +147,7 @@ CADO-NFS is optimized only for numbers above 85 digits, and no support will
 be provided for numbers of less than 60 digits. Note that it is a
 good idea to remove small prime factors using special-purpose algorithms
 such as trial division, P-1, P+1, or ECM, and use CADO-NFS only for the
-remaining composite factor. 
+remaining composite factor.
 
 ./factor.sh 353493749731236273014678071260920590602836471854359705356610427214806564110716801866803409 -t 4 -ssh
 
@@ -182,7 +182,7 @@ Host    localhost
 
 You should also put in $HOME/.ssh/authorized_keys your public key.
 
-If everything is correctly configured, when you type 
+If everything is correctly configured, when you type
 
 ssh localhost
 
@@ -200,7 +200,7 @@ recipe, you can type:
 Factoring with SNFS:
 ====================
 
-It is possible to take advantage of the special form of an integer and 
+It is possible to take advantage of the special form of an integer and
 use the Special Number Field Sieve. See the doc in cadofactor.pl for
 that. Note in particular that you can force the special-q to be on the
 rational side if this is more appropriate for your number.
@@ -208,7 +208,7 @@ rational side if this is more appropriate for your number.
 The default square root algorithm does not work in some very rare cases
 that could possibly occur with SNFS polynomials (a degree 4 polynomial
 with Galois group Z/2 x Z/2 is the only reasonable example, next case is
-for degree 8). The CRT approach is a workaround. See crtaglsqrt.c . 
+for degree 8). The CRT approach is a workaround. See crtaglsqrt.c .
 
 Factoring with two non-linear polynomials:
 ==========================================
@@ -266,7 +266,7 @@ There are two mailing-lists associated to Cado-nfs:
   - cado-nfs-commits: if you want to receive an email each time a
     modification to the development version is committed to the
     repository.
-  - cado-nfs-discuss: for general discussions about cado-nfs. 
+  - cado-nfs-discuss: for general discussions about cado-nfs.
 Instructions about how to subscribe are available at
    http://gforge.inria.fr/mail/?group_id=2065
 

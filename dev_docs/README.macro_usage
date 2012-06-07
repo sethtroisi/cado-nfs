@@ -1,7 +1,7 @@
 Here are the useful macros that are defined by macros.h and their
 semantics:
 
-ASSERT(x)       
+ASSERT(x)
         The condition x is checked unless NDEBUG is defined, just like
         the standard assert() in assert.h .
 ASSERT_ALWAYS(x)
@@ -28,7 +28,7 @@ Usage of asserts:
 
         You are of course allowed to add your own additional assert
         variants in a specific file, (like ASSERT_EXPENSIVE), but they
-        should not go to macros.h. 
+        should not go to macros.h.
 
 
 ABS(x)
