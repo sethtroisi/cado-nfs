@@ -435,7 +435,7 @@ int main(int argc, char * argv[])
         last[n % NLAST] = (t - t1) / CLOCKS_PER_SEC;
         sum_last += (t - t1) / CLOCKS_PER_SEC;
         t1 = t;
-        int nlast = NLAST;
+        unsigned int nlast = NLAST;
         n++;
         if (n < nlast) nlast = n;
         if (dt > next || n == nmax - 1) {
