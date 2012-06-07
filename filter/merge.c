@@ -182,7 +182,10 @@ main (int argc, char *argv[])
 	    argv += 2;
 	}
 	else
-	  usage ();
+          {
+            fprintf (stderr, "Unknown option %s\n", argv[1]);
+            usage ();
+          }
     }
 
     purgedfile_stream ps;
@@ -227,10 +230,6 @@ main (int argc, char *argv[])
           total_weight += w;
           if (w <= maxlevel)
             nbm[w] ++;
-          if (w == 0)
-            fprintf (stderr, "O=> %lx\n", j);
-          if (w == 1)
-            fprintf (stderr, "1=> %lx\n", j);
         }
       printf ("Total matrix weight: %lu\n", total_weight);
       for (j = 0; j <= (unsigned long) maxlevel; j++)

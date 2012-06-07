@@ -2,7 +2,7 @@
 #define CURL_SOURCE_H_
 
 #include <curl/curl.h>
-#include <curl/types.h>
+/* #include <curl/types.h> */
 #include <curl/easy.h>
 
 #include "balancing_data_source.h"

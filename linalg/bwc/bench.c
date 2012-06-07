@@ -287,6 +287,8 @@ int main(int argc, char * argv[])
     }
 
     param_list_lookup_string(ba->pl, "matmul_bucket_methods");
+    param_list_lookup_string(ba->pl, "l1_cache_size");
+    param_list_lookup_string(ba->pl, "l2_cache_size");
 
     double tmax = 100.0;
     param_list_parse_double(ba->pl, "tmax", &tmax);
@@ -423,7 +425,9 @@ int main(int argc, char * argv[])
     double t, dt;
     if (next > tmax * CLOCKS_PER_SEC) { next = tmax * CLOCKS_PER_SEC; }
     unsigned int n;
-    for(n = 0 ; n < nmax ; n++ ) {
+    printf("Note: timings in seconds per iterations are given in cpu seconds ;\n");
+    printf("Note: with %d threads, this means %.2f walltime seconds.\n", ba->nthreads, 1.0 / ba->nthreads);
+    for(n = 0 ; n < nmax ; ) {
         worker_threads_do(ba->tg, (worker_func_t) &mul_func, ba);
         t = clock();
         dt = t - t0;
@@ -431,13 +435,16 @@ int main(int argc, char * argv[])
         last[n % NLAST] = (t - t1) / CLOCKS_PER_SEC;
         sum_last += (t - t1) / CLOCKS_PER_SEC;
         t1 = t;
+        unsigned int nlast = NLAST;
+        n++;
+        if (n < nlast) nlast = n;
         if (dt > next || n == nmax - 1) {
             do { next += 0.25 * CLOCKS_PER_SEC; } while (dt > next);
             if (next > tmax * CLOCKS_PER_SEC) { next = tmax * CLOCKS_PER_SEC; }
             dt /= CLOCKS_PER_SEC;
             printf("%d iters in %2.fs, %.3f/1, %.2f %s (last %u : %.3f/1, %.2f %s)        \r",
                     n, dt, dt/n, ba->freq * 1.0e9 * dt/n/ncoeffs_total, unit,
-                    NLAST, sum_last/NLAST, ba->freq * 1.0e9 *sum_last/NLAST/ncoeffs_total, unit);
+                    nlast, sum_last/nlast, ba->freq * 1.0e9 *sum_last/nlast/ncoeffs_total, unit);
             fflush(stdout);
             if (dt > tmax)
                 break;
