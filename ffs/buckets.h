@@ -66,6 +66,9 @@ void print_bucket_info(buckets_srcptr buckets);
 void buckets_fill(buckets_ptr buckets, factor_base_srcptr FB,
                   sublat_srcptr sublat, unsigned I, unsigned J);
 
+void buckets_fill2(buckets_ptr buckets, large_factor_base_srcptr FB,
+        sublat_srcptr sublat, unsigned I, unsigned J, qlat_srcptr qlat);
+
 // Apply all the updates from a given bucket to the sieve region S.
 void bucket_apply(uint8_t *S, buckets_srcptr buckets, unsigned k);
 
@@ -73,7 +76,7 @@ void bucket_apply(uint8_t *S, buckets_srcptr buckets, unsigned k);
 void bucket_prepare_replay(replayable_bucket_ptr bb,
         buckets_srcptr buckets, uint8_t *S, unsigned k);
 void bucket_apply_at_pos(fppol_ptr norm, ijpos_t pp, 
-        replayable_bucket_srcptr buckets, factor_base_srcptr FB);
+        replayable_bucket_srcptr buckets, large_factor_base_srcptr FB);
 #endif
 
 

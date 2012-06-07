@@ -12,5 +12,8 @@ void sieveFB(uint8_t *S, factor_base_srcptr FB, unsigned I, unsigned J,
              ij_t j0, ijpos_t pos0, ijpos_t size, sublat_ptr sublat);
 
 
+void sieveFB2(uint8_t *S, small_factor_base_ptr FB, unsigned I, unsigned J,
+             ij_t j0, ijpos_t pos0, ijpos_t size, sublat_ptr sublat);
+
 
 #endif   /* __LATSIEVE_H__ */

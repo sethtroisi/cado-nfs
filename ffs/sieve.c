@@ -25,7 +25,7 @@
 int factor_survivor(fppol_t a, fppol_t b,
         MAYBE_UNUSED ijpos_t pos, 
         MAYBE_UNUSED replayable_bucket_t *buckets,
-        MAYBE_UNUSED factor_base_t *FB,
+        MAYBE_UNUSED large_factor_base_t *FB,
         ffspol_t* F, int *B, sq_t q, int side) 
 {
     fppol_t Nab;
@@ -501,6 +501,10 @@ int main(int argc, char **argv)
             factor_base_precomp_lambda(FB[i], qlat, sublat);
         t_lambda += seconds();
 
+        // Precompute all the data for small factor base elements.
+        for (int i = 0; i < 2; ++i)
+            small_factor_base_precomp(SFB[i], qlat, sublat, I, J);
+
 
         // Loop on all sublattices
         // In the no_sublat case, this loops degenerates into one pass, since
@@ -516,8 +520,8 @@ int main(int argc, char **argv)
 
             // Fill the buckets.
             t_buckets -= seconds();
-            buckets_fill(buckets[0], FB[0], sublat, I, J);
-            buckets_fill(buckets[1], FB[1], sublat, I, J);
+            buckets_fill2(buckets[0], LFB[0], sublat, I, J, qlat);
+            buckets_fill2(buckets[1], LFB[1], sublat, I, J, qlat);
             t_buckets += seconds();
 
             // j0 is the first valid line in the current bucket region.
@@ -560,30 +564,6 @@ int main(int argc, char **argv)
                   }
                 }
               }
-
-              // If the norm computation is too expensive, it might pay to
-              // activate this block.
-#if 0
-              // Kill positions where gcd(hat i, hat j) != 1
-              {
-                ij_t i, j;
-                ij_t hati, hatj, g;
-                int rci, rcj = 1;
-                for (ij_set(j, j0); rcj; rcj = ij_monic_set_next(j, j, J)) {
-                    ijpos_t start = ijvec_get_start_pos(j, I, J) - pos0;
-                    if (start >= size)
-                      break;
-                    rci = 1;
-                    for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
-                        ijpos_t pos = start + ijvec_get_offset(i, I);
-                        ij_convert_sublat(hati, hatj, i, j, sublat);
-                        ij_gcd(g, hati, hatj);
-                        if (ij_deg(g) != 0 && ij_deg(hati)>0  && ij_deg(hatj)>0)
-                            S[pos] = 255;
-                    }
-                }
-              }
-#endif
               t_initS += seconds();
 
               for (int twice = 0; twice < 2; twice++) {
@@ -600,7 +580,7 @@ int main(int argc, char **argv)
 
                 // Line sieve.
                 t_sieve -= seconds();
-                sieveFB(S, FB[side], I, J, j0, pos0, size, sublat);
+                sieveFB2(S, SFB[side], I, J, j0, pos0, size, sublat);
                 t_sieve += seconds();
 
                 // Apply the updates from the corresponding bucket.
@@ -659,7 +639,7 @@ int main(int argc, char **argv)
                         continue;
                       ij2ab(a, b, hati, hatj, qlat);
                       nrels += factor_survivor(a, b, pos, replayable_bucket,
-                              FB, ffspol, lpb, qlat->q, qlat->side);
+                              LFB, ffspol, lpb, qlat->q, qlat->side);
                     }
                   }
                 }

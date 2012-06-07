@@ -23,6 +23,9 @@ int factor_base_init2(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
 void factor_base_precomp_lambda(factor_base_ptr FB, qlat_srcptr qlat,
         sublat_ptr sublat);
 
+void small_factor_base_precomp(small_factor_base_ptr FB, qlat_srcptr qlat,
+        sublat_ptr sublat, unsigned I, unsigned J);
+
 // Return the largest degree of the ideals in the factor base.
 // /!\ Assume that the factor base is sorted, at least for the ideals higher
 //     degree. The highest degree should thus be the degree of the last

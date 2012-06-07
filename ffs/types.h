@@ -319,6 +319,10 @@ typedef       __large_fbideal_struct  large_fbideal_t[1];
 typedef       __large_fbideal_struct *large_fbideal_ptr;
 typedef const __large_fbideal_struct *large_fbideal_srcptr;
 
+static inline unsigned fbideal_deg(large_fbideal_srcptr gothp) {
+  return gothp->data & 31U;
+}
+
 typedef struct {
   unsigned   alloc;
   unsigned   n;  // nb of entries in the factor base
@@ -335,6 +339,8 @@ typedef const __large_factor_base_struct *large_factor_base_srcptr;
 // Field description:
 //   - basis,   an F_p-basis of the intersection of the
 //              gothp-lattice with the (I,J)-rectangle.
+//              (see below)
+//   - adjustment_basis, part of another basis for the same vect space.
 //   - current, some information to keep track of where we are
 //              when jumping from a bucket-region to another.
 //   - degq,    the real degree of q
@@ -343,10 +349,18 @@ typedef const __large_factor_base_struct *large_factor_base_srcptr;
 //              (and actually, this is not always deg(p)).
 //   - proj,    indicate a projective root.
 //   - power,   indicate a power.
+//
+// The <basis> has two blocks of vectors: the first I-L vectors have j=0,
+// and the others have j=t^k+t^(k-1)+...+t+1. See ijbasis_compute_small()
+// for details.
+// The <adjustment_basis> is used for monic enumeration, and contains J
+// vectors for which j has the form j=2*t^k. In char 2, this is of course
+// not used.
 typedef struct {
     fbprime_t q;
     fbprime_t r;
     ijbasis_t basis;
+    ijbasis_t adjustment_basis;
     ij_t      current;
     ij_t      tildep;
     int       degp;

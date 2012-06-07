@@ -5,6 +5,7 @@
 
 #include "macros.h"
 #include "fb.h"
+#include "qlat.h"
 
 
 // Return the last character read, or EOF.
@@ -448,6 +449,34 @@ void factor_base_precomp_lambda(factor_base_ptr FB, qlat_srcptr qlat,
     }
   }
 }
+
+void small_factor_base_precomp(small_factor_base_ptr FB, qlat_srcptr qlat,
+    sublat_ptr sublat, unsigned I, unsigned J)
+{
+  for (unsigned i = 0; i < FB->n; ++i) {
+    fbprime_t lambda;
+    small_fbideal_ptr gothp = FB->elts[i];
+    compute_lambda(lambda, gothp->q, gothp->r, qlat);
+    if (fbprime_eq(lambda, gothp->q)) {
+      gothp->proj = 1;
+      gothp->basis->dim = 0;
+      gothp->adjustment_basis->dim = 0;
+    } else {
+      gothp->proj = 0;
+      ijbasis_init(gothp->basis, I, J);
+      ijbasis_init(gothp->adjustment_basis, I, J);
+      ijbasis_compute_small(gothp->basis, gothp->adjustment_basis,
+          gothp, lambda);
+      if (use_sublat(sublat)) {
+        // XXX TODO: precompute tildep
+      }
+    }
+  }
+}
+
+
+
+
 
 
 // Return the largest degree of the ideals in the factor base.
