@@ -17,7 +17,8 @@ int factor_base_init(factor_base_ptr FB, const char *filename,
                      unsigned sorted_min_degp, unsigned max_degp);
 
 int factor_base_init2(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
-        const char *filename, unsigned sorted_min_degp, unsigned max_degp);
+        const char *filename, unsigned sorted_min_degp,
+        unsigned max_degp, unsigned J);
 
 // Precompute lambda for each element of the factor base.
 void factor_base_precomp_lambda(factor_base_ptr FB, qlat_srcptr qlat,

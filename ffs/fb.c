@@ -178,8 +178,53 @@ int factor_base_init(factor_base_ptr FB, const char *filename,
   return 1;
 }
 
+/* 
+ * Compute a basis of the vector space of polynomials that are multiples
+ * of p and of degree less than J.
+ * The basis is echelon on the monomial basis, starting with high
+ * degree. This echelon form is normalized in the sense that it is lower
+ * triangular, full of ones.
+ *
+ * p must be monic.
+ *
+ * The "basis" parameter must be preallocated to contain at least
+ * J-degp elements.
+ */
+static 
+void normalized_echelon_multiples(ij_t *basis, fbprime_t p, int degp, int J)
+{
+    ASSERT(fbprime_deg(p) == degp);
+    ASSERT(fbprime_is_monic(p));
+    if (degp >= J)
+        return;
+
+    // Make it diagonal (classical reduced-echelon form).
+    ij_set_fbprime(basis[0], p);
+    for (int i = 1; i < J-degp; ++i) {
+        fbprime_t tip;
+        fbprime_mul_ti(tip, p, i);
+        ij_set_fbprime(basis[i], tip);
+        for (int j = i-1; j >= 0; --j) {
+            fp_t c;
+            ij_t aux;
+            ij_get_coeff(c, basis[i], degp + j);
+            ij_smul(aux, basis[j], c);
+            ij_sub(basis[i], basis[i], aux);
+        }
+    }
+
+    // Put 1's in the lower triangle.
+    for (int i = 1; i < J-degp; ++i)
+        for (int j = 0; j < i; ++j)
+            ij_add(basis[i], basis[i], basis[j]);
+}
+
+
+// Store a factor base element corresponding to a small prime ideal.
+// Precompute what we can at this early stage.
+static
 void push_small_ideal(small_factor_base_ptr FB, fbprime_t p, fbprime_t r,
-    unsigned degp, int power)
+    unsigned degp, int power, unsigned J)
 {
   unsigned alloc = FB->alloc;
   if (alloc <= FB->n) {
@@ -194,11 +239,19 @@ void push_small_ideal(small_factor_base_ptr FB, fbprime_t p, fbprime_t r,
   FB->elts[FB->n]->degp = degp;
   FB->elts[FB->n]->degq = fbprime_deg(p);
   FB->elts[FB->n]->power = power;
+
+  FB->elts[FB->n]->projective_basis = (ij_t *)malloc(J*sizeof(ij_t));
+  ASSERT_ALWAYS(FB->elts[FB->n]->projective_basis != NULL);
+  
+  normalized_echelon_multiples(FB->elts[FB->n]->projective_basis, p,
+      fbprime_deg(p), J);
+
   // other fields are recomputed for each special-q.
  
   FB->n++;
 }
 
+static
 void push_large_ideal(large_factor_base_ptr FB, fbprime_t p, fbprime_t r,
     unsigned degp)
 {
@@ -217,11 +270,13 @@ void push_large_ideal(large_factor_base_ptr FB, fbprime_t p, fbprime_t r,
   FB->n++;
 }
 
+static
 void push_ideal(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
-    fbprime_t p, fbprime_t r, unsigned degp, int power, unsigned min_degp)
+    fbprime_t p, fbprime_t r, unsigned degp, int power, unsigned min_degp,
+    unsigned J)
 {
   if (degp < min_degp)
-    push_small_ideal(SFB, p, r, degp, power);
+    push_small_ideal(SFB, p, r, degp, power, J);
   else {
     if (power) {
       fprintf(stderr, "Warning: large power in factor base. Ignoring...\n");
@@ -241,7 +296,8 @@ void push_ideal(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
 // FIXME: fix max_degp so that this bound is exclusive, not inclusive!
 // Return 1 if successful.
 int factor_base_init2(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
-    const char *filename, unsigned sorted_min_degp, unsigned max_degp)
+    const char *filename, unsigned sorted_min_degp, unsigned max_degp,
+    unsigned J)
 {
   FILE *file;
   file = fopen(filename, "r");
@@ -354,7 +410,7 @@ int factor_base_init2(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
       return 0;
     }
 
-    push_ideal(LFB, SFB, p, r, degp, power, sorted_min_degp);
+    push_ideal(LFB, SFB, p, r, degp, power, sorted_min_degp, J);
 
     // Other r's ?
     while ((c = getc(file)) == ',') {
@@ -365,7 +421,7 @@ int factor_base_init2(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
         return 0;
       }
     
-      push_ideal(LFB, SFB, p, r, degp, power, sorted_min_degp);
+      push_ideal(LFB, SFB, p, r, degp, power, sorted_min_degp, J);
     }
     ungetc(c, file);
   }
@@ -498,6 +554,8 @@ void factor_base_clear(factor_base_ptr FB)
 
 void factor_base_clear2(large_factor_base_ptr LFB, small_factor_base_ptr SFB)
 {
+  for (unsigned i = 0; i < SFB->n; ++i)
+    free(SFB->elts[i]->projective_basis);
   free(LFB->elts);
   free(SFB->elts);
 }

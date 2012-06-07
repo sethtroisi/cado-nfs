@@ -7,48 +7,6 @@
 #include "gray.h"
 
 
-/* 
- * Compute a basis of the vector space of polynomials that are multiples
- * of p and of degree less than J.
- * The basis is echelon on the monomial basis, starting with high
- * degree. This echelon form is normalized in the sense that it is lower
- * triangular, full of ones.
- *
- * p must be monic.
- *
- * The "basis" parameter must be preallocated to contain at least
- * J-degp-1 elements.
- */
-static MAYBE_UNUSED
-void normalized_echelon_multiples(ij_t *basis, fbprime_t p, int degp, int J)
-{
-    ASSERT(fbprime_deg(p) == degp);
-    ASSERT(fbprime_is_monic(p));
-    if (degp >= J)
-        return;
-
-    // Make it diagonal (classical reduced-echelon form).
-    ij_set_fbprime(basis[0], p);
-    for (int i = 1; i < J-degp-1; ++i) {
-        fbprime_t tip;
-        fbprime_mul_ti(tip, p, i);
-        ij_set_fbprime(basis[i], tip);
-        for (int j = i-1; j >= 0; --j) {
-            fp_t c;
-            ij_t aux;
-            ij_get_coeff(c, basis[i], degp + j);
-            ij_smul(aux, basis[j], c);
-            ij_sub(basis[i], basis[i], aux);
-        }
-    }
-
-    // Put 1's in the lower triangle.
-    for (int i = 1; i < J-degp-1; ++i)
-        for (int j = 0; j < i; ++j)
-            ij_add(basis[i], basis[i], basis[j]);
-}
-
-
 /*
  * Given j is a multiple of p. 
  * Compute the next multiple of p, in lex order. 
@@ -88,77 +46,6 @@ int next_projective_j(ij_t rj, ij_t j, ij_t *basis, int degp, int J)
     }
     return 1;
 }
-
-
-// FIXME: Multiplication is not compatible with lexicographical order, so there
-// is no guarantee that we visit lines by increasing j's.
-// However, since the positive-j part of the basis of the GF(p)-vector-space is
-// (0, p*t^k) for 0 <= k < J-deg(p), and since this basis is independent from
-// the special-Q or the sublattice, we can precompute a reduced row-echelon
-// form of this basis for all small primes while reading the factor bases.
-// Then, a simple enumeration via a p-ary monic Gray code should nicely do the
-// trick (TODO!).
-#if 0
-void sieve_projective_root(uint8_t *S, fbideal_ptr gothp, unsigned I,
-                           unsigned J, ijpos_t pos0, ijpos_t size,
-                           sublat_ptr sublat)
-{
-    ASSERT(gothp->degp < I);
-    ij_t i, j, jj, p;
-    ij_set_fbprime(p, gothp->p);
-
-    // First time round?
-    if (UNLIKELY(!pos0)) {
-      // Find the first line to fill
-      if (use_sublat(sublat)) {
-        // take the first multiple of p that is congruent to y.
-        ij_t tmp, y;
-        ij_set_16(tmp, sublat->modulus);
-        ij_set_16(y, sublat->lat[sublat->n][1]);
-        ij_mulmod(gothp->j0, y, gothp->tildep, tmp);
-        ij_mul   (gothp->j0, gothp->j0, p);
-        // map it into the sublattice.
-        ij_sub(gothp->j0, gothp->j0, y);
-        ij_div(gothp->j0, gothp->j0, tmp);
-      } else {
-        ij_set_zero(gothp->j0);
-      }
-      ij_set_zero(gothp->j);
-    }
-
-    int rci, rcj = 1;
-    for(ij_set(jj, gothp->j); rcj;
-        rcj = ij_monic_set_next(jj, jj, J-gothp->degp)) {
-        ij_mul(j, jj, p);
-        if (use_sublat(sublat))
-            ij_add(j, j, gothp->j0);
-        if (start >= size)
-          break;
-        rci = 1;
-        for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
-            ijpos_t pos = start + ijvec_get_offset(i, I);
-#ifdef TRACE_POS
-            if (pos == TRACE_POS) {
-                fprintf(stderr, "TRACE_POS(%lu): ", pos);
-                fbprime_out(stderr, gothp->p); fprintf(stderr, " ");
-                fbprime_out(stderr, gothp->r); fprintf(stderr, "\n");
-                fprintf(stderr, "TRACE_POS(%lu): degnorm is now %d\n", pos,
-                        S[pos]-gothp->degp);
-            }
-#endif
-#ifndef NDEBUG
-            if (pos != 0 && (S[pos] < gothp->degp)) {
-                fprintf(stderr, "faulty pos is %lu\n", pos);
-            }
-            ASSERT(pos == 0 || (S[pos] >= gothp->degp)); 
-#endif
-            S[pos] -= gothp->degp;
-
-        }
-    }
-    ij_set(gothp->j, jj);
-}
-#endif
 
 
 static inline
@@ -344,10 +231,33 @@ void sieveFB2(uint8_t *S, small_factor_base_ptr FB, unsigned I, unsigned J,
 
         // projective roots are handled differently
         if (gothp->proj) {
-            // FIXME: For the time being, projective-root sieving is disabled.
-            // See above for an explanation why.
-            // sieve_projective_root(S, gothp, I, J, pos0, size, sublat);
-            continue;
+          // First time round?
+          if (UNLIKELY(!pos0)) {
+            // Find the first line to fill
+            ij_set_zero(gothp->current);
+            if (use_sublat(sublat)) {
+              ASSERT_ALWAYS(0);  // XXX Sublat is broken
+            }
+          }
+          ij_t i, j;
+          int rcj = 1;
+          ij_set(j, gothp->current);
+          while (rcj) {
+            ijpos_t start = ijvec_get_start_pos(j, I, J) - pos0;
+            if (start >= size)
+              break;
+
+            // Sieve the whole line
+            int rci = 1;
+            for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
+              ijpos_t pos = start + ijvec_get_offset(i, I);
+              sieve_hit(S, gothp->degp, pos, gothp->q, gothp->r, pos0);
+            }
+
+            rcj = next_projective_j(j, j, gothp->projective_basis, L, J);
+          }
+          ij_set(gothp->current, j); // remember the next line to sieve.
+          continue;
         }
 
         // Only the first time round.

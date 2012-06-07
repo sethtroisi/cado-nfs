@@ -323,7 +323,7 @@ int main(int argc, char **argv)
             }
             
             tm = seconds();
-            noerr = factor_base_init2(LFB[i], SFB[i], filename, I, fbb[i]);
+            noerr = factor_base_init2(LFB[i], SFB[i], filename, I, fbb[i], J);
             fprintf(stdout, "# Reading factor base %d took %1.1f s\n", 
                     i, seconds()-tm);
             if (!noerr) {
