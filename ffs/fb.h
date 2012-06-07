@@ -13,16 +13,10 @@
 // degree max_degp.
 // FIXME: fix max_degp so that this bound is exclusive, not inclusive!
 // Return 1 if successful.
-int factor_base_init(factor_base_ptr FB, const char *filename,
-                     unsigned sorted_min_degp, unsigned max_degp);
 
-int factor_base_init2(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
+int factor_base_init(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
         const char *filename, unsigned sorted_min_degp,
         unsigned max_degp, unsigned J);
-
-// Precompute lambda for each element of the factor base.
-void factor_base_precomp_lambda(factor_base_ptr FB, qlat_srcptr qlat,
-        sublat_ptr sublat);
 
 void small_factor_base_precomp(small_factor_base_ptr FB, qlat_srcptr qlat,
         sublat_ptr sublat, unsigned I, unsigned J);
@@ -32,10 +26,9 @@ void small_factor_base_precomp(small_factor_base_ptr FB, qlat_srcptr qlat,
 //     degree. The highest degree should thus be the degree of the last
 //     ideal in the factor base.
 // FIXME: should this be inclusive or exclusive?
-unsigned factor_base_max_degp(factor_base_srcptr FB);
+unsigned factor_base_max_degp(large_factor_base_srcptr FB);
 
 // Clean up memory.
-void factor_base_clear(factor_base_ptr FB);
-void factor_base_clear2(large_factor_base_ptr LFB, small_factor_base_ptr SFB);
+void factor_base_clear(large_factor_base_ptr LFB, small_factor_base_ptr SFB);
 
 #endif   /* __FB_H__ */

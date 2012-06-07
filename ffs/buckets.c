@@ -330,7 +330,7 @@ void buckets_push_update(MAYBE_UNUSED buckets_ptr buckets,
 
 // Fill the buckets with updates corresponding to divisibility by elements of
 // the factor base.
-void buckets_fill2(buckets_ptr buckets, large_factor_base_srcptr FB,
+void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
         sublat_srcptr sublat, unsigned I, unsigned J, qlat_srcptr qlat)
 {
   ijbasis_t basis;
@@ -444,118 +444,6 @@ void buckets_fill2(buckets_ptr buckets, large_factor_base_srcptr FB,
   ijbasis_clear(euclid);
   ijbasis_clear(basis);
 }
-
-
-
-// Fill the buckets with updates corresponding to divisibility by elements of
-// the factor base.
-void buckets_fill(buckets_ptr buckets, factor_base_srcptr FB,
-                  sublat_srcptr sublat, unsigned I, unsigned J)
-{
-  ijbasis_t basis;
-  ijbasis_t euclid;
-  unsigned  hatI, hatJ;
-  hatI = I + sublat->deg;
-  hatJ = J + sublat->deg;
-
-  // The bucket sieve requires all considered ideals to be of degree larger
-  // than I.
-  ASSERT_ALWAYS(buckets->min_degp >= I);
-
-  ijbasis_init(basis,     I,    J);
-  ijbasis_init(euclid, hatI, hatJ);
-
-  // Pointers to the current writing position in each bucket.
-  update_packed_t **ptr =
-    (update_packed_t **)malloc(buckets->n * sizeof(update_packed_t *));
-  ASSERT_ALWAYS(ptr != NULL);
-  for (unsigned k = 0; k < buckets->n; ++k)
-    ptr[k] = buckets->start[k];
-
-  // Skip prime ideals of degree less than min_degp.
-  unsigned i;
-  for (i = 0; i < FB->n && FB->elts[i]->degp < buckets->min_degp; ++i);
-
-  fbideal_srcptr gothp = FB->elts[i];
-  // Go through the factor base by successive deg(gothp).
-  for (unsigned degp = buckets->min_degp; degp < buckets->max_degp; ++degp) {
-    // Not supported yet.
-    if (use_sublat(sublat) && degp == 1) continue;
-
-    // Go through each prime ideal of degree degp.
-    for (; i < FB->n && gothp->degp == degp; ++i, ++gothp) {
-      // Not supported yet.
-      if (gothp->proj) continue;
-
-      ijbasis_compute(euclid, basis, gothp);
-      ijvec_t v;
-      if (use_sublat(sublat)) {
-        int st = compute_starting_point(v, euclid, sublat);
-        if (!st)
-          continue; // next factor base prime.
-      }
-      else
-        ijvec_set_zero(v);
-
-      // Size of Gray codes to use for the inner loop.
-#     if   defined(USE_F2)
-#       define ENUM_LATTICE_UNROLL 8
-#     elif defined(USE_F3)
-#       define ENUM_LATTICE_UNROLL 5
-#     endif
-
-      // Unrolled p-ary Gray code of size ENUM_LATTICE_UNROLL.
-      static const uint8_t gray[] = { GRAY(ENUM_LATTICE_UNROLL) };
-      unsigned             ngray  = GRAY_LENGTH(ENUM_LATTICE_UNROLL);
-
-      // We only need the "monic" Gray code for the first iteration. Jump
-      // directly there in the array.
-      unsigned gray_dim = MIN(basis->dim, ENUM_LATTICE_UNROLL);
-      unsigned i0       = ngray - GRAY_LENGTH(gray_dim) / (__FP_SIZE-1);
-
-      hint_t hint = 0;
-#ifdef BUCKET_RESIEVE
-      hint = i;
-#endif
-      ij_t s, t;
-      ij_set_zero(t);
-      int rc = basis->dim > ENUM_LATTICE_UNROLL;
-      do {
-        // Inner-level Gray code enumeration: just go through the Gray code
-        // array, each time adding the indicated basis vector.
-        for (unsigned ii = i0; ii < ngray; ++ii) {
-          ijvec_add(v, v, basis->v[gray[ii]]);
-          buckets_push_update(buckets, ptr, hint, v, I, J);
-        }
-        i0 = 0;
-
-        // Outer-level Gray code enumeration: using ij_monic_set_next, the
-        // degree of the difference with the previous one indicates which basis
-        // vector should be added to the current lattice point.
-        // rc is set to 0 when all vectors have been enumerated.
-        ij_set(s, t);
-        rc = rc && ij_monic_set_next(t, t, basis->dim-ENUM_LATTICE_UNROLL);
-        if (rc) {
-          ij_diff(s, s, t);
-          ijvec_add(v, v, basis->v[ij_deg(s)+ENUM_LATTICE_UNROLL]);
-          buckets_push_update(buckets, ptr, hint, v, I, J);
-        }
-      } while (rc);
-    }
-
-    // Mark the last position for this degree in the degp_end array.
-    for (unsigned i = degp - buckets->min_degp, k = 0; k < buckets->n; ++k)
-      buckets->degp_end[i*buckets->n + k] = ptr[k];
-  }
-
-  //for (unsigned k = 0; k < buckets->n; ++k)
-  //  printf("# #updates[%u] = %u\n", k, ptr[k]-buckets->start[k]);
-
-  free(ptr);
-  ijbasis_clear(euclid);
-  ijbasis_clear(basis);
-}
-
 
 // Apply all the updates from a given bucket to the sieve region S.
 void bucket_apply(uint8_t *S, buckets_srcptr buckets, unsigned k)

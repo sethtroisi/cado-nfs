@@ -63,10 +63,7 @@ void print_bucket_info(buckets_srcptr buckets);
 
 // Fill the buckets with updates corresponding to divisibility by elements of
 // the factor base.
-void buckets_fill(buckets_ptr buckets, factor_base_srcptr FB,
-                  sublat_srcptr sublat, unsigned I, unsigned J);
-
-void buckets_fill2(buckets_ptr buckets, large_factor_base_srcptr FB,
+void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
         sublat_srcptr sublat, unsigned I, unsigned J, qlat_srcptr qlat);
 
 // Apply all the updates from a given bucket to the sieve region S.

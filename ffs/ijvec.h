@@ -104,9 +104,6 @@ int ijvec_set_pos(ijvec_ptr v, ijpos_t pos, unsigned I, unsigned J)
 void ijbasis_init(ijbasis_ptr basis, unsigned I, unsigned J);
 
 // Compute the (i,j)-basis of a given p-lattice.
-void ijbasis_compute(ijbasis_ptr euclid, ijbasis_ptr basis,
-        fbideal_srcptr gothp);
-
 void ijbasis_compute_large(ijbasis_ptr euclid, ijbasis_ptr basis,
         large_fbideal_srcptr gothp, fbprime_srcptr lambda);
 
