@@ -403,7 +403,7 @@ remove_j_from_row(filter_matrix_t *mat, int i, int j)
 // what is the weight of the sum of Ra and Rb? Works even in the partial
 // scenario of MPI.
 int
-weightSum(filter_matrix_t *mat, int i1, int i2, int32_t j)
+weightSum(filter_matrix_t *mat, int i1, int i2, MAYBE_UNUSED int32_t j)
 {
     int k1, k2, w, len1, len2;
 

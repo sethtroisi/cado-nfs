@@ -273,8 +273,8 @@ pureMkz(filter_matrix_t *mat, int32_t j)
           if ((i = mat->R[GETJ(mat, j)][k]) != -1)
 	    {
 	      if (i != i0)
-		mkz += weightSum (mat, i, i0); /* merge i and i0 */
-	      mkz -= mat->rows[i][0];          /* remove row i */
+          mkz += weightSum (mat, i, i0, j); /* merge i and i0 */
+	      mkz -= matLengthRow(mat, i);          /* remove row i */
 	    }
 #endif
 	return mkz;
