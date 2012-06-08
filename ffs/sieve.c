@@ -137,7 +137,6 @@ void usage(const char *argv0, const char * missing)
     exit(1);
 }
 
-// usage: ./a.out q rho
 int main(int argc, char **argv)
 {
     ffspol_t ffspol[2]; 
