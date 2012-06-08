@@ -446,7 +446,7 @@ static int deg_norm_full(ffspol_t ffspol_ij, fppol_t *pow_i, fppol_t *pow_j, int
    the monomials in the norm computation are distinct. The gap value
    zero means there are several monomials of higher degree but no cancellation */
 
-static int deg_norm_ij(ffspol_ptr ffspol_ij, ij_t i, ij_t j, int *gap)
+int deg_norm_ij(ffspol_ptr ffspol_ij, ij_t i, ij_t j, int *gap)
 {
   int degi = ij_deg(i);
   int degj = ij_deg(j);

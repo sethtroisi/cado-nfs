@@ -16,6 +16,10 @@ void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
                 ij_t j0, ijpos_t pos0, ijpos_t size, qlat_t qlat,
                 int sqside, sublat_ptr sublat, MAYBE_UNUSED int side);
 
+int deg_norm_ij(ffspol_ptr ffspol_ij, ij_t i, ij_t j, int *gap);
+
+
+
 #ifdef WANT_NORM_STATS
 void norm_stats_print();
 #endif
