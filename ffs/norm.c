@@ -30,6 +30,7 @@ void norm_stats_print() {
 }
 #endif
 
+#define MAX_PREC_N 32
 
 /*
   Take the N less significant bits of p and the N less significant bits of q,
@@ -44,7 +45,7 @@ static MAYBE_UNUSED void fppol64_mul_high(fppol64_ptr r,
         fppol64_srcptr p, fppol64_srcptr q,
         unsigned int N)
 {
-  ASSERT(N <= 32);
+  ASSERT(N <= MAX_PREC_N);
   ASSERT(N > 0);
   ASSERT(fppol64_deg(p) < (int)N);
   ASSERT(fppol64_deg(q) < (int)N);
@@ -65,6 +66,7 @@ static MAYBE_UNUSED void fppol64_mul_high(fppol64_ptr r,
     fppol32_div_ti(rr, rr, N-1);
     fppol64_set_32(r, rr);
   } else {              // N in ]16,32]
+    ASSERT(MAX_PREC_N <= 32); // otherwise, implement another case.
     fppol32_t pp, qq;
     fppol64_t rr;
     fppol32_set_64(pp, p);
@@ -268,11 +270,11 @@ static int deg_norm_prec_0(ffspol_t ffspol_ij, int degi, int degj, int *gap)
 
 /* function which takes as input a fppol and returns a fppol64 with
    N bits of precision containing the N monomials of higher degree,
-   with N <= 32 */
+   with N <= MAX_PREC_N */
 
 static void to_prec_N(fppol64_ptr r, fppol_t p, unsigned int N)
 {
-  ASSERT(N <= 32);
+  ASSERT(N <= MAX_PREC_N);
   ASSERT(N > 0);
   int shift = fppol_deg(p) - N + 1;
   if (shift == 0) { 
@@ -316,8 +318,10 @@ static int deg_norm_prec_N(ffspol_t ffspol_ij, int degi, fppol_t *pow_i, int deg
   fppol64_t pow_i_prec_N;
   fppol64_t pow_j_prec_N;
         
+#define PREC_GAP 8
+
   do{
-    N = N + 8;
+    N = N + PREC_GAP;
     /* Computing and sorting the degrees and the monomials in precision N.
        Also align the truncated monomials to be able to add them without
        further shifts. */   
@@ -399,7 +403,7 @@ static int deg_norm_prec_N(ffspol_t ffspol_ij, int degi, fppol_t *pow_i, int deg
       return deg_norm;
     }
 
-  } while (tab_size < 0 && N <= 32);
+  } while (tab_size < 0 && N + PREC_GAP <= MAX_PREC_N);
 
   // Failed, even at maximum allowed precision. Mark it in gap.
   *gap = max_deg + 1;
@@ -408,6 +412,8 @@ static int deg_norm_prec_N(ffspol_t ffspol_ij, int degi, fppol_t *pow_i, int deg
   return deg_norm;
 }
 
+#undef PREC_GAP
+#undef MAX_PREC_N
 
 
 static int deg_norm_full(ffspol_t ffspol_ij, fppol_t *pow_i, fppol_t *pow_j, int *gap, int max_deg)
@@ -499,7 +505,6 @@ int deg_norm_ij(ffspol_ptr ffspol_ij, ij_t i, ij_t j, int *gap)
     deg_norm = deg_norm_prec_N(ffspol_ij, degi, pow_i, degj, pow_j, gap, max_deg);
     if (*gap == max_deg + 1) {
       deg_norm = deg_norm_full(ffspol_ij, pow_i, pow_j, gap, max_deg);
-      ASSERT_ALWAYS(0); // I'd like to see a case where we enter this branch.
     } else {
 #if 0   // this is a very expensive check
 #ifndef NDEBUG
