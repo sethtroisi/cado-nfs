@@ -21,4 +21,5 @@ extern void addRows(typerow_t **rows, int i1, int i2, int32_t j);
 extern int hasCol(int32_t **rows, int i, int32_t j);
 extern int cmp(const void *p, const void *q);
 
+extern int parse_hisfile_line (int32_t *ind, char *t, int32_t *j);
 #endif  /* CADO_SPARSE_H_ */

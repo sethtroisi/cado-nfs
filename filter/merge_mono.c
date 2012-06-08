@@ -234,7 +234,7 @@ removeRowDefinitely(report_t *rep, filter_matrix_t *mat, int32_t i)
 {
     removeRowAndUpdate(mat, i, 1);
     destroyRow(mat, i);
-    report1(rep, i);
+    report1(rep, i, -1);
     mat->rem_nrows--;
 }
 
@@ -271,7 +271,7 @@ tryAllCombinations(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind,
 #if DEBUG >= 1
     printf ("=> new_ind: %d %d\n", ind[0], ind[1]);
 #endif
-    reportn(rep, ind, m);
+    reportn(rep, ind, m, j);
     removeRowAndUpdate(mat, ind[0], 1);
     destroyRow(mat, ind[0]);
 }
@@ -342,7 +342,7 @@ MSTWithA(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind, int32_t j,
 #if 0
 	reporthis(rep, history, i);
 #else
-        reportn(rep, history[i]+1, history[i][0]);
+        reportn(rep, history[i]+1, history[i][0], j);
 #endif
     removeRowAndUpdate(mat, ind[0], 1);
     destroyRow(mat, ind[0]);
@@ -825,20 +825,6 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
 //////////////////////////////////////////////////////////////////////
 
 // A line is "i i1 ... ik".
-static int
-indicesFromString(int32_t *ind, char *str)
-{
-    int ni = 0;
-    char *tok = strtok(str, " ");
-
-    while(tok != NULL){
-	ind[ni++] = atoi(tok);
-	tok = strtok(NULL, " ");
-    }
-    return ni;
-}
-
-// A line is "i i1 ... ik".
 // If i >= 0 then
 //     row[i] is to be added to rows i1...ik and destroyed at the end of
 //     the process.
@@ -849,34 +835,33 @@ indicesFromString(int32_t *ind, char *str)
 static void
 doAllAdds(report_t *rep, filter_matrix_t *mat, char *str)
 {
-/* FIXME for FFS we need to know for which ideal we are doing the merge */
-/* Can't be used for FFS until it is fixed */
-    int32_t j = 42;
+  int32_t j;
+  int32_t ind[MERGE_LEVEL_MAX], i0;
+  int ni, sg, k;
 
-    int32_t ind[MERGE_LEVEL_MAX], i0;
-    int ni, sg, k;
+  ni = parse_hisfile_line (ind, str, &j);  
+  
+  if (ind[0] < 0)
+    {
+      sg = -1;
+      i0 = -ind[0]-1;
+    }
+  else
+    {
+      sg = 1;
+      i0 = ind[0];
+    }
 
-    ni = indicesFromString(ind, str);
-    if(ind[0] < 0){
-	i0 = -ind[0]-1;
-	sg = -1;
-    }
-    else{
-	i0 = ind[0];
-	sg = 1;
-    }
-    for(k = 1; k < ni; k++)
+  for (k = 1; k < ni; k++)
       addRowsAndUpdate(mat, ind[k], i0, j);
-    reportn(rep, ind, ni);
-    if(sg > 0){
-	// when ni == 1, then the corresponding row was too heavy and dropped
-	// unless m = 1 was used, in which case S[1] will contain j and
-	// can dispensed of next time (?) In the case of S[0], it'll be done
-	// later on also (?)
-        removeRowAndUpdate(mat, i0, 1);
-	destroyRow(mat, i0);
-	mat->rem_nrows--;
-	// the number of active j's is recomputed, anyway, later on
+
+  reportn(rep, ind, ni, j);
+  
+  if (sg > 0)
+    {
+      removeRowAndUpdate(mat, i0, 1);
+      destroyRow(mat, i0);
+      mat->rem_nrows--;
     }
 }
 

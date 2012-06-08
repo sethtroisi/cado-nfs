@@ -183,3 +183,45 @@ cmp (const void *p, const void *q)
   int y = *((int *)q);
   return (x <= y ? -1 : 1);
 }
+
+// A line is "[-]i i1 ... ik [#j]"
+int parse_hisfile_line (int32_t *ind, char *t, int32_t *j)
+{
+  int ni = 0, sg = 1;
+
+  if(*t == '-')
+    {
+      sg = -1;
+	    t++;
+    }
+
+  ind[0] = 0;
+  while(1)
+    {
+      if((*t == '\n') || (*t == '#'))
+          break;
+      else if (*t == ' ')
+        {
+          ni++;
+          ind[ni] = 0;
+        }
+	    else
+          ind[ni] = 10 * ind[ni] + (*t - '0');
+
+	    t++;
+    }
+
+  ind[0] = sg * ind[0];
+  *j=0;
+
+  if (*t == '#')
+      for (t++ ; (*t != '\n') ; t++)
+          *j = 10 * (*j) + (*t - '0');
+  else
+    {
+      ni++;
+      *j = -1;
+    }
+
+  return ni;
+}

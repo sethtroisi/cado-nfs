@@ -247,7 +247,7 @@ main (int argc, char *argv[])
     /* initialize rep, i.e., mostly opens outname */
     init_rep (rep, outname, mat, 0, MERGE_LEVEL_MAX);
     /* output the matrix dimensions in the history file */
-    report2 (rep, mat->nrows, mat->ncols);
+    report2 (rep, mat->nrows, mat->ncols, -1);
 
     /* resume from given history file if needed */
     if (resumename != NULL)

@@ -27,6 +27,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 
 #include "utils.h"
 
+#include "merge_opts.h"
 #include "sparse.h"
 #include "gzip.h"
 
@@ -327,8 +328,42 @@ renumber (int *small_ncols, int *colweight, int ncols)
 static void
 doAllAdds(typerow_t **newrows, char *str)
 {
+  int32_t j;
+  int32_t ind[MERGE_LEVEL_MAX], i0;
+  int ni, destroy;
+
+  ni = parse_hisfile_line (ind, str, &j);  
+  
+  if (ind[0] < 0)
+    {
+      destroy = 0;
+      i0 = -ind[0]-1;
+    }
+  else
+    {
+      destroy = 1;
+      i0 = ind[0];
+    }
+#if DEBUG >= 1
+    fprintf(stderr, "first i is %d in %s", i0, str);
+#endif
+
+  for (int k = 1; k < ni; k++)
+		addRows(newrows, ind[k], i0, j);
+  
+  if(destroy)
+    {
+	    //destroy initial row!
+      free(newrows[i0]);
+      newrows[i0] = NULL;
+    }
+ }
+ #if 0
+ {
     char *t = str;
     int i, ii, destroy = 1;
+  
+    
 
     if(*t == '-'){
 	destroy = 0;
@@ -338,9 +373,6 @@ doAllAdds(typerow_t **newrows, char *str)
 	i = 10 * i + (*t - '0');
     if(!destroy)
 	i--; // what a trick, man!
-#if DEBUG >= 1
-    fprintf(stderr, "first i is %d in %s", i, str);
-#endif
     if(*t != '\n'){
 	++t;
 	ii = 0;
@@ -360,13 +392,8 @@ doAllAdds(typerow_t **newrows, char *str)
 	    t++;
 	}
     }
-    if(destroy){
-	// destroy initial row!
-	free(newrows[i]);
-	newrows[i] = NULL;
-    }
 }
-
+#endif
 #define STRLENMAX 2048
 
 // sparsemat is small_nrows x small_ncols, after small_ncols is found using
