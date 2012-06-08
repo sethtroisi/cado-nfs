@@ -431,20 +431,41 @@ build_newrows_from_file(typerow_t **newrows, FILE *hisfile, uint64_t bwcostmin)
 static void
 readPurged(typerow_t **sparsemat, purgedfile_stream ps, int verbose)
 {
-    fprintf(stderr, "Reading sparse matrix from purged file\n");
-    for(int i = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; i++) {
-	if (verbose && purgedfile_stream_disp_progress_now_p(ps))
-	    fprintf(stderr, "Treating old rel #%d at %2.2lf\n",
-                    ps->rrows,ps->dt);
-	if(ps->nc == 0)
-	    fprintf(stderr, "Hard to believe: row[%d] is NULL\n", i);
-	qsort(ps->cols, ps->nc, sizeof(int), cmp);
-	sparsemat[i] = (typerow_t *)malloc((ps->nc+1) * sizeof(typerow_t));
-	ASSERT_ALWAYS(sparsemat[i] != NULL);
-	rowLength(sparsemat, i) = ps->nc;
-        for(int k = 0; k < ps->nc; k++)
-	    rowCell(sparsemat, i, k+1) = ps->cols[k];
-    }
+  fprintf(stderr, "Reading sparse matrix from purged file\n");
+  for(int i = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; i++) {
+      if (verbose && purgedfile_stream_disp_progress_now_p(ps))
+          fprintf(stderr, "Treating old rel #%d at %2.2lf\n",
+                          ps->rrows,ps->dt);
+	    if(ps->nc == 0)
+          fprintf(stderr, "Hard to believe: row[%d] is NULL\n", i);
+      qsort(ps->cols, ps->nc, sizeof(int), cmp);
+      sparsemat[i] = (typerow_t *)malloc((ps->nc+1) * sizeof(typerow_t));
+      ASSERT_ALWAYS(sparsemat[i] != NULL);
+#ifdef FOR_FFS
+      int j = 0;
+      int previous = -1;
+#else
+      int j = ps->nc;
+#endif
+      for(int k = 0; k < ps->nc; k++)
+        {
+#ifdef FOR_FFS
+          if (ps->cols[k] == previous)
+              sparsemat[i][j].e++;
+          else
+            {
+              j++;
+              rowCell(sparsemat, i, j) = ps->cols[k];
+              sparsemat[i][j].e = 1;
+            }
+
+          previous = ps->cols[k];
+#else
+          rowCell(sparsemat, i, k+1) = ps->cols[k];
+#endif
+        }
+      rowLength(sparsemat, i) = j;
+  }
 }
 
 static void
