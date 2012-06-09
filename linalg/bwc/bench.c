@@ -24,7 +24,7 @@
 #include "utils.h"
 #include "mpfq/abase_vbase.h"
 #include "matmul-mf.h"
-// #include "debug.h"
+#include "debug.h"
 
 void usage()
 {
@@ -141,14 +141,19 @@ void check_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct 
     A->vec_set(A, dstT, p->src, nc);
     A->vec_set(A, srcT, p->dst, nr);
 
+    debug_write(p->src, A->vec_elt_stride(A, nr), "/tmp/Lsrc");
+
     printf("T%d src(%u): %08" PRIx32 "\n", tnum,
             nc, crc32((unsigned long*) p->src, A->vec_elt_stride(A, nc0) / sizeof(unsigned long)));
     matmul_mul(p->mm, p->dst, p->src, 1);
     printf("T%d dst(%u): %08" PRIx32 "\n", tnum,
             nr, crc32((unsigned long*) p->dst, A->vec_elt_stride(A, nr0) / sizeof(unsigned long)));
-    // debug_write(p->dst, abbytes(A, nr), "/tmp/Lmul");
+
+    debug_write(p->dst, A->vec_elt_stride(A, nr), "/tmp/Lmul");
 
     A->dotprod(A, check0, p->dst, srcT, nr0);
+
+    debug_write(srcT, A->vec_elt_stride(A, nc), "/tmp/Rsrc");
 
     printf("T%d srcT(%u): %08" PRIx32 "\n", tnum,
             nr, crc32((unsigned long*) srcT, A->vec_elt_stride(A, nr0) / sizeof(unsigned long)));
@@ -156,7 +161,7 @@ void check_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct 
     printf("T%d dstT(%u): %08" PRIx32 "\n", tnum,
             nc, crc32((unsigned long*) dstT, A->vec_elt_stride(A, nc0) / sizeof(unsigned long)));
 
-    // debug_write(dstT, abbytes(A, nc), "/tmp/Rmul");
+    debug_write(dstT, A->vec_elt_stride(A, nc), "/tmp/Rmul");
 
     A->dotprod(A, check1, p->src, dstT, nc0);
 
