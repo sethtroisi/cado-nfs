@@ -22,6 +22,7 @@ ropt_L1_cachesize ()
     L1_cachesize = ret / 2;
     size_tune_sievearray = L1_cachesize / 2;
   }
+#if 0
   else {
     ret = cachesize_guess (0);
     if ((2048 <= ret) && (ret <= (1 << 20))) {
@@ -29,6 +30,7 @@ ropt_L1_cachesize ()
       size_tune_sievearray = L1_cachesize / 2;
     }
   }
+#endif
 }
 
 
