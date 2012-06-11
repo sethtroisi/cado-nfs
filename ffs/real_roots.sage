@@ -3,14 +3,19 @@
 # The option count_real_roots(f,false) has both a different algorithm and 
 # output: it is a slower and counts the total number of polynomials r such
 # that for a/b \approx r the degree of N(a,b) is less than its raw value,
-# i.e. def_t(f)+max(deg(b),deg(a))^deg_x(f).
+# i.e. deg_t(f)+max(deg(b),deg(a))^deg_x(f).
 
 
 
 
-def hensel_lift(f,r,prec,df=None):
+def hensel_lift(f,r,prec,R=GF(2)['t,x'],df=None):
     if df==None:
         df=f.derivative()
+        F=R.base_ring()
+        t,x=R.gens()
+        At.<t>=F['t']
+        K=FractionField(At)
+        S.<x>=K['x']
     assert f(r) % t^prec == 0
     assert df(r) % t != 0
     r_new=r-f(r)*df(r).inverse_mod(t^(2*prec))
@@ -113,27 +118,27 @@ def count_all_roots(f,prec,R):
 def rotate(g,R):
     F=R.base_ring()
     t,x=R.gens()
-    A.<t>=F['t']
-    S.<x>=FractionField(A)['x']
+    At.<t>=F['t']
+    S.<x>=FractionField(At)['x']
     n,gg=S(g).degree(),S(g).coeffs()
-    minv=min([(valuation(gg[i],t)-valuation(gg[n],t))/(n-i) for i in range(n)])
+    minv=min([(valuation(gg[i],At(t))-valuation(gg[n],At(t)))/(n-i) for i in range(n)])
     if minv != Infinity:
         s=floor(minv)
     else:
         print "invalid polynomial to rotate"
         assert False
-    m=-n*s-valuation(gg[n],t)
+    m=-n*s-valuation(gg[n],At(t))
     g0=t^m*g(x*t^s)
-    assert valuation(g0.leading_coefficient(),t) == 0
+    assert valuation(At(g0.leading_coefficient()),At(t)) == 0
     for c in g0.coefficients():
-        assert valuation(c,t) >= 0
+        assert valuation(At(c),At(t)) >= 0
     g0=R(g0)
-    return g0, s
+    return g0, s, m
 
 
 def real_roots(f,prec,R):
     f_bar=R(f)(1/t,x)
-    f_tilde,s=rotate(f_bar,R)
+    f_tilde,s,m=rotate(f_bar,R)
     roots_f_tilde=all_roots(f_tilde,prec+s,R)
     roots_f_bar=[r*t^s for r in roots_f_tilde]
     roots_f=[r(1/t) for r in roots_f_bar]
@@ -233,7 +238,7 @@ def count_real_roots(f,multiplicities=False,prec=0,R=GF(2)['t,x'],minslope=-1000
     if prec==0:
         prec=10*S(f).degree()
     f_bar=R(f)(1/t,x)
-    f_tilde,s=rotate(f_bar,R)
+    f_tilde,s,m=rotate(f_bar,R)
     if R(f_tilde).degrees()[0] == 0:
         X.<x>=F['x']
         g=X(f_tilde)
@@ -249,7 +254,7 @@ def construct_f_with_real_roots(P=0,R=GF(2)['t,x']):
     t,x=R.gens()
     A.<t>=F['t']
     K=FractionField(A)
-    S.<x>=A['x']
+    S.<x>=K['x']
     if P == 0:
         P=A.random_element(20)
     f0=1
@@ -257,7 +262,7 @@ def construct_f_with_real_roots(P=0,R=GF(2)['t,x']):
         f0*=(x-i)
     f=f0+t*P
     f_bar=R(f)(1/t,x)
-    f_tilde,s=rotate(f_bar,R)
+    f_tilde,s,m=rotate(S(f_bar),R)
     return f_tilde
 
 
