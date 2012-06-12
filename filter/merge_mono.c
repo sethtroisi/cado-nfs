@@ -177,7 +177,7 @@ removeRowAndUpdate(filter_matrix_t *mat, int i, int final)
     mat->weight -= matLengthRow(mat, i);
     for(k = 1; k <= matLengthRow(mat, i); k++){
 #if TRACE_COL >= 0
-	if(cell(mat, i, k) == TRACE_COL){
+	if(matCell(mat, i, k) == TRACE_COL){
 	    printf ("removeRowAndUpdate removes %d from R_%d\n", TRACE_COL, i);
 	}
 #endif

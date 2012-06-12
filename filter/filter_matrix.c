@@ -251,7 +251,8 @@ filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
 #endif
                 }
 #ifdef FOR_FFS
-                else if  (previousj == j && ibuf != 0)
+                else if  (previousj == j && ibuf != 0 &&
+                                ((tooheavy == NULL) || (tooheavy[j] == 0)))
                     buf[ibuf-1].e++;
 #endif
             }
