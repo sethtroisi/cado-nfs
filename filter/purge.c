@@ -808,9 +808,7 @@ reread (const char *oname, const char *oname2, char ** ficname, hashtable_t *H,
               if (relation_stream_get(rs, NULL, 0, ab_base) < 0)
                 break;
 
-#if 0
               fprint_relation_raw (ofile2, &rs->rel);
-#endif
 #endif
             }
           else
