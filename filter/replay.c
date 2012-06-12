@@ -32,6 +32,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "gzip.h"
 
 #define DEBUG 0
+#define STAT_FFS
 
 #define TRACE_COL -1 // 231 // put to -1 if not...!
 
@@ -75,6 +76,9 @@ static unsigned long
 flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows, 
             int small_ncols, int *code, int skip, int bin)
 {
+#ifdef FOR_FFS
+  ASSERT_ALWAYS (skip == 0);
+#endif
     const struct {
         const char * ext;
         const char * smat;
@@ -200,8 +204,15 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
                     x-=skip;
                     if (bin) {
                         fwrite32_little(&x, 1, smatfile);
+#ifdef FOR_FFS
+                        uint32_t e = (uint32_t) sparsemat[i][j].e;
+                        fwrite32_little(&e, 1, smatfile);
+#endif
                     } else {
                         fprintf(smatfile, " %"PRIu32"", x);
+#ifdef FOR_FFS
+                        fprintf(smatfile, ":%d", sparsemat[i][j].e);
+#endif
                     }
                 }
 	    }
@@ -1007,12 +1018,38 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
           colweight[rowCell(newrows, i, k)] += 1;
 
     /* comment out the following line to disable cycle optimization */
+#ifndef FOR_FFS /* FIXME optimize create a bug for FFS*/
     optimize (newrows, nrows, colweight, ncols, skip, hisname);
+#endif
 
     /* crunch empty rows */
     for (int i = small_nrows = 0; i < nrows; i++)
       if (newrows[i] != NULL)
         newrows[small_nrows++] = newrows[i];
+
+#ifdef FOR_FFS
+#ifdef STAT_FFS
+    int count[11] = {0,0,0,0,0,0,0,0,0,0,0};
+    int nonzero = 0;
+    for (int i = 0; i < small_nrows ; i++)
+      {
+        for(int k = 1; k <= rowLength(newrows, i); k++)
+          {
+            if (abs(newrows[i][k].e) > 10)
+              count[0]++;
+            else
+              count[abs(newrows[i][k].e)]++;
+            nonzero++;
+          }
+      }
+    fprintf (stderr, "# of non zero coeff: %d\n", nonzero); 
+    for (int i = 1; i <= 10 ; i++)
+      fprintf (stderr, "# of %d: %d(%.2f%%)\n", i, count[i], 
+                       100 * (double) count[i]/nonzero);
+    fprintf (stderr, "# of > 10: %d(%.2f%%)\n", count[0], 
+                     100 * (double) count[0]/nonzero);
+#endif
+#endif
 
     /* renumber columns after sorting them by decreasing weight */
     small_ncols = toFlush(sparsename, newrows, colweight, ncols,
@@ -1022,8 +1059,10 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
         toIndex(newrows, indexname, hisfile, bwcostmin, nrows,
                 small_nrows, small_ncols);
     for(int i = 0; i < nrows; i++)
-       if(newrows[i] != NULL)
-        free (newrows[i]);
+      /* If writeindex is false, we free only the "crunched" part */
+      if (writeindex || i < small_nrows) 
+        if(newrows[i] != NULL)
+          free (newrows[i]);
     free(newrows);
 
     fclose (hisfile);
@@ -1045,6 +1084,7 @@ main(int argc, char *argv[])
     int verbose = 0;
     int bin=0;
     int skip=0;
+    int noindex = 0;
     char *rp, str[STRLENMAX];
     double wct0 = wct_seconds ();
 
@@ -1063,6 +1103,7 @@ main(int argc, char *argv[])
     argv++,argc--;
     param_list_configure_knob(pl, "--verbose", &verbose);
     param_list_configure_knob(pl, "--binary", &bin);
+    param_list_configure_knob(pl, "--noindex", &noindex);
     param_list_configure_alias(pl, "--verbose", "-v");
 
     for( ; argc ; ) {
@@ -1080,6 +1121,14 @@ main(int argc, char *argv[])
     param_list_parse_uint64(pl, "bwcostmin", &bwcostmin);
     if (has_suffix(sparsename, ".bin") || has_suffix(sparsename, ".bin.gz"))
         bin=1;
+
+#ifdef FOR_FFS
+    if (skip != 0)
+      {
+        fprintf (stderr, "Error, for FFS -skip should be 0\n");
+        exit (1);
+      }
+#endif
 
     purgedfile_stream ps;
     purgedfile_stream_init(ps);
@@ -1108,7 +1157,7 @@ main(int argc, char *argv[])
     // matrix
 
     fasterVersion (newrows, sparsename, indexname, hisname, ps,
-                   bwcostmin, nrows, ncols, skip, bin, 1);
+                   bwcostmin, nrows, ncols, skip, bin, !noindex);
 
 
     purgedfile_stream_closefile(ps);

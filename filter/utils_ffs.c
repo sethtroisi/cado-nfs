@@ -103,29 +103,3 @@ int ffs_poly_read(cado_poly poly, const char *filename)
     fclose(file);
     return r;
 }
-/*
-void sort_ffs (filter_matrix_t *mat, int i, int32_t size)
-{
-  ideal_merge_ffs_t *tmp_array;
-  int k;
-  
-  //malloc
-  tmp_array = (ideal_merge_ffs_t*) malloc (size * sizeof (ideal_merge_ffs_t));
-
-  for (k = 0; k < size; k++)
-    {
-      tmp_array[k].id = mat->rows[i][k+1]; 
-      tmp_array[k].e = mat->coeff[i][k+1];
-    }
-
-  qsort(tmp_array, size, sizeof(ideal_merge_ffs_t), cmp);
-
-  for (k = 0; k < size; k++)
-    {
-      mat->rows[i][k+1] = tmp_array[k].id;
-      mat->coeff[i][k+1] = tmp_array[k].e; 
-    }
-
-  free (tmp_array);
-}
-*/
