@@ -13,16 +13,12 @@ extern "C" {
 
 /*** Constants for field_specify ***/
 
-#define MPFQ_PRIME 1
-#define MPFQ_POLYNOMIAL 2
-#define MPFQ_DEGREE 3
-#define MPFQ_IO_TYPE 4 /* for setopt */
-
-/*** OO interface ***/
-
-#define MPFQ_OO_RELATED_SELF    0
-#define MPFQ_OO_RELATED_BASE_FIELD      10
-#define MPFQ_OO_RELATED_SIMD_VARIABLE   20
+#define MPFQ_DONE 0             /* At the end of the variadic option functions */
+#define MPFQ_PRIME 1            /* mpz_t */
+#define MPFQ_POLYNOMIAL 2       /* this expects an mpfq polynomial */
+#define MPFQ_DEGREE 3           /* int */
+#define MPFQ_IO_TYPE 4          /* for setopt */
+#define MPFQ_GROUPSIZE 5        /* int (SIMD group size) */
 
 /***  Some useful macros ***/
 

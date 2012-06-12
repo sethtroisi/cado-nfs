@@ -9,9 +9,7 @@ MPFQ:=$$HOME/Mp/mpfq/src
 all: basic binary-fields
 
 basic:
-	$(MPFQ)/simd/abase.pl u64k1
-	$(MPFQ)/simd/abase.pl u64k2
-	$(MPFQ)/simd/abase.pl p16
+	$(MPFQ)/simd/abase.pl
 	/bin/cp -f $(MPFQ)/simd/binary-dotprods-backends.h .
 	/bin/cp -f $(MPFQ)/include/mpfq/mpfq.h .
 	ls abase_*[ch] mpfq*[ch] | xargs -n 1 sed -e s,mpfq/,, -i

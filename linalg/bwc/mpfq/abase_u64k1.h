@@ -21,102 +21,123 @@
 #endif
 #define MPFQ_LAST_GENERATED_TAG      u64k1
 
-/* Active handler: Mpfq::defaults::vec */
+/* Active handler: simd_u64k */
+/* Automatically generated code  */
 /* Active handler: Mpfq::defaults */
-/* Active handler: Mpfq::engine::defaults::mpi_flat */
+/* Active handler: Mpfq::defaults::vec */
+/* Active handler: Mpfq::defaults::mpi_flat */
 /* Active handler: simd_dotprod */
 /* Active handler: io */
 /* Active handler: trivialities */
 /* Active handler: simd_flat */
-/* Active handler: simd_u64k */
-/* Automatically generated code  */
-/* Options used: k=1 tag=u64k1 choose_by_groupsize=<code> prefix=abase_ virtual_base={
+/* Options used: k=1 tag=u64k1 vbase_stuff={
+                 'vc:includes' => [
+                                    '<stdarg.h>'
+                                  ],
+                 'member_templates_restrict' => {
+                                                  'u64k2' => [
+                                                               'u64k1',
+                                                               'u64k2'
+                                                             ],
+                                                  'p16' => [
+                                                             'p16'
+                                                           ],
+                                                  'u64k1' => $vbase_stuff->{'member_templates_restrict'}{'u64k2'}
+                                                },
+                 'families' => [
+                                 $vbase_stuff->{'member_templates_restrict'}{'u64k2'},
+                                 $vbase_stuff->{'member_templates_restrict'}{'p16'}
+                               ],
+                 'choose_byfeatures' => sub { "DUMMY" }
+               };
+ family=[u64k1, u64k2] virtual_base={
                   'filebase' => 'abase_vbase',
                   'substitutions' => [
                                        [
-                                         qr/(?-xism:abase_u64k1_elt \*)/,
+                                         qr/(?^:abase_u64k1_elt \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_src_elt\b)/,
+                                         qr/(?^:abase_u64k1_src_elt\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_elt\b)/,
+                                         qr/(?^:abase_u64k1_elt\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_dst_elt\b)/,
+                                         qr/(?^:abase_u64k1_dst_elt\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_elt_ur \*)/,
+                                         qr/(?^:abase_u64k1_elt_ur \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_src_elt_ur\b)/,
+                                         qr/(?^:abase_u64k1_src_elt_ur\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_elt_ur\b)/,
+                                         qr/(?^:abase_u64k1_elt_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_dst_elt_ur\b)/,
+                                         qr/(?^:abase_u64k1_dst_elt_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_vec \*)/,
+                                         qr/(?^:abase_u64k1_vec \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_src_vec\b)/,
+                                         qr/(?^:abase_u64k1_src_vec\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_vec\b)/,
+                                         qr/(?^:abase_u64k1_vec\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_dst_vec\b)/,
+                                         qr/(?^:abase_u64k1_dst_vec\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_vec_ur \*)/,
+                                         qr/(?^:abase_u64k1_vec_ur \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_src_vec_ur\b)/,
+                                         qr/(?^:abase_u64k1_src_vec_ur\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_vec_ur\b)/,
+                                         qr/(?^:abase_u64k1_vec_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_dst_vec_ur\b)/,
+                                         qr/(?^:abase_u64k1_dst_vec_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_poly \*)/,
+                                         qr/(?^:abase_u64k1_poly \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_src_poly\b)/,
+                                         qr/(?^:abase_u64k1_src_poly\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_poly\b)/,
+                                         qr/(?^:abase_u64k1_poly\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_dst_poly\b)/,
+                                         qr/(?^:abase_u64k1_dst_poly\b)/,
                                          'void *'
                                        ]
                                      ],
-                  'name' => 'abase_vbase'
+                  'name' => 'abase_vbase',
+                  'global_prefix' => 'abase_'
                 };
- family=[u64k1, u64k2] */
+ */
 
 typedef void * abase_u64k1_field[1];
 typedef void * abase_u64k1_dst_field;
@@ -144,21 +165,20 @@ extern "C" {
 /* Functions operating on the field structure */
 /* *simd_char2::code_for_field_characteristic */
 #define abase_u64k1_field_characteristic(K, z)	mpz_set_ui(z,2)
-/* *simd_char2::code_for_field_degree */
-#define abase_u64k1_field_degree(K)	1
-/* *Mpfq::defaults::code_for_field_init */
-#define abase_u64k1_field_init(K)	/**/
-/* *Mpfq::defaults::code_for_field_clear */
+/* *simd_u64k::code_for_field_degree */
+#define abase_u64k1_field_degree(f)	1
+static inline
+void abase_u64k1_field_init(abase_u64k1_dst_field);
+/* *simd_u64k::code_for_field_clear */
 #define abase_u64k1_field_clear(K)	/**/
-/* *Mpfq::defaults::code_for_field_specify */
-#define abase_u64k1_field_specify(k, dummy, vp)	/**/
-/* *Mpfq::defaults::code_for_field_setopt */
+void abase_u64k1_field_specify(abase_u64k1_dst_field, unsigned long, void *);
+/* *simd_u64k::code_for_field_setopt */
 #define abase_u64k1_field_setopt(f, x, y)	/**/
 
 /* Element allocation functions */
-/* *Mpfq::defaults::flatdata::code_for_init */
+/* *Mpfq::defaults::flatdata::code_for_init, simd_flat */
 #define abase_u64k1_init(f, px)	/**/
-/* *Mpfq::defaults::flatdata::code_for_clear */
+/* *Mpfq::defaults::flatdata::code_for_clear, simd_flat */
 #define abase_u64k1_clear(f, px)	/**/
 
 /* Elementary assignment functions */
@@ -194,9 +214,9 @@ void abase_u64k1_add(abase_u64k1_dst_field, abase_u64k1_dst_elt, abase_u64k1_src
 /* missing mul_ui */
 
 /* Operations involving unreduced elements */
-/* *Mpfq::defaults::flatdata::code_for_elt_ur_init */
+/* *Mpfq::defaults::flatdata::code_for_elt_ur_init, simd_flat */
 #define abase_u64k1_elt_ur_init(f, px)	/**/
-/* *Mpfq::defaults::flatdata::code_for_elt_ur_clear */
+/* *Mpfq::defaults::flatdata::code_for_elt_ur_clear, simd_flat */
 #define abase_u64k1_elt_ur_clear(f, px)	/**/
 static inline
 void abase_u64k1_elt_ur_set(abase_u64k1_dst_field, abase_u64k1_dst_elt_ur, abase_u64k1_src_elt_ur);
@@ -264,7 +284,7 @@ void abase_u64k1_vec_fprint(abase_u64k1_dst_field, FILE *, abase_u64k1_src_vec, 
 void abase_u64k1_vec_print(abase_u64k1_dst_field, abase_u64k1_src_vec, unsigned int);
 int abase_u64k1_vec_sscan(abase_u64k1_dst_field, abase_u64k1_vec *, unsigned int *, const char *);
 int abase_u64k1_vec_fscan(abase_u64k1_dst_field, FILE *, abase_u64k1_vec *, unsigned int *);
-/* *Mpfq::defaults::vec::io::code_for_vec_scan */
+/* *Mpfq::defaults::vec::io::code_for_vec_scan, Mpfq::defaults::vec, Mpfq::defaults */
 #define abase_u64k1_vec_scan(K, w, n)	abase_u64k1_vec_fscan(K,stdout,w,n)
 void abase_u64k1_vec_ur_init(abase_u64k1_dst_field, abase_u64k1_vec_ur *, unsigned int);
 void abase_u64k1_vec_ur_reinit(abase_u64k1_dst_field, abase_u64k1_vec_ur *, unsigned int, unsigned int);
@@ -282,14 +302,12 @@ void abase_u64k1_vec_ur_sub(abase_u64k1_dst_field, abase_u64k1_dst_vec_ur, abase
 /* missing vec_scal_mul_ur */
 /* missing vec_conv_ur */
 /* missing vec_reduce */
-/* *Mpfq::defaults::flatdata::code_for_vec_elt_stride */
+/* *Mpfq::defaults::flatdata::code_for_vec_elt_stride, simd_flat */
 #define abase_u64k1_vec_elt_stride(K, n)	((n)*sizeof(abase_u64k1_elt))
 
 /* Functions related to SIMD operation */
 /* *simd_u64k::code_for_groupsize */
 #define abase_u64k1_groupsize(K)	64
-/* *simd_u64k::code_for_set_groupsize */
-#define abase_u64k1_set_groupsize(K, n)	assert(n==64)
 /* *trivialities::code_for_offset */
 #define abase_u64k1_offset(K, n)	n /* TO BE DEPRECATED */
 /* *trivialities::code_for_stride */
@@ -324,7 +342,13 @@ void abase_u64k1_oo_field_init(abase_vbase_ptr);
 #endif
 
 /* Implementations for inlines */
-/* *Mpfq::defaults::flatdata::code_for_set */
+/* *simd_u64k::code_for_field_init */
+static inline
+void abase_u64k1_field_init(abase_u64k1_dst_field f MAYBE_UNUSED)
+{
+}
+
+/* *Mpfq::defaults::flatdata::code_for_set, simd_flat */
 static inline
 void abase_u64k1_set(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_elt r, abase_u64k1_src_elt s)
 {
@@ -345,7 +369,7 @@ void abase_u64k1_random(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_el
     myrand_area(r, sizeof(abase_u64k1_elt));
 }
 
-/* *simd_flat::code_for_add */
+/* *simd_char2::code_for_add */
 static inline
 void abase_u64k1_add(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_elt r, abase_u64k1_src_elt s1, abase_u64k1_src_elt s2)
 {
@@ -354,21 +378,21 @@ void abase_u64k1_add(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_elt r
         }
 }
 
-/* *Mpfq::defaults::flatdata::code_for_elt_ur_set */
+/* *Mpfq::defaults::flatdata::code_for_elt_ur_set, simd_flat */
 static inline
 void abase_u64k1_elt_ur_set(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_elt_ur r, abase_u64k1_src_elt_ur s)
 {
     if (r != s) memcpy(r,s,sizeof(abase_u64k1_elt_ur));
 }
 
-/* *Mpfq::defaults::flatdata::code_for_elt_ur_set_zero */
+/* *Mpfq::defaults::flatdata::code_for_elt_ur_set_zero, simd_flat */
 static inline
 void abase_u64k1_elt_ur_set_zero(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_elt_ur r)
 {
     memset(r, 0, sizeof(abase_u64k1_elt_ur));
 }
 
-/* *simd_flat::code_for_elt_ur_add */
+/* *simd_char2::code_for_elt_ur_add */
 static inline
 void abase_u64k1_elt_ur_add(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_elt_ur r, abase_u64k1_src_elt_ur s1, abase_u64k1_src_elt_ur s2)
 {
@@ -377,14 +401,14 @@ void abase_u64k1_elt_ur_add(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_ds
         }
 }
 
-/* *Mpfq::defaults::flatdata::code_for_cmp */
+/* *Mpfq::defaults::flatdata::code_for_cmp, simd_flat */
 static inline
 int abase_u64k1_cmp(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_src_elt r, abase_u64k1_src_elt s)
 {
     return memcmp(r,s,sizeof(abase_u64k1_elt));
 }
 
-/* *Mpfq::defaults::flatdata::code_for_is_zero */
+/* *Mpfq::defaults::flatdata::code_for_is_zero, simd_flat */
 static inline
 int abase_u64k1_is_zero(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_src_elt r)
 {
@@ -395,35 +419,35 @@ int abase_u64k1_is_zero(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_src_el
         return 1;
 }
 
-/* *Mpfq::defaults::vec::flatdata::code_for_vec_set */
+/* *Mpfq::defaults::vec::flatdata::code_for_vec_set, Mpfq::defaults::flatdata, simd_flat */
 static inline
 void abase_u64k1_vec_set(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec r, abase_u64k1_src_vec s, unsigned int n)
 {
     if (r != s) memcpy(r, s, n*sizeof(abase_u64k1_elt));
 }
 
-/* *Mpfq::defaults::vec::flatdata::code_for_vec_set_zero */
+/* *Mpfq::defaults::vec::flatdata::code_for_vec_set_zero, Mpfq::defaults::flatdata, simd_flat */
 static inline
 void abase_u64k1_vec_set_zero(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec r, unsigned int n)
 {
     memset(r, 0, n*sizeof(abase_u64k1_elt));
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_setcoef */
+/* *Mpfq::defaults::vec::getset::code_for_vec_setcoef, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 void abase_u64k1_vec_setcoef(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec w, abase_u64k1_src_elt x, unsigned int i)
 {
     abase_u64k1_set(K, w[i], x);
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_getcoef */
+/* *Mpfq::defaults::vec::getset::code_for_vec_getcoef, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 void abase_u64k1_vec_getcoef(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_elt x, abase_u64k1_src_vec w, unsigned int i)
 {
     abase_u64k1_set(K, x, w[i]);
 }
 
-/* *Mpfq::defaults::vec::addsub::code_for_vec_add */
+/* *Mpfq::defaults::vec::addsub::code_for_vec_add, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 void abase_u64k1_vec_add(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec w, abase_u64k1_src_vec u, abase_u64k1_src_vec v, unsigned int n)
 {
@@ -432,7 +456,7 @@ void abase_u64k1_vec_add(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_v
         abase_u64k1_add(K, w[i], u[i], v[i]);
 }
 
-/* *Mpfq::defaults::vec::addsub::code_for_vec_neg */
+/* *Mpfq::defaults::vec::addsub::code_for_vec_neg, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 void abase_u64k1_vec_neg(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec w, abase_u64k1_src_vec u, unsigned int n)
 {
@@ -441,7 +465,7 @@ void abase_u64k1_vec_neg(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_v
         abase_u64k1_neg(K, w[i], u[i]);
 }
 
-/* *Mpfq::defaults::vec::addsub::code_for_vec_rev */
+/* *Mpfq::defaults::vec::addsub::code_for_vec_rev, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 void abase_u64k1_vec_rev(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec w, abase_u64k1_src_vec u, unsigned int n)
 {
@@ -459,7 +483,7 @@ void abase_u64k1_vec_rev(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_v
     abase_u64k1_clear(K, tmp);
 }
 
-/* *Mpfq::defaults::vec::addsub::code_for_vec_sub */
+/* *Mpfq::defaults::vec::addsub::code_for_vec_sub, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 void abase_u64k1_vec_sub(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec w, abase_u64k1_src_vec u, abase_u64k1_src_vec v, unsigned int n)
 {
@@ -468,7 +492,7 @@ void abase_u64k1_vec_sub(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_v
         abase_u64k1_sub(K, w[i], u[i], v[i]);
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_random */
+/* *Mpfq::defaults::vec::getset::code_for_vec_random, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 void abase_u64k1_vec_random(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec w, unsigned int n)
 {
@@ -477,7 +501,7 @@ void abase_u64k1_vec_random(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_ds
         abase_u64k1_random(K, w[i]);
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_cmp */
+/* *Mpfq::defaults::vec::getset::code_for_vec_cmp, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 int abase_u64k1_vec_cmp(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_src_vec u, abase_u64k1_src_vec v, unsigned int n)
 {
@@ -490,7 +514,7 @@ int abase_u64k1_vec_cmp(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_src_ve
     return 0;
 }
 
-/* *Mpfq::defaults::vec::flatdata::code_for_vec_is_zero */
+/* *Mpfq::defaults::vec::flatdata::code_for_vec_is_zero, Mpfq::defaults::flatdata, simd_flat */
 static inline
 int abase_u64k1_vec_is_zero(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_src_vec r, unsigned int n)
 {
@@ -501,28 +525,28 @@ int abase_u64k1_vec_is_zero(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_sr
     return 1;
 }
 
-/* *Mpfq::defaults::vec::flatdata::code_for_vec_ur_set */
+/* *Mpfq::defaults::vec::flatdata::code_for_vec_ur_set, Mpfq::defaults::flatdata, simd_flat */
 static inline
 void abase_u64k1_vec_ur_set(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec_ur r, abase_u64k1_src_vec_ur s, unsigned int n)
 {
     if (r != s) memcpy(r, s, n*sizeof(abase_u64k1_elt_ur));
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_ur_setcoef */
+/* *Mpfq::defaults::vec::getset::code_for_vec_ur_setcoef, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 void abase_u64k1_vec_ur_setcoef(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec_ur w, abase_u64k1_src_elt_ur x, unsigned int i)
 {
     abase_u64k1_elt_ur_set(K, w[i], x);
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_ur_getcoef */
+/* *Mpfq::defaults::vec::getset::code_for_vec_ur_getcoef, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 void abase_u64k1_vec_ur_getcoef(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_elt_ur x, abase_u64k1_src_vec_ur w, unsigned int i)
 {
     abase_u64k1_elt_ur_set(K, x, w[i]);
 }
 
-/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_add */
+/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_add, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 void abase_u64k1_vec_ur_add(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec_ur w, abase_u64k1_src_vec_ur u, abase_u64k1_src_vec_ur v, unsigned int n)
 {
@@ -531,7 +555,7 @@ void abase_u64k1_vec_ur_add(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_ds
         abase_u64k1_elt_ur_add(K, w[i], u[i], v[i]);
 }
 
-/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_sub */
+/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_sub, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 void abase_u64k1_vec_ur_sub(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec_ur w, abase_u64k1_src_vec_ur u, abase_u64k1_src_vec_ur v, unsigned int n)
 {

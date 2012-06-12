@@ -21,100 +21,122 @@
 #endif
 #define MPFQ_LAST_GENERATED_TAG      p16
 
-/* Active handler: Mpfq::defaults::vec */
-/* Active handler: Mpfq::defaults */
-/* Active handler: Mpfq::engine::defaults::mpi_flat */
-/* Active handler: simd_flat */
-/* Active handler: io */
 /* Active handler: simd_p16 */
 /* Automatically generated code  */
-/* Options used: vtag=p16 tag=p16 choose_by_groupsize=<code> prefix=abase_ virtual_base={
+/* Active handler: Mpfq::defaults */
+/* Active handler: Mpfq::defaults::vec */
+/* Active handler: Mpfq::defaults::mpi_flat */
+/* Active handler: io */
+/* Active handler: trivialities */
+/* Active handler: simd_flat */
+/* Options used: vtag=p16 tag=p16 vbase_stuff={
+                 'vc:includes' => [
+                                    '<stdarg.h>'
+                                  ],
+                 'member_templates_restrict' => {
+                                                  'u64k2' => [
+                                                               'u64k1',
+                                                               'u64k2'
+                                                             ],
+                                                  'p16' => [
+                                                             'p16'
+                                                           ],
+                                                  'u64k1' => $vbase_stuff->{'member_templates_restrict'}{'u64k2'}
+                                                },
+                 'families' => [
+                                 $vbase_stuff->{'member_templates_restrict'}{'u64k2'},
+                                 $vbase_stuff->{'member_templates_restrict'}{'p16'}
+                               ],
+                 'choose_byfeatures' => sub { "DUMMY" }
+               };
+ family=[p16] virtual_base={
                   'filebase' => 'abase_vbase',
                   'substitutions' => [
                                        [
-                                         qr/(?-xism:abase_p16_elt \*)/,
+                                         qr/(?^:abase_p16_elt \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_p16_src_elt\b)/,
+                                         qr/(?^:abase_p16_src_elt\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_p16_elt\b)/,
+                                         qr/(?^:abase_p16_elt\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_p16_dst_elt\b)/,
+                                         qr/(?^:abase_p16_dst_elt\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_p16_elt_ur \*)/,
+                                         qr/(?^:abase_p16_elt_ur \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_p16_src_elt_ur\b)/,
+                                         qr/(?^:abase_p16_src_elt_ur\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_p16_elt_ur\b)/,
+                                         qr/(?^:abase_p16_elt_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_p16_dst_elt_ur\b)/,
+                                         qr/(?^:abase_p16_dst_elt_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_p16_vec \*)/,
+                                         qr/(?^:abase_p16_vec \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_p16_src_vec\b)/,
+                                         qr/(?^:abase_p16_src_vec\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_p16_vec\b)/,
+                                         qr/(?^:abase_p16_vec\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_p16_dst_vec\b)/,
+                                         qr/(?^:abase_p16_dst_vec\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_p16_vec_ur \*)/,
+                                         qr/(?^:abase_p16_vec_ur \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_p16_src_vec_ur\b)/,
+                                         qr/(?^:abase_p16_src_vec_ur\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_p16_vec_ur\b)/,
+                                         qr/(?^:abase_p16_vec_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_p16_dst_vec_ur\b)/,
+                                         qr/(?^:abase_p16_dst_vec_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_p16_poly \*)/,
+                                         qr/(?^:abase_p16_poly \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_p16_src_poly\b)/,
+                                         qr/(?^:abase_p16_src_poly\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_p16_poly\b)/,
+                                         qr/(?^:abase_p16_poly\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_p16_dst_poly\b)/,
+                                         qr/(?^:abase_p16_dst_poly\b)/,
                                          'void *'
                                        ]
                                      ],
-                  'name' => 'abase_vbase'
+                  'name' => 'abase_vbase',
+                  'global_prefix' => 'abase_'
                 };
- family=[p16] */
+ */
 
 typedef int32_t abase_p16_field[1];
 typedef int32_t * abase_p16_dst_field;
@@ -148,15 +170,14 @@ void abase_p16_field_characteristic(abase_p16_dst_field, mpz_t);
 #define abase_p16_field_init(f)	/**/
 /* *simd_p16::code_for_field_clear */
 #define abase_p16_field_clear(f)	/**/
-static inline
 void abase_p16_field_specify(abase_p16_dst_field, unsigned long, void *);
 /* *simd_p16::code_for_field_setopt */
 #define abase_p16_field_setopt(f, x, y)	/**/
 
 /* Element allocation functions */
-/* *Mpfq::defaults::flatdata::code_for_init */
+/* *Mpfq::defaults::flatdata::code_for_init, simd_flat */
 #define abase_p16_init(f, px)	/**/
-/* *Mpfq::defaults::flatdata::code_for_clear */
+/* *Mpfq::defaults::flatdata::code_for_clear, simd_flat */
 #define abase_p16_clear(f, px)	/**/
 
 /* Elementary assignment functions */
@@ -192,9 +213,9 @@ void abase_p16_set_zero(abase_p16_dst_field, abase_p16_dst_elt);
 /* missing mul_ui */
 
 /* Operations involving unreduced elements */
-/* *Mpfq::defaults::flatdata::code_for_elt_ur_init */
+/* *Mpfq::defaults::flatdata::code_for_elt_ur_init, simd_flat */
 #define abase_p16_elt_ur_init(f, px)	/**/
-/* *Mpfq::defaults::flatdata::code_for_elt_ur_clear */
+/* *Mpfq::defaults::flatdata::code_for_elt_ur_clear, simd_flat */
 #define abase_p16_elt_ur_clear(f, px)	/**/
 static inline
 void abase_p16_elt_ur_set(abase_p16_dst_field, abase_p16_dst_elt_ur, abase_p16_src_elt_ur);
@@ -266,7 +287,7 @@ void abase_p16_vec_fprint(abase_p16_dst_field, FILE *, abase_p16_src_vec, unsign
 void abase_p16_vec_print(abase_p16_dst_field, abase_p16_src_vec, unsigned int);
 int abase_p16_vec_sscan(abase_p16_dst_field, abase_p16_vec *, unsigned int *, const char *);
 int abase_p16_vec_fscan(abase_p16_dst_field, FILE *, abase_p16_vec *, unsigned int *);
-/* *Mpfq::defaults::vec::io::code_for_vec_scan */
+/* *Mpfq::defaults::vec::io::code_for_vec_scan, Mpfq::defaults::vec, Mpfq::defaults */
 #define abase_p16_vec_scan(K, w, n)	abase_p16_vec_fscan(K,stdout,w,n)
 void abase_p16_vec_ur_init(abase_p16_dst_field, abase_p16_vec_ur *, unsigned int);
 void abase_p16_vec_ur_reinit(abase_p16_dst_field, abase_p16_vec_ur *, unsigned int, unsigned int);
@@ -285,14 +306,12 @@ void abase_p16_vec_ur_sub(abase_p16_dst_field, abase_p16_dst_vec_ur, abase_p16_s
 /* missing vec_conv_ur */
 static inline
 void abase_p16_vec_reduce(abase_p16_dst_field, abase_p16_dst_vec, abase_p16_dst_vec_ur, unsigned int);
-/* *Mpfq::defaults::flatdata::code_for_vec_elt_stride */
+/* *Mpfq::defaults::flatdata::code_for_vec_elt_stride, simd_flat */
 #define abase_p16_vec_elt_stride(K, n)	((n)*sizeof(abase_p16_elt))
 
 /* Functions related to SIMD operation */
 /* *simd_p16::code_for_groupsize */
 #define abase_p16_groupsize(K)	1
-/* *simd_p16::code_for_set_groupsize */
-#define abase_p16_set_groupsize(K, n)	assert(n==1)
 /* *simd_p16::code_for_offset */
 #define abase_p16_offset(K, n)	n /* TO BE DEPRECATED */
 /* *simd_p16::code_for_stride */
@@ -334,14 +353,7 @@ void abase_p16_field_characteristic(abase_p16_dst_field K, mpz_t z)
     mpz_set_si(z,*K);
 }
 
-/* *simd_p16::code_for_field_specify */
-static inline
-void abase_p16_field_specify(abase_p16_dst_field K, unsigned long dummy MAYBE_UNUSED, void * z)
-{
-    *K=*(uint16_t*) z;
-}
-
-/* *Mpfq::defaults::flatdata::code_for_set */
+/* *Mpfq::defaults::flatdata::code_for_set, simd_flat */
 static inline
 void abase_p16_set(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_elt r, abase_p16_src_elt s)
 {
@@ -355,14 +367,14 @@ void abase_p16_set_zero(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_elt r)
     memset(r, 0, sizeof(abase_p16_elt));
 }
 
-/* *Mpfq::defaults::flatdata::code_for_elt_ur_set */
+/* *Mpfq::defaults::flatdata::code_for_elt_ur_set, simd_flat */
 static inline
 void abase_p16_elt_ur_set(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_elt_ur r, abase_p16_src_elt_ur s)
 {
     if (r != s) memcpy(r,s,sizeof(abase_p16_elt_ur));
 }
 
-/* *Mpfq::defaults::flatdata::code_for_elt_ur_set_zero */
+/* *Mpfq::defaults::flatdata::code_for_elt_ur_set_zero, simd_flat */
 static inline
 void abase_p16_elt_ur_set_zero(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_elt_ur r)
 {
@@ -376,14 +388,14 @@ void abase_p16_reduce(abase_p16_dst_field K, abase_p16_dst_elt x, abase_p16_dst_
     *x = *y % *K;
 }
 
-/* *Mpfq::defaults::flatdata::code_for_cmp */
+/* *Mpfq::defaults::flatdata::code_for_cmp, simd_flat */
 static inline
 int abase_p16_cmp(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_src_elt r, abase_p16_src_elt s)
 {
     return memcmp(r,s,sizeof(abase_p16_elt));
 }
 
-/* *Mpfq::defaults::flatdata::code_for_is_zero */
+/* *Mpfq::defaults::flatdata::code_for_is_zero, simd_flat */
 static inline
 int abase_p16_is_zero(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_src_elt r)
 {
@@ -394,35 +406,35 @@ int abase_p16_is_zero(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_src_elt r)
         return 1;
 }
 
-/* *Mpfq::defaults::vec::flatdata::code_for_vec_set */
+/* *Mpfq::defaults::vec::flatdata::code_for_vec_set, Mpfq::defaults::flatdata, simd_flat */
 static inline
 void abase_p16_vec_set(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_vec r, abase_p16_src_vec s, unsigned int n)
 {
     if (r != s) memcpy(r, s, n*sizeof(abase_p16_elt));
 }
 
-/* *Mpfq::defaults::vec::flatdata::code_for_vec_set_zero */
+/* *Mpfq::defaults::vec::flatdata::code_for_vec_set_zero, Mpfq::defaults::flatdata, simd_flat */
 static inline
 void abase_p16_vec_set_zero(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_vec r, unsigned int n)
 {
     memset(r, 0, n*sizeof(abase_p16_elt));
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_setcoef */
+/* *Mpfq::defaults::vec::getset::code_for_vec_setcoef, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 void abase_p16_vec_setcoef(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_vec w, abase_p16_src_elt x, unsigned int i)
 {
     abase_p16_set(K, w[i], x);
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_getcoef */
+/* *Mpfq::defaults::vec::getset::code_for_vec_getcoef, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 void abase_p16_vec_getcoef(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_elt x, abase_p16_src_vec w, unsigned int i)
 {
     abase_p16_set(K, x, w[i]);
 }
 
-/* *Mpfq::defaults::vec::addsub::code_for_vec_add */
+/* *Mpfq::defaults::vec::addsub::code_for_vec_add, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 void abase_p16_vec_add(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_vec w, abase_p16_src_vec u, abase_p16_src_vec v, unsigned int n)
 {
@@ -431,7 +443,7 @@ void abase_p16_vec_add(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_vec w, 
         abase_p16_add(K, w[i], u[i], v[i]);
 }
 
-/* *Mpfq::defaults::vec::addsub::code_for_vec_neg */
+/* *Mpfq::defaults::vec::addsub::code_for_vec_neg, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 void abase_p16_vec_neg(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_vec w, abase_p16_src_vec u, unsigned int n)
 {
@@ -440,7 +452,7 @@ void abase_p16_vec_neg(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_vec w, 
         abase_p16_neg(K, w[i], u[i]);
 }
 
-/* *Mpfq::defaults::vec::addsub::code_for_vec_rev */
+/* *Mpfq::defaults::vec::addsub::code_for_vec_rev, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 void abase_p16_vec_rev(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_vec w, abase_p16_src_vec u, unsigned int n)
 {
@@ -458,7 +470,7 @@ void abase_p16_vec_rev(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_vec w, 
     abase_p16_clear(K, tmp);
 }
 
-/* *Mpfq::defaults::vec::addsub::code_for_vec_sub */
+/* *Mpfq::defaults::vec::addsub::code_for_vec_sub, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 void abase_p16_vec_sub(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_vec w, abase_p16_src_vec u, abase_p16_src_vec v, unsigned int n)
 {
@@ -467,7 +479,7 @@ void abase_p16_vec_sub(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_vec w, 
         abase_p16_sub(K, w[i], u[i], v[i]);
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_random */
+/* *Mpfq::defaults::vec::getset::code_for_vec_random, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 void abase_p16_vec_random(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_vec w, unsigned int n)
 {
@@ -476,7 +488,7 @@ void abase_p16_vec_random(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_vec 
         abase_p16_random(K, w[i]);
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_cmp */
+/* *Mpfq::defaults::vec::getset::code_for_vec_cmp, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 int abase_p16_vec_cmp(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_src_vec u, abase_p16_src_vec v, unsigned int n)
 {
@@ -489,7 +501,7 @@ int abase_p16_vec_cmp(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_src_vec u, a
     return 0;
 }
 
-/* *Mpfq::defaults::vec::flatdata::code_for_vec_is_zero */
+/* *Mpfq::defaults::vec::flatdata::code_for_vec_is_zero, Mpfq::defaults::flatdata, simd_flat */
 static inline
 int abase_p16_vec_is_zero(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_src_vec r, unsigned int n)
 {
@@ -500,28 +512,28 @@ int abase_p16_vec_is_zero(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_src_vec 
     return 1;
 }
 
-/* *Mpfq::defaults::vec::flatdata::code_for_vec_ur_set */
+/* *Mpfq::defaults::vec::flatdata::code_for_vec_ur_set, Mpfq::defaults::flatdata, simd_flat */
 static inline
 void abase_p16_vec_ur_set(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_vec_ur r, abase_p16_src_vec_ur s, unsigned int n)
 {
     if (r != s) memcpy(r, s, n*sizeof(abase_p16_elt_ur));
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_ur_setcoef */
+/* *Mpfq::defaults::vec::getset::code_for_vec_ur_setcoef, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 void abase_p16_vec_ur_setcoef(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_vec_ur w, abase_p16_src_elt_ur x, unsigned int i)
 {
     abase_p16_elt_ur_set(K, w[i], x);
 }
 
-/* *Mpfq::defaults::vec::getset::code_for_vec_ur_getcoef */
+/* *Mpfq::defaults::vec::getset::code_for_vec_ur_getcoef, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 void abase_p16_vec_ur_getcoef(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_elt_ur x, abase_p16_src_vec_ur w, unsigned int i)
 {
     abase_p16_elt_ur_set(K, x, w[i]);
 }
 
-/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_add */
+/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_add, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 void abase_p16_vec_ur_add(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_vec_ur w, abase_p16_src_vec_ur u, abase_p16_src_vec_ur v, unsigned int n)
 {
@@ -530,7 +542,7 @@ void abase_p16_vec_ur_add(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_vec_
         abase_p16_elt_ur_add(K, w[i], u[i], v[i]);
 }
 
-/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_sub */
+/* *Mpfq::defaults::vec::addsub::code_for_vec_ur_sub, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 void abase_p16_vec_ur_sub(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_vec_ur w, abase_p16_src_vec_ur u, abase_p16_src_vec_ur v, unsigned int n)
 {
@@ -539,7 +551,7 @@ void abase_p16_vec_ur_sub(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_vec_
         abase_p16_elt_ur_sub(K, w[i], u[i], v[i]);
 }
 
-/* *Mpfq::defaults::vec::mul::code_for_vec_reduce */
+/* *Mpfq::defaults::vec::mul::code_for_vec_reduce, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
 void abase_p16_vec_reduce(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_vec w, abase_p16_dst_vec_ur u, unsigned int n)
 {

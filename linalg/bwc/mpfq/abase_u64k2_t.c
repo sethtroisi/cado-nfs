@@ -4,102 +4,123 @@
 #include "abase_u64k2_t.h"
 
 #include "binary-dotprods-backends.h"
-/* Active handler: Mpfq::defaults::vec */
+/* Active handler: simd_u64k */
+/* Automatically generated code  */
 /* Active handler: Mpfq::defaults */
-/* Active handler: Mpfq::engine::defaults::mpi_flat */
+/* Active handler: Mpfq::defaults::vec */
+/* Active handler: Mpfq::defaults::mpi_flat */
 /* Active handler: simd_dotprod */
 /* Active handler: io */
 /* Active handler: trivialities */
 /* Active handler: simd_flat */
-/* Active handler: simd_u64k */
-/* Automatically generated code  */
-/* Options used: k=2 tag=u64k2 choose_by_groupsize=<code> prefix=abase_ virtual_base={
+/* Options used: k=2 tag=u64k2 vbase_stuff={
+                 'vc:includes' => [
+                                    '<stdarg.h>'
+                                  ],
+                 'member_templates_restrict' => {
+                                                  'u64k2' => [
+                                                               'u64k1',
+                                                               'u64k2'
+                                                             ],
+                                                  'p16' => [
+                                                             'p16'
+                                                           ],
+                                                  'u64k1' => $vbase_stuff->{'member_templates_restrict'}{'u64k2'}
+                                                },
+                 'families' => [
+                                 $vbase_stuff->{'member_templates_restrict'}{'u64k2'},
+                                 $vbase_stuff->{'member_templates_restrict'}{'p16'}
+                               ],
+                 'choose_byfeatures' => sub { "DUMMY" }
+               };
+ family=[u64k1, u64k2] virtual_base={
                   'filebase' => 'abase_vbase',
                   'substitutions' => [
                                        [
-                                         qr/(?-xism:abase_u64k2_elt \*)/,
+                                         qr/(?^:abase_u64k2_elt \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_src_elt\b)/,
+                                         qr/(?^:abase_u64k2_src_elt\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_elt\b)/,
+                                         qr/(?^:abase_u64k2_elt\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_dst_elt\b)/,
+                                         qr/(?^:abase_u64k2_dst_elt\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_elt_ur \*)/,
+                                         qr/(?^:abase_u64k2_elt_ur \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_src_elt_ur\b)/,
+                                         qr/(?^:abase_u64k2_src_elt_ur\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_elt_ur\b)/,
+                                         qr/(?^:abase_u64k2_elt_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_dst_elt_ur\b)/,
+                                         qr/(?^:abase_u64k2_dst_elt_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_vec \*)/,
+                                         qr/(?^:abase_u64k2_vec \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_src_vec\b)/,
+                                         qr/(?^:abase_u64k2_src_vec\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_vec\b)/,
+                                         qr/(?^:abase_u64k2_vec\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_dst_vec\b)/,
+                                         qr/(?^:abase_u64k2_dst_vec\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_vec_ur \*)/,
+                                         qr/(?^:abase_u64k2_vec_ur \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_src_vec_ur\b)/,
+                                         qr/(?^:abase_u64k2_src_vec_ur\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_vec_ur\b)/,
+                                         qr/(?^:abase_u64k2_vec_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_dst_vec_ur\b)/,
+                                         qr/(?^:abase_u64k2_dst_vec_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_poly \*)/,
+                                         qr/(?^:abase_u64k2_poly \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_src_poly\b)/,
+                                         qr/(?^:abase_u64k2_src_poly\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_poly\b)/,
+                                         qr/(?^:abase_u64k2_poly\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_dst_poly\b)/,
+                                         qr/(?^:abase_u64k2_dst_poly\b)/,
                                          'void *'
                                        ]
                                      ],
-                  'name' => 'abase_vbase'
+                  'name' => 'abase_vbase',
+                  'global_prefix' => 'abase_'
                 };
- family=[u64k1, u64k2] */
+ */
 
 
 /* Functions operating on the field structure */

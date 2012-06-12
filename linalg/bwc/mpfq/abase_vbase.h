@@ -16,7 +16,7 @@ typedef struct abase_vbase_tmpl_s * abase_vbase_tmpl_ptr;
 typedef struct abase_vbase_tmpl_s const * abase_vbase_tmpl_srcptr;
 
 struct abase_vbase_s {
-    void * obj; /* pointer to concrete implementation private fields */
+    void * obj; /* pointer to global implementation private fields */
     void (*field_characteristic)(abase_vbase_ptr, mpz_t);
     int (*field_degree)(abase_vbase_ptr);
     void (*field_init)(abase_vbase_ptr);
@@ -105,7 +105,6 @@ struct abase_vbase_s {
     void (*vec_reduce)(abase_vbase_ptr, void *, void *, unsigned int);
     ptrdiff_t (*vec_elt_stride)(abase_vbase_ptr, int);
     int (*groupsize)(abase_vbase_ptr);
-    void (*set_groupsize)(abase_vbase_ptr, int);
     int (*offset)(abase_vbase_ptr, int);
     int (*stride)(abase_vbase_ptr);
     void (*set_ui_at)(abase_vbase_ptr, void *, int, unsigned long);
@@ -133,8 +132,7 @@ struct abase_vbase_tmpl_s {
 typedef struct abase_vbase_s abase_vbase[1];
 typedef struct abase_vbase_tmpl_s abase_vbase_tmpl[1];
 
-void abase_vbase_oo_field_init_byname(abase_vbase_ptr, const char *);
-void abase_vbase_oo_field_init_bygroupsize(abase_vbase_ptr, int);
+void abase_vbase_oo_field_init_byfeatures(abase_vbase_ptr, ...);
 void abase_vbase_oo_init_templates(abase_vbase_tmpl_ptr, abase_vbase_ptr, abase_vbase_ptr);
 
 #endif  /* ABASE_VBASE_H_ */

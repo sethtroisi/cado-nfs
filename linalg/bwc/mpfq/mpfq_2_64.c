@@ -9,8 +9,8 @@
 #if !(GMP_LIMB_BITS == 64)
 #error "Constraints not met for this file: GMP_LIMB_BITS == 64"
 #endif
-/* Active handler: Mpfq::defaults::vec */
 /* Active handler: Mpfq::defaults */
+/* Active handler: Mpfq::defaults::vec */
 /* Active handler: Mpfq::gf2n::field */
 /* Automatically generated code for GF(2^64) */
 /* Definition polynomial P = X^64 + X^4 + X^3 + X + 1 */
@@ -216,7 +216,7 @@ int mpfq_2_64_fscan(mpfq_2_64_dst_field k, FILE * file, mpfq_2_64_dst_elt z)
 
 
 /* Vector functions */
-/* *Mpfq::defaults::vec::alloc::code_for_vec_init */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_init, Mpfq::defaults::vec, Mpfq::defaults */
 void mpfq_2_64_vec_init(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec * v, unsigned int n)
 {
     unsigned int i;
@@ -225,7 +225,7 @@ void mpfq_2_64_vec_init(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec * v, u
         mpfq_2_64_init(K, (*v) + i);
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_reinit */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_reinit, Mpfq::defaults::vec, Mpfq::defaults */
 void mpfq_2_64_vec_reinit(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec * v, unsigned int n, unsigned int m)
 {
     if (n < m) { // increase size
@@ -241,7 +241,7 @@ void mpfq_2_64_vec_reinit(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec * v,
     }
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_clear */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_clear, Mpfq::defaults::vec, Mpfq::defaults */
 void mpfq_2_64_vec_clear(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec * v, unsigned int n)
 {
         unsigned int i;
@@ -250,7 +250,7 @@ void mpfq_2_64_vec_clear(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec * v, 
     free(*v);
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_asprint */
+/* *Mpfq::defaults::vec::io::code_for_vec_asprint, Mpfq::defaults::vec, Mpfq::defaults */
 void mpfq_2_64_vec_asprint(mpfq_2_64_dst_field K MAYBE_UNUSED, char * * pstr, mpfq_2_64_src_vec w, unsigned int n)
 {
     if (n == 0) {
@@ -287,7 +287,7 @@ void mpfq_2_64_vec_asprint(mpfq_2_64_dst_field K MAYBE_UNUSED, char * * pstr, mp
     (*pstr)[len] = '\0';
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_fprint */
+/* *Mpfq::defaults::vec::io::code_for_vec_fprint, Mpfq::defaults::vec, Mpfq::defaults */
 void mpfq_2_64_vec_fprint(mpfq_2_64_dst_field K MAYBE_UNUSED, FILE * file, mpfq_2_64_src_vec w, unsigned int n)
 {
     char *str;
@@ -296,13 +296,13 @@ void mpfq_2_64_vec_fprint(mpfq_2_64_dst_field K MAYBE_UNUSED, FILE * file, mpfq_
     free(str);
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_print */
+/* *Mpfq::defaults::vec::io::code_for_vec_print, Mpfq::defaults::vec, Mpfq::defaults */
 void mpfq_2_64_vec_print(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_src_vec w, unsigned int n)
 {
     mpfq_2_64_vec_fprint(K,stdout,w,n);
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_sscan */
+/* *Mpfq::defaults::vec::io::code_for_vec_sscan, Mpfq::defaults::vec, Mpfq::defaults */
 int mpfq_2_64_vec_sscan(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec * w, unsigned int * n, const char * str)
 {
     // start with a clean vector
@@ -346,7 +346,7 @@ int mpfq_2_64_vec_sscan(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec * w, u
     return 1;
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_fscan */
+/* *Mpfq::defaults::vec::io::code_for_vec_fscan, Mpfq::defaults::vec, Mpfq::defaults */
 int mpfq_2_64_vec_fscan(mpfq_2_64_dst_field K MAYBE_UNUSED, FILE * file, mpfq_2_64_vec * w, unsigned int * n)
 {
     char *tmp;
@@ -379,7 +379,7 @@ int mpfq_2_64_vec_fscan(mpfq_2_64_dst_field K MAYBE_UNUSED, FILE * file, mpfq_2_
     return ret;
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_init */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_init, Mpfq::defaults::vec, Mpfq::defaults */
 void mpfq_2_64_vec_ur_init(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec_ur * v, unsigned int n)
 {
     unsigned int i;
@@ -388,7 +388,7 @@ void mpfq_2_64_vec_ur_init(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec_ur 
         mpfq_2_64_elt_ur_init(K, &( (*v)[i]));
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_reinit */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_reinit, Mpfq::defaults::vec, Mpfq::defaults */
 void mpfq_2_64_vec_ur_reinit(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec_ur * v, unsigned int n, unsigned int m)
 {
     if (n < m) { // increase size
@@ -404,7 +404,7 @@ void mpfq_2_64_vec_ur_reinit(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec_u
     }
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_clear */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_clear, Mpfq::defaults::vec, Mpfq::defaults */
 void mpfq_2_64_vec_ur_clear(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_vec_ur * v, unsigned int n)
 {
     unsigned int i;

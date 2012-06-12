@@ -204,7 +204,6 @@
 
 
 #define abgroupsize(a0)	abcommon_name_(groupsize) (a0)
-#define abset_groupsize(a0,a1)	abcommon_name_(set_groupsize) (a0,a1)
 #define aboffset(a0,a1)	abcommon_name_(offset) (a0,a1)
 #define abstride(a0)	abcommon_name_(stride) (a0)
 #define abset_ui_at(a0,a1,a2,a3)	abcommon_name_(set_ui_at) (a0,a1,a2,a3)

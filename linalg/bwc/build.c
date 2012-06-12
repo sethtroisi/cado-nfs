@@ -6,6 +6,7 @@
 #include "bwc_config.h"
 #include "matmul.h"
 #include "macros.h"
+#include "mpfq/mpfq.h"
 #include "mpfq/abase_vbase.h"
 #include "matmul-mf.h"
 
@@ -17,8 +18,11 @@ void usage()
 int main(int argc, char * argv[])
 {
     abase_vbase xx;
-    abase_vbase_oo_field_init_byname(xx, "u64k1");
-    xx->set_groupsize(xx, 64);
+    abase_vbase_oo_field_init_byfeatures(xx,
+                /* MPFQ_PRIME, (2 as mpz), */ /* this is by default I
+                                                 think */
+                MPFQ_GROUPSIZE, 64,
+                MPFQ_DONE);
 
     matmul_t mm;
 
