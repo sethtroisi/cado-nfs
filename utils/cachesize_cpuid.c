@@ -44,26 +44,31 @@ static inline uint32_t bits_11_0(uint32_t x) {
 
 
 void cpuid(uint32_t res[4], uint32_t op) {
-  uint32_t saved[4];
-  __asm__ __volatile__(
-    "movl %%eax, 0(%[src])\n"
-    "movl %%ebx, 4(%[src])\n"
-    "movl %%ecx, 8(%[src])\n"
-    "movl %%edx, 12(%[src])\n"
-    "movl %[op], %%eax\n"
-    "cpuid\n"
-    "movl %%eax, 0(%[res])\n"
-    "movl %%ebx, 4(%[res])\n"
-    "movl %%ecx, 8(%[res])\n"
-    "movl %%edx, 12(%[res])\n"
-    "movl 0(%[src]), %%eax\n"
-    "movl 4(%[src]), %%ebx\n"
-    "movl 8(%[src]), %%ecx\n"
-    "movl 12(%[src]), %%edx\n"
-    :
-    : [op]"m"(op), [res]"D"(res), [src]"S"(saved)
-    : "memory"
-    );
+    volatile uint64_t saved[4];
+    volatile uint32_t pre_res[4];
+    __asm__ __volatile__(
+            "movq %%rax, 0(%[src])\n"
+            "movq %%rbx, 8(%[src])\n"
+            "movq %%rcx, 16(%[src])\n"
+            "movq %%rdx, 24(%[src])\n"
+            "movl %[op], %%eax\n"
+            "cpuid\n"
+            "movl %%eax, 0(%[res])\n"
+            "movl %%ebx, 4(%[res])\n"
+            "movl %%ecx, 8(%[res])\n"
+            "movl %%edx, 12(%[res])\n"
+            "movq 0(%[src]), %%rax\n"
+            "movq 8(%[src]), %%rbx\n"
+            "movq 16(%[src]), %%rcx\n"
+            "movq 24(%[src]), %%rdx\n"
+            :
+            : [op]"m"(op), [res]"D"(pre_res), [src]"S"(saved)
+            : "memory"
+            );
+    res[0] = pre_res[0];
+    res[1] = pre_res[1];
+    res[2] = pre_res[2];
+    res[3] = pre_res[3];
 }
 
 
