@@ -141,7 +141,7 @@ if ($mode eq 'balancing') {
 }
 
 
-if ($mode =~ /^(permutation|weights)$/) {
+if ($mode =~ /^(permutation|weights|pvector32)$/) {
     # Dump a list of unsigned ints
     my $add1 = $mode eq 'permutation';
     my @p=();

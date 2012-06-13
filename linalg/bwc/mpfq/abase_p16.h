@@ -193,8 +193,8 @@ void abase_p16_set_zero(abase_p16_dst_field, abase_p16_dst_elt);
 /* missing get_mpz */
 
 /* Assignment of random values */
-/* *simd_p16::code_for_random */
-#define abase_p16_random(K, r)	*r = rand()
+static inline
+void abase_p16_random(abase_p16_dst_field, abase_p16_dst_elt);
 
 /* Arithmetic operations on elements */
 /* *simd_p16::code_for_add */
@@ -365,6 +365,13 @@ static inline
 void abase_p16_set_zero(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_elt r)
 {
     memset(r, 0, sizeof(abase_p16_elt));
+}
+
+/* *simd_p16::code_for_random */
+static inline
+void abase_p16_random(abase_p16_dst_field K, abase_p16_dst_elt r)
+{
+    *r = rand() % *K;
 }
 
 /* *Mpfq::defaults::flatdata::code_for_elt_ur_set, simd_flat */

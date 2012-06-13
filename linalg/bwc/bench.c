@@ -328,7 +328,6 @@ int main(int argc, char * argv[])
                 MPFQ_PRIME, ba->prime,
                 MPFQ_GROUPSIZE, nbys,
                 MPFQ_DONE);
-    abort();
 
     param_list_lookup_string(ba->pl, "srcvec");
     if (param_list_warn_unused(ba->pl)) {

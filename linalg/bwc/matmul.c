@@ -41,7 +41,8 @@ matmul_ptr matmul_init(abase_vbase_ptr x, unsigned int nr, unsigned int nc, cons
     (*sym)(fake);
 
     // do_rebinding(fake, impl);
-    matmul_ptr mm = fake->bind->init(x, pl, optimized_direction);
+    // be careful, we really want ->obj here !
+    matmul_ptr mm = fake->bind->init(x->obj, pl, optimized_direction);
     if (mm == NULL) return NULL;
     // do_rebinding(mm, impl);
     (*sym)(mm);

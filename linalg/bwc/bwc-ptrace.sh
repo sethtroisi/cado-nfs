@@ -39,7 +39,7 @@ nullspace=left
 
 # and also, I acknowledge there is a bug presently.
 set +e
-$bins/bench  -t --withcoeffs --nbys 1 --impl basicp  -- $matrix
+$bins/bench  -t --nmax 1000 --prime 65521 --nbys 1 --impl basicp  -- $matrix
 
 mdir=$wdir
 
@@ -51,3 +51,8 @@ $cmd weights < $rwfile > $mdir/rw.m
 $cmd weights < $cwfile > $mdir/cw.m
 
 $cmd bpmatrix < $matrix > $mdir/t.m
+
+$cmd pvector32 < /tmp/Lsrc > $mdir/lsrc.m
+$cmd pvector32 < /tmp/Lmul > $mdir/lmul.m
+$cmd pvector32 < /tmp/Rsrc > $mdir/rsrc.m
+$cmd pvector32 < /tmp/Rmul > $mdir/rmul.m
