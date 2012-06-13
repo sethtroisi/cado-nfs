@@ -55,7 +55,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             MPFQ_DONE);
 
     abase_vbase Ar;
-    abase_vbase_oo_field_init_byfeatures(Ac,
+    abase_vbase_oo_field_init_byfeatures(Ar,
             MPFQ_PRIME, p,
             MPFQ_GROUPSIZE, bw->n,
             MPFQ_DONE);

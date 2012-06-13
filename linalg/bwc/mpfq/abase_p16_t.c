@@ -149,11 +149,11 @@
 /* *simd_p16::code_for_member_template_dotprod */
 void abase_p16_p16_dotprod(abase_p16_dst_field K0 MAYBE_UNUSED, abase_p16_dst_field K1 MAYBE_UNUSED, abase_p16_dst_vec xw, abase_p16_src_vec xu1, abase_p16_src_vec xu0, unsigned int n)
 {
-        int32_t s = 0;
+        int64_t s = 0;
         for(unsigned int i = 0 ; i < n ; i++) {
-            s+=xu0[i][0] * xu1[i][0];
+            s+=((int64_t) xu0[i][0]) * ((int64_t) xu1[i][0]);
         }
-        xw[0][0] =s % *K0;
+        xw[0][0] =s % (int64_t) *K0;
 }
 
 /* *simd_p16::code_for_member_template_addmul_tiny */

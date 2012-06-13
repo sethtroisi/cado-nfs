@@ -29,7 +29,7 @@ int gen_row(double lambda, int n, int * ptr)
         int e = 1 + (int) (lambda * dist_func() * (i+1));
         i += e;
         c += 1;
-        if (i < 0 || i >= n)
+        if (i < 0 || i > n)
             break;
         if (ptr) *ptr++ = i - 1;
     }

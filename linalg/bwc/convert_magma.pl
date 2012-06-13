@@ -153,6 +153,18 @@ if ($mode =~ /^(permutation|weights|pvector32)$/) {
     exit;
 }
 
+if ($mode =~ /^(spvector32)$/) {
+    # Dump a list of SIGNED ints
+    my $add1 = $mode eq 'permutation';
+    my @p=();
+    while(sysread(STDIN, my $x, 4)) {
+        my $v = unpack("l",$x);
+        push @p, $v+$add1;
+    }
+    print "var:=[",join(',',@p),"];\n";
+    exit;
+}
+
 if ($mode eq 'x') {
     die unless defined($_=<>);
     die unless /^(\d+)$/;

@@ -18,10 +18,10 @@ nc:=Ncols(M);
 load "/tmp/bwc/rw.m"; rw:=var;
 load "/tmp/bwc/cw.m"; cw:=var;
 
-load "/tmp/bwc/lsrc.m"; lsrc:=var;
-load "/tmp/bwc/rsrc.m"; rsrc:=var;
-load "/tmp/bwc/lmul.m"; lmul:=var;
-load "/tmp/bwc/rmul.m"; rmul:=var;
+load "/tmp/bwc/rowvec1.m"; rowvec1:=Vector(GF(p),nr,var);
+load "/tmp/bwc/rowvec2.m"; rowvec2:=Vector(GF(p),nr,var);
+load "/tmp/bwc/colvec1.m"; colvec1:=Vector(GF(p),nc,var);
+load "/tmp/bwc/colvec2.m"; colvec2:=Vector(GF(p),nc,var);
 
 // load "/tmp/bwc/placemats.m";
 // load "/tmp/bwc/b.m"; 

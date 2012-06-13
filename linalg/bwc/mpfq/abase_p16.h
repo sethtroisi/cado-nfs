@@ -392,7 +392,7 @@ void abase_p16_elt_ur_set_zero(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst
 static inline
 void abase_p16_reduce(abase_p16_dst_field K, abase_p16_dst_elt x, abase_p16_dst_elt_ur y)
 {
-    *x = *y % *K;
+    *x = *y % *K; *x += *K & -(*x < 0);
 }
 
 /* *Mpfq::defaults::flatdata::code_for_cmp, simd_flat */

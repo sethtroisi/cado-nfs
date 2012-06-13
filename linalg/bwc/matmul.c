@@ -221,6 +221,20 @@ void matmul_save_cache(matmul_ptr mm)
 
 void matmul_mul(matmul_ptr mm, void * dst, void const * src, int d)
 {
+    /* d == 1: this is a matrix-times-vector product.
+     * d == 0: this is a vector-times-matrix product.
+     *
+     * In terms of number of rows and columns of vectors, this has
+     * implications of course.
+     *
+     * A matrix times vector product takes a src vector of mm->dim[1]
+     * coordinates, and outputs a dst vector of mm->dim[0] coordinates.
+     *
+     * This external interface is _not_ concerned with the value of the
+     * mm->store_transposed flag. That one only relates to how the
+     * implementation layer expects the data to be presented when the
+     * cache is being built.
+     */
     mm->bind->mul(mm, dst, src, d);
 }
 

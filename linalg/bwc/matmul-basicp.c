@@ -131,6 +131,13 @@ void matmul_basicp_mul(struct matmul_basicp_data_s * mm, void * xdst, void const
     abelt_ur rowsum;
     abelt_ur_init(x, rowsum);
 
+    /* d == 1: matrix times vector product */
+    /* d == 0: vector times matrix product */
+
+    /* However the matrix may be stored either row-major
+     * (store_transposed == 0) or column-major (store_transposed == 1)
+     */
+
     if (d == !mm->public_->store_transposed) {
         abvec_set_zero(x, dst, mm->public_->dim[!d]);
         ASM_COMMENT("critical loop");

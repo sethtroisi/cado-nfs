@@ -29,7 +29,11 @@ mpi=${Mh}x${Mv}
 thr=${Th}x${Tv}
 
 # The test matrix may be created by:
-# $bins/random  100 -c 10 --kleft 10 > $mats/t100p.txt
+#
+# Pay attention to the fact that when the implementation layers expect the
+# matrix in column major order, we must not use --kleft, but rather
+# --kright, even though we use -t in the end.
+# $bins/random  90 100 -c 10 --kright 10 > $mats/t100p.txt
 # $bins/mf_scan  --ascii-in --withcoeffs --mfile $mats/t100p.txt  --freq --binary-out --ofile $mats/t100p.bin
 
 matrix=$mats/t100p.bin
@@ -51,8 +55,10 @@ $cmd weights < $rwfile > $mdir/rw.m
 $cmd weights < $cwfile > $mdir/cw.m
 
 $cmd bpmatrix < $matrix > $mdir/t.m
+echo "var:=Transpose(var);" >> $mdir/t.m
 
-$cmd pvector32 < /tmp/Lsrc > $mdir/lsrc.m
-$cmd pvector32 < /tmp/Lmul > $mdir/lmul.m
-$cmd pvector32 < /tmp/Rsrc > $mdir/rsrc.m
-$cmd pvector32 < /tmp/Rmul > $mdir/rmul.m
+
+$cmd spvector32 < /tmp/rowvec1 > $mdir/rowvec1.m
+$cmd spvector32 < /tmp/rowvec2 > $mdir/rowvec2.m
+$cmd spvector32 < /tmp/colvec1 > $mdir/colvec1.m
+$cmd spvector32 < /tmp/colvec2 > $mdir/colvec2.m

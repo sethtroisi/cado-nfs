@@ -128,7 +128,10 @@ void matrix_read_pass(
             expand(cw_out, exp_nc - cskip);
             drop_cw_p=1;
         }
-        // we don't even set cw_out->size.
+        // we don't even set cw_out->size. There's a reason for this.
+        // When reading from binary data, we can't compute cw precisely
+        // anyway. So better not rely on something which is specific to
+        // the ascii case.
         // cw_out->size = exp_nc;
     } else {
         if (cw_out && cw_out->p == NULL)  {

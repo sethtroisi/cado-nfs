@@ -52,6 +52,22 @@ void mf_prepare_matrix_u32(matmul_ptr mm, matrix_u32_ptr m, const char * file, i
     m->twist = NULL;
     m->p = mf->p;
 
+    /* Beware. We really have dim[0] = nrows and dim[1] = ncols as far as
+     * this matrix bit is concerned. However, when m->transpose == 1
+     * the submatrix file which gets written on disk is transposed. This
+     * is the reason why in this case we need to swap indices, and work
+     * de facto with a transposed matrix.
+     *
+     * Let's state it a second time. A bit matrix of size 100M * 99M, if
+     * split over a processor grid of size 100x100, and with the
+     * implementation expecting transposed matrix data, will (with
+     * save_submatrices=1) save submatrices of size 100k * 99k, but in
+     * column major order. In turn,
+     * if we use the bench program on such submatrices, we will (as per
+     * matrix_read_pass above) read them in row major order to count a
+     * ``number of rows'' (in fact, columns), and a ``number of columns''
+     * (in fact, rows).
+     */
     mm->dim[m->transpose] = rw->size;
     mm->dim[!m->transpose] = cw->size;
 }
