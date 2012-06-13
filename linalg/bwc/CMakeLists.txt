@@ -76,6 +76,10 @@ foreach(v ${bwc_abases})
     set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/abase_${v}.c mpfq/abase_${v}_t.c )
 endforeach(v)
 
+foreach(v p16)
+    set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/abase_${v}.c mpfq/abase_${v}_t.c )
+endforeach(v)
+
 set(bwc_base_sources
     parallelizing_info.c
     intersections.c
@@ -116,6 +120,7 @@ set_target_properties(bwc_mpfq PROPERTIES
         LINK_FLAGS "--mpi")
 
 set(matmul_basic_sources    matmul-basic.c)
+set(matmul_basicp_sources    matmul-basicp.c)
 set(matmul_sliced_sources   matmul-sliced.cpp)
 set(matmul_bucket_sources   matmul-bucket.cpp)
 set(matmul_threaded_sources matmul-threaded.c worker-threads.c)
@@ -172,6 +177,7 @@ foreach(v ${bwc_abases})
         configure_matmul_lib(${v} ${i})
     endforeach(i)
 endforeach(v)
+configure_matmul_lib(p16 basicp)
 
 # INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/share/${CADO_DIST_ARCHIVE_NAME}/libexec"
 

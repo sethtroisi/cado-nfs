@@ -21,6 +21,7 @@
 #define MM_IMPL_MAGIC_sliced    2
 #define MM_IMPL_MAGIC_bucket    3
 #define MM_IMPL_MAGIC_threaded  4
+#define MM_IMPL_MAGIC_basicp    1025
 
 #define CPP_PAD2(A,B) A ## B
 #define MM_IMPL_MY_MAGIC(X) CPP_PAD2(MM_IMPL_MAGIC_,X)
@@ -35,6 +36,8 @@
 #include "matmul-bucket.h"
 #elif     MM_IMPL_MY_MAGIC(MM_IMPL) == MM_IMPL_MAGIC_threaded
 #include "matmul-threaded.h"
+#elif     MM_IMPL_MY_MAGIC(MM_IMPL) == MM_IMPL_MAGIC_basicp
+#include "matmul-basicp.h"
 #else
 #error "Undefined MM implementation provided in MM_IMPL"
 #endif

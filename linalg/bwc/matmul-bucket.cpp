@@ -449,7 +449,7 @@ void matmul_bucket_clear(struct matmul_bucket_data_s * mm)
 
 static void mm_finish_init(struct matmul_bucket_data_s * mm);
 
-struct matmul_bucket_data_s * matmul_bucket_init(abdst_field xx MAYBE_UNUSED, param_list pl, int optimized_direction)
+struct matmul_bucket_data_s * matmul_bucket_init(abdst_field xx, param_list pl, int optimized_direction)
 {
     struct matmul_bucket_data_s * mm;
     mm = new matmul_bucket_data_s;

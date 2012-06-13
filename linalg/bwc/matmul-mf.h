@@ -8,7 +8,7 @@
 extern "C" {
 #endif
 
-void mf_prepare_matrix_u32(matmul_ptr mm, matrix_u32_ptr m, const char * file);
+void mf_prepare_matrix_u32(matmul_ptr mm, matrix_u32_ptr m, const char * file, int withcoeffs);
 
 #ifdef __cplusplus
 }
