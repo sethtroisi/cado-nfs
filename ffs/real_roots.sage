@@ -9,16 +9,15 @@
 
 
 def hensel_lift(f,r,prec,R=GF(2)['t,x'],df=None):
+    t,x=R.gens()
+    F=R.base_ring()
+    At.<t>=F['t']
+    S.<x>=At['x']
     if df==None:
-        df=f.derivative()
-        F=R.base_ring()
-        t,x=R.gens()
-        At.<t>=F['t']
-        K=FractionField(At)
-        S.<x>=K['x']
+        df=S(f).derivative()
     assert f(r) % t^prec == 0
     assert df(r) % t != 0
-    r_new=r-f(r)*df(r).inverse_mod(t^(2*prec))
+    r_new=r-f(r)*At(df(r)).inverse_mod(At(t)^(2*prec))
     assert (r-r_new) % t^prec == 0
     assert f(r_new) % t^(2*prec) ==0
     return r_new
@@ -61,6 +60,8 @@ def all_roots(f,prec,R):
     f=S(f)
     df=f.derivative()
     l=roots_mod_t(S(f))
+    if prec == 1:
+        return l
     final=[]
     for r in l:
         if A(df(r)) % t != 0:
@@ -71,6 +72,10 @@ def all_roots(f,prec,R):
             assert f(r) % t^prec == 0
             final.append(r.truncate(prec))
         else:
+            if A(df(r)) % t^2 ==0:
+                f_aux=f(t,r+t*x)
+                final+=[r+t*e for e in all_roots(f_aux,prec-1,R)]
+                continue
             pr=1
             lr=[r]
             while pr<prec:
@@ -82,7 +87,36 @@ def all_roots(f,prec,R):
             final+=lr
     return final
 
-       
+
+def all_roots_rec(f,prec,R=GF(2)['t,x'],pr=None):
+    if pr == None:
+        pr=prec
+    if pr <=0:
+        return []
+    F=R.base_ring()
+    t,x=R.gens()
+    At.<t>=F['t']
+    S.<x>=At['x']
+    f=S(f)
+    df=f.derivative()
+    l=roots_mod_t(S(f))
+    if pr == 1:
+        return l
+    final=[]
+    for r in l:
+        if At(df(r)) % t != 0:
+            pr0=1
+            while pr0<prec:
+                r=hensel_lift(f,r,pr0)
+                pr0*=2
+            assert f(r) % t^prec == 0
+            final.append(r.truncate(prec))
+        else:
+            f_aux=S(f)(r+t*x)
+            v_content=valuation(gcd(f_aux.coefficients()),At(t))
+            final+=[r+t*e for e in all_roots_rec(f_aux,prec-v_content,R,pr-1)]
+    return final
+
 def count_all_roots(f,prec,R):
     F=R.base_ring()
     t,x=R.gens()
@@ -119,7 +153,9 @@ def rotate(g,R):
     F=R.base_ring()
     t,x=R.gens()
     At.<t>=F['t']
-    S.<x>=FractionField(At)['x']
+    K=FractionField(At)
+    S.<x>=K['x']
+    g=S(g.numerator())*K(1/g.denominator())
     n,gg=S(g).degree(),S(g).coeffs()
     minv=min([(valuation(gg[i],At(t))-valuation(gg[n],At(t)))/(n-i) for i in range(n)])
     if minv != Infinity:
@@ -136,10 +172,17 @@ def rotate(g,R):
     return g0, s, m
 
 
-def real_roots(f,prec,R):
+def real_roots(f,prec=0,R=GF(2)['t,x']):
+    if prec ==0:
+        prec=4*f.degree()
+    t,x=R.gens()
+    F=R.base_ring()
+    At.<t>=F['t']
+    K=FractionField(At)
+    S.<x>=K['x']
     f_bar=R(f)(1/t,x)
     f_tilde,s,m=rotate(f_bar,R)
-    roots_f_tilde=all_roots(f_tilde,prec+s,R)
+    roots_f_tilde=find_roots_of_integer_polynomial(f_tilde,R,prec+abs(s),-10000)
     roots_f_bar=[r*t^s for r in roots_f_tilde]
     roots_f=[r(1/t) for r in roots_f_bar]
     return roots_f 
@@ -216,6 +259,7 @@ def count_roots_of_integer_polynomial(f,R,prec,minslope):
     i=S(f).degree()
     while i>0:
         i,sl,d=next_newton_segment(i,fc,A)
+        sl=min(sl,prec)
         if sl in ZZ and sl>= minslope:
             f_new=R(f)(t,x-t^sl)
             if sl < prec:
@@ -224,12 +268,38 @@ def count_roots_of_integer_polynomial(f,R,prec,minslope):
                 result+=d
     return result 
 
+def find_roots_of_integer_polynomial(f,R,prec,minslope):
+    F=R.base_ring()
+    t,x=R.gens()
+    A.<t>=F['t']
+    K=FractionField(A)
+    S.<x>=A['x']
+    if prec==0:
+        prec=10*S(f).degree()
+    if R(f).degrees()[0] == 0:
+        X.<x>=F['x']
+        g=X(f)
+        return [e[0] for e in g.roots()]
+    result=[]
+    fc=S(f).coeffs()
+    i=S(f).degree()
+    while i>0:
+        i,sl,d=next_newton_segment(i,fc,A)
+        sl=min(sl,prec)
+        if sl in ZZ and sl>= minslope:
+            f_new=R(f)(t,x-t^sl)
+            if sl < prec:
+                result+=[ t^sl+e for e in
+                        find_roots_of_integer_polynomial(f_new,R,prec,sl+1)]
+            else:
+                result+=[0]
+    return result 
 # If double roots count as 2 roots than multiplicities=True
 # and in this case we might speed up computations.
 # If two roots are equal by multiplicity t^70 we count as a double root.
 # IMPORTANT REMARK: A "root" at precision 10 may not expand to a real root.
 # Thus multiplicities=False may find many more roots that the True option
-def count_real_roots(f,multiplicities=False,prec=0,R=GF(2)['t,x'],minslope=-100000):
+def count_real_roots(f,multiplicities=True,prec=0,R=GF(2)['t,x'],minslope=-100000):
     F=R.base_ring()
     t,x=R.gens()
     A.<t>=F['t']
