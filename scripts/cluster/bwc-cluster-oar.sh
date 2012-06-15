@@ -205,6 +205,7 @@ while [ "$#" -gt 0 ] ; do
         req_arg $arg 1 $#
         slotlength="$1"
         shift
+    elif [ "$arg" = "--no-rebuild" ] ; then no_rebuild=1
     elif [ "$arg" = "--local" ] ; then locally=1
     elif [ "$arg" = "--mksol" ] ; then mksol=1
     elif [ "$arg" = "--debug" ] ; then debug=1
@@ -522,6 +523,11 @@ fi
 
 if [ "$bcode" = todo ] ; then
     unset bcode
+fi
+
+if [ "$no_rebuild" ] && ! [ "$bcode" ] ; then
+    echo "${BS}ERROR: Need to rebuild, although rebuilding is forbidden${BE}" >&2
+    exit 1
 fi
 
 if ! [ "$bcode" ] ; then
