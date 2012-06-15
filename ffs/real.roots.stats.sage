@@ -53,29 +53,26 @@ def all_roots_at_t_in_makefb_style(f,prec,R):
             truncroots+=lr
     return truncroots
 
-def truncated_root_to_statistics(r,prec,A,B,At):
+def truncated_root_to_statistics(r,prec,A,B,At,lost_prec):
     # r is a truncated root which guarantees precision prec
     # presented as r=(r1,r2), root=r1(t)+r2(1/t)
-    # At(resp. B) is the maximal degree of a (resp. b)
-    r1,r2=r[0],r[1]
-    assert prec>=1
+    # A(resp. B) is the maximal degree of a (resp. b)
+    r1,r2=At(r[0]),At(r[1])
     if r1 != 0:
-		ubdb=min(B,A-r1.degree())
-		lbdb=prec-r1.degree()
-		# (u)lbdb = (upper) lower bound degree of b
-		return sum([2^(i+(i+1+r1.degree()-prec)) for i in [lbdb..ubdb]])/2^(A+B+2) 
-		# a*t^(prec-(1+r1.degree()))= b*(r1*t^(prec-(1+r1.degree()))+ rev(r2,prec-(1+r1.degree()))) +c
-		# with deg(b)<=B0
-		# deg(c)<=B0 and (c = -b*(r1*t^prec+rev(r2)) mod t^(prec-(1+r1.degree())
+        delta_degree=At(r1).degree()
+        nb_conditions=prec-lost_prec
     else:
-		if r2 == 0:
-			v2=prec-1
-		else:
-			v2=valuation(At(r2),At(t))
-		# v2= deg(b)-deg(a)
-		ubdb=min(B, A+v2)
-		lbdb=prec-1
-		return sum([2^(i+(i-v2- (prec-1-v2))) for i in [lbdb..ubdb]])/2^(A+B+2)
+        if r2 != 0:
+            delta_degree=-valuation(At(r2),At(t))
+            nb_conditions=prec-lost_prec
+        else:
+            delta_degree=-prec
+            nb_conditions=0
+    ubdb=min(B,A-delta_degree)
+    lbdb=max(0,nb_conditions-delta_degree-1) 
+    result=sum([2^(i+(i+delta_degree+1-nb_conditions)) for i in
+        [lbdb..ubdb]])/2^(A+B+2)
+    return result
 
 def r_tilde_to_gap(r_tilde,prec,f_bar,s,R):
     F=R.base_ring()
@@ -97,7 +94,8 @@ def r_tilde_to_gap(r_tilde,prec,f_bar,s,R):
         value0=S(f_bar).constant_coefficient()
     # sage has a bug: cannot evaluate polynomials of S at 0
     fbcoeffs=[ K(e) for e in S(f_bar).coeffs()]
-    gap=min(valuation(value,At(t)),valuation(value0,At(t)))-min([valuation(fbcoeffs[0],At(t))]+[valuation(fbcoeffs[i],At(t))+i*valuation(r_bar,At(t))
+    v=valuation(At(r_tilde),At(t))+s # val of r_bar
+    gap=min(valuation(value,At(t)),valuation(value0,At(t)))-min([valuation(fbcoeffs[0],At(t))]+[valuation(fbcoeffs[i],At(t))+i*v
         for i in [1..S(f_bar).degree()]])
     return gap
 
@@ -106,15 +104,16 @@ def root_of_reversed_poly_to_real_root(s,r_tilde,R):
     t,x=R.gens()
     F=R.base_ring() 
     At.<t>=F['t']
+    K=FractionField(At)
     # s,m are such that f_tilde=t^m*f_bar(x*t^s)
     # parameter
     r_bar=r_tilde*t^s
-    r=r_bar(1/t)
+    r=K(r_bar)(1/t)
     num=r.numerator()
     den=r.denominator()
     r1=num.quo_rem(den)[0]
     aux=(num % den)/den
-    r2= At(aux(1/t))
+    r2= At(K(aux)(1/t))
     return [r1,r2]
 
 def tree_to_cancelation(truncroots,N):
@@ -148,9 +147,13 @@ def real_roots_stats(f,max_prec,A,B,R):
     for i in range(len(truncroots)):
         r_tilde=truncroots[i][0]
         prec=truncroots[i][2]
-        r=root_of_reversed_poly_to_real_root(s,r_tilde,R)
+        aux=0
+        prec_on_r=prec-aux
         truncroots[i][3]=r_tilde_to_gap(r_tilde,prec,f_bar,s,R)
-        truncroots[i][4]=truncated_root_to_statistics(r,prec,A,B,At).numerical_approx()
+        r=root_of_reversed_poly_to_real_root(s,r_tilde,R)
+        lost_prec=valuation(At(r_tilde),At(t))
+        truncroots[i][4]=truncated_root_to_statistics(r,prec,A,B,At,lost_prec).numerical_approx()
+    #print truncroots
     cancelation=tree_to_cancelation(truncroots,N)
     return cancelation
 
