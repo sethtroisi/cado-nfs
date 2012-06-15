@@ -206,6 +206,7 @@ while [ "$#" -gt 0 ] ; do
         slotlength="$1"
         shift
     elif [ "$arg" = "--no-rebuild" ] ; then no_rebuild=1
+    elif [ "$arg" = "--insist" ] ; then insist=1
     elif [ "$arg" = "--local" ] ; then locally=1
     elif [ "$arg" = "--mksol" ] ; then mksol=1
     elif [ "$arg" = "--debug" ] ; then debug=1
@@ -296,18 +297,25 @@ check_mandatory_definitions() {
 }
 
 check_servers() {
-    echo "Checking rsync servers:"
-    nok=0
-    for rsync_server in ${rsync_servers[@]} ; do
-        if rsync $rsync_server$server_subdir/ >/dev/null 2>&1 ; then
-            echo -e "\t$rsync_server: alive"
-            let nok+=1
+    while true ; do
+        echo "Checking rsync servers:"
+        nok=0
+        for rsync_server in ${rsync_servers[@]} ; do
+            if rsync $rsync_server$server_subdir/ >/dev/null 2>&1 ; then
+                echo -e "\t$rsync_server: alive"
+                let nok+=1
+            else
+                echo -e "\t$rsync_server: ${BS}unreachale${BE}"
+            fi
+        done
+        if [ "$nok" ] ; then
+            break
         else
-            echo -e "\t$rsync_server: ${BS}unreachale${BE}"
-        fi
-    done
-    if [ "$nok" = 0 ] ; then
-             cat >&2 <<EOF
+            if [ "$insist" ] ; then
+                echo "All rsync servers failed. Trying again in 30 seconds" >&2
+                sleep 30
+            else
+                 cat >&2 <<EOF
 All rsync servers failed.
 Arrange so that one is started on the relevant servers with the command line:
     ${BS}rsync --daemon --config=rsyncd.conf${BE}
@@ -322,17 +330,30 @@ Example config file:
           comment = cado
           read only = no
 EOF
-        exit 1
-    fi
+                exit 1
+            fi
+        fi
+    done
 }
 
 get_possible_bcodes() {
     split="$1"
-    res=()
-    for rsync_server in ${rsync_servers[@]} ; do
-        x=$( (rsync  --include="$matrix_base.$split.????????.bin" --exclude='*' $rsync_server$server_subdir/$split/ || :) | perl -ne "m,$matrix_base\.$split\.([\da-f]+)\.bin, && print qq{\$1\n};")
-        if [ "$x" ] ; then
-            res=(${res[@]} $x)
+    while true ; do
+        res=()
+        for rsync_server in ${rsync_servers[@]} ; do
+            x=$( (rsync  --include="$matrix_base.$split.????????.bin" --exclude='*' $rsync_server$server_subdir/$split/ || :) | perl -ne "m,$matrix_base\.$split\.([\da-f]+)\.bin, && print qq{\$1\n};")
+            if [ "$x" ] ; then
+                res=(${res[@]} $x)
+            fi
+        done
+        if [ "$res" ] ; then break ; fi
+        # If rebuilding is allowed, then we may exit from here.
+        if ! [ "$no_rebuild" ] ; then break ; fi
+        if [ "$insist" ] ; then
+            echo "All rsync servers failed. Trying again in 30 seconds" >&2
+            sleep 30
+        else
+            break
         fi
     done
     possible_bcodes=(`echo "${res[@]}" | xargs -n 1 echo | sort -u`)
