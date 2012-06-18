@@ -185,7 +185,7 @@ def real_roots(f,prec=0,R=GF(2)['t,x']):
     roots_f_tilde=find_roots_of_integer_polynomial(f_tilde,R,prec+abs(s),-10000)
     roots_f_bar=[r*t^s for r in roots_f_tilde]
     roots_f=[r(1/t) for r in roots_f_bar]
-    return roots_f 
+    return list(Set(roots_f)) 
 
 
 def reconstruct_real_root(r,prec,R):
@@ -293,7 +293,7 @@ def find_roots_of_integer_polynomial(f,R,prec,minslope):
                         find_roots_of_integer_polynomial(f_new,R,prec,sl+1)]
             else:
                 result+=[0]
-    return result 
+    return list(Set(result)) 
 # If double roots count as 2 roots than multiplicities=True
 # and in this case we might speed up computations.
 # If two roots are equal by multiplicity t^70 we count as a double root.
@@ -316,7 +316,8 @@ def count_real_roots(f,multiplicities=True,prec=0,R=GF(2)['t,x'],minslope=-10000
     if multiplicities == False:
         return count_all_roots(f_tilde,prec,R)
     else:
-        return count_roots_of_integer_polynomial(f_tilde,R,prec,-100000)      
+        return
+    list(Set(find_roots_of_integer_polynomial(f_tilde,R,prec,-100000)))      
 
 
 def construct_f_with_real_roots(P=0,R=GF(2)['t,x']):
