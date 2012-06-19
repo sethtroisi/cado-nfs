@@ -1586,7 +1586,7 @@ main (int argc, char **argv)
   rel_weight = (uint8_t*) malloc (nrelmax * sizeof(uint8_t));
   tot_alloc0 += nrelmax * (sizeof (int*) + sizeof(uint8_t));
   /* %zu is the C99 modifier for size_t */
-  fprintf (stderr, "Allocated rel_compact of %zuMb (total %luMb so far)\n",
+  fprintf (stderr, "Allocated rel_compact of %luMb (total %luMb so far)\n",
 	   (nrelmax * sizeof (int *)) >> 20,
 	   tot_alloc0 >> 20);
   
