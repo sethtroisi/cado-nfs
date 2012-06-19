@@ -2,6 +2,7 @@ Main changes between cado-nfs-1.1 and cado-nfs-1.2:
 
 * the replay step is faster and uses less memory
 * the default parameters in the params subdirectory have been improved
+* fixed bug in the lattice siever (las) on 32-bit computers
 
 Main changes between cado-nfs-1.0 and cado-nfs-1.1:
 
