@@ -1,0 +1,118 @@
+This patch may be used to tweak the MPFQ-generated files directly, and
+turn them into files which are general enough to be used with this code.
+
+(note though that our ambitions are limited at the moment. We do not
+claim, for instance, that what we do here is magically turning the
+mpfq-generated file into something valid for 32- and 64-bit.)
+--- a/mpfq_2_128.h	2012-05-29 22:52:07.000000000 +0200
++++ b/mpfq_2_128.h	2012-03-22 10:58:49.000000000 +0100
+@@ -2,6 +2,8 @@
+ #define MPFQ_2_128_H_
+ 
+ /* MPFQ generated file -- do not edit */
++/* Note: A patch adding pclmul functionality (if enabled) has been added
++ * on top of the MPFQ generated file */
+ 
+ #include "mpfq/mpfq.h"
+ #include "mpfq/mpfq_gf2n_common.h"
+@@ -14,6 +14,11 @@
+ #include <emmintrin.h>
+ #include <stddef.h>
+ #include <stdio.h>
++
++#ifdef  HAVE_PCLMUL
++#include <wmmintrin.h>
++#endif
++
+ #include "assert.h"
+ #ifdef	MPFQ_LAST_GENERATED_TAG
+ #undef	MPFQ_LAST_GENERATED_TAG
+@@ -966,6 +971,37 @@
+ static inline
+ void mpfq_2_128_mul_ur(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt_ur t, mpfq_2_128_src_elt s1, mpfq_2_128_src_elt s2)
+ {
++#if HAVE_PCLMUL
++    typedef union {
++        __v2di s;
++        unsigned long x[2];
++    } __v2di_proxy;
++
++    __v2di ss1, ss2, s1s, s2s;
++    __v2di_proxy t00, tk;
++    __v2di_proxy t11;
++    ss1 = _mm_loadu_si128((__v2di *)s1);
++    ss2 = _mm_loadu_si128((__v2di *)s2);
++
++
++    t00.s = _mm_clmulepi64_si128(ss1, ss2, 0);
++    t11.s = _mm_clmulepi64_si128(ss1, ss2, 17);
++
++    s1s = _mm_shuffle_epi32(ss1, 78);
++    ss1 ^= s1s;
++    s2s = _mm_shuffle_epi32(ss2, 78);
++    ss2 ^= s2s;
++
++    tk.s = _mm_clmulepi64_si128(ss1, ss2, 0);
++
++    tk.s ^= t00.s ^ t11.s;
++
++    /* store result */
++    t[0] = t00.x[0];
++    t[1] = t00.x[1] ^ tk.x[0];
++    t[2] = t11.x[0] ^ tk.x[1];
++    t[3] = t11.x[1];
++#else
+     typedef union { __v2di s; unsigned long x[2]; } v2di_proxy;
+ #define SHL(x, r) _mm_slli_epi64((x), (r))
+ #define SHR(x, r) _mm_srli_epi64((x), (r))
+@@ -1059,6 +1095,7 @@
+ #undef SHR
+ #undef SHLD
+ #undef SHRD
++#endif
+ }
+ 
+ /* *Mpfq::gf2n::squaring::code_for_sqr_ur */
+--- a/mpfq_2_64.h	2012-05-29 22:52:07.000000000 +0200
++++ b/mpfq_2_64.h	2012-03-22 10:58:49.000000000 +0100
+@@ -2,6 +2,8 @@
+ #define MPFQ_2_64_H_
+ 
+ /* MPFQ generated file -- do not edit */
++/* Note: A patch adding pclmul functionality (if enabled) has been added
++ * on top of the MPFQ generated file */
+ 
+ #include "mpfq/mpfq.h"
+ #include "mpfq/mpfq_gf2n_common.h"
+@@ -14,6 +14,11 @@
+ #include <emmintrin.h>
+ #include <stddef.h>
+ #include <stdio.h>
++
++#ifdef  HAVE_PCLMUL
++#include <wmmintrin.h>
++#endif
++
+ #include "assert.h"
+ #ifdef	MPFQ_LAST_GENERATED_TAG
+ #undef	MPFQ_LAST_GENERATED_TAG
+@@ -871,6 +876,11 @@
+ static inline
+ void mpfq_2_64_mul_ur(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_elt_ur t, mpfq_2_64_src_elt s1, mpfq_2_64_src_elt s2)
+ {
++#if HAVE_PCLMUL
++    __v2di aa = (__v2di) { s1[0], 0 };
++    __v2di bb = (__v2di) { s2[0], 0 };
++    _mm_storeu_si128((__v2di*)t, _mm_clmulepi64_si128(aa, bb, 0));
++#else
+        unsigned long hi, lo;
+        unsigned long A[16];
+        unsigned long a = s2[0];
+@@ -935,6 +945,7 @@
+        }
+        t[0] = lo;
+        t[1] = hi;
++#endif
+ }
+ 
+ /* *Mpfq::gf2n::squaring::code_for_sqr_ur */

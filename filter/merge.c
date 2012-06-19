@@ -244,32 +244,10 @@ main (int argc, char *argv[])
     filter_matrix_read (mat, ps, verbose, skip);
     printf ("Time for filter_matrix_read: %2.2lf\n", wct_seconds () - tt);
 
-#if 0 //FOR_FFS
-    for (int it = 0; it < mat->ncols; it++)
-      {
-        fprintf (stderr, "%d[%d]:", it, mat->wt[it]);
-        for (int it2 = 1; it2 <= mat->R[it][0] ; it2++)
-          {
-            fprintf (stderr, " %d", mat->R[it][it2]);
-          }
-        fprintf (stderr, "\n");
-      }
-    for (int it = 0; it < mat->nrows; it++)
-      {
-        fprintf (stderr, "%d:", it);
-        for (int it2 = 1; it2 <= mat->rows[it][0].id ; it2++)
-          {
-            fprintf (stderr, " %d(%d)", mat->rows[it][it2].id, 
-                             mat->rows[it][it2].e);
-          }
-        fprintf (stderr, "\n");
-      }
-#endif
-
     /* initialize rep, i.e., mostly opens outname */
     init_rep (rep, outname, mat, 0, MERGE_LEVEL_MAX);
     /* output the matrix dimensions in the history file */
-    report2 (rep, mat->nrows, mat->ncols);
+    report2 (rep, mat->nrows, mat->ncols, -1);
 
     /* resume from given history file if needed */
     if (resumename != NULL)
@@ -282,21 +260,6 @@ main (int argc, char *argv[])
     printf ("Time for MkzInit: %2.2lf\n", seconds()-tt);
 
     mergeOneByOne (rep, mat, maxlevel, verbose, forbw, ratio, coverNmax);
-#if 0 //def FOR_FFS 
-    for (int it = 0; it < mat->nrows; it++)
-      {
-        if (mat->rows[it] != NULL)
-          {
-            fprintf (stderr, "%d:", it);
-            for (int it2 = 1; it2 <= mat->rows[it][0].id ; it2++)
-              {
-                fprintf (stderr, " %d(%d)", mat->rows[it][it2].id, 
-                             mat->rows[it][it2].e);
-              }
-            fprintf (stderr, "\n");
-          }
-      }
-#endif
 
     gzip_close (rep->outfile, outname);
     printf ("Final matrix has N=%d nc=%d (%d) w(M)=%lu N*w(M)=%"

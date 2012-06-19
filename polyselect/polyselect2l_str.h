@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <inttypes.h>
 #include <gmp.h>
 #include <pthread.h>
 #include "cado.h"
@@ -30,7 +31,7 @@ typedef struct
 {
   mpz_t N;
   unsigned int d;
-  unsigned long ad;
+  uint64_t ad;
   int thread;
 } __tab_struct;
 typedef __tab_struct tab_t[1];
@@ -60,7 +61,7 @@ typedef struct
 {
   mpz_t N;
   unsigned long d;
-  unsigned long ad;
+  uint64_t ad;
   mpz_t Ntilde;
   mpz_t m0;
 } _header_struct;
@@ -74,30 +75,28 @@ unsigned long initPrimes (unsigned long, uint32_t**);
 void printPrimes (uint32_t*, unsigned long);
 void clearPrimes (uint32_t**);
 
-void header_init (header_t, mpz_t, unsigned long, unsigned long);
+void header_init (header_t, mpz_t, unsigned long, uint64_t);
 void header_clear (header_t);
 
 void proots_init (proots_t, unsigned long);
-void proots_add (proots_t, unsigned long, unsigned long*, unsigned long);
+void proots_add (proots_t, unsigned long, uint64_t*, unsigned long);
 void proots_print (proots_t, unsigned long);
 void proots_clear (proots_t, unsigned long);
 
 void qroots_init (qroots_t);
 void qroots_realloc (qroots_t, unsigned long);
-void qroots_add (qroots_t, unsigned int, unsigned int, unsigned long*);
+void qroots_add (qroots_t, unsigned int, unsigned int, uint64_t*);
 void qroots_print (qroots_t);
 void qroots_clear (qroots_t);
 
 void hash_init (hash_t, unsigned long);
-void hash_add (hash_t, unsigned long, int64_t, mpz_t, unsigned long,
-                      unsigned int, mpz_t, unsigned long, mpz_t);
+void hash_add (hash_t, unsigned long, int64_t, mpz_t, uint64_t,
+               unsigned long, mpz_t, unsigned long, mpz_t);
+void gmp_hash_add (hash_t, uint32_t, int64_t, mpz_t, uint64_t,
+		   unsigned long, mpz_t, uint64_t, mpz_t);
 void hash_grow (hash_t);
 void hash_clear (hash_t);
 
 void print_poly_info (mpz_t *, unsigned int d, mpz_t *, int);
-
-void match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
-            unsigned long ad, unsigned int d, mpz_t N, unsigned long q,
-            mpz_t rq);
 
 #endif

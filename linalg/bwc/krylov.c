@@ -15,6 +15,8 @@
 #include "filenames.h"
 #include "xdotprod.h"
 #include "rolling.h"
+#include "mpfq/mpfq.h"
+#include "mpfq/abase_vbase.h"
 
 /*
  * Relatively common manipulation in fact. Move to matmul_top ?
@@ -59,13 +61,27 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         ys[1] = ys[0] + (bw->ys[1]-bw->ys[0])/2;
     }
 
+    mpz_t p;
+    mpz_init_set_ui(p, 2);
+    param_list_parse_mpz(pl, "prime", p);
     abase_vbase A;
-    abase_vbase_oo_field_init_bygroupsize(A, ys[1]-ys[0]);
-    A->set_groupsize(A, ys[1]-ys[0]);
-
+    abase_vbase_oo_field_init_byfeatures(A, 
+            MPFQ_PRIME, p,
+            MPFQ_GROUPSIZE, ys[1]-ys[0],
+            MPFQ_DONE);
+    /* Hmmm. This would deserve better thought. Surely we don't need 64
+     * in the prime case. Anything which makes checks relevant will do.
+     * For the binary case, we used to work with 64 as a constant, but
+     * for the prime case we want to make this tunable (or maybe 1 ?)
+     */
     abase_vbase Ac;
-    abase_vbase_oo_field_init_byname(Ac, "u64k1");
-    Ac->set_groupsize(Ac, NCHECKS_CHECK_VECTOR);
+    abase_vbase_oo_field_init_byfeatures(Ac,
+            MPFQ_PRIME, p,
+            MPFQ_GROUPSIZE, NCHECKS_CHECK_VECTOR,
+            MPFQ_DONE);
+    mpz_clear(p);
+
+
 
     block_control_signals();
 

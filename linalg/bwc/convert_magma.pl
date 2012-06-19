@@ -65,6 +65,30 @@ if ($mode eq 'bmatrix') {
     exit;
 }
 
+if ($mode eq 'bpmatrix') {
+    my $nr=0;
+    my $nc=0;
+    my $curr=0;
+    my @coeffs=();
+    while(sysread(STDIN, my $x, 4)) {
+        my $v = unpack("L", $x);
+        if ($curr-- == 0) {
+            $nr++;
+            $curr=$v;
+        } else {
+            $nc = $v + 1 if $v >= $nc;
+            sysread(STDIN, my $x, 4) or die;
+            my $w=unpack("l", $x);
+            push @coeffs, [$nr, $v+1, $w];
+        }
+    }
+    print "var:=SparseMatrix($nr,$nc,[\n";
+    print join(", ", map { "<$_->[0], $_->[1], $_->[2]>" } @coeffs);
+    print "]);\n";
+    die unless $curr==0;
+    exit;
+}
+
 if ($mode eq 'balancing') {
     sysread(STDIN, my $x, 32);
     my ($nh,$nv,$nr,$nc,$ncoeffs,$checksum,$flags) = unpack("L4QLL", $x);
@@ -117,12 +141,24 @@ if ($mode eq 'balancing') {
 }
 
 
-if ($mode =~ /^(permutation|weights)$/) {
+if ($mode =~ /^(permutation|weights|pvector32)$/) {
     # Dump a list of unsigned ints
     my $add1 = $mode eq 'permutation';
     my @p=();
     while(sysread(STDIN, my $x, 4)) {
         my $v = unpack("L",$x);
+        push @p, $v+$add1;
+    }
+    print "var:=[",join(',',@p),"];\n";
+    exit;
+}
+
+if ($mode =~ /^(spvector32)$/) {
+    # Dump a list of SIGNED ints
+    my $add1 = $mode eq 'permutation';
+    my @p=();
+    while(sysread(STDIN, my $x, 4)) {
+        my $v = unpack("l",$x);
         push @p, $v+$add1;
     }
     print "var:=[",join(',',@p),"];\n";

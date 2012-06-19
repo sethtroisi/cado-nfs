@@ -16,7 +16,7 @@ typedef struct abase_vbase_tmpl_s * abase_vbase_tmpl_ptr;
 typedef struct abase_vbase_tmpl_s const * abase_vbase_tmpl_srcptr;
 
 struct abase_vbase_s {
-    void * obj; /* pointer to concrete implementation private fields */
+    void * obj; /* pointer to global implementation private fields */
     void (*field_characteristic)(abase_vbase_ptr, mpz_t);
     int (*field_degree)(abase_vbase_ptr);
     void (*field_init)(abase_vbase_ptr);
@@ -50,6 +50,7 @@ struct abase_vbase_s {
     void (*elt_ur_init)(abase_vbase_ptr, void *);
     void (*elt_ur_clear)(abase_vbase_ptr, void *);
     void (*elt_ur_set)(abase_vbase_ptr, void *, const void *);
+    void (*elt_ur_set_zero)(abase_vbase_ptr, void *);
     void (*elt_ur_set_ui)(abase_vbase_ptr, void *, unsigned long);
     void (*elt_ur_add)(abase_vbase_ptr, void *, const void *, const void *);
     void (*elt_ur_neg)(abase_vbase_ptr, void *, const void *);
@@ -57,6 +58,7 @@ struct abase_vbase_s {
     void (*mul_ur)(abase_vbase_ptr, void *, const void *, const void *);
     void (*sqr_ur)(abase_vbase_ptr, void *, const void *);
     void (*reduce)(abase_vbase_ptr, void *, void *);
+    void (*addmul1)(abase_vbase_ptr, void *, const void *, int);
     int (*cmp)(abase_vbase_ptr, const void *, const void *);
     int (*cmp_ui)(abase_vbase_ptr, const void *, unsigned long);
     int (*is_zero)(abase_vbase_ptr, const void *);
@@ -103,7 +105,6 @@ struct abase_vbase_s {
     void (*vec_reduce)(abase_vbase_ptr, void *, void *, unsigned int);
     ptrdiff_t (*vec_elt_stride)(abase_vbase_ptr, int);
     int (*groupsize)(abase_vbase_ptr);
-    void (*set_groupsize)(abase_vbase_ptr, int);
     int (*offset)(abase_vbase_ptr, int);
     int (*stride)(abase_vbase_ptr);
     void (*set_ui_at)(abase_vbase_ptr, void *, int, unsigned long);
@@ -131,8 +132,7 @@ struct abase_vbase_tmpl_s {
 typedef struct abase_vbase_s abase_vbase[1];
 typedef struct abase_vbase_tmpl_s abase_vbase_tmpl[1];
 
-void abase_vbase_oo_field_init_byname(abase_vbase_ptr, const char *);
-void abase_vbase_oo_field_init_bygroupsize(abase_vbase_ptr, int);
+void abase_vbase_oo_field_init_byfeatures(abase_vbase_ptr, ...);
 void abase_vbase_oo_init_templates(abase_vbase_tmpl_ptr, abase_vbase_ptr, abase_vbase_ptr);
 
 #endif  /* ABASE_VBASE_H_ */

@@ -104,6 +104,7 @@
 #define abelt_ur_init(a0,a1)	abcommon_name_(elt_ur_init) (a0,a1)
 #define abelt_ur_clear(a0,a1)	abcommon_name_(elt_ur_clear) (a0,a1)
 #define abelt_ur_set(a0,a1,a2)	abcommon_name_(elt_ur_set) (a0,a1,a2)
+#define abelt_ur_set_zero(a0,a1)	abcommon_name_(elt_ur_set_zero) (a0,a1)
 #define abelt_ur_set_ui(a0,a1,a2)	abcommon_name_(elt_ur_set_ui) (a0,a1,a2)
 #define abelt_ur_add(a0,a1,a2,a3)	abcommon_name_(elt_ur_add) (a0,a1,a2,a3)
 #define abelt_ur_neg(a0,a1,a2)	abcommon_name_(elt_ur_neg) (a0,a1,a2)
@@ -111,6 +112,7 @@
 #define abmul_ur(a0,a1,a2,a3)	abcommon_name_(mul_ur) (a0,a1,a2,a3)
 #define absqr_ur(a0,a1,a2)	abcommon_name_(sqr_ur) (a0,a1,a2)
 #define abreduce(a0,a1,a2)	abcommon_name_(reduce) (a0,a1,a2)
+#define abaddmul1(a0,a1,a2,a3)	abcommon_name_(addmul1) (a0,a1,a2,a3)
 
 #define abcmp(a0,a1,a2)	abcommon_name_(cmp) (a0,a1,a2)
 #define abcmp_ui(a0,a1,a2)	abcommon_name_(cmp_ui) (a0,a1,a2)
@@ -202,7 +204,6 @@
 
 
 #define abgroupsize(a0)	abcommon_name_(groupsize) (a0)
-#define abset_groupsize(a0,a1)	abcommon_name_(set_groupsize) (a0,a1)
 #define aboffset(a0,a1)	abcommon_name_(offset) (a0,a1)
 #define abstride(a0)	abcommon_name_(stride) (a0)
 #define abset_ui_at(a0,a1,a2,a3)	abcommon_name_(set_ui_at) (a0,a1,a2,a3)

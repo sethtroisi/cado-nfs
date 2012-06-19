@@ -1,20 +1,17 @@
-#ifndef ABASE_U64K2_T_H_
-#define ABASE_U64K2_T_H_
-
 /* MPFQ generated file -- do not edit */
 
-#include "abase_u64k1.h"
-#include "abase_u64k2.h"
-/* Active handler: simd_u64k */
+#define _POSIX_C_SOURCE 200112L
+#include "abase_p16_t.h"
+
+/* Active handler: simd_p16 */
 /* Automatically generated code  */
 /* Active handler: Mpfq::defaults */
 /* Active handler: Mpfq::defaults::vec */
 /* Active handler: Mpfq::defaults::mpi_flat */
-/* Active handler: simd_dotprod */
 /* Active handler: io */
 /* Active handler: trivialities */
 /* Active handler: simd_flat */
-/* Options used: k=2 tag=u64k2 vbase_stuff={
+/* Options used: vtag=p16 tag=p16 vbase_stuff={
                  'vc:includes' => [
                                     '<stdarg.h>'
                                   ],
@@ -34,87 +31,87 @@
                                ],
                  'choose_byfeatures' => sub { "DUMMY" }
                };
- family=[u64k1, u64k2] virtual_base={
+ family=[p16] virtual_base={
                   'filebase' => 'abase_vbase',
                   'substitutions' => [
                                        [
-                                         qr/(?^:abase_u64k2_elt \*)/,
+                                         qr/(?^:abase_p16_elt \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?^:abase_u64k2_src_elt\b)/,
+                                         qr/(?^:abase_p16_src_elt\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?^:abase_u64k2_elt\b)/,
+                                         qr/(?^:abase_p16_elt\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?^:abase_u64k2_dst_elt\b)/,
+                                         qr/(?^:abase_p16_dst_elt\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?^:abase_u64k2_elt_ur \*)/,
+                                         qr/(?^:abase_p16_elt_ur \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?^:abase_u64k2_src_elt_ur\b)/,
+                                         qr/(?^:abase_p16_src_elt_ur\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?^:abase_u64k2_elt_ur\b)/,
+                                         qr/(?^:abase_p16_elt_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?^:abase_u64k2_dst_elt_ur\b)/,
+                                         qr/(?^:abase_p16_dst_elt_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?^:abase_u64k2_vec \*)/,
+                                         qr/(?^:abase_p16_vec \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?^:abase_u64k2_src_vec\b)/,
+                                         qr/(?^:abase_p16_src_vec\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?^:abase_u64k2_vec\b)/,
+                                         qr/(?^:abase_p16_vec\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?^:abase_u64k2_dst_vec\b)/,
+                                         qr/(?^:abase_p16_dst_vec\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?^:abase_u64k2_vec_ur \*)/,
+                                         qr/(?^:abase_p16_vec_ur \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?^:abase_u64k2_src_vec_ur\b)/,
+                                         qr/(?^:abase_p16_src_vec_ur\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?^:abase_u64k2_vec_ur\b)/,
+                                         qr/(?^:abase_p16_vec_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?^:abase_u64k2_dst_vec_ur\b)/,
+                                         qr/(?^:abase_p16_dst_vec_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?^:abase_u64k2_poly \*)/,
+                                         qr/(?^:abase_p16_poly \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?^:abase_u64k2_src_poly\b)/,
+                                         qr/(?^:abase_p16_src_poly\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?^:abase_u64k2_poly\b)/,
+                                         qr/(?^:abase_p16_poly\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?^:abase_u64k2_dst_poly\b)/,
+                                         qr/(?^:abase_p16_dst_poly\b)/,
                                          'void *'
                                        ]
                                      ],
@@ -149,13 +146,29 @@
 /* MPI interface */
 
 /* Object-oriented interface */
-void abase_u64k2_u64k1_dotprod(abase_u64k2_dst_field, abase_u64k1_dst_field, abase_u64k2_dst_vec, abase_u64k1_src_vec, abase_u64k2_src_vec, unsigned int);
-void abase_u64k2_u64k2_dotprod(abase_u64k2_dst_field, abase_u64k2_dst_field, abase_u64k2_dst_vec, abase_u64k2_src_vec, abase_u64k2_src_vec, unsigned int);
-void abase_u64k2_u64k1_addmul_tiny(abase_u64k2_dst_field, abase_u64k1_dst_field, abase_u64k1_dst_vec, abase_u64k2_src_vec, abase_u64k1_dst_vec, unsigned int);
-void abase_u64k2_u64k2_addmul_tiny(abase_u64k2_dst_field, abase_u64k2_dst_field, abase_u64k2_dst_vec, abase_u64k2_src_vec, abase_u64k2_dst_vec, unsigned int);
-void abase_u64k2_u64k1_transpose(abase_u64k2_dst_field, abase_u64k1_dst_field, abase_u64k2_dst_vec, abase_u64k1_src_vec);
-void abase_u64k2_u64k2_transpose(abase_u64k2_dst_field, abase_u64k2_dst_field, abase_u64k2_dst_vec, abase_u64k2_src_vec);
+/* *simd_p16::code_for_member_template_dotprod */
+void abase_p16_p16_dotprod(abase_p16_dst_field K0 MAYBE_UNUSED, abase_p16_dst_field K1 MAYBE_UNUSED, abase_p16_dst_vec xw, abase_p16_src_vec xu1, abase_p16_src_vec xu0, unsigned int n)
+{
+        int64_t s = 0;
+        for(unsigned int i = 0 ; i < n ; i++) {
+            s+=((int64_t) xu0[i][0]) * ((int64_t) xu1[i][0]);
+        }
+        xw[0][0] =s % (int64_t) *K0;
+}
 
-#endif  /* ABASE_U64K2_T_H_ */
+/* *simd_p16::code_for_member_template_addmul_tiny */
+void abase_p16_p16_addmul_tiny(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_field L MAYBE_UNUSED, abase_p16_dst_vec w, abase_p16_src_vec u, abase_p16_dst_vec v, unsigned int n)
+{
+        for(unsigned int i = 0 ; i < n ; i++) {
+            w[i][0] += u[i][0] * v[0][0];
+        }
+}
+
+/* *simd_p16::code_for_member_template_transpose */
+void abase_p16_p16_transpose(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_field L MAYBE_UNUSED, abase_p16_dst_vec w, abase_p16_src_vec u)
+{
+    w[0][0]=u[0][0];
+}
+
 
 /* vim:set ft=cpp: */

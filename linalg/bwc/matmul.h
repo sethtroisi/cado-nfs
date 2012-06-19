@@ -42,14 +42,19 @@ struct matmul_bindings_s {
 
 struct matmul_public_s {
     /* The fields here must be exposed by all implementations */
-    unsigned int dim[2];        /* dim[0] is nrows, dim[1] is ncols. The
-                                   organization of the matrix in memory
-                                   also obeys the ``transposed'' flag */
+    unsigned int dim[2];        /* dim[0] is nrows, dim[1] is ncols. Really. */
+                                /* However, data needs not be stored in
+                                 * that order */
     uint64_t ncoeffs;
 
-    int store_transposed;
-
-    int iteration[2];
+    int store_transposed;       /* For matrix building purposes, this
+                                   indicates whether the implementation
+                                   layer expects the flat matrix data in
+                                   row major order (0) or transposed, in
+                                   column major order (1). */
+    int iteration[2];           /* [0]: number of vector times matrix products
+                                 * [1]: number of matrix times vector products
+                                 */
 
     const char * locfile;
 
