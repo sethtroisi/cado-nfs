@@ -235,11 +235,13 @@ def next_newton_segment(i,fc,A):
         return i-1, -Infinity, 1
     vertex=i-1
     sl=( valuation(fc[i-1],t)- valuation(fc[i],t) )/(i-(i-1))
-    for j in range(i):
-        sl_new= ( valuation(fc[j],t)- valuation(fc[i],t) )/(i-j)
-        if sl_new < sl:
+    for j in range(2,i+1):
+        sl_new= ( valuation(fc[i-j],t)- valuation(fc[i],t) )/j
+        if sl_new <= sl:
+            # <= instead of < makes viewing two concatenated segments as a
+            # single one.
             sl=sl_new
-            vertex=j
+            vertex=i-j
     return vertex,sl,i-vertex
 
 def count_roots_of_integer_polynomial(f,R,prec,minslope):
@@ -262,10 +264,16 @@ def count_roots_of_integer_polynomial(f,R,prec,minslope):
         sl=min(sl,prec)
         if sl in ZZ and sl>= minslope:
             f_new=R(f)(t,x-t^sl)
-            if sl < prec:
-                result+=count_roots_of_integer_polynomial(f_new,R,prec,sl+1)
+            if d == 1:
+                result+=1
             else:
-                result+=d
+                if sl < prec:
+                    result+=count_roots_of_integer_polynomial(f_new,R,prec,sl+1)
+                else:
+                    print "Warning: there might be extra roots. Try again with a higher precision."
+                    result+=0
+                    # we cannot decide if our degree d factor splits at a
+                    # higher precision
     return result 
 
 def find_roots_of_integer_polynomial(f,R,prec,minslope):
@@ -275,7 +283,7 @@ def find_roots_of_integer_polynomial(f,R,prec,minslope):
     K=FractionField(A)
     S.<x>=A['x']
     if prec==0:
-        prec=10*S(f).degree()
+        prec=3*S(f).degree()
     if R(f).degrees()[0] == 0:
         X.<x>=F['x']
         g=X(f)
@@ -289,11 +297,10 @@ def find_roots_of_integer_polynomial(f,R,prec,minslope):
         if sl in ZZ and sl>= minslope:
             f_new=R(f)(t,x-t^sl)
             if sl < prec:
-                result+=[ t^sl+e for e in
-                        find_roots_of_integer_polynomial(f_new,R,prec,sl+1)]
+                result+=[ t^sl+A(e) for e in find_roots_of_integer_polynomial(f_new,R,prec,sl+1)]
             else:
                 result+=[0]
-    return list(Set(result)) 
+    return result 
 # If double roots count as 2 roots than multiplicities=True
 # and in this case we might speed up computations.
 # If two roots are equal by multiplicity t^70 we count as a double root.
@@ -316,8 +323,7 @@ def count_real_roots(f,multiplicities=True,prec=0,R=GF(2)['t,x'],minslope=-10000
     if multiplicities == False:
         return count_all_roots(f_tilde,prec,R)
     else:
-        return
-    list(Set(find_roots_of_integer_polynomial(f_tilde,R,prec,-100000)))      
+        return len(find_roots_of_integer_polynomial(f_tilde,R,prec,-100000))     
 
 
 def construct_f_with_real_roots(P=0,R=GF(2)['t,x']):
