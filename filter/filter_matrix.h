@@ -88,7 +88,7 @@ extern void add_i_to_Rj(filter_matrix_t *mat, int i, int j);
 extern int decrS(int w);
 extern int incrS(int w);
 extern int weightSum(filter_matrix_t *mat, int i1, int i2);
-extern void fillTabWithRowsForGivenj(int32_t *ind, filter_matrix_t *mat, int32_t j);
+extern int fillTabWithRowsForGivenj(int32_t *ind, filter_matrix_t *mat, int32_t j);
 extern void checkData(filter_matrix_t *mat);
 extern void destroyRow(filter_matrix_t *mat, int i);
 

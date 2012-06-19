@@ -442,15 +442,20 @@ weightSum(filter_matrix_t *mat, int i1, int i2)
     return w + ((len1 + 1) - k1) + ((len2 + 1) - k2);
 }
 
-void
+/* put in ind[0]..ind[m-1] the indices of the m (active) rows containing j,
+   and return the total weight of all those rows */
+int
 fillTabWithRowsForGivenj(int32_t *ind, filter_matrix_t *mat, int32_t j)
 {
-    int ni = 0, k, i;
+  int ni = 0, k, i, w = 0;
 
-    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
-	if((i = mat->R[GETJ(mat, j)][k]) != -1){
-	    ind[ni++] = i;
-	    if(ni == mat->wt[GETJ(mat, j)])
-		break;
-	}
+  for (k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
+    if ((i = mat->R[GETJ(mat, j)][k]) != -1)
+      {
+        ind[ni++] = i;
+        w += mat->rows[i][0];
+        if (ni == mat->wt[GETJ(mat, j)])
+          break;
+      }
+  return w;
 }
