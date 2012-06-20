@@ -312,7 +312,7 @@ int main(int argc, char **argv)
             filename = param_list_lookup_string(pl, param);
             if (filename == NULL) usage(argv0, param);
             double tm = seconds();
-            noerr = factor_base_init(LFB[i], SFB[i], filename, I, fbb[i], J);
+            noerr = factor_base_init(LFB[i], SFB[i], filename, I, fbb[i], I, J);
             fprintf(stdout, "# Reading factor base %d took %1.1f s\n", 
                     i, seconds()-tm);
             if (!noerr) {
@@ -485,7 +485,7 @@ int main(int argc, char **argv)
 
         // Precompute all the data for small factor base elements.
         for (int i = 0; i < 2; ++i)
-            small_factor_base_precomp(SFB[i], qlat, sublat, I, J);
+            small_factor_base_precomp(SFB[i], qlat, sublat);
         t_init += seconds();
 
         // Loop on all sublattices

@@ -74,7 +74,7 @@ void normalized_echelon_multiples(ij_t *basis, fbprime_t p, int degp, int J)
 // Precompute what we can at this early stage.
 static
 void push_small_ideal(small_factor_base_ptr FB, fbprime_t p, fbprime_t r,
-    unsigned degp, int power, unsigned J)
+    unsigned degp, int power, unsigned I, unsigned J)
 {
   unsigned alloc = FB->alloc;
   if (alloc <= FB->n) {
@@ -92,6 +92,9 @@ void push_small_ideal(small_factor_base_ptr FB, fbprime_t p, fbprime_t r,
 
   FB->elts[FB->n]->projective_basis = (ij_t *)malloc(J*sizeof(ij_t));
   ASSERT_ALWAYS(FB->elts[FB->n]->projective_basis != NULL);
+      
+  ijbasis_init(FB->elts[FB->n]->basis, I, J);
+  ijbasis_init(FB->elts[FB->n]->adjustment_basis, I, J);
   
   normalized_echelon_multiples(FB->elts[FB->n]->projective_basis, p,
       fbprime_deg(p), J);
@@ -123,10 +126,10 @@ void push_large_ideal(large_factor_base_ptr FB, fbprime_t p, fbprime_t r,
 static
 void push_ideal(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
     fbprime_t p, fbprime_t r, unsigned degp, int power, unsigned min_degp,
-    unsigned J)
+    unsigned I, unsigned J)
 {
   if (degp < min_degp)
-    push_small_ideal(SFB, p, r, degp, power, J);
+    push_small_ideal(SFB, p, r, degp, power, I, J);
   else {
     if (power) {
       fprintf(stderr, "Warning: large power in factor base. Ignoring...\n");
@@ -147,7 +150,7 @@ void push_ideal(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
 // Return 1 if successful.
 int factor_base_init(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
     const char *filename, unsigned sorted_min_degp, unsigned max_degp,
-    unsigned J)
+    unsigned I, unsigned J)
 {
   FILE *file;
   file = fopen(filename, "r");
@@ -260,7 +263,7 @@ int factor_base_init(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
       return 0;
     }
 
-    push_ideal(LFB, SFB, p, r, degp, power, sorted_min_degp, J);
+    push_ideal(LFB, SFB, p, r, degp, power, sorted_min_degp, I, J);
 
     // Other r's ?
     while ((c = getc(file)) == ',') {
@@ -271,7 +274,7 @@ int factor_base_init(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
         return 0;
       }
     
-      push_ideal(LFB, SFB, p, r, degp, power, sorted_min_degp, J);
+      push_ideal(LFB, SFB, p, r, degp, power, sorted_min_degp, I, J);
     }
     ungetc(c, file);
   }
@@ -303,7 +306,7 @@ int factor_base_init(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
 
 
 void small_factor_base_precomp(small_factor_base_ptr FB, qlat_srcptr qlat,
-    sublat_ptr sublat, unsigned I, unsigned J)
+    sublat_ptr sublat)
 {
   for (unsigned i = 0; i < FB->n; ++i) {
     fbprime_t lambda;
@@ -315,8 +318,6 @@ void small_factor_base_precomp(small_factor_base_ptr FB, qlat_srcptr qlat,
       gothp->adjustment_basis->dim = 0;
     } else {
       gothp->proj = 0;
-      ijbasis_init(gothp->basis, I, J);
-      ijbasis_init(gothp->adjustment_basis, I, J);
       ijbasis_compute_small(gothp->basis, gothp->adjustment_basis,
           gothp, lambda);
       if (use_sublat(sublat)) {
@@ -340,8 +341,11 @@ unsigned factor_base_max_degp(large_factor_base_srcptr FB)
 
 void factor_base_clear(large_factor_base_ptr LFB, small_factor_base_ptr SFB)
 {
-  for (unsigned i = 0; i < SFB->n; ++i)
+  for (unsigned i = 0; i < SFB->n; ++i) {
     free(SFB->elts[i]->projective_basis);
+    ijbasis_clear(SFB->elts[i]->basis);
+    ijbasis_clear(SFB->elts[i]->adjustment_basis);
+  }
   free(LFB->elts);
   free(SFB->elts);
 }
