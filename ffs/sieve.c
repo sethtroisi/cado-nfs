@@ -48,6 +48,22 @@ int factor_survivor(fppol_t a, fppol_t b,
         }
     }
 
+    // There are rare cases where q divides both a and b.
+    // We did check that i and j are coprime, but the transformation to a
+    // and b has determinant q, so it can produce a common cofactor q.
+    // For degree reasons, we expect this to be rare.
+    {
+        fppol_t g;
+        fppol_init(g);
+        fppol_gcd(g, a, b);
+        int dg = fppol_deg(g);
+        fppol_clear(g);
+        if (dg > 0) {
+            fppol_clear(Nab);
+            return 0;
+        } 
+    }
+
     // OK. Now we know that we have a relation.
     // Let's factor it completely and print it.
     // But first, ensure that b is monic (destructively, but who
