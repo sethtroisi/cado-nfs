@@ -1697,7 +1697,6 @@ prempt_scan_relations_pass_two (const char *oname,
                   ret = 0; /* we are done IN THIS THREAD for re-read */
 	    }
 #ifdef FOR_FFS
-#if 0
 	  else
 	    {
 	      while (cpy_cpt_rel_a == cpt_rel_b + T_REL)
@@ -1710,7 +1709,6 @@ prempt_scan_relations_pass_two (const char *oname,
 	      
 	      fprint_relation_raw (ofile2, &(buf_rel[k].rel));
 	    }
-#endif
 #endif
 	  rs->nrels++;
 	}
