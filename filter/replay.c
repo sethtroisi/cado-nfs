@@ -302,9 +302,20 @@ makeIndexFile(const char *indexname, int nrows, typerow_t **newrows,
 // contains the new index for j. Heavier columns are in front of the new
 // matrix.
 static void
-renumber (int *small_ncols, int *colweight, int ncols)
+renumber (int *small_ncols, int *colweight, int ncols,
+          MAYBE_UNUSED const char *idealsfilename)
 {
     int j, k, nb, *tmp;
+
+#ifdef FOR_FFS
+    FILE *renumberfile = fopen (idealsfilename, "w+");
+    if (renumberfile == NULL)
+      {
+        fprintf (stderr, "Error while opening file to save permutation of"
+                         "ideals\n");
+        exit(1);
+      }
+#endif
 
     tmp = (int *)malloc((ncols<<1) * sizeof(int));
     ASSERT_ALWAYS(tmp != NULL);
@@ -324,7 +335,16 @@ renumber (int *small_ncols, int *colweight, int ncols)
     memset(colweight, 0, ncols * sizeof(int));
     // useful for BW + skipping heavy part only...
     for(j = nb-1, k = 1; j >= 0; j -= 2)
-	colweight[tmp[j]] = k++; // always this +1 trick
+      {
+        colweight[tmp[j]] = k++; // always this +1 trick
+#ifdef FOR_FFS
+        fprintf (renumberfile, "%d %x\n", colweight[tmp[j]]-1, tmp[j]);
+#endif
+      }
+
+#ifdef FOR_FFS
+    fclose(renumberfile);
+#endif
     free(tmp);
 }
 
@@ -411,13 +431,14 @@ doAllAdds(typerow_t **newrows, char *str)
 // renumbering.
 static int
 toFlush (const char *sparsename, typerow_t **sparsemat, int *colweight, 
-         int ncols, int small_nrows, int skip, int bin)
+         int ncols, int small_nrows, int skip, int bin,
+         const char *idealsfilename)
 {
     unsigned long W;
     int small_ncols;
 
     fprintf(stderr, "Renumbering columns (including sorting w.r.t. weight)\n");
-    renumber (&small_ncols, colweight, ncols);
+    renumber (&small_ncols, colweight, ncols, idealsfilename);
 
     fprintf(stderr, "small_nrows=%d small_ncols=%d\n",small_nrows,small_ncols);
 
@@ -982,7 +1003,7 @@ static void
 fasterVersion(typerow_t **newrows, const char *sparsename, 
               const char *indexname, const char *hisname, purgedfile_stream ps,
               uint64_t bwcostmin, int nrows, int ncols, int skip, int bin, 
-              int writeindex)
+              int writeindex, const char *idealsfilename)
 {
     FILE *hisfile;
     int *colweight;
@@ -1053,7 +1074,7 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
 
     /* renumber columns after sorting them by decreasing weight */
     small_ncols = toFlush(sparsename, newrows, colweight, ncols,
-			  small_nrows, skip, bin);
+			  small_nrows, skip, bin, idealsfilename);
     free (colweight);
     if(writeindex)
         toIndex(newrows, indexname, hisfile, bwcostmin, nrows,
@@ -1115,6 +1136,7 @@ main(int argc, char *argv[])
     const char * hisname = param_list_lookup_string(pl, "his");
     const char * sparsename = param_list_lookup_string(pl, "out");
     const char * indexname = param_list_lookup_string(pl, "index");
+    const char * idealsfilename = param_list_lookup_string(pl, "ideals");
     param_list_parse_int(pl, "binary", &bin);
     param_list_parse_int(pl, "nslices", &nslices);
     param_list_parse_int(pl, "skip", &skip);
@@ -1126,6 +1148,11 @@ main(int argc, char *argv[])
     if (skip != 0)
       {
         fprintf (stderr, "Error, for FFS -skip should be 0\n");
+        exit (1);
+      }
+    if (idealsfilename == NULL)
+      {
+        fprintf (stderr, "Error, for FFS -ideals should be non null\n");
         exit (1);
       }
 #endif
@@ -1157,7 +1184,8 @@ main(int argc, char *argv[])
     // matrix
 
     fasterVersion (newrows, sparsename, indexname, hisname, ps,
-                   bwcostmin, nrows, ncols, skip, bin, !noindex);
+                   bwcostmin, nrows, ncols, skip, bin, !noindex,
+                   idealsfilename);
 
 
     purgedfile_stream_closefile(ps);
