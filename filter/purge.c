@@ -1438,10 +1438,18 @@ approx_ffs (int d)
 {
 #ifdef USE_F2 
   ASSERT_ALWAYS(d <= 36); /* otherwise the result is > 2^31 */
-  return (d < 0) ? 0 : (int) ((double) pow (2.0, (double) d)/((double) d));
+  if (d <= 0)
+    return 0;
+  else
+  /* for d >= 9, between 1 and 10% greater than the real value */
+    return (int) ((double) 1.12 * pow (2.0, (double) (d + 1 - log(d)/log(2))));
 #elif USE_F3
   ASSERT_ALWAYS(d <= 22); /* otherwise the result is > 2^31 */
-  return (d < 0) ? 0 : (int) ((double) pow (3.0, (double) d)/((double) d));
+  if (d <= 0)
+    return 0;
+  else
+  /* for d >= 6, between 1 and 10% greater than the real value */
+    return (int) ((double) 1.05 * pow (3.0, (double) (d+0.4-log(d)/log(3))));
 #else
   ASSERT_ALWAYS(0);
 #endif
