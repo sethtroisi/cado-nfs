@@ -116,7 +116,148 @@ computeroots (relation_t *rel)
 }
 
 void
+sswap(char *pd, char *pe)
+{
+  char c;
+  while (pe > pd)
+    {
+      c = *pe; *pe-- = *pd; *pd++ = c;
+    }
+}
+
+char *
+u64toa16 (char *p, uint64_t m)
+{
+  char *op;
+  static char v[] = "0123456789abcdef";
+
+  op = p;
+  do
+    {
+      *p++ = v[m & 0xf];
+      m >>= 4;
+    }
+  while (m);
+  sswap(op, &(p[-1]));
+  return (p);
+}
+
+char *
+u64toa10 (char *p, uint64_t m)
+{
+  char *op;
+  uint64_t n;
+
+  op = p;
+  do
+    {
+      n = m / 10;
+      *p++ = (unsigned char) ((m - n * 10) + '0');
+      m = n;
+    }
+  while (m);
+  sswap(op, &(p[-1]));
+  return (p);
+}
+
+char *
+d64toa10 (char *p, int64_t m)
+{
+  if (m < 0)
+    {
+      *p++ = '-';
+      m = -m;
+    }
+  return (u64toa10 (p, (uint64_t) m));
+}
+
+void
 fprint_relation (FILE *file, relation_t * rel)
+{
+  char buf[1<<10], *p, *op;
+  size_t lg;
+  int i, j;
+  
+  p = d64toa10(buf, rel->a);
+  *p++ = ' ';
+  p = u64toa10(p, rel->b);
+  *p++ = ':';
+  for (i = 0; i < rel->nb_rp; ++i)
+    if (rel->rp[i].e)
+      {
+	op = p;
+	p = u64toa16 (p, rel->rp[i].p);
+	*p++ = ' ';
+	lg = (p - op);
+	for (j = 0; j < rel->rp[i].e - 1; j++)
+	  {
+	    memcpy (p, op, lg);
+	    p += lg;
+	  }
+      }
+  p[-1] = ':';
+  for (i = 0; i < rel->nb_ap; ++i)
+    if (rel->ap[i].e)
+      {
+	op = p;
+	p = u64toa16 (p, rel->ap[i].p);
+	*p++ = ' ';
+	lg = (p - op);
+	for (j = 0; j < rel->ap[i].e - 1; j++)
+	  {
+	    memcpy (p, op, lg);
+	    p += lg;
+	  }
+      }
+  p[-1] = '\n';
+  fwrite (buf, sizeof(*buf), p - buf, file);
+}
+
+void
+fprint_relation_raw (FILE *file, relation_t * rel)
+{
+  char buf[1<<10], *p, *op;
+  size_t lg;
+  int i, j;
+  
+  p = d64toa10(buf, rel->a);
+  *p++ = ' ';
+  p = u64toa10(p, rel->b);
+  *p++ = ':';
+  for (i = 0; i < rel->nb_rp; ++i)
+    {
+      ASSERT (rel->rp[i].e);
+      op = p;
+      p = u64toa16 (p, rel->rp[i].p);
+      *p++ = ' ';
+      lg = (p - op);
+      for (j = 0; j < rel->rp[i].e - 1; j++)
+	{
+	  memcpy (p, op, lg);
+	  p += lg;
+	}
+    }
+  p[-1] = ':';
+  for (i = 0; i < rel->nb_ap; ++i)
+    if (rel->ap[i].e)
+      {
+	ASSERT (rel->ap[i].e);
+	op = p;
+	p = u64toa16 (p, rel->ap[i].p);
+	*p++ = ' ';
+	lg = (p - op);
+	for (j = 0; j < rel->ap[i].e - 1; j++)
+	  {
+	    memcpy (p, op, lg);
+	    p += lg;
+	  }
+      }
+  p[-1] = '\n';
+  fwrite (buf, sizeof(*buf), p - buf, file);
+}
+
+void
+fprint_relation_old (FILE *file, relation_t * rel)
 {
   int i, j;
 
@@ -139,7 +280,7 @@ fprint_relation (FILE *file, relation_t * rel)
 
 /* same as fprint_relation, but exponents > 1 are allowed */
 void
-fprint_relation_raw (FILE *file, relation_t * rel)
+fprint_relation_raw_old (FILE *file, relation_t * rel)
 {
   int i, j;
 
