@@ -488,7 +488,7 @@ fillTabWithRowsForGivenj(int32_t *ind, filter_matrix_t *mat, int32_t j)
     if ((i = mat->R[GETJ(mat, j)][k]) != -1)
       {
         ind[ni++] = i;
-        w += mat->rows[i][0];
+        w += matLengthRow(mat, i);
         if (ni == mat->wt[GETJ(mat, j)])
           break;
       }

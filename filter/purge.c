@@ -1654,7 +1654,7 @@ prempt_scan_relations_pass_two (const char *oname,
 	      if (raw)
 		{
 		  buf_rel[0].num = rs->nrels;
-#ifndef FOR_FSS
+#ifndef FOR_FFS
 		  relation_stream_get_fast (prempt_data, 0);
 #else
 		  relation_stream_get_fast (prempt_data, 0, 1);
@@ -1665,7 +1665,7 @@ prempt_scan_relations_pass_two (const char *oname,
 		{
 		  k = (unsigned int) (cpy_cpt_rel_a & (T_REL - 1));
 		  buf_rel[k].num = rs->nrels;
-#ifndef	FOR_FSS
+#ifndef	FOR_FFS
 		  relation_stream_get_fast (prempt_data, k);
 #else		  
 		  relation_stream_get_fast (prempt_data, k, 1);
