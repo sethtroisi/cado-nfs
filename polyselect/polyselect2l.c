@@ -23,6 +23,7 @@
 #define MAX_THREADS 16
 #define INIT_FACTOR 4
 //#define DEBUG_POLYSELECT2L
+
 #ifdef NEW_ROOTSIEVE
 #include "ropt.h"
 #endif
@@ -33,7 +34,7 @@
 #ifdef BATCH_P
 #define BATCH_SIZE 8 /* batch 8 p */
 #else
-#define BATCH_SIZE 10  /* batch 10 sq */
+#define BATCH_SIZE 10 /* batch 10 sq */
 #endif
 
 /* consider only two roots or more */
@@ -93,7 +94,7 @@ crt_sq ( mpz_t qqz,
   mpz_init_set_ui (sum, 0);
 
   for (i = 0; i < lq; i ++) {
-    qq[i] = q[i] * q[i];
+    qq[i] = q[i] * q[i]; // q small
     mpz_mul_ui (prod, prod, qq[i]);
   }
 
@@ -150,17 +151,17 @@ print_poly_info ( mpz_t *f,
 /* rq is a root of N = (m0 + rq)^d mod (q^2) */
 void
 match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
-       unsigned long ad, unsigned int d, mpz_t N, unsigned long q,
+       uint64_t ad, unsigned long d, mpz_t N, uint64_t q,
        mpz_t rq)
 {
-  mpz_t l, mtilde, m, adm1, t, k, *f, g[2], *fold, gold[2], qq;
-  unsigned int j;
+  mpz_t l, mtilde, m, adm1, t, k, *f, g[2], *fold, gold[2], qq, adz;
+  unsigned long j;
   int cmp;
   double skew, logmu, E;
   /* the expected rotation space is S^5 for degree 6 */
-
 #ifdef DEBUG_POLYSELECT2L
-  gmp_printf ("Found match: (%lu,%ld) (%lu,%ld) for ad=%lu, q=%lu, rq=%Zd\n",
+  gmp_printf ("Found match: (%lu,%"PRId64") (%lu,%"PRId64") for "
+	      "ad=%"PRIu64", q=%"PRIu64", rq=%Zd\n",
               p1, i, p2, i, ad, q, rq);
   gmp_printf ("m0=%Zd\n", m0);
 #endif
@@ -171,6 +172,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_init (k);
   mpz_init (qq);
   mpz_init (adm1);
+  mpz_init (adz);
   mpz_init (mtilde);
   mpz_init (g[0]);
   mpz_init (g[1]);
@@ -200,7 +202,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_add (mtilde, mtilde, m0);
   /* we want mtilde = d*ad*m + a_{d-1}*l with 0 <= a_{d-1} < d*ad.
      We have a_{d-1} = mtilde/l mod (d*ad). */
-  mpz_set_ui (m, ad);
+  mpz_set_uint64 (m, ad);
   mpz_mul_ui (m, m, d);
   if (mpz_invert (adm1, l, m) == 0)
   {
@@ -225,19 +227,22 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   }
 #endif
   mpz_divexact_ui (m, m, d);
+
+  mpz_set_uint64 (adz, ad);
+
 #ifdef DEBUG_POLYSELECT2L
-  if (mpz_divisible_ui_p (m, ad) == 0)
+  if (mpz_divisible_p (m, adz) == 0)
   {
     fprintf (stderr, "Error: (m-a_{d-1}*l)/d not divisible by ad\n");
     exit (1);
   }
 #endif
-  mpz_divexact_ui (m, m, ad);
+  mpz_divexact (m, m, adz);
   mpz_set (g[1], l);
   mpz_neg (g[0], m);
-  mpz_set_ui (f[d], ad);
+  mpz_set (f[d], adz);
   mpz_pow_ui (t, m, d);
-  mpz_mul_ui (t, t, ad);
+  mpz_mul (t, t, adz);
   mpz_sub (t, N, t);
   mpz_set (f[d-1], adm1);
 #ifdef DEBUG_POLYSELECT2L
@@ -453,6 +458,334 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_clear (k);
   mpz_clear (qq);
   mpz_clear (adm1);
+  mpz_clear (adz);
+  mpz_clear (mtilde);
+  mpz_clear (g[0]);
+  mpz_clear (g[1]);
+  mpz_clear (gold[0]);
+  mpz_clear (gold[1]);
+  for (j = 0; j <= d; j++) {
+    mpz_clear (f[j]);
+    mpz_clear (fold[j]);
+  }
+  free (f);
+  free (fold);
+}
+
+
+/* rq is a root of N = (m0 + rq)^d mod (q^2) */
+void
+gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
+	   uint64_t ad, unsigned long d, mpz_t N, uint64_t q,
+	   mpz_t rq)
+{
+  mpz_t l, mtilde, m, adm1, t, k, *f, g[2], *fold, gold[2], qq, adz, tmp;
+  unsigned int j;
+  int cmp;
+  double skew, logmu, E;
+
+#ifdef DEBUG_POLYSELECT2L
+  gmp_printf ("Found match: (%"PRIu32",%"PRId64") (%"PRIu32",%"PRId64") for "
+	      "ad=%"PRIu64", q=%"PRIu64", rq=%Zd\n",
+              p1, i, p2, i, ad, q, rq);
+  gmp_printf ("m0=%Zd\n", m0);
+#endif
+  mpz_init (tmp);
+  mpz_init (l);
+  mpz_init (m);
+  mpz_init (t);
+  mpz_init (k);
+  mpz_init (qq);
+  mpz_init (adm1);
+  mpz_init (adz);
+  mpz_init (mtilde);
+  mpz_init (g[0]);
+  mpz_init (g[1]);
+  mpz_init (gold[0]);
+  mpz_init (gold[1]);
+  f = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
+  fold = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
+  if (f == NULL || fold == NULL)
+  {
+    fprintf (stderr, "Error, cannot allocate memory in match\n");
+    exit (1);
+  }
+  for (j = 0; j <= d; j++) {
+    mpz_init (f[j]);
+    mpz_init (fold[j]);
+  }
+  /* we have l = p1*p2*q */
+  mpz_set_ui (l, p1);
+  mpz_mul_ui (l, l, p2);
+  mpz_set_uint64 (tmp, q);
+  mpz_mul (l, l, tmp);
+  /* mtilde = m0 + rq + i*q^2 */
+  mpz_set (qq, tmp); // qq = q
+  mpz_mul (qq, qq, tmp); // qq = q^2
+  if (i >= 0)
+    mpz_set_uint64 (tmp, (uint64_t) i);
+  else {
+    mpz_set_uint64 (tmp, (uint64_t) (-i));
+    mpz_neg (tmp, tmp);
+  }
+  mpz_set (mtilde, tmp);
+  mpz_mul (mtilde, mtilde, qq);
+  mpz_add (mtilde, mtilde, rq);
+  mpz_add (mtilde, mtilde, m0);
+  /* we want mtilde = d*ad*m + a_{d-1}*l with 0 <= a_{d-1} < d*ad.
+     We have a_{d-1} = mtilde/l mod (d*ad). */
+  mpz_set_uint64 (m, ad);
+  mpz_mul_ui (m, m, d);
+  if (mpz_invert (adm1, l, m) == 0)
+  {
+    fprintf (stderr, "Error in 1/l mod (d*ad)\n");
+    exit (1);
+  }
+  mpz_mul (adm1, adm1, mtilde);
+  mpz_mod (adm1, adm1, m); /* m is d*ad here */
+  /* we make -d*ad/2 <= adm1 < d*ad/2 */
+  mpz_mul_2exp (t, adm1, 1);
+  if (mpz_cmp (t, m) >= 0)
+    mpz_sub (adm1, adm1, m);
+  mpz_mul (m, adm1, l);
+  mpz_sub (m, mtilde, m);
+#ifdef DEBUG_POLYSELECT2L
+  if (mpz_divisible_ui_p (m, d) == 0)
+  {
+    fprintf (stderr, "Error: m-a_{d-1}*l not divisible by d\n");
+    exit (1);
+  }
+#endif
+  mpz_divexact_ui (m, m, d);
+  mpz_set_uint64 (adz, ad);
+#ifdef DEBUG_POLYSELECT2L
+  if (mpz_divisible_p (m, adz) == 0)
+  {
+    fprintf (stderr, "Error: (m-a_{d-1}*l)/d not divisible by ad\n");
+    exit (1);
+  }
+#endif
+  mpz_divexact (m, m, adz);
+  mpz_set (g[1], l);
+  mpz_neg (g[0], m);
+  mpz_set (f[d], adz);
+  mpz_pow_ui (t, m, d);
+  mpz_mul (t, t, adz);
+  mpz_sub (t, N, t);
+  mpz_set (f[d-1], adm1);
+#ifdef DEBUG_POLYSELECT2L
+  if (mpz_divisible_p (t, l) == 0)
+  {
+    fprintf (stderr, "Error: t not divisible by l\n");
+    exit (1);
+  }
+#endif
+  mpz_divexact (t, t, l);
+  mpz_pow_ui (mtilde, m, d-1);
+  mpz_mul (mtilde, mtilde, adm1);
+  mpz_sub (t, t, mtilde);
+  for (j = d - 2; j > 0; j--)
+  {
+#ifdef DEBUG_POLYSELECT2L
+    if (mpz_divisible_p (t, l) == 0)
+    {
+      fprintf (stderr, "Error: t not divisible by l\n");
+      exit (1);
+    }
+#endif
+    mpz_divexact (t, t, l);
+    /* t = a_j*m^j + l*R thus a_j = t/m^j mod l */
+    mpz_pow_ui (mtilde, m, j);
+    mpz_fdiv_q (adm1, t, mtilde); /* t -> adm1 * mtilde + t */
+    mpz_invert (k, mtilde, l); /* search adm1 + k such that
+                                  t = (adm1 + k) * m^j mod l */
+    mpz_mul (k, k, t);
+    mpz_sub (k, k, adm1);
+    mpz_mod (k, k, l);
+    mpz_mul_2exp (k, k, 1);
+    cmp = mpz_cmp (k, l);
+    mpz_div_2exp (k, k, 1);
+    if (cmp >= 0)
+      mpz_sub (k, k, l);
+    mpz_add (adm1, adm1, k);
+    mpz_set (f[j], adm1);
+    /* subtract adm1*m^j */
+    mpz_submul (t, mtilde, adm1);
+  }
+
+#ifdef DEBUG_POLYSELECT2L
+  if (mpz_divisible_p (t, l) == 0)
+  {
+    fprintf (stderr, "Error: t not divisible by l\n");
+    exit (1);
+  }
+#endif
+  mpz_divexact (t, t, l);
+  mpz_set (f[0], t);
+
+  /* save unoptimized polynomial to fold */
+  for (i = d + 1; i -- != 0; )
+    mpz_set (fold[i], f[i]);
+  mpz_set (gold[1], g[1]);
+  mpz_set (gold[0], g[0]);
+
+  /* old lognorm */
+  skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+  logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
+
+  double g0 = mpz_get_d (g[0]);
+  g0 /= mpz_get_d (f[d-2]);
+  g0 = (g0 > 0)? g0 : -g0;
+
+#ifdef MAX_THREADS
+  pthread_mutex_lock (&lock);
+#endif
+  /* information on all polynomials */
+  total_adminus2 += g0;
+  collisions ++;
+  tot_found ++;
+  aver_raw_lognorm += logmu;
+  if (logmu < min_raw_lognorm)
+      min_raw_lognorm = logmu;
+  if (logmu > max_raw_lognorm)
+    max_raw_lognorm = logmu;
+#ifdef MAX_THREADS
+  pthread_mutex_unlock (&lock);
+#endif
+
+  /* if the polynomial has norm < "-maxnorm", we optimize it */
+  if (logmu <= max_norm)
+  {
+    /* optimize size */
+    optimize (f, d, g, 0, 1);
+
+    if (!raw) {
+
+/* root sieve */
+#ifndef NEW_ROOTSIEVE
+      unsigned long alim = 2000;
+      long jmin, kmin;
+#endif
+      mpz_neg (m, g[0]);
+
+      rootsieve_time -= seconds_thread ();
+
+#ifdef NEW_ROOTSIEVE
+      if (d > 3) {
+        ropt_polyselect (f, d, m, g[1], N, 0); // verbose = 2 to see details.
+        mpz_neg (g[0], m);
+      }
+      else {
+        unsigned long alim = 2000;
+        long jmin, kmin;
+        rotate (f, d, alim, m, g[1], &jmin, &kmin, 0, verbose, DEFAULT_L2_METHOD);
+        mpz_neg (g[0], m);
+        /* optimize again, but only translation */
+        optimize_aux (f, d, g, 0, 0, CIRCULAR);
+      }
+#else
+      rotate (f, d, alim, m, g[1], &jmin, &kmin, 0, verbose, DEFAULT_L2_METHOD);
+      mpz_neg (g[0], m);
+      /* optimize again, but only translation */
+      optimize_aux (f, d, g, 0, 0, CIRCULAR);
+#endif
+
+      rootsieve_time += seconds_thread ();
+
+    } // raw and sopt only ?
+
+    skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+    logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
+
+    for (i = 10; i > 0 && logmu < best_logmu[i-1]; i--)
+      best_logmu[i] = best_logmu[i-1];
+    best_logmu[i] = logmu;
+
+#ifdef MAX_THREADS
+    pthread_mutex_lock (&lock);
+#endif
+    collisions_good ++;
+    aver_opt_lognorm += logmu;
+    if (logmu < min_opt_lognorm)
+      min_opt_lognorm = logmu;
+    if (logmu > max_opt_lognorm)
+      max_opt_lognorm = logmu;
+#ifdef MAX_THREADS
+    pthread_mutex_unlock (&lock);
+#endif
+
+    /* MurphyE */
+    mpz_set (curr_poly->rat->f[0], g[0]);
+    mpz_set (curr_poly->rat->f[1], g[1]);
+    for (j = d + 1; j -- != 0; )
+      mpz_set (curr_poly->alg->f[j], f[j]);
+    curr_poly->skew = skew;
+    E =  MurphyE (curr_poly, BOUND_F, BOUND_G, AREA, MURPHY_K);
+
+    mpz_neg (m, g[0]);
+
+#ifdef MAX_THREADS
+		  pthread_mutex_lock (&lock);
+#endif
+    if (E > best_E)
+    {
+      best_E = E;
+      cado_poly_set (best_poly, curr_poly);
+    }
+    if (out != NULL) /* msieve output */
+    {
+      FILE *fp;
+      fp = fopen (out, (found == 0) ? "w" : "a");
+      if (fp == NULL)
+      {
+        fprintf (stderr, "Error, cannot open file %s\n", out);
+        exit (1);
+      }
+      fprintf (fp, "0");
+      for (j = d + 1; j -- != 0; )
+        gmp_fprintf (fp, " %Zd", f[j]);
+      mpz_neg (m, g[0]);
+      gmp_fprintf (fp, " %Zd %Zd\n", g[1], m);
+      fclose (fp);
+    }
+    found ++;
+#ifdef MAX_THREADS
+		  pthread_mutex_unlock (&lock);
+#endif
+
+    /* raw poly */
+    if (raw) {
+      printf ("# Raw polynomial:\n");
+      gmp_printf ("n: %Zd\n", N);
+      print_poly_info (fold, d, gold, 1);
+      gmp_printf ("# Optimized polynomial:\n");
+    }
+
+    /* print optimized (maybe size- or size-root- optimized) polynomial */
+    if (verbose >= 0)
+      {
+        gmp_printf ("n: %Zd\n", N);
+        print_poly_info (f, d, g, 0);
+        printf ("# Murphy's E(Bf=%.0f,Bg=%.0f,area=%.2e)=%1.2e (best so far %1.2e)\n",
+                BOUND_F, BOUND_G, AREA, E, best_E);
+        printf ("\n");
+        fflush (stdout);
+      }
+  }
+  else {
+    if (verbose >= 0)
+      gmp_printf ("# Skip polynomial: %.2f, ad: %"PRIu64", l: %Zd, m: %Zd\n",
+                  logmu, ad, l, m);
+  }
+
+  mpz_clear (tmp);
+  mpz_clear (l);
+  mpz_clear (m);
+  mpz_clear (t);
+  mpz_clear (k);
+  mpz_clear (qq);
+  mpz_clear (adm1);
+  mpz_clear (adz);
   mpz_clear (mtilde);
   mpz_clear (g[0]);
   mpz_clear (g[1]);
@@ -476,8 +809,9 @@ static inline void
 collision_on_p ( header_t header,
                  proots_t R )
 {
-  unsigned long i, j, nprimes, p, *rp, nrp;
-  long ppl = 0;
+  unsigned long i, j, nprimes, p, nrp;
+  uint64_t *rp;
+  int64_t ppl = 0;
   double pc1;
   mpz_t *f, tmp;
 
@@ -492,7 +826,7 @@ collision_on_p ( header_t header,
     mpz_init (f[i]);
   mpz_set_ui (f[header->d], 1);
 
-  rp = (unsigned long*) malloc (header->d * sizeof (unsigned long));
+  rp = (uint64_t*) malloc (header->d * sizeof (uint64_t));
   if (rp == NULL) {
     fprintf (stderr, "Error, cannot allocate memory in collision_on_p\n");
     exit (1);
@@ -500,9 +834,10 @@ collision_on_p ( header_t header,
 
   hash_t H;
 #ifdef CONSIDER_ONLY_TWO_ROOTS
-  hash_init (H,  (unsigned long) (INIT_FACTOR * (double) lenPrimes));
+  hash_init (H, (unsigned long) (INIT_FACTOR * (double) lenPrimes));
 #else
-  hash_init (H,  (unsigned long) (INIT_FACTOR * NUMBER_CONSIDERED_ROOTS * (double) lenPrimes));
+  hash_init (H, (unsigned long) (INIT_FACTOR * NUMBER_CONSIDERED_ROOTS
+				 * (double) lenPrimes));
 #endif
 
 #ifdef DEBUG_POLYSELECT2L
@@ -510,9 +845,10 @@ collision_on_p ( header_t header,
 #endif
 
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
-
     p = Primes[nprimes];
-    ppl = (long) (p*p);
+    ppl = (int64_t) p;
+    ppl *= (int64_t) p;
+    printf ("p: %lu, ppl %"PRId64"\n", p, ppl);
 
     /* add faked roots to keep indices */
     if ((header->d * header->ad) % p == 0) {
@@ -525,20 +861,22 @@ collision_on_p ( header_t header,
        (m0 + i)^d = N (mod p^2) or m0 + i = N^(1/d) mod p^2 */
     mpz_mod_ui (f[0], header->Ntilde, p);
     mpz_neg (f[0], f[0]); /* f = x^d - N */
-    nrp = poly_roots_ulong (rp, f, header->d, p);
+    nrp = poly_roots_uint64 (rp, f, header->d, p);
     roots_lift (rp, header->Ntilde, header->d, header->m0, p, nrp);
     proots_add (R, nrp, rp, nprimes);
-
     for (j = 0; j < nrp; j++) {
       /* only consider r[j] and r[j] - pp */
-      hash_add (H, p, rp[j], header->m0, header->ad, header->d, header->N, 1, tmp);
-      hash_add (H, p, rp[j] - ppl, header->m0, header->ad, header->d, header->N, 1, tmp);
+      hash_add (H, p, (int64_t) rp[j], header->m0, header->ad,
+		header->d, header->N, 1, tmp);
+      hash_add (H, p, (int64_t) (rp[j] - ppl), header->m0,
+		header->ad, header->d, header->N, 1, tmp);
     }
   }
 
 #ifdef DEBUG_POLYSELECT2L
   fprintf (stderr, "# collision_on_p took %dms\n", cputime () - st);
-  fprintf (stderr, "# p hash_size: %u for ad = %lu\n", H->size, header->ad);
+  fprintf (stderr, "# p hash_size: %u for ad = %"PRIu64"\n", H->size,
+	   header->ad);
 #endif
 
   /* if the hash table contains n entries, each one smaller than (2P)^2,
@@ -558,7 +896,7 @@ collision_on_p ( header_t header,
 }
 
 
-/* collision on each special-q, call collision_on_batch_p() */
+/* collision on each special-q, called by collision_on_batch_p() */
 static inline void
 collision_on_each_sq ( header_t header,
                        proots_t R,
@@ -635,7 +973,7 @@ collision_on_each_sq ( header_t header,
       modul_mul (res_rp, res_rp, res_tmp, modul_pp);
       u = (long) modul_get_ul (res_rp, modul_pp);
 
-#ifdef DEBUG_POLYSELECT2L
+#ifdef DEBUG_POLYSELECT2L // this is perhaps wrong.
       mpz_t Ntmp, m0tmp, tmp, qqz;
       mpz_init_set_ui (qqz, q);
       mpz_mul_ui (qqz, qqz, q);
@@ -649,8 +987,10 @@ collision_on_each_sq ( header_t header,
       mpz_pow_ui (m0tmp, m0tmp, header->d);
       mpz_mod_ui (m0tmp, m0tmp, ppl);
       if (mpz_cmp (m0tmp, Ntmp) != 0) {
-        fprintf (stderr, "Error: i computation is wrong in collision_on_each_sq\n");
-        gmp_printf ("Details: (p=%lu, i(mod p^2)=%ld) for ad=%lu, q=%lu, rq=%Zd, rp=%lu, invqq=%lu\n",
+        fprintf (stderr, "Error: i computation is wrong in "
+                 "collision_on_each_sq\n");
+        gmp_printf ("Details: (p=%lu, i(mod p^2)=%ld) for "
+                    "ad=%"PRIu64", q=%lu, rq=%Zd, rp=%lu, invqq=%lu\n",
                     p, u, header->ad, q, rqqz, rp, inv_qq[nprimes]);
         gmp_printf ("m0=%Zd\n", header->m0);
         gmp_printf ("Ntilde=%Zd\n", header->Ntilde);
@@ -704,7 +1044,7 @@ collision_on_each_sq ( header_t header,
 static inline void
 collision_on_batch_p ( header_t header,
                        proots_t R,
-                       unsigned long q,
+                       uint64_t q,
                        mpz_t qqz,
                        mpz_t rqqz )
 {
@@ -832,7 +1172,7 @@ collision_on_batch_p ( header_t header,
 }
 
 
-/* collision on special-q, call collisio_on_each_sq */
+/* collision on special-q, call collisio_on_batch_p */
 static void
 collision_on_sq ( header_t header,
                   proots_t R )
@@ -845,7 +1185,8 @@ collision_on_sq ( header_t header,
 
   qroots_init (SQ_R);
   comp_sq_roots (header, SQ_R);
-  unsigned long k = lq, n = SQ_R->size, q;
+  unsigned long k = lq, n = SQ_R->size;
+  uint64_t q;
   // roots_print (SQ_R);
 
   /* less than lq special primes having roots for this ad */
@@ -858,28 +1199,21 @@ collision_on_sq ( header_t header,
 
   if (tot > (unsigned long) nq)
     tot = (unsigned long) nq;
-  // fprintf (stderr, "n=%lu, k=%lu, (n,k)=%lu, nq:%d\n", n, k, tot, nq);
+  /*
+   fprintf (stderr, "n=%"PRIu64", k=%"PRIu64", (n,k)=%"PRIu64",
+   nq:%d\n", n, k, tot, nq);
+  */
 
   /* enumerate each combination */
   first_comb (n, idx_q);
   q = return_q_rq (SQ_R, idx_q, k, qqz, rqqz);
-  collision_on_batch_p ( header,
-                         R,
-                         q,
-                         qqz,
-                         rqqz );
+  collision_on_batch_p (header, R, q, qqz, rqqz);
 
   //fprintf (stderr, "# - q ");
   for (i = 1; i < tot; i ++) {
     next_comb (n, k, idx_q); // print_comb (k, idx_q);
-
     q = return_q_rq (SQ_R, idx_q, k, qqz, rqqz);
-
-    collision_on_batch_p ( header,
-                           R,
-                           q,
-                           qqz,
-                           rqqz );
+    collision_on_batch_p (header, R, q, qqz, rqqz);
   }
 
   mpz_clear (qqz);
@@ -888,34 +1222,17 @@ collision_on_sq ( header_t header,
 }
 
 
-static void
-newAlgo (mpz_t N, unsigned long d, unsigned long ad)
+// separator between modredc_ul and gmp
+
+
+/* find collisions between "P" primes */
+static inline void
+gmp_collision_on_p ( header_t header,
+		     proots_t R )
 {
-
-  header_t header;
-  header_init (header, N, d, ad);
-
-  proots_t R;
-  proots_init (R, lenPrimes);
-
-  collision_on_p (header, R);
-  collision_on_sq (header, R);
-
-  proots_clear (R, lenPrimes);
-  header_clear (header);
-}
-
-
-#else // TAG
-
-
-/* find collisions between "P" primes, return number of loops */
-static inline unsigned long
-collision_on_p ( header_t header,
-                 proots_t R )
-{
-  unsigned long i, j, nprimes, p, *rp, nrp, c = 0;
-  long ppl = 0;
+  unsigned long i, j, nprimes, p, nrp;
+  uint64_t *rp;
+  int64_t ppl = 0;
   double pc1;
   mpz_t *f, tmp;
 
@@ -930,7 +1247,448 @@ collision_on_p ( header_t header,
     mpz_init (f[i]);
   mpz_set_ui (f[header->d], 1);
 
-  rp = (unsigned long*) malloc (header->d * sizeof (unsigned long));
+  rp = (uint64_t*) malloc (header->d * sizeof (uint64_t));
+  if (rp == NULL) {
+    fprintf (stderr, "Error, cannot allocate memory in collision_on_p\n");
+    exit (1);
+  }
+
+  hash_t H;
+#ifdef CONSIDER_ONLY_TWO_ROOTS
+  hash_init (H, (unsigned long) (INIT_FACTOR * (double) lenPrimes));
+#else
+  hash_init (H, (unsigned long) (INIT_FACTOR * NUMBER_CONSIDERED_ROOTS
+				 * (double) lenPrimes));
+#endif
+
+#ifdef DEBUG_POLYSELECT2L
+  int st = cputime();
+#endif
+
+  for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
+    p = Primes[nprimes];
+    ppl = (int64_t) p;
+    ppl *= (int64_t) p;
+
+    /* add faked roots to keep indices */
+    if ((header->d * header->ad) % p == 0) {
+      R->nr[nprimes] = 0; // nr = 0.
+      R->roots[nprimes] = NULL;
+      continue;
+    }
+
+    /* we want p^2 | N - (m0 + i)^d, thus
+       (m0 + i)^d = N (mod p^2) or m0 + i = N^(1/d) mod p^2 */
+    mpz_mod_ui (f[0], header->Ntilde, p);
+    mpz_neg (f[0], f[0]); /* f = x^d - N */
+    nrp = poly_roots_uint64 (rp, f, header->d, p);
+    roots_lift (rp, header->Ntilde, header->d, header->m0, p, nrp);
+    proots_add (R, nrp, rp, nprimes);
+    for (j = 0; j < nrp; j++) {
+      /* only consider r[j] and r[j] - pp */
+      gmp_hash_add (H, p, (int64_t) rp[j], header->m0, header->ad,
+		    header->d, header->N, 1, tmp);
+      gmp_hash_add (H, p, (int64_t)((int64_t) (rp[j])-ppl),  header->m0,
+		    header->ad, header->d, header->N, 1, tmp);
+    }
+  }
+
+#ifdef DEBUG_POLYSELECT2L
+  fprintf (stderr, "# collision_on_p took %dms\n", cputime () - st);
+  fprintf (stderr, "# p hash_size: %u for ad = %"PRIu64"\n", H->size,
+	   header->ad);
+#endif
+
+  /* if the hash table contains n entries, each one smaller than (2P)^2,
+     the number of potential collisions is about 0.5*n^2/(2P)^2 */
+  pc1 = 0.5 * pow ((double) H->size / (double) Primes[nprimes - 1], 2.0);
+  hash_clear (H);
+
+  for (i = 0; i <= header->d; i++)
+    mpz_clear (f[i]);
+  free (f);
+  free (rp);
+  mpz_clear (tmp);
+
+  pthread_mutex_lock (&lock);
+  potential_collisions += pc1;
+  pthread_mutex_unlock (&lock);
+}
+
+
+/* collision on each special-q, called by collision_on_batch_p() */
+static inline void
+gmp_collision_on_each_sq ( header_t header,
+			   proots_t R,
+			   uint64_t q,
+			   mpz_t rqqz,
+			   uint64_t *inv_qq )
+{
+  unsigned int nr, j;
+  unsigned long nprimes, p;
+  mpz_t rppz, ppmp, tmp;
+  double pc2;
+  uint64_t pp, rp;
+  int64_t ppl, u;
+
+#ifndef CONSIDER_ONLY_TWO_ROOTS
+  int i;
+  int64_t h;
+#endif  
+
+  mpz_init (rppz);
+  mpz_init (ppmp);
+  mpz_init (tmp);
+  /*
+  gmp_printf ("ad: %"PRIu64", rq: %Zd, q: %"PRIu64"\n",
+	      header->ad, rqqz, q);
+  */
+#ifdef DEBUG_POLYSELECT2L
+  mpz_t tmp_debug, tmp_debug2, qqz;
+  mpz_init_set (tmp_debug, header->Ntilde);
+  mpz_init_set_ui (qqz, q);
+  mpz_mul_ui (qqz, qqz, q);
+  mpz_mod (tmp_debug, tmp_debug, qqz);
+  mpz_init_set (tmp_debug2, header->m0);
+  mpz_add (tmp_debug2, tmp_debug2, rqqz);
+  mpz_pow_ui (tmp_debug2, tmp_debug2, header->d);
+  mpz_mod (tmp_debug2, tmp_debug2, qqz);
+  if (mpz_cmp (tmp_debug, tmp_debug2) != 0) {
+    fprintf (stderr, "Error: crt root is wrong in collision_on_each_sq\n");
+    exit (1);
+  }
+  mpz_clear (tmp_debug);
+  mpz_clear (tmp_debug2);
+  mpz_clear (qqz);
+#endif
+
+#ifdef DEBUG_POLYSELECT2L
+  int st = cputime();
+#endif
+
+  hash_t H;
+
+#ifdef CONSIDER_ONLY_TWO_ROOTS
+  hash_init (H,  (unsigned long) (INIT_FACTOR * (double) lenPrimes));
+#else
+  hash_init (H,  (unsigned long) (INIT_FACTOR * NUMBER_CONSIDERED_ROOTS
+				  * (double) lenPrimes));
+#endif
+
+  for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
+    p = Primes[nprimes];
+    if ((header->d * header->ad) % p == 0)
+      continue;
+    /* set p, p^2, ppl */
+    pp = (uint64_t) p;
+    pp *= (uint64_t) p;
+    ppl = (int64_t) pp;
+    nr = R->nr[nprimes];
+
+    for (j = 0; j < nr; j++) {
+      rp = R->roots[nprimes][j];
+      mpz_set_uint64 (rppz, rp);
+      mpz_sub (rppz, rppz, rqqz);
+      mpz_mul_ui (rppz, rppz, inv_qq[nprimes]);
+      mpz_set_uint64 (ppmp, pp);
+      mpz_fdiv_r (tmp, rppz, ppmp);
+      u = (int64_t) mpz_get_uint64 (tmp);
+
+#ifdef DEBUG_POLYSELECT2L
+      mpz_t Ntmp, m0tmp, qqz, tmp2, tmp3;
+      mpz_init (Ntmp);
+      mpz_init (m0tmp);
+      mpz_init (qqz);
+      mpz_init (tmp2);
+      mpz_init (tmp3);
+      /* qqz = q^2 */
+      mpz_set_ui (qqz, q);
+      mpz_mul_ui (qqz, qqz, q);
+      /* tmp3 = p^2 */
+      mpz_set_uint64 (tmp3, pp);
+      /* tildeN (mod p^2) */
+      mpz_set (Ntmp, header->Ntilde);
+      mpz_fdiv_r (Ntmp, Ntmp, tmp3);
+      /* m0 + rq */
+      mpz_set (m0tmp, header->m0);
+      mpz_add (m0tmp, m0tmp, rqqz);
+      /* i*q^2 */
+      if (u >= 0)
+	mpz_set_uint64 (tmp2, (uint64_t) u);
+      else
+	mpz_set_uint64 (tmp2, (uint64_t) (-u));
+      mpz_mul (tmp2, tmp2, qqz);
+      mpz_add (m0tmp, m0tmp, tmp2); // m0 + rq + i*q^2
+      mpz_pow_ui (m0tmp, m0tmp, header->d);
+      mpz_mod (m0tmp, m0tmp, tmp3);
+      if (mpz_cmp (m0tmp, Ntmp) != 0) {
+        fprintf (stderr, "Error: i computation is wrong in "
+		 "collision_on_each_sq\n");
+        gmp_printf ("Details: (p=%lu, i(mod p^2)=%"PRId64") "
+		    "for ad=%"PRIu64", q=%lu, rq=%Zd, rp=%"PRIu64", "
+		    "invqq=%"PRIu64"\n",
+                    p, u, header->ad, q, rqqz, rp, inv_qq[nprimes]);
+        gmp_printf ("m0=%Zd\n", header->m0);
+        gmp_printf ("Ntilde=%Zd\n", header->Ntilde);
+        exit (1);
+      }
+      mpz_clear (Ntmp);
+      mpz_clear (m0tmp);
+      mpz_clear (tmp2);
+      mpz_clear (tmp3);
+      mpz_clear (qqz);
+#endif
+
+#ifdef CONSIDER_ONLY_TWO_ROOTS
+      gmp_hash_add (H, p, u, header->m0, header->ad, header->d, header->N,
+		q, rqqz);
+      gmp_hash_add (H, p, u - ppl, header->m0, header->ad, header->d,
+		header->N, q, rqqz);
+#else
+      h = u - ppl;
+      for (i = 0; i < NUMBER_CONSIDERED_ROOTS; i ++) {
+        gmp_hash_add (H, p, u, header->m0, header->ad, header->d, header->N,
+		  q, rqqz);
+        gmp_hash_add (H, p, h, header->m0, header->ad, header->d, header->N,
+		  q, rqqz);
+        u += ppl;
+        h -= ppl;
+      }
+
+#endif
+
+    }  // next rp
+  } // next p
+
+
+#ifdef DEBUG_POLYSELECT2L
+  fprintf (stderr, "# inner collision_on_each_sq took %dms\n", cputime () - st);
+  fprintf (stderr, "# - q hash_size (q=%lu): %u\n", q, H->size);
+#endif
+
+  pc2 = 0.5 * pow ((double) H->size / (double) Primes[nprimes - 1], 2.0);
+
+  /* clear */
+  mpz_clear (rppz);
+  mpz_clear (ppmp);
+  mpz_clear (tmp);
+  hash_clear (H);
+
+  pthread_mutex_lock (&lock);
+  potential_collisions += pc2;
+  pthread_mutex_unlock (&lock);
+}
+
+
+/* Batch P mode */
+static inline void
+gmp_collision_on_batch_p ( header_t header,
+			   proots_t R,
+			   uint64_t q,
+			   mpz_t qqz,
+			   mpz_t rqqz )
+{
+  unsigned int size = BATCH_SIZE;
+  if (size == 0)
+    return;
+  unsigned int i, j;
+  unsigned long nprimes, pul, index[size];
+  uint64_t ppul[size], *invqq;
+  mpz_t tmp, tmp1, p_prod, *ppmp;
+
+  mpz_init (tmp);
+  mpz_init (tmp1);
+  mpz_init (p_prod);
+  invqq = (uint64_t*) malloc (lenPrimes * sizeof (uint64_t));
+  ppmp = (mpz_t*) malloc (size * sizeof(mpz_t));
+  if (!invqq || !ppmp) {
+    fprintf (stderr, "Error, cannot allocate memory in %s\n", __FUNCTION__);
+    exit (1);
+  }
+
+  for (j = 0; j < size; j ++)
+    mpz_init (ppmp[j]);
+
+  //int st = cputime();
+
+  /* Step 1: batch inversion */
+  i = 0;
+  mpz_set_ui (p_prod, 1);
+
+  //int st = cputime();
+
+  for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
+
+    pul = Primes[nprimes];
+    if ((header->d * header->ad) % pul == 0)
+      continue;
+
+    // batch or reset
+    if ( (i == size - 1) || (nprimes == (lenPrimes-1)) ) {
+
+      ppul[i] = (uint64_t) pul;
+      ppul[i] *= (uint64_t) pul;
+      mpz_set_uint64 (ppmp[i], ppul[i]);
+      mpz_mul (p_prod, p_prod, ppmp[i]);
+      index[i] = nprimes;
+
+      // the inversion
+      mpz_invert (tmp, qqz, p_prod);
+
+      // individual inversions
+      for (j = 0; j <= i; j ++) {
+	mpz_fdiv_r (tmp1, tmp, ppmp[j]);
+	invqq[index[j]] = mpz_get_uint64 (tmp1);
+      }
+
+#ifdef DEBUG_POLYSELECT2L // check inversions for p in this batch
+      for (j = 0; j < i; j ++) {
+        mpz_t tmp_debug, tmp_debug2;
+        mpz_init (tmp_debug);
+	mpz_set_uint64 (tmp_debug, invqq[index[j]]);
+        mpz_init (tmp_debug2);
+        mpz_mul (tmp_debug2, tmp_debug, qqz);
+	mpz_set_uint64 (tmp_debug, ppul[j]);
+	mpz_fdiv_r (tmp_debug, tmp_debug2, tmp_debug);
+        if (mpz_cmp_ui (tmp_debug, 1) != 0) {
+          fprintf (stderr, "Error, batch inversion is wrong "
+		   "in %s, iter: %d\n", __FUNCTION__, i);
+          exit (1);
+        }
+        mpz_clear (tmp_debug);
+        mpz_clear (tmp_debug2);
+      }
+#endif
+      i = 0;
+      mpz_set_ui (p_prod, 1);
+    }
+    else {
+      ppul[i] = (uint64_t) pul;
+      ppul[i] *= (uint64_t) pul;
+      mpz_set_uint64 (ppmp[i], ppul[i]);
+      mpz_mul (p_prod, p_prod, ppmp[i]);
+      index[i++] = nprimes;
+    }
+
+  } // next prime
+
+  //fprintf (stderr, "# one batch P inversion took %dms\n", cputime () - st);
+
+  /* Step 2: find collisions on sq. */
+
+  //st = cputime();
+  gmp_collision_on_each_sq (header, R, q, rqqz, invqq);
+  //printf ("# collision_on_each_sq took %dms\n", cputime () - st);
+
+  mpz_clear (p_prod);
+  mpz_clear (tmp);
+  mpz_clear (tmp1);
+  for (j = 0; j < size; j ++)
+    mpz_clear (ppmp[j]);
+  free (ppmp);
+  free (invqq);
+}
+
+
+/* collision on special-q, call collisio_on_batch_p */
+static void
+gmp_collision_on_sq ( header_t header,
+		      proots_t R )
+{
+  mpz_t qqz, rqqz;
+  qroots_t SQ_R;
+
+  mpz_init (qqz);
+  mpz_init (rqqz);
+
+  qroots_init (SQ_R);
+  comp_sq_roots (header, SQ_R);
+  unsigned long k = lq, n = SQ_R->size;
+  uint64_t q;
+  // roots_print (SQ_R);
+
+  /* less than lq special primes having roots for this ad */
+  if (n == 0 || n < k)
+    return;
+
+  unsigned long idx_q[n], tot, i;
+  /* if tot (n, k) < wanted, use tot as wanted */
+  tot =  binom (n, k);
+
+  if (tot > (unsigned long) nq)
+    tot = (unsigned long) nq;
+  /*
+   fprintf (stderr, "n=%"PRIu64", k=%"PRIu64", (n,k)=%"PRIu64",
+   nq:%d\n", n, k, tot, nq);
+  */
+
+  /* enumerate each combination */
+  first_comb (n, idx_q);
+  q = return_q_rq (SQ_R, idx_q, k, qqz, rqqz);
+  gmp_collision_on_batch_p (header, R, q, qqz, rqqz);
+
+  //fprintf (stderr, "# - q ");
+  for (i = 1; i < tot; i ++) {
+    next_comb (n, k, idx_q); // print_comb (k, idx_q);
+    q = return_q_rq (SQ_R, idx_q, k, qqz, rqqz);
+    gmp_collision_on_batch_p (header, R, q, qqz, rqqz);
+  }
+
+  mpz_clear (qqz);
+  mpz_clear (rqqz);
+  qroots_clear (SQ_R);
+}
+
+
+static void
+newAlgo (mpz_t N, unsigned long d, uint64_t ad)
+{
+  header_t header;
+  header_init (header, N, d, ad);
+
+  proots_t R;
+  proots_init (R, lenPrimes);
+
+  if (sizeof (unsigned long int) == 8) {
+    collision_on_p (header, R);
+    collision_on_sq (header, R);
+  }
+  else {
+    gmp_collision_on_p (header, R);
+    gmp_collision_on_sq (header, R);
+  }
+
+  proots_clear (R, lenPrimes);
+  header_clear (header);
+}
+
+
+#else // TAG
+
+
+/* find collisions between "P" primes, return number of loops */
+static inline unsigned long
+collision_on_p ( header_t header,
+                 proots_t R )
+{
+  unsigned long i, j, nprimes, p, nrp, c = 0;
+  uint64_t *rp;
+  int64_t ppl = 0;
+  double pc1;
+  mpz_t *f, tmp;
+
+  /* init f for roots computation */
+  mpz_init_set_ui (tmp, 0);
+  f = (mpz_t*) malloc ((header->d + 1) * sizeof (mpz_t));
+  if (f == NULL) {
+    fprintf (stderr, "Error, cannot allocate memory in collision_on_p\n");
+    exit (1);
+  }
+  for (i = 0; i <= header->d; i++)
+    mpz_init (f[i]);
+  mpz_set_ui (f[header->d], 1);
+
+  rp = (uint64_t*) malloc (header->d * sizeof (uint64_t));
   if (rp == NULL) {
     fprintf (stderr, "Error, cannot allocate memory in collision_on_p\n");
     exit (1);
@@ -949,9 +1707,9 @@ collision_on_p ( header_t header,
 #endif
 
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
-
     p = Primes[nprimes];
-    ppl = (long) (p*p);
+    ppl = (int64_t) p;
+    ppl *= (int64_t) p;
 
     /* add faked roots to keep indices */
     if ((header->d * header->ad) % p == 0) {
@@ -964,14 +1722,15 @@ collision_on_p ( header_t header,
        (m0 + i)^d = N (mod p^2) or m0 + i = N^(1/d) mod p^2 */
     mpz_mod_ui (f[0], header->Ntilde, p);
     mpz_neg (f[0], f[0]); /* f = x^d - N */
-    nrp = poly_roots_ulong (rp, f, header->d, p);
+    nrp = poly_roots_uint64 (rp, f, header->d, p);
     roots_lift (rp, header->Ntilde, header->d, header->m0, p, nrp);
     proots_add (R, nrp, rp, nprimes);
-
     for (j = 0; j < nrp; j++, c++) {
       /* only consider r[j] and r[j] - pp */
-      hash_add (H, p, rp[j], header->m0, header->ad, header->d, header->N, 1, tmp);
-      hash_add (H, p, rp[j] - ppl, header->m0, header->ad, header->d, header->N, 1, tmp);
+      hash_add (H, p, (int64_t) rp[j], header->m0, header->ad, header->d,
+		header->N, 1, tmp);
+      hash_add (H, p, (int64_t) (rp[j] - ppl), header->m0, header->ad,
+		header->d, header->N, 1, tmp);
     }
   }
 
@@ -1007,8 +1766,9 @@ collision_on_each_sq ( header_t header,
                        unsigned long *inv_qq )
 {
   unsigned int nr, j;
-  unsigned long nprimes, p, rp MAYBE_UNUSED, pp, c = 0;
-  long ppl, u;
+  unsigned long nprimes, p, c = 0;
+  uint64_t pp;
+  int64_t ppl, u;
   double pc2;
 
 #ifndef CONSIDER_ONLY_TWO_ROOTS
@@ -1025,7 +1785,8 @@ collision_on_each_sq ( header_t header,
 #ifdef CONSIDER_ONLY_TWO_ROOTS
   hash_init (H,  (unsigned long) (INIT_FACTOR * (double) lenPrimes));
 #else
-  hash_init (H,  (unsigned long) (INIT_FACTOR * NUMBER_CONSIDERED_ROOTS * (double) lenPrimes));
+  hash_init (H,  (unsigned long) (INIT_FACTOR * NUMBER_CONSIDERED_ROOTS
+				  * (double) lenPrimes));
 #endif
 
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
@@ -1041,17 +1802,20 @@ collision_on_each_sq ( header_t header,
 
     for (j = 0; j < nr; j++, c++)
     {
-      rp = R->roots[nprimes][j];
       u = (long) inv_qq[c];
 
 #ifdef CONSIDER_ONLY_TWO_ROOTS
-      hash_add (H, p, u, header->m0, header->ad, header->d, header->N, q, rqqz);
-      hash_add (H, p, u - ppl, header->m0, header->ad, header->d, header->N, q, rqqz);
+      hash_add (H, p, u, header->m0, header->ad, header->d, 
+		header->N, q, rqqz);
+      hash_add (H, p, u - ppl, header->m0, header->ad, header->d,
+		header->N, q, rqqz);
 #else
       h = u - ppl;
       for (i = 0; i < NUMBER_CONSIDERED_ROOTS; i ++) {
-        hash_add (H, p, u, header->m0, header->ad, header->d, header->N, q, rqqz);
-        hash_add (H, p, h, header->m0, header->ad, header->d, header->N, q, rqqz);
+        hash_add (H, p, u, header->m0, header->ad, header->d,
+		  header->N, q, rqqz);
+        hash_add (H, p, h, header->m0, header->ad, header->d, 
+		  header->N, q, rqqz);
         u += ppl;
         h -= ppl;
       }
@@ -1089,7 +1853,8 @@ collision_on_batch_sq ( header_t header,
     return;
 
   unsigned int i, j, nr;
-  unsigned long nprimes, p, pp, c = 0, rp;
+  unsigned long nprimes, p, c = 0, rp;
+  uint64_t pp;
   unsigned long **invqq = malloc (size * sizeof (unsigned long *));
 
   if (invqq) {
@@ -1113,7 +1878,8 @@ collision_on_batch_sq ( header_t header,
     mpz_pow_ui (tmp_debug2, tmp_debug2, header->d);
     mpz_mod (tmp_debug2, tmp_debug2, qqz);
     if (mpz_cmp (tmp_debug, tmp_debug2) != 0) {
-      fprintf (stderr, "Error: crt root is wrong in %s, iter: %d, ad: %lu\n",
+      fprintf (stderr, "Error: crt root is wrong in %s, iter: %d, "
+               "ad: %"PRIu64"\n",
                __FUNCTION__, i, header->ad);
       fprintf (stderr, "We should have Ntilde = (m0+r)^d mod q^2\n");
       gmp_fprintf (stderr, "Ntilde=%Zd m0=%Zd r=%Zd d=%d q=%lu\n",
@@ -1217,7 +1983,7 @@ collision_on_batch_sq ( header_t header,
           fprintf (stderr, "Error: u computation is wrong in"
                    "collision_on_each_sq, i: %d\n", i);
           gmp_printf ("Details: (p=%lu, i(mod p^2)=%ld) for "
-                      "ad=%lu, q=%lu, rq=%Zd, rp=%lu, invqq=%lu\n",
+                      "ad=%"PRIu64", q=%lu, rq=%Zd, rp=%lu, invqq=%lu\n",
                       p, invqq[i][c], header->ad, q[i], rqqz[i], rp, tmp2_modul[0]);
           gmp_printf ("m0=%Zd\n", header->m0);
           gmp_printf ("Ntilde=%Zd\n", header->Ntilde);
@@ -1281,7 +2047,7 @@ collision_on_batch_sq ( header_t header,
         fprintf (stderr, "Error: u computation is wrong in"
                  "collision_on_each_sq, i: %d\n", i);
         gmp_printf ("Details: (p=%lu, i(mod p^2)=%ld) for "
-                    "ad=%lu, q=%lu, rq=%Zd, rp=%lu, invqq=%lu\n",
+                    "ad=%"PRIu64", q=%lu, rq=%Zd, rp=%lu, invqq=%lu\n",
                     p, invqq[0][c], header->ad, q[0], rqqz[0], rp, tmp_modul[0]);
         gmp_printf ("m0=%Zd\n", header->m0);
         gmp_printf ("Ntilde=%Zd\n", header->Ntilde);
@@ -1348,7 +2114,8 @@ collision_on_sq ( header_t header,
 
   // less than lq special primes having roots for this ad
   if (N == 0 || N < K) {
-    fprintf (stderr, "# Info: binomial(%lu, %lu) error in collision_on_sq(). ad=%lu.\n", N, K, header->ad);
+    fprintf (stderr, "# Info: binomial(%lu, %lu) error in "
+             "collision_on_sq(). ad=%"PRIu64".\n", N, K, header->ad);
     return;
   }
   
@@ -1361,7 +2128,8 @@ collision_on_sq ( header_t header,
     tot = BATCH_SIZE;
 
 #ifdef DEBUG_POLYSELECT2L
-  fprintf (stderr, "# Info: n=%lu, k=%lu, (n,k)=%lu, maxnq=%d, nq=%lu\n", N, K, binom(N, K), nq, tot);
+  fprintf (stderr, "# Info: n=%lu, k=%lu, (n,k)=%lu"
+	   ", maxnq=%d, nq=%lu\n", N, K, binom(N, K), nq, tot);
 #endif
 
   i = 0;
@@ -1409,7 +2177,8 @@ collision_on_sq ( header_t header,
     q[l] = return_q_rq (SQ_R, idx_q, K, qqz[l], rqqz[l]);
 
 #ifdef DEBUG_POLYSELECT2L
-    gmp_fprintf (stderr, "q: %lu, qq: %Zd, rqq: %Zd\n", q[l], qqz[l], rqqz[l]);
+    gmp_fprintf (stderr, "q: %lu, qq: %Zd, rqq: %Zd\n",
+		 q[l], qqz[l], rqqz[l]);
 #endif
 
   }
@@ -1429,18 +2198,415 @@ collision_on_sq ( header_t header,
 }
 
 
-static void
-newAlgo (mpz_t N, unsigned long d, unsigned long ad)
+// separator between modredc_ul and gmp
+
+
+/* find collisions between "P" primes, return number of loops */
+static inline unsigned long
+gmp_collision_on_p ( header_t header,
+		     proots_t R )
 {
+  unsigned long i, j, nprimes, p, nrp, c = 0;
+  uint64_t *rp;
+  int64_t ppl = 0;
+  double pc1;
+  mpz_t *f, tmp;
 
+  /* init f for roots computation */
+  mpz_init_set_ui (tmp, 0);
+  f = (mpz_t*) malloc ((header->d + 1) * sizeof (mpz_t));
+  if (f == NULL) {
+    fprintf (stderr, "Error, cannot allocate memory in collision_on_p\n");
+    exit (1);
+  }
+  for (i = 0; i <= header->d; i++)
+    mpz_init (f[i]);
+  mpz_set_ui (f[header->d], 1);
+
+  rp = (uint64_t*) malloc (header->d * sizeof (uint64_t));
+  if (rp == NULL) {
+    fprintf (stderr, "Error, cannot allocate memory in collision_on_p\n");
+    exit (1);
+  }
+
+  hash_t H;
+  
+#ifdef CONSIDER_ONLY_TWO_ROOTS
+  hash_init (H,  (unsigned long) (INIT_FACTOR * (double) lenPrimes));
+#else
+  hash_init (H,  (unsigned long) (INIT_FACTOR * NUMBER_CONSIDERED_ROOTS
+				  * (double) lenPrimes));
+#endif
+
+#ifdef DEBUG_POLYSELECT2L
+  int st = cputime();
+#endif
+
+  for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
+    p = Primes[nprimes];
+    ppl = (int64_t) p;
+    ppl *= (int64_t) p;
+
+    /* add faked roots to keep indices */
+    if ((header->d * header->ad) % p == 0) {
+      R->nr[nprimes] = 0; // nr = 0.
+      R->roots[nprimes] = NULL;
+      continue;
+    }
+
+    /* we want p^2 | N - (m0 + i)^d, thus
+       (m0 + i)^d = N (mod p^2) or m0 + i = N^(1/d) mod p^2 */
+    mpz_mod_ui (f[0], header->Ntilde, p);
+    mpz_neg (f[0], f[0]); /* f = x^d - N */
+    nrp = poly_roots_uint64 (rp, f, header->d, p);
+    roots_lift (rp, header->Ntilde, header->d, header->m0, p, nrp);
+    proots_add (R, nrp, rp, nprimes);
+    for (j = 0; j < nrp; j++, c++) {
+      /* only consider r[j] and r[j] - pp */
+      gmp_hash_add (H, p, (int64_t) rp[j], header->m0, header->ad,
+		    header->d, header->N, 1, tmp);
+      gmp_hash_add (H, p, (int64_t) (rp[j] - ppl), header->m0, header->ad,
+		header->d, header->N, 1, tmp);
+    }
+  }
+
+#ifdef DEBUG_POLYSELECT2L
+  fprintf (stderr, "# collision_on_p took %dms\n", cputime () - st);
+  fprintf (stderr, "# p hash_size: %u for ad = %lu\n", H->size, header->ad);
+#endif
+
+  /* if the hash table contains n entries, each one smaller than (2P)^2,
+     the number of potential collisions is about 0.5*n^2/(2P)^2 */
+  pc1 = 0.5 * pow ((double) H->size / (double) Primes[nprimes - 1], 2.0);
+  hash_clear (H);
+
+  for (i = 0; i <= header->d; i++)
+    mpz_clear (f[i]);
+  free (f);
+  free (rp);
+  mpz_clear (tmp);
+
+  pthread_mutex_lock (&lock);
+  potential_collisions += pc1;
+  pthread_mutex_unlock (&lock);
+  return c;
+}
+
+
+/* collision on each special-q, call collision_on_batch_p() */
+static inline void
+gmp_collision_on_each_sq ( header_t header,
+			   proots_t R,
+			   uint64_t q,
+			   mpz_t rqqz,
+			   uint64_t *inv_qq )
+{
+  unsigned int nr, j;
+  unsigned long nprimes, p, c = 0;
+  uint64_t pp;
+  int64_t ppl, u;
+  double pc2;
+
+#ifndef CONSIDER_ONLY_TWO_ROOTS
+  int i;
+  int64_t h;
+#endif  
+
+#ifdef DEBUG_POLYSELECT2L
+  int st = cputime();
+#endif
+
+  hash_t H;
+
+#ifdef CONSIDER_ONLY_TWO_ROOTS
+  hash_init (H,  (unsigned long) (INIT_FACTOR * (double) lenPrimes));
+#else
+  hash_init (H,  (unsigned long) (INIT_FACTOR * NUMBER_CONSIDERED_ROOTS
+				  * (double) lenPrimes));
+#endif
+
+  for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
+
+    p = Primes[nprimes];
+    if ((header->d * header->ad) % p == 0)
+      continue;
+
+    /* set p, p^2, ppl */
+    pp = (uint64_t) p;
+    pp *= (uint64_t) p;
+    ppl = (int64_t) pp;
+    nr = R->nr[nprimes];
+
+    for (j = 0; j < nr; j++, c++)
+    {
+      u = (int64_t) inv_qq[c];
+
+#ifdef CONSIDER_ONLY_TWO_ROOTS
+      gmp_hash_add (H, p, u, header->m0, header->ad, header->d, 
+		    header->N, q, rqqz);
+      gmp_hash_add (H, p, u - ppl, header->m0, header->ad, header->d,
+		    header->N, q, rqqz);
+#else
+      h = u - ppl;
+      for (i = 0; i < NUMBER_CONSIDERED_ROOTS; i ++) {
+        gmp_hash_add (H, p, u, header->m0, header->ad, header->d,
+		      header->N, q, rqqz);
+        gmp_hash_add (H, p, h, header->m0, header->ad, header->d,
+		      header->N, q, rqqz);
+        u += ppl;
+        h -= ppl;
+      }
+
+#endif
+
+    }  // next rp
+  } // next p
+
+#ifdef DEBUG_POLYSELECT2L
+  fprintf (stderr, "# inner collision_on_each_sq took %dms\n",
+	   cputime () - st);
+  fprintf (stderr, "# - q hash_size (q=%lu): %u\n", q, H->size);
+#endif
+
+  pc2 = 0.5 * pow ((double) H->size / (double) Primes[nprimes - 1], 2.0);
+
+  hash_clear (H);
+
+  pthread_mutex_lock (&lock);
+  potential_collisions += pc2;
+  pthread_mutex_unlock (&lock);
+}
+
+
+/* Batch SQ mode */
+static inline void
+gmp_collision_on_batch_sq ( header_t header,
+			    proots_t R,
+			    uint64_t *q,
+			    mpz_t *qqz,
+			    mpz_t *rqqz,
+			    unsigned long size,
+			    unsigned long number_pr )
+{
+  if (size == 0)
+    return;
+
+  unsigned int i, j, nr;
+  unsigned long nprimes, p, c = 0;
+  uint64_t pp, **invqq, rp;
+  mpz_t qprod[size], modpp, tmp, tmp1, tmp2, rpmp;
+
+  mpz_init (tmp);
+  mpz_init (tmp1);
+  mpz_init (tmp2);
+  mpz_init (rpmp);
+  mpz_init (modpp);
+  for (i = 0; i < size; i++)
+    mpz_init (qprod[i]);
+
+  invqq = (uint64_t **) malloc (size * sizeof (uint64_t *));
+  if (invqq) {
+    for (i = 0; i < size; i++)
+      invqq[i] = malloc (number_pr * sizeof (uint64_t));
+  }
+  else {
+    fprintf (stderr, "Error, cannot allocate memory in %s\n", __FUNCTION__);
+    exit (1);
+  }
+
+  mpz_set (qprod[0], qqz[0]);
+  for (i = 1; i < size; i ++)
+    mpz_mul(qprod[i], qqz[i], qprod[i-1]);
+
+  /* Step 1: batch inversion */
+  for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
+
+    p = Primes[nprimes];
+    pp = (uint64_t) p;
+    pp *= (uint64_t) p;
+    if ((header->d * header->ad) % p == 0)
+      continue;
+    if (R->nr[nprimes] == 0)
+      continue;
+    nr = R->nr[nprimes];
+
+    /* inversion */
+    mpz_set_uint64 (modpp, pp);
+    mpz_invert (tmp1 ,qprod[size-1], modpp);
+
+    /* for each (q, r) \in a batch */
+    for (i = size-1; i > 0; i --) {
+      mpz_mul(tmp, qprod[i-1], tmp1);
+      /* for each rp, compute (rp-rq)*1/q^2 (mod p^2) */
+      for (j = 0; j < nr; j ++, c++) {
+        rp = R->roots[nprimes][j];
+	mpz_set_uint64 (rpmp, rp);
+	mpz_sub (rpmp, rpmp, rqqz[i]);
+	mpz_mul (rpmp, rpmp, tmp);
+	mpz_mod (rpmp, rpmp, modpp);
+        invqq[i][c] = mpz_get_uint64 (rpmp);
+      }
+      mpz_mul (tmp, qqz[i], tmp1);
+      mpz_mod (tmp1, tmp, modpp);
+      c -= nr;
+    }
+    /* last q in the batch is in tmp_modul */
+    for (j = 0; j < nr; j ++, c ++) {
+      rp = R->roots[nprimes][j];
+      mpz_set_uint64 (rpmp, rp);
+      mpz_sub (rpmp, rpmp, rqqz[0]);
+      mpz_fdiv_r (rpmp, rpmp, modpp);
+      mpz_mul (tmp2, rpmp, tmp1);
+      mpz_mod (tmp2, tmp2, modpp);
+      invqq[0][c] = mpz_get_uint64 (tmp2);
+    }
+  } // next prime p
+
+  /* Step 2: find collisions on q. */
+  for (i = 0; i < size; i ++) {
+    //int st2 = cputime();
+    gmp_collision_on_each_sq (header, R, q[i], rqqz[i], invqq[i]);
+    //printf ("# outer collision_on_each_sq took %dms\n", cputime () - st2);
+  }
+
+  for (i = 0; i < size; i++)
+    free (invqq[i]);
+  free (invqq);
+  mpz_clear (tmp);
+  mpz_clear (tmp1);
+  mpz_clear (tmp2);
+  mpz_clear (rpmp);
+  mpz_clear (modpp);
+  for (i = 0; i < size; i++)
+    mpz_clear (qprod[i]);
+}
+
+
+/* collision on special-q, call collisio_on_batch_sq */
+static inline void
+gmp_collision_on_sq ( header_t header,
+		      proots_t R,
+		      unsigned long c )
+{
+  // init special-q roots
+  qroots_t SQ_R;
+  qroots_init (SQ_R);
+  comp_sq_roots (header, SQ_R);
+  // qroots_print (SQ_R);
+
+  unsigned long K = lq, N = SQ_R->size, tot, i, l, idx_q[K];
+  uint64_t q[BATCH_SIZE];
+  mpz_t *qqz, *rqqz;
+
+  qqz = (mpz_t*) malloc (BATCH_SIZE * sizeof (mpz_t));
+  rqqz = (mpz_t*) malloc (BATCH_SIZE * sizeof (mpz_t));
+  if (!qqz || !rqqz) {
+    fprintf (stderr, "Error, cannot allocate memory "
+	     "in gmp_collision_on_sq \n");
+    exit (1);
+  }
+  for (l = 0; l < BATCH_SIZE; l++) {
+    mpz_init (qqz[l]);
+    mpz_init (rqqz[l]);
+  }
+
+  // less than lq special primes having roots for this ad
+  if (N == 0 || N < K) {
+    fprintf (stderr, "# Info: binomial(%lu, %lu) error in "
+             "collision_on_sq(). ad=%"PRIu64".\n", N, K, header->ad);
+    return;
+  }
+  
+  tot =  binom (N, K);
+
+  if (tot > (unsigned long) nq)
+    tot = (unsigned long) nq;
+
+  if (tot < BATCH_SIZE)
+    tot = BATCH_SIZE;
+
+#ifdef DEBUG_POLYSELECT2L
+  fprintf (stderr, "# Info: n=%lu, k=%lu, (n,k)=%lu"
+	   ", maxnq=%d, nq=%lu\n", N, K, binom(N, K), nq, tot);
+#endif
+
+  i = 0;
+  while ( i <= (tot-BATCH_SIZE) ) {
+
+    l = i; // why do I use an extra l here?
+    if (l == 0) {
+
+      // enumerate first combination
+      first_comb (K, idx_q);
+      //print_comb (K, idx_q);
+      q[l] = return_q_rq (SQ_R, idx_q, K, qqz[l], rqqz[l]);
+
+      for (l = 1; l < BATCH_SIZE; l++) {
+        next_comb (N, K, idx_q);
+        q[l] = return_q_rq (SQ_R, idx_q, K, qqz[l], rqqz[l]);
+      }
+    }
+    else {
+      for (l = 0; l < BATCH_SIZE; l++) {
+        next_comb (N, K, idx_q);
+        q[l] = return_q_rq (SQ_R, idx_q, K, qqz[l], rqqz[l]);
+      }
+    }
+
+#ifdef DEBUG_POLYSELECT2L
+    unsigned long j;
+    for (j = 0; j < BATCH_SIZE; j++)
+      gmp_fprintf (stderr, "q: %lu, qq: %Zd, rqq: %Zd\n",
+		   q[j], qqz[j], rqqz[j]);
+#endif
+
+    // collision batch
+    gmp_collision_on_batch_sq (header, R, q, qqz, rqqz, BATCH_SIZE, c);
+    i += BATCH_SIZE;
+  }
+
+  // tail batch
+  for (l = 0; l < (tot % BATCH_SIZE); l++) {
+    next_comb (N, K, idx_q);
+    q[l] = return_q_rq (SQ_R, idx_q, K, qqz[l], rqqz[l]);
+
+#ifdef DEBUG_POLYSELECT2L
+    gmp_fprintf (stderr, "q: %lu, qq: %Zd, rqq: %Zd\n",
+		 q[l], qqz[l], rqqz[l]);
+#endif
+
+  }
+
+  gmp_collision_on_batch_sq (header, R, q, qqz, rqqz, tot % BATCH_SIZE, c);
+
+  for (l = 0; l < BATCH_SIZE; l++) {
+    mpz_clear (qqz[l]);
+    mpz_clear (rqqz[l]);
+  }
+  free (qqz);
+  free (rqqz);
+  qroots_clear (SQ_R);
+}
+
+
+static void
+newAlgo (mpz_t N, unsigned long d, uint64_t ad)
+{
+  unsigned long c = 0;
   header_t header;
-  header_init (header, N, d, ad);
-
   proots_t R;
+
+  header_init (header, N, d, ad);
   proots_init (R, lenPrimes);
 
-  unsigned long c = collision_on_p (header, R);
-  collision_on_sq (header, R, c);
+  if (sizeof (unsigned long int) == 8) {
+    c = collision_on_p (header, R);
+    collision_on_sq (header, R, c);
+  }
+  else {
+    c = gmp_collision_on_p (header, R);
+    gmp_collision_on_sq (header,R, c);
+  }
 
   proots_clear (R, lenPrimes);
   header_clear (header);

@@ -484,7 +484,7 @@ mergeForColumn (report_t *rep, double *tt, double *tfill, double *tMST,
 	if(mat->R[GETJ(mat, j)][k] != -1){
 	    ind[ni++] = mat->R[GETJ(mat, j)][k];
       if (ni == m)
-              break; /* earky abort, since we know there are m rows */
+              break; /* early abort, since we know there are m rows */
 	}
     }
     /* now ind[0], ..., ind[m-1] are the m rows containing j */

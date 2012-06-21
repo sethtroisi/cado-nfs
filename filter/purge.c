@@ -74,7 +74,7 @@ typedef struct {
 } fr_t;
 
 /* Main variables */
-static hashtable_t H;
+static hashtable_t H[1];
 static int **rel_compact = NULL; /* see above */
 static uint8_t *rel_weight = NULL; /* rel_weight[i] is the total weight of
                                       row i */
@@ -94,6 +94,8 @@ static double wct0;
 static bit_vector rel_used;
 static relation_stream rs;
 static char *pmin, *pminlessone;
+static double W; /* total weight for last pass */
+static FILE *ofile;     /* For the principal file output. */
 
 static const unsigned char ugly[256] = {
   255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
@@ -246,7 +248,7 @@ static unsigned long minus2;
    nb_coeff is the current index in table_ind[] (input and output).
  */
 static void
-fprint_rat (int *table_ind, int *nb_coeff, relation_t *rel, hashtable_t *H)
+fprint_rat (int *table_ind, int *nb_coeff, relation_t *rel)
 {
   int i, nbc = *nb_coeff;
 
@@ -268,7 +270,7 @@ fprint_rat (int *table_ind, int *nb_coeff, relation_t *rel, hashtable_t *H)
    nb_coeff is the current index in table_ind[] (input and output).
  */
 static void
-fprint_alg (int *table_ind, int *nb_coeff, relation_t *rel, hashtable_t *H)
+fprint_alg (int *table_ind, int *nb_coeff, relation_t *rel)
 {
   int i, nbc = *nb_coeff;
 
@@ -287,7 +289,7 @@ fprint_alg (int *table_ind, int *nb_coeff, relation_t *rel, hashtable_t *H)
 
 /* Adds a free relation in table_ind[]: a is the corresponding prime */
 static void
-fprint_free (int *table_ind, int *nb_coeff, relation_t *rel, hashtable_t *H)
+fprint_free (int *table_ind, int *nb_coeff, relation_t *rel)
 {
   long p = rel->a;
   int i, nbc = *nb_coeff, index;
@@ -325,46 +327,56 @@ fprint_free (int *table_ind, int *nb_coeff, relation_t *rel, hashtable_t *H)
    WARNING: the primes in the input relation are not necessarily sorted.
 */
 static int
-fprint_rel_row (FILE *file, int irel, relation_t rel, hashtable_t *H)
+fprint_rel_row (FILE *file, int irel, relation_t *rel)
 {
+  char buf[1<<12], *p;
   int i;
   int *table_ind;
   int nb_coeff;
 
 #ifndef FOR_FFS
-  table_ind = (int*) malloc ((rel.nb_rp + rel.nb_ap) * sizeof (int));
+  table_ind = (int*) malloc ((rel->nb_rp + rel->nb_ap) * sizeof (int));
 #else
   /*For FFS, the exponents can be different from 1.*/
   /*FIXME do better than 4x */
-  table_ind = (int*) malloc (4 * (rel.nb_rp + rel.nb_ap) * sizeof (int));
+  table_ind = (int*) malloc (4 * (rel->nb_rp + rel->nb_ap) * sizeof (int));
 #endif
 
   nb_coeff = 0;
 
-  if (rel.b == 0) /* free relation */
-    fprint_free (table_ind, &nb_coeff, &rel, H);
+  if (rel->b == 0) /* free relation */
+    fprint_free (table_ind, &nb_coeff, rel);
   else
     {
       /* adds rational primes in table_ind */
-      fprint_rat (table_ind, &nb_coeff, &rel, H);
+      fprint_rat (table_ind, &nb_coeff, rel);
 
       /* adds algebraic primes in table_ind */
-      fprint_alg (table_ind, &nb_coeff, &rel, H);
+      fprint_alg (table_ind, &nb_coeff, rel);
     }
 
-  fprintf (file, "%d %"PRId64" %"PRIu64" %d",
-          irel, rel.a, rel.b, nb_coeff);
+  p = d64toa10(buf, (int64_t) irel);
+  *p++ = ' ';
+  p = d64toa10(p, (uint64_t) rel->a);
+  *p++ = ' ';
+  p = u64toa10(p, (uint64_t) rel->b);
+  *p++ = ' ';
+  p = d64toa10(p, (int64_t) nb_coeff);
   for (i = 0; i < nb_coeff; ++i)
+    {
+      *p++ = ' ';
     /* due to the +1 in renumber */
-    fprintf (file, " " PURGE_INT_FORMAT, table_ind[i] - 1);
-  fprintf (file, "\n");
-
+      p = u64toa16(p, (uint64_t) (table_ind[i] - 1));
+    }
+  *p = '\n';
+  p[1] = 0;
+  fputs(buf, file);
   free (table_ind);
 
 #ifndef FOR_FFS
   return nb_coeff;
 #else
-  return weight_rel_ffs (rel);
+  return weight_rel_ffs (*rel);
 #endif
 }
 
@@ -390,16 +402,16 @@ insertNormalRelation (unsigned int j)
     {
       /* we insert all ideals (even small ones) in the hash table since we
          need to renumber them in the second pass */
-      h = hashInsert (&H, buf_rel[j].rel.rp[i].p, minus2);
-      nprimes += (H.hashcount[h] == 1); /* new prime */
+      h = hashInsert (H, buf_rel[j].rel.rp[i].p, minus2);
+      nprimes += (H->hashcount[h] == 1); /* new prime */
       /* but we only store in memory those >= minpr */
       if (((long) buf_rel[j].rel.rp[i].p) >= minpr)
         my_tmp[itmp++] = h;
     }
   for (i = 0; i < (unsigned int) buf_rel[j].rel.nb_ap; i++)
     {
-      h = hashInsert (&H, buf_rel[j].rel.ap[i].p, buf_rel[j].rel.ap[i].r);
-      nprimes += (H.hashcount[h] == 1); /* new ideal */
+      h = hashInsert (H, buf_rel[j].rel.ap[i].p, buf_rel[j].rel.ap[i].r);
+      nprimes += (H->hashcount[h] == 1); /* new ideal */
       if (((long) buf_rel[j].rel.ap[i].p) >= minpa)
         my_tmp[itmp++] = h;
     }
@@ -429,14 +441,14 @@ insertFreeRelation (unsigned int j)
   my_tmp = my_malloc_int(buf_rel[j].ltmp); 
   itmp = 0;
   /* insert all ideals */
-  h = hashInsert (&H, ((long) buf_rel[j].rel.a), minus2);
-  nprimes += (H.hashcount[h] == 1); /* new prime */
+  h = hashInsert (H, ((long) buf_rel[j].rel.a), minus2);
+  nprimes += (H->hashcount[h] == 1); /* new prime */
   if (((long) buf_rel[j].rel.a) >= minpr)
     my_tmp[itmp++] = h;
   for (i = 0; i < (unsigned int) buf_rel[j].rel.nb_ap; i++)
     {
-      h = hashInsert(&H, ((long) buf_rel[j].rel.a), buf_rel[j].rel.ap[i].p);
-      nprimes += (H.hashcount[h] == 1); /* new ideal */
+      h = hashInsert(H, ((long) buf_rel[j].rel.a), buf_rel[j].rel.ap[i].p);
+      nprimes += (H->hashcount[h] == 1); /* new ideal */
       if (((long) buf_rel[j].rel.a) >= minpa)
         my_tmp[itmp++] = h;
     }
@@ -455,7 +467,7 @@ insertFreeRelation (unsigned int j)
    (tab[j] is the index in the hash table of the corresponding prime ideal).
 */
 static int
-has_singleton (int *tab, hashtable_t *H)
+has_singleton (int *tab)
 {
     int j;
 
@@ -471,7 +483,7 @@ has_singleton (int *tab, hashtable_t *H)
    rational primes >= minpr and algebraic primes >= minpa.
 */
 static void
-delete_relation (int i, int *nprimes, hashtable_t *H)
+delete_relation (int i, int *nprimes)
 {
   int j, *tab = rel_compact[i];
 
@@ -529,8 +541,8 @@ compare (const void *v1, const void *v2)
    i1 and i2 share a prime of weight 2.
    Return number of rows of components, and put in w the total weight. */
 static int
-compute_connected_component (bit_vector_ptr T, uint32_t i, hashtable_t *H,
-                             unsigned long *w, uint32_t *sum)
+compute_connected_component (bit_vector_ptr T, uint32_t i, unsigned long *w,
+			     uint32_t *sum)
 {
   int j, h, n;
   uint32_t k;
@@ -542,7 +554,7 @@ compute_connected_component (bit_vector_ptr T, uint32_t i, hashtable_t *H,
       {
         k = sum[h] - i; /* other row where prime of index h appears */
         if (!bit_vector_getbit(T, k)) /* row k was not visited yet */
-          n += compute_connected_component (T, k, H, w, sum);
+          n += compute_connected_component (T, k, w, sum);
       }
   *w += rel_weight[i]; /* add row weight */
   return n;
@@ -553,7 +565,7 @@ compute_connected_component (bit_vector_ptr T, uint32_t i, hashtable_t *H,
    to 2, but we don't want to treat that case. Thus we check in addition
    that sum[h] <> 0, which only occurs when H->hashcount[h] = 2 initially. */
 static int
-delete_connected_component (bit_vector_ptr T, uint32_t i, hashtable_t *H,
+delete_connected_component (bit_vector_ptr T, uint32_t i, 
                             uint32_t *sum, int *nprimes)
 {
   int j, h, w = 1;
@@ -567,15 +579,15 @@ delete_connected_component (bit_vector_ptr T, uint32_t i, hashtable_t *H,
         { /* first row that contains ideal of index h */
           k = sum[h] - i; /* other row where prime of index h appears */
           if (bit_vector_getbit(T, k) == 1) /* row k was not visited yet */
-            w += delete_connected_component (T, k, H, sum, nprimes);
+            w += delete_connected_component (T, k, sum, nprimes);
         }
     }
-  delete_relation (i, nprimes, H);
+  delete_relation (i, nprimes);
   return w;
 }
 
 static void
-deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes,
+deleteHeavierRows (int *nrel, int *nprimes,
                    int nrelmax, int keep)
 {
   uint32_t *sum; /* sum of row indices for primes with weight 2 */
@@ -612,7 +624,7 @@ deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes,
     if (bit_vector_getbit(rel_used, i) && bit_vector_getbit(T, i) == 0)
       {
         w = 0;
-        n = compute_connected_component (T, i, H, &w, sum);
+        n = compute_connected_component (T, i, &w, sum);
         ltmp ++;
         tmp = (comp_t*) realloc (tmp, ltmp * sizeof (comp_t));
         tmp[ltmp - 1].w = (float) COST(w,W,n,N);
@@ -628,7 +640,7 @@ deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes,
   if (++count >= MAX_STEPS)
     target = keep; /* enough steps */
   for (i = 0; i < ltmp && (*nrel) - (*nprimes) > target; i ++)
-    *nrel -= delete_connected_component (T, tmp[i].i, H, sum, nprimes);
+    *nrel -= delete_connected_component (T, tmp[i].i, sum, nprimes);
 
   bit_vector_clear(T);
   free (sum);
@@ -636,22 +648,20 @@ deleteHeavierRows (hashtable_t *H, int *nrel, int *nprimes,
 }
 
 static void
-onepass_singleton_removal (int nrelmax, int *nrel, int *nprimes,
-                           hashtable_t *H)
+onepass_singleton_removal (int nrelmax, int *nrel, int *nprimes)
 {
   int i;
 
   for (i = 0; i < nrelmax; i++)
-    if (bit_vector_getbit(rel_used, i) && has_singleton (rel_compact[i], H))
+    if (bit_vector_getbit(rel_used, i) && has_singleton (rel_compact[i]))
       {
-        delete_relation (i, nprimes, H);
+        delete_relation (i, nprimes);
         (*nrel)--;
       }
 }
 
 static void
-remove_singletons (int *nrel, int nrelmax, int *nprimes, hashtable_t *H,
-                   int keep)
+remove_singletons (int *nrel, int nrelmax, int *nprimes, int keep)
 {
   int old, newnrel = *nrel, newnprimes = *nprimes, oldexcess, excess;
   int count = 0;
@@ -665,13 +675,13 @@ remove_singletons (int *nrel, int nrelmax, int *nprimes, hashtable_t *H,
       /* delete heavy rows */
       if (count >= MAX_STEPS/2)
         {
-          deleteHeavierRows (H, &newnrel, &newnprimes, nrelmax, keep);
+          deleteHeavierRows (&newnrel, &newnprimes, nrelmax, keep);
           if (newnrel != old)
             fprintf (stderr, "deleted heavier relations: %d %d at %2.2lf\n",
                      newnrel, newnprimes, seconds ());
         }
 
-      onepass_singleton_removal (nrelmax, &newnrel, &newnprimes, H);
+      onepass_singleton_removal (nrelmax, &newnrel, &newnprimes);
 
       excess = newnrel - newnprimes;
       fprintf (stderr, "   new_nrows=%d new_ncols=%d (%d) at %2.2lf\n",
@@ -703,7 +713,7 @@ remove_singletons (int *nrel, int nrelmax, int *nprimes, hashtable_t *H,
    weight, since this will probably be done later on.
    All rows will be 1 more that needed -> subtract 1 in fprint...! */
 static void
-renumber (int *nprimes, hashtable_t *H, const char *sos)
+renumber (int *nprimes, const char *sos)
 {
     FILE *fsos = NULL;
     unsigned int i;
@@ -765,10 +775,10 @@ renumber (int *nprimes, hashtable_t *H, const char *sos)
 */
 static void
 #ifndef FOR_FFS
-reread (const char *oname, char ** ficname, hashtable_t *H,
+reread (const char *oname, char ** ficname, 
         bit_vector_srcptr rel_used, int nrows, int ncols, int raw)
 #else
-reread (const char *oname, const char *oname2, char ** ficname, hashtable_t *H,
+reread (const char *oname, const char *oname2, char ** ficname,
         bit_vector_srcptr rel_used, int nrows, int ncols, int raw)
 #endif
 {
@@ -807,7 +817,6 @@ reread (const char *oname, const char *oname2, char ** ficname, hashtable_t *H,
 #else
               if (relation_stream_get(rs, NULL, 0, ab_base) < 0)
                 break;
-
               fprint_relation_raw (ofile2, &rs->rel);
 #endif
             }
@@ -827,7 +836,7 @@ reread (const char *oname, const char *oname2, char ** ficname, hashtable_t *H,
 		    computeroots_ffs (&rs->rel);
 #endif
                   }
-                  W += (double) fprint_rel_row (ofile, irel, rs->rel, H);
+                  W += (double) fprint_rel_row (ofile, irel, &rs->rel);
               }
               else
                   fprint_relation_raw (ofile, &rs->rel);
@@ -931,7 +940,11 @@ prempt_load (prempt_t prempt_data) {
 }
 
 static inline void
+#ifndef FOR_FFS
 relation_stream_get_fast (prempt_t prempt_data, unsigned int j)
+#else
+relation_stream_get_fast (prempt_t prempt_data, unsigned int j, int passtwo)
+#endif
 {
   int64_t n;
   char *p;
@@ -979,7 +992,7 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j)
   }
   ASSERT_ALWAYS(c == ':');
   buf_rel[j].rel.b = n;
-  
+
   if (!rs->parse_only_ab) {
     /* Do something if we're also interested in primes */
     for ( k = 0, c = 0 ; ; ) {
@@ -991,13 +1004,23 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j)
 	LOAD_ONE(p);
       }
       ASSERT_ALWAYS(c == ',' || c == ':');
-      if (pr) {
-	for (i = k; i--; ) {
-	  if (buf_rel[j].rel.rp[i].p == pr) {
-	    buf_rel[j].rel.rp[i].e++;
-	    goto next_rat;
+      /*
+      if (pr)
+        {
+      */
+	for (i = k; i--; )
+	  {
+	  if (buf_rel[j].rel.rp[i].p == pr)
+	    {
+#ifdef FOR_FFS
+	      /* FOR_FFS, all .e != 0 must set to one in pass 1.
+		 In passtwo, all .e must be keeped. */
+	      if (passtwo)
+#endif
+		buf_rel[j].rel.rp[i].e++;
+	      goto next_rat;
+	    }
 	  }
-	}
 	if ((unsigned int) buf_rel[j].rel.nb_rp_alloc <= k) {
 	  buf_rel[j].rel.nb_rp_alloc = buf_rel[j].rel.nb_rp_alloc ?
 	    buf_rel[j].rel.nb_rp_alloc + (buf_rel[j].rel.nb_rp_alloc>>1) : 8;
@@ -1005,7 +1028,9 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j)
 	    realloc (buf_rel[j].rel.rp, buf_rel[j].rel.nb_rp_alloc * sizeof(rat_prime_t));
 	}
 	buf_rel[j].rel.rp[k++] = (rat_prime_t) { .p = pr, .e = 1};
+	/*
       }
+	*/
     }
     buf_rel[j].rel.nb_rp = k;
     
@@ -1013,70 +1038,86 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j)
     next_alg:
       if (c == '\n') break;
       LOAD_ONE(p);
-      for (pr = 0 ; (v = ugly[c]) < 16 ; ) {
-	pr = (pr << 4) + v;
-	LOAD_ONE(p);
-      }
+      for (pr = 0 ; (v = ugly[c]) < 16 ; )
+	{
+	  pr = (pr << 4) + v;
+	  LOAD_ONE(p);
+	}
       ASSERT_ALWAYS(c == ',' || c == '\n');
-      if (pr) {
-	for (i = k; i--; ) {
-	  if (buf_rel[j].rel.ap[i].p == pr) {
-	    buf_rel[j].rel.ap[i].e++;
-	    goto next_alg;
+      /*
+      if (pr)
+	{
+      */
+	for (i = k; i--; )
+	  {
+	    if (buf_rel[j].rel.ap[i].p == pr)
+	      {
+#ifdef FOR_FFS
+		if (passtwo)
+#endif
+		  buf_rel[j].rel.ap[i].e++;
+		
+		goto next_alg;
+	      }
 	  }
-	}
-	if ((unsigned int) buf_rel[j].rel.nb_ap_alloc <= k) {
-	  buf_rel[j].rel.nb_ap_alloc = buf_rel[j].rel.nb_ap_alloc ?
-	    buf_rel[j].rel.nb_ap_alloc + (buf_rel[j].rel.nb_ap_alloc>>1) : 16;
-	  buf_rel[j].rel.ap = (alg_prime_t *)
-	    realloc (buf_rel[j].rel.ap, buf_rel[j].rel.nb_ap_alloc * sizeof(alg_prime_t));
-	}
+	if ((unsigned int) buf_rel[j].rel.nb_ap_alloc <= k)
+	  {
+	    buf_rel[j].rel.nb_ap_alloc = buf_rel[j].rel.nb_ap_alloc ?
+	      buf_rel[j].rel.nb_ap_alloc + (buf_rel[j].rel.nb_ap_alloc>>1) : 16;
+	    buf_rel[j].rel.ap = (alg_prime_t *)
+	      realloc (buf_rel[j].rel.ap, buf_rel[j].rel.nb_ap_alloc * sizeof(alg_prime_t));
+	  }
 	buf_rel[j].rel.ap[k++] = (alg_prime_t) { .p = pr,.r = -1, .e = 1};
-      }
+	/*
+	}
+	*/
     }
     buf_rel[j].rel.nb_ap = k;
-
+    
     if (buf_rel[j].rel.b > 0) 
-     {
-      ltmp = 1;
-      for (k = 0, i = 0; i < (unsigned int) buf_rel[j].rel.nb_rp; i++)
-       {
+      {
+	ltmp = 1;
 #ifndef FOR_FFS
-        if (buf_rel[j].rel.rp[i].e & 1)
+	for (k = 0, i = 0; i < (unsigned int) buf_rel[j].rel.nb_rp; i++)
+	  {
+	    if (buf_rel[j].rel.rp[i].e & 1)
+		{
+		  buf_rel[j].rel.rp[k].p = buf_rel[j].rel.rp[i].p;
+		  buf_rel[j].rel.rp[k].e = 1;
+		  ltmp += ((long) buf_rel[j].rel.rp[k].p >= minpr);
+		  k++;
+		}
+	  }
+	buf_rel[j].rel.nb_rp = k;
+	for (k = 0, i = 0; i < (unsigned int) buf_rel[j].rel.nb_ap; i++)
+	  {
+	    if (buf_rel[j].rel.ap[i].e & 1) 
+		{
+		  /* rel.ap[k].r will be computed later with another threads */
+		  buf_rel[j].rel.ap[k].p = buf_rel[j].rel.ap[i].p;
+		  buf_rel[j].rel.ap[k].e = 1;
+		  ltmp += ((long) buf_rel[j].rel.ap[k].p >= minpa);
+		  k++;
+		}
+	  }
+	buf_rel[j].rel.nb_ap = k;
 #else
-        if (buf_rel[j].rel.rp[i].e >= 1)
+	for (i = 0; i < (unsigned int) buf_rel[j].rel.nb_rp; i++)
+	  {
+	    ltmp += ((long) buf_rel[j].rel.rp[i].p >= minpr);
+	  }
+	for (i = 0; i < (unsigned int) buf_rel[j].rel.nb_ap; i++)
+	  {
+	    ltmp += ((long) buf_rel[j].rel.ap[i].p >= minpa);
+	  }
 #endif
-         {
-          buf_rel[j].rel.rp[k] =
-	    (rat_prime_t) { .p = buf_rel[j].rel.rp[i].p, .e = 1 };
-          ltmp += ((long) buf_rel[j].rel.rp[k].p >= minpr);
-          k++;
-         }
-       }
-      buf_rel[j].rel.nb_rp = k;
-      for (k = 0, i = 0; i < (unsigned int) buf_rel[j].rel.nb_ap; i++)
-       {
-#ifndef FOR_FFS
-        if (buf_rel[j].rel.ap[i].e & 1) 
-#else
-        if (buf_rel[j].rel.ap[i].e >= 1)
-#endif
-         {
-	  /* Spurious set of ap[k].r : it be computed later with another threads */
-	   buf_rel[j].rel.ap[k] =
-	     (alg_prime_t) { .p = buf_rel[j].rel.ap[i].p, .e = 1, .r = 0xffffffff };
-          ltmp += ((long) buf_rel[j].rel.ap[k].p >= minpa);
-          k++;
-         }
-       }
-      buf_rel[j].rel.nb_ap = k;
-     }
+      }
     else 
-     {
-      ltmp = ((long) buf_rel[j].rel.a >= minpr) + 1;
-      if ((long) buf_rel[j].rel.a >= minpa) 
-        ltmp += buf_rel[j].rel.nb_ap;
-     }
+      {
+	ltmp = ((long) buf_rel[j].rel.a >= minpr) + 1;
+	if ((long) buf_rel[j].rel.a >= minpa) 
+	  ltmp += buf_rel[j].rel.nb_ap;
+      }
     buf_rel[j].ltmp = ltmp;
   }
 }
@@ -1129,6 +1170,43 @@ void insertRelation() {
   }
 }
 
+void printrel() {
+  unsigned int j;
+  unsigned long cpy_cpt_rel_b;
+
+  /*
+  pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+  pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+  */
+  cpy_cpt_rel_b = cpt_rel_b;
+  for ( ; ; ) {
+    while (cpt_rel_a == cpy_cpt_rel_b)
+      if (!end_insertRelation)
+	{
+	  nanosleep (&wait_classical, NULL);
+	}
+      else
+	if (cpt_rel_a == cpy_cpt_rel_b)
+	  pthread_exit(NULL);
+    if (cpt_rel_a == cpy_cpt_rel_b + 1)
+      {
+      nanosleep (&wait_classical, NULL);
+      }
+    j = (unsigned int) (cpy_cpt_rel_b & (T_REL - 1));
+
+    W += (double) fprint_rel_row(ofile, buf_rel[j].num, &(buf_rel[j].rel));
+     
+    if (relation_stream_disp_progress_now_p(rs))
+      fprintf(stderr,
+	      "re-read & print useful %lu relations in %.1fs"
+	      " -- %.1f MB/s -- %.1f rels/s\n",
+	      rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
+
+    cpy_cpt_rel_b++;
+    cpt_rel_b = cpy_cpt_rel_b;
+  }
+}
+
 static void threadfindroot(fr_t *mfr) {
   unsigned int i, j;
   for (;;) 
@@ -1170,12 +1248,12 @@ static void threadfindroot(fr_t *mfr) {
    - rel_compact is an array, terminated by -1, of pointers to the entries
      in the hash table for the considered primes
 
-     Trick: we only read relations for which rel_used[i]=1.
+     Trick: we only read relations for which rel_used[i]==1.
  */
 static int
-prempt_scan_relations ()
+prempt_scan_relations_pass_one ()
 {
-  char *pcons, *pcons_old, *pcons_max, *p;
+  char *pcons, *pcons_old, *pcons_max, *p, **ff;
   pthread_attr_t attr;
   pthread_t thread_load, thread_relation, thread_fr[(1<<NFR)];
   fr_t fr[(1<<NFR)];
@@ -1189,7 +1267,7 @@ prempt_scan_relations ()
   end_insertRelation = 0;
   if (!(buf_rel = malloc (sizeof(*(buf_rel)) * T_REL)))
     {
-      fprintf (stderr, "prempt_scan_relations: malloc error. %s\n",
+      fprintf (stderr, "prempt_scan_relations_pass_one: malloc error. %s\n",
                strerror (errno));
       exit (1);
     }
@@ -1206,7 +1284,7 @@ prempt_scan_relations ()
   prempt_data->files = prempt_open_compressed_rs (fic);
   if ((err = posix_memalign ((void **) &(prempt_data->buf), PREMPT_BUF, PREMPT_BUF)))
     {
-    fprintf (stderr, "prempt_scan_relations: posix_memalign error (%d): %s\n", err, strerror (errno));
+    fprintf (stderr, "prempt_scan_relations_pass_one: posix_memalign error (%d): %s\n", err, strerror (errno));
     exit (1);
     }
   pmin = prempt_data->buf;
@@ -1220,18 +1298,18 @@ prempt_scan_relations ()
   pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_JOINABLE);
   if ((err = pthread_create (&thread_load, &attr, (void *) prempt_load, prempt_data)))
     {
-    fprintf (stderr, "prempt_scan_relations: pthread_create error 1: %d. %s\n", err, strerror (errno)); 
+    fprintf (stderr, "prempt_scan_relations_pass_one: pthread_create error 1: %d. %s\n", err, strerror (errno)); 
     exit (1);
     }
   if ((err = pthread_create (&thread_relation, &attr, (void *) insertRelation, NULL)))
     {
-    fprintf (stderr, "prempt_scan_relations: pthread_create error 2: %d. %s\n", err, strerror (errno)); 
+    fprintf (stderr, "prempt_scan_relations_pass_one: pthread_create error 2: %d. %s\n", err, strerror (errno)); 
     exit (1);
     }
   for (i = 0; i < (1<<NFR); i++)
     if ((err = pthread_create (&(thread_fr[i]), &attr, (void *) threadfindroot, &(fr[i]))))
       {
-    fprintf (stderr, "prempt_scan_relations: pthread_create error 3: %d. %s\n", err, strerror (errno)); 
+    fprintf (stderr, "prempt_scan_relations_pass_one: pthread_create error 3: %d. %s\n", err, strerror (errno)); 
     exit (1);
       }
   
@@ -1287,13 +1365,13 @@ prempt_scan_relations ()
 	testendline:
 	  if (c != '\n' && pcons == prempt_data->pprod)
 	    {
-	      fprintf (stderr, "prempt_scan_relations: "
+	      fprintf (stderr, "prempt_scan_relations_pass_one: "
 		       "the last line has not a carriage return\n");
 	      exit(1);
 	    }
 	  if (length_line > ((unsigned int) RELATION_MAX_BYTES))
 	    {
-	      fprintf (stderr, "prempt_scan_relations: relation line size (%u) is "
+	      fprintf (stderr, "prempt_scan_relations_pass_one: relation line size (%u) is "
 		       "greater than RELATION_MAX_BYTES (%d)\n",
 		       length_line, RELATION_MAX_BYTES);
 	      exit(1);
@@ -1305,8 +1383,11 @@ prempt_scan_relations ()
 	    }
 	  k = (unsigned int) (cpy_cpt_rel_a & (T_REL - 1));
 	  buf_rel[k].num = rs->nrels++;
+#ifndef FOR_FFS
 	  relation_stream_get_fast (prempt_data, k);
-
+#else
+	  relation_stream_get_fast (prempt_data, k, 0);
+#endif
 	  /* Delayed find root computation by block of 1<<NNFR */
 	  if (cpy_cpt_rel_a && !(k & ((1<<NNFR)-1)))
 	    {
@@ -1339,7 +1420,7 @@ prempt_scan_relations ()
 		  else
 		    if (pcons == prempt_data->pprod)
 		      {
-			fprintf (stderr, "prempt_scan_relations: at the end of"
+			fprintf (stderr, "prempt_scan_relations_pass_one: at the end of"
 				 " files, a line without \\n ?\n");
 			exit (1); 
 		      }
@@ -1385,17 +1466,10 @@ prempt_scan_relations ()
     pthread_cancel(thread_load);
   pthread_join(thread_load, NULL);
   pthread_attr_destroy(&attr);
-  free (prempt_data->buf);
-  prempt_data->buf = NULL;
-  free (prempt_data->files);
 
-  fprintf (stderr, "read %lu relations in %.1fs -- %.1f MB/s -- %.1f rels/s\n",
-           rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
-  if (rs->nrels != nrelmax) {
-    fprintf (stderr, "Error, -nrels value should match the number of scanned relations\nexpected %lu relations, found %lu\n", nrelmax, rs->nrels);
-    exit (EXIT_FAILURE);
-  }
-  
+  free (prempt_data->buf);
+  for (ff = prempt_data->files; *ff; free(*ff++));
+  free (prempt_data->files);
   for (i = T_REL ; i ; ) {
     free(buf_rel[--i].rel.rp);
     free(buf_rel[i].rel.ap);
@@ -1403,6 +1477,319 @@ prempt_scan_relations ()
   free (buf_rel);
   buf_rel = NULL;
 
+  relation_stream_trigger_disp_progress(rs);
+  fprintf (stderr, "End of read: %lu relations in %.1fs -- %.1f MB/s -- %.1f rels/s\n",
+           rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
+  relation_stream_clear(rs);
+
+  if (rs->nrels != nrelmax) {
+    fprintf (stderr, "Error, -nrels value should match the number of scanned relations\nexpected %lu relations, found %lu\n", nrelmax, rs->nrels);
+    exit (EXIT_FAILURE);
+  }
+  
+  return 1;
+}
+
+/* ReRead all relations from files and output remaining relations
+   (those with rel_used[i] <> 0) in ofile.
+
+   For FFS ouput deleted relations (those with rel_used[i] == 0) in ofile2
+
+   If raw is non-zero, output relations in CADO format
+   (otherwise in format used by merge).
+ */
+static int
+prempt_scan_relations_pass_two (const char *oname, 
+#ifdef FOR_FFS
+				const char *oname2,
+#endif
+				bit_vector_srcptr rel_used, int nrows, int ncols, int raw)
+{
+  char *pcons, *pcons_old, *pcons_max, *p, **f;
+  pthread_attr_t attr;
+  pthread_t thread_load, thread_printrel, thread_fr[(1<<NFR)];
+  fr_t fr[(1<<NFR)];
+  prempt_t prempt_data;
+  unsigned long cpy_cpt_rel_a;
+  unsigned int length_line, i, k;
+  int err;
+  int ret MAYBE_UNUSED, nr = 0;
+  char c;
+
+  int pipe;
+#ifdef FOR_FFS
+  FILE *ofile2;
+  int pipe2;
+#endif
+
+  ofile = fopen_compressed_w(oname, &pipe, NULL);
+#ifdef FOR_FFS
+  ofile2 = fopen_compressed_w(oname2, &pipe2, NULL);
+#endif
+  if (!raw)
+    fprintf (ofile, "%d %d\n", nrows, ncols);
+  fprintf (stderr, "Final pass:\n");
+
+  memset (fr, 0, (1<<NFR) * sizeof(*fr));
+  end_insertRelation = 0;
+  if (!raw)
+    {
+      if (!(buf_rel = malloc (sizeof(*(buf_rel)) * T_REL)))
+	{
+	  fprintf (stderr, "prempt_scan_relations_pass_two: malloc error. %s\n",
+		   strerror (errno));
+	  exit (1);
+	}
+      memset (buf_rel, 0, sizeof(*(buf_rel)) * T_REL);
+    }
+  else
+    {
+      /* Only buf_rel[1] for raw */
+      if (!(buf_rel = malloc (sizeof(*(buf_rel)))))
+	{
+	  fprintf (stderr, "prempt_scan_relations_pass_two: malloc error. %s\n",
+		   strerror (errno));
+	  exit (1);
+	}
+      memset (buf_rel, 0, sizeof(*(buf_rel)));
+    }
+
+  cpt_rel_a = cpt_rel_b = 0;
+  cpy_cpt_rel_a = cpt_rel_a;
+  relation_stream_init (rs);
+  rs->pipe = 1;
+  length_line = 0;
+  
+  prempt_data->files = prempt_open_compressed_rs (fic);
+  if ((err = posix_memalign ((void **) &(prempt_data->buf), PREMPT_BUF, PREMPT_BUF)))
+    {
+    fprintf (stderr, "prempt_scan_relations_pass_two: posix_memalign error (%d): %s\n", err, strerror (errno));
+    exit (1);
+    }
+  pmin = prempt_data->buf;
+  pminlessone = pmin - 1;
+  prempt_data->pcons = pmin;
+  prempt_data->pprod = pmin;
+  pcons_max = &(prempt_data->buf[PREMPT_BUF]);
+  prempt_data->end = 0;
+  pthread_attr_init (&attr);
+  pthread_attr_setstacksize (&attr, 1<<16);
+  pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_JOINABLE);
+  if ((err = pthread_create (&thread_load, &attr, (void *) prempt_load, prempt_data)))
+    {
+    fprintf (stderr, "prempt_scan_relations_pass_two: pthread_create error 1: %d. %s\n", err, strerror (errno)); 
+    exit (1);
+    }
+  W = 0.0;
+  if (!raw && (err = pthread_create (&thread_printrel, &attr, (void *) printrel, NULL)))
+    {
+    fprintf (stderr, "prempt_scan_relations_pass_two: pthread_create error 2: %d. %s\n", err, strerror (errno)); 
+    exit (1);
+    }
+  for (i = 0; i < (1<<NFR); i++)
+    if ((err = pthread_create (&(thread_fr[i]), &attr, (void *) threadfindroot, &(fr[i]))))
+      {
+    fprintf (stderr, "prempt_scan_relations_pass_two: pthread_create error 3: %d. %s\n", err, strerror (errno)); 
+    exit (1);
+      }
+  
+  pcons = (char *) prempt_data->pcons;
+  for ( ; ; )
+    {
+      rs->pos += length_line;
+      length_line = 0;
+      prempt_data->pcons = pcons;
+      
+      while (pcons == prempt_data->pprod)
+        {
+          if (!prempt_data->end)
+	    {
+	      nanosleep (&wait_classical, NULL);
+	    }
+	  else
+            if (pcons == prempt_data->pprod)
+              goto end_of_files;
+        }
+      
+      rs->lnum++;
+      
+      if (*pcons != '#') 
+	{
+	  while ((((PREMPT_BUF + ((size_t) prempt_data->pprod)) -
+		   ((size_t) pcons)) & (PREMPT_BUF - 1)) <= ((unsigned int) RELATION_MAX_BYTES) &&
+		 !prempt_data->end)
+	    {
+	      nanosleep(&wait_classical, NULL);
+	    }
+	  if (pcons > prempt_data->pprod)
+	    {
+	      p = &(pcons_max[-1]);
+	      c = *p;
+	      *p = '\n';
+	      pcons_old = pcons;
+	      while (*pcons++ != '\n');
+	      *p = c;
+	      length_line = (pcons - pcons_old);
+	      if (pcons <= p)
+		goto lineok;
+	      pcons = pmin;
+	      if (c == '\n')
+		goto lineok;
+	    }
+	  p = &(((char *) prempt_data->pprod)[-1]);
+	  c = *p;
+	  *p = '\n';
+	  pcons_old = pcons;
+	  while (*pcons++ != '\n');
+	  *p = c;
+	  length_line += (pcons - pcons_old);
+	lineok:
+	  /* Is is a non skipped relation ? */
+	  if (bit_vector_getbit (rel_used, rs->nrels)) 
+	    {
+	      while (cpy_cpt_rel_a == cpt_rel_b + T_REL)
+		{
+		  nanosleep(&wait_classical, NULL);
+		}
+	      if (raw)
+		{
+		  buf_rel[0].num = rs->nrels;
+#ifndef FOR_FSS
+		  relation_stream_get_fast (prempt_data, 0);
+#else
+		  relation_stream_get_fast (prempt_data, 0, 1);
+#endif
+		  fprint_relation_raw (ofile, &(buf_rel[0].rel));
+		}
+	      else
+		{
+		  k = (unsigned int) (cpy_cpt_rel_a & (T_REL - 1));
+		  buf_rel[k].num = rs->nrels;
+#ifndef	FOR_FSS
+		  relation_stream_get_fast (prempt_data, k);
+#else		  
+		  relation_stream_get_fast (prempt_data, k, 1);
+#endif
+		  
+		  /* Delayed find root computation by block of 1<<NNFR */
+		  if (cpy_cpt_rel_a && !(k & ((1<<NNFR)-1)))
+		    {
+		      i = (k>>NNFR) & ((1<<NFR)-1);
+		      while (fr[i].ok) nanosleep(&wait_classical, NULL);
+		      if (k)
+			{
+			  fr[i].num = k - (1<<NNFR);
+			  fr[i].end = k - 1;
+			}
+		      else
+			{
+			  fr[i].num = T_REL - (1<<NNFR);
+			  fr[i].end = T_REL - 1;
+			}
+		      fr[i].ok = 1;
+		      if (cpy_cpt_rel_a > (1<<(NFR+NNFR)))
+			cpt_rel_a = cpy_cpt_rel_a - (1<<(NFR+NNFR));
+		    }
+		  cpy_cpt_rel_a++;
+		}
+	      nr++;
+              if (nr >= nrows)
+                  ret = 0; /* we are done IN THIS THREAD for re-read */
+	    }
+#ifdef FOR_FFS
+	  else
+	    {
+	      while (cpy_cpt_rel_a == cpt_rel_b + T_REL)
+		{
+		  nanosleep(&wait_classical, NULL);
+		}
+	      k = (unsigned int) (cpy_cpt_rel_a & (T_REL - 1));
+	      buf_rel[k].num = rs->nrels;
+	      relation_stream_get_fast (prempt_data, k, 1);
+	      
+	      fprint_relation_raw (ofile2, &(buf_rel[k].rel));
+	    }
+#endif
+	  rs->nrels++;
+	}
+      else
+	{
+	  do
+	    {
+	      while (pcons == prempt_data->pprod)
+		{
+		  if (!prempt_data->end)
+		    nanosleep (&wait_classical, NULL);
+		}
+	      p = ((pcons <= prempt_data->pprod) ? (char *) prempt_data->pprod
+		   : pcons_max) - 1;
+	      c = *p;
+	      *p = '\n';
+	      pcons_old = pcons;
+	      while (*pcons++ != '\n');
+	      *p = c;
+	      length_line += (pcons - pcons_old);
+	      err = (pcons > p && c != '\n');
+	      if (pcons == pcons_max) pcons = pmin;
+	    }
+	  while (err);
+	}
+    }
+  
+ end_of_files:
+  if (cpy_cpt_rel_a) {
+    k = (unsigned int) ((cpy_cpt_rel_a - 1) & (T_REL - 1));
+    if (k & ((1<<NNFR)-1)) {
+      i = ((k>>NNFR)+1) & ((1<<NFR)-1);
+      while (fr[i].ok) nanosleep(&wait_classical, NULL);
+      fr[i].num = k & ~((1<<NNFR)-1);
+      fr[i].end = k;
+      fr[i].ok = 1;
+    }
+  }
+  for (i = 0; i < (1<<NFR); i++) {
+    while (fr[i].ok) nanosleep(&wait_classical, NULL);
+    fr[i].ok = 2;
+    pthread_join(thread_fr[i], NULL);
+  }
+  cpt_rel_a = cpy_cpt_rel_a;
+  while (cpy_cpt_rel_a != cpt_rel_b)
+    nanosleep(&wait_classical, NULL);
+
+  end_insertRelation = 1;
+  if (!raw)
+    pthread_join(thread_printrel, NULL);
+  if (pthread_tryjoin_np (thread_load, NULL))
+    pthread_cancel(thread_load);
+  pthread_join(thread_load, NULL);
+  pthread_attr_destroy(&attr);
+  
+  free (prempt_data->buf);
+  for (f = prempt_data->files; *f; free(*f++));
+  free (prempt_data->files);
+  for (i = T_REL ; i ; ) {
+    free(buf_rel[--i].rel.rp);
+    free(buf_rel[i].rel.ap);
+  }
+  free (buf_rel);
+  buf_rel = NULL;
+  
+  relation_stream_trigger_disp_progress(rs);
+  fprintf (stderr, "End of re-read: %lu relations in %.1fs -- %.1f MB/s -- %.1f rels/s\n",
+           rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
+  relation_stream_clear(rs);
+  
+  if (pipe)  pclose(ofile);  else fclose(ofile);
+#ifdef FOR_FFS
+  if (pipe2) pclose(ofile2); else fclose(ofile2);
+#endif
+  
+  /* write excess to stdout */
+  if (!raw)
+    printf ("NROWS:%d WEIGHT:%1.0f WEIGHT*NROWS=%1.2e\n", nr, W, W * (double) nr);
+  printf ("EXCESS: %d\n", nrows - ncols);
+  fflush (stdout);
+  
   return 1;
 }
 
@@ -1582,7 +1969,7 @@ main (int argc, char **argv)
       Hsize = Hsizer + Hsizea;
     }
   fprintf (stderr, "Estimated number of prime ideals: %d\n", Hsize);
-  tot_alloc0 = H.hashmod * H.size;
+  tot_alloc0 = H->hashmod * H->size;
   
   bit_vector_init_set(rel_used, nrelmax, 1);
   tot_alloc0 += nrelmax;
@@ -1594,7 +1981,7 @@ main (int argc, char **argv)
   rel_weight = (uint8_t*) malloc (nrelmax * sizeof(uint8_t));
   tot_alloc0 += nrelmax * (sizeof (int*) + sizeof(uint8_t));
   /* %zu is the C99 modifier for size_t */
-  fprintf (stderr, "Allocated rel_compact of %zuMb (total %luMb so far)\n",
+  fprintf (stderr, "Allocated rel_compact of %luMb (total %luMb so far)\n",
 	   (nrelmax * sizeof (int *)) >> 20,
 	   tot_alloc0 >> 20);
   
@@ -1660,9 +2047,9 @@ main (int argc, char **argv)
 #endif
 #endif
 
-  hashInit (&H, Hsize, 1, need64);
+  hashInit (H, Hsize, 1, need64);
 
-  prempt_scan_relations ();
+  prempt_scan_relations_pass_one ();
 
   fprintf (stderr, "   nrels=%d, nprimes=%d; excess=%d\n",
            nrel, nprimes, nrel - nprimes);
@@ -1670,7 +2057,7 @@ main (int argc, char **argv)
   nrel_new = nrel;
   nprimes_new = nprimes;
 
-  remove_singletons (&nrel_new, nrelmax, &nprimes_new, &H, keep);
+  remove_singletons (&nrel_new, nrelmax, &nprimes_new, keep);
       
   fprintf (stderr, "   nrel=%d, nprimes=%d; excess=%d\n",
            nrel_new, nprimes_new, nrel_new - nprimes_new);
@@ -1681,7 +2068,7 @@ main (int argc, char **argv)
       exit (1);
     }
 
-  hashCheck (&H);
+  hashCheck (H);
 
   my_malloc_free_all ();
 
@@ -1696,18 +2083,19 @@ main (int argc, char **argv)
   /*************************** second pass ***********************************/
 
   /* we renumber the primes in order of apparition in the hashtable */
-  renumber (&nprimes_new, &H, sos);
+  renumber (&nprimes_new, sos);
   
   /* reread the relation files and convert them to the new coding */
   fprintf (stderr, "Storing remaining relations...\n");
 #ifndef FOR_FFS
-  reread (purgedname, fic, &H, rel_used, nrel_new, nprimes_new, raw);
+  /* reread (purgedname, fic, rel_used, nrel_new, nprimes_new, raw); */
+  prempt_scan_relations_pass_two (purgedname, rel_used, nrel_new, nprimes_new, raw);
 #else
-  reread (purgedname, deletedname, fic, &H, rel_used, nrel_new, nprimes_new, 
-                                                                raw);
+  /* reread (purgedname, deletedname, fic, rel_used, nrel_new, nprimes_new,                                                                raw); */
+  prempt_scan_relations_pass_two (purgedname, deletedname, rel_used, nrel_new, nprimes_new, raw);
 #endif
 
-  hashFree (&H);
+  hashFree (H);
   bit_vector_clear(rel_used);
   cado_poly_clear (pol);
   

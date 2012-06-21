@@ -919,7 +919,7 @@ optimize (typerow_t **newrows, int nrows, int *colweight, int ncols, int skip,
       len_col[j] = 0;
     }
 
-  printf ("Optimize: small_nrows=%d small_ncols=%d weight=%lu (av. %1.2f)\n",
+  printf ("Optimize: small_nrows=%d small_ncols=%d weight=%"PRIu64" (av. %1.2f)\n",
           small_nrows, small_ncols, total_weight,
           (double) total_weight / (double) small_nrows);
 
@@ -968,7 +968,7 @@ optimize (typerow_t **newrows, int nrows, int *colweight, int ncols, int skip,
               bit_vector_clearbit (active, j);
             total_weight -= gain;
           }
-      printf ("%lu (%1.2f per row)\n", total_weight,
+      printf ("%"PRIu64" (%1.2f per row)\n", total_weight,
               (double) total_weight / (double) small_nrows);
       fflush (stdout);
     }

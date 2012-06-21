@@ -20,6 +20,20 @@ mpz_set_uint64 (mpz_t z, uint64_t q)
     }
 }
 
+void
+mpz_set_int64 (mpz_t z, int64_t q)
+{
+  if (sizeof (long int) == 8)
+    mpz_set_si (z, (long int) q);
+  else if (q >= 0)
+    mpz_set_uint64 (z, q);
+  else
+    {
+      mpz_set_uint64 (z, -q);
+      mpz_neg (z, z);
+    }
+}
+
 /* this functions discards z */
 uint64_t
 mpz_get_uint64 (mpz_t z)
@@ -36,6 +50,36 @@ mpz_get_uint64 (mpz_t z)
       q += (uint64_t) mpz_get_ui (z) << 32;
     }
   return q;
+}
+
+void
+mpz_mul_uint64 (mpz_t a, mpz_t b, uint64_t c)
+{
+  if (sizeof (unsigned long int) == 8)
+    mpz_mul_ui (a, b, (unsigned long int) c);
+  else
+    {
+      mpz_t d;
+      mpz_init (d);
+      mpz_set_uint64 (d, c);
+      mpz_mul (a, b, d);
+      mpz_clear (d);
+    }
+}
+
+void
+mpz_mul_int64 (mpz_t a, mpz_t b, int64_t c)
+{
+  if (sizeof (long int) == 8)
+    mpz_mul_si (a, b, (long int) c);
+  else
+    {
+      mpz_t d;
+      mpz_init (d);
+      mpz_set_int64 (d, c);
+      mpz_mul (a, b, d);
+      mpz_clear (d);
+    }
 }
 
 /* returns the smallest prime > q */

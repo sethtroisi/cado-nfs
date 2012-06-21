@@ -71,6 +71,11 @@ extern void clear_relation(relation_t *rel);
 // extern int fread_relation(FILE *file, relation_t *rel);
 extern unsigned long findroot(long a, unsigned long b, unsigned long p);
 extern void computeroots(relation_t * rel);
+extern char * u64toa16 (char *p, uint64_t m);
+extern char * u64toa10 (char *p, uint64_t m);
+extern char * d64toa10 (char *p, int64_t m);
+
+
 extern void fprint_relation(FILE *file, relation_t * rel);
 extern void fprint_relation_raw (FILE *file, relation_t * rel);
 extern void reduce_exponents_mod2 (relation_t *rel);
