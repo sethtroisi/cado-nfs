@@ -197,6 +197,21 @@ recipe, you can type:
    eval `ssh-agent`
    ssh-add
 
+Restarting an interrupted factorization:
+========================================
+
+If you have started a factorization with the cadofactor.pl script, and it was
+interrupted (for example because of a power failure) you can restart it simply
+with the same cadofactor.pl command line.
+
+If the factorization was interrupted during the linear algebra step, the
+cadofactor.pl script will propose you to restart it from the last checkpoint
+by typing 'l' instead of 'y' (restarts the linear algebra from the beginning).
+
+Alternatively, you can launch the krylov or mksol binary by hand (expert mode),
+with the same command line (see the *.bwc.log file), but with an extra
+argument ``start='', where start is the number of the last checkpoint saved.
+
 Factoring with SNFS:
 ====================
 
