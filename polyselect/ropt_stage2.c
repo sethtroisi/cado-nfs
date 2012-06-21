@@ -775,7 +775,7 @@ rootsieve_one_block ( sievearray_t sa,
                  this happends since the last j-block could too 
                  short and the previous sieve jump out of this block
                  and hence % wind back to the beginning */
-              if ((j_idx[r] > sa->len_j) && (nbb == (totnbb-1)))
+              if ((j_idx[r] > (long) sa->len_j) && (nbb == (totnbb-1)))
                   j_idx[r] = sa->len_j;
               else
                 j_idx[r] %= sa->len_j;

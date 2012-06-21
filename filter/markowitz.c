@@ -259,13 +259,8 @@ pureMkz(filter_matrix_t *mat, int32_t j)
         for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
           if((i = mat->R[GETJ(mat, j)][k]) != -1){
 	    // this should be the weight of row i
-#ifdef FOR_FFS
-	    if(mat->rows[i][0].id < w0)
-              w0 = mat->rows[i][0].id, i0 = i;
-#else
-	    if(mat->rows[i][0] < w0)
-              w0 = mat->rows[i][0], i0 = i;
-#endif
+      if(matLengthRow(mat, i) < w0)
+          w0 = matLengthRow(mat, i), i0 = i;
           }
 #if 0   /* here we assume there is no cancellation other than for ideal j:
 	   the lightest row has weight w0, we add wt-1 times w0-1,
@@ -278,8 +273,8 @@ pureMkz(filter_matrix_t *mat, int32_t j)
           if ((i = mat->R[GETJ(mat, j)][k]) != -1)
 	    {
 	      if (i != i0)
-		mkz += weightSum (mat, i, i0); /* merge i and i0 */
-	      mkz -= mat->rows[i][0];          /* remove row i */
+          mkz += weightSum (mat, i, i0, j); /* merge i and i0 */
+	      mkz -= matLengthRow(mat, i);          /* remove row i */
 	    }
 #endif
 	return mkz;
@@ -305,11 +300,11 @@ lightColAndMkz(filter_matrix_t *mat, int32_t j)
     else if(wj == 2){
 	fillTabWithRowsForGivenj(ind, mat, j);
 	// the more this is < 0, the less the weight is
-	return 2 * cte + weightSum(mat, ind[0], ind[1]);
+	return 2 * cte + weightSum(mat, ind[0], ind[1], j);
     }
     else if(wj <= mat->wmstmax){
 	fillTabWithRowsForGivenj(ind, mat, j);
-	mkz = minCostUsingMST(mat, mat->wt[GETJ(mat, j)], ind, &tfill, &tMST);
+	mkz = minCostUsingMST(mat, mat->wt[GETJ(mat, j)], ind, j, &tfill, &tMST);
 	return wj * cte + mkz;
     }
     // real traditional Markowitz count
@@ -317,13 +312,8 @@ lightColAndMkz(filter_matrix_t *mat, int32_t j)
     for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
 	if((i = mat->R[GETJ(mat, j)][k]) != -1){
 	    // this should be the weight of row i
-#ifdef FOR_FFS
-      if(mat->rows[i][0].id < mkz)
-          mkz = mat->rows[i][0].id;
-#else
-      if(mat->rows[i][0] < mkz)
-          mkz = mat->rows[i][0];
-#endif
+      if(matLengthRow(mat, i) < mkz)
+          mkz = matLengthRow(mat, i);
 	}
     mkz = wj * cte + (mkz-1) * (wj-1);
 #if MKZ_TIMINGS

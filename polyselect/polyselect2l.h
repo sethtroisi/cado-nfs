@@ -5,7 +5,4 @@
 #include "polyselect2l_arith.h"
 #include "modredc_ul.h"
 
-/* declarations for ropt */
-extern int MAX_k;
-
 #endif

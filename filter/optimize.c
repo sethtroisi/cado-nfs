@@ -358,7 +358,7 @@ optimize (FILE *hisfile, FILE *optfile)
     }
 
   /* compute number of relations with given frequency */
-  printf ("Total relation weight: %lu (aver. %1.2f)\n", total_weight,
+  printf ("Total relation weight: %"PRIu64" (aver. %1.2f)\n", total_weight,
           (double) total_weight / (double) small_nrows);
   for (i = 0; i < 256; i++)
     tot_count[i] = 0;
@@ -415,7 +415,7 @@ optimize (FILE *hisfile, FILE *optfile)
           if (count[j] >= 2)
             try_merge (row, len_row, transpose, len_transpose, j, optfile);
         }
-      printf ("Pass %u: total weight: %lu (aver. %1.2f)\n", ++pass,
+      printf ("Pass %u: total weight: %"PRIu64" (aver. %1.2f)\n", ++pass,
               total_weight, (double) total_weight / (double) small_nrows);
     }
   while (total_weight < old_total_weight);

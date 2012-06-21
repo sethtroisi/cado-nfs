@@ -1,6 +1,14 @@
 /* Data struct used for polyselect2l */
 #include "polyselect2l_str.h"
 
+void match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
+            uint64_t ad, unsigned long d, mpz_t N, unsigned long q,
+            mpz_t rq);
+
+void gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
+		uint64_t ad, unsigned long d, mpz_t N, uint64_t q,
+		mpz_t rq);
+
 /* LEN_SPECIAL_Q in the header */
 const unsigned int SPECIAL_Q[LEN_SPECIAL_Q] = {
   2, 3, 5, 7, 11, 13, 17, 19, 23, 29,
@@ -92,7 +100,7 @@ void
 header_init ( header_t header,
               mpz_t N,
               unsigned long d,
-              unsigned long ad )
+              uint64_t ad )
 {
   /* compute Ntilde, m0 */
   mpz_init_set (header->N, N);
@@ -102,7 +110,7 @@ header_init ( header_t header,
   header->ad = ad;
 
   /* compute Ntilde, ... from N, ... */
-  mpz_set_ui (header->Ntilde, header->ad);
+  mpz_set_uint64 (header->Ntilde, header->ad);
   mpz_mul_ui (header->Ntilde, header->Ntilde, header->d);
   mpz_pow_ui (header->Ntilde, header->Ntilde, header->d - 1);
   mpz_mul_ui (header->Ntilde, header->Ntilde, header->d);
@@ -129,8 +137,8 @@ proots_init ( proots_t R,
   R->size = size;
 
   /* length of nr&roots is known now. lengths of roots[i] are TBD. */
-  R->nr = malloc (size * sizeof (unsigned int));
-  R->roots = malloc (size * sizeof (uint64_t*));
+  R->nr = (unsigned int *) malloc (size * sizeof (unsigned int));
+  R->roots = (uint64_t **) malloc (size * sizeof (uint64_t*));
 
   if (R->nr == NULL || R->roots == NULL) {
     fprintf (stderr, "Error, cannot allocate memory in proots_init().\n");
@@ -143,15 +151,14 @@ proots_init ( proots_t R,
 void
 proots_add ( proots_t R,
              unsigned long nr,
-             unsigned long *roots,
+             uint64_t *roots,
              unsigned long index )
 {
   unsigned int i;
   R->nr[index] = nr;
 
   if (nr != 0) {
-    R->roots[index] = malloc (nr * sizeof (uint64_t));
-
+    R->roots[index] = (uint64_t *) malloc (nr * sizeof (uint64_t));
     if (R->roots[index] == NULL) {
       fprintf (stderr, "Error, cannot allocate memory in proots_add\n");
       exit (1);
@@ -177,7 +184,7 @@ proots_print ( proots_t R,
     }
     else {
       for (j = 0; j < R->nr[i]; j ++)
-        fprintf (stderr, "%lu ", R->roots[i][j]);
+        fprintf (stderr, "%"PRIu64" ", R->roots[i][j]);
       fprintf (stderr, "\n");
     }
   }
@@ -225,7 +232,7 @@ qroots_realloc (qroots_t R, unsigned long newalloc)
     fprintf (stderr, "Error, cannot reallocate memory in roots_realloc\n");
     exit (1);
   }
-  R->roots = realloc (R->roots, newalloc * sizeof (unsigned long*));
+  R->roots = realloc (R->roots, newalloc * sizeof (uint64_t*));
   if (R->roots == NULL)
   {
     fprintf (stderr, "Error, cannot reallocate memory in roots_realloc\n");
@@ -234,7 +241,8 @@ qroots_realloc (qroots_t R, unsigned long newalloc)
 }
 
 void
-qroots_add (qroots_t R, unsigned int q, unsigned int nr, unsigned long *roots)
+qroots_add (qroots_t R, unsigned int q, unsigned int nr, 
+	    uint64_t *roots)
 {
   unsigned int i;
 
@@ -244,7 +252,7 @@ qroots_add (qroots_t R, unsigned int q, unsigned int nr, unsigned long *roots)
     qroots_realloc (R, R->alloc + R->alloc / 2 + 1);
   R->q[R->size] = q;
   R->nr[R->size] = nr;
-  R->roots[R->size] = malloc (nr * sizeof (unsigned long));
+  R->roots[R->size] = malloc (nr * sizeof (uint64_t));
   if (R->roots[R->size] == NULL)
   {
     fprintf (stderr, "Error, cannot allocate memory in roots_add\n");
@@ -262,7 +270,7 @@ qroots_print (qroots_t R)
   for (i = 0; i < R->size; i++) {
     fprintf (stderr, "p: %u, r: ", R->q[i]);
     for (j = 0; j < R->nr[i]; j ++)
-      fprintf (stderr, "%lu ", R->roots[i][j]);
+      fprintf (stderr, "%"PRIu64" ", R->roots[i][j]);
     fprintf (stderr, "\n");
   }
 }
@@ -299,16 +307,18 @@ hash_init (hash_t H, unsigned long init_size)
     fprintf (stderr, "Error, cannot allocate memory in hash_init\n");
     exit (1);
   }
-  for (j = 0; j < H->alloc; j++)
+  for (j = 0; j < H->alloc; j++) {
     H->p[j] = 0;
+    H->i[j] = 0;
+  }
   H->size = 0;
 }
 
 
 /* rq is a root of N = (m0 + rq)^d mod (q^2) */
 void
-hash_add (hash_t H, unsigned long p, int64_t i, mpz_t m0, unsigned long ad,
-          unsigned int d, mpz_t N, unsigned long q, mpz_t rq)
+hash_add (hash_t H, unsigned long p, int64_t i, mpz_t m0, uint64_t ad,
+          unsigned long d, mpz_t N, unsigned long q, mpz_t rq)
 {
   unsigned long h;
 
@@ -336,6 +346,39 @@ hash_add (hash_t H, unsigned long p, int64_t i, mpz_t m0, unsigned long ad,
   H->i[h] = i;
   H->size ++;
 }
+
+
+/* rq is a root of N = (m0 + rq)^d mod (q^2) */
+void
+gmp_hash_add (hash_t H, uint32_t p, int64_t i, mpz_t m0, uint64_t ad,
+	      unsigned long d, mpz_t N, uint64_t q, mpz_t rq)
+{
+  unsigned long h;
+  
+  if (H->size >= H->alloc)
+    hash_grow (H);
+  if (i >= 0)
+    h = ((int)i) % H->alloc;
+  else
+    {
+      h = H->alloc - ( ((int)(-i)) % H->alloc);
+      if (h == H->alloc)
+	h = 0;
+    }
+
+  while (H->p[h] != 0)
+    {
+      if (m0 != NULL && H->i[h] == i && H->p[h] != p) {
+	gmp_match (H->p[h], p, i, m0, ad, d, N, q, rq);
+      }
+      if (++h == H->alloc)
+	h = 0;
+    }
+  H->p[h] = p;
+  H->i[h] = i;
+  H->size ++;
+}
+
 
 void
 hash_clear (hash_t H)

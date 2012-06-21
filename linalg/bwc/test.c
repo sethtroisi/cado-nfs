@@ -8,6 +8,8 @@
 #include "xvectors.h"
 #include "bw-common-mpi.h"
 #include "filenames.h"
+#include "mpfq/mpfq.h"
+#include "mpfq/abase_vbase.h"
 
 /*
 extern void broadcast_down(matmul_top_data_ptr mmt, int d);
@@ -34,9 +36,16 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     flags[!bw->dir] = 0;
 
 
+    mpz_t p;
+    mpz_init_set_ui(p, 2);
+    param_list_parse_mpz(pl, "prime", p);
     abase_vbase A;
-    abase_vbase_oo_field_init_bygroupsize(A, NCHECKS_CHECK_VECTOR);
-    A->set_groupsize(A, NCHECKS_CHECK_VECTOR);
+    abase_vbase_oo_field_init_byfeatures(A, 
+            MPFQ_PRIME, p,
+            MPFQ_GROUPSIZE, NCHECKS_CHECK_VECTOR,
+            MPFQ_DONE);
+    mpz_clear(p);
+
 
     matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);

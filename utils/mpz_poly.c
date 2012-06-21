@@ -115,7 +115,9 @@ mp_poly_cmp (mpz_t *f, mpz_t *g, int d)
 }
 
 /* v <- |f(i,j)|, where f is of degree d */
-void mp_poly_homogeneous_eval_siui (mpz_t v, mpz_t *f, const unsigned int d, const long i, const unsigned long j)
+void
+mp_poly_homogeneous_eval_siui (mpz_t v, mpz_t *f, const unsigned int d,
+			       const int64_t i, const uint64_t j)
 {
   unsigned int k;
   mpz_t jpow;
@@ -124,8 +126,8 @@ void mp_poly_homogeneous_eval_siui (mpz_t v, mpz_t *f, const unsigned int d, con
   mpz_set (v, f[d]);
   for (k = d; k-- > 0;)
     {
-      mpz_mul_si (v, v, i);
-      mpz_mul_ui (jpow, jpow, j);
+      mpz_mul_int64 (v, v, i);
+      mpz_mul_uint64 (jpow, jpow, j);
       mpz_addmul (v, f[k], jpow);
     }
   mpz_abs (v, v); /* avoids problems with negative norms */

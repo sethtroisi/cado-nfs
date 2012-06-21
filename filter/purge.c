@@ -376,7 +376,7 @@ fprint_rel_row (FILE *file, int irel, relation_t *rel)
 #ifndef FOR_FFS
   return nb_coeff;
 #else
-  return weight_ffs (*rel);
+  return weight_rel_ffs (*rel);
 #endif
 }
 
@@ -421,7 +421,7 @@ insertNormalRelation (unsigned int j)
 #ifndef FOR_FFS
   rel_weight[buf_rel[j].num] = buf_rel[j].rel.nb_rp + buf_rel[j].rel.nb_ap;
 #else
-  rel_weight[buf_rel[j].num] = weight_ffs (buf_rel[j].rel);
+  rel_weight[buf_rel[j].num] = weight_rel_ffs (buf_rel[j].rel);
 #endif
   rel_compact[buf_rel[j].num] = my_tmp;
 }
@@ -458,7 +458,7 @@ insertFreeRelation (unsigned int j)
 #ifndef FOR_FFS
   rel_weight[buf_rel[j].num] = 1 + buf_rel[j].rel.nb_ap;
 #else
-  rel_weight[buf_rel[j].num] = weight_ffs (buf_rel[j].rel);
+  rel_weight[buf_rel[j].num] = weight_rel_ffs (buf_rel[j].rel);
 #endif
   rel_compact[buf_rel[j].num] = my_tmp;
 }
@@ -817,9 +817,7 @@ reread (const char *oname, const char *oname2, char ** ficname,
 #else
               if (relation_stream_get(rs, NULL, 0, ab_base) < 0)
                 break;
-#if 0
               fprint_relation_raw (ofile2, &rs->rel);
-#endif
 #endif
             }
           else
@@ -1977,7 +1975,7 @@ main (int argc, char **argv)
   rel_weight = (uint8_t*) malloc (nrelmax * sizeof(uint8_t));
   tot_alloc0 += nrelmax * (sizeof (int*) + sizeof(uint8_t));
   /* %zu is the C99 modifier for size_t */
-  fprintf (stderr, "Allocated rel_compact of %zuMb (total %luMb so far)\n",
+  fprintf (stderr, "Allocated rel_compact of %luMb (total %luMb so far)\n",
 	   (nrelmax * sizeof (int *)) >> 20,
 	   tot_alloc0 >> 20);
   

@@ -8,7 +8,8 @@ typedef struct {
   int32_t e;   
 } ideal_merge_ffs_t;
 
-extern unsigned int weight_ffs (relation_t rel);
+extern unsigned int weight_ffs (int e);
+extern unsigned int weight_rel_ffs (relation_t rel);
 extern unsigned long findroot_ffs (long a, unsigned long b, unsigned long p);
 extern void computeroots_ffs (relation_t * rel);
 extern int ffs_poly_read(cado_poly poly, const char *filename);

@@ -19,39 +19,85 @@ invert (unsigned long a, unsigned long p)
   return a;
 }
 
+
 /* lift the n roots r[0..n-1] of N = x^d (mod p) to roots of
    N = (m0 + r)^d (mod p^2) */
 void
-roots_lift (unsigned long *r, mpz_t N, unsigned long d, mpz_t m0,
-            unsigned long p, unsigned int n)
+roots_lift (uint64_t *r, mpz_t N, unsigned long d, mpz_t m0,
+            unsigned long p, unsigned long n)
 {
-  unsigned int j;
+  uint64_t pp;
+  unsigned long j, inv;
   mpz_t tmp, lambda;
-  unsigned long inv, pp;
-
   mpz_init (tmp);
   mpz_init (lambda);
-  pp = p * p;
-  for (j = 0; j < n; j++)
-  {
-    /* we have for r=r[j]: r^d = N (mod p), lift mod p^2:
-       (r+lambda*p)^d = N (mod p^2) implies
-       r^d + d*lambda*p*r^(d-1) = N (mod p^2)
-       lambda = (N - r^d)/(p*d*r^(d-1)) mod p */
-    mpz_ui_pow_ui (tmp, r[j], d - 1);
-    mpz_mul_ui (lambda, tmp, r[j]);    /* lambda = r^d */
-    mpz_sub (lambda, N, lambda);
-    mpz_divexact_ui (lambda, lambda, p);
-    mpz_mul_ui (tmp, tmp, d);         /* tmp = d*r^(d-1) */
-    inv = invert (mpz_fdiv_ui (tmp, p), p);
-    mpz_mul_ui (lambda, lambda, inv * p); /* inv * p fits in 64 bits if
-                                             p < 2^32 */
-    mpz_add_ui (lambda, lambda, r[j]); /* now lambda^d = N (mod p^2) */
+  pp = (uint64_t) p;
+  pp *= (uint64_t) p;
 
-    /* subtract m0 to get roots of (m0+r)^d = N (mod p^2) */
-    mpz_sub (lambda, lambda, m0);
-    r[j] = mpz_fdiv_ui (lambda, pp);
+  if (sizeof (unsigned long) == 8) {
+    for (j = 0; j < n; j++) {
+	/* we have for r=r[j]: r^d = N (mod p), lift mod p^2:
+	   (r+lambda*p)^d = N (mod p^2) implies
+	   r^d + d*lambda*p*r^(d-1) = N (mod p^2)
+	   lambda = (N - r^d)/(p*d*r^(d-1)) mod p */
+	mpz_ui_pow_ui (tmp, r[j], d - 1);
+	mpz_mul_ui (lambda, tmp, r[j]);    /* lambda = r^d */
+	mpz_sub (lambda, N, lambda);
+	mpz_divexact_ui (lambda, lambda, p);
+	mpz_mul_ui (tmp, tmp, d);         /* tmp = d*r^(d-1) */
+	inv = invert (mpz_fdiv_ui (tmp, p), p);
+	mpz_mul_ui (lambda, lambda, inv * p); /* inv * p fits in 64 bits if
+						 p < 2^32 */
+	mpz_add_ui (lambda, lambda, r[j]); /* now lambda^d = N (mod p^2) */
+
+	/* subtract m0 to get roots of (m0+r)^d = N (mod p^2) */
+	mpz_sub (lambda, lambda, m0);
+	r[j] = mpz_fdiv_ui (lambda, pp);
+      }
   }
+  else {
+#if 0   
+    printf ("p: %lu, ppl %"PRId64": ", p, pp);
+#endif
+    uint64_t tmp1;
+    mpz_t ppz, *rz, tmpz;
+    rz = (mpz_t*) malloc (n * sizeof (mpz_t));
+    mpz_init (ppz);
+    mpz_init (tmpz);
+    for (j = 0; j < n; j++) {
+      mpz_init_set_ui (rz[j], 0UL);
+      mpz_set_uint64 (rz[j], r[j]);
+#if 0   
+      printf (" %"PRIu64"", r[j]);
+#endif
+    }
+
+    for (j = 0; j < n; j++) {
+	mpz_pow_ui (tmp, rz[j], d - 1);
+	mpz_mul (lambda, tmp, rz[j]);    /* lambda = r^d */
+	mpz_sub (lambda, N, lambda);
+	mpz_divexact_ui (lambda, lambda, p);
+	mpz_mul_ui (tmp, tmp, d);         /* tmp = d*r^(d-1) */
+	inv = invert (mpz_fdiv_ui (tmp, p), p);
+	tmp1 = (uint64_t) inv;
+	tmp1 *= (uint64_t) p;
+	mpz_set_uint64 (tmpz, tmp1);
+	mpz_mul (lambda, lambda, tmpz); 
+	mpz_add (lambda, lambda, rz[j]); /* now lambda^d = N (mod p^2) */
+	/* subtract m0 to get roots of (m0+r)^d = N (mod p^2) */
+	mpz_sub (lambda, lambda, m0);
+	mpz_set_uint64 (tmpz, pp);
+	mpz_fdiv_r (rz[j], lambda, tmpz);
+	r[j] = mpz_get_uint64 (rz[j]);
+      }
+
+    for (j = 0; j < n; j++)
+      mpz_clear (rz[j]);
+    free (rz);
+    mpz_clear (ppz);
+    mpz_clear (tmpz);
+  }
+
   mpz_clear (tmp);
   mpz_clear (lambda);
 }
@@ -142,7 +188,8 @@ void
 comp_sq_roots ( header_t header,
                 qroots_t SQ_R )
 {
-  unsigned long i, q, *rq, nrq;
+  unsigned long i, q, nrq;
+  uint64_t *rq;
   modulusul_t qq;
   mpz_t *f;
 
@@ -156,7 +203,7 @@ comp_sq_roots ( header_t header,
     mpz_init (f[i]);
   mpz_set_ui (f[header->d], 1);
 
-  rq = (unsigned long*) malloc (header->d * sizeof (unsigned long));
+  rq = (uint64_t*) malloc (header->d * sizeof (uint64_t));
   if (rq == NULL)
   {
     fprintf (stderr, "Error, cannot allocate memory in comp_sq_q\n");
@@ -175,20 +222,24 @@ comp_sq_roots ( header_t header,
     modul_initmod_ul (qq, q * q);
     mpz_mod_ui (f[0], header->Ntilde, q);
     mpz_neg (f[0], f[0]); /* f = x^d - N */
-    nrq = poly_roots_ulong (rq, f, header->d, q);
+    nrq = poly_roots_uint64 (rq, f, header->d, q);
     roots_lift (rq, header->Ntilde, header->d, header->m0, q, nrq);
 
 #if 0
     unsigned int j = 0;
-    mpz_t r1, r2;
+    mpz_t r1, r2, *rqz;
     mpz_init (r1);
     mpz_init (r2);
+    rqz = (mpz_t*) malloc (header->d * sizeof (mpz_t));
     mpz_set (r1, header->Ntilde);
     mpz_mod_ui (r1, r1, q*q);
+
     gmp_fprintf (stderr, "Ntilde: %Zd, Ntilde (mod %u): %Zd\n", 
                 header->Ntilde, q*q, r1);
+
     for (j = 0; j < nrq; j ++) {
       mpz_set (r2, header->m0);
+
       mpz_add_ui (r2, r2, rq[j]);
       mpz_pow_ui (r2, r2, header->d);
       mpz_mod_ui (r2, r2, q*q);
@@ -199,6 +250,7 @@ comp_sq_roots ( header_t header,
         exit(1);
       }
     }
+
     mpz_clear (r1);
     mpz_clear (r2);
 #endif
@@ -216,14 +268,15 @@ comp_sq_roots ( header_t header,
 
 
 /* given individual q's, return crted rq */
-unsigned long
+uint64_t
 return_q_rq ( qroots_t SQ_R,
               unsigned long *idx_q,
               unsigned long k,
               mpz_t qqz,
               mpz_t rqqz )
 {
-  unsigned long i, j, idv_q[k], idv_rq[k], q = 1;
+  unsigned long i, j, idv_q[k], idv_rq[k];
+  uint64_t q = 1;
 
   /* q and roots */
   for (i = 0; i < k; i ++) {

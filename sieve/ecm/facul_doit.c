@@ -59,8 +59,12 @@ facul_doit (unsigned long *factors, const modulus_t m,
   
   for (i = method_start; strategy->methods[i].method != 0; i++)
     {
-      /* Simple-minded early abort for large input */
-      if (i > 3 && mod_intbits (n) > LONG_BIT)
+      /* Simple-minded early abort for large input.
+         Note: before the test was mod_intbits (n) > LONG_BIT which was
+         machine-dependent. However it would be better if the early abort
+         test depends on the size of the number we are trying to factor,
+         since for a large number we can invest more in cofactorization. */
+      if (i > 3 && mod_intbits (n) > 64)
         break;
       
       if (i < STATS_LEN)

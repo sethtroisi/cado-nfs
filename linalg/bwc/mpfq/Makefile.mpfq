@@ -6,15 +6,35 @@
 
 MPFQ:=$$HOME/Mp/mpfq/src
 
-all:
-	$(MPFQ)/simd/abase.pl u64k1
-	$(MPFQ)/simd/abase.pl u64k2
-	ls abase_*[ch] | xargs -n 1 sed -e s,mpfq/,, -i
+all: basic binary-fields
+
+basic:
+	$(MPFQ)/simd/abase.pl
 	/bin/cp -f $(MPFQ)/simd/binary-dotprods-backends.h .
 	/bin/cp -f $(MPFQ)/include/mpfq/mpfq.h .
+	ls abase_*[ch] mpfq*[ch] | xargs -n 1 sed -e s,mpfq/,, -i
 	$(MPFQ)/test/mk_name_k.pl  name=ab --noshift general_prefix=abase > mpfq_name_ab.h
 
+binary-fields:
+	# This is slightly more complicated, as we need mpfq, a built
+	# image with the helper binary, and also some additional tweaks.
+	if ! [ -w /tmp/mpfq ] || ! [ -x /tmp/mpfq ] ; then \
+	    echo "/tmp/mpfq not a writeable directory, binary fields skipped" ; \
+	    exit 0 ; \
+	fi
+	if ! [ -x /tmp/mpfq/gf2n/helper/helper ] ; then \
+	(cd /tmp/mpfq ; cmake $(MPFQ) ; make helper) ; \
+	fi
+	$(MPFQ)/gf2n/gen_gf2n.pl helper=/tmp/mpfq/gf2n/helper/helper table=/tmp/mpfq/gf2x/wizard.table output_path=. n=128 w=64
+	$(MPFQ)/gf2n/gen_gf2n.pl helper=/tmp/mpfq/gf2n/helper/helper table=/tmp/mpfq/gf2x/wizard.table output_path=. n=64 w=64
+	patch -p1 -d. < pclmul.patch
+
+
 clean:
+	-rm -f abase_p16.c
+	-rm -f abase_p16.h
+	-rm -f abase_p16_t.c
+	-rm -f abase_p16_t.h
 	-rm -f abase_u64k1.c
 	-rm -f abase_u64k1.h
 	-rm -f abase_u64k1_t.c

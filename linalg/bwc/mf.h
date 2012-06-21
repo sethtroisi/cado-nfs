@@ -29,7 +29,8 @@ extern void matrix_read_pass(
         struct mf_io_file * cw_out,
         unsigned int rskip,
         unsigned int cskip,
-        int progress);
+        int progress,
+        int withcoeffs);
 
 extern char * build_mat_auxfile(const char * prefix, const char * what, const char * ext);
 

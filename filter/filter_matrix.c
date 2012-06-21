@@ -251,7 +251,8 @@ filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
 #endif
                 }
 #ifdef FOR_FFS
-                else if  (previousj == j && ibuf != 0)
+                else if  (previousj == j && ibuf != 0 &&
+                                ((tooheavy == NULL) || (tooheavy[j] == 0)))
                     buf[ibuf-1].e++;
 #endif
             }
@@ -266,12 +267,7 @@ filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
             // TODO: do not store rows not having at least one light
             // column, but do not decrease mat->nrows!
             mat->rows[i] = (typerow_t*) malloc ((ibuf+1) * sizeof (typerow_t));
-#ifdef FOR_FFS
-            mat->rows[i][0].id = ibuf;
-            mat->rows[i][0].e = ibuf;
-#else
-            mat->rows[i][0] = ibuf;
-#endif
+            matLengthRow(mat, i) = ibuf;
             memcpy(mat->rows[i]+1, buf, ibuf * sizeof(typerow_t));
             // sort indices in val to ease row merges
             qsort(mat->rows[i]+1, ibuf, sizeof(typerow_t), cmp);
@@ -408,7 +404,7 @@ remove_j_from_row(filter_matrix_t *mat, int i, int j)
 // what is the weight of the sum of Ra and Rb? Works even in the partial
 // scenario of MPI.
 int
-weightSum(filter_matrix_t *mat, int i1, int i2)
+weightSum(filter_matrix_t *mat, int i1, int i2, MAYBE_UNUSED int32_t j)
 {
     int k1, k2, w, len1, len2;
 
@@ -416,41 +412,85 @@ weightSum(filter_matrix_t *mat, int i1, int i2)
     len2 = (isRowNull(mat, i2) ? 0 : matLengthRow(mat, i2));
     if((len1 == 0) || (len2 == 0))
         fprintf(stderr, "i1=%d i2=%d len1=%d len2=%d\n", i1, i2, len1, len2);
+#ifdef FOR_FFS /* look for the exponents of j in i1 i2*/
+    int e1 = 0, e2 = 0;
+    int d;
+    int l;
+    for (l = 1 ; l <= matLengthRow(mat, i1) ; l++)
+        if (matCell(mat, i1, l) == j)
+            e1 = mat->rows[i1][l].e;
+    for (l = 1 ; l <= matLengthRow(mat, i2) ; l++)
+        if (matCell(mat, i2, l) == j)
+            e2 = mat->rows[i2][l].e;
+
+    ASSERT (e1 != 0 && e2 != 0);
+
+    d  = (int) gcd_int64 ((int64_t) e1, (int64_t) e2);
+    e1 /= -d;
+    e2 /= d;
+#endif
     k1 = k2 = 1;
     w = 0;
     while((k1 <= len1) && (k2 <= len2))
     {
         if(matCell(mat, i1, k1) < matCell(mat, i2, k2))
         {
-            k1++;
+#ifdef FOR_FFS
+            w += weight_ffs (e2 * mat->rows[i1][k1].e);
+#else
             w++;
+#endif
+            k1++;
         }
         else if(matCell(mat, i1, k1) > matCell(mat, i2, k2))
         {
-            k2++;
+#ifdef FOR_FFS
+            w += weight_ffs (e1 * mat->rows[i2][k2].e);
+#else
             w++;
+#endif
+            k2++;
         }
         else
         {
+#ifdef FOR_FFS
+            w += weight_ffs (e2*mat->rows[i1][k1].e + e1*mat->rows[i2][k2].e);
+#endif
             k1++; 
             k2++;
-#ifdef FOR_FFS
-            w++;
-#endif
         }
     }
-    return w + ((len1 + 1) - k1) + ((len2 + 1) - k2);
+    // finish with k1
+    for( ; k1 <= matLengthRow(mat, i1); k1++)
+#ifdef FOR_FFS
+            w += weight_ffs (e2 * mat->rows[i1][k1].e);
+#else
+            w++;
+#endif
+    // finish with k2
+    for( ; k2 <= matLengthRow(mat, i2); k2++)
+#ifdef FOR_FFS
+            w += weight_ffs (e1 * mat->rows[i2][k2].e);
+#else
+            w++;
+#endif
+    return w;
 }
 
-void
+/* put in ind[0]..ind[m-1] the indices of the m (active) rows containing j,
+   and return the total weight of all those rows */
+int
 fillTabWithRowsForGivenj(int32_t *ind, filter_matrix_t *mat, int32_t j)
 {
-    int ni = 0, k, i;
+  int ni = 0, k, i, w = 0;
 
-    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
-	if((i = mat->R[GETJ(mat, j)][k]) != -1){
-	    ind[ni++] = i;
-	    if(ni == mat->wt[GETJ(mat, j)])
-		break;
-	}
+  for (k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
+    if ((i = mat->R[GETJ(mat, j)][k]) != -1)
+      {
+        ind[ni++] = i;
+        w += mat->rows[i][0];
+        if (ni == mat->wt[GETJ(mat, j)])
+          break;
+      }
+  return w;
 }

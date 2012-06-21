@@ -240,7 +240,7 @@ minimalSpanningTreeWithPrim(int *w, int *father, int *height,
 
 void
 fillRowAddMatrix(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], filter_matrix_t *mat,
-                 int m, int32_t *ind)
+                 int m, int32_t *ind, int32_t ideal)
 {
     int i, j;
 
@@ -249,7 +249,7 @@ fillRowAddMatrix(int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX], filter_matrix_t *mat,
     // A[i][j] <- estimated weight(R[ind[i]]+R[ind[j]]);
     for(i = 0; i < m; i++)
 	for(j = i+1; j < m; j++){
-	    A[i][j] = weightSum(mat, ind[i], ind[j]);
+	    A[i][j] = weightSum(mat, ind[i], ind[j], ideal);
 	    A[j][i] = A[i][j];
 #if DEBUG >= 1
 	    fprintf(stderr, "A[%d][%d] = A[%d][%d] = %d\n",i,j,j,i,A[i][j]);
@@ -267,7 +267,8 @@ minimalSpanningTree(int *w, int *father, int *height,
 }
 
 int
-minCostUsingMST(filter_matrix_t *mat, int m, int32_t *ind, double *tfill, double *tMST)
+minCostUsingMST(filter_matrix_t *mat, int m, int32_t *ind, int32_t j, 
+                double *tfill, double *tMST)
 {
     int A[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX];
     int sons[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1];
@@ -275,7 +276,7 @@ minCostUsingMST(filter_matrix_t *mat, int m, int32_t *ind, double *tfill, double
     // int hmax;
 
     *tfill = seconds();
-    fillRowAddMatrix(A, mat, m, ind);
+    fillRowAddMatrix(A, mat, m, ind, j);
     *tfill = seconds()-*tfill;
     *tMST = seconds();
     /* hmax = */ minimalSpanningTree(&w, father, height, sons, m, A);
