@@ -175,7 +175,7 @@ ropt_do_both_stages ( ropt_poly_t poly,
                       ropt_param_t param,
                       ropt_info_t info )
 {
-  if (poly->d == 5 || poly->d == 4)
+  if (poly->d == 5 || poly->d == 4 || poly->d == 3)
     ropt_linear (poly, bestpoly, param, info);
   else if (poly->d == 6)
     ropt_quadratic (poly, bestpoly, param, info);

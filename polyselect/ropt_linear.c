@@ -466,7 +466,7 @@ ropt_linear_deg5 ( ropt_poly_t poly,
  * Linear rotation: deg 4.
  */
 void
-ropt_linear_deg4 ( ropt_poly_t poly,
+ropt_linear_deg34 ( ropt_poly_t poly,
                    ropt_bestpoly_t bestpoly,
                    ropt_param_t param,
                    ropt_info_t info )
@@ -524,8 +524,8 @@ ropt_linear ( ropt_poly_t poly,
               ropt_param_t param,
               ropt_info_t info )
 {
-  if (poly->d == 4)
-    ropt_linear_deg4 (poly, bestpoly, param, info);
+  if (poly->d == 4 || poly->d == 3)
+    ropt_linear_deg34 (poly, bestpoly, param, info);
   else if (poly->d == 5)
     ropt_linear_deg5 (poly, bestpoly, param, info);
   else 
