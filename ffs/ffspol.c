@@ -242,6 +242,7 @@ void ffspol_mul(ffspol_ptr z, ffspol_srcptr x, ffspol_srcptr y)
     for (int i = 0; i <= x->deg + y->deg ; ++i)
         fppol_set(z->coeffs[i], zz->coeffs[i]);
     z->deg = x->deg + y->deg;
+    ffspol_clear(zz);
 }
 
 
