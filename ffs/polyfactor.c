@@ -107,11 +107,21 @@ int fppol_fact_pop(fppol_ptr p, fppol_fact_ptr F)
 
 void fppol_fact_out(FILE *out, fppol_fact_ptr F)
 {
+    fppol_t aux;
+    fppol_init(aux);
     for (int i = 0; i < F->n; ++i) {
-        fppol_out(out, F->factors[i]);
+        if (!fppol_is_monic(F->factors[i])) {
+            fp_t lc;
+            fppol_get_coeff(lc, F->factors[i], fppol_deg(F->factors[i]));
+            fppol_sdiv(aux, F->factors[i], lc);
+        } else {
+            fppol_set(aux, F->factors[i]);
+        }
+        fppol_out(out, aux);
         if (i != F->n - 1)
             fprintf(out, ",");
     }
+    fppol_clear(aux);
 }
 
 // TODO: Maybe should go into the fppol_t interface.
