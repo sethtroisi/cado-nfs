@@ -265,7 +265,8 @@ ropt_on_cadopoly ( FILE *file,
 
     if ( flag == 1023 || // deg 6
          flag == 959 || // deg 5
-         flag == 927 ) // deg 4
+         flag == 927 || // deg 4
+         flag == 911 ) // deg 3
     {
       fprintf (stderr, "\n# Polynomial (# %5d).\n", count);
       ropt_common (poly, param);
