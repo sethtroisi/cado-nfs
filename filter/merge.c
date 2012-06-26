@@ -193,7 +193,11 @@ main (int argc, char *argv[])
     purgedfile_stream_openfile (ps, purgedname);
 
     mat->nrows = ps->nrows;
+#ifdef FOR_FFS
+    mat->ncols = ps->ncols + 1; /*for FFS, we add a column of 1*/
+#else
     mat->ncols = ps->ncols;
+#endif
     mat->keep  = keep;
     mat->cwmax = 2 * maxlevel;
     mat->rwmax = INT_MAX;
@@ -207,7 +211,7 @@ main (int argc, char *argv[])
     MPI_Finalize();
     return 0;
 #endif
-    initMat (mat, 0, ps->ncols);
+    initMat (mat, 0, mat->ncols);
 
     tt = seconds ();
     filter_matrix_read_weights (mat, ps);
@@ -247,7 +251,11 @@ main (int argc, char *argv[])
     /* initialize rep, i.e., mostly opens outname */
     init_rep (rep, outname, mat, 0, MERGE_LEVEL_MAX);
     /* output the matrix dimensions in the history file */
+#ifdef FOR_FFS
+    report2 (rep, mat->nrows, mat->ncols-1, -1);
+#else
     report2 (rep, mat->nrows, mat->ncols, -1);
+#endif
 
     /* resume from given history file if needed */
     if (resumename != NULL)
