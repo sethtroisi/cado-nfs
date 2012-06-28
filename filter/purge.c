@@ -1658,9 +1658,14 @@ prempt_scan_relations_pass_two (const char *oname,
   free (prempt_data->buf);
   for (f = prempt_data->files; *f; free(*f++));
   free (prempt_data->files);
-  for (i = T_REL ; i ; ) {
-    free(buf_rel[--i].rel.rp);
-    free(buf_rel[i].rel.ap);
+  if (!raw)
+    for (i = T_REL ; i ; ) {
+      free(buf_rel[--i].rel.rp);
+      free(buf_rel[i].rel.ap);
+    }
+  else {
+    free(buf_rel[0].rel.rp);
+    free(buf_rel[0].rel.ap);
   }
   free (buf_rel);
   buf_rel = NULL;
