@@ -44,10 +44,10 @@ complete_relation (relation_t *rel, cado_poly_ptr cpoly)
               mpz_divexact_ui (no, no, p);
           }
       }
+      getprime(0);
       mpz_clear(no);
   }
 
-  getprime(0);
   // were printing our output, thus we don't care about tidyness of the
   // internal structure.
   // relation_compress_rat_primes(rel);
