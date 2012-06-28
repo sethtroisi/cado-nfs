@@ -498,14 +498,15 @@ readPurged(typerow_t **sparsemat, purgedfile_stream ps, int verbose)
 	    if(ps->nc == 0)
           fprintf(stderr, "Hard to believe: row[%d] is NULL\n", i);
       qsort(ps->cols, ps->nc, sizeof(int), cmp);
-      sparsemat[i] = (typerow_t *)malloc((ps->nc+1) * sizeof(typerow_t));
-      ASSERT_ALWAYS(sparsemat[i] != NULL);
 #ifdef FOR_FFS
+      sparsemat[i] = (typerow_t *)malloc((ps->nc+2) * sizeof(typerow_t));
       int j = 0;
       int previous = -1;
 #else
+      sparsemat[i] = (typerow_t *)malloc((ps->nc+1) * sizeof(typerow_t));
       int j = ps->nc;
 #endif
+      ASSERT_ALWAYS(sparsemat[i] != NULL);
       for(int k = 0; k < ps->nc; k++)
         {
 #ifdef FOR_FFS
@@ -523,6 +524,11 @@ readPurged(typerow_t **sparsemat, purgedfile_stream ps, int verbose)
           rowCell(sparsemat, i, k+1) = ps->cols[k];
 #endif
         }
+#ifdef FOR_FFS
+      j++;
+      rowCell(sparsemat, i, j) = ps->ncols - 1;
+      sparsemat[i][j].e = 1;
+#endif
       rowLength(sparsemat, i) = j;
   }
 }
@@ -1171,6 +1177,11 @@ main(int argc, char *argv[])
     sscanf(str, "%d %d", &nrows, &ncols);
     ASSERT_ALWAYS(nrows == ps->nrows);
     ASSERT_ALWAYS(ncols == ps->ncols);
+
+#ifdef FOR_FFS
+    ncols++; //for FFS we add a column of 1
+    ps->ncols++;
+#endif
 
     fprintf(stderr, "Original matrix has size %d x %d\n", nrows, ncols);
 

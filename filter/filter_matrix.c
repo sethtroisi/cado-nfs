@@ -106,6 +106,10 @@ filter_matrix_read_weights(filter_matrix_t * mat, purgedfile_stream_ptr ps)
               }
           }
       }
+#ifdef FOR_FFS
+    int32_t j = mat->ncols - 1;
+    mat->wt[GETJ(mat, j)] = mat->nrows;
+#endif
 }
 
 /* initialize Rj[j] for light columns, i.e., for those of weight <= cwmax */
@@ -208,7 +212,7 @@ filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
 #if !defined(USE_MPI)
             int nb_heavy_j = 0;
 #endif
-            if(ps->nc > lbuf){
+            if(ps->nc >= lbuf){
                 lbuf <<= 1;
                 fprintf(stderr, "Warning: doubling lbuf in readmat;");
                 fprintf(stderr, " new value is %d\n", lbuf);
@@ -256,6 +260,23 @@ filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
                     buf[ibuf-1].e++;
 #endif
             }
+#ifdef FOR_FFS
+          int32_t j = mat->ncols-1;
+          if((j >= jmin) && (j < jmax))
+            {
+              if ((tooheavy == NULL) || (tooheavy[j] == 0))
+                {
+                  mat->weight++;
+                  buf[ibuf++] = (typerow_t) { .id = j, .e = 1};
+                  if(mat->wt[GETJ(mat, j)] > 0) // redundant test?
+                    {
+                      mat->R[GETJ(mat, j)][0]++;
+                      mat->R[GETJ(mat, j)][mat->R[GETJ(mat, j)][0]] = i;
+                    }
+                }
+            }
+#endif
+
 #if !defined(USE_MPI)
             if(nb_heavy_j == ps->nc){
                 // all the columns are heavy and thus will never participate
