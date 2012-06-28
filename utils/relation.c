@@ -187,7 +187,7 @@ fprint_relation (FILE *file, relation_t * rel)
       {
 	op = p;
 	p = u64toa16 (p, rel->rp[i].p);
-	*p++ = ' ';
+	*p++ = ',';
 	lg = (p - op);
 	for (j = 0; j < rel->rp[i].e - 1; j++)
 	  {
@@ -201,7 +201,7 @@ fprint_relation (FILE *file, relation_t * rel)
       {
 	op = p;
 	p = u64toa16 (p, rel->ap[i].p);
-	*p++ = ' ';
+	*p++ = ',';
 	lg = (p - op);
 	for (j = 0; j < rel->ap[i].e - 1; j++)
 	  {
@@ -229,7 +229,7 @@ fprint_relation_raw (FILE *file, relation_t * rel)
       ASSERT (rel->rp[i].e);
       op = p;
       p = u64toa16 (p, rel->rp[i].p);
-      *p++ = ' ';
+      *p++ = ',';
       lg = (p - op);
       for (j = 0; j < rel->rp[i].e - 1; j++)
 	{
@@ -244,7 +244,7 @@ fprint_relation_raw (FILE *file, relation_t * rel)
 	ASSERT (rel->ap[i].e);
 	op = p;
 	p = u64toa16 (p, rel->ap[i].p);
-	*p++ = ' ';
+	*p++ = ',';
 	lg = (p - op);
 	for (j = 0; j < rel->ap[i].e - 1; j++)
 	  {
