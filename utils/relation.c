@@ -179,7 +179,7 @@ fprint_relation (FILE *file, relation_t * rel)
   int i, j;
   
   p = d64toa10(buf, rel->a);
-  *p++ = ' ';
+  *p++ = ',';
   p = u64toa10(p, rel->b);
   *p++ = ':';
   for (i = 0; i < rel->nb_rp; ++i)
@@ -221,7 +221,7 @@ fprint_relation_raw (FILE *file, relation_t * rel)
   int i, j;
   
   p = d64toa10(buf, rel->a);
-  *p++ = ' ';
+  *p++ = ',';
   p = u64toa10(p, rel->b);
   *p++ = ':';
   for (i = 0; i < rel->nb_rp; ++i)
