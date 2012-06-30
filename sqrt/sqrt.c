@@ -141,10 +141,6 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
   mpz_init_set_ui (prd[0], 1);
 
   depfile = fopen (depname, "r");
-  /*if(!depfile) {
-    fprintf (stderr, "Error: file %s not exist\n", depname);
-    exit(1);
-  }*/
   ASSERT_ALWAYS(depfile != NULL);
     
   line_number = 2;
@@ -166,7 +162,7 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
           res = Memusage2 ();
           if (res > peakres)
             peakres = res;
-            fprintf (stderr, "%lu pairs: size %zuMb, %dms, VIRT %luM (peak %luM), RES %luM (peak %luM)\n",
+            fprintf (stderr, "SqrtRat: %lu pairs: size %zuMb, %dms, VIRT %luM (peak %luM), RES %luM (peak %luM)\n",
                        ab_pairs, stats (prd, lprd) >> 17, cputime (),
                        Memusage () >> 10, PeakMemusage () >> 10,
                        res >> 10, peakres >> 10);
@@ -184,12 +180,12 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
         if (feof (depfile))
           break;
       }
-    fprintf (stderr, "%lu (a,b) pairs\n", line_number);
+    fprintf (stderr, "SqrtRat: %lu (a,b) pairs\n", line_number);
 
     fclose (depfile);
 
-  fprintf (stderr, "Read %lu (a,b) pairs, including %lu free\n", ab_pairs,
-           freerels);
+  fprintf (stderr, "SqrtRat: read %lu (a,b) pairs, including %lu free\n",
+           ab_pairs, freerels);
 
   accumulate_fast_end (prd, lprd);
 
@@ -198,7 +194,8 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
   if (ab_pairs & 1)
     mpz_mul (prd[0], prd[0], pol->rat->f[1]);
 
-  fprintf (stderr, "Size of product = %zu bits\n", mpz_sizeinbase (prd[0], 2));
+  fprintf (stderr, "SqrtRat: size of product = %zu bits\n",
+           mpz_sizeinbase (prd[0], 2));
 
   if (mpz_sgn (prd[0]) < 0)
     {
@@ -206,12 +203,12 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
       exit (1);
     }
 
-  fprintf (stderr, "Starting square root at %dms\n", cputime ());
+  fprintf (stderr, "Starting rational square root at %dms\n", cputime ());
 
   /* since we know we have a square, take the square root */
   mpz_sqrtrem (prd[0], v, prd[0]);
   
-  fprintf (stderr, "Computed square root at %dms\n", cputime ());
+  fprintf (stderr, "Computed rational square root at %dms\n", cputime ());
 
   if (mpz_cmp_ui (v, 0) != 0)
     {
@@ -219,7 +216,7 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
       mpz_t pp;
 
       mpz_init (pp);
-      fprintf (stderr, "Error, square root remainder is not zero\n");
+      fprintf (stderr, "Error, rational square root remainder is not zero\n");
       /* reconstruct the initial value of prd[0] to debug */
       mpz_mul (prd[0], prd[0], prd[0]);
       mpz_add (prd[0], prd[0], v);
@@ -248,13 +245,13 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
 
   mpz_mod (prd[0], prd[0], Np);
 
-  fprintf (stderr, "Reduced mod n at %dms\n", cputime ());
+  fprintf (stderr, "SqrtRat: reduced mod n at %dms\n", cputime ());
 
   /* now divide by g1^(ab_pairs/2) if ab_pairs is even, and g1^((ab_pairs+1)/2)
      if ab_pairs is odd */
   
   mpz_powm_ui (v, pol->rat->f[1], (ab_pairs + 1) / 2, Np);
-  fprintf (stderr, "Computed g1^(nab/2) mod n at %dms\n", cputime ());
+  fprintf (stderr, "SqrtRat: computed g1^(nab/2) mod n at %dms\n", cputime ());
 
   mpz_invert (v, v, Np);
   mpz_mul (prd[0], prd[0], v);
@@ -266,7 +263,7 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
 
   gmp_fprintf (stderr, "rational square root is %Zd\n", prd[0]);
 
-  fprintf (stderr, "Rational square root time at %dms\n", cputime ());
+  fprintf (stderr, "Rational square root time: %dms\n", cputime ());
 
   mpz_clear (prd[0]);
 
