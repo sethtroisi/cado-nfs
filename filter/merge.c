@@ -101,11 +101,12 @@ main (int argc, char *argv[])
     int itermax = 0;
     double wct0 = wct_seconds ();
 
-    /* print comand-line arguments */
+    /* print command-line arguments */
     printf ("%s.r%s", argv[0], CADO_REV);
     for (i = 1; i < argc; i++)
       printf (" %s", argv[i]);
     printf ("\n");
+    fflush (stdout);
 #ifdef USE_MPI
     MPI_Init(&argc, &argv);
 #endif
@@ -216,6 +217,7 @@ main (int argc, char *argv[])
     tt = seconds ();
     filter_matrix_read_weights (mat, ps);
     printf ("Getting column weights took %2.2lf\n", seconds () - tt);
+    fflush (stdout);
     /* note: we can't use purgedfile_stream_rewind on a compressed file,
        thus we close and reopen */
     purgedfile_stream_closefile (ps);
@@ -241,6 +243,7 @@ main (int argc, char *argv[])
           printf ("There are %lu column(s) of weight %lu\n", nbm[j], j);
       free (nbm);
     }
+    fflush (stdout);
 
     fillmat (mat);
 
