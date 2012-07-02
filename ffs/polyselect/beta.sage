@@ -1,4 +1,3 @@
-# sage: load init_rings.sage
 # sage: f=S(x^5-x+t)
 # sage: l,makefblist=prepare_small_primes_stats(f,10)
 # Preparing root property for primes up to degree 10.
@@ -12,7 +11,7 @@
 # Variables l and makefblist depend on f only, they are reused for different
 # parameters.
 
-
+load init_rings.sage
 load real.roots.stats.sage
 load makefb.sage
 
