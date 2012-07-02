@@ -1,10 +1,17 @@
-load ../makefb/tools.sage
+load tools.sage
 
-# The main function if alpha(f,B) which computes the root property of f with
+# The main function is alpha(f,B) which computes the root property of f with
 # respect to irreducible polynomials of position less than B,e.g. B=2^5 for
 # polynomials of degree below 5 if characteristic=2
 #The "estimate_<name_of_function>" makes probabilistic estimates of
 #<name_of_function> 
+
+# Polynomials must be in (GF(p)['t'])['x']
+# A.<t>=GF(2)['t']
+# S.<x>=A['x']
+# alpha(S((x-t)*(x-t^2)),100)
+
+
 
 def number_of_roots(f,p):
     """
