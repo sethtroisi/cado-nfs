@@ -264,7 +264,7 @@ Known problems:
 ===============
 
 * GCC 4.1.2 is known to miscompile CADO-NFS (reproduced with CADO-NFS 1.1 on
-  gcc10.fsffrance.org)
+  gcc10.fsffrance.org, where all versions 4.1.2 <= x.y.z < 4.2.4 fail too)
 * under NetBSD 5.1 amd64, Pthreads in the linear algebra step seem not to
   work, please use bwmt=1x1 option in factor.sh or cadofactor.pl.
 
