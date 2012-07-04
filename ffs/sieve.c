@@ -164,26 +164,26 @@ void stats_yield_push(stats_yield_ptr stats_yield, int nrels, double time,
 }
 
 // Attempt to compute a confidence interval for the average yield.
-void stats_yield_print_ci(stats_yield_srcptr stats_yield)
+void yield_confidence_interval(double *av_yield, double * ci68, double * ci95,
+        double * ci99, stats_yield_srcptr stats_yield)
 {
     long tot_rels = 0;
-    double av_yield = 0;
+    *av_yield = 0;
     int n = stats_yield->n;
     for (int i = 0; i < n; ++i) {
         tot_rels += stats_yield->data[i].nrels;
-        av_yield += stats_yield->data[i].time;
+        *av_yield += stats_yield->data[i].time;
     }
-    av_yield /= tot_rels;
+    *av_yield /= tot_rels;
 
     double sigma = 0;
     for (int i = 0; i < n; ++i) {
         double diff = stats_yield->data[i].time/stats_yield->data[i].nrels
-            - av_yield;
+            - *av_yield;
         sigma += stats_yield->data[i].nrels*diff*diff;
     }
     sigma /= (tot_rels-1);  // the "-1" is supposed to give a better estimator.
     sigma = sqrt(sigma);
-    double ci;
     // We divide by n and not by tot_rels, because the number of samples
     // is more the number of special-q than the number of relations.
     // Indeed, the yield starts to make sense only at the special-q
@@ -192,16 +192,26 @@ void stats_yield_print_ci(stats_yield_srcptr stats_yield)
     // want a notion of average yield that is global, and the variation
     // of the number of relations is correlated to the yield for a given
     // q.
-    // TODO: ask someone who know about statistics if this is correct.
-    ci = sigma/sqrt(n);
+    // TODO: ask someone who knows about statistics if this is correct.
+    if (ci68 != NULL) 
+        *ci68 = sigma/sqrt(n);
+    if (ci95 != NULL) 
+        *ci95 = 2*sigma/sqrt(n);
+    if (ci99 != NULL) 
+        *ci99 = 3*sigma/sqrt(n);
+}
+
+// Attempt to compute a confidence interval for the average yield.
+void stats_yield_print_ci(stats_yield_srcptr stats_yield)
+{
+    double ci68, ci95, ci99, av_yield;
+    yield_confidence_interval(&av_yield, &ci68, &ci95, &ci99, stats_yield);
     printf("#   Confidence interval for yield at 68.2%%: [%1.4f - %1.4f]\n",
-            av_yield - ci, av_yield + ci);
-    ci = 2*sigma/sqrt(n);
+            av_yield - ci68, av_yield + ci68);
     printf("#                                 at 95.4%%: [%1.4f - %1.4f]\n",
-            av_yield - ci, av_yield + ci);
-    ci = 3*sigma/sqrt(n);
+            av_yield - ci95, av_yield + ci95);
     printf("#                                 at 99.7%%: [%1.4f - %1.4f]\n",
-            av_yield - ci, av_yield + ci);
+            av_yield - ci99, av_yield + ci99);
 }
 
 #define SQSIDE_DEFAULT 0
@@ -229,6 +239,8 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "  rho  *           rho-poly of the special-q\n");
     fprintf(stderr, "  q0   *           lower bound for special-q range\n");
     fprintf(stderr, "  q1   *           lower bound for special-q range\n");
+    fprintf(stderr, "  reliableyield *  ignore q1, run until estimated yield is reliable\n");
+    fprintf(stderr, "  reliableyield *    that is in a +/-3%% interval with 95%% confidence level.\n");
     fprintf(stderr, "    Note: giving (q0,q1) is exclusive to giving (q,rho). In the latter case,\n" "    rho is optional.\n");
     fprintf(stderr, "  sqside           side (0 or 1) of the special-q (default %d)\n", SQSIDE_DEFAULT);
     fprintf(stderr, "  firstsieve       side (0 or 1) to sieve first (default %d)\n", FIRSTSIEVE_DEFAULT);
@@ -259,10 +271,12 @@ int main(int argc, char **argv)
     int rho_given = 0;
     int skewness = 0;
     int gf = 0;
+    int want_reliable_yield = 0;
 
     param_list pl;
     param_list_init(pl);
     param_list_configure_knob(pl, "-sublat", &want_sublat);
+    param_list_configure_knob(pl, "-reliableyield", &want_reliable_yield);
     argv++, argc--;
     for (; argc;) {
         if (param_list_update_cmdline(pl, &argc, &argv)) {
@@ -539,7 +553,18 @@ int main(int argc, char **argv)
                 nroots = sq_roots(roots, q0, ffspol[sqside]);
             } while (nroots == 0);
 
-            if (sq_cmp(q0, q1) >= 0)
+            if (want_reliable_yield) {
+                if (stats_yield->n > 10) {
+                    double av_yield, ci95;
+                    yield_confidence_interval(&av_yield, NULL, &ci95, NULL,
+                            stats_yield);
+                    printf("############################################\n");
+                    printf("#   Current average yield: %1.2f\n", av_yield);
+                    stats_yield_print_ci(stats_yield);
+                    if (ci95/av_yield < 0.03)
+                        break;
+                }
+            } else if (sq_cmp(q0, q1) >= 0)
                 break;
 
             printf("############################################\n");
