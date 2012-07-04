@@ -603,8 +603,35 @@ Using bwc.pl
     More extensive documentation in bwc.pl is included in the file
     header.
 
+Using bwc.pl with MPI (updated 20120704)
+=====================
+
+    1) first you have to compile CADO-NFS with MPI support:
+
+    $ MPI=1 make
+
+    Check the following lines are present in the make output:
+
+    -- Using MPI C compiler /usr/bin/mpicc
+    -- Using MPI C++ compiler /usr/bin/mpic++
+    -- Using MPI driver /usr/bin/mpiexec
+
+    2) secondly you need a working directory (wdir) which is accessible by all
+       machines (it can be empty initially)
+
+    3) then launch the following command where you have to adapt:
+       thr=3x4   each machine has 12 cores, we split them in 3x4
+       mpi=2x2:  we use 4 machines, and split them in 2x2
+       hosts=... list of machines used
+       matrix=   location of the matrix (on the machine where bwc.pl is run)
+       wdir=...  working directory (accessible by all machines)
+       bwc_bindir= where the binaries are (accessible by all machines)
+       mpi_extra_args= this is needed for openmp
+
+    $ bwc.pl :complete seed=1 thr=2x2 mpi=2x2 hosts=andouille,chorizo matrix=/localdisk/tmp/nfs/c156.small.bin nullspace=left mm_impl=bucket interleaving=0 interval=1000 mn=64 wdir=/global/bwc.wdir shuffled_product=1 bwc_bindir=/global/bin/bwc mpi_extra_args='--mca btl_tcp_if_exclude lo,virbr0'
+
+
 Notes:
 ======
 
 (T): This assumes that nullspace=right. If nullspace=left, replace M by trsp(M).
-
