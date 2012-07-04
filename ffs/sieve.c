@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <string.h>
 #include <inttypes.h>
+#include <math.h>
 #include "macros.h"
 
 #include "types.h"
@@ -114,6 +115,93 @@ int sq_is_irreducible(sq_srcptr p) {
     int ret = fppol_is_irreducible(P);
     fppol_clear(P);
     return ret;
+}
+
+typedef struct {
+    int nrels;
+    double time;
+    qlat_t qlat;
+} stats_sq_struct;
+
+typedef struct {
+    stats_sq_struct * data;
+    int n;
+    int alloc;
+} stats_yield_struct;
+
+typedef stats_yield_struct stats_yield_t[1];
+typedef stats_yield_struct *stats_yield_ptr;
+typedef const stats_yield_struct *stats_yield_srcptr;
+
+void stats_yield_init(stats_yield_ptr stats_yield)
+{
+    stats_yield->n = 0;
+    stats_yield->alloc = 100;
+    stats_yield->data = (stats_sq_struct *)malloc(100*sizeof(stats_sq_struct));
+    ASSERT_ALWAYS(stats_yield->data != NULL);
+}
+
+void stats_yield_clear(stats_yield_ptr stats_yield)
+{
+    free(stats_yield->data);
+}
+
+void stats_yield_push(stats_yield_ptr stats_yield, int nrels, double time,
+        qlat_srcptr qlat)
+{
+    if (stats_yield->n == stats_yield->alloc) {
+        stats_yield->alloc += 100;
+        stats_yield->data = (stats_sq_struct *)realloc(
+                stats_yield->data, 
+                stats_yield->alloc*sizeof(stats_sq_struct));
+        ASSERT_ALWAYS(stats_yield->data != NULL);
+    }
+    stats_yield->data[stats_yield->n].nrels = nrels;
+    stats_yield->data[stats_yield->n].time = time;
+    memcpy(&stats_yield->data[stats_yield->n].qlat[0],
+            qlat, sizeof(qlat_t));
+    stats_yield->n++;
+}
+
+// Attempt to compute a confidence interval for the average yield.
+void stats_yield_print_ci(stats_yield_srcptr stats_yield)
+{
+    long tot_rels = 0;
+    double av_yield = 0;
+    int n = stats_yield->n;
+    for (int i = 0; i < n; ++i) {
+        tot_rels += stats_yield->data[i].nrels;
+        av_yield += stats_yield->data[i].time;
+    }
+    av_yield /= tot_rels;
+
+    double sigma = 0;
+    for (int i = 0; i < n; ++i) {
+        double diff = stats_yield->data[i].time/stats_yield->data[i].nrels
+            - av_yield;
+        sigma += stats_yield->data[i].nrels*diff*diff;
+    }
+    sigma /= (tot_rels-1);  // the "-1" is supposed to give a better estimator.
+    sigma = sqrt(sigma);
+    double ci;
+    // We divide by n and not by tot_rels, because the number of samples
+    // is more the number of special-q than the number of relations.
+    // Indeed, the yield starts to make sense only at the special-q
+    // level.
+    // On the other hand, we used individual relations before, because we
+    // want a notion of average yield that is global, and the variation
+    // of the number of relations is correlated to the yield for a given
+    // q.
+    // TODO: ask someone who know about statistics if this is correct.
+    ci = sigma/sqrt(n);
+    printf("#   Confidence interval for yield at 68.2%%: [%1.4f - %1.4f]\n",
+            av_yield - ci, av_yield + ci);
+    ci = 2*sigma/sqrt(n);
+    printf("#                                 at 95.4%%: [%1.4f - %1.4f]\n",
+            av_yield - ci, av_yield + ci);
+    ci = 3*sigma/sqrt(n);
+    printf("#                                 at 99.7%%: [%1.4f - %1.4f]\n",
+            av_yield - ci, av_yield + ci);
 }
 
 #define SQSIDE_DEFAULT 0
@@ -435,6 +523,8 @@ int main(int argc, char **argv)
         }
     }
 
+    stats_yield_t stats_yield;
+    stats_yield_init(stats_yield);
 
     //
     // Begin of loop over special-q's
@@ -670,6 +760,8 @@ int main(int argc, char **argv)
         tot_buckets += t_buckets;
         tot_cofact  += t_cofact;
         tot_init   += t_init;
+
+        stats_yield_push(stats_yield, nrels, t_tot, qlat);
     } while (1); // End of loop over special-q's
 
     free(S);
@@ -699,12 +791,15 @@ int main(int argc, char **argv)
     fprintf(stdout, "#   %d relations found (%1.1f rel/sq)\n",
             tot_nrels, (double)tot_nrels / (double)tot_sq);
     fprintf(stdout, "#   Yield: %1.5f s/rel\n", tot_time/tot_nrels);
+    stats_yield_print_ci(stats_yield);
 #ifdef WANT_NORM_STATS
     norm_stats_print();
 #endif
 
+
     ffspol_clear(ffspol[0]);
     ffspol_clear(ffspol[1]);
+    stats_yield_clear(stats_yield);
 
     return EXIT_SUCCESS;
 }
