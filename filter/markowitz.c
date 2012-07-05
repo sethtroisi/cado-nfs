@@ -262,7 +262,7 @@ pureMkz(filter_matrix_t *mat, int32_t j)
       if(matLengthRow(mat, i) < w0)
           w0 = matLengthRow(mat, i), i0 = i;
           }
-#if 0   /* here we assume there is no cancellation other than for ideal j:
+#if 1   /* here we assume there is no cancellation other than for ideal j:
 	   the lightest row has weight w0, we add wt-1 times w0-1,
 	   remove once w0-1, and remove wt entries in the jth column */
         mkz = (w0 - 2) * (mat->wt[GETJ(mat, j)] - 2) - 2;
