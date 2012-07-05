@@ -76,13 +76,14 @@ int is_supported_compression_format(const char * s)
    [empty string]
 */
 char **
-prempt_open_compressed_rs (char **ficname)
+prempt_open_compressed_rs (char *rep_cado, char **ficname)
 {
   const struct suffix_handler *cp_r = NULL, *r = supported_compression_formats;
   char **cmd;
   size_t s_cmds = 2;
   size_t p_cmds = 0;
   int suffix_choice = 0;
+  char lastcom[256];
 
   if (!(cmd = calloc (s_cmds, sizeof(unsigned char *)))) {
     fprintf (stderr, "fopen_compressed_rs: calloc erreur : %s\n", strerror(errno));
@@ -104,96 +105,35 @@ prempt_open_compressed_rs (char **ficname)
       }
       for (cp_r = r ; cp_r->suffix ; cp_r++)
 	if (has_suffix (*ficname, cp_r->suffix)) break;
-      strcpy (cmd[p_cmds], cp_r->pfmt_in ? cp_r->pfmt_in : "cat %s");
-      cmd[p_cmds][strlen(cmd[p_cmds]) - 2] = 0; /* "%s" suppress */
+      strcpy (cmd[p_cmds], rep_cado);
+      strcat (cmd[p_cmds], "utils/antebuffer 24 ");
+      strcpy (lastcom, " | ");
+      strcat (lastcom, cp_r->pfmt_in ? cp_r->pfmt_in : "cat %s");
+      strcpy (&(lastcom[strlen(lastcom)-2]), "-"); /* "%s" remplaces by "-" */
       suffix_choice = 1;
       if (strlen (*ficname) + strlen (cmd[p_cmds]) >= PREMPT_S_CMD) {
-	fprintf(stderr, "fopen_compressed_rs: PREMPT_S_CMD (%d) too small. Please * 2\n", PREMPT_S_CMD);
+	fprintf(stderr, "prempt_open_compressed_rs: PREMPT_S_CMD (%d) too small. Please * 2\n", PREMPT_S_CMD);
 	exit (1);
       }
       strcat (cmd[p_cmds], *ficname++);
     }
     else {
       if (has_suffix (*ficname, cp_r->suffix) &&
-	  (strlen (*ficname) + strlen (cmd[p_cmds]) + 1 < PREMPT_S_CMD)) {
-	strcat (cmd[p_cmds], " ");
-	strcat (cmd[p_cmds], *ficname++);
-      }
+	  (strlen (*ficname) + strlen (cmd[p_cmds]) + strlen(lastcom) + 1 < PREMPT_S_CMD))
+	{
+	  strcat (cmd[p_cmds], " ");
+	  strcat (cmd[p_cmds], *ficname++);
+	}
       else {
+	strcat (cmd[p_cmds], lastcom);
 	suffix_choice = 0;
 	p_cmds++;
       }
     }
+  if (cmd[p_cmds][strlen(cmd[p_cmds])-1] != '-')
+    strcat (cmd[p_cmds], lastcom);
   return cmd;
 }
-
-#if 0
-/* Return a struct to read the files data. Exemple :
-   cat file_relation1
-   gzip -dc file_relation2.gz file_relation3.gz
-   bzip2 -dc file_relation4.gz file_relation5.gz
-   [empty string]
-*/
-__pfic_t *
-prempt_open_files_compressed_rs (char **ficname)
-{
-  const struct suffix_handler *cp_r = NULL, *r = supported_compression_formats;
-  char pfic_t pfic;
-  size_t s_pfic = 0x10, p_pfic = 0, lenght_cmd;
-  int suffix_choice = 0;
-  
-
-  if (!(pfic = calloc (s_pfic, sizeof(__pfic_t)))) {
-    fprintf (stderr, "fopen_files_compressed_rs: calloc erreur : %s\n", strerror(errno));
-    exit (1);
-  }
-  while (*ficname)
-    if (!suffix_choice) {
-      if (p_pfic + 1 >= s_pfic) {
-	if (!(pfic = realloc (pfic, sizeof(__pfic_t) * (s_pfic<<1)))) {
-	  fprintf (stderr, "fopen_files_compressed_rs: realloc erreur : %s\n", strerror(errno));
-	  exit (1);
-	}
-	memset(&(pfic[s_pfic]), 0, sizeof(unsigned char *) * s_pfic);
-	s_pfic <<= 1;
-      }
-      if (!(pfic[p_pfic].fics = malloc(PREMPT_S_CMD))) {
-	fprintf (stderr, "fopen_files_compressed_rs: malloc erreur : %s\n", strerror(errno));
-	exit (1);
-      }
-      for (cp_r = r ; cp_r->suffix ; cp_r++)
-	if (has_suffix (*ficname, cp_r->suffix)) break;
-      pfic[p_pfic].cmd = strdup (cp_r->pfmt_in ? cp_r->pfmt_in : "cat - > %s");
-      lenght_cmd = strlen(pfic[p_pfic].cmd);
-      if (lenght_cmd > 2)
-	if (!strcpm(&(pfic[p_pfic].cmd[lenght_cmd - 2]), "%s")) {
-	  pfic[p_pfic].cmd[lenght_cmd - 2] = 0;
-      
-
-
-      if (!strcpm(&(pfic[p_pfic].cmd[strlen(pfic[p_pfic].cmd) - 2]), "%s")))
-	cmd[p_pfic][strlen(cmd[p_pfic]) - 2] = 0; /* "%s" suppress */
-      suffix_choice = 1;
-      if (strlen (*ficname) + strlen (cmd[p_pfic]) >= PREMPT_S_CMD) {
-	fprintf(stderr, "fopen_compressed_rs: PREMPT_S_CMD (%d) too small. Please * 2\n", PREMPT_S_CMD);
-	exit (1);
-      }
-      strcat (cmd[p_pfic], *ficname++);
-    }
-    else {
-      if (has_suffix (*ficname, cp_r->suffix) &&
-	  (strlen (*ficname) + strlen (cmd[p_pfic]) + 1 < PREMPT_S_CMD)) {
-	strcat (cmd[p_pfic], " ");
-	strcat (cmd[p_pfic], *ficname++);
-      }
-      else {
-	suffix_choice = 0;
-	p_pfic++;
-      }
-    }
-  return pfic;
-}
-#endif
 
 /* The pipe capacity is 2^16 by default, we can increase it, but it does not
    seem to make a difference, thus we don't change it by default (patch from

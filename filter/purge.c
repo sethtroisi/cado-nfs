@@ -74,6 +74,7 @@ typedef struct {
 } fr_t;
 
 /* Main variables */
+static char rep_cado[4096];     /* directory of cado to find utils/antebuffer */
 static hashtable_t H[1];
 static int **rel_compact = NULL; /* see above */
 static uint8_t *rel_weight = NULL; /* rel_weight[i] is the total weight of
@@ -390,6 +391,7 @@ fprint_rel_row (FILE *file, int irel, relation_t *rel)
                  rational (resp. algebraic) side. This means that the output
                  might contain ideals <= minpr or minpa appearing only once.
 */
+
 static inline void
 insertNormalRelation (unsigned int j)
 {
@@ -424,6 +426,8 @@ insertNormalRelation (unsigned int j)
   rel_weight[buf_rel[j].num] = weight_rel_ffs (buf_rel[j].rel);
 #endif
   rel_compact[buf_rel[j].num] = my_tmp;
+
+
 }
 
 /* The information is stored in the ap[].p part, which is odd, but convenient.
@@ -780,18 +784,22 @@ prempt_load (prempt_t prempt_data) {
       fprintf (stderr, "prempt_load: popen error. %s\n", strerror (errno));
       exit (1);
     }
-    p = strstr(*p_files, "/");
+    p = strchr(*p_files, '/');
     if (p) {
       *p = 0;
       fprintf (stderr, "%s\n", *p_files);
       *p = '/';
       for ( ; ; ) {
-	l = strstr(p, " ");
+	l = strchr(p, ' ');
 	if (l) {
 	  *l = 0;
 	  fprintf(stderr, "   %-70s\n", p);
 	  *l = ' ';
-	  p = strstr(&(l[1]), "/");
+	  p = strchr(&(l[1]), '/');
+	  if (!p) {
+	    fprintf(stderr, "%s\n", &(l[1]));
+	    break;
+	  }
 	}
 	else {
 	  fprintf(stderr, "   %-70s\n", p);
@@ -1172,7 +1180,7 @@ prempt_scan_relations_pass_one ()
   rs->pipe = 1;
   length_line = 0;
   
-  prempt_data->files = prempt_open_compressed_rs (fic);
+  prempt_data->files = prempt_open_compressed_rs (rep_cado, fic);
   if ((err = posix_memalign ((void **) &(prempt_data->buf), PREMPT_BUF, PREMPT_BUF)))
     {
     fprintf (stderr, "prempt_scan_relations_pass_one: posix_memalign error (%d): %s\n", err, strerror (errno));
@@ -1450,8 +1458,8 @@ prempt_scan_relations_pass_two (const char *oname,
   relation_stream_init (rs);
   rs->pipe = 1;
   length_line = 0;
-  
-  prempt_data->files = prempt_open_compressed_rs (fic);
+
+  prempt_data->files = prempt_open_compressed_rs (rep_cado, fic);
   if ((err = posix_memalign ((void **) &(prempt_data->buf), PREMPT_BUF, PREMPT_BUF)))
     {
     fprintf (stderr, "prempt_scan_relations_pass_two: posix_memalign error (%d): %s\n", err, strerror (errno));
@@ -1739,11 +1747,24 @@ approx_ffs (int d)
 }
 #endif
 
+static void
+set_rep_cado (char *argv0) {
+  char *p;
+
+  strcpy(rep_cado, argv0);
+  p = strrchr(rep_cado, '/');
+  if (p)
+    strcpy (&(p[1]), "../");
+  else
+    strcat(rep_cado, "../");
+}
+
 int
 main (int argc, char **argv)
 {
   int k;
   
+  set_rep_cado(argv[0]);
   wct0 = wct_seconds ();
   fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
   for (k = 1; k < argc; k++)
