@@ -239,8 +239,9 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "  rho  *           rho-poly of the special-q\n");
     fprintf(stderr, "  q0   *           lower bound for special-q range\n");
     fprintf(stderr, "  q1   *           lower bound for special-q range\n");
-    fprintf(stderr, "  reliableyield *  ignore q1, run until estimated yield is reliable\n");
-    fprintf(stderr, "  reliableyield *    that is in a +/-3%% interval with 95%% confidence level.\n");
+    fprintf(stderr, "  sqt  [2]         skip special-q whose defect is sqt or more\n");
+    fprintf(stderr, "  reliableyield    ignore q1, run until estimated yield is reliable\n");
+    fprintf(stderr, "  reliableyield      that is in a +/-3%% interval with 95%% confidence level.\n");
     fprintf(stderr, "    Note: giving (q0,q1) is exclusive to giving (q,rho). In the latter case,\n" "    rho is optional.\n");
     fprintf(stderr, "  sqside           side (0 or 1) of the special-q (default %d)\n", SQSIDE_DEFAULT);
     fprintf(stderr, "  firstsieve       side (0 or 1) to sieve first (default %d)\n", FIRSTSIEVE_DEFAULT);
@@ -272,6 +273,7 @@ int main(int argc, char **argv)
     int skewness = 0;
     int gf = 0;
     int want_reliable_yield = 0;
+    int sqt = 2;
 
     param_list pl;
     param_list_init(pl);
@@ -318,6 +320,7 @@ int main(int argc, char **argv)
         ffspol_set_str(ffspol[1], polstr);
     }
     // read various bounds
+    param_list_parse_int(pl, "sqt", &sqt); 
     param_list_parse_int(pl, "S", &skewness); 
     param_list_parse_int(pl, "I", &I); 
     param_list_parse_int(pl, "J", &J); 
@@ -596,7 +599,6 @@ int main(int argc, char **argv)
         double t_init = 0;
         int nrels = 0;
 
-        t_init -= seconds();
         // Check the given special-q
         if (!is_valid_sq(qlat, ffspol[sqside])) {
             fprintf(stderr, "Error: the rho = ");
@@ -614,7 +616,23 @@ int main(int argc, char **argv)
         print_qlat_info(qlat);
         fflush(stdout);
 
+        // If the reduced q-lattice is still too skewed, then skip it.
+        {
+            int opt_deg = 1 + (sq_deg(qlat->q)+1)/2;
+            int sqsize = MAX(
+                    MAX(ai_deg(qlat->a0), ai_deg(qlat->a1)),
+                    MAX(skewness+ai_deg(qlat->b0), skewness+ai_deg(qlat->b1))
+                    );
+            printf("#   qlat vector degree: %d\n", sqsize);
+            if (sqsize >= opt_deg + sqt) {
+                printf("# Special-q lattice is too skewed, let's skip it!\n");
+                tot_sq--;
+                continue;
+            }
+        }
+
         // Precompute all the data for small factor base elements.
+        t_init -= seconds();
         for (int i = 0; i < 2; ++i)
             small_factor_base_precomp(SFB[i], qlat, sublat);
         t_init += seconds();
