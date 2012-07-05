@@ -136,7 +136,7 @@ if [[ -z $1 || $(expr $1 : '.*[r].*') != 0 ]]
     if [ ! -f ${name}.sqrt.log ] 2> /dev/null
       then echo "sqrt logfile were not found"
     else
-      rat=$(grep Rational ${name}.sqrt.log | head -1 | sed "s/.* at \(.*\)ms$/\1/g")
+      rat=$(grep Rational ${name}.sqrt.log | head -1 | sed "s/.*: \(.*\)ms$/\1/g")
       if [ ! -z $rat ]
       then rat2=$(echo "scale=3; $rat/1000" | bc -l | f)
            alg=$(grep Algebraic ${name}.sqrt.log | head -1 | cut -d' ' -f6 | f)
