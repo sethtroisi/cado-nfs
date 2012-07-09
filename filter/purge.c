@@ -65,7 +65,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #endif
 
 #define MAX_FILES 1000000
-#define MAX_STEPS 10   /* maximal number of singleton removal steps */
+#define MAX_STEPS 50   /* maximal number of singleton removal steps */
 
 typedef struct {
   volatile unsigned int ok;
@@ -508,7 +508,7 @@ delete_relation (int i, int *nprimes)
    W (double) is the total matrix weight, n (int) is the number of rows of the
    component, and N (double) is the number of rows of the matrix. This macro
    must return a double. */
-#define COST_MODEL 0
+#define COST_MODEL 1
 
 #if COST_MODEL == 0
 /* optimize the decrease of W*N */
@@ -541,7 +541,7 @@ compare (const void *v1, const void *v2)
    i1 and i2 share a prime of weight 2.
    Return number of rows of components, and put in w the total weight. */
 static int
-compute_connected_component (bit_vector_ptr T, uint32_t i, unsigned long *w,
+compute_connected_component (bit_vector_ptr T, uint32_t i, double *w,
 			     uint32_t *sum)
 {
   int j, h, n;
@@ -550,13 +550,16 @@ compute_connected_component (bit_vector_ptr T, uint32_t i, unsigned long *w,
   n = 1;         /* current row */
   bit_vector_setbit(T, i); /* mark row as visited */
   for (j = 0; (h = rel_compact[i][j]) != -1; j++)
+    {
     if (H->hashcount[h] == 2)
       {
         k = sum[h] - i; /* other row where prime of index h appears */
         if (!bit_vector_getbit(T, k)) /* row k was not visited yet */
           n += compute_connected_component (T, k, w, sum);
       }
-  *w += rel_weight[i]; /* add row weight */
+    if (H->hashcount[h] >= 2)
+      *w += ldexp (1.0, -H->hashcount[h]);
+    }
   return n;
 }
 
@@ -587,17 +590,16 @@ delete_connected_component (bit_vector_ptr T, uint32_t i,
 }
 
 static void
-deleteHeavierRows (int *nrel, int *nprimes,
-                   int nrelmax, int keep)
+deleteHeavierRows (int *nrel, int *nprimes, int nrelmax, int keep)
 {
   uint32_t *sum; /* sum of row indices for primes with weight 2 */
-  int i, j, h, n, ltmp = 0;
-  unsigned long w;
+  int i, j, h, ltmp = 0;
+  double n MAYBE_UNUSED, w;
   double W = 0.0; /* total matrix weight */
   double N = 0.0; /* numebr of rows */
   comp_t *tmp = NULL; /* (weight, index) */
   int target;
-  static int count = 0;
+  static int count = 0, chunk = 0;
 
   if ((*nrel - *nprimes) <= keep)
     return;
@@ -634,13 +636,22 @@ deleteHeavierRows (int *nrel, int *nprimes,
   qsort (tmp, ltmp, sizeof(comp_t), compare);
   
   /* remove heaviest components, assuming each one decreases the excess by 1;
-     we remove only half of the excess at each call of deleteHeavierRows,
+     we remove only part of the excess at each call of deleteHeavierRows,
      hoping to get "better" components to remove at the next call. */
-  target = (*nrel - *nprimes + keep) / 2;
-  if (++count >= MAX_STEPS)
+  if (count == 0)
+    chunk = (*nrel - *nprimes) / MAX_STEPS;
+  if (++count < MAX_STEPS)
+    {
+      target = (*nrel - *nprimes) - chunk;
+      if (target < keep)
+        target = keep;
+    }
+  else
     target = keep; /* enough steps */
   for (i = 0; i < ltmp && (*nrel) - (*nprimes) > target; i ++)
     *nrel -= delete_connected_component (T, tmp[i].i, sum, nprimes);
+  fprintf (stderr, "deleted %d heavier relations at %2.2lf\n",
+                     i, seconds ());
 
   bit_vector_clear(T);
   free (sum);
@@ -663,23 +674,20 @@ onepass_singleton_removal (int nrelmax, int *nrel, int *nprimes)
 static void
 remove_singletons (int *nrel, int nrelmax, int *nprimes, int keep)
 {
-  int old, newnrel = *nrel, newnprimes = *nprimes, oldexcess, excess;
-  int count = 0;
+  int old = 0, newnrel = *nrel, newnprimes = *nprimes, oldexcess, excess;
+  int clique, old0;
 
   excess = newnrel - newnprimes;
   while (1)
     {
-      old = newnrel;
       oldexcess = excess;
+      old0 = newnrel;
 
-      /* delete heavy rows */
-      if (count >= MAX_STEPS/2)
-        {
-          deleteHeavierRows (&newnrel, &newnprimes, nrelmax, keep);
-          if (newnrel != old)
-            fprintf (stderr, "deleted heavier relations: %d %d at %2.2lf\n",
-                     newnrel, newnprimes, seconds ());
-        }
+      /* delete heavy rows when we have reached a fixed point */
+      if ((clique = (newnrel == old)))
+        deleteHeavierRows (&newnrel, &newnprimes, nrelmax, keep);
+
+      old = newnrel;
 
       onepass_singleton_removal (nrelmax, &newnrel, &newnprimes);
 
@@ -687,18 +695,16 @@ remove_singletons (int *nrel, int nrelmax, int *nprimes, int keep)
       fprintf (stderr, "   new_nrows=%d new_ncols=%d (%d) at %2.2lf\n",
                newnrel, newnprimes, excess, seconds());
 
-      if ((count >= MAX_STEPS/2) && (oldexcess > excess))
+      if (clique && (oldexcess > excess))
         fprintf (stderr, "   [each excess row deleted %2.2lf rows]\n",
-                 (double) (old - newnrel) / (double) (oldexcess - excess));
-
-      count ++;
+                 (double) (old0 - newnrel) / (double) (oldexcess - excess));
 
       if (newnrel == old && excess <= keep)
         break;
     }
 
   /* Warning: we might have empty rows, i.e., empty rel_compact[i] lists,
-     if all primes in a relation are less then minpr or minpa. */
+     if all primes in a relation are less than minpr or minpa. */
 
   *nrel = newnrel;
   *nprimes = newnprimes;
