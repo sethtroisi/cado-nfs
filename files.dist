@@ -27,6 +27,7 @@ linalg/bwc/async.c
 linalg/bwc/async.h
 utils/barrier.c
 utils/barrier.h
+utils/antebuffer.c
 linalg/bwc/balancing.c
 linalg/bwc/balancing.h
 linalg/bwc/bench.c
