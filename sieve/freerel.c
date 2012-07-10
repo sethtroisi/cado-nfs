@@ -254,8 +254,8 @@ addFreeRelations(char *roots, int deg)
     }
 }
 
-static void
-smallFreeRelations(char *fbfilename)
+static void MAYBE_UNUSED
+smallFreeRelations (char *fbfilename)
 {
     int deg;
     int nfree = countFreeRelations (&deg, fbfilename);
@@ -265,22 +265,56 @@ smallFreeRelations(char *fbfilename)
     addFreeRelations (fbfilename, deg);
 }
 
+/* generate all free relations up to the large prime bound */
+static void MAYBE_UNUSED
+allFreeRelations (cado_poly pol)
+{
+  unsigned long lpb, p, *roots;
+  int d = pol->alg->degree, i, n, proj;
+
+  lpb = (pol->rat->lpb > pol->alg->lpb) ? pol->rat->lpb : pol->alg->lpb;
+  ASSERT_ALWAYS(lpb < sizeof(unsigned long) * CHAR_BIT);
+  lpb = 1UL << lpb;
+  roots = (unsigned long*) malloc (d * sizeof (unsigned long));
+  for (p = 2; p <= lpb; p = getprime (p))
+    {
+      n = poly_roots_ulong (roots, pol->alg->f, d, p);
+      proj = mpz_divisible_ui_p (pol->alg->f[d], p) ? 1 : 0;
+      if (n + proj == d)
+        {
+          printf ("%lu,0:%lx:%lx", p, p, roots[0]);
+          for (i = 1; i < d; i++)
+            printf (",%lx", roots[i]);
+          if (proj)
+            printf (",%lx", p);
+          printf ("\n");
+        }
+    }
+  getprime (0);
+  free (roots);
+}
+
 static void
 usage (char *argv0)
 {
-  fprintf (stderr, "Usage: %s -fb xxx.roots\n", argv0);
-  fprintf (stderr, "or     %s [-v] -poly xxx.poly xxx.rels1 xxx.rels2 ... xxx.relsk\n", argv0);
+  fprintf (stderr, "Usage: %s [-v] -poly xxx.poly\n", argv0);
+  fprintf (stderr, "or     %s [-v] -poly xxx.poly -fb xxx.roots xxx.rels1 xxx.rels2 ... xxx.relsk\n", argv0);
   exit (1);
 }
 
 int
-main(int argc, char *argv[])
+main (int argc, char *argv[])
 {
-    char *fbfilename = NULL, *polyfilename = NULL, **fic;
+    char *fbfilename = NULL, *polyfilename = NULL, **fic MAYBE_UNUSED;
     char *argv0 = argv[0];
     cado_poly cpoly;
     int nfic = 0;
-    int verbose = 0;
+    int verbose = 0, k;
+
+    fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
+    for (k = 1; k < argc; k++)
+      fprintf (stderr, " %s", argv[k]);
+    fprintf (stderr, "\n");
 
     while (argc > 1 && argv[1][0] == '-')
       {
@@ -322,19 +356,14 @@ main(int argc, char *argv[])
     /* check that n divides Res(f,g) [might be useful to factor n...] */
     cado_poly_check (cpoly);
 
-#if 0
-    if (mpz_cmp_ui (cpoly->g[1], 1) != 0)
-      {
-        fprintf (stderr, "Error, non-monic linear polynomial not yet treated");
-        fprintf (stderr, " (more theory needed)\n");
-        exit (1);
-      }
-#endif
-
+#if 1
     if (nfic == 0)
 	smallFreeRelations(fbfilename);
     else
       largeFreeRelations(cpoly, fic, verbose);
+#else
+    allFreeRelations (cpoly);
+#endif
 
     cado_poly_clear (cpoly);
 
