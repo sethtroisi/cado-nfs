@@ -30,6 +30,16 @@ void bit_vector_clear(bit_vector_ptr b)
     free(b->p); b->p = NULL; b->n = 0;
 }
 
+/* assume b and c have the same size */
+void bit_vector_neg(bit_vector_ptr b, bit_vector_srcptr c)
+{
+  size_t i, n;
+  n = b->n;
+  ASSERT_ALWAYS(n == c->n);
+  for (i = 0; i < iceildiv(n, BV_BITS); i++)
+    b->p[i] = ~c->p[i];
+}
+
 int bit_vector_getbit(bit_vector_srcptr b, size_t pos)
 {
     bv_t val = b->p[pos >> LN2_BV_BITS];

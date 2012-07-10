@@ -20,6 +20,7 @@ extern void bit_vector_init(bit_vector_ptr b, size_t n);
 extern void bit_vector_init_set(bit_vector_ptr b, size_t n, int s);
 extern void bit_vector_set(bit_vector_ptr b, int s);
 extern void bit_vector_clear(bit_vector_ptr b);
+extern void bit_vector_neg(bit_vector_ptr b, bit_vector_srcptr c);
 
 extern int bit_vector_getbit(bit_vector_srcptr b, size_t pos);
 /* The value returned by the two following functions reflect the _old_
