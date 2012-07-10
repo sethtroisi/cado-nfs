@@ -122,7 +122,6 @@ filter/mst.c
 filter/mst.h
 filter/purge.c
 filter/purge-mt.c
-filter/optimize.c
 filter/replay.c
 filter/report.c
 filter/report.h

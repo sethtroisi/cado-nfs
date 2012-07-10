@@ -17,9 +17,6 @@ target_link_libraries(merge utils)
 add_executable(replay replay.c sparse.c)
 target_link_libraries(replay utils)
 
-add_executable(optimize optimize.c sparse.c)
-target_link_libraries(optimize utils)
-
-install(TARGETS dup1 dup2 purge merge replay optimize RUNTIME DESTINATION bin/filter)
+install(TARGETS dup1 dup2 purge merge replay RUNTIME DESTINATION bin/filter)
 
 include(CMakeLists-nodist.txt OPTIONAL)
