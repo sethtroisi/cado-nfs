@@ -618,7 +618,7 @@ deleteHeavierRows (int *nrel, int *nprimes, int nrelmax, int keep)
   for (i = 0; i < nrelmax; i++)
     if (bit_vector_getbit(T, i) == 0)
       {
-        unsigned int wplus;
+        int wplus;
         w = 0;
         n = compute_connected_component (T, i, &w, sum);
         wplus = (unsigned int) w + 1;
@@ -632,7 +632,9 @@ deleteHeavierRows (int *nrel, int *nprimes, int nrelmax, int keep)
             tmp[ltmp].w = w;
             tmp[ltmp].i = i;
             ltmp ++;
-            for (j = 0; j < wplus && j < MAX_WEIGHT; j++)
+            if (wplus > MAX_WEIGHT)
+              wplus = MAX_WEIGHT;
+            for (j = 0; j < wplus; j++)
               Count[j] ++;
           }
       }
