@@ -507,26 +507,6 @@ delete_relation (int i, int *nprimes)
    then we save w*N+n*W (neglecting 2nd order terms), thus we remove
    first the components with the largest value of n/N + w/W. */
 
-/* Define the weight of a connected component: those with the largest cost
-   are removed first in the pruning; w (unsigned long) is the component weight,
-   W (double) is the total matrix weight, n (int) is the number of rows of the
-   component, and N (double) is the number of rows of the matrix. This macro
-   must return a double. */
-#define COST_MODEL 1
-
-#if COST_MODEL == 0
-/* optimize the decrease of W*N */
-#define COST(w,W,n,N) ((double) (w) / (W) + (double) (n) / (N))
-#elif COST_MODEL == 1
-/* optimize the decrease of W */
-#define COST(w,W,n,N) ((double) (w) / (W))
-#elif COST_MODEL == 2
-/* optimize the decrease of N */
-#define COST(w,W,n,N) ((double) (n) / (N))
-#else
-#error "Invalid cost model"
-#endif
-
 typedef struct {
   float w;
   uint32_t i;
@@ -545,7 +525,7 @@ compare (const void *v1, const void *v2)
    i1 and i2 share a prime of weight 2.
    Return number of rows of components, and put in w the total weight. */
 static int
-compute_connected_component (bit_vector_ptr T, uint32_t i, double *w,
+compute_connected_component (bit_vector_ptr T, uint32_t i, float *w,
 			     uint32_t *sum)
 {
   int j, h, n;
@@ -561,8 +541,9 @@ compute_connected_component (bit_vector_ptr T, uint32_t i, double *w,
         if (!bit_vector_getbit(T, k)) /* row k was not visited yet */
           n += compute_connected_component (T, k, w, sum);
       }
+    /* since we count twice each weight-2 ideal, we add 0.5 for each */
     if (H->hashcount[h] >= 2)
-      *w += ldexp (1.0, -H->hashcount[h]);
+      *w += ldexpf (0.5, -7 * (H->hashcount[h] - 2));
     }
   return n;
 }
@@ -597,13 +578,15 @@ static void
 deleteHeavierRows (int *nrel, int *nprimes, int nrelmax, int keep)
 {
   uint32_t *sum; /* sum of row indices for primes with weight 2 */
-  int i, j, h, ltmp = 0;
-  double n MAYBE_UNUSED, w;
-  double W = 0.0; /* total matrix weight */
-  double N = 0.0; /* numebr of rows */
+  int i, j, h, ltmp = 0, alloctmp = 0;
+  float n MAYBE_UNUSED, w;
+  float W = 0.0; /* total matrix weight */
+  float N = 0.0; /* number of rows */
   comp_t *tmp = NULL; /* (weight, index) */
   int target;
   static int count = 0, chunk = 0;
+#define MAX_WEIGHT 10
+  int Count[MAX_WEIGHT]; /* Count[w] is the # of components of weight >= w */
 
   if ((*nrel - *nprimes) <= keep)
     return;
@@ -624,17 +607,34 @@ deleteHeavierRows (int *nrel, int *nprimes, int nrelmax, int keep)
 
   /* now initialize bit table for relations used */
   bit_vector T;
-  bit_vector_init_set(T, nrelmax, 0);
+  bit_vector_init(T, nrelmax);
+  bit_vector_neg (T, rel_used);
 
+  if (count == 0)
+    chunk = (*nrel - *nprimes) / MAX_STEPS;
+
+  for (i = 0; i < MAX_WEIGHT; i++)
+    Count[i] = 0;
   for (i = 0; i < nrelmax; i++)
-    if (bit_vector_getbit(rel_used, i) && bit_vector_getbit(T, i) == 0)
+    if (bit_vector_getbit(T, i) == 0)
       {
+        unsigned int wplus;
         w = 0;
         n = compute_connected_component (T, i, &w, sum);
-        ltmp ++;
-        tmp = (comp_t*) realloc (tmp, ltmp * sizeof (comp_t));
-        tmp[ltmp - 1].w = (float) COST(w,W,n,N);
-        tmp[ltmp - 1].i = i;
+        wplus = (unsigned int) w + 1;
+        if (wplus >= MAX_WEIGHT || Count[wplus] < chunk)
+          {
+            if (ltmp >= alloctmp)
+              {
+                alloctmp = (alloctmp == 0) ? 1 : 2 * alloctmp;
+                tmp = (comp_t*) realloc (tmp, alloctmp * sizeof (comp_t));
+              }
+            tmp[ltmp].w = w;
+            tmp[ltmp].i = i;
+            ltmp ++;
+            for (j = 0; j < wplus && j < MAX_WEIGHT; j++)
+              Count[j] ++;
+          }
       }
 
   qsort (tmp, ltmp, sizeof(comp_t), compare);
@@ -642,8 +642,6 @@ deleteHeavierRows (int *nrel, int *nprimes, int nrelmax, int keep)
   /* remove heaviest components, assuming each one decreases the excess by 1;
      we remove only part of the excess at each call of deleteHeavierRows,
      hoping to get "better" components to remove at the next call. */
-  if (count == 0)
-    chunk = (*nrel - *nprimes) / MAX_STEPS;
   if (++count < MAX_STEPS)
     {
       target = (*nrel - *nprimes) - chunk;
@@ -654,7 +652,7 @@ deleteHeavierRows (int *nrel, int *nprimes, int nrelmax, int keep)
     target = keep; /* enough steps */
   for (i = 0; i < ltmp && (*nrel) - (*nprimes) > target; i ++)
     *nrel -= delete_connected_component (T, tmp[i].i, sum, nprimes);
-  fprintf (stderr, "deleted %d heavier relations at %2.2lf\n",
+  fprintf (stderr, "deleted %d heavier connected components at %2.2lf\n",
                      i, seconds ());
 
   bit_vector_clear(T);
@@ -678,18 +676,23 @@ onepass_singleton_removal (int nrelmax, int *nrel, int *nprimes)
 static void
 remove_singletons (int *nrel, int nrelmax, int *nprimes, int keep)
 {
-  int old = 0, newnrel = *nrel, newnprimes = *nprimes, oldexcess, excess;
-  int clique, old0;
+  int old = 0, newnrel = *nrel, newnprimes = *nprimes, oldexcess = 0, excess;
+  int clique, old0 = 0;
 
   excess = newnrel - newnprimes;
   while (1)
     {
-      oldexcess = excess;
-      old0 = newnrel;
-
       /* delete heavy rows when we have reached a fixed point */
       if ((clique = (newnrel == old)))
-        deleteHeavierRows (&newnrel, &newnprimes, nrelmax, keep);
+        {
+          if (oldexcess > excess)
+            fprintf (stderr, "   [each excess row deleted %2.2lf rows]\n",
+                    (double) (old0 - newnrel) / (double) (oldexcess - excess));
+
+          oldexcess = excess;
+          old0 = newnrel;
+          deleteHeavierRows (&newnrel, &newnprimes, nrelmax, keep);
+        }
 
       old = newnrel;
 
@@ -698,10 +701,6 @@ remove_singletons (int *nrel, int nrelmax, int *nprimes, int keep)
       excess = newnrel - newnprimes;
       fprintf (stderr, "   new_nrows=%d new_ncols=%d (%d) at %2.2lf\n",
                newnrel, newnprimes, excess, seconds());
-
-      if (clique && (oldexcess > excess))
-        fprintf (stderr, "   [each excess row deleted %2.2lf rows]\n",
-                 (double) (old0 - newnrel) / (double) (oldexcess - excess));
 
       if (newnrel == old && excess <= keep)
         break;
