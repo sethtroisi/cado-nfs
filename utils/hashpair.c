@@ -121,9 +121,9 @@ getHashAddr (hashtable_t *H, long p, unsigned long r)
     unsigned int h;
 
     r = r & mask; /* ensures that -1 and -2 are mapped to -1 and -2
-                     in 32-bit mode */
+                     when H->need64 is 0. In particular for a relation where
+                     gcd(b,p) <> 1, findroot returns -1 as unsigned long. */
     h = getInitialAddressMod((unsigned long) p, r, H->HC0, H->HC1, H->hashmod);
-
     return getHashAddrAux (H, p, r, h);
 }
 
