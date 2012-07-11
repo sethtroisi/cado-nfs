@@ -526,12 +526,9 @@ int deg_norm_ij(ffspol_ptr ffspol_ij, ij_t i, ij_t j, int *gap)
   }
 }
 
-
 /* Function init_norms 
-   For each (i,j), it compute the corresponding (a,b) using ij2ab from
-   qlat.h. Then it computes deg_norm(ffspol, a, b).
-   In a first approximation, we will assume that it fits in an
-   uint8_t.
+   Compute the degree of the norm at each valid position. in the given
+   j-range.
    
    The sqside parameter is a boolean that tells whether we are on the
    side of the special q. If so, then the degree of q must be subtracted
@@ -544,6 +541,9 @@ void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
   ffspol_t ffspol_ij;
   ffspol_init2(ffspol_ij, ffspol->alloc);
 
+  if (use_sublat(sublat))
+    ASSERT_ALWAYS(0);
+
   // TODO: this could be precomputed once for all and stored in qlat
   ffspol_2ij(ffspol_ij, ffspol, qlat);  
 
@@ -552,36 +552,57 @@ void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
       degq = sq_deg(qlat->q);
 
   ij_t i, j;
-  ij_t hati, hati0, hatj;
-  int deghati0, gap, normdeg0;
+  int gap;
   int rci, rcj = 1;
   for (ij_set(j, j0); rcj; rcj = ij_monic_set_next(j, j, J)) {
     ijpos_t start = ijvec_get_start_pos(j, I, J) - pos0;
     if (start >= size)
       break;
+
     rci = 1;
-    ij_set_zero(hati0);
-    deghati0 = -1;
-    gap = 0;
-    normdeg0 = -1;
-    for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
+    for (ij_set_zero(i); rci; ) {
       ijpos_t pos = start + ijvec_get_offset(i, I);
- 
-      if (S[pos] != 255) {
-        // If we have sublattices, have to convert (i,j) to (hat i, hat j)
-        ij_convert_sublat(hati, hatj, i, j, sublat);
+      if (S[pos] == 255) {
+        rci = ij_set_next(i, i, I);
+        continue;
+      }
+
+      // Compute the degree of the norm, and the gap information.
+      int deg = deg_norm_ij(ffspol_ij, i, j, &gap);
+
+      // Deduce the next i for which we have to compute the norm.
+      ij_t i_next;
+      {
+        int degi = ij_deg(i);
+        if (gap == -1) { 
+          ij_set_ti(i_next, degi+1);
+        } else {
+          int s = MAX(degi - gap, 0);
+          ij_div_ti(i_next, i, s);
+          ij_set_next(i_next, i_next, I+1); // we don't care for overflow, here
+          ij_mul_ti(i_next, i_next, s);
+        }
+      }
+
+      // Fast loop with constant degree of norm.
+      // TODO: this is still about 14 asm instructions in charac 2. We
+      // can probably do it in half of this.
+      deg -= degq;
+      if (deg == 0)
+        deg = 255;
+      do {
 #ifdef TRACE_POS
         if (pos + pos0 == TRACE_POS) {
-          fprintf(stderr, "TRACE_POS(%" PRIu64 "): (hat i, hat j) = (", pos + pos0);
-          ij_out(stderr, hati); fprintf(stderr, " ");
-          ij_out(stderr, hatj); fprintf(stderr, ")\n");
+          fprintf(stderr, "TRACE_POS(%" PRIu64 "): (i, j) = (", pos + pos0);
+          ij_out(stderr, i); fprintf(stderr, " ");
+          ij_out(stderr, j); fprintf(stderr, ")\n");
           fprintf(stderr, "TRACE_POS(%" PRIu64 "): norm = ", pos + pos0);
           fppol_t norm, ii, jj;
           fppol_init(norm);
           fppol_init(ii);
           fppol_init(jj);
-          fppol_set_ij(ii, hati);
-          fppol_set_ij(jj, hatj);
+          fppol_set_ij(ii, i);
+          fppol_set_ij(jj, j);
           ffspol_norm(norm, ffspol_ij, ii, jj);
           fppol_out(stderr, norm);
           fppol_clear(norm);
@@ -592,51 +613,20 @@ void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
                   pos + pos0, fppol_deg(norm)-degq);
         }
 #endif
-        int deg = -10; // means uncomputed.
-        int deghati = ij_deg(hati);
-
-        // Cases where we can guess the degree of the norm.
-        if (gap == -1) {
-          // gap = -1 encodes the case where all monomials have distinct
-          // degrees. If degree of i does not change, ok.
-          if (deghati == deghati0)
-            deg = normdeg0;
-        } else {
-          ij_t Delta_i;
-          ij_diff(Delta_i, hati, hati0); // diff is enough for degree 
-          int degDeltai = ij_deg(Delta_i);
-          if (degDeltai < deghati0 - gap) {
-            // In that case, the degree computed for i0 is still valid.
-            deg = normdeg0;
-          }
-        }
-
-        // Guessing failed.
-        if (deg == -10) {
-          // i is too different from i0. We have to recompute.
-          // And i becomes i0 for next turn.
-          deg = deg_norm_ij(ffspol_ij, hati, hatj, &gap); 
-          normdeg0 = deg;
-          ij_set(hati0, hati);
-          deghati0 = ij_deg(hati0);
-        }
-          
-        // Put the degree of the norm in sieve array.
-        if (deg > 0) {
-          ASSERT_ALWAYS(deg < 255);
-          S[pos] = deg - degq;
+        if (S[pos] != 255) {
+          S[pos] = deg;
 #ifdef WANT_NORM_STATS
           norm_stats_n[side]++;
-          norm_stats_sum[side] += deg;
-          if ((deg < norm_stats_min[side]) || (norm_stats_min[side] == 0))
-              norm_stats_min[side] = deg;
-          if (deg > norm_stats_max[side])
-              norm_stats_max[side] = deg;
+          norm_stats_sum[side] += deg+degq;
+          if ((deg+degq < norm_stats_min[side]) || (norm_stats_min[side] == 0))
+            norm_stats_min[side] = deg+degq;
+          if (deg+degq > norm_stats_max[side])
+            norm_stats_max[side] = deg+degq;
 #endif
         }
-        else
-          S[pos] = 255;
-      }
+        rci = ij_set_next(i, i, I);
+        pos = start + ijvec_get_offset(i, I);
+      } while (rci && !ij_eq(i, i_next));
     }
   }
   ffspol_clear(ffspol_ij); 
