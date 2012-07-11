@@ -79,6 +79,7 @@ void sieveFB(uint8_t *S, small_factor_base_ptr FB, unsigned I, unsigned J,
     for (unsigned int ii = 0; ii < FB->n; ++ii) {
         small_fbideal_ptr gothp = FB->elts[ii];
         int L = gothp->degq;
+        int degp = gothp->degp;
 
         // Larger primes are left to the bucket sieve.
         ASSERT((unsigned)L < I);
@@ -96,7 +97,7 @@ void sieveFB(uint8_t *S, small_factor_base_ptr FB, unsigned I, unsigned J,
               ASSERT_ALWAYS(0);  // XXX Sublat is broken
             }
           }
-          ij_t i, j;
+          ij_t j;
           int rcj = 1;
           ij_set(j, gothp->current);
           while (rcj) {
@@ -105,11 +106,18 @@ void sieveFB(uint8_t *S, small_factor_base_ptr FB, unsigned I, unsigned J,
               break;
 
             // Sieve the whole line
+            // TODO: this should be a big memsub().
+#ifndef USE_F2
+            ij_t i;
             int rci = 1;
             for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
               ijpos_t pos = start + ijvec_get_offset(i, I);
-              sieve_hit(S, gothp->degp, pos, gothp->q, gothp->r, pos0);
+              sieve_hit(S, degp, pos, gothp->q, gothp->r, pos0);
             }
+#else
+            for(int i=0; i < 1<<I; ++i)
+              S[start+i] -= degp;
+#endif
 
             rcj = next_projective_j(j, j, gothp->projective_basis, L, J);
           }
@@ -161,11 +169,11 @@ void sieveFB(uint8_t *S, small_factor_base_ptr FB, unsigned I, unsigned J,
           ij_set(i, gothp->current);
           ijpos_t pos = start + ijvec_get_offset(i, I);
           if (LIKELY(pos0 || pos))
-            sieve_hit(S, gothp->degp, pos, gothp->q, gothp->r, pos0);
+            sieve_hit(S, degp, pos, gothp->q, gothp->r, pos0);
 
           // Size of Gray codes to use for the inner loop.
 #         if   defined(USE_F2)
-#           define ENUM_LATTICE_UNROLL 8
+#           define ENUM_LATTICE_UNROLL 5
 #         elif defined(USE_F3)
 #           define ENUM_LATTICE_UNROLL 5
 #         endif
@@ -185,12 +193,40 @@ void sieveFB(uint8_t *S, small_factor_base_ptr FB, unsigned I, unsigned J,
           do {
             // Inner-level Gray code enumeration: just go through the Gray code
             // array, each time adding the indicated basis vector.
-            for (unsigned k = k0; k < ngray; ++k) {
-              ij_add(i, i, gothp->basis->v[gray[k]]->i);
-              pos = start + ijvec_get_offset(i, I);
-              sieve_hit(S, gothp->degp, pos, gothp->q, gothp->r, pos0);
+#if defined(USE_F2) 
+            if (k0 == 0 && sizeof(ij_t)==4) {
+#define DOGRAY(n) \
+    "\txorq     "#n "(%[V]), %[i]\n\tsubb     %[degp], (%[S],%[i])\n"
+#define DOALLGRAY2  DOGRAY(0) DOGRAY(8) DOGRAY(0)
+#define DOALLGRAY3  DOALLGRAY2 DOGRAY(16) DOALLGRAY2
+#define DOALLGRAY4  DOALLGRAY3 DOGRAY(24) DOALLGRAY3
+#define DOALLGRAY5  DOALLGRAY4 DOGRAY(32) DOALLGRAY4
+#define DOALLGRAY6  DOALLGRAY5 DOGRAY(40) DOALLGRAY5
+#define DOALLGRAY7  DOALLGRAY6 DOGRAY(48) DOALLGRAY6
+#define DOALLGRAY8  DOALLGRAY7 DOGRAY(56) DOALLGRAY7
+#define DOALLGRAY   CAT(DOALLGRAY, ENUM_LATTICE_UNROLL)
+                uint64_t ii = i[0];
+                uint8_t dd = degp;
+                __asm volatile(
+                    DOALLGRAY
+                        : [i] "+r" (ii)
+                        : [S] "r" (S+start),
+                          [V] "r" (gothp->basis->v),
+                          [degp] "r" (dd)
+                        : "memory");
+                ASSERT((ii >> 32) == 0);
+                i[0] = ii;
+            } else 
+#endif
+            {
+                for (unsigned k = k0; k < ngray; ++k) {
+                    ij_add(i, i, gothp->basis->v[gray[k]]->i);
+                    pos = start + ijvec_get_offset(i, I);
+                    sieve_hit(S, degp, pos, gothp->q, gothp->r, pos0);
+                }
             }
             k0 = 0;
+
 
             // Outer-level Gray code enumeration: using ij_set_next, the degree
             // of the difference with the previous one indicates which basis
@@ -202,7 +238,7 @@ void sieveFB(uint8_t *S, small_factor_base_ptr FB, unsigned I, unsigned J,
               ij_diff(s, s, t);
               ij_add(i, i, gothp->basis->v[ij_deg(s)+ENUM_LATTICE_UNROLL]->i);
               pos = start + ijvec_get_offset(i, I);
-              sieve_hit(S, gothp->degp, pos, gothp->q, gothp->r, pos0);
+              sieve_hit(S, degp, pos, gothp->q, gothp->r, pos0);
             }
           } while (rc);
 
