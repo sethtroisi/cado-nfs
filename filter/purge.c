@@ -580,8 +580,8 @@ deleteHeavierRows (int *nrel, int *nprimes, int nrelmax, int keep)
   uint32_t *sum; /* sum of row indices for primes with weight 2 */
   int i, j, h, ltmp = 0, alloctmp = 0;
   float n MAYBE_UNUSED, w;
-  float W = 0.0; /* total matrix weight */
-  float N = 0.0; /* number of rows */
+  double W = 0.0; /* total matrix weight */
+  double N = 0.0; /* number of rows */
   comp_t *tmp = NULL; /* (weight, index) */
   int target;
   static int count = 0, chunk = 0;
