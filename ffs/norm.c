@@ -534,7 +534,7 @@ int deg_norm_ij(ffspol_ptr ffspol_ij, ij_t i, ij_t j, int *gap)
    side of the special q. If so, then the degree of q must be subtracted
    from the norm.
    */
-void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
+void init_norms(uint8_t * S, ffspol_srcptr ffspol, unsigned I, unsigned J,
                 ij_t j0, ijpos_t pos0, ijpos_t size, qlat_t qlat,
                 int sqside, sublat_ptr sublat, MAYBE_UNUSED int side)
 {
@@ -569,7 +569,7 @@ void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
 
       // Compute the degree of the norm, and the gap information.
       int deg = deg_norm_ij(ffspol_ij, i, j, &gap);
-
+      
       // Deduce the next i for which we have to compute the norm.
       ij_t i_next;
       {
@@ -585,11 +585,27 @@ void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
       }
 
       // Fast loop with constant degree of norm.
-      // TODO: this is still about 14 asm instructions in charac 2. We
-      // can probably do it in half of this.
       deg -= degq;
       if (deg == 0)
         deg = 255;
+#if defined(USE_F2) && !defined(TRACE_POS) && !defined(WANT_NORM_STATS)
+      // The generic loop below takes a dozen of asm instructions in
+      // charac 2.
+      // With specific, simplified code for charac 2, gcc does a good
+      // job, unroll the loop, use simd instructions, and so on.
+      {
+        uint8_t * Sptr = S + pos;
+        uint32_t ii = i[0];
+        uint32_t iinext = i_next[0];
+        do {
+          *Sptr++ |= deg;
+          ii++;
+        } while (ii!=iinext);
+        i[0] = ii;
+        i_next[0] = iinext;
+        rci = iinext < (1U<<I);
+      }
+#else // Generic loop, with debug code and statistics
       do {
 #ifdef TRACE_POS
         if (pos + pos0 == TRACE_POS) {
@@ -613,20 +629,21 @@ void init_norms(uint8_t *S, ffspol_srcptr ffspol, unsigned I, unsigned J,
                   pos + pos0, fppol_deg(norm)-degq);
         }
 #endif
-        if (S[pos] != 255) {
-          S[pos] = deg;
+        S[pos] |= deg;
 #ifdef WANT_NORM_STATS
+        if (S[pos] != 255) {
           norm_stats_n[side]++;
           norm_stats_sum[side] += deg+degq;
           if ((deg+degq < norm_stats_min[side]) || (norm_stats_min[side] == 0))
             norm_stats_min[side] = deg+degq;
           if (deg+degq > norm_stats_max[side])
             norm_stats_max[side] = deg+degq;
-#endif
         }
+#endif
         rci = ij_set_next(i, i, I);
         pos = start + ijvec_get_offset(i, I);
       } while (rci && !ij_eq(i, i_next));
+#endif
     }
   }
   ffspol_clear(ffspol_ij); 

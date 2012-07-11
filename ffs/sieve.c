@@ -728,6 +728,8 @@ int main(int argc, char **argv)
                 for (unsigned i = 0; i < size; ++i) {
                   if (S[i] > threshold[side])
                     S[i] = 255; 
+                  else 
+                    S[i] = 0;
                 }
               }
 
