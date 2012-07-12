@@ -505,9 +505,9 @@ int main(int argc, char **argv)
     double tot_time = seconds();
     double tot_norms = 0;
     double tot_sieve = 0;
-    double tot_buckets = 0;
+    double tot_buck_fill = 0;
+    double tot_buck_apply = 0;
     double tot_cofact = 0;
-    double tot_init = 0;
 
     int tot_nrels = 0;
     int tot_sq = 0;
@@ -594,9 +594,9 @@ int main(int argc, char **argv)
 
         double t_norms = 0;
         double t_sieve = 0;
-        double t_buckets = 0;
+        double t_buck_fill = 0;
+        double t_buck_apply = 0;
         double t_cofact = 0;
-        double t_init = 0;
         int nrels = 0;
 
         // Check the given special-q
@@ -632,10 +632,8 @@ int main(int argc, char **argv)
         }
 
         // Precompute all the data for small factor base elements.
-        t_init -= seconds();
         for (int i = 0; i < 2; ++i)
             small_factor_base_precomp(SFB[i], qlat, sublat);
-        t_init += seconds();
 
         // Loop on all sublattices
         // In the no_sublat case, this loops degenerates into one pass, since
@@ -650,10 +648,10 @@ int main(int argc, char **argv)
             }
 
             // Fill the buckets.
-            t_buckets -= seconds();
+            t_buck_fill -= seconds();
             buckets_fill(buckets[0], LFB[0], sublat, I, J, qlat);
             buckets_fill(buckets[1], LFB[1], sublat, I, J, qlat);
-            t_buckets += seconds();
+            t_buck_fill += seconds();
 
             // j0 is the first valid line in the current bucket region.
             ij_t j0;
@@ -664,7 +662,6 @@ int main(int argc, char **argv)
               if (ijvec_get_start_pos(j0, I, J) >= pos0+size)
                 continue;
 
-              t_init -= seconds();
               // Init the bucket region.
               memset(S, 0, size*sizeof(uint8_t));
 
@@ -695,7 +692,6 @@ int main(int argc, char **argv)
                   }
                 }
               }
-              t_init += seconds();
 
               for (int twice = 0; twice < 2; twice++) {
                 // Select the side to be sieved
@@ -715,9 +711,9 @@ int main(int argc, char **argv)
                 t_sieve += seconds();
 
                 // Apply the updates from the corresponding bucket.
-                t_buckets -= seconds();
+                t_buck_apply -= seconds();
                 bucket_apply(S, buckets[side], k);
-                t_buckets += seconds();
+                t_buck_apply += seconds();
 
                 // since (0,0) is divisible by everyone, its position might
                 // have been clobbered.
@@ -790,21 +786,20 @@ int main(int argc, char **argv)
                 "in %1.1f s\n", nrels, t_tot);
         fprintf(stdout,
                 "# Time of main steps: "
-                "%1.2f s (init);   "
-                "%1.2f s (norms);\n"
+                "%1.2f s      (norms);                "
+                "%1.2f s (sieve);\n"
                 "#                     "
-                "%1.2f s (sieve);  "
-                "%1.2f s (buckets); "
+                "%1.2f+%1.2f s (buckets: fill+apply);  "
                 "%1.2f s (cofact).\n",
-                t_init, t_norms, t_sieve, t_buckets, t_cofact);
+                t_norms, t_sieve, t_buck_fill, t_buck_apply, t_cofact);
         fprintf(stdout, "# Yield: %1.5f s/rel\n", t_tot/nrels);
         fflush(stdout);
         tot_nrels += nrels;
         tot_norms   += t_norms;
         tot_sieve   += t_sieve;
-        tot_buckets += t_buckets;
+        tot_buck_apply += t_buck_apply;
+        tot_buck_fill += t_buck_fill;
         tot_cofact  += t_cofact;
-        tot_init   += t_init;
 
         stats_yield_push(stats_yield, nrels, t_tot, qlat);
     } while (1); // End of loop over special-q's
@@ -823,14 +818,15 @@ int main(int argc, char **argv)
     tot_time = seconds()-tot_time;
     fprintf(stdout, "###### General statistics ######\n");
     fprintf(stdout, "#   Total time: %1.1f s\n", tot_time);
-    fprintf(stdout, "#   Main steps: "
-                    "%1.2f s (init);   "
-                    "%1.2f s (norms);\n"
-                    "#               "
-                    "%1.2f s (sieve);  "
-                    "%1.2f s (buckets); "
-                    "%1.2f s (cofact).\n",
-        tot_init, tot_norms, tot_sieve, tot_buckets, tot_cofact);
+    fprintf(stdout,
+                "# Time of main steps: "
+                "%1.2f s      (norms);                "
+                "%1.2f s (sieve);\n"
+                "#                     "
+                "%1.2f+%1.2f s (buckets: fill+apply);  "
+                "%1.2f s (cofact).\n",
+        tot_norms, tot_sieve,
+        tot_buck_fill, tot_buck_apply, tot_cofact);
  
     fprintf(stdout, "#   Computed %d special-q\n", tot_sq);
     fprintf(stdout, "#   %d relations found (%1.1f rel/sq)\n",
