@@ -616,7 +616,7 @@ int main(int argc, char **argv)
         print_qlat_info(qlat);
         fflush(stdout);
 
-        // If the reduced q-lattice is still too skewed, then skip it.
+        // If the reduced q-lattice is still too unbalanced, then skip it.
         {
             int opt_deg = 1 + (sq_deg(qlat->q)+1)/2;
             int sqsize = MAX(
@@ -625,7 +625,7 @@ int main(int argc, char **argv)
                     );
             printf("#   qlat vector degree: %d\n", sqsize);
             if (sqsize >= opt_deg + sqt) {
-                printf("# Special-q lattice is too skewed, let's skip it!\n");
+                printf("# Special-q lattice basis is too unbalanced, let's skip it!\n");
                 tot_sq--;
                 continue;
             }
