@@ -593,7 +593,7 @@ int main(int argc, char **argv)
                     break; 
                 int degq0 = sq_deg(q0);
                 double rpq = (double)tot_nrels / (double)tot_sq;
-                double nsq = (double)(1<<degq0) / (double)degq0;
+                double nsq = (double)(1L<<degq0) / (double)degq0;
                 double nr = rpq*nsq;
                 printf("#BENCH ###########################################\n");
                 printf("#BENCH Estimations for special-q's of degree %d:\n",
