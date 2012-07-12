@@ -240,9 +240,12 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "  q0   *           lower bound for special-q range\n");
     fprintf(stderr, "  q1   *           lower bound for special-q range\n");
     fprintf(stderr, "  sqt  [2]         skip special-q whose defect is sqt or more\n");
+    fprintf(stderr, "  bench            bench-mode. Takes parameter of the form deg0-deg1\n");
+    fprintf(stderr, "                   and estimates the time and number of rels for corresping sq.\n");
+    fprintf(stderr, "                   q0 and q1 are ignored.\n");
     fprintf(stderr, "  reliableyield    ignore q1, run until estimated yield is reliable\n");
-    fprintf(stderr, "  reliableyield      that is in a +/-3%% interval with 95%% confidence level.\n");
-    fprintf(stderr, "    Note: giving (q0,q1) is exclusive to giving (q,rho). In the latter case,\n" "    rho is optional.\n");
+    fprintf(stderr, "                   that is in a +/-3%% interval with 95%% confidence level.\n");
+    fprintf(stderr, "Note: giving (q0,q1) is exclusive to giving (q,rho). In the latter case,\n" "    rho is optional.\n");
     fprintf(stderr, "  sqside           side (0 or 1) of the special-q (default %d)\n", SQSIDE_DEFAULT);
     fprintf(stderr, "  firstsieve       side (0 or 1) to sieve first (default %d)\n", FIRSTSIEVE_DEFAULT);
     fprintf(stderr, "  S                skewness, i.e. deg(a)-deg(b)\n");
@@ -274,6 +277,10 @@ int main(int argc, char **argv)
     int gf = 0;
     int want_reliable_yield = 0;
     int sqt = 2;
+    int bench = 0;
+    int bench_end = 0;
+    double bench_tot_rels = 0;
+    double bench_tot_time = 0;
 
     param_list pl;
     param_list_init(pl);
@@ -367,6 +374,20 @@ int main(int argc, char **argv)
         } else {
             sq_set_zero(q0);
             sq_set_zero(q1);
+        }
+    }
+
+    // want to bench ?
+    {
+        int res[2];
+        int ret = param_list_parse_int_and_int(pl, "bench", res, "-");
+        if (ret) {
+            bench = 1;
+            bench_end = res[1];
+            sq_set_ti(q0, res[0]);
+            sq_t range;
+            sq_set_ti(range, 10);
+            sq_add(q1, q0, range);
         }
     }
 
@@ -567,8 +588,47 @@ int main(int argc, char **argv)
                     if (ci95/av_yield < 0.03)
                         break;
                 }
-            } else if (sq_cmp(q0, q1) >= 0)
-                break;
+            } else if (sq_cmp(q0, q1) >= 0) {
+                if (!bench)
+                    break; 
+                int degq0 = sq_deg(q0);
+                double rpq = (double)tot_nrels / (double)tot_sq;
+                double nsq = (double)(1<<degq0) / (double)degq0;
+                double nr = rpq*nsq;
+                printf("#BENCH ###########################################\n");
+                printf("#BENCH Estimations for special-q's of degree %d:\n",
+                        degq0);
+                printf("#BENCH   rels per sq: %1.2f rel/sq\n", rpq);
+                printf("#BENCH   rels for all sq: %1.0f\n", nr);
+                tot_time = seconds()-tot_time;
+                double yield = (double)tot_time / (double)tot_nrels;
+                double tm = yield*nr;
+                printf("#BENCH   yield: %1.2f s/rel\n", yield);
+                printf("#BENCH   time: %1.0f s", tm);
+                printf(" = %1.1f d\n", tm/86400);
+                bench_tot_rels += nr;
+                bench_tot_time += tm;
+                printf("#BENCH Accumulated data for deg up to %d:\n", degq0);
+                printf("#BENCH   total rels: %1.0f\n", bench_tot_rels);
+                printf("#BENCH   total time: %1.0f s", bench_tot_time);
+                printf(" = %1.1f d\n", bench_tot_time/86400);
+                printf("#BENCH ###########################################\n");
+                tot_nrels = 0;
+                tot_time = seconds();
+                tot_sq = 0;
+                
+                if (degq0 >= bench_end)
+                    break;
+                else {
+                    // select next degree to bench
+                    sq_set_ti(q0, degq0+1);
+                    sq_t range;
+                    sq_set_ti(range, 10);
+                    sq_add(q1, q0, range);
+                    nroots = 0;
+                    continue;
+                }
+            }
 
             printf("############################################\n");
             printf("# Roots for q = "); 
@@ -815,6 +875,7 @@ int main(int argc, char **argv)
     free(replayable_bucket[1]->b);
 #endif
 
+    if (!bench) {
     tot_time = seconds()-tot_time;
     fprintf(stdout, "###### General statistics ######\n");
     fprintf(stdout, "#   Total time: %1.1f s\n", tot_time);
@@ -836,7 +897,7 @@ int main(int argc, char **argv)
 #ifdef WANT_NORM_STATS
     norm_stats_print();
 #endif
-
+    }
 
     ffspol_clear(ffspol[0]);
     ffspol_clear(ffspol[1]);
