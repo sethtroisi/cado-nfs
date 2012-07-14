@@ -540,10 +540,6 @@ void init_norms(uint8_t * S, ffspol_srcptr ffspol, unsigned I, unsigned J,
 {
   ffspol_t ffspol_ij;
   ffspol_init2(ffspol_ij, ffspol->alloc);
-
-  if (use_sublat(sublat))
-    ASSERT_ALWAYS(0);
-
   // TODO: this could be precomputed once for all and stored in qlat
   ffspol_2ij(ffspol_ij, ffspol, qlat);  
 
@@ -551,7 +547,7 @@ void init_norms(uint8_t * S, ffspol_srcptr ffspol, unsigned I, unsigned J,
   if (sqside)
       degq = sq_deg(qlat->q);
 
-  ij_t i, j;
+  ij_t i, j, hati, hatj;
   int gap;
   int rci, rcj = 1;
   for (ij_set(j, j0); rcj; rcj = ij_monic_set_next(j, j, J)) {
@@ -567,8 +563,11 @@ void init_norms(uint8_t * S, ffspol_srcptr ffspol, unsigned I, unsigned J,
         continue;
       }
 
+      // Sublat conversion
+      ij_convert_sublat(hati, hatj, i, j, sublat);
+
       // Compute the degree of the norm, and the gap information.
-      int deg = deg_norm_ij(ffspol_ij, i, j, &gap);
+      int deg = deg_norm_ij(ffspol_ij, hati, hatj, &gap);
       
       // Deduce the next i for which we have to compute the norm.
       ij_t i_next;
@@ -612,13 +611,20 @@ void init_norms(uint8_t * S, ffspol_srcptr ffspol, unsigned I, unsigned J,
           fprintf(stderr, "TRACE_POS(%" PRIu64 "): (i, j) = (", pos + pos0);
           ij_out(stderr, i); fprintf(stderr, " ");
           ij_out(stderr, j); fprintf(stderr, ")\n");
+          ij_convert_sublat(hati, hatj, i, j, sublat);
+          if (use_sublat(sublat)) {
+            fprintf(stderr,
+                "TRACE_POS(%" PRIu64 "): (hati, hatj) = (", pos + pos0);
+            ij_out(stderr, hati); fprintf(stderr, " ");
+            ij_out(stderr, hatj); fprintf(stderr, ")\n");
+          }
           fprintf(stderr, "TRACE_POS(%" PRIu64 "): norm = ", pos + pos0);
           fppol_t norm, ii, jj;
           fppol_init(norm);
           fppol_init(ii);
           fppol_init(jj);
-          fppol_set_ij(ii, i);
-          fppol_set_ij(jj, j);
+          fppol_set_ij(ii, hati);
+          fppol_set_ij(jj, hatj);
           ffspol_norm(norm, ffspol_ij, ii, jj);
           fppol_out(stderr, norm);
           fppol_clear(norm);
