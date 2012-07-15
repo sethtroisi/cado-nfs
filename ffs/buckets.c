@@ -363,8 +363,7 @@ void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
   ASSERT_ALWAYS(fbideal_deg(gothp) >= buckets->min_degp);
   unsigned i = 0;
   for (unsigned degp = buckets->min_degp; degp < buckets->max_degp; ++degp) {
-    // Not supported yet.
-    if (use_sublat(sublat) && degp == 1) continue;
+    ASSERT(degp >= I);
 
     // Go through each prime ideal of degree degp.
     for (; i < FB->n && fbideal_deg(gothp) == degp; ++i, ++gothp) {
@@ -375,6 +374,11 @@ void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
           // This is a projective root. For the moment, we skip them.
           continue;
       }
+      
+      hint_t hint = 0;
+#ifdef BUCKET_RESIEVE
+      hint = i;
+#endif
 
       ijbasis_compute_large(euclid, basis, gothp, lambda);
       ijvec_t v;
@@ -382,6 +386,9 @@ void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
         int st = compute_starting_point(v, euclid, sublat);
         if (!st)
           continue; // next factor base prime.
+        // The first position is to be sieved when we use sublat, but
+        // otherwise not, since this is (0,0).
+        buckets_push_update(buckets, ptr, hint, v, I, J);
       }
       else
         ijvec_set_zero(v);
@@ -402,10 +409,6 @@ void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
       unsigned gray_dim = MIN(basis->dim, ENUM_LATTICE_UNROLL);
       unsigned i0       = ngray - GRAY_LENGTH(gray_dim) / (__FP_SIZE-1);
 
-      hint_t hint = 0;
-#ifdef BUCKET_RESIEVE
-      hint = i;
-#endif
       ij_t s, t;
       ij_set_zero(t);
       int rc = basis->dim > ENUM_LATTICE_UNROLL;

@@ -84,11 +84,19 @@ void sieveFB(uint8_t *S, small_factor_base_ptr FB, unsigned I, unsigned J,
         // Larger primes are left to the bucket sieve.
         ASSERT((unsigned)L < I);
 
-        // List of cases that are not handled yet:
-        if (use_sublat(sublat) && L == 1) continue;
+        // In case of sublat, the primes of degree 1 gives a uniform
+        // contribution and it is better to handle them globally using
+        // thresholds.
+        // TODO: take this into account in sieve.c
+        if (use_sublat(sublat) && L == 1)
+          continue;
 
         // projective roots are handled differently
         if (gothp->proj) {
+          // TODO: repair sublat with projective roots.
+          if (use_sublat(sublat))
+            continue;
+
           // First time round?
           if (UNLIKELY(!pos0)) {
             // Find the first line to fill
@@ -128,9 +136,6 @@ void sieveFB(uint8_t *S, small_factor_base_ptr FB, unsigned I, unsigned J,
         // Only the first time round.
         if (UNLIKELY(!pos0)) {
           if (use_sublat(sublat)) {
-#if 0
-            // FIXME: sublat are Broken XXX
-            
             // In the case of sublattices, compute the starting point for the
             // sieve by gothp for the current sublattice.
             // TODO: Way too expensive!
@@ -140,12 +145,12 @@ void sieveFB(uint8_t *S, small_factor_base_ptr FB, unsigned I, unsigned J,
             fbprime_t tmp0;
             ij_t tmp1;
             fbprime_set_16(tmp0, sublat->lat[sublat->n][1]);
-            fbprime_mulmod(tmp0, gothp->lambda, tmp0, gothp->p);
+            fbprime_mulmod(tmp0, gothp->lambda, tmp0, gothp->q);
             ij_set_fbprime(yip, tmp0);
             ij_add(xip, xi, yip);
             ij_set_16(tmp1, sublat->modulus);
             ij_mulmod(xip, xip, gothp->tildep, tmp1);
-            ij_set_fbprime(tmp1, gothp->p);
+            ij_set_fbprime(tmp1, gothp->q);
             ij_mul(i0, xip, tmp1);
             ij_add(i0, i0, yip);
 
@@ -153,8 +158,6 @@ void sieveFB(uint8_t *S, small_factor_base_ptr FB, unsigned I, unsigned J,
             ij_set_16(ijmod, sublat->modulus);
             ij_sub(i0, i0, xi);
             ij_div(gothp->current, i0, ijmod);
-#endif
-            ij_set_zero(gothp->current);
           } else {
             ij_set_zero(gothp->current);
           }

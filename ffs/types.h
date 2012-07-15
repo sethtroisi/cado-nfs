@@ -363,6 +363,7 @@ typedef const __large_factor_base_struct *large_factor_base_srcptr;
 typedef struct {
     fbprime_t q;
     fbprime_t r;
+    fbprime_t lambda;
     ijbasis_t basis;
     ijbasis_t adjustment_basis;
     ij_t     *projective_basis;

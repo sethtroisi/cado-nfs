@@ -442,37 +442,7 @@ int main(int argc, char **argv)
         fprintf(stderr, "firstsieve must be 0 or 1\n");
         exit(EXIT_FAILURE);
     }
-   
-    // Read the factor bases
-    {
-        const char *filename;
-        int noerr;
-        for (int i = 0; i < 2; ++i) {
-            char param[4] = {'f', 'b', '0', '\0'};
-            if (i == 1) 
-                param[2] = '1';
-            filename = param_list_lookup_string(pl, param);
-            if (filename == NULL) usage(argv0, param);
-            double tm = seconds();
-            noerr = factor_base_init(LFB[i], SFB[i], filename, I, fbb[i], I, J);
-            fprintf(stdout, "# Reading factor base %d took %1.1f s\n", 
-                    i, seconds()-tm);
-            if (!noerr) {
-                fprintf(stderr, "Could not read %s: %s\n", param, filename);
-                exit(EXIT_FAILURE);
-            }
-
-        }
-    }
-
-    param_list_clear(pl);
-
-    if (want_sublat) {
-        fprintf(stderr, "# WARNING: sublattices seem to be broken, and won't be fixed soon.\n");
-
-        // TODO: init tildep in the factor bases, here.
-    }
-
+ 
 #ifdef USE_F2
     sublat_ptr sublat;
     if (want_sublat)
@@ -484,12 +454,36 @@ int main(int argc, char **argv)
         fprintf(stderr, "# Sorry, no sublattices in characteristic > 2. Ignoring the 'sublat' option\n");
     sublat_ptr sublat = &no_sublat[0];
 #endif
-
-
+  
     // Most of what we do is at the sublattice level. 
     // So we fix I and J accordingly.
     I -= sublat->deg;
     J -= sublat->deg;
+
+    // Read the factor bases
+    {
+        const char *filename;
+        int noerr;
+        for (int i = 0; i < 2; ++i) {
+            char param[4] = {'f', 'b', '0', '\0'};
+            if (i == 1) 
+                param[2] = '1';
+            filename = param_list_lookup_string(pl, param);
+            if (filename == NULL) usage(argv0, param);
+            double tm = seconds();
+            noerr = factor_base_init(LFB[i], SFB[i], filename, I, fbb[i],
+                    I, J, sublat);
+            fprintf(stdout, "# Reading factor base %d took %1.1f s\n", 
+                    i, seconds()-tm);
+            if (!noerr) {
+                fprintf(stderr, "Could not read %s: %s\n", param, filename);
+                exit(EXIT_FAILURE);
+            }
+
+        }
+    }
+
+    param_list_clear(pl);
 
     // Allocate storage space for the buckets.
     // FIXME: The bucket capacity is hardcoded for the moment.
@@ -693,12 +687,13 @@ int main(int argc, char **argv)
 
         // Precompute all the data for small factor base elements.
         for (int i = 0; i < 2; ++i)
-            small_factor_base_precomp(SFB[i], qlat, sublat);
+            small_factor_base_precomp(SFB[i], qlat);
 
         // Loop on all sublattices
         // In the no_sublat case, this loops degenerates into one pass, since
         // nb = 1.
         for (sublat->n = 0; sublat->n < sublat->nb; sublat->n++) {
+#if 0
             if (use_sublat(sublat)) {
                 fprintf(stdout, "# Sublattice (");
                 fppol16_out(stdout, sublat->lat[sublat->n][0]);
@@ -706,7 +701,7 @@ int main(int argc, char **argv)
                 fppol16_out(stdout, sublat->lat[sublat->n][1]);
                 fprintf(stdout, ") :\n");
             }
-
+#endif
             // Fill the buckets.
             t_buck_fill -= seconds();
             buckets_fill(buckets[0], LFB[0], sublat, I, J, qlat);
