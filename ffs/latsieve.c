@@ -73,9 +73,11 @@ void sieve_hit(uint8_t *S, uint8_t degp, ijpos_t pos,
 
 
 // TODO: This code is under-efficient. Fix this!
-void sieveFB(uint8_t *S, small_factor_base_ptr FB, unsigned I, unsigned J,
-             ij_t j0, ijpos_t pos0, ijpos_t size, sublat_ptr sublat)
+void sieveSFB(uint8_t *S, unsigned int *thr,
+    small_factor_base_ptr FB, unsigned I, unsigned J,
+    ij_t j0, ijpos_t pos0, ijpos_t size, sublat_ptr sublat)
 {
+    *thr = 0;
     for (unsigned int ii = 0; ii < FB->n; ++ii) {
         small_fbideal_ptr gothp = FB->elts[ii];
         int L = gothp->degq;
@@ -88,8 +90,25 @@ void sieveFB(uint8_t *S, small_factor_base_ptr FB, unsigned I, unsigned J,
         // contribution and it is better to handle them globally using
         // thresholds.
         // TODO: take this into account in sieve.c
-        if (use_sublat(sublat) && L == 1)
+        if (use_sublat(sublat) && L == 1) {
+          if (!gothp->proj) {
+            fppol16_t qq, rr;
+            fppol16_set_fbprime(qq, gothp->q);
+            fppol16_set_fbprime(rr, gothp->lambda);
+            fppol16_mul(rr, rr, sublat->lat[sublat->n][1]);
+            fppol16_add(rr, rr, sublat->lat[sublat->n][0]);
+            fppol16_rem(rr, rr, qq);
+            if (fppol16_is_zero(rr))
+              *thr += gothp->degp;
+          } else {
+            fppol16_t qq;
+            fppol16_set_fbprime(qq, gothp->q);
+            fppol16_rem(qq, sublat->lat[sublat->n][1], qq);
+            if (fppol16_is_zero(qq))
+              *thr += gothp->degp;
+          }
           continue;
+        }
 
         // projective roots are handled differently
         if (gothp->proj) {

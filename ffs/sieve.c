@@ -761,8 +761,10 @@ int main(int argc, char **argv)
                 t_norms += seconds();
 
                 // Line sieve.
+                unsigned int sublat_thr;
                 t_sieve -= seconds();
-                sieveFB(S, SFB[side], I, J, j0, pos0, size, sublat);
+                sieveSFB(S, &sublat_thr, SFB[side], I, J,
+                        j0, pos0, size, sublat);
                 t_sieve += seconds();
 
                 // Apply the updates from the corresponding bucket.
@@ -772,12 +774,13 @@ int main(int argc, char **argv)
 
                 // since (0,0) is divisible by everyone, its position might
                 // have been clobbered.
+                // FIXME: is this correct??? (probably not with sublat)
                 if (!k) S[0] = 255;
 
                 // mark survivors
                 // no need to check if this is a valid position
                 for (unsigned i = 0; i < size; ++i) {
-                  if (S[i] > threshold[side])
+                  if (S[i] > threshold[side] + sublat_thr)
                     S[i] = 255; 
                   else 
                     S[i] = 0;
