@@ -316,16 +316,22 @@ ropt_on_msievepoly ( FILE *file,
     Lemma21 (poly->f, poly->n, poly->d, l, m);
     mpz_set (poly->g[1], l);
     mpz_neg (poly->g[0], m);
-    optimize (poly->f, poly->d, poly->g, 0, 1);
-
     fprintf (stderr, "\n# Polynomial (# %5d).\n", count);
 
+    print_poly_fg (poly->f, poly->g, poly->d, poly->n, 1);
+    optimize (poly->f, poly->d, poly->g, 0, 1);
+
 #if SKIP_ROPT
-    /* may be used for polyselect2l results (skipped polynomials) */
-    print_poly_info_short (poly->f, poly->g, poly->d, poly->n);
+    /* print optimized poly in CADO format */
+    fprintf (stderr, "\n# Size-optimize only (# %5d).\n", count);
+    print_poly_fg (poly->f, poly->g, poly->d, poly->n, 1);
+
+    /* print optimized poly in Msieve format */
+    //print_poly_info_short (poly->f, poly->g, poly->d, poly->n);
 #else
     ropt_common (poly, param);
 #endif
+
     count ++;
   }
 
