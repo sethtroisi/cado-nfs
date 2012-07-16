@@ -173,6 +173,9 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
     timing_init(timing, bw->start, bw->interval * iceildiv(bw->end, bw->interval));
 
+    pi_interleaving_flip(pi);
+    pi_interleaving_flip(pi);
+
     for(int s = bw->start ; s < bw->end ; s += bw->interval ) {
         // Plan ahead. The check vector is here to predict the final A matrix.
         // Note that our share of the dot product is determined by the
@@ -202,6 +205,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
          * impose strong constraints on twist/untwist_vector being free of
          * MPI calls.
          */
+        pi_interleaving_flip(pi);
         pi_interleaving_flip(pi);
         matmul_top_twist_vector(mmt, bw->dir);
 
