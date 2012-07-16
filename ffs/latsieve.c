@@ -15,6 +15,9 @@
  *
  * For that, make us of the given basis of multiples of p, as precomputed
  * in the normalized_echelon_multiples() function.
+ *
+ * NB: in the case of sublat, the given j is not really a multiple of p.
+ * The computation is still valid.
  */
 static MAYBE_UNUSED
 int next_projective_j(ij_t rj, ij_t j, ij_t *basis, int degp, int J)
@@ -72,7 +75,6 @@ void sieve_hit(uint8_t *S, uint8_t degp, ijpos_t pos,
 }
 
 
-// TODO: This code is under-efficient. Fix this!
 void sieveSFB(uint8_t *S, unsigned int *thr,
     small_factor_base_ptr FB, unsigned I, unsigned J,
     ij_t j0, ijpos_t pos0, ijpos_t size, sublat_ptr sublat)
@@ -89,7 +91,8 @@ void sieveSFB(uint8_t *S, unsigned int *thr,
         // In case of sublat, the primes of degree 1 gives a uniform
         // contribution and it is better to handle them globally using
         // thresholds.
-        // TODO: take this into account in sieve.c
+        // TODO: we recompute this for each bucket region, whereas it
+        // could be computed once and for all.
         if (use_sublat(sublat) && L == 1) {
           if (!gothp->proj) {
             fppol16_t qq, rr;
@@ -112,16 +115,19 @@ void sieveSFB(uint8_t *S, unsigned int *thr,
 
         // projective roots are handled differently
         if (gothp->proj) {
-          // TODO: repair sublat with projective roots.
-          if (use_sublat(sublat))
-            continue;
-
           // First time round?
           if (UNLIKELY(!pos0)) {
-            // Find the first line to fill
+            // Find the first line to fill. If no sublat, this is zero.
+            // Otherwise, there is a bit of computation.
             ij_set_zero(gothp->current);
             if (use_sublat(sublat)) {
-              ASSERT_ALWAYS(0);  // XXX Sublat is broken
+              ij_t tmp0, tmp1, ijmod;
+              ij_set_16(ijmod, sublat->modulus);
+              ij_set_16(tmp0, sublat->lat[sublat->n][1]);
+              ij_mulmod(tmp0, gothp->tildep, tmp0, ijmod);
+              ij_set_fbprime(tmp1, gothp->q);
+              ij_mul(tmp1, tmp1, tmp0);
+              ij_div(gothp->current, tmp1, ijmod);
             }
           }
           ij_t j;
@@ -133,8 +139,8 @@ void sieveSFB(uint8_t *S, unsigned int *thr,
               break;
 
             // Sieve the whole line
-            // TODO: this should be a big memsub().
 #ifndef USE_F2
+            // TODO: this should be a big memsub().
             ij_t i;
             int rci = 1;
             for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
@@ -142,6 +148,7 @@ void sieveSFB(uint8_t *S, unsigned int *thr,
               sieve_hit(S, degp, pos, gothp->q, gothp->r, pos0);
             }
 #else
+            // For GF(2), this becomes so simple (and Gcc does it well).
             for(int i=0; i < 1<<I; ++i)
               S[start+i] -= degp;
 #endif
