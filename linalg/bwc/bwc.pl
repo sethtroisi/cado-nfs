@@ -382,12 +382,25 @@ if (!defined($param->{'splits'})) {
         push @splits, $x;
     }
     if ($param->{'interleaving'}) {
-        die "Interleaving is on the bad track here" unless ((scalar
-                @splits)&1)==0 && $splits[1] == 64;
         @splits=(0,int($n/2),$n);
     }
     push @main_args, "splits=" . join(",", @splits);
 }
+
+if ($param->{'interleaving'}) {
+    my @t = @splits;
+    my $b = shift @t;
+    while (scalar @t) {
+        my $b0 = shift @t;
+        my $b1 = shift @t;
+        die "Interleaving can't work with splits ",
+            join(",",@splits),
+            "(intervals $b..$b0 and $b0..$b1 have different widths)"
+            unless $b0-$b == $b1-$b0;
+        $b = $b1;
+    }
+}
+
 if (!defined($param->{'ys'})) {
     push @main_args, "ys=0..$n";
 }
@@ -721,7 +734,7 @@ sub drive {
                 &drive("./split", @_, "--split-y");
                 # despicable ugly hack.
                 my @ka=@_;
-                if ($n == 128) {
+                if ($n == 128 && !$interleaving) {
                     @ka = grep !/^ys=/, @_;
                     &drive("krylov", @ka, "ys=0..64");
                     &drive("krylov", @ka, "ys=64..128");
@@ -741,7 +754,7 @@ sub drive {
             &drive("./split", @_, "--split-f");
             # same ugly hack already seen above.
             my @ka=@_;
-            if ($n == 128) {
+            if ($n == 128 && !$interleaving) {
                 @ka = grep !/^ys=/, @_;
                 &drive("mksol", @ka, "ys=0..64");
                 &drive("mksol", @ka, "ys=64..128");
