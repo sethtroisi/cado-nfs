@@ -87,13 +87,6 @@ void ij_convert_sublat(ij_t hati, ij_t hatj, ij_t i, ij_t j,
     }
 }
 
-// the same for ijvec_t's.
-static inline
-void ijvec_convert_sublat(ijvec_t W, ijvec_t V, sublat_ptr sublat)
-{
-    ij_convert_sublat(W->i, W->j, V->i, V->j, sublat);
-}
-
 #ifdef USE_F2
 // Functions to compute x mod (t^2+t).
 static inline

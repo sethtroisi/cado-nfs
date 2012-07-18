@@ -5,45 +5,37 @@
 /* Basis of the p-lattice seen as a GF(p)-vector space of (i,j)-vectors.
  *****************************************************************************/
 
-
-// Allocate memory for an (i,j)-basis of degrees bounded by I and J.
-void ijbasis_init(ijbasis_ptr basis, unsigned I, unsigned J)
-{
-  basis->I = I;
-  basis->J = J;
-  basis->v = (ijvec_t *)malloc((I+J) * sizeof(ijvec_t));
-  ASSERT_ALWAYS(basis->v != NULL);
-}
-
-
 // Fill the basis with the vectors (i*t^k, j*t^k) as long as their degrees
 // stay below the given bounds I and J, respectively.
 static inline
-unsigned fill_gap(ijvec_t *v, fbprime_t i, fbprime_t j, unsigned I, unsigned J)
+unsigned fill_gap(ijvec_t *v, fbprime_t i, fbprime_t j,
+                  int max_degi, int max_degj, unsigned I)
 {
-  int degi = fbprime_deg(i), degj = fbprime_deg(j);
-  int di   = (signed)I-degi, dj   = (signed)J-degj;
+  int degi = fbprime_deg(i),  degj = fbprime_deg(j);
+  int di   = max_degi - degi, dj   = max_degj - degj;
   int n    = degi < 0 ? dj : MIN(di, dj);
   if (n <= 0) return 0;
-  ij_set_fbprime(v[0]->i, i);
-  ij_set_fbprime(v[0]->j, j);
-  for (int k = 1; k < n; ++k) {
-    ij_mul_ti(v[k]->i, v[k-1]->i, 1);
-    ij_mul_ti(v[k]->j, v[k-1]->j, 1);
-  }
+  ij_t ii, jj;
+  ij_set_fbprime(ii, i);
+  ij_set_fbprime(jj, j);
+  ijvec_set_i_j(v[0], ii, jj, I);
+  for (int k = 1; k < n; ++k)
+    ijvec_mul_ti(v[k], v[k-1], 1);
   return n;
 }
 
 static inline
 unsigned fill_euclid(ijvec_t *v, fbprime_t i, fbprime_t j, 
-        int degI, int degJ)
+                     int max_degi, int max_degj, unsigned I)
 {
-    if ((fbprime_deg(i) < degI) && (fbprime_deg(j) < degJ)) {
-        ij_set_fbprime(v[0]->i, i);
-        ij_set_fbprime(v[0]->j, j);
-        return 1;
-    }
-    return 0;
+  if ((fbprime_deg(i) < max_degi) && (fbprime_deg(j) < max_degj)) {
+    ij_t ii, jj;
+    ij_set_fbprime(ii, i);
+    ij_set_fbprime(jj, j);
+    ijvec_set_i_j(v[0], ii, jj, I);
+    return 1;
+  }
+  return 0;
 }
 
 // Compute the (i,j)-basis of a given p-lattice.
@@ -79,14 +71,15 @@ void ijbasis_compute_small(ij_t *basis, ij_t *adjustment_basis,
 
 
 #ifdef USE_F2
-static void specific_euclid_char2(ijbasis_ptr basis, ijbasis_ptr euclid,
-        fbprime_t alpha0, fbprime_t beta0, fbprime_t alpha1, fbprime_t beta1)
+static
+void specific_euclid_char2(ijvec_t *basis,  unsigned *basis_dim, 
+                           unsigned I,      unsigned  J,
+                           ijvec_t *euclid, unsigned *euclid_dim,
+                           unsigned hatI,   unsigned  hatJ,
+                           fbprime_srcptr alpha0, fbprime_srcptr beta0,
+                           fbprime_srcptr alpha1, fbprime_srcptr beta1)
 {
     ASSERT(__fbprime_SIZE <= 32);
-    unsigned I = basis->I;
-    unsigned J = basis->J;
-    unsigned hatI = euclid->I;
-    unsigned hatJ = euclid->J;
     fppol64_t v0, v1;
     v0[0] = alpha0[0] | ((uint64_t)beta0[0] << 32);
     v1[0] = alpha1[0] | ((uint64_t)beta1[0] << 32);
@@ -116,36 +109,36 @@ static void specific_euclid_char2(ijbasis_ptr basis, ijbasis_ptr euclid,
         fbprime_ptr al1, be1;
         al1 = (fbprime_ptr)&v1[0];
         be1 = (fbprime_ptr)(((fppol32_ptr)&v1[0])+1);
-        basis->dim += fill_gap(basis->v+basis->dim, al1, be1,
-                MIN((unsigned)da0, I), J);
-        euclid->dim += fill_euclid(euclid->v + euclid->dim,
-                al1, be1, hatI, hatJ);
+        *basis_dim  += fill_gap   (basis +*basis_dim,  al1, be1,
+                                   MIN(da0, (signed)I), J, I);
+        *euclid_dim += fill_euclid(euclid+*euclid_dim, al1, be1,
+                                   hatI, hatJ, I);
     }
 }
 #endif
 
 // Compute the (i,j)-basis of a given p-lattice.
 // Large case.
-void ijbasis_compute_large(MAYBE_UNUSED ijbasis_ptr euclid, ijbasis_ptr basis,
-        large_fbideal_srcptr gothp, fbprime_srcptr lambda)
+void ijbasis_compute_large(ijvec_t *basis,  unsigned *basis_dim,
+                           unsigned I,      unsigned  J,
+                           ijvec_t *euclid, unsigned *euclid_dim,
+                           unsigned hatI,   unsigned  hatJ,
+                           large_fbideal_srcptr gothp, fbprime_srcptr lambda)
 {
-  unsigned I = basis->I;
-  unsigned J = basis->J;
-
   // Basis is obtained from an Euclidian algorithm on
   // (p, 0) and (lambda, 1). See tex file.
-  unsigned hatI = euclid->I;
-  unsigned hatJ = euclid->J;
   fbprime_t alpha0, beta0, alpha1, beta1;
   fbprime_set(alpha0, gothp->p);
   fbprime_set_zero(beta0);
   fbprime_set(alpha1, lambda);
   fbprime_set_one (beta1);
-  basis->dim = fill_gap(basis->v, alpha1, beta1, I, J);
-  euclid->dim = fill_euclid(euclid->v, alpha1, beta1, hatI, hatJ);
+  *basis_dim  = fill_gap   (basis,  alpha1, beta1, I,    J,    I);
+  *euclid_dim = fill_euclid(euclid, alpha1, beta1, hatI, hatJ, I);
 
 #if 1 && defined(USE_F2)
-  specific_euclid_char2(basis, euclid, alpha0, beta0, alpha1, beta1);
+  specific_euclid_char2(basis,  basis_dim,  I,    J,
+                        euclid, euclid_dim, hatI, hatJ,
+                        alpha0, beta0, alpha1, beta1);
 #else
   fbprime_t q;
   fp_t lc;
@@ -158,16 +151,10 @@ void ijbasis_compute_large(MAYBE_UNUSED ijbasis_ptr euclid, ijbasis_ptr basis,
     fbprime_get_coeff(lc, beta1, fbprime_deg(beta1));
     fbprime_sdiv(alpha1, alpha1, lc);
     fbprime_sdiv(beta1,  beta1,  lc);
-    basis->dim += fill_gap(basis->v+basis->dim, alpha1, beta1,
-        MIN((unsigned)fbprime_deg(alpha0), I), J);
-    euclid->dim += fill_euclid(euclid->v + euclid->dim, alpha1, beta1, hatI, hatJ);
+    *basis_dim  += fill_gap   (basis +*basis_dim,  alpha1, beta1,
+                               MIN(fbprime_deg(alpha0), (signed)I), J, I);
+    *euclid_dim += fill_euclid(euclid+*euclid_dim, alpha1, beta1,
+                               hatI, hatJ, I);
   }
 #endif
-}
-
-
-// Clean up memory.
-void ijbasis_clear(ijbasis_ptr basis)
-{
-  free(basis->v);
 }

@@ -208,13 +208,18 @@ void print_bucket_info(buckets_srcptr buckets)
 // by gothp for the current sublattice.
 // If there is no starting point return 0.
 // This code is specific to GF(2).
-static int compute_starting_point(ijvec_ptr V0,
-    MAYBE_UNUSED ijbasis_ptr euclid, sublat_srcptr sublat)
+static
+int compute_starting_point(ijvec_ptr V0,
+                           MAYBE_UNUSED ijvec_t *euclid,
+                           MAYBE_UNUSED unsigned euclid_dim,
+                           MAYBE_UNUSED unsigned hatI,
+                           MAYBE_UNUSED unsigned hatJ, sublat_srcptr sublat)
 {
   if (!use_sublat(sublat)) {
     ijvec_set_zero(V0);
     return 1;
   }
+#if 0
 #ifdef USE_F2  
   int hatI = euclid->I;
   int hatJ = euclid->J;
@@ -289,6 +294,7 @@ static int compute_starting_point(ijvec_ptr V0,
   }
   return 0;
 #endif
+#endif
 
   // should never go there.
   ASSERT_ALWAYS(0);
@@ -301,7 +307,7 @@ void buckets_push_update(MAYBE_UNUSED buckets_ptr buckets,
                          ijvec_srcptr v, unsigned I, unsigned J)
 {
   ijpos_t  pos = ijvec_get_pos(v, I, J);
-  unsigned k   = pos >> UPDATE_POS_BITS;
+  size_t   k   = pos >> UPDATE_POS_BITS;
   pos_t    p   = pos & (((pos_t)1<<UPDATE_POS_BITS)-1);
   ASSERT(ptr[k] - buckets->start[k] < buckets->max_size);
 #ifdef BUCKET_RESIEVE
@@ -326,18 +332,15 @@ void buckets_push_update(MAYBE_UNUSED buckets_ptr buckets,
 void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
         sublat_srcptr sublat, unsigned I, unsigned J, qlat_srcptr qlat)
 {
-  ijbasis_t basis;
-  ijbasis_t euclid;
-  unsigned  hatI, hatJ;
-  hatI = I + sublat->deg;
-  hatJ = J + sublat->deg;
+  unsigned hatI = I + sublat->deg, hatJ = J + sublat->deg;
+  ijvec_t *basis  = (ijvec_t *)malloc((I+J)       * sizeof(ijvec_t));
+  ijvec_t *euclid = (ijvec_t *)malloc((hatI+hatJ) * sizeof(ijvec_t));
+  ASSERT_ALWAYS(basis  != NULL);
+  ASSERT_ALWAYS(euclid != NULL);
 
   // The bucket sieve requires all considered ideals to be of degree larger
   // than I.
   ASSERT_ALWAYS(buckets->min_degp >= I);
-
-  ijbasis_init(basis,     I,    J);
-  ijbasis_init(euclid, hatI, hatJ);
 
   // Pointers to the current writing position in each bucket.
   update_packed_t **ptr =
@@ -382,10 +385,14 @@ void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
       hint = i;
 #endif
 
-      ijbasis_compute_large(euclid, basis, gothp, lambda);
+      unsigned dim, euclid_dim;
+      ijbasis_compute_large(basis,  &dim,        I,    J,
+                            euclid, &euclid_dim, hatI, hatJ,
+                            gothp, lambda);
       ijvec_t v;
       if (use_sublat(sublat)) {
-        int st = compute_starting_point(v, euclid, sublat);
+        int st = compute_starting_point(v, euclid, euclid_dim,
+                                        hatI, hatJ, sublat);
         if (!st)
           continue; // next factor base prime.
         // The first position is to be sieved when we use sublat, but
@@ -408,17 +415,17 @@ void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
 
       // We only need the "monic" Gray code for the first iteration. Jump
       // directly there in the array.
-      unsigned gray_dim = MIN(basis->dim, ENUM_LATTICE_UNROLL);
+      unsigned gray_dim = MIN(dim, ENUM_LATTICE_UNROLL);
       unsigned i0       = ngray - GRAY_LENGTH(gray_dim) / (__FP_SIZE-1);
 
       ij_t s, t;
       ij_set_zero(t);
-      int rc = basis->dim > ENUM_LATTICE_UNROLL;
+      int rc = dim > ENUM_LATTICE_UNROLL;
       do {
         // Inner-level Gray code enumeration: just go through the Gray code
         // array, each time adding the indicated basis vector.
         for (unsigned ii = i0; ii < ngray; ++ii) {
-          ijvec_add(v, v, basis->v[gray[ii]]);
+          ijvec_add(v, v, basis[gray[ii]]);
           buckets_push_update(buckets, ptr, hint, v, I, J);
         }
         i0 = 0;
@@ -428,10 +435,10 @@ void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
         // vector should be added to the current lattice point.
         // rc is set to 0 when all vectors have been enumerated.
         ij_set(s, t);
-        rc = rc && ij_monic_set_next(t, t, basis->dim-ENUM_LATTICE_UNROLL);
+        rc = rc && ij_monic_set_next(t, t, dim-ENUM_LATTICE_UNROLL);
         if (rc) {
           ij_diff(s, s, t);
-          ijvec_add(v, v, basis->v[ij_deg(s)+ENUM_LATTICE_UNROLL]);
+          ijvec_add(v, v, basis[ij_deg(s)+ENUM_LATTICE_UNROLL]);
           buckets_push_update(buckets, ptr, hint, v, I, J);
         }
       } while (rc);
@@ -446,8 +453,8 @@ void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
   //  printf("# #updates[%u] = %u\n", k, ptr[k]-buckets->start[k]);
 
   free(ptr);
-  ijbasis_clear(euclid);
-  ijbasis_clear(basis);
+  free(basis);
+  free(euclid);
 }
 
 // Apply all the updates from a given bucket to the sieve region S.

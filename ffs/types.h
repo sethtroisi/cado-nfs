@@ -29,6 +29,7 @@
 # define      __ai_SIZE 32
 # define __fbprime_SIZE 32
 # define      __ij_SIZE 32
+# define   __ijvec_SIZE 64
 
 // Over GF(3).
 #elif defined(USE_F3)
@@ -36,6 +37,7 @@
 # define      __ai_SIZE 32
 # define __fbprime_SIZE 32
 # define      __ij_SIZE 32
+# define   __ijvec_SIZE 64
 #endif
 
 
@@ -52,6 +54,7 @@ __ALIAS_TYPE(sq)
 __ALIAS_TYPE(ai)
 __ALIAS_TYPE(fbprime)
 __ALIAS_TYPE(ij)
+__ALIAS_TYPE(ijvec)
 
 #undef __ALIAS_TYPE
 
@@ -156,6 +159,7 @@ __ALIAS_TYPE(ij)
   __ALIAS_FUN1(int,      type, set, ai,        _ptr, _tp)                     \
   __ALIAS_FUN1(int,      type, set, fbprime,   _ptr, _tp)                     \
   __ALIAS_FUN1(int,      type, set, ij,        _ptr, _tp)                     \
+  __ALIAS_FUN1(int,      type, set, ijvec,     _ptr, _tp)                     \
   __ALIAS_FUN1(int,      type, set,  8,        _ptr, _tp)                     \
   __ALIAS_FUN1(int,      type, set, 16,        _ptr, _tp)                     \
   __ALIAS_FUN1(int,      type, set, 32,        _ptr, _tp)                     \
@@ -206,12 +210,14 @@ __ALIAS_TYPE(ij)
   __ALIAS_MUL2(         fppol, type, sq)                                      \
   __ALIAS_MUL2(         fppol, type, ai)                                      \
   __ALIAS_MUL2(         fppol, type, fbprime)                                 \
-  __ALIAS_MUL2(         fppol, type, ij)
+  __ALIAS_MUL2(         fppol, type, ij)                                      \
+  __ALIAS_MUL2(         fppol, type, ijvec)
 
 __ALIAS_FUN_ALL(sq)
 __ALIAS_FUN_ALL(ai)
 __ALIAS_FUN_ALL(fbprime)
 __ALIAS_FUN_ALL(ij)
+__ALIAS_FUN_ALL(ijvec)
 
 #undef  __8_IS_NUM
 #undef __16_IS_NUM
@@ -260,37 +266,6 @@ typedef qlat_struct_t qlat_t[1];
 typedef qlat_struct_t* qlat_ptr;
 typedef const qlat_struct_t* qlat_srcptr;
 
-
-/* Vector in the reduced q-lattice as a pair of polynomials (i,j).
- * Note that, by convention, j should be kept monic.
- *****************************************************************************/
-
-// Structure definition.
-typedef struct {
-  ij_t i;
-  ij_t j;
-} __ijvec_struct;
-
-// Type and pointer shorthands.
-typedef       __ijvec_struct  ijvec_t[1];
-typedef       __ijvec_struct *ijvec_ptr;
-typedef const __ijvec_struct *ijvec_srcptr;
-
-
-/* Basis of the p-lattice seen as a GF(p)-vector space of (i,j)-vectors.
- *****************************************************************************/
-
-// Structure definition.
-typedef struct {
-  unsigned I, J;  // TODO: do I and J really belongs to this structure ?
-  unsigned dim;
-  ijvec_t *v;
-} __ijbasis_struct;
-
-// Type and pointer shorthands.
-typedef       __ijbasis_struct  ijbasis_t[1];
-typedef       __ijbasis_struct *ijbasis_ptr;
-typedef const __ijbasis_struct *ijbasis_srcptr;
 
 
 /* Factor bases
