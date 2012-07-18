@@ -61,6 +61,7 @@ __ALIAS_TYPE(ij)
  *****************************************************************************/
 
 // Size of know polynomial types.
+#define  __fppol8_SIZE 8
 #define __fppol16_SIZE 16
 #define __fppol32_SIZE 32
 #define __fppol64_SIZE 64
@@ -160,6 +161,7 @@ __ALIAS_TYPE(ij)
   __ALIAS_FUN1(int,      type, set, 32,        _ptr, _tp)                     \
   __ALIAS_FUN1(int,      type, set, 64,        _ptr, _tp)                     \
   __ALIAS_FUN1(int,      type, set, mp,        _ptr, _tp)                     \
+  __ALIAS_FUN1(int,    fppol8, set, type,      _ptr, _tp)                     \
   __ALIAS_FUN1(int,   fppol16, set, type,      _ptr, _tp)                     \
   __ALIAS_FUN1(int,   fppol32, set, type,      _ptr, _tp)                     \
   __ALIAS_FUN1(int,   fppol64, set, type,      _ptr, _tp)                     \
