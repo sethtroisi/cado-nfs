@@ -18,7 +18,8 @@ int factor_base_init(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
         const char *filename, unsigned sorted_min_degp,
         unsigned max_degp, unsigned I, unsigned J, sublat_ptr sublat);
 
-void small_factor_base_precomp(small_factor_base_ptr FB, qlat_srcptr qlat);
+void small_factor_base_precomp(small_factor_base_ptr FB,
+                               unsigned I, unsigned J, qlat_srcptr qlat);
 
 // Return the largest degree of the ideals in the factor base.
 // /!\ Assume that the factor base is sorted, at least for the ideals higher

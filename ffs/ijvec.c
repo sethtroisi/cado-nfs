@@ -48,43 +48,33 @@ unsigned fill_euclid(ijvec_t *v, fbprime_t i, fbprime_t j,
 
 // Compute the (i,j)-basis of a given p-lattice.
 // Small case.
-void ijbasis_compute_small(ijbasis_ptr basis, ijbasis_ptr adjustment_basis,
-        small_fbideal_srcptr gothp, fbprime_srcptr lambda)
+void ijbasis_compute_small(ij_t *basis, ij_t *adjustment_basis,
+        small_fbideal_srcptr gothp, fbprime_srcptr lambda,
+        unsigned I, unsigned J)
 {
-  unsigned I = basis->I;
-  unsigned J = basis->J;
   unsigned L = gothp->degq;
 
   // First the canonical basis:
   // Basis is { (     q*t^k,       0  ) : k in [0..I-L-1] } join
   //          { (lambda*t^k mod q, t^k) : k in [0..J-1]   }.
-  basis->dim = I+J-L;
+  // The J vectors are not stored, however.
   unsigned k = 0;
-  ij_set_fbprime(basis->v[k]->i, gothp->q);
-  ij_set_zero(basis->v[k]->j);
-  while (++k < I-L) {
-    ij_mul_ti(basis->v[k]->i, basis->v[k-1]->i, 1);
-    ij_set_zero(basis->v[k]->j);
-  }
-  ij_set_fbprime(basis->v[k]->i, lambda);
-  ij_set_one(basis->v[k]->j);
-  while (++k < I+J-L) {
-    ij_multmod(basis->v[k]->i, basis->v[k-1]->i, basis->v[0]->i);
-    ij_set_ti (basis->v[k]->j, k - (I-L));
-  }
+  ij_set_fbprime(basis[k], gothp->q);
+  while (++k < I-L)
+    ij_mul_ti(basis[k], basis[k-1], 1);
+  ij_set_fbprime(basis[k], lambda);
+  while (++k < I+J-L)
+    ij_multmod(basis[k], basis[k-1], basis[0]);
 
   // Transform the second part into triangular instead of diagonal (on
   // the j part) and construct the adjustment part.
   fp_t one, two;
   fp_set_one(one);
   fp_add(two, one, one);
-  for (unsigned i = 0; i < J; ++i) {
-    ij_smul(adjustment_basis->v[i]->i, basis->v[I-L+i]->i, two);
-    ij_smul(adjustment_basis->v[i]->j, basis->v[I-L+i]->j, two);
-  }
-  for (unsigned i = I-L+1; i < basis->dim; ++i)
-    ijvec_add(basis->v[i], basis->v[i], basis->v[i-1]);
-  adjustment_basis->dim = J;
+  for (unsigned k = 0; k < J; ++k)
+    ij_smul(adjustment_basis[k], basis[I-L+k], two);
+  for (unsigned k = I-L+1; k < I+J-L; ++k)
+    ij_add(basis[k], basis[k], basis[k-1]);
 }
 
 

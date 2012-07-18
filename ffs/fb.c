@@ -103,12 +103,13 @@ void push_small_ideal(small_factor_base_ptr FB, fbprime_t p, fbprime_t r,
       ij_set_zero(FB->elts[FB->n]->tildep);
   }
 
-  FB->elts[FB->n]->projective_basis = (ij_t *)malloc(J*sizeof(ij_t));
+  FB->elts[FB->n]->basis            = (ij_t *)malloc((I+J)*sizeof(ij_t));
+  FB->elts[FB->n]->adjustment_basis = (ij_t *)malloc(   J *sizeof(ij_t));
+  FB->elts[FB->n]->projective_basis = (ij_t *)malloc(   J *sizeof(ij_t));
+  ASSERT_ALWAYS(FB->elts[FB->n]->basis            != NULL);
+  ASSERT_ALWAYS(FB->elts[FB->n]->adjustment_basis != NULL);
   ASSERT_ALWAYS(FB->elts[FB->n]->projective_basis != NULL);
-      
-  ijbasis_init(FB->elts[FB->n]->basis, I, J);
-  ijbasis_init(FB->elts[FB->n]->adjustment_basis, I, J);
-  
+
   normalized_echelon_multiples(FB->elts[FB->n]->projective_basis, p,
       fbprime_deg(p), J);
 
@@ -318,19 +319,18 @@ int factor_base_init(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
 }
 
 
-void small_factor_base_precomp(small_factor_base_ptr FB, qlat_srcptr qlat)
+void small_factor_base_precomp(small_factor_base_ptr FB,
+                               unsigned I, unsigned J, qlat_srcptr qlat)
 {
   for (unsigned i = 0; i < FB->n; ++i) {
     small_fbideal_ptr gothp = FB->elts[i];
     compute_lambda(gothp->lambda, gothp->q, gothp->r, qlat);
     if (fbprime_eq(gothp->lambda, gothp->q)) {
       gothp->proj = 1;
-      gothp->basis->dim = 0;
-      gothp->adjustment_basis->dim = 0;
     } else {
       gothp->proj = 0;
       ijbasis_compute_small(gothp->basis, gothp->adjustment_basis,
-          gothp, gothp->lambda);
+          gothp, gothp->lambda, I, J);
     }
   }
 }
@@ -350,9 +350,9 @@ unsigned factor_base_max_degp(large_factor_base_srcptr FB)
 void factor_base_clear(large_factor_base_ptr LFB, small_factor_base_ptr SFB)
 {
   for (unsigned i = 0; i < SFB->n; ++i) {
+    free(SFB->elts[i]->basis);
+    free(SFB->elts[i]->adjustment_basis);
     free(SFB->elts[i]->projective_basis);
-    ijbasis_clear(SFB->elts[i]->basis);
-    ijbasis_clear(SFB->elts[i]->adjustment_basis);
   }
   free(LFB->elts);
   free(SFB->elts);

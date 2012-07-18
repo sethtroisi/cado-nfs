@@ -223,33 +223,33 @@ void sieveSFB(uint8_t *S, unsigned int *thr,
             // Inner-level Gray code enumeration: just go through the Gray code
             // array, each time adding the indicated basis vector.
 #if defined(USE_F2) 
-            if (k0 == 0 && sizeof(ij_t)==4) {
-#define DOGRAY(n) \
-    "\txorq     "#n "(%[V]), %[i]\n\tsubb     %[degp], (%[S],%[i])\n"
-#define DOALLGRAY2  DOGRAY(0) DOGRAY(8) DOGRAY(0)
-#define DOALLGRAY3  DOALLGRAY2 DOGRAY(16) DOALLGRAY2
-#define DOALLGRAY4  DOALLGRAY3 DOGRAY(24) DOALLGRAY3
-#define DOALLGRAY5  DOALLGRAY4 DOGRAY(32) DOALLGRAY4
-#define DOALLGRAY6  DOALLGRAY5 DOGRAY(40) DOALLGRAY5
-#define DOALLGRAY7  DOALLGRAY6 DOGRAY(48) DOALLGRAY6
-#define DOALLGRAY8  DOALLGRAY7 DOGRAY(56) DOALLGRAY7
-#define DOALLGRAY   CAT(DOALLGRAY, ENUM_LATTICE_UNROLL)
-                uint64_t ii = i[0];
-                uint8_t dd = degp;
-                __asm volatile(
-                    DOALLGRAY
-                        : [i] "+r" (ii)
-                        : [S] "r" (S+start),
-                          [V] "r" (gothp->basis->v),
-                          [degp] "r" (dd)
-                        : "memory");
-                ASSERT((ii >> 32) == 0);
-                i[0] = ii;
+            if (k0 == 0 && sizeof(ij_t) == 4) {
+#             define DOGRAY(n)                      \
+                "xorl     " #n "(%[B]), %k[i]\n\t"  \
+                "subb     %[degp], (%[S],%[i])\n\t"
+#             define DOALLGRAY2 DOGRAY(0)  DOGRAY(4)  DOGRAY(0)
+#             define DOALLGRAY3 DOALLGRAY2 DOGRAY(8)  DOALLGRAY2
+#             define DOALLGRAY4 DOALLGRAY3 DOGRAY(12) DOALLGRAY3
+#             define DOALLGRAY5 DOALLGRAY4 DOGRAY(16) DOALLGRAY4
+#             define DOALLGRAY6 DOALLGRAY5 DOGRAY(20) DOALLGRAY5
+#             define DOALLGRAY7 DOALLGRAY6 DOGRAY(24) DOALLGRAY6
+#             define DOALLGRAY8 DOALLGRAY7 DOGRAY(28) DOALLGRAY7
+#             define DOALLGRAY  CAT(DOALLGRAY, ENUM_LATTICE_UNROLL)
+              uint64_t ii = i[0];
+              uint8_t  dd = degp;
+              __asm volatile( DOALLGRAY
+                            : [i]   "+r" (ii)
+                            : [S]    "r" (S+start),
+                              [B]    "r" (gothp->basis),
+                              [degp] "r" (dd)
+                            : "memory");
+              ASSERT((ii >> 32) == 0);
+              i[0] = ii;
             } else 
 #endif
             {
                 for (unsigned k = k0; k < ngray; ++k) {
-                    ij_add(i, i, gothp->basis->v[gray[k]]->i);
+                    ij_add(i, i, gothp->basis[gray[k]]);
                     pos = start + ijvec_get_offset(i, I);
                     sieve_hit(S, degp, pos, gothp->q, gothp->r, pos0);
                 }
@@ -265,7 +265,7 @@ void sieveSFB(uint8_t *S, unsigned int *thr,
             rc = rc && ij_set_next(t, t, I-L-ENUM_LATTICE_UNROLL);
             if (rc) {
               ij_diff(s, s, t);
-              ij_add(i, i, gothp->basis->v[ij_deg(s)+ENUM_LATTICE_UNROLL]->i);
+              ij_add(i, i, gothp->basis[ij_deg(s)+ENUM_LATTICE_UNROLL]);
               pos = start + ijvec_get_offset(i, I);
               sieve_hit(S, degp, pos, gothp->q, gothp->r, pos0);
             }
@@ -277,10 +277,10 @@ void sieveSFB(uint8_t *S, unsigned int *thr,
             ij_diff(jj, jj, j);
             degjj = ij_deg(jj);
             ij_add(gothp->current, gothp->current,
-                    gothp->basis->v[I-L+degjj]->i);
+                   gothp->basis[I-L+degjj]);
             if (degjj > degj) {
               ij_sub(gothp->current, gothp->current,
-                      gothp->adjustment_basis->v[degjj-1]->i);
+                     gothp->adjustment_basis[degjj-1]);
               degj = degjj;
             }
           }

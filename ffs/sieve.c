@@ -692,7 +692,7 @@ int main(int argc, char **argv)
 
         // Precompute all the data for small factor base elements.
         for (int i = 0; i < 2; ++i)
-            small_factor_base_precomp(SFB[i], qlat);
+            small_factor_base_precomp(SFB[i], I, J, qlat);
 
         // Loop on all sublattices
         // In the no_sublat case, this loops degenerates into one pass, since

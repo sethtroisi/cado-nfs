@@ -107,8 +107,9 @@ void ijbasis_init(ijbasis_ptr basis, unsigned I, unsigned J);
 void ijbasis_compute_large(ijbasis_ptr euclid, ijbasis_ptr basis,
         large_fbideal_srcptr gothp, fbprime_srcptr lambda);
 
-void ijbasis_compute_small(ijbasis_ptr basis, ijbasis_ptr adjustment_basis,
-        small_fbideal_srcptr gothp, fbprime_srcptr lambda);
+void ijbasis_compute_small(ij_t *basis, ij_t *adjustment_basis,
+        small_fbideal_srcptr gothp, fbprime_srcptr lambda,
+        unsigned I, unsigned J);
 
 
 // Clean up memory.
