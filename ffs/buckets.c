@@ -352,7 +352,7 @@ void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
 
   // Go through the factor base by successive deg(gothp).
   // We should have no small prime in this factor base.
-  large_fbideal_srcptr gothp = FB->elts[0];
+  large_fbideal_ptr gothp = FB->elts[0];
   ASSERT_ALWAYS(fbideal_deg(gothp) >= buckets->min_degp);
   unsigned i = 0;
   for (unsigned degp = buckets->min_degp; degp < buckets->max_degp; ++degp) {
@@ -361,7 +361,16 @@ void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
     // Go through each prime ideal of degree degp.
     for (; i < FB->n && fbideal_deg(gothp) == degp; ++i, ++gothp) {
       fbprime_t lambda;
-      compute_lambda(lambda, gothp->p, gothp->r, qlat);
+      if (sublat->n == 0) {
+        compute_lambda(lambda, gothp->p, gothp->r, qlat);
+#ifdef ENABLE_SUBLAT
+        fbprime_set(gothp->lambda, lambda);
+#endif
+      } else {
+#ifdef ENABLE_SUBLAT
+        fbprime_set(lambda, gothp->lambda);
+#endif
+      }
 
       if (fbprime_eq(lambda, gothp->p)) {
           // This is a projective root. For the moment, we skip them.

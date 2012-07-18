@@ -314,6 +314,9 @@ typedef const __ijbasis_struct *ijbasis_srcptr;
 typedef struct {
     fbprime_t p;
     fbprime_t r;
+#ifdef ENABLE_SUBLAT
+    fbprime_t lambda;
+#endif
     uint8_t data;
 } __large_fbideal_struct;
 
