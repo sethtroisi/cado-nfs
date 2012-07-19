@@ -112,7 +112,7 @@ void specific_euclid_char2(ijvec_t *basis,  unsigned *basis_dim,
         *basis_dim  += fill_gap   (basis +*basis_dim,  al1, be1,
                                    MIN(da0, (signed)I), J, I);
         *euclid_dim += fill_euclid(euclid+*euclid_dim, al1, be1,
-                                   hatI, hatJ, I);
+                                   hatI, hatJ, hatI);
     }
 }
 #endif
@@ -133,7 +133,7 @@ void ijbasis_compute_large(ijvec_t *basis,  unsigned *basis_dim,
   fbprime_set(alpha1, lambda);
   fbprime_set_one (beta1);
   *basis_dim  = fill_gap   (basis,  alpha1, beta1, I,    J,    I);
-  *euclid_dim = fill_euclid(euclid, alpha1, beta1, hatI, hatJ, I);
+  *euclid_dim = fill_euclid(euclid, alpha1, beta1, hatI, hatJ, hatI);
 
 #if 1 && defined(USE_F2)
   specific_euclid_char2(basis,  basis_dim,  I,    J,
@@ -154,7 +154,7 @@ void ijbasis_compute_large(ijvec_t *basis,  unsigned *basis_dim,
     *basis_dim  += fill_gap   (basis +*basis_dim,  alpha1, beta1,
                                MIN(fbprime_deg(alpha0), (signed)I), J, I);
     *euclid_dim += fill_euclid(euclid+*euclid_dim, alpha1, beta1,
-                               hatI, hatJ, I);
+                               hatI, hatJ, hatI);
   }
 #endif
 }

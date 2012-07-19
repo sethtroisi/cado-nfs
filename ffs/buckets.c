@@ -210,34 +210,35 @@ void print_bucket_info(buckets_srcptr buckets)
 // This code is specific to GF(2).
 static
 int compute_starting_point(ijvec_ptr V0,
+                           MAYBE_UNUSED unsigned I,
                            MAYBE_UNUSED ijvec_t *euclid,
                            MAYBE_UNUSED unsigned euclid_dim,
                            MAYBE_UNUSED unsigned hatI,
-                           MAYBE_UNUSED unsigned hatJ, sublat_srcptr sublat)
+                           MAYBE_UNUSED unsigned hatJ,
+                           sublat_srcptr sublat)
 {
   if (!use_sublat(sublat)) {
     ijvec_set_zero(V0);
     return 1;
   }
-#if 0
-#ifdef USE_F2  
-  int hatI = euclid->I;
-  int hatJ = euclid->J;
-
+#if defined(ENABLE_SUBLAT) && defined(USE_F2)
   fppol8_t i0, j0;
   fppol8_set_16(i0,sublat->lat[sublat->n][0]);
   fppol8_set_16(j0,sublat->lat[sublat->n][1]);
 
   // case of just one vector in euclid.vec
-  if (euclid->dim == 1) {
+  if (euclid_dim == 1) {
+    ij_t     i, j;
     fppol8_t rem;
-    sublat_mod_ij(rem, euclid->v[0]->i);
+    ijvec_get_i_j(i, j, euclid[0], hatI);
+    sublat_mod_ij(rem, i);
     if (fppol8_eq(rem, i0)) {
-      sublat_mod_ij(rem, euclid->v[0]->j);
+      sublat_mod_ij(rem, j);
       if (fppol8_eq(rem, j0)) {
         // Got a valid point!
-        sublat_div_ij(V0->i, euclid->v[0]->i);
-        sublat_div_ij(V0->j, euclid->v[0]->j);
+        sublat_div_ij(i, i);
+        sublat_div_ij(j, j);
+        ijvec_set_i_j(V0, i, j, I);
         return 1;
       }
     }
@@ -251,12 +252,10 @@ int compute_starting_point(ijvec_ptr V0,
   // since we are working modulo (t^2+t), the determinant of the matrix,
   // which is invertible, is necessarily equal to 1, so its inverse is
   // trivial.
-  for (unsigned ind = 0; ind < MIN(2, euclid->dim-1); ++ind) {
+  for (unsigned ind = 0; ind < MIN(2, euclid_dim-1); ++ind) {
     ij_t a,b,c,d;
-    ij_set(a, euclid->v[ind]->i);
-    ij_set(b, euclid->v[ind]->j);
-    ij_set(c, euclid->v[ind+1]->i);
-    ij_set(d, euclid->v[ind+1]->j);
+    ijvec_get_i_j(a, b, euclid[ind],   hatI);
+    ijvec_get_i_j(c, d, euclid[ind+1], hatI);
 
     fppol8_t aa, bb, cc, dd;
     sublat_mod_ij(aa, a);
@@ -277,23 +276,23 @@ int compute_starting_point(ijvec_ptr V0,
     sublat_mul(beta, bb, i0);
     sublat_addmul(beta, beta, aa, j0);
 
-    ij_t tmp1, tmp2;
+    ij_t i, j, tmp1, tmp2;
     ij_mul_sublat(tmp1, a, alpha);
     ij_mul_sublat(tmp2, c, beta);
     ij_add(tmp1, tmp1, tmp2);
-    if (ij_deg(tmp1) >= hatI)
+    if (ij_deg(tmp1) >= (signed)hatI)
       continue;
-    sublat_div_ij(V0->i, tmp1);
+    sublat_div_ij(i, tmp1);
     ij_mul_sublat(tmp1, b, alpha);
     ij_mul_sublat(tmp2, d, beta);
     ij_add(tmp1, tmp1, tmp2);
-    if (ij_deg(tmp1) >= hatJ)
+    if (ij_deg(tmp1) >= (signed)hatJ)
       continue;
-    sublat_div_ij(V0->j, tmp1);
+    sublat_div_ij(j, tmp1);
+    ijvec_set_i_j(V0, i, j, I);
     return 1;
   }
   return 0;
-#endif
 #endif
 
   // should never go there.
@@ -391,7 +390,7 @@ void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
                             gothp, lambda);
       ijvec_t v;
       if (use_sublat(sublat)) {
-        int st = compute_starting_point(v, euclid, euclid_dim,
+        int st = compute_starting_point(v, I, euclid, euclid_dim,
                                         hatI, hatJ, sublat);
         if (!st)
           continue; // next factor base prime.

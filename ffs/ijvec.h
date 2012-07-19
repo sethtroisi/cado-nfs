@@ -32,6 +32,28 @@ void ijvec_set_i_j(ijvec_ptr v, ij_srcptr i, ij_srcptr j, unsigned I)
   ijvec_add_disjoint(v, ii, jj);
 }
 
+static inline
+void ijvec_get_i(ij_ptr i, ijvec_srcptr v, unsigned I)
+{
+  ijvec_t ii;
+  ijvec_mod_ti(ii, v, I);
+  ij_set_ijvec(i, ii);
+}
+
+static inline
+void ijvec_get_j(ij_ptr j, ijvec_srcptr v, unsigned I)
+{
+  ijvec_t jj;
+  ijvec_div_ti(jj, v, I);
+  ij_set_ijvec(j, jj);
+}
+
+static inline
+void ijvec_get_i_j(ij_ptr i, ij_ptr j, ijvec_srcptr v, unsigned I)
+{
+  ijvec_get_i(i, v, I);
+  ijvec_get_j(j, v, I);
+}
 
 // Corresponding position as an unsigned int.
 typedef uint64_t ijpos_t;
