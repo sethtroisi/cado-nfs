@@ -203,6 +203,9 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
 
     timing_init(timing, bw->start, exp_end);
 
+    pi_interleaving_flip(pi);
+    pi_interleaving_flip(pi);
+
     for(int s = bw->start ; s < bw->end ; s += bw->interval ) {
         serialize(pi->m);
         if (pi->m->trank == 0 && pi->m->jrank == 0) {
@@ -282,6 +285,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
          * impose strong constraints on twist/untwist_vector being free of
          * MPI calls.
          */
+        pi_interleaving_flip(pi);
         pi_interleaving_flip(pi);
         matmul_top_twist_vector(mmt, bw->dir);
         serialize(pi->m);

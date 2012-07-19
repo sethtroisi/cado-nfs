@@ -35,14 +35,14 @@ void abase_vbase_oo_field_init_byfeatures(abase_vbase_ptr v, ...)
                 /* TODO: SSE-2 ! */
                 abase_u64k2_oo_field_init(v);
             } else {
-                fprintf(stderr, "Unsupported group size\n");
+                fprintf(stderr, "Unsupported group size %d\n", groupsize);
                 exit(1);
             }
         } else if (mpz_cmp_ui(p, 1 << 16) < 0) {
             if (groupsize == 1) {
                 abase_p16_oo_field_init(v);
             } else {
-                fprintf(stderr, "Unsupported group size\n");
+                fprintf(stderr, "Unsupported group size %d\n", groupsize);
                 exit(1);
             }
         } else {

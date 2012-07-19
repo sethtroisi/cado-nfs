@@ -32,11 +32,16 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
     flags[!bw->dir] = 0;
 
     int ys[2] = { bw->ys[0], bw->ys[1], };
+    /*
+     * Hmm. Interleaving doesn't make a lot of sense for this program,
+     * right ? Furthermore, it gets in the way for the sanity checks. We
+     * tend to always receive ys=0..64 as an argument.
     if (pi->interleaved) {
         ASSERT_ALWAYS((bw->ys[1]-bw->ys[0]) % 2 == 0);
         ys[0] = bw->ys[0] + pi->interleaved->idx * (bw->ys[1]-bw->ys[0])/2;
         ys[1] = ys[0] + (bw->ys[1]-bw->ys[0])/2;
     }
+    */
 
     mpz_t p;
     mpz_init_set_ui(p, 2);
@@ -172,6 +177,9 @@ int main(int argc, char * argv[])
     if (param_list_warn_unused(pl)) usage();
 
     if (bw->ys[0] < 0) { fprintf(stderr, "no ys value set\n"); exit(1); }
+
+    /* Forcibly disable interleaving here */
+    param_list_add_key(pl, "interleaving", "0", PARAMETER_FROM_CMDLINE);
 
     setvbuf(stdout,NULL,_IONBF,0);
     setvbuf(stderr,NULL,_IONBF,0);
