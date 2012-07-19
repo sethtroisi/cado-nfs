@@ -23,6 +23,9 @@
 #include "las-arith.h"
 #include "las-qlattice.h"
 #include "las-smallsieve.h"
+#ifdef HAVE_SSE41
+#include <smmintrin.h>
+#endif
 
 #define LOG_SCALE 1.4426950408889634 /* 1/log(2) to 17 digits, rounded to
                                         nearest. This is enough to uniquely
@@ -1401,16 +1404,28 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
     /* Scan array one long word at a time. If any byte is <255, i.e. if
        the long word is != 0xFFFF...FF, examine the bytes */
-    for (int xul = 0; xul < bucket_region; xul += sizeof (unsigned long)) {
+#ifdef  HAVE_SSE41
+    const int together = sizeof(__m128i);
+    __m128i ones128 = (__m128i) {-1,-1};
+#else
+    const int together = sizeof(unsigned long);
+#endif
+
+    for (int xul = 0; xul < bucket_region; xul += together) {
 #ifdef TRACE_K
         if ((unsigned int) N == trace_Nx.N && (unsigned int) xul <= trace_Nx.x && (unsigned int) xul + sizeof (unsigned long) > trace_Nx.x) {
             fprintf(stderr, "# Slot [%u] in bucket %u has value %u\n",
                     trace_Nx.x, trace_Nx.N, SS[trace_Nx.x]);
         }
 #endif
+#ifdef HAVE_SSE41
+        if (_mm_testc_si128(*(__m128i *)(SS + xul), ones128))
+            continue;
+#else
         if (*(unsigned long *)(SS + xul) == (unsigned long)(-1L)) 
             continue;
-        for (int x = xul; x < xul + (int) sizeof (unsigned long); ++x) {
+#endif
+        for (int x = xul; x < xul + (int) together; ++x) {
             if (SS[x] == 255) continue;
 
             int64_t a;
