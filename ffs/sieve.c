@@ -779,8 +779,7 @@ int main(int argc, char **argv)
 
                 // since (0,0) is divisible by everyone, its position might
                 // have been clobbered.
-                // FIXME: is this correct??? (probably not with sublat)
-                if (!k) S[0] = 255;
+                if (!k && !use_sublat(sublat)) S[0] = 255;
 
                 // mark survivors
                 // no need to check if this is a valid position
