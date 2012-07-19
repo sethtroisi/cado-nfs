@@ -52,7 +52,8 @@ int nq = INT_MAX;
 int lq = LQ_DEFAULT;
 double max_norm = DBL_MAX; /* maximal wanted norm (before rotation) */
 const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
-static int verbose = 0, incr = DEFAULT_INCR;
+static int verbose = 0;
+static unsigned long incr = DEFAULT_INCR;
 char *out = NULL; /* output file for msieve input (msieve.dat.m) */
 cado_poly best_poly, curr_poly;
 double best_E = 0.0; /* Murphy's E (the larger the better) */
