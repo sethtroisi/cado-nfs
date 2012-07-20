@@ -451,7 +451,7 @@ ularith_div_2ul_ul_ul_r (unsigned long *r, unsigned long a1,
            "X" (*r), "X" (a1), "X" (a2), "X" (b));
 #endif
 #ifdef HAVE_GCC_STYLE_AMD64_ASM
-  __asm__ ( "divq %3"
+  __asm__ __volatile__ ( "divq %3"
             : "+a" (a1), "=d" (*r)
             : "1" (a2), "rm" (b)
             : "cc");
