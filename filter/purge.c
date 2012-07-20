@@ -1879,17 +1879,17 @@ main (int argc, char **argv)
   param_list_parse_uint(pl, "nprimes", (unsigned int *) &nprimes);
   param_list_parse_uint(pl, "keep", (unsigned int *) &keep);
 #else
-  param_list_parse_uint64_t(pl, "nrels", (int64_t *) &nrelmax);
-  param_list_parse_uint64_t(pl, "nprimes", (int64_t *) &nprimes);
-  param_list_parse_uint64_t(pl, "keep", (int64_t *) &keep);
+  param_list_parse_uint64(pl, "nrels", (int64_t *) &nrelmax);
+  param_list_parse_uint64(pl, "nprimes", (int64_t *) &nprimes);
+  param_list_parse_uint64(pl, "keep", (int64_t *) &keep);
 #endif
   
 #if HT == 32
   param_list_parse_int(pl, "minpr", (int *) &minpr);
   param_list_parse_int(pl, "minpa", (int *) &minpa);
 #else
-  param_list_parse_int64_t(pl, "minpr", (int64_t *) &minpr);
-  param_list_parse_int64_t(pl, "minpa", (int64_t *) &minpa);
+  param_list_parse_int64(pl, "minpr", (int64_t *) &minpr);
+  param_list_parse_int64(pl, "minpa", (int64_t *) &minpa);
 #endif
     
   const char * filelist = param_list_lookup_string(pl, "filelist");
@@ -1955,7 +1955,7 @@ main (int argc, char **argv)
   need64 = (pol->rat->lpb >= 32) || (pol->alg->lpb >= 32);
 #endif
 
-  assert(need64 == (sizeof(HT_T) > 4));
+  /* assert(need64 == (sizeof(HT_T) > 4)); */
   if (need64 && sizeof (long) < 8)
     {
       fprintf (stderr, "Error, too large LPBs for a 32-bit computer\n");
