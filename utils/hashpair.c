@@ -19,7 +19,7 @@ void
 hashInit (hashtable_t *H, HR_T n, unsigned int verbose)
 {
   H->hm = (HR_T) (ulong_nextprime ((unsigned long) ((n>>1)*3)));
-  if (verbose) fprintf (stderr, "# hashmod = %lu\n", (unsigned long) n);
+  if (verbose) fprintf (stderr, "# hashmod = %lu\n", (unsigned long) H->hm);
   SMALLOC(H->hc, H->hm, "hashInit 1");
   SMALLOC(H->ht, H->hm, "hashInit 2");
   if (verbose) fprintf (stderr, "Hash table:\n"
