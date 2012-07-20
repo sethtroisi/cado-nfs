@@ -93,6 +93,7 @@ extern int param_list_parse_int(param_list, const char *, int *);
 extern int param_list_parse_long(param_list, const char *, long *);
 extern int param_list_parse_uint(param_list, const char *, unsigned int *);
 extern int param_list_parse_ulong(param_list, const char *, unsigned long *);
+extern int param_list_parse_int64(param_list, const char *, int64_t *);
 extern int param_list_parse_uint64(param_list, const char *, uint64_t *);
 extern int param_list_parse_double(param_list, const char *, double *);
 extern int param_list_parse_string(param_list, const char *, char *, size_t);

@@ -589,6 +589,27 @@ int param_list_parse_size_t(param_list pl, const char * key, size_t * r)
 }
 
 
+int param_list_parse_int64(param_list pl, const char * key, int64_t * r)
+{
+    int v = assoc(pl, key);
+    if (v < 0)
+        return 0;
+    char * value = pl->p[v]->value;
+    pl->p[v]->parsed=1;
+    char * end;
+    int64_t res;
+    res = strtoimax(value, &end, 0);
+    if (*end != '\0') {
+        fprintf(stderr, "Parse error:"
+                " parameter for key %s is not an int64_t: %s\n",
+                key, value);
+        exit(1);
+    }
+    if (r)
+        *r = res;
+    return pl->p[v]->seen;
+}
+
 int param_list_parse_uint64(param_list pl, const char * key, uint64_t * r)
 {
     int v = assoc(pl, key);
@@ -601,7 +622,7 @@ int param_list_parse_uint64(param_list pl, const char * key, uint64_t * r)
     res = strtoumax(value, &end, 0);
     if (*end != '\0') {
         fprintf(stderr, "Parse error:"
-                " parameter for key %s is not an ulong: %s\n",
+                " parameter for key %s is not an uint64_t: %s\n",
                 key, value);
         exit(1);
     }

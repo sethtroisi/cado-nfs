@@ -131,6 +131,7 @@ insertNormalRelation (int **rel_compact, int irel,
                       unsigned long *tot_alloc, int final)
 {
   int *tmp = NULL, ltmp = 0, i, j, h, ok;
+  unsigned int np;
 
     reduce_exponents_mod2 (rel);
 
@@ -157,10 +158,10 @@ insertNormalRelation (int **rel_compact, int irel,
         if (ok || final)
           /* in the final pass, we need to insert all ideals, since we need
              to renumber them in the output file */
-          h = hashInsert (H, rel->rp[j].p, minus2);
+          h = hashInsert (H, rel->rp[j].p, minus2, &np);
         if (ok)
           {
-            *nprimes += (H->hashcount[h] == 1); /* new prime */
+            *nprimes += np;
             tmp[i++] = h;
           }
       }
@@ -171,11 +172,11 @@ insertNormalRelation (int **rel_compact, int irel,
         if (ok || final)
           {
             rel->ap[j].r = findroot (rel->a, rel->b, rel->ap[j].p);
-            h = hashInsert (H, rel->ap[j].p, rel->ap[j].r);
+            h = hashInsert (H, rel->ap[j].p, rel->ap[j].r, &np);
           }
         if (ok)
           {
-            *nprimes += (H->hashcount[h] == 1); /* new prime */
+            *nprimes += np;
             tmp[i++] = h;
           }
       }
@@ -195,6 +196,7 @@ insertFreeRelation (int **rel_compact, int irel, int *nprimes,
 {
     unsigned long p = rel->a; /* rel->b == 0 */
     int j, h, *tmp = NULL, itmp, ltmp;
+    unsigned int np;
 
     /* the prime on the rational side is rel->a
        the prime ideal on the algebraic side are (rel->a, rel->ap[j].p) */
@@ -205,19 +207,19 @@ insertFreeRelation (int **rel_compact, int irel, int *nprimes,
     *tot_alloc += ltmp * sizeof (int);
     itmp = 0;
     if ((p >= minpr) || final)
-      h = hashInsert (H, p, minus2);
+      h = hashInsert (H, p, minus2, &np);
     if (p >= minpr)
       {
-        *nprimes += (H->hashcount[h] == 1); /* new prime */
+        *nprimes += np;
         tmp[itmp++] = h;
       }
     for (j = 0; j < rel->nb_ap; j++)
       {
         if ((p >= minpa) || final)
-          h = hashInsert(H, p, rel->ap[j].p);
+          h = hashInsert(H, p, rel->ap[j].p, &np);
         if (p >= minpa)
           {
-            *nprimes += (H->hashcount[h] == 1); /* new ideal */
+            *nprimes += np;
             tmp[itmp++] = h;
           }
       }
@@ -531,8 +533,8 @@ main (int argc, char **argv)
       Hsize = Hsizer + Hsizea;
     }
     fprintf (stderr, "Estimated number of prime ideals: %d\n", Hsize);
-    hashInit (&H, Hsize, 1, need64);
-    tot_alloc0 = H.hashmod * H.size;
+    hashInit (&H, Hsize, 1);
+    tot_alloc0 = H.hm * (sizeof(ht_t) + sizeof (HC_T));
 
     bit_vector rel_used;
     bit_vector_init_set(rel_used, nrelmax, 1);
