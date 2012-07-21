@@ -491,21 +491,21 @@ int main(int argc, char **argv)
     param_list_clear(pl);
 
     // Allocate storage space for the buckets.
-    // FIXME: The bucket capacity is hardcoded for the moment.
     buckets_t buckets[2];
-    buckets_init(buckets[0], I, J, 1<<16, I, 1+factor_base_max_degp(LFB[0]));
-    buckets_init(buckets[1], I, J, 1<<16, I, 1+factor_base_max_degp(LFB[1]));
+    buckets_init(buckets[0], I, J, expected_hit_number(LFB[0], I, J),
+            I, 1+factor_base_max_degp(LFB[0]));
+    buckets_init(buckets[1], I, J, expected_hit_number(LFB[1], I, J),
+            I, 1+factor_base_max_degp(LFB[1]));
     ASSERT_ALWAYS(buckets[0]->n == buckets[1]->n);
-    print_bucket_info(buckets[0]);
+    print_bucket_info(buckets[0], buckets[1]);
     fflush(stdout);
 
 #ifdef BUCKET_RESIEVE
     replayable_bucket_t replayable_bucket[2];
-    // FIXME: we copy the hardcoded capacity of buckets
     replayable_bucket[0]->b = (__replayable_update_struct *)
-        malloc((1<<16) * sizeof(__replayable_update_struct));
+        malloc((buckets[0]->max_size) * sizeof(__replayable_update_struct));
     replayable_bucket[1]->b = (__replayable_update_struct *)
-        malloc((1<<16) * sizeof(__replayable_update_struct));
+        malloc((buckets[1]->max_size) * sizeof(__replayable_update_struct));
     ASSERT_ALWAYS(replayable_bucket[0]->b != NULL);
     ASSERT_ALWAYS(replayable_bucket[1]->b != NULL);
 #else

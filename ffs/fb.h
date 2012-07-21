@@ -31,4 +31,8 @@ unsigned factor_base_max_degp(large_factor_base_srcptr FB);
 // Clean up memory.
 void factor_base_clear(large_factor_base_ptr LFB, small_factor_base_ptr SFB);
 
+// Expected number of hits during sieving an array of size IxJ.
+double expected_hit_number(large_factor_base_srcptr LFB,
+    unsigned I, unsigned J);
+
 #endif   /* __FB_H__ */

@@ -18,6 +18,12 @@
 #
 #OPTFLAGS = -O3 -DNDEBUG
 
+# The default value for the size of the bucket regions is 2^16, which is
+# supposed to be close to the L1 cache size. However, it might be that a
+# lower of a higher value gives better performance.
+#
+#CFLAGS += -DBUCKET_REGION_BITS=18
+
 # If you do not plan to use the -sublat option, we can disable this
 # feature at compile time, and this will save some memory.
 #

@@ -50,7 +50,7 @@ typedef const __buckets_struct *buckets_srcptr;
 
 // Initialize structure and allocate buckets.
 void buckets_init(buckets_ptr buckets, unsigned I, unsigned J,
-                  unsigned max_size, unsigned min_degp, unsigned max_degp);
+                  double hits, unsigned min_degp, unsigned max_degp);
 
 // Clean up memory.
 void buckets_clear(buckets_ptr buckets);
@@ -59,7 +59,7 @@ void buckets_clear(buckets_ptr buckets);
 unsigned bucket_region_size();
 
 // Print information about the buckets.
-void print_bucket_info(buckets_srcptr buckets);
+void print_bucket_info(buckets_srcptr buckets0, buckets_srcptr buckets1);
 
 // Fill the buckets with updates corresponding to divisibility by elements of
 // the factor base.

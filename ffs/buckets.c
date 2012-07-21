@@ -9,7 +9,9 @@
 #include "macros.h"
 #include "gray.h"
 
-
+#ifndef BUCKET_REGION_BITS
+#define BUCKET_REGION_BITS 16
+#endif
 
 /* Bucket updates.
  *
@@ -29,7 +31,7 @@
  *****************************************************************************/
 
 // Size of the two fields and of a bucket update, in bits.
-#define UPDATE_POS_BITS  16
+#define UPDATE_POS_BITS  BUCKET_REGION_BITS
 #ifdef BUCKET_RESIEVE
 #define UPDATE_HINT_BITS  16
 #else
@@ -114,7 +116,7 @@ hint_t update_get_hint(update_t update)
 
 // Initialize structure and allocate buckets.
 void buckets_init(buckets_ptr buckets, unsigned I, unsigned J,
-                  unsigned max_size, unsigned min_degp, unsigned max_degp)
+                  double hits, unsigned min_degp, unsigned max_degp)
 {
   // FIXME: Everything breaks in characteristic 3 if bucket regions are not of
   // size 2^8 or 2^16. This would indeed imply that bucket regions would not
@@ -137,6 +139,10 @@ void buckets_init(buckets_ptr buckets, unsigned I, unsigned J,
 
   unsigned n        = 1 + ((ijvec_get_max_pos(I, J)-1) >> UPDATE_POS_BITS);
   buckets->n        = n;
+  // The size of the buckets is the number of hits divided by the number
+  // of buckets. But we take of margin of 10%, and an offset of 1000 to
+  // allow for deviations.
+  unsigned max_size = (unsigned)((1.1*hits / n)+1000);
   buckets->max_size = max_size;
   buckets->min_degp = min_degp;
   buckets->max_degp = max_degp;
@@ -187,11 +193,11 @@ unsigned bucket_region_size()
 
 
 // Print information about the buckets.
-void print_bucket_info(buckets_srcptr buckets)
+void print_bucket_info(buckets_srcptr buckets0, buckets_srcptr buckets1)
 {
-  printf("# buckets info:\n");
-  printf("#   nb of buckets   = %u\n", buckets->n);
-  printf("#   size of buckets = %u\n", buckets->max_size);
+  printf("#   nb of buckets   = %u\n", buckets0->n);
+  printf("#   size of buckets on side 0 = %u\n", buckets0->max_size);
+  printf("#   size of buckets on side 1 = %u\n", buckets1->max_size);
   printf("#   size of bucket-region (ie, 2^UPDATE_POS_BITS) = %d\n",
          bucket_region_size());
   printf("#   number of bits for the hint = %d\n", UPDATE_HINT_BITS);

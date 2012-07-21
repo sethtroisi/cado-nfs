@@ -357,3 +357,22 @@ void factor_base_clear(large_factor_base_ptr LFB, small_factor_base_ptr SFB)
   free(LFB->elts);
   free(SFB->elts);
 }
+
+double expected_hit_number(large_factor_base_srcptr LFB,
+    unsigned I, unsigned J)
+{
+  double powers[I+J];
+  powers[0] = 1.0;
+  for (unsigned i = 1; i < I+J; ++i)
+    powers[i] = powers[i-1]*FP_SIZE;
+  double nb = 0;
+  large_fbideal_t * ptr = LFB->elts; 
+  for (unsigned i = 0; i < LFB->n; ++i, ptr++) {
+    unsigned L = fbideal_deg(ptr[0]);
+    if (L <= I+J)
+      nb += powers[I+J-L];
+    else
+      nb += 1/powers[L-(I+J)];
+  }
+  return nb;
+}
