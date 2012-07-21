@@ -291,6 +291,7 @@ typedef struct {
     fbprime_t r;
 #ifdef ENABLE_SUBLAT
     fbprime_t lambda;
+    ijvec_t euclid[3];
 #endif
     uint8_t data;
 } __large_fbideal_struct;

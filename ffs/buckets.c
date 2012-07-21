@@ -365,13 +365,15 @@ void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
       fbprime_t lambda;
       if (sublat->n == 0) {
         compute_lambda(lambda, gothp->p, gothp->r, qlat);
-#ifdef ENABLE_SUBLAT
-        fbprime_set(gothp->lambda, lambda);
-#endif
+#       ifdef ENABLE_SUBLAT
+        if (use_sublat(sublat))
+          fbprime_set(gothp->lambda, lambda);
+#       endif
       } else {
-#ifdef ENABLE_SUBLAT
+        // TODO: we don't really need to save lambda.
+#       ifdef ENABLE_SUBLAT
         fbprime_set(lambda, gothp->lambda);
-#endif
+#       endif
       }
 
       if (fbprime_eq(lambda, gothp->p)) {
@@ -385,12 +387,38 @@ void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
 #endif
 
       unsigned dim, euclid_dim;
-      ijbasis_compute_large(basis,  &dim,        I,    J,
-                            euclid, &euclid_dim, hatI, hatJ,
-                            gothp, lambda);
+      if (sublat->n == 0) {
+        ijbasis_compute_large(basis, &dim, I, J,
+            euclid, &euclid_dim, hatI, hatJ,
+            gothp, lambda);
+#       ifdef ENABLE_SUBLAT
+        if (use_sublat(sublat)) {
+          // save the first 3 vectors of the Euclid basis
+          for (unsigned int k = 0; k < MIN(euclid_dim, 3); ++k)
+            ijvec_set(gothp->euclid[k], euclid[k]);
+          for (unsigned int k = MIN(euclid_dim, 3); k < 3; ++k)
+            ijvec_set_zero(gothp->euclid[k]);
+        }
+#       endif
+      }
+#     ifdef ENABLE_SUBLAT
+      else {
+        // recover basis from the saved vectors
+        ijbasis_complete_large(basis, &dim, I, J, gothp->euclid,
+            hatI, hatJ);
+      }
+#     endif
+
       ijvec_t v;
       if (use_sublat(sublat)) {
-        int st = compute_starting_point(v, I, euclid, euclid_dim,
+        euclid_dim = 3;
+        if (ijvec_is_zero(gothp->euclid[2])) {
+          euclid_dim = 2;
+          if (ijvec_is_zero(gothp->euclid[1])) {
+            euclid_dim = 1;
+          }
+        }
+        int st = compute_starting_point(v, I, gothp->euclid, euclid_dim,
                                         hatI, hatJ, sublat);
         if (!st)
           continue; // next factor base prime.

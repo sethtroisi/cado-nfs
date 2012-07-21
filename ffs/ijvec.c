@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 // Fill the basis with the vectors (i*t^k, j*t^k) as long as their degrees
-// stay below the given bounds I and J, respectively.
+// stay below the given bounds.
 static inline
 unsigned fill_gap(ijvec_t *v, fbprime_t i, fbprime_t j,
                   int max_degi, int max_degj, unsigned I)
@@ -111,8 +111,9 @@ void specific_euclid_char2(ijvec_t *basis,  unsigned *basis_dim,
         be1 = (fbprime_ptr)(((fppol32_ptr)&v1[0])+1);
         *basis_dim  += fill_gap   (basis +*basis_dim,  al1, be1,
                                    MIN(da0, (signed)I), J, I);
-        *euclid_dim += fill_euclid(euclid+*euclid_dim, al1, be1,
-                                   hatI, hatJ, hatI);
+        if (euclid != NULL)
+            *euclid_dim += fill_euclid(euclid+*euclid_dim, al1, be1,
+                hatI, hatJ, hatI);
     }
 }
 #endif
@@ -158,3 +159,43 @@ void ijbasis_compute_large(ijvec_t *basis,  unsigned *basis_dim,
   }
 #endif
 }
+
+#ifdef ENABLE_SUBLAT
+// Deduce the basis from the first 3 vectors of euclid, that have been
+// precomputed somewhere else.
+// This is used for sublat, and therefore is relevant only for USE_F2,
+// right now.
+void ijbasis_complete_large(ijvec_t *basis, unsigned *basis_dim,
+    unsigned I, unsigned J, ijvec_t *euclid,
+    MAYBE_UNUSED unsigned hatI, MAYBE_UNUSED unsigned hatJ)
+{
+  ij_t a, b;
+  fbprime_t alpha0, beta0, alpha1, beta1;
+  fbprime_set_zero(alpha0);
+  fbprime_set_zero(beta0);
+  fbprime_set_zero(alpha1);
+  fbprime_set_zero(beta1);
+  ijvec_get_i_j(a, b, euclid[0], hatI);
+  fbprime_set_ij(alpha1, a);
+  fbprime_set_ij(beta1, b);
+  *basis_dim = fill_gap(basis, alpha1, beta1, I, J, I);
+  for (int k = 1; k < 3; ++k) {
+    if (ijvec_is_zero(euclid[k])) // less than 3 vectors available?
+      return;
+    ijvec_get_i_j(a, b, euclid[k], hatI);
+    fbprime_set(alpha0, alpha1);
+    fbprime_set(beta0, beta1);
+    fbprime_set_ij(alpha1, a);
+    fbprime_set_ij(beta1, b);
+    *basis_dim += fill_gap(basis + *basis_dim, alpha1, beta1,
+        MIN(fbprime_deg(alpha0), (signed)I), J, I);
+  }
+#ifdef USE_F2
+  specific_euclid_char2(basis, basis_dim, I, J,
+      NULL, NULL, hatI, hatJ, alpha0, beta0, alpha1, beta1);
+#else
+  ASSERT_ALWAYS(0);
+#endif
+}
+
+#endif

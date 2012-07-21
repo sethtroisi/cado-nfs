@@ -117,4 +117,8 @@ void ijbasis_compute_small(ij_t *basis, ij_t *adjustment_basis,
         small_fbideal_srcptr gothp, fbprime_srcptr lambda,
         unsigned I, unsigned J);
 
+void ijbasis_complete_large(ijvec_t *basis, unsigned *basis_dim,
+    unsigned I, unsigned J, ijvec_t *euclid, unsigned hatI, unsigned hatJ);
+
+
 #endif  /* __IJVEC_H__ */
