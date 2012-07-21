@@ -160,7 +160,7 @@ void ijbasis_compute_large(ijvec_t *basis,  unsigned *basis_dim,
 #endif
 }
 
-#ifdef ENABLE_SUBLAT
+#ifndef DISABLE_SUBLAT
 // Deduce the basis from the first 3 vectors of euclid, that have been
 // precomputed somewhere else.
 // This is used for sublat, and therefore is relevant only for USE_F2,

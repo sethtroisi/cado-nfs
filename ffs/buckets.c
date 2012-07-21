@@ -208,7 +208,7 @@ void print_bucket_info(buckets_srcptr buckets)
 // by gothp for the current sublattice.
 // If there is no starting point return 0.
 // This code is specific to GF(2).
-static
+static MAYBE_UNUSED
 int compute_starting_point(ijvec_ptr V0,
                            MAYBE_UNUSED unsigned I,
                            MAYBE_UNUSED ijvec_t *euclid,
@@ -221,7 +221,7 @@ int compute_starting_point(ijvec_ptr V0,
     ijvec_set_zero(V0);
     return 1;
   }
-#if defined(ENABLE_SUBLAT) && defined(USE_F2)
+#if !defined(DISABLE_SUBLAT) && defined(USE_F2)
   fppol8_t i0, j0;
   fppol8_set_16(i0,sublat->lat[sublat->n][0]);
   fppol8_set_16(j0,sublat->lat[sublat->n][1]);
@@ -365,13 +365,13 @@ void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
       fbprime_t lambda;
       if (sublat->n == 0) {
         compute_lambda(lambda, gothp->p, gothp->r, qlat);
-#       ifdef ENABLE_SUBLAT
+#       ifndef DISABLE_SUBLAT
         if (use_sublat(sublat))
           fbprime_set(gothp->lambda, lambda);
 #       endif
       } else {
         // TODO: we don't really need to save lambda.
-#       ifdef ENABLE_SUBLAT
+#       ifndef DISABLE_SUBLAT
         fbprime_set(lambda, gothp->lambda);
 #       endif
       }
@@ -391,7 +391,7 @@ void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
         ijbasis_compute_large(basis, &dim, I, J,
             euclid, &euclid_dim, hatI, hatJ,
             gothp, lambda);
-#       ifdef ENABLE_SUBLAT
+#       ifndef DISABLE_SUBLAT
         if (use_sublat(sublat)) {
           // save the first 3 vectors of the Euclid basis
           for (unsigned int k = 0; k < MIN(euclid_dim, 3); ++k)
@@ -401,7 +401,7 @@ void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
         }
 #       endif
       }
-#     ifdef ENABLE_SUBLAT
+#     ifndef DISABLE_SUBLAT
       else {
         // recover basis from the saved vectors
         ijbasis_complete_large(basis, &dim, I, J, gothp->euclid,
@@ -410,6 +410,7 @@ void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
 #     endif
 
       ijvec_t v;
+#     ifndef DISABLE_SUBLAT
       if (use_sublat(sublat)) {
         euclid_dim = 3;
         if (ijvec_is_zero(gothp->euclid[2])) {
@@ -427,6 +428,7 @@ void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
         buckets_push_update(buckets, ptr, hint, v, I, J);
       }
       else
+#     endif
         ijvec_set_zero(v);
 
       // Size of Gray codes to use for the inner loop.

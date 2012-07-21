@@ -446,9 +446,9 @@ int main(int argc, char **argv)
 #ifdef USE_F2
     sublat_ptr sublat;
     if (want_sublat) {
-#ifndef ENABLE_SUBLAT
+#ifdef DISABLE_SUBLAT
         fprintf(stderr,
-                "Error: your binary was not compiled with ENABLE_SUBLAT\n");
+                "Error: your binary was compiled with DISABLE_SUBLAT\n");
         exit(EXIT_FAILURE);
 #endif
         sublat = &nine_sublat[0];

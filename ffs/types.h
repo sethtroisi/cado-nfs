@@ -289,7 +289,7 @@ typedef const qlat_struct_t* qlat_srcptr;
 typedef struct {
     fbprime_t p;
     fbprime_t r;
-#ifdef ENABLE_SUBLAT
+#ifndef DISABLE_SUBLAT
     fbprime_t lambda;
     ijvec_t euclid[3];
 #endif
