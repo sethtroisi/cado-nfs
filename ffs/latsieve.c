@@ -222,6 +222,9 @@ void sieveSFB(uint8_t *S, unsigned int *thr,
           do {
             // Inner-level Gray code enumeration: just go through the Gray code
             // array, each time adding the indicated basis vector.
+            // This uses undocumented feature of GCC to access the lower
+            // 32 bits of a register with the %k prefix.
+            // See gcc-4.7.1/gcc/config/i386/i386.md
 #if defined(USE_F2) 
             if (k0 == 0 && sizeof(ij_t) == 4) {
 #             define DOGRAY(n)                      \
