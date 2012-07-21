@@ -30,6 +30,8 @@ LDFLAGS     =
 LDLIBS      = -lm
 
 # Override variables in here!
+# See Makefile.local.example for a small documentation about compile
+# options.
 -include Makefile.local
 
 # Use GF2X?

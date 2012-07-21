@@ -1,0 +1,38 @@
+# This file is an example of what could be your Makefile.local which is
+# included by the main Makefile.
+# You can rename it and uncoment the appropriate lines.
+
+
+# You can link with gf2x (see https://gforge.inria.fr/projects/gf2x/) for
+# faster arithmetic in characteristic 2. In particular, if you have a
+# modern Intel processor with the Pclmulqdq instruction, gf2x will use
+# it, and sieve will be much faster.
+# To activate this feature, uncomment the following line and 
+# give the path where gf2x is installed.
+#
+#GF2XPREFIX = /path/to/gf2xlib
+
+# By default, there are no optimization flags, and debug sanity checks
+# are always performed. For production, uncomment the following, and
+# maybe add more flags, like -funroll-loops.
+#
+#OPTFLAGS = -O3 -DNDEBUG
+
+# If you do not plan to use the -sublat option, we can disable this
+# feature at compile time, and this will save some memory.
+#
+#CFLAGS += -DDISABLE_SUBLAT
+
+# For development, it might be interesting to get some statistics on the
+# sizes of the norms. Beware that this slows down the code.
+#
+#CFLAGS += -DWANT_NORM_STATS 
+
+# A potential improvement that is still at work. Don't try it unless you
+# know what you are doing.
+#
+#CFLAGS += -DBUCKET_RESIEVE
+
+# Debuging tool: traces what's going on at given position.
+#
+#CFLAGS += -DTRACE_POS=696526
