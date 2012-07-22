@@ -526,6 +526,25 @@ if (!-d $wdir) {
     }
 }
 
+sub get_mpi_hosts_torque {
+    my @x = split /^/, eval {
+		local $/=undef;
+		open F, "$ENV{PBS_NODEFILE}";
+		<F> };
+    my $nth = $thr_split[0] * $thr_split[1];
+    @hosts=();
+    while (scalar @x) {
+        my @z = splice @x, 0, $nth;
+        my %h=();
+        $h{$_}=1 for @z;
+        die "\$PBS_NODEFILE not consistent mod $nth\n" unless scalar
+			keys %h == 1;
+        my $c = $z[0];
+        chomp($c);
+        push @hosts, $c;
+    }
+}
+
 if ($mpi_needed) {
     detect_mpi;
 
@@ -537,6 +556,10 @@ if ($mpi_needed) {
         system "uniq $ENV{'OAR_NODEFILE'} > /tmp/HOSTS.$ENV{'OAR_JOBID'}";
         $hostfile = "/tmp/HOSTS.$ENV{'OAR_JOBID'}";
     }
+	elsif (exists($ENV{'PBS_JOBID'}) && !defined($hostfile) && !scalar @hosts ) {
+        print STDERR "Torque/OpenPBS environment detected, setting hostfile.\n";
+        get_mpi_hosts_torque;
+	}
     if (scalar @hosts) {
         # Don't use an uppercase filename, it would be deleted by
         # wipeout.

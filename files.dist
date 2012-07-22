@@ -17,6 +17,7 @@ linalg/CMakeLists.txt
 linalg/Makefile
 linalg/bwc/CMakeLists.txt
 linalg/bwc/README
+linalg/bwc/README.TORQUE
 linalg/bwc/GUIDED_TOUR_OF_SOURCES
 linalg/bwc/TODO
 linalg/bwc/Makefile
