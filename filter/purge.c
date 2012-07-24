@@ -583,18 +583,18 @@ static void
   delete_relation (HR_T i)
 {
   HR_T *tab = rel_compact[i];
+  HC_T *o, p;
 
   while (*tab != UMAX(*tab)) {
-    HC_T *o = &(H.hc[*tab++]);
-    switch (*o) {
-    case 1 :
-      *o = 0;
-    case 0 :
-      newnprimes--;
-      break;
-    default:
+    o = &(H.hc[*tab++]);
+    p = *o + 1;
+    if (p > 2)
       (*o)--;
-    }
+    else
+      if (p == 2) {
+        *o = 0;
+        newnprimes--;
+      }
   }
   rel_compact[i] = NULL;
   bit_vector_clearbit(rel_used, (size_t) i);
@@ -633,7 +633,7 @@ compute_connected_component (HR_T i)
   while ((h = *myrel_compact++) != UMAX(h)) {
     if (H.hc[h] == 2) {
       k = sum[h] - i; /* other row where prime of index h appears */
-      if (!bit_vector_getbit(Tbv, k)) /* row k was not visited yet */
+      if (!bit_vector_getbit(Tbv, (size_t) k)) /* row k was not visited yet */
 	n += compute_connected_component (k);
     }
     if (H.hc[h] >= 2)
@@ -698,13 +698,13 @@ deleteHeavierRows ()
   ASSERT_ALWAYS(N == (double) newnrel);
 
   /* now initialize bit table for relations used */
-  bit_vector_init(Tbv, nrelmax);
+  bit_vector_init(Tbv, (size_t) nrelmax);
   bit_vector_neg (Tbv, rel_used);
   memset(Count, 0, sizeof(unsigned int) * MAX_WEIGHT);
   SMALLOC(tmp, alloctmp, "deleteHeavierRows 2");
 
   for (i = 0; i < nrelmax; i++)
-    if (bit_vector_getbit(Tbv, i) == 0) {
+    if (bit_vector_getbit(Tbv, (size_t) i) == 0) {
       w_ccc = 0;
       h = compute_connected_component (i);
       wceil = (unsigned int) w_ccc + 1;
@@ -1633,7 +1633,7 @@ prempt_scan_relations_pass_two (const char *oname,
 	  length_line += (pcons - pcons_old);
 	lineok:
 	  /* Is is a non skipped relation ? */
-	  if (bit_vector_getbit (rel_used, rs->nrels)) 
+	  if (bit_vector_getbit (rel_used, (size_t) rs->nrels)) 
 	    {
 	      while (cpy_cpt_rel_a == cpt_rel_b + T_REL)
 		{
@@ -1985,7 +1985,7 @@ main (int argc, char **argv)
   fprintf (stderr, "Estimated number of prime ideals: %lu\n", (unsigned long) Hsize);
   tot_alloc0 = H.hm * (sizeof(HC_T) + sizeof(ht_t));
   
-  bit_vector_init_set(rel_used, nrelmax, 1);
+  bit_vector_init_set(rel_used, (size_t) nrelmax, 1);
   tot_alloc0 += nrelmax;
   fprintf (stderr, "Allocated rel_used of %luMb (total %luMb so far)\n",
 	   (unsigned long) nrelmax >> 20,
