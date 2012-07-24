@@ -26,8 +26,9 @@ modredcul_initmod_ul (unsigned long *m, const unsigned long s)
 
   fprintf(stderr, "m = %lu\n", *m);
 
-  if (*m != 8241071186)
-    return 1;
+  if (sizeof(unsigned long) == 8)
+    if (*m != 8241071186)
+      return 1;
   else
     return 0;
 }
