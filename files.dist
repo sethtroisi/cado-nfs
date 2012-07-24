@@ -454,6 +454,8 @@ config/mpi.cmake
 config/math.cmake
 config/rusage_thread.cmake
 config/rusage_thread.c
+config/gcc-ubuntu-bug.c
+config/gcc-ubuntu-bug.cmake
 scripts/fixup_params_file.sh.in
 linalg/bwc/matmul-sub-large-fbd.S
 linalg/bwc/matmul-sub-large-fbd.h
