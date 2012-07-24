@@ -60,7 +60,7 @@ void skip_relations_in_file(FILE * f, int n)
 }
 
 
-/* return a/b mod p, and -1 when gcd(b,p) <> 1 */
+/* return a/b mod p, and p+1 when gcd(b,p) <> 1 */
 unsigned long
 findroot(long a, unsigned long b, unsigned long p) {
   int sig, inv;
@@ -90,7 +90,7 @@ findroot(long a, unsigned long b, unsigned long p) {
       modul_neg(r, r, m);
     root = modul_get_ul (r, m);
   } else {
-    root = (unsigned long) -1L;
+    root = p + 1;
   }
   
   modul_clear (pa, m); /* No-ops. Here for the sake of pedantry */
@@ -101,7 +101,7 @@ findroot(long a, unsigned long b, unsigned long p) {
   return root;
 }
 
-// root = -1 if we don't know the result (p divides leading coeff)
+// root = p+1 if we don't know the result (p divides leading coeff)
 void
 computeroots (relation_t *rel)
 {

@@ -50,6 +50,9 @@ hashCheck (hashtable_t *H)
             100.0 * (double) nb / (double) H->hm, (unsigned long) nb, (unsigned long) H->hm);
 }
 
+/* special values of the root r:
+   p+1 for relations (a,b) where gcd(b,p) <>1
+   p+2 for rational ideals */
 HR_T
 hashInsertWithKey(hashtable_t *H, HT_T p, UHT_T r, HR_T h, unsigned int *f)
 {

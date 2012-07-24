@@ -269,9 +269,6 @@ my_malloc_free_all (void)
 
 /*****************************************************************************/
 
-/* dirty trick to distinguish rational primes: we store -2 for their root */
-static UHT_T minus2;
-
 /* Print the relation 'rel' in matrix format, i.e., a line of the form:
 
    i a b k t_1 t_2 ... t_k
@@ -343,7 +340,7 @@ fprint_rel_row (FILE *file, buf_rel_t *my_buf_rel)
     for (prp =  my_buf_rel->rel.rp;
 	 prp != &(my_buf_rel->rel.rp[my_buf_rel->rel.nb_rp]);
 	 prp++) {
-      REALKEY(prp->p, minus2);
+      REALKEY(prp->p, prp->p + 2);
       WRITEP;
     }
     for (pap =  my_buf_rel->rel.ap;
@@ -354,7 +351,7 @@ fprint_rel_row (FILE *file, buf_rel_t *my_buf_rel)
     }
   }
   else {
-    REALKEY(my_buf_rel->rel.a, minus2);
+    REALKEY(my_buf_rel->rel.a, my_buf_rel->rel.a + 2);
     WRITEP;
     for (pap =  my_buf_rel->rel.ap;
 	 pap != &(my_buf_rel->rel.ap[my_buf_rel->rel.nb_ap]);
@@ -373,7 +370,7 @@ fprint_rel_row (FILE *file, buf_rel_t *my_buf_rel)
 	 prp++)
       if (prp->e > 0) {
 	op = p;
-	REALKEY(prp->p, minus2);
+	REALKEY(prp->p, prp->p + 2);
 	WRITEP;
 	FFSCOPYDATA(prp->e);
       }
@@ -388,7 +385,7 @@ fprint_rel_row (FILE *file, buf_rel_t *my_buf_rel)
       }
   }
   else {
-    REALKEY(my_buf_rel->rel.a, minus2);
+    REALKEY(my_buf_rel->rel.a, my_buf_rel->rel.a + 2);
     WRITEP;
     for (pap =  my_buf_rel->rel.ap;
 	 pap != &(my_buf_rel->rel.ap[my_buf_rel->rel.nb_ap]);
@@ -440,7 +437,6 @@ insertNormalRelation (unsigned int j)
   my_tmp = my_malloc(my_br->ltmp); 
   phk = my_br->hk;
   itmp = 0; /* number of entries in my_tmp */
-  pr.r = (UHT_T) minus2;
   i = my_br->rel.nb_rp;
   my_rp = my_br->rel.rp;
   while (i--)
@@ -456,6 +452,7 @@ insertNormalRelation (unsigned int j)
       */
       h = *phk++;
       pr.p = (HT_T) (my_rp++)->p;
+      pr.r = (UHT_T) pr.p + 2;
       /* fprintf (stderr, "%u %d %u %lu %lu %u\n", h, pr.p, pr.r, HC0, HC1, H.hm); */
       my_ht = &(H.ht[h]);
       my_hc = &(H.hc[h]);
@@ -545,7 +542,7 @@ insertFreeRelation (unsigned int j)
   phk = buf_rel[j].hk;
   itmp = 0;
   /* insert all ideals */
-  h = hashInsertWithKey(&H, (HT_T) buf_rel[j].rel.a, (UHT_T) minus2, *phk++, &np);
+  h = hashInsertWithKey(&H, (HT_T) buf_rel[j].rel.a, (UHT_T) buf_rel[j].rel.a + 2, *phk++, &np);
   nprimes += np; /* (H->hc[h] == 1); new prime */
   if ((HT_T) buf_rel[j].rel.a >= minpr) my_tmp[itmp++] = h;
   for (i = 0; i < buf_rel[j].rel.nb_ap; i++) {
@@ -896,7 +893,7 @@ renumber (const char *sos)
 	static int count = 0;
 	if (H.hc[i] == 1 && (count ++ < 10))
 	  {
-	    if (GET_HASH_R(&H,i) == minus2)
+	    if (GET_HASH_R(&H,i) == (UHT_T) GET_HASH_P(&H,i) + 2)
 	      fprintf (stderr, "Warning: singleton rational prime %lu\n",
 		       (unsigned long) GET_HASH_P(&H,i));
 	    else
@@ -1295,7 +1292,7 @@ static void threadfindroot(fr_t *mfr) {
 	    {
 	      phk = buf_rel_new_hk(j, mybufrel->rel.nb_rp + mybufrel->rel.nb_ap);
 	      for (i = 0; i < mybufrel->rel.nb_rp; i++)
-		*phk++ = HKM(mybufrel->rel.rp[i].p, minus2, H.hm);
+		*phk++ = HKM(mybufrel->rel.rp[i].p, mybufrel->rel.rp[i].p + 2, H.hm);
 	      for (i = 0; i < mybufrel->rel.nb_ap; i++)
 		{
 #ifndef FOR_FFS
@@ -1311,7 +1308,7 @@ static void threadfindroot(fr_t *mfr) {
 	  else
 	    {
 	      phk = buf_rel_new_hk(j, mybufrel->rel.nb_ap + 1);
-	      *phk++ = HKM((HR_T) mybufrel->rel.a, minus2, H.hm);
+	      *phk++ = HKM((HR_T) mybufrel->rel.a, mybufrel->rel.a + 2, H.hm);
 	      for (i = 0; i < mybufrel->rel.nb_ap; i++) {
 		*phk++ = HKM((HR_T) mybufrel->rel.a, mybufrel->rel.ap[i].p, H.hm);
 	      }
@@ -2033,8 +2030,6 @@ main (int argc, char **argv)
       usage();
     }
   
-  minus2 = UMAX(minus2) -1;
-  
   if (minpr < 0) minpr = pol->rat->lim;
   if (minpa < 0) minpa = pol->alg->lim;
   
@@ -2143,7 +2138,7 @@ main (int argc, char **argv)
 	   (unsigned long) nrel, (unsigned long) nprimes, ((long) nrel) - nprimes);
   if (nrel <= nprimes) /* covers case nrel = nprimes = 0 */
     {
-      fprintf(stderr, "nrel <= nprimes_new\n");
+      fprintf(stderr, "number of relations <= number of ideals\n");
       exit (1);
     }
   hashCheck (&H);
