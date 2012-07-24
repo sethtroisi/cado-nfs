@@ -100,6 +100,7 @@ include(${CADO_NFS_SOURCE_DIR}/config/curl.cmake)
 include(${CADO_NFS_SOURCE_DIR}/config/alloca.cmake)
 include("${CADO_NFS_SOURCE_DIR}/config/math.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/rusage_thread.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/gcc-ubuntu-bug.cmake")
 
 ######################################################################
 # Try to detect whether pthreads and/or MPI are available.
