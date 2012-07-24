@@ -583,18 +583,14 @@ static void
   delete_relation (HR_T i)
 {
   HR_T *tab = rel_compact[i];
-  HC_T *o, p;
+  HC_T *o;
 
   while (*tab != UMAX(*tab)) {
     o = &(H.hc[*tab++]);
-    p = *o + 1;
-    if (p > 2)
-      (*o)--;
-    else
-      if (p == 2) {
-        *o = 0;
-        newnprimes--;
-      }
+    ASSERT(*o);
+    if (*o < UMAX(*o))
+      if (!(--(*o)))
+	newnprimes--;
   }
   rel_compact[i] = NULL;
   bit_vector_clearbit(rel_used, (size_t) i);
@@ -751,6 +747,81 @@ static void
     }
 }
 
+typedef struct {
+  unsigned int nb;
+  pthread_t mt;
+  HR_T begin, end, sup_nrel, sup_npri;
+} ti_t;
+static ti_t *ti;
+
+static void
+onepass_thread_singleton_removal (ti_t *mti)
+{
+  HR_T *tab, i;
+  HC_T *o;
+
+  mti->sup_nrel = 0;
+  mti->sup_npri = 0;
+  for (i = mti->begin; i < mti->end; i++)
+    if (bit_vector_getbit(rel_used, (size_t) i)) {
+      tab = rel_compact[i];
+      while (*tab != UMAX(*tab))
+	if (H.hc[*tab++] == 1) {
+	  tab = rel_compact[i];
+	  while (*tab != UMAX(*tab)) {
+	    o = &(H.hc[*tab++]);
+	    ASSERT(*o);
+	    if (*o < UMAX(*o))
+	      if (!(--(*o)))
+		(mti->sup_npri)++;
+	  }
+	  rel_compact[i] = NULL;
+	  bit_vector_clearbit(rel_used, (size_t) i);
+	  (mti->sup_nrel)++;
+	  break;
+	}
+    }
+  pthread_exit(NULL);
+}
+
+static void
+onepass_singleton_parallel_removal (unsigned int nb_thread)
+{
+  pthread_attr_t attr;
+  unsigned int i;
+  HR_T pas, incr;
+  int err;
+
+  SMALLOC(ti, nb_thread, "onepass_singleton_parallel_removal :");
+  ti[0].begin = 0;
+  pas = (nrelmax / nb_thread) & ((HR_T) ~7);
+  incr = 0;
+  for (i = 0, incr = 0; i < nb_thread - 1; ) {
+    incr += pas;
+    ti[i].nb = i;
+    ti[i++].end = incr;
+    ti[i].begin = incr;
+  }
+  ti[i].nb = i;
+  ti[i].end = nrelmax;
+  pthread_attr_init (&attr);
+  pthread_attr_setstacksize (&attr, 1<<16);
+  pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_JOINABLE);
+  for (i = 0; i < nb_thread; i++)
+    if ((err = pthread_create (&ti[i].mt, &attr, (void *) onepass_thread_singleton_removal, &ti[i])))
+    {
+    fprintf (stderr, "onepass_singleton_parallel_removal : pthread_create error 1: %d. %s\n", err, strerror (errno)); 
+    exit (1);
+    }
+  for (i = 0; i < nb_thread; i++) {
+    pthread_join(ti[i].mt, NULL);
+    newnrel -= ti[i].sup_nrel;
+    newnprimes -= ti[i].sup_npri;
+  }
+  pthread_attr_destroy(&attr);
+  SFREE(ti);
+}
+
 static void
 remove_singletons ()
 {
@@ -779,7 +850,7 @@ remove_singletons ()
       deleteHeavierRows();
     }
     oldnewnrel = newnrel;
-    onepass_singleton_removal();
+    onepass_singleton_parallel_removal(NB_CORES);
     excess = ((long) newnrel) - newnprimes;
     fprintf (stderr, "   new_nrows=%lu new_ncols=%lu (%ld) at %2.2lf\n",
 	     (unsigned long) newnrel, (unsigned long) newnprimes, (long) excess, seconds());
