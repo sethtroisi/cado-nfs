@@ -27,3 +27,5 @@
 #cmakedefine    HAVE_CABSL
 #cmakedefine    HAVE_LOG2
 #cmakedefine    HAVE_EXP2
+
+#cmakedefine	VOLATILE_IF_GCC_UBUNTU_BUG
