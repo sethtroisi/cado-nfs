@@ -2271,7 +2271,7 @@ sub purge {
     my $cmd = cmd("$param{'bindir'}/filter/purge ".
                   "-poly $param{'prefix'}.poly -keep $param{'keeppurge'} ".
                   "-nrels $nbrels -out $param{'prefix'}.purged.gz ".
-                  "-basepath $param{'wdir'} " .
+                  "-npthr $param{'bwmt'} -basepath $param{'wdir'} ".
                   "-subdirlist $param{'prefix'}.subdirlist ".
                   "-filelist $param{'prefix'}.filelist ",
                   { cmdlog => 1,

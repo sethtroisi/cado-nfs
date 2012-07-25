@@ -1,4 +1,3 @@
-
 /* CADO_REV indicates the scm-level revision */
 #define    CADO_REV        "@CADO_REV@"
 
@@ -27,3 +26,5 @@
 #cmakedefine    HAVE_CABSL
 #cmakedefine    HAVE_LOG2
 #cmakedefine    HAVE_EXP2
+
+#cmakedefine    HAVE_SYNC_FETCH

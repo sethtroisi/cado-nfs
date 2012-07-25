@@ -12,8 +12,6 @@
 extern "C" {
 #endif
 
-#define NB_CORES ((unsigned int) (sysconf(_SC_NPROCESSORS_ONLN)))
-
 #define UMAX(A) (0xffffffffffffffffULL >>((8-sizeof(A))<<3))
 #define SMAX(A) (0x7fffffffffffffffLL  >>((8-sizeof(A))<<3))
 #define UMIN(A) (0)

@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#define BV_BITS 64      // since we're using uint64_t's
+#define LN2_BV_BITS 6   // 2^^LN2_BV_BITS = BV_BITS
+
+
 struct bit_vector_s {
     uint64_t * p;
     size_t n;

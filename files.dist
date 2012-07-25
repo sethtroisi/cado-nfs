@@ -454,6 +454,8 @@ config/mpi.cmake
 config/math.cmake
 config/rusage_thread.cmake
 config/rusage_thread.c
+config/sync_fetch.c
+config/sync_fetch.cmake
 config/gcc-ubuntu-bug.c
 config/gcc-ubuntu-bug.cmake
 scripts/fixup_params_file.sh.in

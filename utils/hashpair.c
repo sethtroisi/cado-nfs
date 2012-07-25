@@ -51,7 +51,7 @@ hashCheck (hashtable_t *H)
 }
 
 HR_T
-hashInsertWithKey(hashtable_t *H, HT_T p, UHT_T r, HR_T h, unsigned int *f)
+hashInsertWithKey(hashtable_t *H, HT_T p, HT_T r, HR_T h, unsigned int *f)
 {
   for ( ; ; ) {
     if (H->ht[h].p == p && H->ht[h].r == r) {
@@ -71,7 +71,7 @@ hashInsertWithKey(hashtable_t *H, HT_T p, UHT_T r, HR_T h, unsigned int *f)
 }
 
 HR_T
-hashInsert(hashtable_t *H, HT_T p, UHT_T r, unsigned int *f)
+hashInsert(hashtable_t *H, HT_T p, HT_T r, unsigned int *f)
 {
   return HASHINSERT(H,p,r,f);
 }
