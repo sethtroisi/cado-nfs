@@ -1,13 +1,7 @@
-/*
-  HC_T : 8 bits.
-  HT_T : (32 + 32 * need64) bits. Signed.
-  HR_T : 32 if H.hm < 2^32-1, otherwise 64 bits.
-  Note : sizeof(HT_T)>=sizeof(HR_T)
-*/
-
 /* purge --- remove singletons
 
-Copyright 2008, 2009, 2010, 2011, 2012 Francois Morain, Paul Zimmermann
+Copyright 2008, 2009, 2010, 2011, 2012 Alain Filbois, Francois Morain,
+                                       Paul Zimmermann
 
 This file is part of CADO-NFS.
 
@@ -52,6 +46,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
   GET_HASH_P(H,h) - prime corresponding to index h
   GET_HASH_R(H,h) - root  corresponding to index h (-2 for rational prime)
   H->hashcount[h] - number of occurrences of (p, r) in current relations
+*/
+
+/*
+  HC_T : 8 bits.
+  HT_T : (32 + 32 * need64) bits. Signed.
+  HR_T : 32 if H.hm < 2^32-1, otherwise 64 bits.
+  Note : sizeof(HT_T)>=sizeof(HR_T)
 */
 
 #include "cado.h"
@@ -884,7 +885,7 @@ renumber (const char *sos)
         fprintf (fsos, "# each row contains 3 hexadecimal values: i p r\n"
 		 "# i is the ideal index value (starting from 0)\n"
 		 "# p is the corresponding prime\n"
-		 "# r is the corresponding root (-2=fffffffe on the rational side)\n");
+		 "# r is the corresponding root (p+2 on the rational side)\n");
       }
     for (i = 0; i < H.hm; i++)
       if (H.hc[i]) {
@@ -895,7 +896,7 @@ renumber (const char *sos)
 	static int count = 0;
 	if (H.hc[i] == 1 && (count ++ < 10))
 	  {
-	    if (GET_HASH_P(&H,i) == GET_HASH_R(&H,i) + 2)
+	    if (GET_HASH_P(&H,i) == GET_HASH_R(&H,i) + 1)
 	      fprintf (stderr, "Warning: singleton rational prime %lu\n",
 		       (unsigned long) GET_HASH_P(&H,i));
 	    else
@@ -2013,6 +2014,9 @@ main (int argc, char **argv)
     }
 #endif
 
+  /* the current code assumes the "rational" side has degree 1 */
+  ASSERT_ALWAYS(pol->rat->degree == 1);
+
   /* On a 32-bit computer, even 1 << 32 would overflow. Well, we could set
      map[ra] = 2^32-1 in that case, but not sure we want to support 32-bit
      primes on a 32-bit computer... */
@@ -2143,7 +2147,7 @@ main (int argc, char **argv)
 	   (unsigned long) nrel, (unsigned long) nprimes, ((long) nrel) - nprimes);
   if (nrel <= nprimes) /* covers case nrel = nprimes = 0 */
     {
-      fprintf(stderr, "nrel <= nprimes_new\n");
+      fprintf(stderr, "number of relations <= number of ideals\n");
       exit (1);
     }
   hashCheck (&H);

@@ -28,3 +28,6 @@
 #cmakedefine    HAVE_EXP2
 
 #cmakedefine    HAVE_SYNC_FETCH
+
+#cmakedefine	VOLATILE_IF_GCC_UBUNTU_BUG
+
