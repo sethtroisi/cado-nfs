@@ -1,13 +1,7 @@
-/*
-  HC_T : 8 bits.
-  HT_T : (32 + 32 * need64) bits. Signed.
-  HR_T : 32 if H.hm < 2^32-1, otherwise 64 bits.
-  Note : sizeof(HT_T)>=sizeof(HR_T)
-*/
-
 /* purge --- remove singletons
 
-Copyright 2008, 2009, 2010, 2011, 2012 Francois Morain, Paul Zimmermann
+Copyright 2008, 2009, 2010, 2011, 2012 Alain Filbois, Francois Morain,
+                                       Paul Zimmermann
 
 This file is part of CADO-NFS.
 
@@ -52,6 +46,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
   GET_HASH_P(H,h) - prime corresponding to index h
   GET_HASH_R(H,h) - root  corresponding to index h (-2 for rational prime)
   H->hashcount[h] - number of occurrences of (p, r) in current relations
+*/
+
+/*
+  HC_T : 8 bits.
+  HT_T : (32 + 32 * need64) bits. Signed.
+  HR_T : 32 if H.hm < 2^32-1, otherwise 64 bits.
+  Note : sizeof(HT_T)>=sizeof(HR_T)
 */
 
 #include "cado.h"
@@ -730,18 +731,6 @@ deleteHeavierRows ()
                      j, seconds ());
   bit_vector_clear(Tbv);
   free (tmp);
-}
-
-static void
-  onepass_singleton_removal ()
-{
-  HR_T i;
-
-  for (i = 0; i < nrelmax; i++)
-    if (bit_vector_getbit(rel_used, (size_t) i) && has_singleton (rel_compact[i])) {
-      delete_relation(i);
-      newnrel--;
-    }
 }
 
 typedef struct {
