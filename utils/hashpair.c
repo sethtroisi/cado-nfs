@@ -51,6 +51,7 @@ hashCheck (hashtable_t *H)
 }
 
 /* special values of the root r:
+   p   for free relations with a projective root
    p+1 for relations (a,b) where gcd(b,p) <>1
    p+2 for rational ideals */
 HR_T

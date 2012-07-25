@@ -562,16 +562,6 @@ insertFreeRelation (unsigned int j)
   rel_compact[buf_rel[j].num] = my_tmp;
 }
 
-/* Return a non-zero value iff some prime (ideal) in the array tab[] is single
-   (tab[j] is the index in the hash table of the corresponding prime ideal).
-*/
-static unsigned int
-has_singleton (HR_T *tab)
-{
-  while (*tab != UMAX(*tab)) if (H.hc[*tab++] == 1) return 1;
-  return 0;
-}
-
 /* Delete a relation: set rel_used[i] to 0, update the count of primes
    in that relation, and set rel_compact[i] to NULL.
    Warning: we only update the count of primes that we consider, i.e.,
@@ -836,7 +826,7 @@ remove_singletons ()
       deleteHeavierRows();
     }
     oldnewnrel = newnrel;
-    onepass_singleton_parallel_removal(NB_CORES);
+    onepass_singleton_parallel_removal(1 /*NB_CORES*/);
     excess = ((long) newnrel) - newnprimes;
     fprintf (stderr, "   new_nrows=%lu new_ncols=%lu (%ld) at %2.2lf\n",
 	     (unsigned long) newnrel, (unsigned long) newnprimes, (long) excess, seconds());
@@ -871,7 +861,7 @@ renumber (const char *sos)
         fprintf (fsos, "# each row contains 3 hexadecimal values: i p r\n"
 		 "# i is the ideal index value (starting from 0)\n"
 		 "# p is the corresponding prime\n"
-		 "# r is the corresponding root (-2=fffffffe on the rational side)\n");
+		 "# r is the corresponding root (p+2 on the rational side)\n");
       }
     for (i = 0; i < H.hm; i++)
       if (H.hc[i]) {
@@ -1996,6 +1986,9 @@ main (int argc, char **argv)
       exit(1);
     }
 #endif
+
+  /* the current code assumes the "rational" side has degree 1 */
+  ASSERT_ALWAYS(pol->rat->degree == 1);
 
   /* On a 32-bit computer, even 1 << 32 would overflow. Well, we could set
      map[ra] = 2^32-1 in that case, but not sure we want to support 32-bit
