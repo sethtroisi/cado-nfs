@@ -727,7 +727,7 @@ deleteHeavierRows ()
 static void
   onepass_singleton_removal ()
 {
-  HR_T i;
+  HR_T *tab, i;
 
   for (i = 0; i < nrelmax; i++)
     if (bit_vector_getbit(rel_used, (size_t) i))
@@ -739,7 +739,7 @@ static void
 	}
 }
 
-#else /* ifdef HAVE_SYNC_FETCH */
+#else /* ifndef HAVE_SYNC_FETCH */
 
 typedef struct {
   unsigned int nb;
@@ -748,33 +748,31 @@ typedef struct {
 } ti_t;
 static ti_t *ti;
 
+/* Hightest criticality for performance. I inline all myself. */
 static void
 onepass_thread_singleton_removal (ti_t *mti)
 {
-  HR_T *tab, i;
+  HR_T *tab, **prc, **prcf, i;
   HC_T *o;
 
-  mti->sup_nrel = 0;
-  mti->sup_npri = 0;
-  for (i = mti->begin; i < mti->end; i++)
-    if (bit_vector_getbit(rel_used, (size_t) i)) {
-      tab = rel_compact[i];
-      while (*tab != UMAX(*tab))
+  mti->sup_nrel = mti->sup_npri = 0;
+  prcf = &(rel_compact[mti->end]);
+  for (prc = &(rel_compact[mti->begin + ((long) -1)]); ++prc < prcf ; )
+    if (*prc)
+      for (tab = *prc; *tab != UMAX(*tab); )
 	if (H.hc[*tab++] == 1) {
-	  tab = rel_compact[i];
-	  while (*tab != UMAX(*tab)) {
+	  for (tab = *prc; *tab != UMAX(*tab); ) {
 	    o = &(H.hc[*tab++]);
 	    ASSERT(*o);
-	    if (*o < UMAX(*o))
-	      if (!__sync_sub_and_fetch(o, 1))
-		(mti->sup_npri)++;
+	    if (*o < UMAX(*o) && !__sync_sub_and_fetch(o, 1))
+	      (mti->sup_npri)++;
 	  }
-	  rel_compact[i] = NULL;
-	  bit_vector_clearbit(rel_used, (size_t) i);
-	  (mti->sup_nrel)++;
+	  *prc = NULL;
+	  i = (HR_T) (prc - rel_compact);
+	  rel_used->p[i>>LN2_BV_BITS] &= ~(((uint64_t) 1) << (i & (BV_BITS - 1)));
+ 	  (mti->sup_nrel)++;
 	  break;
 	}
-    }
   pthread_exit(NULL);
 }
 
@@ -782,8 +780,8 @@ static void
 onepass_singleton_parallel_removal (unsigned int nb_thread)
 {
   pthread_attr_t attr;
-  unsigned int i;
   HR_T pas, incr;
+  unsigned int i;
   int err;
 
   SMALLOC(ti, nb_thread, "onepass_singleton_parallel_removal :");
@@ -815,7 +813,7 @@ onepass_singleton_parallel_removal (unsigned int nb_thread)
   pthread_attr_destroy(&attr);
   SFREE(ti);
 }
-#endif  /* ifdef HAVE_SYNC_FETCH */
+#endif /* ifdef HAVE_SYNC_FETCH */
 
 static void
 remove_singletons ()
@@ -1954,18 +1952,19 @@ main (int argc, char **argv)
 
   /* param_list_parse_uint(pl, "npthr", (unsigned int *) &npt); */
   const char * snpt = param_list_lookup_string(pl, "npthr");
-  char *p;
-  if ((p = strchr(snpt, 'x'))) {
-    unsigned int x, y;
-    *p = 0;
-    if (sscanf(snpt, "%u", &x) && sscanf(&p[1], "%u", &y))
-      npt = x * y;
-    else
-      usage();
-  } else
-    if (!sscanf(snpt, "%u", &npt))
-      usage();
-    
+  if (snpt) {
+    char *p;
+    if ((p = strchr(snpt, 'x'))) {
+      unsigned int x, y;
+      *p = 0;
+      if (sscanf(snpt, "%u", &x) && sscanf(&p[1], "%u", &y))
+	npt = x * y;
+      else
+	usage();
+    } else
+      if (!sscanf(snpt, "%u", &npt))
+	usage();
+  }
   const char * filelist = param_list_lookup_string(pl, "filelist");
   const char * basepath = param_list_lookup_string(pl, "basepath");
   const char * subdirlist = param_list_lookup_string(pl, "subdirlist");
