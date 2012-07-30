@@ -372,7 +372,7 @@ static int deg_norm_prec_N(ffspol_t ffspol_ij, int degi, fppol_t *pow_i, int deg
       }
       
       deg_sum_prec = fppol64_deg(sum);
-      /* If the we still have information, we put the 
+      /* If we still have information, we put the 
 	 sum in monomials[] and degree in degrees[] and keep
          the tables sorted */
       if (deg_sum_prec >= 0) {
@@ -527,7 +527,7 @@ int deg_norm_ij(ffspol_ptr ffspol_ij, ij_t i, ij_t j, int *gap)
 }
 
 /* Function init_norms 
-   Compute the degree of the norm at each valid position. in the given
+   Compute the degree of the norm at each valid position in the given
    j-range.
    
    The sqside parameter is a boolean that tells whether we are on the
