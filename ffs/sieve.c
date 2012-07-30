@@ -716,7 +716,8 @@ int main(int argc, char **argv)
             // j0 is the first valid line in the current bucket region.
             ij_t j0;
             ij_set_zero(j0);
-            for (unsigned k = 0, pos0 = 0; k < buckets[0]->n;
+	    ijpos_t pos0 = 0;
+            for (unsigned k = 0; k < buckets[0]->n;
                  ++k, pos0 += size) {
               // Skip empty bucket regions.
               if (ijvec_get_start_pos(j0, I, J) >= pos0+size)
@@ -745,7 +746,7 @@ int main(int argc, char **argv)
                   for (int rc = 1; rc; rc = ij_monic_set_next(j, j, J)) {
                     if (UNLIKELY(ij_in_fp(j)))
                       continue;
-                    unsigned pos = ijvec_get_start_pos(j, I, J) - pos0;
+                    ijpos_t pos = ijvec_get_start_pos(j, I, J) - pos0;
                     if (pos >= size)
                       break;
                     S[pos] = 255;
