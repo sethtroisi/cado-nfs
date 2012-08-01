@@ -63,11 +63,8 @@ def average_valuation_homogeneous_coprime(f,p):
     x = ZP.gen()
     affine_average=average_valuation_affine(f, p)
     proj_average=QQ(average_valuation_affine((f.reverse())(p*x), p))
-    if proj_average ==0:
-        return affine_average
-    else:
-        return (affine_average*(Norm(p)-1)/Norm(p)+proj_average/(Norm(p)))
-
+    return (affine_average*Norm(p)/(Norm(p)+1)+proj_average/(Norm(p)+1))
+    # hom = Prob(b=0)*proj + Prob(b!=0)*affine
 
 def alpha_p(f,p):
     """
@@ -75,11 +72,30 @@ def alpha_p(f,p):
     """
     return float((1/(Norm(p)-1)-average_valuation_homogeneous_coprime(f,p))*p.degree())
 
-def Estimate_alpha_p(f,p,nt):
+def estimate_alpha_p(f, p, nt):
     """
-    Same as alpha_p(f,p), but experimentally.  Only for debugging.
+    Should compute the same thing as alpha_p, but experimentally
     """
-    return float((1/(Norm(p)-1)-estimate_average_valuation_homogeneous_coprime(f,p,nt))*p.degree())
+    s=0
+    n=0
+    x=f.parent().gen()
+    A=f.base_ring()
+    F=homogenize(f)
+    l=p.degree()
+    list=element_list(A,nt^2,0)
+    for i in range(nt):
+        ia=randrange(0,nt)
+        ib=randrange(0,nt)
+        ic=randrange(0,nt^2)
+        a=list[ia]
+        b=list[ib]
+        c=list[ic]
+        if gcd(a,b) == 1:
+            ds=valuation(c,p)-valuation(A(F(a,b)), p)
+            s+=ZZ(ds)
+            n+=1
+    #sys.stdout.write("%f\r" % float(s*l/n))
+    return float(s*l/n) 
 
 
 def alpha(f,B):
@@ -94,57 +110,34 @@ def estimate_alpha(f,B,nt):
     Same as alpha(f,B), but experimentally.  Only for debugging.
     """
     A=f.base_ring()
-    return sum([Estimate_alpha_p(f, p, nt) for p in Primes(A,B+1)])
+    return sum([estimate_alpha_p(f, p, nt) for p in Primes(A,B+1)])
 
 
 
 def estimate_average_valuation_homogeneous_coprime(f, p, nt,x0=0, x1=0,y0=0,y1=0):
-	"""
-	this computes the same thing as average_valuation_homogeneous_coprime(f,p),
-	but does so experimentally.  Only for debugging.
-	"""
-	if x1==0:
-            x1=nt
+    """
+    this computes the same thing as average_valuation_homogeneous_coprime(f,p),
+    but does so experimentally.  Only for debugging.
+    """
+    if x1==0:
+        x1=nt
         if y1==0:
             y1=nt
-	s=0
-	n=0
-	x=f.parent().gen()
-	A=f.base_ring()
-	F=homogenize(f)
-	for a in element_list(A,x0+x1,x0):
-		for b in element_list(A,y0+y1,y0):
-			if gcd(a,b) == 1:
-				#print a,b
-                                s+=valuation(A(F(a,b)), p)
-				n+=1
+    s=0
+    n=0
+    x=f.parent().gen()
+    A=f.base_ring()
+    F=homogenize(f)
+    for a in element_list(A,x0+x1,x0):
+        for b in element_list(A,y0+y1,y0):
+            if gcd(a,b) == 1:
+                #print a,b
+                s+=valuation(A(F(a,b)), p)
+                n+=1
 	return float(s/n) if n > 0 else Infinity
 
 
-def estimate_alpha_p(f, p, nt):
-	"""
-	Should compute the same thing as alpha_p, but experimentally
-	"""
-	s=0
-	n=0
-	x=f.parent().gen()
-	A=f.base_ring()
-	F=homogenize(f)
-	l=p.degree()
-	list=element_list(A,nt^2,0)
-	for i in range(nt):
-		ia=randrange(0,nt)
-		ib=randrange(0,nt)
-		ic=randrange(0,nt^2)
-		a=list[ia]
-                b=list[ib]
-                c=list[ic]
-		if gcd(a,b) == 1:
-			ds=valuation(c,p)-valuation(A(F(a,b)), p)
-			s+=ZZ(ds)
-			n+=1
-	#sys.stdout.write("%f\r" % float(s*l/n))
-	return float(s*l/n) 
+
 
 
 
