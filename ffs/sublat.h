@@ -87,14 +87,113 @@ void ij_convert_sublat(ij_t hati, ij_t hatj, ij_t i, ij_t j,
     }
 }
 
-// the same for ijvec_t's.
+#ifdef USE_F2
+// Functions to compute x mod (t^2+t).
 static inline
-void ijvec_convert_sublat(ijvec_t W, ijvec_t V, sublat_ptr sublat)
-{
-    ij_convert_sublat(W->i, W->j, V->i, V->j, sublat);
+void sublat_mod(fppol8_t res, unsigned int x) {
+    uint8_t xt = x & 1U;
+    uint8_t xtt = __builtin_parity(x) ^ xt;
+    res[0] = xt | (xtt<<1);
 }
 
+static inline
+void sublat_mod_16(fppol8_t res, fppol16_t x) {
+    sublat_mod(res, x[0]);
+}
 
+static inline
+void sublat_mod_32(fppol8_t res, fppol32_t x) {
+    sublat_mod(res, x[0]);
+}
+
+static inline
+void sublat_mod_ij(fppol8_t res, ij_t x) {
+    sublat_mod(res, x[0]);
+}
+
+// Functions to compute x div (t^2+t).
+static inline
+void sublat_div_16(fppol16_t res, fppol16_t x) {
+    uint16_t xx = x[0];
+    xx >>= 1; // divide by t
+    // division by (t+1), using log-time algo.
+    uint16_t xx2 = xx ^ (xx>>1);
+    uint16_t xx4 = xx2 ^ (xx2>>2);
+    uint16_t xx8 = xx4 ^ (xx4>>4);
+    uint16_t xx16 = xx8 ^ (xx8>>8);
+    res[0] = xx16 >> 1;
+}
+
+static inline
+void sublat_div_32(fppol32_t res, fppol32_t x) {
+    uint32_t xx = x[0];
+    xx >>= 1; // divide by t
+    // division by (t+1), using log-time algo.
+    uint32_t xx2 = xx ^ (xx>>1);
+    uint32_t xx4 = xx2 ^ (xx2>>2);
+    uint32_t xx8 = xx4 ^ (xx4>>4);
+    uint32_t xx16 = xx8 ^ (xx8>>8);
+    uint32_t xx32 = xx16 ^ (xx16>>16);
+    res[0] = xx32 >> 1;
+}
+
+static inline
+void sublat_div_ij(ij_t res, ij_t x) {
+#if __ij_SIZE == 32
+    sublat_div_32(res, x);
+#elif __ij_SIZE == 16
+    sublat_div_16(res, x);
+#else
+    ASSERT_ALWAYS(0);
+#endif
+}
+
+// Arithmetic modulo (t^2 + t), assuming reduced inputs.
+static inline
+void sublat_add(fppol8_t z, fppol8_t x, fppol8_t y) {
+    z[0] = x[0] ^ y[0];
+}
+
+static inline
+void sublat_sub(fppol8_t z, fppol8_t x, fppol8_t y) {
+    sublat_add(z, x, y);
+}
+
+static inline
+void sublat_mul(fppol8_t z, fppol8_t x, fppol8_t y) {
+    uint8_t yy0, yy1;
+    yy0 = y[0]; yy1 = yy0 << 1;
+    uint8_t xx = x[0], zz;
+    zz = (xx & 1u) ? yy0 : 0;
+    yy1 = (xx & 2u) ? yy1 : 0;
+    zz ^= yy1;  // zz contains now the unreduced result
+    uint8_t rr = (zz & 4u); // coefficient in t^2
+    z[0] = zz ^ rr ^ (rr>>1);
+}
+
+static inline
+void sublat_addmul(fppol8_t Z, fppol8_t z, fppol8_t x, fppol8_t y) {
+    uint8_t yy0, yy1;
+    yy0 = y[0]; yy1 = yy0 << 1;
+    uint8_t xx = x[0], zz;
+    zz = (xx & 1u) ? yy0 : 0;
+    yy1 = (xx & 2u) ? yy1 : 0;
+    zz ^= yy1;  // zz contains now the unreduced result
+    uint8_t rr = (zz & 4u); // coefficient in t^2
+    Z[0] = z[0] ^ zz ^ rr ^ (rr>>1);
+}
+
+// Multiply an ij_t by an element of degree at most 1.
+static inline
+void ij_mul_sublat(ij_t z, ij_t x, fppol8_t y)
+{
+    z[0] = (y[0] & 1u) ? x[0] : 0;
+    ij_t xx;
+    xx[0] = x[0] << 1;
+    z[0] ^= (y[0] & 2u) ? xx[0] : 0;
+}
+
+#endif
 
 
 #endif   /* __SUBLAT_H__ */

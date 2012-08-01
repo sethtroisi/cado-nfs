@@ -15,6 +15,9 @@
  *
  * For that, make us of the given basis of multiples of p, as precomputed
  * in the normalized_echelon_multiples() function.
+ *
+ * NB: in the case of sublat, the given j is not really a multiple of p.
+ * The computation is still valid.
  */
 static MAYBE_UNUSED
 int next_projective_j(ij_t rj, ij_t j, ij_t *basis, int degp, int J)
@@ -72,31 +75,62 @@ void sieve_hit(uint8_t *S, uint8_t degp, ijpos_t pos,
 }
 
 
-// TODO: This code is under-efficient. Fix this!
-void sieveFB(uint8_t *S, small_factor_base_ptr FB, unsigned I, unsigned J,
-             ij_t j0, ijpos_t pos0, ijpos_t size, sublat_ptr sublat)
+void sieveSFB(uint8_t *S, unsigned int *thr,
+    small_factor_base_ptr FB, unsigned I, unsigned J,
+    ij_t j0, ijpos_t pos0, ijpos_t size, sublat_ptr sublat)
 {
+    *thr = 0;
     for (unsigned int ii = 0; ii < FB->n; ++ii) {
         small_fbideal_ptr gothp = FB->elts[ii];
         int L = gothp->degq;
+        int degp = gothp->degp;
 
         // Larger primes are left to the bucket sieve.
         ASSERT((unsigned)L < I);
 
-        // List of cases that are not handled yet:
-        if (use_sublat(sublat) && L == 1) continue;
+        // In case of sublat, the primes of degree 1 gives a uniform
+        // contribution and it is better to handle them globally using
+        // thresholds.
+        // TODO: we recompute this for each bucket region, whereas it
+        // could be computed once and for all.
+        if (use_sublat(sublat) && L == 1) {
+          if (!gothp->proj) {
+            fppol16_t qq, rr;
+            fppol16_set_fbprime(qq, gothp->q);
+            fppol16_set_fbprime(rr, gothp->lambda);
+            fppol16_mul(rr, rr, sublat->lat[sublat->n][1]);
+            fppol16_add(rr, rr, sublat->lat[sublat->n][0]);
+            fppol16_rem(rr, rr, qq);
+            if (fppol16_is_zero(rr))
+              *thr += gothp->degp;
+          } else {
+            fppol16_t qq;
+            fppol16_set_fbprime(qq, gothp->q);
+            fppol16_rem(qq, sublat->lat[sublat->n][1], qq);
+            if (fppol16_is_zero(qq))
+              *thr += gothp->degp;
+          }
+          continue;
+        }
 
         // projective roots are handled differently
         if (gothp->proj) {
           // First time round?
           if (UNLIKELY(!pos0)) {
-            // Find the first line to fill
+            // Find the first line to fill. If no sublat, this is zero.
+            // Otherwise, there is a bit of computation.
             ij_set_zero(gothp->current);
             if (use_sublat(sublat)) {
-              ASSERT_ALWAYS(0);  // XXX Sublat is broken
+              ij_t tmp0, tmp1, ijmod;
+              ij_set_16(ijmod, sublat->modulus);
+              ij_set_16(tmp0, sublat->lat[sublat->n][1]);
+              ij_mulmod(tmp0, gothp->tildep, tmp0, ijmod);
+              ij_set_fbprime(tmp1, gothp->q);
+              ij_mul(tmp1, tmp1, tmp0);
+              ij_div(gothp->current, tmp1, ijmod);
             }
           }
-          ij_t i, j;
+          ij_t j;
           int rcj = 1;
           ij_set(j, gothp->current);
           while (rcj) {
@@ -105,11 +139,19 @@ void sieveFB(uint8_t *S, small_factor_base_ptr FB, unsigned I, unsigned J,
               break;
 
             // Sieve the whole line
+#ifndef USE_F2
+            // TODO: this should be a big memsub().
+            ij_t i;
             int rci = 1;
             for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
               ijpos_t pos = start + ijvec_get_offset(i, I);
-              sieve_hit(S, gothp->degp, pos, gothp->q, gothp->r, pos0);
+              sieve_hit(S, degp, pos, gothp->q, gothp->r, pos0);
             }
+#else
+            // For GF(2), this becomes so simple (and Gcc does it well).
+            for(int i=0; i < 1<<I; ++i)
+              S[start+i] -= degp;
+#endif
 
             rcj = next_projective_j(j, j, gothp->projective_basis, L, J);
           }
@@ -120,9 +162,6 @@ void sieveFB(uint8_t *S, small_factor_base_ptr FB, unsigned I, unsigned J,
         // Only the first time round.
         if (UNLIKELY(!pos0)) {
           if (use_sublat(sublat)) {
-#if 0
-            // FIXME: sublat are Broken XXX
-            
             // In the case of sublattices, compute the starting point for the
             // sieve by gothp for the current sublattice.
             // TODO: Way too expensive!
@@ -132,12 +171,12 @@ void sieveFB(uint8_t *S, small_factor_base_ptr FB, unsigned I, unsigned J,
             fbprime_t tmp0;
             ij_t tmp1;
             fbprime_set_16(tmp0, sublat->lat[sublat->n][1]);
-            fbprime_mulmod(tmp0, gothp->lambda, tmp0, gothp->p);
+            fbprime_mulmod(tmp0, gothp->lambda, tmp0, gothp->q);
             ij_set_fbprime(yip, tmp0);
             ij_add(xip, xi, yip);
             ij_set_16(tmp1, sublat->modulus);
             ij_mulmod(xip, xip, gothp->tildep, tmp1);
-            ij_set_fbprime(tmp1, gothp->p);
+            ij_set_fbprime(tmp1, gothp->q);
             ij_mul(i0, xip, tmp1);
             ij_add(i0, i0, yip);
 
@@ -145,8 +184,6 @@ void sieveFB(uint8_t *S, small_factor_base_ptr FB, unsigned I, unsigned J,
             ij_set_16(ijmod, sublat->modulus);
             ij_sub(i0, i0, xi);
             ij_div(gothp->current, i0, ijmod);
-#endif
-            ij_set_zero(gothp->current);
           } else {
             ij_set_zero(gothp->current);
           }
@@ -161,11 +198,11 @@ void sieveFB(uint8_t *S, small_factor_base_ptr FB, unsigned I, unsigned J,
           ij_set(i, gothp->current);
           ijpos_t pos = start + ijvec_get_offset(i, I);
           if (LIKELY(pos0 || pos))
-            sieve_hit(S, gothp->degp, pos, gothp->q, gothp->r, pos0);
+            sieve_hit(S, degp, pos, gothp->q, gothp->r, pos0);
 
           // Size of Gray codes to use for the inner loop.
 #         if   defined(USE_F2)
-#           define ENUM_LATTICE_UNROLL 8
+#           define ENUM_LATTICE_UNROLL 5
 #         elif defined(USE_F3)
 #           define ENUM_LATTICE_UNROLL 5
 #         endif
@@ -185,12 +222,43 @@ void sieveFB(uint8_t *S, small_factor_base_ptr FB, unsigned I, unsigned J,
           do {
             // Inner-level Gray code enumeration: just go through the Gray code
             // array, each time adding the indicated basis vector.
-            for (unsigned k = k0; k < ngray; ++k) {
-              ij_add(i, i, gothp->basis->v[gray[k]]->i);
-              pos = start + ijvec_get_offset(i, I);
-              sieve_hit(S, gothp->degp, pos, gothp->q, gothp->r, pos0);
+            // This uses undocumented feature of GCC to access the lower
+            // 32 bits of a register with the %k prefix.
+            // See gcc-4.7.1/gcc/config/i386/i386.md
+#if defined(USE_F2) 
+            if (k0 == 0 && sizeof(ij_t) == 4) {
+#             define DOGRAY(n)                      \
+                "xorl     " #n "(%[B]), %k[i]\n\t"  \
+                "subb     %[degp], (%[S],%[i])\n\t"
+#             define DOALLGRAY2 DOGRAY(0)  DOGRAY(4)  DOGRAY(0)
+#             define DOALLGRAY3 DOALLGRAY2 DOGRAY(8)  DOALLGRAY2
+#             define DOALLGRAY4 DOALLGRAY3 DOGRAY(12) DOALLGRAY3
+#             define DOALLGRAY5 DOALLGRAY4 DOGRAY(16) DOALLGRAY4
+#             define DOALLGRAY6 DOALLGRAY5 DOGRAY(20) DOALLGRAY5
+#             define DOALLGRAY7 DOALLGRAY6 DOGRAY(24) DOALLGRAY6
+#             define DOALLGRAY8 DOALLGRAY7 DOGRAY(28) DOALLGRAY7
+#             define DOALLGRAY  CAT(DOALLGRAY, ENUM_LATTICE_UNROLL)
+              uint64_t ii = i[0];
+              uint8_t  dd = degp;
+              __asm volatile( DOALLGRAY
+                            : [i]   "+r" (ii)
+                            : [S]    "r" (S+start),
+                              [B]    "r" (gothp->basis),
+                              [degp] "r" (dd)
+                            : "memory");
+              ASSERT((ii >> 32) == 0);
+              i[0] = ii;
+            } else 
+#endif
+            {
+                for (unsigned k = k0; k < ngray; ++k) {
+                    ij_add(i, i, gothp->basis[gray[k]]);
+                    pos = start + ijvec_get_offset(i, I);
+                    sieve_hit(S, degp, pos, gothp->q, gothp->r, pos0);
+                }
             }
             k0 = 0;
+
 
             // Outer-level Gray code enumeration: using ij_set_next, the degree
             // of the difference with the previous one indicates which basis
@@ -200,9 +268,9 @@ void sieveFB(uint8_t *S, small_factor_base_ptr FB, unsigned I, unsigned J,
             rc = rc && ij_set_next(t, t, I-L-ENUM_LATTICE_UNROLL);
             if (rc) {
               ij_diff(s, s, t);
-              ij_add(i, i, gothp->basis->v[ij_deg(s)+ENUM_LATTICE_UNROLL]->i);
+              ij_add(i, i, gothp->basis[ij_deg(s)+ENUM_LATTICE_UNROLL]);
               pos = start + ijvec_get_offset(i, I);
-              sieve_hit(S, gothp->degp, pos, gothp->q, gothp->r, pos0);
+              sieve_hit(S, degp, pos, gothp->q, gothp->r, pos0);
             }
           } while (rc);
 
@@ -212,10 +280,10 @@ void sieveFB(uint8_t *S, small_factor_base_ptr FB, unsigned I, unsigned J,
             ij_diff(jj, jj, j);
             degjj = ij_deg(jj);
             ij_add(gothp->current, gothp->current,
-                    gothp->basis->v[I-L+degjj]->i);
+                   gothp->basis[I-L+degjj]);
             if (degjj > degj) {
               ij_sub(gothp->current, gothp->current,
-                      gothp->adjustment_basis->v[degjj-1]->i);
+                     gothp->adjustment_basis[degjj-1]);
               degj = degjj;
             }
           }

@@ -9,7 +9,9 @@
 #include "macros.h"
 #include "gray.h"
 
-
+#ifndef BUCKET_REGION_BITS
+#define BUCKET_REGION_BITS 16
+#endif
 
 /* Bucket updates.
  *
@@ -29,7 +31,7 @@
  *****************************************************************************/
 
 // Size of the two fields and of a bucket update, in bits.
-#define UPDATE_POS_BITS  16
+#define UPDATE_POS_BITS  BUCKET_REGION_BITS
 #ifdef BUCKET_RESIEVE
 #define UPDATE_HINT_BITS  16
 #else
@@ -114,7 +116,7 @@ hint_t update_get_hint(update_t update)
 
 // Initialize structure and allocate buckets.
 void buckets_init(buckets_ptr buckets, unsigned I, unsigned J,
-                  unsigned max_size, unsigned min_degp, unsigned max_degp)
+                  double hits, unsigned min_degp, unsigned max_degp)
 {
   // FIXME: Everything breaks in characteristic 3 if bucket regions are not of
   // size 2^8 or 2^16. This would indeed imply that bucket regions would not
@@ -137,6 +139,10 @@ void buckets_init(buckets_ptr buckets, unsigned I, unsigned J,
 
   unsigned n        = 1 + ((ijvec_get_max_pos(I, J)-1) >> UPDATE_POS_BITS);
   buckets->n        = n;
+  // The size of the buckets is the number of hits divided by the number
+  // of buckets. But we take of margin of 10%, and an offset of 1000 to
+  // allow for deviations.
+  unsigned max_size = (unsigned)((1.1*hits / n)+1000);
   buckets->max_size = max_size;
   buckets->min_degp = min_degp;
   buckets->max_degp = max_degp;
@@ -187,11 +193,11 @@ unsigned bucket_region_size()
 
 
 // Print information about the buckets.
-void print_bucket_info(buckets_srcptr buckets)
+void print_bucket_info(buckets_srcptr buckets0, buckets_srcptr buckets1)
 {
-  printf("# buckets info:\n");
-  printf("#   nb of buckets   = %u\n", buckets->n);
-  printf("#   size of buckets = %u\n", buckets->max_size);
+  printf("#   nb of buckets   = %u\n", buckets0->n);
+  printf("#   size of buckets on side 0 = %u\n", buckets0->max_size);
+  printf("#   size of buckets on side 1 = %u\n", buckets1->max_size);
   printf("#   size of bucket-region (ie, 2^UPDATE_POS_BITS) = %d\n",
          bucket_region_size());
   printf("#   number of bits for the hint = %d\n", UPDATE_HINT_BITS);
@@ -207,99 +213,97 @@ void print_bucket_info(buckets_srcptr buckets)
 // In the case of sublattices, compute the starting point for the sieve
 // by gothp for the current sublattice.
 // If there is no starting point return 0.
-static int compute_starting_point(ijvec_ptr V0, ijbasis_ptr euclid,
-                                  sublat_srcptr sublat)
+// This code is specific to GF(2).
+static MAYBE_UNUSED
+int compute_starting_point(ijvec_ptr V0,
+                           MAYBE_UNUSED unsigned I,
+                           MAYBE_UNUSED ijvec_t *euclid,
+                           MAYBE_UNUSED unsigned euclid_dim,
+                           MAYBE_UNUSED unsigned hatI,
+                           MAYBE_UNUSED unsigned hatJ,
+                           sublat_srcptr sublat)
 {
-    if (!use_sublat(sublat)) {
-        ijvec_set_zero(V0);
+  if (!use_sublat(sublat)) {
+    ijvec_set_zero(V0);
+    return 1;
+  }
+#if !defined(DISABLE_SUBLAT) && defined(USE_F2)
+  fppol8_t i0, j0;
+  fppol8_set_16(i0,sublat->lat[sublat->n][0]);
+  fppol8_set_16(j0,sublat->lat[sublat->n][1]);
+
+  // case of just one vector in euclid.vec
+  if (euclid_dim == 1) {
+    ij_t     i, j;
+    fppol8_t rem;
+    ijvec_get_i_j(i, j, euclid[0], hatI);
+    sublat_mod_ij(rem, i);
+    if (fppol8_eq(rem, i0)) {
+      sublat_mod_ij(rem, j);
+      if (fppol8_eq(rem, j0)) {
+        // Got a valid point!
+        sublat_div_ij(i, i);
+        sublat_div_ij(j, j);
+        ijvec_set_i_j(V0, i, j, I);
         return 1;
-    }
-    int hatI = euclid->I;
-    int hatJ = euclid->J;
-    // TODO: FIXME: WARNING: this whole block is to be rewritten
-    // completely!
-
-    // There must be some Thm that says that a combination of
-    // the first two or of the second two basis vectors is
-    // enough to find a valid starting point (assuming that
-    // the basis is sorted in increasing order for deg j).
-    // Cf a .tex that is to be written.
-    // If p is too large, then the code below is broken (and
-    // anyway, this is a weird idea to sieve with such
-    // parameters).
-
-    // Try with the first 2 fundamental vectors and if this does not
-    // work, try with the second 2 vectors.
-    // TODO: question: does it ensures that vectors will be
-    // visited in increasing order of j ?
-    // FIXME: What if there are only 2 fundamental vectors?
-    //
-    //
-
-    // Naive approach: check all combinations.
-    ij_t ijmod, xi, yi;
-    ij_set_16(ijmod, sublat->modulus);
-    ij_set_16(xi, sublat->lat[sublat->n][0]);
-    ij_set_16(yi, sublat->lat[sublat->n][1]);
-    int found = 0;
-
-    // case of just one vector in euclid.vec
-    if (euclid->dim == 1) {
-      ij_t rem;
-      ij_rem(rem, euclid->v[0]->i, ijmod);
-      if (ij_eq(rem, xi)) {
-        ij_rem(rem, euclid->v[0]->j, ijmod);
-        if (ij_eq(rem, yi)) {
-          // Got a valid point!
-          ij_sub(V0->i, euclid->v[0]->i, xi);
-          ij_div(V0->i, V0->i, ijmod);
-          ij_sub(V0->j, euclid->v[0]->j, yi);
-          ij_div(V0->j, V0->j, ijmod);
-          found = 1;
-        }
       }
     }
+    return 0;
+  }
 
-    for (unsigned int ind = 0; (!found) && ind < euclid->dim-1; ++ind) {
-      for (int i0 = 0; (!found) && i0 < 2; ++i0)
-        for (int i1 = 0; (!found) && i1 < 2; ++i1)
-          for (int i2 = 0; (!found) && i2 < 2; ++i2)
-            for (int i3 = 0; (!found) && i3 < 2; ++i3){
-              ijvec_t W, tmp;
-              ijvec_set_zero(W);
-              int i01 = i0 ^ i1;
-              int i23 = i2 ^ i3;
-              if (i0) ijvec_add(W,W,euclid->v[ind]);
-              if (i2) ijvec_add(W,W,euclid->v[ind+1]);
-              if (i01) {
-                ijvec_mul_ti(tmp,euclid->v[ind],1);
-                ijvec_add(W, W, tmp);
-              }
-              if (i23) {
-                ijvec_mul_ti(tmp,euclid->v[ind+1],1);
-                ijvec_add(W, W, tmp);
-              }
-              if ((ij_deg(W->i) >= hatI)
-                  || (ij_deg(W->j) >= hatJ))
-                continue;
-              ij_t rem;
-              ij_rem(rem, W->i, ijmod);
-              if (!ij_eq(rem, xi))
-                continue;
-              ij_rem(rem, W->j, ijmod);
-              if (!ij_eq(rem, yi))
-                continue;
-              // Got a valid point!
-              ij_sub(W->i, W->i, xi);
-              ij_div(V0->i, W->i, ijmod);
-              ij_sub(W->j, W->j, yi);
-              ij_div(V0->j, W->j, ijmod);
-              found = 1;
-            }
-    }
-    return found;
+  // Try to combine the first two vectors of the euclidian sequence.
+  // If this does not work, the next two should do.
+  // For that, we multiply the vector (i0, j0) by the inverse of the 
+  // 2x2 matrix formed by the coordinates of the base vectors.
+  // since we are working modulo (t^2+t), the determinant of the matrix,
+  // which is invertible, is necessarily equal to 1, so its inverse is
+  // trivial.
+  for (unsigned ind = 0; ind < MIN(2, euclid_dim-1); ++ind) {
+    ij_t a,b,c,d;
+    ijvec_get_i_j(a, b, euclid[ind],   hatI);
+    ijvec_get_i_j(c, d, euclid[ind+1], hatI);
+
+    fppol8_t aa, bb, cc, dd;
+    sublat_mod_ij(aa, a);
+    sublat_mod_ij(bb, b);
+    sublat_mod_ij(cc, c);
+    sublat_mod_ij(dd, d);
+
+    fppol8_t alpha, beta;
+    sublat_mul(alpha, dd, i0);
+    sublat_addmul(alpha, alpha, cc, j0);
+// TODO: this shortcut is invalid, but one could fix it.
+#if 0
+    // In the first pass, v0 has max degree, so if alpha has degree 1,
+    // it won't work. 
+    if ((ind == 0) && (alpha[0] & 2u))
+      continue;
+#endif
+    sublat_mul(beta, bb, i0);
+    sublat_addmul(beta, beta, aa, j0);
+
+    ij_t i, j, tmp1, tmp2;
+    ij_mul_sublat(tmp1, a, alpha);
+    ij_mul_sublat(tmp2, c, beta);
+    ij_add(tmp1, tmp1, tmp2);
+    if (ij_deg(tmp1) >= (signed)hatI)
+      continue;
+    sublat_div_ij(i, tmp1);
+    ij_mul_sublat(tmp1, b, alpha);
+    ij_mul_sublat(tmp2, d, beta);
+    ij_add(tmp1, tmp1, tmp2);
+    if (ij_deg(tmp1) >= (signed)hatJ)
+      continue;
+    sublat_div_ij(j, tmp1);
+    ijvec_set_i_j(V0, i, j, I);
+    return 1;
+  }
+  return 0;
+#endif
+
+  // should never go there.
+  ASSERT_ALWAYS(0);
 }
-
 
 // Push an update into the corresponding bucket.
 static inline
@@ -308,7 +312,7 @@ void buckets_push_update(MAYBE_UNUSED buckets_ptr buckets,
                          ijvec_srcptr v, unsigned I, unsigned J)
 {
   ijpos_t  pos = ijvec_get_pos(v, I, J);
-  unsigned k   = pos >> UPDATE_POS_BITS;
+  size_t   k   = pos >> UPDATE_POS_BITS;
   pos_t    p   = pos & (((pos_t)1<<UPDATE_POS_BITS)-1);
   ASSERT(ptr[k] - buckets->start[k] < buckets->max_size);
 #ifdef BUCKET_RESIEVE
@@ -333,18 +337,15 @@ void buckets_push_update(MAYBE_UNUSED buckets_ptr buckets,
 void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
         sublat_srcptr sublat, unsigned I, unsigned J, qlat_srcptr qlat)
 {
-  ijbasis_t basis;
-  ijbasis_t euclid;
-  unsigned  hatI, hatJ;
-  hatI = I + sublat->deg;
-  hatJ = J + sublat->deg;
+  unsigned hatI = I + sublat->deg, hatJ = J + sublat->deg;
+  ijvec_t *basis  = (ijvec_t *)malloc((I+J)       * sizeof(ijvec_t));
+  ijvec_t *euclid = (ijvec_t *)malloc((hatI+hatJ) * sizeof(ijvec_t));
+  ASSERT_ALWAYS(basis  != NULL);
+  ASSERT_ALWAYS(euclid != NULL);
 
   // The bucket sieve requires all considered ideals to be of degree larger
   // than I.
   ASSERT_ALWAYS(buckets->min_degp >= I);
-
-  ijbasis_init(basis,     I,    J);
-  ijbasis_init(euclid, hatI, hatJ);
 
   // Pointers to the current writing position in each bucket.
   update_packed_t **ptr =
@@ -359,31 +360,81 @@ void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
 
   // Go through the factor base by successive deg(gothp).
   // We should have no small prime in this factor base.
-  large_fbideal_srcptr gothp = FB->elts[0];
+  large_fbideal_ptr gothp = FB->elts[0];
   ASSERT_ALWAYS(fbideal_deg(gothp) >= buckets->min_degp);
   unsigned i = 0;
   for (unsigned degp = buckets->min_degp; degp < buckets->max_degp; ++degp) {
-    // Not supported yet.
-    if (use_sublat(sublat) && degp == 1) continue;
+    ASSERT(degp >= I);
 
     // Go through each prime ideal of degree degp.
     for (; i < FB->n && fbideal_deg(gothp) == degp; ++i, ++gothp) {
       fbprime_t lambda;
-      compute_lambda(lambda, gothp->p, gothp->r, qlat);
+      if (sublat->n == 0) {
+        compute_lambda(lambda, gothp->p, gothp->r, qlat);
+#       ifndef DISABLE_SUBLAT
+        if (use_sublat(sublat))
+          fbprime_set(gothp->lambda, lambda);
+#       endif
+      } else {
+        // TODO: we don't really need to save lambda.
+#       ifndef DISABLE_SUBLAT
+        fbprime_set(lambda, gothp->lambda);
+#       endif
+      }
 
       if (fbprime_eq(lambda, gothp->p)) {
           // This is a projective root. For the moment, we skip them.
           continue;
       }
+      
+      hint_t hint = 0;
+#ifdef BUCKET_RESIEVE
+      hint = i;
+#endif
 
-      ijbasis_compute_large(euclid, basis, gothp, lambda);
+      unsigned dim, euclid_dim;
+      if (sublat->n == 0) {
+        ijbasis_compute_large(basis, &dim, I, J,
+            euclid, &euclid_dim, hatI, hatJ,
+            gothp, lambda);
+#       ifndef DISABLE_SUBLAT
+        if (use_sublat(sublat)) {
+          // save the first 3 vectors of the Euclid basis
+          for (unsigned int k = 0; k < MIN(euclid_dim, 3); ++k)
+            ijvec_set(gothp->euclid[k], euclid[k]);
+          for (unsigned int k = MIN(euclid_dim, 3); k < 3; ++k)
+            ijvec_set_zero(gothp->euclid[k]);
+        }
+#       endif
+      }
+#     ifndef DISABLE_SUBLAT
+      else {
+        // recover basis from the saved vectors
+        ijbasis_complete_large(basis, &dim, I, J, gothp->euclid,
+            hatI, hatJ);
+      }
+#     endif
+
       ijvec_t v;
+#     ifndef DISABLE_SUBLAT
       if (use_sublat(sublat)) {
-        int st = compute_starting_point(v, euclid, sublat);
+        euclid_dim = 3;
+        if (ijvec_is_zero(gothp->euclid[2])) {
+          euclid_dim = 2;
+          if (ijvec_is_zero(gothp->euclid[1])) {
+            euclid_dim = 1;
+          }
+        }
+        int st = compute_starting_point(v, I, gothp->euclid, euclid_dim,
+                                        hatI, hatJ, sublat);
         if (!st)
           continue; // next factor base prime.
+        // The first position is to be sieved when we use sublat, but
+        // otherwise not, since this is (0,0).
+        buckets_push_update(buckets, ptr, hint, v, I, J);
       }
       else
+#     endif
         ijvec_set_zero(v);
 
       // Size of Gray codes to use for the inner loop.
@@ -399,21 +450,17 @@ void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
 
       // We only need the "monic" Gray code for the first iteration. Jump
       // directly there in the array.
-      unsigned gray_dim = MIN(basis->dim, ENUM_LATTICE_UNROLL);
+      unsigned gray_dim = MIN(dim, ENUM_LATTICE_UNROLL);
       unsigned i0       = ngray - GRAY_LENGTH(gray_dim) / (__FP_SIZE-1);
 
-      hint_t hint = 0;
-#ifdef BUCKET_RESIEVE
-      hint = i;
-#endif
       ij_t s, t;
       ij_set_zero(t);
-      int rc = basis->dim > ENUM_LATTICE_UNROLL;
+      int rc = dim > ENUM_LATTICE_UNROLL;
       do {
         // Inner-level Gray code enumeration: just go through the Gray code
         // array, each time adding the indicated basis vector.
         for (unsigned ii = i0; ii < ngray; ++ii) {
-          ijvec_add(v, v, basis->v[gray[ii]]);
+          ijvec_add(v, v, basis[gray[ii]]);
           buckets_push_update(buckets, ptr, hint, v, I, J);
         }
         i0 = 0;
@@ -423,10 +470,10 @@ void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
         // vector should be added to the current lattice point.
         // rc is set to 0 when all vectors have been enumerated.
         ij_set(s, t);
-        rc = rc && ij_monic_set_next(t, t, basis->dim-ENUM_LATTICE_UNROLL);
+        rc = rc && ij_monic_set_next(t, t, dim-ENUM_LATTICE_UNROLL);
         if (rc) {
           ij_diff(s, s, t);
-          ijvec_add(v, v, basis->v[ij_deg(s)+ENUM_LATTICE_UNROLL]);
+          ijvec_add(v, v, basis[ij_deg(s)+ENUM_LATTICE_UNROLL]);
           buckets_push_update(buckets, ptr, hint, v, I, J);
         }
       } while (rc);
@@ -441,8 +488,8 @@ void buckets_fill(buckets_ptr buckets, large_factor_base_srcptr FB,
   //  printf("# #updates[%u] = %u\n", k, ptr[k]-buckets->start[k]);
 
   free(ptr);
-  ijbasis_clear(euclid);
-  ijbasis_clear(basis);
+  free(basis);
+  free(euclid);
 }
 
 // Apply all the updates from a given bucket to the sieve region S.

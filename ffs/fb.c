@@ -74,7 +74,7 @@ void normalized_echelon_multiples(ij_t *basis, fbprime_t p, int degp, int J)
 // Precompute what we can at this early stage.
 static
 void push_small_ideal(small_factor_base_ptr FB, fbprime_t p, fbprime_t r,
-    unsigned degp, int power, unsigned I, unsigned J)
+    unsigned degp, int power, unsigned I, unsigned J, sublat_ptr sublat)
 {
   unsigned alloc = FB->alloc;
   if (alloc <= FB->n) {
@@ -89,13 +89,27 @@ void push_small_ideal(small_factor_base_ptr FB, fbprime_t p, fbprime_t r,
   FB->elts[FB->n]->degp = degp;
   FB->elts[FB->n]->degq = fbprime_deg(p);
   FB->elts[FB->n]->power = power;
+  // In case we are using sublattices, precompute 1/p mod modulus
+  if (use_sublat(sublat)) {
+    int ret;
+    ij_t tmp;
+    ij_t ijmod;
+    if (use_sublat(sublat))
+      ij_set_16(ijmod, sublat->modulus);
+    ij_set_fbprime(tmp, FB->elts[FB->n]->q);
+    ij_rem(tmp, tmp, ijmod);
+    ret = ij_invmod(FB->elts[FB->n]->tildep, tmp, ijmod);
+    if (!ret)
+      ij_set_zero(FB->elts[FB->n]->tildep);
+  }
 
-  FB->elts[FB->n]->projective_basis = (ij_t *)malloc(J*sizeof(ij_t));
+  FB->elts[FB->n]->basis            = (ij_t *)malloc((I+J)*sizeof(ij_t));
+  FB->elts[FB->n]->adjustment_basis = (ij_t *)malloc(   J *sizeof(ij_t));
+  FB->elts[FB->n]->projective_basis = (ij_t *)malloc(   J *sizeof(ij_t));
+  ASSERT_ALWAYS(FB->elts[FB->n]->basis            != NULL);
+  ASSERT_ALWAYS(FB->elts[FB->n]->adjustment_basis != NULL);
   ASSERT_ALWAYS(FB->elts[FB->n]->projective_basis != NULL);
-      
-  ijbasis_init(FB->elts[FB->n]->basis, I, J);
-  ijbasis_init(FB->elts[FB->n]->adjustment_basis, I, J);
-  
+
   normalized_echelon_multiples(FB->elts[FB->n]->projective_basis, p,
       fbprime_deg(p), J);
 
@@ -106,7 +120,7 @@ void push_small_ideal(small_factor_base_ptr FB, fbprime_t p, fbprime_t r,
 
 static
 void push_large_ideal(large_factor_base_ptr FB, fbprime_t p, fbprime_t r,
-    unsigned degp)
+    unsigned degp, MAYBE_UNUSED sublat_ptr sublat)
 {
   unsigned alloc = FB->alloc;
   if (alloc <= FB->n) {
@@ -126,16 +140,16 @@ void push_large_ideal(large_factor_base_ptr FB, fbprime_t p, fbprime_t r,
 static
 void push_ideal(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
     fbprime_t p, fbprime_t r, unsigned degp, int power, unsigned min_degp,
-    unsigned I, unsigned J)
+    unsigned I, unsigned J, sublat_ptr sublat)
 {
   if (degp < min_degp)
-    push_small_ideal(SFB, p, r, degp, power, I, J);
+    push_small_ideal(SFB, p, r, degp, power, I, J, sublat);
   else {
     if (power) {
       fprintf(stderr, "Warning: large power in factor base. Ignoring...\n");
       return;
     }
-    push_large_ideal(LFB, p, r, degp);
+    push_large_ideal(LFB, p, r, degp, sublat);
   }
 }
 
@@ -150,7 +164,7 @@ void push_ideal(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
 // Return 1 if successful.
 int factor_base_init(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
     const char *filename, unsigned sorted_min_degp, unsigned max_degp,
-    unsigned I, unsigned J)
+    unsigned I, unsigned J, sublat_ptr sublat)
 {
   FILE *file;
   file = fopen(filename, "r");
@@ -263,7 +277,7 @@ int factor_base_init(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
       return 0;
     }
 
-    push_ideal(LFB, SFB, p, r, degp, power, sorted_min_degp, I, J);
+    push_ideal(LFB, SFB, p, r, degp, power, sorted_min_degp, I, J, sublat);
 
     // Other r's ?
     while ((c = getc(file)) == ',') {
@@ -274,7 +288,7 @@ int factor_base_init(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
         return 0;
       }
     
-      push_ideal(LFB, SFB, p, r, degp, power, sorted_min_degp, I, J);
+      push_ideal(LFB, SFB, p, r, degp, power, sorted_min_degp, I, J, sublat);
     }
     ungetc(c, file);
   }
@@ -305,24 +319,18 @@ int factor_base_init(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
 }
 
 
-void small_factor_base_precomp(small_factor_base_ptr FB, qlat_srcptr qlat,
-    sublat_ptr sublat)
+void small_factor_base_precomp(small_factor_base_ptr FB,
+                               unsigned I, unsigned J, qlat_srcptr qlat)
 {
   for (unsigned i = 0; i < FB->n; ++i) {
-    fbprime_t lambda;
     small_fbideal_ptr gothp = FB->elts[i];
-    compute_lambda(lambda, gothp->q, gothp->r, qlat);
-    if (fbprime_eq(lambda, gothp->q)) {
+    compute_lambda(gothp->lambda, gothp->q, gothp->r, qlat);
+    if (fbprime_eq(gothp->lambda, gothp->q)) {
       gothp->proj = 1;
-      gothp->basis->dim = 0;
-      gothp->adjustment_basis->dim = 0;
     } else {
       gothp->proj = 0;
       ijbasis_compute_small(gothp->basis, gothp->adjustment_basis,
-          gothp, lambda);
-      if (use_sublat(sublat)) {
-        // XXX TODO: precompute tildep
-      }
+          gothp, gothp->lambda, I, J);
     }
   }
 }
@@ -342,10 +350,29 @@ unsigned factor_base_max_degp(large_factor_base_srcptr FB)
 void factor_base_clear(large_factor_base_ptr LFB, small_factor_base_ptr SFB)
 {
   for (unsigned i = 0; i < SFB->n; ++i) {
+    free(SFB->elts[i]->basis);
+    free(SFB->elts[i]->adjustment_basis);
     free(SFB->elts[i]->projective_basis);
-    ijbasis_clear(SFB->elts[i]->basis);
-    ijbasis_clear(SFB->elts[i]->adjustment_basis);
   }
   free(LFB->elts);
   free(SFB->elts);
+}
+
+double expected_hit_number(large_factor_base_srcptr LFB,
+    unsigned I, unsigned J)
+{
+  double powers[I+J];
+  powers[0] = 1.0;
+  for (unsigned i = 1; i < I+J; ++i)
+    powers[i] = powers[i-1]*FP_SIZE;
+  double nb = 0;
+  large_fbideal_t * ptr = LFB->elts; 
+  for (unsigned i = 0; i < LFB->n; ++i, ptr++) {
+    unsigned L = fbideal_deg(ptr[0]);
+    if (L <= I+J)
+      nb += powers[I+J-L];
+    else
+      nb += 1/powers[L-(I+J)];
+  }
+  return nb;
 }

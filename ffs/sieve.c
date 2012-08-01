@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <string.h>
 #include <inttypes.h>
+#include <math.h>
 #include "macros.h"
 
 #include "types.h"
@@ -116,6 +117,103 @@ int sq_is_irreducible(sq_srcptr p) {
     return ret;
 }
 
+typedef struct {
+    int nrels;
+    double time;
+    qlat_t qlat;
+} stats_sq_struct;
+
+typedef struct {
+    stats_sq_struct * data;
+    int n;
+    int alloc;
+} stats_yield_struct;
+
+typedef stats_yield_struct stats_yield_t[1];
+typedef stats_yield_struct *stats_yield_ptr;
+typedef const stats_yield_struct *stats_yield_srcptr;
+
+void stats_yield_init(stats_yield_ptr stats_yield)
+{
+    stats_yield->n = 0;
+    stats_yield->alloc = 100;
+    stats_yield->data = (stats_sq_struct *)malloc(100*sizeof(stats_sq_struct));
+    ASSERT_ALWAYS(stats_yield->data != NULL);
+}
+
+void stats_yield_clear(stats_yield_ptr stats_yield)
+{
+    free(stats_yield->data);
+}
+
+void stats_yield_push(stats_yield_ptr stats_yield, int nrels, double time,
+        qlat_srcptr qlat)
+{
+    if (stats_yield->n == stats_yield->alloc) {
+        stats_yield->alloc += 100;
+        stats_yield->data = (stats_sq_struct *)realloc(
+                stats_yield->data, 
+                stats_yield->alloc*sizeof(stats_sq_struct));
+        ASSERT_ALWAYS(stats_yield->data != NULL);
+    }
+    stats_yield->data[stats_yield->n].nrels = nrels;
+    stats_yield->data[stats_yield->n].time = time;
+    memcpy(&stats_yield->data[stats_yield->n].qlat[0],
+            qlat, sizeof(qlat_t));
+    stats_yield->n++;
+}
+
+// Attempt to compute a confidence interval for the average yield.
+void yield_confidence_interval(double *av_yield, double * ci68, double * ci95,
+        double * ci99, stats_yield_srcptr stats_yield)
+{
+    long tot_rels = 0;
+    *av_yield = 0;
+    int n = stats_yield->n;
+    for (int i = 0; i < n; ++i) {
+        tot_rels += stats_yield->data[i].nrels;
+        *av_yield += stats_yield->data[i].time;
+    }
+    *av_yield /= tot_rels;
+
+    double sigma = 0;
+    for (int i = 0; i < n; ++i) {
+        double diff = stats_yield->data[i].time/stats_yield->data[i].nrels
+            - *av_yield;
+        sigma += stats_yield->data[i].nrels*diff*diff;
+    }
+    sigma /= (tot_rels-1);  // the "-1" is supposed to give a better estimator.
+    sigma = sqrt(sigma);
+    // We divide by n and not by tot_rels, because the number of samples
+    // is more the number of special-q than the number of relations.
+    // Indeed, the yield starts to make sense only at the special-q
+    // level.
+    // On the other hand, we used individual relations before, because we
+    // want a notion of average yield that is global, and the variation
+    // of the number of relations is correlated to the yield for a given
+    // q.
+    // TODO: ask someone who knows about statistics if this is correct.
+    if (ci68 != NULL) 
+        *ci68 = sigma/sqrt(n);
+    if (ci95 != NULL) 
+        *ci95 = 2*sigma/sqrt(n);
+    if (ci99 != NULL) 
+        *ci99 = 3*sigma/sqrt(n);
+}
+
+// Attempt to compute a confidence interval for the average yield.
+void stats_yield_print_ci(stats_yield_srcptr stats_yield)
+{
+    double ci68, ci95, ci99, av_yield;
+    yield_confidence_interval(&av_yield, &ci68, &ci95, &ci99, stats_yield);
+    printf("#   Confidence interval for yield at 68.2%%: [%1.4f - %1.4f]\n",
+            av_yield - ci68, av_yield + ci68);
+    printf("#                                 at 95.4%%: [%1.4f - %1.4f]\n",
+            av_yield - ci95, av_yield + ci95);
+    printf("#                                 at 99.7%%: [%1.4f - %1.4f]\n",
+            av_yield - ci99, av_yield + ci99);
+}
+
 #define SQSIDE_DEFAULT 0
 #define FIRSTSIEVE_DEFAULT 0
 
@@ -141,7 +239,13 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "  rho  *           rho-poly of the special-q\n");
     fprintf(stderr, "  q0   *           lower bound for special-q range\n");
     fprintf(stderr, "  q1   *           lower bound for special-q range\n");
-    fprintf(stderr, "    Note: giving (q0,q1) is exclusive to giving (q,rho). In the latter case,\n" "    rho is optional.\n");
+    fprintf(stderr, "  sqt  [2]         skip special-q whose defect is sqt or more\n");
+    fprintf(stderr, "  bench            bench-mode. Takes parameter of the form deg0-deg1\n");
+    fprintf(stderr, "                   and estimates the time and number of rels for corresping sq.\n");
+    fprintf(stderr, "                   q0 and q1 are ignored.\n");
+    fprintf(stderr, "  reliableyield    ignore q1, run until estimated yield is reliable\n");
+    fprintf(stderr, "                   that is in a +/-3%% interval with 95%% confidence level.\n");
+    fprintf(stderr, "Note: giving (q0,q1) is exclusive to giving (q,rho). In the latter case,\n" "    rho is optional.\n");
     fprintf(stderr, "  sqside           side (0 or 1) of the special-q (default %d)\n", SQSIDE_DEFAULT);
     fprintf(stderr, "  firstsieve       side (0 or 1) to sieve first (default %d)\n", FIRSTSIEVE_DEFAULT);
     fprintf(stderr, "  S                skewness, i.e. deg(a)-deg(b)\n");
@@ -171,10 +275,17 @@ int main(int argc, char **argv)
     int rho_given = 0;
     int skewness = 0;
     int gf = 0;
+    int want_reliable_yield = 0;
+    int sqt = 2;
+    int bench = 0;
+    int bench_end = 0;
+    double bench_tot_rels = 0;
+    double bench_tot_time = 0;
 
     param_list pl;
     param_list_init(pl);
     param_list_configure_knob(pl, "-sublat", &want_sublat);
+    param_list_configure_knob(pl, "-reliableyield", &want_reliable_yield);
     argv++, argc--;
     for (; argc;) {
         if (param_list_update_cmdline(pl, &argc, &argv)) {
@@ -216,6 +327,7 @@ int main(int argc, char **argv)
         ffspol_set_str(ffspol[1], polstr);
     }
     // read various bounds
+    param_list_parse_int(pl, "sqt", &sqt); 
     param_list_parse_int(pl, "S", &skewness); 
     param_list_parse_int(pl, "I", &I); 
     param_list_parse_int(pl, "J", &J); 
@@ -262,6 +374,20 @@ int main(int argc, char **argv)
         } else {
             sq_set_zero(q0);
             sq_set_zero(q1);
+        }
+    }
+
+    // want to bench ?
+    {
+        int res[2];
+        int ret = param_list_parse_int_and_int(pl, "bench", res, "-");
+        if (ret) {
+            bench = 1;
+            bench_end = res[1];
+            sq_set_ti(q0, res[0]);
+            sq_t range;
+            sq_set_ti(range, 10);
+            sq_add(q1, q0, range);
         }
     }
 
@@ -316,7 +442,29 @@ int main(int argc, char **argv)
         fprintf(stderr, "firstsieve must be 0 or 1\n");
         exit(EXIT_FAILURE);
     }
-   
+ 
+#ifdef USE_F2
+    sublat_ptr sublat;
+    if (want_sublat) {
+#ifdef DISABLE_SUBLAT
+        fprintf(stderr,
+                "Error: your binary was compiled with DISABLE_SUBLAT\n");
+        exit(EXIT_FAILURE);
+#endif
+        sublat = &nine_sublat[0];
+    } else
+        sublat = &no_sublat[0];
+#else
+    if (want_sublat)
+        fprintf(stderr, "# Sorry, no sublattices in characteristic > 2. Ignoring the 'sublat' option\n");
+    sublat_ptr sublat = &no_sublat[0];
+#endif
+  
+    // Most of what we do is at the sublattice level. 
+    // So we fix I and J accordingly.
+    I -= sublat->deg;
+    J -= sublat->deg;
+
     // Read the factor bases
     {
         const char *filename;
@@ -328,7 +476,8 @@ int main(int argc, char **argv)
             filename = param_list_lookup_string(pl, param);
             if (filename == NULL) usage(argv0, param);
             double tm = seconds();
-            noerr = factor_base_init(LFB[i], SFB[i], filename, I, fbb[i], I, J);
+            noerr = factor_base_init(LFB[i], SFB[i], filename, I, fbb[i],
+                    I, J, sublat);
             fprintf(stdout, "# Reading factor base %d took %1.1f s\n", 
                     i, seconds()-tm);
             if (!noerr) {
@@ -341,46 +490,22 @@ int main(int argc, char **argv)
 
     param_list_clear(pl);
 
-    if (want_sublat) {
-        fprintf(stderr, "# WARNING: sublattices seem to be broken, and won't be fixed soon.\n");
-
-        // TODO: init tildep in the factor bases, here.
-    }
-
-#ifdef USE_F2
-    sublat_ptr sublat;
-    if (want_sublat)
-        sublat = &nine_sublat[0];
-    else
-        sublat = &no_sublat[0];
-#else
-    if (want_sublat)
-        fprintf(stderr, "# Sorry, no sublattices in characteristic > 2. Ignoring the 'sublat' option\n");
-    sublat_ptr sublat = &no_sublat[0];
-#endif
-
-
-    // Most of what we do is at the sublattice level. 
-    // So we fix I and J accordingly.
-    I -= sublat->deg;
-    J -= sublat->deg;
-
     // Allocate storage space for the buckets.
-    // FIXME: The bucket capacity is hardcoded for the moment.
     buckets_t buckets[2];
-    buckets_init(buckets[0], I, J, 1<<16, I, 1+factor_base_max_degp(LFB[0]));
-    buckets_init(buckets[1], I, J, 1<<16, I, 1+factor_base_max_degp(LFB[1]));
+    buckets_init(buckets[0], I, J, expected_hit_number(LFB[0], I, J),
+            I, 1+factor_base_max_degp(LFB[0]));
+    buckets_init(buckets[1], I, J, expected_hit_number(LFB[1], I, J),
+            I, 1+factor_base_max_degp(LFB[1]));
     ASSERT_ALWAYS(buckets[0]->n == buckets[1]->n);
-    print_bucket_info(buckets[0]);
+    print_bucket_info(buckets[0], buckets[1]);
     fflush(stdout);
 
 #ifdef BUCKET_RESIEVE
     replayable_bucket_t replayable_bucket[2];
-    // FIXME: we copy the hardcoded capacity of buckets
     replayable_bucket[0]->b = (__replayable_update_struct *)
-        malloc((1<<16) * sizeof(__replayable_update_struct));
+        malloc((buckets[0]->max_size) * sizeof(__replayable_update_struct));
     replayable_bucket[1]->b = (__replayable_update_struct *)
-        malloc((1<<16) * sizeof(__replayable_update_struct));
+        malloc((buckets[1]->max_size) * sizeof(__replayable_update_struct));
     ASSERT_ALWAYS(replayable_bucket[0]->b != NULL);
     ASSERT_ALWAYS(replayable_bucket[1]->b != NULL);
 #else
@@ -400,9 +525,9 @@ int main(int argc, char **argv)
     double tot_time = seconds();
     double tot_norms = 0;
     double tot_sieve = 0;
-    double tot_buckets = 0;
+    double tot_buck_fill = 0;
+    double tot_buck_apply = 0;
     double tot_cofact = 0;
-    double tot_init = 0;
 
     int tot_nrels = 0;
     int tot_sq = 0;
@@ -435,6 +560,8 @@ int main(int argc, char **argv)
         }
     }
 
+    stats_yield_t stats_yield;
+    stats_yield_init(stats_yield);
 
     //
     // Begin of loop over special-q's
@@ -449,8 +576,58 @@ int main(int argc, char **argv)
                 nroots = sq_roots(roots, q0, ffspol[sqside]);
             } while (nroots == 0);
 
-            if (sq_cmp(q0, q1) >= 0)
-                break;
+            if (want_reliable_yield) {
+                if (stats_yield->n > 10) {
+                    double av_yield, ci95;
+                    yield_confidence_interval(&av_yield, NULL, &ci95, NULL,
+                            stats_yield);
+                    printf("############################################\n");
+                    printf("#   Current average yield: %1.2f\n", av_yield);
+                    stats_yield_print_ci(stats_yield);
+                    if (ci95/av_yield < 0.03)
+                        break;
+                }
+            } else if (sq_cmp(q0, q1) >= 0) {
+                if (!bench)
+                    break; 
+                int degq0 = sq_deg(q0);
+                double rpq = (double)tot_nrels / (double)tot_sq;
+                double nsq = (double)(1L<<degq0) / (double)degq0;
+                double nr = rpq*nsq;
+                printf("#BENCH ###########################################\n");
+                printf("#BENCH Estimations for special-q's of degree %d:\n",
+                        degq0);
+                printf("#BENCH   rels per sq: %1.2f rel/sq\n", rpq);
+                printf("#BENCH   rels for all sq: %1.0f\n", nr);
+                tot_time = seconds()-tot_time;
+                double yield = (double)tot_time / (double)tot_nrels;
+                double tm = yield*nr;
+                printf("#BENCH   yield: %1.2f s/rel\n", yield);
+                printf("#BENCH   time: %1.0f s", tm);
+                printf(" = %1.1f d\n", tm/86400);
+                bench_tot_rels += nr;
+                bench_tot_time += tm;
+                printf("#BENCH Accumulated data for deg up to %d:\n", degq0);
+                printf("#BENCH   total rels: %1.0f\n", bench_tot_rels);
+                printf("#BENCH   total time: %1.0f s", bench_tot_time);
+                printf(" = %1.1f d\n", bench_tot_time/86400);
+                printf("#BENCH ###########################################\n");
+                tot_nrels = 0;
+                tot_time = seconds();
+                tot_sq = 0;
+                
+                if (degq0 >= bench_end)
+                    break;
+                else {
+                    // select next degree to bench
+                    sq_set_ti(q0, degq0+1);
+                    sq_t range;
+                    sq_set_ti(range, 10);
+                    sq_add(q1, q0, range);
+                    nroots = 0;
+                    continue;
+                }
+            }
 
             printf("############################################\n");
             printf("# Roots for q = "); 
@@ -476,12 +653,11 @@ int main(int argc, char **argv)
 
         double t_norms = 0;
         double t_sieve = 0;
-        double t_buckets = 0;
+        double t_buck_fill = 0;
+        double t_buck_apply = 0;
         double t_cofact = 0;
-        double t_init = 0;
         int nrels = 0;
 
-        t_init -= seconds();
         // Check the given special-q
         if (!is_valid_sq(qlat, ffspol[sqside])) {
             fprintf(stderr, "Error: the rho = ");
@@ -499,15 +675,30 @@ int main(int argc, char **argv)
         print_qlat_info(qlat);
         fflush(stdout);
 
+        // If the reduced q-lattice is still too unbalanced, then skip it.
+        {
+            int opt_deg = 1 + (sq_deg(qlat->q)+1)/2;
+            int sqsize = MAX(
+                    MAX(ai_deg(qlat->a0), ai_deg(qlat->a1)),
+                    MAX(skewness+ai_deg(qlat->b0), skewness+ai_deg(qlat->b1))
+                    );
+            printf("#   qlat vector degree: %d\n", sqsize);
+            if (sqsize >= opt_deg + sqt) {
+                printf("# Special-q lattice basis is too unbalanced, let's skip it!\n");
+                tot_sq--;
+                continue;
+            }
+        }
+
         // Precompute all the data for small factor base elements.
         for (int i = 0; i < 2; ++i)
-            small_factor_base_precomp(SFB[i], qlat, sublat);
-        t_init += seconds();
+            small_factor_base_precomp(SFB[i], I, J, qlat);
 
         // Loop on all sublattices
         // In the no_sublat case, this loops degenerates into one pass, since
         // nb = 1.
         for (sublat->n = 0; sublat->n < sublat->nb; sublat->n++) {
+#if 0
             if (use_sublat(sublat)) {
                 fprintf(stdout, "# Sublattice (");
                 fppol16_out(stdout, sublat->lat[sublat->n][0]);
@@ -515,23 +706,23 @@ int main(int argc, char **argv)
                 fppol16_out(stdout, sublat->lat[sublat->n][1]);
                 fprintf(stdout, ") :\n");
             }
-
+#endif
             // Fill the buckets.
-            t_buckets -= seconds();
+            t_buck_fill -= seconds();
             buckets_fill(buckets[0], LFB[0], sublat, I, J, qlat);
             buckets_fill(buckets[1], LFB[1], sublat, I, J, qlat);
-            t_buckets += seconds();
+            t_buck_fill += seconds();
 
             // j0 is the first valid line in the current bucket region.
             ij_t j0;
             ij_set_zero(j0);
-            for (unsigned k = 0, pos0 = 0; k < buckets[0]->n;
+	    ijpos_t pos0 = 0;
+            for (unsigned k = 0; k < buckets[0]->n;
                  ++k, pos0 += size) {
               // Skip empty bucket regions.
               if (ijvec_get_start_pos(j0, I, J) >= pos0+size)
                 continue;
 
-              t_init -= seconds();
               // Init the bucket region.
               memset(S, 0, size*sizeof(uint8_t));
 
@@ -555,14 +746,13 @@ int main(int argc, char **argv)
                   for (int rc = 1; rc; rc = ij_monic_set_next(j, j, J)) {
                     if (UNLIKELY(ij_in_fp(j)))
                       continue;
-                    unsigned pos = ijvec_get_start_pos(j, I, J) - pos0;
+                    ijpos_t pos = ijvec_get_start_pos(j, I, J) - pos0;
                     if (pos >= size)
                       break;
                     S[pos] = 255;
                   }
                 }
               }
-              t_init += seconds();
 
               for (int twice = 0; twice < 2; twice++) {
                 // Select the side to be sieved
@@ -577,24 +767,28 @@ int main(int argc, char **argv)
                 t_norms += seconds();
 
                 // Line sieve.
+                unsigned int sublat_thr;
                 t_sieve -= seconds();
-                sieveFB(S, SFB[side], I, J, j0, pos0, size, sublat);
+                sieveSFB(S, &sublat_thr, SFB[side], I, J,
+                        j0, pos0, size, sublat);
                 t_sieve += seconds();
 
                 // Apply the updates from the corresponding bucket.
-                t_buckets -= seconds();
+                t_buck_apply -= seconds();
                 bucket_apply(S, buckets[side], k);
-                t_buckets += seconds();
+                t_buck_apply += seconds();
 
                 // since (0,0) is divisible by everyone, its position might
                 // have been clobbered.
-                if (!k) S[0] = 255;
+                if (!k && !use_sublat(sublat)) S[0] = 255;
 
                 // mark survivors
                 // no need to check if this is a valid position
                 for (unsigned i = 0; i < size; ++i) {
-                  if (S[i] > threshold[side])
+                  if (S[i] > threshold[side] + sublat_thr)
                     S[i] = 255; 
+                  else 
+                    S[i] = 0;
                 }
               }
 
@@ -655,21 +849,22 @@ int main(int argc, char **argv)
                 "in %1.1f s\n", nrels, t_tot);
         fprintf(stdout,
                 "# Time of main steps: "
-                "%1.2f s (init);   "
-                "%1.2f s (norms);\n"
+                "%1.2f s      (norms);                "
+                "%1.2f s (sieve);\n"
                 "#                     "
-                "%1.2f s (sieve);  "
-                "%1.2f s (buckets); "
+                "%1.2f+%1.2f s (buckets: fill+apply);  "
                 "%1.2f s (cofact).\n",
-                t_init, t_norms, t_sieve, t_buckets, t_cofact);
+                t_norms, t_sieve, t_buck_fill, t_buck_apply, t_cofact);
         fprintf(stdout, "# Yield: %1.5f s/rel\n", t_tot/nrels);
         fflush(stdout);
         tot_nrels += nrels;
         tot_norms   += t_norms;
         tot_sieve   += t_sieve;
-        tot_buckets += t_buckets;
+        tot_buck_apply += t_buck_apply;
+        tot_buck_fill += t_buck_fill;
         tot_cofact  += t_cofact;
-        tot_init   += t_init;
+
+        stats_yield_push(stats_yield, nrels, t_tot, qlat);
     } while (1); // End of loop over special-q's
 
     free(S);
@@ -683,28 +878,33 @@ int main(int argc, char **argv)
     free(replayable_bucket[1]->b);
 #endif
 
+    if (!bench) {
     tot_time = seconds()-tot_time;
     fprintf(stdout, "###### General statistics ######\n");
     fprintf(stdout, "#   Total time: %1.1f s\n", tot_time);
-    fprintf(stdout, "#   Main steps: "
-                    "%1.2f s (init);   "
-                    "%1.2f s (norms);\n"
-                    "#               "
-                    "%1.2f s (sieve);  "
-                    "%1.2f s (buckets); "
-                    "%1.2f s (cofact).\n",
-        tot_init, tot_norms, tot_sieve, tot_buckets, tot_cofact);
+    fprintf(stdout,
+                "# Time of main steps: "
+                "%1.2f s      (norms);                "
+                "%1.2f s (sieve);\n"
+                "#                     "
+                "%1.2f+%1.2f s (buckets: fill+apply);  "
+                "%1.2f s (cofact).\n",
+        tot_norms, tot_sieve,
+        tot_buck_fill, tot_buck_apply, tot_cofact);
  
     fprintf(stdout, "#   Computed %d special-q\n", tot_sq);
     fprintf(stdout, "#   %d relations found (%1.1f rel/sq)\n",
             tot_nrels, (double)tot_nrels / (double)tot_sq);
     fprintf(stdout, "#   Yield: %1.5f s/rel\n", tot_time/tot_nrels);
+    stats_yield_print_ci(stats_yield);
 #ifdef WANT_NORM_STATS
     norm_stats_print();
 #endif
+    }
 
     ffspol_clear(ffspol[0]);
     ffspol_clear(ffspol[1]);
+    stats_yield_clear(stats_yield);
 
     return EXIT_SUCCESS;
 }
