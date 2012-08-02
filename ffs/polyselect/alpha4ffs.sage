@@ -82,14 +82,10 @@ def estimate_alpha_p(f, p, nt):
     A=f.base_ring()
     F=homogenize(f)
     l=p.degree()
-    list=element_list(A,nt^2,0)
     for i in range(nt):
-        ia=randrange(0,nt)
-        ib=randrange(0,nt)
-        ic=randrange(0,nt^2)
-        a=list[ia]
-        b=list[ib]
-        c=list[ic]
+        a=A.random_element(ceil(log(nt,2)))
+        b=A.random_element(ceil(log(nt,2)))
+        c=A.random_element(f(0).degree()+f.degree()*ceil(log(nt,2)))
         if gcd(a,b) == 1:
             ds=valuation(c,p)-valuation(A(F(a,b)), p)
             s+=ZZ(ds)
