@@ -64,9 +64,9 @@ void fppol_rem_precomp(fppol_ptr r, fppol_srcptr pq,
     int d = fppol_deg(m);
     ASSERT_ALWAYS(fppol_deg(pq) <= fppol_deg(m) + fppol_deg(invm));
     fppol_init(pqt);
-    fppol_div_ti(pqt, pq, d-2);
+    fppol_div_ti(pqt, pq, d);
     fppol_mul(pqt, pqt, invm);  // should be a mul-high
-    fppol_div_ti(pqt, pqt, fppol_deg(invm)+2);
+    fppol_div_ti(pqt, pqt, fppol_deg(invm));
     fppol_mul(pqt, pqt, m);     // should be a mul-low
     fppol_sub(r, pq, pqt);
     ASSERT_ALWAYS(fppol_deg(r) < fppol_deg(m));
