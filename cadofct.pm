@@ -2684,6 +2684,7 @@ sub do_merge {
     my $cmd = "$param{'bindir'}/filter/merge ".
               "-out $param{'prefix'}.merge.his ".
               "-mat $param{'prefix'}.purged.gz ".
+              "-skip $param{'skip'} ".
               "-forbw $param{'bwstrat'} ".
               "-coverNmax $param{'coverNmax'} ".
               "-keep $param{'keep'} ".
