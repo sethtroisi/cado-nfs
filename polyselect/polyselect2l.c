@@ -2953,7 +2953,18 @@ main (int argc, char *argv[])
     best_logmu[i] = 999.9;
 
   /* init primes */
-  P = atoi (argv[1]);
+  double Pd;
+  Pd = strtod (argv[1], NULL);
+  if (Pd > (double) UINT_MAX) {
+    fprintf (stderr, "Error, too large value of P\n");
+    exit (1);
+  }
+  P = (unsigned long) Pd;
+  if (P <= (unsigned long) SPECIAL_Q[LEN_SPECIAL_Q - 2]) {
+    fprintf (stderr, "Error, too small value of P\n");
+    exit (1);
+  }
+
   st = cputime ();
   lenPrimes = initPrimes (P, &Primes);
 
