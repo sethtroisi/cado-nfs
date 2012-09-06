@@ -58,6 +58,15 @@
 #define ULARITH_CONSTRAINT_G "rme"
 #endif
 
+/* On 64 bit gcc (Ubuntu/Linaro 4.6.3-1ubuntu5) with -O3, the inline
+   asm in ularith_div_2ul_ul_ul_r() is wrongly optimized (Alex Kruppa
+   finds that gcc optimizes away the whole asm block and simply
+   leaves a constant). */
+#ifdef VOLATILE_IF_GCC_UBUNTU_BUG
+#define VOLATILE __volatile__
+#else
+#define VOLATILE
+#endif
 
 /* Increases r if a != 0 */
 static inline void
@@ -451,7 +460,7 @@ ularith_div_2ul_ul_ul_r (unsigned long *r, unsigned long a1,
            "X" (*r), "X" (a1), "X" (a2), "X" (b));
 #endif
 #ifdef HAVE_GCC_STYLE_AMD64_ASM
-  __asm__ ( "divq %3"
+  __asm__ VOLATILE ( "divq %3"
             : "+a" (a1), "=d" (*r)
             : "1" (a2), "rm" (b)
             : "cc");

@@ -52,7 +52,8 @@ int nq = INT_MAX;
 int lq = LQ_DEFAULT;
 double max_norm = DBL_MAX; /* maximal wanted norm (before rotation) */
 const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
-static int verbose = 0, incr = DEFAULT_INCR;
+static int verbose = 0;
+static unsigned long incr = DEFAULT_INCR;
 char *out = NULL; /* output file for msieve input (msieve.dat.m) */
 cado_poly best_poly, curr_poly;
 double best_E = 0.0; /* Murphy's E (the larger the better) */
@@ -64,7 +65,7 @@ pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER; /* used as mutual exclusion
 int tot_found = 0; /* total number of polynomials */
 int found = 0; /* number of polynomials below maxnorm */
 double potential_collisions = 0.0, aver_opt_lognorm = 0.0,
-       aver_raw_lognorm = 0.0;
+  aver_raw_lognorm = 0.0, aver_lognorm_ratio = 0.0;
 double min_raw_lognorm = DBL_MAX, max_raw_lognorm = 0.0;
 double min_opt_lognorm = DBL_MAX, max_opt_lognorm = 0.0;
 unsigned long collisions = 0;
@@ -306,6 +307,21 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
   logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
 
+  /* for degree 6 polynomials, find bottleneck coefficient */
+  double skewtmp = 0.0, logmu0c4 = 0.0, logmu0c3 = 0.0;
+  if (d == 6) {
+    mpz_set (adz, f[3]);
+    mpz_set_ui (f[3], 0);
+    skewtmp = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+    logmu0c3 = L2_lognorm (f, d, skewtmp, DEFAULT_L2_METHOD);
+    mpz_set (f[3], adz);
+    mpz_set (adz, f[4]);
+    mpz_set_ui (f[4], 0);
+    skewtmp = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+    logmu0c4 = L2_lognorm (f, d, skewtmp, DEFAULT_L2_METHOD);
+    mpz_set (f[4], adz);
+  }
+
   double g0 = mpz_get_d (g[0]);
   g0 /= mpz_get_d (f[d-2]);
   g0 = (g0 > 0)? g0 : -g0;
@@ -318,6 +334,9 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   collisions ++;
   tot_found ++;
   aver_raw_lognorm += logmu;
+  if (d == 6) {
+    aver_lognorm_ratio += logmu0c4/logmu0c3;
+  }
   if (logmu < min_raw_lognorm)
       min_raw_lognorm = logmu;
   if (logmu > max_raw_lognorm)
@@ -432,6 +451,9 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       printf ("# Raw polynomial:\n");
       gmp_printf ("n: %Zd\n", N);
       print_poly_info (fold, d, gold, 1);
+      if (d == 6)
+        gmp_printf ("# noc4/noc3: %.2f/%.2f (%.2f)\n",
+                    logmu0c4, logmu0c3, logmu0c4/logmu0c3);
       gmp_printf ("# Optimized polynomial:\n");
     }
 
@@ -447,9 +469,14 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       }
   }
   else {
-    if (verbose >= 0)
-      gmp_printf ("# Skip polynomial: %.2f, ad: %lu, l: %Zd, m: %Zd\n",
-                  logmu, ad, l, m);
+    if (verbose >= 0) {
+      if (d == 6)
+        gmp_printf ("# Skip polynomial: %.2f, ad: %"PRIu64", l: %Zd, m: %Zd, noc4/noc3: %.2f/%.2f (%.2f)\n",
+                    logmu, ad, l, m, logmu0c4, logmu0c3, logmu0c4/logmu0c3);
+      else
+        gmp_printf ("# Skip polynomial: %.2f, ad: %"PRIu64", l: %Zd, m: %Zd\n",
+                    logmu, ad, l, m);
+    }
   }
 
   mpz_clear (l);
@@ -483,6 +510,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   unsigned int j;
   int cmp;
   double skew, logmu, E;
+
 
 #ifdef DEBUG_POLYSELECT2L
   gmp_printf ("Found match: (%"PRIu32",%"PRId64") (%"PRIu32",%"PRId64") for "
@@ -633,6 +661,21 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
   logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
 
+  /* for degree 6 polynomials, find bottleneck coefficient */
+  double skewtmp = 0.0, logmu0c4 = 0.0, logmu0c3 = 0.0;
+  if (d == 6) {
+    mpz_set (tmp, f[3]);
+    mpz_set_ui (f[3], 0);
+    skewtmp = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+    logmu0c3 = L2_lognorm (f, d, skewtmp, DEFAULT_L2_METHOD);
+    mpz_set (f[3], tmp);
+    mpz_set (tmp, f[4]);
+    mpz_set_ui (f[4], 0);
+    skewtmp = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
+    logmu0c4 = L2_lognorm (f, d, skewtmp, DEFAULT_L2_METHOD);
+    mpz_set (f[4], tmp);
+  }
+  
   double g0 = mpz_get_d (g[0]);
   g0 /= mpz_get_d (f[d-2]);
   g0 = (g0 > 0)? g0 : -g0;
@@ -645,6 +688,9 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   collisions ++;
   tot_found ++;
   aver_raw_lognorm += logmu;
+  if (d == 6) {
+    aver_lognorm_ratio += logmu0c4/logmu0c3;
+  }
   if (logmu < min_raw_lognorm)
       min_raw_lognorm = logmu;
   if (logmu > max_raw_lognorm)
@@ -758,6 +804,9 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       printf ("# Raw polynomial:\n");
       gmp_printf ("n: %Zd\n", N);
       print_poly_info (fold, d, gold, 1);
+      if (d == 6)
+        gmp_printf ("# noc4/noc3: %.2f/%.2f (%.2f)\n",
+                    logmu0c4, logmu0c3, logmu0c4/logmu0c3);
       gmp_printf ("# Optimized polynomial:\n");
     }
 
@@ -773,9 +822,14 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       }
   }
   else {
-    if (verbose >= 0)
-      gmp_printf ("# Skip polynomial: %.2f, ad: %"PRIu64", l: %Zd, m: %Zd\n",
-                  logmu, ad, l, m);
+    if (verbose >= 0) {
+      if (d == 6)
+        gmp_printf ("# Skip polynomial: %.2f, ad: %"PRIu64", l: %Zd, m: %Zd, noc3: %.2f, noc4: %.2f\n",
+                    logmu, ad, l, m, logmu0c3, logmu0c4);
+      else
+        gmp_printf ("# Skip polynomial: %.2f, ad: %"PRIu64", l: %Zd, m: %Zd\n",
+                    logmu, ad, l, m);
+    }
   }
 
   mpz_clear (tmp);
@@ -2899,7 +2953,18 @@ main (int argc, char *argv[])
     best_logmu[i] = 999.9;
 
   /* init primes */
-  P = atoi (argv[1]);
+  double Pd;
+  Pd = strtod (argv[1], NULL);
+  if (Pd > (double) UINT_MAX) {
+    fprintf (stderr, "Error, too large value of P\n");
+    exit (1);
+  }
+  P = (unsigned long) Pd;
+  if (P <= (unsigned long) SPECIAL_Q[LEN_SPECIAL_Q - 2]) {
+    fprintf (stderr, "Error, too small value of P\n");
+    exit (1);
+  }
+
   st = cputime ();
   lenPrimes = initPrimes (P, &Primes);
 
@@ -3024,13 +3089,14 @@ main (int argc, char *argv[])
     }
   }
 
+  /* finishing up statistics */
   if (verbose >= 0)
     {
       printf ("# Stat: tried %d ad-value(s), found %d polynomial(s), %d below maxnorm\n",
               tries, tot_found, found);
-      printf ("# Raw lognorm (min/av/max): %1.2f/%1.2f/%1.2f\n",
+      printf ("# Stat: raw lognorm (min/av/max): %1.2f/%1.2f/%1.2f\n",
               min_raw_lognorm, aver_raw_lognorm / collisions, max_raw_lognorm);
-      printf ("# Optimized lognorm (min/av/max): %1.2f/%1.2f/%1.2f\n",
+      printf ("# Stat: optimized lognorm (min/av/max): %1.2f/%1.2f/%1.2f\n",
               min_opt_lognorm, aver_opt_lognorm / collisions_good,
               max_opt_lognorm);
       printf ("# Stat: potential collisions=%1.2e (%1.2e/s)\n",
@@ -3038,9 +3104,12 @@ main (int argc, char *argv[])
               / (double) cputime ());
       printf ("# Stat: av. g0/adm2 ratio: %.3e\n",
               total_adminus2 / (double) collisions);
+      if (d == 6)
+        printf ("# Stat: av. logmu noc4/noc3 ratio: %.3f\n",
+                aver_lognorm_ratio / (double) collisions);
     }
 
-  printf ("# Tried %d ad-value(s), found %d polynomial(s), %d below maxnorm\n",
+  printf ("# Stat: tried %d ad-value(s), found %d polynomial(s), %d below maxnorm\n",
           tries, tot_found, found);
 
   /* print best 10 values of logmu */

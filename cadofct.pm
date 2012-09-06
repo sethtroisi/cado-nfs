@@ -2271,7 +2271,7 @@ sub purge {
     my $cmd = cmd("$param{'bindir'}/filter/purge ".
                   "-poly $param{'prefix'}.poly -keep $param{'keeppurge'} ".
                   "-nrels $nbrels -out $param{'prefix'}.purged.gz ".
-                  "-basepath $param{'wdir'} " .
+                  "-npthr $param{'bwmt'} -basepath $param{'wdir'} ".
                   "-subdirlist $param{'prefix'}.subdirlist ".
                   "-filelist $param{'prefix'}.filelist ",
                   { cmdlog => 1,
@@ -2684,6 +2684,7 @@ sub do_merge {
     my $cmd = "$param{'bindir'}/filter/merge ".
               "-out $param{'prefix'}.merge.his ".
               "-mat $param{'prefix'}.purged.gz ".
+              "-skip $param{'skip'} ".
               "-forbw $param{'bwstrat'} ".
               "-coverNmax $param{'coverNmax'} ".
               "-keep $param{'keep'} ".

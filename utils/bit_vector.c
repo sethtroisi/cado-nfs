@@ -1,11 +1,10 @@
 #include "cado.h"
 #include <stdlib.h>
 #include <string.h>
+#include <misc.h>
 #include "bit_vector.h"
 #include "macros.h"
 
-#define BV_BITS 64      // since we're using uint64_t's
-#define LN2_BV_BITS 6   // 2^^LN2_BV_BITS = BV_BITS
 typedef uint64_t bv_t;
 
 void bit_vector_init(bit_vector_ptr b, size_t n)
@@ -28,6 +27,16 @@ void bit_vector_set(bit_vector_ptr b, int s)
 void bit_vector_clear(bit_vector_ptr b)
 {
     free(b->p); b->p = NULL; b->n = 0;
+}
+
+/* assume b and c have the same size */
+void bit_vector_neg(bit_vector_ptr b, bit_vector_srcptr c)
+{
+  size_t i, n;
+  n = b->n;
+  ASSERT_ALWAYS(n == c->n);
+  for (i = 0; i < iceildiv(n, BV_BITS); i++)
+    b->p[i] = ~c->p[i];
 }
 
 int bit_vector_getbit(bit_vector_srcptr b, size_t pos)

@@ -21,12 +21,12 @@ typedef struct {
 typedef struct {
   int64_t a;		/* only a is allowed to be negative */
   uint64_t b;
-  int nb_rp;		/* number of rational primes */
-  int nb_ap;		/* number of algebraic primes */
   rat_prime_t *rp;	/* array of rational primes */
   alg_prime_t *ap;	/* array of algebraic primes */
-  int nb_rp_alloc;	/* allocated space for rp */
-  int nb_ap_alloc;	/* allocated space for ap */
+  uint8_t nb_rp;	/* number of rational primes */
+  uint8_t nb_ap;        /* number of algebraic primes */
+  uint8_t nb_rp_alloc;	/* allocated space for rp */
+  uint8_t nb_ap_alloc;	/* allocated space for ap */
 } relation_t;
 
 struct relation_stream_s {

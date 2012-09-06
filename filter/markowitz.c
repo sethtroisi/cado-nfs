@@ -240,6 +240,8 @@ Cavallar(filter_matrix_t *mat, int32_t j)
     return abs(mat->wt[GETJ(mat, j)]);
 }
 
+/* #define COUNT_CANCELLED_IDEALS */
+
 static int
 pureMkz(filter_matrix_t *mat, int32_t j)
 {
@@ -252,17 +254,27 @@ pureMkz(filter_matrix_t *mat, int32_t j)
       return -2;
     else
       {
-	int i0 = 0, w0;
+#ifdef COUNT_CANCELLED_IDEALS
+	int i0 = 0;
+#endif
+        int w0;
+
         /* approximate traditional Markowitz count: we assume we add the
 	   lightest row to all other rows */
         w0 = mat->nrows;
         for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
           if((i = mat->R[GETJ(mat, j)][k]) != -1){
 	    // this should be the weight of row i
-      if(matLengthRow(mat, i) < w0)
-          w0 = matLengthRow(mat, i), i0 = i;
+            if(matLengthRow(mat, i) < w0)
+              {
+                w0 = matLengthRow(mat, i);
+#ifdef COUNT_CANCELLED_IDEALS
+                i0 = i;
+#endif
+              }
           }
-#if 1   /* here we assume there is no cancellation other than for ideal j:
+#ifndef COUNT_CANCELLED_IDEALS
+        /* here we assume there is no cancellation other than for ideal j:
 	   the lightest row has weight w0, we add wt-1 times w0-1,
 	   remove once w0-1, and remove wt entries in the jth column */
         mkz = (w0 - 2) * (mat->wt[GETJ(mat, j)] - 2) - 2;
@@ -273,7 +285,7 @@ pureMkz(filter_matrix_t *mat, int32_t j)
           if ((i = mat->R[GETJ(mat, j)][k]) != -1)
 	    {
 	      if (i != i0)
-          mkz += weightSum (mat, i, i0, j); /* merge i and i0 */
+                mkz += weightSum (mat, i, i0, j); /* merge i and i0 */
 	      mkz -= matLengthRow(mat, i);          /* remove row i */
 	    }
 #endif

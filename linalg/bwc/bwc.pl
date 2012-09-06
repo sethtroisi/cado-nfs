@@ -382,12 +382,25 @@ if (!defined($param->{'splits'})) {
         push @splits, $x;
     }
     if ($param->{'interleaving'}) {
-        die "Interleaving is on the bad track here" unless ((scalar
-                @splits)&1)==0 && $splits[1] == 64;
         @splits=(0,int($n/2),$n);
     }
     push @main_args, "splits=" . join(",", @splits);
 }
+
+if ($param->{'interleaving'}) {
+    my @t = @splits;
+    my $b = shift @t;
+    while (scalar @t) {
+        my $b0 = shift @t;
+        my $b1 = shift @t;
+        die "Interleaving can't work with splits ",
+            join(",",@splits),
+            "(intervals $b..$b0 and $b0..$b1 have different widths)"
+            unless $b0-$b == $b1-$b0;
+        $b = $b1;
+    }
+}
+
 if (!defined($param->{'ys'})) {
     push @main_args, "ys=0..$n";
 }
@@ -513,6 +526,25 @@ if (!-d $wdir) {
     }
 }
 
+sub get_mpi_hosts_torque {
+    my @x = split /^/, eval {
+		local $/=undef;
+		open F, "$ENV{PBS_NODEFILE}";
+		<F> };
+    my $nth = $thr_split[0] * $thr_split[1];
+    @hosts=();
+    while (scalar @x) {
+        my @z = splice @x, 0, $nth;
+        my %h=();
+        $h{$_}=1 for @z;
+        die "\$PBS_NODEFILE not consistent mod $nth\n" unless scalar
+			keys %h == 1;
+        my $c = $z[0];
+        chomp($c);
+        push @hosts, $c;
+    }
+}
+
 if ($mpi_needed) {
     detect_mpi;
 
@@ -524,6 +556,10 @@ if ($mpi_needed) {
         system "uniq $ENV{'OAR_NODEFILE'} > /tmp/HOSTS.$ENV{'OAR_JOBID'}";
         $hostfile = "/tmp/HOSTS.$ENV{'OAR_JOBID'}";
     }
+	elsif (exists($ENV{'PBS_JOBID'}) && !defined($hostfile) && !scalar @hosts ) {
+        print STDERR "Torque/OpenPBS environment detected, setting hostfile.\n";
+        get_mpi_hosts_torque;
+	}
     if (scalar @hosts) {
         # Don't use an uppercase filename, it would be deleted by
         # wipeout.
@@ -721,7 +757,7 @@ sub drive {
                 &drive("./split", @_, "--split-y");
                 # despicable ugly hack.
                 my @ka=@_;
-                if ($n == 128) {
+                if ($n == 128 && !$interleaving) {
                     @ka = grep !/^ys=/, @_;
                     &drive("krylov", @ka, "ys=0..64");
                     &drive("krylov", @ka, "ys=64..128");
@@ -741,7 +777,7 @@ sub drive {
             &drive("./split", @_, "--split-f");
             # same ugly hack already seen above.
             my @ka=@_;
-            if ($n == 128) {
+            if ($n == 128 && !$interleaving) {
                 @ka = grep !/^ys=/, @_;
                 &drive("mksol", @ka, "ys=0..64");
                 &drive("mksol", @ka, "ys=64..128");

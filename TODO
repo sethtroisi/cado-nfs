@@ -78,3 +78,11 @@ Sieve:
   sides, the probability p(s,t) that we find a relation. Then we run again the
   siever with input that file and a probability threshold p0. If p(s,t) < p0,
   then we don't run the cofactorization.
+
+Linear algebra:
+===============
+
+* write some conversions routines from the CADO-NFS format to the msieve format
+  and vice versa. From Jason Papadopoulos: "The cycle file and matrix file
+  formats Msieve uses are described in the Readme.nfs document in the Msieve
+  source."

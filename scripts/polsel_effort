@@ -28,6 +28,7 @@ while ("$n" != "205")
    set admin=`echo $admin | sed 's/e11/00000000000/g'`
    set admax=`grep '^polsel_admax=' params.c$n | sed 's/=/ /g' | cut -d" " -f2`
    set admax=`echo $admax | sed 's/e4/0000/g'`
+   set admax=`echo $admax | sed 's/e3/000/g'`
    set admax=`echo $admax | sed 's/e5/00000/g'`
    set admax=`echo $admax | sed 's/e6/000000/g'`
    set admax=`echo $admax | sed 's/e7/0000000/g'`

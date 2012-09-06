@@ -8,6 +8,7 @@
 #include "rootfinder.h"
 #include "plain_poly.h"
 #include "modul_poly.h"
+#include "poly.h"
 
 /* put in r[0], ..., r[n-1] the roots of f (of degree d) modulo p,
    and the return value n is the number of roots (without multiplicities) */
@@ -108,8 +109,8 @@ int poly_roots(mpz_t * r, mpz_t * f, int d, mpz_t p)
         free(rr);
         return n;
     } else {
-        fprintf(stderr, "Cannot compute roots of polynomial (p too large)\n");
-        exit(1);
+      int n;
+      n = poly_roots_mpz (r, f, d, p);
+      return n;
     }
 }
-
