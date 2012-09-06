@@ -255,7 +255,7 @@ addFreeRelations(char *roots, int deg)
 }
 
 static void
-smallFreeRelations(char *fbfilename)
+smallFreeRelations (char *fbfilename)
 {
     int deg;
     int nfree = countFreeRelations (&deg, fbfilename);
@@ -265,11 +265,33 @@ smallFreeRelations(char *fbfilename)
     addFreeRelations (fbfilename, deg);
 }
 
+/* generate all free relations up to the large prime bound */
+static void
+FreeRelations (cado_poly pol)
+{
+  unsigned long lpb, p, *roots;
+  int d = pol->alg->degree, i;
+
+  lpb = (pol->rat->lpb > pol->alg->lpb) ? pol->rat->lpb : pol->alg->lpb;
+  roots = (unsigned long*) malloc (d * sizeof (unsigned long));
+  for (p = 2; p <= lpb; p = getprime (p))
+    {
+      if (poly_roots_ulong (roots, pol->alg->f, d, p) == d)
+        {
+          printf ("%lu,0:%lx", p, roots[0]);
+          for (i = 1; i < d; i++)
+            printf (",%lx", roots[i]);
+          printf ("\n");
+        }
+    }
+  free (roots);
+}
+
 static void
 usage (char *argv0)
 {
-  fprintf (stderr, "Usage: %s -fb xxx.roots\n", argv0);
-  fprintf (stderr, "or     %s [-v] -poly xxx.poly xxx.rels1 xxx.rels2 ... xxx.relsk\n", argv0);
+  fprintf (stderr, "Usage: %s [-v] -poly xxx.poly\n", argv0);
+  fprintf (stderr, "or     %s [-v] -poly xxx.poly -fb xxx.roots xxx.rels1 xxx.rels2 ... xxx.relsk\n", argv0);
   exit (1);
 }
 
@@ -323,18 +345,13 @@ main(int argc, char *argv[])
     cado_poly_check (cpoly);
 
 #if 0
-    if (mpz_cmp_ui (cpoly->g[1], 1) != 0)
-      {
-        fprintf (stderr, "Error, non-monic linear polynomial not yet treated");
-        fprintf (stderr, " (more theory needed)\n");
-        exit (1);
-      }
-#endif
-
     if (nfic == 0)
 	smallFreeRelations(fbfilename);
     else
       largeFreeRelations(cpoly, fic, verbose);
+#else
+    FreeRelations (cpoly);
+#endif
 
     cado_poly_clear (cpoly);
 
