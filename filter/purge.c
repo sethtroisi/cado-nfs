@@ -620,8 +620,8 @@ compute_connected_component (HR_T i)
       if (!bit_vector_getbit(Tbv, (size_t) k)) /* row k was not visited yet */
 	n += compute_connected_component (k);
     }
-    if (H.hc[h] >= 2)
-      w_ccc += ldexpf (0.5, -7 * (H.hc[h] - 2));
+    if (H.hc[h] >= 3)
+      w_ccc += (float) 1/H.hc[h];
     }
   return n;
 }
