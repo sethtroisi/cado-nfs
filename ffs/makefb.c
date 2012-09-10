@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <math.h>
 #include "macros.h"
 
 #include "types.h"
@@ -364,6 +365,39 @@ void all_roots(entry_list_ptr E, ffspol_t F, sq_t p, int powerlim)
     qsort((void *)(E->list), E->len, sizeof(entry), cmp_entry);
 }
 
+double alpha_p(entry_list_srcptr E, sq_srcptr p, int powerlim) 
+{
+    static double * pows = NULL;
+    if (pows == NULL) {
+        pows = (double *) malloc (20*sizeof(double));
+        pows[0] = 1.0;
+        pows[1] = 1.0/((double)FP_SIZE);
+        for (int i = 2; i < 20; ++i) 
+            pows[i] = pows[i-1]*pows[1];
+    }
+
+    int degp = sq_deg(p);
+    double alpha = 0.0;
+
+    // initialize with value for rational polynomial (only up to powerlim)
+    alpha += pows[degp];
+    for (int i = 2; i*degp < powerlim; ++i)
+        alpha += pows[i*degp];
+
+    // subtract contribution of each entry
+    if (E->len != 0) {
+        double al = 0.0;
+        for (int i = 0; i < E->len; ++i)
+            al -= (E->list[i].n1 - E->list[i].n0) * pows[sq_deg(E->list[i].q)];
+        alpha += al / (pows[degp]+1); // coprimality of (a,b)
+    }
+
+    // normalize alpha
+    alpha *= degp;  // multiply the valuation by the degree.
+
+    return alpha;
+}
+
 void makefb(ffspol_t F, int fbb, const char *filename, int powerlim)
 {
     FILE *file;
@@ -373,6 +407,7 @@ void makefb(ffspol_t F, int fbb, const char *filename, int powerlim)
         exit(EXIT_FAILURE);
     }
 
+    double alpha = 0.0;
     sq_t p;
     sq_set_ti(p, 0);
     sq_monic_set_next(p, p, 64);
@@ -381,6 +416,7 @@ void makefb(ffspol_t F, int fbb, const char *filename, int powerlim)
         entry_list_init(E);
         E->len = 0;
         all_roots(E, F, p, powerlim);
+        alpha += alpha_p(E, p, powerlim);
         entry_list_out(file, E);
         entry_list_clear(E);
         do {
@@ -388,6 +424,7 @@ void makefb(ffspol_t F, int fbb, const char *filename, int powerlim)
         } while (!sq_is_irreducible(p));
     }
     fclose(file);
+    printf("alpha = %f\n", alpha);
 }
 
 void usage(const char *argv0, const char * missing)
