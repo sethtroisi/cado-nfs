@@ -43,6 +43,12 @@
  
         zcat rels.gz | $CADO/misc/get_valid_lines | gzip -c --fast > rels_ok.gz
 
+       and check all relations are correct (this is ***very important*** since
+       CADO-NFS does not check relations, thus any corrupted relation might
+       make the factorization fail):
+
+       $CADO/utils/complete_rels -poly rsa100.poly rels_ok.gz > /dev/null
+
     b) generate the factor base and the free relations:
 
         $CADO/sieve/makefb -poly rsa100.poly > rsa100.fb
