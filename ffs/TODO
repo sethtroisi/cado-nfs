@@ -53,3 +53,10 @@
   We do not sieve projective roots for large ideals.
   This is probably of very little effect, but we might want to give it
   a try.
+
+- Indexing the sieving area.
+  Order i and j polynomials by Gray code order instead of lex order in the
+  (i,j) plane. This would avoid to-and-fro pentatrit conversions, and remove
+  gaps in the array. This should work quite straightforwardly for i
+  polynomials, but j polynomials will require some more work because of the
+  buckets.
