@@ -366,6 +366,7 @@ fprint_rel_row (FILE *file, buf_rel_t *my_buf_rel)
   if (my_buf_rel->rel.b) {
     char *op;
     size_t t;
+    unsigned int i;
     
     for (prp =  my_buf_rel->rel.rp;
 	 prp != &(my_buf_rel->rel.rp[my_buf_rel->rel.nb_rp]);
@@ -387,6 +388,10 @@ fprint_rel_row (FILE *file, buf_rel_t *my_buf_rel)
       }
   }
   else {
+    char *op;
+    size_t t;
+    unsigned int i;
+
     REALKEY(my_buf_rel->rel.a, my_buf_rel->rel.a + 1);
     WRITEP;
     for (pap =  my_buf_rel->rel.ap;
@@ -406,7 +411,7 @@ fprint_rel_row (FILE *file, buf_rel_t *my_buf_rel)
 #ifndef FOR_FFS
   return nb_coeff;
 #else
-  return weight_rel_ffs (&(my_buf_rel->rel));
+  return weight_rel_ffs (my_buf_rel->rel);
 #endif
 }
 
