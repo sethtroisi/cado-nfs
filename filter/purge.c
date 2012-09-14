@@ -824,6 +824,7 @@ remove_singletons ()
 #else
   int64_t oldexcess = 0, excess;
 #endif
+  int count = 0;
 
   SMALLOC(sum, H.hm, "remove_singletons 1");
   newnrel = nrel;
@@ -832,6 +833,12 @@ remove_singletons ()
   for ( ; newnrel != oldnewnrel || excess > (long) keep ; ) {
     /* delete heavy rows when we have reached a fixed point */
     if (newnrel == oldnewnrel) {
+      /* check we have enough excess initially (at least 10%) */
+      if (count++ == 0 && (double) excess < 0.1 * (double) newnrel)
+        {
+          fprintf(stderr, "#relations <= 1.1 * #ideals\n");
+          exit (1);
+        }
       if (oldexcess > excess)
 	fprintf (stderr, "   [each excess row deleted %2.2lf rows]\n",
 		 (double) (oldtmpnewnrel - newnrel) / (double) (oldexcess - excess));
@@ -840,7 +847,7 @@ remove_singletons ()
       /*
 	deleteHeavierRows (&newnrel, &newnprimes, nrelmax, keep);
       */
-      deleteHeavierRows();
+      deleteHeavierRows ();
     }
     oldnewnrel = newnrel;
 #ifdef HAVE_SYNC_FETCH
@@ -2141,7 +2148,7 @@ main (int argc, char **argv)
   fprintf (stderr, "   nrels=%lu, nprimes=%lu; excess=%ld\n",
            (unsigned long) nrel, (unsigned long) nprimes, ((long) nrel) - nprimes);
 
-  remove_singletons();
+  remove_singletons ();
   fprintf (stderr, "   nrel=%lu, nprimes=%lu; excess=%ld\n",
 	   (unsigned long) nrel, (unsigned long) nprimes, ((long) nrel) - nprimes);
   if (nrel <= nprimes) /* covers case nrel = nprimes = 0 */
@@ -2149,10 +2156,9 @@ main (int argc, char **argv)
       fprintf(stderr, "number of relations <= number of ideals\n");
       exit (1);
     }
+
   hashCheck (&H);
   my_malloc_free_all ();
-
-
 
   fprintf (stderr, "Freeing rel_compact array...\n");
   /* we do not use it anymore */
