@@ -533,6 +533,7 @@ int main(int argc, char **argv)
 
     int tot_nrels = 0;
     int tot_sq = 0;
+    int no_rels_sq = 0;
     
     sq_t * roots;
     roots = (sq_t *) malloc (ffspol[sqside]->deg * sizeof(sq_t));
@@ -624,7 +625,13 @@ int main(int argc, char **argv)
                     // select next degree to bench
                     sq_set_ti(q0, degq0+1);
                     sq_t range;
-                    sq_set_ti(range, 10);
+#if FP_SIZE == 2
+#define RANGE 13
+#else
+#define RANGE 6
+#endif
+                    sq_set_ti(range, RANGE);
+#undef RANGE
                     sq_add(q1, q0, range);
                     nroots = 0;
                     continue;
@@ -866,7 +873,10 @@ int main(int argc, char **argv)
         tot_buck_fill += t_buck_fill;
         tot_cofact  += t_cofact;
 
-        stats_yield_push(stats_yield, nrels, t_tot, qlat);
+        if (nrels == 0) {
+            no_rels_sq++;
+        } else
+            stats_yield_push(stats_yield, nrels, t_tot, qlat);
     } while (1); // End of loop over special-q's
 
     free(S);
@@ -899,6 +909,9 @@ int main(int argc, char **argv)
             tot_nrels, (double)tot_nrels / (double)tot_sq);
     fprintf(stdout, "#   Yield: %1.5f s/rel\n", tot_time/tot_nrels);
     stats_yield_print_ci(stats_yield);
+    if (no_rels_sq > 0) {
+        fprintf(stdout, "#   Warning: statistics are biased. There were %d special-q with no relations.\n", no_rels_sq);
+    }
 #ifdef WANT_NORM_STATS
     norm_stats_print();
 #endif
