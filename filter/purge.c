@@ -2098,15 +2098,15 @@ main (int argc, char **argv)
   if (!filelist) {
     fic = argv;
   } else if (!subdirlist) {
-    fic = filelist_from_file(basepath, filelist);
+    fic = filelist_from_file (basepath, filelist, 0);
   } else {
     /* count the number of files in the filelist */
     int nfiles = 0;
     int nsubdirs = 0;
-    char ** fl = filelist_from_file(NULL, filelist);
+    char ** fl = filelist_from_file (NULL, filelist, 0);
     for(char ** p = fl ; *p ; p++, nfiles++);
     
-    char ** sl = filelist_from_file(basepath, subdirlist);
+    char ** sl = filelist_from_file (basepath, subdirlist, 1);
     for(char ** p = sl ; *p ; p++, nsubdirs++);
     
     SMALLOC(fic, nsubdirs * nfiles + 1, "main 3");

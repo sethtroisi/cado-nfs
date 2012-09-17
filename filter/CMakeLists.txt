@@ -8,9 +8,6 @@ target_link_libraries(dup2 utils)
 add_executable(purge purge.c)
 target_link_libraries(purge utils pthread)
 
-add_executable(purge-mt purge-mt.c)
-target_link_libraries(purge-mt utils ${pthread_libs})
-
 add_executable(merge merge.c markowitz.c mst.c report.c merge_mono.c filter_matrix.c sparse.c)
 target_link_libraries(merge utils)
 

@@ -124,7 +124,8 @@ void chomp(char *s) {
         *p = '\0';
 }
 
-char ** filelist_from_file(const char * basepath, const char * filename)
+char ** filelist_from_file(const char * basepath, const char * filename,
+                           int typ)
 {
     char ** files = NULL;
     int nfiles_alloc = 0;
@@ -132,8 +133,11 @@ char ** filelist_from_file(const char * basepath, const char * filename)
     FILE *f;
     f = fopen(filename, "r");
     if (f == NULL) {
-        perror("Problem opening filelist");
-        exit(1);
+      if (typ == 0)
+        perror ("Problem opening filelist");
+      else
+        perror ("Problem opening subdirlist");
+      exit (1);
     }
     char relfile[FILENAME_MAX + 10];
     while (fgets(relfile, FILENAME_MAX + 10, f) != NULL) {

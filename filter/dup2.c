@@ -325,7 +325,7 @@ int main (int argc, char *argv[])
       usage();
   }
 
-  char ** files = filelist ? filelist_from_file(basepath, filelist) : argv;
+  char ** files = filelist ? filelist_from_file(basepath, filelist, 0) : argv;
   unsigned long rread = remove_dup_in_files (files, dirname, outfmt, H, K, 
                                                                (ab_hexa)?16:10);
   if (filelist) filelist_clear(files);
