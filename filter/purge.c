@@ -1873,11 +1873,10 @@ usage (void)
 
 #ifndef FOR_FFS
 /* estimate the number of primes <= B */
-static int
+static uint64_t
 approx_phi (long B)
 {
-  ASSERT_ALWAYS((double) B <= 53030236260.0); /* otherwise B/log(B) > 2^31 */
-  return (B <= 1) ? 0 : (int) ((double) B / log ((double) B));
+  return (B <= 1) ? 0 : (uint64_t) ((double) B / log ((double) B));
 }
 #else
 /* estimate the number of ideals of degree <= B */
