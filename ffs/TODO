@@ -60,3 +60,5 @@
   gaps in the array. This should work quite straightforwardly for i
   polynomials, but j polynomials will require some more work because of the
   buckets.
+
+- Think about making i monic instead of j.
