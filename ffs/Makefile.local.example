@@ -1,6 +1,6 @@
 # This file is an example of what could be your Makefile.local which is
 # included by the main Makefile.
-# You can rename it and uncoment the appropriate lines.
+# You can rename it and uncomment the appropriate lines.
 
 
 # You can link with gf2x (see https://gforge.inria.fr/projects/gf2x/) for
@@ -20,11 +20,11 @@
 
 # The default value for the size of the bucket regions is 2^16, which is
 # supposed to be close to the L1 cache size. However, it might be that a
-# lower of a higher value gives better performance.
+# lower or a higher value gives a better performance.
 #
 #CFLAGS += -DBUCKET_REGION_BITS=18
 
-# If you do not plan to use the -sublat option, we can disable this
+# If you do not plan to use the -sublat option, you can disable this
 # feature at compile time, and this will save some memory.
 #
 #CFLAGS += -DDISABLE_SUBLAT
@@ -39,6 +39,6 @@
 #
 #CFLAGS += -DBUCKET_RESIEVE
 
-# Debuging tool: traces what's going on at given position.
+# Debuging tool: traces what's going on at the given position.
 #
 #CFLAGS += -DTRACE_POS=696526
