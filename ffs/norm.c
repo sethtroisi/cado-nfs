@@ -356,7 +356,7 @@ static int deg_norm_prec_N(ffspol_t ffspol_ij, int degi, fppol_t *pow_i, int deg
     --tab_size;
     
     /* Computing the sum of all monomials of maximal degree until we
-       find only one monomial of maximal degree */
+       find only one monomial (term) of maximal degree */
     
     fppol64_t sum;
     int deg_sum_prec; 
@@ -448,9 +448,9 @@ static int deg_norm_full(ffspol_t ffspol_ij, fppol_t *pow_i, fppol_t *pow_j, int
    which is defined as the difference between the maximum degree of the
    monomials in the norm and the degree of the norm. Hence a strictly positive
    gap means there are cancellations of high degrees during the norm 
-   computation. We also define the gap to be -1 if all the degrees of 
-   the monomials in the norm computation are distinct. The gap value
-   zero means there are several monomials of higher degree but no cancellation */
+   computation. We also define the gap to be -1 if there is only one 
+   monomial of maximal degree. The gap value zero means there are several 
+   monomials of higher degree but no cancellation */
 
 int deg_norm_ij(ffspol_ptr ffspol_ij, ij_t i, ij_t j, int *gap)
 {
