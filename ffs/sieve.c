@@ -239,7 +239,7 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "  rho  *           rho-poly of the special-q\n");
     fprintf(stderr, "  q0   *           lower bound for special-q range\n");
     fprintf(stderr, "  q1   *           lower bound for special-q range\n");
-    fprintf(stderr, "  sqt  [2]         skip special-q whose defect is sqt or more\n");
+    fprintf(stderr, "  sqt  [3]         skip special-q whose defect is sqt or more\n");
     fprintf(stderr, "  bench            bench-mode. Takes parameter of the form deg0-deg1\n");
     fprintf(stderr, "                   and estimates the time and number of rels for corresping sq.\n");
     fprintf(stderr, "                   q0 and q1 are ignored.\n");
@@ -276,7 +276,7 @@ int main(int argc, char **argv)
     int skewness = 0;
     int gf = 0;
     int want_reliable_yield = 0;
-    int sqt = 2;
+    int sqt = 3;
     int bench = 0;
     int bench_end = 0;
     double bench_tot_rels = 0;
@@ -380,6 +380,11 @@ int main(int argc, char **argv)
     }
 
     // want to bench ?
+#if FP_SIZE == 2
+#define BENCH_RANGE 10
+#else
+#define BENCH_RANGE 5
+#endif
     {
         int res[2];
         int ret = param_list_parse_int_and_int(pl, "bench", res, "-");
@@ -388,7 +393,7 @@ int main(int argc, char **argv)
             bench_end = res[1];
             sq_set_ti(q0, res[0]);
             sq_t range;
-            sq_set_ti(range, 10);
+            sq_set_ti(range, BENCH_RANGE);
             sq_add(q1, q0, range);
         }
     }
@@ -625,13 +630,7 @@ int main(int argc, char **argv)
                     // select next degree to bench
                     sq_set_ti(q0, degq0+1);
                     sq_t range;
-#if FP_SIZE == 2
-#define RANGE 13
-#else
-#define RANGE 6
-#endif
-                    sq_set_ti(range, RANGE);
-#undef RANGE
+                    sq_set_ti(range, BENCH_RANGE);
                     sq_add(q1, q0, range);
                     nroots = 0;
                     continue;
