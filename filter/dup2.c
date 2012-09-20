@@ -201,7 +201,10 @@ uint32_t * H, unsigned long K, unsigned int ab_base)
             }
         }
         relation_stream_unbind(rs);
-        if (p_out) pclose(f_out); else fclose(f_out);
+        if (f_out != NULL)
+          {
+            if (p_out) pclose(f_out); else fclose(f_out);
+          }
         if (p_in) pclose(f_in); else fclose(f_in);
 
 
