@@ -1,13 +1,7 @@
-/*
-  HC_T : 8 bits.
-  HT_T : (32 + 32 * need64) bits. Signed.
-  HR_T : 32 if H.hm < 2^32-1, otherwise 64 bits.
-  Note : sizeof(HT_T)>=sizeof(HR_T)
-*/
-
 /* purge --- remove singletons
 
-Copyright 2008, 2009, 2010, 2011, 2012 Francois Morain, Paul Zimmermann
+Copyright 2008, 2009, 2010, 2011, 2012 Alain Filbois, Francois Morain,
+                                       Paul Zimmermann
 
 This file is part of CADO-NFS.
 
@@ -52,6 +46,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
   GET_HASH_P(H,h) - prime corresponding to index h
   GET_HASH_R(H,h) - root  corresponding to index h (-2 for rational prime)
   H->hashcount[h] - number of occurrences of (p, r) in current relations
+*/
+
+/*
+  HC_T : 8 bits.
+  HT_T : (32 + 32 * need64) bits. Signed.
+  HR_T : 32 if H.hm < 2^32-1, otherwise 64 bits.
+  Note : sizeof(HT_T)>=sizeof(HR_T)
 */
 
 #include "cado.h"
@@ -103,10 +104,11 @@ static HR_T nrel,
   Hsizer,
   Hsizea,
   keep = 160;         /* default maximum final excess */
-static HT_T minpr = -1,
-  minpa = -1; /* negative values mean use minpr=rlim and
+static HT_T minpr = UMAX(minpr),
+  minpa = UMAX(minpa); /* negative values mean use minpr=rlim and
 				       minpa=alim */
 static int raw = 0, need64;
+static unsigned int npt = 4;
 static float w_ccc;
 
 static const unsigned char ugly[256] = {
@@ -269,9 +271,6 @@ my_malloc_free_all (void)
 
 /*****************************************************************************/
 
-/* dirty trick to distinguish rational primes: we store -2 for their root */
-static UHT_T minus2;
-
 /* Print the relation 'rel' in matrix format, i.e., a line of the form:
 
    i a b k t_1 t_2 ... t_k
@@ -295,7 +294,7 @@ static UHT_T minus2;
 */
 
 #define REALKEY(A,B)							\
-  for (h = *phk++; H.ht[h].p != (HT_T) (A) || H.ht[h].r != (UHT_T) (B); ) \
+  for (h = *phk++; H.ht[h].p != (HT_T) (A) || H.ht[h].r != (HT_T) (B); ) \
     if (++h >= H.hm) h = 0
 #define FFSCOPYDATA(E) \
   t = p - op;								\
@@ -343,7 +342,7 @@ fprint_rel_row (FILE *file, buf_rel_t *my_buf_rel)
     for (prp =  my_buf_rel->rel.rp;
 	 prp != &(my_buf_rel->rel.rp[my_buf_rel->rel.nb_rp]);
 	 prp++) {
-      REALKEY(prp->p, minus2);
+      REALKEY(prp->p, prp->p + 1);
       WRITEP;
     }
     for (pap =  my_buf_rel->rel.ap;
@@ -354,7 +353,7 @@ fprint_rel_row (FILE *file, buf_rel_t *my_buf_rel)
     }
   }
   else {
-    REALKEY(my_buf_rel->rel.a, minus2);
+    REALKEY(my_buf_rel->rel.a, my_buf_rel->rel.a + 1);
     WRITEP;
     for (pap =  my_buf_rel->rel.ap;
 	 pap != &(my_buf_rel->rel.ap[my_buf_rel->rel.nb_ap]);
@@ -367,13 +366,14 @@ fprint_rel_row (FILE *file, buf_rel_t *my_buf_rel)
   if (my_buf_rel->rel.b) {
     char *op;
     size_t t;
+    unsigned int i;
     
     for (prp =  my_buf_rel->rel.rp;
 	 prp != &(my_buf_rel->rel.rp[my_buf_rel->rel.nb_rp]);
 	 prp++)
       if (prp->e > 0) {
 	op = p;
-	REALKEY(prp->p, minus2);
+	REALKEY(prp->p, prp->p + 1);
 	WRITEP;
 	FFSCOPYDATA(prp->e);
       }
@@ -388,7 +388,11 @@ fprint_rel_row (FILE *file, buf_rel_t *my_buf_rel)
       }
   }
   else {
-    REALKEY(my_buf_rel->rel.a, minus2);
+    char *op;
+    size_t t;
+    unsigned int i;
+
+    REALKEY(my_buf_rel->rel.a, my_buf_rel->rel.a + 1);
     WRITEP;
     for (pap =  my_buf_rel->rel.ap;
 	 pap != &(my_buf_rel->rel.ap[my_buf_rel->rel.nb_ap]);
@@ -407,7 +411,7 @@ fprint_rel_row (FILE *file, buf_rel_t *my_buf_rel)
 #ifndef FOR_FFS
   return nb_coeff;
 #else
-  return weight_rel_ffs (&(my_buf_rel->rel));
+  return weight_rel_ffs (my_buf_rel->rel);
 #endif
 }
 
@@ -440,7 +444,6 @@ insertNormalRelation (unsigned int j)
   my_tmp = my_malloc(my_br->ltmp); 
   phk = my_br->hk;
   itmp = 0; /* number of entries in my_tmp */
-  pr.r = (UHT_T) minus2;
   i = my_br->rel.nb_rp;
   my_rp = my_br->rel.rp;
   while (i--)
@@ -449,14 +452,15 @@ insertNormalRelation (unsigned int j)
          need to renumber them in the second pass */
 
       /* The next code is exactly :
-	 h = hashInsertWithKey(&H, (UHT_T) buf_rel[j].rel.rp[i].p, minus2, *phk++, &np);
+	 h = hashInsertWithKey(&H, (HT_T) buf_rel[j].rel.rp[i].p,
+	 (HT_T) buf_rel[j].rel.rp[i].p + 1, *phk++, &np);
 	 nprimes += np;
 	 but it's so critical in perfs I prefer inlining and uses dirty
 	 (really dirty!) tricks to help the compiler to speed up the code at the max.
       */
       h = *phk++;
-      pr.p = (HT_T) (my_rp++)->p;
-      /* fprintf (stderr, "%u %d %u %lu %lu %u\n", h, pr.p, pr.r, HC0, HC1, H.hm); */
+      pr = (ht_t) { (HT_T) my_rp->p, (HT_T) (my_rp->p + 1) };
+      my_rp++;
       my_ht = &(H.ht[h]);
       my_hc = &(H.hc[h]);
       /* Highest critical section */
@@ -486,13 +490,12 @@ insertNormalRelation (unsigned int j)
   while (i--) 
     {
       /*
-	h = hashInsertWithKey (&H, (UHT_T) buf_rel[j].rel.ap[i].p, (HT_T) buf_rel[j].rel.ap[i].r,
+	h = hashInsertWithKey (&H, (HT_T) buf_rel[j].rel.ap[i].p, (HT_T) buf_rel[j].rel.ap[i].r,
 	*phk++, &np);
         nprimes += np;
       */
       h = *phk++;
-      pr = (ht_t) { (HT_T) my_ap->p, (UHT_T) my_ap->r };
-      /* fprintf (stderr, "%u %d %u %lu %lu %u\n", h, pr.p, pr.r, HC0, HC1, H.hm); */
+      pr = (ht_t) { (HT_T) my_ap->p, (HT_T) my_ap->r };
       my_ap++;
       my_ht = &(H.ht[h]);
       my_hc = &(H.hc[h]);
@@ -545,11 +548,11 @@ insertFreeRelation (unsigned int j)
   phk = buf_rel[j].hk;
   itmp = 0;
   /* insert all ideals */
-  h = hashInsertWithKey(&H, (HT_T) buf_rel[j].rel.a, (UHT_T) minus2, *phk++, &np);
+  h = hashInsertWithKey(&H, (HT_T) buf_rel[j].rel.a, (HT_T) (buf_rel[j].rel.a + 1), *phk++, &np);
   nprimes += np; /* (H->hc[h] == 1); new prime */
   if ((HT_T) buf_rel[j].rel.a >= minpr) my_tmp[itmp++] = h;
   for (i = 0; i < buf_rel[j].rel.nb_ap; i++) {
-    h = hashInsertWithKey(&H, (HT_T) buf_rel[j].rel.a, (UHT_T) buf_rel[j].rel.ap[i].p, *phk++, &np);
+    h = hashInsertWithKey(&H, (HT_T) buf_rel[j].rel.a, (HT_T) buf_rel[j].rel.ap[i].p, *phk++, &np);
     nprimes += np; /* (H->hc[h] == 1); new ideal */
     if ((HT_T) buf_rel[j].rel.a >= minpa) my_tmp[itmp++] = h;
   }
@@ -564,16 +567,6 @@ insertFreeRelation (unsigned int j)
   rel_compact[buf_rel[j].num] = my_tmp;
 }
 
-/* Return a non-zero value iff some prime (ideal) in the array tab[] is single
-   (tab[j] is the index in the hash table of the corresponding prime ideal).
-*/
-static unsigned int
-has_singleton (HR_T *tab)
-{
-  while (*tab != UMAX(*tab)) if (H.hc[*tab++] == 1) return 1;
-  return 0;
-}
-
 /* Delete a relation: set rel_used[i] to 0, update the count of primes
    in that relation, and set rel_compact[i] to NULL.
    Warning: we only update the count of primes that we consider, i.e.,
@@ -583,18 +576,14 @@ static void
   delete_relation (HR_T i)
 {
   HR_T *tab = rel_compact[i];
-  HC_T *o, p;
+  HC_T *o;
 
   while (*tab != UMAX(*tab)) {
     o = &(H.hc[*tab++]);
-    p = *o + 1;
-    if (p > 2)
-      (*o)--;
-    else
-      if (p == 2) {
-        *o = 0;
-        newnprimes--;
-      }
+    ASSERT(*o);
+    if (*o < UMAX(*o))
+      if (!(--(*o)))
+	newnprimes--;
   }
   rel_compact[i] = NULL;
   bit_vector_clearbit(rel_used, (size_t) i);
@@ -636,8 +625,8 @@ compute_connected_component (HR_T i)
       if (!bit_vector_getbit(Tbv, (size_t) k)) /* row k was not visited yet */
 	n += compute_connected_component (k);
     }
-    if (H.hc[h] >= 2)
-      w_ccc += ldexpf (0.5, -7 * (H.hc[h] - 2));
+    if (H.hc[h] >= 3)
+      w_ccc += (float) 1/H.hc[h];
     }
   return n;
 }
@@ -739,17 +728,97 @@ deleteHeavierRows ()
   free (tmp);
 }
 
+#ifndef HAVE_SYNC_FETCH
 static void
   onepass_singleton_removal ()
 {
-  HR_T i;
+  HR_T *tab, i;
 
   for (i = 0; i < nrelmax; i++)
-    if (bit_vector_getbit(rel_used, (size_t) i) && has_singleton (rel_compact[i])) {
-      delete_relation(i);
-      newnrel--;
-    }
+    if (bit_vector_getbit(rel_used, (size_t) i))
+      for (tab = rel_compact[i]; *tab != UMAX(*tab); )
+	if (H.hc[*tab++] == 1) {
+	  delete_relation(i);
+	  newnrel--;
+	  break;
+	}
 }
+
+#else /* ifndef HAVE_SYNC_FETCH */
+
+typedef struct {
+  unsigned int nb;
+  pthread_t mt;
+  HR_T begin, end, sup_nrel, sup_npri;
+} ti_t;
+static ti_t *ti;
+
+/* Hightest criticality for performance. I inline all myself. */
+static void
+onepass_thread_singleton_removal (ti_t *mti)
+{
+  HR_T *tab, **prc, **prcf, i;
+  HC_T *o;
+
+  mti->sup_nrel = mti->sup_npri = 0;
+  prcf = &(rel_compact[mti->end]);
+  for (prc = &(rel_compact[mti->begin + ((long) -1)]); ++prc < prcf ; )
+    if (*prc)
+      for (tab = *prc; *tab != UMAX(*tab); )
+	if (H.hc[*tab++] == 1) {
+	  for (tab = *prc; *tab != UMAX(*tab); ) {
+	    o = &(H.hc[*tab++]);
+	    ASSERT(*o);
+	    if (*o < UMAX(*o) && !__sync_sub_and_fetch(o, 1))
+	      (mti->sup_npri)++;
+	  }
+	  *prc = NULL;
+	  i = (HR_T) (prc - rel_compact);
+	  rel_used->p[i>>LN2_BV_BITS] &= ~(((uint64_t) 1) << (i & (BV_BITS - 1)));
+ 	  (mti->sup_nrel)++;
+	  break;
+	}
+  pthread_exit(NULL);
+}
+
+static void
+onepass_singleton_parallel_removal (unsigned int nb_thread)
+{
+  pthread_attr_t attr;
+  HR_T pas, incr;
+  unsigned int i;
+  int err;
+
+  SMALLOC(ti, nb_thread, "onepass_singleton_parallel_removal :");
+  ti[0].begin = 0;
+  pas = (nrelmax / nb_thread) & ((HR_T) ~(BV_BITS -1));
+  incr = 0;
+  for (i = 0, incr = 0; i < nb_thread - 1; ) {
+    incr += pas;
+    ti[i].nb = i;
+    ti[i++].end = incr;
+    ti[i].begin = incr;
+  }
+  ti[i].nb = i;
+  ti[i].end = nrelmax;
+  pthread_attr_init (&attr);
+  pthread_attr_setstacksize (&attr, 1<<16);
+  pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_JOINABLE);
+  for (i = 0; i < nb_thread; i++)
+    if ((err = pthread_create (&ti[i].mt, &attr, (void *) onepass_thread_singleton_removal, &ti[i])))
+    {
+    fprintf (stderr, "onepass_singleton_parallel_removal : pthread_create error 1: %d. %s\n", err, strerror (errno)); 
+    exit (1);
+    }
+  for (i = 0; i < nb_thread; i++) {
+    pthread_join(ti[i].mt, NULL);
+    newnrel -= ti[i].sup_nrel;
+    newnprimes -= ti[i].sup_npri;
+  }
+  pthread_attr_destroy(&attr);
+  SFREE(ti);
+}
+#endif /* ifdef HAVE_SYNC_FETCH */
 
 static void
 remove_singletons ()
@@ -760,6 +829,7 @@ remove_singletons ()
 #else
   int64_t oldexcess = 0, excess;
 #endif
+  int count = 0;
 
   SMALLOC(sum, H.hm, "remove_singletons 1");
   newnrel = nrel;
@@ -768,6 +838,12 @@ remove_singletons ()
   for ( ; newnrel != oldnewnrel || excess > (long) keep ; ) {
     /* delete heavy rows when we have reached a fixed point */
     if (newnrel == oldnewnrel) {
+      /* check we have enough excess initially (at least 10%) */
+      if (count++ == 0 && (double) excess < 0.1 * (double) newnrel)
+        {
+          fprintf(stderr, "#relations <= 1.1 * #ideals\n");
+          exit (1);
+        }
       if (oldexcess > excess)
 	fprintf (stderr, "   [each excess row deleted %2.2lf rows]\n",
 		 (double) (oldtmpnewnrel - newnrel) / (double) (oldexcess - excess));
@@ -776,10 +852,15 @@ remove_singletons ()
       /*
 	deleteHeavierRows (&newnrel, &newnprimes, nrelmax, keep);
       */
-      deleteHeavierRows();
+      deleteHeavierRows ();
     }
     oldnewnrel = newnrel;
+#ifdef HAVE_SYNC_FETCH
+    ASSERT(npt);
+    onepass_singleton_parallel_removal(npt);
+#else
     onepass_singleton_removal();
+#endif
     excess = ((long) newnrel) - newnprimes;
     fprintf (stderr, "   new_nrows=%lu new_ncols=%lu (%ld) at %2.2lf\n",
 	     (unsigned long) newnrel, (unsigned long) newnprimes, (long) excess, seconds());
@@ -814,7 +895,7 @@ renumber (const char *sos)
         fprintf (fsos, "# each row contains 3 hexadecimal values: i p r\n"
 		 "# i is the ideal index value (starting from 0)\n"
 		 "# p is the corresponding prime\n"
-		 "# r is the corresponding root (-2=fffffffe on the rational side)\n");
+		 "# r is the corresponding root (p+2 on the rational side)\n");
       }
     for (i = 0; i < H.hm; i++)
       if (H.hc[i]) {
@@ -825,7 +906,7 @@ renumber (const char *sos)
 	static int count = 0;
 	if (H.hc[i] == 1 && (count ++ < 10))
 	  {
-	    if (GET_HASH_R(&H,i) == minus2)
+	    if (GET_HASH_P(&H,i) == GET_HASH_R(&H,i) + 1)
 	      fprintf (stderr, "Warning: singleton rational prime %lu\n",
 		       (unsigned long) GET_HASH_P(&H,i));
 	    else
@@ -1003,7 +1084,7 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j, int passtwo)
 	  if (!mybufrel->rel.nb_rp_alloc)
 	    mybufrel->rel.nb_rp_alloc = 7;
 	  else {
-	    assert(mybufrel->rel.nb_rp_alloc != UMAX(mybufrel->rel.nb_rp_alloc));
+	    ASSERT(mybufrel->rel.nb_rp_alloc != UMAX(mybufrel->rel.nb_rp_alloc));
 	    mybufrel->rel.nb_rp_alloc = (mybufrel->rel.nb_rp_alloc<<1) + 1;
 	  }
 	  mybufrel->rel.rp = (rat_prime_t *)
@@ -1014,7 +1095,7 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j, int passtwo)
       }
 	*/
     }
-    assert(k <= UMAX(mybufrel->rel.nb_rp));
+    ASSERT(k <= UMAX(mybufrel->rel.nb_rp));
     mybufrel->rel.nb_rp = k;
     
     for ( k = 0 ; ; ) {
@@ -1043,12 +1124,12 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j, int passtwo)
 		goto next_alg;
 	      }
 	  }
-	if ((unsigned int) mybufrel->rel.nb_ap_alloc <= k)
+	if (mybufrel->rel.nb_ap_alloc <= k)
 	  {
 	    if (!mybufrel->rel.nb_ap_alloc)
 	      mybufrel->rel.nb_ap_alloc = 15;
 	    else {
-	      assert(mybufrel->rel.nb_ap_alloc != UMAX(mybufrel->rel.nb_ap_alloc));
+	      ASSERT(mybufrel->rel.nb_ap_alloc != UMAX(mybufrel->rel.nb_ap_alloc));
 	      mybufrel->rel.nb_ap_alloc = (mybufrel->rel.nb_ap_alloc<<1) + 1;
 	    }
 	    mybufrel->rel.ap = (alg_prime_t *)
@@ -1059,45 +1140,45 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j, int passtwo)
 	}
 	*/
     }
-    assert(k <= UMAX(mybufrel->rel.nb_ap));
+    ASSERT(k <= UMAX(mybufrel->rel.nb_ap));
     mybufrel->rel.nb_ap = k;
     
     if (mybufrel->rel.b > 0) 
       {
 	ltmp = 1;
 #ifndef FOR_FFS
-	for (k = 0, i = 0; i < (unsigned int) mybufrel->rel.nb_rp; i++)
+	for (k = 0, i = 0; i < mybufrel->rel.nb_rp; i++)
 	  {
 	    if (mybufrel->rel.rp[i].e & 1)
 		{
 		  mybufrel->rel.rp[k].p = mybufrel->rel.rp[i].p;
 		  mybufrel->rel.rp[k].e = 1;
-		  ltmp += ((long) mybufrel->rel.rp[k++].p >= minpr);
+		  ltmp += ((HT_T) mybufrel->rel.rp[k++].p >= minpr);
 		}
 	  }
 	mybufrel->rel.nb_rp = k;
-	for (k = 0, i = 0; i < (unsigned int) mybufrel->rel.nb_ap; i++)
+	for (k = 0, i = 0; i < mybufrel->rel.nb_ap; i++)
 	  {
 	    if (mybufrel->rel.ap[i].e & 1) 
 		{
 		  /* rel.ap[k].r will be computed later with another threads */
 		  mybufrel->rel.ap[k].p = mybufrel->rel.ap[i].p;
 		  mybufrel->rel.ap[k].e = 1;
-		  ltmp += ((long) mybufrel->rel.ap[k++].p >= minpa);
+		  ltmp += ((HT_T) mybufrel->rel.ap[k++].p >= minpa);
 		}
 	  }
 	mybufrel->rel.nb_ap = k;
 #else
 	for (i = mybufrel->rel.nb_rp; i-- ;)
-	    ltmp += ((long) mybufrel->rel.rp[i].p >= minpr);
+	  ltmp += ((HT_T) mybufrel->rel.rp[i].p >= minpr);
 	for (i = mybufrel->rel.nb_ap; i-- ;)
-	    ltmp += ((long) mybufrel->rel.ap[i].p >= minpa);
+	    ltmp += ((HT_T) mybufrel->rel.ap[i].p >= minpa);
 #endif
       }
     else 
       {
-	ltmp = ((long) mybufrel->rel.a >= minpr) + 1;
-	if ((long) mybufrel->rel.a >= minpa) 
+	ltmp = ((HT_T) mybufrel->rel.a >= minpr) + 1;
+	if ((HT_T) mybufrel->rel.a >= minpa) 
 	  ltmp += mybufrel->rel.nb_ap;
       }
     mybufrel->ltmp = ltmp;
@@ -1192,7 +1273,7 @@ void printrel() {
 static HR_T *buf_rel_new_hk(unsigned int j, unsigned int t) {
    if (buf_rel[j].mhk < t) {
      SFREE(buf_rel[j].hk);
-     t = t; /* For avoid a spurius warning in gcc... */
+     t = t; /* For avoid a spurious warning in gcc... */
      SMALLOC(buf_rel[j].hk, t, "buf_rel_new_hk");
      buf_rel[j].mhk = t;
    }
@@ -1205,12 +1286,6 @@ static void threadfindroot(fr_t *mfr) {
   buf_rel_t *mybufrel;
   unsigned int i, j;
 
-  /* Mask is useful because findroot might return -1. If arch=64 bits and
-     need64 == 0, r is 64 bits long BUT must be < 0xffffffff for the
-     hash key computation. So I prefer here to do immediatly a perhaps non
-     useful AND.
-     NOTA: (A & 0xffffffffUL) could be remplace by ((uint32_t) A) -> ((UHT_T) A)
-  */
   for (;;) 
     switch(mfr->ok) { 
     case 0:
@@ -1224,25 +1299,27 @@ static void threadfindroot(fr_t *mfr) {
 	    {
 	      phk = buf_rel_new_hk(j, mybufrel->rel.nb_rp + mybufrel->rel.nb_ap);
 	      for (i = 0; i < mybufrel->rel.nb_rp; i++)
-		*phk++ = HKM(mybufrel->rel.rp[i].p, minus2, H.hm);
+		*phk++ = HKM(mybufrel->rel.rp[i].p, mybufrel->rel.rp[i].p + 1, H.hm);
 	      for (i = 0; i < mybufrel->rel.nb_ap; i++)
 		{
 #ifndef FOR_FFS
-		  mybufrel->rel.ap[i].r = (UHT_T)
+		  mybufrel->rel.ap[i].r = (HT_T)
 		    findroot (mybufrel->rel.a, mybufrel->rel.b, mybufrel->rel.ap[i].p);
 #else
-		  mybufrel->rel.ap[i].r = (UHT_T)
+		  mybufrel->rel.ap[i].r = (HT_T)
 		    findroot_ffs (mybufrel->rel.a, mybufrel->rel.b, mybufrel->rel.ap[i].p);
 #endif
+		  if (mybufrel->rel.ap[i].r == UMAX(mybufrel->rel.ap[i].r))
+		    mybufrel->rel.ap[i].r = mybufrel->rel.ap[i].p;
 		  *phk++ = HKM(mybufrel->rel.ap[i].p, mybufrel->rel.ap[i].r, H.hm);
 		}
 	    }
 	  else
 	    {
 	      phk = buf_rel_new_hk(j, mybufrel->rel.nb_ap + 1);
-	      *phk++ = HKM((HR_T) mybufrel->rel.a, minus2, H.hm);
+	      *phk++ = HKM(mybufrel->rel.a, mybufrel->rel.a + 1, H.hm);
 	      for (i = 0; i < mybufrel->rel.nb_ap; i++) {
-		*phk++ = HKM((HR_T) mybufrel->rel.a, mybufrel->rel.ap[i].p, H.hm);
+		*phk++ = HKM(mybufrel->rel.a, mybufrel->rel.ap[i].p, H.hm);
 	      }
 	    }
 	}
@@ -1275,16 +1352,11 @@ prempt_scan_relations_pass_one ()
   unsigned int length_line, i, k;
   int err;
   char c;
-    
+
   memset (fr, 0, (1<<NFR) * sizeof(*fr));
   end_insertRelation = 0;
-  if (!(buf_rel = malloc (sizeof(*(buf_rel)) * T_REL)))
-    {
-      fprintf (stderr, "prempt_scan_relations_pass_one: malloc error. %s\n",
-               strerror (errno));
-      exit (1);
-    }
-  memset (buf_rel, 0, sizeof(*(buf_rel)) * T_REL);
+  SMALLOC (buf_rel, T_REL, "prempt_scan_relations_pass_one 1");
+  MEMSETZERO(buf_rel, T_REL);
 
   cpt_rel_a = cpt_rel_b = 0;
   cpy_cpt_rel_a = cpt_rel_a;
@@ -1295,11 +1367,8 @@ prempt_scan_relations_pass_one ()
   length_line = 0;
   
   prempt_data->files = prempt_open_compressed_rs (rep_cado, fic);
-  if ((err = posix_memalign ((void **) &(prempt_data->buf), PREMPT_BUF, PREMPT_BUF)))
-    {
-    fprintf (stderr, "prempt_scan_relations_pass_one: posix_memalign error (%d): %s\n", err, strerror (errno));
-    exit (1);
-    }
+  
+  SMALLOC (prempt_data->buf, PREMPT_BUF, "prempt_scan_relations_pass_one 2");
   pmin = prempt_data->buf;
   pminlessone = pmin - 1;
   prempt_data->pcons = pmin;
@@ -1795,6 +1864,7 @@ usage (void)
   fprintf (stderr, "       -nprimes nnn - expected number of prime ideals\n");
   fprintf (stderr, "       -sos sosfile - to keep track of the renumbering\n");
   fprintf (stderr, "       -raw         - output relations in CADO format\n");
+  fprintf (stderr, "       -npthr   nnn - threads number for suppress singletons\n");
 #ifdef FOR_FFS
   fprintf (stderr, "       -outdel file - output file for deleted relations\n");
 #endif
@@ -1803,11 +1873,10 @@ usage (void)
 
 #ifndef FOR_FFS
 /* estimate the number of primes <= B */
-static int
+static uint64_t
 approx_phi (long B)
 {
-  ASSERT_ALWAYS((double) B <= 53030236260.0); /* otherwise B/log(B) > 2^31 */
-  return (B <= 1) ? 0 : (int) ((double) B / log ((double) B));
+  return (B <= 1) ? 0 : (uint64_t) ((double) B / log ((double) B));
 }
 #else
 /* estimate the number of ideals of degree <= B */
@@ -1879,19 +1948,34 @@ main (int argc, char **argv)
   param_list_parse_uint(pl, "nprimes", (unsigned int *) &nprimes);
   param_list_parse_uint(pl, "keep", (unsigned int *) &keep);
 #else
-  param_list_parse_uint64(pl, "nrels", (int64_t *) &nrelmax);
-  param_list_parse_uint64(pl, "nprimes", (int64_t *) &nprimes);
-  param_list_parse_uint64(pl, "keep", (int64_t *) &keep);
+  param_list_parse_uint64(pl, "nrels", (uint64_t *) &nrelmax);
+  param_list_parse_uint64(pl, "nprimes", (uint64_t *) &nprimes);
+  param_list_parse_uint64(pl, "keep", (uint64_t *) &keep);
 #endif
   
 #if HT == 32
-  param_list_parse_int(pl, "minpr", (int *) &minpr);
-  param_list_parse_int(pl, "minpa", (int *) &minpa);
+  param_list_parse_uint(pl, "minpr", (unsigned int *) &minpr);
+  param_list_parse_uint(pl, "minpa", (unsigned int *) &minpa);
 #else
-  param_list_parse_int64(pl, "minpr", (int64_t *) &minpr);
-  param_list_parse_int64(pl, "minpa", (int64_t *) &minpa);
+  param_list_parse_uint64(pl, "minpr", (uint64_t *) &minpr);
+  param_list_parse_uint64(pl, "minpa", (uint64_t *) &minpa);
 #endif
-    
+
+  /* param_list_parse_uint(pl, "npthr", (unsigned int *) &npt); */
+  const char * snpt = param_list_lookup_string(pl, "npthr");
+  if (snpt) {
+    char *p;
+    if ((p = strchr(snpt, 'x'))) {
+      unsigned int x, y;
+      *p = 0;
+      if (sscanf(snpt, "%u", &x) && sscanf(&p[1], "%u", &y))
+	npt = x * y;
+      else
+	usage();
+    } else
+      if (!sscanf(snpt, "%u", &npt))
+	usage();
+  }
   const char * filelist = param_list_lookup_string(pl, "filelist");
   const char * basepath = param_list_lookup_string(pl, "basepath");
   const char * subdirlist = param_list_lookup_string(pl, "subdirlist");
@@ -1940,6 +2024,9 @@ main (int argc, char **argv)
     }
 #endif
 
+  /* the current code assumes the "rational" side has degree 1 */
+  ASSERT_ALWAYS(pol->rat->degree == 1);
+
   /* On a 32-bit computer, even 1 << 32 would overflow. Well, we could set
      map[ra] = 2^32-1 in that case, but not sure we want to support 32-bit
      primes on a 32-bit computer... */
@@ -1962,10 +2049,8 @@ main (int argc, char **argv)
       usage();
     }
   
-  minus2 = UMAX(minus2) -1;
-  
-  if (minpr < 0) minpr = pol->rat->lim;
-  if (minpa < 0) minpa = pol->alg->lim;
+  if (minpr == UMAX(minpr)) minpr = pol->rat->lim;
+  if (minpa == UMAX(minpa)) minpa = pol->alg->lim;
   
   fprintf (stderr, "Number of relations is %lu\n", (unsigned long) nrelmax);
   if (nprimes > 0) Hsize = nprimes;
@@ -2013,15 +2098,15 @@ main (int argc, char **argv)
   if (!filelist) {
     fic = argv;
   } else if (!subdirlist) {
-    fic = filelist_from_file(basepath, filelist);
+    fic = filelist_from_file (basepath, filelist, 0);
   } else {
     /* count the number of files in the filelist */
     int nfiles = 0;
     int nsubdirs = 0;
-    char ** fl = filelist_from_file(NULL, filelist);
+    char ** fl = filelist_from_file (NULL, filelist, 0);
     for(char ** p = fl ; *p ; p++, nfiles++);
     
-    char ** sl = filelist_from_file(basepath, subdirlist);
+    char ** sl = filelist_from_file (basepath, subdirlist, 1);
     for(char ** p = sl ; *p ; p++, nsubdirs++);
     
     SMALLOC(fic, nsubdirs * nfiles + 1, "main 3");
@@ -2044,11 +2129,11 @@ main (int argc, char **argv)
   tot_alloc = tot_alloc0;
       
 #ifndef FOR_FFS
-  fprintf (stderr, "Pass 1, filtering ideals >= %ld on rat. side and "
-           "%ld on alg. side:\n", (long) minpr, (long) minpa);
+  fprintf (stderr, "Pass 1, filtering ideals >= %lu on rat. side and "
+           "%lu on alg. side:\n", (unsigned long) minpr, (unsigned long) minpa);
 #else
-  fprintf (stderr, "Pass 1, filtering ideals of degree >= %ld on rat. side "
-           "and %ld on alg. side:\n", (long) minpr, (long) minpa);
+  fprintf (stderr, "Pass 1, filtering ideals of degree >= %lu on rat. side "
+           "and %lu on alg. side:\n", (unsigned long) minpr, (unsigned long) minpa);
 #ifdef USE_F2 
   minpr = 1 << minpr;
   minpa = 1 << minpa;
@@ -2067,18 +2152,17 @@ main (int argc, char **argv)
   fprintf (stderr, "   nrels=%lu, nprimes=%lu; excess=%ld\n",
            (unsigned long) nrel, (unsigned long) nprimes, ((long) nrel) - nprimes);
 
-  remove_singletons();
+  remove_singletons ();
   fprintf (stderr, "   nrel=%lu, nprimes=%lu; excess=%ld\n",
 	   (unsigned long) nrel, (unsigned long) nprimes, ((long) nrel) - nprimes);
   if (nrel <= nprimes) /* covers case nrel = nprimes = 0 */
     {
-      fprintf(stderr, "nrel <= nprimes_new\n");
+      fprintf(stderr, "number of relations <= number of ideals\n");
       exit (1);
     }
+
   hashCheck (&H);
   my_malloc_free_all ();
-
-
 
   fprintf (stderr, "Freeing rel_compact array...\n");
   /* we do not use it anymore */

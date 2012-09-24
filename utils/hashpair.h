@@ -21,17 +21,14 @@
 #endif
 
 #if HT == 32
-#define HT_T int32_t
-#define UHT_T uint32_t
+#define HT_T uint32_t
 #else
-#define HT_T int64_t
-#define UHT_T uint64_t
+#define HT_T uint64_t
 #endif 
 
 /* Hashtable data (p,r). */
 typedef struct {
-  HT_T p;
-  UHT_T r;
+  HT_T p, r;
 } ht_t;
 
 typedef struct {
@@ -61,7 +58,7 @@ typedef struct {
 #define HK(A,B) (((unsigned long)(A))*HC0+((unsigned long)(B))*HC1)
 #define HKM(A,B,M) ((HR_T) (HK(A,B)%((unsigned long) (M))))
 #define HASHINSERT(H,P,R,F) \
-  hashInsertWithKey(H, (HT_T) P, (UHT_T) R, (HR_T) HKM(P,R,(H)->hm), (unsigned int *) F)
+  hashInsertWithKey(H, (HT_T) P, (HT_T) R, (HR_T) HKM(P,R,(H)->hm), (unsigned int *) F)
 
 #ifdef  __cplusplus
 extern "C" { 
@@ -71,8 +68,8 @@ extern "C" {
   extern void hashInit (hashtable_t *, HR_T, unsigned int);
   extern void hashFree (hashtable_t *);
   extern void hashCheck (hashtable_t *);
-  extern HR_T hashInsert (hashtable_t *, HT_T, UHT_T, unsigned int *);
-  extern HR_T hashInsertWithKey (hashtable_t *, HT_T, UHT_T, HR_T, unsigned int *);
+  extern HR_T hashInsert (hashtable_t *, HT_T, HT_T, unsigned int *);
+  extern HR_T hashInsertWithKey (hashtable_t *, HT_T, HT_T, HR_T, unsigned int *);
 
 #ifdef	__cplusplus
 }	/* extern "C" */

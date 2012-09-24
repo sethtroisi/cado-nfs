@@ -1,11 +1,10 @@
 #include "cado.h"
 #include <stdlib.h>
 #include <string.h>
+#include <misc.h>
 #include "bit_vector.h"
 #include "macros.h"
 
-#define BV_BITS 64      // since we're using uint64_t's
-#define LN2_BV_BITS 6   // 2^^LN2_BV_BITS = BV_BITS
 typedef uint64_t bv_t;
 
 void bit_vector_init(bit_vector_ptr b, size_t n)

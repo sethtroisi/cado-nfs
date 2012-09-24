@@ -50,8 +50,13 @@ hashCheck (hashtable_t *H)
             100.0 * (double) nb / (double) H->hm, (unsigned long) nb, (unsigned long) H->hm);
 }
 
+/* special values of the root r:
+   p   for a projective root (can happen both in normal relations when p
+                              divides b, or in free relations when p divides
+                              the leading coefficient of f)
+   p+2 for rational ideals */
 HR_T
-hashInsertWithKey(hashtable_t *H, HT_T p, UHT_T r, HR_T h, unsigned int *f)
+hashInsertWithKey(hashtable_t *H, HT_T p, HT_T r, HR_T h, unsigned int *f)
 {
   for ( ; ; ) {
     if (H->ht[h].p == p && H->ht[h].r == r) {
@@ -71,7 +76,7 @@ hashInsertWithKey(hashtable_t *H, HT_T p, UHT_T r, HR_T h, unsigned int *f)
 }
 
 HR_T
-hashInsert(hashtable_t *H, HT_T p, UHT_T r, unsigned int *f)
+hashInsert(hashtable_t *H, HT_T p, HT_T r, unsigned int *f)
 {
   return HASHINSERT(H,p,r,f);
 }

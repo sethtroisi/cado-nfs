@@ -18,8 +18,8 @@ while read in x ; do
         let nok+=1
     fi
     let n+=1
-    if [ `expr $n % 1000` = 0 ] ; then
-        echo -e "# $nok/$n\r" >&2
+    if [ `expr $n % 100` = 0 ] ; then
+        echo -e "# OK $nok/$n\r" >&2
     fi
 done
 

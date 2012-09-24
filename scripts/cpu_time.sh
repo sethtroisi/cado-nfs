@@ -51,9 +51,9 @@ if [[ -z $1 || $(expr $1 : '.*[p].*') != 0 ]]
          echo -n "   # of polyselect files:   "
          ls ${name}.polsel_out.* | wc -l
          echo -n "   # of found polynomials:  "
-         grep Tried ${name}.polsel_out.* | sed "s/^.*found \([^p]*\).*$/+\1/g" | tr "\n" " " | cut -c2- | bc
+         grep tried ${name}.polsel_out.* | sed "s/^.*found \([^p]*\).*$/+\1/g" | tr "\n" " " | cut -c2- | bc
          echo -n "   # below maxnorm:         "
-         grep Tried ${name}.polsel_out.* | sed "s/^.*, \([0-9]*\) below.*$/+\1/g" | tr "\n" " " | cut -c2- | bc
+         grep tried ${name}.polsel_out.* | sed "s/^.*, \([0-9]*\) below.*$/+\1/g" | tr "\n" " " | cut -c2- | bc
     fi
 fi
 
@@ -76,7 +76,10 @@ if [[ -z $1 || $(expr $1 : '.*[s].*') != 0 ]]
     fi
     first=`ls ${name}.rels.*.gz | sed "s/^.*rels.\([0-9]*\)\-[0-9]*.gz$/\1/g" | sort -n | head -1`
     last=`ls ${name}.rels.*.gz | sed "s/^.*.rels.[0-9]*-\([0-9]*\).gz$/\1/g" | sort -n | tail -1`
-    echo "   special-q range:         ${first}-${last}"
+    echo -n "   special-q range:         ${first}-${last}"
+    lpba=`grep lpba ${name}.poly | cut -c 7-`
+    percent=`echo ${last}00/2^${lpba} | bc`
+    echo " (${percent}% of LP bound)"
     echo -n "   # of sieve files:        "
     ls ${name}.rels.*.gz | wc -l
 fi

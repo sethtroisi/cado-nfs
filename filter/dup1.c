@@ -213,7 +213,7 @@ main (int argc, char * argv[])
         usage();
     }
 
-    char ** files = filelist ? filelist_from_file(basepath, filelist) : argv;
+    char ** files = filelist ? filelist_from_file(basepath, filelist, 0) : argv;
 
     relation_stream rs;
     relation_stream_init(rs);

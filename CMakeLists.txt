@@ -90,8 +90,7 @@ get_override(GF2X_CONFIGURE_FLAGS GF2X_CONFIGURE_FLAGS)
 
 include(CheckFunctionExists)
 
-# posix_memalign
-CHECK_FUNCTION_EXISTS(posix_memalign      HAVE_POSIX_MEMALIGN)
+CHECK_FUNCTION_EXISTS(posix_memalign	HAVE_POSIX_MEMALIGN)
 
 include(${CADO_NFS_SOURCE_DIR}/config/sse2.cmake)
 include(${CADO_NFS_SOURCE_DIR}/config/sse41.cmake)
@@ -101,6 +100,7 @@ include(${CADO_NFS_SOURCE_DIR}/config/alloca.cmake)
 include("${CADO_NFS_SOURCE_DIR}/config/math.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/rusage_thread.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/gcc-ubuntu-bug.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/sync_fetch.cmake")
 
 ######################################################################
 # Try to detect whether pthreads and/or MPI are available.

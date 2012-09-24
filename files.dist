@@ -122,7 +122,6 @@ filter/merge_opts.h
 filter/mst.c
 filter/mst.h
 filter/purge.c
-filter/purge-mt.c
 filter/replay.c
 filter/report.c
 filter/report.h
@@ -244,6 +243,7 @@ params/params.c168
 params/params.c169
 params/params.c170
 params/params.c171
+params/params.c175
 params/params.c180
 params/params.c190
 params/params.c204
@@ -425,6 +425,7 @@ utils/test_modredc_15ul.c
 utils/test_modredc_2ul2.c
 utils/test_modredc_ul.c
 utils/testbase-rootfinder.quick
+utils/testmpz-rootfinder.quick
 utils/timing.c
 utils/timing.h
 utils/ularith.h
@@ -454,6 +455,8 @@ config/mpi.cmake
 config/math.cmake
 config/rusage_thread.cmake
 config/rusage_thread.c
+config/sync_fetch.c
+config/sync_fetch.cmake
 config/gcc-ubuntu-bug.c
 config/gcc-ubuntu-bug.cmake
 scripts/fixup_params_file.sh.in
