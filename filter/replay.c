@@ -357,7 +357,7 @@ renumber (int *small_ncols, int *colweight, int ncols,
 //     row[-i-1] is to be added to rows i1...ik and NOT destroyed.
 //
 static void
-doAllAdds(typerow_t **newrows, char *str)
+doAllAdds(typerow_t **newrows, char *str, MAYBE_UNUSED FILE *outdelfile)
 {
   int32_t j;
   int32_t ind[MERGE_LEVEL_MAX], i0;
@@ -385,6 +385,12 @@ doAllAdds(typerow_t **newrows, char *str)
   if(destroy)
     {
 	    //destroy initial row!
+#ifdef FOR_FFS
+      fprintf (outdelfile, "%x %d", j, rowLength(newrows, i0));
+      for (int k = 1; k <= rowLength(newrows, i0); k++)
+          fprintf (outdelfile, " %x:%d", newrows[i0][k].id, newrows[i0][k].e);
+      fprintf (outdelfile, "\n");
+#endif
       free(newrows[i0]);
       newrows[i0] = NULL;
     }
@@ -452,11 +458,23 @@ toFlush (const char *sparsename, typerow_t **sparsemat, int *colweight,
 }
 
 static void
-build_newrows_from_file(typerow_t **newrows, FILE *hisfile, uint64_t bwcostmin)
+build_newrows_from_file(typerow_t **newrows, FILE *hisfile, uint64_t bwcostmin,
+                        const char* outdelfilename)
 {
     uint64_t bwcost;
     unsigned long addread = 0;
     char str[STRLENMAX];
+
+    FILE *outdelfile = NULL;
+    if (outdelfilename != NULL)
+      {
+        outdelfile = fopen (outdelfilename, "w+");
+        if (outdelfile == NULL)
+          {
+            fprintf (stderr, "Error, cannot open file %s.\n", outdelfilename);
+            exit(1);
+          }
+      }
 
     fprintf(stderr, "Reading row additions\n");
     double tt = wct_seconds();
@@ -470,7 +488,7 @@ build_newrows_from_file(typerow_t **newrows, FILE *hisfile, uint64_t bwcostmin)
 	    break;
 	}
 	if(strncmp(str, "BWCOST", 6) != 0)
-	    doAllAdds(newrows, str);
+	    doAllAdds(newrows, str, outdelfile);
 	else{
 	    if(strncmp(str, "BWCOSTMIN", 9) != 0){
 		sscanf(str+8, "%"PRIu64"", &bwcost);
@@ -555,7 +573,7 @@ toIndex(typerow_t **newrows, const char *indexname, FILE *hisfile,
 	rowCell(newrows, i, 1) = i;
     }
     // replay hisfile
-    build_newrows_from_file(newrows, hisfile, bwcostmin);
+    build_newrows_from_file(newrows, hisfile, bwcostmin, NULL);
     // re-determining small_nrows to check
     small_nrows2 = 0;
     for(int i = 0; i < nrows; i++)
@@ -1009,7 +1027,8 @@ static void
 fasterVersion(typerow_t **newrows, const char *sparsename, 
               const char *indexname, const char *hisname, purgedfile_stream ps,
               uint64_t bwcostmin, int nrows, int ncols, int skip, int bin, 
-              int writeindex, const char *idealsfilename)
+              int writeindex, const char *idealsfilename,
+              const char *outdelfilename)
 {
     FILE *hisfile;
     int *colweight;
@@ -1033,7 +1052,7 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
 #endif
 
     // read merges in the *.merge.his file and replay them
-    build_newrows_from_file(newrows, hisfile, bwcostmin);
+    build_newrows_from_file(newrows, hisfile, bwcostmin, outdelfilename);
 
     /* compute column weights */
     colweight = (int*) malloc (ncols * sizeof(int *));
@@ -1054,8 +1073,7 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
       if (newrows[i] != NULL)
         newrows[small_nrows++] = newrows[i];
 
-#ifdef FOR_FFS
-#ifdef STAT_FFS
+#if defined FOR_FFS && defined STAT_FFS
     int count[11] = {0,0,0,0,0,0,0,0,0,0,0};
     int nonzero = 0;
     for (int i = 0; i < small_nrows ; i++)
@@ -1075,7 +1093,6 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
                        100 * (double) count[i]/nonzero);
     fprintf (stderr, "# of > 10: %d(%.2f%%)\n", count[0], 
                      100 * (double) count[0]/nonzero);
-#endif
 #endif
 
     /* renumber columns after sorting them by decreasing weight */
@@ -1143,6 +1160,7 @@ main(int argc, char *argv[])
     const char * sparsename = param_list_lookup_string(pl, "out");
     const char * indexname = param_list_lookup_string(pl, "index");
     const char * idealsfilename = param_list_lookup_string(pl, "ideals");
+    const char * outdelfilename = param_list_lookup_string(pl, "outdel");
     param_list_parse_int(pl, "binary", &bin);
     param_list_parse_int(pl, "nslices", &nslices);
     param_list_parse_int(pl, "skip", &skip);
@@ -1159,6 +1177,11 @@ main(int argc, char *argv[])
     if (idealsfilename == NULL)
       {
         fprintf (stderr, "Error, for FFS -ideals should be non null\n");
+        exit (1);
+      }
+    if (outdelfilename == NULL)
+      {
+        fprintf (stderr, "Error, for FFS -outdel should be non null\n");
         exit (1);
       }
 #endif
@@ -1196,7 +1219,7 @@ main(int argc, char *argv[])
 
     fasterVersion (newrows, sparsename, indexname, hisname, ps,
                    bwcostmin, nrows, ncols, skip, bin, !noindex,
-                   idealsfilename);
+                   idealsfilename, outdelfilename);
 
 
     purgedfile_stream_closefile(ps);
