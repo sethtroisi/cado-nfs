@@ -45,7 +45,7 @@ findroot_ffs (long a, unsigned long b, unsigned long p)
 
   sprintf (s, "%lx", p);
   if (fppol64_set_str (pol_p, s) != 1)
-      fprintf(stderr, "Error in findroot_ffs with c=%s\n", s);
+      fprintf(stderr, "Error in findroot_ffs with p=%s\n", s);
       
   fppol64_rem (pol_a, pol_a, pol_p);
   fppol64_rem (pol_b, pol_b, pol_p);
