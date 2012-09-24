@@ -1123,7 +1123,7 @@ main(int argc, char *argv[])
 {
     FILE *hisfile;
     uint64_t bwcostmin = 0;
-    int nrows, ncols, nslices = 0;
+    int nrows, ncols;
     typerow_t **newrows;
     int verbose = 0;
     int bin=0;
@@ -1162,7 +1162,6 @@ main(int argc, char *argv[])
     const char * idealsfilename = param_list_lookup_string(pl, "ideals");
     const char * outdelfilename = param_list_lookup_string(pl, "outdel");
     param_list_parse_int(pl, "binary", &bin);
-    param_list_parse_int(pl, "nslices", &nslices);
     param_list_parse_int(pl, "skip", &skip);
     param_list_parse_uint64(pl, "bwcostmin", &bwcostmin);
     if (has_suffix(sparsename, ".bin") || has_suffix(sparsename, ".bin.gz"))
