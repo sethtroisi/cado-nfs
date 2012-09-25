@@ -178,6 +178,8 @@ char *fppol_get_str(char *str, fppol_srcptr p)
 // Return 1 if successful.
 int fppol_set_str(fppol_ptr r, const char *str)
 {
+  if (strlen(str) == 0)
+    return 0;
   static __thread char buf[__FP_BITS*16+1];
   unsigned n        = 0;
   buf[__FP_BITS*16] = '\0';
