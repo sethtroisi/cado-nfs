@@ -329,7 +329,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         if (!bw->skip_online_checks) {
             /* Last dot product. This must cancel ! Recall that x_dotprod
              * adds to the result. */
-            x_dotprod(mmt, gxvecs, nx, ahead, 0, nchecks);
+            x_dotprod(mmt, gxvecs, nx, ahead, 0, nchecks, -1);
 
             allreduce_generic(ahead, pi->m, nchecks);
             if (!A->vec_is_zero(A, ahead->v, nchecks)) {

@@ -220,7 +220,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             /* This segment must be guaranteed to be free of any mpi
              * calls */
             /* Compute the product by x */
-            x_dotprod(mmt, gxvecs, nx, xymats, i * bw->m, bw->m);
+            x_dotprod(mmt, gxvecs, nx, xymats, i * bw->m, bw->m, 1);
 
             
             matmul_top_mul_cpu(mmt, bw->dir);
@@ -238,11 +238,8 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         if (!bw->skip_online_checks) {
             /* Last dot product. This must cancel ! */
-            x_dotprod(mmt, gxvecs, nx, ahead, 0, nchecks);
+            x_dotprod(mmt, gxvecs, nx, ahead, 0, nchecks, -1);
 
-            /* XXX SILLY ME ! I must not rely on 1+1==0 for this to work
-             * also over GF(p). To be fixed (soon).
-             */
             allreduce_generic(ahead, pi->m, nchecks);
             if (!A->vec_is_zero(A, ahead->v, nchecks)) {
                 printf("Failed check at iteration %d\n", s + bw->interval);

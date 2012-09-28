@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-void x_dotprod(matmul_top_data_ptr mmt, uint32_t * xv, unsigned int, mmt_vec_ptr v, unsigned int z0, unsigned int m);
+void x_dotprod(matmul_top_data_ptr mmt, uint32_t * xv, unsigned int, mmt_vec_ptr v, unsigned int z0, unsigned int m, int sign);
 
 #ifdef __cplusplus
 }
