@@ -143,7 +143,7 @@ int main(int argc, char * argv[])
 
     param_list_configure_alias(pl, "density", "-d");
     param_list_configure_alias(pl, "seed", "-s");
-    param_list_configure_knob(pl, "-v", &verbose);
+    param_list_configure_switch(pl, "-v", &verbose);
 
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }

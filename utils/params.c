@@ -20,9 +20,9 @@ void param_list_init(param_list pl)
     pl->aliases = NULL;
     pl->naliases = 0;
     pl->naliases_alloc = 0;
-    pl->knobs = NULL;
-    pl->nknobs = 0;
-    pl->nknobs_alloc = 0;
+    pl->switches = NULL;
+    pl->nswitches = 0;
+    pl->nswitches_alloc = 0;
 }
 
 void param_list_clear(param_list pl)
@@ -36,10 +36,10 @@ void param_list_clear(param_list pl)
         if (pl->aliases[i]->alias) free(pl->aliases[i]->alias);
     }
     free(pl->aliases);
-    for(int i = 0 ; i < pl->nknobs ; i++) {
-        free(pl->knobs[i]->knob);
+    for(int i = 0 ; i < pl->nswitches ; i++) {
+        free(pl->switches[i]->switchname);
     }
-    free(pl->knobs);
+    free(pl->switches);
     memset(pl, 0, sizeof(pl));
 }
 
@@ -64,7 +64,7 @@ static int param_list_add_key_nostrdup(param_list pl,
     pl->p[pl->size]->key = key;
     pl->p[pl->size]->value = value;
     pl->p[pl->size]->origin = o;
-    // knobs always count as parsed, of course. Hence the (value==NULL) thing
+    // switches always count as parsed, of course. Hence the (value==NULL) thing
     pl->p[pl->size]->parsed = (value == NULL);
     // values above 1 are built within the sorting step.
     pl->p[pl->size]->seen = 1;
@@ -138,7 +138,7 @@ void param_list_consolidate(param_list pl)
              */
             free(pl->p[i]->key);
             free(pl->p[i]->value);
-            // this value is useful for knobs
+            // this value is useful for switches
             pl->p[i+1]->seen += pl->p[i]->seen;
         } else {
             // I can't see why there could conceivably be a problem if i == j,
@@ -275,7 +275,7 @@ int param_list_configure_alias(param_list pl, const char * key, const char * ali
 
     ASSERT_ALWAYS(alias != NULL);
     ASSERT_ALWAYS(key != NULL);
-    /* A knob may be aliases, but only as another knob !!! */
+    /* A switch may be aliases, but only as another switch !!! */
     ASSERT_ALWAYS(key[0] != '-' || (alias[0] == '-' && alias[len-1] != '='));
 
     if (alias[0] != '-' && alias[len-1] != '=') {
@@ -301,31 +301,31 @@ int param_list_configure_alias(param_list pl, const char * key, const char * ali
     return 0;
 }
 
-int param_list_configure_knob(param_list pl, const char * knob, int * ptr)
+int param_list_configure_switch(param_list pl, const char * switchname, int * ptr)
 {
-    ASSERT_ALWAYS(knob != NULL);
-    if ((pl->nknobs + 1) >= pl->nknobs_alloc) {
-        pl->nknobs_alloc += 2;
-        pl->nknobs_alloc <<= 1;
-        pl->knobs = realloc(pl->knobs, pl->nknobs_alloc * sizeof(param_list_knob));
+    ASSERT_ALWAYS(switchname != NULL);
+    if ((pl->nswitches + 1) >= pl->nswitches_alloc) {
+        pl->nswitches_alloc += 2;
+        pl->nswitches_alloc <<= 1;
+        pl->switches = realloc(pl->switches, pl->nswitches_alloc * sizeof(param_list_switch));
     }
-    char * tmp = (char *) malloc(strlen(knob)+2);
+    char * tmp = (char *) malloc(strlen(switchname)+2);
     tmp[0]='-';
-    if (knob[1] == '-') { // have -- in the knob
-        strncpy(tmp, knob, strlen(knob) + 1);
+    if (switchname[1] == '-') { // have -- in the switch
+        strncpy(tmp, switchname, strlen(switchname) + 1);
     } else {
-        strncpy(tmp+1, knob, strlen(knob) + 1);
+        strncpy(tmp+1, switchname, strlen(switchname) + 1);
     }
     // put the -- version
-    pl->knobs[pl->nknobs]->knob = strdup(tmp);
-    pl->knobs[pl->nknobs]->ptr = ptr;
+    pl->switches[pl->nswitches]->switchname = strdup(tmp);
+    pl->switches[pl->nswitches]->ptr = ptr;
     if (ptr) *ptr = 0;
-    pl->nknobs++;
+    pl->nswitches++;
     // put the - version
-    pl->knobs[pl->nknobs]->knob = strdup(tmp+1);
-    pl->knobs[pl->nknobs]->ptr = ptr;
+    pl->switches[pl->nswitches]->switchname = strdup(tmp+1);
+    pl->switches[pl->nswitches]->ptr = ptr;
     if (ptr) *ptr = 0;
-    pl->nknobs++;
+    pl->nswitches++;
     free(tmp);
 
     return 0;
@@ -342,7 +342,7 @@ static int param_list_update_cmdline_alias(param_list pl,
     }
     const char * a = (*p_argv[0]);
     if (al->alias[strlen(al->alias)-1] == '=') {
-        // since knobs are aliased only by knobs, we know we have a plain
+        // since switches are aliased only by switches, we know we have a plain
         // option here.
         if (strncmp(a, al->alias, strlen(al->alias)) != 0)
             return 0;
@@ -357,9 +357,9 @@ static int param_list_update_cmdline_alias(param_list pl,
     }
     if (strcmp(a, al->alias) == 0) {
         if (al->key[0] == '-') {
-            /* This is a knob ; we have to treat it accordingly. The
+            /* This is a switch ; we have to treat it accordingly. The
              * difficult part is to properly land on
-             * param_list_update_cmdline_knob at the proper time. This
+             * param_list_update_cmdline_switch at the proper time. This
              * means in particular not necessarily there. It's
              * considerably easier to simply change the value in the
              * command line. Except that it's a const cast, it's ugly.
@@ -383,8 +383,8 @@ static int param_list_update_cmdline_alias(param_list pl,
     return 0;
 }
 
-static int param_list_update_cmdline_knob(param_list pl,
-        param_list_knob knob,
+static int param_list_update_cmdline_switch(param_list pl,
+        param_list_switch switchpar,
         int * p_argc, char *** p_argv)
 {
     if (!pl->cmdline_argv0) {
@@ -392,11 +392,11 @@ static int param_list_update_cmdline_knob(param_list pl,
         pl->cmdline_argc0 = *p_argc;
     }
     const char * a = (*p_argv[0]);
-    if (strcmp(a, knob->knob) == 0) {
-        param_list_add_key(pl, knob->knob, NULL, PARAMETER_FROM_CMDLINE);
+    if (strcmp(a, switchpar->switchname) == 0) {
+        param_list_add_key(pl, switchpar->switchname, NULL, PARAMETER_FROM_CMDLINE);
         (*p_argv)+=1;
         (*p_argc)-=1;
-        if (knob->ptr) (*(knob->ptr))++;
+        if (switchpar->ptr) (*(switchpar->ptr))++;
         return 1;
     }
     return 0;
@@ -416,15 +416,15 @@ int param_list_update_cmdline(param_list pl,
 
     /* We rely on having alias scanning first, because this incurs a
      * command line changed (could get along without except in the case
-     * of knobs where it's particularly handy).
+     * of switches where it's particularly handy).
      */
     for(i = 0 ; i < pl->naliases ; i++) {
         if (param_list_update_cmdline_alias(pl, pl->aliases[i], p_argc, p_argv))
             return 1;
     }
 
-    for(i = 0 ; i < pl->nknobs ; i++) {
-        if (param_list_update_cmdline_knob(pl, pl->knobs[i], p_argc, p_argv))
+    for(i = 0 ; i < pl->nswitches ; i++) {
+        if (param_list_update_cmdline_switch(pl, pl->switches[i], p_argc, p_argv))
             return 1;
     }
 
@@ -758,7 +758,7 @@ int param_list_parse_mpz(param_list pl, const char * key, mpz_ptr r)
     return pl->p[v]->seen;
 }
 
-int param_list_parse_knob(param_list pl, const char * key)
+int param_list_parse_switch(param_list pl, const char * key)
 {
     int v = assoc(pl, key);
     if (v < 0)

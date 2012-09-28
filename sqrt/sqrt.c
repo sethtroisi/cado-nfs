@@ -1109,11 +1109,11 @@ int main(int argc, char *argv[])
     int opt_rat = 0;
     int opt_alg = 0;
     int opt_gcd = 0;
-    param_list_configure_knob(pl, "ab", &opt_ab);
-    param_list_configure_knob(pl, "rat", &opt_rat);
-    param_list_configure_knob(pl, "alg", &opt_alg);
-    param_list_configure_knob(pl, "gcd", &opt_gcd);
-    param_list_configure_knob(pl, "-v", &verbose);
+    param_list_configure_switch(pl, "ab", &opt_ab);
+    param_list_configure_switch(pl, "rat", &opt_rat);
+    param_list_configure_switch(pl, "alg", &opt_alg);
+    param_list_configure_switch(pl, "gcd", &opt_gcd);
+    param_list_configure_switch(pl, "-v", &verbose);
     argc--,argv++;
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) continue;

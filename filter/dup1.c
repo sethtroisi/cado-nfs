@@ -151,9 +151,9 @@ main (int argc, char * argv[])
 
     int bz = 0;
     int ab_hexa = 0;
-    param_list_configure_knob(pl, "bz", &bz);
-    param_list_configure_knob(pl, "ab", &only_ab);
-    param_list_configure_knob(pl, "abhexa", &ab_hexa);
+    param_list_configure_switch(pl, "bz", &bz);
+    param_list_configure_switch(pl, "ab", &only_ab);
+    param_list_configure_switch(pl, "abhexa", &ab_hexa);
 
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }

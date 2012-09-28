@@ -240,16 +240,16 @@ int main(int argc, char * argv[])
 
     param_list_init(pl);
     argv++,argc--;
-    param_list_configure_knob(pl, "--quiet", &quiet);
-    param_list_configure_knob(pl, "--display-correlation", &display_correlation);
-    // param_list_configure_knob(pl, "--ascii-in", &ascii_in);
-    // param_list_configure_knob(pl, "--binary-in", &binary_in);
-    // param_list_configure_knob(pl, "--ascii-out", &ascii_out);
-    // param_list_configure_knob(pl, "--binary-out", &binary_out);
-    // param_list_configure_knob(pl, "--ascii-freq", &ascii_freq);
-    // param_list_configure_knob(pl, "--binary-freq", &binary_freq);
-    param_list_configure_knob(pl, "--balance2d", &twodim);
-    param_list_configure_knob(pl, "--shuffled-product", &shuffled_product);
+    param_list_configure_switch(pl, "--quiet", &quiet);
+    param_list_configure_switch(pl, "--display-correlation", &display_correlation);
+    // param_list_configure_switch(pl, "--ascii-in", &ascii_in);
+    // param_list_configure_switch(pl, "--binary-in", &binary_in);
+    // param_list_configure_switch(pl, "--ascii-out", &ascii_out);
+    // param_list_configure_switch(pl, "--binary-out", &binary_out);
+    // param_list_configure_switch(pl, "--ascii-freq", &ascii_freq);
+    // param_list_configure_switch(pl, "--binary-freq", &binary_freq);
+    param_list_configure_switch(pl, "--balance2d", &twodim);
+    param_list_configure_switch(pl, "--shuffled-product", &shuffled_product);
 
     for(;argc;) {
         char * q;

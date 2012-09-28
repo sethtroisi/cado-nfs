@@ -437,7 +437,7 @@ main (int argc, char *argv[])
   param_list_init(pl);
   cado_poly_init(cpoly);
 
-  param_list_configure_knob(pl, "-nopowers", &no_powers);
+  param_list_configure_switch(pl, "-nopowers", &no_powers);
 
   argv++, argc--;
   for( ; argc ; ) {

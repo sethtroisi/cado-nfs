@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
     param_list_init(pl);
     int wild = 0;
     argv++, argc--;
-    param_list_configure_knob(pl, "--transpose", &transposing);
+    param_list_configure_switch(pl, "--transpose", &transposing);
     for (; argc;) {
 	if (param_list_update_cmdline(pl, &argc, &argv))
 	    continue;
