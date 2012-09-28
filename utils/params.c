@@ -399,6 +399,20 @@ static int param_list_update_cmdline_switch(param_list pl,
         if (switchpar->ptr) (*(switchpar->ptr))++;
         return 1;
     }
+    if (strncmp(switchpar->switchname, "--", 2) != 0)
+        return 0;
+    char * inv_switch;
+    int rc = asprintf(&inv_switch, "--no-%s", switchpar->switchname+2);
+    ASSERT_ALWAYS(rc>=0);
+    int match = strcmp(inv_switch, a) == 0;
+    free(inv_switch);
+    if (match) {
+        param_list_add_key(pl, a, NULL, PARAMETER_FROM_CMDLINE);
+        (*p_argv)+=1;
+        (*p_argc)-=1;
+        if (switchpar->ptr) (*(switchpar->ptr))=0;
+        return 1;
+    }
     return 0;
 }
 
