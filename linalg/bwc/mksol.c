@@ -35,6 +35,8 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         ys[1] = ys[0] + (bw->ys[1]-bw->ys[0])/2;
     }
 
+    int withcoeffs = param_list_lookup_string(pl, "prime") != NULL;
+    int nchecks = withcoeffs ? NCHECKS_CHECK_VECTOR_GFp : NCHECKS_CHECK_VECTOR_GF2;
     mpz_t p;
     mpz_init_set_ui(p, 2);
     param_list_parse_mpz(pl, "prime", p);
@@ -51,7 +53,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     abase_vbase Ac;
     abase_vbase_oo_field_init_byfeatures(Ac,
             MPFQ_PRIME, p,
-            MPFQ_GROUPSIZE, NCHECKS_CHECK_VECTOR,
+            MPFQ_GROUPSIZE, nchecks,
             MPFQ_DONE);
 
     abase_vbase Ar;
@@ -264,7 +266,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         // intersections of the i0..i1 intervals on both sides.
         
         if (!bw->skip_online_checks) {
-            A->vec_set_zero(A, ahead->v, NCHECKS_CHECK_VECTOR);
+            A->vec_set_zero(A, ahead->v, nchecks);
             unsigned int how_many;
             unsigned int offset_c;
             unsigned int offset_v;
@@ -327,10 +329,10 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
         if (!bw->skip_online_checks) {
             /* Last dot product. This must cancel ! Recall that x_dotprod
              * adds to the result. */
-            x_dotprod(mmt, gxvecs, nx, ahead, 0, NCHECKS_CHECK_VECTOR);
+            x_dotprod(mmt, gxvecs, nx, ahead, 0, nchecks);
 
-            allreduce_generic(ahead, pi->m, NCHECKS_CHECK_VECTOR);
-            if (!A->vec_is_zero(A, ahead->v, NCHECKS_CHECK_VECTOR)) {
+            allreduce_generic(ahead, pi->m, nchecks);
+            if (!A->vec_is_zero(A, ahead->v, nchecks)) {
                 printf("Failed check at iteration %d\n", s + bw->interval);
                 exit(1);
             }
@@ -414,7 +416,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     matmul_top_vec_clear_generic(mmt, sum, bw->dir);
     if (!bw->skip_online_checks) {
         matmul_top_vec_clear_generic(mmt, check_vector, !bw->dir);
-        vec_clear_generic(pi->m, ahead, NCHECKS_CHECK_VECTOR);
+        vec_clear_generic(pi->m, ahead, nchecks);
         free(gxvecs);
     }
     vec_clear_generic(pi->m, fcoeffs, A->groupsize(A)*bw->interval);

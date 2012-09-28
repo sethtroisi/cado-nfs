@@ -35,6 +35,8 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     flags[bw->dir] = THREAD_SHARED_VECTOR;
     flags[!bw->dir] = 0;
 
+    int withcoeffs = param_list_lookup_string(pl, "prime") != NULL;
+    int nchecks = withcoeffs ? NCHECKS_CHECK_VECTOR_GFp : NCHECKS_CHECK_VECTOR_GF2;
 
     mpz_t p;
     mpz_init_set_ui(p, 2);
@@ -42,7 +44,7 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     abase_vbase A;
     abase_vbase_oo_field_init_byfeatures(A, 
             MPFQ_PRIME, p,
-            MPFQ_GROUPSIZE, NCHECKS_CHECK_VECTOR,
+            MPFQ_GROUPSIZE, nchecks,
             MPFQ_DONE);
     mpz_clear(p);
 

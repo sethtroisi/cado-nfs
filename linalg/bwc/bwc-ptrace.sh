@@ -21,12 +21,14 @@ mkdir $wdir
 mn=1
 
 Mh=1; Mv=1;
-Th=2; Tv=2;
+Th=1; Tv=1;
 Nh=$((Mh*Th))
 Nv=$((Mv*Tv))
 
 mpi=${Mh}x${Mv}
 thr=${Th}x${Tv}
+
+prime=65521
 
 # The test matrix may be created by:
 #
@@ -36,7 +38,7 @@ thr=${Th}x${Tv}
 
 # -c 10 imposes a bound on the coefficients.
 
-$bins/random  90 100 -c 10 --kright 10 > $mats/t100p.txt
+$bins/random  100 -c 10 --kright 10 > $mats/t100p.txt
 $bins/mf_scan  --ascii-in --withcoeffs --mfile $mats/t100p.txt  --freq --binary-out --ofile $mats/t100p.bin
 
 matrix=$mats/t100p.bin
@@ -63,7 +65,7 @@ echo "Using balancing file $bfile"
 checksum=${bfile#$wdir/`basename $matrix .bin`.${Nh}x${Nv}.}
 checksum=`basename $checksum .bin`
 
-common="matrix=$matrix mpi=$mpi thr=$thr balancing=$bfile mn=$mn wdir=$wdir"
+common="matrix=$matrix mpi=$mpi thr=$thr balancing=$bfile mn=$mn wdir=$wdir prime=$prime mm_impl=basicp"
 if [ "$nullspace" = left ] ; then
     common="$common nullspace=left"
     transpose_if_left="Transpose"
@@ -82,14 +84,36 @@ while [ $j0 -lt $mn ] ; do
 done
 
 
-# ys=0..64 here is really a hack. It merely has to match the version
+# ys=0..1 here is really a hack. It merely has to match the version
 # which is used in production.
-$bins/bwc.pl dispatch sanity_check_vector=H1   $common save_submatrices=1 ys=0..64
+$bins/bwc.pl dispatch $common save_submatrices=1 ys=0..1
 
-set +e
-$bins/bench  --nmax 1000 --prime 65521 --nbys 1 --impl basicp  -- $matrix
-
+[ "$?" = 0 ] && $bins/bwc.pl prep   $common
+[ "$?" = 0 ] && $bins/bwc.pl secure  $common interval=10
+[ "$?" = 0 ] && $bins/bwc.pl secure  $common interval=1
+ln -s Y.0 $wdir/V0-1.0
+# [ "$?" = 0 ] && $bins/bwc.pl :ysplit $common splits=$all_splits
+[ "$?" = 0 ] && $bins/bwc.pl krylov  $common interval=10 end=10 ys=0..1 skip_online_checks=1
+[ "$?" = 0 ] && $bins/bwc.pl krylov  $common interval=1 end=10 ys=0..1 skip_online_checks=1
+[ "$?" = 0 ] && rm -f $wdir/A*
+j0=0
+while [ $j0 -lt $mn ] ; do
+    let j1=$j0+1
+    [ "$?" = 0 ] && $bins/bwc.pl krylov  $common interval=10 ys=$j0..$j1
+    j0=$j1
+done
+# [ "$?" = 0 ] && $bins/bwc.pl acollect    $common -- --remove-old
+# 
+# 
+# 
+# # set +e
+# # $bins/bench  --nmax 1000 --prime $prime --nbys 1 --impl basicp  -- $matrix
+# 
 mdir=$wdir
+
+split=${Nh}x${Nv}
+b=`basename $matrix .bin`
+c=$b.$split.$checksum
 
 cmd=`dirname $0`/convert_magma.pl
 
@@ -98,11 +122,58 @@ cwfile=${matrix%%bin}cw.bin
 $cmd weights < $rwfile > $mdir/rw.m
 $cmd weights < $cwfile > $mdir/cw.m
 
+# This is for the **unbalanced** matrix !!
+
 $cmd bpmatrix < $matrix > $mdir/t.m
-echo "var:=Transpose(var);" >> $mdir/t.m
+
+$cmd balancing < $wdir/$c.bin > $mdir/b.m
+
+(
+echo "nullspace:=\"$nullspace\";"
+echo "xtr:=func<x|$transpose_if_left(x)>;"
+echo "nh:=$Nh;"
+echo "nv:=$Nv;"
+echo "nrp:=nv*Ceiling(nr/(nh*nv));"
+echo "ncp:=nh*Ceiling(nc/(nh*nv));"
+echo "Mt:=Matrix(GF($prime),nh*nrp,nv*ncp,[]);"
+for i in `seq 0 $((Nh-1))` ; do
+    echo "nr$i:=nrp;" # nr div nh + ($i lt nr mod nh select 1 else 0);"
+    echo "snr$i:=$i *nrp;" # $i*(nr div nh) + Min($i, nr mod nh);"
+    for j in `seq 0 $((Nv-1))` ; do
+        $cmd bpmatrix < $wdir/$c.h$i.v$j> $mdir/t$i$j.m
+        echo "nc$j:=ncp;" #  div nv + ($j lt nc mod nv select 1 else 0);"
+        echo "snc$j:=$j*ncp;" # (nc div nv) + Min($j, nc mod nv);"
+        echo "load \"$mdir/t$i$j.m\"; M$i$j:=Matrix(GF($prime),Matrix(var));"
+        echo "x:=RMatrixSpace(GF($prime),nr$i,nc$j)!0;InsertBlock(~x,$transpose_if_left(M$i$j),1,1);M$i$j:=x;"
+        echo "InsertBlock(~Mt,M$i$j,1+snr$i,1+snc$j);"
+    done
+done
+echo "mlist:=["
+for i in `seq 0 $((Nh-1))` ; do
+    if [ "$i" != 0 ] ; then echo "," ; fi
+    echo -n "["
+    for j in `seq 0 $((Nv-1))` ; do
+        if [ "$j" != 0 ] ; then echo -n ", " ; fi
+        echo -n "M$i$j";
+    done
+    echo -n "]"
+done
+echo "];"
+) > $mdir/placemats.m
 
 
-$cmd spvector32 < /tmp/rowvec1 > $mdir/rowvec1.m
-$cmd spvector32 < /tmp/rowvec2 > $mdir/rowvec2.m
-$cmd spvector32 < /tmp/colvec1 > $mdir/colvec1.m
-$cmd spvector32 < /tmp/colvec2 > $mdir/colvec2.m
+$cmd spvector32 < $wdir/Y.0 > $mdir/Y0.m
+$cmd spvector32 < $wdir/V0-1.0 > $mdir/V0.m
+$cmd spvector32 < $wdir/V0-1.1 > $mdir/V1.m
+$cmd spvector32 < $wdir/V0-1.2 > $mdir/V2.m
+$cmd spvector32 < $wdir/V0-1.3 > $mdir/V3.m
+$cmd spvector32 < $wdir/V0-1.4 > $mdir/V4.m
+$cmd spvector32 < $wdir/V0-1.5 > $mdir/V5.m
+$cmd spvector32 < $wdir/V0-1.6 > $mdir/V6.m
+$cmd spvector32 < $wdir/V0-1.7 > $mdir/V7.m
+$cmd spvector32 < $wdir/V0-1.8 > $mdir/V8.m
+$cmd spvector32 < $wdir/V0-1.9 > $mdir/V9.m
+$cmd spvector32 < $wdir/V0-1.10 > $mdir/V10.m
+$cmd spvector32 < $wdir/C.1 > $mdir/C1.m
+$cmd spvector32 < $wdir/C.10 > $mdir/C10.m
+$cmd x $wdir/X > $mdir/x.m

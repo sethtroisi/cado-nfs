@@ -61,6 +61,9 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         ys[1] = ys[0] + (bw->ys[1]-bw->ys[0])/2;
     }
 
+    int withcoeffs = param_list_lookup_string(pl, "prime") != NULL;
+    int nchecks = withcoeffs ? NCHECKS_CHECK_VECTOR_GFp : NCHECKS_CHECK_VECTOR_GF2;
+
     mpz_t p;
     mpz_init_set_ui(p, 2);
     param_list_parse_mpz(pl, "prime", p);
@@ -77,7 +80,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     abase_vbase Ac;
     abase_vbase_oo_field_init_byfeatures(Ac,
             MPFQ_PRIME, p,
-            MPFQ_GROUPSIZE, NCHECKS_CHECK_VECTOR,
+            MPFQ_GROUPSIZE, nchecks,
             MPFQ_DONE);
     mpz_clear(p);
 
@@ -130,7 +133,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     }
 
     if (!bw->skip_online_checks) {
-        vec_init_generic(pi->m, A, ahead, 0, NCHECKS_CHECK_VECTOR);
+        vec_init_generic(pi->m, A, ahead, 0, nchecks);
     }
 
     /* We'll store all xy matrices locally before doing reductions. Given
@@ -185,7 +188,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
          * memory */
 
         if (!bw->skip_online_checks) {
-            A->vec_set_zero(A, ahead->v, NCHECKS_CHECK_VECTOR);
+            A->vec_set_zero(A, ahead->v, nchecks);
             unsigned int how_many;
             unsigned int offset_c;
             unsigned int offset_v;
@@ -235,10 +238,13 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         if (!bw->skip_online_checks) {
             /* Last dot product. This must cancel ! */
-            x_dotprod(mmt, gxvecs, nx, ahead, 0, NCHECKS_CHECK_VECTOR);
+            x_dotprod(mmt, gxvecs, nx, ahead, 0, nchecks);
 
-            allreduce_generic(ahead, pi->m, NCHECKS_CHECK_VECTOR);
-            if (!A->vec_is_zero(A, ahead->v, NCHECKS_CHECK_VECTOR)) {
+            /* XXX SILLY ME ! I must not rely on 1+1==0 for this to work
+             * also over GF(p). To be fixed (soon).
+             */
+            allreduce_generic(ahead, pi->m, nchecks);
+            if (!A->vec_is_zero(A, ahead->v, nchecks)) {
                 printf("Failed check at iteration %d\n", s + bw->interval);
                 exit(1);
             }
@@ -290,7 +296,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
     if (!bw->skip_online_checks) {
         matmul_top_vec_clear_generic(mmt, check_vector, !bw->dir);
-        vec_clear_generic(pi->m, ahead, NCHECKS_CHECK_VECTOR);
+        vec_clear_generic(pi->m, ahead, nchecks);
     }
 
     free(gxvecs);
