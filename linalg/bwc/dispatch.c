@@ -63,7 +63,7 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
 
     // in no situation shall we try to do our sanity check if we've just
     // been told to export our cache list
-    if (tmp != NULL && !only_export) {
+    if (tmp != NULL && !only_export && !param_list_lookup_string(pl, "prime")) {
         /* We have computed a sanity check vector, which is H=M*K, with K
          * constant and easily given. Note that we have not computed K*M,
          * but really M*K. Thus independently of which side we prefer, we

@@ -17,8 +17,8 @@
 #include "balancing.h"
 #include "balancing_workhorse.h"
 
-// FIXME -- the command line currently does not allow changing this.
-int transposing = 1;
+int transposing = 1;    // Use --no-transpose to unset.
+int withcoeffs = 0;
 
 void usage()
 {
@@ -35,6 +35,7 @@ void * all(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
     matrix_u32 mat;
     mat->transpose=1;
+    mat->withcoeffs=withcoeffs;
     mat->bfile = param_list_lookup_string(pl, "balancing");
     mat->mfile = param_list_lookup_string(pl, "matrix");
     balancing_get_matrix_u32(pi, pl, mat);
@@ -49,6 +50,7 @@ int main(int argc, char *argv[])
     int wild = 0;
     argv++, argc--;
     param_list_configure_switch(pl, "--transpose", &transposing);
+    param_list_configure_switch(pl, "--withcoeffs", &withcoeffs);
     for (; argc;) {
 	if (param_list_update_cmdline(pl, &argc, &argv))
 	    continue;

@@ -13,6 +13,7 @@ struct matrix_u32_s {
     const char * mfile;    // matrix file name
     const char * bfile;    // balancing file name ; NULL will mean auto-detect
     int transpose;
+    int withcoeffs;
     // output arguments.
     uint32_t * p;
     size_t size;
