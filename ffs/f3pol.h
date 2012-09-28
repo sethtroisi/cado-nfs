@@ -192,8 +192,8 @@ extern const uint16_t __f3_monic_set_ui_conv[];
         t |= t >> 8;                                     \
         t &= 0x0000ffff0000fffful;                       \
         t |= t >> 16;                                    \
-        ASSERT (sz >= 32 || t < 1<<sz);                  \
-        r[k] = (t & 0xfffffffful);                       \
+        ASSERT (sz >= 32 || t>>sz == 0);                 \
+        r[k] = (uint##sz##_t) (t & 0xfffffffful);        \
       }                                                  \
   } while (0)
 
