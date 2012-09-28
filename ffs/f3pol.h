@@ -158,6 +158,44 @@ extern const uint16_t __f3_monic_set_ui_conv[];
     }                                                     \
   } while (0)
 
+// Conversion of an polynomial to an uint64_t (evaluation in 2^__FP_BITS)
+#define __FP_GET_UI_SPARSE(sz, r, p)                  \
+  do {                                                \
+    ASSERT (fppol##sz##_deg(p) < 32);                 \
+    r = 0;                                            \
+    uint64_t t;                                       \
+    for (unsigned k = 0; k < __FP_BITS; ++k) {        \
+      t = (uint64_t) p[k] & 0xfffffffful;             \
+      t = (t | (t << 16)) & 0x0000ffff0000fffful;     \
+      t = (t | (t << 8)) & 0x00ff00ff00ff00fful;      \
+      t = (t | (t << 4)) & 0x0f0f0f0f0f0f0f0ful;      \
+      t = (t | (t << 2)) & 0x3333333333333333ul;      \
+      t = (t | (t << 1)) & 0x5555555555555555ul;      \
+      r |= t << k;                                    \
+    }                                                 \
+  } while (0)
+
+// Conversion of an uint64_t (evaluation in 2^__FP_BITS) in polynomial
+#define __FP_SET_UI_SPARSE(sz, r, x)                     \
+  do {                                                   \
+    fppol##sz##_set_zero(r);                             \
+      uint64_t t;                                        \
+      for (unsigned k = 0; k < __FP_BITS; ++k) {         \
+        t = x >> k;                                      \
+        t &= 0x5555555555555555ul;                       \
+        t |= t >> 1;                                     \
+        t &= 0x3333333333333333ul;                       \
+        t |= t >> 2;                                     \
+        t &= 0x0f0f0f0f0f0f0f0ful;                       \
+        t |= t >> 4;                                     \
+        t &= 0x00ff00ff00ff00fful;                       \
+        t |= t >> 8;                                     \
+        t &= 0x0000ffff0000fffful;                       \
+        t |= t >> 16;                                    \
+        ASSERT (sz >= 32 || t < 1<<sz);                  \
+        r[k] = (t & 0xfffffffful);                       \
+      }                                                  \
+  } while (0)
 
 
 /* Multiplications.

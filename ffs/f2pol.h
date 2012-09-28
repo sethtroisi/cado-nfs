@@ -90,6 +90,14 @@
 #define __FP_SET_UI(sz, r, x, n, m) \
   do { r[0] = (uint##sz##_t)x; } while (0)
 
+// Conversion of an polynomial to an uint64_t (evaluation in 2^__FP_BITS)
+#define __FP_GET_UI_SPARSE(sz, r, p) \
+  do { r = (uint64_t)p[0]; } while (0)
+
+// Conversion of an uint64_t (evaluation in 2^__FP_BITS) in polynomial
+#define __FP_SET_UI_SPARSE(sz, r, x) \
+  do { ASSERT(sz==64 || x>>sz == 0); r[0] = (uint##sz##_t)x; } while (0)
+
 
 
 /* Multiplications.
