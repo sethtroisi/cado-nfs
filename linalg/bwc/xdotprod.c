@@ -13,51 +13,32 @@ void x_dotprod(matmul_top_data_ptr mmt, uint32_t * xv, unsigned int nx, mmt_vec_
         serialize_threads(mmt->pi->wr[bw->dir]);
     } else {
         /* I presume that no locking is needed here. But it's unchecked
-         */
+        */
         // ASSERT_ALWAYS(0);
     }
 
-    if (sign > 0) {
-        for(unsigned int j = 0 ; j < m ; j++) {
-            void * where = SUBVEC(v, v, z0 + j);
-            for(unsigned int t = 0 ; t < nx ; t++) {
-                uint32_t i = xv[j*nx+t];
-                unsigned int vi0 = mmt->wr[bw->dir]->i0;
-                unsigned int vi1 = mmt->wr[bw->dir]->i1;
-                unsigned int hi0 = mmt->wr[!bw->dir]->i0;
-                unsigned int hi1 = mmt->wr[!bw->dir]->i1;
-                if (i < vi0 || i >= vi1)
-                    continue;
-                /* We want the data to match our interval on both
-                 * directions, because otherwise we'll end up
-                 * computing rubbish -- recall that no broadcast_down
-                 * has occurred yet.
-                 */
-                if (i < hi0 || i >= hi1)
-                    continue;
+    for(unsigned int j = 0 ; j < m ; j++) {
+        void * where = SUBVEC(v, v, z0 + j);
+        for(unsigned int t = 0 ; t < nx ; t++) {
+            uint32_t i = xv[j*nx+t];
+            unsigned int vi0 = mmt->wr[bw->dir]->i0;
+            unsigned int vi1 = mmt->wr[bw->dir]->i1;
+            unsigned int hi0 = mmt->wr[!bw->dir]->i0;
+            unsigned int hi1 = mmt->wr[!bw->dir]->i1;
+            if (i < vi0 || i >= vi1)
+                continue;
+            /* We want the data to match our interval on both
+             * directions, because otherwise we'll end up
+             * computing rubbish -- recall that no broadcast_down
+             * has occurred yet.
+             */
+            if (i < hi0 || i >= hi1)
+                continue;
+            if (sign > 0) {
                 v->abase->add(v->abase,
                         where, where,
                         SUBVEC(mmt->wr[bw->dir]->v, v, i - vi0));
-            }
-        }
-    } else {
-        for(unsigned int j = 0 ; j < m ; j++) {
-            void * where = SUBVEC(v, v, z0 + j);
-            for(unsigned int t = 0 ; t < nx ; t++) {
-                uint32_t i = xv[j*nx+t];
-                unsigned int vi0 = mmt->wr[bw->dir]->i0;
-                unsigned int vi1 = mmt->wr[bw->dir]->i1;
-                unsigned int hi0 = mmt->wr[!bw->dir]->i0;
-                unsigned int hi1 = mmt->wr[!bw->dir]->i1;
-                if (i < vi0 || i >= vi1)
-                    continue;
-                /* We want the data to match our interval on both
-                 * directions, because otherwise we'll end up
-                 * computing rubbish -- recall that no broadcast_down
-                 * has occurred yet.
-                 */
-                if (i < hi0 || i >= hi1)
-                    continue;
+            } else {
                 v->abase->sub(v->abase,
                         where, where,
                         SUBVEC(mmt->wr[bw->dir]->v, v, i - vi0));
