@@ -239,7 +239,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
                     electric_free(test,rstride * abnbits(abase));
                 }
 #endif
-                ArxA->transpose(Ar, A,
+                ArxA->transpose(Ar->obj, A->obj,
                         SUBVEC(fcoeffs, v, i * A->groupsize(A)),
                         ahead->v);
             }
@@ -275,7 +275,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
                     mcol->i0, mcol->i1);
 
             if (how_many) {
-                AxAc->dotprod(A, Ac, ahead->v,
+                AxAc->dotprod(A->obj, Ac->obj, ahead->v,
                         SUBVEC(check_vector, v, offset_c),
                         SUBVEC(mcol->v, v, offset_v),
                         how_many);
@@ -303,7 +303,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             /* This segment must be guaranteed to be free of any mpi
              * calls */
 
-            AxAr->addmul_tiny(A, Ar,
+            AxAr->addmul_tiny(A->obj, Ar->obj,
                     sum->v,
                     SUBVEC(mcol->v, v, ii0 - mcol->i0),
                     SUBVEC(fcoeffs, v, i * A->groupsize(A)),

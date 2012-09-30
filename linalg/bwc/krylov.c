@@ -197,7 +197,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                     mcol->i0, mcol->i1);
 
             if (how_many) {
-                AxAc->dotprod(A, Ac, ahead->v,
+                AxAc->dotprod(A->obj, Ac->obj, ahead->v,
                         SUBVEC(check_vector, v, offset_c),
                         SUBVEC(mcol->v, v, offset_v),
                         how_many);
