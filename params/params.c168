@@ -34,7 +34,7 @@ polsel_delay=300             # time between two checks
 polsel_nice=4            # nice level for selection
 
 ## Parameters of polyselect
-polsel_P=2000000             # choose lc(g) with two prime factors in [P,2P]
+polsel_P=220000              # choose lc(g) with two prime factors in [P,2P]
 polsel_maxnorm=55            # max. lognorm of polynomials (before rootsieve)
 polsel_admax=2e9             # max value for lc(f)
 polsel_adrange=2e7           # individual tasks
