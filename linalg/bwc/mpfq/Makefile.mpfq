@@ -18,10 +18,11 @@ basic:
 binary-fields:
 	# This is slightly more complicated, as we need mpfq, a built
 	# image with the helper binary, and also some additional tweaks.
-	if ! [ -w /tmp/mpfq ] || ! [ -x /tmp/mpfq ] ; then \
+	if ! [ -e /tmp/mpfq ] ; then mkdir /tmp/mpfq ; fi
+	if ! [ -d /tmp/mpfq ] || ! [ -w /tmp/mpfq ] || ! [ -x /tmp/mpfq ] ; then \
 	    echo "/tmp/mpfq not a writeable directory, binary fields skipped" ; \
 	    exit 0 ; \
-	fi
+	fi ; \
 	if ! [ -x /tmp/mpfq/gf2n/helper/helper ] ; then \
 	(cd /tmp/mpfq ; cmake $(MPFQ) ; make helper) ; \
 	fi
