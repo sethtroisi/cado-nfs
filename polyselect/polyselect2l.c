@@ -28,7 +28,7 @@
 #include "ropt.h"
 #endif
 
-/* Two modes: batch P (default) or batch SQ. The latter 
+/* Two modes: batch P or batch SQ. The latter
    seems faster, but need more memory. Use the latter by default. */
 //#define BATCH_P
 #ifdef BATCH_P
@@ -2145,7 +2145,7 @@ collision_on_batch_sq ( header_t header,
 }
 
 
-/* collision on special-q, call collisio_on_batch_sq */
+/* collision on special-q, call collision_on_batch_sq */
 static inline void
 collision_on_sq ( header_t header,
                   proots_t R,
