@@ -76,7 +76,7 @@ foreach(v ${bwc_abases})
     set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/abase_${v}.c mpfq/abase_${v}_t.c )
 endforeach(v)
 
-foreach(v p16)
+foreach(v p16 p_4)
     set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/abase_${v}.c mpfq/abase_${v}_t.c )
 endforeach(v)
 
@@ -178,6 +178,7 @@ foreach(v ${bwc_abases})
     endforeach(i)
 endforeach(v)
 configure_matmul_lib(p16 basicp)
+configure_matmul_lib(p_4 basicp)
 
 # INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/share/${CADO_DIST_ARCHIVE_NAME}/libexec"
 
@@ -238,3 +239,5 @@ target_link_libraries(cleanup utils m)
 install(TARGETS cleanup RUNTIME DESTINATION bin/linalg/bwc)
 
 include(CMakeLists-nodist.txt OPTIONAL)
+
+# add_subdirectory(old-lingen)

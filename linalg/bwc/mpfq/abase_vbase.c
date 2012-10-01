@@ -10,6 +10,8 @@
 #include "abase_u64k2_t.h"
 #include "abase_p16.h"
 #include "abase_p16_t.h"
+#include "abase_p_4.h"
+#include "abase_p_4_t.h"
 void abase_vbase_oo_field_init_byfeatures(abase_vbase_ptr v, ...)
 {
         va_list ap;
@@ -38,15 +40,15 @@ void abase_vbase_oo_field_init_byfeatures(abase_vbase_ptr v, ...)
                 fprintf(stderr, "Unsupported group size %d\n", groupsize);
                 exit(1);
             }
+        } else if (groupsize > 1) {
+            /* All prime fields require group size == 1 */
+            fprintf(stderr, "Unsupported group size %d\n", groupsize);
+            exit(1);
         } else if (mpz_cmp_ui(p, 1 << 16) < 0) {
-            if (groupsize == 1) {
-                abase_p16_oo_field_init(v);
-            } else {
-                fprintf(stderr, "Unsupported group size %d\n", groupsize);
-                exit(1);
-            }
+            abase_p16_oo_field_init(v);
+        } else if (mpz_size(p) == 4) { abase_p_4_oo_field_init(v);
         } else {
-            fprintf(stderr, "Unsupported prime\n");
+            fprintf(stderr, "Unsupported prime (%zu limbs)\n", mpz_size(p));
             exit(1);
         }
         v->field_specify(v, MPFQ_PRIME, p);
@@ -78,6 +80,10 @@ void abase_vbase_oo_init_templates(abase_vbase_tmpl_ptr w, abase_vbase_ptr v0, a
         w->dotprod = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_p16_p16_dotprod;
         w->addmul_tiny = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *, void *, unsigned int)) abase_p16_p16_addmul_tiny;
         w->transpose = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *)) abase_p16_p16_transpose;
+    } else if (strcmp(s0, "p_4") == 0 && strcmp(s1, "p_4") == 0) {
+        w->dotprod = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_p_4_p_4_dotprod;
+        w->addmul_tiny = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *, void *, unsigned int)) abase_p_4_p_4_addmul_tiny;
+        w->transpose = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *)) abase_p_4_p_4_transpose;
     } else {
         abort();
     }

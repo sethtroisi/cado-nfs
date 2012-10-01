@@ -13,17 +13,21 @@ static MPI_Op abase_p16_impl_mpi_addition_op_ur;
 static int abase_p16_impl_mpi_use_count;   /* several stacked init()/clear() pairs are supported */
 /* Active handler: simd_p16 */
 /* Automatically generated code  */
+/* Active handler: p16 */
 /* Active handler: Mpfq::defaults */
 /* Active handler: Mpfq::defaults::vec */
 /* Active handler: Mpfq::defaults::mpi_flat */
 /* Active handler: io */
 /* Active handler: trivialities */
 /* Active handler: simd_flat */
-/* Options used: vtag=p16 tag=p16 vbase_stuff={
+/* Options used: w=64 vtag=p16 tag=p16 vbase_stuff={
                  'vc:includes' => [
                                     '<stdarg.h>'
                                   ],
                  'member_templates_restrict' => {
+                                                  'p_4' => [
+                                                             'p_4'
+                                                           ],
                                                   'u64k2' => [
                                                                'u64k1',
                                                                'u64k2'
@@ -35,7 +39,8 @@ static int abase_p16_impl_mpi_use_count;   /* several stacked init()/clear() pai
                                                 },
                  'families' => [
                                  $vbase_stuff->{'member_templates_restrict'}{'u64k2'},
-                                 $vbase_stuff->{'member_templates_restrict'}{'p16'}
+                                 $vbase_stuff->{'member_templates_restrict'}{'p16'},
+                                 $vbase_stuff->{'member_templates_restrict'}{'p_4'}
                                ],
                  'choose_byfeatures' => sub { "DUMMY" }
                };
@@ -130,7 +135,7 @@ static int abase_p16_impl_mpi_use_count;   /* several stacked init()/clear() pai
 
 
 /* Functions operating on the field structure */
-/* *simd_p16::code_for_field_specify */
+/* *p16::code_for_field_specify */
 void abase_p16_field_specify(abase_p16_dst_field K MAYBE_UNUSED, unsigned long tag, void * x MAYBE_UNUSED)
 {
         if (tag == MPFQ_GROUPSIZE) {
@@ -176,7 +181,7 @@ void abase_p16_field_specify(abase_p16_dst_field K MAYBE_UNUSED, unsigned long t
 /* missing cmp_ui */
 
 /* Input/output functions */
-/* *simd_p16::code_for_asprint */
+/* *p16::code_for_asprint */
 void abase_p16_asprint(abase_p16_dst_field K MAYBE_UNUSED, char * * ps, abase_p16_src_elt x)
 {
         *ps = malloc(13);
@@ -184,7 +189,7 @@ void abase_p16_asprint(abase_p16_dst_field K MAYBE_UNUSED, char * * ps, abase_p1
         snprintf(*ps, 13, "%" PRId32, *x);
 }
 
-/* *io::code_for_fprint */
+/* *io::code_for_fprint, p16 */
 void abase_p16_fprint(abase_p16_dst_field k, FILE * file, abase_p16_src_elt x)
 {
     char *str;
@@ -193,13 +198,13 @@ void abase_p16_fprint(abase_p16_dst_field k, FILE * file, abase_p16_src_elt x)
     free(str);
 }
 
-/* *simd_p16::code_for_sscan */
+/* *p16::code_for_sscan */
 int abase_p16_sscan(abase_p16_dst_field k MAYBE_UNUSED, abase_p16_dst_elt z, const char * str)
 {
     return sscanf(str, "%" SCNd32, z) == 1;
 }
 
-/* *io::code_for_fscan */
+/* *io::code_for_fscan, p16 */
 int abase_p16_fscan(abase_p16_dst_field k, FILE * file, abase_p16_dst_elt z)
 {
     char *tmp;
@@ -240,7 +245,7 @@ int abase_p16_fscan(abase_p16_dst_field k, FILE * file, abase_p16_dst_elt z)
 
 
 /* Vector functions */
-/* *Mpfq::defaults::vec::alloc::code_for_vec_init, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_init, Mpfq::defaults::vec, Mpfq::defaults, p16 */
 void abase_p16_vec_init(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_vec * v, unsigned int n)
 {
     unsigned int i;
@@ -249,7 +254,7 @@ void abase_p16_vec_init(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_vec * v, u
         abase_p16_init(K, (*v) + i);
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_reinit, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_reinit, Mpfq::defaults::vec, Mpfq::defaults, p16 */
 void abase_p16_vec_reinit(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_vec * v, unsigned int n, unsigned int m)
 {
     if (n < m) { // increase size
@@ -265,7 +270,7 @@ void abase_p16_vec_reinit(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_vec * v,
     }
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_clear, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_clear, Mpfq::defaults::vec, Mpfq::defaults, p16 */
 void abase_p16_vec_clear(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_vec * v, unsigned int n)
 {
         unsigned int i;
@@ -277,7 +282,7 @@ void abase_p16_vec_clear(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_vec * v, 
 /* missing vec_setcoef_ui */
 /* missing vec_scal_mul */
 /* missing vec_conv */
-/* *Mpfq::defaults::vec::io::code_for_vec_asprint, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::io::code_for_vec_asprint, Mpfq::defaults::vec, Mpfq::defaults, p16 */
 void abase_p16_vec_asprint(abase_p16_dst_field K MAYBE_UNUSED, char * * pstr, abase_p16_src_vec w, unsigned int n)
 {
     if (n == 0) {
@@ -314,7 +319,7 @@ void abase_p16_vec_asprint(abase_p16_dst_field K MAYBE_UNUSED, char * * pstr, ab
     (*pstr)[len] = '\0';
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_fprint, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::io::code_for_vec_fprint, Mpfq::defaults::vec, Mpfq::defaults, p16 */
 void abase_p16_vec_fprint(abase_p16_dst_field K MAYBE_UNUSED, FILE * file, abase_p16_src_vec w, unsigned int n)
 {
     char *str;
@@ -323,13 +328,13 @@ void abase_p16_vec_fprint(abase_p16_dst_field K MAYBE_UNUSED, FILE * file, abase
     free(str);
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_print, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::io::code_for_vec_print, Mpfq::defaults::vec, Mpfq::defaults, p16 */
 void abase_p16_vec_print(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_src_vec w, unsigned int n)
 {
     abase_p16_vec_fprint(K,stdout,w,n);
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_sscan, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::io::code_for_vec_sscan, Mpfq::defaults::vec, Mpfq::defaults, p16 */
 int abase_p16_vec_sscan(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_vec * w, unsigned int * n, const char * str)
 {
     // start with a clean vector
@@ -373,7 +378,7 @@ int abase_p16_vec_sscan(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_vec * w, u
     return 1;
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_fscan, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::io::code_for_vec_fscan, Mpfq::defaults::vec, Mpfq::defaults, p16 */
 int abase_p16_vec_fscan(abase_p16_dst_field K MAYBE_UNUSED, FILE * file, abase_p16_vec * w, unsigned int * n)
 {
     char *tmp;
@@ -406,7 +411,7 @@ int abase_p16_vec_fscan(abase_p16_dst_field K MAYBE_UNUSED, FILE * file, abase_p
     return ret;
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_init, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_init, Mpfq::defaults::vec, Mpfq::defaults, p16 */
 void abase_p16_vec_ur_init(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_vec_ur * v, unsigned int n)
 {
     unsigned int i;
@@ -415,7 +420,7 @@ void abase_p16_vec_ur_init(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_vec_ur 
         abase_p16_elt_ur_init(K, &( (*v)[i]));
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_reinit, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_reinit, Mpfq::defaults::vec, Mpfq::defaults, p16 */
 void abase_p16_vec_ur_reinit(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_vec_ur * v, unsigned int n, unsigned int m)
 {
     if (n < m) { // increase size
@@ -431,7 +436,7 @@ void abase_p16_vec_ur_reinit(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_vec_u
     }
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_clear, Mpfq::defaults::vec, Mpfq::defaults */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_clear, Mpfq::defaults::vec, Mpfq::defaults, p16 */
 void abase_p16_vec_ur_clear(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_vec_ur * v, unsigned int n)
 {
     unsigned int i;
@@ -459,7 +464,7 @@ void abase_p16_dotprod(abase_p16_dst_field K MAYBE_UNUSED, abase_p16_dst_vec xw,
 
 /* MPI interface */
 static void abase_p16_mpi_op_inner(void *, void *, int *, MPI_Datatype *);
-static /* *Mpfq::defaults::mpi_flat::code_for_mpi_ops_init */
+static /* *Mpfq::defaults::mpi_flat::code_for_mpi_ops_init, p16 */
 void abase_p16_mpi_op_inner(void * invec, void * inoutvec, int * len, MPI_Datatype * datatype)
 {
     int got_it;
@@ -470,7 +475,7 @@ void abase_p16_mpi_op_inner(void * invec, void * inoutvec, int * len, MPI_Dataty
 }
 
 static void abase_p16_mpi_op_inner_ur(void *, void *, int *, MPI_Datatype *);
-static /* *Mpfq::defaults::mpi_flat::code_for_mpi_ops_init */
+static /* *Mpfq::defaults::mpi_flat::code_for_mpi_ops_init, p16 */
 void abase_p16_mpi_op_inner_ur(void * invec, void * inoutvec, int * len, MPI_Datatype * datatype)
 {
     int got_it;
@@ -480,7 +485,7 @@ void abase_p16_mpi_op_inner_ur(void * invec, void * inoutvec, int * len, MPI_Dat
     abase_p16_vec_ur_add(K, inoutvec, inoutvec, invec, *len);
 }
 
-/* *Mpfq::defaults::mpi_flat::code_for_mpi_ops_init */
+/* *Mpfq::defaults::mpi_flat::code_for_mpi_ops_init, p16 */
 void abase_p16_mpi_ops_init(abase_p16_dst_field K MAYBE_UNUSED)
 {
         if (abase_p16_impl_mpi_use_count++) return;
@@ -497,31 +502,31 @@ void abase_p16_mpi_ops_init(abase_p16_dst_field K MAYBE_UNUSED)
     MPI_Op_create(&abase_p16_mpi_op_inner_ur, 1, &abase_p16_impl_mpi_addition_op_ur);
 }
 
-/* *Mpfq::defaults::mpi_flat::code_for_mpi_datatype */
+/* *Mpfq::defaults::mpi_flat::code_for_mpi_datatype, p16 */
 MPI_Datatype abase_p16_mpi_datatype(abase_p16_dst_field K MAYBE_UNUSED)
 {
     return abase_p16_impl_mpi_datatype;
 }
 
-/* *Mpfq::defaults::mpi_flat::code_for_mpi_datatype_ur */
+/* *Mpfq::defaults::mpi_flat::code_for_mpi_datatype_ur, p16 */
 MPI_Datatype abase_p16_mpi_datatype_ur(abase_p16_dst_field K MAYBE_UNUSED)
 {
     return abase_p16_impl_mpi_datatype_ur;
 }
 
-/* *Mpfq::defaults::mpi_flat::code_for_mpi_addition_op */
+/* *Mpfq::defaults::mpi_flat::code_for_mpi_addition_op, p16 */
 MPI_Op abase_p16_mpi_addition_op(abase_p16_dst_field K MAYBE_UNUSED)
 {
     return abase_p16_impl_mpi_addition_op;
 }
 
-/* *Mpfq::defaults::mpi_flat::code_for_mpi_addition_op_ur */
+/* *Mpfq::defaults::mpi_flat::code_for_mpi_addition_op_ur, p16 */
 MPI_Op abase_p16_mpi_addition_op_ur(abase_p16_dst_field K MAYBE_UNUSED)
 {
     return abase_p16_impl_mpi_addition_op_ur;
 }
 
-/* *Mpfq::defaults::mpi_flat::code_for_mpi_ops_clear */
+/* *Mpfq::defaults::mpi_flat::code_for_mpi_ops_clear, p16 */
 void abase_p16_mpi_ops_clear(abase_p16_dst_field K MAYBE_UNUSED)
 {
         if (--abase_p16_impl_mpi_use_count) return;
@@ -668,10 +673,10 @@ static void abase_p16_wrapper_reduce(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p
     abase_p16_reduce(vbase->obj, x, y);
 }
 
-static void abase_p16_wrapper_addmul1(abase_vbase_ptr, abase_p16_dst_elt_ur, abase_p16_src_elt, int);
-static void abase_p16_wrapper_addmul1(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p16_dst_elt_ur r MAYBE_UNUSED, abase_p16_src_elt s1 MAYBE_UNUSED, int v MAYBE_UNUSED)
+static void abase_p16_wrapper_addmul_si_ur(abase_vbase_ptr, abase_p16_dst_elt_ur, abase_p16_src_elt, long);
+static void abase_p16_wrapper_addmul_si_ur(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p16_dst_elt_ur r MAYBE_UNUSED, abase_p16_src_elt s1 MAYBE_UNUSED, long v MAYBE_UNUSED)
 {
-    abase_p16_addmul1(vbase->obj, r, s1, v);
+    abase_p16_addmul_si_ur(vbase->obj, r, s1, v);
 }
 
 static int abase_p16_wrapper_cmp(abase_vbase_ptr, abase_p16_src_elt, abase_p16_src_elt);
@@ -1048,7 +1053,7 @@ void abase_p16_oo_field_init(abase_vbase_ptr vbase)
     /* missing mul_ur */
     /* missing sqr_ur */
     vbase->reduce = (void (*) (abase_vbase_ptr, void *, void *)) abase_p16_wrapper_reduce;
-    vbase->addmul1 = (void (*) (abase_vbase_ptr, void *, const void *, int)) abase_p16_wrapper_addmul1;
+    vbase->addmul_si_ur = (void (*) (abase_vbase_ptr, void *, const void *, long)) abase_p16_wrapper_addmul_si_ur;
     vbase->cmp = (int (*) (abase_vbase_ptr, const void *, const void *)) abase_p16_wrapper_cmp;
     /* missing cmp_ui */
     vbase->is_zero = (int (*) (abase_vbase_ptr, const void *)) abase_p16_wrapper_is_zero;

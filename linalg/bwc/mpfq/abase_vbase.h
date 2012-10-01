@@ -58,7 +58,7 @@ struct abase_vbase_s {
     void (*mul_ur)(abase_vbase_ptr, void *, const void *, const void *);
     void (*sqr_ur)(abase_vbase_ptr, void *, const void *);
     void (*reduce)(abase_vbase_ptr, void *, void *);
-    void (*addmul1)(abase_vbase_ptr, void *, const void *, int);
+    void (*addmul_si_ur)(abase_vbase_ptr, void *, const void *, long);
     int (*cmp)(abase_vbase_ptr, const void *, const void *);
     int (*cmp_ui)(abase_vbase_ptr, const void *, unsigned long);
     int (*is_zero)(abase_vbase_ptr, const void *);

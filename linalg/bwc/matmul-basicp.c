@@ -129,7 +129,7 @@ void matmul_basicp_mul(struct matmul_basicp_data_s * mm, void * xdst, void const
     abdst_vec dst = xdst;
 
     abelt_ur rowsum;
-    abelt_ur_init(x, rowsum);
+    abelt_ur_init(x, &rowsum);
 
     /* d == 1: matrix times vector product */
     /* d == 0: vector times matrix product */
@@ -149,7 +149,7 @@ void matmul_basicp_mul(struct matmul_basicp_data_s * mm, void * xdst, void const
                 j = *q++;
                 int32_t c = *(int32_t*)q++;
                 ASSERT(j < mm->public_->dim[d]);
-                abaddmul1(x, rowsum, src[j], c);
+                abaddmul_si_ur(x, rowsum, src[j], c);
             }
             abreduce(x, dst[i], rowsum);
         }
@@ -167,7 +167,7 @@ void matmul_basicp_mul(struct matmul_basicp_data_s * mm, void * xdst, void const
                 j = *q++;
                 int32_t c = *(int32_t*)q++;
                 ASSERT(j < mm->public_->dim[!d]);
-                abaddmul1(x, dst[j], src[i], c);
+                abaddmul_si_ur(x, dst[j], src[i], c);
             }
         }
         for(unsigned int j = 0 ; j < mm->public_->dim[!d] ; j++) {
@@ -177,7 +177,7 @@ void matmul_basicp_mul(struct matmul_basicp_data_s * mm, void * xdst, void const
     }
     ASM_COMMENT("end of multiplication code");
 
-    abelt_ur_clear(x, rowsum);
+    abelt_ur_clear(x, &rowsum);
     mm->public_->iteration[d]++;
 }
 

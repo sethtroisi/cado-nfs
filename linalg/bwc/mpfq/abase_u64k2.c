@@ -20,11 +20,14 @@ static int abase_u64k2_impl_mpi_use_count;   /* several stacked init()/clear() p
 /* Active handler: io */
 /* Active handler: trivialities */
 /* Active handler: simd_flat */
-/* Options used: k=2 tag=u64k2 vbase_stuff={
+/* Options used: w=64 k=2 tag=u64k2 vbase_stuff={
                  'vc:includes' => [
                                     '<stdarg.h>'
                                   ],
                  'member_templates_restrict' => {
+                                                  'p_4' => [
+                                                             'p_4'
+                                                           ],
                                                   'u64k2' => [
                                                                'u64k1',
                                                                'u64k2'
@@ -36,7 +39,8 @@ static int abase_u64k2_impl_mpi_use_count;   /* several stacked init()/clear() p
                                                 },
                  'families' => [
                                  $vbase_stuff->{'member_templates_restrict'}{'u64k2'},
-                                 $vbase_stuff->{'member_templates_restrict'}{'p16'}
+                                 $vbase_stuff->{'member_templates_restrict'}{'p16'},
+                                 $vbase_stuff->{'member_templates_restrict'}{'p_4'}
                                ],
                  'choose_byfeatures' => sub { "DUMMY" }
                };
