@@ -1,10 +1,10 @@
-BIN = sieve makefb normstats checkrels
+BIN = sieve makefb normstats checkrels freerels
 LIB = fppol
 
 fppol_OBJ = f2pol.o f3pol.o fppol.o fppol_test.o fppol_set.o  \
 	    fppol_arith.o fppol_mul.o fppol_div.o fppol_mod.o \
 	    fppol_gcd.o fppol_io.o fppol_facttools.o fppol_internal.o \
-      fppol_conv.o
+	    fppol_conv.o
 
 sieve_OBJ = $(fppol_OBJ) ffspol.o fqpol.o ijvec.o params.o fb.o qlat.o    \
 	    buckets.o norm.o latsieve.o polyfactor.o smoothness.o sieve.o \
@@ -14,9 +14,12 @@ makefb_OBJ = $(fppol_OBJ) ffspol.o fqpol.o polyfactor.o smoothness.o \
 	     memusage.o timing.o params.o
 
 normstats_OBJ = $(fppol_OBJ) ffspol.o fqpol.o ijvec.o params.o \
-	    norm.o normstats.o memusage.o timing.o 
+	        norm.o normstats.o memusage.o timing.o 
 
 checkrels_OBJ = $(fppol_OBJ) ffspol.o memusage.o timing.o params.o norm.o 
+
+freerels_OBJ = $(fppol_OBJ) ffspol.o memusage.o timing.o params.o fqpol.o \
+	       polyfactor.o
 
 BUILDDIR = ./build
 

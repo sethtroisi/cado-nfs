@@ -517,6 +517,53 @@ int fqpol_roots(fq_t * roots, fqpol_srcptr f, fq_info_srcptr Fq)
     return ret;
 }
 
+
+// roots allocated by caller.
+int fqpol_is_split(fq_t * roots, fqpol_srcptr f, fq_info_srcptr Fq)
+{
+    ASSERT_ALWAYS(!fqpol_is_zero(f, Fq));
+    if (f->deg == 0)
+        return 0;
+
+    // work with a monic copy of f.
+    fqpol_t F;
+    fqpol_init(F);
+    {
+        fq_t lcf;
+        fqpol_get_coeff(lcf, f, f->deg, Fq);
+        fqpol_sdiv(F, f, lcf, Fq);
+    }
+
+    if (F->deg == 1) {
+        fq_t c;
+        fqpol_get_coeff(c, F, 0, Fq);
+        fq_opp(roots[0], c, Fq);
+        fqpol_clear(F);
+        return 1;
+    }
+
+    // extract factor of f that contains only linear factors.
+    fqpol_t xq, x;
+    fqpol_init(xq);
+    fqpol_init(x);
+    int ret;
+    fqpol_powerXmod(xq, Fq->order, F, Fq);
+    fqpol_set_ti(x, 1, Fq);
+    fqpol_sub(xq, xq, x, Fq);
+    fqpol_gcd(xq, xq, F, Fq);
+    if (xq->deg < f->deg) {
+        ret = 0;
+    } else {
+        ret = 1;
+        fqpol_splitlinear(roots, xq, Fq);
+    }
+
+    fqpol_clear(xq);
+    fqpol_clear(x);
+    fqpol_clear(F);
+    return ret;
+}
+
 // Horner scheme
 void fqpol_eval(fq_ptr z, fqpol_srcptr f, fq_srcptr x, fq_info_srcptr Fq)
 {

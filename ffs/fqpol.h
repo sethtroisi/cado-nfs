@@ -43,6 +43,7 @@ void fqpol_gcd(fqpol_ptr r, fqpol_srcptr p, fqpol_srcptr q, fq_info_srcptr Fq);
 // roots must be allocated by caller.
 // return the number of (distinct) roots. 
 int fqpol_roots(fq_t * roots, fqpol_srcptr f, fq_info_srcptr Fq);
+int fqpol_is_split(fq_t * roots, fqpol_srcptr f, fq_info_srcptr Fq);
 int fqpol_root_multiplicity(fqpol_srcptr f, fq_srcptr root, fq_info_srcptr Fq);
 
 void fqpol_out(FILE *file, fqpol_srcptr p, fq_info_srcptr Fq);
