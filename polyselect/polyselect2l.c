@@ -5,9 +5,10 @@
 
   The parameters are similar to those in polyselect2.c, except the following,
 
-  "-np xxx" denotes the number of special-q's trials for each ad;
+  "-nq xxx" denotes the number of special-q's trials for each ad;
 
-  "-lq xxx" denotes the number of small factors (< 251) in the special-q;
+  "-lq xxx" denotes the number of small factors (<= 251) in the special-q
+  (see SPECIAL_Q[] in polyselect2l_str.c);
 
   "-maxnorm xxx" only optimize raw polynomials with size <= xxx.
   If the raw polynomial is not good enough, we will still stream
@@ -119,6 +120,22 @@ crt_sq ( mpz_t qqz,
   mpz_clear (sum);
 }
 
+/* check l = p_1 * p_2 * q <= m0, where q is the product of special-q primes */
+static void
+check_parameters (mpz_t m0)
+{
+  double maxq = 1.0;
+  
+  while (nq > 0)
+    maxq *= (double) SPECIAL_Q[LEN_SPECIAL_Q - nq--];
+
+  if ((double) Primes[lenPrimes - 1] * (double) Primes[lenPrimes - 1]
+      * maxq >= mpz_get_d (m0))
+    {
+      fprintf (stderr, "Error, too large value of -nq\n");
+      exit (1);
+    }
+}
 
 /* print poly info */
 void
@@ -1699,6 +1716,7 @@ newAlgo (mpz_t N, unsigned long d, uint64_t ad)
 {
   header_t header;
   header_init (header, N, d, ad);
+  check_parameters (header->m0);
 
   proots_t R;
   proots_init (R, lenPrimes);
@@ -2642,7 +2660,6 @@ gmp_collision_on_sq ( header_t header,
   qroots_clear (SQ_R);
 }
 
-
 static void
 newAlgo (mpz_t N, unsigned long d, uint64_t ad)
 {
@@ -2651,6 +2668,7 @@ newAlgo (mpz_t N, unsigned long d, uint64_t ad)
   proots_t R;
 
   header_init (header, N, d, ad);
+  check_parameters (header->m0);
   proots_init (R, lenPrimes);
 
   if (sizeof (unsigned long int) == 8) {
