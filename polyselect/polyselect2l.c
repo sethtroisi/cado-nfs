@@ -125,17 +125,19 @@ static void
 check_parameters (mpz_t m0)
 {
   double maxq = 1.0;
+  int i = lq;
   
-  while (nq > 0)
-    maxq *= (double) SPECIAL_Q[LEN_SPECIAL_Q - nq--];
-
-  if ((double) Primes[lenPrimes - 1] * (double) Primes[lenPrimes - 1]
-      * maxq >= mpz_get_d (m0))
-    {
-      fprintf (stderr, "Error, too large value of -nq\n");
-      exit (1);
-    }
-}
+  while (i > 0) {
+    maxq *= (double) SPECIAL_Q[LEN_SPECIAL_Q - 1 - i--];
+  }
+  if ( (maxq * (double) Primes[0] * (double) Primes[0]) >
+       (mpz_get_d (m0) / ((double) Primes[lenPrimes - 1] *
+        (double) Primes[lenPrimes - 1])) )
+  {
+    fprintf (stderr, "Error, too large value of -lq\n");
+    exit (1);
+  }
+ }
 
 /* print poly info */
 void
