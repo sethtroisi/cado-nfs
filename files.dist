@@ -715,6 +715,10 @@ linalg/bwc/mpfq/abase_p16.c
 linalg/bwc/mpfq/abase_p16.h
 linalg/bwc/mpfq/abase_p16_t.c
 linalg/bwc/mpfq/abase_p16_t.h
+linalg/bwc/mpfq/abase_p_4.c
+linalg/bwc/mpfq/abase_p_4.h
+linalg/bwc/mpfq/abase_p_4_t.c
+linalg/bwc/mpfq/abase_p_4_t.h
 sieve/README.fb_format
 sieve/las.sse_single.c
 sieve/makefb.sage

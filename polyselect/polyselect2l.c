@@ -1226,7 +1226,7 @@ collision_on_batch_p ( header_t header,
 }
 
 
-/* collision on special-q, call collisio_on_batch_p */
+/* collision on special-q, call collision_on_batch_p */
 static void
 collision_on_sq ( header_t header,
                   proots_t R )
@@ -1644,7 +1644,7 @@ gmp_collision_on_batch_p ( header_t header,
 }
 
 
-/* collision on special-q, call collisio_on_batch_p */
+/* collision on special-q, call gmp_collision_on_batch_p */
 static void
 gmp_collision_on_sq ( header_t header,
 		      proots_t R )
