@@ -29,12 +29,14 @@ binary-fields: mpfq-buildtree
 	if ! [ -x /tmp/mpfq/gf2n/helper/helper ] ; then \
 	(cd /tmp/mpfq ; cmake $(MPFQ) ; make helper) ; \
 	fi
+	/bin/cp -f $(MPFQ)/gf2n/mpfq_gf2n_common.h .
 	$(MPFQ)/gf2n/gen_gf2n.pl helper=/tmp/mpfq/gf2n/helper/helper table=/tmp/mpfq/gf2x/wizard.table output_path=. n=128 w=64
 	$(MPFQ)/gf2n/gen_gf2n.pl helper=/tmp/mpfq/gf2n/helper/helper table=/tmp/mpfq/gf2x/wizard.table output_path=. n=64 w=64
 	patch -p1 -d. < pclmul.patch
 
 prime-fields: mpfq-buildtree
 	$(MAKE) -C /tmp/mpfq fixmp_files
+	$(MPFQ)/gfp/gen_gfp.pl output_path=. type=plain w=64 n=4
 	/bin/cp -f /tmp/mpfq/include/mpfq/fixmp*h .
 	ls fixmp*[ch] | xargs -n 1 sed -e s,mpfq/,, -i
 
@@ -68,6 +70,5 @@ clean:
 	-rm -f mpfq_2_64.h.orig
 	-rm -f mpfq_gf2n_common.h
 	-rm -f mpfq_name_ab.h
-	-rm -f mpfq_name_K.h
 	-rm -f tags
 	-rm -f *~

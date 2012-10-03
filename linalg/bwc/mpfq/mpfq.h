@@ -14,11 +14,12 @@ extern "C" {
 /*** Constants for field_specify ***/
 
 #define MPFQ_DONE 0             /* At the end of the variadic option functions */
-#define MPFQ_PRIME 1            /* mpz_t */
+#define MPFQ_PRIME_MPN 1        /* mp_limb_t *, size depending on implementation. Prefer MPFQ_PRIME_MPZ */
 #define MPFQ_POLYNOMIAL 2       /* this expects an mpfq polynomial */
 #define MPFQ_DEGREE 3           /* int */
 #define MPFQ_IO_TYPE 4          /* for setopt */
 #define MPFQ_GROUPSIZE 5        /* int (SIMD group size) */
+#define MPFQ_PRIME_MPZ 6        /* mpz_t */
 
 /***  Some useful macros ***/
 

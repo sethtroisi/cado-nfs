@@ -140,7 +140,7 @@ void abase_u64k2_field_specify(abase_u64k2_dst_field K MAYBE_UNUSED, unsigned lo
 {
         if (tag == MPFQ_GROUPSIZE) {
             assert(*(int*)x == 128);
-        } else if (tag == MPFQ_PRIME) {
+        } else if (tag == MPFQ_PRIME_MPZ) {
             assert(mpz_cmp_ui((mpz_srcptr)x, 2) == 0);
         } else {
             fprintf(stderr, "Unsupported field_specify tag %ld\n", tag);
@@ -166,9 +166,11 @@ void abase_u64k2_field_specify(abase_u64k2_dst_field K MAYBE_UNUSED, unsigned lo
 /* missing is_sqr */
 /* missing sqrt */
 /* missing pow */
+/* missing frobenius */
 /* missing add_ui */
 /* missing sub_ui */
 /* missing mul_ui */
+/* missing inv */
 
 /* Operations involving unreduced elements */
 /* missing elt_ur_set_ui */
@@ -1038,9 +1040,11 @@ void abase_u64k2_oo_field_init(abase_vbase_ptr vbase)
     /* missing is_sqr */
     /* missing sqrt */
     /* missing pow */
+    /* missing frobenius */
     /* missing add_ui */
     /* missing sub_ui */
     /* missing mul_ui */
+    /* missing inv */
     vbase->elt_ur_init = (void (*) (abase_vbase_ptr, void *)) abase_u64k2_wrapper_elt_ur_init;
     vbase->elt_ur_clear = (void (*) (abase_vbase_ptr, void *)) abase_u64k2_wrapper_elt_ur_clear;
     vbase->elt_ur_set = (void (*) (abase_vbase_ptr, void *, const void *)) abase_u64k2_wrapper_elt_ur_set;

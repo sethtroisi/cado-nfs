@@ -162,6 +162,15 @@ typedef abase_p_4_elt * abase_p_4_src_vec;
 typedef abase_p_4_elt_ur * abase_p_4_vec_ur;
 typedef abase_p_4_elt_ur * abase_p_4_dst_vec_ur;
 typedef abase_p_4_elt_ur * abase_p_4_src_vec_ur;
+/* Extra types defined by implementation: */
+typedef struct {
+  abase_p_4_vec c;
+  unsigned int alloc;
+  unsigned int size;
+} abase_p_4_poly_struct;
+typedef abase_p_4_poly_struct abase_p_4_poly [1];
+typedef abase_p_4_poly_struct * abase_p_4_dst_poly;
+typedef abase_p_4_poly_struct * abase_p_4_src_poly;
 
 #ifdef  __cplusplus
 extern "C" {
@@ -227,12 +236,16 @@ int abase_p_4_is_sqr(abase_p_4_dst_field, abase_p_4_src_elt);
 int abase_p_4_sqrt(abase_p_4_dst_field, abase_p_4_dst_elt, abase_p_4_src_elt);
 static inline
 void abase_p_4_pow(abase_p_4_dst_field, abase_p_4_dst_elt, abase_p_4_src_elt, unsigned long *, size_t);
+/* *Mpfq::gfp::elt::code_for_frobenius, Mpfq::gfp */
+#define abase_p_4_frobenius(k, x, y)	abase_p_4_set(k, x, y)
 static inline
 void abase_p_4_add_ui(abase_p_4_dst_field, abase_p_4_dst_elt, abase_p_4_src_elt, unsigned long);
 static inline
 void abase_p_4_sub_ui(abase_p_4_dst_field, abase_p_4_dst_elt, abase_p_4_src_elt, unsigned long);
 static inline
 void abase_p_4_mul_ui(abase_p_4_dst_field, abase_p_4_dst_elt, abase_p_4_src_elt, unsigned long);
+static inline
+int abase_p_4_inv(abase_p_4_dst_field, abase_p_4_dst_elt, abase_p_4_src_elt);
 #define HAVE_abase_p_4_hadamard
 static inline
 void abase_p_4_hadamard(abase_p_4_dst_field, abase_p_4_dst_elt, abase_p_4_dst_elt, abase_p_4_dst_elt, abase_p_4_dst_elt);
@@ -399,7 +412,7 @@ void abase_p_4_field_init(abase_p_4_dst_field k)
 
 /* *Mpfq::gfp::elt::code_for_init, Mpfq::gfp */
 static inline
-void abase_p_4_init(abase_p_4_dst_field k, abase_p_4_elt * x)
+void abase_p_4_init(abase_p_4_dst_field k MAYBE_UNUSED, abase_p_4_elt * x MAYBE_UNUSED)
 {
     assert(k);
     assert(k->p);
@@ -408,7 +421,7 @@ void abase_p_4_init(abase_p_4_dst_field k, abase_p_4_elt * x)
 
 /* *Mpfq::gfp::elt::code_for_clear, Mpfq::gfp */
 static inline
-void abase_p_4_clear(abase_p_4_dst_field k, abase_p_4_elt * x)
+void abase_p_4_clear(abase_p_4_dst_field k MAYBE_UNUSED, abase_p_4_elt * x MAYBE_UNUSED)
 {
     assert(k);
     assert(*x);
@@ -673,6 +686,16 @@ void abase_p_4_mul_ui(abase_p_4_dst_field k, abase_p_4_dst_elt z, abase_p_4_src_
     abase_p_4_clear(k, &yy);
 }
 
+/* *Mpfq::gfp::elt::code_for_inv, Mpfq::gfp */
+static inline
+int abase_p_4_inv(abase_p_4_dst_field k, abase_p_4_dst_elt z, abase_p_4_src_elt x)
+{
+    int ret=invmod_4(z, x, k->p);
+    if (!ret)
+        abase_p_4_get_mpz(k, k->factor, z);
+    return ret;
+}
+
 /* *Mpfq::gfp::elt::code_for_hadamard, Mpfq::gfp */
 static inline
 void abase_p_4_hadamard(abase_p_4_dst_field k, abase_p_4_dst_elt x, abase_p_4_dst_elt y, abase_p_4_dst_elt z, abase_p_4_dst_elt t)
@@ -695,7 +718,7 @@ void abase_p_4_hadamard(abase_p_4_dst_field k, abase_p_4_dst_elt x, abase_p_4_ds
 
 /* *Mpfq::gfp::elt::code_for_elt_ur_init, Mpfq::gfp */
 static inline
-void abase_p_4_elt_ur_init(abase_p_4_dst_field k, abase_p_4_elt_ur * x)
+void abase_p_4_elt_ur_init(abase_p_4_dst_field k MAYBE_UNUSED, abase_p_4_elt_ur * x MAYBE_UNUSED)
 {
     assert(k);
     assert(k->p);
@@ -704,7 +727,7 @@ void abase_p_4_elt_ur_init(abase_p_4_dst_field k, abase_p_4_elt_ur * x)
 
 /* *Mpfq::gfp::elt::code_for_elt_ur_clear, Mpfq::gfp */
 static inline
-void abase_p_4_elt_ur_clear(abase_p_4_dst_field k, abase_p_4_elt_ur * x)
+void abase_p_4_elt_ur_clear(abase_p_4_dst_field k MAYBE_UNUSED, abase_p_4_elt_ur * x MAYBE_UNUSED)
 {
     assert(k);
     assert(*x);

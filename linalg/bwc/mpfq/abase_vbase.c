@@ -20,11 +20,12 @@ void abase_vbase_oo_field_init_byfeatures(abase_vbase_ptr v, ...)
         mpz_init_set_ui(p, 2);
         int groupsize = 1;
         for(int a ; (a = va_arg(ap, int)) != 0 ; ) {
-            if (a == MPFQ_PRIME) {
+            if (a == MPFQ_PRIME_MPZ) {
                 mpz_set(p, va_arg(ap, mpz_srcptr));
             } else if (a == MPFQ_GROUPSIZE) {
                 groupsize = va_arg(ap, int);
             } else {
+                /* We do not support MPFQ_PRIME_MPN. Only MPFQ_PRIME_MPZ*/
                 fprintf(stderr, "Feature code %d unsupported\n", a);
                 exit(1);
             }
@@ -51,7 +52,7 @@ void abase_vbase_oo_field_init_byfeatures(abase_vbase_ptr v, ...)
             fprintf(stderr, "Unsupported prime (%zu limbs)\n", mpz_size(p));
             exit(1);
         }
-        v->field_specify(v, MPFQ_PRIME, p);
+        v->field_specify(v, MPFQ_PRIME_MPZ, p);
         v->field_specify(v, MPFQ_GROUPSIZE, &groupsize);
         mpz_clear(p);
 }
