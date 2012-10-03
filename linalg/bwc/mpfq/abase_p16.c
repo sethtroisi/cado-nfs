@@ -140,7 +140,7 @@ void abase_p16_field_specify(abase_p16_dst_field K MAYBE_UNUSED, unsigned long t
 {
         if (tag == MPFQ_GROUPSIZE) {
             assert(*(int*)x == 1);
-        } else if (tag == MPFQ_PRIME) {
+        } else if (tag == MPFQ_PRIME_MPZ) {
             assert(mpz_cmp_ui((mpz_srcptr)x, 1 << 16) < 0);
             assert(mpz_cmp_ui((mpz_srcptr)x, 0) > 0);
             *K = mpz_get_ui((mpz_srcptr)x);
@@ -168,9 +168,11 @@ void abase_p16_field_specify(abase_p16_dst_field K MAYBE_UNUSED, unsigned long t
 /* missing is_sqr */
 /* missing sqrt */
 /* missing pow */
+/* missing frobenius */
 /* missing add_ui */
 /* missing sub_ui */
 /* missing mul_ui */
+/* missing inv */
 
 /* Operations involving unreduced elements */
 /* missing elt_ur_set_ui */
@@ -1039,9 +1041,11 @@ void abase_p16_oo_field_init(abase_vbase_ptr vbase)
     /* missing is_sqr */
     /* missing sqrt */
     /* missing pow */
+    /* missing frobenius */
     /* missing add_ui */
     /* missing sub_ui */
     /* missing mul_ui */
+    /* missing inv */
     vbase->elt_ur_init = (void (*) (abase_vbase_ptr, void *)) abase_p16_wrapper_elt_ur_init;
     vbase->elt_ur_clear = (void (*) (abase_vbase_ptr, void *)) abase_p16_wrapper_elt_ur_clear;
     vbase->elt_ur_set = (void (*) (abase_vbase_ptr, void *, const void *)) abase_p16_wrapper_elt_ur_set;

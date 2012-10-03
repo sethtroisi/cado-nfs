@@ -43,9 +43,11 @@ struct abase_vbase_s {
     int (*is_sqr)(abase_vbase_ptr, const void *);
     int (*sqrt)(abase_vbase_ptr, void *, const void *);
     void (*pow)(abase_vbase_ptr, void *, const void *, unsigned long *, size_t);
+    void (*frobenius)(abase_vbase_ptr, void *, const void *);
     void (*add_ui)(abase_vbase_ptr, void *, const void *, unsigned long);
     void (*sub_ui)(abase_vbase_ptr, void *, const void *, unsigned long);
     void (*mul_ui)(abase_vbase_ptr, void *, const void *, unsigned long);
+    int (*inv)(abase_vbase_ptr, void *, const void *);
     void (*hadamard)(abase_vbase_ptr, void *, void *, void *, void *);
     void (*elt_ur_init)(abase_vbase_ptr, void *);
     void (*elt_ur_clear)(abase_vbase_ptr, void *);

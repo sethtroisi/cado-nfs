@@ -213,9 +213,11 @@ void abase_u64k2_add(abase_u64k2_dst_field, abase_u64k2_dst_elt, abase_u64k2_src
 /* missing is_sqr */
 /* missing sqrt */
 /* missing pow */
+/* missing frobenius */
 /* missing add_ui */
 /* missing sub_ui */
 /* missing mul_ui */
+/* missing inv */
 
 /* Operations involving unreduced elements */
 /* *Mpfq::defaults::flatdata::code_for_elt_ur_init, simd_flat */

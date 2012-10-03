@@ -166,24 +166,31 @@ void abase_p_4_field_clear(abase_p_4_dst_field k)
 /* *Mpfq::gfp::field::code_for_field_specify, Mpfq::gfp */
 void abase_p_4_field_specify(abase_p_4_dst_field k, unsigned long dummy MAYBE_UNUSED, void * vp)
 {
-    assert (dummy == MPFQ_PRIME);
-    mp_limb_t *p = (mp_limb_t*) vp;
-    if (k->p == NULL) 
-        k->p = (mp_limb_t *)malloc(4*sizeof(mp_limb_t));
-    if (k->bigmul_p == NULL) 
-        k->bigmul_p = (mp_limb_t *)malloc(9*sizeof(mp_limb_t));
-    if ((!k->p) || (!k->bigmul_p))
-        MALLOC_FAILED();
-    memcpy(k->p, p, 4*sizeof(mp_limb_t));
-    k->kl = 4;
-    k->url = 9;
-    k->url_margin = LONG_MAX;
+        if (k->p == NULL) k->p = (mp_limb_t *)malloc(4*sizeof(mp_limb_t));
+        if (k->bigmul_p == NULL) k->bigmul_p = (mp_limb_t *)malloc(9*sizeof(mp_limb_t));
+        if ((!k->p) || (!k->bigmul_p))
+            MALLOC_FAILED();
+        k->kl = 4;
+        k->url = 9;
+        k->url_margin = LONG_MAX;
+        int i;
+        if (dummy == MPFQ_PRIME_MPN) {
+            mp_limb_t *p = (mp_limb_t*) vp;
+            memcpy(k->p, p, 4*sizeof(mp_limb_t));
+        } else if (dummy == MPFQ_PRIME_MPZ) {
+            mpz_srcptr p = (mpz_srcptr) vp;
+            assert(mpz_size(p) == 4);
+            for(i = 0 ; i < 4 ; i++) {
+                k->p[i] = mpz_getlimbn(p, i);
+            }
+        } else {
+            abort();
+        }
     // precompute bigmul_p = largest multiple of p that fits in an elt_ur
     //   p*Floor( (2^(9*64)-1)/p )
     {
         abase_p_4_elt_ur big;
         mp_limb_t q[9-4+1], r[4], tmp[9+1];
-        int i;
         
         for (i = 0; i < 9; ++i)
             big[i] = ~0UL;
@@ -929,6 +936,12 @@ static void abase_p_4_wrapper_pow(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_
     abase_p_4_pow(vbase->obj, res, r, x, n);
 }
 
+static void abase_p_4_wrapper_frobenius(abase_vbase_ptr, abase_p_4_dst_elt, abase_p_4_src_elt);
+static void abase_p_4_wrapper_frobenius(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_elt x MAYBE_UNUSED, abase_p_4_src_elt y MAYBE_UNUSED)
+{
+    abase_p_4_frobenius(vbase->obj, x, y);
+}
+
 static void abase_p_4_wrapper_add_ui(abase_vbase_ptr, abase_p_4_dst_elt, abase_p_4_src_elt, unsigned long);
 static void abase_p_4_wrapper_add_ui(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_elt z MAYBE_UNUSED, abase_p_4_src_elt x MAYBE_UNUSED, unsigned long y MAYBE_UNUSED)
 {
@@ -945,6 +958,12 @@ static void abase_p_4_wrapper_mul_ui(abase_vbase_ptr, abase_p_4_dst_elt, abase_p
 static void abase_p_4_wrapper_mul_ui(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_elt z MAYBE_UNUSED, abase_p_4_src_elt x MAYBE_UNUSED, unsigned long y MAYBE_UNUSED)
 {
     abase_p_4_mul_ui(vbase->obj, z, x, y);
+}
+
+static int abase_p_4_wrapper_inv(abase_vbase_ptr, abase_p_4_dst_elt, abase_p_4_src_elt);
+static int abase_p_4_wrapper_inv(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_elt z MAYBE_UNUSED, abase_p_4_src_elt x MAYBE_UNUSED)
+{
+    return abase_p_4_inv(vbase->obj, z, x);
 }
 
 static void abase_p_4_wrapper_hadamard(abase_vbase_ptr, abase_p_4_dst_elt, abase_p_4_dst_elt, abase_p_4_dst_elt, abase_p_4_dst_elt);
@@ -1428,9 +1447,11 @@ void abase_p_4_oo_field_init(abase_vbase_ptr vbase)
     vbase->is_sqr = (int (*) (abase_vbase_ptr, const void *)) abase_p_4_wrapper_is_sqr;
     vbase->sqrt = (int (*) (abase_vbase_ptr, void *, const void *)) abase_p_4_wrapper_sqrt;
     vbase->pow = (void (*) (abase_vbase_ptr, void *, const void *, unsigned long *, size_t)) abase_p_4_wrapper_pow;
+    vbase->frobenius = (void (*) (abase_vbase_ptr, void *, const void *)) abase_p_4_wrapper_frobenius;
     vbase->add_ui = (void (*) (abase_vbase_ptr, void *, const void *, unsigned long)) abase_p_4_wrapper_add_ui;
     vbase->sub_ui = (void (*) (abase_vbase_ptr, void *, const void *, unsigned long)) abase_p_4_wrapper_sub_ui;
     vbase->mul_ui = (void (*) (abase_vbase_ptr, void *, const void *, unsigned long)) abase_p_4_wrapper_mul_ui;
+    vbase->inv = (int (*) (abase_vbase_ptr, void *, const void *)) abase_p_4_wrapper_inv;
     vbase->hadamard = (void (*) (abase_vbase_ptr, void *, void *, void *, void *)) abase_p_4_wrapper_hadamard;
     vbase->elt_ur_init = (void (*) (abase_vbase_ptr, void *)) abase_p_4_wrapper_elt_ur_init;
     vbase->elt_ur_clear = (void (*) (abase_vbase_ptr, void *)) abase_p_4_wrapper_elt_ur_clear;

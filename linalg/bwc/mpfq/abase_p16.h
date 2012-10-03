@@ -213,9 +213,11 @@ void abase_p16_neg(abase_p16_dst_field, abase_p16_dst_elt, abase_p16_src_elt);
 /* missing is_sqr */
 /* missing sqrt */
 /* missing pow */
+/* missing frobenius */
 /* missing add_ui */
 /* missing sub_ui */
 /* missing mul_ui */
+/* missing inv */
 
 /* Operations involving unreduced elements */
 /* *Mpfq::defaults::flatdata::code_for_elt_ur_init, simd_flat, p16 */
