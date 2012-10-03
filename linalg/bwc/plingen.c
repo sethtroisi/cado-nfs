@@ -50,7 +50,6 @@ struct bmstatus_s {
     // bw_nbpoly E;
     // bw_nbmat e0;        /* Useful ??? */
     int t;
-    unsigned int len;
     /* Not clear we need the following: t0, F0. */
 };
 typedef struct bmstatus_s bmstatus[1];
@@ -938,13 +937,12 @@ void showuse(void)
 
 /**********************************************************************/
 
-unsigned int (*compute_initial_F(bmstatus_ptr bm, bw_mnpoly A))[2] /*{{{ */
+unsigned int (*compute_initial_F(bmstatus_ptr bm, bw_mnpoly A, unsigned int len))[2] /*{{{ */
 {				
     dims *d = bm->d;
     abdst_field ab = d->ab;
     unsigned int m = d->m;
     unsigned int n = d->n;
-    unsigned int len = bm->len;
     abelt tmp;
     abinit(ab, &tmp);
 
@@ -955,6 +953,7 @@ unsigned int (*compute_initial_F(bmstatus_ptr bm, bw_mnpoly A))[2] /*{{{ */
      * from the first coefficients of A */
 
     bw_mmmat M = polymat_alloc(m, m, 1);
+    polymat_zero(M,m,m,1);
     /* For each integer i between 0 and m-1, we have a column, picked
      * from column cnum[i] of coeff exponent[i] of A which, once reduced modulo
      * the other ones, has coefficient at row pivots[i] unequal to zero.
@@ -1169,7 +1168,7 @@ void write_f(bmstatus_ptr bm, bw_nnpoly f_red)
 }
 
 
-bw_mbpoly compute_initial_E(bmstatus_ptr bm, bw_mnpoly A, unsigned int (*fdesc)[2])/*{{{*/
+bw_mbpoly compute_initial_E(bmstatus_ptr bm, bw_mnpoly A, unsigned int len, unsigned int (*fdesc)[2])/*{{{*/
 {
     // F0 is exactly the n x n identity matrix, plus the
     // X^(s-exponent)e_{cnum} vectors. fdesc has the (exponent, cnum)
@@ -1178,13 +1177,12 @@ bw_mbpoly compute_initial_E(bmstatus_ptr bm, bw_mnpoly A, unsigned int (*fdesc)[
     unsigned int m = d->m;
     unsigned int n = d->n;
     unsigned int b = m + n;
-    unsigned int len = bm->len;
     unsigned int t0 = bm->t;
     abdst_field ab = d->ab;
     /* Now we're ready to compute E, which is nothing more than a rewrite
      * of A, of course. */
-    bw_mbpoly E = polymat_alloc(m, b, bm->len - t0 + DEBUG_EXTRA_ROOM);
-    polymat_zero(E, m, b, bm->len - t0 + DEBUG_EXTRA_ROOM);
+    bw_mbpoly E = polymat_alloc(m, b, len - t0 + DEBUG_EXTRA_ROOM);
+    polymat_zero(E, m, b, len - t0 + DEBUG_EXTRA_ROOM);
     for(unsigned int k = t0 ; k < len ; k++) {
         for(unsigned int j = 0 ; j < n ; j++) {
             /* Take column j of A, shifted by t0 positions */
@@ -1210,27 +1208,49 @@ bw_mbpoly compute_initial_E(bmstatus_ptr bm, bw_mnpoly A, unsigned int (*fdesc)[
 }/*}}}*/
 
 
-void read_data_for_series(bmstatus_ptr bm, bw_mnpoly a_poly, /* {{{ */
-			  const char *input_file)
+bw_mnpoly read_data_for_series(bmstatus_ptr bm, /* {{{ */
+			  const char *input_file,
+                          unsigned int * plen)
 {
     dims * d = bm->d;
     unsigned int m = d->m;
     unsigned int n = d->n;
     abdst_field ab = d->ab;
+
+    unsigned int guess_len = 1000;
+
+    bw_mnpoly a_poly = polymat_alloc(m, n, guess_len);
+    polymat_zero(a_poly, m, n, guess_len);
+
     FILE *f = fopen(input_file, "r");
     DIE_ERRNO_DIAG(f == NULL, "fopen", input_file);
-    for (unsigned int k = 0; k < bm->len; k++) {
+    unsigned int k = 0;
+    int eof_met = 0;
+    for( ; !eof_met ; k++) {
+        if (k == guess_len) {
+            unsigned int newguess = guess_len;
+            newguess += newguess / 10;
+            a_poly = polymat_realloc(a_poly, m, n, newguess);
+            bw_mnpoly tail = polymat_part(a_poly, m, n, 0, 0, guess_len);
+            polymat_zero(tail, m, n, newguess - guess_len);
+            guess_len = newguess;
+        }
+
 	/* coefficient 0 will be read to position 0 (k-!!k=0), but all
 	 * other coefficients from position 1 onwards will be stored to
 	 * position k-1 (!!k=1), effectively chopping the first
 	 * coefficient.
 	 */
 	int k1 = k - ! !k;
-	for (unsigned int i = 0; i < m; i++) {
-	    for (unsigned int j = 0; j < n; j++) {
+	for (unsigned int i = 0; i < m && !eof_met ; i++) {
+	    for (unsigned int j = 0; j < n && !eof_met ; j++) {
 		int rc =
 		    abfscan(ab, f, polymat_coeff(a_poly, m, n, i, j, k1));
 		if (rc != 1) {
+                    if (i == 0 && j == 0) {
+                        eof_met = 1;
+                        break;
+                    }
 		    fprintf(stderr,
 			    "Parse error in %s while reading coefficient (%d,%d,%d)\n",
 			    input_file, i, j, k);
@@ -1239,9 +1259,13 @@ void read_data_for_series(bmstatus_ptr bm, bw_mnpoly a_poly, /* {{{ */
 	    }
 	}
     }
+    /* We can bail out only via eof_met, so this incurs an extra k++ */
+    k--;
     fclose(f);
     printf("Using A(X) div X in order to consider Y as starting point\n");
-    bm->len--;
+    *plen = k - 1;
+
+    return a_poly;
 } /* }}} */
 
 
@@ -1287,8 +1311,22 @@ int main(int argc, char *argv[])
 
     bw_common_init(bw, pl, &argc, &argv);
 
+    const char * afile = param_list_lookup_string(pl, "afile");
+
     if (bw->m == -1) {
 	fprintf(stderr, "no m value set\n");
+	exit(1);
+    }
+    if (bw->n == -1) {
+	fprintf(stderr, "no n value set\n");
+	exit(1);
+    }
+    if (!afile) {
+        fprintf(stderr, "No afile provided\n");
+        exit(1);
+    }
+    if (!param_list_lookup_string(pl, "prime")) {
+	fprintf(stderr, "no prime set\n");
 	exit(1);
     }
 
@@ -1298,11 +1336,6 @@ int main(int argc, char *argv[])
     unsigned int n = d->n;
     unsigned int b = m + n;
     abdst_field ab = d->ab;
-
-    if (!param_list_lookup_string(pl, "prime")) {
-	fprintf(stderr, "no prime set\n");
-	exit(1);
-    }
 
     abfield_init(ab);
     {
@@ -1315,77 +1348,25 @@ int main(int argc, char *argv[])
 
     if (param_list_warn_unused(pl))
 	usage();
-    param_list_clear(pl);
-    /* }}} */
-
-    char input_file[FILENAME_MAX];
-
-    /* {{{ detect the input file -- there must be only one file. */
-    unsigned int n0, n1, j0, j1;
-    {
-	DIR * dir = opendir(".");
-	struct dirent * de;
-	input_file[0] = '\0';
-	for (; (de = readdir(dir)) != NULL;) {
-	    int len;
-	    int rc = sscanf(de->d_name, A_FILE_PATTERN "%n",
-			    &n0, &n1, &j0, &j1, &len);
-	    /* rc is expected to be 4 or 5 depending on our reading of the
-	     * standard */
-	    if (rc < 4 || len != (int) strlen(de->d_name)) {
-		continue;
-	    }
-	    if (input_file[0] != '\0') {
-		fprintf(stderr, "Found two possible file names %s and %s\n",
-			input_file, de->d_name);
-		exit(1);
-	    }
-	    size_t clen = MAX((size_t) len, sizeof(input_file));
-	    memcpy(input_file, de->d_name, clen);
-	}
-	closedir(dir);
-        if (!input_file[0]) {
-            fprintf(stderr, "No input file found for pattern %s\n", A_FILE_PATTERN);
-            exit(1);
-        }
-    }				/* }}} */
-
-    /* {{{ More argument checking. Learn input size */
-    if (bw->n == 0) {
-	bw->n = n1 - n0;
-    } else if (bw->n != (int) (n1 - n0)) {
-	fprintf(stderr, "n value mismatch (config says %d, A file says %u)\n",
-		bw->n, n1 - n0);
-	exit(1);
-    }
-
-    if (bw->end == 0) {
-	ASSERT_ALWAYS(bw->start == 0);
-	bw->end = j1 - j0;
-    } else if (bw->end - bw->start > (int) (j1 - j0)) {
-	fprintf(stderr, "sequence file %s is too short\n", input_file);
-	exit(1);
-    }
-
-    bm->len = bw->end - bw->start;
     /* }}} */
 
     unsigned int (*fdesc)[2];
 
     bw_mbpoly E;
 
+    unsigned int a_len;
+
     { /* {{{ Read A, compute F0 and E, and keep only E */
-        bw_mnpoly a_poly = polymat_alloc(m, n, bm->len);
-        polymat_zero(a_poly, m, n, bm->len);
+        printf("Reading scalar data in polynomial ``a'' from %s\n", afile);
+        bw_mnpoly a_poly = read_data_for_series(bm, afile, &a_len);
 
-        printf("Reading scalar data in polynomial ``a'' from %s\n", input_file);
-        read_data_for_series(bm, a_poly, input_file);
-
+        printf("Read %u+1=%u iterations (bw parameters: expect %u)\n",
+                a_len, a_len + 1, bw->end - bw->start);
         /* Data read stage completed. */
 
-        fdesc = compute_initial_F(bm, a_poly);
+        fdesc = compute_initial_F(bm, a_poly, a_len);
 
-        E = compute_initial_E(bm, a_poly, fdesc);
+        E = compute_initial_E(bm, a_poly, a_len, fdesc);
 
         printf("Throwing out a(X)\n");
         polymat_free(a_poly /* , m, n, bm->len */);
@@ -1393,12 +1374,12 @@ int main(int argc, char *argv[])
 
     // bw_bbpoly piL, piR, piP;
 
-    unsigned int len = bm->len - bm->t;
+    unsigned int e_len = a_len - bm->t;
     unsigned int t0 = bm->t;
 
-    bw_bbpoly piL = bw_lingen_basecase(bm, E, len, bm->delta);
+    bw_bbpoly piL = bw_lingen_basecase(bm, E, e_len, bm->delta);
     polymat_free(E /* , m, b, len */);
-    bm->t += len;
+    bm->t += e_len;
 
     unsigned int nlucky = 0;
     for(unsigned int j = 0 ; j < b ; nlucky += bm->lucky[j++] > 0) ;
@@ -1441,6 +1422,7 @@ int main(int argc, char *argv[])
     abfield_clear(ab);
     bmstatus_clear(bm);
     bw_common_clear(bw);
+    param_list_clear(pl);
     return 0;
 }
 

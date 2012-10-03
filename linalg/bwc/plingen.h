@@ -34,6 +34,9 @@ extern "C" {
 static inline abelt * polymat_alloc(unsigned int m, unsigned int n, int len) {
     return (abelt*) malloc(m*n*len*sizeof(abelt));
 }
+static inline abelt * polymat_realloc(abelt * x, unsigned int m, unsigned int n, int len) {
+    return (abelt*) realloc(x, m*n*len*sizeof(abelt));
+}
 static inline void polymat_zero(abelt * x, unsigned int m, unsigned int n, int len) {
     memset(x, 0, m*n*len*sizeof(abelt));
 }
@@ -47,6 +50,9 @@ static inline abelt * polymat_part(abelt * x, unsigned int m, unsigned int n, un
 }
 static inline abdst_elt polymat_coeff(abelt * x, unsigned int m, unsigned int n, unsigned int i, unsigned int j, unsigned int k) {
     return *polymat_part(x,m,n,i,j,k);
+}
+static inline abelt_ur * polymat_realloc_ur(abelt_ur * x, unsigned int m, unsigned int n, int len) {
+    return (abelt_ur*) realloc(x, m*n*len*sizeof(abelt_ur));
 }
 static inline abelt_ur * polymat_alloc_ur(unsigned int m, unsigned int n, int len) {
     return (abelt_ur*) malloc(m*n*len*sizeof(abelt_ur));
