@@ -60,6 +60,11 @@ our $tab_level = 0;
 
 # Should we use colors (for terminal output) or not?
 my $use_colors = defined $ENV{CADO_COLOR} ? $ENV{CADO_COLOR} : 1;
+my $CSI = "\033["; # ANSI Control Sequence Introducer
+my %colors = (normal => "${CSI}01;00m",
+              red => "${CSI}01;31m",
+              green => "${CSI}01;32m",
+              magenta => "${CSI}01;35m");
 
 # Terminal width
 my $term_cols = 80;
@@ -67,7 +72,7 @@ my $term_cols = 80;
 # Whether to show output.
 my $verbose = 0;
 
-# Whether to show output.
+# Whether to assume yes to all confirmations
 my $assume_yes = 0;
 
 # Whether to replace ``remote'' accesses to localhost by localhost.
@@ -90,7 +95,13 @@ sub format_message {
     my $prefix = ("    " x $tab_level) . shift;
     my $prefix_raw = $prefix;
 
-    $prefix_raw =~ s/\033\[[^m]*m//g;
+    # Remove ANSI color codes from string
+    # We need to escape the "[" character in the CSI to make a regex pattern
+    my $escape = $CSI;
+    $escape =~ s/\[/\\\[/g;
+    my $match = $escape . "[^m]*m";
+
+    $prefix_raw =~ s/$match//g;
     $prefix = $prefix_raw unless $use_colors;
 
     my @msg;
@@ -120,7 +131,7 @@ my $log_fh;     # filehandle for logging.
 # Message function
 sub info {
     my $text=shift;
-    print STDERR format_message("\033[01;32mInfo\033[01;00m:", $text);
+    print STDERR format_message("$colors{green}Info$colors{normal}:", $text);
     print $log_fh format_message("Info:", $text) if defined($log_fh);
 }
 
@@ -134,7 +145,7 @@ sub banner {
 $SIG{__WARN__} = sub {
     my $text=shift;
     print $log_fh format_message("Warning:", $text) if defined($log_fh);
-    warn         format_message("\033[01;35mWarning\033[01;00m:", $text);
+    warn         format_message("$colors{magenta}Warning$colors{normal}:", $text);
 };
 
 # Error hook
@@ -142,7 +153,7 @@ $SIG{__DIE__}  = sub {
     die @_ if $^S;
     my $text=shift;
     print $log_fh format_message("Error:", $text) if defined($log_fh);
-    die          format_message("\033[01;31mError\033[01;00m:", $text);
+    die          format_message("$colors{red}Error$colors{normal}:", $text);
 };
 
 ###############################################################################
