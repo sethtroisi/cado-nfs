@@ -312,10 +312,10 @@ linalg/bwc/mf_dobal.c
 linalg/bwc/mf_scan.c
 linalg/bwc/mksol.c
 linalg/bwc/mpfq/Makefile.mpfq
-linalg/bwc/mpfq/abase_p16.c
-linalg/bwc/mpfq/abase_p16.h
-linalg/bwc/mpfq/abase_p16_t.c
-linalg/bwc/mpfq/abase_p16_t.h
+linalg/bwc/mpfq/abase_p_1.c
+linalg/bwc/mpfq/abase_p_1.h
+linalg/bwc/mpfq/abase_p_1_t.c
+linalg/bwc/mpfq/abase_p_1_t.h
 linalg/bwc/mpfq/abase_p_4.c
 linalg/bwc/mpfq/abase_p_4.h
 linalg/bwc/mpfq/abase_p_4_t.c

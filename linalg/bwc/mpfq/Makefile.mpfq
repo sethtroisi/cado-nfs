@@ -6,10 +6,13 @@
 
 MPFQ:=$$HOME/Mp/mpfq/src
 
+mpfq_tag_list:=u64k1 u64k2 p_1 p_4
+
 all: basic binary-fields prime-fields
 
+
 basic:
-	$(MPFQ)/simd/abase.pl w=64
+	$(MPFQ)/simd/abase.pl w=64 $(mpfq_tag_list)
 	/bin/cp -f $(MPFQ)/simd/binary-dotprods-backends.h .
 	/bin/cp -f $(MPFQ)/include/mpfq/mpfq.h .
 	/bin/cp -f $(MPFQ)/gfp/mpfq_gfp_common.h .
@@ -33,10 +36,11 @@ binary-fields: mpfq-buildtree
 	$(MPFQ)/gf2n/gen_gf2n.pl helper=/tmp/mpfq/gf2n/helper/helper table=/tmp/mpfq/gf2x/wizard.table output_path=. n=128 w=64
 	$(MPFQ)/gf2n/gen_gf2n.pl helper=/tmp/mpfq/gf2n/helper/helper table=/tmp/mpfq/gf2x/wizard.table output_path=. n=64 w=64
 	patch -p1 -d. < pclmul.patch
+	-rm -f *.orig
 
 prime-fields: mpfq-buildtree
 	$(MAKE) -C /tmp/mpfq fixmp_files
-	$(MPFQ)/gfp/gen_gfp.pl output_path=. type=plain w=64 n=4
+	# $(MPFQ)/gfp/gen_gfp.pl output_path=. type=plain w=64 n=4
 	/bin/cp -f /tmp/mpfq/include/mpfq/fixmp*h .
 	ls fixmp*[ch] | xargs -n 1 sed -e s,mpfq/,, -i
 
