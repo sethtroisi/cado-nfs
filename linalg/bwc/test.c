@@ -43,7 +43,7 @@ void * tst_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     param_list_parse_mpz(pl, "prime", p);
     abase_vbase A;
     abase_vbase_oo_field_init_byfeatures(A, 
-            MPFQ_PRIME, p,
+            MPFQ_PRIME_MPZ, p,
             MPFQ_GROUPSIZE, nchecks,
             MPFQ_DONE);
     mpz_clear(p);

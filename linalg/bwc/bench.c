@@ -328,7 +328,7 @@ int main(int argc, char * argv[])
      * setting nbys is pointless.
      */
     abase_vbase_oo_field_init_byfeatures(A,
-                MPFQ_PRIME, ba->prime,
+                MPFQ_PRIME_MPZ, ba->prime,
                 MPFQ_GROUPSIZE, nbys,
                 MPFQ_DONE);
 
