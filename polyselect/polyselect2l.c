@@ -120,10 +120,11 @@ crt_sq ( mpz_t qqz,
   mpz_clear (sum);
 }
 
-/* check that l = p_1 * p_2 * q <= m0/P^2,
-   where q is the product of special-q primes */
+/* check that l/2 <= d*m0/P^2, where l = p1 * p2 * q with P <= p1, p2 <= 2P
+   q is the product of special-q primes. It suffices to check that
+   q <= d*m0/(2P^4). */
 static void
-check_parameters (mpz_t m0)
+check_parameters (mpz_t m0, unsigned long d)
 {
   double maxq = 1.0, maxP;
   int k = lq;
@@ -132,7 +133,7 @@ check_parameters (mpz_t m0)
     maxq *= (double) SPECIAL_Q[LEN_SPECIAL_Q - 1 - (k--)];
 
   maxP = (double) Primes[lenPrimes - 1];
-  if (4.0 * pow (maxP, 4.0) * maxq >= mpz_get_d (m0))
+  if (2.0 * pow (maxP, 4.0) * maxq >= (double) d * mpz_get_d (m0))
     {
       fprintf (stderr, "Error, too large value of -lq parameter\n");
       exit (1);
@@ -1718,7 +1719,7 @@ newAlgo (mpz_t N, unsigned long d, uint64_t ad)
 {
   header_t header;
   header_init (header, N, d, ad);
-  check_parameters (header->m0);
+  check_parameters (header->m0, d);
 
   proots_t R;
   proots_init (R, lenPrimes);
@@ -2670,7 +2671,7 @@ newAlgo (mpz_t N, unsigned long d, uint64_t ad)
   proots_t R;
 
   header_init (header, N, d, ad);
-  check_parameters (header->m0);
+  check_parameters (header->m0, d);
   proots_init (R, lenPrimes);
 
   if (sizeof (unsigned long int) == 8) {
