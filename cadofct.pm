@@ -22,8 +22,7 @@
 # 02110-1301, USA.
 
 package cadofct;
-use Exporter;
-our @ISA= qw(Exporter);
+use parent qw(Exporter);
 our @EXPORT=qw(%param $tab_level &read_machines &read_param &do_polysel_bench
 &do_sieve_bench &do_factbase &do_init &do_task &banner &info &last_line
 &format_dhms);
@@ -44,12 +43,16 @@ use IPC::Open3;
 # Failing to load ioctl.ph is mostly harmless. It just prevents us from
 # detaching the controlling tty, which is a measure meant to forbid any
 # attempt of interaction between ssh and the ``user''.
-eval q{local $SIG{__WARN__}=sub{}; require "sys/ioctl.ph"};
-my $can_use_tiocnotty=1;
-if ($@) {
-    $can_use_tiocnotty=0;
+# If the shell environment variable CADO_KEEPTTY is defined, we do not
+# detach, as doing so interferes with debugging in DDD
+my $can_use_tiocnotty;
+if (! defined $ENV{CADO_KEEPTTY}) {
+    eval q{local $SIG{__WARN__}=sub{}; require "sys/ioctl.ph"};
+    $can_use_tiocnotty=1;
+    if ($@) {
+        $can_use_tiocnotty=0;
+    }
 }
-
 
 ###############################################################################
 # Message and error handling ##################################################
@@ -66,7 +69,7 @@ my %colors = (normal => "${CSI}01;00m",
               green => "${CSI}01;32m",
               magenta => "${CSI}01;35m");
 
-# Terminal width
+# Terminal width. Use Term::ReadKey GetTerminalSize() ?
 my $term_cols = 80;
 
 # Whether to show output.
@@ -164,6 +167,7 @@ $SIG{__DIE__}  = sub {
 # This list gives:
 #  - the preferred ordering for parameters;
 #  - the default values (if any).
+# This is stored as an array, not a hash, to preserve the preferred ordering
 my @default_param = (
     # global
     wdir         => undef,
@@ -286,9 +290,10 @@ sub read_param {
             info "interpreting directory $_ as wdir=$_";
             $_ = "wdir=$_";
         }
-        for my $p (@param_list) {
-            if (/^$p=(.*)$/) {
-                my $v=$1;
+
+        if ( /^(\w*)\s*=(.*)$/ && grep ($_ eq $1, @param_list) != 0) {
+                my $p = $1;
+                my $v = $2;
                 if ($secondary && $p =~ /^(wdir)$/) {
                     if (!defined($param->{$p}) || $param->{$p} ne $v) {
                         warn "$_ ignored in secondary input file\n";
@@ -301,9 +306,9 @@ sub read_param {
                     # wins. Presently early wins. late wins would be:
                     # $param->{$p} = $v;
                     # $count_args++;
-		    # WARNING: if a factorization is restarted, we don't want
-		    # to just issue a warning if some parameters are changed
-		    # on the command line!!!
+                    # WARNING: if a factorization is restarted, we don't want
+                    # to just issue a warning if some parameters are changed
+                    # on the command line!!!
                     next ARGS;
                 }
 
@@ -321,7 +326,6 @@ sub read_param {
                     unshift @_, [$f,1,$origin]
                 }
                 next ARGS;
-            }
         }
         if (/^params?=(.*)$/) {
             # die "Paramfile must be the first argument !\n" if ($count_args);
@@ -330,7 +334,7 @@ sub read_param {
                 or die "Cannot open `$file' for reading: $!.\n";
             my @args;
             while (<FILE>) {
-                s/^\s+//; s/\s*(#.*)?$//;
+                s/^\s+//; s/\s*(#.*)?$//; # Remove empty lines and comments
                 next if /^$/;
                 if (/^(\w+)=(.*)$/) {
                     push @args, "$1=$2";
