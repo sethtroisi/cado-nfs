@@ -59,7 +59,7 @@ typedef struct bmstatus_s *bmstatus_ptr;
  * polynomial expansions, and uses this for detecting termination of the
  * expansion. Thus for gdb'ing the code, I set 1 below.
  */
-#define DEBUG_EXTRA_ROOM        0
+#define DEBUG_EXTRA_ROOM        1
 
 #if 0
 bw_nbpoly f_poly;
@@ -978,13 +978,14 @@ unsigned int (*compute_initial_F(bmstatus_ptr bm, bw_mnpoly A, unsigned int len)
 		 * coefficient, and zeroes for the other coefficients
 		 * referenced in the pivots[0] to pivots[v-1] indices).
 		 */
+                /* add M[u,r]*column v of M to column r of M */
                 for(unsigned int i = 0 ; i < m ; i++) {
                     if (i == u) continue;
                     abmul(ab, tmp,
                               polymat_coeff(M, m, m, i, v, 0),
                               polymat_coeff(M, m, m, u, r, 0));
-                    abadd(ab, polymat_coeff(M, m, m, i, v, 0),
-                              polymat_coeff(M, m, m, i, v, 0),
+                    abadd(ab, polymat_coeff(M, m, m, i, r, 0),
+                              polymat_coeff(M, m, m, i, r, 0),
                               tmp);
                 }
                 abset_zero(ab,
