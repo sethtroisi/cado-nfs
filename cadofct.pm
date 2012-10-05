@@ -345,8 +345,6 @@ sub read_param {
             }
             close FILE;
             unshift @_, map { [$_,$secondary, $file] } @args;
-        } elsif (-f $_) {
-            unshift @_, [ "param=$_", $secondary, $origin ];
         } else {
             die "Unknown argument: `$_'.\n" if $opt->{'strict'};
         }
