@@ -42,7 +42,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
     param_list_parse_mpz(pl, "prime", p);
     abase_vbase A;
     abase_vbase_oo_field_init_byfeatures(A, 
-            MPFQ_PRIME, p,
+            MPFQ_PRIME_MPZ, p,
             MPFQ_GROUPSIZE, ys[1]-ys[0],
             MPFQ_DONE);
     /* Hmmm. This would deserve better thought. Surely we don't need 64
@@ -52,13 +52,13 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
      */
     abase_vbase Ac;
     abase_vbase_oo_field_init_byfeatures(Ac,
-            MPFQ_PRIME, p,
+            MPFQ_PRIME_MPZ, p,
             MPFQ_GROUPSIZE, nchecks,
             MPFQ_DONE);
 
     abase_vbase Ar;
     abase_vbase_oo_field_init_byfeatures(Ar,
-            MPFQ_PRIME, p,
+            MPFQ_PRIME_MPZ, p,
             MPFQ_GROUPSIZE, bw->n,
             MPFQ_DONE);
     mpz_clear(p);

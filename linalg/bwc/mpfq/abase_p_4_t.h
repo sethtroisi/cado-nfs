@@ -17,6 +17,9 @@
                                     '<stdarg.h>'
                                   ],
                  'member_templates_restrict' => {
+                                                  'p_1' => [
+                                                             'p_1'
+                                                           ],
                                                   'p_4' => [
                                                              'p_4'
                                                            ],
@@ -24,15 +27,12 @@
                                                                'u64k1',
                                                                'u64k2'
                                                              ],
-                                                  'p16' => [
-                                                             'p16'
-                                                           ],
                                                   'u64k1' => $vbase_stuff->{'member_templates_restrict'}{'u64k2'}
                                                 },
                  'families' => [
-                                 $vbase_stuff->{'member_templates_restrict'}{'u64k2'},
-                                 $vbase_stuff->{'member_templates_restrict'}{'p16'},
-                                 $vbase_stuff->{'member_templates_restrict'}{'p_4'}
+                                 $vbase_stuff->{'member_templates_restrict'}{'p_4'},
+                                 $vbase_stuff->{'member_templates_restrict'}{'p_1'},
+                                 $vbase_stuff->{'member_templates_restrict'}{'u64k2'}
                                ],
                  'choose_byfeatures' => sub { "DUMMY" }
                };
