@@ -584,13 +584,13 @@ bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta)
                     continue;
                 }
                 for(unsigned int i = 0 ; i < b ; i++) {
-                    /* XXX FIXME. The assert() below is wrong. */
-                    /* Not clear whether this assert() is correct or not.
-                     * If it isn't, then why do we sort w.r.t this in
-                     * ctable ? */
-                    ASSERT_ALWAYS(pi_lengths[j] <= pi_lengths[k]);
-                    /* If we are to allow length[j] > length[k], then we
-                     * should update length[k], of course */
+                    /* Beware. One may be tempted to think that the code
+                     * above is dubious. It is, in fact, not a problem.
+                     * As long as the delta[] array undergoes no
+                     * disturbing modification, everything is ok.
+                     */
+                    if (pi_lengths[k] < pi_lengths[j])
+                        pi_lengths[k] = pi_lengths[j];
                     for(unsigned int s = 0 ; s < pi_lengths[j] ; s++) {
                         /* TODO: Would be better if mpfq had an addmul */
                         abmul(ab, tmp, lambda,
