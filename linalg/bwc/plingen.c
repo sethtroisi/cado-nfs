@@ -18,8 +18,8 @@
 #include "utils.h"
 #include "abase.h"
 #include "polymat.h"
-#include "bw-common.h"		/* Handy. Allows Using global functions for recovering
-				   parameters */
+#include "bw-common.h"		/* Handy. Allows Using global functions
+                                 * for recovering parameters */
 #include "filenames.h"
 #include "plingen.h"
 
@@ -53,7 +53,7 @@ struct bmstatus_s {
 typedef struct bmstatus_s bmstatus[1];
 typedef struct bmstatus_s *bmstatus_ptr;
 
-#if 0
+#if 0/*{{{*/
 bw_nbpoly f_poly;
 int t_counter;
 int *global_delta;
@@ -312,29 +312,23 @@ static int retrieve_pi_files(struct t_poly **p_pi, int t_start)
 }
 #endif /* }}} */
 
-#endif
+#endif/*}}}*/
 
 /* {{{ col sorting */
-/* XXX FIXME.
+/* We sort only with respect to the global delta[] parameter. As it turns
+ * out, we also access the column index in the same aray and sort with
+ * respect to it, but this is only cosmetic.
  *
- * The text below is plain wrong we should not be relying on the columns
- * of pi be in any degree order.
- */
-/* It might seem merely cosmetic and useless to sort w.r.t both the
- * global and local nominal degrees. In fact, it is crucial for the
- * corectness of the computations. (Imagine a 2-step increase, starting
- * with uneven global deltas, and hitting an even situation in the
- * middle. One has to sort out the local deltas to prevent trashing the
- * whole picture).
- *
- * The positional sort, however, *is* cosmetic (makes debugging easier).
+ * Note that unlike what is asserted in other coiped of the code, sorting
+ * w.r.t. the local delta[] value is completely useless. Code which
+ * relies on this should be fixed.
  */
 
 typedef int (*sortfunc_t) (const void*, const void*);
 
-static int col_cmp(const int x[3], const int y[3])
+static int col_cmp(const int x[2], const int y[2])
 {
-    for(int i = 0 ; i < 3 ; i++) {
+    for(int i = 0 ; i < 2 ; i++) {
         int d = x[i] - y[i];
         if (d) return d;
     }
@@ -343,7 +337,7 @@ static int col_cmp(const int x[3], const int y[3])
 
 /* }}} */
 
-static inline unsigned int expected_pi_length(dims * d, unsigned int len)
+static inline unsigned int expected_pi_length(dims * d, unsigned int len)/*{{{*/
 {
     /* The idea is that we want something which may account for something
      * exceptional, bounded by probability 2^-64. This corresponds to a
@@ -377,10 +371,10 @@ static inline unsigned int expected_pi_length(dims * d, unsigned int len)
     // unsigned int safety = iceildiv(abgroupsize(ab), m * sizeof(abelt));
     unsigned int safety = iceildiv(64, m * l);
     return res + safety;
-}
+}/*}}}*/
 
 /* Forward declaration, it's used by the recursive version */
-static void bw_lingen(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta);
+static int bw_lingen(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta);
 
 
 /* This destructively cancels the first len coefficients of E, and
@@ -392,8 +386,7 @@ static void bw_lingen(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delt
  * that E*pi is divisible by X^len.
  */
 
-static void
-bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta)
+static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta) /*{{{*/
 {
     dims * d = bm->d;
     unsigned int m = d->m;
@@ -492,18 +485,18 @@ bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta)
              * like this to be impossible by mere chance. Thus we want n*k >
              * luck_mini, which can easily be checked */
 
-            unsigned int luck_mini = expected_pi_length(d, 0);
-            unsigned int luck_total = 0;
+            int luck_mini = expected_pi_length(d, 0);
+            unsigned int luck_sure = 0;
 
             printf("t=%d, canceled columns:", t + bm->t);
             for(unsigned int j = 0 ; j < b ; j++) {
                 if (bm->lucky[j] > 0) {
                     printf(" %u", j);
-                    luck_total += bm->lucky[j];
+                    luck_sure += bm->lucky[j] > luck_mini;
                 }
             }
 
-            if (newluck == n && luck_total > luck_mini) {
+            if (newluck == n && luck_sure == n) {
                 if (!generator_found) {
                     printf(", complete generator found, for sure");
                 }
@@ -513,7 +506,7 @@ bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta)
         }
         /* }}} */
 
-        int (*ctable)[3] = malloc(b * 3 * sizeof(int));
+        int (*ctable)[2] = malloc(b * 2 * sizeof(int));
         /* {{{ Now see in which order I may look at the columns of pi, so
          * as to keep the nominal degrees correct. In contrast with what
          * we used to do before, we no longer apply the permutation to
@@ -521,10 +514,9 @@ bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta)
          * indices, and we'll tune this in the end. */
         for(unsigned int j = 0; j < b; j++) {
             ctable[j][0] = delta[j];
-            ctable[j][1] = pi_lengths[j];
-            ctable[j][2] = j;
+            ctable[j][1] = j;
         }
-        qsort(ctable, b, 3 * sizeof(int), (sortfunc_t) & col_cmp);
+        qsort(ctable, b, 2 * sizeof(int), (sortfunc_t) & col_cmp);
         /* }}} */
 
         /* {{{ Now do Gaussian elimination */
@@ -532,7 +524,7 @@ bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta)
         unsigned int r = 0;
         /* Loop through logical indices */
         for(unsigned int jl = 0; jl < b; jl++) {
-            unsigned int j = ctable[jl][2];
+            unsigned int j = ctable[jl][1];
             unsigned int u = 0;
             /* {{{ Find the pivot */
             for( ; u < m ; u++) {
@@ -550,7 +542,7 @@ bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta)
             abinv(ab, inv, polymat_coeff(e, u, j, 0));
             abneg(ab, inv, inv);
             for (unsigned int kl = jl + 1; kl < b ; kl++) {
-                unsigned int k = ctable[kl][2];
+                unsigned int k = ctable[kl][1];
                 if (abcmp_ui(ab, polymat_coeff(e, u, k, 0), 0) == 0)
                     continue;
                 // add lambda = e[u,k]*-e[u,j]^-1 times col j to col k.
@@ -680,16 +672,18 @@ bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta)
     free(pi_lengths);   /* What shall we do with this one ??? */
 
     bm->t += E->size;
-}
 
-static void
-bw_lingen_recursive(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta)
+    return generator_found;
+}/*}}}*/
+
+static int bw_lingen_recursive(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta) /*{{{*/
 {
     dims * d = bm->d;
     unsigned int m = d->m;
     unsigned int n = d->n;
     unsigned int b = m + n;
     abdst_field ab = d->ab;
+    int done;
 
     /* XXX I think we have to start with something large enough to get
      * all coefficients of E_right correct */
@@ -706,9 +700,15 @@ bw_lingen_recursive(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta)
     polymat pi_left;
     polymat_init(pi_left, 0, 0, 0);
 
-    bw_lingen(bm, pi_left, E_left, delta);
+    done = bw_lingen(bm, pi_left, E_left, delta);
 
     polymat_clear(E_left);
+
+    if (done) {
+        polymat_swap(pi_left, pi);
+        polymat_clear(pi_left);
+        return 1;
+    }
 
     /* Do a naive middle product for the moment, just to make sure I'm
      * not speaking nonsense */
@@ -719,7 +719,7 @@ bw_lingen_recursive(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta)
 
     /* length of the middle product is the difference of lengths + 1 */
     unsigned mp_len = E_i1 - E_i0 - (pi_left->size - 1);
-    printf("Middle product of size %zu * %u --> %u\n", pi_left->size, E_i1 - E_i0, mp_len);
+    printf("t=%u, MP(%zu, %u) --> %u\n", bm->t, pi_left->size, E_i1 - E_i0, mp_len);
 
     polymat E_right;
     polymat_init(E_right, m, b, mp_len);
@@ -737,7 +737,7 @@ bw_lingen_recursive(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta)
     polymat pi_right;
     polymat_init(pi_right, 0, 0, 0);
 
-    bw_lingen(bm, pi_right, E_right, delta);
+    done = bw_lingen(bm, pi_right, E_right, delta);
 
     polymat_clear(E_right);
 
@@ -745,19 +745,21 @@ bw_lingen_recursive(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta)
     
     polymat_clear(pi_left);
     polymat_clear(pi_right);
-}
 
-static void
+    return done;
+}/*}}}*/
+
+static int/*{{{*/
 bw_lingen(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta)
 {
     if (E->size < bm->lingen_threshold) {
-        bw_lingen_basecase(bm, pi, E, delta);
+        return bw_lingen_basecase(bm, pi, E, delta);
     } else {
-        bw_lingen_recursive(bm, pi, E, delta);
+        return bw_lingen_recursive(bm, pi, E, delta);
     }
-}
+}/*}}}*/
 
-#if 0
+#if 0/*{{{*/
 int check_zero_and_advance(struct e_coeff *ec, unsigned int kill)
 {
     unsigned int i;
@@ -1027,7 +1029,7 @@ void showuse(void)
     die("Usage : bw-master <bank#>\n", 1);
 }
 
-#endif
+#endif/*}}}*/
 
 /**********************************************************************/
 
@@ -1259,7 +1261,7 @@ void compute_final_F_red(bmstatus_ptr bm, polymat f, unsigned int (*fdesc)[2], u
 }/*}}}*/
 
 
-void write_f(bmstatus_ptr bm, const char * filename, polymat f_red, unsigned int * delta)
+void write_f(bmstatus_ptr bm, const char * filename, polymat f_red, unsigned int * delta)/*{{{*/
 {
     dims * d = bm->d;
     unsigned int n = d->n;
@@ -1279,7 +1281,7 @@ void write_f(bmstatus_ptr bm, const char * filename, polymat f_red, unsigned int
         fprintf(f, "\n");
     }
     fclose(f);
-}
+}/*}}}*/
 
 
 void compute_initial_E(bmstatus_ptr bm, polymat E, polymat A, unsigned int (*fdesc)[2])/*{{{*/

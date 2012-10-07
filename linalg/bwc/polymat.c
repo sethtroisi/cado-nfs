@@ -33,6 +33,14 @@ void polymat_clear(polymat_ptr p) {
     free(p->x);
     memset(p, 0, sizeof(polymat));
 }
+void polymat_swap(polymat_ptr a, polymat_ptr b)
+{
+    polymat x;
+    memcpy(x, a, sizeof(polymat));
+    memcpy(a, b, sizeof(polymat));
+    memcpy(b, x, sizeof(polymat));
+}
+
 /* }}} */
 
 /* {{{ init/zero/clear interface for polymat_ur */
@@ -58,6 +66,14 @@ void polymat_ur_clear(polymat_ur_ptr p) {
     free(p->x);
     memset(p, 0, sizeof(polymat_ur));
 }
+void polymat_ur_swap(polymat_ur_ptr a, polymat_ur_ptr b)
+{
+    polymat_ur x;
+    memcpy(x, a, sizeof(polymat_ur));
+    memcpy(a, b, sizeof(polymat_ur));
+    memcpy(b, x, sizeof(polymat_ur));
+}
+
 /* }}} */
 
 
