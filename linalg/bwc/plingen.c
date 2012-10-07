@@ -49,6 +49,8 @@ struct bmstatus_s {
     int * lucky;
 
     unsigned int lingen_threshold;
+    double t_basecase;
+    double t_mp;
 };
 typedef struct bmstatus_s bmstatus[1];
 typedef struct bmstatus_s *bmstatus_ptr;
@@ -724,13 +726,12 @@ static int bw_lingen_recursive(bmstatus_ptr bm, polymat pi, polymat E, unsigned 
     E_right->size = mp_len;
 
     /* Note that because E_i0 */
+    bm->t_mp -= seconds();
     polymat_mp_raw(ab,
             E_right, 0,
             E, E_i0, E_i1 - E_i0,
             pi_left, 0, pi_left->size);
-    /*
-    polymat_mp(ab, E_right, E_left, pi_left);
-            */
+    bm->t_mp += seconds();
 
     polymat pi_right;
     polymat_init(pi_right, 0, 0, 0);
@@ -739,7 +740,9 @@ static int bw_lingen_recursive(bmstatus_ptr bm, polymat pi, polymat E, unsigned 
 
     polymat_clear(E_right);
 
+    bm->t_mp -= seconds();
     polymat_mul(ab, pi, pi_left, pi_right);
+    bm->t_mp += seconds();
     
     polymat_clear(pi_left);
     polymat_clear(pi_right);
@@ -751,7 +754,10 @@ static int/*{{{*/
 bw_lingen(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta)
 {
     if (E->size < bm->lingen_threshold) {
-        return bw_lingen_basecase(bm, pi, E, delta);
+        bm->t_basecase -= seconds();
+        int res = bw_lingen_basecase(bm, pi, E, delta);
+        bm->t_basecase += seconds();
+        return res;
     } else {
         return bw_lingen_recursive(bm, pi, E, delta);
     }
@@ -1515,6 +1521,8 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Could not find the required set of solutions (nlucky=%u)\n", nlucky);
     }
 
+    printf("t_basecase = %.2f\n", bm->t_basecase);
+    printf("t_mp = %.2f\n", bm->t_mp);
     free(delta);
     polymat_clear(pi);
     free(fdesc);
