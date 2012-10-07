@@ -427,7 +427,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
     polymat e;
     polymat_init(e, m, b, 1);
 
-    for (unsigned int t = 0; t < E->size ; t++) {
+    for (unsigned int t = 0; t < E->size ; t++, bm->t++) {
 
         /* {{{ Update the columns of e for degree t. Save computation
          * time by not recomputing those which can easily be derived from
@@ -488,7 +488,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
             int luck_mini = expected_pi_length(d, 0);
             unsigned int luck_sure = 0;
 
-            printf("t=%d, canceled columns:", t + bm->t);
+            printf("t=%d, canceled columns:", bm->t);
             for(unsigned int j = 0 ; j < b ; j++) {
                 if (bm->lucky[j] > 0) {
                     printf(" %u", j);
@@ -505,6 +505,8 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
             printf(".\n");
         }
         /* }}} */
+
+        if (generator_found) break;
 
         int (*ctable)[2] = malloc(b * 2 * sizeof(int));
         /* {{{ Now see in which order I may look at the columns of pi, so
@@ -600,7 +602,6 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
             abclear(ab, &inv); /* }}} */
         }
         /* }}} */
-
         free(ctable);
 
         ASSERT_ALWAYS(r == m);
@@ -611,8 +612,8 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
             if (pi_lengths[j] >= pi->alloc) {
                 if (!generator_found) {
                     polymat_realloc(pi, pi->alloc + pi->alloc / (m+n));
-                    printf("t=%zu, expanding allocation for pi (now %zu%%) ; lengths: ",
-                            bm->t + E->size,
+                    printf("t=%u, expanding allocation for pi (now %zu%%) ; lengths: ",
+                            bm->t,
                             100 * pi->alloc / pi_room_base);
                     for(unsigned int j = 0; j < b; j++)
                         printf(" %u", pi_lengths[j]);
@@ -620,9 +621,8 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
                 } else {
                     ASSERT_ALWAYS(bm->lucky[j] <= 0);
                     if (bm->lucky[j] == 0)
-                        printf("t=%zu, column %u discarded from now on\n",
-                                bm->t + E->size,
-                                j);
+                        printf("t=%u, column %u discarded from now on\n",
+                                bm->t, j);
                     bm->lucky[j] = -1;
                     pi_lengths[j]++;
                     delta[j]++;
@@ -642,7 +642,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
         /* }}} */
 
         /*
-        printf("t=%u:", bm->t + t);
+        printf("t=%u:", bm->t);
         for(unsigned int j = 0; j < b; j++) {
             printf(" %u", delta[j]);
         }
@@ -650,7 +650,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
         */
     }
     /*
-        printf("t=%u: delta =", bm->t + len);
+        printf("t=%u: delta =", bm->t);
         for(unsigned int j = 0; j < b; j++) {
             printf(" %u", delta[j]);
         }
@@ -670,8 +670,6 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
     free(is_pivot);
     free(pivots);
     free(pi_lengths);   /* What shall we do with this one ??? */
-
-    bm->t += E->size;
 
     return generator_found;
 }/*}}}*/
