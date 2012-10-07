@@ -45,12 +45,10 @@
 
 struct bmstatus_s {
     dims d[1];
-    int * delta;
+    unsigned int t;
     int * lucky;
-    // bw_nbpoly E;
-    // bw_nbmat e0;        /* Useful ??? */
-    int t;
-    /* Not clear we need the following: t0, F0. */
+
+    unsigned int lingen_threshold;
 };
 typedef struct bmstatus_s bmstatus[1];
 typedef struct bmstatus_s *bmstatus_ptr;
@@ -382,7 +380,8 @@ static inline unsigned int expected_pi_length(dims * d, unsigned int len)
 }
 
 /* Forward declaration, it's used by the recursive version */
-// static double bw_lingen(struct e_coeff *, int *, struct t_poly **);
+static void bw_lingen(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta);
+
 
 /* This destructively cancels the first len coefficients of E, and
  * computes the appropriate matrix pi which achieves this. The
@@ -394,7 +393,7 @@ static inline unsigned int expected_pi_length(dims * d, unsigned int len)
  */
 
 static void
-bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, int *delta)
+bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta)
 {
     dims * d = bm->d;
     unsigned int m = d->m;
@@ -679,10 +678,12 @@ bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, int *delta)
     free(is_pivot);
     free(pivots);
     free(pi_lengths);   /* What shall we do with this one ??? */
+
+    bm->t += E->size;
 }
 
 static void
-bw_lingen_recursive(bmstatus_ptr bm, polymat pi, polymat E, int *delta)
+bw_lingen_recursive(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta)
 {
     dims * d = bm->d;
     unsigned int m = d->m;
@@ -705,11 +706,9 @@ bw_lingen_recursive(bmstatus_ptr bm, polymat pi, polymat E, int *delta)
     polymat pi_left;
     polymat_init(pi_left, 0, 0, 0);
 
-    bw_lingen_basecase(bm, pi_left, E_left, delta);
+    bw_lingen(bm, pi_left, E_left, delta);
 
     polymat_clear(E_left);
-
-    bm->t += half;
 
     /* Do a naive middle product for the moment, just to make sure I'm
      * not speaking nonsense */
@@ -719,7 +718,7 @@ bw_lingen_recursive(bmstatus_ptr bm, polymat pi, polymat E, int *delta)
     unsigned int E_i1 = E->size;
 
     /* length of the middle product is the difference of lengths + 1 */
-    unsigned mp_len = E_i1 - E_i0 - pi_left->size + 1;
+    unsigned mp_len = E_i1 - E_i0 - (pi_left->size - 1);
     printf("Middle product of size %zu * %u --> %u\n", pi_left->size, E_i1 - E_i0, mp_len);
 
     polymat E_right;
@@ -738,7 +737,7 @@ bw_lingen_recursive(bmstatus_ptr bm, polymat pi, polymat E, int *delta)
     polymat pi_right;
     polymat_init(pi_right, 0, 0, 0);
 
-    bw_lingen_basecase(bm, pi_right, E_right, delta);
+    bw_lingen(bm, pi_right, E_right, delta);
 
     polymat_clear(E_right);
 
@@ -746,6 +745,16 @@ bw_lingen_recursive(bmstatus_ptr bm, polymat pi, polymat E, int *delta)
     
     polymat_clear(pi_left);
     polymat_clear(pi_right);
+}
+
+static void
+bw_lingen(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta)
+{
+    if (E->size < bm->lingen_threshold) {
+        bw_lingen_basecase(bm, pi, E, delta);
+    } else {
+        bw_lingen_recursive(bm, pi, E, delta);
+    }
 }
 
 #if 0
@@ -1129,9 +1138,6 @@ unsigned int (*compute_initial_F(bmstatus_ptr bm, polymat A))[2] /*{{{ */
     unsigned int t0 = exponents[r - 1] + 1;
     printf("Found satisfying init data for t0=%d\n", t0);
  
-    for(unsigned int j = 0 ; j < m + n ; j++) {
-        bm->delta[j] = t0;
-    }
     bm->t = t0;
 
     unsigned int (*fdesc)[2] = malloc(2 * m * sizeof(unsigned int));
@@ -1148,7 +1154,7 @@ unsigned int (*compute_initial_F(bmstatus_ptr bm, polymat A))[2] /*{{{ */
     return fdesc;
 }				/*}}} */
 
-unsigned int get_max_delta_on_solutions(bmstatus_ptr bm)/*{{{*/
+unsigned int get_max_delta_on_solutions(bmstatus_ptr bm, unsigned int * delta)/*{{{*/
 {
     dims * d = bm->d;
     unsigned int m = d->m;
@@ -1157,15 +1163,14 @@ unsigned int get_max_delta_on_solutions(bmstatus_ptr bm)/*{{{*/
     for(unsigned int j = 0 ; j < m + n ; j++) {
         if (bm->lucky[j] <= 0)
             continue;
-        unsigned int delta = bm->delta[j];
-        if (delta > maxdelta)
-            maxdelta = delta;
+        if (delta[j] > maxdelta)
+            maxdelta = delta[j];
     }
     return maxdelta;
 }/*}}}*/
 
 
-void compute_final_F_red(bmstatus_ptr bm, polymat f, unsigned int (*fdesc)[2], unsigned int t0, polymat pi)/*{{{*/
+void compute_final_F_red(bmstatus_ptr bm, polymat f, unsigned int (*fdesc)[2], unsigned int t0, polymat pi, unsigned int * delta)/*{{{*/
 {
     dims * d = bm->d;
     unsigned int m = d->m;
@@ -1173,7 +1178,7 @@ void compute_final_F_red(bmstatus_ptr bm, polymat f, unsigned int (*fdesc)[2], u
     unsigned int b = m + n;
     abdst_field ab = d->ab;
 
-    unsigned int maxdelta = get_max_delta_on_solutions(bm);
+    unsigned int maxdelta = get_max_delta_on_solutions(bm, delta);
 
     // F0 is exactly the n x n identity matrix, plus the
     // X^(t0-exponent)e_{cnum} vectors. fdesc has the (exponent, cnum)
@@ -1204,7 +1209,7 @@ void compute_final_F_red(bmstatus_ptr bm, polymat f, unsigned int (*fdesc)[2], u
     printf("Computing value of f(X)=f0(X)pi(X) (degree %u)\n", maxdelta);
     printf("Final, t=%u: delta =", bm->t);
     for(unsigned int j = 0; j < b; j++) {
-        printf(" %u", bm->delta[j]);
+        printf(" %u", delta[j]);
         if (bm->lucky[j] < 0) {
             printf("(*)");
         }
@@ -1254,14 +1259,14 @@ void compute_final_F_red(bmstatus_ptr bm, polymat f, unsigned int (*fdesc)[2], u
 }/*}}}*/
 
 
-void write_f(bmstatus_ptr bm, const char * filename, polymat f_red)
+void write_f(bmstatus_ptr bm, const char * filename, polymat f_red, unsigned int * delta)
 {
     dims * d = bm->d;
     unsigned int n = d->n;
     abdst_field ab = d->ab;
     FILE * f = fopen(filename, "w");
     DIE_ERRNO_DIAG(f == NULL, "fopen", filename);
-    unsigned int maxdelta = get_max_delta_on_solutions(bm);
+    unsigned int maxdelta = get_max_delta_on_solutions(bm, delta);
     unsigned int flen = maxdelta + 1;
     for(unsigned int k = 0 ; k < flen ; k++) {
         for(unsigned int i = 0 ; i < n ; i++) {
@@ -1388,15 +1393,12 @@ void bmstatus_init(bmstatus_ptr bm, unsigned int m, unsigned int n)/*{{{*/
     memset(bm, 0, sizeof(bmstatus));
     bm->d->m = m;
     bm->d->n = n;
-    bm->delta = malloc((m + n) * sizeof(int));
     bm->lucky = malloc((m + n) * sizeof(int));
-    memset(bm->delta, 0, (m + n) * sizeof(int));
     memset(bm->lucky, 0, (m + n) * sizeof(int));
 }/*}}}*/
 
 void bmstatus_clear(bmstatus_ptr bm)/*{{{*/
 {
-    free(bm->delta);
     free(bm->lucky);
     memset(bm, 0, sizeof(bmstatus));
 }/*}}}*/
@@ -1450,6 +1452,8 @@ int main(int argc, char *argv[])
 	mpz_clear(p);
     }
 
+    bm->lingen_threshold = 10;
+    param_list_parse_uint(pl, "lingen-threshold", &(bm->lingen_threshold));
     if (param_list_warn_unused(pl))
 	usage();
     /* }}} */
@@ -1481,11 +1485,15 @@ int main(int argc, char *argv[])
 
     unsigned int t0 = bm->t;
 
+    unsigned int * delta = malloc((m + n) * sizeof(unsigned int));
+    for(unsigned int j = 0 ; j < m + n ; j++) {
+        delta[j] = t0;
+    }
+
     polymat pi;
     polymat_init(pi, 0, 0, 0);
 
-    bw_lingen_recursive(bm, pi, E, bm->delta);
-    bm->t += E->size;
+    bw_lingen(bm, pi, E, delta);
     polymat_clear(E);
 
     unsigned int nlucky = 0;
@@ -1496,17 +1504,18 @@ int main(int argc, char *argv[])
     if (nlucky == n) {
         polymat f_red;
         polymat_init(f_red, 0, 0, 0);
-        compute_final_F_red(bm, f_red, fdesc, t0, pi);
+        compute_final_F_red(bm, f_red, fdesc, t0, pi, delta);
         char * f_filename;
         int rc = asprintf(&f_filename, "%s.gen", afile);
         ASSERT_ALWAYS(rc >= 0);
-        write_f(bm, f_filename, f_red);
+        write_f(bm, f_filename, f_red, delta);
         free(f_filename);
         polymat_clear(f_red);
     } else {
         fprintf(stderr, "Could not find the required set of solutions (nlucky=%u)\n", nlucky);
     }
 
+    free(delta);
     polymat_clear(pi);
     free(fdesc);
 
