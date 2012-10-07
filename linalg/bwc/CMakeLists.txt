@@ -243,6 +243,7 @@ include(CMakeLists-nodist.txt OPTIONAL)
 add_executable(plingen EXCLUDE_FROM_ALL
                 bw-common.c
                 plingen.c
+                polymat.c
                 mpfq/abase_p_1.c
         )
     #               variables.c fft_on_matrices.cpp
