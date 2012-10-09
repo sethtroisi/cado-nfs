@@ -23,7 +23,7 @@
 
 package cadofct;
 use parent qw(Exporter);
-our @EXPORT=qw(%param $tab_level &read_machines &read_param &do_polysel_bench
+our @EXPORT=qw(%param $tab_level &read_machines &parse_param &do_polysel_bench
 &do_sieve_bench &do_factbase &do_init &do_task &banner &info &last_line
 &format_dhms);
 
@@ -252,103 +252,82 @@ my @default_param = (
 );
 
 # Hash for the parameters, global to avoid passing it to each function
-our %param = @default_param; # initialize to default values
+our %param;
 
 # Build the ordered list of parameters
 my @param_list;
 
-while (@default_param) {
-    push @param_list, shift @default_param;
-    shift @default_param;
+for (my $i = 0; $i < @default_param; $i += 2) {
+    push @param_list, $default_param[$i];
 }
 
 
+# Merge second hash into first hash. Value of a key in first hash remains 
+# unchanged in case of collision
+sub merge_hash {
+  die unless ref $_[0] eq 'HASH' && ref $_[1] eq 'HASH';
+  for (keys %{$_[1]}) {
+    $_[0]->{$_} = $_[1]->{$_} if !exists $_[0]->{$_};
+  }
+}
+
+
+# Parse command line switches that are not permitted in config files
+# We set parsed switches to the empty string to hide them from the
+# parameter parser
+sub parse_options () {
+  foreach (@ARGV) {
+      if (/^-v$/) { $verbose++; $_ = ""; }
+      if (/^-y$/) { $assume_yes='y'; $_ = ""; }
+      if (/^-l$/) { $assume_yes='l'; $_ = ""; }
+  }
+}
 
 # Parses command-line and configuration file parameters.
 # The second parameter is a hash of options:
 #  - `strict' specifies whether the checking should be strict or not
 #             (i.e. die in case of parsing errors)
-sub read_param {
-    my ($param, $opt) = (shift, shift);
-    my $count_args = 0;
 
-    my %files_read = ();
-
-    @_ = map { [$_, 0, 'cmdline'] } @_;
-
-    ARGS : while (defined ($_ = shift)) {
-        die unless ref $_ eq 'ARRAY';
-        my $secondary = $_->[1];
-        my $origin = $_->[2];
-        $_=$_->[0];
-        if (/^-v$/) { $verbose++; next; }
-        if (/^-y$/) { $assume_yes='y'; next; }
-        if (/^-l$/) { $assume_yes='l'; next; }
-        next if $files_read{$_};
-        $files_read{$_}=1;
-        if (-d $_) {
-            info "interpreting directory $_ as wdir=$_";
-            $_ = "wdir=$_";
-        }
-
-        if ( /^(\w*)\s*=(.*)$/ && grep ($_ eq $1, @param_list) != 0) {
-                my $p = $1;
-                my $v = $2;
-                if ($secondary && $p =~ /^(wdir)$/) {
-                    if (!defined($param->{$p}) || $param->{$p} ne $v) {
-                        warn "$_ ignored in secondary input file\n";
-                    }
-                    next ARGS;
-                }
-                if ($secondary && defined($param->{$p}) && $param->{$p} ne $v) {
-                    die "parameter $p from $origin clashes with value defined earlier from other config files";
-                    # We may also warn, provided we make a choice for who
-                    # wins. Presently early wins. late wins would be:
-                    # $param->{$p} = $v;
-                    # $count_args++;
-                    # WARNING: if a factorization is restarted, we don't want
-                    # to just issue a warning if some parameters are changed
-                    # on the command line!!!
-                    next ARGS;
-                }
-
-                $param->{$p} = $v;
-                $count_args++;
-                my $f;
-                if ($p eq 'wdir') {
-                    $f = "$1/param";
-                } elsif ($p eq 'name' && defined($param->{'wdir'})) {
-                    $f = "$param->{'wdir'}/$param->{'name'}.param";
-                }
-                if (defined($f) && -f $f && !$files_read{$f}) {
-                    $count_args--;
-                    info "Reading extra parameters from $f\n";
-                    unshift @_, [$f,1,$origin]
-                }
-                next ARGS;
-        }
-        if (/^params?=(.*)$/) {
-            # die "Paramfile must be the first argument !\n" if ($count_args);
-            my $file = $1;
-            open FILE, "< $file"
-                or die "Cannot open `$file' for reading: $!.\n";
-            my @args;
-            while (<FILE>) {
-                s/^\s+//; s/\s*(#.*)?$//; # Remove empty lines and comments
-                next if /^$/;
-                if (/^(\w+)=(.*)$/) {
-                    push @args, "$1=$2";
-                    next;
-                }
-                die "Cannot parse line `$_' in file `$file'.\n"
-                    if $opt->{'strict'};
-            }
-            close FILE;
-            unshift @_, map { [$_,$secondary, $file] } @args;
-        } else {
-            die "Unknown argument: `$_'.\n" if $opt->{'strict'};
-        }
+sub parse_param {
+  my ($param_ref, $opt_ref, $line_ref, $source_name) = @_; 
+  # The parameters to be parsed now as lines of text in an array
+  # Parameters for the parsing, e.g., "strict=1"
+  # Reference to hash of previous parameter values
+  # Name of the source of parameters, e.g., "command line", or a file name
+  
+  my %sub_param;
+  
+  foreach (@{$line_ref}) {
+    s/^\s+//; # Remove empty lines and comments
+    s/\s*(#.*)?$//;
+    next if /^$/;
+    if (! /^(\w+)=(.*)$/) {
+      die "Cannot parse option `$_' in $source_name.\n"
+          if $opt_ref->{'strict'};
     }
+    
+    if ($1 eq "param" || $1 eq "params") {
+      open(my $FILE, $2) or die "Could not open parameter file $2";
+      my @slurp = <$FILE>;
+      close ($FILE);
+      parse_param (\%sub_param, $opt_ref, \@slurp, "file $2");
+    } else {
+      die "Key $1 not recognized in line $_\n" 
+        if grep ($_ eq $1, @param_list) == 0;
+      die "Parameter $1=$2 from $source_name was previously defined with " .
+          "different value $param_ref->{$1}\n"
+        if (exists $param_ref->{$1} && $2 ne $param_ref->{$1});
+      $param_ref->{$1} = $2;
+    }
+  }
+
+  merge_hash ($param_ref, \%sub_param);
+}
+
+
+sub check_param {
+    my $param = shift;
+    my $opt = shift;
 
     # sanity check: old config files may still have true/false values
     while (my ($k, $v) = each %$param) {
@@ -393,6 +372,7 @@ sub read_param {
 	$param->{'keep'} = 128 + $param->{'skip'};
     }
 }
+
 
 # Dumps the list of parameters to a file
 sub write_param {
@@ -1631,7 +1611,12 @@ sub do_init {
     # Getting configuration
     info "Reading the parameters...\n";
     $tab_level++;
-    read_param(\%param, { strict => 1 }, @ARGV);
+    
+    parse_options ();
+    parse_param (\%param, { strict => 1 }, \@ARGV, "command line");
+    my %default_param_hash = @default_param;
+    merge_hash (\%param, \%default_param_hash);
+    check_param (\%param, { strict => 1 });
     $tab_level--;
 
     if ($param{'parallel'}) {
@@ -1690,8 +1675,8 @@ sub do_init {
     if ($recover && -f "$param{'prefix'}.param") {
         eval {
             my %param_old;
-            read_param(\%param_old, { strict => 0 },
-                       "param=$param{'prefix'}.param");
+            parse_param (\%param_old, { strict => 0 },  ["param=$param{'prefix'}.param"], 
+                        "file $param{'prefix'}.param");
             for (keys %param) {
             		$param_diff{$_} =$param{$_} ne $param_old{$_}
 						if (exists($param_old{$_}));
