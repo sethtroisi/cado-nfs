@@ -1475,8 +1475,13 @@ int main(int argc, char *argv[])
         printf("Reading scalar data in polynomial ``a'' from %s\n", afile);
         read_data_for_series(bm, A, afile);
 
-        printf("Read %zu+1=%zu iterations (bw parameters: expect %u)\n",
-                A->size, A->size+ 1, bw->end - bw->start);
+        printf("Read %zu+1=%zu iterations",
+                A->size, A->size+ 1);
+        if (bw->end || bw->start) {
+            printf(" (bw parameters: expect %u)",
+                    bw->end - bw->start);
+        }
+        printf(".\n");
         /* Data read stage completed. */
 
         fdesc = compute_initial_F(bm, A);
