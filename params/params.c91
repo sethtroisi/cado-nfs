@@ -51,7 +51,7 @@ machines=mach_desc      # file describing available computers for parallel
 ###########################################################################
 
 degree=4                     # degree of the algebraic polynomial
-polsel_P=9600                # choose lc(g) with two prime factors in [P,2P]
+polsel_P=16000               # choose lc(g) with two prime factors in [P,2P]
     # Setting a large value will most likely find better polynomials,
     # but the number of found polynomials will be smaller.
     # As a rule of thumb, we want at least 100 found polynomials in total
