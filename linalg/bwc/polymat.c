@@ -4,6 +4,10 @@
 #include "macros.h"
 #include "polymat.h"
 
+#define MIDDLE_PRODUCT_KARA_THRESHOLD   8
+#define MIDDLE_PRODUCT_SUBDIVIDE_THRESHOLD      MIDDLE_PRODUCT_KARA_THRESHOLD
+
+
 /* {{{ init/zero/clear interface for polymat */
 void polymat_init(polymat_ptr p, unsigned int m, unsigned int n, int len) {
     memset(p, 0, sizeof(polymat));
@@ -97,6 +101,96 @@ void bwmat_move_coeffs(abdst_field ab MAYBE_UNUSED, abelt * x0, int stride0, abe
             abset(ab, x0[i * stride0], x1[i * stride1]);
         }
     }
+}
+
+void polymat_addmat(abdst_field ab,
+        polymat c, unsigned int kc,
+        polymat a, unsigned int ka,
+        polymat b, unsigned int kb)
+{
+    for(unsigned int i = 0 ; i < a->m ; i++) {
+        for(unsigned int j = 0 ; j < a->n ; j++) {
+            abadd(ab,
+                    polymat_coeff(c, i, j, kc),
+                    polymat_coeff(a, i, j, ka),
+                    polymat_coeff(b, i, j, kb));
+        }
+    }
+}
+
+void polymat_submat(abdst_field ab,
+        polymat c, unsigned int kc,
+        polymat a, unsigned int ka,
+        polymat b, unsigned int kb)
+{
+    for(unsigned int i = 0 ; i < a->m ; i++) {
+        for(unsigned int j = 0 ; j < a->n ; j++) {
+            absub(ab,
+                    polymat_coeff(c, i, j, kc),
+                    polymat_coeff(a, i, j, ka),
+                    polymat_coeff(b, i, j, kb));
+        }
+    }
+}
+
+void polymat_addmulmat_ur(abdst_field ab,
+        polymat_ur c, unsigned int kc,
+        polymat a, unsigned int ka,
+        polymat b, unsigned int kb)
+{
+    abelt_ur tmp_ur;
+    abelt_ur_init(ab, &tmp_ur);
+    for(unsigned int i = 0 ; i < a->m ; i++) {
+        for(unsigned int j = 0 ; j < b->n ; j++) {
+            for(unsigned int k = 0 ; k < a->n ; k++) {
+                absrc_elt ea = polymat_coeff(a, i, k, ka);
+                absrc_elt eb = polymat_coeff(b, k, j, kb);
+                abmul_ur(ab, tmp_ur, ea, eb);
+                abelt_ur_add(ab,
+                        polymat_ur_coeff(c, i, j, kc),
+                        polymat_ur_coeff(c, i, j, kc),
+                        tmp_ur);
+            }
+        }
+    }
+    abelt_ur_clear(ab, &tmp_ur);
+}
+
+void polymat_reducemat(abdst_field ab,
+        polymat c, unsigned int kc,
+        polymat_ur a, unsigned int ka)
+{
+    for(unsigned int i = 0 ; i < a->m ; i++) {
+        for(unsigned int j = 0 ; j < a->n ; j++) {
+            abreduce(ab, 
+                    polymat_coeff(c, i, j, kc),
+                    polymat_ur_coeff(a, i, j, ka));
+        }
+    }
+}
+
+void polymat_mulmat(abdst_field ab,
+        polymat c, unsigned int kc,
+        polymat a, unsigned int ka,
+        polymat b, unsigned int kb)
+{
+    polymat_ur cx;
+    polymat_ur_init(cx, c->m, c->n, 1);
+    polymat_addmulmat_ur(ab, cx, 0, a, ka, b, kb);
+    polymat_reducemat(ab, c, kc, cx, 0);
+    polymat_ur_clear(cx);
+}
+
+void polymat_addmulmat(abdst_field ab,
+        polymat c, unsigned int kc,
+        polymat a, unsigned int ka,
+        polymat b, unsigned int kb)
+{
+    polymat cc;
+    polymat_init(cc, c->m, c->n, 1);
+    polymat_mulmat(ab,cc,0,a,ka,b,kb);
+    polymat_addmat(ab,c,kc,c,kc,cc,0);
+    polymat_clear(cc);
 }
 
 void polymat_mul(abdst_field ab, polymat c, polymat a, polymat b)
@@ -210,17 +304,25 @@ void polymat_mp(abdst_field ab, polymat c, polymat a, polymat b)
  * respectively. The coefficients of the result (their number is
  * MAX(na,nb)-MIN(na,nb) + 1) are put at offset xc within c
  */
-void polymat_mp_raw(abdst_field ab,
+void polymat_mp_raw_basecase(abdst_field ab,
         polymat c, unsigned int xc,
         polymat a, unsigned int xa, unsigned int na,
-        polymat b, unsigned int xb, unsigned int nb)
+        polymat b, unsigned int xb, unsigned int nb,
+        int transpose, int add)
 {
+    // printf("mp_basecase(%d,%d)%c\n",na,nb,transpose?'T':' ');
     unsigned int s0 = MIN(na, nb) - 1;
     unsigned int s1 = MAX(na, nb);
     polymat_ur cx;
-    ASSERT_ALWAYS(a->n == b->m);
-    ASSERT_ALWAYS(c->m == a->m);
-    ASSERT_ALWAYS(c->n == b->n);
+    if (!transpose) {
+        ASSERT_ALWAYS(a->n == b->m);
+        ASSERT_ALWAYS(c->m == a->m);
+        ASSERT_ALWAYS(c->n == b->n);
+    } else {
+        ASSERT_ALWAYS(b->n == a->m);
+        ASSERT_ALWAYS(c->m == b->m);
+        ASSERT_ALWAYS(c->n == a->n);
+    }
     ASSERT_ALWAYS(c->alloc >= s1 - s0);
 
     polymat_ur_init(cx, c->m, c->n, 1);
@@ -228,8 +330,6 @@ void polymat_mp_raw(abdst_field ab,
     abelt_ur_init(ab, &tmp_ur);
     ASSERT_ALWAYS(s1 - s0 == MAX(na, nb) - MIN(na, nb) + 1);
     for(unsigned int s = s0 ; s < s1 ; s++) {
-        polymat_ur_zero(cx);
-        cx->size = 1;
         unsigned int t0 = 0;
         unsigned int t1 = MIN(na, nb);
         if (nb < na) {
@@ -243,31 +343,222 @@ void polymat_mp_raw(abdst_field ab,
         ASSERT_ALWAYS(s >= t0);
         ASSERT_ALWAYS(s >= (t1-1));
         // printf("Coefficient of degree %u in product\n", xa + xb + s);
+        polymat_ur_zero(cx);
+        cx->size = 1;
         for(unsigned int t = t0 ; t < t1 ; t++) {
             unsigned int u = s - t;
             // printf("a%u * b%u\n", xa + t, xb + u);
-            for(unsigned int i = 0 ; i < a->m ; i++) {
-                for(unsigned int j = 0 ; j < b->n ; j++) {
-                    for(unsigned int k = 0 ; k < a->n ; k++) {
-                        abmul_ur(ab, tmp_ur,
-                                polymat_coeff(a, i, k, xa + t),
-                                polymat_coeff(b, k, j, xb + u));
-                        abelt_ur_add(ab,
-                                polymat_ur_coeff(cx, i, j, 0),
-                                polymat_ur_coeff(cx, i, j, 0),
-                                tmp_ur);
-                    }
-                }
+            if (!transpose) {
+                polymat_addmulmat_ur(ab, cx, 0, a, xa + t, b, xb + u);
+            } else {
+                polymat_addmulmat_ur(ab, cx, 0, b, xb + u, a, xa + t);
             }
         }
-        for(unsigned int i = 0 ; i < a->m ; i++) {
-            for(unsigned int j = 0 ; j < b->n ; j++) {
-                abreduce(ab, 
-                        polymat_coeff(c, i, j, xc + s - s0),
-                        polymat_ur_coeff(cx, i, j, 0));
-            }
+        if (!add) {
+            polymat_reducemat(ab, c, xc + s - s0, cx, 0);
+        } else {
+            polymat cc;
+            polymat_init(cc, c->m, c->n, 1);
+            polymat_reducemat(ab, cc, 0, cx, 0);
+            polymat_addmat(ab, c, xc + s - s0, c, xc + s - s0, cc, 0);
+            polymat_clear(cc);
         }
     }
     polymat_ur_clear(cx);
     abelt_ur_clear(ab, &tmp_ur);
+}
+
+void polymat_mp_raw_kara(abdst_field ab,
+        polymat c, unsigned int xc,
+        polymat a, unsigned int xa, unsigned int na,
+        polymat b, unsigned int xb, unsigned int nb,
+        int transpose, int add)
+{
+    // printf("mp_kara(%d,%d)%c\n",na,nb,transpose?'T':' ');
+    if (MIN(na, nb) < MIDDLE_PRODUCT_KARA_THRESHOLD) {
+        polymat_mp_raw_basecase(ab, c, xc, a, xa, na, b, xb, nb, transpose, add);
+        return;
+    }
+    if (nb < na) {
+        polymat_mp_raw_kara(ab, c, xc, b, xb, nb, a, xa, na, !transpose, add);
+    }
+    /* This code works __only__ for kara-sized middle products */
+    ASSERT_ALWAYS(nb == 2*na - 1);
+    unsigned int m0 = na / 2;
+    unsigned int m1 = na - m0;
+    /* Spans of different chunks, in (offset, length) format */
+    unsigned int span_a0[2] =  {xa,        m0};
+    unsigned int span_a1[2] =  {xa+m0,     m1};
+    unsigned int span_b0[2] =  {xb,      2*m1-1};
+    unsigned int span_b10[2] = {xb+m1,   2*m0-1};
+    unsigned int span_b11[2] = {xb+m1,   2*m1-1};
+    unsigned int span_b2[2] =  {xb+2*m1, 2*m0-1};
+    /* Dammit, we need some temp storage, of course */
+    polymat q0, q1, q2, s, t;
+    /* The polymats s and t are used to build temporaries, respectively
+     * from a and b, of respective maximum lengths m1 and 2*m1-1 */
+    /* q0 is MP(a1, b0+b11), i.e. MP(m1, 2*m1-1), which
+     * produces m1 coefficients */
+    /* TODO: one can afford _not_ allocating q0, and update c directly */
+    polymat_init(q0, c->m, c->n, m1);
+    polymat_init(t, b->m, b->n, 2*m1-1);
+    for(unsigned int k = 0 ; k < 2*m1 - 1 ; k++) {
+        polymat_addmat(ab, t, k, b, span_b0[0] + k, b, span_b11[0] + k);
+    }
+    polymat_mp_raw_kara(ab, q0, 0,
+            a, span_a1[0], span_a1[1],
+            t, 0, 2*m1-1,
+            transpose, 0);
+    polymat_clear(t);
+    /* q1 is MP(a1-a0, b11), i.e. MP(m1, 2*m1-1) again */
+    polymat_init(q1, c->m, c->n, m1);
+    polymat_init(s, a->m, a->n, m1);
+    bwmat_copy_coeffs(ab,
+            polymat_part(s,0,0,0),1,
+            polymat_part(a,0,0,span_a1[0]),1,
+            m1*a->m*a->n);
+    for(unsigned int k = 0 ; k < m0 ; k++) {
+        /* We've already copied the a1 coefficients above */
+        polymat_submat(ab,
+                s, k + m1 - m0,
+                s, k + m1 - m0,
+                a, span_a0[0] + k);
+    }
+    polymat_mp_raw_kara(ab, q1, 0,
+            s, 0, m1,
+            b, span_b11[0], span_b11[1],
+            transpose, 0);
+    polymat_clear(s);
+    /* q2 is MP(a0, b10+b2), i.e. MP(m0, 2*m0-1) */
+    /* TODO: one can afford _not_ allocating q2, and update c directly */
+    polymat_init(q2, c->m, c->n, m1);
+    polymat_init(t, b->m, b->n, 2*m0-1);
+    for(unsigned int k = 0 ; k < 2*m0 - 1 ; k++) {
+        polymat_addmat(ab, t, k, b, span_b10[0] + k, b, span_b2[0] + k);
+    }
+    polymat_mp_raw_kara(ab, q2, 0,
+            a, span_a0[0], span_a0[1],
+            t, 0, 2*m0-1,
+            transpose, 0);
+    polymat_clear(t);
+
+    /* We now have to append the coefficients to form the result. Not all
+     * coefficients in q1 are read for the high part of the middle
+     * product. */
+    if (!add) {
+        for(unsigned int k = 0 ; k < m1 ; k++) {
+            polymat_submat(ab, c, xc + k, q0, k, q1, k);
+        }
+        for(unsigned int k = 0 ; k < m0 ; k++) {
+            polymat_addmat(ab, c, xc + m1 + k, q2, k, q1, k);
+        }
+    } else {
+        for(unsigned int k = 0 ; k < m1 ; k++) {
+            polymat_addmat(ab, c, xc + k, c, xc + k, q0, k);
+            polymat_submat(ab, c, xc + k, c, xc + k, q1, k);
+        }
+        for(unsigned int k = 0 ; k < m0 ; k++) {
+            polymat_addmat(ab, c, xc + m1 + k, c, xc + m1 + k, q2, k);
+            polymat_addmat(ab, c, xc + m1 + k, c, xc + m1 + k, q1, k);
+        }
+    }
+    polymat_clear(q0);
+    polymat_clear(q1);
+    polymat_clear(q2);
+}
+
+void polymat_mp_raw_subdivide(abdst_field ab,
+        polymat c, unsigned int xc,
+        polymat a, unsigned int xa, unsigned int na,
+        polymat b, unsigned int xb, unsigned int nb,
+        int transpose, int add)
+{
+    // printf("mp_subdivide(%d,%d)%c\n",na,nb,transpose?'T':' ');
+    /* TODO. Presently the strategy below uses only areas of balanced
+     * size (karatsuba-friendly). This is possibly inefficient, if for
+     * example nb/na on input is classically close to a ratio which is
+     * much different. In block Wiedemann for example, nb/na is typically
+     * 1+2n/m, which may well be 3 for instance if m=n=1. In such a case,
+     * the present code will reduce our mp to 2*3 = 6 balanced middle
+     * products.
+     *
+     * Other options could be to rely on e.g. a polymat_mp_raw_toom24,
+     * which would use the following operations to fall back on only 5
+     * balanced middle products:
+     *
+     * Formulae for MP(2k, 6k)-> 3k
+     *  t0 = 1/2*(2*x0 - x1 - 2*x2 + x3)*y1
+     *  t1 = 1/6*(y0 - y1)*(2*x1 - 3*x2 + x3)
+     *  t2 = (2*x1 - x2 - 2*x3 + x4)*y0
+     *  t3 = 1/2*(y0 + y1)*(2*x1 + x2 - x3)
+     *  t4 = -1/6*(x1 - x3)*(2*y0 + y1)
+     *  z0 = t0 + t1 + t3 + t4
+     *  z1 = -t1 + t3 + 2*t4
+     *  z2 = t1 + t3 + 4*t4
+     *  z3 = -t1 + t2 + t3 + 8*t4
+     *
+     * Another option, slightly less efficient, uses a
+     * polymat_mp_raw_toom23 to fall back on balanced middle products in
+     * 2 recursion steps. The used formulae, which absorb a ratio nb/na
+     * close to 2.5, are as follows:
+     *
+     * Formulae for MP(2k, 5k)-> 3k
+     *  t0 (x0 - x2)*y1
+     *  t1 1/2*(x1 - x2)*(y0 - y1)
+     *  t2 -(x1 - x3)*y0
+     *  t3 1/2*(x1 + x2)*(y0 + y1)
+     *  z0 t0 + t1 + t3
+     *  z1 -t1 + t3
+     *  z2 t1 + t2 + t3
+     *
+     * The different options, for reaching balanced products of size
+     * k/4,2*(k/4) from something of size k,3k are:
+     *  - as we do here: Karatsuba twice, two steps: 2*3*3=18M
+     *  - using toom24, followed by Karatsuba: 5*3=15M
+     *  - using toom23 twice: 4*4=16M.
+     */
+    if (!na || !nb) {
+        return;
+    }
+    if (MIN(na, nb) < MIDDLE_PRODUCT_SUBDIVIDE_THRESHOLD) {
+        polymat_mp_raw_basecase(ab, c, xc, a, xa, na, b, xb, nb, transpose, add);
+        return;
+    }
+    if (nb < na) {
+        polymat_mp_raw_subdivide(ab, c, xc, b, xb, nb, a, xa, na, !transpose, add);
+        return;
+    }
+    ASSERT(nb >= na);
+    for( ; nb >= 2 * na - 1 ; ) {
+        polymat_mp_raw_kara(ab, c, xc,
+                a, xa, na, b, xb, 2*na-1, transpose, add);
+        xb += na;
+        xc += na;
+        nb -= na;
+    }
+    if (nb < na) {
+        /* This condition also catches the Karatsuba case n, 2n-1 */
+        return;
+    }
+    // printf("mp_subdivide_tail(%d,%d)%c\n",na,nb,transpose?'T':' ');
+    ASSERT_ALWAYS(nb >= na);
+    /* Fixup needed, now. Treat the largest possible subblock. We want
+     * the intervals [0,na-k[ and [k, nb[ to match a kara scheme, i.e.
+     * have the constraints 0<=k<=na, and nb-k = 2*(na-k)-1, i.e. k =
+     * 2*na-1-nb.  By assumption, the expression above, with nb>=na,
+     * guarantees that the first condition 0<=k<=na is satisfied.
+     */
+    unsigned int chop = 2*na-1-nb;
+    polymat_mp_raw_kara(ab, c, xc,
+            a, xa, na - chop, b, xb + chop, nb - chop, transpose, add);
+    polymat_mp_raw_subdivide(ab, c, xc,
+            a, xa + na - chop, chop, b, xb, na - 1, transpose, 1);
+}
+
+void polymat_mp_raw(abdst_field ab,
+        polymat c, unsigned int xc,
+        polymat a, unsigned int xa, unsigned int na,
+        polymat b, unsigned int xb, unsigned int nb)
+{
+    polymat_mp_raw_subdivide(ab, c, xc, a, xa, na, b, xb, nb, 0, 0);
 }
