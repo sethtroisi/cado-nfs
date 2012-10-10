@@ -64,7 +64,6 @@
 #include <sys/time.h>
 #include <fcntl.h>
 #include <math.h>
-#include "macros.h"
 
 #define MAXNAME 1024
 #define MAX_THREADS 128
