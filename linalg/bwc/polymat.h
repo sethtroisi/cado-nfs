@@ -55,7 +55,8 @@ void polymat_mp_raw(abdst_field ab,
         polymat a,
         unsigned int xa, unsigned int na,
         polymat b,
-        unsigned int xb, unsigned int nb);
+        unsigned int xb, unsigned int nb,
+        int transpose, int add);
 
 #ifdef __cplusplus
 }

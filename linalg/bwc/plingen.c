@@ -730,7 +730,7 @@ static int bw_lingen_recursive(bmstatus_ptr bm, polymat pi, polymat E, unsigned 
     polymat_mp_raw(ab,
             E_right, 0,
             E, E_i0, E_i1 - E_i0,
-            pi_left, 0, pi_left->size);
+            pi_left, 0, pi_left->size, 0, 0);
     bm->t_mp += seconds();
 
     polymat pi_right;
