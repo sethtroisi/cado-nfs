@@ -5,8 +5,6 @@
 #include "bit_vector.h"
 #include "macros.h"
 
-typedef uint64_t bv_t;
-
 void bit_vector_init(bit_vector_ptr b, size_t n)
 {
     b->p = malloc(iceildiv(n, BV_BITS) * sizeof(bv_t));
