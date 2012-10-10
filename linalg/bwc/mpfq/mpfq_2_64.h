@@ -73,12 +73,6 @@ typedef struct {
   unsigned int size;
 } mpfq_2_64_poly_struct;
 typedef mpfq_2_64_poly_struct mpfq_2_64_poly [1];
-typedef struct {
-  mpfq_2_64_poly c00;
-  mpfq_2_64_poly c01;
-  mpfq_2_64_poly c10;
-  mpfq_2_64_poly c11;
-} mpfq_2_64_polymat;
 typedef mpfq_2_64_poly_struct * mpfq_2_64_dst_poly;
 typedef mpfq_2_64_poly_struct * mpfq_2_64_src_poly;
 
@@ -322,8 +316,8 @@ void mpfq_2_64_poly_mul(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, mpfq_2_64_src_p
 void mpfq_2_64_poly_divmod(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, mpfq_2_64_dst_poly, mpfq_2_64_src_poly, mpfq_2_64_src_poly);
 void mpfq_2_64_poly_precomp_mod(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, mpfq_2_64_src_poly);
 void mpfq_2_64_poly_mod_pre(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, mpfq_2_64_src_poly, mpfq_2_64_src_poly, mpfq_2_64_src_poly);
-void mpfq_2_64_poly_gcd(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, mpfq_2_64_src_poly, mpfq_2_64_src_poly);
-void mpfq_2_64_poly_xgcd(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, mpfq_2_64_dst_poly, mpfq_2_64_dst_poly, mpfq_2_64_src_poly, mpfq_2_64_src_poly);
+/* missing poly_gcd */
+/* missing poly_xgcd */
 static inline
 void mpfq_2_64_poly_random(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, unsigned int);
 #define HAVE_mpfq_2_64_poly_random2

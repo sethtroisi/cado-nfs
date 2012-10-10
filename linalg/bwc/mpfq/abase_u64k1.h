@@ -30,23 +30,27 @@
 /* Active handler: io */
 /* Active handler: trivialities */
 /* Active handler: simd_flat */
-/* Options used: k=1 tag=u64k1 vbase_stuff={
+/* Options used: w=64 k=1 tag=u64k1 vbase_stuff={
                  'vc:includes' => [
                                     '<stdarg.h>'
                                   ],
                  'member_templates_restrict' => {
+                                                  'p_1' => [
+                                                             'p_1'
+                                                           ],
+                                                  'p_4' => [
+                                                             'p_4'
+                                                           ],
                                                   'u64k2' => [
                                                                'u64k1',
                                                                'u64k2'
                                                              ],
-                                                  'p16' => [
-                                                             'p16'
-                                                           ],
                                                   'u64k1' => $vbase_stuff->{'member_templates_restrict'}{'u64k2'}
                                                 },
                  'families' => [
-                                 $vbase_stuff->{'member_templates_restrict'}{'u64k2'},
-                                 $vbase_stuff->{'member_templates_restrict'}{'p16'}
+                                 $vbase_stuff->{'member_templates_restrict'}{'p_4'},
+                                 $vbase_stuff->{'member_templates_restrict'}{'p_1'},
+                                 $vbase_stuff->{'member_templates_restrict'}{'u64k2'}
                                ],
                  'choose_byfeatures' => sub { "DUMMY" }
                };
@@ -209,9 +213,11 @@ void abase_u64k1_add(abase_u64k1_dst_field, abase_u64k1_dst_elt, abase_u64k1_src
 /* missing is_sqr */
 /* missing sqrt */
 /* missing pow */
+/* missing frobenius */
 /* missing add_ui */
 /* missing sub_ui */
 /* missing mul_ui */
+/* missing inv */
 
 /* Operations involving unreduced elements */
 /* *Mpfq::defaults::flatdata::code_for_elt_ur_init, simd_flat */

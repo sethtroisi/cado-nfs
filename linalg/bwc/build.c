@@ -19,7 +19,7 @@ int main(int argc, char * argv[])
 {
     abase_vbase xx;
     abase_vbase_oo_field_init_byfeatures(xx,
-                /* MPFQ_PRIME, (2 as mpz), */ /* this is by default I
+                /* MPFQ_PRIME_MPZ, (2 as mpz), */ /* this is by default I
                                                  think */
                 MPFQ_GROUPSIZE, 64,
                 MPFQ_DONE);

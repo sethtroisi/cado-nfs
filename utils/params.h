@@ -28,12 +28,12 @@ struct param_list_alias_s {
 
 typedef struct param_list_alias_s param_list_alias[1];
 
-struct param_list_knob_s {
-    char * knob;
+struct param_list_switch_s {
+    char * switchname;
     int * ptr;
 };
 
-typedef struct param_list_knob_s param_list_knob[1];
+typedef struct param_list_switch_s param_list_switch[1];
 
 struct param_list_s {
     unsigned int alloc;
@@ -43,9 +43,9 @@ struct param_list_s {
     param_list_alias * aliases;
     int naliases;
     int naliases_alloc;
-    param_list_knob * knobs;
-    int nknobs;
-    int nknobs_alloc;
+    param_list_switch * switches;
+    int nswitches;
+    int nswitches_alloc;
     /* We use this to remember the first command line pointer which have
      * been given to us */
     int cmdline_argc0;
@@ -74,7 +74,7 @@ extern int param_list_read_file(param_list pl, const char * name);
 
 // sees whether the arguments pointed to by argv[0] and (possibly)
 // argv[1] correspond to either -<key> <value>, --<key> <value> or
-// <key>=<value> ; configured knobs and aliases for the param list are
+// <key>=<value> ; configured switches and aliases for the param list are
 // also checked.
 extern int param_list_update_cmdline(param_list pl,
         int * p_argc, char *** p_argv);
@@ -102,7 +102,7 @@ extern int param_list_parse_intxint(param_list pl, const char * key, int * r);
 extern int param_list_parse_int_and_int(param_list pl, const char * key, int * r, const char * sep);
 extern int param_list_parse_int_list(param_list pl, const char * key, int * r, size_t n, const char * sep);
 extern int param_list_parse_size_t(param_list pl, const char * key, size_t * r);
-extern int param_list_parse_knob(param_list pl, const char * key);
+extern int param_list_parse_switch(param_list pl, const char * key);
 
 extern const char * param_list_lookup_string(param_list pl, const char * key);
 
@@ -115,9 +115,9 @@ extern void param_list_save(param_list pl, const char * filename);
 // 42).
 extern int param_list_configure_alias(param_list pl, const char * key, const char * alias);
 
-// A knob is a command-line argument which sets a value by its mere
+// A switch is a command-line argument which sets a value by its mere
 // presence. Could be for instance --verbose, or --use-smart-algorithm
-extern int param_list_configure_knob(param_list pl, const char * key, int * ptr);
+extern int param_list_configure_switch(param_list pl, const char * key, int * ptr);
 
 // tells whether everything has been consumed. Otherwise, return the key
 // of the first unconsumed argument.

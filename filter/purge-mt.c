@@ -461,7 +461,7 @@ main (int argc, char **argv)
     param_list pl;
     param_list_init(pl);
 
-    param_list_configure_knob(pl, "raw", &raw);
+    param_list_configure_switch(pl, "raw", &raw);
 
     argv++,argc--;
 

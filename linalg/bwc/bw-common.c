@@ -50,7 +50,7 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     }
 
     (*p_argv)++, (*p_argc)--;
-    param_list_configure_knob(pl, "-v", &bw->verbose);
+    param_list_configure_switch(pl, "-v", &bw->verbose);
     for( ; (*p_argc) ; ) {
         if (param_list_update_cmdline(pl, p_argc, p_argv)) { continue; }
         if (strcmp((*p_argv)[0],"--") == 0) {
@@ -188,6 +188,7 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
     param_list_lookup_string(pl, "export_cachelist");
     param_list_lookup_string(pl, "sanity_check_vector");
 
+    param_list_lookup_string(pl, "prime");
     return 0;
 }
 

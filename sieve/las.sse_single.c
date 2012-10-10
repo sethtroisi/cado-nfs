@@ -3767,10 +3767,10 @@ main (int argc0, char *argv0[])
     param_list pl;
     param_list_init(pl);
     cado_poly_init (cpoly);
-    param_list_configure_knob(pl, "-v", &verbose);
-    param_list_configure_knob(pl, "-ratq", &ratq);
-    param_list_configure_knob(pl, "-bench", &bench);
-    param_list_configure_knob(pl, "-bench2", &bench2);
+    param_list_configure_switch(pl, "-v", &verbose);
+    param_list_configure_switch(pl, "-ratq", &ratq);
+    param_list_configure_switch(pl, "-bench", &bench);
+    param_list_configure_switch(pl, "-bench2", &bench2);
     argv++, argc--;
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }

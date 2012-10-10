@@ -20,23 +20,27 @@ static int abase_u64k1_impl_mpi_use_count;   /* several stacked init()/clear() p
 /* Active handler: io */
 /* Active handler: trivialities */
 /* Active handler: simd_flat */
-/* Options used: k=1 tag=u64k1 vbase_stuff={
+/* Options used: w=64 k=1 tag=u64k1 vbase_stuff={
                  'vc:includes' => [
                                     '<stdarg.h>'
                                   ],
                  'member_templates_restrict' => {
+                                                  'p_1' => [
+                                                             'p_1'
+                                                           ],
+                                                  'p_4' => [
+                                                             'p_4'
+                                                           ],
                                                   'u64k2' => [
                                                                'u64k1',
                                                                'u64k2'
                                                              ],
-                                                  'p16' => [
-                                                             'p16'
-                                                           ],
                                                   'u64k1' => $vbase_stuff->{'member_templates_restrict'}{'u64k2'}
                                                 },
                  'families' => [
-                                 $vbase_stuff->{'member_templates_restrict'}{'u64k2'},
-                                 $vbase_stuff->{'member_templates_restrict'}{'p16'}
+                                 $vbase_stuff->{'member_templates_restrict'}{'p_4'},
+                                 $vbase_stuff->{'member_templates_restrict'}{'p_1'},
+                                 $vbase_stuff->{'member_templates_restrict'}{'u64k2'}
                                ],
                  'choose_byfeatures' => sub { "DUMMY" }
                };
@@ -136,7 +140,7 @@ void abase_u64k1_field_specify(abase_u64k1_dst_field K MAYBE_UNUSED, unsigned lo
 {
         if (tag == MPFQ_GROUPSIZE) {
             assert(*(int*)x == 64);
-        } else if (tag == MPFQ_PRIME) {
+        } else if (tag == MPFQ_PRIME_MPZ) {
             assert(mpz_cmp_ui((mpz_srcptr)x, 2) == 0);
         } else {
             fprintf(stderr, "Unsupported field_specify tag %ld\n", tag);
@@ -162,9 +166,11 @@ void abase_u64k1_field_specify(abase_u64k1_dst_field K MAYBE_UNUSED, unsigned lo
 /* missing is_sqr */
 /* missing sqrt */
 /* missing pow */
+/* missing frobenius */
 /* missing add_ui */
 /* missing sub_ui */
 /* missing mul_ui */
+/* missing inv */
 
 /* Operations involving unreduced elements */
 /* missing elt_ur_set_ui */
@@ -1034,9 +1040,11 @@ void abase_u64k1_oo_field_init(abase_vbase_ptr vbase)
     /* missing is_sqr */
     /* missing sqrt */
     /* missing pow */
+    /* missing frobenius */
     /* missing add_ui */
     /* missing sub_ui */
     /* missing mul_ui */
+    /* missing inv */
     vbase->elt_ur_init = (void (*) (abase_vbase_ptr, void *)) abase_u64k1_wrapper_elt_ur_init;
     vbase->elt_ur_clear = (void (*) (abase_vbase_ptr, void *)) abase_u64k1_wrapper_elt_ur_clear;
     vbase->elt_ur_set = (void (*) (abase_vbase_ptr, void *, const void *)) abase_u64k1_wrapper_elt_ur_set;

@@ -138,8 +138,8 @@ static void sieve_info_init(sieve_info_ptr si, param_list pl)
     param_list_print_command_line(si->output, pl);
     las_display_config_flags(si->output);
 
-    si->verbose = param_list_parse_knob(pl, "-v");
-    si->ratq = param_list_parse_knob(pl, "-ratq");
+    si->verbose = param_list_parse_switch(pl, "-v");
+    si->ratq = param_list_parse_switch(pl, "-ratq");
     si->nb_threads = 1;		/* default value */
     param_list_parse_int(pl, "mt", &si->nb_threads);
     if (si->nb_threads <= 0) {
@@ -2058,10 +2058,10 @@ main (int argc0, char *argv0[])
     param_list pl;
     param_list_init(pl);
 
-    param_list_configure_knob(pl, "-v", &si->verbose);
-    param_list_configure_knob(pl, "-ratq", &si->ratq);
-    param_list_configure_knob(pl, "-bench", &bench);
-    param_list_configure_knob(pl, "-bench2", &bench2);
+    param_list_configure_switch(pl, "-v", &si->verbose);
+    param_list_configure_switch(pl, "-ratq", &si->ratq);
+    param_list_configure_switch(pl, "-bench", &bench);
+    param_list_configure_switch(pl, "-bench2", &bench2);
     param_list_configure_alias(pl, "-skew", "-S");
 
     argv++, argc--;

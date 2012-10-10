@@ -3,7 +3,7 @@
 #include "xdotprod.h"
 #include "bw-common.h"
 
-void x_dotprod(matmul_top_data_ptr mmt, uint32_t * xv, unsigned int nx, mmt_vec_ptr v, unsigned int z0, unsigned int m)
+void x_dotprod(matmul_top_data_ptr mmt, uint32_t * xv, unsigned int nx, mmt_vec_ptr v, unsigned int z0, unsigned int m, int sign)
 {
     /* We're reading from the shared right vector data -- this area is
      * written to by the other threads in the column. Some of them might
@@ -13,7 +13,7 @@ void x_dotprod(matmul_top_data_ptr mmt, uint32_t * xv, unsigned int nx, mmt_vec_
         serialize_threads(mmt->pi->wr[bw->dir]);
     } else {
         /* I presume that no locking is needed here. But it's unchecked
-         */
+        */
         // ASSERT_ALWAYS(0);
     }
 
@@ -34,9 +34,15 @@ void x_dotprod(matmul_top_data_ptr mmt, uint32_t * xv, unsigned int nx, mmt_vec_
              */
             if (i < hi0 || i >= hi1)
                 continue;
-            v->abase->add(v->abase,
-                    where, where,
-                    SUBVEC(mmt->wr[bw->dir]->v, v, i - vi0));
+            if (sign > 0) {
+                v->abase->add(v->abase,
+                        where, where,
+                        SUBVEC(mmt->wr[bw->dir]->v, v, i - vi0));
+            } else {
+                v->abase->sub(v->abase,
+                        where, where,
+                        SUBVEC(mmt->wr[bw->dir]->v, v, i - vi0));
+            }
         }
     }
 }

@@ -245,9 +245,9 @@ int main(int argc, char * argv[])
     /* {{{ */
     param_list_init(ba->pl);
     argv++,argc--;
-    param_list_configure_knob(ba->pl, "--transpose", &ba->transpose);
-    param_list_configure_knob(ba->pl, "--rebuild", &ba->rebuild);
-    param_list_configure_knob(ba->pl, "--nocheck", &nocheck);
+    param_list_configure_switch(ba->pl, "--transpose", &ba->transpose);
+    param_list_configure_switch(ba->pl, "--rebuild", &ba->rebuild);
+    param_list_configure_switch(ba->pl, "--nocheck", &nocheck);
     param_list_configure_alias(ba->pl, "--transpose", "-t");
     param_list_configure_alias(ba->pl, "--rebuild", "-r");
 
@@ -328,7 +328,7 @@ int main(int argc, char * argv[])
      * setting nbys is pointless.
      */
     abase_vbase_oo_field_init_byfeatures(A,
-                MPFQ_PRIME, ba->prime,
+                MPFQ_PRIME_MPZ, ba->prime,
                 MPFQ_GROUPSIZE, nbys,
                 MPFQ_DONE);
 
