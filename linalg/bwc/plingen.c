@@ -1413,6 +1413,7 @@ int main(int argc, char *argv[])
 {
     bmstatus bm;
     dims * d = bm->d;
+    int tune = 0;
 
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
@@ -1421,6 +1422,7 @@ int main(int argc, char *argv[])
     param_list pl;
     param_list_init(pl);
 
+    param_list_configure_switch(pl, "--tune", &tune);
     bw_common_init(bw, pl, &argc, &argv);
 
     const char * afile = param_list_lookup_string(pl, "afile");
@@ -1433,7 +1435,7 @@ int main(int argc, char *argv[])
 	fprintf(stderr, "no n value set\n");
 	exit(1);
     }
-    if (!afile) {
+    if (!tune && !afile) {
         fprintf(stderr, "No afile provided\n");
         exit(1);
     }
@@ -1463,6 +1465,76 @@ int main(int argc, char *argv[])
     if (param_list_warn_unused(pl))
 	usage();
     /* }}} */
+
+    int tune_bm_basecase = tune;
+    int tune_mp = tune;
+
+    if (tune_bm_basecase) {
+        unsigned int maxtune = 1000;
+        for(unsigned int k = 10 ; k < maxtune ; k += k/10) {
+            unsigned int * delta = malloc((m + n) * sizeof(unsigned int));
+            polymat E, pi;
+            polymat_init(pi, 0, 0, 0);
+            polymat_init(E, m, m+n, maxtune);
+            E->size = k;
+            for(unsigned int v = 0 ; v < E->m * E->n * E->size ; v++) {
+                abrandom(ab, E->x[v]);
+            }
+            double tt = seconds();
+            for(unsigned int j = 0 ; j < m + n ; delta[j++]=1);
+            bm->t = 1;
+            bw_lingen_basecase(bm, pi, E, delta);
+            printf("%zu %.2e\n", E->size, (seconds()-tt) / (k * k));
+            polymat_clear(pi);
+            polymat_clear(E);
+            free(delta);
+        }
+    }
+
+    if (tune_mp) {
+        /* Now for benching mp and plain mul */
+        unsigned int maxtune = 10000;
+        for(unsigned int k = 10 ; k < maxtune ; k+= k/10) {
+            polymat E, piL, piR, pi, Er;
+            unsigned int sE = k*(m+2*n)/(m+n);
+            unsigned int spi = k*m/(m+n);
+            polymat_init(E, m, m+n, sE);
+            polymat_init(piL, m+n, m+n, spi);
+            polymat_init(piR, m+n, m+n, spi);
+            polymat_init(pi, m+n, m+n, spi*2);
+            polymat_init(Er, m, m+n, sE-spi+1);
+            E->size = sE;
+            for(unsigned int v = 0 ; v < E->m * E->n * E->size ; v++) {
+                abrandom(ab, E->x[v]);
+            }
+            piL->size = spi;
+            piR->size = spi;
+            for(unsigned int v = 0 ; v < piL->m * piL->n * piL->size ; v++) {
+                abrandom(ab, piL->x[v]);
+                abrandom(ab, piR->x[v]);
+            }
+            double ttmp = 0, ttmul = 0;
+            ttmp -= seconds();
+            polymat_mp(ab, Er, E, piL);
+            ttmp += seconds();
+            ttmul -= seconds();
+            polymat_mul(ab, pi, piL, piR);
+            ttmul += seconds();
+            ttmp /= k*k;
+            ttmul /= k*k;
+            printf("%u %.2e+%.2e = %.2e\n", k, ttmp, ttmul, ttmp + ttmul);
+            // (seconds()-tt) / (k*k)); // ((sE-spi) * spi) / (m*(m+n)*(m+n)));
+            // printf("%zu %.2e\n", E->size, (seconds()-tt) / (k*k)); // (spi * spi) / ((m+n)*(m+n)*(m+n)));
+            polymat_clear(E);
+            polymat_clear(piL);
+            polymat_clear(piR);
+            polymat_clear(pi);
+            polymat_clear(Er);
+        }
+    }
+
+    if (tune)
+        return 0;
 
     unsigned int (*fdesc)[2];
 
