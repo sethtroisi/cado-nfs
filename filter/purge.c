@@ -194,25 +194,30 @@ static const unsigned char nbbits[256] = {
 */
 static const struct timespec wait_classical = { 0, 1<<21 };
 
-/* I'm sure there is a bug here.
-   HR_T is the type need to numerate the primes OR
-   the type need to numerate the relations numbers ?
-*/
+#define NB_RATP_OPT (12)
+#define NB_ALGP_OPT (19)
+#define NB_HK_OPT (NB_RATP_OPT + NB_ALGP_OPT - 4)
 typedef struct {
   HR_T *hk;          /* The renumbers of primes in the rel. */
   relation_t rel;    /* Relation itself */
-  HR_T num;          /* Relation number */
   unsigned int lhk;  /* Actual number of hk */
   unsigned int mhk;  /* Size max of the local hk; after free + malloc again */
   unsigned int ltmp; /* Size of renumbers for rel_compact */
+  HR_T num;          /* Relation number */
 } buf_rel_t;
 static buf_rel_t *buf_rel;
+
+typedef struct {
+  rat_prime_t rp[NB_RATP_OPT];
+  alg_prime_t ap[NB_ALGP_OPT];
+  HR_T hk[NB_HK_OPT];
+} buf_rel_data_t;
+static buf_rel_data_t *buf_rel_data;
 
 /* For the multithread sync */
 static volatile unsigned long cpt_rel_a;
 static volatile unsigned long cpt_rel_b;
 static volatile unsigned int end_insertRelation = 0;
-
 
 /* Be careful. 1<<13 = 8µs; in fact, about 30-50 µs at least
    with a very reactive machine. Use for debugging only.
@@ -620,7 +625,7 @@ delete_relation (HR_T i)
     ASSERT(*o);
     if (*o < UMAX(*o) && !(--(*o))) newnprimes--;
   }
-  rel_compact[i] = NULL;
+  /* rel_compact[i] = NULL; */
   bit_vector_clearbit(rel_used, (size_t) i);
 }
 
@@ -808,7 +813,7 @@ onepass_thread_singleton_removal (ti_t *mti)
 	    if (*o < UMAX(*o) && !__sync_sub_and_fetch(o, 1))
 	      (mti->sup_npri)++;
 	  }
-	  rel_compact[i] = NULL;
+	  /* rel_compact[i] = NULL; */
 	  rel_used->p[i>>LN2_BV_BITS] &= ~j;
  	  (mti->sup_nrel)++;
 	  break;
@@ -1113,22 +1118,22 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j, int passtwo)
 	      goto next_rat;
 	    }
 	  }
-	if ((unsigned int) mybufrel->rel.nb_rp_alloc <= k) {
-	  if (!mybufrel->rel.nb_rp_alloc)
-	    mybufrel->rel.nb_rp_alloc = 7;
-	  else {
-	    ASSERT(mybufrel->rel.nb_rp_alloc != UMAX(mybufrel->rel.nb_rp_alloc));
-	    mybufrel->rel.nb_rp_alloc = (mybufrel->rel.nb_rp_alloc<<1) + 1;
+	if (mybufrel->rel.nb_rp_alloc == k) {
+	  mybufrel->rel.nb_rp_alloc += mybufrel->rel.nb_rp_alloc >> 1;
+	  if (k == NB_RATP_OPT) {
+	    rat_prime_t *p = mybufrel->rel.rp;
+	    SMALLOC(mybufrel->rel.rp, mybufrel->rel.nb_rp_alloc, "relation_stream_get_fast 1");
+	    memcpy (mybufrel->rel.rp, p, NB_RATP_OPT * sizeof(rat_prime_t));
 	  }
-	  mybufrel->rel.rp = (rat_prime_t *)
-	    realloc (mybufrel->rel.rp, mybufrel->rel.nb_rp_alloc * sizeof(rat_prime_t));
+	  else
+	    mybufrel->rel.rp = (rat_prime_t *)
+	      realloc (mybufrel->rel.rp, mybufrel->rel.nb_rp_alloc * sizeof(rat_prime_t));
 	}
 	mybufrel->rel.rp[k++] = (rat_prime_t) { .p = pr, .e = 1};
 	/*
       }
 	*/
     }
-    ASSERT(k <= UMAX(mybufrel->rel.nb_rp));
     mybufrel->rel.nb_rp = k;
     
     for ( k = 0 ; ; ) {
@@ -1157,14 +1162,14 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j, int passtwo)
 		goto next_alg;
 	      }
 	  }
-	if (mybufrel->rel.nb_ap_alloc <= k)
-	  {
-	    if (!mybufrel->rel.nb_ap_alloc)
-	      mybufrel->rel.nb_ap_alloc = 15;
-	    else {
-	      ASSERT(mybufrel->rel.nb_ap_alloc != UMAX(mybufrel->rel.nb_ap_alloc));
-	      mybufrel->rel.nb_ap_alloc = (mybufrel->rel.nb_ap_alloc<<1) + 1;
-	    }
+	if (mybufrel->rel.nb_ap_alloc == k) {
+	  mybufrel->rel.nb_ap_alloc += mybufrel->rel.nb_ap_alloc >> 1;
+	  if (k == NB_ALGP_OPT) {
+	    alg_prime_t *p = mybufrel->rel.ap;
+	    SMALLOC(mybufrel->rel.ap, mybufrel->rel.nb_ap_alloc, "relation_stream_get_fast 2");
+	    memcpy (mybufrel->rel.ap, p, NB_ALGP_OPT * sizeof(alg_prime_t));
+	  }
+	  else
 	    mybufrel->rel.ap = (alg_prime_t *)
 	      realloc (mybufrel->rel.ap, mybufrel->rel.nb_ap_alloc * sizeof(alg_prime_t));
 	  }
@@ -1173,7 +1178,6 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j, int passtwo)
 	}
 	*/
     }
-    ASSERT(k <= UMAX(mybufrel->rel.nb_ap));
     mybufrel->rel.nb_ap = k;
     
     if (mybufrel->rel.b > 0) 
@@ -1329,15 +1333,13 @@ printrel() {
 }
 
 static HR_T *buf_rel_new_hk(unsigned int j, unsigned int t) {
-   if (buf_rel[j].mhk < t) {
-     SFREE(buf_rel[j].hk);
-     t = t; /* For avoid a spurious warning in gcc... */
-     SMALLOC(buf_rel[j].hk, t, "buf_rel_new_hk");
-     buf_rel[j].mhk = t;
-   }
-   return(buf_rel[j].hk);
+  if (buf_rel[j].mhk < t) {
+    if (buf_rel[j].mhk != NB_HK_OPT) SFREE(buf_rel[j].hk);
+    buf_rel[j].mhk = t;
+    SMALLOC(buf_rel[j].hk, buf_rel[j].mhk, "buf_rel_new_hk");
+  }
+  return(buf_rel[j].hk);
 }
-
 
 static void threadfindroot(fr_t *mfr) {
   HR_T *phk;
@@ -1501,8 +1503,18 @@ prempt_scan_relations_pass_one ()
 
   memset (fr, 0, (1<<NFR) * sizeof(*fr));
   end_insertRelation = 0;
+
   SMALLOC (buf_rel, T_REL, "prempt_scan_relations_pass_one 1");
   MEMSETZERO(buf_rel, T_REL);
+  SMALLOC (buf_rel_data, T_REL, "prempt_scan_relations_pass_one 2");
+  for (i = T_REL; i--; ) {
+    buf_rel[i].rel.rp = buf_rel_data[i].rp;
+    buf_rel[i].rel.nb_rp_alloc = NB_RATP_OPT;
+    buf_rel[i].rel.ap = buf_rel_data[i].ap;
+    buf_rel[i].rel.nb_ap_alloc = NB_ALGP_OPT;
+    buf_rel[i].hk = buf_rel_data[i].hk;
+    buf_rel[i].mhk = NB_HK_OPT;
+  }    
 
   cpt_rel_a = cpt_rel_b = 0;
   cpy_cpt_rel_a = cpt_rel_a;
@@ -1513,7 +1525,7 @@ prempt_scan_relations_pass_one ()
   
   prempt_data->files = prempt_open_compressed_rs (rep_cado, fic);
   
-  SMALLOC (prempt_data->buf, PREMPT_BUF, "prempt_scan_relations_pass_one 2");
+  SMALLOC (prempt_data->buf, PREMPT_BUF, "prempt_scan_relations_pass_one 3");
   pmin = prempt_data->buf;
   pminlessone = pmin - 1;
   prempt_data->pcons = pmin;
@@ -1693,12 +1705,13 @@ prempt_scan_relations_pass_one ()
   free (prempt_data->buf);
   for (ff = prempt_data->files; *ff; free(*ff++));
   free (prempt_data->files);
-  for (i = T_REL ; i ; ) {
-    free(buf_rel[--i].rel.rp);
-    free(buf_rel[i].rel.ap);
+  for (i = T_REL; i-- ; ) {
+    if (buf_rel[i].rel.nb_rp_alloc != NB_RATP_OPT ) SFREE(buf_rel[i].rel.rp);
+    if (buf_rel[i].rel.nb_ap_alloc != NB_ALGP_OPT)  SFREE(buf_rel[i].rel.ap);
+    if (buf_rel[i].mhk             != NB_HK_OPT   ) SFREE(buf_rel[i].hk);
   }
-  free (buf_rel);
-  buf_rel = NULL;
+  SFREE (buf_rel);
+  SFREE (buf_rel_data);
 
   relation_stream_trigger_disp_progress(rs);
   fprintf (stderr, "End of read: %lu relations in %.1fs -- %.1f MB/s -- %.1f rels/s\n",
@@ -1752,8 +1765,19 @@ prempt_scan_relations_pass_two (const char *oname,
   fprintf (stderr, "Final pass:\n");
   MEMSETZERO(fr, 1<<NFR);
   end_insertRelation = 0;
+
   SMALLOC(buf_rel, T_REL, "prempt_scan_relations_pass_two 1");
   MEMSETZERO(buf_rel, T_REL);
+  SMALLOC (buf_rel_data, T_REL, "prempt_scan_relations_pass_one 2");
+  for (i = T_REL; i--; ) {
+    buf_rel[i].rel.rp = buf_rel_data[i].rp;
+    buf_rel[i].rel.nb_rp_alloc = NB_RATP_OPT;
+    buf_rel[i].rel.ap = buf_rel_data[i].ap;
+    buf_rel[i].rel.nb_ap_alloc = NB_ALGP_OPT;
+    buf_rel[i].hk = buf_rel_data[i].hk;
+    buf_rel[i].mhk = NB_HK_OPT;
+  }    
+
   cpt_rel_a = cpt_rel_b = 0;
   cpy_cpt_rel_a = cpt_rel_a;
   relation_stream_init (rs);
@@ -1761,7 +1785,8 @@ prempt_scan_relations_pass_two (const char *oname,
   length_line = 0;
 
   prempt_data->files = prempt_open_compressed_rs (rep_cado, fic);
-  SMALLOC(prempt_data->buf, PREMPT_BUF, "prempt_scan_relations_pass_two 2");
+
+  SMALLOC(prempt_data->buf, PREMPT_BUF, "prempt_scan_relations_pass_two 3");
   pmin = prempt_data->buf;
   pminlessone = pmin - 1;
   prempt_data->pcons = pmin;
@@ -1921,12 +1946,13 @@ prempt_scan_relations_pass_two (const char *oname,
   free (prempt_data->buf);
   for (f = prempt_data->files; *f; free(*f++));
   free (prempt_data->files);
-  for (i = T_REL ; i ; ) {
-    free(buf_rel[--i].rel.rp);
-    free(buf_rel[i].rel.ap);
+  for (i = T_REL; i-- ; ) {
+    if (buf_rel[i].rel.nb_rp_alloc != NB_RATP_OPT ) SFREE(buf_rel[i].rel.rp);
+    if (buf_rel[i].rel.nb_ap_alloc != NB_ALGP_OPT)  SFREE(buf_rel[i].rel.ap);
+    if (buf_rel[i].mhk             != NB_HK_OPT   ) SFREE(buf_rel[i].hk);
   }
-  free (buf_rel);
-  buf_rel = NULL;
+  SFREE (buf_rel);
+  SFREE (buf_rel_data);
   
   relation_stream_trigger_disp_progress(rs);
   fprintf (stderr, "End of re-read: %lu relations in %.1fs -- %.1f MB/s -- %.1f rels/s\n",
@@ -2019,7 +2045,7 @@ main (int argc, char **argv)
   int k;
   size_t mysize;
   param_list pl;
- 
+
   set_rep_cado(argv[0]);
   wct0 = wct_seconds ();
   fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
