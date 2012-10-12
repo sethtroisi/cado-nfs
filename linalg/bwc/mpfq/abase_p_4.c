@@ -183,6 +183,8 @@ void abase_p_4_field_specify(abase_p_4_dst_field k, unsigned long dummy MAYBE_UN
             for(i = 0 ; i < 4 ; i++) {
                 k->p[i] = mpz_getlimbn(p, i);
             }
+        } else if (dummy == MPFQ_GROUPSIZE && *(int*)vp == 1) {
+            /* Do nothing, this is an admitted condition */
         } else {
             abort();
         }
