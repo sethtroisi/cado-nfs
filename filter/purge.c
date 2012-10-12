@@ -1961,7 +1961,8 @@ prempt_scan_relations_pass_two (const char *oname,
 
   /* write excess to stdout */
   if (!raw)
-    printf ("NROWS:%lu WEIGHT:%1.0f WEIGHT*NROWS=%1.2e\n", (unsigned long) rs->nrels, W, W * (double) rs->nrels);
+    printf ("NROWS:%lu WEIGHT:%1.0f WEIGHT*NROWS=%1.2e\n",
+                 (unsigned long) nrows, W, W * (double) nrows);
   printf ("EXCESS: %lu\n", ((long) nrows) - ncols);
   fflush (stdout);
 
