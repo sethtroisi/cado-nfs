@@ -420,7 +420,9 @@ void mf_pipe(data_source_ptr input, data_dest_ptr output, const char * name)/*{{
             /* Must make sure the temp buffer is large enough ! */
             ASSERT_ALWAYS(n > 1);
             ptr[0] = ptr[r];
-            n = 1 + input->get(input, &ptr, n-1);
+            uint32_t * nptr = 1 + ptr;
+            n = 1 + input->get(input, &nptr, n-1);
+            ASSERT_ALWAYS(nptr == 1 + ptr);
         } else {
             n = 0;
         }
