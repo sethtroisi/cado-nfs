@@ -95,6 +95,7 @@ struct abase_vbase_s {
     int (*vec_fscan)(abase_vbase_ptr, FILE *, void *, unsigned int *);
     int (*vec_scan)(abase_vbase_ptr, void *, unsigned int *);
     void (*vec_ur_init)(abase_vbase_ptr, void *, unsigned int);
+    void (*vec_ur_set_zero)(abase_vbase_ptr, void *, unsigned int);
     void (*vec_ur_reinit)(abase_vbase_ptr, void *, unsigned int, unsigned int);
     void (*vec_ur_clear)(abase_vbase_ptr, void *, unsigned int);
     void (*vec_ur_set)(abase_vbase_ptr, void *, const void *, unsigned int);
