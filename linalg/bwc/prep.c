@@ -206,11 +206,12 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
     save_x(xvecs, bw->m, my_nx, pi);
 
     matmul_top_clear(mmt);
-    A->oo_field_clear(A);
-
 
     /* clean up xy mats stuff */
     vec_clear_generic(pi->m, xymats, bw->m * prep_lookahead_iterations);
+
+    A->oo_field_clear(A);
+
 
     free(xvecs);
     return NULL;
