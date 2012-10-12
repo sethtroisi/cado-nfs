@@ -73,7 +73,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #endif
 
 #define MAX_FILES 1000000
-#define MAX_STEPS 50   /* maximal number of singleton removal steps */
+#define DEFAULT_NPASS 50
 
 typedef struct {
   volatile unsigned int ok;
@@ -694,7 +694,7 @@ delete_connected_component (HR_T i)
 }
 
 static void
-deleteHeavierRows ()
+deleteHeavierRows (unsigned int npass)
 /* int *nrel, int *nprimes, int nrelmax, int keep)
    &newnrel, &newnprimes, nrelmax, keep */
 {
@@ -712,7 +712,7 @@ deleteHeavierRows ()
   if (newnrel - newnprimes <= keep)
     return;
   if (!count)
-    chunk = (newnrel - newnprimes) / MAX_STEPS;
+    chunk = (newnrel - newnprimes) / npass;
 
   /* first collect sums for primes with weight 2, and compute total weight */
   MEMSETZERO(sum, H.hm);
@@ -723,7 +723,8 @@ deleteHeavierRows ()
       N += 1.0;
       W += rel_weight[i]; /* row weight */
     }
-  fprintf (stderr, "Step %u on %u: Matrix has %1.0f real (non null) rows and weight %1.0f\n", count, MAX_STEPS, N, W);
+  fprintf (stderr, "Step %u on %u: Matrix has %1.0f real (non null) rows "
+                   "and weight %1.0f\n", count, npass, N, W);
   ASSERT_ALWAYS(N == (double) newnrel);
 
   /* now initialize bit table for relations used */
@@ -752,7 +753,7 @@ deleteHeavierRows ()
   /* remove heaviest components, assuming each one decreases the excess by 1;
      we remove only part of the excess at each call of deleteHeavierRows,
      hoping to get "better" components to remove at the next call. */
-  if (++count < MAX_STEPS)
+  if (++count < npass)
     {
       target = ((long) newnrel) - newnprimes - chunk;
       if (((long) target) - keep < 0) target = keep;
@@ -862,7 +863,7 @@ onepass_singleton_parallel_removal (unsigned int nb_thread)
 #endif /* ifdef HAVE_SYNC_FETCH */
 
 static void
-remove_singletons ()
+remove_singletons (unsigned int npass)
 {
   HR_T oldnewnrel = 0, oldtmpnewnrel = 0;
 #if HR == 32
@@ -890,7 +891,7 @@ remove_singletons ()
 		 (double) (oldtmpnewnrel - newnrel) / (double) (oldexcess - excess));
       oldexcess = excess;
       oldtmpnewnrel = newnrel;
-      deleteHeavierRows ();
+      deleteHeavierRows (npass);
     }
     oldnewnrel = newnrel;
 #ifdef HAVE_SYNC_FETCH
@@ -2045,6 +2046,7 @@ main (int argc, char **argv)
   int k;
   size_t mysize;
   param_list pl;
+  unsigned int npass = DEFAULT_NPASS;
 
   set_rep_cado(argv[0]);
   wct0 = wct_seconds ();
@@ -2100,6 +2102,7 @@ main (int argc, char **argv)
       if (!sscanf(snpt, "%u", &npt))
 	usage();
   }
+  param_list_parse_uint(pl, "npass", &npass);
   const char * filelist = param_list_lookup_string(pl, "filelist");
   const char * basepath = param_list_lookup_string(pl, "basepath");
   const char * subdirlist = param_list_lookup_string(pl, "subdirlist");
@@ -2321,7 +2324,7 @@ main (int argc, char **argv)
 	     (unsigned long) nrel, (unsigned long) newnrel, (unsigned long) nprimes, ((long) newnrel) - nprimes);
 
   if (!boutfilerel) {
-    remove_singletons ();
+    remove_singletons (npass);
     fprintf (stderr, "   nrel=%lu, nprimes=%lu; excess=%ld\n",
 	     (unsigned long) nrel, (unsigned long) nprimes, ((long) nrel) - nprimes);
     if (nrel <= nprimes) /* covers case nrel = nprimes = 0 */
