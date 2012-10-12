@@ -74,6 +74,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 
 #define MAX_FILES 1000000
 #define DEFAULT_NPASS 50
+#define DEFAULT_REQUIRED_EXCESS 0.1
 
 typedef struct {
   volatile unsigned int ok;
@@ -863,7 +864,7 @@ onepass_singleton_parallel_removal (unsigned int nb_thread)
 #endif /* ifdef HAVE_SYNC_FETCH */
 
 static void
-remove_singletons (unsigned int npass)
+remove_singletons (unsigned int npass, double required_excess)
 {
   HR_T oldnewnrel = 0, oldtmpnewnrel = 0;
 #if HR == 32
@@ -880,10 +881,11 @@ remove_singletons (unsigned int npass)
   for ( ; newnrel != oldnewnrel || excess > (long) keep ; ) {
     /* delete heavy rows when we have reached a fixed point */
     if (newnrel == oldnewnrel) {
-      /* check we have enough excess initially (at least 10%) */
-      if (count++ == 0 && (double) excess < 0.1 * (double) newnrel)
+      /* check we have enough excess initially (at least required_excess) */
+      if (count++ == 0 && (double) excess < required_excess * (double) newnrel)
         {
-          fprintf(stderr, "#relations <= 1.1 * #ideals\n");
+          fprintf(stderr, "excess < %.2f * #relations. See -required_excess "
+                          "argument.\n", required_excess);
           exit (1);
         }
       if (oldexcess > excess)
@@ -1991,6 +1993,9 @@ usage (void)
   fprintf (stderr, "       -inprel  file_rel_used : load actives relations\n");
   fprintf (stderr, "       -outrel  file_rel_used : write actives relations\n");
   fprintf (stderr, "       -npthr   nnn - threads number for suppress singletons\n");
+  fprintf (stderr, "       -npass   nnn - number of step of clique removal (default %d)\n", DEFAULT_NPASS);
+  fprintf (stderr, "       -required_excess nnn - percentage of excess required at the end of the first singleton removal step (default %.2f)\n",
+  DEFAULT_REQUIRED_EXCESS);
 #ifdef FOR_FFS
   fprintf (stderr, "       -outdel file - output file for deleted relations\n");
 #endif
@@ -2048,6 +2053,7 @@ main (int argc, char **argv)
   size_t mysize;
   param_list pl;
   unsigned int npass = DEFAULT_NPASS;
+  double required_excess = DEFAULT_REQUIRED_EXCESS;
 
   set_rep_cado(argv[0]);
   wct0 = wct_seconds ();
@@ -2104,6 +2110,7 @@ main (int argc, char **argv)
 	usage();
   }
   param_list_parse_uint(pl, "npass", &npass);
+  param_list_parse_double(pl, "required_excess", &required_excess);
   const char * filelist = param_list_lookup_string(pl, "filelist");
   const char * basepath = param_list_lookup_string(pl, "basepath");
   const char * subdirlist = param_list_lookup_string(pl, "subdirlist");
@@ -2325,7 +2332,7 @@ main (int argc, char **argv)
 	     (unsigned long) nrel, (unsigned long) newnrel, (unsigned long) nprimes, ((long) newnrel) - nprimes);
 
   if (!boutfilerel) {
-    remove_singletons (npass);
+    remove_singletons (npass, required_excess);
     fprintf (stderr, "   nrel=%lu, nprimes=%lu; excess=%ld\n",
 	     (unsigned long) nrel, (unsigned long) nprimes, ((long) nrel) - nprimes);
     if (nrel <= nprimes) /* covers case nrel = nprimes = 0 */
