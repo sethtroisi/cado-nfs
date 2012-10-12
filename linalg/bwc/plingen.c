@@ -1265,7 +1265,7 @@ void compute_final_F_red(bmstatus_ptr bm, polymat f, unsigned int (*fdesc)[2], u
 }/*}}}*/
 
 
-void write_f(bmstatus_ptr bm, const char * filename, polymat f_red, unsigned int * delta)/*{{{*/
+void write_f(bmstatus_ptr bm, const char * filename, polymat f_red, unsigned int * delta, int ascii)/*{{{*/
 {
     dims * d = bm->d;
     unsigned int n = d->n;
@@ -1274,15 +1274,25 @@ void write_f(bmstatus_ptr bm, const char * filename, polymat f_red, unsigned int
     DIE_ERRNO_DIAG(f == NULL, "fopen", filename);
     unsigned int maxdelta = get_max_delta_on_solutions(bm, delta);
     unsigned int flen = maxdelta + 1;
-    for(unsigned int k = 0 ; k < flen ; k++) {
-        for(unsigned int i = 0 ; i < n ; i++) {
-            for(unsigned int j = 0 ; j < n ; j++) {
-                if (j) fprintf(f, " ");
-                abfprint(ab, f, polymat_coeff(f_red, i, j, k));
+    if (ascii) {
+        for(unsigned int k = 0 ; k < flen ; k++) {
+            for(unsigned int i = 0 ; i < n ; i++) {
+                for(unsigned int j = 0 ; j < n ; j++) {
+                    if (j) fprintf(f, " ");
+                    abfprint(ab, f, polymat_coeff(f_red, i, j, k));
+                }
+                fprintf(f, "\n");
             }
             fprintf(f, "\n");
         }
-        fprintf(f, "\n");
+    } else {
+        for(unsigned int k = 0 ; k < flen ; k++) {
+            for(unsigned int i = 0 ; i < n ; i++) {
+                for(unsigned int j = 0 ; j < n ; j++) {
+                    fwrite(polymat_coeff(f_red, i, j, k), sizeof(abelt), 1, f);
+                }
+            }
+        }
     }
     fclose(f);
 }/*}}}*/
@@ -1332,7 +1342,7 @@ void compute_initial_E(bmstatus_ptr bm, polymat E, polymat A, unsigned int (*fde
 
 
 void read_data_for_series(bmstatus_ptr bm, polymat A, /* {{{ */
-			  const char *input_file)
+			  const char *input_file, int ascii_input)
 {
     dims * d = bm->d;
     unsigned int m = d->m;
@@ -1346,6 +1356,7 @@ void read_data_for_series(bmstatus_ptr bm, polymat A, /* {{{ */
 
     FILE *f = fopen(input_file, "r");
     DIE_ERRNO_DIAG(f == NULL, "fopen", input_file);
+
     unsigned int k = 0;
     int eof_met = 0;
     for( ; !eof_met ; k++) {
@@ -1361,9 +1372,15 @@ void read_data_for_series(bmstatus_ptr bm, polymat A, /* {{{ */
 	int k1 = k - ! !k;
 	for (unsigned int i = 0; i < m && !eof_met ; i++) {
 	    for (unsigned int j = 0; j < n && !eof_met ; j++) {
-		int rc =
-		    abfscan(ab, f, polymat_coeff(A, i, j, k1));
-		if (rc != 1) {
+		int rc;
+                if (ascii_input) {
+                    rc = abfscan(ab, f, polymat_coeff(A, i, j, k1));
+                    rc = rc == 1;
+                } else {
+                    rc = fread(polymat_coeff(A, i, j, k1), sizeof(abelt), 1, f);
+                    rc = rc == 1;
+                }
+		if (!rc) {
                     if (i == 0 && j == 0) {
                         eof_met = 1;
                         break;
@@ -1414,6 +1431,7 @@ int main(int argc, char *argv[])
     bmstatus bm;
     dims * d = bm->d;
     int tune = 0;
+    int ascii = 0;
 
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
@@ -1423,6 +1441,7 @@ int main(int argc, char *argv[])
     param_list_init(pl);
 
     param_list_configure_switch(pl, "--tune", &tune);
+    param_list_configure_switch(pl, "--ascii", &ascii);
     bw_common_init(bw, pl, &argc, &argv);
 
     const char * afile = param_list_lookup_string(pl, "afile");
@@ -1545,7 +1564,7 @@ int main(int argc, char *argv[])
         polymat A;
         polymat_init(A, 0, 0, 0);
         printf("Reading scalar data in polynomial ``a'' from %s\n", afile);
-        read_data_for_series(bm, A, afile);
+        read_data_for_series(bm, A, afile, ascii);
 
         printf("Read %zu+1=%zu iterations",
                 A->size, A->size+ 1);
@@ -1591,7 +1610,7 @@ int main(int argc, char *argv[])
         char * f_filename;
         int rc = asprintf(&f_filename, "%s.gen", afile);
         ASSERT_ALWAYS(rc >= 0);
-        write_f(bm, f_filename, f_red, delta);
+        write_f(bm, f_filename, f_red, delta, ascii);
         free(f_filename);
         polymat_clear(f_red);
     } else {
