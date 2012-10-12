@@ -666,7 +666,7 @@ compute_connected_component (HR_T i)
 	n += compute_connected_component (k);
     }
     if (H.hc[h] >= 3)
-      w_ccc += (float) 1/H.hc[h];
+      w_ccc += (float) 1.0 / (float) H.hc[h];
     }
   return n;
 }
