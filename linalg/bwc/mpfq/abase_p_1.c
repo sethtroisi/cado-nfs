@@ -1250,6 +1250,12 @@ static void abase_p_1_wrapper_vec_ur_init(abase_vbase_ptr vbase MAYBE_UNUSED, ab
     abase_p_1_vec_ur_init(vbase->obj, v, n);
 }
 
+static void abase_p_1_wrapper_vec_ur_set_zero(abase_vbase_ptr, abase_p_1_dst_vec_ur, unsigned int);
+static void abase_p_1_wrapper_vec_ur_set_zero(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_1_dst_vec_ur r MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    abase_p_1_vec_ur_set_zero(vbase->obj, r, n);
+}
+
 static void abase_p_1_wrapper_vec_ur_reinit(abase_vbase_ptr, abase_p_1_vec_ur *, unsigned int, unsigned int);
 static void abase_p_1_wrapper_vec_ur_reinit(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_1_vec_ur * v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED, unsigned int m MAYBE_UNUSED)
 {
@@ -1501,6 +1507,7 @@ void abase_p_1_oo_field_init(abase_vbase_ptr vbase)
     vbase->vec_fscan = (int (*) (abase_vbase_ptr, FILE *, void *, unsigned int *)) abase_p_1_wrapper_vec_fscan;
     vbase->vec_scan = (int (*) (abase_vbase_ptr, void *, unsigned int *)) abase_p_1_wrapper_vec_scan;
     vbase->vec_ur_init = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_p_1_wrapper_vec_ur_init;
+    vbase->vec_ur_set_zero = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_p_1_wrapper_vec_ur_set_zero;
     vbase->vec_ur_reinit = (void (*) (abase_vbase_ptr, void *, unsigned int, unsigned int)) abase_p_1_wrapper_vec_ur_reinit;
     vbase->vec_ur_clear = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_p_1_wrapper_vec_ur_clear;
     vbase->vec_ur_set = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_p_1_wrapper_vec_ur_set;

@@ -338,6 +338,8 @@ int abase_p_1_vec_fscan(abase_p_1_dst_field, FILE *, abase_p_1_vec *, unsigned i
 /* *Mpfq::defaults::vec::io::code_for_vec_scan, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
 #define abase_p_1_vec_scan(K, w, n)	abase_p_1_vec_fscan(K,stdout,w,n)
 void abase_p_1_vec_ur_init(abase_p_1_dst_field, abase_p_1_vec_ur *, unsigned int);
+static inline
+void abase_p_1_vec_ur_set_zero(abase_p_1_dst_field, abase_p_1_dst_vec_ur, unsigned int);
 void abase_p_1_vec_ur_reinit(abase_p_1_dst_field, abase_p_1_vec_ur *, unsigned int, unsigned int);
 void abase_p_1_vec_ur_clear(abase_p_1_dst_field, abase_p_1_vec_ur *, unsigned int);
 static inline
@@ -1007,6 +1009,13 @@ int abase_p_1_vec_is_zero(abase_p_1_dst_field K MAYBE_UNUSED, abase_p_1_src_vec 
         if (!abase_p_1_is_zero(K,r[i])) return 0;
     }
     return 1;
+}
+
+/* *Mpfq::defaults::vec::flatdata::code_for_vec_ur_set_zero, Mpfq::defaults::flatdata, Mpfq::gfp::elt, Mpfq::gfp */
+static inline
+void abase_p_1_vec_ur_set_zero(abase_p_1_dst_field K MAYBE_UNUSED, abase_p_1_dst_vec_ur r, unsigned int n)
+{
+    memset(r, 0, n*sizeof(abase_p_1_elt_ur));
 }
 
 /* *Mpfq::defaults::vec::flatdata::code_for_vec_ur_set, Mpfq::defaults::flatdata, Mpfq::gfp::elt, Mpfq::gfp */
