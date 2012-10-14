@@ -1268,31 +1268,50 @@ void compute_final_F_red(bmstatus_ptr bm, polymat f, unsigned int (*fdesc)[2], u
 void write_f(bmstatus_ptr bm, const char * filename, polymat f_red, unsigned int * delta, int ascii)/*{{{*/
 {
     dims * d = bm->d;
+    unsigned int m = d->m;
     unsigned int n = d->n;
     abdst_field ab = d->ab;
     FILE * f = fopen(filename, "w");
     DIE_ERRNO_DIAG(f == NULL, "fopen", filename);
     unsigned int maxdelta = get_max_delta_on_solutions(bm, delta);
     unsigned int flen = maxdelta + 1;
+    unsigned int * sols = malloc(n * sizeof(unsigned int));
+    for(unsigned int j = 0, jj=0 ; j < m + n ; j++) {
+        if (bm->lucky[j] <= 0)
+            continue;
+        sols[jj++]=j;
+    }
     if (ascii) {
         for(unsigned int k = 0 ; k < flen ; k++) {
             for(unsigned int i = 0 ; i < n ; i++) {
-                for(unsigned int j = 0 ; j < n ; j++) {
-                    if (j) fprintf(f, " ");
-                    abfprint(ab, f, polymat_coeff(f_red, i, j, k));
+                for(unsigned int jj = 0 ; jj < n ; jj++) {
+                    if (jj) fprintf(f, " ");
+                    unsigned int j = sols[jj];
+                    if (k <= delta[j]) {
+                        abfprint(ab, f, polymat_coeff(f_red, i, jj, delta[j]-k));
+                    } else {
+                        printf("0");
+                    }
                 }
                 fprintf(f, "\n");
             }
             fprintf(f, "\n");
         }
     } else {
+        abelt tmp;
+        abinit(ab, &tmp);
         for(unsigned int k = 0 ; k < flen ; k++) {
             for(unsigned int i = 0 ; i < n ; i++) {
-                for(unsigned int j = 0 ; j < n ; j++) {
-                    fwrite(polymat_coeff(f_red, i, j, k), sizeof(abelt), 1, f);
+                for(unsigned int jj = 0 ; jj < n ; jj++) {
+                    unsigned int j = sols[jj];
+                    abset_zero(ab, tmp);
+                    if (k <= delta[j])
+                        abset(ab, tmp, polymat_coeff(f_red, i, jj, delta[j]-k));
+                    fwrite(tmp, sizeof(abelt), 1, f);
                 }
             }
         }
+        abclear(ab, &tmp);
     }
     fclose(f);
 }/*}}}*/

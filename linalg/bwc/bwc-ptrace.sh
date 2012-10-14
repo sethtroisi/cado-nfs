@@ -7,6 +7,7 @@ top=`dirname $0`/../..
 export DEBUG=1
 # export MPI=1
 make -s -C $top -j 4
+make -s -C $top -j 4 plingen
 eval `make -s -C $top show`
 bins=$top/$build_tree/linalg/bwc
 mats=$HOME/Local/mats
@@ -18,7 +19,7 @@ wdir=/tmp/bwcp
 if [ -d $wdir ] ; then rm -rf $wdir 2>/dev/null ; fi
 mkdir $wdir
 
-mn=1
+m=1 n=1
 
 Mh=1; Mv=1;
 Th=1; Tv=1;
@@ -29,6 +30,7 @@ mpi=${Mh}x${Mv}
 thr=${Th}x${Tv}
 
 prime=65521
+bits_per_coeff=64
 
 # The test matrix may be created by:
 #
@@ -38,11 +40,12 @@ prime=65521
 
 # -c 10 imposes a bound on the coefficients.
 
-$bins/random  100 -c 10 --kright 10 > $mats/t100p.txt
-$bins/mf_scan  --ascii-in --withcoeffs --mfile $mats/t100p.txt  --freq --binary-out --ofile $mats/t100p.bin
+$bins/random  1000 -c 10 --kright 10 > $mats/t1000p.txt
+$bins/mf_scan  --ascii-in --withcoeffs --mfile $mats/t1000p.txt  --freq --binary-out --ofile $mats/t1000p.bin
 
-matrix=$mats/t100p.bin
+matrix=$mats/t1000p.bin
 nullspace=right
+interval=50
 
 
 
@@ -65,7 +68,7 @@ echo "Using balancing file $bfile"
 checksum=${bfile#$wdir/`basename $matrix .bin`.${Nh}x${Nv}.}
 checksum=`basename $checksum .bin`
 
-common="matrix=$matrix mpi=$mpi thr=$thr balancing=$bfile mn=$mn wdir=$wdir prime=$prime mm_impl=basicp"
+common="matrix=$matrix mpi=$mpi thr=$thr balancing=$bfile m=$m n=$n wdir=$wdir prime=$prime mm_impl=basicp"
 if [ "$nullspace" = left ] ; then
     common="$common nullspace=left"
     transpose_if_left="Transpose"
@@ -74,11 +77,11 @@ else
     transpose_if_left=""
 fi
 
-set +e
+set -e
 
 all_splits=0
 j0=0
-while [ $j0 -lt $mn ] ; do
+while [ $j0 -lt $n ] ; do
     let j0=$j0+1
     all_splits=$all_splits,$j0
 done
@@ -88,20 +91,35 @@ done
 # which is used in production.
 $bins/bwc.pl dispatch $common save_submatrices=1 ys=0..1
 
-[ "$?" = 0 ] && $bins/bwc.pl prep   $common
-[ "$?" = 0 ] && $bins/bwc.pl secure  $common interval=10
-[ "$?" = 0 ] && $bins/bwc.pl secure  $common interval=1
+$bins/bwc.pl prep   $common
+$bins/bwc.pl secure  $common interval=$interval
+$bins/bwc.pl secure  $common interval=1
 ln -s Y.0 $wdir/V0-1.0
 # [ "$?" = 0 ] && $bins/bwc.pl :ysplit $common splits=$all_splits
-[ "$?" = 0 ] && $bins/bwc.pl krylov  $common interval=10 end=10 ys=0..1 skip_online_checks=1
-[ "$?" = 0 ] && $bins/bwc.pl krylov  $common interval=1 end=10 ys=0..1 skip_online_checks=1
-[ "$?" = 0 ] && rm -f $wdir/A*
+# [ "$?" = 0 ] && $bins/bwc.pl krylov  $common interval=$interval end=$interval ys=0..1 skip_online_checks=1
+$bins/bwc.pl krylov  $common interval=1 end=$interval ys=0..1 skip_online_checks=1
+rm -f $wdir/A*
 j0=0
-while [ $j0 -lt $mn ] ; do
+while [ $j0 -lt $n ] ; do
     let j1=$j0+1
-    [ "$?" = 0 ] && $bins/bwc.pl krylov  $common interval=10 ys=$j0..$j1
+    $bins/bwc.pl krylov  $common interval=$interval ys=$j0..$j1
     j0=$j1
 done
+
+afile=$($bins/acollect wdir=/tmp/bwcp m=$m n=$n bits-per-coeff=$bits_per_coeff --remove-old | tail -1)
+$bins/plingen lingen-threshold=10 m=$m n=$n wdir=$wdir prime=$prime afile=$afile
+
+ln $wdir/$afile.gen $wdir/F0-$n
+j0=0
+while [ $j0 -lt $n ] ; do
+    let j1=$j0+1
+    $bins/bwc.pl mksol  $common interval=$interval ys=$j0..$j1
+    j0=$j1
+done
+
+$bins/bwc.pl gather  $common interval=$interval || :
+
+
 # [ "$?" = 0 ] && $bins/bwc.pl acollect    $common -- --remove-old
 # 
 # 
@@ -162,18 +180,22 @@ echo "];"
 ) > $mdir/placemats.m
 
 
-$cmd spvector32 < $wdir/Y.0 > $mdir/Y0.m
-$cmd spvector32 < $wdir/V0-1.0 > $mdir/V0.m
-$cmd spvector32 < $wdir/V0-1.1 > $mdir/V1.m
-$cmd spvector32 < $wdir/V0-1.2 > $mdir/V2.m
-$cmd spvector32 < $wdir/V0-1.3 > $mdir/V3.m
-$cmd spvector32 < $wdir/V0-1.4 > $mdir/V4.m
-$cmd spvector32 < $wdir/V0-1.5 > $mdir/V5.m
-$cmd spvector32 < $wdir/V0-1.6 > $mdir/V6.m
-$cmd spvector32 < $wdir/V0-1.7 > $mdir/V7.m
-$cmd spvector32 < $wdir/V0-1.8 > $mdir/V8.m
-$cmd spvector32 < $wdir/V0-1.9 > $mdir/V9.m
-$cmd spvector32 < $wdir/V0-1.10 > $mdir/V10.m
-$cmd spvector32 < $wdir/C.1 > $mdir/C1.m
-$cmd spvector32 < $wdir/C.10 > $mdir/C10.m
+$cmd spvector64 < $wdir/Y.0 > $mdir/Y0.m
+$cmd spvector64 < $wdir/V0-1.0 > $mdir/V0.m
+$cmd spvector64 < $wdir/V0-1.1 > $mdir/V1.m
+$cmd spvector64 < $wdir/V0-1.2 > $mdir/V2.m
+$cmd spvector64 < $wdir/V0-1.3 > $mdir/V3.m
+$cmd spvector64 < $wdir/V0-1.4 > $mdir/V4.m
+$cmd spvector64 < $wdir/V0-1.5 > $mdir/V5.m
+$cmd spvector64 < $wdir/V0-1.6 > $mdir/V6.m
+$cmd spvector64 < $wdir/V0-1.7 > $mdir/V7.m
+$cmd spvector64 < $wdir/V0-1.8 > $mdir/V8.m
+$cmd spvector64 < $wdir/V0-1.9 > $mdir/V9.m
+$cmd spvector64 < $wdir/V0-1.10 > $mdir/V10.m
+$cmd spvector64 < $wdir/C.0 > $mdir/C0.m
+$cmd spvector64 < $wdir/C.1 > $mdir/C1.m
+$cmd spvector64 < $wdir/C.$interval > $mdir/C$interval.m
 $cmd x $wdir/X > $mdir/x.m
+$cmd spvector64 < $wdir/$afile > $mdir/A.m
+$cmd spvector64 < $wdir/F0-$n > $mdir/F0-$n.m
+$cmd spvector64 < $wdir/W > $mdir/W.m
