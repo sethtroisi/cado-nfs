@@ -260,6 +260,8 @@ int mpfq_2_64_vec_fscan(mpfq_2_64_dst_field, FILE *, mpfq_2_64_vec *, unsigned i
 /* *Mpfq::defaults::vec::io::code_for_vec_scan, Mpfq::defaults::vec, Mpfq::defaults */
 #define mpfq_2_64_vec_scan(K, w, n)	mpfq_2_64_vec_fscan(K,stdout,w,n)
 void mpfq_2_64_vec_ur_init(mpfq_2_64_dst_field, mpfq_2_64_vec_ur *, unsigned int);
+static inline
+void mpfq_2_64_vec_ur_set_zero(mpfq_2_64_dst_field, mpfq_2_64_dst_vec_ur, unsigned int);
 void mpfq_2_64_vec_ur_reinit(mpfq_2_64_dst_field, mpfq_2_64_vec_ur *, unsigned int, unsigned int);
 void mpfq_2_64_vec_ur_clear(mpfq_2_64_dst_field, mpfq_2_64_vec_ur *, unsigned int);
 static inline
@@ -1207,6 +1209,13 @@ int mpfq_2_64_vec_is_zero(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_src_vec 
         if (!mpfq_2_64_is_zero(K,r[i])) return 0;
     }
     return 1;
+}
+
+/* *Mpfq::defaults::vec::flatdata::code_for_vec_ur_set_zero, Mpfq::defaults::flatdata, Mpfq::gf2n::trivialities */
+static inline
+void mpfq_2_64_vec_ur_set_zero(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_vec_ur r, unsigned int n)
+{
+    memset(r, 0, n*sizeof(mpfq_2_64_elt_ur));
 }
 
 /* *Mpfq::defaults::vec::flatdata::code_for_vec_ur_set, Mpfq::defaults::flatdata, Mpfq::gf2n::trivialities */

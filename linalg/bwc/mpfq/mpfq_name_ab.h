@@ -157,6 +157,7 @@
 #define abvec_fscan(a0,a1,a2,a3)	abcommon_name_(vec_fscan) (a0,a1,a2,a3)
 #define abvec_scan(a0,a1,a2)	abcommon_name_(vec_scan) (a0,a1,a2)
 #define abvec_ur_init(a0,a1,a2)	abcommon_name_(vec_ur_init) (a0,a1,a2)
+#define abvec_ur_set_zero(a0,a1,a2)	abcommon_name_(vec_ur_set_zero) (a0,a1,a2)
 #define abvec_ur_reinit(a0,a1,a2,a3)	abcommon_name_(vec_ur_reinit) (a0,a1,a2,a3)
 #define abvec_ur_clear(a0,a1,a2)	abcommon_name_(vec_ur_clear) (a0,a1,a2)
 #define abvec_ur_set(a0,a1,a2,a3)	abcommon_name_(vec_ur_set) (a0,a1,a2,a3)
