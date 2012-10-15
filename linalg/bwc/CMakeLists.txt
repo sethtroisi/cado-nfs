@@ -244,7 +244,7 @@ add_executable(plingen EXCLUDE_FROM_ALL
                 bw-common.c
                 plingen.c
                 polymat.c
-                mpfq/abase_p_1.c
+                mpfq/abase_p_4.c
         )
     #               variables.c fft_on_matrices.cpp
     #               ops_poly_integerfft.cpp
@@ -255,6 +255,6 @@ add_executable(plingen EXCLUDE_FROM_ALL
 target_link_libraries(plingen gmp utils)
 
 # Only to play with it for the moment.
-set_target_properties(plingen PROPERTIES COMPILE_FLAGS "-DSELECT_ABASE_p_1")
+set_target_properties(plingen PROPERTIES COMPILE_FLAGS "-DSELECT_ABASE_p_4")
 
 # install(TARGETS plingen RUNTIME DESTINATION bin/linalg/bwc)
