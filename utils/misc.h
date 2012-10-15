@@ -20,7 +20,7 @@ extern "C" {
 #define MEMSETZERO(A,T) memset (A, 0, (T) * sizeof(*(A)))
 #define SMALLOC(A,T,M)							\
   do {									\
-    size_t mysize;								\
+    size_t mysize;							\
     if (!(A = malloc (mysize = (T) * sizeof(*(A))))) {			\
       fprintf (stderr, "%s: malloc error (%lu MB): %s\n",		\
 	       M, mysize>>20, strerror(errno));				\
