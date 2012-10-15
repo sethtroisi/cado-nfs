@@ -93,6 +93,18 @@ sub pad {
     return $str . (" " x $w);
 }
 
+# Takes a reference to a hash and prints its key=value pairs
+sub print_hash {
+  my $h = $_[0];
+  my $s = "{";
+  for my $k (keys %$h) {
+    $s .= "'$k' => '$$h{$k}', ";
+  }
+  $s .= "}\n";
+  print ($s);
+}
+
+
 # Formats a message by inserting an indented prefix in front of each line
 sub format_message {
     my $prefix = ("    " x $tab_level) . shift;
@@ -395,8 +407,7 @@ sub read_machines {
     my $file = shift;
     die "No machine description file was defined.\n" if !$param{'machines'};
     if ( $file ) {
-        open FILE, "< $file"
-            or die "Cannot open `$param{'machines'}' for reading: $!.\n";
+        open FILE, "< $file" or die "Cannot open `$file' for reading: $!.\n";
     } else {
         # read from given location if given as an absolute file,
         # otherwise understand as a location relative to the working
@@ -414,24 +425,29 @@ sub read_machines {
     # There are several steps for checking jobs.
     my $dir_check_commands={};
     while (<FILE>) {
+        # Remove comments and empty lines
         s/^\s+//; s/\s*(#.*)?$//;
         next if /^$/;
 
         if (/^\[(\S+)\]$/) {
+            # If this is a [cluster] line, clear the key=value hash table and init the cluster= entry
             %vars = ( cluster => $1 );
         } elsif (/^(\w+)=(.*)$/) {
             $vars{$1} = $2;
+            # This changes the global parameter 'bindir'
             $param{'bindir'} = $2 if ($1 eq "bindir");
+            # Try to find out if tmpdir= uses absolute path or relative to working dir
             if ($1 eq "tmpdir") {
                     my $wdir = $param{'wdir'};
                     $wdir = abs_path(dirname($wdir))."/".basename($wdir);
                     my $tmpdir = abs_path(dirname($2))."/".basename($2);
-                    die "tmpdir must be different of wdir in parallel mode.\n"
+                    die "tmpdir must be different from wdir in parallel mode.\n"
                             if $wdir eq $tmpdir;
             }
         } elsif (s/^(\S+)\s*//) {
+            # These are settings for one individual slave machine
             my $host = $1;
-            my %desc = %vars;
+            my %desc = %vars; # Init this machine's parameters to the shared settings read so far
             while (s/^(\w+)=(\S*)\s*//) {
                 $desc{$1} = $2;
             }
@@ -454,6 +470,8 @@ sub read_machines {
             $dir_check_commands->{$host}=
                 [ "env " . join(" && ", map { "test -d $_" } @dirs),
                     \@dirs ];
+            # $param{'mpi'} becomes sum of the $desc{'mpi'} for all slaves, 
+            # $param{'hosts'} becomes list of MPI slaves with multiplicity
             while ( $desc{'mpi'} ) {
                     $desc{'mpi'}--;
                     $param{'mpi'}++;
@@ -472,12 +490,27 @@ sub read_machines {
 
     my $res = parallel_remote_cmd($dir_check_commands);
 
-    for my $k (keys %$res) {
-        if ($res->{$k}->{'status'}) {
-            my @dirs = @{$dir_check_commands->{$k}->[1]};
-            die "One of the directories " .
-                join(" ", @dirs) .
-                " does not exist on $k.\n"
+    for my $host (keys %$res) {
+        if ($verbose > 2) {
+            print ("Result of parallel_remote_cmd on $host:\n");
+            print_hash ($res->{$host});
+        }
+
+        my $tries = 0; 
+        while ($res->{$host}->{'status'} != 0) {
+            if ($res->{$host}->{'status'} == 1) {
+                # The test -d command returns 1 if a directory doesn't exist
+                my @dirs = @{$dir_check_commands->{$host}->[1]};
+                die "One of the directories " .
+                    join(" ", @dirs) .
+                    " does not exist on $host.\n"
+            } elsif ($res->{$host}->{'status'} == 255) {
+                die "Could not connect to $host after $tries tries. Terminating.\n" if (++$tries > 2);
+                warn ("Connecting to $host failed, retrying...\n");
+                $res->{$host} = remote_cmd($host, $dir_check_commands->{$host}->[0]);
+            } else {
+                die "Directory check on $host gave unexpected return code $res->{$host}->{'status'}, exiting\n";
+            }
         }
     }
 
@@ -675,8 +708,9 @@ sub remote_cmd {
 # 1024-epsilon sub-jobs are a no-go here.
 sub parallel_remote_cmd {
     my $h = shift(@_);
-    my $res = {};
-    my $kids={};
+    my $res = {}; # Hash hostname => {status => $status>>8, out => stdout, signal => something}
+
+    my $kids = {}; # Spawned child processes pid => (hostname, filehandle, stdout)
     # Start jobs.
     for my $k (keys %$h) {
         my $fh;
@@ -688,7 +722,9 @@ sub parallel_remote_cmd {
         } else {
             info "Running $cmd on $k\n" if $verbose > 1;
             my $x=remote_cmd($k, $cmd);
-            print $x->{'out'};
+            print ("parallel_remote_cmd(): stdout from $k: $x->{'out'}\n") if ($verbose > 2);
+            print ("parallel_remote_cmd(): stderr from $k: $x->{'err'}\n") if ($verbose > 2);
+            print ("parallel_remote_cmd(): exit code for $k: $x->{'status'}\n") if ($verbose > 2);
             exit $x->{'status'};
         }
     }
@@ -699,12 +735,15 @@ sub parallel_remote_cmd {
         my $rin='';
         my $ein='';
         my ($rout, $eout);
+        # Build bit vector of the file handles to query for select() call
         for my $pid (keys %$kids) {
             my $fh=$kids->{$pid}->[1];
             vec($rin, fileno($fh), 1) = 1;
             vec($ein, fileno($fh), 1) = 1;
         }
         my $timeout = 10.0;
+        # Wait for any file handle to become ready to read, or an exception, 
+        # or a timeout
         my ($nfound,$timeleft) = select($rout=$rin, undef, $eout=$ein, $timeout);
         if (!$nfound) {
             info "Select() loop returned with no FDs after $timeout s\n";
