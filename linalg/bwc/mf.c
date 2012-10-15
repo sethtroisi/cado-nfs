@@ -203,6 +203,8 @@ void matrix_read_pass(
                         if (withcoeffs) {
                             /* XXX Can probably be more tolerant on how
                              * coeffs are presented */
+                            int sp = fgetc(m_in->f);
+                            ASSERT_ALWAYS(sp == ' ' || sp == ':');
                             rc = fscanf(m_in->f, "%" SCNd32, (int32_t *) &c);
                             if (rc == EOF) abort_unexpected_eof();
                         }
@@ -252,6 +254,8 @@ void matrix_read_pass(
                     rc = fscanf(m_in->f, "%" SCNu32, &c);
                     if (rc == EOF) abort_unexpected_eof();
                     if (withcoeffs) {
+                        int sp = fgetc(m_in->f);
+                        ASSERT_ALWAYS(sp == ' ' || sp == ':');
                         rc = fscanf(m_in->f, "%" SCNd32, (int32_t*) &coeff);
                         if (rc == EOF) abort_unexpected_eof();
                     }
