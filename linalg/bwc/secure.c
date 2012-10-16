@@ -22,7 +22,7 @@ static void xvec_to_vec(matmul_top_data_ptr mmt, uint32_t * gxvecs, int m, unsig
     abase_vbase_ptr A = mcol->v->abase;
     if (!shared || picol->trank == 0) {
         A->vec_set_zero(A, mcol->v->v, mcol->i1 - mcol->i0);
-        for(int j = 0 ; j < MIN(NCHECKS_CHECK_VECTOR, m) ; j++) {
+        for(int j = 0 ; j < m ; j++) {
             for(unsigned int k = 0 ; k < nx ; k++) {
                 uint32_t i = gxvecs[j*nx+k];
                 // set bit j of entry i to 1.
@@ -101,13 +101,15 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     flags[bw->dir] = 0;
 
 
+    int withcoeffs = param_list_lookup_string(pl, "prime") != NULL;
+    int nchecks = withcoeffs ? NCHECKS_CHECK_VECTOR_GFp : NCHECKS_CHECK_VECTOR_GF2;
     mpz_t p;
     mpz_init_set_ui(p, 2);
     param_list_parse_mpz(pl, "prime", p);
     abase_vbase A;
     abase_vbase_oo_field_init_byfeatures(A, 
-            MPFQ_PRIME, p,
-            MPFQ_GROUPSIZE, NCHECKS_CHECK_VECTOR,
+            MPFQ_PRIME_MPZ, p,
+            MPFQ_GROUPSIZE, nchecks,
             MPFQ_DONE);
     mpz_clear(p);
 
@@ -131,10 +133,10 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
 
     load_x(&gxvecs, bw->m, &nx, mmt->pi);
 
-    xvec_to_vec(mmt, gxvecs, bw->m, nx, !bw->dir);
+    xvec_to_vec(mmt, gxvecs, MIN(nchecks, bw->m), nx, !bw->dir);
 
     /*
-    for(int j = 0 ; j < NCHECKS_CHECK_VECTOR ; j++) {
+    for(int j = 0 ; j < nchecks ; j++) {
         for(unsigned int k = 0 ; k < nx ; k++) {
             uint32_t i = gxvecs[j*nx+k];
             // set bit j of entry i to 1.

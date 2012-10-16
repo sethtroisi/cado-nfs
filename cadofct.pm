@@ -22,9 +22,8 @@
 # 02110-1301, USA.
 
 package cadofct;
-use Exporter;
-our @ISA= qw(Exporter);
-our @EXPORT=qw(%param $tab_level &read_machines &read_param &do_polysel_bench
+use parent qw(Exporter);
+our @EXPORT=qw(%param $tab_level &read_machines &parse_param &do_polysel_bench
 &do_sieve_bench &do_factbase &do_init &do_task &banner &info &last_line
 &format_dhms);
 
@@ -44,12 +43,16 @@ use IPC::Open3;
 # Failing to load ioctl.ph is mostly harmless. It just prevents us from
 # detaching the controlling tty, which is a measure meant to forbid any
 # attempt of interaction between ssh and the ``user''.
-eval q{local $SIG{__WARN__}=sub{}; require "sys/ioctl.ph"};
-my $can_use_tiocnotty=1;
-if ($@) {
-    $can_use_tiocnotty=0;
+# If the shell environment variable CADO_KEEPTTY is defined, we do not
+# detach, as doing so interferes with debugging in DDD
+my $can_use_tiocnotty;
+if (! defined $ENV{CADO_KEEPTTY}) {
+    eval q{local $SIG{__WARN__}=sub{}; require "sys/ioctl.ph"};
+    $can_use_tiocnotty=1;
+    if ($@) {
+        $can_use_tiocnotty=0;
+    }
 }
-
 
 ###############################################################################
 # Message and error handling ##################################################
@@ -60,14 +63,19 @@ our $tab_level = 0;
 
 # Should we use colors (for terminal output) or not?
 my $use_colors = defined $ENV{CADO_COLOR} ? $ENV{CADO_COLOR} : 1;
+my $CSI = "\033["; # ANSI Control Sequence Introducer
+my %colors = (normal => "${CSI}01;00m",
+              red => "${CSI}01;31m",
+              green => "${CSI}01;32m",
+              magenta => "${CSI}01;35m");
 
-# Terminal width
+# Terminal width. Use Term::ReadKey GetTerminalSize() ?
 my $term_cols = 80;
 
 # Whether to show output.
 my $verbose = 0;
 
-# Whether to show output.
+# Whether to assume yes to all confirmations
 my $assume_yes = 0;
 
 # Whether to replace ``remote'' accesses to localhost by localhost.
@@ -85,12 +93,30 @@ sub pad {
     return $str . (" " x $w);
 }
 
+# Takes a reference to a hash and prints its key=value pairs
+sub print_hash {
+  my $h = $_[0];
+  my $s = "{";
+  for my $k (keys %$h) {
+    $s .= "'$k' => '$$h{$k}', ";
+  }
+  $s .= "}\n";
+  print ($s);
+}
+
+
 # Formats a message by inserting an indented prefix in front of each line
 sub format_message {
     my $prefix = ("    " x $tab_level) . shift;
     my $prefix_raw = $prefix;
 
-    $prefix_raw =~ s/\033\[[^m]*m//g;
+    # Remove ANSI color codes from string
+    # We need to escape the "[" character in the CSI to make a regex pattern
+    my $escape = $CSI;
+    $escape =~ s/\[/\\\[/g;
+    my $match = $escape . "[^m]*m";
+
+    $prefix_raw =~ s/$match//g;
     $prefix = $prefix_raw unless $use_colors;
 
     my @msg;
@@ -120,7 +146,7 @@ my $log_fh;     # filehandle for logging.
 # Message function
 sub info {
     my $text=shift;
-    print STDERR format_message("\033[01;32mInfo\033[01;00m:", $text);
+    print STDERR format_message("$colors{green}Info$colors{normal}:", $text);
     print $log_fh format_message("Info:", $text) if defined($log_fh);
 }
 
@@ -134,7 +160,7 @@ sub banner {
 $SIG{__WARN__} = sub {
     my $text=shift;
     print $log_fh format_message("Warning:", $text) if defined($log_fh);
-    warn         format_message("\033[01;35mWarning\033[01;00m:", $text);
+    warn         format_message("$colors{magenta}Warning$colors{normal}:", $text);
 };
 
 # Error hook
@@ -142,7 +168,7 @@ $SIG{__DIE__}  = sub {
     die @_ if $^S;
     my $text=shift;
     print $log_fh format_message("Error:", $text) if defined($log_fh);
-    die          format_message("\033[01;31mError\033[01;00m:", $text);
+    die          format_message("$colors{red}Error$colors{normal}:", $text);
 };
 
 ###############################################################################
@@ -153,6 +179,7 @@ $SIG{__DIE__}  = sub {
 # This list gives:
 #  - the preferred ordering for parameters;
 #  - the default values (if any).
+# This is stored as an array, not a hash, to preserve the preferred ordering
 my @default_param = (
     # global
     wdir         => undef,
@@ -237,105 +264,82 @@ my @default_param = (
 );
 
 # Hash for the parameters, global to avoid passing it to each function
-our %param = @default_param; # initialize to default values
+our %param;
 
 # Build the ordered list of parameters
 my @param_list;
 
-while (@default_param) {
-    push @param_list, shift @default_param;
-    shift @default_param;
+for (my $i = 0; $i < @default_param; $i += 2) {
+    push @param_list, $default_param[$i];
 }
 
 
+# Merge second hash into first hash. Value of a key in first hash remains 
+# unchanged in case of collision
+sub merge_hash {
+  die unless ref $_[0] eq 'HASH' && ref $_[1] eq 'HASH';
+  for (keys %{$_[1]}) {
+    $_[0]->{$_} = $_[1]->{$_} if !exists $_[0]->{$_};
+  }
+}
+
+
+# Parse command line switches that are not permitted in config files
+# We set parsed switches to the empty string to hide them from the
+# parameter parser
+sub parse_options () {
+  foreach (@ARGV) {
+      if (/^-v$/) { $verbose++; $_ = ""; }
+      if (/^-y$/) { $assume_yes='y'; $_ = ""; }
+      if (/^-l$/) { $assume_yes='l'; $_ = ""; }
+  }
+}
 
 # Parses command-line and configuration file parameters.
 # The second parameter is a hash of options:
 #  - `strict' specifies whether the checking should be strict or not
 #             (i.e. die in case of parsing errors)
-sub read_param {
-    my ($param, $opt) = (shift, shift);
-    my $count_args = 0;
 
-    my %files_read = ();
-
-    @_ = map { [$_, 0, 'cmdline'] } @_;
-
-    ARGS : while (defined ($_ = shift)) {
-        die unless ref $_ eq 'ARRAY';
-        my $secondary = $_->[1];
-        my $origin = $_->[2];
-        $_=$_->[0];
-        if (/^-v$/) { $verbose++; next; }
-        if (/^-y$/) { $assume_yes='y'; next; }
-        if (/^-l$/) { $assume_yes='l'; next; }
-        next if $files_read{$_};
-        $files_read{$_}=1;
-        if (-d $_) {
-            info "interpreting directory $_ as wdir=$_";
-            $_ = "wdir=$_";
-        }
-        for my $p (@param_list) {
-            if (/^$p=(.*)$/) {
-                my $v=$1;
-                if ($secondary && $p =~ /^(wdir)$/) {
-                    if (!defined($param->{$p}) || $param->{$p} ne $v) {
-                        warn "$_ ignored in secondary input file\n";
-                    }
-                    next ARGS;
-                }
-                if ($secondary && defined($param->{$p}) && $param->{$p} ne $v) {
-                    die "parameter $p from $origin clashes with value defined earlier from other config files";
-                    # We may also warn, provided we make a choice for who
-                    # wins. Presently early wins. late wins would be:
-                    # $param->{$p} = $v;
-                    # $count_args++;
-		    # WARNING: if a factorization is restarted, we don't want
-		    # to just issue a warning if some parameters are changed
-		    # on the command line!!!
-                    next ARGS;
-                }
-
-                $param->{$p} = $v;
-                $count_args++;
-                my $f;
-                if ($p eq 'wdir') {
-                    $f = "$1/param";
-                } elsif ($p eq 'name' && defined($param->{'wdir'})) {
-                    $f = "$param->{'wdir'}/$param->{'name'}.param";
-                }
-                if (defined($f) && -f $f && !$files_read{$f}) {
-                    $count_args--;
-                    info "Reading extra parameters from $f\n";
-                    unshift @_, [$f,1,$origin]
-                }
-                next ARGS;
-            }
-        }
-        if (/^params?=(.*)$/) {
-            # die "Paramfile must be the first argument !\n" if ($count_args);
-            my $file = $1;
-            open FILE, "< $file"
-                or die "Cannot open `$file' for reading: $!.\n";
-            my @args;
-            while (<FILE>) {
-                s/^\s+//; s/\s*(#.*)?$//;
-                next if /^$/;
-                if (/^(\w+)=(.*)$/) {
-                    push @args, "$1=$2";
-                    next;
-                }
-                die "Cannot parse line `$_' in file `$file'.\n"
-                    if $opt->{'strict'};
-            }
-            close FILE;
-            unshift @_, map { [$_,$secondary, $file] } @args;
-        } elsif (-f $_) {
-            unshift @_, [ "param=$_", $secondary, $origin ];
-        } else {
-            die "Unknown argument: `$_'.\n" if $opt->{'strict'};
-        }
+sub parse_param {
+  my ($param_ref, $opt_ref, $line_ref, $source_name) = @_; 
+  # The parameters to be parsed now as lines of text in an array
+  # Parameters for the parsing, e.g., "strict=1"
+  # Reference to hash of previous parameter values
+  # Name of the source of parameters, e.g., "command line", or a file name
+  
+  my %sub_param;
+  
+  foreach (@{$line_ref}) {
+    s/^\s+//; # Remove empty lines and comments
+    s/\s*(#.*)?$//;
+    next if /^$/;
+    if (! /^(\w+)=(.*)$/) {
+      die "Cannot parse option `$_' in $source_name.\n"
+          if $opt_ref->{'strict'};
     }
+    
+    if ($1 eq "param" || $1 eq "params") {
+      open(my $FILE, $2) or die "Could not open parameter file $2";
+      my @slurp = <$FILE>;
+      close ($FILE);
+      parse_param (\%sub_param, $opt_ref, \@slurp, "file $2");
+    } else {
+      die "Key $1 not recognized in line $_\n" 
+        if grep ($_ eq $1, @param_list) == 0;
+      die "Parameter $1=$2 from $source_name was previously defined with " .
+          "different value $param_ref->{$1}\n"
+        if (exists $param_ref->{$1} && $2 ne $param_ref->{$1});
+      $param_ref->{$1} = $2;
+    }
+  }
+
+  merge_hash ($param_ref, \%sub_param);
+}
+
+
+sub check_param {
+    my $param = shift;
+    my $opt = shift;
 
     # sanity check: old config files may still have true/false values
     while (my ($k, $v) = each %$param) {
@@ -381,6 +385,7 @@ sub read_param {
     }
 }
 
+
 # Dumps the list of parameters to a file
 sub write_param {
     my ($file) = @_;
@@ -402,8 +407,7 @@ sub read_machines {
     my $file = shift;
     die "No machine description file was defined.\n" if !$param{'machines'};
     if ( $file ) {
-        open FILE, "< $file"
-            or die "Cannot open `$param{'machines'}' for reading: $!.\n";
+        open FILE, "< $file" or die "Cannot open `$file' for reading: $!.\n";
     } else {
         # read from given location if given as an absolute file,
         # otherwise understand as a location relative to the working
@@ -421,24 +425,29 @@ sub read_machines {
     # There are several steps for checking jobs.
     my $dir_check_commands={};
     while (<FILE>) {
+        # Remove comments and empty lines
         s/^\s+//; s/\s*(#.*)?$//;
         next if /^$/;
 
         if (/^\[(\S+)\]$/) {
+            # If this is a [cluster] line, clear the key=value hash table and init the cluster= entry
             %vars = ( cluster => $1 );
         } elsif (/^(\w+)=(.*)$/) {
             $vars{$1} = $2;
+            # This changes the global parameter 'bindir'
             $param{'bindir'} = $2 if ($1 eq "bindir");
+            # Try to find out if tmpdir= uses absolute path or relative to working dir
             if ($1 eq "tmpdir") {
                     my $wdir = $param{'wdir'};
                     $wdir = abs_path(dirname($wdir))."/".basename($wdir);
                     my $tmpdir = abs_path(dirname($2))."/".basename($2);
-                    die "tmpdir must be different of wdir in parallel mode.\n"
+                    die "tmpdir must be different from wdir in parallel mode.\n"
                             if $wdir eq $tmpdir;
             }
         } elsif (s/^(\S+)\s*//) {
+            # These are settings for one individual slave machine
             my $host = $1;
-            my %desc = %vars;
+            my %desc = %vars; # Init this machine's parameters to the shared settings read so far
             while (s/^(\w+)=(\S*)\s*//) {
                 $desc{$1} = $2;
             }
@@ -461,6 +470,8 @@ sub read_machines {
             $dir_check_commands->{$host}=
                 [ "env " . join(" && ", map { "test -d $_" } @dirs),
                     \@dirs ];
+            # $param{'mpi'} becomes sum of the $desc{'mpi'} for all slaves, 
+            # $param{'hosts'} becomes list of MPI slaves with multiplicity
             while ( $desc{'mpi'} ) {
                     $desc{'mpi'}--;
                     $param{'mpi'}++;
@@ -479,12 +490,27 @@ sub read_machines {
 
     my $res = parallel_remote_cmd($dir_check_commands);
 
-    for my $k (keys %$res) {
-        if ($res->{$k}->{'status'}) {
-            my @dirs = @{$dir_check_commands->{$k}->[1]};
-            die "One of the directories " .
-                join(" ", @dirs) .
-                " does not exist on $k.\n"
+    for my $host (keys %$res) {
+        if ($verbose > 2) {
+            print ("Result of parallel_remote_cmd on $host:\n");
+            print_hash ($res->{$host});
+        }
+
+        my $tries = 0; 
+        while ($res->{$host}->{'status'} != 0) {
+            if ($res->{$host}->{'status'} == 1) {
+                # The test -d command returns 1 if a directory doesn't exist
+                my @dirs = @{$dir_check_commands->{$host}->[1]};
+                die "One of the directories " .
+                    join(" ", @dirs) .
+                    " does not exist on $host.\n"
+            } elsif ($res->{$host}->{'status'} == 255) {
+                die "Could not connect to $host after $tries tries. Terminating.\n" if (++$tries > 2);
+                warn ("Connecting to $host failed, retrying...\n");
+                $res->{$host} = remote_cmd($host, $dir_check_commands->{$host}->[0]);
+            } else {
+                die "Directory check on $host gave unexpected return code $res->{$host}->{'status'}, exiting\n";
+            }
         }
     }
 
@@ -682,8 +708,9 @@ sub remote_cmd {
 # 1024-epsilon sub-jobs are a no-go here.
 sub parallel_remote_cmd {
     my $h = shift(@_);
-    my $res = {};
-    my $kids={};
+    my $res = {}; # Hash hostname => {status => $status>>8, out => stdout, signal => something}
+
+    my $kids = {}; # Spawned child processes pid => (hostname, filehandle, stdout)
     # Start jobs.
     for my $k (keys %$h) {
         my $fh;
@@ -695,7 +722,9 @@ sub parallel_remote_cmd {
         } else {
             info "Running $cmd on $k\n" if $verbose > 1;
             my $x=remote_cmd($k, $cmd);
-            print $x->{'out'};
+            print ("parallel_remote_cmd(): stdout from $k: $x->{'out'}\n") if ($verbose > 2);
+            print ("parallel_remote_cmd(): stderr from $k: $x->{'err'}\n") if ($verbose > 2);
+            print ("parallel_remote_cmd(): exit code for $k: $x->{'status'}\n") if ($verbose > 2);
             exit $x->{'status'};
         }
     }
@@ -706,12 +735,15 @@ sub parallel_remote_cmd {
         my $rin='';
         my $ein='';
         my ($rout, $eout);
+        # Build bit vector of the file handles to query for select() call
         for my $pid (keys %$kids) {
             my $fh=$kids->{$pid}->[1];
             vec($rin, fileno($fh), 1) = 1;
             vec($ein, fileno($fh), 1) = 1;
         }
         my $timeout = 10.0;
+        # Wait for any file handle to become ready to read, or an exception, 
+        # or a timeout
         my ($nfound,$timeleft) = select($rout=$rin, undef, $eout=$ein, $timeout);
         if (!$nfound) {
             info "Select() loop returned with no FDs after $timeout s\n";
@@ -1618,7 +1650,12 @@ sub do_init {
     # Getting configuration
     info "Reading the parameters...\n";
     $tab_level++;
-    read_param(\%param, { strict => 1 }, @ARGV);
+    
+    parse_options ();
+    parse_param (\%param, { strict => 1 }, \@ARGV, "command line");
+    my %default_param_hash = @default_param;
+    merge_hash (\%param, \%default_param_hash);
+    check_param (\%param, { strict => 1 });
     $tab_level--;
 
     if ($param{'parallel'}) {
@@ -1677,8 +1714,8 @@ sub do_init {
     if ($recover && -f "$param{'prefix'}.param") {
         eval {
             my %param_old;
-            read_param(\%param_old, { strict => 0 },
-                       "param=$param{'prefix'}.param");
+            parse_param (\%param_old, { strict => 0 },  ["param=$param{'prefix'}.param"], 
+                        "file $param{'prefix'}.param");
             for (keys %param) {
             		$param_diff{$_} =$param{$_} ne $param_old{$_}
 						if (exists($param_old{$_}));

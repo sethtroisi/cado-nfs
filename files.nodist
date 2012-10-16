@@ -105,3 +105,5 @@ misc/README
 misc/contains_zerochar.c
 misc/convert_rels.c
 misc/phi.c
+filter/out-of-core/Makefile
+filter/out-of-core/singleton.c

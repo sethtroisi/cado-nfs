@@ -169,6 +169,8 @@ namespace globals {
 void compute_E_from_A(polmat const &a)/*{{{*/
 {
     using namespace globals;
+    /* FIXME: Hmmm, should be m, not n here, right ??? */
+    ASSERT_ALWAYS(m == n);      /* plausible error trap */
     polmat tmp_E(n, m + n, a.ncoef - t0);
     for(unsigned int j = 0 ; j < n ; j++) {
         tmp_E.import_col_shift(j, a, j, - (int) t0);
@@ -498,7 +500,7 @@ void bw_commit_f(polmat& F)
 /*}}}*/
 
 
-/* {{{ polmat I/O ; this concerns only th epi matrices */
+/* {{{ polmat I/O ; this concerns only the pi matrices */
 /* This changes from the format used pre-bwc. */
 void write_polmat(polmat const& P, const char * fn)/*{{{*/
 {

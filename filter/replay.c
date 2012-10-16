@@ -1167,9 +1167,9 @@ main(int argc, char *argv[])
 
     param_list_init(pl);
     argv++,argc--;
-    param_list_configure_knob(pl, "--verbose", &verbose);
-    param_list_configure_knob(pl, "--binary", &bin);
-    param_list_configure_knob(pl, "--noindex", &noindex);
+    param_list_configure_switch(pl, "--verbose", &verbose);
+    param_list_configure_switch(pl, "--binary", &bin);
+    param_list_configure_switch(pl, "--noindex", &noindex);
     param_list_configure_alias(pl, "--verbose", "-v");
 
     for( ; argc ; ) {

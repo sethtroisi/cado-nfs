@@ -112,7 +112,7 @@
 #define abmul_ur(a0,a1,a2,a3)	abcommon_name_(mul_ur) (a0,a1,a2,a3)
 #define absqr_ur(a0,a1,a2)	abcommon_name_(sqr_ur) (a0,a1,a2)
 #define abreduce(a0,a1,a2)	abcommon_name_(reduce) (a0,a1,a2)
-#define abaddmul1(a0,a1,a2,a3)	abcommon_name_(addmul1) (a0,a1,a2,a3)
+#define abaddmul_si_ur(a0,a1,a2,a3)	abcommon_name_(addmul_si_ur) (a0,a1,a2,a3)
 
 #define abcmp(a0,a1,a2)	abcommon_name_(cmp) (a0,a1,a2)
 #define abcmp_ui(a0,a1,a2)	abcommon_name_(cmp_ui) (a0,a1,a2)
@@ -157,6 +157,7 @@
 #define abvec_fscan(a0,a1,a2,a3)	abcommon_name_(vec_fscan) (a0,a1,a2,a3)
 #define abvec_scan(a0,a1,a2)	abcommon_name_(vec_scan) (a0,a1,a2)
 #define abvec_ur_init(a0,a1,a2)	abcommon_name_(vec_ur_init) (a0,a1,a2)
+#define abvec_ur_set_zero(a0,a1,a2)	abcommon_name_(vec_ur_set_zero) (a0,a1,a2)
 #define abvec_ur_reinit(a0,a1,a2,a3)	abcommon_name_(vec_ur_reinit) (a0,a1,a2,a3)
 #define abvec_ur_clear(a0,a1,a2)	abcommon_name_(vec_ur_clear) (a0,a1,a2)
 #define abvec_ur_set(a0,a1,a2,a3)	abcommon_name_(vec_ur_set) (a0,a1,a2,a3)

@@ -1900,9 +1900,9 @@ main (int argc, char **argv)
   int skip_r;
   int skip_a;
 
-  param_list_configure_knob(pl, "-v", &verbose);
-  param_list_configure_knob(pl, "-skip_a", &skip_a);
-  param_list_configure_knob(pl, "-skip_r", &skip_r);
+  param_list_configure_switch(pl, "-v", &verbose);
+  param_list_configure_switch(pl, "-skip_a", &skip_a);
+  param_list_configure_switch(pl, "-skip_r", &skip_r);
 
   for( ; argc ; ) {
       if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }

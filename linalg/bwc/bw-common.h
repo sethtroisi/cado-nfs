@@ -15,7 +15,8 @@
  * constant.  Don't imagine it's easily tunable. If one really insists,
  * perhaps a u64k/secure or u64n/secure or u128/secure would work, but
  * this has not been checked. */
-#define NCHECKS_CHECK_VECTOR    64
+#define NCHECKS_CHECK_VECTOR_GF2    64
+#define NCHECKS_CHECK_VECTOR_GFp    1
 
 #define MAX_NUMBER_OF_CHECK_STOPS       32
 

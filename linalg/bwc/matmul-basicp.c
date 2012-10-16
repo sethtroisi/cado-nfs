@@ -128,9 +128,6 @@ void matmul_basicp_mul(struct matmul_basicp_data_s * mm, void * xdst, void const
     absrc_vec src = (absrc_vec) xsrc; // typical C const problem.
     abdst_vec dst = xdst;
 
-    abelt_ur rowsum;
-    abelt_ur_init(x, rowsum);
-
     /* d == 1: matrix times vector product */
     /* d == 0: vector times matrix product */
 
@@ -139,6 +136,9 @@ void matmul_basicp_mul(struct matmul_basicp_data_s * mm, void * xdst, void const
      */
 
     if (d == !mm->public_->store_transposed) {
+        abelt_ur rowsum;
+        abelt_ur_init(x, &rowsum);
+
         abvec_set_zero(x, dst, mm->public_->dim[!d]);
         ASM_COMMENT("critical loop");
         for(unsigned int i = 0 ; i < mm->public_->dim[!d] ; i++) {
@@ -149,16 +149,20 @@ void matmul_basicp_mul(struct matmul_basicp_data_s * mm, void * xdst, void const
                 j = *q++;
                 int32_t c = *(int32_t*)q++;
                 ASSERT(j < mm->public_->dim[d]);
-                abaddmul1(x, rowsum, src[j], c);
+                abaddmul_si_ur(x, rowsum, src[j], c);
             }
             abreduce(x, dst[i], rowsum);
         }
         ASM_COMMENT("end of critical loop");
+        abelt_ur_clear(x, &rowsum);
     } else {
+        abvec_ur tdst;
+        abvec_ur_init(x, &tdst, mm->public_->dim[!d]);
         if (mm->public_->iteration[d] == 10) {
             fprintf(stderr, "Warning: Doing many iterations with transposed code (not a huge problem for impl=basicp)\n");
         }
         abvec_set_zero(x, dst, mm->public_->dim[!d]);
+        abvec_ur_set_zero(x, tdst, mm->public_->dim[!d]);
         ASM_COMMENT("critical loop (transposed mult)");
         for(unsigned int i = 0 ; i < mm->public_->dim[d] ; i++) {
             uint32_t len = *q++;
@@ -167,17 +171,17 @@ void matmul_basicp_mul(struct matmul_basicp_data_s * mm, void * xdst, void const
                 j = *q++;
                 int32_t c = *(int32_t*)q++;
                 ASSERT(j < mm->public_->dim[!d]);
-                abaddmul1(x, dst[j], src[i], c);
+                abaddmul_si_ur(x, tdst[j], src[i], c);
             }
         }
         for(unsigned int j = 0 ; j < mm->public_->dim[!d] ; j++) {
-            abreduce(x, dst[j], dst[j]);
+            abreduce(x, dst[j], tdst[j]);
         }
         ASM_COMMENT("end of critical loop (transposed mult)");
+        abvec_ur_clear(x, &tdst, mm->public_->dim[!d]);
     }
     ASM_COMMENT("end of multiplication code");
 
-    abelt_ur_clear(x, rowsum);
     mm->public_->iteration[d]++;
 }
 

@@ -3518,11 +3518,11 @@ int main(int argc, char **argv)
     param_list pl;
     param_list_init(pl);
     int cache=0;
-    param_list_configure_knob(pl, "-v", &verbose);
-    param_list_configure_knob(pl, "--cache", &cache);
-    param_list_configure_knob(pl, "--rcache", &rcache);
-    param_list_configure_knob(pl, "--wcache", &wcache);
-    // param_list_configure_knob(pl, "--size-guess", &size_guess);
+    param_list_configure_switch(pl, "-v", &verbose);
+    param_list_configure_switch(pl, "--cache", &cache);
+    param_list_configure_switch(pl, "--rcache", &rcache);
+    param_list_configure_switch(pl, "--wcache", &wcache);
+    // param_list_configure_switch(pl, "--size-guess", &size_guess);
     int wild = 0;
     argv++, argc--;
     for (; argc;) {

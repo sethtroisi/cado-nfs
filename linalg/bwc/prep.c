@@ -39,7 +39,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
     param_list_parse_mpz(pl, "prime", p);
     abase_vbase A;
     abase_vbase_oo_field_init_byfeatures(A, 
-            MPFQ_PRIME, p,
+            MPFQ_PRIME_MPZ, p,
             MPFQ_GROUPSIZE, bw->n,
             MPFQ_DONE);
     mpz_clear(p);
@@ -206,11 +206,12 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
     save_x(xvecs, bw->m, my_nx, pi);
 
     matmul_top_clear(mmt);
-    A->oo_field_clear(A);
-
 
     /* clean up xy mats stuff */
     vec_clear_generic(pi->m, xymats, bw->m * prep_lookahead_iterations);
+
+    A->oo_field_clear(A);
+
 
     free(xvecs);
     return NULL;

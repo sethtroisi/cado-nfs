@@ -30,23 +30,27 @@
 /* Active handler: io */
 /* Active handler: trivialities */
 /* Active handler: simd_flat */
-/* Options used: k=1 tag=u64k1 vbase_stuff={
+/* Options used: w=64 k=1 tag=u64k1 vbase_stuff={
                  'vc:includes' => [
                                     '<stdarg.h>'
                                   ],
                  'member_templates_restrict' => {
+                                                  'p_1' => [
+                                                             'p_1'
+                                                           ],
+                                                  'p_4' => [
+                                                             'p_4'
+                                                           ],
                                                   'u64k2' => [
                                                                'u64k1',
                                                                'u64k2'
                                                              ],
-                                                  'p16' => [
-                                                             'p16'
-                                                           ],
                                                   'u64k1' => $vbase_stuff->{'member_templates_restrict'}{'u64k2'}
                                                 },
                  'families' => [
-                                 $vbase_stuff->{'member_templates_restrict'}{'u64k2'},
-                                 $vbase_stuff->{'member_templates_restrict'}{'p16'}
+                                 $vbase_stuff->{'member_templates_restrict'}{'p_4'},
+                                 $vbase_stuff->{'member_templates_restrict'}{'p_1'},
+                                 $vbase_stuff->{'member_templates_restrict'}{'u64k2'}
                                ],
                  'choose_byfeatures' => sub { "DUMMY" }
                };
@@ -209,9 +213,11 @@ void abase_u64k1_add(abase_u64k1_dst_field, abase_u64k1_dst_elt, abase_u64k1_src
 /* missing is_sqr */
 /* missing sqrt */
 /* missing pow */
+/* missing frobenius */
 /* missing add_ui */
 /* missing sub_ui */
 /* missing mul_ui */
+/* missing inv */
 
 /* Operations involving unreduced elements */
 /* *Mpfq::defaults::flatdata::code_for_elt_ur_init, simd_flat */
@@ -287,6 +293,8 @@ int abase_u64k1_vec_fscan(abase_u64k1_dst_field, FILE *, abase_u64k1_vec *, unsi
 /* *Mpfq::defaults::vec::io::code_for_vec_scan, Mpfq::defaults::vec, Mpfq::defaults */
 #define abase_u64k1_vec_scan(K, w, n)	abase_u64k1_vec_fscan(K,stdout,w,n)
 void abase_u64k1_vec_ur_init(abase_u64k1_dst_field, abase_u64k1_vec_ur *, unsigned int);
+static inline
+void abase_u64k1_vec_ur_set_zero(abase_u64k1_dst_field, abase_u64k1_dst_vec_ur, unsigned int);
 void abase_u64k1_vec_ur_reinit(abase_u64k1_dst_field, abase_u64k1_vec_ur *, unsigned int, unsigned int);
 void abase_u64k1_vec_ur_clear(abase_u64k1_dst_field, abase_u64k1_vec_ur *, unsigned int);
 static inline
@@ -523,6 +531,13 @@ int abase_u64k1_vec_is_zero(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_sr
         if (!abase_u64k1_is_zero(K,r[i])) return 0;
     }
     return 1;
+}
+
+/* *Mpfq::defaults::vec::flatdata::code_for_vec_ur_set_zero, Mpfq::defaults::flatdata, simd_flat */
+static inline
+void abase_u64k1_vec_ur_set_zero(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec_ur r, unsigned int n)
+{
+    memset(r, 0, n*sizeof(abase_u64k1_elt_ur));
 }
 
 /* *Mpfq::defaults::vec::flatdata::code_for_vec_ur_set, Mpfq::defaults::flatdata, simd_flat */
