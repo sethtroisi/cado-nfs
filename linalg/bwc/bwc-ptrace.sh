@@ -106,7 +106,7 @@ while [ $j0 -lt $n ] ; do
     j0=$j1
 done
 
-afile=$($bins/acollect wdir=/tmp/bwcp m=$m n=$n bits-per-coeff=$bits_per_coeff --remove-old | tail -1)
+afile=$($bins/acollect wdir=$wdir m=$m n=$n bits-per-coeff=$bits_per_coeff --remove-old | tail -1)
 $bins/plingen lingen-threshold=10 m=$m n=$n wdir=$wdir prime=$prime afile=$afile
 
 ln $wdir/$afile.gen $wdir/F0-$n

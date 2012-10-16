@@ -76,7 +76,7 @@ foreach(v ${bwc_abases})
     set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/abase_${v}.c mpfq/abase_${v}_t.c )
 endforeach(v)
 
-foreach(v p_1 p_4)
+foreach(v p_1 p_3 p_4)
     set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/abase_${v}.c mpfq/abase_${v}_t.c )
 endforeach(v)
 
@@ -178,6 +178,7 @@ foreach(v ${bwc_abases})
     endforeach(i)
 endforeach(v)
 configure_matmul_lib(p_1 basicp)
+configure_matmul_lib(p_3 basicp)
 configure_matmul_lib(p_4 basicp)
 
 # INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/share/${CADO_DIST_ARCHIVE_NAME}/libexec"
@@ -244,7 +245,7 @@ add_executable(plingen EXCLUDE_FROM_ALL
                 bw-common.c
                 plingen.c
                 polymat.c
-                mpfq/abase_p_4.c
+                mpfq/abase_p_3.c
         )
     #               variables.c fft_on_matrices.cpp
     #               ops_poly_integerfft.cpp
@@ -255,6 +256,6 @@ add_executable(plingen EXCLUDE_FROM_ALL
 target_link_libraries(plingen gmp utils)
 
 # Only to play with it for the moment.
-set_target_properties(plingen PROPERTIES COMPILE_FLAGS "-DSELECT_ABASE_p_4")
+set_target_properties(plingen PROPERTIES COMPILE_FLAGS "-DSELECT_ABASE_p_3")
 
 # install(TARGETS plingen RUNTIME DESTINATION bin/linalg/bwc)

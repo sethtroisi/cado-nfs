@@ -543,7 +543,13 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
             /* {{{ Cancel this coeff in all other columns. */
             abelt inv;
             abinit(ab, &inv);
-            abinv(ab, inv, polymat_coeff(e, u, j, 0));
+            int rc = abinv(ab, inv, polymat_coeff(e, u, j, 0));
+            if (!rc) {
+                fprintf(stderr, "Error, found a factor of the modulus: ");
+                abfprint(ab, stderr, inv);
+                fprintf(stderr, "\n");
+                exit(1);
+            }
             abneg(ab, inv, inv);
             for (unsigned int kl = jl + 1; kl < b ; kl++) {
                 unsigned int k = ctable[kl][1];
@@ -1118,7 +1124,13 @@ unsigned int (*compute_initial_F(bmstatus_ptr bm, polymat A))[2] /*{{{ */
 	    exponents[r] = k;
 
 	    /* Multiply the column so that the pivot becomes -1 */
-            abinv(ab, tmp, polymat_coeff(M, u, r, 0));
+            int rc = abinv(ab, tmp, polymat_coeff(M, u, r, 0));
+            if (!rc) {
+                fprintf(stderr, "Error, found a factor of the modulus: ");
+                abfprint(ab, stderr, tmp);
+                fprintf(stderr, "\n");
+                exit(1);
+            }
             abneg(ab, tmp, tmp);
             for(unsigned int i = 0 ; i < m ; i++) {
                 abmul(ab, polymat_coeff(M, i, r, 0),
