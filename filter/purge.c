@@ -2164,7 +2164,9 @@ main (int argc, char **argv)
 #endif
 
   /* the current code assumes the "rational" side has degree 1 */
+#ifndef FOR_FFS
   ASSERT_ALWAYS(pol->rat->degree == 1);
+#endif
 
   /* On a 32-bit computer, even 1 << 32 would overflow. Well, we could set
      map[ra] = 2^32-1 in that case, but not sure we want to support 32-bit
