@@ -10,9 +10,7 @@ typedef struct {
 
 extern unsigned int weight_ffs (int e);
 extern unsigned int weight_rel_ffs (relation_t rel);
-extern unsigned long findroot_ffs (long a, unsigned long b, unsigned long p);
-extern void computeroots_ffs (relation_t * rel);
+extern HT_T findroot_ffs (int64_t a, uint64_t b, HT_T p);
 extern int ffs_poly_read(cado_poly poly, const char *filename);
-//extern void sort_ffs (filter_matrix_t *mat, int i, int32_t size);
 
 #endif
