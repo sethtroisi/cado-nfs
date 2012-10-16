@@ -1387,9 +1387,9 @@ static void threadfindroot(fr_t *mfr) {
 		else
 		  {
 		    phk = buf_rel_new_hk(j, mybufrel->rel.nb_ap + 1);
-		    if (!boutfilerel || mybufrel->rel.a >= minpr)
+		    if (!boutfilerel || (uint64_t) mybufrel->rel.a >= minpr)
 		      *phk++ = HKM(mybufrel->rel.a, mybufrel->rel.a + 1, H.hm);
-		    if (!boutfilerel || mybufrel->rel.a >= minpa)
+		    if (!boutfilerel || (uint64_t) mybufrel->rel.a >= minpa)
 		      for (i = 0; i < mybufrel->rel.nb_ap; i++)
 			*phk++ = HKM(mybufrel->rel.a, mybufrel->rel.ap[i].p, H.hm);
 		  }
@@ -1459,11 +1459,11 @@ threadfindroot_exactphk(fr_t *mfr) {
 	    else
 	      {
 		phk = buf_rel_new_hk(j, mybufrel->rel.nb_ap + 1);
-		if (mybufrel->rel.a >= minpr) {
+		if ((uint64_t) mybufrel->rel.a >= minpr) {
 		  pr = (ht_t) { (HT_T) mybufrel->rel.a, (HT_T) (mybufrel->rel.a + 1) };
 		  FIND_PR_IN_H;
 		}
-		if (mybufrel->rel.a >= minpa) 
+		if ((uint64_t) mybufrel->rel.a >= minpa)
 		  for (i = 0; i < mybufrel->rel.nb_ap; i++) {
 		    pr = (ht_t) { (HT_T) mybufrel->rel.a, (HT_T) mybufrel->rel.ap[i].p };
 		    FIND_PR_IN_H;
