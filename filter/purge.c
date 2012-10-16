@@ -1744,8 +1744,10 @@ static int
 prempt_scan_relations_pass_two (const char *oname, 
 #ifdef FOR_FFS
 				const char *oname2,
+#else
+				bit_vector_srcptr rel_used,
 #endif
-				bit_vector_srcptr rel_used, HR_T nrows, HR_T ncols, int raw)
+				HR_T nrows, HR_T ncols, int raw)
 {
   char *pcons, *pcons_old, *pcons_max, *p, **f;
   pthread_attr_t attr;
@@ -2369,7 +2371,7 @@ main (int argc, char **argv)
   prempt_scan_relations_pass_two (purgedname, rel_used, nrel, nprimes, raw);
 #else
   /* reread (purgedname, deletedname, fic, rel_used, nrel_new, nprimes_new,                                                                raw); */
-  prempt_scan_relations_pass_two (purgedname, deletedname, rel_used, nrel, nprimes, raw);
+  prempt_scan_relations_pass_two (purgedname, deletedname, nrel, nprimes, raw);
 #endif
  
   if (boutfilerel) {
