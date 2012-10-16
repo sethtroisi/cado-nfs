@@ -119,7 +119,7 @@ static uint8_t boutfilerel;   /* True (1) if a rel_used relations file must be w
 
 #ifdef FOR_FFS
 static FILE *ofile2;
-static int pipe2;
+static int pipe_2;
 #endif
 
 static const unsigned char ugly[256] = {
@@ -1761,7 +1761,7 @@ prempt_scan_relations_pass_two (const char *oname,
 
   ofile = fopen_compressed_w(oname, &pipe, NULL);
 #ifdef FOR_FFS
-  ofile2 = fopen_compressed_w(oname2, &pipe2, NULL);
+  ofile2 = fopen_compressed_w(oname2, &pipe_2, NULL);
 #endif
   if (!raw)
     fprintf (ofile, "%lu %lu\n", (unsigned long) nrows, (unsigned long) ncols);
@@ -1972,7 +1972,7 @@ prempt_scan_relations_pass_two (const char *oname,
   
   if (pipe)  pclose(ofile);  else fclose(ofile);
 #ifdef FOR_FFS
-  if (pipe2) pclose(ofile2); else fclose(ofile2);
+  if (pipe_2) pclose(ofile2); else fclose(ofile2);
 #endif
   
   return 1;
