@@ -301,12 +301,17 @@ insert2 (uint64_t h, double w)
 static void
 insert2a (uint64_t h, uint64_t h0)
 {
+  double w0, w;
+
   while (H2[h].pointer > 0)
     h = H2[h].pointer - 1;
   if (h == h0) /* already connected */
     return;
-  assert (H2[h0].pointer <= 0);
-  H2[h0].weight += H2[h].weight;
+  w0 = H2[h0].weight;
+  w = H2[h].weight;
+  if (w0 > 0 || w > 0)
+    return; /* avoid an assert which might fail */
+  H2[h0].weight = w0 + w;
   H2[h].pointer = h0 + 1;
 }
 
