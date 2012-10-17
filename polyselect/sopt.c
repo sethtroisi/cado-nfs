@@ -28,7 +28,8 @@
 #include "auxiliary.h"
 
 #define MAX_LINE_LENGTH 1024
-#define DEG_F 6
+
+int fake = 0; // optimize anyway regardless of the common root condition
 
 /* Care: poly_print is named in utils.h */
 static void
@@ -135,12 +136,14 @@ opt_file (FILE *file, int deg, mpz_t N) {
 					mpz_add (t, t, f[i]);
 					mpz_mod (t, t, N);
 			   }
-			   if (mpz_cmp_ui (t, 0) != 0)
-			   {
-					fprintf (stderr, "This polynomials have no common root mod N\n");
-					polyprint (f, g, deg, N);
-					exit (1);
-			   }
+         
+         if (!fake) {
+           if (mpz_cmp_ui (t, 0) != 0) {
+             fprintf (stderr, "This polynomials have no common root mod N\n");
+             polyprint (f, g, deg, N);
+             exit (1);
+           }
+         }
 
 			   // need to output raw, since we may re-optimize this using updated optimize.c
 			   nroots = numberOfRealRoots (f, deg, 0, 0);
@@ -197,7 +200,7 @@ opt_file (FILE *file, int deg, mpz_t N) {
 /* print usage and exit */
 static void
 usage (void) {
-	 fprintf (stderr, "Usage: polyopt -f POLYFILE -n NUMBER\n");
+	 fprintf (stderr, "Usage: polyopt [--fake] -f POLYFILE -d DEGREE -n NUMBER\n");
 	 exit(1);
 }
 
@@ -205,50 +208,61 @@ usage (void) {
 int
 main (int argc, char **argv)
 {
-	 FILE *file = NULL;
-	 char *filename = NULL;
-	 int i;
-	 mpz_t N;
+  int degree = 0;
+  FILE *file = NULL;
+  const char *filename = NULL;
+  mpz_t N;
 
-	 // print command-line arguments
-	 fprintf (stderr, "# %s.r%s", argv[0], CADO_REV);
-	 for (i = 1; i < argc; i++)
-		  fprintf (stderr, " %s", argv[i]);
-	 fprintf (stderr, "\n");
+  mpz_init (N);
 
-	 // parse
-	 mpz_init (N);
-	 while (argc > 2 && argv[1][0] == '-') {
+  if (argc == 1) usage();
 
-		  if (strcmp(argv[1], "-f") == 0) {
-			   filename = argv[2];
-			   argv += 2;
-			   argc -= 2;
-		  }
-		  else if (strcmp(argv[1], "-n") == 0) {
-			   mpz_set_str (N, argv[2], 10);
-			   argv += 2;
-			   argc -= 2;
-		  }
-		  else {
-			   usage ();
-		  }
-	 }
-	 if (argc != 1)
-		  usage ();
+  /* read params */
+  param_list pl;
+  param_list_init (pl);
 
-	 // read
-	 file = fopen(filename, "r");
-	 if (file == NULL) {
-		  fprintf(stderr, "# Error in reading file\n");
-		  mpz_clear (N);
-		  exit (1);
-	 }
+  param_list_configure_switch (pl, "--fake", &fake);
 
-	 // optimize the raw polys in the file
-	 opt_file (file, DEG_F, N);
+  argv++, argc--;
+  for ( ; argc; ) {
+    if (param_list_update_cmdline (pl, &argc, &argv)) continue;
+    fprintf (stderr, "Unhandled parameter %s\n", argv[0]);
+    usage ();
+  }
 
-	 fclose (file);
-	 mpz_clear (N);
-	 return 0;
+  /* parse n */
+  int have_n = param_list_parse_mpz(pl, "n", N);
+  if (!have_n) {
+      fprintf(stderr, "No N defined ; sorry.\n");
+      exit(1);
+  }
+  if (mpz_cmp_ui (N, 0) <= 0) usage();
+
+  /* parse degree */
+  param_list_parse_int (pl, "d", &degree);
+  if (degree <= 0) usage();
+  
+  /* parse poly filename */
+  filename = param_list_lookup_string (pl, "f");
+
+  /* print out commands */
+  param_list_print_command_line (stdout, pl);
+
+  if (param_list_warn_unused(pl)) usage();
+
+  /* read */
+  file = fopen(filename, "r");
+  if (file == NULL) {
+    fprintf(stderr, "# Error in reading file\n");
+    mpz_clear (N);
+    exit (1);
+  }
+
+  /* optimize the raw polys in the file */
+  opt_file (file, degree, N);
+
+  fclose (file);
+  mpz_clear (N);
+  param_list_clear (pl);
+  return 0;
 }
