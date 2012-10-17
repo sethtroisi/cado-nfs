@@ -2767,6 +2767,7 @@ main (int argc, char *argv[])
   param_list_configure_switch (pl, "-q", &quiet);
   param_list_configure_alias(pl, "degree", "-d");
   param_list_configure_alias(pl, "incr", "-i");
+  param_list_configure_alias(pl, "N", "-n");
 
   argv++, argc--;
   for ( ; argc-1; ) {
@@ -2777,10 +2778,18 @@ main (int argc, char *argv[])
 
   /* parse and check N in the first place */
   int have_n = param_list_parse_mpz(pl, "N", N);
+
   if (!have_n) {
-      fprintf(stderr, "No N defined ; sorry.\n");
+    fprintf(stderr, "Reading n from stdin\n");
+    param_list_read_stream(pl, stdin);
+    have_n = param_list_parse_mpz(pl, "n", N);
+  }
+
+  if (!have_n) {
+      fprintf(stderr, "No n defined ; sorry.\n");
       exit(1);
   }
+
   if (mpz_cmp_ui (N, 0) <= 0) usage(argv0[0], "N");
 
   param_list_parse_int (pl, "t", &nthreads);
