@@ -321,6 +321,27 @@ size_t thread_source_get(thread_source_ptr s, uint32_t ** p, size_t avail)
     return n;
 }
 
+size_t thread_source_get_with_keepback(thread_source_ptr s, uint32_t ** p, size_t avail MAYBE_UNUSED, size_t keep_back)
+{
+    // ASSERT_ALWAYS(avail == 0);
+    ASSERT_ALWAYS(s->b->pos <= s->t->avail);
+    s->b->pos -= keep_back;
+    size_t n = s->t->avail - s->b->pos;
+    *p = s->t->buf+s->b->pos;
+    if (n > keep_back) {
+        s->b->pos += n;
+        return n;
+    }
+    pthread_mutex_lock(&s->t->mu);
+    for( ; (n = s->t->avail - s->b->pos) <= keep_back && s->t->avail < s->t->total; ) {
+        pthread_cond_wait(&s->t->hello, &s->t->mu);
+        ASSERT_ALWAYS(s->b->pos <= s->t->avail);
+    }
+    s->b->pos += n;
+    pthread_mutex_unlock(&s->t->mu);
+    return n;
+}
+
 void thread_source_rewind(thread_source_ptr s)
 {
     s->b->pos = 0;      /* easy enough ;-) */
@@ -332,6 +353,7 @@ thread_source_ptr thread_source_alloc(thread_pipe_ptr t)
     memset(res, 0, sizeof(thread_source));
     res->t = t;
     res->b->get = (size_t(*)(void*,uint32_t**,size_t))thread_source_get;
+    res->b->get_with_keepback = (size_t(*)(void*,uint32_t**,size_t,size_t))thread_source_get_with_keepback;
     return res;
 }
 
@@ -415,14 +437,19 @@ void mf_pipe(data_source_ptr input, data_dest_ptr output, const char * name)/*{{
 	}
         if (r < (int) n) {
             /* We need to refill */
-            fprintf(stderr, "Refill !!!\n");
+            // fprintf(stderr, "Refill !!!\n");
             ASSERT_ALWAYS(r == (int) n - 1);
             /* Must make sure the temp buffer is large enough ! */
             ASSERT_ALWAYS(n > 1);
-            ptr[0] = ptr[r];
-            uint32_t * nptr = 1 + ptr;
-            n = 1 + input->get(input, &nptr, n-1);
-            ASSERT_ALWAYS(nptr == 1 + ptr);
+            if (!input->get_with_keepback) {
+                ptr[0] = ptr[r];
+                uint32_t * nptr = 1 + ptr;
+                n = 1 + input->get(input, &nptr, n-1);
+                ASSERT_ALWAYS(nptr == 1 + ptr);
+            } else {
+                n = input->get_with_keepback(input, &ptr, n, 1);
+                ASSERT(n > 1);
+            }
         } else {
             n = 0;
         }
@@ -790,7 +817,7 @@ void set_slave_variables(slave_data s, param_list pl, parallelizing_info_ptr pi)
      * Since this has to be rewinded, it remains in core memory, thus the
      * necessity of guessing this.
      */
-    s->expected_size = s->bal->h->ncoeffs / pi->m->totalsize;
+    s->expected_size = (s->bal->h->ncoeffs << s->withcoeffs) / pi->m->totalsize;
     s->expected_size += 2 * sqrt(s->expected_size);
     s->expected_size += 2 * s->bal->trows;
     s->expected_size += s->expected_size / 10;
@@ -876,6 +903,11 @@ uint32_t slave_dest_put(slave_dest_ptr R, uint32_t * p, size_t n)
 {
     size_t i;
     for(i = 0 ; i < n ; i++) {
+        if (R->s->withcoeffs && (i + 1 == n) && !R->incoming_rowindex) {
+            /* We cannot put the condition in the loop, because we need
+             * to grok the row markers */
+            break;
+        }
         uint32_t x = p[i];
         if (R->incoming_rowindex == 2) {
             R->current_row = x;

@@ -55,7 +55,7 @@ double max_norm = DBL_MAX; /* maximal wanted norm (before rotation) */
 const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
 static int verbose = 0;
 static unsigned long incr = DEFAULT_INCR;
-char *out = NULL; /* output file for msieve input (msieve.dat.m) */
+const char *out = NULL; /* output file for msieve input (msieve.dat.m) */
 cado_poly best_poly, curr_poly;
 double best_E = 0.0; /* Murphy's E (the larger the better) */
 int seed = 0; /* seed */
@@ -2701,7 +2701,7 @@ one_thread (void* args)
 
 
 static void
-usage (char *argv)
+usage (const char *argv, const char * missing)
 {
   fprintf (stderr, "Usage: %s [options] P\n", argv);
   fprintf (stderr, "Required parameters and options:\n");
@@ -2728,6 +2728,10 @@ usage (char *argv)
   fprintf (stderr, "-out xxx     --- for msieve-format output\n");
   fprintf (stderr, "-s xxx       --- time intervals (seconds) for printing\n");
   fprintf (stderr, "                 out statistics (default %d)\n", TARGET_TIME / 1000);
+  if (missing) {
+      fprintf(stderr, "\nError: missing or invalid parameter \"-%s\"\n",
+              missing);
+  }
   exit (1);
 }
 
@@ -2736,184 +2740,88 @@ int
 main (int argc, char *argv[])
 {
   int argc0 = argc;
-  char **argv0 = argv, *save = NULL, *resume = NULL;
+  char **argv0 = argv;
+  const char *save = NULL, *resume = NULL;
   double st0 = seconds (), maxtime = DBL_MAX;
   mpz_t N;
   unsigned int d = 0;
   unsigned long P, admin = 0, admax = ULONG_MAX;
-  int tries = 0, i, nthreads = 1, st, target_time = TARGET_TIME, incr_target_time = TARGET_TIME;
+  int quiet = 0, tries = 0, i, nthreads = 1, st, 
+    target_time = TARGET_TIME, incr_target_time = TARGET_TIME;
   tab_t *T;
   FILE *fp;
 #ifdef MAX_THREADS
   pthread_t tid[MAX_THREADS];
 #endif
 
-  /* printf command-line */
-  printf ("#");
-  for (i = 0; i < argc; i++)
-    printf (" %s", argv[i]);
-  printf ("\n");
-  fflush (stdout);
-
   mpz_init (N);
   cado_poly_init (best_poly);
   cado_poly_init (curr_poly);
 
   /* read params */
-  if (argc == 1)
-    usage (argv0[0]);
+  param_list pl;
+  param_list_init (pl);
 
-  while (argc >= 2 && argv[1][0] == '-')
-  {
-    if (strcmp (argv[1], "-t") == 0)
-    {
-      nthreads = atoi (argv[2]);
-      argv += 2;
-      argc -= 2;
-    }
-    else if (argc >= 3 && strcmp (argv[1], "-maxnorm") == 0)
-    {
-      max_norm = atof (argv[2]);
-      argv += 2;
-      argc -= 2;
-    }
-    else if (argc >= 3 && strcmp (argv[1], "-maxtime") == 0)
-    {
-      maxtime = atof (argv[2]);
-      argv += 2;
-      argc -= 2;
-    }
-    else if (argc >= 3 && strcmp (argv[1], "-admin") == 0)
-    {
-      double d;
-      d = strtod (argv[2], NULL);
-      if (d > (double) ULONG_MAX)
-      {
-        fprintf (stderr, "Error, too large value of admin\n");
-        exit (1);
-      }
-      admin = (unsigned long) d;
-      argv += 2;
-      argc -= 2;
-    }
-    else if (argc >= 3 && strcmp (argv[1], "-admax") == 0)
-    {
-      double d;
-      d = strtod (argv[2], NULL);
-      if (d > (double) ULONG_MAX)
-      {
-        fprintf (stderr, "Error, too large value of admax\n");
-        exit (1);
-      }
-      admax = (unsigned long) d;
-      argv += 2;
-      argc -= 2;
-    }
-    else if (argc >= 3 && strcmp (argv[1], "-incr") == 0)
-    {
-      incr = strtoul (argv[2], NULL, 10);
-      argv += 2;
-      argc -= 2;
-    }
-    else if (argc >= 3 && strcmp (argv[1], "-N") == 0)
-    {
-      mpz_set_str (N, argv[2], 10);
-      argv += 2;
-      argc -= 2;
-    }
-    else if (argc >= 3 && strcmp (argv[1], "-degree") == 0)
-    {
-      d = atoi (argv[2]);
-      argv += 2;
-      argc -= 2;
-    }
-    else if (argc >= 3 && strcmp (argv[1], "-nq") == 0)
-    {
-      nq = atoi (argv[2]);
-      argv += 2;
-      argc -= 2;
-    }
-    else if (argc >= 3 && strcmp (argv[1], "-lq") == 0)
-    {
-      lq = atoi (argv[2]);
-      argv += 2;
-      argc -= 2;
-    }
-    else if (argc >= 3 && strcmp (argv[1], "-seed") == 0)
-    {
-      seed = atoi (argv[2]);
-      argv += 2;
-      argc -= 2;
-    }
-    else if (argc >= 3 && strcmp (argv[1], "-save") == 0)
-    {
-      save = argv[2];
-      argv += 2;
-      argc -= 2;
-    }
-    else if (argc >= 3 && strcmp (argv[1], "-resume") == 0)
-    {
-      resume = argv[2];
-      argv += 2;
-      argc -= 2;
-    }
-    else if (argc >= 3 && strcmp (argv[1], "-out") == 0)
-    {
-      out = argv[2];
-      argv += 2;
-      argc -= 2;
-    }
-    else if (argc >= 3 && strcmp (argv[1], "-s") == 0)
-    {
-      target_time = atoi (argv[2]) * 1000;
-      incr_target_time = target_time;
-      argv += 2;
-      argc -= 2;
-    }
-    else if (strcmp (argv[1], "-v") == 0)
-    {
-      verbose ++;
-      argv += 1;
-      argc -= 1;
-    }
-    else if (strcmp (argv[1], "-q") == 0)
-    {
-      verbose = -1;
-      argv += 1;
-      argc -= 1;
-    }
-    else if (strcmp (argv[1], "-r") == 0)
-    {
-      raw = 1;
-      argv += 1;
-      argc -= 1;
-    }
-    else
-    {
-      fprintf (stderr, "Invalid option: %s\n", argv[1]);
-      exit (1);
-    }
+  param_list_configure_switch (pl, "-v", &verbose);
+  param_list_configure_switch (pl, "-r", &raw);
+  param_list_configure_switch (pl, "-q", &quiet);
+  param_list_configure_alias(pl, "degree", "-d");
+  param_list_configure_alias(pl, "incr", "-i");
+  param_list_configure_alias(pl, "N", "-n");
+
+  argv++, argc--;
+  for ( ; argc-1; ) {
+    if (param_list_update_cmdline (pl, &argc, &argv)) continue;
+    fprintf (stderr, "Unhandled parameter %s\n", argv[0]);
+    usage (argv0[0],NULL);
   }
 
-  /* verify params */
-  if (mpz_cmp_ui (N, 0) == 0)
-  {
-    int ret;
+  /* parse and check N in the first place */
+  int have_n = param_list_parse_mpz(pl, "N", N);
 
-    ret = gmp_scanf ("n: %Zd\n", N);
-    if (ret != 1)
-    {
-      fprintf (stderr, "Error, input number N cannot be read\n");
-      exit (1);
-    }
+  if (!have_n) {
+    fprintf(stderr, "Reading n from stdin\n");
+    param_list_read_stream(pl, stdin);
+    have_n = param_list_parse_mpz(pl, "n", N);
   }
 
-  if (lq < 1 || nq < 1)
-  {
-    fprintf (stderr, "Error, number of factors in special-q should >= 1 and/or number of special-q's should >=1\n");
+  if (!have_n) {
+      fprintf(stderr, "No n defined ; sorry.\n");
+      exit(1);
+  }
+
+  if (mpz_cmp_ui (N, 0) <= 0) usage(argv0[0], "N");
+
+  param_list_parse_int (pl, "t", &nthreads);
+  param_list_parse_int (pl, "nq", &nq);
+  param_list_parse_int (pl, "lq", &lq);
+  param_list_parse_int (pl, "seed", &seed);
+  param_list_parse_int (pl, "s", &target_time);
+  incr_target_time = target_time;
+  param_list_parse_uint (pl, "degree", &d);
+  param_list_parse_ulong (pl, "admin", &admin);
+  param_list_parse_ulong (pl, "admax", &admax);
+  param_list_parse_ulong (pl, "incr", &incr);
+  param_list_parse_double (pl, "maxnorm", &max_norm);
+  param_list_parse_double (pl, "maxtime", &maxtime);
+  save = param_list_lookup_string (pl, "save");
+  resume = param_list_lookup_string (pl, "resume");
+  out = param_list_lookup_string (pl, "out");
+
+  /* print command line */
+  param_list_print_command_line (stdout, pl);
+
+  /* check degree */
+  if (d <= 0) usage(argv0[0], "degree");
+
+  /* check lq and nq */
+  if (lq < 1 || nq < 1) {
+    fprintf (stderr, "Error, number of factors in special-q "
+             "should >= 1 and/or number of special-q's should >=1\n");
     exit (1);
   }
 
+  /* check seed */
   if (seed < 1) {
     seed = time(NULL);
     srand(seed);
@@ -2921,38 +2829,27 @@ main (int argc, char *argv[])
   else
     srand(seed);
 
-  /* set cpoly */
-  mpz_set (best_poly->n, N);
-  mpz_set (curr_poly->n, N);
-
-  if (argc != 2)
-    usage (argv0[0]);
-
+  /* check nthreads */
 #ifdef MAX_THREADS
-  if (nthreads > MAX_THREADS)
-  {
+  if (nthreads > MAX_THREADS) {
     fprintf (stderr, "Error, nthreads should be <= %d\n", MAX_THREADS);
     exit (1);
   }
 #endif
 
-  if (mpz_cmp_ui (N, 0) <= 0)
-  {
-    fprintf (stderr, "Error, missing input number (-N option)\n");
-    exit (1);
-  }
+  /* quiet mode */
+  if (quiet == 1)
+    verbose = -1;
 
-  if (d == 0)
-  {
-    fprintf (stderr, "Error, missing degree (-d option)\n");
-    exit (1);
-  }
-
+  /* set cpoly */
+  mpz_set (best_poly->n, N);
+  mpz_set (curr_poly->n, N);
   best_poly->alg->degree = d;
   best_poly->rat->degree = 1;
   curr_poly->alg->degree = d;
   curr_poly->rat->degree = 1;
 
+  /* if resume, read admin */
   if (resume != NULL)
   {
     fp = fopen (resume, "r");
@@ -2975,7 +2872,7 @@ main (int argc, char *argv[])
 
   /* init primes */
   double Pd;
-  Pd = strtod (argv[1], NULL);
+  Pd = strtod (argv[argc-1], NULL);
   if (Pd > (double) UINT_MAX) {
     fprintf (stderr, "Error, too large value of P\n");
     exit (1);
@@ -2989,7 +2886,8 @@ main (int argc, char *argv[])
   st = cputime ();
   lenPrimes = initPrimes (P, &Primes);
 
-  printf ( "# Info: initializing %lu P primes took %dms, seed=%d, rawonly=%d, nq=%d, target_time=%d\n",
+  printf ( "# Info: initializing %lu P primes took %dms, seed=%d,"
+           " rawonly=%d, nq=%d, target_time=%d\n",
            lenPrimes,
            cputime () - st,
            seed,
@@ -3000,13 +2898,17 @@ main (int argc, char *argv[])
 #ifdef CONSIDER_ONLY_TWO_ROOTS
 
 #ifdef BATCH_P
-  printf ( "# Info: estimated peak memory=%.2fMB (%d thread(s), batch %d inversions on P)\n",
-           (double) (nthreads * INIT_FACTOR * lenPrimes * (sizeof(uint32_t) + sizeof(uint64_t)) / 1024 / 1024),
+  printf ( "# Info: estimated peak memory=%.2fMB (%d thread(s),"
+           " batch %d inversions on P)\n",
+           (double) (nthreads * INIT_FACTOR * lenPrimes *
+           (sizeof(uint32_t) + sizeof(uint64_t)) / 1024 / 1024),
            nthreads,
            BATCH_SIZE );
 #else
-  printf ( "# Info: estimated peak memory=%.2fMB (%d thread(s), batch %d inversions on SQ)\n",
-           (double) (nthreads * (BATCH_SIZE + INIT_FACTOR) * lenPrimes * (sizeof(uint32_t) + sizeof(uint64_t)) / 1024 / 1024),
+  printf ( "# Info: estimated peak memory=%.2fMB (%d thread(s),"
+           " batch %d inversions on SQ)\n",
+           (double) (nthreads * (BATCH_SIZE + INIT_FACTOR) * lenPrimes
+           * (sizeof(uint32_t) + sizeof(uint64_t)) / 1024 / 1024),
            nthreads,
            BATCH_SIZE );
 #endif
@@ -3014,13 +2916,18 @@ main (int argc, char *argv[])
 #else
 
 #ifdef BATCH_P
-  printf ( "# Info: estimated peak memory=%.2fMB (%d threads, batch %d inversions on P)\n",
-           (double) (nthreads * INIT_FACTOR * NUMBER_CONSIDERED_ROOTS * lenPrimes * (sizeof(uint32_t) + sizeof(uint64_t)) / 1024 / 1024),
+  printf ( "# Info: estimated peak memory=%.2fMB (%d threads,"
+           " batch %d inversions on P)\n",
+           (double) (nthreads * INIT_FACTOR * NUMBER_CONSIDERED_ROOTS *
+           lenPrimes * (sizeof(uint32_t) + sizeof(uint64_t)) / 1024 / 1024),
            nthreads,
            BATCH_SIZE );
 #else
-  printf ( "# Info: estimated peak memory=%.2fMB (%d threads, batch %d inversions on SQ)\n",
-           (double) (nthreads * (BATCH_SIZE + INIT_FACTOR * NUMBER_CONSIDERED_ROOTS) * lenPrimes * (sizeof(uint32_t) + sizeof(uint64_t)) / 1024 / 1024),
+  printf ( "# Info: estimated peak memory=%.2fMB (%d threads,"
+           " batch %d inversions on SQ)\n",
+           (double) (nthreads * (BATCH_SIZE + INIT_FACTOR * 
+           NUMBER_CONSIDERED_ROOTS) * lenPrimes * (sizeof(uint32_t)
+            + sizeof(uint64_t)) / 1024 / 1024),
            nthreads,
            BATCH_SIZE );
 #endif
@@ -3159,6 +3066,7 @@ main (int argc, char *argv[])
   clearPrimes (&Primes);
   cado_poly_clear (best_poly);
   cado_poly_clear (curr_poly);
+  param_list_clear (pl);
 
   return 0;
 }

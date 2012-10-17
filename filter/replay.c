@@ -187,6 +187,25 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
                 if (skip) fprintf(dmatfile, "%"PRIu32"", dw);
                 if (skip) fprintf(drwfile, "%"PRIu32"\n", dw);
             }
+
+
+#if 0 //#ifdef FOR_FFS //for FFS sort the index
+      for (int k = 1; k < rowLength(sparsemat, i); k++)
+        {
+          for (int l = k+1; l <= rowLength(sparsemat, i); l++)
+            {
+              uint32_t x = code[rowCell(sparsemat, i, k)]-1;
+              uint32_t y = code[rowCell(sparsemat, i, l)]-1;
+              if (x > y)
+                {
+                  typerow_t tmp = sparsemat[i][k];
+                  sparsemat[i][k] = sparsemat[i][l];
+                  sparsemat[i][l] = tmp;
+                }
+            }
+        }
+#endif
+
 	    for(int j = 1; j <= rowLength(sparsemat, i); j++){
 #if DEBUG >= 1
 		ASSERT(code[rowCell(sparsemat, i, j)] > 0);
@@ -543,9 +562,12 @@ readPurged(typerow_t **sparsemat, purgedfile_stream ps, int verbose)
 #endif
         }
 #ifdef FOR_FFS
-      j++;
-      rowCell(sparsemat, i, j) = ps->ncols - 1;
-      sparsemat[i][j].e = 1;
+      if (ps->b != 0)
+        {
+          j++;
+          rowCell(sparsemat, i, j) = ps->ncols - 1;
+          sparsemat[i][j].e = 1;
+        }
 #endif
       rowLength(sparsemat, i) = j;
   }

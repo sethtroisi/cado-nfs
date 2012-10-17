@@ -6,6 +6,7 @@
 
 struct data_source_s {/*{{{*/
     size_t (*get)(void*,uint32_t **,size_t);
+    size_t (*get_with_keepback)(void*,uint32_t **,size_t, size_t);
     size_t pos;
 };
 typedef struct data_source_s data_source[1];

@@ -119,7 +119,7 @@ static uint8_t boutfilerel;   /* True (1) if a rel_used relations file must be w
 
 #ifdef FOR_FFS
 static FILE *ofile2;
-static int pipe2;
+static int pipe_2;
 #endif
 
 static const unsigned char ugly[256] = {
@@ -1387,9 +1387,9 @@ static void threadfindroot(fr_t *mfr) {
 		else
 		  {
 		    phk = buf_rel_new_hk(j, mybufrel->rel.nb_ap + 1);
-		    if (!boutfilerel || mybufrel->rel.a >= minpr)
+		    if (!boutfilerel || (uint64_t) mybufrel->rel.a >= minpr)
 		      *phk++ = HKM(mybufrel->rel.a, mybufrel->rel.a + 1, H.hm);
-		    if (!boutfilerel || mybufrel->rel.a >= minpa)
+		    if (!boutfilerel || (uint64_t) mybufrel->rel.a >= minpa)
 		      for (i = 0; i < mybufrel->rel.nb_ap; i++)
 			*phk++ = HKM(mybufrel->rel.a, mybufrel->rel.ap[i].p, H.hm);
 		  }
@@ -1459,11 +1459,11 @@ threadfindroot_exactphk(fr_t *mfr) {
 	    else
 	      {
 		phk = buf_rel_new_hk(j, mybufrel->rel.nb_ap + 1);
-		if (mybufrel->rel.a >= minpr) {
+		if ((uint64_t) mybufrel->rel.a >= minpr) {
 		  pr = (ht_t) { (HT_T) mybufrel->rel.a, (HT_T) (mybufrel->rel.a + 1) };
 		  FIND_PR_IN_H;
 		}
-		if (mybufrel->rel.a >= minpa) 
+		if ((uint64_t) mybufrel->rel.a >= minpa)
 		  for (i = 0; i < mybufrel->rel.nb_ap; i++) {
 		    pr = (ht_t) { (HT_T) mybufrel->rel.a, (HT_T) mybufrel->rel.ap[i].p };
 		    FIND_PR_IN_H;
@@ -1744,8 +1744,10 @@ static int
 prempt_scan_relations_pass_two (const char *oname, 
 #ifdef FOR_FFS
 				const char *oname2,
+#else
+				bit_vector_srcptr rel_used,
 #endif
-				bit_vector_srcptr rel_used, HR_T nrows, HR_T ncols, int raw)
+				HR_T nrows, HR_T ncols, int raw)
 {
   char *pcons, *pcons_old, *pcons_max, *p, **f;
   pthread_attr_t attr;
@@ -1761,7 +1763,7 @@ prempt_scan_relations_pass_two (const char *oname,
 
   ofile = fopen_compressed_w(oname, &pipe, NULL);
 #ifdef FOR_FFS
-  ofile2 = fopen_compressed_w(oname2, &pipe2, NULL);
+  ofile2 = fopen_compressed_w(oname2, &pipe_2, NULL);
 #endif
   if (!raw)
     fprintf (ofile, "%lu %lu\n", (unsigned long) nrows, (unsigned long) ncols);
@@ -1972,7 +1974,7 @@ prempt_scan_relations_pass_two (const char *oname,
   
   if (pipe)  pclose(ofile);  else fclose(ofile);
 #ifdef FOR_FFS
-  if (pipe2) pclose(ofile2); else fclose(ofile2);
+  if (pipe_2) pclose(ofile2); else fclose(ofile2);
 #endif
   
   return 1;
@@ -2164,7 +2166,9 @@ main (int argc, char **argv)
 #endif
 
   /* the current code assumes the "rational" side has degree 1 */
+#ifndef FOR_FFS
   ASSERT_ALWAYS(pol->rat->degree == 1);
+#endif
 
   /* On a 32-bit computer, even 1 << 32 would overflow. Well, we could set
      map[ra] = 2^32-1 in that case, but not sure we want to support 32-bit
@@ -2367,7 +2371,7 @@ main (int argc, char **argv)
   prempt_scan_relations_pass_two (purgedname, rel_used, nrel, nprimes, raw);
 #else
   /* reread (purgedname, deletedname, fic, rel_used, nrel_new, nprimes_new,                                                                raw); */
-  prempt_scan_relations_pass_two (purgedname, deletedname, rel_used, nrel, nprimes, raw);
+  prempt_scan_relations_pass_two (purgedname, deletedname, nrel, nprimes, raw);
 #endif
  
   if (boutfilerel) {

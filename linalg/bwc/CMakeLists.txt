@@ -239,21 +239,3 @@ target_link_libraries(cleanup utils m)
 install(TARGETS cleanup RUNTIME DESTINATION bin/linalg/bwc)
 
 include(CMakeLists-nodist.txt OPTIONAL)
-
-# add_executable(plingen
-#                 bw-common.c
-#                 plingen.c
-#                 mpfq/abase_p_1.c
-#         )
-#     #               variables.c fft_on_matrices.cpp
-#     #               ops_poly_integerfft.cpp
-#     #               e_polynomial.c structure.c
-#     #               twisting_polynomials.c
-#     #               master_common.c)
-# 
-# target_link_libraries(plingen gmp utils)
-# 
-# # Only to play with it for the moment.
-# set_target_properties(plingen PROPERTIES COMPILE_FLAGS "-DSELECT_ABASE_p_1")
-# 
-# install(TARGETS plingen RUNTIME DESTINATION bin/linalg/bwc)

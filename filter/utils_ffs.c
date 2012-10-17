@@ -28,47 +28,33 @@ unsigned int weight_rel_ffs (relation_t rel)
   return w;
 }
 
-unsigned long 
-findroot_ffs (long a, unsigned long b, unsigned long p)
+/* return a/b mod p, and p when gcd(b,p) <> 1: this corresponds to a
+   projective root */
+HT_T
+findroot_ffs (int64_t a, uint64_t b, HT_T p)
 {
-  char s[17];
   fppol64_t pol_a, pol_b, pol_p;
   fppol64_t pol_r;
 
-  sprintf (s, "%lx", (unsigned long) a);
-  if (fppol64_set_str (pol_a, s) != 1)
-      fprintf(stderr, "Error in findroot_ffs with a=%s\n", s);
+  fppol64_set_ui_sparse (pol_a, (uint64_t) a);
+  fppol64_set_ui_sparse (pol_b, b);
+  fppol64_set_ui_sparse (pol_p, (uint64_t) p);
 
-  sprintf (s, "%lx", b);
-  if (fppol64_set_str (pol_b, s) != 1)
-      fprintf(stderr, "Error in findroot_ffs with b=%s\n", s);
+#if DEBUG
+  if (UNLIKELY(fppol64_deg(pol_p) == -1))
+    {
+      fprintf(stderr, "p: ul=%lu lx=%lx str=%s\n", p, p, s);
+    }
+#endif
 
-  sprintf (s, "%lx", p);
-  if (fppol64_set_str (pol_p, s) != 1)
-      fprintf(stderr, "Error in findroot_ffs with p=%s\n", s);
-      
   fppol64_rem (pol_a, pol_a, pol_p);
   fppol64_rem (pol_b, pol_b, pol_p);
   if (!fppol64_invmod (pol_b, pol_b, pol_p))
-      return (unsigned long) -1L;
+      return (HT_T) p;
 
   fppol64_mulmod (pol_r, pol_a, pol_b, pol_p);
 
-  fppol64_get_str (s, pol_r);
-  return strtol (s, NULL, 16);
-}
-
-void
-computeroots_ffs (relation_t *rel)
-{
-  unsigned long r;
-  int i;
-
-  for (i = 0; i < rel->nb_ap; ++i)
-    {
-      r = findroot_ffs (rel->a, rel->b, rel->ap[i].p);
-      rel->ap[i].r = r;
-  }
+  return (HT_T) fppol64_get_ui_sparse(pol_r);
 }
 
 int ffs_poly_set_plist(cado_poly poly, param_list pl)
