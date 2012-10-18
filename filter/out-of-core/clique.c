@@ -67,6 +67,7 @@ struct suffix_handler {
 struct suffix_handler supported_compression_formats[] = {
     { ".gz", "gzip -dc %s", "gzip -c --fast > %s", },
     { ".bz2", "bzip2 -dc %s", "bzip2 -c --fast > %s", },
+    { ".lzma", "lzma -dc  %s", "lzma -c -0 > %s", },
     /* These two have to be present */
     { "", NULL, NULL },
     { NULL, NULL, NULL },
