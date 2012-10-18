@@ -34,7 +34,14 @@
 #include <sys/time.h>
 #include <fcntl.h>
 #include <math.h>
+#include <linux/limits.h>
+#include <semaphore.h>
+#include <libgen.h>
 
+#define NEW_DIR "new/"
+#define MAX_FILES_PER_THREAD 16
+#define MAX_RAT_PER_LINE 16
+#define MAX_ALG_PER_LINE 32
 #define MAXNAME 1024
 #define MAX_THREADS 128
 #define EXACT_HASH /* store (p,r) exactly in hash table */
@@ -42,13 +49,13 @@
 /* thread structure */
 typedef struct
 {
-  char g[MAXNAME];
-  int thread;
   unsigned long nlines;
   unsigned long nideal;
   unsigned long nsingl;
   unsigned long ndupli;
-  unsigned long nthreads;
+  char g[ARG_MAX];
+  uint8_t busy; /* 0 = free; 1 = work done; 2 = busy */
+  uint8_t thread, nthreads;
 } __tab_struct;
 typedef __tab_struct tab_t[1];
 
@@ -65,8 +72,8 @@ struct suffix_handler {
 };
 
 struct suffix_handler supported_compression_formats[] = {
-    { ".gz", "gzip -dc %s", "gzip -c --fast > %s", },
-    { ".bz2", "bzip2 -dc %s", "bzip2 -c --fast > %s", },
+    { ".gz", "antebuffer 24 %s|gzip -dc", "gzip -c --fast > %s", },
+    { ".bz2", "antebuffer 24 %s|bzip2 -dc", "bzip2 -c --fast > %s", },
     { ".lzma", "lzma -dc  %s", "lzma -c -0 > %s", },
     /* These two have to be present */
     { "", NULL, NULL },
@@ -80,18 +87,82 @@ uint64_t M = 0, minpa = 0, minpr = 0, Hsize, *H, nrels, remains, *PR;
 uint64_t target = 0;
 tab2_t *H2;
 double threshold_weight = 999.0;
+sem_t sem_pt;
 
-long
+static const unsigned char ugly[256] = {
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  0,   1,   2,   3,   4,   5,   6,   7,   8,   9, 255, 255, 255, 255, 255, 255,
+  255,  10,  11,  12,  13,  14,  15, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255,  10,  11,  12,  13,  14,  15, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255 };
+
+static const uint64_t mask[16] = {
+  0xf, 0xf0, 0xf00, 0xf000, 0xf0000, 0xf00000, 0xf000000, 0xf0000000, 0xf00000000,
+  0xf000000000, 0xf0000000000, 0xf00000000000, 0xf000000000000, 0xf0000000000000,
+  0xf00000000000000, 0xf000000000000000};
+
+static const uint64_t addm[16] = {
+  0x1, 0x10, 0x100, 0x1000, 0x10000, 0x100000, 0x1000000, 0x10000000, 0x100000000,
+  0x1000000000, 0x10000000000, 0x100000000000, 0x1000000000000, 0x10000000000000,
+  0x100000000000000, 0x1000000000000000};
+
+void
+create_directories (char *filelist)
+{
+  static char odirg[MAXNAME];
+  FILE *f;
+  char g[MAXNAME], *pdirg, mkdirg[MAXNAME<<1];
+  size_t lg;
+  
+  f = fopen (filelist, "r");
+  while (!feof (f)) {
+    if (fgets (g, MAXNAME, f) && (lg = strlen(g))) {
+      g[lg-1] = 0;
+      pdirg = dirname(g);
+      if (strcmp(odirg,pdirg)) {
+	strcpy(odirg,pdirg);
+	strcpy(mkdirg, "mkdir -p ");
+	strcat(mkdirg, NEW_DIR);
+	strcat(mkdirg, pdirg);
+	system(mkdirg);
+      }
+    }
+  }
+  fclose(f);
+}
+
+double
+compute_delay_stat ()
+{
+  uint64_t h;
+  uint32_t i;
+
+  for (h = (Hsize>>24), i = 0; h; h >>=1, i++);
+  return (i) ? (double) (i<<6) : 32.;
+}
+
+double
 cputime ()
 {
   struct rusage rus;
 
   getrusage (RUSAGE_SELF, &rus);
   /* This overflows a 32 bit signed int after 2147483s = 24.85 days */
-  return rus.ru_utime.tv_sec;
+  return rus.ru_utime.tv_sec + rus.ru_utime.tv_usec / 1000000.0;
 }
 
-long
+double
 realtime ()
 {
   struct timeval tv[1];
@@ -101,7 +172,7 @@ realtime ()
      }; */
 
   gettimeofday (tv, NULL);
-  return tv->tv_sec;
+  return tv->tv_sec + tv->tv_usec / 1000000.0 ;
 }
 
 int has_suffix(const char * path, const char * sfx)
@@ -209,61 +280,48 @@ index_hash (uint64_t pr)
 static inline uint64_t
 index_hash (uint64_t pr)
 {
-  uint64_t h = pr % M;
+  uint64_t *prh = &(PR[pr % M]);
 
-  while (PR[h] != 0 && PR[h] != pr)
-    if (++h == M)
-      h = 0;
-  /* now PR[h] = 0 or PR[h] = pr */
-  PR[h] = pr;
-  return h;
+  while (*prh != 0 && *prh != pr)
+    if (++prh == &(PR[M]))
+      prh= PR;
+  /* now *prh = 0 or *prh = pr */
+  *prh = pr;
+  return (prh - PR);
 }
 #endif
 
+#define INDEX_RAT(P) (index_hash ((P) + 1)) /* even for even M */
 static inline uint64_t
 index_rat (uint64_t p)
 {
-  uint64_t h;
-
-  h = index_hash (p + 1); /* even for even M */
-  return h;
+  return INDEX_RAT(p); 
 }
 
+#define INDEX_ALG(P,R) (index_hash ((P)+ (M - 2) * (R)))  /* always odd for odd p and even M */
 static inline uint64_t
 index_alg (uint64_t p, uint64_t r)
 {
-  uint64_t h;
-
-  h = index_hash (p + (M - 2) * r); /* always odd for odd p and even M */
-  return h;
+  return INDEX_ALG(p,r);
 }
 
+#define WEIGHT(P) ((H[(P)>>4] >> (((P)&15)<<2)) & 15)
 static inline uint64_t
 weight (uint64_t h)
 {
-  uint64_t r, s;
-
-  r = h >> 4;
-  s = h & 15;
-  return (H[r] >> (s << 2)) & 15;
+  return WEIGHT(h);
 }
 
 static void
 insert (uint64_t h)
 {
-  uint64_t r, s, v;
-  const uint64_t mask[16] = {0xf, 0xf0, 0xf00, 0xf000, 0xf0000, 0xf00000,
-                             0xf000000, 0xf0000000, 0xf00000000, 0xf000000000,
-                             0xf0000000000, 0xf00000000000, 0xf000000000000,
-                             0xf0000000000000, 0xf00000000000000,
-                             0xf000000000000000};
-
+  uint64_t *hhr4, s, u;
   assert (h < M);
-  r = h >> 4;         /* h div 16 */
-  s = h & 15;         /* h mod 16 */
-  v = H[r] & mask[s];
-  if (v != mask[s])
-    H[r] += (uint64_t) 1 << (s << 2); /* add 1 to bit 4s */
+  s = h & 15;
+  u = mask[s];
+  hhr4 = &(H[h >> 4]);
+  if ((*hhr4 & u) != u)
+    *hhr4 += addm[s]; /* add 1 to bit 4s */
 }
 
 static double
@@ -326,8 +384,7 @@ stat2 ()
   double wmax = 0.0, wsum = 0.0, w;
   uint64_t count[SAMPLE+1], n;
 
-  for (h = 0; h <= SAMPLE; h++)
-    count[h] = 0;
+  memset(count, 0, sizeof(*count) * (SAMPLE + 1));
   for (h = 0; h < M; h++)
     if (H2[h].weight < 0)
       {
@@ -341,15 +398,18 @@ stat2 ()
           n = SAMPLE - 1;
         count[n] ++;
       }
-  fprintf (stderr, "Number of connected components: %lu\n", nc);
-  fprintf (stderr, "Weight: %.2f (avg), %.2f (max)\n", wsum / (double) nc, wmax);
+  fprintf (stderr,
+	   "Number of connected components: %lu\n"
+	   "Weight: %.2f (avg), %.2f (max)\n", nc, wsum / (double) nc, wmax);
   n = SAMPLE;
   while (n > 0)
     {
       count[n-1] += count[n];
+      /*
       if (count[n-1] > 0)
         fprintf (stderr, "Weight >= %.2f: %lu components\n",
                  (double) (n - 1) / RESOLUTION, count[n-1]);
+      */
       if (count[n-1] > target)
         break;
       n--;
@@ -366,21 +426,17 @@ stat2 ()
 static void
 delete (uint64_t h)
 {
-  uint64_t r, s, v;
-  const uint64_t mask[16] = {0xf, 0xf0, 0xf00, 0xf000, 0xf0000, 0xf00000,
-                             0xf000000, 0xf0000000, 0xf00000000, 0xf000000000,
-                             0xf0000000000, 0xf00000000000, 0xf000000000000,
-                             0xf0000000000000, 0xf00000000000000,
-                             0xf000000000000000};
-
+  uint64_t *hhr4, s, u, v;
   assert (h < M);
-  r = h >> 4;         /* h div 16 */
-  s = h & 15;         /* h mod 16 */
-  v = H[r] & mask[s];
-  if (v == 0)
+  s = h & 15;
+  u = mask[s];
+  hhr4 = &(H[h >> 4]);
+  v = *hhr4 & u;
+  if (!v)
     fprintf (stderr, "Warning: deleting ideal with weight 0 at h=%lu\n", h);
-  else if (v != mask[s])
-    H[r] -= (uint64_t) 1 << (s << 2); /* remove 1 to bit 4s */
+  else
+    if (v != u)
+      *hhr4 -= addm[s]; /* remove 1 to bit 4s */
 }
 
 /* return a*b mod p, assuming 0 <= a, b, p < 2^40 */
@@ -416,10 +472,10 @@ root (long a0, long b0, long p)
   a = b;
   b = p;
   /* invariant: a = u*b0 mod p, b = w*b0 mod p */
-  while (b != 0)
+  while (b)
     {
       q = a / b;
-      r = a % b;
+      r = a - q * b;
       a = b;
       b = r;
       t = u;
@@ -445,11 +501,12 @@ root (long a0, long b0, long p)
 static unsigned long
 foo (char *g)
 {
+  char s[1024], *ret, *t;
   FILE *f;
-  char *ret, s[1024], *t, *endptr;
   unsigned long line = 0, b, r;
   long a;
   uint64_t p, pfree;
+  uint8_t m;
 
   f = gzip_open (g, "r");
 
@@ -460,56 +517,44 @@ foo (char *g)
         break;
       line ++;
       t = s;
-      a = 0;
-      a = strtol (t, &endptr, 10);
+      if (*t != '-')
+	a = 1;
+      else {
+	a = -1;
+	t++;
+      }
+      for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++)
+	p = p * 10 + m;
+      a *= p;
       assert (a != 0);
-      assert (endptr > t);
-      t = endptr;
       assert (*t == ',');
       t ++;
-      b = strtoul (t, &endptr, 10);
-      assert (endptr > t);
-      t = endptr;
+      for (b = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++)
+	b = b * 10 + m;
       assert (*t == ':');
       t ++;
       pfree = 0;
       while (1)
         {
-          p = 0;
-          while (('0' <= *t && *t <= '9') || ('a' <= *t && *t <= 'f'))
-            {
-              p = 16 * p;
-              if ('0' <= *t && *t <= '9')
-                p += *t - '0';
-              else
-                p += *t - 'a' + 10;
-              t++;
-            }
+	  for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++)
+	    p = (p << 4) + m;
           if (b == 0)
             pfree = p;
           if (p >= minpr)
-            insert (index_rat (p));
+            insert (INDEX_RAT (p));
           if (*t++ != ',')
             break; /* end of rational primes */
         }
       while (1)
         {
-          p = 0;
-          while (('0' <= *t && *t <= '9') || ('a' <= *t && *t <= 'f'))
-            {
-              p = 16 * p;
-              if ('0' <= *t && *t <= '9')
-                p += *t - '0';
-              else
-                p += *t - 'a' + 10;
-              t++;
-            }
+	  for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++)
+	    p = (p << 4) + m;
           if (pfree >= minpa)
-            insert (index_alg (pfree, p));
+            insert (INDEX_ALG (pfree, p));
           else if (p >= minpa)
             {
               r = root (a, b, p);
-              insert (index_alg (p, r));
+              insert (INDEX_ALG (p, r));
             }
           if (*t++ != ',')
             break; /* end of algebraic primes */
@@ -524,14 +569,15 @@ foo (char *g)
 static void
 bar2 (char *g)
 {
+  uint64_t rp[MAX_RAT_PER_LINE], ap[MAX_ALG_PER_LINE], ar[MAX_ALG_PER_LINE];
+  char s[1024], *t, *ret;
   FILE *f;
-  char *ret, s[1024], *t, *endptr;
   unsigned long line = 0, b, r, output = 0;
   long a;
   uint64_t p, pfree, w, h;
   int nr, na, keep;
-  uint64_t rp[16], ap[16], ar[16];
   double W;
+  uint8_t m;
 
   f = gzip_open (g, "r");
 
@@ -542,17 +588,18 @@ bar2 (char *g)
         break;
       line ++;
       t = s;
-      a = 0;
-      a = strtol (t, &endptr, 10);
-      // assert (a != 0);       /* already checked in pass 1 */
-      // assert (endptr > t);   /* already checked in pass 1 */
-      t = endptr;
-      // assert (*t == ',');    /* already checked in pass 1 */
+      if (*t != '-')
+	a = 1;
+      else {
+	a = -1;
+	t++;
+      }
+      for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++)
+	p = p * 10 + m;
+      a *= p;
       t ++;
-      b = strtoul (t, &endptr, 10);
-      // assert (endptr > t);   /* already checked in pass 1 */
-      t = endptr;
-      // assert (*t == ':');    /* already checked in pass 1 */
+      for (b = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++)
+	b = b * 10 + m;
       t ++;
       pfree = 0;
       nr = na = 0;
@@ -560,43 +607,34 @@ bar2 (char *g)
       keep = 1;
       while (keep)
         {
-          p = 0;
-          while (('0' <= *t && *t <= '9') || ('a' <= *t && *t <= 'f'))
-            {
-              p = 16 * p;
-              if ('0' <= *t && *t <= '9')
-                p += *t - '0';
-              else
-                p += *t - 'a' + 10;
-              t++;
-            }
+	  for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++)
+	    p = (p << 4) + m;
           if (b == 0)
             pfree = p;
           if (p >= minpr)
             {
-              w = weight (index_rat (p));
-              if (w <= 1)
-                keep = 0;
-              else if (w == 2)
+              w = WEIGHT (INDEX_RAT (p));
+	      switch (w) {
+	      case 0: case 1:
+		keep = 0;
+		break;
+	      case 2 :
                 rp[nr++] = p;
-              else if (w <= 15)
+		break;
+	      case 3:  case 4:  case 5:  case 6:  case 7:  case 8:  case 9:
+	      case 10: case 11: case 12: case 13: case 14: case 15:
                 W += 1.0 / (double) w;
+		break;
+	      }
             }
           if (*t++ != ',')
             break; /* end of rational primes */
         }
+      assert (nr < MAX_RAT_PER_LINE);
       while (keep)
         {
-          p = 0;
-          while (('0' <= *t && *t <= '9') || ('a' <= *t && *t <= 'f'))
-            {
-              p = 16 * p;
-              if ('0' <= *t && *t <= '9')
-                p += *t - '0';
-              else
-                p += *t - 'a' + 10;
-              t++;
-            }
+	  for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++)
+	    p = (p << 4) + m;
           if (pfree >= minpa)
             {
               r = p;
@@ -606,20 +644,25 @@ bar2 (char *g)
             r = root (a, b, p);
           if (p >= minpa)
             {
-              w = weight (index_alg (p, r));
-              if (w <= 1)
-                keep = 0;
-              else if (w == 2)
-                {
-                  ap[na] = p;
-                  ar[na++] = r;
-                }
-              else if (w <= 15)
+              w = WEIGHT (INDEX_ALG (p, r));
+	      switch (w) {
+	      case 0: case 1:
+		keep = 0;
+		break;
+	      case 2 :
+		ap[na] = p;
+		ar[na++] = r;
+		break;
+	      case 3:  case 4:  case 5:  case 6:  case 7:  case 8:  case 9:
+	      case 10: case 11: case 12: case 13: case 14: case 15:
                 W += 1.0 / (double) w;
+		break;
+	      }
             }
           if (*t++ != ',')
             break; /* end of algebraic primes */
         }
+      assert (na < MAX_ALG_PER_LINE);
       if (keep && (nr + na > 0)) /* at least one ideal of weight 2 */
         {
           /* Warning: it can be that an ideal appears twice (or more).
@@ -627,16 +670,16 @@ bar2 (char *g)
              we insert this ideal twice, but then we should avoid for infinite
              loops. */
           if (nr-- > 0)
-            h = insert2 (index_rat (rp[nr]), W);
+            h = insert2 (INDEX_RAT (rp[nr]), W);
           else /* na > 0 */
             {
               na --;
-              h = insert2 (index_alg (ap[na], ar[na]), W);
+              h = insert2 (INDEX_ALG (ap[na], ar[na]), W);
             }
           while (nr-- > 0)
-            insert2a (index_rat (rp[nr]), h);
+            insert2a (INDEX_RAT (rp[nr]), h);
           while (na-- > 0)
-            insert2a (index_alg (ap[na], ar[na]), h);
+            insert2a (INDEX_ALG (ap[na], ar[na]), h);
         }
       output += keep;
     }
@@ -653,20 +696,20 @@ bar2 (char *g)
 static void
 bar (char *g)
 {
+  uint64_t rp[MAX_RAT_PER_LINE], ap[MAX_ALG_PER_LINE], ar[MAX_ALG_PER_LINE];
+  char s[1024], newg[MAXNAME<<1], *t, *ret;
   FILE *f, *newf;
-  char *ret, s[1024], *t, *endptr, newg[1024];
   unsigned long line = 0, b, r, output = 0;
   long a;
   uint64_t p, pfree, w, h;
   int keep, nr, na;
-  uint64_t rp[16], ap[16], ar[16];
+  uint8_t m;
 
+  strcpy (newg, NEW_DIR);
+  strcat (newg, g);
   f = gzip_open (g, "r");
-  strcpy (newg, "new/");
-  strcpy (newg + 4, g);
   newf = gzip_open (newg, "w");
   assert (newf != NULL);
-
   while (1)
     {
       ret = fgets (s, 1024, f);
@@ -674,43 +717,34 @@ bar (char *g)
         break;
       line ++;
       t = s;
-      a = 0;
-      a = strtol (t, &endptr, 10);
-      // assert (a != 0);          /* already checked in pass 1 */
-      // assert (endptr > t);      /* already checked in pass 1 */
-      t = endptr;
-      // assert (*t == ',');       /* already checked in pass 1 */
+      if (*t != '-')
+	a = 1;
+      else {
+	a = -1;
+	t++;
+      }
+      for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++)
+	p = p * 10 + m;
+      a *= p;
       t ++;
-      b = strtoul (t, &endptr, 10);
-      // assert (endptr > t);      /* already checked in pass 1 */
-      t = endptr;
-      // assert (*t == ':');       /* already checked in pass 1 */
+      for (b = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++)
+	b = b * 10 + m;
       t ++;
       pfree = 0;
       keep = 1;
       nr = na = 0;
       while (1)
         {
-          p = 0;
-          while (('0' <= *t && *t <= '9') || ('a' <= *t && *t <= 'f'))
-            {
-              p = 16 * p;
-              if ('0' <= *t && *t <= '9')
-                p += *t - '0';
-              else
-                p += *t - 'a' + 10;
-              t++;
-            }
+	  for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++)
+	    p = (p << 4) + m;
           if (b == 0)
             pfree = p;
           if (p >= minpr)
             {
               rp[nr++] = p;
-              h = index_rat (p);
-              w = weight (h);
-              if (w <= 1)
-                keep = 0;
-              else if ((w == 2) && (clique_weight (h) >= threshold_weight))
+              h = INDEX_RAT (p);
+              w = WEIGHT (h);
+              if (w <= 1 || ((w == 2) && (clique_weight (h) >= threshold_weight)))
                 keep = 0;
             }
           if (*t++ != ',')
@@ -718,16 +752,8 @@ bar (char *g)
         }
       while (1)
         {
-          p = 0;
-          while (('0' <= *t && *t <= '9') || ('a' <= *t && *t <= 'f'))
-            {
-              p = 16 * p;
-              if ('0' <= *t && *t <= '9')
-                p += *t - '0';
-              else
-                p += *t - 'a' + 10;
-              t++;
-            }
+	  for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++)
+	    p = (p << 4) + m;
           if (pfree >= minpa)
             {
               r = p;
@@ -739,11 +765,9 @@ bar (char *g)
             {
               ap[na] = p;
               ar[na++] = r;
-              h = index_alg (p, r);
-              w = weight (h);
-              if (w <= 1)
-                keep = 0;
-              else if ((w == 2) && (clique_weight (h) >= threshold_weight))
+              h = INDEX_ALG (p, r);
+              w = WEIGHT (h);
+              if (w <= 1 || ((w == 2) && (clique_weight (h) >= threshold_weight)))
                 keep = 0;
             }
           if (*t++ != ',')
@@ -751,15 +775,15 @@ bar (char *g)
         }
       if (keep)
         {
-          fprintf (newf, "%s", s);
+          fputs (s, newf);
           output ++;
         }
       else /* update 2-bit counters of removed ideals */
         {
           while (nr-- > 0)
-            delete (index_rat (rp[nr]));
+            delete (INDEX_RAT (rp[nr]));
           while (na-- > 0)
-            delete (index_alg (ap[na], ar[na]));
+            delete (INDEX_ALG (ap[na], ar[na]));
         }
     }
 
@@ -768,7 +792,6 @@ bar (char *g)
 
   fprintf (stderr, "   new/%s done: remains %lu rels out of %lu\n",
            g, output, line);
-  fflush (stderr);
   pthread_mutex_lock (&lock);
   remains += output;
   nrels += line;
@@ -779,12 +802,21 @@ void*
 one_thread (void* args)
 {
   tab_t *tab = (tab_t*) args;
+  /*
+  char cg[ARG_MAX], *pg;
 
-  fprintf (stderr, "1: Thread %d deals with %s\n", tab[0]->thread, tab[0]->g);
+  strcpy(cg, tab[0]->g);
+  for (pg = cg; (pg = strchr(pg, ' ')) != NULL; *pg = '\n');
+  fprintf (stderr, "1: Thread %d deals with %s\n", tab[0]->thread, cg);
   fflush (stderr);
+  */
   tab[0]->nlines = foo (tab[0]->g);
-  fprintf (stderr, "   %s done (%lu relations)\n", tab[0]->g, tab[0]->nlines);
+  /*
+  fprintf (stderr, "   %s done (%lu relations)\n", cg, tab[0]->nlines);
   fflush (stderr);
+  */
+  tab[0]->busy = 1;
+  sem_post(&sem_pt);
   return NULL;
 }
 
@@ -794,9 +826,13 @@ pass2_one_thread (void* args)
 {
   tab_t *tab = (tab_t*) args;
 
+  /*
   fprintf (stderr, "2: Thread %d deals with %s\n", tab[0]->thread, tab[0]->g);
   fflush (stderr);
+  */
   bar2 (tab[0]->g);
+  tab[0]->busy = 1;
+  sem_post(&sem_pt);
   return NULL;
 }
 
@@ -806,9 +842,13 @@ pass3_one_thread (void* args)
 {
   tab_t *tab = (tab_t*) args;
 
+  /*
   fprintf (stderr, "3: Thread %d deals with %s\n", tab[0]->thread, tab[0]->g);
   fflush (stderr);
+  */
   bar (tab[0]->g);
+  tab[0]->busy = 1;
+  sem_post(&sem_pt);
   return NULL;
 }
 
@@ -816,25 +856,23 @@ void*
 one_thread3 (void* args)
 {
   tab_t *tab = (tab_t*) args;
-  uint64_t h, r, wt[16];
+  uint64_t *hd, *he, h, wt[16];
 
-  for (r = 1; r < 16; r++)
-    wt[r] = 0;
-  for (r = tab[0]->thread; r < Hsize; r += tab[0]->nthreads)
+  memset (wt, 0, sizeof(*wt) * 16);
+  hd = &(H[(tab[0]->thread * Hsize) / tab[0]->nthreads]);
+  he = &(H[((tab[0]->thread + 1) * Hsize) / tab[0]->nthreads]);
+  while (hd < he)
     {  /* deal with 64 bits, i.e., 16 entries at a time */
-      h = H[r];
-      while (h != 0)
+      h = *hd++;
+      while (h)
         {
           wt[h & 0xf] ++;
           h >>= 4;
         }
     }
-
-  for (tab[0]->nideal = 0, r = 1; r < 16; r++)
-    tab[0]->nideal += wt[r];
-  tab[0]->nsingl = wt[1];
+  tab[0]->nideal = tab[0]->nsingl = wt[1];
   tab[0]->ndupli = wt[2];
-
+  for (hd = &(wt[2]); hd < &(wt[16]); tab[0]->nideal += *hd++);
   return NULL;
 }
 
@@ -886,24 +924,23 @@ stat_mt (int nthreads)
       ndupli += T[i]->ndupli;
     }
   free (T);
-  fprintf (stderr, "stat_mt() took %lds (cpu), %lds (real)\n",
-           cputime () - st, realtime () - rt);
+  fprintf (stderr, "   Stat_mt() took %lds (cpu), %lds (real)\n",
+           (unsigned long) (cputime () - st), (unsigned long) (realtime () - rt));
   est_ideals = estimate_ideals ((double) M, (double) nideal);
 #ifndef EXACT_HASH
-  fprintf (stderr, "Read %lu rels (%lu/s), %lu entries (%.2f%%), est. %1.0f ideals, %lu singletons, %lu of weight 2\n",
-           nrels, nrels / (rt - wct0 + (rt == wct0)),
+  fprintf (stderr, "   Read %lu rels (%lu/s), %lu entries (%.2f%%), est. %1.0f ideals, %lu singletons, %lu of weight 2\n",
+           nrels, (unsignend long) (nrels / (rt - wct0)),
            nideal, 100.0 * (double) nideal / (double) M,
            est_ideals, nsingl, ndupli);
 #else
-  fprintf (stderr, "Read %lu rels (%lu/s), %lu ideals (%.2f%%), %lu singletons, %lu of weight 2\n",
-           nrels, nrels / (rt - wct0 + (rt == wct0)),
+  fprintf (stderr, "   Read %lu rels (%lu/s), %lu ideals (%.2f%%), %lu singletons, %lu of weight 2\n",
+           nrels, (unsigned long) (nrels / (rt - wct0)),
            nideal, 100.0 * (double) nideal / (double) M,
            nsingl, ndupli);
 #endif
-  fprintf (stderr, "Estimated excess %1.0f, need %1.0f\n",
+  fprintf (stderr, "   Estimated excess %1.0f, need %1.0f\n",
            (double) nrels - est_ideals,
            est_excess ((double) minpr) + est_excess ((double) minpa));
-  fflush (stderr);
 }
 
 /* read all files and fills the hash table */
@@ -911,12 +948,19 @@ static void
 doit (int nthreads, char *filelist)
 {
   FILE *f;
-  char g[MAXNAME], *ret;
-  int i = 0, j;
+  char g[ARG_MAX], *pg;
+  int i, j = 0, nbt = 0, notload, nbf, askstat;
   tab_t *T;
   pthread_t tid[MAX_THREADS];
-  long st, rt;
+  double st = cputime(), rt = realtime(), crt, art, oart,
+    delay_stat = compute_delay_stat();
+  size_t lpg;
+  uint64_t onrels = 0;
 
+  fprintf (stderr, "\n"
+	   "************\n"
+	   "* PASS 1/3 *\n"
+	   "************\n\n");
   f = fopen (filelist, "r");
   if (f == NULL)
     {
@@ -924,43 +968,68 @@ doit (int nthreads, char *filelist)
       exit (1);
     }
   T = malloc (nthreads * sizeof (tab_t));
-  while (!feof (f))
-    {
-      ret = fgets (g, MAXNAME, f);
-      if (ret == NULL)
-        break;
-      g[strlen(g) - 1] = '\0';
-      strcpy (T[i]->g, g);
-      T[i]->thread = i;
-      i ++;
-      if (i == nthreads)
-        {
-          st = cputime ();
-          rt = realtime ();
-          for (i = 0; i < nthreads; i++)
-            pthread_create (&tid[i], NULL, one_thread, (void *) (T + i));
-          for (i = 0; i < nthreads; i++)
-            {
-              pthread_join (tid[i], NULL);
-              nrels += T[i]->nlines;
-            }
-          fprintf (stderr, "Batch took %lds (cpu), %lds (real)\n",
-                   cputime () - st, realtime () - rt);
-          i = 0;
-          stat_mt (nthreads);
-        }
+  memset(T, 0, nthreads * sizeof (tab_t));
+  sem_init(&sem_pt, 0, nthreads - 1);
+  crt = oart = art = rt;
+  while ((notload = (!feof (f))) || nbt) {
+    if (notload && !(askstat = ((art - crt) > delay_stat))) {
+      pg = g;
+      nbf = 0;
+      do {
+	if (fgets (pg, MAXNAME, f) && (lpg = strlen(pg))) {
+	  nbf++;
+	  pg += lpg;
+	  pg[-1] = ' ';
+	}
+	else break;
+      } while (nbf < MAX_FILES_PER_THREAD && pg < g + ARG_MAX - MAXNAME);
+      if (nbf) {
+	pg[-1] = 0;
+	for (i = 0; T[i]->busy && i < nthreads; i++);
+	assert(i < nthreads);
+	strcpy (T[i]->g, g);
+	T[i]->busy = 2;
+	T[i]->thread = i;
+	nbt++;
+	pthread_create (&tid[i], NULL, one_thread, (void *) (T + i));
+      }
     }
-  if (i > 0)
-    {
-      for (j = 0; j < i; j++)
-        pthread_create (&tid[j], NULL, one_thread, (void *) (T + j));
-      for (j = 0; j < i; j++)
-        {
-          pthread_join (tid[j], NULL);
-          nrels += T[j]->nlines;
-        }
+    sem_wait(&sem_pt);
+    for (i = 0; i < nthreads; i++)
+      if (T[i]->busy == 1) {
+	pthread_join (tid[i], NULL);
+	nrels += T[i]->nlines;
+	T[i]->busy = 0;
+	nbt--;
+	j = i;
+	break;
+      }
+    art = realtime();
+    if (j + 1 == nthreads) {
+      fprintf (stderr, "Pass1; mrels: load %lu; krels/s: avg %lu, spot %lu. " 
+	       "Time: %lus cpu, %lus real\n", nrels >> 20,
+	       (unsigned long) ((nrels >> 10) / (art - rt)), 
+	       (unsigned long) (((nrels - onrels) >> 10) / (art - oart)),
+	       (unsigned long) (cputime() - st),
+	       (unsigned long) (art - rt));
+      oart = art;
+      onrels = nrels;
+      j = 0;
+    }
+    if (askstat && !nbt) {
       stat_mt (nthreads);
+      crt = art;
+      sem_destroy(&sem_pt);
+      sem_init(&sem_pt, 0, nthreads - 1);
     }
+  }
+  fprintf (stderr, "\n*** Pass 1, final stats: *** \n");
+  stat_mt (nthreads);
+  fprintf (stderr, "\n"
+	   "*****************\n"
+	   "* PASS 1/3 DONE *\n"
+	   "*****************\n\n");
+  sem_destroy(&sem_pt);
   fclose (f);
   free (T);
 }
@@ -970,102 +1039,147 @@ static void
 pass2 (int nthreads, char *filelist)
 {
   FILE *f;
-  char g[MAXNAME], *ret;
-  int i = 0, j;
+  char g[ARG_MAX], *pg;
+  int i, j = 0, notload, nbt = 0, nbf;
   tab_t *T;
   pthread_t tid[MAX_THREADS];
-  long st, rt;
+  double st = cputime(), rt = realtime(), art, oart;
+  size_t lpg;
+  uint64_t onrels = 0;
 
+  fprintf (stderr, "\n"
+	   "************\n"
+	   "* PASS 2/3 *\n"
+	   "************\n\n");
   f = fopen (filelist, "r");
   T = malloc (nthreads * sizeof (tab_t));
-  while (!feof (f))
-    {
-      ret = fgets (g, MAXNAME, f);
-      if (ret == NULL)
-        break;
-      g[strlen(g) - 1] = '\0';
-      strcpy (T[i]->g, g);
-      T[i]->thread = i;
-      i ++;
-      if (i == nthreads)
-        {
-          st = cputime ();
-          rt = realtime ();
-          for (i = 0; i < nthreads; i++)
-            pthread_create (&tid[i], NULL, pass2_one_thread, (void *) (T + i));
-          for (i = 0; i < nthreads; i++)
-            pthread_join (tid[i], NULL);
-          fprintf (stderr, "Batch took %lds (cpu), %lds (real)\n",
-                   cputime () - st, realtime () - rt);
-          i = 0;
-          fprintf (stderr, "Total %lu rels remaining out of %lu (%.2f%%)\n",
-                   remains, nrels, 100.0 * (double) remains / (double) nrels);
-          fflush (stderr);
-        }
+  memset(T, 0, nthreads * sizeof (tab_t));
+  sem_init(&sem_pt, 0, nthreads - 1);
+  oart = art = rt;
+  while ((notload = (!feof (f))) || nbt) {
+    if (notload) {
+      pg = g;
+      nbf = 0;
+      do {
+	if (fgets (pg, MAXNAME, f) && (lpg = strlen(pg))) {
+	  nbf++;
+	  pg += lpg;
+	  pg[-1] = ' ';
+	}
+	else
+	  break;
+      } while (nbf < MAX_FILES_PER_THREAD && pg < g + ARG_MAX - MAXNAME);
+      if (nbf) {
+	pg[-1] = 0;
+	for (i = 0; T[i]->busy && i < nthreads; i++);
+	assert(i < nthreads);
+	strcpy (T[i]->g, g);
+	T[i]->busy = 2;
+	T[i]->thread = i;
+	nbt++;
+	pthread_create (&tid[i], NULL, pass2_one_thread, (void *) (T + i));
+      }
     }
-  if (i > 0)
-    {
-      for (j = 0; j < i; j++)
-        pthread_create (&tid[j], NULL, pass2_one_thread, (void *) (T + j));
-      for (j = 0; j < i; j++)
-        pthread_join (tid[j], NULL);
-      fprintf (stderr, "Total %lu rels remaining out of %lu (%.2f%%)\n",
-               remains, nrels, 100.0 * (double) remains / (double) nrels);
-      fflush (stderr);
+    sem_wait(&sem_pt);
+    for (i = 0; i < nthreads; i++)
+      if (T[i]->busy == 1) {
+	pthread_join (tid[i], NULL);
+	T[i]->busy = 0;
+	nbt--;
+	j = i;
+	break;
+      }
+    art = realtime();
+    if (j + 1 == nthreads) {
+      fprintf (stderr, "Pass2; mrels: load %lu, used %lu (%.2f%%); "
+	       "krels/s: %lu avg, %lu spot; time: %lus cpu, %lus real\n",
+	       nrels >> 20, remains >> 20,
+	       100.0 * (double) remains / (double) nrels,
+	       (unsigned long) ((nrels >> 10) / (art - rt)), 
+	       (unsigned long) (((nrels - onrels) >> 10) / (art - oart)),
+	       (unsigned long) (cputime() - st),
+	       (unsigned long) (art - rt));
+      oart = art;
+      onrels = nrels;
+      j = 0;
     }
+  }
+  fprintf (stderr, "\n"
+	   "*****************\n"
+	   "* PASS 2/3 DONE *\n"
+	   "*****************\n\n");
   stat2 ();
+  sem_destroy(&sem_pt);
   fclose (f);
   free (T);
 }
 
 /* third pass: outputs remaining relations */
+/* Problem: I cannot agglomerate the files because 1 file load = 1 file written.
+   So I have to take them one by one and write them synchronously, one by one too.
+   It's a pity for disk access...
+*/
 static void
 pass3 (int nthreads, char *filelist)
 {
   FILE *f;
-  char g[MAXNAME], *ret;
-  int i = 0, j;
+  char g[MAXNAME];
+  int i, j = 0, k = 0, nbt = 0, notload;
   tab_t *T;
   pthread_t tid[MAX_THREADS];
-  long st, rt;
+  double st = cputime(), rt = realtime(), art, oart;
+  size_t lg;
+  uint64_t onrels = 0;
 
+  fprintf (stderr, "\n"
+	   "************\n"
+	   "* PASS 3/3 *\n"
+	   "************\n\n");
   f = fopen (filelist, "r");
   T = malloc (nthreads * sizeof (tab_t));
-  while (!feof (f))
-    {
-      ret = fgets (g, MAXNAME, f);
-      if (ret == NULL)
-        break;
-      g[strlen(g) - 1] = '\0';
+  memset(T, 0, nthreads * sizeof (tab_t));
+  sem_init(&sem_pt, 0, nthreads - 1);
+  oart = art = rt;
+  while ((notload = (!feof (f))) || nbt) {
+    if (notload && fgets (g, MAXNAME, f) && (lg = strlen(g))) {
+      g[lg - 1] = 0;
+      for (i = 0; T[i]->busy && i < nthreads; i++);
+      assert(i < nthreads);
       strcpy (T[i]->g, g);
+      T[i]->busy = 2;
       T[i]->thread = i;
-      i ++;
-      if (i == nthreads)
-        {
-          st = cputime ();
-          rt = realtime ();
-          for (i = 0; i < nthreads; i++)
-            pthread_create (&tid[i], NULL, pass3_one_thread, (void *) (T + i));
-          for (i = 0; i < nthreads; i++)
-            pthread_join (tid[i], NULL);
-          fprintf (stderr, "Batch took %lds (cpu), %lds (real)\n",
-                   cputime () - st, realtime () - rt);
-          i = 0;
-          fprintf (stderr, "Total %lu rels remaining out of %lu (%.2f%%)\n",
-                   remains, nrels, 100.0 * (double) remains / (double) nrels);
-          fflush (stderr);
-        }
+      nbt++;
+      pthread_create (&tid[i], NULL, pass3_one_thread, (void *) (T + i));
     }
-  if (i > 0)
-    {
-      for (j = 0; j < i; j++)
-        pthread_create (&tid[j], NULL, pass3_one_thread, (void *) (T + j));
-      for (j = 0; j < i; j++)
-        pthread_join (tid[j], NULL);
-      fprintf (stderr, "Total %lu rels remaining out of %lu (%.2f%%)\n",
-               remains, nrels, 100.0 * (double) remains / (double) nrels);
-      fflush (stderr);
+    sem_wait(&sem_pt);
+    for (i = 0; i < nthreads; i++)
+      if (T[i]->busy == 1) {
+	pthread_join (tid[i], NULL);
+	T[i]->busy = 0;
+	nbt--;
+	j = i;
+	break;
+      }
+    art = realtime();
+    if (j + 1 == nthreads && ++k == MAX_FILES_PER_THREAD) {
+      fprintf (stderr, "Pass3; mrels: load %lu, used %lu (%.2f%%); "
+	       "krels/s: %lu avg, %lu spot; time: %lus cpu, %lus real\n",
+	       nrels >> 20, remains >> 20,
+	       100.0 * (double) remains / (double) nrels,
+	       (unsigned long) ((nrels >> 10) / (art - rt)), 
+	       (unsigned long) (((nrels - onrels) >> 10) / (art - oart)),
+	       (unsigned long) (cputime() - st),
+	       (unsigned long) (art - rt));
+      oart = art;
+      onrels = nrels;
+      j = k = 0;
     }
+  }
+  fprintf (stderr, "\n"
+	   "*****************\n"
+	   "* PASS 3/3 DONE *\n"
+	   "*****************\n\n");
+  sem_destroy(&sem_pt);
   fclose (f);
   free (T);
 }
@@ -1075,10 +1189,9 @@ isprime (uint64_t n)
 {
   uint64_t p;
 
-  if ((n % 2) == 0)
-    return 0;
+  if (!(n & 1)) return 0;
   for (p = 3; p * p <= n; p += 3)
-    if ((n % p) == 0)
+    if (!(n % p))
       return 0;
   return 1;
 }
@@ -1088,6 +1201,7 @@ main (int argc, char *argv[])
 {
   int nthreads = 1, i;
   char *filelist = NULL;
+  size_t size_malloc;
 
   /* print command-line arguments */
   fprintf (stderr, "%s", argv[0]);
@@ -1179,24 +1293,37 @@ main (int argc, char *argv[])
     }
 
   /* check that M = 2p where p is prime */
-  assert ((M % 2) == 0);
-  assert (isprime (M/2));
+  assert (!(M & 1));
+  assert (isprime (M>>1));
 
-  Hsize = 1 + (M - 1) / 16; /* each entry uses 4 bits */
-  H = (uint64_t*) malloc (Hsize * sizeof (uint64_t));
-  memset (H, 0, Hsize * sizeof (uint64_t));
+  Hsize = 1 + ((M - 1) >> 4); /* each entry uses 4 bits */
+
+  size_malloc = Hsize * sizeof (*H);
+  fprintf (stderr, "Creating & clearing hashtable: %lu mB...", size_malloc >> 20);
+  H = malloc (size_malloc);
+  memset (H, 0, size_malloc);
+  fprintf (stderr, " Done. \n");
 #ifdef EXACT_HASH
-  PR = (uint64_t*) malloc (M * sizeof (uint64_t));
-  memset (PR, 0, M * sizeof (uint64_t));
+  size_malloc = M * sizeof (*PR);
+  fprintf (stderr, "Creating & clearing (p,r) array: %lu mB...", size_malloc >> 20);
+  PR = malloc (size_malloc);
+  memset (PR, 0, size_malloc);
+  fprintf (stderr, " Done.\n");
 #endif
+  fprintf (stderr, "Creating possible " NEW_DIR "* directories...");
+  create_directories(filelist);
+  fprintf (stderr, " Done.\n");
 
   wct0 = realtime ();
-
   nrels = 0;
   doit (nthreads, filelist);
 
-  H2 = (tab2_t*) malloc (M * sizeof (tab2_t));
-  memset (H2, 0, M * sizeof (tab2_t));
+  size_malloc = M * sizeof (*H2);
+  fprintf (stderr, "Creating & clearing weight primes array: %lu mB...", size_malloc >> 20);
+  H2 = malloc (size_malloc);
+  memset (H2, 0, size_malloc);
+  fprintf (stderr, " Done.\n");
+
   nrels = remains = 0;
   pass2 (nthreads, filelist);
 
