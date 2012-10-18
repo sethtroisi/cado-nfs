@@ -935,13 +935,13 @@ FIXME: can we find the locations to sieve? */
 #else
                     push_bucket_update(BA, x >> shiftbucket, update);
 #endif
-                }
 #ifdef TRACE_K
-                if (trace_on_spot_x(x)) {
-                    fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
-                            (unsigned int) (x & maskbucket), logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
-                }
+                    if (trace_on_spot_x(x)) {
+                        fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
+                                (unsigned int) (x & maskbucket), logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
+                    }
 #endif
+                }
                 if (i >= bound1) x += inc_a;
                 if (i < bound0)  x += inc_c;
             }

@@ -520,6 +520,10 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 
 
     /* Handle 3 */
+    /* For the time being, it's really 3. But the only thing we care about is
+     * the hit rate to be 1 every 3rd, on lines for which we hit. So the code
+     * below could be improved to handle more cases, although presently it
+     * does not. */
     WHERE_AM_I_UPDATE(w, p, 3);
     /* First collect updates for powers of three in a pattern,
        then apply pattern to sieve line.
@@ -564,6 +568,13 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                  * we're certain that a projective prime is trivial*/
                 /* TODO */
             }
+        }
+        
+        if (!((j ^ row0_is_oddj)&1)) {
+            /* We have an even j. There, we must not sieve even i's either !
+             */
+            for (unsigned int i = 0; i < 3 * sizeof(unsigned long); i += 2)
+                ((unsigned char *)pattern)[i] = 0;
         }
 
         if (pattern[0]) {
@@ -704,7 +715,10 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 #ifdef TRACE_K
                     if (trace_on_range_Nx(w->N, i0, i0 + I)) {
                         WHERE_AM_I_UPDATE(w, x, trace_Nx.x);
-                        sieve_decrease_logging(S + w->x, logp, w);
+                        unsigned int x = trace_Nx.x;
+                        unsigned int k = x % I;
+                        unsigned int v = (((unsigned char *)(&logps2))[k%sizeof(unsigned long)]);
+                        sieve_decrease_logging(S + w->x, v, w);
                     }
 #endif
                     while (S_ptr < end)
