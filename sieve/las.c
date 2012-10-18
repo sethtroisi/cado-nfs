@@ -2151,7 +2151,7 @@ main (int argc0, char *argv0[])
             tfb = seconds ();
             leading_div = factor_small (pol->f[pol->degree], pol->lim);
             fprintf(stderr, "Reading %s factor base from %s\n", sidenames[side], fbfilename);
-            sis->fb = fb_read(fbfilename, sis->scale * LOG_SCALE, 0);
+            sis->fb = fb_read(fbfilename, sis->scale * LOG_SCALE, 0, pol->lim, apow_lim);
             ASSERT_ALWAYS(sis->fb != NULL);
             tfb = seconds () - tfb;
             fprintf (si->output, 
