@@ -274,19 +274,26 @@ void gzip_close(FILE * f, const char * name)
 static inline uint64_t
 index_hash (uint64_t pr)
 {
-  return pr % M;
+  return (pr % M);
 }
 #else
 static inline uint64_t
 index_hash (uint64_t pr)
 {
-  uint64_t *prh = &(PR[pr % M]);
-
-  while (*prh != 0 && *prh != pr)
-    if (++prh == &(PR[M]))
-      prh= PR;
-  /* now *prh = 0 or *prh = pr */
+  uint64_t *prh;
+  
+  prh = &(PR[pr % M]);
+ bouc:
+  if (*prh == pr) goto s2;
+  if (!(*prh)) goto s1;
+  if (++prh != &(PR[M])) goto bouc;
+  else {
+    prh = PR;
+    goto bouc;
+  }
+ s1:
   *prh = pr;
+ s2:
   return (prh - PR);
 }
 #endif
