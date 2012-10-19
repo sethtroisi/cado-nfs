@@ -603,11 +603,17 @@ get_maxnorm (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
 
   free (fd);
 
-  /* multiply by (B*I)^d and divide by q0 if sieving on alg side */
-  tmp = max_norm * pow (si->B * (double) si->I, (double) d);
+  /* multiply by (B*I)^d: don't use the pow() function since it does not
+     work properly when the rounding mode is not to nearest (at least under
+     Linux with the glibc). Moreover for a small exponent d a direct loop
+     as follows should not be much slower (if any), anyway the efficiency of
+     that function is not critical */
+  for (tmp = max_norm, k = 0; k < d; k++)
+    tmp *= si->B * (double) si->I;
+  /* divide by q0 if sieving on alg side */
   if (!si->ratq)
       tmp /= (double) q0;
-  return log2(tmp);
+  return log2 (tmp);
 }
 
 void sieve_info_init_norm_data(sieve_info_ptr si, unsigned long q0)
