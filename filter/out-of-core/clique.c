@@ -124,6 +124,7 @@ create_directories (char *filelist)
   FILE *f;
   char g[MAXNAME], *pdirg, mkdirg[MAXNAME<<1];
   size_t lg;
+  int ret;
   
   f = fopen (filelist, "r");
   while (!feof (f)) {
@@ -135,7 +136,12 @@ create_directories (char *filelist)
 	strcpy(mkdirg, "mkdir -p ");
 	strcat(mkdirg, NEW_DIR);
 	strcat(mkdirg, pdirg);
-	system(mkdirg);
+	ret = system (mkdirg);
+        if (ret == -1)
+          {
+            fprintf (stderr, "An error occurred during system() call\n");
+            exit (1);
+          }
       }
     }
   }
