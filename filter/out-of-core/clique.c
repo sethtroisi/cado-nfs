@@ -282,14 +282,14 @@ static inline uint64_t
 index_hash (uint64_t pr)
 {
   PR_TYPE *prh;
-  
+
   prh = PR + (pr % M);
- bouc:
+ loop:
   if (*prh == (PR_TYPE) pr) goto s2;
   if (!(*prh)) goto s1;
-  if (++prh != PR + M) goto bouc;
+  if (++prh != PR + M) goto loop;
   prh = PR;
-  goto bouc;
+  goto loop;
  s1:
   *prh = (PR_TYPE) pr;
  s2:
@@ -300,7 +300,7 @@ index_hash (uint64_t pr)
 static inline uint64_t
 index_rat (uint64_t p)
 {
-  return INDEX_RAT(p); 
+  return INDEX_RAT(p);
 }
 
 #define INDEX_ALG(P,R) (index_hash ((P)+ (M - 2) * (R)))  /* always odd for odd p and even M */
@@ -1016,9 +1016,9 @@ doit (int nthreads, char *filelist)
       }
     art = realtime();
     if (j + 1 == nthreads) {
-      fprintf (stderr, "Pass1; rels: load %lu; krels/s: avg %lu, spot %lu. " 
+      fprintf (stderr, "Pass1; rels: load %lu; krels/s: avg %lu, spot %lu. "
 	       "Time: %lus cpu, %lus real\n", nrels,
-	       (unsigned long) ((nrels >> 10) / (art - rt)), 
+	       (unsigned long) ((nrels >> 10) / (art - rt)),
 	       (unsigned long) (((nrels - onrels) >> 10) / (art - oart)),
 	       (unsigned long) (cputime() - st),
 	       (unsigned long) (art - rt));
@@ -1106,7 +1106,7 @@ pass2 (int nthreads, char *filelist)
 	       "krels/s: %lu avg, %lu spot; time: %lus cpu, %lus real\n",
 	       nrels, remains,
 	       100.0 * (double) remains / (double) nrels,
-	       (unsigned long) ((nrels >> 10) / (art - rt)), 
+	       (unsigned long) ((nrels >> 10) / (art - rt)),
 	       (unsigned long) (((nrels - onrels) >> 10) / (art - oart)),
 	       (unsigned long) (cputime() - st),
 	       (unsigned long) (art - rt));
@@ -1123,7 +1123,7 @@ pass2 (int nthreads, char *filelist)
 	       "krels/s: %lu avg, %lu spot; time: %lus cpu, %lus real\n",
 	       nrels, remains,
 	       100.0 * (double) remains / (double) nrels,
-	       (unsigned long) ((nrels >>10) / (art - rt)), 
+	       (unsigned long) ((nrels >>10) / (art - rt)),
 	       (unsigned long) (((nrels - onrels) >> 10) / (art - oart)),
 	       (unsigned long) (cputime() - st),
 	       (unsigned long) (art - rt));
@@ -1185,7 +1185,7 @@ pass3 (int nthreads, char *filelist)
 	       "krels/s: %lu avg, %lu spot; time: %lus cpu, %lus real\n",
 	       nrels, remains,
 	       100.0 * (double) remains / (double) nrels,
-	       (unsigned long) ((nrels >> 10) / (art - rt)), 
+	       (unsigned long) ((nrels >> 10) / (art - rt)),
 	       (unsigned long) (((nrels - onrels) >> 10) / (art - oart)),
 	       (unsigned long) (cputime() - st),
 	       (unsigned long) (art - rt));
