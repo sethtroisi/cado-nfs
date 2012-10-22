@@ -283,15 +283,13 @@ index_hash (uint64_t pr)
 {
   PR_TYPE *prh;
   
-  prh = &(PR[pr % M]);
+  prh = PR + (pr % M);
  bouc:
   if (*prh == (PR_TYPE) pr) goto s2;
   if (!(*prh)) goto s1;
-  if (++prh != &(PR[M])) goto bouc;
-  else {
-    prh = PR;
-    goto bouc;
-  }
+  if (++prh != PR + M) goto bouc;
+  prh = PR;
+  goto bouc;
  s1:
   *prh = (PR_TYPE) pr;
  s2:
@@ -982,8 +980,9 @@ doit (int nthreads, char *filelist)
   memset(T, 0, nthreads * sizeof (tab_t));
   sem_init(&sem_pt, 0, nthreads - 1);
   crt = oart = art = rt;
+  askstat = 0;
   while ((notload = (!feof (f))) || nbt) {
-    if (notload && !(askstat = ((art - crt) > delay_stat))) {
+    if (notload && !askstat) {
       pg = g;
       nbf = 0;
       do {
@@ -1017,8 +1016,8 @@ doit (int nthreads, char *filelist)
       }
     art = realtime();
     if (j + 1 == nthreads) {
-      fprintf (stderr, "Pass1; mrels: load %lu; krels/s: avg %lu, spot %lu. " 
-	       "Time: %lus cpu, %lus real\n", nrels >> 20,
+      fprintf (stderr, "Pass1; rels: load %lu; krels/s: avg %lu, spot %lu. " 
+	       "Time: %lus cpu, %lus real\n", nrels,
 	       (unsigned long) ((nrels >> 10) / (art - rt)), 
 	       (unsigned long) (((nrels - onrels) >> 10) / (art - oart)),
 	       (unsigned long) (cputime() - st),
@@ -1027,7 +1026,8 @@ doit (int nthreads, char *filelist)
       onrels = nrels;
       j = 0;
     }
-    if (askstat && !nbt) {
+    if ((askstat = ((art - crt) > delay_stat)) && !nbt) {
+      askstat = 0;
       stat_mt (nthreads);
       crt = art;
       sem_destroy(&sem_pt);
@@ -1102,9 +1102,9 @@ pass2 (int nthreads, char *filelist)
       }
     art = realtime();
     if (j + 1 == nthreads) {
-      fprintf (stderr, "Pass2; mrels: load %lu, used %lu (%.2f%%); "
+      fprintf (stderr, "Pass2; rels: load %lu, used %lu (%.2f%%); "
 	       "krels/s: %lu avg, %lu spot; time: %lus cpu, %lus real\n",
-	       nrels >> 20, remains >> 20,
+	       nrels, remains,
 	       100.0 * (double) remains / (double) nrels,
 	       (unsigned long) ((nrels >> 10) / (art - rt)), 
 	       (unsigned long) (((nrels - onrels) >> 10) / (art - oart)),
@@ -1119,6 +1119,14 @@ pass2 (int nthreads, char *filelist)
 	   "*****************\n"
 	   "* PASS 2/3 DONE *\n"
 	   "*****************\n\n");
+  fprintf (stderr, "Pass2; rels: load %lu, used %lu (%.2f%%); "
+	       "krels/s: %lu avg, %lu spot; time: %lus cpu, %lus real\n",
+	       nrels, remains,
+	       100.0 * (double) remains / (double) nrels,
+	       (unsigned long) ((nrels >>10) / (art - rt)), 
+	       (unsigned long) (((nrels - onrels) >> 10) / (art - oart)),
+	       (unsigned long) (cputime() - st),
+	       (unsigned long) (art - rt));
   stat2 ();
   sem_destroy(&sem_pt);
   fclose (f);
@@ -1173,9 +1181,9 @@ pass3 (int nthreads, char *filelist)
       }
     art = realtime();
     if (j + 1 == nthreads && ++k == MAX_FILES_PER_THREAD) {
-      fprintf (stderr, "Pass3; mrels: load %lu, used %lu (%.2f%%); "
+      fprintf (stderr, "Pass3; rels: load %lu, used %lu (%.2f%%); "
 	       "krels/s: %lu avg, %lu spot; time: %lus cpu, %lus real\n",
-	       nrels >> 20, remains >> 20,
+	       nrels, remains,
 	       100.0 * (double) remains / (double) nrels,
 	       (unsigned long) ((nrels >> 10) / (art - rt)), 
 	       (unsigned long) (((nrels - onrels) >> 10) / (art - oart)),
