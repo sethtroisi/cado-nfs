@@ -37,14 +37,15 @@
 #include <linux/limits.h>
 #include <semaphore.h>
 #include <libgen.h>
+#include <limits.h> /* for CHAR_BIT */
 
 #define NEW_DIR "new/"
-#define MAX_FILES_PER_THREAD 16
+#define MAX_FILES_PER_THREAD 1
 #define MAX_RAT_PER_LINE 16
 #define MAX_ALG_PER_LINE 32
 #define MAXNAME 1024
 #define MAX_THREADS 128
-#define EXACT_HASH /* store (p,r) exactly in hash table */
+#define PR_TYPE uint32_t
 
 /* thread structure */
 typedef struct
@@ -83,7 +84,8 @@ struct suffix_handler supported_compression_formats[] = {
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER; /* mutual exclusion lock */
 long wct0;
 
-uint64_t M = 0, minpa = 0, minpr = 0, Hsize, *H, nrels, remains, *PR;
+uint64_t M = 0, minpa = 0, minpr = 0, Hsize, *H, nrels, remains;
+PR_TYPE *PR;
 uint64_t target = 0;
 tab2_t *H2;
 double threshold_weight = 999.0;
@@ -125,7 +127,7 @@ create_directories (char *filelist)
   char g[MAXNAME], *pdirg, mkdirg[MAXNAME<<1];
   size_t lg;
   int ret;
-  
+
   f = fopen (filelist, "r");
   while (!feof (f)) {
     if (fgets (g, MAXNAME, f) && (lg = strlen(g))) {
@@ -276,21 +278,14 @@ void gzip_close(FILE * f, const char * name)
     }
 }
 
-#ifndef EXACT_HASH
 static inline uint64_t
 index_hash (uint64_t pr)
 {
-  return (pr % M);
-}
-#else
-static inline uint64_t
-index_hash (uint64_t pr)
-{
-  uint64_t *prh;
+  PR_TYPE *prh;
   
   prh = &(PR[pr % M]);
  bouc:
-  if (*prh == pr) goto s2;
+  if (*prh == (PR_TYPE) pr) goto s2;
   if (!(*prh)) goto s1;
   if (++prh != &(PR[M])) goto bouc;
   else {
@@ -298,11 +293,10 @@ index_hash (uint64_t pr)
     goto bouc;
   }
  s1:
-  *prh = pr;
+  *prh = (PR_TYPE) pr;
  s2:
   return (prh - PR);
 }
-#endif
 
 #define INDEX_RAT(P) (index_hash ((P) + 1)) /* even for even M */
 static inline uint64_t
@@ -325,6 +319,7 @@ weight (uint64_t h)
   return WEIGHT(h);
 }
 
+#if 0
 static void
 insert (uint64_t h)
 {
@@ -336,6 +331,20 @@ insert (uint64_t h)
   if ((*hhr4 & u) != u)
     *hhr4 += addm[s]; /* add 1 to bit 4s */
 }
+#else
+static void
+insert (uint64_t h)
+{
+  uint8_t *hh, mask[2] = {15, 240}, addm[2] = {1, 16}, u, s;
+
+  assert (h < M);
+  s = h & 1;
+  hh = ((uint8_t*) H) + (h >> 1);
+  u = mask[s];
+  if ((hh[0] & u) != u)
+    hh[0] += addm[s];
+}
+#endif
 
 static double
 clique_weight (uint64_t h)
@@ -897,11 +906,7 @@ one_thread3 (void* args)
 static double
 estimate_ideals (double n, double ek)
 {
-#ifdef EXACT_HASH
   return ek;
-#else
-  return -n * log (1.0 - ek / n);
-#endif
 }
 
 /* estimate the number of prime ideals below a */
@@ -940,17 +945,10 @@ stat_mt (int nthreads)
   fprintf (stderr, "   Stat_mt() took %lds (cpu), %lds (real)\n",
            (unsigned long) (cputime () - st), (unsigned long) (realtime () - rt));
   est_ideals = estimate_ideals ((double) M, (double) nideal);
-#ifndef EXACT_HASH
-  fprintf (stderr, "   Read %lu rels (%lu/s), %lu entries (%.2f%%), est. %1.0f ideals, %lu singletons, %lu of weight 2\n",
-           nrels, (unsignend long) (nrels / (rt - wct0)),
-           nideal, 100.0 * (double) nideal / (double) M,
-           est_ideals, nsingl, ndupli);
-#else
   fprintf (stderr, "   Read %lu rels (%lu/s), %lu ideals (%.2f%%), %lu singletons, %lu of weight 2\n",
            nrels, (unsigned long) (nrels / (rt - wct0)),
            nideal, 100.0 * (double) nideal / (double) M,
            nsingl, ndupli);
-#endif
   fprintf (stderr, "   Estimated excess %1.0f, need %1.0f\n",
            (double) nrels - est_ideals,
            est_excess ((double) minpr) + est_excess ((double) minpa));
@@ -1316,16 +1314,17 @@ main (int argc, char *argv[])
   H = malloc (size_malloc);
   memset (H, 0, size_malloc);
   fprintf (stderr, " Done. \n");
-#ifdef EXACT_HASH
   size_malloc = M * sizeof (*PR);
-  fprintf (stderr, "Creating & clearing (p,r) array: %lu mB...", size_malloc >> 20);
+  fprintf (stderr, "Creating & clearing (p,r) array: %lu mB (%lu bits per entry)...", size_malloc >> 20, sizeof(PR_TYPE) * CHAR_BIT);
   PR = malloc (size_malloc);
   memset (PR, 0, size_malloc);
   fprintf (stderr, " Done.\n");
-#endif
   fprintf (stderr, "Creating possible " NEW_DIR "* directories...");
   create_directories(filelist);
   fprintf (stderr, " Done.\n");
+
+  fprintf (stderr, "Each thread processing %d files\n", MAX_FILES_PER_THREAD);
+  fflush (stderr);
 
   wct0 = realtime ();
   nrels = 0;
@@ -1345,9 +1344,7 @@ main (int argc, char *argv[])
 
   free (H);
   free (H2);
-#ifdef EXACT_HASH
   free (PR);
-#endif
 
   return 0;
 }
