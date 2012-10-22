@@ -278,6 +278,7 @@ void gzip_close(FILE * f, const char * name)
     }
 }
 
+#if 1
 static inline uint64_t
 index_hash (uint64_t pr)
 {
@@ -295,6 +296,27 @@ index_hash (uint64_t pr)
  s2:
   return (prh - PR);
 }
+#else /* same without goto */
+static inline uint64_t
+index_hash (uint64_t pr)
+{
+  PR_TYPE *prh;
+
+  prh = PR + (pr % M);
+  while (1)
+    {
+      if (*prh == (PR_TYPE) pr)
+        return prh - PR;
+      if (!(*prh))
+        break;
+      if (++prh != PR + M)
+        continue;
+      prh = PR;
+    }
+  *prh = (PR_TYPE) pr;
+  return (prh - PR);
+}
+#endif
 
 #define INDEX_RAT(P) (index_hash ((P) + 1)) /* even for even M */
 static inline uint64_t
@@ -317,19 +339,6 @@ weight (uint64_t h)
   return WEIGHT(h);
 }
 
-#if 0
-static void
-insert (uint64_t h)
-{
-  uint64_t *hhr4, s, u;
-  assert (h < M);
-  s = h & 15;
-  u = mask[s];
-  hhr4 = &(H[h >> 4]);
-  if ((*hhr4 & u) != u)
-    *hhr4 += addm[s]; /* add 1 to bit 4s */
-}
-#else
 static void
 insert (uint64_t h)
 {
@@ -342,7 +351,6 @@ insert (uint64_t h)
   if ((hh[0] & u) != u)
     hh[0] += addm[s];
 }
-#endif
 
 static double
 clique_weight (uint64_t h)
@@ -812,6 +820,7 @@ bar (char *g)
 
   fprintf (stderr, "   new/%s done: remains %lu rels out of %lu\n",
            g, output, line);
+  fflush (stderr);
   pthread_mutex_lock (&lock);
   remains += output;
   nrels += line;
@@ -1036,6 +1045,9 @@ doit (int nthreads, char *filelist)
   }
   fprintf (stderr, "\n*** Pass 1, final stats: *** \n");
   stat_mt (nthreads);
+  fprintf (stderr, "Pass 1 took %lds (cpu), %lds (real)\n",
+           (unsigned long) (cputime () - st), (unsigned long) (realtime () - rt));
+  fflush (stderr);
   fprintf (stderr, "\n"
 	   "*****************\n"
 	   "* PASS 1/3 DONE *\n"
@@ -1115,18 +1127,13 @@ pass2 (int nthreads, char *filelist)
       j = 0;
     }
   }
+  fprintf (stderr, "Pass 2 took %lds (cpu), %lds (real)\n",
+           (unsigned long) (cputime () - st), (unsigned long) (realtime () - rt));
+  fflush (stderr);
   fprintf (stderr, "\n"
 	   "*****************\n"
 	   "* PASS 2/3 DONE *\n"
 	   "*****************\n\n");
-  fprintf (stderr, "Pass2; rels: load %lu, used %lu (%.2f%%); "
-	       "krels/s: %lu avg, %lu spot; time: %lus cpu, %lus real\n",
-	       nrels, remains,
-	       100.0 * (double) remains / (double) nrels,
-	       (unsigned long) ((nrels >>10) / (art - rt)),
-	       (unsigned long) (((nrels - onrels) >> 10) / (art - oart)),
-	       (unsigned long) (cputime() - st),
-	       (unsigned long) (art - rt));
   stat2 ();
   sem_destroy(&sem_pt);
   fclose (f);
@@ -1189,11 +1196,15 @@ pass3 (int nthreads, char *filelist)
 	       (unsigned long) (((nrels - onrels) >> 10) / (art - oart)),
 	       (unsigned long) (cputime() - st),
 	       (unsigned long) (art - rt));
+      fflush (stderr);
       oart = art;
       onrels = nrels;
       j = k = 0;
     }
   }
+  fprintf (stderr, "Pass 3 took %lds (cpu), %lds (real)\n",
+           (unsigned long) (cputime () - st), (unsigned long) (realtime () - rt));
+  fflush (stderr);
   fprintf (stderr, "\n"
 	   "*****************\n"
 	   "* PASS 3/3 DONE *\n"
