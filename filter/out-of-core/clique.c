@@ -77,7 +77,7 @@ struct suffix_handler supported_compression_formats[] = {
     { ".bz2", "antebuffer 24 %s|bzip2 -dc", "bzip2 -c --fast > %s", },
     { ".lzma", "lzma -dc  %s", "lzma -c -0 > %s", },
     /* These two have to be present */
-    { "", NULL, NULL },
+    { "", "antebuffer 24 %s", NULL },
     { NULL, NULL, NULL },
 };
 
@@ -108,16 +108,6 @@ static const unsigned char ugly[256] = {
   255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
   255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
   255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255 };
-
-static const uint64_t mask[16] = {
-  0xf, 0xf0, 0xf00, 0xf000, 0xf0000, 0xf00000, 0xf000000, 0xf0000000, 0xf00000000,
-  0xf000000000, 0xf0000000000, 0xf00000000000, 0xf000000000000, 0xf0000000000000,
-  0xf00000000000000, 0xf000000000000000};
-
-static const uint64_t addm[16] = {
-  0x1, 0x10, 0x100, 0x1000, 0x10000, 0x100000, 0x1000000, 0x10000000, 0x100000000,
-  0x1000000000, 0x10000000000, 0x100000000000, 0x1000000000000, 0x10000000000000,
-  0x100000000000000, 0x1000000000000000};
 
 void
 create_directories (char *filelist)
@@ -278,45 +268,23 @@ void gzip_close(FILE * f, const char * name)
     }
 }
 
-#if 1
 static inline uint64_t
 index_hash (uint64_t pr)
 {
   PR_TYPE *prh;
-
+  
   prh = PR + (pr % M);
- loop:
-  if (*prh == (PR_TYPE) pr) goto s2;
-  if (!(*prh)) goto s1;
-  if (++prh != PR + M) goto loop;
-  prh = PR;
-  goto loop;
- s1:
-  *prh = (PR_TYPE) pr;
- s2:
-  return (prh - PR);
-}
-#else /* same without goto */
-static inline uint64_t
-index_hash (uint64_t pr)
-{
-  PR_TYPE *prh;
-
-  prh = PR + (pr % M);
-  while (1)
-    {
-      if (*prh == (PR_TYPE) pr)
-        return prh - PR;
-      if (!(*prh))
-        break;
-      if (++prh != PR + M)
-        continue;
-      prh = PR;
+  while (1) {
+    if (*prh == (PR_TYPE) pr)
+      return (prh - PR);
+    if (!(*prh)) {
+      *prh = (PR_TYPE) pr;
+      return (prh - PR);
     }
-  *prh = (PR_TYPE) pr;
-  return (prh - PR);
+    if (++prh == PR + M)
+      prh = PR;
+  }
 }
-#endif
 
 #define INDEX_RAT(P) (index_hash ((P) + 1)) /* even for even M */
 static inline uint64_t
@@ -342,14 +310,31 @@ weight (uint64_t h)
 static void
 insert (uint64_t h)
 {
-  uint8_t *hh, mask[2] = {15, 240}, addm[2] = {1, 16}, u, s;
-
+  uint8_t *hh, d, m, a;
   assert (h < M);
-  s = h & 1;
   hh = ((uint8_t*) H) + (h >> 1);
-  u = mask[s];
-  if ((hh[0] & u) != u)
-    hh[0] += addm[s];
+  d = (h & 1) << 2;
+  m = 15 << d;
+  a = 1 << d;
+  if ((*hh & m) != m) *hh += a;
+}
+
+static void
+delete (uint64_t h)
+{
+  uint8_t *hh, d, m, a, v;
+  assert (h < M);
+
+  hh = ((uint8_t*) H) + (h >> 1);
+  d = (h & 1) << 2;
+  m = 15 << d;
+  a = 1 << d;
+  v = *hh & m;
+  if (!v)
+    fprintf (stderr, "Warning: deleting ideal with weight 0 at h=%lu\n", h);
+  else
+    if (v != m)
+      *hh -= a; /* remove 1 to bit 4s */
 }
 
 static double
@@ -360,18 +345,47 @@ clique_weight (uint64_t h)
   return -H2[h].weight;
 }
 
+#if 0
+/* Warning: recursive procedure calls might explose the stack */
 static double
 propagate_weight (uint64_t h)
 {
-  double w;
-
   if (H2[h].pointer > 0)
-    {
-      w = propagate_weight (H2[h].pointer - 1);
-      H2[h].weight = w;
-    }
+    H2[h].weight = propagate_weight(H2[h].pointer - 1);
   return H2[h].weight;
 }
+#else
+static void
+propagate_weight ()
+{
+  tab2_t *cH, *pro_wgt = NULL, *ppro_wgt = NULL, *max_pro_wgt = NULL;
+  uint64_t nb_pro_wgt, h;
+
+  for (cH = H2; cH < H2 + M; cH++)
+    if (cH->pointer > 0) {
+      h = cH - H2;
+      do {
+	if (ppro_wgt >= max_pro_wgt) {
+	  if (!ppro_wgt) {
+	    nb_pro_wgt = 512;
+	    ppro_wgt = pro_wgt = malloc(nb_pro_wgt * sizeof(*pro_wgt));
+	  }
+	  else {
+	    nb_pro_wgt <<= 1;
+	    pro_wgt = realloc(pro_wgt, nb_pro_wgt * sizeof(*pro_wgt));
+	  }
+	  max_pro_wgt = &(pro_wgt[nb_pro_wgt]);
+	}
+	(ppro_wgt++)->pointer = h;
+	h = H2[h].pointer - 1;
+      } while (H2[h].pointer > 0);
+      while (ppro_wgt-- > pro_wgt)
+	ppro_wgt->weight = H2[h].weight;
+    }
+  if (pro_wgt)
+    free(pro_wgt);
+}
+#endif
 
 /* adds the weight w to the connected component of H2[h] */
 static uint64_t
@@ -445,26 +459,6 @@ stat2 ()
   threshold_weight = (double) n / RESOLUTION;
   fprintf (stderr, "Will remove %lu components of weight >= %.2f\n",
            count[n], threshold_weight);
-
-  /* propagate weights to speed up clique_weight */
-  for (h = 0; h < M; h++)
-    propagate_weight (h);
-}
-
-static void
-delete (uint64_t h)
-{
-  uint64_t *hhr4, s, u, v;
-  assert (h < M);
-  s = h & 15;
-  u = mask[s];
-  hhr4 = &(H[h >> 4]);
-  v = *hhr4 & u;
-  if (!v)
-    fprintf (stderr, "Warning: deleting ideal with weight 0 at h=%lu\n", h);
-  else
-    if (v != u)
-      *hhr4 -= addm[s]; /* remove 1 to bit 4s */
 }
 
 /* return a*b mod p, assuming 0 <= a, b, p < 2^40 */
@@ -820,7 +814,6 @@ bar (char *g)
 
   fprintf (stderr, "   new/%s done: remains %lu rels out of %lu\n",
            g, output, line);
-  fflush (stderr);
   pthread_mutex_lock (&lock);
   remains += output;
   nrels += line;
@@ -1047,14 +1040,13 @@ doit (int nthreads, char *filelist)
   stat_mt (nthreads);
   fprintf (stderr, "Pass 1 took %lds (cpu), %lds (real)\n",
            (unsigned long) (cputime () - st), (unsigned long) (realtime () - rt));
-  fflush (stderr);
+  sem_destroy(&sem_pt);
+  fclose (f);
+  free (T);
   fprintf (stderr, "\n"
 	   "*****************\n"
 	   "* PASS 1/3 DONE *\n"
 	   "*****************\n\n");
-  sem_destroy(&sem_pt);
-  fclose (f);
-  free (T);
 }
 
 /* second pass: stores ideals of weight 2 */
@@ -1127,17 +1119,25 @@ pass2 (int nthreads, char *filelist)
       j = 0;
     }
   }
-  fprintf (stderr, "Pass 2 took %lds (cpu), %lds (real)\n",
-           (unsigned long) (cputime () - st), (unsigned long) (realtime () - rt));
-  fflush (stderr);
+  art = realtime();
+  fprintf (stderr, "\n*** Pass 2, final stats: *** \n"
+	   "Relations: load %lu, used %lu (%.2f%%); "
+	   "krels/s: %lu; time: %lus cpu, %lus real\n",
+	   nrels, remains,
+	   100.0 * (double) remains / (double) nrels,
+	   (unsigned long) ((nrels >> 10) / (art - rt)),
+	   (unsigned long) (cputime() - st),
+	   (unsigned long) (art - rt));
+  sem_destroy(&sem_pt);
+  fclose (f);
+  free (T);
+  stat2 ();
+  /* propagate weights to speed up clique_weight */
+  propagate_weight ();
   fprintf (stderr, "\n"
 	   "*****************\n"
 	   "* PASS 2/3 DONE *\n"
 	   "*****************\n\n");
-  stat2 ();
-  sem_destroy(&sem_pt);
-  fclose (f);
-  free (T);
 }
 
 /* third pass: outputs remaining relations */
@@ -1196,7 +1196,6 @@ pass3 (int nthreads, char *filelist)
 	       (unsigned long) (((nrels - onrels) >> 10) / (art - oart)),
 	       (unsigned long) (cputime() - st),
 	       (unsigned long) (art - rt));
-      fflush (stderr);
       oart = art;
       onrels = nrels;
       j = k = 0;
@@ -1204,14 +1203,13 @@ pass3 (int nthreads, char *filelist)
   }
   fprintf (stderr, "Pass 3 took %lds (cpu), %lds (real)\n",
            (unsigned long) (cputime () - st), (unsigned long) (realtime () - rt));
-  fflush (stderr);
+  sem_destroy(&sem_pt);
+  fclose (f);
+  free (T);
   fprintf (stderr, "\n"
 	   "*****************\n"
 	   "* PASS 3/3 DONE *\n"
 	   "*****************\n\n");
-  sem_destroy(&sem_pt);
-  fclose (f);
-  free (T);
 }
 
 int
@@ -1238,7 +1236,6 @@ main (int argc, char *argv[])
   for (i = 1; i < argc; i++)
     fprintf (stderr, " %s", argv[i]);
   fprintf (stderr, "\n");
-  fflush (stderr);
 
   while (argc > 1 && argv[1][0] == '-')
     {
@@ -1343,7 +1340,6 @@ main (int argc, char *argv[])
   fprintf (stderr, " Done.\n");
 
   fprintf (stderr, "Each thread processing %d files\n", MAX_FILES_PER_THREAD);
-  fflush (stderr);
 
   wct0 = realtime ();
   nrels = 0;
