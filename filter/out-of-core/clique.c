@@ -272,7 +272,7 @@ static inline uint64_t
 index_hash (uint64_t pr)
 {
   PR_TYPE *prh;
-  
+
   prh = PR + (pr % M);
   while (1) {
     if (*prh == (PR_TYPE) pr)
@@ -324,6 +324,7 @@ delete (uint64_t h)
 {
   uint8_t *hh, d, m, a, v;
   assert (h < M);
+  static int count = 0;
 
   hh = ((uint8_t*) H) + (h >> 1);
   d = (h & 1) << 2;
@@ -331,7 +332,13 @@ delete (uint64_t h)
   a = 1 << d;
   v = *hh & m;
   if (!v)
-    fprintf (stderr, "Warning: deleting ideal with weight 0 at h=%lu\n", h);
+    {
+      if (count++ < 10)
+        {
+          fprintf (stderr, "Warning: deleting weight-0 ideal 0 at h=%lu\n", h);
+          fflush (stderr);
+        }
+    }
   else
     if (v != m)
       *hh -= a; /* remove 1 to bit 4s */
@@ -345,13 +352,13 @@ clique_weight (uint64_t h)
   return -H2[h].weight;
 }
 
-#if 0
+#if 1
 /* Warning: recursive procedure calls might explose the stack */
 static double
 propagate_weight (uint64_t h)
 {
   if (H2[h].pointer > 0)
-    H2[h].weight = propagate_weight(H2[h].pointer - 1);
+    H2[h].weight = propagate_weight (H2[h].pointer - 1);
   return H2[h].weight;
 }
 #else
@@ -447,11 +454,9 @@ stat2 ()
   while (n > 0)
     {
       count[n-1] += count[n];
-      /*
-      if (count[n-1] > 0)
+      if (count[n] > 0)
         fprintf (stderr, "Weight >= %.2f: %lu components\n",
                  (double) (n - 1) / RESOLUTION, count[n-1]);
-      */
       if (count[n-1] > target)
         break;
       n--;
@@ -459,6 +464,7 @@ stat2 ()
   threshold_weight = (double) n / RESOLUTION;
   fprintf (stderr, "Will remove %lu components of weight >= %.2f\n",
            count[n], threshold_weight);
+  fflush (stderr);
 }
 
 /* return a*b mod p, assuming 0 <= a, b, p < 2^40 */
@@ -814,6 +820,7 @@ bar (char *g)
 
   fprintf (stderr, "   new/%s done: remains %lu rels out of %lu\n",
            g, output, line);
+  fflush (stderr);
   pthread_mutex_lock (&lock);
   remains += output;
   nrels += line;
@@ -952,6 +959,7 @@ stat_mt (int nthreads)
   fprintf (stderr, "   Estimated excess %1.0f, need %1.0f\n",
            (double) nrels - est_ideals,
            est_excess ((double) minpr) + est_excess ((double) minpa));
+  fflush (stderr);
 }
 
 /* read all files and fills the hash table */
@@ -972,6 +980,7 @@ doit (int nthreads, char *filelist)
 	   "************\n"
 	   "* PASS 1/3 *\n"
 	   "************\n\n");
+  fflush (stderr);
   f = fopen (filelist, "r");
   if (f == NULL)
     {
@@ -1024,6 +1033,7 @@ doit (int nthreads, char *filelist)
 	       (unsigned long) (((nrels - onrels) >> 10) / (art - oart)),
 	       (unsigned long) (cputime() - st),
 	       (unsigned long) (art - rt));
+      fflush (stderr);
       oart = art;
       onrels = nrels;
       j = 0;
@@ -1040,6 +1050,7 @@ doit (int nthreads, char *filelist)
   stat_mt (nthreads);
   fprintf (stderr, "Pass 1 took %lds (cpu), %lds (real)\n",
            (unsigned long) (cputime () - st), (unsigned long) (realtime () - rt));
+  fflush (stderr);
   sem_destroy(&sem_pt);
   fclose (f);
   free (T);
@@ -1114,6 +1125,7 @@ pass2 (int nthreads, char *filelist)
 	       (unsigned long) (((nrels - onrels) >> 10) / (art - oart)),
 	       (unsigned long) (cputime() - st),
 	       (unsigned long) (art - rt));
+      fflush (stderr);
       oart = art;
       onrels = nrels;
       j = 0;
@@ -1128,12 +1140,21 @@ pass2 (int nthreads, char *filelist)
 	   (unsigned long) ((nrels >> 10) / (art - rt)),
 	   (unsigned long) (cputime() - st),
 	   (unsigned long) (art - rt));
+  fflush (stderr);
   sem_destroy(&sem_pt);
   fclose (f);
   free (T);
   stat2 ();
   /* propagate weights to speed up clique_weight */
+#if 1
+  {
+    uint64_t h;
+    for (h = 0; h < M; h++)
+      propagate_weight (h);
+  }
+#else
   propagate_weight ();
+#endif
   fprintf (stderr, "\n"
 	   "*****************\n"
 	   "* PASS 2/3 DONE *\n"
@@ -1196,6 +1217,7 @@ pass3 (int nthreads, char *filelist)
 	       (unsigned long) (((nrels - onrels) >> 10) / (art - oart)),
 	       (unsigned long) (cputime() - st),
 	       (unsigned long) (art - rt));
+      fflush (stderr);
       oart = art;
       onrels = nrels;
       j = k = 0;
@@ -1203,6 +1225,7 @@ pass3 (int nthreads, char *filelist)
   }
   fprintf (stderr, "Pass 3 took %lds (cpu), %lds (real)\n",
            (unsigned long) (cputime () - st), (unsigned long) (realtime () - rt));
+  fflush (stderr);
   sem_destroy(&sem_pt);
   fclose (f);
   free (T);
