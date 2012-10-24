@@ -22,7 +22,7 @@
 #define TARGET_TIME 10000000 /* print stats every TARGET_TIME milliseconds */
 #define NEW_ROOTSIEVE
 #define MAX_THREADS 16
-#define INIT_FACTOR 4
+#define INIT_FACTOR 4UL
 //#define DEBUG_POLYSELECT2L
 
 #ifdef NEW_ROOTSIEVE
@@ -41,7 +41,7 @@
 /* consider only two roots or more */
 #define CONSIDER_ONLY_TWO_ROOTS
 #ifndef CONSIDER_ONLY_TWO_ROOTS
-#define NUMBER_CONSIDERED_ROOTS 16
+#define NUMBER_CONSIDERED_ROOTS 16UL
 #endif
 
 #define LQ_DEFAULT 1 /* default number of factors in special-q part */
@@ -908,10 +908,9 @@ collision_on_p ( header_t header,
 
   hash_t H;
 #ifdef CONSIDER_ONLY_TWO_ROOTS
-  hash_init (H, (unsigned long) (INIT_FACTOR * (double) lenPrimes));
+  hash_init (H, INIT_FACTOR * lenPrimes);
 #else
-  hash_init (H, (unsigned long) (INIT_FACTOR * NUMBER_CONSIDERED_ROOTS
-				 * (double) lenPrimes));
+  hash_init (H, INIT_FACTOR * NUMBER_CONSIDERED_ROOTS * lenPrimes);
 #endif
 
 #ifdef DEBUG_POLYSELECT2L
@@ -1017,9 +1016,9 @@ collision_on_each_sq ( header_t header,
   hash_t H;
 
 #ifdef CONSIDER_ONLY_TWO_ROOTS
-  hash_init (H,  (unsigned long) (INIT_FACTOR * (double) lenPrimes));
+  hash_init (H,  INIT_FACTOR * lenPrimes);
 #else
-  hash_init (H,  (unsigned long) (INIT_FACTOR * NUMBER_CONSIDERED_ROOTS * (double) lenPrimes));
+  hash_init (H,  INIT_FACTOR * NUMBER_CONSIDERED_ROOTS * lenPrimes);
 #endif
 
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
@@ -1329,10 +1328,9 @@ gmp_collision_on_p ( header_t header,
 
   hash_t H;
 #ifdef CONSIDER_ONLY_TWO_ROOTS
-  hash_init (H, (unsigned long) (INIT_FACTOR * (double) lenPrimes));
+  hash_init (H, INIT_FACTOR * lenPrimes);
 #else
-  hash_init (H, (unsigned long) (INIT_FACTOR * NUMBER_CONSIDERED_ROOTS
-				 * (double) lenPrimes));
+  hash_init (H, INIT_FACTOR * NUMBER_CONSIDERED_ROOTS * lenPrimes);
 #endif
 
 #ifdef DEBUG_POLYSELECT2L
@@ -1443,10 +1441,9 @@ gmp_collision_on_each_sq ( header_t header,
   hash_t H;
 
 #ifdef CONSIDER_ONLY_TWO_ROOTS
-  hash_init (H,  (unsigned long) (INIT_FACTOR * (double) lenPrimes));
+  hash_init (H, INIT_FACTOR * lenPrimes);
 #else
-  hash_init (H,  (unsigned long) (INIT_FACTOR * NUMBER_CONSIDERED_ROOTS
-				  * (double) lenPrimes));
+  hash_init (H, INIT_FACTOR * NUMBER_CONSIDERED_ROOTS * lenPrimes);
 #endif
 
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
@@ -1772,9 +1769,9 @@ collision_on_p ( header_t header,
   hash_t H;
   
 #ifdef CONSIDER_ONLY_TWO_ROOTS
-  hash_init (H,  (unsigned long) (INIT_FACTOR * (double) lenPrimes));
+  hash_init (H, INIT_FACTOR * lenPrimes);
 #else
-  hash_init (H,  (unsigned long) (INIT_FACTOR * NUMBER_CONSIDERED_ROOTS * (double) lenPrimes));
+  hash_init (H, INIT_FACTOR * NUMBER_CONSIDERED_ROOTS lenPrimes);
 #endif
 
 #ifdef DEBUG_POLYSELECT2L
@@ -1858,10 +1855,9 @@ collision_on_each_sq ( header_t header,
   hash_t H;
 
 #ifdef CONSIDER_ONLY_TWO_ROOTS
-  hash_init (H,  (unsigned long) (INIT_FACTOR * (double) lenPrimes));
+  hash_init (H, INIT_FACTOR * lenPrimes);
 #else
-  hash_init (H,  (unsigned long) (INIT_FACTOR * NUMBER_CONSIDERED_ROOTS
-				  * (double) lenPrimes));
+  hash_init (H, INIT_FACTOR * NUMBER_CONSIDERED_ROOTS * lenPrimes);
 #endif
 
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
@@ -1979,9 +1975,9 @@ collision_on_batch_sq ( header_t header,
     pp = p*p;
     if ((header->d * header->ad) % p == 0)
       continue;
-    if (R->nr[nprimes] == 0)
-      continue;
     nr = R->nr[nprimes];
+    if (nr == 0)
+      continue;
     
     modulusredcul_t modpp;
     residueredcul_t qprod[size], tmp_modul, tmp2_modul, tmp3_modul;
@@ -1993,25 +1989,29 @@ collision_on_batch_sq ( header_t header,
     modredcul_init (tmp3_modul, modpp);
     modredcul_init (res_rp, modpp);
     modredcul_init (res_tmp, modpp);
-    for (i = 0; i < size; i++) {
+    for (i = 0; i < size; i++)
       modredcul_init (qprod[i], modpp);
-    }
 
-    // (size -1) multiplications
+    // (size-1) multiplications
     modredcul_set_ul (qprod[0], q[0], modpp);
-    modredcul_sqr (qprod[0], qprod[0], modpp);
-    for (i = 1; i < size; i ++) {
-      modredcul_set_ul (tmp_modul, q[i], modpp);
-      modredcul_sqr (tmp_modul, tmp_modul, modpp);
-      modredcul_mul(qprod[i], tmp_modul, qprod[i-1], modpp);
-    }
+    modredcul_sqr (qprod[0], qprod[0], modpp); /* q[0]^2 */
+    for (i = 1; i < size; i ++)
+      {
+        modredcul_set_ul (tmp_modul, q[i], modpp);
+        modredcul_sqr (tmp_modul, tmp_modul, modpp);
+        modredcul_mul (qprod[i], tmp_modul, qprod[i-1], modpp);
+      }
     // the inversion, also reduce qprod[size-1] (mod pp).
     modredcul_inv (tmp_modul, qprod[size-1], modpp);
 
     // for each q in a batch
-    for (i = size-1; i > 0; i --) {
+    for (i = size - 1; i > 0; i --)
+      {
 
-      modredcul_mul (tmp2_modul, qprod[i-1], tmp_modul, modpp);
+        modredcul_mul (tmp2_modul, qprod[i-1], tmp_modul, modpp);
+        /* qprod[i-1] = (q[0] * ... * q[i-1])^2 (mod p^2)
+           tmp_modul = 1/(q[0] * ... * q[i])^2 (mod p^2)
+           thus tmp2_modul = 1/q[i]^2 mod (p^2) */
       
 #ifdef DEBUG_POLYSELECT2L /* check if batch inversions correct */
       unsigned long tmp_1 = modredcul_get_ul (tmp2_modul, modpp);
@@ -2033,11 +2033,12 @@ collision_on_batch_sq ( header_t header,
 #endif
 
       // for each rp, compute (rp-rq)*1/q^2 (mod p^2)
+      unsigned long rqi = mpz_fdiv_ui (rqqz[i], pp);
       for (j = 0; j < nr; j ++, c++) {
 
         rp = R->roots[nprimes][j];
         modredcul_set_ul (res_rp, rp, modpp);
-        modredcul_sub_ul (res_rp, res_rp, mpz_fdiv_ui (rqqz[i], pp), modpp);
+        modredcul_sub_ul (res_rp, res_rp, rqi, modpp);
         modredcul_mul (res_rp, res_rp, tmp2_modul, modpp);
         invqq[i][c] = modredcul_get_ul (res_rp, modpp);
 
@@ -2072,18 +2073,19 @@ collision_on_batch_sq ( header_t header,
       }
       
       modredcul_set_ul (tmp3_modul, q[i], modpp);
-      modredcul_sqr (tmp3_modul, tmp3_modul, modpp);
+      modredcul_sqr (tmp3_modul, tmp3_modul, modpp); /* q[i]^2 mod p^2 */
       modredcul_mul (tmp_modul, tmp3_modul, tmp_modul, modpp);
+      /* now tmp_modul = 1/(q[0] * ... * q[i-1])^2 (mod p^2) */
       c -= nr;
-    }
+      }
 
-    // last q in the batch is in tmp_modul
-    // invqq[0][nprimes] = modredcul_get_ul (tmp_modul, modpp);
+    /* now tmp_modul = 1/q[0]^2 mpd p^2 */
+    unsigned long rqi = mpz_fdiv_ui (rqqz[0], pp);
     for (j = 0; j < nr; j ++, c ++) {
       rp = R->roots[nprimes][j];
       modredcul_set_ul (res_rp, rp, modpp);
-      modredcul_sub_ul (res_rp, res_rp, mpz_fdiv_ui (rqqz[0], pp), modpp);
-      modredcul_mul (tmp2_modul, res_rp, tmp_modul, modpp); // tmp_modul should be retained!
+      modredcul_sub_ul (res_rp, res_rp, rqi, modpp);
+      modredcul_mul (tmp2_modul, res_rp, tmp_modul, modpp); // tmp_modul should be retained for debug!
       invqq[0][c] = modredcul_get_ul (tmp2_modul, modpp);
 
 #ifdef DEBUG_POLYSELECT2L /* check if batch inversions correct */
@@ -2144,10 +2146,13 @@ collision_on_batch_sq ( header_t header,
       modredcul_clear (qprod[i], modpp);
     modredcul_clearmod (modpp);
 
+    /* c was increased by nr for this prime p */
+
   } // next prime p
 
   if (verbose > 2)
-    fprintf (stderr, "# one batch SQ inversion took %dms\n", cputime () - st);
+    fprintf (stderr, "# one batch SQ inversion for %lu primes took %dms\n",
+             lenPrimes, cputime () - st);
 
   /* Step 2: find collisions on q. */
   int st2 = cputime();
@@ -2310,10 +2315,9 @@ gmp_collision_on_p ( header_t header,
   hash_t H;
   
 #ifdef CONSIDER_ONLY_TWO_ROOTS
-  hash_init (H,  (unsigned long) (INIT_FACTOR * (double) lenPrimes));
+  hash_init (H, INIT_FACTOR * lenPrimes);
 #else
-  hash_init (H,  (unsigned long) (INIT_FACTOR * NUMBER_CONSIDERED_ROOTS
-				  * (double) lenPrimes));
+  hash_init (H, INIT_FACTOR * NUMBER_CONSIDERED_ROOTS * lenPrimes);
 #endif
 
 #ifdef DEBUG_POLYSELECT2L
@@ -2397,10 +2401,9 @@ gmp_collision_on_each_sq ( header_t header,
   hash_t H;
 
 #ifdef CONSIDER_ONLY_TWO_ROOTS
-  hash_init (H,  (unsigned long) (INIT_FACTOR * (double) lenPrimes));
+  hash_init (H, INIT_FACTOR * lenPrimes);
 #else
-  hash_init (H,  (unsigned long) (INIT_FACTOR * NUMBER_CONSIDERED_ROOTS
-				  * (double) lenPrimes));
+  hash_init (H, INIT_FACTOR * NUMBER_CONSIDERED_ROOTS * lenPrimes);
 #endif
 
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {

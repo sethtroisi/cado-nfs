@@ -322,6 +322,9 @@ hash_add (hash_t H, unsigned long p, int64_t i, mpz_t m0, uint64_t ad,
 {
   unsigned long h;
 
+  if (m0 == NULL)
+    return;
+
   if (H->size >= H->alloc)
     hash_grow (H);
   if (i >= 0)
@@ -337,7 +340,7 @@ hash_add (hash_t H, unsigned long p, int64_t i, mpz_t m0, uint64_t ad,
 
   while (H->p[h] != 0)
   {
-    if (m0 != NULL && H->i[h] == i && H->p[h] != p)
+    if (H->i[h] == i && H->p[h] != p)
       match (H->p[h], p, i, m0, ad, d, N, q, rq);
     if (++h == H->alloc)
       h = 0;
