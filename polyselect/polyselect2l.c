@@ -1970,7 +1970,7 @@ collision_on_batch_sq ( header_t header,
   }
 #endif
 
-  //int st = cputime();
+  int st = cputime();
    
   /* Step 1: batch inversion */
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
@@ -2146,19 +2146,22 @@ collision_on_batch_sq ( header_t header,
 
   } // next prime p
 
-  //fprintf (stderr, "# one batch SQ inversion took %dms\n", cputime () - st);
+  if (verbose > 2)
+    fprintf (stderr, "# one batch SQ inversion took %dms\n", cputime () - st);
 
   /* Step 2: find collisions on q. */
+  int st2 = cputime();
   for (i = 0; i < size; i ++) {
-    //int st2 = cputime();
     collision_on_each_sq ( header,
                            R,
                            q[i],
                            rqqz[i],
                            invqq[i] );
 
-    //printf ("# outer collision_on_each_sq took %dms\n", cputime () - st2);
   }
+  if (verbose > 2)
+    fprintf (stderr, "# loop on collision_on_each_sq took %dms\n",
+             cputime () - st2);
 
   for (i = 0; i < size; i++)
     free (invqq[i]);
