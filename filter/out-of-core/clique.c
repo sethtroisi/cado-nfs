@@ -41,8 +41,8 @@
 
 #define NEW_DIR "new/"
 #define MAX_FILES_PER_THREAD 1
-#define MAX_RAT_PER_LINE 16
-#define MAX_ALG_PER_LINE 32
+#define MAX_STOCK_RAT_PER_LINE 16
+#define MAX_STOCK_ALG_PER_LINE 32
 #define MAXNAME 1024
 #define MAX_THREADS 128
 #define PR_TYPE uint32_t
@@ -81,7 +81,9 @@ struct suffix_handler supported_compression_formats[] = {
     { NULL, NULL, NULL },
 };
 
+#ifndef HAVE_SYNC_FETCH
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER; /* mutual exclusion lock */
+#endif
 long wct0;
 
 uint64_t M = 0, minpa = 0, minpr = 0, Hsize, *H, nrels, remains;
@@ -336,7 +338,6 @@ delete (uint64_t h)
       if (count++ < 10)
         {
           fprintf (stderr, "Warning: deleting weight-0 ideal 0 at h=%lu\n", h);
-          fflush (stderr);
         }
     }
   else
@@ -352,7 +353,7 @@ clique_weight (uint64_t h)
   return -H2[h].weight;
 }
 
-#if 1
+#if 0
 /* Warning: recursive procedure calls might explose the stack */
 static double
 propagate_weight (uint64_t h)
@@ -365,7 +366,8 @@ propagate_weight (uint64_t h)
 static void
 propagate_weight ()
 {
-  tab2_t *cH, *pro_wgt = NULL, *ppro_wgt = NULL, *max_pro_wgt = NULL;
+  tab2_t *cH;
+  tab2_t **pro_wgt = NULL, **ppro_wgt = NULL, **max_pro_wgt = NULL;
   uint64_t nb_pro_wgt, h;
 
   for (cH = H2; cH < H2 + M; cH++)
@@ -383,11 +385,11 @@ propagate_weight ()
 	  }
 	  max_pro_wgt = &(pro_wgt[nb_pro_wgt]);
 	}
-	(ppro_wgt++)->pointer = h;
+	*ppro_wgt++ = &(H2[h]);
 	h = H2[h].pointer - 1;
       } while (H2[h].pointer > 0);
-      while (ppro_wgt-- > pro_wgt)
-	ppro_wgt->weight = H2[h].weight;
+      while (ppro_wgt > pro_wgt)
+	(*--ppro_wgt)->weight = H2[h].weight;
     }
   if (pro_wgt)
     free(pro_wgt);
@@ -464,12 +466,11 @@ stat2 ()
   threshold_weight = (double) n / RESOLUTION;
   fprintf (stderr, "Will remove %lu components of weight >= %.2f\n",
            count[n], threshold_weight);
-  fflush (stderr);
 }
 
 /* return a*b mod p, assuming 0 <= a, b, p < 2^40 */
 uint64_t
-mulmod (uint64_t a, uint64_t b, uint64_t p)
+mulmod_old (uint64_t a, uint64_t b, uint64_t p)
 {
   uint64_t a1, a0, b1, b0, r;
 
@@ -483,254 +484,216 @@ mulmod (uint64_t a, uint64_t b, uint64_t p)
   return r;
 }
 
+/* return a*b mod p, assuming 0 <= a, b, p < 2^40 */
+uint64_t
+mulmod (uint64_t a, uint64_t b, uint64_t p)
+{
+  uint64_t r;
+
+  assert (a <= 0x100000000000);
+  r = ((b >> 20) * a) % p; /* r < 2^40 */
+  return ((r << 20) + (b & 0xfffff) * a) % p;
+}
+
 /* return a/b mod p */
 static unsigned long
 root (long a0, long b0, long p)
 {
   long u, w, q, r, t, a, b;
 
-  a = a0 % p;
   b = b0 % p;
   assert (b != 0);
-  if (a < 0)
-    a += p;
-
+  a = b;
   u = 1;
   w = 0;
-  a = b;
   b = p;
   /* invariant: a = u*b0 mod p, b = w*b0 mod p */
-  while (b)
-    {
+  while (b) {
       q = a / b;
-      r = a - q * b;
+      r = a - q * b; /* r = a % b; */
       a = b;
       b = r;
       t = u;
       u = w;
       w = (t - q * w) % p;
-    }
-  assert (a == 1);
+  }
   /* compute a0*u % p */
-  if (u < 0)
-    u += p;
-  assert (u > 0);
-  if (a0 >= 0)
-    u = mulmod (a0, u, p);
-  else
-    u = p - mulmod (-a0, u, p);
-  assert (u > 0);
-  r = ((long) mulmod (u, b0, p) - a0) % p;
-  assert (r == 0);
-  return u;
+  if (u < 0) u += p;
+  return (a0 >= 0) ? mulmod (a0, u, p) : p - mulmod (-a0, u, p);
 }
 
 /* first pass, return the number of lines read */
 static unsigned long
-foo (char *g)
+load_pass1 (char *g)
 {
-  char s[1024], *ret, *t;
+  char s[1024], *t;
   FILE *f;
-  unsigned long line = 0, b, r;
+  unsigned long line, b, r;
   long a;
-  uint64_t p, pfree;
+  uint64_t p, p2;
   uint8_t m;
+  
 
   f = gzip_open (g, "r");
-
-  while (1)
-    {
-      ret = fgets (s, 1024, f);
-      if (ret == 0)
-        break;
-      line ++;
-      t = s;
-      if (*t != '-')
-	a = 1;
-      else {
-	a = -1;
-	t++;
-      }
-      for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++)
-	p = p * 10 + m;
-      a *= p;
-      assert (a != 0);
-      assert (*t == ',');
-      t ++;
-      for (b = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++)
-	b = b * 10 + m;
-      assert (*t == ':');
-      t ++;
-      pfree = 0;
-      while (1)
-        {
-	  for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++)
-	    p = (p << 4) + m;
-          if (b == 0)
-            pfree = p;
-          if (p >= minpr)
-            insert (INDEX_RAT (p));
-          if (*t++ != ',')
-            break; /* end of rational primes */
-        }
-      while (1)
-        {
-	  for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++)
-	    p = (p << 4) + m;
-          if (pfree >= minpa)
-            insert (INDEX_ALG (pfree, p));
-          else if (p >= minpa)
-            {
-              r = root (a, b, p);
-              insert (INDEX_ALG (p, r));
-            }
-          if (*t++ != ',')
-            break; /* end of algebraic primes */
-        }
+  line = 0;
+  while (fgets (s, 1024, f)) {
+    line++;
+    t = s;
+    if (*t != '-')
+      a = 1;
+    else {
+      a = -1;
+      t++;
     }
-
+    for (p = 0; (m = ugly[*((uint8_t *) t)]) != 255; t++, p = p * 10 + m);
+    a *= p;
+    assert (a != 0);
+    assert (*t == ',');
+    t ++;
+    for (b = 0; (m = ugly[*((uint8_t *) t)]) != 255; t++, b = b * 10 + m);
+    assert (*t == ':');
+    t ++;
+    do {
+      for (p = 0; (m = ugly[*((uint8_t *) t)]) != 255; t++, p = (p << 4) + m);
+      if (p >= minpr) {
+	insert (INDEX_RAT (p));
+      }
+    } while (*t++ == ',');
+    if (b) {
+      do {
+	for (p = 0; (m = ugly[*((uint8_t *) t)]) != 255; t++, p = (p << 4) + m);
+	if (p >= minpa) {
+	  r = root (a, b, p);
+	  insert (INDEX_ALG (p, r));
+	}
+      } while (*t++ == ',');
+    }
+    else
+      if (p >= minpa)
+	do {
+	  for (p2 = 0; (m = ugly[*((uint8_t *) t)]) != 255; t++, p2 = (p2 << 4) + m);
+	  insert (INDEX_ALG (p, p2));
+	} while (*t++ == ',');
+  }
   gzip_close (f, g);
   return line;
 }
 
 /* pass 2: insert in H2 ideals with weight 2 */
 static void
-bar2 (char *g)
+load_pass2 (char *g)
 {
-  uint64_t rp[MAX_RAT_PER_LINE], ap[MAX_ALG_PER_LINE], ar[MAX_ALG_PER_LINE];
-  char s[1024], *t, *ret;
+  uint64_t rp[MAX_STOCK_RAT_PER_LINE], ap[MAX_STOCK_ALG_PER_LINE], ar[MAX_STOCK_ALG_PER_LINE];
+  char s[1024], *t;
   FILE *f;
-  unsigned long line = 0, b, r, output = 0;
+  unsigned long line, output, b, r;
   long a;
-  uint64_t p, pfree, w, h;
-  int nr, na, keep;
+  uint64_t p, p2, i, w, h;
   double W;
+  unsigned int nr, na;
   uint8_t m;
 
   f = gzip_open (g, "r");
-
-  while (1)
-    {
-      ret = fgets (s, 1024, f);
-      if (ret == 0)
-        break;
-      line ++;
-      t = s;
-      if (*t != '-')
-	a = 1;
-      else {
-	a = -1;
-	t++;
-      }
-      for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++)
-	p = p * 10 + m;
-      a *= p;
-      t ++;
-      for (b = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++)
-	b = b * 10 + m;
-      t ++;
-      pfree = 0;
-      nr = na = 0;
-      W = 0.0;
-      keep = 1;
-      while (keep)
-        {
-	  for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++)
-	    p = (p << 4) + m;
-          if (b == 0)
-            pfree = p;
-          if (p >= minpr)
-            {
-              w = WEIGHT (INDEX_RAT (p));
-	      switch (w) {
-	      case 0: case 1:
-		keep = 0;
-		break;
-	      case 2 :
-                rp[nr++] = p;
-		break;
-	      case 3:  case 4:  case 5:  case 6:  case 7:  case 8:  case 9:
-	      case 10: case 11: case 12: case 13: case 14: case 15:
-                W += 1.0 / (double) w;
-		break;
-	      }
-            }
-          if (*t++ != ',')
-            break; /* end of rational primes */
-        }
-      assert (nr < MAX_RAT_PER_LINE);
-      while (keep)
-        {
-	  for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++)
-	    p = (p << 4) + m;
-          if (pfree >= minpa)
-            {
-              r = p;
-              p = pfree;
-            }
-          else if (p >= minpa) /* non-free case */
-            r = root (a, b, p);
-          if (p >= minpa)
-            {
-              w = WEIGHT (INDEX_ALG (p, r));
-	      switch (w) {
-	      case 0: case 1:
-		keep = 0;
-		break;
-	      case 2 :
-		ap[na] = p;
-		ar[na++] = r;
-		break;
-	      case 3:  case 4:  case 5:  case 6:  case 7:  case 8:  case 9:
-	      case 10: case 11: case 12: case 13: case 14: case 15:
-                W += 1.0 / (double) w;
-		break;
-	      }
-            }
-          if (*t++ != ',')
-            break; /* end of algebraic primes */
-        }
-      assert (na < MAX_ALG_PER_LINE);
-      if (keep && (nr + na > 0)) /* at least one ideal of weight 2 */
-        {
-          /* Warning: it can be that an ideal appears twice (or more).
-             To avoid reducing exponents mod 2, which would be expensive,
-             we insert this ideal twice, but then we should avoid for infinite
-             loops. */
-          if (nr-- > 0)
-            h = insert2 (INDEX_RAT (rp[nr]), W);
-          else /* na > 0 */
-            {
-              na --;
-              h = insert2 (INDEX_ALG (ap[na], ar[na]), W);
-            }
-          while (nr-- > 0)
-            insert2a (INDEX_RAT (rp[nr]), h);
-          while (na-- > 0)
-            insert2a (INDEX_ALG (ap[na], ar[na]), h);
-        }
-      output += keep;
+  line = output = 0;
+ next_line:
+  while (fgets (s, 1024, f)) {
+    line ++;
+    t = s;
+    if (*t != '-')
+      a = 1;
+    else {
+      a = -1;
+      t++;
     }
-
+    for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p = p * 10 + m);
+    a *= p;
+    t ++;
+    for (b = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, b = b * 10 + m);
+    t ++;
+    nr = na = 0;
+    W = 0.0;
+    do {
+      for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p = (p << 4) + m);
+      if (p >= minpr) {
+	i = INDEX_RAT(p);
+	w = WEIGHT (i);
+	if (w < 2) goto next_line;
+	if (w == 2) {
+	  assert(nr < MAX_STOCK_RAT_PER_LINE);
+	  rp[nr++] = p;
+	}
+	else
+	  W += 1.0 / (double) w;
+      }
+    } while (*t++ == ',');
+    if (b)
+      do {
+	for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p = (p << 4) + m);
+	if (p >= minpa) {
+	  r = root (a, b, p);
+	  i = INDEX_ALG (p, r);
+	  w = WEIGHT (i);
+	  if (w < 2) goto next_line;
+	  if (w == 2) {
+	    assert (na < MAX_STOCK_ALG_PER_LINE);
+	    ap[na] = p;
+	    ar[na++] = r;
+	  } else
+	    W += 1.0 / (double) w;
+	}
+      } while (*t++ == ',');
+    else
+      if (p >= minpa)
+	do {
+	  for (p2 = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p2 = (p2 << 4) + m);
+	  i = INDEX_ALG (p, p2);
+	  w = WEIGHT (i);
+	  if (w < 2) goto next_line;
+	  if (w == 2) {
+	    assert (na < MAX_STOCK_ALG_PER_LINE);
+	    ap[na] = p;
+	    ar[na++] = p2;
+	  } else
+	    W += 1.0 / (double) w;
+	} while (*t++ == ',');
+    output++;
+    /* Warning: it can be that an ideal appears twice (or more).
+       To avoid reducing exponents mod 2, which would be expensive,
+       we insert this ideal twice, but then we should avoid for infinite
+       loops. */
+    if (nr-- > 0) {
+      h = insert2 (INDEX_RAT (rp[nr]), W);
+      while (nr-- > 0) insert2a (INDEX_RAT (rp[nr]), h);
+      while (na-- > 0) insert2a (INDEX_ALG (ap[na], ar[na]), h);
+    }
+    else if (na-- > 0) {
+      h = insert2 (INDEX_ALG (ap[na], ar[na]), W);
+      while (na-- > 0) insert2a (INDEX_ALG (ap[na], ar[na]), h);
+    }
+  }
   gzip_close (f, g);
-
+#ifdef HAVE_SYNC_FETCH
+  __sync_fetch_and_add(&remains, output);
+  __sync_fetch_and_add(&nrels, line);
+#else
   pthread_mutex_lock (&lock);
   remains += output;
   nrels += line;
   pthread_mutex_unlock (&lock);
+#endif
 }
 
 /* pass 3: writes remaining relations */
 static void
-bar (char *g)
+load_pass3 (char *g)
 {
-  uint64_t rp[MAX_RAT_PER_LINE], ap[MAX_ALG_PER_LINE], ar[MAX_ALG_PER_LINE];
-  char s[1024], newg[MAXNAME<<1], *t, *ret;
+  uint64_t rp[MAX_STOCK_RAT_PER_LINE], ap[MAX_STOCK_ALG_PER_LINE], ar[MAX_STOCK_ALG_PER_LINE];
+  char s[1024], newg[MAXNAME<<1], *t;
   FILE *f, *newf;
   unsigned long line = 0, b, r, output = 0;
   long a;
-  uint64_t p, pfree, w, h;
-  int keep, nr, na;
+  uint64_t p, p2, w, h;
+  unsigned int nr, na;
   uint8_t m;
 
   strcpy (newg, NEW_DIR);
@@ -738,112 +701,90 @@ bar (char *g)
   f = gzip_open (g, "r");
   newf = gzip_open (newg, "w");
   assert (newf != NULL);
-  while (1)
-    {
-      ret = fgets (s, 1024, f);
-      if (ret == 0)
-        break;
-      line ++;
-      t = s;
-      if (*t != '-')
-	a = 1;
-      else {
-	a = -1;
-	t++;
-      }
-      for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++)
-	p = p * 10 + m;
-      a *= p;
-      t ++;
-      for (b = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++)
-	b = b * 10 + m;
-      t ++;
-      pfree = 0;
-      keep = 1;
-      nr = na = 0;
-      while (1)
-        {
-	  for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++)
-	    p = (p << 4) + m;
-          if (b == 0)
-            pfree = p;
-          if (p >= minpr)
-            {
-              rp[nr++] = p;
-              h = INDEX_RAT (p);
-              w = WEIGHT (h);
-              if (w <= 1 || ((w == 2) && (clique_weight (h) >= threshold_weight)))
-                keep = 0;
-            }
-          if (*t++ != ',')
-            break; /* end of rational primes */
-        }
-      while (1)
-        {
-	  for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++)
-	    p = (p << 4) + m;
-          if (pfree >= minpa)
-            {
-              r = p;
-              p = pfree;
-            }
-          else if (p >= minpa) /* non-free case */
-            r = root (a, b, p);
-          if (p >= minpa)
-            {
-              ap[na] = p;
-              ar[na++] = r;
-              h = INDEX_ALG (p, r);
-              w = WEIGHT (h);
-              if (w <= 1 || ((w == 2) && (clique_weight (h) >= threshold_weight)))
-                keep = 0;
-            }
-          if (*t++ != ',')
-            break; /* end of algebraic primes */
-        }
-      if (keep)
-        {
-          fputs (s, newf);
-          output ++;
-        }
-      else /* update 2-bit counters of removed ideals */
-        {
-          while (nr-- > 0)
-            delete (INDEX_RAT (rp[nr]));
-          while (na-- > 0)
-            delete (INDEX_ALG (ap[na], ar[na]));
-        }
+  line = output = 0;
+  if (0) {
+  next_line: /* update 2-bit counters of removed ideals of the suppress line */
+    while (nr-- > 0)
+      delete (INDEX_RAT (rp[nr]));
+    while (na-- > 0)
+      delete (INDEX_ALG (ap[na], ar[na]));
+  }
+  while (fgets (s, 1024, f)) {
+    line ++;
+    t = s;
+    if (*t != '-')
+      a = 1;
+    else {
+      a = -1;
+      t++;
     }
-
+    for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p = p * 10 + m);
+    a *= p;
+    t ++;
+    for (b = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, b = b * 10 + m);
+    t ++;
+    nr = na = 0;
+    do {
+      for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p = (p << 4) + m);
+      if (p >= minpr) {
+	assert(nr < MAX_STOCK_RAT_PER_LINE);
+	rp[nr++] = p;
+	h = INDEX_RAT (p);
+	w = WEIGHT (h);
+	if (w < 2 || ((w == 2) && (clique_weight (h) >= threshold_weight)))
+	  goto next_line;
+      }
+    } while (*t++ == ',');
+    if (b)
+      do {
+	for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p = (p << 4) + m);
+	if (p >= minpa) {
+	  assert (na < MAX_STOCK_ALG_PER_LINE);
+	  r = root (a, b, p);
+	  ap[na] = p;
+	  ar[na++] = r;
+	  h = INDEX_ALG (p, r);
+	  w = WEIGHT (h);
+	  if (w < 2 || ((w == 2) && (clique_weight (h) >= threshold_weight)))
+	    goto next_line;
+	}
+      } while (*t++ == ',');
+    else
+      if (p >= minpa)
+	do {
+	  assert (na < MAX_STOCK_ALG_PER_LINE);
+	  for (p2 = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p2 = (p2 << 4) + m);
+	  ap[na] = p;
+	  ar[na++] = p2;
+	  h = INDEX_ALG (p, p2);
+	  w = WEIGHT (h);
+	  if (w < 2 || ((w == 2) && (clique_weight (h) >= threshold_weight)))
+	    goto next_line;
+	} while (*t++ == ',');
+    fputs (s, newf);
+    output ++;
+  }
   gzip_close (f, g);
   gzip_close (newf, newg);
-
   fprintf (stderr, "   new/%s done: remains %lu rels out of %lu\n",
            g, output, line);
-  fflush (stderr);
+#ifdef HAVE_SYNC_FETCH
+  __sync_fetch_and_add(&remains, output);
+  __sync_fetch_and_add(&nrels, line);
+#else
   pthread_mutex_lock (&lock);
   remains += output;
   nrels += line;
   pthread_mutex_unlock (&lock);
+#endif
 }
 
 void*
-one_thread (void* args)
+pass1_one_thread (void* args)
 {
   tab_t *tab = (tab_t*) args;
-  /*
-  char cg[ARG_MAX], *pg;
 
-  strcpy(cg, tab[0]->g);
-  for (pg = cg; (pg = strchr(pg, ' ')) != NULL; *pg = '\n');
-  fprintf (stderr, "1: Thread %d deals with %s\n", tab[0]->thread, cg);
-  fflush (stderr);
-  */
-  tab[0]->nlines = foo (tab[0]->g);
-  /*
-  fprintf (stderr, "   %s done (%lu relations)\n", cg, tab[0]->nlines);
-  fflush (stderr);
-  */
+  tab[0]->nlines = load_pass1 (tab[0]->g);
   tab[0]->busy = 1;
   sem_post(&sem_pt);
   return NULL;
@@ -855,11 +796,7 @@ pass2_one_thread (void* args)
 {
   tab_t *tab = (tab_t*) args;
 
-  /*
-  fprintf (stderr, "2: Thread %d deals with %s\n", tab[0]->thread, tab[0]->g);
-  fflush (stderr);
-  */
-  bar2 (tab[0]->g);
+  load_pass2 (tab[0]->g);
   tab[0]->busy = 1;
   sem_post(&sem_pt);
   return NULL;
@@ -871,11 +808,7 @@ pass3_one_thread (void* args)
 {
   tab_t *tab = (tab_t*) args;
 
-  /*
-  fprintf (stderr, "3: Thread %d deals with %s\n", tab[0]->thread, tab[0]->g);
-  fflush (stderr);
-  */
-  bar (tab[0]->g);
+  load_pass3 (tab[0]->g);
   tab[0]->busy = 1;
   sem_post(&sem_pt);
   return NULL;
@@ -954,12 +887,10 @@ stat_mt (int nthreads)
   est_ideals = estimate_ideals ((double) M, (double) nideal);
   fprintf (stderr, "   Read %lu rels (%lu/s), %lu ideals (%.2f%%), %lu singletons, %lu of weight 2\n",
            nrels, (unsigned long) (nrels / (rt - wct0)),
-           nideal, 100.0 * (double) nideal / (double) M,
-           nsingl, ndupli);
+           nideal, (100.0 * nideal) / M, nsingl, ndupli);
   fprintf (stderr, "   Estimated excess %1.0f, need %1.0f\n",
            (double) nrels - est_ideals,
            est_excess ((double) minpr) + est_excess ((double) minpa));
-  fflush (stderr);
 }
 
 /* read all files and fills the hash table */
@@ -971,16 +902,14 @@ doit (int nthreads, char *filelist)
   int i, j = 0, nbt = 0, notload, nbf, askstat;
   tab_t *T;
   pthread_t tid[MAX_THREADS];
-  double st = cputime(), rt = realtime(), crt, art, oart,
+  double st = cputime(), rt = realtime(), crt, art,
     delay_stat = compute_delay_stat();
   size_t lpg;
-  uint64_t onrels = 0;
 
   fprintf (stderr, "\n"
 	   "************\n"
 	   "* PASS 1/3 *\n"
 	   "************\n\n");
-  fflush (stderr);
   f = fopen (filelist, "r");
   if (f == NULL)
     {
@@ -990,7 +919,7 @@ doit (int nthreads, char *filelist)
   T = malloc (nthreads * sizeof (tab_t));
   memset(T, 0, nthreads * sizeof (tab_t));
   sem_init(&sem_pt, 0, nthreads - 1);
-  crt = oart = art = rt;
+  crt = art = rt;
   askstat = 0;
   while ((notload = (!feof (f))) || nbt) {
     if (notload && !askstat) {
@@ -1012,7 +941,7 @@ doit (int nthreads, char *filelist)
 	T[i]->busy = 2;
 	T[i]->thread = i;
 	nbt++;
-	pthread_create (&tid[i], NULL, one_thread, (void *) (T + i));
+	pthread_create (&tid[i], NULL, pass1_one_thread, (void *) (T + i));
       }
     }
     sem_wait(&sem_pt);
@@ -1027,15 +956,11 @@ doit (int nthreads, char *filelist)
       }
     art = realtime();
     if (j + 1 == nthreads) {
-      fprintf (stderr, "Pass1; rels: load %lu; krels/s: avg %lu, spot %lu. "
-	       "Time: %lus cpu, %lus real\n", nrels,
-	       (unsigned long) ((nrels >> 10) / (art - rt)),
-	       (unsigned long) (((nrels - onrels) >> 10) / (art - oart)),
+      fprintf (stderr, "Pass1; rels: load %lu; krels/s: %lu; time: %lus cpu, %lus real\n",
+	       nrels,
+	       (unsigned long) (nrels / ((art - rt) * 1000)),
 	       (unsigned long) (cputime() - st),
 	       (unsigned long) (art - rt));
-      fflush (stderr);
-      oart = art;
-      onrels = nrels;
       j = 0;
     }
     if ((askstat = ((art - crt) > delay_stat)) && !nbt) {
@@ -1050,7 +975,6 @@ doit (int nthreads, char *filelist)
   stat_mt (nthreads);
   fprintf (stderr, "Pass 1 took %lds (cpu), %lds (real)\n",
            (unsigned long) (cputime () - st), (unsigned long) (realtime () - rt));
-  fflush (stderr);
   sem_destroy(&sem_pt);
   fclose (f);
   free (T);
@@ -1069,9 +993,8 @@ pass2 (int nthreads, char *filelist)
   int i, j = 0, notload, nbt = 0, nbf;
   tab_t *T;
   pthread_t tid[MAX_THREADS];
-  double st = cputime(), rt = realtime(), art, oart;
+  double st = cputime(), rt = realtime(), art;
   size_t lpg;
-  uint64_t onrels = 0;
 
   fprintf (stderr, "\n"
 	   "************\n"
@@ -1081,7 +1004,7 @@ pass2 (int nthreads, char *filelist)
   T = malloc (nthreads * sizeof (tab_t));
   memset(T, 0, nthreads * sizeof (tab_t));
   sem_init(&sem_pt, 0, nthreads - 1);
-  oart = art = rt;
+  art = rt;
   while ((notload = (!feof (f))) || nbt) {
     if (notload) {
       pg = g;
@@ -1118,16 +1041,12 @@ pass2 (int nthreads, char *filelist)
     art = realtime();
     if (j + 1 == nthreads) {
       fprintf (stderr, "Pass2; rels: load %lu, used %lu (%.2f%%); "
-	       "krels/s: %lu avg, %lu spot; time: %lus cpu, %lus real\n",
+	       "krels/s: %lu; time: %lus cpu, %lus real\n",
 	       nrels, remains,
-	       100.0 * (double) remains / (double) nrels,
-	       (unsigned long) ((nrels >> 10) / (art - rt)),
-	       (unsigned long) (((nrels - onrels) >> 10) / (art - oart)),
+	       (100.0 * remains) / nrels,
+	       (unsigned long) (nrels / ((art - rt) * 1000)),
 	       (unsigned long) (cputime() - st),
 	       (unsigned long) (art - rt));
-      fflush (stderr);
-      oart = art;
-      onrels = nrels;
       j = 0;
     }
   }
@@ -1136,17 +1055,16 @@ pass2 (int nthreads, char *filelist)
 	   "Relations: load %lu, used %lu (%.2f%%); "
 	   "krels/s: %lu; time: %lus cpu, %lus real\n",
 	   nrels, remains,
-	   100.0 * (double) remains / (double) nrels,
-	   (unsigned long) ((nrels >> 10) / (art - rt)),
+	   (100.0 * remains) / nrels,
+	   (unsigned long) (nrels / ((art - rt) * 1000)),
 	   (unsigned long) (cputime() - st),
 	   (unsigned long) (art - rt));
-  fflush (stderr);
   sem_destroy(&sem_pt);
   fclose (f);
   free (T);
   stat2 ();
   /* propagate weights to speed up clique_weight */
-#if 1
+#if 0
   {
     uint64_t h;
     for (h = 0; h < M; h++)
@@ -1174,9 +1092,8 @@ pass3 (int nthreads, char *filelist)
   int i, j = 0, k = 0, nbt = 0, notload;
   tab_t *T;
   pthread_t tid[MAX_THREADS];
-  double st = cputime(), rt = realtime(), art, oart;
+  double st = cputime(), rt = realtime(), art;
   size_t lg;
-  uint64_t onrels = 0;
 
   fprintf (stderr, "\n"
 	   "************\n"
@@ -1186,7 +1103,7 @@ pass3 (int nthreads, char *filelist)
   T = malloc (nthreads * sizeof (tab_t));
   memset(T, 0, nthreads * sizeof (tab_t));
   sem_init(&sem_pt, 0, nthreads - 1);
-  oart = art = rt;
+  art = rt;
   while ((notload = (!feof (f))) || nbt) {
     if (notload && fgets (g, MAXNAME, f) && (lg = strlen(g))) {
       g[lg - 1] = 0;
@@ -1210,22 +1127,17 @@ pass3 (int nthreads, char *filelist)
     art = realtime();
     if (j + 1 == nthreads && ++k == MAX_FILES_PER_THREAD) {
       fprintf (stderr, "Pass3; rels: load %lu, used %lu (%.2f%%); "
-	       "krels/s: %lu avg, %lu spot; time: %lus cpu, %lus real\n",
+	       "krels/s: %lu; time: %lus cpu, %lus real\n",
 	       nrels, remains,
-	       100.0 * (double) remains / (double) nrels,
-	       (unsigned long) ((nrels >> 10) / (art - rt)),
-	       (unsigned long) (((nrels - onrels) >> 10) / (art - oart)),
+	       (100.0 * remains) / nrels,
+	       (unsigned long) (nrels / ((art - rt) * 1000)),
 	       (unsigned long) (cputime() - st),
 	       (unsigned long) (art - rt));
-      fflush (stderr);
-      oart = art;
-      onrels = nrels;
       j = k = 0;
     }
   }
   fprintf (stderr, "Pass 3 took %lds (cpu), %lds (real)\n",
            (unsigned long) (cputime () - st), (unsigned long) (realtime () - rt));
-  fflush (stderr);
   sem_destroy(&sem_pt);
   fclose (f);
   free (T);
