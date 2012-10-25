@@ -35,7 +35,7 @@
 #ifdef BATCH_P
 #define BATCH_SIZE 8 /* batch 8 p */
 #else
-#define BATCH_SIZE 10 /* batch 10 sq */
+#define BATCH_SIZE 20 /* batch 10 sq */
 #endif
 
 /* consider only two roots or more */

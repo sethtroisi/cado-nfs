@@ -292,8 +292,6 @@ qroots_clear (qroots_t R)
 void
 hash_init (hash_t H, unsigned long init_size)
 {
-  unsigned long j;
-
   H->alloc = init_size;
   H->p = (uint32_t*) malloc (H->alloc * sizeof (uint32_t));
   if (H->p == NULL)
@@ -307,10 +305,8 @@ hash_init (hash_t H, unsigned long init_size)
     fprintf (stderr, "Error, cannot allocate memory in hash_init\n");
     exit (1);
   }
-  for (j = 0; j < H->alloc; j++) {
-    H->p[j] = 0;
-    H->i[j] = 0;
-  }
+
+  memset(H->i, 0, sizeof(int64_t)*H->alloc);
   H->size = 0;
 }
 
@@ -327,9 +323,12 @@ hash_add (hash_t H, unsigned long p, int64_t i, mpz_t m0, uint64_t ad,
 
   if (H->size >= H->alloc)
     hash_grow (H);
-  if (i >= 0)
+  if (i > 0)
     // h = i % H->alloc;
     h = ((int)i) % H->alloc;
+  else if (i == 0) {
+    h = ((unsigned int)~0) % H->alloc;
+  }
   else
   {
     // h = H->alloc - ( (-i) % H->alloc );
@@ -338,7 +337,7 @@ hash_add (hash_t H, unsigned long p, int64_t i, mpz_t m0, uint64_t ad,
       h = 0;
   }
 
-  while (H->p[h] != 0)
+  while (H->i[h] != 0)
   {
     if (H->i[h] == i && H->p[h] != p)
       match (H->p[h], p, i, m0, ad, d, N, q, rq);
