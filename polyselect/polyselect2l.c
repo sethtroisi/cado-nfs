@@ -1994,11 +1994,10 @@ collision_on_batch_sq ( header_t header,
 
     // (size-1) multiplications
     modredcul_set_ul (qprod[0], q[0], modpp);
-    modredcul_sqr (qprod[0], qprod[0], modpp); /* q[0]^2 */
+
     for (i = 1; i < size; i ++)
       {
         modredcul_set_ul (tmp_modul, q[i], modpp);
-        modredcul_sqr (tmp_modul, tmp_modul, modpp);
         modredcul_mul (qprod[i], tmp_modul, qprod[i-1], modpp);
       }
     // the inversion, also reduce qprod[size-1] (mod pp).
@@ -2009,10 +2008,12 @@ collision_on_batch_sq ( header_t header,
       {
 
         modredcul_mul (tmp2_modul, qprod[i-1], tmp_modul, modpp);
-        /* qprod[i-1] = (q[0] * ... * q[i-1])^2 (mod p^2)
-           tmp_modul = 1/(q[0] * ... * q[i])^2 (mod p^2)
-           thus tmp2_modul = 1/q[i]^2 mod (p^2) */
+        /* qprod[i-1] = q[0] * ... * q[i-1] (mod p^2)
+           tmp_modul = 1/(q[0] * ... * q[i]) (mod p^2)
+           thus tmp2_modul = 1/q[i] mod (p^2) */
       
+      modredcul_sqr (tmp2_modul, tmp2_modul, modpp); /* 1/q[i]^2 (mod p^2) */
+
 #ifdef DEBUG_POLYSELECT2L /* check if batch inversions correct */
       unsigned long tmp_1 = modredcul_get_ul (tmp2_modul, modpp);
       mpz_t tmp_debug, tmp_debug2, qqz;
@@ -2073,9 +2074,8 @@ collision_on_batch_sq ( header_t header,
       }
       
       modredcul_set_ul (tmp3_modul, q[i], modpp);
-      modredcul_sqr (tmp3_modul, tmp3_modul, modpp); /* q[i]^2 mod p^2 */
       modredcul_mul (tmp_modul, tmp3_modul, tmp_modul, modpp);
-      /* now tmp_modul = 1/(q[0] * ... * q[i-1])^2 (mod p^2) */
+      /* now tmp_modul = 1/(q[0] * ... * q[i-1]) (mod p^2) */
       c -= nr;
       }
 
