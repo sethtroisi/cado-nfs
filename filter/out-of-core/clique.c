@@ -532,7 +532,7 @@ load_pass1 (char *g)
   long a;
   uint64_t p, p2;
   uint8_t m;
-  
+
 
   f = gzip_open (g, "r");
   line = 0;
@@ -1274,7 +1274,8 @@ main (int argc, char *argv[])
   create_directories(filelist);
   fprintf (stderr, " Done.\n");
 
-  fprintf (stderr, "Each thread processing %d files\n", MAX_FILES_PER_THREAD);
+  fprintf (stderr, "Each thread processing %d file(s)\n",
+           MAX_FILES_PER_THREAD);
 
   wct0 = realtime ();
   nrels = 0;
