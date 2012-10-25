@@ -145,11 +145,15 @@ create_directories (char *filelist)
 double
 compute_delay_stat ()
 {
+  /*
   uint64_t h;
   uint32_t i;
-
+  */
+  return (60 + (Hsize>>24));
+  /*
   for (h = (Hsize>>24), i = 0; h; h >>=1, i++);
   return (i) ? (double) (i<<6) : 32.;
+  */
 }
 
 double
@@ -484,13 +488,14 @@ mulmod_old (uint64_t a, uint64_t b, uint64_t p)
   return r;
 }
 
-/* return a*b mod p, assuming 0 <= a, b, p < 2^40 */
+/* return a*b mod p, assuming p < 2^40 */
 uint64_t
 mulmod (uint64_t a, uint64_t b, uint64_t p)
 {
   uint64_t r;
 
-  assert (a <= 0x100000000000);
+  a %= p;
+  b %= p;
   r = ((b >> 20) * a) % p; /* r < 2^40 */
   return ((r << 20) + (b & 0xfffff) * a) % p;
 }
@@ -532,10 +537,9 @@ load_pass1 (char *g)
   long a;
   uint64_t p, p2;
   uint8_t m;
-
-
-  f = gzip_open (g, "r");
+  
   line = 0;
+  f = gzip_open (g, "r");
   while (fgets (s, 1024, f)) {
     line++;
     t = s;
@@ -618,10 +622,8 @@ load_pass2 (char *g)
 	i = INDEX_RAT(p);
 	w = WEIGHT (i);
 	if (w < 2) goto next_line;
-	if (w == 2) {
-	  assert(nr < MAX_STOCK_RAT_PER_LINE);
+	if (w == 2)
 	  rp[nr++] = p;
-	}
 	else
 	  W += 1.0 / (double) w;
       }
@@ -635,7 +637,6 @@ load_pass2 (char *g)
 	  w = WEIGHT (i);
 	  if (w < 2) goto next_line;
 	  if (w == 2) {
-	    assert (na < MAX_STOCK_ALG_PER_LINE);
 	    ap[na] = p;
 	    ar[na++] = r;
 	  } else
@@ -650,7 +651,6 @@ load_pass2 (char *g)
 	  w = WEIGHT (i);
 	  if (w < 2) goto next_line;
 	  if (w == 2) {
-	    assert (na < MAX_STOCK_ALG_PER_LINE);
 	    ap[na] = p;
 	    ar[na++] = p2;
 	  } else
@@ -727,7 +727,6 @@ load_pass3 (char *g)
     do {
       for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p = (p << 4) + m);
       if (p >= minpr) {
-	assert(nr < MAX_STOCK_RAT_PER_LINE);
 	rp[nr++] = p;
 	h = INDEX_RAT (p);
 	w = WEIGHT (h);
@@ -739,7 +738,6 @@ load_pass3 (char *g)
       do {
 	for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p = (p << 4) + m);
 	if (p >= minpa) {
-	  assert (na < MAX_STOCK_ALG_PER_LINE);
 	  r = root (a, b, p);
 	  ap[na] = p;
 	  ar[na++] = r;
@@ -752,7 +750,6 @@ load_pass3 (char *g)
     else
       if (p >= minpa)
 	do {
-	  assert (na < MAX_STOCK_ALG_PER_LINE);
 	  for (p2 = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p2 = (p2 << 4) + m);
 	  ap[na] = p;
 	  ar[na++] = p2;
@@ -856,6 +853,43 @@ est_excess (double a)
   return a / log (a);
 }
 
+/* mono-thread version */
+static void*
+stat () {
+  uint64_t *hd, *he, h, wt[16];
+  long st = cputime (), rt = realtime ();
+  unsigned long nideal, nsingl, ndupli;
+  double est_ideals;
+  int dum;
+
+  pthread_setcancelstate(PTHREAD_CANCEL_ENABLE,&dum);
+  pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS,&dum);
+  /* pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED,&dum); */
+  memset (wt, 0, sizeof(*wt) * 16);
+  for (hd = H, he = H + Hsize; hd < he; )
+    {  /* deal with 64 bits, i.e., 16 entries at a time */
+      h = *hd++;
+      while (h)
+        {
+          wt[h & 0xf] ++;
+          h >>= 4;
+        }
+    }
+  nideal = nsingl = wt[1];
+  ndupli = wt[2];
+  for (hd = &(wt[2]); hd < &(wt[16]); nideal += *hd++);
+  fprintf (stderr, "   Stat() took %lds (cpu), %lds (real)\n",
+           (unsigned long) (cputime () - st), (unsigned long) (realtime () - rt));
+  est_ideals = estimate_ideals ((double) M, (double) nideal);
+  fprintf (stderr, "   Read at least %lu rels (%lu/s), %lu ideals (%.2f%%), %lu singletons, %lu of weight 2\n",
+           nrels, (unsigned long) (nrels / (rt - wct0)),
+           nideal, (100.0 * nideal) / M, nsingl, ndupli);
+  fprintf (stderr, "   Estimated excess %1.0f, need %1.0f\n",
+           (double) nrels - est_ideals,
+           est_excess ((double) minpr) + est_excess ((double) minpa));
+  return NULL;
+}
+
 /* multi-thread version */
 static void
 stat_mt (int nthreads)
@@ -895,13 +929,13 @@ stat_mt (int nthreads)
 
 /* read all files and fills the hash table */
 static void
-doit (int nthreads, char *filelist)
+pass1 (int nthreads, char *filelist)
 {
   FILE *f;
   char g[ARG_MAX], *pg;
-  int i, j = 0, nbt = 0, notload, nbf, askstat;
+  int i, j = 0, nbt = 0, notload, nbf, askstat, notfirst = 0;
   tab_t *T;
-  pthread_t tid[MAX_THREADS];
+  pthread_t tid[MAX_THREADS], sid;
   double st = cputime(), rt = realtime(), crt, art,
     delay_stat = compute_delay_stat();
   size_t lpg;
@@ -922,7 +956,7 @@ doit (int nthreads, char *filelist)
   crt = art = rt;
   askstat = 0;
   while ((notload = (!feof (f))) || nbt) {
-    if (notload && !askstat) {
+    if (notload /* && !askstat */ ) {
       pg = g;
       nbf = 0;
       do {
@@ -963,13 +997,25 @@ doit (int nthreads, char *filelist)
 	       (unsigned long) (art - rt));
       j = 0;
     }
-    if ((askstat = ((art - crt) > delay_stat)) && !nbt) {
+    if ((askstat = ((art - crt) > delay_stat)) /* && !nbt */) {
       askstat = 0;
-      stat_mt (nthreads);
+      /* stat_mt (nthreads); */
+      if (notfirst) {
+	pthread_cancel(sid);
+	pthread_join (sid, NULL);
+      }
+      notfirst = 1;
+      pthread_create (&sid, NULL, stat, NULL);
       crt = art;
+      /*
       sem_destroy(&sem_pt);
       sem_init(&sem_pt, 0, nthreads - 1);
+      */
     }
+  }
+  if (notfirst) {
+    pthread_cancel(sid);
+    pthread_join (sid, NULL);
   }
   fprintf (stderr, "\n*** Pass 1, final stats: *** \n");
   stat_mt (nthreads);
@@ -1279,7 +1325,7 @@ main (int argc, char *argv[])
 
   wct0 = realtime ();
   nrels = 0;
-  doit (nthreads, filelist);
+  pass1 (nthreads, filelist);
 
   size_malloc = M * sizeof (*H2);
   fprintf (stderr, "Creating & clearing weight primes array: %lu mB...", size_malloc >> 20);
