@@ -472,32 +472,18 @@ stat2 ()
            count[n], threshold_weight);
 }
 
-/* return a*b mod p, assuming 0 <= a, b, p < 2^40 */
-uint64_t
-mulmod_old (uint64_t a, uint64_t b, uint64_t p)
-{
-  uint64_t a1, a0, b1, b0, r;
-
-  a1 = a >> 20;
-  a0 = a & 1048575;
-  b1 = b >> 20;
-  b0 = b & 1048575;
-  r = (a1 * b1) % p; /* r < 2^40 */
-  r = ((r << 20) + a1 * b0 + a0 * b1) % p;
-  r = ((r << 20) + a0 * b0) % p;
-  return r;
-}
-
 /* return a*b mod p, assuming p < 2^40 */
 uint64_t
 mulmod (uint64_t a, uint64_t b, uint64_t p)
 {
   uint64_t r;
 
-  a %= p;
-  b %= p;
-  r = ((b >> 20) * a) % p; /* r < 2^40 */
-  return ((r << 20) + (b & 0xfffff) * a) % p;
+  a %= p; /* now 0 <= a < 2^40 */
+  b %= p; /* now 0 <= b < 2^40 */
+
+  /* let b = b1 * 2^20 + b0: we compute (b1*a)*2^20 + b0*a */
+  r = ((b >> 20) * a) % p; /* b1*a < 2^60 and r < 2^40 */
+  return ((r << 20) + (b & 0xfffff) * a) % p; /* r*2^20 < 2^60, b0*a < 2^60 */
 }
 
 /* return a/b mod p */
@@ -537,7 +523,7 @@ load_pass1 (char *g)
   long a;
   uint64_t p, p2;
   uint8_t m;
-  
+
   line = 0;
   f = gzip_open (g, "r");
   while (fgets (s, 1024, f)) {
@@ -956,7 +942,7 @@ pass1 (int nthreads, char *filelist)
   crt = art = rt;
   askstat = 0;
   while ((notload = (!feof (f))) || nbt) {
-    if (notload /* && !askstat */ ) {
+    if (notload) {
       pg = g;
       nbf = 0;
       do {
@@ -997,7 +983,7 @@ pass1 (int nthreads, char *filelist)
 	       (unsigned long) (art - rt));
       j = 0;
     }
-    if ((askstat = ((art - crt) > delay_stat)) /* && !nbt */) {
+    if ((askstat = ((art - crt) > delay_stat))) {
       askstat = 0;
       /* stat_mt (nthreads); */
       if (notfirst) {
