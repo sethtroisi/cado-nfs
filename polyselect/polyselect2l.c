@@ -2079,6 +2079,7 @@ collision_on_batch_sq ( header_t header,
       c -= nr;
       }
 
+    modredcul_sqr (tmp_modul, tmp_modul, modpp);
     /* now tmp_modul = 1/q[0]^2 mpd p^2 */
     unsigned long rqi = mpz_fdiv_ui (rqqz[0], pp);
     for (j = 0; j < nr; j ++, c ++) {
