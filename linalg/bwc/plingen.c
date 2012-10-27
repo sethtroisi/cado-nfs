@@ -1520,7 +1520,7 @@ int main(int argc, char *argv[])
     int tune_mp = tune;
 
     if (tune_bm_basecase) {
-        unsigned int maxtune = 1000;
+        unsigned int maxtune = 10000 / (m * n);
         for(unsigned int k = 10 ; k < maxtune ; k += k/10) {
             unsigned int * delta = malloc((m + n) * sizeof(unsigned int));
             polymat E, pi;
@@ -1543,7 +1543,12 @@ int main(int argc, char *argv[])
 
     if (tune_mp) {
         /* Now for benching mp and plain mul */
-        unsigned int maxtune = 10000;
+        unsigned int maxtune = 10000 / (m*n);
+        /* Bench the products which would come together with a k-steps
+         * basecase algorithm. IOW a 2k, one-level recursive call incurs
+         * twice the k-steps basecase, plus once the timings counted here
+         * (presently, this has Karatsuba complexity)
+         */
         for(unsigned int k = 10 ; k < maxtune ; k+= k/10) {
             polymat E, piL, piR, pi, Er;
             unsigned int sE = k*(m+2*n)/(m+n);
@@ -1570,9 +1575,15 @@ int main(int argc, char *argv[])
             ttmul -= seconds();
             polymat_mul(ab, pi, piL, piR);
             ttmul += seconds();
-            ttmp /= k*k;
-            ttmul /= k*k;
-            printf("%u %.2e+%.2e = %.2e\n", k, ttmp, ttmul, ttmp + ttmul);
+            double ttmpq = ttmp / (k*k);
+            double ttmulq = ttmul / (k*k);
+            double ttmpk = ttmp / pow(k, 1.58);
+            double ttmulk = ttmul / pow(k, 1.58);
+            printf("%u [%.2e+%.2e = %.2e] [%.2e+%.2e = %.2e]\n",
+                    k,
+                    ttmpq, ttmulq, ttmpq + ttmulq,
+                    ttmpk, ttmulk, ttmpk + ttmulk
+                    );
             // (seconds()-tt) / (k*k)); // ((sE-spi) * spi) / (m*(m+n)*(m+n)));
             // printf("%zu %.2e\n", E->size, (seconds()-tt) / (k*k)); // (spi * spi) / ((m+n)*(m+n)*(m+n)));
             polymat_clear(E);
