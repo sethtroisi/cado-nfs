@@ -15,12 +15,19 @@
 
 #define LEN_SPECIAL_Q 55
 
+/* hash table slots */
+typedef struct
+{
+  int64_t i;               /* contains the values of r such that p^2
+                              divides N - (m0 + r)^2 */
+  uint32_t p;              /* contains the primes */
+} __slot_t;
+typedef __slot_t slot_t;
+
 /* hash table structure */
 typedef struct
 {
-  uint32_t *p;              /* contains the primes */
-  int64_t *i;               /* contains the values of r such that p^2
-                               divides N - (m0 + r)^2 */
+  slot_t *slot;
   unsigned int alloc;      /* total allocated size */
   unsigned int size;       /* number of entries in hash table */
 } __hash_struct;

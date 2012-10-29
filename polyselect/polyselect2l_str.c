@@ -293,20 +293,16 @@ void
 hash_init (hash_t H, unsigned long init_size)
 {
   H->alloc = init_size;
-  H->p = (uint32_t*) malloc (H->alloc * sizeof (uint32_t));
-  if (H->p == NULL)
-  {
-    fprintf (stderr, "Error, cannot allocate memory in hash_init\n");
-    exit (1);
-  }
-  H->i = (int64_t*) malloc (H->alloc * sizeof (int64_t));
-  if (H->i == NULL)
-  {
+  H->slot = (slot_t*) malloc (H->alloc * sizeof (slot_t));
+  if (H->slot == NULL) {
     fprintf (stderr, "Error, cannot allocate memory in hash_init\n");
     exit (1);
   }
 
-  memset(H->i, 0, sizeof(int64_t)*H->alloc);
+  for (unsigned int j = 0; j < H->alloc; j ++) {
+    H->slot[j].i = 0;
+    H->slot[j].p = 0;
+  }
   H->size = 0;
 }
 
@@ -337,23 +333,24 @@ hash_add (hash_t H, unsigned long p, int64_t i, mpz_t m0, uint64_t ad,
       h = 0;
   }
 
-  while (H->i[h] != 0)
+  while (H->slot[h].i != 0)
   {
-    if (H->i[h] == i && H->p[h] != p)
-      match (H->p[h], p, i, m0, ad, d, N, q, rq);
+    if (H->slot[h].i == i)
+      if  (H->slot[h].p != p)
+        match (H->slot[h].p, p, i, m0, ad, d, N, q, rq);
     if (++h == H->alloc)
       h = 0;
   }
-  H->p[h] = p;
-  H->i[h] = i;
+
+  H->slot[h].p = p;
+  H->slot[h].i = i;
   H->size ++;
 }
-
 
 /* rq is a root of N = (m0 + rq)^d mod (q^2) */
 void
 gmp_hash_add (hash_t H, uint32_t p, int64_t i, mpz_t m0, uint64_t ad,
-	      unsigned long d, mpz_t N, uint64_t q, mpz_t rq)
+              unsigned long d, mpz_t N, uint64_t q, mpz_t rq)
 {
   unsigned long h;
   
@@ -362,22 +359,22 @@ gmp_hash_add (hash_t H, uint32_t p, int64_t i, mpz_t m0, uint64_t ad,
   if (i >= 0)
     h = ((int)i) % H->alloc;
   else
-    {
-      h = H->alloc - ( ((int)(-i)) % H->alloc);
-      if (h == H->alloc)
-	h = 0;
-    }
+  {
+    h = H->alloc - ( ((int)(-i)) % H->alloc);
+    if (h == H->alloc)
+      h = 0;
+  }
 
-  while (H->p[h] != 0)
-    {
-      if (m0 != NULL && H->i[h] == i && H->p[h] != p) {
-	gmp_match (H->p[h], p, i, m0, ad, d, N, q, rq);
-      }
-      if (++h == H->alloc)
-	h = 0;
+  while (H->slot[h].p != 0)
+  {
+    if (m0 != NULL && H->slot[h].i== i && H->slot[h].p != p) {
+      gmp_match (H->slot[h].p, p, i, m0, ad, d, N, q, rq);
     }
-  H->p[h] = p;
-  H->i[h] = i;
+    if (++h == H->alloc)
+      h = 0;
+  }
+  H->slot[h].p = p;
+  H->slot[h].i = i;
   H->size ++;
 }
 
@@ -385,47 +382,35 @@ gmp_hash_add (hash_t H, uint32_t p, int64_t i, mpz_t m0, uint64_t ad,
 void
 hash_clear (hash_t H)
 {
-  free (H->p);
-  free (H->i);
+  free (H->slot);
 }
 
 void
 hash_grow (hash_t H)
 {
   unsigned long j, old_alloc;
-  uint32_t *old_p;
-  int64_t *old_i;
+  slot_t *old_slot;
   mpz_t tmp;
   mpz_init (tmp);
   mpz_set_ui (tmp, 0);
 
   old_alloc = H->alloc;
-  old_p = H->p;
-  old_i = H->i;
-
+  old_slot = H->slot;
   H->alloc = 2 * old_alloc;
-  H->p = (uint32_t*) malloc (H->alloc * sizeof (uint32_t));
-  if (H->p == NULL)
-  {
-    fprintf (stderr, "Error, cannot allocate memory in hash_grow\n");
+  H->slot = (slot_t*) malloc (H->alloc * sizeof (slot_t));
+  if (H->slot == NULL) {
+    fprintf (stderr, "Error, cannot allocate memory in hash_init\n");
     exit (1);
   }
-  for (j = 0; j < H->alloc; j++)
-    H->p[j] = 0;
-  H->i = (int64_t*) malloc (H->alloc * sizeof (int64_t));
-  if (H->i == NULL)
-  {
-    fprintf (stderr, "Error, cannot allocate memory in hash_grow\n");
-    exit (1);
-  }
+  memset (H->slot, 0, (sizeof(int64_t) + sizeof(uint32_t)) * H->alloc);
   H->size = 0;
-  for (j = 0; j < old_alloc; j++)
-    if (old_p[j] != 0)
-      hash_add (H, old_p[j], old_i[j], NULL, 0, 0, NULL, 0, tmp);
-  free (old_p);
-  free (old_i);
-  mpz_clear (tmp);
 
+  for (j = 0; j < old_alloc; j++)
+    if (old_slot[j].p != 0)
+      hash_add (H, old_slot[j].p, old_slot[j].i, NULL, 0, 0, NULL, 0, tmp);
+
+  free (old_slot);
+  mpz_clear (tmp);
 }
 
 
