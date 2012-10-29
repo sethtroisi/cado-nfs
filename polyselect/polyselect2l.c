@@ -3029,19 +3029,22 @@ main (int argc, char *argv[])
     {
       printf ("# Stat: tried %d ad-value(s), found %d polynomial(s), %d below maxnorm\n",
               tries, tot_found, found);
-      printf ("# Stat: raw lognorm (min/av/max): %1.2f/%1.2f/%1.2f\n",
-              min_raw_lognorm, aver_raw_lognorm / collisions, max_raw_lognorm);
-      printf ("# Stat: optimized lognorm (min/av/max): %1.2f/%1.2f/%1.2f\n",
-              min_opt_lognorm, aver_opt_lognorm / collisions_good,
-              max_opt_lognorm);
       printf ("# Stat: potential collisions=%1.2e (%1.2e/s)\n",
               potential_collisions, 1000.0 * potential_collisions
               / (double) cputime ());
-      printf ("# Stat: av. g0/adm2 ratio: %.3e\n",
-              total_adminus2 / (double) collisions);
-      if (d == 6)
-        printf ("# Stat: av. logmu noc4/noc3 ratio: %.3f\n",
-                aver_lognorm_ratio / (double) collisions);
+      if (collisions > 0)
+        {
+          printf ("# Stat: raw lognorm (min/av/max): %1.2f/%1.2f/%1.2f\n",
+                  min_raw_lognorm, aver_raw_lognorm / collisions, max_raw_lognorm);
+          printf ("# Stat: optimized lognorm (min/av/max): %1.2f/%1.2f/%1.2f\n",
+                  min_opt_lognorm, aver_opt_lognorm / collisions_good,
+                  max_opt_lognorm);
+          printf ("# Stat: av. g0/adm2 ratio: %.3e\n",
+                  total_adminus2 / (double) collisions);
+          if (d == 6)
+            printf ("# Stat: av. logmu noc4/noc3 ratio: %.3f\n",
+                    aver_lognorm_ratio / (double) collisions);
+        }
     }
 
   printf ("# Stat: tried %d ad-value(s), found %d polynomial(s), %d below maxnorm\n",
