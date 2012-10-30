@@ -304,6 +304,10 @@ hash_init (hash_t H, unsigned long init_size)
     H->slot[j].p = 0;
   }
   H->size = 0;
+#ifdef DEBUG_HASH_TABLE
+  H->coll = 0;
+  H->coll_all = 0;
+#endif
 }
 
 
@@ -312,27 +316,31 @@ void
 hash_add (hash_t H, unsigned long p, int64_t i, mpz_t m0, uint64_t ad,
           unsigned long d, mpz_t N, unsigned long q, mpz_t rq)
 {
+  // the whole block takes 3900ms (for 20 batches q)
   unsigned long h;
-
   if (m0 == NULL)
     return;
 
+  // hashes only take 100ms
   if (H->size >= H->alloc)
     hash_grow (H);
   if (i > 0)
-    // h = i % H->alloc;
     h = ((int)i) % H->alloc;
   else if (i == 0) {
     h = ((unsigned int)~0) % H->alloc;
   }
   else
   {
-    // h = H->alloc - ( (-i) % H->alloc );
     h = H->alloc - ( ((int)(-i)) % H->alloc);
     if (h == H->alloc)
       h = 0;
   }
 
+#ifdef DEBUG_HASH_TABLE
+  if (H->slot[h].i != 0)
+    H->coll ++;
+#endif
+  // while loop ~3000ms
   while (H->slot[h].i != 0)
   {
     if (H->slot[h].i == i)
@@ -340,8 +348,11 @@ hash_add (hash_t H, unsigned long p, int64_t i, mpz_t m0, uint64_t ad,
         match (H->slot[h].p, p, i, m0, ad, d, N, q, rq);
     if (++h == H->alloc)
       h = 0;
+#ifdef DEBUG_HASH_TABLE
+    H->coll_all ++;
+#endif
   }
-
+  // the following three lines 1000ms
   H->slot[h].p = p;
   H->slot[h].i = i;
   H->size ++;

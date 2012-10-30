@@ -73,9 +73,9 @@ struct suffix_handler {
 };
 
 struct suffix_handler supported_compression_formats[] = {
-    { ".gz", "antebuffer 24 %s|gzip -dc", "gzip -c --fast > %s", },
-    { ".bz2", "antebuffer 24 %s|bzip2 -dc", "bzip2 -c --fast > %s", },
-    { ".lzma", "lzma -dc  %s", "lzma -c -0 > %s", },
+    { ".gz", "antebuffer 24 %s|gzip -dc", "gzip -c1>%s", },
+    { ".bz2", "antebuffer 24 %s|bzip2 -dc", "bzip2 -c1>%s", },
+    { ".lzma", "lzma -dc %s", "lzma -c0>%s", },
     /* These two have to be present */
     { "", "antebuffer 24 %s", NULL },
     { NULL, NULL, NULL },
@@ -919,7 +919,7 @@ pass1 (int nthreads, char *filelist)
 {
   FILE *f;
   char g[ARG_MAX], *pg;
-  int i, j = 0, nbt = 0, notload, nbf, askstat, notfirst = 0;
+  int i, j = 0, nbt = 0, notload, nbf, notfirst = 0;
   tab_t *T;
   pthread_t tid[MAX_THREADS], sid;
   double st = cputime(), rt = realtime(), crt, art,
@@ -940,7 +940,6 @@ pass1 (int nthreads, char *filelist)
   memset(T, 0, nthreads * sizeof (tab_t));
   sem_init(&sem_pt, 0, nthreads - 1);
   crt = art = rt;
-  askstat = 0;
   while ((notload = (!feof (f))) || nbt) {
     if (notload) {
       pg = g;
@@ -983,20 +982,14 @@ pass1 (int nthreads, char *filelist)
 	       (unsigned long) (art - rt));
       j = 0;
     }
-    if ((askstat = ((art - crt) > delay_stat))) {
-      askstat = 0;
-      /* stat_mt (nthreads); */
+    if (art - crt > delay_stat) {
       if (notfirst) {
 	pthread_cancel(sid);
 	pthread_join (sid, NULL);
-      }
-      notfirst = 1;
+      } else
+	notfirst = 1;
       pthread_create (&sid, NULL, stat, NULL);
       crt = art;
-      /*
-      sem_destroy(&sem_pt);
-      sem_init(&sem_pt, 0, nthreads - 1);
-      */
     }
   }
   if (notfirst) {
@@ -1168,8 +1161,15 @@ pass3 (int nthreads, char *filelist)
       j = k = 0;
     }
   }
-  fprintf (stderr, "Pass 3 took %lds (cpu), %lds (real)\n",
-           (unsigned long) (cputime () - st), (unsigned long) (realtime () - rt));
+  art = realtime();
+  fprintf (stderr, "\n*** Pass 3, final stats: *** \n"
+	   "Relations: load %lu, used %lu (%.2f%%); "
+	   "krels/s: %lu; time: %lus cpu, %lus real\n",
+	   nrels, remains,
+	   (100.0 * remains) / nrels,
+	   (unsigned long) (nrels / ((art - rt) * 1000)),
+	   (unsigned long) (cputime() - st),
+	   (unsigned long) (art - rt));
   sem_destroy(&sem_pt);
   fclose (f);
   free (T);

@@ -613,6 +613,7 @@ get_maxnorm (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
   /* divide by q0 if sieving on alg side */
   if (!si->ratq)
       tmp /= (double) q0;
+  tmp *= 0.5;
   return log2 (tmp);
 }
 

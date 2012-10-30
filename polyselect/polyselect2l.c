@@ -952,8 +952,6 @@ collision_on_p ( header_t header,
 	   header->ad);
 #endif
 
-  /* the expected number of collisions is lenPrimes^2/2/(2P)^2 */
-  pc1 = expected_collisions (Primes[nprimes - 1]);
   hash_clear (H);
 
   for (i = 0; i <= header->d; i++)
@@ -962,6 +960,7 @@ collision_on_p ( header_t header,
   free (rp);
   mpz_clear (tmp);
 
+  pc1 = expected_collisions (Primes[nprimes - 1]);
   pthread_mutex_lock (&lock);
   potential_collisions += pc1;
   pthread_mutex_unlock (&lock);
@@ -1084,11 +1083,10 @@ collision_on_each_sq ( header_t header,
   fprintf (stderr, "# - q hash_size (q=%lu): %u\n", q, H->size);
 #endif
 
-  pc2 = expected_collisions (Primes[nprimes - 1]);
-
   mpz_clear (rppz);
   hash_clear (H);
 
+  pc2 = expected_collisions (Primes[nprimes - 1]);
   pthread_mutex_lock (&lock);
   potential_collisions += pc2;
   pthread_mutex_unlock (&lock);
@@ -1351,7 +1349,6 @@ gmp_collision_on_p ( header_t header,
 	   header->ad);
 #endif
 
-  pc1 = expected_collisions (Primes[nprimes - 1]);
   hash_clear (H);
 
   for (i = 0; i <= header->d; i++)
@@ -1360,6 +1357,7 @@ gmp_collision_on_p ( header_t header,
   free (rp);
   mpz_clear (tmp);
 
+  pc1 = expected_collisions (Primes[nprimes - 1]);
   pthread_mutex_lock (&lock);
   potential_collisions += pc1;
   pthread_mutex_unlock (&lock);
@@ -1496,14 +1494,13 @@ gmp_collision_on_each_sq ( header_t header,
   fprintf (stderr, "# - q hash_size (q=%lu): %u\n", q, H->size);
 #endif
 
-  pc2 = expected_collisions (Primes[nprimes - 1]);
-
   /* clear */
   mpz_clear (rppz);
   mpz_clear (ppmp);
   mpz_clear (tmp);
   hash_clear (H);
 
+  pc2 = expected_collisions (Primes[nprimes - 1]);
   pthread_mutex_lock (&lock);
   potential_collisions += pc2;
   pthread_mutex_unlock (&lock);
@@ -1768,7 +1765,10 @@ collision_on_p ( header_t header,
   fprintf (stderr, "# p hash_size: %u for ad = %lu\n", H->size, header->ad);
 #endif
 
-  pc1 = expected_collisions (Primes[nprimes - 1]);
+#ifdef DEBUG_HASH_TABLE
+  fprintf (stderr, "# p hash_size: %u, hash_alloc: %u\n", H->size, H->alloc);
+  fprintf (stderr, "# hash table coll: %lu, all_coll: %lu\n", H->coll, H->coll_all);
+#endif
   hash_clear (H);
 
   for (i = 0; i <= header->d; i++)
@@ -1777,6 +1777,7 @@ collision_on_p ( header_t header,
   free (rp);
   mpz_clear (tmp);
 
+  pc1 = expected_collisions (Primes[nprimes - 1]);
   pthread_mutex_lock (&lock);
   potential_collisions += pc1;
   pthread_mutex_unlock (&lock);
@@ -1837,10 +1838,14 @@ collision_on_each_sq ( header_t header,
   fprintf (stderr, "# - q hash_size (q=%lu): %u\n", q, H->size);
 #endif
 
-  pc2 = expected_collisions (Primes[nprimes - 1]);
+#ifdef DEBUG_HASH_TABLE
+  fprintf (stderr, "# p hash_size: %u, hash_alloc: %u\n", H->size, H->alloc);
+  fprintf (stderr, "# hash table coll: %lu, all_coll: %lu\n", H->coll, H->coll_all);
+#endif
 
   hash_clear (H);
 
+  pc2 = expected_collisions (Primes[nprimes - 1]);
   pthread_mutex_lock (&lock);
   potential_collisions += pc2;
   pthread_mutex_unlock (&lock);
@@ -2292,7 +2297,6 @@ gmp_collision_on_p ( header_t header,
   fprintf (stderr, "# p hash_size: %u for ad = %lu\n", H->size, header->ad);
 #endif
 
-  pc1 = expected_collisions (Primes[nprimes - 1]);
   hash_clear (H);
 
   for (i = 0; i <= header->d; i++)
@@ -2301,6 +2305,7 @@ gmp_collision_on_p ( header_t header,
   free (rp);
   mpz_clear (tmp);
 
+  pc1 = expected_collisions (Primes[nprimes - 1]);
   pthread_mutex_lock (&lock);
   potential_collisions += pc1;
   pthread_mutex_unlock (&lock);
@@ -2363,10 +2368,9 @@ gmp_collision_on_each_sq ( header_t header,
   fprintf (stderr, "# - q hash_size (q=%lu): %u\n", q, H->size);
 #endif
 
-  pc2 = expected_collisions (Primes[nprimes - 1]);
-
   hash_clear (H);
 
+  pc2 = expected_collisions (Primes[nprimes - 1]);
   pthread_mutex_lock (&lock);
   potential_collisions += pc2;
   pthread_mutex_unlock (&lock);
