@@ -14,6 +14,7 @@
 #include "murphyE.h"
 
 #define LEN_SPECIAL_Q 55
+//#define DEBUG_HASH_TABLE
 
 /* hash table slots */
 typedef struct
@@ -30,6 +31,10 @@ typedef struct
   slot_t *slot;
   unsigned int alloc;      /* total allocated size */
   unsigned int size;       /* number of entries in hash table */
+#ifdef DEBUG_HASH_TABLE
+  unsigned long coll;
+  unsigned long coll_all;
+#endif
 } __hash_struct;
 typedef __hash_struct hash_t[1];
 

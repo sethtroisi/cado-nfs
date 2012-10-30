@@ -1770,6 +1770,8 @@ collision_on_p ( header_t header,
   
 #ifdef CONSIDER_ONLY_TWO_ROOTS
   hash_init (H, INIT_FACTOR * lenPrimes);
+  //hash_init (H, 4652189);
+  //hash_init (H, 9304381);
 #else
   hash_init (H, INIT_FACTOR * NUMBER_CONSIDERED_ROOTS lenPrimes);
 #endif
@@ -1809,6 +1811,11 @@ collision_on_p ( header_t header,
 #ifdef DEBUG_POLYSELECT2L
   fprintf (stderr, "# collision_on_p took %dms\n", cputime () - st);
   fprintf (stderr, "# p hash_size: %u for ad = %lu\n", H->size, header->ad);
+#endif
+
+#ifdef DEBUG_HASH_TABLE
+  fprintf (stderr, "# p hash_size: %u, hash_alloc: %u\n", H->size, H->alloc);
+  fprintf (stderr, "# hash table coll: %lu, all_coll: %lu\n", H->coll, H->coll_all);
 #endif
 
   /* if the hash table contains n entries, each one smaller than (2P)^2,
@@ -1856,6 +1863,9 @@ collision_on_each_sq ( header_t header,
 
 #ifdef CONSIDER_ONLY_TWO_ROOTS
   hash_init (H, INIT_FACTOR * lenPrimes);
+  //hash_init (H, 4652189);
+  //hash_init (H, 9304381);
+
 #else
   hash_init (H, INIT_FACTOR * NUMBER_CONSIDERED_ROOTS * lenPrimes);
 #endif
@@ -1899,6 +1909,11 @@ collision_on_each_sq ( header_t header,
 #ifdef DEBUG_POLYSELECT2L
   fprintf (stderr, "# inner collision_on_each_sq took %dms\n", cputime () - st);
   fprintf (stderr, "# - q hash_size (q=%lu): %u\n", q, H->size);
+#endif
+
+#ifdef DEBUG_HASH_TABLE
+  fprintf (stderr, "# p hash_size: %u, hash_alloc: %u\n", H->size, H->alloc);
+  fprintf (stderr, "# hash table coll: %lu, all_coll: %lu\n", H->coll, H->coll_all);
 #endif
 
   pc2 = 0.5 * pow ((double) H->size / (double) Primes[nprimes - 1], 2.0);
