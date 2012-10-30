@@ -22,7 +22,7 @@
 #define TARGET_TIME 10000000 /* print stats every TARGET_TIME milliseconds */
 #define NEW_ROOTSIEVE
 #define MAX_THREADS 16
-#define INIT_FACTOR 5UL
+#define INIT_FACTOR 7UL
 //#define DEBUG_POLYSELECT2L
 
 #ifdef NEW_ROOTSIEVE
@@ -2921,8 +2921,6 @@ main (int argc, char *argv[])
   /* finishing up statistics */
   if (verbose >= 0)
     {
-      printf ("# Stat: tried %d ad-value(s), found %d polynomial(s), %d below maxnorm\n",
-              tries, tot_found, found);
       printf ("# Stat: potential collisions=%1.2f (%1.2e/s)\n",
               potential_collisions, 1000.0 * potential_collisions
               / (double) cputime ());
@@ -2930,9 +2928,10 @@ main (int argc, char *argv[])
         {
           printf ("# Stat: raw lognorm (min/av/max): %1.2f/%1.2f/%1.2f\n",
                   min_raw_lognorm, aver_raw_lognorm / collisions, max_raw_lognorm);
-          printf ("# Stat: optimized lognorm (min/av/max): %1.2f/%1.2f/%1.2f\n",
-                  min_opt_lognorm, aver_opt_lognorm / collisions_good,
-                  max_opt_lognorm);
+          if (collisions_good > 0)
+            printf ("# Stat: optimized lognorm (min/av/max): %1.2f/%1.2f/%1.2f\n",
+                    min_opt_lognorm, aver_opt_lognorm / collisions_good,
+                    max_opt_lognorm);
           printf ("# Stat: av. g0/adm2 ratio: %.3e\n",
                   total_adminus2 / (double) collisions);
           if (d == 6)
@@ -2945,10 +2944,13 @@ main (int argc, char *argv[])
           tries, tot_found, found);
 
   /* print best 10 values of logmu */
-  printf ("# Stat: best logmu:");
-  for (i = 0; i < 10; i++)
-    printf (" %1.2f", best_logmu[i]);
-  printf ("\n");
+  if (collisions_good > 0)
+    {
+      printf ("# Stat: best logmu:");
+      for (i = 0; i < 10; i++)
+        printf (" %1.2f", best_logmu[i]);
+      printf ("\n");
+    }
 
   /* print total time (format for cpu_time.sh) */
   printf ("# Stat: total phase took %.2fs\n", seconds () - st0);
