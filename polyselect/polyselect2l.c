@@ -22,7 +22,7 @@
 #define TARGET_TIME 10000000 /* print stats every TARGET_TIME milliseconds */
 #define NEW_ROOTSIEVE
 #define MAX_THREADS 16
-#define INIT_FACTOR 4UL
+#define INIT_FACTOR 5UL
 //#define DEBUG_POLYSELECT2L
 
 #ifdef NEW_ROOTSIEVE
@@ -36,12 +36,6 @@
 #define BATCH_SIZE 8 /* batch 8 p */
 #else
 #define BATCH_SIZE 20 /* batch 10 sq */
-#endif
-
-/* consider only two roots or more */
-#define CONSIDER_ONLY_TWO_ROOTS
-#ifndef CONSIDER_ONLY_TWO_ROOTS
-#define NUMBER_CONSIDERED_ROOTS 16UL
 #endif
 
 #define LQ_DEFAULT 1 /* default number of factors in special-q part */
@@ -128,7 +122,7 @@ check_parameters (mpz_t m0, unsigned long d)
 {
   double maxq = 1.0, maxP;
   int k = lq;
-  
+
   while (k > 0)
     maxq *= (double) SPECIAL_Q[LEN_SPECIAL_Q - 1 - (k--)];
 
@@ -166,6 +160,13 @@ print_poly_info ( mpz_t *f,
           logmu, skew, alpha, logmu + alpha,
           logmu - 0.824 * sqrt (2.0 * exp_rot[d] * log (skew)),
           nroots);
+}
+
+/* the number of expected collisions is 8*lenPrimes^2/2/(2P)^2 */
+static double
+expected_collisions (uint32_t twoP)
+{
+  return 8.0 * 0.5 * pow ((double) lenPrimes / (double) twoP, 2.0);
 }
 
 
@@ -345,7 +346,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   double g0 = mpz_get_d (g[0]);
   g0 /= mpz_get_d (f[d-2]);
   g0 = (g0 > 0)? g0 : -g0;
-  
+
 #ifdef MAX_THREADS
   pthread_mutex_lock (&lock);
 #endif
@@ -888,6 +889,7 @@ collision_on_p ( header_t header,
   int64_t ppl = 0;
   double pc1;
   mpz_t *f, tmp;
+  int64_t u, umax;
 
   /* init f for roots computation */
   mpz_init_set_ui (tmp, 0);
@@ -907,16 +909,13 @@ collision_on_p ( header_t header,
   }
 
   hash_t H;
-#ifdef CONSIDER_ONLY_TWO_ROOTS
   hash_init (H, INIT_FACTOR * lenPrimes);
-#else
-  hash_init (H, INIT_FACTOR * NUMBER_CONSIDERED_ROOTS * lenPrimes);
-#endif
 
 #ifdef DEBUG_POLYSELECT2L
   int st = cputime();
 #endif
 
+  umax = (int64_t) Primes[lenPrimes - 1] * (int64_t) Primes[lenPrimes - 1];
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
     p = Primes[nprimes];
     ppl = (int64_t) p;
@@ -938,11 +937,12 @@ collision_on_p ( header_t header,
     roots_lift (rp, header->Ntilde, header->d, header->m0, p, nrp);
     proots_add (R, nrp, rp, nprimes);
     for (j = 0; j < nrp; j++) {
-      /* only consider r[j] and r[j] - pp */
-      hash_add (H, p, (int64_t) rp[j], header->m0, header->ad,
-		header->d, header->N, 1, tmp);
-      hash_add (H, p, (int64_t) (rp[j] - ppl), header->m0,
-		header->ad, header->d, header->N, 1, tmp);
+      for (u = (int64_t) rp[j]; u < umax; u += ppl)
+        hash_add (H, p, u, header->m0, header->ad, header->d, header->N, 1,
+                  tmp);
+      for (u = ppl - (int64_t) rp[j]; u < umax; u += ppl)
+        hash_add (H, p, -u, header->m0, header->ad, header->d, header->N, 1,
+                  tmp);
     }
   }
 
@@ -952,9 +952,8 @@ collision_on_p ( header_t header,
 	   header->ad);
 #endif
 
-  /* if the hash table contains n entries, each one smaller than (2P)^2,
-     the number of potential collisions is about 0.5*n^2/(2P)^2 */
-  pc1 = 0.5 * pow ((double) H->size / (double) Primes[nprimes - 1], 2.0);
+  /* the expected number of collisions is lenPrimes^2/2/(2P)^2 */
+  pc1 = expected_collisions (Primes[nprimes - 1]);
   hash_clear (H);
 
   for (i = 0; i <= header->d; i++)
@@ -979,14 +978,9 @@ collision_on_each_sq ( header_t header,
 {
   unsigned int nr, j;
   unsigned long nprimes, p, rp, pp;
-  long ppl, u;
+  long ppl, u, v, umax;
   mpz_t rppz;
   double pc2;
-
-#ifndef CONSIDER_ONLY_TWO_ROOTS
-  int i;
-  long h;
-#endif  
 
   mpz_init (rppz);
 
@@ -1015,12 +1009,9 @@ collision_on_each_sq ( header_t header,
 
   hash_t H;
 
-#ifdef CONSIDER_ONLY_TWO_ROOTS
   hash_init (H,  INIT_FACTOR * lenPrimes);
-#else
-  hash_init (H,  INIT_FACTOR * NUMBER_CONSIDERED_ROOTS * lenPrimes);
-#endif
 
+  umax = (int64_t) Primes[lenPrimes - 1] * (int64_t) Primes[lenPrimes - 1];
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
 
     p = Primes[nprimes];
@@ -1075,19 +1066,10 @@ collision_on_each_sq ( header_t header,
       mpz_clear (qqz);
 #endif
 
-#ifdef CONSIDER_ONLY_TWO_ROOTS
-      hash_add (H, p, u, header->m0, header->ad, header->d, header->N, q, rqqz);
-      hash_add (H, p, u - ppl, header->m0, header->ad, header->d, header->N, q, rqqz);
-#else
-      h = u - ppl;
-      for (i = 0; i < NUMBER_CONSIDERED_ROOTS; i ++) {
-        hash_add (H, p, u, header->m0, header->ad, header->d, header->N, q, rqqz);
-        hash_add (H, p, h, header->m0, header->ad, header->d, header->N, q, rqqz);
-        u += ppl;
-        h -= ppl;
-      }
-
-#endif
+      for (v = u; v < umax; v += ppl)
+        hash_add (H, p, v, header->m0, header->ad, header->d, header->N, q, rqqz);
+      for (v = ppl - u; v < umax; v += ppl)
+        hash_add (H, p, -v, header->m0, header->ad, header->d, header->N, q, rqqz);
 
     }  // next rp
 
@@ -1102,7 +1084,7 @@ collision_on_each_sq ( header_t header,
   fprintf (stderr, "# - q hash_size (q=%lu): %u\n", q, H->size);
 #endif
 
-  pc2 = 0.5 * pow ((double) H->size / (double) Primes[nprimes - 1], 2.0);
+  pc2 = expected_collisions (Primes[nprimes - 1]);
 
   mpz_clear (rppz);
   hash_clear (H);
@@ -1305,7 +1287,7 @@ gmp_collision_on_p ( header_t header,
 {
   unsigned long i, j, nprimes, p, nrp;
   uint64_t *rp;
-  int64_t ppl = 0;
+  int64_t ppl = 0, u, umax;
   double pc1;
   mpz_t *f, tmp;
 
@@ -1327,16 +1309,13 @@ gmp_collision_on_p ( header_t header,
   }
 
   hash_t H;
-#ifdef CONSIDER_ONLY_TWO_ROOTS
   hash_init (H, INIT_FACTOR * lenPrimes);
-#else
-  hash_init (H, INIT_FACTOR * NUMBER_CONSIDERED_ROOTS * lenPrimes);
-#endif
 
 #ifdef DEBUG_POLYSELECT2L
   int st = cputime();
 #endif
 
+  umax = (int64_t) Primes[lenPrimes - 1] * (int64_t) Primes[lenPrimes - 1];
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
     p = Primes[nprimes];
     ppl = (int64_t) p;
@@ -1357,11 +1336,12 @@ gmp_collision_on_p ( header_t header,
     roots_lift (rp, header->Ntilde, header->d, header->m0, p, nrp);
     proots_add (R, nrp, rp, nprimes);
     for (j = 0; j < nrp; j++) {
-      /* only consider r[j] and r[j] - pp */
-      gmp_hash_add (H, p, (int64_t) rp[j], header->m0, header->ad,
-		    header->d, header->N, 1, tmp);
-      gmp_hash_add (H, p, (int64_t)((int64_t) (rp[j])-ppl),  header->m0,
-		    header->ad, header->d, header->N, 1, tmp);
+      for (u = (int64_t) rp[j]; u < umax; u += ppl)
+        gmp_hash_add (H, p, u, header->m0, header->ad,
+                      header->d, header->N, 1, tmp);
+      for (u = ppl - (int64_t) rp[j]; u < umax; u += ppl)
+        gmp_hash_add (H, p, -u,  header->m0,
+                      header->ad, header->d, header->N, 1, tmp);
     }
   }
 
@@ -1371,9 +1351,7 @@ gmp_collision_on_p ( header_t header,
 	   header->ad);
 #endif
 
-  /* if the hash table contains n entries, each one smaller than (2P)^2,
-     the number of potential collisions is about 0.5*n^2/(2P)^2 */
-  pc1 = 0.5 * pow ((double) H->size / (double) Primes[nprimes - 1], 2.0);
+  pc1 = expected_collisions (Primes[nprimes - 1]);
   hash_clear (H);
 
   for (i = 0; i <= header->d; i++)
@@ -1401,12 +1379,7 @@ gmp_collision_on_each_sq ( header_t header,
   mpz_t rppz, ppmp, tmp;
   double pc2;
   uint64_t pp, rp;
-  int64_t ppl, u;
-
-#ifndef CONSIDER_ONLY_TWO_ROOTS
-  int i;
-  int64_t h;
-#endif  
+  int64_t ppl, u, v, umax;
 
   mpz_init (rppz);
   mpz_init (ppmp);
@@ -1440,12 +1413,9 @@ gmp_collision_on_each_sq ( header_t header,
 
   hash_t H;
 
-#ifdef CONSIDER_ONLY_TWO_ROOTS
   hash_init (H, INIT_FACTOR * lenPrimes);
-#else
-  hash_init (H, INIT_FACTOR * NUMBER_CONSIDERED_ROOTS * lenPrimes);
-#endif
 
+  umax = (int64_t) Primes[lenPrimes - 1] * (int64_t) Primes[lenPrimes - 1];
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
     p = Primes[nprimes];
     if ((header->d * header->ad) % p == 0)
@@ -1510,23 +1480,12 @@ gmp_collision_on_each_sq ( header_t header,
       mpz_clear (qqz);
 #endif
 
-#ifdef CONSIDER_ONLY_TWO_ROOTS
-      gmp_hash_add (H, p, u, header->m0, header->ad, header->d, header->N,
-		q, rqqz);
-      gmp_hash_add (H, p, u - ppl, header->m0, header->ad, header->d,
-		header->N, q, rqqz);
-#else
-      h = u - ppl;
-      for (i = 0; i < NUMBER_CONSIDERED_ROOTS; i ++) {
-        gmp_hash_add (H, p, u, header->m0, header->ad, header->d, header->N,
-		  q, rqqz);
-        gmp_hash_add (H, p, h, header->m0, header->ad, header->d, header->N,
-		  q, rqqz);
-        u += ppl;
-        h -= ppl;
-      }
-
-#endif
+      for (v = u; v < umax; v += ppl)
+        gmp_hash_add (H, p, v, header->m0, header->ad, header->d, header->N,
+                      q, rqqz);
+      for (v = ppl - u; v < umax; v += ppl)
+        gmp_hash_add (H, p, -v, header->m0, header->ad, header->d,
+                      header->N, q, rqqz);
 
     }  // next rp
   } // next p
@@ -1537,7 +1496,7 @@ gmp_collision_on_each_sq ( header_t header,
   fprintf (stderr, "# - q hash_size (q=%lu): %u\n", q, H->size);
 #endif
 
-  pc2 = 0.5 * pow ((double) H->size / (double) Primes[nprimes - 1], 2.0);
+  pc2 = expected_collisions (Primes[nprimes - 1]);
 
   /* clear */
   mpz_clear (rppz);
@@ -1745,7 +1704,7 @@ collision_on_p ( header_t header,
 {
   unsigned long i, j, nprimes, p, nrp, c = 0;
   uint64_t *rp;
-  int64_t ppl = 0;
+  int64_t ppl = 0, u, umax;
   double pc1;
   mpz_t *f, tmp;
 
@@ -1767,17 +1726,14 @@ collision_on_p ( header_t header,
   }
 
   hash_t H;
-  
-#ifdef CONSIDER_ONLY_TWO_ROOTS
+
   hash_init (H, INIT_FACTOR * lenPrimes);
-#else
-  hash_init (H, INIT_FACTOR * NUMBER_CONSIDERED_ROOTS lenPrimes);
-#endif
 
 #ifdef DEBUG_POLYSELECT2L
   int st = cputime();
 #endif
 
+  umax = (int64_t) Primes[lenPrimes - 1] * (int64_t) Primes[lenPrimes - 1];
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
     p = Primes[nprimes];
     ppl = (int64_t) p;
@@ -1798,11 +1754,12 @@ collision_on_p ( header_t header,
     roots_lift (rp, header->Ntilde, header->d, header->m0, p, nrp);
     proots_add (R, nrp, rp, nprimes);
     for (j = 0; j < nrp; j++, c++) {
-      /* only consider r[j] and r[j] - pp */
-      hash_add (H, p, (int64_t) rp[j], header->m0, header->ad, header->d,
-		header->N, 1, tmp);
-      hash_add (H, p, (int64_t) (rp[j] - ppl), header->m0, header->ad,
-		header->d, header->N, 1, tmp);
+      for (u = (int64_t) rp[j]; u < umax; u += ppl)
+        hash_add (H, p, u, header->m0, header->ad, header->d,
+                  header->N, 1, tmp);
+      for (u = ppl - (int64_t) rp[j]; u < umax; u += ppl)
+        hash_add (H, p, -u, header->m0, header->ad,
+                  header->d, header->N, 1, tmp);
     }
   }
 
@@ -1811,9 +1768,7 @@ collision_on_p ( header_t header,
   fprintf (stderr, "# p hash_size: %u for ad = %lu\n", H->size, header->ad);
 #endif
 
-  /* if the hash table contains n entries, each one smaller than (2P)^2,
-     the number of potential collisions is about 0.5*n^2/(2P)^2 */
-  pc1 = 0.5 * pow ((double) H->size / (double) Primes[nprimes - 1], 2.0);
+  pc1 = expected_collisions (Primes[nprimes - 1]);
   hash_clear (H);
 
   for (i = 0; i <= header->d; i++)
@@ -1840,13 +1795,8 @@ collision_on_each_sq ( header_t header,
   unsigned int nr, j;
   unsigned long nprimes, p, c = 0;
   uint64_t pp;
-  int64_t ppl, u;
+  int64_t ppl, u, umax, v;
   double pc2;
-
-#ifndef CONSIDER_ONLY_TWO_ROOTS
-  int i;
-  long h;
-#endif  
 
 #ifdef DEBUG_POLYSELECT2L
   int st = cputime();
@@ -1854,12 +1804,9 @@ collision_on_each_sq ( header_t header,
 
   hash_t H;
 
-#ifdef CONSIDER_ONLY_TWO_ROOTS
   hash_init (H, INIT_FACTOR * lenPrimes);
-#else
-  hash_init (H, INIT_FACTOR * NUMBER_CONSIDERED_ROOTS * lenPrimes);
-#endif
 
+  umax = (int64_t) Primes[lenPrimes - 1] * (int64_t) Primes[lenPrimes - 1];
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
 
     p = Primes[nprimes];
@@ -1875,23 +1822,12 @@ collision_on_each_sq ( header_t header,
     {
       u = (long) inv_qq[c];
 
-#ifdef CONSIDER_ONLY_TWO_ROOTS
-      hash_add (H, p, u, header->m0, header->ad, header->d, 
-		header->N, q, rqqz);
-      hash_add (H, p, u - ppl, header->m0, header->ad, header->d,
-		header->N, q, rqqz);
-#else
-      h = u - ppl;
-      for (i = 0; i < NUMBER_CONSIDERED_ROOTS; i ++) {
-        hash_add (H, p, u, header->m0, header->ad, header->d,
-		  header->N, q, rqqz);
-        hash_add (H, p, h, header->m0, header->ad, header->d, 
-		  header->N, q, rqqz);
-        u += ppl;
-        h -= ppl;
-      }
-
-#endif
+      for (v = u; v < umax; v += ppl)
+        hash_add (H, p, v, header->m0, header->ad, header->d,
+                  header->N, q, rqqz);
+      for (v = ppl - u; v < umax; v += ppl)
+        hash_add (H, p, -v, header->m0, header->ad, header->d,
+                  header->N, q, rqqz);
 
     }  // next rp
   } // next p
@@ -1901,7 +1837,7 @@ collision_on_each_sq ( header_t header,
   fprintf (stderr, "# - q hash_size (q=%lu): %u\n", q, H->size);
 #endif
 
-  pc2 = 0.5 * pow ((double) H->size / (double) Primes[nprimes - 1], 2.0);
+  pc2 = expected_collisions (Primes[nprimes - 1]);
 
   hash_clear (H);
 
@@ -1967,7 +1903,7 @@ collision_on_batch_sq ( header_t header,
 #endif
 
   int st = cputime();
-   
+
   /* Step 1: batch inversion */
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
 
@@ -1978,7 +1914,7 @@ collision_on_batch_sq ( header_t header,
     nr = R->nr[nprimes];
     if (nr == 0)
       continue;
-    
+
     modulusredcul_t modpp;
     residueredcul_t qprod[size], tmp_modul, tmp2_modul, tmp3_modul;
     residueredcul_t res_rp, res_tmp;
@@ -2011,7 +1947,7 @@ collision_on_batch_sq ( header_t header,
         /* qprod[i-1] = q[0] * ... * q[i-1] (mod p^2)
            tmp_modul = 1/(q[0] * ... * q[i]) (mod p^2)
            thus tmp2_modul = 1/q[i] mod (p^2) */
-      
+
       modredcul_sqr (tmp2_modul, tmp2_modul, modpp); /* 1/q[i]^2 (mod p^2) */
 
 #ifdef DEBUG_POLYSELECT2L /* check if batch inversions correct */
@@ -2072,7 +2008,7 @@ collision_on_batch_sq ( header_t header,
         mpz_clear (qqz);
 #endif
       }
-      
+
       modredcul_set_ul (tmp3_modul, q[i], modpp);
       modredcul_mul (tmp_modul, tmp3_modul, tmp_modul, modpp);
       /* now tmp_modul = 1/(q[0] * ... * q[i-1]) (mod p^2) */
@@ -2202,7 +2138,7 @@ collision_on_sq ( header_t header,
              "collision_on_sq(). ad=%"PRIu64".\n", N, K, header->ad);
     return;
   }
-  
+
   tot =  binom (N, K);
 
   if (tot > (unsigned long) nq)
@@ -2292,7 +2228,7 @@ gmp_collision_on_p ( header_t header,
 {
   unsigned long i, j, nprimes, p, nrp, c = 0;
   uint64_t *rp;
-  int64_t ppl = 0;
+  int64_t ppl = 0, u, umax;
   double pc1;
   mpz_t *f, tmp;
 
@@ -2314,17 +2250,14 @@ gmp_collision_on_p ( header_t header,
   }
 
   hash_t H;
-  
-#ifdef CONSIDER_ONLY_TWO_ROOTS
+
   hash_init (H, INIT_FACTOR * lenPrimes);
-#else
-  hash_init (H, INIT_FACTOR * NUMBER_CONSIDERED_ROOTS * lenPrimes);
-#endif
 
 #ifdef DEBUG_POLYSELECT2L
   int st = cputime();
 #endif
 
+  umax = (int64_t) Primes[lenPrimes - 1] * (int64_t) Primes[lenPrimes - 1];
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
     p = Primes[nprimes];
     ppl = (int64_t) p;
@@ -2345,11 +2278,12 @@ gmp_collision_on_p ( header_t header,
     roots_lift (rp, header->Ntilde, header->d, header->m0, p, nrp);
     proots_add (R, nrp, rp, nprimes);
     for (j = 0; j < nrp; j++, c++) {
-      /* only consider r[j] and r[j] - pp */
-      gmp_hash_add (H, p, (int64_t) rp[j], header->m0, header->ad,
-		    header->d, header->N, 1, tmp);
-      gmp_hash_add (H, p, (int64_t) (rp[j] - ppl), header->m0, header->ad,
-		header->d, header->N, 1, tmp);
+      for (u = (int64_t) rp[j]; u < umax; u += ppl)
+        gmp_hash_add (H, p, u, header->m0, header->ad,
+                      header->d, header->N, 1, tmp);
+      for (u = ppl - (int64_t) rp[j]; u < umax; u += ppl)
+        gmp_hash_add (H, p, -u, header->m0, header->ad,
+                      header->d, header->N, 1, tmp);
     }
   }
 
@@ -2358,9 +2292,7 @@ gmp_collision_on_p ( header_t header,
   fprintf (stderr, "# p hash_size: %u for ad = %lu\n", H->size, header->ad);
 #endif
 
-  /* if the hash table contains n entries, each one smaller than (2P)^2,
-     the number of potential collisions is about 0.5*n^2/(2P)^2 */
-  pc1 = 0.5 * pow ((double) H->size / (double) Primes[nprimes - 1], 2.0);
+  pc1 = expected_collisions (Primes[nprimes - 1]);
   hash_clear (H);
 
   for (i = 0; i <= header->d; i++)
@@ -2387,13 +2319,8 @@ gmp_collision_on_each_sq ( header_t header,
   unsigned int nr, j;
   unsigned long nprimes, p, c = 0;
   uint64_t pp;
-  int64_t ppl, u;
+  int64_t ppl, u, v, umax;
   double pc2;
-
-#ifndef CONSIDER_ONLY_TWO_ROOTS
-  int i;
-  int64_t h;
-#endif  
 
 #ifdef DEBUG_POLYSELECT2L
   int st = cputime();
@@ -2401,12 +2328,9 @@ gmp_collision_on_each_sq ( header_t header,
 
   hash_t H;
 
-#ifdef CONSIDER_ONLY_TWO_ROOTS
   hash_init (H, INIT_FACTOR * lenPrimes);
-#else
-  hash_init (H, INIT_FACTOR * NUMBER_CONSIDERED_ROOTS * lenPrimes);
-#endif
 
+  umax = (int64_t) Primes[lenPrimes - 1] * (int64_t) Primes[lenPrimes - 1];
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
 
     p = Primes[nprimes];
@@ -2423,23 +2347,12 @@ gmp_collision_on_each_sq ( header_t header,
     {
       u = (int64_t) inv_qq[c];
 
-#ifdef CONSIDER_ONLY_TWO_ROOTS
-      gmp_hash_add (H, p, u, header->m0, header->ad, header->d, 
-		    header->N, q, rqqz);
-      gmp_hash_add (H, p, u - ppl, header->m0, header->ad, header->d,
-		    header->N, q, rqqz);
-#else
-      h = u - ppl;
-      for (i = 0; i < NUMBER_CONSIDERED_ROOTS; i ++) {
-        gmp_hash_add (H, p, u, header->m0, header->ad, header->d,
-		      header->N, q, rqqz);
-        gmp_hash_add (H, p, h, header->m0, header->ad, header->d,
-		      header->N, q, rqqz);
-        u += ppl;
-        h -= ppl;
-      }
-
-#endif
+      for (v = u; v < umax; v += ppl)
+        gmp_hash_add (H, p, v, header->m0, header->ad, header->d,
+                      header->N, q, rqqz);
+      for (v = ppl - u; v < umax; v += ppl)
+        gmp_hash_add (H, p, -v, header->m0, header->ad, header->d,
+                      header->N, q, rqqz);
 
     }  // next rp
   } // next p
@@ -2450,7 +2363,7 @@ gmp_collision_on_each_sq ( header_t header,
   fprintf (stderr, "# - q hash_size (q=%lu): %u\n", q, H->size);
 #endif
 
-  pc2 = 0.5 * pow ((double) H->size / (double) Primes[nprimes - 1], 2.0);
+  pc2 = expected_collisions (Primes[nprimes - 1]);
 
   hash_clear (H);
 
@@ -2598,7 +2511,7 @@ gmp_collision_on_sq ( header_t header,
              "collision_on_sq(). ad=%"PRIu64".\n", N, K, header->ad);
     return;
   }
-  
+
   tot =  binom (N, K);
 
   if (tot > (unsigned long) nq)
@@ -2753,7 +2666,7 @@ main (int argc, char *argv[])
   mpz_t N;
   unsigned int d = 0;
   unsigned long P, admin = 0, admax = ULONG_MAX;
-  int quiet = 0, tries = 0, i, nthreads = 1, st, 
+  int quiet = 0, tries = 0, i, nthreads = 1, st,
     target_time = TARGET_TIME, incr_target_time = TARGET_TIME;
   tab_t *T;
   FILE *fp;
@@ -2902,7 +2815,6 @@ main (int argc, char *argv[])
            nq,
            target_time / 1000 );
 
-#ifdef CONSIDER_ONLY_TWO_ROOTS
 
 #ifdef BATCH_P
   printf ( "# Info: estimated peak memory=%.2fMB (%d thread(s),"
@@ -2918,28 +2830,6 @@ main (int argc, char *argv[])
            * (sizeof(uint32_t) + sizeof(uint64_t)) / 1024 / 1024),
            nthreads,
            BATCH_SIZE );
-#endif
-
-#else
-
-#ifdef BATCH_P
-  printf ( "# Info: estimated peak memory=%.2fMB (%d threads,"
-           " batch %d inversions on P)\n",
-           (double) (nthreads * INIT_FACTOR * NUMBER_CONSIDERED_ROOTS *
-           lenPrimes * (sizeof(uint32_t) + sizeof(uint64_t)) / 1024 / 1024),
-           nthreads,
-           BATCH_SIZE );
-#else
-  printf ( "# Info: estimated peak memory=%.2fMB (%d threads,"
-           " batch %d inversions on SQ)\n",
-           (double) (nthreads * (BATCH_SIZE + INIT_FACTOR * 
-           NUMBER_CONSIDERED_ROOTS) * lenPrimes * (sizeof(uint32_t)
-            + sizeof(uint64_t)) / 1024 / 1024),
-           nthreads,
-           BATCH_SIZE );
-#endif
-
-
 #endif
 
   //printPrimes (Primes, lenPrimes);
@@ -3010,7 +2900,7 @@ main (int argc, char *argv[])
 
     if (cputime () > target_time || verbose > 0)
     {
-      printf ("# Stat: ad=%lu, exp. coll.=%1.1f (%0.3f/s), got %lu with %lu good ones, av. lognorm=%1.2f, av. raw. lognorm=%1.2f, time=%dms\n",
+      printf ("# Stat: ad=%lu, exp. coll.=%1.2f (%0.2e/s), got %lu with %lu good ones, av. lognorm=%1.2f, av. raw. lognorm=%1.2f, time=%dms\n",
               admin,
               potential_collisions,
               1000.0 * (double) potential_collisions / cputime (),
@@ -3029,7 +2919,7 @@ main (int argc, char *argv[])
     {
       printf ("# Stat: tried %d ad-value(s), found %d polynomial(s), %d below maxnorm\n",
               tries, tot_found, found);
-      printf ("# Stat: potential collisions=%1.2e (%1.2e/s)\n",
+      printf ("# Stat: potential collisions=%1.2f (%1.2e/s)\n",
               potential_collisions, 1000.0 * potential_collisions
               / (double) cputime ());
       if (collisions > 0)
