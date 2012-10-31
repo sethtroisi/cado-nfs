@@ -309,7 +309,7 @@ int factor_base_init(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
   // Sanity check: if we did not read any ideal of the maximum degree,
   // there is probably a problem with the factor base file.
   if (!fbb_ok) {
-    fprintf(stderr, "Warning: the factor base file %s does not contain any ideal of maximu allowed\n"
+    fprintf(stderr, "Warning: the factor base file %s does not contain any ideal of maximum allowed\n"
         "  degree. The file might be corrupted, or was prepared for a smaller factor\n"
         "  base bound. Running again 'makefb' is recommended.\n",
         filename);
