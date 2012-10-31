@@ -241,8 +241,7 @@ qroots_realloc (qroots_t R, unsigned long newalloc)
 }
 
 void
-qroots_add (qroots_t R, unsigned int q, unsigned int nr, 
-	    uint64_t *roots)
+qroots_add (qroots_t R, unsigned int q, unsigned int nr, uint64_t *roots)
 {
   unsigned int i;
 
@@ -290,7 +289,7 @@ qroots_clear (qroots_t R)
 
 /* init hash table */
 void
-hash_init (hash_t H, unsigned long init_size)
+hash_init (hash_t H, unsigned int init_size)
 {
   H->alloc = init_size;
   H->slot = (slot_t*) malloc (H->alloc * sizeof (slot_t));
@@ -310,18 +309,36 @@ hash_init (hash_t H, unsigned long init_size)
 #endif
 }
 
+void
+shash_init (shash_t H, unsigned int init_size)
+{
+  /* round up to next power of two */
+  init_size --;
+  while (init_size & (init_size - 1))
+    init_size &= init_size - 1;
+  init_size <<= 1;
+  ASSERT_ALWAYS((init_size & (init_size - 1)) == 0);
+  H->alloc = init_size;
+  H->i = (SHASH_UINT*) malloc (H->alloc * sizeof (SHASH_UINT));
+  if (H->i == NULL)
+    {
+      fprintf (stderr, "Error, cannot allocate memory in shash_init\n");
+      exit (1);
+    }
+  memset (H->i, 0, H->alloc * sizeof (SHASH_UINT));
+}
 
 /* rq is a root of N = (m0 + rq)^d mod (q^2) */
 void
 hash_add (hash_t H, unsigned long p, int64_t i, mpz_t m0, uint64_t ad,
           unsigned long d, mpz_t N, unsigned long q, mpz_t rq)
 {
-  unsigned long h;
+  uint32_t h;
 
   ASSERT(m0 != NULL);
   ASSERT(H->size < H->alloc);
 
-  h = (unsigned int) i % H->alloc;
+  h = (uint32_t) i % H->alloc;
 
 #ifdef DEBUG_HASH_TABLE
   if (H->slot[h].i != 0)
@@ -343,13 +360,32 @@ hash_add (hash_t H, unsigned long p, int64_t i, mpz_t m0, uint64_t ad,
   H->size ++;
 }
 
+/* return non-zero iff there is a collision */
+int
+shash_add (shash_t H, int64_t i)
+{
+  uint32_t h;
+
+  h = (uint32_t) i & (H->alloc - 1); /* H->alloc is a power of two */
+  while (H->i[h] != 0)
+    {
+      if (UNLIKELY(H->i[h] == (SHASH_UINT) i))
+        return 1;
+      h ++;
+      if (UNLIKELY(h == H->alloc))
+        h = 0;
+    }
+  H->i[h] = (SHASH_UINT) i;
+  return 0;
+}
+
 /* rq is a root of N = (m0 + rq)^d mod (q^2) */
 void
 gmp_hash_add (hash_t H, uint32_t p, int64_t i, mpz_t m0, uint64_t ad,
               unsigned long d, mpz_t N, uint64_t q, mpz_t rq)
 {
   unsigned long h;
-  
+
   if (H->size >= H->alloc)
     hash_grow (H);
   if (i >= 0)
@@ -374,11 +410,16 @@ gmp_hash_add (hash_t H, uint32_t p, int64_t i, mpz_t m0, uint64_t ad,
   H->size ++;
 }
 
-
 void
 hash_clear (hash_t H)
 {
   free (H->slot);
+}
+
+void
+shash_clear (shash_t H)
+{
+  free (H->i);
 }
 
 void

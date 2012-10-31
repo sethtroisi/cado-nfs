@@ -38,6 +38,15 @@ typedef struct
 } __hash_struct;
 typedef __hash_struct hash_t[1];
 
+typedef uint64_t SHASH_UINT;
+
+typedef struct
+{
+  SHASH_UINT *i;
+  uint32_t alloc;      /* total allocated size */
+} __shash_struct;
+typedef __shash_struct shash_t[1];
+
 /* thread structure */
 typedef struct
 {
@@ -101,13 +110,16 @@ void qroots_add (qroots_t, unsigned int, unsigned int, uint64_t*);
 void qroots_print (qroots_t);
 void qroots_clear (qroots_t);
 
-void hash_init (hash_t, unsigned long);
+void hash_init (hash_t, unsigned int);
+void shash_init (shash_t, unsigned int);
 void hash_add (hash_t, unsigned long, int64_t, mpz_t, uint64_t,
                unsigned long, mpz_t, unsigned long, mpz_t);
+int shash_add (shash_t, int64_t);
 void gmp_hash_add (hash_t, uint32_t, int64_t, mpz_t, uint64_t,
 		   unsigned long, mpz_t, uint64_t, mpz_t);
 void hash_grow (hash_t);
 void hash_clear (hash_t);
+void shash_clear (shash_t);
 
 void print_poly_info (mpz_t *, unsigned int d, mpz_t *, int);
 

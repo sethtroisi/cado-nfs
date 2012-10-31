@@ -1798,40 +1798,63 @@ collision_on_each_sq ( header_t header,
   uint64_t pp;
   int64_t ppl, u, umax, v;
   double pc2;
+  int found = 0;
 
 #ifdef DEBUG_POLYSELECT2L
   int st = cputime();
 #endif
 
-  hash_t H;
+  shash_t H;
 
-  hash_init (H, INIT_FACTOR * lenPrimes);
-
+  shash_init (H, INIT_FACTOR * lenPrimes);
   umax = (int64_t) Primes[lenPrimes - 1] * (int64_t) Primes[lenPrimes - 1];
-  for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
-
-    p = Primes[nprimes];
-    if ((header->d * header->ad) % p == 0)
-      continue;
-
-    /* set p, p^2, ppl */
-    pp = p * p;
-    ppl = (long) pp;
-    nr = R->nr[nprimes];
-
-    for (j = 0; j < nr; j++, c++)
+  for (nprimes = 0; nprimes < lenPrimes; nprimes ++)
     {
-      u = (long) inv_qq[c];
+      p = Primes[nprimes];
+      if ((header->d * header->ad) % p == 0)
+        continue;
+      pp = p * p;
+      ppl = (long) pp;
+      nr = R->nr[nprimes];
+      for (j = 0; j < nr; j++, c++)
+        {
+          u = (long) inv_qq[c];
+          for (v = u; v < umax; v += ppl)
+            found |= shash_add (H, v);
+          for (v = ppl - u; v < umax; v += ppl)
+            found |= shash_add (H, -v);
+        }
+    }
+  shash_clear (H);
 
-      for (v = u; v < umax; v += ppl)
-        hash_add (H, p, v, header->m0, header->ad, header->d,
-                  header->N, q, rqqz);
-      for (v = ppl - u; v < umax; v += ppl)
-        hash_add (H, p, -v, header->m0, header->ad, header->d,
-                  header->N, q, rqqz);
+  if (found) /* do the real work */
+    {
+      hash_t H;
 
-    }  // next rp
-  } // next p
+      hash_init (H, INIT_FACTOR * lenPrimes);
+
+      umax = (int64_t) Primes[lenPrimes - 1] * (int64_t) Primes[lenPrimes - 1];
+      for (nprimes = c = 0; nprimes < lenPrimes; nprimes ++)
+        {
+          p = Primes[nprimes];
+          if ((header->d * header->ad) % p == 0)
+            continue;
+          pp = p * p;
+          ppl = (long) pp;
+          nr = R->nr[nprimes];
+          for (j = 0; j < nr; j++, c++)
+            {
+              u = (long) inv_qq[c];
+              for (v = u; v < umax; v += ppl)
+                hash_add (H, p, v, header->m0, header->ad, header->d,
+                          header->N, q, rqqz);
+              for (v = ppl - u; v < umax; v += ppl)
+                hash_add (H, p, -v, header->m0, header->ad, header->d,
+                          header->N, q, rqqz);
+            }
+        }
+      hash_clear (H);
+    }
 
 #ifdef DEBUG_POLYSELECT2L
   fprintf (stderr, "# inner collision_on_each_sq took %dms\n", cputime () - st);
@@ -1842,8 +1865,6 @@ collision_on_each_sq ( header_t header,
   fprintf (stderr, "# p hash_size: %u, hash_alloc: %u\n", H->size, H->alloc);
   fprintf (stderr, "# hash table coll: %lu, all_coll: %lu\n", H->coll, H->coll_all);
 #endif
-
-  hash_clear (H);
 
   pc2 = expected_collisions (Primes[nprimes - 1]);
   pthread_mutex_lock (&lock);
