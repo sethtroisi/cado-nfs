@@ -50,6 +50,7 @@
 /* thread structure */
 typedef struct
 {
+  FILE *fin, *fout;
   unsigned long nlines;
   unsigned long nideal;
   unsigned long nsingl;
@@ -258,20 +259,18 @@ FILE * gzip_open(const char * name, const char * mode)
 
 void gzip_close(FILE * f, const char * name)
 {
-    const char * e = name + strlen(name);
-    const struct suffix_handler * r = supported_compression_formats;
-    for( ; r->suffix ; r++) {
-        const char * ne = e - MIN(strlen(name), strlen(r->suffix));
-        if (strcmp(r->suffix, ne) != 0)
-            continue;
-        if (r->pfmt_out) {
-            pclose(f);
-            return;
-        } else {
-            fclose(f);
-            return;
-        }
-    }
+  const char * e = name + strlen(name);
+  const struct suffix_handler * r = supported_compression_formats;
+  for( ; r->suffix ; r++) {
+    const char * ne = e - MIN(strlen(name), strlen(r->suffix));
+    if (strcmp(r->suffix, ne))
+      continue;
+    if (r->pfmt_out)
+      pclose(f);
+    else
+      fclose(f);
+    return;
+  }
 }
 
 static inline uint64_t
@@ -514,18 +513,20 @@ root (long a0, long b0, long p)
 }
 
 /* first pass, return the number of lines read */
-static unsigned long
-load_pass1 (char *g)
+void*
+pass1_one_thread (void* args)
 {
-  char s[1024], *t;
+  tab_t *tab = (tab_t*) args;
   FILE *f;
+  char s[1024], *t;
   unsigned long line, b, r;
   long a;
   uint64_t p, p2;
   uint8_t m;
-
+  
+  f = (tab[0]->fin) ? tab[0]->fin : gzip_open(tab[0]->g, "r");
+  assert (f);
   line = 0;
-  f = gzip_open (g, "r");
   while (fgets (s, 1024, f)) {
     line++;
     t = s;
@@ -565,14 +566,18 @@ load_pass1 (char *g)
 	  insert (INDEX_ALG (p, p2));
 	} while (*t++ == ',');
   }
-  gzip_close (f, g);
-  return line;
+  tab[0]->nlines = line;
+  tab[0]->busy = 1;
+  sem_post(&sem_pt);
+  gzip_close (f, tab[0]->g);
+  return NULL;
 }
 
 /* pass 2: insert in H2 ideals with weight 2 */
-static void
-load_pass2 (char *g)
+void*
+pass2_one_thread (void *args)
 {
+  tab_t *tab = (tab_t*) args;
   uint64_t rp[MAX_STOCK_RAT_PER_LINE], ap[MAX_STOCK_ALG_PER_LINE], ar[MAX_STOCK_ALG_PER_LINE];
   char s[1024], *t;
   FILE *f;
@@ -583,7 +588,7 @@ load_pass2 (char *g)
   unsigned int nr, na;
   uint8_t m;
 
-  f = gzip_open (g, "r");
+  f = (tab[0]->fin) ? tab[0]->fin : gzip_open(tab[0]->g, "r");
   line = output = 0;
  next_line:
   while (fgets (s, 1024, f)) {
@@ -657,7 +662,7 @@ load_pass2 (char *g)
       while (na-- > 0) insert2a (INDEX_ALG (ap[na], ar[na]), h);
     }
   }
-  gzip_close (f, g);
+  gzip_close (f, tab[0]->g);
 #ifdef HAVE_SYNC_FETCH
   __sync_fetch_and_add(&remains, output);
   __sync_fetch_and_add(&nrels, line);
@@ -667,12 +672,16 @@ load_pass2 (char *g)
   nrels += line;
   pthread_mutex_unlock (&lock);
 #endif
+  tab[0]->busy = 1;
+  sem_post(&sem_pt);
+  return NULL;
 }
 
 /* pass 3: writes remaining relations */
-static void
-load_pass3 (char *g)
+void*
+pass3_one_thread (void* args)
 {
+  tab_t *tab = (tab_t*) args;
   uint64_t rp[MAX_STOCK_RAT_PER_LINE], ap[MAX_STOCK_ALG_PER_LINE], ar[MAX_STOCK_ALG_PER_LINE];
   char s[1024], newg[MAXNAME<<1], *t;
   FILE *f, *newf;
@@ -682,11 +691,15 @@ load_pass3 (char *g)
   unsigned int nr, na;
   uint8_t m;
 
-  strcpy (newg, NEW_DIR);
-  strcat (newg, g);
-  f = gzip_open (g, "r");
-  newf = gzip_open (newg, "w");
-  assert (newf != NULL);
+  if ((f = tab[0]->fin))
+     newf = tab[0]->fout;
+  else {
+    f = gzip_open(tab[0]->g, "r");
+    strcpy (newg, NEW_DIR);
+    strcat (newg, tab[0]->g);
+    newf = gzip_open (newg, "w");
+  }
+  assert (newf);
   line = output = 0;
   if (0) {
   next_line: /* update 2-bit counters of removed ideals of the suppress line */
@@ -747,10 +760,10 @@ load_pass3 (char *g)
     fputs (s, newf);
     output ++;
   }
-  gzip_close (f, g);
-  gzip_close (newf, newg);
+  gzip_close (f, tab[0]->g);
+  gzip_close (newf, tab[0]->g);
   fprintf (stderr, "   new/%s done: remains %lu rels out of %lu\n",
-           g, output, line);
+           tab[0]->g, output, line);
 #ifdef HAVE_SYNC_FETCH
   __sync_fetch_and_add(&remains, output);
   __sync_fetch_and_add(&nrels, line);
@@ -760,38 +773,6 @@ load_pass3 (char *g)
   nrels += line;
   pthread_mutex_unlock (&lock);
 #endif
-}
-
-void*
-pass1_one_thread (void* args)
-{
-  tab_t *tab = (tab_t*) args;
-
-  tab[0]->nlines = load_pass1 (tab[0]->g);
-  tab[0]->busy = 1;
-  sem_post(&sem_pt);
-  return NULL;
-}
-
-/* for pass2 */
-void*
-pass2_one_thread (void* args)
-{
-  tab_t *tab = (tab_t*) args;
-
-  load_pass2 (tab[0]->g);
-  tab[0]->busy = 1;
-  sem_post(&sem_pt);
-  return NULL;
-}
-
-/* for pass3 */
-void*
-pass3_one_thread (void* args)
-{
-  tab_t *tab = (tab_t*) args;
-
-  load_pass3 (tab[0]->g);
   tab[0]->busy = 1;
   sem_post(&sem_pt);
   return NULL;
@@ -919,9 +900,9 @@ pass1 (int nthreads, char *filelist)
 {
   FILE *f;
   char g[ARG_MAX], *pg;
-  int i, j = 0, nbt = 0, notload, nbf, notfirst = 0;
+  int i, j = 0, nbt = 0, notload, nbf, notfirst = 0, avoidwarning = 0;
   tab_t *T;
-  pthread_t tid[MAX_THREADS], sid;
+  pthread_t tid[MAX_THREADS+1], sid;
   double st = cputime(), rt = realtime(), crt, art,
     delay_stat = compute_delay_stat();
   size_t lpg;
@@ -936,9 +917,9 @@ pass1 (int nthreads, char *filelist)
       fprintf (stderr, "Error, cannot open %s\n", filelist);
       exit (1);
     }
-  T = malloc (nthreads * sizeof (tab_t));
-  memset(T, 0, nthreads * sizeof (tab_t));
-  sem_init(&sem_pt, 0, nthreads - 1);
+  T = malloc ((nthreads + 1) * sizeof (tab_t));
+  memset(T, 0, (nthreads + 1) * sizeof (tab_t));
+  sem_init(&sem_pt, 0, nthreads);
   crt = art = rt;
   while ((notload = (!feof (f))) || nbt) {
     if (notload) {
@@ -954,17 +935,24 @@ pass1 (int nthreads, char *filelist)
       } while (nbf < MAX_FILES_PER_THREAD && pg < g + ARG_MAX - MAXNAME);
       if (nbf) {
 	pg[-1] = 0;
-	for (i = 0; T[i]->busy && i < nthreads; i++);
-	assert(i < nthreads);
+	for (i = 0; T[i]->busy && i <= nthreads; i++);
+	assert(i <= nthreads);
 	strcpy (T[i]->g, g);
 	T[i]->busy = 2;
 	T[i]->thread = i;
-	nbt++;
-	pthread_create (&tid[i], NULL, pass1_one_thread, (void *) (T + i));
+	if (nbt++ < nthreads) {
+	  T[i]->fin = NULL;
+	  pthread_create (&tid[i], NULL, pass1_one_thread, (void *) (T + i));
+	} else {
+	  avoidwarning = i;
+	  T[i]->fin = gzip_open(g, "r");
+	}
       }
     }
     sem_wait(&sem_pt);
-    for (i = 0; i < nthreads; i++)
+    if (nbt > nthreads)
+      pthread_create (&tid[avoidwarning], NULL, pass1_one_thread, (void *) (T + avoidwarning));
+    for (i = 0; i <= nthreads; i++)
       if (T[i]->busy == 1) {
 	pthread_join (tid[i], NULL);
 	nrels += T[i]->nlines;
@@ -974,7 +962,7 @@ pass1 (int nthreads, char *filelist)
 	break;
       }
     art = realtime();
-    if (j + 1 == nthreads) {
+    if (j == nthreads) {
       fprintf (stderr, "Pass1; rels: load %lu; krels/s: %lu; time: %lus cpu, %lus real\n",
 	       nrels,
 	       (unsigned long) (nrels / ((art - rt) * 1000)),
@@ -1015,9 +1003,9 @@ pass2 (int nthreads, char *filelist)
 {
   FILE *f;
   char g[ARG_MAX], *pg;
-  int i, j = 0, notload, nbt = 0, nbf;
+  int i, j = 0, notload, nbt = 0, nbf, avoidwarning = 0;
   tab_t *T;
-  pthread_t tid[MAX_THREADS];
+  pthread_t tid[MAX_THREADS+1];
   double st = cputime(), rt = realtime(), art;
   size_t lpg;
 
@@ -1026,9 +1014,9 @@ pass2 (int nthreads, char *filelist)
 	   "* PASS 2/3 *\n"
 	   "************\n\n");
   f = fopen (filelist, "r");
-  T = malloc (nthreads * sizeof (tab_t));
-  memset(T, 0, nthreads * sizeof (tab_t));
-  sem_init(&sem_pt, 0, nthreads - 1);
+  T = malloc ((nthreads + 1) * sizeof (tab_t));
+  memset(T, 0, (nthreads + 1) * sizeof (tab_t));
+  sem_init(&sem_pt, 0, nthreads);
   art = rt;
   while ((notload = (!feof (f))) || nbt) {
     if (notload) {
@@ -1045,17 +1033,24 @@ pass2 (int nthreads, char *filelist)
       } while (nbf < MAX_FILES_PER_THREAD && pg < g + ARG_MAX - MAXNAME);
       if (nbf) {
 	pg[-1] = 0;
-	for (i = 0; T[i]->busy && i < nthreads; i++);
-	assert(i < nthreads);
+	for (i = 0; T[i]->busy && i <= nthreads; i++);
+	assert(i <= nthreads);
 	strcpy (T[i]->g, g);
 	T[i]->busy = 2;
 	T[i]->thread = i;
-	nbt++;
-	pthread_create (&tid[i], NULL, pass2_one_thread, (void *) (T + i));
+	if (nbt++ < nthreads) {
+	  T[i]->fin = NULL;
+	  pthread_create (&tid[i], NULL, pass2_one_thread, (void *) (T + i));
+	} else {
+	  T[i]->fin = gzip_open(g, "r");
+	  avoidwarning = i;
+	}
       }
     }
     sem_wait(&sem_pt);
-    for (i = 0; i < nthreads; i++)
+    if (nbt > nthreads)
+      pthread_create (&tid[avoidwarning], NULL, pass2_one_thread, (void *) (T + avoidwarning));
+    for (i = 0; i <= nthreads; i++)
       if (T[i]->busy == 1) {
 	pthread_join (tid[i], NULL);
 	T[i]->busy = 0;
@@ -1064,7 +1059,7 @@ pass2 (int nthreads, char *filelist)
 	break;
       }
     art = realtime();
-    if (j + 1 == nthreads) {
+    if (j == nthreads) {
       fprintf (stderr, "Pass2; rels: load %lu, used %lu (%.2f%%); "
 	       "krels/s: %lu; time: %lus cpu, %lus real\n",
 	       nrels, remains,
@@ -1113,10 +1108,10 @@ static void
 pass3 (int nthreads, char *filelist)
 {
   FILE *f;
-  char g[MAXNAME];
-  int i, j = 0, k = 0, nbt = 0, notload;
+  char g[MAXNAME], newg[MAXNAME<<1];
+  int i, j = 0, k = 0, nbt = 0, notload, avoidwarning = 0;
   tab_t *T;
-  pthread_t tid[MAX_THREADS];
+  pthread_t tid[MAX_THREADS+1];
   double st = cputime(), rt = realtime(), art;
   size_t lg;
 
@@ -1125,23 +1120,34 @@ pass3 (int nthreads, char *filelist)
 	   "* PASS 3/3 *\n"
 	   "************\n\n");
   f = fopen (filelist, "r");
-  T = malloc (nthreads * sizeof (tab_t));
-  memset(T, 0, nthreads * sizeof (tab_t));
-  sem_init(&sem_pt, 0, nthreads - 1);
+  T = malloc ((nthreads + 1) * sizeof (tab_t));
+  memset(T, 0, (nthreads + 1) * sizeof (tab_t));
+  sem_init(&sem_pt, 0, nthreads);
   art = rt;
   while ((notload = (!feof (f))) || nbt) {
     if (notload && fgets (g, MAXNAME, f) && (lg = strlen(g))) {
       g[lg - 1] = 0;
-      for (i = 0; T[i]->busy && i < nthreads; i++);
-      assert(i < nthreads);
+      for (i = 0; T[i]->busy && i <= nthreads; i++);
+      assert(i <= nthreads);
       strcpy (T[i]->g, g);
       T[i]->busy = 2;
       T[i]->thread = i;
-      nbt++;
-      pthread_create (&tid[i], NULL, pass3_one_thread, (void *) (T + i));
+      if (nbt++ < nthreads) {
+	T[i]->fin = NULL;
+	pthread_create (&tid[i], NULL, pass3_one_thread, (void *) (T + i));
+      }
+      else {
+	T[i]->fin = gzip_open(g, "r");
+	strcpy (newg, NEW_DIR);
+	strcat (newg, T[i]->g);
+	T[i]->fout = gzip_open (newg, "w");
+	avoidwarning = i;
+      }
     }
     sem_wait(&sem_pt);
-    for (i = 0; i < nthreads; i++)
+    if (nbt > nthreads)
+      pthread_create (&tid[avoidwarning], NULL, pass3_one_thread, (void *) (T + avoidwarning));
+    for (i = 0; i <= nthreads; i++)
       if (T[i]->busy == 1) {
 	pthread_join (tid[i], NULL);
 	T[i]->busy = 0;
@@ -1150,7 +1156,7 @@ pass3 (int nthreads, char *filelist)
 	break;
       }
     art = realtime();
-    if (j + 1 == nthreads && ++k == MAX_FILES_PER_THREAD) {
+    if (j == nthreads && ++k == MAX_FILES_PER_THREAD) {
       fprintf (stderr, "Pass3; rels: load %lu, used %lu (%.2f%%); "
 	       "krels/s: %lu; time: %lus cpu, %lus real\n",
 	       nrels, remains,
