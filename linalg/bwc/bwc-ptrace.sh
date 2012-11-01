@@ -29,8 +29,8 @@ Nv=$((Mv*Tv))
 mpi=${Mh}x${Mv}
 thr=${Th}x${Tv}
 
-prime=65521
-bits_per_coeff=64
+prime=109378681671075297195692480234213908123642560192251038455204252439
+bits_per_coeff=256
 
 # The test matrix may be created by:
 #
@@ -55,6 +55,9 @@ interval=50
 
 if [ "$shuffle" = 1 ] ; then
     shuffle_option=--shuffled-product
+else
+    # I have the impression that it's better to leave this here !
+    shuffle_option="noshuffle=1"
 fi
 
 $bins/mf_bal $shuffle_option mfile=$matrix $Nh $Nv out=$wdir/ --withcoeffs

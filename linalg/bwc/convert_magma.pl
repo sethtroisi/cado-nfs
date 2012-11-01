@@ -170,7 +170,7 @@ if ($mode =~ /^(spvector64)$/) {
     my $add1 = $mode eq 'permutation';
     my @p=();
     while(sysread(STDIN, my $x, 8)) {
-        my $v = unpack("l",$x);
+        my $v = unpack("q",$x);
         push @p, $v+$add1;
     }
     print "var:=[",join(',',@p),"];\n";

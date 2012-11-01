@@ -2,7 +2,7 @@
 m:=1;
 n:=1;
 
-p:=65521;
+p:=109378681671075297195692480234213908123642560192251038455204252439;
 
 load "/tmp/bwcp/t.m"; M:=Matrix(GF(p),Matrix(var));
 KP<X>:=PolynomialRing(GF(p));
@@ -111,23 +111,27 @@ assert rowweights(Transpose(Pr*Sr*Cr)*Mt) eq rowweights(M);
 
 
 
+function group(nlimbs)
+    return func<var|[Seqint([x mod 2^64:x in var[i*k+1..i*k+k]],2^64):i in [0..#var div k - 1]] where k is nlimbs>;
+end function;
 
+g:=group(Ceiling(Log(2^64,p)));
 
-load "/tmp/bwcp/Y0.m"; Y0:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/V0.m"; V0:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/V1.m"; V1:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/V2.m"; V2:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/V3.m"; V3:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/V4.m"; V4:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/V5.m"; V5:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/V6.m"; V6:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/V7.m"; V7:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/V8.m"; V8:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/V9.m"; V9:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/V10.m"; V10:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/C0.m"; C0:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/C1.m"; C1:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/C50.m"; C50:=Vector(GF(p),nr,var);
+load "/tmp/bwcp/Y0.m"; Y0:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/V0.m"; V0:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/V1.m"; V1:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/V2.m"; V2:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/V3.m"; V3:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/V4.m"; V4:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/V5.m"; V5:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/V6.m"; V6:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/V7.m"; V7:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/V8.m"; V8:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/V9.m"; V9:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/V10.m"; V10:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/C0.m"; C0:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/C1.m"; C1:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/C50.m"; C50:=Vector(GF(p),nr,g(var));
 
 load "/tmp/bwcp/x.m";
 Xt:=Matrix(GF(p),nr,1,[]);
