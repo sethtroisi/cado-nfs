@@ -319,13 +319,14 @@ shash_init (shash_t H, unsigned int init_size)
   init_size <<= 1;
   ASSERT_ALWAYS((init_size & (init_size - 1)) == 0);
   H->alloc = init_size;
-  H->i = (SHASH_UINT*) malloc (H->alloc * sizeof (SHASH_UINT));
+  H->i = (uint32_t*) malloc (H->alloc * sizeof (uint32_t));
   if (H->i == NULL)
     {
       fprintf (stderr, "Error, cannot allocate memory in shash_init\n");
       exit (1);
     }
-  memset (H->i, 0, H->alloc * sizeof (SHASH_UINT));
+  memset (H->i, 0, H->alloc * sizeof (uint32_t));
+  H->mask = H->alloc - 1;
 }
 
 /* rq is a root of N = (m0 + rq)^d mod (q^2) */
@@ -362,20 +363,21 @@ hash_add (hash_t H, unsigned long p, int64_t i, mpz_t m0, uint64_t ad,
 
 /* return non-zero iff there is a collision */
 int
-shash_add (shash_t H, int64_t i)
+shash_add (shash_t H, uint64_t i)
 {
   uint32_t h;
+  uint32_t v = (uint32_t) (i + (i >> 32)); /* i mod (2^32-1) */
 
-  h = (uint32_t) i & (H->alloc - 1); /* H->alloc is a power of two */
+  h = (uint32_t) i & H->mask; /* H->mask is a power of two minus 1 */
   while (H->i[h] != 0)
     {
-      if (UNLIKELY(H->i[h] == (SHASH_UINT) i))
+      if (UNLIKELY(H->i[h] == v))
         return 1;
       h ++;
       if (UNLIKELY(h == H->alloc))
         h = 0;
     }
-  H->i[h] = (SHASH_UINT) i;
+  H->i[h] = v;
   return 0;
 }
 
