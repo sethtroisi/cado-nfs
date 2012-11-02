@@ -1798,13 +1798,11 @@ collision_on_each_sq ( header_t header,
   uint64_t pp;
   int64_t ppl, u, umax, v;
   double pc2;
-  int found = 0;
-
+  int found;
+  shash_t H;
 #ifdef DEBUG_POLYSELECT2L
   int st = cputime();
 #endif
-
-  shash_t H;
 
   shash_init (H, INIT_FACTOR * lenPrimes);
   umax = (int64_t) Primes[lenPrimes - 1] * (int64_t) Primes[lenPrimes - 1];
@@ -1820,11 +1818,12 @@ collision_on_each_sq ( header_t header,
         {
           u = (long) inv_qq[c];
           for (v = u; v < umax; v += ppl)
-            found |= shash_add (H, v);
+            shash_add (H, v);
           for (v = ppl - u; v < umax; v += ppl)
-            found |= shash_add (H, -v);
+            shash_add (H, -v);
         }
     }
+  found = shash_find_collision (H);
   shash_clear (H);
 
   if (found) /* do the real work */

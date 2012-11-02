@@ -38,10 +38,15 @@ typedef struct
 } __hash_struct;
 typedef __hash_struct hash_t[1];
 
+#define SHASH_NBUCKETS 16 /* should be a power of two */
+
 typedef struct
 {
-  uint32_t *i;
+  uint64_t *mem;
+  uint64_t *(i[SHASH_NBUCKETS]);
+  uint64_t size[SHASH_NBUCKETS];
   uint32_t alloc;      /* total allocated size */
+  uint32_t balloc;     /* allocated size for each bucket */
   uint32_t mask;       /* alloc - 1 */
 } __shash_struct;
 typedef __shash_struct shash_t[1];
@@ -113,7 +118,8 @@ void hash_init (hash_t, unsigned int);
 void shash_init (shash_t, unsigned int);
 void hash_add (hash_t, unsigned long, int64_t, mpz_t, uint64_t,
                unsigned long, mpz_t, unsigned long, mpz_t);
-int shash_add (shash_t, uint64_t);
+void shash_add (shash_t, uint64_t);
+int shash_find_collision (shash_t);
 void gmp_hash_add (hash_t, uint32_t, int64_t, mpz_t, uint64_t,
 		   unsigned long, mpz_t, uint64_t, mpz_t);
 void hash_grow (hash_t);

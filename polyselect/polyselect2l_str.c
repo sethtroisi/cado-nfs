@@ -312,6 +312,8 @@ hash_init (hash_t H, unsigned int init_size)
 void
 shash_init (shash_t H, unsigned int init_size)
 {
+  int j;
+
   /* round up to next power of two */
   init_size --;
   while (init_size & (init_size - 1))
@@ -319,13 +321,20 @@ shash_init (shash_t H, unsigned int init_size)
   init_size <<= 1;
   ASSERT_ALWAYS((init_size & (init_size - 1)) == 0);
   H->alloc = init_size;
-  H->i = (uint32_t*) malloc (H->alloc * sizeof (uint32_t));
-  if (H->i == NULL)
+  H->mem = (uint64_t*) malloc (H->alloc * sizeof (uint64_t));
+  if (H->mem == NULL)
     {
       fprintf (stderr, "Error, cannot allocate memory in shash_init\n");
       exit (1);
     }
-  memset (H->i, 0, H->alloc * sizeof (uint32_t));
+  H->balloc = H->alloc / SHASH_NBUCKETS; /* exact division */
+  ASSERT_ALWAYS(H->balloc * SHASH_NBUCKETS == H->alloc);
+  ASSERT_ALWAYS((H->balloc & (H->balloc - 1)) == 0);
+  for (j = 0; j < SHASH_NBUCKETS; j++)
+    {
+      H->i[j] = H->mem + j * H->balloc;
+      H->size[j] = 0;
+    }
   H->mask = H->alloc - 1;
 }
 
@@ -361,24 +370,48 @@ hash_add (hash_t H, unsigned long p, int64_t i, mpz_t m0, uint64_t ad,
   H->size ++;
 }
 
-/* return non-zero iff there is a collision */
-int
+void
 shash_add (shash_t H, uint64_t i)
 {
-  uint32_t h;
-  uint32_t v = (uint32_t) (i + (i >> 32)); /* i mod (2^32-1) */
+  int j;
 
-  h = (uint32_t) i & H->mask; /* H->mask is a power of two minus 1 */
-  while (H->i[h] != 0)
+  j = i & (SHASH_NBUCKETS - 1);
+  H->i[j][H->size[j]] = i;
+  H->size[j]++;
+}
+
+/* return non-zero iff there is a collision */
+int
+shash_find_collision (shash_t H)
+{
+  int ret = 0;
+  unsigned int j, k;
+  uint32_t *T, h, v, mask = H->balloc - 1;
+  uint64_t i, *Hj;
+  
+  T = (uint32_t*) malloc (H->balloc * sizeof(uint32_t));
+  for (j = 0; j < SHASH_NBUCKETS; j++)
     {
-      if (UNLIKELY(H->i[h] == v))
-        return 1;
-      h ++;
-      if (UNLIKELY(h == H->alloc))
-        h = 0;
+      memset (T, 0, H->balloc * sizeof(uint32_t));
+      Hj = H->i[j];
+      for (k = 0; k < H->size[j]; k++)
+        {
+          i = Hj[k];
+          h = i & mask;
+          v = (uint32_t) (i + (i >> 32));
+          while (T[h] != 0)
+            {
+              if (UNLIKELY(T[h] == v))
+                ret = 1;
+              h ++;
+              if (UNLIKELY(h == H->balloc))
+                h = 0;
+            }
+          T[h] = v;
+        }
     }
-  H->i[h] = v;
-  return 0;
+  free (T);
+  return ret;
 }
 
 /* rq is a root of N = (m0 + rq)^d mod (q^2) */
@@ -421,7 +454,7 @@ hash_clear (hash_t H)
 void
 shash_clear (shash_t H)
 {
-  free (H->i);
+  free (H->mem);
 }
 
 void
