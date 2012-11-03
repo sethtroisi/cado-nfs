@@ -920,7 +920,6 @@ collision_on_p ( header_t header,
     p = Primes[nprimes];
     ppl = (int64_t) p;
     ppl *= (int64_t) p;
-    printf ("p: %lu, ppl %"PRId64"\n", p, ppl);
 
     /* add faked roots to keep indices */
     if ((header->d * header->ad) % p == 0) {
