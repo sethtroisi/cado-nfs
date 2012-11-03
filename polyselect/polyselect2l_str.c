@@ -309,33 +309,28 @@ hash_init (hash_t H, unsigned int init_size)
 #endif
 }
 
+/* init_size is an approximation of the number of entries */
 void
 shash_init (shash_t H, unsigned int init_size)
 {
   int j;
 
-  /* round up to next power of two */
-  init_size --;
-  while (init_size & (init_size - 1))
-    init_size &= init_size - 1;
-  init_size <<= 1;
-  ASSERT_ALWAYS((init_size & (init_size - 1)) == 0);
-  H->alloc = init_size;
+  init_size += init_size / 10; /* use 10% margin */
+  /* round up to multiple of SHASH_NBUCKETS */
+  init_size = 1 + (init_size - 1) / SHASH_NBUCKETS;
+  H->alloc = init_size * SHASH_NBUCKETS;
   H->mem = (uint64_t*) malloc (H->alloc * sizeof (uint64_t));
   if (H->mem == NULL)
     {
       fprintf (stderr, "Error, cannot allocate memory in shash_init\n");
       exit (1);
     }
-  H->balloc = H->alloc / SHASH_NBUCKETS; /* exact division */
-  ASSERT_ALWAYS(H->balloc * SHASH_NBUCKETS == H->alloc);
-  ASSERT_ALWAYS((H->balloc & (H->balloc - 1)) == 0);
+  H->balloc = init_size;
   for (j = 0; j < SHASH_NBUCKETS; j++)
     {
       H->i[j] = H->mem + j * H->balloc;
       H->size[j] = 0;
     }
-  H->mask = H->alloc - 1;
 }
 
 /* rq is a root of N = (m0 + rq)^d mod (q^2) */
@@ -386,13 +381,21 @@ shash_find_collision (shash_t H)
 {
   int ret = 0;
   unsigned int j, k;
-  uint32_t *T, h, v, mask = H->balloc - 1;
+  uint32_t *T, h, v, size, mask;
   uint64_t i, *Hj;
   
-  T = (uint32_t*) malloc (H->balloc * sizeof(uint32_t));
+  size = H->balloc +  H->balloc / 2;
+  /* round up to power of 2 */
+  size --;
+  while (size & (size - 1))
+    size &= size - 1;
+  size <<= 1;
+  ASSERT_ALWAYS((size & (size - 1)) == 0);
+  mask = size - 1;
+  T = (uint32_t*) malloc (size * sizeof(uint32_t));
   for (j = 0; j < SHASH_NBUCKETS; j++)
     {
-      memset (T, 0, H->balloc * sizeof(uint32_t));
+      memset (T, 0, size * sizeof(uint32_t));
       Hj = H->i[j];
       for (k = 0; k < H->size[j]; k++)
         {
@@ -404,7 +407,7 @@ shash_find_collision (shash_t H)
               if (UNLIKELY(T[h] == v))
                 ret = 1;
               h ++;
-              if (UNLIKELY(h == H->balloc))
+              if (UNLIKELY(h == size))
                 h = 0;
             }
           T[h] = v;

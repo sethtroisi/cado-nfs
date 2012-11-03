@@ -29,7 +29,7 @@
 #include "ropt.h"
 #endif
 
-#define BATCH_SIZE 20 /* batch 10 special-q */
+#define BATCH_SIZE 20 /* number of special-q per batch */
 
 #define LQ_DEFAULT 1 /* default number of factors in special-q part */
 
@@ -978,7 +978,7 @@ collision_on_each_sq ( header_t header,
   int st = cputime();
 #endif
 
-  shash_init (H, INIT_FACTOR * lenPrimes);
+  shash_init (H, 4 * lenPrimes);
   umax = (int64_t) Primes[lenPrimes - 1] * (int64_t) Primes[lenPrimes - 1];
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++)
     {
