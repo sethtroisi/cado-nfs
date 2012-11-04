@@ -315,9 +315,9 @@ shash_init (shash_t H, unsigned int init_size)
 {
   int j;
 
-  init_size += init_size / 10; /* use 10% margin */
   /* round up to multiple of SHASH_NBUCKETS */
   init_size = 1 + (init_size - 1) / SHASH_NBUCKETS;
+  init_size += init_size / 10 + 32; /* use 10% margin */
   H->alloc = init_size * SHASH_NBUCKETS;
   H->mem = (uint64_t*) malloc (H->alloc * sizeof (uint64_t));
   if (H->mem == NULL)
@@ -372,6 +372,7 @@ shash_add (shash_t H, uint64_t i)
 
   j = i & (SHASH_NBUCKETS - 1);
   H->i[j][H->size[j]] = i;
+  ASSERT_ALWAYS(H->size[j] < H->balloc);
   H->size[j]++;
 }
 
