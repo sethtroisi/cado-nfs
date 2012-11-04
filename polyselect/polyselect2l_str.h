@@ -38,7 +38,7 @@ typedef struct
 } __hash_struct;
 typedef __hash_struct hash_t[1];
 
-#define SHASH_NBUCKETS 16 /* should be a power of two */
+#define SHASH_NBUCKETS 32 /* should be a power of two */
 
 typedef struct
 {
