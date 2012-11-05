@@ -878,6 +878,11 @@ collision_on_p ( header_t header,
   int64_t ppl = 0, u, umax;
   double pc1;
   mpz_t *f, tmp;
+  int found = 0;
+  shash_t H;
+#ifdef DEBUG_POLYSELECT2L
+  int st = cputime();
+#endif
 
   /* init f for roots computation */
   mpz_init_set_ui (tmp, 0);
@@ -896,54 +901,72 @@ collision_on_p ( header_t header,
     exit (1);
   }
 
-  hash_t H;
-
-  hash_init (H, INIT_FACTOR * lenPrimes);
-
-#ifdef DEBUG_POLYSELECT2L
-  int st = cputime();
-#endif
-
+  shash_init (H, 4 * lenPrimes);
   umax = (int64_t) Primes[lenPrimes - 1] * (int64_t) Primes[lenPrimes - 1];
-  for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
-    p = Primes[nprimes];
-    ppl = (int64_t) p;
-    ppl *= (int64_t) p;
+  for (nprimes = 0; nprimes < lenPrimes; nprimes ++)
+    {
+      p = Primes[nprimes];
+      ppl = (int64_t) p * (int64_t) p;
 
-    /* add faked roots to keep indices */
-    if ((header->d * header->ad) % p == 0) {
-      R->nr[nprimes] = 0; // nr = 0.
-      R->roots[nprimes] = NULL;
-      continue;
-    }
+      /* add fake roots to keep indices */
+      if ((header->d * header->ad) % p == 0)
+        {
+          R->nr[nprimes] = 0; // nr = 0.
+          R->roots[nprimes] = NULL;
+          continue;
+        }
 
-    /* we want p^2 | N - (m0 + i)^d, thus
-       (m0 + i)^d = N (mod p^2) or m0 + i = N^(1/d) mod p^2 */
-    mpz_mod_ui (f[0], header->Ntilde, p);
-    mpz_neg (f[0], f[0]); /* f = x^d - N */
-    nrp = poly_roots_uint64 (rp, f, header->d, p);
-    roots_lift (rp, header->Ntilde, header->d, header->m0, p, nrp);
-    proots_add (R, nrp, rp, nprimes);
-    for (j = 0; j < nrp; j++, c++) {
-      for (u = (int64_t) rp[j]; u < umax; u += ppl)
-        hash_add (H, p, u, header->m0, header->ad, header->d,
-                  header->N, 1, tmp);
-      for (u = ppl - (int64_t) rp[j]; u < umax; u += ppl)
-        hash_add (H, p, -u, header->m0, header->ad,
-                  header->d, header->N, 1, tmp);
-    }
-  }
+      mpz_mod_ui (f[0], header->Ntilde, p);
+      mpz_neg (f[0], f[0]); /* f = x^d - N */
+      nrp = poly_roots_uint64 (rp, f, header->d, p);
+      roots_lift (rp, header->Ntilde, header->d, header->m0, p, nrp);
+      proots_add (R, nrp, rp, nprimes);
+      for (j = 0; j < nrp; j++, c++)
+            {
+              for (u = (int64_t) rp[j]; u < umax; u += ppl)
+                shash_add (H, u);
+              for (u = ppl - (int64_t) rp[j]; u < umax; u += ppl)
+                shash_add (H, -u);
+            }
+        }
+  found = shash_find_collision (H);
+  shash_clear (H);
 
+  if (found) /* do the real work */
+    {
+      hash_t H;
+
+      hash_init (H, INIT_FACTOR * lenPrimes);
+      for (nprimes = 0; nprimes < lenPrimes; nprimes ++)
+        {
+          p = Primes[nprimes];
+          ppl = (int64_t) p * (int64_t) p;
+
+          if ((header->d * header->ad) % p == 0)
+            continue;
+
+          nrp = R->nr[nprimes];
+          for (j = 0; j < nrp; j++, c++)
+            {
+              for (u = (int64_t) rp[j]; u < umax; u += ppl)
+                hash_add (H, p, u, header->m0, header->ad, header->d,
+                          header->N, 1, tmp);
+              for (u = ppl - (int64_t) rp[j]; u < umax; u += ppl)
+                hash_add (H, p, -u, header->m0, header->ad,
+                          header->d, header->N, 1, tmp);
+            }
+        }
 #ifdef DEBUG_POLYSELECT2L
-  fprintf (stderr, "# collision_on_p took %dms\n", cputime () - st);
-  fprintf (stderr, "# p hash_size: %u for ad = %lu\n", H->size, header->ad);
+      fprintf (stderr, "# collision_on_p took %dms\n", cputime () - st);
+      fprintf (stderr, "# p hash_size: %u for ad = %lu\n", H->size, header->ad);
 #endif
 
 #ifdef DEBUG_HASH_TABLE
-  fprintf (stderr, "# p hash_size: %u, hash_alloc: %u\n", H->size, H->alloc);
-  fprintf (stderr, "# hash table coll: %lu, all_coll: %lu\n", H->coll, H->coll_all);
+      fprintf (stderr, "# p hash_size: %u, hash_alloc: %u\n", H->size, H->alloc);
+      fprintf (stderr, "# hash table coll: %lu, all_coll: %lu\n", H->coll, H->coll_all);
 #endif
-  hash_clear (H);
+      hash_clear (H);
+    }
 
   for (i = 0; i <= header->d; i++)
     mpz_clear (f[i]);
@@ -1459,10 +1482,9 @@ gmp_collision_on_p ( header_t header,
   umax = (int64_t) Primes[lenPrimes - 1] * (int64_t) Primes[lenPrimes - 1];
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
     p = Primes[nprimes];
-    ppl = (int64_t) p;
-    ppl *= (int64_t) p;
+    ppl = (int64_t) p * (int64_t) p;
 
-    /* add faked roots to keep indices */
+    /* add fake roots to keep indices */
     if ((header->d * header->ad) % p == 0) {
       R->nr[nprimes] = 0; // nr = 0.
       R->roots[nprimes] = NULL;
