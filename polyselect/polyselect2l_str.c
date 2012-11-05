@@ -314,10 +314,13 @@ void
 shash_init (shash_t H, unsigned int init_size)
 {
   int j;
+  unsigned int init_size0 = init_size;
 
   /* round up to multiple of SHASH_NBUCKETS */
   init_size = 1 + (init_size - 1) / SHASH_NBUCKETS;
-  init_size += init_size / 10 + 32; /* use 10% margin */
+  init_size += init_size / 10 + 64; /* use 10% margin */
+  if (init_size > init_size0)
+    init_size = init_size0;
   H->alloc = init_size * SHASH_NBUCKETS;
   H->mem = (uint64_t*) malloc (H->alloc * sizeof (uint64_t));
   if (H->mem == NULL)
