@@ -42,10 +42,14 @@
 #define NEW_DIR "new/"
 #define MAX_FILES_PER_THREAD 1
 #define MAX_STOCK_RAT_PER_LINE 16
-#define MAX_STOCK_ALG_PER_LINE 32
+#define MAX_STOCK_ALG_PER_LINE 24
 #define MAXNAME 1024
 #define MAX_THREADS 128
 #define PR_TYPE uint32_t
+#define MAXLINE 1024
+
+#define LIKELY(X)    __builtin_expect((X), 1)
+#define UNLIKELY(X)  __builtin_expect((X), 0)
 
 /* thread structure */
 typedef struct
@@ -67,6 +71,24 @@ typedef union
   int64_t pointer; /* h+1 if points to H2[h] */
 } tab2_t;
 
+/* Mix of hashtable, (p,r) array, and weight, to optimize Lx caches :
+   200 bytes with LN2BPRHWP = 4.
+   So, when (p,r) is found, h has ~80% to be in the same L0 cache line
+   and 99.9% to be in the same 16K page (so, less TLB miss and so on).
+   CAREFUL: __prhwp_struct must be compact and h type must encode exactly
+   BPRHWP entries. The procedures stat and one_thread3 hardcode the
+   lenght of h (uint64_t). So don't change LN2BPRHWP.
+*/
+#define LN2BPRHWP 4
+#define BPRHWP (1U<<LN2BPRHWP)
+typedef struct
+{
+  PR_TYPE  pr[BPRHWP]; /* BPRHWP (p,r) of 32 bits */
+  uint64_t h;          /* entries of 4 bits : WARNING: hardcoded type! */
+  tab2_t   wp[BPRHWP]; /* BPRHWP weight/pointeur of 64 bits */
+} __prhwp_struct /* __attribute__ ((__packed__)) */ ;
+__prhwp_struct *prhwp;
+
 struct suffix_handler {
     const char * suffix;
     const char * pfmt_in;
@@ -87,12 +109,12 @@ pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER; /* mutual exclusion lock */
 #endif
 long wct0;
 
-uint64_t M = 0, minpa = 0, minpr = 0, Hsize, *H, nrels, remains;
-PR_TYPE *PR;
+uint64_t M = 0, minpa = 0, minpr = 0, Hsize, nrels, remains;
+PR_TYPE *maxpr;
 uint64_t target = 0;
-tab2_t *H2;
 double threshold_weight = 999.0;
 sem_t sem_pt;
+
 
 static const unsigned char ugly[256] = {
   255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
@@ -276,19 +298,46 @@ void gzip_close(FILE * f, const char * name)
 static inline uint64_t
 index_hash (uint64_t pr)
 {
-  PR_TYPE *prh;
+  PR_TYPE *prh, *prm, mpr;
 
-  prh = PR + (pr % M);
-  while (1) {
-    if (*prh == (PR_TYPE) pr)
-      return (prh - PR);
-    if (!(*prh)) {
-      *prh = (PR_TYPE) pr;
-      return (prh - PR);
-    }
-    if (++prh == PR + M)
-      prh = PR;
+  mpr = (PR_TYPE) pr;
+  pr %= M;
+  prm = prhwp[pr >> LN2BPRHWP].pr;
+  prh = prm + (pr & (BPRHWP-1));
+  
+  /* Fastest & most common procedure: hash[pr] == pr or hash[pr] == 0 */
+  if (*prh == mpr)
+    return pr;
+  if (!(*prh)) {
+    *prh = mpr;
+    return pr;
   }
+  
+  prh++;
+  pr++;
+  prm += BPRHWP;
+  if (prm > maxpr) prm = maxpr;
+  for (;;) {
+    if (UNLIKELY(prh == prm)) {
+      if (LIKELY(prm != maxpr)) {
+	prm = (PR_TYPE *) ((void *) prm + sizeof(*prhwp));
+	prh = prm - BPRHWP;
+      } else {
+	pr = 0;
+	prh = prhwp[0].pr;
+	prm = prh + BPRHWP;
+      }
+    }
+    if (*prh == mpr)
+      return pr;
+    if (!(*prh)) {
+      *prh = mpr;
+      return pr;
+    }
+    prh++;
+    pr++;
+  }
+  return pr;
 }
 
 #define INDEX_RAT(P) (index_hash ((P) + 1)) /* even for even M */
@@ -298,114 +347,88 @@ index_rat (uint64_t p)
   return INDEX_RAT(p);
 }
 
-#define INDEX_ALG(P,R) (index_hash ((P)+ (M - 2) * (R)))  /* always odd for odd p and even M */
+#define INDEX_ALG(P,R) (index_hash ((P) + (M - 2) * (R)))  /* always odd for odd p and even M */
 static inline uint64_t
 index_alg (uint64_t p, uint64_t r)
 {
   return INDEX_ALG(p,r);
 }
 
-#define WEIGHT(P) ((H[(P)>>4] >> (((P)&15)<<2)) & 15)
-static inline uint64_t
+#define WEIGHT(P) ((prhwp[(P) >> LN2BPRHWP].h >> (((P)&(BPRHWP-1)) << 2)) & (BPRHWP-1))
+static inline uint8_t
 weight (uint64_t h)
 {
-  return WEIGHT(h);
+  return (uint8_t) WEIGHT(h);
 }
 
 static void
 insert (uint64_t h)
 {
-  uint8_t *hh, d, m, a;
-  assert (h < M);
-  hh = ((uint8_t*) H) + (h >> 1);
-  d = (h & 1) << 2;
-  m = 15 << d;
-  a = 1 << d;
-  if ((*hh & m) != m) *hh += a;
+  uint8_t *hh;
+  hh = ((uint8_t *) &(prhwp[h >> LN2BPRHWP].h)) + ((h & (BPRHWP-1)) >> 1);
+  if (h & 1) {
+    if ((*hh & 0xf0) != 0xf0) *hh += 0x10;
+  } else
+    if ((*hh & 0x0f) != 0x0f) *hh += 0x01;
 }
 
 static void
 delete (uint64_t h)
 {
-  uint8_t *hh, d, m, a, v;
-  assert (h < M);
+  uint8_t *hh, v;
   static int count = 0;
 
-  hh = ((uint8_t*) H) + (h >> 1);
-  d = (h & 1) << 2;
-  m = 15 << d;
-  a = 1 << d;
-  v = *hh & m;
-  if (!v)
-    {
-      if (count++ < 10)
-        {
-          fprintf (stderr, "Warning: deleting weight-0 ideal 0 at h=%lu\n", h);
-        }
-    }
-  else
-    if (v != m)
-      *hh -= a; /* remove 1 to bit 4s */
+  hh = ((uint8_t *) &(prhwp[h >> LN2BPRHWP].h)) + ((h & (BPRHWP-1)) >> 1);
+  if (h & 1) {
+    v = *hh & 0xf0;
+    if (v) {
+      if (v != 0xf0) *hh -= 0x10;
+    } else
+      if (count++ < 10) fprintf (stderr, "Warning: deleting weight-0 ideal 0 at h=%lu\n", h);
+  } else {
+    v = *hh & 0x0f;
+    if (v) {
+      if (v != 0x0f) *hh -= 0x01;
+    } else
+      if (count++ < 10) fprintf (stderr, "Warning: deleting weight-0 ideal 0 at h=%lu\n", h);
+  }
 }
 
 static double
 clique_weight (uint64_t h)
 {
-  while (H2[h].pointer > 0)
-    h = H2[h].pointer - 1;
-  return -H2[h].weight;
+  tab2_t *pw;
+  
+  for (;;) {
+    pw = prhwp[h >> LN2BPRHWP].wp + (h & (BPRHWP-1));
+    if (pw->pointer <= 0) return -(pw->weight);
+    h = pw->pointer - 1;
+  }
 }
 
-#if 0
-/* Warning: recursive procedure calls might explose the stack */
 static double
 propagate_weight (uint64_t h)
 {
-  if (H2[h].pointer > 0)
-    H2[h].weight = propagate_weight (H2[h].pointer - 1);
-  return H2[h].weight;
-}
-#else
-static void
-propagate_weight ()
-{
-  tab2_t *cH;
-  tab2_t **pro_wgt = NULL, **ppro_wgt = NULL, **max_pro_wgt = NULL;
-  uint64_t nb_pro_wgt, h;
+  tab2_t *pw;
 
-  for (cH = H2; cH < H2 + M; cH++)
-    if (cH->pointer > 0) {
-      h = cH - H2;
-      do {
-	if (ppro_wgt >= max_pro_wgt) {
-	  if (!ppro_wgt) {
-	    nb_pro_wgt = 512;
-	    ppro_wgt = pro_wgt = malloc(nb_pro_wgt * sizeof(*pro_wgt));
-	  }
-	  else {
-	    nb_pro_wgt <<= 1;
-	    pro_wgt = realloc(pro_wgt, nb_pro_wgt * sizeof(*pro_wgt));
-	  }
-	  max_pro_wgt = &(pro_wgt[nb_pro_wgt]);
-	}
-	*ppro_wgt++ = &(H2[h]);
-	h = H2[h].pointer - 1;
-      } while (H2[h].pointer > 0);
-      while (ppro_wgt > pro_wgt)
-	(*--ppro_wgt)->weight = H2[h].weight;
-    }
-  if (pro_wgt)
-    free(pro_wgt);
+  pw = prhwp[h >> LN2BPRHWP].wp + (h & (BPRHWP-1));
+  if (pw->pointer > 0)
+    pw->weight = propagate_weight (pw->pointer - 1);
+  return pw->weight;
 }
-#endif
 
 /* adds the weight w to the connected component of H2[h] */
 static uint64_t
 insert2 (uint64_t h, double w)
 {
-  while (H2[h].pointer > 0)
-    h = H2[h].pointer - 1;
-  H2[h].weight -= w;
+  tab2_t *pw;
+
+  for (;;) {
+    pw = prhwp[h >> LN2BPRHWP].wp + (h & (BPRHWP-1));
+    if (pw->pointer <= 0) break;
+    h = pw->pointer - 1;
+  }
+  pw->weight -= w;
   return h;
 }
 
@@ -414,18 +437,21 @@ insert2 (uint64_t h, double w)
 static void
 insert2a (uint64_t h, uint64_t h0)
 {
-  double w0, w;
+  double *w0;
+  tab2_t *pw;
 
-  while (H2[h].pointer > 0)
-    h = H2[h].pointer - 1;
+  for (;;) {
+    pw = prhwp[h >> LN2BPRHWP].wp + (h & (BPRHWP-1));
+    if (pw->pointer <= 0) break;
+    h = pw->pointer - 1;
+  }
   if (h == h0) /* already connected */
     return;
-  w0 = H2[h0].weight;
-  w = H2[h].weight;
-  if (w0 > 0 || w > 0)
+  w0 = &(prhwp[h0 >> LN2BPRHWP].wp[h0 & (BPRHWP-1)].weight);
+  if (*w0 > 0 || pw->weight > 0)
     return; /* avoid an assert which might fail */
-  H2[h0].weight = w0 + w;
-  H2[h].pointer = h0 + 1;
+  *w0 += pw->weight;
+  pw->pointer = h0 + 1;
 }
 
 #define SAMPLE 1000       /* number of intervals for component weight */
@@ -440,17 +466,17 @@ stat2 ()
 
   memset(count, 0, sizeof(*count) * (SAMPLE + 1));
   for (h = 0; h < M; h++)
-    if (H2[h].weight < 0)
+    if ((w = prhwp[h >> LN2BPRHWP].wp[h & (BPRHWP-1)].weight) < 0)
       {
-        nc ++;
-        w = -H2[h].weight;
+	w = -w;
+        nc++;
         wsum += w;
         if (w > wmax)
           wmax = w;
         n = (uint64_t) (RESOLUTION * w);
         if (n >= SAMPLE)
           n = SAMPLE - 1;
-        count[n] ++;
+        count[n]++;
       }
   fprintf (stderr,
 	   "Number of connected components: %lu\n"
@@ -472,7 +498,7 @@ stat2 ()
 }
 
 /* return a*b mod p, assuming p < 2^40 */
-uint64_t
+static inline uint64_t
 mulmod (uint64_t a, uint64_t b, uint64_t p)
 {
   uint64_t r;
@@ -486,7 +512,7 @@ mulmod (uint64_t a, uint64_t b, uint64_t p)
 }
 
 /* return a/b mod p */
-static unsigned long
+static inline unsigned long
 root (long a0, long b0, long p)
 {
   long u, w, q, r, t, a, b;
@@ -516,18 +542,18 @@ root (long a0, long b0, long p)
 void*
 pass1_one_thread (void* args)
 {
+  char s[MAXLINE], *t;
   tab_t *tab = (tab_t*) args;
   FILE *f;
-  char s[1024], *t;
+  uint64_t p, p2;
   unsigned long line, b, r;
   long a;
-  uint64_t p, p2;
   uint8_t m;
   
   f = (tab[0]->fin) ? tab[0]->fin : gzip_open(tab[0]->g, "r");
   assert (f);
   line = 0;
-  while (fgets (s, 1024, f)) {
+  while (fgets (s, MAXLINE, f)) {
     line++;
     t = s;
     if (*t != '-')
@@ -540,31 +566,33 @@ pass1_one_thread (void* args)
     a *= p;
     assert (a != 0);
     assert (*t == ',');
-    t ++;
+    t++;
     for (b = 0; (m = ugly[*((uint8_t *) t)]) != 255; t++, b = b * 10 + m);
     assert (*t == ':');
-    t ++;
     do {
+      t++;
       for (p = 0; (m = ugly[*((uint8_t *) t)]) != 255; t++, p = (p << 4) + m);
       if (p >= minpr) {
 	insert (INDEX_RAT (p));
       }
-    } while (*t++ == ',');
+    } while (*t == ',');
     if (b) {
       do {
+	t++;
 	for (p = 0; (m = ugly[*((uint8_t *) t)]) != 255; t++, p = (p << 4) + m);
 	if (p >= minpa) {
 	  r = root (a, b, p);
 	  insert (INDEX_ALG (p, r));
 	}
-      } while (*t++ == ',');
-    }
+      } while (*t == ',');
+    } 
     else
       if (p >= minpa)
 	do {
+	  t++;
 	  for (p2 = 0; (m = ugly[*((uint8_t *) t)]) != 255; t++, p2 = (p2 << 4) + m);
 	  insert (INDEX_ALG (p, p2));
-	} while (*t++ == ',');
+	} while (*t == ',');
   }
   tab[0]->nlines = line;
   tab[0]->busy = 1;
@@ -577,22 +605,22 @@ pass1_one_thread (void* args)
 void*
 pass2_one_thread (void *args)
 {
-  tab_t *tab = (tab_t*) args;
   uint64_t rp[MAX_STOCK_RAT_PER_LINE], ap[MAX_STOCK_ALG_PER_LINE], ar[MAX_STOCK_ALG_PER_LINE];
-  char s[1024], *t;
+  char s[MAXLINE], *t;
+  tab_t *tab = (tab_t*) args;
   FILE *f;
+  uint64_t p, p2, i, h;
+  double W;
   unsigned long line, output, b, r;
   long a;
-  uint64_t p, p2, i, w, h;
-  double W;
   unsigned int nr, na;
-  uint8_t m;
+  uint8_t m, w;
 
   f = (tab[0]->fin) ? tab[0]->fin : gzip_open(tab[0]->g, "r");
   line = output = 0;
  next_line:
-  while (fgets (s, 1024, f)) {
-    line ++;
+  while (fgets (s, MAXLINE, f)) {
+    line++;
     t = s;
     if (*t != '-')
       a = 1;
@@ -602,12 +630,12 @@ pass2_one_thread (void *args)
     }
     for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p = p * 10 + m);
     a *= p;
-    t ++;
+    t++;
     for (b = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, b = b * 10 + m);
-    t ++;
     nr = na = 0;
     W = 0.0;
     do {
+      t++;
       for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p = (p << 4) + m);
       if (p >= minpr) {
 	i = INDEX_RAT(p);
@@ -618,9 +646,10 @@ pass2_one_thread (void *args)
 	else
 	  W += 1.0 / (double) w;
       }
-    } while (*t++ == ',');
+    } while (*t == ',');
     if (b)
       do {
+	t++;
 	for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p = (p << 4) + m);
 	if (p >= minpa) {
 	  r = root (a, b, p);
@@ -633,10 +662,11 @@ pass2_one_thread (void *args)
 	  } else
 	    W += 1.0 / (double) w;
 	}
-      } while (*t++ == ',');
+      } while (*t == ',');
     else
       if (p >= minpa)
 	do {
+	  t++;
 	  for (p2 = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p2 = (p2 << 4) + m);
 	  i = INDEX_ALG (p, p2);
 	  w = WEIGHT (i);
@@ -646,7 +676,7 @@ pass2_one_thread (void *args)
 	    ar[na++] = p2;
 	  } else
 	    W += 1.0 / (double) w;
-	} while (*t++ == ',');
+	} while (*t == ',');
     output++;
     /* Warning: it can be that an ideal appears twice (or more).
        To avoid reducing exponents mod 2, which would be expensive,
@@ -681,13 +711,13 @@ pass2_one_thread (void *args)
 void*
 pass3_one_thread (void* args)
 {
-  tab_t *tab = (tab_t*) args;
   uint64_t rp[MAX_STOCK_RAT_PER_LINE], ap[MAX_STOCK_ALG_PER_LINE], ar[MAX_STOCK_ALG_PER_LINE];
-  char s[1024], newg[MAXNAME<<1], *t;
+  char s[MAXLINE], newg[MAXNAME<<1], *t;
+  tab_t *tab = (tab_t*) args;
   FILE *f, *newf;
+  uint64_t p, p2, w, h;
   unsigned long line = 0, b, r, output = 0;
   long a;
-  uint64_t p, p2, w, h;
   unsigned int nr, na;
   uint8_t m;
 
@@ -708,8 +738,8 @@ pass3_one_thread (void* args)
     while (na-- > 0)
       delete (INDEX_ALG (ap[na], ar[na]));
   }
-  while (fgets (s, 1024, f)) {
-    line ++;
+  while (fgets (s, MAXLINE, f)) {
+    line++;
     t = s;
     if (*t != '-')
       a = 1;
@@ -719,11 +749,11 @@ pass3_one_thread (void* args)
     }
     for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p = p * 10 + m);
     a *= p;
-    t ++;
+    t++;
     for (b = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, b = b * 10 + m);
-    t ++;
     nr = na = 0;
     do {
+      t++;
       for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p = (p << 4) + m);
       if (p >= minpr) {
 	rp[nr++] = p;
@@ -732,9 +762,10 @@ pass3_one_thread (void* args)
 	if (w < 2 || ((w == 2) && (clique_weight (h) >= threshold_weight)))
 	  goto next_line;
       }
-    } while (*t++ == ',');
+    } while (*t == ',');
     if (b)
       do {
+	t++;
 	for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p = (p << 4) + m);
 	if (p >= minpa) {
 	  r = root (a, b, p);
@@ -745,10 +776,11 @@ pass3_one_thread (void* args)
 	  if (w < 2 || ((w == 2) && (clique_weight (h) >= threshold_weight)))
 	    goto next_line;
 	}
-      } while (*t++ == ',');
+      } while (*t == ',');
     else
       if (p >= minpa)
 	do {
+	  t++;
 	  for (p2 = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p2 = (p2 << 4) + m);
 	  ap[na] = p;
 	  ar[na++] = p2;
@@ -756,9 +788,9 @@ pass3_one_thread (void* args)
 	  w = WEIGHT (h);
 	  if (w < 2 || ((w == 2) && (clique_weight (h) >= threshold_weight)))
 	    goto next_line;
-	} while (*t++ == ',');
+	} while (*t == ',');
     fputs (s, newf);
-    output ++;
+    output++;
   }
   gzip_close (f, tab[0]->g);
   gzip_close (newf, tab[0]->g);
@@ -785,11 +817,13 @@ one_thread3 (void* args)
   uint64_t *hd, *he, h, wt[16];
 
   memset (wt, 0, sizeof(*wt) * 16);
-  hd = &(H[(tab[0]->thread * Hsize) / tab[0]->nthreads]);
-  he = &(H[((tab[0]->thread + 1) * Hsize) / tab[0]->nthreads]);
+  hd = &(prhwp[(tab[0]->thread * Hsize) / tab[0]->nthreads].h);
+  he = &(prhwp[((tab[0]->thread + 1) * Hsize) / tab[0]->nthreads].h);
   while (hd < he)
     {  /* deal with 64 bits, i.e., 16 entries at a time */
-      h = *hd++;
+      h = *hd;
+      hd = (uint64_t *) ((void *) hd + sizeof(*prhwp));
+      __builtin_prefetch(hd);
       while (h)
         {
           wt[h & 0xf] ++;
@@ -833,9 +867,11 @@ stat () {
   pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS,&dum);
   /* pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED,&dum); */
   memset (wt, 0, sizeof(*wt) * 16);
-  for (hd = H, he = H + Hsize; hd < he; )
+  for (hd = &(prhwp[0].h), he = &(prhwp[Hsize].h); hd < he; )
     {  /* deal with 64 bits, i.e., 16 entries at a time */
-      h = *hd++;
+      h = *hd;
+      hd = (uint64_t *) ((void *) hd + sizeof(*prhwp));
+      __builtin_prefetch(hd);
       while (h)
         {
           wt[h & 0xf] ++;
@@ -912,11 +948,10 @@ pass1 (int nthreads, char *filelist)
 	   "* PASS 1/3 *\n"
 	   "************\n\n");
   f = fopen (filelist, "r");
-  if (f == NULL)
-    {
-      fprintf (stderr, "Error, cannot open %s\n", filelist);
-      exit (1);
-    }
+  if (f == NULL) {
+    fprintf (stderr, "Error, cannot open %s\n", filelist);
+    exit (1);
+  }
   T = malloc ((nthreads + 1) * sizeof (tab_t));
   memset(T, 0, (nthreads + 1) * sizeof (tab_t));
   sem_init(&sem_pt, 0, nthreads);
@@ -1003,11 +1038,12 @@ pass2 (int nthreads, char *filelist)
 {
   FILE *f;
   char g[ARG_MAX], *pg;
-  int i, j = 0, notload, nbt = 0, nbf, avoidwarning = 0;
   tab_t *T;
   pthread_t tid[MAX_THREADS+1];
   double st = cputime(), rt = realtime(), art;
   size_t lpg;
+  uint64_t h;
+  int i, j = 0, notload, nbt = 0, nbf, avoidwarning = 0;
 
   fprintf (stderr, "\n"
 	   "************\n"
@@ -1084,15 +1120,8 @@ pass2 (int nthreads, char *filelist)
   free (T);
   stat2 ();
   /* propagate weights to speed up clique_weight */
-#if 0
-  {
-    uint64_t h;
-    for (h = 0; h < M; h++)
-      propagate_weight (h);
-  }
-#else
-  propagate_weight ();
-#endif
+  for (h = 0; h < M; h++)
+    propagate_weight (h);
   fprintf (stderr, "\n"
 	   "*****************\n"
 	   "* PASS 2/3 DONE *\n"
@@ -1295,19 +1324,16 @@ main (int argc, char *argv[])
   /* check that M = 2p where p is prime */
   assert (!(M & 1));
   assert (isprime (M>>1));
-
-  Hsize = 1 + ((M - 1) >> 4); /* each entry uses 4 bits */
-
-  size_malloc = Hsize * sizeof (*H);
-  fprintf (stderr, "Creating & clearing hashtable: %lu mB...", size_malloc >> 20);
-  H = malloc (size_malloc);
-  memset (H, 0, size_malloc);
+  /* an *hpr stocks 16 entries. */
+  Hsize = (M + BPRHWP-1) >> LN2BPRHWP; /* each entry uses 4 bits AND h is uint64_t */
+  size_malloc = Hsize * sizeof (*prhwp);
+  fprintf (stderr, "Creating & clearing hashtable + (p,r) array + weight array : %lu mB...", size_malloc >> 20);
+  if (posix_memalign ((void **) &prhwp, 1<<14, size_malloc)) {
+    fprintf (stderr, "Malloc error.\n");
+    exit (1);
+  }
+  memset (prhwp, 0, size_malloc);
   fprintf (stderr, " Done. \n");
-  size_malloc = M * sizeof (*PR);
-  fprintf (stderr, "Creating & clearing (p,r) array: %lu mB (%lu bits per entry)...", size_malloc >> 20, sizeof(PR_TYPE) * CHAR_BIT);
-  PR = malloc (size_malloc);
-  memset (PR, 0, size_malloc);
-  fprintf (stderr, " Done.\n");
   fprintf (stderr, "Creating possible " NEW_DIR "* directories...");
   create_directories(filelist);
   fprintf (stderr, " Done.\n");
@@ -1315,15 +1341,10 @@ main (int argc, char *argv[])
   fprintf (stderr, "Each thread processing %d file(s)\n",
            MAX_FILES_PER_THREAD);
 
+  maxpr = prhwp[M>>LN2BPRHWP].pr + (M&(BPRHWP-1));
   wct0 = realtime ();
   nrels = 0;
   pass1 (nthreads, filelist);
-
-  size_malloc = M * sizeof (*H2);
-  fprintf (stderr, "Creating & clearing weight primes array: %lu mB...", size_malloc >> 20);
-  H2 = malloc (size_malloc);
-  memset (H2, 0, size_malloc);
-  fprintf (stderr, " Done.\n");
 
   nrels = remains = 0;
   pass2 (nthreads, filelist);
@@ -1331,9 +1352,7 @@ main (int argc, char *argv[])
   nrels = remains = 0;
   pass3 (nthreads, filelist);
 
-  free (H);
-  free (H2);
-  free (PR);
+  free (prhwp);
 
   return 0;
 }
