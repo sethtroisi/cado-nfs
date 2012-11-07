@@ -946,7 +946,8 @@ collision_on_p ( header_t header,
             continue;
 
           nrp = R->nr[nprimes];
-          for (j = 0; j < nrp; j++, c++)
+          rp = R->roots[nprimes];
+          for (j = 0; j < nrp; j++)
             {
               for (u = (int64_t) rp[j]; u < umax; u += ppl)
                 hash_add (H, p, u, header->m0, header->ad, header->d,
