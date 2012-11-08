@@ -46,13 +46,19 @@ typedef struct
 } __hash_struct;
 typedef __hash_struct hash_t[1];
 
-#define SHASH_NBUCKETS 32 /* should be a power of two */
+#define LN2SHASH_NBUCKETS 9
+#define SHASH_NBUCKETS (1<<LN2SHASH_NBUCKETS)
+
+typedef struct
+{
+  uint64_t *base, *current;
+} __shash_tab_struct;
+typedef __shash_tab_struct shash_tab_t;
 
 typedef struct
 {
   uint64_t *mem;
-  uint64_t *(i[SHASH_NBUCKETS]);
-  uint64_t size[SHASH_NBUCKETS];
+  shash_tab_t tab[SHASH_NBUCKETS+1]; /* +1 for guard */
   uint32_t alloc;      /* total allocated size */
   uint32_t balloc;     /* allocated size for each bucket */
   uint32_t mask;       /* alloc - 1 */
@@ -105,11 +111,16 @@ typedef _header_struct header_t[1];
 INLINE void
 shash_add (shash_t H, uint64_t i)
 {
-  int j;
+  unsigned int j;
+  uint64_t **cur;
+
   j = i & (SHASH_NBUCKETS - 1);
-  H->i[j][H->size[j]] = i;
-  ASSERT_ALWAYS(H->size[j] < H->balloc);
-  H->size[j]++;
+  cur = &(H->tab[j].current);
+  *(*cur)++ = i;
+  if (*cur >= *(cur+1)) {
+    fprintf (stderr, "A Shash bucket is full.\n");
+    exit (1);
+  }
 }
 
 /* declarations */

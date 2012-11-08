@@ -323,16 +323,16 @@ shash_init (shash_t H, unsigned int init_size)
     init_size = init_size0;
   H->alloc = init_size * SHASH_NBUCKETS;
   H->mem = (uint64_t*) malloc (H->alloc * sizeof (uint64_t));
-  if (H->mem == NULL)
+  if (!H->mem)
     {
       fprintf (stderr, "Error, cannot allocate memory in shash_init\n");
       exit (1);
     }
   H->balloc = init_size;
-  for (j = 0; j < SHASH_NBUCKETS; j++)
+  H->tab[0].base = H->tab[0].current = H->mem;
+  for (j = 1; j <= SHASH_NBUCKETS; j++)
     {
-      H->i[j] = H->mem + j * H->balloc;
-      H->size[j] = 0;
+      H->tab[j].base = H->tab[j].current = H->tab[j-1].base + H->balloc;
     }
 }
 
@@ -372,42 +372,50 @@ hash_add (hash_t H, unsigned long p, int64_t i, mpz_t m0, uint64_t ad,
 int
 shash_find_collision (shash_t H)
 {
-  int ret = 0;
-  unsigned int j, k;
-  uint32_t *T, h, v, size, mask;
-  uint64_t i, *Hj;
-  
-  size = H->balloc +  H->balloc / 2;
-  /* round up to power of 2 */
-  size --;
-  while (size & (size - 1))
-    size &= size - 1;
-  size <<= 1;
-  ASSERT_ALWAYS((size & (size - 1)) == 0);
-  mask = size - 1;
-  T = (uint32_t*) malloc (size * sizeof(uint32_t));
-  for (j = 0; j < SHASH_NBUCKETS; j++)
-    {
-      memset (T, 0, size * sizeof(uint32_t));
-      Hj = H->i[j];
-      for (k = 0; k < H->size[j]; k++)
-        {
-          i = Hj[k];
-          h = i & mask;
-          v = (uint32_t) (i + (i >> 32));
-          while (T[h] != 0)
-            {
-              if (UNLIKELY(T[h] == v))
-                ret = 1;
-              h ++;
-              if (UNLIKELY(h == size))
-                h = 0;
-            }
-          T[h] = v;
-        }
+  shash_tab_t *ptab;
+  uint64_t *Hj, *Hjm, i;
+  uint64_t *T, *Th, *Tend;
+  unsigned int j;
+  static uint32_t size = 0, mask;
+
+  if (!size) {
+    size = H->balloc + (H->balloc >> 1);
+    /* round up to power of 2 */
+    size --;
+    while (size & (size - 1))
+      size &= size - 1;
+    size <<= 1;
+    ASSERT_ALWAYS((size & (size - 1)) == 0);
+    mask = size - 1;
+  }
+  T = (uint64_t*) malloc (size * sizeof(*T));
+  Tend = T + size;
+  ptab = H->tab;
+  j = SHASH_NBUCKETS;
+  while (j--) {
+    memset (T, 0, size * sizeof(uint64_t));
+    Hj = ptab->base;
+    Hjm = (ptab++)->current;
+    while (LIKELY(Hj != Hjm)) {
+      i = *Hj++;
+      Th = T + ((i >> LN2SHASH_NBUCKETS) & mask);
+      if (LIKELY(!*Th))
+	*Th = i;
+      else
+	do {
+	  if (UNLIKELY(*Th == i)) {
+	    free (T);
+	    return 1;
+	  }
+	  Th++;
+	  if (UNLIKELY(Th == Tend))
+	    Th = T;
+	} while (UNLIKELY(*Th));
+      *Th = i;
     }
+  }
   free (T);
-  return ret;
+  return 0;
 }
 
 /* rq is a root of N = (m0 + rq)^d mod (q^2) */
@@ -480,7 +488,6 @@ hash_grow (hash_t H)
   free (old_slot);
   mpz_clear (tmp);
 }
-
 
 #if 0
 double

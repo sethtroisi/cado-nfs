@@ -162,9 +162,9 @@ print_poly_info ( mpz_t *f,
 static double
 expected_collisions (uint32_t twoP)
 {
-  return 8.0 * 0.5 * pow ((double) lenPrimes / (double) twoP, 2.0);
+  double m = (lenPrimes << 1) / (double) twoP;
+  return m * m;
 }
-
 
 /* rq is a root of N = (m0 + rq)^d mod (q^2) */
 void
@@ -978,7 +978,7 @@ collision_on_p ( header_t header,
   free (f);
   mpz_clear (tmp);
 
-  pc1 = expected_collisions (Primes[nprimes - 1]);
+  pc1 = expected_collisions (Primes[lenPrimes - 1]);
   pthread_mutex_lock (&lock);
   potential_collisions += pc1;
   pthread_mutex_unlock (&lock);
@@ -994,39 +994,61 @@ collision_on_each_sq ( header_t header,
                        mpz_t rqqz,
                        unsigned long *inv_qq )
 {
-  unsigned int nr, j;
-  unsigned long nprimes, p, c = 0;
-  uint64_t pp;
-  int64_t ppl, u, umax, v;
-  double pc2;
-  int found;
   shash_t H;
+  shash_tab_t *ptab;
+  uint64_t **cur;
+  uint32_t *pPrimes;
+  unsigned int *pnr;
+  double pc2;
+  uint64_t had_ha, pp;
+  int64_t ppl, u, umax, neg_umax, v;
+  unsigned long nprimes = 0, p, c;
+  long *pc, *pcnr;
+  unsigned int nr, k, j;
+  int found;
 #ifdef DEBUG_POLYSELECT2L
   int st = cputime();
 #endif
-
+  
   shash_init (H, 4 * lenPrimes);
-  umax = (int64_t) Primes[lenPrimes - 1] * (int64_t) Primes[lenPrimes - 1];
-  for (nprimes = 0; nprimes < lenPrimes; nprimes ++)
-    {
-      p = Primes[nprimes];
-      if ((header->d * header->ad) % p == 0)
-        continue;
-      pp = p * p;
-      ppl = (long) pp;
-      nr = R->nr[nprimes];
-      for (j = 0; j < nr; j++, c++)
-        {
-          u = (long) inv_qq[c];
-          for (v = u; v < umax; v += ppl)
-            shash_add (H, v);
-          for (v = ppl - u; v < umax; v += ppl)
-            shash_add (H, -v);
-        }
+  umax = (int64_t) Primes[lenPrimes - 1];
+  umax *= umax;
+  neg_umax = -umax;
+  pc = (long *) inv_qq;
+  pPrimes = Primes;
+  pnr = R->nr;
+  had_ha = header->d * header->ad;
+  ptab = H->tab;
+  while (pPrimes != Primes + lenPrimes) {
+    p = *pPrimes++;
+    if (!(had_ha % p))
+      continue;
+    ppl = (long) (p * p);
+    pcnr = pc + *pnr++;
+    while (pc != pcnr) {
+      u = *pc++;
+      for (v = u; v < umax; v += ppl) {
+	k = v & (SHASH_NBUCKETS - 1);
+	cur = &(ptab[k].current);
+	*(*cur)++ = v;
+	if (UNLIKELY(*cur >= *(cur + 1))) {
+	  fprintf (stderr, "A Shash bucket is full.\n");
+	  exit (1);
+	}
+      }
+      for (v = u - ppl; v > neg_umax; v -= ppl) {
+	k = v & (SHASH_NBUCKETS - 1);
+	cur = &(ptab[k].current);
+	*(*cur)++ = v;
+	if (UNLIKELY(*cur >= *(cur + 1))) {
+	  fprintf (stderr, "A Shash bucket is full.\n");
+	  exit (1);
+	}
+      }
     }
+  }
   found = shash_find_collision (H);
   shash_clear (H);
-
   if (found) /* do the real work */
     {
       hash_t H;
@@ -1066,7 +1088,7 @@ collision_on_each_sq ( header_t header,
   fprintf (stderr, "# hash table coll: %lu, all_coll: %lu\n", H->coll, H->coll_all);
 #endif
 
-  pc2 = expected_collisions (Primes[nprimes - 1]);
+  pc2 = expected_collisions (Primes[lenPrimes - 1]);
   pthread_mutex_lock (&lock);
   potential_collisions += pc2;
   pthread_mutex_unlock (&lock);
@@ -1525,7 +1547,7 @@ gmp_collision_on_p ( header_t header,
   free (rp);
   mpz_clear (tmp);
 
-  pc1 = expected_collisions (Primes[nprimes - 1]);
+  pc1 = expected_collisions (Primes[lenPrimes - 1]);
   pthread_mutex_lock (&lock);
   potential_collisions += pc1;
   pthread_mutex_unlock (&lock);
@@ -1590,7 +1612,7 @@ gmp_collision_on_each_sq ( header_t header,
 
   hash_clear (H);
 
-  pc2 = expected_collisions (Primes[nprimes - 1]);
+  pc2 = expected_collisions (Primes[lenPrimes - 1]);
   pthread_mutex_lock (&lock);
   potential_collisions += pc2;
   pthread_mutex_unlock (&lock);
