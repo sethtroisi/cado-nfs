@@ -931,6 +931,7 @@ collision_on_p ( header_t header,
         }
   found = shash_find_collision (H);
   shash_clear (H);
+  free (rp);
 
   if (found) /* do the real work */
     {
@@ -972,7 +973,6 @@ collision_on_p ( header_t header,
   for (i = 0; i <= header->d; i++)
     mpz_clear (f[i]);
   free (f);
-  free (rp);
   mpz_clear (tmp);
 
   pc1 = expected_collisions (Primes[nprimes - 1]);
@@ -1821,7 +1821,7 @@ newAlgo (mpz_t N, unsigned long d, uint64_t ad)
   }
   else {
     c = gmp_collision_on_p (header, R);
-    gmp_collision_on_sq (header,R, c);
+    gmp_collision_on_sq (header, R, c);
   }
 
   proots_clear (R, lenPrimes);
