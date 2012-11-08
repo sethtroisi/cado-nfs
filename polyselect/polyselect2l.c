@@ -63,6 +63,9 @@ double best_logmu[11];
 double rootsieve_time = 0.0;
 int raw = 0;
 
+/* inline function */
+extern void shash_add (shash_t, uint64_t);
+
 /* -- functions starts here -- */
 
 /* crt, set r and qqz */

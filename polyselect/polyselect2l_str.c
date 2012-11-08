@@ -368,17 +368,6 @@ hash_add (hash_t H, unsigned long p, int64_t i, mpz_t m0, uint64_t ad,
   H->size ++;
 }
 
-void
-shash_add (shash_t H, uint64_t i)
-{
-  int j;
-
-  j = i & (SHASH_NBUCKETS - 1);
-  H->i[j][H->size[j]] = i;
-  ASSERT_ALWAYS(H->size[j] < H->balloc);
-  H->size[j]++;
-}
-
 /* return non-zero iff there is a collision */
 int
 shash_find_collision (shash_t H)

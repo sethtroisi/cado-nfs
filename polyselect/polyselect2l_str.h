@@ -16,6 +16,14 @@
 #define LEN_SPECIAL_Q 55
 //#define DEBUG_HASH_TABLE
 
+#ifndef INLINE
+# if __GNUC__ && !__GNUC_STDC_INLINE__
+#  define INLINE extern inline
+# else
+#  define INLINE inline
+# endif
+#endif
+
 /* hash table slots */
 typedef struct
 {
@@ -92,6 +100,18 @@ typedef struct
 } _header_struct;
 typedef _header_struct header_t[1];
 
+/* inline functions */
+
+INLINE void
+shash_add (shash_t H, uint64_t i)
+{
+  int j;
+  j = i & (SHASH_NBUCKETS - 1);
+  H->i[j][H->size[j]] = i;
+  ASSERT_ALWAYS(H->size[j] < H->balloc);
+  H->size[j]++;
+}
+
 /* declarations */
 
 extern const unsigned int SPECIAL_Q[];
@@ -118,7 +138,6 @@ void hash_init (hash_t, unsigned int);
 void shash_init (shash_t, unsigned int);
 void hash_add (hash_t, unsigned long, int64_t, mpz_t, uint64_t,
                unsigned long, mpz_t, unsigned long, mpz_t);
-void shash_add (shash_t, uint64_t);
 int shash_find_collision (shash_t);
 void gmp_hash_add (hash_t, uint32_t, int64_t, mpz_t, uint64_t,
 		   unsigned long, mpz_t, uint64_t, mpz_t);
