@@ -1561,7 +1561,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                     relation_add_prime(rel, side, factors[side].fac[i]);
                 for (unsigned int i = 0; i < f[side]->length; ++i) {
                     if (!mpz_fits_ulong_p(f[side]->data[i]))
-                        fprintf(stderr, "Warning: misprinted relation because of large prime at (%"PRId64",%"PRIu64")\n",a,b);
+                        fprintf(stderr, "Warning: misprinted relation because of large prime of %zu bits at (%"PRId64",%"PRIu64")\n",
+                                mpz_sizeinbase(f[side]->data[i], 2), a, b);
                     for (unsigned int j = 0; j < m[side]->data[i]; j++) {
                         relation_add_prime(rel, side, mpz_get_ui(f[side]->data[i]));
                     }
@@ -2389,6 +2390,7 @@ main (int argc0, char *argv0[])
         if (bench) {
             uint64_t newq0 = (uint64_t) (skip_factor*((double) q0));
             uint64_t savq0 = q0;
+            t_bench = seconds() - t_bench;
             // print some estimates for special-q's between q0 and the next
             int nb_q = 1;
             do {
@@ -2397,14 +2399,13 @@ main (int argc0, char *argv0[])
             } while (q0 < newq0);
             q0 = newq0;
             nroots=0;
-            t_bench = seconds() - t_bench;
             fprintf(si->output,
                     "# Stats for q=%" PRIu64 ": %d reports in %1.1f s\n",
-                    savq0, rep_bench, t0);
+                    savq0, rep_bench, t_bench);
             fprintf(si->output,
                     "# Estimates for next %d q's: %d reports in %1.0f s, %1.2f s/r\n",
-                    nb_q, nb_q*rep_bench, t0*nb_q, t0/((double)rep_bench));
-            bench_tot_time += t0*nb_q;
+                    nb_q, nb_q*rep_bench, t_bench*nb_q, t_bench/((double)rep_bench));
+            bench_tot_time += t_bench*nb_q;
             bench_tot_rep += nb_q*rep_bench;
             rep_bench = 0;
             fprintf(si->output, "# Cumulative (estimated): %lu reports in %1.0f s, %1.2f s/r\n",
