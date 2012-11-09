@@ -63,6 +63,20 @@ double best_logmu[11];
 double rootsieve_time = 0.0;
 int raw = 0;
 
+static inline uint64_t cputicks()
+{
+        uint64_t r;
+        __asm__ __volatile__(
+                "rdtsc\n\t"
+                "shlq $32, %%rdx\n\t"
+                "orq %%rdx, %%rax\n\t"
+                : "=a"(r)
+                :
+                : "rdx");
+        return r;
+}
+
+
 /* inline function */
 extern void shash_add (shash_t, uint64_t);
 
@@ -997,18 +1011,23 @@ collision_on_each_sq ( header_t header,
   shash_t H;
   shash_tab_t *ptab;
   uint64_t **cur;
-  uint32_t *pPrimes;
+  uint32_t *pPrimes, *ePrimes;
   unsigned int *pnr;
   double pc2;
   uint64_t had_ha, pp;
   int64_t ppl, u, umax, neg_umax, v;
   unsigned long nprimes = 0, p, c;
   long *pc, *pcnr;
-  unsigned int nr, k, j;
+  unsigned int nr, k, j, vpnr;
   int found;
 #ifdef DEBUG_POLYSELECT2L
   int st = cputime();
 #endif
+
+  /*
+  uint64_t t1, t2;
+  static uint64_t sum1 = 0, sum2 = 0;
+  */
   
   shash_init (H, 4 * lenPrimes);
   umax = (int64_t) Primes[lenPrimes - 1];
@@ -1019,18 +1038,24 @@ collision_on_each_sq ( header_t header,
   pnr = R->nr;
   had_ha = header->d * header->ad;
   ptab = H->tab;
-  while (pPrimes != Primes + lenPrimes) {
-    p = *pPrimes++;
-    if (!(had_ha % p))
-      continue;
+  ePrimes = Primes + lenPrimes;
+  /*
+  t1 = cputicks();
+  */
+  for (pPrimes = Primes; pPrimes != ePrimes; pPrimes++) {
+    vpnr = *pnr++;
+    if (!vpnr) continue;
+    p = *pPrimes;
+    if (!(had_ha % p)) continue;
     ppl = (long) (p * p);
-    pcnr = pc + *pnr++;
+    pcnr = pc + vpnr;
     while (pc != pcnr) {
       u = *pc++;
       for (v = u; v < umax; v += ppl) {
 	k = v & (SHASH_NBUCKETS - 1);
 	cur = &(ptab[k].current);
 	*(*cur)++ = v;
+	__builtin_prefetch(*cur);
 	if (UNLIKELY(*cur >= *(cur + 1))) {
 	  fprintf (stderr, "A Shash bucket is full.\n");
 	  exit (1);
@@ -1040,6 +1065,7 @@ collision_on_each_sq ( header_t header,
 	k = v & (SHASH_NBUCKETS - 1);
 	cur = &(ptab[k].current);
 	*(*cur)++ = v;
+	__builtin_prefetch(*cur);
 	if (UNLIKELY(*cur >= *(cur + 1))) {
 	  fprintf (stderr, "A Shash bucket is full.\n");
 	  exit (1);
@@ -1047,8 +1073,15 @@ collision_on_each_sq ( header_t header,
       }
     }
   }
+  /*
+  t2 = cputicks();
+  sum1 += t2 - t1;
+  */
   found = shash_find_collision (H);
   shash_clear (H);
+  /*
+  sum2 += cputicks() - t2;
+  */
   if (found) /* do the real work */
     {
       hash_t H;
@@ -1092,6 +1125,9 @@ collision_on_each_sq ( header_t header,
   pthread_mutex_lock (&lock);
   potential_collisions += pc2;
   pthread_mutex_unlock (&lock);
+  /*
+  fprintf (stderr, "%lu %lu\n", sum1 / 3000000, sum2 / 3000000);
+  */
 }
 
 
