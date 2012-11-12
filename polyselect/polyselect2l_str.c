@@ -374,7 +374,7 @@ shash_find_collision (shash_t H)
 {
   shash_tab_t *ptab;
   uint64_t *Hj, *Hjm, i;
-  uint32_t *T, *Th, *Tend;
+  uint32_t *T, *Th, *Tend, key;
   unsigned int j;
   static uint32_t size = 0, mask;
 
@@ -393,25 +393,30 @@ shash_find_collision (shash_t H)
   ptab = H->tab;
   j = SHASH_NBUCKETS;
   while (j--) {
-    memset (T, 0, size * sizeof(uint32_t));
+    memset (T, 0, size * sizeof(*T));
     Hj = ptab->base;
     Hjm = (ptab++)->current;
     while (LIKELY(Hj != Hjm)) {
       i = *Hj++;
       Th = T + ((i >> LN2SHASH_NBUCKETS) & mask);
+      key = i + (i >> 32);
       if (LIKELY(!*Th))
-	*Th = i;
+	*Th = key;
       else
-	do {
-	  if (UNLIKELY(*Th == i)) {
-	    free (T);
-	    return 1;
-	  }
-	  Th++;
-	  if (UNLIKELY(Th == Tend))
-	    Th = T;
-	} while (UNLIKELY(*Th));
-      *Th = i;
+        {
+          do {
+            if (UNLIKELY(*Th == key))
+              {
+                printf ("collision on i=%lu key=%u\n", i, key);
+                free (T);
+                return 1;
+              }
+            Th++;
+            if (UNLIKELY(Th == Tend))
+              Th = T;
+          } while (UNLIKELY(*Th));
+          *Th = key;
+        }
     }
   }
   free (T);
