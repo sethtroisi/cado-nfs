@@ -376,12 +376,16 @@ modredcul_set (residueredcul_t r, const residueredcul_t s,
 }
 
 
+/* Puts in r the value of s * beta mod m, where beta is the word base.
+   Note: s can be any unsigned long, in particular can be larger than m.
+   When 0 <= s < m, use modredcul_set_ul_reduced for better efficiency. */
 MAYBE_UNUSED
 static inline void
 modredcul_set_ul (residueredcul_t r, const unsigned long s, 
                   const modulusredcul_t m)
 {
   unsigned long plow, phigh;
+
   ularith_mul_ul_ul_2ul (&plow, &phigh, s, m[0].one[0]);
   modredcul_redc (r, plow, phigh, m);
   modredcul_tomontgomery (r, r, m);

@@ -1201,7 +1201,7 @@ collision_on_batch_sq ( header_t header,
 
     modulusredcul_t modpp;
     residueredcul_t qprod[size], tmp_modul, tmp2_modul, tmp3_modul;
-    residueredcul_t res_rp, res_tmp;
+    residueredcul_t res_rp, res_tmp, res_rqi;
 
     modredcul_initmod_ul (modpp, pp);
     modredcul_init (tmp_modul, modpp);
@@ -1209,6 +1209,7 @@ collision_on_batch_sq ( header_t header,
     modredcul_init (tmp3_modul, modpp);
     modredcul_init (res_rp, modpp);
     modredcul_init (res_tmp, modpp);
+    modredcul_init (res_rqi, modpp);
     for (i = 0; i < size; i++)
       modredcul_init (qprod[i], modpp);
 
@@ -1255,11 +1256,12 @@ collision_on_batch_sq ( header_t header,
 
       // for each rp, compute (rp-rq)*1/q^2 (mod p^2)
       unsigned long rqi = mpz_fdiv_ui (rqqz[i], pp);
+      modredcul_set_ul_reduced (res_rqi, rqi, modpp);
       for (j = 0; j < nr; j ++, c++) {
 
         rp = R->roots[nprimes][j];
-        modredcul_set_ul (res_rp, rp, modpp);
-        modredcul_sub_ul (res_rp, res_rp, rqi, modpp);
+        modredcul_set_ul_reduced (res_rp, rp, modpp);
+        modredcul_sub (res_rp, res_rp, res_rqi, modpp);
         modredcul_mul (res_rp, res_rp, tmp2_modul, modpp);
         invqq[i][c] = modredcul_get_ul (res_rp, modpp);
 
@@ -1302,10 +1304,11 @@ collision_on_batch_sq ( header_t header,
     modredcul_sqr (tmp_modul, tmp_modul, modpp);
     /* now tmp_modul = 1/q[0]^2 mpd p^2 */
     unsigned long rqi = mpz_fdiv_ui (rqqz[0], pp);
+    modredcul_set_ul_reduced (res_rqi, rqi, modpp);
     for (j = 0; j < nr; j ++, c ++) {
       rp = R->roots[nprimes][j];
-      modredcul_set_ul (res_rp, rp, modpp);
-      modredcul_sub_ul (res_rp, res_rp, rqi, modpp);
+      modredcul_set_ul_reduced (res_rp, rp, modpp);
+      modredcul_sub (res_rp, res_rp, res_rqi, modpp);
       modredcul_mul (tmp2_modul, res_rp, tmp_modul, modpp); // tmp_modul should be retained for debug!
       invqq[0][c] = modredcul_get_ul (tmp2_modul, modpp);
 
@@ -1359,6 +1362,7 @@ collision_on_batch_sq ( header_t header,
     }
 
     modredcul_clear (res_rp, modpp);
+    modredcul_clear (res_rqi, modpp);
     modredcul_clear (res_tmp, modpp);
     modredcul_clear (tmp_modul, modpp);
     modredcul_clear (tmp2_modul, modpp);
