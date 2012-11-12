@@ -374,7 +374,7 @@ shash_find_collision (shash_t H)
 {
   shash_tab_t *ptab;
   uint64_t *Hj, *Hjm, i;
-  uint64_t *T, *Th, *Tend;
+  uint32_t *T, *Th, *Tend;
   unsigned int j;
   static uint32_t size = 0, mask;
 
@@ -388,12 +388,12 @@ shash_find_collision (shash_t H)
     ASSERT_ALWAYS((size & (size - 1)) == 0);
     mask = size - 1;
   }
-  T = (uint64_t*) malloc (size * sizeof(*T));
+  T = (uint32_t*) malloc (size * sizeof(*T));
   Tend = T + size;
   ptab = H->tab;
   j = SHASH_NBUCKETS;
   while (j--) {
-    memset (T, 0, size * sizeof(uint64_t));
+    memset (T, 0, size * sizeof(uint32_t));
     Hj = ptab->base;
     Hjm = (ptab++)->current;
     while (LIKELY(Hj != Hjm)) {

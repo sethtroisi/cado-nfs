@@ -46,7 +46,7 @@ typedef struct
 } __hash_struct;
 typedef __hash_struct hash_t[1];
 
-#define LN2SHASH_NBUCKETS 9
+#define LN2SHASH_NBUCKETS 8
 #define SHASH_NBUCKETS (1<<LN2SHASH_NBUCKETS)
 
 typedef struct
@@ -116,11 +116,12 @@ shash_add (shash_t H, uint64_t i)
 
   j = i & (SHASH_NBUCKETS - 1);
   cur = &(H->tab[j].current);
+  if (UNLIKELY(*cur >= *(cur+1)))
+    {
+      fprintf (stderr, "A Shash bucket is full.\n");
+      exit (1);
+    }
   *(*cur)++ = i;
-  if (*cur >= *(cur+1)) {
-    fprintf (stderr, "A Shash bucket is full.\n");
-    exit (1);
-  }
 }
 
 /* declarations */
