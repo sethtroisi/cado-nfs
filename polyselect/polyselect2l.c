@@ -1200,13 +1200,12 @@ collision_on_batch_sq ( header_t header,
       continue;
 
     modulusredcul_t modpp;
-    residueredcul_t qprod[size], tmp_modul, tmp2_modul, tmp3_modul;
+    residueredcul_t qprod[size], tmp_modul, tmp2_modul;
     residueredcul_t res_rp, res_tmp, res_rqi;
 
-    modredcul_initmod_ul (modpp, pp);
+    modredcul_initmod_ul_raw (modpp, pp);
     modredcul_init (tmp_modul, modpp);
     modredcul_init (tmp2_modul, modpp);
-    modredcul_init (tmp3_modul, modpp);
     modredcul_init (res_rp, modpp);
     modredcul_init (res_tmp, modpp);
     modredcul_init (res_rqi, modpp);
@@ -1214,151 +1213,60 @@ collision_on_batch_sq ( header_t header,
       modredcul_init (qprod[i], modpp);
 
     // (size-1) multiplications
-    modredcul_set_ul (qprod[0], q[0], modpp);
+    modredcul_intset_ul (qprod[0], q[0]); /* qprod[0] = q[0] */
 
     for (i = 1; i < size; i ++)
       {
-        modredcul_set_ul (tmp_modul, q[i], modpp);
+        modredcul_intset_ul (tmp_modul, q[i]);
         modredcul_mul (qprod[i], tmp_modul, qprod[i-1], modpp);
+        /* qprod[i] = q[0] * ... * q[i] / B^i */
       }
-    // the inversion, also reduce qprod[size-1] (mod pp).
-    modredcul_inv (tmp_modul, qprod[size-1], modpp);
+    modredcul_frommontgomery (qprod[size-1], qprod[size-1], modpp);
+    /* qprod[size-1] = q[0] * ... * q[size-1] / B^size */
+    modredcul_intinv (tmp_modul, qprod[size-1], modpp);
+    /* tmp_modul = B^size / (q[0] * ... * q[size-1]) */
 
     // for each q in a batch
     for (i = size - 1; i > 0; i --)
       {
-
+        /* tmp_modul = B^(i+1) / (q[0] * ... * q[i])
+           qprod[i-1] = q[0] * ... * q[i-1] / B^(i-1) */
         modredcul_mul (tmp2_modul, qprod[i-1], tmp_modul, modpp);
-        /* qprod[i-1] = q[0] * ... * q[i-1] (mod p^2)
-           tmp_modul = 1/(q[0] * ... * q[i]) (mod p^2)
-           thus tmp2_modul = 1/q[i] mod (p^2) */
+        /* tmp2_modul = B / q[i] */
 
-      modredcul_sqr (tmp2_modul, tmp2_modul, modpp); /* 1/q[i]^2 (mod p^2) */
+        modredcul_sqr (tmp2_modul, tmp2_modul, modpp); /* B / q[i]^2 */
 
-#ifdef DEBUG_POLYSELECT2L /* check if batch inversions correct */
-      unsigned long tmp_1 = modredcul_get_ul (tmp2_modul, modpp);
-      mpz_t tmp_debug, tmp_debug2, qqz;
-      mpz_init_set_ui (qqz, q[i]);
-      mpz_mul_ui (qqz, qqz, q[i]);
-      mpz_init_set_ui (tmp_debug, tmp_1);
-      mpz_init (tmp_debug2);
-      mpz_mul (tmp_debug2, tmp_debug, qqz);
-      tmp_1 = mpz_fdiv_ui (tmp_debug2, pp);
-      if (tmp_1 != 1) {
-        fprintf (stderr, "Error, batch inversion is wrong in %s, iter: %d\n",
-                 __FUNCTION__, i);
-        exit (1);
-      }
-      mpz_clear (qqz);
-      mpz_clear (tmp_debug);
-      mpz_clear (tmp_debug2);
-#endif
+        // for each rp, compute (rp-rq)*1/q^2 (mod p^2)
+        unsigned long rqi = mpz_fdiv_ui (rqqz[i], pp);
+        modredcul_intset_ul (res_rqi, rqi);
+        for (j = 0; j < nr; j ++, c++)
+          {
+            rp = R->roots[nprimes][j];
+            modredcul_intset_ul (res_rp, rp);
+            modredcul_sub (res_rp, res_rp, res_rqi, modpp); /* rp - rq */
+            modredcul_mul (res_rp, res_rp, tmp2_modul, modpp);
+            /* res_rp = (rp - rq) / q[i]^2 */
+            invqq[i][c] = modredcul_intget_ul (res_rp, modpp);
+          }
 
-      // for each rp, compute (rp-rq)*1/q^2 (mod p^2)
-      unsigned long rqi = mpz_fdiv_ui (rqqz[i], pp);
-      modredcul_set_ul_reduced (res_rqi, rqi, modpp);
-      for (j = 0; j < nr; j ++, c++) {
-
-        rp = R->roots[nprimes][j];
-        modredcul_set_ul_reduced (res_rp, rp, modpp);
-        modredcul_sub (res_rp, res_rp, res_rqi, modpp);
-        modredcul_mul (res_rp, res_rp, tmp2_modul, modpp);
-        invqq[i][c] = modredcul_get_ul (res_rp, modpp);
-
-#ifdef DEBUG_POLYSELECT2L  /* check if u is correct */
-        mpz_t Ntmp, m0tmp, tmp, qqz;
-        mpz_init_set_ui (qqz, q[i]);
-        mpz_mul_ui (qqz, qqz, q[i]);
-        mpz_init_set (Ntmp, header->Ntilde);
-        mpz_mod_ui (Ntmp, Ntmp, pp); // tildeN (mod p^2)
-        mpz_init_set (m0tmp, header->m0);
-        mpz_add (m0tmp, m0tmp, rqqz[i]); // m0 + rq
-        mpz_init_set_ui (tmp, invqq[i][c]);
-        mpz_mul (tmp, tmp, qqz); // i*q^2
-        mpz_add (m0tmp, m0tmp, tmp); // m0 + rq + i*q^2
-        mpz_pow_ui (m0tmp, m0tmp, header->d);
-        mpz_mod_ui (m0tmp, m0tmp, pp);
-        if (mpz_cmp (m0tmp, Ntmp) != 0) {
-          fprintf (stderr, "Error: u computation is wrong in"
-                   "collision_on_each_sq, i: %d\n", i);
-          gmp_printf ("Details: (p=%lu, i(mod p^2)=%ld) for "
-                      "ad=%"PRIu64", q=%lu, rq=%Zd, rp=%lu, invqq=%lu\n",
-                      p, invqq[i][c], header->ad, q[i], rqqz[i], rp, tmp2_modul[0]);
-          gmp_printf ("m0=%Zd\n", header->m0);
-          gmp_printf ("Ntilde=%Zd\n", header->Ntilde);
-          exit (1);
-        }
-        mpz_clear (Ntmp);
-        mpz_clear (m0tmp);
-        mpz_clear (tmp);
-        mpz_clear (qqz);
-#endif
+        modredcul_intset_ul (tmp2_modul, q[i]);
+        modredcul_mul (tmp_modul, tmp2_modul, tmp_modul, modpp);
+        /* now tmp_modul = B^i / (q[0] * ... * q[i-1]) */
+        c -= nr;
       }
 
-      modredcul_set_ul (tmp3_modul, q[i], modpp);
-      modredcul_mul (tmp_modul, tmp3_modul, tmp_modul, modpp);
-      /* now tmp_modul = 1/(q[0] * ... * q[i-1]) (mod p^2) */
-      c -= nr;
-      }
+    /* tmp_modul = B / q[0] */
 
     modredcul_sqr (tmp_modul, tmp_modul, modpp);
-    /* now tmp_modul = 1/q[0]^2 mpd p^2 */
+    /* now tmp_modul = B / q[0]^2 mod p^2 */
     unsigned long rqi = mpz_fdiv_ui (rqqz[0], pp);
-    modredcul_set_ul_reduced (res_rqi, rqi, modpp);
+    modredcul_intset_ul (res_rqi, rqi);
     for (j = 0; j < nr; j ++, c ++) {
       rp = R->roots[nprimes][j];
-      modredcul_set_ul_reduced (res_rp, rp, modpp);
+      modredcul_intset_ul (res_rp, rp);
       modredcul_sub (res_rp, res_rp, res_rqi, modpp);
       modredcul_mul (tmp2_modul, res_rp, tmp_modul, modpp); // tmp_modul should be retained for debug!
-      invqq[0][c] = modredcul_get_ul (tmp2_modul, modpp);
-
-#ifdef DEBUG_POLYSELECT2L /* check if batch inversions correct */
-      unsigned long tmp_1 = modredcul_get_ul (tmp_modul, modpp);
-      mpz_t tmp_debug, tmp_debug2, qqz1;
-      mpz_init_set_ui (qqz1, q[0]);
-      mpz_mul_ui (qqz1, qqz1, q[0]);
-      mpz_init_set_ui (tmp_debug, tmp_1);
-      mpz_init (tmp_debug2);
-      mpz_mul (tmp_debug2, tmp_debug, qqz1);
-      tmp_1 = mpz_fdiv_ui (tmp_debug2, pp);
-      if (tmp_1 != 1) {
-        fprintf (stderr, "Error, batch inversion is wrong in %s, iter: %d\n",
-                 __FUNCTION__, i);
-        exit (1);
-      }
-      mpz_clear (qqz1);
-      mpz_clear (tmp_debug);
-      mpz_clear (tmp_debug2);
-#endif
-
-#ifdef DEBUG_POLYSELECT2L  /* check if u is correct */
-      mpz_t Ntmp, m0tmp, tmp, qqz;
-      mpz_init_set_ui (qqz, q[0]);
-      mpz_mul_ui (qqz, qqz, q[0]);
-      mpz_init_set (Ntmp, header->Ntilde);
-      mpz_mod_ui (Ntmp, Ntmp, pp); // tildeN (mod p^2)
-      mpz_init_set (m0tmp, header->m0);
-      mpz_add (m0tmp, m0tmp, rqqz[0]); // m0 + rq
-      mpz_init_set_ui (tmp, invqq[0][c]);
-      mpz_mul (tmp, tmp, qqz); // i*q^2
-      mpz_add (m0tmp, m0tmp, tmp); // m0 + rq + i*q^2
-      mpz_pow_ui (m0tmp, m0tmp, header->d);
-      mpz_mod_ui (m0tmp, m0tmp, pp);
-      if (mpz_cmp (m0tmp, Ntmp) != 0) {
-        fprintf (stderr, "Error: u computation is wrong in"
-                 "collision_on_each_sq, i: %d\n", i);
-        gmp_printf ("Details: (p=%lu, i(mod p^2)=%ld) for "
-                    "ad=%"PRIu64", q=%lu, rq=%Zd, rp=%lu, invqq=%lu\n",
-                    p, invqq[0][c], header->ad, q[0], rqqz[0], rp, tmp_modul[0]);
-        gmp_printf ("m0=%Zd\n", header->m0);
-        gmp_printf ("Ntilde=%Zd\n", header->Ntilde);
-        exit (1);
-      }
-      mpz_clear (Ntmp);
-      mpz_clear (m0tmp);
-      mpz_clear (tmp);
-      mpz_clear (qqz);
-#endif
+      invqq[0][c] = modredcul_intget_ul (tmp2_modul, modpp);
     }
 
     modredcul_clear (res_rp, modpp);
@@ -1366,7 +1274,6 @@ collision_on_batch_sq ( header_t header,
     modredcul_clear (res_tmp, modpp);
     modredcul_clear (tmp_modul, modpp);
     modredcul_clear (tmp2_modul, modpp);
-    modredcul_clear (tmp3_modul, modpp);
     for (i = 0; i < size; i++)
       modredcul_clear (qprod[i], modpp);
     modredcul_clearmod (modpp);

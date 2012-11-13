@@ -407,7 +407,6 @@ shash_find_collision (shash_t H)
           do {
             if (UNLIKELY(*Th == key))
               {
-                printf ("collision on i=%lu key=%u\n", i, key);
                 free (T);
                 return 1;
               }

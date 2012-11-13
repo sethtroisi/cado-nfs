@@ -1,11 +1,11 @@
 /* Some functions for modular arithmetic with residues and modulus in
    unsigned long variables. Residues are stored in Montgomery form,
-   reduction after multiplication is done with REDC. Due to inlining, 
+   reduction after multiplication is done with REDC. Due to inlining,
    this file must be included in the caller's source code with #include */
 
-/* Naming convention: all function start with modredcul, for 
-   MODulus REDC Unsigned Long, followed by underscore, functionality of 
-   function (add, mul, etc), and possibly underscore and specification of 
+/* Naming convention: all function start with modredcul, for
+   MODulus REDC Unsigned Long, followed by underscore, functionality of
+   function (add, mul, etc), and possibly underscore and specification of
    what argument types the function takes (_ul, etc). */
 
 #ifndef MODREDC_UL_H
@@ -40,7 +40,7 @@
 
 typedef unsigned long residueredcul_t[MODREDCUL_SIZE];
 typedef unsigned long modintredcul_t[MODREDCUL_SIZE];
-typedef struct { 
+typedef struct {
   unsigned long m;
   unsigned long invm;
   residueredcul_t one;
@@ -51,12 +51,12 @@ typedef __modulusredcul_t modulusredcul_t[1];
 /* ==================== Functions used internally ==================== */
 
 static inline void
-modredcul_add (residueredcul_t, const residueredcul_t, 
+modredcul_add (residueredcul_t, const residueredcul_t,
                const residueredcul_t, const modulusredcul_t);
 /* Computes (a * 2^wordsize) % m */
 MAYBE_UNUSED
 static inline void
-modredcul_tomontgomery (residueredcul_t r, const residueredcul_t a, 
+modredcul_tomontgomery (residueredcul_t r, const residueredcul_t a,
                         const modulusredcul_t m)
 {
   ASSERT_EXPENSIVE (a[0] < m[0].m);
@@ -67,7 +67,7 @@ modredcul_tomontgomery (residueredcul_t r, const residueredcul_t a,
 /* Computes (a / 2^wordsize) % m. Assumes a < m */
 MAYBE_UNUSED
 static inline void
-modredcul_frommontgomery (residueredcul_t r, const residueredcul_t a, 
+modredcul_frommontgomery (residueredcul_t r, const residueredcul_t a,
                           const modulusredcul_t m)
 {
   unsigned long tlow, thigh;
@@ -80,7 +80,7 @@ modredcul_frommontgomery (residueredcul_t r, const residueredcul_t a,
    Requires phigh < m */
 MAYBE_UNUSED
 static inline void
-modredcul_redc (residueredcul_t r, const unsigned long plow, 
+modredcul_redc (residueredcul_t r, const unsigned long plow,
                 const unsigned long phigh, const modulusredcul_t m)
 {
   unsigned long tlow, thigh, t = phigh;
@@ -89,13 +89,13 @@ modredcul_redc (residueredcul_t r, const unsigned long plow,
 
   tlow = plow * m[0].invm;
   ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
-  /* Let w = 2^wordsize. We know (phigh * w + plow) + (thigh * w + tlow) 
-     == 0 (mod w) so either plow == tlow == 0, or plow !=0 and tlow != 0. 
-     In the former case we want phigh + thigh + 1, in the latter 
-     phigh + thigh. Since t = phigh < m, and modredcul_add can handle the 
+  /* Let w = 2^wordsize. We know (phigh * w + plow) + (thigh * w + tlow)
+     == 0 (mod w) so either plow == tlow == 0, or plow !=0 and tlow != 0.
+     In the former case we want phigh + thigh + 1, in the latter
+     phigh + thigh. Since t = phigh < m, and modredcul_add can handle the
      case where the second operand is equal to m, adding 1 is safe */
 
-  t += (plow != 0UL) ? 1UL : 0UL; /* Does not depend on the mul */ 
+  t += (plow != 0UL) ? 1UL : 0UL; /* Does not depend on the mul */
 
   modredcul_add (r, &t, &thigh, m);
 }
@@ -106,7 +106,7 @@ modredcul_redc (residueredcul_t r, const unsigned long plow,
    Implies r < b if b >= m. */
 MAYBE_UNUSED
 static inline void
-modredcul_add_semi (residueredcul_t r, const residueredcul_t a, 
+modredcul_add_semi (residueredcul_t r, const residueredcul_t a,
 		    const residueredcul_t b, const modulusredcul_t m)
 {
   ASSERT_EXPENSIVE (a[0] < m[0].m);
@@ -114,7 +114,7 @@ modredcul_add_semi (residueredcul_t r, const residueredcul_t a,
 #if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_ASM)
   {
     unsigned long t = a[0] - m[0].m, tr = a[0] + b[0];
-    
+
     __asm__ (
       "add %2, %1\n\t"   /* t = t + b ( t == a - m + b (mod w)) */
       "cmovc %1, %0\n\t"  /* if (cy) tr = t */
@@ -131,11 +131,11 @@ modredcul_add_semi (residueredcul_t r, const residueredcul_t a,
 
 
 /* Requires phigh < ULONG_MAX. If phigh:plow = a*b with a,b < ULONG_MAX,
-   phigh <= ULONG_MAX - 1, so that works. 
+   phigh <= ULONG_MAX - 1, so that works.
    If phigh < m, then r < m, otherwise r <= phigh. */
 MAYBE_UNUSED
 static inline void
-modredcul_redc_semi (residueredcul_t r, const unsigned long plow, 
+modredcul_redc_semi (residueredcul_t r, const unsigned long plow,
 		     const unsigned long phigh, const modulusredcul_t m)
 {
   unsigned long tlow, thigh, t = phigh;
@@ -145,10 +145,10 @@ modredcul_redc_semi (residueredcul_t r, const unsigned long plow,
   tlow = plow * m[0].invm;
   ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
   t += (plow != 0UL) ? 1UL : 0UL;
-  /* We have thigh < m since thigh = trunc (m * (something % w) / w), 
-     so this add always produces the correct residue class (although 
+  /* We have thigh < m since thigh = trunc (m * (something % w) / w),
+     so this add always produces the correct residue class (although
      it may have r >= m if phigh >= m. This add is slightly slower
-     than in the modredcul_redc() function, since thigh depends on the 
+     than in the modredcul_redc() function, since thigh depends on the
      previous mul and is used first in the add. */
   modredcul_add_semi (r, &thigh, &t, m);
 }
@@ -214,7 +214,7 @@ modredcul_intfits_ul (const modintredcul_t a MAYBE_UNUSED)
 
 MAYBE_UNUSED
 static inline void
-modredcul_intadd (modintredcul_t r, const modintredcul_t a, 
+modredcul_intadd (modintredcul_t r, const modintredcul_t a,
                   const modintredcul_t b)
 {
   r[0] = a[0] + b[0];
@@ -222,14 +222,14 @@ modredcul_intadd (modintredcul_t r, const modintredcul_t a,
 
 MAYBE_UNUSED
 static inline void
-modredcul_intsub (modintredcul_t r, const modintredcul_t a, 
+modredcul_intsub (modintredcul_t r, const modintredcul_t a,
                   const modintredcul_t b)
 {
   r[0] = a[0] - b[0];
 }
 
 
-/* Returns the number of bits in a, that is, floor(log_2(a))+1. 
+/* Returns the number of bits in a, that is, floor(log_2(a))+1.
    For a == 0 returns 0. */
 MAYBE_UNUSED
 static inline int
@@ -259,21 +259,21 @@ modredcul_intshl (modintredcul_t r, const modintredcul_t s, const int i)
 /* r = n/d. We require d|n */
 MAYBE_UNUSED
 static inline void
-modredcul_intdivexact (modintredcul_t r, const modintredcul_t n, 
+modredcul_intdivexact (modintredcul_t r, const modintredcul_t n,
                        const modintredcul_t d)
 {
   /* ularith_invmod() is faster than a DIV */
-  r[0] = n[0] * ularith_invmod(d[0]); 
+  r[0] = n[0] * ularith_invmod(d[0]);
 }
 
 
 /* r = n%d */
 MAYBE_UNUSED
 static inline void
-modredcul_intmod (modintredcul_t r, const modintredcul_t n, 
+modredcul_intmod (modintredcul_t r, const modintredcul_t n,
                   const modintredcul_t d)
 {
-  r[0] = n[0] % d[0]; 
+  r[0] = n[0] % d[0];
 }
 
 
@@ -294,6 +294,14 @@ modredcul_initmod_ul (modulusredcul_t m, const unsigned long s)
     }
 }
 
+/* same as modredcul_initmod_ul, but does not compute m[0].one */
+MAYBE_UNUSED
+static inline void
+modredcul_initmod_ul_raw (modulusredcul_t m, const unsigned long s)
+{
+  m[0].m = s;
+  m[0].invm = -ularith_invmod (s);
+}
 
 MAYBE_UNUSED
 static inline void
@@ -350,7 +358,7 @@ modredcul_init (residueredcul_t r, const modulusredcul_t m MAYBE_UNUSED)
    residue_t types, that leaves nothing to do at all. */
 MAYBE_UNUSED
 static inline void
-modredcul_init_noset0 (residueredcul_t r MAYBE_UNUSED, 
+modredcul_init_noset0 (residueredcul_t r MAYBE_UNUSED,
                        const modulusredcul_t m MAYBE_UNUSED)
 {
   return;
@@ -359,7 +367,7 @@ modredcul_init_noset0 (residueredcul_t r MAYBE_UNUSED,
 
 MAYBE_UNUSED
 static inline void
-modredcul_clear (residueredcul_t r MAYBE_UNUSED, 
+modredcul_clear (residueredcul_t r MAYBE_UNUSED,
                  const modulusredcul_t m MAYBE_UNUSED)
 {
   return;
@@ -368,7 +376,7 @@ modredcul_clear (residueredcul_t r MAYBE_UNUSED,
 
 MAYBE_UNUSED
 static inline void
-modredcul_set (residueredcul_t r, const residueredcul_t s, 
+modredcul_set (residueredcul_t r, const residueredcul_t s,
                const modulusredcul_t m MAYBE_UNUSED)
 {
   ASSERT_EXPENSIVE (s[0] < m[0].m);
@@ -381,7 +389,7 @@ modredcul_set (residueredcul_t r, const residueredcul_t s,
    When 0 <= s < m, use modredcul_set_ul_reduced for better efficiency. */
 MAYBE_UNUSED
 static inline void
-modredcul_set_ul (residueredcul_t r, const unsigned long s, 
+modredcul_set_ul (residueredcul_t r, const unsigned long s,
                   const modulusredcul_t m)
 {
   unsigned long plow, phigh;
@@ -397,7 +405,7 @@ modredcul_set_ul (residueredcul_t r, const unsigned long s,
 
 MAYBE_UNUSED
 static inline void
-modredcul_set_ul_reduced (residueredcul_t r, const unsigned long s, 
+modredcul_set_ul_reduced (residueredcul_t r, const unsigned long s,
                           const modulusredcul_t m MAYBE_UNUSED)
 {
   ASSERT (s < m[0].m);
@@ -408,7 +416,7 @@ modredcul_set_ul_reduced (residueredcul_t r, const unsigned long s,
 
 MAYBE_UNUSED
 static inline void
-modredcul_set_uls (residueredcul_t r, const modintredcul_t s, 
+modredcul_set_uls (residueredcul_t r, const modintredcul_t s,
 		   const modulusredcul_t m)
 {
   r[0] = s[0] % m[0].m;
@@ -418,7 +426,7 @@ modredcul_set_uls (residueredcul_t r, const modintredcul_t s,
 
 MAYBE_UNUSED
 static inline void
-modredcul_set_uls_reduced (residueredcul_t r, const modintredcul_t s, 
+modredcul_set_uls_reduced (residueredcul_t r, const modintredcul_t s,
 			   const modulusredcul_t m)
 {
   ASSERT (s[0] < m[0].m);
@@ -428,20 +436,20 @@ modredcul_set_uls_reduced (residueredcul_t r, const modintredcul_t s,
 
 
 /* This one is so trivial that we don't really require m in the
- * interface. For interface homogeneity we make it take the m parameter 
+ * interface. For interface homogeneity we make it take the m parameter
  * anyway.
  */
-MAYBE_UNUSED 
-static inline void 
-modredcul_set0 (residueredcul_t r, const modulusredcul_t m MAYBE_UNUSED) 
-{ 
+MAYBE_UNUSED
+static inline void
+modredcul_set0 (residueredcul_t r, const modulusredcul_t m MAYBE_UNUSED)
+{
   r[0] = 0UL;
 }
 
 
-MAYBE_UNUSED 
-static inline void 
-modredcul_set1 (residueredcul_t r, const modulusredcul_t m) 
+MAYBE_UNUSED
+static inline void
+modredcul_set1 (residueredcul_t r, const modulusredcul_t m)
 {
   r[0] = m[0].one[0];
 }
@@ -451,7 +459,7 @@ modredcul_set1 (residueredcul_t r, const modulusredcul_t m)
 
 MAYBE_UNUSED
 static inline void
-modredcul_swap (residueredcul_t a, residueredcul_t b, 
+modredcul_swap (residueredcul_t a, residueredcul_t b,
                 const modulusredcul_t m MAYBE_UNUSED)
 {
   unsigned long t;
@@ -464,7 +472,7 @@ modredcul_swap (residueredcul_t a, residueredcul_t b,
 
 MAYBE_UNUSED
 static inline unsigned long
-modredcul_get_ul (const residueredcul_t s, 
+modredcul_get_ul (const residueredcul_t s,
 	          const modulusredcul_t m MAYBE_UNUSED)
 {
   unsigned long t;
@@ -475,8 +483,17 @@ modredcul_get_ul (const residueredcul_t s,
 
 
 MAYBE_UNUSED
+static inline unsigned long
+modredcul_intget_ul (const residueredcul_t s,
+                     const modulusredcul_t m MAYBE_UNUSED)
+{
+  return s[0];
+}
+
+
+MAYBE_UNUSED
 static inline void
-modredcul_get_uls (modintredcul_t r, const residueredcul_t s, 
+modredcul_get_uls (modintredcul_t r, const residueredcul_t s,
 		   const modulusredcul_t m MAYBE_UNUSED)
 {
   ASSERT_EXPENSIVE (s[0] < m[0].m);
@@ -486,7 +503,7 @@ modredcul_get_uls (modintredcul_t r, const residueredcul_t s,
 
 MAYBE_UNUSED
 static inline int
-modredcul_equal (const residueredcul_t a, const residueredcul_t b, 
+modredcul_equal (const residueredcul_t a, const residueredcul_t b,
              const modulusredcul_t m MAYBE_UNUSED)
 {
   ASSERT_EXPENSIVE (a[0] < m[0].m && b[0] < m[0].m);
@@ -515,7 +532,7 @@ modredcul_is1 (const residueredcul_t a, const modulusredcul_t m MAYBE_UNUSED)
 /* Requires a < m and b <= m, then r == a+b (mod m) and r < m */
 MAYBE_UNUSED
 static inline void
-modredcul_add (residueredcul_t r, const residueredcul_t a, 
+modredcul_add (residueredcul_t r, const residueredcul_t a,
                const residueredcul_t b, const modulusredcul_t m)
 {
   ASSERT_EXPENSIVE (a[0] < m[0].m && b[0] <= m[0].m);
@@ -526,7 +543,7 @@ modredcul_add (residueredcul_t r, const residueredcul_t a,
 #if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_ASM)
   {
     unsigned long t = a[0] + b[0], tr = a[0] - m[0].m;
-  
+
     __asm__ (
       "add %2, %0\n\t"   /* tr += b */
       "cmovnc %1, %0\n\t"  /* if (!cy) tr = t */
@@ -566,7 +583,7 @@ modredcul_add_ul (residueredcul_t r, const residueredcul_t a,
 
 MAYBE_UNUSED
 static inline void
-modredcul_sub (residueredcul_t r, const residueredcul_t a, 
+modredcul_sub (residueredcul_t r, const residueredcul_t a,
                const residueredcul_t b, const modulusredcul_t m)
 {
   ASSERT_EXPENSIVE (a[0] < m[0].m && b[0] < m[0].m);
@@ -624,7 +641,7 @@ modredcul_sub_ul (residueredcul_t r, const residueredcul_t a,
 
 MAYBE_UNUSED
 static inline void
-modredcul_neg (residueredcul_t r, const residueredcul_t a, 
+modredcul_neg (residueredcul_t r, const residueredcul_t a,
                const modulusredcul_t m)
 {
   ASSERT_EXPENSIVE (a[0] < m[0].m);
@@ -637,7 +654,7 @@ modredcul_neg (residueredcul_t r, const residueredcul_t a,
 
 MAYBE_UNUSED
 static inline void
-modredcul_mul (residueredcul_t r, const residueredcul_t a, 
+modredcul_mul (residueredcul_t r, const residueredcul_t a,
                const residueredcul_t b, const modulusredcul_t m)
 {
   unsigned long plow, phigh;
@@ -647,16 +664,16 @@ modredcul_mul (residueredcul_t r, const residueredcul_t a,
 #if defined(MODTRACE)
   printf ("(%lu * %lu / 2^%ld) %% %lu", a[0], b[0], LONG_BIT, m[0].m);
 #endif
-  
+
   ularith_mul_ul_ul_2ul (&plow, &phigh, a[0], b[0]);
 
 #ifdef HAVE_GCC_STYLE_AMD64_ASM
 
-  /* TODO: are the register constraints watertight? 
+  /* TODO: are the register constraints watertight?
      %rax gets modified but putting tlow as an output constraint with "+"
      will keep r from getting allocated in %rax, which is a shame
      since we often want the result in %rax for the next multiply. */
-  
+
   __asm__ (
     "imulq %[invm], %%rax\n\t"
     "cmpq $1, %%rax \n\t"                /* if plow != 0, increase phigh */
@@ -682,7 +699,7 @@ modredcul_mul (residueredcul_t r, const residueredcul_t a,
 
 MAYBE_UNUSED
 static inline void
-modredcul_sqr (residueredcul_t r, const residueredcul_t a, 
+modredcul_sqr (residueredcul_t r, const residueredcul_t a,
                const modulusredcul_t m)
 {
   unsigned long plow, phigh;
@@ -693,11 +710,11 @@ modredcul_sqr (residueredcul_t r, const residueredcul_t a,
   ularith_sqr_ul_2ul (&plow, &phigh, a[0]);
 #ifdef HAVE_GCC_STYLE_AMD64_ASM
 
-  /* TODO: are the register constraints watertight? 
+  /* TODO: are the register constraints watertight?
      %rax gets modified but putting tlow as an output constraint with "+"
      will keep r from getting allocated in %rax, which is a shame
      since we often want the result in %rax for the next multiply. */
-  
+
   __asm__ (
     "imulq %[invm], %%rax\n\t"
     "cmpq $1, %%rax \n\t"                /* if plow != 0, increase phigh */
@@ -719,7 +736,7 @@ modredcul_sqr (residueredcul_t r, const residueredcul_t a,
 
 MAYBE_UNUSED
 static inline void
-modredcul_div2 (residueredcul_t r, const residueredcul_t a, 
+modredcul_div2 (residueredcul_t r, const residueredcul_t a,
                 const modulusredcul_t m)
 {
 #if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_ASM)
@@ -762,35 +779,37 @@ modredcul_finished (const residueredcul_t r, const modulusredcul_t m)
 
 
 /* prototypes of non-inline functions */
-int modredcul_div3 (residueredcul_t, const residueredcul_t, 
+int modredcul_div3 (residueredcul_t, const residueredcul_t,
                      const modulusredcul_t);
-int modredcul_div5 (residueredcul_t, const residueredcul_t, 
+int modredcul_div5 (residueredcul_t, const residueredcul_t,
                      const modulusredcul_t);
-int modredcul_div7 (residueredcul_t, const residueredcul_t, 
+int modredcul_div7 (residueredcul_t, const residueredcul_t,
                      const modulusredcul_t);
-int modredcul_div11 (residueredcul_t, const residueredcul_t, 
+int modredcul_div11 (residueredcul_t, const residueredcul_t,
                       const modulusredcul_t);
-int modredcul_div13 (residueredcul_t, const residueredcul_t, 
+int modredcul_div13 (residueredcul_t, const residueredcul_t,
                       const modulusredcul_t);
-void modredcul_gcd (modintredcul_t, const residueredcul_t, 
+void modredcul_gcd (modintredcul_t, const residueredcul_t,
                     const modulusredcul_t);
-void modredcul_pow_ul (residueredcul_t, const residueredcul_t, 
+void modredcul_pow_ul (residueredcul_t, const residueredcul_t,
                        const unsigned long, const modulusredcul_t);
-void modredcul_2pow_ul (residueredcul_t, const unsigned long, 
+void modredcul_2pow_ul (residueredcul_t, const unsigned long,
                         const modulusredcul_t);
-void modredcul_pow_mp (residueredcul_t, const residueredcul_t, 
+void modredcul_pow_mp (residueredcul_t, const residueredcul_t,
                    const unsigned long *, const int, const modulusredcul_t);
-void modredcul_2pow_mp (residueredcul_t, const unsigned long *, const int, 
+void modredcul_2pow_mp (residueredcul_t, const unsigned long *, const int,
                         const modulusredcul_t);
-void modredcul_V_ul (residueredcul_t, const residueredcul_t, 
+void modredcul_V_ul (residueredcul_t, const residueredcul_t,
 		     const unsigned long, const modulusredcul_t);
-void modredcul_V_mp (residueredcul_t, const residueredcul_t, 
+void modredcul_V_mp (residueredcul_t, const residueredcul_t,
 		     const unsigned long *, const int, const modulusredcul_t);
 int modredcul_sprp (const residueredcul_t, const modulusredcul_t);
 int modredcul_sprp2 (const modulusredcul_t);
 int modredcul_isprime (const modulusredcul_t);
-int modredcul_inv (residueredcul_t, const residueredcul_t, 
+int modredcul_inv (residueredcul_t, const residueredcul_t,
 		   const modulusredcul_t);
+int modredcul_intinv (residueredcul_t, const residueredcul_t,
+                      const modulusredcul_t);
 int modredcul_jacobi (const residueredcul_t, const modulusredcul_t);
 
 #endif  /* MODREDC_UL_H */
