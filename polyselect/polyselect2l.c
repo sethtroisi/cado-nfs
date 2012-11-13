@@ -897,9 +897,7 @@ collision_on_p ( header_t header,
   mpz_t *f, tmp;
   int found = 0;
   shash_t H;
-#ifdef DEBUG_POLYSELECT2L
-  int st = cputime();
-#endif
+  int st = 0;
 
   /* init f for roots computation */
   mpz_init_set_ui (tmp, 0);
@@ -935,7 +933,9 @@ collision_on_p ( header_t header,
 
       mpz_mod_ui (f[0], header->Ntilde, p);
       mpz_neg (f[0], f[0]); /* f = x^d - N */
+      st -= cputime ();
       nrp = poly_roots_uint64 (rp, f, header->d, p);
+      st += cputime ();
       roots_lift (rp, header->Ntilde, header->d, header->m0, p, nrp);
       proots_add (R, nrp, rp, nprimes);
       for (j = 0; j < nrp; j++, c++)
@@ -949,6 +949,9 @@ collision_on_p ( header_t header,
   found = shash_find_collision (H);
   shash_clear (H);
   free (rp);
+
+  if (verbose > 2)
+    fprintf (stderr, "# computing p-roots took %dms\n", st);
 
   if (found) /* do the real work */
     {
