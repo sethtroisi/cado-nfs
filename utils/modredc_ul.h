@@ -83,10 +83,34 @@ static inline void
 modredcul_redc (residueredcul_t r, const unsigned long plow,
                 const unsigned long phigh, const modulusredcul_t m)
 {
-  unsigned long tlow, thigh, t = phigh;
+  unsigned long t = phigh;
+#ifndef HAVE_GCC_STYLE_AMD64_ASM
+  unsigned long tlow, thigh;
+#endif
 
   ASSERT_EXPENSIVE (phigh < m[0].m);
 
+#ifdef HAVE_GCC_STYLE_AMD64_ASM
+
+  /* TODO: are the register constraints watertight?
+     %rax gets modified but putting tlow as an output constraint with "+"
+     will keep r from getting allocated in %rax, which is a shame
+     since we often want the result in %rax for the next multiply. */
+
+  __asm__ (
+    "imulq %[invm], %%rax\n\t"
+    "cmpq $1, %%rax \n\t"                /* if plow != 0, increase t */
+    "sbbq $-1, %[t]\n\t"
+    "mulq %[m]\n\t"
+    "lea (%[t],%%rdx,1), %[r]\n\t"  /* compute (rdx + thigh) mod m */
+    "subq %[m], %[t]\n\t"
+    "addq %%rdx, %[t]\n\t"
+    "cmovcq %[t], %[r]\n\t"
+    : [t] "+&r" (t), [r] "=&r" (r[0])
+    : [invm] "rm" (m[0].invm), [m] "rm" (m[0].m), "a" (plow)
+    : "%rdx", "cc"
+  );
+#else
   tlow = plow * m[0].invm;
   ularith_mul_ul_ul_2ul (&tlow, &thigh, tlow, m[0].m);
   /* Let w = 2^wordsize. We know (phigh * w + plow) + (thigh * w + tlow)
@@ -98,6 +122,7 @@ modredcul_redc (residueredcul_t r, const unsigned long plow,
   t += (plow != 0UL) ? 1UL : 0UL; /* Does not depend on the mul */
 
   modredcul_add (r, &t, &thigh, m);
+#endif
 }
 
 
@@ -666,30 +691,7 @@ modredcul_mul (residueredcul_t r, const residueredcul_t a,
 #endif
 
   ularith_mul_ul_ul_2ul (&plow, &phigh, a[0], b[0]);
-
-#ifdef HAVE_GCC_STYLE_AMD64_ASM
-
-  /* TODO: are the register constraints watertight?
-     %rax gets modified but putting tlow as an output constraint with "+"
-     will keep r from getting allocated in %rax, which is a shame
-     since we often want the result in %rax for the next multiply. */
-
-  __asm__ (
-    "imulq %[invm], %%rax\n\t"
-    "cmpq $1, %%rax \n\t"                /* if plow != 0, increase phigh */
-    "sbbq $-1, %[phigh]\n\t"
-    "mulq %[m]\n\t"
-    "lea (%[phigh],%%rdx,1), %[r]\n\t"  /* compute (rdx + thigh) mod m */
-    "subq %[m], %[phigh]\n\t"
-    "addq %%rdx, %[phigh]\n\t"
-    "cmovcq %[phigh], %[r]\n\t"
-    : [phigh] "+&r" (phigh), [r] "=&r" (r[0])
-    : [invm] "rm" (m[0].invm), [m] "rm" (m[0].m), "a" (plow)
-    : "%rdx", "cc"
-  );
-#else
   modredcul_redc (r, plow, phigh, m);
-#endif
 
 #if defined(MODTRACE)
   printf (" == %lu /* PARI */ \n", r[0]);
@@ -707,29 +709,15 @@ modredcul_sqr (residueredcul_t r, const residueredcul_t a,
   ASSERT_EXPENSIVE (m[0].m % 2 != 0);
   ASSERT_EXPENSIVE (a[0] < m[0].m);
 
+#if defined(MODTRACE)
+  printf ("(%lu^2 / 2^%ld) %% %lu", a[0], LONG_BIT, m[0].m);
+#endif
+
   ularith_sqr_ul_2ul (&plow, &phigh, a[0]);
-#ifdef HAVE_GCC_STYLE_AMD64_ASM
-
-  /* TODO: are the register constraints watertight?
-     %rax gets modified but putting tlow as an output constraint with "+"
-     will keep r from getting allocated in %rax, which is a shame
-     since we often want the result in %rax for the next multiply. */
-
-  __asm__ (
-    "imulq %[invm], %%rax\n\t"
-    "cmpq $1, %%rax \n\t"                /* if plow != 0, increase phigh */
-    "sbbq $-1, %[phigh]\n\t"
-    "mulq %[m]\n\t"
-    "lea (%[phigh],%%rdx,1), %[r]\n\t"  /* compute (rdx + thigh) mod m */
-    "subq %[m], %[phigh]\n\t"
-    "addq %%rdx, %[phigh]\n\t"
-    "cmovcq %[phigh], %[r]\n\t"
-    : [phigh] "+&r" (phigh), [r] "=&r" (r[0])
-    : [invm] "rm" (m[0].invm), [m] "rm" (m[0].m), "a" (plow)
-    : "%rdx", "cc"
-  );
-#else
   modredcul_redc (r, plow, phigh, m);
+
+#if defined(MODTRACE)
+  printf (" == %lu /* PARI */ \n", r[0]);
 #endif
 }
 
