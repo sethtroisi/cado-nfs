@@ -20,6 +20,20 @@ const unsigned int SPECIAL_Q[LEN_SPECIAL_Q] = {
 
 //#define LESS_P
 
+static inline uint64_t cputicks()
+{
+        uint64_t r;
+        __asm__ __volatile__(
+                "rdtsc\n\t"
+                "shlq $32, %%rdx\n\t"
+                "orq %%rdx, %%rax\n\t"
+                : "=a"(r)
+                :
+                : "rdx");
+        return r;
+}
+
+
 /* init prime array */
 unsigned long
 initPrimes ( unsigned long P,
@@ -369,15 +383,36 @@ hash_add (hash_t H, unsigned long p, int64_t i, mpz_t m0, uint64_t ad,
 }
 
 /* return non-zero iff there is a collision */
+/* Optimisation : gcc version 4.6.3 20120306 (Red Hat 4.6.3-2) (GCC)
+   When this code doesnt use nTh and nkey, gcc optimisation sets Th
+   and immediatly uses *Th.
+   => The code need 4 to 11 ticks to have the value of *Th.
+   When this code uses nTh and nkey, gcc optimisation suppress them with
+   reordonnancing BUT the loop is :
+   1. cTh = *Th
+   ...
+   n. Th = new valeur
+   n+1. if (Hj != Hjm) goto 1. 
+   In this case, the pipeline code breaks at the << right >> moment: the time
+   needed to goto in 1. is sufficent for the *Th prefetch.
+   The difference in this step is about 15%!
+   I have not found a way to impose this ASM code to gcc...
+   A. Filbois, 11/14/2012.
+*/
+
+
 int
 shash_find_collision (shash_t H)
 {
-  shash_tab_t *ptab;
-  uint64_t *Hj, *Hjm, i;
-  uint32_t *T, *Th, *Tend, key;
-  unsigned int j;
   static uint32_t size = 0, mask;
-
+  uint32_t *Th, *nTh;
+  uint32_t key, nkey;
+  shash_tab_t *ptab;
+  uint64_t *Hj, *Hjm;
+  uint32_t *T, *Tend;
+  uint64_t i;
+  unsigned int k;
+  
   if (!size) {
     size = H->balloc + (H->balloc >> 1);
     /* round up to power of 2 */
@@ -391,15 +426,130 @@ shash_find_collision (shash_t H)
   T = (uint32_t*) malloc (size * sizeof(*T));
   Tend = T + size;
   ptab = H->tab;
-  j = SHASH_NBUCKETS;
-  while (j--) {
+  for (k = SHASH_NBUCKETS; k-- ;) {
     memset (T, 0, size * sizeof(*T));
     Hj = ptab->base;
     Hjm = (ptab++)->current;
+    assert(Hjm != Hj);
+    i = *Hj++;
+    nTh = T +((i >> LN2SHASH_NBUCKETS) & mask);
+    nkey = (i >> 32) + i;
+    while (LIKELY (Hj != Hjm)) {
+      i = *Hj++;
+      Th = nTh;
+      nTh = T + ((i >> LN2SHASH_NBUCKETS) & mask);
+      key = nkey;
+      nkey = (i >> 32) + i;
+      if (LIKELY(!*Th))
+	*Th = key;
+      else {
+	do {
+	  if (UNLIKELY(*Th == key))
+	    {
+	      free (T);
+	      return 1;
+	    }
+	  Th++;
+	  if (UNLIKELY(Th == Tend)) Th = T;
+	} while (UNLIKELY(*Th));
+	*Th = key;
+      }
+    }
+    if (LIKELY(!*nTh))
+      *nTh = nkey;
+    else {
+      do {
+	if (UNLIKELY(*nTh == nkey)) {
+	  free (T);
+	  return 1;
+	}
+	nTh++;
+	if (UNLIKELY(nTh == Tend)) nTh = T;
+      } while (UNLIKELY(*nTh));
+      *nTh = nkey;
+    }
+  }
+  free (T);
+  return 0;
+}
+
+/* return non-zero iff there is a collision */
+#define PREFETCH 16
+int
+shash_find_collision_old (shash_t H)
+{
+  static uint32_t size = 0, mask;
+  struct {
+    uint32_t *Th, key;
+  } data[PREFETCH], *pdata, *edata, *ldata;
+  uint32_t *Th;
+  uint32_t key;
+  shash_tab_t *ptab;
+  uint64_t *Hj, *Hjm;
+  uint32_t *T, *Tend;
+  uint64_t i;
+  unsigned int k;
+  
+  if (!size) {
+    size = H->balloc + (H->balloc >> 1);
+    /* round up to power of 2 */
+    size --;
+    while (size & (size - 1))
+      size &= size - 1;
+    size <<= 1;
+    ASSERT_ALWAYS((size & (size - 1)) == 0);
+    mask = size - 1;
+  }
+  T = (uint32_t*) malloc (size * sizeof(*T));
+  Tend = T + size;
+  ptab = H->tab;
+  edata = data + PREFETCH;
+  for (k = SHASH_NBUCKETS; k-- ;) {
+    memset (T, 0, size * sizeof(*T));
+    Hj = ptab->base;
+    Hjm = (ptab++)->current;
+    assert((Hjm - Hj) >= PREFETCH);
+    pdata = data;
+    while (pdata != edata) {
+      i = *Hj++;
+      pdata->Th = T + ((i >> LN2SHASH_NBUCKETS) & mask);
+      __builtin_prefetch(pdata->Th, 1, 0);
+      pdata->key = (i >> 32) + i;
+      pdata++;
+    }
+    pdata = data;
     while (LIKELY(Hj != Hjm)) {
       i = *Hj++;
-      Th = T + ((i >> LN2SHASH_NBUCKETS) & mask);
-      key = i + (i >> 32);
+      Th = pdata->Th;
+      pdata->Th = T + ((i >> LN2SHASH_NBUCKETS) & mask);
+      __builtin_prefetch(pdata->Th, 1, 0);
+      key = pdata->key;
+      pdata->key = (i >> 32) + i;
+      pdata++;
+      if (UNLIKELY (pdata == edata)) pdata = data;
+      if (LIKELY(!*Th))
+	*Th = key;
+      else
+        {
+          do {
+            if (UNLIKELY(*Th == key))
+              {
+                free (T);
+                return 1;
+              }
+            Th++;
+            if (UNLIKELY(Th == Tend))
+              Th = T;
+          } while (*Th);
+          *Th = key;
+        }
+    }
+    ldata = pdata;
+    do {
+      Th = pdata->Th;
+      key = pdata->key;
+      pdata++;
+      if (UNLIKELY (pdata == edata)) pdata = data;
       if (LIKELY(!*Th))
 	*Th = key;
       else
@@ -416,7 +566,7 @@ shash_find_collision (shash_t H)
           } while (UNLIKELY(*Th));
           *Th = key;
         }
-    }
+    } while (ldata != pdata);
   }
   free (T);
   return 0;

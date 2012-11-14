@@ -1009,19 +1009,19 @@ collision_on_each_sq ( header_t header,
                        proots_t R,
                        unsigned long q,
                        mpz_t rqqz,
-                       unsigned long *inv_qq )
+                       unsigned long *inv_qq,
+		       uint8_t *hd2modp)
 {
   shash_t H;
   shash_tab_t *ptab;
   uint64_t **cur;
-  uint32_t *pPrimes, *ePrimes;
   unsigned int *pnr;
   double pc2;
-  uint64_t had_ha, pp;
+  uint64_t pp;
   int64_t ppl, u, umax, neg_umax, v;
-  unsigned long nprimes = 0, p, c;
+  unsigned long nprimes, p, c;
   long *pc, *pcnr;
-  unsigned int nr, k, j, vpnr;
+  unsigned int nr, j, vpnr;
   int found;
 #ifdef DEBUG_POLYSELECT2L
   int st = cputime();
@@ -1037,40 +1037,42 @@ collision_on_each_sq ( header_t header,
   umax *= umax;
   neg_umax = -umax;
   pc = (long *) inv_qq;
-  pPrimes = Primes;
   pnr = R->nr;
-  had_ha = header->d * header->ad;
   ptab = H->tab;
-  ePrimes = Primes + lenPrimes;
   /*
   t1 = cputicks();
   */
-  for (pPrimes = Primes; pPrimes != ePrimes; pPrimes++) {
-    vpnr = *pnr++;
-    if (!vpnr) continue;
-    p = *pPrimes;
-    if (!(had_ha % p)) continue;
-    ppl = (long) (p * p);
+  for (nprimes = 0; nprimes < lenPrimes; nprimes++) {
+    if (!(vpnr = pnr[nprimes])) continue;
+    if (UNLIKELY(hd2modp[nprimes])) continue;
     pcnr = pc + vpnr;
+    p = Primes[nprimes];
+    ppl = (long) (p * p);
     while (pc != pcnr) {
       u = *pc++;
       for (v = u; v < umax; v += ppl) {
-	k = v & (SHASH_NBUCKETS - 1);
-	cur = &(ptab[k].current);
+#if SHASH_NBUCKETS == 256
+	cur = &(ptab[(uint8_t) v].current);
+#else
+	cur = &(ptab[v & (SHASH_NBUCKETS - 1)].current);
+#endif
 	*(*cur)++ = v;
-	__builtin_prefetch(*cur);
+	__builtin_prefetch(*cur, 1, 3);
 	if (UNLIKELY(*cur >= *(cur + 1))) {
-	  fprintf (stderr, "A Shash bucket is full.\n");
+	  fprintf (stderr, "A Shash bucket is full\n");
 	  exit (1);
 	}
       }
       for (v = u - ppl; v > neg_umax; v -= ppl) {
-	k = v & (SHASH_NBUCKETS - 1);
-	cur = &(ptab[k].current);
+#if SHASH_NBUCKETS == 256
+	cur = &(ptab[(uint8_t) v].current);
+#else
+	cur = &(ptab[v & (SHASH_NBUCKETS - 1)].current);
+#endif
 	*(*cur)++ = v;
-	__builtin_prefetch(*cur);
+	__builtin_prefetch(*cur, 1, 3);
 	if (UNLIKELY(*cur >= *(cur + 1))) {
-	  fprintf (stderr, "A Shash bucket is full.\n");
+	  fprintf (stderr, "A Shash bucket is full\n");
 	  exit (1);
 	}
       }
@@ -1291,14 +1293,20 @@ collision_on_batch_sq ( header_t header,
 
   /* Step 2: find collisions on q. */
   int st2 = cputime();
+  uint64_t had_ha = header->d * header->d;
+  uint8_t *hd2modp = (uint8_t *) malloc(lenPrimes * sizeof(*hd2modp));
+  memset(hd2modp, 0, lenPrimes);
+  for (i = lenPrimes; i--;)
+    if (UNLIKELY(!(had_ha % Primes[i]))) hd2modp[i] = 1;
   for (i = 0; i < size; i ++) {
     collision_on_each_sq ( header,
                            R,
                            q[i],
                            rqqz[i],
-                           invqq[i] );
-
+                           invqq[i],
+			   hd2modp);
   }
+  free(hd2modp);
   if (verbose > 2)
     fprintf (stderr, "# loop on collision_on_each_sq took %dms\n",
              cputime () - st2);
