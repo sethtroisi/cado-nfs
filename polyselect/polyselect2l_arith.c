@@ -259,6 +259,9 @@ comp_sq_roots ( header_t header,
     modul_clearmod (qq);
   }
 
+  /* Reorder R entries by nr. It is safe to comment it. */
+  qroots_rearrange (SQ_R);
+
   free(rq);
   for (i = 0; i <= header->d; i++)
     mpz_clear (f[i]);
@@ -296,6 +299,27 @@ return_q_rq ( qroots_t SQ_R,
   /* crt roots */
   crt_sq (qqz, rqqz, idv_q, idv_rq);
 
+  return q;
+}
+
+
+/* given individual q's, return \product q and q^2 only, no rq */
+uint64_t
+return_q_norq ( qroots_t SQ_R,
+                unsigned long *idx_q,
+                unsigned long k,
+                mpz_t qqz )
+{
+  unsigned long i;
+  uint64_t q = 1;
+  mpz_t t;
+  mpz_init (t);
+  for (i = 0; i < k; i ++)
+    q = q * SQ_R->q[idx_q[i]];
+  mpz_set_uint64 (qqz, q);
+  mpz_set_uint64 (t, q);
+  mpz_mul (qqz, qqz, t);
+  mpz_clear (t);
   return q;
 }
 
