@@ -254,6 +254,41 @@ qroots_realloc (qroots_t R, unsigned long newalloc)
   }
 }
 
+/* reorder by nr */
+void
+qroots_rearrange (qroots_t R)
+{
+  if (R->size > 1) {
+    unsigned int i, j, k, max, tmpq, tmpnr;
+    uint64_t *tmpr = malloc (MAX_DEGREE * sizeof (uint64_t));
+
+    for (i = 0; i < R->size; i ++) {
+      max = i;
+      for (j = i+1; j < R->size; j++) {
+        if (R->nr[j] > R->nr[max]) {
+          max = j;
+        }
+      }
+      
+      tmpq = R->q[i];
+      tmpnr = R->nr[i];
+      for (k = 0; k < MAX_DEGREE; k ++)
+        tmpr[k] = R->roots[i][k];
+
+      R->q[i] = R->q[max];
+      R->nr[i] = R->nr[max];
+      for (k = 0; k < MAX_DEGREE; k ++)
+        R->roots[i][k] = R->roots[max][k];
+
+      R->q[max] = tmpq;
+      R->nr[max] = tmpnr;
+      for (k = 0; k < MAX_DEGREE; k ++)
+        R->roots[max][k] = tmpr[k];
+    }
+    free (tmpr);
+  }
+}
+
 void
 qroots_add (qroots_t R, unsigned int q, unsigned int nr, uint64_t *roots)
 {
@@ -265,7 +300,7 @@ qroots_add (qroots_t R, unsigned int q, unsigned int nr, uint64_t *roots)
     qroots_realloc (R, R->alloc + R->alloc / 2 + 1);
   R->q[R->size] = q;
   R->nr[R->size] = nr;
-  R->roots[R->size] = malloc (nr * sizeof (uint64_t));
+  R->roots[R->size] = malloc (MAX_DEGREE * sizeof (uint64_t));
   if (R->roots[R->size] == NULL)
   {
     fprintf (stderr, "Error, cannot allocate memory in roots_add\n");
@@ -281,7 +316,7 @@ qroots_print (qroots_t R)
 {
   unsigned int i, j;
   for (i = 0; i < R->size; i++) {
-    fprintf (stderr, "p: %u, r: ", R->q[i]);
+    fprintf (stderr, "q: %u, r: ", R->q[i]);
     for (j = 0; j < R->nr[i]; j ++)
       fprintf (stderr, "%"PRIu64" ", R->roots[i][j]);
     fprintf (stderr, "\n");
@@ -427,10 +462,10 @@ shash_find_collision (shash_t H)
   Tend = T + size;
   ptab = H->tab;
   for (k = SHASH_NBUCKETS; k-- ;) {
-    memset (T, 0, size * sizeof(*T));
     Hj = ptab->base;
     Hjm = (ptab++)->current;
-    assert(Hjm != Hj);
+    if (Hj == Hjm) continue;
+    memset (T, 0, size * sizeof(*T));
     i = *Hj++;
     nTh = T +((i >> LN2SHASH_NBUCKETS) & mask);
     nkey = (i >> 32) + i;

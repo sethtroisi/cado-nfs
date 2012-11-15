@@ -144,6 +144,7 @@ void qroots_init (qroots_t);
 void qroots_realloc (qroots_t, unsigned long);
 void qroots_add (qroots_t, unsigned int, unsigned int, uint64_t*);
 void qroots_print (qroots_t);
+void qroots_rearrange (qroots_t R);
 void qroots_clear (qroots_t);
 
 void hash_init (hash_t, unsigned int);
