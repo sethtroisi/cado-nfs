@@ -462,10 +462,10 @@ shash_find_collision (shash_t H)
   Tend = T + size;
   ptab = H->tab;
   for (k = SHASH_NBUCKETS; k-- ;) {
-    memset (T, 0, size * sizeof(*T));
     Hj = ptab->base;
     Hjm = (ptab++)->current;
-    assert(Hjm != Hj);
+    if (Hj == Hjm) continue;
+    memset (T, 0, size * sizeof(*T));
     i = *Hj++;
     nTh = T +((i >> LN2SHASH_NBUCKETS) & mask);
     nkey = (i >> 32) + i;
