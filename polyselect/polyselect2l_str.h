@@ -61,7 +61,6 @@ typedef struct
   shash_tab_t tab[SHASH_NBUCKETS+1]; /* +1 for guard */
   uint32_t alloc;      /* total allocated size */
   uint32_t balloc;     /* allocated size for each bucket */
-  uint32_t mask;       /* alloc - 1 */
 } __shash_struct;
 typedef __shash_struct shash_t[1];
 
