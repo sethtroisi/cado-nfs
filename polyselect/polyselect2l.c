@@ -186,7 +186,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
        uint64_t ad, unsigned long d, mpz_t N, uint64_t q,
        mpz_t rq)
 {
-  mpz_t l, mtilde, m, adm1, t, k, *f, g[2], *fold, gold[2], qq, adz;
+  mpz_t l, mtilde, m, adm1, t, k, *f, g[2], *fold, gold[2], adz;
   unsigned long j;
   int cmp;
   double skew, logmu, E;
@@ -202,7 +202,6 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_init (m);
   mpz_init (t);
   mpz_init (k);
-  mpz_init (qq);
   mpz_init (adm1);
   mpz_init (adz);
   mpz_init (mtilde);
@@ -227,9 +226,8 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_mul_ui (l, l, q);
   /* mtilde = m0 + rq + i*q^2 */
   mpz_set_si (mtilde, i);
-  mpz_set_ui (qq, q);
-  mpz_mul_ui (qq, qq, q);
-  mpz_mul (mtilde, mtilde, qq);
+  mpz_mul_ui (mtilde, mtilde, q);
+  mpz_mul_ui (mtilde, mtilde, q);
   mpz_add (mtilde, mtilde, rq);
   mpz_add (mtilde, mtilde, m0);
   /* we want mtilde = d*ad*m + a_{d-1}*l with 0 <= a_{d-1} < d*ad.
@@ -301,6 +299,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     mpz_divexact (t, t, l);
     /* t = a_j*m^j + l*R thus a_j = t/m^j mod l */
     mpz_pow_ui (mtilde, m, j);
+    /* fdiv rounds toward -infinity: adm1 = floor(t/mtilde) */
     mpz_fdiv_q (adm1, t, mtilde); /* t -> adm1 * mtilde + t */
     mpz_invert (k, mtilde, l); /* search adm1 + k such that
                                   t = (adm1 + k) * m^j mod l */
@@ -514,7 +513,6 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   mpz_clear (m);
   mpz_clear (t);
   mpz_clear (k);
-  mpz_clear (qq);
   mpz_clear (adm1);
   mpz_clear (adz);
   mpz_clear (mtilde);
