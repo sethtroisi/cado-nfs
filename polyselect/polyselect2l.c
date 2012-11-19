@@ -1153,6 +1153,8 @@ collision_on_each_sq_r ( header_t header,
     exit (1);
   }
 
+  int st = cputime();
+  
   /* for each rp, compute (rp-rq)*1/q^2 (mod p^2) */
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
 
@@ -1191,8 +1193,18 @@ collision_on_each_sq_r ( header_t header,
     modredcul_clearmod (modpp);
   }
 
+  if (verbose > 2) {
+    fprintf (stderr, "#  substage: compute (rp-rq)*1/q^2 took %dms\n",
+             cputime () - st);
+    st = cputime();
+  }
+  
   /* core function to find collisions */
   collision_on_each_sq (header, R, q, rqqz, tinv_qq, hd2modp);
+
+  if (verbose > 2)
+    fprintf (stderr, "#  substage: collision finding per rq took %dms\n",
+             cputime () - st);
 
   free (tinv_qq);
 }
@@ -1409,7 +1421,7 @@ collision_on_batch_sq ( header_t header,
   } // next prime p
 
   if (verbose > 2)
-    fprintf (stderr, "# one batch SQ inversion (per ad) for %lu primes took %dms\n",
+    fprintf (stderr, "# stage (batch SQ inversion) for %lu primes took %dms\n",
              lenPrimes, cputime () - st);
 
   /* Step 2: find collisions on q. */
@@ -1429,8 +1441,8 @@ collision_on_batch_sq ( header_t header,
   }
   
   if (verbose > 2)
-    fprintf (stderr, "# loop on collision_on_batch_sq_r took %dms\n",
-             cputime () - st2);
+    fprintf (stderr, "#  stage (special-q) for %d special-q's took %dms\n",
+             cputime () - st2, nq);
 
   free(hd2modp);
   for (i = 0; i < size; i++)
