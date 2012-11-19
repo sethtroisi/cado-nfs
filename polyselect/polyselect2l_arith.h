@@ -26,4 +26,6 @@ void crt_sq (mpz_t, mpz_t, unsigned long *, unsigned long *);
 uint64_t return_q_rq (qroots_t, unsigned long *idx_q,
 		      unsigned long k, mpz_t qqz, mpz_t rqqz);
 
+uint64_t return_q_norq (qroots_t SQ_R, unsigned long *idx_q,
+                        unsigned long k, mpz_t qqz);
 #endif
