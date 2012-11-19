@@ -2,33 +2,69 @@
 
 import http.server
 import socketserver
-import select
-import threading
-import pickle
 import os
-from shutil import copyfileobj
-from tempfile import mkstemp
 
-upload_keywords = ['myupload']
+# Get the shell environment variable name in which we should store the path 
+# to the upload directory
+from upload import UPLOADDIRKEY
 
-newfile_lock = threading.Lock()
+upload_keywords = ['upload.py']
+uploaddir='upload/' # Upload CGI script puts files in this directory
 
 class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     """Handle requests in a separate thread."""
 
+class Workunits():
+    WU_counter = 0
+    
+    def get_new(self):
+        """Returns the contents of a WU file for an available WU"""
+        if self.WU_counter > 500:
+            return None
+        WU = "WORKUNIT WU" + str(self.WU_counter) + "\r\n"
+        WU = WU + "FILE ecm\r\n"
+        WU = WU + "FILE c200\r\n"
+        WU = WU + "COMMAND ecm 44e6 < c200 > output\r\n"
+        WU = WU + "RESULT output"
+        self.WU_counter = self.WU_counter + 1
+        return WU;
+
+WU = Workunits()
+
 class MyHandler(http.server.CGIHTTPRequestHandler):
+    def send_body(self, body):
+        self.wfile.write(bytes(body, "utf-8"))
+        self.wfile.flush()
+
     def do_GET(self):
         """Generates a work unit if request is cgi-bin/getwu, otherwise calls
            parent class' do_GET()"""
-        if is_getwu():
-            make_wu()
+        if self.is_getwu():
+            self.send_WU()
+        elif self.is_cgi():
+            self.send_error(404, "GET for CGI scripts allowed only for work unit request")
         else:
-            http.server.CGIHTTPRequestHandler.do_POST(self)
+            http.server.CGIHTTPRequestHandler.do_GET(self)
+
+    def send_WU(self):
+        new_WU = WU.get_new()
+        if new_WU == None:
+            return self.send_error(404)
+        self.send_response(200)
+        self.send_header("Content-Type", "text/plain")
+        self.send_header("Content-Length", str(len(new_WU)))
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        self.send_body(new_WU)
 
     def do_POST(self):
         """Set environment variable telling the upload directory 
            and call CGI handler to run upload CGI script"""
-        http.server.CGIHTTPRequestHandler.do_POST(self)
+        os.environ[UPLOADDIRKEY] = uploaddir
+        if self.is_upload():
+            http.server.CGIHTTPRequestHandler.do_POST(self)
+        else:
+            self.send_error(404, "POST request allowed only for uploads")
 
     def is_upload(self):
         """Test whether request is a file upload."""
@@ -38,7 +74,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         return False
 
     def is_getwu(self):
-        """Test whether request is for a WU."""
+        """Test whether request is for a new WU."""
         splitpath = http.server._url_collapse_path_split(self.path)
         if self.command == 'GET' and self.is_cgi() and splitpath[1] in ['getwu']:
             return True
