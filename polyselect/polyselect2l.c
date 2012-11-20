@@ -1139,32 +1139,37 @@ static inline void
 collision_on_each_sq_r ( header_t header,
                          proots_t R,
                          unsigned long q,
-                         mpz_t rqqz,
+                         mpz_t *rqqz,
                          unsigned long *inv_qq,
                          unsigned long number_pr,
-                         uint8_t *hd2modp)
+                         uint8_t *hd2modp,
+                         int count )
 {
-  unsigned int i, nr;
+  unsigned int i, nr, *pnr;
   unsigned long nprimes, p, c = 0, rp, rqi;
+  int k;
   uint64_t pp;
-  unsigned long *tinv_qq = malloc (number_pr * sizeof (unsigned long));
-  if (!tinv_qq) {
+  unsigned long **tinv_qq = malloc (count * sizeof (unsigned long*));
+
+  if (!tinv_qq) 
+  {
     fprintf (stderr, "Error, cannot allocate memory in %s\n", __FUNCTION__);
     exit (1);
   }
+  for (k = 0; k < count; k++)
+    tinv_qq[k] = malloc (number_pr * sizeof (unsigned long));
 
   int st = cputime();
+  pnr = R->nr;
   
   /* for each rp, compute (rp-rq)*1/q^2 (mod p^2) */
-  for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
-
+  for (nprimes = 0; nprimes < lenPrimes; nprimes ++) 
+  {
+    if (UNLIKELY(hd2modp[nprimes])) continue;
+    if (!pnr[nprimes]) continue;
+    nr = pnr[nprimes];
     p = Primes[nprimes];
     pp = p*p;
-    if ((header->d * header->ad) % p == 0)
-      continue;
-    nr = R->nr[nprimes];
-    if (nr == 0)
-      continue;
 
     modulusredcul_t modpp;
     residueredcul_t res_rqi, res_rp, res_tmp;
@@ -1173,20 +1178,25 @@ collision_on_each_sq_r ( header_t header,
     modredcul_init (res_rp, modpp);
     modredcul_init (res_tmp, modpp);
 
-    rqi = mpz_fdiv_ui (rqqz, pp);
-    modredcul_intset_ul (res_rqi, rqi);
-    modredcul_intset_ul (res_tmp, inv_qq[nprimes]);
-    for (i = 0; i < nr; i ++, c++)
+    for (k = 0; k < count; k ++) 
     {
-      rp = R->roots[nprimes][i];
-      modredcul_intset_ul (res_rp, rp);
-      /* rp - rq */
-      modredcul_sub (res_rp, res_rp, res_rqi, modpp);
-      /* res_rp = (rp - rq) / q[i]^2 */
-      modredcul_mul (res_rp, res_rp, res_tmp, modpp);
-      tinv_qq[c] = modredcul_intget_ul (res_rp, modpp);
+      rqi = mpz_fdiv_ui (rqqz[k], pp);
+      modredcul_intset_ul (res_rqi, rqi);
+      modredcul_intset_ul (res_tmp, inv_qq[nprimes]);
+      for (i = 0; i < nr; i ++, c++) 
+      {
+        rp = R->roots[nprimes][i];
+        modredcul_intset_ul (res_rp, rp);
+        /* rp - rq */
+        modredcul_sub (res_rp, res_rp, res_rqi, modpp);
+        /* res_rp = (rp - rq) / q[i]^2 */
+        modredcul_mul (res_rp, res_rp, res_tmp, modpp);
+        tinv_qq[k][c] = modredcul_intget_ul (res_rp, modpp);
+      }
+      c -= nr;
     }
-
+    c += nr;
+    
     modredcul_clear (res_rp, modpp);
     modredcul_clear (res_rqi, modpp);
     modredcul_clear (res_tmp, modpp);
@@ -1194,18 +1204,22 @@ collision_on_each_sq_r ( header_t header,
   }
 
   if (verbose > 2) {
-    fprintf (stderr, "#  substage: compute (rp-rq)*1/q^2 took %dms\n",
-             cputime () - st);
+    fprintf (stderr, "#  substage: batch %d many (rp-rq)*1/q^2 took %dms\n",
+             count, cputime () - st);
     st = cputime();
   }
   
   /* core function to find collisions */
-  collision_on_each_sq (header, R, q, rqqz, tinv_qq, hd2modp);
-
+  for (k = 0; k < count; k ++) {
+    collision_on_each_sq (header, R, q, rqqz[k], tinv_qq[k], hd2modp);
+  }
+  
   if (verbose > 2)
-    fprintf (stderr, "#  substage: collision finding per rq took %dms\n",
-             cputime () - st);
+    fprintf (stderr, "#  substage: collision-detection %d many rq took %dms\n",
+             count, cputime () - st);
 
+  for (k = 0; k < count; k++)
+    free (tinv_qq[k]);
   free (tinv_qq);
 }
 
@@ -1270,13 +1284,14 @@ collision_on_batch_sq_r ( header_t header,
                           uint8_t *hd2modp,
                           int *curr_nq )
 {
-  int i;
+  int i, count;
   unsigned int ind_qr[lq]; /* indices of roots for each small q */
   unsigned int len_qnr[lq]; /* for each small q, number of roots */
-  mpz_t qqz, rqqz;
+  mpz_t qqz, rqqz[BATCH_SIZE];
 
   mpz_init (qqz);
-  mpz_init (rqqz);
+  for (i = 0; i < BATCH_SIZE; i ++)
+    mpz_init (rqqz[i]);
 
   /* initialization indices */
   for (i = 0; i < lq; i ++) {
@@ -1294,32 +1309,28 @@ collision_on_batch_sq_r ( header_t header,
   fprintf (stderr, "\n");
 #endif
 
-  i = 0;
+  /* we proceed with BATCH_SIZE many rq for each time */
+  i = count = 0;
   int re = 1;
   while (re) {
+    /* compute BATCH_SIZE such many rqqz[] */
+    for (count = 0; count < BATCH_SIZE; count ++) {
+      aux_return_rq (SQ_R, idx_q, ind_qr, lq, qqz, rqqz[count]);
+      re = aux_nextcomb(ind_qr, lq, len_qnr);
+      if (!re) break;
+    }
 
     /* reach nq limit */
-    if ((*curr_nq)++ > nq)
-      break;
+    (*curr_nq) += count;
+    if ((*curr_nq) > nq) break;
 
-    /* compute qqz, rqqz */
-    aux_return_rq (SQ_R, idx_q, ind_qr, lq, qqz, rqqz);
-
-#if 0
-    for (int j = 0; j < lq; j ++)
-      printf ("%u ", ind_qr[j]);
-    gmp_printf ("qq: %Zd, rqq: %Zd\n", qqz, rqqz);
-#endif
-
-    /* core function for a fixed rqqz */
-    collision_on_each_sq_r (header, R, q, rqqz, inv_qq, number_pr, hd2modp);
-
-    /* return next index to ind_qr */
-    re = aux_nextcomb(ind_qr, lq, len_qnr);
+    /* core function for a fixed qq and several rqqz[] */
+    collision_on_each_sq_r (header, R, q, rqqz, inv_qq, number_pr, hd2modp, count);
   }
 
   mpz_clear (qqz);
-  mpz_clear (rqqz);
+  for (i = 0; i < BATCH_SIZE; i ++)
+    mpz_clear (rqqz[i]);
 }
 
 
@@ -1442,7 +1453,7 @@ collision_on_batch_sq ( header_t header,
   
   if (verbose > 2)
     fprintf (stderr, "#  stage (special-q) for %d special-q's took %dms\n",
-             cputime () - st2, nq);
+             nq, cputime() - st2);
 
   free(hd2modp);
   for (i = 0; i < size; i++)
@@ -2127,7 +2138,7 @@ main (int argc, char *argv[])
 
   printf ( "# Info: estimated peak memory=%.2fMB (%d thread(s),"
            " batch %d inversions on SQ)\n",
-           (double) (nthreads * (BATCH_SIZE + INIT_FACTOR) * lenPrimes
+           (double) (nthreads * (BATCH_SIZE * 2 + INIT_FACTOR) * lenPrimes
            * (sizeof(uint32_t) + sizeof(uint64_t)) / 1024 / 1024),
            nthreads,
            BATCH_SIZE );
