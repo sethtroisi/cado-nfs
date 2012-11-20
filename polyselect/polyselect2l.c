@@ -1027,15 +1027,16 @@ collision_on_each_sq ( header_t header,
 #else
 #define CURRENT(V) (H->current + ((V) & (SHASH_NBUCKETS - 1)))
 #endif
-
   /*
   uint64_t t1, t2;
   static uint64_t sum1 = 0, sum2 = 0;
   */
   shash_init (H, 4 * lenPrimes);
+
   /*
   t1 = cputicks();
   */
+
   pc = (long *) inv_qq;
   umax = (int64_t) Primes[lenPrimes - 1];
   umax *= umax;
@@ -1123,15 +1124,19 @@ collision_on_each_sq ( header_t header,
   }
   for (j = 0; j < SHASH_NBUCKETS; j++)
     assert (H->current[j] <= H->base[j+1]);
+  
   /*
   t2 = cputicks();
   sum1 += t2 - t1;
   */
+
   found = shash_find_collision (H);
   shash_clear (H);
+
   /*
   sum2 += cputicks() - t2;
   */
+
   if (found) /* do the real work */
     {
       hash_t H;
@@ -1175,6 +1180,7 @@ collision_on_each_sq ( header_t header,
   pthread_mutex_lock (&lock);
   potential_collisions += pc2;
   pthread_mutex_unlock (&lock);
+
   /*
   fprintf (stderr, "%lu %lu\n", sum1 / 3000000, sum2 / 3000000);
   */
