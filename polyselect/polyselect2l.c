@@ -2109,12 +2109,8 @@ main (int argc, char *argv[])
   }
 
   /* check seed */
-  if (seed < 1) {
-    seed = time(NULL);
-    srand(seed);
-  }
-  else
-    srand(seed);
+  if (seed == 0)
+    seed = time (NULL);
 
   /* check nthreads */
 #ifdef MAX_THREADS
@@ -2219,6 +2215,9 @@ main (int argc, char *argv[])
 
   while (admin <= admax && seconds () - st0 <= maxtime)
   {
+    srand (seed); /* reset the random seed for each ad, so that we can
+                     reproduce a polynomial found without starting from
+                     the very beginning */
     for (i = 0; i < nthreads ; i++)
     {
       tries ++;

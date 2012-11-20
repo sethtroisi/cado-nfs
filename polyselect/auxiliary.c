@@ -2602,7 +2602,7 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
 {
   mpz_t kt, k2, k1, k, l; /* current offset */
   mpz_t ktot, khitot, lamtot, mutot; /* compute total translation and rotation,
-                                        such that current polynomial are
+                                        such that current polynomials are
                                         [f+(khitot*x^2+lamtot*x+mutot)*g](x+k)
                                         and g(x+k) */
   mpz_t tmp;
@@ -3319,18 +3319,20 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
     /* We use here an idea suggested by Thorsten Kleinjung, namely
        rotating by l*x^3*g for several values of l, and keeping the
        best value of l.
-       With RSA-768, P=10^5, admax=25000 we get the following average
-       lognorms (61 hits), without the logmu -= sqrt (...) line below:
-       LMAX=0: 70.68
-       LMAX=1: 70.29
-       LMAX=2: 70.02
-       LMAX=4: 69.81
-       LMAX=8: 69.64
-       LMAX=16: 69.46
-       LMAX=32: 69.35
-       LMAX=64: 69.27
-       LMAX=128: 69.23
-       LMAX=256: 69.22
+       With RSA-768, P=10^5, admax=2500, incr=60, lq=3, nq=1000, seed=1, we
+       get the following min/av/max lognorms (248 hits):
+       LMAX=0: 68.97/71.66/73.12
+       LMAX=1: 68.97/71.26/72.80
+       LMAX=2: 68.97/71.04/72.47
+       LMAX=4: 68.97/70.78/72.44
+       LMAX=8: 68.59/70.46/72.33
+       LMAX=16: 68.15/70.18/71.91
+       LMAX=32: 68.05/69.90/71.28
+       LMAX=64: 67.94/69.66/71.04
+       LMAX=128: 67.94/69.44/70.86
+       LMAX=256: 67.94/69.30/70.51
+       LMAX=512: 67.94/69.23/70.36
+       LMAX=1024: 67.94/69.20/70.10
     */
 #define LMAX 256
     for (l = -LMAX; l <= LMAX; l++) /* we consider f + l*x^(d-3)*g */
@@ -3366,13 +3368,6 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
         mpz_neg (k, k);
         rotate_auxg_z (f, g[1], g[0], k, 2);
 
-        /* we estimate here the expected alpha value we can get from
-           rotation. For a rotation space of K vakues, we can expect
-           alpha ~ -0.824*sqrt(2*log(K)) (experiments done by Shi Bai
-           for RSA-768). 
-           Since for degree 6 the rotation space is in S^6, we consider
-           -sqrt(SKEW_FACTOR*log(S)). */
-#define SKEW_FACTOR 8.148 /* 0.824^2*2*6 */
 #ifdef OPTIMIZE_MP
         optimize_aux_mp (f, d, g, verbose, use_rotation, CIRCULAR);
         L2_skewness_derivative_mp (f, d, SKEWNESS_DEFAULT_PREC,
@@ -3386,7 +3381,6 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
         skewd = mpz_get_d (skew);
         logmud = logmud / skewd * 0.00043828022511018320850; /* Pi/7168 */
         logmud = 0.5 * log(logmud);
-        logmud -= sqrt (SKEW_FACTOR * log (skewf));
 
         if (logmud < best_logmud) {
           best_logmud = logmud;
@@ -3399,7 +3393,6 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
         skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC,
                             DEFAULT_L2_METHOD);
         logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
-        logmu -= sqrt (SKEW_FACTOR * log (skew));
 
         if (logmu < best_logmu)
         {
