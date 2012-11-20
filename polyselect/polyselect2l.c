@@ -1011,71 +1011,118 @@ collision_on_each_sq ( header_t header,
                        uint8_t *hd2modp)
 {
   shash_t H;
-  shash_tab_t *ptab;
   uint64_t **cur;
-  unsigned int *pnr;
+  long *pc, *pcnr;
   double pc2;
   uint64_t pp;
-  int64_t ppl, u, umax, neg_umax, v;
-  unsigned long nprimes, p, c;
-  long *pc, *pcnr;
-  unsigned int nr, j, vpnr;
+  int64_t ppl, umax, neg_umax, u, v;
+  unsigned long p, nprimes, c;
+  unsigned int vpnr, nr, j;
   int found;
 #ifdef DEBUG_POLYSELECT2L
   int st = cputime();
+#endif
+#if SHASH_NBUCKETS == 256
+#define CURRENT(V) (H->current + (uint8_t) (V))
+#else
+#define CURRENT(V) (H->current + ((V) & (SHASH_NBUCKETS - 1)))
 #endif
 
   /*
   uint64_t t1, t2;
   static uint64_t sum1 = 0, sum2 = 0;
   */
-  
   shash_init (H, 4 * lenPrimes);
-  umax = (int64_t) Primes[lenPrimes - 1];
-  umax *= umax;
-  neg_umax = -umax;
-  pc = (long *) inv_qq;
-  pnr = R->nr;
-  ptab = H->tab;
   /*
   t1 = cputicks();
   */
-  for (nprimes = 0; nprimes < lenPrimes; nprimes++) {
-    if (!(vpnr = pnr[nprimes])) continue;
-    if (UNLIKELY(hd2modp[nprimes])) continue;
+  pc = (long *) inv_qq;
+  umax = (int64_t) Primes[lenPrimes - 1];
+  umax *= umax;
+  neg_umax = -umax;
+  for (nprimes = 0; LIKELY(nprimes < lenPrimes); nprimes++) {
+    if (!(vpnr = R->nr[nprimes])) continue;
+    if (hd2modp[nprimes]) continue;
     pcnr = pc + vpnr;
-    p = Primes[nprimes];
-    ppl = (long) (p * p);
-    while (pc != pcnr) {
-      u = *pc++;
-      for (v = u; v < umax; v += ppl) {
-#if SHASH_NBUCKETS == 256
-	cur = &(ptab[(uint8_t) v].current);
-#else
-	cur = &(ptab[v & (SHASH_NBUCKETS - 1)].current);
-#endif
-	*(*cur)++ = v;
-	__builtin_prefetch(*cur, 1, 3);
-	if (UNLIKELY(*cur >= *(cur + 1))) {
-	  fprintf (stderr, "A Shash bucket is full\n");
-	  exit (1);
-	}
+    ppl = (long) Primes[nprimes];
+    ppl *= ppl;
+    do {
+      v = *pc++;
+      u = v - ppl;
+      while (v < umax) {
+	/* Careful. If the loop is unrolled, use at least 12-16 occurencies,
+	   or gcc optimiser does stupid slower << optimizations >> */ 
+	cur = CURRENT(v); *(*cur)++ = v; __builtin_prefetch(*cur, 1, 3);
+	v += ppl; if (v >= umax) break;
+	cur = CURRENT(v); *(*cur)++ = v; __builtin_prefetch(*cur, 1, 3);
+	v += ppl; if (v >= umax) break;
+	cur = CURRENT(v); *(*cur)++ = v; __builtin_prefetch(*cur, 1, 3);
+	v += ppl; if (v >= umax) break;
+	cur = CURRENT(v); *(*cur)++ = v; __builtin_prefetch(*cur, 1, 3);
+	v += ppl; if (v >= umax) break;
+	cur = CURRENT(v); *(*cur)++ = v; __builtin_prefetch(*cur, 1, 3);
+	v += ppl; if (v >= umax) break;
+	cur = CURRENT(v); *(*cur)++ = v; __builtin_prefetch(*cur, 1, 3);
+	v += ppl; if (v >= umax) break;
+	cur = CURRENT(v); *(*cur)++ = v; __builtin_prefetch(*cur, 1, 3);
+	v += ppl; if (v >= umax) break;
+	cur = CURRENT(v); *(*cur)++ = v; __builtin_prefetch(*cur, 1, 3);
+	v += ppl; if (v >= umax) break;
+	cur = CURRENT(v); *(*cur)++ = v; __builtin_prefetch(*cur, 1, 3);
+	v += ppl; if (v >= umax) break;
+	cur = CURRENT(v); *(*cur)++ = v; __builtin_prefetch(*cur, 1, 3);
+	v += ppl; if (v >= umax) break;
+	cur = CURRENT(v); *(*cur)++ = v; __builtin_prefetch(*cur, 1, 3);
+	v += ppl; if (v >= umax) break;
+	cur = CURRENT(v); *(*cur)++ = v; __builtin_prefetch(*cur, 1, 3);
+	v += ppl; if (v >= umax) break;
+	cur = CURRENT(v); *(*cur)++ = v; __builtin_prefetch(*cur, 1, 3);
+	v += ppl; if (v >= umax) break;
+	cur = CURRENT(v); *(*cur)++ = v; __builtin_prefetch(*cur, 1, 3);
+	v += ppl; if (v >= umax) break;
+	cur = CURRENT(v); *(*cur)++ = v; __builtin_prefetch(*cur, 1, 3);
+	v += ppl; if (v >= umax) break;
+	cur = CURRENT(v); *(*cur)++ = v; __builtin_prefetch(*cur, 1, 3);
+	v += ppl;
       }
-      for (v = u - ppl; v > neg_umax; v -= ppl) {
-#if SHASH_NBUCKETS == 256
-	cur = &(ptab[(uint8_t) v].current);
-#else
-	cur = &(ptab[v & (SHASH_NBUCKETS - 1)].current);
-#endif
-	*(*cur)++ = v;
-	__builtin_prefetch(*cur, 1, 3);
-	if (UNLIKELY(*cur >= *(cur + 1))) {
-	  fprintf (stderr, "A Shash bucket is full\n");
-	  exit (1);
-	}
+      while (u > neg_umax) {
+	cur = CURRENT(u); *(*cur)++ = u; __builtin_prefetch(*cur, 1, 3);
+	u -= ppl; if (u <= neg_umax) break;
+	cur = CURRENT(u); *(*cur)++ = u; __builtin_prefetch(*cur, 1, 3);
+	u -= ppl; if (u <= neg_umax) break;
+	cur = CURRENT(u); *(*cur)++ = u; __builtin_prefetch(*cur, 1, 3);
+	u -= ppl; if (u <= neg_umax) break;
+	cur = CURRENT(u); *(*cur)++ = u; __builtin_prefetch(*cur, 1, 3);
+	u -= ppl; if (u <= neg_umax) break;
+	cur = CURRENT(u); *(*cur)++ = u; __builtin_prefetch(*cur, 1, 3);
+	u -= ppl; if (u <= neg_umax) break;
+	cur = CURRENT(u); *(*cur)++ = u; __builtin_prefetch(*cur, 1, 3);
+	u -= ppl; if (u <= neg_umax) break;
+	cur = CURRENT(u); *(*cur)++ = u; __builtin_prefetch(*cur, 1, 3);
+	u -= ppl; if (u <= neg_umax) break;
+	cur = CURRENT(u); *(*cur)++ = u; __builtin_prefetch(*cur, 1, 3);
+	u -= ppl; if (u <= neg_umax) break;
+	cur = CURRENT(u); *(*cur)++ = u; __builtin_prefetch(*cur, 1, 3);
+	u -= ppl; if (u <= neg_umax) break;
+	cur = CURRENT(u); *(*cur)++ = u; __builtin_prefetch(*cur, 1, 3);
+	u -= ppl; if (u <= neg_umax) break;
+	cur = CURRENT(u); *(*cur)++ = u; __builtin_prefetch(*cur, 1, 3);
+	u -= ppl; if (u <= neg_umax) break;
+	cur = CURRENT(u); *(*cur)++ = u; __builtin_prefetch(*cur, 1, 3);
+	u -= ppl; if (u <= neg_umax) break;
+	cur = CURRENT(u); *(*cur)++ = u; __builtin_prefetch(*cur, 1, 3);
+	u -= ppl; if (u <= neg_umax) break;
+	cur = CURRENT(u); *(*cur)++ = u; __builtin_prefetch(*cur, 1, 3);
+	u -= ppl; if (u <= neg_umax) break;
+	cur = CURRENT(u); *(*cur)++ = u; __builtin_prefetch(*cur, 1, 3);
+	u -= ppl; if (u <= neg_umax) break;
+	cur = CURRENT(u); *(*cur)++ = u; __builtin_prefetch(*cur, 1, 3);
+	u -= ppl;
       }
-    }
+    } while (pc != pcnr);
   }
+  for (j = 0; j < SHASH_NBUCKETS; j++)
+    assert (H->current[j] <= H->base[j+1]);
   /*
   t2 = cputicks();
   sum1 += t2 - t1;

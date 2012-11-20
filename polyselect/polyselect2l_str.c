@@ -370,7 +370,8 @@ shash_init (shash_t H, unsigned int init_size)
   init_size += init_size / 10 + 128; /* use 10% margin */
   if (init_size > init_size0)
     init_size = init_size0;
-  H->alloc = init_size * SHASH_NBUCKETS;
+  H->alloc = init_size * SHASH_NBUCKETS + 1;
+  /* +1 for guard for the last buckets to avoid seg fault */
   H->mem = (uint64_t*) malloc (H->alloc * sizeof (uint64_t));
   if (!H->mem)
     {
@@ -378,10 +379,10 @@ shash_init (shash_t H, unsigned int init_size)
       exit (1);
     }
   H->balloc = init_size;
-  H->tab[0].base = H->tab[0].current = H->mem;
+  H->base[0] = H->current[0] = H->mem;
   for (j = 1; j <= SHASH_NBUCKETS; j++)
     {
-      H->tab[j].base = H->tab[j].current = H->tab[j-1].base + H->balloc;
+      H->base[j] = H->current[j] = H->base[j-1] + H->balloc;
     }
 }
 
@@ -442,14 +443,13 @@ shash_find_collision (shash_t H)
   static uint32_t size = 0, mask;
   uint32_t *Th, *nTh;
   uint32_t key, nkey;
-  shash_tab_t *ptab;
   uint64_t *Hj, *Hjm;
   uint32_t *T, *Tend;
   uint64_t i;
   unsigned int k;
   
   if (!size) {
-    size = H->balloc + (H->balloc >> 1);
+    size = H->balloc << 1;
     /* round up to power of 2 */
     size --;
     while (size & (size - 1))
@@ -460,10 +460,9 @@ shash_find_collision (shash_t H)
   }
   T = (uint32_t*) malloc (size * sizeof(*T));
   Tend = T + size;
-  ptab = H->tab;
-  for (k = SHASH_NBUCKETS; k-- ;) {
-    Hj = ptab->base;
-    Hjm = (ptab++)->current;
+  for (k = 0; k < SHASH_NBUCKETS; k++) {
+    Hj = H->base[k];
+    Hjm = H->current[k];
     if (Hj == Hjm) continue;
     memset (T, 0, size * sizeof(*T));
     i = *Hj++;
@@ -473,6 +472,7 @@ shash_find_collision (shash_t H)
       i = *Hj++;
       Th = nTh;
       nTh = T + ((i >> LN2SHASH_NBUCKETS) & mask);
+      /* __builtin_prefetch(pdata->Th, 1, 0); */
       key = nkey;
       nkey = (i >> 32) + i;
       if (LIKELY(!*Th))
@@ -519,11 +519,10 @@ shash_find_collision_old (shash_t H)
   } data[PREFETCH], *pdata, *edata, *ldata;
   uint32_t *Th;
   uint32_t key;
-  shash_tab_t *ptab;
   uint64_t *Hj, *Hjm;
   uint32_t *T, *Tend;
   uint64_t i;
-  unsigned int k;
+  unsigned int j, k, l;
   
   if (!size) {
     size = H->balloc + (H->balloc >> 1);
@@ -537,49 +536,53 @@ shash_find_collision_old (shash_t H)
   }
   T = (uint32_t*) malloc (size * sizeof(*T));
   Tend = T + size;
-  ptab = H->tab;
   edata = data + PREFETCH;
-  for (k = SHASH_NBUCKETS; k-- ;) {
+  for (k = 0; k <SHASH_NBUCKETS; k++) {
+    Hj = H->base[k];
+    Hjm = H->current[k];
+    if (Hj == Hjm) continue;
     memset (T, 0, size * sizeof(*T));
-    Hj = ptab->base;
-    Hjm = (ptab++)->current;
-    assert((Hjm - Hj) >= PREFETCH);
     pdata = data;
-    while (pdata != edata) {
-      i = *Hj++;
-      pdata->Th = T + ((i >> LN2SHASH_NBUCKETS) & mask);
+    j = Hjm - Hj;
+    if (j > PREFETCH) j = PREFETCH;
+    for (l = 0; l < j; l++) {
+      i = Hj[l];
+      data[l].Th = T + ((i >> LN2SHASH_NBUCKETS) & mask);
       __builtin_prefetch(pdata->Th, 1, 0);
-      pdata->key = (i >> 32) + i;
-      pdata++;
+      data[l].key = (i >> 32) + i;
     }
-    pdata = data;
-    while (LIKELY(Hj != Hjm)) {
-      i = *Hj++;
-      Th = pdata->Th;
-      pdata->Th = T + ((i >> LN2SHASH_NBUCKETS) & mask);
-      __builtin_prefetch(pdata->Th, 1, 0);
-      key = pdata->key;
-      pdata->key = (i >> 32) + i;
-      pdata++;
-      if (UNLIKELY (pdata == edata)) pdata = data;
-      if (LIKELY(!*Th))
-	*Th = key;
-      else
-        {
-          do {
-            if (UNLIKELY(*Th == key))
-              {
-                free (T);
-                return 1;
-              }
-            Th++;
-            if (UNLIKELY(Th == Tend))
-              Th = T;
-          } while (*Th);
-          *Th = key;
-        }
+    Hj += j;
+    if (LIKELY(j == PREFETCH)) {
+      while (LIKELY(Hj != Hjm)) {
+	i = *Hj++;
+	Th = pdata->Th;
+	pdata->Th = T + ((i >> LN2SHASH_NBUCKETS) & mask);
+	__builtin_prefetch(pdata->Th, 1, 0);
+	key = pdata->key;
+	pdata->key = (i >> 32) + i;
+	pdata++;
+	if (UNLIKELY (pdata == edata)) pdata = data;
+	if (LIKELY(!*Th))
+	  *Th = key;
+	else
+	  {
+	    do {
+	      if (UNLIKELY(*Th == key))
+		{
+		  free (T);
+		  return 1;
+		}
+	      Th++;
+	      if (UNLIKELY(Th == Tend))
+		Th = T;
+	    } while (*Th);
+	    *Th = key;
+	  }
+      }
+      ldata = pdata;
     }
-    ldata = pdata;
+    else
+      ldata = data + l;
     do {
       Th = pdata->Th;
       key = pdata->key;
@@ -601,7 +604,7 @@ shash_find_collision_old (shash_t H)
           } while (UNLIKELY(*Th));
           *Th = key;
         }
-    } while (ldata != pdata);
+    } while (LIKELY(ldata != pdata));
   }
   free (T);
   return 0;
