@@ -42,6 +42,26 @@ sieve_info_init_lognorm (unsigned char *C, unsigned char threshold,
 #endif
 }
 
+static void
+sieve_info_init_lognorm_prob (unsigned char *C, const unsigned long *rels,
+    const unsigned long *surv, const double thresh)
+{
+  const double scale = -126./log(thresh);
+
+  /* Success probability up to thresh get values 0 (probability=1) 
+     through 126 (probability=thresh). Probabilities worse than thresh 
+     all get 127. */
+
+  for (size_t i = 0; i < 256; i++) {
+    if ((double) rels[i] < thresh * (double) surv[i]) {
+        C[i] = 127;
+    } else {
+      const double prob = (double) rels[i] / (double) surv[i];
+      C[i] = -log(prob) * scale; /* TODO: How should we round here? */
+    }
+  }
+}
+
 /* {{{ initializing norms */
 /* Knowing the norm on the rational side is bounded by 2^(2^k), compute
  * lognorms approximations for k bits of exponent + NORM_BITS-k bits
@@ -587,9 +607,6 @@ void sieve_info_init_norm_data(sieve_info_ptr si, unsigned long q0)
         for (int k = 0; k <= d; k++)
             mpz_init(si->sides[side]->fij[k]);
     }
-
-
-
 
   double r, scale;
   unsigned char alg_bound, rat_bound;

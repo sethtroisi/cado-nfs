@@ -15,7 +15,7 @@ typedef const struct sieve_info_s * sieve_info_srcptr;
 #include "las-unsieve.h"
 
 struct sieve_side_info_s {
-    unsigned char Bound[256]; /* zero for good lognorms, 127 otherwise */
+    unsigned char Bound[256]; /* -log(prob of relation), 127 for prob<thresh */
     fbprime_t *trialdiv_primes;
     trialdiv_divisor_t *trialdiv_data;
     unsigned char lognorm_table[1 << NORM_BITS];
