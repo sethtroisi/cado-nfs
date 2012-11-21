@@ -22,10 +22,10 @@ class Workunits():
         if self.WU_counter > 500:
             return None
         WU = "WORKUNIT WU" + str(self.WU_counter) + "\r\n"
-        WU = WU + "FILE ecm\r\n"
+        WU = WU + "EXECFILE ecm\r\n"
         WU = WU + "FILE c200\r\n"
-        WU = WU + "COMMAND ecm 44e6 < c200 > output\r\n"
-        WU = WU + "RESULT output"
+        WU = WU + "COMMAND $DLDIR/ecm 1e6 < $DLDIR/c200 > $WORKDIR/output\r\n"
+        WU = WU + "RESULT output\r\n"
         self.WU_counter = self.WU_counter + 1
         return WU;
 

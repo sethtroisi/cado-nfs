@@ -7,6 +7,9 @@ import shutil
 import time
 import urllib.request
 import subprocess
+from email.mime.application import MIMEApplication
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from string import Template
 
 # Settings which we require on the command line (no defaults)
@@ -16,11 +19,6 @@ OPTIONAL_SETTINGS = {"WU_FILENAME" : "WU", "GETWUPATH" : "/cgi-bin/getwu",
                      "POSTRESULTPATH" : "cgi-bin/upload.py"}
 # Merge the two
 SETTINGS = dict(list(REQUIRED_SETTINGS.items()) + list(OPTIONAL_SETTINGS.items()))
-
-# Keys that must occur only once
-WU_SCALAR_KEYS = ("WORKUNIT")
-# Keys that can occur multiple times
-WU_LIST_KEYS = ("FILE", "EXECFILE", "CHECKSUM", "COMMAND", "RESULT")
 
 def get_file(urlpath, dlpath = None):
     # print('get_file("' + urlpath + '", "' + dlpath + '")')
@@ -42,39 +40,119 @@ def get_missing_file(urlpath, filename, checksum = None):
     if checksum:
         # FIXME CHECKSUM
         pass
+    return True
 
-def parse_WU(filename):
-    wu = {}
-    for key in WU_LIST_KEYS:
-      wu[key] = []
-    wu_file = open(filename)
-    for line in wu_file:
-        (key, value) = line.split(" ", 1)
-        value = value.rstrip()
-        if key in WU_SCALAR_KEYS:
-            if key in wu:
-                print("Error: key " + key + " redefined")
-                return None
-            wu[key] = value
-        elif key in WU_LIST_KEYS:
-            # (EXEC)FILE/CHECKSUM keys get special treatment, as CHECKSUM 
-            # always refers to the previous (EXEC)FILE
-            if key == "FILE" or key == "EXECFILE":
-                wu["CHECKSUM"].append(None)
-            if key == "CHECKSUM":
-                if len(wu[key]) == 0 or wu[key][-1] != None:
-                    print("Error: extraneous " + key)
-                    return None
-                wu[key][-1] = value
-            else:
-                wu[key].append(value)
-        else:
-            print("Error: key " + key + " not recognized")
-            return None
-    return wu
-
-def upload_results(wu):
+def _do_nothing(msg):
     pass
+
+class Workunit():
+    # Keys that must occur only once
+    SCALAR_KEYS = ("WORKUNIT", "RESULT")
+    # Keys that can occur multiple times
+    LIST_KEYS = ("FILE", "EXECFILE", "CHECKSUM", "COMMAND")
+
+    parsed = None
+    exitcode = 0 # will get set if any command exits with code != 0
+    debug = 2 # Controls debugging output
+    
+    def parse(self, filepath):
+        wu = {}
+        for key in self.LIST_KEYS:
+          wu[key] = [] # Init to empty list
+        if self.debug >= 1:
+            print ("Reading workunit from file " + filepath)
+        wu_file = open(filepath)
+        for line in wu_file:
+            (key, value) = line.split(" ", 1)
+            value = value.rstrip() # Drop trailing whitespace, incl. CR/LF
+            if key in self.SCALAR_KEYS:
+                if key in wu:
+                    print("Error: key " + key + " redefined")
+                    return False
+                wu[key] = value
+            elif key in self.LIST_KEYS:
+                # (EXEC)FILE/CHECKSUM keys get special treatment, as CHECKSUM 
+                # always refers to the previous (EXEC)FILE
+                if key == "FILE" or key == "EXECFILE":
+                    wu["CHECKSUM"].append(None)
+                if key == "CHECKSUM":
+                    if len(wu[key]) == 0 or wu[key][-1] != None:
+                        print("Error: extraneous " + key)
+                        return False
+                    wu[key][-1] = value
+                else:
+                    wu[key].append(value)
+            else:
+                print("Error: key " + key + " not recognized")
+                return False
+        wu_file.close()
+        self.parsed = wu
+        return True
+
+    def get_files(self):
+        for filename in self.parsed["FILE"] + self.parsed["EXECFILE"]:
+            if not get_missing_file (filename, SETTINGS["DLDIR"] + '/' + filename):
+                return False
+        for filename in self.parsed["EXECFILE"]:
+            path = SETTINGS["DLDIR"] + '/' + filename
+            mode = os.stat(path).st_mode
+            if mode & stat.S_IXUSR == 0:
+                print ("Setting executable flag for " + path)
+                os.chmod(path, mode | stat.S_IXUSR)
+        return True
+    
+    def run_commands(self):
+        for command in self.parsed["COMMAND"]:
+            command = Template(command).safe_substitute(SETTINGS)
+            if self.debug >= 1:
+                print ("Running command: " + command)
+            rc = subprocess.call(command, shell=True)
+            if rc != 0:
+                print ("Command exited with exit code " + str(rc)) 
+                self.exitcode = rc
+                return False
+            elif self.debug >= 1:
+                print ("Command exited successfully")
+        return True
+
+    def upload_result(self):
+        # Build a multi-part MIME document containing the WU id and result file
+        postdata = MIMEMultipart()
+        WUid = MIMEText(self.parsed["WORKUNIT"])
+        WUid.add_header('Content-Disposition', 'form-data', name="WUid")
+        postdata.attach(WUid)
+        if self.exitcode > 0:
+            rc = MIMEText(str(self.exitcode))
+            WUid.add_header('Content-Disposition', 'form-data', name="exitcode")
+            postdata.attach(rc)
+        if "RESULT" in self.parsed:
+            filepath = SETTINGS["WORKDIR"] + "/" + self.parsed["RESULT"]
+            file = open(filepath, "rb")
+            filedata = file.read()
+            file.close()
+            result = MIMEApplication(filedata)
+            result.add_header('Content-Disposition', 'form-data', name="results", 
+                              filename=self.parsed["RESULT"]);
+            postdata.attach(result)
+        if self.debug >= 2:
+            print("Headers of postdata as a dictionary:")
+            print(dict(postdata.items()))
+        # Ugly hack: overwrite method for writing headers to suppress them
+        postdata._write_headers = _do_nothing
+        postdata2 = postdata.as_string(unixfrom=False) + "\n"
+        if self.debug >= 2:
+            print("Postdata as a string:")
+            print(postdata2)
+        postdata3 = bytes(postdata2, encoding="utf-8")
+        if self.debug >= 2:
+            print("Postdata as a bytes array:")
+            print(postdata3)
+        url = SETTINGS["SERVER"] + "/" + SETTINGS["POSTRESULTPATH"]
+        request = urllib.request.Request(url, data=postdata3, headers=dict(postdata.items()))
+        conn = urllib.request.urlopen(request)
+        for line in conn:
+            print(line)
+        conn.close()
 
 def process_WU(filename):
     print ("Processing work unit file " + filename + ":")
@@ -83,26 +161,15 @@ def process_WU(filename):
     # If all output files exist, send them, return WU as done
     # Otherwise, run commands in WU. If no error and all output 
     #   files exist, send them, return WU as done
-    wu = parse_WU(filename)
-    if wu == None:
+    wu = Workunit()
+    if not wu.parse(filename):
         return False
     # print(str(wu))
-    for filename in wu["FILE"] + wu["EXECFILE"]:
-        get_missing_file (filename, SETTINGS["DLDIR"] + '/' + filename)
-    for filename in wu["EXECFILE"]:
-        path = SETTINGS["DLDIR"] + '/' + filename
-        mode = os.stat(path).st_mode
-        if mode & stat.S_IXUSR == 0:
-            print ("Setting executable flag for " + path)
-            os.chmod(path, mode | stat.S_IXUSR)
-    for command in wu["COMMAND"]:
-        print (command)
-        command = Template(command).safe_substitute(SETTINGS)
-        print (command)
-        rc = subprocess.call(command, shell=True)
-        if rc != 0:
-            return False
-    upload_result(wu)
+    if not wu.get_files():
+        return False
+    if not wu.run_commands():
+        return False
+    wu.upload_result()
 
 
 def do_work():
