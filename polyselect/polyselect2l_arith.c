@@ -182,6 +182,21 @@ binom ( unsigned long n,
   return tot;
 }
 
+/* sort r[0..n-1] in increasing order */
+static void
+roots_sort (uint64_t *r, unsigned long n)
+{
+  unsigned long i, j;
+  uint64_t v;
+
+  for (i = 1; i < n; i++)
+    {
+      v = r[i];
+      for (j = i; j > 0 && v < r[j - 1]; j--)
+        r[j] = r[j - 1];
+      r[j] = v;
+    }
+}
 
 /* prepare special-q's roots */
 void
@@ -223,6 +238,9 @@ comp_sq_roots ( header_t header,
     mpz_mod_ui (f[0], header->Ntilde, q);
     mpz_neg (f[0], f[0]); /* f = x^d - N */
     nrq = poly_roots_uint64 (rq, f, header->d, q);
+    /* sort roots to get reproducible results with the same seed
+       (since poly_roots_uint64 also uses the random generator) */
+    roots_sort (rq, nrq);
     roots_lift (rq, header->Ntilde, header->d, header->m0, q, nrq);
 
 #if 0
@@ -312,14 +330,11 @@ return_q_norq ( qroots_t SQ_R,
 {
   unsigned long i;
   uint64_t q = 1;
-  mpz_t t;
-  mpz_init (t);
+
   for (i = 0; i < k; i ++)
     q = q * SQ_R->q[idx_q[i]];
   mpz_set_uint64 (qqz, q);
-  mpz_set_uint64 (t, q);
-  mpz_mul (qqz, qqz, t);
-  mpz_clear (t);
+  mpz_mul (qqz, qqz, qqz);
   return q;
 }
 
