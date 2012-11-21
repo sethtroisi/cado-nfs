@@ -57,7 +57,7 @@ See local.sh.example for a documentation on the recognized flags.
 
 * local.sh
 
-At the top of the source tree, if a file is called local.sh exists, it is
+At the top of the source tree, if a file called local.sh exists, it is
 sourced by scripts/call_cmake.sh ; therefore, any environment variable
 which is set by this script is passed to cmake.
 

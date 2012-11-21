@@ -26,6 +26,15 @@ if [ -x "$HOME/cmake/bin/cmake" ] ; then
     PATH="$HOME/cmake/bin:$PATH"
 fi
 
+# Add $HOME/bin unconditionally, for convenience. It's easy to install
+# e.g. git in some directory under $HOME, and then have a link from
+# there.
+PATH="$HOME/bin:$PATH"
+
+nickname=$1
+: ${nickname:=`hostname`}
+
+
 # If the DIR variable is set, then use it as the basename of the temp directory.
 if ! [ "$DIR" ] ; then
     DIR=`mktemp -d /tmp/cado-nightly.XXXXXXXX`
@@ -43,14 +52,14 @@ cd $DIR
 : ${USER=`whoami`}
 
 # git clone --depth 2 $GIT scm
-git clone --depth 2 git://scm.gforge.inria.fr/cado-nfs/cado-nfs.git scm
-SCM=scm/
+git clone https://gforge.inria.fr/git/cado-nfs/cado-nfs.git scm
+SCM=scm
 
 # If the cado repository contains a local.sh for this machine, use it.
 # Note that this is mandatory even for make dist, since a missing gmp is
 # fatal to the cmake process !
-if [ -f "$SCM/local.sh.`hostname`" ] ; then
-    LOCALFILE="$SCM/local.sh.`hostname`"
+if [ -f "$SCM/local.sh.$h" ] ; then
+    LOCALFILE="$SCM/local.sh.$h"
 elif [ -f "$HOME/local.sh" ] ; then
     LOCALFILE="$HOME/local.sh"
 elif [ -f "$cwd/local.sh" ] ; then
@@ -103,9 +112,9 @@ fi
 
 echo -n "Starting factorization at: "
 date
-CADO_COLOR=0 $PREFIX/bin/factor.sh 17762929200312168400214710176085810924733654900109067769192140912049 -t 4 -ssh expected_factorization=19,59,3851,836165399,7191239729962900539391,684288898843653097584035467291
-CADO_COLOR=0 $PREFIX/bin/factor.sh 4989987986917107645320509935679224561541664588721574446483221849128942141 -t 2 expected_factorization=109,311,143958853,538977678334135295534626724297,1897157801458502657009465237299
-
+# CADO_COLOR=0 $PREFIX/bin/factor.sh 17762929200312168400214710176085810924733654900109067769192140912049 -t 4 -ssh expected_factorization=19,59,3851,836165399,7191239729962900539391,684288898843653097584035467291
+# CADO_COLOR=0 $PREFIX/bin/factor.sh 4989987986917107645320509935679224561541664588721574446483221849128942141 -t 2 expected_factorization=109,311,143958853,538977678334135295534626724297,1897157801458502657009465237299
+CADO_COLOR=0 $PREFIX/bin/factor.sh `$PREFIX/bin/utils/random_integer 59 80` -t 2 bwc_mn=128
 rc=$?
 
 if [ "$rc" = 0 ] ; then

@@ -53,6 +53,8 @@ get_override(CC                   CMAKE_C_COMPILER)
 get_override(CXX                  CMAKE_CXX_COMPILER)
 get_override(CADO_DIST_ARCHIVE_NAME         CADO_DIST_ARCHIVE_NAME)
 get_override(MPI                  MPI)
+get_override(LDFLAGS              CMAKE_EXE_LINKER_FLAGS)
+get_override(LDFLAGS              CMAKE_SHARED_LINKER_FLAGS)
 
 if(EXISTS ${CADO_NFS_SOURCE_DIR}/files.dist)
     set(EXCLUDE_FROM_RELEASE_BUILD )
@@ -88,16 +90,17 @@ get_override(GF2X_CONFIGURE_FLAGS GF2X_CONFIGURE_FLAGS)
 
 include(CheckFunctionExists)
 
-# posix_memalign
-CHECK_FUNCTION_EXISTS(posix_memalign      HAVE_POSIX_MEMALIGN)
+CHECK_FUNCTION_EXISTS(posix_memalign	HAVE_POSIX_MEMALIGN)
 
 include(${CADO_NFS_SOURCE_DIR}/config/sse2.cmake)
 include(${CADO_NFS_SOURCE_DIR}/config/sse41.cmake)
 include(${CADO_NFS_SOURCE_DIR}/config/gcc-assembly.cmake)
 include(${CADO_NFS_SOURCE_DIR}/config/curl.cmake)
 include(${CADO_NFS_SOURCE_DIR}/config/alloca.cmake)
-
 include("${CADO_NFS_SOURCE_DIR}/config/math.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/rusage_thread.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/gcc-ubuntu-bug.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/sync_fetch.cmake")
 
 ######################################################################
 # Try to detect whether pthreads and/or MPI are available.
@@ -198,6 +201,7 @@ add_subdirectory (sqrt)
 add_subdirectory (linalg)
 add_subdirectory (filter)
 add_subdirectory (linalg/bwc)
+add_subdirectory (misc)
 
 add_custom_target(dist
     COMMAND scripts/dist.sh ${package_basename}

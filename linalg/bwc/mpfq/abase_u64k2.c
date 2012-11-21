@@ -11,105 +11,142 @@ static MPI_Datatype abase_u64k2_impl_mpi_datatype_ur;
 static MPI_Op abase_u64k2_impl_mpi_addition_op;
 static MPI_Op abase_u64k2_impl_mpi_addition_op_ur;
 static int abase_u64k2_impl_mpi_use_count;   /* several stacked init()/clear() pairs are supported */
-/* Active handler: Mpfq::defaults::vec */
+/* Active handler: simd_u64k */
+/* Automatically generated code  */
 /* Active handler: Mpfq::defaults */
-/* Active handler: Mpfq::engine::defaults::mpi_flat */
+/* Active handler: Mpfq::defaults::vec */
+/* Active handler: Mpfq::defaults::mpi_flat */
 /* Active handler: simd_dotprod */
 /* Active handler: io */
 /* Active handler: trivialities */
 /* Active handler: simd_flat */
-/* Active handler: simd_u64k */
-/* Automatically generated code  */
-/* Options used: k=2 tag=u64k2 choose_by_groupsize=<code> prefix=abase_ family=[u64k1, u64k2] virtual_base={
+/* Options used: w=64 k=2 tag=u64k2 vbase_stuff={
+                 'vc:includes' => [
+                                    '<stdarg.h>'
+                                  ],
+                 'member_templates_restrict' => {
+                                                  'p_1' => [
+                                                             'p_1'
+                                                           ],
+                                                  'p_4' => [
+                                                             'p_4'
+                                                           ],
+                                                  'u64k2' => [
+                                                               'u64k1',
+                                                               'u64k2'
+                                                             ],
+                                                  'u64k1' => $vbase_stuff->{'member_templates_restrict'}{'u64k2'}
+                                                },
+                 'families' => [
+                                 $vbase_stuff->{'member_templates_restrict'}{'p_4'},
+                                 $vbase_stuff->{'member_templates_restrict'}{'p_1'},
+                                 $vbase_stuff->{'member_templates_restrict'}{'u64k2'}
+                               ],
+                 'choose_byfeatures' => sub { "DUMMY" }
+               };
+ family=[u64k1, u64k2] virtual_base={
                   'filebase' => 'abase_vbase',
                   'substitutions' => [
                                        [
-                                         qr/(?-xism:abase_u64k2_elt \*)/,
+                                         qr/(?^:abase_u64k2_elt \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_src_elt\b)/,
+                                         qr/(?^:abase_u64k2_src_elt\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_elt\b)/,
+                                         qr/(?^:abase_u64k2_elt\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_dst_elt\b)/,
+                                         qr/(?^:abase_u64k2_dst_elt\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_elt_ur \*)/,
+                                         qr/(?^:abase_u64k2_elt_ur \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_src_elt_ur\b)/,
+                                         qr/(?^:abase_u64k2_src_elt_ur\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_elt_ur\b)/,
+                                         qr/(?^:abase_u64k2_elt_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_dst_elt_ur\b)/,
+                                         qr/(?^:abase_u64k2_dst_elt_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_vec \*)/,
+                                         qr/(?^:abase_u64k2_vec \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_src_vec\b)/,
+                                         qr/(?^:abase_u64k2_src_vec\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_vec\b)/,
+                                         qr/(?^:abase_u64k2_vec\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_dst_vec\b)/,
+                                         qr/(?^:abase_u64k2_dst_vec\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_vec_ur \*)/,
+                                         qr/(?^:abase_u64k2_vec_ur \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_src_vec_ur\b)/,
+                                         qr/(?^:abase_u64k2_src_vec_ur\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_vec_ur\b)/,
+                                         qr/(?^:abase_u64k2_vec_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_dst_vec_ur\b)/,
+                                         qr/(?^:abase_u64k2_dst_vec_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_poly \*)/,
+                                         qr/(?^:abase_u64k2_poly \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_src_poly\b)/,
+                                         qr/(?^:abase_u64k2_src_poly\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_poly\b)/,
+                                         qr/(?^:abase_u64k2_poly\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k2_dst_poly\b)/,
+                                         qr/(?^:abase_u64k2_dst_poly\b)/,
                                          'void *'
                                        ]
                                      ],
-                  'name' => 'abase_vbase'
+                  'name' => 'abase_vbase',
+                  'global_prefix' => 'abase_'
                 };
  */
 
 
 /* Functions operating on the field structure */
+/* *simd_u64k::code_for_field_specify */
+void abase_u64k2_field_specify(abase_u64k2_dst_field K MAYBE_UNUSED, unsigned long tag, void * x MAYBE_UNUSED)
+{
+        if (tag == MPFQ_GROUPSIZE) {
+            assert(*(int*)x == 128);
+        } else if (tag == MPFQ_PRIME_MPZ) {
+            assert(mpz_cmp_ui((mpz_srcptr)x, 2) == 0);
+        } else {
+            fprintf(stderr, "Unsupported field_specify tag %ld\n", tag);
+        }
+}
+
 
 /* Element allocation functions */
 
@@ -129,9 +166,11 @@ static int abase_u64k2_impl_mpi_use_count;   /* several stacked init()/clear() p
 /* missing is_sqr */
 /* missing sqrt */
 /* missing pow */
+/* missing frobenius */
 /* missing add_ui */
 /* missing sub_ui */
 /* missing mul_ui */
+/* missing inv */
 
 /* Operations involving unreduced elements */
 /* missing elt_ur_set_ui */
@@ -225,7 +264,7 @@ int abase_u64k2_fscan(abase_u64k2_dst_field k, FILE * file, abase_u64k2_dst_elt 
 
 
 /* Vector functions */
-/* *Mpfq::defaults::vec::alloc::code_for_vec_init */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_init, Mpfq::defaults::vec, Mpfq::defaults */
 void abase_u64k2_vec_init(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_vec * v, unsigned int n)
 {
     unsigned int i;
@@ -234,7 +273,7 @@ void abase_u64k2_vec_init(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_vec 
         abase_u64k2_init(K, (*v) + i);
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_reinit */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_reinit, Mpfq::defaults::vec, Mpfq::defaults */
 void abase_u64k2_vec_reinit(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_vec * v, unsigned int n, unsigned int m)
 {
     if (n < m) { // increase size
@@ -250,7 +289,7 @@ void abase_u64k2_vec_reinit(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_ve
     }
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_clear */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_clear, Mpfq::defaults::vec, Mpfq::defaults */
 void abase_u64k2_vec_clear(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_vec * v, unsigned int n)
 {
         unsigned int i;
@@ -262,7 +301,7 @@ void abase_u64k2_vec_clear(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_vec
 /* missing vec_setcoef_ui */
 /* missing vec_scal_mul */
 /* missing vec_conv */
-/* *Mpfq::defaults::vec::io::code_for_vec_asprint */
+/* *Mpfq::defaults::vec::io::code_for_vec_asprint, Mpfq::defaults::vec, Mpfq::defaults */
 void abase_u64k2_vec_asprint(abase_u64k2_dst_field K MAYBE_UNUSED, char * * pstr, abase_u64k2_src_vec w, unsigned int n)
 {
     if (n == 0) {
@@ -299,7 +338,7 @@ void abase_u64k2_vec_asprint(abase_u64k2_dst_field K MAYBE_UNUSED, char * * pstr
     (*pstr)[len] = '\0';
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_fprint */
+/* *Mpfq::defaults::vec::io::code_for_vec_fprint, Mpfq::defaults::vec, Mpfq::defaults */
 void abase_u64k2_vec_fprint(abase_u64k2_dst_field K MAYBE_UNUSED, FILE * file, abase_u64k2_src_vec w, unsigned int n)
 {
     char *str;
@@ -308,13 +347,13 @@ void abase_u64k2_vec_fprint(abase_u64k2_dst_field K MAYBE_UNUSED, FILE * file, a
     free(str);
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_print */
+/* *Mpfq::defaults::vec::io::code_for_vec_print, Mpfq::defaults::vec, Mpfq::defaults */
 void abase_u64k2_vec_print(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_src_vec w, unsigned int n)
 {
     abase_u64k2_vec_fprint(K,stdout,w,n);
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_sscan */
+/* *Mpfq::defaults::vec::io::code_for_vec_sscan, Mpfq::defaults::vec, Mpfq::defaults */
 int abase_u64k2_vec_sscan(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_vec * w, unsigned int * n, const char * str)
 {
     // start with a clean vector
@@ -358,10 +397,11 @@ int abase_u64k2_vec_sscan(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_vec 
     return 1;
 }
 
-/* *Mpfq::defaults::vec::io::code_for_vec_fscan */
+/* *Mpfq::defaults::vec::io::code_for_vec_fscan, Mpfq::defaults::vec, Mpfq::defaults */
 int abase_u64k2_vec_fscan(abase_u64k2_dst_field K MAYBE_UNUSED, FILE * file, abase_u64k2_vec * w, unsigned int * n)
 {
-    char *tmp, c;
+    char *tmp;
+    int c;
     int allocated, len=0;
     allocated=100;
     tmp = (char *)malloc(allocated*sizeof(char));
@@ -390,7 +430,7 @@ int abase_u64k2_vec_fscan(abase_u64k2_dst_field K MAYBE_UNUSED, FILE * file, aba
     return ret;
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_init */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_init, Mpfq::defaults::vec, Mpfq::defaults */
 void abase_u64k2_vec_ur_init(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_vec_ur * v, unsigned int n)
 {
     unsigned int i;
@@ -399,7 +439,7 @@ void abase_u64k2_vec_ur_init(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_v
         abase_u64k2_elt_ur_init(K, &( (*v)[i]));
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_reinit */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_reinit, Mpfq::defaults::vec, Mpfq::defaults */
 void abase_u64k2_vec_ur_reinit(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_vec_ur * v, unsigned int n, unsigned int m)
 {
     if (n < m) { // increase size
@@ -415,7 +455,7 @@ void abase_u64k2_vec_ur_reinit(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2
     }
 }
 
-/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_clear */
+/* *Mpfq::defaults::vec::alloc::code_for_vec_ur_clear, Mpfq::defaults::vec, Mpfq::defaults */
 void abase_u64k2_vec_ur_clear(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_vec_ur * v, unsigned int n)
 {
     unsigned int i;
@@ -443,7 +483,7 @@ void abase_u64k2_dotprod(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_dst_v
 
 /* MPI interface */
 static void abase_u64k2_mpi_op_inner(void *, void *, int *, MPI_Datatype *);
-static /* *Mpfq::engine::defaults::mpi_flat::code_for_mpi_ops_init */
+static /* *Mpfq::defaults::mpi_flat::code_for_mpi_ops_init */
 void abase_u64k2_mpi_op_inner(void * invec, void * inoutvec, int * len, MPI_Datatype * datatype)
 {
     int got_it;
@@ -454,7 +494,7 @@ void abase_u64k2_mpi_op_inner(void * invec, void * inoutvec, int * len, MPI_Data
 }
 
 static void abase_u64k2_mpi_op_inner_ur(void *, void *, int *, MPI_Datatype *);
-static /* *Mpfq::engine::defaults::mpi_flat::code_for_mpi_ops_init */
+static /* *Mpfq::defaults::mpi_flat::code_for_mpi_ops_init */
 void abase_u64k2_mpi_op_inner_ur(void * invec, void * inoutvec, int * len, MPI_Datatype * datatype)
 {
     int got_it;
@@ -464,7 +504,7 @@ void abase_u64k2_mpi_op_inner_ur(void * invec, void * inoutvec, int * len, MPI_D
     abase_u64k2_vec_ur_add(K, inoutvec, inoutvec, invec, *len);
 }
 
-/* *Mpfq::engine::defaults::mpi_flat::code_for_mpi_ops_init */
+/* *Mpfq::defaults::mpi_flat::code_for_mpi_ops_init */
 void abase_u64k2_mpi_ops_init(abase_u64k2_dst_field K MAYBE_UNUSED)
 {
         if (abase_u64k2_impl_mpi_use_count++) return;
@@ -481,31 +521,31 @@ void abase_u64k2_mpi_ops_init(abase_u64k2_dst_field K MAYBE_UNUSED)
     MPI_Op_create(&abase_u64k2_mpi_op_inner_ur, 1, &abase_u64k2_impl_mpi_addition_op_ur);
 }
 
-/* *Mpfq::engine::defaults::mpi_flat::code_for_mpi_datatype */
+/* *Mpfq::defaults::mpi_flat::code_for_mpi_datatype */
 MPI_Datatype abase_u64k2_mpi_datatype(abase_u64k2_dst_field K MAYBE_UNUSED)
 {
     return abase_u64k2_impl_mpi_datatype;
 }
 
-/* *Mpfq::engine::defaults::mpi_flat::code_for_mpi_datatype_ur */
+/* *Mpfq::defaults::mpi_flat::code_for_mpi_datatype_ur */
 MPI_Datatype abase_u64k2_mpi_datatype_ur(abase_u64k2_dst_field K MAYBE_UNUSED)
 {
     return abase_u64k2_impl_mpi_datatype_ur;
 }
 
-/* *Mpfq::engine::defaults::mpi_flat::code_for_mpi_addition_op */
+/* *Mpfq::defaults::mpi_flat::code_for_mpi_addition_op */
 MPI_Op abase_u64k2_mpi_addition_op(abase_u64k2_dst_field K MAYBE_UNUSED)
 {
     return abase_u64k2_impl_mpi_addition_op;
 }
 
-/* *Mpfq::engine::defaults::mpi_flat::code_for_mpi_addition_op_ur */
+/* *Mpfq::defaults::mpi_flat::code_for_mpi_addition_op_ur */
 MPI_Op abase_u64k2_mpi_addition_op_ur(abase_u64k2_dst_field K MAYBE_UNUSED)
 {
     return abase_u64k2_impl_mpi_addition_op_ur;
 }
 
-/* *Mpfq::engine::defaults::mpi_flat::code_for_mpi_ops_clear */
+/* *Mpfq::defaults::mpi_flat::code_for_mpi_ops_clear */
 void abase_u64k2_mpi_ops_clear(abase_u64k2_dst_field K MAYBE_UNUSED)
 {
         if (--abase_u64k2_impl_mpi_use_count) return;
@@ -545,9 +585,9 @@ static void abase_u64k2_wrapper_field_clear(abase_vbase_ptr vbase MAYBE_UNUSED)
 }
 
 static void abase_u64k2_wrapper_field_specify(abase_vbase_ptr, unsigned long, void *);
-static void abase_u64k2_wrapper_field_specify(abase_vbase_ptr vbase MAYBE_UNUSED, unsigned long dummy MAYBE_UNUSED, void * vp MAYBE_UNUSED)
+static void abase_u64k2_wrapper_field_specify(abase_vbase_ptr vbase MAYBE_UNUSED, unsigned long tag MAYBE_UNUSED, void * x MAYBE_UNUSED)
 {
-    abase_u64k2_field_specify(vbase->obj, dummy, vp);
+    abase_u64k2_field_specify(vbase->obj, tag, x);
 }
 
 static void abase_u64k2_wrapper_field_setopt(abase_vbase_ptr, unsigned long, void *);
@@ -620,6 +660,12 @@ static void abase_u64k2_wrapper_elt_ur_set(abase_vbase_ptr, abase_u64k2_dst_elt_
 static void abase_u64k2_wrapper_elt_ur_set(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k2_dst_elt_ur r MAYBE_UNUSED, abase_u64k2_src_elt_ur s MAYBE_UNUSED)
 {
     abase_u64k2_elt_ur_set(vbase->obj, r, s);
+}
+
+static void abase_u64k2_wrapper_elt_ur_set_zero(abase_vbase_ptr, abase_u64k2_dst_elt_ur);
+static void abase_u64k2_wrapper_elt_ur_set_zero(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k2_dst_elt_ur r MAYBE_UNUSED)
+{
+    abase_u64k2_elt_ur_set_zero(vbase->obj, r);
 }
 
 static void abase_u64k2_wrapper_elt_ur_add(abase_vbase_ptr, abase_u64k2_dst_elt_ur, abase_u64k2_src_elt_ur, abase_u64k2_src_elt_ur);
@@ -814,6 +860,12 @@ static void abase_u64k2_wrapper_vec_ur_init(abase_vbase_ptr vbase MAYBE_UNUSED, 
     abase_u64k2_vec_ur_init(vbase->obj, v, n);
 }
 
+static void abase_u64k2_wrapper_vec_ur_set_zero(abase_vbase_ptr, abase_u64k2_dst_vec_ur, unsigned int);
+static void abase_u64k2_wrapper_vec_ur_set_zero(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k2_dst_vec_ur r MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    abase_u64k2_vec_ur_set_zero(vbase->obj, r, n);
+}
+
 static void abase_u64k2_wrapper_vec_ur_reinit(abase_vbase_ptr, abase_u64k2_vec_ur *, unsigned int, unsigned int);
 static void abase_u64k2_wrapper_vec_ur_reinit(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k2_vec_ur * v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED, unsigned int m MAYBE_UNUSED)
 {
@@ -866,12 +918,6 @@ static int abase_u64k2_wrapper_groupsize(abase_vbase_ptr);
 static int abase_u64k2_wrapper_groupsize(abase_vbase_ptr vbase MAYBE_UNUSED)
 {
     return abase_u64k2_groupsize(vbase->obj);
-}
-
-static void abase_u64k2_wrapper_set_groupsize(abase_vbase_ptr, int);
-static void abase_u64k2_wrapper_set_groupsize(abase_vbase_ptr vbase MAYBE_UNUSED, int n MAYBE_UNUSED)
-{
-    abase_u64k2_set_groupsize(vbase->obj, n);
 }
 
 static int abase_u64k2_wrapper_offset(abase_vbase_ptr, int);
@@ -1000,12 +1046,15 @@ void abase_u64k2_oo_field_init(abase_vbase_ptr vbase)
     /* missing is_sqr */
     /* missing sqrt */
     /* missing pow */
+    /* missing frobenius */
     /* missing add_ui */
     /* missing sub_ui */
     /* missing mul_ui */
+    /* missing inv */
     vbase->elt_ur_init = (void (*) (abase_vbase_ptr, void *)) abase_u64k2_wrapper_elt_ur_init;
     vbase->elt_ur_clear = (void (*) (abase_vbase_ptr, void *)) abase_u64k2_wrapper_elt_ur_clear;
     vbase->elt_ur_set = (void (*) (abase_vbase_ptr, void *, const void *)) abase_u64k2_wrapper_elt_ur_set;
+    vbase->elt_ur_set_zero = (void (*) (abase_vbase_ptr, void *)) abase_u64k2_wrapper_elt_ur_set_zero;
     /* missing elt_ur_set_ui */
     vbase->elt_ur_add = (void (*) (abase_vbase_ptr, void *, const void *, const void *)) abase_u64k2_wrapper_elt_ur_add;
     vbase->elt_ur_neg = (void (*) (abase_vbase_ptr, void *, const void *)) abase_u64k2_wrapper_elt_ur_neg;
@@ -1046,6 +1095,7 @@ void abase_u64k2_oo_field_init(abase_vbase_ptr vbase)
     vbase->vec_fscan = (int (*) (abase_vbase_ptr, FILE *, void *, unsigned int *)) abase_u64k2_wrapper_vec_fscan;
     vbase->vec_scan = (int (*) (abase_vbase_ptr, void *, unsigned int *)) abase_u64k2_wrapper_vec_scan;
     vbase->vec_ur_init = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_u64k2_wrapper_vec_ur_init;
+    vbase->vec_ur_set_zero = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_u64k2_wrapper_vec_ur_set_zero;
     vbase->vec_ur_reinit = (void (*) (abase_vbase_ptr, void *, unsigned int, unsigned int)) abase_u64k2_wrapper_vec_ur_reinit;
     vbase->vec_ur_clear = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_u64k2_wrapper_vec_ur_clear;
     vbase->vec_ur_set = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_u64k2_wrapper_vec_ur_set;
@@ -1058,7 +1108,6 @@ void abase_u64k2_oo_field_init(abase_vbase_ptr vbase)
     /* missing vec_reduce */
     vbase->vec_elt_stride = (ptrdiff_t (*) (abase_vbase_ptr, int)) abase_u64k2_wrapper_vec_elt_stride;
     vbase->groupsize = (int (*) (abase_vbase_ptr)) abase_u64k2_wrapper_groupsize;
-    vbase->set_groupsize = (void (*) (abase_vbase_ptr, int)) abase_u64k2_wrapper_set_groupsize;
     vbase->offset = (int (*) (abase_vbase_ptr, int)) abase_u64k2_wrapper_offset;
     vbase->stride = (int (*) (abase_vbase_ptr)) abase_u64k2_wrapper_stride;
     vbase->set_ui_at = (void (*) (abase_vbase_ptr, void *, int, unsigned long)) abase_u64k2_wrapper_set_ui_at;

@@ -14,8 +14,8 @@
 
 /************************** sieve info stuff *********************************/
 
-/* initialize array C[0..255]: C[i] is non-zero whenever the log-norm i
-   is considered as a potential report.
+/* initialize array C[0..255]: C[i] is zero whenever the log-norm i
+   is considered as a potential report, and 127 otherwise.
    The large prime bound is L = 2^l.
 */
 static void
@@ -32,12 +32,22 @@ sieve_info_init_lognorm (unsigned char *C, unsigned char threshold,
 #ifdef COFACTOR_TRICK
   {
     unsigned char k0, k1;
-    /* for L < R <= B^2, R cannot be L-smooth (see lattice.tex) */
-    k0 = (unsigned char) ((double) l * scale + 0.5) + GUARD;
-    k1 = (unsigned char) (2.0 * log2 ((double) B) * scale + 0.5)
-      + GUARD;
-    for (k = k0 + GUARD; k + GUARD <= k1 && k < 256; k++)
-      C[k] = 0;
+    double lost = 6.0; /* maximal number of bits lost due to prime powers */
+
+    /* for L < R < B^2, a cofactor R cannot be L-smooth, since then it should
+       have at least two prime factors in [B,L], and then should be >= B^2.
+       Note:
+       - the lognorms S[] are GUARD larger than the real values, thus the
+         interval [L,R^2] corresponds to [k0+GUARD,k1+GUARD], but to take into
+         account the roundoff errors we consider [k0+2*GUARD,k1]
+       - 'lost' takes into account the error because we do not sieve
+         prime powers; it applies only to the lower bound, and has to be scaled
+       - the additional guard value takes into account additional errors
+    */
+    k0 = (unsigned char) (((double) l + lost) * scale) + 2 * GUARD + 2;
+    k1 = (unsigned char) (2.0 * log2 ((double) B) * scale) - 2;
+    for (k = k0; k <= k1 && k < 256; k++)
+      C[k] = 127;
   }
 #endif
 }
@@ -234,29 +244,53 @@ void init_rat_norms_bucket_region(unsigned char *S,
 		uint64_t y1;
 	    } intpair;
 	} y_vec;
-        __v2df gi_vec = { 2 * u[1], 2 * u[1] };
-        __v2di mask_vec = { mask, mask };
-        __v2di cst_vec = { (uint64_t) 0x3FF0000000000000,
-            (uint64_t) 0x3FF0000000000000
-        };
+        if ((j & 1) == 1) {
+            __v2df gi_vec = { 2*u[1], 2*u[1] };
+            __v2di mask_vec = { mask, mask };
+            __v2di cst_vec = { (uint64_t) 0x3FF0000000000000,
+                (uint64_t) 0x3FF0000000000000 };
+           
+            // in spite of the appearance, only the low word gives the shift
+            // count. The high word is ignored.
+            __v2di shift_value = { (uint64_t)(52 - l), (uint64_t)(52 - l) };
+            __v2df z_vec = { zx->z, zx->z+u[1] };
+             
+            for (i = 0; i < halfI; ++i) {
+                y_vec.dble = z_vec;
+                y_vec.intg -= cst_vec;
+                y_vec.intg = _mm_srl_epi64(y_vec.intg, shift_value);
+                y_vec.intg &= mask_vec;
+                //            *S++ = L[((uint32_t *)(&y_vec.intg))[0]];
+                //             *S++ = L[((uint32_t *)(&y_vec.intg))[2]];
+                *S++ = L[y_vec.intpair.y0];
+                *S++ = L[y_vec.intpair.y1];
+                z_vec += gi_vec;
+            }
+        } else { // skip when i and j are both even
+            __v2df gi_vec = { 4*u[1], 4*u[1] };
+            __v2di mask_vec = { mask, mask };
+            __v2di cst_vec = { (uint64_t) 0x3FF0000000000000,
+                (uint64_t) 0x3FF0000000000000 };
 
-        // in spite of the appearance, only the low word gives the shift
-        // count. The high word is ignored.
-        __v2di shift_value = { (uint64_t) (52 - l), (uint64_t) (52 - l) };
-        __v2df z_vec = { zx->z, zx->z + u[1] };
+            // in spite of the appearance, only the low word gives the shift
+            // count. The high word is ignored.
+            __v2di shift_value = { (uint64_t)(52 - l), (uint64_t)(52 - l) };
+            __v2df z_vec = { zx->z + u[1], zx->z+3*u[1] };
 
-        for (i = 0; i < halfI; ++i) {
-            y_vec.dble = z_vec;
-            y_vec.intg -= cst_vec;
-            y_vec.intg = _mm_srl_epi64(y_vec.intg, shift_value);
-            y_vec.intg &= mask_vec;
-            //            *S++ = L[((uint32_t *)(&y_vec.intg))[0]];
-            //            *S++ = L[((uint32_t *)(&y_vec.intg))[2]];
-            *S++ = L[y_vec.intpair.y0];
-            *S++ = L[y_vec.intpair.y1];
-            z_vec += gi_vec;
+            for (i = 0; i < halfI; i+=2) {
+                y_vec.dble = z_vec;
+                y_vec.intg -= cst_vec;
+                y_vec.intg = _mm_srl_epi64(y_vec.intg, shift_value);
+                y_vec.intg &= mask_vec;
+                //            *S++ = L[((uint32_t *)(&y_vec.intg))[0]];
+                //             *S++ = L[((uint32_t *)(&y_vec.intg))[2]];
+                *S++ = 255;
+                *S++ = L[y_vec.intpair.y0];
+                *S++ = 255;
+                *S++ = L[y_vec.intpair.y1];
+                z_vec += gi_vec;
+            }
         }
-
 #endif
 #endif
 	__asm__("### End rational norm loop\n");
@@ -589,11 +623,18 @@ get_maxnorm (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
 
   free (fd);
 
-  /* multiply by (B*I)^d and divide by q0 if sieving on alg side */
-  tmp = max_norm * pow (si->B * (double) si->I, (double) d);
+  /* multiply by (B*I)^d: don't use the pow() function since it does not
+     work properly when the rounding mode is not to nearest (at least under
+     Linux with the glibc). Moreover for a small exponent d a direct loop
+     as follows should not be much slower (if any), anyway the efficiency of
+     that function is not critical */
+  for (tmp = max_norm, k = 0; k < d; k++)
+    tmp *= si->B * (double) si->I;
+  /* divide by q0 if sieving on alg side */
   if (!si->ratq)
       tmp /= (double) q0;
-  return log2(tmp);
+  tmp *= 0.5;
+  return log2 (tmp);
 }
 
 void sieve_info_init_norm_data(sieve_info_ptr si, unsigned long q0)

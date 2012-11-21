@@ -86,18 +86,21 @@ int main(int argc, char * argv[])
     int ascii_freq = 0;
     int binary_freq = 0;
 
+    int withcoeffs = 0;
+
     param_list_init(pl);
     argv++,argc--;
 
-    param_list_configure_knob(pl, "--quiet", &quiet);
-    param_list_configure_knob(pl, "--ascii-in", &ascii_in);
-    param_list_configure_knob(pl, "--binary-in", &binary_in);
-    param_list_configure_knob(pl, "--ascii-out", &ascii_out);
-    param_list_configure_knob(pl, "--binary-out", &binary_out);
-    param_list_configure_knob(pl, "--ascii-freq", &ascii_freq);
-    param_list_configure_knob(pl, "--binary-freq", &binary_freq);
-    param_list_configure_knob(pl, "--nofreq", &nofreq);
-    param_list_configure_knob(pl, "--freq", &freq);
+    param_list_configure_switch(pl, "--quiet", &quiet);
+    param_list_configure_switch(pl, "--ascii-in", &ascii_in);
+    param_list_configure_switch(pl, "--binary-in", &binary_in);
+    param_list_configure_switch(pl, "--ascii-out", &ascii_out);
+    param_list_configure_switch(pl, "--binary-out", &binary_out);
+    param_list_configure_switch(pl, "--ascii-freq", &ascii_freq);
+    param_list_configure_switch(pl, "--binary-freq", &binary_freq);
+    param_list_configure_switch(pl, "--nofreq", &nofreq);
+    param_list_configure_switch(pl, "--freq", &freq);
+    param_list_configure_switch(pl, "--withcoeffs", &withcoeffs);
 
     for(;argc;) {
         if (param_list_update_cmdline(pl, &argc, &argv)) continue;
@@ -226,7 +229,8 @@ int main(int argc, char * argv[])
             cw->f ? cw : NULL,
             rskip,
             cskip,
-            !quiet);
+            !quiet,
+            withcoeffs);
 
     if (rwfile) fclose(rw->f);
     if (cwfile) fclose(cw->f);

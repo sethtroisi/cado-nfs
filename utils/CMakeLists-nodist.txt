@@ -1,5 +1,4 @@
 
-add_executable(cache EXCLUDE_FROM_ALL cache.c timing.c)
-add_executable(cachesize EXCLUDE_FROM_ALL cachesize.c)
+add_executable(cachesize EXCLUDE_FROM_ALL cachesize.c cachesize_cpuid.c cachesize_guess.c timing.c memusage.c)
 
 # vim: set ft=cmake:

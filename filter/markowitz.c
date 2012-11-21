@@ -3,23 +3,20 @@
 
 #include "merge_opts.h"
 
-#ifdef USE_MARKOWITZ
-
 #include "sparse.h"
-#include "dclist.h"
 #include "filter_matrix.h"
 #include "mst.h"
 #include "report.h"
 #include "markowitz.h"
 
 #define MKZ_DEBUG 0
-#define MKZ_TIMINGS 1
+// #define MKZ_TIMINGS 1
 
 #if MKZ_TIMINGS
 double tmkzup, tmkzdown, tmkzupdown, tmkzcount;
 #endif
 
-#define MKZ_INF -1
+#define MKZ_INF -1 /* mat->MKZA[j] becomes MKZ_INF when column j is deleted */
 
 // Again, a priority queue as a heap...!
 // Q[0] contains the number of items in Q[], so that useful part of Q
@@ -27,6 +24,8 @@ double tmkzup, tmkzdown, tmkzupdown, tmkzcount;
 
 // Q[2*i] contains j-jmin = dj
 // Q[2*i+1] contains the Markowitz count for j
+
+// A[j] gives u s.t. Q[2*u] = j
 
 // get r-th component of Q[i]
 #define MkzGet(Q, i, r) (Q[((i)<<1)+(r)])
@@ -86,7 +85,7 @@ MkzUpQueue(int32_t *Q, int32_t *A, int32_t k)
     while((k > 1) && (MkzGet(Q, k/2, 1) >= count)){
 	// we are at level > 0 and the father is >= son
 	// the father replaces the son
-	MkzAssign(Q, A, k, k/2);
+      MkzAssign(Q, A, k, k/2);
 	k /= 2;
     }
     // we found the place of (dj, count)
@@ -108,7 +107,8 @@ MkzInsert(int32_t *Q, int32_t *A, int32_t dj, int32_t count)
     MkzUpQueue(Q, A, Q[0]);
 }
 
-// Move Q[k] down.
+// Move Q[k] down, by keeping the structure of Q as a heap, i.e.,
+// each node has a smaller cost than its two left and right nodes
 static void
 MkzDownQueue(int32_t *Q, int32_t *A, int32_t k)
 {
@@ -117,19 +117,17 @@ MkzDownQueue(int32_t *Q, int32_t *A, int32_t k)
     double tt = seconds();
 #endif
 
-    while(k <= Q[0]/2){
-	// k has at least a left son
-	j = 2*k;
+    while ((j = 2*k) <= Q[0]){ /* node k has at least one left son 2k */
 	if(j < Q[0])
-	    // k has a right son
+	    // node k has also a right son
 	    if(MkzGet(Q, j, 1) > MkzGet(Q, j+1, 1))
 		j++;
-	// at this point, Q[j] is the largest son
-	if(count <= MkzGet(Q, j, 1))
+	// at this point, Q[j] is the son with the smallest "count"
+	if(count <= MkzGet(Q, j, 1)) /* Q[k] has smaller cost than both sons */
 	    break;
 	else{
-	    // the father takes the place of the son
-	    MkzAssign(Q, A, k, j);
+	    // the father takes the place of the "smaller" son
+          MkzAssign(Q, A, k, j);
 	    k = j;
 	}
     }
@@ -140,27 +138,6 @@ MkzDownQueue(int32_t *Q, int32_t *A, int32_t k)
 #if MKZ_TIMINGS
     tmkzdown += (seconds()-tt);
 #endif
-}
-
-void
-MkzPopQueue(int32_t *dj, int32_t *mkz, int32_t *Q, int32_t *A)
-{
-    *dj = MkzGet(Q, 1, 0);
-    *mkz = MkzGet(Q, 1, 1);
-#if 0 // to see what happens
-    {
-	int i;
-
-	for(i = 2; i <= Q[0]; i++)
-	    if(MkzGet(Q, i, 1) != *mkz)
-		break;
-	printf("N(mkz=%d)=%d\n", *mkz, i);
-    }
-#endif
-    A[*dj] = MKZ_INF;
-    MkzAssign(Q, A, 1, Q[0]);
-    Q[0]--;
-    MkzDownQueue(Q, A, 1);
 }
 
 // (Q, A)[k] has just arrived, but we have to move it in the heap, so that
@@ -198,7 +175,7 @@ MkzDelete(int32_t *Q, int32_t *A, int32_t k)
 	    MkzGet(Q, k, 0), MkzGet(Q, k, 1));
 #endif
     // we put Q[Q[0]] in Q[k]
-    MkzAssign(Q, A, k, Q[0]);
+    MkzAssign (Q, A, k, Q[0]);
     Q[0]--;
     MkzMoveUpOrDown(Q, A, k);
 }
@@ -245,11 +222,16 @@ static void
 MkzCheck(filter_matrix_t *mat)
 {
     int32_t dj;
+    int maxlevel = mat->mergelevelmax;
 
     for(dj = 0; dj < mat->jmax - mat->jmin; dj++)
-	if(mat->wt[dj] > 0)
+      if (0 < mat->wt[dj] && mat->wt[dj] <= maxlevel)
 	    if(MkzGet(mat->MKZQ, mat->MKZA[dj], 0) != dj)
-		fprintf(stderr, "GASP: %d in MkzCheck\n", dj);
+              {
+		fprintf(stderr, "GASP: %d <> %d in MkzCheck\n",
+                        MkzGet(mat->MKZQ, mat->MKZA[dj], 0), dj);
+                exit (1);
+              }
 }
 
 static int
@@ -258,36 +240,57 @@ Cavallar(filter_matrix_t *mat, int32_t j)
     return abs(mat->wt[GETJ(mat, j)]);
 }
 
+/* #define COUNT_CANCELLED_IDEALS */
+
 static int
 pureMkz(filter_matrix_t *mat, int32_t j)
 {
     int mkz, k, i;
-    int32_t ind[MERGE_LEVEL_MAX];
+    int w = mat->wt[GETJ(mat, j)];
 
-#if MKZ_TIMINGS
-    double tt = seconds();
+    if (w == 1)
+      return -4; /* ensures that singletons are removed earlier */
+    else if (w == 2)
+      return -2;
+    else
+      {
+#ifdef COUNT_CANCELLED_IDEALS
+	int i0 = 0;
 #endif
-    // trick to be sure that columns with wt <= 2 are treated asap
-    if(mat->wt[GETJ(mat, j)] == 1)
-	return 1-2*mat->ncols;
-    else if(mat->wt[GETJ(mat, j)] == 2){
-	fillTabWithRowsForGivenj(ind, mat, j);
-	// the more this is < 0, the less the weight is
-	return weightSum(mat, ind[0], ind[1])-2*mat->ncols;
-    }
-    // real traditional Markowitz count
-    mkz = mat->nrows;
-    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
-	if((i = mat->R[GETJ(mat, j)][k]) != -1){
+        int w0;
+
+        /* approximate traditional Markowitz count: we assume we add the
+	   lightest row to all other rows */
+        w0 = mat->nrows;
+        for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
+          if((i = mat->R[GETJ(mat, j)][k]) != -1){
 	    // this should be the weight of row i
-	    if(mat->rows[i][0] < mkz)
-		mkz = mat->rows[i][0];
-	}
-    mkz = (mkz-1) * (mat->wt[GETJ(mat, j)]-1);
-#if MKZ_TIMINGS
-    tmkzcount += (seconds()-tt);
+            if(matLengthRow(mat, i) < w0)
+              {
+                w0 = matLengthRow(mat, i);
+#ifdef COUNT_CANCELLED_IDEALS
+                i0 = i;
 #endif
-    return mkz;
+              }
+          }
+#ifndef COUNT_CANCELLED_IDEALS
+        /* here we assume there is no cancellation other than for ideal j:
+	   the lightest row has weight w0, we add wt-1 times w0-1,
+	   remove once w0-1, and remove wt entries in the jth column */
+        mkz = (w0 - 2) * (mat->wt[GETJ(mat, j)] - 2) - 2;
+#else   /* we compute the real weight obtained when adding the lightest row.
+	   This is more expensive but gives a slightly sparser matrix. */
+	mkz = 0;
+	for (k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
+          if ((i = mat->R[GETJ(mat, j)][k]) != -1)
+	    {
+	      if (i != i0)
+                mkz += weightSum (mat, i, i0, j); /* merge i and i0 */
+	      mkz -= matLengthRow(mat, i);          /* remove row i */
+	    }
+#endif
+	return mkz;
+      }
 }
 
 // forcing lighter columns first.
@@ -309,11 +312,11 @@ lightColAndMkz(filter_matrix_t *mat, int32_t j)
     else if(wj == 2){
 	fillTabWithRowsForGivenj(ind, mat, j);
 	// the more this is < 0, the less the weight is
-	return 2 * cte + weightSum(mat, ind[0], ind[1]);
+	return 2 * cte + weightSum(mat, ind[0], ind[1], j);
     }
     else if(wj <= mat->wmstmax){
 	fillTabWithRowsForGivenj(ind, mat, j);
-	mkz = minCostUsingMST(mat, mat->wt[GETJ(mat, j)], ind, &tfill, &tMST);
+	mkz = minCostUsingMST(mat, mat->wt[GETJ(mat, j)], ind, j, &tfill, &tMST);
 	return wj * cte + mkz;
     }
     // real traditional Markowitz count
@@ -321,8 +324,8 @@ lightColAndMkz(filter_matrix_t *mat, int32_t j)
     for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
 	if((i = mat->R[GETJ(mat, j)][k]) != -1){
 	    // this should be the weight of row i
-	    if(mat->rows[i][0] < mkz)
-		mkz = mat->rows[i][0];
+      if(matLengthRow(mat, i) < mkz)
+          mkz = matLengthRow(mat, i);
 	}
     mkz = wj * cte + (mkz-1) * (wj-1);
 #if MKZ_TIMINGS
@@ -331,6 +334,7 @@ lightColAndMkz(filter_matrix_t *mat, int32_t j)
     return mkz;
 }
 
+/* return the cost of merging column j (the smaller, the better) */
 static int
 MkzCount(filter_matrix_t *mat, int32_t j)
 {
@@ -345,21 +349,54 @@ MkzCount(filter_matrix_t *mat, int32_t j)
     }
 }
 
+/* pop the top element from the heap, return 0 iff heap is empty */
+int
+MkzPopQueue(int32_t *dj, int32_t *mkz, filter_matrix_t *mat)
+{
+  int32_t *Q = mat->MKZQ;
+  int32_t *A = mat->MKZA;
+
+  /* Q[0] contains the number of items in Q[], thus the first element is
+     stored in Q[2..3] */
+  *dj = MkzGet(Q, 1, 0);
+  *mkz = MkzGet(Q, 1, 1);
+  while (mat->wt[*dj] > mat->mergelevelmax)
+    {
+      /* remove heavy column */
+      MkzDelete (Q, A, 1);
+      A[*dj] = MKZ_INF;
+
+      if (MkzQueueCardinality(mat->MKZQ) <= 0)
+        return 0;
+
+      *dj = MkzGet(Q, 1, 0);
+      *mkz = MkzGet(Q, 1, 1);
+    }
+  A[*dj] = MKZ_INF; /* already done in MkzRemoveJ, but if we don't do it,
+                       we get A[j1]=A[j2] for some j1 <> j2 */
+  if (MkzQueueCardinality(mat->MKZQ) <= 0)
+    return 0;
+  MkzAssign(Q, A, 1, Q[0]); /* move entry of index Q[0] in Q,A to index 1 */
+  Q[0]--;                   /* decrease number of entries in Q,A */
+  MkzDownQueue(Q, A, 1);    /* reorder heap structure */
+  return 1;
+}
+
 void
 MkzInit(filter_matrix_t *mat)
 {
     int32_t j, mkz;
     int sz = 0;
+    int maxlevel = mat->mergelevelmax;
 
 #if MKZ_TIMINGS
     tmkzup = tmkzdown = tmkzupdown = tmkzcount = 0.0;
 #endif
     fprintf(stderr, "Entering initMarkowitz");
-    fprintf(stderr, " (wmstmax=%d, rnd=%d", mat->wmstmax, mat->mkzrnd);
-    fprintf(stderr, ", type=%d)\n", mat->mkztype);
+    fprintf(stderr, " (wmstmax=%d, type=%d)\n", mat->wmstmax, mat->mkztype);
     // compute number of elligible columns in the heap
     for(j = mat->jmin; j < mat->jmax; j++)
-	if(mat->wt[GETJ(mat, j)] > 0)
+      if(0 < mat->wt[GETJ(mat, j)] && mat->wt[GETJ(mat, j)] <= maxlevel)
 	    sz++;
     fprintf(stderr, "Allocating heap for %d columns\n", sz);
     mat->MKZQ = (int32_t *)malloc((sz+1) * 2 * sizeof(int32_t));
@@ -368,7 +405,8 @@ MkzInit(filter_matrix_t *mat)
     // every j needs a pointer
     mat->MKZA = (int32_t *)malloc((mat->jmax - mat->jmin + 1) * sizeof(int32_t));
     for(j = mat->jmin; j < mat->jmax; j++)
-	if(mat->wt[GETJ(mat, j)] > 0){
+      if (0 < mat->wt[GETJ(mat, j)] && mat->wt[GETJ(mat, j)] <= maxlevel)
+        {
 	    mkz = MkzCount(mat, j);
 #if MKZ_DEBUG >= 1
 	    printf("j=%d wt=%d", j, mat->wt[GETJ(mat, j)]);
@@ -399,6 +437,7 @@ MkzClose(filter_matrix_t *mat)
     free(mat->MKZA);
 }
 
+/* increment the weight of column j (in absolute value) */
 int
 MkzIncrCol(filter_matrix_t *mat, int32_t j)
 {
@@ -445,11 +484,33 @@ MkzUpdate(filter_matrix_t *mat, int32_t i MAYBE_UNUSED, int32_t j)
 	    MkzGet(mat->MKZQ, adr, 1), mkz);
 #endif
     // nothing to do if new count == old count
-    if(mkz < MkzGet(mat->MKZQ, adr, 1)){
-	// add new count
-	MkzSet(mat->MKZQ, adr, 1, mkz);
-	// a variant of delete is needed...!
-	MkzMoveUpOrDown(mat->MKZQ, mat->MKZA, adr);
+    if (mkz != MkzGet(mat->MKZQ, adr, 1))
+      {
+        // add new count
+        MkzSet(mat->MKZQ, adr, 1, mkz);
+        // a variant of delete is needed...!
+        MkzMoveUpOrDown(mat->MKZQ, mat->MKZA, adr);
+      }
+}
+
+// Row[i] has been removed for column j, so that we need to update
+// the Markowitz count.
+void
+MkzUpdateDown (filter_matrix_t *mat, int32_t i MAYBE_UNUSED, int32_t j)
+{
+  int32_t adr = mat->MKZA[GETJ(mat, j)];
+  int mkz;
+
+  if (adr == -1) /* column too heavy or already removed */
+    return;
+
+  mkz = MkzCount(mat, j);
+  if (mkz != MkzGet(mat->MKZQ, adr, 1))
+    {
+      // update count
+      MkzSet(mat->MKZQ, adr, 1, mkz);
+      // a variant of delete is needed...!
+      MkzMoveUpOrDown(mat->MKZQ, mat->MKZA, adr);
     }
 }
 
@@ -471,23 +532,25 @@ MkzDecreaseColWeight(filter_matrix_t *mat, int32_t j)
     mat->wt[dj] = decrS(mat->wt[dj]);
 }
 
+/* remove column j from and update matrix */
 void
 MkzRemoveJ(filter_matrix_t *mat, int32_t j)
 {
     int32_t dj = GETJ(mat, j);
 
-    if(mat->MKZA[dj] == MKZ_INF){
-#if MKZ_DEBUG >= 1
-	fprintf(stderr, "Prevented use of adr[%d]=-1 in MkzRemoveJ\n", j);
-#endif
+    mat->wt[dj] = 0;
+
+    /* This can happen when maxlevel < weight[dj] <= cwmax initially, thus
+       A[dj] was initialized to MKZ_INF, but because of a merge it becomes
+       larger than cwmax. FIXME: should we have maxlevel = cwmax? */
+    if (mat->MKZA[dj] == MKZ_INF)
 	return;
-    }
+
 #if MKZ_DEBUG >= 1
     fprintf(stderr, "Removing col %d of weight %d\n", j, mat->wt[dj]);
 #endif
-    mat->wt[dj] = 0;
     // remove j from the QA structure
-    MkzDelete(mat->MKZQ, mat->MKZA, mat->MKZA[dj]);
+    MkzDelete (mat->MKZQ, mat->MKZA, mat->MKZA[dj]);
     mat->MKZA[dj] = MKZ_INF;
 #if MKZ_DEBUG >= 1
     MkzIsHeap(mat->MKZQ);
@@ -519,5 +582,3 @@ MkzDeleteHeavyColumns(report_t *rep MAYBE_UNUSED, filter_matrix_t *mat MAYBE_UNU
     return njmax;
 #endif
 }
-
-#endif /* USE_MARKOWITZ */

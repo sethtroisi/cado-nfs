@@ -632,7 +632,7 @@ modredc15ul_sub (residueredc15ul_t r, const residueredc15ul_t a,
   ASSERT_EXPENSIVE (modredc15ul_intlt (a, m[0].m));
   ASSERT_EXPENSIVE (modredc15ul_intlt (b, m[0].m));
 
-#if defined(__x86_64__) && defined(__GNUC__)
+#ifdef HAVE_GCC_STYLE_AMD64_ASM
   {
     unsigned long s1 = m[0].m[0], s2 = m[0].m[1], t1 = a[0], t2 = a[1];
     
@@ -745,7 +745,7 @@ static inline void
 modredc15ul_mul (residueredc15ul_t r, const residueredc15ul_t a, 
                  const residueredc15ul_t b, const modulusredc15ul_t m)
 {
-#if defined(__x86_64__) && defined(__GNUC__)
+#ifdef HAVE_GCC_STYLE_AMD64_ASM
 
   ASSERT_EXPENSIVE (modredc15ul_intlt (a, m[0].m));
   ASSERT_EXPENSIVE (modredc15ul_intlt (b, m[0].m));
@@ -908,7 +908,7 @@ static inline void
 modredc15ul_sqr (residueredc15ul_t r, const residueredc15ul_t a, 
                  const modulusredc15ul_t m)
 {
-#if defined(__x86_64__) && defined(__GNUC__)
+#ifdef HAVE_GCC_STYLE_AMD64_ASM
   ASSERT_EXPENSIVE (modredc15ul_intlt (a, m[0].m));
 #if defined(MODTRACE)
   printf ("((%lu * 2^%d + %lu)^2 / 2^%d) %% (%lu * 2^%d + %lu)", 

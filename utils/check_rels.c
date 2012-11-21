@@ -52,19 +52,22 @@ check_relation (relation_t *rel, cado_poly_ptr cpoly)
 }
 
 void usage_and_die(char *str) {
-    fprintf(stderr, "usage: %s -poly <polyfile> <relfile1> <relfile2> ...\n",
+    fprintf(stderr, "usage: %s [-q] -poly <polyfile> [-f] <relfile1> <relfile2> ...\n",
             str);
     exit(3);
 }
 
 int
-check_relation_files (char ** files, cado_poly_ptr cpoly, int forced_read)
+check_relation_files (char ** files, cado_poly_ptr cpoly, int forced_read,
+                      int quiet)
 {
     relation_stream rs;
     relation_stream_init(rs);
     unsigned long ok = 0;
     unsigned long bad = 0;
     int had_error = 0;
+    unsigned long total = 0, nbfiles = 0;
+
     for( ; *files ; files++) {
         relation_stream_openfile(rs, *files);
         char line[RELATION_MAX_BYTES];
@@ -72,11 +75,14 @@ check_relation_files (char ** files, cado_poly_ptr cpoly, int forced_read)
         unsigned long ok0 = ok;
         unsigned long bad0 = bad;
         int nread;
-        for( ; (nread = relation_stream_get (rs, line, forced_read)) >= 0 ; ) {
+        nbfiles ++;
+        for( ; (nread = relation_stream_get (rs, line, forced_read, 10)) >= 0 ; )
+        {
             unsigned long l = rs->lnum - l0;
             if (nread > 0 && check_relation (&rs->rel, cpoly))
               {
-                printf ("%s", line);
+                if (quiet == 0)
+                  printf ("%s", line);
                 ok++;
                 continue;
               }
@@ -86,7 +92,8 @@ check_relation_files (char ** files, cado_poly_ptr cpoly, int forced_read)
             had_error = 1;
         }
         if (bad == bad0) {
-            fprintf(stderr, "%s : %lu ok\n", *files, ok-ok0);
+            fprintf (stderr, "%s : %lu ok\n", *files, ok-ok0);
+            total += ok - ok0;
         } else {
             fprintf(stderr, "%s : %lu ok ; FOUND %lu ERRORS\n",
                     *files, ok-ok0, bad-bad0);
@@ -94,6 +101,9 @@ check_relation_files (char ** files, cado_poly_ptr cpoly, int forced_read)
         relation_stream_closefile(rs);
     }
     relation_stream_clear(rs);
+
+    if (nbfiles > 1)
+      fprintf (stderr, "Total %lu relations ok\n", total);
 
     return had_error ? -1 : 0;
 }
@@ -103,6 +113,14 @@ int main(int argc, char * argv[])
     int forced_read = 0;
     cado_poly cpoly;
     int had_error = 0;
+    int quiet = 0;
+
+    if (argc >= 2 && strcmp (argv[1], "-q") == 0)
+      {
+        quiet = 1;
+        argc --;
+        argv ++;
+      }
 
     if (argc < 4 || strcmp(argv[1], "-poly") != 0) {
         usage_and_die(argv[0]);
@@ -120,7 +138,7 @@ int main(int argc, char * argv[])
     argv++,argc--;
     argv++,argc--;
 
-    had_error = check_relation_files (argv, cpoly, forced_read) < 0;
+    had_error = check_relation_files (argv, cpoly, forced_read, quiet) < 0;
 
     cado_poly_clear(cpoly);
 

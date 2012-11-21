@@ -15,7 +15,7 @@
 # proper support in  ~/.ssh/config. For the gcc compile farm, e.g.:
 # GET http://gcc.gnu.org/wiki/CompileFarm | perl ~thome/.ssh/parse-cfarm.pl
 
-# results with cado-nfs-1.1-RC5.tar.gz
+# results with cado-nfs-1.1.tar.gz
 gccs=(\
 gcc10 # ok
 gcc11 # ok
@@ -36,11 +36,11 @@ gcc38 # ok
 # gcc41 Connection refused
 # gcc42 Connection refused
 # gcc43 Connection refused
-# gcc45 Connection refused
+gcc45 # ok
 gcc46 # ok
 gcc47 # ok
 # gcc50 Connection timed out
-# gcc51 Connection refused
+gcc51 # ok
 # gcc52 Connection refused
 # gcc53 Connection timed out
 gcc54 # ok
@@ -51,10 +51,12 @@ gcc60 # ok
 gcc61 # ok
 # gcc62 Connection timed out
 gcc63 # ok
-gcc64 # compil ok, polyselect2 fails, can't load library 'libpolyselect_common.so' -> pb cmake?
+gcc64 # ok with egcc 4.2.4 (GMP compiled with egcc too)
+gcc66 # ok
 gcc70 # coredump in dispatch -> bug in pthreads?
 # gcc100 Connection timed out
 # gcc101 Connection timed out
+gcc110
 # gcc200 Connection timed out
 # gcc201 Connection timed out
 )

@@ -3055,8 +3055,8 @@ esac
 
 
 
-macro_version='2.4'
-macro_revision='1.3293'
+macro_version='2.4.2'
+macro_revision='1.3337'
 
 
 
@@ -16449,7 +16449,7 @@ $as_echo "#define HAVE_SSE2_SUPPORT 1" >>confdefs.h
 
 
 
- ac_save_CFLAGS=$CFLAGS
+ ac_save_CFLAGS="$CFLAGS"
  { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether $CC can compile pclmulqdq and if it is supported by the hardware" >&5
 $as_echo_n "checking whether $CC can compile pclmulqdq and if it is supported by the hardware... " >&6; }
 if ${gf2x_cv_cc_supports_pclmul+:} false; then :
@@ -16605,8 +16605,8 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gf2x_cv_cpp_requires_mpclmul_flag" >&5
 $as_echo "$gf2x_cv_cpp_requires_mpclmul_flag" >&6; }
  fi
- CFLAGS=$ac_save_CFLAGS
- CPPFLAGS=$ac_save_CPPFLAGS
+ CFLAGS="$ac_save_CFLAGS"
+ CPPFLAGS="$ac_save_CPPFLAGS"
  if test "$gf2x_cv_cc_supports_pclmul" = "requires -mpclmul" ;then
   CFLAGS="$CFLAGS -mpclmul"
  fi

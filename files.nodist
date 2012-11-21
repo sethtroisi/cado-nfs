@@ -21,8 +21,8 @@ filter/debug.c
 filter/debug.h
 filter/merge_mpi.c
 filter/merge_mpi.h
-misc/
 scripts/nightly-test
+scripts/polsel_effort
 polyselect/alpha.mpl
 polyselect/alpha.sage
 polyselect/alpha.c
@@ -35,7 +35,7 @@ polyselect/kleinjung-list-of-lattices.sage
 polyselect/linear_interpolation.sage
 polyselect/fast_rootsieve.h
 polyselect/fast_rootsieve.c
-polyselect/rootsieve5_main.c
+polyselect/ropt_main.c
 polyselect/play.c
 polyselect/rotation_bound.sage
 polyselect/ROOTSIEVE_TODO
@@ -68,11 +68,9 @@ sqrt/jmc.mag
 sqrt/lift.c
 sqrt/magma-manu/
 sqrt/ratsqrt.c
-sqrt/allsqrt.c
 sqrt/algsqrt.c
 utils/README_POLYNOMIALS
 utils/CMakeLists-nodist.txt
-utils/cache.c
 utils/cachesize.c
 utils/build-testcases-rootfinder.m
 linalg/bwc/CMakeLists-nodist.txt
@@ -82,7 +80,6 @@ polyselect/fast_rootsieve.h
 polyselect/fast_rootsieve.c
 filter/CMakeLists-nodist.txt
 filter/refresh-purged.c
-params/params.dl30
 params/params.rsa100
 params/rsa155.poly
 params/rsa155.poly2
@@ -104,3 +101,9 @@ linalg/bwc/mf_twistvec.c
 linalg/bwc/test_hello.c
 linalg/bwc/shell.c
 linalg/bwc/tool.sh
+misc/README
+misc/contains_zerochar.c
+misc/convert_rels.c
+misc/phi.c
+filter/out-of-core/Makefile
+filter/out-of-core/singleton.c

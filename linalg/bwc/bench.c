@@ -22,6 +22,7 @@
 #include "params.h"
 #include "worker-threads.h"
 #include "utils.h"
+#include "mpfq/mpfq.h"
 #include "mpfq/abase_vbase.h"
 #include "matmul-mf.h"
 // #include "debug.h"
@@ -36,8 +37,8 @@ void usage()
 
 struct private_args {
     matmul_t mm;
-    void * src;
-    void * dst;
+    void * colvec;
+    void * rowvec;
 };
 
 struct bench_args {
@@ -48,6 +49,7 @@ struct bench_args {
     int transpose;
     int nchecks;
     int rebuild;
+    mpz_t prime;
     double freq;
     char ** mfiles;
     const char * source_vec;
@@ -79,7 +81,8 @@ void init_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct b
         pthread_mutex_unlock(&tg->mu);
         ASSERT_ALWAYS(p->mm->store_transposed == ba->transpose);
         matrix_u32 m;
-        mf_prepare_matrix_u32(p->mm, m, ba->mfiles[tnum]);
+        int withcoeffs = mpz_cmp_ui(ba->prime, 2) > 0;
+        mf_prepare_matrix_u32(p->mm, m, ba->mfiles[tnum], withcoeffs);
         matmul_build_cache(p->mm, m);
         pthread_mutex_lock(&tg->mu);
         fprintf(stderr, "T%d Cache build time %.2fs cpu\n",
@@ -107,10 +110,10 @@ void init_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct b
     matmul_aux(p->mm, MATMUL_AUX_GET_READAHEAD, &nr);
     matmul_aux(p->mm, MATMUL_AUX_GET_READAHEAD, &nc);
 
-    ba->xx->vec_init(ba->xx, &p->src, nc);
-    ba->xx->vec_init(ba->xx, &p->dst, nr);
-    ba->xx->vec_set_zero(ba->xx, p->src, nc);
-    ba->xx->vec_set_zero(ba->xx, p->dst, nr);
+    ba->xx->vec_init(ba->xx, &p->colvec, nc);
+    ba->xx->vec_init(ba->xx, &p->rowvec, nr);
+    ba->xx->vec_set_zero(ba->xx, p->colvec, nc);
+    ba->xx->vec_set_zero(ba->xx, p->rowvec, nr);
 }/*}}}*/
 
 void check_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct bench_args * ba)/*{{{*/
@@ -125,39 +128,47 @@ void check_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct 
     matmul_aux(p->mm, MATMUL_AUX_GET_READAHEAD, &nr);
     matmul_aux(p->mm, MATMUL_AUX_GET_READAHEAD, &nc);
 
-    void * dstT;
-    void * srcT;
-    A->vec_init(A, &dstT, nc);
-    A->vec_init(A, &srcT, nr);
-    A->vec_set_zero(A, dstT, nc);
-    A->vec_set_zero(A, srcT, nr);
+    void * colvec_bis;
+    void * rowvec_bis;
+    A->vec_init(A, &colvec_bis, nc);
+    A->vec_init(A, &rowvec_bis, nr);
+    A->vec_set_zero(A, colvec_bis, nc);
+    A->vec_set_zero(A, rowvec_bis, nr);
 
     void * check0;
     void * check1;
     A->vec_init(A, &check0, A->groupsize(A));
     A->vec_init(A, &check1, A->groupsize(A));
 
-    A->vec_set(A, dstT, p->src, nc);
-    A->vec_set(A, srcT, p->dst, nr);
+    A->vec_set(A, colvec_bis, p->colvec, nc);
+    A->vec_set(A, rowvec_bis, p->rowvec, nr);
 
-    printf("T%d src(%u): %08" PRIx32 "\n", tnum,
-            nc, crc32((unsigned long*) p->src, A->vec_elt_stride(A, nc0) / sizeof(unsigned long)));
-    matmul_mul(p->mm, p->dst, p->src, 1);
-    printf("T%d dst(%u): %08" PRIx32 "\n", tnum,
-            nr, crc32((unsigned long*) p->dst, A->vec_elt_stride(A, nr0) / sizeof(unsigned long)));
-    // debug_write(p->dst, abbytes(A, nr), "/tmp/Lmul");
+    // debug_write(p->colvec, A->vec_elt_stride(A, nc), "/tmp/colvec1");
 
-    A->dotprod(A, check0, p->dst, srcT, nr0);
+    /* See the comment in matmul_mul about the direction argument and the
+     * number of coordinates of source/destination vectors */
 
-    printf("T%d srcT(%u): %08" PRIx32 "\n", tnum,
-            nr, crc32((unsigned long*) srcT, A->vec_elt_stride(A, nr0) / sizeof(unsigned long)));
-    matmul_mul(p->mm, dstT, srcT, 0);
-    printf("T%d dstT(%u): %08" PRIx32 "\n", tnum,
-            nc, crc32((unsigned long*) dstT, A->vec_elt_stride(A, nc0) / sizeof(unsigned long)));
+    printf("T%d colvec(%u): %08" PRIx32 "\n", tnum,
+            nc, crc32((unsigned long*) p->colvec, A->vec_elt_stride(A, nc0) / sizeof(unsigned long)));
+    matmul_mul(p->mm, p->rowvec, p->colvec, 1);
+    printf("T%d rowvec(%u): %08" PRIx32 "\n", tnum,
+            nr, crc32((unsigned long*) p->rowvec, A->vec_elt_stride(A, nr0) / sizeof(unsigned long)));
 
-    // debug_write(dstT, abbytes(A, nc), "/tmp/Rmul");
+    // debug_write(p->rowvec, A->vec_elt_stride(A, nr), "/tmp/rowvec1");
 
-    A->dotprod(A, check1, p->src, dstT, nc0);
+    A->dotprod(A, check0, p->rowvec, rowvec_bis, nr0);
+
+    // debug_write(rowvec_bis, A->vec_elt_stride(A, nr), "/tmp/rowvec2");
+
+    printf("T%d rowvec_bis(%u): %08" PRIx32 "\n", tnum,
+            nr, crc32((unsigned long*) rowvec_bis, A->vec_elt_stride(A, nr0) / sizeof(unsigned long)));
+    matmul_mul(p->mm, colvec_bis, rowvec_bis, 0);
+    printf("T%d colvec_bis(%u): %08" PRIx32 "\n", tnum,
+            nc, crc32((unsigned long*) colvec_bis, A->vec_elt_stride(A, nc0) / sizeof(unsigned long)));
+
+    // debug_write(colvec_bis, A->vec_elt_stride(A, nc), "/tmp/colvec2");
+
+    A->dotprod(A, check1, p->colvec, colvec_bis, nc0);
 
     if (A->vec_cmp(A, check0, check1, A->groupsize(A)) != 0) {
         pthread_mutex_lock(&tg->mu);
@@ -166,8 +177,8 @@ void check_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct 
         abort();
     }
 
-    A->vec_clear(A, &dstT, nc);
-    A->vec_clear(A, &srcT, nr);
+    A->vec_clear(A, &colvec_bis, nc);
+    A->vec_clear(A, &rowvec_bis, nr);
     A->vec_clear(A, &check0, A->groupsize(A));
     A->vec_clear(A, &check1, A->groupsize(A));
 
@@ -178,9 +189,9 @@ void check_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct 
 void mul_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct bench_args * ba)/*{{{*/
 {
     struct private_args * p = ba->p + tnum;
-    matmul_mul(p->mm, ba->transpose ? p->src : p->dst,
-            ba->transpose ? p->dst : p->src,
-            !ba->transpose);
+    void * dstvec = ba->transpose ? p->colvec : p->rowvec;
+    void * srcvec = ba->transpose ? p->rowvec : p->colvec;
+    matmul_mul(p->mm, dstvec, srcvec, !ba->transpose);
 }/*}}}*/
 
 void clear_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct bench_args * ba)/*{{{*/
@@ -194,8 +205,8 @@ void clear_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct 
     printf("\n");
     pthread_mutex_unlock(&tg->mu);
     matmul_clear(p->mm);
-    A->vec_clear(A, &p->src, nc);
-    A->vec_clear(A, &p->dst, nr);
+    A->vec_clear(A, &p->colvec, nc);
+    A->vec_clear(A, &p->rowvec, nr);
 }/*}}}*/
 
 void banner(int argc, char * argv[])
@@ -221,19 +232,22 @@ int main(int argc, char * argv[])
 
     banner(argc, argv);
 
+    memset(ba, 0, sizeof(ba));
+
     ba->impl = "bucket";
     char * file = NULL;
     int nocheck = 0;
     ba->nchecks = 4;
     ba->nthreads = 1;
     ba->freq = 1;
+    mpz_init_set_ui(ba->prime, 2);
 
     /* {{{ */
     param_list_init(ba->pl);
     argv++,argc--;
-    param_list_configure_knob(ba->pl, "--transpose", &ba->transpose);
-    param_list_configure_knob(ba->pl, "--rebuild", &ba->rebuild);
-    param_list_configure_knob(ba->pl, "--nocheck", &nocheck);
+    param_list_configure_switch(ba->pl, "--transpose", &ba->transpose);
+    param_list_configure_switch(ba->pl, "--rebuild", &ba->rebuild);
+    param_list_configure_switch(ba->pl, "--nocheck", &nocheck);
     param_list_configure_alias(ba->pl, "--transpose", "-t");
     param_list_configure_alias(ba->pl, "--rebuild", "-r");
 
@@ -255,6 +269,7 @@ int main(int argc, char * argv[])
     }
 
     unsigned int nmax = UINT_MAX;
+    param_list_parse_mpz(ba->pl, "prime", ba->prime);
     param_list_parse_uint(ba->pl, "nmax", &nmax);
     param_list_parse_int(ba->pl, "nthreads", &ba->nthreads);
     const char * unit;
@@ -287,6 +302,8 @@ int main(int argc, char * argv[])
     }
 
     param_list_lookup_string(ba->pl, "matmul_bucket_methods");
+    param_list_lookup_string(ba->pl, "l1_cache_size");
+    param_list_lookup_string(ba->pl, "l2_cache_size");
 
     double tmax = 100.0;
     param_list_parse_double(ba->pl, "tmax", &tmax);
@@ -302,15 +319,18 @@ int main(int argc, char * argv[])
 
     abase_vbase_ptr A = ba->xx;
 
-    /* may leave nbys unchanged ! */
+    /* may leave nbys at the default value ! */
     param_list_parse_uint(ba->pl, "nbys", &nbys);
+
     /* The api mandates that we set the desired value for nbys. Here,
      * that's not really our intent, since we really want to bench
      * the layer in its favorite working context. Most of the time,
      * setting nbys is pointless.
      */
-    abase_vbase_oo_field_init_bygroupsize(A, nbys);
-    A->set_groupsize(A, nbys);
+    abase_vbase_oo_field_init_byfeatures(A,
+                MPFQ_PRIME_MPZ, ba->prime,
+                MPFQ_GROUPSIZE, nbys,
+                MPFQ_DONE);
 
     param_list_lookup_string(ba->pl, "srcvec");
     if (param_list_warn_unused(ba->pl)) {
@@ -327,7 +347,10 @@ int main(int argc, char * argv[])
     for(int tnum = 0 ; tnum < ba->nthreads ; tnum++) {
         struct private_args * p = ba->p + tnum;
         fprintf (stderr, "T%d %s: %u rows %u cols %" PRIu64 " coeffs\n",
-                tnum, ba->mfiles[tnum], p->mm->dim[0], p->mm->dim[1], p->mm->ncoeffs);
+                tnum, ba->mfiles[tnum],
+                p->mm->dim[0],
+                p->mm->dim[1],
+                p->mm->ncoeffs);
         ncoeffs_total += p->mm->ncoeffs;
     }
     fprintf (stderr, "total %" PRIu64 " coeffs\n", ncoeffs_total);
@@ -339,17 +362,17 @@ int main(int argc, char * argv[])
         /* create deterministic test values */
         for(int tnum = 0 ; tnum < ba->nthreads ; tnum++) {
             struct private_args * p = ba->p + tnum;
-            A->vec_random(A, p->src, p->mm->dim[1]);
-            A->vec_random(A, p->dst, p->mm->dim[0]);
+            A->vec_random(A, p->colvec, p->mm->dim[1]);
+            A->vec_random(A, p->rowvec, p->mm->dim[0]);
             /* If we want shared vectors, this is the way to go. */
             /* Note that for such a test, the clear_func must be skipped
              * or improved, since we don't really want to free() the same
              * pointer twice */
             /*
             if (ba->transpose)
-                p->dst = ba->p[0].dst;
+                p->rowvec = ba->p[0].rowvec;
             else
-                p->src = ba->p[0].src;
+                p->colvec = ba->p[0].colvec;
                 */
         }
         worker_threads_do(ba->tg, (worker_func_t) &check_func, ba);
@@ -361,8 +384,8 @@ int main(int argc, char * argv[])
 
     for(int tnum = 0 ; tnum < ba->nthreads ; tnum++) {
         struct private_args * p = ba->p + tnum;
-        A->vec_random(A, p->src, p->mm->dim[1]);
-        A->vec_random(A, p->dst, p->mm->dim[0]);
+        A->vec_random(A, p->colvec, p->mm->dim[1]);
+        A->vec_random(A, p->rowvec, p->mm->dim[0]);
     }
 
     if ((tmp = param_list_lookup_string(ba->pl, "srcvec")) != NULL) {
@@ -371,33 +394,35 @@ int main(int argc, char * argv[])
             fprintf(stderr, "srcvec incompatible with multithread\n");
             exit(1);
         }
-        A->vec_set_zero(A, p->src, p->mm->dim[1]);
-        A->vec_set_zero(A, p->dst, p->mm->dim[0]);
+        A->vec_set_zero(A, p->colvec, p->mm->dim[1]);
+        A->vec_set_zero(A, p->rowvec, p->mm->dim[0]);
         FILE * f = fopen(tmp, "r");
         if (f == NULL) {
             fprintf(stderr, "fopen(%s): %s\n", tmp, strerror(errno));
             exit(1);
         }
-        void * src = ba->transpose ? p->dst : p->src;
-        void * dst = ba->transpose ? p->src : p->dst;
-        int n = ba->transpose ? p->mm->dim[0] : p->mm->dim[1];
+        /* with ba->transpose, we're doing vector times matrix (rowvec
+         * times matrix -> colvec) */
+        void * srcvec = ba->transpose ? p->rowvec : p->colvec;
+        void * dstvec = ba->transpose ? p->colvec : p->rowvec;
+        int n = p->mm->dim[1 ^ ba->transpose];
         fprintf(stderr, "reading %zu bytes from %s\n",
                 n * sizeof(uint64_t), tmp);
-        int nread = fread(src, sizeof(uint64_t), n, f);
+        int nread = fread(srcvec, sizeof(uint64_t), n, f);
         if (nread != n) {
             fprintf(stderr, "short read (%d < %d)\n", nread, n);
             exit(1);
         }
         fclose(f);
         worker_threads_do(ba->tg, (worker_func_t) &mul_func, ba);
-        char * dstvec;
-        int rc = asprintf(&dstvec, "%s.dst", tmp);
+        char * dstfile;
+        int rc = asprintf(&dstfile, "%s.dst", tmp);
         ASSERT_ALWAYS(rc >= 0);
-        f = fopen(dstvec, "w");
-        int nw = ba->transpose ? p->mm->dim[1] : p->mm->dim[0];
+        f = fopen(dstfile, "w");
+        int nw = p->mm->dim[0 ^ ba->transpose];
         fprintf(stderr, "writing %zu bytes to %s\n",
-                nw * sizeof(uint64_t), dstvec);
-        int nwritten = fwrite(dst, sizeof(uint64_t), nw, f);
+                nw * sizeof(uint64_t), dstfile);
+        int nwritten = fwrite(dstvec, sizeof(uint64_t), nw, f);
         if (nwritten != nw) {
             fprintf(stderr, "short write (%d < %d)\n", nwritten, nw);
             exit(1);
@@ -407,11 +432,9 @@ int main(int argc, char * argv[])
                 p->mm->cachefile_name,
                 ba->transpose ? "^T" : "",
                 tmp,
-                dstvec);
+                dstfile);
         free(dstvec);
     }
-
-
 
 #define NLAST   10
     double last[10]={0,};
@@ -423,7 +446,9 @@ int main(int argc, char * argv[])
     double t, dt;
     if (next > tmax * CLOCKS_PER_SEC) { next = tmax * CLOCKS_PER_SEC; }
     unsigned int n;
-    for(n = 0 ; n < nmax ; n++ ) {
+    printf("Note: timings in seconds per iterations are given in cpu seconds ;\n");
+    printf("Note: with %d threads, this means %.2f walltime seconds.\n", ba->nthreads, 1.0 / ba->nthreads);
+    for(n = 0 ; n < nmax ; ) {
         worker_threads_do(ba->tg, (worker_func_t) &mul_func, ba);
         t = clock();
         dt = t - t0;
@@ -431,13 +456,16 @@ int main(int argc, char * argv[])
         last[n % NLAST] = (t - t1) / CLOCKS_PER_SEC;
         sum_last += (t - t1) / CLOCKS_PER_SEC;
         t1 = t;
+        unsigned int nlast = NLAST;
+        n++;
+        if (n < nlast) nlast = n;
         if (dt > next || n == nmax - 1) {
             do { next += 0.25 * CLOCKS_PER_SEC; } while (dt > next);
             if (next > tmax * CLOCKS_PER_SEC) { next = tmax * CLOCKS_PER_SEC; }
             dt /= CLOCKS_PER_SEC;
             printf("%d iters in %2.fs, %.3f/1, %.2f %s (last %u : %.3f/1, %.2f %s)        \r",
                     n, dt, dt/n, ba->freq * 1.0e9 * dt/n/ncoeffs_total, unit,
-                    NLAST, sum_last/NLAST, ba->freq * 1.0e9 *sum_last/NLAST/ncoeffs_total, unit);
+                    nlast, sum_last/nlast, ba->freq * 1.0e9 *sum_last/nlast/ncoeffs_total, unit);
             fflush(stdout);
             if (dt > tmax)
                 break;
@@ -450,6 +478,7 @@ int main(int argc, char * argv[])
     worker_threads_clear(ba->tg);
     param_list_clear(ba->pl);
     free(ba->p);
+    mpz_clear(ba->prime);
 
     return 0;
 }

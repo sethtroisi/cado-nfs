@@ -23,7 +23,7 @@
 # Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
 # 02110-1301, USA.
 #
-# 
+#
 # Preamble:
 # =========
 #
@@ -36,10 +36,10 @@
 # ======
 #
 # cadofactor.pl params=<paramfile> wdir=<workdir> n=<nnn> ...
-# 
+#
 # where:
 #   <paramfile> is a file describing the choice of parameters for the
-#               algorithm. It depends essentially on the size of 
+#               algorithm. It depends essentially on the size of
 #               the input number, but it also contains non-algorithmic
 #               information, like the nice level you want, and the name
 #               of the file where to find the list of available machines.
@@ -47,15 +47,15 @@
 #               there is a list of default paramfiles that you can use.
 #   <workdir>   a directory where cadofactor.pl will put all the
 #               intermediate information (relation files, log files, etc)
-#   <nnn>       the number you want to factor. 
+#   <nnn>       the number you want to factor.
 #
 # At the end of the command line, you can add parameters, in the form
 # x=my_choice_for_x. If they were defined in <paramfile>, they will
-# be overriden. It is useful if you choose for <paramfile> one of the 
+# be overriden. It is useful if you choose for <paramfile> one of the
 # default files in the params/ directory. You can then override some
 # parameters without editing the file.
 #
-# The possible parameters in a <paramfile> are not listed here. The 
+# The possible parameters in a <paramfile> are not listed here. The
 # file params/params.c91 is an example where a lot of comments have been
 # added, describing the role of each parameter.
 #
@@ -68,11 +68,11 @@
 #   bindir=/tmp/cado-nfs/build/localhost
 #   localhost cores=4
 # (this file is created automatically by the script factor.sh).
-# The format of mach_desc is described in the example file: 
+# The format of mach_desc is described in the example file:
 #   params/mach_desc
 # It allows in particular to tell exactly how many cores there are to be
 # used on each computer.
-# 
+#
 # Remark: the meaning of tmpdir is different from wdir. wdir is the main
 # working directory, whereas tmpdir (which can be different on each computer)
 # is a scratch space for individual tasks. Typically, during sieving,
@@ -98,10 +98,10 @@
 #
 # After parsing (and checking) the parameters and the command line, the
 # script starts running jobs on available ressources. It periodically
-# checks if the tasks are finished and if it is the case, it imports the 
+# checks if the tasks are finished and if it is the case, it imports the
 # resulting data and starts new jobs.
 #
-# The filtering phase is currently fully sequential, and is run on the 
+# The filtering phase is currently fully sequential, and is run on the
 # host machine that runs cadofactor.pl. The same is true for the square
 # root task.
 #
@@ -109,13 +109,13 @@
 # compilation and if the mach_desc file contains machines that are
 # explicitly marked as supporting MPI (see params/mach_desc for an
 # example). Otherwise it is also run on the host machine.
-# 
+#
 # Therefore, for non-trivial factorization, the host machine that runs
 # cadofactor.pl must have enough memory.
 #
 # The cadofactor.pl script writes in <workdir> all its intermediate data and
 # some diagnostics. Notice in particular the two following files:
-#   - <workdir>/<name>.cmd  
+#   - <workdir>/<name>.cmd
 #     It contains all the shell commands that are run by the script
 #     with full arguments, so that it is easy to reproduce part of
 #     the computation.
@@ -135,11 +135,11 @@
 # file. Conversely, creating such a file can be used to skip some steps,
 # if the corresponding data is produced by a third-party software or
 # by hand. It is used for instance for an SNFS computation (see below).
-#  
+#
 #
 # Example: factorization of an integer of 155 digits (on several machines):
 # =========================================================================
-# 
+#
 # Before starting the factorization, you must configure ssh (cf README)
 # for all the machines.
 #
@@ -157,7 +157,7 @@
 #
 # To factorize an integer with SNFS (on several machines):
 # ========================================================
-# 
+#
 # Before starting the factorization, you must configure ssh (cf README)
 # for all the machines.
 #
@@ -169,7 +169,7 @@
 # $ cd $HOME/snfs
 # $ cp $CADO_DIR/params/mach_desc .
 #   Edit the file mach_desc and configure it.
-# $ cp $CADO_DIR/params/params.c<size> .  
+# $ cp $CADO_DIR/params/params.c<size> .
 #   [substitute <size> by the integer size]
 #   It is not necessary to edit the paramfile but you can choose to modify
 #   some parameters in this file or the cadofactor.pl command line.

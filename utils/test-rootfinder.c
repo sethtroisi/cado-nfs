@@ -47,6 +47,8 @@ int main(int argc, char *argv[])
 	mpz_clear(f[i]);
 	mpz_clear(r[i]);
     }
+    free(f);
+    free(r);
     mpz_clear(p);
     return 0;
 }

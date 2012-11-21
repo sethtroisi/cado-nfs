@@ -8,6 +8,8 @@
 #include "xvectors.h"
 #include "bw-common-mpi.h"
 #include "filenames.h"
+#include "mpfq/mpfq.h"
+#include "mpfq/abase_vbase.h"
 
 /*
  * Relatively common manipulation in fact. Move to matmul_top ?
@@ -99,9 +101,17 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
     flags[bw->dir] = 0;
 
 
+    int withcoeffs = param_list_lookup_string(pl, "prime") != NULL;
+    int nchecks = withcoeffs ? NCHECKS_CHECK_VECTOR_GFp : NCHECKS_CHECK_VECTOR_GF2;
+    mpz_t p;
+    mpz_init_set_ui(p, 2);
+    param_list_parse_mpz(pl, "prime", p);
     abase_vbase A;
-    abase_vbase_oo_field_init_byname(A, "u64k1");
-    A->set_groupsize(A, NCHECKS_CHECK_VECTOR);
+    abase_vbase_oo_field_init_byfeatures(A, 
+            MPFQ_PRIME_MPZ, p,
+            MPFQ_GROUPSIZE, nchecks,
+            MPFQ_DONE);
+    mpz_clear(p);
 
     matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
@@ -123,10 +133,10 @@ void * sec_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSE
 
     load_x(&gxvecs, bw->m, &nx, mmt->pi);
 
-    xvec_to_vec(mmt, gxvecs, bw->m, nx, !bw->dir);
+    xvec_to_vec(mmt, gxvecs, MIN(nchecks, bw->m), nx, !bw->dir);
 
     /*
-    for(int j = 0 ; j < NCHECKS_CHECK_VECTOR ; j++) {
+    for(int j = 0 ; j < nchecks ; j++) {
         for(unsigned int k = 0 ; k < nx ; k++) {
             uint32_t i = gxvecs[j*nx+k];
             // set bit j of entry i to 1.

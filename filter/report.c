@@ -23,7 +23,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "utils.h"
 #include "gzip.h"
 #include "sparse.h"
-#include "dclist.h"
 #include "filter_matrix.h"
 #include "report.h"
 
@@ -66,7 +65,7 @@ init_rep (report_t *rep, char *outname, filter_matrix_t *mat, int type,
 /* terrific hack: everybody on the same line
    the first is to be destroyed in replay!!! */
 void
-reportn (report_t *rep, int32_t *ind, int n)
+reportn (report_t *rep, int32_t *ind, int n, MAYBE_UNUSED int32_t j)
 {
     int i;
 
@@ -81,6 +80,10 @@ reportn (report_t *rep, int32_t *ind, int n)
 	    if(i < n-1)
 		fprintf(rep->outfile, " ");
 	}
+#ifdef FOR_FFS
+    if (j >= 0)
+        fprintf(rep->outfile, " #%d", j);
+#endif
 	fprintf(rep->outfile, "\n");
     }
     else if((rep->type == 1) && (rep->mark != -2)){
@@ -98,19 +101,18 @@ reportn (report_t *rep, int32_t *ind, int n)
 
 /* print a new line "i" in the history file */
 void
-report1 (report_t *rep, int32_t i)
+report1 (report_t *rep, int32_t i, int32_t j)
 {
-  reportn (rep, &i, 1);
+  reportn (rep, &i, 1, j);
 }
 
 /* print a new line "i1 i2" in the history file */
 void
-report2 (report_t *rep, int32_t i1, int32_t i2)
+report2 (report_t *rep, int32_t i1, int32_t i2, int32_t j)
 {
     int32_t tmp[2];
 
     tmp[0] = i1;
     tmp[1] = i2;
-    reportn (rep, tmp, 2);
+    reportn (rep, tmp, 2, j);
 }
-

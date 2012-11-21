@@ -30,17 +30,17 @@ machines=mach_desc      # file describing available computers for parallel
 ###########################################################################
 
 degree=5                # degree of the algebraic polynomial
-kjdelay=300             # time between two checks
-selectnice=4            # nice level for selection
+polsel_delay=300             # time between two checks
+polsel_nice=4            # nice level for selection
 
 ## Parameters of polyselect
 # note: those parameters are just a guess, they might be far from optimal
-kjP=200000              # choose lc(g) with two prime factors in [P,2P]
-kjmaxnorm=65            # max. lognorm of polynomials (before rootsieve)
-kjadmax=2e9             # max value for lc(f)
-kjadrange=2e7           # individual tasks
-kjkmax=24               # rotation is bounded by 2^kmax
-kjincr=210              # forced divisor of lc(f)
+polsel_P=5000000             # choose lc(g) with two prime factors in [P,2P]
+polsel_maxnorm=65            # max. lognorm of polynomials (before rootsieve)
+polsel_admax=2e11            # max value for lc(f)
+polsel_adrange=2e9           # individual tasks
+polsel_incr=360360           # forced divisor of lc(f)
+polsel_lq=3                  # special-q in lc(g) has such many factors
 
 # Shi Bai got for RSA-190
 # lognorm: 64.90, alpha -8.81
@@ -80,12 +80,8 @@ sieve_max_threads=2
 # Filtering
 ###########################################################################
 
-excessratio=1.01        # minimal excess we want before pruning
 keeppurge=160           # shrink in purge if excess exceeds keeppurge
-keep=160                # excess wanted after merge
-maxlevel=20             # maximal merge level
-cwmax=100  
-rwmax=100  
+maxlevel=25             # maximal merge level
 ratio=1.1  
 bwstrat=3               
 

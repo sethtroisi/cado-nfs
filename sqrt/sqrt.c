@@ -5,10 +5,8 @@
 #include <string.h>
 #include <inttypes.h>
 #include <math.h> /* for log */
-#include <sys/types.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
-#include <unistd.h>
 #include <errno.h>
 
 #include "utils.h"
@@ -26,98 +24,6 @@ static int verbose = 0;
 #include "plain_poly.h"
 
 /********** RATSQRT **********/
-
-/* Returns memory usage, in KB 
- * This is the VmSize field in the status file of /proc/pid/ dir
- * This is highly non portable.
- * Return -1 in case of failure.
- */
-static long Memusage() {
-  pid_t pid = getpid();
-
-  char str[1024];
-  char *truc;
-  snprintf(str, 1024, "/proc/%d/status", pid);
-
-  FILE *file;
-  file = fopen(str, "r");
-  if (file == NULL)
-    return -1;
-
-  long mem;
-  for(;;) {
-    truc = fgets(str, 1023, file);
-    if (truc == NULL) {
-      fclose(file);
-      return -1;
-    }
-    int ret = sscanf(str, "VmSize: %ld", &mem);
-    if (ret == 1) {
-      fclose(file);
-      return mem;
-    }
-  }
-}
-
-/* same as above, for resident memory (column RES of top) */
-static long Memusage2() {
-  pid_t pid = getpid();
-
-  char str[1024];
-  char *truc;
-  snprintf(str, 1024, "/proc/%d/status", pid);
-
-  FILE *file;
-  file = fopen(str, "r");
-  if (file == NULL)
-    return -1;
-
-  long mem;
-  for(;;) {
-    truc = fgets(str, 1023, file);
-    if (truc == NULL) {
-      fclose(file);
-      return -1;
-    }
-    int ret = sscanf(str, "VmRSS: %ld", &mem);
-    if (ret == 1) {
-      fclose(file);
-      return mem;
-    }
-  }
-}
-
-/* Returns peak memory usage, in KB 
- * This is the VmPeak field in the status file of /proc/pid/ dir
- * This is highly non portable.
- * Return -1 in case of failure.
- */
-static long PeakMemusage() {
-  pid_t pid = getpid();
-
-  char str[1024];
-  char *truc;
-  snprintf(str, 1024, "/proc/%d/status", pid);
-
-  FILE *file;
-  file = fopen(str, "r");
-  if (file == NULL)
-    return -1;
-
-  long mem;
-  for(;;) {
-    truc = fgets(str, 1023, file);
-    if (truc == NULL) {
-      fclose(file);
-      return -1;
-    }
-    int ret = sscanf(str, "VmPeak: %ld", &mem);
-    if (ret == 1) {
-      fclose(file);
-      return mem;
-    }
-  }
-}
 
 static void
 my_mpz_mul (mpz_t a, mpz_t b, mpz_t c)
@@ -235,10 +141,6 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
   mpz_init_set_ui (prd[0], 1);
 
   depfile = fopen (depname, "r");
-  /*if(!depfile) {
-    fprintf (stderr, "Error: file %s not exist\n", depname);
-    exit(1);
-  }*/
   ASSERT_ALWAYS(depfile != NULL);
     
   line_number = 2;
@@ -260,7 +162,7 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
           res = Memusage2 ();
           if (res > peakres)
             peakres = res;
-            fprintf (stderr, "%lu pairs: size %zuMb, %dms, VIRT %luM (peak %luM), RES %luM (peak %luM)\n",
+            fprintf (stderr, "SqrtRat: %lu pairs: size %zuMb, %dms, VIRT %luM (peak %luM), RES %luM (peak %luM)\n",
                        ab_pairs, stats (prd, lprd) >> 17, cputime (),
                        Memusage () >> 10, PeakMemusage () >> 10,
                        res >> 10, peakres >> 10);
@@ -278,12 +180,12 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
         if (feof (depfile))
           break;
       }
-    fprintf (stderr, "%lu (a,b) pairs\n", line_number);
+    fprintf (stderr, "SqrtRat: %lu (a,b) pairs\n", line_number);
 
     fclose (depfile);
 
-  fprintf (stderr, "Read %lu (a,b) pairs, including %lu free\n", ab_pairs,
-           freerels);
+  fprintf (stderr, "SqrtRat: read %lu (a,b) pairs, including %lu free\n",
+           ab_pairs, freerels);
 
   accumulate_fast_end (prd, lprd);
 
@@ -292,7 +194,8 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
   if (ab_pairs & 1)
     mpz_mul (prd[0], prd[0], pol->rat->f[1]);
 
-  fprintf (stderr, "Size of product = %zu bits\n", mpz_sizeinbase (prd[0], 2));
+  fprintf (stderr, "SqrtRat: size of product = %zu bits\n",
+           mpz_sizeinbase (prd[0], 2));
 
   if (mpz_sgn (prd[0]) < 0)
     {
@@ -300,12 +203,12 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
       exit (1);
     }
 
-  fprintf (stderr, "Starting square root at %dms\n", cputime ());
+  fprintf (stderr, "Starting rational square root at %dms\n", cputime ());
 
   /* since we know we have a square, take the square root */
   mpz_sqrtrem (prd[0], v, prd[0]);
   
-  fprintf (stderr, "Computed square root at %dms\n", cputime ());
+  fprintf (stderr, "Computed rational square root at %dms\n", cputime ());
 
   if (mpz_cmp_ui (v, 0) != 0)
     {
@@ -313,7 +216,7 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
       mpz_t pp;
 
       mpz_init (pp);
-      fprintf (stderr, "Error, square root remainder is not zero\n");
+      fprintf (stderr, "Error, rational square root remainder is not zero\n");
       /* reconstruct the initial value of prd[0] to debug */
       mpz_mul (prd[0], prd[0], prd[0]);
       mpz_add (prd[0], prd[0], v);
@@ -342,13 +245,13 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
 
   mpz_mod (prd[0], prd[0], Np);
 
-  fprintf (stderr, "Reduced mod n at %dms\n", cputime ());
+  fprintf (stderr, "SqrtRat: reduced mod n at %dms\n", cputime ());
 
   /* now divide by g1^(ab_pairs/2) if ab_pairs is even, and g1^((ab_pairs+1)/2)
      if ab_pairs is odd */
   
   mpz_powm_ui (v, pol->rat->f[1], (ab_pairs + 1) / 2, Np);
-  fprintf (stderr, "Computed g1^(nab/2) mod n at %dms\n", cputime ());
+  fprintf (stderr, "SqrtRat: computed g1^(nab/2) mod n at %dms\n", cputime ());
 
   mpz_invert (v, v, Np);
   mpz_mul (prd[0], prd[0], v);
@@ -360,7 +263,7 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
 
   gmp_fprintf (stderr, "rational square root is %Zd\n", prd[0]);
 
-  fprintf (stderr, "Rational square root time at %dms\n", cputime ());
+  fprintf (stderr, "Rational square root time: %dms\n", cputime ());
 
   mpz_clear (prd[0]);
 
@@ -1173,6 +1076,7 @@ void create_dependencies(const char * prefix, const char * indexname, const char
         fclose(dep_files[i]);
         free(dep_names[i]);
     }
+    free (abs);
 }
 
 
@@ -1205,11 +1109,11 @@ int main(int argc, char *argv[])
     int opt_rat = 0;
     int opt_alg = 0;
     int opt_gcd = 0;
-    param_list_configure_knob(pl, "ab", &opt_ab);
-    param_list_configure_knob(pl, "rat", &opt_rat);
-    param_list_configure_knob(pl, "alg", &opt_alg);
-    param_list_configure_knob(pl, "gcd", &opt_gcd);
-    param_list_configure_knob(pl, "-v", &verbose);
+    param_list_configure_switch(pl, "ab", &opt_ab);
+    param_list_configure_switch(pl, "rat", &opt_rat);
+    param_list_configure_switch(pl, "alg", &opt_alg);
+    param_list_configure_switch(pl, "gcd", &opt_gcd);
+    param_list_configure_switch(pl, "-v", &verbose);
     argc--,argv++;
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) continue;

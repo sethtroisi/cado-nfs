@@ -29,17 +29,17 @@ machines=mach_desc      # file describing available computers for parallel
 # Polynomial selection
 ###########################################################################
 
-degree=5                # degree of the algebraic polynomial
-kjdelay=60              # time between two checks
-selectnice=4            # nice level for selection
+degree=4                 # degree of the algebraic polynomial
+polsel_delay=60          # time between two checks
+polsel_nice=4            # nice level for selection
 
 ## Parameters of polyselect
-kjP=10000               # choose lc(g) with two prime factors in [P,2P]
-kjmaxnorm=34.6          # max. lognorm of polynomials (before rootsieve)
-kjadmax=1e8             # max value for lc(f)
-kjadrange=2e6           # individual tasks
-kjkmax=20               # rotation is bounded by 2^kmax
-kjincr=30030            # forced divisor of lc(f)
+polsel_P=20000               # choose lc(g) with two prime factors in [P,2P]
+polsel_maxnorm=36.6          # max. lognorm of polynomials (before rootsieve)
+polsel_admax=1e8             # max value for lc(f)
+polsel_adrange=1e6           # individual tasks
+polsel_incr=13860            # forced divisor of lc(f)
+polsel_lq=2                  # special-q in lc(g) has such many factors
 
 ###########################################################################
 # Sieve
@@ -74,12 +74,8 @@ sieve_max_threads=2
 # Filtering
 ###########################################################################
 
-excessratio=1.01        # minimal excess we want before pruning
 keeppurge=160           # shrink in purge if excess exceeds keeppurge
-keep=160                # excess wanted after merge
-maxlevel=15
-cwmax=100
-rwmax=100
+maxlevel=20
 ratio=1.1
 bwstrat=3               
 

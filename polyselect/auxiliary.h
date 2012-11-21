@@ -67,25 +67,34 @@ double L2_skewness (mpz_t*, int, int, int);
 double L2_skewness_old (mpz_t*, int, int, int);
 double L2_skewness_Newton (mpz_t*, int, int, int);
 double L2_skewness_derivative (mpz_t*, int, int, int);
-/* rotation */
+
+/* alpha */
 double special_val0 (mpz_t*, int, unsigned long);
+double special_valuation (mpz_t * f, int d, unsigned long p, mpz_t disc);
+double special_valuation_affine ( mpz_t * f, int d, unsigned long p, mpz_t disc );
 double get_alpha (mpz_t*, const int, unsigned long);
+double get_biased_alpha_projective ( mpz_t *f, const int d, unsigned long B );
+
+/* poly info, being called in order */
+void print_cadopoly_fg (FILE*, mpz_t*, mpz_t*, int, mpz_t);
+double print_cadopoly (FILE*, cado_poly, int);
+void print_cadopoly_extra (FILE*, cado_poly, int, char**, double, int);
+double print_poly_fg ( mpz_t*, mpz_t*, int, mpz_t, int);
+
 void discriminant (mpz_t, mpz_t*, const int);
 long rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k, unsigned int t);
 double rotate (mpz_t*, int, unsigned long, mpz_t, mpz_t, long*, long*, int,
                int, int);
-void print_poly (FILE*, cado_poly, int, char**, double, int);
 long translate (mpz_t*, int, mpz_t*, mpz_t, mpz_t, int, int);
 void optimize (mpz_t*, int, mpz_t*, int, int);
 void optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation, int method);
+void optimize_dir_aux (mpz_t *f, int d, mpz_t *g, int verbose, int method);
 void rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1, long *J0, long *J1, int verbose, int);
 void do_translate_z (mpz_t *f, int d, mpz_t *g, mpz_t k);
 
 /* changed for rootsieve5.c */
 void eval_poly_ui (mpz_t v, mpz_t *f, int d, unsigned long r);
 void eval_poly_diff_ui (mpz_t v, mpz_t *f, int d, unsigned long r);
-double special_valuation (mpz_t * f, int d, unsigned long p, mpz_t disc);
-
 
 #ifdef __cplusplus
 }

@@ -15,7 +15,7 @@
 # General parameters
 ###########################################################################
 
-# Sample parameter file for a 76/77-digit gnfs input
+# Sample parameter file for a 77-digit gnfs input
 # Warning: the parameters here are not claimed to be optimal!
 # Example: cadofactor.pl wdir=... name=... n=...
 
@@ -31,21 +31,19 @@ machines=mach_desc      # file describing available computers for parallel
 ###########################################################################
 
 degree=4                # degree of the algebraic polynomial
-kjdelay=30              # time between two checks
-selectnice=4            # nice level for selection
+polsel_delay=30              # time between two checks
+polsel_nice=4            # nice level for selection
 
-# on the test number
-# 31622776601683671471288591636294038333008877770402802515954225356479416762883
-# we get
-# lognorm: 26.00, alpha: -3.11 E=22.89
-# Murphy's E(Bf=10000000,Bg=5000000,area=1.00e+16)=2.55e-07
+# one can expect
+# MurphyE(Bf=10000000,Bg=5000000,area=1.00e+16)=2.63e-07
 
 ## Parameters of polyselect
-kjadmax=1e4             # max value for lc(f)
-kjadrange=1000          # individual tasks
-kjkmax=18               # rotation is bounded by 2^kmax
-kjincr=60               # forced divisor of lc(f)
-kjP=2000                # choose lc(g) with two prime factors in [P,2P]
+polsel_admax=112e3           # max value for lc(f)
+polsel_adrange=28e3          # individual tasks
+polsel_incr=60               # forced divisor of lc(f)
+polsel_P=4800                # choose lc(g) with two prime factors in [P,2P]
+polsel_lq=1                  # special-q in lc(g) has such many factors
+polsel_maxnorm=28.8          # maximal lognorm before rootsieve
 
 ###########################################################################
 # Sieve
@@ -79,14 +77,10 @@ sieve_max_threads=2
 # Filtering
 ###########################################################################
 
-excessratio=1.01        # minimal excess we want before pruning
                         # (don't start merge otherwise)
 keeppurge=160           # maximal excess wanted after purge
                         # (purge shrinks if needed)
-keep=160                # excess wanted after merge
 maxlevel=15
-cwmax=100
-rwmax=100
 ratio=1.1
 bwstrat=3
 

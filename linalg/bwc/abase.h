@@ -15,10 +15,35 @@
 #elif defined(SELECT_ABASE_u128)
 #error "argh"
 #include "mpfq/abase_u128.h"
+#elif defined(SELECT_ABASE_p16) /* This is really the first non-gf2 try */
+#define NOT_OVER_GF2
+#include "mpfq/abase_p16.h"
+
+/* In reality we don't have everything configured for the moment. Update
+ * CMakeLists.txt when the need for other moduli arises */
+
+#elif defined(SELECT_ABASE_p_1)
+#define NOT_OVER_GF2
+#include "mpfq/abase_p_1.h"
+#elif defined(SELECT_ABASE_p_2)
+#define NOT_OVER_GF2
+#include "mpfq/abase_p_2.h"
+#elif defined(SELECT_ABASE_p_3)
+#define NOT_OVER_GF2
+#include "mpfq/abase_p_3.h"
+#elif defined(SELECT_ABASE_p_4)
+#define NOT_OVER_GF2
+#include "mpfq/abase_p_4.h"
+#elif defined(SELECT_ABASE_p_5)
+#define NOT_OVER_GF2
+#include "mpfq/abase_p_5.h"
+#elif defined(SELECT_ABASE_p_6)
+#define NOT_OVER_GF2
+#include "mpfq/abase_p_6.h"
 #else
-#warning "Using default selection for abase"
-#error "argh"
-#include "mpfq/abase_u64.h"
+// #warning "Using default selection for abase"
+#error "argh. This code must be compiled with some SELECT_ABASE_ macro defined"
+// #include "mpfq/abase_u64.h"
 #endif
 
 /* This is used as a shorthand throughout in order to ease the access to

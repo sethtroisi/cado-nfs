@@ -28,6 +28,7 @@ void purgedfile_stream_openfile(purgedfile_stream_ptr ps, const char * fname)
     }
     int rc = fscanf (ps->source, "%d %d\n", &ps->nrows, &ps->ncols);
     ASSERT_ALWAYS(rc == 2);
+    ps->rrows = 0;
 }
 
 void purgedfile_stream_closefile(purgedfile_stream_ptr ps)
@@ -87,6 +88,7 @@ void purgedfile_stream_rewind(purgedfile_stream_ptr ps)
     /* re-parse header */
     rc = fscanf (ps->source, "%d %d\n", &ps->nrows, &ps->ncols);
     ASSERT_ALWAYS(rc == 2);
+    ps->rrows = 0;
 }
 
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env perl
 
-# Copyright 2008, 2009, 2010, 2011 Pierrick Gaudry, Emmanuel Thome,
-#                                  Paul Zimmermann, Jeremie Detrey,
-#                                  Lionel Muller
+# Copyright 2008, 2009, 2010, 2011, 2012 Pierrick Gaudry, Emmanuel Thome,
+#                                        Paul Zimmermann, Jeremie Detrey,
+#                                        Lionel Muller
 #
 # This file is part of CADO-NFS.
 #
@@ -22,9 +22,8 @@
 # 02110-1301, USA.
 
 package cadofct;
-use Exporter;
-our @ISA= qw(Exporter);
-our @EXPORT=qw(%param $tab_level &read_machines &read_param &do_polysel_bench
+use parent qw(Exporter);
+our @EXPORT=qw(%param $tab_level &read_machines &parse_param &do_polysel_bench
 &do_sieve_bench &do_factbase &do_init &do_task &banner &info &last_line
 &format_dhms);
 
@@ -37,18 +36,23 @@ use File::Copy;
 use Cwd qw(abs_path);
 use List::Util qw[min];
 use POSIX qw(ceil);
+use POSIX ":sys_wait_h";
 use Math::BigInt;
 use IPC::Open3;
 
 # Failing to load ioctl.ph is mostly harmless. It just prevents us from
 # detaching the controlling tty, which is a measure meant to forbid any
 # attempt of interaction between ssh and the ``user''.
-eval q{local $SIG{__WARN__}=sub{}; require "sys/ioctl.ph"};
-my $can_use_tiocnotty=1;
-if ($@) {
-    $can_use_tiocnotty=0;
+# If the shell environment variable CADO_KEEPTTY is defined, we do not
+# detach, as doing so interferes with debugging in DDD
+my $can_use_tiocnotty;
+if (! defined $ENV{CADO_KEEPTTY}) {
+    eval q{local $SIG{__WARN__}=sub{}; require "sys/ioctl.ph"};
+    $can_use_tiocnotty=1;
+    if ($@) {
+        $can_use_tiocnotty=0;
+    }
 }
-
 
 ###############################################################################
 # Message and error handling ##################################################
@@ -59,14 +63,19 @@ our $tab_level = 0;
 
 # Should we use colors (for terminal output) or not?
 my $use_colors = defined $ENV{CADO_COLOR} ? $ENV{CADO_COLOR} : 1;
+my $CSI = "\033["; # ANSI Control Sequence Introducer
+my %colors = (normal => "${CSI}01;00m",
+              red => "${CSI}01;31m",
+              green => "${CSI}01;32m",
+              magenta => "${CSI}01;35m");
 
-# Terminal width
+# Terminal width. Use Term::ReadKey GetTerminalSize() ?
 my $term_cols = 80;
 
 # Whether to show output.
 my $verbose = 0;
 
-# Whether to show output.
+# Whether to assume yes to all confirmations
 my $assume_yes = 0;
 
 # Whether to replace ``remote'' accesses to localhost by localhost.
@@ -84,12 +93,30 @@ sub pad {
     return $str . (" " x $w);
 }
 
+# Takes a reference to a hash and prints its key=value pairs
+sub print_hash {
+  my $h = $_[0];
+  my $s = "{";
+  for my $k (keys %$h) {
+    $s .= "'$k' => '$$h{$k}', ";
+  }
+  $s .= "}\n";
+  print ($s);
+}
+
+
 # Formats a message by inserting an indented prefix in front of each line
 sub format_message {
     my $prefix = ("    " x $tab_level) . shift;
     my $prefix_raw = $prefix;
 
-    $prefix_raw =~ s/\033\[[^m]*m//g;
+    # Remove ANSI color codes from string
+    # We need to escape the "[" character in the CSI to make a regex pattern
+    my $escape = $CSI;
+    $escape =~ s/\[/\\\[/g;
+    my $match = $escape . "[^m]*m";
+
+    $prefix_raw =~ s/$match//g;
     $prefix = $prefix_raw unless $use_colors;
 
     my @msg;
@@ -119,7 +146,7 @@ my $log_fh;     # filehandle for logging.
 # Message function
 sub info {
     my $text=shift;
-    print STDERR format_message("\033[01;32mInfo\033[01;00m:", $text);
+    print STDERR format_message("$colors{green}Info$colors{normal}:", $text);
     print $log_fh format_message("Info:", $text) if defined($log_fh);
 }
 
@@ -133,15 +160,15 @@ sub banner {
 $SIG{__WARN__} = sub {
     my $text=shift;
     print $log_fh format_message("Warning:", $text) if defined($log_fh);
-    warn         format_message("\033[01;35mWarning\033[01;00m:", $text);
+    warn         format_message("$colors{magenta}Warning$colors{normal}:", $text);
 };
 
 # Error hook
 $SIG{__DIE__}  = sub {
-    die @_ if $^S; 
+    die @_ if $^S;
     my $text=shift;
     print $log_fh format_message("Error:", $text) if defined($log_fh);
-    die          format_message("\033[01;31mError\033[01;00m:", $text);
+    die          format_message("$colors{red}Error$colors{normal}:", $text);
 };
 
 ###############################################################################
@@ -152,6 +179,7 @@ $SIG{__DIE__}  = sub {
 # This list gives:
 #  - the preferred ordering for parameters;
 #  - the default values (if any).
+# This is stored as an array, not a hash, to preserve the preferred ordering
 my @default_param = (
     # global
     wdir         => undef,
@@ -161,17 +189,18 @@ my @default_param = (
     n            => undef,
     parallel     => 0,
 
-    # polyselect using Kleinjung's (kj) algorithm
-    degree       => 5,
-    kjkmax       => 10,
-    kjincr       => 60,
-    kjadmin      => 0,
-    kjadmax      => undef,
-    kjadrange    => 1e7,
-    kjdelay      => 120,
-    kjP          => undef,
-    kjmaxnorm    => 1e9,
-    selectnice   => 10,
+    # polyselect using Kleinjung's algorithm
+    degree         => 5,
+    polsel_lq      => 1,
+    polsel_nq      => 1000,
+    polsel_incr    => 60,
+    polsel_admin   => 0,
+    polsel_admax   => undef,
+    polsel_adrange => 1e7,
+    polsel_delay   => 120,
+    polsel_P       => undef,
+    polsel_maxnorm => 1e9,
+    polsel_nice    => 10,
 
     # sieve
     rlim         => 8000000,
@@ -196,29 +225,26 @@ my @default_param = (
     ratq	 => 0,
 
     # filtering
-    keep         => 160, # should be 128+skip
-    excessratio  => 1.01,
-    keeppurge    => 160,
+    skip         => -1, # should be about bwc_mn - 32
+    keep         => -1, # should be 128 + skip
+    keeppurge    => 208, # should be 160 + #ideals <= FINAL_BOUND (cf purge.c)
     maxlevel     => 15,
-    cwmax        => 200,
-    rwmax        => 200,
     ratio        => 1.5,
     bwstrat      => 3,
     coverNmax    => 100,
-    skip         => 32,
     nslices_log  => 1,
-    filterlastrels => 0,
+    filterlastrels => 1,
 
     # linalg
     linalg       => 'bwc',
     bwmt         => 2,
     mpi		 => 0,
     hosts	 => "",
-    bwthreshold  => 64,
-    bwtidy       => 1,
     bwc_interval => 1000,
     bwc_mm_impl => 'bucket',
     bwc_interleaving => 0,
+    # bwc_mn should be 64 or 128
+    bwc_mn       => 64,
     # shuffled product is expected to be better in most cases, at least
     # when we use MPI. Since it is the preferred communication algorithm
     # for large runs, we prefer to force its use also for mid-range
@@ -238,102 +264,82 @@ my @default_param = (
 );
 
 # Hash for the parameters, global to avoid passing it to each function
-our %param = @default_param; # initialize to default values
+our %param;
 
 # Build the ordered list of parameters
 my @param_list;
 
-while (@default_param) {
-    push @param_list, shift @default_param;
-    shift @default_param;
+for (my $i = 0; $i < @default_param; $i += 2) {
+    push @param_list, $default_param[$i];
 }
 
 
+# Merge second hash into first hash. Value of a key in first hash remains 
+# unchanged in case of collision
+sub merge_hash {
+  die unless ref $_[0] eq 'HASH' && ref $_[1] eq 'HASH';
+  for (keys %{$_[1]}) {
+    $_[0]->{$_} = $_[1]->{$_} if !exists $_[0]->{$_};
+  }
+}
+
+
+# Parse command line switches that are not permitted in config files
+# We set parsed switches to the empty string to hide them from the
+# parameter parser
+sub parse_options () {
+  foreach (@ARGV) {
+      if (/^-v$/) { $verbose++; $_ = ""; }
+      if (/^-y$/) { $assume_yes='y'; $_ = ""; }
+      if (/^-l$/) { $assume_yes='l'; $_ = ""; }
+  }
+}
 
 # Parses command-line and configuration file parameters.
 # The second parameter is a hash of options:
 #  - `strict' specifies whether the checking should be strict or not
 #             (i.e. die in case of parsing errors)
-sub read_param {
-    my ($param, $opt) = (shift, shift);
-    my $count_args = 0;
 
-    my %files_read = ();
-
-    @_ = map { [$_, 0, 'cmdline'] } @_;
-
-    ARGS : while (defined ($_ = shift)) {
-        die unless ref $_ eq 'ARRAY';
-        my $secondary = $_->[1];
-        my $origin = $_->[2];
-        $_=$_->[0];
-        if (/^-v$/) { $verbose=1; next; }
-        if (/^-y$/) { $assume_yes='y'; next; }
-        if (/^-l$/) { $assume_yes='l'; next; }
-        next if $files_read{$_};
-        $files_read{$_}=1;
-        if (-d $_) {
-            info "interpreting directory $_ as wdir=$_";
-            $_ = "wdir=$_";
-        }
-        for my $p (@param_list) {
-            if (/^$p=(.*)$/) {
-                my $v=$1;
-                if ($secondary && $p =~ /^(wdir)$/) {
-                    if (!defined($param->{$p}) || $param->{$p} ne $v) {
-                        warn "$_ ignored in secondary input file\n";
-                    }
-                    next ARGS;
-                }
-                if ($secondary && defined($param->{$p}) && $param->{$p} ne $v) {
-                    die "parameter $p from $origin clashes with value defined earlier from other config files";
-                    # We may also warn, provided we make a choice for who
-                    # wins. Presently early wins. late wins would be:
-                    # $param->{$p} = $v;
-                    # $count_args++;
-                    next ARGS;
-                }
-
-                $param->{$p} = $v;
-                $count_args++;
-                my $f;
-                if ($p eq 'wdir') {
-                    $f = "$1/param";
-                } elsif ($p eq 'name' && defined($param->{'wdir'})) {
-                    $f = "$param->{'wdir'}/$param->{'name'}.param";
-                }
-                if (defined($f) && -f $f && !$files_read{$f}) {
-                    $count_args--;
-                    info "Reading extra parameters from $f\n";
-                    unshift @_, [$f,1,$origin]
-                }
-                next ARGS;
-            }
-        }
-        if (/^params?=(.*)$/) {
-            # die "Paramfile must be the first argument !\n" if ($count_args);
-            my $file = $1;
-            open FILE, "< $file"
-                or die "Cannot open `$file' for reading: $!.\n";
-            my @args;
-            while (<FILE>) {
-                s/^\s+//; s/\s*(#.*)?$//;
-                next if /^$/;
-                if (/^(\w+)=(.*)$/) {
-                    push @args, "$1=$2";
-                    next;
-                }
-                die "Cannot parse line `$_' in file `$file'.\n"
-                    if $opt->{'strict'};
-            }
-            close FILE;
-            unshift @_, map { [$_,$secondary, $file] } @args;
-        } elsif (-f $_) {
-            unshift @_, [ "param=$_", $secondary, $origin ];
-        } else {
-            die "Unknown argument: `$_'.\n" if $opt->{'strict'};
-        }
+sub parse_param {
+  my ($param_ref, $opt_ref, $line_ref, $source_name) = @_; 
+  # The parameters to be parsed now as lines of text in an array
+  # Parameters for the parsing, e.g., "strict=1"
+  # Reference to hash of previous parameter values
+  # Name of the source of parameters, e.g., "command line", or a file name
+  
+  my %sub_param;
+  
+  foreach (@{$line_ref}) {
+    s/^\s+//; # Remove empty lines and comments
+    s/\s*(#.*)?$//;
+    next if /^$/;
+    if (! /^(\w+)=(.*)$/) {
+      die "Cannot parse option `$_' in $source_name.\n"
+          if $opt_ref->{'strict'};
     }
+    
+    if ($1 eq "param" || $1 eq "params") {
+      open(my $FILE, $2) or die "Could not open parameter file $2";
+      my @slurp = <$FILE>;
+      close ($FILE);
+      parse_param (\%sub_param, $opt_ref, \@slurp, "file $2");
+    } else {
+      die "Key $1 not recognized in line $_\n" 
+        if grep ($_ eq $1, @param_list) == 0;
+      die "Parameter $1=$2 from $source_name was previously defined with " .
+          "different value $param_ref->{$1}\n"
+        if (exists $param_ref->{$1} && $2 ne $param_ref->{$1});
+      $param_ref->{$1} = $2;
+    }
+  }
+
+  merge_hash ($param_ref, \%sub_param);
+}
+
+
+sub check_param {
+    my $param = shift;
+    my $opt = shift;
 
     # sanity check: old config files may still have true/false values
     while (my ($k, $v) = each %$param) {
@@ -346,7 +352,7 @@ sub read_param {
     if ($opt->{'strict'}) {
         die "The paramater `n' must be an integer larger than 1.\n"
           if ($param->{'n'} < 2);
-        for my $k ("wdir", "name", "kjadmax", "kjP") {
+        for my $k ("wdir", "name", "polsel_admax", "polsel_P") {
             die "The parameter `$k' is mandatory.\n" if !$param->{$k};
         }
         die "The parameter `machines' is mandatory for parallel mode.\n"
@@ -363,7 +369,22 @@ sub read_param {
 
     # `prefix' is a shorthand for `$param->{'wdir'}/$param->{'name'}'
     $param->{'prefix'} = "$param->{'wdir'}/$param->{'name'}";
+
+    if ($param{'bwc_mn'} != 64 && $param{'bwc_mn'} != 128) {
+	die "The parameter bwc_mn should be 64 or 128.\n";
+    }
+
+    # adjust skip if undefined to bwc_mn - 32
+    if ($param->{'skip'} == -1) {
+	$param->{'skip'} = $param->{'bwc_mn'} - 32;
+    }
+
+    # adjust keep if undefined to 128 + skip
+    if ($param->{'keep'} == -1) {
+	$param->{'keep'} = 128 + $param->{'skip'};
+    }
 }
+
 
 # Dumps the list of parameters to a file
 sub write_param {
@@ -386,8 +407,7 @@ sub read_machines {
     my $file = shift;
     die "No machine description file was defined.\n" if !$param{'machines'};
     if ( $file ) {
-        open FILE, "< $file"
-            or die "Cannot open `$param{'machines'}' for reading: $!.\n";
+        open FILE, "< $file" or die "Cannot open `$file' for reading: $!.\n";
     } else {
         # read from given location if given as an absolute file,
         # otherwise understand as a location relative to the working
@@ -402,25 +422,32 @@ sub read_machines {
 
     my %vars = ();
 	
+    # There are several steps for checking jobs.
+    my $dir_check_commands={};
     while (<FILE>) {
+        # Remove comments and empty lines
         s/^\s+//; s/\s*(#.*)?$//;
         next if /^$/;
 
         if (/^\[(\S+)\]$/) {
+            # If this is a [cluster] line, clear the key=value hash table and init the cluster= entry
             %vars = ( cluster => $1 );
         } elsif (/^(\w+)=(.*)$/) {
             $vars{$1} = $2;
+            # This changes the global parameter 'bindir'
             $param{'bindir'} = $2 if ($1 eq "bindir");
+            # Try to find out if tmpdir= uses absolute path or relative to working dir
             if ($1 eq "tmpdir") {
                     my $wdir = $param{'wdir'};
                     $wdir = abs_path(dirname($wdir))."/".basename($wdir);
                     my $tmpdir = abs_path(dirname($2))."/".basename($2);
-                    die "tmpdir must be different of wdir in parallel mode.\n"
+                    die "tmpdir must be different from wdir in parallel mode.\n"
                             if $wdir eq $tmpdir;
             }
         } elsif (s/^(\S+)\s*//) {
+            # These are settings for one individual slave machine
             my $host = $1;
-            my %desc = %vars;
+            my %desc = %vars; # Init this machine's parameters to the shared settings read so far
             while (s/^(\w+)=(\S*)\s*//) {
                 $desc{$1} = $2;
             }
@@ -432,18 +459,19 @@ sub read_machines {
 					if !$desc{$k};
             }
             $desc{'tmpdir'} =~ s/%s/$param{'name'}/g;
-            die "the directory tmpdir=$desc{'tmpdir'} or bindir=$desc{'bindir'} don't exist on $host.\n"
-            if ( remote_cmd($host, "env test -d $desc{'tmpdir'} " .
-                " && test -d $desc{'bindir'}")->{'status'} );
             $desc{'cores'}  = 1 unless defined $desc{'cores'};
-            $desc{'poly_cores'} = $desc{'cores'} 
+            $desc{'poly_cores'} = $desc{'cores'}
                     unless defined $desc{'poly_cores'};
             $desc{'mpi'} = 0 unless defined $desc{'mpi'};
-            if ( $desc{'mpi'} ) {
-                    die "the directory wdir don't exist on $host.\n"
-                    if ( remote_cmd($host,
-                            "env test -d $param{'wdir'} ")->{'status'} );
-            }
+
+            my @dirs=($desc{'tmpdir'}, $desc{'bindir'});
+            push @dirs, $param{'wdir'} if $desc{'mpi'};
+            # We store auxiliary data for later retrieval.
+            $dir_check_commands->{$host}=
+                [ "env " . join(" && ", map { "test -d $_" } @dirs),
+                    \@dirs ];
+            # $param{'mpi'} becomes sum of the $desc{'mpi'} for all slaves, 
+            # $param{'hosts'} becomes list of MPI slaves with multiplicity
             while ( $desc{'mpi'} ) {
                     $desc{'mpi'}--;
                     $param{'mpi'}++;
@@ -456,8 +484,35 @@ sub read_machines {
             die "Cannot parse line `$_' in file `$param{'machines'}'.\n";
         }
     }
-
     close FILE;
+
+    info "Probing remote nodes\n";
+
+    my $res = parallel_remote_cmd($dir_check_commands);
+
+    for my $host (keys %$res) {
+        if ($verbose > 2) {
+            print ("Result of parallel_remote_cmd on $host:\n");
+            print_hash ($res->{$host});
+        }
+
+        my $tries = 0; 
+        while ($res->{$host}->{'status'} != 0) {
+            if ($res->{$host}->{'status'} == 1) {
+                # The test -d command returns 1 if a directory doesn't exist
+                my @dirs = @{$dir_check_commands->{$host}->[1]};
+                die "One of the directories " .
+                    join(" ", @dirs) .
+                    " does not exist on $host.\n"
+            } elsif ($res->{$host}->{'status'} == 255) {
+                die "Could not connect to $host after $tries tries. Terminating.\n" if (++$tries > 2);
+                warn ("Connecting to $host failed, retrying...\n");
+                $res->{$host} = remote_cmd($host, $dir_check_commands->{$host}->[0]);
+            } else {
+                die "Directory check on $host gave unexpected return code $res->{$host}->{'status'}, exiting\n";
+            }
+        }
+    }
 
     if ( $param{'mpi'} ) {
         chop $param{'hosts'};
@@ -468,7 +523,7 @@ sub read_machines {
                 die "CADO-NFS has not been compiled with MPI flag.\n".
                 "Please add the path of the MPI library in the file local.sh ".
                 "(for example: MPI=/usr/lib64/openmpi) and recompile.\n";
-        } 
+        }
         close FILE;
     }
     # We used to reconstruct a mach_desc file here based on e.g.
@@ -523,19 +578,19 @@ sub cmd {
     open NULL, "</dev/null" or die;
     my $pid = open3(*NULL,\*CHLD_OUT, \*CHLD_ERR, $cmd);
     close NULL;
-    
+
     my $fds = {
         'out' => [ *CHLD_OUT{IO}, "", 1, "" ],
         'err' => [ *CHLD_ERR{IO}, "", 1, "" ],
     };
-    
+
     while (scalar grep { $_->[2] } values %$fds) {
         my $rin = '';
         for my $v (values %$fds) {
-            next if !$v->[2]; 
+            next if !$v->[2];
             vec($rin, fileno($v->[0]), 1) = 1;
         }
-        
+
         my $rc;
         my $rout;
         while ($rc = select($rout=$rin, undef, undef, 1.0) == 0) {}
@@ -543,11 +598,11 @@ sub cmd {
             print STDERR "Left select with $!\n";
             last;
         }
-    
+
         for my $k (keys %$fds) {
             my $v = $fds->{$k};
             next unless vec($rout, fileno($v->[0]), 1);
-            if (sysread $v->[0], my $x, 1024) { 
+            if (sysread $v->[0], my $x, 1024) {
                 $v->[1] .= $x;
                 while ($v->[1]=~s/^(.*(?:\n|\r))//) {
                     print $logfh $1 if $logfh;
@@ -642,6 +697,101 @@ sub remote_cmd {
     return $ret;
 }
 
+# As of 20111122, cadofactor can't deal with large clusters properly.
+# Okay, the cluster scripts are more adapted to this, but OTOH a simple
+# illustrating example _should_ work, and not take ages pinging jobs.
+#
+# The parallel_remote_cmd mechanism offers some advantages. At the moment
+# only the initial probe uses it, but it eliminates the associated delay
+# completely. It also has a downside, is that it's limited by the OS
+# maximum number of open files (typically 1024). So more than
+# 1024-epsilon sub-jobs are a no-go here.
+sub parallel_remote_cmd {
+    my $h = shift(@_);
+    my $res = {}; # Hash hostname => {status => $status>>8, out => stdout, signal => something}
+
+    my $kids = {}; # Spawned child processes pid => (hostname, filehandle, stdout)
+    # Start jobs.
+    for my $k (keys %$h) {
+        my $fh;
+        my $cmd=$h->{$k}->[0];
+        my $pid = open($fh, "-|");
+        die "fork: $!" unless defined $pid;
+        if ($pid) {     # parent
+            $kids->{$pid}=[$k, $fh, ''];
+        } else {
+            info "Running $cmd on $k\n" if $verbose > 1;
+            my $x=remote_cmd($k, $cmd);
+            print ("parallel_remote_cmd(): stdout from $k: $x->{'out'}\n") if ($verbose > 2);
+            print ("parallel_remote_cmd(): stderr from $k: $x->{'err'}\n") if ($verbose > 2);
+            print ("parallel_remote_cmd(): exit code for $k: $x->{'status'}\n") if ($verbose > 2);
+            exit $x->{'status'};
+        }
+    }
+    my $nj = scalar keys %$kids;
+    info "Checking for completion of $nj remote jobs\n";
+    my $out_statuses={};
+    while(scalar keys %$kids) {
+        my $rin='';
+        my $ein='';
+        my ($rout, $eout);
+        # Build bit vector of the file handles to query for select() call
+        for my $pid (keys %$kids) {
+            my $fh=$kids->{$pid}->[1];
+            vec($rin, fileno($fh), 1) = 1;
+            vec($ein, fileno($fh), 1) = 1;
+        }
+        my $timeout = 10.0;
+        # Wait for any file handle to become ready to read, or an exception, 
+        # or a timeout
+        my ($nfound,$timeleft) = select($rout=$rin, undef, $eout=$ein, $timeout);
+        if (!$nfound) {
+            info "Select() loop returned with no FDs after $timeout s\n";
+            next;
+        }
+        my @reap=();
+        for my $pid (keys %$kids) {
+            my $h=$kids->{$pid};
+            my $fh = $h->[1];
+            my $n = fileno($fh);
+            next unless vec($rout, $n, 1) || vec($eout, $n, 1);
+            sysread($fh, my $x, 1024);
+            $h->[2] .= $x;
+            if (vec($eout, $n, 1)) {
+                my $rc = waitpid($pid, WNOHANG);
+                if ($rc == -1) {
+                    warn "waitpid($pid) [$h->[0]]: no such process\n";
+                    push @reap, [ $pid, -1 ];
+                } elsif ($rc > 0) {
+                    warn "waitpid($pid) [$h->[0]]: returns $rc ???\n";
+                    push @reap, [ $pid, $? ];
+                    push @reap, [ $rc, $? ];
+                } elsif ($rc == 0) {
+                    warn "waitpid($pid) [$h->[0]]: still running after exceptional event ?\n";
+                }
+            }
+        }
+        while ((my $rc = waitpid(-1, WNOHANG)) > 0) {
+            push @reap, [ $rc, $? ];
+        }
+        for my $x (@reap) {
+            my ($pid, $status) = @$x;
+            my $h = $kids->{$pid}->[0];
+            $out_statuses->{$status>>8}++;
+            $res->{$h} = {  status=> $status>>8,
+                            out=>$kids->{$pid}->[2],
+                            signal => $status & 255, # core dump info as well
+                        };
+            info "remote command on $h completed\n" if $verbose > 1;
+            delete $kids->{$pid};
+        }
+    }
+    my $stat = join(", ", map { "$_^^$out_statuses->{$_}" } sort keys
+        %$out_statuses);
+    info "Completed $nj remote jobs [$stat]\n";
+    return $res;
+}
+
 ###############################################################################
 # Remote jobs #################################################################
 ###############################################################################
@@ -699,7 +849,7 @@ sub write_jobs {
 sub job_string {
     my ($job) = @_;
     my @name = split (/\./, basename($job->{'file'}));
-    my $str = "$name[0] ";  
+    my $str = "$name[0] ";
     $str .= pad($job->{'host'}, 16);
     $str .= " ".pad($_, 8) for @{$job->{'param'}};
     return $str;
@@ -885,6 +1035,12 @@ sub count_lines {
 # Returns the first line of a file.
 sub first_line {
     my ($f) = @_;
+    my $last = "";
+    if ($f =~ /\.gz$/) {
+            $last= cmd ("gzip -dc $f | head -n 1" )->{'out'};
+            chomp $last;
+            return $last;
+    }
     open FILE, "< $f" or die "Cannot open `$f' for reading: $!.\n";
     $_ = <FILE>;
     close FILE;
@@ -945,16 +1101,16 @@ sub local_time {
     print CMDLOG "# Starting $job on " . localtime() . "\n";
     close CMDLOG;
 }
-    
+
 sub format_dhms {
     my $sec = shift;
     my ($d, $h, $m);
     $d = int ( $sec / 86400 ); $sec = $sec % 86400;
     $h = int ($sec / 3600 ); $sec = $sec % 3600;
     $m = int ($sec / 60 ); $sec = $sec % 60;
-    return "$d"."d:$h"."h:$m"."m:$sec"."s"; 
+    return "$d"."d:$h"."h:$m"."m:$sec"."s";
 }
-    
+
 ###############################################################################
 # Distributed tasks ###########################################################
 ###############################################################################
@@ -1025,7 +1181,7 @@ sub find_hole {
 #                 name job status files;
 #  - `title'      is the title of the task, to be displayed in a flashy banner;
 #  - `suffix'     is the common suffix of the job output files of the task
-#                 (i.e. "kjout" for polynomial selection, or "rels" for
+#                 (i.e. "polsel_out" for polynomial selection, or "rels" for
 #                 sieving);
 #  - `extra'      is an optional suffix, to match extra files when recovering
 #                 job output files (i.e. "freerels" for sieving);
@@ -1182,7 +1338,7 @@ sub distribute_task {
             HOST : for my $h (keys %machines) {
                 my $m = $machines{$h};
                 my $cores= $m->{'cores'};
-                $cores = $m->{'poly_cores'} if ($opt->{'task'} eq "polysel"); 
+                $cores = $m->{'poly_cores'} if ($opt->{'task'} eq "polysel");
 				
                 # How many free cores on this host?
                 my $busy_cores = 0;
@@ -1353,9 +1509,10 @@ my %tasks = (
 
     polysel   => { name   => "polynomial selection",
                    dep    => ['init'],
-                   param  => ['degree', 'kjkmax', 'kjincr', 'kjadmin',
-                              'kjadmax'],
-                   files  => ['kjout\.[\de.]+-[\de.]+', 'poly', 'poly_tmp'],
+                   param  => ['degree', 'polsel_incr',
+			      'polsel_admin', 'polsel_admax', 'polsel_lq',
+		              'polsel_nq'],
+                   files  => ['polsel_out\.[\de.]+-[\de.]+', 'poly', 'poly_tmp'],
                    resume => 1,
                    dist   => 1 },
 
@@ -1370,8 +1527,8 @@ my %tasks = (
     sieve     => { name   => "sieve and purge",
                    dep    => ['polysel'],
                    req    => ['factbase', 'freerels'],
-                   files  => ['rels\.[\de.]+-[\de.]+(|\.gz)', 
-                              'rels\.tmp', 'nrels'], 
+                   files  => ['rels\.[\de.]+-[\de.]+(|\.gz)',
+                              'rels\.tmp', 'nrels'],
                    resume => 1,
                    dist   => 1 },
 
@@ -1384,12 +1541,11 @@ my %tasks = (
 
     purge     => { name   => "singletons and cliques",
                    dep    => ['dup'],
-                   files  => ['purged', 'purge\.log'] },
+                   files  => ['purged\.gz', 'purge\.log'] },
 
     merge     => { name   => "merge",
                    dep    => ['purge'],
-                   param  => ['keep', 'maxlevel', 'cwmax', 'rwmax',
-                              'ratio', 'bwstrat'],
+                   param  => ['keep', 'maxlevel', 'ratio', 'bwstrat'],
                    files  => ['merge\.his', 'merge\.log'] },
 
     # replay shouldn't appear as a step in its own right. It's a bug.
@@ -1494,7 +1650,12 @@ sub do_init {
     # Getting configuration
     info "Reading the parameters...\n";
     $tab_level++;
-    read_param(\%param, { strict => 1 }, @ARGV);
+    
+    parse_options ();
+    parse_param (\%param, { strict => 1 }, \@ARGV, "command line");
+    my %default_param_hash = @default_param;
+    merge_hash (\%param, \%default_param_hash);
+    check_param (\%param, { strict => 1 });
     $tab_level--;
 
     if ($param{'parallel'}) {
@@ -1553,8 +1714,8 @@ sub do_init {
     if ($recover && -f "$param{'prefix'}.param") {
         eval {
             my %param_old;
-            read_param(\%param_old, { strict => 0 },
-                       "param=$param{'prefix'}.param");
+            parse_param (\%param_old, { strict => 0 },  ["param=$param{'prefix'}.param"], 
+                        "file $param{'prefix'}.param");
             for (keys %param) {
             		$param_diff{$_} =$param{$_} ne $param_old{$_}
 						if (exists($param_old{$_}));
@@ -1758,7 +1919,7 @@ my $polysel_check = sub {
     while (<FILE>) {
         if (/^No polynomial found/) {
             warn "No polynomial in file `$f'.\n".
-			     "please increase the [kj]adrange or [kj]maxnorm.\n"
+	     "please increase [polsel_]adrange or [polsel_]maxnorm.\n"
                if ($ENV{'CADO_DEBUG'});
             close FILE;
             return;
@@ -1766,7 +1927,7 @@ my $polysel_check = sub {
         $poly{$1} = $2 if /^(\w+):\s*([\w\-.]+)$/;
     }
     close FILE;
-        
+
     # Remove invalid files
     for (qw(n skew Y1 Y0), map "c$_", (0 .. $param{'degree'})) {
         if (!defined $poly{$_}) {
@@ -1783,18 +1944,19 @@ my $polysel_check = sub {
 
 my $polysel_cmd = sub {
     my ($a, $b, $m, $nthreads, $gzip) = @_;
-    return "env nice -$param{'selectnice'} ".
-           "$m->{'bindir'}/polyselect/polyselect2 -q ".
-           "-kmax $param{'kjkmax'} ".
-           "-incr $param{'kjincr'} ".
+    return "env nice -$param{'polsel_nice'} ".
+           "$m->{'bindir'}/polyselect/polyselect2l -q ".
+           "-lq $param{'polsel_lq'} ".
+           "-nq $param{'polsel_nq'} ".
+           "-incr $param{'polsel_incr'} ".
            "-admin $a ".
            "-admax $b ".
            "-degree $param{'degree'} ".
-           "-maxnorm $param{'kjmaxnorm'} ".
+           "-maxnorm $param{'polsel_maxnorm'} ".
            "-t $nthreads ".
-           "$param{'kjP'} ".
+           "$param{'polsel_P'} ".
            "< $m->{'prefix'}.n ".
-           "> $m->{'prefix'}.kjout.$a-$b ".
+           "> $m->{'prefix'}.polsel_out.$a-$b ".
            "2>&1";
 };
 
@@ -1803,17 +1965,17 @@ sub do_polysel {
         shift;
         my ($ranges) = @_;
         for (@$ranges) {
-            next     if $_->[1] <  $param{'kjadmax'};
-            last     if $_->[0] >  $param{'kjadmin'};
-            return 1 if $_->[0] <= $param{'kjadmin'} &&
-                        $_->[1] >= $param{'kjadmax'};
+            next     if $_->[1] <  $param{'polsel_admax'};
+            last     if $_->[0] >  $param{'polsel_admin'};
+            return 1 if $_->[0] <= $param{'polsel_admin'} &&
+                        $_->[1] >= $param{'polsel_admax'};
         }
         return 0;
     };
 
     my $polysel_progress = sub {
         my ($ranges) = @_;
-        my ($min, $max) = ($param{'kjadmin'}, $param{'kjadmax'});
+        my ($min, $max) = ($param{'polsel_admin'}, $param{'polsel_admax'});
 
         my $total = 0;
         for (@$ranges) {
@@ -1828,13 +1990,13 @@ sub do_polysel {
 
     distribute_task({ task     => "polysel",
                       title    => "Polynomial selection",
-                      suffix   => "kjout",
+                      suffix   => "polsel_out",
                       files    => ["$param{'name'}.n"],
                       pattern  => '^(# generated|No polynomial found)',
-                      min      => $param{'kjadmin'},
-                      max      => $param{'kjadmax'},
-                      len      => $param{'kjadrange'},
-                      delay    => $param{'kjdelay'},
+                      min      => $param{'polsel_admin'},
+                      max      => $param{'polsel_admax'},
+                      len      => $param{'polsel_adrange'},
+                      delay    => $param{'polsel_delay'},
                       check    => $polysel_check,
                       progress => $polysel_progress,
                       is_done  => $polysel_is_done,
@@ -1849,7 +2011,7 @@ sub do_polysel {
 
     opendir DIR, $param{'wdir'}
         or die "Cannot open directory `$param{'wdir'}': $!\n";
-    my @files = grep /^$param{'name'}\.kjout\.[\de.]+-[\de.]+$/,
+    my @files = grep /^$param{'name'}\.polsel_out\.[\de.]+-[\de.]+$/,
                      readdir DIR;
     closedir DIR;
 
@@ -1874,7 +2036,7 @@ sub do_polysel {
     }
 
     die "No polynomial was found in the given range!\n".
-        "Please increase the range or [kj]maxnorm.\n"
+        "Please increase the range or [polsel_]maxnorm.\n"
       unless defined $Emax;
 
     # Copy the best polynomial
@@ -1898,7 +2060,7 @@ sub do_polysel_bench {
     my $polysel_is_done = sub {
         shift;
         my ($ranges) = @_;
-        my ($min, $max) = ($param{'kjadmin'}, $param{'kjadmax'});
+        my ($min, $max) = ($param{'polsel_admin'}, $param{'polsel_admax'});
 
         my $total = 0;
         for (@$ranges) {
@@ -1906,13 +2068,13 @@ sub do_polysel_bench {
                      $_->[1] > $max ? $max : $_->[1]);
             $total += $r[1] - $r[0] if $r[0] < $r[1];
         }
-        $total = ceil ($total / $param{'kjadrange'});
+        $total = ceil ($total / $param{'polsel_adrange'});
 		my $total_cores=0;
 		foreach (keys %machines) {
 			$total_cores += $machines{$_}{'poly_cores'};
 		}
         my $size = count_lines("$param{'prefix'}.polysel_jobs", "$param{'name'}\.");
-		my $total_jobs = ceil (($max-$min)/$param{'kjadrange'});
+		my $total_jobs = ceil (($max-$min)/$param{'polsel_adrange'});
 		if ($last) {
 			return 1 if $total >= $total_jobs + $size;
 		} else {
@@ -1923,13 +2085,13 @@ sub do_polysel_bench {
 
     distribute_task({ task     => "polysel",
                       title    => "Polynomial selection",
-                      suffix   => "kjout",
+                      suffix   => "polsel_out",
                       files    => ["$param{'name'}.n"],
                       pattern  => '^(# generated|No polynomial found)',
-                      min      => $param{'kjadmin'},
-                      max      => $param{'kjadmax'},
-                      len      => $param{'kjadrange'},
-                      delay    => $param{'kjdelay'},
+                      min      => $param{'polsel_admin'},
+                      max      => $param{'polsel_admax'},
+                      len      => $param{'polsel_adrange'},
+                      delay    => $param{'polsel_delay'},
                       check    => $polysel_check,
                       is_done  => $polysel_is_done,
                       cmd      => $polysel_cmd,
@@ -2047,7 +2209,7 @@ sub dup {
         while (<FILE>) {
            if ( $_ =~ /^# (Number of primes in \S+ factor base = \d+)$/ ) {
                 $i++;
-                last if $i==2; 
+                last if $i==2;
             }
         }
         close FILE;
@@ -2089,7 +2251,7 @@ sub dup {
                   logfile=>"$param{'prefix'}.dup1.log" });
         }
     }
-    
+
     $name="$param{'prefix'}.subdirlist";
     open FILE, "> $name" or die "$name: $!";
     print FILE join("\n", map { "$param{'name'}.nodup/$_"; } (0..$nslices-1));
@@ -2145,12 +2307,10 @@ sub purge {
     $tab_level++;
     my $cmd = cmd("$param{'bindir'}/filter/purge ".
                   "-poly $param{'prefix'}.poly -keep $param{'keeppurge'} ".
-                  "-excess $param{'excessratio'} ".
-                  "-nrels $nbrels -out $param{'prefix'}.purged ".
-                  "-basepath $param{'wdir'} " .
+                  "-nrels $nbrels -out $param{'prefix'}.purged.gz ".
+                  "-npthr $param{'bwmt'} -basepath $param{'wdir'} ".
                   "-subdirlist $param{'prefix'}.subdirlist ".
-                  "-filelist $param{'prefix'}.filelist ".
-                  "-noclique $noclique ",
+                  "-filelist $param{'prefix'}.filelist ",
                   { cmdlog => 1,
                     logfile => "$param{'prefix'}.purge.log"
                  });
@@ -2164,8 +2324,8 @@ sub do_purge {
     } else {
         info "Purge has already been done\n";
     }
-    # Get the number of rows and columns from the .purged file
-    my ($nrows, $ncols) = split / /, first_line("$param{'prefix'}.purged");
+    # Get the number of rows and columns from the .purged.gz file
+    my ($nrows, $ncols) = split / /, first_line("$param{'prefix'}.purged.gz");
     my $excess = $nrows - $ncols;
     $tab_level++;
     info "Nrows: $nrows; Ncols: $ncols; Excess: $excess.\n";
@@ -2366,13 +2526,13 @@ sub do_sieve {
                 or die "Cannot open `$param{'prefix'}.nrels' for writing: $!.\n";
             print FILE "$nrels\n";
             close FILE;
-        
+
             # Remove duplicates
             dup();
             $force_purge++;
             return 0 if ($nrels > 20000000);
-        } 
-        
+        }
+
         $force_purge = 0;
         $$delay = 0  if ($nrels > 10000000);
         # Remove singletons and cliques
@@ -2386,7 +2546,7 @@ sub do_sieve {
 
         return 1;
     };
-    
+
     distribute_task({ task     => "sieve",
                       title    => "Sieve",
                       suffix   => "rels",
@@ -2482,7 +2642,7 @@ sub do_sieve_bench {
             return;
         } elsif ($ret->{'status'}) {
             # Non-zero, but not 1? Something's wrong, bail out
-            die "check_rels exited with unknown error code ", 
+            die "check_rels exited with unknown error code ",
                  $ret->{'status'}, ", aborting."
         }
         # The file is clean: we can import the relations now
@@ -2560,13 +2720,12 @@ sub do_merge {
 
     my $cmd = "$param{'bindir'}/filter/merge ".
               "-out $param{'prefix'}.merge.his ".
-              "-mat $param{'prefix'}.purged ".
+              "-mat $param{'prefix'}.purged.gz ".
+              "-skip $param{'skip'} ".
               "-forbw $param{'bwstrat'} ".
               "-coverNmax $param{'coverNmax'} ".
               "-keep $param{'keep'} ".
               "-maxlevel $param{'maxlevel'} ".
-              "-cwmax $param{'cwmax'} ".
-              "-rwmax $param{'rwmax'} ".
               "-ratio $param{'ratio'} ";
 
     cmd($cmd, { cmdlog => 1, kill => 1, logfile =>
@@ -2598,9 +2757,9 @@ sub do_replay {
     my $cmd = "$param{'bindir'}/filter/replay ".
               "--binary " .
               "-skip $param{'skip'} " .
+              "-purged $param{'prefix'}.purged.gz ".
               "-his $param{'prefix'}.merge.his ".
               "-index $param{'prefix'}.index ".
-              "-purged $param{'prefix'}.purged ".
               "-out $param{'prefix'}.small.bin ".
               (defined $bwcostmin ? "-costmin $bwcostmin " : "");
 
@@ -2645,7 +2804,7 @@ sub do_linalg {
         # Note: $param{'bindir'} is not expanded yet. So if we get it as
         # a variable from the mach_desc file, it won't do. It's better to
         # pass it as a command-line argument to bwc.pl
-        
+
         my $bwc_bindir = "$param{'bindir'}/linalg/bwc";
 
         # XXX NOTE: This is a despair-mode fallback. It's really not
@@ -2681,7 +2840,7 @@ sub do_linalg {
                "mm_impl=$param{'bwc_mm_impl'} ".
                "interleaving=$param{'bwc_interleaving'} ".
                "interval=$param{'bwc_interval'} ".
-               "mn=64 splits=0,64 ys=0..64 ".
+               "mn=$param{'bwc_mn'} ".
                "wdir=$param{'prefix'}.bwc " .
                "shuffled_product=$param{'bwc_shuffled_product'} " .
                "bwc_bindir=$bwc_bindir ";
@@ -2712,8 +2871,12 @@ sub do_chars {
 
     my $cmd = "$param{'bindir'}/linalg/characters ".
               "-poly $param{'prefix'}.poly ".
-              "-purged $param{'prefix'}.purged ".
+              "-purged $param{'prefix'}.purged.gz ".
               "-index $param{'prefix'}.index ".
+              # Note: one can omit the -heavyblock option, but in that case
+              # one should add -nratchars nnn (with nnn=16 for example) to fix
+              # the rational characters, since -nchar only fixes the algebraic
+              # characters
               "-heavyblock $param{'prefix'}.small.dense.bin ".
               "-nchar $param{'nchar'} ".
               "-t $param{'nthchar'} ".
@@ -2773,7 +2936,7 @@ sub do_sqrt {
             "-poly $param{'prefix'}.poly ".
             "-prefix $param{'prefix'}.dep " .
             "-ab " .
-            "-purged $param{'prefix'}.purged ".
+            "-purged $param{'prefix'}.purged.gz ".
             "-index $param{'prefix'}.index ".
             "-ker $param{'prefix'}.ker ";
 
@@ -2793,7 +2956,7 @@ sub do_sqrt {
             "-prefix $param{'prefix'}.dep " .
             "-dep $numdep " .
             "-rat -alg -gcd " .
-            "-purged $param{'prefix'}.purged ".
+            "-purged $param{'prefix'}.purged.gz ".
             "-index $param{'prefix'}.index ".
             "-ker $param{'prefix'}.ker ".
             "> $f";
@@ -2809,7 +2972,7 @@ sub do_sqrt {
         cmd("env cp -f $f $param{'prefix'}.fact", { kill => 1 });
 
         my @factors_thisdep=();
-        open FILE, "< $f" 
+        open FILE, "< $f"
             or die "Cannot open `$f' for reading: $!.\n";
         while (<FILE>) {
             chomp($_);
@@ -2820,7 +2983,7 @@ sub do_sqrt {
         for my $p (@factors_thisdep) {
             info(primetest_print($p) ."\n");
         }
-            
+
         info "Doing gcds with previously known composite factors\n";
 
         my @kcomp = keys %composite_factors;
@@ -2846,7 +3009,7 @@ sub do_sqrt {
                     }
                     # m /= gcd(m, a)
                     my $za = Math::BigInt->new($a);
-                    my $zg = Math::BigInt::bgcd($zm,$za); 
+                    my $zg = Math::BigInt::bgcd($zm,$za);
                     $zm->bdiv($zg);
                 }
             }

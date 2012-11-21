@@ -1,6 +1,6 @@
 add_executable(alpha alpha.c fast_rootsieve.c)
-add_executable(rootsieve5 rootsieve5.c rootsieve5_main.c)
+add_executable(ropt ropt_main.c ${ropt_sources})
 
 target_link_libraries(alpha polyselect_common utils m gmp)
-target_link_libraries(rootsieve5 polyselect_common utils m ${pthread_libs})
+target_link_libraries(ropt polyselect_common utils m ${pthread_libs})
 # vim: set ft=cmake:

@@ -60,7 +60,8 @@ void skip_relations_in_file(FILE * f, int n)
 }
 
 
-/* return a/b mod p, and -1 when gcd(b,p) <> 1 */
+/* return a/b mod p, and p when gcd(b,p) <> 1: this corresponds to a
+   projective root */
 unsigned long
 findroot(long a, unsigned long b, unsigned long p) {
   int sig, inv;
@@ -90,7 +91,7 @@ findroot(long a, unsigned long b, unsigned long p) {
       modul_neg(r, r, m);
     root = modul_get_ul (r, m);
   } else {
-    root = (unsigned long) -1L;
+    root = p;
   }
   
   modul_clear (pa, m); /* No-ops. Here for the sake of pedantry */
@@ -101,7 +102,7 @@ findroot(long a, unsigned long b, unsigned long p) {
   return root;
 }
 
-// root = -1 if we don't know the result (p divides leading coeff)
+// root = p if we don't know the result (p divides leading coeff)
 void
 computeroots (relation_t *rel)
 {
@@ -116,7 +117,148 @@ computeroots (relation_t *rel)
 }
 
 void
+sswap(char *pd, char *pe)
+{
+  char c;
+  while (pe > pd)
+    {
+      c = *pe; *pe-- = *pd; *pd++ = c;
+    }
+}
+
+char *
+u64toa16 (char *p, uint64_t m)
+{
+  char *op;
+  static char v[] = "0123456789abcdef";
+
+  op = p;
+  do
+    {
+      *p++ = v[m & 0xf];
+      m >>= 4;
+    }
+  while (m);
+  sswap(op, &(p[-1]));
+  return (p);
+}
+
+char *
+u64toa10 (char *p, uint64_t m)
+{
+  char *op;
+  uint64_t n;
+
+  op = p;
+  do
+    {
+      n = m / 10;
+      *p++ = (unsigned char) ((m - n * 10) + '0');
+      m = n;
+    }
+  while (m);
+  sswap(op, &(p[-1]));
+  return (p);
+}
+
+char *
+d64toa10 (char *p, int64_t m)
+{
+  if (m < 0)
+    {
+      *p++ = '-';
+      m = -m;
+    }
+  return (u64toa10 (p, (uint64_t) m));
+}
+
+void
 fprint_relation (FILE *file, relation_t * rel)
+{
+  char buf[1<<10], *p, *op;
+  size_t lg;
+  int i, j;
+  
+  p = d64toa10(buf, rel->a);
+  *p++ = ',';
+  p = u64toa10(p, rel->b);
+  *p++ = ':';
+  for (i = 0; i < rel->nb_rp; ++i)
+    if (rel->rp[i].e)
+      {
+	op = p;
+	p = u64toa16 (p, rel->rp[i].p);
+	*p++ = ',';
+	lg = (p - op);
+	for (j = 0; j < rel->rp[i].e - 1; j++)
+	  {
+	    memcpy (p, op, lg);
+	    p += lg;
+	  }
+      }
+  p[-1] = ':';
+  for (i = 0; i < rel->nb_ap; ++i)
+    if (rel->ap[i].e)
+      {
+	op = p;
+	p = u64toa16 (p, rel->ap[i].p);
+	*p++ = ',';
+	lg = (p - op);
+	for (j = 0; j < rel->ap[i].e - 1; j++)
+	  {
+	    memcpy (p, op, lg);
+	    p += lg;
+	  }
+      }
+  p[-1] = '\n';
+  fwrite (buf, sizeof(*buf), p - buf, file);
+}
+
+void
+fprint_relation_raw (FILE *file, relation_t * rel)
+{
+  char buf[1<<10], *p, *op;
+  size_t lg;
+  int i, j;
+  
+  p = d64toa10(buf, rel->a);
+  *p++ = ',';
+  p = u64toa10(p, rel->b);
+  *p++ = ':';
+  for (i = 0; i < rel->nb_rp; ++i)
+    {
+      ASSERT (rel->rp[i].e);
+      op = p;
+      p = u64toa16 (p, rel->rp[i].p);
+      *p++ = ',';
+      lg = (p - op);
+      for (j = 0; j < rel->rp[i].e - 1; j++)
+	{
+	  memcpy (p, op, lg);
+	  p += lg;
+	}
+    }
+  p[-1] = ':';
+  for (i = 0; i < rel->nb_ap; ++i)
+    if (rel->ap[i].e)
+      {
+	ASSERT (rel->ap[i].e);
+	op = p;
+	p = u64toa16 (p, rel->ap[i].p);
+	*p++ = ',';
+	lg = (p - op);
+	for (j = 0; j < rel->ap[i].e - 1; j++)
+	  {
+	    memcpy (p, op, lg);
+	    p += lg;
+	  }
+      }
+  p[-1] = '\n';
+  fwrite (buf, sizeof(*buf), p - buf, file);
+}
+
+void
+fprint_relation_old (FILE *file, relation_t * rel)
 {
   int i, j;
 
@@ -139,7 +281,7 @@ fprint_relation (FILE *file, relation_t * rel)
 
 /* same as fprint_relation, but exponents > 1 are allowed */
 void
-fprint_relation_raw (FILE *file, relation_t * rel)
+fprint_relation_raw_old (FILE *file, relation_t * rel)
 {
   int i, j;
 
@@ -191,7 +333,7 @@ reduce_exponents_mod2 (relation_t *rel)
         }
     }
   if(j == 0)
-      fprintf(stderr, "WARNING: j_rp=0 in reduce_exponents_mod2\n");
+    fprintf(stderr, "WARNING: j_rp=0 in reduce_exponents_mod2. k=%d\n", rel->nb_rp);
   rel->nb_rp = j;
 
   if(rel->nb_ap == 0)
@@ -203,7 +345,7 @@ reduce_exponents_mod2 (relation_t *rel)
       if (rel->ap[i].e != 0)
         {
           rel->ap[j].p = rel->ap[i].p;
-          rel->ap[j].r = rel->ap[i].r;  // in fact useless at this point.
+          /* rel->ap[j].r = rel->ap[i].r;  */ // in fact useless at this point.
           rel->ap[j].e = 1;
           j ++;
         }
@@ -227,21 +369,71 @@ static int alg_prime_cmp(alg_prime_t * a, alg_prime_t * b)
 
 typedef int (*sortfunc_t) (const void *, const void *);
 
-void relation_provision_for_primes(relation_t * rel, int nr, int na)
+void
+relation_provision_for_primes (relation_t * rel, int nr, int na)
 {
-    if (nr > 0 && rel->nb_rp_alloc < nr) {
-        rel->nb_rp_alloc = nr + nr / 2;
-        rel->rp = (rat_prime_t *) realloc(rel->rp, rel->nb_rp_alloc * sizeof(rat_prime_t));
+  if (nr > 0 && rel->nb_rp_alloc < nr)
+    {
+      rel->nb_rp_alloc = nr + nr / 2;
+      rel->rp = (rat_prime_t *) realloc (rel->rp,
+                                       rel->nb_rp_alloc * sizeof(rat_prime_t));
     }
-    if (na > 0 && rel->nb_ap_alloc < na) {
-        rel->nb_ap_alloc = na + na / 2;
-        rel->ap = (alg_prime_t *) realloc(rel->ap, rel->nb_ap_alloc * sizeof(alg_prime_t));
+  if (na > 0 && rel->nb_ap_alloc < na)
+    {
+      rel->nb_ap_alloc = na + na / 2;
+      rel->ap = (alg_prime_t *) realloc (rel->ap,
+                                       rel->nb_ap_alloc * sizeof(alg_prime_t));
+    }
+}
+
+/* assumes all the exponents are initially 1 */
+static void
+sort_rat_primes (rat_prime_t *rp, int nb_rp)
+{
+  int i, j;
+  unsigned long pi;
+
+  /* insertion sort */
+  for (i = 1; i < nb_rp; i++)
+    {
+      pi = rp[i].p;
+      for (j = i - 1; (j >= 0) && (pi < rp[j].p); j--)
+        rp[j+1].p = rp[j].p;
+      /* the prime pi should go at index j+1 */
+      rp[j+1].p = pi;
+    }
+}
+
+/* assumes all the exponents are 1 */
+static void
+sort_alg_primes (alg_prime_t *ap, int nb_ap)
+{
+  int i, j;
+  unsigned long pi, ri;
+
+  /* insertion sort: for a given relation (a,b), r is uniquely determined
+     by (a,b), thus we only need to compare p */
+  for (i = 1; i < nb_ap; i++)
+    {
+      pi = ap[i].p;
+      ri = ap[i].r;
+      for (j = i - 1; (j >= 0) && (pi < ap[j].p); j--)
+        {
+          ap[j+1].p = ap[j].p;
+          ap[j+1].r = ap[j].r;
+        }
+      ap[j+1].p = pi;
+      ap[j+1].r = ri;
     }
 }
 
 void relation_compress_rat_primes(relation_t * rel)
 {
-    qsort(rel->rp, rel->nb_rp, sizeof(rat_prime_t), (sortfunc_t) &rat_prime_cmp);
+#if 0
+  qsort(rel->rp, rel->nb_rp, sizeof(rat_prime_t), (sortfunc_t) &rat_prime_cmp);
+#else
+  sort_rat_primes (rel->rp, rel->nb_rp);
+#endif
     int j = 0;
     for(int i = 0 ; i < rel->nb_rp ; j++) {
         if (i-j) memcpy(rel->rp + j, rel->rp + i, sizeof(rat_prime_t));
@@ -255,11 +447,15 @@ void relation_compress_rat_primes(relation_t * rel)
 
 void relation_compress_alg_primes(relation_t * rel)
 {
+#if 0
     /* We're considering the list as containing possibly distinct (p,r)
      * pairs, although in reality it cannot happen. I doubt this causes
      * any performance hit though.
      */
-    qsort(rel->ap, rel->nb_ap, sizeof(alg_prime_t), (sortfunc_t) &alg_prime_cmp);
+  qsort(rel->ap, rel->nb_ap, sizeof(alg_prime_t), (sortfunc_t) &alg_prime_cmp);
+#else
+  sort_alg_primes (rel->ap, rel->nb_ap);
+#endif
     int j = 0;
     for(int i = 0 ; i < rel->nb_ap ; j++) {
         if (i-j) memcpy(rel->ap + j, rel->ap + i, sizeof(alg_prime_t));
@@ -280,7 +476,7 @@ void relation_compress_alg_primes(relation_t * rel)
  * - if forced_read is non-zero, return 0.
  */
 int relation_stream_get(relation_stream_ptr rs, char * supplied_line,
-                        int forced_read)
+                        int forced_read, unsigned int ab_base)
 {
     FILE * f = rs->source;
     char tbuf[RELATION_MAX_BYTES];
@@ -314,10 +510,10 @@ another_line:
 
     p = line;
 
-    *p++ = (c = fgetc(f));
+    *p++ = (c = fgetc_unlocked(f));
     if (c == EOF) return -1;
     if (c == '#') {
-        for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc(f))) ;
+        for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f))) ;
         goto another_line;
     }
 
@@ -325,23 +521,23 @@ another_line:
     *pb = 0;
     int s = 1;
     int v;
-    if (c == '-') { s=-1; *p++ = (c=fgetc(f)); }
-    for( ; (v=ugly[(unsigned char) c]) >= 0 ; *p++ = (c=fgetc(f)))
-        *pa=*pa*10+v;
+    if (c == '-') { s=-1; *p++ = (c=fgetc_unlocked(f)); }
+    for( ; (v=ugly[(unsigned char) c]) >= 0 ; *p++ = (c=fgetc_unlocked(f)))
+        *pa=*pa*ab_base+v;
     expected = ',';
     if (forced_read && c != expected) {
-      for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc(f))) ;
+      for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f))) ;
       return 0;
     }
     else
       ASSERT_ALWAYS(c == expected);
-    *p++ = (c=fgetc(f));
+    *p++ = (c=fgetc_unlocked(f));
     *pa*=s;
-    for( ; (v=ugly[(unsigned char) c]) >= 0 ; *p++ = (c=fgetc(f)))
-        *pb=*pb*10+v;
+    for( ; (v=ugly[(unsigned char) c]) >= 0 ; *p++ = (c=fgetc_unlocked(f)))
+        *pb=*pb*ab_base+v;
     expected = ':';
     if (forced_read && c != expected) {
-      for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc(f))) ;
+      for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f))) ;
       return 0;
     }
     else
@@ -355,12 +551,12 @@ another_line:
 
         base = p;
         n = 1;
-        *p++ = (c = fgetc(f));
-        for (; c != EOF && c != '\n' && c != ':'; *p++ = (c = fgetc(f)))
+        *p++ = (c = fgetc_unlocked(f));
+        for (; c != EOF && c != '\n' && c != ':'; *p++ = (c = fgetc_unlocked(f)))
             n += c == ',';
         expected = ':';
         if (forced_read && c != expected) {
-          for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc(f))) ;
+          for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f))) ;
           return 0;
         }
         else
@@ -382,7 +578,7 @@ another_line:
 
         expected = ':';
         if (forced_read && c != expected) {
-          for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc(f))) ;
+          for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f))) ;
           return 0;
         }
         else
@@ -391,12 +587,12 @@ another_line:
 
         base = p;
         n = 1;
-        *p++ = (c = fgetc(f));
-        for (; c != EOF && c != '\n' && c != ':'; *p++ = (c = fgetc(f)))
+        *p++ = (c = fgetc_unlocked(f));
+        for (; c != EOF && c != '\n' && c != ':'; *p++ = (c = fgetc_unlocked(f)))
             n += c == ',';
         expected = '\n';
         if (forced_read && c != expected) {
-          for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc(f))) ;
+          for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f))) ;
           return 0;
         }
         else
@@ -418,7 +614,7 @@ another_line:
 
         expected = '\n';
         if (forced_read && c != expected) {
-          for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc(f))) ;
+          for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f))) ;
           return 0;
         }
         else
@@ -428,7 +624,7 @@ another_line:
 
     /* skip rest of line -- a no-op if we've been told to parse
      * everything. */
-    for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc(f)));
+    for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f)));
 
     size_t nread =  p-line;
     *p++='\0';
@@ -452,7 +648,7 @@ relation_stream_get_skip (relation_stream_ptr rs)
 another_line:
     rs->lnum++;
 
-    c = fgetc (f);
+    c = fgetc_unlocked (f);
     nread = 1;
 
     if (c == EOF)
@@ -463,12 +659,12 @@ another_line:
 
     if (c == '#')
       {
-        for( ; c != EOF && c != '\n' ; c = fgetc (f), nread++);
+        for( ; c != EOF && c != '\n' ; c = fgetc_unlocked (f), nread++);
         goto another_line;
       }
 
     /* read entire line */
-    for( ; c != EOF && c != '\n' ; c = fgetc (f), nread++);
+    for( ; c != EOF && c != '\n' ; c = fgetc_unlocked (f), nread++);
 
     rs->pos += nread;
     rs->nrels++;
@@ -525,17 +721,23 @@ void relation_stream_unbind(relation_stream_ptr rs)
 
 int relation_stream_disp_progress_now_p(relation_stream_ptr rs)
 {
-    if (rs->nrels % 100)
-        return 0;
-    double t = wct_seconds();
-    if (rs->nrels % 1000000 == 0 || t >= rs->t1 + 1) {
-        rs->dt = t - rs->t0;
-        rs->mb_s = rs->dt > 0.01 ? (rs->pos/rs->dt * 1.0e-6) : 0;
-        rs->rels_s = rs->dt > 0.01 ? rs->nrels/rs->dt : 0;
-        rs->t1 = t;
-        return 1;
-    }
+  static unsigned long change;
+  double t;
+
+  if ((rs->nrels >> 18) == (change >> 18))
     return 0;
+
+  t = wct_seconds();
+  change = rs->nrels;
+  if (t >= rs->t1 + 1)
+    {
+      rs->dt = t - rs->t0;
+      rs->mb_s = rs->dt > 0.01 ? (rs->pos/rs->dt * 1.0e-6) : 0;
+      rs->rels_s = rs->dt > 0.01 ? rs->nrels/rs->dt : 0;
+      rs->t1 = t;
+      return 1;
+    }
+  return 0;
 }
 
 void relation_stream_trigger_disp_progress(relation_stream_ptr rs)

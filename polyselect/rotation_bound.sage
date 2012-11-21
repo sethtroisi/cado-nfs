@@ -37,6 +37,8 @@ deviation=0
 
 ##### Norm computations.
 
+PRECISION=53
+
 def deskew_polynomial(f,s):
     """Utility function. Returns a polynomial over the reals."""
     d=f.degree()
@@ -46,7 +48,7 @@ def deskew_polynomial(f,s):
         g.append(float(f[i])*ss)
         ss*=float(s)
     g.append(f[d]*ss)
-    return RealField()['x'](g), ss
+    return RealField(PRECISION)['x'](g), ss
 
 def supnorm(f,s):
     g,ss=deskew_polynomial(f,s)
@@ -80,6 +82,8 @@ def l2norm_tk(f,s):
     coeffs=[4/(2*i+1)/(2*(d-i)+1) for i in [0..d]]
     return sqrt(vector(g2.coeffs())*vector(coeffs)/ss)
 
+PRECISION=53
+
 def l2norm_tk_circular(f,s):
    if f.degree()==6:
       a0 = f[0]
@@ -92,7 +96,7 @@ def l2norm_tk_circular(f,s):
       n = 231 * (a6 * a6 + a0 * a0) + 42 * (a6 * a4 + a2 * a0) + 21 * (a5 * a5 + a1 * a1) + 7 * (a4 * a4 + a2 * a2) + 14 * (a6 * a2 + a5 * a3 + a4 * a0 + a3 * a1) + 10 * (a6 * a0 + a5 * a1 + a4 * a2) + 5 * a3 * a3
       n = n * pi / 7168
       # return float(1/2 * log(n / (s * s * s * s * s * s)))
-      return RealField(128)(1/2 * log(n / (s * s * s * s * s * s)))
+      return RealField(PRECISION)(1/2 * log(n / (s * s * s * s * s * s)))
    else:
       raise ValueError, "circular norm not yet implemented for this degree"
 
@@ -193,7 +197,7 @@ def best_l2norm_tk_circular(f):
 
 def skew_l2norm_tk_circular(f):
    if f.degree()==6:
-      R.<s> = RDF[]
+      R.<s> = RealField(PRECISION)[]
       a0 = f[0]
       a1 = f[1] * s
       a2 = f[2] * s^2
@@ -201,14 +205,20 @@ def skew_l2norm_tk_circular(f):
       a4 = f[4] * s^4
       a5 = f[5] * s^5
       a6 = f[6] * s^6
+      d = (231*a0^2+42*a0*a2+14*a0*a4+10*a0*a6+21*a1^2+14*a1*a3+10*a1*a5+7*a2^2+10*a2*a4+14*a2*a6+5*a3^2+14*a3*a5+7*a4^2+42*a4*a6+21*a5^2+231*a6^2)/s^6
+      # derivative of d wrt s
       e = -1386*a0^2+168*a6*a4+28*a6*a2-28*a4*a0-168*a2*a0+84*a5^2-84*a1^2+1386*a6^2+14*a4^2-14*a2^2+28*a5*a3-28*a3*a1
       r = e.real_roots()
       root_pos=[s for s in r if s > 0]
-      if len(root_pos) <> 1:
-         raise ValueError, "number of positive roots <> 1"
-      return root_pos[0]
+      best_norm = infinity
+      for r in root_pos:
+         no = d(r)
+         if no < best_norm:
+            best_norm = no
+            best_root = r
+      return best_root
    elif f.degree()==5:
-      R.<s> = RDF[]
+      R.<s> = RealField(PRECISION)[]
       a0 = f[0]
       a1 = f[1] * s
       a2 = f[2] * s^2
@@ -305,7 +315,7 @@ def flog10(x): return float(log(abs(float(x)))/log(10))
 def fexp10(x): return float(exp(float(x*log(10))))
 
 def change_ccoeff(f,a0):
-    return PolynomialRing(RealField(),'x')(f-f[0])+a0
+    return PolynomialRing(RealField(PRECISION),'x')(f-f[0])+a0
 
 
 
@@ -425,7 +435,7 @@ def lognorm_plus_alpha_rot(f,g,normfunc,w):
     separated from the mean by as many standard deviations as given by
     the global ``deviation'' parameter.
     """
-    RP=PolynomialRing(RealField(),'z');
+    RP=PolynomialRing(RealField(PRECISION),'z');
     E=[fexp10(w), -fexp10(w)]
     lognorm=min([flog(normfunc(RP(f)+e*RP(g))) for e in E])
     alpha=eval_dichotomy(reduced_alpha_affine_table,10.0*(w))
@@ -440,7 +450,7 @@ def lognorm_plus_alpha_rot_scons(f,g,normfunc,skew,w):
     separated from the mean by as many standard deviations as given by
     the global ``deviation'' parameter.
     """
-    RP=PolynomialRing(RealField(),'z');
+    RP=PolynomialRing(RealField(PRECISION),'z');
     E=[fexp10(w), -fexp10(w)]
     lognorm=min([flog(normfunc(RP(f)+e*RP(g), skew)) for e in E])
     alpha=eval_dichotomy(reduced_alpha_affine_table,10.0*(w))
@@ -457,7 +467,7 @@ def lognorm_plus_alpha_rot_scons_linear(f,g,normfunc,skew,w):
     s=flog(skew)
     logb=(w*flog(10)+s)/2
     loga=(w*flog(10)-s)/2
-    RP=PolynomialRing(RealField(),'z');
+    RP=PolynomialRing(RealField(PRECISION),'z');
     z=RP.gen()
     Ea=fexp(loga); Eb=fexp(logb)
     E=[ Ea*z+Eb, Ea*z-Eb, -Ea*z+Eb, -Ea*z-Eb ];
@@ -478,7 +488,7 @@ def lognorm_plus_alpha_rot_linear(f,g,normfunc,skew,w):
     s=flog(skew)
     logb=(w*flog(10)+s)/2
     loga=(w*flog(10)-s)/2
-    RP=PolynomialRing(RealField(),'z');
+    RP=PolynomialRing(RealField(PRECISION),'z');
     z=RP.gen()
     Ea=fexp(loga); Eb=fexp(logb)
     E=[ Ea*z+Eb, Ea*z-Eb, -Ea*z+Eb, -Ea*z-Eb ];
@@ -499,7 +509,7 @@ def lognorm_plus_alpha_rot_linear_sopt(f,g,normfunc,w):
     """
     cands=[]
     nsteps=20
-    RP=PolynomialRing(RealField(),'z');
+    RP=PolynomialRing(RealField(PRECISION),'z');
     z=RP.gen()
     for s in [(k+1)/nsteps for k in range(nsteps)]:
         #+ [ flog(skew_l2norm_tk(f)) ]:
@@ -596,7 +606,6 @@ def optimize(f,g):
         g = g(x+kt)
         logmu = best_l2norm_tk_circular(R(f))
 	if logmu < logmu0:
-            print count, "translate by", kt
             changedt = True
             logmu0 = logmu
         else:
@@ -604,7 +613,6 @@ def optimize(f,g):
             g = g(x-2*kt)
 	    logmu = best_l2norm_tk_circular(R(f))
 	    if logmu < logmu0:
-                print count, "translate by", -kt
 	        changedt = True
                 logmu0 = logmu
 	    else:
@@ -614,14 +622,12 @@ def optimize(f,g):
         f = f + kr2*x^2*g
         logmu = best_l2norm_tk_circular(R(f))
 	if logmu < logmu0:
-            print count, "rotate by", kr2*x^2
             changedr2 = True
             logmu0 = logmu
         else:
             f = f - 2*kr2*x^2*g
 	    logmu = best_l2norm_tk_circular(R(f))
 	    if logmu < logmu0:
-                print count, "rotate by", -kr2*x^2
 	        changedr2 = True
                 logmu0 = logmu
 	    else:
@@ -630,15 +636,12 @@ def optimize(f,g):
         f = f + kr1*x*g
         logmu = best_l2norm_tk_circular(R(f))
 	if logmu < logmu0:
-            print count, "rotate by", kr1*x
             changedr1 = True
             logmu0 = logmu
         else:
             f = f - 2*kr1*x*g
 	    logmu = best_l2norm_tk_circular(R(f))
-            print -kr1*x, logmu, logmu0
 	    if logmu < logmu0:
-                print count, "rotate by", -kr1*x
 	        changedr1 = True
                 logmu0 = logmu
 	    else:
@@ -646,16 +649,13 @@ def optimize(f,g):
         # try rotation by g
         f = f + kr0*g
         logmu = best_l2norm_tk_circular(R(f))
-	print kr0, logmu, logmu0
 	if logmu < logmu0:
-            print count, "rotate by", kr0
             changedr0 = True
             logmu0 = logmu
         else:
             f = f - 2*kr0*g
 	    logmu = best_l2norm_tk_circular(R(f))
 	    if logmu < logmu0:
-                print count, "rotate by", -kr0
 	        changedr0 = True
                 logmu0 = logmu
 	    else:

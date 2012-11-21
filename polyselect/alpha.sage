@@ -63,6 +63,11 @@ def average_valuation_homogeneous_coprime(f,p):
     returns the average p-valuation of f(a,b) for a,b coprime. Projective
     roots are counted as well.
     """
+    if disc(f) % p > 0:
+        # Then we know that the average valuation is
+        # number_of_roots/(p-1), multiplied by p/(p+1) so as to take into
+        # account the non-coprime pairs.
+        return number_of_roots(f,p)/(p-1)*p/(p+1)
     # modulo p^n, roots touch one class having p^n*(1-1/p) representatives,
     # amongst the p^2n*(1-1/p^2) coprime representative pairs for
     # P^1(Z/p^n). So the contribution is, for p^n, p/(p+1) * p^-n
@@ -80,14 +85,7 @@ def alpha_p(f,disc,p):
     """
     Computes the contribution at p of the alpha value of f
     """
-    if disc % p == 0:
-        s = float((1/(p-1)-average_valuation_homogeneous_coprime(f,p))*log(p))
-    else:
-        # Then we know that the average valuation is
-        # number_of_roots/(p-1), multiplied by p/(p+1) so as to take into
-        # account the non-coprime pairs.
-        s = float((1-number_of_roots(f,p)*p/(p+1))*log(p)/(p-1))
-    return s
+    return float((1/(p-1)-average_valuation_homogeneous_coprime(f,p))*log(p))
 
 def alpha_p_nodisc(f,p):
     """
@@ -168,9 +166,56 @@ def alpha_affine(f,B):
     disc = f.discriminant()
     return sum([alpha_p_affine(f, disc, p) for p in prime_range(2,B+1)])
 
+# If we consider 10000 random irreducible polynomials (of degree 5) with
+# leading coefficient ad, the records for the average projective alpha are:
+# ad alpha
+# 1 0
+# 2 -0.360690687857
+# 3 -0.369037600417
+# 4 -0.509931774087
+# 6 -0.730588833099
+# 12 -0.878720091232
+# 24 -0.946481583101
+# 30 -1.04940896209
+# 60 -1.19986394549
+# 120 -1.26667891471
+# 180 -1.31231327574
+# 210 -1.32294380312
+# 360 -1.38818816912
+# 420 -1.47641320724
+# 840 -1.54315029826
+# 1260 -1.5916463863
+# 2520 -1.66107247254
+# 4620 -1.69245754414
+# 5040 -1.70643311481
+# 9240 -1.76238361373
+# 13860 -1.8092879226
+# 27720 -1.87554651074
+# 55440 -1.92230149269
+# 110880 -1.9409975078
+# 120120 -1.95548978794
+# 138600 -1.9579224421
+# 180180 -2.00300045817
+# 360360 -2.07759306437
+# 720720 -2.11776935996
+# 1441440 -2.12997717254
+# 1801800 -2.14915176062
+# 2162160 -2.15017287971
+# 3063060 -2.17025643763
+# 3603600 -2.19357626159
+# 6126120 -2.23852322631
+# 12252240 -2.28536035419
+# 24504480 -2.29913075626
+# 30630600 -2.32088761142
+# 58198140 -2.32116657149
+# 61261200 -2.35980719547
+# 116396280 -2.39334666315
+# 183783600 -2.39692462272
+# 232792560 -2.43637124145
+# 465585120 -2.45262230569
 def alpha_projective(f,B):
     """
-    Computes the affine part of the alpha value of f, up to prime bound B.
+    Computes the projective part of the alpha value of f, up to prime bound B.
     Always <= 0.
     """
     disc = f.discriminant()

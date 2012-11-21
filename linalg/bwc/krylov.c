@@ -15,6 +15,8 @@
 #include "filenames.h"
 #include "xdotprod.h"
 #include "rolling.h"
+#include "mpfq/mpfq.h"
+#include "mpfq/abase_vbase.h"
 
 /*
  * Relatively common manipulation in fact. Move to matmul_top ?
@@ -59,13 +61,30 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         ys[1] = ys[0] + (bw->ys[1]-bw->ys[0])/2;
     }
 
-    abase_vbase A;
-    abase_vbase_oo_field_init_bygroupsize(A, ys[1]-ys[0]);
-    A->set_groupsize(A, ys[1]-ys[0]);
+    int withcoeffs = param_list_lookup_string(pl, "prime") != NULL;
+    int nchecks = withcoeffs ? NCHECKS_CHECK_VECTOR_GFp : NCHECKS_CHECK_VECTOR_GF2;
 
+    mpz_t p;
+    mpz_init_set_ui(p, 2);
+    param_list_parse_mpz(pl, "prime", p);
+    abase_vbase A;
+    abase_vbase_oo_field_init_byfeatures(A, 
+            MPFQ_PRIME_MPZ, p,
+            MPFQ_GROUPSIZE, ys[1]-ys[0],
+            MPFQ_DONE);
+    /* Hmmm. This would deserve better thought. Surely we don't need 64
+     * in the prime case. Anything which makes checks relevant will do.
+     * For the binary case, we used to work with 64 as a constant, but
+     * for the prime case we want to make this tunable (or maybe 1 ?)
+     */
     abase_vbase Ac;
-    abase_vbase_oo_field_init_byname(Ac, "u64k1");
-    Ac->set_groupsize(Ac, NCHECKS_CHECK_VECTOR);
+    abase_vbase_oo_field_init_byfeatures(Ac,
+            MPFQ_PRIME_MPZ, p,
+            MPFQ_GROUPSIZE, nchecks,
+            MPFQ_DONE);
+    mpz_clear(p);
+
+
 
     block_control_signals();
 
@@ -114,7 +133,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     }
 
     if (!bw->skip_online_checks) {
-        vec_init_generic(pi->m, A, ahead, 0, NCHECKS_CHECK_VECTOR);
+        vec_init_generic(pi->m, A, ahead, 0, nchecks);
     }
 
     /* We'll store all xy matrices locally before doing reductions. Given
@@ -157,6 +176,9 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
     timing_init(timing, bw->start, bw->interval * iceildiv(bw->end, bw->interval));
 
+    pi_interleaving_flip(pi);
+    pi_interleaving_flip(pi);
+
     for(int s = bw->start ; s < bw->end ; s += bw->interval ) {
         // Plan ahead. The check vector is here to predict the final A matrix.
         // Note that our share of the dot product is determined by the
@@ -166,7 +188,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
          * memory */
 
         if (!bw->skip_online_checks) {
-            A->vec_set_zero(A, ahead->v, NCHECKS_CHECK_VECTOR);
+            A->vec_set_zero(A, ahead->v, nchecks);
             unsigned int how_many;
             unsigned int offset_c;
             unsigned int offset_v;
@@ -175,7 +197,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
                     mcol->i0, mcol->i1);
 
             if (how_many) {
-                AxAc->dotprod(A, Ac, ahead->v,
+                AxAc->dotprod(A->obj, Ac->obj, ahead->v,
                         SUBVEC(check_vector, v, offset_c),
                         SUBVEC(mcol->v, v, offset_v),
                         how_many);
@@ -187,6 +209,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
          * MPI calls.
          */
         pi_interleaving_flip(pi);
+        pi_interleaving_flip(pi);
         matmul_top_twist_vector(mmt, bw->dir);
 
         A->vec_set_zero(A, xymats->v, bw->m*bw->interval);
@@ -197,7 +220,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
             /* This segment must be guaranteed to be free of any mpi
              * calls */
             /* Compute the product by x */
-            x_dotprod(mmt, gxvecs, nx, xymats, i * bw->m, bw->m);
+            x_dotprod(mmt, gxvecs, nx, xymats, i * bw->m, bw->m, 1);
 
             
             matmul_top_mul_cpu(mmt, bw->dir);
@@ -215,10 +238,10 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
         if (!bw->skip_online_checks) {
             /* Last dot product. This must cancel ! */
-            x_dotprod(mmt, gxvecs, nx, ahead, 0, NCHECKS_CHECK_VECTOR);
+            x_dotprod(mmt, gxvecs, nx, ahead, 0, nchecks, -1);
 
-            allreduce_generic(ahead, pi->m, NCHECKS_CHECK_VECTOR);
-            if (!A->vec_is_zero(A, ahead->v, NCHECKS_CHECK_VECTOR)) {
+            allreduce_generic(ahead, pi->m, nchecks);
+            if (!A->vec_is_zero(A, ahead->v, nchecks)) {
                 printf("Failed check at iteration %d\n", s + bw->interval);
                 exit(1);
             }
@@ -270,7 +293,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
 
     if (!bw->skip_online_checks) {
         matmul_top_vec_clear_generic(mmt, check_vector, !bw->dir);
-        vec_clear_generic(pi->m, ahead, NCHECKS_CHECK_VECTOR);
+        vec_clear_generic(pi->m, ahead, nchecks);
     }
 
     free(gxvecs);

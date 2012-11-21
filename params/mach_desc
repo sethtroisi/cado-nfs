@@ -20,7 +20,8 @@
 # cores is the number of cores used on a machine for the sieve (default is 1).
 #     For example: if cores=5 and $param{'sieve_max_threads'}=2 then 3 jobs
 #     will be run on the machine (2+2+1).
-# poly_cores (optional) defaults to cores.
+# poly_cores (optional) is the number of cores used on a machine for the
+#     polynomial selection (default is the value of "cores").
 # mpi=1 (optional) after machine name for using MPI in linear algebra on this
 #     machine, default mpi=0. If mpi=0 for all machines, then the linear
 #     algebra will be run on localhost.

@@ -37,7 +37,7 @@ using namespace std;
 
 /* Here is how the matrix is stored in memory, in the
  * "matmul_sliced_data_s" type.  The matrix is cut in slices, where each
- * slice is a set of contiguous rows. The size of a slice is tune so as
+ * slice is a set of contiguous rows. The size of a slice is tuned so as
  * to fill the L1 cache as per the macro above, with some adjustment to
  * handle non-exact divisibility: some slices will have packbase rows and
  * some others packbase+1 rows.  Within a slice, entries are stored as a

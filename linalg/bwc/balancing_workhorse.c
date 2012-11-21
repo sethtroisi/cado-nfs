@@ -57,7 +57,7 @@
  *     balancing to perform, compute the row and column permutation which
  *     must be applied to the original matrix. Note that this step does
  *     _NOT_ require the original matrix to be read ! It is performed by
- *     mf_dobal (but could optionally be called from here as well).
+ *     mf_bal (but could optionally be called from here as well).
  * 
  * The code here handles the two remaining steps. Precisions are given
  * later on.
@@ -321,6 +321,27 @@ size_t thread_source_get(thread_source_ptr s, uint32_t ** p, size_t avail)
     return n;
 }
 
+size_t thread_source_get_with_keepback(thread_source_ptr s, uint32_t ** p, size_t avail MAYBE_UNUSED, size_t keep_back)
+{
+    // ASSERT_ALWAYS(avail == 0);
+    ASSERT_ALWAYS(s->b->pos <= s->t->avail);
+    s->b->pos -= keep_back;
+    size_t n = s->t->avail - s->b->pos;
+    *p = s->t->buf+s->b->pos;
+    if (n > keep_back) {
+        s->b->pos += n;
+        return n;
+    }
+    pthread_mutex_lock(&s->t->mu);
+    for( ; (n = s->t->avail - s->b->pos) <= keep_back && s->t->avail < s->t->total; ) {
+        pthread_cond_wait(&s->t->hello, &s->t->mu);
+        ASSERT_ALWAYS(s->b->pos <= s->t->avail);
+    }
+    s->b->pos += n;
+    pthread_mutex_unlock(&s->t->mu);
+    return n;
+}
+
 void thread_source_rewind(thread_source_ptr s)
 {
     s->b->pos = 0;      /* easy enough ;-) */
@@ -332,6 +353,7 @@ thread_source_ptr thread_source_alloc(thread_pipe_ptr t)
     memset(res, 0, sizeof(thread_source));
     res->t = t;
     res->b->get = (size_t(*)(void*,uint32_t**,size_t))thread_source_get;
+    res->b->get_with_keepback = (size_t(*)(void*,uint32_t**,size_t,size_t))thread_source_get_with_keepback;
     return res;
 }
 
@@ -396,18 +418,41 @@ void mf_pipe(data_source_ptr input, data_dest_ptr output, const char * name)/*{{
     time_t t1 = t0 + 1;
     time_t t = t0;
 
+    size_t n = 0;       // values still to flush
+    uint32_t * ptr = NULL;  // we are not providing a buffer.
     for (;;) {
-        uint32_t * ptr = NULL;  // we are not providing a buffer.
-        size_t n = input->get(input, &ptr, 0);
+        if (n == 0) {
+            ptr = NULL;
+            n = input->get(input, &ptr, 0);
+        }
         if (n == 0) break;
         int r = output->put(output, ptr, n);
-	t = time(NULL);
+        ASSERT_ALWAYS(r <= (int) n);
         if (r < 0)
             break;
+	t = time(NULL);
 	if (t >= t1) {
 	    t1 = t + 1;
             mf_progress(input, output, t-t0, name);
 	}
+        if (r < (int) n) {
+            /* We need to refill */
+            // fprintf(stderr, "Refill !!!\n");
+            ASSERT_ALWAYS(r == (int) n - 1);
+            /* Must make sure the temp buffer is large enough ! */
+            ASSERT_ALWAYS(n > 1);
+            if (!input->get_with_keepback) {
+                ptr[0] = ptr[r];
+                uint32_t * nptr = 1 + ptr;
+                n = 1 + input->get(input, &nptr, n-1);
+                ASSERT_ALWAYS(nptr == 1 + ptr);
+            } else {
+                n = input->get_with_keepback(input, &ptr, n, 1);
+                ASSERT(n > 1);
+            }
+        } else {
+            n = 0;
+        }
     }
     mf_progress(input, output, t-t0, name);
     printf("\n");
@@ -628,6 +673,8 @@ struct master_data_s {/*{{{*/
     uint32_t *exp_rows;
 
     parallelizing_info_ptr pi;
+
+    int withcoeffs;
 };
 typedef struct master_data_s master_data[1];
 typedef struct master_data_s *master_data_ptr;/*}}}*/
@@ -724,6 +771,8 @@ struct slave_data_s {/*{{{*/
     matrix_u32 mat;
 
     thread_pipe_ptr tp;
+
+    int withcoeffs;
 };
 typedef struct slave_data_s slave_data[1];
 typedef struct slave_data_s *slave_data_ptr;/*}}}*/
@@ -731,6 +780,8 @@ typedef struct slave_data_s *slave_data_ptr;/*}}}*/
 void set_slave_variables(slave_data s, param_list pl, parallelizing_info_ptr pi)/*{{{*/
 {
     s->pi = pi;
+
+    s->withcoeffs = s->mat->withcoeffs;
 
     share_bfile_header_data(pi, s->bal);
 
@@ -766,7 +817,7 @@ void set_slave_variables(slave_data s, param_list pl, parallelizing_info_ptr pi)
      * Since this has to be rewinded, it remains in core memory, thus the
      * necessity of guessing this.
      */
-    s->expected_size = s->bal->h->ncoeffs / pi->m->totalsize;
+    s->expected_size = (s->bal->h->ncoeffs << s->withcoeffs) / pi->m->totalsize;
     s->expected_size += 2 * sqrt(s->expected_size);
     s->expected_size += 2 * s->bal->trows;
     s->expected_size += s->expected_size / 10;
@@ -850,7 +901,13 @@ typedef struct slave_dest_s *slave_dest_ptr;
 
 uint32_t slave_dest_put(slave_dest_ptr R, uint32_t * p, size_t n)
 {
-    for(size_t i = 0 ; i < n ; i++) {
+    size_t i;
+    for(i = 0 ; i < n ; i++) {
+        if (R->s->withcoeffs && (i + 1 == n) && !R->incoming_rowindex) {
+            /* We cannot put the condition in the loop, because we need
+             * to grok the row markers */
+            break;
+        }
         uint32_t x = p[i];
         if (R->incoming_rowindex == 2) {
             R->current_row = x;
@@ -898,11 +955,32 @@ uint32_t slave_dest_put(slave_dest_ptr R, uint32_t * p, size_t n)
             *(R->fill[r]++) = c;
         }
         R->tw++;
+        if (R->s->withcoeffs) {
+            ASSERT_ALWAYS(i + 1 < n);
+            i++;
+            x = p[i];
+            /* okay, the first loop just does not read the coeffficients.
+             * It's not so much of a trouble, since they do travel only
+             * once through the real congestion point, which is the
+             * master thread. The place where they get duplicated is at
+             * the endpoint thread on each node */
+            if (R->fill) {
+                if (R->s->mat->transpose) {
+                    *(R->fill[c]++) = x;
+                } else {
+                    *(R->fill[r]++) = x;
+                }
+            }
+        }
     }
-    R->b->pos += n;
+    R->b->pos += i;
+    /* We used to have something else for the return code. Is this still
+     * used ? We now want to have provision in mf_pipe for the output
+     * sink not draining completely...
     int rc = 0; // R->current_row == UINT32_MAX ? -1 : 0;
     // fprintf(stderr, "slave_dest_put(%zu) returns %d (last row seen %u)\n", n, rc, R->current_row);
-    return rc;
+     */
+    return i;
 }
 
 void slave_dest_stats(slave_dest_ptr s)
@@ -983,8 +1061,9 @@ void slave_dest_engage_final_pass(slave_dest_ptr D)
 {
     slave_data_ptr s = D->s;
     char buf[16];
+    int c = D->s->withcoeffs; // 0 or 1
     if (D->s->mat->transpose) {
-	s->mat->size = s->my_ncols + D->tw;
+	s->mat->size = s->my_ncols + (D->tw << c);
         if ((s->mat->size * sizeof(uint32_t)) >> 28) {
             printf("[J%uT%u] malloc(%s)\n", s->pi->m->jrank, s->pi->m->trank, size_disp(s->mat->size * sizeof(uint32_t), buf));
         }
@@ -996,11 +1075,11 @@ void slave_dest_engage_final_pass(slave_dest_ptr D)
 	for (uint32_t j = 0; j < s->my_ncols; j++) {
 	    *lptr++ = D->col_weights[j];
 	    D->fill[j] = lptr;
-	    lptr += D->col_weights[j];
+	    lptr += D->col_weights[j] << c;
 	}
-	ASSERT_ALWAYS((uint32_t) (lptr - s->mat->p) == s->my_ncols + D->tw);
+	ASSERT_ALWAYS((uint32_t) (lptr - s->mat->p) == s->my_ncols + (D->tw << c));
     } else {
-	s->mat->size = s->my_nrows + D->tw;
+	s->mat->size = s->my_nrows + (D->tw << c);
         if ((s->mat->size * sizeof(uint32_t)) >> 28) {
             printf("[J%uT%u] malloc(%s)\n", s->pi->m->jrank, s->pi->m->trank, size_disp(s->mat->size * sizeof(uint32_t), buf));
         }
@@ -1012,9 +1091,9 @@ void slave_dest_engage_final_pass(slave_dest_ptr D)
 	for (uint32_t u = 0; u < s->my_nrows; u++) {
 	    *lptr++ = D->row_weights[u];
 	    D->fill[u] = lptr;
-	    lptr += D->row_weights[u];
+	    lptr += D->row_weights[u] << c;
 	}
-	ASSERT_ALWAYS((uint32_t) (lptr - s->mat->p) == s->my_nrows + D->tw);
+	ASSERT_ALWAYS((uint32_t) (lptr - s->mat->p) == s->my_nrows + (D->tw << c));
     }
     D->b->r = 0;
 }
@@ -1274,9 +1353,14 @@ int master_dispatcher_put(master_dispatcher_ptr d, uint32_t * p, size_t n)
         return 0;
     }
 
-    for (size_t s = 0; s < n; s++) {
+    size_t s;   /* number of values processed in the input buffer */
+    for (s = 0; s < n; s++) {
+        /* The crow_togo counter indicates how many 32-bit values
+         * still need to be sent for the current row */
         if (d->crow_togo == 0) {
-            d->crow_togo = p[s];
+            /* When we have coefficients, we need to send twice as much
+             * data */
+            d->crow_togo = p[s] << m->withcoeffs;
             /* We are processing row r of the input matrix. As per the
              * shuffling of the input matrix, this is mapped to some
              * other row index. */
@@ -1308,6 +1392,13 @@ int master_dispatcher_put(master_dispatcher_ptr d, uint32_t * p, size_t n)
             }
             /* This advances, even if the row is not complete. */
             r++;
+        } else if (m->withcoeffs && n-s == 1) {
+            /* We need to schedule a refill of the input buffer, because
+             * we lack track of the column index associated with the
+             * coefficient. Keeping track of this sensibly, _and_ allow
+             * the UINT32_MAX trick to be used for new row markers is
+             * going to be terribly ugly */
+            break;
         } else {
             uint32_t q = p[s];
             ASSERT_ALWAYS(q < m->bal->h->ncols);
@@ -1315,6 +1406,8 @@ int master_dispatcher_put(master_dispatcher_ptr d, uint32_t * p, size_t n)
             if (d->check_vector) {
                 /* column index is q. Get the index of our constant
                  * vector which corresponds to q */
+                /* FIXME. When we have a matrix with coefficients, it's
+                 * difficult to make sense out of this. */
                 d->w ^= DUMMY_VECTOR_COORD_VALUE(q);
             }
             uint32_t c = m->fw_colperm[q];
@@ -1323,6 +1416,17 @@ int master_dispatcher_put(master_dispatcher_ptr d, uint32_t * p, size_t n)
             data_dest_ptr where = d->x[d->noderow + nodecol];
             where->put(where, &c, 1);
             d->crow_togo--;
+            if (m->withcoeffs) {
+                /* We need to send the coefficient value. This must go to
+                 * the node which has just received the previous column
+                 * index value */
+                ASSERT_ALWAYS(s+1 < n);
+                s++;
+                uint32_t v = p[s];
+                where->put(where, &v, 1);
+                d->crow_togo--;
+                d->b->pos++;
+            }
         }
         if (d->check_vector && d->crow_togo == 0 && r <= m->bal->h->nrows) {
             fwrite(&d->w, sizeof(uint64_t), 1, d->check_vector);
@@ -1331,7 +1435,7 @@ int master_dispatcher_put(master_dispatcher_ptr d, uint32_t * p, size_t n)
         d->b->pos++;
     }
     d->b->r = r;
-    return 0;
+    return s;
 }
 
 void master_dispatcher_stats(master_dispatcher_ptr d)
@@ -1436,7 +1540,7 @@ void master_loop_inner(master_data m, data_source_ptr input, data_dest_ptr outpu
     for (; output->r < m->bal->trows;) {
         uint32_t zero = 0;
         int rc = output->put(output, &zero, 1);
-        ASSERT_ALWAYS(rc == 0);
+        ASSERT_ALWAYS(rc == 1);
     }
     output->put(output, NULL, 0);
     printf("Final sends completed, everybody should finish.\n");
@@ -1445,6 +1549,9 @@ void master_loop_inner(master_data m, data_source_ptr input, data_dest_ptr outpu
 void master_loop(master_data m, parallelizing_info_ptr pi, param_list_ptr pl, slave_data_ptr * slaves, int nslaves MAYBE_UNUSED)
 {
     size_t esz = (m->bal->h->ncoeffs + m->bal->h->nrows) * sizeof(uint32_t);
+    if (m->withcoeffs) {
+        esz += m->bal->h->ncoeffs * sizeof(uint32_t);
+    }
     size_t queue_size = default_queue_size;
     if (param_list_parse_size_t(pl, "balancing_queue_size", &queue_size)) {
         queue_size /= sizeof(uint32_t);
@@ -1460,7 +1567,11 @@ void master_loop(master_data m, parallelizing_info_ptr pi, param_list_ptr pl, sl
     data_dest_ptr output = master_dispatcher_alloc(m, pi, slaves, queue_size);
     const char * tmp;
     if ((tmp = param_list_lookup_string(pl, "sanity_check_vector")) != NULL) {
-        master_dispatcher_setup_check_vector(output, tmp);
+        if (m->withcoeffs) {
+            fprintf(stderr, "Can't handle check vectors for the moment for matrices with coefficients\n");
+        } else {
+            master_dispatcher_setup_check_vector(output, tmp);
+        }
     }
     master_loop_inner(m, input, output);
     master_dispatcher_stats((master_dispatcher_ptr) output);
@@ -1522,6 +1633,7 @@ void * balancing_get_matrix_u32(parallelizing_info_ptr pi, param_list pl, matrix
     memset(m, 0, sizeof(master_data));
 
     m->mfile = arg->mfile;
+    m->withcoeffs = arg->withcoeffs;
 
     if (pi->m->trank == 0) {
         slaves = malloc(pi->m->totalsize * sizeof(slave_data_ptr));

@@ -61,7 +61,8 @@ int rm = 0;
 /* infile is the input file
    if dirname is NULL, no output is done */
 unsigned long
-remove_dup_in_files (char ** files, const char *dirname, const char * outfmt, uint32_t * H, unsigned long K)
+remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
+uint32_t * H, unsigned long K, unsigned int ab_base)
 {
     FILE * f_in;
     int p_in;
@@ -126,7 +127,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt, ui
                 rs->rel.a = desc.a;
                 rs->rel.b = desc.b;
             } else {
-                if (relation_stream_get(rs, line, 0) < 0)
+                if (relation_stream_get(rs, line, 0, ab_base) < 0)
                     break;
             }
 
@@ -193,14 +194,17 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt, ui
 
             if (relation_stream_disp_progress_now_p(rs)) {
                 fprintf(stderr,
-                        "Read %d relations, %lu duplicates (%1.2f%%)"
+                        "Read %lu relations, %lu duplicates (%1.2f%%)"
                         " in %.1f s -- %.1f MB/s, %.1f rels/s\n",
                         rs->nrels, dupl, 100.0 * (double) dupl / (double) rs->nrels,
                         rs->dt, rs->mb_s, rs->rels_s);
             }
         }
         relation_stream_unbind(rs);
-        if (p_out) pclose(f_out); else fclose(f_out);
+        if (f_out != NULL)
+          {
+            if (p_out) pclose(f_out); else fclose(f_out);
+          }
         if (p_in) pclose(f_in); else fclose(f_in);
 
 
@@ -226,7 +230,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt, ui
     }
     relation_stream_trigger_disp_progress(rs);
     fprintf(stderr,
-            "Read %d relations, %lu duplicates (%1.2f%%)"
+            "Read %lu relations, %lu duplicates (%1.2f%%)"
             " in %.1f s -- %.1f MB/s, %.1f rels/s\n",
             rs->nrels, dupl, 100.0 * (double) dupl / (double) rs->nrels,
             rs->dt, rs->mb_s, rs->rels_s);
@@ -251,8 +255,10 @@ int main (int argc, char *argv[])
     argv++,argc--;
 
     int bz = 0;
-    param_list_configure_knob(pl, "bz", &bz);
-    param_list_configure_knob(pl, "rm", &rm);
+    int ab_hexa = 0;
+    param_list_configure_switch(pl, "bz", &bz);
+    param_list_configure_switch(pl, "rm", &rm);
+    param_list_configure_switch(pl, "abhexa", &ab_hexa);
 
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
@@ -322,8 +328,9 @@ int main (int argc, char *argv[])
       usage();
   }
 
-  char ** files = filelist ? filelist_from_file(basepath, filelist) : argv;
-  unsigned long rread = remove_dup_in_files (files, dirname, outfmt, H, K);
+  char ** files = filelist ? filelist_from_file(basepath, filelist, 0) : argv;
+  unsigned long rread = remove_dup_in_files (files, dirname, outfmt, H, K, 
+                                                               (ab_hexa)?16:10);
   if (filelist) filelist_clear(files);
 
 

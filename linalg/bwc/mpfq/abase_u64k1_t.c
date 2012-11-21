@@ -4,100 +4,125 @@
 #include "abase_u64k1_t.h"
 
 #include "binary-dotprods-backends.h"
-/* Active handler: Mpfq::defaults::vec */
+/* Active handler: simd_u64k */
+/* Automatically generated code  */
 /* Active handler: Mpfq::defaults */
-/* Active handler: Mpfq::engine::defaults::mpi_flat */
+/* Active handler: Mpfq::defaults::vec */
+/* Active handler: Mpfq::defaults::mpi_flat */
 /* Active handler: simd_dotprod */
 /* Active handler: io */
 /* Active handler: trivialities */
 /* Active handler: simd_flat */
-/* Active handler: simd_u64k */
-/* Automatically generated code  */
-/* Options used: k=1 tag=u64k1 choose_by_groupsize=<code> prefix=abase_ family=[u64k1, u64k2] virtual_base={
+/* Options used: w=64 k=1 tag=u64k1 vbase_stuff={
+                 'vc:includes' => [
+                                    '<stdarg.h>'
+                                  ],
+                 'member_templates_restrict' => {
+                                                  'p_1' => [
+                                                             'p_1'
+                                                           ],
+                                                  'p_4' => [
+                                                             'p_4'
+                                                           ],
+                                                  'u64k2' => [
+                                                               'u64k1',
+                                                               'u64k2'
+                                                             ],
+                                                  'u64k1' => $vbase_stuff->{'member_templates_restrict'}{'u64k2'}
+                                                },
+                 'families' => [
+                                 $vbase_stuff->{'member_templates_restrict'}{'p_4'},
+                                 $vbase_stuff->{'member_templates_restrict'}{'p_1'},
+                                 $vbase_stuff->{'member_templates_restrict'}{'u64k2'}
+                               ],
+                 'choose_byfeatures' => sub { "DUMMY" }
+               };
+ family=[u64k1, u64k2] virtual_base={
                   'filebase' => 'abase_vbase',
                   'substitutions' => [
                                        [
-                                         qr/(?-xism:abase_u64k1_elt \*)/,
+                                         qr/(?^:abase_u64k1_elt \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_src_elt\b)/,
+                                         qr/(?^:abase_u64k1_src_elt\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_elt\b)/,
+                                         qr/(?^:abase_u64k1_elt\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_dst_elt\b)/,
+                                         qr/(?^:abase_u64k1_dst_elt\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_elt_ur \*)/,
+                                         qr/(?^:abase_u64k1_elt_ur \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_src_elt_ur\b)/,
+                                         qr/(?^:abase_u64k1_src_elt_ur\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_elt_ur\b)/,
+                                         qr/(?^:abase_u64k1_elt_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_dst_elt_ur\b)/,
+                                         qr/(?^:abase_u64k1_dst_elt_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_vec \*)/,
+                                         qr/(?^:abase_u64k1_vec \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_src_vec\b)/,
+                                         qr/(?^:abase_u64k1_src_vec\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_vec\b)/,
+                                         qr/(?^:abase_u64k1_vec\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_dst_vec\b)/,
+                                         qr/(?^:abase_u64k1_dst_vec\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_vec_ur \*)/,
+                                         qr/(?^:abase_u64k1_vec_ur \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_src_vec_ur\b)/,
+                                         qr/(?^:abase_u64k1_src_vec_ur\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_vec_ur\b)/,
+                                         qr/(?^:abase_u64k1_vec_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_dst_vec_ur\b)/,
+                                         qr/(?^:abase_u64k1_dst_vec_ur\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_poly \*)/,
+                                         qr/(?^:abase_u64k1_poly \*)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_src_poly\b)/,
+                                         qr/(?^:abase_u64k1_src_poly\b)/,
                                          'const void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_poly\b)/,
+                                         qr/(?^:abase_u64k1_poly\b)/,
                                          'void *'
                                        ],
                                        [
-                                         qr/(?-xism:abase_u64k1_dst_poly\b)/,
+                                         qr/(?^:abase_u64k1_dst_poly\b)/,
                                          'void *'
                                        ]
                                      ],
-                  'name' => 'abase_vbase'
+                  'name' => 'abase_vbase',
+                  'global_prefix' => 'abase_'
                 };
  */
 

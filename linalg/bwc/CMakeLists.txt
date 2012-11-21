@@ -1,5 +1,5 @@
 
-include_directories(..)
+include_directories(. ..)
 # include_directories(mpfq)
 
 # Use with care. Normally, binaries not needed MPI for real should not
@@ -76,6 +76,10 @@ foreach(v ${bwc_abases})
     set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/abase_${v}.c mpfq/abase_${v}_t.c )
 endforeach(v)
 
+foreach(v p_1 p_4)
+    set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/abase_${v}.c mpfq/abase_${v}_t.c )
+endforeach(v)
+
 set(bwc_base_sources
     parallelizing_info.c
     intersections.c
@@ -116,6 +120,7 @@ set_target_properties(bwc_mpfq PROPERTIES
         LINK_FLAGS "--mpi")
 
 set(matmul_basic_sources    matmul-basic.c)
+set(matmul_basicp_sources    matmul-basicp.c)
 set(matmul_sliced_sources   matmul-sliced.cpp)
 set(matmul_bucket_sources   matmul-bucket.cpp)
 set(matmul_threaded_sources matmul-threaded.c worker-threads.c)
@@ -144,7 +149,7 @@ macro(configure_matmul_lib v i)
     endif(doing_u64 AND doing_bucket)
 
     add_library(matmul_${v}_${i} SHARED ${sources})
-    target_link_libraries(matmul_${v}_${i} bwc_mpfq mat_io)
+    target_link_libraries(matmul_${v}_${i} bwc_mpfq)
     set_target_properties(matmul_${v}_${i} PROPERTIES
             COMPILE_FLAGS "--mpi -DSELECT_ABASE_${v} -DMM_IMPL=${i}"
             LINK_FLAGS "--mpi")
@@ -172,6 +177,8 @@ foreach(v ${bwc_abases})
         configure_matmul_lib(${v} ${i})
     endforeach(i)
 endforeach(v)
+configure_matmul_lib(p_1 basicp)
+configure_matmul_lib(p_4 basicp)
 
 # INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/share/${CADO_DIST_ARCHIVE_NAME}/libexec"
 

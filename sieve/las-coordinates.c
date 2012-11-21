@@ -64,30 +64,6 @@ void IJToAB(int64_t *a, uint64_t *b, const int i, const unsigned int j,
       }
 }
 
-/* Warning: b might be negative, in which case we return (-a,-b) */
-void xToAB(int64_t *a, uint64_t *b, const unsigned int x, sieve_info_srcptr si)
-{
-    int i, j;
-    int64_t c;
-    uint32_t I = si->I;
-
-    i = (x & (I - 1)) - (I >> 1);
-    j = x >> si->logI;
-    *a = (int64_t) i * (int64_t) si->a0 + (int64_t) j * (int64_t) si->a1;
-    c =  (int64_t) i * (int64_t) si->b0 + (int64_t) j * (int64_t) si->b1;
-    if (c >= 0)
-      *b = c;
-    else
-      {
-        *a = -*a;
-        *b = -c;
-      }
-}
-void NxToAB(int64_t *a, uint64_t *b, const unsigned int N, const unsigned int x, sieve_info_srcptr si)
-{
-    xToAB(a, b, (N << LOG_BUCKET_REGION) + x, si);
-}
-
 int ABToIJ(int *i, unsigned int *j, const int64_t a, const uint64_t b, sieve_info_srcptr si)
 {
     int64_t ii =   a * (int64_t) si->b1 - b * (int64_t)si->a1;

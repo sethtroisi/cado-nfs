@@ -613,7 +613,7 @@ modredc2ul2_sub (residueredc2ul2_t r, const residueredc2ul2_t a,
   ASSERT_EXPENSIVE (modredc2ul2_intlt (a, m[0].m));
   ASSERT_EXPENSIVE (modredc2ul2_intlt (b, m[0].m));
 
-#if defined(__x86_64__) && defined(__GNUC__)
+#ifdef HAVE_GCC_STYLE_AMD64_ASM
   {
     unsigned long s1 = m[0].m[0], s2 = m[0].m[1], t1 = a[0], t2 = a[1];
     
@@ -725,7 +725,7 @@ static inline void
 modredc2ul2_mul (residueredc2ul2_t r, const residueredc2ul2_t a, 
                const residueredc2ul2_t b, const modulusredc2ul2_t m)
 {
-#if defined(__x86_64__) && defined(__GNUC__)
+#ifdef HAVE_GCC_STYLE_AMD64_ASM
 
   ASSERT_EXPENSIVE (modredc2ul2_intlt (a, m[0].m));
   ASSERT_EXPENSIVE (modredc2ul2_intlt (b, m[0].m));
@@ -810,7 +810,7 @@ modredc2ul2_mul (residueredc2ul2_t r, const residueredc2ul2_t a,
       [m0] "rm" (m[0].m[0]), [m1] "rm" (m[0].m[1]), [invm] "rm" (m[0].invm)
     : "%rax", "%rdx", "cc"
   );
-#else /* if defined(__x86_64__) && defined(__GNUC__) */
+#else /* HAVE_GCC_STYLE_AMD64_ASM */
 
   unsigned long pl, ph, t[4], k;
   
@@ -870,7 +870,7 @@ static inline void
 modredc2ul2_sqr (residueredc2ul2_t r, const residueredc2ul2_t a, 
                  const modulusredc2ul2_t m)
 {
-#if defined(__x86_64__) && defined(__GNUC__)
+#ifdef HAVE_GCC_STYLE_AMD64_ASM
 
   ASSERT_EXPENSIVE (modredc2ul2_intlt (a, m[0].m));
 #if defined(MODTRACE)
@@ -960,7 +960,7 @@ modredc2ul2_sqr (residueredc2ul2_t r, const residueredc2ul2_t a,
       [m0] "rm" (m[0].m[0]), [m1] "rm" (m[0].m[1]), [invm] "rm" (m[0].invm)
     : "%rax", "%rdx", "cc"
   );
-#else /* if defined(__x86_64__) && defined(__GNUC__) */
+#else /* HAVE_GCC_STYLE_AMD64_ASM */
 
   unsigned long pl, ph, t[4], k;
   

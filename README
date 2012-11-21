@@ -68,6 +68,31 @@ gives documentation on the recognized environment variables and their effect.
 Note that tweaks in local.sh are global (relevant to all sub-directories
 of the cado-nfs tree, not to a particular directory).
 
+As a rule of thumb, whenever you happen to modify the local.sh script, it
+is advised to trigger re-configuration of the build system, by the
+special command ``make cmake''. Another way to achieve the same goal is
+to remove the build tree, which is below build/ (normally named as the
+hostname of the current machine).
+
+Optional (alternative): configure using cmake directly
+======================================================
+
+cado-nfs includes a top-level Makefile which builds the binary objects in
+a special build directory which is below build/ (normally named as the
+hostname of the current machine). This way, parralel builds for different
+machines may coexist on one shared directory. This is sort of a magic
+``out-of-source'' build.
+
+Another way to do ``out-of-source'' build is to create a separate build
+directory and build from there, by calling cmake directly for the
+configuration. This proceeds as follows:
+
+mkdir /some/build/directory
+cd /some/build/directory
+cmake /path/to/cado-nfs/source/tree
+
+Note however that in this case, the local.sh file found in the source
+tree is not read (but you may elect to do so before calling cmake).
 
 Compile:
 ========
@@ -115,10 +140,14 @@ Run a factorization on current machine:
 
 ./factor.sh 90377629292003121684002147101760858109247336549001090677693 -t 2
 
-The integer must not be too small, say at least 60 digits [note though
-that cado-nfs is optimized only for numbers above 85 digits] and it is a
-good idea to remove its small prime factors. The option '-t 2' tells how many
-cores to use on the current machine (for sieving and linear algebra).
+where the option '-t 2' tells how many cores to use on the current machine
+(for sieving and linear algebra).
+
+CADO-NFS is optimized only for numbers above 85 digits, and no support will
+be provided for numbers of less than 60 digits. Note that it is a
+good idea to remove small prime factors using special-purpose algorithms
+such as trial division, P-1, P+1, or ECM, and use CADO-NFS only for the
+remaining composite factor.
 
 ./factor.sh 353493749731236273014678071260920590602836471854359705356610427214806564110716801866803409 -t 4 -ssh
 
@@ -153,7 +182,7 @@ Host    localhost
 
 You should also put in $HOME/.ssh/authorized_keys your public key.
 
-If everything is correctly configured, when you type 
+If everything is correctly configured, when you type
 
 ssh localhost
 
@@ -168,10 +197,25 @@ recipe, you can type:
    eval `ssh-agent`
    ssh-add
 
+Restarting an interrupted factorization:
+========================================
+
+If you have started a factorization with the cadofactor.pl script, and it was
+interrupted (for example because of a power failure) you can restart it simply
+with the same cadofactor.pl command line.
+
+If the factorization was interrupted during the linear algebra step, the
+cadofactor.pl script will propose you to restart it from the last checkpoint
+by typing 'l' instead of 'y' (restarts the linear algebra from the beginning).
+
+Alternatively, you can launch the krylov or mksol binary by hand (expert mode),
+with the same command line (see the *.bwc.log file), but with an extra
+argument ``start='', where start is the number of the last checkpoint saved.
+
 Factoring with SNFS:
 ====================
 
-It is possible to take advantage of the special form of an integer and 
+It is possible to take advantage of the special form of an integer and
 use the Special Number Field Sieve. See the doc in cadofactor.pl for
 that. Note in particular that you can force the special-q to be on the
 rational side if this is more appropriate for your number.
@@ -179,7 +223,7 @@ rational side if this is more appropriate for your number.
 The default square root algorithm does not work in some very rare cases
 that could possibly occur with SNFS polynomials (a degree 4 polynomial
 with Galois group Z/2 x Z/2 is the only reasonable example, next case is
-for degree 8). The CRT approach is a workaround. See crtaglsqrt.c . 
+for degree 8). The CRT approach is a workaround. See crtaglsqrt.c .
 
 Factoring with two non-linear polynomials:
 ==========================================
@@ -219,10 +263,37 @@ under Windows:
 Known problems:
 ===============
 
-* under Debian Etch amd64, GCC 4.1.2 is known to miscompile CADO-NFS (Lenny and
-  Squeeze are ok)
+* GCC 4.1.2 is known to miscompile CADO-NFS (see
+  https://gforge.inria.fr/tracker/index.php?func=detail&aid=14490),
+  GCC 4.2.0, 4.2.1 and 4.2.2 are also affected
 * under NetBSD 5.1 amd64, Pthreads in the linear algebra step seem not to
   work, please use bwmt=1x1 option in factor.sh or cadofactor.pl.
+
+Publications related to CADO-NFS:
+=================================
+
+Square Root Algorithms for the Number Field Sieve, Emmanuel Thomé, proceedings
+of WAIFI 2012, F. Özbudak and F. Rodriguez-Henriquez (Eds), LNCS 7369,
+pages 208-224, 2012.
+
+Factorisation of RSA-704 with CADO-NFS, Shi Bai, Emmanuel Thomé and Paul
+Zimmermann, preprint, http://eprint.iacr.org/2012/369, 2012.
+
+Size Optimization of Sextic Polynomials in the Number Field Sieve, Shi Bai
+and Paul Zimmermann, preprint, http://wwwmaths.anu.edu.au/~bai/paper/sopt.pdf,
+2012.
+
+Root Optimization of Polynomials in the Number Field Sieve, Shi Bai, Richard
+Brent and Emmanuel Thomé, http://wwwmaths.anu.edu.au/~bai/paper/rs.pdf,
+preprint, 2011.
+
+Non-Linear Polynomial Selection for the Number Field Sieve, Thomas Prest and
+Paul Zimmermann, Journal of Symbolic Computation, special issue in the honour
+of Joachim von zur Gathen, volume 47, number 4, pages 401-409, 2011. 
+
+Améliorations de la multiplication et de la factorisation d'entier, Alexander
+Kruppa, PhD thesis, Université Henri Poincaré - Nancy I, 2010, available from
+http://tel.archives-ouvertes.fr/tel-00477005/en/.
 
 Contact, links:
 ===============
@@ -237,7 +308,7 @@ There are two mailing-lists associated to Cado-nfs:
   - cado-nfs-commits: if you want to receive an email each time a
     modification to the development version is committed to the
     repository.
-  - cado-nfs-discuss: for general discussions about cado-nfs. 
+  - cado-nfs-discuss: for general discussions about cado-nfs.
 Instructions about how to subscribe are available at
    http://gforge.inria.fr/mail/?group_id=2065
 

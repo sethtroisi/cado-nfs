@@ -346,6 +346,10 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
                    iter, timing->end_mark, eta_string, dwct / di);
         }
     }
+    /* We're sharing via thread_broadcast data which sits on the stack of
+     * one thread. So it's important that no thread exits this function
+     * prematurely ! */
+    serialize_threads(pi->m);
 }
 
 

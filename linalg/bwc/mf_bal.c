@@ -220,6 +220,7 @@ int main(int argc, char * argv[])
     int nh=0;
     int nv=0;
     int twodim=0;
+    int withcoeffs=0;
     // int ascii_in = 0;
     // int ascii_out = 0;
     // int binary_in = 0;
@@ -240,16 +241,17 @@ int main(int argc, char * argv[])
 
     param_list_init(pl);
     argv++,argc--;
-    param_list_configure_knob(pl, "--quiet", &quiet);
-    param_list_configure_knob(pl, "--display-correlation", &display_correlation);
-    // param_list_configure_knob(pl, "--ascii-in", &ascii_in);
-    // param_list_configure_knob(pl, "--binary-in", &binary_in);
-    // param_list_configure_knob(pl, "--ascii-out", &ascii_out);
-    // param_list_configure_knob(pl, "--binary-out", &binary_out);
-    // param_list_configure_knob(pl, "--ascii-freq", &ascii_freq);
-    // param_list_configure_knob(pl, "--binary-freq", &binary_freq);
-    param_list_configure_knob(pl, "--balance2d", &twodim);
-    param_list_configure_knob(pl, "--shuffled-product", &shuffled_product);
+    param_list_configure_switch(pl, "--quiet", &quiet);
+    param_list_configure_switch(pl, "--display-correlation", &display_correlation);
+    // param_list_configure_switch(pl, "--ascii-in", &ascii_in);
+    // param_list_configure_switch(pl, "--binary-in", &binary_in);
+    // param_list_configure_switch(pl, "--ascii-out", &ascii_out);
+    // param_list_configure_switch(pl, "--binary-out", &binary_out);
+    // param_list_configure_switch(pl, "--ascii-freq", &ascii_freq);
+    // param_list_configure_switch(pl, "--binary-freq", &binary_freq);
+    param_list_configure_switch(pl, "--balance2d", &twodim);
+    param_list_configure_switch(pl, "--shuffled-product", &shuffled_product);
+    param_list_configure_switch(pl, "--withcoeffs", &withcoeffs);
 
     for(;argc;) {
         char * q;
@@ -337,14 +339,7 @@ int main(int argc, char * argv[])
 
     size_t maxdim = MAX(bal->h->nrows, bal->h->ncols);
     if (maxdim != bal->h->nrows) {
-        fprintf(stderr, "More columns than rows."
-                " Most of the code now requires nrows > ncols,"
-                " so we presume this matrix will lead"
-                " to a failure somewhere\n");
-        // weird. nothing wrong, but this program has not been written
-        // with this situation in mind, so most probably we're going to
-        // lack stuff.
-        abort();
+        fprintf(stderr, "Warning. More columns than rows. There could be bugs.\n");
     }
 
     // we are forcibly computing a symmetric permutation, according to a
@@ -369,10 +364,18 @@ int main(int argc, char * argv[])
         fprintf(stderr, "%s: %" PRIu32 " rows %" PRIu32 " cols\n",
                 mfile, bal->h->nrows, bal->h->ncols);
         fprintf(stderr,
-                "%s: main input file not present, total weight unknown\n", mfile);
+                "%s: main input file not present locally, total weight unknown\n", mfile);
         bal->h->ncoeffs = 0;
     } else {
         bal->h->ncoeffs = sbuf_mat->st_size / sizeof(uint32_t) - bal->h->nrows;
+        if (withcoeffs) {
+            if (bal->h->ncoeffs & 1) {
+                fprintf(stderr, "Matrix with coefficient must have an even number of 32-bit entries for all (col index, coeff). Here, %"PRIu64" is odd.\n", bal->h->ncoeffs);
+                abort();
+            }
+            bal->h->ncoeffs /= 2;
+        }
+
         int extra = bal->h->ncols - bal->h->nrows;
         if (extra > 0) {
             fprintf(stderr,
@@ -490,6 +493,7 @@ int main(int argc, char * argv[])
             fprintf(stderr, "Inconsistency in number of coefficients\n"
                     "From %s: %"PRIu64", from file sizes; %"PRIu64"\n",
                     cwfile, tw, bal->h->ncoeffs);
+            fprintf(stderr, "Maybe use the --withcoeffs option for DL matrices ?\n");
             exit(1);
         }
     } else {

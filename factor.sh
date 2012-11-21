@@ -15,7 +15,7 @@
 usage() {
     cat >&2 <<EOF
 Usage: $0 <integer> [options] [arguments passed to cadofactor.pl]
-    <integer>     - integer to be factored. must be at least 60 digits,
+    <integer>     - integer to be factored. must be at least 57 digits,
                     and free of small prime factors [parameters are
                     optimized only for 85 digits and above].
 options:
@@ -53,7 +53,7 @@ for ((i=1; i<=2; i=i+1)) ; do
     shift
   fi
 done
-    
+
 b=$(perl -e '{print int(sqrt(<STDIN>))."\n"}' <<< $cores)
 until [ `expr $cores % $b` -eq  0 ]; do
       b=`expr $b - 1`
@@ -96,6 +96,7 @@ elif [ -f "`dirname $0`/cado_config_h.in" ] ; then
     bindir=`cd "$build_tree" ; pwd`
 else
     echo "I don't know where I am !" >&2
+    # but I do care
 fi
 
 if ! [ -d "$paramdir" ] ; then
@@ -116,7 +117,7 @@ size=${#n}
 # Try n, n+1, n-1, n+2...
 for ((i=1; i<=4; i=i+1)) ; do
   file="$paramdir/params.c$size"
-  if [ -f $file ] ; then 
+  if [ -f $file ] ; then
     break
   fi
   size=`expr $size + \( 2 \* \( $i % 2 \) - 1 \) \* $i`
@@ -152,13 +153,13 @@ $host cores=$cores
 EOF
 
 if [ $ssh -eq 0 ]; then
-  $cadofactor $t/param n=$n bindir=$bindir parallel=0 \
-  sieve_max_threads=$cores poly_max_threads=$cores nthchar=$cores\
-  bwmt=$bwmt wdir=$t sievenice=0 selectnice=0 logfile=$t/out "$@"
+  $cadofactor params=$t/param n=$n bindir=$bindir parallel=0 \
+  sieve_max_threads=$cores nthchar=$cores\
+  bwmt=$bwmt wdir=$t sievenice=0 polsel_nice=0 logfile=$t/out "$@"
 else
-  $cadofactor $t/param n=$n bindir=$bindir parallel=1 \
+  $cadofactor params=$t/param n=$n bindir=$bindir parallel=1 \
   machines=$t/mach_desc nthchar=$cores bwmt=$bwmt wdir=$t \
-  sievenice=0 selectnice=0 logfile=$t/out "$@"
+  sievenice=0 polsel_nice=0 logfile=$t/out "$@"
 fi
 
 rc=$?

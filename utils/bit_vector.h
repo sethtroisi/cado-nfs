@@ -4,8 +4,12 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#define BV_BITS 64      // since we're using uint64_t's
+#define LN2_BV_BITS 6   // 2^^LN2_BV_BITS = BV_BITS
+typedef uint64_t bv_t;
+
 struct bit_vector_s {
-    uint64_t * p;
+    bv_t *p;
     size_t n;
 };
 typedef struct bit_vector_s bit_vector[1];
@@ -20,6 +24,7 @@ extern void bit_vector_init(bit_vector_ptr b, size_t n);
 extern void bit_vector_init_set(bit_vector_ptr b, size_t n, int s);
 extern void bit_vector_set(bit_vector_ptr b, int s);
 extern void bit_vector_clear(bit_vector_ptr b);
+extern void bit_vector_neg(bit_vector_ptr b, bit_vector_srcptr c);
 
 extern int bit_vector_getbit(bit_vector_srcptr b, size_t pos);
 /* The value returned by the two following functions reflect the _old_

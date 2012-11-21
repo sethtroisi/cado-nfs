@@ -1,11 +1,9 @@
 #include "cado.h"
 #include <stdlib.h>
 #include <string.h>
+#include <misc.h>
 #include "bit_vector.h"
 #include "macros.h"
-
-#define BV_BITS 64      // since we're using uint64_t's
-typedef uint64_t bv_t;
 
 void bit_vector_init(bit_vector_ptr b, size_t n)
 {
@@ -16,7 +14,7 @@ void bit_vector_init(bit_vector_ptr b, size_t n)
 void bit_vector_init_set(bit_vector_ptr b, size_t n, int s)
 {
     bit_vector_init(b,n);
-    bit_vector_set(b, s);
+    bit_vector_set(b,s);
 }
 
 void bit_vector_set(bit_vector_ptr b, int s)
@@ -26,36 +24,46 @@ void bit_vector_set(bit_vector_ptr b, int s)
 
 void bit_vector_clear(bit_vector_ptr b)
 {
-    free(b->p); b->p = NULL; b->n =0;
+    free(b->p); b->p = NULL; b->n = 0;
+}
+
+/* assume b and c have the same size */
+void bit_vector_neg(bit_vector_ptr b, bit_vector_srcptr c)
+{
+  size_t i, n;
+  n = b->n;
+  ASSERT_ALWAYS(n == c->n);
+  for (i = 0; i < iceildiv(n, BV_BITS); i++)
+    b->p[i] = ~c->p[i];
 }
 
 int bit_vector_getbit(bit_vector_srcptr b, size_t pos)
 {
-    bv_t val = b->p[pos / BV_BITS];
-    bv_t mask = ((bv_t)1) << (pos % BV_BITS);
+    bv_t val = b->p[pos >> LN2_BV_BITS];
+    bv_t mask = ((bv_t)1) << (pos & (BV_BITS - 1));
     return (val & mask) != 0;
 }
 
 int bit_vector_setbit(bit_vector_ptr b, size_t pos)
 {
-    bv_t val = b->p[pos / BV_BITS];
-    bv_t mask = ((bv_t)1) << (pos % BV_BITS);
-    b->p[pos / BV_BITS] |= mask;
+    bv_t val = b->p[pos >> LN2_BV_BITS];
+    bv_t mask = ((bv_t)1) << (pos & (BV_BITS - 1));
+    b->p[pos >> LN2_BV_BITS] |= mask;
     return (val & mask) != 0;
 }
 
 int bit_vector_clearbit(bit_vector_ptr b, size_t pos)
 {
-    bv_t val = b->p[pos / BV_BITS];
-    bv_t mask = ((bv_t)1) << (pos % BV_BITS);
-    b->p[pos / BV_BITS] &= ~mask;
+    bv_t val = b->p[pos >> LN2_BV_BITS];
+    bv_t mask = ((bv_t)1) << (pos & (BV_BITS - 1));
+    b->p[pos >> LN2_BV_BITS] &= ~mask;
     return (val & mask) != 0;
 }
 
 int bit_vector_flipbit(bit_vector_ptr b, size_t pos)
 {
-    bv_t mask = ((bv_t)1) << (pos % BV_BITS);
-    bv_t val = b->p[pos / BV_BITS] ^= mask;
+    bv_t mask = ((bv_t)1) << (pos & (BV_BITS - 1));
+    bv_t val = b->p[pos >> LN2_BV_BITS] ^= mask;
     return (val & mask) != 0;
 }
 

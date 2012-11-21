@@ -6,6 +6,7 @@ use POSIX qw/getcwd/;
 use File::Basename;
 use File::Temp qw/tempdir/;
 use List::Util qw[max];
+use Data::Dumper;
 
 # This companion program serves as a helper for running bwc programs.
 
@@ -374,13 +375,32 @@ if ((!defined($m) || !defined($n)) && $main !~ /^:wipeout$/) {
     usage "The parameters m and n must be set";
 }
 if (!defined($param->{'splits'})) {
+    @splits=(0);
+    my $x=0;
+    while ($x<$n) {
+        $x+=64;
+        push @splits, $x;
+    }
     if ($param->{'interleaving'}) {
         @splits=(0,int($n/2),$n);
-    } else {
-        @splits=(0,$n);
     }
     push @main_args, "splits=" . join(",", @splits);
 }
+
+if ($param->{'interleaving'}) {
+    my @t = @splits;
+    my $b = shift @t;
+    while (scalar @t) {
+        my $b0 = shift @t;
+        my $b1 = shift @t;
+        die "Interleaving can't work with splits ",
+            join(",",@splits),
+            "(intervals $b..$b0 and $b0..$b1 have different widths)"
+            unless $b0-$b == $b1-$b0;
+        $b = $b1;
+    }
+}
+
 if (!defined($param->{'ys'})) {
     push @main_args, "ys=0..$n";
 }
@@ -506,6 +526,25 @@ if (!-d $wdir) {
     }
 }
 
+sub get_mpi_hosts_torque {
+    my @x = split /^/, eval {
+		local $/=undef;
+		open F, "$ENV{PBS_NODEFILE}";
+		<F> };
+    my $nth = $thr_split[0] * $thr_split[1];
+    @hosts=();
+    while (scalar @x) {
+        my @z = splice @x, 0, $nth;
+        my %h=();
+        $h{$_}=1 for @z;
+        die "\$PBS_NODEFILE not consistent mod $nth\n" unless scalar
+			keys %h == 1;
+        my $c = $z[0];
+        chomp($c);
+        push @hosts, $c;
+    }
+}
+
 if ($mpi_needed) {
     detect_mpi;
 
@@ -517,6 +556,10 @@ if ($mpi_needed) {
         system "uniq $ENV{'OAR_NODEFILE'} > /tmp/HOSTS.$ENV{'OAR_JOBID'}";
         $hostfile = "/tmp/HOSTS.$ENV{'OAR_JOBID'}";
     }
+	elsif (exists($ENV{'PBS_JOBID'}) && !defined($hostfile) && !scalar @hosts ) {
+        print STDERR "Torque/OpenPBS environment detected, setting hostfile.\n";
+        get_mpi_hosts_torque;
+	}
     if (scalar @hosts) {
         # Don't use an uppercase filename, it would be deleted by
         # wipeout.
@@ -616,9 +659,9 @@ sub obtain_bfile {
     opendir(my $dh, $wdir);
     my $foo = join(' ', @mpi_precmd_single) . ' ' . "find $wdir -name $x.${nh}x${nv}.????????.bin";
     print "Running $foo\n";
-    $foo = basename `$foo`;
-    my @bfiles = split(' ', $foo);
-    @bfiles = map { /^\s*(.*)\s*$/; $_=$1; } @bfiles;
+    # $foo = basename `$foo`;
+    my @bfiles = split(' ', `$foo`);
+    @bfiles = map { /^\s*(.*)\s*$/; $_=basename($1); $_; } @bfiles;
     @bfiles = grep { /^$pat/ } @bfiles;
     if (scalar @bfiles != 1) {
         print STDERR "Expected 1 bfile, found ", scalar @bfiles, ":\n";
@@ -636,6 +679,10 @@ sub obtain_bfile {
 sub last_cp {
     my $pat;
     return undef if $force_complete;
+    # Sorry, but I'd like to expand what is returned as a last checkpoint
+    # indication if there are more than two sequences (e.g. a sequence
+    # number, followed by a checkpoint value).
+    return undef if $n != 64;
     if ($_[0] eq 'krylov') {
         $pat = qr/^V/;
     } elsif ($_[0] eq 'mksol') {
@@ -688,6 +735,7 @@ sub drive {
 
 
     if ($program eq ':complete') {
+        print Dumper(\@_);
         my $cp;
         &drive(":wipeout", @_) if $force_complete;
         unless (defined($cp = last_cp('mksol'))) {
@@ -698,12 +746,28 @@ sub drive {
                 &drive("mf_bal", @mfbal);
                 obtain_bfile();
                 push @_, "balancing=$balancing";
-                &drive("dispatch", @_, "sequential_cache_build=1", "sanity_check_vector=H1");
+                # Note the ys=0..64 below. It's here only to match the
+                # width which is used in the main krylov/mksol programs.
+                # Actually, a match isn't even needed. It's just that
+                # dispatch does a sanity check, and uses arithmetic of
+                # this width to do the sanity check.
+                &drive("dispatch", @_, "sequential_cache_build=1", "sanity_check_vector=H1", "ys=0..64");
                 &drive("prep", @_);
                 &drive("secure", @_) unless $param->{'skip_online_checks'};
                 &drive("./split", @_, "--split-y");
-                &drive("krylov", @_);
+                # despicable ugly hack.
+                my @ka=@_;
+                if ($n == 128 && !$interleaving) {
+                    @ka = grep !/^ys=/, @_;
+                    &drive("krylov", @ka, "ys=0..64");
+                    &drive("krylov", @ka, "ys=64..128");
+                } else {
+                    &drive("krylov", @ka);
+                }
             } else {
+                # Given that I've forbidden this in last_cp, we should
+                # never reach here.
+                die if $n == 128;
                 obtain_bfile();
                 push @_, "balancing=$balancing";
                 &drive("krylov", @_, "start=$cp");
@@ -711,8 +775,19 @@ sub drive {
             &drive("./acollect", @_, "--remove-old");
             &drive("./lingen", @_, "--lingen-threshold", 64);
             &drive("./split", @_, "--split-f");
-            &drive("mksol", @_);
+            # same ugly hack already seen above.
+            my @ka=@_;
+            if ($n == 128 && !$interleaving) {
+                @ka = grep !/^ys=/, @_;
+                &drive("mksol", @ka, "ys=0..64");
+                &drive("mksol", @ka, "ys=64..128");
+            } else {
+                &drive("mksol", @ka);
+            }
         } else {
+            # Given that I've forbidden this in last_cp, we should
+            # never reach here.
+            die if $n == 128;
             obtain_bfile();
             push @_, "balancing=$balancing";
             &drive("mksol", @_, "start=$cp");

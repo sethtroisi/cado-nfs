@@ -1,4 +1,6 @@
-  
+WARNING: this documentation is (at least partly) obsolete.
+----------------------------------------------------------
+
 duplicates -nrels <n> <rel_file>  >  <rel_file2>
   Remove duplicates. The output format is the same as the input format
   for relations.

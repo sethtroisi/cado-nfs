@@ -37,11 +37,11 @@ int main(int argc, char * argv[])
     int truncate = 0;
     int expand = 0;
     int xmode = 0;
-    param_list_configure_knob(pl, "--untwist", &untwist);
-    param_list_configure_knob(pl, "--twist", &twist);
-    param_list_configure_knob(pl, "--truncate", &truncate);
-    param_list_configure_knob(pl, "--expand", &expand);
-    param_list_configure_knob(pl, "-x", &xmode);
+    param_list_configure_switch(pl, "--untwist", &untwist);
+    param_list_configure_switch(pl, "--twist", &twist);
+    param_list_configure_switch(pl, "--truncate", &truncate);
+    param_list_configure_switch(pl, "--expand", &expand);
+    param_list_configure_switch(pl, "-x", &xmode);
     unsigned int wild = 0;
     const char * bname = NULL;
     const char * vname = NULL;

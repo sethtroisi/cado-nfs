@@ -1,0 +1,67 @@
+Benchmark of CADO-NFS
+=====================
+
+Machine used: chorizo.loria.fr (Intel L5640 with 12 cores, 2.27GHz)
+[no other job was running during the tests]
+
+GCC 4.4.5
+
+Polynomial: rsa155.poly (see below)
+
+Parameters of las: -I 13 -q0 16777216 -q1 16778216
+
+CADO-NFS 1.0 (with -DNDEBUG):
+# Total time 95.9s [norm 9.13+4.3, sieving 56.7 (44.8 + 11.9), factor 25.7]
+# Total 1041 reports [0.092s/r, 21.7r/sq]
+# Total time 95.7s [norm 8.88+5.0, sieving 56.2 (44.3 + 11.8), factor 25.6]
+# Total 1041 reports [0.092s/r, 21.7r/sq]
+# Total time 95.7s [norm 9.26+4.8, sieving 56.3 (44.4 + 11.9), factor 25.4]
+# Total 1041 reports [0.092s/r, 21.7r/sq]
+
+CADO-NFS 1.1 (with -DNDEBUG):
+# Total time 95.2s [norm 1.66+4.8, sieving 57.5 (45.7 + 11.8), factor 31.2]
+# Total 1041 reports [0.091s/r, 21.7r/sq]
+# Total time 95.4s [norm 1.85+4.7, sieving 57.5 (45.6 + 11.9), factor 31.4]
+# Total 1041 reports [0.092s/r, 21.7r/sq]
+# Total time 95.1s [norm 1.66+4.4, sieving 57.7 (45.8 + 11.9), factor 31.3]
+# Total 1041 reports [0.091s/r, 21.7r/sq]
+
+CADO-NFS master (0f6a4f71f3471cdeeb5cf5949f42bd32454a19e3, -DNDEBUG):
+# Total time 95.9s [norm 1.49+4.7, sieving 58.0 (45.8 + 12.2), factor 31.7]
+# Total 1041 reports [0.092s/r, 21.7r/sq]
+# Total time 95.8s [norm 1.70+4.9, sieving 57.8 (45.9 + 11.9), factor 31.4]
+# Total 1041 reports [0.092s/r, 21.7r/sq]
+# Total time 95.8s [norm 1.32+4.5, sieving 57.8 (45.7 + 12.2), factor 32.1]
+# Total 1041 reports [0.092s/r, 21.7r/sq]
+
+CADO-NFS master (0f6a4f71f3471cdeeb5cf5949f42bd32454a19e3, with LAZY_NORMS
+and -DNDEBUG):
+# Total time 92.9s [norm 1.57+1.9, sieving 57.4 (45.8 + 11.6), factor 32.0]
+# Total 1041 reports [0.089s/r, 21.7r/sq]
+# Total time 92.8s [norm 1.65+2.2, sieving 57.4 (45.4 + 12.0), factor 31.5]
+# Total 1041 reports [0.089s/r, 21.7r/sq]
+# Total time 92.9s [norm 1.79+2.1, sieving 57.9 (46.1 + 11.8), factor 31.1]
+# Total 1041 reports [0.089s/r, 21.7r/sq]
+
+---------------------------------- rsa155.poly --------------------------------
+
+n: 10941738641570527421809707322040357612003732945449205990913842131476349984288934784717997257891267332497625752899781833797076537244027146743531593354333897
+type: gnfs
+skew: 10800.0
+c5: 119377138320
+c4: -80168937284997582
+c3: -66269852234118574445
+c2: 11816848430079521880356852
+c1: 7459661580071786443919743056
+c0: -40679843542362159361913708405064
+Y1: 1
+Y0: -39123079721168000771313449081
+rlim: 16777216
+alim: 16777216
+lpbr: 30
+lpba: 30
+mfbr: 60
+mfba: 86
+rlambda: 2.1
+alambda: 3.2
+

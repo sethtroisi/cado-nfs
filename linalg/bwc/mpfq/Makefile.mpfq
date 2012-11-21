@@ -6,15 +6,54 @@
 
 MPFQ:=$$HOME/Mp/mpfq/src
 
-all:
-	$(MPFQ)/simd/abase.pl u64k1
-	$(MPFQ)/simd/abase.pl u64k2
-	ls abase_*[ch] | xargs -n 1 sed -e s,mpfq/,, -i
+mpfq_tag_list:=u64k1 u64k2 p_1 p_4
+
+all: basic binary-fields prime-fields
+
+
+basic:
+	$(MPFQ)/simd/abase.pl w=64 $(mpfq_tag_list)
 	/bin/cp -f $(MPFQ)/simd/binary-dotprods-backends.h .
 	/bin/cp -f $(MPFQ)/include/mpfq/mpfq.h .
+	/bin/cp -f $(MPFQ)/gfp/mpfq_gfp_common.h .
+	ls abase_*[ch] mpfq*[ch] | xargs -n 1 sed -e s,mpfq/,, -i
 	$(MPFQ)/test/mk_name_k.pl  name=ab --noshift general_prefix=abase > mpfq_name_ab.h
 
+mpfq-buildtree:
+	if ! [ -e /tmp/mpfq ] ; then mkdir /tmp/mpfq ; fi
+	if ! [ -d /tmp/mpfq ] || ! [ -w /tmp/mpfq ] || ! [ -x /tmp/mpfq ] ; then \
+	    echo "/tmp/mpfq not a writeable directory, binary fields skipped" ; \
+	    exit 0 ; \
+	fi
+
+binary-fields: mpfq-buildtree
+	# We need mpfq, a built image with the helper binary, and also
+	# some additional tweaks.
+	if ! [ -x /tmp/mpfq/gf2n/helper/helper ] ; then \
+	(cd /tmp/mpfq ; cmake $(MPFQ) ; make helper) ; \
+	fi
+	/bin/cp -f $(MPFQ)/gf2n/mpfq_gf2n_common.h .
+	$(MPFQ)/gf2n/gen_gf2n.pl helper=/tmp/mpfq/gf2n/helper/helper table=/tmp/mpfq/gf2x/wizard.table output_path=. n=128 w=64
+	$(MPFQ)/gf2n/gen_gf2n.pl helper=/tmp/mpfq/gf2n/helper/helper table=/tmp/mpfq/gf2x/wizard.table output_path=. n=64 w=64
+	patch -p1 -d. < pclmul.patch
+	-rm -f *.orig
+
+prime-fields: mpfq-buildtree
+	$(MAKE) -C /tmp/mpfq fixmp_files
+	# $(MPFQ)/gfp/gen_gfp.pl output_path=. type=plain w=64 n=4
+	/bin/cp -f /tmp/mpfq/include/mpfq/fixmp*h .
+	ls fixmp*[ch] | xargs -n 1 sed -e s,mpfq/,, -i
+
+
 clean:
+	-rm -f abase_p16.c
+	-rm -f abase_p16.h
+	-rm -f abase_p16_t.c
+	-rm -f abase_p16_t.h
+	-rm -f abase_p_*.c
+	-rm -f abase_p_*.h
+	-rm -f abase_p_*_t.c
+	-rm -f abase_p_*_t.h
 	-rm -f abase_u64k1.c
 	-rm -f abase_u64k1.h
 	-rm -f abase_u64k1_t.c
@@ -27,5 +66,13 @@ clean:
 	-rm -f abase_vbase.h
 	-rm -f binary-dotprods-backends.h
 	-rm -f mpfq.h
+	-rm -f mpfq_gfp_common.h
+	-rm -f fixmp*.h
+	-rm -f mpfq_2_128.[ch]
+	-rm -f mpfq_2_64.[ch]
+	-rm -f mpfq_2_128.h.orig
+	-rm -f mpfq_2_64.h.orig
+	-rm -f mpfq_gf2n_common.h
 	-rm -f mpfq_name_ab.h
+	-rm -f tags
 	-rm -f *~

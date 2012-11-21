@@ -1,4 +1,4 @@
-/* complete_rels: same as complete_rels, but completes small factors if omitted */
+/* complete_rels: same as check_rels, but completes small factors if omitted */
 #include "cado.h"
 #include <stdlib.h>
 #include <stdio.h>
@@ -44,10 +44,10 @@ complete_relation (relation_t *rel, cado_poly_ptr cpoly)
               mpz_divexact_ui (no, no, p);
           }
       }
+      getprime(0);
       mpz_clear(no);
   }
 
-  getprime(0);
   // were printing our output, thus we don't care about tidyness of the
   // internal structure.
   // relation_compress_rat_primes(rel);
@@ -69,7 +69,7 @@ int complete_relation_files(char ** files, cado_poly_ptr cpoly)
         unsigned long l0 = rs->lnum;
         unsigned long ok0 = ok;
         unsigned long bad0 = bad;
-        for( ; relation_stream_get(rs, line, 0) >= 0 ; ) {
+        for( ; relation_stream_get(rs, line, 0, 10) >= 0 ; ) {
             unsigned long l = rs->lnum - l0;
             if (complete_relation(&rs->rel, cpoly)) {
                 fprint_relation (stdout, &rs->rel);

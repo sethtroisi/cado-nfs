@@ -1,18 +1,27 @@
-Important changes between cado-nfs-1.0 and cado-nfs-1.1:
+Main changes between cado-nfs-1.1 and cado-nfs-1.2:
+
+* the default parameters in the params subdirectory have been improved
+* major speedup in the purge step
+* the purge step produces a smaller matrix (about 5% less rows)
+* the replay step is faster and uses less memory
+* fixed bug in the lattice siever (las) on 32-bit computers
+
+Main changes between cado-nfs-1.0 and cado-nfs-1.1:
 
 * the polynomial selection uses the new algorithm presented by Kleinjung at
   the 2008 CADO workshop (supports multithreading)
-* connecting rootsieve5 in the polynomial selection
-* las supports I=16 (useful for integers greater than 200 digits), minor bug
-  fixes, small speedup in las and purge.
-* reorganization of the executable in the linear algebra step and acceleration
-  of computing time on many machines with MPI.
-* addition of experimental scripts to execute the sieve on a cluster.
-  These scripts rely on the OAR job scheduler being used, and exploit its 
-  "besteffort" mode. Some even more exeprimental scripts for linear
+* the polynomial selection uses a faster root sieve (rootsieve5)
+* the lattice siever (las) supports a larger sieving region (I=16). This is
+  useful for integers greater than 200 digits
+* minor bug fixes, small speedup in sieving (las) and filtering (purge)
+* reorganization of the binaries in the linear algebra step and speedup
+  when using many machines with MPI
+* new experimental scripts to execute the sieve on a cluster.
+  These scripts rely on the OAR job scheduler being used, and exploit its
+  "besteffort" mode. Some even more experimental scripts for linear
   algebra are in the development version.
 * addition of new parameter files and a few new parameters (cf params.c91)
-* The linear algebra step now makes use of dynamically loaded shared
+* the linear algebra step now makes use of dynamically loaded shared
   libraries. This might result in configuration issues, which we hope the
-  scripts get right. See the README file.
+  scripts get it right. See the README file.
 

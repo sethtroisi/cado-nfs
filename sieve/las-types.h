@@ -12,7 +12,17 @@ struct sieve_info_s;
 typedef struct sieve_info_s * sieve_info_ptr;
 typedef const struct sieve_info_s * sieve_info_srcptr;
 
+struct where_am_I_s;
+typedef struct where_am_I_s * where_am_I_ptr;
+typedef const struct where_am_I_s * where_am_I_srcptr;
+
 #include "las-unsieve.h"
+#include "las-smallsieve.h"
+
+typedef struct {
+    factorbase_degn_t * start;
+    factorbase_degn_t * end;
+} fb_interval;
 
 struct sieve_side_info_s {
     unsigned char Bound[256]; /* -log(prob of relation), 127 for prob<thresh */
@@ -20,6 +30,21 @@ struct sieve_side_info_s {
     trialdiv_divisor_t *trialdiv_data;
     unsigned char lognorm_table[1 << NORM_BITS];
     factorbase_degn_t * fb;
+    struct {
+        factorbase_degn_t * pow2[2];
+        factorbase_degn_t * pow3[2];
+        factorbase_degn_t * td[2];
+        factorbase_degn_t * rs[2];
+        factorbase_degn_t * rest[2];
+    } fb_parts[1];
+    struct {
+        int pow2[2];
+        int pow3[2];
+        int td[2];
+        int rs[2];
+        int rest[2];
+    } fb_parts_x[1];
+
 
     /* These fields are used for the norm initialization essentially.
      * Only the scale is also relevant to part of the rest, since it
@@ -29,8 +54,12 @@ struct sieve_side_info_s {
 
     mpz_t *fij;       /* coefficients of F(a0*i+a1*j, b0*i+b1*j)  */
     double *fijd;     /* coefficients of F_q (divided by q on the special q side) */
-    int smallpow2[64];
-    int smallpow3[64];
+
+    /* This updated by applying the special-q lattice transform to the
+     * factor base. */
+    small_sieve_data_t ssd[1];
+    /* And this is just created as an extraction of the above */
+    small_sieve_data_t rsd[1];
 };
 
 typedef struct sieve_side_info_s * sieve_side_info_ptr;
@@ -87,6 +116,7 @@ typedef struct sieve_info_s sieve_info[1];
 struct where_am_I_s {
 #ifdef TRACK_CODE_PATH
     fbprime_t p;        /* current prime or prime power, when applicable */
+    fbprime_t r;        /* current root */
     int fb_idx;         /* index into the factor base si->sides[side]->fb
                            or into th->sides[side]->fb_bucket */
     unsigned int j;     /* row number in bucket */
@@ -97,8 +127,6 @@ struct where_am_I_s {
 #endif  /* TRACK_CODE_PATH */
 } TYPE_MAYBE_UNUSED;
 typedef struct where_am_I_s where_am_I[1];
-typedef struct where_am_I_s * where_am_I_ptr TYPE_MAYBE_UNUSED;
-typedef const struct where_am_I_s *where_am_I_srcptr TYPE_MAYBE_UNUSED;
 
 #ifdef TRACK_CODE_PATH
 #define WHERE_AM_I_UPDATE(w, field, value) (w)->field = (value)

@@ -149,7 +149,7 @@ return zz.x[[0]] - 61;
 # Check whether we need some flag such as -mpclmul in order to enable pclmulqdq
 # support
 AC_DEFUN([CHECK_PCLMUL_SUPPORT],[
- ac_save_CFLAGS=$CFLAGS
+ ac_save_CFLAGS="$CFLAGS"
  AC_CACHE_CHECK([whether $CC can compile pclmulqdq and if it is supported by the hardware], [gf2x_cv_cc_supports_pclmul],[
   gf2x_cv_cc_supports_pclmul=no
   if test "x${enable_pclmul}" = xno ; then
@@ -187,8 +187,8 @@ AC_DEFUN([CHECK_PCLMUL_SUPPORT],[
    ])
   ])
  fi
- CFLAGS=$ac_save_CFLAGS
- CPPFLAGS=$ac_save_CPPFLAGS
+ CFLAGS="$ac_save_CFLAGS"
+ CPPFLAGS="$ac_save_CPPFLAGS"
  if test "$gf2x_cv_cc_supports_pclmul" = "requires -mpclmul" ;then
   CFLAGS="$CFLAGS -mpclmul"
  fi

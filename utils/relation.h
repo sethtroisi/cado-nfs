@@ -21,12 +21,12 @@ typedef struct {
 typedef struct {
   int64_t a;		/* only a is allowed to be negative */
   uint64_t b;
-  int nb_rp;		/* number of rational primes */
-  int nb_ap;		/* number of algebraic primes */
   rat_prime_t *rp;	/* array of rational primes */
   alg_prime_t *ap;	/* array of algebraic primes */
-  int nb_rp_alloc;	/* allocated space for rp */
-  int nb_ap_alloc;	/* allocated space for ap */
+  uint8_t nb_rp;	/* number of rational primes */
+  uint8_t nb_ap;        /* number of algebraic primes */
+  uint8_t nb_rp_alloc;	/* allocated space for rp */
+  uint8_t nb_ap_alloc;	/* allocated space for ap */
 } relation_t;
 
 struct relation_stream_s {
@@ -46,7 +46,7 @@ struct relation_stream_s {
     
     // various stats stuff. May be used by the caller.
     size_t pos;
-    int nrels;
+    unsigned long nrels;
     unsigned long lnum;
     // only valid after relation_stream_trigger_disp_progress
     // of relation_stream_disp_progress_now_p
@@ -71,6 +71,11 @@ extern void clear_relation(relation_t *rel);
 // extern int fread_relation(FILE *file, relation_t *rel);
 extern unsigned long findroot(long a, unsigned long b, unsigned long p);
 extern void computeroots(relation_t * rel);
+extern char * u64toa16 (char *p, uint64_t m);
+extern char * u64toa10 (char *p, uint64_t m);
+extern char * d64toa10 (char *p, int64_t m);
+
+
 extern void fprint_relation(FILE *file, relation_t * rel);
 extern void fprint_relation_raw (FILE *file, relation_t * rel);
 extern void reduce_exponents_mod2 (relation_t *rel);
@@ -101,7 +106,7 @@ extern void relation_stream_openfile(relation_stream_ptr rs, const char * name);
 extern void relation_stream_bind(relation_stream_ptr rs, FILE * f);
 extern void relation_stream_unbind(relation_stream_ptr rs);
 extern int relation_stream_disp_progress_now_p(relation_stream_ptr rs);
-extern int relation_stream_get(relation_stream_ptr rs, char * line, int forced_read);
+extern int relation_stream_get(relation_stream_ptr rs, char * line, int forced_read, unsigned int ab_base);
 extern int relation_stream_get_skip(relation_stream_ptr rs);
 extern void relation_stream_trigger_disp_progress(relation_stream_ptr rs);
 

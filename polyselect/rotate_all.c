@@ -51,7 +51,7 @@ main (int argc, char **argv)
 
     printf ("Initial polynomial:\n");
     if (verbose)
-      print_poly (stdout, poly, argc0, argv0, 0, 1);
+      print_cadopoly_extra (stdout, poly, argc0, argv0, 0, 1);
     else
       printf ("skewness=%1.2f, alpha=%1.2f\n", poly->skew,
               get_alpha (poly->alg->f, poly->alg->degree, ALPHA_BOUND));
@@ -61,7 +61,7 @@ main (int argc, char **argv)
     
     printf ("After norm optimization:\n");
     if (verbose)
-      print_poly (stdout, poly, argc0, argv0, 0, 1);
+      print_cadopoly_extra (stdout, poly, argc0, argv0, 0, 1);
     else
       printf ("skewness=%1.2f, alpha=%1.2f\n",
               poly->skew, get_alpha (poly->alg->f, poly->alg->degree, ALPHA_BOUND));
@@ -80,6 +80,6 @@ main (int argc, char **argv)
     mpz_clear(b);
     mpz_clear(m);
 
-    print_poly (stdout, poly, argc0, argv0, 0, 1);
+    print_cadopoly_extra (stdout, poly, argc0, argv0, 0, 1);
     return 0;
 } 

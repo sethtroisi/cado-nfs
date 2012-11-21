@@ -291,6 +291,12 @@ while (defined($_=shift(@ARGV))) {
 }
 usage unless scalar keys %storehosts;
 
+sub fqdn {
+    my $x=`host $_[0]`;
+    $x=~/^(\S*)/;
+    return $1;
+}
+
 unless ($quiet) {
     print "## Calling $0 ", join(" ", @orig_argv), "\n";
 }
@@ -395,7 +401,7 @@ for my $h (keys %$dispatch) {
                         print STDERR "All servers failed\n";
                         for my $k (keys %failed_storehosts) {
                             my $v = $failed_storehosts{$k};
-                            my $out = $v->[1];
+                            my $out = $v->[1] || '';
                             $out =~ s/^/\t/mg;
                             print STDERR "$k : status $v->[0]:\n$out";
                         }
@@ -473,7 +479,7 @@ for my $h (keys %$dispatch) {
                         system "$ssh -q -n $h touch $ldir/done.$base";
                     } else {
                         unlink $cachefile;
-                        symlink node_server($h), $cachefile or warn "$!";
+                        symlink node_server(fqdn($h)), $cachefile or warn "$!";
                     }
                     last;
                 }

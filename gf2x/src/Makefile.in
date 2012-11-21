@@ -79,6 +79,7 @@ target_triplet = @target@
 @GF2X_PCLMUL_AVAILABLE_TRUE@	tune_mul2cl$(EXEEXT) \
 @GF2X_PCLMUL_AVAILABLE_TRUE@	tune_mul2cl2$(EXEEXT) \
 @GF2X_PCLMUL_AVAILABLE_TRUE@	tune_mul3cl$(EXEEXT) \
+@GF2X_PCLMUL_AVAILABLE_TRUE@	tune_mul4cl1$(EXEEXT) \
 @GF2X_PCLMUL_AVAILABLE_TRUE@	tune_mul4clk$(EXEEXT) \
 @GF2X_PCLMUL_AVAILABLE_TRUE@	tune_mul5clk_c$(EXEEXT) \
 @GF2X_PCLMUL_AVAILABLE_TRUE@	tune_mul5k3$(EXEEXT) \
@@ -259,6 +260,15 @@ tune_mul3t_OBJECTS = $(am_tune_mul3t_OBJECTS) \
 @GF2X_32BIT_SOURCES_TRUE@@GF2X_SSE2_AVAILABLE_TRUE@tune_mul3t_DEPENDENCIES = libtuneup-s3.la \
 @GF2X_32BIT_SOURCES_TRUE@@GF2X_SSE2_AVAILABLE_TRUE@	libtiming.la \
 @GF2X_32BIT_SOURCES_TRUE@@GF2X_SSE2_AVAILABLE_TRUE@	../libgf2x.la
+am__tune_mul4cl1_SOURCES_DIST = mul4cl1.c
+@GF2X_PCLMUL_AVAILABLE_TRUE@am_tune_mul4cl1_OBJECTS =  \
+@GF2X_PCLMUL_AVAILABLE_TRUE@	tune_mul4cl1-mul4cl1.$(OBJEXT)
+nodist_tune_mul4cl1_OBJECTS =
+tune_mul4cl1_OBJECTS = $(am_tune_mul4cl1_OBJECTS) \
+	$(nodist_tune_mul4cl1_OBJECTS)
+@GF2X_PCLMUL_AVAILABLE_TRUE@tune_mul4cl1_DEPENDENCIES =  \
+@GF2X_PCLMUL_AVAILABLE_TRUE@	libtuneup-s4.la libtiming.la \
+@GF2X_PCLMUL_AVAILABLE_TRUE@	../libgf2x.la
 am__tune_mul4clk_SOURCES_DIST = mul4clk.c
 @GF2X_PCLMUL_AVAILABLE_TRUE@am_tune_mul4clk_OBJECTS =  \
 @GF2X_PCLMUL_AVAILABLE_TRUE@	tune_mul4clk-mul4clk.$(OBJEXT)
@@ -458,7 +468,8 @@ SOURCES = $(libtiming_la_SOURCES) $(nodist_libtuneup_s1_la_SOURCES) \
 	$(nodist_tune_mul3cl_SOURCES) $(tune_mul3k_SOURCES) \
 	$(nodist_tune_mul3k_SOURCES) $(tune_mul3k2_SOURCES) \
 	$(nodist_tune_mul3k2_SOURCES) $(tune_mul3t_SOURCES) \
-	$(nodist_tune_mul3t_SOURCES) $(tune_mul4clk_SOURCES) \
+	$(nodist_tune_mul3t_SOURCES) $(tune_mul4cl1_SOURCES) \
+	$(nodist_tune_mul4cl1_SOURCES) $(tune_mul4clk_SOURCES) \
 	$(nodist_tune_mul4clk_SOURCES) $(tune_mul4k_SOURCES) \
 	$(nodist_tune_mul4k_SOURCES) $(tune_mul4t_SOURCES) \
 	$(nodist_tune_mul4t_SOURCES) $(tune_mul5clk_c_SOURCES) \
@@ -488,6 +499,7 @@ DIST_SOURCES = $(libtiming_la_SOURCES) $(am__tune_mul1cl_SOURCES_DIST) \
 	$(am__tune_mul2t_SOURCES_DIST) $(am__tune_mul2t2_SOURCES_DIST) \
 	$(am__tune_mul3cl_SOURCES_DIST) $(tune_mul3k_SOURCES) \
 	$(tune_mul3k2_SOURCES) $(am__tune_mul3t_SOURCES_DIST) \
+	$(am__tune_mul4cl1_SOURCES_DIST) \
 	$(am__tune_mul4clk_SOURCES_DIST) $(tune_mul4k_SOURCES) \
 	$(am__tune_mul4t_SOURCES_DIST) \
 	$(am__tune_mul5clk_c_SOURCES_DIST) \
@@ -821,6 +833,10 @@ tune_mul9k2_LDADD = libtuneup-s9.la libtiming.la ../libgf2x.la
 @GF2X_PCLMUL_AVAILABLE_TRUE@tune_mul3cl_SOURCES = mul3cl.c
 @GF2X_PCLMUL_AVAILABLE_TRUE@nodist_tune_mul3cl_SOURCES = tuning_undefs_3.h
 @GF2X_PCLMUL_AVAILABLE_TRUE@tune_mul3cl_LDADD = libtuneup-s3.la libtiming.la ../libgf2x.la
+@GF2X_PCLMUL_AVAILABLE_TRUE@tune_mul4cl1_CPPFLAGS = -I$(top_builddir) -I$(top_srcdir) -DTUNING=4
+@GF2X_PCLMUL_AVAILABLE_TRUE@tune_mul4cl1_SOURCES = mul4cl1.c
+@GF2X_PCLMUL_AVAILABLE_TRUE@nodist_tune_mul4cl1_SOURCES = tuning_undefs_4.h
+@GF2X_PCLMUL_AVAILABLE_TRUE@tune_mul4cl1_LDADD = libtuneup-s4.la libtiming.la ../libgf2x.la
 @GF2X_PCLMUL_AVAILABLE_TRUE@tune_mul4clk_CPPFLAGS = -I$(top_builddir) -I$(top_srcdir) -DTUNING=4
 @GF2X_PCLMUL_AVAILABLE_TRUE@tune_mul4clk_SOURCES = mul4clk.c
 @GF2X_PCLMUL_AVAILABLE_TRUE@nodist_tune_mul4clk_SOURCES = tuning_undefs_4.h
@@ -867,6 +883,7 @@ TOOM_TUNING_LIMIT = 2048
 tunefft_SOURCES = tunefft.c tuning-common.c
 tunefft_LDADD = libtiming.la ../libgf2x.la
 FFT_TUNING_LIMIT = 8000000
+FFT_TUNING_SCALE = 1.02
 all: $(BUILT_SOURCES)
 	$(MAKE) $(AM_MAKEFLAGS) all-am
 
@@ -982,6 +999,9 @@ tune_mul3k2$(EXEEXT): $(tune_mul3k2_OBJECTS) $(tune_mul3k2_DEPENDENCIES)
 tune_mul3t$(EXEEXT): $(tune_mul3t_OBJECTS) $(tune_mul3t_DEPENDENCIES) 
 	@rm -f tune_mul3t$(EXEEXT)
 	$(LINK) $(tune_mul3t_OBJECTS) $(tune_mul3t_LDADD) $(LIBS)
+tune_mul4cl1$(EXEEXT): $(tune_mul4cl1_OBJECTS) $(tune_mul4cl1_DEPENDENCIES) 
+	@rm -f tune_mul4cl1$(EXEEXT)
+	$(LINK) $(tune_mul4cl1_OBJECTS) $(tune_mul4cl1_LDADD) $(LIBS)
 tune_mul4clk$(EXEEXT): $(tune_mul4clk_OBJECTS) $(tune_mul4clk_DEPENDENCIES) 
 	@rm -f tune_mul4clk$(EXEEXT)
 	$(LINK) $(tune_mul4clk_OBJECTS) $(tune_mul4clk_LDADD) $(LIBS)
@@ -1095,6 +1115,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tune_mul3k-mul3k.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tune_mul3k2-mul3k2.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tune_mul3t-mul3t.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tune_mul4cl1-mul4cl1.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tune_mul4clk-mul4clk.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tune_mul4k-mul4k.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tune_mul4t-mul4t.Po@am__quote@
@@ -1485,6 +1506,20 @@ tune_mul3t-mul3t.obj: mul3t.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mul3t.c' object='tune_mul3t-mul3t.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tune_mul3t_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o tune_mul3t-mul3t.obj `if test -f 'mul3t.c'; then $(CYGPATH_W) 'mul3t.c'; else $(CYGPATH_W) '$(srcdir)/mul3t.c'; fi`
+
+tune_mul4cl1-mul4cl1.o: mul4cl1.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tune_mul4cl1_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT tune_mul4cl1-mul4cl1.o -MD -MP -MF $(DEPDIR)/tune_mul4cl1-mul4cl1.Tpo -c -o tune_mul4cl1-mul4cl1.o `test -f 'mul4cl1.c' || echo '$(srcdir)/'`mul4cl1.c
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/tune_mul4cl1-mul4cl1.Tpo $(DEPDIR)/tune_mul4cl1-mul4cl1.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mul4cl1.c' object='tune_mul4cl1-mul4cl1.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tune_mul4cl1_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o tune_mul4cl1-mul4cl1.o `test -f 'mul4cl1.c' || echo '$(srcdir)/'`mul4cl1.c
+
+tune_mul4cl1-mul4cl1.obj: mul4cl1.c
+@am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tune_mul4cl1_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT tune_mul4cl1-mul4cl1.obj -MD -MP -MF $(DEPDIR)/tune_mul4cl1-mul4cl1.Tpo -c -o tune_mul4cl1-mul4cl1.obj `if test -f 'mul4cl1.c'; then $(CYGPATH_W) 'mul4cl1.c'; else $(CYGPATH_W) '$(srcdir)/mul4cl1.c'; fi`
+@am__fastdepCC_TRUE@	$(am__mv) $(DEPDIR)/tune_mul4cl1-mul4cl1.Tpo $(DEPDIR)/tune_mul4cl1-mul4cl1.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='mul4cl1.c' object='tune_mul4cl1-mul4cl1.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tune_mul4cl1_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o tune_mul4cl1-mul4cl1.obj `if test -f 'mul4cl1.c'; then $(CYGPATH_W) 'mul4cl1.c'; else $(CYGPATH_W) '$(srcdir)/mul4cl1.c'; fi`
 
 tune_mul4clk-mul4clk.o: mul4clk.c
 @am__fastdepCC_TRUE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tune_mul4clk_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT tune_mul4clk-mul4clk.o -MD -MP -MF $(DEPDIR)/tune_mul4clk-mul4clk.Tpo -c -o tune_mul4clk-mul4clk.o `test -f 'mul4clk.c' || echo '$(srcdir)/'`mul4clk.c
@@ -2054,6 +2089,7 @@ gen_bb_mul_code$(EXEEXT_FOR_BUILD): gen_bb_mul_code.c
 # mul2cl2 uses psrldq, which is slightly different.
 #*   test mul2cl2
 #*   test mul3cl
+#*   test mul4cl1
 #*   test mul4clk
 #*   test mul5clk_c
 #*   test mul5k3
@@ -2147,6 +2183,7 @@ mul9k2.$(OBJEXT): tuning_undefs_9.h
 @GF2X_PCLMUL_AVAILABLE_TRUE@mul2cl.$(OBJEXT): tuning_undefs_2.h
 @GF2X_PCLMUL_AVAILABLE_TRUE@mul2cl2.$(OBJEXT): tuning_undefs_2.h
 @GF2X_PCLMUL_AVAILABLE_TRUE@mul3cl.$(OBJEXT): tuning_undefs_3.h
+@GF2X_PCLMUL_AVAILABLE_TRUE@mul4cl1.$(OBJEXT): tuning_undefs_4.h
 @GF2X_PCLMUL_AVAILABLE_TRUE@mul4clk.$(OBJEXT): tuning_undefs_4.h
 @GF2X_PCLMUL_AVAILABLE_TRUE@mul5clk_c.$(OBJEXT): tuning_undefs_5.h
 @GF2X_PCLMUL_AVAILABLE_TRUE@mul5k3.$(OBJEXT): tuning_undefs_5.h
@@ -2175,7 +2212,7 @@ tune-toom: tunetoom.res update-thresholds$(EXEEXT)
 	cd $(top_builddir) ; $(MAKE)
 
 tunefft.res: tunefft$(EXEEXT)
-	./tunefft -s 1.02 $(FFT_TUNING_LIMIT) -o tunefft.res
+	./tunefft -s $(FFT_TUNING_SCALE) $(FFT_TUNING_LIMIT) -o tunefft.res
 
 tune-fft: tunefft.res update-thresholds$(EXEEXT)
 	cd $(top_builddir) ; $(MAKE)

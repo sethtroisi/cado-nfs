@@ -1012,6 +1012,17 @@ void gf2x_tfft_init(gf2x_tfft_info_ptr o, size_t bits_a, size_t bits_b, ...)
     va_list ap;
     va_start(ap, bits_b);
     long K = va_arg(ap, long);
+
+    /* Since we have a dangerous interface with a variable argument which
+     * is a possibly _signed_ long, better try to catch the expected
+     * mistakes */
+    for(int i = 2*(K>0)-1 ; K/i > 1 ; i*=3) {
+        if ((K/i)%3) {
+            fprintf(stderr, "extra argument to gf2x_tfft_init (of type long) must be a power of 3 (got %ld)\n", K);
+            abort();
+        }
+    }
+
     size_t M;
     if (K > 0) {
         M = CEIL((nwa + nwb) * WLEN, K);	// ceil(bits(product)/K)

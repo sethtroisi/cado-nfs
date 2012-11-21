@@ -1,9 +1,24 @@
 /* 
  * Program: free relations
- * Author : F. Morain
+ * Original author : F. Morain
  * Purpose: creating free relations in a suitable format
- * 
- */
+
+This file is part of CADO-NFS.
+
+CADO-NFS is free software; you can redistribute it and/or modify it under the
+terms of the GNU Lesser General Public License as published by the Free
+Software Foundation; either version 2.1 of the License, or (at your option)
+any later version.
+
+CADO-NFS is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+details.
+
+You should have received a copy of the GNU Lesser General Public License
+along with CADO-NFS; see the file COPYING.  If not, write to the Free Software
+Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
+*/
 
 #include "cado.h"
 #include <stdio.h>
@@ -50,11 +65,12 @@ int
 findFreeRelations(hashtable_t *H, cado_poly pol, int nprimes)
 {
     unsigned long *tmp = (unsigned long *)malloc((2+(nprimes<<1)) * sizeof(unsigned long));
-    unsigned int i, j, k, ntmp = 0;
+    HR_T i;
+    unsigned int j, k, ntmp = 0;
     int pdeg, nfree;
 
-    for(i = 0; i < H->hashmod; i++)
-	if(H->hashcount[i] > 0){
+    for(i = 0; i < H->hm; i++)
+	if(H->hc[i] > 0){
           tmp[ntmp++] = (unsigned long) GET_HASH_P(H,i);
           tmp[ntmp++] = GET_HASH_R(H,i);
 	}
@@ -120,7 +136,9 @@ largeFreeRelations (cado_poly pol, char **fic, int verbose)
 {
     hashtable_t H;
     int Hsizea, nprimes_alg = 0, nfree = 0;
+    /*
     int need64 = (pol->rat->lpb > 32) || (pol->alg->lpb > 32);
+    */
 
     ASSERT(fic != NULL);
     /* The number of algebraic large primes is about 1/2*L/log(L)
@@ -128,7 +146,7 @@ largeFreeRelations (cado_poly pol, char **fic, int verbose)
        However since we store separately primes p and the corresponding root r
        of f mod p, the number of (p,r) pairs is about L/log(L). */
     Hsizea = (1 << pol->alg->lpb) / ((int)((double) pol->alg->lpb * log(2.0)));
-    hashInit (&H, Hsizea, verbose, need64);
+    hashInit (&H, Hsizea, verbose);
     if (verbose)
       fprintf (stderr, "Scanning relations\n");
 
@@ -140,7 +158,7 @@ largeFreeRelations (cado_poly pol, char **fic, int verbose)
         relation_stream_openfile(rs, *fic);
         if (verbose)
             fprintf (stderr, "Adding file %s\n", *fic);
-        for( ; relation_stream_get(rs, NULL, 0) >= 0 ; ) {
+        for( ; relation_stream_get(rs, NULL, 0, 10) >= 0 ; ) {
             if (rs->rel.b == 0) {
                 fprintf(stderr, "Ignoring already found free relation...\n");
                 continue;
@@ -150,8 +168,9 @@ largeFreeRelations (cado_poly pol, char **fic, int verbose)
             reduce_exponents_mod2(&rs->rel);
             computeroots(&rs->rel);
             for(int j = 0; j < rs->rel.nb_ap; j++){
-                int h = hashInsert(&H, rs->rel.ap[j].p, rs->rel.ap[j].r);
-                nprimes_alg += (H.hashcount[h] == 1); // new prime
+	      unsigned int np;
+	      HASHINSERT(&H, rs->rel.ap[j].p, rs->rel.ap[j].r, &np);
+	      nprimes_alg += np; // new prime
             }
         }
         relation_stream_closefile(rs);
@@ -194,10 +213,12 @@ countFreeRelations(int *deg, char *roots)
     while(1){
 	if(!fgets(str, 1024, ifile))
             break;
-	// format is "11: 2,6,10"
-	sscanf(str, "%s %s", str0, str1);
+	// format is "11: 2,6,10" or "11:1,0: 2,6,11"
+        t = strrchr(str, ':');
+        if (t == NULL)
+            continue;
 	nroots = 1;
-	for(t = str1; *t != '\0'; t++)
+	for(; *t != '\0'; t++)
 	    if(*t == ',')
 		nroots++;
 	if(nroots == *deg)
@@ -205,6 +226,26 @@ countFreeRelations(int *deg, char *roots)
     }
     fclose(ifile);
     return nfree;
+}
+
+
+/* Assuming q is a prime or a prime power, let k be the largest integer with
+   q = p^k, return p if k > 1, 0 otherwise */
+// TODO: stolen from fb.c, maybe share it ? 
+static uint32_t
+is_prime_power (uint32_t q)
+{
+    unsigned int maxk, k;
+    uint32_t p;
+
+    for (maxk = 0, p = q; p > 1; p /= 2, maxk ++);
+    for (k = maxk; k >= 2; k--)
+    {
+        p = (uint32_t) (pow ((double) q, 1.0 / (double) k) + 0.5);
+        if (q % p == 0)
+            return p;
+    }
+    return 0;
 }
 
 void
@@ -217,6 +258,8 @@ addFreeRelations(char *roots, int deg)
     for(fbptr = fb; fbptr->p != FB_END; fbptr = fb_next(fbptr)){
 	p = fbptr->p;
 	if(fbptr->nr_roots == deg){
+            if (is_prime_power(p))
+                continue;
 	    // free relation, add it!
 	    // (p, 0) -> p-0*m
 	    printf("%d,0:%lx:", p, (long)p);
@@ -230,8 +273,8 @@ addFreeRelations(char *roots, int deg)
     }
 }
 
-static void
-smallFreeRelations(char *fbfilename)
+static void MAYBE_UNUSED
+smallFreeRelations (char *fbfilename)
 {
     int deg;
     int nfree = countFreeRelations (&deg, fbfilename);
@@ -241,22 +284,69 @@ smallFreeRelations(char *fbfilename)
     addFreeRelations (fbfilename, deg);
 }
 
+/* generate all free relations up to the large prime bound */
+
+static void MAYBE_UNUSED
+allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax)
+{
+  unsigned long lpb, p, *roots;
+  int d = pol->alg->degree, i, n, proj;
+
+  /* we generate all free relations up to the *minimum* of the two large
+     prime bounds, since larger primes will never occur on at least one side */
+  lpb = (pol->rat->lpb < pol->alg->lpb) ? pol->rat->lpb : pol->alg->lpb;
+  ASSERT_ALWAYS(lpb < sizeof(unsigned long) * CHAR_BIT);
+  lpb = 1UL << lpb;
+  roots = (unsigned long*) malloc (d * sizeof (unsigned long));
+  if (pmax == 0)
+    pmax = lpb;
+  for (p = 2; p <= pmax; p = getprime (p))
+    {
+      if (p >= pmin)
+        {
+          /* first compute the number of roots */
+          n = poly_roots_ulong (NULL, pol->alg->f, d, p);
+          proj = mpz_divisible_ui_p (pol->alg->f[d], p) ? 1 : 0;
+          if (n + proj == d)
+            {
+              /* then only compute the roots if we have d roots in total */
+              poly_roots_ulong (roots, pol->alg->f, d, p);
+              printf ("%lu,0:%lx:%lx", p, p, roots[0]);
+              for (i = 1; i < d; i++)
+                printf (",%lx", roots[i]);
+              if (proj)
+                printf (",%lx", p);
+              printf ("\n");
+            }
+        }
+    }
+  getprime (0);
+  free (roots);
+}
+
 static void
 usage (char *argv0)
 {
-  fprintf (stderr, "Usage: %s -fb xxx.roots\n", argv0);
-  fprintf (stderr, "or     %s [-v] -poly xxx.poly xxx.rels1 xxx.rels2 ... xxx.relsk\n", argv0);
+  fprintf (stderr, "Usage: %s [-v] [-pmin nnn] [-pmax nnn] -poly xxx.poly\n", argv0);
+  fprintf (stderr, "or     %s [-v] -poly xxx.poly -fb xxx.roots xxx.rels1 xxx.rels2 ... xxx.relsk\n", argv0);
   exit (1);
 }
 
 int
-main(int argc, char *argv[])
+main (int argc, char *argv[])
 {
-    char *fbfilename = NULL, *polyfilename = NULL, **fic;
+    char *fbfilename MAYBE_UNUSED, *polyfilename = NULL, **fic MAYBE_UNUSED;
     char *argv0 = argv[0];
     cado_poly cpoly;
-    int nfic = 0;
-    int verbose = 0;
+    int nfic MAYBE_UNUSED;
+    int verbose = 0, k;
+    unsigned long pmin = 2, pmax = 0;
+
+    fbfilename = NULL;
+    fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
+    for (k = 1; k < argc; k++)
+      fprintf (stderr, " %s", argv[k]);
+    fprintf (stderr, "\n");
 
     while (argc > 1 && argv[1][0] == '-')
       {
@@ -278,6 +368,18 @@ main(int argc, char *argv[])
             argc -= 2;
             argv += 2;
           }
+        else if (argc > 2 && strcmp (argv[1], "-pmin") == 0)
+          {
+            pmin = strtoul (argv[2], NULL, 10);
+            argc -= 2;
+            argv += 2;
+          }
+        else if (argc > 2 && strcmp (argv[1], "-pmax") == 0)
+          {
+            pmax = strtoul (argv[2], NULL, 10);
+            argc -= 2;
+            argv += 2;
+          }
         else
           usage (argv0);
       }
@@ -285,7 +387,7 @@ main(int argc, char *argv[])
     fic = argv+1;
     nfic = argc-1;
 
-    if (polyfilename == NULL || ((fbfilename == NULL) && (nfic == 0)))
+    if (polyfilename == NULL)
       usage (argv0);
 
     cado_poly_init(cpoly);
@@ -299,18 +401,17 @@ main(int argc, char *argv[])
     cado_poly_check (cpoly);
 
 #if 0
-    if (mpz_cmp_ui (cpoly->g[1], 1) != 0)
-      {
-        fprintf (stderr, "Error, non-monic linear polynomial not yet treated");
-        fprintf (stderr, " (more theory needed)\n");
-        exit (1);
-      }
-#endif
-
     if (nfic == 0)
+      {
+        if (fbfilename == NULL)
+          usage (argv0);
 	smallFreeRelations(fbfilename);
+      }
     else
       largeFreeRelations(cpoly, fic, verbose);
+#else
+    allFreeRelations (cpoly, pmin, pmax);
+#endif
 
     cado_poly_clear (cpoly);
 

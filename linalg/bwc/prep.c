@@ -12,6 +12,8 @@
 #include "xymats.h"
 #include "bw-common-mpi.h"
 #include "filenames.h"
+#include "mpfq/mpfq.h"
+#include "mpfq/abase_vbase.h"
 
 void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
@@ -32,9 +34,16 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
     flags[bw->dir] = THREAD_SHARED_VECTOR;
     flags[!bw->dir] = 0;
 
+    mpz_t p;
+    mpz_init_set_ui(p, 2);
+    param_list_parse_mpz(pl, "prime", p);
     abase_vbase A;
-    abase_vbase_oo_field_init_bygroupsize(A, bw->n);
-    A->set_groupsize(A, bw->n);
+    abase_vbase_oo_field_init_byfeatures(A, 
+            MPFQ_PRIME_MPZ, p,
+            MPFQ_GROUPSIZE, bw->n,
+            MPFQ_DONE);
+    mpz_clear(p);
+
 
     matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);
@@ -197,11 +206,12 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
     save_x(xvecs, bw->m, my_nx, pi);
 
     matmul_top_clear(mmt);
-    A->oo_field_clear(A);
-
 
     /* clean up xy mats stuff */
     vec_clear_generic(pi->m, xymats, bw->m * prep_lookahead_iterations);
+
+    A->oo_field_clear(A);
+
 
     free(xvecs);
     return NULL;

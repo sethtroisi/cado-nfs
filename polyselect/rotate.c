@@ -38,6 +38,6 @@ int main(int argc, char **argv) {
     mpz_clear(b);
     mpz_clear(m);
 
-    print_poly (stdout, poly, argc, argv, 0, 1);
+    print_cadopoly_extra (stdout, poly, argc, argv, 0, 1);
     return 0;
 } 

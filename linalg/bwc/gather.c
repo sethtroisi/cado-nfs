@@ -16,6 +16,8 @@
 #include "bw-common-mpi.h"
 #include "filenames.h"
 #include "balancing.h"
+#include "mpfq/mpfq.h"
+#include "mpfq/abase_vbase.h"
 
 struct sfile_info {
     unsigned int n0,n1;
@@ -121,9 +123,16 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     flags[bw->dir] = THREAD_SHARED_VECTOR;
     flags[!bw->dir] = 0;
 
+    mpz_t p;
+    mpz_init_set_ui(p, 2);
+    param_list_parse_mpz(pl, "prime", p);
     abase_vbase A;
-    abase_vbase_oo_field_init_bygroupsize(A, bw->n);
-    A->set_groupsize(A, bw->n);
+    abase_vbase_oo_field_init_byfeatures(A, 
+            MPFQ_PRIME_MPZ, p,
+            MPFQ_GROUPSIZE, bw->n,
+            MPFQ_DONE);
+    mpz_clear(p);
+
 
     matmul_top_init(mmt, A, pi, flags, pl, bw->dir);
     unsigned int unpadded = MAX(mmt->n0[0], mmt->n0[1]);

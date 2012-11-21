@@ -30,16 +30,19 @@ machines=mach_desc      # file describing available computers for parallel
 ###########################################################################
 
 degree=5                # degree of the algebraic polynomial
-kjdelay=300             # time between two checks
-selectnice=4            # nice level for selection
+polsel_delay=300             # time between two checks
+polsel_nice=4            # nice level for selection
+
+# we can expect
+# MurphyE(Bf=10000000,Bg=5000000,area=1.00e+16)=1.35e-12
 
 ## Parameters of polyselect
-kjP=200000              # choose lc(g) with two prime factors in [P,2P]
-kjmaxnorm=51            # max. lognorm of polynomials (before rootsieve)
-kjadmax=1e8             # max value for lc(f)
-kjadrange=1e6           # individual tasks
-kjkmax=24               # rotation is bounded by 2^kmax
-kjincr=210              # forced divisor of lc(f)
+polsel_P=500000              # choose lc(g) with two prime factors in [P,2P]
+polsel_maxnorm=51.3          # max. lognorm of polynomials (before rootsieve)
+polsel_admax=1e9             # max value for lc(f)
+polsel_adrange=5e6           # individual tasks
+polsel_incr=30030            # forced divisor of lc(f)
+polsel_lq=3                  # special-q in lc(g) has such many factors
 
 ###########################################################################
 # Sieve
@@ -75,12 +78,8 @@ sieve_max_threads=2
 # Filtering
 ###########################################################################
 
-excessratio=1.01        # minimal excess we want before pruning
 keeppurge=160           # shrink in purge if excess exceeds keeppurge
-keep=160                # excess wanted after merge
-maxlevel=20             # maximal merge level
-cwmax=100  
-rwmax=100  
+maxlevel=25             # maximal merge level
 ratio=1.1  
 bwstrat=3               
 

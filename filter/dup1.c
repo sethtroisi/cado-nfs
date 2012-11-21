@@ -41,7 +41,8 @@ static int only_ab = 0;
 /* output relations in dirname/0/name, ..., dirname/31/name */
 int split_relfile (relation_stream_ptr rs, const char *name,
                    const char *dirname, const char * outfmt,
-                   int *do_slice, int nslices_log, int nslices)
+                   int *do_slice, int nslices_log, int nslices, 
+                   unsigned int ab_base)
 {
     FILE * f_in;
     int p_in;
@@ -52,9 +53,6 @@ int split_relfile (relation_stream_ptr rs, const char *name,
     FILE * ofile[nslices];
     int p_out[nslices];
 
-    //unsigned long count[nslices] = {0,};
-    unsigned long count[nslices];
-    count[0] = 0;
     uint64_t h;
 
     f_in = fopen_compressed_r(name, &p_in, &suffix_in);
@@ -84,7 +82,7 @@ int split_relfile (relation_stream_ptr rs, const char *name,
         char line[RELATION_MAX_BYTES];
         size_t rpos = rs->pos - pos0;
 
-        if (relation_stream_get(rs, line, 0) < 0)
+        if (relation_stream_get(rs, line, 0, ab_base) < 0)
             break;
 
 	ok = 1;
@@ -113,11 +111,10 @@ int split_relfile (relation_stream_ptr rs, const char *name,
                 }
             }
         }
-        count[i] ++;
 
         if (relation_stream_disp_progress_now_p(rs)) {
             fprintf (stderr,
-                    "# split %d relations in %.1fs"
+                    "# split %lu relations in %.1fs"
                     " -- %.1f MB/s -- %.1f rels/s\n",
                     rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
         }
@@ -129,13 +126,10 @@ int split_relfile (relation_stream_ptr rs, const char *name,
       if (do_slice[i])
         {
           if (p_out[i]) pclose (ofile[i]); else fclose(ofile[i]);
-          fprintf (stderr, "%d:%lu ", i, count[i]);
         }
       free(oname[i]);
     }
-    fprintf (stderr, " %s\n", name);
-
-
+    fprintf (stderr, "# done %s\n", name);
 
     if (p_in) pclose(f_in); else fclose(f_in);
     return 0;
@@ -156,8 +150,10 @@ main (int argc, char * argv[])
     argv++,argc--;
 
     int bz = 0;
-    param_list_configure_knob(pl, "bz", &bz);
-    param_list_configure_knob(pl, "ab", &only_ab);
+    int ab_hexa = 0;
+    param_list_configure_switch(pl, "bz", &bz);
+    param_list_configure_switch(pl, "ab", &only_ab);
+    param_list_configure_switch(pl, "abhexa", &ab_hexa);
 
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
@@ -217,17 +213,17 @@ main (int argc, char * argv[])
         usage();
     }
 
-    char ** files = filelist ? filelist_from_file(basepath, filelist) : argv;
+    char ** files = filelist ? filelist_from_file(basepath, filelist, 0) : argv;
 
     relation_stream rs;
     relation_stream_init(rs);
     for (char ** fp = files ; *fp ; fp++) {
         had_error |= split_relfile (rs, *fp, dirname, outfmt, do_slice,
-                                    nslices_log, nslices);
+                                    nslices_log, nslices, (ab_hexa)?16:10);
     }
     relation_stream_trigger_disp_progress(rs);
     fprintf (stderr,
-            "# split %d relations in %.1fs"
+            "# split %lu relations in %.1fs"
             " -- %.1f MB/s -- %.1f rels/s\n",
             rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
     relation_stream_clear(rs);

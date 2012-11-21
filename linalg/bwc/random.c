@@ -29,7 +29,7 @@ int gen_row(double lambda, int n, int * ptr)
         int e = 1 + (int) (lambda * dist_func() * (i+1));
         i += e;
         c += 1;
-        if (i < 0 || i >= n)
+        if (i < 0 || i > n)
             break;
         if (ptr) *ptr++ = i - 1;
     }
@@ -85,7 +85,7 @@ double get_corresponding_lambda(int dens, int n)
     return l0;
 }
 
-void printrows(int nrows, int ncols, double lambda)
+void printrows(int nrows, int ncols, double lambda, int maxc)
 {
     int * ptr = malloc((ncols + 1) * sizeof(int));
     int total_coeffs = 0;
@@ -95,6 +95,10 @@ void printrows(int nrows, int ncols, double lambda)
         printf("%d", c);
         for(int j = 0 ; j < c ; j++) {
             printf(" %d", ptr[j]);
+            if (maxc) {
+                int co = rand() % (2 * maxc + 1) - maxc;
+                printf(" %d", co);
+            }
         }
         printf("\n");
         total_coeffs += c;
@@ -116,6 +120,7 @@ void usage()
             "Options:\n"
             "\t-d <density> : another way for specifying the density per row\n"
             "\t-s <seed> : seed\n"
+            "\t-c <maxc> : add coefficients\n"
             "\t-v : turn verbosity on\n"
             "\t--kleft <d>: ensure at least a left kernel of dimension d\n"
             "\t--kright <d>: ditto for right kernel\n");
@@ -132,11 +137,13 @@ int main(int argc, char * argv[])
     argv++, argc--;
     int wild = 0;
 
+    int maxcoeff = 0;
+
     int wild_args[3] = { -1, -1, -1 }; // nrows ncols coeffs_per_row
 
     param_list_configure_alias(pl, "density", "-d");
     param_list_configure_alias(pl, "seed", "-s");
-    param_list_configure_knob(pl, "-v", &verbose);
+    param_list_configure_switch(pl, "-v", &verbose);
 
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
@@ -160,6 +167,8 @@ int main(int argc, char * argv[])
     int seed = 0;
     param_list_parse_int(pl, "seed", &seed);
     if (seed) setup_seeding(seed);
+
+    param_list_parse_int(pl, "c", &maxcoeff);
 
     int nrows = wild_args[0];
     if (nrows < 0) {
@@ -215,7 +224,7 @@ int main(int argc, char * argv[])
                 " Could trigger misbehaviours\n");
     }
 
-    printrows(nrows - kernel_right, ncols - kernel_left, lambda);
+    printrows(nrows - kernel_right, ncols - kernel_left, lambda, maxcoeff);
     for(int i = 0 ; i < kernel_right ; i++) {
         printf("0\n");
     }
