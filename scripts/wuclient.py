@@ -13,12 +13,18 @@ from email.mime.text import MIMEText
 from string import Template
 
 # Settings which we require on the command line (no defaults)
-REQUIRED_SETTINGS = {"CLIENTID" : "", "DLDIR" : "", "SERVER" : "", "WORKDIR" : ""}
-# Optional settings (with defaults, overrideable on command line)
-OPTIONAL_SETTINGS = {"WU_FILENAME" : "WU", "GETWUPATH" : "/cgi-bin/getwu", 
-                     "POSTRESULTPATH" : "cgi-bin/upload.py"}
-# Merge the two
-SETTINGS = dict(list(REQUIRED_SETTINGS.items()) + list(OPTIONAL_SETTINGS.items()))
+REQUIRED_SETTINGS = {"CLIENTID" : ("", "Unique ID for this client"), 
+                     "DLDIR" : ("", "Directory for downloading files"), 
+                     "SERVER" : ("", "Base URL for WU server"), 
+                     "WORKDIR" : ("", "Directory for result files")}
+# Optional settings with defaults, overrideable on command line, and a help text
+OPTIONAL_SETTINGS = {"WU_FILENAME" : ("WU", "Filename under which to store WU files"), 
+                     "GETWUPATH" : ("/cgi-bin/getwu", "Path segment of URL for requesting WUs from server"), 
+                     "POSTRESULTPATH" : ("/cgi-bin/upload.py", "Path segment of URL for reporting results to server"), 
+                     "DEBUG" : ("0", "Debugging verbosity")}
+# Merge the two, removing help string
+SETTINGS = dict([(a,b) for (a,(b,c)) in list(REQUIRED_SETTINGS.items()) + \
+                                        list(OPTIONAL_SETTINGS.items())])
 
 def get_file(urlpath, dlpath = None):
     # print('get_file("' + urlpath + '", "' + dlpath + '")')
@@ -37,6 +43,8 @@ def get_missing_file(urlpath, filename, checksum = None):
     if not os.path.isfile(filename):
         get_file(urlpath, filename)
         # FIXME CHECKSUM
+    else:
+        print (filename + " already exists, not downloading")
     if checksum:
         # FIXME CHECKSUM
         pass
@@ -53,14 +61,14 @@ class Workunit():
 
     parsed = None
     exitcode = 0 # will get set if any command exits with code != 0
-    debug = 2 # Controls debugging output
+    debug = 1 # Controls debugging output
     
     def parse(self, filepath):
         wu = {}
         for key in self.LIST_KEYS:
           wu[key] = [] # Init to empty list
         if self.debug >= 1:
-            print ("Reading workunit from file " + filepath)
+            print ("Parsing workunit from file " + filepath)
         wu_file = open(filepath)
         for line in wu_file:
             (key, value) = line.split(" ", 1)
@@ -87,6 +95,8 @@ class Workunit():
                 return False
         wu_file.close()
         self.parsed = wu
+        if self.debug >= 1:
+            print (" done, workunit ID is " + self.parsed["WORKUNIT"])
         return True
 
     def get_files(self):
@@ -105,7 +115,7 @@ class Workunit():
         for command in self.parsed["COMMAND"]:
             command = Template(command).safe_substitute(SETTINGS)
             if self.debug >= 1:
-                print ("Running command: " + command)
+                print ("Running command for " + self.parsed["WORKUNIT"] + ": " + command)
             rc = subprocess.call(command, shell=True)
             if rc != 0:
                 print ("Command exited with exit code " + str(rc)) 
@@ -127,6 +137,7 @@ class Workunit():
             postdata.attach(rc)
         if "RESULT" in self.parsed:
             filepath = SETTINGS["WORKDIR"] + "/" + self.parsed["RESULT"]
+            print ("Adding result file " + filepath + " to upload")
             file = open(filepath, "rb")
             filedata = file.read()
             file.close()
@@ -150,41 +161,58 @@ class Workunit():
         url = SETTINGS["SERVER"] + "/" + SETTINGS["POSTRESULTPATH"]
         request = urllib.request.Request(url, data=postdata3, headers=dict(postdata.items()))
         conn = urllib.request.urlopen(request)
+        print ("Server response:")
         for line in conn:
             print(line)
         conn.close()
+        return True
 
-def process_WU(filename):
-    print ("Processing work unit file " + filename + ":")
-    for line in open(filename):
-        print(line.rstrip())
-    # If all output files exist, send them, return WU as done
-    # Otherwise, run commands in WU. If no error and all output 
-    #   files exist, send them, return WU as done
-    wu = Workunit()
-    if not wu.parse(filename):
-        return False
-    # print(str(wu))
-    if not wu.get_files():
-        return False
-    if not wu.run_commands():
-        return False
-    wu.upload_result()
+    def cleanup(self):
+        print ("Cleaning up for workunit " + self.parsed["WORKUNIT"])
+        if "RESULT" in self.parsed:
+            filepath = SETTINGS["WORKDIR"] + "/" + self.parsed["RESULT"]
+            print ("Removing result file " + filepath)
+            os.remove(filepath)
 
+    def process_file(self, filepath):
+        if int(SETTINGS["DEBUG"]) > 0:
+            print ("Processing work unit file " + filepath + ":")
+            for line in open(filepath):
+                print(line.rstrip())
+        # If all output files exist, send them, return WU as done
+        # Otherwise, run commands in WU. If no error and all output 
+        #   files exist, send them, return WU as done
+        if not self.parse(filepath):
+            return False
+        # print(str(wu))
+        if not self.get_files():
+            return False
+        if not self.run_commands():
+            return False
+        if not self.upload_result():
+            return False
+        self.cleanup()
 
 def do_work():
     wu_filename = SETTINGS["DLDIR"] + "/" + SETTINGS["WU_FILENAME"]
-    get_missing_file(SETTINGS["GETWUPATH"], wu_filename)
-    process_WU(wu_filename)
+    if not get_missing_file(SETTINGS["GETWUPATH"], wu_filename):
+        return False
+    wu = Workunit()
+    if not wu.process_file(wu_filename):
+        return False
+    print ("Removing workunit file " + wu_filename)
+    os.remove(wu_filename)
 
 if __name__ == '__main__':
     # Create command line parser from the keys in SETTINGS
     parser = argparse.ArgumentParser()
     for arg in REQUIRED_SETTINGS.keys():
-        parser.add_argument('--' + arg.lower(), required = True)
+        parser.add_argument('--' + arg.lower(), required = True,
+        help=REQUIRED_SETTINGS[arg][1])
     for arg in OPTIONAL_SETTINGS.keys():
         parser.add_argument('--' + arg.lower(), required = False, 
-            default=OPTIONAL_SETTINGS[arg])
+            default=OPTIONAL_SETTINGS[arg][0], 
+            help=OPTIONAL_SETTINGS[arg][1] + " (default: " + OPTIONAL_SETTINGS[arg][0] + ")")
     # Parse command line, store as dictionary
     args = vars(parser.parse_args())
     # Copy values to SETTINGS
@@ -192,6 +220,6 @@ if __name__ == '__main__':
         if arg.lower() in args:
             SETTINGS[arg] = args[arg.lower()].rstrip("/")
 
-    print (str(SETTINGS))
+    # print (str(SETTINGS))
 
     do_work()
