@@ -61,6 +61,7 @@ B) to use within another program: compile without -DMAIN, the main function
 #include <stdlib.h>
 #include <math.h>
 #include <gmp.h>
+#include "usp.h"
 
 /* #define DEBUG */
 
@@ -101,7 +102,7 @@ ln2 (mpz_t a)
 }
 
 /* divides in-place the input polynomial by 2^k*x-a */
-void
+static void
 divide (mpz_t a, int k, int n, mpz_t *p)
 {
   int i;
@@ -124,36 +125,18 @@ divide (mpz_t a, int k, int n, mpz_t *p)
   mpz_clear (w);
 }
 
+/* isolating interval is [a/2^ka, b/2^kb] */
 static void
-printQ (mpz_t a, int k)
+printInt (mpz_t a, int ka, mpz_t b, int kb, int *nroots, root_struct *R)
 {
-  mpz_t w;
-
-  mpz_init (w);
-  mpz_out_str (stdout, 10, a);
-  if (k > 0)
+  if (R != NULL)
     {
-      /* printf ("/%d",1<<k); may overflow */
-      mpz_set_ui (w, 1);
-      mpz_mul_2exp (w, w, k);
-      printf ("/");
-      mpz_out_str (stdout, 10, w);
+      mpz_set (R[*nroots].a, a);
+      R[*nroots].ka = ka;
+      mpz_set (R[*nroots].b, b);
+      R[*nroots].kb = kb;
     }
-  mpz_clear (w);
-}
-
-static void
-printInt (mpz_t a, int ka, mpz_t b, int kb, int *nroots, int verbose)
-{
   *nroots += 1;
-  if (verbose)
-    {
-      printf ("%d: ", *nroots);
-      printQ (a, ka);
-      printf ("..");
-      printQ (b, kb);
-      printf ("\n");
-    }
 }
 
 /* returns the sign of p(a/2^k) */
@@ -178,10 +161,14 @@ signValue (mpz_t a, int k, int n, mpz_t *p)
   return ret;
 }
 
-/* returns number of real roots isolated in a/2^m..b/2^m */
+/* returns number of real roots (isolated) in a/2^m..b/2^m of polynomial
+   p[0]+p[1]*x+...+p[n]*x^n
+   r[0..n] is an auxiliary array.
+   If R is not NULL, puts the roots in R.
+*/
 static int
 usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
-     mpz_t *p, mpz_t *r, int verbose)
+     mpz_t *p, mpz_t *r, int verbose, root_struct *R)
 {
    int lmi, i, k, c, s, smi, last, d;
    mpz_t mi, u, v, w;
@@ -199,7 +186,7 @@ usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
      return 0;
    else if (up == 1)
      {
-       printInt (a, m, b, m, nroots, verbose);
+       printInt (a, m, b, m, nroots, R);
        return 1;
      }
    mpz_init (mi);
@@ -220,7 +207,7 @@ usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
            mpz_out_str (stdout, 10, mi);
            printf ("/2^%d\n", lmi);
 #endif
-           printInt (mi, lmi, mi, lmi, nroots, verbose);
+           printInt (mi, lmi, mi, lmi, nroots, R);
            divide (mi, lmi, n, p);
 #ifdef DEBUG
            printf ("new input polynomial is ");
@@ -234,9 +221,9 @@ usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
            mpz_mul_2exp (b, b, 1);
          }
        le = usp (a, mi, lmi, n, signValue (a, lmi, n, p),
-                 signValue (mi, lmi, n, p), n, nroots, p, r, verbose);
+                 signValue (mi, lmi, n, p), n, nroots, p, r, verbose, R);
        ri = usp (mi, b, lmi, n, signValue (mi, lmi, n, p),
-                 signValue (b, lmi, n, p), n, nroots, p, r, verbose);
+                 signValue (b, lmi, n, p), n, nroots, p, r, verbose, R);
        mpz_clear (mi);
        return 1 + le + ri;
    }
@@ -244,8 +231,8 @@ usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
      {
        if (up == 2)
          {
-           printInt (a, m, mi, lmi, nroots, verbose);
-           printInt (mi, lmi, b, m, nroots, verbose);
+           printInt (a, m, mi, lmi, nroots, R);
+           printInt (mi, lmi, b, m, nroots, R);
            mpz_clear (mi);
            return 2;
          }
@@ -258,14 +245,14 @@ usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
            mpz_mul_2exp (aa, a, 1);
          else
            mpz_set (aa, a);
-         c = usp (aa, mi, lmi, up, va, smi, n, nroots, p, r, verbose);
+         c = usp (aa, mi, lmi, up, va, smi, n, nroots, p, r, verbose, R);
          if (c < up)
            {
              if (lmi > m)
                mpz_mul_2exp (aa, b, 1);
              else
                mpz_set (aa, b);
-             c += usp (mi, aa, lmi, up - c, smi, vb, n, nroots, p, r, verbose);
+             c += usp (mi, aa, lmi, up - c, smi, vb, n, nroots, p, r, verbose, R);
            }
          mpz_clear (mi);
          mpz_clear (aa);
@@ -326,7 +313,7 @@ usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
          }
      }
    if (c == 1)
-     printInt (a, m, b, m, nroots, verbose);
+     printInt (a, m, b, m, nroots, R);
    else if (c > 1)
      {
        mpz_t aa;
@@ -343,14 +330,14 @@ usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
          mpz_mul_2exp (aa, a, 1);
        else
          mpz_set (aa, a);
-       c = usp (aa, mi, lmi, up, va, smi, n, nroots, p, r, verbose);
+       c = usp (aa, mi, lmi, up, va, smi, n, nroots, p, r, verbose, R);
        if (c < up)
          {
            if (lmi > m)
              mpz_mul_2exp (aa, b, 1);
            else
              mpz_set (aa, b);
-           c += usp (mi, aa, lmi, up-c, smi, vb, n, nroots, p, r, verbose);
+           c += usp (mi, aa, lmi, up-c, smi, vb, n, nroots, p, r, verbose, R);
          }
        mpz_clear (aa);
      }
@@ -359,6 +346,24 @@ usp (mpz_t a, mpz_t b, int m, int up, int va, int vb, int n, int *nroots,
 }
 
 #ifdef DEBUG
+static void
+printQ (mpz_t a, int k)
+{
+  mpz_t w;
+
+  mpz_init (w);
+  mpz_out_str (stdout, 10, a);
+  if (k > 0)
+    {
+      /* printf ("/%d",1<<k); may overflow */
+      mpz_set_ui (w, 1);
+      mpz_mul_2exp (w, w, k);
+      printf ("/");
+      mpz_out_str (stdout, 10, w);
+    }
+  mpz_clear (w);
+}
+
 static void
 printPol (mpz_t *p, int n)
 {
@@ -379,9 +384,10 @@ printPol (mpz_t *p, int n)
    Assume p[n] is not zero.
    T (if not zero) is a bound on the absolute value of the real roots.
    If verbose is non-zero, print the isolating intervals for the roots.
- */
+   If Roots is not NULL, put the isolating intervals in Roots[0..nroots-1].
+*/
 int
-numberOfRealRoots (mpz_t *p, int n, double T, int verbose)
+numberOfRealRoots (mpz_t *p, int n, double T, int verbose, root_struct *Roots)
 {
   int i, nroots;
   mpz_t a, R, R1, *r;
@@ -401,7 +407,7 @@ numberOfRealRoots (mpz_t *p, int n, double T, int verbose)
   if (mpz_cmp_ui (p[0], 0) == 0) /* root at 0 */
     {
       mpz_set_ui (a, 0);
-      printInt (a, 0, a, 0, &nroots, verbose);
+      printInt (a, 0, a, 0, &nroots, Roots);
       while (mpz_cmp_ui (p[0], 0) == 0)
         divide (a, 0, n, p);
     }
@@ -452,7 +458,7 @@ numberOfRealRoots (mpz_t *p, int n, double T, int verbose)
   mpz_init (R1);
   mpz_neg (R1, R);
   i = usp (R1, R, 0, n, signValue (R1, 0, n, p), signValue (R, 0, n, p),
-           n, &nroots, p, r, verbose);
+           n, &nroots, p, r, verbose, Roots);
 
   mpz_clear (a);
   mpz_clear (R);

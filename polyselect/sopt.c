@@ -146,7 +146,7 @@ opt_file (FILE *file, int deg, mpz_t N) {
          }
 
 			   // need to output raw, since we may re-optimize this using updated optimize.c
-			   nroots = numberOfRealRoots (f, deg, 0, 0);
+                           nroots = numberOfRealRoots (f, deg, 0, 0, NULL);
 			   skew = L2_skewness (f, deg, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
 			   logmu = L2_lognorm (f, deg, skew, DEFAULT_L2_METHOD);
 			   alpha = get_alpha (f, deg, ALPHA_BOUND);
@@ -157,7 +157,7 @@ opt_file (FILE *file, int deg, mpz_t N) {
 			   // optimize
 			   optimize (f, deg, g, 0, 1); // no verbose
 			   // optimized polynomial
-			   nroots = numberOfRealRoots (f, deg, 0, 0);
+			   nroots = numberOfRealRoots (f, deg, 0, 0, NULL);
 			   skew = L2_skewness (f, deg, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
 			   logmu = L2_lognorm (f, deg, skew, DEFAULT_L2_METHOD);
 			   alpha = get_alpha (f, deg, ALPHA_BOUND);

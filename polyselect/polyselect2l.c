@@ -158,7 +158,7 @@ print_poly_info ( mpz_t *f,
   for (i = d + 1; i -- != 0; )
     gmp_printf ("c%u: %Zd\n", i, f[i]);
 
-  nroots = numberOfRealRoots (f, d, 0, 0);
+  nroots = numberOfRealRoots (f, d, 0, 0, NULL);
   skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
   logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
   alpha = get_alpha (f, d, ALPHA_BOUND);
