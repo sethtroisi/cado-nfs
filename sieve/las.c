@@ -74,27 +74,6 @@ int factor_leftover_norm (mpz_t n, unsigned int b, mpz_array_t* const factors,
 			  uint32_array_t* const multis,
 			  facul_strategy_t *strategy);
 
-/* Determine whether a sieve entry with sieve residue S1 on sieving side 1
-   and sieve residue S2 on sieving side 2 is likely smooth. 
-   The array entry C1[S1] is initialized by sieve_info_init_lognorm() 
-   to something similar to 
-   -log(Pr[norm on side 1 with sieve residue S1 is smooth]),
-   similar for C2, S2. Assuming the two probabilities are independent enough,
-   we can estimate the neg log of the probability that both sides are smooth 
-   by C1[S1] + C2[S2]. 
-   If that sum does not exceed a threshold, the corresponding sieve entry is
-   a sieve survivor. 
-   Alternative: have a bit array telling whether (S1,S2) is likely smooth */
-static inline int 
-sieve_info_test_lognorm (const unsigned char *C1, 
-                         const unsigned char *C2, 
-                         const unsigned char S1,
-                         const unsigned char S2,
-                         const unsigned char threshold)
-{
-  return C1[S1] + C2[S2] <= threshold;
-}
-
 static void sieve_info_init_trialdiv(sieve_info_ptr si)
 {
     /* Our trial division needs odd divisors, 2 is handled by mpz_even_p().
