@@ -542,7 +542,7 @@ print_poly_info_short ( mpz_t *f,
   mpz_neg (g[0], g[0]);
 
   /* compute skew, logmu, nroots */
-  nroots = numberOfRealRoots (f, d, 0, 0);
+  nroots = numberOfRealRoots (f, d, 0, 0, NULL);
   skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
   logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
   alpha = get_alpha (f, d, ALPHA_BOUND);
