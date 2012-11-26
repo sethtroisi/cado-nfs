@@ -52,7 +52,7 @@ sieve_info_init_lognorm (unsigned char *C, unsigned char threshold,
 #endif
 }
 
-static void
+MAYBE_UNUSED static void
 sieve_info_init_lognorm_prob (unsigned char *C, const unsigned long *rels,
     const unsigned long *surv, const double thresh)
 {
