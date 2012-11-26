@@ -958,14 +958,13 @@ collision_on_p ( header_t header,
       hash_init (H, INIT_FACTOR * lenPrimes);
       for (nprimes = 0; nprimes < lenPrimes; nprimes ++)
         {
+          nrp = R->nr[nprimes];
+          if (nrp == 0)
+            continue;
           p = Primes[nprimes];
           ppl = (int64_t) p * (int64_t) p;
-
-          if ((header->d * header->ad) % p == 0)
-            continue;
-
-          nrp = R->nr[nprimes];
           rp = R->roots[nprimes];
+
           for (j = 0; j < nrp; j++)
             {
               for (u = (int64_t) rp[j]; u < umax; u += ppl)
@@ -1007,8 +1006,7 @@ collision_on_each_sq ( header_t header,
                        proots_t R,
                        unsigned long q,
                        mpz_t rqqz,
-                       unsigned long *inv_qq,
-                       uint8_t *hd2modp)
+                       unsigned long *inv_qq )
 {
   shash_t H;
   uint64_t **cur;
@@ -1042,8 +1040,8 @@ collision_on_each_sq ( header_t header,
   umax *= umax;
   neg_umax = -umax;
   for (nprimes = 0; LIKELY(nprimes < lenPrimes); nprimes++) {
+
     if (!(vpnr = R->nr[nprimes])) continue;
-    if (hd2modp[nprimes]) continue;
     pcnr = pc + vpnr;
     ppl = (long) Primes[nprimes];
     ppl *= ppl;
@@ -1195,7 +1193,6 @@ collision_on_each_sq_r ( header_t header,
                          mpz_t *rqqz,
                          unsigned long *inv_qq,
                          unsigned long number_pr,
-                         uint8_t *hd2modp,
                          int count )
 {
   unsigned int i, nr, *pnr;
@@ -1218,7 +1215,6 @@ collision_on_each_sq_r ( header_t header,
   /* for each rp, compute (rp-rq)*1/q^2 (mod p^2) */
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++) 
   {
-    if (UNLIKELY(hd2modp[nprimes])) continue;
     if (!pnr[nprimes]) continue;
     nr = pnr[nprimes];
     p = Primes[nprimes];
@@ -1264,7 +1260,7 @@ collision_on_each_sq_r ( header_t header,
   
   /* core function to find collisions */
   for (k = 0; k < count; k ++) {
-    collision_on_each_sq (header, R, q, rqqz[k], tinv_qq[k], hd2modp);
+    collision_on_each_sq (header, R, q, rqqz[k], tinv_qq[k]);
   }
   
   if (verbose > 2)
@@ -1334,7 +1330,6 @@ collision_on_batch_sq_r ( header_t header,
                           unsigned long *idx_q,
                           unsigned long *inv_qq,
                           unsigned long number_pr,
-                          uint8_t *hd2modp,
                           int *curr_nq )
 {
   int i, count;
@@ -1378,7 +1373,7 @@ collision_on_batch_sq_r ( header_t header,
     if ((*curr_nq) > nq) break;
 
     /* core function for a fixed qq and several rqqz[] */
-    collision_on_each_sq_r (header, R, q, rqqz, inv_qq, number_pr, hd2modp, count);
+    collision_on_each_sq_r (header, R, q, rqqz, inv_qq, number_pr, count);
   }
 
   mpz_clear (qqz);
@@ -1490,25 +1485,18 @@ collision_on_batch_sq ( header_t header,
 
   /* Step 2: find collisions on q. */
   int st2 = cputime();
-  uint64_t had_ha = header->d * header->d;
-  uint8_t *hd2modp = (uint8_t *) malloc(lenPrimes * sizeof(*hd2modp));
-  memset (hd2modp, 0, lenPrimes);
-
-  for (i = lenPrimes; i--;)
-    if (UNLIKELY(!(had_ha % Primes[i]))) hd2modp[i] = 1;
 
   for (i = 0; i < size; i ++) {
     if (curr_nq >= nq)
       break;
     collision_on_batch_sq_r (header, R, SQ_R, q[i], idx_q[i],
-                             invqq[i], number_pr, hd2modp, &curr_nq);
+                             invqq[i], number_pr, &curr_nq);
   }
   
   if (verbose > 2)
     fprintf (stderr, "#  stage (special-q) for %d special-q's took %dms\n",
              nq, cputime() - st2);
 
-  free(hd2modp);
   for (i = 0; i < size; i++)
     free (invqq[i]);
   free (invqq);
