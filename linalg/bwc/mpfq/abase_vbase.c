@@ -7,6 +7,8 @@
 #include "abase_p_4_t.h"
 #include "abase_p_1.h"
 #include "abase_p_1_t.h"
+#include "abase_p_3.h"
+#include "abase_p_3_t.h"
 #include "abase_u64k1.h"
 #include "abase_u64k1_t.h"
 #include "abase_u64k2.h"
@@ -35,6 +37,8 @@ void abase_vbase_oo_field_init_byfeatures(abase_vbase_ptr v, ...)
             abase_p_4_oo_field_init(v);
         } else if (groupsize == 1 && mpz_size(p) == 1) {
             abase_p_1_oo_field_init(v);
+        } else if (groupsize == 1 && mpz_size(p) == 3) {
+            abase_p_3_oo_field_init(v);
         } else if (groupsize == 64 && mpz_cmp_ui(p, 2) == 0) {
             abase_u64k1_oo_field_init(v);
         } else if (groupsize == 128 && mpz_cmp_ui(p, 2) == 0) {
@@ -60,6 +64,10 @@ void abase_vbase_oo_init_templates(abase_vbase_tmpl_ptr w, abase_vbase_ptr v0, a
         w->dotprod = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_p_1_p_1_dotprod;
         w->addmul_tiny = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *, void *, unsigned int)) abase_p_1_p_1_addmul_tiny;
         w->transpose = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *)) abase_p_1_p_1_transpose;
+    } else if (strcmp(s0, "p_3") == 0 && strcmp(s1, "p_3") == 0) {
+        w->dotprod = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_p_3_p_3_dotprod;
+        w->addmul_tiny = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *, void *, unsigned int)) abase_p_3_p_3_addmul_tiny;
+        w->transpose = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *)) abase_p_3_p_3_transpose;
     } else if (strcmp(s0, "u64k1") == 0 && strcmp(s1, "u64k1") == 0) {
         w->dotprod = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_u64k1_u64k1_dotprod;
         w->addmul_tiny = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *, void *, unsigned int)) abase_u64k1_u64k1_addmul_tiny;

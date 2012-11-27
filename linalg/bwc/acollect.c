@@ -29,6 +29,7 @@ void usage()
 struct bw_params bw[1];
 
 int remove_old = 0;
+int bits_per_coeff = 1;
 
 struct afile_s {
     unsigned int n0, n1, j0, j1;
@@ -79,7 +80,7 @@ int read_afiles(struct afile_list * a)
             // fprintf(stderr, "skipped %s\n", de->d_name);
             continue;
         }
-        if (A->n1 % CHAR_BIT || A->n0 % CHAR_BIT) {
+        if ((A->n1 * bits_per_coeff) % CHAR_BIT || (A->n0 * bits_per_coeff) % CHAR_BIT) {
             fprintf(stderr, "%s has bad boundaries\n",
                     de->d_name);
             exit(1);
@@ -90,7 +91,7 @@ int read_afiles(struct afile_list * a)
             fprintf(stderr, "stat(%s): %s\n", de->d_name, strerror(errno));
             exit(1);
         }
-        ssize_t expected = bw->m * (A->n1-A->n0) / CHAR_BIT * (A->j1 - A->j0);
+        ssize_t expected = bw->m * (A->n1-A->n0) * bits_per_coeff / CHAR_BIT * (A->j1 - A->j0);
 
         if (sbuf->st_size != expected) {
             fprintf(stderr, "%s does not have expected size %zu\n",
@@ -130,6 +131,7 @@ int main(int argc, char * argv[])
     param_list_init(pl);
     param_list_configure_switch(pl, "--remove-old", &remove_old);
     bw_common_init(bw, pl, &argc, &argv);
+    param_list_parse_int(pl, "bits-per-coeff", &bits_per_coeff);
     param_list_clear(pl);
 
     struct afile_list a[1];
@@ -281,7 +283,7 @@ int main(int argc, char * argv[])
             free(tmp);
         }
 
-        char * buf = malloc((n1-n0)/CHAR_BIT);
+        char * buf = malloc((n1-n0)*bits_per_coeff/CHAR_BIT);
 
         final->j1 = j0;
 
@@ -291,7 +293,7 @@ int main(int argc, char * argv[])
                 size_t rz;
                 size_t sz;
                 for(int k = k0 ; k < k1 ; k++) {
-                    sz = (a->a[k]->n1 - a->a[k]->n0) / CHAR_BIT;
+                    sz = (a->a[k]->n1 - a->a[k]->n0) * bits_per_coeff/ CHAR_BIT;
                     rz = fread(ptr, 1, sz, rs[k-k0]);
                     if (rz < sz) {
                         rc = 2;
@@ -299,7 +301,7 @@ int main(int argc, char * argv[])
                     }
                     ptr += sz;
                 }
-                sz = (n1-n0)/CHAR_BIT;
+                sz = (n1-n0)* bits_per_coeff/CHAR_BIT;
                 rz = fwrite(buf, 1, sz, f);
                 if (rz != sz) {
                     fprintf(stderr, "fwrite: short write\n");
