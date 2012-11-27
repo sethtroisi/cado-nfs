@@ -165,6 +165,18 @@ if ($mode =~ /^(spvector32)$/) {
     exit;
 }
 
+if ($mode =~ /^(spvector64)$/) {
+    # Dump a list of SIGNED ints
+    my $add1 = $mode eq 'permutation';
+    my @p=();
+    while(sysread(STDIN, my $x, 8)) {
+        my $v = unpack("q",$x);
+        push @p, $v+$add1;
+    }
+    print "var:=[",join(',',@p),"];\n";
+    exit;
+}
+
 if ($mode eq 'x') {
     die unless defined($_=<>);
     die unless /^(\d+)$/;
