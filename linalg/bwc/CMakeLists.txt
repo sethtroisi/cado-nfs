@@ -76,9 +76,14 @@ foreach(v ${bwc_abases})
     set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/abase_${v}.c mpfq/abase_${v}_t.c )
 endforeach(v)
 
+# The code in mpfq/ is 64-bit only, and relies on GNU CC idioms. As it is
+# not used in production yet, we don't want to expose it on 32-bit
+# platforms.
+if (HAVE_GCC_STYLE_AMD64_ASM)
 foreach(v p_1 p_3 p_4)
     set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/abase_${v}.c mpfq/abase_${v}_t.c )
 endforeach(v)
+endif (HAVE_GCC_STYLE_AMD64_ASM)
 
 set(bwc_base_sources
     parallelizing_info.c
@@ -177,9 +182,13 @@ foreach(v ${bwc_abases})
         configure_matmul_lib(${v} ${i})
     endforeach(i)
 endforeach(v)
+
+# See above
+if (HAVE_GCC_STYLE_AMD64_ASM)
 configure_matmul_lib(p_1 basicp)
 configure_matmul_lib(p_3 basicp)
 configure_matmul_lib(p_4 basicp)
+endif (HAVE_GCC_STYLE_AMD64_ASM)
 
 # INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/share/${CADO_DIST_ARCHIVE_NAME}/libexec"
 
@@ -239,23 +248,19 @@ target_link_libraries(cleanup utils m)
 
 install(TARGETS cleanup RUNTIME DESTINATION bin/linalg/bwc)
 
-include(CMakeLists-nodist.txt OPTIONAL)
 
+if (HAVE_GCC_STYLE_AMD64_ASM)
 add_executable(plingen EXCLUDE_FROM_ALL
                 bw-common.c
                 plingen.c
                 polymat.c
                 mpfq/abase_p_4.c
         )
-    #               variables.c fft_on_matrices.cpp
-    #               ops_poly_integerfft.cpp
-    #               e_polynomial.c structure.c
-    #               twisting_polynomials.c
-    #               master_common.c)
-
 target_link_libraries(plingen gmp utils)
-
 # Only to play with it for the moment.
 set_target_properties(plingen PROPERTIES COMPILE_FLAGS "-DSELECT_ABASE_p_4")
-
 # install(TARGETS plingen RUNTIME DESTINATION bin/linalg/bwc)
+endif (HAVE_GCC_STYLE_AMD64_ASM)
+
+include(CMakeLists-nodist.txt OPTIONAL)
+
