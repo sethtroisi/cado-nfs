@@ -3,12 +3,14 @@
 #define _POSIX_C_SOURCE 200112L
 #include <stdarg.h>
 #include "abase_vbase.h"
+#ifdef  ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG
 #include "abase_p_4.h"
 #include "abase_p_4_t.h"
 #include "abase_p_1.h"
 #include "abase_p_1_t.h"
 #include "abase_p_3.h"
 #include "abase_p_3_t.h"
+#endif  /* ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG */
 #include "abase_u64k1.h"
 #include "abase_u64k1_t.h"
 #include "abase_u64k2.h"
@@ -33,12 +35,14 @@ void abase_vbase_oo_field_init_byfeatures(abase_vbase_ptr v, ...)
         }
         va_end(ap);
         if (0) {
+#ifdef ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG
         } else if (groupsize == 1 && mpz_size(p) == 4) {
             abase_p_4_oo_field_init(v);
         } else if (groupsize == 1 && mpz_size(p) == 1) {
             abase_p_1_oo_field_init(v);
         } else if (groupsize == 1 && mpz_size(p) == 3) {
             abase_p_3_oo_field_init(v);
+#endif  /* ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG */
         } else if (groupsize == 64 && mpz_cmp_ui(p, 2) == 0) {
             abase_u64k1_oo_field_init(v);
         } else if (groupsize == 128 && mpz_cmp_ui(p, 2) == 0) {
@@ -56,7 +60,9 @@ void abase_vbase_oo_init_templates(abase_vbase_tmpl_ptr w, abase_vbase_ptr v0, a
 {
     const char * s0 = v0->oo_impl_name(v0);
     const char * s1 = v1->oo_impl_name(v1);
-    if (strcmp(s0, "p_4") == 0 && strcmp(s1, "p_4") == 0) {
+    if (0) {
+#ifdef ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG
+    } else if (strcmp(s0, "p_4") == 0 && strcmp(s1, "p_4") == 0) {
         w->dotprod = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_p_4_p_4_dotprod;
         w->addmul_tiny = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *, void *, unsigned int)) abase_p_4_p_4_addmul_tiny;
         w->transpose = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *)) abase_p_4_p_4_transpose;
@@ -68,6 +74,7 @@ void abase_vbase_oo_init_templates(abase_vbase_tmpl_ptr w, abase_vbase_ptr v0, a
         w->dotprod = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_p_3_p_3_dotprod;
         w->addmul_tiny = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *, void *, unsigned int)) abase_p_3_p_3_addmul_tiny;
         w->transpose = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *)) abase_p_3_p_3_transpose;
+#endif
     } else if (strcmp(s0, "u64k1") == 0 && strcmp(s1, "u64k1") == 0) {
         w->dotprod = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_u64k1_u64k1_dotprod;
         w->addmul_tiny = (void (*) (abase_vbase_ptr, abase_vbase_ptr, void *, const void *, void *, unsigned int)) abase_u64k1_u64k1_addmul_tiny;
