@@ -337,6 +337,14 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
   logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
 
+  /* raw poly */
+  if (logmu <= max_norm)
+    {
+      printf ("# Raw polynomial:\n");
+      gmp_printf ("n: %Zd\n", N);
+      print_poly_info (fold, d, gold, 1);
+    }
+
   /* for degree 6 polynomials, find bottleneck coefficient */
   double skewtmp = 0.0, logmu0c4 = 0.0, logmu0c3 = 0.0;
   if (d == 6) {
@@ -476,20 +484,13 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 		  pthread_mutex_unlock (&lock);
 #endif
 
-    /* raw poly */
-    if (raw) {
-      printf ("# Raw polynomial:\n");
-      gmp_printf ("n: %Zd\n", N);
-      print_poly_info (fold, d, gold, 1);
-      if (d == 6)
-        gmp_printf ("# noc4/noc3: %.2f/%.2f (%.2f)\n",
-                    logmu0c4, logmu0c3, logmu0c4/logmu0c3);
-      gmp_printf ("# Optimized polynomial:\n");
-    }
-
     /* print optimized (maybe size- or size-root- optimized) polynomial */
     if (verbose >= 0)
       {
+        if (d == 6 && verbose >= 1)
+          gmp_printf ("# noc4/noc3: %.2f/%.2f (%.2f)\n",
+                      logmu0c4, logmu0c3, logmu0c4/logmu0c3);
+        gmp_printf ("# Optimized polynomial:\n");
         gmp_printf ("n: %Zd\n", N);
         print_poly_info (f, d, g, 0);
         printf ("# Murphy's E(Bf=%.0f,Bg=%.0f,area=%.2e)=%1.2e (best so far %1.2e)\n",
@@ -499,7 +500,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       }
   }
   else {
-    if (verbose >= 0) {
+    if (verbose >= 1) {
       if (d == 6)
         gmp_printf ("# Skip polynomial: %.2f, ad: %"PRIu64", l: %Zd, m: %Zd, noc4/noc3: %.2f/%.2f (%.2f)\n",
                     logmu, ad, l, m, logmu0c4, logmu0c3, logmu0c4/logmu0c3);
