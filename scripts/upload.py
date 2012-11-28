@@ -11,20 +11,18 @@ from sys import stderr
 from sys import argv
 from tempfile import mkstemp
 
+def diag(level, text, var):
+    if debug > level and var != None:
+        print (text + str(var), file=stderr)
+
 # Global variable in this module so that other Python modules can import
 # it and store the path to the upload directory in the shell environment 
 # variable specified here
 UPLOADDIRKEY="UPLOADDIR"
 
 def do_upload():
-    if debug > 1:
-        stderr.write("Command line arguments:\n")
-        stderr.write(str(argv))
-    if debug > 2:
-        stderr.write("\nEnvironment:\n")
-        for e in os.environ.items():
-            stderr.write(str(e) + "\n")
-        stderr.write("\n")
+    diag(1, "Command line arguments:", argv)
+    diag(2, "Environment:", os.environ)
 
     try: # Windows needs stdio set for binary mode.
         import msvcrt
@@ -33,7 +31,12 @@ def do_upload():
     except ImportError:
         pass
 
+    diag(1, "Reading POST data\n", "")
+        
     form = cgi.FieldStorage()
+
+    diag (2, "Attributes for form: ", dir(form))
+    diag (2, "form = ", form)
 
     print ("Content-Type: text/plain\r\n\r\n",)
 
@@ -50,6 +53,15 @@ def do_upload():
     else:
         WUid = form['WUid']
         fileitem = form['results']
+        diag (2, "Attributes of fileitem: ", dir(fileitem))
+        diag (2, "fileitem.name = ", fileitem.name);
+        diag (2, "fileitem.filename = ", fileitem.filename);
+        diag (2, "fileitem.type = ", fileitem.type);
+        diag (2, "fileitem.type_options = ", fileitem.type_options);
+        diag (2, "fileitem.disposition = ", fileitem.disposition);
+        diag (2, "fileitem.disposition_options = ", fileitem.disposition_options);
+        diag (2, "fileitem.headers = ", fileitem.headers);
+        diag (2, "fileitem.encoding = ", fileitem.encoding);
         # Test if the result was uploaded and WUid was set:
         if not fileitem.filename:
             message = 'No file was uploaded'
@@ -70,7 +82,7 @@ def do_upload():
             ' was uploaded successfully and stored as ' + filename + \
             ', received ' + str(bytes) + ' bytes.'
 
-    stderr.write(argv[0] + ': ' + message + '\n')
+    diag (0, argv[0] + ': ', message)
     print(message)
 
 
