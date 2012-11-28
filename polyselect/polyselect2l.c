@@ -337,6 +337,14 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
   logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
 
+  /* raw poly */
+  if (logmu <= max_norm)
+    {
+      printf ("# Raw polynomial:\n");
+      gmp_printf ("n: %Zd\n", N);
+      print_poly_info (fold, d, gold, 1);
+    }
+
   /* for degree 6 polynomials, find bottleneck coefficient */
   double skewtmp = 0.0, logmu0c4 = 0.0, logmu0c3 = 0.0;
   if (d == 6) {
@@ -476,20 +484,13 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 		  pthread_mutex_unlock (&lock);
 #endif
 
-    /* raw poly */
-    if (raw) {
-      printf ("# Raw polynomial:\n");
-      gmp_printf ("n: %Zd\n", N);
-      print_poly_info (fold, d, gold, 1);
-      if (d == 6)
-        gmp_printf ("# noc4/noc3: %.2f/%.2f (%.2f)\n",
-                    logmu0c4, logmu0c3, logmu0c4/logmu0c3);
-      gmp_printf ("# Optimized polynomial:\n");
-    }
-
     /* print optimized (maybe size- or size-root- optimized) polynomial */
     if (verbose >= 0)
       {
+        if (d == 6 && verbose >= 1)
+          gmp_printf ("# noc4/noc3: %.2f/%.2f (%.2f)\n",
+                      logmu0c4, logmu0c3, logmu0c4/logmu0c3);
+        gmp_printf ("# Optimized polynomial:\n");
         gmp_printf ("n: %Zd\n", N);
         print_poly_info (f, d, g, 0);
         printf ("# Murphy's E(Bf=%.0f,Bg=%.0f,area=%.2e)=%1.2e (best so far %1.2e)\n",
@@ -499,7 +500,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       }
   }
   else {
-    if (verbose >= 0) {
+    if (verbose >= 1) {
       if (d == 6)
         gmp_printf ("# Skip polynomial: %.2f, ad: %"PRIu64", l: %Zd, m: %Zd, noc4/noc3: %.2f/%.2f (%.2f)\n",
                     logmu, ad, l, m, logmu0c4, logmu0c3, logmu0c4/logmu0c3);
@@ -704,7 +705,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
     logmu0c4 = L2_lognorm (f, d, skewtmp, DEFAULT_L2_METHOD);
     mpz_set (f[4], tmp);
   }
-  
+
   double g0 = mpz_get_d (g[0]);
   g0 /= mpz_get_d (f[d-2]);
   g0 = (g0 > 0)? g0 : -g0;
@@ -958,14 +959,13 @@ collision_on_p ( header_t header,
       hash_init (H, INIT_FACTOR * lenPrimes);
       for (nprimes = 0; nprimes < lenPrimes; nprimes ++)
         {
+          nrp = R->nr[nprimes];
+          if (nrp == 0)
+            continue;
           p = Primes[nprimes];
           ppl = (int64_t) p * (int64_t) p;
-
-          if ((header->d * header->ad) % p == 0)
-            continue;
-
-          nrp = R->nr[nprimes];
           rp = R->roots[nprimes];
+
           for (j = 0; j < nrp; j++)
             {
               for (u = (int64_t) rp[j]; u < umax; u += ppl)
@@ -1007,8 +1007,7 @@ collision_on_each_sq ( header_t header,
                        proots_t R,
                        unsigned long q,
                        mpz_t rqqz,
-                       unsigned long *inv_qq,
-                       uint8_t *hd2modp)
+                       unsigned long *inv_qq )
 {
   shash_t H;
   uint64_t **cur;
@@ -1042,8 +1041,8 @@ collision_on_each_sq ( header_t header,
   umax *= umax;
   neg_umax = -umax;
   for (nprimes = 0; LIKELY(nprimes < lenPrimes); nprimes++) {
+
     if (!(vpnr = R->nr[nprimes])) continue;
-    if (hd2modp[nprimes]) continue;
     pcnr = pc + vpnr;
     ppl = (long) Primes[nprimes];
     ppl *= ppl;
@@ -1052,7 +1051,7 @@ collision_on_each_sq ( header_t header,
       u = v - ppl;
       while (v < umax) {
 	/* Careful. If the loop is unrolled, use at least 12-16 occurencies,
-	   or gcc optimiser does stupid slower << optimizations >> */ 
+	   or gcc optimiser does stupid slower << optimizations >> */
 	cur = CURRENT(v); *(*cur)++ = v; __builtin_prefetch(*cur, 1, 3);
 	v += ppl; if (v >= umax) break;
 	cur = CURRENT(v); *(*cur)++ = v; __builtin_prefetch(*cur, 1, 3);
@@ -1124,7 +1123,7 @@ collision_on_each_sq ( header_t header,
   }
   for (j = 0; j < SHASH_NBUCKETS; j++)
     assert (H->current[j] <= H->base[j+1]);
-  
+
   /*
   t2 = cputicks();
   sum1 += t2 - t1;
@@ -1195,7 +1194,6 @@ collision_on_each_sq_r ( header_t header,
                          mpz_t *rqqz,
                          unsigned long *inv_qq,
                          unsigned long number_pr,
-                         uint8_t *hd2modp,
                          int count )
 {
   unsigned int i, nr, *pnr;
@@ -1204,7 +1202,7 @@ collision_on_each_sq_r ( header_t header,
   uint64_t pp;
   unsigned long **tinv_qq = malloc (count * sizeof (unsigned long*));
 
-  if (!tinv_qq) 
+  if (!tinv_qq)
   {
     fprintf (stderr, "Error, cannot allocate memory in %s\n", __FUNCTION__);
     exit (1);
@@ -1214,11 +1212,10 @@ collision_on_each_sq_r ( header_t header,
 
   int st = cputime();
   pnr = R->nr;
-  
+
   /* for each rp, compute (rp-rq)*1/q^2 (mod p^2) */
-  for (nprimes = 0; nprimes < lenPrimes; nprimes ++) 
+  for (nprimes = 0; nprimes < lenPrimes; nprimes ++)
   {
-    if (UNLIKELY(hd2modp[nprimes])) continue;
     if (!pnr[nprimes]) continue;
     nr = pnr[nprimes];
     p = Primes[nprimes];
@@ -1231,12 +1228,12 @@ collision_on_each_sq_r ( header_t header,
     modredcul_init (res_rp, modpp);
     modredcul_init (res_tmp, modpp);
 
-    for (k = 0; k < count; k ++) 
+    for (k = 0; k < count; k ++)
     {
       rqi = mpz_fdiv_ui (rqqz[k], pp);
       modredcul_intset_ul (res_rqi, rqi);
       modredcul_intset_ul (res_tmp, inv_qq[nprimes]);
-      for (i = 0; i < nr; i ++, c++) 
+      for (i = 0; i < nr; i ++, c++)
       {
         rp = R->roots[nprimes][i];
         modredcul_intset_ul (res_rp, rp);
@@ -1249,7 +1246,7 @@ collision_on_each_sq_r ( header_t header,
       c -= nr;
     }
     c += nr;
-    
+
     modredcul_clear (res_rp, modpp);
     modredcul_clear (res_rqi, modpp);
     modredcul_clear (res_tmp, modpp);
@@ -1261,12 +1258,12 @@ collision_on_each_sq_r ( header_t header,
              count, cputime () - st);
     st = cputime();
   }
-  
+
   /* core function to find collisions */
   for (k = 0; k < count; k ++) {
-    collision_on_each_sq (header, R, q, rqqz[k], tinv_qq[k], hd2modp);
+    collision_on_each_sq (header, R, q, rqqz[k], tinv_qq[k]);
   }
-  
+
   if (verbose > 2)
     fprintf (stderr, "#  substage: collision-detection %d many rq took %dms\n",
              count, cputime () - st);
@@ -1334,7 +1331,6 @@ collision_on_batch_sq_r ( header_t header,
                           unsigned long *idx_q,
                           unsigned long *inv_qq,
                           unsigned long number_pr,
-                          uint8_t *hd2modp,
                           int *curr_nq )
 {
   int i, count;
@@ -1351,7 +1347,7 @@ collision_on_batch_sq_r ( header_t header,
     ind_qr[i] = 0;
     len_qnr[i] = SQ_R->nr[idx_q[i]];
   }
-  
+
 #if 0
   fprintf (stderr, "q: %lu, ", q);
   for (i = 0; i < lq; i ++)
@@ -1378,7 +1374,7 @@ collision_on_batch_sq_r ( header_t header,
     if ((*curr_nq) > nq) break;
 
     /* core function for a fixed qq and several rqqz[] */
-    collision_on_each_sq_r (header, R, q, rqqz, inv_qq, number_pr, hd2modp, count);
+    collision_on_each_sq_r (header, R, q, rqqz, inv_qq, number_pr, count);
   }
 
   mpz_clear (qqz);
@@ -1490,25 +1486,18 @@ collision_on_batch_sq ( header_t header,
 
   /* Step 2: find collisions on q. */
   int st2 = cputime();
-  uint64_t had_ha = header->d * header->d;
-  uint8_t *hd2modp = (uint8_t *) malloc(lenPrimes * sizeof(*hd2modp));
-  memset (hd2modp, 0, lenPrimes);
-
-  for (i = lenPrimes; i--;)
-    if (UNLIKELY(!(had_ha % Primes[i]))) hd2modp[i] = 1;
 
   for (i = 0; i < size; i ++) {
     if (curr_nq >= nq)
       break;
     collision_on_batch_sq_r (header, R, SQ_R, q[i], idx_q[i],
-                             invqq[i], number_pr, hd2modp, &curr_nq);
+                             invqq[i], number_pr, &curr_nq);
   }
-  
+
   if (verbose > 2)
     fprintf (stderr, "#  stage (special-q) for %d special-q's took %dms\n",
              nq, cputime() - st2);
 
-  free(hd2modp);
   for (i = 0; i < size; i++)
     free (invqq[i]);
   free (invqq);
@@ -1573,7 +1562,7 @@ collision_on_sq ( header_t header,
     q[i] = return_q_norq (SQ_R, idx_q_tmp, K, qqz[i]);
     //print_comb (K, idx_q_tmp);
   }
-  
+
 #ifdef DEBUG_POLYSELECT2L
   fprintf (stderr, "# Info: n=%lu, k=%lu, (n,k)=%lu"
            ", maxnq=%d, nq=%lu\n", N, K, binom(N, K), nq, tbatch_size);
@@ -1588,7 +1577,7 @@ collision_on_sq ( header_t header,
   /* clean */
   for (i = 0; i < tbatch_size; i++) {
     mpz_clear (qqz[i]);
-    free (idx_q[i]);    
+    free (idx_q[i]);
   }
   free (idx_q);
   qroots_clear (SQ_R);

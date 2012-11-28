@@ -2,9 +2,10 @@
 m:=1;
 n:=1;
 
-p:=65521;
+p:=109378681671075297195692480234213908123642560192251038455204252439;
 
 load "/tmp/bwcp/t.m"; M:=Matrix(GF(p),Matrix(var));
+KP<X>:=PolynomialRing(GF(p));
 nr:=Nrows(M);
 nc:=Ncols(M);
 
@@ -110,30 +111,36 @@ assert rowweights(Transpose(Pr*Sr*Cr)*Mt) eq rowweights(M);
 
 
 
+function group(nlimbs)
+    return func<var|[Seqint([x mod 2^64:x in var[i*k+1..i*k+k]],2^64):i in [0..#var div k - 1]] where k is nlimbs>;
+end function;
 
+g:=group(Ceiling(Log(2^64,p)));
 
-load "/tmp/bwcp/Y0.m"; Y0:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/V0.m"; V0:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/V1.m"; V1:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/V2.m"; V2:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/V3.m"; V3:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/V4.m"; V4:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/V5.m"; V5:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/V6.m"; V6:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/V7.m"; V7:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/V8.m"; V8:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/V9.m"; V9:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/V10.m"; V10:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/C1.m"; C1:=Vector(GF(p),nr,var);
-load "/tmp/bwcp/C10.m"; C10:=Vector(GF(p),nr,var);
+load "/tmp/bwcp/Y0.m"; Y0:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/V0.m"; V0:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/V1.m"; V1:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/V2.m"; V2:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/V3.m"; V3:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/V4.m"; V4:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/V5.m"; V5:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/V6.m"; V6:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/V7.m"; V7:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/V8.m"; V8:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/V9.m"; V9:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/V10.m"; V10:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/C0.m"; C0:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/C1.m"; C1:=Vector(GF(p),nr,g(var));
+load "/tmp/bwcp/C50.m"; C50:=Vector(GF(p),nr,g(var));
 
 load "/tmp/bwcp/x.m";
 Xt:=Matrix(GF(p),nr,1,[]);
 for i in [1..1] do for u in var[i] do Xt[u][i] +:=1; end for; end for;
 
+interval:=50;
 
 C1 eq Vector(Xt)*Mx*Q;
-C10 eq Vector(Xt)*(Mx*Q)^10;
+C50 eq Vector(Xt)*(Mx*Q)^interval;
 
 
 V1 eq Vector(V0)*Transpose(Mx*Q);
@@ -146,6 +153,40 @@ V7 eq Vector(V6)*Transpose(Mx*Q);
 V8 eq Vector(V7)*Transpose(Mx*Q);
 V9 eq Vector(V8)*Transpose(Mx*Q);
 V10 eq Vector(V9)*Transpose(Mx*Q);
+
+function matpol_from_sequence(seq, m, n)
+    assert #seq mod m*n eq 0;
+    deg:=#seq div (m*n)-1;
+    F:=&+[KP.1^i*      Matrix(KP,m,n,seq[i*m*n+1..(i+1)*m*n]):i in [0..deg]];
+    Fr:= &+[KP.1^(deg-i)*Matrix(KP,m,n,seq[i*m*n+1..(i+1)*m*n]):i in [0..deg]];
+    return F, Fr;
+end function;
+
+mcoeff:=func<M,k|Matrix(CoefficientRing(CoefficientRing(M)),Nrows(M),Ncols(M),[Coefficient(M[i,j],k):j in [1..Ncols(M)], i in [1..Nrows(M)]])>;
+mdiv:=func<M,k|Matrix(KP,Nrows(M),Ncols(M),[M[i,j] div KP.1^k:j in [1..Ncols(M)], i in [1..Nrows(M)]] where KP is CoefficientRing(M))>;
+mmod:=func<M,k|Matrix(KP,Nrows(M),Ncols(M),[M[i,j] mod KP.1^k:j in [1..Ncols(M)], i in [1..Nrows(M)]] where KP is CoefficientRing(M))>;
+
+
+load "/tmp/bwcp/A.m";
+A:=matpol_from_sequence(var,m,n);
+
+
+load "/tmp/bwcp/F0-1.m";
+F,Fr:=matpol_from_sequence(var,n,n);
+
+
+load "/tmp/bwcp/W.m";    W:=Vector(GF(p), nr, var);
+
+IsZero(W*Transpose(Mx*Q));
+assert Mt eq Pr*Sr*Mx*Q*Sc^-1;
+Mt eq P*S*Mx*Q*S^-1;
+Transpose(Pr*Sr)*Mt*Sc eq Mx*Q;
+Mx eq Cr*M*Transpose(Cc);
+
+IsZero(W*Transpose(Q)*Cc*Transpose(M)*Transpose(Cr));
+sol:=Vector(Eltseq(W*Transpose(Q)*Cc)[1..nc]);
+IsZero(sol*Transpose(M));
+
 
 
 // 

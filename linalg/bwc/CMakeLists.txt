@@ -76,9 +76,12 @@ foreach(v ${bwc_abases})
     set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/abase_${v}.c mpfq/abase_${v}_t.c )
 endforeach(v)
 
-foreach(v p_1 p_4)
+
+if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
+foreach(v p_1 p_3 p_4)
     set(bwc_mpfq_sources ${bwc_mpfq_sources} mpfq/abase_${v}.c mpfq/abase_${v}_t.c )
 endforeach(v)
+endif (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
 
 set(bwc_base_sources
     parallelizing_info.c
@@ -177,8 +180,13 @@ foreach(v ${bwc_abases})
         configure_matmul_lib(${v} ${i})
     endforeach(i)
 endforeach(v)
+
+# See above
+if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
 configure_matmul_lib(p_1 basicp)
+configure_matmul_lib(p_3 basicp)
 configure_matmul_lib(p_4 basicp)
+endif (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
 
 # INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/share/${CADO_DIST_ARCHIVE_NAME}/libexec"
 
@@ -238,4 +246,19 @@ target_link_libraries(cleanup utils m)
 
 install(TARGETS cleanup RUNTIME DESTINATION bin/linalg/bwc)
 
+
+if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
+add_executable(plingen EXCLUDE_FROM_ALL
+                bw-common.c
+                plingen.c
+                polymat.c
+                mpfq/abase_p_4.c
+        )
+target_link_libraries(plingen gmp utils)
+# Only to play with it for the moment.
+set_target_properties(plingen PROPERTIES COMPILE_FLAGS "-DSELECT_ABASE_p_4")
+# install(TARGETS plingen RUNTIME DESTINATION bin/linalg/bwc)
+endif (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
+
 include(CMakeLists-nodist.txt OPTIONAL)
+

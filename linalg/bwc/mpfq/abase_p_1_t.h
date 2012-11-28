@@ -27,11 +27,15 @@
                                                                'u64k1',
                                                                'u64k2'
                                                              ],
+                                                  'p_3' => [
+                                                             'p_3'
+                                                           ],
                                                   'u64k1' => $vbase_stuff->{'member_templates_restrict'}{'u64k2'}
                                                 },
                  'families' => [
                                  $vbase_stuff->{'member_templates_restrict'}{'p_4'},
                                  $vbase_stuff->{'member_templates_restrict'}{'p_1'},
+                                 $vbase_stuff->{'member_templates_restrict'}{'p_3'},
                                  $vbase_stuff->{'member_templates_restrict'}{'u64k2'}
                                ],
                  'choose_byfeatures' => sub { "DUMMY" }
