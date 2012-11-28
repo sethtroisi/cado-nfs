@@ -1363,15 +1363,15 @@ collision_on_batch_sq_r ( header_t header,
   int re = 1;
   while (re) {
     /* compute BATCH_SIZE such many rqqz[] */
-    for (count = 0; count < BATCH_SIZE; count ++) {
-      aux_return_rq (SQ_R, idx_q, ind_qr, lq, qqz, rqqz[count]);
-      re = aux_nextcomb(ind_qr, lq, len_qnr);
-      if (!re) break;
-    }
-
-    /* reach nq limit */
-    (*curr_nq) += count;
-    if ((*curr_nq) > nq) break;
+    for (count = 0; count < BATCH_SIZE; count ++, (*curr_nq)++)
+      {
+        aux_return_rq (SQ_R, idx_q, ind_qr, lq, qqz, rqqz[count]);
+        re = aux_nextcomb (ind_qr, lq, len_qnr);
+        if ((*curr_nq) >= nq)
+          re = 0;
+        if (!re)
+          break;
+      }
 
     /* core function for a fixed qq and several rqqz[] */
     collision_on_each_sq_r (header, R, q, rqqz, inv_qq, number_pr, count);
@@ -1487,16 +1487,17 @@ collision_on_batch_sq ( header_t header,
   /* Step 2: find collisions on q. */
   int st2 = cputime();
 
-  for (i = 0; i < size; i ++) {
-    if (curr_nq >= nq)
-      break;
-    collision_on_batch_sq_r (header, R, SQ_R, q[i], idx_q[i],
-                             invqq[i], number_pr, &curr_nq);
-  }
+  for (i = 0; i < size; i ++)
+    {
+      collision_on_batch_sq_r (header, R, SQ_R, q[i], idx_q[i],
+                               invqq[i], number_pr, &curr_nq);
+      if (curr_nq >= nq)
+        break;
+    }
 
   if (verbose > 2)
     fprintf (stderr, "#  stage (special-q) for %d special-q's took %dms\n",
-             nq, cputime() - st2);
+             curr_nq, cputime() - st2);
 
   for (i = 0; i < size; i++)
     free (invqq[i]);
