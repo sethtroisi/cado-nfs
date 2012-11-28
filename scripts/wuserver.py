@@ -3,6 +3,7 @@
 import http.server
 import socketserver
 import os
+from Workunit import Workunit
 
 # Get the shell environment variable name in which we should store the path 
 # to the upload directory
@@ -24,8 +25,9 @@ class Workunits():
         WU = "WORKUNIT WU" + str(self.WU_counter) + "\r\n"
         WU = WU + "EXECFILE ecm\r\n"
         WU = WU + "FILE c200\r\n"
-        WU = WU + "COMMAND $DLDIR/ecm 1e6 < $DLDIR/c200 > $WORKDIR/output\r\n"
-        WU = WU + "RESULT output\r\n"
+        WU = WU + "COMMAND $DLDIR/ecm 1e5 < $DLDIR/c200 > $WORKDIR/output\r\n"
+        WU = WU + "COMMAND gzip -9 $WORKDIR/output\r\n"
+        WU = WU + "RESULT output.gz\r\n"
         self.WU_counter = self.WU_counter + 1
         return WU;
 

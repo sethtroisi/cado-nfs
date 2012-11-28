@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import sys
 import os
 import stat
 import argparse
@@ -10,7 +11,25 @@ import subprocess
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+import email.encoders
+import email.generator
 from string import Template
+from io import StringIO,BytesIO
+from Workunit import Workunit
+
+class FixedBytesGenerator(email.generator.BytesGenerator):
+    def _handle_bytes(self, msg):
+        payload = msg.get_payload()
+        if payload is None:
+            return
+        if isinstance(payload, bytes):
+            # Payload is bytes, output is bytes - just write them
+            self._fp.write(payload)
+        else:
+            # Payload is neither bytes not string - this can't be right
+            raise TypeError('bytes payload expected: %s' % type(payload))
+    _writeBody = _handle_bytes
+
 
 # Settings which we require on the command line (no defaults)
 REQUIRED_SETTINGS = {"CLIENTID" : ("", "Unique ID for this client"), 
@@ -53,57 +72,29 @@ def get_missing_file(urlpath, filename, checksum = None):
 def _do_nothing(msg):
     pass
 
-class Workunit():
-    # Keys that must occur only once
-    SCALAR_KEYS = ("WORKUNIT", "RESULT")
-    # Keys that can occur multiple times
-    LIST_KEYS = ("FILE", "EXECFILE", "CHECKSUM", "COMMAND")
-
-    parsed = None
-    exitcode = 0 # will get set if any command exits with code != 0
-    debug = 1 # Controls debugging output
+class Workunit_Processor(Workunit):
     
-    def parse(self, filepath):
-        wu = {}
-        for key in self.LIST_KEYS:
-          wu[key] = [] # Init to empty list
+    def __init__(self, filepath, debug = 0):
+        self.exitcode = 0 # will get set if any command exits with code != 0
+        self.debug = debug # Controls debugging output
+
         if self.debug >= 1:
             print ("Parsing workunit from file " + filepath)
         wu_file = open(filepath)
-        for line in wu_file:
-            (key, value) = line.split(" ", 1)
-            value = value.rstrip() # Drop trailing whitespace, incl. CR/LF
-            if key in self.SCALAR_KEYS:
-                if key in wu:
-                    print("Error: key " + key + " redefined")
-                    return False
-                wu[key] = value
-            elif key in self.LIST_KEYS:
-                # (EXEC)FILE/CHECKSUM keys get special treatment, as CHECKSUM 
-                # always refers to the previous (EXEC)FILE
-                if key == "FILE" or key == "EXECFILE":
-                    wu["CHECKSUM"].append(None)
-                if key == "CHECKSUM":
-                    if len(wu[key]) == 0 or wu[key][-1] != None:
-                        print("Error: extraneous " + key)
-                        return False
-                    wu[key][-1] = value
-                else:
-                    wu[key].append(value)
-            else:
-                print("Error: key " + key + " not recognized")
-                return False
+        wu_text = wu_file.read()
         wu_file.close()
-        self.parsed = wu
+        self.wu = Workunit(wu_text)
         if self.debug >= 1:
-            print (" done, workunit ID is " + self.parsed["WORKUNIT"])
-        return True
+            print (" done, workunit ID is " + self.wu.get_id())
+
+    def  __str__(self):
+        return "Processor for Workunit:\n" + self.wu.__str__()
 
     def get_files(self):
-        for filename in self.parsed["FILE"] + self.parsed["EXECFILE"]:
-            if not get_missing_file (filename, SETTINGS["DLDIR"] + '/' + filename):
+        for (filename, checksum) in self.wu.data["FILE"] + self.wu.data["EXECFILE"]:
+            if not get_missing_file (filename, SETTINGS["DLDIR"] + '/' + filename, checksum):
                 return False
-        for filename in self.parsed["EXECFILE"]:
+        for (filename, checksum) in self.wu.data["EXECFILE"]:
             path = SETTINGS["DLDIR"] + '/' + filename
             mode = os.stat(path).st_mode
             if mode & stat.S_IXUSR == 0:
@@ -112,10 +103,10 @@ class Workunit():
         return True
     
     def run_commands(self):
-        for command in self.parsed["COMMAND"]:
+        for command in self.wu.data["COMMAND"]:
             command = Template(command).safe_substitute(SETTINGS)
-            if self.debug >= 1:
-                print ("Running command for " + self.parsed["WORKUNIT"] + ": " + command)
+            if self.debug >= 0:
+                print ("Running command for " + self.wu.get_id() + ": " + command)
             rc = subprocess.call(command, shell=True)
             if rc != 0:
                 print ("Command exited with exit code " + str(rc)) 
@@ -128,33 +119,43 @@ class Workunit():
     def upload_result(self):
         # Build a multi-part MIME document containing the WU id and result file
         postdata = MIMEMultipart()
-        WUid = MIMEText(self.parsed["WORKUNIT"])
+        WUid = MIMEText(self.wu.get_id())
         WUid.add_header('Content-Disposition', 'form-data', name="WUid")
         postdata.attach(WUid)
         if self.exitcode > 0:
             rc = MIMEText(str(self.exitcode))
             WUid.add_header('Content-Disposition', 'form-data', name="exitcode")
             postdata.attach(rc)
-        if "RESULT" in self.parsed:
-            filepath = SETTINGS["WORKDIR"] + "/" + self.parsed["RESULT"]
-            print ("Adding result file " + filepath + " to upload")
+        if "RESULT" in self.wu.data:
+            filepath = SETTINGS["WORKDIR"] + "/" + self.wu.data["RESULT"]
+            if self.debug >= 1:
+                print ("Adding result file " + filepath + " to upload")
             file = open(filepath, "rb")
             filedata = file.read()
             file.close()
-            result = MIMEApplication(filedata)
+            # HTTP does not use a Content-Transfer-Encoding, so use noop encoder
+            # This fails, probably related to http://bugs.python.org/issue4768
+            result = MIMEApplication(filedata, _encoder=email.encoders.encode_noop)
             result.add_header('Content-Disposition', 'form-data', name="results", 
-                              filename=self.parsed["RESULT"]);
+                              filename=self.wu.data["RESULT"])
             postdata.attach(result)
         if self.debug >= 2:
             print("Headers of postdata as a dictionary:")
             print(dict(postdata.items()))
         # Ugly hack: overwrite method for writing headers to suppress them
-        postdata._write_headers = _do_nothing
-        postdata2 = postdata.as_string(unixfrom=False) + "\n"
-        if self.debug >= 2:
-            print("Postdata as a string:")
-            print(postdata2)
-        postdata3 = bytes(postdata2, encoding="utf-8")
+        # We pass the MIME headers to the request below via the headers= argument, 
+        # and don't want them to occur again as part of the POST data
+        if False:
+            postdata2 = postdata.as_string(unixfrom=False) + "\n"
+            if self.debug >= 2:
+                print("Postdata as a string:")
+                print(postdata2)
+            postdata3 = bytes(postdata2, encoding="utf-8")
+        else:
+            fp = BytesIO()
+            g = FixedBytesGenerator(fp)
+            g.flatten(postdata, unixfrom=False)
+            postdata3 = fp.getvalue() + b"\n"
         if self.debug >= 2:
             print("Postdata as a bytes array:")
             print(postdata3)
@@ -167,44 +168,50 @@ class Workunit():
         conn.close()
         return True
 
+    def result_exists(self):
+        if "RESULT" in self.wu.data:
+            filepath = SETTINGS["WORKDIR"] + "/" + self.wu.data["RESULT"]
+            if not os.path.isfile(filepath):
+                return False
+            print ("Result file " + filepath + " already exists")
+        print ("All result files already exist")
+        return True
+
     def cleanup(self):
-        print ("Cleaning up for workunit " + self.parsed["WORKUNIT"])
-        if "RESULT" in self.parsed:
-            filepath = SETTINGS["WORKDIR"] + "/" + self.parsed["RESULT"]
+        print ("Cleaning up for workunit " + self.wu.get_id())
+        if "RESULT" in self.wu.data:
+            filepath = SETTINGS["WORKDIR"] + "/" + self.wu.data["RESULT"]
             print ("Removing result file " + filepath)
             os.remove(filepath)
 
-    def process_file(self, filepath):
-        if int(SETTINGS["DEBUG"]) > 0:
-            print ("Processing work unit file " + filepath + ":")
-            for line in open(filepath):
-                print(line.rstrip())
+    def process(self):
         # If all output files exist, send them, return WU as done
         # Otherwise, run commands in WU. If no error and all output 
         #   files exist, send them, return WU as done
-        if not self.parse(filepath):
-            return False
         # print(str(wu))
         if not self.get_files():
             return False
-        if not self.run_commands():
-            return False
+        if not self.result_exists():
+            self.run_commands()
         if not self.upload_result():
             return False
         self.cleanup()
+        return True
 
 def do_work():
     wu_filename = SETTINGS["DLDIR"] + "/" + SETTINGS["WU_FILENAME"]
     if not get_missing_file(SETTINGS["GETWUPATH"], wu_filename):
         return False
-    wu = Workunit()
-    if not wu.process_file(wu_filename):
+    wu = Workunit_Processor(wu_filename, int(SETTINGS["DEBUG"]))
+    if not wu.process():
         return False
     print ("Removing workunit file " + wu_filename)
     os.remove(wu_filename)
+    return True
 
 if __name__ == '__main__':
     # Create command line parser from the keys in SETTINGS
+    print (sys.path)
     parser = argparse.ArgumentParser()
     for arg in REQUIRED_SETTINGS.keys():
         parser.add_argument('--' + arg.lower(), required = True,
