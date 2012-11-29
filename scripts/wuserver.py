@@ -3,35 +3,20 @@
 import http.server
 import socketserver
 import os
-from Workunit import Workunit
+from workunit import Workunit
+import wudb
+from wudb import DbWuEntry
+import upload
 
 # Get the shell environment variable name in which we should store the path 
 # to the upload directory
-from upload import UPLOADDIRKEY
 
 upload_keywords = ['upload.py']
 uploaddir='upload/' # Upload CGI script puts files in this directory
+dbfilename='wudb'
 
 class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     """Handle requests in a separate thread."""
-
-class Workunits():
-    WU_counter = 0
-    
-    def get_new(self):
-        """Returns the contents of a WU file for an available WU"""
-        if self.WU_counter > 500:
-            return None
-        WU = "WORKUNIT WU" + str(self.WU_counter) + "\r\n"
-        WU = WU + "EXECFILE ecm\r\n"
-        WU = WU + "FILE c200\r\n"
-        WU = WU + "COMMAND $DLDIR/ecm 1e5 < $DLDIR/c200 > $WORKDIR/output\r\n"
-        WU = WU + "COMMAND gzip -9 $WORKDIR/output\r\n"
-        WU = WU + "RESULT output.gz\r\n"
-        self.WU_counter = self.WU_counter + 1
-        return WU;
-
-WU = Workunits()
 
 class MyHandler(http.server.CGIHTTPRequestHandler):
     def send_body(self, body):
@@ -49,22 +34,43 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             http.server.CGIHTTPRequestHandler.do_GET(self)
 
     def send_WU(self):
-        new_WU = WU.get_new()
-        if new_WU == None:
-            return self.send_error(404)
+        filename = self.cgi_info[1]
+        if not "?" in filename:
+            return self.send_error(400, "No query string given")
+        (filename, query) = self.cgi_info[1].split("?", 1)
+        if query.count("=") != 1 or "?" in query or "&" in query:
+            return self.send_error(400, "Bad query string in request")
+        (key, clientid) = query.split("=")
+        if key != "clientid":
+            return self.send_error(400, "No client id specified")
+        if not clientid.isalnum():
+            return self.send_error(400, "Malformed client id specified")
+        
+        wu = db.where_eq("status", wudb.WuStatus.AVAILABLE, limit=1)
+        if not wu:
+            return self.send_error(404, "No work available")
+        
+        self.log_message("Sending work unit " + wu[0].get_id() + " to client " + clientid)
+        db.assign(wu[0].get_id(), clientid)
+        wu_text = str(wu[0])
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")
-        self.send_header("Content-Length", str(len(new_WU)))
+        self.send_header("Content-Length", len(wu_text))
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()
-        self.send_body(new_WU)
+        self.send_body(wu_text)
 
     def do_POST(self):
         """Set environment variable telling the upload directory 
            and call CGI handler to run upload CGI script"""
-        os.environ[UPLOADDIRKEY] = uploaddir
         if self.is_upload():
-            http.server.CGIHTTPRequestHandler.do_POST(self)
+            os.environ[upload.UPLOADDIRKEY] = uploaddir
+            os.environ[upload.DBFILENAMEKEY] = dbfilename
+            if False:
+                self.send_response(200, "Script output follows")
+                upload.do_upload(db, input = self.rfile, output = self.wfile)
+            else:
+                http.server.CGIHTTPRequestHandler.do_POST(self)
         else:
             self.send_error(404, "POST request allowed only for uploads")
 
@@ -77,9 +83,10 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
 
     def is_getwu(self):
         """Test whether request is for a new WU."""
-        splitpath = http.server._url_collapse_path_split(self.path)
-        if self.command == 'GET' and self.is_cgi() and splitpath[1] in ['getwu']:
-            return True
+        if self.is_cgi():
+            filename=self.cgi_info[1].split("?", 1)[0]
+            if self.command == 'GET' and filename in ['getwu']:
+                return True
         return False
 
 if __name__ == '__main__':
@@ -95,6 +102,8 @@ if __name__ == '__main__':
 
     if argv[1:]:
         PORT = int(argv[1])
+
+    db = wudb.WuDb(dbfilename)
 
     HandlerClass = MyHandler
     httpd = ServerClass((HTTP, PORT), HandlerClass)

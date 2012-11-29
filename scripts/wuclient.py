@@ -15,7 +15,7 @@ import email.encoders
 import email.generator
 from string import Template
 from io import StringIO,BytesIO
-from Workunit import Workunit
+from workunit import Workunit
 
 class FixedBytesGenerator(email.generator.BytesGenerator):
     def _handle_bytes(self, msg):
@@ -45,11 +45,13 @@ OPTIONAL_SETTINGS = {"WU_FILENAME" : ("WU", "Filename under which to store WU fi
 SETTINGS = dict([(a,b) for (a,(b,c)) in list(REQUIRED_SETTINGS.items()) + \
                                         list(OPTIONAL_SETTINGS.items())])
 
-def get_file(urlpath, dlpath = None):
+def get_file(urlpath, dlpath = None, options = None):
     # print('get_file("' + urlpath + '", "' + dlpath + '")')
     if dlpath == None:
         dlpath = SETTINGS["DLDIR"] + "/" + os.basename(urlpath) # FIXME: should be url base name
     url = SETTINGS["SERVER"] + "/" + urlpath
+    if options:
+        url = url + "?" + options
     print ("Downloading " + url + " to " + dlpath);
     request = urllib.request.urlopen(url)
     file = open(dlpath, "wb")
@@ -57,10 +59,10 @@ def get_file(urlpath, dlpath = None):
     file.close()
     request.close()
 
-def get_missing_file(urlpath, filename, checksum = None):
+def get_missing_file(urlpath, filename, checksum = None, options = None):
     # print('get_missing_file("' + urlpath + '", "' + filename + '", ' + str(checksum) + ')')
     if not os.path.isfile(filename):
-        get_file(urlpath, filename)
+        get_file(urlpath, filename, options)
         # FIXME CHECKSUM
     else:
         print (filename + " already exists, not downloading")
@@ -68,9 +70,6 @@ def get_missing_file(urlpath, filename, checksum = None):
         # FIXME CHECKSUM
         pass
     return True
-
-def _do_nothing(msg):
-    pass
 
 class Workunit_Processor(Workunit):
     
@@ -106,7 +105,7 @@ class Workunit_Processor(Workunit):
         for command in self.wu.data["COMMAND"]:
             command = Template(command).safe_substitute(SETTINGS)
             if self.debug >= 0:
-                print ("Running command for " + self.wu.get_id() + ": " + command)
+                print ("Running command for workunit " + self.wu.get_id() + ": " + command)
             rc = subprocess.call(command, shell=True)
             if rc != 0:
                 print ("Command exited with exit code " + str(rc)) 
@@ -122,6 +121,9 @@ class Workunit_Processor(Workunit):
         WUid = MIMEText(self.wu.get_id())
         WUid.add_header('Content-Disposition', 'form-data', name="WUid")
         postdata.attach(WUid)
+        clientid = MIMEText(SETTINGS["CLIENTID"])
+        clientid.add_header('Content-Disposition', 'form-data', name="clientid")
+        postdata.attach(clientid)
         if self.exitcode > 0:
             rc = MIMEText(str(self.exitcode))
             WUid.add_header('Content-Disposition', 'form-data', name="exitcode")
@@ -200,7 +202,7 @@ class Workunit_Processor(Workunit):
 
 def do_work():
     wu_filename = SETTINGS["DLDIR"] + "/" + SETTINGS["WU_FILENAME"]
-    if not get_missing_file(SETTINGS["GETWUPATH"], wu_filename):
+    if not get_missing_file(SETTINGS["GETWUPATH"], wu_filename, options="clientid=" + SETTINGS["CLIENTID"]):
         return False
     wu = Workunit_Processor(wu_filename, int(SETTINGS["DEBUG"]))
     if not wu.process():
@@ -211,7 +213,6 @@ def do_work():
 
 if __name__ == '__main__':
     # Create command line parser from the keys in SETTINGS
-    print (sys.path)
     parser = argparse.ArgumentParser()
     for arg in REQUIRED_SETTINGS.keys():
         parser.add_argument('--' + arg.lower(), required = True,

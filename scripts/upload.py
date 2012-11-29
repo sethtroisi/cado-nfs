@@ -7,21 +7,22 @@ debug=1
 import cgi, os
 if debug > 0:
   import cgitb; cgitb.enable()
-from sys import stderr
-from sys import argv
+import sys
 from tempfile import mkstemp
+from wudb import DbWuEntry
 
 def diag(level, text, var):
     if debug > level and var != None:
-        print (text + str(var), file=stderr)
+        print (text + str(var), file=sys.stderr)
 
 # Global variable in this module so that other Python modules can import
 # it and store the path to the upload directory in the shell environment 
 # variable specified here
 UPLOADDIRKEY="UPLOADDIR"
+DBFILENAMEKEY="DBFILENAME"
 
-def do_upload():
-    diag(1, "Command line arguments:", argv)
+def do_upload(db, input = sys.stdin, output = sys.stdout):
+    diag(1, "Command line arguments:", sys.argv)
     diag(2, "Environment:", os.environ)
 
     try: # Windows needs stdio set for binary mode.
@@ -33,17 +34,19 @@ def do_upload():
 
     diag(1, "Reading POST data\n", "")
         
-    form = cgi.FieldStorage()
+    form = cgi.FieldStorage(fp = input)
 
     diag (2, "Attributes for form: ", dir(form))
     diag (2, "form = ", form)
 
-    print ("Content-Type: text/plain\r\n\r\n",)
+    header = "Content-Type: text/plain\r\n\r\n"
 
     # A nested FieldStorage instance holds the file
     message = None
     if "WUid" not in form:
         message = 'No "WUid" key found in POST data'
+    if "clientid" not in form:
+        message = 'No "clientid" key found in POST data'
     elif "results" not in form:
         message = 'No "results" key found in POST data'
     elif UPLOADDIRKEY not in os.environ:
@@ -52,7 +55,12 @@ def do_upload():
         message = 'Script error: ' + os.environ[UPLOADDIRKEY] + ' is not a directory'
     else:
         WUid = form['WUid']
+        clientid = form['clientid']
         fileitem = form['results']
+        if 'errorcode' in form:
+            errorcode = form['errorcode'].value
+        else:
+            errorcode = 0
         diag (2, "Attributes of fileitem: ", dir(fileitem))
         diag (2, "fileitem.name = ", fileitem.name);
         diag (2, "fileitem.filename = ", fileitem.filename);
@@ -67,6 +75,8 @@ def do_upload():
             message = 'No file was uploaded'
         elif not WUid.value:
             message = 'No work unit was specified'
+        elif not clientid.value:
+            message = 'No client id was specified'
 
     if not message:
         # strip leading path from file name to avoid directory traversal attacks
@@ -79,13 +89,22 @@ def do_upload():
         bytes = file.tell()
         file.close()
         message = 'The file "' + basename + '" for work unit ' + WUid.value + \
-            ' was uploaded successfully and stored as ' + filename + \
-            ', received ' + str(bytes) + ' bytes.'
+            ' was uploaded successfully by client ' + clientid.value + \
+            ' and stored as ' + filename + ', received ' + str(bytes) + ' bytes.'
+        db.result(WUid.value, clientid.value, errorcode, (filename,))
 
-    diag (0, argv[0] + ': ', message)
-    print(message)
+    diag (0, sys.argv[0] + ': ', message)
+    if output == sys.stdout:
+        output.write(header + message)
+    else:
+        output.write((header + message).encode("ascii"))
 
 
 # If this file is run directly by Python, call do_upload()
 if __name__ == '__main__':
-    do_upload()
+    import wudb
+    if DBFILENAMEKEY not in os.environ:
+        message = 'Script error: Environment variable ' + DBFILENAMEKEY + ' not set'
+    dbfilename = os.environ[DBFILENAMEKEY]
+    db = wudb.WuDb(dbfilename)
+    do_upload(db)
