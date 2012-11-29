@@ -731,3 +731,7 @@ utils/ularith.h
 utils/usp.c
 utils/usp.h
 utils/utils.h
+linalg/bwc/mpfq/abase_p_3.c
+linalg/bwc/mpfq/abase_p_3.h
+linalg/bwc/mpfq/abase_p_3_t.c
+linalg/bwc/mpfq/abase_p_3_t.h
