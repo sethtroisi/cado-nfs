@@ -209,6 +209,7 @@ void fppol_out(FILE *f, fppol_srcptr p)
 }
 
 
+// FIXME: does this function works when parsing "0" ???
 // Input from stream.
 // Return 1 if successful.
 int fppol_inp(fppol_ptr r, FILE *f)

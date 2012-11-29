@@ -1,3 +1,13 @@
+- Implement the char 3 arith with Pairing 2008
+  Paper by Aoki et al. 
+  Use 6 ops for add instead of 7, but changes the representation.
+  This other representation implies several changes but should not be
+  more costly than the current one.
+
+- Bark if powerlim > I.
+  This is not so interesting to allow powerlim > I, anyway, but this
+  comes at no cost to allow it, then why not?
+
 - Norm initialization speed-up.
   There is still time to save in norm init. For instance, the
   bit-fiddling to check if we have to recompute the norm is probably too
