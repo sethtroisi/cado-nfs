@@ -24,7 +24,7 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "  and take the form 'optname=optval' in the optionfile\n");
     fprintf(stderr, "Polynomials to be tested are given on stdin in sieve4ffs format\n");
     fprintf(stderr, "List of options:\n");
-    fprintf(stderr, "  deg_ell          degree of ell used for testing\n");
+    fprintf(stderr, "  deg_ell          degree of ell used for testing (prime degree is preferred)\n");
     fprintf(stderr, "  ntest            number of ell tested per polynomial\n");
     if (missing != NULL)
         fprintf(stderr, "Missing parameter: %s\n", missing);
