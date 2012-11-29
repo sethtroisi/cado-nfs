@@ -154,8 +154,10 @@ int ffspol_inp(ffspol_ptr r, FILE *f)
 {
   if (f == NULL) f = stdin;
   int c = ',';
-  for (r->deg = -1; c == ','; c = getc(f))
+  for (r->deg = -1; c == ','; c = getc(f)) {
+    __ffspol_realloc_lazy(r, r->deg + 2);
     if (!fppol_inp(r->coeffs[++r->deg], f)) return 0;
+  }
   ungetc(c, f);
   __ffspol_update_degree(r);
   return 1;

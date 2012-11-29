@@ -1,5 +1,5 @@
 #include "fqpol.h"
-#include "string.h"
+#include <string.h>
 
 void fqpol_init(fqpol_ptr r)
 {
@@ -559,6 +559,52 @@ int fqpol_is_split(fq_t * roots, fqpol_srcptr f, fq_info_srcptr Fq)
     }
 
     fqpol_clear(xq);
+    fqpol_clear(x);
+    fqpol_clear(F);
+    return ret;
+}
+
+int fqpol_is_irreducible(fqpol_srcptr f, fq_info_srcptr Fq)
+{
+    ASSERT_ALWAYS(!fqpol_is_zero(f, Fq));
+    if (f->deg == 0)
+        return 0;
+    if (f->deg == 1)
+        return 1;
+
+    // work with a monic copy of f.
+    fqpol_t F;
+    fqpol_init(F);
+    {
+        fq_t lcf;
+        fqpol_get_coeff(lcf, f, f->deg, Fq);
+        fqpol_sdiv(F, f, lcf, Fq);
+    }
+
+    // Compute prod_{i<=d/2}(X^q^i-X) mod F
+    fqpol_t xqi, x, acc, tmp;
+    fqpol_init(xqi);
+    fqpol_init(x);
+    fqpol_init(acc);
+    fqpol_init(tmp);
+    fqpol_set_ti(x, 1, Fq);
+    fqpol_powerXmod(xqi, Fq->order, F, Fq);
+    fqpol_sub(acc, xqi, x, Fq);
+    int i = 2;
+    while (2*i <= f->deg) {
+        fqpol_powmod(xqi, xqi, Fq->order, F, Fq);
+        fqpol_sub(tmp, xqi, x, Fq);
+        fqpol_mul(acc, acc, tmp, Fq);
+        fqpol_rem(acc, acc, F, Fq);
+        ++i;
+    }
+    fqpol_gcd(acc, acc, F, Fq);
+    
+    int ret = (acc->deg > 0) ? 0 : 1;
+    
+    fqpol_clear(tmp);
+    fqpol_clear(acc);
+    fqpol_clear(xqi);
     fqpol_clear(x);
     fqpol_clear(F);
     return ret;
