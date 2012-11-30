@@ -735,3 +735,7 @@ linalg/bwc/mpfq/abase_p_3.c
 linalg/bwc/mpfq/abase_p_3.h
 linalg/bwc/mpfq/abase_p_3_t.c
 linalg/bwc/mpfq/abase_p_3_t.h
+linalg/bwc/plingen.c
+linalg/bwc/plingen.h
+linalg/bwc/polymat.c
+linalg/bwc/polymat.h
