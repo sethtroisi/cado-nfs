@@ -1,4 +1,4 @@
-BIN = sieve makefb normstats checkrels freerels testirred
+BIN = sieve makefb normstats checkrels freerels testirred descent_init
 LIB = fppol
 
 fppol_OBJ = f2pol.o f3pol.o fppol.o fppol_test.o fppol_set.o  \
@@ -23,6 +23,9 @@ freerels_OBJ = $(fppol_OBJ) ffspol.o memusage.o timing.o params.o fqpol.o \
 
 testirred_OBJ = $(fppol_OBJ) ffspol.o memusage.o timing.o params.o fqpol.o \
 		polyfactor.o
+
+descent_init_OBJ =  $(fppol_OBJ) ffspol.o params.o polyfactor.o smoothness.o \
+	    memusage.o timing.o
 
 BUILDDIR = ./build
 
