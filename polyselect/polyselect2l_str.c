@@ -269,7 +269,7 @@ qroots_rearrange (qroots_t R)
           max = j;
         }
       }
-      
+
       tmpq = R->q[i];
       tmpnr = R->nr[i];
       for (k = 0; k < MAX_DEGREE; k ++)
@@ -431,7 +431,7 @@ shash_find_collision (shash_t H)
   uint64_t i0, i1, i2, i3, i4;
   uint32_t k;
   unsigned int key;
-  
+
 #define SHASH_RESEARCH(TH,I)				\
   do {							\
     key = ((I) >> 32) + (I);				\
@@ -448,7 +448,7 @@ shash_find_collision (shash_t H)
     TH = T + ((I >> LN2SHASH_NBUCKETS) & mask); \
     __builtin_prefetch(TH, 1, 3);		\
   } while (0)					\
-  
+
   if (!size) {
     size = H->balloc << 1;
     /* round up to power of 2 */
@@ -514,7 +514,7 @@ shash_find_collision_old (shash_t H)
   uint32_t *T, *Tend;
   uint64_t i;
   unsigned int j, k, l;
-  
+
   if (!size) {
     size = H->balloc + (H->balloc >> 1);
     /* round up to power of 2 */
