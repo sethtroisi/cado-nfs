@@ -1,4 +1,4 @@
-# Usage: count_real_roots(f,true) for number of real roots.
+# Usage: count_real_roots(f,true) for the number of real roots.
 # Option true stays for "with multiplicities", i.e. a double root counts 2.
 # The option count_real_roots(f,false) has both a different algorithm and 
 # output: it is a slower and counts the total number of polynomials r such

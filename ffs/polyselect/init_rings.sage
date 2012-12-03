@@ -1,7 +1,8 @@
 try:
-    F=GF(p)
+    F.<wk>=GF(p)
 except NameError:
     F=GF(2)
+
 A.<t>=F['t']
 K.<t>=FractionField(A)
 S.<x>=A['x']
