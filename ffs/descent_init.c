@@ -21,7 +21,7 @@ int fppol_half_extended_Euclidian(fppol_ptr r, fppol_ptr v, fppol_srcptr p, fppo
   ASSERT_ALWAYS(fppol_is_monic(m));
   ASSERT_ALWAYS(fppol_deg(p) < fppol_deg(m));
   fppol_t r0, r1, v0, v1, tmp;
-  fppol_inits(r1, v1, tmp, NULL);
+  fppol_inits(r0, r1, v0, v1, tmp, NULL);
 
   /* Euclid-reduce (r0, r1) and maintain the following:         */
   /*   u0*m + v0*p = r0   (u0, u1 not computed!)                */
@@ -90,9 +90,12 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "  lpb *           large prime bound \n");
     fprintf(stderr, "  target *        element whose discrete log has to be computed \n");
     fprintf(stderr, "  phi *           finite field defining polynomial \n");
-    fprintf(stderr, "  beta *         generator of the subgroup target belongs to \n");
+    /* fprintf(stderr, "  beta *         generator of the subgroup target belongs to \n"); */
     fprintf(stderr, "  gf              indicate the base field for sanity check\n");
  
+    /* We consider we can assume that t is a "valid" generator even if it is not,
+     hence beta is commented for the moment */
+
     if (missing != NULL)
         fprintf(stderr, "Missing parameter: %s\n", missing);
     exit(1);
@@ -101,7 +104,7 @@ void usage(const char *argv0, const char * missing)
 int main(int argc, char **argv)
 {
     int lpb = 0; 
-    fppol_t target, phi, beta; 
+    fppol_t target, phi; /*,beta */ 
     char *argv0 = argv[0];
     int gf = 0;
 
@@ -145,36 +148,45 @@ int main(int argc, char **argv)
         const char * polstr;
         fppol_init(target);
         fppol_init(phi);
-        fppol_init(beta);
+        /* fppol_init(beta); */
         polstr = param_list_lookup_string(pl, "target");
         if (polstr == NULL) usage(argv0, "target");
         fppol_set_str(target, polstr);
         polstr = param_list_lookup_string(pl, "phi");
         if (polstr == NULL) usage(argv0, "phi");
         fppol_set_str(phi, polstr);
-        polstr = param_list_lookup_string(pl, "beta");
+        /* polstr = param_list_lookup_string(pl, "beta");
         if (polstr == NULL) usage(argv0, "beta");
-        fppol_set_str(phi, polstr);
+        fppol_set_str(beta, polstr); */
     }
 
+    do {
+       fppol_t r, v;
+       fppol_inits(r, v, NULL);
     /* Randomizing target : target = target * beta^j
        form some j and beta being the generator of the subgroup
        the initial target belongs to */
-
-    /* Applying an extended Euclidian algoritm to target and phi
+      
+      /* Do we pick j at random? Which random ? */
+      unsigned int j = 1;
+      for (unsigned int i = 0; i < j; ++i) 
+	fppol_multmod(target, target, phi);
+      
+      /* Applying an extended Euclidian algoritm to target and phi
        to stop when u.phi + v. target = r whit deg(v) ~ deg(r) ~ n/2 */
-    
-    /* Apply a smoothness test on v and r to check if they are lpb-smooth */
+      
+      fppol_half_extended_Euclidian(r, v, target, phi);
+	
+      /* Apply a smoothness test on v and r to check if they are lpb-smooth */
+    } while( !(fppol_is_smooth(r, lpb) && fppol_is_smooth(v, lpb)));  
 
     /* If v and r are lpb-smooth, we get log target = log r - log v 
        which involves only polynomials of degree less than lpb:
        the initialization of the special-q descent is over */
-       
 
-
-
-
+    /* We want to output r and v: how do we output them? */
+      
     param_list_clear(pl);
-
+    
     return EXIT_SUCCESS;
 }
