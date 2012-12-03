@@ -7,7 +7,7 @@ int main() {
     x = _mm_cmpeq_epi64(x, y);
     /* the following test is for emulated 32-bit on physical 64-bit */
     if (sizeof(unsigned long) != 8)
-      return 1;
+      abort ();
     return 0;
 }
 
