@@ -72,3 +72,7 @@
   buckets.
 
 - Think about making i monic instead of j.
+
+- Monic is not needed. Normalized is what we want.
+  We might prefer use the constant term equal to 1 instead of the leading
+  coefficient, as they do in Japan.
