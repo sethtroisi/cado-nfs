@@ -53,19 +53,25 @@ def get_file(urlpath, dlpath = None, options = None):
     if options:
         url = url + "?" + options
     print ("Downloading " + url + " to " + dlpath);
-    request = urllib.request.urlopen(url)
+    try:
+        request = urllib.request.urlopen(url)
+    except urllib.error.HTTPError as e:
+        print (e)
+        return False
     file = open(dlpath, "wb")
     shutil.copyfileobj (request, file)
     file.close()
     request.close()
+    return True
 
 def get_missing_file(urlpath, filename, checksum = None, options = None):
     # print('get_missing_file("' + urlpath + '", "' + filename + '", ' + str(checksum) + ')')
     if not os.path.isfile(filename):
-        get_file(urlpath, filename, options)
+        return get_file(urlpath, filename, options)
         # FIXME CHECKSUM
     else:
         print (filename + " already exists, not downloading")
+        return True
     if checksum:
         # FIXME CHECKSUM
         pass
@@ -202,7 +208,8 @@ class Workunit_Processor(Workunit):
 
 def do_work():
     wu_filename = SETTINGS["DLDIR"] + "/" + SETTINGS["WU_FILENAME"]
-    if not get_missing_file(SETTINGS["GETWUPATH"], wu_filename, options="clientid=" + SETTINGS["CLIENTID"]):
+    if not get_missing_file(SETTINGS["GETWUPATH"], wu_filename, 
+                            options="clientid=" + SETTINGS["CLIENTID"]):
         return False
     wu = Workunit_Processor(wu_filename, int(SETTINGS["DEBUG"]))
     if not wu.process():
@@ -230,4 +237,6 @@ if __name__ == '__main__':
 
     # print (str(SETTINGS))
 
-    do_work()
+    while do_work():
+        pass
+

@@ -5,7 +5,6 @@ import socketserver
 import os
 from workunit import Workunit
 import wudb
-from wudb import DbWuEntry
 import upload
 
 # Get the shell environment variable name in which we should store the path 
@@ -46,13 +45,14 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         if not clientid.isalnum():
             return self.send_error(400, "Malformed client id specified")
         
-        wu = db.where_eq("status", wudb.WuStatus.AVAILABLE, limit=1)
-        if not wu:
+        wu = wudb.DbWuEntry(db)
+        wu.find_available()
+        if wu.get_wuid() is None:
             return self.send_error(404, "No work available")
         
-        self.log_message("Sending work unit " + wu[0].get_id() + " to client " + clientid)
-        db.assign(wu[0].get_id(), clientid)
-        wu_text = str(wu[0])
+        self.log_message("Sending work unit " + wu.get_wuid() + " to client " + clientid)
+        wu.assign(clientid)
+        wu_text = wu.get_wu()
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")
         self.send_header("Content-Length", len(wu_text))
@@ -93,7 +93,7 @@ if __name__ == '__main__':
     from sys import argv
     PORT = 8001
     HTTP = "" # address on which to listen
-    want_threaded = 1
+    want_threaded = 0
 
     if want_threaded:
         ServerClass = ThreadedHTTPServer

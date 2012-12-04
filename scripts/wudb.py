@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
 
-import dbm
-import sys
-import pickle
-import pickletools
+import sqlite3
 from datetime import datetime
 from workunit import Workunit
 
-debug = 1
-
+debug = 2
 
 # A DB entry for a WU uses the WUid as the key, and stores:
 # - status (available, assigned, received, received with error, verified:correct, verified:error
@@ -31,157 +27,284 @@ class WuStatus:
     VERIFIED_ERROR = 5
     CANCELLED = 6
 
+    def check(status):
+        assert status in (WuStatus.AVAILABLE, WuStatus.ASSIGNED, WuStatus.RECEIVED_OK, 
+            WuStatus.RECEIVED_ERROR, WuStatus.VERIFIED_OK, WuStatus.VERIFIED_ERROR, 
+            WuStatus.CANCELLED)
+
+# If we try to update the status in any way other than progressive 
+# (AVAILABLE -> ASSIGNED -> ...), we raise this exception
 class StatusUpdateError(Exception):
     pass
 
-# One entry in the WU DB, including the dictionary with the WU contents 
+# This class represents a DB connection and provides wrappers around SQL queries
+class WuDb:
+    def __init__(self, filename):
+        """ Open a connection to a sqlite database with the specified filename 
+            and create a cursor. We also create the required tables if they do 
+            not exits """
+        self.db = sqlite3.connect(filename)
+
+    def __del__(self):
+        self.db.close()
+
+    def _fieldlist(l):
+        """ For a list ('a', 'b', 'c') returns 'a=?, b=?, c=?' """
+        return ", ".join([k + "=?" for k in l])
+
+    def _exec(cursor, command, values, name):
+        """ Wrapper around self.cursor.execute() that prints arguments 
+            for debugging """
+        # Could use inspect module to remove name parameter
+        if debug > 1:
+            print ("WuDb." + name + "(): command = " + command);
+            print ("WuDb." + name + "(): values = " + str(values))
+        cursor.execute(command, values)
+
+    def create_table(self, table, layout):
+        command = "CREATE TABLE IF NOT EXISTS " + table + \
+            "( id INTEGER PRIMARY KEY ASC, " + \
+            ", ".join([" ".join(col) for col in layout]) + " );"
+        cursor = self.db.cursor()            
+        WuDb._exec (cursor, command, (), "create_table")
+        self.db.commit()
+        cursor.close()
+    
+    def insert(self, table, d):
+        """ Insert a new entry, where d is a dictionary containing the 
+            field:value pairs. Returns the id of the newly created entry """
+        # INSERT INTO WORKUNITS (field_1, field_2, ..., field_n) 
+        # 	VALUES (value_1, value_2, ..., value_n)
+        sqlformat = ", ".join(("?",) * len(d)) # sqlformat = "?, ?, ?, " ... "?"
+        command = "INSERT INTO " + table + \
+            " (" + ", ".join(d.keys()) + ") VALUES (" + sqlformat + ");"
+        values = list(d.values())
+        cursor = self.db.cursor()            
+        WuDb._exec(cursor, command, values, "insert")
+        id = cursor.lastrowid
+        self.db.commit()
+        cursor.close()
+        return id
+
+    def update(self, table, id, d):
+        """ Update fields of an existing entry. id is the row id of the 
+            entry to update, d is the dictionary of fields and their values 
+            to update """
+        # UPDATE WORKUNITS SET column_1=value1, column2=value_2, ..., 
+        # column_n=value_n WHERE id="id"
+        assert id is not None
+        command = "UPDATE " + table + " SET " + WuDb._fieldlist(d.keys()) + \
+            " WHERE id=?;"
+        values = list(d.values()) + [id, ]
+        cursor = self.db.cursor()            
+        WuDb._exec(cursor, command, values, "update")
+        self.db.commit()
+        cursor.close()
+    
+    def read(self, table, id):
+        """ Read an entry by id, return None if it does not exist """
+        assert id is not None
+        command = "SELECT * FROM " + table + " WHERE id=?;"
+        values = (id,)
+        cursor = self.db.cursor()            
+        WuDb._exec(cursor, command, values, "read")
+        row = cursor.fetchone()
+        cursor.close()
+        return row
+    
+    def where_eq(self, table, d = None, limit=None):
+        """ Get a up to "limit" table rows (limit == 0: no limit) where 
+            the key:value pairs of the dictionary d are set to the same 
+            value in the database table "table" """
+        result = []
+
+        # Table/Column names cannot be substituted, so include in query directly.
+        if d is None or len(d) == 0:
+            WHERE = ""
+            values = ()
+        else:
+            WHERE = " WHERE " + WuDb._fieldlist(d.keys())
+            values = list(d.values())
+
+        if limit is None:
+            LIMIT = ""
+        else:
+            LIMIT = " LIMIT " + str(int(limit))
+        command = "SELECT * FROM " + table + WHERE + LIMIT + ";"
+        cursor = self.db.cursor()            
+        WuDb._exec(cursor, command, values, "where_eq")
+        
+        desc = [k[0] for k in cursor.description]
+        row = cursor.fetchone()
+        while row is not None:
+            if debug > 1:
+                print("WuDb.where_eq(): row = " + str(row))
+            result.append(dict(zip(desc, row)))
+            row = cursor.fetchone()
+        cursor.close()
+        return result
+
+
+# One entry in the WU DB, including the text with the WU contents 
 # (FILEs, COMMANDs, etc.) and info about the progress on this WU (when and 
 # to whom assigned, received, etc.)
 
 class DbWuEntry:
-    def __init__(self, wu_data):
-        self.data = {}
-        self.data["status"] = WuStatus.AVAILABLE
-        self.data["wu_data"] = wu_data
-        self.data["timecreated"] = str(datetime.now())
-        self.data["timeassigned"] = ""
-        self.data["assignedclient"] = ""
-        self.data["timeresult"] = ""
-        self.data["resultclient"] = ""
-        self.data["errorcode"] = ""
-        self.data["filenames"] = []
-        self.data["timeverified"] = ""
+    # wuid is the unique wuid of the workunit
+    # status is a status code as defined in WuStatus
+    # data is the str containing the text of the workunit
+    # timecreated is the string containing the date and time of when the WU was added to the db
+    # timeassigned is the ... of when the WU was assigned to a client
+    # assignedclient is the clientid of the client to which the WU was assigned
+    # timeresult is the ... of when a result for this WU was received
+    # resultclient is the clientid of the client that uploaded a result for this WU
+    # errorcode is the exit status code of the first failed command, or 0 if none failed
+    # timeverified is the ... of when the result was marked as verified
+    table = "workunits"
+    # Each entry specifies a sqlite column-def: column-name, type-name, column-constraint
+    fields = (
+        ("wuid", "TEXT", "UNIQUE NOT NULL"), 
+        ("status", "INTEGER", "NOT NULL"), 
+        ("wu", "TEXT", "NOT NULL"), 
+        ("timecreated", "TEXT", ""), 
+        ("timeassigned", "TEXT", ""), 
+        ("assignedclient", "TEXT", ""), 
+        ("timeresult", "TEXT", ""), 
+        ("resultclient", "TEXT", ""), 
+        ("errorcode", "INTEGER", ""), 
+        ("timeverified", "TEXT", "")
+    )
 
+    _is_created = False
+
+    def __init__(self, db):
+        self.db = db
+        self.id = None # The unique DB key (an integer) for this table row
+        self.data = {key[0]: None for key in DbWuEntry.fields}
+        if not DbWuEntry._is_created:
+            self.db.create_table(DbWuEntry.table, DbWuEntry.fields)
+            DbWuEntry._is_created = True
+    
     def __str__(self):
         return str(self.data)
-    
-    def get_WU(self):
-        if debug > 1:
-            print ("DbWuEntry.get_WU(): self.data = " + str(self.data))
-            print ('DbWuEntry.get_WU(): self.data["wu_data"] = ' + str(self.data["wu_data"]))
-        return self.data["wu_data"]
-    
-    def assign(self, clientid):
-        if not self.data["status"] == WuStatus.AVAILABLE:
-            raise StatusUpdateError("WU " + self.data["wu_data"].get_id() + 
-                                    " has status " + self.data["status"])
-        self.data["status"] = WuStatus.ASSIGNED
-        self.data["assignedclient"] = clientid
-        self.data["timeassigned"] = str(datetime.now())
 
-    def result(self, clientid, errorcode, filenames):
-        if not self.data["status"] == WuStatus.ASSIGNED:
-            raise StatusUpdateError("WU " + self.data["wu_data"].get_id() + 
-                                    " has status " + str(self.data["status"]))
+    def update(self, d):
+        """ Assign the key:value pairs in d to self.data, and call 
+            db.update() method to write these updates to the DB """
+        self.data.update(d) # Python built-in dict.update() method
+        self.db.update(DbWuEntry.table, self.id, d)
+
+    def from_dict(self, d):
+        self.id = d["id"]
+        for k in DbWuEntry.fields:
+            self.data[k[0]] = d[k[0]]
+    
+    def check(self):
+        status = self.data["status"]
+        WuStatus.check(status)
+        wu = Workunit(self.data["wu"])
+        assert wu.get_id() == self.data["wuid"]
+        if status == WuStatus.AVAILABLE:
+            assert self.data["timeassigned"] == None
+            assert self.data["assignedclient"] == None
+            return
+        if status == WuStatus.ASSIGNED:
+            assert self.data["timeresult"] == None
+            assert self.data["resultclient"] == None
+            return
+        if status == WuStatus.RECEIVED_OK:
+            assert self.data["errorcode"] == 0
+        # etc.
+    
+    def get_wuid(self):
+        return self.data["wuid"]
+    
+    def get_wu(self):
+        return self.data["wu"]
+    
+    def _checkstatus(self, status):
+        if not self.data["status"] == status:
+            raise StatusUpdateError("WU " + str(self.data["wuid"]) + 
+                " has status " + str(self.data["status"]))
+
+    def find_available(self):
+        row = self.db.where_eq(DbWuEntry.table, {"status" : WuStatus.AVAILABLE}, limit=1)
+        if len(row) == 0:
+            return
+        self.from_dict(row[0])
+
+    def find_wuid(self, wuid):
+        """ Find a row by its wuid """
+        row = self.db.where_eq(DbWuEntry.table, {"wuid" : wuid}, limit=1)
+        if len(row) == 0:
+            return
+        self.from_dict(row[0])
+
+    def add(self, wu):
+        self.data["wuid"] = Workunit(wu).get_id()
+        self.data["wu"] = wu
+        self.data["status"] = WuStatus.AVAILABLE
+        self.data["timecreated"] = str(datetime.now())
+        self.id = self.db.insert(DbWuEntry.table, self.data)
+
+    def assign(self, clientid):
+        self._checkstatus(WuStatus.AVAILABLE)
+        if debug > 0:
+            self.check()
+        d = {"status": WuStatus.ASSIGNED, 
+             "assignedclient": clientid,
+             "timeassigned": str(datetime.now())}
+        self.update(d)
+
+    def result(self, clientid, errorcode, files):
+        self._checkstatus(WuStatus.ASSIGNED)
+        if debug > 0:
+            self.check()
+        d = {"resultclient": clientid,
+             "errorcode": errorcode,
+             "timeresult": str(datetime.now())}
         if errorcode == 0:
-            self.data["status"] = WuStatus.RECEIVED_OK
+           d["status"] = WuStatus.RECEIVED_OK
         else:
-            self.data["status"] = WuStatus.RECEIVED_ERROR
-        self.data["clientid_res"] = clientid
-        self.data["errorcode"] = errorcode
-        self.data["filenames"] = filenames
-        self.data["timeresult"] = str(datetime.now())
+            d["status"] = WuStatus.RECEIVED_ERROR
+        self.update(d)
 
     def verification(self, ok):
-        if not self.data["status"] == WuStatus.RECEIVED_OK:
-            raise StatusUpdateError("WU " + self.data["wu_data"].get_id() + 
-                                    " has status " + self.data["status"])
+        self._checkstatus(WuStatus.RECEIVED_OK)
+        if debug > 0:
+            self.check()
+        d = {["timeverified"]: str(datetime.now())}
         if ok:
-            self.data["status"] = WuStatus.VERIFIED_OK
+            d["status"] = WuStatus.VERIFIED_OK
         else:
-            self.data["status"] = WuStatus.VERIFIED_ERROR
-        self.data["timeverified"] = str(datetime.now())
-    
-# If we try to add a WU under a key (WUid) that is already in the database, 
-# we raise an exception. Python's built-in KeyError is not a good choice,
-# as it is specified as indicating a lookup with a key that does not exist.
-class KeyCollisionError(LookupError):
-    pass
-    
-class WuDb:
-    def __init__(self, filename):
-        self.db = dbm.open(filename, 'c', 0o644)
+            d["status"] = WuStatus.VERIFIED_ERROR
+        self.update(d)
 
-    # Pickle and write an entry
-    def _write(self, key, entry):
-        if debug > 1:
-            print ("wudb._write(" + key + "): entry = " + str(entry))
-            print ("wudb._write(" + key + "): entry.data = " + str(entry.data))
-        pickledata = pickle.dumps(entry)
-        if debug > 1:
-            pickletools.dis(pickledata, annotate=1)
-        self.db[key] = pickledata
-        if hasattr(self.db, "sync"):
-            self.db.sync()
-    
-    # Read an entry and unpickle it
-    def _read(self, key):
-        if key in self.db:
-            data = self.db[key]
-            if debug > 1:
-                pickletools.dis(data, annotate=1)
-            entry = pickle.loads(data)
-            if debug > 1:
-                print ("wudb._read(" + str(key) + "): entry.data = " + str(entry.data))
-            return entry
-        else:
-            return None
-    
-    def add(self, WU):
-        """ Add WU under its WUid. Set added-time, available flag """
-        WUid = WU.get_id()
-        if debug > 0:
-            print ("WuDb.add(" + WUid + ")")
-        if WUid in self.db:
-            raise KeyCollisionError("Work unit id " + WUid + " already in database")
-        self._write(WUid, DbWuEntry(WU))
 
-    def get(self, WUid):
-        entry = self._read(WUid)
-        if entry is None:
-            return None
-        return entry
+# A table storing names of uploaded files that belong to work units.
+# The table stored that wuid, the filename under which the client 
+# created and uploaded the file, and the file path and name under which 
+# the server stored it.
+class DbFilesEntry:
     
-    def where_eq(self, key, value, limit=0):
-        """ Get a WU where DbWuEntry[key] == value """
-        result = []
-        found = 0;
-        for wuid in self.db.keys():
-            entry = self._read(wuid)
-            if entry.data[key] == value:
-                result.append(entry.get_WU())
-                found = found + 1
-                if limit > 0 and found == limit:
-                    break
-        return result
+    table = "files"
+    fields = (
+        ("wuid", "TEXT", ""), 
+        ("filename", "TEXT", ""), 
+        ("path", "TEXT", "")
+    )
+    
+    _is_created = False
 
-    def assign(self, WUid, clientid):
-        """ Assign a database WU entry to a client """
-        if debug > 0:
-            print ("WuDb.assign(" + WUid + ", " + clientid + ")")
-        entry = self._read(WUid)
-        entry.assign(clientid)
-        self._write(WUid, entry)
+    def __init__(self, db):
+        self.db = db
+        if not DbFilesEntry._is_created:
+            self.db.create_table(DbFilesEntry.table, DbFilesEntry.fields)
+            DbFilesEntry._is_created = True
         
-    def result(self, WUid, clientid, errorcode, filenames):
-        """ Mark a database WU entry as having received a result """
-        if debug > 0:
-            print ("WuDb.result(" + WUid + ", " + clientid + ", " + str(errorcode) + \
-                   ", " + str(filenames) + ")")
-        entry = self._read(WUid)
-        entry.result(clientid, errorcode, filenames)
-        self._write(WUid, entry)
-    
-    def verify(self, WUid, ok):
-        """ Mark a database WU entry as having been verified, ok == True means 
-            verification succeeded, ok = False means it failed """
-        if debug > 0:
-            print ("WuDb.verify(" + WUid + ", " + ok + ")")
-        entry = self._read(WUid)
-        entry.verification(ok)
-        self._write(WUid, entry)
-    
+
 if __name__ == '__main__':
+    import sys
     dbname = "wudb"
     for arg in sys.argv:
         args = arg.split("=")
@@ -190,16 +313,29 @@ if __name__ == '__main__':
         if args[0] == "-add":
             db = WuDb(dbname)
             wutext = sys.stdin.read()
-            wu = Workunit(wutext)
-            db.add(wu)
+            wu = DbWuEntry(db)
+            wu.add(wutext)
         if args[0] == "-avail":
             db = WuDb(dbname)
-            available = db.where_eq("status", WuStatus.AVAILABLE)
+            available = db.where_eq("workunits", {"status": WuStatus.AVAILABLE})
             print("Available workunits: ")
+            for wu in available:
+                print (str(wu))
+        if args[0] == "-assigned":
+            db = WuDb(dbname)
+            assigned = db.where_eq("workunits", {"status": WuStatus.ASSIGNED})
+            print("Assigned workunits: ")
             for wu in available:
                 print (str(wu))
         if args[0] == "-all":
             db = WuDb(dbname)
-            for key in db.db.keys():
-                print ("Workunit: " + key.decode())
-                print(db.get(key))
+            all = db.where_eq("workunits")
+            print("Existing workunits: ")
+            for wu in all:
+                print (str(wu))
+        if args[0] == "-find_avail":
+            db = WuDb(dbname)
+            wu = DbWuEntry(db)
+            wu.find_available()
+            print("One aviailable workunit: ")
+            print (str(wu))
