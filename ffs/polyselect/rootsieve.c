@@ -1,18 +1,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include <limits.h> /* for ULONG_MAX */
 #include <assert.h>
 #include <float.h>
+#include <sys/types.h>
+#include <sys/resource.h>
 
 /* some hard-coded values (for now) */
-#define B 63
 #define DEGREE 6
 
 float **s, **sl, threshold = -DBL_MAX;
-unsigned long nsol = 0;
+unsigned long nsol = 0, B = 0;
 unsigned long f[DEGREE + 1] = {0, 0, 0, 0, 0, 0, 1};
 uint8_t *G;
+int init_time = 0, sieve_time = 0;
 
 /* return the number of significant bits of l, 0 for l = 0 */
 static unsigned long
@@ -23,6 +26,15 @@ nbits (unsigned long l)
   while (l > 0)
     d++, l >>= 1;
   return d;
+}
+
+int
+cputime ()
+{
+  struct rusage rus;
+
+  getrusage (0, &rus);
+  return rus.ru_utime.tv_sec * 1000 + rus.ru_utime.tv_usec / 1000;
 }
 
 static void
@@ -41,17 +53,21 @@ print_poly (unsigned long *f, unsigned long d)
           if (first == 0)
             printf ("+");
           first = 0;
-          if (fd == (1UL << (n - 1)))
+          if (fd == (1UL << (n - 1))) /* only one coefficient t^k */
             {
               if (n - 1 > 0)
                 {
                   if (n - 1 == 1)
-                    printf ("t*");
+                    printf ("t");
                   else
-                    printf ("t^%lu*", n - 1);
+                    printf ("t^%lu", n - 1);
+                  if (d > 0)
+                    printf ("*");
                 }
+              else if (d == 0)
+                printf ("1");
             }
-          else
+          else /* two or more coefficients */
             {
               if (d > 0)
                 printf ("(");
@@ -81,6 +97,23 @@ print_poly (unsigned long *f, unsigned long d)
             printf ("y^%lu", d);
         }
     }
+}
+
+/* return a * b */
+static unsigned long
+mul (unsigned long a, unsigned long b)
+{
+  unsigned long r, n;
+
+  n = nbits (b);
+  r = 0;
+  while (n > 0)
+    {
+      r = r << 1;
+      if ((b >> --n) & 1)
+        r = r ^ a;
+    }
+  return r;
 }
 
 /* return a * b mod l, where a is reduced mod l */
@@ -154,35 +187,96 @@ gray (unsigned long n)
 }
 
 int
+is_divisible_by_y2_plus_a1y1_plus_a0 (unsigned long *f, unsigned long d,
+                                      unsigned long a1, unsigned long a0)
+{
+  unsigned long g[DEGREE + 1], i;
+
+  for (i = 0; i <= d; i++)
+    g[i] = f[i];
+  while (d >= 2)
+    {
+      /* g -= g[d]*y^d - g[d]*a1*y^(d-1) - g[d]*a0*y^(d-2) */
+      g[d-1] ^= mul (g[d], a1);
+      g[d-2] ^= mul (g[d], a0);
+      d--;
+    }
+  return g[1] == 0 && g[0] == 0;
+}
+
+int
+is_divisible_by_y2_plus_a2y2_plus_a1y1_plus_a0 (unsigned long *f,
+                                                unsigned long d,
+                                                unsigned long a2,
+                                                unsigned long a1,
+                                                unsigned long a0)
+{
+  unsigned long g[DEGREE + 1], i;
+
+  for (i = 0; i <= d; i++)
+    g[i] = f[i];
+  while (d >= 3)
+    {
+      /* g -= g[d]*y^d - g[d]*a2*y^(d-1) - g[d]*a1*y^(d-2) - g[d]*a0*y^(d-3) */
+      g[d-1] ^= mul (g[d], a2);
+      g[d-2] ^= mul (g[d], a1);
+      g[d-3] ^= mul (g[d], a0);
+      d--;
+    }
+  return g[2] == 0 && g[1] == 0 && g[0] == 0;
+}
+
+int
 is_maybe_irreducible (unsigned long *f, unsigned long d)
 {
-  /* does x+1 divide f? */
-  if (evalmod (f, d, 1, ~0UL) == 0)
-    return 0;
+  unsigned long l0[] = {1, 2, 3, 4, 5, 6, 7, ULONG_MAX}, i, a0, a1;
+  unsigned long l1[][2] = {{1,1},{1,2},{1,3},{1,4},{1,5},{1,6},{1,7},
+                      {2,0},{2,1},{2,2},{2,4},{2,5},{2,6},{2,7},
+                      {3,0},{3,1},{3,3},{3,4},{3,5},{3,6},{3,7},
+                      {4,1},{4,2},{4,3},{4,4},{4,6},{4,7},
+                      {5,1},{5,2},{5,3},{5,5},{5,6},{5,7},
+                      {6,0},{6,2},{6,3},{6,4},{6,5},{6,6},
+                      {7,0},{7,1},{7,2},{7,3},{7,4},{7,5},{7,7},
+                      {8,0},{8,1},{8,2},{8,3},{8,4},{8,5},{8,7},
+                      {9,0},{9,1},{9,2},{9,3},{9,5},{9,6},{9,7},
+                      {10,0},{10,1},{10,2},{10,3},{10,4},{10,6},
+                      {11,0},{11,1},{11,2},{11,3},{11,4},{11,5},{11,6},{11,7},
+                      {12,0},{12,1},{12,2},{12,3},{12,5},{12,6},
+                      {13,0},{13,1},{13,2},{13,3},{13,4},{13,5},{13,6},{13,7},
+                      {14,0},{14,1},{14,2},{14,3},{14,4},{14,6},{14,7},
+                      {15,0},{15,1},{15,2},{15,3},{15,4},{15,5},{15,7},
+                      {16,1},{16,2},{16,3},{16,4},{16,5},{16,6},{16,7},
+                      {17,1},{17,2},{17,3},{17,4},{17,5},{17,6},{17,7},
+                      {18,0},{18,2},{18,3},{18,4},{18,5},{18,6},{18,7},
+                      {19,0},{19,1},{19,2},{19,3},{19,4},{19,5},{19,6},{19,7},
+                      {20,2},{20,3},{20,4},{20,5},{20,6},{20,7},
+                      {21,1},{21,2},{21,3},{21,4},{21,5},{21,6},{21,7},
+                      {22,0},{22,1},{22,2},{22,3},{22,4},{22,5},{22,6},{22,7},
+                      {23,0},{23,1},{23,2},{23,3},{23,4},{23,5},{23,6},{23,7},
+                      {24,0},{24,1},{24,3},{24,4},{24,5},{24,6},{24,7},
+                      {25,0},{25,1},{25,2},{25,3},{25,4},{25,5},{25,6},{25,7},
+                      {26,0},{26,1},{26,2},{26,3},{26,4},{26,5},{26,6},{26,7},
+                      {27,0},{27,1},{27,3},{27,4},{27,5},{27,6},{27,7},
+                      {28,0},{28,1},{28,2},{28,4},{28,5},{28,6},{28,7},
+                      {29,0},{29,1},{29,2},{29,3},{29,4},{29,5},{29,6},{29,7},
+                      {30,0},{30,1},{30,2},{30,4},{30,5},{30,6},{30,7},
+                      {31,0},{31,1},{31,2},{31,3},{31,4},{31,5},{31,6},{31,7},
+                      {ULONG_MAX,0}};
+  unsigned long l2[][3] = {{4,2,0},{5,3,0},{6,6,2},{16,2,3},{16,4,0},{16,7,3},{17,3,2},{17,5,0},{17,7,2},{19,7,2},{20,2,2},{20,3,3},{20,6,0},{21,7,0},{24,0,2},{30,0,3},{34,10,0},{35,3,2},{40,12,0},{42,14,0},{64,8,0},{65,9,0},{69,11,0},{81,13,0},{84,14,0},{85,15,0},{113,11,2},{114,12,3},{120,8,2},{120,15,3},{ULONG_MAX,0,0}};
 
-  /* does x+t divide f? */
-  if (evalmod (f, d, 2, ~0UL) == 0)
-    return 0;
+  for (i = 0; (a0 = l0[i]) != ULONG_MAX; i++)
+    /* does y+a0 divide f? */
+    if (evalmod (f, d, a0, ~0UL) == 0)
+      return 0;
 
-  /* does x+t+1 divide f? */
-  if (evalmod (f, d, 3, ~0UL) == 0)
-    return 0;
+  for (i = 0; (a0 = l1[i][0]) != ULONG_MAX; i++)
+    if (is_divisible_by_y2_plus_a1y1_plus_a0 (f, d, l1[i][1], a0))
+      return 0;
 
-  /* does x+t^2 divide f? */
-  if (evalmod (f, d, 4, ~0UL) == 0)
-    return 0;
-
-  /* does x+t^2+1 divide f? */
-  if (evalmod (f, d, 5, ~0UL) == 0)
-    return 0;
-
-  /* does x+t^2+t divide f? */
-  if (evalmod (f, d, 6, ~0UL) == 0)
-    return 0;
-
-  /* does x+t^2+t+1 divide f? */
-  if (evalmod (f, d, 7, ~0UL) == 0)
-    return 0;
+  for (i = 0; (a0 = l2[i][0]) != ULONG_MAX; i++)
+    if (is_divisible_by_y2_plus_a2y2_plus_a1y1_plus_a0 (f, d, l2[i][2],
+                                                        l2[i][1], a0))
+      return 0;
 
   return 1;
 }
@@ -208,13 +302,36 @@ all1 (unsigned long *f, unsigned long n1, unsigned long n0)
                        55, /* t^5 + t^4 + t^2 + t + 1 */
                        59, /* t^5 + t^4 + t^3 + t + 1 */
                        61, /* t^5 + t^4 + t^3 + t^2 + 1 */
+                       67, 73, 87, 91, 97, 103, 109, 115, 117,
+                       131, 137, 143, 145, 157, 167, 171, 185, 191, 193, 203,
+                       211, 213, 229, 239, 241, 247, 253,
+                       283, 285, 299, 301, 313, 319, 333, 351, 355, 357, 361,
+                       369, 375, 379, 391, 395, 397, 415, 419, 425, 433, 445,
+                       451, 463, 471, 477, 487, 499, 501, 505,
+                       515, 529, 535, 539, 545, 557, 563, 587, 601, 607, 613,
+                       617, 623, 631, 637, 647, 661, 665, 675, 677, 687, 695,
+                       701, 719, 721, 731, 757, 761, 769, 787, 789, 799, 803,
+                       817, 827, 841, 847, 859, 865, 875, 877, 883, 895, 901,
+                       911, 929, 949, 953, 967, 971, 973, 981, 985, 995, 1001,
+                       1019,
+                       1033, 1039, 1051, 1053, 1063, 1069, 1077, 1095, 1107,
+                       1123, 1125, 1135, 1153, 1163, 1177, 1193, 1199, 1221,
+                       1225, 1239, 1255, 1261, 1267, 1279, 1291, 1293, 1305,
+                       1311, 1315, 1329, 1341, 1347, 1367, 1377, 1383, 1387,
+                       1413, 1423, 1431, 1435, 1441, 1451, 1465, 1473, 1479,
+                       1509, 1527, 1531, 1555, 1557, 1571, 1573, 1585, 1591,
+                       1603, 1615, 1617, 1627, 1657, 1663, 1669, 1673, 1703,
+                       1709, 1717, 1727, 1729, 1741, 1747, 1759, 1783, 1789,
+                       1807, 1809, 1815, 1821, 1825, 1835, 1845, 1849, 1863,
+                       1869, 1877, 1881, 1891, 1915, 1917, 1921, 1927, 1933,
+                       1939, 1961, 1969, 1989, 2011, 2027, 2035, 2041, 2047,
                        ULONG_MAX};
 
   f[0] = f[1] = 0;
   for (j = 0; j < N1; j++)
     for (i = 0; i < N0; i++)
       s[j][i] = 0.0;
-  for (l = L;  *l != ULONG_MAX; l++)
+  for (l = L;  *l < B; l++)
     {
       d = nbits (*l) - 1; /* degree of l */
       D = 1UL << d;
@@ -223,15 +340,10 @@ all1 (unsigned long *f, unsigned long n1, unsigned long n0)
       for (j = 0; j < N1; j++)
         for (i = 0; i < D; i++)
           sl[j][i] = s0;
+      init_time -= cputime ();
       for (r = 0; r < D; r++)
         {
           f0 = evalmod (f, DEGREE, r, *l);
-          if (f0 > B)
-            {
-              printf ("f0=%lu r=%lu *l=%lu\n", f0, r, *l);
-              print_poly (f, DEGREE);
-              printf ("\n");
-            }
           assert (f0 <= B);
           sl[0][f0] -= s1;
           for (j = 1; j < N1; j++)
@@ -242,7 +354,9 @@ all1 (unsigned long *f, unsigned long n1, unsigned long n0)
               sl[j][fj] -= s1;
             }
         }
+      init_time += cputime ();
       K = 1 << (n0 - d);
+      sieve_time -= cputime ();
       for (j = 0; j < N1; j++)
         for (r = 0, hl = 0; r < D; r++)
           {
@@ -250,11 +364,12 @@ all1 (unsigned long *f, unsigned long n1, unsigned long n0)
             for (k = 0, hl = 0; k < K; k++)
               {
                 m = hl ^ r;
-                if (m < N0)
-                  s[j][m] += sj;
+                assert (m < N0);
+                s[j][m] += sj;
                 hl ^= *l << G[k];
               }
           }
+      sieve_time += cputime ();
     }
 
   for (j = 0; j < N1; j++)
@@ -278,14 +393,21 @@ all1 (unsigned long *f, unsigned long n1, unsigned long n0)
 int
 main (int argc, char *argv[])
 {
-  unsigned long i, j;
-  unsigned long n0 = 0, n1 = 0, n2 = 0, N0, N1, N2, f2;
+  unsigned long j;
+  unsigned long n0 = 0, n1 = 0, n2 = 0, n3 = 0, n4 = 0, n5 = 0,
+    N0, N1, N2, N3, N4, N5, f5min = 0, f4min = 0, f3min = 0, f2min = 0;
 
   while (argc > 1 && argv[1][0] == '-')
     {
       if (argc > 2 && strcmp (argv[1], "-threshold") == 0)
         {
           threshold = atof (argv[2]);
+          argc -= 2;
+          argv += 2;
+        }
+      else if (argc > 2 && strcmp (argv[1], "-B") == 0)
+        {
+          B = atoi (argv[2]);
           argc -= 2;
           argv += 2;
         }
@@ -307,9 +429,57 @@ main (int argc, char *argv[])
           argc -= 2;
           argv += 2;
         }
-      else if (argc > 2 && strcmp (argv[1], "-f5") == 0)
+      else if (argc > 2 && strcmp (argv[1], "-n3") == 0)
         {
-          f[5] = strtoul (argv[2], NULL, 10);
+          n3 = atoi (argv[2]);
+          argc -= 2;
+          argv += 2;
+        }
+      else if (argc > 2 && strcmp (argv[1], "-n4") == 0)
+        {
+          n4 = atoi (argv[2]);
+          argc -= 2;
+          argv += 2;
+        }
+      else if (argc > 2 && strcmp (argv[1], "-n5") == 0)
+        {
+          n5 = atoi (argv[2]);
+          argc -= 2;
+          argv += 2;
+        }
+      else if (argc > 2 && strcmp (argv[1], "-f5min") == 0)
+        {
+          f5min = strtoul (argv[2], NULL, 10);
+          argc -= 2;
+          argv += 2;
+        }
+      else if (argc > 2 && strcmp (argv[1], "-f4min") == 0)
+        {
+          f4min = strtoul (argv[2], NULL, 10);
+          argc -= 2;
+          argv += 2;
+        }
+      else if (argc > 2 && strcmp (argv[1], "-f3min") == 0)
+        {
+          f3min = strtoul (argv[2], NULL, 10);
+          argc -= 2;
+          argv += 2;
+        }
+      else if (argc > 2 && strcmp (argv[1], "-f2min") == 0)
+        {
+          f2min = strtoul (argv[2], NULL, 10);
+          argc -= 2;
+          argv += 2;
+        }
+      else if (argc > 2 && strcmp (argv[1], "-f4") == 0)
+        {
+          f[4] = strtoul (argv[2], NULL, 10);
+          argc -= 2;
+          argv += 2;
+        }
+      else if (argc > 2 && strcmp (argv[1], "-f3") == 0)
+        {
+          f[3] = strtoul (argv[2], NULL, 10);
           argc -= 2;
           argv += 2;
         }
@@ -323,10 +493,19 @@ main (int argc, char *argv[])
   N0 = 1 << n0;
   N1 = 1 << n1;
   N2 = 1 << n2;
+  N3 = 1 << n3;
+  N4 = 1 << n4;
+  N5 = 1 << n5;
 
   if (threshold == -DBL_MAX)
     {
       fprintf (stderr, "Missing -threshold option\n");
+      exit (1);
+    }
+
+  if (B == 0)
+    {
+      fprintf (stderr, "Missing -B option\n");
       exit (1);
     }
 
@@ -343,12 +522,13 @@ main (int argc, char *argv[])
   G = (uint8_t*) malloc ((N0/2) * sizeof (uint8_t));
   gray (N0/2);
 
-  for (f2 = 0; f2 < N2; f2++)
-    {
-      f[2] = f2;
-      all1 (f, n1, n0);
-    }
-  printf ("Found %lu polynomial(s) below threshold\n", nsol);
+  for (f[5] = f5min; f[5] < f5min + N5; f[5]++)
+    for (f[4] = f4min; f[4] < f4min + N4; f[4]++)
+      for (f[3] = f3min; f[3] < f3min + N3; f[3]++)
+        for (f[2] = f2min; f[2] < f2min + N2; f[2]++)
+          all1 (f, n1, n0);
+  fprintf (stderr, "Found %lu polynomial(s) below threshold\n", nsol);
+  fprintf (stderr, "Init time %dms, sieve time %dms\n", init_time, sieve_time);
 
   free (G);
   for (j = 0; j < N1; j++)
