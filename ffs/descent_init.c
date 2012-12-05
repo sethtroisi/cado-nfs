@@ -160,8 +160,8 @@ int main(int argc, char **argv)
         fppol_set_str(beta, polstr); */
     }
 
+    fppol_t r, v;
     do {
-       fppol_t r, v;
        fppol_inits(r, v, NULL);
     /* Randomizing target : target = target * beta^j
        form some j and beta being the generator of the subgroup
