@@ -8,6 +8,15 @@
 #include <sys/types.h>
 #include <sys/resource.h>
 
+#define USE_FQPOL
+#ifdef USE_FQPOL
+#include "types.h"
+#include "ffspol.h"
+#include "fqpol.h"
+#include "params.h"
+#include "polyfactor.h"
+#endif
+
 /* some hard-coded values (for now) */
 #define DEGREE 6
 
@@ -205,28 +214,6 @@ is_divisible_by_y2_plus_a1y1_plus_a0 (unsigned long *f, unsigned long d,
 }
 
 int
-is_divisible_by_y2_plus_a2y2_plus_a1y1_plus_a0 (unsigned long *f,
-                                                unsigned long d,
-                                                unsigned long a2,
-                                                unsigned long a1,
-                                                unsigned long a0)
-{
-  unsigned long g[DEGREE + 1], i;
-
-  for (i = 0; i <= d; i++)
-    g[i] = f[i];
-  while (d >= 3)
-    {
-      /* g -= g[d]*y^d - g[d]*a2*y^(d-1) - g[d]*a1*y^(d-2) - g[d]*a0*y^(d-3) */
-      g[d-1] ^= mul (g[d], a2);
-      g[d-2] ^= mul (g[d], a1);
-      g[d-3] ^= mul (g[d], a0);
-      d--;
-    }
-  return g[2] == 0 && g[1] == 0 && g[0] == 0;
-}
-
-int
 is_maybe_irreducible (unsigned long *f, unsigned long d)
 {
   unsigned long l0[] = {1, 2, 3, 4, 5, 6, 7, ULONG_MAX}, i, a0, a1;
@@ -264,79 +251,158 @@ is_maybe_irreducible (unsigned long *f, unsigned long d)
                       {ULONG_MAX,0}};
   unsigned long l2[][3] = {{4,2,0},{5,3,0},{6,6,2},{16,2,3},{16,4,0},{16,7,3},{17,3,2},{17,5,0},{17,7,2},{19,7,2},{20,2,2},{20,3,3},{20,6,0},{21,7,0},{24,0,2},{30,0,3},{34,10,0},{35,3,2},{40,12,0},{42,14,0},{64,8,0},{65,9,0},{69,11,0},{81,13,0},{84,14,0},{85,15,0},{113,11,2},{114,12,3},{120,8,2},{120,15,3},{ULONG_MAX,0,0}};
 
+  /* divisors of degree 1 in y */
   for (i = 0; (a0 = l0[i]) != ULONG_MAX; i++)
     /* does y+a0 divide f? */
     if (evalmod (f, d, a0, ~0UL) == 0)
       return 0;
 
+  /* divisors of degree 2 in y */
   for (i = 0; (a0 = l1[i][0]) != ULONG_MAX; i++)
     if (is_divisible_by_y2_plus_a1y1_plus_a0 (f, d, l1[i][1], a0))
-      return 0;
-
-  for (i = 0; (a0 = l2[i][0]) != ULONG_MAX; i++)
-    if (is_divisible_by_y2_plus_a2y2_plus_a1y1_plus_a0 (f, d, l2[i][2],
-                                                        l2[i][1], a0))
       return 0;
 
   return 1;
 }
 
+#ifdef USE_FQPOL
+/* This function is duplicated from sieve4ffs/sieve.c */
+static int
+sq_is_irreducible (sq_srcptr p)
+{
+  fppol_t P;
+  int ret;
+
+  fppol_init (P);
+  fppol_set_sq (P, p);
+  ret = fppol_is_irreducible (P);
+  fppol_clear (P);
+  return ret;
+}
+
+/* cf files testirred.c and fqpol.c */
+static int
+is_irreducible (unsigned long *f, unsigned long d)
+{
+  ffspol_t ffspol;
+  sq_t ell; /* polynomial used for testing */
+  fq_info_t Fq;
+  fqpol_t Fbar;
+  unsigned int i;
+  int ret;
+  fppol64_t f64;
+  int DEG_ELL = 13;
+  int NTEST = 10;
+
+  assert (d == 6);
+  ffspol_init2 (ffspol, d + 1);
+  for (i = 0; i <= d; i++)
+    {
+      fppol64_set_ui (f64, f[i], 64, 0);
+      fppol_set_64 (ffspol->coeffs[i], f64);
+    }
+  ffspol->deg = d;
+
+  sq_set_ti (ell, DEG_ELL);
+  for (i = ret = 0; i < NTEST && ret == 0; i++)
+    {
+      do
+        sq_monic_set_next (ell, ell, 64);
+      while (!sq_is_irreducible (ell));
+      fq_info_init (Fq, ell);
+      fqpol_init (Fbar);
+      fqpol_set_ffspol (Fbar, ffspol, Fq);
+      if (Fbar->deg == d && fqpol_is_irreducible (Fbar, Fq))
+        ret = 1;
+    }
+  fqpol_clear (Fbar);
+  fq_info_clear (Fq);
+  ffspol_clear (ffspol);
+  return ret;
+}
+#endif
+
 static void
 all1 (unsigned long *f, unsigned long n1, unsigned long n0)
 {
   unsigned long i, j, *l, d, D, r, f0, fj, K, N1 = 1 << n1, N0 = 1 << n0;
-  unsigned long hl, k, m;
+  unsigned long hl, k, m, p;
   float s0, s1, sj;
-  /* list of irreducible polynomials of index <= B */
-  unsigned long L[] = {2, /* t */
-                       3, /* t + 1 */
-                       7, /* t^2 + t + 1 */
-                       11, /* t^3 + t + 1 */
-                       13, /* t^3 + t^2 + 1 */
-                       19, /* t^4 + t + 1 */
-                       25, /* t^4 + t^3 + 1 */
-                       31, /* t^4 + t^3 + t^2 + t + 1 */
-                       37, /* t^5 + t^2 + 1 */
-                       41, /* t^5 + t^3 + 1 */
-                       47, /* t^5 + t^3 + t^2 + t + 1 */
-                       55, /* t^5 + t^4 + t^2 + t + 1 */
-                       59, /* t^5 + t^4 + t^3 + t + 1 */
-                       61, /* t^5 + t^4 + t^3 + t^2 + 1 */
-                       67, 73, 87, 91, 97, 103, 109, 115, 117,
-                       131, 137, 143, 145, 157, 167, 171, 185, 191, 193, 203,
-                       211, 213, 229, 239, 241, 247, 253,
-                       283, 285, 299, 301, 313, 319, 333, 351, 355, 357, 361,
+  int is_power;
+  /* irreducible polynomials and powers of increasing index */
+  unsigned long L[] = {2, 3, 4, 5, 7, 8, 11, 13, 15, 16, 17, 19, 21, 25, 31,
+                       32, 37, 41, 47, 51, 55, 59, 61, 64, 67, 69, 73, 81, 85,
+                       87, 91, 97, 103, 107, 109, 115, 117, 128, 131, 137, 143,
+                       145, 157, 167, 171, 185, 191, 193, 203, 211, 213, 229,
+                       239, 241, 247, 253, 255, 256, 257, 261, 273, 283, 285,
+                       299, 301, 313, 319, 321, 333, 341, 351, 355, 357, 361,
                        369, 375, 379, 391, 395, 397, 415, 419, 425, 433, 445,
-                       451, 463, 471, 477, 487, 499, 501, 505,
-                       515, 529, 535, 539, 545, 557, 563, 587, 601, 607, 613,
-                       617, 623, 631, 637, 647, 661, 665, 675, 677, 687, 695,
-                       701, 719, 721, 731, 757, 761, 769, 787, 789, 799, 803,
+                       451, 463, 471, 477, 487, 499, 501, 505, 512, 515, 529,
+                       535, 539, 545, 557, 563, 587, 601, 607, 613, 617, 623,
+                       631, 637, 647, 661, 665, 675, 677, 687, 695, 701, 719,
+                       721, 731, 743, 757, 761, 769, 771, 787, 789, 799, 803,
                        817, 827, 841, 847, 859, 865, 875, 877, 883, 895, 901,
-                       911, 929, 949, 953, 967, 971, 973, 981, 985, 995, 1001,
-                       1019,
-                       1033, 1039, 1051, 1053, 1063, 1069, 1077, 1095, 1107,
-                       1123, 1125, 1135, 1153, 1163, 1177, 1193, 1199, 1221,
-                       1225, 1239, 1255, 1261, 1267, 1279, 1291, 1293, 1305,
-                       1311, 1315, 1329, 1341, 1347, 1367, 1377, 1383, 1387,
-                       1413, 1423, 1431, 1435, 1441, 1451, 1465, 1473, 1479,
-                       1509, 1527, 1531, 1555, 1557, 1571, 1573, 1585, 1591,
-                       1603, 1615, 1617, 1627, 1657, 1663, 1669, 1673, 1703,
-                       1709, 1717, 1727, 1729, 1741, 1747, 1759, 1783, 1789,
-                       1807, 1809, 1815, 1821, 1825, 1835, 1845, 1849, 1863,
-                       1869, 1877, 1881, 1891, 1915, 1917, 1921, 1927, 1933,
-                       1939, 1961, 1969, 1989, 2011, 2027, 2035, 2041, 2047,
-                       ULONG_MAX};
+                       911, 925, 929, 949, 953, 967, 971, 973, 981, 985, 995,
+                       1001, 1019, 1024, 1033, 1039, 1041, 1051, 1053, 1063,
+                       1069, 1077, 1089, 1095, 1107, 1109, 1123, 1125, 1135,
+                       1153, 1163, 1177, 1193, 1199, 1221, 1225, 1239, 1255,
+                       1261, 1267, 1279, 1285, 1291, 1293, 1301, 1305, 1311,
+                       1315, 1329, 1341, 1347, 1349, 1361, 1367, 1377, 1383,
+                       1387, 1413, 1423, 1431, 1435, 1441, 1451, 1465, 1473,
+                       1479, 1509, 1527, 1531, 1555, 1557, 1571, 1573, 1585,
+                       1591, 1603, 1615, 1617, 1627, 1657, 1663, 1669, 1673,
+                       1703, 1709, 1717, 1727, 1729, 1741, 1747, 1759, 1783,
+                       1789, 1807, 1809, 1815, 1821, 1825, 1835, 1845, 1849,
+                       1863, 1869, 1877, 1881, 1891, 1911, 1915, 1917, 1921,
+                       1927, 1933, 1939, 1961, 1969, 1989, 2011, 2027, 2035,
+                       2041, 2047, ULONG_MAX};
+  /* powers of irreducible polynomials, with corresponding power */
+  unsigned long P[][2] = {{4, 2}, {5, 2}, {8, 3}, {15, 3}, {16, 4}, {17, 4},
+                          {21, 2}, {32, 5}, {51, 5}, {64, 6}, {69, 2}, {81, 2},
+                          {85, 6}, {107, 3}, {128, 7}, {255, 7}, {256, 8},
+                          {257, 8}, {261, 2}, {273, 4}, {321, 2}, {341, 2},
+                          {512, 9}, {743, 3}, {771, 9}, {925, 3}, {1024, 10},
+                          {1041, 2}, {1089, 2}, {1109, 2}, {1285, 10},
+                          {1301, 2}, {1349, 2}, {1361, 2}, {1911, 5},
+                          {ULONG_MAX, 0}};
 
   f[0] = f[1] = 0;
   for (j = 0; j < N1; j++)
     for (i = 0; i < N0; i++)
       s[j][i] = 0.0;
-  for (l = L;  *l < B; l++)
+  for (l = L, p = 0; *l < B; l++)
     {
+      unsigned long d0, D0;
+      while (P[p][0] < *l)
+        p++;
+      if (P[p][0] == *l)
+        is_power = P[p][1];
+      else
+        is_power = 1;
       d = nbits (*l) - 1; /* degree of l */
       D = 1UL << d;
-      s0 = (float) d / (float) (D - 1);
-      s1 = (float) d * (float) D / (float) (D * D - 1);
+      d0 = d / is_power; /* degree of irreducible */
+      D0 = 1UL << d0;
+      if (is_power == 1 && (B < D * D)) /* only power is 1 */
+        {
+          s0 = (float) d / (float) (D - 1);
+          s1 = (float) d * (float) D / (float) (D * D - 1);
+        }
+      else if ((1UL << (d + d0)) <= B) /* not the largest power */
+        {
+          if (is_power == 1)
+            s0 = (float) d / (float) (D - 1);
+          else
+            s0 = (float) 0.0;
+          s1 = (float) d0 / (float) (D0 + 1) / (float) (1UL << (d - d0));
+        }
+      else
+        {
+          assert (is_power > 1);
+          s0 = (float) 0.0;
+          s1 = (float) d0 * (float) D0 / (float) (D0 * D0 - 1)
+            / (float) (1UL << (d - d0));
+        }
       for (j = 0; j < N1; j++)
         for (i = 0; i < D; i++)
           sl[j][i] = s0;
@@ -380,7 +446,8 @@ all1 (unsigned long *f, unsigned long n1, unsigned long n0)
         {
           f[0] = i;
           f[1] = j;
-          if (is_maybe_irreducible (f, DEGREE))
+          if (is_maybe_irreducible (f, DEGREE) &&
+              is_irreducible (f, DEGREE))
             {
               nsol ++;
               print_poly (f, DEGREE);
@@ -396,6 +463,12 @@ main (int argc, char *argv[])
   unsigned long j;
   unsigned long n0 = 0, n1 = 0, n2 = 0, n3 = 0, n4 = 0, n5 = 0,
     N0, N1, N2, N3, N4, N5, f5min = 0, f4min = 0, f3min = 0, f2min = 0;
+
+  /* print command line */
+  fprintf (stderr, "%s", argv[0]);
+  for (j = 1; j < argc; j++)
+    fprintf (stderr, " %s", argv[j]);
+  fprintf (stderr, "\n");
 
   while (argc > 1 && argv[1][0] == '-')
     {
@@ -537,6 +610,6 @@ main (int argc, char *argv[])
   for (j = 0; j < N1; j++)
     free (s[j]);
   free (s);
-  
+
   return 0;
 }
