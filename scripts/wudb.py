@@ -328,21 +328,33 @@ if __name__ == '__main__':
             wu.add(wutext)
         if args[0] == "-avail":
             db = WuDb(dbname)
-            available = db.where_eq("workunits", {"status": WuStatus.AVAILABLE})
+            wus = db.where_eq("workunits", {"status": WuStatus.AVAILABLE})
             print("Available workunits: ")
-            for wu in available:
+            for wu in wus:
                 print (str(wu))
         if args[0] == "-assigned":
             db = WuDb(dbname)
-            assigned = db.where_eq("workunits", {"status": WuStatus.ASSIGNED})
+            wus = db.where_eq("workunits", {"status": WuStatus.ASSIGNED})
             print("Assigned workunits: ")
-            for wu in available:
+            for wu in wus:
+                print (str(wu))
+        if args[0] == "-receivedok":
+            db = WuDb(dbname)
+            wus = db.where_eq("workunits", {"status": WuStatus.RECEIVED_OK})
+            print("Received ok workunits: ")
+            for wu in wus:
+                print (str(wu))
+        if args[0] == "-receivederr":
+            db = WuDb(dbname)
+            wus = db.where_eq("workunits", {"status": WuStatus.RECEIVED_ERROR})
+            print("Received with error workunits: ")
+            for wu in wus:
                 print (str(wu))
         if args[0] == "-all":
             db = WuDb(dbname)
-            all = db.where_eq("workunits")
+            wus = db.where_eq("workunits")
             print("Existing workunits: ")
-            for wu in all:
+            for wu in wus:
                 print (str(wu))
         if args[0] == "-find_avail":
             db = WuDb(dbname)
