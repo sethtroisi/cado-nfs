@@ -1,4 +1,4 @@
-BIN = sieve makefb normstats checkrels freerels testirred descent_init
+BIN = sieve makefb normstats checkrels freerels testirred # descent_init
 LIB = fppol
 
 fppol_OBJ = f2pol.o f3pol.o fppol.o fppol_test.o fppol_set.o  \
