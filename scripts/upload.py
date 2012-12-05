@@ -11,9 +11,12 @@ import sys
 from tempfile import mkstemp
 import wudb
 
-def diag(level, text, var):
-    if debug > level and var != None:
-        print (text + str(var), file=sys.stderr)
+def diag(level, text, var = None):
+    if debug > level:
+        if var == None:
+            print (text, file=sys.stderr)
+        else:
+            print (text + str(var), file=sys.stderr)
 
 # Global variable in this module so that other Python modules can import
 # it and store the path to the upload directory in the shell environment 

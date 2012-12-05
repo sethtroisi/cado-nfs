@@ -1,10 +1,18 @@
 #!/usr/bin/env python3
 
+import sys
 import sqlite3
 from datetime import datetime
 from workunit import Workunit
 
-debug = 2
+debug = 1
+
+def diag(level, text, var = None):
+    if debug > level:
+        if var == None:
+            print (text, file=sys.stderr)
+        else:
+            print (text + str(var), file=sys.stderr)
 
 # A DB entry for a WU uses the WUid as the key, and stores:
 # - status (available, assigned, received, received with error, verified:correct, verified:error
@@ -56,9 +64,8 @@ class WuDb:
         """ Wrapper around self.cursor.execute() that prints arguments 
             for debugging """
         # Could use inspect module to remove name parameter
-        if debug > 1:
-            print ("WuDb." + name + "(): command = " + command);
-            print ("WuDb." + name + "(): values = " + str(values))
+        diag (1, "WuDb." + name + "(): command = " + command);
+        diag (1, "WuDb." + name + "(): values = ", values)
         cursor.execute(command, values)
 
     def create_table(self, table, layout):
@@ -137,8 +144,7 @@ class WuDb:
         desc = [k[0] for k in cursor.description]
         row = cursor.fetchone()
         while row is not None:
-            if debug > 1:
-                print("WuDb.where_eq(): row = " + str(row))
+            diag(1, "WuDb.where_eq(): row = ", row)
             result.append(dict(zip(desc, row)))
             row = cursor.fetchone()
         cursor.close()
@@ -223,9 +229,14 @@ class DbWuEntry:
         return self.data["wu"]
     
     def _checkstatus(self, status):
-        if not self.data["status"] == status:
-            raise StatusUpdateError("WU " + str(self.data["wuid"]) + 
-                " has status " + str(self.data["status"]))
+        diag (1, "DbWuEntry._checkstatus(" + str(self) + ", " + str(status) + ")")
+        if self.data["status"] != status:
+            wuid = str(self.data["wuid"])
+            wustatus = str(self.data["status"])
+            msg = "WU " + wuid + " has status " + wustatus + ", expected " + str(status)
+            diag (0, "DbWuEntry._checkstatus(): " + msg)
+            # raise wudb.StatusUpdateError(msg)
+            raise Exception(msg)
 
     def find_available(self):
         row = self.db.where_eq(DbWuEntry.table, {"status" : WuStatus.AVAILABLE}, limit=1)
