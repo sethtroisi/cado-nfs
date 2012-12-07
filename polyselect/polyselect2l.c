@@ -53,7 +53,8 @@ pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER; /* used as mutual exclusion
 int tot_found = 0; /* total number of polynomials */
 int found = 0; /* number of polynomials below maxnorm */
 double potential_collisions = 0.0, aver_opt_lognorm = 0.0,
-  aver_raw_lognorm = 0.0, aver_lognorm_ratio = 0.0;
+  aver_raw_lognorm = 0.0, aver_lognorm_ratio = 0.0,
+  var_opt_lognorm = 0.0, var_raw_lognorm = 0.0;
 double min_raw_lognorm = DBL_MAX, max_raw_lognorm = 0.0;
 double min_opt_lognorm = DBL_MAX, max_opt_lognorm = 0.0;
 unsigned long collisions = 0;
@@ -372,6 +373,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   collisions ++;
   tot_found ++;
   aver_raw_lognorm += logmu;
+  var_raw_lognorm += logmu * logmu;
   if (d == 6) {
     aver_lognorm_ratio += logmu0c4/logmu0c3;
   }
@@ -437,6 +439,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 #endif
     collisions_good ++;
     aver_opt_lognorm += logmu;
+    var_opt_lognorm += logmu * logmu;
     if (logmu < min_opt_lognorm)
       min_opt_lognorm = logmu;
     if (logmu > max_opt_lognorm)
@@ -718,6 +721,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
   collisions ++;
   tot_found ++;
   aver_raw_lognorm += logmu;
+  var_raw_lognorm += logmu * logmu;
   if (d == 6) {
     aver_lognorm_ratio += logmu0c4/logmu0c3;
   }
@@ -782,6 +786,7 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 #endif
     collisions_good ++;
     aver_opt_lognorm += logmu;
+    var_opt_lognorm += logmu * logmu;
     if (logmu < min_opt_lognorm)
       min_opt_lognorm = logmu;
     if (logmu > max_opt_lognorm)
@@ -2253,14 +2258,19 @@ main (int argc, char *argv[])
 
     if (cputime () > target_time || verbose > 0)
     {
-      printf ("# Stat: ad=%lu, exp. coll.=%1.2f (%0.2e/s), got %lu with %lu good ones, av. lognorm=%1.2f, av. raw. lognorm=%1.2f, time=%dms\n",
+      double mean = aver_opt_lognorm / collisions_good;
+      double rawmean = aver_raw_lognorm / collisions;
+
+      printf ("# Stat: ad=%lu, exp. coll.=%1.2f (%0.2e/s), got %lu with %lu good ones, av. lognorm=%1.2f (min=%1.2f,std=%1.2f), av. raw. lognorm=%1.2f (min=%1.2f,std=%1.2f), time=%dms\n",
               admin,
               potential_collisions,
               1000.0 * (double) potential_collisions / cputime (),
               collisions,
               collisions_good,
-              aver_opt_lognorm / collisions_good,
-              aver_raw_lognorm / collisions,
+              mean, min_opt_lognorm,
+              sqrt (var_opt_lognorm / collisions_good - mean * mean),
+              rawmean, min_raw_lognorm,
+              sqrt (var_raw_lognorm / collisions - rawmean * rawmean),
               cputime () );
       fflush (stdout);
       target_time += incr_target_time;
@@ -2275,12 +2285,16 @@ main (int argc, char *argv[])
               / (double) cputime ());
       if (collisions > 0)
         {
-          printf ("# Stat: raw lognorm (min/av/max): %1.2f/%1.2f/%1.2f\n",
-                  min_raw_lognorm, aver_raw_lognorm / collisions, max_raw_lognorm);
+          double mean = aver_opt_lognorm / collisions_good;
+          double rawmean = aver_raw_lognorm / collisions;
+
+          printf ("# Stat: raw lognorm (min/av/max/std): %1.2f/%1.2f/%1.2f/%1.2f\n",
+                  min_raw_lognorm, rawmean, max_raw_lognorm,
+                  sqrt (var_raw_lognorm / collisions - rawmean * rawmean));
           if (collisions_good > 0)
-            printf ("# Stat: optimized lognorm (min/av/max): %1.2f/%1.2f/%1.2f\n",
-                    min_opt_lognorm, aver_opt_lognorm / collisions_good,
-                    max_opt_lognorm);
+            printf ("# Stat: optimized lognorm (min/av/max/std): %1.2f/%1.2f/%1.2f/%1.2f\n",
+                    min_opt_lognorm, mean, max_opt_lognorm,
+                    sqrt (var_opt_lognorm / collisions_good - mean * mean));
           printf ("# Stat: av. g0/adm2 ratio: %.3e\n",
                   total_adminus2 / (double) collisions);
           if (d == 6)
