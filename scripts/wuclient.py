@@ -41,7 +41,8 @@ OPTIONAL_SETTINGS = {"WU_FILENAME" : ("WU", "Filename under which to store WU fi
                      "GETWUPATH" : ("/cgi-bin/getwu", "Path segment of URL for requesting WUs from server"), 
                      "POSTRESULTPATH" : ("/cgi-bin/upload.py", "Path segment of URL for reporting results to server"), 
                      "DEBUG" : ("0", "Debugging verbosity"),
-                     "ARCH" : ("", "Architecture string for this client")}
+                     "ARCH" : ("", "Architecture string for this client"),
+                     "DOWNLOADRETRY" : ("300", "Time to wait before download retries")}
 # Merge the two, removing help string
 SETTINGS = dict([(a,b) for (a,(b,c)) in list(REQUIRED_SETTINGS.items()) + \
                                         list(OPTIONAL_SETTINGS.items())])
@@ -61,11 +62,19 @@ def get_file(urlpath, dlpath = None, options = None):
     if options:
         url = url + "?" + options
     log (0, "Downloading " + url + " to " + dlpath);
-    try:
-        request = urllib.request.urlopen(url)
-    except urllib.error.HTTPError as e:
-        log (0, str(e))
-        return False
+    request = None
+    while request == None:
+        try:
+            request = urllib.request.urlopen(url)
+        except urllib.error.HTTPError as e:
+            log (0, str(e))
+            return False
+        except (NameError, urllib.error.URLError) as e:
+            request = None
+            wait = float(SETTINGS["DOWNLOADRETRY"])
+            log(0, "Download of " + urlpath + " failed, " + str(e))
+            log(0, "Waiting " + str(wait) + " seconds before retrying")
+            time.sleep(wait)
     file = open(dlpath, "wb")
     shutil.copyfileobj (request, file)
     file.close()
