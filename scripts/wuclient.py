@@ -40,7 +40,8 @@ REQUIRED_SETTINGS = {"CLIENTID" : ("", "Unique ID for this client"),
 OPTIONAL_SETTINGS = {"WU_FILENAME" : ("WU", "Filename under which to store WU files"), 
                      "GETWUPATH" : ("/cgi-bin/getwu", "Path segment of URL for requesting WUs from server"), 
                      "POSTRESULTPATH" : ("/cgi-bin/upload.py", "Path segment of URL for reporting results to server"), 
-                     "DEBUG" : ("0", "Debugging verbosity")}
+                     "DEBUG" : ("0", "Debugging verbosity"),
+                     "ARCH" : ("", "Architecture string for this client")}
 # Merge the two, removing help string
 SETTINGS = dict([(a,b) for (a,(b,c)) in list(REQUIRED_SETTINGS.items()) + \
                                         list(OPTIONAL_SETTINGS.items())])
@@ -102,7 +103,9 @@ class Workunit_Processor(Workunit):
 
     def get_files(self):
         for (filename, checksum) in self.wu.data["FILE"] + self.wu.data["EXECFILE"]:
-            if not get_missing_file (filename, SETTINGS["DLDIR"] + '/' + filename, checksum):
+            archname = Template(filename).safe_substitute({"ARCH": SETTINGS["ARCH"]})
+            dlname = Template(filename).safe_substitute({"ARCH": ""})
+            if not get_missing_file (archname, SETTINGS["DLDIR"] + '/' + dlname, checksum):
                 return False
         for (filename, checksum) in self.wu.data["EXECFILE"]:
             path = SETTINGS["DLDIR"] + '/' + filename
@@ -236,7 +239,7 @@ if __name__ == '__main__':
     # Copy values to SETTINGS
     for arg in SETTINGS.keys():
         if arg.lower() in args:
-            SETTINGS[arg] = args[arg.lower()].rstrip("/")
+            SETTINGS[arg] = args[arg.lower()]
 
     # print (str(SETTINGS))
 
