@@ -117,7 +117,8 @@ class Workunit_Processor(Workunit):
             if not get_missing_file (archname, SETTINGS["DLDIR"] + '/' + dlname, checksum):
                 return False
         for (filename, checksum) in self.wu.data["EXECFILE"]:
-            path = SETTINGS["DLDIR"] + '/' + filename
+            dlname = Template(filename).safe_substitute({"ARCH": ""})
+            path = SETTINGS["DLDIR"] + '/' + dlname
             mode = os.stat(path).st_mode
             if mode & stat.S_IXUSR == 0:
                 log (0, "Setting executable flag for " + path)
@@ -215,7 +216,8 @@ class Workunit_Processor(Workunit):
         if not self.get_files():
             return False
         if not self.result_exists():
-            self.run_commands()
+            if not self.run_commands():
+                return False
         if not self.upload_result():
             return False
         self.cleanup()
