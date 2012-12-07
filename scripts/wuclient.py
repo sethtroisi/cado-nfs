@@ -45,6 +45,13 @@ OPTIONAL_SETTINGS = {"WU_FILENAME" : ("WU", "Filename under which to store WU fi
 SETTINGS = dict([(a,b) for (a,(b,c)) in list(REQUIRED_SETTINGS.items()) + \
                                         list(OPTIONAL_SETTINGS.items())])
 
+def log(level, text, var = None):
+    if int(SETTINGS["DEBUG"]) >= level:
+        if var == None:
+            print (text)
+        else:
+            print (text + str(var))
+
 def get_file(urlpath, dlpath = None, options = None):
     # print('get_file("' + urlpath + '", "' + dlpath + '")')
     if dlpath == None:
@@ -52,11 +59,11 @@ def get_file(urlpath, dlpath = None, options = None):
     url = SETTINGS["SERVER"] + "/" + urlpath
     if options:
         url = url + "?" + options
-    print ("Downloading " + url + " to " + dlpath);
+    log (0, "Downloading " + url + " to " + dlpath);
     try:
         request = urllib.request.urlopen(url)
     except urllib.error.HTTPError as e:
-        print (e)
+        log (0, str(e))
         return False
     file = open(dlpath, "wb")
     shutil.copyfileobj (request, file)
@@ -70,7 +77,7 @@ def get_missing_file(urlpath, filename, checksum = None, options = None):
         return get_file(urlpath, filename, options)
         # FIXME CHECKSUM
     else:
-        print (filename + " already exists, not downloading")
+        log (0, filename + " already exists, not downloading")
         return True
     if checksum:
         # FIXME CHECKSUM
@@ -83,14 +90,12 @@ class Workunit_Processor(Workunit):
         self.exitcode = 0 # will get set if any command exits with code != 0
         self.debug = debug # Controls debugging output
 
-        if self.debug >= 1:
-            print ("Parsing workunit from file " + filepath)
+        log (1, "Parsing workunit from file " + filepath)
         wu_file = open(filepath)
         wu_text = wu_file.read()
         wu_file.close()
         self.wu = Workunit(wu_text)
-        if self.debug >= 1:
-            print (" done, workunit ID is " + self.wu.get_id())
+        log (1, " done, workunit ID is " + self.wu.get_id())
 
     def  __str__(self):
         return "Processor for Workunit:\n" + self.wu.__str__()
@@ -103,22 +108,21 @@ class Workunit_Processor(Workunit):
             path = SETTINGS["DLDIR"] + '/' + filename
             mode = os.stat(path).st_mode
             if mode & stat.S_IXUSR == 0:
-                print ("Setting executable flag for " + path)
+                log (0, "Setting executable flag for " + path)
                 os.chmod(path, mode | stat.S_IXUSR)
         return True
     
     def run_commands(self):
         for command in self.wu.data["COMMAND"]:
             command = Template(command).safe_substitute(SETTINGS)
-            if self.debug >= 0:
-                print ("Running command for workunit " + self.wu.get_id() + ": " + command)
+            log (0, "Running command for workunit " + self.wu.get_id() + ": " + command)
             rc = subprocess.call(command, shell=True)
             if rc != 0:
-                print ("Command exited with exit code " + str(rc)) 
+                log (0, "Command exited with exit code " + str(rc)) 
                 self.exitcode = rc
                 return False
-            elif self.debug >= 1:
-                print ("Command exited successfully")
+            else:
+                log (1, "Command exited successfully")
         return True
 
     def upload_result(self):
@@ -136,8 +140,7 @@ class Workunit_Processor(Workunit):
             postdata.attach(rc)
         if "RESULT" in self.wu.data:
             filepath = SETTINGS["WORKDIR"] + "/" + self.wu.data["RESULT"]
-            if self.debug >= 1:
-                print ("Adding result file " + filepath + " to upload")
+            log (1, "Adding result file " + filepath + " to upload")
             file = open(filepath, "rb")
             filedata = file.read()
             file.close()
@@ -170,9 +173,9 @@ class Workunit_Processor(Workunit):
         url = SETTINGS["SERVER"] + "/" + SETTINGS["POSTRESULTPATH"]
         request = urllib.request.Request(url, data=postdata3, headers=dict(postdata.items()))
         conn = urllib.request.urlopen(request)
-        print ("Server response:")
+        log (1, "Server response:")
         for line in conn:
-            print(line)
+            log(1, line)
         conn.close()
         return True
 
@@ -181,15 +184,15 @@ class Workunit_Processor(Workunit):
             filepath = SETTINGS["WORKDIR"] + "/" + self.wu.data["RESULT"]
             if not os.path.isfile(filepath):
                 return False
-            print ("Result file " + filepath + " already exists")
-        print ("All result files already exist")
+            log (0, "Result file " + filepath + " already exists")
+        log (0, "All result files already exist")
         return True
 
     def cleanup(self):
-        print ("Cleaning up for workunit " + self.wu.get_id())
+        log (0, "Cleaning up for workunit " + self.wu.get_id())
         if "RESULT" in self.wu.data:
             filepath = SETTINGS["WORKDIR"] + "/" + self.wu.data["RESULT"]
-            print ("Removing result file " + filepath)
+            log (0, "Removing result file " + filepath)
             os.remove(filepath)
 
     def process(self):
@@ -214,7 +217,7 @@ def do_work():
     wu = Workunit_Processor(wu_filename, int(SETTINGS["DEBUG"]))
     if not wu.process():
         return False
-    print ("Removing workunit file " + wu_filename)
+    log (0, "Removing workunit file " + wu_filename)
     os.remove(wu_filename)
     return True
 
