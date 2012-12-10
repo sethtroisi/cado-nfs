@@ -123,7 +123,7 @@ class WuDb: # {
         values = list(d.values()) + [id, ]
         WuDb._exec(cursor, command, values, "update")
     
-    def where_eq(self, cursor, table, d = None, limit=None):
+    def where_eq(self, cursor, table, d = None, limit = None, order = None):
         """ Get a up to "limit" table rows (limit == 0: no limit) where 
             the key:value pairs of the dictionary d are set to the same 
             value in the database table """
@@ -137,11 +137,19 @@ class WuDb: # {
             WHERE = " WHERE " + WuDb._fieldlist(d.keys())
             values = list(d.values())
 
+        if order is None:
+            ORDER = ""
+        else:
+            if not order[1] in ("ASC", "DESC"):
+                raise Exception
+            ORDER = " ORDER BY " + str(order[0]) + " " + order[1]
+
         if limit is None:
             LIMIT = ""
         else:
             LIMIT = " LIMIT " + str(int(limit))
-        command = "SELECT * FROM " + table + WHERE + LIMIT + ";"
+
+        command = "SELECT * FROM " + table + WHERE + ORDER + LIMIT + ";"
         WuDb._exec(cursor, command, values, "where_eq")
         
         # cursor.description is a list of lists, where the first element of 
@@ -192,8 +200,9 @@ class DbTable: # {
             be written are specified key:value pairs of the dictionary d """
         self.db.update(cursor, self.tablename, id, d)
 
-    def where_eq(self, cursor, d = None, limit = None):
-        return self.db.where_eq(cursor, self.tablename, d, limit)
+    def where_eq(self, cursor, d = None, limit = None, order = None):
+        assert order is None or order[0] in self._get_colnames()
+        return self.db.where_eq(cursor, self.tablename, d, limit=limit, order=order)
 # }
 
 class WuTable(DbTable):
@@ -209,7 +218,9 @@ class WuTable(DbTable):
         ("timeresult", "TEXT", ""), 
         ("resultclient", "TEXT", ""), 
         ("errorcode", "INTEGER", ""), 
-        ("timeverified", "TEXT", "")
+        ("timeverified", "TEXT", ""),
+        ("retryof", "TEXT", ""),
+        ("priority", "INTEGER", "")
     )
     def __init__(self, db):
         DbTable.__init__(self, db, WuTable.name, WuTable.fields)
@@ -219,13 +230,15 @@ class FilesTable(DbTable):
     name = "files"
     fields = (
         ("id", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"), 
-        ("wuid", "TEXT", ""), 
+        ("wurowid", "INTEGER", "REFERENCES " + WuTable.name + " (id)"), 
         ("filename", "TEXT", ""), 
         ("path", "TEXT", "UNIQUE NOT NULL")
     )
     def __init__(self, db):
         DbTable.__init__(self, db, FilesTable.name, FilesTable.fields)
 
+class ClientsTable(DbTable):
+    pass
 
 class WuActiveRecord(): # {
     """ This class maps between the WORKUNIT and FILES tables 
@@ -262,9 +275,9 @@ class WuActiveRecord(): # {
             self.data["files"] = []
         for f in files:
             d = {"filename": f[0], "path": f[1]}
-            d["wuid"] = self.data["wuid"]
+            d["wurowid"] = self.data["id"]
             d["id"] = self.filestable.insert(cursor, d)
-            del d["wuid"]
+            del d["wurowid"]
             self.data["files"].append(d)
 
     def _from_db_row(self, wu_row, files_rows):
@@ -281,19 +294,19 @@ class WuActiveRecord(): # {
             wu.data["files"] = None
         for f in files_rows:
             fileentry = self.filestable.dictextract(f)
-            assert fileentry["wuid"] == wu.data["wuid"]
-            del(fileentry["wuid"])
+            assert fileentry["wurowid"] == wu.data["id"]
+            del(fileentry["wurowid"])
             wu.data["files"].append(fileentry)
         return wu
 
-    def where_eq(self, cursor, where = None, limit = None):
+    def where_eq(self, cursor, where = None, limit = None, order = None):
         result = []
         wu_d = self.wutable.dictextract(where)
-        wu_rows = self.wutable.where_eq(cursor, wu_d, limit)
+        wu_rows = self.wutable.where_eq(cursor, wu_d, limit, order)
         # print ("* wu_rows = " + str(wu_rows))
         for wu_row in wu_rows:	
             # print ("* wu_row = " + str(wu_row))
-            files_rows = self.filestable.where_eq(cursor, {"wuid" : wu_row["wuid"]})
+            files_rows = self.filestable.where_eq(cursor, {"wurowid" : wu_row["id"]})
             wu = self._from_db_row(wu_row, files_rows)
             # print ("* wu = " + str(wu))
             result.append(wu)
@@ -366,24 +379,26 @@ class WuActiveRecord(): # {
     def get_wu(self):
         return self.data["wu"]
     
-    def create1(self, cursor, wu):
+    def create1(self, cursor, wu, priority = None):
         self.data = {}
         self.data["wuid"] = Workunit(wu).get_id()
         self.data["wu"] = wu
         self.data["status"] = WuStatus.AVAILABLE
         self.data["timecreated"] = str(datetime.now())
         self.data["files"] = []
+        if not priority is None:
+            self.data["priority"] = priority
         self.data["id"] = self.wutable.insert(cursor, self.data)
 
-    def create(self, wus):
+    def create(self, wus, priority = None):
         """ Create a new workunit from wu which contains the text of the 
             workunit file """
         cursor = self.db.cursor()
         if isinstance(wus, str):
-            self.create1(cursor, wus)
+            self.create1(cursor, wus, priority)
         elif isinstance(wus, tuple) or isinstance(wus, list):
             for wu in wus:
-                self.create1(cursor, wu)
+                self.create1(cursor, wu, priority)
         else:
             cursor.close()
             raise Exception
@@ -394,7 +409,7 @@ class WuActiveRecord(): # {
         """ Finds an available workunit and assigns it to clientid.
             Returns False of no available workunit exists """
         cursor = self.db.cursor()
-        r = self.where_eq(cursor, {"status": WuStatus.AVAILABLE}, limit = 1)
+        r = self.where_eq(cursor, {"status": WuStatus.AVAILABLE}, limit = 1, order=("priority", "DESC"))
         if len(r) == 1:
             self.data = r[0].data
             self._checkstatus(WuStatus.AVAILABLE)
@@ -483,87 +498,81 @@ class WuActiveRecord(): # {
         
 
 
-if __name__ == '__main__':
-    import sys
+if __name__ == '__main__': # {
+    import argparse
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-create', action="store_true", required=False, help='Create the database tables if they do not exist')
+    parser.add_argument('-add', action="store_true", required=False, help='Add new work units. Contents of WU(s) are read from stdin, separated by blank line')
+    parser.add_argument('-assign', required = False, nargs = 1, metavar = 'clientid', help = 'Assign an available WU to clientid')
+    parser.add_argument('-prio', required = False, nargs = 1, metavar = 'N', help = 'If used with -add, newly added WUs receive priority N')
+
+    for arg in ("avail", "assigned", "receivedok", "receivederr", "all"):
+        parser.add_argument('-' + arg, action="store_true", required = False)
+    for arg in ("dbname", "debug"):
+        parser.add_argument('-' + arg, required = False, nargs = 1)
+    # Parse command line, store as dictionary
+    args = vars(parser.parse_args())
+    print(args)
+
+
     dbname = "wudb"
-    for arg in sys.argv:
-        args = arg.split("=")
-        if args[0] == "-dbname":
-            dbname = args[1]
-        if args[0] == "-create":
-            db = WuDb(dbname)
-            wu = WuActiveRecord(db)
-            wu .create_tables()
-            db.close()
-        if args[0] == "-add":
-            db = WuDb(dbname)
-            wu = WuActiveRecord(db)
-            s = ""
-            wus = []
-            for line in sys.stdin:
-                if line == "\n":
-                    wus.append(s)
-                    s = ""
-                else:
-                    s = s + line
-            if s != "":
+    if args["dbname"]:
+        dbname = args["dbname"]
+
+    if args["debug"]:
+        debug = int(args["debug"][0])
+    prio = 0
+    if args["prio"]:
+        debug = int(args["prio"][0])
+
+    db = WuDb(dbname)
+    wu = WuActiveRecord(db)
+    
+    if args["create"]:
+        wu.create_tables()
+    if args["add"]:
+        s = ""
+        wus = []
+        for line in sys.stdin:
+            if line == "\n":
                 wus.append(s)
-            wu.create(wus)
-            db.close()
-        # Functions for testing
-        if args[0] == "-assign":
-            db = WuDb(dbname)
-            wu = WuActiveRecord(db)
-            clientid = "client1"
-            wu.assign(clientid)
-            db.close()
-        if args[0] == "-result":
-            db = WuDb(dbname)
-            wu = WuActiveRecord(db)
-            wuid = "a"
-            clientid = "client1"
-            files = (("output", "/foo/bar"),)
-            errorcode = 0
-            wu.result(wuid, clientid, errorcode, files)
-            db.close()
-        # Functions for queries
-        if args[0] == "-avail":
-            db = WuDb(dbname)
-            wu = WuActiveRecord(db)
-            wus = wu.query({"status": WuStatus.AVAILABLE})
-            print("Available workunits: ")
-            for wu in wus:
-                print (str(wu))
-            db.close()
-        if args[0] == "-assigned":
-            db = WuDb(dbname)
-            wu = WuActiveRecord(db)
-            wus = wu.query({"status": WuStatus.ASSIGNED})
-            print("Assigned workunits: ")
-            for wu in wus:
-                print (str(wu))
-            db.close()
-        if args[0] == "-receivedok":
-            db = WuDb(dbname)
-            wu = WuActiveRecord(db)
-            wus = wu.query({"status": WuStatus.RECEIVED_OK})
-            print("Received ok workunits: ")
-            for wu in wus:
-                print (str(wu))
-            db.close()
-        if args[0] == "-receivederr":
-            db = WuDb(dbname)
-            wu = WuActiveRecord(db)
-            wus = wu.query({"status": WuStatus.RECEIVED_ERROR})
-            print("Received with error workunits: ")
-            for wu in wus:
-                print (str(wu))
-            db.close()
-        if args[0] == "-all":
-            db = WuDb(dbname)
-            wu = WuActiveRecord(db)
-            wus = wu.query()
-            print("Existing workunits: ")
-            for wu in wus:
-                print (str(wu))
-            db.close()
+                s = ""
+            else:
+                s = s + line
+        if s != "":
+            wus.append(s)
+        wu.create(wus, priority=prio)
+    # Functions for queries
+    if args["avail"]:
+        wus = wu.query({"status": WuStatus.AVAILABLE})
+        print("Available workunits: ")
+        for wu in wus:
+            print (str(wu))
+    if args["assigned"]:
+        wus = wu.query({"status": WuStatus.ASSIGNED})
+        print("Assigned workunits: ")
+        for wu in wus:
+            print (str(wu))
+    if args["receivedok"]:
+        wus = wu.query({"status": WuStatus.RECEIVED_OK})
+        print("Received ok workunits: ")
+        for wu in wus:
+            print (str(wu))
+    if args["receivederr"]:
+        wus = wu.query({"status": WuStatus.RECEIVED_ERROR})
+        print("Received with error workunits: ")
+        for wu in wus:
+            print (str(wu))
+    if args["all"]:
+        wus = wu.query()
+        print("Existing workunits: ")
+        for wu in wus:
+            print (str(wu))
+    # Functions for testing
+    if args["assign"]:
+        clientid = args["assign"][0]
+        wu.assign(clientid)
+    
+    db.close()
+# }
