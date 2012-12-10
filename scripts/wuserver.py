@@ -45,13 +45,12 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         if not clientid.isalnum():
             return self.send_error(400, "Malformed client id specified")
         
-        wu = wudb.DbWuEntry(db)
-        wu.find_available()
+        wu = wudb.WuActiveRecord(db)
+        wu.assign(clientid)
         if wu.get_wuid() is None:
             return self.send_error(404, "No work available")
         
         self.log_message("Sending work unit " + wu.get_wuid() + " to client " + clientid)
-        wu.assign(clientid)
         wu_text = wu.get_wu()
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")

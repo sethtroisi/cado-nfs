@@ -82,26 +82,22 @@ def do_upload(db, input = sys.stdin, output = sys.stdout):
             message = 'No client id was specified'
 
     if not message:
-        wu = wudb.DbWuEntry(db)
-        wu.find_wuid(WUid.value)
-        if wu.get_wuid() != WUid.value:
-            message = 'Workunit ' + WUid.value + 'not found in database'
-
-    if not message:
         filetuples = []
         # strip leading path from file name to avoid directory traversal attacks
         basename = os.path.basename(fileitem.filename)
         # Make a file name which does not exist yet and create the file
         (fd, filename) = mkstemp(suffix='', prefix=basename, 
             dir=os.environ[UPLOADDIRKEY])
-        # fd is a file descriptor, make a file object from it
-        filetuples.append((fileitem.filename, filename))
+        filestuple = (fileitem.filename, filename)
+        filetuples.append(filestuple)
         
+        wu = wudb.WuActiveRecord(db)
         try:
-            wu.result(clientid.value, errorcode, filetuples)
+            wu.result(WUid.value, clientid.value, errorcode, filetuples)
         except wudb.StatusUpdateError:
             message = 'Workunit ' + WUid.value + 'was not currently assigned'
 
+        # fd is a file descriptor, make a file object from it
         file = os.fdopen(fd, "wb")
         file.write(fileitem.file.read())
         bytes = file.tell()
@@ -119,7 +115,6 @@ def do_upload(db, input = sys.stdin, output = sys.stdout):
 
 # If this file is run directly by Python, call do_upload()
 if __name__ == '__main__':
-    import wudb
     if DBFILENAMEKEY not in os.environ:
         message = 'Script error: Environment variable ' + DBFILENAMEKEY + ' not set'
     dbfilename = os.environ[DBFILENAMEKEY]
