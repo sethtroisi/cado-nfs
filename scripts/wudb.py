@@ -45,7 +45,10 @@ class WuDb: # {
 
     def __init__(self, filename):
         """ Open a connection to a sqlite database with the specified filename """
-        self.db = sqlite3.connect(filename)
+        # DEFERRED causes sqlite to created a SHARED lock after a read access, 
+        # which (hopefully) prevents, e.g., race conditions between two threads
+        # looking up an available workunit and assigning it to a client
+        self.db = sqlite3.connect(filename, isolation_level="DEFERRED")
 
     def __del__(self):
         self.close()
@@ -165,10 +168,10 @@ class WuDb: # {
 
 class DbTable: # {
     """ A class template defining access methods to a database table """
-    def __init__(self, db, tablename, fields):
+    def __init__(self, db):
         self.db = db
-        self.tablename = tablename
-        self.fields = fields
+        self.tablename = type(self).name
+        self.fields = type(self).fields
 
     @staticmethod
     def _subdict(d, l):
@@ -222,9 +225,6 @@ class WuTable(DbTable):
         ("retryof", "TEXT", ""),
         ("priority", "INTEGER", "")
     )
-    def __init__(self, db):
-        DbTable.__init__(self, db, WuTable.name, WuTable.fields)
-
 
 class FilesTable(DbTable):
     name = "files"
@@ -234,11 +234,6 @@ class FilesTable(DbTable):
         ("filename", "TEXT", ""), 
         ("path", "TEXT", "UNIQUE NOT NULL")
     )
-    def __init__(self, db):
-        DbTable.__init__(self, db, FilesTable.name, FilesTable.fields)
-
-class ClientsTable(DbTable):
-    pass
 
 class WuActiveRecord(): # {
     """ This class maps between the WORKUNIT and FILES tables 
@@ -513,8 +508,7 @@ if __name__ == '__main__': # {
         parser.add_argument('-' + arg, required = False, nargs = 1)
     # Parse command line, store as dictionary
     args = vars(parser.parse_args())
-    print(args)
-
+    # print(args)
 
     dbname = "wudb"
     if args["dbname"]:
