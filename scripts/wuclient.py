@@ -161,17 +161,18 @@ class Workunit_Processor(Workunit):
             WUid.add_header('Content-Disposition', 'form-data', name="exitcode")
             postdata.attach(rc)
         if "RESULT" in self.wu.data:
-            filepath = SETTINGS["WORKDIR"] + "/" + self.wu.data["RESULT"]
-            log (1, "Adding result file " + filepath + " to upload")
-            file = open(filepath, "rb")
-            filedata = file.read()
-            file.close()
-            # HTTP does not use a Content-Transfer-Encoding, so use noop encoder
-            # This fails, probably related to http://bugs.python.org/issue4768
-            result = MIMEApplication(filedata, _encoder=email.encoders.encode_noop)
-            result.add_header('Content-Disposition', 'form-data', name="results", 
-                              filename=self.wu.data["RESULT"])
-            postdata.attach(result)
+            for f in self.wu.data["RESULT"]:
+                filepath = SETTINGS["WORKDIR"] + "/" + f
+                log (1, "Adding result file " + filepath + " to upload")
+                file = open(filepath, "rb")
+                filedata = file.read()
+                file.close()
+                # HTTP does not use a Content-Transfer-Encoding, so use noop encoder
+                # This fails, probably related to http://bugs.python.org/issue4768
+                result = MIMEApplication(filedata, _encoder=email.encoders.encode_noop)
+                result.add_header('Content-Disposition', 'form-data', name="results", 
+                                  filename=f)
+                postdata.attach(result)
         if self.debug >= 2:
             print("Headers of postdata as a dictionary:")
             print(dict(postdata.items()))
@@ -203,19 +204,22 @@ class Workunit_Processor(Workunit):
 
     def result_exists(self):
         if "RESULT" in self.wu.data:
-            filepath = SETTINGS["WORKDIR"] + "/" + self.wu.data["RESULT"]
-            if not os.path.isfile(filepath):
-                return False
-            log (0, "Result file " + filepath + " already exists")
+            for f in self.wu.data["RESULT"]:
+                filepath = SETTINGS["WORKDIR"] + "/" + f
+                if not os.path.isfile(filepath):
+                    log (0, "Result file " + filepath + " does not exist")
+                    return False
+                log (0, "Result file " + filepath + " already exists")
         log (0, "All result files already exist")
         return True
 
     def cleanup(self):
         log (0, "Cleaning up for workunit " + self.wu.get_id())
         if "RESULT" in self.wu.data:
-            filepath = SETTINGS["WORKDIR"] + "/" + self.wu.data["RESULT"]
-            log (0, "Removing result file " + filepath)
-            os.remove(filepath)
+            for f in self.wu.data["RESULT"]:
+                filepath = SETTINGS["WORKDIR"] + "/" + f
+                log (0, "Removing result file " + filepath)
+                os.remove(filepath)
 
     def process(self):
         # If all output files exist, send them, return WU as done

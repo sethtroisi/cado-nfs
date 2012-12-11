@@ -18,6 +18,17 @@ def diag(level, text, var = None):
         else:
             print (text + str(var), file=sys.stderr)
 
+def analyze(level, name, o):
+    """ Dump tons of internal data about an object """
+    if debug > level:
+        diag (level, "*** Content dump of " + name)
+        diag (level, "type(" + name + "): ", type(o))
+        diag (level, "dir(" + name + "): ", dir(o))
+        diag (level, name + " = ", o);
+        diag (level, name + ".__repr__() = ", o.__repr__());
+        for n in dir(o):
+            diag (level, name + "." + n + " = ", getattr(o, n))
+
 # Global variable in this module so that other Python modules can import
 # it and store the path to the upload directory in the shell environment 
 # variable specified here
@@ -36,7 +47,7 @@ def do_upload(db, input = sys.stdin, output = sys.stdout):
         pass
 
     diag(1, "Reading POST data\n", "")
-        
+
     form = cgi.FieldStorage(fp = input)
 
     diag (2, "Attributes for form: ", dir(form))
@@ -50,8 +61,6 @@ def do_upload(db, input = sys.stdin, output = sys.stdout):
         message = 'No "WUid" key found in POST data'
     if "clientid" not in form:
         message = 'No "clientid" key found in POST data'
-    elif "results" not in form:
-        message = 'No "results" key found in POST data'
     elif UPLOADDIRKEY not in os.environ:
         message = 'Script error: Environment variable ' + UPLOADDIRKEY + ' not set'
     elif not os.path.isdir(os.environ[UPLOADDIRKEY]):
@@ -59,52 +68,57 @@ def do_upload(db, input = sys.stdin, output = sys.stdout):
     else:
         WUid = form['WUid']
         clientid = form['clientid']
-        fileitem = form['results']
         if 'errorcode' in form:
             errorcode = form['errorcode'].value
         else:
-            errorcode = 0
-        diag (2, "Attributes of fileitem: ", dir(fileitem))
-        diag (2, "fileitem.name = ", fileitem.name);
-        diag (2, "fileitem.filename = ", fileitem.filename);
-        diag (2, "fileitem.type = ", fileitem.type);
-        diag (2, "fileitem.type_options = ", fileitem.type_options);
-        diag (2, "fileitem.disposition = ", fileitem.disposition);
-        diag (2, "fileitem.disposition_options = ", fileitem.disposition_options);
-        diag (2, "fileitem.headers = ", fileitem.headers);
-        diag (2, "fileitem.encoding = ", fileitem.encoding);
-        # Test if the result was uploaded and WUid was set:
-        if not fileitem.filename:
-            message = 'No file was uploaded'
-        elif not WUid.value:
+            errorcode = None
+
+        # Test if WUid and clientid was set:
+        if not WUid.value:
             message = 'No work unit was specified'
         elif not clientid.value:
             message = 'No client id was specified'
 
     if not message:
         filetuples = []
-        # strip leading path from file name to avoid directory traversal attacks
-        basename = os.path.basename(fileitem.filename)
-        # Make a file name which does not exist yet and create the file
-        (fd, filename) = mkstemp(suffix='', prefix=basename, 
-            dir=os.environ[UPLOADDIRKEY])
-        filestuple = (fileitem.filename, filename)
-        filetuples.append(filestuple)
+        if 'results' in form:
+            fileitem = form['results']
+            if isinstance(fileitem, cgi.FieldStorage):
+                fileitem = [fileitem] # Make it iterable
+        else:
+            fileitem = []
+
+        analyze (2, "fileitem", fileitem)
+
+        message = ""
+        for f in fileitem:
+            analyze (2, "f", f)
+
+            # strip leading path from file name to avoid directory traversal attacks
+            basename = os.path.basename(f.filename)
+            # Make a file name which does not exist yet and create the file
+            (fd, filename) = mkstemp(suffix='', prefix=basename, 
+                dir=os.environ[UPLOADDIRKEY])
+            filestuple = (f.filename, filename)
+            filetuples.append(filestuple)
         
+            # fd is a file descriptor, make a file object from it
+            file = os.fdopen(fd, "wb")
+            file.write(f.file.read())
+            bytes = file.tell()
+            file.close()
+
+            message = message + 'The file "' + basename + '" for work unit ' + WUid.value + \
+                ' was uploaded successfully by client ' + clientid.value + \
+                ' and stored as ' + filename + ', received ' + str(bytes) + ' bytes.\n'
+
         wu = wudb.WuActiveRecord(db)
         try:
             wu.result(WUid.value, clientid.value, errorcode, filetuples)
         except wudb.StatusUpdateError:
             message = 'Workunit ' + WUid.value + 'was not currently assigned'
 
-        # fd is a file descriptor, make a file object from it
-        file = os.fdopen(fd, "wb")
-        file.write(fileitem.file.read())
-        bytes = file.tell()
-        file.close()
-        message = 'The file "' + basename + '" for work unit ' + WUid.value + \
-            ' was uploaded successfully by client ' + clientid.value + \
-            ' and stored as ' + filename + ', received ' + str(bytes) + ' bytes.'
+        message = message + 'Workunit ' + WUid.value + ' completed.\n'
 
     diag (0, sys.argv[0] + ': ', message)
     if output == sys.stdout:

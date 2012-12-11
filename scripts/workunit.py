@@ -1,9 +1,8 @@
 class Workunit:
     # Keys that must occur only once
-    SCALAR_KEYS = ("WORKUNIT", "RESULT")
-    # Keys that can occur multiple times. RESULT should go in here once 
-    # I figure out how to upload multiple files in one POST correctly
-    LIST_KEYS = ("COMMAND",)
+    SCALAR_KEYS = ("WORKUNIT",)
+    # Keys that can occur multiple times
+    LIST_KEYS = ("COMMAND", "RESULT")
     # Keys that can be accompanied by a CHECKSUM line. These keys can occur 
     # multiple times, like those in LIST_KEYS
     CHECKSUM_KEYS = ("FILE", "EXECFILE")
