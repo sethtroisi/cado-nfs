@@ -42,7 +42,8 @@ OPTIONAL_SETTINGS = {"WU_FILENAME" : ("WU", "Filename under which to store WU fi
                      "POSTRESULTPATH" : ("/cgi-bin/upload.py", "Path segment of URL for reporting results to server"), 
                      "DEBUG" : ("0", "Debugging verbosity"),
                      "ARCH" : ("", "Architecture string for this client"),
-                     "DOWNLOADRETRY" : ("300", "Time to wait before download retries")}
+                     "DOWNLOADRETRY" : ("300", "Time to wait before download retries"),
+                     "NICENESS" : ("0", "Run subprocesses under this niceness")}
 # Merge the two, removing help string
 SETTINGS = dict([(a,b) for (a,(b,c)) in list(REQUIRED_SETTINGS.items()) + \
                                         list(OPTIONAL_SETTINGS.items())])
@@ -124,12 +125,20 @@ class Workunit_Processor(Workunit):
                 log (0, "Setting executable flag for " + path)
                 os.chmod(path, mode | stat.S_IXUSR)
         return True
+
+    @staticmethod
+    def renice():
+        os.nice(int(SETTINGS["NICENESS"]))
     
     def run_commands(self):
         for command in self.wu.data["COMMAND"]:
             command = Template(command).safe_substitute(SETTINGS)
             log (0, "Running command for workunit " + self.wu.get_id() + ": " + command)
-            rc = subprocess.call(command, shell=True)
+            if int(SETTINGS["NICENESS"]) > 0:
+                renice_func = self.renice
+            else:
+                renice_func = None
+            rc = subprocess.call(command, shell=True, preexec_fn = renice_func)
             if rc != 0:
                 log (0, "Command exited with exit code " + str(rc)) 
                 self.exitcode = rc
