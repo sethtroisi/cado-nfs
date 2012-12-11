@@ -46,7 +46,10 @@ class DbThread():
         self.cv.wait()
         # Make a thread-local copy of the WU while we are in locked region
         local = threading.local()
-        local.wu = self.wu[:]
+        if self.wu:
+            local.wu = self.wu[:]
+        else:
+            local.wu = None
         self.cv.release()
         self.lock.release()
         return local.wu
