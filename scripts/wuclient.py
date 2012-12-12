@@ -8,6 +8,7 @@ import shutil
 import time
 import urllib.request
 import subprocess
+import hashlib
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -82,18 +83,57 @@ def get_file(urlpath, dlpath = None, options = None):
     request.close()
     return True
 
+def do_checksum(filename, checksum = None):
+    """ Computes the SHA1 checksum for a file. If checksum is None, returns 
+        the computed checksum. If checksum is not None, return whether the
+        computed SHA1 sum and checksum agree """
+    blocksize = 65536
+    m = hashlib.sha1()
+    file = open(filename, "rb")
+    data = file.read(blocksize)
+    while data:
+        m.update(data)
+        data = file.read(blocksize)
+    file.close()
+    filesum = m.hexdigest()
+    if checksum is None:
+        return filesum
+    else:
+        return filesum.lower() == checksum.lower()
+
 def get_missing_file(urlpath, filename, checksum = None, options = None):
     # print('get_missing_file("' + urlpath + '", "' + filename + '", ' + str(checksum) + ')')
-    if not os.path.isfile(filename):
-        return get_file(urlpath, filename, options)
-        # FIXME CHECKSUM
-    else:
+    if os.path.isfile(filename):
         log (0, filename + " already exists, not downloading")
-        return True
-    if checksum:
-        # FIXME CHECKSUM
-        pass
-    return True
+        if checksum is None:
+            return True
+        filesum = do_checksum(filename)
+        if filesum.lower() == checksum.lower():
+            return True
+        log (0, "Existing file " + filename + " has wrong checksum " + filesum + 
+             ", workunit specified " + checksum +". Deleting file.")
+        os.remove(filename)
+    
+    # If checksum is wrong and does not change during two downloads, exit with 
+    # failue, as apparently the file on the server and checksum in workunit do 
+    # not agree
+    last_filesum = None
+    while True:
+        if not get_file(urlpath, filename, options):
+            return False
+        if checksum is None:
+            return True
+        filesum = do_checksum(filename)
+        if filesum.lower() == checksum.lower():
+            return True
+        if not last_filesum is None and filesum == last_filesum:
+            log (0, "Downloaded file " + filename + " has same wrong checksum " 
+                 + filesum + " again. Exiting.")
+            return False
+        log (0, "Downloaded file " + filename + " has wrong checksum " + 
+             filesum + ", workunit specified " + checksum + ". Deleting file.")
+        os.remove(filename)
+        last_filesum = filesum
 
 class Workunit_Processor(Workunit):
     
