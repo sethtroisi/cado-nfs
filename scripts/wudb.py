@@ -236,6 +236,7 @@ class WuTable(DbTable):
         ("timeresult", "TEXT", ""), 
         ("resultclient", "TEXT", ""), 
         ("errorcode", "INTEGER", ""), 
+        ("failedcommand", "INTEGER", ""), 
         ("timeverified", "TEXT", ""),
         ("retryof", "TEXT", ""),
         ("priority", "INTEGER", "")
@@ -432,7 +433,7 @@ class WuActiveRecord(): # {
         cursor.close()
         return len(r) == 1
 
-    def result(self, wuid, clientid, errorcode, files):
+    def result(self, wuid, clientid, files, errorcode = None, failedcommand = None):
         cursor = self.db.cursor()
         if not self.get_by_wuid(cursor, wuid):
             cursor.close()
@@ -442,6 +443,7 @@ class WuActiveRecord(): # {
             self.check()
         d = {"resultclient": clientid,
              "errorcode": errorcode,
+             "failedcommand": failedcommand, 
              "timeresult": str(datetime.now())}
         if errorcode == 0:
            d["status"] = WuStatus.RECEIVED_OK

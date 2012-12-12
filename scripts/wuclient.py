@@ -139,6 +139,8 @@ class Workunit_Processor(Workunit):
     
     def __init__(self, filepath, debug = 0):
         self.exitcode = 0 # will get set if any command exits with code != 0
+        self.failedcommand = None
+        self.clientid = SETTINGS["CLIENTID"]
         self.debug = debug # Controls debugging output
 
         log (1, "Parsing workunit from file " + filepath)
@@ -146,7 +148,8 @@ class Workunit_Processor(Workunit):
         wu_text = wu_file.read()
         wu_file.close()
         self.wu = Workunit(wu_text)
-        log (1, " done, workunit ID is " + self.wu.get_id())
+        self.WUid = self.wu.get_id()
+        log (1, " done, workunit ID is " + self.WUid)
 
     def  __str__(self):
         return "Processor for Workunit:\n" + self.wu.__str__()
@@ -171,7 +174,7 @@ class Workunit_Processor(Workunit):
         os.nice(int(SETTINGS["NICENESS"]))
     
     def run_commands(self):
-        for command in self.wu.data["COMMAND"]:
+        for (counter, command) in enumerate(self.wu.data["COMMAND"]):
             command = Template(command).safe_substitute(SETTINGS)
             log (0, "Running command for workunit " + self.wu.get_id() + ": " + command)
             if int(SETTINGS["NICENESS"]) > 0:
@@ -181,6 +184,7 @@ class Workunit_Processor(Workunit):
             rc = subprocess.call(command, shell=True, preexec_fn = renice_func)
             if rc != 0:
                 log (0, "Command exited with exit code " + str(rc)) 
+                self.failedcommand = counter
                 self.exitcode = rc
                 return False
             else:
@@ -190,16 +194,11 @@ class Workunit_Processor(Workunit):
     def upload_result(self):
         # Build a multi-part MIME document containing the WU id and result file
         postdata = MIMEMultipart()
-        WUid = MIMEText(self.wu.get_id())
-        WUid.add_header('Content-Disposition', 'form-data', name="WUid")
-        postdata.attach(WUid)
-        clientid = MIMEText(SETTINGS["CLIENTID"])
-        clientid.add_header('Content-Disposition', 'form-data', name="clientid")
-        postdata.attach(clientid)
-        if self.exitcode > 0:
-            rc = MIMEText(str(self.exitcode))
-            WUid.add_header('Content-Disposition', 'form-data', name="exitcode")
-            postdata.attach(rc)
+        for key in ("WUid", "clientid", "exitcode", "failedcommand"):
+            if not getattr(self, key, None) is None:
+                attachment = MIMEText(str(getattr(self, key)))
+                attachment.add_header('Content-Disposition', 'form-data', name=key)
+                postdata.attach(attachment)
         if "RESULT" in self.wu.data:
             for f in self.wu.data["RESULT"]:
                 filepath = SETTINGS["WORKDIR"] + "/" + f

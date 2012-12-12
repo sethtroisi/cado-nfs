@@ -49,9 +49,7 @@ def do_upload(db, input = sys.stdin, output = sys.stdout):
     diag(1, "Reading POST data\n", "")
 
     form = cgi.FieldStorage(fp = input)
-
-    diag (2, "Attributes for form: ", dir(form))
-    diag (2, "form = ", form)
+    analyze(2, "form", form)
 
     header = "Content-Type: text/plain\r\n\r\n"
 
@@ -72,6 +70,10 @@ def do_upload(db, input = sys.stdin, output = sys.stdout):
             errorcode = form['errorcode'].value
         else:
             errorcode = None
+        if 'failedcommand' in form:
+            failedcommand = form['failedcommand'].value
+        else:
+            failedcommand = None
 
         # Test if WUid and clientid was set:
         if not WUid.value:
@@ -114,7 +116,8 @@ def do_upload(db, input = sys.stdin, output = sys.stdout):
 
         wu = wudb.WuActiveRecord(db)
         try:
-            wu.result(WUid.value, clientid.value, errorcode, filetuples)
+            wu.result(WUid.value, clientid.value, filetuples, errorcode, 
+                      failedcommand)
         except wudb.StatusUpdateError:
             message = 'Workunit ' + WUid.value + 'was not currently assigned'
 
