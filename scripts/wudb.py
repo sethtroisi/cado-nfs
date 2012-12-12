@@ -43,9 +43,13 @@ class WuDb: # {
         structure of Python on the other hand, where one row of one table maps to one 
         dictoriary """
 
+    # This is used in where queries; it converts from named arguments such as 
+    # "eq" to a binary operator such as "="
+    name_to_operator = {"lt": "<", "le": "<=", "eq": "=", "ge": ">=", "gt" : ">", "ne": "!="}
+    
     def __init__(self, filename):
         """ Open a connection to a sqlite database with the specified filename """
-        # DEFERRED causes sqlite to created a SHARED lock after a read access, 
+        # DEFERRED causes sqlite to create a SHARED lock after a read access, 
         # which (hopefully) prevents, e.g., race conditions between two threads
         # looking up an available workunit and assigning it to a client
         self.db = sqlite3.connect(filename, isolation_level="DEFERRED")
@@ -63,9 +67,10 @@ class WuDb: # {
         self.db.close()
 
     @staticmethod
-    def _fieldlist(l):
-        """ For a list l = ('a', 'b', 'c') returns the string 'a=?, b=?, c=?' """
-        return ", ".join([k + "=?" for k in l])
+    def _fieldlist(l, r = "="):
+        """ For a list l = ('a', 'b', 'c') returns the string 'a = ?, b = ?, c = ?',
+            or with a different string r in place of the "=" """
+        return ", ".join([k + " " + r + " ?" for k in l])
 
     @staticmethod
     def _without_None(d):
@@ -87,11 +92,26 @@ class WuDb: # {
         diag (1, "WuDb." + name + "(): values = ", values)
         cursor.execute(command, values)
 
+    @classmethod
+    def where_str(cls, **args):
+        where = ""
+        values = []
+        for opname in args:
+            if args[opname] is None:
+                continue
+            if where == "":
+                where = " WHERE "
+            else:
+                where = where + ", "
+            where = where + cls._fieldlist(args[opname].keys(), cls.name_to_operator[opname])
+            values = values + list(args[opname].values())
+        return (where, values)
+
     def create_table(self, cursor, table, layout):
         """ Creates a table with fields as described in the layout parameter """
         command = "CREATE TABLE IF NOT EXISTS " + table + \
             "( " + ", ".join([" ".join(col) for col in layout]) + " );"
-        WuDb._exec (cursor, command, (), "create_table")
+        self.__class__._exec (cursor, command, (), "create_table")
     
     def insert(self, cursor, table, d):
         """ Insert a new entry, where d is a dictionary containing the 
@@ -110,7 +130,7 @@ class WuDb: # {
         command = "INSERT INTO " + table + \
             " (" + ", ".join(fields.keys()) + ") VALUES (" + sqlformat + ");"
         values = list(fields.values())
-        WuDb._exec(cursor, command, values, "insert")
+        self.__class__._exec(cursor, command, values, "insert")
         id = cursor.lastrowid
         return id
 
@@ -121,24 +141,19 @@ class WuDb: # {
         # UPDATE table SET column_1=value1, column2=value_2, ..., 
         # column_n=value_n WHERE id="id"
         # FIXME: can generalize this a bit by passing a dict for the where clause
-        command = "UPDATE " + table + " SET " + WuDb._fieldlist(d.keys()) + \
+        command = "UPDATE " + table + " SET " + self.__class__._fieldlist(d.keys()) + \
             " WHERE id=?;"
         values = list(d.values()) + [id, ]
-        WuDb._exec(cursor, command, values, "update")
+        self.__class__._exec(cursor, command, values, "update")
     
-    def where_eq(self, cursor, table, d = None, limit = None, order = None):
+    def where(self, cursor, table, limit = None, order = None, **conditions):
         """ Get a up to "limit" table rows (limit == 0: no limit) where 
             the key:value pairs of the dictionary d are set to the same 
             value in the database table """
         result = []
 
         # Table/Column names cannot be substituted, so include in query directly.
-        if d is None or len(d) == 0:
-            WHERE = ""
-            values = ()
-        else:
-            WHERE = " WHERE " + WuDb._fieldlist(d.keys())
-            values = list(d.values())
+        (WHERE, values) = self.__class__.where_str(**conditions)
 
         if order is None:
             ORDER = ""
@@ -153,14 +168,14 @@ class WuDb: # {
             LIMIT = " LIMIT " + str(int(limit))
 
         command = "SELECT * FROM " + table + WHERE + ORDER + LIMIT + ";"
-        WuDb._exec(cursor, command, values, "where_eq")
+        self.__class__._exec(cursor, command, values, "where")
         
         # cursor.description is a list of lists, where the first element of 
         # each inner list is the column name
         desc = [k[0] for k in cursor.description]
         row = cursor.fetchone()
         while row is not None:
-            diag(1, "WuDb.where_eq(): row = ", row)
+            diag(1, "WuDb.where(): row = ", row)
             result.append(dict(zip(desc, row)))
             row = cursor.fetchone()
         return result
@@ -203,9 +218,9 @@ class DbTable: # {
             be written are specified key:value pairs of the dictionary d """
         self.db.update(cursor, self.tablename, id, d)
 
-    def where_eq(self, cursor, d = None, limit = None, order = None):
+    def where(self, cursor, limit = None, order = None, **conditions):
         assert order is None or order[0] in self._get_colnames()
-        return self.db.where_eq(cursor, self.tablename, d, limit=limit, order=order)
+        return self.db.where(cursor, self.tablename, limit=limit, order=order, **conditions)
 # }
 
 class WuTable(DbTable):
@@ -294,21 +309,20 @@ class WuActiveRecord(): # {
             wu.data["files"].append(fileentry)
         return wu
 
-    def where_eq(self, cursor, where = None, limit = None, order = None):
+    def where(self, cursor, limit = None, order = None, **conditions):
         result = []
-        wu_d = self.wutable.dictextract(where)
-        wu_rows = self.wutable.where_eq(cursor, wu_d, limit, order)
+        wu_rows = self.wutable.where(cursor, limit=limit, order=order, **conditions)
         # print ("* wu_rows = " + str(wu_rows))
         for wu_row in wu_rows:	
             # print ("* wu_row = " + str(wu_row))
-            files_rows = self.filestable.where_eq(cursor, {"wurowid" : wu_row["id"]})
+            files_rows = self.filestable.where(cursor, eq={"wurowid" : wu_row["id"]})
             wu = self._from_db_row(wu_row, files_rows)
             # print ("* wu = " + str(wu))
             result.append(wu)
         return result
     
     def get_by_wuid(self, cursor, wuid):
-        r = self.where_eq(cursor, {"wuid": wuid}, limit = 1)
+        r = self.where(cursor, eq={"wuid": wuid}, limit = 1)
         if len(r) == 0:
             return False
         self.data = r[0].data
@@ -404,7 +418,7 @@ class WuActiveRecord(): # {
         """ Finds an available workunit and assigns it to clientid.
             Returns False of no available workunit exists """
         cursor = self.db.cursor()
-        r = self.where_eq(cursor, {"status": WuStatus.AVAILABLE}, limit = 1, order=("priority", "DESC"))
+        r = self.where(cursor, limit = 1, order=("priority", "DESC"), eq={"status": WuStatus.AVAILABLE})
         if len(r) == 1:
             self.data = r[0].data
             self._checkstatus(WuStatus.AVAILABLE)
@@ -467,9 +481,9 @@ class WuActiveRecord(): # {
         self.db.commit()
         cursor.close()
 
-    def query(self, where = None, limit = None):
+    def query(self, limit = None, **conditions):
         cursor = self.db.cursor()
-        r = self.where_eq(cursor, where, limit)
+        r = self.where(cursor, limit=limit, **conditions)
         cursor.close()
         return r
 # }
@@ -539,22 +553,22 @@ if __name__ == '__main__': # {
         wu.create(wus, priority=prio)
     # Functions for queries
     if args["avail"]:
-        wus = wu.query({"status": WuStatus.AVAILABLE})
+        wus = wu.query(eq={"status": WuStatus.AVAILABLE})
         print("Available workunits: ")
         for wu in wus:
             print (str(wu))
     if args["assigned"]:
-        wus = wu.query({"status": WuStatus.ASSIGNED})
+        wus = wu.query(eq={"status": WuStatus.ASSIGNED})
         print("Assigned workunits: ")
         for wu in wus:
             print (str(wu))
     if args["receivedok"]:
-        wus = wu.query({"status": WuStatus.RECEIVED_OK})
+        wus = wu.query(eq={"status": WuStatus.RECEIVED_OK})
         print("Received ok workunits: ")
         for wu in wus:
             print (str(wu))
     if args["receivederr"]:
-        wus = wu.query({"status": WuStatus.RECEIVED_ERROR})
+        wus = wu.query(eq={"status": WuStatus.RECEIVED_ERROR})
         print("Received with error workunits: ")
         for wu in wus:
             print (str(wu))
