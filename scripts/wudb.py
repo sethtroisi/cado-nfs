@@ -93,14 +93,14 @@ class WuDb: # {
         cursor.execute(command, values)
 
     @classmethod
-    def where_str(cls, **args):
+    def where_str(cls, name, **args):
         where = ""
         values = []
         for opname in args:
             if args[opname] is None:
                 continue
             if where == "":
-                where = " WHERE "
+                where = " " + name + " "
             else:
                 where = where + ", "
             where = where + cls._fieldlist(args[opname].keys(), cls.name_to_operator[opname])
@@ -134,16 +134,17 @@ class WuDb: # {
         id = cursor.lastrowid
         return id
 
-    def update(self, cursor, table, id, d):
-        """ Update fields of an existing entry. id is the row id of the 
-            entry to update, other entries in the dictionary d are the fields 
-            and their values to update """
+    def update(self, cursor, table, d, **conditions):
+        """ Update fields of an existing entry. conditions specifies the where 
+            clause to use for to update, entries in the dictionary d are the 
+            fields and their values to update """
         # UPDATE table SET column_1=value1, column2=value_2, ..., 
-        # column_n=value_n WHERE id="id"
-        # FIXME: can generalize this a bit by passing a dict for the where clause
-        command = "UPDATE " + table + " SET " + self.__class__._fieldlist(d.keys()) + \
-            " WHERE id=?;"
-        values = list(d.values()) + [id, ]
+        # column_n=value_n WHERE column_n+1=value_n+1, ...,
+        setstr = " SET " + self.__class__._fieldlist(d.keys())
+        setvalues = d.values()
+        (wherestr, wherevalues) = self.__class__.where_str("WHERE", **conditions)
+        command = "UPDATE " + table + setstr + wherestr
+        values = list(setvalues) + wherevalues
         self.__class__._exec(cursor, command, values, "update")
     
     def where(self, cursor, table, limit = None, order = None, **conditions):
@@ -153,7 +154,7 @@ class WuDb: # {
         result = []
 
         # Table/Column names cannot be substituted, so include in query directly.
-        (WHERE, values) = self.__class__.where_str(**conditions)
+        (WHERE, values) = self.__class__.where_str("WHERE", **conditions)
 
         if order is None:
             ORDER = ""
@@ -213,10 +214,10 @@ class DbTable: # {
             The database's row id for the new entry is returned """
         return self.db.insert(cursor, self.tablename, self.dictextract(d))
 
-    def update(self, cursor, id, d):
+    def update(self, cursor, d, **conditions):
         """ Update an existing row in this table. The column:value pairs to 
             be written are specified key:value pairs of the dictionary d """
-        self.db.update(cursor, self.tablename, id, d)
+        self.db.update(cursor, self.tablename, d, **conditions)
 
     def where(self, cursor, limit = None, order = None, **conditions):
         assert order is None or order[0] in self._get_colnames()
@@ -333,7 +334,7 @@ class WuActiveRecord(): # {
         """ Assign the key:value pairs in d to self.data, and call 
             db.update() method to write these updates to the DB """
         self.data.update(d) # Python built-in dict.update() method
-        self.wutable.update(cursor, self.data["id"], d)
+        self.wutable.update(cursor, d, eq={"id": self.data["id"]})
     
     def _checkstatus(self, status):
         diag (2, "WuActiveRecord._checkstatus(" + str(self) + ", " + str(status) + ")")
