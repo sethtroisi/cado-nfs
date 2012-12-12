@@ -96,7 +96,8 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         elif self.is_cgi():
             self.send_error(404, "GET for CGI scripts allowed only for work unit request")
         else:
-            http.server.CGIHTTPRequestHandler.do_GET(self)
+            super().do_GET(self)
+        sys.stdout.flush()
 
     def send_WU(self):
         filename = self.cgi_info[1]
@@ -138,6 +139,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
                 http.server.CGIHTTPRequestHandler.do_POST(self)
         else:
             self.send_error(404, "POST request allowed only for uploads")
+        sys.stdout.flush()
 
     def is_upload(self):
         """Test whether request is a file upload."""
