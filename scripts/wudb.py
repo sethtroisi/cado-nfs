@@ -535,7 +535,7 @@ if __name__ == '__main__': # {
         debug = int(args["debug"][0])
     prio = 0
     if args["prio"]:
-        debug = int(args["prio"][0])
+        prio = int(args["prio"][0])
 
     db = WuDb(dbname)
     wu = WuActiveRecord(db)
