@@ -2,8 +2,14 @@
 
 import sys
 import sqlite3
+import threading
+import traceback
 from datetime import datetime
 from workunit import Workunit
+if sys.version_info.major == 3:
+    from queue import Queue
+else:
+    from Queue import Queue
 
 debug = 1
 
@@ -43,6 +49,12 @@ class WuDb: # {
         structure of Python on the other hand, where one row of one table maps to one 
         dictoriary """
 
+    # FIXME: this really implements convenience functions for Cursor objects. 
+    # It probably should inherit Cursor and be called WuCursor. 
+    # How to construct instances of this class then? 
+    # Have another class WuConnection that inherits Connection and whose 
+    # .cursor() returns a WuCursor?
+
     # This is used in where queries; it converts from named arguments such as 
     # "eq" to a binary operator such as "="
     name_to_operator = {"lt": "<", "le": "<=", "eq": "=", "ge": ">=", "gt" : ">", "ne": "!="}
@@ -53,9 +65,6 @@ class WuDb: # {
         # which (hopefully) prevents, e.g., race conditions between two threads
         # looking up an available workunit and assigning it to a client
         self.db = sqlite3.connect(filename, isolation_level="DEFERRED")
-
-    def __del__(self):
-        self.close()
 
     def cursor(self):
         return self.db.cursor()
@@ -77,11 +86,6 @@ class WuDb: # {
         """ Return a copy of the dictionary d, but without entries whose values 
             are None """
         return {k[0]:k[1] for k in d.items() if k[1] is not None}
-    
-    @staticmethod
-    def _without_id(d):
-        """ Return a copy of the dictionary d, but without the "id" entry """
-        return {k[0]:k[1] for k in d.items() if k[0] != "id"}
     
     @staticmethod
     def _exec(cursor, command, values, name):
@@ -206,7 +210,7 @@ class DbTable: # {
         return self._subdict(d, self._get_colnames())
 
     def create(self, cursor):
-        db.create_table(cursor, self.tablename, self.fields)
+        self.db.create_table(cursor, self.tablename, self.fields)
 
     def insert(self, cursor, d):
         """ Insert a new row into this table. The column:value pairs are 
@@ -491,6 +495,67 @@ class WuActiveRecord(): # {
         return r
 # }
 
+
+class DbWorker(threading.Thread):
+    """Thread executing WuActiveRecord requests from a given tasks queue"""
+    def __init__(self, dbfilename, taskqueue):
+        threading.Thread.__init__(self)
+        self.dbfilename = dbfilename
+        self.taskqueue = taskqueue
+        self.start()
+    
+    def run(self):
+        # One DB connection per thread. Created inside the new thread to make
+        # sqlite happy
+        self.db = WuDb(self.dbfilename)
+        while True:
+            # We expect a 4-tuple in the task queue. The elements of the tuple:
+            # a 2-array, where element [0] receives the result of the DB call, 
+            #  and [1] is an Event variable to notify the caller when the 
+            #  result is available
+            # fn_name, the name (as a string) of the WuActiveRecord method to call
+            # args, a tuple of positional arguments
+            # kargs, a dictionary of keyword arguments
+            (result_tuple, fn_name, args, kargs) = self.taskqueue.get()
+            if fn_name == "terminate":
+                break
+            ev = result_tuple[1]
+            wuar = WuActiveRecord(self.db)
+            # Assign to tuple in-place, so result is visible to caller. 
+            # No slice etc. here which would create a copy of the array
+            try: result_tuple[0] = getattr(wuar, fn_name)(*args, **kargs)
+            except Exception as e: 
+                traceback.print_exc()
+            ev.set()
+            self.taskqueue.task_done()
+        self.db.close()
+
+class DbThreadPool:
+    """Pool of threads consuming tasks from a queue"""
+    def __init__(self, dbfilename, num_threads = 1):
+        self.taskqueue = Queue(num_threads)
+        self.pool = []
+        for _ in range(num_threads): 
+            self.pool.append(DbWorker(dbfilename, self.taskqueue))
+
+    def do_task(self, func, *args, **kargs):
+        """Add a task to the queue, wait for its completion, and return the result"""
+        ev = threading.Event()
+        result = [None, ev]
+        self.taskqueue.put((result, func, args, kargs))
+        ev.wait()
+        return result[0]
+
+    def terminate(self):
+        for t in self.pool:
+            self.taskqueue.put((None, "terminate", None, None))
+        self.wait_completion
+
+    def wait_completion(self):
+        """Wait for completion of all the tasks in the queue"""
+        self.taskqueue.join()
+
+
 # One entry in the WU DB, including the text with the WU contents 
 # (FILEs, COMMANDs, etc.) and info about the progress on this WU (when and 
 # to whom assigned, received, etc.)
@@ -537,11 +602,10 @@ if __name__ == '__main__': # {
     if args["prio"]:
         prio = int(args["prio"][0])
 
-    db = WuDb(dbname)
-    wu = WuActiveRecord(db)
+    db_pool = DbThreadPool(dbname)
     
     if args["create"]:
-        wu.create_tables()
+        db_pool.do_task("create_tables")
     if args["add"]:
         s = ""
         wus = []
@@ -553,37 +617,52 @@ if __name__ == '__main__': # {
                 s = s + line
         if s != "":
             wus.append(s)
-        wu.create(wus, priority=prio)
+        db_pool.do_task("create", wus, priority=prio)
     # Functions for queries
     if args["avail"]:
-        wus = wu.query(eq={"status": WuStatus.AVAILABLE})
+        wus = db_pool.do_task("query", eq={"status": WuStatus.AVAILABLE})
         print("Available workunits: ")
-        for wu in wus:
-            print (str(wu))
+        if wus is None:
+            print(wus)
+        else:
+            for wu in wus:
+                print (str(wu))
     if args["assigned"]:
-        wus = wu.query(eq={"status": WuStatus.ASSIGNED})
+        wus = db_pool.do_task("query", eq={"status": WuStatus.ASSIGNED})
         print("Assigned workunits: ")
-        for wu in wus:
-            print (str(wu))
+        if wus is None:
+            print(wus)
+        else:
+            for wu in wus:
+                print (str(wu))
     if args["receivedok"]:
-        wus = wu.query(eq={"status": WuStatus.RECEIVED_OK})
+        wus = db_pool.do_task("query", eq={"status": WuStatus.RECEIVED_OK})
         print("Received ok workunits: ")
-        for wu in wus:
-            print (str(wu))
+        if wus is None:
+            print(wus)
+        else:
+            for wu in wus:
+                print (str(wu))
     if args["receivederr"]:
-        wus = wu.query(eq={"status": WuStatus.RECEIVED_ERROR})
+        wus = db_pool.do_task("query", eq={"status": WuStatus.RECEIVED_ERROR})
         print("Received with error workunits: ")
-        for wu in wus:
-            print (str(wu))
+        if wus is None:
+            print(wus)
+        else:
+            for wu in wus:
+                print (str(wu))
     if args["all"]:
-        wus = wu.query()
+        wus = db_pool.do_task("query")
         print("Existing workunits: ")
-        for wu in wus:
-            print (str(wu))
+        if wus is None:
+            print(wus)
+        else:
+            for wu in wus:
+                print (str(wu))
     # Functions for testing
     if args["assign"]:
         clientid = args["assign"][0]
-        wu.assign(clientid)
+        wus = db_pool.do_task("assign", clientid)
     
-    db.close()
+    db_pool.terminate()
 # }
