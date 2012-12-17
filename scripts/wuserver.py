@@ -4,6 +4,7 @@ import http.server
 import socketserver
 import os
 import sys
+from urllib.parse import unquote_plus
 from workunit import Workunit
 import wudb
 import upload
@@ -27,6 +28,54 @@ def diag(level, text, var = None):
             print (text + str(var), file=sys.stderr)
         sys.stderr.flush()
 
+class HtmlGen:
+    def __init__(self):
+        self.body = \
+            '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" ' + \
+            '"http://www.w3.org/TR/html4/strict.dtd">\n' + \
+            '<html>\n' + \
+            '<head>\n' + \
+            '<title>List of workunits</title>\n' + \
+            '</head>\n' + \
+            '<body>'
+
+    def __str__(self):
+        return self.body + '</body>'
+
+    def append(self, str):
+        self.body = self.body + str
+
+    def start_table(self, fields):
+        self.append('<table border="1">\n<tr>')
+        for h in fields:
+            self.append('<th>' + h + '</th>')
+        self.append('</tr>\n')
+
+    def add_table_row(self, row):
+        self.append('<tr>')
+        for d in row:
+            self.append('<td>' + str(d) + '</td>')
+        self.append('</tr>\n')
+
+    def end_table(self):
+        self.append('</table>\n')
+
+    def wu_row(self, wu, fields, cwd):
+        arr = []
+        for k in fields:
+            if k == "files" and not wu["files"] is None:
+                s = ""
+                for f in wu["files"]:
+                    path = f["path"]
+                    if path.startswith(cwd):
+                        path = path[len(cwd):]
+                    s = s + '<a href="' + path + '">' + f["filename"] + '</a><br>'
+                arr.append(s)
+            else:
+                arr.append(wu[k])
+        self.add_table_row(arr)
+
+
 class MyHandler(http.server.CGIHTTPRequestHandler):
     def send_body(self, body):
         self.wfile.write(bytes(body, "utf-8"))
@@ -35,20 +84,22 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
     def do_GET(self):
         """Generates a work unit if request is cgi-bin/getwu, otherwise calls
            parent class' do_GET()"""
+        self.cwd = os.getcwd()
         if self.is_cgi():
             if self.is_getwu():
                 self.send_WU()
             elif self.is_getstatus():
                 self.send_status()
             else:
-                self.send_error(404, "GET for CGI scripts allowed only for work unit request")
+                self.send_error(404, "GET for CGI scripts allowed only for work unit or status page request")
         else:
-            super().do_GET(self)
+            super().do_GET()
         sys.stdout.flush()
 
     def do_POST(self):
         """Set environment variable telling the upload directory 
            and call CGI handler to run upload CGI script"""
+        self.cwd = os.getcwd()
         if self.is_upload():
             os.environ[upload.UPLOADDIRKEY] = uploaddir
             os.environ[upload.DBFILENAMEKEY] = dbfilename
@@ -72,10 +123,19 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         """Test whether request is for a new WU."""
         filename=self.cgi_info[1].split("?", 1)[0]
         return self.command == 'GET' and filename in ['getwu']
+
     def is_getstatus(self):
         """Test whether request is for a a status page."""
         filename=self.cgi_info[1].split("?", 1)[0]
         return self.command == 'GET' and filename in ['status']
+
+    def guess_type(self, path):
+        type = super().guess_type(path)
+        # Use text/plain for files in upload, unless the type was properly identified
+        # FIXME: make path identification more robust
+        if type == "application/octet-stream" and path.startswith(self.cwd + '/upload/'):
+            return "text/plain"
+        return type
 
     def send_WU(self):
         filename = self.cgi_info[1]
@@ -104,9 +164,48 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         self.end_headers()
         self.send_body(wu_text)
 
-    def send_status():
+    def send_status(self):
+        self.send_query()
+
+    def send_query(self):
         filename = self.cgi_info[1]
         (filename, query) = self.cgi_info[1].split("?", 1)
+        # Now split off the fragment part
+        query = query.split("#", 1)[0]
+        print("Query = " + query)
+        conditions = {}
+        # Now look at individual key=value pairs
+        for q in query.split("&"):
+            q = unquote_plus(q)
+            print("Processing token " + q)
+            for (name, op) in wudb.WuDb.name_to_operator.items():
+                if op in q:
+                    (key, value) = q.split(op, 1)
+                    if not name in conditions:
+                        conditions[name] = {}
+                    conditions[name][key] = value
+                    break
+        if len(conditions) == 0:
+            conditions = None
+        wus = db_pool.query(**conditions)
+
+        body = HtmlGen()
+
+        body.append("<p>Query for " + str(conditions) + "</p>")
+
+        if not wus is None and len(wus) > 0:
+            keys = wus[0].tuple_keys()
+            body.start_table(keys)
+            for wu in wus:
+                body.wu_row(wu.as_dict(), keys, self.cwd)
+            body.end_table()
+        
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html")
+        self.send_header("Cache-Control", "no-cache")
+        self.send_header("Content-Length", len(str(body)))
+        self.end_headers()
+        self.send_body(str(body))
 
 if __name__ == '__main__':
     from sys import argv

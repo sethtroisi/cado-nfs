@@ -11,7 +11,7 @@ if sys.version_info.major == 3:
 else:
     from Queue import Queue
 
-debug = 1
+debug = 2
 
 def diag(level, text, var = None):
     if debug > level:
@@ -76,10 +76,10 @@ class WuDb: # {
         self.db.close()
 
     @staticmethod
-    def _fieldlist(l, r = "="):
+    def _fieldlist(l, r = "=", s = ", "):
         """ For a list l = ('a', 'b', 'c') returns the string 'a = ?, b = ?, c = ?',
             or with a different string r in place of the "=" """
-        return ", ".join([k + " " + r + " ?" for k in l])
+        return s.join([k + " " + r + " ?" for k in l])
 
     @staticmethod
     def _without_None(d):
@@ -112,8 +112,8 @@ class WuDb: # {
             if where == "":
                 where = " " + name + " "
             else:
-                where = where + ", "
-            where = where + cls._fieldlist(args[opname].keys(), cls.name_to_operator[opname])
+                where = where + " AND "
+            where = where + cls._fieldlist(args[opname].keys(), cls.name_to_operator[opname], s = " AND ")
             values = values + list(args[opname].values())
         return (where, values)
 
@@ -186,7 +186,7 @@ class WuDb: # {
         desc = [k[0] for k in cursor.description]
         row = cursor.fetchone()
         while row is not None:
-            diag(1, "WuDb.where(): row = ", row)
+            diag (2, "WuDb.where(): row = ", row)
             result.append(dict(zip(desc, row)))
             row = cursor.fetchone()
         return result
