@@ -47,7 +47,7 @@ uint64_pow_mod (uint64_t b, uint64_t e, uint64_t m)
 static int
 roots2 (uint64_t *r, uint64_t a, int d, uint64_t p)
 {
-  uint64_t q, s, z, m, n, i, j;
+  uint64_t q, s, z, m, n, i, j, k = 0;
   modulusredcul_t pp;
   residueredcul_t cc0, aa, RR, tt, cc, uu, bb;
 
@@ -67,14 +67,16 @@ roots2 (uint64_t *r, uint64_t a, int d, uint64_t p)
       /* solutions are +/-a^((p+1)/4) */
       for (i = 0; i < n; i++)
         {
-          r[2*i] = uint64_pow_mod (r[d/2+i], (p + 1) >> 2, p);
-          r[2*i+1] = p - r[2*i];
+          if (legendre (r[d/2+i], p) != 1)
+            continue;
+          r[2*k] = uint64_pow_mod (r[d/2+i], (p + 1) >> 2, p);
+          r[2*k+1] = p - r[2*k];
+          k ++;
         }
       return 2*n;
     }
 
   /* case p = 1 (mod 4) */
-  //  ASSERT_ALWAYS(p <= 4294967295UL); /* the code below assumes p^2 < 2^64 */
   for (z = 2; legendre (z, p) != -1; z++);
   modredcul_initmod_ul (pp, p);
   modredcul_init (cc0, pp);
@@ -84,40 +86,34 @@ roots2 (uint64_t *r, uint64_t a, int d, uint64_t p)
   modredcul_init (cc, pp);
   modredcul_init (uu, pp);
   modredcul_init (bb, pp);
-  // c0 = uint64_pow_mod (z, q, p);
   modredcul_set_ul (cc0, z, pp);
   modredcul_pow_ul (cc0, cc0, q, pp);
   for (i = 0; i < n; i++)
     {
-      // a = r[d/2+i];
+      if (legendre (r[d/2+i], p) != 1)
+        continue;
+
       modredcul_set_ul (aa, r[d/2+i], pp);
-      // R = uint64_pow_mod (a, (q + 1) >> 1, p);
       modredcul_pow_ul (RR, aa, (q + 1) >> 1, pp);
-      // t = uint64_pow_mod (a, q, p);
       modredcul_pow_ul (tt, aa, q, pp);
       m = s;
-      // c = c0;
       modredcul_set (cc, cc0, pp);
       do
         {
           if (modredcul_is1 (tt, pp))
             {
-              r[2*i] = modredcul_get_ul (RR, pp);
-              r[2*i+1] = p - r[2*i];
+              r[2*k] = modredcul_get_ul (RR, pp);
+              r[2*k+1] = p - r[2*k];
+              k ++;
               break;
             }
-          //for (j = 0, u = t; u != 1; u = (u * u) % p, j++);
           for (j = 0, modredcul_set (uu, tt, pp); modredcul_is1 (uu, pp) == 0;
                modredcul_sqr (uu, uu, pp), j++);
           ASSERT_ALWAYS(j < m);
-          //for (m = m - j - 1, b = c; m > 0; b = (b * b) % p, m--);
           for (m = m - j - 1, modredcul_set (bb, cc, pp); m > 0;
                modredcul_sqr (bb, bb, pp), m--);
-          // R = (R * b) % p;
           modredcul_mul (RR, RR, bb, pp);
-          // c = (b * b) % p;
           modredcul_sqr (cc, bb, pp);
-          // t = (t * c) % p;
           modredcul_mul (tt, tt, cc, pp);
           m = j;
         }
@@ -133,7 +129,7 @@ roots2 (uint64_t *r, uint64_t a, int d, uint64_t p)
   modredcul_clear (bb, pp);
   modredcul_clearmod (pp);
 
-  return 2*n;
+  return 2*k;
 }
 
 /* put in r[0], r[1], ... the roots of x^d = a (mod p),
