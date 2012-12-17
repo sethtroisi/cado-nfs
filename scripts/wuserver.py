@@ -91,7 +91,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             return self.send_error(400, "Malformed client id specified")
         
         # wu = wudb.WuActiveRecord(db)
-        wu_text = db_pool.(clientid)
+        wu_text = db_pool.assign(clientid)
         if not wu_text:
             return self.send_error(404, "No work available")
         
@@ -122,7 +122,7 @@ if __name__ == '__main__':
     if argv[1:]:
         PORT = int(argv[1])
 
-    db_pool = DbThreadPool(dbfilename)
+    db_pool = wudb.DbThreadPool(dbfilename, 1)
 
     HandlerClass = MyHandler
     httpd = ServerClass((HTTP, PORT), HandlerClass)
@@ -130,4 +130,4 @@ if __name__ == '__main__':
 
     print ("serving at " + HTTP + ":" + str(PORT))
     httpd.serve_forever()
-    db.finish()
+    db.terminate()

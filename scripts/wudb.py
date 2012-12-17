@@ -90,11 +90,17 @@ class WuDb: # {
     @staticmethod
     def _exec(cursor, command, values, name):
         """ Wrapper around self.cursor.execute() that prints arguments 
-            for debugging """
+            for debugging and retries in case of "database locked" error """
         # Could use inspect module to remove name parameter
         diag (1, "WuDb." + name + "(): command = " + command);
         diag (1, "WuDb." + name + "(): values = ", values)
-        cursor.execute(command, values)
+        while True:
+            try:
+                cursor.execute(command, values)
+                break
+            except sqlite3.OperationalError as e:
+                if str(e) != "database is locked":
+                    raise
 
     @classmethod
     def where_str(cls, name, **args):
@@ -385,6 +391,7 @@ class WuActiveRecord(): # {
         cursor = self.db.cursor()
         self.wutable.create(cursor)
         self.filestable.create(cursor)
+        cursor.execute("PRAGMA journal_mode=WAL;")
         self.db.commit()
         cursor.close()
 
@@ -422,7 +429,8 @@ class WuActiveRecord(): # {
 
     def assign(self, clientid):
         """ Finds an available workunit and assigns it to clientid.
-            Returns False of no available workunit exists """
+            Returns the text of the workunit, or None if no available 
+            workunit exists """
         cursor = self.db.cursor()
         r = self.where(cursor, limit = 1, order=("priority", "DESC"), eq={"status": WuStatus.AVAILABLE})
         if len(r) == 1:
@@ -436,7 +444,10 @@ class WuActiveRecord(): # {
             self.update_wu(cursor, d)
             self.db.commit()
         cursor.close()
-        return len(r) == 1
+        if len(r) == 1:
+            return r[0].get_wu()
+        else:
+            return None
 
     def result(self, wuid, clientid, files, errorcode = None, failedcommand = None):
         cursor = self.db.cursor()
