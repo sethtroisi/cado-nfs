@@ -22,7 +22,10 @@
 # 02110-1301, USA.
 
 package cadofct;
-use parent qw(Exporter);
+BEGIN {
+    require Exporter;
+    push @ISA, qw/Exporter/;
+}
 our @EXPORT=qw(%param $tab_level &read_machines &parse_param &do_polysel_bench
 &do_sieve_bench &do_factbase &do_init &do_task &banner &info &last_line
 &format_dhms);
