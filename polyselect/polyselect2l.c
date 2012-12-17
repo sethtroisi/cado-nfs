@@ -928,10 +928,9 @@ collision_on_p ( header_t header,
           continue;
         }
 
-      mpz_mod_ui (f[0], header->Ntilde, p);
-      mpz_neg (f[0], f[0]); /* f = x^d - N */
       st -= cputime ();
-      nrp = poly_roots_uint64 (rp, f, header->d, p);
+      nrp = roots_mod_uint64 (rp, mpz_fdiv_ui (header->Ntilde, p), header->d,
+                              p);
       st += cputime ();
       roots_lift (rp, header->Ntilde, header->d, header->m0, p, nrp);
       proots_add (R, nrp, rp, nprimes);
@@ -1733,9 +1732,7 @@ gmp_collision_on_p ( header_t header,
 
     /* we want p^2 | N - (m0 + i)^d, thus
        (m0 + i)^d = N (mod p^2) or m0 + i = N^(1/d) mod p^2 */
-    mpz_mod_ui (f[0], header->Ntilde, p);
-    mpz_neg (f[0], f[0]); /* f = x^d - N */
-    nrp = poly_roots_uint64 (rp, f, header->d, p);
+    nrp = roots_mod_uint64 (rp, mpz_fdiv_ui (header->Ntilde, p), header->d, p);
     roots_lift (rp, header->Ntilde, header->d, header->m0, p, nrp);
     proots_add (R, nrp, rp, nprimes);
     for (j = 0; j < nrp; j++, c++) {
