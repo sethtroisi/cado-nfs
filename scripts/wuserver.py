@@ -4,8 +4,10 @@ import http.server
 import socketserver
 import os
 import sys
+import re
 from urllib.parse import unquote_plus
 from workunit import Workunit
+import datetime
 import wudb
 import upload
 
@@ -169,29 +171,39 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
 
     def send_query(self):
         filename = self.cgi_info[1]
-        (filename, query) = self.cgi_info[1].split("?", 1)
-        # Now split off the fragment part
-        query = query.split("#", 1)[0]
-        print("Query = " + query)
+        if "#" in filename:
+            # Get rid of fragment part
+            filename = filename.split("#", 1)[0]
         conditions = {}
-        # Now look at individual key=value pairs
-        for q in query.split("&"):
-            q = unquote_plus(q)
-            print("Processing token " + q)
-            for (name, op) in wudb.WuDb.name_to_operator.items():
-                if op in q:
-                    (key, value) = q.split(op, 1)
-                    if not name in conditions:
-                        conditions[name] = {}
-                    conditions[name][key] = value
-                    break
-        if len(conditions) == 0:
-            conditions = None
+        if "?" in filename:
+            # Parse query part into SELECT conditions
+            (filename, query) = filename.split("?", 1)
+            print("Query = " + query)
+            conditions = {}
+            # Now look at individual key=value pairs
+            for q in query.split("&"):
+                q = unquote_plus(q)
+                print("Processing token " + q)
+                for (name, op) in wudb.WuDb.name_to_operator.items():
+                    if op in q:
+                        (key, value) = q.split(op, 1)
+                        if not name in conditions:
+                            conditions[name] = {}
+                        # If value is of the form "now(-123)", convert it to a 
+                        # time stamp of 123 minutes ago
+                        r = re.match(r"now\((-?\d+)\)", value)
+                        if r:
+                            minutes_ago = int(r.group(1))
+                            td = datetime.timedelta(minutes = minutes_ago)
+                            value = str(datetime.datetime.now() + td)
+                        conditions[name][key] = value
+                        break
         wus = db_pool.query(**conditions)
 
         body = HtmlGen()
 
-        body.append("<p>Query for " + str(conditions) + "</p>")
+        body.append('<a href="/index.html">Back to index</a>')
+        body.append("<p>Query for conditions = " + str(conditions) + "</p>")
 
         if not wus is None and len(wus) > 0:
             keys = wus[0].tuple_keys()
@@ -199,6 +211,8 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             for wu in wus:
                 body.wu_row(wu.as_dict(), keys, self.cwd)
             body.end_table()
+        else:
+            body.append("No records match.")
         
         self.send_response(200)
         self.send_header("Content-Type", "text/html")
