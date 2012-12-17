@@ -23,7 +23,7 @@ legendre (unsigned long a, unsigned long p)
   return ret;
 }
 
-/* return b^e mod m */
+/* Return b^e mod m. Assumes a 64-bit word. */
 uint64_t
 uint64_pow_mod (uint64_t b, uint64_t e, uint64_t m)
 {
@@ -43,7 +43,7 @@ uint64_pow_mod (uint64_t b, uint64_t e, uint64_t m)
   return r;
 }
 
-/* roots of x^d = a (mod p) for d even */
+/* Roots of x^d = a (mod p) for d even and a 64-bit word */
 static int
 roots2 (uint64_t *r, uint64_t a, int d, uint64_t p)
 {
@@ -148,7 +148,7 @@ roots_mod_uint64 (uint64_t *r, uint64_t a, int d, uint64_t p)
       return 1;
     }
 
-  if ((d & 1) == 0) /* d is even */
+  if ((d & 1) == 0 && sizeof (unsigned long) == 8) /* d is even */
     return roots2 (r, a, d, p);
 
   f = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
