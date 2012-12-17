@@ -267,7 +267,7 @@ class WuActiveRecord(): # {
         and a dictionary 
         {"wuid": string, ..., "timeverified": string, "files": list}
         where list is None or a list of dictionaries of the from
-        {"id": int, "wuid": string, "filename1": string, "path": string
+        {"id": int, "wuid": string, "filename": string, "path": string
         Operations on instances of WuActiveRecord are directly carried 
         out on the database persistent storage, i.e., they behave kind 
         of as if the WuActiveRecord instance were itself a persistent 
@@ -291,6 +291,15 @@ class WuActiveRecord(): # {
                 for f in self.data["files"]:
                     s = s + "    " + str(f) + "\n"
         return s
+
+    def tuple_keys(self):
+        return self.wutable._get_colnames() + ["files"]
+
+    def as_tuple(self):
+        return (self.data[k] for k in self.wutable._get_colnames())
+            
+    def as_dict(self):
+        return self.data
 
     def add_files(self, cursor, files):
         if len(files) > 0 and self.data["files"] is None:
@@ -461,7 +470,7 @@ class WuActiveRecord(): # {
              "errorcode": errorcode,
              "failedcommand": failedcommand, 
              "timeresult": str(datetime.now())}
-        if errorcode == 0:
+        if errorcode is None or errorcode == 0:
            d["status"] = WuStatus.RECEIVED_OK
         else:
             d["status"] = WuStatus.RECEIVED_ERROR
