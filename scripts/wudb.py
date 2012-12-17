@@ -530,6 +530,23 @@ class DbWorker(threading.Thread):
             self.taskqueue.task_done()
         self.db.close()
 
+class DbRequest:
+    """ Class that represents a request to a given WuActiveRecord function.
+        Used mostly so that DbThreadPool's __getattr__ can return a callable 
+        that knows which of WuActiveRecord's methods should be called by the 
+        worker thread """
+    def __init__(self, taskqueue, func):
+        self.taskqueue = taskqueue
+        self.func = func
+    
+    def do_task(self, *args, **kargs):
+        """Add a task to the queue, wait for its completion, and return the result"""
+        ev = threading.Event()
+        result = [None, ev]
+        self.taskqueue.put((result, self.func, args, kargs))
+        ev.wait()
+        return result[0]
+
 class DbThreadPool:
     """Pool of threads consuming tasks from a queue"""
     def __init__(self, dbfilename, num_threads = 1):
@@ -537,14 +554,6 @@ class DbThreadPool:
         self.pool = []
         for _ in range(num_threads): 
             self.pool.append(DbWorker(dbfilename, self.taskqueue))
-
-    def do_task(self, func, *args, **kargs):
-        """Add a task to the queue, wait for its completion, and return the result"""
-        ev = threading.Event()
-        result = [None, ev]
-        self.taskqueue.put((result, func, args, kargs))
-        ev.wait()
-        return result[0]
 
     def terminate(self):
         for t in self.pool:
@@ -554,6 +563,21 @@ class DbThreadPool:
     def wait_completion(self):
         """Wait for completion of all the tasks in the queue"""
         self.taskqueue.join()
+    
+    def __getattr__(self, name):
+        """ Delegate calls to methods of WuActiveRecord to a worker thread.
+            If the called method exists in WuActiveRecord, creates a new 
+            DbRequest instance that remembers the name of the method that we 
+            tried to call, and returns the DbRequest instance's do_task 
+            method which will process the method call via the thread pool. 
+            We need to go through a new object's method since we cannot make 
+            the caller pass the name of the method to call to the thread pool 
+            otherwise """
+        if hasattr(WuActiveRecord, name):
+            task = DbRequest(self.taskqueue, name)
+            return task.do_task
+        else:
+            raise AttributeError(name)
 
 
 # One entry in the WU DB, including the text with the WU contents 
@@ -605,7 +629,7 @@ if __name__ == '__main__': # {
     db_pool = DbThreadPool(dbname)
     
     if args["create"]:
-        db_pool.do_task("create_tables")
+        db_pool.create_tables()
     if args["add"]:
         s = ""
         wus = []
@@ -617,10 +641,10 @@ if __name__ == '__main__': # {
                 s = s + line
         if s != "":
             wus.append(s)
-        db_pool.do_task("create", wus, priority=prio)
+        db_pool.create(wus, priority=prio)
     # Functions for queries
     if args["avail"]:
-        wus = db_pool.do_task("query", eq={"status": WuStatus.AVAILABLE})
+        wus = db_pool.query(eq={"status": WuStatus.AVAILABLE})
         print("Available workunits: ")
         if wus is None:
             print(wus)
@@ -628,7 +652,7 @@ if __name__ == '__main__': # {
             for wu in wus:
                 print (str(wu))
     if args["assigned"]:
-        wus = db_pool.do_task("query", eq={"status": WuStatus.ASSIGNED})
+        wus = db_pool.query(eq={"status": WuStatus.ASSIGNED})
         print("Assigned workunits: ")
         if wus is None:
             print(wus)
@@ -636,7 +660,7 @@ if __name__ == '__main__': # {
             for wu in wus:
                 print (str(wu))
     if args["receivedok"]:
-        wus = db_pool.do_task("query", eq={"status": WuStatus.RECEIVED_OK})
+        wus = db_pool.query(eq={"status": WuStatus.RECEIVED_OK})
         print("Received ok workunits: ")
         if wus is None:
             print(wus)
@@ -644,7 +668,7 @@ if __name__ == '__main__': # {
             for wu in wus:
                 print (str(wu))
     if args["receivederr"]:
-        wus = db_pool.do_task("query", eq={"status": WuStatus.RECEIVED_ERROR})
+        wus = db_pool.query(eq={"status": WuStatus.RECEIVED_ERROR})
         print("Received with error workunits: ")
         if wus is None:
             print(wus)
@@ -652,7 +676,7 @@ if __name__ == '__main__': # {
             for wu in wus:
                 print (str(wu))
     if args["all"]:
-        wus = db_pool.do_task("query")
+        wus = db_pool.query()
         print("Existing workunits: ")
         if wus is None:
             print(wus)
@@ -662,7 +686,7 @@ if __name__ == '__main__': # {
     # Functions for testing
     if args["assign"]:
         clientid = args["assign"][0]
-        wus = db_pool.do_task("assign", clientid)
+        wus = db_pool.assign(clientid)
     
     db_pool.terminate()
 # }
