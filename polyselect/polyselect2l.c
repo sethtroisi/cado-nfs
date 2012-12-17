@@ -1382,8 +1382,11 @@ collision_on_each_sq_r ( header_t header,
     fprintf (stderr, "Error, cannot allocate memory in %s\n", __FUNCTION__);
     exit (1);
   }
-  for (k = 0; k < count; k++)
-    tinv_qq[k] = malloc (number_pr * sizeof (unsigned long));
+  for (k = 0; k < count; k++) {
+    /* number_pr + 1 for guard for pre-load in collision_on_each_sq (nv) */
+    tinv_qq[k] = malloc ((number_pr + 1) * sizeof (unsigned long));
+    tinv_qq[k][number_pr] = 0;
+  }
 
   int st = cputime();
   pnr = R->nr;
