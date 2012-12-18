@@ -352,7 +352,7 @@ qroots_clear (qroots_t R)
 void
 hash_init (hash_t H, unsigned int init_size)
 {
-  H->alloc = init_size;
+  H->alloc = init_size + (init_size / 3);
   H->slot = (slot_t*) malloc (H->alloc * sizeof (slot_t));
   if (H->slot == NULL) {
     fprintf (stderr, "Error, cannot allocate memory in hash_init\n");

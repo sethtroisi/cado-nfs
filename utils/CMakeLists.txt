@@ -6,13 +6,13 @@ set (sources
         discriminant.c random_generation.c mpz_array.c gzip.c misc.c
         hashpair.c poly.c crc.c purgedfile.c bit_vector.c
         barrier.c usp.c fix-endianness.c cut_n_roots.c memusage.c
-        cachesize_cpuid.c cachesize_guess.c
+        cachesize_cpuid.c cachesize_guess.c roots_mod.c
 )
 
 # the utils library is used by some shared objects (prominently the
 # matmul shared libs in bwc), and therefore must be shared.
 add_library (utils SHARED ${sources})
-target_link_libraries(utils gmp m)
+target_link_libraries(utils pthread gmp m)
 install(TARGETS utils DESTINATION lib/${package_basename})
 
 add_executable(check_rels check_rels.c)
