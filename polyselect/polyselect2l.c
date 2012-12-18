@@ -887,7 +887,7 @@ static inline unsigned long
 collision_on_p ( header_t header,
                  proots_t R )
 {
-  unsigned long i, j, nprimes, p, nrp, c = 0;
+  unsigned long i, j, nprimes, p, nrp, c = 0, tot_roots = 0;
   uint64_t *rp;
   int64_t ppl = 0, u, umax;
   double pc1;
@@ -932,6 +932,7 @@ collision_on_p ( header_t header,
       nrp = roots_mod_uint64 (rp, mpz_fdiv_ui (header->Ntilde, p), header->d,
                               p);
       st += cputime ();
+      tot_roots += nrp;
       roots_lift (rp, header->Ntilde, header->d, header->m0, p, nrp);
       proots_add (R, nrp, rp, nprimes);
       for (j = 0; j < nrp; j++, c++)
@@ -947,7 +948,7 @@ collision_on_p ( header_t header,
   free (rp);
 
   if (verbose > 2)
-    fprintf (stderr, "# computing p-roots took %dms\n", st);
+    fprintf (stderr, "# computing %lu p-roots took %dms\n", tot_roots, st);
 
   if (found) /* do the real work */
     {
