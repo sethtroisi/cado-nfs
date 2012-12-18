@@ -888,10 +888,16 @@ mod_jacobi (const residue_t a_par, const modulus_t m_par)
   unsigned long a, m, s;
   int t = 1;
 
-  /* We probably could stay in Montgomery representation here,
+  /* We can stay in Montgomery representation here,
      a_par = a * 2^w, w even, so 2^w is a square and won't change
      the quadratic character */
+#if 0
+  /* Convert out of Montgomery form */
   a = mod_get_ul (a_par, m_par);
+#else
+  /* Get residue in Montgomery form directly without converting */
+  a = a_par[0]; 
+#endif
   m = mod_getmod_ul (m_par);
   ASSERT (a < m);
   
