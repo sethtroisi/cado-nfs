@@ -27,17 +27,50 @@ static unsigned char isprime_table[] = {0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1,
 static uint64_t
 invert_mod (uint64_t a, uint64_t b)
 {
-  modulus_t bb;
+  modulus_t cc;
   residue_t aa;
-  uint64_t ret;
+  uint64_t c, r;
+  int t;
+  
+  for (c = b, t = 0; c % 2 == 0; t++, c >>= 1);
+  /* b = 2^t * c */
+  
+  /* Inverse 1/a mod c */
+  mod_initmod_ul (cc, c);
+  mod_init (aa, cc);
+  mod_set_ul (aa, a, cc);
+  mod_inv (aa, aa, cc);
 
-  mod_initmod_ul (bb, b);
-  mod_init (aa, bb);
-  mod_set_ul (aa, a, bb);
-  mod_inv (aa, aa, bb);
-  ret = mod_get_ul (aa, bb);
-  mod_clearmod (bb);
-  return ret;
+  r = mod_get_ul (aa, cc);
+
+  if (t > 0) {
+    uint64_t r2;
+    int i;
+    /* x := a_1 n_2 [n_2^{-1}]_{n_1} + a_2 n_1 [n_1^{-1}]_{n_2} */
+    /* x := 2^t [aa 2^{-t}]_{c} + c [r2 c^{-1}]_{2^t} */
+
+    /* Compute r2 = 1/a mod 2^t */
+    r2 = ularith_invmod(a);
+
+    /* Compute r2 = r2 c^{-1} (mod 2^t) */
+    r2 = (r2 * r) & ((1UL << t) - 1);
+
+    /* Compute r = r 2^{-t} (mod c) */
+    for (i = 0 ; i < t; i++)
+      mod_div2 (aa, aa, cc);
+    r = mod_get_ul (aa, cc);
+
+    r = (r << t) + r2 * c;
+    if (r >= b)
+      r -= b;
+  }
+
+  mod_clear (aa, cc);
+  mod_clearmod (cc);
+
+  // printf ("1/Mod(%lu, %lu) == %lu\n", a, b, r);
+
+  return r;
 }
 
 /************************** square roots *************************************/
@@ -467,7 +500,7 @@ mod_roots (residue_t *rr, residue_t aa, int d, modulus_t pp)
       return roots3 (rr, aa, d, pp);
     }
   else
-    abort ();
+    return roots(rr, aa, d, pp);
 }
 
 
@@ -506,8 +539,7 @@ roots_mod_uint64 (uint64_t *r, uint64_t a, int d, uint64_t p)
       return 1;
     }
 
-  /* Stupid hack: use old code for d == 5 until general d-th root is done */
-  if (sizeof (unsigned long) == 8 && d != 5)
+  if (sizeof (unsigned long) == 8)
     {
       modulus_t pp;
       residue_t aa, rr[10];
@@ -520,8 +552,10 @@ roots_mod_uint64 (uint64_t *r, uint64_t a, int d, uint64_t p)
 
       for (i = 0; i < n; i++) {
         r[i] = mod_get_ul (rr[i], pp);
-        // mod_pow_ul (rr[i], rr[i], d, pp);
-        // ASSERT_ALWAYS (mod_get_ul (rr[i], pp) == a);
+        if (do_both) {
+          mod_pow_ul (rr[i], rr[i], d, pp);
+          ASSERT_ALWAYS (mod_get_ul (rr[i], pp) == a);
+        }
       }
       sort_roots (r, n);
 
