@@ -882,9 +882,9 @@ remove_singletons (unsigned int npass, double required_excess)
     /* delete heavy rows when we have reached a fixed point */
     if (newnrel == oldnewnrel) {
       /* check we have enough excess initially (at least required_excess) */
-      if (count++ == 0 && (double) excess < required_excess * (double) newnrel)
+      if (count++ == 0 && (double) excess < required_excess*(double)newnprimes)
         {
-          fprintf(stderr, "excess < %.2f * #relations. See -required_excess "
+          fprintf(stderr, "excess < %.2f * #primes. See -required_excess "
                           "argument.\n", required_excess);
           exit (1);
         }
