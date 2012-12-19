@@ -74,6 +74,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 
 //#define STAT_FFS
 
+//#define USE_CAVALLAR_WEIGHT_FUNCTION
+
 #define MAX_FILES 1000000
 #define DEFAULT_NPASS 50
 #define DEFAULT_REQUIRED_EXCESS 0.1
@@ -657,6 +659,24 @@ compare (const void *v1, const void *v2)
   return (w1->w >= w2->w) ? -1 : 1;
 }
 
+float
+weight_function_clique (HC_T w)
+{
+#ifdef USE_CAVALLAR_WEIGHT_FUNCTION
+  if (w >= 3)
+    return ldexpf (1, -(w-1));
+  else if (w == 2)
+    return 0.25;
+  else
+      return 0.0;
+#else
+    if (w >= 3)
+      return (float) 1.0 / (float) w;
+    else
+      return 0.0;
+#endif
+}
+
 /* Compute connected component of row i for the relation R(i1,i2) if rows
    i1 and i2 share a prime of weight 2.
    Return number of rows of components, and put in w the total weight. */
@@ -672,8 +692,7 @@ compute_connected_component (HR_T i)
       if (!bit_vector_getbit(Tbv, (size_t) k)) /* row k was not visited yet */
 	n += compute_connected_component (k);
     }
-    if (H.hc[h] >= 3)
-      w_ccc += (float) 1.0 / (float) H.hc[h];
+    w_ccc += weight_function_clique (H.hc[h]);
     }
   return n;
 }
@@ -2233,7 +2252,15 @@ main (int argc, char **argv)
   
   if (minpr == UMAX(minpr)) minpr = pol->rat->lim;
   if (minpa == UMAX(minpa)) minpa = pol->alg->lim;
-  
+
+  fprintf (stderr, "Weight function used during clique removal:\n"
+                   "  0     1     2     3     4     5     6     7\n"
+                   "%0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %0.3f\n",
+                   weight_function_clique(0), weight_function_clique(1),
+                   weight_function_clique(2), weight_function_clique(3),
+                   weight_function_clique(4), weight_function_clique(5),
+                   weight_function_clique(6), weight_function_clique(7));
+
   fprintf (stderr, "Number of relations is %lu\n", (unsigned long) nrelmax);
   if (nprimes > 0) Hsize = nprimes;
   else
