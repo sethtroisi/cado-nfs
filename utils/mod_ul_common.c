@@ -882,6 +882,7 @@ mod_isprime (const modulus_t m)
   return r;
 }
 
+#if 0
 int
 mod_jacobi (const residue_t a_par, const modulus_t m_par)
 {
@@ -903,12 +904,10 @@ mod_jacobi (const residue_t a_par, const modulus_t m_par)
   
   while (a != 0UL)
   {
-    while (a % 2UL == 0UL)
-    {
-      a /= 2UL;
-      if (m % 8UL == 3UL || m % 8UL == 5UL)
-        t = -t;
-    }
+    int tz = ularith_ctz(a);
+    a >>= tz;
+    if (tz % 2 != 0 && (m % 8UL == 3UL || m % 8UL == 5UL))
+      t = -t;
     s = a; a = m; m = s; /* swap */
     if (a % 4UL == 3UL && m % 4UL == 3UL)
       t = -t;
@@ -923,3 +922,79 @@ mod_jacobi (const residue_t a_par, const modulus_t m_par)
 #endif
   return t;
 }
+
+#else
+
+int
+mod_jacobi (const residue_t a_par, const modulus_t m_par)
+{
+  unsigned long x, m;
+  unsigned int s, j;
+
+  /* Get residue in Montgomery form directly without converting */
+  x = a_par[0]; 
+  m = mod_getmod_ul (m_par);
+  ASSERT (x < m);
+  ASSERT(m % 2 == 1);
+
+  j = ularith_ctz(x);
+  x = x >> j;
+  /* If we divide by an odd power of 2, and 2 is a QNR, flip sign */
+  /* 2 is a QNR (mod m) iff m = 3,5 (mod 8)
+     m = 1 = 001b:   1
+     m = 3 = 011b:  -1
+     m = 5 = 101b:  -1
+     m = 7 = 111b:   1
+     Hence we can store in s the exponent of -1, i.e., s=0 for jacobi()=1 
+     and s=1 for jacobi()=-1, and update s ^= (m>>1) & (m>>2) & 1. 
+     We can do the &1 at the very end.
+     In fact, we store the exponent of -1 in the second bit of s.
+     The s ^= ((j<<1) & (m ^ (m>>1))) still needs 2 shift but one of them can 
+     be done with LEA, and f = s ^ (x&m) needs no shift */
+
+  s = ((j<<1) & (m ^ (m>>1)));
+
+  while (x > 1) {
+    /* Here, x < m, x and m are odd */
+
+    /* Implicitly swap by reversing roles of x and m in next loop */
+    /* Flip sign if both are 3 (mod 4) */
+    s = s ^ (x&m);
+
+    /* Make m smaller by subtracting and shifting */
+    do {
+      m -= x; /* Difference is even */
+      if (m == 0)
+        break;
+      /* Make odd again */
+      j = ularith_ctz(m);
+      s ^= ((j<<1) & (x ^ (x>>1)));
+      m >>= j;
+    } while (m >= x);
+
+    if (m <= 1) {
+      x = m;
+      break;
+    }
+
+    /* Flip sign if both are 3 (mod 4) */
+    /* Implicitly swap again */
+    s = s ^ (x&m);
+
+    /* Make x<m  by subtracting and shifting */
+    do {
+      x -= m; /* Difference is even */
+      if (x == 0)
+        break;
+      /* Make odd again */
+      j = ularith_ctz(x);
+      s ^= ((j<<1) & (m ^ (m>>1)));
+      x >>= j;
+    } while (x >= m);
+  }
+
+  if (x == 0)
+    return 0;
+  return ((s & 2) == 0) ? 1 : -1;
+}
+#endif
