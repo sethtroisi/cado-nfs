@@ -184,6 +184,8 @@ one_cubic_root_1mod3 (residue_t rr, residue_t zeta, residue_t ddelta, modulus_t 
     {
       mod_add1 (rho, rho, pp);
       /* rho is equal to i (mod pp) */
+      /* no point in testing i = k*l where we know both k and l are cubic 
+         residues, so we do only primes */
       if (!isprime_table[i])
         continue;
       mod_pow_ul (a, rho, s, pp); /* a = rho^s */
@@ -224,12 +226,11 @@ one_cubic_root_1mod3 (residue_t rr, residue_t zeta, residue_t ddelta, modulus_t 
           mod_mul (b, b, a, pp);
         }
     }
-  l = (s + 1) / 3;
-  mod_set (d, ddelta, pp);
-  mod_pow_ul (d, d, l, pp);
+  mod_pow_ul (d, ddelta, (s + 1) / 3, pp);
   mod_mul (h, h, d, pp);
-  if (s == 3 * l + 1)
-    mod_pow_ul (h, h, p - 2, pp);
+  if (s % 3 == 1)
+    mod_inv (h, h, pp);
+
   mod_set (rr, h, pp);
 
   mod_clear (rho, pp);
