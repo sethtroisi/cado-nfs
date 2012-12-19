@@ -1371,6 +1371,9 @@ collision_on_each_sq_r ( header_t header,
                          unsigned long number_pr,
                          int count )
 {
+  if (count == 0)
+    return;
+
   uint8_t i, nr, *pnr;
   unsigned long nprimes, p, c = 0, rp, rqi;
   int k;
