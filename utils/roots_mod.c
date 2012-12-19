@@ -142,23 +142,26 @@ roots2 (residue_t *rr, residue_t aa, int d, modulus_t pp)
   return 2*k;
 }
 
-/* Put in rr a root of x^3 = ddelta (mod pp), assuming one exists */
-/* rr and ddelta overlapping is permissible. */
 static void 
-one_cubic_root (residue_t rr, residue_t ddelta, modulus_t pp)
+one_cubic_root_2mod3 (residue_t rr, residue_t ddelta, modulus_t pp)
 {
-  residue_t rho, a, aprime, b, h, d;
-  uint64_t i, j, s, t, l;
-  const uint64_t p = mod_getmod_ul(pp);
-
   /* when p = 2 (mod 3), then 1/3 = (2p-1)/3 mod (p-1), thus a cubic root
      is delta^((2p-1)/3) mod p. We rewrite exponent as (p+1)/3*2-1 to 
      avoid overflow */
 
-  if ((p % 3) == 2) {
-    mod_pow_ul (rr, ddelta, (p + 1) / 3 * 2 - 1, pp);
-    return;
-  }
+  mod_pow_ul (rr, ddelta, (mod_getmod_ul(pp) + 1) / 3 * 2 - 1, pp);
+}
+
+
+/* Put in rr a root of x^3 = ddelta (mod pp), assuming one exists,
+   and in zeta a primitive 3-rd root of unity */
+/* rr and ddelta overlapping is permissible. */
+static void 
+one_cubic_root_1mod3 (residue_t rr, residue_t zeta, residue_t ddelta, modulus_t pp)
+{
+  residue_t rho, a, aprime, b, h, d;
+  uint64_t i, j, s, t, l;
+  const uint64_t p = mod_getmod_ul(pp);
 
   /* now p = 1 (mod 3), use Algorithm from Table 3 of [1] */
   s = (p - 1) / 3;
@@ -181,12 +184,16 @@ one_cubic_root (residue_t rr, residue_t ddelta, modulus_t pp)
         continue;
       mod_pow_ul (a, rho, s, pp); /* a = rho^s */
       mod_set (aprime, a, pp);
-      for (j = 0; j < t - 1; j++)
-        mod_pow_ul (aprime, aprime, 3, pp);
+      for (j = 0; j < t - 1; j++) {
+        mod_sqr (b, aprime, pp); /* use b as temp */
+        mod_mul (aprime, aprime, b, pp);
+      }
       /* aprime = rho^(3^(t-1)*s) = rho^((p-1)/3) */
       if (!mod_is1 (aprime, pp))
         break;
     }
+  /* aprime  =  rho^((p-1)/3)  !=  1, so it is a 3-rd rood of 1 */
+  mod_set (zeta, aprime, pp);
   mod_pow_ul (b, ddelta, s, pp);
   mod_set1 (h, pp);
   for (i = 1; i < t ; i++)
@@ -286,7 +293,7 @@ is_cube (residue_t aa, modulus_t pp)
       int r;
       mod_init_noset0 (cc, pp);
       mod_pow_ul (cc, aa, (mod_getmod_ul(pp) - 1) / 3, pp);
-      r = mod_is1(cc, pp);
+      r = mod_is1 (cc, pp);
       mod_clear (cc, pp);
       return r;
     }
@@ -320,18 +327,10 @@ roots3 (residue_t *rr, residue_t aa, int d, modulus_t pp)
       mod_set1 (t, pp);
       i = 1;
 
-      do {
-        mod_add1 (t, t, pp);
-        i++;
-        if (!isprime_table[i])
-          continue;
-        mod_pow_ul (zeta, t, (p - 1) / 3, pp);
-      } while (mod_is1 (zeta, pp));
-
-      /* zeta is a cubic root of 1 */
       for (i = 0; i < n; i++)
         {
-          one_cubic_root (rr[3*i], rr[2 * (d / 3) + i], pp);
+          one_cubic_root_1mod3 (rr[3*i], zeta, rr[2 * (d / 3) + i], pp);
+          /* zeta is a cubic root of 1 */
           mod_mul (rr[3*i+1], rr[3*i], zeta, pp);
           mod_mul (rr[3*i+2], rr[3*i+1], zeta, pp);
         }
@@ -342,7 +341,7 @@ roots3 (residue_t *rr, residue_t aa, int d, modulus_t pp)
   else /* p = 2 (mod 3): exactly one root each */
     {
       for (i = 0; i < n; i++) {
-        one_cubic_root (rr[i], rr[2 * (d / 3) + i], pp);
+        one_cubic_root_2mod3 (rr[i], rr[2 * (d / 3) + i], pp);
       }
       return n;
     }
@@ -405,7 +404,8 @@ roots_mod_uint64 (uint64_t *r, uint64_t a, int d, uint64_t p)
       return 1;
     }
 
-  if (sizeof (unsigned long) == 8)
+  /* Stupid hack: use old code for d == 5 until general d-th root is done */
+  if (sizeof (unsigned long) == 8 && d != 5)
     {
       modulus_t pp;
       residue_t aa, rr[10];
@@ -416,8 +416,11 @@ roots_mod_uint64 (uint64_t *r, uint64_t a, int d, uint64_t p)
 
       n = mod_roots (rr, aa, d, pp);
 
-      for (i = 0; i < n; i++)
+      for (i = 0; i < n; i++) {
         r[i] = mod_get_ul (rr[i], pp);
+        // mod_pow_ul (rr[i], rr[i], d, pp);
+        // ASSERT_ALWAYS (mod_get_ul (rr[i], pp) == a);
+      }
       sort_roots (r, n);
 
       mod_clear (aa, pp);
