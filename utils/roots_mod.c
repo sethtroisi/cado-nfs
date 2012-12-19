@@ -49,6 +49,23 @@ uint64_pow_mod (uint64_t b, uint64_t e, uint64_t m)
   return r;
 }
 
+/* return 1/a mod b */
+static uint64_t
+invert_mod (uint64_t a, uint64_t b)
+{
+  modulus_t bb;
+  residue_t aa;
+  uint64_t ret;
+
+  mod_initmod_ul (bb, b);
+  mod_init (aa, bb);
+  mod_set_ul (aa, a, bb);
+  mod_inv (aa, aa, bb);
+  ret = mod_get_ul (aa, bb);
+  mod_clearmod (bb);
+  return ret;
+}
+
 /* Roots of x^d = a (mod p) for d even and a 64-bit word */
 static int
 roots2 (uint64_t *r, uint64_t a, int d, uint64_t p)
@@ -238,6 +255,49 @@ one_cubic_root (residue_t rr, residue_t ddelta, modulus_t pp)
   mod_clear (b, pp);
   mod_clear (h, pp);
   mod_clear (d, pp);
+}
+
+/* Return a r-th root of delta (mod p), assuming one exists,
+   using the algorithm from Table 4 in reference [1]. */
+static uint64_t
+one_rth_root (uint64_t r, uint64_t delta, uint64_t p)
+{
+  uint64_t rho, i, j, s, t, alpha, a, c, h, b, d;
+
+  /* when p-1 is not divisible by r, there is exactly one root */
+  rho = (p - 1) % r;
+  if (rho != 0)
+    {
+      for (i = 1; (i * (p - 1) + 1) % r != 0; i++);
+      return uint64_pow_mod (delta, (i * (p - 1) + 1) / r, p);
+    }
+
+  /* now p-1 is divisible by r */
+  
+  for (s = (p - 1) / r, t = 1; (s % r) == 0; s /= r, t++);
+  for (rho = 2; rho < p; rho++)
+    {
+      c = uint64_pow_mod (rho, s, p);
+      for (a = c, i = 0; i < t - 1; i++)
+        a = uint64_pow_mod (a, r, p);
+      if (a != 1)
+        break;
+    }
+  alpha = invert_mod (r, s);
+  b = uint64_pow_mod (delta, r * alpha - 1, p);
+  h = 1;
+  for (i = 1; i < t; i++)
+    {
+      d = b;
+      for (j = 0; j < t - 1- i; j++)
+        d = uint64_pow_mod (d, r, p);
+      if (d == 1)
+        c = uint64_pow_mod (c, r, p);
+      else
+        {
+          
+        }
+    }
 }
 
 /* return 1 iff a is a cube mod p */
