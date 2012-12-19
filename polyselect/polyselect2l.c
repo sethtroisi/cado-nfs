@@ -1544,21 +1544,24 @@ collision_on_batch_sq_r ( header_t header,
 
   /* we proceed with BATCH_SIZE many rq for each time */
   i = count = 0;
-  int re = 1;
+  int re = 1, num_rq;
   while (re) {
     /* compute BATCH_SIZE such many rqqz[] */
-    for (count = 0; count < BATCH_SIZE; count ++, (*curr_nq)++)
-      {
+    num_rq = 0;
+    for (count = 0; count < BATCH_SIZE; count ++)
+    {
         aux_return_rq (SQ_R, idx_q, ind_qr, lq, qqz, rqqz[count], lq);
         re = aux_nextcomb (ind_qr, lq, len_qnr);
+        (*curr_nq)++;
+        num_rq ++;
         if ((*curr_nq) >= nq)
           re = 0;
         if (!re)
           break;
-      }
-
+    }
+    
     /* core function for a fixed qq and several rqqz[] */
-    collision_on_each_sq_r (header, R, q, rqqz, inv_qq, number_pr, count);
+    collision_on_each_sq_r (header, R, q, rqqz, inv_qq, number_pr, num_rq);
   }
 
   mpz_clear (qqz);
