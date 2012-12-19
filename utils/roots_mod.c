@@ -81,7 +81,7 @@ roots2 (residue_t *rr, residue_t aa, int d, modulus_t pp)
           mod_neg (rr[2*k+1], rr[2*k], pp);
           k ++;
         }
-      return 2*n;
+      return 2*k;
     }
 
   /* case p = 1 (mod 4). Uses Tonelli-Shanks, more precisely
