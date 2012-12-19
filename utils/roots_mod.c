@@ -164,7 +164,7 @@ static void
 one_cubic_root_1mod3 (residue_t rr, residue_t zeta, residue_t ddelta, modulus_t pp)
 {
   residue_t rho, a, aprime, b, h, d;
-  uint64_t i, j, s, t, l;
+  uint64_t i, j, s, t;
   const uint64_t p = mod_getmod_ul(pp);
 
   /* now p = 1 (mod 3), use Algorithm from Table 3 of [1] */
