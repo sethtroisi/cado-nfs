@@ -72,6 +72,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "utils_ffs.h"
 #endif
 
+//#define STAT_FFS
+
+//#define USE_CAVALLAR_WEIGHT_FUNCTION
+
 #define MAX_FILES 1000000
 #define DEFAULT_NPASS 50
 #define DEFAULT_REQUIRED_EXCESS 0.1
@@ -120,6 +124,10 @@ static uint8_t boutfilerel;   /* True (1) if a rel_used relations file must be w
 #ifdef FOR_FFS
 static FILE *ofile2;
 static int pipe_2;
+#ifdef STAT_FFS
+uint64_t __stat_count[11] = {0,0,0,0,0,0,0,0,0,0,0};
+uint64_t __stat_nonzero = 0;
+#endif
 #endif
 
 static const unsigned char ugly[256] = {
@@ -651,6 +659,24 @@ compare (const void *v1, const void *v2)
   return (w1->w >= w2->w) ? -1 : 1;
 }
 
+float
+weight_function_clique (HC_T w)
+{
+#ifdef USE_CAVALLAR_WEIGHT_FUNCTION
+  if (w >= 3)
+    return ldexpf (1, -(w-1));
+  else if (w == 2)
+    return 0.25;
+  else
+      return 0.0;
+#else
+    if (w >= 3)
+      return (float) 1.0 / (float) w;
+    else
+      return 0.0;
+#endif
+}
+
 /* Compute connected component of row i for the relation R(i1,i2) if rows
    i1 and i2 share a prime of weight 2.
    Return number of rows of components, and put in w the total weight. */
@@ -666,8 +692,7 @@ compute_connected_component (HR_T i)
       if (!bit_vector_getbit(Tbv, (size_t) k)) /* row k was not visited yet */
 	n += compute_connected_component (k);
     }
-    if (H.hc[h] >= 3)
-      w_ccc += (float) 1.0 / (float) H.hc[h];
+    w_ccc += weight_function_clique (H.hc[h]);
     }
   return n;
 }
@@ -882,9 +907,9 @@ remove_singletons (unsigned int npass, double required_excess)
     /* delete heavy rows when we have reached a fixed point */
     if (newnrel == oldnewnrel) {
       /* check we have enough excess initially (at least required_excess) */
-      if (count++ == 0 && (double) excess < required_excess * (double) newnrel)
+      if (count++ == 0 && (double) excess < required_excess*(double)newnprimes)
         {
-          fprintf(stderr, "excess < %.2f * #relations. See -required_excess "
+          fprintf(stderr, "excess < %.2f * #primes. See -required_excess "
                           "argument.\n", required_excess);
           exit (1);
         }
@@ -1210,9 +1235,33 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j, int passtwo)
 	mybufrel->rel.nb_ap = k;
 #else
 	for (i = mybufrel->rel.nb_rp; i-- ;)
+    {
 	  ltmp += ((HT_T) mybufrel->rel.rp[i].p >= minpr);
-	for (i = mybufrel->rel.nb_ap; i-- ;)
+#if defined FOR_FFS && defined STAT_FFS
+	    if (passtwo && bit_vector_getbit(rel_used, (size_t) buf_rel[j].num))
+      {
+        if (abs(mybufrel->rel.rp[i].e) > 10)
+          __stat_count[0]++;
+        else
+          __stat_count[abs(mybufrel->rel.rp[i].e)]++;
+        __stat_nonzero++;
+      }
+#endif
+	  }
+  for (i = mybufrel->rel.nb_ap; i-- ;)
+    {
 	    ltmp += ((HT_T) mybufrel->rel.ap[i].p >= minpa);
+#if defined FOR_FFS && defined STAT_FFS
+	    if (passtwo && bit_vector_getbit(rel_used, (size_t) buf_rel[j].num))
+      {
+        if (abs(mybufrel->rel.ap[i].e) > 10)
+          __stat_count[0]++;
+        else
+          __stat_count[abs(mybufrel->rel.ap[i].e)]++;
+        __stat_nonzero++;
+      }
+#endif
+    }
 #endif
       }
     else 
@@ -1963,6 +2012,15 @@ prempt_scan_relations_pass_two (const char *oname,
   fprintf (stderr, "End of re-read: %lu relations in %.1fs -- %.1f MB/s -- %.1f rels/s\n",
            rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
 
+#if defined FOR_FFS && defined STAT_FFS
+  fprintf (stderr, "# of non zero coeff: %lu\n", __stat_nonzero);
+  for (int i = 1; i <= 10 ; i++)
+    fprintf (stderr, "# of coeffs of abs value %d: %lu(%.2f%%)\n", i,
+             __stat_count[i], 100 * (double) __stat_count[i]/__stat_nonzero);
+  fprintf (stderr, "# of coeffs of abs value > 10: %lu(%.2f%%)\n",
+           __stat_count[0], 100 * (double) __stat_count[0]/__stat_nonzero);
+#endif
+
   /* write excess to stdout */
   if (!raw)
     printf ("NROWS:%lu WEIGHT:%1.0f WEIGHT*NROWS=%1.2e\n",
@@ -2194,7 +2252,15 @@ main (int argc, char **argv)
   
   if (minpr == UMAX(minpr)) minpr = pol->rat->lim;
   if (minpa == UMAX(minpa)) minpa = pol->alg->lim;
-  
+
+  fprintf (stderr, "Weight function used during clique removal:\n"
+                   "  0     1     2     3     4     5     6     7\n"
+                   "%0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %0.3f %0.3f\n",
+                   weight_function_clique(0), weight_function_clique(1),
+                   weight_function_clique(2), weight_function_clique(3),
+                   weight_function_clique(4), weight_function_clique(5),
+                   weight_function_clique(6), weight_function_clique(7));
+
   fprintf (stderr, "Number of relations is %lu\n", (unsigned long) nrelmax);
   if (nprimes > 0) Hsize = nprimes;
   else
