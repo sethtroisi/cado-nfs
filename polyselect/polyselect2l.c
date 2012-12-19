@@ -2059,13 +2059,13 @@ newAlgo (mpz_t N, unsigned long d, uint64_t ad)
 
   if (sizeof (unsigned long int) == 8) {
     c = collision_on_p (header, R);
-    if (nq == 0) return;
-    collision_on_sq (header, R, c);
+    if (nq > 0)
+      collision_on_sq (header, R, c);
   }
   else {
     c = gmp_collision_on_p (header, R);
-    if (nq == 0) return;
-    gmp_collision_on_sq (header, R, c);
+    if (nq > 0)
+      gmp_collision_on_sq (header, R, c);
   }
 
   proots_clear (R, lenPrimes);
