@@ -1371,6 +1371,9 @@ collision_on_each_sq_r ( header_t header,
                          unsigned long number_pr,
                          int count )
 {
+  if (count == 0)
+    return;
+
   uint8_t i, nr, *pnr;
   unsigned long nprimes, p, c = 0, rp, rqi;
   int k;
@@ -1661,6 +1664,8 @@ collision_on_sq ( header_t header,
   /* lq < 8 for the moment */
   if (lq > 7)
     lq = 7;
+  if (lq < 1)
+    lq = 1;
 
   unsigned long q, idx_q[lq];
   mpz_t qqz;
@@ -2054,10 +2059,12 @@ newAlgo (mpz_t N, unsigned long d, uint64_t ad)
 
   if (sizeof (unsigned long int) == 8) {
     c = collision_on_p (header, R);
+    if (nq == 0) return;
     collision_on_sq (header, R, c);
   }
   else {
     c = gmp_collision_on_p (header, R);
+    if (nq == 0) return;
     gmp_collision_on_sq (header, R, c);
   }
 
@@ -2184,9 +2191,8 @@ main (int argc, char *argv[])
   if (d <= 0) usage(argv0[0], "degree");
 
   /* check lq and nq */
-  if (nq < 1) {
-    fprintf (stderr, "Error, number of factors in special-q "
-             "should >= 1 and/or number of special-q's should >=1\n");
+  if (nq < 0) {
+    fprintf (stderr, "Error, number of special-q's should >= 0\n");
     exit (1);
   }
 
