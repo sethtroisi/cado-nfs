@@ -72,6 +72,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "utils_ffs.h"
 #endif
 
+//#define STAT_FFS
+
 #define MAX_FILES 1000000
 #define DEFAULT_NPASS 50
 #define DEFAULT_REQUIRED_EXCESS 0.1
@@ -120,6 +122,10 @@ static uint8_t boutfilerel;   /* True (1) if a rel_used relations file must be w
 #ifdef FOR_FFS
 static FILE *ofile2;
 static int pipe_2;
+#ifdef STAT_FFS
+uint64_t __stat_count[11] = {0,0,0,0,0,0,0,0,0,0,0};
+uint64_t __stat_nonzero = 0;
+#endif
 #endif
 
 static const unsigned char ugly[256] = {
@@ -1210,9 +1216,33 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j, int passtwo)
 	mybufrel->rel.nb_ap = k;
 #else
 	for (i = mybufrel->rel.nb_rp; i-- ;)
+    {
 	  ltmp += ((HT_T) mybufrel->rel.rp[i].p >= minpr);
-	for (i = mybufrel->rel.nb_ap; i-- ;)
+#if defined FOR_FFS && defined STAT_FFS
+	    if (passtwo && bit_vector_getbit(rel_used, (size_t) buf_rel[j].num))
+      {
+        if (abs(mybufrel->rel.rp[i].e) > 10)
+          __stat_count[0]++;
+        else
+          __stat_count[abs(mybufrel->rel.rp[i].e)]++;
+        __stat_nonzero++;
+      }
+#endif
+	  }
+  for (i = mybufrel->rel.nb_ap; i-- ;)
+    {
 	    ltmp += ((HT_T) mybufrel->rel.ap[i].p >= minpa);
+#if defined FOR_FFS && defined STAT_FFS
+	    if (passtwo && bit_vector_getbit(rel_used, (size_t) buf_rel[j].num))
+      {
+        if (abs(mybufrel->rel.ap[i].e) > 10)
+          __stat_count[0]++;
+        else
+          __stat_count[abs(mybufrel->rel.ap[i].e)]++;
+        __stat_nonzero++;
+      }
+#endif
+    }
 #endif
       }
     else 
@@ -1962,6 +1992,15 @@ prempt_scan_relations_pass_two (const char *oname,
   relation_stream_trigger_disp_progress(rs);
   fprintf (stderr, "End of re-read: %lu relations in %.1fs -- %.1f MB/s -- %.1f rels/s\n",
            rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
+
+#if defined FOR_FFS && defined STAT_FFS
+  fprintf (stderr, "# of non zero coeff: %lu\n", __stat_nonzero);
+  for (int i = 1; i <= 10 ; i++)
+    fprintf (stderr, "# of coeffs of abs value %d: %lu(%.2f%%)\n", i,
+             __stat_count[i], 100 * (double) __stat_count[i]/__stat_nonzero);
+  fprintf (stderr, "# of coeffs of abs value > 10: %lu(%.2f%%)\n",
+           __stat_count[0], 100 * (double) __stat_count[0]/__stat_nonzero);
+#endif
 
   /* write excess to stdout */
   if (!raw)
