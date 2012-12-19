@@ -451,6 +451,7 @@ params/params.c168
 params/params.c169
 params/params.c170
 params/params.c171
+params/params.c173
 params/params.c175
 params/params.c180
 params/params.c190
@@ -730,3 +731,12 @@ utils/ularith.h
 utils/usp.c
 utils/usp.h
 utils/utils.h
+utils/roots_mod.c
+linalg/bwc/mpfq/abase_p_3.c
+linalg/bwc/mpfq/abase_p_3.h
+linalg/bwc/mpfq/abase_p_3_t.c
+linalg/bwc/mpfq/abase_p_3_t.h
+linalg/bwc/plingen.c
+linalg/bwc/plingen.h
+linalg/bwc/polymat.c
+linalg/bwc/polymat.h

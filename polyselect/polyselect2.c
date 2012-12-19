@@ -301,7 +301,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 #ifdef DEBUG_POLYSELECT2
 	 for (j = d + 1; j -- != 0; )
 		  gmp_printf ("c%u: %Zd\n", j, f[j]);
-	 nroots = numberOfRealRoots (f, d, 0, 0);
+	 nroots = numberOfRealRoots (f, d, 0, 0, NULL);
 	 skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
 	 logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
 	 alpha = get_alpha (f, d, ALPHA_BOUND);
@@ -312,7 +312,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 
 	 optimize (f, d, g, 0, 1);
 
-	 nroots = numberOfRealRoots (f, d, 0, 0);
+	 nroots = numberOfRealRoots (f, d, 0, 0, NULL);
 	 skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
 	 logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
 	 total_lognorm[q] += logmu;
@@ -365,7 +365,7 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 #endif /* NEW_ROOTSIEVE */
                   rootsieve_time += seconds_thread ();
 
-		  nroots = numberOfRealRoots (f, d, 0, 0);
+		  nroots = numberOfRealRoots (f, d, 0, 0, NULL);
 		  skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
 		  logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
 

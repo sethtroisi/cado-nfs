@@ -73,7 +73,7 @@ printBuf(FILE *file, int *buf, int ibuf)
 #endif
 
 static unsigned long
-flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows, 
+flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
             int small_ncols, int *code, int skip, int bin)
 {
 #ifdef FOR_FFS
@@ -297,7 +297,7 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
 
 // dump of newrows in indexname.
 static void
-makeIndexFile(const char *indexname, int nrows, typerow_t **newrows, 
+makeIndexFile(const char *indexname, int nrows, typerow_t **newrows,
               int small_nrows, int small_ncols)
 {
     FILE *indexfile;
@@ -382,8 +382,8 @@ doAllAdds(typerow_t **newrows, char *str, MAYBE_UNUSED FILE *outdelfile)
   int32_t ind[MERGE_LEVEL_MAX], i0;
   int ni, destroy;
 
-  ni = parse_hisfile_line (ind, str, &j);  
-  
+  ni = parse_hisfile_line (ind, str, &j);
+
   if (ind[0] < 0)
     {
       destroy = 0;
@@ -400,7 +400,7 @@ doAllAdds(typerow_t **newrows, char *str, MAYBE_UNUSED FILE *outdelfile)
 
   for (int k = 1; k < ni; k++)
 		addRows(newrows, ind[k], i0, j);
-  
+
   if(destroy)
     {
 	    //destroy initial row!
@@ -418,8 +418,6 @@ doAllAdds(typerow_t **newrows, char *str, MAYBE_UNUSED FILE *outdelfile)
  {
     char *t = str;
     int i, ii, destroy = 1;
-  
-    
 
     if(*t == '-'){
 	destroy = 0;
@@ -455,7 +453,7 @@ doAllAdds(typerow_t **newrows, char *str, MAYBE_UNUSED FILE *outdelfile)
 // sparsemat is small_nrows x small_ncols, after small_ncols is found using
 // renumbering.
 static int
-toFlush (const char *sparsename, typerow_t **sparsemat, int *colweight, 
+toFlush (const char *sparsename, typerow_t **sparsemat, int *colweight,
          int ncols, int small_nrows, int skip, int bin,
          const char *idealsfilename)
 {
@@ -799,6 +797,9 @@ try_merge (typerow_t **newrows, int **cols, int *len_col, int j, int skip,
   int i, k, gain, gain_max, imax, kmax, *W, ii, kk, *J, s, t;
   mpz_t *M, and;
 
+  if (len_col[j] < 2) /* a column with 0 or 1 ideal cannot be merged */
+    return 0;
+
   /* compute weights of rows containing the ideal j */
   W = (int*) malloc (len_col[j] * sizeof(int));
   for (i = 0, s = 0; i < len_col[j]; i++)
@@ -825,6 +826,7 @@ try_merge (typerow_t **newrows, int **cols, int *len_col, int j, int skip,
   for (i = 1, k = 0; i < t; i++)
     if ((J[i-1] == J[i]) && (k == 0 || (J[k-1] != J[i])))
       J[k++] = J[i];
+  ASSERT_ALWAYS(k < s);
   J[k++] = INT_MAX;
   t = k;
 
@@ -1046,9 +1048,9 @@ optimize (typerow_t **newrows, int nrows, int *colweight, int ncols, int skip,
 }
 
 static void
-fasterVersion(typerow_t **newrows, const char *sparsename, 
+fasterVersion(typerow_t **newrows, const char *sparsename,
               const char *indexname, const char *hisname, purgedfile_stream ps,
-              uint64_t bwcostmin, int nrows, int ncols, int skip, int bin, 
+              uint64_t bwcostmin, int nrows, int ncols, int skip, int bin,
               int writeindex, const char *idealsfilename,
               const char *outdelfilename)
 {
@@ -1109,11 +1111,11 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
             nonzero++;
           }
       }
-    fprintf (stderr, "# of non zero coeff: %d\n", nonzero); 
+    fprintf (stderr, "# of non zero coeff: %d\n", nonzero);
     for (int i = 1; i <= 10 ; i++)
-      fprintf (stderr, "# of %d: %d(%.2f%%)\n", i, count[i], 
+      fprintf (stderr, "# of %d: %d(%.2f%%)\n", i, count[i],
                        100 * (double) count[i]/nonzero);
-    fprintf (stderr, "# of > 10: %d(%.2f%%)\n", count[0], 
+    fprintf (stderr, "# of > 10: %d(%.2f%%)\n", count[0],
                      100 * (double) count[0]/nonzero);
 #endif
 
@@ -1126,7 +1128,7 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
                 small_nrows, small_ncols);
     for(int i = 0; i < nrows; i++)
       /* If writeindex is false, we free only the "crunched" part */
-      if (writeindex || i < small_nrows) 
+      if (writeindex || i < small_nrows)
         if(newrows[i] != NULL)
           free (newrows[i]);
     free(newrows);

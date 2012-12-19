@@ -1749,8 +1749,8 @@ prempt_scan_relations_pass_one ()
 
   end_insertRelation = 1;
   pthread_join(thread_relation, NULL);
-  if (pthread_tryjoin_np (thread_load, NULL))
-    pthread_cancel(thread_load);
+  /* if (pthread_tryjoin_np (thread_load, NULL)) */
+  pthread_cancel(thread_load);
   pthread_join(thread_load, NULL);
   pthread_attr_destroy(&attr);
 
@@ -1992,8 +1992,8 @@ prempt_scan_relations_pass_two (const char *oname,
 
   end_insertRelation = 1;
   pthread_join(thread_printrel, NULL);
-  if (pthread_tryjoin_np (thread_load, NULL))
-    pthread_cancel(thread_load);
+  /* if (pthread_tryjoin_np (thread_load, NULL)) */
+  pthread_cancel(thread_load);
   pthread_join(thread_load, NULL);
   pthread_attr_destroy(&attr);
   

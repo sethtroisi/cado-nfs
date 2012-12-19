@@ -510,10 +510,10 @@ another_line:
 
     p = line;
 
-    *p++ = (c = fgetc_unlocked(f));
+    *p++ = (c = getc_unlocked(f));
     if (c == EOF) return -1;
     if (c == '#') {
-        for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f))) ;
+        for( ; c != EOF && c != '\n' ; *p++ = (c=getc_unlocked(f))) ;
         goto another_line;
     }
 
@@ -521,23 +521,23 @@ another_line:
     *pb = 0;
     int s = 1;
     int v;
-    if (c == '-') { s=-1; *p++ = (c=fgetc_unlocked(f)); }
-    for( ; (v=ugly[(unsigned char) c]) >= 0 ; *p++ = (c=fgetc_unlocked(f)))
+    if (c == '-') { s=-1; *p++ = (c=getc_unlocked(f)); }
+    for( ; (v=ugly[(unsigned char) c]) >= 0 ; *p++ = (c=getc_unlocked(f)))
         *pa=*pa*ab_base+v;
     expected = ',';
     if (forced_read && c != expected) {
-      for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f))) ;
+      for( ; c != EOF && c != '\n' ; *p++ = (c=getc_unlocked(f))) ;
       return 0;
     }
     else
       ASSERT_ALWAYS(c == expected);
-    *p++ = (c=fgetc_unlocked(f));
+    *p++ = (c=getc_unlocked(f));
     *pa*=s;
-    for( ; (v=ugly[(unsigned char) c]) >= 0 ; *p++ = (c=fgetc_unlocked(f)))
+    for( ; (v=ugly[(unsigned char) c]) >= 0 ; *p++ = (c=getc_unlocked(f)))
         *pb=*pb*ab_base+v;
     expected = ':';
     if (forced_read && c != expected) {
-      for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f))) ;
+      for( ; c != EOF && c != '\n' ; *p++ = (c=getc_unlocked(f))) ;
       return 0;
     }
     else
@@ -551,12 +551,12 @@ another_line:
 
         base = p;
         n = 1;
-        *p++ = (c = fgetc_unlocked(f));
-        for (; c != EOF && c != '\n' && c != ':'; *p++ = (c = fgetc_unlocked(f)))
+        *p++ = (c = getc_unlocked(f));
+        for (; c != EOF && c != '\n' && c != ':'; *p++ = (c = getc_unlocked(f)))
             n += c == ',';
         expected = ':';
         if (forced_read && c != expected) {
-          for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f))) ;
+          for( ; c != EOF && c != '\n' ; *p++ = (c=getc_unlocked(f))) ;
           return 0;
         }
         else
@@ -578,7 +578,7 @@ another_line:
 
         expected = ':';
         if (forced_read && c != expected) {
-          for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f))) ;
+          for( ; c != EOF && c != '\n' ; *p++ = (c=getc_unlocked(f))) ;
           return 0;
         }
         else
@@ -587,12 +587,12 @@ another_line:
 
         base = p;
         n = 1;
-        *p++ = (c = fgetc_unlocked(f));
-        for (; c != EOF && c != '\n' && c != ':'; *p++ = (c = fgetc_unlocked(f)))
+        *p++ = (c = getc_unlocked(f));
+        for (; c != EOF && c != '\n' && c != ':'; *p++ = (c = getc_unlocked(f)))
             n += c == ',';
         expected = '\n';
         if (forced_read && c != expected) {
-          for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f))) ;
+          for( ; c != EOF && c != '\n' ; *p++ = (c=getc_unlocked(f))) ;
           return 0;
         }
         else
@@ -614,7 +614,7 @@ another_line:
 
         expected = '\n';
         if (forced_read && c != expected) {
-          for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f))) ;
+          for( ; c != EOF && c != '\n' ; *p++ = (c=getc_unlocked(f))) ;
           return 0;
         }
         else
@@ -624,7 +624,7 @@ another_line:
 
     /* skip rest of line -- a no-op if we've been told to parse
      * everything. */
-    for( ; c != EOF && c != '\n' ; *p++ = (c=fgetc_unlocked(f)));
+    for( ; c != EOF && c != '\n' ; *p++ = (c=getc_unlocked(f)));
 
     size_t nread =  p-line;
     *p++='\0';
@@ -648,7 +648,7 @@ relation_stream_get_skip (relation_stream_ptr rs)
 another_line:
     rs->lnum++;
 
-    c = fgetc_unlocked (f);
+    c = getc_unlocked (f);
     nread = 1;
 
     if (c == EOF)
@@ -659,12 +659,12 @@ another_line:
 
     if (c == '#')
       {
-        for( ; c != EOF && c != '\n' ; c = fgetc_unlocked (f), nread++);
+        for( ; c != EOF && c != '\n' ; c = getc_unlocked (f), nread++);
         goto another_line;
       }
 
     /* read entire line */
-    for( ; c != EOF && c != '\n' ; c = fgetc_unlocked (f), nread++);
+    for( ; c != EOF && c != '\n' ; c = getc_unlocked (f), nread++);
 
     rs->pos += nread;
     rs->nrels++;

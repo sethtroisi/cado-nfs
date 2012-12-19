@@ -1968,7 +1968,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
     {
       best_E = (double *) malloc (multi * sizeof (double));
       for (i = 0; i < multi; ++i)
-  best_E[i] = DBL_MAX;
+        best_E[i] = DBL_MAX;
     }
 
   /* allocate D(k) = disc(f + (j*x+k)*g, x) */
@@ -2233,7 +2233,7 @@ print_cadopoly (FILE *fp, cado_poly p, int raw)
    logmu = L2_lognorm (p->alg->f, p->alg->degree, p->skew, DEFAULT_L2_METHOD);
    alpha = get_alpha (p->alg->f, p->alg->degree, ALPHA_BOUND);
    alpha_proj = get_biased_alpha_projective (p->alg->f, p->alg->degree, ALPHA_BOUND);
-   nroots = numberOfRealRoots (p->alg->f, p->alg->degree, 0, 0);
+   nroots = numberOfRealRoots (p->alg->f, p->alg->degree, 0, 0, NULL);
    e = MurphyE (p, BOUND_F, BOUND_G, AREA, MURPHY_K);
    
    fprintf (fp, "# lognorm: %1.2f, alpha: %1.2f (proj: %1.2f), E: %1.2f, nr: %u\n",
@@ -2591,7 +2591,6 @@ optimize_dir_aux (mpz_t *f, int d, mpz_t *g, int verbose, int method)
   mpz_clear (g0[1]);
 }
 
-
 /* Use rotation and translation to find a polynomial with smaller norm
    (local minimum). Modify f and g accordingly.
    If use_rotation is non zero, use also rotation.
@@ -2601,10 +2600,9 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
               int method)
 {
   mpz_t kt, k2, k1, k, l; /* current offset */
-  mpz_t ktot, khitot, lamtot, mutot; /* compute total translation and rotation,
-                                        such that current polynomial are
-                                        [f+(khitot*x^2+lamtot*x+mutot)*g](x+k)
-                                        and g(x+k) */
+  mpz_t ktot, khitot, lamtot, mutot;
+  /* compute total translation and rotation, such that current polynomials are
+     [f+(khitot*x^2+lamtot*x+mutot)*g](x+k) and g(x+k) */
   mpz_t tmp;
   int changed, changedt, changed2, changed1;
   double logmu00, logmu0, logmu, skew;
@@ -2619,8 +2617,8 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
   mpz_init_set_ui (kt, 1);
   mpz_init (l);
   mpz_init (ktot);
-  mpz_init (lamtot);
   mpz_init (khitot);
+  mpz_init (lamtot);
   mpz_init (mutot);
   mpz_init (tmp);
   while (1)
@@ -2661,11 +2659,12 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
               mpz_add (ktot, ktot, kt);
             }
         }
-      
+
       /* then do rotation by k2*x^2*g if d >= 6 */
       if (d >= 6 && use_rotation)
         {
           rotate_auxg_z (f, g[1], g[0], k2, 2);
+          /* k2*(x-ktot)^2 = k2*x^2 - 2*k2*ktot*x + k2*ktot^2 */
           mpz_mul (tmp, ktot, k2);
           mpz_submul_ui (lamtot, tmp, 2);
           mpz_addmul (mutot, tmp, ktot);
@@ -3117,16 +3116,16 @@ optimize_aux_mp (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
 }
 #endif
 
-/* b <- h(k) where deg(h)=3 */
 static void
-eval_fdminus3_translated (mpz_t b, mpz_t *h, mpz_t k)
+eval_poly (mpz_t b, mpz_t *h, int n, mpz_t k)
 {
-  mpz_mul (b, h[3], k);
-  mpz_add (b, b, h[2]);
-  mpz_mul (b, b, k);
-  mpz_add (b, b, h[1]);
-  mpz_mul (b, b, k);
-  mpz_add (b, b, h[0]);
+  mpz_mul (b, h[n], k);
+  mpz_add (b, b, h[--n]);
+  while (n > 0)
+    {
+      mpz_mul (b, b, k);
+      mpz_add (b, b, h[--n]);
+    }
 }
 
 /* puts in h[3], ..., h[0] the coefficients (in k) of the degree-3 (in x)
@@ -3140,19 +3139,19 @@ fdminus3_translated (mpz_t *h, mpz_t *f, int d)
   mpz_set (h[0], f[d-3]);
 }
 
-/* assuming h(a)*h(b) < 0 where h(k) = h[3]*k^3+...+h[0] and a < b,
+/* assuming h(a)*h(b) < 0 where h(k) = h[n]*k^n+...+h[0] and a < b,
    refines the root such that a + 1 = b.
    The refined root is in a.
 */
 static void
-root_refine (mpz_t a, mpz_t b, mpz_t *h)
+root_refine (mpz_t a, mpz_t b, mpz_t *h, int n)
 {
   mpz_t c, v;
-  int sa;
+  int sa, i;
 
   mpz_init (c);
   mpz_init (v);
-  eval_fdminus3_translated (v, h, a);
+  eval_poly (v, h, n, a);
   sa = mpz_sgn (v);
   while (1)
     {
@@ -3160,7 +3159,7 @@ root_refine (mpz_t a, mpz_t b, mpz_t *h)
       mpz_fdiv_q_2exp (c, c, 1);
       if (mpz_cmp (c, a) == 0)
         break;
-      eval_fdminus3_translated (v, h, c);
+      eval_poly (v, h, n, c);
       if (mpz_sgn (v) == sa)
         mpz_swap (a, c);
       else
@@ -3168,15 +3167,17 @@ root_refine (mpz_t a, mpz_t b, mpz_t *h)
     }
 
   /* now b = a+1, we do one more iteration to round to nearest, i.e.,
-     we check the sign of h(a+1/2) */
+     we check the sign of 2^n*h(a+1/2) = h[n]*(2a+1)^n + ... + 2^n*h[0] */
+
   mpz_mul_2exp (c, a, 1);
-  mpz_add_ui (c, c, 1);
-  mpz_mul (v, h[3], c);
-  mpz_addmul_ui (v, h[2], 2);
-  mpz_mul (v, v, c);
-  mpz_addmul_ui (v, h[1], 4);
-  mpz_mul (v, v, c);
-  mpz_addmul_ui (v, h[0], 8);
+  mpz_add_ui (c, c, 1); /* c = 2a+1 */
+  mpz_mul (v, h[n], c);
+  mpz_addmul_ui (v, h[n-1], 2);
+  for (i = n-2; i >= 0; i--)
+    {
+      mpz_mul (v, v, c);
+      mpz_addmul_ui (v, h[i], 1UL << (n - i));
+    }
   if (mpz_sgn (v) == sa) /* root is in [a+1/2,b], round to b */
     mpz_add_ui (a, a, 1);
 
@@ -3221,7 +3222,7 @@ roots3 (mpz_t *r, mpz_t *h)
   /* now we have four control points -Inf < r[1] < r[2] < +Inf */
   mpz_init (v);
   mpz_init (k);
-  eval_fdminus3_translated (v, h, r[1]);
+  eval_poly (v, h, 3, r[1]);
   s1 = mpz_sgn (v);
   if (-mpz_sgn (h[3]) * s1 < 0) /* one root in -Inf..r[1] */
     {
@@ -3230,19 +3231,20 @@ roots3 (mpz_t *r, mpz_t *h)
         mpz_mul_2exp (k, k, 1);
       while (1)
         {
-          eval_fdminus3_translated (v, h, k);
+          eval_poly (v, h, 3, k);
           if (mpz_sgn (v) * s1 < 0)
             break;
           mpz_mul_2exp (k, k, 1);
         }
-      root_refine (k, r[1], h);
+      root_refine (k, r[1], h, 3);
       mpz_swap (r[n++], k);
     }
-  eval_fdminus3_translated (v, h, r[2]);
+  eval_poly (v, h, 3, r[2]);
+
   s2 = mpz_sgn (v);
   if (s1 * s2 < 0) /* one root in r[1]..r[2] */
     {
-      root_refine (r[1], r[2], h);
+      root_refine (r[1], r[2], h, 3);
       mpz_swap (r[n++], r[1]);
     }
   if (s2 * mpz_sgn (h[3]) < 0) /* one root in r[2]..+Inf */
@@ -3252,12 +3254,12 @@ roots3 (mpz_t *r, mpz_t *h)
         mpz_mul_2exp (k, k, 1);
       while (1)
         {
-          eval_fdminus3_translated (v, h, k);
+          eval_poly (v, h, 3, k);
           if (mpz_sgn (v) * s2 < 0)
             break;
           mpz_mul_2exp (k, k, 1);
         }
-      root_refine (r[2], k, h);
+      root_refine (r[2], k, h, 3);
       mpz_swap (r[n++], r[2]);
     }
   mpz_clear (v);
@@ -3265,6 +3267,70 @@ roots3 (mpz_t *r, mpz_t *h)
 
   return n;
 }
+
+#if 0
+/* put in r[0..n-1] the real roots of x^3 + a*x^2 + b*x + c and return n */
+static int
+cubic_roots (double *r, double a, double b, double c)
+{
+  double Q = (a * a - 3.0 * b) / 9.0;
+  double R = ((2.0 * a * a - 9.0 * b) * a + 27.0 * c) / 54.0;
+  double R2 = R * R;
+  double Q3 = Q * Q * Q;
+  double theta;
+
+  a = a / 3.0;
+  if (R2 < Q3)
+    {
+      double twopioverthree = 2.0943951023931954923;
+
+      theta = acos (R / sqrt (Q3)) / 3.0;
+      Q = -2.0 * sqrt (Q);
+      r[0] = Q * cos (theta) - a;
+      r[1] = Q * cos (theta + twopioverthree) - a;
+      r[2] = Q * cos (theta - twopioverthree) - a;
+      return 3;
+    }
+  else
+    {
+      double A = cbrt (fabs (R) + sqrt (R2 - Q3)), B;
+      A = (R >= 0) ? -A : A;
+      B = Q / A;
+      r[0] = (A + B) - a;
+      return 1;
+    }
+}
+
+/* for degree 6, and a given l, estimate the smallest degree-3 coefficient
+   of f + l*x^3*g */
+static double
+optimize_c3 (mpz_t *f, mpz_t *g, long l)
+{
+  double c6 = mpz_get_d (f[6]);
+  double c5 = mpz_get_d (f[5]);
+  double c4 = mpz_get_d (f[4]);
+  double c3 = mpz_get_d (f[3]);
+  double g1 = mpz_get_d (g[1]);
+  double g0 = mpz_get_d (g[0]);
+  double roots[3], k, v, vmin = DBL_MAX;
+  int n;
+
+  c6 = 20.0 * c6;
+  c5 = 10.0 * c5;
+  c4 = 4.0 * (c4 + (double) l * g1);
+  c3 = c3 + (double) l * g0;
+  n = cubic_roots (roots, c5 / c6, c4 / c6, c3 / c6);
+  while (n)
+    {
+      k = round (roots[--n]);
+      v = ((c6 * k + c5) * k + c4) * k + c3;
+      v = fabs (v);
+      if (v < vmin)
+        vmin = v;
+    }
+  return vmin;
+}
+#endif
 
 /* if use_rotation is non-zero, also use rotation */
 void
@@ -3275,9 +3341,10 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
      and we want to force f[d-3] to be small. */
   if (d == 6)
   {
-    mpz_t k, h[4], r[4], f_copy[MAX_DEGREE], g0_copy, best_k;
+    mpz_t k, h[4], r[3], f_copy[MAX_DEGREE], g0_copy, best_k;
     int i, j, n;
     long l, best_l = LONG_MAX;
+
     mpz_init (k);
     mpz_init (best_k);
 
@@ -3293,10 +3360,9 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
 #endif
 
     for (i = 0; i <= 3; i++)
-    {
       mpz_init (h[i]);
+    for (i = 0; i < 3; i++)
       mpz_init (r[i]);
-    }
 
 /* debug
    #ifdef OPTIMIZE_MP
@@ -3319,24 +3385,25 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
     /* We use here an idea suggested by Thorsten Kleinjung, namely
        rotating by l*x^3*g for several values of l, and keeping the
        best value of l.
-       With RSA-768, P=10^5, admax=25000 we get the following average
-       lognorms (61 hits), without the logmu -= sqrt (...) line below:
-       LMAX=0: 70.68
-       LMAX=1: 70.29
-       LMAX=2: 70.02
-       LMAX=4: 69.81
-       LMAX=8: 69.64
-       LMAX=16: 69.46
-       LMAX=32: 69.35
-       LMAX=64: 69.27
-       LMAX=128: 69.23
-       LMAX=256: 69.22
+       With RSA-768, P=10^5, admax=2500, incr=60, lq=3, nq=1000, seed=1, we
+       get the following min/av/max lognorms (248 hits):
+       LMAX=0: 68.97/71.66/73.12
+       LMAX=1: 68.97/71.26/72.80
+       LMAX=2: 68.97/71.04/72.47
+       LMAX=4: 68.97/70.78/72.44
+       LMAX=8: 68.59/70.46/72.33
+       LMAX=16: 68.15/70.18/71.91
+       LMAX=32: 68.05/69.90/71.28
+       LMAX=64: 67.94/69.66/71.04
+       LMAX=128: 67.94/69.44/70.86
+       LMAX=256: 67.94/69.30/70.51
+       LMAX=512: 67.94/69.23/70.36
+       LMAX=1024: 67.94/69.20/70.10
     */
 #define LMAX 256
     for (l = -LMAX; l <= LMAX; l++) /* we consider f + l*x^(d-3)*g */
 #undef LMAX
     {
-
       for (i = 0; i < d; i++)
         mpz_set (f[i], f_copy[i]);
       mpz_set (g[0], g0_copy);
@@ -3366,13 +3433,6 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
         mpz_neg (k, k);
         rotate_auxg_z (f, g[1], g[0], k, 2);
 
-        /* we estimate here the expected alpha value we can get from
-           rotation. For a rotation space of K vakues, we can expect
-           alpha ~ -0.824*sqrt(2*log(K)) (experiments done by Shi Bai
-           for RSA-768). 
-           Since for degree 6 the rotation space is in S^6, we consider
-           -sqrt(SKEW_FACTOR*log(S)). */
-#define SKEW_FACTOR 8.148 /* 0.824^2*2*6 */
 #ifdef OPTIMIZE_MP
         optimize_aux_mp (f, d, g, verbose, use_rotation, CIRCULAR);
         L2_skewness_derivative_mp (f, d, SKEWNESS_DEFAULT_PREC,
@@ -3386,7 +3446,6 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
         skewd = mpz_get_d (skew);
         logmud = logmud / skewd * 0.00043828022511018320850; /* Pi/7168 */
         logmud = 0.5 * log(logmud);
-        logmud -= sqrt (SKEW_FACTOR * log (skewf));
 
         if (logmud < best_logmud) {
           best_logmud = logmud;
@@ -3399,13 +3458,12 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
         skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC,
                             DEFAULT_L2_METHOD);
         logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
-        logmu -= sqrt (SKEW_FACTOR * log (skew));
 
         if (logmu < best_logmu)
-        {
-          best_logmu = logmu;
-          best_l = l;
-          mpz_set (best_k, r[j]);
+          {
+            best_logmu = logmu;
+            best_l = l;
+            mpz_set (best_k, r[j]);
         }
 #endif
 
@@ -3436,10 +3494,9 @@ optimize (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation)
     mpz_clear (k);
     mpz_clear (best_k);
     for (i = 0; i <= 3; i++)
-    {
       mpz_clear (h[i]);
+    for (i = 0; i < 3; i++)
       mpz_clear (r[i]);
-    }
     for (i = 0; i < d; i++)
       mpz_clear (f_copy[i]);
     mpz_clear (g0_copy);

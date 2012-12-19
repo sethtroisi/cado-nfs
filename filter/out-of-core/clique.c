@@ -34,21 +34,34 @@
 #include <sys/time.h>
 #include <fcntl.h>
 #include <math.h>
+#include <linux/limits.h>
+#include <semaphore.h>
+#include <libgen.h>
+#include <limits.h> /* for CHAR_BIT */
 
+#define NEW_DIR "new/"
+#define MAX_FILES_PER_THREAD 1
+#define MAX_STOCK_RAT_PER_LINE 16
+#define MAX_STOCK_ALG_PER_LINE 24
 #define MAXNAME 1024
 #define MAX_THREADS 128
-#define EXACT_HASH /* store (p,r) exactly in hash table */
+#define PR_TYPE uint32_t
+#define MAXLINE 1024
+
+#define LIKELY(X)    __builtin_expect((X), 1)
+#define UNLIKELY(X)  __builtin_expect((X), 0)
 
 /* thread structure */
 typedef struct
 {
-  char g[MAXNAME];
-  int thread;
+  FILE *fin, *fout;
   unsigned long nlines;
   unsigned long nideal;
   unsigned long nsingl;
   unsigned long ndupli;
-  unsigned long nthreads;
+  char g[ARG_MAX];
+  uint8_t busy; /* 0 = free; 1 = work done; 2 = busy */
+  uint8_t thread, nthreads;
 } __tab_struct;
 typedef __tab_struct tab_t[1];
 
@@ -58,6 +71,24 @@ typedef union
   int64_t pointer; /* h+1 if points to H2[h] */
 } tab2_t;
 
+/* Mix of hashtable, (p,r) array, and weight, to optimize Lx caches :
+   200 bytes with LN2BPRHWP = 4.
+   So, when (p,r) is found, h has ~80% to be in the same L0 cache line
+   and 99.9% to be in the same 16K page (so, less TLB miss and so on).
+   CAREFUL: __prhwp_struct must be compact and h type must encode exactly
+   BPRHWP entries. The procedures stat and one_thread3 hardcode the
+   lenght of h (uint64_t). So don't change LN2BPRHWP.
+*/
+#define LN2BPRHWP 4
+#define BPRHWP (1U<<LN2BPRHWP)
+typedef struct
+{
+  PR_TYPE  pr[BPRHWP]; /* BPRHWP (p,r) of 32 bits */
+  uint64_t h;          /* entries of 4 bits : WARNING: hardcoded type! */
+  tab2_t   wp[BPRHWP]; /* BPRHWP weight/pointeur of 64 bits */
+} __prhwp_struct /* __attribute__ ((__packed__)) */ ;
+__prhwp_struct *prhwp;
+
 struct suffix_handler {
     const char * suffix;
     const char * pfmt_in;
@@ -65,32 +96,100 @@ struct suffix_handler {
 };
 
 struct suffix_handler supported_compression_formats[] = {
-    { ".gz", "gzip -dc %s", "gzip -c --fast > %s", },
-    { ".bz2", "bzip2 -dc %s", "bzip2 -c --fast > %s", },
+    { ".gz", "antebuffer 24 %s|gzip -dc", "gzip -c1>%s", },
+    { ".bz2", "antebuffer 24 %s|bzip2 -dc", "bzip2 -c1>%s", },
+    { ".lzma", "lzma -dc %s", "lzma -c0>%s", },
     /* These two have to be present */
-    { "", NULL, NULL },
+    { "", "antebuffer 24 %s", NULL },
     { NULL, NULL, NULL },
 };
 
+#ifndef HAVE_SYNC_FETCH
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER; /* mutual exclusion lock */
+#endif
 long wct0;
 
-uint64_t M = 0, minpa = 0, minpr = 0, Hsize, *H, nrels, remains, *PR;
+uint64_t M = 0, minpa = 0, minpr = 0, Hsize, nrels, remains;
+PR_TYPE *maxpr;
 uint64_t target = 0;
-tab2_t *H2;
 double threshold_weight = 999.0;
+sem_t sem_pt;
 
-long
+
+static const unsigned char ugly[256] = {
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  0,   1,   2,   3,   4,   5,   6,   7,   8,   9, 255, 255, 255, 255, 255, 255,
+  255,  10,  11,  12,  13,  14,  15, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255,  10,  11,  12,  13,  14,  15, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255 };
+
+void
+create_directories (char *filelist)
+{
+  static char odirg[MAXNAME];
+  FILE *f;
+  char g[MAXNAME], *pdirg, mkdirg[MAXNAME<<1];
+  size_t lg;
+  int ret;
+
+  f = fopen (filelist, "r");
+  while (!feof (f)) {
+    if (fgets (g, MAXNAME, f) && (lg = strlen(g))) {
+      g[lg-1] = 0;
+      pdirg = dirname(g);
+      if (strcmp(odirg,pdirg)) {
+	strcpy(odirg,pdirg);
+	strcpy(mkdirg, "mkdir -p ");
+	strcat(mkdirg, NEW_DIR);
+	strcat(mkdirg, pdirg);
+	ret = system (mkdirg);
+        if (ret == -1)
+          {
+            fprintf (stderr, "An error occurred during system() call\n");
+            exit (1);
+          }
+      }
+    }
+  }
+  fclose(f);
+}
+
+double
+compute_delay_stat ()
+{
+  /*
+  uint64_t h;
+  uint32_t i;
+  */
+  return (60 + (Hsize>>24));
+  /*
+  for (h = (Hsize>>24), i = 0; h; h >>=1, i++);
+  return (i) ? (double) (i<<6) : 32.;
+  */
+}
+
+double
 cputime ()
 {
   struct rusage rus;
 
   getrusage (RUSAGE_SELF, &rus);
   /* This overflows a 32 bit signed int after 2147483s = 24.85 days */
-  return rus.ru_utime.tv_sec;
+  return rus.ru_utime.tv_sec + rus.ru_utime.tv_usec / 1000000.0;
 }
 
-long
+double
 realtime ()
 {
   struct timeval tv[1];
@@ -100,7 +199,7 @@ realtime ()
      }; */
 
   gettimeofday (tv, NULL);
-  return tv->tv_sec;
+  return tv->tv_sec + tv->tv_usec / 1000000.0 ;
 }
 
 int has_suffix(const char * path, const char * sfx)
@@ -182,117 +281,154 @@ FILE * gzip_open(const char * name, const char * mode)
 
 void gzip_close(FILE * f, const char * name)
 {
-    const char * e = name + strlen(name);
-    const struct suffix_handler * r = supported_compression_formats;
-    for( ; r->suffix ; r++) {
-        const char * ne = e - MIN(strlen(name), strlen(r->suffix));
-        if (strcmp(r->suffix, ne) != 0)
-            continue;
-        if (r->pfmt_out) {
-            pclose(f);
-            return;
-        } else {
-            fclose(f);
-            return;
-        }
+  const char * e = name + strlen(name);
+  const struct suffix_handler * r = supported_compression_formats;
+  for( ; r->suffix ; r++) {
+    const char * ne = e - MIN(strlen(name), strlen(r->suffix));
+    if (strcmp(r->suffix, ne))
+      continue;
+    if (r->pfmt_out)
+      pclose(f);
+    else
+      fclose(f);
+    return;
+  }
+}
+
+static inline uint64_t
+index_hash (uint64_t pr)
+{
+  PR_TYPE *prh, *prm, mpr;
+
+  mpr = (PR_TYPE) pr;
+  pr %= M;
+  prm = prhwp[pr >> LN2BPRHWP].pr;
+  prh = prm + (pr & (BPRHWP-1));
+  
+  /* Fastest & most common procedure: hash[pr] == pr or hash[pr] == 0 */
+  if (*prh == mpr)
+    return pr;
+  if (!(*prh)) {
+    *prh = mpr;
+    return pr;
+  }
+  
+  prh++;
+  pr++;
+  prm += BPRHWP;
+  if (prm > maxpr) prm = maxpr;
+  for (;;) {
+    if (UNLIKELY(prh == prm)) {
+      if (LIKELY(prm != maxpr)) {
+	prm = (PR_TYPE *) ((void *) prm + sizeof(*prhwp));
+	prh = prm - BPRHWP;
+      } else {
+	pr = 0;
+	prh = prhwp[0].pr;
+	prm = prh + BPRHWP;
+      }
     }
+    if (*prh == mpr)
+      return pr;
+    if (!(*prh)) {
+      *prh = mpr;
+      return pr;
+    }
+    prh++;
+    pr++;
+  }
+  return pr;
 }
 
-#ifndef EXACT_HASH
-static inline uint64_t
-index_hash (uint64_t pr)
-{
-  return pr % M;
-}
-#else
-static inline uint64_t
-index_hash (uint64_t pr)
-{
-  uint64_t h = pr % M;
-
-  while (PR[h] != 0 && PR[h] != pr)
-    if (++h == M)
-      h = 0;
-  /* now PR[h] = 0 or PR[h] = pr */
-  PR[h] = pr;
-  return h;
-}
-#endif
-
+#define INDEX_RAT(P) (index_hash ((P) + 1)) /* even for even M */
 static inline uint64_t
 index_rat (uint64_t p)
 {
-  uint64_t h;
-
-  h = index_hash (p + 1); /* even for even M */
-  return h;
+  return INDEX_RAT(p);
 }
 
+#define INDEX_ALG(P,R) (index_hash ((P) + (M - 2) * (R)))  /* always odd for odd p and even M */
 static inline uint64_t
 index_alg (uint64_t p, uint64_t r)
 {
-  uint64_t h;
-
-  h = index_hash (p + (M - 2) * r); /* always odd for odd p and even M */
-  return h;
+  return INDEX_ALG(p,r);
 }
 
-static inline uint64_t
+#define WEIGHT(P) ((prhwp[(P) >> LN2BPRHWP].h >> (((P)&(BPRHWP-1)) << 2)) & (BPRHWP-1))
+static inline uint8_t
 weight (uint64_t h)
 {
-  uint64_t r, s;
-
-  r = h >> 4;
-  s = h & 15;
-  return (H[r] >> (s << 2)) & 15;
+  return (uint8_t) WEIGHT(h);
 }
 
 static void
 insert (uint64_t h)
 {
-  uint64_t r, s, v;
-  const uint64_t mask[16] = {0xf, 0xf0, 0xf00, 0xf000, 0xf0000, 0xf00000,
-                             0xf000000, 0xf0000000, 0xf00000000, 0xf000000000,
-                             0xf0000000000, 0xf00000000000, 0xf000000000000,
-                             0xf0000000000000, 0xf00000000000000,
-                             0xf000000000000000};
+  uint8_t *hh;
+  hh = ((uint8_t *) &(prhwp[h >> LN2BPRHWP].h)) + ((h & (BPRHWP-1)) >> 1);
+  if (h & 1) {
+    if ((*hh & 0xf0) != 0xf0) *hh += 0x10;
+  } else
+    if ((*hh & 0x0f) != 0x0f) *hh += 0x01;
+}
 
-  assert (h < M);
-  r = h >> 4;         /* h div 16 */
-  s = h & 15;         /* h mod 16 */
-  v = H[r] & mask[s];
-  if (v != mask[s])
-    H[r] += (uint64_t) 1 << (s << 2); /* add 1 to bit 4s */
+static void
+delete (uint64_t h)
+{
+  uint8_t *hh, v;
+  static int count = 0;
+
+  hh = ((uint8_t *) &(prhwp[h >> LN2BPRHWP].h)) + ((h & (BPRHWP-1)) >> 1);
+  if (h & 1) {
+    v = *hh & 0xf0;
+    if (v) {
+      if (v != 0xf0) *hh -= 0x10;
+    } else
+      if (count++ < 10) fprintf (stderr, "Warning: deleting weight-0 ideal 0 at h=%lu\n", h);
+  } else {
+    v = *hh & 0x0f;
+    if (v) {
+      if (v != 0x0f) *hh -= 0x01;
+    } else
+      if (count++ < 10) fprintf (stderr, "Warning: deleting weight-0 ideal 0 at h=%lu\n", h);
+  }
 }
 
 static double
 clique_weight (uint64_t h)
 {
-  while (H2[h].pointer > 0)
-    h = H2[h].pointer - 1;
-  return -H2[h].weight;
+  tab2_t *pw;
+  
+  for (;;) {
+    pw = prhwp[h >> LN2BPRHWP].wp + (h & (BPRHWP-1));
+    if (pw->pointer <= 0) return -(pw->weight);
+    h = pw->pointer - 1;
+  }
 }
 
 static double
 propagate_weight (uint64_t h)
 {
-  double w;
+  tab2_t *pw;
 
-  if (H2[h].pointer > 0)
-    {
-      w = propagate_weight (H2[h].pointer - 1);
-      H2[h].weight = w;
-    }
-  return H2[h].weight;
+  pw = prhwp[h >> LN2BPRHWP].wp + (h & (BPRHWP-1));
+  if (pw->pointer > 0)
+    pw->weight = propagate_weight (pw->pointer - 1);
+  return pw->weight;
 }
 
 /* adds the weight w to the connected component of H2[h] */
 static uint64_t
 insert2 (uint64_t h, double w)
 {
-  while (H2[h].pointer > 0)
-    h = H2[h].pointer - 1;
-  H2[h].weight -= w;
+  tab2_t *pw;
+
+  for (;;) {
+    pw = prhwp[h >> LN2BPRHWP].wp + (h & (BPRHWP-1));
+    if (pw->pointer <= 0) break;
+    h = pw->pointer - 1;
+  }
+  pw->weight -= w;
   return h;
 }
 
@@ -301,13 +437,21 @@ insert2 (uint64_t h, double w)
 static void
 insert2a (uint64_t h, uint64_t h0)
 {
-  while (H2[h].pointer > 0)
-    h = H2[h].pointer - 1;
+  double *w0;
+  tab2_t *pw;
+
+  for (;;) {
+    pw = prhwp[h >> LN2BPRHWP].wp + (h & (BPRHWP-1));
+    if (pw->pointer <= 0) break;
+    h = pw->pointer - 1;
+  }
   if (h == h0) /* already connected */
     return;
-  assert (H2[h0].pointer <= 0);
-  H2[h0].weight += H2[h].weight;
-  H2[h].pointer = h0 + 1;
+  w0 = &(prhwp[h0 >> LN2BPRHWP].wp[h0 & (BPRHWP-1)].weight);
+  if (*w0 > 0 || pw->weight > 0)
+    return; /* avoid an assert which might fail */
+  *w0 += pw->weight;
+  pw->pointer = h0 + 1;
 }
 
 #define SAMPLE 1000       /* number of intervals for component weight */
@@ -320,28 +464,28 @@ stat2 ()
   double wmax = 0.0, wsum = 0.0, w;
   uint64_t count[SAMPLE+1], n;
 
-  for (h = 0; h <= SAMPLE; h++)
-    count[h] = 0;
+  memset(count, 0, sizeof(*count) * (SAMPLE + 1));
   for (h = 0; h < M; h++)
-    if (H2[h].weight < 0)
+    if ((w = prhwp[h >> LN2BPRHWP].wp[h & (BPRHWP-1)].weight) < 0)
       {
-        nc ++;
-        w = -H2[h].weight;
+	w = -w;
+        nc++;
         wsum += w;
         if (w > wmax)
           wmax = w;
         n = (uint64_t) (RESOLUTION * w);
         if (n >= SAMPLE)
           n = SAMPLE - 1;
-        count[n] ++;
+        count[n]++;
       }
-  fprintf (stderr, "Number of connected components: %lu\n", nc);
-  fprintf (stderr, "Weight: %.2f (avg), %.2f (max)\n", wsum / (double) nc, wmax);
+  fprintf (stderr,
+	   "Number of connected components: %lu\n"
+	   "Weight: %.2f (avg), %.2f (max)\n", nc, wsum / (double) nc, wmax);
   n = SAMPLE;
   while (n > 0)
     {
       count[n-1] += count[n];
-      if (count[n-1] > 0)
+      if (count[n] > 0)
         fprintf (stderr, "Weight >= %.2f: %lu components\n",
                  (double) (n - 1) / RESOLUTION, count[n-1]);
       if (count[n-1] > target)
@@ -351,458 +495,318 @@ stat2 ()
   threshold_weight = (double) n / RESOLUTION;
   fprintf (stderr, "Will remove %lu components of weight >= %.2f\n",
            count[n], threshold_weight);
-
-  /* propagate weights to speed up clique_weight */
-  for (h = 0; h < M; h++)
-    propagate_weight (h);
 }
 
-static void
-delete (uint64_t h)
-{
-  uint64_t r, s, v;
-  const uint64_t mask[16] = {0xf, 0xf0, 0xf00, 0xf000, 0xf0000, 0xf00000,
-                             0xf000000, 0xf0000000, 0xf00000000, 0xf000000000,
-                             0xf0000000000, 0xf00000000000, 0xf000000000000,
-                             0xf0000000000000, 0xf00000000000000,
-                             0xf000000000000000};
-
-  assert (h < M);
-  r = h >> 4;         /* h div 16 */
-  s = h & 15;         /* h mod 16 */
-  v = H[r] & mask[s];
-  if (v == 0)
-    fprintf (stderr, "Warning: deleting ideal with weight 0 at h=%lu\n", h);
-  else if (v != mask[s])
-    H[r] -= (uint64_t) 1 << (s << 2); /* remove 1 to bit 4s */
-}
-
-/* return a*b mod p, assuming 0 <= a, b, p < 2^40 */
-uint64_t
+/* return a*b mod p, assuming p < 2^40 */
+static inline uint64_t
 mulmod (uint64_t a, uint64_t b, uint64_t p)
 {
-  uint64_t a1, a0, b1, b0, r;
+  uint64_t r;
 
-  a1 = a >> 20;
-  a0 = a & 1048575;
-  b1 = b >> 20;
-  b0 = b & 1048575;
-  r = (a1 * b1) % p; /* r < 2^40 */
-  r = ((r << 20) + a1 * b0 + a0 * b1) % p;
-  r = ((r << 20) + a0 * b0) % p;
-  return r;
+  a %= p; /* now 0 <= a < 2^40 */
+  b %= p; /* now 0 <= b < 2^40 */
+
+  /* let b = b1 * 2^20 + b0: we compute (b1*a)*2^20 + b0*a */
+  r = ((b >> 20) * a) % p; /* b1*a < 2^60 and r < 2^40 */
+  return ((r << 20) + (b & 0xfffff) * a) % p; /* r*2^20 < 2^60, b0*a < 2^60 */
 }
 
 /* return a/b mod p */
-static unsigned long
+static inline unsigned long
 root (long a0, long b0, long p)
 {
   long u, w, q, r, t, a, b;
 
-  a = a0 % p;
   b = b0 % p;
   assert (b != 0);
-  if (a < 0)
-    a += p;
-
+  a = b;
   u = 1;
   w = 0;
-  a = b;
   b = p;
   /* invariant: a = u*b0 mod p, b = w*b0 mod p */
-  while (b != 0)
-    {
+  while (b) {
       q = a / b;
-      r = a % b;
+      r = a - q * b; /* r = a % b; */
       a = b;
       b = r;
       t = u;
       u = w;
       w = (t - q * w) % p;
-    }
-  assert (a == 1);
+  }
   /* compute a0*u % p */
-  if (u < 0)
-    u += p;
-  assert (u > 0);
-  if (a0 >= 0)
-    u = mulmod (a0, u, p);
-  else
-    u = p - mulmod (-a0, u, p);
-  assert (u > 0);
-  r = ((long) mulmod (u, b0, p) - a0) % p;
-  assert (r == 0);
-  return u;
+  if (u < 0) u += p;
+  return (a0 >= 0) ? mulmod (a0, u, p) : p - mulmod (-a0, u, p);
 }
 
 /* first pass, return the number of lines read */
-static unsigned long
-foo (char *g)
+void*
+pass1_one_thread (void* args)
 {
+  char s[MAXLINE], *t;
+  tab_t *tab = (tab_t*) args;
   FILE *f;
-  char *ret, s[1024], *t, *endptr;
-  unsigned long line = 0, b, r;
+  uint64_t p, p2;
+  unsigned long line, b, r;
   long a;
-  uint64_t p, pfree;
-
-  f = gzip_open (g, "r");
-
-  while (1)
-    {
-      ret = fgets (s, 1024, f);
-      if (ret == 0)
-        break;
-      line ++;
-      t = s;
-      a = 0;
-      a = strtol (t, &endptr, 10);
-      assert (a != 0);
-      assert (endptr > t);
-      t = endptr;
-      assert (*t == ',');
-      t ++;
-      b = strtoul (t, &endptr, 10);
-      assert (endptr > t);
-      t = endptr;
-      assert (*t == ':');
-      t ++;
-      pfree = 0;
-      while (1)
-        {
-          p = 0;
-          while (('0' <= *t && *t <= '9') || ('a' <= *t && *t <= 'f'))
-            {
-              p = 16 * p;
-              if ('0' <= *t && *t <= '9')
-                p += *t - '0';
-              else
-                p += *t - 'a' + 10;
-              t++;
-            }
-          if (b == 0)
-            pfree = p;
-          if (p >= minpr)
-            insert (index_rat (p));
-          if (*t++ != ',')
-            break; /* end of rational primes */
-        }
-      while (1)
-        {
-          p = 0;
-          while (('0' <= *t && *t <= '9') || ('a' <= *t && *t <= 'f'))
-            {
-              p = 16 * p;
-              if ('0' <= *t && *t <= '9')
-                p += *t - '0';
-              else
-                p += *t - 'a' + 10;
-              t++;
-            }
-          if (pfree >= minpa)
-            insert (index_alg (pfree, p));
-          else if (p >= minpa)
-            {
-              r = root (a, b, p);
-              insert (index_alg (p, r));
-            }
-          if (*t++ != ',')
-            break; /* end of algebraic primes */
-        }
+  uint8_t m;
+  
+  f = (tab[0]->fin) ? tab[0]->fin : gzip_open(tab[0]->g, "r");
+  assert (f);
+  line = 0;
+  while (fgets (s, MAXLINE, f)) {
+    line++;
+    t = s;
+    if (*t != '-')
+      a = 1;
+    else {
+      a = -1;
+      t++;
     }
-
-  gzip_close (f, g);
-  return line;
+    for (p = 0; (m = ugly[*((uint8_t *) t)]) != 255; t++, p = p * 10 + m);
+    a *= p;
+    assert (a != 0);
+    assert (*t == ',');
+    t++;
+    for (b = 0; (m = ugly[*((uint8_t *) t)]) != 255; t++, b = b * 10 + m);
+    assert (*t == ':');
+    do {
+      t++;
+      for (p = 0; (m = ugly[*((uint8_t *) t)]) != 255; t++, p = (p << 4) + m);
+      if (p >= minpr) {
+	insert (INDEX_RAT (p));
+      }
+    } while (*t == ',');
+    if (b) {
+      do {
+	t++;
+	for (p = 0; (m = ugly[*((uint8_t *) t)]) != 255; t++, p = (p << 4) + m);
+	if (p >= minpa) {
+	  r = root (a, b, p);
+	  insert (INDEX_ALG (p, r));
+	}
+      } while (*t == ',');
+    } 
+    else
+      if (p >= minpa)
+	do {
+	  t++;
+	  for (p2 = 0; (m = ugly[*((uint8_t *) t)]) != 255; t++, p2 = (p2 << 4) + m);
+	  insert (INDEX_ALG (p, p2));
+	} while (*t == ',');
+  }
+  tab[0]->nlines = line;
+  tab[0]->busy = 1;
+  sem_post(&sem_pt);
+  gzip_close (f, tab[0]->g);
+  return NULL;
 }
 
 /* pass 2: insert in H2 ideals with weight 2 */
-static void
-bar2 (char *g)
+void*
+pass2_one_thread (void *args)
 {
+  uint64_t rp[MAX_STOCK_RAT_PER_LINE], ap[MAX_STOCK_ALG_PER_LINE], ar[MAX_STOCK_ALG_PER_LINE];
+  char s[MAXLINE], *t;
+  tab_t *tab = (tab_t*) args;
   FILE *f;
-  char *ret, s[1024], *t, *endptr;
-  unsigned long line = 0, b, r, output = 0;
-  long a;
-  uint64_t p, pfree, w, h;
-  int nr, na, keep;
-  uint64_t rp[16], ap[16], ar[16];
+  uint64_t p, p2, i, h;
   double W;
+  unsigned long line, output, b, r;
+  long a;
+  unsigned int nr, na;
+  uint8_t m, w;
 
-  f = gzip_open (g, "r");
-
-  while (1)
-    {
-      ret = fgets (s, 1024, f);
-      if (ret == 0)
-        break;
-      line ++;
-      t = s;
-      a = 0;
-      a = strtol (t, &endptr, 10);
-      // assert (a != 0);       /* already checked in pass 1 */
-      // assert (endptr > t);   /* already checked in pass 1 */
-      t = endptr;
-      // assert (*t == ',');    /* already checked in pass 1 */
-      t ++;
-      b = strtoul (t, &endptr, 10);
-      // assert (endptr > t);   /* already checked in pass 1 */
-      t = endptr;
-      // assert (*t == ':');    /* already checked in pass 1 */
-      t ++;
-      pfree = 0;
-      nr = na = 0;
-      W = 0.0;
-      keep = 1;
-      while (keep)
-        {
-          p = 0;
-          while (('0' <= *t && *t <= '9') || ('a' <= *t && *t <= 'f'))
-            {
-              p = 16 * p;
-              if ('0' <= *t && *t <= '9')
-                p += *t - '0';
-              else
-                p += *t - 'a' + 10;
-              t++;
-            }
-          if (b == 0)
-            pfree = p;
-          if (p >= minpr)
-            {
-              w = weight (index_rat (p));
-              if (w <= 1)
-                keep = 0;
-              else if (w == 2)
-                rp[nr++] = p;
-              else if (w <= 15)
-                W += 1.0 / (double) w;
-            }
-          if (*t++ != ',')
-            break; /* end of rational primes */
-        }
-      while (keep)
-        {
-          p = 0;
-          while (('0' <= *t && *t <= '9') || ('a' <= *t && *t <= 'f'))
-            {
-              p = 16 * p;
-              if ('0' <= *t && *t <= '9')
-                p += *t - '0';
-              else
-                p += *t - 'a' + 10;
-              t++;
-            }
-          if (pfree >= minpa)
-            {
-              r = p;
-              p = pfree;
-            }
-          else if (p >= minpa) /* non-free case */
-            r = root (a, b, p);
-          if (p >= minpa)
-            {
-              w = weight (index_alg (p, r));
-              if (w <= 1)
-                keep = 0;
-              else if (w == 2)
-                {
-                  ap[na] = p;
-                  ar[na++] = r;
-                }
-              else if (w <= 15)
-                W += 1.0 / (double) w;
-            }
-          if (*t++ != ',')
-            break; /* end of algebraic primes */
-        }
-      if (keep && (nr + na > 0)) /* at least one ideal of weight 2 */
-        {
-          /* Warning: it can be that an ideal appears twice (or more).
-             To avoid reducing exponents mod 2, which would be expensive,
-             we insert this ideal twice, but then we should avoid for infinite
-             loops. */
-          if (nr-- > 0)
-            h = insert2 (index_rat (rp[nr]), W);
-          else /* na > 0 */
-            {
-              na --;
-              h = insert2 (index_alg (ap[na], ar[na]), W);
-            }
-          while (nr-- > 0)
-            insert2a (index_rat (rp[nr]), h);
-          while (na-- > 0)
-            insert2a (index_alg (ap[na], ar[na]), h);
-        }
-      output += keep;
+  f = (tab[0]->fin) ? tab[0]->fin : gzip_open(tab[0]->g, "r");
+  line = output = 0;
+ next_line:
+  while (fgets (s, MAXLINE, f)) {
+    line++;
+    t = s;
+    if (*t != '-')
+      a = 1;
+    else {
+      a = -1;
+      t++;
     }
-
-  gzip_close (f, g);
-
+    for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p = p * 10 + m);
+    a *= p;
+    t++;
+    for (b = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, b = b * 10 + m);
+    nr = na = 0;
+    W = 0.0;
+    do {
+      t++;
+      for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p = (p << 4) + m);
+      if (p >= minpr) {
+	i = INDEX_RAT(p);
+	w = WEIGHT (i);
+	if (w < 2) goto next_line;
+	if (w == 2)
+	  rp[nr++] = p;
+	else
+	  W += 1.0 / (double) w;
+      }
+    } while (*t == ',');
+    if (b)
+      do {
+	t++;
+	for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p = (p << 4) + m);
+	if (p >= minpa) {
+	  r = root (a, b, p);
+	  i = INDEX_ALG (p, r);
+	  w = WEIGHT (i);
+	  if (w < 2) goto next_line;
+	  if (w == 2) {
+	    ap[na] = p;
+	    ar[na++] = r;
+	  } else
+	    W += 1.0 / (double) w;
+	}
+      } while (*t == ',');
+    else
+      if (p >= minpa)
+	do {
+	  t++;
+	  for (p2 = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p2 = (p2 << 4) + m);
+	  i = INDEX_ALG (p, p2);
+	  w = WEIGHT (i);
+	  if (w < 2) goto next_line;
+	  if (w == 2) {
+	    ap[na] = p;
+	    ar[na++] = p2;
+	  } else
+	    W += 1.0 / (double) w;
+	} while (*t == ',');
+    output++;
+    /* Warning: it can be that an ideal appears twice (or more).
+       To avoid reducing exponents mod 2, which would be expensive,
+       we insert this ideal twice, but then we should avoid for infinite
+       loops. */
+    if (nr-- > 0) {
+      h = insert2 (INDEX_RAT (rp[nr]), W);
+      while (nr-- > 0) insert2a (INDEX_RAT (rp[nr]), h);
+      while (na-- > 0) insert2a (INDEX_ALG (ap[na], ar[na]), h);
+    }
+    else if (na-- > 0) {
+      h = insert2 (INDEX_ALG (ap[na], ar[na]), W);
+      while (na-- > 0) insert2a (INDEX_ALG (ap[na], ar[na]), h);
+    }
+  }
+  gzip_close (f, tab[0]->g);
+#ifdef HAVE_SYNC_FETCH
+  __sync_fetch_and_add(&remains, output);
+  __sync_fetch_and_add(&nrels, line);
+#else
   pthread_mutex_lock (&lock);
   remains += output;
   nrels += line;
   pthread_mutex_unlock (&lock);
+#endif
+  tab[0]->busy = 1;
+  sem_post(&sem_pt);
+  return NULL;
 }
 
 /* pass 3: writes remaining relations */
-static void
-bar (char *g)
+void*
+pass3_one_thread (void* args)
 {
+  uint64_t rp[MAX_STOCK_RAT_PER_LINE], ap[MAX_STOCK_ALG_PER_LINE], ar[MAX_STOCK_ALG_PER_LINE];
+  char s[MAXLINE], newg[MAXNAME<<1], *t;
+  tab_t *tab = (tab_t*) args;
   FILE *f, *newf;
-  char *ret, s[1024], *t, *endptr, newg[1024];
+  uint64_t p, p2, w, h;
   unsigned long line = 0, b, r, output = 0;
   long a;
-  uint64_t p, pfree, w, h;
-  int keep, nr, na;
-  uint64_t rp[16], ap[16], ar[16];
+  unsigned int nr, na;
+  uint8_t m;
 
-  f = gzip_open (g, "r");
-  strcpy (newg, "new/");
-  strcpy (newg + 4, g);
-  newf = gzip_open (newg, "w");
-  assert (newf != NULL);
-
-  while (1)
-    {
-      ret = fgets (s, 1024, f);
-      if (ret == 0)
-        break;
-      line ++;
-      t = s;
-      a = 0;
-      a = strtol (t, &endptr, 10);
-      // assert (a != 0);          /* already checked in pass 1 */
-      // assert (endptr > t);      /* already checked in pass 1 */
-      t = endptr;
-      // assert (*t == ',');       /* already checked in pass 1 */
-      t ++;
-      b = strtoul (t, &endptr, 10);
-      // assert (endptr > t);      /* already checked in pass 1 */
-      t = endptr;
-      // assert (*t == ':');       /* already checked in pass 1 */
-      t ++;
-      pfree = 0;
-      keep = 1;
-      nr = na = 0;
-      while (1)
-        {
-          p = 0;
-          while (('0' <= *t && *t <= '9') || ('a' <= *t && *t <= 'f'))
-            {
-              p = 16 * p;
-              if ('0' <= *t && *t <= '9')
-                p += *t - '0';
-              else
-                p += *t - 'a' + 10;
-              t++;
-            }
-          if (b == 0)
-            pfree = p;
-          if (p >= minpr)
-            {
-              rp[nr++] = p;
-              h = index_rat (p);
-              w = weight (h);
-              if (w <= 1)
-                keep = 0;
-              else if ((w == 2) && (clique_weight (h) >= threshold_weight))
-                keep = 0;
-            }
-          if (*t++ != ',')
-            break; /* end of rational primes */
-        }
-      while (1)
-        {
-          p = 0;
-          while (('0' <= *t && *t <= '9') || ('a' <= *t && *t <= 'f'))
-            {
-              p = 16 * p;
-              if ('0' <= *t && *t <= '9')
-                p += *t - '0';
-              else
-                p += *t - 'a' + 10;
-              t++;
-            }
-          if (pfree >= minpa)
-            {
-              r = p;
-              p = pfree;
-            }
-          else if (p >= minpa) /* non-free case */
-            r = root (a, b, p);
-          if (p >= minpa)
-            {
-              ap[na] = p;
-              ar[na++] = r;
-              h = index_alg (p, r);
-              w = weight (h);
-              if (w <= 1)
-                keep = 0;
-              else if ((w == 2) && (clique_weight (h) >= threshold_weight))
-                keep = 0;
-            }
-          if (*t++ != ',')
-            break; /* end of algebraic primes */
-        }
-      if (keep)
-        {
-          fprintf (newf, "%s", s);
-          output ++;
-        }
-      else /* update 2-bit counters of removed ideals */
-        {
-          while (nr-- > 0)
-            delete (index_rat (rp[nr]));
-          while (na-- > 0)
-            delete (index_alg (ap[na], ar[na]));
-        }
+  if ((f = tab[0]->fin))
+     newf = tab[0]->fout;
+  else {
+    f = gzip_open(tab[0]->g, "r");
+    strcpy (newg, NEW_DIR);
+    strcat (newg, tab[0]->g);
+    newf = gzip_open (newg, "w");
+  }
+  assert (newf);
+  line = output = 0;
+  if (0) {
+  next_line: /* update 2-bit counters of removed ideals of the suppress line */
+    while (nr-- > 0)
+      delete (INDEX_RAT (rp[nr]));
+    while (na-- > 0)
+      delete (INDEX_ALG (ap[na], ar[na]));
+  }
+  while (fgets (s, MAXLINE, f)) {
+    line++;
+    t = s;
+    if (*t != '-')
+      a = 1;
+    else {
+      a = -1;
+      t++;
     }
-
-  gzip_close (f, g);
-  gzip_close (newf, newg);
-
+    for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p = p * 10 + m);
+    a *= p;
+    t++;
+    for (b = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, b = b * 10 + m);
+    nr = na = 0;
+    do {
+      t++;
+      for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p = (p << 4) + m);
+      if (p >= minpr) {
+	rp[nr++] = p;
+	h = INDEX_RAT (p);
+	w = WEIGHT (h);
+	if (w < 2 || ((w == 2) && (clique_weight (h) >= threshold_weight)))
+	  goto next_line;
+      }
+    } while (*t == ',');
+    if (b)
+      do {
+	t++;
+	for (p = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p = (p << 4) + m);
+	if (p >= minpa) {
+	  r = root (a, b, p);
+	  ap[na] = p;
+	  ar[na++] = r;
+	  h = INDEX_ALG (p, r);
+	  w = WEIGHT (h);
+	  if (w < 2 || ((w == 2) && (clique_weight (h) >= threshold_weight)))
+	    goto next_line;
+	}
+      } while (*t == ',');
+    else
+      if (p >= minpa)
+	do {
+	  t++;
+	  for (p2 = 0; ((m = ugly[*((uint8_t *) t)]) != 255); t++, p2 = (p2 << 4) + m);
+	  ap[na] = p;
+	  ar[na++] = p2;
+	  h = INDEX_ALG (p, p2);
+	  w = WEIGHT (h);
+	  if (w < 2 || ((w == 2) && (clique_weight (h) >= threshold_weight)))
+	    goto next_line;
+	} while (*t == ',');
+    fputs (s, newf);
+    output++;
+  }
+  gzip_close (f, tab[0]->g);
+  gzip_close (newf, tab[0]->g);
   fprintf (stderr, "   new/%s done: remains %lu rels out of %lu\n",
-           g, output, line);
-  fflush (stderr);
+           tab[0]->g, output, line);
+#ifdef HAVE_SYNC_FETCH
+  __sync_fetch_and_add(&remains, output);
+  __sync_fetch_and_add(&nrels, line);
+#else
   pthread_mutex_lock (&lock);
   remains += output;
   nrels += line;
   pthread_mutex_unlock (&lock);
-}
-
-void*
-one_thread (void* args)
-{
-  tab_t *tab = (tab_t*) args;
-
-  fprintf (stderr, "1: Thread %d deals with %s\n", tab[0]->thread, tab[0]->g);
-  fflush (stderr);
-  tab[0]->nlines = foo (tab[0]->g);
-  fprintf (stderr, "   %s done (%lu relations)\n", tab[0]->g, tab[0]->nlines);
-  fflush (stderr);
-  return NULL;
-}
-
-/* for pass2 */
-void*
-pass2_one_thread (void* args)
-{
-  tab_t *tab = (tab_t*) args;
-
-  fprintf (stderr, "2: Thread %d deals with %s\n", tab[0]->thread, tab[0]->g);
-  fflush (stderr);
-  bar2 (tab[0]->g);
-  return NULL;
-}
-
-/* for pass3 */
-void*
-pass3_one_thread (void* args)
-{
-  tab_t *tab = (tab_t*) args;
-
-  fprintf (stderr, "3: Thread %d deals with %s\n", tab[0]->thread, tab[0]->g);
-  fflush (stderr);
-  bar (tab[0]->g);
+#endif
+  tab[0]->busy = 1;
+  sem_post(&sem_pt);
   return NULL;
 }
 
@@ -810,25 +814,25 @@ void*
 one_thread3 (void* args)
 {
   tab_t *tab = (tab_t*) args;
-  uint64_t h, r, wt[16];
+  uint64_t *hd, *he, h, wt[16];
 
-  for (r = 1; r < 16; r++)
-    wt[r] = 0;
-  for (r = tab[0]->thread; r < Hsize; r += tab[0]->nthreads)
+  memset (wt, 0, sizeof(*wt) * 16);
+  hd = &(prhwp[(tab[0]->thread * Hsize) / tab[0]->nthreads].h);
+  he = &(prhwp[((tab[0]->thread + 1) * Hsize) / tab[0]->nthreads].h);
+  while (hd < he)
     {  /* deal with 64 bits, i.e., 16 entries at a time */
-      h = H[r];
-      while (h != 0)
+      h = *hd;
+      hd = (uint64_t *) ((void *) hd + sizeof(*prhwp));
+      __builtin_prefetch(hd);
+      while (h)
         {
           wt[h & 0xf] ++;
           h >>= 4;
         }
     }
-
-  for (tab[0]->nideal = 0, r = 1; r < 16; r++)
-    tab[0]->nideal += wt[r];
-  tab[0]->nsingl = wt[1];
+  tab[0]->nideal = tab[0]->nsingl = wt[1];
   tab[0]->ndupli = wt[2];
-
+  for (hd = &(wt[2]); hd < &(wt[16]); tab[0]->nideal += *hd++);
   return NULL;
 }
 
@@ -840,11 +844,7 @@ one_thread3 (void* args)
 static double
 estimate_ideals (double n, double ek)
 {
-#ifdef EXACT_HASH
   return ek;
-#else
-  return -n * log (1.0 - ek / n);
-#endif
 }
 
 /* estimate the number of prime ideals below a */
@@ -852,6 +852,45 @@ static double
 est_excess (double a)
 {
   return a / log (a);
+}
+
+/* mono-thread version */
+static void*
+stat () {
+  uint64_t *hd, *he, h, wt[16];
+  long st = cputime (), rt = realtime ();
+  unsigned long nideal, nsingl, ndupli;
+  double est_ideals;
+  int dum;
+
+  pthread_setcancelstate(PTHREAD_CANCEL_ENABLE,&dum);
+  pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS,&dum);
+  /* pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED,&dum); */
+  memset (wt, 0, sizeof(*wt) * 16);
+  for (hd = &(prhwp[0].h), he = &(prhwp[Hsize].h); hd < he; )
+    {  /* deal with 64 bits, i.e., 16 entries at a time */
+      h = *hd;
+      hd = (uint64_t *) ((void *) hd + sizeof(*prhwp));
+      __builtin_prefetch(hd);
+      while (h)
+        {
+          wt[h & 0xf] ++;
+          h >>= 4;
+        }
+    }
+  nideal = nsingl = wt[1];
+  ndupli = wt[2];
+  for (hd = &(wt[2]); hd < &(wt[16]); nideal += *hd++);
+  fprintf (stderr, "   Stat() took %lds (cpu), %lds (real)\n",
+           (unsigned long) (cputime () - st), (unsigned long) (realtime () - rt));
+  est_ideals = estimate_ideals ((double) M, (double) nideal);
+  fprintf (stderr, "   Read at least %lu rels (%lu/s), %lu ideals (%.2f%%), %lu singletons, %lu of weight 2\n",
+           nrels, (unsigned long) (nrels / (rt - wct0)),
+           nideal, (100.0 * nideal) / M, nsingl, ndupli);
+  fprintf (stderr, "   Estimated excess %1.0f, need %1.0f\n",
+           (double) nrels - est_ideals,
+           est_excess ((double) minpr) + est_excess ((double) minpa));
+  return NULL;
 }
 
 /* multi-thread version */
@@ -880,83 +919,117 @@ stat_mt (int nthreads)
       ndupli += T[i]->ndupli;
     }
   free (T);
-  fprintf (stderr, "stat_mt() took %lds (cpu), %lds (real)\n",
-           cputime () - st, realtime () - rt);
+  fprintf (stderr, "   Stat_mt() took %lds (cpu), %lds (real)\n",
+           (unsigned long) (cputime () - st), (unsigned long) (realtime () - rt));
   est_ideals = estimate_ideals ((double) M, (double) nideal);
-#ifndef EXACT_HASH
-  fprintf (stderr, "Read %lu rels (%lu/s), %lu entries (%.2f%%), est. %1.0f ideals, %lu singletons, %lu of weight 2\n",
-           nrels, nrels / (rt - wct0 + (rt == wct0)),
-           nideal, 100.0 * (double) nideal / (double) M,
-           est_ideals, nsingl, ndupli);
-#else
-  fprintf (stderr, "Read %lu rels (%lu/s), %lu ideals (%.2f%%), %lu singletons, %lu of weight 2\n",
-           nrels, nrels / (rt - wct0 + (rt == wct0)),
-           nideal, 100.0 * (double) nideal / (double) M,
-           nsingl, ndupli);
-#endif
-  fprintf (stderr, "Estimated excess %1.0f, need %1.0f\n",
+  fprintf (stderr, "   Read %lu rels (%lu/s), %lu ideals (%.2f%%), %lu singletons, %lu of weight 2\n",
+           nrels, (unsigned long) (nrels / (rt - wct0)),
+           nideal, (100.0 * nideal) / M, nsingl, ndupli);
+  fprintf (stderr, "   Estimated excess %1.0f, need %1.0f\n",
            (double) nrels - est_ideals,
            est_excess ((double) minpr) + est_excess ((double) minpa));
-  fflush (stderr);
 }
 
 /* read all files and fills the hash table */
 static void
-doit (int nthreads, char *filelist)
+pass1 (int nthreads, char *filelist)
 {
   FILE *f;
-  char g[MAXNAME], *ret;
-  int i = 0, j;
+  char g[ARG_MAX], *pg;
+  int i, j = 0, nbt = 0, notload, nbf, notfirst = 0, avoidwarning = 0;
   tab_t *T;
-  pthread_t tid[MAX_THREADS];
-  long st, rt;
+  pthread_t tid[MAX_THREADS+1], sid;
+  double st = cputime(), rt = realtime(), crt, art,
+    delay_stat = compute_delay_stat();
+  size_t lpg;
 
+  fprintf (stderr, "\n"
+	   "************\n"
+	   "* PASS 1/3 *\n"
+	   "************\n\n");
   f = fopen (filelist, "r");
-  if (f == NULL)
-    {
-      fprintf (stderr, "Error, cannot open %s\n", filelist);
-      exit (1);
+  if (f == NULL) {
+    fprintf (stderr, "Error, cannot open %s\n", filelist);
+    exit (1);
+  }
+  T = malloc ((nthreads + 1) * sizeof (tab_t));
+  memset(T, 0, (nthreads + 1) * sizeof (tab_t));
+  sem_init(&sem_pt, 0, nthreads);
+  crt = art = rt;
+  while ((notload = (!feof (f))) || nbt) {
+    if (notload) {
+      pg = g;
+      nbf = 0;
+      do {
+	if (fgets (pg, MAXNAME, f) && (lpg = strlen(pg))) {
+	  nbf++;
+	  pg += lpg;
+	  pg[-1] = ' ';
+	}
+	else break;
+      } while (nbf < MAX_FILES_PER_THREAD && pg < g + ARG_MAX - MAXNAME);
+      if (nbf) {
+	pg[-1] = 0;
+	for (i = 0; T[i]->busy && i <= nthreads; i++);
+	assert(i <= nthreads);
+	strcpy (T[i]->g, g);
+	T[i]->busy = 2;
+	T[i]->thread = i;
+	if (nbt++ < nthreads) {
+	  T[i]->fin = NULL;
+	  pthread_create (&tid[i], NULL, pass1_one_thread, (void *) (T + i));
+	} else {
+	  avoidwarning = i;
+	  T[i]->fin = gzip_open(g, "r");
+	}
+      }
     }
-  T = malloc (nthreads * sizeof (tab_t));
-  while (!feof (f))
-    {
-      ret = fgets (g, MAXNAME, f);
-      if (ret == NULL)
-        break;
-      g[strlen(g) - 1] = '\0';
-      strcpy (T[i]->g, g);
-      T[i]->thread = i;
-      i ++;
-      if (i == nthreads)
-        {
-          st = cputime ();
-          rt = realtime ();
-          for (i = 0; i < nthreads; i++)
-            pthread_create (&tid[i], NULL, one_thread, (void *) (T + i));
-          for (i = 0; i < nthreads; i++)
-            {
-              pthread_join (tid[i], NULL);
-              nrels += T[i]->nlines;
-            }
-          fprintf (stderr, "Batch took %lds (cpu), %lds (real)\n",
-                   cputime () - st, realtime () - rt);
-          i = 0;
-          stat_mt (nthreads);
-        }
+    sem_wait(&sem_pt);
+    if (nbt > nthreads)
+      pthread_create (&tid[avoidwarning], NULL, pass1_one_thread, (void *) (T + avoidwarning));
+    for (i = 0; i <= nthreads; i++)
+      if (T[i]->busy == 1) {
+	pthread_join (tid[i], NULL);
+	nrels += T[i]->nlines;
+	T[i]->busy = 0;
+	nbt--;
+	j = i;
+	break;
+      }
+    art = realtime();
+    if (j == nthreads) {
+      fprintf (stderr, "Pass1; rels: load %lu; krels/s: %lu; time: %lus cpu, %lus real\n",
+	       nrels,
+	       (unsigned long) (nrels / ((art - rt) * 1000)),
+	       (unsigned long) (cputime() - st),
+	       (unsigned long) (art - rt));
+      j = 0;
     }
-  if (i > 0)
-    {
-      for (j = 0; j < i; j++)
-        pthread_create (&tid[j], NULL, one_thread, (void *) (T + j));
-      for (j = 0; j < i; j++)
-        {
-          pthread_join (tid[j], NULL);
-          nrels += T[j]->nlines;
-        }
-      stat_mt (nthreads);
+    if (art - crt > delay_stat) {
+      if (notfirst) {
+	pthread_cancel(sid);
+	pthread_join (sid, NULL);
+      } else
+	notfirst = 1;
+      pthread_create (&sid, NULL, stat, NULL);
+      crt = art;
     }
+  }
+  if (notfirst) {
+    pthread_cancel(sid);
+    pthread_join (sid, NULL);
+  }
+  fprintf (stderr, "\n*** Pass 1, final stats: *** \n");
+  stat_mt (nthreads);
+  fprintf (stderr, "Pass 1 took %lds (cpu), %lds (real)\n",
+           (unsigned long) (cputime () - st), (unsigned long) (realtime () - rt));
+  sem_destroy(&sem_pt);
   fclose (f);
   free (T);
+  fprintf (stderr, "\n"
+	   "*****************\n"
+	   "* PASS 1/3 DONE *\n"
+	   "*****************\n\n");
 }
 
 /* second pass: stores ideals of weight 2 */
@@ -964,104 +1037,181 @@ static void
 pass2 (int nthreads, char *filelist)
 {
   FILE *f;
-  char g[MAXNAME], *ret;
-  int i = 0, j;
+  char g[ARG_MAX], *pg;
   tab_t *T;
-  pthread_t tid[MAX_THREADS];
-  long st, rt;
+  pthread_t tid[MAX_THREADS+1];
+  double st = cputime(), rt = realtime(), art;
+  size_t lpg;
+  uint64_t h;
+  int i, j = 0, notload, nbt = 0, nbf, avoidwarning = 0;
 
+  fprintf (stderr, "\n"
+	   "************\n"
+	   "* PASS 2/3 *\n"
+	   "************\n\n");
   f = fopen (filelist, "r");
-  T = malloc (nthreads * sizeof (tab_t));
-  while (!feof (f))
-    {
-      ret = fgets (g, MAXNAME, f);
-      if (ret == NULL)
-        break;
-      g[strlen(g) - 1] = '\0';
-      strcpy (T[i]->g, g);
-      T[i]->thread = i;
-      i ++;
-      if (i == nthreads)
-        {
-          st = cputime ();
-          rt = realtime ();
-          for (i = 0; i < nthreads; i++)
-            pthread_create (&tid[i], NULL, pass2_one_thread, (void *) (T + i));
-          for (i = 0; i < nthreads; i++)
-            pthread_join (tid[i], NULL);
-          fprintf (stderr, "Batch took %lds (cpu), %lds (real)\n",
-                   cputime () - st, realtime () - rt);
-          i = 0;
-          fprintf (stderr, "Total %lu rels remaining out of %lu (%.2f%%)\n",
-                   remains, nrels, 100.0 * (double) remains / (double) nrels);
-          fflush (stderr);
-        }
+  T = malloc ((nthreads + 1) * sizeof (tab_t));
+  memset(T, 0, (nthreads + 1) * sizeof (tab_t));
+  sem_init(&sem_pt, 0, nthreads);
+  art = rt;
+  while ((notload = (!feof (f))) || nbt) {
+    if (notload) {
+      pg = g;
+      nbf = 0;
+      do {
+	if (fgets (pg, MAXNAME, f) && (lpg = strlen(pg))) {
+	  nbf++;
+	  pg += lpg;
+	  pg[-1] = ' ';
+	}
+	else
+	  break;
+      } while (nbf < MAX_FILES_PER_THREAD && pg < g + ARG_MAX - MAXNAME);
+      if (nbf) {
+	pg[-1] = 0;
+	for (i = 0; T[i]->busy && i <= nthreads; i++);
+	assert(i <= nthreads);
+	strcpy (T[i]->g, g);
+	T[i]->busy = 2;
+	T[i]->thread = i;
+	if (nbt++ < nthreads) {
+	  T[i]->fin = NULL;
+	  pthread_create (&tid[i], NULL, pass2_one_thread, (void *) (T + i));
+	} else {
+	  T[i]->fin = gzip_open(g, "r");
+	  avoidwarning = i;
+	}
+      }
     }
-  if (i > 0)
-    {
-      for (j = 0; j < i; j++)
-        pthread_create (&tid[j], NULL, pass2_one_thread, (void *) (T + j));
-      for (j = 0; j < i; j++)
-        pthread_join (tid[j], NULL);
-      fprintf (stderr, "Total %lu rels remaining out of %lu (%.2f%%)\n",
-               remains, nrels, 100.0 * (double) remains / (double) nrels);
-      fflush (stderr);
+    sem_wait(&sem_pt);
+    if (nbt > nthreads)
+      pthread_create (&tid[avoidwarning], NULL, pass2_one_thread, (void *) (T + avoidwarning));
+    for (i = 0; i <= nthreads; i++)
+      if (T[i]->busy == 1) {
+	pthread_join (tid[i], NULL);
+	T[i]->busy = 0;
+	nbt--;
+	j = i;
+	break;
+      }
+    art = realtime();
+    if (j == nthreads) {
+      fprintf (stderr, "Pass2; rels: load %lu, used %lu (%.2f%%); "
+	       "krels/s: %lu; time: %lus cpu, %lus real\n",
+	       nrels, remains,
+	       (100.0 * remains) / nrels,
+	       (unsigned long) (nrels / ((art - rt) * 1000)),
+	       (unsigned long) (cputime() - st),
+	       (unsigned long) (art - rt));
+      j = 0;
     }
-  stat2 ();
+  }
+  art = realtime();
+  fprintf (stderr, "\n*** Pass 2, final stats: *** \n"
+	   "Relations: load %lu, used %lu (%.2f%%); "
+	   "krels/s: %lu; time: %lus cpu, %lus real\n",
+	   nrels, remains,
+	   (100.0 * remains) / nrels,
+	   (unsigned long) (nrels / ((art - rt) * 1000)),
+	   (unsigned long) (cputime() - st),
+	   (unsigned long) (art - rt));
+  sem_destroy(&sem_pt);
   fclose (f);
   free (T);
+  stat2 ();
+  /* propagate weights to speed up clique_weight */
+  for (h = 0; h < M; h++)
+    propagate_weight (h);
+  fprintf (stderr, "\n"
+	   "*****************\n"
+	   "* PASS 2/3 DONE *\n"
+	   "*****************\n\n");
 }
 
 /* third pass: outputs remaining relations */
+/* Problem: I cannot agglomerate the files because 1 file load = 1 file written.
+   So I have to take them one by one and write them synchronously, one by one too.
+   It's a pity for disk access...
+*/
 static void
 pass3 (int nthreads, char *filelist)
 {
   FILE *f;
-  char g[MAXNAME], *ret;
-  int i = 0, j;
+  char g[MAXNAME], newg[MAXNAME<<1];
+  int i, j = 0, k = 0, nbt = 0, notload, avoidwarning = 0;
   tab_t *T;
-  pthread_t tid[MAX_THREADS];
-  long st, rt;
+  pthread_t tid[MAX_THREADS+1];
+  double st = cputime(), rt = realtime(), art;
+  size_t lg;
 
+  fprintf (stderr, "\n"
+	   "************\n"
+	   "* PASS 3/3 *\n"
+	   "************\n\n");
   f = fopen (filelist, "r");
-  T = malloc (nthreads * sizeof (tab_t));
-  while (!feof (f))
-    {
-      ret = fgets (g, MAXNAME, f);
-      if (ret == NULL)
-        break;
-      g[strlen(g) - 1] = '\0';
+  T = malloc ((nthreads + 1) * sizeof (tab_t));
+  memset(T, 0, (nthreads + 1) * sizeof (tab_t));
+  sem_init(&sem_pt, 0, nthreads);
+  art = rt;
+  while ((notload = (!feof (f))) || nbt) {
+    if (notload && fgets (g, MAXNAME, f) && (lg = strlen(g))) {
+      g[lg - 1] = 0;
+      for (i = 0; T[i]->busy && i <= nthreads; i++);
+      assert(i <= nthreads);
       strcpy (T[i]->g, g);
+      T[i]->busy = 2;
       T[i]->thread = i;
-      i ++;
-      if (i == nthreads)
-        {
-          st = cputime ();
-          rt = realtime ();
-          for (i = 0; i < nthreads; i++)
-            pthread_create (&tid[i], NULL, pass3_one_thread, (void *) (T + i));
-          for (i = 0; i < nthreads; i++)
-            pthread_join (tid[i], NULL);
-          fprintf (stderr, "Batch took %lds (cpu), %lds (real)\n",
-                   cputime () - st, realtime () - rt);
-          i = 0;
-          fprintf (stderr, "Total %lu rels remaining out of %lu (%.2f%%)\n",
-                   remains, nrels, 100.0 * (double) remains / (double) nrels);
-          fflush (stderr);
-        }
+      if (nbt++ < nthreads) {
+	T[i]->fin = NULL;
+	pthread_create (&tid[i], NULL, pass3_one_thread, (void *) (T + i));
+      }
+      else {
+	T[i]->fin = gzip_open(g, "r");
+	strcpy (newg, NEW_DIR);
+	strcat (newg, T[i]->g);
+	T[i]->fout = gzip_open (newg, "w");
+	avoidwarning = i;
+      }
     }
-  if (i > 0)
-    {
-      for (j = 0; j < i; j++)
-        pthread_create (&tid[j], NULL, pass3_one_thread, (void *) (T + j));
-      for (j = 0; j < i; j++)
-        pthread_join (tid[j], NULL);
-      fprintf (stderr, "Total %lu rels remaining out of %lu (%.2f%%)\n",
-               remains, nrels, 100.0 * (double) remains / (double) nrels);
-      fflush (stderr);
+    sem_wait(&sem_pt);
+    if (nbt > nthreads)
+      pthread_create (&tid[avoidwarning], NULL, pass3_one_thread, (void *) (T + avoidwarning));
+    for (i = 0; i <= nthreads; i++)
+      if (T[i]->busy == 1) {
+	pthread_join (tid[i], NULL);
+	T[i]->busy = 0;
+	nbt--;
+	j = i;
+	break;
+      }
+    art = realtime();
+    if (j == nthreads && ++k == MAX_FILES_PER_THREAD) {
+      fprintf (stderr, "Pass3; rels: load %lu, used %lu (%.2f%%); "
+	       "krels/s: %lu; time: %lus cpu, %lus real\n",
+	       nrels, remains,
+	       (100.0 * remains) / nrels,
+	       (unsigned long) (nrels / ((art - rt) * 1000)),
+	       (unsigned long) (cputime() - st),
+	       (unsigned long) (art - rt));
+      j = k = 0;
     }
+  }
+  art = realtime();
+  fprintf (stderr, "\n*** Pass 3, final stats: *** \n"
+	   "Relations: load %lu, used %lu (%.2f%%); "
+	   "krels/s: %lu; time: %lus cpu, %lus real\n",
+	   nrels, remains,
+	   (100.0 * remains) / nrels,
+	   (unsigned long) (nrels / ((art - rt) * 1000)),
+	   (unsigned long) (cputime() - st),
+	   (unsigned long) (art - rt));
+  sem_destroy(&sem_pt);
   fclose (f);
   free (T);
+  fprintf (stderr, "\n"
+	   "*****************\n"
+	   "* PASS 3/3 DONE *\n"
+	   "*****************\n\n");
 }
 
 int
@@ -1069,10 +1219,9 @@ isprime (uint64_t n)
 {
   uint64_t p;
 
-  if ((n % 2) == 0)
-    return 0;
+  if (!(n & 1)) return 0;
   for (p = 3; p * p <= n; p += 3)
-    if ((n % p) == 0)
+    if (!(n % p))
       return 0;
   return 1;
 }
@@ -1082,13 +1231,13 @@ main (int argc, char *argv[])
 {
   int nthreads = 1, i;
   char *filelist = NULL;
+  size_t size_malloc;
 
   /* print command-line arguments */
   fprintf (stderr, "%s", argv[0]);
   for (i = 1; i < argc; i++)
     fprintf (stderr, " %s", argv[i]);
   fprintf (stderr, "\n");
-  fflush (stderr);
 
   while (argc > 1 && argv[1][0] == '-')
     {
@@ -1173,35 +1322,37 @@ main (int argc, char *argv[])
     }
 
   /* check that M = 2p where p is prime */
-  assert ((M % 2) == 0);
-  assert (isprime (M/2));
+  assert (!(M & 1));
+  assert (isprime (M>>1));
+  /* an *hpr stocks 16 entries. */
+  Hsize = (M + BPRHWP-1) >> LN2BPRHWP; /* each entry uses 4 bits AND h is uint64_t */
+  size_malloc = Hsize * sizeof (*prhwp);
+  fprintf (stderr, "Creating & clearing hashtable + (p,r) array + weight array : %lu mB...", size_malloc >> 20);
+  if (posix_memalign ((void **) &prhwp, 1<<14, size_malloc)) {
+    fprintf (stderr, "Malloc error.\n");
+    exit (1);
+  }
+  memset (prhwp, 0, size_malloc);
+  fprintf (stderr, " Done. \n");
+  fprintf (stderr, "Creating possible " NEW_DIR "* directories...");
+  create_directories(filelist);
+  fprintf (stderr, " Done.\n");
 
-  Hsize = 1 + (M - 1) / 16; /* each entry uses 4 bits */
-  H = (uint64_t*) malloc (Hsize * sizeof (uint64_t));
-  memset (H, 0, Hsize * sizeof (uint64_t));
-#ifdef EXACT_HASH
-  PR = (uint64_t*) malloc (M * sizeof (uint64_t));
-  memset (PR, 0, M * sizeof (uint64_t));
-#endif
+  fprintf (stderr, "Each thread processing %d file(s)\n",
+           MAX_FILES_PER_THREAD);
 
+  maxpr = prhwp[M>>LN2BPRHWP].pr + (M&(BPRHWP-1));
   wct0 = realtime ();
-
   nrels = 0;
-  doit (nthreads, filelist);
+  pass1 (nthreads, filelist);
 
-  H2 = (tab2_t*) malloc (M * sizeof (tab2_t));
-  memset (H2, 0, M * sizeof (tab2_t));
   nrels = remains = 0;
   pass2 (nthreads, filelist);
 
   nrels = remains = 0;
   pass3 (nthreads, filelist);
 
-  free (H);
-  free (H2);
-#ifdef EXACT_HASH
-  free (PR);
-#endif
+  free (prhwp);
 
   return 0;
 }

@@ -74,27 +74,6 @@ int factor_leftover_norm (mpz_t n, unsigned int b, mpz_array_t* const factors,
 			  uint32_array_t* const multis,
 			  facul_strategy_t *strategy);
 
-/* Determine whether a sieve entry with sieve residue S1 on sieving side 1
-   and sieve residue S2 on sieving side 2 is likely smooth. 
-   The array entry C1[S1] is initialized by sieve_info_init_lognorm() 
-   to something similar to 
-   -log(Pr[norm on side 1 with sieve residue S1 is smooth]),
-   similar for C2, S2. Assuming the two probabilities are independent enough,
-   we can estimate the neg log of the probability that both sides are smooth 
-   by C1[S1] + C2[S2]. 
-   If that sum does not exceed a threshold, the corresponding sieve entry is
-   a sieve survivor. 
-   Alternative: have a bit array telling whether (S1,S2) is likely smooth */
-static inline int 
-sieve_info_test_lognorm (const unsigned char *C1, 
-                         const unsigned char *C2, 
-                         const unsigned char S1,
-                         const unsigned char S2,
-                         const unsigned char threshold)
-{
-  return C1[S1] + C2[S2] <= threshold;
-}
-
 static void sieve_info_init_trialdiv(sieve_info_ptr si)
 {
     /* Our trial division needs odd divisors, 2 is handled by mpz_even_p().
@@ -935,13 +914,13 @@ FIXME: can we find the locations to sieve? */
 #else
                     push_bucket_update(BA, x >> shiftbucket, update);
 #endif
-                }
 #ifdef TRACE_K
-                if (trace_on_spot_x(x)) {
-                    fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
-                            (unsigned int) (x & maskbucket), logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
-                }
+                    if (trace_on_spot_x(x)) {
+                        fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
+                                (unsigned int) (x & maskbucket), logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
+                    }
 #endif
+                }
                 if (i >= bound1) x += inc_a;
                 if (i < bound0)  x += inc_c;
             }
@@ -1561,7 +1540,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                     relation_add_prime(rel, side, factors[side].fac[i]);
                 for (unsigned int i = 0; i < f[side]->length; ++i) {
                     if (!mpz_fits_ulong_p(f[side]->data[i]))
-                        fprintf(stderr, "Warning: misprinted relation because of large prime at (%"PRId64",%"PRIu64")\n",a,b);
+                        fprintf(stderr, "Warning: misprinted relation because of large prime of %zu bits at (%"PRId64",%"PRIu64")\n",
+                                mpz_sizeinbase(f[side]->data[i], 2), a, b);
                     for (unsigned int j = 0; j < m[side]->data[i]; j++) {
                         relation_add_prime(rel, side, mpz_get_ui(f[side]->data[i]));
                     }
@@ -2389,6 +2369,7 @@ main (int argc0, char *argv0[])
         if (bench) {
             uint64_t newq0 = (uint64_t) (skip_factor*((double) q0));
             uint64_t savq0 = q0;
+            t_bench = seconds() - t_bench;
             // print some estimates for special-q's between q0 and the next
             int nb_q = 1;
             do {
@@ -2397,14 +2378,13 @@ main (int argc0, char *argv0[])
             } while (q0 < newq0);
             q0 = newq0;
             nroots=0;
-            t_bench = seconds() - t_bench;
             fprintf(si->output,
                     "# Stats for q=%" PRIu64 ": %d reports in %1.1f s\n",
-                    savq0, rep_bench, t0);
+                    savq0, rep_bench, t_bench);
             fprintf(si->output,
                     "# Estimates for next %d q's: %d reports in %1.0f s, %1.2f s/r\n",
-                    nb_q, nb_q*rep_bench, t0*nb_q, t0/((double)rep_bench));
-            bench_tot_time += t0*nb_q;
+                    nb_q, nb_q*rep_bench, t_bench*nb_q, t_bench/((double)rep_bench));
+            bench_tot_time += t_bench*nb_q;
             bench_tot_rep += nb_q*rep_bench;
             rep_bench = 0;
             fprintf(si->output, "# Cumulative (estimated): %lu reports in %1.0f s, %1.2f s/r\n",
@@ -2472,8 +2452,7 @@ end:
                 unsigned long r2 = report->survivor_sizes[i1][i2];
                 if (r1 > r2) {
                     fprintf(stderr, "Error, statistics report more relations (%lu) than "
-                            "sieve survivors (%lu) for (%d,%d)\n", r1, r2, i1, i2)
-                        ;
+                            "sieve survivors (%lu) for (%d,%d)\n", r1, r2, i1, i2);
                 }
                 if (r2 > 0)
                     fprintf (sievestats_file, "%d %d %lu %lu\n", 
@@ -2481,6 +2460,7 @@ end:
             }
             fprintf (sievestats_file, "\n");
         }
+        fprintf (sievestats_file, "# ");
         fclose(sievestats_file);
         sievestats_file = NULL;
     }

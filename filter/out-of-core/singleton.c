@@ -68,14 +68,6 @@
 #define MAXNAME 1024
 #define MAX_THREADS 128
 
-// #define EXACT_INDEX /* use collision-free indexing on the rational side */
-
-#ifdef EXACT_INDEX
-#define INDEX_M 510510
-#define INDEX_PHI 92160 /* phi(INDEX_M) */
-uint32_t Index[INDEX_M];
-#endif
-
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER; /* mutual exclusion lock */
 long wct0;
 
@@ -241,51 +233,11 @@ void gzip_close(FILE * f, const char * name)
     }
 }
 
-#ifdef EXACT_INDEX
-static void
-init_index (void)
-{
-  uint32_t r, n = 0;
-  uint32_t small_primes[] = {2, 3, 5, 7, 11, 13, 17};
-  int i, isprime;
-
-  for (r = 0; r < INDEX_M; r++)
-    {
-      for (isprime = 1, i = 0; i < 7 && isprime; i++)
-        if ((r % small_primes[i]) == 0)
-          isprime = 0;
-      if (isprime)
-        Index[r] = n++;
-    }
-  assert (n == INDEX_PHI);
-}
-
-/* collision-free hash function for all odd primes up to 2^40. Idea is from
-   Alexander Kruppa:
-   - write p = q*m + r with 0 <= r < m and phi(m)/m small (here m=510510)
-   - return phi(m)*q + Index(r) where 0 <= Index(r) < phi(m)
-   The maximum value is 198489896839 for p=1099511627689, and thus 2r is
-   at most 396979793678.
-*/
-static uint64_t
-index_rat (uint64_t p)
-{
-  uint64_t q, r;
-
-  q = p / INDEX_M;
-  r = p % INDEX_M;
-  r = INDEX_PHI * q + (uint64_t) Index[r];
-  r = r << 1; /* we return 2r to distinguish from algebraic ideals which have
-                 an odd index */
-  return r;
-}
-#else
 static uint64_t
 index_rat (uint64_t p)
 {
   return (p + 1) % M;
 }
-#endif
 
 static uint64_t
 index_alg (uint64_t p, uint64_t r)
@@ -293,6 +245,7 @@ index_alg (uint64_t p, uint64_t r)
   return (p + (M - 2) * r) % M; /* always odd for odd p and even M */
 }
 
+#if 0
 static void
 insert (uint64_t h)
 {
@@ -305,6 +258,21 @@ insert (uint64_t h)
   if (v < 3)
     H[r] += (uint64_t) 1 << s;
 }
+#else
+static void
+insert (uint64_t h)
+{
+  uint64_t r, s, v;
+  const uint64_t mask[32] = {0x3, 0xc, 0x30, 0xc0, 0x300, 0xc00, 0x3000, 0xc000, 0x30000, 0xc0000, 0x300000, 0xc00000, 0x3000000, 0xc000000, 0x30000000, 0xc0000000, 0x300000000, 0xc00000000, 0x3000000000, 0xc000000000, 0x30000000000, 0xc0000000000, 0x300000000000, 0xc00000000000, 0x3000000000000, 0xc000000000000, 0x30000000000000, 0xc0000000000000, 0x300000000000000, 0xc00000000000000, 0x3000000000000000, 0xc000000000000000};
+
+  assert (h < M);
+  r = h >> 5;        /* h div 32 */
+  s = h & 31       ; /* h mod 32 */
+  v = H[r] & mask[s];
+  if (v != mask[s])
+    H[r] += (uint64_t) 1 << (s << 1); /* add 1 to bit 2s */
+}
+#endif
 
 static void
 delete (uint64_t h)
@@ -648,9 +616,16 @@ one_thread3 (void* args)
    which gives e(k) = n - n*(1-1/n)^k,
    thus k = log(1-e(k)/n)/log(1-1/n) */
 double
-estimate_entries (double n, double ek)
+estimate_ideals (double n, double ek)
 {
   return -n * log (1.0 - ek / n);
+}
+
+/* estimate the number of prime ideals below a */
+static double
+est_excess (double a)
+{
+  return a / log (a);
 }
 
 #if 0
@@ -692,6 +667,7 @@ stat_mt (int nthreads)
   pthread_t tid[MAX_THREADS];
   unsigned long nideal = 0, nsingl = 0, ndupli = 0;
   long st = cputime (), rt = realtime ();
+  double est_ideals;
 
   T = malloc (nthreads * sizeof (tab_t));
   for (i = 0; i < nthreads; i++)
@@ -710,11 +686,14 @@ stat_mt (int nthreads)
   free (T);
   fprintf (stderr, "stat_mt() took %lds (cpu), %lds (real)\n",
            cputime () - st, realtime () - rt);
+  est_ideals = estimate_ideals ((double) M, (double) nideal);
   fprintf (stderr, "Read %lu rels (%lu/s), %lu entries (%.2f%%), est. %1.0f ideals, %lu singletons, %lu of weight 2\n",
-           nrels, nrels / (rt - wct0),
+           nrels, nrels / (rt - wct0 + (rt == wct0)),
            nideal, 100.0 * (double) nideal / (double) M,
-           estimate_entries ((double) M, (double) nideal),
-           nsingl, ndupli);
+           est_ideals, nsingl, ndupli);
+  fprintf (stderr, "Estimated excess %1.0f, need %1.0f\n",
+           (double) nrels - est_ideals,
+           est_excess ((double) minpr) + est_excess ((double) minpa));
   fflush (stderr);
 }
 
@@ -756,7 +735,7 @@ doit (int nthreads, char *filelist)
               pthread_join (tid[i], NULL);
               nrels += T[i]->nlines;
             }
-          fprintf (stderr, "Bunch took %lds (cpu), %lds (real)\n",
+          fprintf (stderr, "Batch took %lds (cpu), %lds (real)\n",
                    cputime () - st, realtime () - rt);
           i = 0;
           stat_mt (nthreads);
@@ -771,8 +750,8 @@ doit (int nthreads, char *filelist)
           pthread_join (tid[j], NULL);
           nrels += T[j]->nlines;
         }
+      stat_mt (nthreads);
     }
-  stat_mt (nthreads);
   fclose (f);
   free (T);
 }
@@ -926,16 +905,6 @@ main (int argc, char *argv[])
   /* check that M = 2p where p is prime */
   assert ((M % 2) == 0);
   assert (isprime (M/2));
-
-#ifdef EXACT_INDEX
-  /* check that M > 396979793678 (required for index_rat) */
-  assert (M > 396979793678UL);
-  init_index ();
-  fprintf (stderr, "Using collision-free hash function on the rational side\n");
-#else
-  fprintf (stderr, "Using hash function with collisions on the rational side\n");
-#endif
-  fflush (stderr);
 
   Hsize = 1 + (M - 1) / 32;
   H = (uint64_t*) malloc (Hsize * sizeof (uint64_t));

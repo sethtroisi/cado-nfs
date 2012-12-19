@@ -52,6 +52,26 @@ sieve_info_init_lognorm (unsigned char *C, unsigned char threshold,
 #endif
 }
 
+MAYBE_UNUSED static void
+sieve_info_init_lognorm_prob (unsigned char *C, const unsigned long *rels,
+    const unsigned long *surv, const double thresh)
+{
+  const double scale = -126./log(thresh);
+
+  /* Success probability up to thresh get values 0 (probability=1) 
+     through 126 (probability=thresh). Probabilities worse than thresh 
+     all get 127. */
+
+  for (size_t i = 0; i < 256; i++) {
+    if ((double) rels[i] < thresh * (double) surv[i]) {
+        C[i] = 127;
+    } else {
+      const double prob = (double) rels[i] / (double) surv[i];
+      C[i] = -log(prob) * scale; /* TODO: How should we round here? */
+    }
+  }
+}
+
 /* {{{ initializing norms */
 /* Knowing the norm on the rational side is bounded by 2^(2^k), compute
  * lognorms approximations for k bits of exponent + NORM_BITS-k bits
@@ -603,11 +623,18 @@ get_maxnorm (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
 
   free (fd);
 
-  /* multiply by (B*I)^d and divide by q0 if sieving on alg side */
-  tmp = max_norm * pow (si->B * (double) si->I, (double) d);
+  /* multiply by (B*I)^d: don't use the pow() function since it does not
+     work properly when the rounding mode is not to nearest (at least under
+     Linux with the glibc). Moreover for a small exponent d a direct loop
+     as follows should not be much slower (if any), anyway the efficiency of
+     that function is not critical */
+  for (tmp = max_norm, k = 0; k < d; k++)
+    tmp *= si->B * (double) si->I;
+  /* divide by q0 if sieving on alg side */
   if (!si->ratq)
       tmp /= (double) q0;
-  return log2(tmp);
+  tmp *= 0.5;
+  return log2 (tmp);
 }
 
 void sieve_info_init_norm_data(sieve_info_ptr si, unsigned long q0)
@@ -621,9 +648,6 @@ void sieve_info_init_norm_data(sieve_info_ptr si, unsigned long q0)
         for (int k = 0; k <= d; k++)
             mpz_init(si->sides[side]->fij[k]);
     }
-
-
-
 
   double r, scale;
   unsigned char alg_bound, rat_bound;

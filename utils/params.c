@@ -653,7 +653,7 @@ int param_list_parse_uint(param_list pl, const char * key, unsigned int * r)
         return 0;
     if (res > UINT_MAX) {
         fprintf(stderr, "Parse error:"
-                " parameter for key %s does not fit within an uinsigned int: %ld\n",
+                " parameter for key %s does not fit within an unsigned int: %ld\n",
                 key, res);
         exit(1);
     }

@@ -326,8 +326,8 @@ ropt_on_msievepoly ( FILE *file,
     fprintf (stderr, "\n# Size-optimize only (# %5d).\n", count);
     print_poly_fg (poly->f, poly->g, poly->d, poly->n, 1);
 
-    /* print optimized poly in Msieve format */
-    //print_poly_info_short (poly->f, poly->g, poly->d, poly->n);
+    /* also print optimized poly in Msieve format */
+    print_poly_info_short (poly->f, poly->g, poly->d, poly->n);
 #else
     ropt_common (poly, param);
 #endif
@@ -542,7 +542,7 @@ print_poly_info_short ( mpz_t *f,
   mpz_neg (g[0], g[0]);
 
   /* compute skew, logmu, nroots */
-  nroots = numberOfRealRoots (f, d, 0, 0);
+  nroots = numberOfRealRoots (f, d, 0, 0, NULL);
   skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
   logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
   alpha = get_alpha (f, d, ALPHA_BOUND);
@@ -560,7 +560,7 @@ print_poly_info_short ( mpz_t *f,
           alpha_proj,
           logmu + alpha,
           nroots,
-          logmu - sqrt (2.0 * exp_rot[d] * log (skew) ),
+          logmu - 0.824 * sqrt (2.0 * exp_rot[d] * log (skew) ),
           e );
 
   fflush( stdout );
