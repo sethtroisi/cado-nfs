@@ -317,6 +317,23 @@ makeIndexFile(const char *indexname, int nrows, typerow_t **newrows,
     gzip_close(indexfile, indexname);
 }
 
+/* we also compare x[1] and y[1] to make the code deterministic
+   since in case x[0] = y[0] qsort() may give different results on
+   different machines */
+static int
+cmp2 (const void *p, const void *q)
+{
+  int *x = (int*) p;
+  int *y = (int*) q;
+
+  if (x[0] < y[0])
+    return -1;
+  else if (x[0] > y[0])
+    return 1;
+  else
+    return (x[1] < y[1]) ? 1 : -1;
+}
+
 // on input, colweight[j] contains the weight; on exit, colweight[j]
 // contains the new index for j. Heavier columns are in front of the new
 // matrix.
@@ -350,7 +367,7 @@ renumber (int *small_ncols, int *colweight, int ncols,
     *small_ncols = nb>>1;
     fprintf (stderr, "Sorting %d columns by decreasing weight\n",
              *small_ncols);
-    qsort(tmp, nb>>1, 2*sizeof(int), cmp);
+    qsort(tmp, nb>>1, 2*sizeof(int), cmp2);
     memset(colweight, 0, ncols * sizeof(int));
     // useful for BW + skipping heavy part only...
     for(j = nb-1, k = 1; j >= 0; j -= 2)
