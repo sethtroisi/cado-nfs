@@ -810,7 +810,7 @@ try_merge (typerow_t **newrows, int **cols, int *len_col, int j, int skip,
   /* compute all ideals appearing in the rows containing j */
   if (j >= skip)
     s -= len_col[j];
-  J = (int*) malloc (s * sizeof(int));
+  J = (int*) malloc ((s + 1) * sizeof(int));
   for (ii = 0, t = 0; ii < len_col[j]; ii++)
     {
       i = cols[j][ii];

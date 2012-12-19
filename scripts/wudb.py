@@ -2,10 +2,16 @@
 
 import sys
 import sqlite3
+import threading
+import traceback
 from datetime import datetime
 from workunit import Workunit
+if sys.version_info.major == 3:
+    from queue import Queue
+else:
+    from Queue import Queue
 
-debug = 1
+debug = 2
 
 def diag(level, text, var = None):
     if debug > level:
@@ -43,6 +49,12 @@ class WuDb: # {
         structure of Python on the other hand, where one row of one table maps to one 
         dictoriary """
 
+    # FIXME: this really implements convenience functions for Cursor objects. 
+    # It probably should inherit Cursor and be called WuCursor. 
+    # How to construct instances of this class then? 
+    # Have another class WuConnection that inherits Connection and whose 
+    # .cursor() returns a WuCursor?
+
     # This is used in where queries; it converts from named arguments such as 
     # "eq" to a binary operator such as "="
     name_to_operator = {"lt": "<", "le": "<=", "eq": "=", "ge": ">=", "gt" : ">", "ne": "!="}
@@ -54,9 +66,6 @@ class WuDb: # {
         # looking up an available workunit and assigning it to a client
         self.db = sqlite3.connect(filename, isolation_level="DEFERRED")
 
-    def __del__(self):
-        self.close()
-
     def cursor(self):
         return self.db.cursor()
 
@@ -67,10 +76,10 @@ class WuDb: # {
         self.db.close()
 
     @staticmethod
-    def _fieldlist(l, r = "="):
+    def _fieldlist(l, r = "=", s = ", "):
         """ For a list l = ('a', 'b', 'c') returns the string 'a = ?, b = ?, c = ?',
             or with a different string r in place of the "=" """
-        return ", ".join([k + " " + r + " ?" for k in l])
+        return s.join([k + " " + r + " ?" for k in l])
 
     @staticmethod
     def _without_None(d):
@@ -79,31 +88,32 @@ class WuDb: # {
         return {k[0]:k[1] for k in d.items() if k[1] is not None}
     
     @staticmethod
-    def _without_id(d):
-        """ Return a copy of the dictionary d, but without the "id" entry """
-        return {k[0]:k[1] for k in d.items() if k[0] != "id"}
-    
-    @staticmethod
     def _exec(cursor, command, values, name):
         """ Wrapper around self.cursor.execute() that prints arguments 
-            for debugging """
+            for debugging and retries in case of "database locked" error """
         # Could use inspect module to remove name parameter
         diag (1, "WuDb." + name + "(): command = " + command);
         diag (1, "WuDb." + name + "(): values = ", values)
-        cursor.execute(command, values)
+        while True:
+            try:
+                cursor.execute(command, values)
+                break
+            except sqlite3.OperationalError as e:
+                if str(e) != "database is locked":
+                    raise
 
     @classmethod
-    def where_str(cls, **args):
+    def where_str(cls, name, **args):
         where = ""
         values = []
         for opname in args:
             if args[opname] is None:
                 continue
             if where == "":
-                where = " WHERE "
+                where = " " + name + " "
             else:
-                where = where + ", "
-            where = where + cls._fieldlist(args[opname].keys(), cls.name_to_operator[opname])
+                where = where + " AND "
+            where = where + cls._fieldlist(args[opname].keys(), cls.name_to_operator[opname], s = " AND ")
             values = values + list(args[opname].values())
         return (where, values)
 
@@ -134,16 +144,17 @@ class WuDb: # {
         id = cursor.lastrowid
         return id
 
-    def update(self, cursor, table, id, d):
-        """ Update fields of an existing entry. id is the row id of the 
-            entry to update, other entries in the dictionary d are the fields 
-            and their values to update """
+    def update(self, cursor, table, d, **conditions):
+        """ Update fields of an existing entry. conditions specifies the where 
+            clause to use for to update, entries in the dictionary d are the 
+            fields and their values to update """
         # UPDATE table SET column_1=value1, column2=value_2, ..., 
-        # column_n=value_n WHERE id="id"
-        # FIXME: can generalize this a bit by passing a dict for the where clause
-        command = "UPDATE " + table + " SET " + self.__class__._fieldlist(d.keys()) + \
-            " WHERE id=?;"
-        values = list(d.values()) + [id, ]
+        # column_n=value_n WHERE column_n+1=value_n+1, ...,
+        setstr = " SET " + self.__class__._fieldlist(d.keys())
+        setvalues = d.values()
+        (wherestr, wherevalues) = self.__class__.where_str("WHERE", **conditions)
+        command = "UPDATE " + table + setstr + wherestr
+        values = list(setvalues) + wherevalues
         self.__class__._exec(cursor, command, values, "update")
     
     def where(self, cursor, table, limit = None, order = None, **conditions):
@@ -153,7 +164,7 @@ class WuDb: # {
         result = []
 
         # Table/Column names cannot be substituted, so include in query directly.
-        (WHERE, values) = self.__class__.where_str(**conditions)
+        (WHERE, values) = self.__class__.where_str("WHERE", **conditions)
 
         if order is None:
             ORDER = ""
@@ -175,7 +186,7 @@ class WuDb: # {
         desc = [k[0] for k in cursor.description]
         row = cursor.fetchone()
         while row is not None:
-            diag(1, "WuDb.where(): row = ", row)
+            diag (2, "WuDb.where(): row = ", row)
             result.append(dict(zip(desc, row)))
             row = cursor.fetchone()
         return result
@@ -205,7 +216,7 @@ class DbTable: # {
         return self._subdict(d, self._get_colnames())
 
     def create(self, cursor):
-        db.create_table(cursor, self.tablename, self.fields)
+        self.db.create_table(cursor, self.tablename, self.fields)
 
     def insert(self, cursor, d):
         """ Insert a new row into this table. The column:value pairs are 
@@ -213,10 +224,10 @@ class DbTable: # {
             The database's row id for the new entry is returned """
         return self.db.insert(cursor, self.tablename, self.dictextract(d))
 
-    def update(self, cursor, id, d):
+    def update(self, cursor, d, **conditions):
         """ Update an existing row in this table. The column:value pairs to 
             be written are specified key:value pairs of the dictionary d """
-        self.db.update(cursor, self.tablename, id, d)
+        self.db.update(cursor, self.tablename, d, **conditions)
 
     def where(self, cursor, limit = None, order = None, **conditions):
         assert order is None or order[0] in self._get_colnames()
@@ -256,7 +267,7 @@ class WuActiveRecord(): # {
         and a dictionary 
         {"wuid": string, ..., "timeverified": string, "files": list}
         where list is None or a list of dictionaries of the from
-        {"id": int, "wuid": string, "filename1": string, "path": string
+        {"id": int, "wuid": string, "filename": string, "path": string
         Operations on instances of WuActiveRecord are directly carried 
         out on the database persistent storage, i.e., they behave kind 
         of as if the WuActiveRecord instance were itself a persistent 
@@ -280,6 +291,15 @@ class WuActiveRecord(): # {
                 for f in self.data["files"]:
                     s = s + "    " + str(f) + "\n"
         return s
+
+    def tuple_keys(self):
+        return self.wutable._get_colnames() + ["files"]
+
+    def as_tuple(self):
+        return (self.data[k] for k in self.wutable._get_colnames())
+            
+    def as_dict(self):
+        return self.data
 
     def add_files(self, cursor, files):
         if len(files) > 0 and self.data["files"] is None:
@@ -333,7 +353,7 @@ class WuActiveRecord(): # {
         """ Assign the key:value pairs in d to self.data, and call 
             db.update() method to write these updates to the DB """
         self.data.update(d) # Python built-in dict.update() method
-        self.wutable.update(cursor, self.data["id"], d)
+        self.wutable.update(cursor, d, eq={"id": self.data["id"]})
     
     def _checkstatus(self, status):
         diag (2, "WuActiveRecord._checkstatus(" + str(self) + ", " + str(status) + ")")
@@ -380,6 +400,7 @@ class WuActiveRecord(): # {
         cursor = self.db.cursor()
         self.wutable.create(cursor)
         self.filestable.create(cursor)
+        cursor.execute("PRAGMA journal_mode=WAL;")
         self.db.commit()
         cursor.close()
 
@@ -417,7 +438,8 @@ class WuActiveRecord(): # {
 
     def assign(self, clientid):
         """ Finds an available workunit and assigns it to clientid.
-            Returns False of no available workunit exists """
+            Returns the text of the workunit, or None if no available 
+            workunit exists """
         cursor = self.db.cursor()
         r = self.where(cursor, limit = 1, order=("priority", "DESC"), eq={"status": WuStatus.AVAILABLE})
         if len(r) == 1:
@@ -431,7 +453,10 @@ class WuActiveRecord(): # {
             self.update_wu(cursor, d)
             self.db.commit()
         cursor.close()
-        return len(r) == 1
+        if len(r) == 1:
+            return r[0].get_wu()
+        else:
+            return None
 
     def result(self, wuid, clientid, files, errorcode = None, failedcommand = None):
         cursor = self.db.cursor()
@@ -445,7 +470,7 @@ class WuActiveRecord(): # {
              "errorcode": errorcode,
              "failedcommand": failedcommand, 
              "timeresult": str(datetime.now())}
-        if errorcode == 0:
+        if errorcode is None or errorcode == 0:
            d["status"] = WuStatus.RECEIVED_OK
         else:
             d["status"] = WuStatus.RECEIVED_ERROR
@@ -489,6 +514,91 @@ class WuActiveRecord(): # {
         cursor.close()
         return r
 # }
+
+
+class DbWorker(threading.Thread):
+    """Thread executing WuActiveRecord requests from a given tasks queue"""
+    def __init__(self, dbfilename, taskqueue):
+        threading.Thread.__init__(self)
+        self.dbfilename = dbfilename
+        self.taskqueue = taskqueue
+        self.start()
+    
+    def run(self):
+        # One DB connection per thread. Created inside the new thread to make
+        # sqlite happy
+        self.db = WuDb(self.dbfilename)
+        while True:
+            # We expect a 4-tuple in the task queue. The elements of the tuple:
+            # a 2-array, where element [0] receives the result of the DB call, 
+            #  and [1] is an Event variable to notify the caller when the 
+            #  result is available
+            # fn_name, the name (as a string) of the WuActiveRecord method to call
+            # args, a tuple of positional arguments
+            # kargs, a dictionary of keyword arguments
+            (result_tuple, fn_name, args, kargs) = self.taskqueue.get()
+            if fn_name == "terminate":
+                break
+            ev = result_tuple[1]
+            wuar = WuActiveRecord(self.db)
+            # Assign to tuple in-place, so result is visible to caller. 
+            # No slice etc. here which would create a copy of the array
+            try: result_tuple[0] = getattr(wuar, fn_name)(*args, **kargs)
+            except Exception as e: 
+                traceback.print_exc()
+            ev.set()
+            self.taskqueue.task_done()
+        self.db.close()
+
+class DbRequest:
+    """ Class that represents a request to a given WuActiveRecord function.
+        Used mostly so that DbThreadPool's __getattr__ can return a callable 
+        that knows which of WuActiveRecord's methods should be called by the 
+        worker thread """
+    def __init__(self, taskqueue, func):
+        self.taskqueue = taskqueue
+        self.func = func
+    
+    def do_task(self, *args, **kargs):
+        """Add a task to the queue, wait for its completion, and return the result"""
+        ev = threading.Event()
+        result = [None, ev]
+        self.taskqueue.put((result, self.func, args, kargs))
+        ev.wait()
+        return result[0]
+
+class DbThreadPool:
+    """Pool of threads consuming tasks from a queue"""
+    def __init__(self, dbfilename, num_threads = 1):
+        self.taskqueue = Queue(num_threads)
+        self.pool = []
+        for _ in range(num_threads): 
+            self.pool.append(DbWorker(dbfilename, self.taskqueue))
+
+    def terminate(self):
+        for t in self.pool:
+            self.taskqueue.put((None, "terminate", None, None))
+        self.wait_completion
+
+    def wait_completion(self):
+        """Wait for completion of all the tasks in the queue"""
+        self.taskqueue.join()
+    
+    def __getattr__(self, name):
+        """ Delegate calls to methods of WuActiveRecord to a worker thread.
+            If the called method exists in WuActiveRecord, creates a new 
+            DbRequest instance that remembers the name of the method that we 
+            tried to call, and returns the DbRequest instance's do_task 
+            method which will process the method call via the thread pool. 
+            We need to go through a new object's method since we cannot make 
+            the caller pass the name of the method to call to the thread pool 
+            otherwise """
+        if hasattr(WuActiveRecord, name):
+            task = DbRequest(self.taskqueue, name)
+            return task.do_task
+        else:
+            raise AttributeError(name)
+
 
 # One entry in the WU DB, including the text with the WU contents 
 # (FILEs, COMMANDs, etc.) and info about the progress on this WU (when and 
@@ -536,11 +646,10 @@ if __name__ == '__main__': # {
     if args["prio"]:
         prio = int(args["prio"][0])
 
-    db = WuDb(dbname)
-    wu = WuActiveRecord(db)
+    db_pool = DbThreadPool(dbname)
     
     if args["create"]:
-        wu.create_tables()
+        db_pool.create_tables()
     if args["add"]:
         s = ""
         wus = []
@@ -552,37 +661,52 @@ if __name__ == '__main__': # {
                 s = s + line
         if s != "":
             wus.append(s)
-        wu.create(wus, priority=prio)
+        db_pool.create(wus, priority=prio)
     # Functions for queries
     if args["avail"]:
-        wus = wu.query(eq={"status": WuStatus.AVAILABLE})
+        wus = db_pool.query(eq={"status": WuStatus.AVAILABLE})
         print("Available workunits: ")
-        for wu in wus:
-            print (str(wu))
+        if wus is None:
+            print(wus)
+        else:
+            for wu in wus:
+                print (str(wu))
     if args["assigned"]:
-        wus = wu.query(eq={"status": WuStatus.ASSIGNED})
+        wus = db_pool.query(eq={"status": WuStatus.ASSIGNED})
         print("Assigned workunits: ")
-        for wu in wus:
-            print (str(wu))
+        if wus is None:
+            print(wus)
+        else:
+            for wu in wus:
+                print (str(wu))
     if args["receivedok"]:
-        wus = wu.query(eq={"status": WuStatus.RECEIVED_OK})
+        wus = db_pool.query(eq={"status": WuStatus.RECEIVED_OK})
         print("Received ok workunits: ")
-        for wu in wus:
-            print (str(wu))
+        if wus is None:
+            print(wus)
+        else:
+            for wu in wus:
+                print (str(wu))
     if args["receivederr"]:
-        wus = wu.query(eq={"status": WuStatus.RECEIVED_ERROR})
+        wus = db_pool.query(eq={"status": WuStatus.RECEIVED_ERROR})
         print("Received with error workunits: ")
-        for wu in wus:
-            print (str(wu))
+        if wus is None:
+            print(wus)
+        else:
+            for wu in wus:
+                print (str(wu))
     if args["all"]:
-        wus = wu.query()
+        wus = db_pool.query()
         print("Existing workunits: ")
-        for wu in wus:
-            print (str(wu))
+        if wus is None:
+            print(wus)
+        else:
+            for wu in wus:
+                print (str(wu))
     # Functions for testing
     if args["assign"]:
         clientid = args["assign"][0]
-        wu.assign(clientid)
+        wus = db_pool.assign(clientid)
     
-    db.close()
+    db_pool.terminate()
 # }
