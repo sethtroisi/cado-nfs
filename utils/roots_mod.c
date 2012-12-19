@@ -32,7 +32,7 @@ invert_mod (uint64_t a, uint64_t b)
   uint64_t c, r;
   int t;
   
-  for (c = b, t = 0; c % 2 == 0; t++, c >>= 1);
+  for (c = b, t = 0; (c & 1) == 0; t++, c >>= 1);
   /* b = 2^t * c */
   
   /* Inverse 1/a mod c */
@@ -67,8 +67,6 @@ invert_mod (uint64_t a, uint64_t b)
 
   mod_clear (aa, cc);
   mod_clearmod (cc);
-
-  // printf ("1/Mod(%lu, %lu) == %lu\n", a, b, r);
 
   return r;
 }
@@ -278,7 +276,7 @@ one_cubic_root_1mod3 (residue_t rr, residue_t zeta, residue_t ddelta, modulus_t 
 static int
 is_cube (residue_t aa, modulus_t pp)
 {
-  if ((mod_getmod_ul(pp) % 3) == 1)
+  if ((mod_getmod_ul (pp) % 3) == 1)
     {
       residue_t cc;
       int r;
@@ -370,18 +368,24 @@ one_rth_root (residue_t rop, uint64_t r, residue_t delta, modulus_t pp)
       mod_set_ul (c, i, pp);
       mod_pow_ul (c, c, s, pp);
       mod_set (a, c, pp);
-      for (i = 0; i < t - 1; i++)
+      for (j = 0; j < t - 1; j++)
         mod_pow_ul (a, a, r, pp);
       if (mod_is1 (a, pp) != 1)
         break;
     }
-  alpha = invert_mod (r, s);
+  alpha = invert_mod (s, r);
+  /* we have alpha = 1/s mod r, thus alpha*s = 1 + beta*r,
+     where beta = (alpha*s - 1)/r, and 1/r = -beta mod s */
+  alpha = alpha * s - 1;
+  ASSERT(alpha % r == 0);
+  alpha = alpha / r;
+  alpha = (alpha == 0) ? alpha : s - alpha;
   mod_pow_ul (b, delta, r * alpha - 1, pp);
   mod_set1 (h, pp);
   for (i = 1; i < t; i++)
     {
       mod_set (d, b, pp);
-      for (j = 0; j < t - 1- i; j++)
+      for (j = 0; j < t - 1 - i; j++)
         mod_pow_ul (d, d, r, pp);
       if (mod_is1 (d, pp))
         mod_pow_ul (c, c, r, pp);
@@ -391,7 +395,8 @@ one_rth_root (residue_t rop, uint64_t r, residue_t delta, modulus_t pp)
           mod_pow_ul (d, c, j, pp);
           mod_mul (h, h, d, pp);
           mod_pow_ul (c, c, r, pp);
-          mod_mul (b, b, c, pp);
+          mod_pow_ul (d, c, j, pp);
+          mod_mul (b, b, d, pp);
         }
     }
   mod_pow_ul (rop, delta, alpha, pp);
@@ -462,8 +467,8 @@ roots (residue_t *rr, residue_t a, int d, modulus_t pp)
   for (i = 2; i < p; i++)
     {
       mod_set_ul (z, i, pp);
-      mod_pow_ul (rr[0], z, (p - 1) / r, pp);
-      if (mod_is1 (rr[0], pp) == 0)
+      mod_pow_ul (z, z, (p - 1) / r, pp);
+      if (mod_is1 (z, pp) == 0)
         break;
     }
   for (i = k = 0; i < n; i++)
@@ -473,8 +478,8 @@ roots (residue_t *rr, residue_t a, int d, modulus_t pp)
       if (mod_is1 (rr[k], pp) == 0)
         continue;
       /* get one r-th root */
-      one_rth_root (rr[k++], r, rr0[i], pp);
-      for (j = 1; j < r; j++, k++)
+      one_rth_root (rr[k], r, rr0[i], pp);
+      for (j = 1, k++; j < r; j++, k++)
         mod_mul (rr[k], rr[k-1], z, pp);
     }
   mod_clear (z, pp);
@@ -491,7 +496,7 @@ mod_roots (residue_t *rr, residue_t aa, int d, modulus_t pp)
       mod_set (rr[0], aa, pp);
       return 1;
     }
-  else if (d % 2 == 0) /* d is even */
+  else if ((d & 1) == 0) /* d is even */
     {
       return roots2 (rr, aa, d, pp);
     }
@@ -500,7 +505,7 @@ mod_roots (residue_t *rr, residue_t aa, int d, modulus_t pp)
       return roots3 (rr, aa, d, pp);
     }
   else
-    return roots(rr, aa, d, pp);
+    return roots (rr, aa, d, pp);
 }
 
 
@@ -547,18 +552,22 @@ roots_mod_uint64 (uint64_t *r, uint64_t a, int d, uint64_t p)
       mod_initmod_ul (pp, p);
       mod_init (aa, pp);
       mod_set_ul (aa, a, pp);
+      for (i = 0; i < d; i++)
+        mod_init (rr[i], pp);
 
       n = mod_roots (rr, aa, d, pp);
 
       for (i = 0; i < n; i++) {
         r[i] = mod_get_ul (rr[i], pp);
         if (do_both) {
-          mod_pow_ul (rr[i], rr[i], d, pp);
-          ASSERT_ALWAYS (mod_get_ul (rr[i], pp) == a);
+          mod_pow_ul (aa, rr[i], d, pp);
+          ASSERT_ALWAYS (mod_get_ul (aa, pp) == a);
         }
       }
       sort_roots (r, n);
 
+      for (i = 0; i < d; i++)
+        mod_clear (rr[i], pp);
       mod_clear (aa, pp);
       mod_clearmod (pp);
     }
