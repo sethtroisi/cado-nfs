@@ -267,9 +267,13 @@ one_rth_root (uint64_t r, uint64_t delta, uint64_t p)
         c = uint64_pow_mod (c, r, p);
       else
         {
-          
+          for (j = 0; d != 1; d = (d * a) % p, j++);
+          h = (h * uint64_pow_mod (c, j, p)) % p;
+          c = uint64_pow_mod (c, r, p);
+          b = (b * uint64_pow_mod (c, r, p)) % p;
         }
     }
+  return (h * uint64_pow_mod (delta, alpha, p)) % p;
 }
 
 /* return 1 iff a is a cube mod p */
