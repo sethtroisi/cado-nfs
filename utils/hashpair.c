@@ -25,7 +25,7 @@ hashInit (hashtable_t *H, HR_T n, unsigned int verbose)
   if (verbose) fprintf (stderr, "Hash table:\n"
 			"Hash (p,r) uses %lu-bit type, hash index uses %lu-bit type,\n"
 			"Allocated hash table of total size %lu MB\n",
-			sizeof(HT_T), sizeof(HR_T),
+			(unsigned long) sizeof(HT_T), (unsigned long) sizeof(HR_T),
 			(unsigned long) (H->hm * (sizeof(HC_T) + sizeof(ht_t))) >> 20);
   H->hr = NULL;
   hashClear (H);
