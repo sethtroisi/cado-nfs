@@ -22,7 +22,7 @@ extern "C" {
   do {									\
     size_t mysize;							\
     if (!(A = malloc (mysize = (T) * sizeof(*(A))))) {			\
-      fprintf (stderr, "%s: malloc error (%lu MB): %s\n",		\
+      fprintf (stderr, "%s: malloc error (%zu MB): %s\n",		\
 	       M, mysize>>20, strerror(errno));				\
       exit (1);								\
     }									\
