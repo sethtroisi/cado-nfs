@@ -647,6 +647,15 @@ modredc2ul2_sub (residueredc2ul2_t r, const residueredc2ul2_t a,
 
 MAYBE_UNUSED
 static inline void
+modredc2ul2_add1 (residueredc2ul2_t r, const residueredc2ul2_t a, 
+		  const modulusredc2ul2_t m)
+{
+  modredc2ul2_add(r, a, m[0].one, m);
+}
+
+
+MAYBE_UNUSED
+static inline void
 modredc2ul2_add_ul (residueredc2ul2_t r, const residueredc2ul2_t a,
 		    const unsigned long b, const modulusredc2ul2_t m)
 {
