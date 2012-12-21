@@ -266,7 +266,7 @@ class WuTable(DbTable):
         ("retryof", "TEXT", ""),
         ("priority", "INTEGER", "")
     )
-    index = {}
+    index = {"wuidindex": (fields[1],), "statusindex" : (fields[2],)}
 
 class FilesTable(DbTable):
     name = "files"
