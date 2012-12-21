@@ -36,7 +36,6 @@
 */
 #define LN2SHASH_NBUCKETS 10
 
-
 /* hash table slots */
 typedef struct
 {
@@ -114,7 +113,10 @@ typedef _header_struct header_t[1];
 
 /* inline functions */
 
-INLINE void
+#ifndef EMIT_ADDRESSABLE_shash_add
+INLINE
+#endif
+void
 shash_add (shash_t H, uint64_t i)
 {
   /*
