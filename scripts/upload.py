@@ -17,6 +17,7 @@ def diag(level, text, var = None):
             print (text, file=sys.stderr)
         else:
             print (text + str(var), file=sys.stderr)
+        sys.stderr.flush()
 
 def analyze(level, name, o):
     """ Dump tons of internal data about an object """
@@ -123,7 +124,7 @@ def do_upload(db, input = sys.stdin, output = sys.stdout):
 
         message = message + 'Workunit ' + WUid.value + ' completed.\n'
 
-    diag (0, sys.argv[0] + ': ', message)
+    diag (0, sys.argv[0] + ': ', message.rstrip("\n"))
     if output == sys.stdout:
         output.write(header + message)
     else:
