@@ -32,7 +32,7 @@ invert_mod (uint64_t a, uint64_t b)
   uint64_t c, r;
   int t;
   
-  for (c = b, t = 0; c % 2 == 0; t++, c >>= 1);
+  for (c = b, t = 0; (c & 1) == 0; t++, c >>= 1);
   /* b = 2^t * c */
   
   /* Inverse 1/a mod c */
@@ -67,8 +67,6 @@ invert_mod (uint64_t a, uint64_t b)
 
   mod_clear (aa, cc);
   mod_clearmod (cc);
-
-  // printf ("1/Mod(%lu, %lu) == %lu\n", a, b, r);
 
   return r;
 }
@@ -191,16 +189,16 @@ one_cubic_root_2mod3 (residue_t rr, residue_t ddelta, modulus_t pp)
 
 
 /* Put in rr a root of x^3 = ddelta (mod pp), assuming one exists,
-   and in zeta a primitive 3-rd root of unity */
-/* rr and ddelta overlapping is permissible. */
+   and in zeta a primitive 3-rd root of unity.
+   Use the algorithm from Table 3 in reference [1].
+   rr and ddelta overlapping is permissible. */
 static void 
 one_cubic_root_1mod3 (residue_t rr, residue_t zeta, residue_t ddelta, modulus_t pp)
 {
   residue_t rho, a, aprime, b, h, d;
-  uint64_t i, j, s, t;
-  const uint64_t p = mod_getmod_ul(pp);
+  uint64_t i, j, s, t, smod3, l;
+  const uint64_t p = mod_getmod_ul (pp);
 
-  /* now p = 1 (mod 3), use Algorithm from Table 3 of [1] */
   s = (p - 1) / 3;
   t = 1;
   while ((s % 3) == 0)
@@ -213,6 +211,7 @@ one_cubic_root_1mod3 (residue_t rr, residue_t zeta, residue_t ddelta, modulus_t 
   mod_init (d, pp);
   
   mod_set1 (rho, pp);
+  smod3 = s % 3;
   for (i = 2; i < p; i++)
     {
       mod_add1 (rho, rho, pp);
@@ -233,7 +232,8 @@ one_cubic_root_1mod3 (residue_t rr, residue_t zeta, residue_t ddelta, modulus_t 
     }
   /* aprime  =  rho^((p-1)/3)  !=  1, so it is a 3-rd rood of 1 */
   mod_set (zeta, aprime, pp);
-  mod_pow_ul (b, ddelta, s, pp);
+  /* see below to explain why we start from delta^(2s) for s = 1 mod 3 */
+  mod_pow_ul (b, ddelta, (smod3 == 1) ? 2*s : s, pp);
   mod_set1 (h, pp);
   for (i = 1; i < t ; i++)
     {
@@ -259,10 +259,13 @@ one_cubic_root_1mod3 (residue_t rr, residue_t zeta, residue_t ddelta, modulus_t 
           mod_mul (b, b, a, pp);
         }
     }
-  mod_pow_ul (d, ddelta, (s + 1) / 3, pp);
+  /* in the case s = 3l+1, instead of computing r = delta^l*h and then
+     inverting r mod p as in Table 3, we use the generic algorithm from
+     Table 4, which computes r as delta^alpha*h where alpha = 1/3 mod s,
+     i.e., alpha = 2l+1. However this needs to start from b = delta^(2s). */
+  l = (s + 1) / 3;
+  mod_pow_ul (d, ddelta, (smod3 == 1) ? 2*l+1 : l, pp);
   mod_mul (h, h, d, pp);
-  if (s % 3 == 1)
-    mod_inv (h, h, pp);
 
   mod_set (rr, h, pp);
 
@@ -278,7 +281,7 @@ one_cubic_root_1mod3 (residue_t rr, residue_t zeta, residue_t ddelta, modulus_t 
 static int
 is_cube (residue_t aa, modulus_t pp)
 {
-  if ((mod_getmod_ul(pp) % 3) == 1)
+  if ((mod_getmod_ul (pp) % 3) == 1)
     {
       residue_t cc;
       int r;
@@ -297,7 +300,7 @@ is_cube (residue_t aa, modulus_t pp)
 static int
 roots3 (residue_t *rr, residue_t aa, int d, modulus_t pp)
 {
-  uint64_t i, n;
+  uint64_t i, n, k;
   const uint64_t p = mod_getmod_ul(pp);
 
   if (!is_cube (aa, pp))
@@ -318,22 +321,29 @@ roots3 (residue_t *rr, residue_t aa, int d, modulus_t pp)
       mod_set1 (t, pp);
       i = 1;
 
-      for (i = 0; i < n; i++)
+      for (i = k = 0; i < n; i++)
         {
-          one_cubic_root_1mod3 (rr[3*i], zeta, rr[2 * (d / 3) + i], pp);
+          /* Note: if d is divisible by 9, then we must check again if each
+             root of x^(d/3) = a (mod p) is a cube. For example for d = 9,
+             a = 9943082 and p = 20000047, we have three roots of x^3 = a,
+             namely 10169532, 11660661 and 18169901, but only 11660661 is a
+             cube mod p */
+          if ((d % 9) == 0 && is_cube (rr[2 * (d / 3) + i], pp) == 0)
+            continue;
+          one_cubic_root_1mod3 (rr[k], zeta, rr[2 * (d / 3) + i], pp);
           /* zeta is a cubic root of 1 */
-          mod_mul (rr[3*i+1], rr[3*i], zeta, pp);
-          mod_mul (rr[3*i+2], rr[3*i+1], zeta, pp);
+          mod_mul (rr[k+1], rr[3*i], zeta, pp);
+          mod_mul (rr[k+2], rr[3*i+1], zeta, pp);
+          k += 3;
         }
       mod_clear (zeta, pp);
       mod_clear (t, pp);
-      return 3*n;
+      return k;
     }
   else /* p = 2 (mod 3): exactly one root each */
     {
-      for (i = 0; i < n; i++) {
+      for (i = 0; i < n; i++)
         one_cubic_root_2mod3 (rr[i], rr[2 * (d / 3) + i], pp);
-      }
       return n;
     }
 }
@@ -370,18 +380,24 @@ one_rth_root (residue_t rop, uint64_t r, residue_t delta, modulus_t pp)
       mod_set_ul (c, i, pp);
       mod_pow_ul (c, c, s, pp);
       mod_set (a, c, pp);
-      for (i = 0; i < t - 1; i++)
+      for (j = 0; j < t - 1; j++)
         mod_pow_ul (a, a, r, pp);
       if (mod_is1 (a, pp) != 1)
         break;
     }
-  alpha = invert_mod (r, s);
+  alpha = invert_mod (s, r);
+  /* we have alpha = 1/s mod r, thus alpha*s = 1 + beta*r,
+     where beta = (alpha*s - 1)/r, and 1/r = -beta mod s */
+  alpha = alpha * s - 1;
+  ASSERT(alpha % r == 0);
+  /* since alpha is a modular inverse, it cannot be 0 */
+  alpha = s - (alpha / r);
   mod_pow_ul (b, delta, r * alpha - 1, pp);
   mod_set1 (h, pp);
   for (i = 1; i < t; i++)
     {
       mod_set (d, b, pp);
-      for (j = 0; j < t - 1- i; j++)
+      for (j = 0; j < t - 1 - i; j++)
         mod_pow_ul (d, d, r, pp);
       if (mod_is1 (d, pp))
         mod_pow_ul (c, c, r, pp);
@@ -391,7 +407,8 @@ one_rth_root (residue_t rop, uint64_t r, residue_t delta, modulus_t pp)
           mod_pow_ul (d, c, j, pp);
           mod_mul (h, h, d, pp);
           mod_pow_ul (c, c, r, pp);
-          mod_mul (b, b, c, pp);
+          mod_pow_ul (d, c, j, pp);
+          mod_mul (b, b, d, pp);
         }
     }
   mod_pow_ul (rop, delta, alpha, pp);
@@ -420,7 +437,9 @@ is_rth_power (residue_t a, uint64_t r, modulus_t pp)
   return ret;
 }
 
-/* Roots of x^d = a (mod p), assuming d is not divisible by 2 nor 3 */
+/* Roots of x^d = a (mod p), assuming d is not divisible by 2 nor 3.
+   (This code works in fact for d divisible by 3 too, if one starts by r = 3
+   in the loop below.) */
 static int
 roots (residue_t *rr, residue_t a, int d, modulus_t pp)
 {
@@ -462,8 +481,8 @@ roots (residue_t *rr, residue_t a, int d, modulus_t pp)
   for (i = 2; i < p; i++)
     {
       mod_set_ul (z, i, pp);
-      mod_pow_ul (rr[0], z, (p - 1) / r, pp);
-      if (mod_is1 (rr[0], pp) == 0)
+      mod_pow_ul (z, z, (p - 1) / r, pp);
+      if (mod_is1 (z, pp) == 0)
         break;
     }
   for (i = k = 0; i < n; i++)
@@ -473,8 +492,8 @@ roots (residue_t *rr, residue_t a, int d, modulus_t pp)
       if (mod_is1 (rr[k], pp) == 0)
         continue;
       /* get one r-th root */
-      one_rth_root (rr[k++], r, rr0[i], pp);
-      for (j = 1; j < r; j++, k++)
+      one_rth_root (rr[k], r, rr0[i], pp);
+      for (j = 1, k++; j < r; j++, k++)
         mod_mul (rr[k], rr[k-1], z, pp);
     }
   mod_clear (z, pp);
@@ -491,7 +510,7 @@ mod_roots (residue_t *rr, residue_t aa, int d, modulus_t pp)
       mod_set (rr[0], aa, pp);
       return 1;
     }
-  else if (d % 2 == 0) /* d is even */
+  else if ((d & 1) == 0) /* d is even */
     {
       return roots2 (rr, aa, d, pp);
     }
@@ -500,7 +519,7 @@ mod_roots (residue_t *rr, residue_t aa, int d, modulus_t pp)
       return roots3 (rr, aa, d, pp);
     }
   else
-    return roots(rr, aa, d, pp);
+    return roots (rr, aa, d, pp);
 }
 
 
@@ -520,6 +539,7 @@ sort_roots (uint64_t *r, int n)
     }
 }
 
+#define MAX_DEGREE 10
 
 /* put in r[0], r[1], ... the roots of x^d = a (mod p),
    and return the number of roots.
@@ -530,8 +550,10 @@ roots_mod_uint64 (uint64_t *r, uint64_t a, int d, uint64_t p)
 {
   mpz_t *f;
   int n = -1, nn = -1, i;
-  uint64_t r2[10];
+  uint64_t r2[MAX_DEGREE];
   const int do_both = 0; /* Compute both ways to test? */
+
+  ASSERT_ALWAYS(d <= MAX_DEGREE);
 
   if (d == 1)
     {
@@ -542,23 +564,27 @@ roots_mod_uint64 (uint64_t *r, uint64_t a, int d, uint64_t p)
   if (sizeof (unsigned long) == 8)
     {
       modulus_t pp;
-      residue_t aa, rr[10];
+      residue_t aa, rr[MAX_DEGREE];
 
       mod_initmod_ul (pp, p);
       mod_init (aa, pp);
       mod_set_ul (aa, a, pp);
+      for (i = 0; i < d; i++)
+        mod_init (rr[i], pp);
 
       n = mod_roots (rr, aa, d, pp);
 
       for (i = 0; i < n; i++) {
         r[i] = mod_get_ul (rr[i], pp);
         if (do_both) {
-          mod_pow_ul (rr[i], rr[i], d, pp);
-          ASSERT_ALWAYS (mod_get_ul (rr[i], pp) == a);
+          mod_pow_ul (aa, rr[i], d, pp);
+          ASSERT_ALWAYS (mod_get_ul (aa, pp) == a);
         }
       }
       sort_roots (r, n);
 
+      for (i = 0; i < d; i++)
+        mod_clear (rr[i], pp);
       mod_clear (aa, pp);
       mod_clearmod (pp);
     }

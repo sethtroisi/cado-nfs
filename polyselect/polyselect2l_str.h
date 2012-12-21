@@ -36,7 +36,6 @@
 */
 #define LN2SHASH_NBUCKETS 10
 
-
 /* hash table slots */
 typedef struct
 {

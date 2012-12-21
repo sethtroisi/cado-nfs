@@ -1000,7 +1000,7 @@ collision_on_p ( header_t header,
 
 
 /* collision on each special-q, call collision_on_batch_p() */
-static inline void
+static __attribute__ ((noinline))  void
 collision_on_each_sq ( header_t header,
                        proots_t R,
                        unsigned long q,
@@ -1009,16 +1009,15 @@ collision_on_each_sq ( header_t header,
 {
   shash_t H;
   uint64_t **cur1, **cur2, *ccur1, *ccur2;
-  MAYBE_UNUSED uint64_t **cur3, *ccur3;
   long *pc, *epc;
   double pc2;
   uint64_t pp;
-  int64_t ppl, umax, v1, v2, nv;
-  MAYBE_UNUSED int64_t v3;
+  int64_t ppl, neg_umax, umax, v1, v2, nv;
   unsigned long p, nprimes, c;
   uint8_t vpnr, *pnr, nr, j;
   uint32_t *pprimes, i;
   int found;
+  MAYBE_UNUSED uint64_t cpt = 0, cpt1 = 0, cpt2 = 0, cpt3 = 0;
 
 #ifdef DEBUG_POLYSELECT2L
   int st = cputime();
@@ -1046,8 +1045,7 @@ collision_on_each_sq ( header_t header,
   R->nr[R->size] = 0xff; /* I use guard to end */
   umax = Primes[lenPrimes - 1];
   umax *= umax;
-
-#if 0 /* Old algo */
+  neg_umax = -umax;
 
   /* This define inserts 2 values v1 and v2 with a interlace.
      The goal is to have a little time to read ccurX from L0
@@ -1068,9 +1066,9 @@ collision_on_each_sq ( header_t header,
     __builtin_prefetch(ccur1, 1, 3); *cur1 = ccur1;		\
   } while (0)
 
-  int64_t neg_umax;
-  neg_umax = -umax;
-  do {
+#if 0 /* Old algo */
+
+  for (;;) {
     do {
       vpnr = *pnr++;
       pprimes++;
@@ -1082,58 +1080,40 @@ collision_on_each_sq ( header_t header,
     __builtin_prefetch(((void *) pc) + 0x280, 0, 3);
     ppl *= ppl;
     epc = pc + vpnr;
-    do {
+    for (;;) {
       /* v2 = nv [- ppl] insertions == nv + [ppl] insertions -/+ 1;
-	 max inserts == 4, min == 0. */
-      do {
-	v1 = nv; nv = pc[1]; v2 = v1 - ppl;
-	if (UNLIKELY(v1 >= umax))     goto l1v2;
-	if (UNLIKELY(v2 <= neg_umax)) goto l1v1;
-	INSERT_2I(v1, v2); v1 += ppl; v2 -= ppl;
-	if (UNLIKELY(v1 >= umax))     goto l1v2;
-	if (UNLIKELY(v2 <= neg_umax)) goto l1v1;
-	INSERT_2I(v1, v2); v1 += ppl; v2 -= ppl;
-	if (UNLIKELY(v1 >= umax))     goto l1v2;
-	if (UNLIKELY(v2 <= neg_umax)) goto l1v1;
-	INSERT_2I(v1, v2); v1 += ppl; v2 -= ppl;
-	if (UNLIKELY(v1 >= umax))     goto l1v2;
-	if (UNLIKELY(v2 <= neg_umax)) goto l1v1;
-	INSERT_2I(v1, v2);
-	break;
-      l1v1:
-	INSERT_I(v1);
-	break;
-      l1v2:
-	if (v2 > neg_umax) INSERT_I(v2);
-      } while (0);
-      v1 = nv; pc += 2; nv = *pc; v2 = v1 - ppl;
-      if (UNLIKELY(v1 >= umax))     goto l2v2;
-      if (UNLIKELY(v2 <= neg_umax)) goto l2v1;
-      INSERT_2I(v1, v2); v1 += ppl; v2 -= ppl;
-      if (UNLIKELY(v1 >= umax))     goto l2v2;
-      if (UNLIKELY(v2 <= neg_umax)) goto l2v1;
-      INSERT_2I(v1, v2); v1 += ppl; v2 -= ppl;
-      if (UNLIKELY(v1 >= umax))     goto l2v2;
-      if (UNLIKELY(v2 <= neg_umax)) goto l2v1;
-      INSERT_2I(v1, v2); v1 += ppl; v2 -= ppl;
-      if (UNLIKELY(v1 >= umax))     goto l2v2;
-      if (UNLIKELY(v2 <= neg_umax)) goto l2v1;
-      INSERT_2I(v1, v2);
-      continue;
-    l2v1:
-      INSERT_I(v1);
-      continue;
-    l2v2:
-      if (v2 > neg_umax) INSERT_I(v2);
-    } while (pc != epc);
-  } while (1); 
-#undef INSERT_2I
-#undef INSERT_I
-  
+	 max inserts == 4+4, min == 1+1. */
+      v1 = nv;       cur1 = CURRENT(v1); ccur1 = *cur1;
+      v2 = v1 - ppl; cur2 = CURRENT(v2); ccur2 = *cur2;
+      nv = *++pc;
+      *ccur1++ = v1; __builtin_prefetch(ccur1, 1, 3); *cur1 = ccur1;
+      *ccur2++ = v2; __builtin_prefetch(ccur2, 1, 3); *cur2 = ccur2;
+      v1 += ppl; v2 -= ppl;
+      if (v1 > umax)     goto l1v2;
+      if (v2 < neg_umax) goto l1v1;
+      INSERT_2I(v1,v2); v1 += ppl; v2 -= ppl;
+      if (v1 > umax)     goto l1v2;
+      if (v2 < neg_umax) goto l1v1;
+      INSERT_2I(v1,v2); v1 += ppl; v2 -= ppl;
+      if (LIKELY(v1 > umax))
+      l1v2: if (LIKELY(v2 < neg_umax))
+	  if (LIKELY(pc != epc)) continue; else break;
+	else {
+	  INSERT_I(v2); if (LIKELY(pc != epc)) continue; else break;
+	}
+      else if (LIKELY(v2 < neg_umax)) {
+      l1v1: INSERT_I(v1); if (LIKELY(pc != epc)) continue; else break;
+      }
+      else {
+	INSERT_2I(v1,v2); if (LIKELY(pc != epc)) continue; else break;
+      }
+    }
+  }
+    
 #else /* New Algo */
-  
+
   int64_t b;
-  b = umax * .2857142857142857;
+  b = (int64_t) ((double) umax * 0.3333333333333333);
   do {
     do {
       vpnr = *pnr++;
@@ -1142,93 +1122,33 @@ collision_on_each_sq ( header_t header,
     if (UNLIKELY(vpnr == 0xff)) goto bend;
     ppl = *pprimes;
     __builtin_prefetch(((void *) pnr) + 0x040, 0, 3);
-    __builtin_prefetch(((void *) pprimes) + 0x100, 0, 3);
-    __builtin_prefetch(((void *) pc) + 0x280, 0, 3);
+    __builtin_prefetch(((void *) pprimes) + 0x80, 0, 3);
+    __builtin_prefetch(((void *) pc) + 0x100, 0, 3);
     ppl *= ppl;
     epc = pc + vpnr;
-    if (UNLIKELY(ppl > b)) { b = umax * .4; goto iter3; }
+    if (UNLIKELY(ppl > b)) { b = umax >> 1; goto iter2; }
     do {
       v1 = nv;                    cur1 = CURRENT(v1); ccur1 = *cur1;
-      v2 = v1 + ppl;              cur2 = CURRENT(v2); ccur2 = *cur2;
-      v3 = v2 + ppl;              cur3 = CURRENT(v3); ccur3 = *cur3;
-      *ccur1++ = v1; __builtin_prefetch(ccur1, 1, 3); *cur1 = ccur1;
-      *ccur2++ = v2; __builtin_prefetch(ccur2, 1, 3); *cur2 = ccur2;
-      *ccur3++ = v3; __builtin_prefetch(ccur3, 1, 3); *cur3 = ccur3;
-      v1 -= ppl;                  cur1 = CURRENT(v1); ccur1 = *cur1;
       v2 = v1 - ppl;              cur2 = CURRENT(v2); ccur2 = *cur2;
-      v3 += ppl;                  cur3 = CURRENT(v3); ccur3 = *cur3;
+      nv = *++pc; 
       *ccur1++ = v1; __builtin_prefetch(ccur1, 1, 3); *cur1 = ccur1;
       *ccur2++ = v2; __builtin_prefetch(ccur2, 1, 3); *cur2 = ccur2;
-      *ccur3++ = v3; __builtin_prefetch(ccur3, 1, 3); *cur3 = ccur3;
-      v1 = v2 - ppl;              cur1 = CURRENT(v1); ccur1 = *cur1;
-      v2 = v1 - ppl;              cur2 = CURRENT(v2); ccur2 = *cur2;
-      nv = pc[1];
+      v1 += ppl;                  cur1 = CURRENT(v1); ccur1 = *cur1;
+      v2 -= ppl;                  cur2 = CURRENT(v2); ccur2 = *cur2;
       *ccur1++ = v1; __builtin_prefetch(ccur1, 1, 3); *cur1 = ccur1;
       *ccur2++ = v2; __builtin_prefetch(ccur2, 1, 3); *cur2 = ccur2;
-
-      v1 = nv;                    cur1 = CURRENT(v1); ccur1 = *cur1;
-      v2 = v1 + ppl;              cur2 = CURRENT(v2); ccur2 = *cur2;
-      v3 = v2 + ppl;              cur3 = CURRENT(v3); ccur3 = *cur3;
+      v1 += ppl;                  cur1 = CURRENT(v1); ccur1 = *cur1;
+      v2 -= ppl;                  cur2 = CURRENT(v2); ccur2 = *cur2;
       *ccur1++ = v1; __builtin_prefetch(ccur1, 1, 3); *cur1 = ccur1;
       *ccur2++ = v2; __builtin_prefetch(ccur2, 1, 3); *cur2 = ccur2;
-      *ccur3++ = v3; __builtin_prefetch(ccur3, 1, 3); *cur3 = ccur3;
-      v1 -= ppl;                  cur1 = CURRENT(v1); ccur1 = *cur1;
-      v2 = v1 - ppl;              cur2 = CURRENT(v2); ccur2 = *cur2;
-      v3 += ppl;                  cur3 = CURRENT(v3); ccur3 = *cur3;
-      *ccur1++ = v1; __builtin_prefetch(ccur1, 1, 3); *cur1 = ccur1;
-      *ccur2++ = v2; __builtin_prefetch(ccur2, 1, 3); *cur2 = ccur2;
-      *ccur3++ = v3; __builtin_prefetch(ccur3, 1, 3); *cur3 = ccur3;
-      v1 = v2 - ppl;              cur1 = CURRENT(v1); ccur1 = *cur1;
-      v2 = v1 - ppl;              cur2 = CURRENT(v2); ccur2 = *cur2;
-      pc += 2; nv = *pc; 
-      *ccur1++ = v1; __builtin_prefetch(ccur1, 1, 3); *cur1 = ccur1;
-      *ccur2++ = v2; __builtin_prefetch(ccur2, 1, 3); *cur2 = ccur2;
+      v1 += ppl; v2 -= ppl;
+      if (LIKELY (v1 > umax)) {
+	if (UNLIKELY (v2 >= neg_umax)) INSERT_I(v2);
+      } else if (UNLIKELY (v2 >= neg_umax)) INSERT_2I(v1, v2);
+      else INSERT_I(v1);
     } while (pc != epc);
   } while (1);
   
-  do {
-    do {
-      vpnr = *pnr++;
-      pprimes++;
-    } while (!vpnr);
-    if (UNLIKELY(vpnr == 0xff)) goto bend;
-    ppl = *pprimes;
-    __builtin_prefetch(((void *) pnr) + 0x040, 0, 3);
-    __builtin_prefetch(((void *) pprimes) + 0x100, 0, 3);
-    __builtin_prefetch(((void *) pc) + 0x280, 0, 3);
-    ppl *= ppl;
-    epc = pc + vpnr;
-  iter3:
-    if (UNLIKELY(ppl > b)) { b = umax * .6666666666666667; goto iter2; }
-    do {
-      v1 = nv; nv = pc[1];        cur1 = CURRENT(v1); ccur1 = *cur1;
-      v2 = v1 + ppl;              cur2 = CURRENT(v2); ccur2 = *cur2;
-      v3 = v2 + ppl;              cur3 = CURRENT(v3); ccur3 = *cur3;
-      *ccur1++ = v1; __builtin_prefetch(ccur1, 1, 3); *cur1 = ccur1;
-      *ccur2++ = v2; __builtin_prefetch(ccur2, 1, 3); *cur2 = ccur2;
-      *ccur3++ = v3; __builtin_prefetch(ccur3, 1, 3); *cur3 = ccur3;
-      v1 -= ppl;                  cur1 = CURRENT(v1); ccur1 = *cur1;
-      v2 = v1 - ppl;              cur2 = CURRENT(v2); ccur2 = *cur2;
-      v3 = v2 - ppl;              cur3 = CURRENT(v3); ccur3 = *cur3;
-      *ccur1++ = v1; __builtin_prefetch(ccur1, 1, 3); *cur1 = ccur1;
-      *ccur2++ = v2; __builtin_prefetch(ccur2, 1, 3); *cur2 = ccur2;
-      *ccur3++ = v3; __builtin_prefetch(ccur3, 1, 3); *cur3 = ccur3;
-
-      v1 = nv; pc += 2; nv = *pc; cur1 = CURRENT(v1); ccur1 = *cur1;
-      v2 = v1 + ppl;              cur2 = CURRENT(v2); ccur2 = *cur2;
-      v3 = v2 + ppl;              cur3 = CURRENT(v3); ccur3 = *cur3;
-      *ccur1++ = v1; __builtin_prefetch(ccur1, 1, 3); *cur1 = ccur1;
-      *ccur2++ = v2; __builtin_prefetch(ccur2, 1, 3); *cur2 = ccur2;
-      *ccur3++ = v3; __builtin_prefetch(ccur3, 1, 3); *cur3 = ccur3;
-      v1 -= ppl;                  cur1 = CURRENT(v1); ccur1 = *cur1;
-      v2 = v1 - ppl;              cur2 = CURRENT(v2); ccur2 = *cur2;
-      v3 = v2 - ppl;              cur3 = CURRENT(v3); ccur3 = *cur3;
-      *ccur1++ = v1; __builtin_prefetch(ccur1, 1, 3); *cur1 = ccur1;
-      *ccur2++ = v2; __builtin_prefetch(ccur2, 1, 3); *cur2 = ccur2;
-      *ccur3++ = v3; __builtin_prefetch(ccur3, 1, 3); *cur3 = ccur3;
-    } while (pc != epc);
-  } while (1);
-
   do {
     do {
       vpnr = *pnr++;
@@ -1246,23 +1166,18 @@ collision_on_each_sq ( header_t header,
     do {
       v1 = nv;                    cur1 = CURRENT(v1); ccur1 = *cur1;
       v2 = v1 - ppl;              cur2 = CURRENT(v2); ccur2 = *cur2;
-      nv = pc[1];
+      nv = *++pc;
       *ccur1++ = v1; __builtin_prefetch(ccur1, 1, 3); *cur1 = ccur1;
       *ccur2++ = v2; __builtin_prefetch(ccur2, 1, 3); *cur2 = ccur2;
       v1 += ppl;                  cur1 = CURRENT(v1); ccur1 = *cur1;
       v2 -= ppl;                  cur2 = CURRENT(v2); ccur2 = *cur2;
       *ccur1++ = v1; __builtin_prefetch(ccur1, 1, 3); *cur1 = ccur1;
       *ccur2++ = v2; __builtin_prefetch(ccur2, 1, 3); *cur2 = ccur2;
-
-      v1 = nv;                    cur1 = CURRENT(v1); ccur1 = *cur1;
-      v2 = v1 - ppl;              cur2 = CURRENT(v2); ccur2 = *cur2;
-      pc += 2; nv = *pc;
-      *ccur1++ = v1; __builtin_prefetch(ccur1, 1, 3); *cur1 = ccur1;
-      *ccur2++ = v2; __builtin_prefetch(ccur2, 1, 3); *cur2 = ccur2;
-      v1 += ppl;                  cur1 = CURRENT(v1); ccur1 = *cur1;
-      v2 -= ppl;                  cur2 = CURRENT(v2); ccur2 = *cur2;
-      *ccur1++ = v1; __builtin_prefetch(ccur1, 1, 3); *cur1 = ccur1;
-      *ccur2++ = v2; __builtin_prefetch(ccur2, 1, 3); *cur2 = ccur2;
+      v1 += ppl; v2 -= ppl;
+      if (LIKELY (v1 > umax)) {
+	if (UNLIKELY (v2 >= neg_umax)) INSERT_I(v2);
+      } else if (UNLIKELY (v2 >= neg_umax)) INSERT_2I(v1, v2);
+      else INSERT_I(v1);
     } while (pc != epc);
   } while (1);
 
@@ -1282,21 +1197,23 @@ collision_on_each_sq ( header_t header,
     do {
       v1 = nv;                    cur1 = CURRENT(v1); ccur1 = *cur1;
       v2 = v1 - ppl;              cur2 = CURRENT(v2); ccur2 = *cur2;
-      nv = pc[1];
+      nv = *++pc; 
       *ccur1++ = v1; __builtin_prefetch(ccur1, 1, 3); *cur1 = ccur1;
       *ccur2++ = v2; __builtin_prefetch(ccur2, 1, 3); *cur2 = ccur2;
-
-      v1 = nv;                    cur1 = CURRENT(v1); ccur1 = *cur1;
-      v2 = v1 - ppl;              cur2 = CURRENT(v2); ccur2 = *cur2;
-      pc += 2; nv = *pc;
-      *ccur1++ = v1; __builtin_prefetch(ccur1, 1, 3); *cur1 = ccur1;
-      *ccur2++ = v2; __builtin_prefetch(ccur2, 1, 3); *cur2 = ccur2;
+      v1 += ppl; v2 -= ppl;
+      if (LIKELY (v1 > umax)) {
+	if (UNLIKELY (v2 >= neg_umax)) INSERT_I(v2);
+      } else if (UNLIKELY (v2 >= neg_umax)) INSERT_2I(v1, v2);
+      else INSERT_I(v1);
     } while (pc != epc);
   } while (1);
 
  bend:
 #endif
-  
+#undef INSERT_2I
+#undef INSERT_I
+
+  /* fprintf (stderr, "%lu %lu %lu %lu\n", cpt, cpt1, cpt2, cpt3); */
   for (i = 0; i < SHASH_NBUCKETS; i++) assert (H->current[i] <= H->base[i+1]);
 
   /*
