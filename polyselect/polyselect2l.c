@@ -1002,7 +1002,7 @@ collision_on_p ( header_t header,
 
 
 /* collision on each special-q, call collision_on_batch_p() */
-static __attribute__ ((noinline))  void
+static inline void
 collision_on_each_sq ( header_t header,
                        proots_t R,
                        unsigned long q,
