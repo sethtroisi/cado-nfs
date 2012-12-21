@@ -65,6 +65,11 @@ class WuDb: # {
         # which (hopefully) prevents, e.g., race conditions between two threads
         # looking up an available workunit and assigning it to a client
         self.db = sqlite3.connect(filename, isolation_level="DEFERRED")
+        # Enable foreign key support
+        cursor = self.db.cursor()
+        cursor.execute("PRAGMA foreign_keys = ON;")
+        self.db.commit()
+        cursor.close()
 
     def cursor(self):
         return self.db.cursor()
@@ -122,6 +127,14 @@ class WuDb: # {
         command = "CREATE TABLE IF NOT EXISTS " + table + \
             "( " + ", ".join([" ".join(col) for col in layout]) + " );"
         self.__class__._exec (cursor, command, (), "create_table")
+    
+    def create_index(self, cursor, table, d):
+        """ Creates an index with fields as described in the d dictionary """
+        for (name, columns) in d.items():
+            column_names = [col[0] for col in columns]
+            command = "CREATE INDEX IF NOT EXISTS " + name + " ON " + \
+                table + "( " + ", ".join(column_names) + " );"
+            self.__class__._exec (cursor, command, (), "create_index")
     
     def insert(self, cursor, table, d):
         """ Insert a new entry, where d is a dictionary containing the 
@@ -217,6 +230,7 @@ class DbTable: # {
 
     def create(self, cursor):
         self.db.create_table(cursor, self.tablename, self.fields)
+        self.db.create_index(cursor, self.tablename, self.index)
 
     def insert(self, cursor, d):
         """ Insert a new row into this table. The column:value pairs are 
@@ -252,6 +266,7 @@ class WuTable(DbTable):
         ("retryof", "TEXT", ""),
         ("priority", "INTEGER", "")
     )
+    index = {}
 
 class FilesTable(DbTable):
     name = "files"
@@ -261,6 +276,7 @@ class FilesTable(DbTable):
         ("filename", "TEXT", ""), 
         ("path", "TEXT", "UNIQUE NOT NULL")
     )
+    index = {"wuindex": (fields[1],)}
 
 class WuActiveRecord(): # {
     """ This class maps between the WORKUNIT and FILES tables 
@@ -400,6 +416,7 @@ class WuActiveRecord(): # {
         cursor = self.db.cursor()
         self.wutable.create(cursor)
         self.filestable.create(cursor)
+        
         cursor.execute("PRAGMA journal_mode=WAL;")
         self.db.commit()
         cursor.close()
@@ -701,8 +718,9 @@ if __name__ == '__main__': # {
         if wus is None:
             print(wus)
         else:
-            for wu in wus:
-                print (str(wu))
+            # for wu in wus:
+            #    print (str(wu))
+            print (len(wus))
     # Functions for testing
     if args["assign"]:
         clientid = args["assign"][0]
