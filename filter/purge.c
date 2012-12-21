@@ -971,7 +971,7 @@ renumber (const char *sos)
         fprintf (fsos, "# each row contains 3 hexadecimal values: i p r\n"
 		 "# i is the ideal index value (starting from 0)\n"
 		 "# p is the corresponding prime\n"
-		 "# r is the corresponding root (p+2 on the rational side)\n");
+		 "# r is the corresponding root (p+1 on the rational side)\n");
       }
     for (i = 0; i < H.hm; i++)
       if (H.hc[i]) {
@@ -982,7 +982,7 @@ renumber (const char *sos)
 	static int count = 0;
 	if (H.hc[i] == 1 && (count ++ < 10))
 	  {
-	    if (GET_HASH_P(&H,i) == GET_HASH_R(&H,i) + 1)
+	    if (GET_HASH_P(&H,i) == GET_HASH_R(&H,i) - 1)
 	      fprintf (stderr, "Warning: singleton rational prime %lu\n",
 		       (unsigned long) GET_HASH_P(&H,i));
 	    else
