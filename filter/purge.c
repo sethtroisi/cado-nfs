@@ -2325,7 +2325,7 @@ main (int argc, char **argv)
     rel_used->p[nrelmax>>LN2_BV_BITS] &= (((bv_t) 1)<<(nrelmax & (BV_BITS - 1))) - 1;
 
   tot_alloc0 += mysize;
-  fprintf (stderr, "Allocated rel_used of %zuMb (total %zuMb so far)\n",
+  fprintf (stderr, "Allocated rel_used of %uMb (total %zuMb so far)\n",
 	   nrelmax >> 20,
 	   tot_alloc0 >> 20);
 
