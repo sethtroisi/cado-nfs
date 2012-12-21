@@ -14,6 +14,8 @@
   Please report bugs to shi.bai AT anu.edu.au.
 */
 
+#define EMIT_ADDRESSABLE_shash_add
+
 #include "polyselect2l.h"
 
 #define TARGET_TIME 10000000 /* print stats every TARGET_TIME milliseconds */
