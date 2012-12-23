@@ -13,6 +13,7 @@
 #include "gmp_aux.h"
 #include "rootfinder.h"
 #include "modredc_ul.h"
+#include "mod_ul.h"
 #include "modredc_ul_default.h"
 
 static int 
@@ -23,50 +24,27 @@ static unsigned char isprime_table[] = {0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1,
   0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 
   1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0};
 
+static const size_t isprime_table_size = 
+    sizeof(isprime_table) / sizeof(isprime_table[0]);
+
 /* return 1/a mod b */
 static uint64_t
 invert_mod (uint64_t a, uint64_t b)
 {
-  modulus_t cc;
-  residue_t aa;
-  uint64_t c, r;
-  int t;
+  modulusul_t bb;
+  residueul_t aa;
+  uint64_t r;
   
-  for (c = b, t = 0; (c & 1) == 0; t++, c >>= 1);
-  /* b = 2^t * c */
-  
-  /* Inverse 1/a mod c */
-  mod_initmod_ul (cc, c);
-  mod_init (aa, cc);
-  mod_set_ul (aa, a, cc);
-  mod_inv (aa, aa, cc);
+  /* Inverse 1/a mod b */
+  modul_initmod_ul (bb, b);
+  modul_init (aa, bb);
+  modul_set_ul (aa, a, bb);
+  modul_inv (aa, aa, bb);
 
-  r = mod_get_ul (aa, cc);
+  r = modul_get_ul (aa, bb);
 
-  if (t > 0) {
-    uint64_t r2;
-    int i;
-    /* x := a_1 n_2 [n_2^{-1}]_{n_1} + a_2 n_1 [n_1^{-1}]_{n_2} */
-    /* x := 2^t [aa 2^{-t}]_{c} + c [r2 c^{-1}]_{2^t} */
-
-    /* Compute r2 = 1/a mod 2^t */
-    r2 = ularith_invmod(a);
-
-    /* Compute r2 = r2 c^{-1} (mod 2^t) */
-    r2 = (r2 * r) & ((1UL << t) - 1);
-
-    /* Compute r = r 2^{-t} (mod c) */
-    for (i = 0 ; i < t; i++)
-      mod_div2 (aa, aa, cc);
-    r = mod_get_ul (aa, cc);
-
-    r = (r << t) + r2 * c;
-    if (r >= b)
-      r -= b;
-  }
-
-  mod_clear (aa, cc);
-  mod_clearmod (cc);
+  modul_clear (aa, bb);
+  modul_clearmod (bb);
 
   return r;
 }
@@ -127,7 +105,8 @@ roots2 (residue_t *rr, residue_t aa, int d, modulus_t pp)
     /* zz is equal to i (mod pp) */
     mod_add1 (zz, zz, pp);
     i++;
-  } while (!isprime_table[i] || mod_jacobi (zz, pp) != -1);
+  } while (i < isprime_table_size && (!isprime_table[i] || mod_jacobi (zz, pp) != -1));
+  ASSERT_ALWAYS(i < isprime_table_size);
   mod_init (hh, pp);
   mod_init (aa, pp);
   mod_init (delta, pp);
@@ -218,6 +197,7 @@ one_cubic_root_1mod3 (residue_t rr, residue_t zeta, residue_t ddelta, modulus_t 
       /* rho is equal to i (mod pp) */
       /* no point in testing i = k*l where we know both k and l are cubic 
          residues, so we do only primes */
+      ASSERT_ALWAYS(i < isprime_table_size);
       if (!isprime_table[i])
         continue;
       mod_pow_ul (a, rho, s, pp); /* a = rho^s */
@@ -548,10 +528,7 @@ sort_roots (uint64_t *r, int n)
 int
 roots_mod_uint64 (uint64_t *r, uint64_t a, int d, uint64_t p)
 {
-  mpz_t *f;
-  int n = -1, nn = -1, i;
-  uint64_t r2[MAX_DEGREE];
-  const int do_both = 0; /* Compute both ways to test? */
+  int n = -1, i;
 
   ASSERT_ALWAYS(d <= MAX_DEGREE);
 
@@ -576,45 +553,30 @@ roots_mod_uint64 (uint64_t *r, uint64_t a, int d, uint64_t p)
 
       for (i = 0; i < n; i++) {
         r[i] = mod_get_ul (rr[i], pp);
-        if (do_both) {
-          mod_pow_ul (aa, rr[i], d, pp);
-          ASSERT_ALWAYS (mod_get_ul (aa, pp) == a);
-        }
+#ifndef NDEBUG
+        /* Check that it's a d-th root of a */
+        mod_set_ul (aa, r[i], pp);
+        mod_pow_ul (aa, aa, d, pp);
+        ASSERT (mod_get_ul (aa, pp) == a);
+#endif
       }
       sort_roots (r, n);
+#ifndef NDEBUG
+      for (i = 1; i < n; i++) {
+        /* Check for dupes */
+        if (r[i-1] >= r[i]) {
+          fprintf (stderr, "%lu^(1/%d) (mod %lu), r[%d]: %lu >= r[%d]: %lu\n", 
+                   a, d, p, i-1, r[i-1], i, r[i]);
+          ASSERT(r[i-1] < r[i]);
+        }
+      }
+#endif
 
       for (i = 0; i < d; i++)
         mod_clear (rr[i], pp);
       mod_clear (aa, pp);
       mod_clearmod (pp);
     }
-
-  if (n == -1 || do_both) {
-    f = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
-    for (i = 0; i <= d; i++)
-      mpz_init (f[i]);
-    mpz_set_ui (f[d], 1);
-    mpz_set_uint64 (f[0], p - a);
-    nn = poly_roots_uint64 (r2, f, d, p);
-    for (i = 0; i <= d; i++)
-      mpz_clear (f[i]);
-    free (f);
-    sort_roots (r2, nn);
-  }
-
-  if (n != -1 && nn != -1) {
-    /* If we ran both, compare to verify results */
-    ASSERT_ALWAYS(n == nn);
-    for (i = 0; i < n; i++) {
-      ASSERT_ALWAYS(r[i] == r2[i]);
-    }
-  } else if (n == -1) {
-    /* We ran poly_roots_uint64(). Copy result */
-    n = nn;
-    for (i = 0; i < n; i++) {
-      r[i] = r2[i];
-    }
-  }
 
   return n;
 }
