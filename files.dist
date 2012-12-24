@@ -1,8 +1,8 @@
 # This file gives the exact contents of the distribution. If a directory is
-# are *NOT* recognized (by the fascist sanity check program).
 # mentioned (with a trailing slash), then all its children are included. Note
 # that the union of this file and its companion files.nodist must agree with
 # the list of files known to the SCM.  A further word of caution: wildcards
+# are *NOT* recognized (by the fascist sanity check program).
 AUTHORS
 CMakeLists.txt
 COPYING
@@ -732,6 +732,7 @@ utils/usp.c
 utils/usp.h
 utils/utils.h
 utils/roots_mod.c
+utils/test_roots_mod.c
 linalg/bwc/mpfq/abase_p_3.c
 linalg/bwc/mpfq/abase_p_3.h
 linalg/bwc/mpfq/abase_p_3_t.c
