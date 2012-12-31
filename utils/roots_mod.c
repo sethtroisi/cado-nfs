@@ -49,6 +49,181 @@ invert_mod (uint64_t a, uint64_t b)
   return r;
 }
 
+static inline int
+isprime_ul (unsigned long n)
+{
+  int r;
+  modulus_t nn;
+  mod_initmod_ul (nn, n);
+  r = mod_isprime (nn);
+  mod_clearmod (nn);
+  return r;
+}
+
+
+/* Factor n, put prime factors into p, their exponents into e */
+unsigned char
+factor_ul (unsigned long *p, unsigned char *e, const unsigned long n)
+{
+  unsigned long c = n;
+  unsigned char ndiv = 0;
+  
+  if (c % 2 == 0) {
+    p[ndiv] = 2;
+    e[ndiv] = ularith_ctz(c);
+    c >>= e[ndiv];
+    ndiv++;
+  }
+
+  if (c % 3 == 0) {
+    p[ndiv] = 3;
+    e[ndiv] = 0;
+    do {
+      e[ndiv]++;
+      c /= 3;
+    } while (c % 3 == 0);
+    ndiv++;
+  }
+
+  if (c % 5 == 0) {
+    p[ndiv] = 5;
+    e[ndiv] = 0;
+    do {
+      e[ndiv]++;
+      c /= 5;
+    } while (c % 5 == 0);
+    ndiv++;
+  }
+
+  if (c >= 49 && !isprime_ul(c)) {
+    unsigned long q, maxq = ularith_sqrt (c);
+    for (q = 7; q <= maxq; q += 2) {
+      if (c % q == 0) {
+        p[ndiv] = q;
+        e[ndiv] = 0;
+        do {
+          e[ndiv]++;
+          c /= q;
+        } while (c % q == 0);
+        ndiv++;
+        maxq = ularith_sqrt (c);
+        if (q > maxq || isprime_ul(c))
+          break;
+      }
+    }
+  }
+
+  if (c > 1) {
+    p[ndiv] = c;
+    e[ndiv] = 1;
+    ndiv++;
+  }
+
+  return ndiv;
+}
+
+
+/* Initialise enumeration of all proper divisors of n */
+void 
+enumeratediv_init (enumeratediv_t *r, const unsigned long n)
+{
+  unsigned int i;
+
+  r->ndiv = factor_ul (r->p, r->e, n);
+
+  for (i = 0; i < r->ndiv; i++) {
+    r->c[i] = 0;
+  }
+}
+
+
+/* Iterate through the proper divisors of n. *Not* necessarily in increasing order.
+   Return code of 0 means no more divisors. */
+unsigned long 
+enumeratediv (enumeratediv_t *r)
+{
+  unsigned int i = 0;
+  unsigned long P = 1;
+  
+  while (i < r->ndiv && ++r->c[i] > r->e[i]) {
+    r->c[i] = 0;
+    i++;
+  }
+  if (i == r->ndiv)
+    return 0;
+  
+  for (i = 0; i < r->ndiv; i++) {
+    int j;
+    for (j = 0; j < r->c[i]; j++)
+      P *= r->p[i];
+  }
+  return P;
+}
+
+
+/* Return in o a k-th primitive root of unity modulo p, and in b a residue 
+   that is a q-th non-power for each q|k. Assumes that k | p-1. */
+void
+omega (residue_t o, residue_t b, const unsigned long k, const modulus_t pp) 
+{
+  residue_t pow;
+  const unsigned long p = mod_getmod_ul (pp);
+  unsigned long pprime;
+  unsigned long kdivq[15] = {}; /* k/q for each prime q | k */
+  unsigned char exp[15] = {};
+  unsigned long c = k;
+  unsigned int i, ndiv;
+
+  ASSERT (k > 0);
+  if (k == 1) {
+    mod_set1 (o, pp);
+    return;
+  }
+  
+  pprime = (p-1) / k;
+  ASSERT (pprime * k == p-1);
+
+  if (c % 2 == 0) {
+    /* Not added to prime factor list, we use Jacobi symbol for check */
+    c >>= ularith_ctz (c);
+  }
+
+  ndiv = factor_ul (kdivq, exp, c);
+  for (i = 0; i < ndiv; i++)
+    kdivq[i] = k / kdivq[i];
+
+  mod_init (pow, pp);
+  mod_set1 (b, pp);
+  for (i = 2; i < p; i++) {
+    unsigned int j;
+    mod_add1 (b, b, pp);
+    if ((ndiv == 0 || (ndiv == 1 && k % 2 == 1)) && !isprime_table[i])
+      continue;
+    if (k % 2 == 0 && mod_jacobi(b, pp) == 1)
+      continue;
+    mod_pow_ul (o, b, pprime, pp);
+    for (j = 0; j < ndiv; j++) {
+      mod_pow_ul (pow, o, kdivq[j], pp);
+      if (mod_is1(pow, pp))
+        break;
+    }
+    if (j == ndiv)
+      break;
+  }
+
+#if 0
+  /* Very slow but simple test */
+  for (c = 1; c < k; c++) {
+    mod_pow_ul (pow, o, c, pp);
+    ASSERT_ALWAYS (!mod_is1(pow, pp));
+    mod_pow_ul (pow, o, k, pp);
+    ASSERT_ALWAYS (mod_is1(pow, pp));
+  }
+#endif
+  mod_clear (pow, pp);
+}
+
+
 /************************** square roots *************************************/
 
 /* Roots of x^d = a (mod p) for d even and a 64-bit word */
@@ -337,7 +512,7 @@ one_rth_root (residue_t rop, uint64_t r, residue_t delta, modulus_t pp)
 {
   residue_t a, b, c, d, h;
   const uint64_t p = mod_getmod_ul (pp);
-  uint64_t i, j, s, t, alpha;
+  uint64_t i, j, s, t, alpha, rt;
 
   /* when p-1 is not divisible by r, there is exactly one root */
   if (((p - 1) % r) != 0)
@@ -354,17 +529,28 @@ one_rth_root (residue_t rop, uint64_t r, residue_t delta, modulus_t pp)
   mod_init (c, pp);
   mod_init (d, pp);
   mod_init (h, pp);
-  for (s = (p - 1) / r, t = 1; (s % r) == 0; s /= r, t++);
+  /* Write s * r^t = p-1, t maximal, and rt = r^t */
+  for (s = (p - 1) / r, t = 1, rt = r; (s % r) == 0; s /= r, t++, rt *= r);
+
+#if 1
+  omega(c, a, rt, pp);
+  mod_pow_ul (a, c, rt/r, pp);
+#else  
   for (i = 2; i < p; i++)
     {
+      /* c = i (mod p) */
       mod_set_ul (c, i, pp);
       mod_pow_ul (c, c, s, pp);
       mod_set (a, c, pp);
       for (j = 0; j < t - 1; j++)
         mod_pow_ul (a, a, r, pp);
-      if (mod_is1 (a, pp) != 1)
+      if (mod_is1 (a, pp) != 1) {
+        /* Now c is an r^t-th primitive root of unity, and a is an r-th 
+           primitive root of unity */
         break;
+      }
     }
+#endif
   alpha = invert_mod (s, r);
   /* we have alpha = 1/s mod r, thus alpha*s = 1 + beta*r,
      where beta = (alpha*s - 1)/r, and 1/r = -beta mod s */
