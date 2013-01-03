@@ -207,6 +207,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         body.append("<p>Query for conditions = " + str(conditions) + "</p>")
 
         if not wus is None and len(wus) > 0:
+            body.append(str(len(wus)) + " records match.")
             keys = wus[0].tuple_keys()
             body.start_table(keys)
             for wu in wus:
