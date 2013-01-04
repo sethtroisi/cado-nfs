@@ -733,6 +733,7 @@ utils/usp.h
 utils/utils.h
 utils/roots_mod.c
 utils/test_roots_mod.c
+utils/test_omega.c
 linalg/bwc/mpfq/abase_p_3.c
 linalg/bwc/mpfq/abase_p_3.h
 linalg/bwc/mpfq/abase_p_3_t.c

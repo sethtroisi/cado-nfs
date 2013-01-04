@@ -62,6 +62,14 @@ modul_intset_ul (modintul_t r, const unsigned long s)
 
 
 MAYBE_UNUSED
+static inline unsigned long 
+modul_intget_ul (const modintul_t s)
+{
+  return s[0];
+}
+
+
+MAYBE_UNUSED
 static inline int
 modul_intequal (const modintul_t a, const modintul_t b)
 {
