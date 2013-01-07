@@ -743,8 +743,7 @@ roots_mod_uint64 (uint64_t *r, uint64_t a, int d, uint64_t p)
         r[i] = mod_get_ul (rr[i], pp);
 #ifndef NDEBUG
         /* Check that it's a d-th root of a */
-        mod_set_ul (aa, r[i], pp);
-        mod_pow_ul (aa, aa, d, pp);
+        mod_pow_ul (aa, rr[i], d, pp);
         ASSERT (mod_get_ul (aa, pp) == a);
 #endif
       }
