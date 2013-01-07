@@ -49,6 +49,7 @@ int main(int argc, char **argv) {
   unsigned long a, p, d, *r1, *r2;
   int n1, n2, i;
   unsigned long minp = 100, maxp=10000, mina=1, maxa=100, mind=1, maxd=10;
+  const int check = 1;
   
   if (argc > 1)
     minp = strtoul (argv[1], NULL, 10);
@@ -75,24 +76,26 @@ int main(int argc, char **argv) {
     for (a = mina; a <= maxa && a < p; a++) {
       for (d = mind; d <= maxd; d++) {
         n1 = roots_mod_uint64 (r1, a, d, p);
-        n2 = roots_mod_mpz (r2, a, d, p);
-        if (n1 != n2) {
-          fprintf (stderr, "Error: for a=%lu, d=%lu, p=%lu, roots_mod_uint64()"
-                   " reports %d roots, roots_mod_mpz() reports %d\n", 
-                   a, d, p, n1, n2);
-          exit (EXIT_FAILURE);
-        }
-        for (i = 0; i < n1 && r1[i] == r2[i]; i++);
-        if (i != n1) {
-          fprintf (stderr, "Error: for a=%lu, d=%lu, p=%lu, roots_mod_uint64()"
-                   " reports roots: ", a, d, p);
-          for (i = 0; i < n1; i++)
-            fprintf (stderr, "%lu ", r1[i]);
-          fprintf (stderr, ", roots_mod_mpz() reports ");
-          for (i = 0; i < n2; i++)
-            fprintf (stderr, "%lu ", r2[i]);
-          fprintf (stderr, "\n");
-          exit (EXIT_FAILURE);
+        if (check) {
+          n2 = roots_mod_mpz (r2, a, d, p);
+          if (n1 != n2) {
+            fprintf (stderr, "Error: for a=%lu, d=%lu, p=%lu, roots_mod_uint64()"
+                     " reports %d roots, roots_mod_mpz() reports %d\n", 
+                     a, d, p, n1, n2);
+            exit (EXIT_FAILURE);
+          }
+          for (i = 0; i < n1 && r1[i] == r2[i]; i++);
+          if (i != n1) {
+            fprintf (stderr, "Error: for a=%lu, d=%lu, p=%lu, roots_mod_uint64()"
+                     " reports roots: ", a, d, p);
+            for (i = 0; i < n1; i++)
+              fprintf (stderr, "%lu ", r1[i]);
+            fprintf (stderr, ", roots_mod_mpz() reports ");
+            for (i = 0; i < n2; i++)
+              fprintf (stderr, "%lu ", r2[i]);
+            fprintf (stderr, "\n");
+            exit (EXIT_FAILURE);
+          }
         }
       }
     }

@@ -20,9 +20,11 @@ static int
 mod_roots (residue_t *, residue_t, int, modulus_t);
 
 /* For i < 50, isprime_table[i] == 1 iff i is prime */
-static unsigned char isprime_table[] = {0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 
-  0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 
-  1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0};
+static unsigned char isprime_table[] = {
+0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 
+0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 
+0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 
+0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0};
 
 static const size_t isprime_table_size = 
     sizeof(isprime_table) / sizeof(isprime_table[0]);
