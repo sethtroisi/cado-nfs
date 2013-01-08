@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 #include <gmp.h>
 #include "getprime.h"
 #include "gmp_aux.h"
@@ -49,8 +50,14 @@ int main(int argc, char **argv) {
   unsigned long a, p, d, *r1, *r2;
   int n1, n2, i;
   unsigned long minp = 100, maxp=10000, mina=1, maxa=100, mind=1, maxd=10;
-  const int check = 1;
+  int check = 1;
   
+  if (argc > 1 && strcmp(argv[1], "-nc") == 0) {
+    printf ("Checking results disabled.\n");
+    check = 0;
+    argc--;
+    argv++;
+  }
   if (argc > 1)
     minp = strtoul (argv[1], NULL, 10);
   if (argc > 2)
