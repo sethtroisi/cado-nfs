@@ -1,6 +1,6 @@
 /* Approximation of Dickman's rho function.
 
-Copyright 2010 Paul Zimmermann
+Copyright 2010, 2012 Paul Zimmermann
 
 This file is part of CADO-NFS.
 
