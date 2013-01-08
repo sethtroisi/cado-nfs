@@ -228,52 +228,16 @@ omega (residue_t o, residue_t b, const unsigned long k, const modulus_t pp)
 
 /************************** square roots *************************************/
 
-/* Roots of x^d = a (mod p) for d even and a 64-bit word */
+/* Uses Tonelli-Shanks, more precisely Algorithm from Table 1 in [1] */
 static int
-roots2 (residue_t *rr, residue_t aa, int d, modulus_t pp)
+tonelli_shanks(residue_t *rr, int d, uint64_t n, const modulus_t pp)
 {
-  uint64_t q, s, n, i, j, k = 0, l;
-  residue_t hh, delta, dd, bb, zz;
+  uint64_t q, s, i, j, k = 0, l;
+  residue_t aa, hh, delta, dd, bb, zz;
   const uint64_t p =  mod_getmod_ul(pp);
-
-  if (mod_jacobi (aa, pp) != 1)
-    return 0;
-
-  /* find the roots of x^(d/2) = a (mod p) */
-  n = mod_roots (rr + d / 2, aa, d / 2, pp);
-
-  if (n == 0)
-    return n;
 
   /* write p-1 = q*2^s with q odd */
   for (q = p-1, s = 0; (q&1) == 0; q/=2, s++);
-
-  if (s == 1) /* p = 3 (mod 4) */
-    {
-      /* solutions are +/-a^((p+1)/4) */
-      for (i = 0; i < n; i++)
-        {
-          /* If d = 2 (mod 4), then every root of x^(d/2) = a (mod p) gives
-             two roots of x^d = a (mod p) since a is a quadratic residue.
-             However if d = 0 (mod 4), then a root of x^(d/2) = a (mod p) can
-             give no root of x^d = a (mod p), thus we have to check the
-             Legendre symbol again.
-             Consider for example x^4 = 3 (mod 11): x^2 = 3 mod 11 has
-             two roots (5 and 6), then x^2-5 mod 11 has two roots (4 and 7)
-             but x^2-6 mod 11 has no root. */
-          
-          if ((d & 3) == 0 && mod_jacobi (rr[d/2+i], pp) != 1)
-            continue;
-
-          mod_pow_ul (rr[2*k], rr[d/2+i], (p + 1) >> 2, pp);
-          mod_neg (rr[2*k+1], rr[2*k], pp);
-          k ++;
-        }
-      return 2*k;
-    }
-
-  /* case p = 1 (mod 4). Uses Tonelli-Shanks, more precisely
-     Algorithm from Table 1 in [1] */
   
   mod_init (zz, pp);
   mod_set1 (zz, pp);
@@ -326,7 +290,147 @@ roots2 (residue_t *rr, residue_t aa, int d, modulus_t pp)
   mod_clear (delta, pp);
   mod_clear (dd, pp);
   mod_clear (bb, pp);
-  mod_clearmod (pp);
+
+  return k;
+}
+
+
+static void
+one_root2_V (residue_t rr, const residue_t aa, const modulus_t pp)
+{
+  residue_t xx, two, discr;
+  unsigned long c;
+  const unsigned long p = mod_getmod_ul (pp);
+
+  mod_init (xx, pp);
+  mod_init (discr, pp);
+  mod_init (two, pp);
+  mod_set1 (two, pp);
+  mod_add1 (two, two, pp); /* two = 2 */
+  ASSERT_ALWAYS (p % 4 == 1);
+
+  mod_sub (xx, aa, two, pp); /* x = a - 2 */
+  mod_sqr (discr, xx, pp);
+  mod_sub (discr, discr, two, pp); /* discr = x^2 - 2 */
+  mod_sub (discr, discr, two, pp); /* discr = x^2 - 4 */
+
+  if (mod_jacobi(discr, pp) == -1) {
+    mod_V_ul (rr, xx, (p+3)/4, pp);
+  } else {
+    /* Find a suitable c value */
+    residue_t cc;
+    mod_init (cc, pp);
+    mod_set1 (cc, pp);
+    for (c = 2; c < p; c++) {
+      mod_add1 (cc, cc, pp); /* cc = c */
+      mod_sqr (xx, cc, pp);
+      mod_mul (xx, xx, aa, pp);
+      mod_sub (xx, xx, two, pp);
+      mod_sqr (discr, xx, pp);
+      mod_sub (discr, discr, two, pp); /* discr = x^2 - 2 */
+      mod_sub (discr, discr, two, pp); /* discr = x^2 - 4 */
+      if (mod_jacobi(discr, pp) == -1)
+        break;
+    }
+    ASSERT_ALWAYS(c < p);
+    mod_V_ul (xx, xx, (p+3)/4, pp);
+    /* Divide out c, using hard-coded functions for small cases */
+    while (c % 2 == 0) {
+      mod_div2 (xx, xx, pp);
+      mod_div2 (cc, cc, pp);
+      c /= 2;
+    }
+    while (c % 3 == 0) {
+      c /= 3;
+      mod_div3 (xx, xx, pp);
+      mod_div3 (cc, cc, pp);
+    }
+    while (c % 5 == 0) {
+      mod_div5 (xx, xx, pp);
+      mod_div5 (cc, cc, pp);
+      c /= 5;
+    }
+    while (c % 11 == 0) {
+      mod_div11 (xx, xx, pp);
+      mod_div11 (cc, cc, pp);
+      c /= 11;
+    }
+    if (c > 1) {
+      /* About 1/2^11 + 1/2^13 + 1/2^17 + ... ~= 0.06% of cases get here */
+      mod_inv (cc, cc, pp);
+      mod_mul (xx, xx, cc, pp);
+    }
+    mod_set (rr, xx, pp);
+    mod_clear (cc, pp);
+  }
+  
+  mod_clear (xx, pp);
+  mod_clear (discr, pp);
+  mod_clear (two, pp);
+}
+
+static int
+roots2_V (residue_t *rr, int d, uint64_t n, const modulus_t pp)
+{
+  uint64_t i, k = 0;
+
+  for (i = 0; i < n; i++)
+    {
+      if ((d & 3) == 0 && mod_jacobi (rr[d/2+i], pp) != 1)
+        continue;
+      one_root2_V (rr[2*k], rr[d/2+i], pp);
+      mod_neg (rr[2*k + 1], rr[2*k], pp);
+      k++;
+    }
+  return k;
+}
+
+
+/* Roots of x^d = a (mod p) for d even and a 64-bit word */
+static int
+roots2 (residue_t *rr, residue_t aa, int d, modulus_t pp)
+{
+  uint64_t n, i, k = 0;
+  const uint64_t p =  mod_getmod_ul(pp);
+
+  if (mod_jacobi (aa, pp) != 1)
+    return 0;
+
+  /* find the roots of x^(d/2) = a (mod p) */
+  n = mod_roots (rr + d / 2, aa, d / 2, pp);
+
+  if (n == 0)
+    return n;
+
+  if (p % 4 == 3)
+    {
+      /* solutions are +/-a^((p+1)/4) */
+      for (i = 0; i < n; i++)
+        {
+          /* If d = 2 (mod 4), then every root of x^(d/2) = a (mod p) gives
+             two roots of x^d = a (mod p) since a is a quadratic residue.
+             However if d = 0 (mod 4), then a root of x^(d/2) = a (mod p) can
+             give no root of x^d = a (mod p), thus we have to check the
+             Legendre symbol again.
+             Consider for example x^4 = 3 (mod 11): x^2 = 3 mod 11 has
+             two roots (5 and 6), then x^2-5 mod 11 has two roots (4 and 7)
+             but x^2-6 mod 11 has no root. */
+          
+          if ((d & 3) == 0 && mod_jacobi (rr[d/2+i], pp) != 1)
+            continue;
+
+          mod_pow_ul (rr[2*k], rr[d/2+i], (p + 1) >> 2, pp);
+          mod_neg (rr[2*k+1], rr[2*k], pp);
+          k ++;
+        }
+      return 2*k;
+    }
+
+  /* case p = 1 (mod 4). */ 
+  if (0)
+    k = tonelli_shanks (rr, d, n, pp);
+  else
+    k = roots2_V (rr, d, n, pp);
 
   return 2*k;
 }
