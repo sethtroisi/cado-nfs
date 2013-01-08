@@ -792,7 +792,7 @@ deleteHeavierRows (unsigned int npass)
   if (++count < npass)
     {
       target = ((long) newnrel) - newnprimes - chunk;
-      if (((long) target) - keep < 0) target = keep;
+      if (target < keep) target = keep;
     }
   else
     target = keep; /* enough steps */
@@ -2060,9 +2060,8 @@ usage (void)
   fprintf (stderr, "       -sos sosfile - to keep track of the renumbering\n");
   fprintf (stderr, "       -raw         - output relations in CADO format\n");
   fprintf (stderr, "       -npthr   nnn - threads number for suppress singletons\n");
-  fprintf (stderr, "       -inprel  file_rel_used : load actives relations\n");
-  fprintf (stderr, "       -outrel  file_rel_used : write actives relations\n");
-  fprintf (stderr, "       -npthr   nnn - threads number for suppress singletons\n");
+  fprintf (stderr, "       -inprel  file_rel_used : load active relations\n");
+  fprintf (stderr, "       -outrel  file_rel_used : write active relations\n");
   fprintf (stderr, "       -npass   nnn - number of step of clique removal (default %d)\n", DEFAULT_NPASS);
   fprintf (stderr, "       -required_excess nnn - percentage of excess required at the end of the first singleton removal step (default %.2f)\n",
   DEFAULT_REQUIRED_EXCESS);
@@ -2325,7 +2324,7 @@ main (int argc, char **argv)
     rel_used->p[nrelmax>>LN2_BV_BITS] &= (((bv_t) 1)<<(nrelmax & (BV_BITS - 1))) - 1;
 
   tot_alloc0 += mysize;
-  fprintf (stderr, "Allocated rel_used of %luMb (total %luMb so far)\n",
+  fprintf (stderr, "Allocated rel_used of %luMb (total %zuMb so far)\n",
 	   (unsigned long) nrelmax >> 20,
 	   tot_alloc0 >> 20);
 
@@ -2334,8 +2333,8 @@ main (int argc, char **argv)
     SMALLOC(rel_weight, nrelmax, "main 2");
   tot_alloc0 += nrelmax * (sizeof (HR_T *) + sizeof (HC_T));
   /* %zu is the C99 modifier for size_t */
-  fprintf (stderr, "Allocated rel_compact of %lu MB (total %lu MB so far)\n",
-	   (nrelmax * sizeof (HR_T *)) >> 20,
+  fprintf (stderr, "Allocated rel_compact of %lu MB (total %zu MB so far)\n",
+	   (unsigned long) (nrelmax * sizeof (HR_T *)) >> 20,
 	   tot_alloc0 >> 20);
   }
   /* Build the file list (ugly). It is the concatenation of all
