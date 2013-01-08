@@ -170,6 +170,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         self.send_query()
 
     def send_query(self):
+        diag(1, "self.cgi_info = ", self.cgi_info)
         filename = self.cgi_info[1]
         if "#" in filename:
             # Get rid of fragment part
@@ -183,7 +184,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             # Now look at individual key=value pairs
             for q in query.split("&"):
                 q = unquote_plus(q)
-                print("Processing token " + q)
+                diag(1, "Processing token ", q)
                 for (name, op) in wudb.WuDb.name_to_operator.items():
                     if op in q:
                         (key, value) = q.split(op, 1)
@@ -206,6 +207,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         body.append("<p>Query for conditions = " + str(conditions) + "</p>")
 
         if not wus is None and len(wus) > 0:
+            body.append(str(len(wus)) + " records match.")
             keys = wus[0].tuple_keys()
             body.start_table(keys)
             for wu in wus:
@@ -242,5 +244,9 @@ if __name__ == '__main__':
     httpd.server_name = "test"
 
     print ("serving at " + HTTP + ":" + str(PORT))
-    httpd.serve_forever()
-    db.terminate()
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        db_pool.terminate()
+    else:
+        raise

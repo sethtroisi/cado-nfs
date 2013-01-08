@@ -792,7 +792,7 @@ deleteHeavierRows (unsigned int npass)
   if (++count < npass)
     {
       target = ((long) newnrel) - newnprimes - chunk;
-      if (target < keep) target = keep;
+      if (target < (long) keep) target = keep;
     }
   else
     target = keep; /* enough steps */
@@ -971,7 +971,7 @@ renumber (const char *sos)
         fprintf (fsos, "# each row contains 3 hexadecimal values: i p r\n"
 		 "# i is the ideal index value (starting from 0)\n"
 		 "# p is the corresponding prime\n"
-		 "# r is the corresponding root (p+2 on the rational side)\n");
+		 "# r is the corresponding root (p+1 on the rational side)\n");
       }
     for (i = 0; i < H.hm; i++)
       if (H.hc[i]) {
@@ -982,7 +982,7 @@ renumber (const char *sos)
 	static int count = 0;
 	if (H.hc[i] == 1 && (count ++ < 10))
 	  {
-	    if (GET_HASH_P(&H,i) == GET_HASH_R(&H,i) + 1)
+	    if (GET_HASH_P(&H,i) == GET_HASH_R(&H,i) - 1)
 	      fprintf (stderr, "Warning: singleton rational prime %lu\n",
 		       (unsigned long) GET_HASH_P(&H,i));
 	    else
@@ -2249,14 +2249,13 @@ main (int argc, char **argv)
   ASSERT_ALWAYS(0);
 #endif
 #else
-  need64 = (pol->rat->lpb >= 32) || (pol->alg->lpb >= 32);
+  need64 = (pol->rat->lpb > 32) || (pol->alg->lpb > 32);
 #endif
 
-  /* assert(need64 == (sizeof(HT_T) > 4)); */
-  if (need64 && sizeof (long) < 8)
+  if (need64 && sizeof (HT_T) < 8)
     {
-      fprintf (stderr, "Error, too large LPBs for a 32-bit computer\n");
-      usage();
+      fprintf (stderr, "Error, too large LPBs for a 32-bit program\n");
+      exit(1);
     }
 
   if (minpr == UMAX(minpr)) minpr = pol->rat->lim;
@@ -2324,18 +2323,16 @@ main (int argc, char **argv)
     rel_used->p[nrelmax>>LN2_BV_BITS] &= (((bv_t) 1)<<(nrelmax & (BV_BITS - 1))) - 1;
 
   tot_alloc0 += mysize;
-  fprintf (stderr, "Allocated rel_used of %luMb (total %zuMb so far)\n",
-	   (unsigned long) nrelmax >> 20,
-	   tot_alloc0 >> 20);
+  fprintf (stderr, "Allocated rel_used of %uMb (total %zuMb so far)\n",
+	   nrelmax >> 20, tot_alloc0 >> 20);
 
   if (!boutfilerel) {
     SMALLOC(rel_compact, nrelmax, "main 1");
     SMALLOC(rel_weight, nrelmax, "main 2");
   tot_alloc0 += nrelmax * (sizeof (HR_T *) + sizeof (HC_T));
   /* %zu is the C99 modifier for size_t */
-  fprintf (stderr, "Allocated rel_compact of %lu MB (total %zu MB so far)\n",
-	   (unsigned long) (nrelmax * sizeof (HR_T *)) >> 20,
-	   tot_alloc0 >> 20);
+  fprintf (stderr, "Allocated rel_compact of %zu MB (total %zu MB so far)\n",
+	   ((size_t) nrelmax * sizeof (HR_T *)) >> 20, tot_alloc0 >> 20);
   }
   /* Build the file list (ugly). It is the concatenation of all
    *  b s p

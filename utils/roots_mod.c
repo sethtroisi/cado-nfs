@@ -13,6 +13,7 @@
 #include "gmp_aux.h"
 #include "rootfinder.h"
 #include "modredc_ul.h"
+#include "mod_ul.h"
 #include "modredc_ul_default.h"
 
 static int 
@@ -23,53 +24,205 @@ static unsigned char isprime_table[] = {0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1,
   0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 
   1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0};
 
+static const size_t isprime_table_size = 
+    sizeof(isprime_table) / sizeof(isprime_table[0]);
+
 /* return 1/a mod b */
 static uint64_t
 invert_mod (uint64_t a, uint64_t b)
 {
-  modulus_t cc;
-  residue_t aa;
-  uint64_t c, r;
-  int t;
+  modulusul_t bb;
+  residueul_t aa;
+  uint64_t r;
   
-  for (c = b, t = 0; (c & 1) == 0; t++, c >>= 1);
-  /* b = 2^t * c */
-  
-  /* Inverse 1/a mod c */
-  mod_initmod_ul (cc, c);
-  mod_init (aa, cc);
-  mod_set_ul (aa, a, cc);
-  mod_inv (aa, aa, cc);
+  /* Inverse 1/a mod b */
+  modul_initmod_ul (bb, b);
+  modul_init (aa, bb);
+  modul_set_ul (aa, a, bb);
+  modul_inv (aa, aa, bb);
 
-  r = mod_get_ul (aa, cc);
+  r = modul_get_ul (aa, bb);
 
-  if (t > 0) {
-    uint64_t r2;
-    int i;
-    /* x := a_1 n_2 [n_2^{-1}]_{n_1} + a_2 n_1 [n_1^{-1}]_{n_2} */
-    /* x := 2^t [aa 2^{-t}]_{c} + c [r2 c^{-1}]_{2^t} */
-
-    /* Compute r2 = 1/a mod 2^t */
-    r2 = ularith_invmod(a);
-
-    /* Compute r2 = r2 c^{-1} (mod 2^t) */
-    r2 = (r2 * r) & ((1UL << t) - 1);
-
-    /* Compute r = r 2^{-t} (mod c) */
-    for (i = 0 ; i < t; i++)
-      mod_div2 (aa, aa, cc);
-    r = mod_get_ul (aa, cc);
-
-    r = (r << t) + r2 * c;
-    if (r >= b)
-      r -= b;
-  }
-
-  mod_clear (aa, cc);
-  mod_clearmod (cc);
+  modul_clear (aa, bb);
+  modul_clearmod (bb);
 
   return r;
 }
+
+static inline int
+isprime_ul (unsigned long n)
+{
+  int r;
+  modulus_t nn;
+  mod_initmod_ul (nn, n);
+  r = mod_isprime (nn);
+  mod_clearmod (nn);
+  return r;
+}
+
+
+/* Factor n, put prime factors into p, their exponents into e */
+unsigned char
+factor_ul (unsigned long *p, unsigned char *e, const unsigned long n)
+{
+  unsigned long c = n;
+  unsigned char ndiv = 0;
+  
+  if (c % 2 == 0) {
+    p[ndiv] = 2;
+    e[ndiv] = ularith_ctz(c);
+    c >>= e[ndiv];
+    ndiv++;
+  }
+
+  if (c % 3 == 0) {
+    p[ndiv] = 3;
+    e[ndiv] = 0;
+    do {
+      e[ndiv]++;
+      c /= 3;
+    } while (c % 3 == 0);
+    ndiv++;
+  }
+
+  if (c % 5 == 0) {
+    p[ndiv] = 5;
+    e[ndiv] = 0;
+    do {
+      e[ndiv]++;
+      c /= 5;
+    } while (c % 5 == 0);
+    ndiv++;
+  }
+
+  if (c >= 49 && !isprime_ul(c)) {
+    unsigned long q, maxq = ularith_sqrt (c);
+    for (q = 7; q <= maxq; q += 2) {
+      if (c % q == 0) {
+        p[ndiv] = q;
+        e[ndiv] = 0;
+        do {
+          e[ndiv]++;
+          c /= q;
+        } while (c % q == 0);
+        ndiv++;
+        maxq = ularith_sqrt (c);
+        if (q > maxq || isprime_ul(c))
+          break;
+      }
+    }
+  }
+
+  if (c > 1) {
+    p[ndiv] = c;
+    e[ndiv] = 1;
+    ndiv++;
+  }
+
+  return ndiv;
+}
+
+
+/* Initialise enumeration of all proper divisors of n */
+void 
+enumeratediv_init (enumeratediv_t *r, const unsigned long n)
+{
+  unsigned int i;
+
+  r->ndiv = factor_ul (r->p, r->e, n);
+
+  for (i = 0; i < r->ndiv; i++) {
+    r->c[i] = 0;
+  }
+}
+
+
+/* Iterate through the proper divisors of n. *Not* necessarily in increasing order.
+   Return code of 0 means no more divisors. */
+unsigned long 
+enumeratediv (enumeratediv_t *r)
+{
+  unsigned int i = 0;
+  unsigned long P = 1;
+  
+  while (i < r->ndiv && ++r->c[i] > r->e[i]) {
+    r->c[i] = 0;
+    i++;
+  }
+  if (i == r->ndiv)
+    return 0;
+  
+  for (i = 0; i < r->ndiv; i++) {
+    int j;
+    for (j = 0; j < r->c[i]; j++)
+      P *= r->p[i];
+  }
+  return P;
+}
+
+
+/* Return in o a k-th primitive root of unity modulo p, and in b a residue 
+   that is a q-th non-power for each q|k. Assumes that k | p-1. */
+void
+omega (residue_t o, residue_t b, const unsigned long k, const modulus_t pp) 
+{
+  residue_t pow;
+  const unsigned long p = mod_getmod_ul (pp);
+  unsigned long pprime;
+  unsigned long kdivq[15] = {}; /* k/q for each prime q | k */
+  unsigned char exp[15] = {};
+  unsigned long c = k;
+  unsigned int i, ndiv;
+
+  ASSERT (k > 0);
+  if (k == 1) {
+    mod_set1 (o, pp);
+    return;
+  }
+  
+  pprime = (p-1) / k;
+  ASSERT (pprime * k == p-1);
+
+  if (c % 2 == 0) {
+    /* Not added to prime factor list, we use Jacobi symbol for check */
+    c >>= ularith_ctz (c);
+  }
+
+  ndiv = factor_ul (kdivq, exp, c);
+  for (i = 0; i < ndiv; i++)
+    kdivq[i] = k / kdivq[i];
+
+  mod_init (pow, pp);
+  mod_set1 (b, pp);
+  for (i = 2; i < p; i++) {
+    unsigned int j;
+    mod_add1 (b, b, pp);
+    if ((ndiv == 0 || (ndiv == 1 && k % 2 == 1)) && !isprime_table[i])
+      continue;
+    if (k % 2 == 0 && mod_jacobi(b, pp) == 1)
+      continue;
+    mod_pow_ul (o, b, pprime, pp);
+    for (j = 0; j < ndiv; j++) {
+      mod_pow_ul (pow, o, kdivq[j], pp);
+      if (mod_is1(pow, pp))
+        break;
+    }
+    if (j == ndiv)
+      break;
+  }
+
+#if 0
+  /* Very slow but simple test */
+  for (c = 1; c < k; c++) {
+    mod_pow_ul (pow, o, c, pp);
+    ASSERT_ALWAYS (!mod_is1(pow, pp));
+    mod_pow_ul (pow, o, k, pp);
+    ASSERT_ALWAYS (mod_is1(pow, pp));
+  }
+#endif
+  mod_clear (pow, pp);
+}
+
 
 /************************** square roots *************************************/
 
@@ -127,7 +280,8 @@ roots2 (residue_t *rr, residue_t aa, int d, modulus_t pp)
     /* zz is equal to i (mod pp) */
     mod_add1 (zz, zz, pp);
     i++;
-  } while (!isprime_table[i] || mod_jacobi (zz, pp) != -1);
+  } while (i < isprime_table_size && (!isprime_table[i] || mod_jacobi (zz, pp) != -1));
+  ASSERT_ALWAYS(i < isprime_table_size);
   mod_init (hh, pp);
   mod_init (aa, pp);
   mod_init (delta, pp);
@@ -218,6 +372,7 @@ one_cubic_root_1mod3 (residue_t rr, residue_t zeta, residue_t ddelta, modulus_t 
       /* rho is equal to i (mod pp) */
       /* no point in testing i = k*l where we know both k and l are cubic 
          residues, so we do only primes */
+      ASSERT_ALWAYS(i < isprime_table_size);
       if (!isprime_table[i])
         continue;
       mod_pow_ul (a, rho, s, pp); /* a = rho^s */
@@ -357,7 +512,7 @@ one_rth_root (residue_t rop, uint64_t r, residue_t delta, modulus_t pp)
 {
   residue_t a, b, c, d, h;
   const uint64_t p = mod_getmod_ul (pp);
-  uint64_t i, j, s, t, alpha;
+  uint64_t i, j, s, t, alpha, rt;
 
   /* when p-1 is not divisible by r, there is exactly one root */
   if (((p - 1) % r) != 0)
@@ -374,17 +529,28 @@ one_rth_root (residue_t rop, uint64_t r, residue_t delta, modulus_t pp)
   mod_init (c, pp);
   mod_init (d, pp);
   mod_init (h, pp);
-  for (s = (p - 1) / r, t = 1; (s % r) == 0; s /= r, t++);
+  /* Write s * r^t = p-1, t maximal, and rt = r^t */
+  for (s = (p - 1) / r, t = 1, rt = r; (s % r) == 0; s /= r, t++, rt *= r);
+
+#if 1
+  omega(c, a, rt, pp);
+  mod_pow_ul (a, c, rt/r, pp);
+#else  
   for (i = 2; i < p; i++)
     {
+      /* c = i (mod p) */
       mod_set_ul (c, i, pp);
       mod_pow_ul (c, c, s, pp);
       mod_set (a, c, pp);
       for (j = 0; j < t - 1; j++)
         mod_pow_ul (a, a, r, pp);
-      if (mod_is1 (a, pp) != 1)
+      if (mod_is1 (a, pp) != 1) {
+        /* Now c is an r^t-th primitive root of unity, and a is an r-th 
+           primitive root of unity */
         break;
+      }
     }
+#endif
   alpha = invert_mod (s, r);
   /* we have alpha = 1/s mod r, thus alpha*s = 1 + beta*r,
      where beta = (alpha*s - 1)/r, and 1/r = -beta mod s */
@@ -548,10 +714,7 @@ sort_roots (uint64_t *r, int n)
 int
 roots_mod_uint64 (uint64_t *r, uint64_t a, int d, uint64_t p)
 {
-  mpz_t *f;
-  int n = -1, nn = -1, i;
-  uint64_t r2[MAX_DEGREE];
-  const int do_both = 0; /* Compute both ways to test? */
+  int n = -1, i;
 
   ASSERT_ALWAYS(d <= MAX_DEGREE);
 
@@ -576,45 +739,44 @@ roots_mod_uint64 (uint64_t *r, uint64_t a, int d, uint64_t p)
 
       for (i = 0; i < n; i++) {
         r[i] = mod_get_ul (rr[i], pp);
-        if (do_both) {
-          mod_pow_ul (aa, rr[i], d, pp);
-          ASSERT_ALWAYS (mod_get_ul (aa, pp) == a);
-        }
+#ifndef NDEBUG
+        /* Check that it's a d-th root of a */
+        mod_set_ul (aa, r[i], pp);
+        mod_pow_ul (aa, aa, d, pp);
+        ASSERT (mod_get_ul (aa, pp) == a);
+#endif
       }
       sort_roots (r, n);
+#ifndef NDEBUG
+      for (i = 1; i < n; i++) {
+        /* Check for dupes */
+        if (r[i-1] >= r[i]) {
+          fprintf (stderr, "%lu^(1/%d) (mod %lu), r[%d]: %lu >= r[%d]: %lu\n", 
+                   a, d, p, i-1, r[i-1], i, r[i]);
+          ASSERT(r[i-1] < r[i]);
+        }
+      }
+#endif
 
       for (i = 0; i < d; i++)
         mod_clear (rr[i], pp);
       mod_clear (aa, pp);
       mod_clearmod (pp);
     }
-
-  if (n == -1 || do_both) {
-    f = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
-    for (i = 0; i <= d; i++)
-      mpz_init (f[i]);
-    mpz_set_ui (f[d], 1);
-    mpz_set_uint64 (f[0], p - a);
-    nn = poly_roots_uint64 (r2, f, d, p);
-    for (i = 0; i <= d; i++)
-      mpz_clear (f[i]);
-    free (f);
-    sort_roots (r2, nn);
-  }
-
-  if (n != -1 && nn != -1) {
-    /* If we ran both, compare to verify results */
-    ASSERT_ALWAYS(n == nn);
-    for (i = 0; i < n; i++) {
-      ASSERT_ALWAYS(r[i] == r2[i]);
+  else
+    {
+      mpz_t *f;
+      f = (mpz_t*) malloc ((d + 1) * sizeof (mpz_t));
+      for (i = 0; i <= d; i++)
+        mpz_init (f[i]);
+      mpz_set_ui (f[d], 1);
+      mpz_set_uint64 (f[0], p - a);
+      n = poly_roots_uint64 (r, f, d, p);
+      for (i = 0; i <= d; i++)
+        mpz_clear (f[i]);
+      free (f);
+      sort_roots (r, n);
     }
-  } else if (n == -1) {
-    /* We ran poly_roots_uint64(). Copy result */
-    n = nn;
-    for (i = 0; i < n; i++) {
-      r[i] = r2[i];
-    }
-  }
 
   return n;
 }

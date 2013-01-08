@@ -264,7 +264,16 @@ class Workunit_Processor(Workunit):
             print(postdata3)
         url = SETTINGS["SERVER"] + "/" + SETTINGS["POSTRESULTPATH"]
         request = urllib.request.Request(url, data=postdata3, headers=dict(postdata.items()))
-        conn = urllib.request.urlopen(request)
+        conn = None;
+        while conn is None:
+            try:
+                conn = urllib.request.urlopen(request)
+            except (urllib.error.URLError) as e:
+                conn = None
+                wait = float(SETTINGS["DOWNLOADRETRY"])
+                log(0, "Upload of result failed, " + str(e))
+                log(0, "Waiting " + str(wait) + " seconds before retrying")
+                time.sleep(wait)
         log (1, "Server response:")
         for line in conn:
             log(1, line)
