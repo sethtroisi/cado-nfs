@@ -797,7 +797,7 @@ newAlgo (mpz_t N, unsigned long d, unsigned long ad)
 						 modul_set_ul_reduced (inv, qq, pp);
 						 modul_inv (inv, inv, pp);
 						 modul_mul (k, k, inv, pp);
-	      
+
 						 /* only consider k and k - pp */
 						 u = (long) modul_get_ul (k, pp);
 #ifdef CONSIDER_ONLY_TWO_ROOTS
