@@ -8,7 +8,7 @@
 git ls-files -s | awk '/120000/{print $4}' > symlinked.files
 for F in $(< symlinked.files)
 do
-  TARGET="`cat "$F" | head -n 1`"
+  TARGET="`dirname "$F"`"/"`cat "$F" | head -n 1`"
   if ! test -f "$TARGET"
   then
     echo "$F does not seem to be a borked symlink file"
