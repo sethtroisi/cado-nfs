@@ -101,6 +101,7 @@ if [ "$1" = "show" ] ; then
     echo "MPI=\"$MPI\""
     echo "GF2X_CONFIGURE_EXTRA=\"$GF2X_CONFIGURE_EXTRA\""
     echo "PTHREADS=\"$PTHREADS\""
+    echo "CMAKE_GENERATOR=\"$CMAKE_GENERATOR\""
     exit 0
 fi
 
@@ -147,7 +148,12 @@ fi
 
 if [ "$1" = "cmake" ] || [ ! -f "$build_tree/Makefile" ] ; then
     mkdir -p "$build_tree"
-    (cd "$build_tree" ; "$cmake_path" "$absolute_path_of_source")
+    if [ ! "x$CMAKE_GENERATOR" == "x" ] ; then
+      CMAKE_GENERATOR_OPT="-G$CMAKE_GENERATOR"
+    else
+      unset CMAKE_GENERATOR_OPT
+    fi
+    (cd "$build_tree" ; "$cmake_path" "$CMAKE_GENERATOR_OPT" "$absolute_path_of_source")
 fi
 
 if [ "$1" = "cmake" ] ; then
