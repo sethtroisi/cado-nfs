@@ -52,7 +52,7 @@
    only very few singletons should remain.
 */
 
-#define _GNU_SOURCE
+#define _GNU_SOURCE     /* FIXME. Include directly cado.h instead */
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>

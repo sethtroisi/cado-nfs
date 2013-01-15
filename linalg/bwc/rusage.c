@@ -13,6 +13,7 @@
 #include "bwc_config.h"
 #include "macros.h"
 #include "timing.h"
+#include "misc.h"
 
 #if defined(__linux) && defined(__GLIBC__)
 #include <linux/version.h>

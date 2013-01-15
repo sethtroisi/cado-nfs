@@ -36,6 +36,7 @@
 #cmakedefine    HAVE_LRAND48
 
 #cmakedefine    HAVE_SYNC_FETCH
+#cmakedefine    HAVE_ASPRINTF
 
 #cmakedefine    VOLATILE_IF_GCC_UBUNTU_BUG
 

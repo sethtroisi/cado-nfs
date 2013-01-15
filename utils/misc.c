@@ -244,3 +244,31 @@ int mkdir_with_parents(const char * dir, int fatal)
     free(tmp);
     return 0;
 }
+
+#ifndef HAVE_ASPRINTF
+/* Copied and improved from
+ * http://mingw-users.1079350.n2.nabble.com/Query-regarding-offered-alternative-to-asprintf-td6329481.html
+ */
+int vasprintf( char **sptr, char *fmt, va_list argv )
+{
+    int wanted = vsnprintf( *sptr = NULL, 0, fmt, argv );
+    if (wanted<0)
+        return -1;
+    *sptr = malloc(1 + wanted);
+    if (!*sptr)
+        return -1;
+    return vsnprintf(*sptr, 1+wanted, fmt, argv );
+}
+
+int asprintf( char **sptr, char *fmt, ... )
+{
+    int retval;
+    va_list argv;
+    va_start(argv, fmt);
+    retval = vasprintf(sptr, fmt, argv);
+    va_end(argv);
+    return retval;
+}
+#endif  /* HAVE_ASPRINTF */
+
+

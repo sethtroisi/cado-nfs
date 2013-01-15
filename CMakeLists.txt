@@ -102,6 +102,7 @@ include("${CADO_NFS_SOURCE_DIR}/config/posix.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/rusage_thread.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/gcc-ubuntu-bug.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/sync_fetch.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/asprintf.cmake")
 
 ######################################################################
 # Try to detect whether pthreads and/or MPI are available.

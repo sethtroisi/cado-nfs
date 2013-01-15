@@ -742,3 +742,5 @@ linalg/bwc/plingen.c
 linalg/bwc/plingen.h
 linalg/bwc/polymat.c
 linalg/bwc/polymat.h
+config/asprintf.c
+config/asprintf.cmake

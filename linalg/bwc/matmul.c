@@ -12,6 +12,7 @@
 #include "bwc_config.h"
 #include "matmul.h"
 #include "matmul-libnames.h"
+#include "misc.h"
 
 #define MATMUL_DEFAULT_IMPL "bucket"
 

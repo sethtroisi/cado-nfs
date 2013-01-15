@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdarg.h>
 #include <limits.h>
 #include <errno.h>
 #include "macros.h"
@@ -110,6 +111,13 @@ static inline int ctzl(unsigned long x)
 #define HAVE_ctzl_fallback
 #endif
 #endif  /* HAVE_ctzl */
+
+#ifndef HAVE_ASPRINTF
+extern int asprintf(char **, char *, ...);
+extern int vasprintf(char **, char *, va_list);
+#endif  /* HAVE_ASPRINTF */
+
+
 
 #ifdef __cplusplus
 }

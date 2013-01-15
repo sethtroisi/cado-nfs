@@ -10,6 +10,7 @@
 #include "params.h"
 #include "bw-common-mpi.h"
 #include "filenames.h"
+#include "misc.h"
 
 int command_argc;
 char ** command_argv;

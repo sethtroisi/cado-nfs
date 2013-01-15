@@ -13,6 +13,7 @@
 #include "debug.h"
 #include "filenames.h"
 #include "balancing_workhorse.h"
+#include "misc.h"
 
 #ifndef CONJUGATED_PERMUTATIONS
 #error "Do you really, really want to use arbitrary left and right sigmas ?"
