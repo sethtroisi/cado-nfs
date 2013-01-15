@@ -9,6 +9,7 @@ if debug > 0:
   import cgitb; cgitb.enable()
 import sys
 from tempfile import mkstemp
+import sqlite3
 import wudb
 
 def diag(level, text, var = None):
@@ -114,8 +115,7 @@ def do_upload(db, input = sys.stdin, output = sys.stdout):
             message = message + 'The file "' + basename + '" for work unit ' + WUid.value + \
                 ' was uploaded successfully by client ' + clientid.value + \
                 ' and stored as ' + filename + ', received ' + str(bytes) + ' bytes.\n'
-
-        wu = wudb.WuActiveRecord(db)
+        wu = wudb.WuAccess(db)
         try:
             wu.result(WUid.value, clientid.value, filetuples, errorcode, 
                       failedcommand)
@@ -136,5 +136,5 @@ if __name__ == '__main__':
     if DBFILENAMEKEY not in os.environ:
         message = 'Script error: Environment variable ' + DBFILENAMEKEY + ' not set'
     dbfilename = os.environ[DBFILENAMEKEY]
-    db = wudb.WuDb(dbfilename)
+    db = sqlite3.connect(dbfilename)
     do_upload(db)

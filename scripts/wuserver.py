@@ -152,7 +152,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         if not clientid.isalnum():
             return self.send_error(400, "Malformed client id specified")
         
-        # wu = wudb.WuActiveRecord(db)
+        # wu = wudb.WuAccess(db)
         wu_text = db_pool.assign(clientid)
         if not wu_text:
             return self.send_error(404, "No work available")
@@ -208,10 +208,10 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
 
         if not wus is None and len(wus) > 0:
             body.append(str(len(wus)) + " records match.")
-            keys = wus[0].tuple_keys()
+            keys = wus[0].keys()
             body.start_table(keys)
             for wu in wus:
-                body.wu_row(wu.as_dict(), keys, self.cwd)
+                body.wu_row(wu, keys, self.cwd)
             body.end_table()
         else:
             body.append("No records match.")
