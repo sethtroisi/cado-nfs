@@ -102,7 +102,7 @@ void *malloc_pagealigned(size_t sz)
 
 void free_pagealigned(void * p, size_t sz)
 {
-    free_aligned(p, sz, sysconf(_SC_PAGESIZE));
+    free_aligned(p, sz, pagesize ());
 }
 
 int has_suffix(const char * path, const char * sfx)
