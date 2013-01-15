@@ -17,12 +17,6 @@
 #include "macros.h"
 #include "misc.h"
 
-/* from svn.unidata.ucar.edu/repos/netcdf/tags/netcdf-4.2.1/libsrc/posixio.c:
-   Hmm, aren't standards great? */
-#if defined(_SC_PAGE_SIZE) && !defined(_SC_PAGESIZE)
-#define _SC_PAGESIZE _SC_PAGE_SIZE
-#endif
-
 /* Not every libc has this, and providing a workalike is very easy */
 
 char *cado_strndup(const char *a, size_t n)
@@ -86,9 +80,22 @@ void free_aligned(void * p, size_t size MAYBE_UNUSED, size_t alignment MAYBE_UNU
 #endif
 }
 
+static long
+pagesize (void)
+{
+#if defined(_WIN32) || defined(_WIN64)
+  /* cf http://en.wikipedia.org/wiki/Page_%28computer_memory%29 */
+  SYSTEM_INFO si;
+  GetSystemInfo(&si);
+  return si.dwPageSize;
+#else
+  return sysconf (_SC_PAGESIZE);
+#endif
+}
+
 void *malloc_pagealigned(size_t sz)
 {
-    void *p = malloc_aligned(sz, sysconf(_SC_PAGESIZE));
+    void *p = malloc_aligned (sz, pagesize ());
     ASSERT_ALWAYS(p != NULL);
     return p;
 }
