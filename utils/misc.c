@@ -11,7 +11,7 @@
 /* For MinGW Build */
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
-#enfif
+#endif
 
 #include "cado_config.h"
 #include "macros.h"
