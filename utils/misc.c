@@ -13,6 +13,12 @@
 #include "macros.h"
 #include "misc.h"
 
+/* from svn.unidata.ucar.edu/repos/netcdf/tags/netcdf-4.2.1/libsrc/posixio.c:
+   Hmm, aren't standards great? */
+#if defined(_SC_PAGE_SIZE) && !defined(_SC_PAGESIZE)
+#define _SC_PAGESIZE _SC_PAGE_SIZE
+#endif
+
 /* Not every libc has this, and providing a workalike is very easy */
 
 char *cado_strndup(const char *a, size_t n)
