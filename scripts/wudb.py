@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+# Make Python 2.7 use the print() syntax from Python 3
+from __future__ import print_function
+
 import sys
 import sqlite3
 import threading
@@ -11,7 +14,7 @@ if sys.version_info.major == 3:
 else:
     from Queue import Queue
 
-debug = 2
+debug = 1
 
 def diag(level, text, var = None):
     if debug > level:
@@ -19,6 +22,27 @@ def diag(level, text, var = None):
             print (text, file=sys.stderr)
         else:
             print (text + str(var), file=sys.stderr)
+
+def join3(l, op = None, pre = None, post = None, sep = ", "):
+    """ For a list l = ('a', 'b', 'c'), string pre = "+", 
+    string post = "-", and set = ", ", 
+    returns the string '+a-, +b-, +c-' 
+    If any parameter is None, it is interpreted as the empty string """
+    if pre is None:
+        pre = ""
+    if post is None:
+        post = ""
+    if sep is None:
+        sep = "";
+    if op is None:
+        op = ""
+    return sep.join([pre + op.join(list(k)) + post for k in l])
+
+def dict_join3(d, sep=None, op=None, pre=None, post=None):
+    """ For a dictionary {"a": "1", "b": "2"}, sep = "," op = "=",
+    pre="-" and post="+", returns "-a=1+,-b=2+"
+    If any parameter is None, it is interpreted as the empty string """
+    return join3(d.items(), sep=sep, op=op, pre=pre, post=post)
 
 # Dummy class for defining "constants"
 class WuStatus:
@@ -30,7 +54,8 @@ class WuStatus:
     VERIFIED_ERROR = 5
     CANCELLED = 6
 
-    def check(status):
+    @classmethod
+    def check(cls, status):
         """ Check whether status is equal to one of the constants """
         assert status in (WuStatus.AVAILABLE, WuStatus.ASSIGNED, WuStatus.RECEIVED_OK, 
             WuStatus.RECEIVED_ERROR, WuStatus.VERIFIED_OK, WuStatus.VERIFIED_ERROR, 
@@ -41,7 +66,7 @@ class WuStatus:
 class StatusUpdateError(Exception):
     pass
 
-class MyCursor(sqlite3.Cursor): # {
+class MyCursor(sqlite3.Cursor):
     """ This class represents a DB cursor and provides convenience functions 
         around SQL queries. In particular it is meant to provide an  
         (1) an interface to SQL functionality via method calls with parameters, 
@@ -55,23 +80,8 @@ class MyCursor(sqlite3.Cursor): # {
     
     def __init__(self, conn):
         # Enable foreign key support
-        sqlite3.Cursor.__init__(self, conn)
+        super(MyCursor, self).__init__(conn)
         self._exec("PRAGMA foreign_keys = ON;")
-
-    @staticmethod
-    def join3(l, pre = None, post = None, sep = ", "):
-        """ For a list l = ('a', 'b', 'c'), string pre = "+", 
-            string post = "-", and set = ", ", 
-            returns the string '+a-, +b-, +c-' 
-            If any parameter is None, it is interpreted as the empty string"""
-        
-        if pre is None:
-            pre = ""
-        if post is None:
-            post = ""
-        if sep is None:
-            sep = "";
-        return sep.join([pre + k + post for k in l])
 
     @staticmethod
     def _fieldlist(l, r = "=", s = ", "):
@@ -85,6 +95,13 @@ class MyCursor(sqlite3.Cursor): # {
         """ Return a copy of the dictionary d, but without entries whose values 
             are None """
         return {k[0]:k[1] for k in d.items() if k[1] is not None}
+
+    @staticmethod
+    def as_string(d):
+        if d is None:
+            return ""
+        else:
+            return ", " + dict_join3(d, sep=", ", op=" AS ")
     
     @classmethod
     def where_str(cls, name, **args):
@@ -127,7 +144,7 @@ class MyCursor(sqlite3.Cursor): # {
     def create_table(self, table, layout):
         """ Creates a table with fields as described in the layout parameter """
         command = "CREATE TABLE IF NOT EXISTS " + table + \
-            "( " + ", ".join([" ".join(col) for col in layout]) + " );"
+            "( " + join3(layout, op=" ", sep=", ") + " );"
         self._exec (command)
     
     def create_index(self, table, d):
@@ -156,8 +173,8 @@ class MyCursor(sqlite3.Cursor): # {
             " (" + ", ".join(fields.keys()) + ") VALUES (" + sqlformat + ");"
         values = list(fields.values())
         self._exec(command, values)
-        id = self.lastrowid
-        return id
+        rowid = self.lastrowid
+        return rowid
 
     def update(self, table, d, **conditions):
         """ Update fields of an existing entry. conditions specifies the where 
@@ -172,11 +189,11 @@ class MyCursor(sqlite3.Cursor): # {
         values = list(setvalues) + wherevalues
         self._exec(command, values)
     
-    def where(self, table, limit = None, order = None, **conditions):
+    def where(self, joinsource, col_alias = None, limit = None, order = None, 
+              **conditions):
         """ Get a up to "limit" table rows (limit == 0: no limit) where 
             the key:value pairs of the dictionary d are set to the same 
             value in the database table """
-        result = []
 
         # Table/Column names cannot be substituted, so include in query directly.
         (WHERE, values) = self.__class__.where_str("WHERE", **conditions)
@@ -193,25 +210,36 @@ class MyCursor(sqlite3.Cursor): # {
         else:
             LIMIT = " LIMIT " + str(int(limit))
 
-        command = "SELECT * FROM " + table + WHERE + ORDER + LIMIT + ";"
+        AS = self.as_string(col_alias);
+
+        command = "SELECT *" + AS + " FROM " + joinsource + WHERE + \
+            ORDER + LIMIT + ";"
         self._exec(command, values)
         
+
+    def where_as_dict(self, joinsource, col_alias = None, limit = None, 
+                      order = None, **conditions):
+        self.where(joinsource, col_alias=col_alias, limit=limit, 
+                      order=order, **conditions)
         # cursor.description is a list of lists, where the first element of 
         # each inner list is the column name
+        result = []
         desc = [k[0] for k in self.description]
         row = self.fetchone()
         while row is not None:
-            diag (2, "MyCursor.where(): row = ", row)
+            diag (2, "MyCursor.where_as_dict(): row = ", row)
             result.append(dict(zip(desc, row)))
             row = self.fetchone()
         return result
-# }
 
-class DbTable: # {
+
+class DbTable(object):
     """ A class template defining access methods to a database table """
     def __init__(self):
         self.tablename = type(self).name
         self.fields = type(self).fields
+        self.primarykey = type(self).primarykey
+        self.references = type(self).references
 
     @staticmethod
     def _subdict(d, l):
@@ -224,35 +252,62 @@ class DbTable: # {
     def _get_colnames(self):
         return [k[0] for k in self.fields]
 
+    def getname(self):
+        return self.tablename
+
+    def getpk(self):
+        return self.primarykey
+
     def dictextract(self, d):
         """ Return a dictionary with all those key:value pairs of d
             for which key is in self._get_colnames() """
         return self._subdict(d, self._get_colnames())
 
     def create(self, cursor):
-        cursor.create_table(self.tablename, self.fields)
+        fields = list(self.fields)
+        if self.references:
+            # If this table references another table, we use the primary
+            # key of the referenced table as the foreign key name
+            r = self.references # referenced table
+            fk = (r.primarykey, "INTEGER", "REFERENCES " + 
+                  r.getname() + " (" + r.primarykey + ") ")
+            fields.append(fk)
+        cursor.create_table(self.tablename, fields)
         cursor.create_index(self.tablename, self.index)
 
-    def insert(self, cursor, d):
+    def insert(self, cursor, values, foreign=None):
         """ Insert a new row into this table. The column:value pairs are 
             specified key:value pairs of the dictionary d. 
-            The database's row id for the new entry is returned """
-        return cursor.insert(self.tablename, self.dictextract(d))
+            The database's row id for the new entry is stored in d[primarykey] """
+        d = self.dictextract(values)
+        assert self.primarykey not in d or d[self.primarykey] is None
+        # If a foreign key is specified in foreign, add it to the column
+        # that is marked as being a foreign key
+        if foreign:
+            r = self.references.primarykey
+            assert not r in d or d[r] is None
+            d[r] = foreign
+        values[self.primarykey] = cursor.insert(self.tablename, d)
+
+    def insert_list(self, cursor, values, foreign=None):
+        for v in values:
+            self.insert(cursor, v, foreign)
 
     def update(self, cursor, d, **conditions):
         """ Update an existing row in this table. The column:value pairs to 
             be written are specified key:value pairs of the dictionary d """
-        cursor.update(cursor, self.tablename, d, **conditions)
+        cursor.update(self.tablename, d, **conditions)
 
     def where(self, cursor, limit = None, order = None, **conditions):
         assert order is None or order[0] in self._get_colnames()
-        return cursor.where(self.tablename, limit=limit, order=order, **conditions)
-# }
+        return cursor.where_as_dict(self.tablename, limit=limit, 
+                                    order=order, **conditions)
+
 
 class WuTable(DbTable):
     name = "workunits"
     fields = (
-        ("id", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"), 
+        ("wurowid", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"), 
         ("wuid", "TEXT", "UNIQUE NOT NULL"), 
         ("status", "INTEGER", "NOT NULL"), 
         ("wu", "TEXT", "NOT NULL"), 
@@ -267,145 +322,190 @@ class WuTable(DbTable):
         ("retryof", "TEXT", ""),
         ("priority", "INTEGER", "")
     )
+    primarykey = fields[0][0]
+    references = None
     index = {"wuidindex": (fields[1],), "statusindex" : (fields[2],)}
 
 class FilesTable(DbTable):
     name = "files"
     fields = (
-        ("id", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"), 
-        ("wurowid", "INTEGER", "REFERENCES " + WuTable.name + " (id)"), 
+        ("filesrowid", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"), 
         ("filename", "TEXT", ""), 
         ("path", "TEXT", "UNIQUE NOT NULL")
     )
+    primarykey = fields[0][0]
+    references = WuTable()
     index = {"wuindex": (fields[1],)}
 
-class WuActiveRecord(): # {
+
+class Mapper(object):
+    """ This class translates between application objects, i.e., Python 
+        directories, and the relational data layout in an SQL DB, i.e.,
+        one or more tables which possibly have foreign key relationships 
+        that map to hierarchical data structures. For now, only one 
+        foreign key / subdirectory."""
+
+    def __init__(self, table, subtables = None):
+        self.table = table
+        self.subtables = {}
+        if subtables:
+            for s in subtables.keys():
+                self.subtables[s] = Mapper(subtables[s])
+
+    def __sub_dict(self, d):
+        """ For each key "k" that has a subtable assigned in "self.subtables",
+        pop the entry with key "k" from "d", and store it in a new directory
+        which is returned. I.e., the directory d is separated into 
+        two parts: the part which corresponds to subtables and is the return 
+        value, and the rest which is left in the input dictionary. """
+        sub_dict = {}
+        for s in self.subtables.keys():
+            # Don't store s:None entries even if they exist in d
+            t = d.pop(s, None)
+            if not t is None:
+                sub_dict[s] = t
+        return sub_dict
+
+    def getname(self):
+        return self.table.getname()
+
+    def getpk(self):
+        return self.table.getpk()
+
+    def create(self, cursor):
+        self.table.create(cursor)
+        for t in self.subtables.values():
+            t.create(cursor)
+
+    def insert(self, cursor, wus, foreign=None):
+        pk = self.getpk()
+        for wu in wus:
+            # Make copy so sub_dict does not change caller's data
+            wuc = wu.copy()
+            # Split off entries that refer to subtables
+            sub_dict = self.__sub_dict(wuc)
+            # We add the entries in wuc only if it does not have a primary 
+            # key yet. If it does have a primary key, we add only the data 
+            # for the subtables
+            if not pk in wuc:
+                self.table.insert(cursor, wuc, foreign=foreign)
+                # Copy primary key into caller's data
+                wu[pk] = wuc[pk]
+            for subtable_name in sub_dict.keys():
+                self.subtables[subtable_name].insert(
+                    cursor, sub_dict[subtable_name], foreign=wu[pk])
+
+    def update(self, cursor, wus):
+        pk = self.getpk()
+        for wu in wus:
+            assert not wu[pk] is None
+            wuc = wu.copy()
+            sub_dict = self.__sub_dict(wuc)
+            rowid = wuc.pop(pk, None)
+            if rowid:
+                self.table.update(cursor, wuc, {wp: rowid})
+            for s in sub.keys:
+                self.subtables[s].update(cursor, sub_dict[s])
+    
+    def where(self, cursor, limit = None, order = None, **cond):
+        pk = self.getpk()
+        joinsource = self.table.name
+        for s in self.subtables.keys():
+            # FIXME: this probably breaks with more than 2 tables
+            joinsource = joinsource + " LEFT JOIN " + \
+                self.subtables[s].getname() + \
+                " USING ( " + pk + " )"
+        # FIXME: don't get result rows as dict! Leave as tuple and
+        # take them apart positionally
+        rows = cursor.where_as_dict(joinsource, limit=limit, order=order, 
+                                    **cond)
+        wus = []
+        for r in rows:
+            # Collapse rows with identical primary key
+            if len(wus) == 0 or r[pk] != wus[-1][pk]:
+                wus.append(self.table.dictextract(r))
+                for s in self.subtables.keys():
+                    wus[-1][s] = None
+
+            for (sn, sm) in self.subtables.items():
+                spk = sm.getpk()
+                if spk in r and not r[spk] is None:
+                    if wus[-1][sn] == None:
+                        # If this sub-array is empty, init it
+                        wus[-1][sn] = [sm.table.dictextract(r)]
+                    elif r[spk] != wus[-1][sn][-1][spk]:
+                        # If not empty, and primary key of sub-table is not
+                        # same as in previous entry, add it
+                        wus[-1][sn].append(sm.table.dictextract(r))
+        return wus
+
+class WuAccess(object): # {
     """ This class maps between the WORKUNIT and FILES tables 
         and a dictionary 
         {"wuid": string, ..., "timeverified": string, "files": list}
         where list is None or a list of dictionaries of the from
         {"id": int, "wuid": string, "filename": string, "path": string
-        Operations on instances of WuActiveRecord are directly carried 
+        Operations on instances of WuAcccess are directly carried 
         out on the database persistent storage, i.e., they behave kind 
-        of as if the WuActiveRecord instance were itself a persistent 
+        of as if the WuAccess instance were itself a persistent 
         storage device """
     
     def __init__(self, conn):
         self.conn = conn
-        self.wutable = WuTable()
-        self.filestable = FilesTable()
+        self.mapper = Mapper(WuTable(), {"files": FilesTable()})
 
-    def __str__(self):
-        s = "Workunit " + str(self.data["wuid"]) + ":\n"
-        for (k,v) in self.data.items():
-            if k != "wuid" and k != "files":
-                s = s + "  " + k + ": " + repr(v) + "\n"
-        if "files" in self.data:
-            s = s + "  Associated files:\n"
-            if self.data["files"] is None:
-                s = s + "    None\n"
-            else:
-                for f in self.data["files"]:
-                    s = s + "    " + str(f) + "\n"
+    @staticmethod
+    def to_str(wus):
+        s = ""
+        for wu in wus:
+            s = s + "Workunit " + str(wu["wuid"]) + ":\n"
+            for (k,v) in wu.items():
+                if k != "wuid" and k != "files":
+                    s = s + "  " + k + ": " + repr(v) + "\n"
+            if "files" in wu:
+                s = s + "  Associated files:\n"
+                if wu["files"] is None:
+                    s = s + "    None\n"
+                else:
+                    for f in wu["files"]:
+                        s = s + "    " + str(f) + "\n"
         return s
 
-    def tuple_keys(self):
-        return self.wutable._get_colnames() + ["files"]
-
-    def as_tuple(self):
-        return (self.data[k] for k in self.wutable._get_colnames())
-            
-    def as_dict(self):
-        return self.data
-
-    def add_files(self, cursor, files):
-        if len(files) > 0 and self.data["files"] is None:
-            self.data["files"] = []
-        for f in files:
-            d = {"filename": f[0], "path": f[1]}
-            d["wurowid"] = self.data["id"]
-            d["id"] = self.filestable.insert(cursor, d)
-            del d["wurowid"]
-            self.data["files"].append(d)
-
-    def _from_db_row(self, wu_row, files_rows):
-        """ Return a WuActiveRecord instance with the data from the workunit table row
-            wu_row, and files table rows files_rows """
-        # Create an instance
-        wu = type(self)(self.conn)
-        # Fill in data from the workunit row
-        wu.data = self.wutable.dictextract(wu_row)
-        assert not "files" in wu.data
-        if len(files_rows) > 0:
-            wu.data["files"] = []
-        else:
-            wu.data["files"] = None
-        for f in files_rows:
-            fileentry = self.filestable.dictextract(f)
-            assert fileentry["wurowid"] == wu.data["id"]
-            del(fileentry["wurowid"])
-            wu.data["files"].append(fileentry)
-        return wu
-
-    def where(self, cursor, limit = None, order = None, **conditions):
-        result = []
-        wu_rows = self.wutable.where(cursor, limit=limit, order=order, **conditions)
-        # print ("* wu_rows = " + str(wu_rows))
-        for wu_row in wu_rows:	
-            # print ("* wu_row = " + str(wu_row))
-            files_rows = self.filestable.where(cursor, eq={"wurowid" : wu_row["id"]})
-            wu = self._from_db_row(wu_row, files_rows)
-            # print ("* wu = " + str(wu))
-            result.append(wu)
-        return result
-    
-    def get_by_wuid(self, cursor, wuid):
-        r = self.where(cursor, eq={"wuid": wuid}, limit = 1)
-        if len(r) == 0:
-            return False
-        self.data = r[0].data
-        return True
-
-    def update_wu(self, cursor, d):
-        """ Assign the key:value pairs in d to self.data, and call 
-            db.update() method to write these updates to the DB """
-        self.data.update(d) # Python built-in dict.update() method
-        self.wutable.update(cursor, d, eq={"id": self.data["id"]})
-    
-    def _checkstatus(self, status):
-        diag (2, "WuActiveRecord._checkstatus(" + str(self) + ", " + str(status) + ")")
-        if self.data["status"] != status:
-            wuid = self.get_wuid()
-            wustatus = str(self.data["status"])
-            msg = "WU " + wuid + " has status " + wustatus + ", expected " + str(status)
-            diag (0, "WuActiveRecord._checkstatus(): " + msg)
-            # FIXME: this raise has no effect other than returning from the method. Why?
+    @staticmethod
+    def _checkstatus(wu, status):
+        diag (2, "WuAccess._checkstatus(" + str(wu) + ", " + str(status) + ")")
+        if wu["status"] != status:
+            msg = "WU " + str(wu["wuid"]) + " has status " + str(wu["status"]) \
+                + ", expected " + str(status)
+            diag (0, "WuAccess._checkstatus(): " + msg)
+            # FIXME: this raise has no effect other than returning from the 
+            # method. Why?
             # raise wudb.StatusUpdateError(msg)
             raise Exception(msg)
 
-    def check(self):
-        status = self.data["status"]
+    def check(self, data):
+        status = data["status"]
         WuStatus.check(status)
-        wu = Workunit(self.get_wu())
-        assert wu.get_id() == self.get_wuid()
+        wu = Workunit(data["wu"])
+        assert wu.get_id() == data["wuid"]
         if status > WuStatus.RECEIVED_ERROR:
             return
         if status == WuStatus.RECEIVED_ERROR:
-            assert self.data["errorcode"] != 0
+            assert data["errorcode"] != 0
             return
         if status == WuStatus.RECEIVED_OK:
-            assert self.data["errorcode"] == 0
+            assert data["errorcode"] == 0
             return
-        assert self.data["errorcode"] is None
-        assert self.data["timeresult"] is None
-        assert self.data["resultclient"] is None
+        assert data["errorcode"] is None
+        assert data["timeresult"] is None
+        assert data["resultclient"] is None
         if status == WuStatus.ASSIGNED:
             return
-        assert self.data["timeassigned"] is None
-        assert self.data["assignedclient"] is None
+        assert data["timeassigned"] is None
+        assert data["assignedclient"] is None
         if status == WuStatus.AVAILABLE:
             return
-        assert self.data["timecreated"] is None
+        assert data["timecreated"] is None
         # etc.
     
     # Here come the application-visible functions that implement the 
@@ -413,44 +513,54 @@ class WuActiveRecord(): # {
     # assigning it to a client, receiving a result for the WU, marking it as
     # verified, or marking it as cancelled
 
+    def add_files(self, cursor, files, wuid = None, rowid = None):
+        # Exactly one must be given
+        assert not wuid is None or not rowid is None
+        assert wuid is None or rowid is None
+        # FIXME: allow selecting row to update directly via wuid, without 
+        # doing query for rowid first
+        pk = self.mapper.getpk()
+        if rowid is None:
+            wu = get_by_wuid(cursor, wuid)
+            if wu:
+                rowid = wu[pk]
+            else:
+                return False
+        d = ({"filename": f[0], "path": f[1]} for f in files)
+        # These two should behave identically
+        if True:
+            self.mapper.insert(cursor, [{pk:rowid, "files": d},])
+        else:
+            self.mapper.subtables["files"].insert(cursor, d, foreign=rowid)
+
     def create_tables(self):
         cursor = self.conn.cursor(MyCursor)
-        self.wutable.create(cursor)
-        self.filestable.create(cursor)
-        
-        cursor.execute("PRAGMA journal_mode=WAL;")
+        cursor._exec("PRAGMA journal_mode=WAL;")
+        self.mapper.create(cursor)
         self.conn.commit()
         cursor.close()
 
-    def get_wuid(self):
-        return self.data["wuid"]
-    
-    def get_wu(self):
-        return self.data["wu"]
-    
-    def create1(self, cursor, wu, priority = None):
-        self.data = {}
-        self.data["wuid"] = Workunit(wu).get_id()
-        self.data["wu"] = wu
-        self.data["status"] = WuStatus.AVAILABLE
-        self.data["timecreated"] = str(datetime.now())
-        self.data["files"] = []
+    def create1(self, cursor, wutext, priority = None):
+        d = {
+            "wuid": Workunit(wutext).get_id(),
+            "wu": wutext,
+            "status": WuStatus.AVAILABLE,
+            "timecreated": str(datetime.now())
+            }
         if not priority is None:
-            self.data["priority"] = priority
-        self.data["id"] = self.wutable.insert(cursor, self.data)
+            d["priority"] = priority
+        # Insert directly into wu table
+        self.mapper.table.insert(cursor, d)
 
     def create(self, wus, priority = None):
-        """ Create a new workunit from wu which contains the text of the 
-            workunit file """
+        """ Create new workunits from wus which contains the texts of the 
+            workunit files """
         cursor = self.conn.cursor(MyCursor)
         if isinstance(wus, str):
             self.create1(cursor, wus, priority)
-        elif isinstance(wus, tuple) or isinstance(wus, list):
+        else:
             for wu in wus:
                 self.create1(cursor, wu, priority)
-        else:
-            cursor.close()
-            raise Exception
         self.conn.commit()
         cursor.close()
 
@@ -459,31 +569,44 @@ class WuActiveRecord(): # {
             Returns the text of the workunit, or None if no available 
             workunit exists """
         cursor = self.conn.cursor(MyCursor)
-        r = self.where(cursor, limit = 1, order=("priority", "DESC"), eq={"status": WuStatus.AVAILABLE})
+        r = self.mapper.table.where(cursor, limit = 1, 
+                                    order=("priority", "DESC"), 
+                                    eq={"status": WuStatus.AVAILABLE})
+        assert len(r) <= 1
         if len(r) == 1:
-            self.data = r[0].data
-            self._checkstatus(WuStatus.AVAILABLE)
+            self._checkstatus(r[0], WuStatus.AVAILABLE)
             if debug > 0:
-                self.check()
+                self.check(r[0])
             d = {"status": WuStatus.ASSIGNED, 
                  "assignedclient": clientid,
                  "timeassigned": str(datetime.now())}
-            self.update_wu(cursor, d)
+            pk = self.mapper.getpk()
+            self.mapper.table.update(cursor, d, eq={pk:r[0][pk]})
             self.conn.commit()
-        cursor.close()
+            cursor.close()
+            return r[0]["wu"]
+        else:
+            cursor.close()
+            return None
+
+    def get_by_wuid(self, cursor, wuid):
+        r = self.mapper.where(cursor, eq={"wuid": wuid})
+        assert len(r) <= 1
         if len(r) == 1:
-            return r[0].get_wu()
+            return r[0]
         else:
             return None
 
-    def result(self, wuid, clientid, files, errorcode = None, failedcommand = None):
+    def result(self, wuid, clientid, files, errorcode = None, 
+               failedcommand = None):
         cursor = self.conn.cursor(MyCursor)
-        if not self.get_by_wuid(cursor, wuid):
+        data = self.get_by_wuid(cursor, wuid)
+        if data is None:
             cursor.close()
-            raise Exception
-        self._checkstatus(WuStatus.ASSIGNED)
+            return False
+        self._checkstatus(data, WuStatus.ASSIGNED)
         if debug > 0:
-            self.check()
+            self.check(data)
         d = {"resultclient": clientid,
              "errorcode": errorcode,
              "failedcommand": failedcommand, 
@@ -492,50 +615,48 @@ class WuActiveRecord(): # {
            d["status"] = WuStatus.RECEIVED_OK
         else:
             d["status"] = WuStatus.RECEIVED_ERROR
-        self.update_wu(cursor, d)
-        self.add_files(cursor, files)
+        pk = self.mapper.getpk()
+        self.mapper.table.update(cursor, d, eq={pk:data[pk]})
+        self.add_files(cursor, files, rowid = data[pk])
         self.conn.commit()
         cursor.close()
 
     def verification(self, wuid, ok):
         cursor = self.conn.cursor(MyCursor)
-        if not self.get_by_wuid(cursor, wuid):
+        data = self.get_by_wuid(cursor, wuid)
+        if data is None:
             cursor.close()
-            raise Exception
-        self.data = r[0].data
-        self._checkstatus(WuStatus.RECEIVED_OK)
+            return False
+        # FIXME: should we do the update by wuid and skip these checks?
+        self._checkstatus(data, WuStatus.RECEIVED_OK)
         if debug > 0:
-            self.check()
+            self.check(data)
         d = {["timeverified"]: str(datetime.now())}
         if ok:
             d["status"] = WuStatus.VERIFIED_OK
         else:
             d["status"] = WuStatus.VERIFIED_ERROR
-        self.update_wu(cursor, d)
+        pk = self.mapper.getpk()
+        self.mapper.table.update(cursor, d, eq={pk:data[pk]})
         self.conn.commit()
         cursor.close()
 
     def cancel(self, wuid):
         cursor = self.conn.cursor(MyCursor)
-        if not self.get_by_wuid(cursor, wuid):
-            cursor.close()
-            raise Exception
-        self.data = r[0].data
         d = {"status": WuStatus.CANCELLED}
-        self.update_wu(cursor, d)
+        self.mapper.table.update(cursor, d, eq={"wuid": wuid})
         self.conn.commit()
         cursor.close()
 
     def query(self, limit = None, **conditions):
         cursor = self.conn.cursor(MyCursor)
-        r = self.where(cursor, limit=limit, **conditions)
+        r = self.mapper.where(cursor, limit=limit, **conditions)
         cursor.close()
         return r
-# }
 
 
 class DbWorker(threading.Thread):
-    """Thread executing WuActiveRecord requests from a given tasks queue"""
+    """Thread executing WuAccess requests from a given tasks queue"""
     def __init__(self, dbfilename, taskqueue):
         threading.Thread.__init__(self)
         self.dbfilename = dbfilename
@@ -551,14 +672,14 @@ class DbWorker(threading.Thread):
             # a 2-array, where element [0] receives the result of the DB call, 
             #  and [1] is an Event variable to notify the caller when the 
             #  result is available
-            # fn_name, the name (as a string) of the WuActiveRecord method to call
+            # fn_name, the name (as a string) of the WuAccess method to call
             # args, a tuple of positional arguments
             # kargs, a dictionary of keyword arguments
             (result_tuple, fn_name, args, kargs) = self.taskqueue.get()
             if fn_name == "terminate":
                 break
             ev = result_tuple[1]
-            wuar = WuActiveRecord(self.connection)
+            wuar = WuAccess(self.connection)
             # Assign to tuple in-place, so result is visible to caller. 
             # No slice etc. here which would create a copy of the array
             try: result_tuple[0] = getattr(wuar, fn_name)(*args, **kargs)
@@ -568,10 +689,10 @@ class DbWorker(threading.Thread):
             self.taskqueue.task_done()
         self.connection.close()
 
-class DbRequest:
-    """ Class that represents a request to a given WuActiveRecord function.
+class DbRequest(object):
+    """ Class that represents a request to a given WuAccess function.
         Used mostly so that DbThreadPool's __getattr__ can return a callable 
-        that knows which of WuActiveRecord's methods should be called by the 
+        that knows which of WuAccess's methods should be called by the 
         worker thread """
     def __init__(self, taskqueue, func):
         self.taskqueue = taskqueue
@@ -585,7 +706,7 @@ class DbRequest:
         ev.wait()
         return result[0]
 
-class DbThreadPool:
+class DbThreadPool(object):
     """Pool of threads consuming tasks from a queue"""
     def __init__(self, dbfilename, num_threads = 1):
         self.taskqueue = Queue(num_threads)
@@ -603,15 +724,15 @@ class DbThreadPool:
         self.taskqueue.join()
     
     def __getattr__(self, name):
-        """ Delegate calls to methods of WuActiveRecord to a worker thread.
-            If the called method exists in WuActiveRecord, creates a new 
+        """ Delegate calls to methods of WuAccess to a worker thread.
+            If the called method exists in WuAccess, creates a new 
             DbRequest instance that remembers the name of the method that we 
             tried to call, and returns the DbRequest instance's do_task 
             method which will process the method call via the thread pool. 
             We need to go through a new object's method since we cannot make 
             the caller pass the name of the method to call to the thread pool 
             otherwise """
-        if hasattr(WuActiveRecord, name):
+        if hasattr(WuAccess, name):
             task = DbRequest(self.taskqueue, name)
             return task.do_task
         else:
@@ -639,14 +760,27 @@ class DbThreadPool:
 
 if __name__ == '__main__': # {
     import argparse
-    
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-create', action="store_true", required=False, help='Create the database tables if they do not exist')
-    parser.add_argument('-add', action="store_true", required=False, help='Add new work units. Contents of WU(s) are read from stdin, separated by blank line')
-    parser.add_argument('-assign', required = False, nargs = 1, metavar = 'clientid', help = 'Assign an available WU to clientid')
-    parser.add_argument('-prio', required = False, nargs = 1, metavar = 'N', help = 'If used with -add, newly added WUs receive priority N')
 
-    for arg in ("avail", "assigned", "receivedok", "receivederr", "all"):
+    use_pool = False
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-create', action="store_true", required=False, 
+                        help='Create the database tables if they do not exist')
+    parser.add_argument('-add', action="store_true", required=False, 
+                        help='Add new work units. Contents of WU(s) are ' + 
+                        'read from stdin, separated by blank line')
+    parser.add_argument('-assign', required = False, nargs = 1, 
+                        metavar = 'clientid', 
+                        help = 'Assign an available WU to clientid')
+    parser.add_argument('-prio', required = False, nargs = 1, metavar = 'N', 
+                        help = 'If used with -add, newly added WUs ' + 
+                        'receive priority N')
+    parser.add_argument('-result', required = False, nargs = 4, 
+                        metavar = ('clientid', 'wuid', 'filename', 'filepath'), 
+                        help = 'Return a result for wu from client')
+
+    for arg in ("avail", "assigned", "receivedok", "receivederr", "all", 
+                "dump"):
         parser.add_argument('-' + arg, action="store_true", required = False)
     for arg in ("dbname", "debug"):
         parser.add_argument('-' + arg, required = False, nargs = 1)
@@ -663,8 +797,12 @@ if __name__ == '__main__': # {
     prio = 0
     if args["prio"]:
         prio = int(args["prio"][0])
-
-    db_pool = DbThreadPool(dbname)
+    
+    if use_pool:
+        db_pool = DbThreadPool(dbname)
+    else:
+        conn = sqlite3.connect(dbname)
+        db_pool = WuAccess(conn)
     
     if args["create"]:
         db_pool.create_tables()
@@ -687,45 +825,60 @@ if __name__ == '__main__': # {
         if wus is None:
             print(wus)
         else:
-            for wu in wus:
-                print (str(wu))
+            print (len(wus))
+            if args["dump"]:
+                print(WuAccess.to_str(wus))
     if args["assigned"]:
         wus = db_pool.query(eq={"status": WuStatus.ASSIGNED})
         print("Assigned workunits: ")
         if wus is None:
             print(wus)
         else:
-            for wu in wus:
-                print (str(wu))
+            print (len(wus))
+            if args["dump"]:
+                print(WuAccess.to_str(wus))
     if args["receivedok"]:
         wus = db_pool.query(eq={"status": WuStatus.RECEIVED_OK})
         print("Received ok workunits: ")
         if wus is None:
             print(wus)
         else:
-            for wu in wus:
-                print (str(wu))
+            print (len(wus))
+            if args["dump"]:
+                print(WuAccess.to_str(wus))
     if args["receivederr"]:
         wus = db_pool.query(eq={"status": WuStatus.RECEIVED_ERROR})
         print("Received with error workunits: ")
         if wus is None:
             print(wus)
         else:
-            for wu in wus:
-                print (str(wu))
+            print (len(wus))
+            if args["dump"]:
+                print(WuAccess.to_str(wus))
     if args["all"]:
         wus = db_pool.query()
         print("Existing workunits: ")
         if wus is None:
             print(wus)
         else:
-            # for wu in wus:
-            #    print (str(wu))
             print (len(wus))
+            if args["dump"]:
+                print(WuAccess.to_str(wus))
     # Functions for testing
     if args["assign"]:
         clientid = args["assign"][0]
         wus = db_pool.assign(clientid)
+
+    if args["result"]:
+        (wuid, clientid, filename, filepath) = args["result"]
+        db_pool.result(wuid, clientid, [(filename, filepath)])
     
-    db_pool.terminate()
+    if use_pool:
+        db_pool.terminate()
+    else:
+        conn.close()
 # }
+
+# Local Variables:
+# version-control: t
+# End:

@@ -24,6 +24,7 @@ config/gcc-ubuntu-bug.c
 config/gcc-ubuntu-bug.cmake
 config/gmp.cmake
 config/math.cmake
+config/posix.cmake
 config/mpi.cmake
 config/pthreads.cmake
 config/rusage_thread.c
