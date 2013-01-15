@@ -26,6 +26,14 @@
 #cmakedefine    HAVE_CABSL
 #cmakedefine    HAVE_LOG2
 #cmakedefine    HAVE_EXP2
+#cmakedefine    HAVE_RESOURCE_H
+#cmakedefine    HAVE_GETRUSAGE
+#cmakedefine    HAVE_GETC_UNLOCKED
+#cmakedefine    HAVE_NANOSLEEP
+#cmakedefine    HAVE_USLEEP
+#cmakedefine    HAVE_POPEN
+#cmakedefine    HAVE_PCLOSE
+#cmakedefine    HAVE_LRAND48
 
 #cmakedefine    HAVE_SYNC_FETCH
 

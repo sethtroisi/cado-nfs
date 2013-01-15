@@ -164,4 +164,14 @@ LEXLE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
 #define UNLIKELY(x)	EXPECT(x,0)
 #endif
 
+/* Portability macros */
+/* Handles portability cases which can be solved with a simple rename, 
+   such as using the slower getc() instead of getc_unlocked() */
+#ifndef HAVE_GETC_UNLOCKED
+#define getc_unlocked getc
+#endif
+#ifndef HAVE_LRAND48
+#define lrand48 rand
+#endif
+
 #endif	/* CADO_MACROS_H_ */
