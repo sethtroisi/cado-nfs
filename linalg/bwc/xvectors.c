@@ -22,7 +22,7 @@ int uint32_cmp(const uint32_t * xa, const uint32_t * xb)
 
 void setup_x_random(uint32_t * xs,
         unsigned int m, unsigned int nx, unsigned int nr,
-        parallelizing_info_ptr pi, cado_random_state_ptr rs)
+        parallelizing_info_ptr pi)
 {
     /* Here, everybody has to agree on an array of random values. The xs
      * pointer is on the stack of each calling thread, so threads must
@@ -33,7 +33,7 @@ void setup_x_random(uint32_t * xs,
         for(unsigned int i = 0 ; i < m ; i++) {
             for(;;) {
                 for(unsigned int j = 0 ; j < nx ; j++) {
-                    xs[i*nx+j] = cado_random(rs) % nr;
+                    xs[i*nx+j] = rand() % nr;
                 }
                 /* Make sure that there's no collision. Not that it
                  * matters so much, but at times the X vector is set with

@@ -710,8 +710,6 @@ utils/poly.h
 utils/prempt.h
 utils/purgedfile.c
 utils/purgedfile.h
-utils/random_generation.c
-utils/random_generation.h
 utils/random_integer.c
 utils/relation.c
 utils/relation.h

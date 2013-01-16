@@ -11,7 +11,7 @@ extern "C" {
 
 void setup_x_random(uint32_t * xs,
         unsigned int m, unsigned int nx, unsigned int nr,
-        parallelizing_info_ptr pi, cado_random_state_ptr rs);
+        parallelizing_info_ptr pi);
 void load_x(uint32_t ** xs, unsigned int m, unsigned int *pnx,
         parallelizing_info_ptr pi);
 void save_x(uint32_t * xs, unsigned int m, unsigned int nx,

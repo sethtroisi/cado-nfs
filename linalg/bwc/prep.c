@@ -4,7 +4,6 @@
 #include "parallelizing_info.h"
 #include "matmul_top.h"
 #include "select_mpi.h"
-#include "random_generation.h"
 #include "gauss.h"
 #include "gauss.h"
 #include "params.h"
@@ -17,8 +16,6 @@
 
 void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
-    cado_random_state_ptr rs = (cado_random_state_ptr) arg;
-
     /* Interleaving does not make sense for this program. So the second
      * block of threads just leave immediately */
     if (pi->interleaved && pi->interleaved->idx)
@@ -78,7 +75,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
         serialize_threads(pi->m);
 
         if (tcan_print) {
-            printf("// Generating new x,y vector pair (trial # %u -- seed %lu)\n", ntri, (unsigned long) cado_random(rs));
+            printf("// Generating new x,y vector pair (trial # %u -- seed %lu)\n", ntri, (unsigned long) rand());
         }
         if (ntri >= my_nx * 10) {
             ++my_nx;
@@ -93,7 +90,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
         // Otherwise, it's on the right.
 
         // generate indices w.r.t *unpadded* dimensions !
-        setup_x_random(xvecs, bw->m, my_nx, mmt->n0[bw->dir], pi, rs);
+        setup_x_random(xvecs, bw->m, my_nx, mmt->n0[bw->dir], pi);
 
         /* Random generation + save is better done as writing random data
          * to a file followed by reading it: this way, seeding works
@@ -236,17 +233,15 @@ int main(int argc, char * argv[])
 
     setvbuf(stdout,NULL,_IONBF,0);
     setvbuf(stderr,NULL,_IONBF,0);
+    
+    srand(bw->seed ? bw->seed : time(NULL));
 
-    cado_random_state rs[1];
-    cado_random_init(rs, bw->seed);
-    pi_go(prep_prog, pl, rs);
+    pi_go(prep_prog, pl, 0);
 
     param_list_remove_key(pl, "sequential_cache_build");
     param_list_remove_key(pl, "rebuild_cache");
 
     param_list_clear(pl);
-
-    cado_random_clear(rs);
 
     bw_common_clear_mpi(bw);
     return 0;
