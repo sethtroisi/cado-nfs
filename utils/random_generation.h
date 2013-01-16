@@ -14,10 +14,8 @@
 extern "C" {
 #endif
 
-extern void myseed(unsigned long int x);
-extern mp_limb_t myrand();
-extern void myrand_area(void * p, size_t s);
-
+extern mp_limb_t myrand ();
+extern void myrand_area(void*, size_t);
 extern void setup_seeding(unsigned int);
 
 #ifdef __cplusplus

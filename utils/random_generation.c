@@ -12,25 +12,25 @@ mp_limb_t myrand()
 {
     return gmp_urandomb_ui(random_state, GMP_LIMB_BITS);
 }
-void myseed(unsigned long int x)
+static void myseed(unsigned long int x)
 {
     gmp_randseed_ui(random_state, x);
 }
 #else
 mp_limb_t myrand()
 {
-    return random();
+    return rand ();
 }
-void myseed(unsigned long int x)
+static void myseed(unsigned long int x)
 {
-    srand(x);
+    srand (x);
 }
 #endif
 
 void myrand_area(void * p, size_t s)
 {
     for(size_t i = 0 ; i < s ; i++) {
-        ((char*)p)[i]=myrand();
+        ((char*)p)[i] = myrand();
     }
 #if 0
     /* FIXME This does not work with seeding ! */
