@@ -49,10 +49,10 @@ microseconds_thread (void)
 }
 
 /* cputime */
-int
-cputime (void)
+unsigned long 
+milliseconds (void)
 {
-    return (int) (microseconds() / (uint64_t) 1000);
+    return (unsigned long) (microseconds() / (uint64_t) 1000);
 }
 
 double

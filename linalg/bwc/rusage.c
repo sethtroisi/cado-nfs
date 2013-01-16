@@ -7,7 +7,9 @@
 
 #include <sys/types.h>
 #include <sys/time.h>
+#ifdef HAVE_RESOURCE_H
 #include <sys/resource.h>
+#endif
 #include <time.h>
 
 #include "bwc_config.h"

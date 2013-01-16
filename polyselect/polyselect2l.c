@@ -930,10 +930,10 @@ collision_on_p ( header_t header,
           continue;
         }
 
-      st -= cputime ();
+      st -= milliseconds ();
       nrp = roots_mod_uint64 (rp, mpz_fdiv_ui (header->Ntilde, p), header->d,
                               p);
-      st += cputime ();
+      st += milliseconds ();
       tot_roots += nrp;
       roots_lift (rp, header->Ntilde, header->d, header->m0, p, nrp);
       proots_add (R, nrp, rp, nprimes);
@@ -977,7 +977,7 @@ collision_on_p ( header_t header,
             }
         }
 #ifdef DEBUG_POLYSELECT2L
-      fprintf (stderr, "# collision_on_p took %dms\n", cputime () - st);
+      fprintf (stderr, "# collision_on_p took %dms\n", milliseconds () - st);
       fprintf (stderr, "# p hash_size: %u for ad = %lu\n", H->size, header->ad);
 #endif
 
@@ -1022,7 +1022,7 @@ collision_on_each_sq ( header_t header,
   MAYBE_UNUSED uint64_t cpt = 0, cpt1 = 0, cpt2 = 0, cpt3 = 0;
 
 #ifdef DEBUG_POLYSELECT2L
-  int st = cputime();
+  int st = milliseconds();
 #endif
 #if SHASH_NBUCKETS == 256
 #define CURRENT(V) (H->current + (uint8_t) (V))
@@ -1260,7 +1260,7 @@ collision_on_each_sq ( header_t header,
     }
 
 #ifdef DEBUG_POLYSELECT2L
-  fprintf (stderr, "# inner collision_on_each_sq took %dms\n", cputime () - st);
+  fprintf (stderr, "# inner collision_on_each_sq took %dms\n", milliseconds () - st);
   fprintf (stderr, "# - q hash_size (q=%lu): %u\n", q, H->size);
 #endif
 
@@ -1310,7 +1310,7 @@ collision_on_each_sq_r ( header_t header,
     tinv_qq[k][number_pr] = 0;
   }
 
-  int st = cputime();
+  int st = milliseconds();
   pnr = R->nr;
 
   /* for each rp, compute (rp-rq)*1/q^2 (mod p^2) */
@@ -1354,9 +1354,9 @@ collision_on_each_sq_r ( header_t header,
   }
 
   if (verbose > 2) {
-    fprintf (stderr, "#  substage: batch %d many (rp-rq)*1/q^2 took %dms\n",
-             count, cputime () - st);
-    st = cputime();
+    fprintf (stderr, "#  substage: batch %d many (rp-rq)*1/q^2 took %lums\n",
+             count, milliseconds () - st);
+    st = milliseconds();
   }
 
   /* core function to find collisions */
@@ -1365,8 +1365,8 @@ collision_on_each_sq_r ( header_t header,
   }
 
   if (verbose > 2)
-    fprintf (stderr, "#  substage: collision-detection %d many rq took %dms\n",
-             count, cputime () - st);
+    fprintf (stderr, "#  substage: collision-detection %d many rq took %lums\n",
+             count, milliseconds () - st);
 
   for (k = 0; k < count; k++)
     free (tinv_qq[k]);
@@ -1509,7 +1509,7 @@ collision_on_batch_sq ( header_t header,
     exit (1);
   }
 
-  int st = cputime();
+  int st = milliseconds();
 
   /* Step 1: inversion */
   for (nprimes = 0; nprimes < lenPrimes; nprimes ++) {
@@ -1541,17 +1541,17 @@ collision_on_batch_sq ( header_t header,
   }
 
   if (verbose > 2)
-    fprintf (stderr, "# stage (1/q^2 inversion) for %lu primes took %dms\n",
-             lenPrimes, cputime () - st);
+    fprintf (stderr, "# stage (1/q^2 inversion) for %lu primes took %lums\n",
+             lenPrimes, milliseconds () - st);
 
   /* Step 2: find collisions on q. */
-  int st2 = cputime();
+  int st2 = milliseconds();
 
   collision_on_batch_sq_r ( header, R, SQ_R, q, idx_q, invqq, number_pr,
                             &curr_nq, lq );
   if (verbose > 2)
-    fprintf (stderr, "#  stage (special-q) for %d special-q's took %dms\n",
-             curr_nq, cputime() - st2);
+    fprintf (stderr, "#  stage (special-q) for %d special-q's took %lums\n",
+             curr_nq, milliseconds() - st2);
 
   free (invqq);
 }
@@ -1643,7 +1643,7 @@ gmp_collision_on_p ( header_t header,
   hash_init (H, INIT_FACTOR * lenPrimes);
 
 #ifdef DEBUG_POLYSELECT2L
-  int st = cputime();
+  int st = milliseconds();
 #endif
 
   umax = (int64_t) Primes[lenPrimes - 1] * (int64_t) Primes[lenPrimes - 1];
@@ -1674,7 +1674,7 @@ gmp_collision_on_p ( header_t header,
   }
 
 #ifdef DEBUG_POLYSELECT2L
-  fprintf (stderr, "# collision_on_p took %dms\n", cputime () - st);
+  fprintf (stderr, "# collision_on_p took %dms\n", milliseconds () - st);
   fprintf (stderr, "# p hash_size: %u for ad = %lu\n", H->size, header->ad);
 #endif
 
@@ -1709,7 +1709,7 @@ gmp_collision_on_each_sq ( header_t header,
   double pc2;
 
 #ifdef DEBUG_POLYSELECT2L
-  int st = cputime();
+  int st = milliseconds();
 #endif
 
   hash_t H;
@@ -1745,7 +1745,7 @@ gmp_collision_on_each_sq ( header_t header,
 
 #ifdef DEBUG_POLYSELECT2L
   fprintf (stderr, "# inner collision_on_each_sq took %dms\n",
-	   cputime () - st);
+	   milliseconds () - st);
   fprintf (stderr, "# - q hash_size (q=%lu): %u\n", q, H->size);
 #endif
 
@@ -1844,9 +1844,9 @@ gmp_collision_on_batch_sq ( header_t header,
 
   /* Step 2: find collisions on q. */
   for (i = 0; i < size; i ++) {
-    //int st2 = cputime();
+    //int st2 = milliseconds();
     gmp_collision_on_each_sq (header, R, q[i], rqqz[i], invqq[i]);
-    //printf ("# outer collision_on_each_sq took %dms\n", cputime () - st2);
+    //printf ("# outer collision_on_each_sq took %dms\n", milliseconds () - st2);
   }
 
   for (i = 0; i < size; i++)
@@ -2172,13 +2172,13 @@ main (int argc, char *argv[])
     exit (1);
   }
 
-  st = cputime ();
+  st = milliseconds ();
   lenPrimes = initPrimes (P, &Primes);
 
-  printf ( "# Info: initializing %lu P primes took %dms,"
+  printf ( "# Info: initializing %lu P primes took %lums,"
            " rawonly=%d, nq=%d, target_time=%d\n",
            lenPrimes,
-           cputime () - st,
+           milliseconds () - st,
            raw,
            nq,
            target_time / 1000 );
@@ -2257,22 +2257,22 @@ main (int argc, char *argv[])
       fclose (fp);
     }
 
-    if (cputime () > target_time || verbose > 0)
+    if (milliseconds () > (unsigned long) target_time || verbose > 0)
     {
       double mean = aver_opt_lognorm / collisions_good;
       double rawmean = aver_raw_lognorm / collisions;
 
-      printf ("# Stat: ad=%lu, exp. coll.=%1.2f (%0.2e/s), got %lu with %lu good ones, av. lognorm=%1.2f (min=%1.2f,std=%1.2f), av. raw. lognorm=%1.2f (min=%1.2f,std=%1.2f), time=%dms\n",
+      printf ("# Stat: ad=%lu, exp. coll.=%1.2f (%0.2e/s), got %lu with %lu good ones, av. lognorm=%1.2f (min=%1.2f,std=%1.2f), av. raw. lognorm=%1.2f (min=%1.2f,std=%1.2f), time=%lums\n",
               admin,
               potential_collisions,
-              1000.0 * (double) potential_collisions / cputime (),
+              1000.0 * (double) potential_collisions / milliseconds (),
               collisions,
               collisions_good,
               mean, min_opt_lognorm,
               sqrt (var_opt_lognorm / collisions_good - mean * mean),
               rawmean, min_raw_lognorm,
               sqrt (var_raw_lognorm / collisions - rawmean * rawmean),
-              cputime () );
+              milliseconds () );
       fflush (stdout);
       target_time += incr_target_time;
     }
@@ -2283,7 +2283,7 @@ main (int argc, char *argv[])
     {
       printf ("# Stat: potential collisions=%1.2f (%1.2e/s)\n",
               potential_collisions, 1000.0 * potential_collisions
-              / (double) cputime ());
+              / (double) milliseconds ());
       if (collisions > 0)
         {
           double mean = aver_opt_lognorm / collisions_good;

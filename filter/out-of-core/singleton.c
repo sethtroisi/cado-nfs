@@ -60,7 +60,6 @@
 #include <pthread.h>
 #include <assert.h>
 #include <sys/types.h>
-#include <sys/resource.h>
 #include <sys/time.h>
 #include <fcntl.h>
 #include <math.h>
@@ -103,11 +102,7 @@ struct suffix_handler supported_compression_formats[] = {
 long
 cputime ()
 {
-  struct rusage rus;
-
-  getrusage (RUSAGE_SELF, &rus);
-  /* This overflows a 32 bit signed int after 2147483s = 24.85 days */
-  return rus.ru_utime.tv_sec;
+  return (long) seconds();
 }
 
 long
