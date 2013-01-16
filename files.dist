@@ -36,6 +36,7 @@ config/sse41.c
 config/sse41.cmake
 config/sync_fetch.c
 config/sync_fetch.cmake
+config/mingw.cmake
 factor.sh
 filter/CMakeLists.txt
 filter/Makefile

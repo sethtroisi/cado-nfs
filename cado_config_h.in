@@ -39,6 +39,7 @@
 
 #cmakedefine    HAVE_SYNC_FETCH
 #cmakedefine    HAVE_ASPRINTF
+#cmakedefine    HAVE_MINGW
 
 #cmakedefine    VOLATILE_IF_GCC_UBUNTU_BUG
 
