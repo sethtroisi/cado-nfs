@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <inttypes.h>
 #include <string.h>
 #include <gmp.h>
 #include "getprime.h"
@@ -47,7 +48,8 @@ roots_mod_mpz(uint64_t *r, uint64_t a, int d, uint64_t p)
 
 
 int main(int argc, char **argv) {
-  unsigned long a, p, d, *r1, *r2;
+  uint64_t *r1;
+  unsigned long a, p, d, *r2;
   int n1, n2, i;
   unsigned long minp = 100, maxp=10000, mina=1, maxa=100, mind=1, maxd=10;
   int check = 1;
@@ -74,7 +76,7 @@ int main(int argc, char **argv) {
   printf ("minp = %lu, maxp = %lu, mina = %lu, maxa = %lu, mind = %lu, maxd = %lu\n",
           minp, maxp, mina, maxa, mind, maxd);
 
-  r1 = malloc (sizeof(unsigned long) * maxd);
+  r1 = malloc (sizeof(uint64_t) * maxd);
   r2 = malloc (sizeof(unsigned long) * maxd);
   
   for (p = 2; p < minp; p = getprime(p));
@@ -96,7 +98,7 @@ int main(int argc, char **argv) {
             fprintf (stderr, "Error: for a=%lu, d=%lu, p=%lu, roots_mod_uint64()"
                      " reports roots: ", a, d, p);
             for (i = 0; i < n1; i++)
-              fprintf (stderr, "%lu ", r1[i]);
+              fprintf (stderr, "%" PRIu64 " ", r1[i]);
             fprintf (stderr, ", roots_mod_mpz() reports ");
             for (i = 0; i < n2; i++)
               fprintf (stderr, "%lu ", r2[i]);
