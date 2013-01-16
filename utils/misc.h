@@ -1,7 +1,6 @@
 #ifndef CADO_UTILS_MISC_H_
 #define CADO_UTILS_MISC_H_
 
-#include "cado.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <stdarg.h>
