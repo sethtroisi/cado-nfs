@@ -265,7 +265,7 @@ int mkdir_with_parents(const char * dir, int fatal)
 /* Copied and improved from
  * http://mingw-users.1079350.n2.nabble.com/Query-regarding-offered-alternative-to-asprintf-td6329481.html
  */
-int vasprintf( char **sptr, char *fmt, va_list argv )
+int vasprintf( char **sptr, const char *fmt, va_list argv )
 {
     int wanted = vsnprintf( *sptr = NULL, 0, fmt, argv );
     if (wanted<0)
@@ -276,7 +276,7 @@ int vasprintf( char **sptr, char *fmt, va_list argv )
     return vsnprintf(*sptr, 1+wanted, fmt, argv );
 }
 
-int asprintf( char **sptr, char *fmt, ... )
+int asprintf( char **sptr, const char *fmt, ... )
 {
     int retval;
     va_list argv;

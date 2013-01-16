@@ -40,7 +40,9 @@ static inline const void* pointer_arith_const(const void * a, ptrdiff_t q) {
     return (const void*)(((const char*)a)+q);
 }
 
-#ifndef HAVE_STRDUP
+/* MinGW's string.h does not declare a prototype for strdup if __STRICT_ANSI__
+   is defined */
+#if !defined(HAVE_STRDUP) || (defined(__MINGW32__) && defined(__STRICT_ANSI__))
 char * strdup(const char *s);
 #endif
 #ifndef HAVE_STRNDUP
