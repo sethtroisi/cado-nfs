@@ -68,7 +68,14 @@ endif(EXISTS ${CADO_NFS_SOURCE_DIR}/files.dist)
 # of e.g. warnings by the user-defined overrides.
 
 if(CMAKE_COMPILER_IS_GNUCC)
-    set (CMAKE_C_FLAGS   "-std=c99 -g -W -Wall ${CMAKE_C_FLAGS}")
+    # gcc defines __STRICT_ANSI__ with -std=c99, which under MinGW
+    # causes many prototypes and macros not to be defined. Using gnu99
+    # prevents the definition of __STRICT_ANSI__
+    if (MINGW)
+        set (CMAKE_C_FLAGS   "-std=gnu99 -g -W -Wall ${CMAKE_C_FLAGS}")
+    else
+        set (CMAKE_C_FLAGS   "-std=c99 -g -W -Wall ${CMAKE_C_FLAGS}")
+    endif
     set (CMAKE_CXX_FLAGS "-g -W -Wall ${CMAKE_CXX_FLAGS}")
 endif(CMAKE_COMPILER_IS_GNUCC)
 
@@ -237,3 +244,7 @@ configure_file(
 
 install(PROGRAMS ${CADO_NFS_BINARY_DIR}/factor.sh DESTINATION bin)
 install(PROGRAMS ${CADO_NFS_BINARY_DIR}/fixup_params_file.sh DESTINATION bin)
+
+IF (DEFINED ENV{CMAKE_DUMP_VARIABLES})
+  include("${CADO_NFS_SOURCE_DIR}/config/variables.cmake")
+ENDIF(DEFINED ENV{CMAKE_DUMP_VARIABLES})
