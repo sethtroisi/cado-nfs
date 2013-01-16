@@ -228,6 +228,22 @@ static volatile unsigned long cpt_rel_a;
 static volatile unsigned long cpt_rel_b;
 static volatile unsigned int end_insertRelation = 0;
 
+/* copied from utils/antebuffer.c */
+#ifndef HAVE_NANOSLEEP
+  int nanosleep(const struct timespec *req, struct timespec *rem) {
+    if (rem == NULL) {
+      /* Dummy to shut up the warning */
+    }
+#ifdef HAVE_USLEEP
+    unsigned long usec = req->tv_sec * 1000000UL + req->tv_nsec / 1000UL;
+    usleep(usec);
+#else
+    sleep(req->tv_sec);
+#endif
+    return 0;
+  }
+#endif
+
 /* Be careful. 1<<13 = 8µs; in fact, about 30-50 µs at least
    with a very reactive machine. Use for debugging only.
 */
