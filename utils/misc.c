@@ -17,15 +17,31 @@
 #include "macros.h"
 #include "misc.h"
 
-/* Not every libc has this, and providing a workalike is very easy */
-
-char *cado_strndup(const char *a, size_t n)
+#ifndef HAVE_STRDUP
+char *strdup(const char * const s)
 {
-    char *r = malloc(n+1);
-    memcpy(r, a, MIN(strlen(a),n)+1);
-    r[n] = '\0';
+    const size_t size = strlen(s) + 1;
+    char *r = (char *) malloc(size * sizeof(char));
+    if (r != NULL)
+        memcpy(r, s, size);
     return r;
 }
+#endif
+
+
+#ifndef HAVE_STRNDUP
+/* Not every libc has this, and providing a workalike is very easy */
+char *strndup(const char * const a, const size_t n)
+{
+    const size_t size = MIN(strlen(a), n) + 1;
+    char *r = (char *) malloc(size * sizeof(char));
+    if (r != NULL) {
+        memcpy(r, a, size);
+        r[size] = '\0';
+    }
+    return r;
+}
+#endif
 
 void
 *malloc_check (const size_t x)

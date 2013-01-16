@@ -1430,7 +1430,7 @@ static void mmt_fill_fields_from_balancing(matmul_top_data_ptr mmt, param_list p
             if (strcmp(mname+l-ls,suffixes[k]) == 0)
                 l -= ls;
         }
-        base = cado_strndup(mname, l);
+        base = strndup(mname, l);
     }
 
     /* The name choice is only indicative. Depending on the value of

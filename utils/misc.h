@@ -39,7 +39,13 @@ static inline void* pointer_arith(void * a, ptrdiff_t q) {
 static inline const void* pointer_arith_const(const void * a, ptrdiff_t q) {
     return (const void*)(((const char*)a)+q);
 }
-extern char * cado_strndup(const char * a, size_t n);
+
+#ifndef HAVE_STRDUP
+char * strdup(const char *s);
+#endif
+#ifndef HAVE_STRNDUP
+char * strndup(const char * a, size_t n);
+#endif
 
 extern char * derived_filename(const char * prefix, const char * what, const char * ext);
 extern int has_suffix(const char * path, const char * sfx);
@@ -113,8 +119,8 @@ static inline int ctzl(unsigned long x)
 #endif  /* HAVE_ctzl */
 
 #ifndef HAVE_ASPRINTF
-extern int asprintf(char **, char *, ...);
-extern int vasprintf(char **, char *, va_list);
+extern int asprintf(char **, const char *, ...);
+extern int vasprintf(char **, const char *, va_list);
 #endif  /* HAVE_ASPRINTF */
 
 
