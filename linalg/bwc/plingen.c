@@ -620,7 +620,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
             if (pi_lengths[j] >= pi->alloc) {
                 if (!generator_found) {
                     polymat_realloc(pi, pi->alloc + pi->alloc / (m+n));
-                    printf("t=%u, expanding allocation for pi (now %zu%%) ; lengths: ",
+                    printf("t=%u, expanding allocation for pi (now %" PRISIZ "%%) ; lengths: ",
                             bm->t,
                             100 * pi->alloc / pi_room_base);
                     for(unsigned int j = 0; j < b; j++)
@@ -725,7 +725,7 @@ static int bw_lingen_recursive(bmstatus_ptr bm, polymat pi, polymat E, unsigned 
 
     /* length of the middle product is the difference of lengths + 1 */
     unsigned mp_len = E_i1 - E_i0 - (pi_left->size - 1);
-    printf("t=%u, MP(%zu, %u) --> %u\n", bm->t, pi_left->size, E_i1 - E_i0, mp_len);
+    printf("t=%u, MP(%" PRISIZ ", %u) --> %u\n", bm->t, pi_left->size, E_i1 - E_i0, mp_len);
 
     polymat E_right;
     polymat_init(E_right, m, b, mp_len);
@@ -1232,7 +1232,7 @@ void compute_final_F_red(bmstatus_ptr bm, polymat f, unsigned int (*fdesc)[2], u
             printf("(*)");
         }
     }
-    printf(", (alloc=%zu)", pi->alloc);
+    printf(", (alloc=%" PRISIZ ")", pi->alloc);
     printf("\n");
 
     unsigned int * pi_colidx = malloc(n * sizeof(unsigned int));
@@ -1534,7 +1534,7 @@ int main(int argc, char *argv[])
             for(unsigned int j = 0 ; j < m + n ; delta[j++]=1);
             bm->t = 1;
             bw_lingen_basecase(bm, pi, E, delta);
-            printf("%zu %.2e\n", E->size, (seconds()-tt) / (k * k));
+            printf("%" PRISIZ " %.2e\n", E->size, (seconds()-tt) / (k * k));
             polymat_clear(pi);
             polymat_clear(E);
             free(delta);
@@ -1585,7 +1585,7 @@ int main(int argc, char *argv[])
                     ttmpk, ttmulk, ttmpk + ttmulk
                     );
             // (seconds()-tt) / (k*k)); // ((sE-spi) * spi) / (m*(m+n)*(m+n)));
-            // printf("%zu %.2e\n", E->size, (seconds()-tt) / (k*k)); // (spi * spi) / ((m+n)*(m+n)*(m+n)));
+            // printf("%" PRISIZ " %.2e\n", E->size, (seconds()-tt) / (k*k)); // (spi * spi) / ((m+n)*(m+n)*(m+n)));
             polymat_clear(E);
             polymat_clear(piL);
             polymat_clear(piR);
@@ -1608,7 +1608,7 @@ int main(int argc, char *argv[])
         printf("Reading scalar data in polynomial ``a'' from %s\n", afile);
         read_data_for_series(bm, A, afile, ascii);
 
-        printf("Read %zu+1=%zu iterations",
+        printf("Read %" PRISIZ "+1=%" PRISIZ " iterations",
                 A->size, A->size+ 1);
         if (bw->end || bw->start) {
             printf(" (bw parameters: expect %u)",

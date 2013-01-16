@@ -195,7 +195,7 @@ int docheck(size_t nf, size_t ng, int nrep)
         DO_ift_h(gf2x_tfft);
 
         if (memcmp(fake_h, c128_h, nwh * sizeof(unsigned long)) != 0) {
-            fprintf(stderr, "fake != c128 for %zu*%zu ; seed=%u\n",
+            fprintf(stderr, "fake != c128 for %" PRISIZ "*%" PRISIZ " ; seed=%u\n",
                     nf,ng,seed);
             printf("w:=%d;\n", (int) ULONG_BITS);
             display("f1",f1,nwf1);
@@ -210,7 +210,7 @@ int docheck(size_t nf, size_t ng, int nrep)
         }
 
         if (memcmp(fake_h, gf2x_tfft_h, nwh * sizeof(unsigned long)) != 0) {
-            fprintf(stderr, "fake != gf2x_tfft for %zu*%zu ; seed=%u\n",
+            fprintf(stderr, "fake != gf2x_tfft for %" PRISIZ "*%" PRISIZ " ; seed=%u\n",
                     nf,ng,seed);
             printf("w:=%d;\n", (int) ULONG_BITS);
             display("f1",f1,nwf1);

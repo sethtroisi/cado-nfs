@@ -756,7 +756,7 @@ void reorder_fb(sieve_info_ptr si, int side)
         fprintf(si->output, ", %d rs", fb_diff(q[1], q[0]));
         q = si->sides[side]->fb_parts->rest;
         fprintf(si->output, ", %d rest", fb_diff(q[1], q[0]));
-        fprintf(si->output, " (total %zu)\n", fb_nroots_total(fb_base));
+        fprintf(si->output, " (total %" PRISIZ ")\n", fb_nroots_total(fb_base));
     }
 }
 
@@ -1540,7 +1540,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                     relation_add_prime(rel, side, factors[side].fac[i]);
                 for (unsigned int i = 0; i < f[side]->length; ++i) {
                     if (!mpz_fits_ulong_p(f[side]->data[i]))
-                        fprintf(stderr, "Warning: misprinted relation because of large prime of %zu bits at (%"PRId64",%"PRIu64")\n",
+                        fprintf(stderr, "Warning: misprinted relation because of large prime of %" PRISIZ " bits at (%"PRId64",%"PRIu64")\n",
                                 mpz_sizeinbase(f[side]->data[i], 2), a, b);
                     for (unsigned int j = 0; j < m[side]->data[i]; j++) {
                         relation_add_prime(rel, side, mpz_get_ui(f[side]->data[i]));
@@ -1869,7 +1869,7 @@ static thread_data * thread_data_alloc(sieve_info_ptr si)
         for (int i = 0; i < si->nb_threads; ++i) {
             thrs[i]->sides[side]->fb_bucket = fb_bucket[i];
         }
-        fprintf (si->output, "# Number of small-sieved primes in %s factor base = %zu\n", sidenames[side], fb_nroots_total(s->fb));
+        fprintf (si->output, "# Number of small-sieved primes in %s factor base = %" PRISIZ "\n", sidenames[side], fb_nroots_total(s->fb));
 
         /* Counting the bucket-sieved primes per thread.  */
         unsigned long * nn = (unsigned long *) malloc(si->nb_threads * sizeof(unsigned long));
@@ -2153,7 +2153,7 @@ main (int argc0, char *argv0[])
       ASSERT_ALWAYS(alg->fb != NULL);
       tfb = seconds () - tfb;
       fprintf (si->output, 
-               "# Reading algebraic factor base of %zuMb took %1.1fs\n", 
+               "# Reading algebraic factor base of %" PRISIZ "Mb took %1.1fs\n", 
                fb_size (alg->fb) >> 20, tfb);
       free (leading_div);
     }
@@ -2170,7 +2170,7 @@ main (int argc0, char *argv0[])
                                  rpow_lim, rat->scale * LOG_SCALE, 
                                  si->verbose, 1, si->output);
         tfb = seconds () - tfb;
-        fprintf (si->output, "# Creating rational factor base of %zuMb took %1.1fs\n",
+        fprintf (si->output, "# Creating rational factor base of %" PRISIZ "Mb took %1.1fs\n",
                  fb_size (rat->fb) >> 20, tfb);
     }
     /* }}} */

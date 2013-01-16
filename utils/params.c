@@ -729,7 +729,7 @@ int param_list_parse_int_list(param_list pl, const char * key, int * r, size_t n
     }
     if (*end != '\0') {
         fprintf(stderr, "Parse error: parameter for key %s"
-                " must match %%d(%s%%d){0,%zu}; got %s\n",
+                " must match %%d(%s%%d){0,%" PRISIZ "}; got %s\n",
                 key, sep, n-1, pl->p[v]->value);
         exit(1);
     }

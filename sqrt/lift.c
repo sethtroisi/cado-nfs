@@ -57,7 +57,7 @@ static void WRAP_mpz_mul(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
     double w1 = wct_seconds();
     double rate = (w1-w0) ? ((t1-t0)/(w1-w0) * 100.0) : 0;
     if (REPORT_THIS(na, nb)) {
-        printf("mul %zu %zu (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
+        printf("mul %" PRISIZ " %" PRISIZ " (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
     }
 }
 
@@ -72,7 +72,7 @@ static void WRAP_mpz_invert(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
     double w1 = wct_seconds();
     double rate = (w1-w0) ? ((t1-t0)/(w1-w0) * 100.0) : 0;
     if (REPORT_THIS(na, nb)) {
-        printf("inv %zu %zu (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
+        printf("inv %" PRISIZ " %" PRISIZ " (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
     }
 }
 
@@ -87,7 +87,7 @@ static void WRAP_mpz_addmul(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
     double w1 = wct_seconds();
     double rate = (w1-w0) ? ((t1-t0)/(w1-w0) * 100.0) : 0;
     if (REPORT_THIS(na, nb)) {
-        printf("mul %zu %zu (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
+        printf("mul %" PRISIZ " %" PRISIZ " (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
     }
 }
 
@@ -102,7 +102,7 @@ static void WRAP_mpz_submul(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
     double w1 = wct_seconds();
     double rate = (w1-w0) ? ((t1-t0)/(w1-w0) * 100.0) : 0;
     if (REPORT_THIS(na, nb)) {
-        printf("mul %zu %zu (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
+        printf("mul %" PRISIZ " %" PRISIZ " (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
     }
 }
 
@@ -117,7 +117,7 @@ static void WRAP_barrett_mod(mpz_ptr c, mpz_srcptr a, mpz_srcptr p, mpz_srcptr q
     double w1 = wct_seconds();
     double rate = (w1-w0) ? ((t1-t0)/(w1-w0) * 100.0) : 0;
     if (REPORT_THIS(na, nb) && na > nb + 10) {
-        printf("mod %zu %zu (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
+        printf("mod %" PRISIZ " %" PRISIZ " (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
     }
 }
 /* }}} */

@@ -2323,15 +2323,14 @@ main (int argc, char **argv)
     rel_used->p[nrelmax>>LN2_BV_BITS] &= (((bv_t) 1)<<(nrelmax & (BV_BITS - 1))) - 1;
 
   tot_alloc0 += mysize;
-  fprintf (stderr, "Allocated rel_used of %uMb (total %zuMb so far)\n",
+  fprintf (stderr, "Allocated rel_used of %uMb (total %" PRISIZ "Mb so far)\n",
 	   nrelmax >> 20, tot_alloc0 >> 20);
 
   if (!boutfilerel) {
     SMALLOC(rel_compact, nrelmax, "main 1");
     SMALLOC(rel_weight, nrelmax, "main 2");
   tot_alloc0 += nrelmax * (sizeof (HR_T *) + sizeof (HC_T));
-  /* %zu is the C99 modifier for size_t */
-  fprintf (stderr, "Allocated rel_compact of %zu MB (total %zu MB so far)\n",
+  fprintf (stderr, "Allocated rel_compact of %" PRISIZ " MB (total %" PRISIZ " MB so far)\n",
 	   ((size_t) nrelmax * sizeof (HR_T *)) >> 20, tot_alloc0 >> 20);
   }
   /* Build the file list (ugly). It is the concatenation of all

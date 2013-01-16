@@ -94,7 +94,7 @@ int read_afiles(struct afile_list * a)
         ssize_t expected = bw->m * (A->n1-A->n0) * bits_per_coeff / CHAR_BIT * (A->j1 - A->j0);
 
         if (sbuf->st_size != expected) {
-            fprintf(stderr, "%s does not have expected size %zu\n",
+            fprintf(stderr, "%s does not have expected size %" PRISIZ "\n",
                     de->d_name, expected);
             exit(1);
         }

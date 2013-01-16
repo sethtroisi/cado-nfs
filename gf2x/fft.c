@@ -32,7 +32,6 @@
 #include "gf2x/gf2x-impl.h"
 #include "gf2x/gf2x-tfft.h"
 
-
 // #define DEBUG
 // #define DEBUG_LSHIFT
 // #define DEBUG_MULMOD
@@ -1099,7 +1098,7 @@ void gf2x_mul_fft(unsigned long *c, const unsigned long *a, size_t an,
     gf2x_tfft_init(o, an * WLEN, bn * WLEN, K);
     
     if (o->K == 0) {
-	printf("gf2x_mul_fft: arguments (%zu, %zu) too small\n", an, bn);
+	printf("gf2x_mul_fft: arguments (%" PRISIZ ", %" PRISIZ ") too small\n", an, bn);
         /* Note that actually the routines below do work, because they're
          * specified for working. However, this contradicts the fact that
          * via this entry point, we have explicitly asked for _not_

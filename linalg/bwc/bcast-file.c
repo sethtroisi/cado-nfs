@@ -123,11 +123,11 @@ int main(int argc, char * argv[])
         MPI_Allreduce(MPI_IN_PLACE, &ok,    1, MPI_INT, MPI_SUM, comm);
         if (ok) {
             if (rank == 0)
-                printf("%s ok everywhere (%zu MB)\n", argv[i], szmax >> 20);
+                printf("%s ok everywhere (%" PRISIZ " MB)\n", argv[i], szmax >> 20);
             continue;
         } else {
             if (rc == 0 && me < szmax) {
-                printf("node %d/%d, %s is only %zu < %zu. Removed\n",
+                printf("node %d/%d, %s is only %" PRISIZ " < %" PRISIZ ". Removed\n",
                         rank,size,argv[i],me,szmax);
                 unlink(argv[i]);
                 rc = -1;
@@ -144,7 +144,7 @@ int main(int argc, char * argv[])
         if (rc == 0) node = rank;
         MPI_Allreduce(MPI_IN_PLACE, &node, 1, MPI_INT, MPI_MAX, comm);
         if (rank == 0) {
-            printf("%s (%zu MB, node %d)\n", argv[i], szmax >> 20, node);
+            printf("%s (%" PRISIZ " MB, node %d)\n", argv[i], szmax >> 20, node);
             fflush(stdout);
         }
         share_file(argv[i], node, szmax, comm);

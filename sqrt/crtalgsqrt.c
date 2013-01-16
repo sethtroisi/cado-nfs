@@ -173,7 +173,7 @@ static void WRAP_mpz_mul(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
     mpz_mul(c,a,b);
     STOPWATCH_GET();
     if (REPORT_THIS(na, nb)) {
-        logprint("<9> mpz_mul %zu %zu (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
+        logprint("<9> mpz_mul %" PRISIZ " %" PRISIZ " (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
     }
 }
 
@@ -187,7 +187,7 @@ static void WRAP_mpz_invert(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
     mpz_invert(c,a,b);
     STOPWATCH_GET();
     if (REPORT_THIS(na, nb)) {
-        logprint("<9> mpz_inv %zu %zu (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
+        logprint("<9> mpz_inv %" PRISIZ " %" PRISIZ " (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
     }
 }
 #endif
@@ -201,7 +201,7 @@ static void WRAP_mpz_addmul(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
     mpz_addmul(c,a,b);
     STOPWATCH_GET();
     if (REPORT_THIS(na, nb)) {
-        logprint("<9> mpz_mul %zu %zu (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
+        logprint("<9> mpz_mul %" PRISIZ " %" PRISIZ " (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
     }
 }
 
@@ -214,7 +214,7 @@ static void WRAP_mpz_submul(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
     mpz_submul(c,a,b);
     STOPWATCH_GET();
     if (REPORT_THIS(na, nb)) {
-        logprint("<9> mpz_mul %zu %zu (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
+        logprint("<9> mpz_mul %" PRISIZ " %" PRISIZ " (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
     }
 }
 
@@ -227,7 +227,7 @@ static void WRAP_barrett_mod(mpz_ptr c, mpz_srcptr a, mpz_srcptr p, mpz_srcptr q
     barrett_mod(c,a,p,q);
     STOPWATCH_GET();
     if (REPORT_THIS(na, nb) && na > nb + 10) {
-        logprint("<9> mpz_mod %zu %zu (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
+        logprint("<9> mpz_mod %" PRISIZ " %" PRISIZ " (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
     }
 }
 
@@ -240,7 +240,7 @@ static void WRAP_mpz_mod(mpz_ptr c, mpz_srcptr a, mpz_srcptr p)
     mpz_mod(c,a,p);
     STOPWATCH_GET();
     if (REPORT_THIS(na, nb) && na > nb + 10) {
-        logprint("<9> mpz_mod %zu %zu (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
+        logprint("<9> mpz_mod %" PRISIZ " %" PRISIZ " (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
     }
 }
 /* }}} */
@@ -649,7 +649,7 @@ void ab_source_init(ab_source_ptr ab, const char * fname, int rank, int root, MP
             FILE * f = fopen(fname, "r");
             char * xx = fgets(line, sizeof(line), f);
             DIE_ERRNO_DIAG(xx == NULL, "fgets", fname);
-            rc = sscanf(line, "AB %zu %zu", &ab->nab, &dummy);
+            rc = sscanf(line, "AB %" PRISIZ " %" PRISIZ, &ab->nab, &dummy);
             DIE_ERRNO_DIAG(rc != 2, "parse", fname);
             hdrbytes = ftell(f);
             fclose(f);
@@ -683,8 +683,8 @@ void ab_source_init(ab_source_ptr ab, const char * fname, int rank, int root, MP
         ab->totalsize = ab->file_bases[ab->nfiles];
     }
     /*
-       fprintf(stderr, "# [%2.2lf] %s: roughly %zu rows,"
-       " %zu digits (%zu bits/c)\n",
+       fprintf(stderr, "# [%2.2lf] %s: roughly %" PRISIZ " rows,"
+       " %" PRISIZ " digits (%" PRISIZ " bits/c)\n",
        WCT,
        ab->nfiles ? "kleinjung" : "cado",
        ab->nab_estim, ab->digitbytes_estim,
@@ -834,7 +834,7 @@ void ab_source_move_afterpos(ab_source_ptr ab, size_t offset)
         int r = ab_source_next(ab, &a, &b);
         FATAL_ERROR_CHECK(r == 0, "adjustment failed");
     }
-    logprint("(a,b) rewind to %s, pos %zu\n",
+    logprint("(a,b) rewind to %s, pos %" PRISIZ "\n",
             ab->nfiles ? ab->sname : ab->fname0, ab->cpos);
 }
 // }}}
@@ -1123,9 +1123,9 @@ void estimate_nbits_sqrt(size_t * sbits, ab_source_ptr ab) // , int guess)
      *abits += *abits / 10;
      *sbits += *sbits / 10;
      logprint("coefficients of A"
-     " have at most %zu bits (ESTIMATED)\n", WCT, *abits);
+     " have at most %" PRISIZ " bits (ESTIMATED)\n", WCT, *abits);
      logprint("square root coefficients"
-     " have at most %zu bits (ESTIMATED)\n", WCT, *sbits);
+     " have at most %" PRISIZ " bits (ESTIMATED)\n", WCT, *sbits);
      return;
      }
      */
@@ -1232,7 +1232,7 @@ void estimate_nbits_sqrt(size_t * sbits, ab_source_ptr ab) // , int guess)
         if (wt > w1 + print_delay || !(ab->nab % 10000000)) {
             w1 = wt;
             fprintf(stderr,
-                    "# [%2.2lf] floating point evaluation: %zu (%.1f%%)\n",
+                    "# [%2.2lf] floating point evaluation: %" PRISIZ " (%.1f%%)\n",
                     WCT, ab->nab, 100.0*(double)ab->nab/ab->nab_estim);
         }
     }
@@ -1348,9 +1348,9 @@ void estimate_nbits_sqrt(size_t * sbits, ab_source_ptr ab) // , int guess)
     *sbits = ceil(logbound_sqrt / M_LN2);
     *abits = ceil(logbound_a / M_LN2);
     fprintf(stderr, "# [%2.2lf] coefficients of A"
-            " have at most %zu bits\n", WCT, *abits);
+            " have at most %" PRISIZ " bits\n", WCT, *abits);
     fprintf(stderr, "# [%2.2lf] square root coefficients"
-            " have at most %zu bits\n", WCT, *sbits);
+            " have at most %" PRISIZ " bits\n", WCT, *sbits);
 
     free(a_bounds);
     free(sqrt_bounds);
@@ -2142,7 +2142,7 @@ void get_parameters(int * pr, int * ps, int * pt, int asked_r)
             100.0 * ramfraction, size_disp(ram_gb*1024.0*1048576.0, buf2), s);
 
     fprintf(stderr, "# [%2.2lf] %d groups of %d prime powers,"
-            " each of %zu bits\n",
+            " each of %" PRISIZ " bits\n",
             WCT, t, r, B);
 
     /* If these asserts fail, it means that the constraints are
@@ -2150,7 +2150,7 @@ void get_parameters(int * pr, int * ps, int * pt, int asked_r)
     ASSERT_ALWAYS((double)T/t < (double) R/n);
     ASSERT_ALWAYS(B*n <= R);
 
-    fprintf(stderr, "# [%2.2lf] number of pairs is %zu\n", WCT,
+    fprintf(stderr, "# [%2.2lf] number of pairs is %" PRISIZ "\n", WCT,
             glob.ab->nab);
     *pr = r;
     *ps = s;
@@ -2163,7 +2163,7 @@ int rat_red_caches_ok(struct prime_data * primes, int i0, int i1, size_t off0, s
     if (!rcache) return 0;
     int nok = 0;
     for(int i = i0 ; i < i1 ; i++) {
-        nok += cachefile_exists("a_%zu_%zu_mod_%lu_%lu", off0, off1, primes[i].p, glob.prec);
+        nok += cachefile_exists("a_%" PRISIZ "_%" PRISIZ "_mod_%lu_%lu", off0, off1, primes[i].p, glob.prec);
     }
     MPI_Allreduce(MPI_IN_PLACE, &nok, 1, MPI_MY_SIZE_T, MPI_SUM, MPI_COMM_WORLD);
     return nok == glob.m * glob.s;
@@ -2176,7 +2176,7 @@ int alg_red_caches_ok(struct prime_data * primes, int i0, int i1, size_t off0, s
     for(int i = i0 ; i < i1 ; i++) {
         struct prime_data * p = &primes[i];
         for(int j = 0 ; j < glob.n ; j++) {
-            nok += cachefile_exists("a_%zu_%zu_mod_%lu_%lu_%lu",
+            nok += cachefile_exists("a_%" PRISIZ "_%" PRISIZ "_mod_%lu_%lu_%lu",
                     off0, off1, p->p, p->r[j], glob.prec);
         }
     }
@@ -2268,11 +2268,11 @@ void * a_poly_read_share_child(struct subtask_info_t * info)
     poly_ptr P = info->P;
     cachefile c;
 
-    cachefile_init(c, "a_%zu_%zu", off0, off1);
+    cachefile_init(c, "a_%" PRISIZ "_%" PRISIZ, off0, off1);
 
     if (rcache && cachefile_open_r(c)) {
         logprint("reading cache %s\n", c->basename);
-        rc = fscanf(c->f, "%zu", &info->nab_loc);
+        rc = fscanf(c->f, "%" PRISIZ, &info->nab_loc);
         ASSERT_ALWAYS(rc == 1);
         for(int i = 0 ; i < glob.n ; i++) {
             rc = gmp_fscanf(c->f, "%Zx", info->P->coeff[i]);
@@ -2293,7 +2293,7 @@ void * a_poly_read_share_child(struct subtask_info_t * info)
 
     if (wcache && cachefile_open_w(c)) {
         logprint("writing cache %s\n", c->basename);
-        fprintf(c->f, "%zu\n", info->nab_loc);
+        fprintf(c->f, "%" PRISIZ "\n", info->nab_loc);
         for(int i = 0 ; i < glob.n ; i++) {
             gmp_fprintf(c->f, "%Zx\n", info->P->coeff[i]);
         }
@@ -2320,11 +2320,11 @@ size_t a_poly_read_share(poly_t P, size_t off0, size_t off1)
 
     cachefile c;
 
-    cachefile_init(c, "a_%zu_%zu", off0, off1);
+    cachefile_init(c, "a_%" PRISIZ "_%" PRISIZ, off0, off1);
 
     if (rcache && cachefile_open_r(c)) {
         logprint("reading cache %s\n", c->basename);
-        rc = fscanf(c->f, "%zu", &nab_loc);
+        rc = fscanf(c->f, "%" PRISIZ, &nab_loc);
         ASSERT_ALWAYS(rc == 1);
         for(int i = 0 ; i < glob.n ; i++) {
             rc = gmp_fscanf(c->f, "%Zx", P->coeff[i]);
@@ -2406,7 +2406,7 @@ size_t a_poly_read_share(poly_t P, size_t off0, size_t off1)
 
     if (wcache && cachefile_open_w(c)) {
         logprint("writing cache %s\n", c->basename);
-        fprintf(c->f, "%zu\n", nab_loc);
+        fprintf(c->f, "%" PRISIZ "\n", nab_loc);
         for(int i = 0 ; i < glob.n ; i++) {
             gmp_fprintf(c->f, "%Zx\n", P->coeff[i]);
         }
@@ -2751,13 +2751,13 @@ void * rational_reduction_child(struct subtask_info_t * info)
     if (wcache) {
         for(int i = i0 ; i < i1 ; i++) {
             cachefile c;
-            cachefile_init(c, "a_%zu_%zu_mod_%lu_%lu",
+            cachefile_init(c, "a_%" PRISIZ "_%" PRISIZ "_mod_%lu_%lu",
                     off0, off1, primes[i].p, glob.prec);
             if (cachefile_open_w(c)) {
                 logprint("writing cache %s\n", c->basename);
                 /* XXX nab_loc is a misnomer here. In reality we have nab_total
                  * there in this context */
-                fprintf(c->f, "%zu\n", info->nab_loc);
+                fprintf(c->f, "%" PRISIZ "\n", info->nab_loc);
                 for(int j = 0 ; j < glob.n ; j++)
                     gmp_fprintf(c->f, "%Zx\n", primes[i].A->coeff[j]);
                 cachefile_close(c);
@@ -2781,11 +2781,11 @@ void rational_reduction(struct prime_data * primes, int i0, int i1, poly_ptr P, 
         ASSERT_ALWAYS(*p_nab_total == 0);
         for(int i = i0 ; i < i1 ; i++) {
             cachefile c;
-            cachefile_init(c, "a_%zu_%zu_mod_%lu_%lu",
+            cachefile_init(c, "a_%" PRISIZ "_%" PRISIZ "_mod_%lu_%lu",
                     off0, off1, primes[i].p, glob.prec);
             if (cachefile_open_r(c)) {
                 logprint("reading cache %s\n", c->basename);
-                rc = fscanf(c->f, "%zu", p_nab_total);
+                rc = fscanf(c->f, "%" PRISIZ, p_nab_total);
                 ASSERT_ALWAYS(rc == 1);
                 for(int j = 0 ; j < glob.n ; j++) {
                     rc = gmp_fscanf(c->f, "%Zx", primes[i].A->coeff[j]);
@@ -2837,12 +2837,12 @@ void * algebraic_reduction_child(struct subtask_info_t * info)
 
     cachefile c;
 
-    cachefile_init(c, "a_%zu_%zu_mod_%lu_%lu_%lu",
+    cachefile_init(c, "a_%" PRISIZ "_%" PRISIZ "_mod_%lu_%lu_%lu",
             info->off0, info->off1, info->p->p, info->p->r[j], glob.prec);
 
     if (rcache && cachefile_open_r(c)) {
         logprint("reading cache %s\n", c->basename);
-        rc = fscanf(c->f, "%zu", &info->nab_loc);
+        rc = fscanf(c->f, "%" PRISIZ, &info->nab_loc);
         ASSERT_ALWAYS(rc == 1);
         rc = gmp_fscanf(c->f, "%Zx", p->evals->coeff[j]);
         ASSERT_ALWAYS(rc == 1);
@@ -2866,7 +2866,7 @@ void * algebraic_reduction_child(struct subtask_info_t * info)
 
     if (wcache && cachefile_open_w(c)) {
         logprint("writing cache %s\n", c->basename);
-        fprintf(c->f, "%zu\n", info->nab_loc);
+        fprintf(c->f, "%" PRISIZ "\n", info->nab_loc);
         gmp_fprintf(c->f, "%Zx\n", p->evals->coeff[j]);
         cachefile_close(c);
     }
@@ -2942,7 +2942,7 @@ void multiply_all_shares(struct prime_data * primes, int i0, int i1, size_t * p_
                 int ok = cachefile_open_r(c);
                 ASSERT_ALWAYS(ok);
                 logprint("reading cache %s\n", c->basename);
-                rc = fscanf(c->f, "%zu", p_nab_total);
+                rc = fscanf(c->f, "%" PRISIZ, p_nab_total);
                 ASSERT_ALWAYS(rc == 1);
                 rc = gmp_fscanf(c->f, "%Zx", primes[i].evals->coeff[j]);
                 ASSERT_ALWAYS(rc == 1);
@@ -2974,7 +2974,7 @@ void multiply_all_shares(struct prime_data * primes, int i0, int i1, size_t * p_
                 int ok = cachefile_open_w(c);
                 ASSERT_ALWAYS(ok);
                 logprint("writing cache %s\n", c->basename);
-                fprintf(c->f, "%zu\n", * p_nab_total);
+                fprintf(c->f, "%" PRISIZ "\n", * p_nab_total);
                 gmp_fprintf(c->f, "%Zx\n", primes[i].evals->coeff[j]);
                 cachefile_close(c);
             }
@@ -2992,7 +2992,7 @@ void * local_square_roots_child(struct subtask_info_t * info)
     cachefile c;
     cachefile_init(c, "sqrt_%lu_%lu_%lu", p->p, p->r[j], glob.prec);
     if (rcache && cachefile_open_r(c)) {
-        rc = fscanf(c->f, "%zu", &info->nab_loc);
+        rc = fscanf(c->f, "%" PRISIZ, &info->nab_loc);
         ASSERT_ALWAYS(rc == 1);
         logprint("reading cache %s\n", c->basename);
         rc = gmp_fscanf(c->f, "%Zx", p->sqrts->coeff[j]);
@@ -3007,7 +3007,7 @@ void * local_square_roots_child(struct subtask_info_t * info)
 
     if (wcache && cachefile_open_w(c)) {
         logprint("writing cache %s\n", c->basename);
-        fprintf(c->f, "%zu\n", info->nab_loc);
+        fprintf(c->f, "%" PRISIZ "\n", info->nab_loc);
         gmp_fprintf(c->f, "%Zx\n", p->sqrts->coeff[j]);
         cachefile_close(c);
     }
@@ -3604,7 +3604,7 @@ int main(int argc, char **argv)
     for (int i = glob.pol->alg->degree; i >= 0; --i)
         poly_setcoeff(glob.F, i, glob.f_hat[i]);
 
-    // fprintf(stderr, "# [%2.2lf] A is f_d^%zu*f_hat'(alpha_hat)*prod(f_d a - b alpha_hat)\n", WCT, nab + (nab &1));
+    // fprintf(stderr, "# [%2.2lf] A is f_d^%" PRISIZ "*f_hat'(alpha_hat)*prod(f_d a - b alpha_hat)\n", WCT, nab + (nab &1));
 
     ab_source_init(glob.ab, param_list_lookup_string(pl, "depfile"),
             glob.rank, 0, MPI_COMM_WORLD);

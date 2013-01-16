@@ -48,7 +48,7 @@ void abase_vbase_oo_field_init_byfeatures(abase_vbase_ptr v, ...)
         } else if (groupsize == 128 && mpz_cmp_ui(p, 2) == 0) {
             abase_u64k2_oo_field_init(v);
         } else {
-            gmp_fprintf(stderr, "Unsupported combination: group size = %d, p = %Zd, %zu limbs\n", groupsize, p, mpz_size(p));
+            gmp_fprintf(stderr, "Unsupported combination: group size = %d, p = %Zd, %" PRISIZ " limbs\n", groupsize, p, mpz_size(p));
             exit(1);
         }
         v->field_specify(v, MPFQ_PRIME_MPZ, p);

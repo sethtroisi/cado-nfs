@@ -165,6 +165,18 @@ LEXLE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
 #endif
 
 /* Portability macros */
+
+/* Portable format specifier for size_t */
+#ifndef PRISIZ
+  /* MS VS and MinGW use the MS RTL (called MSVCRT for MinGW) which does not
+     know the "%zu" format, they use "%Iu" instead */
+#if defined(_MSC_VER) || defined(__MSVCRT__)
+#define PRISIZ "Iu"
+#else
+#define PRISIZ "zu"
+#endif
+#endif
+
 /* Handles portability cases which can be solved with a simple rename, 
    such as using the slower getc() instead of getc_unlocked() */
 #ifndef HAVE_GETC_UNLOCKED
