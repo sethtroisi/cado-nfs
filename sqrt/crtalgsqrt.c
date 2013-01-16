@@ -1533,7 +1533,7 @@ void modul_find_ts_gen(residueul_t z, modulusul_t p)
     residueul_t r;
     modul_init(r, p);
     do {
-        modul_set_ul(z, random(), p);
+        modul_set_ul(z, rand (), p);
         modul_pow_ul(z, z, pp, p);
         modul_pow_ul(r, z, s, p);
         modul_add_ul(r, r, 1, p);
