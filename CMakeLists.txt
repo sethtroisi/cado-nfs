@@ -73,9 +73,9 @@ if(CMAKE_COMPILER_IS_GNUCC)
     # prevents the definition of __STRICT_ANSI__
     if (MINGW)
         set (CMAKE_C_FLAGS   "-std=gnu99 -g -W -Wall ${CMAKE_C_FLAGS}")
-    else
+    else (MINGW)
         set (CMAKE_C_FLAGS   "-std=c99 -g -W -Wall ${CMAKE_C_FLAGS}")
-    endif
+    endif (MINGW)
     set (CMAKE_CXX_FLAGS "-g -W -Wall ${CMAKE_CXX_FLAGS}")
 endif(CMAKE_COMPILER_IS_GNUCC)
 
