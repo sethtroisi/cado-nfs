@@ -4,33 +4,22 @@
 #include <time.h>
 #include <gmp.h>
 
+#include "macros.h"
 #include "random_generation.h"
 
+mp_limb_t cado_random(cado_random_state_ptr r MAYBE_UNUSED)
+{
 #ifdef  USE_GMP_RANDOM
-static gmp_randstate_t random_state;
-mp_limb_t myrand()
-{
-    return gmp_urandomb_ui(random_state, GMP_LIMB_BITS);
-}
-static void myseed(unsigned long int x)
-{
-    gmp_randseed_ui(random_state, x);
-}
+    return gmp_urandomb_ui(r->g, GMP_LIMB_BITS);
 #else
-mp_limb_t myrand()
-{
     return rand ();
-}
-static void myseed(unsigned long int x)
-{
-    srand (x);
-}
 #endif
+}
 
-void myrand_area(void * p, size_t s)
+void cado_random_area(cado_random_state_ptr r, void * p, size_t s)
 {
     for(size_t i = 0 ; i < s ; i++) {
-        ((char*)p)[i] = myrand();
+        ((char*)p)[i] = cado_random(r);
     }
 #if 0
     /* FIXME This does not work with seeding ! */
@@ -42,14 +31,20 @@ void myrand_area(void * p, size_t s)
 #endif
 }
 
-void setup_seeding(unsigned int s)
+void cado_random_init(cado_random_state_ptr r MAYBE_UNUSED, unsigned int s)
+{
+    if (s == 0)
+        s = time(NULL);
+#ifdef  USE_GMP_RANDOM
+    gmp_randinit_mt(r->g);
+    gmp_randseed_ui(r->g, s);
+#endif
+    srand(s);
+}
+
+void cado_random_clear(cado_random_state_ptr r MAYBE_UNUSED)
 {
 #ifdef  USE_GMP_RANDOM
-    gmp_randinit_mt(random_state);
+    gmp_randclear_mt(r->g);
 #endif
-    if (s == 0) {
-        myseed(time(NULL));
-    } else {
-        myseed(s);
-    }
 }

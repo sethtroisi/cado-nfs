@@ -17,6 +17,8 @@
 
 void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
+    cado_random_state_ptr rs = (cado_random_state_ptr) arg;
+
     /* Interleaving does not make sense for this program. So the second
      * block of threads just leave immediately */
     if (pi->interleaved && pi->interleaved->idx)
@@ -76,7 +78,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
         serialize_threads(pi->m);
 
         if (tcan_print) {
-            printf("// Generating new x,y vector pair (trial # %u -- seed %lu)\n", ntri, (unsigned long) myrand());
+            printf("// Generating new x,y vector pair (trial # %u -- seed %lu)\n", ntri, (unsigned long) cado_random(rs));
         }
         if (ntri >= my_nx * 10) {
             ++my_nx;
@@ -91,7 +93,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
         // Otherwise, it's on the right.
 
         // generate indices w.r.t *unpadded* dimensions !
-        setup_x_random(xvecs, bw->m, my_nx, mmt->n0[bw->dir], pi);
+        setup_x_random(xvecs, bw->m, my_nx, mmt->n0[bw->dir], pi, rs);
 
         /* Random generation + save is better done as writing random data
          * to a file followed by reading it: this way, seeding works
@@ -232,17 +234,19 @@ int main(int argc, char * argv[])
     bw_common_init_mpi(bw, pl, &argc, &argv);
     if (param_list_warn_unused(pl)) usage();
 
-    if (bw->seed) setup_seeding(bw->seed);
-
     setvbuf(stdout,NULL,_IONBF,0);
     setvbuf(stderr,NULL,_IONBF,0);
 
-    pi_go(prep_prog, pl, 0);
+    cado_random_state rs[1];
+    cado_random_init(rs, bw->seed);
+    pi_go(prep_prog, pl, rs);
 
     param_list_remove_key(pl, "sequential_cache_build");
     param_list_remove_key(pl, "rebuild_cache");
 
     param_list_clear(pl);
+
+    cado_random_clear(rs);
 
     bw_common_clear_mpi(bw);
     return 0;
