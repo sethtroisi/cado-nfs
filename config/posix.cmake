@@ -2,7 +2,12 @@
 
 INCLUDE (CheckIncludeFiles)
 
+# The fact that CMake prints "Looking for include files HAVE_RESOURCE_H"
+# rather than "Looking for include files sys/resource.h" is a bug:
+# http://public.kitware.com/Bug/view.php?id=13484
+
 CHECK_INCLUDE_FILES (sys/resource.h HAVE_RESOURCE_H)
+CHECK_INCLUDE_FILES (sys/utsname.h HAVE_UTSNAME_H)
 
 # Unset the CMake variable that search_for_function() interprets
 set(CMAKE_REQUIRED_FLAGS)

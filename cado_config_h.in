@@ -27,6 +27,7 @@
 #cmakedefine    HAVE_LOG2
 #cmakedefine    HAVE_EXP2
 #cmakedefine    HAVE_RESOURCE_H
+#cmakedefine    HAVE_UTSNAME_H
 #cmakedefine    HAVE_GETRUSAGE
 #cmakedefine    HAVE_GETC_UNLOCKED
 #cmakedefine    HAVE_NANOSLEEP
