@@ -8,6 +8,12 @@ INCLUDE (CheckIncludeFiles)
 
 CHECK_INCLUDE_FILES (sys/resource.h HAVE_RESOURCE_H)
 CHECK_INCLUDE_FILES (sys/utsname.h HAVE_UTSNAME_H)
+CHECK_INCLUDE_FILES (sys/mman.h HAVE_MMAN_H)
+CHECK_INCLUDE_FILES (sys/statvfs.h HAVE_STATVFS_H)
+CHECK_INCLUDE_FILES (sys/wait.h HAVE_WAIT_H)
+
+INCLUDE (CheckSymbolExists)
+CHECK_SYMBOL_EXISTS(SIGHUP "signal.h" HAVE_SIGHUP) 
 
 # Unset the CMake variable that search_for_function() interprets
 set(CMAKE_REQUIRED_FLAGS)
@@ -25,3 +31,4 @@ search_for_function(getrusage HAVE_GETRUSAGE)
 search_for_function(lrand48 HAVE_LRAND48)
 search_for_function(strdup HAVE_STRDUP)
 search_for_function(strndup HAVE_STRNDUP)
+search_for_function(sigaction HAVE_SIGACTION)
