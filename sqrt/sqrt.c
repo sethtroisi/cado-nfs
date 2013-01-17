@@ -164,7 +164,7 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
           res = Memusage2 ();
           if (res > peakres)
             peakres = res;
-            fprintf (stderr, "SqrtRat: %lu pairs: size %zuMb, %dms, VIRT %luM (peak %luM), RES %luM (peak %luM)\n",
+            fprintf (stderr, "SqrtRat: %lu pairs: size %zuMb, %lums, VIRT %luM (peak %luM), RES %luM (peak %luM)\n",
                        ab_pairs, stats (prd, lprd) >> 17, milliseconds (),
                        Memusage () >> 10, PeakMemusage () >> 10,
                        res >> 10, peakres >> 10);
