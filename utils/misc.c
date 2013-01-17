@@ -363,7 +363,13 @@ int vasprintf( char **sptr, const char *fmt, va_list argv )
     *sptr = malloc(1 + wanted);
     if (!*sptr)
         return -1;
-    return vsnprintf(*sptr, 1+wanted, fmt, argv );
+    /* MinGW (the primary user of this code) can't grok %zu, so we have
+     * to rewrite the format */
+    const char *subst_format;
+    subst_format = subst_zu (format);  
+    int rc = vsnprintf(*sptr, 1+wanted, subst_zu, argv );
+    free ((void *)subst_format);
+    return rc;
 }
 
 int asprintf( char **sptr, const char *fmt, ... )
