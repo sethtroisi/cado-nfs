@@ -28,6 +28,7 @@
 
 #include <stdarg.h> /* for the fft interface */
 
+#include "macros.h"
 #include "gf2x.h"
 #include "gf2x/gf2x-impl.h"
 #include "gf2x/gf2x-tfft.h"

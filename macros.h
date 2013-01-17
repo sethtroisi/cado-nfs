@@ -169,8 +169,13 @@ LEXLE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
 /* MS VS and MinGW use the MS RTL (called MSVCRT for MinGW) which does not
    know the "%zu" format, they use "%Iu" instead. On MinGW, we use wrapper 
    functions that rewrite the %zu format accordingly, so the bulk of the
-   code can continue to use C99 syntax. */
-#ifdef MINGW
+   code can continue to use C99 syntax.
+   We do these renames only if stdio.h has been parsed before this file.
+   Header files that need a certain include order are ugly, but that never
+   stopped us and renaming printf() before parsing stdio.h would be "bad." 
+   This way, when the renames are needed but don't happen, with any luck 
+   gcc will complain about not understanding "%zu". */
+#if defined(MINGW) && defined(_STDIO_H)
 #define PRISIZ "Iu"
 #define printf printf_subst_zu
 #define fprintf fprintf_subst_zu

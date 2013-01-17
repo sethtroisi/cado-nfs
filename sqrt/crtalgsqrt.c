@@ -60,6 +60,7 @@
 #include <sys/stat.h>
 #include <errno.h>
 
+#include "macros.h"
 #include "utils.h"
 #include "modul_poly.h"
 #include "powers_of_p.h"

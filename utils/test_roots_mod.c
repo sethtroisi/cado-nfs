@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
               fprintf (stderr, "%" PRIu64 " ", r1[i]);
             fprintf (stderr, ", roots_mod_mpz() reports ");
             for (i = 0; i < n2; i++)
-              fprintf (stderr, "%lu ", r2[i]);
+              fprintf (stderr, "%" PRIu64 " ", r2[i]);
             fprintf (stderr, "\n");
             exit (EXIT_FAILURE);
           }
