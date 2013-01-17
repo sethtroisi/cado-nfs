@@ -3908,7 +3908,7 @@ main (int argc0, char *argv0[])
       ASSERT_ALWAYS(fb_alg != NULL);
       tfb = seconds () - tfb;
       fprintf (output, 
-               "# Reading algebraic factor base of %" PRISIZ "Mb took %1.1fs\n", 
+               "# Reading algebraic factor base of %zuMb took %1.1fs\n", 
                fb_size (fb_alg) >> 20, tfb);
       free (leading_div);
       
@@ -3935,7 +3935,7 @@ main (int argc0, char *argv0[])
                              rpow_lim, si.scale_rat * LOG_SCALE, 
                              verbose, 1, output);
     tfb = seconds () - tfb;
-    fprintf (output, "# Creating rational factor base of %" PRISIZ "Mb took %1.1fs\n",
+    fprintf (output, "# Creating rational factor base of %zuMb took %1.1fs\n",
              fb_size (fb_rat) >> 20, tfb);
     
     factorbase_degn_t **fb_rat_mt;

@@ -407,7 +407,7 @@ int main(int argc, char * argv[])
         void * srcvec = ba->transpose ? p->rowvec : p->colvec;
         void * dstvec = ba->transpose ? p->colvec : p->rowvec;
         int n = p->mm->dim[1 ^ ba->transpose];
-        fprintf(stderr, "reading %" PRISIZ " bytes from %s\n",
+        fprintf(stderr, "reading %zu bytes from %s\n",
                 n * sizeof(uint64_t), tmp);
         int nread = fread(srcvec, sizeof(uint64_t), n, f);
         if (nread != n) {
@@ -421,7 +421,7 @@ int main(int argc, char * argv[])
         ASSERT_ALWAYS(rc >= 0);
         f = fopen(dstfile, "w");
         int nw = p->mm->dim[0 ^ ba->transpose];
-        fprintf(stderr, "writing %" PRISIZ " bytes to %s\n",
+        fprintf(stderr, "writing %zu bytes to %s\n",
                 nw * sizeof(uint64_t), dstfile);
         int nwritten = fwrite(dstvec, sizeof(uint64_t), nw, f);
         if (nwritten != nw) {

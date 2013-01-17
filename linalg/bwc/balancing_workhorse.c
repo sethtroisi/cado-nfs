@@ -575,7 +575,7 @@ int mpi_dest_try_flush(mpi_dest M)
     } sz_info[1];
     memcpy(sz_info, tailptr, sizeof(sz_info));
     M->pending = time(NULL);
-    // fprintf(stderr, "send [%d] (%" PRISIZ ", over: %d) ->%d\n", M->tag, sz_info->sz, sz_info->over != 0, M->peer);
+    // fprintf(stderr, "send [%d] (%zu, over: %d) ->%d\n", M->tag, sz_info->sz, sz_info->over != 0, M->peer);
     /* note that the closing message contains no significant data.
      * However the receiving side does not know it. */
     MPI_Isend(M->buf[M->cur], M->size * sizeof(uint32_t),
@@ -978,7 +978,7 @@ uint32_t slave_dest_put(slave_dest_ptr R, uint32_t * p, size_t n)
      * used ? We now want to have provision in mf_pipe for the output
      * sink not draining completely...
     int rc = 0; // R->current_row == UINT32_MAX ? -1 : 0;
-    // fprintf(stderr, "slave_dest_put(%" PRISIZ ") returns %d (last row seen %u)\n", n, rc, R->current_row);
+    // fprintf(stderr, "slave_dest_put(%zu) returns %d (last row seen %u)\n", n, rc, R->current_row);
      */
     return i;
 }
@@ -1445,7 +1445,7 @@ void master_dispatcher_stats(master_dispatcher_ptr d)
          * the same as a new row marker)
          */
         char buf[16];
-        printf("[%d] sent %" PRISIZ " rows, %" PRISIZ " coeffs (%s)\n",
+        printf("[%d] sent %zu rows, %zu coeffs (%s)\n",
                 i, (size_t) d->m->sent_rows[i],
                 d->x[i]->pos - 2 * d->m->sent_rows[i],
                 size_disp(d->x[i]->pos * sizeof(uint32_t), buf));

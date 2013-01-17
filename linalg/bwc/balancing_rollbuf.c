@@ -98,15 +98,15 @@ static void rollbuf_grow__(rollbuf_ptr r)
 int rollbuf_put(rollbuf_ptr r, char * p, size_t s)
 {
     pthread_mutex_lock(r->mx);
-    // fprintf(stderr, "put(%" PRISIZ "): (ravail: %" PRISIZ ", wavail: %" PRISIZ ")\n", s, r->avail_to_read, r->avail_to_write);
+    // fprintf(stderr, "put(%zu): (ravail: %zu, wavail: %zu)\n", s, r->avail_to_read, r->avail_to_write);
     for( ; s > r->avail_to_write ; ) {
         if (r->alloc >= ROLLBUF_MAX_SIZE) {
             if (s < r->alloc) {
                 /* Then we want to drain our pipe first. */
-                // fprintf(stderr, "put(%" PRISIZ "): on hold (ravail: %" PRISIZ ", wavail: %" PRISIZ ")\n", s, r->avail_to_read, r->avail_to_write);
+                // fprintf(stderr, "put(%zu): on hold (ravail: %zu, wavail: %zu)\n", s, r->avail_to_read, r->avail_to_write);
                 r->full_count++;
                 pthread_cond_wait(r->bored, r->mx);
-                // fprintf(stderr, "put(%" PRISIZ "): resuming (ravail: %" PRISIZ ", wavail: %" PRISIZ ")\n", s, r->avail_to_read, r->avail_to_write);
+                // fprintf(stderr, "put(%zu): resuming (ravail: %zu, wavail: %zu)\n", s, r->avail_to_read, r->avail_to_write);
                 continue;
             } else {
                 /* Here there is no hope to drain our pipe, so we must
@@ -114,7 +114,7 @@ int rollbuf_put(rollbuf_ptr r, char * p, size_t s)
                  * problem though, since the curl reading buffer is not
                  * expected to grow too large (or so we hope...)
                  */
-                // fprintf(stderr, "Warning: buffer growing beyond max size ! (previous=%" PRISIZ ")\n", r->alloc);
+                // fprintf(stderr, "Warning: buffer growing beyond max size ! (previous=%zu)\n", r->alloc);
             }
         }
 
@@ -172,12 +172,12 @@ int rollbuf_is_done(rollbuf_ptr r)
 int rollbuf_get(rollbuf_ptr r, char * p, size_t s)
 {
     pthread_mutex_lock(r->mx);
-    // fprintf(stderr, "get(%" PRISIZ "): (ravail: %" PRISIZ ", wavail: %" PRISIZ ")\n", s, r->avail_to_read, r->avail_to_write);
+    // fprintf(stderr, "get(%zu): (ravail: %zu, wavail: %zu)\n", s, r->avail_to_read, r->avail_to_write);
     if (!r->done && r->avail_to_read < ROLLBUF_ALIGNED_RETURNS) {
-        // fprintf(stderr, "get(%" PRISIZ "): on hold (ravail: %" PRISIZ ", wavail: %" PRISIZ ")\n", s, r->avail_to_read, r->avail_to_write);
+        // fprintf(stderr, "get(%zu): on hold (ravail: %zu, wavail: %zu)\n", s, r->avail_to_read, r->avail_to_write);
         r->empty_count++;
         pthread_cond_wait(r->bored, r->mx);
-        // fprintf(stderr, "get(%" PRISIZ "): resumed (ravail: %" PRISIZ ", wavail: %" PRISIZ ")\n", s, r->avail_to_read, r->avail_to_write);
+        // fprintf(stderr, "get(%zu): resumed (ravail: %zu, wavail: %zu)\n", s, r->avail_to_read, r->avail_to_write);
     }
     assert(r->done || r->avail_to_read >= ROLLBUF_ALIGNED_RETURNS);
     if (r->done && !r->avail_to_read) {

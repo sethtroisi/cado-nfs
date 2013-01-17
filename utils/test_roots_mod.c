@@ -48,8 +48,8 @@ roots_mod_mpz(uint64_t *r, uint64_t a, int d, uint64_t p)
 
 
 int main(int argc, char **argv) {
-  uint64_t *r1;
-  unsigned long a, p, d, *r2;
+  uint64_t *r1, *r2;
+  unsigned long a, p, d;
   int n1, n2, i;
   unsigned long minp = 100, maxp=10000, mina=1, maxa=100, mind=1, maxd=10;
   int check = 1;

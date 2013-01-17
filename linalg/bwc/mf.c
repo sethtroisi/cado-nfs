@@ -382,7 +382,7 @@ row_done:
                 } else {
                     sz = (ptr - m_in->p) * sizeof(uint32_t);
                 }
-                fprintf(stderr, "read %" PRISIZ " MB in %d s (%.1f MB/s)   \r",
+                fprintf(stderr, "read %zu MB in %d s (%.1f MB/s)   \r",
                         sz >> 20,
                         dt,
                         1.0e-6 * (double) sz / dt);

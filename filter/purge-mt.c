@@ -548,6 +548,7 @@ main (int argc, char **argv)
        only 32 bits per entry on a 64-bit machine. */
     rel_compact = (int **) malloc (nrelmax * sizeof (int *));
     tot_alloc0 += nrelmax * sizeof (int*);
+    /* %zu is the C99 modifier for size_t */
     fprintf (stderr, "Allocated rel_compact of %luMb (total %luMb so far)\n",
              (nrelmax * sizeof (int *)) >> 20,
              tot_alloc0 >> 20);

@@ -23,7 +23,7 @@ extern "C" {
   do {									\
     size_t mysize;							\
     if (!(A = malloc (mysize = (T) * sizeof(*(A))))) {			\
-      fprintf (stderr, "%s: malloc error (%" PRISIZ " MB): %s\n",	\
+      fprintf (stderr, "%s: malloc error (%zu MB): %s\n",		\
 	       M, mysize>>20, strerror(errno));				\
       exit (1);								\
     }									\
@@ -119,6 +119,13 @@ static inline int ctzl(unsigned long x)
 #define HAVE_ctzl_fallback
 #endif
 #endif  /* HAVE_ctzl */
+
+#ifdef MINGW
+int printf_subst_zu (const char *format, ...);
+int fprintf_subst_zu (FILE *stream, const char *format, ...);
+int sprintf_subst_zu (char *str, const char *format, ...);
+int snprintf_subst_zu (char *str, const size_t size, const char *format, ...)
+#endif
 
 #ifndef HAVE_ASPRINTF
 extern int asprintf(char **, const char *, ...);

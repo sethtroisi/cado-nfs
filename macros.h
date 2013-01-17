@@ -166,15 +166,16 @@ LEXLE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
 
 /* Portability macros */
 
-/* Portable format specifier for size_t */
-#ifndef PRISIZ
-  /* MS VS and MinGW use the MS RTL (called MSVCRT for MinGW) which does not
-     know the "%zu" format, they use "%Iu" instead */
-#if defined(_MSC_VER) || defined(__MSVCRT__)
+/* MS VS and MinGW use the MS RTL (called MSVCRT for MinGW) which does not
+   know the "%zu" format, they use "%Iu" instead. On MinGW, we use wrapper 
+   functions that rewrite the %zu format accordingly, so the bulk of the
+   code can continue to use C99 syntax. */
+#ifdef MINGW
 #define PRISIZ "Iu"
-#else
-#define PRISIZ "zu"
-#endif
+#define printf printf_subst_zu
+#define fprintf fprintf_subst_zu
+#define sprintf sprintf_subst_zu
+#define snprintf snprintf_subst_zu
 #endif
 
 /* Handles portability cases which can be solved with a simple rename, 

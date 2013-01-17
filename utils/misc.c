@@ -261,6 +261,96 @@ int mkdir_with_parents(const char * dir, int fatal)
     return 0;
 }
 
+
+#ifdef MINGW
+
+#ifndef PRISIZ
+#error MINGW is defined, but PRISIZ is not
+#endif
+
+/* We call only v*printf(), so no infinite recursion even with rename in 
+   effect here */
+
+static const char *
+subst_zu(const char *s)
+{
+    char *r = strdup(s);
+    const char *prisiz = PRISIZ;
+    const size_t l = strlen(r);
+    size_t i;
+    
+    ASSERT_ALWAYS(strlen(prisiz) == 2);
+    ASSERT_ALWAYS(r != NULL);
+    for (i = 0; i + 2 < l; i++)
+        if (r[i] == '%' && r[i+1] == 'z' && r[i+2] == 'u') {
+            r[i+1] = prisiz[0];
+            r[i+2] = prisiz[1];
+        }
+    return r;
+}
+
+int
+printf_subst_zu (const char *format, ...)
+{
+  va_list ap;
+  const char *subst_format;
+  int r;
+  
+  va_start (ap, format);
+  subst_format = subst_zu (format);  
+  r = vprintf (subst_format, ap);
+  free ((void *)subst_format);
+  va_end (ap);
+  return r;
+}
+
+int
+fprintf_subst_zu (FILE *stream, const char *format, ...)
+{
+  va_list ap;
+  const char *subst_format;
+  int r;
+  
+  va_start (ap, format);
+  subst_format = subst_zu (format);  
+  r = vfprintf (stream, subst_format, ap);
+  free ((void *)subst_format);
+  va_end (ap);
+  return r;
+}
+
+int
+sprintf_subst_zu (char *str, const char *format, ...)
+{
+  va_list ap;
+  const char *subst_format;
+  int r;
+  
+  va_start (ap, format);
+  subst_format = subst_zu (format);  
+  r = vsprintf (str, subst_format, ap);
+  free ((void *)subst_format);
+  va_end (ap);
+  return r;
+}
+
+int
+snprintf_subst_zu (char *str, const size_t size, const char *format, ...)
+{
+  va_list ap;
+  const char *subst_format;
+  int r;
+  
+  va_start (ap, format);
+  subst_format = subst_zu (format);  
+  r = vsnprintf (str, size, subst_format, ap);
+  free ((void *)subst_format);
+  va_end (ap);
+  return r;
+}
+
+#endif
+
 #ifndef HAVE_ASPRINTF
 /* Copied and improved from
  * http://mingw-users.1079350.n2.nabble.com/Query-regarding-offered-alternative-to-asprintf-td6329481.html

@@ -26,7 +26,7 @@ size_t file_source_get(file_source_ptr f, uint32_t ** p, size_t avail)
             exit(1);
         } else {
             if (f->b->pos * sizeof(uint32_t) != (size_t) f->sbuf->st_size) {
-                fprintf(stderr, "Ended at wrong position (%" PRISIZ " != %" PRISIZ ") in %s\n",
+                fprintf(stderr, "Ended at wrong position (%zu != %zu) in %s\n",
                         f->b->pos, (size_t) f->sbuf->st_size, f->filename);
                 exit(1);
             }
@@ -48,7 +48,7 @@ data_source_ptr file_source_alloc(const char * filename, size_t esz)
     fstat(fileno(p->f), p->sbuf);
     if (esz) {
         if ((size_t) p->sbuf->st_size != esz) {
-            fprintf(stderr, "%s: expected size %" PRISIZ ", not %" PRISIZ "\n",
+            fprintf(stderr, "%s: expected size %zu, not %zu\n",
                     filename, esz, (size_t) p->sbuf->st_size);
             exit(1);
         }

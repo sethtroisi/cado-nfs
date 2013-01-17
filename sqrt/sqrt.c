@@ -36,7 +36,7 @@ my_mpz_mul (mpz_t a, mpz_t b, mpz_t c)
   large = mpz_size (b) + mpz_size (c) >= 5000000;
   if (large)
     {
-      fprintf (stderr, "[multiplying %" PRISIZ "*%" PRISIZ " limbs: ",
+      fprintf (stderr, "[multiplying %zu*%zu limbs: ",
                mpz_size (b), mpz_size (c));
       fflush (stderr);
       st = milliseconds ();
@@ -164,7 +164,7 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
           res = Memusage2 ();
           if (res > peakres)
             peakres = res;
-            fprintf (stderr, "SqrtRat: %lu pairs: size %" PRISIZ "Mb, %lums, VIRT %luM (peak %luM), RES %luM (peak %luM)\n",
+            fprintf (stderr, "SqrtRat: %lu pairs: size %zuMb, %dms, VIRT %luM (peak %luM), RES %luM (peak %luM)\n",
                        ab_pairs, stats (prd, lprd) >> 17, milliseconds (),
                        Memusage () >> 10, PeakMemusage () >> 10,
                        res >> 10, peakres >> 10);
@@ -196,7 +196,7 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
   if (ab_pairs & 1)
     mpz_mul (prd[0], prd[0], pol->rat->f[1]);
 
-  fprintf (stderr, "SqrtRat: size of product = %" PRISIZ " bits\n",
+  fprintf (stderr, "SqrtRat: size of product = %zu bits\n",
            mpz_sizeinbase (prd[0], 2));
 
   if (mpz_sgn (prd[0]) < 0)
@@ -230,7 +230,7 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
           mpz_set_ui (pp, p);
           e = mpz_remove (prd[0], prd[0], pp);
           if (verbose)
-            printf (" exponent=%lu, remaining %" PRISIZ " bits\n", e,
+            printf (" exponent=%lu, remaining %zu bits\n", e,
                     mpz_sizeinbase (prd[0], 2));
           if ((e % 2) != 0)
             {
@@ -604,7 +604,7 @@ polymodF_sqrt (polymodF_t res, polymodF_t AA, poly_t F, unsigned long p)
   poly_free (a);
 
   size_t sqrt_size = poly_sizeinbase (res->p, F->deg - 1, 2);
-  fprintf (stderr, "maximal sqrt bit-size = %" PRISIZ " (%.0f%% of target size)\n",
+  fprintf (stderr, "maximal sqrt bit-size = %zu (%.0f%% of target size)\n",
           sqrt_size, 100.0 * (double) sqrt_size / target_size);
 }
 

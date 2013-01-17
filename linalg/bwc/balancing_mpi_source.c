@@ -23,8 +23,8 @@ size_t mpi_source_get(mpi_source_ptr s, uint32_t ** p, size_t avail)
     memset(&x, 0, sizeof(x));
     // int rank;
     // MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    // fprintf(stderr, "[%d] MPI_Recv(%" PRISIZ ",%d)\n", rank, s->size, s->peer);
-    // fprintf(stderr, "MPI_Recv(%" PRISIZ ",%d)\n", s->size, s->peer);
+    // fprintf(stderr, "[%d] MPI_Recv(%zu,%d)\n", rank, s->size, s->peer);
+    // fprintf(stderr, "MPI_Recv(%zu,%d)\n", s->size, s->peer);
     struct {
         size_t sz;
         size_t over;
@@ -42,7 +42,7 @@ size_t mpi_source_get(mpi_source_ptr s, uint32_t ** p, size_t avail)
     abort(); // I believe that by now, we should never arrive here.
     s->tag = 0;
 #endif
-    // fprintf(stderr, "receiving tag %d, length %" PRISIZ " (over: %d)\n",
+    // fprintf(stderr, "receiving tag %d, length %zu (over: %d)\n",
             // s->tag, sz_info->sz, sz_info->over != 0);
     return sz_info->sz;
 }
