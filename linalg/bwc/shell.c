@@ -2,7 +2,9 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/types.h>
+#ifdef HAVE_WAIT_H
 #include <sys/wait.h>
+#endif
 #include <string.h>
 #include "bwc_config.h"
 #include "parallelizing_info.h"
@@ -66,8 +68,10 @@ void * shell_prog(parallelizing_info_ptr pi, param_list pl MAYBE_UNUSED, void * 
             exit(1);
         }
     } else {
-        int status;
+        int status = 0;
+#ifdef HAVE_WAITPID
         waitpid(child,&status,0);
+#endif
         if (WIFEXITED(status)) {
             int rc;
             if ((rc = WEXITSTATUS(status)) != 0) {
@@ -99,6 +103,10 @@ void usage()
 int main(int argc, char * argv[])
 {
     param_list pl;
+#ifndef HAVE_WAITPID
+    fprintf (stderr, "This program needs waitpid() which is not available.\n");
+    return 1;
+#endif
     param_list_init(pl);
     param_list_add_key(pl, "mn", "0", PARAMETER_FROM_FILE);
     bw_common_init_mpi(bw, pl, &argc, &argv);

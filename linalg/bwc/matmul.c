@@ -5,7 +5,9 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#ifdef HAVE_STATVFS_H
 #include <sys/statvfs.h>
+#endif
 #include <dlfcn.h>
 
 
@@ -139,12 +141,15 @@ static void save_to_local_copy(matmul_ptr mm)
     }
 
 
+#ifdef HAVE_STATVFS_H
     struct statvfs sf[1];
     rc = statvfs(dirname, sf);
     if (rc < 0) {
         fprintf(stderr, "Cannot do statvfs on %s: %s\n", dirname, strerror(errno));
         free(dirname);
     }
+#endif
+    /* FIXME: this uses unintitialised data if statvfs() is not available or if the call failed */
     unsigned long mb = sf->f_bsize;
     mb *= sf->f_bavail;
 
