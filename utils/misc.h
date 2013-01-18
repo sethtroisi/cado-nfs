@@ -125,7 +125,7 @@ static inline int ctzl(unsigned long x)
 int printf_subst_zu (const char *format, ...);
 int fprintf_subst_zu (FILE *stream, const char *format, ...);
 int sprintf_subst_zu (char *str, const char *format, ...);
-int snprintf_subst_zu (char *str, const size_t size, const char *format, ...)
+int snprintf_subst_zu (char *str, const size_t size, const char *format, ...);
 #endif
 
 #ifndef HAVE_ASPRINTF
