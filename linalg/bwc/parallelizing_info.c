@@ -1228,7 +1228,7 @@ int pi_save_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
 
     // the page size is always a power of two, so rounding to the next
     // multiple is easy.
-    size_t wsiz = ((siz - 1) | (pagesize()-1) + 1;
+    size_t wsiz = ((siz - 1) | (pagesize()-1)) + 1;
     int leader = w->jrank == 0 && w->trank == 0;
     void * recvbuf = NULL;
     int fd = -1;        // only used by leader
