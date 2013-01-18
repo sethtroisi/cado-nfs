@@ -42,6 +42,7 @@
 #cmakedefine    HAVE_STRDUP
 #cmakedefine    HAVE_STRNDUP
 #cmakedefine    HAVE_WAITPID
+#cmakedefine    HAVE_CTIME_R
 
 #cmakedefine    HAVE_SYNC_FETCH
 #cmakedefine    HAVE_ASPRINTF
