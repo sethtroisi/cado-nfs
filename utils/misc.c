@@ -14,8 +14,8 @@
 #endif
 
 /* Don't rename *printf() and *scanf() functions inside this compilation module.
-   If you want to use %zu in this file, test whether MINGW is defined and use
-   the libc function or the format-substituting function accordingly. */
+   If you want to use %zu in this file, test whether HAVE_MINGW is defined and 
+   use the libc function or the format-substituting function accordingly. */
 #define NO_PRINTF_RENAME
 #include "macros.h"
 #include "misc.h"

@@ -174,11 +174,15 @@ LEXLE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
    Header files that need a certain include order are ugly, but that never
    stopped us and renaming printf() before parsing stdio.h would be "bad." 
    This way, when the renames are needed but don't happen, with any luck 
-   gcc will complain about not understanding "%zu".
+   gcc will complain about not understanding "%zu". Note that C++ does not 
+   define _STDIO_H, so we test instead for a constant that all stdio.h 
+   headers should define, SEEK_SET, and hope that this is in fact a 
+   preprocessor macro (at least under MinGW which is the case that matters).
    If NO_PRINTF_RENAME is defined, no renames happen. This is meant to allow 
    the code that implements the format substitutions to refer to the plain
    libc functions. */
-#if defined(MINGW) && defined(_STDIO_H) && !defined(NO_PRINTF_RENAME)
+#if defined(HAVE_MINGW) && defined(SEEK_SET) && !defined(NO_PRINTF_RENAME)
+#include <stdarg.h>
 #define printf printf_subst_zu
 #define fprintf fprintf_subst_zu
 #define sprintf sprintf_subst_zu
@@ -187,6 +191,14 @@ LEXLE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
 #define scanf scanf_subst_zu
 #define fscanf fscanf_subst_zu
 #define sscanf sscanf_subst_zu
+int printf_subst_zu (const char *format, ...);
+int fprintf_subst_zu (FILE *stream, const char *format, ...);
+int sprintf_subst_zu (char *str, const char *format, ...);
+int snprintf_subst_zu (char *str, const size_t size, const char *format, ...);
+int vsnprintf_subst_zu (char *str, size_t size, const char *format, va_list ap);
+int scanf_subst_zu (const char *format, ...);
+int fscanf_subst_zu (FILE *stream, const char *format, ...);
+int sscanf_subst_zu (char *str, const char *format, ...);
 #endif
 
 /* Handles portability cases which can be solved with a simple rename, 
