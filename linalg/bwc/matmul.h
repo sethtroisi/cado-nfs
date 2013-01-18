@@ -72,6 +72,7 @@ struct matmul_public_s {
     /* Now the virtual method table */
     struct matmul_bindings_s bind[1];
 
+#ifdef  BUILD_DYNAMICALLY_LINKABLE_BWC
     void * solib_handle;        /* passed to dlclose() eventually */
     /* The rest of the implementation-dependent storage comes right after
      * that, in memory. Therefore, only the pointer may be manipulated
@@ -79,6 +80,7 @@ struct matmul_public_s {
      * size. The in-memory data size is allowed to involve pointers, and
      * is not required to match the on-disk structure exactly.
      */
+#endif  /* BUILD_DYNAMICALLY_LINKABLE_BWC */
 };
 
 

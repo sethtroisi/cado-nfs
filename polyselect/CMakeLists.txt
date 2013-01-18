@@ -8,7 +8,7 @@ set (ropt_sources
   ropt_tree.c ropt_arith.c ropt_io.c ropt_stage1.c ropt_stage2.c
   )
 
-add_library(polyselect_common SHARED auxiliary.c rootsieve.c rho.c murphyE.c)
+add_library(polyselect_common ${CADO_SHARED} auxiliary.c rootsieve.c rho.c murphyE.c)
 add_executable (rotate rotate.c)
 add_executable (rotate_all rotate_all.c)
 add_executable (polyselect2 polyselect2.c ${ropt_sources})

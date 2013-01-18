@@ -98,7 +98,7 @@ set(bwc_base_sources
 )
 
 add_library(bwc_base ${bwc_base_sources})
-add_library(bwc_mpfq SHARED ${bwc_mpfq_sources})
+add_library(bwc_mpfq ${CADO_SHARED} ${bwc_mpfq_sources})
 install(TARGETS bwc_mpfq DESTINATION "lib/${package_basename}")
 
 IF(UNIX)
@@ -157,7 +157,7 @@ macro(configure_matmul_lib v i)
         endif(HAVE_GCC_STYLE_AMD64_ASM)
     endif(doing_u64 AND doing_bucket)
 
-    add_library(matmul_${v}_${i} SHARED ${sources})
+    add_library(matmul_${v}_${i} ${CADO_SHARED} ${sources})
     target_link_libraries(matmul_${v}_${i} bwc_mpfq)
     set_target_properties(matmul_${v}_${i} PROPERTIES
             COMPILE_FLAGS "--mpi -DSELECT_ABASE_${v} -DMM_IMPL=${i}"
@@ -181,18 +181,22 @@ else(EXISTS ${CADO_NFS_SOURCE_DIR}/files.dist)
 set(mm_impls bucket)
 endif(EXISTS ${CADO_NFS_SOURCE_DIR}/files.dist)
 
-foreach(v ${bwc_abases})
-    foreach(i ${mm_impls})
-        configure_matmul_lib(${v} ${i})
-    endforeach(i)
-endforeach(v)
+if (BUILD_DYNAMICALLY_LINKABLE_BWC)
+    foreach(v ${bwc_abases})
+        foreach(i ${mm_impls})
+            configure_matmul_lib(${v} ${i})
+        endforeach(i)
+    endforeach(v)
 
-# See above
-if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
-configure_matmul_lib(p_1 basicp)
-configure_matmul_lib(p_3 basicp)
-configure_matmul_lib(p_4 basicp)
-endif (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
+    # See above
+    if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
+    configure_matmul_lib(p_1 basicp)
+    configure_matmul_lib(p_3 basicp)
+    configure_matmul_lib(p_4 basicp)
+    endif (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
+else (BUILD_DYNAMICALLY_LINKABLE_BWC)
+    configure_matmul_lib("u64k1" "bucket")
+endif (BUILD_DYNAMICALLY_LINKABLE_BWC)
 
 # INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/share/${CADO_DIST_ARCHIVE_NAME}/libexec"
 
@@ -206,6 +210,12 @@ macro(bwc_program v)
         # -Wl,-rpath,${CMAKE_CURRENT_BINARY_DIR}")
     target_link_libraries(${v} bwc_base)
     add_dependencies(${v} ${all_matmul_libs})
+    if (BUILD_DYNAMICALLY_LINKABLE_BWC)
+    else (BUILD_DYNAMICALLY_LINKABLE_BWC)
+        # For static builds, we want to force the link with the default
+        # library.
+        target_link_libraries(${v} ${all_matmul_libs})
+    endif (BUILD_DYNAMICALLY_LINKABLE_BWC)
 endmacro(bwc_program)
 
 add_library(matmul_mf matmul-mf.c)
