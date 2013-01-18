@@ -123,7 +123,9 @@ static void usage()
 int max_loglevel=99;
 char prefix[20]={'\0'};
 
-int logprint(const char * fmt, ...)
+int 
+ATTRIBUTE((__format__ (__printf__, 1, 2)))
+logprint(const char * fmt, ...)
 {
     va_list ap;
     int level=0;
@@ -2439,7 +2441,7 @@ void * precompute_powers_child(struct subtask_info_t * info)/* {{{ */
 {
     struct prime_data * p = info->p;
 
-    logprint("Precomputing p^%lu, p=%lu\n", glob.prec, p->p);
+    logprint("Precomputing p^%d, p=%lu\n", glob.prec, p->p);
     // this triggers the whole precomputation.
     power_lookup(p->powers, glob.prec);
 
