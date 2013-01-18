@@ -91,7 +91,6 @@ set(bwc_base_sources
     bw-common-mpi.c
     rusage.c
     async.c
-    debug.c
     rolling.c
     matmul.c
     matmul_top.c

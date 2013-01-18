@@ -264,8 +264,6 @@ linalg/bwc/checks.list
 linalg/bwc/checks.list.light
 linalg/bwc/checks.sh
 linalg/bwc/cleanup.c
-linalg/bwc/debug.c
-linalg/bwc/debug.h
 linalg/bwc/dispatch.c
 linalg/bwc/do-one-test.sh
 linalg/bwc/filenames.h
