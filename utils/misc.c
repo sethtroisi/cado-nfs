@@ -261,7 +261,7 @@ int mkdir_with_parents(const char * dir, int fatal)
 }
 
 
-#ifdef MINGW
+#ifdef HAVE_MINGW
 
 /* We call only v*printf(), so no infinite recursion even with rename in 
    effect here */
@@ -358,7 +358,7 @@ int vasprintf( char **sptr, const char *fmt, va_list argv )
     *sptr = malloc(1 + wanted);
     if (!*sptr)
         return -1;
-#ifdef MINGW
+#ifdef HAVE_MINGW
     /* MinGW (the primary user of this code) can't grok %zu, so we have
      * to rewrite the format */
     const char *subst_format;

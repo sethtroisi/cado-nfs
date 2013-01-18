@@ -121,7 +121,7 @@ static inline int ctzl(unsigned long x)
 #endif
 #endif  /* HAVE_ctzl */
 
-#ifdef MINGW
+#ifdef HAVE_MINGW
 int printf_subst_zu (const char *format, ...);
 int fprintf_subst_zu (FILE *stream, const char *format, ...);
 int sprintf_subst_zu (char *str, const char *format, ...);

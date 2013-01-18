@@ -361,7 +361,7 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
 
 void block_control_signals()
 {
-#ifndef MINGW   /* seems hopeless */
+#ifndef HAVE_MINGW   /* seems hopeless */
     /* Only the master thread receives control signals */
     sigset_t sset[1];
     sigemptyset(sset);
@@ -370,10 +370,10 @@ void block_control_signals()
 #endif
     // sigaddset(sset, SIGINT);
     my_pthread_sigmask(SIG_BLOCK, sset, NULL);
-#endif  /* MINGW */
+#endif  /* HAVE_MINGW */
 }
 
-#ifndef MINGW   /* seems hopeless */
+#ifndef HAVE_MINGW   /* seems hopeless */
 void sighandler(int sig)
 {
     int caught = 0;
@@ -384,11 +384,11 @@ void sighandler(int sig)
     /* Of course, everybody is allowed to print this. */
     if (caught) printf("Signal caught, wait before it is acknowledged\n");
 }
-#endif  /* MINGW */
+#endif  /* HAVE_MINGW */
 
 void catch_control_signals()
 {
-#ifndef MINGW   /* seems hopeless */
+#ifndef HAVE_MINGW   /* seems hopeless */
 #ifdef HAVE_SIGACTION
     struct sigaction sa[1];
     memset(sa, 0, sizeof(sa));
@@ -406,5 +406,5 @@ void catch_control_signals()
 #endif
     // sigaddset(sset, SIGINT);
     my_pthread_sigmask(SIG_UNBLOCK, sset, NULL);
-#endif  /* MINGW */
+#endif  /* HAVE_MINGW */
 }
