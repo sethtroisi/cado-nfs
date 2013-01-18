@@ -271,6 +271,7 @@ subst_zu(const char * const s)
 {
     char * const r = strdup(s);
     const char * const prisiz = "Iu";
+    const char * const priptrdiff = "Id";
     const size_t l = strlen(r);
     size_t i;
     
@@ -280,6 +281,9 @@ subst_zu(const char * const s)
         if (r[i] == '%' && r[i+1] == 'z' && r[i+2] == 'u') {
             r[i+1] = prisiz[0];
             r[i+2] = prisiz[1];
+        } else if (r[i] == '%' && r[i+1] == 't' && r[i+2] == 'd') {
+            r[i+1] = priptrdiff[0];
+            r[i+2] = priptrdiff[1];
         }
     return r;
 }
