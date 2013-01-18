@@ -58,6 +58,7 @@ extern void filelist_clear(char ** filelist);
 
 extern void * malloc_check(const size_t x);
 
+extern long pagesize (void);
 extern void * malloc_aligned(size_t size, size_t alignment);
 extern void free_aligned(void * ptr, size_t size, size_t alignment);
 

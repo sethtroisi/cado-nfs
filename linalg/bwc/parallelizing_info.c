@@ -295,7 +295,7 @@ static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
         if (p) *p='\0';
     }
 #else
-    strncpy(pi->nodename, sizeof(pi->nodename), "unkown");
+    strncpy(pi->nodename, "unknown", sizeof(pi->nodename));
 #endif
     pi->m->njobs = nhj * nvj;
     pi->m->ncores = nhc * nvc;
@@ -1228,7 +1228,7 @@ int pi_save_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
 
     // the page size is always a power of two, so rounding to the next
     // multiple is easy.
-    size_t wsiz = ((siz - 1) | (sysconf(_SC_PAGESIZE)-1)) + 1;
+    size_t wsiz = ((siz - 1) | (pagesize()-1) + 1;
     int leader = w->jrank == 0 && w->trank == 0;
     void * recvbuf = NULL;
     int fd = -1;        // only used by leader
@@ -1338,7 +1338,7 @@ int pi_save_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
 
     // the page size is always a power of two, so rounding to the next
     // multiple is easy.
-    size_t wsiz = ((siz - 1) | (sysconf(_SC_PAGESIZE)-1)) + 1;
+    size_t wsiz = ((siz - 1) | (pagesize()-1)) + 1;
     int leader = w->jrank == 0 && w->trank == 0;
     void * recvbuf = NULL;
     int fd = -1;        // only used by leader
@@ -1446,7 +1446,7 @@ int pi_load_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
 
     // the page size is always a power of two, so rounding to the next
     // multiple is easy.
-    size_t wsiz = ((siz - 1) | (sysconf(_SC_PAGESIZE)-1)) + 1;
+    size_t wsiz = ((siz - 1) | (pagesize()-1)) + 1;
     int leader = w->jrank == 0 && w->trank == 0;
     void * sendbuf = NULL;
     int fd = -1;        // only used by leader
@@ -1571,7 +1571,7 @@ int pi_load_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
 
     // the page size is always a power of two, so rounding to the next
     // multiple is easy.
-    size_t wsiz = ((siz - 1) | (sysconf(_SC_PAGESIZE)-1)) + 1;
+    size_t wsiz = ((siz - 1) | (pagesize()-1)) + 1;
     int leader = w->jrank == 0 && w->trank == 0;
     void * sendbuf = NULL;
     int fd = -1;        // only used by leader

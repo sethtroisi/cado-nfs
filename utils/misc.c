@@ -96,8 +96,7 @@ void free_aligned(void * p, size_t size MAYBE_UNUSED, size_t alignment MAYBE_UNU
 #endif
 }
 
-static long
-pagesize (void)
+long pagesize (void)
 {
 #if defined(_WIN32) || defined(_WIN64)
   /* cf http://en.wikipedia.org/wiki/Page_%28computer_memory%29 */
