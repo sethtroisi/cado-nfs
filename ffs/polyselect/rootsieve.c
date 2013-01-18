@@ -423,6 +423,8 @@ all1 (unsigned long *f, unsigned long n1, unsigned long n0)
       init_time += cputime ();
       K = 1 << (n0 - d);
       sieve_time -= cputime ();
+//if (D < 4) {
+if (1) {
       for (j = 0; j < N1; j++)
         for (r = 0, hl = 0; r < D; r++)
           {
@@ -435,6 +437,38 @@ all1 (unsigned long *f, unsigned long n1, unsigned long n0)
                 hl ^= *l << G[k];
               }
           }
+} else { // Experimental version, which seems to be faster, but
+         // further tests are needed before putting it in prod.
+      for (j = 0; j < N1; j++)
+        for (unsigned long r0 = 0, hl = 0; r0 < D; r0+=4)
+          {
+            unsigned long r1, r2, r3;
+            r1=r0+1;
+            r2=r0+2;
+            r3=r0+3;
+            float sj0,sj1,sj2,sj3;
+            sj0 = sl[j][r0];
+            sj1 = sl[j][r1];
+            sj2 = sl[j][r2];
+            sj3 = sl[j][r3];
+            for (k = 0, hl = 0; k < K; k++)
+              {
+                m = hl ^ r0;
+                assert (m < N0);
+                s[j][m] += sj0;
+                m = hl ^ r1;
+                assert (m < N0);
+                s[j][m] += sj1;
+                m = hl ^ r2;
+                assert (m < N0);
+                s[j][m] += sj2;
+                m = hl ^ r3;
+                assert (m < N0);
+                s[j][m] += sj3;
+                hl ^= *l << G[k];
+              }
+          }
+}
       sieve_time += cputime ();
     }
 
