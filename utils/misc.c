@@ -264,10 +264,6 @@ int mkdir_with_parents(const char * dir, int fatal)
 
 #ifdef MINGW
 
-#ifndef PRISIZ
-#error MINGW is defined, but PRISIZ is not
-#endif
-
 /* We call only v*printf(), so no infinite recursion even with rename in 
    effect here */
 
@@ -275,7 +271,7 @@ static const char *
 subst_zu(const char *s)
 {
     char *r = strdup(s);
-    const char *prisiz = PRISIZ;
+    const char *prisiz = "Iu";
     const size_t l = strlen(r);
     size_t i;
     
@@ -363,12 +359,16 @@ int vasprintf( char **sptr, const char *fmt, va_list argv )
     *sptr = malloc(1 + wanted);
     if (!*sptr)
         return -1;
+#ifdef MINGW
     /* MinGW (the primary user of this code) can't grok %zu, so we have
      * to rewrite the format */
     const char *subst_format;
     subst_format = subst_zu (format);  
-    int rc = vsnprintf(*sptr, 1+wanted, subst_zu, argv );
+    int rc = vsnprintf(*sptr, 1+wanted, subst_format, argv );
     free ((void *)subst_format);
+#else
+    int rc = vsnprintf(*sptr, 1+wanted, format, argv );
+#endif
     return rc;
 }
 

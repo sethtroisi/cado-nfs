@@ -176,7 +176,6 @@ LEXLE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
    This way, when the renames are needed but don't happen, with any luck 
    gcc will complain about not understanding "%zu". */
 #if defined(MINGW) && defined(_STDIO_H)
-#define PRISIZ "Iu"
 #define printf printf_subst_zu
 #define fprintf fprintf_subst_zu
 #define sprintf sprintf_subst_zu
