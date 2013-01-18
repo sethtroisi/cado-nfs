@@ -220,19 +220,8 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         is_zero = agree_on_flag(pi->m, is_zero);
         serialize(pi->m);
         if (agree_on_flag(pi->m, is_zero)) {
-            if (tcan_print)
-                printf("M^%u * V is zero !\n", i);
-            if (pi->m->jrank == 0 && pi->m->trank == 0) {
-                int rc;
-                char * tmp;
-                rc = asprintf(&tmp, K_FILE_BASE_PATTERN ".%u", i-1);
-                ASSERT_ALWAYS(rc != -1);
-                rc = link(tmp, W_FILE);
-                if (rc < 0) {
-                    fprintf(stderr, "Cannot hard link %s to %s: %s\n",
-                            W_FILE, tmp, strerror(errno));
-                }
-                free(tmp);
+            if (tcan_print) {
+                printf("M^%u * V is zero [K.%u contains M^%u * V]!\n", i, i-1, i-1);
             }
             break;
         }
