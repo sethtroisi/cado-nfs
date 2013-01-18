@@ -5,6 +5,7 @@
 #include <string.h>
 #include <ctime>
 #include <gmp.h>
+#include "macros.h"
 #include "utils.h"
 #include "gf2x.h"
 #include "gf2x-fft.h"
