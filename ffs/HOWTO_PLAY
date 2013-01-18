@@ -1,5 +1,8 @@
-Recipe to run an example (as of June 1st, 2012)
------------------------------------------------
+Recipe to run an example (as of January 18th, 2013)
+---------------------------------------------------
+
+- copy Makefile.local.example to Makefile.local and edit it to configure
+  according to what you want.
 
 - compile:
   
@@ -7,25 +10,25 @@ Recipe to run an example (as of June 1st, 2012)
 
 - construct a parameter file:
 
-  Examples are given in param.2.607 , param.3.426 .
+  Examples are given in params/param.2.607 , params/param.3.426 .
 
 - create the factor bases:
 
-  build/f2/makefb param.2.607
+  build/f2/makefb params/param.2.607
   or
-  build/f3/makefb param.3.426
+  build/f3/makefb params/param.3.426
   
 - run:
 
-  build/f2/sieve param.2.607
+  build/f2/sieve params/param.2.607
   or 
-  build/f3/sieve param.3.426
+  build/f3/sieve params/param.3.426
 
   This should output relations for the special-q range specified in the param
   files.
   Parameters can be changed on the command-line, for instance:
 
-  build/f2/sieve param.2.127 -I 12 -lpb1 24 -q1 200000
+  build/f2/sieve params/param.2.127 -I 12 -lpb1 24 -q1 200000
 
 - debug! ;-)
 
