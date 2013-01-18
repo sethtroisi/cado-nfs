@@ -77,7 +77,7 @@ int main(int argc, char * argv[])
     struct utsname u[1];
     char *nodename = u[0].nodename;
 #else
-    char *nodename = "Unknown node name";
+    char *nodename = "unknown";
 #endif
 
 #ifdef HAVE_UTSNAME_H

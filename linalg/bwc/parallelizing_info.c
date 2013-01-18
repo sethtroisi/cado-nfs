@@ -23,9 +23,8 @@
 #include "misc.h"
 
 #include <sys/time.h>   // gettimeofday
-#define OBTAIN_NODENAME
-#ifdef  OBTAIN_NODENAME /* in case someday we have difficulties with this */
-#include <sys/utsname.h>   // gettimeofday      
+#ifdef  HAVE_UTSNAME_H
+#include <sys/utsname.h>
 #endif
 
 static inline void pi_wiring_init_pthread_things(pi_wiring_ptr w, const char * desc)
@@ -286,7 +285,7 @@ static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
 
     memset(pi, 0, sizeof(parallelizing_info));
 
-#ifdef OBTAIN_NODENAME
+#ifdef HAVE_UTSNAME_H
     {
         struct utsname u[1];
         uname(u);
@@ -295,6 +294,8 @@ static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
         char * p = strchr(pi->nodename, '.');
         if (p) *p='\0';
     }
+#else
+    strncpy(pi->nodename, sizeof(pi->nodename), "unkown");
 #endif
     pi->m->njobs = nhj * nvj;
     pi->m->ncores = nhc * nvc;
