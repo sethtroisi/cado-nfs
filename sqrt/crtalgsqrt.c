@@ -1068,18 +1068,6 @@ polymodF_mul_monic (poly_ptr Q, poly_srcptr P1, poly_srcptr P2,
     poly_free(prd);
 }
 
-void poly_swap(poly_ptr a, poly_ptr b)
-{
-    ASSERT_ALWAYS(a->deg + 1 <= b->alloc);
-    ASSERT_ALWAYS(b->deg + 1 <= a->alloc);
-    for(int i = 0 ; i <= a->deg || i<=b->deg ; i++) {
-        mpz_swap(a->coeff[i], b->coeff[i]);
-    }
-    int d = a->deg;
-    a->deg = b->deg;
-    b->deg = d;
-}
-
 // }}}
 
 // {{{ floating point stuff
