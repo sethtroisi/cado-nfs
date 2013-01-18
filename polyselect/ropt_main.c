@@ -198,6 +198,167 @@ usage (char **argv)
 
 
 /**
+ * parse manually input parameters to param.
+ */
+static void
+ropt_parse_param ( int argc,
+                   char **argv,
+                   ropt_param_t param )
+{
+
+  /* filename only */
+  if (argc > 1) {
+    /* stage 2 (root sieve) parameters only */
+    if (strcmp (argv[1], "--s2") == 0) {
+
+      param->stage_flag = 2;
+      argv += 1;
+      argc -= 1;
+      while (argc >= 2 && argv[1][0] == '-') {
+        if (strcmp (argv[1], "-v") == 0)
+        {
+          param->verbose ++;
+          argv += 1;
+          argc -= 1;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-a") == 0)
+        {
+          param->s2_w = atoi (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-b") == 0)
+        {
+          mpz_set_str (param->s2_u, argv[2], 10);
+          argv += 2;
+          argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-c") == 0)
+        {
+          mpz_set_str (param->s2_v, argv[2], 10);
+          argv += 2;
+          argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-mod") == 0)
+        {
+          mpz_set_str (param->s2_mod, argv[2], 10);
+          argv += 2;
+          argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-bmax") == 0)
+        {
+          param->s2_Amax = atol (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-cmax") == 0)
+        {
+          param->s2_Bmax = atol (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-n") == 0)
+        {
+          mpz_set_str (param->n, argv[2], 10);
+          argv += 2;
+          argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-norm") == 0)
+        {
+          param->bound_lognorm = atof (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-d") == 0)
+        {
+          param->d = atoi (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
+        else {
+          usage (argv);
+        }
+      }
+    }
+    /* stage 1 and stage 2 parameters */
+    else {
+      while (argc >= 2 && argv[1][0] == '-') {
+        if (strcmp (argv[1], "-v") == 0)
+        {
+          param->verbose ++;
+          argv += 1;
+          argc -= 1;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-amin") == 0)
+        {
+          param->w_left_bound = atoi (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-amax") == 0)
+        {
+          param->w_length = atoi (argv[2]) - param->w_left_bound + 1;
+          if (param->w_length < 0) {
+            fprintf (stderr, "Error in options -amin and/or -amax.\n");
+            exit(1);
+          }
+          argv += 2;
+          argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-bmax") == 0)
+        {
+          param->s2_Amax = atol (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-cmax") == 0)
+        {
+          param->s2_Bmax = atol (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-n") == 0)
+        {
+          mpz_set_str (param->n, argv[2], 10);
+          argv += 2;
+          argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-norm") == 0)
+        {
+          param->bound_lognorm = atof (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-d") == 0)
+        {
+          param->d = atoi (argv[2]);
+          argv += 2;
+          argc -= 2;
+        }
+        else if (argc >= 3 && strcmp (argv[1], "-e") == 0)
+        {
+          param->stage_flag = 1;
+          param->s1_num_e_sl = atoi (argv[2]);
+          argv += 2;
+          argc -= 2;
+
+          int j = 0;
+          for (j = 0; j < param->s1_num_e_sl; j ++) {
+            param->s1_e_sl[j] = (unsigned short) atoi (argv[1]);
+            argv += 1;
+            argc -= 1;
+          }
+        }
+        else {
+          usage (argv);
+        }
+      }
+    }
+  }
+}
+
+
+/**
  * Main function: call ropt_on_cadopoly() or ropt_on_cadopoly()
  * or ropt_on_stdin().
  */
