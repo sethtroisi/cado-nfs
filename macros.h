@@ -134,7 +134,7 @@ LEXLE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
 #define EXPECT(x,val)	__builtin_expect(x,val)
 #endif
 #ifndef ATTR_PRINTF
-#define ATTR_PRINTF(a,b) __attribute__((format(printf,a,b)))
+#define ATTR_PRINTF(a,b) __attribute__((__format__(__printf__,a,b)))
 #endif
 #ifndef ATTRIBUTE
 #define ATTRIBUTE(x) __attribute__ (x)
@@ -174,12 +174,19 @@ LEXLE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
    Header files that need a certain include order are ugly, but that never
    stopped us and renaming printf() before parsing stdio.h would be "bad." 
    This way, when the renames are needed but don't happen, with any luck 
-   gcc will complain about not understanding "%zu". */
-#if defined(MINGW) && defined(_STDIO_H)
+   gcc will complain about not understanding "%zu".
+   If NO_PRINTF_RENAME is defined, no renames happen. This is meant to allow 
+   the code that implements the format substitutions to refer to the plain
+   libc functions. */
+#if defined(MINGW) && defined(_STDIO_H) && !defined(NO_PRINTF_RENAME)
 #define printf printf_subst_zu
 #define fprintf fprintf_subst_zu
 #define sprintf sprintf_subst_zu
 #define snprintf snprintf_subst_zu
+#define vsnprintf vsnprintf_subst_zu
+#define scanf scanf_subst_zu
+#define fscanf fscanf_subst_zu
+#define sscanf sscanf_subst_zu
 #endif
 
 /* Handles portability cases which can be solved with a simple rename, 

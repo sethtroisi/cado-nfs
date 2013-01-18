@@ -124,7 +124,7 @@ int max_loglevel=99;
 char prefix[20]={'\0'};
 
 int 
-ATTRIBUTE((__format__ (__printf__, 1, 2)))
+ATTR_PRINTF(1, 2)
 logprint(const char * fmt, ...)
 {
     va_list ap;

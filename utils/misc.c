@@ -13,7 +13,10 @@
 #include <windows.h>
 #endif
 
-#include "cado_config.h"
+/* Don't rename *printf() and *scanf() functions inside this compilation module.
+   If you want to use %zu in this file, test whether MINGW is defined and use
+   the libc function or the format-substituting function accordingly. */
+#define NO_PRINTF_RENAME
 #include "macros.h"
 #include "misc.h"
 
@@ -263,14 +266,11 @@ int mkdir_with_parents(const char * dir, int fatal)
 
 #ifdef HAVE_MINGW
 
-/* We call only v*printf(), so no infinite recursion even with rename in 
-   effect here */
-
 static const char *
-subst_zu(const char *s)
+subst_zu(const char * const s)
 {
-    char *r = strdup(s);
-    const char *prisiz = "Iu";
+    char * const r = strdup(s);
+    const char * const prisiz = "Iu";
     const size_t l = strlen(r);
     size_t i;
     
@@ -285,14 +285,13 @@ subst_zu(const char *s)
 }
 
 int
-printf_subst_zu (const char *format, ...)
+printf_subst_zu (const char * const format, ...)
 {
   va_list ap;
-  const char *subst_format;
+  const char * const subst_format = subst_zu (format);
   int r;
   
   va_start (ap, format);
-  subst_format = subst_zu (format);  
   r = vprintf (subst_format, ap);
   free ((void *)subst_format);
   va_end (ap);
@@ -300,14 +299,13 @@ printf_subst_zu (const char *format, ...)
 }
 
 int
-fprintf_subst_zu (FILE *stream, const char *format, ...)
+fprintf_subst_zu (FILE * const stream, const char * const format, ...)
 {
   va_list ap;
-  const char *subst_format;
+  const char * const subst_format = subst_zu (format);
   int r;
   
   va_start (ap, format);
-  subst_format = subst_zu (format);  
   r = vfprintf (stream, subst_format, ap);
   free ((void *)subst_format);
   va_end (ap);
@@ -315,14 +313,13 @@ fprintf_subst_zu (FILE *stream, const char *format, ...)
 }
 
 int
-sprintf_subst_zu (char *str, const char *format, ...)
+sprintf_subst_zu (char * const str, const char * const format, ...)
 {
   va_list ap;
-  const char *subst_format;
+  const char * const subst_format = subst_zu (format);
   int r;
   
   va_start (ap, format);
-  subst_format = subst_zu (format);  
   r = vsprintf (str, subst_format, ap);
   free ((void *)subst_format);
   va_end (ap);
@@ -330,15 +327,67 @@ sprintf_subst_zu (char *str, const char *format, ...)
 }
 
 int
-snprintf_subst_zu (char *str, const size_t size, const char *format, ...)
+snprintf_subst_zu (char * const str, const size_t size, const char * const format, ...)
 {
   va_list ap;
-  const char *subst_format;
+  const char * const subst_format = subst_zu (format);
   int r;
   
   va_start (ap, format);
-  subst_format = subst_zu (format);  
   r = vsnprintf (str, size, subst_format, ap);
+  free ((void *)subst_format);
+  va_end (ap);
+  return r;
+}
+
+int 
+vsnprintf_subst_zu(char * const str, const size_t size, const char * const format, va_list ap)
+{
+  const char * const subst_format = subst_zu (format);
+  int r;
+  
+  r = vsnprintf (str, size, subst_format, ap);
+  free ((void *)subst_format);
+  return r;
+}
+
+int
+scanf_subst_zu (const char * const format, ...)
+{
+  va_list ap;
+  const char * const subst_format = subst_zu (format);
+  int r;
+  
+  va_start (ap, format);
+  r = vscanf (subst_format, ap);
+  free ((void *)subst_format);
+  va_end (ap);
+  return r;
+}
+
+int
+fscanf_subst_zu (FILE * const stream, const char * const format, ...)
+{
+  va_list ap;
+  const char * const subst_format = subst_zu (format);
+  int r;
+  
+  va_start (ap, format);
+  r = vfscanf (stream, subst_format, ap);
+  free ((void *)subst_format);
+  va_end (ap);
+  return r;
+}
+
+int
+sscanf_subst_zu (char * const str, const char * const format, ...)
+{
+  va_list ap;
+  const char * const subst_format = subst_zu (format);
+  int r;
+  
+  va_start (ap, format);
+  r = vsscanf (str, subst_format, ap);
   free ((void *)subst_format);
   va_end (ap);
   return r;
@@ -350,7 +399,7 @@ snprintf_subst_zu (char *str, const size_t size, const char *format, ...)
 /* Copied and improved from
  * http://mingw-users.1079350.n2.nabble.com/Query-regarding-offered-alternative-to-asprintf-td6329481.html
  */
-int vasprintf( char **sptr, const char *fmt, va_list argv )
+int vasprintf( char ** const sptr, const char *const fmt, va_list argv )
 {
     int wanted = vsnprintf( *sptr = NULL, 0, fmt, argv );
     if (wanted<0)
@@ -361,8 +410,7 @@ int vasprintf( char **sptr, const char *fmt, va_list argv )
 #ifdef HAVE_MINGW
     /* MinGW (the primary user of this code) can't grok %zu, so we have
      * to rewrite the format */
-    const char *subst_format;
-    subst_format = subst_zu (fmt);  
+    const char * const subst_format = subst_zu (fmt);
     int rc = vsnprintf(*sptr, 1+wanted, subst_format, argv );
     free ((void *)subst_format);
 #else
@@ -371,7 +419,7 @@ int vasprintf( char **sptr, const char *fmt, va_list argv )
     return rc;
 }
 
-int asprintf( char **sptr, const char *fmt, ... )
+int asprintf( char ** const sptr, const char * const fmt, ... )
 {
     int retval;
     va_list argv;
