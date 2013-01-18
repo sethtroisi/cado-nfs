@@ -13,7 +13,7 @@ int verbose = 0;
 /* Returns something centered on 1. */
 static inline double dist_func()
 {
-    long int y = random();
+    long int y = rand();
     y += y == 0;
     double x = (double) y / RAND_MAX;
     /* With this distribution, bizarrely we tend to get a density which

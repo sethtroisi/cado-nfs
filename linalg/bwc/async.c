@@ -335,8 +335,14 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
             char eta_string[32] = "not available yet\n";
             time(now);
             *eta = *now + (timing->end_mark - iter) * dwct / di;
-            if (di)
+            if (di) {
+#ifdef HAVE_CTIME_R
                 ctime_r(eta, eta_string);
+#else
+                strncpy(eta_string, ctime(eta), sizeof(eta_string));
+#endif
+            }
+
 
             unsigned int s = strlen(eta_string);
             for( ; s && isspace((int)(unsigned char)eta_string[s-1]) ; eta_string[--s]='\0') ;
@@ -355,6 +361,7 @@ void timing_disp_collective_oneline(parallelizing_info pi, struct timing_data * 
 
 void block_control_signals()
 {
+#ifndef HAVE_MINGW   /* seems hopeless */
     /* Only the master thread receives control signals */
     sigset_t sset[1];
     sigemptyset(sset);
@@ -363,8 +370,10 @@ void block_control_signals()
 #endif
     // sigaddset(sset, SIGINT);
     my_pthread_sigmask(SIG_BLOCK, sset, NULL);
+#endif  /* HAVE_MINGW */
 }
 
+#ifndef HAVE_MINGW   /* seems hopeless */
 void sighandler(int sig)
 {
     int caught = 0;
@@ -375,9 +384,11 @@ void sighandler(int sig)
     /* Of course, everybody is allowed to print this. */
     if (caught) printf("Signal caught, wait before it is acknowledged\n");
 }
+#endif  /* HAVE_MINGW */
 
 void catch_control_signals()
 {
+#ifndef HAVE_MINGW   /* seems hopeless */
 #ifdef HAVE_SIGACTION
     struct sigaction sa[1];
     memset(sa, 0, sizeof(sa));
@@ -395,4 +406,5 @@ void catch_control_signals()
 #endif
     // sigaddset(sset, SIGINT);
     my_pthread_sigmask(SIG_UNBLOCK, sset, NULL);
+#endif  /* HAVE_MINGW */
 }

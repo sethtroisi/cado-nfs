@@ -692,6 +692,7 @@ void sieve_info_init_norm_data(sieve_info_ptr si, unsigned long q0)
      region due to roundoff errors */
   rat->scale = LOG_MAX / scale;
   rat_bound = (unsigned char) (r * rat->scale) + GUARD;
+  ASSERT_ALWAYS (rat_bound != 0);
   fprintf (si->output, " bound=%u\n", rat_bound);
   sieve_info_init_lognorm (rat->Bound, rat_bound, si->cpoly->rat->lim, si->cpoly->rat->lpb,
                            rat->scale);

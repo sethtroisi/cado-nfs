@@ -9,7 +9,6 @@
 #include <sys/stat.h>
 
 #include "bwc_config.h"
-#include "debug.h"
 #include "params.h"
 #include "async.h"
 #include "filenames.h"

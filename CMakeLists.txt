@@ -112,6 +112,18 @@ include("${CADO_NFS_SOURCE_DIR}/config/sync_fetch.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/asprintf.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/mingw.cmake")
 
+if(MINGW)
+    unset(BUILD_DYNAMICALLY_LINKABLE_BWC)
+else(MINGW)
+    set(BUILD_DYNAMICALLY_LINKABLE_BWC 1)
+endif(MINGW)
+
+if(BUILD_DYNAMICALLY_LINKABLE_BWC)
+    set(CADO_SHARED SHARED)
+else(BUILD_DYNAMICALLY_LINKABLE_BWC)
+    set(CADO_SHARED)
+endif(BUILD_DYNAMICALLY_LINKABLE_BWC)
+
 ######################################################################
 # Try to detect whether pthreads and/or MPI are available.
 # This checks the MPI and PTHREADS environment variables.

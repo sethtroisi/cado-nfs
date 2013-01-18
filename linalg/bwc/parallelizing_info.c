@@ -712,7 +712,7 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
         void * arg)
 {
     int interleaving = 0;
-#ifdef HAVE_MMAN_H
+#ifndef HAVE_MMAN_H
     fprintf(stderr, "Warning: copy-based mmaped I/O replacement has never been tested, and could very well be bogus\n");
 #endif
     param_list_parse_int(pl, "interleaving", &interleaving);

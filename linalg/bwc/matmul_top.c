@@ -10,7 +10,6 @@
 #include "matmul_top.h"
 #include "select_mpi.h"
 #include "intersections.h"
-#include "debug.h"
 #include "filenames.h"
 #include "balancing_workhorse.h"
 #include "misc.h"
@@ -1230,17 +1229,6 @@ void indices_apply_P(matmul_top_data_ptr mmt, uint32_t * xs, unsigned int n, int
 void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d)
 {
     matmul_top_fill_random_source_generic(mmt, mmt->vr->stride, NULL, d);
-}
-#endif
-
-#if 0
-static void mmt_debug_writeout(matmul_top_data_ptr mmt, int d, const char * name)
-{
-    // serialize(mmt->pi->m);
-    debug_write(mmt->wr[d]->v->v,
-            abbytes(mmt->abase, mmt->wr[d]->i1 - mmt->wr[d]->i0),
-            "%s.j%u.t%u", name, mmt->pi->m->jrank, mmt->pi->m->trank);
-    // serialize(mmt->pi->m);
 }
 #endif
 

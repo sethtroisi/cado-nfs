@@ -42,6 +42,7 @@
 #cmakedefine    HAVE_STRDUP
 #cmakedefine    HAVE_STRNDUP
 #cmakedefine    HAVE_WAITPID
+#cmakedefine    HAVE_CTIME_R
 
 #cmakedefine    HAVE_SYNC_FETCH
 #cmakedefine    HAVE_ASPRINTF
@@ -50,3 +51,5 @@
 #cmakedefine    VOLATILE_IF_GCC_UBUNTU_BUG
 
 #cmakedefine    ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG
+
+#cmakedefine    BUILD_DYNAMICALLY_LINKABLE_BWC

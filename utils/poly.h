@@ -106,6 +106,7 @@ void poly_gcd_mpz (poly_t f, poly_t g, const mpz_t p);
   
 int poly_cantor_zassenhaus (mpz_t *r, poly_t f, const mpz_t p, int depth);
 int poly_roots_mpz (mpz_t *r, mpz_t *f, int d, const mpz_t p);
+void poly_swap (poly_t f, poly_t g);
 
 
 #ifdef __cplusplus

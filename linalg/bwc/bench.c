@@ -26,7 +26,6 @@
 #include "mpfq/mpfq.h"
 #include "mpfq/abase_vbase.h"
 #include "matmul-mf.h"
-// #include "debug.h"
 
 void usage()
 {
@@ -144,8 +143,6 @@ void check_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct 
     A->vec_set(A, colvec_bis, p->colvec, nc);
     A->vec_set(A, rowvec_bis, p->rowvec, nr);
 
-    // debug_write(p->colvec, A->vec_elt_stride(A, nc), "/tmp/colvec1");
-
     /* See the comment in matmul_mul about the direction argument and the
      * number of coordinates of source/destination vectors */
 
@@ -155,19 +152,13 @@ void check_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct 
     printf("T%d rowvec(%u): %08" PRIx32 "\n", tnum,
             nr, crc32((unsigned long*) p->rowvec, A->vec_elt_stride(A, nr0) / sizeof(unsigned long)));
 
-    // debug_write(p->rowvec, A->vec_elt_stride(A, nr), "/tmp/rowvec1");
-
     A->dotprod(A, check0, p->rowvec, rowvec_bis, nr0);
-
-    // debug_write(rowvec_bis, A->vec_elt_stride(A, nr), "/tmp/rowvec2");
 
     printf("T%d rowvec_bis(%u): %08" PRIx32 "\n", tnum,
             nr, crc32((unsigned long*) rowvec_bis, A->vec_elt_stride(A, nr0) / sizeof(unsigned long)));
     matmul_mul(p->mm, colvec_bis, rowvec_bis, 0);
     printf("T%d colvec_bis(%u): %08" PRIx32 "\n", tnum,
             nc, crc32((unsigned long*) colvec_bis, A->vec_elt_stride(A, nc0) / sizeof(unsigned long)));
-
-    // debug_write(colvec_bis, A->vec_elt_stride(A, nc), "/tmp/colvec2");
 
     A->dotprod(A, check1, p->colvec, colvec_bis, nc0);
 

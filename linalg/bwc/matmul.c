@@ -8,7 +8,12 @@
 #ifdef HAVE_STATVFS_H
 #include <sys/statvfs.h>
 #endif
+
+#ifdef  BUILD_DYNAMICALLY_LINKABLE_BWC
 #include <dlfcn.h>
+#else
+extern void matmul_solib_do_rebinding(void * mm);
+#endif
 
 
 #include "bwc_config.h"
@@ -23,9 +28,10 @@ matmul_ptr matmul_init(abase_vbase_ptr x, unsigned int nr, unsigned int nc, cons
     struct matmul_public_s fake[1];
     memset(fake, 0, sizeof(fake));
 
-    char solib[256];
     if (!impl) { impl = MATMUL_DEFAULT_IMPL; }
 
+#ifdef  BUILD_DYNAMICALLY_LINKABLE_BWC
+    char solib[256];
     snprintf(solib, sizeof(solib),
             MATMUL_LIBS_PREFIX "matmul_%s_%s" MATMUL_LIBS_SUFFIX,
             x->oo_impl_name(x), impl);
@@ -42,15 +48,24 @@ matmul_ptr matmul_init(abase_vbase_ptr x, unsigned int nr, unsigned int nc, cons
         abort();
     }
     (*sym)(fake);
+#else   /* BUILD_DYNAMICALLY_LINKABLE_BWC */
+    ASSERT_ALWAYS (strcmp(impl, MATMUL_DEFAULT_IMPL) == 0);
+    /* The compile process should arrange so that only _ONE_ choice is
+     * compiled in, so that in effect we have static, not shared
+     * libraries.
+     */
+    matmul_solib_do_rebinding(fake);
+#endif   /* BUILD_DYNAMICALLY_LINKABLE_BWC */
 
-    // do_rebinding(fake, impl);
     // be careful, we really want ->obj here !
     matmul_ptr mm = fake->bind->init(x->obj, pl, optimized_direction);
     if (mm == NULL) return NULL;
-    // do_rebinding(mm, impl);
-    (*sym)(mm);
-
+#ifdef  BUILD_DYNAMICALLY_LINKABLE_BWC
     mm->solib_handle = handle;
+    (*sym)(mm);
+#else
+    matmul_solib_do_rebinding(mm);
+#endif
 
     mm->dim[0] = nr;
     mm->dim[1] = nc;
@@ -252,9 +267,13 @@ void matmul_clear(matmul_ptr mm)
     if (mm->cachefile_name != NULL) free(mm->cachefile_name);
     if (mm->local_cache_copy != NULL) free(mm->local_cache_copy);
     mm->locfile = NULL;
+#ifdef BUILD_DYNAMICALLY_LINKABLE_BWC
     void * handle = mm->solib_handle;
     mm->bind->clear(mm);
     dlclose(handle);
+#else
+    mm->bind->clear(mm);
+#endif
 }
 
 void matmul_auxv(matmul_ptr mm, int op, va_list ap)
