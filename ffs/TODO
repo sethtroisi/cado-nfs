@@ -32,11 +32,6 @@
   -> the __toto_struct definition should go to the .h file that provide
   also function to work on toto_t.
 
-- Fix sublat.
-  Sublat are completely broken.
-  Also, they are way too slow. It is necessary to have a few specific
-  function for arithmetic involving the t^2+t polynomial.
-
 - Add the fppol*_set_random() functions.
   set_random() is not so simple if we want uniformity in characteristic 3.
   Since it is used only for EDF, we don't really need it and can live
