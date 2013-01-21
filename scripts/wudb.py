@@ -23,10 +23,19 @@ def diag(level, text, var = None):
         else:
             print (text + str(var), file=sys.stderr)
 
-def join3(l, op = None, pre = None, post = None, sep = ", "):
-    """ For a list l = ('a', 'b', 'c'), string pre = "+", 
-    string post = "-", and set = ", ", 
-    returns the string '+a-, +b-, +c-' 
+def join3(l, pre = None, post = None, sep = ", "):
+    """ join3 ( ('a', 'b', 'c'), pre = "+", post = "-", sep = ", ") = '+a-, +b-, +c-' 
+    If any parameter is None, it is interpreted as the empty string """
+    if pre is None:
+        pre = ""
+    if post is None:
+        post = ""
+    if sep is None:
+        sep = "";
+    return sep.join([pre + k + post for k in l])
+
+def dict_join3(d, sep=None, op=None, pre=None, post=None):
+    """ dict_join3 ( {"a": "1", "b": "2"}, sep = "," op = "=", pre="-", post="+") = "-a=1+,-b=2+"
     If any parameter is None, it is interpreted as the empty string """
     if pre is None:
         pre = ""
@@ -36,13 +45,7 @@ def join3(l, op = None, pre = None, post = None, sep = ", "):
         sep = "";
     if op is None:
         op = ""
-    return sep.join([pre + op.join(list(k)) + post for k in l])
-
-def dict_join3(d, sep=None, op=None, pre=None, post=None):
-    """ For a dictionary {"a": "1", "b": "2"}, sep = "," op = "=",
-    pre="-" and post="+", returns "-a=1+,-b=2+"
-    If any parameter is None, it is interpreted as the empty string """
-    return join3(d.items(), sep=sep, op=op, pre=pre, post=post)
+    return sep.join([pre + op.join(k) + post for k in l.items()])
 
 # Dummy class for defining "constants"
 class WuStatus:
@@ -84,13 +87,6 @@ class MyCursor(sqlite3.Cursor):
         self._exec("PRAGMA foreign_keys = ON;")
 
     @staticmethod
-    def _fieldlist(l, r = "=", s = ", "):
-        """ For a list l = ('a', 'b', 'c') returns the string 'a = ?, b = ?, c = ?',
-            or with a different string r in place of the "=", or a different 
-            string s in place of the ", " """
-        return s.join([k + " " + r + " ?" for k in l])
-
-    @staticmethod
     def _without_None(d):
         """ Return a copy of the dictionary d, but without entries whose values 
             are None """
@@ -114,7 +110,7 @@ class MyCursor(sqlite3.Cursor):
                 where = " " + name + " "
             else:
                 where = where + " AND "
-            where = where + cls._fieldlist(args[opname].keys(), cls.name_to_operator[opname], s = " AND ")
+            where = where + join3(args[opname].keys(), post = " " + cls.name_to_operator[opname] + " ?", sep = " AND ")
             values = values + list(args[opname].values())
         return (where, values)
 
@@ -144,7 +140,7 @@ class MyCursor(sqlite3.Cursor):
     def create_table(self, table, layout):
         """ Creates a table with fields as described in the layout parameter """
         command = "CREATE TABLE IF NOT EXISTS " + table + \
-            "( " + join3(layout, op=" ", sep=", ") + " );"
+            "( " + ", ".join(" ".join(k) for k in layout) + " );"
         self._exec (command)
     
     def create_index(self, table, d):
@@ -182,18 +178,17 @@ class MyCursor(sqlite3.Cursor):
             fields and their values to update """
         # UPDATE table SET column_1=value1, column2=value_2, ..., 
         # column_n=value_n WHERE column_n+1=value_n+1, ...,
-        setstr = " SET " + self.__class__._fieldlist(d.keys())
-        setvalues = d.values()
+        setstr = " SET " + join3(d.keys(), post = " = ?", sep = ", ")
         (wherestr, wherevalues) = self.__class__.where_str("WHERE", **conditions)
         command = "UPDATE " + table + setstr + wherestr
-        values = list(setvalues) + wherevalues
+        values = list(d.values()) + wherevalues
         self._exec(command, values)
     
     def where(self, joinsource, col_alias = None, limit = None, order = None, 
               **conditions):
         """ Get a up to "limit" table rows (limit == 0: no limit) where 
-            the key:value pairs of the dictionary d are set to the same 
-            value in the database table """
+            the key:value pairs of the dictionary "conditions" are set to the 
+            same value in the database table """
 
         # Table/Column names cannot be substituted, so include in query directly.
         (WHERE, values) = self.__class__.where_str("WHERE", **conditions)
@@ -755,8 +750,9 @@ class DbThreadPool(object):
     # timeverified is the ... of when the result was marked as verified
 
 
-        
-
+def selftest():
+    assert join3 ( ('a', 'b', 'c'), pre = "+", post = "-", sep = ", ") == '+a-, +b-, +c-' 
+    assert dict_join3 ( {"a": "1", "b": "2"}, sep = ",", op = "=", pre="-", post="+") == "-a=1+,-b=2+"
 
 if __name__ == '__main__': # {
     import argparse
@@ -778,6 +774,8 @@ if __name__ == '__main__': # {
     parser.add_argument('-result', required = False, nargs = 4, 
                         metavar = ('clientid', 'wuid', 'filename', 'filepath'), 
                         help = 'Return a result for wu from client')
+    parser.add_argument('-test', action="store_true", required=False, 
+                        help='Run some self tests')
 
     for arg in ("avail", "assigned", "receivedok", "receivederr", "all", 
                 "dump"):
@@ -791,6 +789,9 @@ if __name__ == '__main__': # {
     dbname = "wudb"
     if args["dbname"]:
         dbname = args["dbname"]
+
+    if args["test"]:
+        selftest()
 
     if args["debug"]:
         debug = int(args["debug"][0])
