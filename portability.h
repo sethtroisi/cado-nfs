@@ -33,6 +33,9 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 
 #ifndef HAVE_STRDUP
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include <stdlib.h>
 #include <string.h>
 static inline char *
@@ -44,10 +47,17 @@ strdup(const char * const s)
         memcpy(r, s, size);
     return r;
 }
+
+#ifdef __cplusplus
+}
+#endif
 #endif /* HAVE_STRDUP */
 
 #ifndef HAVE_STRNDUP
 /* Not every libc has this, and providing a workalike is very easy */
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include <stdlib.h>
 #include <string.h>
 static inline char *
@@ -62,12 +72,18 @@ strndup(const char * const a, const size_t n)
     }
     return r;
 }
+#ifdef __cplusplus
+}
+#endif
 #endif /* HAVE_STRNDUP */
 
 #ifndef HAVE_ASPRINTF
 /* Copied and improved from
  * http://mingw-users.1079350.n2.nabble.com/Query-regarding-offered-alternative-to-asprintf-td6329481.html
  */
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -77,7 +93,7 @@ vasprintf( char ** const sptr, const char *const fmt, va_list argv )
     int wanted = vsnprintf( *sptr = NULL, 0, fmt, argv );
     if (wanted<0)
         return -1;
-    *sptr = malloc(1 + wanted);
+    *sptr = (char *) malloc(1 + wanted);
     if (!*sptr)
         return -1;
     int rc = vsnprintf(*sptr, 1+wanted, fmt, argv );
@@ -94,6 +110,9 @@ asprintf( char ** const sptr, const char * const fmt, ... )
     va_end(argv);
     return retval;
 }
+#ifdef __cplusplus
+}
+#endif
 #endif  /* HAVE_ASPRINTF */
 
 #ifndef HAVE_GETC_UNLOCKED
