@@ -74,7 +74,6 @@ strndup(const char * const a, const size_t n)
 static inline int 
 vasprintf( char ** const sptr, const char *const fmt, va_list argv )
 {
-#error portability.h vasprintf
     int wanted = vsnprintf( *sptr = NULL, 0, fmt, argv );
     if (wanted<0)
         return -1;
@@ -96,7 +95,6 @@ vasprintf( char ** const sptr, const char *const fmt, va_list argv )
 static inline int 
 asprintf( char ** const sptr, const char * const fmt, ... )
 {
-#error portability.h asprintf
     int retval;
     va_list argv;
     va_start(argv, fmt);
