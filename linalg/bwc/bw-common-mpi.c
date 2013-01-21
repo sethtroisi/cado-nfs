@@ -7,6 +7,7 @@
 #include "bwc_config.h"
 #include "select_mpi.h"
 #include "bw-common-mpi.h"
+#include "portability.h"
 
 int bw_common_init_mpi(struct bw_params * bw, param_list pl, int * p_argc, char *** p_argv)
 {

@@ -19,6 +19,7 @@
 #include <string.h>
 #include "bwc_config.h"
 #include "matmul.h"
+#include "portability.h"
 #include "macros.h"
 #include "params.h"
 #include "worker-threads.h"

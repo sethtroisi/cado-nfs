@@ -24,6 +24,7 @@
 #include <ctype.h>
 #include <gmp.h>
 /* CADO-NFS header files */
+#include "portability.h"
 #include "utils.h"
 #include "auxiliary.h"
 

@@ -9,6 +9,7 @@
 #include <gmp.h>
 #include <pthread.h>
 #include "cado.h"
+#include "portability.h"
 #include "utils.h"
 #include "auxiliary.h"
 #include "murphyE.h"

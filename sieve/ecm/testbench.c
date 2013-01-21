@@ -30,6 +30,7 @@
 #include "modredc_ul_default.h"
 #include "getprime.h"
 #include "timing.h"
+#include "portability.h"
 
 #define MAX_METHODS 20
 

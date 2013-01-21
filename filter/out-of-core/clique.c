@@ -37,6 +37,7 @@
 #include <semaphore.h>
 #include <libgen.h>
 #include <limits.h> /* for CHAR_BIT */
+#include "portability.h"
 
 #define NEW_DIR "new/"
 #define MAX_FILES_PER_THREAD 1

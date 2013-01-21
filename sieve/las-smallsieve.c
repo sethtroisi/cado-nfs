@@ -7,6 +7,7 @@
 #include "las-qlattice.h"
 #include "basicnt.h"
 #include "misc.h"
+#include "portability.h"
 
 /* It's defined as a global variable in las.c */
 extern pthread_mutex_t io_mutex;

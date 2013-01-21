@@ -14,6 +14,7 @@
 #include <math.h>
 #include <gmp.h>
 #include <pthread.h>
+#include "portability.h"
 #include "utils.h"
 #include "auxiliary.h"
 #include "murphyE.h"

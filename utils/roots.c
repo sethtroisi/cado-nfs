@@ -9,6 +9,7 @@
 #include <gmp.h>
 #include "utils.h"
 #include "macros.h"
+#include "portability.h"
 
 void usage(const char *argv0)
 {

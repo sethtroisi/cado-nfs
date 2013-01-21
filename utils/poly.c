@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "utils.h"
+#include "portability.h"
 
 #ifndef max
 #define max(a,b) ((a)<(b) ? (b) : (a))

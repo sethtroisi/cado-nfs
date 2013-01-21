@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include "las-types.h"
 #include "fb.h"         /* fbprime_t */
+#include "portability.h"
 
 #ifdef __cplusplus
 extern "C" {

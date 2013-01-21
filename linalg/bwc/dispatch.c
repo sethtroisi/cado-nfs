@@ -12,6 +12,7 @@
 #include "matmul_top.h"
 #include "select_mpi.h"
 #include "params.h"
+#include "portability.h"
 #include "misc.h"
 #include "bw-common-mpi.h"
 #include "async.h"

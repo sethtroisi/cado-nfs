@@ -13,6 +13,7 @@
 #include "filenames.h"
 #include "mpfq/mpfq.h"
 #include "mpfq/abase_vbase.h"
+#include "portability.h"
 
 void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {

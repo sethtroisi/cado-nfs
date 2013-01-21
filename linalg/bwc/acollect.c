@@ -9,6 +9,7 @@
 #include <limits.h>
 #include <dirent.h>
 #include "bwc_config.h"
+#include "portability.h"
 #include "macros.h"
 #include "utils.h"
 #include "filenames.h"

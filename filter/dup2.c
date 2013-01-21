@@ -38,6 +38,7 @@
 #include "utils.h"
 #include "relation.h"
 
+#include "portability.h"
 #include "macros.h"
 
 #define CA 271828182845904523UL

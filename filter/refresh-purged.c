@@ -9,6 +9,7 @@
 #include "cado.h"
 #include <stdio.h>
 #include <string.h>
+#include "portability.h"
 #include "utils.h"
 
 int

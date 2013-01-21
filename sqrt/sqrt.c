@@ -13,6 +13,7 @@
 
 #include "utils.h"
 #include "purgedfile.h"
+#include "portability.h"
 
 #define DEBUG 0
 #define MAPLE 0

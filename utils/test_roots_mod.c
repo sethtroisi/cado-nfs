@@ -1,3 +1,4 @@
+#include "cado_config.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -7,6 +8,7 @@
 #include "getprime.h"
 #include "gmp_aux.h"
 #include "rootfinder.h"
+#include "portability.h"
 
 int
 roots_mod_uint64 (uint64_t *r, uint64_t a, int d, uint64_t p);

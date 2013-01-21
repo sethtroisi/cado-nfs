@@ -15,6 +15,7 @@
 #include "modredc_ul.h"
 #include "mod_ul.h"
 #include "modredc_ul_default.h"
+#include "portability.h"
 
 static int 
 mod_roots (residue_t *, residue_t, int, modulus_t);

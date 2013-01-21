@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <string.h>
 
+#include "portability.h"
 #include "macros.h"
 #ifdef  HAVE_CURL
 #include "balancing_curl_source.h"

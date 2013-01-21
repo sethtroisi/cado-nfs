@@ -1,0 +1,280 @@
+/* Portability header file for the CADO project
+ 
+Copyright 2013 Pierrick Gaudry, Alexander Kruppa,
+               Emmanuel Thome, Paul Zimmermann
+
+This file is part of the CADO project.
+
+This library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Lesser General Public
+License as published by the Free Software Foundation; either
+version 2.1 of the License, or (at your option) any later version.
+
+This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Lesser General Public License for more details.
+
+You should have received a copy of the GNU Lesser General Public
+License along with this library; if not, write to the Free Software
+Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
+
+*/
+
+/* This header file defines macros (and perhaps static functions) to improve 
+   portability of the CADO code. They aim to provide a wrappers for some C99 
+   and POSIX functionality for systems that lack those. */
+
+#ifndef CADO_PORTABILITY_H_
+#define CADO_PORTABILITY_H_
+
+#ifndef CADO_VERSION_MAJOR
+#error cado_config.h must be included before portability.h
+#endif
+
+#ifndef HAVE_STRDUP
+#include <stdlib.h>
+#include <string.h>
+static inline char *
+strdup(const char * const s)
+{
+    const size_t size = strlen(s) + 1;
+    char * const r = (char *) malloc(size * sizeof(char));
+    if (r != NULL)
+        memcpy(r, s, size);
+    return r;
+}
+#endif /* HAVE_STRDUP */
+
+#ifndef HAVE_STRNDUP
+/* Not every libc has this, and providing a workalike is very easy */
+#include <stdlib.h>
+#include <string.h>
+static inline char *
+strndup(const char * const a, const size_t n)
+{
+    const size_t l = strlen(a);
+    const size_t size = (l < n ? l : n) + 1;
+    char * const r = (char *) malloc(size * sizeof(char));
+    if (r != NULL) {
+        memcpy(r, a, size);
+        r[size] = '\0';
+    }
+    return r;
+}
+#endif /* HAVE_STRNDUP */
+
+/* MS VS and MinGW use the MS RTL (called MSVCRT for MinGW) which does not
+   know the "%zu" format, they use "%Iu" instead. On MinGW, we use wrapper 
+   functions that rewrite the %zu format accordingly, so the bulk of the
+   code can continue to use C99 syntax.
+   We do these renames only if stdio.h has been parsed before this file.
+   Header files that need a certain include order are ugly, but that never
+   stopped us and renaming printf() before parsing stdio.h would be "bad." 
+   This way, when the renames are needed but don't happen, with any luck 
+   gcc will complain about not understanding "%zu". Note that C++ does not 
+   define _STDIO_H, so we test instead for a constant that all stdio.h 
+   headers should define, SEEK_SET, and hope that this is in fact a 
+   preprocessor macro (at least under MinGW which is the case that matters).
+   If NO_PRINTF_RENAME is defined, no renames happen. This is meant to allow 
+   the code that implements the format substitutions to refer to the plain
+   libc functions. */
+
+#if defined(HAVE_MINGW) && defined(SEEK_SET)
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+static inline const char *
+subst_zu(const char * const s)
+{
+    char * const r = strdup(s);
+    const char * const prisiz = "Iu";
+    const char * const priptrdiff = "Id";
+    const size_t l = strlen(r);
+    size_t i;
+    
+    ASSERT_ALWAYS(strlen(prisiz) == 2);
+    ASSERT_ALWAYS(strlen(priptrdiff) == 2);
+    ASSERT_ALWAYS(r != NULL);
+    for (i = 0; i + 2 < l; i++)
+        if (r[i] == '%' && r[i+1] == 'z' && r[i+2] == 'u') {
+            r[i+1] = prisiz[0];
+            r[i+2] = prisiz[1];
+        } else if (r[i] == '%' && r[i+1] == 't' && r[i+2] == 'd') {
+            r[i+1] = priptrdiff[0];
+            r[i+2] = priptrdiff[1];
+        }
+    return r;
+}
+
+static inline int
+printf_subst_zu (const char * const format, ...)
+{
+  va_list ap;
+  const char * const subst_format = subst_zu (format);
+  int r;
+  
+  va_start (ap, format);
+  r = vprintf (subst_format, ap);
+  free ((void *)subst_format);
+  va_end (ap);
+  return r;
+}
+
+static inline int
+fprintf_subst_zu (FILE * const stream, const char * const format, ...)
+{
+  va_list ap;
+  const char * const subst_format = subst_zu (format);
+  int r;
+  
+  va_start (ap, format);
+  r = vfprintf (stream, subst_format, ap);
+  free ((void *)subst_format);
+  va_end (ap);
+  return r;
+}
+
+static inline int
+sprintf_subst_zu (char * const str, const char * const format, ...)
+{
+  va_list ap;
+  const char * const subst_format = subst_zu (format);
+  int r;
+  
+  va_start (ap, format);
+  r = vsprintf (str, subst_format, ap);
+  free ((void *)subst_format);
+  va_end (ap);
+  return r;
+}
+
+static inline int
+snprintf_subst_zu (char * const str, const size_t size, const char * const format, ...)
+{
+  va_list ap;
+  const char * const subst_format = subst_zu (format);
+  int r;
+  
+  va_start (ap, format);
+  r = vsnprintf (str, size, subst_format, ap);
+  free ((void *)subst_format);
+  va_end (ap);
+  return r;
+}
+
+static inline int 
+vsnprintf_subst_zu(char * const str, const size_t size, const char * const format, va_list ap)
+{
+  const char * const subst_format = subst_zu (format);
+  int r;
+  
+  r = vsnprintf (str, size, subst_format, ap);
+  free ((void *)subst_format);
+  return r;
+}
+
+static inlne int
+scanf_subst_zu (const char * const format, ...)
+{
+  va_list ap;
+  const char * const subst_format = subst_zu (format);
+  int r;
+  
+  va_start (ap, format);
+  r = vscanf (subst_format, ap);
+  free ((void *)subst_format);
+  va_end (ap);
+  return r;
+}
+
+static inline int
+fscanf_subst_zu (FILE * const stream, const char * const format, ...)
+{
+  va_list ap;
+  const char * const subst_format = subst_zu (format);
+  int r;
+  
+  va_start (ap, format);
+  r = vfscanf (stream, subst_format, ap);
+  free ((void *)subst_format);
+  va_end (ap);
+  return r;
+}
+
+static inline int
+sscanf_subst_zu (char * const str, const char * const format, ...)
+{
+  va_list ap;
+  const char * const subst_format = subst_zu (format);
+  int r;
+  
+  va_start (ap, format);
+  r = vsscanf (str, subst_format, ap);
+  free ((void *)subst_format);
+  va_end (ap);
+  return r;
+}
+
+#define printf printf_subst_zu
+#define fprintf fprintf_subst_zu
+#define sprintf sprintf_subst_zu
+#define snprintf snprintf_subst_zu
+#define vsnprintf vsnprintf_subst_zu
+#define scanf scanf_subst_zu
+#define fscanf fscanf_subst_zu
+#define sscanf sscanf_subst_zu
+
+#endif /* defined(HAVE_MINGW) && defined(SEEK_SET) */
+
+#ifndef HAVE_ASPRINTF
+/* Copied and improved from
+ * http://mingw-users.1079350.n2.nabble.com/Query-regarding-offered-alternative-to-asprintf-td6329481.html
+ */
+#include <stdarg.h>
+#include <stdio.h>
+#include <stdlib.h>
+static inline int 
+vasprintf( char ** const sptr, const char *const fmt, va_list argv )
+{
+#error portability.h vasprintf
+    int wanted = vsnprintf( *sptr = NULL, 0, fmt, argv );
+    if (wanted<0)
+        return -1;
+    *sptr = malloc(1 + wanted);
+    if (!*sptr)
+        return -1;
+#ifdef HAVE_MINGW
+    /* MinGW (the primary user of this code) can't grok %zu, so we have
+     * to rewrite the format */
+    const char * const subst_format = subst_zu (fmt);
+    int rc = vsnprintf(*sptr, 1+wanted, subst_format, argv );
+    free ((void *)subst_format);
+#else
+    int rc = vsnprintf(*sptr, 1+wanted, fmt, argv );
+#endif
+    return rc;
+}
+
+static inline int 
+asprintf( char ** const sptr, const char * const fmt, ... )
+{
+#error portability.h asprintf
+    int retval;
+    va_list argv;
+    va_start(argv, fmt);
+    retval = vasprintf(sptr, fmt, argv);
+    va_end(argv);
+    return retval;
+}
+#endif  /* HAVE_ASPRINTF */
+
+#ifndef HAVE_GETC_UNLOCKED
+#define getc_unlocked getc
+#endif
+#ifndef HAVE_LRAND48
+#define lrand48 rand
+#endif
+
+#endif /* ifndef CADO_PORTABILITY_H_ */

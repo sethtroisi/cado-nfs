@@ -7,6 +7,7 @@
 #include "mod_ul.h"
 #include "modul_poly.h"
 #include "gmp_aux.h"
+#include "portability.h"
 
 /* allocate an array of d coefficients, and initialize it */
 static residueul_t*

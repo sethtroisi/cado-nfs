@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <ctype.h>
 
+#include "portability.h"
 #include "macros.h"
 #include "mf.h"
 #include "utils.h"

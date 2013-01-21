@@ -1,6 +1,7 @@
 /* Contains functions used when doing filter step for FFS instead of NFS */
 
 #include "fppol.h"
+#include "portability.h"
 #include "utils.h"
 #include "filter_matrix.h"
 #include "sparse.h"

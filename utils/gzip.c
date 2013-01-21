@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <errno.h>
 
+#include "portability.h"
 #include "macros.h"
 #include "gzip.h"
 #include "misc.h"

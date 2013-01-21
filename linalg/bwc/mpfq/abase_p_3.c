@@ -4,6 +4,7 @@
 #include "abase_p_3.h"
 
 #include <inttypes.h>
+#include "portability.h"
 static int abase_p_3_impl_mpi_attr;     /* for MPI functions */
 static MPI_Datatype abase_p_3_impl_mpi_datatype;
 static MPI_Datatype abase_p_3_impl_mpi_datatype_ur;

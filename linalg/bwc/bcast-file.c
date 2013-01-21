@@ -19,6 +19,7 @@
 #include <mpi.h>
 #define ASSERT_ALWAYS(x) do { if (!(x)) abort(); } while (0)
 #endif
+#include "portability.h"
 
 int rank;
 int size;

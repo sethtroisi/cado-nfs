@@ -8,6 +8,7 @@
 #include <sys/time.h>	/* for gettimeofday */
 #include "timing.h"
 #include "memusage.h"
+#include "portability.h"
 
 /* return total user time (all threads) */
 uint64_t

@@ -12,6 +12,7 @@
 #define rdtscll(x)
 #include "basicnt.h"
 #include "fb.h"
+#include "portability.h"
 #include "utils.h"
 
 #if 0

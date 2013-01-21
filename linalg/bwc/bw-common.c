@@ -9,6 +9,7 @@
 #include "bw-common.h"
 #include "params.h"
 #include "filenames.h"
+#include "portability.h"
 #include "utils.h"
 
 struct bw_params bw[1];

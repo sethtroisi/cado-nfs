@@ -1,11 +1,13 @@
 /* random_integer d --- generate a random integer of d digits
    random_integer d1 d2 --- generate a random integer of d1 to d2 digits */
 
+#include "cado_config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include "gmp.h"
+#include "portability.h"
 
 int
 main (int argc, char *argv[])

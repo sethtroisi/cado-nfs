@@ -13,6 +13,7 @@
 
 #include "params.h"
 #include "xvectors.h"
+#include "portability.h"
 #include "misc.h"
 #include "bw-common-mpi.h"
 #include "filenames.h"

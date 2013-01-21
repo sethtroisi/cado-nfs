@@ -12,6 +12,7 @@
 #include "parallelizing_info.h"
 #include "select_mpi.h"
 
+#include "portability.h"
 #include "utils.h"
 #include "mf.h"
 #include "balancing.h"

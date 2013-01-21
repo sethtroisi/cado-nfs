@@ -14,6 +14,7 @@ cado_config_h.in
 cado_mpi_config_h.in
 cadofactor.pl
 cadofct.pm
+portability.h
 config/alloca.cmake
 config/asm_sample.c
 config/ccwrap.pl.in

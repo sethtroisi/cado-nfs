@@ -4,6 +4,7 @@
 #include <math.h>
 #include <gmp.h>
 #include "gmp_aux.h"
+#include "portability.h"
 #include "utils.h"
 #include "auxiliary.h"
 #include "mod_ul_default.h"

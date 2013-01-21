@@ -19,6 +19,7 @@
 #include "abase_u64k1_t.h"
 #include "abase_u64k2.h"
 #include "abase_u64k2_t.h"
+#include "portability.h"
 void abase_vbase_oo_field_init_byfeatures(abase_vbase_ptr v, ...)
 {
         va_list ap;

@@ -9,6 +9,7 @@
 #include "ularith.h"
 #include "modredc_ul.h"
 #include "trialdiv.h"
+#include "portability.h"
 
 
 static void

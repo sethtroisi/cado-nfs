@@ -8,6 +8,7 @@
 #include <ctype.h>
 #include <time.h>
 #include <gmp.h>
+#include "portability.h"
 #include "utils.h"
 #include "mpz_poly.h"
 

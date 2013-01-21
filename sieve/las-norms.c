@@ -11,6 +11,7 @@
 #include "las-norms.h"
 #include "utils.h"
 #include "mpz_poly.h"
+#include "portability.h"
 
 /************************** sieve info stuff *********************************/
 

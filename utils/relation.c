@@ -11,6 +11,7 @@
 #include "relation.h"
 #include "gzip.h"
 #include "timing.h"
+#include "portability.h"
 
 /*
   Convention for I/O of rels:

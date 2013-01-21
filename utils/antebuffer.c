@@ -25,6 +25,7 @@
 #include <pthread.h>
 #include <errno.h>
 #include <time.h>
+#include "portability.h"
 
 #ifndef HAVE_NANOSLEEP
   int nanosleep(const struct timespec *req, struct timespec *rem) {

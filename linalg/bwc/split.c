@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include "bwc_config.h"
+#include "portability.h"
 #include "macros.h"
 #include "filenames.h"
 #include "bw-common.h"

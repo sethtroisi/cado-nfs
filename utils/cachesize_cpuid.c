@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <string.h>
 #include "macros.h"
+#include "portability.h"
 
 #ifdef HAVE_GCC_STYLE_AMD64_ASM
 

@@ -87,6 +87,7 @@
 #include "mod_ul.c"
 
 #include "cado-endian.h"
+#include "portability.h"
 #include "utils.h"
 #include "blockmatrix.h"
 #include "gauss.h"

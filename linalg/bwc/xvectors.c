@@ -4,6 +4,7 @@
 #include "bwc_config.h"
 #include "parallelizing_info.h"
 #include "xvectors.h"
+#include "portability.h"
 #include "utils.h"
 #include "filenames.h"
 #include "balancing.h"

@@ -6,6 +6,7 @@
 #include <inttypes.h> /* for PRIx64 macro and strtoumax */
 #include <math.h>   // for ceiling, floor in cfrac
 #include "fb.h"
+#include "portability.h"
 #include "utils.h"           /* lots of stuff */
 #include "basicnt.h"         /* ctzl bin_gcd */
 #include "ecm/facul.h"

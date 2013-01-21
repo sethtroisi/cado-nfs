@@ -2,11 +2,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
+#include <sys/time.h>
 #include "ularith.h"
 #include "modredc_ul.h"
 #include "trialdiv.h"
 #include "getprime.h"
-#include <sys/time.h>
+#include "portability.h"
 
 int main (int argc, char **argv)
 {

@@ -39,6 +39,7 @@ benefit from your work.
 #include <stdlib.h>
 #include <stdio.h>
 #endif
+#include "portability.h"
 
 #include "polyroots.h"
 

@@ -8,6 +8,7 @@
 #include "bwc_config.h"
 #include "async.h"
 #include "rusage.h"
+#include "portability.h"
 #include "macros.h"
 #include "bw-common.h"
 #include "utils.h"

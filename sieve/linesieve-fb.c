@@ -13,6 +13,7 @@
 #include "basicnt.h"
 #include "fb.h"
 #include "linesieve-fb.h"
+#include "portability.h"
 #include "utils.h"
 
 

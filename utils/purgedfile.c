@@ -5,6 +5,7 @@
 #include "timing.h"
 #include "macros.h"
 #include "gzip.h"
+#include "portability.h"
 
 void purgedfile_stream_init(purgedfile_stream_ptr ps)
 {

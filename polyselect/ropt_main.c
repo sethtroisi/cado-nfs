@@ -132,6 +132,7 @@
 #include "auxiliary.h"
 #include "murphyE.h"
 #include "ropt.h"
+#include "portability.h"
 
 
 /**

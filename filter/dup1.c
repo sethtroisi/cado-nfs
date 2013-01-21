@@ -29,6 +29,7 @@
 #include <unistd.h>
 #include <assert.h>
 
+#include "portability.h"
 #include "macros.h"
 #include "utils.h"
 #include "relation.h"

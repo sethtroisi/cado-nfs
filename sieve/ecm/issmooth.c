@@ -27,6 +27,7 @@
 #include <string.h>
 #include <limits.h>
 #include <gmp.h>
+#include "portability.h"
 
 #define MIN(a,b) ((a)<(b))?(a):(b)
 #define MAX(a,b) ((a)>(b))?(a):(b)

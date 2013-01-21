@@ -12,6 +12,7 @@
 #include "las-debug.h"
 #include "las-coordinates.h"
 #include "mpz_poly.h"
+#include "portability.h"
 
 #if defined(__GLIBC__) && (defined(TRACE_K) || defined(CHECK_UNDERFLOW))
 #include <execinfo.h>   /* For backtrace. Since glibc 2.1 */

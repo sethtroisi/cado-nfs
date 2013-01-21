@@ -52,7 +52,7 @@
    only very few singletons should remain.
 */
 
-#define _GNU_SOURCE     /* FIXME. Include directly cado.h instead */
+#include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -63,6 +63,7 @@
 #include <sys/time.h>
 #include <fcntl.h>
 #include <math.h>
+#include "portability.h"
 
 #define MAXNAME 1024
 #define MAX_THREADS 128

@@ -1,5 +1,6 @@
 #include "polyselect2l_arith.h"
 #include "polyselect2l_str.h"
+#include "portability.h"
 
 /* return 1/a mod p, assume 0 <= a < p */
 unsigned long

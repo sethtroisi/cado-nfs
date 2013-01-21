@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h> /* for strcmp() */
 #include <math.h> /* for sqrt and floor and log and ceil */
+#include "portability.h"
 #include "utils.h"
 
 

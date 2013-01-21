@@ -4,6 +4,7 @@
 #include <math.h>
 #include "ecm.h"
 #include "ularith.h"
+#include "portability.h"
 
 /* Do we want backtracking when processing factors of 2 in E? */
 #ifndef ECM_BACKTRACKING

@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <time.h>
+#include "portability.h"
 
 #define UNLIKELY(x)     __builtin_expect(x, 0)
 

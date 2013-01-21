@@ -5,6 +5,7 @@
 #include <math.h>
 #include <time.h>
 #include "bwc_config.h"
+#include "portability.h"
 #include "macros.h"
 #include "utils.h"
 

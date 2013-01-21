@@ -4,7 +4,9 @@
  */
 
 
+#include "cado_config.h"
 #include "ropt_tree.h"
+#include "portability.h"
 
 
 #if 1

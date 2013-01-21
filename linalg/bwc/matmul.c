@@ -19,6 +19,7 @@ extern void matmul_solib_do_rebinding(void * mm);
 #include "bwc_config.h"
 #include "matmul.h"
 #include "matmul-libnames.h"
+#include "portability.h"
 #include "misc.h"
 
 #define MATMUL_DEFAULT_IMPL "bucket"

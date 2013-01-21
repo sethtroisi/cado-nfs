@@ -67,6 +67,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <pthread.h>
 #include <errno.h>
 
+#include "portability.h"
 #include "utils.h"
 #ifdef FOR_FFS
 #include "utils_ffs.h"

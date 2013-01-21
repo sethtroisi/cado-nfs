@@ -5,6 +5,7 @@
 
 #include "binary-dotprods-backends.h"
 #include <inttypes.h>
+#include "portability.h"
 static int abase_u64k2_impl_mpi_attr;     /* for MPI functions */
 static MPI_Datatype abase_u64k2_impl_mpi_datatype;
 static MPI_Datatype abase_u64k2_impl_mpi_datatype_ur;

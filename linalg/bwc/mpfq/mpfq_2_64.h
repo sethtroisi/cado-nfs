@@ -21,6 +21,7 @@
 #include <wmmintrin.h>
 #endif
 
+#include "portability.h"
 #include "assert.h"
 #ifdef	MPFQ_LAST_GENERATED_TAG
 #undef	MPFQ_LAST_GENERATED_TAG

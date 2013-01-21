@@ -41,6 +41,7 @@ History: 0.1 initial release
 #include <math.h>
 #include <gmp.h>
 #include <assert.h>
+#include "portability.h"
 
 #define VERSION "0.1.2.1"
 

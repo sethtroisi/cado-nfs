@@ -5,6 +5,7 @@
 #include <errno.h>
 
 #include "balancing.h"
+#include "portability.h"
 #include "utils.h"
 
 void balancing_set_row_col_count(balancing_ptr bal)

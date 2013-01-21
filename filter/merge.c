@@ -31,6 +31,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <stdlib.h>
 #include <string.h> /* for strcmp */
 
+#include "portability.h"
 #include "utils.h" /* for gzip_open */
 
 #include "merge_opts.h"

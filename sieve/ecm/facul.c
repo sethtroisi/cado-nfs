@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include "portability.h"
 #include "pm1.h"
 #include "pp1.h"
 #include "ecm.h"

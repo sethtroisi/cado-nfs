@@ -5,6 +5,7 @@
 
 
 #include "ropt_str.h"
+#include "portability.h"
 
 
 /* -----------------*/

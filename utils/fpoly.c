@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <math.h>   /* for fabs */
 #include "fpoly.h"
+#include "portability.h"
 
 /* Evaluate the poynomial f of degree deg at point x */
 double

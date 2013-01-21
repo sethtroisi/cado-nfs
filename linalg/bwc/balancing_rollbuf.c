@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <stdint.h>
 #include "balancing_rollbuf.h"
+#include "portability.h"
 
 /* This is a hack. Define to 1 to disable */
 #define ROLLBUF_ALIGNED_RETURNS sizeof(uint32_t)

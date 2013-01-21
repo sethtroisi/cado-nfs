@@ -12,6 +12,7 @@
 #include "intersections.h"
 #include "filenames.h"
 #include "balancing_workhorse.h"
+#include "portability.h"
 #include "misc.h"
 
 #ifndef CONJUGATED_PERMUTATIONS

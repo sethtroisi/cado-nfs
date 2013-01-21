@@ -8,6 +8,7 @@
 #include <string.h>
 #include "getprime.c"
 #include "ecm.h"
+#include "portability.h"
 
 #undef MODTRACE
 // #include "mod_ul.h"

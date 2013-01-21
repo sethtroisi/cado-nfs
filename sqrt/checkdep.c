@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <gmp.h>
 #include <string.h>
+#include "portability.h"
 #include "macros.h"
 
 static void

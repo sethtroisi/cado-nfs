@@ -10,6 +10,7 @@
 #include "params.h"
 #include "macros.h"
 #include "misc.h"
+#include "portability.h"
 
 void param_list_init(param_list pl)
 {

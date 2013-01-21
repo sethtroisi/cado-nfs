@@ -17,6 +17,7 @@
 #define EMIT_ADDRESSABLE_shash_add
 
 #include "polyselect2l.h"
+#include "portability.h"
 
 #define TARGET_TIME 10000000 /* print stats every TARGET_TIME milliseconds */
 #define NEW_ROOTSIEVE

@@ -1,6 +1,7 @@
 #include "cado.h"
 #include "abase.h"
 #include <stdlib.h>
+#include "portability.h"
 #include "macros.h"
 #include "polymat.h"
 

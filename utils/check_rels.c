@@ -9,6 +9,7 @@
 #include <gmp.h>
 #include "utils.h"
 #include "mpz_poly.h"
+#include "portability.h"
 
 int
 check_relation (relation_t *rel, cado_poly_ptr cpoly)
