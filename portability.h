@@ -155,7 +155,7 @@ fscanf_subst_zu (FILE * const stream, const char * const format, ...)
 }
 
 static inline int
-sscanf_subst_zu (char * const str, const char * const format, ...)
+sscanf_subst_zu (const char * const str, const char * const format, ...)
 {
   va_list ap;
   const char * const subst_format = subst_zu (format);
