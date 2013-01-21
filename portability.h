@@ -80,15 +80,7 @@ vasprintf( char ** const sptr, const char *const fmt, va_list argv )
     *sptr = malloc(1 + wanted);
     if (!*sptr)
         return -1;
-#ifdef HAVE_MINGW
-    /* MinGW (the primary user of this code) can't grok %zu, so we have
-     * to rewrite the format */
-    const char * const subst_format = subst_zu (fmt);
-    int rc = vsnprintf(*sptr, 1+wanted, subst_format, argv );
-    free ((void *)subst_format);
-#else
     int rc = vsnprintf(*sptr, 1+wanted, fmt, argv );
-#endif
     return rc;
 }
 
