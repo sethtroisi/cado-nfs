@@ -95,10 +95,6 @@ get_override(GF2X_CONFIGURE_FLAGS GF2X_CONFIGURE_FLAGS)
 #####################################################################
 # Obtain information from the host.
 
-include(CheckFunctionExists)
-
-CHECK_FUNCTION_EXISTS(posix_memalign	HAVE_POSIX_MEMALIGN)
-
 include("${CADO_NFS_SOURCE_DIR}/config/sse2.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/sse41.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/gcc-assembly.cmake")
