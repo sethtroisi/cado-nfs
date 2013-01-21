@@ -77,6 +77,103 @@ strndup(const char * const a, const size_t n)
 #endif
 #endif /* HAVE_STRNDUP */
 
+/* MS VS and MinGW use the MS RTL (called MSVCRT for MinGW) which does not
+   know the "%zu" format, they use "%Iu" instead. On MinGW, we use wrapper 
+   functions that rewrite the %zu format accordingly, so the bulk of the
+   code can continue to use C99 syntax.
+   We do these renames only if stdio.h has been parsed before this file.
+   Header files that need a certain include order are ugly, but that never
+   stopped us and renaming printf() before parsing stdio.h would be "bad." 
+   This way, when the renames are needed but don't happen, with any luck 
+   gcc will complain about not understanding "%zu". Note that C++ does not 
+   define _STDIO_H, so we test instead for a constant that all stdio.h 
+   headers should define, SEEK_SET, and hope that this is in fact a 
+   preprocessor macro (at least under MinGW which is the case that matters).
+   If NO_PRINTF_RENAME is defined, no renames happen. This is meant to allow 
+   the code that implements the format substitutions to refer to the plain
+   libc functions. */
+
+#ifdef HAVE_MINGW
+
+#ifndef SEEK_SET
+#error stdio.h must be included before portability.h
+#endif
+
+#include <stdarg.h>
+#include <stdlib.h>
+#include "macros.h"
+
+static inline const char *
+subst_zu(const char * const s)
+{
+    char * const r = strdup(s);
+    const char * const prisiz = "Iu";
+    const char * const priptrdiff = "Id";
+    const size_t l = strlen(r);
+    size_t i;
+    
+    ASSERT_ALWAYS(strlen(prisiz) == 2);
+    ASSERT_ALWAYS(strlen(priptrdiff) == 2);
+    ASSERT_ALWAYS(r != NULL);
+    for (i = 0; i + 2 < l; i++)
+        if (r[i] == '%' && r[i+1] == 'z' && r[i+2] == 'u') {
+            r[i+1] = prisiz[0];
+            r[i+2] = prisiz[1];
+        } else if (r[i] == '%' && r[i+1] == 't' && r[i+2] == 'd') {
+            r[i+1] = priptrdiff[0];
+            r[i+2] = priptrdiff[1];
+        }
+    return r;
+}
+
+static inline int
+scanf_subst_zu (const char * const format, ...)
+{
+  va_list ap;
+  const char * const subst_format = subst_zu (format);
+  int r;
+  
+  va_start (ap, format);
+  r = vscanf (subst_format, ap);
+  free ((void *)subst_format);
+  va_end (ap);
+  return r;
+}
+
+static inline int
+fscanf_subst_zu (FILE * const stream, const char * const format, ...)
+{
+  va_list ap;
+  const char * const subst_format = subst_zu (format);
+  int r;
+  
+  va_start (ap, format);
+  r = vfscanf (stream, subst_format, ap);
+  free ((void *)subst_format);
+  va_end (ap);
+  return r;
+}
+
+static inline int
+sscanf_subst_zu (char * const str, const char * const format, ...)
+{
+  va_list ap;
+  const char * const subst_format = subst_zu (format);
+  int r;
+  
+  va_start (ap, format);
+  r = vsscanf (str, subst_format, ap);
+  free ((void *)subst_format);
+  va_end (ap);
+  return r;
+}
+
+#define scanf scanf_subst_zu
+#define fscanf fscanf_subst_zu
+#define sscanf sscanf_subst_zu
+
+#endif /* ifdef HAVE_MINGW */
+
 #ifndef HAVE_ASPRINTF
 /* Copied and improved from
  * http://mingw-users.1079350.n2.nabble.com/Query-regarding-offered-alternative-to-asprintf-td6329481.html
