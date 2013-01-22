@@ -1,0 +1,73 @@
+- Implement the char 3 arith with Pairing 2008
+  Paper by Aoki et al. 
+  Use 6 ops for add instead of 7, but changes the representation.
+  This other representation implies several changes but should not be
+  more costly than the current one.
+
+- Bark if powerlim > I.
+  This is not so interesting to allow powerlim > I, anyway, but this
+  comes at no cost to allow it, then why not?
+
+- Norm initialization speed-up.
+  There is still time to save in norm init. For instance, the
+  bit-fiddling to check if we have to recompute the norm is probably too
+  costly. Also, the fix-prec computation has not yet been carefully
+  optimized.
+
+- Provide more fixed sizes in fppol*_ arithmetic.
+  This is important for cofactorization. 
+  It should take advantage of SSE/AVX, so that a bit of rewriting of
+  lowlevel structures in necessary.
+  When we are at it, having 8-bit and 4-bit arithmetic would be nice
+  (especially for norm computations in characteristic 3).
+
+- Cleaning type declaration/definition.
+  It is convenient to *declare* types in a unique .h file.
+  However, it is interesting to keep the struct definitions in the .h
+  file that also declares all the associated functions.
+  -> one file fppol_types.h that contains the CPP-craziness for fppol
+  types.
+  -> one file types.h that contains all other type declarations (ijvec_t,
+  fbideal_t, ...)
+  -> the __toto_struct definition should go to the .h file that provide
+  also function to work on toto_t.
+
+- Add the fppol*_set_random() functions.
+  set_random() is not so simple if we want uniformity in characteristic 3.
+  Since it is used only for EDF, we don't really need it and can live
+  with strongly biased randomness.
+  At some point we might want to use random for automatic tests of the
+  polynomial arithmetic.
+
+- Uniformization of the upper bounds
+  It would make sense to ensure that all the upper bounds on degree
+  involved in the code are *strict* upper bounds. This is currently not
+  the case for fbb/lpb for instance.
+
+- Add basic smoothness tests based on degree.
+  If after sieving irreducibles up to degree (say) 22, we get a
+  result of degree less than 46, then it is necessarily prime.
+  It is not clear that we can use it reliably right now, because we do
+  not do resieving. 
+
+- Factorize / clean-up the fq_t part.
+  Right now, fq_t relies on sq_t. It made sense for enumerating the
+  special-qs. But now, it is also used in makefb...
+
+- Projective roots 
+  We do not sieve projective roots for large ideals.
+  This is probably of very little effect, but we might want to give it
+  a try.
+
+- Indexing the sieving area.
+  Order i and j polynomials by Gray code order instead of lex order in the
+  (i,j) plane. This would avoid to-and-fro pentatrit conversions, and remove
+  gaps in the array. This should work quite straightforwardly for i
+  polynomials, but j polynomials will require some more work because of the
+  buckets.
+
+- Think about making i monic instead of j.
+
+- Monic is not needed. Normalized is what we want.
+  We might prefer use the constant term equal to 1 instead of the leading
+  coefficient, as they do in Japan.

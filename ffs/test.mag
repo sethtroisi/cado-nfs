@@ -1,0 +1,82 @@
+load "skewgauss.mag";
+
+/*    GF(2^127) example
+PP<t> := PolynomialRing(GF(2));
+MP<x> := PolynomialRing(PP);
+F := x^5 + x^4 + x^3 + x^2 + x + t^2;
+G := x*t^25 + x*t^24 + x*t^23 + x*t^21 + x*t^17 + x*t^16 + x*t^15 + x*t^13 + x*t^10 + x*t^9 + x*t^7 + x*t^5 + x*t^3 + x + t^26 + t^25 + t^24 + t^23 + t^21 + t^20 + t^17 + t^14 + t^13 + t^11 + t^9 + t^6 + t^4 + t^3 + t^2;
+q := t^25 + t^24 + t^23 + t^22 + t^21 + t^20 + t^17 + t^15 + t^12 + t^11 + t^10 + t^7 + t^3 + t^2 + 1;
+rho := t^20 + t^19 + t^18 + t^17 + t^13 + t^12 + t^11 + t^10 + t^8 + t^7 + t^6 + t + 1;
+I := 13;
+J := 12;
+*/
+
+// GF(2^313) example
+
+PP<t> := PolynomialRing(GF(2));
+MP<x> := PolynomialRing(PP);
+F := x^5 + x^4 + x^3 + x^2 + x + t^2 + t + 1;
+G := x*t^63 + x*t^61 + x*t^60 + x*t^58 + x*t^54 + x*t^52 + x*t^51 + x*t^49 + x*t^47 + x*t^43 + x*t^38 + x*t^36 + x*t^33 + x*t^31 + x*t^30 + x*t^26 + x*t^25 + x*t^24 + x*t^22 + x*t^21 + x*t^20 + x*t^17 + x*t^9 + x*t^8 + x*t^6 + x*t^5 + x*t^4 + x*t^3 + x*t^2 + x*t + x + t^63 + t^62 + t^56 + t^55 + t^51 + t^50 + t^49 + t^47 + t^46 + t^45 + t^41 + t^39 + t^38 + t^37 + t^36 + t^33 + t^32 + t^31 + t^29 + t^27 + t^26 + t^20 + t^18 + t^16 + t^15 + t^14 + t^7 + t^6 + t^5 + t^4 + 1;
+q := t^22 + t^21 + t^20 + t^18 + t^12 + t^11 + t^9 + t^3 + 1;
+rho := t^20 + t^17 + t^16 + t^14 + t^13 + t^12 + t^9 + t^6 + t^5 + t^4 + t^2 + t + 1;
+I := 11;
+J := 11;
+
+
+
+
+/*  // Compute a special-q
+repeat
+    repeat
+        q := Random(PP, 25);
+    until IsIrreducible(q);
+    Fq := ext<GF(2) | q>;
+    roo := Roots(PolynomialRing(Fq)![ Fq!x : x in Eltseq(F) ]);
+until #roo ge 1;
+rho := PP!Eltseq(roo[1][1]);
+
+q,rho;
+
+*/
+
+a0, b0, a1, b1 := skewgauss(q, rho, 0);
+
+function pol2hex(p)
+    return IntegerToString(Seqint([ Integers()!x : x in  Eltseq(p) ], 2), 16);
+end function;
+
+function dec2pol(x)
+    return PP!Intseq(x, 2);
+end function;
+
+function pol2dec(p)
+    return Seqint([ Integers()!x : x in  Eltseq(p) ], 2);
+end function;
+
+function hex2pol(x)
+    return PP!Intseq(StringToInteger(x, 16), 2);
+end function;
+
+function ij2ab(i,j)
+    return i*a0+j*a1, i*b0+j*b1;
+end function;
+
+function ab2ij(a,b)
+    return ((a*b1 - b*a1) div q), ((-a*b0 + b*a0) div q);
+end function;
+
+function ij2pos(i,j, I)
+    ii := Seqint([Integers()!xx : xx in Eltseq(i)], 2);
+    jj := Seqint([Integers()!xx : xx in Eltseq(j)], 2);
+    return ii + 2^I*jj;
+end function;
+
+function Normf(i,j)
+    a,b := ij2ab(i,j);
+    return Numerator(Evaluate(F, a/b)*b^Degree(F));
+end function;
+
+function Normg(i,j)
+    a,b := ij2ab(i,j);
+    return Numerator(Evaluate(G, a/b)*b^Degree(G));
+end function;
