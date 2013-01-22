@@ -1,11 +1,7 @@
-This is some code to perform the sieving step in the Function Field Sieve
-algorithm. It concentrates on the characteristic 2 and 3 for the moment.
+This subdirectory is an implementation of the steps of the Function Field
+Sieve that are specific to this algorithm.
 
-Current authors: Jérémie Detrey, Pierrick Gaudry, Marion Videau.
+It supports only the characteristic 2 and 3 for the moment.
 
-Some code (not much) is stolen from CADO-NFS (in that case it is visible
-in the header of the file).
-
-Currently no licence -> you are not allowed to redistribute.
-We expect this code to become LGPL.
-
+As a part of CADO_NFS this code is also distributed under the GNU LESSER
+GENERAL PUBLIC LICENSE Version 2.1 or later.
