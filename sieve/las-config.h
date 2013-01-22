@@ -149,7 +149,7 @@
 
 /* Guard for the logarithms of norms, so that the value does not wrap around
    zero due to roundoff errors. */
-#define GUARD 4
+#define GUARD 4.0
 
 /* GUARD+LOG_MAX should be as near as possible from 256, to get more accuracy
    in the norm computations, but not too much, otherwise a norm might be

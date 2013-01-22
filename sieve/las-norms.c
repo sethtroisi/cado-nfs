@@ -564,7 +564,7 @@ get_maxnorm_aux (double *g, const unsigned int d, double s)
    a = a0 * i + a1 * j, b = b0 * i + b1 * j and q >= q0,
    -I/2 <= i <= I/2, 0 <= j <= I/2*min(s*B/|a1|,B/|b1|)
    where B >= sqrt(2*q/s/sqrt(3)) for all special-q in the current range
-   (s is the skewness, and B = si->B, see lattice.tex).
+   (s is the skewness, and B = si->B).
 
    Since |a0| <= s*B and |b0| <= B, then
    |a0 * i + a1 * j| <= s*B*I and |b0 * i + b1 * j| <= B*I,
@@ -580,7 +580,7 @@ get_maxnorm_aux (double *g, const unsigned int d, double s)
        and is attained in (a) or (c).
 */
 static double
-get_maxnorm (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
+get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
 {
   unsigned int d = cpoly->alg->degree, k;
   double *fd; /* double-precision coefficients of f */
@@ -631,74 +631,94 @@ get_maxnorm (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
      that function is not critical */
   for (tmp = max_norm, k = 0; k < d; k++)
     tmp *= si->B * (double) si->I;
-  /* divide by q0 if sieving on alg side */
+  /* divide by q0 if sieving on algebraic side */
   if (!si->ratq)
       tmp /= (double) q0;
   tmp *= 0.5;
   return log2 (tmp);
 }
 
-void sieve_info_init_norm_data(sieve_info_ptr si, unsigned long q0)
+/* this function initializes the scaling factors and report bounds on the
+   rational and algebraic sides */
+void
+sieve_info_init_norm_data(sieve_info_ptr si, unsigned long q0)
 {
-    for (int side = 0; side < 2; side++) {
-        int d = si->cpoly->pols[side]->degree;
-        si->sides[side]->fij = (mpz_t *) malloc((d + 1) * sizeof(mpz_t));
-        FATAL_ERROR_CHECK(si->sides[side]->fij == NULL, "malloc failed");
-        si->sides[side]->fijd = (double *) malloc((d + 1) * sizeof(double));
-        FATAL_ERROR_CHECK(si->sides[side]->fijd == NULL, "malloc failed");
-        for (int k = 0; k <= d; k++)
-            mpz_init(si->sides[side]->fij[k]);
+  for (int side = 0; side < 2; side++)
+    {
+      int d = si->cpoly->pols[side]->degree;
+      si->sides[side]->fij = (mpz_t *) malloc((d + 1) * sizeof(mpz_t));
+      FATAL_ERROR_CHECK(si->sides[side]->fij == NULL, "malloc failed");
+      si->sides[side]->fijd = (double *) malloc((d + 1) * sizeof(double));
+      FATAL_ERROR_CHECK(si->sides[side]->fijd == NULL, "malloc failed");
+      for (int k = 0; k <= d; k++)
+        mpz_init (si->sides[side]->fij[k]);
     }
 
-  double r, scale;
+  double r, maxlog2;
   unsigned char alg_bound, rat_bound;
   sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
   sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
 
-  /* initialize bounds for the norm computation, see lattice.tex */
+  /* Let u = (a0, b0) and v = (a1, b1) the two vectors obtained from skew
+     Gauss reduction, and u' = (a0, s*b0), v' = (a1, s*b1). Assume |u'|<=|v'|.
+     We know from Gauss reduction that the vectors u' and v' form an
+     angle of at least pi/3, and their determinant is qs, thus:
+     |u'|^2 <= |u'|*|v'| <= qs/sin(pi/3) = 2/sqrt(3)*q*s.
+     Define B := sqrt(2/sqrt(3)*q/s), then |a0| <= s*B and |b0| <= B. */
   si->B = sqrt (2.0 * (double) q0 / (si->cpoly->skew * sqrt (3.0)));
-  alg->logmax = get_maxnorm (si->cpoly, si, q0); /* log2(max norm) */
 
-  /* We want some margin, (see below), so that we can set 255 to discard
-   * non-survivors.*/
-  scale = alg->logmax + si->cpoly->alg->lambda * (double) si->cpoly->alg->lpb;
+  /************************** rational side **********************************/
+
+  /* Since |a| <= s*I*B and |b| <= I*B, |G(a,b)| <= (|g[1]|*s+|g[0]|) * I*B */
+  r = fabs (mpz_get_d (si->cpoly->rat->f[1])) * si->cpoly->skew
+    + fabs (mpz_get_d (si->cpoly->rat->f[0]));
+  r *= si->B * (double) si->I;
+  /* if the special-q is on the rational side, divide by it */
+  if (si->ratq)
+    r /= (double) q0;
+  rat->logmax = maxlog2 = log2 (r);
+  /* we know that |G(a,b)| < 2^(rat->logmax) when si->ratq = 0,
+     and |G(a,b)/q| < 2^(rat->logmax) when si->ratq <> 0 */
+
+  fprintf (si->output, "# Rat. side: log2(maxnorm)=%1.2f logbase=%1.6f",
+           maxlog2, exp2 (maxlog2 / ((double) CHAR_MAX - GUARD)));
+  /* we want to map 0 <= x < maxlog2 to GUARD <= y < CHAR_MAX,
+     thus y = GUARD + x * (CHAR_MAX-GUARD)/maxlog2 */
+  rat->scale = ((double) CHAR_MAX - GUARD) / maxlog2;
+  /* we want to select relations with a cofactor of less than r bits on the
+     rational side */
+  r = si->cpoly->rat->lambda * (double) si->cpoly->rat->lpb;
+  rat_bound = (unsigned char) (r * rat->scale) + GUARD;
+  fprintf (si->output, " bound=%u\n", rat_bound);
+  sieve_info_init_lognorm (rat->Bound, rat_bound, si->cpoly->rat->lim,
+                           si->cpoly->rat->lpb, rat->scale);
+
+  /************************** algebraic side *********************************/
+
+  alg->logmax = get_maxnorm_alg (si->cpoly, si, q0); /* log2(max norm) */
+  /* we know that |F(a,b)/q| < 2^(alg->logmax) when si->ratq = 0,
+     and |F(a,b)| < 2^(alg->logmax) when si->ratq <> 0 */
+
+  /* on the algebraic side, we want that the non-reports on the rational
+     side, which are set to 255, remain larger than then report bound 'r',
+     even if the algebraic norm is totally smooth. For this, we artificially
+     increase by 'r' the maximal range */
+  r = si->cpoly->alg->lambda * (double) si->cpoly->alg->lpb;
+  maxlog2 = alg->logmax + r;
 
   fprintf (si->output, "# Alg. side: log2(maxnorm)=%1.2f logbase=%1.6f",
-           scale, exp2 (scale / LOG_MAX));
-  // second guard, due to the 255 trick!
-  scale = (LOG_MAX - GUARD) / scale;
-  alg_bound = (unsigned char) (si->cpoly->alg->lambda * (double) si->cpoly->alg->lpb *  scale)
-            + GUARD;
+           maxlog2, exp2 (maxlog2 / ((double) CHAR_MAX - GUARD)));
+  /* we want to map 0 <= x < maxlog2 to GUARD <= y < CHAR_MAX,
+     thus y = GUARD + x * (CHAR_MAX-GUARD)/maxlog2 */
+  alg->scale = ((double) CHAR_MAX - GUARD) / maxlog2;
+  /* we want to report relations with a remaining log2-norm after sieving of
+     at most lambda * lpb, which corresponds in the y-range to
+     y >= GUARD + lambda * lpb * scale */
+  alg_bound = (unsigned char) (r * alg->scale) + GUARD;
   fprintf (si->output, " bound=%u\n", alg_bound);
-  sieve_info_init_lognorm (alg->Bound, alg_bound, si->cpoly->alg->lim, si->cpoly->alg->lpb,
-                           scale);
-  alg->scale = scale;
-
-  /* similar bound on the rational size: |a| <= s*I*B and |b| <= I*B */
-  scale = fabs (mpz_get_d (si->cpoly->rat->f[1])) * si->cpoly->skew
-        + fabs (mpz_get_d (si->cpoly->rat->f[0]));
-  scale *= si->B * (double) si->I;
-  if (si->ratq)
-      scale /= (double) q0;
-  rat->logmax = scale = log2 (scale);
-  /* on the rational side, we want that the non-reports on the algebraic
-     side, which are set to 255, remain over the report bound R, even if
-     the rational norm is totally smooth. For this, we simply add R to the
-     maximal lognorm to compute the log base */
-  r = si->cpoly->rat->lambda * (double) si->cpoly->rat->lpb; /* base-2 logarithm of the
-                                                report bound */
-  fprintf (si->output, "# Rat. side: log2(maxnorm)=%1.2f ", scale);
-  fprintf (si->output, "logbase=%1.6f", exp2 (scale / LOG_MAX ));
-  /* we subtract again GUARD to avoid that non-reports overlap the report
-     region due to roundoff errors */
-  rat->scale = LOG_MAX / scale;
-  rat_bound = (unsigned char) (r * rat->scale) + GUARD;
-  ASSERT_ALWAYS (rat_bound != 0);
-  fprintf (si->output, " bound=%u\n", rat_bound);
-  sieve_info_init_lognorm (rat->Bound, rat_bound, si->cpoly->rat->lim, si->cpoly->rat->lpb,
-                           rat->scale);
+  sieve_info_init_lognorm (alg->Bound, alg_bound, si->cpoly->alg->lim,
+                           si->cpoly->alg->lpb, alg->scale);
 }
-
 
 void sieve_info_clear_norm_data(sieve_info_ptr si)
 {
