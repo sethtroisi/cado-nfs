@@ -5,6 +5,7 @@ import socketserver
 import os
 import sys
 import re
+import io
 from urllib.parse import unquote_plus
 from workunit import Workunit
 import datetime
@@ -30,22 +31,37 @@ def diag(level, text, var = None):
             print (text + str(var), file=sys.stderr)
         sys.stderr.flush()
 
-class HtmlGen:
-    def __init__(self):
-        self.body = \
-            '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" ' + \
-            '"http://www.w3.org/TR/html4/strict.dtd">\n' + \
-            '<html>\n' + \
-            '<head>\n' + \
-            '<title>List of workunits</title>\n' + \
-            '</head>\n' + \
-            '<body>'
+class HtmlGen(io.BytesIO):
+    def __init__(self, encoding = None):
+        super().__init__()
+        if encoding is None:
+            self.encoding = 'utf-8'
+        else:
+            self.encoding = encoding
 
-    def __str__(self):
-        return self.body + '</body>'
+    def header(self):
+        self.write(
+            b'<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" ' + 
+            b'"http://www.w3.org/TR/html4/strict.dtd">\n' + 
+            b'<html>\n' + 
+            b'<head>\n' + 
+            b'<meta http-equiv="content-type" content="text/html; ' + 
+              b'charset=' + self.encoding.encode("ascii") + b'">\n' 
+            b'<title>List of workunits</title>\n' + 
+            b'</head>\n' + 
+            b'<body>')
+
+    def finish(self):
+        self.write(b'</body>')
+
+    def __bytes__(self):
+        return self.getvalue()
+
+    def get_len(self):
+        return len(self.getvalue())
 
     def append(self, str):
-        self.body = self.body + str
+        self.write(str.encode(self.encoding))
 
     def start_table(self, fields):
         self.append('<table border="1">\n<tr>')
@@ -80,7 +96,7 @@ class HtmlGen:
 
 class MyHandler(http.server.CGIHTTPRequestHandler):
     def send_body(self, body):
-        self.wfile.write(bytes(body, "utf-8"))
+        self.wfile.write(body)
         self.wfile.flush()
 
     def do_GET(self):
@@ -164,7 +180,9 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         self.send_header("Content-Length", len(wu_text))
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()
-        self.send_body(wu_text)
+        # FIXME: is ASCII enough for workunits? Is there any shell syntax
+        # that needs more, or should we allow non-ASCII workunit names?
+        self.send_body(bytes(wu_text, "ascii"))
 
     def send_status(self):
         self.send_query()
@@ -215,13 +233,14 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             body.end_table()
         else:
             body.append("No records match.")
+        body.finish()
         
         self.send_response(200)
         self.send_header("Content-Type", "text/html")
         self.send_header("Cache-Control", "no-cache")
-        self.send_header("Content-Length", len(str(body)))
+        self.send_header("Content-Length", body.get_len())
         self.end_headers()
-        self.send_body(str(body))
+        self.send_body(body.__bytes__())
 
 if __name__ == '__main__':
     from sys import argv
