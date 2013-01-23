@@ -5,6 +5,7 @@
  */
 
 
+#include "cado.h"
 #include "ropt_param.h"
 
 

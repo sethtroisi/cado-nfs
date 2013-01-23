@@ -1,7 +1,6 @@
 #ifndef ROPT_ARITH_H
 #define ROPT_ARITH_H
 
-#include "cado.h"
 #include <math.h>
 #include "auxiliary.h"
 #include "utils.h"

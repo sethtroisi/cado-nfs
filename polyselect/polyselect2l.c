@@ -16,6 +16,7 @@
 
 #define EMIT_ADDRESSABLE_shash_add
 
+#include "cado.h"
 #include "polyselect2l.h"
 #include "portability.h"
 
