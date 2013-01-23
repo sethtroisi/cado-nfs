@@ -72,7 +72,7 @@ if(CMAKE_COMPILER_IS_GNUCC)
     # causes many prototypes and macros not to be defined. Using gnu99
     # prevents the definition of __STRICT_ANSI__
     if (MINGW)
-        set (CMAKE_C_FLAGS   "-std=gnu99 -D__USE_MINGW_ANSI_STDIO -g -W -Wall ${CMAKE_C_FLAGS}")
+        set (CMAKE_C_FLAGS   "-std=gnu99 -g -W -Wall ${CMAKE_C_FLAGS}")
     else (MINGW)
         set (CMAKE_C_FLAGS   "-std=c99 -g -W -Wall ${CMAKE_C_FLAGS}")
     endif (MINGW)
