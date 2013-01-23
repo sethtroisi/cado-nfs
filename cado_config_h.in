@@ -49,7 +49,7 @@
 #cmakedefine    HAVE_MINGW
 /* We define __USE_MINGW_ANSI_STDIO under MinGW to make MinGW provide */
 /* C99-compliant print() functions */
-#cmakedefine    __USE_MINGW_ANSI_STDIO
+#cmakedefine01    __USE_MINGW_ANSI_STDIO
 
 #cmakedefine    VOLATILE_IF_GCC_UBUNTU_BUG
 
