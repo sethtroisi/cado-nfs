@@ -1,4 +1,4 @@
-#include "cado_config.h"
+#include "cado.h"
 #include <stdio.h>
 #include <sys/types.h>
 #include <unistd.h>
