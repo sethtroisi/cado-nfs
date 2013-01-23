@@ -1,5 +1,6 @@
 /* Contains functions used when doing filter step for FFS instead of NFS */
 
+#include "cado.h"
 #include "fppol.h"
 #include "portability.h"
 #include "utils.h"

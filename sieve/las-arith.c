@@ -1,3 +1,4 @@
+#include "cado.h"
 #include <math.h>
 
 #include "las-arith.h"

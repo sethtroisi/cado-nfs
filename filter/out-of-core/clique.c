@@ -22,7 +22,7 @@
    -remove nnn : the number of "cliques" to be removed
 */
 
-#define _GNU_SOURCE     /* FIXME. Include directly cado.h instead */
+#include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
