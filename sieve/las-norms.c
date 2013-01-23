@@ -681,10 +681,10 @@ sieve_info_init_norm_data(sieve_info_ptr si, unsigned long q0)
      and |G(a,b)/q| < 2^(rat->logmax) when si->ratq <> 0 */
 
   fprintf (si->output, "# Rat. side: log2(maxnorm)=%1.2f logbase=%1.6f",
-           maxlog2, exp2 (maxlog2 / ((double) CHAR_MAX - GUARD)));
-  /* we want to map 0 <= x < maxlog2 to GUARD <= y < CHAR_MAX,
-     thus y = GUARD + x * (CHAR_MAX-GUARD)/maxlog2 */
-  rat->scale = ((double) CHAR_MAX - GUARD) / maxlog2;
+           maxlog2, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
+  /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
+     thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
+  rat->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
   /* we want to select relations with a cofactor of less than r bits on the
      rational side */
   r = si->cpoly->rat->lambda * (double) si->cpoly->rat->lpb;
@@ -707,10 +707,10 @@ sieve_info_init_norm_data(sieve_info_ptr si, unsigned long q0)
   maxlog2 = alg->logmax + r;
 
   fprintf (si->output, "# Alg. side: log2(maxnorm)=%1.2f logbase=%1.6f",
-           maxlog2, exp2 (maxlog2 / ((double) CHAR_MAX - GUARD)));
-  /* we want to map 0 <= x < maxlog2 to GUARD <= y < CHAR_MAX,
-     thus y = GUARD + x * (CHAR_MAX-GUARD)/maxlog2 */
-  alg->scale = ((double) CHAR_MAX - GUARD) / maxlog2;
+           maxlog2, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
+  /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
+     thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
+  alg->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
   /* we want to report relations with a remaining log2-norm after sieving of
      at most lambda * lpb, which corresponds in the y-range to
      y >= GUARD + lambda * lpb * scale */
