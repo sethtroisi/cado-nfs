@@ -10,6 +10,7 @@
 #define LABEL_UNIQUE TOKENPASTE2(Label, __LINE__)
 
 /* Data struct used for polyselect2l */
+#include "cado.h"
 #include "polyselect2l_str.h"
 #include "portability.h"
 

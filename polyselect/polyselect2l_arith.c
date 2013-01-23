@@ -1,3 +1,4 @@
+#include "cado.h"
 #include "polyselect2l_arith.h"
 #include "polyselect2l_str.h"
 #include "portability.h"

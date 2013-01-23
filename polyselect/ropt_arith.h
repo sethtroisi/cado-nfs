@@ -2,7 +2,6 @@
 #define ROPT_ARITH_H
 
 #include <math.h>
-#include "cado.h"
 #include "auxiliary.h"
 #include "utils.h"
 
