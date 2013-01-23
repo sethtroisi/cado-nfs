@@ -349,14 +349,17 @@ int main(int argc, char * argv[])
     fprintf (stderr, "total %" PRIu64 " coeffs\n", ncoeffs_total);
     /* }}} */
 
-    srand(1);
+    gmp_randstate_t rstate;
+    gmp_randinit_default(rstate);
+    gmp_randseed_ui(rstate, 1);
+
     /* {{{ Do checks if requested */
     for(int t = 0; t < ba->nchecks ; t++) {
         /* create deterministic test values */
         for(int tnum = 0 ; tnum < ba->nthreads ; tnum++) {
             struct private_args * p = ba->p + tnum;
-            A->vec_random(A, p->colvec, p->mm->dim[1]);
-            A->vec_random(A, p->rowvec, p->mm->dim[0]);
+            A->vec_random(A, p->colvec, p->mm->dim[1], rstate);
+            A->vec_random(A, p->rowvec, p->mm->dim[0], rstate);
             /* If we want shared vectors, this is the way to go. */
             /* Note that for such a test, the clear_func must be skipped
              * or improved, since we don't really want to free() the same
@@ -377,8 +380,8 @@ int main(int argc, char * argv[])
 
     for(int tnum = 0 ; tnum < ba->nthreads ; tnum++) {
         struct private_args * p = ba->p + tnum;
-        A->vec_random(A, p->colvec, p->mm->dim[1]);
-        A->vec_random(A, p->rowvec, p->mm->dim[0]);
+        A->vec_random(A, p->colvec, p->mm->dim[1], rstate);
+        A->vec_random(A, p->rowvec, p->mm->dim[0], rstate);
     }
 
     if ((tmp = param_list_lookup_string(ba->pl, "srcvec")) != NULL) {
@@ -428,6 +431,7 @@ int main(int argc, char * argv[])
                 dstfile);
         free(dstvec);
     }
+    gmp_randclear(rstate);
 
 #define NLAST   10
     double last[10]={0,};

@@ -33,7 +33,7 @@ struct abase_vbase_s {
     void (*set_mpz)(abase_vbase_ptr, void *, mpz_t);
     void (*get_mpn)(abase_vbase_ptr, mp_limb_t *, const void *);
     void (*get_mpz)(abase_vbase_ptr, mpz_t, const void *);
-    void (*random)(abase_vbase_ptr, void *);
+    void (*random)(abase_vbase_ptr, void *, gmp_randstate_t);
     void (*random2)(abase_vbase_ptr, void *);
     void (*add)(abase_vbase_ptr, void *, const void *, const void *);
     void (*sub)(abase_vbase_ptr, void *, const void *, const void *);
@@ -84,7 +84,7 @@ struct abase_vbase_s {
     void (*vec_sub)(abase_vbase_ptr, void *, const void *, const void *, unsigned int);
     void (*vec_scal_mul)(abase_vbase_ptr, void *, const void *, const void *, unsigned int);
     void (*vec_conv)(abase_vbase_ptr, void *, const void *, unsigned int, const void *, unsigned int);
-    void (*vec_random)(abase_vbase_ptr, void *, unsigned int);
+    void (*vec_random)(abase_vbase_ptr, void *, unsigned int, gmp_randstate_t);
     void (*vec_random2)(abase_vbase_ptr, void *, unsigned int);
     int (*vec_cmp)(abase_vbase_ptr, const void *, const void *, unsigned int);
     int (*vec_is_zero)(abase_vbase_ptr, const void *, unsigned int);

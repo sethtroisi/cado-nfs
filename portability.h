@@ -33,13 +33,12 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 #endif
 
 #ifndef HAVE_STRDUP
+#include <stdlib.h>
+#include <string.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
-#include <stdlib.h>
-#include <string.h>
-static inline char *
-strdup(const char * const s)
+static inline char * strdup(const char * const s)
 {
     const size_t size = strlen(s) + 1;
     char * const r = (char *) malloc(size * sizeof(char));
@@ -47,7 +46,6 @@ strdup(const char * const s)
         memcpy(r, s, size);
     return r;
 }
-
 #ifdef __cplusplus
 }
 #endif
@@ -55,13 +53,12 @@ strdup(const char * const s)
 
 #ifndef HAVE_STRNDUP
 /* Not every libc has this, and providing a workalike is very easy */
+#include <stdlib.h>
+#include <string.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
-#include <stdlib.h>
-#include <string.h>
-static inline char *
-strndup(const char * const a, const size_t n)
+static inline char * strndup(const char * const a, const size_t n)
 {
     const size_t l = strlen(a);
     const size_t size = (l < n ? l : n) + 1;
@@ -178,12 +175,12 @@ sscanf_subst_zu (const char * const str, const char * const format, ...)
 /* Copied and improved from
  * http://mingw-users.1079350.n2.nabble.com/Query-regarding-offered-alternative-to-asprintf-td6329481.html
  */
-#ifdef __cplusplus
-extern "C" {
-#endif
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 static inline int 
 vasprintf( char ** const sptr, const char *const fmt, va_list argv )
 {

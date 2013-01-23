@@ -1,7 +1,6 @@
 /* MPFQ generated file -- do not edit */
 
 #include "mpfq/mpfq_2_64.h"
-#include "portability.h"
 
 #ifndef GMP_LIMB_BITS
 #error "Please arrange so that GMP_LIMB_BITS is defined before including this file"
