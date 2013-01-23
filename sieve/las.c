@@ -1984,8 +1984,8 @@ usage (const char *argv0, const char * missing)
   fprintf (stderr, "          -alim     nnn   algebraic factor base bound nnn\n");
   fprintf (stderr, "          -lpbr     nnn   rational large prime bound 2^nnn\n");
   fprintf (stderr, "          -lpba     nnn   algebraic large prime bound 2^nnn\n");
-  fprintf (stderr, "          -rat->mfb     nnn   rational cofactor bound 2^nnn\n");
-  fprintf (stderr, "          -alg->mfb     nnn   algebraic cofactor bound 2^nnn\n");
+  fprintf (stderr, "          ->mfbr     nnn   rational cofactor bound 2^nnn\n");
+  fprintf (stderr, "          ->mfba     nnn   algebraic cofactor bound 2^nnn\n");
   fprintf (stderr, "          -rlambda  nnn   rational lambda value is nnn\n");
   fprintf (stderr, "          -alambda  nnn   algebraic lambda value is nnn\n");
   fprintf (stderr, "          -S        xxx   skewness value is xxx\n");
