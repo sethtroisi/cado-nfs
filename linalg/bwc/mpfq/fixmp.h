@@ -466,6 +466,117 @@ static void mgy_decode_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *invR
 
 
 
+static mp_limb_t addmul1_1hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static mp_limb_t addmul1_2hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static mp_limb_t addmul1_3hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static mp_limb_t addmul1_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static mp_limb_t addmul1_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static mp_limb_t addmul1_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static mp_limb_t addmul1_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static mp_limb_t addmul1_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static mp_limb_t addmul1_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+
+
+static mp_limb_t addmul1_smallz_1hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static mp_limb_t addmul1_smallz_2hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static mp_limb_t addmul1_smallz_3hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static mp_limb_t addmul1_smallz_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static mp_limb_t addmul1_smallz_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static mp_limb_t addmul1_smallz_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static mp_limb_t addmul1_smallz_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static mp_limb_t addmul1_smallz_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static mp_limb_t addmul1_smallz_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+
+static void mul1_1hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static void mul1_2hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static void mul1_3hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static void mul1_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static void mul1_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static void mul1_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static void mul1_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static void mul1_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static void mul1_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+
+static void mul_1hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y) MAYBE_UNUSED;
+static void mul_2hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y) MAYBE_UNUSED;
+static void mul_3hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y) MAYBE_UNUSED;
+static void mul_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y) MAYBE_UNUSED;
+static void mul_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y) MAYBE_UNUSED;
+static void mul_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y) MAYBE_UNUSED;
+static void mul_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y) MAYBE_UNUSED;
+static void mul_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y) MAYBE_UNUSED;
+static void mul_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y) MAYBE_UNUSED;
+
+static void sqr_1hw(mp_limb_t *z, const mp_limb_t *x) MAYBE_UNUSED;
+static void sqr_2hw(mp_limb_t *z, const mp_limb_t *x) MAYBE_UNUSED;
+static void sqr_3hw(mp_limb_t *z, const mp_limb_t *x) MAYBE_UNUSED;
+static void sqr_4hw(mp_limb_t *z, const mp_limb_t *x) MAYBE_UNUSED;
+static void sqr_5hw(mp_limb_t *z, const mp_limb_t *x) MAYBE_UNUSED;
+static void sqr_6hw(mp_limb_t *z, const mp_limb_t *x) MAYBE_UNUSED;
+static void sqr_7hw(mp_limb_t *z, const mp_limb_t *x) MAYBE_UNUSED;
+static void sqr_8hw(mp_limb_t *z, const mp_limb_t *x) MAYBE_UNUSED;
+static void sqr_9hw(mp_limb_t *z, const mp_limb_t *x) MAYBE_UNUSED;
+
+static void mod_1hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) MAYBE_UNUSED;
+static void mod_2hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) MAYBE_UNUSED;
+static void mod_3hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) MAYBE_UNUSED;
+static void mod_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) MAYBE_UNUSED;
+static void mod_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) MAYBE_UNUSED;
+static void mod_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) MAYBE_UNUSED;
+static void mod_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) MAYBE_UNUSED;
+static void mod_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) MAYBE_UNUSED;
+static void mod_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) MAYBE_UNUSED;
+
+static void redc_1hw(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) MAYBE_UNUSED;
+static void redc_2hw(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) MAYBE_UNUSED;
+static void redc_3hw(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) MAYBE_UNUSED;
+static void redc_4hw(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) MAYBE_UNUSED;
+static void redc_5hw(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) MAYBE_UNUSED;
+static void redc_6hw(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) MAYBE_UNUSED;
+static void redc_7hw(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) MAYBE_UNUSED;
+static void redc_8hw(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) MAYBE_UNUSED;
+static void redc_9hw(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) MAYBE_UNUSED;
+
+static void mgy_encode_1hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) MAYBE_UNUSED;
+static void mgy_encode_2hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) MAYBE_UNUSED;
+static void mgy_encode_3hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) MAYBE_UNUSED;
+static void mgy_encode_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) MAYBE_UNUSED;
+static void mgy_encode_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) MAYBE_UNUSED;
+static void mgy_encode_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) MAYBE_UNUSED;
+static void mgy_encode_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) MAYBE_UNUSED;
+static void mgy_encode_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) MAYBE_UNUSED;
+static void mgy_encode_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) MAYBE_UNUSED;
+
+static void mgy_decode_1hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *invR, const mp_limb_t *p) MAYBE_UNUSED;
+static void mgy_decode_2hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *invR, const mp_limb_t *p) MAYBE_UNUSED;
+static void mgy_decode_3hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *invR, const mp_limb_t *p) MAYBE_UNUSED;
+static void mgy_decode_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *invR, const mp_limb_t *p) MAYBE_UNUSED;
+static void mgy_decode_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *invR, const mp_limb_t *p) MAYBE_UNUSED;
+static void mgy_decode_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *invR, const mp_limb_t *p) MAYBE_UNUSED;
+static void mgy_decode_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *invR, const mp_limb_t *p) MAYBE_UNUSED;
+static void mgy_decode_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *invR, const mp_limb_t *p) MAYBE_UNUSED;
+static void mgy_decode_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *invR, const mp_limb_t *p) MAYBE_UNUSED;
+
+static void addmul1_nc_1hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static void addmul1_nc_2hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static void addmul1_nc_3hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static void addmul1_nc_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static void addmul1_nc_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static void addmul1_nc_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static void addmul1_nc_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static void addmul1_nc_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+static void addmul1_nc_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c) MAYBE_UNUSED;
+
+static void redc_ur_1(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) MAYBE_UNUSED;
+static void redc_ur_2(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) MAYBE_UNUSED;
+static void redc_ur_3(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) MAYBE_UNUSED;
+static void redc_ur_4(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) MAYBE_UNUSED;
+static void redc_ur_5(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) MAYBE_UNUSED;
+static void redc_ur_6(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) MAYBE_UNUSED;
+static void redc_ur_7(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) MAYBE_UNUSED;
+static void redc_ur_8(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) MAYBE_UNUSED;
+static void redc_ur_9(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) MAYBE_UNUSED;
+
 /* Load architecture-specific definitions */
 #ifdef __x86_64__
 # include "fixmp_x86_64.h"

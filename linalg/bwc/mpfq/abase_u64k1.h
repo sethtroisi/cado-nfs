@@ -210,7 +210,7 @@ void abase_u64k1_set_zero(abase_u64k1_dst_field, abase_u64k1_dst_elt);
 
 /* Assignment of random values */
 static inline
-void abase_u64k1_random(abase_u64k1_dst_field, abase_u64k1_dst_elt);
+void abase_u64k1_random(abase_u64k1_dst_field, abase_u64k1_dst_elt, gmp_randstate_t);
 
 /* Arithmetic operations on elements */
 static inline
@@ -291,7 +291,7 @@ void abase_u64k1_vec_sub(abase_u64k1_dst_field, abase_u64k1_dst_vec, abase_u64k1
 /* missing vec_scal_mul */
 /* missing vec_conv */
 static inline
-void abase_u64k1_vec_random(abase_u64k1_dst_field, abase_u64k1_dst_vec, unsigned int);
+void abase_u64k1_vec_random(abase_u64k1_dst_field, abase_u64k1_dst_vec, unsigned int, gmp_randstate_t);
 static inline
 int abase_u64k1_vec_cmp(abase_u64k1_dst_field, abase_u64k1_src_vec, abase_u64k1_src_vec, unsigned int);
 static inline
@@ -383,10 +383,10 @@ void abase_u64k1_set_zero(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_
 
 /* *simd_flat::code_for_random */
 static inline
-void abase_u64k1_random(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_elt r)
+void abase_u64k1_random(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_elt r, gmp_randstate_t state)
 {
         for(unsigned int i = 0 ; i < sizeof(abase_u64k1_elt) ; i++) {
-            ((unsigned char*)r)[i] = rand();
+            ((unsigned char*)r)[i] = gmp_urandomb_ui(state, 8);
         }
 }
 
@@ -515,11 +515,11 @@ void abase_u64k1_vec_sub(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_v
 
 /* *Mpfq::defaults::vec::getset::code_for_vec_random, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
-void abase_u64k1_vec_random(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec w, unsigned int n)
+void abase_u64k1_vec_random(abase_u64k1_dst_field K MAYBE_UNUSED, abase_u64k1_dst_vec w, unsigned int n, gmp_randstate_t state)
 {
     unsigned int i;
     for(i = 0; i < n; ++i)
-        abase_u64k1_random(K, w[i]);
+        abase_u64k1_random(K, w[i], state);
 }
 
 /* *Mpfq::defaults::vec::getset::code_for_vec_cmp, Mpfq::defaults::vec, Mpfq::defaults */

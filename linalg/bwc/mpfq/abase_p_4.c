@@ -4,7 +4,6 @@
 #include "abase_p_4.h"
 
 #include <inttypes.h>
-#include "portability.h"
 static int abase_p_4_impl_mpi_attr;     /* for MPI functions */
 static MPI_Datatype abase_p_4_impl_mpi_datatype;
 static MPI_Datatype abase_p_4_impl_mpi_datatype_ur;
@@ -56,7 +55,7 @@ static int abase_p_4_impl_mpi_use_count;   /* several stacked init()/clear() pai
                                ],
                  'choose_byfeatures' => sub { "DUMMY" }
                };
- tag=p_4 type=plain virtual_base={
+ tag=p_4 type=plain opthw= virtual_base={
                   'filebase' => 'abase_vbase',
                   'substitutions' => [
                                        [
@@ -143,7 +142,7 @@ static int abase_p_4_impl_mpi_use_count;   /* several stacked init()/clear() pai
                   'name' => 'abase_vbase',
                   'global_prefix' => 'abase_'
                 };
- family=[HASH(0x175a1f8)] */
+ family=[HASH(0x14a85b8)] */
 
 
 /* Functions operating on the field structure */
@@ -202,7 +201,7 @@ void abase_p_4_field_specify(abase_p_4_dst_field k, unsigned long dummy MAYBE_UN
         } else {
             abort();
         }
-    // precompute bigmul_p = largest multiple of p that fits in an elt_ur
+    // precompute bigmul_p = largest multiple of p that fits in an elt_ur,
     //   p*Floor( (2^(9*64)-1)/p )
     {
         abase_p_4_elt_ur big;
@@ -233,6 +232,8 @@ void abase_p_4_init_ts(abase_p_4_dst_field k)
     mp_limb_t pp[4];
     mp_limb_t *ptr = pp;
     mp_limb_t s[4];
+    gmp_randstate_t rstate;
+    gmp_randinit_default(rstate);
     sub_ui_nc_4(pp, k->p, 1);
     int e = 0;
     while (*ptr == 0) {
@@ -268,7 +269,7 @@ void abase_p_4_init_ts(abase_p_4_dst_field k)
     abase_p_4_init(k, &r);
     abase_p_4_set_ui(k, r, 0);
     do {
-        abase_p_4_random(k, z);
+        abase_p_4_random(k, z, rstate);
         abase_p_4_pow(k, z, z, pp, 4);
         abase_p_4_pow(k, r, z, s, 4);
         abase_p_4_add_ui(k, r, r, 1);
@@ -281,6 +282,7 @@ void abase_p_4_init_ts(abase_p_4_dst_field k)
     rshift_4(pp, 1);
     for (i = 0; i < 4; ++i)
         k->ts_info.hh[i] = pp[i];
+    gmp_randclear(rstate);
 }
 
 /* *Mpfq::gfp::elt::code_for_sqrt, Mpfq::gfp */
@@ -297,7 +299,7 @@ int abase_p_4_sqrt(abase_p_4_dst_field k, abase_p_4_dst_elt z, abase_p_4_src_elt
     abase_p_4_init(k, &y);
     abase_p_4_init(k, &b);
     mp_limb_t r = k->ts_info.e;
-    mp_limb_t s = (1UL<<(r-1));
+    mp_limb_t s; //= (1UL<<(r-1)); not needed...
     abase_p_4_set(k, x, a);
     abase_p_4_set(k, y, (abase_p_4_src_elt)k->ts_info.z);
     
@@ -892,10 +894,10 @@ static void abase_p_4_wrapper_get_mpz(abase_vbase_ptr vbase MAYBE_UNUSED, mpz_t 
     abase_p_4_get_mpz(vbase->obj, z, y);
 }
 
-static void abase_p_4_wrapper_random(abase_vbase_ptr, abase_p_4_dst_elt);
-static void abase_p_4_wrapper_random(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_elt x MAYBE_UNUSED)
+static void abase_p_4_wrapper_random(abase_vbase_ptr, abase_p_4_dst_elt, gmp_randstate_t);
+static void abase_p_4_wrapper_random(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_elt x MAYBE_UNUSED, gmp_randstate_t state MAYBE_UNUSED)
 {
-    abase_p_4_random(vbase->obj, x);
+    abase_p_4_random(vbase->obj, x, state);
 }
 
 static void abase_p_4_wrapper_random2(abase_vbase_ptr, abase_p_4_dst_elt);
@@ -1198,10 +1200,10 @@ static void abase_p_4_wrapper_vec_conv(abase_vbase_ptr vbase MAYBE_UNUSED, abase
     abase_p_4_vec_conv(vbase->obj, w, u, n, v, m);
 }
 
-static void abase_p_4_wrapper_vec_random(abase_vbase_ptr, abase_p_4_dst_vec, unsigned int);
-static void abase_p_4_wrapper_vec_random(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_vec w MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+static void abase_p_4_wrapper_vec_random(abase_vbase_ptr, abase_p_4_dst_vec, unsigned int, gmp_randstate_t);
+static void abase_p_4_wrapper_vec_random(abase_vbase_ptr vbase MAYBE_UNUSED, abase_p_4_dst_vec w MAYBE_UNUSED, unsigned int n MAYBE_UNUSED, gmp_randstate_t state MAYBE_UNUSED)
 {
-    abase_p_4_vec_random(vbase->obj, w, n);
+    abase_p_4_vec_random(vbase->obj, w, n, state);
 }
 
 static void abase_p_4_wrapper_vec_random2(abase_vbase_ptr, abase_p_4_dst_vec, unsigned int);
@@ -1459,7 +1461,7 @@ void abase_p_4_oo_field_init(abase_vbase_ptr vbase)
     vbase->set_mpz = (void (*) (abase_vbase_ptr, void *, mpz_t)) abase_p_4_wrapper_set_mpz;
     vbase->get_mpn = (void (*) (abase_vbase_ptr, mp_limb_t *, const void *)) abase_p_4_wrapper_get_mpn;
     vbase->get_mpz = (void (*) (abase_vbase_ptr, mpz_t, const void *)) abase_p_4_wrapper_get_mpz;
-    vbase->random = (void (*) (abase_vbase_ptr, void *)) abase_p_4_wrapper_random;
+    vbase->random = (void (*) (abase_vbase_ptr, void *, gmp_randstate_t)) abase_p_4_wrapper_random;
     vbase->random2 = (void (*) (abase_vbase_ptr, void *)) abase_p_4_wrapper_random2;
     vbase->add = (void (*) (abase_vbase_ptr, void *, const void *, const void *)) abase_p_4_wrapper_add;
     vbase->sub = (void (*) (abase_vbase_ptr, void *, const void *, const void *)) abase_p_4_wrapper_sub;
@@ -1510,7 +1512,7 @@ void abase_p_4_oo_field_init(abase_vbase_ptr vbase)
     vbase->vec_sub = (void (*) (abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_p_4_wrapper_vec_sub;
     vbase->vec_scal_mul = (void (*) (abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_p_4_wrapper_vec_scal_mul;
     vbase->vec_conv = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int, const void *, unsigned int)) abase_p_4_wrapper_vec_conv;
-    vbase->vec_random = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_p_4_wrapper_vec_random;
+    vbase->vec_random = (void (*) (abase_vbase_ptr, void *, unsigned int, gmp_randstate_t)) abase_p_4_wrapper_vec_random;
     vbase->vec_random2 = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_p_4_wrapper_vec_random2;
     vbase->vec_cmp = (int (*) (abase_vbase_ptr, const void *, const void *, unsigned int)) abase_p_4_wrapper_vec_cmp;
     vbase->vec_is_zero = (int (*) (abase_vbase_ptr, const void *, unsigned int)) abase_p_4_wrapper_vec_is_zero;

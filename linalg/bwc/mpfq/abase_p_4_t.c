@@ -48,7 +48,7 @@
                                ],
                  'choose_byfeatures' => sub { "DUMMY" }
                };
- tag=p_4 type=plain virtual_base={
+ tag=p_4 type=plain opthw= virtual_base={
                   'filebase' => 'abase_vbase',
                   'substitutions' => [
                                        [
@@ -135,7 +135,7 @@
                   'name' => 'abase_vbase',
                   'global_prefix' => 'abase_'
                 };
- family=[HASH(0x175a1f8)] */
+ family=[HASH(0x14a85b8)] */
 
 
 /* Functions operating on the field structure */
