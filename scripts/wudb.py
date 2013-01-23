@@ -451,9 +451,9 @@ class WuAccess(object): # {
 
     @staticmethod
     def to_str(wus):
-        s = ""
+        r = []
         for wu in wus:
-            s = s + "Workunit " + str(wu["wuid"]) + ":\n"
+            s = "Workunit " + str(wu["wuid"]) + ":\n"
             for (k,v) in wu.items():
                 if k != "wuid" and k != "files":
                     s = s + "  " + k + ": " + repr(v) + "\n"
@@ -464,7 +464,8 @@ class WuAccess(object): # {
                 else:
                     for f in wu["files"]:
                         s = s + "    " + str(f) + "\n"
-        return s
+            r.append(s)
+        return '\n'.join(r)
 
     @staticmethod
     def _checkstatus(wu, status):

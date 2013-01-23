@@ -91,7 +91,7 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "  target *        element whose discrete log has to be computed \n");
     fprintf(stderr, "  phi *           finite field defining polynomial \n");
     /* fprintf(stderr, "  beta *         generator of the subgroup target belongs to \n"); */
-    fprintf(stderr, "  gf              indicate the base field for sanity check\n");
+    fprintf(stderr, "  gf              indicates the base field for sanity check\n");
  
     /* We consider we can assume that t is a "valid" generator even if it is not,
      hence beta is commented for the moment */
@@ -167,7 +167,9 @@ int main(int argc, char **argv)
        form some j and beta being the generator of the subgroup
        the initial target belongs to */
       
-      /* Do we pick j at random? Which random ? */
+      /* Do we pick j at random? Which random ? 
+       For the moment j is taken equal to 1 and at each trial
+       target is multipleid by t^j */
       unsigned int j = 1;
       for (unsigned int i = 0; i < j; ++i) 
 	fppol_multmod(target, target, phi);
@@ -184,8 +186,13 @@ int main(int argc, char **argv)
        which involves only polynomials of degree less than lpb:
        the initialization of the special-q descent is over */
 
-    /* We want to output r and v: how do we output them? */
-      
+    /* We want to output r and v */
+    fprintf(stdout, "r = ");
+    fppol_out(stdout, r);
+    fprintf(stdout, "\n");
+	 fprintf(stdout, "v = ");
+    fppol_out(stdout, v);
+    fprintf(stdout, "\n");
     param_list_clear(pl);
     
     return EXIT_SUCCESS;
