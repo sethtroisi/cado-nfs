@@ -71,7 +71,12 @@ uint32_t **cof_succ; /* cof_succ[r][a] is the corresponding number of
 /* Test if entry x in bucket region n is divisible by p */
 void test_divisible_x (const fbprime_t p, const unsigned long x, const int n,
 		       sieve_info_srcptr si, int side);
-int factor_leftover_norm (mpz_t n, unsigned int b, mpz_array_t* const factors,
+/* easylim is a bit size for which we know that bitsize(n)<=easylim
+ * implies n prime */
+int factor_leftover_norm (mpz_t n,
+                          double fbbits,
+                          unsigned int lpb,
+                          mpz_array_t* const factors,
 			  uint32_array_t* const multis,
 			  facul_strategy_t *strategy);
 
@@ -1408,6 +1413,16 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
         for (int x = xul; x < xul + (int) together; ++x) {
             if (SS[x] == 255) continue;
 
+
+            /* For factor_leftover_norm, we need to pass the information of the
+             * sieve bound. If a cofactor is less than the square of the sieve
+             * bound, it is necessarily prime. we implement this by keeping the
+             * log to base 2 of the sieve limits on each side, and compare the
+             * bitsize of the cofactor with their double.
+             */
+            double log2_fbs[2] = {log2(cpoly->pols[0]->lim), log2(cpoly->pols[1]->lim)};
+
+
             int64_t a;
             uint64_t b;
 
@@ -1519,7 +1534,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 int side = first ^ z;
                 int rat = (side == RATIONAL_SIDE);
                 int lpb = rat ? cpoly->rat->lpb : cpoly->alg->lpb;
-                pass = factor_leftover_norm(norm[side], lpb, f[side], m[side], si->strategy);
+                pass = factor_leftover_norm(norm[side], log2_fbs[side], lpb, f[side], m[side], si->strategy);
             }
             if (!pass) continue;
 
@@ -1643,13 +1658,16 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
           with corresponding multiplicities multis[0..factors->length-1].
 */
 int
-factor_leftover_norm (mpz_t n, unsigned int l,
+factor_leftover_norm (mpz_t n, double fbbits, unsigned int lpb,
                       mpz_array_t* const factors, uint32_array_t* const multis,
 		      facul_strategy_t *strategy)
 {
   uint32_t i, nr_factors;
   unsigned long ul_factors[16];
   int facul_code;
+
+  /* For the moment this code can't cope with too large factors */
+  ASSERT_ALWAYS(lpb <= ULONG_BITS);
 
   factors->length = 0;
   multis->length = 0;
@@ -1659,9 +1677,13 @@ factor_leftover_norm (mpz_t n, unsigned int l,
     return 1;
 
   /* If n < L, we know that n is prime, since all primes < B have been
-     removed, and L < B^2 in general, where B is the factor base bound,
-     thus we only need a primality test when n > L. */
-  if (BITSIZE(n) <= l)
+   * removed, and L < B^2 in general, where B is the factor base bound,
+   * thus we only need a primality test when n > L.
+   * For the descent, we rather use the provided fbbits argument
+   * (otherwise that would be 2bitsize(B)), since there could be a strong
+   * unbalance between B and L
+   */
+  if (BITSIZE(n) <= 2*fbbits)
     {
       append_mpz_to_array (factors, n);
       append_uint32_to_array (multis, 1);
@@ -1683,6 +1705,10 @@ factor_leftover_norm (mpz_t n, unsigned int l,
 
   ASSERT (facul_code == 0 || mpz_cmp_ui (n, ul_factors[0]) != 0);
 
+  /* we use this mask to trap prime factors above bound */
+  unsigned long oversize_mask = (-1UL) << lpb;
+  if (lpb == ULONG_BITS) oversize_mask = 0;
+
   if (facul_code > 0)
     {
       nr_factors = facul_code;
@@ -1690,7 +1716,7 @@ factor_leftover_norm (mpz_t n, unsigned int l,
 	{
 	  unsigned long r;
 	  mpz_t t;
-	  if (ul_factors[i] > (1UL << l)) /* Larger than large prime bound? */
+	  if (ul_factors[i] & oversize_mask) /* Larger than large prime bound? */
 	    return 0;
 	  r = mpz_tdiv_q_ui (n, n, ul_factors[i]);
 	  ASSERT_ALWAYS (r == 0UL);
@@ -1705,7 +1731,7 @@ factor_leftover_norm (mpz_t n, unsigned int l,
       if (mpz_cmp_ui (n, 1UL) == 0)
 	return 1;
       unsigned int s = BITSIZE(n);
-      if (s <= l)
+      if (s <= lpb)
         {
           append_mpz_to_array (factors, n);
           append_uint32_to_array (multis, 1);
@@ -1713,7 +1739,7 @@ factor_leftover_norm (mpz_t n, unsigned int l,
         }
       /* If we still have more than two primes (or something non-smooth),
          bail out */
-      if (s > 2*l)
+      if (s > 2*lpb)
         return 0;
       /* We always abort below, so let's skip the prp test
       if (IS_PROBAB_PRIME(n))
@@ -2183,7 +2209,7 @@ main (int argc0, char *argv0[])
 
     sieve_info_init_trialdiv(si); /* Init refactoring stuff */
     si->strategy = facul_make_strategy (15, MIN(si->cpoly->rat->lim, si->cpoly->alg->lim),
-                                       1UL << MIN(si->cpoly->rat->lpb, si->cpoly->alg->lpb));
+                                       MIN(si->cpoly->rat->lpb, si->cpoly->alg->lpb));
 
     las_report report;
     las_report_init(report);
