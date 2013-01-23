@@ -490,8 +490,8 @@ init_alg_norms_bucket_region(unsigned char *S,
 
 /* }}} */
 
-/* return max |g(x)| for 0 <= x <= s,
-   where g(x) = g[d]*x^d + ... + g[1]*x + g[0] */
+/* return max |g(x)| for x in (0, s) where s can be negative,
+   and g(x) = g[d]*x^d + ... + g[1]*x + g[0] */
 static double
 get_maxnorm_aux (double *g, const unsigned int d, double s)
 {
@@ -514,9 +514,9 @@ get_maxnorm_aux (double *g, const unsigned int d, double s)
     for (l = 0; l <= d - k; l++)
       dg[k][l] = (l + 1) * dg[k - 1][l + 1];
   /* now dg[d-1][0]+x*dg[d-1][1] is the (d-1)-th derivative: it can have at
-     most one sign change, iff dg[d-1][0] and dg[d-1][0]+dg[d-1][1] have
-     different signs */
-  if (dg[d-1][0] * (dg[d-1][0] + dg[d-1][1]) < 0)
+     most one sign change in (0, s), this happens iff dg[d-1][0] and
+     dg[d-1][0]+s*dg[d-1][1] have different signs */
+  if (dg[d-1][0] * (dg[d-1][0] + s * dg[d-1][1]) < 0)
     {
       sign_change = 1;
       roots[0] = - dg[d-1][0] / dg[d-1][1]; /* root of (d-1)-th derivative */
