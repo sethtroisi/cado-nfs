@@ -1,6 +1,7 @@
 #ifndef POLYSELECT2L_STR_H
 #define POLYSELECT2L_STR_H
 
+#include "cado.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,7 +9,6 @@
 #include <inttypes.h>
 #include <gmp.h>
 #include <pthread.h>
-#include "cado.h"
 #include "portability.h"
 #include "utils.h"
 #include "auxiliary.h"
