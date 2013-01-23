@@ -25,10 +25,9 @@ sieve_info_init_lognorm (unsigned char *C, unsigned char threshold,
                          unsigned long l MAYBE_UNUSED,
                          double scale MAYBE_UNUSED)
 {
-  unsigned long k;
-
-  for (k = 0; k < 256; k++)
-    C[k] = (k <= threshold) ? 0 : 127;
+  /* for (k = 0; k < 256; k++) C[k] = (k <= threshold) ? 0 : 127; */
+  memset (C, 0, threshold + 1);
+  memset (C + threshold + 1, 127, 256 - (threshold + 1));
 
 #ifdef COFACTOR_TRICK
   {
@@ -641,7 +640,7 @@ get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
 /* this function initializes the scaling factors and report bounds on the
    rational and algebraic sides */
 void
-sieve_info_init_norm_data(sieve_info_ptr si, unsigned long q0)
+sieve_info_init_norm_data (sieve_info_ptr si, unsigned long q0)
 {
   for (int side = 0; side < 2; side++)
     {
@@ -681,10 +680,10 @@ sieve_info_init_norm_data(sieve_info_ptr si, unsigned long q0)
      and |G(a,b)/q| < 2^(rat->logmax) when si->ratq <> 0 */
 
   fprintf (si->output, "# Rat. side: log2(maxnorm)=%1.2f logbase=%1.6f",
-           maxlog2, exp2 (maxlog2 / ((double) CHAR_MAX - GUARD)));
-  /* we want to map 0 <= x < maxlog2 to GUARD <= y < CHAR_MAX,
-     thus y = GUARD + x * (CHAR_MAX-GUARD)/maxlog2 */
-  rat->scale = ((double) CHAR_MAX - GUARD) / maxlog2;
+           maxlog2, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
+  /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
+     thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
+  rat->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
   /* we want to select relations with a cofactor of less than r bits on the
      rational side */
   r = si->cpoly->rat->lambda * (double) si->cpoly->rat->lpb;
@@ -707,10 +706,10 @@ sieve_info_init_norm_data(sieve_info_ptr si, unsigned long q0)
   maxlog2 = alg->logmax + r;
 
   fprintf (si->output, "# Alg. side: log2(maxnorm)=%1.2f logbase=%1.6f",
-           maxlog2, exp2 (maxlog2 / ((double) CHAR_MAX - GUARD)));
-  /* we want to map 0 <= x < maxlog2 to GUARD <= y < CHAR_MAX,
-     thus y = GUARD + x * (CHAR_MAX-GUARD)/maxlog2 */
-  alg->scale = ((double) CHAR_MAX - GUARD) / maxlog2;
+           maxlog2, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
+  /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
+     thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
+  alg->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
   /* we want to report relations with a remaining log2-norm after sieving of
      at most lambda * lpb, which corresponds in the y-range to
      y >= GUARD + lambda * lpb * scale */
@@ -718,6 +717,32 @@ sieve_info_init_norm_data(sieve_info_ptr si, unsigned long q0)
   fprintf (si->output, " bound=%u\n", alg_bound);
   sieve_info_init_lognorm (alg->Bound, alg_bound, si->cpoly->alg->lim,
                            si->cpoly->alg->lpb, alg->scale);
+}
+
+/* same as sieve_info_init_norm_data, but for a given special-q */
+void
+sieve_info_init_norm_data_sq (sieve_info_ptr si, unsigned long q)
+{
+  sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
+  double r, maxlog2;
+  unsigned char rat_bound;
+
+  /************************** rational side **********************************/
+  r = fabs (rat->fijd[1]) * (double) si->I * 0.5
+    + fabs (rat->fijd[0]) * (double) si->J;
+  if (si->ratq)
+    r /= (double) q;
+  rat->logmax = maxlog2 = log2 (r);
+  fprintf (si->output, "# Rat. side: log2(maxnorm)=%1.2f logbase=%1.6f",
+           maxlog2, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
+  rat->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
+  r = si->cpoly->rat->lambda * (double) si->cpoly->rat->lpb;
+  rat_bound = (unsigned char) (r * rat->scale) + GUARD;
+  fprintf (si->output, " bound=%u\n", rat_bound);
+  sieve_info_init_lognorm (rat->Bound, rat_bound, si->cpoly->rat->lim,
+                           si->cpoly->rat->lpb, rat->scale);
+
+  /************************** algebraic side *********************************/
 }
 
 void sieve_info_clear_norm_data(sieve_info_ptr si)
@@ -732,7 +757,8 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
     }
 }
 
-void sieve_info_update_norm_data(sieve_info_ptr si)
+void
+sieve_info_update_norm_data (sieve_info_ptr si)
 {
     int32_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
     /* Update floating point version of algebraic poly (do both, while
@@ -740,11 +766,11 @@ void sieve_info_update_norm_data(sieve_info_ptr si)
     for (int side = 0; side < 2; side++) {
         sieve_side_info_ptr s = si->sides[side];
         cado_poly_side_ptr ps = si->cpoly->pols[side];
-        mp_poly_homography(s->fij, ps->f, ps->degree, H);
+        mp_poly_homography (s->fij, ps->f, ps->degree, H);
         double invq = 1.0;
         if (si->ratq == (side == RATIONAL_SIDE))
             invq /= si->q;
         for (int k = 0; k <= ps->degree; k++)
-            s->fijd[k] = mpz_get_d(s->fij[k]) * invq;
+            s->fijd[k] = mpz_get_d (s->fij[k]) * invq;
     }
 }

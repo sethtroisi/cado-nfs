@@ -233,7 +233,7 @@ sieve_info_update (sieve_info_ptr si)
   si->nb_buckets = 1 + (si->I * si->J - 1) / bucket_region;
   
   /* essentially update the fij polynomials */
-  sieve_info_update_norm_data(si);
+  sieve_info_update_norm_data (si);
 }
 
 static void
@@ -2285,6 +2285,9 @@ main (int argc0, char *argv0[])
          * their floating-point versions */
         sieve_info_update (si);
         totJ += (double) si->J;
+
+        /* updates scaling factors and report bounds for this one special-q */
+        sieve_info_init_norm_data_sq (si, q0);
 
         trace_update_conditions(si);
 
