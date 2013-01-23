@@ -185,7 +185,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             for q in query.split("&"):
                 q = unquote_plus(q)
                 diag(1, "Processing token ", q)
-                for (name, op) in wudb.WuDb.name_to_operator.items():
+                for (name, op) in wudb.MyCursor.name_to_operator.items():
                     if op in q:
                         (key, value) = q.split(op, 1)
                         if not name in conditions:
