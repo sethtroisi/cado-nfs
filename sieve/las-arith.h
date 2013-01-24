@@ -104,6 +104,8 @@ redc_64(const int64_t x, const uint32_t p, const uint64_t invp)
         u -= p;
     return u;
 }
+#else
+#error "Please implement me !"
 #endif
 
 MAYBE_UNUSED

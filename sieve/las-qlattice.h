@@ -6,6 +6,7 @@
 #include "fb.h"         /* fbprime_t */
 #include "portability.h"
 
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -13,11 +14,61 @@ extern "C" {
 int SkewGauss (sieve_info_ptr si, double skewness);
 
 static inline fbprime_t
-fb_root_in_qlattice (const fbprime_t p, const fbprime_t R,
+fb_root_in_qlattice_31bits (const fbprime_t p, const fbprime_t R,
         const uint32_t invp, sieve_info_srcptr si);
+#ifdef  HAVE_redc_64
+static inline fbprime_t
+fb_root_in_qlattice_63bits (const fbprime_t p, const fbprime_t R,
+        const uint64_t invp, sieve_info_srcptr si);
+#endif
 
 
 #ifdef __cplusplus
+}
+#endif
+
+#if defined(DLP_DESCENT) || defined(SUPPORT_LARGE_Q)
+#ifndef  HAVE_redc_64
+#error  "Please implement redc_64"
+#endif
+/* The reason why the special-q is constrained to some limit is quite
+ * clearly linked to the fb_root_in_qlattice variant being used. However,
+ * it does not seem to be exactly 31 or 63 bits. This should be
+ * investigated */
+#define MAX_SPECIALQ_BITSIZE    60
+#ifdef __cplusplus
+extern "C" {
+#endif
+static inline fbprime_t
+fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
+        const uint64_t invp, sieve_info_srcptr si);
+#ifdef __cplusplus
+}
+#endif
+static inline fbprime_t
+fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
+        const uint64_t invp, sieve_info_srcptr si)
+{
+    return fb_root_in_qlattice_63bits(p, R, invp, si);
+}
+
+#else
+
+#define MAX_SPECIALQ_BITSIZE    30
+#ifdef __cplusplus
+extern "C" {
+#endif
+static inline fbprime_t
+fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
+        const uint32_t invp, sieve_info_srcptr si);
+#ifdef __cplusplus
+}
+#endif
+static inline fbprime_t
+fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
+        const uint32_t invp, sieve_info_srcptr si)
+{
+    return fb_root_in_qlattice_31bits(p, R, invp, si);
 }
 #endif
 
@@ -82,7 +133,7 @@ fb_root_in_qlattice_31bits (const fbprime_t p, const fbprime_t R,
 /* This one is dog slow, but should be correct under the relaxed
  * condition that p be at most 63 bits or so */
 static inline fbprime_t
-fb_root_in_qlattice_generic (const fbprime_t p, const fbprime_t R,
+fb_root_in_qlattice_63bits (const fbprime_t p, const fbprime_t R,
         const uint64_t invp, sieve_info_srcptr si)
 {
     /* Handle powers of 2 separately, REDC doesn't like them */
@@ -159,13 +210,6 @@ static inline fbprime_t fb_root_in_qlattice_po2 (const fbprime_t p, const fbprim
         u = invmod_po2 (u);
         return p + ((u * v) & (p - 1));
     }
-}
-
-static inline fbprime_t
-fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
-        const uint32_t invp, sieve_info_srcptr si)
-{
-    return fb_root_in_qlattice_31bits(p, R, invp, si);
 }
 
 #endif	/* LAS_QLATTICE_H_ */

@@ -115,6 +115,16 @@
  */
 #define SUPPORT_I16
 
+/* This is currently used to enable some code paths specific to the
+ * descent. The mid-term plan is to remove this compile-time flag.
+ */
+#define xxxDLP_DESCENT
+#define DESCENT_GRACE_TIME_RATIO 0.4
+
+/* Define this to support larger q. This is almost mandatory for the
+ * descent. */
+#define xxxSUPPORT_LARGE_Q
+
 /* Define SKIP_GCD3 to skip updates where 3 divides gcd(i,j) in the
    bucket sieving phase. Slightly slower than not skipping them
    in single-thread mode, but might be useful for multi-threading,

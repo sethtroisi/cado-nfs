@@ -31,8 +31,6 @@
 #include <smmintrin.h>
 #endif
 
-#define xxxDLP_DESCENT
-#define DESCENT_GRACE_TIME_RATIO 0.4
 
 #define LOG_SCALE 1.4426950408889634 /* 1/log(2) to 17 digits, rounded to
                                         nearest. This is enough to uniquely
@@ -1460,7 +1458,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
         fbprime_t r, R;
 
         R = fb_iterator_get_r(t);
-        r = fb_root_in_qlattice_31bits(p, R, t->fb->invp, si);
+        r = fb_root_in_qlattice(p, R, t->fb->invp, si);
         // TODO: should be line sieved in the non-bucket phase?
         // Or should we have a bucket line siever?
         if (UNLIKELY(r == 0))
