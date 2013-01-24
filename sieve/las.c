@@ -1991,6 +1991,40 @@ static double thread_buckets_max_full(thread_data * thrs)
     return mf0;
 }
 
+/* This function does three distinct things.
+ *  - accumulates the timing reports for all threads into a collated report
+ *  - display the per-sq timing relative to this report, and the given
+ *    timing argument (in seconds).
+ *  - merge the per-sq report into a global report
+ *
+ * returns the number of reports for this sq.
+ */
+int las_report_accumulate_threads_and_display(sieve_info_ptr si, las_report_ptr report, thread_data * thrs, double qt0)
+{
+    /* Display results for this special q */
+    las_report rep;
+    las_report_init(rep);
+    for (int i = 0; i < si->nb_threads; ++i) {
+        las_report_accumulate(rep, thrs[i]->rep);
+    }
+    if (si->verbose) {
+        fprintf (si->output, "# %lu survivors after rational sieve,", rep->survivors0);
+        fprintf (si->output, " %lu survivors after algebraic sieve, ", rep->survivors1);
+        fprintf (si->output, "coprime: %lu\n", rep->survivors2);
+    }
+    gmp_fprintf (si->output, "# %lu relation(s) for (%" PRIu64 ",%" PRIu64 "))\n", rep->reports, si->q, si->rho);
+    double qtts = qt0 - rep->tn[0] - rep->tn[1] - rep->ttf;
+    fprintf (si->output, "# Time for this special-q: %1.4fs [norm %1.4f+%1.4f, sieving %1.4f"
+            " (%1.4f + %1.4f),"
+            " factor %1.4f]\n", qt0,
+            rep->tn[RATIONAL_SIDE],
+            rep->tn[ALGEBRAIC_SIDE],
+            qtts, rep->ttsm, qtts-rep->ttsm, rep->ttf);
+    int ret = rep->reports;
+    las_report_accumulate(report, rep);
+    las_report_clear(rep);
+    return ret;
+}
 
 /*************************** main program ************************************/
 
@@ -2299,6 +2333,7 @@ main (int argc0, char *argv0[])
         si->rho = roots[--nroots];
         if (rho != 0 && si->rho != rho) /* if -rho, wait for wanted root */
             continue;
+        double qt0 = seconds();
         if (SkewGauss (si, si->cpoly->skew) != 0)
             continue;
         /* FIXME: maybe we can discard some special q's if a1/a0 is too large,
@@ -2375,23 +2410,8 @@ main (int argc0, char *argv0[])
         }
 
 
-        /* Display results for this special q */
-        {
-            las_report rep;
-            las_report_init(rep);
-            for (int i = 0; i < si->nb_threads; ++i) {
-                las_report_accumulate(rep, thrs[i]->rep);
-            }
-            if (si->verbose) {
-                fprintf (si->output, "# %lu survivors after rational sieve,", rep->survivors0);
-                fprintf (si->output, " %lu survivors after algebraic sieve, ", rep->survivors1);
-                fprintf (si->output, "coprime: %lu\n", rep->survivors2);
-            }
-            fprintf (si->output, "# %lu relation(s) for (%" PRIu64 ",%" PRIu64")\n", rep->reports, si->q, si->rho);
-            rep_bench += rep->reports;
-            las_report_accumulate(report, rep);
-            las_report_clear(rep);
-        }
+        qt0 = seconds() - qt0;
+        rep_bench += las_report_accumulate_threads_and_display(si, report, thrs, qt0);
 
         thread_buckets_free(thrs);
 
