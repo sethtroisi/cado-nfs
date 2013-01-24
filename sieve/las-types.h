@@ -60,6 +60,8 @@ struct sieve_side_info_s {
     small_sieve_data_t ssd[1];
     /* And this is just created as an extraction of the above */
     small_sieve_data_t rsd[1];
+
+    facul_strategy_t *strategy;
 };
 
 typedef struct sieve_side_info_s * sieve_side_info_ptr;
@@ -96,9 +98,9 @@ struct sieve_info_s {
     sieve_side_info sides[2];
     double B;         /* bound for the norm computation */
 
+    /* I think that by default, unsieving is not done */
     unsieve_aux_data us;
 
-    facul_strategy_t *strategy;
 };
 
 typedef struct sieve_info_s sieve_info[1];

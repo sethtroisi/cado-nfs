@@ -1533,7 +1533,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 int side = first ^ z;
                 int rat = (side == RATIONAL_SIDE);
                 int lpb = rat ? cpoly->rat->lpb : cpoly->alg->lpb;
-                pass = factor_leftover_norm(norm[side], log2_fbs[side], lpb, f[side], m[side], si->strategy);
+                pass = factor_leftover_norm(norm[side], log2_fbs[side], lpb, f[side], m[side], si->sides[side]->strategy);
             }
             if (!pass) continue;
 
@@ -2288,8 +2288,13 @@ main (int argc0, char *argv0[])
     init_norms (si);
 
     sieve_info_init_trialdiv(si); /* Init refactoring stuff */
-    si->strategy = facul_make_strategy (15, MIN(si->cpoly->rat->lim, si->cpoly->alg->lim),
-                                       MIN(si->cpoly->rat->lpb, si->cpoly->alg->lpb));
+
+    /* These strategies also depend on the special-q used within the
+     * descent, assuming lim / lpb depend on the sq bitsize */
+    si->sides[RATIONAL_SIDE]->strategy = facul_make_strategy(
+            15, si->cpoly->rat->lim, si->cpoly->rat->lpb);
+    si->sides[ALGEBRAIC_SIDE]->strategy = facul_make_strategy(
+            15, si->cpoly->alg->lim, si->cpoly->alg->lpb);
 
     las_report report;
     las_report_init(report);
@@ -2550,8 +2555,10 @@ end:
     sieve_info_clear_trialdiv(si);
     sieve_info_clear_norm_data(si);
 
-    facul_clear_strategy (si->strategy);
-    si->strategy = NULL;
+    facul_clear_strategy (si->sides[RATIONAL_SIDE]->strategy);
+    facul_clear_strategy (si->sides[ALGEBRAIC_SIDE]->strategy);
+    si->sides[RATIONAL_SIDE]->strategy = NULL;
+    si->sides[ALGEBRAIC_SIDE]->strategy = NULL;
 
     thread_data_free(thrs);
 
