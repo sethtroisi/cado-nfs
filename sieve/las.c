@@ -2037,7 +2037,6 @@ int
 main (int argc0, char *argv0[])
 {
     sieve_info si;
-    const char *fbfilename = NULL;
     double t0, tfb, tts;
     uint64_t q0 = 0, q1 = 0, rho = 0;
     uint64_t *roots;
@@ -2086,9 +2085,11 @@ main (int argc0, char *argv0[])
         usage(argv0[0],NULL);
     }
 
-    fbfilename = param_list_lookup_string(pl, "fb");
     statsfilename = param_list_lookup_string (pl, "stats");
     sievestatsfilename = param_list_lookup_string (pl, "sievestats");
+    param_list_parse_double(pl, "skfact", &skip_factor);
+    param_list_parse_double(pl, "percent", &bench_percent);
+    param_list_parse_double (pl, "stats_prob", &stats_prob);
 
     param_list_parse_uint64(pl, "q0", &q0);
     param_list_parse_uint64(pl, "q1", &q1);
@@ -2096,17 +2097,13 @@ main (int argc0, char *argv0[])
 
     param_list_parse_int(pl, "rpowlim", &rpow_lim);
     param_list_parse_int(pl, "apowlim", &apow_lim);
-    param_list_parse_double (pl, "stats_prob", &stats_prob);
 
     // these are parsed in sieve_info_init (why them, and not the above ?)
     // param_list_parse_int(pl, "mt", &nb_threads);
     // param_list_parse_int(pl, "I", &I);
 
-    param_list_parse_double(pl, "skfact", &skip_factor);
-    param_list_parse_double(pl, "percent", &bench_percent);
 
     /* {{{ perform some basic checking */
-    if (fbfilename == NULL) usage(argv0[0], "fb");
     if (q0 == 0) usage(argv0[0], "q0");
 
     /* if -rho is given, we sieve only for q0, thus -q1 is not allowed */
@@ -2131,6 +2128,7 @@ main (int argc0, char *argv0[])
     /* this does not depend on the special-q */
     sieve_info_init(si, pl);    /* side effects: prints cmdline and flags */
 
+    si->bench=bench + bench2;
     if (statsfilename != NULL) /* a file was given */
       {
         /* if the file exists, we open it in read-mode, otherwise we create
@@ -2161,12 +2159,54 @@ main (int argc0, char *argv0[])
             exit (EXIT_FAILURE);
           }
       }
+    if (stats != 0)
+      {
+        cof_call = (uint32_t**) malloc ((si->cpoly->rat->mfb + 1) * sizeof(uint32_t*));
+        cof_succ = (uint32_t**) malloc ((si->cpoly->rat->mfb + 1) * sizeof(uint32_t*));
+        for (i = 0; i <= si->cpoly->rat->mfb; i++)
+          {
+            cof_call[i] = (uint32_t*) malloc ((si->cpoly->alg->mfb + 1)
+                                              * sizeof(uint32_t));
+            cof_succ[i] = (uint32_t*) malloc ((si->cpoly->alg->mfb + 1)
+                                              * sizeof(uint32_t));
+            for (j = 0; j <= si->cpoly->alg->mfb; j++)
+              cof_call[i][j] = cof_succ[i][j] = 0;
+          }
+        if (stats == 2)
+          {
+            fprintf (si->output,
+                    "# Use learning file %s with threshold %1.2e\n",
+                     statsfilename, stats_prob);
+            while (!feof (stats_file))
+              {
+                uint32_t c, s;
+                if (fscanf (stats_file, "%u %u %u %u\n", &i, &j, &c, &s) != 4)
+                  {
+                    fprintf (stderr, "Error while reading file %s\n",
+                             statsfilename);
+                    exit (EXIT_FAILURE);
+                  }
+                if (i <= si->cpoly->rat->mfb && j <= si->cpoly->alg->mfb)
+                  {
+                    /* When s=0 and c>0, whatever STATS_PROB, we will always
+                       have s/c < STATS_PROB, thus (i,j) will be discarded.
+                       We allow a small error by considering (s+1)/(c+1)
+                       instead. In case s=0, (i,j) is discarded only when
+                       1/(c+1) < STATS_PROB (always discarded for c=0). */
+                    cof_call[i][j] = c + 1;
+                    cof_succ[i][j] = s + 1;
+                  }
+              }
+          }
+      }
+    int rep_bench = 0;
+    int nbq_bench = 0;
+    double t_bench = seconds();
+
     
 
     /* While obviously, this one does (but only mildly) */
     sieve_info_init_norm_data(si, q0);
-
-    si->bench=bench + bench2;
 
     /* {{{ Read (algebraic) or compute (rational) factor bases */
     for(int side = 0 ; side < 2 ; side++) {
@@ -2176,6 +2216,11 @@ main (int argc0, char *argv0[])
             fbprime_t *leading_div;
             tfb = seconds ();
             leading_div = factor_small (pol->f[pol->degree], pol->lim);
+            /* FIXME: fbfilename should allow *distinct* file names, of
+             * course, for each side (think about the bi-algebraic case)
+             */
+            const char * fbfilename = param_list_lookup_string(pl, "fb");
+            if (fbfilename == NULL) usage(argv0[0], "fb");
             fprintf(stderr, "Reading %s factor base from %s\n", sidenames[side], fbfilename);
             sis->fb = fb_read(fbfilename, sis->scale * LOG_SCALE, 0, pol->lim, apow_lim);
             ASSERT_ALWAYS(sis->fb != NULL);
@@ -2220,52 +2265,8 @@ main (int argc0, char *argv0[])
     q0 --; /* so that nextprime gives q0 if q0 is prime */
     nroots = 0;
 
-    if (stats != 0)
-      {
-        cof_call = (uint32_t**) malloc ((si->cpoly->rat->mfb + 1) * sizeof(uint32_t*));
-        cof_succ = (uint32_t**) malloc ((si->cpoly->rat->mfb + 1) * sizeof(uint32_t*));
-        for (i = 0; i <= si->cpoly->rat->mfb; i++)
-          {
-            cof_call[i] = (uint32_t*) malloc ((si->cpoly->alg->mfb + 1)
-                                              * sizeof(uint32_t));
-            cof_succ[i] = (uint32_t*) malloc ((si->cpoly->alg->mfb + 1)
-                                              * sizeof(uint32_t));
-            for (j = 0; j <= si->cpoly->alg->mfb; j++)
-              cof_call[i][j] = cof_succ[i][j] = 0;
-          }
-        if (stats == 2)
-          {
-            fprintf (si->output,
-                    "# Use learning file %s with threshold %1.2e\n",
-                     statsfilename, stats_prob);
-            while (!feof (stats_file))
-              {
-                uint32_t c, s;
-                if (fscanf (stats_file, "%u %u %u %u\n", &i, &j, &c, &s) != 4)
-                  {
-                    fprintf (stderr, "Error while reading file %s\n",
-                             statsfilename);
-                    exit (EXIT_FAILURE);
-                  }
-                if (i <= si->cpoly->rat->mfb && j <= si->cpoly->alg->mfb)
-                  {
-                    /* When s=0 and c>0, whatever STATS_PROB, we will always
-                       have s/c < STATS_PROB, thus (i,j) will be discarded.
-                       We allow a small error by considering (s+1)/(c+1)
-                       instead. In case s=0, (i,j) is discarded only when
-                       1/(c+1) < STATS_PROB (always discarded for c=0). */
-                    cof_call[i][j] = c + 1;
-                    cof_succ[i][j] = s + 1;
-                  }
-              }
-          }
-      }
-
     t0 = seconds ();
     fprintf (si->output, "#\n");
-    int rep_bench = 0;
-    int nbq_bench = 0;
-    double t_bench = seconds();
 
     where_am_I w MAYBE_UNUSED;
     WHERE_AM_I_UPDATE(w, si, si);
