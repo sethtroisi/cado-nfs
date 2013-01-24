@@ -580,7 +580,7 @@ get_maxnorm_aux (double *g, const unsigned int d, double s)
        and is attained in (a) or (c).
 */
 static double
-get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
+get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, double q0d, int qside)
 {
   unsigned int d = cpoly->alg->degree, k;
   double *fd; /* double-precision coefficients of f */
@@ -631,17 +631,16 @@ get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
      that function is not critical */
   for (tmp = max_norm, k = 0; k < d; k++)
     tmp *= si->B * (double) si->I;
-  /* divide by q0 if sieving on algebraic side */
-  if (!si->ratq)
-      tmp /= (double) q0;
+  /* divide by q0 if sieving on alg side */
+  if (qside == ALGEBRAIC_SIDE)
+      tmp /= q0d;
   tmp *= 0.5;
-  return log2 (tmp);
+  return log2(tmp);
 }
 
 /* this function initializes the scaling factors and report bounds on the
    rational and algebraic sides */
-void
-sieve_info_init_norm_data(sieve_info_ptr si, unsigned long q0)
+void sieve_info_init_norm_data(sieve_info_ptr si, mpz_srcptr q0, int qside)
 {
   for (int side = 0; side < 2; side++)
     {
@@ -654,6 +653,8 @@ sieve_info_init_norm_data(sieve_info_ptr si, unsigned long q0)
         mpz_init (si->sides[side]->fij[k]);
     }
 
+    double q0d = mpz_get_d(q0);
+
   double r, maxlog2;
   unsigned char alg_bound, rat_bound;
   sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
@@ -665,7 +666,7 @@ sieve_info_init_norm_data(sieve_info_ptr si, unsigned long q0)
      angle of at least pi/3, and their determinant is qs, thus:
      |u'|^2 <= |u'|*|v'| <= qs/sin(pi/3) = 2/sqrt(3)*q*s.
      Define B := sqrt(2/sqrt(3)*q/s), then |a0| <= s*B and |b0| <= B. */
-  si->B = sqrt (2.0 * (double) q0 / (si->cpoly->skew * sqrt (3.0)));
+  si->B = sqrt (2.0 * q0d / (si->cpoly->skew * sqrt (3.0)));
 
   /************************** rational side **********************************/
 
@@ -674,8 +675,8 @@ sieve_info_init_norm_data(sieve_info_ptr si, unsigned long q0)
     + fabs (mpz_get_d (si->cpoly->rat->f[0]));
   r *= si->B * (double) si->I;
   /* if the special-q is on the rational side, divide by it */
-  if (si->ratq)
-    r /= (double) q0;
+  if (qside == RATIONAL_SIDE)
+    r /= q0d;
   rat->logmax = maxlog2 = log2 (r);
   /* we know that |G(a,b)| < 2^(rat->logmax) when si->ratq = 0,
      and |G(a,b)/q| < 2^(rat->logmax) when si->ratq <> 0 */
@@ -695,7 +696,7 @@ sieve_info_init_norm_data(sieve_info_ptr si, unsigned long q0)
 
   /************************** algebraic side *********************************/
 
-  alg->logmax = get_maxnorm_alg (si->cpoly, si, q0); /* log2(max norm) */
+  alg->logmax = get_maxnorm_alg (si->cpoly, si, q0d, qside); /* log2(max norm) */
   /* we know that |F(a,b)/q| < 2^(alg->logmax) when si->ratq = 0,
      and |F(a,b)| < 2^(alg->logmax) when si->ratq <> 0 */
 
@@ -742,8 +743,8 @@ void sieve_info_update_norm_data(sieve_info_ptr si)
         cado_poly_side_ptr ps = si->cpoly->pols[side];
         mp_poly_homography(s->fij, ps->f, ps->degree, H);
         double invq = 1.0;
-        if (si->ratq == (side == RATIONAL_SIDE))
-            invq /= si->q;
+        if (si->qside == side)
+            invq /= mpz_get_d(si->q);
         for (int k = 0; k <= ps->degree; k++)
             s->fijd[k] = mpz_get_d(s->fij[k]) * invq;
     }

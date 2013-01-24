@@ -156,10 +156,8 @@ int SkewGauss(sieve_info_ptr si, double skewness)
     mpz_set_square_of_d(sigma, skewness);
 
     mpz_t a[2], b[2];
-    mpz_init(a[0]);
-    mpz_init(a[1]);
-    mpz_set_uint64(a[0], si->q);
-    mpz_set_uint64(a[1], si->rho);
+    mpz_init_set(a[0], si->q);
+    mpz_init_set(a[1], si->rho);
     mpz_init_set_ui(b[0], 0);
     mpz_init_set_ui(b[1], 1);
     generic_skew_gauss(a, b, sigma);

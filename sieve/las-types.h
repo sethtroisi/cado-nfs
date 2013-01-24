@@ -24,6 +24,7 @@ typedef struct {
     factorbase_degn_t * end;
 } fb_interval;
 
+
 struct sieve_side_info_s {
     unsigned char Bound[256]; /* -log(prob of relation), 127 for prob<thresh */
     fbprime_t *trialdiv_primes;
@@ -78,7 +79,6 @@ struct sieve_info_s {
     const char * outputname; /* keep track of whether it's gzipped or not */
     int verbose;
     int bench;
-    int ratq;   // 0 means special q on alg side, otherwise on rat side
 
     // sieving area
     uint32_t I;
@@ -86,8 +86,9 @@ struct sieve_info_s {
     int logI; // such that I = 1<<logI
 
     // description of the q-lattice
-    uint64_t q;
-    uint64_t rho;
+    mpz_t q;
+    mpz_t rho;
+    int qside;  /* RATIONAL_SIDE or ALGEBRAIC_SIDE */
     int32_t a0, b0, a1, b1;
 
     // parameters for bucket sieving
@@ -95,6 +96,7 @@ struct sieve_info_s {
     int bucket_thresh;    // bucket sieve primes >= bucket_thresh
     int nb_buckets;
     double bucket_limit_multiplier;
+    // unsigned int degree;   /* polynomial degree */
     sieve_side_info sides[2];
     double B;         /* bound for the norm computation */
 
