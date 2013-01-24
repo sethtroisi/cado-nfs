@@ -6,6 +6,7 @@ import os
 import sys
 import re
 import io
+import logging
 from urllib.parse import unquote_plus
 from workunit import Workunit
 import datetime
@@ -22,14 +23,17 @@ dbfilename='wudb'
 class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     """Handle requests in a separate thread."""
 
-debug = 1
-def diag(level, text, var = None):
-    if debug > level:
-        if var is None:
-            print (text, file=sys.stderr)
-        else:
-            print (text + str(var), file=sys.stderr)
-        sys.stderr.flush()
+class HttpServerLogger(object):
+    def __init__(self, level):
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(level)
+        formatter = logging.Formatter(fmt='%(address_string)s - - [%(asctime)s] %(message)s')
+        ch = logging.StreamHandler()
+        ch.setFormatter(formatter)
+        self.logger.addHandler(ch)
+    
+    def log(self, lvl, *args, **kwargs):
+        self.logger.log(lvl, *args, **kwargs)
 
 class HtmlGen(io.BytesIO):
     def __init__(self, encoding = None):
@@ -95,6 +99,27 @@ class HtmlGen(io.BytesIO):
 
 
 class MyHandler(http.server.CGIHTTPRequestHandler):
+
+    def log(self, lvl, format, *args, **kwargs):
+        """ Interface to the logger class. 
+            We add the client address (as a string) to the log record so the 
+            logger can print that """
+        e = kwargs.copy()
+        e["address_string"] = self.address_string()
+        logger.log(lvl, format, *args, extra=e)
+
+    # These three methods overwrite the corresponding methods from 
+    # http.server.BaseHTTPRequestHandler
+    # They just call self.log() with a numerical logging level added
+    def log_message(self, format, *args):
+        self.log(logging.INFO, *args, **kwargs)
+
+    def log_request(self, code='-', size='-'):
+        self.log(logging.INFO, '"%s" %s %s', self.requestline, str(code), str(size))
+
+    def log_error(self, format, *args):
+        self.log(logging.ERROR, format, *args)
+
     def send_body(self, body):
         self.wfile.write(body)
         self.wfile.flush()
@@ -188,7 +213,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         self.send_query()
 
     def send_query(self):
-        diag(1, "self.cgi_info = ", self.cgi_info)
+        logging.debug("self.cgi_info = "  + str(self.cgi_info))
         filename = self.cgi_info[1]
         if "#" in filename:
             # Get rid of fragment part
@@ -202,7 +227,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             # Now look at individual key=value pairs
             for q in query.split("&"):
                 q = unquote_plus(q)
-                diag(1, "Processing token ", q)
+                logging.debug("Processing token " + str(q))
                 for (name, op) in wudb.MyCursor.name_to_operator.items():
                     if op in q:
                         (key, value) = q.split(op, 1)
@@ -252,6 +277,8 @@ if __name__ == '__main__':
         ServerClass = ThreadedHTTPServer
     else:
         ServerClass = http.server.HTTPServer
+
+    logger = HttpServerLogger(logging.INFO)
 
     if argv[1:]:
         PORT = int(argv[1])
