@@ -93,15 +93,12 @@ struct sieve_info_s {
     int bucket_thresh;    // bucket sieve primes >= bucket_thresh
     int nb_buckets;
     double bucket_limit_multiplier;
-    // unsigned int degree;   /* polynomial degree */
     sieve_side_info sides[2];
     double B;         /* bound for the norm computation */
 
     unsieve_aux_data us;
 
     facul_strategy_t *strategy;
-
-    unsigned int degree;
 };
 
 typedef struct sieve_info_s sieve_info[1];
