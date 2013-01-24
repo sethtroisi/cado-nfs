@@ -71,7 +71,7 @@ uint32_t **cof_succ; /* cof_succ[r][a] is the corresponding number of
 /* Test if entry x in bucket region n is divisible by p */
 void test_divisible_x (const fbprime_t p, const unsigned long x, const int n,
 		       sieve_info_srcptr si, int side);
-/* easylim is a bit size for which we know that bitsize(n)<=easylim
+/* fbbits is a bit size for which we know that bitsize(n)<=fbbits
  * implies n prime */
 int factor_leftover_norm (mpz_t n,
                           double fbbits,
@@ -589,11 +589,11 @@ typedef const struct thread_data_s * thread_data_srcptr;
 /* {{{ dispatch_fb */
 static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_main, factorbase_degn_t * fb0, int nparts, fbprime_t pmax)
 {
-    /* Given fb0, which is a pointer in the fb array * fb_main, allocates
+    /* Given fb0, which is a pointer in the fb array *fb_main, allocates
      * fb_dst[0] up to fb_dst[nparts-1] as independent fb arrays, each of
      * appropriate length to contain equivalent portions of the _tail_ of
-     * the fb array fb_main, starting at pointer fb0. Reallocates *fb_main
-     * in the end.
+     * the fb array *fb_main, starting at pointer fb0. Reallocates *fb_main
+     * in the end (*fb_main gives away ownership of its contents).
      */
     /* Start by counting, unsurprisingly */
     size_t * fb_sizes = (size_t *) malloc(nparts * sizeof(size_t));
@@ -1266,7 +1266,7 @@ check_leftover_norm (mpz_t n, size_t lpb, mpz_t BB, mpz_t BBB, mpz_t BBBB,
 /* Adds the number of sieve reports to *survivors,
    number of survivors with coprime a, b to *coprimes */
 
-NOPROFILE_STATIC int
+    NOPROFILE_STATIC int
 factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_ptr w MAYBE_UNUSED)
 {
     sieve_info_ptr si = th->si;
@@ -1325,24 +1325,24 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 #ifdef UNSIEVE_NOT_COPRIME
     unsieve_not_coprime (SS, N, si);
 #endif
-    
+
     for (int x = 0; x < bucket_region; ++x)
-      {
+    {
 #ifdef TRACE_K /* {{{ */
-          if (trace_on_spot_Nx(N, x)) {
-              fprintf(stderr, "# alg->Bound[%u]=%u, rat->Bound[%u]=%u\n",
-                      alg_S[trace_Nx.x], alg->Bound[alg_S[x]],
-                      rat_S[trace_Nx.x], rat->Bound[rat_S[x]]);
-          }
+        if (trace_on_spot_Nx(N, x)) {
+            fprintf(stderr, "# alg->Bound[%u]=%u, rat->Bound[%u]=%u\n",
+                    alg_S[trace_Nx.x], alg->Bound[alg_S[x]],
+                    rat_S[trace_Nx.x], rat->Bound[rat_S[x]]);
+        }
 #endif /* }}} */
         unsigned int X;
         unsigned int i, j;
 
         if (!sieve_info_test_lognorm(alg->Bound, rat->Bound, alg_S[x], rat_S[x], 126))
-          {
+        {
             SS[x] = 255;
             continue;
-          }
+        }
         th->rep->survivor_sizes[rat_S[x]][alg_S[x]]++;
         surv++;
 
@@ -1351,7 +1351,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
         j = X >> si->logI;
 #ifndef UNSIEVE_NOT_COPRIME
         if (bin_gcd_safe (i, j) != 1)
-          {
+        {
 #ifdef TRACE_K
             if (trace_on_spot_Nx(N, x)) {
                 fprintf(stderr, "# Slot [%u] in bucket %u has non coprime (i,j)=(%d,%u)\n",
@@ -1360,9 +1360,9 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 #endif
             SS[x] = 255;
             continue;
-          }
+        }
 #endif
-      }
+    }
 
     /* Copy those bucket entries that belong to sieving survivors and
        store them with the complete prime */
@@ -1421,7 +1421,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
              * bitsize of the cofactor with their double.
              */
             double log2_fbs[2] = {log2(cpoly->pols[0]->lim), log2(cpoly->pols[1]->lim)};
-
 
             int64_t a;
             uint64_t b;
@@ -1489,7 +1488,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                         lim, a, b);
 
                 pass = check_leftover_norm (norm[side], lpb,
-                                         BB[side], BBB[side], BBBB[side], mfb);
+                        BB[side], BBB[side], BBBB[side], mfb);
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b)) {
                     gmp_fprintf(stderr, "# checked leftover norm=%Zd on %s side for (%"PRId64",%"PRIu64"): %d\n",norm[side],sidenames[side],a,b,pass);
@@ -1499,30 +1498,30 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             if (!pass) continue;
 
             if (stats != 0)
-              {
+            {
                 cof_rat_bitsize = mpz_sizeinbase (norm[RATIONAL_SIDE], 2);
                 cof_alg_bitsize = mpz_sizeinbase (norm[ALGEBRAIC_SIDE], 2);
                 if (stats == 1) /* learning phase */
-                  /* no need to use a mutex here: either we use one thread only
-                     to compute the cofactorization data and if several threads
-                     the order is irrelevant. The only problem that can happen
-                     is when two threads increase the value at the same time,
-                     and it is increased by 1 instead of 2, but this should
-                     happen rarely. */
-                  cof_call[cof_rat_bitsize][cof_alg_bitsize] ++;
+                    /* no need to use a mutex here: either we use one thread only
+                       to compute the cofactorization data and if several threads
+                       the order is irrelevant. The only problem that can happen
+                       is when two threads increase the value at the same time,
+                       and it is increased by 1 instead of 2, but this should
+                       happen rarely. */
+                    cof_call[cof_rat_bitsize][cof_alg_bitsize] ++;
                 else /* stats == 2: we use the learning data */
-                  {
+                {
                     /* we store the initial number of cofactorization calls in
                        cof_call[0][0] and the remaining nb in cof_succ[0][0] */
                     cof_call[0][0] ++;
                     /* Warning: the <= also catches cases when succ=call=0 */
                     if ((double) cof_succ[cof_rat_bitsize][cof_alg_bitsize] <
-                        (double) cof_call[cof_rat_bitsize][cof_alg_bitsize] *
-                        stats_prob)
-                      continue;
+                            (double) cof_call[cof_rat_bitsize][cof_alg_bitsize] *
+                            stats_prob)
+                        continue;
                     cof_succ[0][0] ++;
-                  }
-              }
+                }
+            }
 
             /* if norm[RATIONAL_SIDE] is above BLPrat, then it might not
              * be smooth. We factor it first. Otherwise we factor it
@@ -1541,7 +1540,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             /* yippee: we found a relation! */
 
             if (stats == 1) /* learning phase */
-              cof_succ[cof_rat_bitsize][cof_alg_bitsize] ++;
+                cof_succ[cof_rat_bitsize][cof_alg_bitsize] ++;
 
 #ifdef UNSIEVE_NOT_COPRIME
             ASSERT (bin_gcd_safe (a, b) == 1);
@@ -1563,6 +1562,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                     }
                 }
             }
+
             relation_compress_rat_primes(rel);
             relation_compress_alg_primes(rel);
 
@@ -1603,6 +1603,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 #endif
                 pthread_mutex_unlock(&io_mutex);
             }
+
             clear_relation(rel);
             cpt++;
             /* Build histogram of lucky S[x] values */
