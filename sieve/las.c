@@ -47,8 +47,6 @@ static double MAYBE_UNUSED exp2 (double x)
 }
 #endif
 
-static void usage (const char *argv0, const char * missing);
-
 /* This global mutex should be locked in multithreaded parts when a
  * thread does a read / write, especially on stdout, stderr...
  */
@@ -56,7 +54,7 @@ pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static const int bucket_region = 1 << LOG_BUCKET_REGION;
 
-/* for cofactorization statistics */
+/* {{{ for cofactorization statistics */
 int stats = 0; /* 0: nothing, 1: write stats file, 2: read stats file,
                   the stats file can be used with gnuplot, for example:
                   splot "stats.dat" u 1:2:3, "stats.dat" u 1:2:4 */
@@ -68,7 +66,10 @@ uint32_t **cof_call; /* cof_call[r][a] is the number of calls of the
                         the rational side, and a bits on the algebraic side */
 uint32_t **cof_succ; /* cof_succ[r][a] is the corresponding number of
                         successes, i.e., of call that lead to a relation */
+/* }}} */
 
+/* {{{ Forward decl of some functions  */
+static void usage (const char *argv0, const char * missing);
 
 /* Test if entry x in bucket region n is divisible by p */
 void test_divisible_x (const fbprime_t p, const unsigned long x, const int n,
@@ -81,8 +82,38 @@ int factor_leftover_norm (mpz_t n,
                           mpz_array_t* const factors,
 			  uint32_array_t* const multis,
 			  facul_strategy_t *strategy);
+/* }}} */
 
-static void sieve_info_init_trialdiv(sieve_info_ptr si)
+/* {{{ thread-related defines */
+/* All of this exists _for each thread_ */
+struct thread_side_data_s {
+    bucket_array_t BA;
+    factorbase_degn_t *fb_bucket; /* in reality a pointer into a shared array */
+    double bucket_fill_ratio;     /* inverse sum of bucket-sieved primes */
+
+    /* For small sieve */
+    int * ssdpos;
+    int * rsdpos;
+};
+typedef struct thread_side_data_s thread_side_data[1];
+typedef struct thread_side_data_s * thread_side_data_ptr;
+typedef const struct thread_side_data_s * thread_side_data_srcptr;
+
+struct thread_data_s {
+    int id;
+    thread_side_data sides[2];
+    sieve_info_ptr si;
+    las_report rep;
+};
+typedef struct thread_data_s thread_data[1];
+typedef struct thread_data_s * thread_data_ptr;
+typedef const struct thread_data_s * thread_data_srcptr;
+/* }}} */
+
+
+
+/* sieve_info stuff */
+static void sieve_info_init_trialdiv(sieve_info_ptr si)/*{{{*/
 {
     /* Our trial division needs odd divisors, 2 is handled by mpz_even_p().
        If the FB primes to trial divide contain 2, we skip over it.
@@ -98,16 +129,322 @@ static void sieve_info_init_trialdiv(sieve_info_ptr si)
         s->trialdiv_data = trialdiv_init (s->trialdiv_primes + skip2,
                 n - skip2);
     }
-}
+}/*}}}*/
 
-static void sieve_info_clear_trialdiv(sieve_info_ptr si)
+static void sieve_info_clear_trialdiv(sieve_info_ptr si)/*{{{*/
 {
     for(int side = 0 ; side < 2 ; side++) {
         trialdiv_clear (si->sides[side]->trialdiv_data);
         free (si->sides[side]->trialdiv_primes);
     }
+}/*}}}*/
+
+/* {{{ Factor base handling */
+/* {{{ silly code to factor small numbers. Should go to utils/ */
+/* Finds prime factors p < lim of n and returns a pointer to a zero-terminated
+   list of those factors. Repeated factors are stored only once. */
+static fbprime_t *
+factor_small (mpz_t n, fbprime_t lim)
+{
+  unsigned long p;
+  unsigned long l; /* number of prime factors */
+  fbprime_t *f;
+
+  l = 0;
+  f = (fbprime_t*) malloc (sizeof (fbprime_t));
+  FATAL_ERROR_CHECK(f == NULL, "malloc failed");
+  for (p = 2; p <= lim; p = getprime (p))
+    {
+      if (mpz_divisible_ui_p (n, p))
+        {
+          l ++;
+          f = (fbprime_t*) realloc (f, (l + 1) * sizeof (fbprime_t));
+          FATAL_ERROR_CHECK(f == NULL, "realloc failed");
+          f[l - 1] = p;
+        }
+    }
+  f[l] = 0; /* end of list marker */
+  getprime (0);
+  return f;
+}
+/*}}}*/
+
+/* {{{ Initialize the factor bases */
+void sieve_info_init_factor_bases(sieve_info_ptr si, param_list pl)
+{
+    double tfb;
+    /* TODO should these go into siever_config or not ? */
+    int rpow_lim = 0, apow_lim = 0;
+    param_list_parse_int(pl, "rpowlim", &rpow_lim);
+    param_list_parse_int(pl, "apowlim", &apow_lim);
+ 
+    for(int side = 0 ; side < 2 ; side++) {
+        cado_poly_side_ptr pol = si->cpoly->pols[side];
+        sieve_side_info_ptr sis = si->sides[side];
+        if (pol->degree > 1) {
+            fbprime_t *leading_div;
+            tfb = seconds ();
+            leading_div = factor_small (pol->f[pol->degree], pol->lim);
+            /* FIXME: fbfilename should allow *distinct* file names, of
+             * course, for each side (think about the bi-algebraic case)
+             */
+            const char * fbfilename = param_list_lookup_string(pl, "fb");
+            fprintf(stderr, "Reading %s factor base from %s\n", sidenames[side], fbfilename);
+            sis->fb = fb_read(fbfilename, sis->scale * LOG_SCALE, 0, pol->lim, apow_lim);
+            ASSERT_ALWAYS(sis->fb != NULL);
+            tfb = seconds () - tfb;
+            fprintf (si->output, 
+                    "# Reading %s factor base of %zuMb took %1.1fs\n",
+                    sidenames[side],
+                    fb_size (sis->fb) >> 20, tfb);
+            free (leading_div);
+        } else {
+            tfb = seconds ();
+            if (rpow_lim >= si->bucket_thresh)
+              {
+                rpow_lim = si->bucket_thresh - 1;
+                printf ("# rpowthresh reduced to %d\n", rpow_lim);
+              }
+            sis->fb = fb_make_linear ((const mpz_t *) pol->f,
+                                    (fbprime_t) pol->lim,
+                                     rpow_lim, sis->scale * LOG_SCALE, 
+                                     si->verbose, 1, si->output);
+            tfb = seconds () - tfb;
+            fprintf (si->output, "# Creating rational factor base of %zuMb took %1.1fs\n",
+                     fb_size (sis->fb) >> 20, tfb);
+        }
+    }
+}
+/*}}}*/
+
+/* {{{ dispatch_fb */
+static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_main, factorbase_degn_t * fb0, int nparts, fbprime_t pmax)
+{
+    /* Given fb0, which is a pointer in the fb array *fb_main, allocates
+     * fb_dst[0] up to fb_dst[nparts-1] as independent fb arrays, each of
+     * appropriate length to contain equivalent portions of the _tail_ of
+     * the fb array *fb_main, starting at pointer fb0. Reallocates *fb_main
+     * in the end (*fb_main gives away ownership of its contents).
+     */
+    /* Start by counting, unsurprisingly */
+    size_t * fb_sizes = (size_t *) malloc(nparts * sizeof(size_t));
+    FATAL_ERROR_CHECK(fb_sizes == NULL, "malloc failed");
+    memset(fb_sizes, 0, nparts * sizeof(size_t));
+    size_t headsize = fb_diff_bytes(fb0, *fb_main);
+    int i = 0;
+    for(factorbase_degn_t * fb = fb0 ; fb->p != FB_END && fb->p <= pmax; fb = fb_next (fb)) {
+        size_t sz = fb_entrysize (fb); 
+        fb_sizes[i] += sz;
+        i++;
+        i %= nparts;
+    }
+    factorbase_degn_t ** fbi = (factorbase_degn_t **) malloc(nparts * sizeof(factorbase_degn_t *));
+    for(i = 0 ; i < nparts ; i++) {
+        // add one for end marker
+        fb_sizes[i] += sizeof(factorbase_degn_t);
+        fb_dst[i] = (factorbase_degn_t *) malloc(fb_sizes[i]);
+        FATAL_ERROR_CHECK(fb_dst[i] == NULL, "malloc failed");
+        fbi[i] = fb_dst[i];
+    }
+    free(fb_sizes); fb_sizes = NULL;
+    i = 0;
+    int k = 0;
+    for(factorbase_degn_t * fb = fb0 ; fb->p != FB_END && fb->p <= pmax; fb = fb_next (fb)) {
+        k++;
+        size_t sz = fb_entrysize (fb); 
+        memcpy(fbi[i], fb, sz);
+        fbi[i] = fb_next(fbi[i]);
+        i++;
+        i %= nparts;
+    }
+    for(i = 0 ; i < nparts ; i++) {
+        memset(fbi[i], 0, sizeof(factorbase_degn_t));
+        fbi[i]->p = FB_END;
+    }
+    free(fbi); fbi = NULL;
+    *fb_main = realloc(*fb_main, (headsize + sizeof(factorbase_degn_t)));
+    FATAL_ERROR_CHECK(*fb_main == NULL, "realloc failed");
+    fb0 = fb_skip(*fb_main, headsize);
+    memset(fb0, 0, sizeof(factorbase_degn_t));
+    fb0->p = FB_END;
+}
+/* }}} */
+
+/* {{{ reordering of the small factor base
+ *
+ * We split the small factor base in several non-overlapping, contiguous
+ * zones:
+ *
+ *      - powers of 2 (up until the pattern sieve limit)
+ *      - powers of 3 (up until the pattern sieve limit)
+ *      - trialdiv primes (not powers)
+ *      - resieved primes
+ *      (- powers of trialdiv primes)
+ *      - rest.
+ *
+ * Problem: bad primes may in fact be pattern sieved, and we might want
+ * to pattern-sieve more than just the ``do it always'' cases where p is
+ * below the pattern sieve limit.
+ *
+ * The answer to this is that such primes are expected to be very very
+ * rare, so we don't really bother. If we were to do something, we could
+ * imagine setting up a schedule list for projective primes -- e.g. a
+ * priority queue. But it feels way overkill.
+ *
+ * Note that the pre-treatment (splitting the factor base in chunks) can
+ * be done once and for all.
+ */
+
+void reorder_fb(sieve_info_ptr si, int side)
+{
+    factorbase_degn_t * fb_pow2, * fb_pow2_base;
+    factorbase_degn_t * fb_pow3, * fb_pow3_base;
+    factorbase_degn_t * fb_td, * fb_td_base;
+    // factorbase_degn_t * fb_pow_td, * fb_pow_td_base;
+    factorbase_degn_t * fb_rs, * fb_rs_base;
+    factorbase_degn_t * fb_rest, * fb_rest_base;
+
+    factorbase_degn_t * fb_base = si->sides[side]->fb;
+    factorbase_degn_t * fb = fb_base;
+
+    size_t sz = fb_size(fb);
+
+    fb_pow2 = fb_pow2_base = (factorbase_degn_t *) malloc(sz);
+    fb_pow3 = fb_pow3_base = (factorbase_degn_t *) malloc(sz);
+    fb_td = fb_td_base = (factorbase_degn_t *) malloc(sz);
+    // fb_pow_td = fb_pow_td_base = (factorbase_degn_t *) malloc(sz);
+    fb_rs = fb_rs_base = (factorbase_degn_t *) malloc(sz);
+    fb_rest = fb_rest_base = (factorbase_degn_t *) malloc(sz);
+
+    fbprime_t plim = si->bucket_thresh;
+    fbprime_t costlim = si->td_thresh;
+
+#define PUSH_LIST(x) do {						\
+            memcpy(fb_## x, fb, fb_entrysize(fb));			\
+            fb_## x = fb_next(fb_## x);					\
+} while (0)
+
+    size_t pattern2_size = sizeof(unsigned long) * 2;
+    for( ; fb->p != FB_END ; fb = fb_next(fb)) {
+        /* The extra conditions on powers of 2 and 3 are related to how
+         * pattern-sieving is done.
+         */
+        if ((fb->p%2)==0 && fb->p <= pattern2_size) {
+            PUSH_LIST(pow2);
+        } else if (fb->p == 3) {
+            PUSH_LIST(pow3);
+        } else if (fb->p <= plim && fb->p <= costlim * fb->nr_roots) {
+            if (!is_prime_power(fb->p)) {
+                PUSH_LIST(td);
+            } else {
+                // PUSH_LIST(pow_td);
+                PUSH_LIST(rest);
+            }
+        } else {
+            if (!is_prime_power(fb->p)) {
+                PUSH_LIST(rs);
+            } else {
+                PUSH_LIST(rest);
+            }
+        }
+    }
+#undef PUSH_LIST
+
+#define APPEND_LIST(x) do {						\
+    char * pb = (char*) (void*) fb_ ## x ## _base;			\
+    char * p  = (char*) (void*) fb_ ## x;				\
+    si->sides[side]->fb_parts->x[0] = fb;                               \
+    si->sides[side]->fb_parts_x->x[0] = n;                              \
+    memcpy(fb, pb, p - pb);						\
+    fb = fb_skip(fb, p - pb);						\
+    n += fb_diff(fb_ ## x, fb_ ## x ## _base);                          \
+    si->sides[side]->fb_parts->x[1] = fb;                               \
+    si->sides[side]->fb_parts_x->x[1] = n;                              \
+} while (0)
+    unsigned int n = 0;
+    fb = fb_base;
+
+    APPEND_LIST(pow2);
+    APPEND_LIST(pow3);
+    APPEND_LIST(td);
+    APPEND_LIST(rs);
+    APPEND_LIST(rest);
+    fb->p = FB_END;
+
+    free(fb_pow2_base);
+    free(fb_pow3_base);
+    free(fb_td_base);
+    free(fb_rs_base);
+    free(fb_rest_base);
+
+#undef  APPEND_LIST
+
+    if (si->verbose) {
+        fprintf(si->output, "# small %s factor base", sidenames[side]);
+        factorbase_degn_t ** q;
+        q = si->sides[side]->fb_parts->pow2;
+        fprintf(si->output, ": %d pow2", fb_diff(q[1], q[0]));
+        q = si->sides[side]->fb_parts->pow3;
+        fprintf(si->output, ", %d pow3", fb_diff(q[1], q[0]));
+        q = si->sides[side]->fb_parts->td;
+        fprintf(si->output, ", %d td", fb_diff(q[1], q[0]));
+        q = si->sides[side]->fb_parts->rs;
+        fprintf(si->output, ", %d rs", fb_diff(q[1], q[0]));
+        q = si->sides[side]->fb_parts->rest;
+        fprintf(si->output, ", %d rest", fb_diff(q[1], q[0]));
+        fprintf(si->output, " (total %zu)\n", fb_nroots_total(fb_base));
+    }
 }
 
+/* }}} */
+
+/* {{{ Split the factor base in pieces for the different threads. */
+void sieve_info_split_bucket_fb_for_threads(sieve_info_ptr si, thread_data * thrs, int side)
+{
+    sieve_side_info_ptr s = si->sides[side];
+    /* aliases */
+    factorbase_degn_t *fb = s->fb;
+
+    /* skip over small primes */
+    while (fb->p != FB_END && fb->p < (fbprime_t) si->bucket_thresh)
+        fb = fb_next (fb); 
+    factorbase_degn_t *fb_bucket[si->nb_threads];
+    dispatch_fb(fb_bucket, &s->fb, fb, si->nb_threads, FBPRIME_MAX);
+    for (int i = 0; i < si->nb_threads; ++i) {
+        thrs[i]->sides[side]->fb_bucket = fb_bucket[i];
+    }
+    fprintf (si->output, "# Number of small-sieved primes in %s factor base = %zu\n", sidenames[side], fb_nroots_total(s->fb));
+
+    /* Counting the bucket-sieved primes per thread.  */
+    unsigned long * nn = (unsigned long *) malloc(si->nb_threads * sizeof(unsigned long));
+    ASSERT_ALWAYS(nn);
+    memset(nn, 0, si->nb_threads * sizeof(unsigned long));
+    for (int i = 0; i < si->nb_threads; ++i) {
+        thrs[i]->sides[side]->bucket_fill_ratio = 0;
+    }
+    for (int i = 0; i < si->nb_threads; ++i) {
+        thrs[i]->sides[side]->bucket_fill_ratio = 0;
+        fb = thrs[i]->sides[side]->fb_bucket;
+        for (; fb->p != FB_END; fb = fb_next(fb)) {
+            nn[i] += fb->nr_roots;
+            thrs[i]->sides[side]->bucket_fill_ratio += fb->nr_roots / (double) fb->p;
+        }
+    }
+    fprintf (si->output, "# Number of bucket-sieved primes in %s factor base per thread =", sidenames[side]);
+    for(int i = 0 ; i < si->nb_threads ; i++)
+        fprintf (si->output, " %lu", nn[i]);
+    fprintf(si->output, "\n");
+    fprintf (si->output, "# Inverse sum of bucket-sieved primes in %s factor base per thread =", sidenames[side]);
+    for(int i = 0 ; i < si->nb_threads ; i++)
+        fprintf (si->output, " %.5f", thrs[i]->sides[side]->bucket_fill_ratio);
+    fprintf(si->output, " [hit jitter %.2f%%]\n",
+            100 * (thrs[0]->sides[side]->bucket_fill_ratio / thrs[si->nb_threads-1]->sides[side]->bucket_fill_ratio- 1));
+    free(nn);
+}
+/*}}}*/
+/* }}} */
+
+/*{{{ sieve_info_init */
 static void sieve_info_init(sieve_info_ptr si, param_list pl)
 {
     memset(si, 0, sizeof(sieve_info));
@@ -203,36 +540,9 @@ static void sieve_info_init(sieve_info_ptr si, param_list pl)
     mpz_init(si->q);
     mpz_init(si->rho);
 }
+/*}}}*/
 
-/* Finds prime factors p < lim of n and returns a pointer to a zero-terminated
-   list of those factors. Repeated factors are stored only once. */
-static fbprime_t *
-factor_small (mpz_t n, fbprime_t lim)
-{
-  unsigned long p;
-  unsigned long l; /* number of prime factors */
-  fbprime_t *f;
-
-  l = 0;
-  f = (fbprime_t*) malloc (sizeof (fbprime_t));
-  FATAL_ERROR_CHECK(f == NULL, "malloc failed");
-  for (p = 2; p <= lim; p = getprime (p))
-    {
-      if (mpz_divisible_ui_p (n, p))
-        {
-          l ++;
-          f = (fbprime_t*) realloc (f, (l + 1) * sizeof (fbprime_t));
-          FATAL_ERROR_CHECK(f == NULL, "realloc failed");
-          f[l - 1] = p;
-        }
-    }
-  f[l] = 0; /* end of list marker */
-  getprime (0);
-  return f;
-}
-
-static void
-sieve_info_update (sieve_info_ptr si)
+static void sieve_info_update (sieve_info_ptr si)/*{{{*/
 {
   if (si->verbose)
     fprintf (si->output, "# I=%u; J=%u\n", si->I, si->J);
@@ -243,18 +553,45 @@ sieve_info_update (sieve_info_ptr si)
   
   /* essentially update the fij polynomials */
   sieve_info_update_norm_data(si);
-}
+}/*}}}*/
 
-static void
-sieve_info_clear (sieve_info_ptr si)
+static void sieve_info_clear (sieve_info_ptr si)/*{{{*/
 {
-  if (si->outputname)
-      gzip_close(si->output, si->outputname);
-  sieve_info_clear_unsieve_data(si);
-  mpz_clear(si->q);
-  mpz_clear(si->rho);
-  cado_poly_clear(si->cpoly);
-}
+    sieve_info_clear_unsieve_data(si);
+    facul_clear_strategy (si->sides[RATIONAL_SIDE]->strategy);
+    facul_clear_strategy (si->sides[ALGEBRAIC_SIDE]->strategy);
+    si->sides[RATIONAL_SIDE]->strategy = NULL;
+    si->sides[ALGEBRAIC_SIDE]->strategy = NULL;
+    sieve_info_clear_trialdiv(si);
+    free(si->sides[0]->fb);
+    free(si->sides[1]->fb);
+
+    sieve_info_clear_norm_data(si);
+    mpz_clear(si->q);
+    mpz_clear(si->rho);
+
+    if (si->outputname)
+        gzip_close(si->output, si->outputname);
+    cado_poly_clear(si->cpoly);
+}/*}}}*/
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/*******************************************************************/
+/********        Walking in p-lattices                    **********/
+
+/* {{{ p-lattice stuff */
 
 // Compute the root r describing the lattice inside the q-lattice
 // corresponding to the factor base prime (p,R).
@@ -563,216 +900,10 @@ plattice_x_t plattice_starting_vector(const plattice_info_t * pli, sieve_info_sr
 #endif
 }
 
-/***************************************************************************/
+/* }}} */
 
 /***************************************************************************/
 /********        Main bucket sieving functions                    **********/
-
-/* All of this exists _for each thread_ */
-struct thread_side_data_s {
-    bucket_array_t BA;
-    factorbase_degn_t *fb_bucket; /* in reality a pointer into a shared array */
-    double bucket_fill_ratio;     /* inverse sum of bucket-sieved primes */
-
-    /* For small sieve */
-    int * ssdpos;
-    int * rsdpos;
-};
-typedef struct thread_side_data_s thread_side_data[1];
-typedef struct thread_side_data_s * thread_side_data_ptr;
-typedef const struct thread_side_data_s * thread_side_data_srcptr;
-
-struct thread_data_s {
-    int id;
-    thread_side_data sides[2];
-    sieve_info_ptr si;
-    las_report rep;
-};
-typedef struct thread_data_s thread_data[1];
-typedef struct thread_data_s * thread_data_ptr;
-typedef const struct thread_data_s * thread_data_srcptr;
-
-/* {{{ dispatch_fb */
-static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_main, factorbase_degn_t * fb0, int nparts, fbprime_t pmax)
-{
-    /* Given fb0, which is a pointer in the fb array *fb_main, allocates
-     * fb_dst[0] up to fb_dst[nparts-1] as independent fb arrays, each of
-     * appropriate length to contain equivalent portions of the _tail_ of
-     * the fb array *fb_main, starting at pointer fb0. Reallocates *fb_main
-     * in the end (*fb_main gives away ownership of its contents).
-     */
-    /* Start by counting, unsurprisingly */
-    size_t * fb_sizes = (size_t *) malloc(nparts * sizeof(size_t));
-    FATAL_ERROR_CHECK(fb_sizes == NULL, "malloc failed");
-    memset(fb_sizes, 0, nparts * sizeof(size_t));
-    size_t headsize = fb_diff_bytes(fb0, *fb_main);
-    int i = 0;
-    for(factorbase_degn_t * fb = fb0 ; fb->p != FB_END && fb->p <= pmax; fb = fb_next (fb)) {
-        size_t sz = fb_entrysize (fb); 
-        fb_sizes[i] += sz;
-        i++;
-        i %= nparts;
-    }
-    factorbase_degn_t ** fbi = (factorbase_degn_t **) malloc(nparts * sizeof(factorbase_degn_t *));
-    for(i = 0 ; i < nparts ; i++) {
-        // add one for end marker
-        fb_sizes[i] += sizeof(factorbase_degn_t);
-        fb_dst[i] = (factorbase_degn_t *) malloc(fb_sizes[i]);
-        FATAL_ERROR_CHECK(fb_dst[i] == NULL, "malloc failed");
-        fbi[i] = fb_dst[i];
-    }
-    free(fb_sizes); fb_sizes = NULL;
-    i = 0;
-    int k = 0;
-    for(factorbase_degn_t * fb = fb0 ; fb->p != FB_END && fb->p <= pmax; fb = fb_next (fb)) {
-        k++;
-        size_t sz = fb_entrysize (fb); 
-        memcpy(fbi[i], fb, sz);
-        fbi[i] = fb_next(fbi[i]);
-        i++;
-        i %= nparts;
-    }
-    for(i = 0 ; i < nparts ; i++) {
-        memset(fbi[i], 0, sizeof(factorbase_degn_t));
-        fbi[i]->p = FB_END;
-    }
-    free(fbi); fbi = NULL;
-    *fb_main = realloc(*fb_main, (headsize + sizeof(factorbase_degn_t)));
-    FATAL_ERROR_CHECK(*fb_main == NULL, "realloc failed");
-    fb0 = fb_skip(*fb_main, headsize);
-    memset(fb0, 0, sizeof(factorbase_degn_t));
-    fb0->p = FB_END;
-}
-/* }}} */
-
-
-/* {{{ reordering of the small factor base
- *
- * We split the small factor base in several non-overlapping, contiguous
- * zones:
- *
- *      - powers of 2 (up until the pattern sieve limit)
- *      - powers of 3 (up until the pattern sieve limit)
- *      - trialdiv primes (not powers)
- *      - resieved primes
- *      (- powers of trialdiv primes)
- *      - rest.
- *
- * Problem: bad primes may in fact be pattern sieved, and we might want
- * to pattern-sieve more than just the ``do it always'' cases where p is
- * below the pattern sieve limit.
- *
- * The answer to this is that such primes are expected to be very very
- * rare, so we don't really bother. If we were to do something, we could
- * imagine setting up a schedule list for projective primes -- e.g. a
- * priority queue. But it feels way overkill.
- *
- * Note that the pre-treatment (splitting the factor base in chunks) can
- * be done once and for all.
- */
-
-void reorder_fb(sieve_info_ptr si, int side)
-{
-    factorbase_degn_t * fb_pow2, * fb_pow2_base;
-    factorbase_degn_t * fb_pow3, * fb_pow3_base;
-    factorbase_degn_t * fb_td, * fb_td_base;
-    // factorbase_degn_t * fb_pow_td, * fb_pow_td_base;
-    factorbase_degn_t * fb_rs, * fb_rs_base;
-    factorbase_degn_t * fb_rest, * fb_rest_base;
-
-    factorbase_degn_t * fb_base = si->sides[side]->fb;
-    factorbase_degn_t * fb = fb_base;
-
-    size_t sz = fb_size(fb);
-
-    fb_pow2 = fb_pow2_base = (factorbase_degn_t *) malloc(sz);
-    fb_pow3 = fb_pow3_base = (factorbase_degn_t *) malloc(sz);
-    fb_td = fb_td_base = (factorbase_degn_t *) malloc(sz);
-    // fb_pow_td = fb_pow_td_base = (factorbase_degn_t *) malloc(sz);
-    fb_rs = fb_rs_base = (factorbase_degn_t *) malloc(sz);
-    fb_rest = fb_rest_base = (factorbase_degn_t *) malloc(sz);
-
-    fbprime_t plim = si->bucket_thresh;
-    fbprime_t costlim = si->td_thresh;
-
-#define PUSH_LIST(x) do {						\
-            memcpy(fb_## x, fb, fb_entrysize(fb));			\
-            fb_## x = fb_next(fb_## x);					\
-} while (0)
-
-    size_t pattern2_size = sizeof(unsigned long) * 2;
-    for( ; fb->p != FB_END ; fb = fb_next(fb)) {
-        /* The extra conditions on powers of 2 and 3 are related to how
-         * pattern-sieving is done.
-         */
-        if ((fb->p%2)==0 && fb->p <= pattern2_size) {
-            PUSH_LIST(pow2);
-        } else if (fb->p == 3) {
-            PUSH_LIST(pow3);
-        } else if (fb->p <= plim && fb->p <= costlim * fb->nr_roots) {
-            if (!is_prime_power(fb->p)) {
-                PUSH_LIST(td);
-            } else {
-                // PUSH_LIST(pow_td);
-                PUSH_LIST(rest);
-            }
-        } else {
-            if (!is_prime_power(fb->p)) {
-                PUSH_LIST(rs);
-            } else {
-                PUSH_LIST(rest);
-            }
-        }
-    }
-#undef PUSH_LIST
-
-#define APPEND_LIST(x) do {						\
-    char * pb = (char*) (void*) fb_ ## x ## _base;			\
-    char * p  = (char*) (void*) fb_ ## x;				\
-    si->sides[side]->fb_parts->x[0] = fb;                               \
-    si->sides[side]->fb_parts_x->x[0] = n;                              \
-    memcpy(fb, pb, p - pb);						\
-    fb = fb_skip(fb, p - pb);						\
-    n += fb_diff(fb_ ## x, fb_ ## x ## _base);                          \
-    si->sides[side]->fb_parts->x[1] = fb;                               \
-    si->sides[side]->fb_parts_x->x[1] = n;                              \
-} while (0)
-    unsigned int n = 0;
-    fb = fb_base;
-
-    APPEND_LIST(pow2);
-    APPEND_LIST(pow3);
-    APPEND_LIST(td);
-    APPEND_LIST(rs);
-    APPEND_LIST(rest);
-    fb->p = FB_END;
-
-    free(fb_pow2_base);
-    free(fb_pow3_base);
-    free(fb_td_base);
-    free(fb_rs_base);
-    free(fb_rest_base);
-
-#undef  APPEND_LIST
-
-    if (si->verbose) {
-        fprintf(si->output, "# small %s factor base", sidenames[side]);
-        factorbase_degn_t ** q;
-        q = si->sides[side]->fb_parts->pow2;
-        fprintf(si->output, ": %d pow2", fb_diff(q[1], q[0]));
-        q = si->sides[side]->fb_parts->pow3;
-        fprintf(si->output, ", %d pow3", fb_diff(q[1], q[0]));
-        q = si->sides[side]->fb_parts->td;
-        fprintf(si->output, ", %d td", fb_diff(q[1], q[0]));
-        q = si->sides[side]->fb_parts->rs;
-        fprintf(si->output, ", %d rs", fb_diff(q[1], q[0]));
-        q = si->sides[side]->fb_parts->rest;
-        fprintf(si->output, ", %d rest", fb_diff(q[1], q[0]));
-        fprintf(si->output, " (total %zu)\n", fb_nroots_total(fb_base));
-    }
-}
-
-/* }}} */
 
 /* {{{ fill_in_buckets */
 void
@@ -953,7 +1084,8 @@ void * fill_in_buckets_both(thread_data_ptr th)
 }
 /* }}} */
 
-void thread_do(thread_data * thrs, void * (*f) (thread_data_ptr))
+/* utility. Can go elsewhere */
+void thread_do(thread_data * thrs, void * (*f) (thread_data_ptr))/*{{{*/
 {
     sieve_info_ptr si = thrs[0]->si;
     if (si->nb_threads == 1) {
@@ -987,7 +1119,7 @@ void thread_do(thread_data * thrs, void * (*f) (thread_data_ptr))
 #endif
 
     free(th);
-}
+}/*}}}*/
 
 /* {{{ apply_buckets */
 NOPROFILE_STATIC void
@@ -1226,6 +1358,8 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
 }
 /* }}} */
 
+/************************ cofactorization ********************************/
+
 /* {{{ cofactoring area */
 
 /* Return 0 if the leftover norm n cannot yield a relation.
@@ -1418,7 +1552,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 #endif
         for (int x = xul; x < xul + (int) together; ++x) {
             if (SS[x] == 255) continue;
-
 
             /* For factor_leftover_norm, we need to pass the information of the
              * sieve bound. If a cofactor is less than the square of the sieve
@@ -1640,7 +1773,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
 /****************************************************************************/
 
-/************************ cofactorization ********************************/
+/* {{{ factor_leftover_norm */
 
 /* FIXME: the value of 20 seems large. Normally, a few Miller-Rabin passes
    should be enough. See also http://www.trnicely.net/misc/mpzspsp.html */
@@ -1756,17 +1889,18 @@ factor_leftover_norm (mpz_t n, double fbbits, unsigned int lpb,
      numbers here that factoring them all takes a long time, for few
      additional relations */
   return 0;
-}
+}/*}}}*/
 
-/* th->id gives the number of the thread: it is supposed to deal with the set
+/* Move above ? */
+/* {{{ process_bucket_region
+ * th->id gives the number of the thread: it is supposed to deal with the set
  * of bucket_regions corresponding to that number, ie those that are
  * congruent to id mod nb_thread.
  *
  * The other threads are accessed by combining the thread pointer th and
  * the thread id: the i-th thread is at th - id + i
  */
-void *
-process_bucket_region(thread_data_ptr th)
+void * process_bucket_region(thread_data_ptr th)
 {
     where_am_I w MAYBE_UNUSED;
     sieve_info_ptr si = th->si;
@@ -1875,9 +2009,10 @@ process_bucket_region(thread_data_ptr th)
 
 
     return NULL;
-}
+}/*}}}*/
 
-static thread_data * thread_data_alloc(sieve_info_ptr si)
+/* thread handling */
+static thread_data * thread_data_alloc(sieve_info_ptr si)/*{{{*/
 {
     thread_data * thrs = (thread_data *) malloc(si->nb_threads * sizeof(thread_data));
     ASSERT_ALWAYS(thrs);
@@ -1891,50 +2026,12 @@ static thread_data * thread_data_alloc(sieve_info_ptr si)
 
     for(int z = 0 ; z < 2 ; z++) {
         int side = ALGEBRAIC_SIDE ^ z;
-        sieve_side_info_ptr s = si->sides[side];
-        /* This serves as a pointer */
-        factorbase_degn_t *fb = s->fb;
-
-        /* skip over small primes */
-        while (fb->p != FB_END && fb->p < (fbprime_t) si->bucket_thresh)
-            fb = fb_next (fb); 
-        factorbase_degn_t *fb_bucket[si->nb_threads];
-        dispatch_fb(fb_bucket, &s->fb, fb, si->nb_threads, FBPRIME_MAX);
-        for (int i = 0; i < si->nb_threads; ++i) {
-            thrs[i]->sides[side]->fb_bucket = fb_bucket[i];
-        }
-        fprintf (si->output, "# Number of small-sieved primes in %s factor base = %zu\n", sidenames[side], fb_nroots_total(s->fb));
-
-        /* Counting the bucket-sieved primes per thread.  */
-        unsigned long * nn = (unsigned long *) malloc(si->nb_threads * sizeof(unsigned long));
-        ASSERT_ALWAYS(nn);
-        memset(nn, 0, si->nb_threads * sizeof(unsigned long));
-        for (int i = 0; i < si->nb_threads; ++i) {
-            thrs[i]->sides[side]->bucket_fill_ratio = 0;
-        }
-        for (int i = 0; i < si->nb_threads; ++i) {
-            thrs[i]->sides[side]->bucket_fill_ratio = 0;
-            fb = thrs[i]->sides[side]->fb_bucket;
-            for (; fb->p != FB_END; fb = fb_next(fb)) {
-                nn[i] += fb->nr_roots;
-                thrs[i]->sides[side]->bucket_fill_ratio += fb->nr_roots / (double) fb->p;
-            }
-        }
-        fprintf (si->output, "# Number of bucket-sieved primes in %s factor base per thread =", sidenames[side]);
-        for(int i = 0 ; i < si->nb_threads ; i++)
-            fprintf (si->output, " %lu", nn[i]);
-        fprintf(si->output, "\n");
-        fprintf (si->output, "# Inverse sum of bucket-sieved primes in %s factor base per thread =", sidenames[side]);
-        for(int i = 0 ; i < si->nb_threads ; i++)
-            fprintf (si->output, " %.5f", thrs[i]->sides[side]->bucket_fill_ratio);
-        fprintf(si->output, " [hit jitter %.2f%%]\n",
-                100 * (thrs[0]->sides[side]->bucket_fill_ratio / thrs[si->nb_threads-1]->sides[side]->bucket_fill_ratio- 1));
-        free(nn);
+        sieve_info_split_bucket_fb_for_threads(si, thrs, side);
     }
     return thrs;
-}
+}/*}}}*/
 
-static void thread_data_free(thread_data * thrs)
+static void thread_data_free(thread_data * thrs)/*{{{*/
 {
     sieve_info_ptr si = thrs[0]->si;
     for (int i = 0; i < si->nb_threads; ++i) {
@@ -1944,8 +2041,10 @@ static void thread_data_free(thread_data * thrs)
         las_report_clear(thrs[i]->rep);
     }
     free(thrs); /* nothing to do ! */
-}
+}/*}}}*/
 
+/* {{{ thread_buckets_alloc
+ */
 static void thread_buckets_alloc(thread_data * thrs)
 {
     sieve_info_ptr si = thrs[0]->si;
@@ -1972,9 +2071,9 @@ static void thread_buckets_alloc(thread_data * thrs)
             */
         }
     }
-}
+}/*}}}*/
 
-static void thread_buckets_free(thread_data * thrs)
+static void thread_buckets_free(thread_data * thrs)/*{{{*/
 {
     sieve_info_ptr si = thrs[0]->si;
     for(int side = 0 ; side < 2 ; side++) {
@@ -1982,9 +2081,9 @@ static void thread_buckets_free(thread_data * thrs)
             clear_bucket_array(thrs[i]->sides[side]->BA);
         }
     }
-}
+}/*}}}*/
 
-static double thread_buckets_max_full(thread_data * thrs)
+static double thread_buckets_max_full(thread_data * thrs)/*{{{*/
 {
     sieve_info_ptr si = thrs[0]->si;
     double mf, mf0 = 0;
@@ -1995,9 +2094,10 @@ static double thread_buckets_max_full(thread_data * thrs)
         if (mf > mf0) mf0 = mf;
     }
     return mf0;
-}
+}/*}}}*/
 
-/* This function does three distinct things.
+/* {{{ las_report_accumulate_threads_and_display
+ * This function does three distinct things.
  *  - accumulates the timing reports for all threads into a collated report
  *  - display the per-sq timing relative to this report, and the given
  *    timing argument (in seconds).
@@ -2030,7 +2130,7 @@ int las_report_accumulate_threads_and_display(sieve_info_ptr si, las_report_ptr 
     las_report_accumulate(report, rep);
     las_report_clear(rep);
     return ret;
-}
+}/*}}}*/
 
 /*************************** main program ************************************/
 
@@ -2077,15 +2177,13 @@ usage (const char *argv0, const char * missing)
 /* }}} */
 
 
-int
-main (int argc0, char *argv0[])
+int main (int argc0, char *argv0[])/*{{{*/
 {
     sieve_info si;
-    double t0, tfb, tts;
+    double t0, tts;
     mpz_t q0,q1,rho;
     mpz_t * roots;
     unsigned long nroots;
-    int rpow_lim = 0, apow_lim = 0;
     int i;
     unsigned long sq = 0;
     double totJ = 0.0;
@@ -2159,13 +2257,6 @@ main (int argc0, char *argv0[])
     param_list_parse_mpz(pl, "q0", q0);
     param_list_parse_mpz(pl, "q1", q1);
     param_list_parse_mpz(pl, "rho", rho);
-
-    param_list_parse_int(pl, "rpowlim", &rpow_lim);
-    param_list_parse_int(pl, "apowlim", &apow_lim);
-
-    // these are parsed in sieve_info_init (why them, and not the above ?)
-    // param_list_parse_int(pl, "mt", &nb_threads);
-    // param_list_parse_int(pl, "I", &I);
 
     /* {{{ perform some basic checking */
     if (mpz_cmp_ui(q0,0) == 0) usage(argv0[0], "q0");
@@ -2277,44 +2368,7 @@ main (int argc0, char *argv0[])
     /* While obviously, this one does (but only mildly) */
     sieve_info_init_norm_data(si, q0, si->qside);
 
-    /* {{{ Read (algebraic) or compute (rational) factor bases */
-    for(int side = 0 ; side < 2 ; side++) {
-        cado_poly_side_ptr pol = si->cpoly->pols[side];
-        sieve_side_info_ptr sis = si->sides[side];
-        if (pol->degree > 1) {
-            fbprime_t *leading_div;
-            tfb = seconds ();
-            leading_div = factor_small (pol->f[pol->degree], pol->lim);
-            /* FIXME: fbfilename should allow *distinct* file names, of
-             * course, for each side (think about the bi-algebraic case)
-             */
-            const char * fbfilename = param_list_lookup_string(pl, "fb");
-            fprintf(stderr, "Reading %s factor base from %s\n", sidenames[side], fbfilename);
-            sis->fb = fb_read(fbfilename, sis->scale * LOG_SCALE, 0, pol->lim, apow_lim);
-            ASSERT_ALWAYS(sis->fb != NULL);
-            tfb = seconds () - tfb;
-            fprintf (si->output, 
-                    "# Reading %s factor base of %zuMb took %1.1fs\n",
-                    sidenames[side],
-                    fb_size (sis->fb) >> 20, tfb);
-            free (leading_div);
-        } else {
-            tfb = seconds ();
-            if (rpow_lim >= si->bucket_thresh)
-              {
-                rpow_lim = si->bucket_thresh - 1;
-                printf ("# rpowthresh reduced to %d\n", rpow_lim);
-              }
-            sis->fb = fb_make_linear ((const mpz_t *) pol->f,
-                                    (fbprime_t) pol->lim,
-                                     rpow_lim, sis->scale * LOG_SCALE, 
-                                     si->verbose, 1, si->output);
-            tfb = seconds () - tfb;
-            fprintf (si->output, "# Creating rational factor base of %zuMb took %1.1fs\n",
-                     fb_size (sis->fb) >> 20, tfb);
-        }
-    }
-    /* }}} */
+    sieve_info_init_factor_bases(si, pl);
 
     thread_data * thrs = thread_data_alloc(si);
 
@@ -2598,25 +2652,16 @@ end:
       fprintf (si->output, "# Rejected %u cofactorizations out of %u due to stats file\n", cof_call[0][0] - cof_succ[0][0], cof_call[0][0]);
     /* }}} */
 
-    sieve_info_clear_trialdiv(si);
-    sieve_info_clear_norm_data(si);
-
-    facul_clear_strategy (si->sides[RATIONAL_SIDE]->strategy);
-    facul_clear_strategy (si->sides[ALGEBRAIC_SIDE]->strategy);
-    si->sides[RATIONAL_SIDE]->strategy = NULL;
-    si->sides[ALGEBRAIC_SIDE]->strategy = NULL;
+    sieve_info_clear (si);
 
     thread_data_free(thrs);
 
-    free(si->sides[0]->fb);
-    free(si->sides[1]->fb);
     for(int i = 0 ; i < deg  ; i++) {
         mpz_clear(roots[i]);
     }
     free(roots);
     las_report_clear(report);
 
-    sieve_info_clear (si);
 
     mpz_clear(q0);
     mpz_clear(q1);
@@ -2641,4 +2686,5 @@ end:
       }
 
     return 0;
-}
+}/*}}}*/
+
