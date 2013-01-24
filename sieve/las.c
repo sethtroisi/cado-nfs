@@ -549,8 +549,8 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, double skewness, int nb_threads)/*{{
     double maxab1 = MAX(fabs(si->a1), fabs(si->b1) * skewness);
     double maxab0 = MAX(fabs(si->a0), fabs(si->b0) * skewness);
     if (maxab0 > maxab1) {
-        int32_t oa[2] = { si->a0, si->a1 };
-        int32_t ob[2] = { si->b0, si->b1 };
+        int64_t oa[2] = { si->a0, si->a1 };
+        int64_t ob[2] = { si->b0, si->b1 };
         si->a0 = oa[1]; si->a1 = oa[0];
         si->b0 = ob[1]; si->b1 = ob[0];
         maxab1 = maxab0;
@@ -2987,7 +2987,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         /* FIXME: maybe we can discard some special q's if a1/a0 is too large,
            see http://www.mersenneforum.org/showthread.php?p=130478 */
 
-        gmp_fprintf (las->output, "# Sieving q=%Zd; rho=%Zd; a0=%"PRId32"; b0=%"PRId32"; a1=%"PRId32"; b1=%"PRId32"\n",
+        gmp_fprintf (las->output, "# Sieving q=%Zd; rho=%Zd; a0=%"PRId64"; b0=%"PRId64"; a1=%"PRId64"; b1=%"PRId64"\n",
                 si->q, si->rho, si->a0, si->b0, si->a1, si->b1);
         sq ++;
         if (las->verbose)

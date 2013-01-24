@@ -157,7 +157,7 @@ struct sieve_info_s {
     // size as well as the special-q side).
     mpz_t q;
     mpz_t rho;
-    int32_t a0, b0, a1, b1;
+    int64_t a0, b0, a1, b1;
 
     // parameters for bucket sieving
     unsigned int td_thresh;
