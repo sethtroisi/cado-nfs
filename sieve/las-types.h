@@ -47,6 +47,25 @@ typedef struct siever_config_s * siever_config_ptr;
 typedef const struct siever_config_s * siever_config_srcptr;
 /* }}} */
 
+/* {{{ descent_hint
+ *
+ * This is used for the descent. For each factor size, we provide a
+ * reasonable siever_config value
+ *
+ * We also provide, based on experience, info relative to how long it
+ * takes to finish the smoothing process for a prime factor of this size.
+ */
+struct descent_hint_s {
+    siever_config conf;
+    double expected_time;
+    double expected_success;
+};
+typedef struct descent_hint_s descent_hint[1];
+typedef struct descent_hint_s * descent_hint_ptr;
+typedef const struct descent_hint_s * descent_hint_srcptr;
+
+/* }}} */
+
 /* {{{ las_todo */
 struct las_todo_s;
 struct las_todo_s {
@@ -186,6 +205,11 @@ struct las_info_s {
      * bucket-sieved primes.
      */
     sieve_info_ptr sievers;
+
+    /* Descent lower steps */
+    descent_hint * hint_table;
+    unsigned int max_hint_bitsize[2];
+    int * hint_lookups[2]; /* quick access indices into hint_table */
 
     las_todo_ptr todo;
     /* These are used for reading the todo list */

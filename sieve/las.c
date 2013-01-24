@@ -30,6 +30,9 @@
 #include <smmintrin.h>
 #endif
 
+#define xxxDLP_DESCENT
+#define DESCENT_GRACE_TIME_RATIO 0.4
+
 #define LOG_SCALE 1.4426950408889634 /* 1/log(2) to 17 digits, rounded to
                                         nearest. This is enough to uniquely
                                         identify the corresponding IEEE 754
@@ -604,6 +607,137 @@ static void sieve_info_clear (las_info_ptr las, sieve_info_ptr si)/*{{{*/
 
 /* las_info stuff */
 
+static void las_info_init_hint_table(las_info_ptr las, param_list pl)/*{{{*/
+{
+    const char * filename = param_list_lookup_string(pl, "descent-hint");
+    if (filename == NULL) return;
+    char line[1024];
+    unsigned int hint_alloc = 0;
+    unsigned int hint_size = 0;
+    FILE * f;
+    f = fopen(filename, "r");
+    if (f == NULL) {
+        fprintf(stderr, "%s: %s\n", filename, strerror(errno));
+        /* There's no point in proceeding, since it would really change
+         * the behaviour of the program to do so */
+        exit(1);
+    }
+    las->max_hint_bitsize[0] = 0;
+    las->max_hint_bitsize[1] = 0;
+    for(;;) {
+        char * x = fgets(line, sizeof(line), f);
+        double t;
+        unsigned long z;
+        /* Tolerate comments and blank lines */
+        if (x == NULL) break;
+        if (*x == '#') continue;
+        for( ; *x && isspace(*x) ; x++) ;
+        if (!*x) continue;
+
+        /* We have a new entry to parse */
+        if (hint_size >= hint_alloc) {
+            hint_alloc = 2 * hint_alloc + 8;
+            las->hint_table = realloc(las->hint_table, hint_alloc * sizeof(descent_hint));
+        }
+
+        descent_hint_ptr h = las->hint_table[hint_size++];
+        siever_config_ptr sc = h->conf;
+
+        z = strtoul(x, &x, 10);
+        ASSERT_ALWAYS(z > 0);
+        sc->bitsize = z;
+        switch(*x++) {
+            case 'a' : sc->side = ALGEBRAIC_SIDE; break;
+            case 'r' : sc->side = RATIONAL_SIDE; break;
+            default:
+                       fprintf(stderr, "%s: parse error at %s\n", filename, line);
+                       exit(1);
+        }
+        for( ; *x && isspace(*x) ; x++) ;
+        t = strtod(x, &x); ASSERT_ALWAYS(t > 0);
+        h->expected_time = t;
+        for( ; *x && isspace(*x) ; x++) ;
+        t = strtod(x, &x); ASSERT_ALWAYS(t > 0);
+        h->expected_success = t;
+        for( ; *x && isspace(*x) ; x++) ;
+        for( ; *x && !isdigit(*x) ; x++) ;
+        z = strtoul(x, &x, 10); ASSERT_ALWAYS(z > 0);
+        sc->logI = z;
+        
+        for(int s = 0 ; s < 2 ; s++) {
+            for( ; *x && isspace(*x) ; x++) ;
+            z = strtoul(x, &x, 10); ASSERT_ALWAYS(z > 0);
+            sc->sides[s]->lim = z;
+            for( ; *x && !isdigit(*x) ; x++) ;
+            z = strtoul(x, &x, 10); ASSERT_ALWAYS(z > 0);
+            sc->sides[s]->lpb = z;
+            for( ; *x && !isdigit(*x) ; x++) ;
+            z = strtoul(x, &x, 10); ASSERT_ALWAYS(z > 0);
+            sc->sides[s]->mfb = z;
+            for( ; *x && !isdigit(*x) ; x++) ;
+            t = strtod(x, &x); ASSERT_ALWAYS(t > 0);
+            sc->sides[s]->lambda = t;
+        }
+        for( ; *x ; x++) ASSERT_ALWAYS(isspace(*x));
+
+        if (sc->bitsize > las->max_hint_bitsize[sc->side])
+            las->max_hint_bitsize[sc->side] = sc->bitsize;
+    }
+    if (las->hint_table == NULL) {
+        fprintf(stderr, "%s: no data ??\n", filename);
+        exit(1);
+    }
+    if (hint_size >= hint_alloc) {
+        hint_alloc = 2 * hint_alloc + 8;
+        las->hint_table = realloc(las->hint_table, hint_alloc * sizeof(descent_hint));
+    }
+    las->hint_table[hint_size++]->conf->bitsize = 0;
+    las->hint_table = realloc(las->hint_table, hint_size * sizeof(descent_hint));
+
+    /* Allocate the quick lookup tables */
+
+    for(int s = 0 ; s < 2 ; s++) {
+        unsigned int n = las->max_hint_bitsize[s] + 1;
+        las->hint_lookups[s] = malloc(n * sizeof(unsigned int));
+        for(unsigned int i = 0 ; i < n ; i++) {
+            las->hint_lookups[s][i] = -1;
+        }
+    }
+    for(descent_hint_ptr h = las->hint_table[0] ; h->conf->bitsize ; h++) {
+        siever_config_ptr sc = h->conf;
+        int d = las->hint_lookups[sc->side][sc->bitsize];
+        if (d >= 0) {
+            fprintf(stderr, "Error: two hints found for %d%c\n",
+                    sc->bitsize, sidenames[sc->side][0]);
+            exit(1);
+        }
+        las->hint_lookups[sc->side][sc->bitsize] = h - las->hint_table[0];
+
+        /* We must make sure that the default factor base bounds are
+         * larger than what we have for all the hint cases, so that it
+         * remains reasonable to base our work on the larger factor base
+         * (thus doing incomplete sieving).
+         */
+        for(int s = 0 ; s < 2 ; s++) {
+            ASSERT_ALWAYS(sc->sides[s]->lim <= las->cpoly->pols[s]->lim);
+        }
+    }
+
+    fclose(f);
+}/*}}}*/
+
+static void las_info_clear_hint_table(las_info_ptr las)/*{{{*/
+{
+    if (las->hint_table == NULL) return;
+    for(int s = 0 ; s < 2 ; s++) {
+        free(las->hint_lookups[s]);
+        las->hint_lookups[s] = NULL;
+        las->max_hint_bitsize[s] = 0;
+    }
+    free(las->hint_table);
+    las->hint_table = NULL;
+}/*}}}*/
+
 static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 {
     memset(las, 0, sizeof(las_info));
@@ -707,6 +841,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
         }
     }
     /* }}} */
+    las_info_init_hint_table(las, pl);
     /* Allocate room for only one sieve_info */
     las->sievers = malloc(sizeof(sieve_info));
     memset(las->sievers, 0, sizeof(sieve_info));
@@ -714,6 +849,8 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
 
 void las_info_clear(las_info_ptr las)/*{{{*/
 {
+    las_info_clear_hint_table(las);
+
     for(sieve_info_ptr si = las->sievers ; si->conf->bitsize ; si++) {
         sieve_info_clear(las, si);
     }
@@ -1932,8 +2069,23 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
              */
             double log2_fbs[2] = {log2(cpoly->pols[0]->lim), log2(cpoly->pols[1]->lim)};
 
+#ifdef  DLP_DESCENT
+            double deadline = DBL_MAX;
+#endif  /* DLP_DESCENT */
+
             int64_t a;
             uint64_t b;
+
+#ifdef  DLP_DESCENT
+            double t = seconds();
+
+            if (t >= deadline) {
+                /* Also break the outer loop (ugly!) */
+                xul = bucket_region;
+                fprintf(stderr, "#descent# Aborting, deadline passed\n");
+                break;
+            }
+#endif  /* DLP_DESCENT */
 
             // Compute algebraic and rational norms.
             NxToAB (&a, &b, N, x, si);
@@ -2124,6 +2276,46 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 #endif
                 pthread_mutex_unlock(&io_mutex);
             }
+
+#ifdef  DLP_DESCENT
+            /* For descent mode: compute the expected time to finish given
+             * the factor sizes, and deduce a deadline.  Assuming that not
+             * all encountered factors are below the factor base bound, if we
+             * expect an additional time T to finish the decomposition, we
+             * keep looking for a better decomposition for a grace time which
+             * is computed as x*T, for some configurable ratio x (one might
+             * think of x=0.2 for instance. x is DESCENT_GRACE_TIME_RATIO),
+             * which defines a ``deadline'' for next step.  [If all factors
+             * happen to be smooth, the deadline is _now_.] If within the
+             * grace period, a new relation is found, with an earlier implied
+             * deadline, the deadline is updated.
+             */
+            
+            if (las->hint_table) {
+                double time_left = 0;
+                for(int side = 0 ; side < 2 ; side++) {
+                    for (unsigned int i = 0; i < f[side]->length; ++i) {
+                        if (mpz_cmp_ui(f[side]->data[i], cpoly->pols[side]->lim) <= 0)
+                            continue;
+                        unsigned int n = mpz_sizeinbase(f[side]->data[i], 2);
+                        int k = las->hint_lookups[side][n];
+                        /* Having no data is normal */
+                        if (k < 0) continue;
+                        // fprintf(stderr, "#descent# Warning: cannot estimate refactoring time for relation involving %d%c\n", n, sidenames[side][0]);
+                        descent_hint_ptr h = las->hint_table[k];
+                        time_left += h->expected_time;
+                    }
+                }
+                // fprintf(stderr, "#descent# This relation entails an additional time of %.2f for the smoothing process\n", time_left);
+
+                double new_deadline = seconds() + DESCENT_GRACE_TIME_RATIO * time_left;
+                if (new_deadline < deadline) {
+                    if (deadline != DBL_MAX)
+                        fprintf(stderr, "#descent# Improved ETA by %.2f\n", (deadline-new_deadline)/DESCENT_GRACE_TIME_RATIO);
+                    deadline = new_deadline;
+                }
+            }
+#endif  /* DLP_DESCENT */
 
             clear_relation(rel);
             cpt++;
@@ -2374,6 +2566,9 @@ void * process_bucket_region(thread_data_ptr th)
         rep->reports += factor_survivors (th, i, S, w);
         rep->ttf += seconds ();
 
+        /* For the descent mode, we bail out as early as possible */
+        if (las->hint_table && rep->reports) break;
+
         for(int side = 0 ; side < 2 ; side++) {
             sieve_side_info_ptr s = si->sides[side];
             thread_side_data_ptr ts = th->sides[side];
@@ -2615,6 +2810,10 @@ int main (int argc0, char *argv0[])/*{{{*/
     memset(las, 0, sizeof(las_info));
     las_info_init(las, pl);    /* side effects: prints cmdline and flags */
 
+
+    /* Normal use of the descent lower steps prefers a file to provide
+     * data. However, using a q range is also OK */
+    int descent_lower = param_list_lookup_string(pl, "descent-hint") != NULL;
 
 #if 0   /* incompatible with the todo list */
     statsfilename = param_list_lookup_string (pl, "stats");
