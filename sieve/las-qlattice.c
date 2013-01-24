@@ -93,7 +93,7 @@ int generic_skew_gauss(mpz_t a[2], mpz_t b[2], mpz_t sigma)
      * want the reduction step here to be oblivious to this L^\infty /
      * L^2 mess, so we provide something which is L^2 minimal. Wrapper
      * code around this function is still guaranteeing L^\infinity
-     * minimality for compatibility, though (see qlattice_safetyguard)
+     * minimality for compatibility, though (see sieve_info_adjust_IJ)
      */
     if (mpz_cmp(N[0], N[1]) > 0) {
         mpz_swap(a[0], a[1]);
@@ -116,37 +116,6 @@ void mpz_set_square_of_d(mpz_t sigma, double skewness)
     mpq_mul(qsigma, qsigma, qsigma);
     mpz_rdiv_q(sigma, mpq_numref(qsigma), mpq_denref(qsigma));
     mpq_clear(qsigma);
-}
-
-/* FIXME: I have doubts that this code really belongs here */
-int qlattice_safetyguard(sieve_info_ptr si, double skewness)
-{
-    /* compare skewed max-norms */
-    double maxab1 = MAX(fabs(si->a1), fabs(si->b1) * skewness);
-    double maxab0 = MAX(fabs(si->a0), fabs(si->b0) * skewness);
-    if (maxab0 > maxab1) {
-        int64_t oa[2] = { si->a0, si->a1 };
-        int64_t ob[2] = { si->b0, si->b1 };
-        si->a0 = oa[1]; si->a1 = oa[0];
-        si->b0 = ob[1]; si->b1 = ob[0];
-        maxab1 = maxab0;
-    }
-    /* make sure J does not exceed I/2 */
-    if (maxab1 >= si->B)
-        si->J = (uint32_t) (si->B * skewness / maxab1 * (double) (si->I >> 1));
-    else
-        si->J = si->I >> 1;
-
-    /* Make sure the bucket region size divides the sieve region size, 
-       partly covered bucket regions may lead to problems when 
-       reconstructing p from half-empty buckets. */
-    /* Compute number of i-lines per bucket region, must be integer */
-    ASSERT_ALWAYS(LOG_BUCKET_REGION >= si->logI);
-    uint32_t i = 1U << (LOG_BUCKET_REGION - si->logI);
-    i *= si->nb_threads;  /* ensures nb of bucket regions divisible by nb_threads */
-    si->J = ((si->J - 1U) / i + 1U) * i; /* Round up to multiple of i */
-
-    return 0;
 }
 
 int SkewGauss(sieve_info_ptr si, double skewness)
@@ -175,7 +144,6 @@ int SkewGauss(sieve_info_ptr si, double skewness)
         si->a1 = mpz_get_int64(a[1]);
         si->b0 = mpz_get_int64(b[0]);
         si->b1 = mpz_get_int64(b[1]);
-        qlattice_safetyguard(si, skewness);
     }
     mpz_clear(a[0]);
     mpz_clear(a[1]);
