@@ -3205,7 +3205,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                 report->tn[RATIONAL_SIDE],
                 report->tn[ALGEBRAIC_SIDE],
                 tts, report->ttsm, tts-report->ttsm, report->ttf);
-    fprintf (las->output, "# Total %lu reports [%1.3fs/r, %1.1fr/sq]\n",
+    fprintf (las->output, "# Total %lu reports [%1.3gs/r, %1.1fr/sq]\n",
             report->reports, t0 / (double) report->reports,
             (double) report->reports / (double) sq);
     /*}}}*/
