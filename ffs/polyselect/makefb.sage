@@ -1,158 +1,98 @@
-#!/usr/bin/env sage
-load tools.sage
+load l_roots.sage
+load hexa.sage
 
-def inverse_mod(a,pk):
-    g,_,u=xgcd(pk,a)
-    assert (not g.is_zero())
-    return u
+"""
+ input : lr a pair of lists containing pairs [r,k] s. t. F(r,1) % l^k=0 and
+ F(1,r) % l^k =0 respectively.
+ output: 
+ simple is a list of roots r such that f(r) % l =0 and f'(r) % l !=0 
+ and possibly r=l if F(1,l) % l =0 and F(1,l) % l^2 !=0
 
-def lift_root_unramified(f,df,r,p,kmax):
-    assert f(r) % p == 0
-    assert df(r) % p != 0
-    k = 1
-    A=f.base_ring()
-    while k < kmax:
-        pass
-        r = A((r - f(r)*inverse_mod(df(r),p^(2*k))+p^(2*k))) % p^(2*k) 
-        k = k * 2;
-    return r
-
-
-# The roots are of the form phi(x), and phi is now to constrain roots mod
-# p^m ; the content of original_f(phi(x)) is known to be equal to k0
-def all_roots_affine(f,p,kmax,k0,m,phi):
-    if k0 >=kmax:
-        return []
-    assert valuation (gcd(f.coefficients()), p) == 0
-    A=f.base_ring()
-    ZP=f.parent()
-    x=ZP.gen()
-    df = f.derivative()
-    res=[]
-    for r in bar(f,p).roots():
-        r=A(r[0].polynomial())
-        if df(r) % p != 0:
-            rr = lift_root_unramified(f,df,r,p,kmax-k0)
-            for l in range(1,kmax-k0):
-                res.append((m+l,phi(rr) % p^(m+l),k0+l-1,k0+l))
+ ram is a list in makefb format i.e. each line is 
+[l,r]    if F(r,1) % l = 0 and  f'(r) % l !=0
+[l, l+r] if F(1,r) % l = 0 and d(F(1,r))/dr !=0
+[l^k,r,v1,v0] if val(F(r,1),l)=v1  and  val(F( r % l^(k-1),1),l)=v0 
+[l^k,l^k+r,v1,v0] if val(F(1,r),l)=v1  and  val(F(1,r % l^(k-1)),l)=v0 
+"""
+def makefb_format(f,l,lr):
+    A=l.parent();t=A.gen();F=A.base_ring();R.<t,x>=F['t,x'];S.<x>=A['x'];
+    f=S(f)
+    df=f.derivative()
+    cf=f.coeffs()
+    cf.reverse()
+    f_proj=S(cf) # f_proj(x)=F(t,1,x), f=F(t,x,1)
+    df_proj=f_proj.derivative()
+    aff=lr[0]
+    proj=lr[1]
+    ram=[]
+    simple=[]
+    for r_ in aff:
+        r=r_[0]
+        k=r_[1]
+        if k == 1 and A(df(r)) % A(l) != 0:
+            simple.append(r)
         else:
-            ff=f(r+p*x)
-            v = valuation(gcd(ff.coefficients()), p)
-            res.append((m+1,phi(r) % p^(m+1), k0, k0 + v))
-            nphi=phi(r+p*x)
-            nm=m+1
-            res.extend(all_roots_affine(ZP(ff/p^v),p,kmax,k0+v,m+1,nphi))
-    return res
-
-
-def all_roots(f,p,powerlim):
-    ZP=f.parent()
-    x=ZP.gen()
-    A=ZP.base_ring();
-    kmax=floor(powerlim/p.degree())
-    #print f,p
-    aff=all_roots_affine(f,A(p),kmax,0,0,x)
-    final=[]
-    # affine
-    for r in aff:
-        final.append((r[0],r[1],1,r[3],r[2]))
-        # print "%d^%d : (%d:%d), delta=%d-%d" % (p,r[0],r[1],1,r[3],r[2])
-    # projective
-    # That's a special precaution, as the all_roots_affine code assumes
-    # we've got no content on input. Note that this value v is used later
-    # on.
-    fh=(f.reverse())(p*x)
-    v = valuation (gcd(fh.coefficients()), p)
-    if v > 0:
-        final.append((1,1,0,v,0))
-        fh=ZP(fh/p^v)
-    proj=all_roots_affine(fh,p,kmax-1,0,0,x)
-    for r in proj:
-        final.append((1+r[0],1,p*r[1],v+r[3],v+r[2]))
-        # print "%d^%d : (%d:%d), delta=%d-%d" % (p,1+r[0],1,p*r[1],v+r[3],v+r[2])
-    # Now print and check:
-    ZP2=PolynomialRing(A,['X','Y'])
-    X,Y=ZP2.gens()
-    cl=f.coeffs()
-    hom_f=ZP2(0)
-    for i in range(f.degree()+1):
-        hom_f+=cl[i]*X^i*Y^(f.degree()-i)
-    final2=[]
-    for r in final:
-        rr = tuple([p] + list(r))
-        final2.append((p^r[0],r[1],r[2],r[3],r[4]))
-        vf=valuation(gcd(hom_f(rr[2]+p^rr[1]*X,rr[3]+p^rr[1]*Y).coefficients()),p)
-        if vf != rr[4]:
-            pass
-        assert valuation(gcd(hom_f(rr[2]+p^rr[1]*X,rr[3]+p^rr[1]*Y).coefficients()),p) == rr[4]
-    return final2
-
-def rewrite_roots(lr):
-    if lr == []:
-        return lr
-    rr = []
-    for r in lr:
-        if r[2] == 1:
-            roo = r[1]
-        else:   # projective root, encoded as p^k + 1/r.
-            roo = r[0] + ((r[2]*inverse_mod(r[1],r[0])) % r[0])
-        rr.append((r[0], r[3], r[4], roo))
-    rr.sort()
-    # merge lines with identical first three entries
-    ss = []
-    old0 = 1
-    old1 = 0
-    old2 = 0
-    lr = []
-    for r in rr:
-        if r[0] == old0 and r[1] == old1 and r[2] == old2:
-            lr.append(r[3])
+            if (A(r) % A(l)) in simple:
+                continue
+            v1=valuation(A(S(f)(r)),l)
+            if k == 1:
+                v0=0
+            else:
+                v0=valuation(A(S(f)(A(r) % A(l)^(k-1))),l)
+            if v1 > v0:
+                ram.append([l^k,v1,v0,r]) 
+    for r_ in proj:
+        r=r_[0]
+        k=r_[1]
+        if k == 1 and A(df_proj(r)) % A(l) != 0:
+            assert r == 0
+            simple.append(r+l)
         else:
-            if lr != []:
-                ss.append((old0, old1, old2, lr))
-            old0 = r[0]
-            old1 = r[1]
-            old2 = r[2]
-            lr = [r[3]]
-    ss.append((old0, old1, old2, lr))
-    return ss
+            if ((A(r) % A(l))+A(l)) in simple:
+                continue
+            v1=valuation(A(S(f_proj)(r)),l)
+            if k == 1:
+                v0=0
+            else:
+                v0=valuation(A(S(f)(r % l^(k-1))),l)
+            ram.append([l^k,v1,v0,r+l^k]) 
+    return ram,simple
 
-#dlim= max degree on the sieving domain
-#powerlim=maximal degree of the irreducibles powers we consider
+"""
+output: a list written one element per line in file filename or on screen
+dlim and powerlim are such that items [l^k,...] verify deg(l)<=dlim and
+deg(l^k)<=powerlim. It is required that powerlim <= dlim.
+"""
+def makefb(f,dlim,powerlim,filename=""): 
+    A=f.base_ring();t=A.gen();F=A.base_ring();R.<t,x>=F['t,x'];S.<x>=A['x'];
+    if filename == "":
+        gd=sys.stdout
+    else:
+        gd=open(filename,"w")
+    gd.flush()
+    gd.write("# f="+str(f)+"\n")
+    gd.write("# dlim="+str(dlim)+"\n")
+    gd.write("# powerlim="+str(powerlim)+"\n")
+    gd.flush()
+    assert powerlim <= dlim
+    for l in A.polynomials(max_degree=dlim):
+        if not A(l).is_irreducible():
+            continue
+        prec=max(floor(powerlim/l.degree()),1)
+        ram,simple=makefb_format(S(f),A(l),all_roots(S(f),A(l),prec))
+        c=len(simple)
+        if c > 0:
+            output=hexify(l)+": "+hexify(A(simple[0]))
+            for i in range(1,c):
+                output+=","+hexify(A(simple[i]))
+            gd.write(output+"\n")
+        for item in ram:
+            gd.write(hexify(A(item[0]))+":"+str(item[1])+","+str(item[2])+": "+hexify(A(item[3]))+"\n")
+        gd.flush()
+    if gd != sys.stdout:
+        gd.close()
 
-def makefb(f,dlim,powerlim,filename="",typo="cado"): 
-	if filename == "":
-		gd=sys.stdout
-	else:
-		gd=open(filename,"w")
-	gd.write("# f={0}\n".format(f))
-	gd.write("# dlim={0}\n".format(dlim))
-	gd.write("# powerlim={0}\n".format(powerlim))
-	A=f.base_ring()
-	if A!=ZZ and A!=QQ:
-		F=A.base_ring()
-		q=len(F.list())
-		dummy=2^ceil(log(q)/log(2))
-		t=A.gen()
-		Zt.<t0>=ZZ['t']
-	def hexify(ri):
-		if typo=="cado":
-			return hex(Zt(ri)(dummy))
-		else:
-			return format(ri)
-		F=A.base_ring()
-		q=F.cardinality()
-	for p in Primes(A,q^min(dlim,powerlim)):
-		#print 'ok'
-		xx = all_roots(f, p, powerlim)
-		xx = rewrite_roots(xx)
-		for r in xx:
-			if (r[1] != 1) or (r[2] != 0):
-				stri =hexify(r[0])+":"+format(r[1])+","+format(r[2])+": "+hexify(r[3][0])
-			else:
-				stri = hexify(r[0])+": "+hexify(r[3][0])
-			for i in range(1,len(r[3])):
-				stri = stri + ","+hexify(r[3][i])
-			gd.write(stri+"\n")
-
-
+""" EXAMPLE
+makefb_format(S((x+t)^3+t^5),A(t),all_roots(S(x+t),A(t),7))
+makefb(S(t*x^3-(1+t)^2),5,3)
+"""
