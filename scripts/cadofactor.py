@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import logging
+import subprocess
 
 class ANSI(object):
     CSI = '\x1b[' # ANSI Control Sequence Introducer. Not the TV show
@@ -7,7 +8,7 @@ class ANSI(object):
     NORMAL = CSI + '0' + SGR
     BLACK = CSI + '30' + SGR 
     GREY = CSI + '30;1'
-    RED= CSI + '31' + SGR 
+    RED = CSI + '31' + SGR 
     BRIGHTRED = CSI + '31;1' + SGR
     GREEN = CSI + '32' + SGR
     BRIGHTGREEN = CSI + '32;1' + SGR
@@ -24,20 +25,25 @@ class ANSI(object):
     WHITE = CSI + '37;1' + SGR
 
 class ScreenFormatter(logging.Formatter):
-    colors = {
+    colours = {
         logging.INFO : ANSI.BRIGHTGREEN,
         logging.WARNING : ANSI.BRIGHTYELLOW,
         logging.ERROR : ANSI.BRIGHTRED
         }
 
-    formatstr = \
+    colourformatstr = \
         '%(padding)s%(colour)s%(levelnametitle)s%(nocolour)s:%(message)s'
+    nocolourformatstr = \
+        '%(padding)s%(levelnametitle)s:%(message)s'
 
-    def __init__(self):
-        super().__init__(fmt=self.__class__.formatstr)
+    def __init__(self, colour = True):
+        if colour:
+            super().__init__(fmt=self.__class__.colourformatstr)
+        else:
+            super().__init__(fmt=self.__class__.nocolourformatstr)
 
     def format(self, record):
-        record.colour = ScreenFormatter.colors[record.levelno]
+        record.colour = ScreenFormatter.colours[record.levelno]
         record.levelnametitle = record.levelname.title()
         record.nocolour = ANSI.NORMAL
         if hasattr(record, "indent"):
@@ -49,28 +55,54 @@ class ScreenFormatter(logging.Formatter):
 
 class FileFormatter(logging.Formatter):
     formatstr = \
-       '%(asctime)s PID%(process)s %(levelnametitle)s:%(message)s' 
+       'PID%(process)s %(asctime)s %(levelnametitle)s:%(message)s' 
 
     def __init__(self):
         super().__init__(fmt=self.__class__.formatstr)
 
 class Logger(object):
     @staticmethod
-    def getLogger(lvl = logging.INFO, filename=None):
+    def getLogger(lvl = logging.INFO, filename=None, filelvl = logging.INFO, colour=True):
         logger = logging.getLogger(__name__)
-        logger.setLevel(lvl)
+        logger.setLevel(logging.DEBUG)
         ch = logging.StreamHandler()
-        screenformatter = ScreenFormatter()
+        ch.setLevel(lvl)
+        screenformatter = ScreenFormatter(colour=colour)
         ch.setFormatter(screenformatter)
         logger.addHandler(ch)
         if not filename is None:
             fh = logging.FileHandler(filename)
+            fh.setLevel(filelvl)
             fileformatter = FileFormatter()
             fh.setFormatter(fileformatter)
             logger.addHandler(fh)
         return logger
 
-logger = Logger.getLogger(filename = "log")
+class Command(object):
+    def __init__(self, command, logfile=None):
+        # Run the command
+        self.command = command
+        if not logfile is None:
+            f = open(logfile, "a")
+            f.write(self.command + "\n")
+        self.child = subprocess.Popen(self.command, stdout = subprocess.PIPE, 
+            stderr = subprocess.PIPE)
+        if not logfile is None:
+            f.write("# Child process has PID " + str(self.child.pid) + "\n")
+            f.close()
+        logger.info("Running command (PID=" + str(self.child.pid) + "): " + self.command)
+
+    def wait(self):
+        # Wait for command to finish executing, capturing stdout and stderr 
+        # in output tuple
+        (self.stdout, self.stderr) = self.child.communicate()
+        logger.info("Exit status " + str(self.child.returncode) + " for PID " + str(self.child.pid))
+        return self.child.returncode
+
+logger = Logger.getLogger(filename = "log", filelvl = logging.DEBUG)
 logger.info("An Info Center!")
 logger.warn("Beware")
 logger.error("All hope abandon", extra={"indent" : 4})
+c = Command("ls", logfile = "commands")
+c.wait()
+print(c.stdout)
