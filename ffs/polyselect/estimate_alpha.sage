@@ -9,13 +9,16 @@ def estimate_alpha_l(f, l, nt):
     s=0
     n=0
     x=f.parent().gen()
-    A=f.base_ring()
-    F=homogenize(f)
-    dl=l.degree()
+    A=f.base_ring(); F=A.base_ring()
+    H.<X,Y>=A['X,Y']
+    d=f.degree()
+    cf=f.coeffs()
+    F=sum(cf[i]*X^i*Y^(d-i)for i in range(d+1))
+    dl=A(l).degree()
     for i in range(nt):
         a=A.random_element(ceil(log(nt,2)))
         b=A.random_element(ceil(log(nt,2)))
-        c=A.random_element(f(0).degree()+f.degree()*ceil(log(nt,2)))
+        c=A.random_element(f(0).degree()+d*ceil(log(nt,2)))
         if gcd(a,b) == 1:
             ds=valuation(c,l)-valuation(A(F(a,b)),l)
             s+=ZZ(ds)

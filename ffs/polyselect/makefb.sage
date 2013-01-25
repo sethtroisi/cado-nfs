@@ -63,7 +63,7 @@ output: a list written one element per line in file filename or on screen
 dlim and powerlim are such that items [l^k,...] verify deg(l)<=dlim and
 deg(l^k)<=powerlim. It is required that powerlim <= dlim.
 """
-def makefb(f,dlim,powerlim,filename=""): 
+def makefb(f,dlim,powerlim=1,filename=""): 
     A=f.base_ring();t=A.gen();F=A.base_ring();R.<t,x>=F['t,x'];S.<x>=A['x'];
     if filename == "":
         gd=sys.stdout

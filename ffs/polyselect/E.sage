@@ -20,8 +20,12 @@ def cancelations(lr,prec,q,s):
         gap_=r_[2]
         if deg(r) == s:
             prob=1/(q+1)*q^(-Nr)
-            c[gap_]+=prob
-            c[gap_-1]-=prob
+            for r__ in lr:
+                if deg(r__[0] - r) < -m+1 and r__[1] == m-1:
+                    gap__=r__[2]
+                    c[gap__]-=prob
+                    c[gap_]+=prob
+                    break
     return c
 
 
@@ -34,7 +38,7 @@ def cancelations(lr,prec,q,s):
         alphaf=alpha(f)
         beta= smoothness bound (in degree)
 """
-def E(f,g,e,s,beta,alphaf):
+def E(f,g,e,s,beta,alphaf,prec=5):
     A=f.base_ring(); t=A.gen(); F=A.base_ring()
     q=F.cardinality(); S.<x>=A['x']
     f=S(f)

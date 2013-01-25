@@ -57,6 +57,7 @@ def Laurent_roots(f,prec=5):
 
 def alpha_infty(f,skew,prec=5):
     rr=Laurent_roots(f,prec)
+    q=f.base_ring().base_ring().cardinality()
     result=0
     for r_ in rr:
         r=r_[0]

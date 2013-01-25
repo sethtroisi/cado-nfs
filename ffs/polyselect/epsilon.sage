@@ -1,6 +1,5 @@
-load init_rings.sage
 load alpha.sage
-load real_roots_stats.sage 
+load alpha_infty.sage 
 
 def sigma(f,s,e=0):
     """
@@ -25,6 +24,7 @@ def epsilon(f,s,e=0,B=1000):
     return alpha(f,B)+alpha_infty(f,s)+sigma(f,s,e)
 
 """
+load init_rings.sage
 f=x^5+t^40*x+t
 sigma(S(f),10)
 sigma(S(f),0)

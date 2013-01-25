@@ -3,7 +3,7 @@ The main function is approx_alpha(f,B). It is a good approximation of alpha
 using the factor base.
 """
 
-load makefb_clean.sage
+load makefb.sage
 
 
 """
