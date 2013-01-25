@@ -32,7 +32,7 @@ static inline int trace_on_spot_x(unsigned int x) {
     return x == (trace_Nx.N << LOG_BUCKET_REGION) + trace_Nx.x;
 }
 
-static inline int trace_on_spot_ab(int a, unsigned int b) {
+static inline int trace_on_spot_ab(int64_t a, uint64_t b) {
     return a == trace_ab.a && b == trace_ab.b;
 }
 
