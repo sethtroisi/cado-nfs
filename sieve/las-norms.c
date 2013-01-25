@@ -560,8 +560,9 @@ get_maxnorm_aux (double *g, const unsigned int d, double s)
   return gmax;
 }
 
-/* returns the maximal value of log2 |F(a,b)/q| for
-   a = a0 * i + a1 * j, b = b0 * i + b1 * j and q >= q0,
+#if 1
+/* returns the maximal value of log2|F(a,b)/q|, or log2|F(a,b)| if ratq=0,
+   for a = a0 * i + a1 * j, b = b0 * i + b1 * j and q >= q0,
    -I/2 <= i <= I/2, 0 <= j <= I/2*min(s*B/|a1|,B/|b1|)
    where B >= sqrt(2*q/s/sqrt(3)) for all special-q in the current range
    (s is the skewness, and B = si->B).
@@ -612,7 +613,7 @@ get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
       fd[d - k] = tmp;
     }
 
-  /* (a) determine the maximum of |g(y)| for 0 <= y <= 1 */
+  /* (a) determine the maximum of |g(y)| for 0 <= y <= 1, with g(y) = F(s,y) */
   norm = get_maxnorm_aux (fd, d, 1.0);
   if (norm > max_norm)
     max_norm = norm;
@@ -634,9 +635,38 @@ get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
   /* divide by q0 if sieving on algebraic side */
   if (!si->ratq)
       tmp /= (double) q0;
-  tmp *= 0.5;
+  //  tmp *= 0.5;
   return log2 (tmp);
 }
+#else
+/* simpler but less accurate version */
+static double
+get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
+{
+  unsigned int d = cpoly->alg->degree, k;
+  double *fd, maxnorm;
+
+  /* if F(a,b) = f[d]*a^d + f[d-1]*a^(d-1)*b + ... + f[0]*b^d,
+     then |F(a,b)| <= |f[d]|*|a|^d + |f[d-1]|*|a|^(d-1)*b + ... + f[0]*b^d
+     and the maximum is attained for a=s and b=1 (see above) */
+
+  fd = (double*) malloc ((d + 1) * sizeof (double));
+  FATAL_ERROR_CHECK(fd == NULL, "malloc failed");
+  for (k = 0; k <= d; k++)
+    {
+      fd[k] = fabs (mpz_get_d (cpoly->alg->f[k]));
+      fprintf (stderr, "f[%d]=%e\n", k, fd[k]);
+    }
+  maxnorm = fpoly_eval (fd, d, cpoly->skew);
+  fprintf (stderr, "s=%f maxnorm=%e\n", cpoly->skew, maxnorm);
+  free (fd);
+  for (k = 0; k < d; k++)
+    maxnorm *= si->B * (double) si->I;
+  if (!si->ratq)
+    maxnorm /= (double) q0;
+  return log2 (maxnorm);
+}
+#endif
 
 /* this function initializes the scaling factors and report bounds on the
    rational and algebraic sides */
@@ -718,32 +748,6 @@ sieve_info_init_norm_data (sieve_info_ptr si, unsigned long q0)
   fprintf (si->output, " bound=%u\n", alg_bound);
   sieve_info_init_lognorm (alg->Bound, alg_bound, si->cpoly->alg->lim,
                            si->cpoly->alg->lpb, alg->scale);
-}
-
-/* same as sieve_info_init_norm_data, but for a given special-q */
-void
-sieve_info_init_norm_data_sq (sieve_info_ptr si, unsigned long q)
-{
-  sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
-  double r, maxlog2;
-  unsigned char rat_bound;
-
-  /************************** rational side **********************************/
-  r = fabs (rat->fijd[1]) * (double) si->I * 0.5
-    + fabs (rat->fijd[0]) * (double) si->J;
-  if (si->ratq)
-    r /= (double) q;
-  rat->logmax = maxlog2 = log2 (r);
-  fprintf (si->output, "# Rat. side: log2(maxnorm)=%1.2f logbase=%1.6f",
-           maxlog2, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
-  rat->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
-  r = si->cpoly->rat->lambda * (double) si->cpoly->rat->lpb;
-  rat_bound = (unsigned char) (r * rat->scale) + GUARD;
-  fprintf (si->output, " bound=%u\n", rat_bound);
-  sieve_info_init_lognorm (rat->Bound, rat_bound, si->cpoly->rat->lim,
-                           si->cpoly->rat->lpb, rat->scale);
-
-  /************************** algebraic side *********************************/
 }
 
 void sieve_info_clear_norm_data(sieve_info_ptr si)

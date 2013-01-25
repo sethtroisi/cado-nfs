@@ -2286,9 +2286,6 @@ main (int argc0, char *argv0[])
         sieve_info_update (si);
         totJ += (double) si->J;
 
-        /* updates scaling factors and report bounds for this one special-q */
-        sieve_info_init_norm_data_sq (si, q0);
-
         trace_update_conditions(si);
 
         report->ttsm -= seconds();
