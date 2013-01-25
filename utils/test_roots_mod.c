@@ -1,4 +1,4 @@
-#include "cado_config.h"
+#include "cado.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>

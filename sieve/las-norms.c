@@ -1,4 +1,5 @@
 #define __STDC_LIMIT_MACROS
+#include "cado.h"
 #include <string.h>
 #include <limits.h>
 #include <math.h>               /* ceil */
