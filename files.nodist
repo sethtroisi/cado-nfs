@@ -87,6 +87,7 @@ params/rsa155.poly3
 params/rsa155.poly4
 params/rsa180.poly
 params/rsa190.poly
+params/rsa704.poly
 params/mach_desc.rsa100
 scripts/check_all_gcc.sh
 scripts/gcc-script.sh

@@ -4,6 +4,7 @@
  */
 
 
+#include "cado.h"
 #include "ropt_arith.h"
 
 

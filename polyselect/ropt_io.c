@@ -4,7 +4,7 @@
  */
 
 
-#include "cado_config.h"
+#include "cado.h"
 #include "ropt_io.h"
 #include "ropt.h"
 #include "portability.h"

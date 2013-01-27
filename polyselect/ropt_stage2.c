@@ -4,6 +4,7 @@
  */
 
 
+#include "cado.h"
 #include "ropt_stage2.h"
 #include "portability.h"
 

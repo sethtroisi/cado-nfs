@@ -1,3 +1,4 @@
+#include "cado.h"
 #include <stdio.h>
 
 #include "las-config.h"

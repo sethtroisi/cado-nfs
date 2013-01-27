@@ -1,4 +1,5 @@
 #define __STDC_LIMIT_MACROS
+#include "cado.h"
 #include <string.h>
 #include <limits.h>
 #include <math.h>               /* ceil */
@@ -25,10 +26,9 @@ sieve_info_init_lognorm (unsigned char *C, unsigned char threshold,
                          unsigned long l MAYBE_UNUSED,
                          double scale MAYBE_UNUSED)
 {
-  unsigned long k;
-
-  for (k = 0; k < 256; k++)
-    C[k] = (k <= threshold) ? 0 : 127;
+  /* for (k = 0; k < 256; k++) C[k] = (k <= threshold) ? 0 : 127; */
+  memset (C, 0, threshold + 1);
+  memset (C + threshold + 1, 127, 256 - (threshold + 1));
 
 #ifdef COFACTOR_TRICK
   {
@@ -488,8 +488,8 @@ init_alg_norms_bucket_region(unsigned char *S,
 
 /* }}} */
 
-/* return max |g(x)| for 0 <= x <= s,
-   where g(x) = g[d]*x^d + ... + g[1]*x + g[0] */
+/* return max |g(x)| for x in (0, s) where s can be negative,
+   and g(x) = g[d]*x^d + ... + g[1]*x + g[0] */
 static double
 get_maxnorm_aux (double *g, const unsigned int d, double s)
 {
@@ -512,9 +512,9 @@ get_maxnorm_aux (double *g, const unsigned int d, double s)
     for (l = 0; l <= d - k; l++)
       dg[k][l] = (l + 1) * dg[k - 1][l + 1];
   /* now dg[d-1][0]+x*dg[d-1][1] is the (d-1)-th derivative: it can have at
-     most one sign change, iff dg[d-1][0] and dg[d-1][0]+dg[d-1][1] have
-     different signs */
-  if (dg[d-1][0] * (dg[d-1][0] + dg[d-1][1]) < 0)
+     most one sign change in (0, s), this happens iff dg[d-1][0] and
+     dg[d-1][0]+s*dg[d-1][1] have different signs */
+  if (dg[d-1][0] * (dg[d-1][0] + s * dg[d-1][1]) < 0)
     {
       sign_change = 1;
       roots[0] = - dg[d-1][0] / dg[d-1][1]; /* root of (d-1)-th derivative */
@@ -558,8 +558,9 @@ get_maxnorm_aux (double *g, const unsigned int d, double s)
   return gmax;
 }
 
-/* returns the maximal value of log2 |F(a,b)/q| for
-   a = a0 * i + a1 * j, b = b0 * i + b1 * j and q >= q0,
+#if 1
+/* returns the maximal value of log2|F(a,b)/q|, or log2|F(a,b)| if ratq=0,
+   for a = a0 * i + a1 * j, b = b0 * i + b1 * j and q >= q0,
    -I/2 <= i <= I/2, 0 <= j <= I/2*min(s*B/|a1|,B/|b1|)
    where B >= sqrt(2*q/s/sqrt(3)) for all special-q in the current range
    (s is the skewness, and B = l_infty_snorm_u).
@@ -611,7 +612,7 @@ get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, double q0d, double l_infty_
       fd[d - k] = tmp;
     }
 
-  /* (a) determine the maximum of |g(y)| for 0 <= y <= 1 */
+  /* (a) determine the maximum of |g(y)| for 0 <= y <= 1, with g(y) = F(s,y) */
   norm = get_maxnorm_aux (fd, d, 1.0);
   if (norm > max_norm)
     max_norm = norm;
@@ -633,9 +634,39 @@ get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, double q0d, double l_infty_
   /* divide by q0 if sieving on alg side */
   if (qside == ALGEBRAIC_SIDE)
       tmp /= q0d;
+  /* FIXME: what is this ??? */
   tmp *= 0.5;
   return log2(tmp);
 }
+#else
+/* simpler but less accurate version */
+static double
+get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
+{
+  unsigned int d = cpoly->alg->degree, k;
+  double *fd, maxnorm;
+
+  /* if F(a,b) = f[d]*a^d + f[d-1]*a^(d-1)*b + ... + f[0]*b^d,
+     then |F(a,b)| <= |f[d]|*|a|^d + |f[d-1]|*|a|^(d-1)*b + ... + f[0]*b^d
+     and the maximum is attained for a=s and b=1 (see above) */
+
+  fd = (double*) malloc ((d + 1) * sizeof (double));
+  FATAL_ERROR_CHECK(fd == NULL, "malloc failed");
+  for (k = 0; k <= d; k++)
+    {
+      fd[k] = fabs (mpz_get_d (cpoly->alg->f[k]));
+      fprintf (stderr, "f[%d]=%e\n", k, fd[k]);
+    }
+  maxnorm = fpoly_eval (fd, d, cpoly->skew);
+  fprintf (stderr, "s=%f maxnorm=%e\n", cpoly->skew, maxnorm);
+  free (fd);
+  for (k = 0; k < d; k++)
+    maxnorm *= si->B * (double) si->I;
+  if (!si->ratq)
+    maxnorm /= (double) q0;
+  return log2 (maxnorm);
+}
+#endif
 
 /* this function initializes the scaling factors and report bounds on the
    rational and algebraic sides */
@@ -736,7 +767,8 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
     }
 }
 
-void sieve_info_update_norm_data(sieve_info_ptr si)
+void
+sieve_info_update_norm_data (sieve_info_ptr si)
 {
     int32_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
     /* Update floating point version of algebraic poly (do both, while
@@ -744,11 +776,11 @@ void sieve_info_update_norm_data(sieve_info_ptr si)
     for (int side = 0; side < 2; side++) {
         sieve_side_info_ptr s = si->sides[side];
         cado_poly_side_ptr ps = si->cpoly->pols[side];
-        mp_poly_homography(s->fij, ps->f, ps->degree, H);
+        mp_poly_homography (s->fij, ps->f, ps->degree, H);
         double invq = 1.0;
         if (si->conf->side == side)
             invq /= mpz_get_d(si->q);
         for (int k = 0; k <= ps->degree; k++)
-            s->fijd[k] = mpz_get_d(s->fij[k]) * invq;
+            s->fijd[k] = mpz_get_d (s->fij[k]) * invq;
     }
 }

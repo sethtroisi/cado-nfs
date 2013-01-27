@@ -9,6 +9,7 @@
  */
 
 
+#include "cado.h"
 #include "ropt.h"
 #include "portability.h"
 

@@ -1,3 +1,4 @@
+#include "cado.h"
 #include <math.h>       /* rint etc */
 #include "las-types.h"
 #include "las-qlattice.h"

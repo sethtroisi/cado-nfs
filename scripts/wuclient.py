@@ -9,6 +9,7 @@ import time
 import urllib.request
 import subprocess
 import hashlib
+import logging
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -44,17 +45,12 @@ OPTIONAL_SETTINGS = {"WU_FILENAME" : ("WU", "Filename under which to store WU fi
                      "DEBUG" : ("0", "Debugging verbosity"),
                      "ARCH" : ("", "Architecture string for this client"),
                      "DOWNLOADRETRY" : ("300", "Time to wait before download retries"),
-                     "NICENESS" : ("0", "Run subprocesses under this niceness")}
+                     "NICENESS" : ("0", "Run subprocesses under this niceness"),
+                     "LOGLEVEL" : ("INFO", "Verbosity of logging"),
+                     "LOGFILE" : (None, "File to which to write log output")}
 # Merge the two, removing help string
 SETTINGS = dict([(a,b) for (a,(b,c)) in list(REQUIRED_SETTINGS.items()) + \
                                         list(OPTIONAL_SETTINGS.items())])
-
-def log(level, text, var = None):
-    if int(SETTINGS["DEBUG"]) >= level:
-        if var == None:
-            print (text)
-        else:
-            print (text + str(var))
 
 def get_file(urlpath, dlpath = None, options = None):
     # print('get_file("' + urlpath + '", "' + dlpath + '")')
@@ -63,19 +59,19 @@ def get_file(urlpath, dlpath = None, options = None):
     url = SETTINGS["SERVER"] + "/" + urlpath
     if options:
         url = url + "?" + options
-    log (0, "Downloading " + url + " to " + dlpath);
+    logging.info ("Downloading " + url + " to " + dlpath);
     request = None
     while request == None:
         try:
             request = urllib.request.urlopen(url)
         except urllib.error.HTTPError as e:
-            log (0, str(e))
+            logging.error (str(e))
             return False
         except (NameError, urllib.error.URLError) as e:
             request = None
             wait = float(SETTINGS["DOWNLOADRETRY"])
-            log(0, "Download of " + urlpath + " failed, " + str(e))
-            log(0, "Waiting " + str(wait) + " seconds before retrying")
+            logging.error("Download of " + urlpath + " failed, " + str(e))
+            logging.error("Waiting " + str(wait) + " seconds before retrying")
             time.sleep(wait)
     file = open(dlpath, "wb")
     shutil.copyfileobj (request, file)
@@ -104,13 +100,13 @@ def do_checksum(filename, checksum = None):
 def get_missing_file(urlpath, filename, checksum = None, options = None):
     # print('get_missing_file("' + urlpath + '", "' + filename + '", ' + str(checksum) + ')')
     if os.path.isfile(filename):
-        log (0, filename + " already exists, not downloading")
+        logging.info (filename + " already exists, not downloading")
         if checksum is None:
             return True
         filesum = do_checksum(filename)
         if filesum.lower() == checksum.lower():
             return True
-        log (0, "Existing file " + filename + " has wrong checksum " + filesum + 
+        logging.error ("Existing file " + filename + " has wrong checksum " + filesum + 
              ", workunit specified " + checksum +". Deleting file.")
         os.remove(filename)
     
@@ -127,10 +123,10 @@ def get_missing_file(urlpath, filename, checksum = None, options = None):
         if filesum.lower() == checksum.lower():
             return True
         if not last_filesum is None and filesum == last_filesum:
-            log (0, "Downloaded file " + filename + " has same wrong checksum " 
+            logging.error ("Downloaded file " + filename + " has same wrong checksum " 
                  + filesum + " again. Exiting.")
             return False
-        log (0, "Downloaded file " + filename + " has wrong checksum " + 
+        logging.error ("Downloaded file " + filename + " has wrong checksum " + 
              filesum + ", workunit specified " + checksum + ". Deleting file.")
         os.remove(filename)
         last_filesum = filesum
@@ -143,13 +139,13 @@ class Workunit_Processor(Workunit):
         self.clientid = SETTINGS["CLIENTID"]
         self.debug = debug # Controls debugging output
 
-        log (1, "Parsing workunit from file " + filepath)
+        logging.debug ("Parsing workunit from file " + filepath)
         wu_file = open(filepath)
         wu_text = wu_file.read()
         wu_file.close()
         self.wu = Workunit(wu_text)
         self.WUid = self.wu.get_id()
-        log (1, " done, workunit ID is " + self.WUid)
+        logging.debug (" done, workunit ID is " + self.WUid)
         self.stdout = []
         self.stderr = []
 
@@ -167,7 +163,7 @@ class Workunit_Processor(Workunit):
             path = SETTINGS["DLDIR"] + '/' + dlname
             mode = os.stat(path).st_mode
             if mode & stat.S_IXUSR == 0:
-                log (0, "Setting executable flag for " + path)
+                logging.info ("Setting executable flag for " + path)
                 os.chmod(path, mode | stat.S_IXUSR)
         return True
 
@@ -178,7 +174,7 @@ class Workunit_Processor(Workunit):
     def run_commands(self):
         for (counter, command) in enumerate(self.wu.data["COMMAND"]):
             command = Template(command).safe_substitute(SETTINGS)
-            log (0, "Running command for workunit " + self.wu.get_id() + ": " + command)
+            logging.info ("Running command for workunit " + self.wu.get_id() + ": " + command)
 
             # If niceness command line parameter was set, call self.renice() in
             # child process, before executing command
@@ -204,12 +200,12 @@ class Workunit_Processor(Workunit):
                 self.stderr.append(None)
 
             if child.returncode != 0:
-                log (0, "Command exited with exit code " + str(child.returncode)) 
+                logging.error ("Command exited with exit code " + str(child.returncode)) 
                 self.failedcommand = counter
                 self.exitcode = child.returncode
                 return False
             else:
-                log (1, "Command exited successfully")
+                logging.debug ("Command exited successfully")
         return True
 
     def upload_result(self):
@@ -223,7 +219,7 @@ class Workunit_Processor(Workunit):
         if "RESULT" in self.wu.data:
             for f in self.wu.data["RESULT"]:
                 filepath = SETTINGS["WORKDIR"] + "/" + f
-                log (1, "Adding result file " + filepath + " to upload")
+                logging.debug ("Adding result file " + filepath + " to upload")
                 file = open(filepath, "rb")
                 filedata = file.read()
                 file.close()
@@ -236,7 +232,7 @@ class Workunit_Processor(Workunit):
         for (name, arr) in (("stdout", self.stdout), ("stderr", self.stderr)):
             for (counter, f) in enumerate(arr):
                 if not f is None:
-                    log (1, "Adding " + name + " for command " + str(counter) + " to upload")
+                    logging.debug ("Adding " + name + " for command " + str(counter) + " to upload")
                     result = MIMEApplication(f, _encoder=email.encoders.encode_noop)
                     result.add_header('Content-Disposition', 'form-data', name="results", 
                                       filename=name + str(counter))
@@ -271,12 +267,11 @@ class Workunit_Processor(Workunit):
             except (urllib.error.URLError) as e:
                 conn = None
                 wait = float(SETTINGS["DOWNLOADRETRY"])
-                log(0, "Upload of result failed, " + str(e))
-                log(0, "Waiting " + str(wait) + " seconds before retrying")
+                logging.error("Upload of result failed, " + str(e))
+                logging.error("Waiting " + str(wait) + " seconds before retrying")
                 time.sleep(wait)
-        log (1, "Server response:")
-        for line in conn:
-            log(1, line)
+        response = conn.read()
+        logging.debug ("Server response:\n" + response)
         conn.close()
         return True
 
@@ -285,18 +280,18 @@ class Workunit_Processor(Workunit):
             for f in self.wu.data["RESULT"]:
                 filepath = SETTINGS["WORKDIR"] + "/" + f
                 if not os.path.isfile(filepath):
-                    log (0, "Result file " + filepath + " does not exist")
+                    logging.info ("Result file " + filepath + " does not exist")
                     return False
-                log (0, "Result file " + filepath + " already exists")
-        log (0, "All result files already exist")
+                logging.info ("Result file " + filepath + " already exists")
+        logging.info ("All result files already exist")
         return True
 
     def cleanup(self):
-        log (0, "Cleaning up for workunit " + self.wu.get_id())
+        logging.info ("Cleaning up for workunit " + self.wu.get_id())
         if "RESULT" in self.wu.data:
             for f in self.wu.data["RESULT"]:
                 filepath = SETTINGS["WORKDIR"] + "/" + f
-                log (0, "Removing result file " + filepath)
+                logging.info ("Removing result file " + filepath)
                 os.remove(filepath)
 
     def process(self):
@@ -322,7 +317,7 @@ def do_work():
     wu = Workunit_Processor(wu_filename, int(SETTINGS["DEBUG"]))
     if not wu.process():
         return False
-    log (0, "Removing workunit file " + wu_filename)
+    logging.info ("Removing workunit file " + wu_filename)
     os.remove(wu_filename)
     return True
 
@@ -333,15 +328,27 @@ if __name__ == '__main__':
         parser.add_argument('--' + arg.lower(), required = True,
         help=REQUIRED_SETTINGS[arg][1])
     for arg in OPTIONAL_SETTINGS.keys():
-        parser.add_argument('--' + arg.lower(), required = False, 
-            default=OPTIONAL_SETTINGS[arg][0], 
-            help=OPTIONAL_SETTINGS[arg][1] + " (default: " + OPTIONAL_SETTINGS[arg][0] + ")")
+        if not OPTIONAL_SETTINGS[arg][0] is None:
+            parser.add_argument('--' + arg.lower(), required = False, 
+                default=OPTIONAL_SETTINGS[arg][0], 
+                help=OPTIONAL_SETTINGS[arg][1] + " (default: " + OPTIONAL_SETTINGS[arg][0] + ")")
+        else:
+            parser.add_argument('--' + arg.lower(), required = False, 
+                help=OPTIONAL_SETTINGS[arg][1])
     # Parse command line, store as dictionary
     args = vars(parser.parse_args())
     # Copy values to SETTINGS
     for arg in SETTINGS.keys():
         if arg.lower() in args:
             SETTINGS[arg] = args[arg.lower()]
+
+    logopt = {}
+    logopt["level"] = getattr(logging, SETTINGS["LOGLEVEL"].upper(), None)
+    if not isinstance(logopt["level"], int):
+        raise ValueError('Invalid log level: ' + SETTINGS["LOGLEVEL"])
+    if not SETTINGS["LOGFILE"] is None:
+        logopt["filename"] = SETTINGS["LOGFILE"]
+    logging.basicConfig(**logopt)
 
     # print (str(SETTINGS))
 

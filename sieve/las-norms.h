@@ -44,6 +44,7 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
 void sieve_info_clear_norm_data(sieve_info_ptr si);
 
 void sieve_info_update_norm_data(sieve_info_ptr si);
+void sieve_info_init_norm_data_sq (sieve_info_ptr si, unsigned long q);
 
 /* Determine whether a sieve entry with sieve residue S1 on sieving side 1
    and sieve residue S2 on sieving side 2 is likely smooth. 

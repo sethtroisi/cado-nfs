@@ -1,7 +1,7 @@
 #ifndef LAS_ARITH_H_
 #define LAS_ARITH_H_
 
-#include "cado_config.h"
+#include "cado.h"
 #include <stdint.h>
 
 #include "fb.h"
