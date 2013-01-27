@@ -594,8 +594,8 @@ static void sieve_info_clear (las_info_ptr las, sieve_info_ptr si)/*{{{*/
         facul_clear_strategy (si->sides[s]->strategy);
         si->sides[s]->strategy = NULL;
         sieve_info_clear_trialdiv(si, s);
+        free(si->sides[s]->fb);
         for(int i = 0 ; i < las->nb_threads ; i++) {
-            free(si->sides[s]->fb);
             free(si->sides[s]->fb_bucket_threads[i]);
         }
         free(si->sides[s]->fb_bucket_threads);
