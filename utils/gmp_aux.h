@@ -23,10 +23,12 @@ extern "C" {
 /* gmp_aux */
 extern void mpz_set_uint64 (mpz_t, uint64_t);
 extern void mpz_set_int64 (mpz_t, int64_t);
-extern uint64_t mpz_get_uint64 (mpz_t);
-extern int64_t mpz_get_int64 (mpz_t);
-extern void mpz_mul_uint64 (mpz_t a, mpz_t b, uint64_t c);
-extern void mpz_mul_int64 (mpz_t a, mpz_t b, int64_t c);
+extern uint64_t mpz_get_uint64 (mpz_srcptr);
+extern int64_t mpz_get_int64 (mpz_srcptr);
+extern void mpz_mul_uint64 (mpz_t a, mpz_srcptr b, uint64_t c);
+extern void mpz_mul_int64 (mpz_t a, mpz_srcptr b, int64_t c);
+extern int mpz_fits_int64_p(mpz_srcptr);
+extern int mpz_fits_uint64_p(mpz_srcptr);
 extern uint64_t uint64_nextprime (uint64_t);
 extern unsigned long ulong_nextprime (unsigned long);
 extern int isprime (unsigned long);

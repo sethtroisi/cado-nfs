@@ -2,6 +2,7 @@
 #include "las-config.h"
 #include "las-types.h"
 #include "las-coordinates.h"
+#include "gmp_aux.h"
 
 /*  Conversions between different representations for sieve locations:
  *
@@ -69,8 +70,8 @@ int ABToIJ(int *i, unsigned int *j, const int64_t a, const uint64_t b, sieve_inf
 {
     int64_t ii =   a * (int64_t) si->b1 - b * (int64_t)si->a1;
     int64_t jj = - a * (int64_t) si->b0 + b * (int64_t)si->a0;
-    if (ii % (int64_t) si->q) return 0; ii /= (int64_t) si->q;
-    if (jj % (int64_t) si->q) return 0; jj /= (int64_t) si->q;
+    if (ii % mpz_get_int64(si->q)) return 0; ii /= mpz_get_int64(si->q);
+    if (jj % mpz_get_int64(si->q)) return 0; jj /= mpz_get_int64(si->q);
     if (jj < 0) { ii = -ii; jj = -jj; }
     *i = ii;
     *j = jj;

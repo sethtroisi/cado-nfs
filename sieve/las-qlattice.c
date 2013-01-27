@@ -132,14 +132,14 @@ int SkewGauss(sieve_info_ptr si, double skewness)
     mpz_init_set_ui(b[1], 1);
     generic_skew_gauss(a, b, sigma);
     int fits = 1;
-    fits = fits && mpz_cmp_si(a[0], INT64_MIN) >= 0;
-    fits = fits && mpz_cmp_si(b[0], INT64_MIN) >= 0;
-    fits = fits && mpz_cmp_si(a[1], INT64_MIN) >= 0;
-    fits = fits && mpz_cmp_si(b[1], INT64_MIN) >= 0;
-    fits = fits && mpz_cmp_si(a[0], INT64_MAX) <= 0;
-    fits = fits && mpz_cmp_si(b[0], INT64_MAX) <= 0;
-    fits = fits && mpz_cmp_si(a[1], INT64_MAX) <= 0;
-    fits = fits && mpz_cmp_si(b[1], INT64_MAX) <= 0;
+    fits = fits && mpz_fits_int64_p(a[0]);
+    fits = fits && mpz_fits_int64_p(b[0]);
+    fits = fits && mpz_fits_int64_p(a[1]);
+    fits = fits && mpz_fits_int64_p(b[1]);
+    fits = fits && mpz_fits_int64_p(a[0]);
+    fits = fits && mpz_fits_int64_p(b[0]);
+    fits = fits && mpz_fits_int64_p(a[1]);
+    fits = fits && mpz_fits_int64_p(b[1]);
     if (fits) {
         si->a0 = mpz_get_int64(a[0]);
         si->a1 = mpz_get_int64(a[1]);

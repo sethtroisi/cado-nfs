@@ -34,42 +34,68 @@ mpz_set_int64 (mpz_t z, int64_t q)
     }
 }
 
-/* this functions discards z */
 uint64_t
-mpz_get_uint64 (mpz_t z)
+mpz_get_uint64 (mpz_srcptr z)
 {
-  uint64_t q;
+    uint64_t q;
 
-  if (sizeof (unsigned long int) == 8)
-    q = mpz_get_ui (z);
-  else
+    if (sizeof (unsigned long int) == 8)
+        q = mpz_get_ui (z);
+    else
     {
-      ASSERT_ALWAYS (sizeof (unsigned long int) == 4);
-      q = mpz_get_ui (z); /* get the low word of z */
-      mpz_div_2exp (z, z, 32);
-      q += (uint64_t) mpz_get_ui (z) << 32;
+        mpz_t foo;
+        mpz_init(foo);
+        ASSERT_ALWAYS (sizeof (unsigned long int) == 4);
+        q = mpz_get_ui (z); /* get the low word of z */
+        mpz_div_2exp (foo, z, 32);
+        q += (uint64_t) mpz_get_ui (foo) << 32;
+        mpz_clear(foo);
     }
-  return q;
+    return q;
 }
 
 int64_t
-mpz_get_int64 (mpz_t z)
+mpz_get_int64 (mpz_srcptr z)
 {
     if (sizeof (long int) == 8) {
         return mpz_get_si (z);
     } else {
         uint64_t q;
         int64_t sign = mpz_sgn(z);
+        mpz_t foo;
+        mpz_init(foo);
         ASSERT_ALWAYS (sizeof (long int) == 4);
         q = mpz_get_ui (z); /* get the low word of z */
-        mpz_div_2exp (z, z, 32);
-        q += (uint64_t) mpz_get_ui (z) << 32;
+        mpz_div_2exp (foo, z, 32);
+        q += (uint64_t) mpz_get_ui (foo) << 32;
+        mpz_clear(foo);
         return q * sign;
     }
 }
 
+/* FIXME: These could probably be optimized into inspection-only code */
+int mpz_fits_int64_p(mpz_srcptr z)
+{
+    mpz_t foo;
+    mpz_init(foo);
+    mpz_set_int64(foo, mpz_get_int64(z));
+    int r = mpz_cmp(foo,z) == 0;
+    mpz_clear(foo);
+    return r;
+}
+
+int mpz_fits_uint64_p(mpz_srcptr z)
+{
+    mpz_t foo;
+    mpz_init(foo);
+    mpz_set_uint64(foo, mpz_get_uint64(z));
+    int r = mpz_cmp(foo,z) == 0;
+    mpz_clear(foo);
+    return r;
+}
+
 void
-mpz_mul_uint64 (mpz_t a, mpz_t b, uint64_t c)
+mpz_mul_uint64 (mpz_t a, mpz_srcptr b, uint64_t c)
 {
   if (sizeof (unsigned long int) == 8)
     mpz_mul_ui (a, b, (unsigned long int) c);
@@ -84,7 +110,7 @@ mpz_mul_uint64 (mpz_t a, mpz_t b, uint64_t c)
 }
 
 void
-mpz_mul_int64 (mpz_t a, mpz_t b, int64_t c)
+mpz_mul_int64 (mpz_t a, mpz_srcptr b, int64_t c)
 {
   if (sizeof (long int) == 8)
     mpz_mul_si (a, b, (long int) c);

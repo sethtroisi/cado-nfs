@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <gmp.h>
+#include <inttypes.h>
 
 #include "gmp_aux.h"
 #include "rootfinder.h"
@@ -857,7 +858,7 @@ roots_mod_uint64 (uint64_t *r, uint64_t a, int d, uint64_t p)
       for (i = 1; i < n; i++) {
         /* Check for dupes */
         if (r[i-1] >= r[i]) {
-          fprintf (stderr, "%lu^(1/%d) (mod %lu), r[%d]: %lu >= r[%d]: %lu\n", 
+          fprintf (stderr, "%"PRIu64"^(1/%d) (mod %"PRIu64"), r[%d]: %"PRIu64" >= r[%d]: %"PRIu64"\n", 
                    a, d, p, i-1, r[i-1], i, r[i]);
           ASSERT(r[i-1] < r[i]);
         }
