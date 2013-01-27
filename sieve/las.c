@@ -879,7 +879,7 @@ sieve_info_ptr get_sieve_info_from_config(las_info_ptr las, siever_config_srcptr
     si = las->sievers + n;
     sieve_info_init_from_siever_config(las, si, sc, pl);
     memset(si + 1, 0, sizeof(sieve_info));
-    fprintf(las->output, "Creating new sieve configuration\n");
+    fprintf(las->output, "# Creating new sieve configuration\n");
     siever_config_display(las->output, sc);
     fprintf(las->output, "#                     skewness=%1.1f\n",
             las->cpoly->skew);
