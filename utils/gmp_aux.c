@@ -9,22 +9,24 @@
 void
 mpz_set_uint64 (mpz_t z, uint64_t q)
 {
-  if (sizeof (unsigned long int) == 8)
-    mpz_set_ui (z, (unsigned long int) q);
+  if (sizeof (unsigned long) == 8)
+    mpz_set_ui (z, (unsigned long) q);
   else
     {
-      ASSERT_ALWAYS (sizeof (unsigned long int) == 4);
-      mpz_set_ui (z, (unsigned long int) (q >> 32));
+      ASSERT_ALWAYS (sizeof (unsigned long) == 4);
+      mpz_set_ui (z, (unsigned long) (q >> 32));
       mpz_mul_2exp (z, z, 32);
-      mpz_add_ui (z, z, (unsigned long int) (q & 4294967295UL));
+      /* The & here should be optimized into a direct cast to a 32-bit
+       * register in most cases (TODO: check) */
+      mpz_add_ui (z, z, (unsigned long) (q & 4294967295UL));
     }
 }
 
 void
 mpz_set_int64 (mpz_t z, int64_t q)
 {
-  if (sizeof (long int) == 8)
-    mpz_set_si (z, (long int) q);
+  if (sizeof (long) == 8)
+    mpz_set_si (z, (long) q);
   else if (q >= 0)
     mpz_set_uint64 (z, q);
   else
@@ -39,17 +41,15 @@ mpz_get_uint64 (mpz_srcptr z)
 {
     uint64_t q;
 
-    if (sizeof (unsigned long int) == 8)
+    if (sizeof (unsigned long) == 8)
         q = mpz_get_ui (z);
     else
     {
-        mpz_t foo;
-        mpz_init(foo);
-        ASSERT_ALWAYS (sizeof (unsigned long int) == 4);
+        ASSERT_ALWAYS (sizeof (unsigned long) == 4);
+        ASSERT_ALWAYS (sizeof (mp_limb_t) == 4);
+        ASSERT_ALWAYS (GMP_LIMB_BITS == 32);
         q = mpz_get_ui (z); /* get the low word of z */
-        mpz_div_2exp (foo, z, 32);
-        q += (uint64_t) mpz_get_ui (foo) << 32;
-        mpz_clear(foo);
+        q += ((uint64_t) mpz_getlimbn(z,1)) << 32;
     }
     return q;
 }
@@ -57,48 +57,29 @@ mpz_get_uint64 (mpz_srcptr z)
 int64_t
 mpz_get_int64 (mpz_srcptr z)
 {
-    if (sizeof (long int) == 8) {
-        return mpz_get_si (z);
-    } else {
-        uint64_t q;
-        int64_t sign = mpz_sgn(z);
-        mpz_t foo;
-        mpz_init(foo);
-        ASSERT_ALWAYS (sizeof (long int) == 4);
-        q = mpz_get_ui (z); /* get the low word of z */
-        mpz_div_2exp (foo, z, 32);
-        q += (uint64_t) mpz_get_ui (foo) << 32;
-        mpz_clear(foo);
-        return q * sign;
-    }
+    return mpz_get_uint64(z) * (int64_t) mpz_sgn(z);
 }
 
-/* FIXME: These could probably be optimized into inspection-only code */
 int mpz_fits_int64_p(mpz_srcptr z)
 {
-    mpz_t foo;
-    mpz_init(foo);
-    mpz_set_int64(foo, mpz_get_int64(z));
-    int r = mpz_cmp(foo,z) == 0;
-    mpz_clear(foo);
-    return r;
+    int l = mpz_sizeinbase(z, 2);
+    if (l <= 63) return 1;
+    /* Also accept -2^63, which is INT64_MIN */
+    if (mpz_sgn(z) < 0 && l == 64  && mpz_scan1(z, 0) == 63) return 1;
+    return 0;
 }
 
 int mpz_fits_uint64_p(mpz_srcptr z)
 {
-    mpz_t foo;
-    mpz_init(foo);
-    mpz_set_uint64(foo, mpz_get_uint64(z));
-    int r = mpz_cmp(foo,z) == 0;
-    mpz_clear(foo);
-    return r;
+    ASSERT_ALWAYS(mpz_sgn(z) >= 0);
+    return mpz_sizeinbase(z, 2) <= 64;
 }
 
 void
 mpz_mul_uint64 (mpz_t a, mpz_srcptr b, uint64_t c)
 {
-  if (sizeof (unsigned long int) == 8)
-    mpz_mul_ui (a, b, (unsigned long int) c);
+  if (sizeof (unsigned long) == 8)
+    mpz_mul_ui (a, b, (unsigned long) c);
   else
     {
       mpz_t d;
@@ -112,8 +93,8 @@ mpz_mul_uint64 (mpz_t a, mpz_srcptr b, uint64_t c)
 void
 mpz_mul_int64 (mpz_t a, mpz_srcptr b, int64_t c)
 {
-  if (sizeof (long int) == 8)
-    mpz_mul_si (a, b, (long int) c);
+  if (sizeof (long) == 8)
+    mpz_mul_si (a, b, (long) c);
   else
     {
       mpz_t d;
