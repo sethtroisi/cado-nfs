@@ -634,8 +634,6 @@ get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, double q0d, double l_infty_
   /* divide by q0 if sieving on alg side */
   if (qside == ALGEBRAIC_SIDE)
       tmp /= q0d;
-  /* FIXME: what is this ??? */
-  tmp *= 0.5;
   return log2(tmp);
 }
 #else
