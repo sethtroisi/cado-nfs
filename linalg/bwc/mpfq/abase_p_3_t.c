@@ -135,7 +135,7 @@
                   'name' => 'abase_vbase',
                   'global_prefix' => 'abase_'
                 };
- family=[HASH(0x14a83a8)] */
+ family=[HASH(0x130a7b8)] */
 
 
 /* Functions operating on the field structure */

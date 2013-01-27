@@ -142,7 +142,7 @@ static int abase_p_4_impl_mpi_use_count;   /* several stacked init()/clear() pai
                   'name' => 'abase_vbase',
                   'global_prefix' => 'abase_'
                 };
- family=[HASH(0x14a85b8)] */
+ family=[HASH(0x130a9c8)] */
 
 
 /* Functions operating on the field structure */
