@@ -878,9 +878,10 @@ sieve_info_ptr get_sieve_info_from_config(las_info_ptr las, siever_config_srcptr
     /* We've hit the end marker. Need to add a new config. */
     las->sievers = realloc(las->sievers, (n+2) * sizeof(sieve_info));
     si = las->sievers + n;
+    fprintf(las->output, "# Creating new sieve configuration for q~2^%d on the %s side\n",
+            sc->bitsize, sidenames[sc->side]);
     sieve_info_init_from_siever_config(las, si, sc, pl);
     memset(si + 1, 0, sizeof(sieve_info));
-    fprintf(las->output, "# Creating new sieve configuration\n");
     siever_config_display(las->output, sc);
     fprintf(las->output, "#                     skewness=%1.1f\n",
             las->cpoly->skew);
@@ -2704,7 +2705,7 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
         fprintf (las->output, " %lu survivors after algebraic sieve, ", rep->survivors1);
         fprintf (las->output, "coprime: %lu\n", rep->survivors2);
     }
-    gmp_fprintf (las->output, "# %lu relation(s) for (%Zd,%Zd))\n", rep->reports, si->q, si->rho);
+    gmp_fprintf (las->output, "# %lu relation(s) for %s (%Zd,%Zd)\n", rep->reports, sidenames[si->conf->side], si->q, si->rho);
     double qtts = qt0 - rep->tn[0] - rep->tn[1] - rep->ttf;
     fprintf (las->output, "# Time for this special-q: %1.4fs [norm %1.4f+%1.4f, sieving %1.4f"
             " (%1.4f + %1.4f),"
@@ -2996,7 +2997,8 @@ int main (int argc0, char *argv0[])/*{{{*/
         /* FIXME: maybe we can discard some special q's if a1/a0 is too large,
            see http://www.mersenneforum.org/showthread.php?p=130478 */
 
-        gmp_fprintf (las->output, "# Sieving q=%Zd; rho=%Zd; a0=%"PRId64"; b0=%"PRId64"; a1=%"PRId64"; b1=%"PRId64"\n",
+        gmp_fprintf (las->output, "# Sieving %s q=%Zd; rho=%Zd; a0=%"PRId64"; b0=%"PRId64"; a1=%"PRId64"; b1=%"PRId64"\n",
+                sidenames[si->conf->side],
                 si->q, si->rho, si->a0, si->b0, si->a1, si->b1);
         sq ++;
         if (las->verbose)
