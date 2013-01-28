@@ -2813,7 +2813,8 @@ int main (int argc0, char *argv0[])/*{{{*/
 
     /* Normal use of the descent lower steps prefers a file to provide
      * data. However, using a q range is also OK */
-    int descent_lower = param_list_lookup_string(pl, "descent-hint") != NULL;
+    int descent_lower MAYBE_UNUSED;
+    descent_lower = param_list_lookup_string(pl, "descent-hint") != NULL;
 
 #if 0   /* incompatible with the todo list */
     statsfilename = param_list_lookup_string (pl, "stats");
