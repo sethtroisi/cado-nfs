@@ -58,7 +58,7 @@ static double MAYBE_UNUSED exp2 (double x)
  */
 pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER; 
 
-int timed = 0;
+int create_descent_hints = 0;
 double tt_qstart;
 
 static const int bucket_region = 1 << LOG_BUCKET_REGION;
@@ -1043,6 +1043,11 @@ int las_todo_feed_qlist(las_info_ptr las, param_list pl)
                    ASSERT_ALWAYS(f->degree == 1);
                    int nroots = poly_roots(&r, f->f, f->degree, p);
                    ASSERT_ALWAYS(nroots == 1);
+                   /* We may in fact also have the root specified. We
+                    * ignore what is in the file, the root is computed
+                    * unconditionally above */
+                   gmp_sscanf(x, "%*Zi%n", &nread);
+                   x+=nread;
                    break;
         default:
                    /* We may as well default on the command-line switch
@@ -2255,7 +2260,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                  * the order of factors in printed relations. It's not so
                  * handy.
                  */
-                if (timed) {
+                if (create_descent_hints) {
                     fprintf (las->output, "(%1.4f) ", seconds() - tt_qstart);
                 }
                 fprintf (las->output, "%" PRId64 ",%" PRIu64, a, b);
@@ -2791,7 +2796,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_switch(pl, "-bench", &bench);
     param_list_configure_switch(pl, "-bench2", &bench2);
 #endif
-    param_list_configure_switch(pl, "-timed", &timed);
+    param_list_configure_switch(pl, "-mkhint", &create_descent_hints);
     param_list_configure_alias(pl, "-skew", "-S");
 
     argv++, argc--;
