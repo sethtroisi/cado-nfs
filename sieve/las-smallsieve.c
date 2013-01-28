@@ -84,13 +84,13 @@ static void small_sieve_print_contents(FILE * f, const char * prefix, small_siev
 }
 
 
-void small_sieve_info(sieve_info_srcptr si, const char * what, int side, small_sieve_data_t * r)
+void small_sieve_info(las_info_ptr las, const char * what, int side, small_sieve_data_t * r)
 {
-    if (!si->verbose) return;
+    if (!las->verbose) return;
     char * tmp;
     int rc = asprintf(&tmp, "%s(%s side)", what, sidenames[side]);
     ASSERT_ALWAYS(rc >= 0);
-    small_sieve_print_contents(si->output, tmp, r);
+    small_sieve_print_contents(las->output, tmp, r);
     free(tmp);
 }
 
@@ -176,7 +176,7 @@ static inline void ssp_init_op(ssp_bad_t * tail, fbprime_t p, fbprime_t r, unsig
     }
 }/*}}}*/
 
-void small_sieve_init(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
+void small_sieve_init(small_sieve_data_t *ssd, las_info_ptr las, const factorbase_degn_t *fb,
                       sieve_info_srcptr si, int side)
 {
     const factorbase_degn_t *fb_sav = fb;
@@ -212,7 +212,7 @@ void small_sieve_init(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
     // For typical primes, this jump is easily precomputed and goes into
     // the ssp struct.
     
-    unsigned int skiprows = (bucket_region >> si->logI)*(si->nb_threads-1);
+    unsigned int skiprows = (bucket_region >> si->conf->logI)*(las->nb_threads-1);
     for (index = 0 ; fb->p != FB_END && fb->p < thresh ; fb = fb_next(fb)) {
         const fbprime_t p = fb->p;
         WHERE_AM_I_UPDATE(w, p, p);
@@ -225,11 +225,11 @@ void small_sieve_init(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
             if ((fb->p&1)==0) event |= SSP_POW2;
             ssd->logp[index] = fb->plog;
             WHERE_AM_I_UPDATE(w, r, fb->roots[nr]);
-            r = fb_root_in_qlattice (p, fb->roots[nr], fb->invp, si);
+            r = fb_root_in_qlattice_31bits (p, fb->roots[nr], fb->invp, si);
             /* If this root is somehow interesting (projective in (a,b) or
                in (i,j) plane), print a message */
             if (verbose && (fb->roots[nr] >= p || r >= p))
-                fprintf (si->output, "# small_sieve_init: %s side, prime " 
+                fprintf (las->output, "# small_sieve_init: %s side, prime " 
                         FBPRIME_FORMAT " root " FBPRIME_FORMAT " -> " 
                         FBPRIME_FORMAT "\n", sidenames[side], p, fb->roots[nr], r);
 
@@ -247,7 +247,7 @@ void small_sieve_init(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
                  */
                 if (!do_bad_primes) {
                     if (verbose) {
-                        fprintf (si->output,
+                        fprintf (las->output,
                                 "# small_sieve_init: not adding bad prime"
                                 " (1:"FBPRIME_FORMAT") mod "FBPRIME_FORMAT")"
                                 " to small sieve because do_bad_primes = 0\n",
@@ -256,7 +256,7 @@ void small_sieve_init(small_sieve_data_t *ssd, const factorbase_degn_t *fb,
                     event |= SSP_DISCARD;
                 } else if (ssp->g >= si->J) {
                     if (verbose) {
-                        fprintf (si->output,
+                        fprintf (las->output,
                                 "# small_sieve_init: not adding bad prime"
                                 " (1:"FBPRIME_FORMAT") mod "FBPRIME_FORMAT")"
                                 " to small sieve  because g=%d >= si->J = %d\n",
@@ -373,9 +373,9 @@ void small_sieve_skip_stride(small_sieve_data_t *ssd, int * ssdpos, unsigned int
              * the (current) bucket base. */
             ssp_bad_t * ssp = (ssp_bad_t *) &(ssd->ssp[i]);
             unsigned int x = ssdpos[i];
-            const unsigned int I = 1U << si->logI;
+            const unsigned int I = 1U << si->conf->logI;
             unsigned int imask = I-1;
-            unsigned int j = x >> si->logI;
+            unsigned int j = x >> si->conf->logI;
             if (j >= skip) {
                 /* The ``ssdpos'' is still ahead of us, so there's
                  * no adjustment to make */
@@ -426,7 +426,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
     const fbprime_t pattern2_size = 2 * sizeof(unsigned long);
     unsigned long j;
     const int test_divisibility = 0; /* very slow, but nice for debugging */
-    const unsigned long nj = bucket_region >> si->logI; /* Nr. of lines 
+    const unsigned long nj = bucket_region >> si->conf->logI; /* Nr. of lines 
                                                            per bucket region */
     /* In order to check whether a j coordinate is even, we need to take
      * into account the bucket number, especially in case buckets are as
@@ -434,7 +434,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
      * i0 is i0/I, but we also need to add bucket_nr*bucket_size/I to
      * this, which is what this flag is for.
      */
-    const int row0_is_oddj = (N << (LOG_BUCKET_REGION - si->logI)) & 1;
+    const int row0_is_oddj = (N << (LOG_BUCKET_REGION - si->conf->logI)) & 1;
 
 
     /* Handle powers of 2 up to 2 * sizeof(long) separately. 
@@ -469,7 +469,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                         ((unsigned char *)pattern)[i] += ssd->logp[n];
 #ifdef UGLY_DEBUGGING
                     for (unsigned int j = i0; j < I ; j+= p) {
-                        WHERE_AM_I_UPDATE(w, x, (w->j << si->logI) + j);
+                        WHERE_AM_I_UPDATE(w, x, (w->j << si->conf->logI) + j);
                         sieve_decrease(S + j, ssd->logp[n], w);
                         /* cancel the above action */
                         S[j] += ssd->logp[n];
@@ -831,9 +831,9 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
     unsigned long j, nj;
     const int resieve_very_verbose = 0, resieve_very_verbose_bad = 0;
     /* See comment above about the variable of the same name */
-    const int row0_is_oddj = (N << (LOG_BUCKET_REGION - si->logI)) & 1;
+    const int row0_is_oddj = (N << (LOG_BUCKET_REGION - si->conf->logI)) & 1;
 
-    nj = (bucket_region >> si->logI);
+    nj = (bucket_region >> si->conf->logI);
 
     ssp_marker_t * next_marker = ssd->markers;
 
@@ -875,13 +875,13 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
                 for (unsigned int i = i0 + (q& -!(i0&1)) ; i < I; i += p+q) {
                     if (S_ptr[i] == 255) continue;
                     bucket_prime_t prime;
-                    unsigned int x = (j << (si->logI)) + i;
+                    unsigned int x = (j << (si->conf->logI)) + i;
                     if (resieve_very_verbose) {
                         pthread_mutex_lock(&io_mutex);
                         fprintf (stderr, "resieve_small_bucket_region: root "
                                 FBPRIME_FORMAT ",%d divides at x = "
                                 "%d = %lu * %u + %d\n",
-                                p, r, x, j, 1 << si->logI, i);
+                                p, r, x, j, 1 << si->conf->logI, i);
                         pthread_mutex_unlock(&io_mutex);
                     }
                     prime.p = p;
@@ -922,7 +922,7 @@ resieve_small_bucket_region (bucket_primes_t *BP, int N, unsigned char *S,
             }
             while (i0 < (unsigned int) bucket_region) {
                 unsigned char *S_ptr = S + i0;
-                if ((i0 >> si->logI) % 2 == 0) { /* Even j coordinate? */
+                if ((i0 >> si->conf->logI) % 2 == 0) { /* Even j coordinate? */
                     /* Yes, test only odd ii-coordinates */
                     for (ii = 1; ii < I; ii += 2) {
                         if (S_ptr[ii] != 255) {

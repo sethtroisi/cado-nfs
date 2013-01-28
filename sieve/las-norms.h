@@ -13,7 +13,7 @@ extern "C" {
    lognorms approximations for k bits of exponent + NORM_BITS-k bits
    of mantissa */
 void
-init_norms (sieve_info_ptr si);
+init_norms (sieve_info_ptr si, int side);
 
 
 /*  initialize norms for bucket regions */
@@ -39,7 +39,7 @@ init_alg_norms_bucket_region (unsigned char *alg_S,
 /* This prepares the auxiliary data which is used by
  * init_rat_norms_bucket_region and init_alg_norms_bucket_region
  */
-void sieve_info_init_norm_data(sieve_info_ptr si, unsigned long q0);
+void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int qside);
 
 void sieve_info_clear_norm_data(sieve_info_ptr si);
 

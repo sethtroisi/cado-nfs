@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include "utils.h"      /* Happens to define ULONG_BITS, which we use */
 #include "portability.h"
 #include "pm1.h"
 #include "pp1.h"
@@ -40,14 +41,16 @@ unsigned long stats_found_n[STATS_LEN] = {
 
 facul_strategy_t *
 facul_make_strategy (const int n, const unsigned long fbb, 
-		     const unsigned long lpb)
+		     const unsigned int lpb)
 {
   facul_strategy_t *strategy;
   facul_method_t *methods;
   int i;
   
   strategy = malloc (sizeof (facul_strategy_t));
-  strategy->lpb = lpb;
+  strategy->lpb = 1UL << lpb;
+  if (lpb == ULONG_BITS)
+      strategy->lpb = ~0UL;
   /* Store fbb^2 in fbb2 */
   ularith_mul_ul_ul_2ul (&(strategy->fbb2[0]), &(strategy->fbb2[1]), fbb, fbb);
 

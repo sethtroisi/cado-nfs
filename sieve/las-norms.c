@@ -81,9 +81,8 @@ sieve_info_init_lognorm_prob (unsigned char *C, const unsigned long *rels,
  * the norms.
  */
 void
-init_norms (sieve_info_ptr si)
+init_norms (sieve_info_ptr si, int s)
 {
-  for(int s = 0 ; s < 2 ; s++) {
       sieve_side_info_ptr sdata = si->sides[s];
 
       unsigned char *S = sdata->lognorm_table;
@@ -118,7 +117,6 @@ init_norms (sieve_info_ptr si)
               }
           }
       }
-  }
 }
 
 /* }}} */
@@ -145,7 +143,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
 
     int32_t I = si->I;
     int halfI = I / 2;
-    int logI = si->logI;
+    int logI = si->conf->logI;
 
     int i MAYBE_UNUSED;
 
@@ -363,7 +361,7 @@ init_alg_norms_bucket_region(unsigned char *S,
 
     int32_t I = si->I;
     double halfI = I / 2;
-    int logI = si->logI;
+    int logI = si->conf->logI;
     unsigned int j0 = N << (LOG_BUCKET_REGION - logI);
     unsigned int j1 = j0 + (1 << (LOG_BUCKET_REGION - logI));
 
@@ -565,7 +563,7 @@ get_maxnorm_aux (double *g, const unsigned int d, double s)
    for a = a0 * i + a1 * j, b = b0 * i + b1 * j and q >= q0,
    -I/2 <= i <= I/2, 0 <= j <= I/2*min(s*B/|a1|,B/|b1|)
    where B >= sqrt(2*q/s/sqrt(3)) for all special-q in the current range
-   (s is the skewness, and B = si->B).
+   (s is the skewness, and B = l_infty_snorm_u).
 
    Since |a0| <= s*B and |b0| <= B, then
    |a0 * i + a1 * j| <= s*B*I and |b0 * i + b1 * j| <= B*I,
@@ -581,11 +579,12 @@ get_maxnorm_aux (double *g, const unsigned int d, double s)
        and is attained in (a) or (c).
 */
 static double
-get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
+get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, double q0d, double l_infty_snorm_u, int qside)
 {
   unsigned int d = cpoly->alg->degree, k;
   double *fd; /* double-precision coefficients of f */
   double norm, max_norm, pows, tmp;
+  double B = l_infty_snorm_u;
 
   fd = (double*) malloc ((d + 1) * sizeof (double));
   FATAL_ERROR_CHECK(fd == NULL, "malloc failed");
@@ -631,12 +630,11 @@ get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
      as follows should not be much slower (if any), anyway the efficiency of
      that function is not critical */
   for (tmp = max_norm, k = 0; k < d; k++)
-    tmp *= si->B * (double) si->I;
-  /* divide by q0 if sieving on algebraic side */
-  if (!si->ratq)
-      tmp /= (double) q0;
-  //  tmp *= 0.5;
-  return log2 (tmp);
+    tmp *= B * (double) si->I;
+  /* divide by q0 if sieving on alg side */
+  if (qside == ALGEBRAIC_SIDE)
+      tmp /= q0d;
+  return log2(tmp);
 }
 #else
 /* simpler but less accurate version */
@@ -670,8 +668,7 @@ get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
 
 /* this function initializes the scaling factors and report bounds on the
    rational and algebraic sides */
-void
-sieve_info_init_norm_data (sieve_info_ptr si, unsigned long q0)
+void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int qside)
 {
   for (int side = 0; side < 2; side++)
     {
@@ -695,22 +692,28 @@ sieve_info_init_norm_data (sieve_info_ptr si, unsigned long q0)
      angle of at least pi/3, and their determinant is qs, thus:
      |u'|^2 <= |u'|*|v'| <= qs/sin(pi/3) = 2/sqrt(3)*q*s.
      Define B := sqrt(2/sqrt(3)*q/s), then |a0| <= s*B and |b0| <= B. */
-  si->B = sqrt (2.0 * (double) q0 / (si->cpoly->skew * sqrt (3.0)));
+
+  /* this was called si->B earlier. This bounds the skewed-L\infty norm
+   * of u=(a0,b0), following |a0| <= s*B and |b0| <= B.
+   * (IMO we have another notational convention elsewhere regarding what
+   * the skewed norm is. But it's the one which is used here).
+   */
+  double B = sqrt (2.0 * q0d / (si->cpoly->skew * sqrt (3.0)));
 
   /************************** rational side **********************************/
 
   /* Since |a| <= s*I*B and |b| <= I*B, |G(a,b)| <= (|g[1]|*s+|g[0]|) * I*B */
   r = fabs (mpz_get_d (si->cpoly->rat->f[1])) * si->cpoly->skew
     + fabs (mpz_get_d (si->cpoly->rat->f[0]));
-  r *= si->B * (double) si->I;
+  r *= B * (double) si->I;
   /* if the special-q is on the rational side, divide by it */
-  if (si->ratq)
-    r /= (double) q0;
+  if (qside == RATIONAL_SIDE)
+    r /= q0d;
   rat->logmax = maxlog2 = log2 (r);
   /* we know that |G(a,b)| < 2^(rat->logmax) when si->ratq = 0,
      and |G(a,b)/q| < 2^(rat->logmax) when si->ratq <> 0 */
 
-  fprintf (si->output, "# Rat. side: log2(maxnorm)=%1.2f logbase=%1.6f",
+  fprintf (output, "# Rat. side: log2(maxnorm)=%1.2f logbase=%1.6f",
            maxlog2, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
   /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
      thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
@@ -719,13 +722,13 @@ sieve_info_init_norm_data (sieve_info_ptr si, unsigned long q0)
      rational side */
   r = si->cpoly->rat->lambda * (double) si->cpoly->rat->lpb;
   rat_bound = (unsigned char) (r * rat->scale) + GUARD;
-  fprintf (si->output, " bound=%u\n", rat_bound);
+  fprintf (output, " bound=%u\n", rat_bound);
   sieve_info_init_lognorm (rat->Bound, rat_bound, si->cpoly->rat->lim,
                            si->cpoly->rat->lpb, rat->scale);
 
   /************************** algebraic side *********************************/
 
-  alg->logmax = get_maxnorm_alg (si->cpoly, si, q0); /* log2(max norm) */
+  alg->logmax = get_maxnorm_alg (si->cpoly, si, q0d, B, qside); /* log2(max norm) */
   /* we know that |F(a,b)/q| < 2^(alg->logmax) when si->ratq = 0,
      and |F(a,b)| < 2^(alg->logmax) when si->ratq <> 0 */
 
@@ -736,7 +739,7 @@ sieve_info_init_norm_data (sieve_info_ptr si, unsigned long q0)
   r = si->cpoly->alg->lambda * (double) si->cpoly->alg->lpb;
   maxlog2 = alg->logmax + r;
 
-  fprintf (si->output, "# Alg. side: log2(maxnorm)=%1.2f logbase=%1.6f",
+  fprintf (output, "# Alg. side: log2(maxnorm)=%1.2f logbase=%1.6f",
            maxlog2, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
   /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
      thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
@@ -745,14 +748,14 @@ sieve_info_init_norm_data (sieve_info_ptr si, unsigned long q0)
      at most lambda * lpb, which corresponds in the y-range to
      y >= GUARD + lambda * lpb * scale */
   alg_bound = (unsigned char) (r * alg->scale) + GUARD;
-  fprintf (si->output, " bound=%u\n", alg_bound);
+  fprintf (output, " bound=%u\n", alg_bound);
   sieve_info_init_lognorm (alg->Bound, alg_bound, si->cpoly->alg->lim,
                            si->cpoly->alg->lpb, alg->scale);
 }
 
 void sieve_info_clear_norm_data(sieve_info_ptr si)
 {
-    for (int side = 0; side < 2; side++) {
+    for(int side = 0 ; side < 2 ; side++) {
         sieve_side_info_ptr s = si->sides[side];
         cado_poly_side_ptr ps = si->cpoly->pols[side];
         for (int k = 0; k <= ps->degree; k++)
@@ -773,8 +776,8 @@ sieve_info_update_norm_data (sieve_info_ptr si)
         cado_poly_side_ptr ps = si->cpoly->pols[side];
         mp_poly_homography (s->fij, ps->f, ps->degree, H);
         double invq = 1.0;
-        if (si->ratq == (side == RATIONAL_SIDE))
-            invq /= si->q;
+        if (si->conf->side == side)
+            invq /= mpz_get_d(si->q);
         for (int k = 0; k <= ps->degree; k++)
             s->fijd[k] = mpz_get_d (s->fij[k]) * invq;
     }

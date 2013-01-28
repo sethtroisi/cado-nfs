@@ -155,7 +155,7 @@
                   'name' => 'abase_vbase',
                   'global_prefix' => 'abase_'
                 };
- family=[HASH(0x149a858)] */
+ family=[HASH(0x12fce38)] */
 
 typedef mpfq_p_field abase_p_1_field;
 typedef mpfq_p_dst_field abase_p_1_dst_field;

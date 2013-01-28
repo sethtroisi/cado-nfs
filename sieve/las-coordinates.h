@@ -30,9 +30,9 @@ static inline void xToAB(int64_t *a, uint64_t *b, const unsigned int x, sieve_in
     uint32_t I = si->I;
 
     i = (x & (I - 1)) - (I >> 1);
-    j = x >> si->logI;
-    *a = (int64_t) i * (int64_t) si->a0 + (int64_t) j * (int64_t) si->a1;
-    c =  (int64_t) i * (int64_t) si->b0 + (int64_t) j * (int64_t) si->b1;
+    j = x >> si->conf->logI;
+    *a = (int64_t) i * si->a0 + (int64_t) j * si->a1;
+    c =  (int64_t) i * si->b0 + (int64_t) j * si->b1;
     if (c >= 0)
       *b = c;
     else
