@@ -27,6 +27,7 @@
 #include "las-qlattice.h"
 #include "las-smallsieve.h"
 #ifdef HAVE_SSE41
+/* #define SSE_SURVIVOR_SEARCH 1 */
 #include <smmintrin.h>
 #endif
 
@@ -2036,8 +2037,10 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     }
 
     /* Scan array one long word at a time. If any byte is <255, i.e. if
-       the long word is != 0xFFFF...FF, examine the bytes */
-#ifdef  HAVE_SSE41
+       the long word is != 0xFFFF...FF, examine the bytes 
+       FIXME: We can use SSE to scan 16 bytes at a time, but have to make 
+       sure that SS is 16-aligned first, thus currently disabled. */
+#if defined(HAVE_SSE41) && defined(SSE_SURVIVOR_SEARCH)
     const int together = sizeof(__m128i);
     __m128i ones128 = (__m128i) {-1,-1};
 #else
@@ -2051,7 +2054,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                     trace_Nx.x, trace_Nx.N, SS[trace_Nx.x]);
         }
 #endif
-#ifdef HAVE_SSE41
+#if defined(HAVE_SSE41) && defined(SSE_SURVIVOR_SEARCH)
         if (_mm_testc_si128(*(__m128i *)(SS + xul), ones128))
             continue;
 #else
