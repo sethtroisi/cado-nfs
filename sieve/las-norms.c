@@ -720,15 +720,15 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
   rat->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
   /* we want to select relations with a cofactor of less than r bits on the
      rational side */
-  r = MIN(si->cpoly->rat->lambda * (double) si->cpoly->rat->lpb, maxlog2 - GUARD / rat->scale);
+  r = MIN(si->conf->sides[RATIONAL_SIDE]->lambda * (double) si->conf->sides[RATIONAL_SIDE]->lpb, maxlog2 - GUARD / rat->scale);
   rat_bound = (unsigned char) (r * rat->scale) + GUARD;
   fprintf (output, " bound=%u\n", rat_bound);
   double max_rlambda = (maxlog2 - GUARD / rat->scale) / si->cpoly->rat->lpb;
   if (si->cpoly->rat->lambda > max_rlambda) {
       fprintf(output, "# Warning, rlambda>%.1f does not make sense (capped to limit)\n", max_rlambda);
   }
-  sieve_info_init_lognorm (rat->Bound, rat_bound, si->cpoly->rat->lim,
-                           si->cpoly->rat->lpb, rat->scale);
+  sieve_info_init_lognorm (rat->Bound, rat_bound, si->conf->sides[RATIONAL_SIDE]->lim,
+                           si->conf->sides[RATIONAL_SIDE]->lpb, rat->scale);
 
   /************************** algebraic side *********************************/
 
@@ -740,7 +740,7 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
      side, which are set to 255, remain larger than then report bound 'r',
      even if the algebraic norm is totally smooth. For this, we artificially
      increase by 'r' the maximal range */
-  r = MIN(si->cpoly->alg->lambda * (double) si->cpoly->alg->lpb, alg->logmax);
+  r = MIN(si->conf->sides[ALGEBRAIC_SIDE]->lambda * (double) si->conf->sides[ALGEBRAIC_SIDE]->lpb, alg->logmax);
   maxlog2 = alg->logmax + r;
 
   fprintf (output, "# Alg. side: log2(maxnorm)=%1.2f logbase=%1.6f",
@@ -757,8 +757,8 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
   if (si->cpoly->alg->lambda > max_alambda) {
       fprintf(output, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
   }
-  sieve_info_init_lognorm (alg->Bound, alg_bound, si->cpoly->alg->lim,
-                           si->cpoly->alg->lpb, alg->scale);
+  sieve_info_init_lognorm (alg->Bound, alg_bound, si->conf->sides[ALGEBRAIC_SIDE]->lim,
+                           si->conf->sides[ALGEBRAIC_SIDE]->lpb, alg->scale);
 }
 
 void sieve_info_clear_norm_data(sieve_info_ptr si)

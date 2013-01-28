@@ -195,16 +195,17 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
     for(int side = 0 ; side < 2 ; side++) {
         cado_poly_side_ptr pol = las->cpoly->pols[side];
         sieve_side_info_ptr sis = si->sides[side];
+        unsigned long lim = si->conf->sides[side]->lim;
         if (pol->degree > 1) {
             fbprime_t *leading_div;
             tfb = seconds ();
-            leading_div = factor_small (pol->f[pol->degree], pol->lim);
+            leading_div = factor_small (pol->f[pol->degree], lim);
             /* FIXME: fbfilename should allow *distinct* file names, of
              * course, for each side (think about the bi-algebraic case)
              */
             const char * fbfilename = param_list_lookup_string(pl, "fb");
             fprintf(las->output, "# Reading %s factor base from %s\n", sidenames[side], fbfilename);
-            sis->fb = fb_read(fbfilename, sis->scale * LOG_SCALE, 0, pol->lim, apow_lim);
+            sis->fb = fb_read(fbfilename, sis->scale * LOG_SCALE, 0, lim, apow_lim);
             ASSERT_ALWAYS(sis->fb != NULL);
             tfb = seconds () - tfb;
             fprintf (las->output, 
@@ -220,7 +221,7 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
                 printf ("# rpowthresh reduced to %d\n", rpow_lim);
               }
             sis->fb = fb_make_linear ((const mpz_t *) pol->f,
-                                    (fbprime_t) pol->lim,
+                                    (fbprime_t) lim,
                                      rpow_lim, sis->scale * LOG_SCALE, 
                                      las->verbose, 1, las->output);
             tfb = seconds () - tfb;
@@ -1950,15 +1951,15 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
         mpz_init (BBB[side]);
         mpz_init (BBBB[side]);
 
-        unsigned long lim = (side == RATIONAL_SIDE) ? cpoly->rat->lim : cpoly->alg->lim;
+        unsigned long lim = si->conf->sides[side]->lim;
         mpz_ui_pow_ui (BB[side], lim, 2);
         mpz_mul_ui (BBB[side], BB[side], lim);
         mpz_mul_ui (BBBB[side], BBB[side], lim);
     }
 
     mpz_init (BLPrat);
-    mpz_set_ui (BLPrat, cpoly->rat->lim);
-    mpz_mul_2exp (BLPrat, BLPrat, cpoly->rat->lpb); /* fb bound * lp bound */
+    mpz_set_ui (BLPrat, si->conf->sides[RATIONAL_SIDE]->lim);
+    mpz_mul_2exp (BLPrat, BLPrat, si->conf->sides[RATIONAL_SIDE]->lpb); /* fb bound * lp bound */
 
     unsigned char * alg_S = S[ALGEBRAIC_SIDE];
     unsigned char * rat_S = S[RATIONAL_SIDE];
@@ -2074,7 +2075,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
              * log to base 2 of the sieve limits on each side, and compare the
              * bitsize of the cofactor with their double.
              */
-            double log2_fbs[2] = {log2(cpoly->pols[0]->lim), log2(cpoly->pols[1]->lim)};
+            double log2_fbs[2] = {log2(si->conf->sides[0]->lim), log2(si->conf->sides[1]->lim)};
 
 #ifdef  DLP_DESCENT
             double deadline = DBL_MAX;
@@ -2138,9 +2139,9 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 int side = RATIONAL_SIDE ^ z;   /* start with rational */
                 mpz_t * f = cpoly->pols[side]->f;
                 int deg = cpoly->pols[side]->degree;
-                int lim = cpoly->pols[side]->lim;
-                int lpb = cpoly->pols[side]->lpb;
-                int mfb = cpoly->pols[side]->mfb;
+                int lim = si->conf->sides[side]->lim;
+                int lpb = si->conf->sides[side]->lpb;
+                int mfb = si->conf->sides[side]->mfb;
 
                 // Trial divide rational norm
                 mp_poly_homogeneous_eval_siui (norm[side], f, deg, a, b);
@@ -2200,11 +2201,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
             for(int z = 0 ; pass && z < 2 ; z++) {
                 int side = first ^ z;
-                int rat = (side == RATIONAL_SIDE);
-                int lpb = rat ? cpoly->rat->lpb : cpoly->alg->lpb;
-                // gmp_fprintf(stderr, "# fln(%Zd, %d) =", norm[side], lpb);
+                int lpb = si->conf->sides[side]->lpb;
                 pass = factor_leftover_norm(norm[side], log2_fbs[side], lpb, f[side], m[side], si->sides[side]->strategy);
-                // fprintf(stderr, " %d\n", pass);
             }
             if (!pass) continue;
 
@@ -2302,13 +2300,29 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 double time_left = 0;
                 for(int side = 0 ; side < 2 ; side++) {
                     for (unsigned int i = 0; i < f[side]->length; ++i) {
+                        /* Currently we're assuming that the base of
+                         * precomputed logs goes at least as far as 
+                         * cpoly->pols[side]->lim, which is asserted to
+                         * exceed si->conf->sides[side]->lim). Therefore
+                         * the second if() is a no-op. */
                         if (mpz_cmp_ui(f[side]->data[i], cpoly->pols[side]->lim) <= 0)
                             continue;
+                        /*
+                        if (mpz_cmp_ui(f[side]->data[i], si->conf->sides[side]->lim) <= 0)
+                            continue;
+                            */
                         unsigned int n = mpz_sizeinbase(f[side]->data[i], 2);
                         int k = las->hint_lookups[side][n];
-                        /* Having no data is normal */
-                        if (k < 0) continue;
-                        // fprintf(stderr, "#descent# Warning: cannot estimate refactoring time for relation involving %d%c\n", n, sidenames[side][0]);
+                        if (k < 0) {
+                            /* Having no data is normal. The factor base
+                             * bound does not have to have any connection
+                             * with the database of prime ideals for
+                             * which the virtual log has been saved
+                             * already (factor base extension can enter
+                             * into play here). */
+                            // fprintf(las->output, "# [descent] Warning: cannot estimate refactoring time for relation involving %d%c\n", n, sidenames[side][0]);
+                            continue;
+>>>>>>> a5fd0e3... blah
                         descent_hint_ptr h = las->hint_table[k];
                         time_left += h->expected_time;
                     }
@@ -2317,9 +2331,20 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
                 double new_deadline = seconds() + DESCENT_GRACE_TIME_RATIO * time_left;
                 if (new_deadline < deadline) {
+                    double delta = DBL_MAX;
                     if (deadline != DBL_MAX)
-                        fprintf(stderr, "#descent# Improved ETA by %.2f\n", (deadline-new_deadline)/DESCENT_GRACE_TIME_RATIO);
+                        delta = (deadline-new_deadline)/DESCENT_GRACE_TIME_RATIO;
                     deadline = new_deadline;
+                    relation_copy(winner, rel);
+                    if (time_left == 0) {
+                        fprintf(las->output, "# [descent] Yiippee, splitting done\n");
+                        /* break both loops */
+                        xul = bucket_region;
+                        relation_clear(rel);
+                        break;
+                    } else if (delta != DBL_MAX) {
+                        fprintf(las->output, "# [descent] Improved ETA by %.2f\n", delta);
+                    }
                 }
             }
 #endif  /* DLP_DESCENT */

@@ -14,12 +14,12 @@
 #define ALGEBRAIC_SIDE   1
 
 struct cado_poly_side_s {
-  mpz_t *f;       /* rational coefficients */
-  unsigned long lim; /* rational  factor base bound */
-  int degree;    /* degree of polynomial g */
-  int lpb;           /* rational  large prime bound is 2^lpbr */
-  int mfb;           /* bound for rational  residuals is 2^mfbr */
-  double lambda;     /* lambda sieve parameter on the rational  side */
+  mpz_t *f;          /* rational coefficients */
+  unsigned long lim; /* rational factor base bound */
+  int degree;        /* degree of polynomial g */
+  int lpb;           /* rational large prime bound is 2^lpbr */
+  int mfb;           /* bound for rational residuals is 2^mfbr */
+  double lambda;     /* lambda sieve parameter on the rational side */
 };
 typedef struct cado_poly_side_s cado_poly_side[1];
 typedef struct cado_poly_side_s * cado_poly_side_ptr;
