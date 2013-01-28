@@ -768,7 +768,7 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
 void
 sieve_info_update_norm_data (sieve_info_ptr si)
 {
-    int32_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
+    int64_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
     /* Update floating point version of algebraic poly (do both, while
      * we're at it...) */
     for (int side = 0; side < 2; side++) {
