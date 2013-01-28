@@ -31,8 +31,12 @@ class ScreenFormatter(logging.Formatter):
         logging.ERROR : ANSI.BRIGHTRED
         }
 
+    # Format string that switches to a different colour (with ANSI code 
+    # specified in the 'colour' key of the log record) for the log level name, 
+    # then back to default text rendition (ANSI code in 'nocolour')
     colourformatstr = \
         '%(padding)s%(colour)s%(levelnametitle)s%(nocolour)s:%(message)s'
+    # Format string that does not use colour changes
     nocolourformatstr = \
         '%(padding)s%(levelnametitle)s:%(message)s'
 
@@ -43,11 +47,11 @@ class ScreenFormatter(logging.Formatter):
             super().__init__(fmt=self.__class__.nocolourformatstr)
 
     def format(self, record):
-        record.colour = ScreenFormatter.colours[record.levelno]
+        # Add attributes to record that our format string expects
+        record.colour = self.__class__.colours[record.levelno]
         record.levelnametitle = record.levelname.title()
         record.nocolour = ANSI.NORMAL
         if hasattr(record, "indent"):
-            assert isinstance(record.indent, int)
             record.padding = " " * record.indent
         else:
             record.padding = ""
@@ -57,26 +61,56 @@ class FileFormatter(logging.Formatter):
     formatstr = \
        'PID%(process)s %(asctime)s %(levelnametitle)s:%(message)s' 
 
+    def format(self, record):
+        record.levelnametitle = record.levelname.title()
+        return super().format(record)
+
     def __init__(self):
         super().__init__(fmt=self.__class__.formatstr)
 
-class Logger(object):
-    @staticmethod
-    def getLogger(lvl = logging.INFO, filename=None, filelvl = logging.INFO, colour=True):
-        logger = logging.getLogger(__name__)
-        logger.setLevel(logging.DEBUG)
-        ch = logging.StreamHandler()
-        ch.setLevel(lvl)
-        screenformatter = ScreenFormatter(colour=colour)
-        ch.setFormatter(screenformatter)
-        logger.addHandler(ch)
+class HandlerRoot(object):
+    # Root class to strip off the logger argument before we reach object()
+    def __init__(self, logger, **kwargs):
+        super().__init__(**kwargs)
+
+class ScreenHandler(HandlerRoot):
+    def __init__(self, logger, lvl = logging.INFO, colour = True, **kwargs):
+        h = logging.StreamHandler()
+        h.setLevel(lvl)
+        h.setFormatter(ScreenFormatter(colour = colour))
+        logger.addHandler(h)
+        super().__init__(logger, **kwargs)
+
+class FileHandler(HandlerRoot):
+    def __init__(self, logger, filelvl = logging.DEBUG, filename = None, **kwargs):
         if not filename is None:
-            fh = logging.FileHandler(filename)
-            fh.setLevel(filelvl)
-            fileformatter = FileFormatter()
-            fh.setFormatter(fileformatter)
-            logger.addHandler(fh)
-        return logger
+            h = logging.FileHandler(filename)
+            h.setLevel(filelvl)
+            h.setFormatter(FileFormatter())
+            logger.addHandler(h)
+        super().__init__(logger, **kwargs)
+
+class Logger(HandlerRoot):
+    # We mustn't instantiate logging.Logger, but get a reference to a
+    # pre-existing instance via getLogger(). Hence no inheritance from 
+    # logging.Logger
+    def __init__(self, **kwargs):
+        self.logger = logging.getLogger(__name__)
+        # Lowest possible threshold, so handlers get to see everything.
+        # They do the filtering by themselves
+        self.logger.setLevel(logging.DEBUG)
+        # Init the various handlers which may exist as sibling classes, and
+        # tell them what our logging.Logger instance is
+        super().__init__(logger = self.logger, **kwargs)
+    # Delegate all other method calls to the logging.Logger instance we 
+    # have referenced in self.logger
+    def __getattr__(self, name):
+        return getattr(self.logger, name)
+
+# Put the pieces together
+class MyLogger(Logger, ScreenHandler, FileHandler):
+    """ Logger that outputs to both screen and disk file. """
+    pass
 
 class Command(object):
     def __init__(self, command, logfile=None):
@@ -99,10 +133,12 @@ class Command(object):
         logger.info("Exit status " + str(self.child.returncode) + " for PID " + str(self.child.pid))
         return self.child.returncode
 
-logger = Logger.getLogger(filename = "log", filelvl = logging.DEBUG)
-logger.info("An Info Center!")
-logger.warn("Beware")
-logger.error("All hope abandon", extra={"indent" : 4})
-c = Command("ls", logfile = "commands")
-c.wait()
-print(c.stdout)
+if __name__ == '__main__':
+    logger = MyLogger(filename = "log", filelvl = logging.DEBUG, lvl=logging.INFO)
+#    logger = MyLogger(lvl=logging.INFO)
+    logger.info("An Info Center!")
+    logger.warn("Beware")
+    logger.error("All hope abandon", extra={"indent" : 4})
+    c = Command("ls", logfile = "commands")
+    c.wait()
+    print(c.stdout)
