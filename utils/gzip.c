@@ -87,29 +87,34 @@ prempt_open_compressed_rs (char *rep_cado, char **ficname)
   size_t p_cmds = 0;
   int suffix_choice = 0;
   char lastcom[256];
-  char *antebuffer_path, *antebuffer_realpath;
+  char *antebuffer_realpath, *fic_realpath;
 
   if (!(cmd = calloc (s_cmds, sizeof(unsigned char *)))) {
     fprintf (stderr, "fopen_compressed_rs: calloc erreur : %s\n", strerror(errno));
     exit (1);
   }
-  antebuffer_path = (char *) malloc(PATH_MAX * sizeof(char));
+  fic_realpath = (char *) malloc(PATH_MAX * sizeof(char));
   antebuffer_realpath = (char *) malloc(PATH_MAX * sizeof(char));
-  if (antebuffer_path == NULL || antebuffer_realpath == NULL) {
+  fic_realpath = (char *) malloc(PATH_MAX * sizeof(char));
+  if (fic_realpath == NULL || antebuffer_realpath == NULL || fic_realpath == NULL) {
     fprintf (stderr, "fopen_compressed_rs: malloc error : %s\n", strerror(errno));
     exit (1);
   }
-  strcpy (antebuffer_path, rep_cado);
-  strcat (antebuffer_path, "utils/antebuffer");
+  /* Use fic_realpath as temp storage for un-normalized path to antebuffer */
+  strcpy (fic_realpath, rep_cado);
+  strcat (fic_realpath, "utils/antebuffer");
 #ifdef EXECUTABLE_SUFFIX
-  strcat (antebuffer_path, EXECUTABLE_SUFFIX);
+  strcat (fic_realpath, EXECUTABLE_SUFFIX);
 #endif
-  if (realpath(antebuffer_path, antebuffer_realpath) == NULL) {
+  if (realpath(fic_realpath, antebuffer_realpath) == NULL) {
     fprintf (stderr, "fopen_compressed_rs: realpath error : %s\n", strerror(errno));
     exit (1);
   }
-  free (antebuffer_path);  
-  while (*ficname)
+  while (*ficname) {
+    if (realpath(*ficname, fic_realpath) == NULL) {
+        fprintf (stderr, "fopen_compressed_rs: realpath error : %s\n", strerror(errno));
+        exit (1);
+    }
     if (!suffix_choice) {
       if (p_cmds + 1 >= s_cmds) {
 	if (!(cmd = realloc (cmd, sizeof(unsigned char *) * (s_cmds<<1)))) {
@@ -124,25 +129,27 @@ prempt_open_compressed_rs (char *rep_cado, char **ficname)
 	exit (1);
       }
       for (cp_r = r ; cp_r->suffix ; cp_r++)
-	if (has_suffix (*ficname, cp_r->suffix)) break;
+	if (has_suffix (fic_realpath, cp_r->suffix)) break;
       strcpy (cmd[p_cmds], antebuffer_realpath);
       strcat (cmd[p_cmds], " 24 ");
       strcpy (lastcom, " | ");
       strcat (lastcom, cp_r->pfmt_in ? cp_r->pfmt_in : "cat %s");
       strcpy (&(lastcom[strlen(lastcom)-2]), "-"); /* "%s" remplaces by "-" */
       suffix_choice = 1;
-      if (strlen (*ficname) + strlen (cmd[p_cmds]) >= PREMPT_S_CMD) {
+      if (strlen (fic_realpath) + strlen (cmd[p_cmds]) >= PREMPT_S_CMD) {
 	fprintf(stderr, "prempt_open_compressed_rs: PREMPT_S_CMD (%d) too small. Please * 2\n", PREMPT_S_CMD);
 	exit (1);
       }
-      strcat (cmd[p_cmds], *ficname++);
+      strcat (cmd[p_cmds], fic_realpath);
+      ficname++;
     }
     else {
-      if (has_suffix (*ficname, cp_r->suffix) &&
-	  (strlen (*ficname) + strlen (cmd[p_cmds]) + strlen(lastcom) + 1 < PREMPT_S_CMD))
+      if (has_suffix (fic_realpath, cp_r->suffix) &&
+	  (strlen (fic_realpath) + strlen (cmd[p_cmds]) + strlen(lastcom) + 1 < PREMPT_S_CMD))
 	{
 	  strcat (cmd[p_cmds], " ");
-	  strcat (cmd[p_cmds], *ficname++);
+	  strcat (cmd[p_cmds], fic_realpath);
+	  ficname++;
 	}
       else {
 	strcat (cmd[p_cmds], lastcom);
@@ -150,9 +157,11 @@ prempt_open_compressed_rs (char *rep_cado, char **ficname)
 	p_cmds++;
       }
     }
+  }
   if (cmd[p_cmds][strlen(cmd[p_cmds])-1] != '-')
     strcat (cmd[p_cmds], lastcom);
   free (antebuffer_realpath);  
+  free (fic_realpath);  
   return cmd;
 }
 
