@@ -216,4 +216,31 @@ asprintf( char ** const sptr, const char * const fmt, ... )
 #define lrand48 rand
 #endif
 
+#if defined(HAVE_MINGW) && !defined(HAVE_REALPATH)
+#include <io.h>
+#include <stdlib.h>
+#include <errno.h>
+/* Copied from http://sourceforge.net/p/mingw/patches/256/?page=0 */
+_CRTIMP char __cdecl
+*realpath( const char *__restrict__ name, char *__restrict__ resolved )
+{
+  char *retname = NULL;
+
+  if( name == NULL )
+    errno = EINVAL;
+  else if( access( name, 4 ) == 0 )
+  {
+    if( (retname = resolved) == NULL )
+    {
+      retname = malloc( _MAX_PATH );
+    }
+    if( retname == NULL )
+      errno = ENOMEM;
+    else if( (retname = _fullpath( retname, name, _MAX_PATH )) == NULL )
+      errno = ENAMETOOLONG;
+  }
+  return retname;
+}
+#endif
+
 #endif /* ifndef CADO_PORTABILITY_H_ */
