@@ -221,7 +221,7 @@ asprintf( char ** const sptr, const char * const fmt, ... )
 #include <stdlib.h>
 #include <errno.h>
 /* Copied from http://sourceforge.net/p/mingw/patches/256/?page=0 */
-_CRTIMP char __cdecl
+static inline char __cdecl
 *realpath( const char *__restrict__ name, char *__restrict__ resolved )
 {
   char *retname = NULL;
@@ -232,7 +232,7 @@ _CRTIMP char __cdecl
   {
     if( (retname = resolved) == NULL )
     {
-      retname = malloc( _MAX_PATH );
+      retname = (char *) malloc( _MAX_PATH );
     }
     if( retname == NULL )
       errno = ENOMEM;
