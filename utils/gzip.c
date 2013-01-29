@@ -101,6 +101,9 @@ prempt_open_compressed_rs (char *rep_cado, char **ficname)
   }
   strcpy (antebuffer_path, rep_cado);
   strcat (antebuffer_path, "utils/antebuffer");
+#ifdef EXECUTABLE_SUFFIX
+  strcat (antebuffer_path, EXECUTABLE_SUFFIX);
+#endif
   if (realpath(antebuffer_path, antebuffer_realpath) == NULL) {
     fprintf (stderr, "fopen_compressed_rs: realpath error : %s\n", strerror(errno));
     exit (1);
