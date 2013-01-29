@@ -1,5 +1,6 @@
 #include "cado.h"
 #include <stdlib.h>
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -86,11 +87,25 @@ prempt_open_compressed_rs (char *rep_cado, char **ficname)
   size_t p_cmds = 0;
   int suffix_choice = 0;
   char lastcom[256];
+  char *antebuffer_path, *antebuffer_realpath;
 
   if (!(cmd = calloc (s_cmds, sizeof(unsigned char *)))) {
     fprintf (stderr, "fopen_compressed_rs: calloc erreur : %s\n", strerror(errno));
     exit (1);
   }
+  antebuffer_path = (char *) malloc(PATH_MAX * sizeof(char));
+  antebuffer_realpath = (char *) malloc(PATH_MAX * sizeof(char));
+  if (antebuffer_path == NULL || antebuffer_realpath == NULL) {
+    fprintf (stderr, "fopen_compressed_rs: malloc error : %s\n", strerror(errno));
+    exit (1);
+  }
+  strcpy (antebuffer_path, rep_cado);
+  strcat (antebuffer_path, "utils/antebuffer");
+  if (realpath(antebuffer_path, antebuffer_realpath) == NULL) {
+    fprintf (stderr, "fopen_compressed_rs: realpath error : %s\n", strerror(errno));
+    exit (1);
+  }
+  free (antebuffer_path);  
   while (*ficname)
     if (!suffix_choice) {
       if (p_cmds + 1 >= s_cmds) {
@@ -107,8 +122,8 @@ prempt_open_compressed_rs (char *rep_cado, char **ficname)
       }
       for (cp_r = r ; cp_r->suffix ; cp_r++)
 	if (has_suffix (*ficname, cp_r->suffix)) break;
-      strcpy (cmd[p_cmds], rep_cado);
-      strcat (cmd[p_cmds], "utils/antebuffer 24 ");
+      strcpy (cmd[p_cmds], antebuffer_realpath);
+      strcat (cmd[p_cmds], " 24 ");
       strcpy (lastcom, " | ");
       strcat (lastcom, cp_r->pfmt_in ? cp_r->pfmt_in : "cat %s");
       strcpy (&(lastcom[strlen(lastcom)-2]), "-"); /* "%s" remplaces by "-" */
@@ -134,6 +149,7 @@ prempt_open_compressed_rs (char *rep_cado, char **ficname)
     }
   if (cmd[p_cmds][strlen(cmd[p_cmds])-1] != '-')
     strcat (cmd[p_cmds], lastcom);
+  free (antebuffer_realpath);  
   return cmd;
 }
 
