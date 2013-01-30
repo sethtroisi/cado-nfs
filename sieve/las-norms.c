@@ -744,7 +744,7 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
   maxlog2 = alg->logmax + r;
 
   fprintf (output, "# Alg. side: log2(maxnorm)=%1.2f logbase=%1.6f",
-           maxlog2, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
+           alg->logmax, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
   /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
      thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
   alg->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
