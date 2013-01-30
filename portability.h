@@ -220,7 +220,14 @@ asprintf( char ** const sptr, const char * const fmt, ... )
 #include <io.h>
 #include <stdlib.h>
 #include <errno.h>
-/* Copied from http://sourceforge.net/p/mingw/patches/256/?page=0 */
+/* realpath() function copied from 
+ * http://sourceforge.net/p/mingw/patches/256/?page=0
+ * Its copyright notice is:
+ * Written by Keith Marshall <keithmarshall@users.sourceforge.net>
+ *
+ * This is free software.  You may redistribute and/or modify it as you
+ * see fit, without restriction of copyright. */
+    
 static inline char __cdecl
 *realpath( const char *__restrict__ name, char *__restrict__ resolved )
 {
