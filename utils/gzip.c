@@ -166,7 +166,7 @@ prempt_open_compressed_rs (char *rep_cado, char **ficname)
   /* replace '/' by '\' under Windows */
   for (p_cmds = 0; cmd[p_cmds] != '\0'; p_cmds++)
     if (cmd[p_cmds] == '/')
-      cmd[p_cmds] = '\';
+      cmd[p_cmds] = '\\';
 #endif
   return cmd;
 }
