@@ -785,7 +785,7 @@ sieve_info_update_norm_data (sieve_info_ptr si)
         mp_poly_homography (s->fij, ps->f, ps->degree, H);
         double invq = 1.0;
         if (si->conf->side == side)
-            invq /= mpz_get_d(si->q);
+            invq /= mpz_get_d(si->doing->p);
         for (int k = 0; k <= ps->degree; k++)
             s->fijd[k] = mpz_get_d (s->fij[k]) * invq;
     }

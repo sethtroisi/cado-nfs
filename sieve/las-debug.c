@@ -78,7 +78,7 @@ int test_divisible(where_am_I_ptr w)
 {
     fbprime_t p = w->p;
     if (p==0) return 1;
-    const unsigned int logI = w->si->logI;
+    const unsigned int logI = w->si->conf->logI;
     const unsigned int I = 1U << logI;
 
     const unsigned long X = w->x + (w->N << LOG_BUCKET_REGION);

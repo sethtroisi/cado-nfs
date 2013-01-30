@@ -6,6 +6,7 @@ static const int STR_LEN_MAX __attribute__((deprecated)) = 2048;
 static const int RELATION_MAX_BYTES = 4096;
 
 #include <stdint.h>
+#include <stdio.h>
 
 typedef struct {
   unsigned long p;      /* rational prime */
@@ -66,7 +67,8 @@ extern "C" {
 #endif
 
 // Relation I/O
-extern void clear_relation(relation_t *rel);
+extern void relation_init(relation_t *rel);
+extern void relation_clear(relation_t *rel);
 // extern int read_relation(relation_t *rel, const char *str);
 // extern int fread_relation(FILE *file, relation_t *rel);
 extern unsigned long findroot(long a, unsigned long b, unsigned long p);
@@ -83,6 +85,10 @@ extern void reduce_exponents_mod2 (relation_t *rel);
 /* FIXME: The following interface still strongly relies on the fact that
  * the rational side is [0] and the algebraic side is [1] */
 extern void relation_add_prime (relation_t *rel, int side, unsigned long p);
+
+
+
+extern void relation_copy (relation_t *s, relation_t * r);
 
 
 /* reads over relations in a file, just discarding them */

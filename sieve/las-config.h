@@ -46,9 +46,9 @@
  * (see also las-coordinates.c)
  */
 #define xxxTRACE_K
-#define TRACE_AB { 5046103,17827 }
+// #define TRACE_AB { 2039914353344275UL,6656604L }
 // #define TRACE_IJ
-#define TRACE_Nx { 0,4849 }
+// #define TRACE_Nx { 0,1655 }
 
 /* Define CHECK_UNDERFLOW to check for underflow when subtracting
    the rounded log(p) from sieve array locations */

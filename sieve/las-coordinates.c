@@ -13,7 +13,7 @@
  * (i, j): For a give special q, this is a point in the q-lattice. Given
  *         the lattice basis given by (a0 b0 a1 b1), this corresponds to
  *         the (a,b) pair equal to i*(a0,b0)+j*(a1,b1). By construction
- *         this should lead to one of the norms having si->q as a factor.
+ *         this should lead to one of the norms having si->doing->p as a factor.
  *         i is within [-I/2, I/2[, and j is within [1, J[
  * (N, x): bucket number N, location x. N is within [0,si->nb_buckets[
  *         and x within [0,bucket_region[ ; we have:
@@ -89,10 +89,10 @@ int ABToIJ(int *i, unsigned int *j, const int64_t a, const uint64_t b, sieve_inf
     int64_t ii =   a * (int64_t) si->b1 - b * (int64_t)si->a1;
     int64_t jj = - a * (int64_t) si->b0 + b * (int64_t)si->a0;
     */
-    if (!mpz_divisible_p(ii, si->q)) ok = 0;
-    if (!mpz_divisible_p(jj, si->q)) ok = 0;
-    mpz_divexact(ii, ii, si->q);
-    mpz_divexact(jj, jj, si->q);
+    if (!mpz_divisible_p(ii, si->doing->p)) ok = 0;
+    if (!mpz_divisible_p(jj, si->doing->p)) ok = 0;
+    mpz_divexact(ii, ii, si->doing->p);
+    mpz_divexact(jj, jj, si->doing->p);
     if (mpz_sgn(jj) < 0) {
         mpz_neg(ii, ii);
         mpz_neg(jj, jj);

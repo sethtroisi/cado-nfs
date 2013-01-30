@@ -7,6 +7,7 @@
 #include "las-config.h"
 #include "cado_poly.h"
 #include "ecm/facul.h"
+#include "relation.h"
 
 /* These must be forward-declared, because the header files below use
  * them */
@@ -70,8 +71,14 @@ typedef const struct descent_hint_s * descent_hint_srcptr;
 struct las_todo_s;
 struct las_todo_s {
     mpz_t p;
-    mpz_t r;    /* unused when side == RATIONAL_SIDE */
+    /* even when side == RATIONAL_SIDE, the field below is used, since
+     * it is needed for the initialization of the q-lattice. All callers
+     * of las_todo_push must therefore make sure that a proper argument
+     * is provided.
+     */
+    mpz_t r;
     int side;
+    int depth;  /* used for the descent only. The normal value is zero. */
     struct las_todo_s * next;
 };
 typedef struct las_todo_s las_todo[1];
@@ -148,6 +155,8 @@ struct sieve_info_s {
      * sides[0,1], as well as some other members */
     siever_config conf;
 
+    las_todo doing;     /* not a todo list, but just one item => next==null */
+
     // sieving area
     uint32_t J;
     uint32_t I; // *conf has logI.
@@ -155,8 +164,6 @@ struct sieve_info_s {
     // description of the q-lattice. The values here should remain
     // compatible with those in ->conf (this concerns notably the bit
     // size as well as the special-q side).
-    mpz_t q;
-    mpz_t rho;
     int64_t a0, b0, a1, b1;
 
     // parameters for bucket sieving
@@ -210,6 +217,9 @@ struct las_info_s {
     descent_hint * hint_table;
     unsigned int max_hint_bitsize[2];
     int * hint_lookups[2]; /* quick access indices into hint_table */
+
+    /* This is an opaque pointer to C++ code. */
+    void * descent_helper;
 
     las_todo_ptr todo;
     /* These are used for reading the todo list */
