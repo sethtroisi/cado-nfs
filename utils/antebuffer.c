@@ -27,6 +27,11 @@
 #include <time.h>
 #include "portability.h"
 
+#ifdef HAVE_MINGW
+int _CRT_fmode = _O_BINARY; /* Binary open for stdin/out/err */
+int _fmode = _O_BINARY;     /* Binary open for all others files */
+#endif
+
 #ifndef HAVE_NANOSLEEP
   int nanosleep(const struct timespec *req, struct timespec *rem) {
     if (rem == NULL) {
