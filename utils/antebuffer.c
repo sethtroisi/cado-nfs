@@ -29,7 +29,6 @@
 
 #ifdef HAVE_MINGW
 int _CRT_fmode = _O_BINARY; /* Binary open for stdin/out/err */
-int _fmode = _O_BINARY;     /* Binary open for all others files */
 #endif
 
 #ifndef HAVE_NANOSLEEP
@@ -91,6 +90,10 @@ int main(int argc, char **argv) {
   size_t cpy_ab_cptp;
   int r;
   unsigned int t, c, p;
+
+#ifdef HAVE_MINGW
+  _fmode = _O_BINARY;     /* Binary open for all others files */
+#endif
 
   if (argc < 3) {
   error:
