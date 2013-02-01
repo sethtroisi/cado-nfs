@@ -816,8 +816,10 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
            maxlog2, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
   /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
      thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
-  /* rat->scale = ((double) UCHAR_MAX - GUARD) / maxlog2; */
-  rat->scale = ((1U << ((int) floor(log2(rat->logmax))+1)) - GUARD) / floor(rat->logmax) * 0.999999;
+  /* rat->scale = ((1U << ((int) floor(log2(rat->logmax))+1)) - GUARD) / floor(rat->logmax) * 0.999999; */
+  /* fprintf (stderr, "rat->scale, my fomula = %f\n", rat->scale); */
+  rat->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
+  /* fprintf (stderr, "rat->scale, old correct fomula = %f\n", rat->scale); */
 
   /* we want to select relations with a cofactor of less than r bits on the
      rational side */
