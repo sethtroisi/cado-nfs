@@ -110,6 +110,14 @@ struct helper {
         }
         return d;
     }
+    int tree_weight(tree * t) {
+        int w = 1;
+        typedef list<tree *>::iterator it_t;
+        for(it_t i = t->children.begin() ; i != t->children.end() ; i++) {
+            w += tree_weight(*i);
+        }
+        return w;
+    }
     int display_tree(FILE* o, tree * t, string const& prefix) {
         int res = 1;
         fprintf(o, "%s%s [%1.4f]%s\n",
@@ -134,7 +142,9 @@ struct helper {
         bool ok;
         double t;
         int d;
-        collected_stats(bool ok, double t, int d) : ok(ok), t(t), d(d) {}
+        int w;
+        collected_stats(bool ok, double t, int d, int w) :
+            ok(ok), t(t), d(d), w(w) {}
     };
     void display_all_trees(FILE * o) {
         typedef list<tree *>::iterator it_t;
@@ -150,7 +160,11 @@ struct helper {
         stats_t stats;
         typedef stats_t::iterator sit_t;
         for(it_t i = forest.begin() ; i != forest.end() ; i++, total++) {
-            collected_stats w(is_successful(*i), (*i)->spent, tree_depth(*i));
+            collected_stats w(is_successful(*i),
+                    (*i)->spent,
+                    tree_depth(*i),
+                    tree_weight(*i)
+                    );
             sit_t si = stats.find((*i)->label);
             if (si == stats.end()) {
                 list<collected_stats> v;
@@ -176,20 +190,28 @@ struct helper {
             int d1 = 0;
             int dmin = 0;
             int dmax = 0;
+            int w1 = 0;
+            int wmin = 0;
+            int wmax = 0;
             typedef list<collected_stats>::iterator lit_t;
             for(lit_t i = si->second.begin() ; i != si->second.end() ; i++) {
                 nok += i->ok;
                 t1 += i->t;
                 t2 += i->t * i->t;
                 d1 += i->d;
+                w1 += i->w;
                 tmin = min(tmin, i->t);
                 tmax = max(tmax, i->t);
                 dmin = min(dmin, i->d);
                 dmax = max(dmax, i->d);
+                wmin = min(wmin, i->w);
+                wmax = max(wmax, i->w);
             }
             fprintf(o, "#   success %.2f (%d/%d)\n", (double) nok / n, nok, n);
             fprintf(o, "#   depth avg %.1f, min %d, max %d\n",
                     (double) d1/n, dmin, dmax);
+            fprintf(o, "#   weight avg %.1f, min %d, max %d\n",
+                    (double) w1/n, wmin, wmax);
             double tt1 = (double) t1/n;
             double tt2 = (double) t2/n;
             fprintf(o, "#   time avg %.3f, sdev %.3f, min %.3f, max %.3f\n",

@@ -579,6 +579,10 @@ void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_ptr * todo)
     *todo = si->doing->next;
     si->doing->next = 0;
     /* sanity check */
+    if (!mpz_probab_prime_p(si->doing->p, 1)) {
+        gmp_fprintf(stderr, "Error, %Zd is not prime\n", si->doing->p);
+        exit(1);
+    }
     ASSERT_ALWAYS(si->conf->side == si->doing->side);
 }
 
