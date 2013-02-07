@@ -1949,6 +1949,8 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
 
 /* Return 0 if the leftover norm n cannot yield a relation.
    FIXME: need to check L^k < n < B^(k+1) too.
+   XXX: In doing this, pay attention to the fact that for the descent,
+   we might have B^2<L.
 
    Possible cases, where qj represents a prime in [B,L], and rj a prime > L:
    (0) n >= 2^mfb
@@ -1972,6 +1974,9 @@ check_leftover_norm (mpz_t n, size_t lpb, mpz_t BB, mpz_t BBB, mpz_t BBBB,
   /* now n < 2^mfb */
   if (s <= lpb)
     return 1; /* case (a) */
+    /* Note also that in the descent case where L > B^2, if we're below L
+     * it's still fine of course, but we have no guarantee that our
+     * cofactor is prime... */
   /* now n >= L=2^lpb */
   if (mpz_cmp (n, BB) < 0)
     return 0; /* case (b) */
