@@ -50,7 +50,8 @@ def Laurent_roots(f,prec=5):
         k_tilde=r_[1]
         r=r_tilde(1/t)*t^s
         m=k_tilde-s-1
-        gap_=gap(S(f),K(r),m)
+        r=K(R(r).numerator())/K(R(r).denominator())
+        gap_=gap(S(f),r,m)
         if gap_ in [1..prec]:
             result.append([r,m,gap_])
     return result
