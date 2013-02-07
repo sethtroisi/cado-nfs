@@ -132,269 +132,275 @@ void init_rat_norms_bucket_region(unsigned char *S,
                                  const int N,
                                  sieve_info_ptr si)
 {
-    sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
-    int halfI = (si->I)>>1,
-      int_i;
-    unsigned int \
-      j0 = N << (LOG_BUCKET_REGION - si->conf->logI),
-      j1 = j0 + (1 << (LOG_BUCKET_REGION - si->conf->logI)),
-      j = j0,
-      oy, y;
-    double \
-      u0 = si->sides[RATIONAL_SIDE]->fijd[0], // gj
-      u1 = si->sides[RATIONAL_SIDE]->fijd[1], // gi
-      u0j = u0 * j,
-      d0_init = pow(2, -1/rat->scale),
-      g, rac, d0, d1, i;
-    size_t ts;
-   
-    /* if j = 0, it will be the first value */
-    if (!j) {
-	// compute only the norm for i = 1. Everybody else is 255.
-        memset(S, 255, halfI<<1);
-	S[halfI + 1] = trunc(log2(fabs(u1)) * rat->scale) + GUARD;
-        S+= halfI<<1;
-	j++;
+  sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
+  int halfI = (si->I)>>1,
+    int_i;
+  unsigned int						\
+    j0 = N << (LOG_BUCKET_REGION - si->conf->logI),
+    j1 = j0 + (1 << (LOG_BUCKET_REGION - si->conf->logI)),
+    j = j0,
+    oy, y;
+  double						\
+    u0 = si->sides[RATIONAL_SIDE]->fijd[0], // gj
+    u1 = si->sides[RATIONAL_SIDE]->fijd[1], // gi
+    u0j = u0 * j,
+    d0_init = pow(2, -1/rat->scale),
+    g, rac, d0, d1, i;
+  size_t ts;
+  
+  /* if j = 0, it will be the first value */
+  if (!j) {
+    // compute only the norm for i = 1. Everybody else is 255.
+    memset(S, 255, halfI<<1);
+    S[halfI + 1] = trunc(log2(fabs(u1)) * rat->scale) + GUARD;
+    S+= halfI<<1;
+    j++;
+  }
+  for( ; j < j1 ; j++, u0j += u0) {
+    /* unsigned char *CS = S; */
+    __asm__("### Begin rational norm loop\n");
+    g = u0j - u1 * halfI;
+    rac = u0j / -u1;
+    d0 = d0_init;
+    d1 = (1 - d0) * rac;
+    int_i = -halfI;
+    if (g > 0) {
+      y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
+      if (rac > -halfI) goto cas1; else goto cas4;
     }
-    for( ; j < j1 ; j++, u0j += u0) {
-	__asm__("### Begin rational norm loop\n");
-	g = u0j - u1 * halfI;
-	rac = u0j / -u1;
-	d0 = d0_init;
-	d1 = (1 - d0) * rac;
-	int_i = -halfI;
-	if (g > 0) {
-	  y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
-	  if (rac > -halfI) goto cas1; else goto cas4;
-	}
-	else {
-	  g = -g;
-	  y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
-	  if (rac > -halfI) goto cas3; else goto cas2;
-	}
-    cas1:
-	for (i = int_i;; y--) {
-	  i = i * d0 + d1;
-	  ts = -int_i;
-	  int_i = (int) trunc(i); 
-	  if (UNLIKELY(int_i >= halfI)) {
-	    ts += halfI;
-	    memset((void *) S, y, ts);
-	    S += ts;
-	    /* fprintf (stderr, "A1.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", halfI - ts, halfI, ts, y, rac); */
-	    goto finratnorm;
-	  }
-	  ts += int_i;
-	  /* fprintf (stderr, "A1 : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", int_i - ts, int_i, ts, y, rac); */
-	  if (UNLIKELY(ts <= 16))
-	    switch (ts) {
-	    case 16 : S[15] = y; 
-	    case 15 : S[14] = y; 
-	    case 14 : S[13] = y; 
-	    case 13 : S[12] = y; 
-	    case 12 : S[11] = y; 
-	    case 11 : S[10] = y; 
-	    case 10 : S[9] = y; 
-	    case 9 : S[8] = y; 
-	    case 8 : S[7] = y; 
-	    case 7 : S[6] = y; 
-	    case 6 : S[5] = y; 
-	    case 5 : S[4] = y; 
-	    case 4 : S[3] = y; 
-	    case 3 : S[2] = y; 
-	    case 2 : S[1] = y; 
-	    case 1 : S[0] = y; 
-	      break;
-	    case 0 : goto np1;
-	    }
-	  else
-	    memset((void *)S, y, ts);
-	  S += ts;
-	}
-    np1:
-	g = u0j + u1 * int_i;
-	if (UNLIKELY(rac > halfI)) {
-	  while (int_i < halfI) {
-	    y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
-	    *S++ = y;
-	    /* fprintf (stderr, "A2.1 : i=%d, y=%u, rac=%f\n", int_i, y, rac); */
-	    g += u1;
-	    int_i++;
-	  }
-	  goto finratnorm;
-	}
-	while (g > 0) {
-	  y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
-	  *S++ = y;
-	  /* fprintf (stderr, "A2.2 : i=%d, y=%u, rac=%f\n", int_i, y, rac); */
-	  g += u1;
-	  int_i++;
-	}
-	g = -g;
-    cas2:
-	do {
-	  *S++ = y;
-	  int_i++;
-	  if (UNLIKELY(int_i >= halfI)) goto finratnorm;
-	  oy = y;
-	  g -= u1;
-	  y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
-	  /* fprintf (stderr, "A3 : i=%d, y=%u, rac=%f\n", int_i-1, oy, rac); */
-	} while (oy != y);
-	d0 = 1/d0;
-	d1 = (1 - d0) * rac;
-	y++;
-	i = rac - pow(2, (y - GUARD + 1) / rat->scale) / u1;
-	/* fprintf (stderr, "A3-4: (i=%e,y=%e), (i=%e,y=%e)\n", (double) int_i, log2(g) * rat->scale + GUARD, i, (double) y + 1); */
-	for (;; y++) {
-	  ts = -int_i;
-	  int_i = (int) trunc(i);
-	  if (UNLIKELY(int_i >= halfI)) {
-	    ts += halfI;
-	    memset((void *) S, y, ts);
-	    S += ts;
-	    /* fprintf (stderr, "A4.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", halfI - ts, halfI, ts, y, rac); */
-	    goto finratnorm;
-	  }
-	  ts += int_i;
-	  /* fprintf (stderr, "A4 : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", int_i - ts, int_i, ts, y, rac); */
-	  if (UNLIKELY(ts <= 16))
-	    switch (ts) {
-	    case 16 : S[15] = y; 
-	    case 15 : S[14] = y; 
-	    case 14 : S[13] = y; 
-	    case 13 : S[12] = y; 
-	    case 12 : S[11] = y; 
-	    case 11 : S[10] = y; 
-	    case 10 : S[9] = y; 
-	    case 9 : S[8] = y; 
-	    case 8 : S[7] = y; 
-	    case 7 : S[6] = y; 
-	    case 6 : S[5] = y; 
-	    case 5 : S[4] = y; 
-	    case 4 : S[3] = y; 
-	    case 3 : S[2] = y; 
-	    case 2 : S[1] = y; 
-	    case 1 : S[0] = y;
-	    }
-	  else
-	    memset((void *)S, y, ts);
-	  S += ts;
-	  i = i * d0 + d1;
-	}
-    cas3:
-	for (i = int_i;; y--) {
-	  i = i * d0 + d1;
-	  ts = -int_i;
-	  int_i = (int) trunc(i); 
-	  if (UNLIKELY(int_i >= halfI)) {
-	    ts += halfI;
-	    memset((void *) S, y, ts);
-	    S += ts;
-	    /* fprintf (stderr, "B1.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", halfI - ts, halfI, ts, y, rac); */
-	    goto finratnorm;
-	  }
-	  ts += int_i;
-	  /* fprintf (stderr, "B1 : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", int_i - ts, int_i, ts, y, rac); */
-	  if (UNLIKELY(ts <= 16))
-	    switch (ts) {
-	    case 16 : S[15] = y; 
-	    case 15 : S[14] = y; 
-	    case 14 : S[13] = y; 
-	    case 13 : S[12] = y; 
-	    case 12 : S[11] = y; 
-	    case 11 : S[10] = y; 
-	    case 10 : S[9] = y; 
-	    case 9 : S[8] = y; 
-	    case 8 : S[7] = y; 
-	    case 7 : S[6] = y; 
-	    case 6 : S[5] = y; 
-	    case 5 : S[4] = y; 
-	    case 4 : S[3] = y; 
-	    case 3 : S[2] = y; 
-	    case 2 : S[1] = y; 
-	    case 1 : S[0] = y; 
-	      break;
-	    case 0 : goto np2;
-	    }
-	  else
-	    memset((void *)S, y, ts);
-	  S += ts;
-	}
-    np2:
-	g = -u0j - u1 * int_i;
-	if (UNLIKELY(rac > halfI)) {
-	  while (int_i < halfI) {
-	    y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
-	    *S++ = y;
-	    /* fprintf (stderr, "B2.1 : i=%d, y=%u, rac=%f\n", int_i, y, rac); */
-	    g -= u1;
-	    int_i++;
-	  }
-	  goto finratnorm;
-	}
-	while (g > 0) {
-	  y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
-	  *S++ = y;
-	  /* fprintf (stderr, "B2.2 : i=%d, y=%u, rac=%f\n", int_i, y, rac); */
-	  g -= u1;
-	  int_i++;
-	}
-	g = -g;
-    cas4:
-	do {
-	  *S++ = y;
-	  int_i++;
-	  if (UNLIKELY(int_i >= halfI)) goto finratnorm;
-	  oy = y;
-	  g += u1;
-	  y = (unsigned int) trunc(log2(g) * rat->scale + GUARD);
-	  /* fprintf (stderr, "B3 : i=%d, oy=%u y=%u, rac=%f\n", int_i, oy, y, rac); */
-	} while (oy != y);
-	d0 = 1/d0;
-	d1 = (1 - d0) * rac;
-	y++;
-	i = rac + pow(2, (y - GUARD + 1) / rat->scale) / u1;
-	for (;; y++) {
-	  ts = -int_i;
-	  int_i = (int) trunc(i);
-	  if (UNLIKELY(int_i >= halfI)) {
-	    ts += halfI;
-	    memset((void *) S, y, ts);
-	    S += ts;
-	    /* fprintf (stderr, "B4.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", halfI - ts, halfI, ts, y, rac); */
-	    goto finratnorm;
-	  }
-	  ts += int_i;
-	  /* fprintf (stderr, "B4 : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", int_i - ts, int_i, ts, y, rac); */
-	  if (ts <= 16)
-	    switch (ts) {
-	    case 16 : S[15] = y; 
-	    case 15 : S[14] = y; 
-	    case 14 : S[13] = y; 
-	    case 13 : S[12] = y; 
-	    case 12 : S[11] = y; 
-	    case 11 : S[10] = y; 
-	    case 10 : S[9] = y; 
-	    case 9 : S[8] = y; 
-	    case 8 : S[7] = y; 
-	    case 7 : S[6] = y; 
-	    case 6 : S[5] = y; 
-	    case 5 : S[4] = y; 
-	    case 4 : S[3] = y; 
-	    case 3 : S[2] = y; 
-	    case 2 : S[1] = y; 
-	    case 1 : S[0] = y;
-	    }
-	  else
-	    memset((void *)S, y, ts);
-	  S += ts;
-	  i = i * d0 + d1;
-	}
-    finratnorm:
-	/* if (S - CS != I) fprintf (stderr, "END norm: cpt = %ld\n", S - CS); */
-	__asm__("### End rational norm loop\n");
+    else {
+      g = -g;
+      y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
+      if (rac > -halfI) goto cas3; else goto cas2;
     }
+  cas1:
+    for (i = int_i;; y--) {
+      i = i * d0 + d1;
+      ts = -int_i;
+      int_i = (int) trunc(i); 
+      if (UNLIKELY(int_i >= halfI)) {
+	ts += halfI;
+	/* fprintf (stderr, "A1.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", halfI - ts, halfI, ts, y, rac); */
+	memset((void *) S, y, ts);
+	S += ts;
+	goto finratnorm;
+      }
+      ts += int_i;
+      /* fprintf (stderr, "A1 : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", int_i - ts, int_i, ts, y, rac); */
+      if (UNLIKELY(ts <= 16))
+	switch (ts) {
+	case 16 : S[15] = y; 
+	case 15 : S[14] = y; 
+	case 14 : S[13] = y; 
+	case 13 : S[12] = y; 
+	case 12 : S[11] = y; 
+	case 11 : S[10] = y; 
+	case 10 : S[9] = y; 
+	case 9 : S[8] = y; 
+	case 8 : S[7] = y; 
+	case 7 : S[6] = y; 
+	case 6 : S[5] = y; 
+	case 5 : S[4] = y; 
+	case 4 : S[3] = y; 
+	case 3 : S[2] = y; 
+	case 2 : S[1] = y; 
+	case 1 : S[0] = y; 
+	  break;
+	case 0 : goto np1;
+	}
+      else
+	memset((void *)S, y, ts);
+      S += ts;
+    }
+  np1:
+    g = u0j + u1 * int_i;
+    if (UNLIKELY(trunc(rac) >= halfI - 1)) {
+      while (int_i < halfI) {
+	y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
+	/* fprintf (stderr, "A2.1 : i=%d, y=%u, rac=%f\n", int_i, y, rac); */
+	*S++ = y;
+	g += u1;
+	int_i++;
+      }
+      goto finratnorm;
+    }
+    while (g > 0) {
+      y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
+      /* fprintf (stderr, "A2.2 : i=%d, y=%u, rac=%f\n", int_i, y, rac); */
+      *S++ = y;
+      g += u1;
+      int_i++;
+    }
+    g = -g;
+  cas2:
+    do {
+      /* fprintf (stderr, "A3 : i=%d, y=%u, rac=%f\n", int_i, y, rac); */
+      *S++ = y;
+      int_i++;
+      if (UNLIKELY(int_i >= halfI)) {
+	ASSERT(int_i == halfI);
+	goto finratnorm;
+      }
+      oy = y;
+      g -= u1;
+      y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
+    } while (oy != y);
+    d0 = 1/d0;
+    d1 = (1 - d0) * rac;
+    y++;
+    i = rac - pow(2, (y - GUARD + 1) / rat->scale) / u1;
+    for (;; y++) {
+      ts = -int_i;
+      int_i = (int) trunc(i);
+      if (UNLIKELY(int_i >= halfI)) {
+	ts += halfI;
+	/* fprintf (stderr, "A4.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", halfI - ts, halfI, ts, y, rac); */
+	memset((void *) S, y, ts);
+	S += ts;
+	goto finratnorm;
+      }
+      ts += int_i;
+      /* fprintf (stderr, "A4 : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", int_i - ts, int_i, ts, y, rac); */
+      if (UNLIKELY(ts <= 16))
+	switch (ts) {
+	case 16 : S[15] = y; 
+	case 15 : S[14] = y; 
+	case 14 : S[13] = y; 
+	case 13 : S[12] = y; 
+	case 12 : S[11] = y; 
+	case 11 : S[10] = y; 
+	case 10 : S[9] = y; 
+	case 9 : S[8] = y; 
+	case 8 : S[7] = y; 
+	case 7 : S[6] = y; 
+	case 6 : S[5] = y; 
+	case 5 : S[4] = y; 
+	case 4 : S[3] = y; 
+	case 3 : S[2] = y; 
+	case 2 : S[1] = y; 
+	case 1 : S[0] = y;
+	}
+      else
+	memset((void *)S, y, ts);
+      S += ts;
+      i = i * d0 + d1;
+    }
+  cas3:
+    for (i = int_i;; y--) {
+      i = i * d0 + d1;
+      ts = -int_i;
+      int_i = (int) trunc(i); 
+      if (UNLIKELY(int_i >= halfI)) {
+	ts += halfI;
+	/* fprintf (stderr, "B1.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", halfI - ts, halfI, ts, y, rac); */
+	memset((void *) S, y, ts);
+	S += ts;
+	goto finratnorm;
+      }
+      ts += int_i;
+      /* fprintf (stderr, "B1 : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", int_i - ts, int_i, ts, y, rac); */
+      if (UNLIKELY(ts <= 16))
+	switch (ts) {
+	case 16 : S[15] = y; 
+	case 15 : S[14] = y; 
+	case 14 : S[13] = y; 
+	case 13 : S[12] = y; 
+	case 12 : S[11] = y; 
+	case 11 : S[10] = y; 
+	case 10 : S[9] = y; 
+	case 9 : S[8] = y; 
+	case 8 : S[7] = y; 
+	case 7 : S[6] = y; 
+	case 6 : S[5] = y; 
+	case 5 : S[4] = y; 
+	case 4 : S[3] = y; 
+	case 3 : S[2] = y; 
+	case 2 : S[1] = y; 
+	case 1 : S[0] = y; 
+	  break;
+	case 0 : goto np2;
+	}
+      else
+	memset((void *)S, y, ts);
+      S += ts;
+    }
+  np2:
+    g = -u0j - u1 * int_i;
+    if (UNLIKELY(trunc(rac) >= halfI - 1)) {
+      while (int_i < halfI) {
+	y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
+	/* fprintf (stderr, "B2.1 : i=%d, y=%u, rac=%f\n", int_i, y, rac); */
+	*S++ = y;
+	g -= u1;
+	int_i++;
+      }
+      goto finratnorm;
+    }
+    while (g > 0) {
+      y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
+      /* fprintf (stderr, "B2.2 : i=%d, y=%u, rac=%f\n", int_i, y, rac); */
+      *S++ = y;
+      g -= u1;
+      int_i++;
+    }
+    g = -g;
+  cas4:
+    do {
+      /* fprintf (stderr, "B3 : i=%d, y=%u, rac=%f\n", int_i, y, rac); */
+      *S++ = y;
+      int_i++;
+      if (UNLIKELY(int_i >= halfI)) {
+	ASSERT(int_i == halfI);
+	goto finratnorm;
+      }
+      oy = y;
+      g += u1;
+      y = (unsigned int) trunc(log2(g) * rat->scale + GUARD);
+    } while (oy != y);
+    d0 = 1/d0;
+    d1 = (1 - d0) * rac;
+    y++;
+    i = rac + pow(2, (y - GUARD + 1) / rat->scale) / u1;
+    for (;; y++) {
+      ts = -int_i;
+      int_i = (int) trunc(i);
+      if (UNLIKELY(int_i >= halfI)) {
+	ts += halfI;
+	/* fprintf (stderr, "B4.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", halfI - ts, halfI, ts, y, rac); */
+	memset((void *) S, y, ts);
+	S += ts;
+	goto finratnorm;
+      }
+      ts += int_i;
+      /* fprintf (stderr, "B4 : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", int_i - ts, int_i, ts, y, rac); */
+      if (ts <= 16)
+	switch (ts) {
+	case 16 : S[15] = y; 
+	case 15 : S[14] = y; 
+	case 14 : S[13] = y; 
+	case 13 : S[12] = y; 
+	case 12 : S[11] = y; 
+	case 11 : S[10] = y; 
+	case 10 : S[9] = y; 
+	case 9 : S[8] = y; 
+	case 8 : S[7] = y; 
+	case 7 : S[6] = y; 
+	case 6 : S[5] = y; 
+	case 5 : S[4] = y; 
+	case 4 : S[3] = y; 
+	case 3 : S[2] = y; 
+	case 2 : S[1] = y; 
+	case 1 : S[0] = y;
+	}
+      else
+	memset((void *)S, y, ts);
+      S += ts;
+      i = i * d0 + d1;
+    }
+  finratnorm:
+    /* if (S - CS != (halfI<<1)) fprintf (stderr, "END norm: cpt = %ld\n", S - CS); */
+    __asm__("### End rational norm loop\n");
+  }
 }
 
 /* {{{ some utility stuff */
@@ -816,9 +822,9 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
            maxlog2, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
   /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
      thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
-  /* rat->scale = ((1U << ((int) floor(log2(rat->logmax))+1)) - GUARD) / floor(rat->logmax) * 0.999999; */
+  rat->scale = ((1U << ((int) floor(log2(rat->logmax))+1)) - GUARD) / floor(rat->logmax) * 0.999999;
   /* fprintf (stderr, "rat->scale, my fomula = %f\n", rat->scale); */
-  rat->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
+  /* rat->scale = ((double) UCHAR_MAX - GUARD) / maxlog2; */
   /* fprintf (stderr, "rat->scale, old correct fomula = %f\n", rat->scale); */
 
   /* we want to select relations with a cofactor of less than r bits on the
