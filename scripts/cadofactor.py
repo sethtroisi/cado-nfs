@@ -113,25 +113,68 @@ class MyLogger(Logger, ScreenHandler, FileHandler):
     pass
 
 class Command(object):
-    def __init__(self, command, logfile=None):
-        # Run the command
-        self.command = command
-        if not logfile is None:
-            f = open(logfile, "a")
-            f.write(self.command + "\n")
-        self.child = subprocess.Popen(self.command, stdout = subprocess.PIPE, 
-            stderr = subprocess.PIPE)
-        if not logfile is None:
-            f.write("# Child process has PID " + str(self.child.pid) + "\n")
-            f.close()
-        logger.info("Running command (PID=" + str(self.child.pid) + "): " + self.command)
+    def __init__(self, args, logfile=None, **kwargs):
+        self.args = args
+        self.logfile = logfile
+        self.kwargs = kwargs
+        # Convert args array to a string for printing if necessary
+        if isinstance(self.args, str):
+            self.cmdline = self.args
+        else:
+            self.cmdline = " ".join(self.args)
+        if not self.logfile is None:
+            self.f = open(logfile, "a")
+            self.f.write("# Command line for id(Command) = " + str(id(self)) + " is:\n" + self.cmdline + "\n")
+            self.f.close()
+
+        self.child = subprocess.Popen(self.args, stdout = subprocess.PIPE, 
+            stderr = subprocess.PIPE, **self.kwargs)
+        
+        if not self.logfile is None:
+            self.f = open(self.logfile, "a")
+            self.f.write("# Child process for id(Command)= " + str(id(self)) + " has PID " + str(self.child.pid) + "\n")
+            self.f.close()
+        logger.info("Running command (PID=" + str(self.child.pid) + "): " + self.cmdline)
 
     def wait(self):
+        if hasattr(self, "returncode"):
+            return self.returncode
         # Wait for command to finish executing, capturing stdout and stderr 
         # in output tuple
         (self.stdout, self.stderr) = self.child.communicate()
-        logger.info("Exit status " + str(self.child.returncode) + " for PID " + str(self.child.pid))
-        return self.child.returncode
+        if not self.logfile is None:
+            self.f = open(self.logfile, "a")
+            self.f.write("# Child process for id(Command)= " + str(id(self)) + " has return code " + str(self.child.returncode) + "\n")
+            self.f.close()
+        if self.child.returncode == 0:
+            logger.info("Process with PID " + str(self.child.pid) + " finished successfully")
+        else:
+            logger.error("Process with PID " + str(self.child.pid) + " finished with return code " + str(self.child.returncode))
+        self.returncode = self.child.returncode
+        return self.returncode
+
+class RemoteCommand(Command):
+    ssh="/usr/bin/ssh"
+    ssh_options = {
+        "ConnectTimeout": 30,
+        "ServerAliveInterval": 10,
+        "PasswordAuthentication": "no"
+    }
+    def __init__(self, command, host, port = None, ssh_options = None, **kwargs):
+        ssh_command = [self.__class__.ssh, host]
+        options = self.__class__.ssh_options.copy()
+        if not ssh_options is None:
+            options.update(ssh_options)
+        if not port is None:
+            ssh_command += ["-p", str(port)];
+        for (opt, val) in options.items():
+            if not val is None:
+                ssh_command += ["-o", opt + "=" + str(val)]
+        if isinstance(command, str):
+            ssh_command.append(command)
+        else:
+            ssh_command += command
+        super().__init__(ssh_command, **kwargs)
 
 if __name__ == '__main__':
     logger = MyLogger(filename = "log", filelvl = logging.DEBUG, lvl=logging.INFO)
@@ -139,6 +182,15 @@ if __name__ == '__main__':
     logger.info("An Info Center!")
     logger.warn("Beware")
     logger.error("All hope abandon", extra={"indent" : 4})
-    c = Command("ls", logfile = "commands")
-    c.wait()
-    print(c.stdout)
+
+    c = Command(["ls", "/"], logfile = "commands")
+    rc = c.wait()
+    print("Stdout: " + str(c.stdout, encoding="utf-8"))
+    print("Stderr: " + str(c.stderr, encoding="utf-8"))
+    del(c)
+
+    c = RemoteCommand(["ls", "/"], "localhost", logfile = "commands")
+    rc = c.wait()
+    print("Stdout: " + str(c.stdout, encoding="utf-8"))
+    print("Stderr: " + str(c.stderr, encoding="utf-8"))
+    del(c)
