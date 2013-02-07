@@ -411,7 +411,7 @@ int main(int argc, char * argv[])
     {
         size_t n = maxdim + padding;
         bal->colperm = malloc(2 * n * sizeof(uint32_t));
-        FILE * fcw = fopen(cwfile, "r");
+        FILE * fcw = fopen(cwfile, "rb");
         if (fcw == NULL) { perror(cwfile); exit(1); }
         colweights = malloc(n * sizeof(uint32_t));
         memset(colweights, 0, n * sizeof(uint32_t));
@@ -507,7 +507,7 @@ int main(int argc, char * argv[])
 
     if (display_correlation) {
         size_t n = maxdim + padding;
-        FILE * frw = fopen(rwfile, "r");
+        FILE * frw = fopen(rwfile, "rb");
         if (frw == NULL) { perror(rwfile); exit(1); }
         uint32_t * rowweights = malloc(n * sizeof(uint32_t));
         memset(rowweights, 0, n * sizeof(uint32_t));
