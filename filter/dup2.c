@@ -291,7 +291,7 @@ int main (int argc, char *argv[])
 
     if (bz) {
         if (outfmt) {
-            fprintf(stderr, "-bz and -outfmt are exclusive");
+            fprintf(stderr, "-bz and -outfmt are mutually exclusive");
             usage();
         } else {
             outfmt = ".bz2";
@@ -310,8 +310,19 @@ int main (int argc, char *argv[])
   fprintf (stderr, "[checking true duplicates on sample of %lu cells]\n",
            sanity_size);
   sanity_a = (int64_t*)  malloc (sanity_size * sizeof (int64_t));
+  if (sanity_a == NULL)
+    {
+      fprintf (stderr, "Error, cannot allocate sanity_a\n");
+      exit (1);
+    }
   memset (sanity_a, 0, sanity_size * sizeof (int64_t));
+
   sanity_b = (uint64_t*) malloc (sanity_size * sizeof (uint64_t));
+  if (sanity_b == NULL)
+    {
+      fprintf (stderr, "Error, cannot allocate sanity_b\n");
+      exit (1);
+    }
 
   H = (uint32_t*) malloc (K * sizeof (uint32_t));
   if (H == NULL)
