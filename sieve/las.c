@@ -476,6 +476,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     memset(si, 0, sizeof(sieve_info));
     si->cpoly = las->cpoly;
     memcpy(si->conf, sc, sizeof(siever_config));
+    ASSERT_ALWAYS(sc->logI > 0);
     si->I = 1 << sc->logI;
     si->J = 1 << (sc->logI - 1);
 
