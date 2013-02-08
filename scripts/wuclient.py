@@ -39,7 +39,7 @@ REQUIRED_SETTINGS = {"CLIENTID" : ("", "Unique ID for this client"),
                      "SERVER" : ("", "Base URL for WU server"), 
                      "WORKDIR" : ("", "Directory for result files")}
 # Optional settings with defaults, overrideable on command line, and a help text
-OPTIONAL_SETTINGS = {"WU_FILENAME" : ("WU", "Filename under which to store WU files"), 
+OPTIONAL_SETTINGS = {"WU_FILENAME" : (None, "Filename under which to store WU files"), 
                      "GETWUPATH" : ("/cgi-bin/getwu", "Path segment of URL for requesting WUs from server"), 
                      "POSTRESULTPATH" : ("/cgi-bin/upload.py", "Path segment of URL for reporting results to server"), 
                      "DEBUG" : ("0", "Debugging verbosity"),
@@ -241,24 +241,16 @@ class Workunit_Processor(Workunit):
         if self.debug >= 2:
             print("Headers of postdata as a dictionary:")
             print(dict(postdata.items()))
-        # Ugly hack: overwrite method for writing headers to suppress them
-        # We pass the MIME headers to the request below via the headers= argument, 
-        # and don't want them to occur again as part of the POST data
-        if False:
-            postdata2 = postdata.as_string(unixfrom=False) + "\n"
-            if self.debug >= 2:
-                print("Postdata as a string:")
-                print(postdata2)
-            postdata3 = bytes(postdata2, encoding="utf-8")
-        else:
-            fp = BytesIO()
-            g = FixedBytesGenerator(fp)
-            g.flatten(postdata, unixfrom=False)
-            postdata3 = fp.getvalue() + b"\n"
+        fp = BytesIO()
+        g = FixedBytesGenerator(fp)
+        g.flatten(postdata, unixfrom=False)
+        postdata3 = fp.getvalue() + b"\n"
         if self.debug >= 2:
             print("Postdata as a bytes array:")
             print(postdata3)
+
         url = SETTINGS["SERVER"] + "/" + SETTINGS["POSTRESULTPATH"]
+        logging.info("Sending result for workunit " + self.WUid + " to " + url)
         request = urllib.request.Request(url, data=postdata3, headers=dict(postdata.items()))
         conn = None;
         while conn is None:
@@ -271,7 +263,23 @@ class Workunit_Processor(Workunit):
                 logging.error("Waiting " + str(wait) + " seconds before retrying")
                 time.sleep(wait)
         response = conn.read()
-        logging.debug ("Server response:\n" + response)
+        encoding = None
+        # Find out the encoding the server response uses. This may matter if 
+        # the path names for the uploaded files contain special characters,
+        # like accents
+        content_type = conn.getheader("Content-Type", default=None)
+        print ("Content-Type: " + content_type)
+        if not content_type is None:
+            # If there are multiple header lines with the same key, their 
+            # values are joind with "," separators
+            for h in content_type.split(","):
+                for g in h.split(";"):
+                    f = g.split("=")
+                    if len(f) == 2 and f[0].strip() == "charset":
+                        encoding = f[1].strip()
+        if encoding is None:
+            encoding = "latin-1"
+        logging.debug ("Server response:\n" + str(response, encoding=encoding))
         conn.close()
         return True
 
@@ -341,6 +349,10 @@ if __name__ == '__main__':
     for arg in SETTINGS.keys():
         if arg.lower() in args:
             SETTINGS[arg] = args[arg.lower()]
+
+    # If no WU filename is given, we use "WU." + client id
+    if SETTINGS["WU_FILENAME"] is None:
+        SETTINGS["WU_FILENAME"] = "WU." + SETTINGS["CLIENTID"]
 
     logopt = {}
     logopt["level"] = getattr(logging, SETTINGS["LOGLEVEL"].upper(), None)
