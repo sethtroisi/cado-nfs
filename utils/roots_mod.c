@@ -15,9 +15,10 @@
 #include "modredc_ul.h"
 #include "mod_ul.h"
 #include "modredc_ul_default.h"
+#include "gcd_uint64.h"
 
-static int 
-mod_roots (residue_t *, residue_t, int, modulus_t);
+static unsigned long 
+mod_roots (residue_t *, const residue_t, unsigned long, const modulus_t);
 
 /* For i < 50, isprime_table[i] == 1 iff i is prime */
 static unsigned char isprime_table[] = {0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 1, 
@@ -223,51 +224,28 @@ omega (residue_t o, residue_t b, const unsigned long k, const modulus_t pp)
   mod_clear (pow, pp);
 }
 
-
 /************************** square roots *************************************/
 
-/* Roots of x^d = a (mod p) for d even and a 64-bit word */
-static int
-roots2 (residue_t *rr, residue_t aa, int d, modulus_t pp)
+/* Return one sqrt of aa (mod pp). pp is assumed to be an odd prime; if it is 
+   composite, this code returns undefined results, it makes no effort to 
+   detect this case. */
+
+static void
+one_root2 (residue_t rr, const residue_t aa, const modulus_t pp)
 {
-  uint64_t q, s, n, i, j, k = 0, l;
-  residue_t hh, delta, dd, bb, zz;
+  uint64_t q, s, i, j, l;
+  residue_t hh, delta, dd, bb, zz, tt;
   const uint64_t p =  mod_getmod_ul(pp);
-
-  if (mod_jacobi (aa, pp) != 1)
-    return 0;
-
-  /* find the roots of x^(d/2) = a (mod p) */
-  n = mod_roots (rr + d / 2, aa, d / 2, pp);
-
-  if (n == 0)
-    return n;
 
   /* write p-1 = q*2^s with q odd */
   for (q = p-1, s = 0; (q&1) == 0; q/=2, s++);
 
   if (s == 1) /* p = 3 (mod 4) */
     {
-      /* solutions are +/-a^((p+1)/4) */
-      for (i = 0; i < n; i++)
-        {
-          /* If d = 2 (mod 4), then every root of x^(d/2) = a (mod p) gives
-             two roots of x^d = a (mod p) since a is a quadratic residue.
-             However if d = 0 (mod 4), then a root of x^(d/2) = a (mod p) can
-             give no root of x^d = a (mod p), thus we have to check the
-             Legendre symbol again.
-             Consider for example x^4 = 3 (mod 11): x^2 = 3 mod 11 has
-             two roots (5 and 6), then x^2-5 mod 11 has two roots (4 and 7)
-             but x^2-6 mod 11 has no root. */
-          
-          if ((d & 3) == 0 && mod_jacobi (rr[d/2+i], pp) != 1)
-            continue;
-
-          mod_pow_ul (rr[2*k], rr[d/2+i], (p + 1) >> 2, pp);
-          mod_neg (rr[2*k+1], rr[2*k], pp);
-          k ++;
-        }
-      return 2*k;
+      /* The two solutions are +/-a^((p+1)/4). We return only the "+" kind, 
+         which is the principal sqrt and can be used for sqrt again */
+      mod_pow_ul (rr, aa, (p + 1) >> 2, pp);
+      return;
     }
 
   /* case p = 1 (mod 4). Uses Tonelli-Shanks, more precisely
@@ -276,57 +254,48 @@ roots2 (residue_t *rr, residue_t aa, int d, modulus_t pp)
   mod_init (zz, pp);
   mod_set1 (zz, pp);
   i = 1;
+
+  /* Find a quadratic non-residue */
+  /* FIXME: use omega() ? */
   do {
     /* zz is equal to i (mod pp) */
     mod_add1 (zz, zz, pp);
     i++;
   } while (i < isprime_table_size && (!isprime_table[i] || mod_jacobi (zz, pp) != -1));
   ASSERT_ALWAYS(i < isprime_table_size);
+
   mod_init (hh, pp);
-  mod_init (aa, pp);
   mod_init (delta, pp);
   mod_init (dd, pp);
   mod_init (bb, pp);
-  for (i = 0; i < n; i++)
-    {
-      /* For d divisible by 4, we have to check the Legendre symbol again.
-         Consider for example x^4 = 10 (mod 13): x^2 = 10 (mod 13) has two
-         roots (6 and 7) but none of them has a root mod 13. */
-      if ((d & 3) == 0 && mod_jacobi (rr[d/2+i], pp) != 1)
-        continue;
+  mod_init (tt, pp);
 
-      mod_pow_ul (aa, zz, q, pp);
-      mod_pow_ul (bb, rr[d/2+i], q, pp);
-      mod_set1 (hh, pp);
-      for (j = 1; j < s; j++)
+  mod_pow_ul (tt, zz, q, pp);
+  mod_pow_ul (bb, tt, q, pp);
+  mod_set1 (hh, pp);
+  for (j = 1; j < s; j++)
+    {
+      mod_set (dd, bb, pp);
+      for (l = 0; l < s - 1 - j; l++)
+        mod_sqr (dd, dd, pp);
+      if (!mod_is1 (dd, pp))
         {
-          mod_set (dd, bb, pp);
-          for (l = 0; l < s - 1 - j; l++)
-            mod_sqr (dd, dd, pp);
-          if (!mod_is1 (dd, pp))
-            {
-              mod_mul (hh, hh, aa, pp);
-              mod_sqr (aa, aa, pp);
-              mod_mul (bb, bb, aa, pp);
-            }
-          else
-            mod_sqr (aa, aa, pp);
+          mod_mul (hh, hh, tt, pp);
+          mod_sqr (tt, tt, pp);
+          mod_mul (bb, bb, tt, pp);
         }
-      mod_pow_ul (delta, rr[d/2+i], (q + 1) >> 1, pp);
-      mod_mul (hh, hh, delta, pp);
-      mod_set (rr[2*k], hh, pp);
-      mod_neg (rr[2*k+1], rr[2*k], pp);
-      k++;
+      else
+        mod_sqr (tt, tt, pp);
     }
+  mod_pow_ul (delta, rr, (q + 1) >> 1, pp);
+  mod_mul (hh, hh, delta, pp);
+  mod_set (rr, hh, pp);
 
   mod_clear (hh, pp);
-  mod_clear (aa, pp);
+  mod_clear (tt, pp);
   mod_clear (delta, pp);
   mod_clear (dd, pp);
   mod_clear (bb, pp);
-  mod_clearmod (pp);
-
-  return 2*k;
 }
 
 /************************** cubic roots **************************************/
@@ -347,7 +316,7 @@ one_cubic_root_2mod3 (residue_t rr, residue_t ddelta, modulus_t pp)
    Use the algorithm from Table 3 in reference [1].
    rr and ddelta overlapping is permissible. */
 static void 
-one_cubic_root_1mod3 (residue_t rr, residue_t zeta, residue_t ddelta, modulus_t pp)
+one_cubic_root_1mod3 (residue_t rr, residue_t zeta, const residue_t ddelta, const modulus_t pp)
 {
   residue_t rho, a, aprime, b, h, d;
   uint64_t i, j, s, t, smod3, l;
@@ -386,7 +355,8 @@ one_cubic_root_1mod3 (residue_t rr, residue_t zeta, residue_t ddelta, modulus_t 
         break;
     }
   /* aprime  =  rho^((p-1)/3)  !=  1, so it is a 3-rd rood of 1 */
-  mod_set (zeta, aprime, pp);
+  if (zeta != NULL) 
+    mod_set (zeta, aprime, pp);
   /* see below to explain why we start from delta^(2s) for s = 1 mod 3 */
   mod_pow_ul (b, ddelta, (smod3 == 1) ? 2*s : s, pp);
   mod_set1 (h, pp);
@@ -508,7 +478,7 @@ roots3 (residue_t *rr, residue_t aa, int d, modulus_t pp)
 /* Put in rop a r-th root of delta (mod p), assuming one exists,
    using the algorithm from Table 4 in reference [1]. */
 static void
-one_rth_root (residue_t rop, uint64_t r, residue_t delta, modulus_t pp)
+one_rth_root (residue_t rop, const uint64_t r, const residue_t delta, const modulus_t pp)
 {
   residue_t a, b, c, d, h;
   const uint64_t p = mod_getmod_ul (pp);
@@ -587,19 +557,19 @@ one_rth_root (residue_t rop, uint64_t r, residue_t delta, modulus_t pp)
 }
 
 static int
-is_rth_power (residue_t a, uint64_t r, modulus_t pp)
+is_rth_power (const residue_t a, const uint64_t r, const modulus_t pp)
 {
   const uint64_t p = mod_getmod_ul (pp);
   residue_t t;
-  int ret = 1;
+  int ret;
 
-  if ((p % r) == 1)
-    {
-      mod_init (t, pp);
-      mod_pow_ul (t, a, (p - 1) / r, pp);
-      ret = mod_is1 (t, pp);
-      mod_clear (t, pp);
-    }
+  ASSERT ((p % r) == 1);
+
+  mod_init (t, pp);
+  mod_pow_ul (t, a, (p - 1) / r, pp);
+  ret = mod_is1 (t, pp);
+  mod_clear (t, pp);
+
   return ret;
 }
 
@@ -615,9 +585,6 @@ roots (residue_t *rr, residue_t a, int d, modulus_t pp)
 
   /* first find the smallest prime r dividing d (r can be d) */
   for (r = 5; d % r; r += 2);
-
-  if (is_rth_power (a, r, pp) == 0)
-    return 0;
 
   /* find the roots of x^(d/r) = a (mod p) */
   n = mod_roots (rr0 = rr + d - d / r, a, d / r, pp);
@@ -668,24 +635,137 @@ roots (residue_t *rr, residue_t a, int d, modulus_t pp)
 
 /*****************************************************************************/
 
-static int 
-mod_roots (residue_t *rr, residue_t aa, int d, modulus_t pp)
+
+static unsigned long 
+mod_roots (residue_t *rr, const residue_t aa, const unsigned long d, 
+           const modulus_t pp)
 {
-  if (d == 1)
-    {
-      mod_set (rr[0], aa, pp);
-      return 1;
+/** Let \f$\ord_p(r)\f$ denote the order of \f$\left<r\right>\f$ with \f$ r \f$ 
+ *  in \f$ (Z/pZ)^{*} \f$. 
+ *
+ *  We have \f$ \ord_p(r^d) = \frac{\ord_p(r)}{\gcd(\ord_p(r), d)} \f$. 
+ *  This is true for multiplicatively written groups in general.
+ *  
+ *  A cyclic group G of order \#G has a subgroup H of order \#H iff \#H | \#G, 
+ *  and a subgroup of given order is unique if it exists.
+ *
+ *  If we want \f$ r \f$ to be a \f$ d \f$-th root of \f$ a \f$, we must have \f$ r^d = a \f$ and hence 
+ *  \f$ \frac{\ord_p(r)}{\gcd(\ord_p(r), d)} = \ord_p(a) \iff \ord_p(r) = \ord_p(a) \gcd(\ord_p(r), d) \f$.
+ *
+ *  \f$ a \f$ has a \f$ d \f$-th root if and only if it is a \f$ g \f$-th power.
+ *  If \f$ g = 2 \f$, we check the Jacobi symbol. For larger \f$ g \f$, we have no 
+ *  fast character check, so we test that \f$ a^{(p-1)/g} \equiv 1 \bmod{p} \f$.
+ */
+  const unsigned long p = modredcul_getmod_ul(pp);
+  unsigned long g, pprime, dprime, e;
+  residue_t root, b, omega_g;
+  unsigned long exp, expmod;
+
+  ASSERT (d > 0); /* Should we allow d < 0? */
+  
+  g = gcd_uint64(d, p - 1);
+  dprime = d / g;
+  pprime = (p-1) / g;
+  if ((g == 2 && !mod_jacobi (aa, pp) == 1) ||
+      (g > 2 && !is_rth_power (aa, g, pp)))
+    return 0;
+
+  /* Now we know that there are exactly g distinct d-th roots */
+
+  /* Compute a primitive g-th root of unity omega_g. */
+  if (g == 1) {
+    /* Nothing to do here, we use omega=1 below */
+  } else if (g == 2) {
+    /* Nothing to do here, we use omega=1,-1 below */
+  } else {
+    mod_init (omega_g, pp);
+    mod_init (b, pp);
+    omega (omega_g, b, g, pp);
+  }
+
+  /* We find a d-th root by finding a g-th root, then exponentiating by 
+     1/(d/g) (mod p-1). Note that gcd(d/g, p-1) = 1, because g = gcd(d, p-1), 
+     so the inverse exists. */
+
+  /* We keep the invariant that root^(d/e) = a */
+  mod_init (root, pp);
+  mod_set (root, aa, pp);
+  e = g;
+  expmod = p-1;
+  exp = 1;
+
+  if (e % 2 == 0) {
+    /* Test whether we can use simple sqrt.
+       FIXME: This condition is sufficient, but not necessary: we can use the 
+       simple sqrt iff ord_p(a) is odd. This is certainly the case when 
+       p==1 (mod 4) and a is a quadratic residue, but it can happen for 
+       p==1 (mod 4), too, for example:
+       sqrt(9) = +-3 (mod 13), and 9^2 = 3 (mod 13).
+       However, when (p-1)/2 is odd, how do we compute the exponent? */
+    if (p % 4 == 3) {
+      /* We know that the order of a is odd, so we can remove factors 
+         of 2 from expmod */
+      do {
+        expmod /= 2;
+        ularith_sub_ul_ul_ge (&exp, expmod);
+      } while (expmod % 2 == 0);
+      /* and divide exp by 2 for each sqrt */
+      do {
+        e /= 2;
+        if (exp % 2 == 0)
+          exp /= 2;
+        else
+          exp = exp / 2 + expmod / 2 + 1;
+      } while (e % 2 == 0);
+    } else {
+      do {
+        e /= 2;
+        one_root2 (root, root, pp);
+      } while (e % 2 == 0);
     }
-  else if ((d & 1) == 0) /* d is even */
-    {
-      return roots2 (rr, aa, d, pp);
+  }
+
+  if (e % 3 == 0) {
+    /* This contition is sufficient but again not necessary */
+    if (p % 3 == 2) {
+      do {
+        modul_div3 (&exp, &exp, &expmod);
+        e /= 3;
+      } while (e % 3 == 0);
+    } else {
+      do {
+        one_cubic_root_1mod3 (root, NULL, root, pp);
+        e /= 3;
+      } while (e % 3 == 0);
     }
-  else if (d % 3 == 0)
-    {
-      return roots3 (rr, aa, d, pp);
+  }
+
+  if (e > 1) {
+    one_rth_root (root, e, root, pp);
+  }
+
+  /* Exponentiate by the accumulated exponent */
+  
+
+  /* Multiply the root by the g different g-th roots of unity. */
+  
+  mod_set (rr[0], root, pp);
+  if (g % 2 == 0) {
+    unsigned long i;
+    mod_neg (rr[g / 2], rr[0], pp);
+    for (i = 1; i < g / 2; i++) {
+      /* g is even so omega_g^(g/2) = -1 */
+      mod_mul (rr[i], rr[i-1], omega_g, pp);
+      mod_neg (rr[i + g / 2], rr[i], pp);
     }
-  else
-    return roots (rr, aa, d, pp);
+  } else {
+    unsigned long i;
+    for (i = 1; i < g; i++) {
+      mod_mul (rr[i], rr[i-1], omega_g, pp);
+    }
+  }
+
+  return g;
 }
 
 

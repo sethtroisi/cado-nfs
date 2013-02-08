@@ -299,6 +299,34 @@ ularith_sub_2ul_2ul_cy (unsigned long *r1, unsigned long *r2,
 /* Subtract only if result is non-negative */
 
 static inline void
+ularith_sub_ul_ul_ge (unsigned long *r, const unsigned long a)
+{
+  unsigned long t = *r;
+#ifdef ULARITH_VERBOSE_ASM
+  __asm__ ("# ularith_sub_2ul_2ul_ge (%0, %1, %2, %3)\n" : : 
+           "X" (*r1), "X" (*r2), "X" (a1), "X" (a2));
+#endif
+#if !defined (ULARITH_NO_ASM) && defined(HAVE_GCC_STYLE_AMD64_ASM)
+  __asm__ ( "subq %2, %0\n\t" /* r -= a */
+	    "cmovc %1, %0\n\t" /* If there's a borrow, restore r from t */
+            : "+&r" (*r)
+            : "r" (t), "rme" (a)
+            : "cc");
+#elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
+  __asm__ ( "subl %2, %0\n\t"
+	    "cmovc %1, %0\n\t"
+            : "+&r" (*r), 
+            : "r" (t), "g" (a)
+            : "cc");
+#else
+  t -= a;
+  if (t < *r)
+    *r = t;
+#endif
+}
+
+
+static inline void
 ularith_sub_2ul_2ul_ge (unsigned long *r1, unsigned long *r2, 
 			const unsigned long a1, const unsigned long a2)
 {

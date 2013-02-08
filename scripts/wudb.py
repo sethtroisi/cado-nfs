@@ -41,49 +41,43 @@ class WuStatus:
 class StatusUpdateError(Exception):
     pass
 
-class WuDb: # {
-    """ This class represents a DB connection and provides wrappers around 
-        SQL queries to individual specified tables.
-        That is, it acts as a Gateway between the SQL syntax and the table/row/column 
-        structure of a relational database table on one hand, and the dictionary data 
-        structure of Python on the other hand, where one row of one table maps to one 
-        dictoriary """
-
-    # FIXME: this really implements convenience functions for Cursor objects. 
-    # It probably should inherit Cursor and be called WuCursor. 
-    # How to construct instances of this class then? 
-    # Have another class WuConnection that inherits Connection and whose 
-    # .cursor() returns a WuCursor?
-
+class MyCursor(sqlite3.Cursor): # {
+    """ This class represents a DB cursor and provides convenience functions 
+        around SQL queries. In particular it is meant to provide an  
+        (1) an interface to SQL functionality via method calls with parameters, 
+        and 
+        (2) hiding some particularities of the SQL variant of the underlying 
+            DBMS as far as possible """
+        
     # This is used in where queries; it converts from named arguments such as 
     # "eq" to a binary operator such as "="
     name_to_operator = {"lt": "<", "le": "<=", "eq": "=", "ge": ">=", "gt" : ">", "ne": "!="}
     
-    def __init__(self, filename):
-        """ Open a connection to a sqlite database with the specified filename """
-        # DEFERRED causes sqlite to create a SHARED lock after a read access, 
-        # which (hopefully) prevents, e.g., race conditions between two threads
-        # looking up an available workunit and assigning it to a client
-        self.db = sqlite3.connect(filename, isolation_level="DEFERRED")
+    def __init__(self, conn):
         # Enable foreign key support
-        cursor = self.db.cursor()
-        cursor.execute("PRAGMA foreign_keys = ON;")
-        self.db.commit()
-        cursor.close()
+        sqlite3.Cursor.__init__(self, conn)
+        self._exec("PRAGMA foreign_keys = ON;")
 
-    def cursor(self):
-        return self.db.cursor()
-
-    def commit(self):
-        return self.db.commit()
-
-    def close(self):
-        self.db.close()
+    @staticmethod
+    def join3(l, pre = None, post = None, sep = ", "):
+        """ For a list l = ('a', 'b', 'c'), string pre = "+", 
+            string post = "-", and set = ", ", 
+            returns the string '+a-, +b-, +c-' 
+            If any parameter is None, it is interpreted as the empty string"""
+        
+        if pre is None:
+            pre = ""
+        if post is None:
+            post = ""
+        if sep is None:
+            sep = "";
+        return sep.join([pre + k + post for k in l])
 
     @staticmethod
     def _fieldlist(l, r = "=", s = ", "):
         """ For a list l = ('a', 'b', 'c') returns the string 'a = ?, b = ?, c = ?',
-            or with a different string r in place of the "=" """
+            or with a different string r in place of the "=", or a different 
+            string s in place of the ", " """
         return s.join([k + " " + r + " ?" for k in l])
 
     @staticmethod
@@ -92,21 +86,6 @@ class WuDb: # {
             are None """
         return {k[0]:k[1] for k in d.items() if k[1] is not None}
     
-    @staticmethod
-    def _exec(cursor, command, values, name):
-        """ Wrapper around self.cursor.execute() that prints arguments 
-            for debugging and retries in case of "database locked" error """
-        # Could use inspect module to remove name parameter
-        diag (1, "WuDb." + name + "(): command = " + command);
-        diag (1, "WuDb." + name + "(): values = ", values)
-        while True:
-            try:
-                cursor.execute(command, values)
-                break
-            except sqlite3.OperationalError as e:
-                if str(e) != "database is locked":
-                    raise
-
     @classmethod
     def where_str(cls, name, **args):
         where = ""
@@ -122,21 +101,44 @@ class WuDb: # {
             values = values + list(args[opname].values())
         return (where, values)
 
-    def create_table(self, cursor, table, layout):
+    def _exec(self, command, values = None):
+        """ Wrapper around self.execute() that prints arguments 
+            for debugging and retries in case of "database locked" exception """
+        if debug > 1:
+            # FIXME: should be the caller's class name, as _exec could be 
+            # called from outside this class
+            classname = self.__class__.__name__
+            parent = sys._getframe(1).f_code.co_name
+            diag (1, classname + "." + parent + "(): command = " + command)
+            if not values is None:
+                diag (1, classname + "." + parent + "(): values = ", values)
+        i = 0
+        while True:
+            try:
+                if values is None:
+                    self.execute(command)
+                else:
+                    self.execute(command, values)
+                break
+            except sqlite3.OperationalError as e:
+                if i == 10 or str(e) != "database is locked":
+                    raise
+
+    def create_table(self, table, layout):
         """ Creates a table with fields as described in the layout parameter """
         command = "CREATE TABLE IF NOT EXISTS " + table + \
             "( " + ", ".join([" ".join(col) for col in layout]) + " );"
-        self.__class__._exec (cursor, command, (), "create_table")
+        self._exec (command)
     
-    def create_index(self, cursor, table, d):
+    def create_index(self, table, d):
         """ Creates an index with fields as described in the d dictionary """
         for (name, columns) in d.items():
             column_names = [col[0] for col in columns]
             command = "CREATE INDEX IF NOT EXISTS " + name + " ON " + \
                 table + "( " + ", ".join(column_names) + " );"
-            self.__class__._exec (cursor, command, (), "create_index")
+            self._exec (command)
     
-    def insert(self, cursor, table, d):
+    def insert(self, table, d):
         """ Insert a new entry, where d is a dictionary containing the 
             field:value pairs. Returns the row id of the newly created entry """
         # INSERT INTO table (field_1, field_2, ..., field_n) 
@@ -153,11 +155,11 @@ class WuDb: # {
         command = "INSERT INTO " + table + \
             " (" + ", ".join(fields.keys()) + ") VALUES (" + sqlformat + ");"
         values = list(fields.values())
-        self.__class__._exec(cursor, command, values, "insert")
-        id = cursor.lastrowid
+        self._exec(command, values)
+        id = self.lastrowid
         return id
 
-    def update(self, cursor, table, d, **conditions):
+    def update(self, table, d, **conditions):
         """ Update fields of an existing entry. conditions specifies the where 
             clause to use for to update, entries in the dictionary d are the 
             fields and their values to update """
@@ -168,9 +170,9 @@ class WuDb: # {
         (wherestr, wherevalues) = self.__class__.where_str("WHERE", **conditions)
         command = "UPDATE " + table + setstr + wherestr
         values = list(setvalues) + wherevalues
-        self.__class__._exec(cursor, command, values, "update")
+        self._exec(command, values)
     
-    def where(self, cursor, table, limit = None, order = None, **conditions):
+    def where(self, table, limit = None, order = None, **conditions):
         """ Get a up to "limit" table rows (limit == 0: no limit) where 
             the key:value pairs of the dictionary d are set to the same 
             value in the database table """
@@ -192,23 +194,22 @@ class WuDb: # {
             LIMIT = " LIMIT " + str(int(limit))
 
         command = "SELECT * FROM " + table + WHERE + ORDER + LIMIT + ";"
-        self.__class__._exec(cursor, command, values, "where")
+        self._exec(command, values)
         
         # cursor.description is a list of lists, where the first element of 
         # each inner list is the column name
-        desc = [k[0] for k in cursor.description]
-        row = cursor.fetchone()
+        desc = [k[0] for k in self.description]
+        row = self.fetchone()
         while row is not None:
-            diag (2, "WuDb.where(): row = ", row)
+            diag (2, "MyCursor.where(): row = ", row)
             result.append(dict(zip(desc, row)))
-            row = cursor.fetchone()
+            row = self.fetchone()
         return result
 # }
 
 class DbTable: # {
     """ A class template defining access methods to a database table """
-    def __init__(self, db):
-        self.db = db
+    def __init__(self):
         self.tablename = type(self).name
         self.fields = type(self).fields
 
@@ -229,23 +230,23 @@ class DbTable: # {
         return self._subdict(d, self._get_colnames())
 
     def create(self, cursor):
-        self.db.create_table(cursor, self.tablename, self.fields)
-        self.db.create_index(cursor, self.tablename, self.index)
+        cursor.create_table(self.tablename, self.fields)
+        cursor.create_index(self.tablename, self.index)
 
     def insert(self, cursor, d):
         """ Insert a new row into this table. The column:value pairs are 
             specified key:value pairs of the dictionary d. 
             The database's row id for the new entry is returned """
-        return self.db.insert(cursor, self.tablename, self.dictextract(d))
+        return cursor.insert(self.tablename, self.dictextract(d))
 
     def update(self, cursor, d, **conditions):
         """ Update an existing row in this table. The column:value pairs to 
             be written are specified key:value pairs of the dictionary d """
-        self.db.update(cursor, self.tablename, d, **conditions)
+        cursor.update(cursor, self.tablename, d, **conditions)
 
     def where(self, cursor, limit = None, order = None, **conditions):
         assert order is None or order[0] in self._get_colnames()
-        return self.db.where(cursor, self.tablename, limit=limit, order=order, **conditions)
+        return cursor.where(self.tablename, limit=limit, order=order, **conditions)
 # }
 
 class WuTable(DbTable):
@@ -289,10 +290,10 @@ class WuActiveRecord(): # {
         of as if the WuActiveRecord instance were itself a persistent 
         storage device """
     
-    def __init__(self, db):
-        self.db = db
-        self.wutable = WuTable(db)
-        self.filestable = FilesTable(db)
+    def __init__(self, conn):
+        self.conn = conn
+        self.wutable = WuTable()
+        self.filestable = FilesTable()
 
     def __str__(self):
         s = "Workunit " + str(self.data["wuid"]) + ":\n"
@@ -331,7 +332,7 @@ class WuActiveRecord(): # {
         """ Return a WuActiveRecord instance with the data from the workunit table row
             wu_row, and files table rows files_rows """
         # Create an instance
-        wu = type(self)(self.db)
+        wu = type(self)(self.conn)
         # Fill in data from the workunit row
         wu.data = self.wutable.dictextract(wu_row)
         assert not "files" in wu.data
@@ -413,12 +414,12 @@ class WuActiveRecord(): # {
     # verified, or marking it as cancelled
 
     def create_tables(self):
-        cursor = self.db.cursor()
+        cursor = self.conn.cursor(MyCursor)
         self.wutable.create(cursor)
         self.filestable.create(cursor)
         
         cursor.execute("PRAGMA journal_mode=WAL;")
-        self.db.commit()
+        self.conn.commit()
         cursor.close()
 
     def get_wuid(self):
@@ -441,7 +442,7 @@ class WuActiveRecord(): # {
     def create(self, wus, priority = None):
         """ Create a new workunit from wu which contains the text of the 
             workunit file """
-        cursor = self.db.cursor()
+        cursor = self.conn.cursor(MyCursor)
         if isinstance(wus, str):
             self.create1(cursor, wus, priority)
         elif isinstance(wus, tuple) or isinstance(wus, list):
@@ -450,14 +451,14 @@ class WuActiveRecord(): # {
         else:
             cursor.close()
             raise Exception
-        self.db.commit()
+        self.conn.commit()
         cursor.close()
 
     def assign(self, clientid):
         """ Finds an available workunit and assigns it to clientid.
             Returns the text of the workunit, or None if no available 
             workunit exists """
-        cursor = self.db.cursor()
+        cursor = self.conn.cursor(MyCursor)
         r = self.where(cursor, limit = 1, order=("priority", "DESC"), eq={"status": WuStatus.AVAILABLE})
         if len(r) == 1:
             self.data = r[0].data
@@ -468,7 +469,7 @@ class WuActiveRecord(): # {
                  "assignedclient": clientid,
                  "timeassigned": str(datetime.now())}
             self.update_wu(cursor, d)
-            self.db.commit()
+            self.conn.commit()
         cursor.close()
         if len(r) == 1:
             return r[0].get_wu()
@@ -476,7 +477,7 @@ class WuActiveRecord(): # {
             return None
 
     def result(self, wuid, clientid, files, errorcode = None, failedcommand = None):
-        cursor = self.db.cursor()
+        cursor = self.conn.cursor(MyCursor)
         if not self.get_by_wuid(cursor, wuid):
             cursor.close()
             raise Exception
@@ -493,11 +494,11 @@ class WuActiveRecord(): # {
             d["status"] = WuStatus.RECEIVED_ERROR
         self.update_wu(cursor, d)
         self.add_files(cursor, files)
-        self.db.commit()
+        self.conn.commit()
         cursor.close()
 
     def verification(self, wuid, ok):
-        cursor = self.db.cursor()
+        cursor = self.conn.cursor(MyCursor)
         if not self.get_by_wuid(cursor, wuid):
             cursor.close()
             raise Exception
@@ -511,22 +512,22 @@ class WuActiveRecord(): # {
         else:
             d["status"] = WuStatus.VERIFIED_ERROR
         self.update_wu(cursor, d)
-        self.db.commit()
+        self.conn.commit()
         cursor.close()
 
     def cancel(self, wuid):
-        cursor = self.db.cursor()
+        cursor = self.conn.cursor(MyCursor)
         if not self.get_by_wuid(cursor, wuid):
             cursor.close()
             raise Exception
         self.data = r[0].data
         d = {"status": WuStatus.CANCELLED}
         self.update_wu(cursor, d)
-        self.db.commit()
+        self.conn.commit()
         cursor.close()
 
     def query(self, limit = None, **conditions):
-        cursor = self.db.cursor()
+        cursor = self.conn.cursor(MyCursor)
         r = self.where(cursor, limit=limit, **conditions)
         cursor.close()
         return r
@@ -544,7 +545,7 @@ class DbWorker(threading.Thread):
     def run(self):
         # One DB connection per thread. Created inside the new thread to make
         # sqlite happy
-        self.db = WuDb(self.dbfilename)
+        self.connection = sqlite3.connect(self.dbfilename)
         while True:
             # We expect a 4-tuple in the task queue. The elements of the tuple:
             # a 2-array, where element [0] receives the result of the DB call, 
@@ -557,7 +558,7 @@ class DbWorker(threading.Thread):
             if fn_name == "terminate":
                 break
             ev = result_tuple[1]
-            wuar = WuActiveRecord(self.db)
+            wuar = WuActiveRecord(self.connection)
             # Assign to tuple in-place, so result is visible to caller. 
             # No slice etc. here which would create a copy of the array
             try: result_tuple[0] = getattr(wuar, fn_name)(*args, **kargs)
@@ -565,7 +566,7 @@ class DbWorker(threading.Thread):
                 traceback.print_exc()
             ev.set()
             self.taskqueue.task_done()
-        self.db.close()
+        self.connection.close()
 
 class DbRequest:
     """ Class that represents a request to a given WuActiveRecord function.
