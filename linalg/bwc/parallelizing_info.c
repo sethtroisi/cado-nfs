@@ -4,7 +4,9 @@
 #include <string.h>
 
 // we're doing open close mmap truncate...
+#ifdef HAVE_MMAN_H
 #include <sys/mman.h>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -17,13 +19,13 @@
 #include "bwc_config.h"
 #include "select_mpi.h"
 #include "parallelizing_info.h"
+#include "portability.h"
 #include "macros.h"
 #include "misc.h"
 
 #include <sys/time.h>   // gettimeofday
-#define OBTAIN_NODENAME
-#ifdef  OBTAIN_NODENAME /* in case someday we have difficulties with this */
-#include <sys/utsname.h>   // gettimeofday      
+#ifdef  HAVE_UTSNAME_H
+#include <sys/utsname.h>
 #endif
 
 static inline void pi_wiring_init_pthread_things(pi_wiring_ptr w, const char * desc)
@@ -284,7 +286,7 @@ static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
 
     memset(pi, 0, sizeof(parallelizing_info));
 
-#ifdef OBTAIN_NODENAME
+#ifdef HAVE_UTSNAME_H
     {
         struct utsname u[1];
         uname(u);
@@ -293,6 +295,8 @@ static void pi_init_mpilevel(parallelizing_info_ptr pi, param_list pl)
         char * p = strchr(pi->nodename, '.');
         if (p) *p='\0';
     }
+#else
+    strncpy(pi->nodename, "unknown", sizeof(pi->nodename));
 #endif
     pi->m->njobs = nhj * nvj;
     pi->m->ncores = nhc * nvc;
@@ -709,6 +713,9 @@ void pi_go(void *(*fcn)(parallelizing_info_ptr, param_list pl, void *),
         void * arg)
 {
     int interleaving = 0;
+#ifndef HAVE_MMAN_H
+    fprintf(stderr, "Warning: copy-based mmaped I/O replacement has never been tested, and could very well be bogus\n");
+#endif
     param_list_parse_int(pl, "interleaving", &interleaving);
     if (interleaving) {
         pi_go_inner_interleaved(fcn, pl, arg);
@@ -1222,7 +1229,7 @@ int pi_save_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
 
     // the page size is always a power of two, so rounding to the next
     // multiple is easy.
-    size_t wsiz = ((siz - 1) | (sysconf(_SC_PAGESIZE)-1)) + 1;
+    size_t wsiz = ((siz - 1) | (pagesize()-1)) + 1;
     int leader = w->jrank == 0 && w->trank == 0;
     void * recvbuf = NULL;
     int fd = -1;        // only used by leader
@@ -1247,6 +1254,7 @@ int pi_save_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
             close(fd);
             goto pi_save_file_leader_init_done;
         }
+#ifdef HAVE_MMAN_H
         recvbuf = mmap(NULL, wsiz, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
         if (recvbuf == MAP_FAILED) {
             fprintf(stderr, "mmap(%s): %s\n",
@@ -1255,6 +1263,10 @@ int pi_save_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
             close(fd);
             goto pi_save_file_leader_init_done;
         }
+#else
+        recvbuf = malloc(wsiz);
+        FATAL_ERROR_CHECK(!recvbuf, "out of memory");
+#endif
 pi_save_file_leader_init_done:
         free(filename);
     }
@@ -1297,7 +1309,12 @@ pi_save_file_leader_init_done:
 
     if (leader) {
         ASSERT_ALWAYS(area_is_zero(recvbuf, sizeondisk, siz));
+#ifdef HAVE_MMAN_H
         munmap(recvbuf, wsiz);
+#else
+        write(fd, recvbuf, wsiz);
+        free(recvbuf);
+#endif
         rc = ftruncate(fd, sizeondisk);
         if (rc < 0) {
             fprintf(stderr, "ftruncate(): %s\n", strerror(errno));
@@ -1322,7 +1339,7 @@ int pi_save_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
 
     // the page size is always a power of two, so rounding to the next
     // multiple is easy.
-    size_t wsiz = ((siz - 1) | (sysconf(_SC_PAGESIZE)-1)) + 1;
+    size_t wsiz = ((siz - 1) | (pagesize()-1)) + 1;
     int leader = w->jrank == 0 && w->trank == 0;
     void * recvbuf = NULL;
     int fd = -1;        // only used by leader
@@ -1347,6 +1364,7 @@ int pi_save_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
             close(fd);
             goto pi_save_file_2d_leader_init_done;
         }
+#ifdef HAVE_MMAN_H
         recvbuf = mmap(NULL, wsiz, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
         if (recvbuf == MAP_FAILED) {
             fprintf(stderr, "mmap(%s): %s\n",
@@ -1355,6 +1373,10 @@ int pi_save_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
             close(fd);
             goto pi_save_file_2d_leader_init_done;
         }
+#else
+        recvbuf = malloc(wsiz);
+        FATAL_ERROR_CHECK(!recvbuf, "out of memory");
+#endif
 pi_save_file_2d_leader_init_done:
         free(filename);
     }
@@ -1397,7 +1419,12 @@ pi_save_file_2d_leader_init_done:
 
     if (leader) {
         ASSERT_ALWAYS(area_is_zero(recvbuf, sizeondisk, siz));
+#ifdef HAVE_MMAN_H
         munmap(recvbuf, wsiz);
+#else
+        write(fd, recvbuf, wsiz);
+        free(recvbuf);
+#endif
         rc = ftruncate(fd, sizeondisk);
         if (rc < 0) {
             fprintf(stderr, "ftruncate(): %s\n", strerror(errno));
@@ -1420,7 +1447,7 @@ int pi_load_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
 
     // the page size is always a power of two, so rounding to the next
     // multiple is easy.
-    size_t wsiz = ((siz - 1) | (sysconf(_SC_PAGESIZE)-1)) + 1;
+    size_t wsiz = ((siz - 1) | (pagesize()-1)) + 1;
     int leader = w->jrank == 0 && w->trank == 0;
     void * sendbuf = NULL;
     int fd = -1;        // only used by leader
@@ -1433,8 +1460,14 @@ int pi_load_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
         FATAL_ERROR_CHECK(rc < 0, "out of memory");
         fd = open(filename, O_RDONLY, 0666);
         DIE_ERRNO_DIAG(fd < 0, "fopen", filename);
+#ifdef HAVE_MMAN_H
         sendbuf = mmap(NULL, wsiz, PROT_READ, MAP_SHARED, fd, 0);
         DIE_ERRNO_DIAG(sendbuf == MAP_FAILED, "mmap", filename);
+#else
+        sendbuf = malloc(wsiz);
+        FATAL_ERROR_CHECK(!sendbuf, "out of memory");
+        read(fd, sendbuf, siz);
+#endif
         free(filename);
     }
 
@@ -1517,7 +1550,11 @@ int pi_load_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
     free(displs);
 
     if (leader) {
+#ifdef HAVE_MMAN_H
         munmap(sendbuf, wsiz);
+#else
+        free(sendbuf);
+#endif
         close(fd);
     }
     return 1;
@@ -1535,7 +1572,7 @@ int pi_load_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
 
     // the page size is always a power of two, so rounding to the next
     // multiple is easy.
-    size_t wsiz = ((siz - 1) | (sysconf(_SC_PAGESIZE)-1)) + 1;
+    size_t wsiz = ((siz - 1) | (pagesize()-1)) + 1;
     int leader = w->jrank == 0 && w->trank == 0;
     void * sendbuf = NULL;
     int fd = -1;        // only used by leader
@@ -1548,8 +1585,14 @@ int pi_load_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
         FATAL_ERROR_CHECK(rc < 0, "out of memory");
         fd = open(filename, O_RDONLY, 0666);
         DIE_ERRNO_DIAG(fd < 0, "fopen", filename);
+#ifdef HAVE_MMAN_H
         sendbuf = mmap(NULL, wsiz, PROT_READ, MAP_SHARED, fd, 0);
         DIE_ERRNO_DIAG(sendbuf == MAP_FAILED, "mmap", filename);
+#else
+        sendbuf = malloc(wsiz);
+        FATAL_ERROR_CHECK(!sendbuf, "out of memory");
+        read(fd, sendbuf, siz);
+#endif
         free(filename);
     }
 
@@ -1583,7 +1626,11 @@ int pi_load_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
     free(displs);
 
     if (leader) {
+#ifdef HAVE_MMAN_H
         munmap(sendbuf, wsiz);
+#else
+        free(sendbuf);
+#endif
         close(fd);
     }
     return 1;

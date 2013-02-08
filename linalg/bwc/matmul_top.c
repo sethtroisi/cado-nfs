@@ -10,9 +10,10 @@
 #include "matmul_top.h"
 #include "select_mpi.h"
 #include "intersections.h"
-#include "debug.h"
 #include "filenames.h"
 #include "balancing_workhorse.h"
+#include "portability.h"
+#include "misc.h"
 
 #ifndef CONJUGATED_PERMUTATIONS
 #error "Do you really, really want to use arbitrary left and right sigmas ?"
@@ -1232,17 +1233,6 @@ void matmul_top_fill_random_source(matmul_top_data_ptr mmt, int d)
 }
 #endif
 
-#if 0
-static void mmt_debug_writeout(matmul_top_data_ptr mmt, int d, const char * name)
-{
-    // serialize(mmt->pi->m);
-    debug_write(mmt->wr[d]->v->v,
-            abbytes(mmt->abase, mmt->wr[d]->i1 - mmt->wr[d]->i0),
-            "%s.j%u.t%u", name, mmt->pi->m->jrank, mmt->pi->m->trank);
-    // serialize(mmt->pi->m);
-}
-#endif
-
 /* Takes data in mmt->wd[d]->v, and compute the corresponding partial result in
  * mmt->wr[!d]->v.
  */
@@ -1429,7 +1419,7 @@ static void mmt_fill_fields_from_balancing(matmul_top_data_ptr mmt, param_list p
             if (strcmp(mname+l-ls,suffixes[k]) == 0)
                 l -= ls;
         }
-        base = cado_strndup(mname, l);
+        base = strndup(mname, l);
     }
 
     /* The name choice is only indicative. Depending on the value of

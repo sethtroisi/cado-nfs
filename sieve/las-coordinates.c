@@ -1,6 +1,8 @@
+#include "cado.h"
 #include "las-config.h"
 #include "las-types.h"
 #include "las-coordinates.h"
+#include "gmp_aux.h"
 
 /*  Conversions between different representations for sieve locations:
  *
@@ -11,7 +13,7 @@
  * (i, j): For a give special q, this is a point in the q-lattice. Given
  *         the lattice basis given by (a0 b0 a1 b1), this corresponds to
  *         the (a,b) pair equal to i*(a0,b0)+j*(a1,b1). By construction
- *         this should lead to one of the norms having si->q as a factor.
+ *         this should lead to one of the norms having si->doing->p as a factor.
  *         i is within [-I/2, I/2[, and j is within [1, J[
  * (N, x): bucket number N, location x. N is within [0,si->nb_buckets[
  *         and x within [0,bucket_region[ ; we have:
@@ -66,14 +68,46 @@ void IJToAB(int64_t *a, uint64_t *b, const int i, const unsigned int j,
 
 int ABToIJ(int *i, unsigned int *j, const int64_t a, const uint64_t b, sieve_info_srcptr si)
 {
+    /* Both a,b and the coordinates ot the lattice basis can be quite
+     * large. However the result should be small.
+     */
+    mpz_t za,zb,ii,jj,a0,b0,a1,b1;
+    mpz_init(ii);
+    mpz_init(jj);
+    mpz_init(za); mpz_init(zb);
+    mpz_init(a0); mpz_init(b0);
+    mpz_init(a1); mpz_init(b1);
+    mpz_set_int64(za, a); mpz_set_uint64(zb, b);
+    mpz_set_int64(a0, si->a0);
+    mpz_set_int64(b0, si->b0);
+    mpz_set_int64(a1, si->a1);
+    mpz_set_int64(b1, si->b1);
+    int ok = 1;
+    mpz_mul(ii, za, b1); mpz_submul(ii, zb, a1);
+    mpz_mul(jj, zb, a0); mpz_submul(jj, za, b0);
+    /*
     int64_t ii =   a * (int64_t) si->b1 - b * (int64_t)si->a1;
     int64_t jj = - a * (int64_t) si->b0 + b * (int64_t)si->a0;
-    if (ii % (int64_t) si->q) return 0; ii /= (int64_t) si->q;
-    if (jj % (int64_t) si->q) return 0; jj /= (int64_t) si->q;
-    if (jj < 0) { ii = -ii; jj = -jj; }
-    *i = ii;
-    *j = jj;
-    return 1;
+    */
+    if (!mpz_divisible_p(ii, si->doing->p)) ok = 0;
+    if (!mpz_divisible_p(jj, si->doing->p)) ok = 0;
+    mpz_divexact(ii, ii, si->doing->p);
+    mpz_divexact(jj, jj, si->doing->p);
+    if (mpz_sgn(jj) < 0) {
+        mpz_neg(ii, ii);
+        mpz_neg(jj, jj);
+    }
+    *i = mpz_get_si(ii);
+    *j = mpz_get_ui(jj);
+    mpz_clear(a0);
+    mpz_clear(b0);
+    mpz_clear(a1);
+    mpz_clear(b1);
+    mpz_clear(za);
+    mpz_clear(zb);
+    mpz_clear(ii);
+    mpz_clear(jj);
+    return ok;
 }
 int ABTox(unsigned int *x, const int64_t a, const uint64_t b, sieve_info_srcptr si)
 {

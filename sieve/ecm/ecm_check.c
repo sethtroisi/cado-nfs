@@ -10,6 +10,7 @@
 #include "../../utils/modredc_ul_default.h"
 #include "facul.h"
 #include "ecm.h"
+#include "portability.h"
 
 /* return non-zero iff p is found */
 static int

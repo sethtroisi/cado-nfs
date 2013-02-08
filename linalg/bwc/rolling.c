@@ -9,10 +9,11 @@
 #include <sys/stat.h>
 
 #include "bwc_config.h"
-#include "debug.h"
 #include "params.h"
 #include "async.h"
 #include "filenames.h"
+#include "portability.h"
+#include "misc.h"
 
 #include "rolling.h"
 #include "bw-common.h"

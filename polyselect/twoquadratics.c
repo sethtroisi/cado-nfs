@@ -7,6 +7,7 @@
 #include "murphyE.h"
 #include "rootsieve.h"
 #include "rho.h"
+#include "portability.h"
 
 
 //print a floating point GMP number using scientific notation

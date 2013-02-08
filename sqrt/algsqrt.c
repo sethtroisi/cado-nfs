@@ -31,6 +31,7 @@
 #include <string.h>
 #include <gmp.h>
 #include <math.h> /* for log */
+#include "portability.h"
 #include "utils.h"
 
 /* Although the functions in plain_poly are not readily available in the

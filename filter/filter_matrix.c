@@ -1,7 +1,9 @@
 #include "cado.h"
 
 #include <string.h>
+#include <stdio.h>
 
+#include "portability.h"
 #include "utils.h"
 #include "merge_opts.h"
 #include "sparse.h"

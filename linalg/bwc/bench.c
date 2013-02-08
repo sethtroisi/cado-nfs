@@ -10,6 +10,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 #include <errno.h>
 #include <limits.h>
@@ -18,6 +19,7 @@
 #include <string.h>
 #include "bwc_config.h"
 #include "matmul.h"
+#include "portability.h"
 #include "macros.h"
 #include "params.h"
 #include "worker-threads.h"
@@ -25,7 +27,6 @@
 #include "mpfq/mpfq.h"
 #include "mpfq/abase_vbase.h"
 #include "matmul-mf.h"
-// #include "debug.h"
 
 void usage()
 {
@@ -143,8 +144,6 @@ void check_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct 
     A->vec_set(A, colvec_bis, p->colvec, nc);
     A->vec_set(A, rowvec_bis, p->rowvec, nr);
 
-    // debug_write(p->colvec, A->vec_elt_stride(A, nc), "/tmp/colvec1");
-
     /* See the comment in matmul_mul about the direction argument and the
      * number of coordinates of source/destination vectors */
 
@@ -154,19 +153,13 @@ void check_func(struct worker_threads_group * tg MAYBE_UNUSED, int tnum, struct 
     printf("T%d rowvec(%u): %08" PRIx32 "\n", tnum,
             nr, crc32((unsigned long*) p->rowvec, A->vec_elt_stride(A, nr0) / sizeof(unsigned long)));
 
-    // debug_write(p->rowvec, A->vec_elt_stride(A, nr), "/tmp/rowvec1");
-
     A->dotprod(A, check0, p->rowvec, rowvec_bis, nr0);
-
-    // debug_write(rowvec_bis, A->vec_elt_stride(A, nr), "/tmp/rowvec2");
 
     printf("T%d rowvec_bis(%u): %08" PRIx32 "\n", tnum,
             nr, crc32((unsigned long*) rowvec_bis, A->vec_elt_stride(A, nr0) / sizeof(unsigned long)));
     matmul_mul(p->mm, colvec_bis, rowvec_bis, 0);
     printf("T%d colvec_bis(%u): %08" PRIx32 "\n", tnum,
             nc, crc32((unsigned long*) colvec_bis, A->vec_elt_stride(A, nc0) / sizeof(unsigned long)));
-
-    // debug_write(colvec_bis, A->vec_elt_stride(A, nc), "/tmp/colvec2");
 
     A->dotprod(A, check1, p->colvec, colvec_bis, nc0);
 
@@ -356,14 +349,17 @@ int main(int argc, char * argv[])
     fprintf (stderr, "total %" PRIu64 " coeffs\n", ncoeffs_total);
     /* }}} */
 
-    setup_seeding(1);
+    gmp_randstate_t rstate;
+    gmp_randinit_default(rstate);
+    gmp_randseed_ui(rstate, 1);
+
     /* {{{ Do checks if requested */
     for(int t = 0; t < ba->nchecks ; t++) {
         /* create deterministic test values */
         for(int tnum = 0 ; tnum < ba->nthreads ; tnum++) {
             struct private_args * p = ba->p + tnum;
-            A->vec_random(A, p->colvec, p->mm->dim[1]);
-            A->vec_random(A, p->rowvec, p->mm->dim[0]);
+            A->vec_random(A, p->colvec, p->mm->dim[1], rstate);
+            A->vec_random(A, p->rowvec, p->mm->dim[0], rstate);
             /* If we want shared vectors, this is the way to go. */
             /* Note that for such a test, the clear_func must be skipped
              * or improved, since we don't really want to free() the same
@@ -384,8 +380,8 @@ int main(int argc, char * argv[])
 
     for(int tnum = 0 ; tnum < ba->nthreads ; tnum++) {
         struct private_args * p = ba->p + tnum;
-        A->vec_random(A, p->colvec, p->mm->dim[1]);
-        A->vec_random(A, p->rowvec, p->mm->dim[0]);
+        A->vec_random(A, p->colvec, p->mm->dim[1], rstate);
+        A->vec_random(A, p->rowvec, p->mm->dim[0], rstate);
     }
 
     if ((tmp = param_list_lookup_string(ba->pl, "srcvec")) != NULL) {
@@ -435,6 +431,7 @@ int main(int argc, char * argv[])
                 dstfile);
         free(dstvec);
     }
+    gmp_randclear(rstate);
 
 #define NLAST   10
     double last[10]={0,};

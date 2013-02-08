@@ -10,6 +10,7 @@
 #include "matmul-basic.h"
 #include "matmul-common.h"
 #include "abase.h"
+#include "portability.h"
 
 /* This extension is used to distinguish between several possible
  * implementations of the product */

@@ -8,11 +8,13 @@
 #include <unistd.h>
 #include <limits.h>
 #include "bwc_config.h"
+#include "portability.h"
 #include "macros.h"
 #include "filenames.h"
 #include "bw-common.h"
 #include "params.h"
 #include "balancing.h"
+#include "misc.h"
 
 char * ifile;
 char * ofile_fmt;
@@ -114,6 +116,8 @@ int main(int argc, char * argv[])
         exit(1);
     }
 
+#ifndef HAVE_MINGW
+    /* mingw does not have link() */
     if (nsplits == 1) {
         char * fname;
         int i = 0;
@@ -139,6 +143,7 @@ int main(int argc, char * argv[])
         free(ofile_fmt);
         return 0;
     }
+#endif
 
     for(int i = 0 ; i < nsplits ; i++) {
         char * fname;

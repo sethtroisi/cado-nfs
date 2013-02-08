@@ -8,20 +8,14 @@
 #include <errno.h>
 #include <unistd.h>
 #include <ctype.h>
+/* For MinGW Build */
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+#endif
 
-#include "cado_config.h"
 #include "macros.h"
+#include "portability.h"
 #include "misc.h"
-
-/* Not every libc has this, and providing a workalike is very easy */
-
-char *cado_strndup(const char *a, size_t n)
-{
-    char *r = malloc(n+1);
-    memcpy(r, a, MIN(strlen(a),n)+1);
-    r[n] = '\0';
-    return r;
-}
 
 void
 *malloc_check (const size_t x)
@@ -76,16 +70,28 @@ void free_aligned(void * p, size_t size MAYBE_UNUSED, size_t alignment MAYBE_UNU
 #endif
 }
 
+long pagesize (void)
+{
+#if defined(_WIN32) || defined(_WIN64)
+  /* cf http://en.wikipedia.org/wiki/Page_%28computer_memory%29 */
+  SYSTEM_INFO si;
+  GetSystemInfo(&si);
+  return si.dwPageSize;
+#else
+  return sysconf (_SC_PAGESIZE);
+#endif
+}
+
 void *malloc_pagealigned(size_t sz)
 {
-    void *p = malloc_aligned(sz, sysconf(_SC_PAGESIZE));
+    void *p = malloc_aligned (sz, pagesize ());
     ASSERT_ALWAYS(p != NULL);
     return p;
 }
 
 void free_pagealigned(void * p, size_t sz)
 {
-    free_aligned(p, sz, sysconf(_SC_PAGESIZE));
+    free_aligned(p, sz, pagesize ());
 }
 
 int has_suffix(const char * path, const char * sfx)
@@ -209,7 +215,13 @@ int mkdir_with_parents(const char * dir, int fatal)
                 if (fatal) exit(1);
                 return -errno;
             }
-            rc = mkdir(tmp, 0777);
+/* MinGW's mkdir has only one argument,
+   cf http://lists.gnu.org/archive/html/bug-gnulib/2008-04/msg00259.html */
+#if (defined _WIN32 || defined __WIN32__) && ! defined __CYGWIN__
+            rc = mkdir (tmp);
+#else
+            rc = mkdir (tmp, 0777);
+#endif
             if (rc < 0) {
                 fprintf(stderr, "mkdir(%s): %s\n", tmp, strerror(errno));
                 free(tmp);

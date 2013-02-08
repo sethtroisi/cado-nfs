@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include "modul_poly.h"
 #include <gmp.h>
+#include "portability.h"
 #include "utils.h"
 #include "macros.h"
 

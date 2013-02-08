@@ -22,6 +22,12 @@ typedef unsigned long largeprime_t; /* On IA32 they'll only get 32 bit
                                        large primes */
 #define LARGEPRIME_FORMAT "%lu"
 
+/* The following format takes 16+4k bytes per prime with k roots. Since
+ * the expected number of roots for primes with at least one root is
+ * 1.58 (for generic Galois group), we are slightly above 14 bytes per
+ * root.
+ */
+
 /* Factor base entry with (possibly) several roots */
 typedef struct {
   fbprime_t p;            /* A prime or a prime power */
@@ -52,7 +58,7 @@ unsigned char	fb_log (double, double, double);
 factorbase_degn_t * 	fb_make_linear (const mpz_t *, const fbprime_t, 
 					const fbprime_t, const double, 
 					const int, const int, FILE *);
-factorbase_degn_t *	fb_read (const char *, const double, const int);
+factorbase_degn_t *	fb_read (const char *, const double, const int, const fbprime_t, fbprime_t);
 fbprime_t	*fb_extract_bycost (const factorbase_degn_t *, 
                                     const fbprime_t, const fbprime_t costlim);
 size_t          fb_size (const factorbase_degn_t *);                   

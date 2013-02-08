@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "balancing_file_source.h"
+#include "portability.h"
 #include "utils.h"
 
 // there's presently no provision for tweaking the following parameter,

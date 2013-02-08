@@ -1,8 +1,9 @@
 #include "cado.h"
-#include "rootfinder.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <gmp.h>
+#include "rootfinder.h"
+#include "portability.h"
 
 int cmp(mpz_t * a, mpz_t * b)
 {

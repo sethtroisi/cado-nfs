@@ -5,13 +5,22 @@
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
+#ifdef HAVE_STATVFS_H
 #include <sys/statvfs.h>
+#endif
+
+#ifdef  BUILD_DYNAMICALLY_LINKABLE_BWC
 #include <dlfcn.h>
+#else
+extern void matmul_solib_do_rebinding(void * mm);
+#endif
 
 
 #include "bwc_config.h"
 #include "matmul.h"
 #include "matmul-libnames.h"
+#include "portability.h"
+#include "misc.h"
 
 #define MATMUL_DEFAULT_IMPL "bucket"
 
@@ -20,9 +29,10 @@ matmul_ptr matmul_init(abase_vbase_ptr x, unsigned int nr, unsigned int nc, cons
     struct matmul_public_s fake[1];
     memset(fake, 0, sizeof(fake));
 
-    char solib[256];
     if (!impl) { impl = MATMUL_DEFAULT_IMPL; }
 
+#ifdef  BUILD_DYNAMICALLY_LINKABLE_BWC
+    char solib[256];
     snprintf(solib, sizeof(solib),
             MATMUL_LIBS_PREFIX "matmul_%s_%s" MATMUL_LIBS_SUFFIX,
             x->oo_impl_name(x), impl);
@@ -39,15 +49,24 @@ matmul_ptr matmul_init(abase_vbase_ptr x, unsigned int nr, unsigned int nc, cons
         abort();
     }
     (*sym)(fake);
+#else   /* BUILD_DYNAMICALLY_LINKABLE_BWC */
+    ASSERT_ALWAYS (strcmp(impl, MATMUL_DEFAULT_IMPL) == 0);
+    /* The compile process should arrange so that only _ONE_ choice is
+     * compiled in, so that in effect we have static, not shared
+     * libraries.
+     */
+    matmul_solib_do_rebinding(fake);
+#endif   /* BUILD_DYNAMICALLY_LINKABLE_BWC */
 
-    // do_rebinding(fake, impl);
     // be careful, we really want ->obj here !
     matmul_ptr mm = fake->bind->init(x->obj, pl, optimized_direction);
     if (mm == NULL) return NULL;
-    // do_rebinding(mm, impl);
-    (*sym)(mm);
-
+#ifdef  BUILD_DYNAMICALLY_LINKABLE_BWC
     mm->solib_handle = handle;
+    (*sym)(mm);
+#else
+    matmul_solib_do_rebinding(mm);
+#endif
 
     mm->dim[0] = nr;
     mm->dim[1] = nc;
@@ -128,6 +147,8 @@ static void save_to_local_copy(matmul_ptr mm)
     }
     unsigned long fsize = sbuf->st_size;
 
+#ifdef HAVE_STATVFS_H
+    /* Check for remaining space on the filesystem */
     char * dirname = strdup(mm->local_cache_copy);
     char * last_slash = strrchr(dirname, '/');
     if (last_slash == NULL) {
@@ -140,23 +161,22 @@ static void save_to_local_copy(matmul_ptr mm)
 
     struct statvfs sf[1];
     rc = statvfs(dirname, sf);
-    if (rc < 0) {
-        fprintf(stderr, "Cannot do statvfs on %s: %s\n", dirname, strerror(errno));
-        free(dirname);
+    if (rc >= 0) {
+        unsigned long mb = sf->f_bsize * sf->f_bavail;
+
+        if (fsize > mb * 0.5) {
+            fprintf(stderr, "Copying %s to %s would occupy %lu MB out of %lu MB available, so more than 50%%. Skipping copy\n",
+                    mm->cachefile_name, dirname, fsize >> 20, mb >> 20);
+            free(dirname);
+            return;
+        }
+        fprintf(stderr, "%lu MB available on %s\n", mb >> 20, dirname);
+    } else {
+        fprintf(stderr, "Cannot do statvfs on %s (skipping check for available disk space): %s\n", dirname, strerror(errno));
     }
-    unsigned long mb = sf->f_bsize;
-    mb *= sf->f_bavail;
-
-
-    if (fsize > mb * 0.5) {
-        fprintf(stderr, "Copying %s to %s would occupy %lu MB out of %lu MB available, so more than 50%%. Skipping copy\n",
-                mm->cachefile_name, dirname, fsize >> 20, mb >> 20);
-        free(dirname);
-        return;
-    }
-    fprintf(stderr, "%lu MB available on %s\n", mb >> 20, dirname);
-
     free(dirname);
+#endif
+
 
     fprintf(stderr, "Also saving cache data to %s (%lu MB)\n", mm->local_cache_copy, fsize >> 20);
 
@@ -248,9 +268,13 @@ void matmul_clear(matmul_ptr mm)
     if (mm->cachefile_name != NULL) free(mm->cachefile_name);
     if (mm->local_cache_copy != NULL) free(mm->local_cache_copy);
     mm->locfile = NULL;
+#ifdef BUILD_DYNAMICALLY_LINKABLE_BWC
     void * handle = mm->solib_handle;
     mm->bind->clear(mm);
     dlclose(handle);
+#else
+    mm->bind->clear(mm);
+#endif
 }
 
 void matmul_auxv(matmul_ptr mm, int op, va_list ap)

@@ -14,6 +14,7 @@
 
 #include <assert.h>
 
+#include "portability.h"
 #include "macros.h"
 #include "utils.h"
 #include "abase.h"

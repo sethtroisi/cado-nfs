@@ -5,7 +5,9 @@
  */
 
 
+#include "cado.h"
 #include "ropt_linear.h"
+#include "portability.h"
 //#define ROPT_LINEAR_TUNE_HARDER
 
 

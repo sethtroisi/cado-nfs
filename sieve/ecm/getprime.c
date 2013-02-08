@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "portability.h"
 
 /* This function returns successive odd primes, starting with 3.
    To perform a loop over all primes <= B1, do the following

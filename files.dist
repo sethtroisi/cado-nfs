@@ -14,6 +14,7 @@ cado_config_h.in
 cado_mpi_config_h.in
 cadofactor.pl
 cadofct.pm
+portability.h
 config/alloca.cmake
 config/asm_sample.c
 config/ccwrap.pl.in
@@ -24,17 +25,22 @@ config/gcc-ubuntu-bug.c
 config/gcc-ubuntu-bug.cmake
 config/gmp.cmake
 config/math.cmake
+config/posix.cmake
 config/mpi.cmake
 config/pthreads.cmake
 config/rusage_thread.c
 config/rusage_thread.cmake
 config/search_for_function.cmake
+config/variables.cmake
 config/sse2.c
 config/sse2.cmake
 config/sse41.c
 config/sse41.cmake
 config/sync_fetch.c
 config/sync_fetch.cmake
+config/mingw.cmake
+config/test-rand.c
+config/test-rand.cmake
 factor.sh
 filter/CMakeLists.txt
 filter/Makefile
@@ -261,8 +267,6 @@ linalg/bwc/checks.list
 linalg/bwc/checks.list.light
 linalg/bwc/checks.sh
 linalg/bwc/cleanup.c
-linalg/bwc/debug.c
-linalg/bwc/debug.h
 linalg/bwc/dispatch.c
 linalg/bwc/do-one-test.sh
 linalg/bwc/filenames.h
@@ -707,8 +711,6 @@ utils/poly.h
 utils/prempt.h
 utils/purgedfile.c
 utils/purgedfile.h
-utils/random_generation.c
-utils/random_generation.h
 utils/random_integer.c
 utils/relation.c
 utils/relation.h
@@ -742,3 +744,7 @@ linalg/bwc/plingen.c
 linalg/bwc/plingen.h
 linalg/bwc/polymat.c
 linalg/bwc/polymat.h
+config/asprintf.c
+config/asprintf.cmake
+sieve/las-descent-helpers.cpp
+sieve/las-descent-helpers.h

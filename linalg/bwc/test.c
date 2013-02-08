@@ -10,6 +10,7 @@
 #include "filenames.h"
 #include "mpfq/mpfq.h"
 #include "mpfq/abase_vbase.h"
+#include "portability.h"
 
 /*
 extern void broadcast_down(matmul_top_data_ptr mmt, int d);

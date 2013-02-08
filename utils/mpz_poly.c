@@ -140,7 +140,7 @@ mp_poly_homogeneous_eval_siui (mpz_t v, mpz_t *f, const unsigned int d,
    Put in fijd[] a double-precision approximation of fij[]/q.
 */
 void
-mp_poly_homography (mpz_t *fij, mpz_t *f, const int d, int32_t H[4])
+mp_poly_homography (mpz_t *fij, mpz_t *f, const int d, int64_t H[4])
 {
   int k, l;
   mpz_t *g; /* will contain the coefficients of (b0*i+b1)^l */

@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include "params.h"
 #include "cado_poly.h"
+#include "portability.h"
 
 const char * sidenames[2] = {
     [RATIONAL_SIDE] = "rational",

@@ -1,3 +1,4 @@
+#include "cado.h"
 #include <stdio.h>
 
 #include "las-config.h"
@@ -48,7 +49,7 @@ void las_display_config_flags(FILE * stream)
     fprintf(stream, " BUCKET_LIMIT_FACTOR=%.1f",
             (double) BUCKET_LIMIT_FACTOR);
     fprintf(stream, " BUCKET_LIMIT_ADD=%u", BUCKET_LIMIT_ADD);
-    fprintf(stream, " GUARD=%u", GUARD);
+    fprintf(stream, " GUARD=%1.2f", GUARD);
     fprintf(stream, " LOG_MAX=%.1f", LOG_MAX);
     fprintf(stream, "\n");
 }				/* }}} */

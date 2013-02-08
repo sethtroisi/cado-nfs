@@ -27,9 +27,8 @@
 #include <string.h>
 #include <limits.h>
 #include <gmp.h>
-
-#define MIN(a,b) ((a)<(b))?(a):(b)
-#define MAX(a,b) ((a)>(b))?(a):(b)
+#include "macros.h"
+#include "portability.h"
 
 #define NR_EXPONENTS 8
 #define EXP_PRIMES {2,3,5,7,11,13,17,19}

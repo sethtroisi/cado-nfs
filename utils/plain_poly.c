@@ -23,6 +23,7 @@
 #include "macros.h"
 #include "plain_poly.h"
 #include "gmp_aux.h"
+#include "portability.h"
 
 /* return non-zero if (p-1)+d*(p-1)^2 fits in type plain_poly_coeff_t (defined in utils.h) */
 int

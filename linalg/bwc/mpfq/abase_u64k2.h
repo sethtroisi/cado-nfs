@@ -14,7 +14,6 @@
 #include <stdio.h>
 #include "assert.h"
 #include "select_mpi.h"
-#include "random_generation.h"
 #include "abase_vbase.h"
 #ifdef	MPFQ_LAST_GENERATED_TAG
 #undef	MPFQ_LAST_GENERATED_TAG
@@ -29,24 +28,32 @@
 /* Active handler: simd_dotprod */
 /* Active handler: io */
 /* Active handler: trivialities */
-/* Active handler: simd_flat */
 /* Options used: w=64 k=2 tag=u64k2 vbase_stuff={
                  'vc:includes' => [
                                     '<stdarg.h>'
                                   ],
                  'member_templates_restrict' => {
                                                   'p_1' => [
-                                                             'p_1'
+                                                             {
+                                                               'cpp_ifdef' => 'COMPILE_MPFQ_PRIME_FIELDS',
+                                                               'tag' => 'p_1'
+                                                             }
                                                            ],
                                                   'p_4' => [
-                                                             'p_4'
+                                                             {
+                                                               'cpp_ifdef' => 'COMPILE_MPFQ_PRIME_FIELDS',
+                                                               'tag' => 'p_4'
+                                                             }
                                                            ],
                                                   'u64k2' => [
                                                                'u64k1',
                                                                'u64k2'
                                                              ],
                                                   'p_3' => [
-                                                             'p_3'
+                                                             {
+                                                               'cpp_ifdef' => 'COMPILE_MPFQ_PRIME_FIELDS',
+                                                               'tag' => 'p_3'
+                                                             }
                                                            ],
                                                   'u64k1' => $vbase_stuff->{'member_templates_restrict'}{'u64k2'}
                                                 },
@@ -203,7 +210,7 @@ void abase_u64k2_set_zero(abase_u64k2_dst_field, abase_u64k2_dst_elt);
 
 /* Assignment of random values */
 static inline
-void abase_u64k2_random(abase_u64k2_dst_field, abase_u64k2_dst_elt);
+void abase_u64k2_random(abase_u64k2_dst_field, abase_u64k2_dst_elt, gmp_randstate_t);
 
 /* Arithmetic operations on elements */
 static inline
@@ -284,7 +291,7 @@ void abase_u64k2_vec_sub(abase_u64k2_dst_field, abase_u64k2_dst_vec, abase_u64k2
 /* missing vec_scal_mul */
 /* missing vec_conv */
 static inline
-void abase_u64k2_vec_random(abase_u64k2_dst_field, abase_u64k2_dst_vec, unsigned int);
+void abase_u64k2_vec_random(abase_u64k2_dst_field, abase_u64k2_dst_vec, unsigned int, gmp_randstate_t);
 static inline
 int abase_u64k2_vec_cmp(abase_u64k2_dst_field, abase_u64k2_src_vec, abase_u64k2_src_vec, unsigned int);
 static inline
@@ -376,9 +383,11 @@ void abase_u64k2_set_zero(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_dst_
 
 /* *simd_flat::code_for_random */
 static inline
-void abase_u64k2_random(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_dst_elt r)
+void abase_u64k2_random(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_dst_elt r, gmp_randstate_t state)
 {
-    myrand_area(r, sizeof(abase_u64k2_elt));
+        for(unsigned int i = 0 ; i < sizeof(abase_u64k2_elt) ; i++) {
+            ((unsigned char*)r)[i] = gmp_urandomb_ui(state, 8);
+        }
 }
 
 /* *simd_char2::code_for_add */
@@ -506,11 +515,11 @@ void abase_u64k2_vec_sub(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_dst_v
 
 /* *Mpfq::defaults::vec::getset::code_for_vec_random, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
-void abase_u64k2_vec_random(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_dst_vec w, unsigned int n)
+void abase_u64k2_vec_random(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_dst_vec w, unsigned int n, gmp_randstate_t state)
 {
     unsigned int i;
     for(i = 0; i < n; ++i)
-        abase_u64k2_random(K, w[i]);
+        abase_u64k2_random(K, w[i], state);
 }
 
 /* *Mpfq::defaults::vec::getset::code_for_vec_cmp, Mpfq::defaults::vec, Mpfq::defaults */

@@ -4,7 +4,9 @@
  */
 
 
+#include "cado.h"
 #include "ropt_str.h"
+#include "portability.h"
 
 
 /* -----------------*/

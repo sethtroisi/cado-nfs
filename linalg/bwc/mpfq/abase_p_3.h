@@ -37,17 +37,26 @@
                                   ],
                  'member_templates_restrict' => {
                                                   'p_1' => [
-                                                             'p_1'
+                                                             {
+                                                               'cpp_ifdef' => 'COMPILE_MPFQ_PRIME_FIELDS',
+                                                               'tag' => 'p_1'
+                                                             }
                                                            ],
                                                   'p_4' => [
-                                                             'p_4'
+                                                             {
+                                                               'cpp_ifdef' => 'COMPILE_MPFQ_PRIME_FIELDS',
+                                                               'tag' => 'p_4'
+                                                             }
                                                            ],
                                                   'u64k2' => [
                                                                'u64k1',
                                                                'u64k2'
                                                              ],
                                                   'p_3' => [
-                                                             'p_3'
+                                                             {
+                                                               'cpp_ifdef' => 'COMPILE_MPFQ_PRIME_FIELDS',
+                                                               'tag' => 'p_3'
+                                                             }
                                                            ],
                                                   'u64k1' => $vbase_stuff->{'member_templates_restrict'}{'u64k2'}
                                                 },
@@ -59,7 +68,7 @@
                                ],
                  'choose_byfeatures' => sub { "DUMMY" }
                };
- tag=p_3 type=plain virtual_base={
+ tag=p_3 type=plain opthw= virtual_base={
                   'filebase' => 'abase_vbase',
                   'substitutions' => [
                                        [
@@ -146,7 +155,7 @@
                   'name' => 'abase_vbase',
                   'global_prefix' => 'abase_'
                 };
- family=[p_3] */
+ family=[HASH(0x130a7b8)] */
 
 typedef mpfq_p_field abase_p_3_field;
 typedef mpfq_p_dst_field abase_p_3_dst_field;
@@ -219,7 +228,7 @@ void abase_p_3_get_mpz(abase_p_3_dst_field, mpz_t, abase_p_3_src_elt);
 static inline
 void abase_p_3_normalize(abase_p_3_dst_field, abase_p_3_dst_elt);
 static inline
-void abase_p_3_random(abase_p_3_dst_field, abase_p_3_dst_elt);
+void abase_p_3_random(abase_p_3_dst_field, abase_p_3_dst_elt, gmp_randstate_t);
 #define HAVE_abase_p_3_random2
 static inline
 void abase_p_3_random2(abase_p_3_dst_field, abase_p_3_dst_elt);
@@ -326,7 +335,7 @@ void abase_p_3_vec_scal_mul(abase_p_3_dst_field, abase_p_3_dst_vec, abase_p_3_sr
 static inline
 void abase_p_3_vec_conv(abase_p_3_dst_field, abase_p_3_dst_vec, abase_p_3_src_vec, unsigned int, abase_p_3_src_vec, unsigned int);
 static inline
-void abase_p_3_vec_random(abase_p_3_dst_field, abase_p_3_dst_vec, unsigned int);
+void abase_p_3_vec_random(abase_p_3_dst_field, abase_p_3_dst_vec, unsigned int, gmp_randstate_t);
 #define HAVE_abase_p_3_vec_random2
 static inline
 void abase_p_3_vec_random2(abase_p_3_dst_field, abase_p_3_dst_vec, unsigned int);
@@ -532,9 +541,13 @@ void abase_p_3_normalize(abase_p_3_dst_field k, abase_p_3_dst_elt x)
 
 /* *Mpfq::gfp::elt::code_for_random, Mpfq::gfp */
 static inline
-void abase_p_3_random(abase_p_3_dst_field k, abase_p_3_dst_elt x)
+void abase_p_3_random(abase_p_3_dst_field k, abase_p_3_dst_elt x, gmp_randstate_t state)
 {
-    mpn_random(x, 3);
+      mpz_t z;
+      mpz_init(z);
+      mpz_urandomb(z, state, 3 * GMP_LIMB_BITS);
+      memcpy(x, z->_mp_d, 3 * sizeof(mp_limb_t));  /* UGLY */
+      mpz_clear(z);
     abase_p_3_normalize(k, x);
 }
 
@@ -685,11 +698,9 @@ void abase_p_3_sub_ui(abase_p_3_dst_field k, abase_p_3_dst_elt z, abase_p_3_src_
 static inline
 void abase_p_3_mul_ui(abase_p_3_dst_field k, abase_p_3_dst_elt z, abase_p_3_src_elt x, unsigned long y)
 {
-    abase_p_3_elt yy;
-    abase_p_3_init(k, &yy);
-    abase_p_3_set_ui(k, yy, y);
-    abase_p_3_mul(k, z, x, yy);
-    abase_p_3_clear(k, &yy);
+    mp_limb_t tmp[3+1], q[2];
+    mul1_3(tmp,x,y);
+    mpn_tdiv_qr(q, z, 0, tmp, 3+1, k->p, 3);
 }
 
 /* *Mpfq::gfp::elt::code_for_inv, Mpfq::gfp */
@@ -799,7 +810,7 @@ void abase_p_3_mul_ur(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_dst_elt_ur z
 {
     mul_3(z, x, y);
     int i;
-    for (i = 2*3; i < 7; ++i) {
+    for (i = 6; i < 7; ++i) {
         z[i] = 0;
     }
 }
@@ -810,7 +821,7 @@ void abase_p_3_sqr_ur(abase_p_3_dst_field k MAYBE_UNUSED, abase_p_3_dst_elt_ur z
 {
     sqr_3(z, x);
     int i;
-    for (i = 2*3; i < 7; ++i) {
+    for (i = 6; i < 7; ++i) {
         z[i] = 0;
     }
 }
@@ -975,11 +986,11 @@ void abase_p_3_vec_conv(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_dst_vec w,
 
 /* *Mpfq::defaults::vec::getset::code_for_vec_random, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */
 static inline
-void abase_p_3_vec_random(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_dst_vec w, unsigned int n)
+void abase_p_3_vec_random(abase_p_3_dst_field K MAYBE_UNUSED, abase_p_3_dst_vec w, unsigned int n, gmp_randstate_t state)
 {
     unsigned int i;
     for(i = 0; i < n; ++i)
-        abase_p_3_random(K, w[i]);
+        abase_p_3_random(K, w[i], state);
 }
 
 /* *Mpfq::defaults::vec::getset::code_for_vec_random2, Mpfq::defaults::vec, Mpfq::defaults, Mpfq::gfp */

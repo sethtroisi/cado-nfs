@@ -3373,6 +3373,519 @@ addmul1_nc_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 }
 #endif
 
+#ifndef HAVE_NATIVE_ADDMUL1_NC_1HW
+#define HAVE_LONGLONG_ADDMUL1_NC_1HW 1
+static void
+addmul1_nc_1hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t lo,carry;
+  carry = 0;
+  lo = c*x[1-1];
+  lo += carry;
+  z[1-1] += lo;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_NC_2HW
+#define HAVE_LONGLONG_ADDMUL1_NC_2HW 1
+static void
+addmul1_nc_2hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t lo,carry;
+  carry = 0;
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[0]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[0];
+      lo += buf;
+      carry += (lo<buf);
+      z[0] = lo;
+  }
+  lo = c*x[2-1];
+  lo += carry;
+  z[2-1] += lo;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_NC_3HW
+#define HAVE_LONGLONG_ADDMUL1_NC_3HW 1
+static void
+addmul1_nc_3hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t lo,carry;
+  carry = 0;
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[0]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[0];
+      lo += buf;
+      carry += (lo<buf);
+      z[0] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[1]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[1];
+      lo += buf;
+      carry += (lo<buf);
+      z[1] = lo;
+  }
+  lo = c*x[3-1];
+  lo += carry;
+  z[3-1] += lo;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_NC_4HW
+#define HAVE_LONGLONG_ADDMUL1_NC_4HW 1
+static void
+addmul1_nc_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t lo,carry;
+  carry = 0;
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[0]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[0];
+      lo += buf;
+      carry += (lo<buf);
+      z[0] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[1]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[1];
+      lo += buf;
+      carry += (lo<buf);
+      z[1] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[2]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[2];
+      lo += buf;
+      carry += (lo<buf);
+      z[2] = lo;
+  }
+  lo = c*x[4-1];
+  lo += carry;
+  z[4-1] += lo;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_NC_5HW
+#define HAVE_LONGLONG_ADDMUL1_NC_5HW 1
+static void
+addmul1_nc_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t lo,carry;
+  carry = 0;
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[0]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[0];
+      lo += buf;
+      carry += (lo<buf);
+      z[0] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[1]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[1];
+      lo += buf;
+      carry += (lo<buf);
+      z[1] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[2]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[2];
+      lo += buf;
+      carry += (lo<buf);
+      z[2] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[3]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[3];
+      lo += buf;
+      carry += (lo<buf);
+      z[3] = lo;
+  }
+  lo = c*x[5-1];
+  lo += carry;
+  z[5-1] += lo;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_NC_6HW
+#define HAVE_LONGLONG_ADDMUL1_NC_6HW 1
+static void
+addmul1_nc_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t lo,carry;
+  carry = 0;
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[0]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[0];
+      lo += buf;
+      carry += (lo<buf);
+      z[0] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[1]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[1];
+      lo += buf;
+      carry += (lo<buf);
+      z[1] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[2]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[2];
+      lo += buf;
+      carry += (lo<buf);
+      z[2] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[3]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[3];
+      lo += buf;
+      carry += (lo<buf);
+      z[3] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[4]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[4];
+      lo += buf;
+      carry += (lo<buf);
+      z[4] = lo;
+  }
+  lo = c*x[6-1];
+  lo += carry;
+  z[6-1] += lo;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_NC_7HW
+#define HAVE_LONGLONG_ADDMUL1_NC_7HW 1
+static void
+addmul1_nc_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t lo,carry;
+  carry = 0;
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[0]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[0];
+      lo += buf;
+      carry += (lo<buf);
+      z[0] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[1]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[1];
+      lo += buf;
+      carry += (lo<buf);
+      z[1] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[2]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[2];
+      lo += buf;
+      carry += (lo<buf);
+      z[2] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[3]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[3];
+      lo += buf;
+      carry += (lo<buf);
+      z[3] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[4]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[4];
+      lo += buf;
+      carry += (lo<buf);
+      z[4] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[5]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[5];
+      lo += buf;
+      carry += (lo<buf);
+      z[5] = lo;
+  }
+  lo = c*x[7-1];
+  lo += carry;
+  z[7-1] += lo;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_NC_8HW
+#define HAVE_LONGLONG_ADDMUL1_NC_8HW 1
+static void
+addmul1_nc_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t lo,carry;
+  carry = 0;
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[0]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[0];
+      lo += buf;
+      carry += (lo<buf);
+      z[0] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[1]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[1];
+      lo += buf;
+      carry += (lo<buf);
+      z[1] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[2]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[2];
+      lo += buf;
+      carry += (lo<buf);
+      z[2] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[3]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[3];
+      lo += buf;
+      carry += (lo<buf);
+      z[3] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[4]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[4];
+      lo += buf;
+      carry += (lo<buf);
+      z[4] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[5]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[5];
+      lo += buf;
+      carry += (lo<buf);
+      z[5] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[6]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[6];
+      lo += buf;
+      carry += (lo<buf);
+      z[6] = lo;
+  }
+  lo = c*x[8-1];
+  lo += carry;
+  z[8-1] += lo;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_NC_9HW
+#define HAVE_LONGLONG_ADDMUL1_NC_9HW 1
+static void
+addmul1_nc_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t lo,carry;
+  carry = 0;
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[0]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[0];
+      lo += buf;
+      carry += (lo<buf);
+      z[0] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[1]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[1];
+      lo += buf;
+      carry += (lo<buf);
+      z[1] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[2]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[2];
+      lo += buf;
+      carry += (lo<buf);
+      z[2] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[3]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[3];
+      lo += buf;
+      carry += (lo<buf);
+      z[3] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[4]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[4];
+      lo += buf;
+      carry += (lo<buf);
+      z[4] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[5]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[5];
+      lo += buf;
+      carry += (lo<buf);
+      z[5] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[6]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[6];
+      lo += buf;
+      carry += (lo<buf);
+      z[6] = lo;
+  }
+
+  {
+      mp_limb_t hi, buf;
+      umul_ppmm(hi,lo,c,x[7]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[7];
+      lo += buf;
+      carry += (lo<buf);
+      z[7] = lo;
+  }
+  lo = c*x[9-1];
+  lo += carry;
+  z[9-1] += lo;
+}
+#endif
+
 #ifndef HAVE_NATIVE_ADDMUL1_1
 #define HAVE_LONGLONG_ADDMUL1_1 1
 static mp_limb_t
@@ -3841,6 +4354,1023 @@ addmul1_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
 }
 #endif
 
+#ifndef HAVE_NATIVE_ADDMUL1_1HW
+#define HAVE_LONGLONG_ADDMUL1_1HW 1
+static mp_limb_t
+addmul1_1hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t lo,carry,buf;
+  carry = 0;
+  lo = c*x[1-1];
+  lo += carry;
+  carry = (lo < carry);
+  buf = z[1-1];
+  lo += buf;
+  carry += (lo<buf);
+  z[1-1] = lo;
+  return carry;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_2HW
+#define HAVE_LONGLONG_ADDMUL1_2HW 1
+static mp_limb_t
+addmul1_2hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t lo,carry,buf;
+  carry = 0;
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[0]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[0];
+      lo += buf;
+      carry += (lo<buf);
+      z[0] = lo;
+  }
+  lo = c*x[2-1];
+  lo += carry;
+  carry = (lo < carry);
+  buf = z[2-1];
+  lo += buf;
+  carry += (lo<buf);
+  z[2-1] = lo;
+  return carry;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_3HW
+#define HAVE_LONGLONG_ADDMUL1_3HW 1
+static mp_limb_t
+addmul1_3hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t lo,carry,buf;
+  carry = 0;
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[0]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[0];
+      lo += buf;
+      carry += (lo<buf);
+      z[0] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[1]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[1];
+      lo += buf;
+      carry += (lo<buf);
+      z[1] = lo;
+  }
+  lo = c*x[3-1];
+  lo += carry;
+  carry = (lo < carry);
+  buf = z[3-1];
+  lo += buf;
+  carry += (lo<buf);
+  z[3-1] = lo;
+  return carry;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_4HW
+#define HAVE_LONGLONG_ADDMUL1_4HW 1
+static mp_limb_t
+addmul1_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t lo,carry,buf;
+  carry = 0;
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[0]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[0];
+      lo += buf;
+      carry += (lo<buf);
+      z[0] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[1]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[1];
+      lo += buf;
+      carry += (lo<buf);
+      z[1] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[2]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[2];
+      lo += buf;
+      carry += (lo<buf);
+      z[2] = lo;
+  }
+  lo = c*x[4-1];
+  lo += carry;
+  carry = (lo < carry);
+  buf = z[4-1];
+  lo += buf;
+  carry += (lo<buf);
+  z[4-1] = lo;
+  return carry;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_5HW
+#define HAVE_LONGLONG_ADDMUL1_5HW 1
+static mp_limb_t
+addmul1_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t lo,carry,buf;
+  carry = 0;
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[0]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[0];
+      lo += buf;
+      carry += (lo<buf);
+      z[0] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[1]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[1];
+      lo += buf;
+      carry += (lo<buf);
+      z[1] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[2]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[2];
+      lo += buf;
+      carry += (lo<buf);
+      z[2] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[3]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[3];
+      lo += buf;
+      carry += (lo<buf);
+      z[3] = lo;
+  }
+  lo = c*x[5-1];
+  lo += carry;
+  carry = (lo < carry);
+  buf = z[5-1];
+  lo += buf;
+  carry += (lo<buf);
+  z[5-1] = lo;
+  return carry;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_6HW
+#define HAVE_LONGLONG_ADDMUL1_6HW 1
+static mp_limb_t
+addmul1_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t lo,carry,buf;
+  carry = 0;
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[0]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[0];
+      lo += buf;
+      carry += (lo<buf);
+      z[0] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[1]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[1];
+      lo += buf;
+      carry += (lo<buf);
+      z[1] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[2]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[2];
+      lo += buf;
+      carry += (lo<buf);
+      z[2] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[3]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[3];
+      lo += buf;
+      carry += (lo<buf);
+      z[3] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[4]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[4];
+      lo += buf;
+      carry += (lo<buf);
+      z[4] = lo;
+  }
+  lo = c*x[6-1];
+  lo += carry;
+  carry = (lo < carry);
+  buf = z[6-1];
+  lo += buf;
+  carry += (lo<buf);
+  z[6-1] = lo;
+  return carry;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_7HW
+#define HAVE_LONGLONG_ADDMUL1_7HW 1
+static mp_limb_t
+addmul1_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t lo,carry,buf;
+  carry = 0;
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[0]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[0];
+      lo += buf;
+      carry += (lo<buf);
+      z[0] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[1]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[1];
+      lo += buf;
+      carry += (lo<buf);
+      z[1] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[2]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[2];
+      lo += buf;
+      carry += (lo<buf);
+      z[2] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[3]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[3];
+      lo += buf;
+      carry += (lo<buf);
+      z[3] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[4]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[4];
+      lo += buf;
+      carry += (lo<buf);
+      z[4] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[5]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[5];
+      lo += buf;
+      carry += (lo<buf);
+      z[5] = lo;
+  }
+  lo = c*x[7-1];
+  lo += carry;
+  carry = (lo < carry);
+  buf = z[7-1];
+  lo += buf;
+  carry += (lo<buf);
+  z[7-1] = lo;
+  return carry;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_8HW
+#define HAVE_LONGLONG_ADDMUL1_8HW 1
+static mp_limb_t
+addmul1_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t lo,carry,buf;
+  carry = 0;
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[0]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[0];
+      lo += buf;
+      carry += (lo<buf);
+      z[0] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[1]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[1];
+      lo += buf;
+      carry += (lo<buf);
+      z[1] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[2]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[2];
+      lo += buf;
+      carry += (lo<buf);
+      z[2] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[3]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[3];
+      lo += buf;
+      carry += (lo<buf);
+      z[3] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[4]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[4];
+      lo += buf;
+      carry += (lo<buf);
+      z[4] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[5]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[5];
+      lo += buf;
+      carry += (lo<buf);
+      z[5] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[6]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[6];
+      lo += buf;
+      carry += (lo<buf);
+      z[6] = lo;
+  }
+  lo = c*x[8-1];
+  lo += carry;
+  carry = (lo < carry);
+  buf = z[8-1];
+  lo += buf;
+  carry += (lo<buf);
+  z[8-1] = lo;
+  return carry;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_9HW
+#define HAVE_LONGLONG_ADDMUL1_9HW 1
+static mp_limb_t
+addmul1_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t lo,carry,buf;
+  carry = 0;
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[0]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[0];
+      lo += buf;
+      carry += (lo<buf);
+      z[0] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[1]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[1];
+      lo += buf;
+      carry += (lo<buf);
+      z[1] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[2]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[2];
+      lo += buf;
+      carry += (lo<buf);
+      z[2] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[3]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[3];
+      lo += buf;
+      carry += (lo<buf);
+      z[3] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[4]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[4];
+      lo += buf;
+      carry += (lo<buf);
+      z[4] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[5]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[5];
+      lo += buf;
+      carry += (lo<buf);
+      z[5] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[6]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[6];
+      lo += buf;
+      carry += (lo<buf);
+      z[6] = lo;
+  }
+
+  {
+      mp_limb_t hi;
+      umul_ppmm(hi,lo,c,x[7]);
+      lo += carry;
+      carry = (lo<carry) + hi;
+      buf = z[7];
+      lo += buf;
+      carry += (lo<buf);
+      z[7] = lo;
+  }
+  lo = c*x[9-1];
+  lo += carry;
+  carry = (lo < carry);
+  buf = z[9-1];
+  lo += buf;
+  carry += (lo<buf);
+  z[9-1] = lo;
+  return carry;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_SMALLZ_1HW
+#define HAVE_LONGLONG_ADDMUL1_SMALLZ_1HW 1
+static mp_limb_t
+addmul1_smallz_1hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t hi,lo,carry,buf;
+  carry = 0;
+
+  umul_ppmm(hi,lo,c,x[0]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[0];
+  lo += buf;
+  carry += (lo<buf);
+  z[0] = lo;
+  return carry;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_SMALLZ_2HW
+#define HAVE_LONGLONG_ADDMUL1_SMALLZ_2HW 1
+static mp_limb_t
+addmul1_smallz_2hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t hi,lo,carry,buf;
+  carry = 0;
+
+  umul_ppmm(hi,lo,c,x[0]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[0];
+  lo += buf;
+  carry += (lo<buf);
+  z[0] = lo;
+
+  umul_ppmm(hi,lo,c,x[1]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[1];
+  lo += buf;
+  carry += (lo<buf);
+  z[1] = lo;
+  return carry;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_SMALLZ_3HW
+#define HAVE_LONGLONG_ADDMUL1_SMALLZ_3HW 1
+static mp_limb_t
+addmul1_smallz_3hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t hi,lo,carry,buf;
+  carry = 0;
+
+  umul_ppmm(hi,lo,c,x[0]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[0];
+  lo += buf;
+  carry += (lo<buf);
+  z[0] = lo;
+
+  umul_ppmm(hi,lo,c,x[1]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[1];
+  lo += buf;
+  carry += (lo<buf);
+  z[1] = lo;
+
+  umul_ppmm(hi,lo,c,x[2]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[2];
+  lo += buf;
+  carry += (lo<buf);
+  z[2] = lo;
+  return carry;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_SMALLZ_4HW
+#define HAVE_LONGLONG_ADDMUL1_SMALLZ_4HW 1
+static mp_limb_t
+addmul1_smallz_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t hi,lo,carry,buf;
+  carry = 0;
+
+  umul_ppmm(hi,lo,c,x[0]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[0];
+  lo += buf;
+  carry += (lo<buf);
+  z[0] = lo;
+
+  umul_ppmm(hi,lo,c,x[1]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[1];
+  lo += buf;
+  carry += (lo<buf);
+  z[1] = lo;
+
+  umul_ppmm(hi,lo,c,x[2]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[2];
+  lo += buf;
+  carry += (lo<buf);
+  z[2] = lo;
+
+  umul_ppmm(hi,lo,c,x[3]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[3];
+  lo += buf;
+  carry += (lo<buf);
+  z[3] = lo;
+  return carry;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_SMALLZ_5HW
+#define HAVE_LONGLONG_ADDMUL1_SMALLZ_5HW 1
+static mp_limb_t
+addmul1_smallz_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t hi,lo,carry,buf;
+  carry = 0;
+
+  umul_ppmm(hi,lo,c,x[0]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[0];
+  lo += buf;
+  carry += (lo<buf);
+  z[0] = lo;
+
+  umul_ppmm(hi,lo,c,x[1]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[1];
+  lo += buf;
+  carry += (lo<buf);
+  z[1] = lo;
+
+  umul_ppmm(hi,lo,c,x[2]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[2];
+  lo += buf;
+  carry += (lo<buf);
+  z[2] = lo;
+
+  umul_ppmm(hi,lo,c,x[3]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[3];
+  lo += buf;
+  carry += (lo<buf);
+  z[3] = lo;
+
+  umul_ppmm(hi,lo,c,x[4]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[4];
+  lo += buf;
+  carry += (lo<buf);
+  z[4] = lo;
+  return carry;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_SMALLZ_6HW
+#define HAVE_LONGLONG_ADDMUL1_SMALLZ_6HW 1
+static mp_limb_t
+addmul1_smallz_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t hi,lo,carry,buf;
+  carry = 0;
+
+  umul_ppmm(hi,lo,c,x[0]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[0];
+  lo += buf;
+  carry += (lo<buf);
+  z[0] = lo;
+
+  umul_ppmm(hi,lo,c,x[1]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[1];
+  lo += buf;
+  carry += (lo<buf);
+  z[1] = lo;
+
+  umul_ppmm(hi,lo,c,x[2]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[2];
+  lo += buf;
+  carry += (lo<buf);
+  z[2] = lo;
+
+  umul_ppmm(hi,lo,c,x[3]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[3];
+  lo += buf;
+  carry += (lo<buf);
+  z[3] = lo;
+
+  umul_ppmm(hi,lo,c,x[4]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[4];
+  lo += buf;
+  carry += (lo<buf);
+  z[4] = lo;
+
+  umul_ppmm(hi,lo,c,x[5]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[5];
+  lo += buf;
+  carry += (lo<buf);
+  z[5] = lo;
+  return carry;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_SMALLZ_7HW
+#define HAVE_LONGLONG_ADDMUL1_SMALLZ_7HW 1
+static mp_limb_t
+addmul1_smallz_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t hi,lo,carry,buf;
+  carry = 0;
+
+  umul_ppmm(hi,lo,c,x[0]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[0];
+  lo += buf;
+  carry += (lo<buf);
+  z[0] = lo;
+
+  umul_ppmm(hi,lo,c,x[1]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[1];
+  lo += buf;
+  carry += (lo<buf);
+  z[1] = lo;
+
+  umul_ppmm(hi,lo,c,x[2]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[2];
+  lo += buf;
+  carry += (lo<buf);
+  z[2] = lo;
+
+  umul_ppmm(hi,lo,c,x[3]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[3];
+  lo += buf;
+  carry += (lo<buf);
+  z[3] = lo;
+
+  umul_ppmm(hi,lo,c,x[4]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[4];
+  lo += buf;
+  carry += (lo<buf);
+  z[4] = lo;
+
+  umul_ppmm(hi,lo,c,x[5]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[5];
+  lo += buf;
+  carry += (lo<buf);
+  z[5] = lo;
+
+  umul_ppmm(hi,lo,c,x[6]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[6];
+  lo += buf;
+  carry += (lo<buf);
+  z[6] = lo;
+  return carry;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_SMALLZ_8HW
+#define HAVE_LONGLONG_ADDMUL1_SMALLZ_8HW 1
+static mp_limb_t
+addmul1_smallz_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t hi,lo,carry,buf;
+  carry = 0;
+
+  umul_ppmm(hi,lo,c,x[0]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[0];
+  lo += buf;
+  carry += (lo<buf);
+  z[0] = lo;
+
+  umul_ppmm(hi,lo,c,x[1]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[1];
+  lo += buf;
+  carry += (lo<buf);
+  z[1] = lo;
+
+  umul_ppmm(hi,lo,c,x[2]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[2];
+  lo += buf;
+  carry += (lo<buf);
+  z[2] = lo;
+
+  umul_ppmm(hi,lo,c,x[3]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[3];
+  lo += buf;
+  carry += (lo<buf);
+  z[3] = lo;
+
+  umul_ppmm(hi,lo,c,x[4]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[4];
+  lo += buf;
+  carry += (lo<buf);
+  z[4] = lo;
+
+  umul_ppmm(hi,lo,c,x[5]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[5];
+  lo += buf;
+  carry += (lo<buf);
+  z[5] = lo;
+
+  umul_ppmm(hi,lo,c,x[6]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[6];
+  lo += buf;
+  carry += (lo<buf);
+  z[6] = lo;
+
+  umul_ppmm(hi,lo,c,x[7]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[7];
+  lo += buf;
+  carry += (lo<buf);
+  z[7] = lo;
+  return carry;
+}
+#endif
+
+#ifndef HAVE_NATIVE_ADDMUL1_SMALLZ_9HW
+#define HAVE_LONGLONG_ADDMUL1_SMALLZ_9HW 1
+static mp_limb_t
+addmul1_smallz_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
+{
+  mp_limb_t hi,lo,carry,buf;
+  carry = 0;
+
+  umul_ppmm(hi,lo,c,x[0]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[0];
+  lo += buf;
+  carry += (lo<buf);
+  z[0] = lo;
+
+  umul_ppmm(hi,lo,c,x[1]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[1];
+  lo += buf;
+  carry += (lo<buf);
+  z[1] = lo;
+
+  umul_ppmm(hi,lo,c,x[2]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[2];
+  lo += buf;
+  carry += (lo<buf);
+  z[2] = lo;
+
+  umul_ppmm(hi,lo,c,x[3]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[3];
+  lo += buf;
+  carry += (lo<buf);
+  z[3] = lo;
+
+  umul_ppmm(hi,lo,c,x[4]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[4];
+  lo += buf;
+  carry += (lo<buf);
+  z[4] = lo;
+
+  umul_ppmm(hi,lo,c,x[5]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[5];
+  lo += buf;
+  carry += (lo<buf);
+  z[5] = lo;
+
+  umul_ppmm(hi,lo,c,x[6]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[6];
+  lo += buf;
+  carry += (lo<buf);
+  z[6] = lo;
+
+  umul_ppmm(hi,lo,c,x[7]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[7];
+  lo += buf;
+  carry += (lo<buf);
+  z[7] = lo;
+
+  umul_ppmm(hi,lo,c,x[8]);
+  lo += carry;
+  carry = (lo<carry) + hi;
+  buf = z[8];
+  lo += buf;
+  carry += (lo<buf);
+  z[8] = lo;
+  return carry;
+}
+#endif
+
 #ifndef HAVE_NATIVE_MUL1_1
 #define HAVE_LONGLONG_MUL1_1 1
 static void
@@ -3946,6 +5476,114 @@ mul1_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t y)
   for (i = 0; i < 9+1; ++i) 
     z[i] = 0;
   addmul1_nc_9(z, x, y);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MUL1_1HW
+#define HAVE_LONGLONG_MUL1_1HW 1
+static void
+mul1_1hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t y)
+{
+  int i;
+  for (i = 0; i < 1; ++i) 
+    z[i] = 0;
+  addmul1_nc_1hw(z, x, y);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MUL1_2HW
+#define HAVE_LONGLONG_MUL1_2HW 1
+static void
+mul1_2hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t y)
+{
+  int i;
+  for (i = 0; i < 2; ++i) 
+    z[i] = 0;
+  addmul1_nc_2hw(z, x, y);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MUL1_3HW
+#define HAVE_LONGLONG_MUL1_3HW 1
+static void
+mul1_3hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t y)
+{
+  int i;
+  for (i = 0; i < 3; ++i) 
+    z[i] = 0;
+  addmul1_nc_3hw(z, x, y);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MUL1_4HW
+#define HAVE_LONGLONG_MUL1_4HW 1
+static void
+mul1_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t y)
+{
+  int i;
+  for (i = 0; i < 4; ++i) 
+    z[i] = 0;
+  addmul1_nc_4hw(z, x, y);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MUL1_5HW
+#define HAVE_LONGLONG_MUL1_5HW 1
+static void
+mul1_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t y)
+{
+  int i;
+  for (i = 0; i < 5; ++i) 
+    z[i] = 0;
+  addmul1_nc_5hw(z, x, y);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MUL1_6HW
+#define HAVE_LONGLONG_MUL1_6HW 1
+static void
+mul1_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t y)
+{
+  int i;
+  for (i = 0; i < 6; ++i) 
+    z[i] = 0;
+  addmul1_nc_6hw(z, x, y);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MUL1_7HW
+#define HAVE_LONGLONG_MUL1_7HW 1
+static void
+mul1_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t y)
+{
+  int i;
+  for (i = 0; i < 7; ++i) 
+    z[i] = 0;
+  addmul1_nc_7hw(z, x, y);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MUL1_8HW
+#define HAVE_LONGLONG_MUL1_8HW 1
+static void
+mul1_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t y)
+{
+  int i;
+  for (i = 0; i < 8; ++i) 
+    z[i] = 0;
+  addmul1_nc_8hw(z, x, y);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MUL1_9HW
+#define HAVE_LONGLONG_MUL1_9HW 1
+static void
+mul1_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t y)
+{
+  int i;
+  for (i = 0; i < 9; ++i) 
+    z[i] = 0;
+  addmul1_nc_9hw(z, x, y);
 }
 #endif
 
@@ -4273,6 +5911,150 @@ mul_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y)
 }
 #endif
 
+#ifndef HAVE_NATIVE_MUL_1HW
+#define HAVE_LONGLONG_MUL_1HW 1
+static void
+mul_1hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y)
+{
+  int i;
+  for (i = 0; i < (2*1-1); ++i) 
+    z[i] = 0;
+addmul1_nc_1hw (z+0,x,y[0]); 
+ } 
+#endif
+
+#ifndef HAVE_NATIVE_MUL_2HW
+#define HAVE_LONGLONG_MUL_2HW 1
+static void
+mul_2hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y)
+{
+  int i;
+  for (i = 0; i < (2*2-1); ++i) 
+    z[i] = 0;
+  addmul1_nc_2 (z+0, x, y[0]);
+addmul1_nc_2hw (z+1,x,y[1]); 
+ } 
+#endif
+
+#ifndef HAVE_NATIVE_MUL_3HW
+#define HAVE_LONGLONG_MUL_3HW 1
+static void
+mul_3hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y)
+{
+  int i;
+  for (i = 0; i < (2*3-1); ++i) 
+    z[i] = 0;
+  addmul1_nc_3 (z+0, x, y[0]);
+  addmul1_nc_3 (z+1, x, y[1]);
+addmul1_nc_3hw (z+2,x,y[2]); 
+ } 
+#endif
+
+#ifndef HAVE_NATIVE_MUL_4HW
+#define HAVE_LONGLONG_MUL_4HW 1
+static void
+mul_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y)
+{
+  int i;
+  for (i = 0; i < (2*4-1); ++i) 
+    z[i] = 0;
+  addmul1_nc_4 (z+0, x, y[0]);
+  addmul1_nc_4 (z+1, x, y[1]);
+  addmul1_nc_4 (z+2, x, y[2]);
+addmul1_nc_4hw (z+3,x,y[3]); 
+ } 
+#endif
+
+#ifndef HAVE_NATIVE_MUL_5HW
+#define HAVE_LONGLONG_MUL_5HW 1
+static void
+mul_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y)
+{
+  int i;
+  for (i = 0; i < (2*5-1); ++i) 
+    z[i] = 0;
+  addmul1_nc_5 (z+0, x, y[0]);
+  addmul1_nc_5 (z+1, x, y[1]);
+  addmul1_nc_5 (z+2, x, y[2]);
+  addmul1_nc_5 (z+3, x, y[3]);
+addmul1_nc_5hw (z+4,x,y[4]); 
+ } 
+#endif
+
+#ifndef HAVE_NATIVE_MUL_6HW
+#define HAVE_LONGLONG_MUL_6HW 1
+static void
+mul_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y)
+{
+  int i;
+  for (i = 0; i < (2*6-1); ++i) 
+    z[i] = 0;
+  addmul1_nc_6 (z+0, x, y[0]);
+  addmul1_nc_6 (z+1, x, y[1]);
+  addmul1_nc_6 (z+2, x, y[2]);
+  addmul1_nc_6 (z+3, x, y[3]);
+  addmul1_nc_6 (z+4, x, y[4]);
+addmul1_nc_6hw (z+5,x,y[5]); 
+ } 
+#endif
+
+#ifndef HAVE_NATIVE_MUL_7HW
+#define HAVE_LONGLONG_MUL_7HW 1
+static void
+mul_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y)
+{
+  int i;
+  for (i = 0; i < (2*7-1); ++i) 
+    z[i] = 0;
+  addmul1_nc_7 (z+0, x, y[0]);
+  addmul1_nc_7 (z+1, x, y[1]);
+  addmul1_nc_7 (z+2, x, y[2]);
+  addmul1_nc_7 (z+3, x, y[3]);
+  addmul1_nc_7 (z+4, x, y[4]);
+  addmul1_nc_7 (z+5, x, y[5]);
+addmul1_nc_7hw (z+6,x,y[6]); 
+ } 
+#endif
+
+#ifndef HAVE_NATIVE_MUL_8HW
+#define HAVE_LONGLONG_MUL_8HW 1
+static void
+mul_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y)
+{
+  int i;
+  for (i = 0; i < (2*8-1); ++i) 
+    z[i] = 0;
+  addmul1_nc_8 (z+0, x, y[0]);
+  addmul1_nc_8 (z+1, x, y[1]);
+  addmul1_nc_8 (z+2, x, y[2]);
+  addmul1_nc_8 (z+3, x, y[3]);
+  addmul1_nc_8 (z+4, x, y[4]);
+  addmul1_nc_8 (z+5, x, y[5]);
+  addmul1_nc_8 (z+6, x, y[6]);
+addmul1_nc_8hw (z+7,x,y[7]); 
+ } 
+#endif
+
+#ifndef HAVE_NATIVE_MUL_9HW
+#define HAVE_LONGLONG_MUL_9HW 1
+static void
+mul_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y)
+{
+  int i;
+  for (i = 0; i < (2*9-1); ++i) 
+    z[i] = 0;
+  addmul1_nc_9 (z+0, x, y[0]);
+  addmul1_nc_9 (z+1, x, y[1]);
+  addmul1_nc_9 (z+2, x, y[2]);
+  addmul1_nc_9 (z+3, x, y[3]);
+  addmul1_nc_9 (z+4, x, y[4]);
+  addmul1_nc_9 (z+5, x, y[5]);
+  addmul1_nc_9 (z+6, x, y[6]);
+  addmul1_nc_9 (z+7, x, y[7]);
+addmul1_nc_9hw (z+8,x,y[8]); 
+ } 
+#endif
+
 #ifndef HAVE_NATIVE_SQR_1
 #define HAVE_LONGLONG_SQR_1 1
 static void
@@ -4498,6 +6280,231 @@ sqr_9(mp_limb_t *z, const mp_limb_t *x)
 }
 #endif
 
+#ifndef HAVE_NATIVE_SQR_1HW
+#define HAVE_LONGLONG_SQR_1HW 1
+static void
+sqr_1hw(mp_limb_t *z, const mp_limb_t *x)
+{
+  mp_limb_t buf[2*1-1];
+  int i;
+
+  for (i = 0; i < (2*1-1); ++i)
+    buf[i] = 0;
+
+  z[2*0]=x[0]*x[0];
+  mpn_lshift(buf, buf, 2*1-1, 1);
+  mpn_add_n(z, z, buf, 2*1-1);
+}
+#endif
+
+#ifndef HAVE_NATIVE_SQR_2HW
+#define HAVE_LONGLONG_SQR_2HW 1
+static void
+sqr_2hw(mp_limb_t *z, const mp_limb_t *x)
+{
+  mp_limb_t buf[2*2-1];
+  int i;
+
+  for (i = 0; i < (2*2-1); ++i)
+    buf[i] = 0;
+  addmul1_nc_1(buf+1, x, x[1]);
+
+  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  z[2*1]=x[1]*x[1];
+  mpn_lshift(buf, buf, 2*2-1, 1);
+  mpn_add_n(z, z, buf, 2*2-1);
+}
+#endif
+
+#ifndef HAVE_NATIVE_SQR_3HW
+#define HAVE_LONGLONG_SQR_3HW 1
+static void
+sqr_3hw(mp_limb_t *z, const mp_limb_t *x)
+{
+  mp_limb_t buf[2*3-1];
+  int i;
+
+  for (i = 0; i < (2*3-1); ++i)
+    buf[i] = 0;
+  addmul1_nc_1(buf+1, x, x[1]);
+  addmul1_nc_2(buf+2, x, x[2]);
+
+  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
+  z[2*2]=x[2]*x[2];
+  mpn_lshift(buf, buf, 2*3-1, 1);
+  mpn_add_n(z, z, buf, 2*3-1);
+}
+#endif
+
+#ifndef HAVE_NATIVE_SQR_4HW
+#define HAVE_LONGLONG_SQR_4HW 1
+static void
+sqr_4hw(mp_limb_t *z, const mp_limb_t *x)
+{
+  mp_limb_t buf[2*4-1];
+  int i;
+
+  for (i = 0; i < (2*4-1); ++i)
+    buf[i] = 0;
+  addmul1_nc_1(buf+1, x, x[1]);
+  addmul1_nc_2(buf+2, x, x[2]);
+  addmul1_nc_3(buf+3, x, x[3]);
+
+  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
+  umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
+  z[2*3]=x[3]*x[3];
+  mpn_lshift(buf, buf, 2*4-1, 1);
+  mpn_add_n(z, z, buf, 2*4-1);
+}
+#endif
+
+#ifndef HAVE_NATIVE_SQR_5HW
+#define HAVE_LONGLONG_SQR_5HW 1
+static void
+sqr_5hw(mp_limb_t *z, const mp_limb_t *x)
+{
+  mp_limb_t buf[2*5-1];
+  int i;
+
+  for (i = 0; i < (2*5-1); ++i)
+    buf[i] = 0;
+  addmul1_nc_1(buf+1, x, x[1]);
+  addmul1_nc_2(buf+2, x, x[2]);
+  addmul1_nc_3(buf+3, x, x[3]);
+  addmul1_nc_4(buf+4, x, x[4]);
+
+  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
+  umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
+  umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
+  z[2*4]=x[4]*x[4];
+  mpn_lshift(buf, buf, 2*5-1, 1);
+  mpn_add_n(z, z, buf, 2*5-1);
+}
+#endif
+
+#ifndef HAVE_NATIVE_SQR_6HW
+#define HAVE_LONGLONG_SQR_6HW 1
+static void
+sqr_6hw(mp_limb_t *z, const mp_limb_t *x)
+{
+  mp_limb_t buf[2*6-1];
+  int i;
+
+  for (i = 0; i < (2*6-1); ++i)
+    buf[i] = 0;
+  addmul1_nc_1(buf+1, x, x[1]);
+  addmul1_nc_2(buf+2, x, x[2]);
+  addmul1_nc_3(buf+3, x, x[3]);
+  addmul1_nc_4(buf+4, x, x[4]);
+  addmul1_nc_5(buf+5, x, x[5]);
+
+  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
+  umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
+  umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
+  umul_ppmm(z[2*4+1], z[2*4], x[4], x[4]);
+  z[2*5]=x[5]*x[5];
+  mpn_lshift(buf, buf, 2*6-1, 1);
+  mpn_add_n(z, z, buf, 2*6-1);
+}
+#endif
+
+#ifndef HAVE_NATIVE_SQR_7HW
+#define HAVE_LONGLONG_SQR_7HW 1
+static void
+sqr_7hw(mp_limb_t *z, const mp_limb_t *x)
+{
+  mp_limb_t buf[2*7-1];
+  int i;
+
+  for (i = 0; i < (2*7-1); ++i)
+    buf[i] = 0;
+  addmul1_nc_1(buf+1, x, x[1]);
+  addmul1_nc_2(buf+2, x, x[2]);
+  addmul1_nc_3(buf+3, x, x[3]);
+  addmul1_nc_4(buf+4, x, x[4]);
+  addmul1_nc_5(buf+5, x, x[5]);
+  addmul1_nc_6(buf+6, x, x[6]);
+
+  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
+  umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
+  umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
+  umul_ppmm(z[2*4+1], z[2*4], x[4], x[4]);
+  umul_ppmm(z[2*5+1], z[2*5], x[5], x[5]);
+  z[2*6]=x[6]*x[6];
+  mpn_lshift(buf, buf, 2*7-1, 1);
+  mpn_add_n(z, z, buf, 2*7-1);
+}
+#endif
+
+#ifndef HAVE_NATIVE_SQR_8HW
+#define HAVE_LONGLONG_SQR_8HW 1
+static void
+sqr_8hw(mp_limb_t *z, const mp_limb_t *x)
+{
+  mp_limb_t buf[2*8-1];
+  int i;
+
+  for (i = 0; i < (2*8-1); ++i)
+    buf[i] = 0;
+  addmul1_nc_1(buf+1, x, x[1]);
+  addmul1_nc_2(buf+2, x, x[2]);
+  addmul1_nc_3(buf+3, x, x[3]);
+  addmul1_nc_4(buf+4, x, x[4]);
+  addmul1_nc_5(buf+5, x, x[5]);
+  addmul1_nc_6(buf+6, x, x[6]);
+  addmul1_nc_7(buf+7, x, x[7]);
+
+  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
+  umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
+  umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
+  umul_ppmm(z[2*4+1], z[2*4], x[4], x[4]);
+  umul_ppmm(z[2*5+1], z[2*5], x[5], x[5]);
+  umul_ppmm(z[2*6+1], z[2*6], x[6], x[6]);
+  z[2*7]=x[7]*x[7];
+  mpn_lshift(buf, buf, 2*8-1, 1);
+  mpn_add_n(z, z, buf, 2*8-1);
+}
+#endif
+
+#ifndef HAVE_NATIVE_SQR_9HW
+#define HAVE_LONGLONG_SQR_9HW 1
+static void
+sqr_9hw(mp_limb_t *z, const mp_limb_t *x)
+{
+  mp_limb_t buf[2*9-1];
+  int i;
+
+  for (i = 0; i < (2*9-1); ++i)
+    buf[i] = 0;
+  addmul1_nc_1(buf+1, x, x[1]);
+  addmul1_nc_2(buf+2, x, x[2]);
+  addmul1_nc_3(buf+3, x, x[3]);
+  addmul1_nc_4(buf+4, x, x[4]);
+  addmul1_nc_5(buf+5, x, x[5]);
+  addmul1_nc_6(buf+6, x, x[6]);
+  addmul1_nc_7(buf+7, x, x[7]);
+  addmul1_nc_8(buf+8, x, x[8]);
+
+  umul_ppmm(z[2*0+1], z[2*0], x[0], x[0]);
+  umul_ppmm(z[2*1+1], z[2*1], x[1], x[1]);
+  umul_ppmm(z[2*2+1], z[2*2], x[2], x[2]);
+  umul_ppmm(z[2*3+1], z[2*3], x[3], x[3]);
+  umul_ppmm(z[2*4+1], z[2*4], x[4], x[4]);
+  umul_ppmm(z[2*5+1], z[2*5], x[5], x[5]);
+  umul_ppmm(z[2*6+1], z[2*6], x[6], x[6]);
+  umul_ppmm(z[2*7+1], z[2*7], x[7], x[7]);
+  z[2*8]=x[8]*x[8];
+  mpn_lshift(buf, buf, 2*9-1, 1);
+  mpn_add_n(z, z, buf, 2*9-1);
+}
+#endif
+
 #ifndef HAVE_NATIVE_MOD_1
 #define HAVE_LONGLONG_MOD_1 1
 static void
@@ -4619,6 +6626,132 @@ mod_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p)
   mp_limb_t q[9+1], r[9];
   assert (p[9-1] != 0);
   mpn_tdiv_qr(q, r, 0, x, 2*9, p, 9);
+  for (i = 0; i < 9; ++i)
+    z[i] = r[i];
+}
+#endif
+
+#ifndef HAVE_NATIVE_MOD_1HW
+#define HAVE_LONGLONG_MOD_1HW 1
+static void
+mod_1hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p)
+{
+  int i;
+  mp_limb_t q[1], r[1];
+  assert (p[1-1] != 0);
+  mpn_tdiv_qr(q, r, 0, x, 2*1-1, p, 1);
+  for (i = 0; i < 1; ++i)
+    z[i] = r[i];
+}
+#endif
+
+#ifndef HAVE_NATIVE_MOD_2HW
+#define HAVE_LONGLONG_MOD_2HW 1
+static void
+mod_2hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p)
+{
+  int i;
+  mp_limb_t q[2], r[2];
+  assert (p[2-1] != 0);
+  mpn_tdiv_qr(q, r, 0, x, 2*2-1, p, 2);
+  for (i = 0; i < 2; ++i)
+    z[i] = r[i];
+}
+#endif
+
+#ifndef HAVE_NATIVE_MOD_3HW
+#define HAVE_LONGLONG_MOD_3HW 1
+static void
+mod_3hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p)
+{
+  int i;
+  mp_limb_t q[3], r[3];
+  assert (p[3-1] != 0);
+  mpn_tdiv_qr(q, r, 0, x, 2*3-1, p, 3);
+  for (i = 0; i < 3; ++i)
+    z[i] = r[i];
+}
+#endif
+
+#ifndef HAVE_NATIVE_MOD_4HW
+#define HAVE_LONGLONG_MOD_4HW 1
+static void
+mod_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p)
+{
+  int i;
+  mp_limb_t q[4], r[4];
+  assert (p[4-1] != 0);
+  mpn_tdiv_qr(q, r, 0, x, 2*4-1, p, 4);
+  for (i = 0; i < 4; ++i)
+    z[i] = r[i];
+}
+#endif
+
+#ifndef HAVE_NATIVE_MOD_5HW
+#define HAVE_LONGLONG_MOD_5HW 1
+static void
+mod_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p)
+{
+  int i;
+  mp_limb_t q[5], r[5];
+  assert (p[5-1] != 0);
+  mpn_tdiv_qr(q, r, 0, x, 2*5-1, p, 5);
+  for (i = 0; i < 5; ++i)
+    z[i] = r[i];
+}
+#endif
+
+#ifndef HAVE_NATIVE_MOD_6HW
+#define HAVE_LONGLONG_MOD_6HW 1
+static void
+mod_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p)
+{
+  int i;
+  mp_limb_t q[6], r[6];
+  assert (p[6-1] != 0);
+  mpn_tdiv_qr(q, r, 0, x, 2*6-1, p, 6);
+  for (i = 0; i < 6; ++i)
+    z[i] = r[i];
+}
+#endif
+
+#ifndef HAVE_NATIVE_MOD_7HW
+#define HAVE_LONGLONG_MOD_7HW 1
+static void
+mod_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p)
+{
+  int i;
+  mp_limb_t q[7], r[7];
+  assert (p[7-1] != 0);
+  mpn_tdiv_qr(q, r, 0, x, 2*7-1, p, 7);
+  for (i = 0; i < 7; ++i)
+    z[i] = r[i];
+}
+#endif
+
+#ifndef HAVE_NATIVE_MOD_8HW
+#define HAVE_LONGLONG_MOD_8HW 1
+static void
+mod_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p)
+{
+  int i;
+  mp_limb_t q[8], r[8];
+  assert (p[8-1] != 0);
+  mpn_tdiv_qr(q, r, 0, x, 2*8-1, p, 8);
+  for (i = 0; i < 8; ++i)
+    z[i] = r[i];
+}
+#endif
+
+#ifndef HAVE_NATIVE_MOD_9HW
+#define HAVE_LONGLONG_MOD_9HW 1
+static void
+mod_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p)
+{
+  int i;
+  mp_limb_t q[9], r[9];
+  assert (p[9-1] != 0);
+  mpn_tdiv_qr(q, r, 0, x, 2*9-1, p, 9);
   for (i = 0; i < 9; ++i)
     z[i] = r[i];
 }
@@ -5127,6 +7260,428 @@ redc_9(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) {
 }
 #endif
 
+#ifndef HAVE_NATIVE_REDC_UR_1
+#define HAVE_LONGLONG_REDC_UR_1 1
+static void
+redc_ur_1(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) {
+
+  int i;
+  mp_limb_t cy, q;
+  for (i = 0; i < 1; ++i) {
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_1(x+i, p, t);
+    assert (x[i] == 0);
+    x[i] = cy;
+  }
+  cy=add_1(x+1+1, x+1+1, x);
+  if (cy) {
+    mpn_sub(x+1,x+1,1+1,p,1);
+    mpn_tdiv_qr(&q, z, 0, x+1, 1+1, p, 1);
+  } else
+  mpn_tdiv_qr(&q, z, 0, x+1, 1+1, p, 1);
+}
+#endif
+
+#ifndef HAVE_NATIVE_REDC_UR_2
+#define HAVE_LONGLONG_REDC_UR_2 1
+static void
+redc_ur_2(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) {
+
+  int i;
+  mp_limb_t cy, q;
+  for (i = 0; i < 2; ++i) {
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_2(x+i, p, t);
+    assert (x[i] == 0);
+    x[i] = cy;
+  }
+  cy=add_2(x+2+1, x+2+1, x);
+  if (cy) {
+    mpn_sub(x+2,x+2,2+1,p,2);
+    mpn_tdiv_qr(&q, z, 0, x+2, 2+1, p, 2);
+  } else
+  mpn_tdiv_qr(&q, z, 0, x+2, 2+1, p, 2);
+}
+#endif
+
+#ifndef HAVE_NATIVE_REDC_UR_3
+#define HAVE_LONGLONG_REDC_UR_3 1
+static void
+redc_ur_3(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) {
+
+  int i;
+  mp_limb_t cy, q;
+  for (i = 0; i < 3; ++i) {
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_3(x+i, p, t);
+    assert (x[i] == 0);
+    x[i] = cy;
+  }
+  cy=add_3(x+3+1, x+3+1, x);
+  if (cy) {
+    mpn_sub(x+3,x+3,3+1,p,3);
+    mpn_tdiv_qr(&q, z, 0, x+3, 3+1, p, 3);
+  } else
+  mpn_tdiv_qr(&q, z, 0, x+3, 3+1, p, 3);
+}
+#endif
+
+#ifndef HAVE_NATIVE_REDC_UR_4
+#define HAVE_LONGLONG_REDC_UR_4 1
+static void
+redc_ur_4(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) {
+
+  int i;
+  mp_limb_t cy, q;
+  for (i = 0; i < 4; ++i) {
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_4(x+i, p, t);
+    assert (x[i] == 0);
+    x[i] = cy;
+  }
+  cy=add_4(x+4+1, x+4+1, x);
+  if (cy) {
+    mpn_sub(x+4,x+4,4+1,p,4);
+    mpn_tdiv_qr(&q, z, 0, x+4, 4+1, p, 4);
+  } else
+  mpn_tdiv_qr(&q, z, 0, x+4, 4+1, p, 4);
+}
+#endif
+
+#ifndef HAVE_NATIVE_REDC_UR_5
+#define HAVE_LONGLONG_REDC_UR_5 1
+static void
+redc_ur_5(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) {
+
+  int i;
+  mp_limb_t cy, q;
+  for (i = 0; i < 5; ++i) {
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_5(x+i, p, t);
+    assert (x[i] == 0);
+    x[i] = cy;
+  }
+  cy=add_5(x+5+1, x+5+1, x);
+  if (cy) {
+    mpn_sub(x+5,x+5,5+1,p,5);
+    mpn_tdiv_qr(&q, z, 0, x+5, 5+1, p, 5);
+  } else
+  mpn_tdiv_qr(&q, z, 0, x+5, 5+1, p, 5);
+}
+#endif
+
+#ifndef HAVE_NATIVE_REDC_UR_6
+#define HAVE_LONGLONG_REDC_UR_6 1
+static void
+redc_ur_6(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) {
+
+  int i;
+  mp_limb_t cy, q;
+  for (i = 0; i < 6; ++i) {
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_6(x+i, p, t);
+    assert (x[i] == 0);
+    x[i] = cy;
+  }
+  cy=add_6(x+6+1, x+6+1, x);
+  if (cy) {
+    mpn_sub(x+6,x+6,6+1,p,6);
+    mpn_tdiv_qr(&q, z, 0, x+6, 6+1, p, 6);
+  } else
+  mpn_tdiv_qr(&q, z, 0, x+6, 6+1, p, 6);
+}
+#endif
+
+#ifndef HAVE_NATIVE_REDC_UR_7
+#define HAVE_LONGLONG_REDC_UR_7 1
+static void
+redc_ur_7(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) {
+
+  int i;
+  mp_limb_t cy, q;
+  for (i = 0; i < 7; ++i) {
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_7(x+i, p, t);
+    assert (x[i] == 0);
+    x[i] = cy;
+  }
+  cy=add_7(x+7+1, x+7+1, x);
+  if (cy) {
+    mpn_sub(x+7,x+7,7+1,p,7);
+    mpn_tdiv_qr(&q, z, 0, x+7, 7+1, p, 7);
+  } else
+  mpn_tdiv_qr(&q, z, 0, x+7, 7+1, p, 7);
+}
+#endif
+
+#ifndef HAVE_NATIVE_REDC_UR_8
+#define HAVE_LONGLONG_REDC_UR_8 1
+static void
+redc_ur_8(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) {
+
+  int i;
+  mp_limb_t cy, q;
+  for (i = 0; i < 8; ++i) {
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_8(x+i, p, t);
+    assert (x[i] == 0);
+    x[i] = cy;
+  }
+  cy=add_8(x+8+1, x+8+1, x);
+  if (cy) {
+    mpn_sub(x+8,x+8,8+1,p,8);
+    mpn_tdiv_qr(&q, z, 0, x+8, 8+1, p, 8);
+  } else
+  mpn_tdiv_qr(&q, z, 0, x+8, 8+1, p, 8);
+}
+#endif
+
+#ifndef HAVE_NATIVE_REDC_UR_9
+#define HAVE_LONGLONG_REDC_UR_9 1
+static void
+redc_ur_9(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) {
+
+  int i;
+  mp_limb_t cy, q;
+  for (i = 0; i < 9; ++i) {
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_9(x+i, p, t);
+    assert (x[i] == 0);
+    x[i] = cy;
+  }
+  cy=add_9(x+9+1, x+9+1, x);
+  if (cy) {
+    mpn_sub(x+9,x+9,9+1,p,9);
+    mpn_tdiv_qr(&q, z, 0, x+9, 9+1, p, 9);
+  } else
+  mpn_tdiv_qr(&q, z, 0, x+9, 9+1, p, 9);
+}
+#endif
+
+#ifndef HAVE_NATIVE_REDC_1HW
+#define HAVE_LONGLONG_REDC_1HW 1
+static void
+redc_1hw(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) {
+    mp_limb_t t = x[0]*mip[0];
+    mp_limb_t tmp[2];
+    tmp[0]=x[0];
+    tmp[1]=0UL;
+    addmul1_1(tmp, p, t);
+    if (tmp[1]>=p[0]) //tmp[1] shouldn't be gretter than p[0] in our half word case
+        z[0] = tmp[1] - p[0];
+    else 
+        z[0] = tmp[1];
+}
+#endif
+
+#ifndef HAVE_NATIVE_REDC_2HW
+#define HAVE_LONGLONG_REDC_2HW 1
+static void
+redc_2hw(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) {
+
+  int i;
+  mp_limb_t cy, ret[1];
+  for (i = 0; i < 1; ++i) {
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_2(x+i, p, t);
+    assert (x[i] == 0);
+    ret[i] = cy;
+  }
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_smallz_2hw(x+i, p, t);
+    assert (x[i] == 0);
+
+  for (i=0; i< 1; ++i)
+    z[i]=x[i+2];
+  z[i]=cy;
+  add_1(z+1,z+1,ret);
+  if (cmp_2(z,p)>=0)// z shouldn't be gretter than p in the half word case
+    sub_2(z,z,p);
+}
+#endif
+
+#ifndef HAVE_NATIVE_REDC_3HW
+#define HAVE_LONGLONG_REDC_3HW 1
+static void
+redc_3hw(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) {
+
+  int i;
+  mp_limb_t cy, ret[2];
+  for (i = 0; i < 2; ++i) {
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_3(x+i, p, t);
+    assert (x[i] == 0);
+    ret[i] = cy;
+  }
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_smallz_3hw(x+i, p, t);
+    assert (x[i] == 0);
+
+  for (i=0; i< 2; ++i)
+    z[i]=x[i+3];
+  z[i]=cy;
+  add_2(z+1,z+1,ret);
+  if (cmp_3(z,p)>=0)// z shouldn't be gretter than p in the half word case
+    sub_3(z,z,p);
+}
+#endif
+
+#ifndef HAVE_NATIVE_REDC_4HW
+#define HAVE_LONGLONG_REDC_4HW 1
+static void
+redc_4hw(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) {
+
+  int i;
+  mp_limb_t cy, ret[3];
+  for (i = 0; i < 3; ++i) {
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_4(x+i, p, t);
+    assert (x[i] == 0);
+    ret[i] = cy;
+  }
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_smallz_4hw(x+i, p, t);
+    assert (x[i] == 0);
+
+  for (i=0; i< 3; ++i)
+    z[i]=x[i+4];
+  z[i]=cy;
+  add_3(z+1,z+1,ret);
+  if (cmp_4(z,p)>=0)// z shouldn't be gretter than p in the half word case
+    sub_4(z,z,p);
+}
+#endif
+
+#ifndef HAVE_NATIVE_REDC_5HW
+#define HAVE_LONGLONG_REDC_5HW 1
+static void
+redc_5hw(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) {
+
+  int i;
+  mp_limb_t cy, ret[4];
+  for (i = 0; i < 4; ++i) {
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_5(x+i, p, t);
+    assert (x[i] == 0);
+    ret[i] = cy;
+  }
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_smallz_5hw(x+i, p, t);
+    assert (x[i] == 0);
+
+  for (i=0; i< 4; ++i)
+    z[i]=x[i+5];
+  z[i]=cy;
+  add_4(z+1,z+1,ret);
+  if (cmp_5(z,p)>=0)// z shouldn't be gretter than p in the half word case
+    sub_5(z,z,p);
+}
+#endif
+
+#ifndef HAVE_NATIVE_REDC_6HW
+#define HAVE_LONGLONG_REDC_6HW 1
+static void
+redc_6hw(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) {
+
+  int i;
+  mp_limb_t cy, ret[5];
+  for (i = 0; i < 5; ++i) {
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_6(x+i, p, t);
+    assert (x[i] == 0);
+    ret[i] = cy;
+  }
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_smallz_6hw(x+i, p, t);
+    assert (x[i] == 0);
+
+  for (i=0; i< 5; ++i)
+    z[i]=x[i+6];
+  z[i]=cy;
+  add_5(z+1,z+1,ret);
+  if (cmp_6(z,p)>=0)// z shouldn't be gretter than p in the half word case
+    sub_6(z,z,p);
+}
+#endif
+
+#ifndef HAVE_NATIVE_REDC_7HW
+#define HAVE_LONGLONG_REDC_7HW 1
+static void
+redc_7hw(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) {
+
+  int i;
+  mp_limb_t cy, ret[6];
+  for (i = 0; i < 6; ++i) {
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_7(x+i, p, t);
+    assert (x[i] == 0);
+    ret[i] = cy;
+  }
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_smallz_7hw(x+i, p, t);
+    assert (x[i] == 0);
+
+  for (i=0; i< 6; ++i)
+    z[i]=x[i+7];
+  z[i]=cy;
+  add_6(z+1,z+1,ret);
+  if (cmp_7(z,p)>=0)// z shouldn't be gretter than p in the half word case
+    sub_7(z,z,p);
+}
+#endif
+
+#ifndef HAVE_NATIVE_REDC_8HW
+#define HAVE_LONGLONG_REDC_8HW 1
+static void
+redc_8hw(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) {
+
+  int i;
+  mp_limb_t cy, ret[7];
+  for (i = 0; i < 7; ++i) {
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_8(x+i, p, t);
+    assert (x[i] == 0);
+    ret[i] = cy;
+  }
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_smallz_8hw(x+i, p, t);
+    assert (x[i] == 0);
+
+  for (i=0; i< 7; ++i)
+    z[i]=x[i+8];
+  z[i]=cy;
+  add_7(z+1,z+1,ret);
+  if (cmp_8(z,p)>=0)// z shouldn't be gretter than p in the half word case
+    sub_8(z,z,p);
+}
+#endif
+
+#ifndef HAVE_NATIVE_REDC_9HW
+#define HAVE_LONGLONG_REDC_9HW 1
+static void
+redc_9hw(mp_limb_t *z, mp_limb_t *x, const mp_limb_t *mip, const mp_limb_t *p) {
+
+  int i;
+  mp_limb_t cy, ret[8];
+  for (i = 0; i < 8; ++i) {
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_9(x+i, p, t);
+    assert (x[i] == 0);
+    ret[i] = cy;
+  }
+    mp_limb_t t = x[i]*mip[0];
+    cy = addmul1_smallz_9hw(x+i, p, t);
+    assert (x[i] == 0);
+
+  for (i=0; i< 8; ++i)
+    z[i]=x[i+9];
+  z[i]=cy;
+  add_8(z+1,z+1,ret);
+  if (cmp_9(z,p)>=0)// z shouldn't be gretter than p in the half word case
+    sub_9(z,z,p);
+}
+#endif
+
 #ifndef HAVE_NATIVE_MGY_ENCODE_1
 #define HAVE_LONGLONG_MGY_ENCODE_1 1
 static void
@@ -5262,6 +7817,141 @@ mgy_encode_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p)
 }
 #endif
 
+#ifndef HAVE_NATIVE_MGY_ENCODE_1HW
+#define HAVE_LONGLONG_MGY_ENCODE_1HW 1
+static void
+mgy_encode_1hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) 
+{
+  mp_limb_t t[2];
+  int i;
+  for (i = 0; i < 1; ++i) {
+    t[i] = 0;
+    t[i+1] = x[i];
+  }
+  mod_1(z, t, p);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MGY_ENCODE_2HW
+#define HAVE_LONGLONG_MGY_ENCODE_2HW 1
+static void
+mgy_encode_2hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) 
+{
+  mp_limb_t t[4];
+  int i;
+  for (i = 0; i < 2; ++i) {
+    t[i] = 0;
+    t[i+2] = x[i];
+  }
+  mod_2(z, t, p);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MGY_ENCODE_3HW
+#define HAVE_LONGLONG_MGY_ENCODE_3HW 1
+static void
+mgy_encode_3hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) 
+{
+  mp_limb_t t[6];
+  int i;
+  for (i = 0; i < 3; ++i) {
+    t[i] = 0;
+    t[i+3] = x[i];
+  }
+  mod_3(z, t, p);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MGY_ENCODE_4HW
+#define HAVE_LONGLONG_MGY_ENCODE_4HW 1
+static void
+mgy_encode_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) 
+{
+  mp_limb_t t[8];
+  int i;
+  for (i = 0; i < 4; ++i) {
+    t[i] = 0;
+    t[i+4] = x[i];
+  }
+  mod_4(z, t, p);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MGY_ENCODE_5HW
+#define HAVE_LONGLONG_MGY_ENCODE_5HW 1
+static void
+mgy_encode_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) 
+{
+  mp_limb_t t[10];
+  int i;
+  for (i = 0; i < 5; ++i) {
+    t[i] = 0;
+    t[i+5] = x[i];
+  }
+  mod_5(z, t, p);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MGY_ENCODE_6HW
+#define HAVE_LONGLONG_MGY_ENCODE_6HW 1
+static void
+mgy_encode_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) 
+{
+  mp_limb_t t[12];
+  int i;
+  for (i = 0; i < 6; ++i) {
+    t[i] = 0;
+    t[i+6] = x[i];
+  }
+  mod_6(z, t, p);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MGY_ENCODE_7HW
+#define HAVE_LONGLONG_MGY_ENCODE_7HW 1
+static void
+mgy_encode_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) 
+{
+  mp_limb_t t[14];
+  int i;
+  for (i = 0; i < 7; ++i) {
+    t[i] = 0;
+    t[i+7] = x[i];
+  }
+  mod_7(z, t, p);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MGY_ENCODE_8HW
+#define HAVE_LONGLONG_MGY_ENCODE_8HW 1
+static void
+mgy_encode_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) 
+{
+  mp_limb_t t[16];
+  int i;
+  for (i = 0; i < 8; ++i) {
+    t[i] = 0;
+    t[i+8] = x[i];
+  }
+  mod_8(z, t, p);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MGY_ENCODE_9HW
+#define HAVE_LONGLONG_MGY_ENCODE_9HW 1
+static void
+mgy_encode_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *p) 
+{
+  mp_limb_t t[18];
+  int i;
+  for (i = 0; i < 9; ++i) {
+    t[i] = 0;
+    t[i+9] = x[i];
+  }
+  mod_9(z, t, p);
+}
+#endif
+
 #ifndef HAVE_NATIVE_MGY_DECODE_1
 #define HAVE_LONGLONG_MGY_DECODE_1 1
 static void
@@ -5358,6 +8048,105 @@ mgy_decode_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *invR, const mp_l
   mp_limb_t t[18];
   mul_9(t, x, invR);
   mod_9(z, t, p);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MGY_DECODE_1HW
+#define HAVE_LONGLONG_MGY_DECODE_1HW 1
+static void
+mgy_decode_1hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *invR, const mp_limb_t *p) 
+{
+  mp_limb_t t[1];
+  mul_1hw(t, x, invR);
+  mod_1hw(z, t, p);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MGY_DECODE_2HW
+#define HAVE_LONGLONG_MGY_DECODE_2HW 1
+static void
+mgy_decode_2hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *invR, const mp_limb_t *p) 
+{
+  mp_limb_t t[3];
+  mul_2hw(t, x, invR);
+  mod_2hw(z, t, p);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MGY_DECODE_3HW
+#define HAVE_LONGLONG_MGY_DECODE_3HW 1
+static void
+mgy_decode_3hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *invR, const mp_limb_t *p) 
+{
+  mp_limb_t t[5];
+  mul_3hw(t, x, invR);
+  mod_3hw(z, t, p);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MGY_DECODE_4HW
+#define HAVE_LONGLONG_MGY_DECODE_4HW 1
+static void
+mgy_decode_4hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *invR, const mp_limb_t *p) 
+{
+  mp_limb_t t[7];
+  mul_4hw(t, x, invR);
+  mod_4hw(z, t, p);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MGY_DECODE_5HW
+#define HAVE_LONGLONG_MGY_DECODE_5HW 1
+static void
+mgy_decode_5hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *invR, const mp_limb_t *p) 
+{
+  mp_limb_t t[9];
+  mul_5hw(t, x, invR);
+  mod_5hw(z, t, p);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MGY_DECODE_6HW
+#define HAVE_LONGLONG_MGY_DECODE_6HW 1
+static void
+mgy_decode_6hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *invR, const mp_limb_t *p) 
+{
+  mp_limb_t t[11];
+  mul_6hw(t, x, invR);
+  mod_6hw(z, t, p);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MGY_DECODE_7HW
+#define HAVE_LONGLONG_MGY_DECODE_7HW 1
+static void
+mgy_decode_7hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *invR, const mp_limb_t *p) 
+{
+  mp_limb_t t[13];
+  mul_7hw(t, x, invR);
+  mod_7hw(z, t, p);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MGY_DECODE_8HW
+#define HAVE_LONGLONG_MGY_DECODE_8HW 1
+static void
+mgy_decode_8hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *invR, const mp_limb_t *p) 
+{
+  mp_limb_t t[15];
+  mul_8hw(t, x, invR);
+  mod_8hw(z, t, p);
+}
+#endif
+
+#ifndef HAVE_NATIVE_MGY_DECODE_9HW
+#define HAVE_LONGLONG_MGY_DECODE_9HW 1
+static void
+mgy_decode_9hw(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *invR, const mp_limb_t *p) 
+{
+  mp_limb_t t[17];
+  mul_9hw(t, x, invR);
+  mod_9hw(z, t, p);
 }
 #endif
 

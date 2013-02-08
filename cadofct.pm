@@ -56,6 +56,14 @@ if (! defined $ENV{CADO_KEEPTTY}) {
         $can_use_tiocnotty=0;
     }
 }
+# If we are running under MSYS/MinGW, we set this to 1, otherwise 0.
+# This will influence parameters passed to some tools to avoid reliance on 
+# functionality that is not present in MinGW 
+my $on_mingw = 0;
+if (defined $ENV{MSYSTEM} && 
+    ($ENV{MSYSTEM} eq "MINGW32" || $ENV{MSYSTEM} eq "MINGW64")) {
+    $on_mingw = 1;
+}
 
 ###############################################################################
 # Message and error handling ##################################################
@@ -237,6 +245,7 @@ my @default_param = (
     coverNmax    => 100,
     nslices_log  => 1,
     filterlastrels => 1,
+    dup_rm => $on_mingw, # Give -rm parameter to dup2 when on MinGW
 
     # linalg
     linalg       => 'bwc',
@@ -428,6 +437,7 @@ sub read_machines {
     # There are several steps for checking jobs.
     my $dir_check_commands={};
     while (<FILE>) {
+        s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
         # Remove comments and empty lines
         s/^\s+//; s/\s*(#.*)?$//;
         next if /^$/;
@@ -522,6 +532,7 @@ sub read_machines {
         open FILE, "< $param{'bindir'}/linalg/bwc/bwc.pl"
                 or die "Cannot open `$param{'bindir'}/linalg/bwc/bwc.pl' for reading: $!.\n";
         while (<FILE>) {
+                s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
                 next unless /^my \$mpiexec='';$/;
                 die "CADO-NFS has not been compiled with MPI flag.\n".
                 "Please add the path of the MPI library in the file local.sh ".
@@ -815,6 +826,7 @@ sub read_jobs {
     open FILE, "< $file"
         or die "Cannot open `$file' for reading: $!.\n";
     while (<FILE>) {
+        s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
         s/^\s+//; s/\s*(#.*)?$//;
         next if /^$/;
 
@@ -1028,6 +1040,7 @@ sub count_lines {
     open FILE, "< $f"
        	or die "Cannot open `$f' for reading: $!.\n";
     while (<FILE>) {
+        s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
         $n++ unless $re && /$re/;
     }
     close FILE;
@@ -1047,6 +1060,7 @@ sub first_line {
     open FILE, "< $f" or die "Cannot open `$f' for reading: $!.\n";
     $_ = <FILE>;
     close FILE;
+    s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
     chomp;
     return $_;
 }
@@ -1066,6 +1080,7 @@ sub last_line {
     seek FILE, -512, 2;
     $last = $_ while <FILE>;
     close FILE;
+    $last =~ s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
     chomp $last;
     return $last;
 }
@@ -1697,6 +1712,7 @@ sub do_init {
             or die "Cannot open `$param{'prefix'}.n' for reading: $!.\n";
         $_ = <FILE>;
         close FILE;
+        s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
         chomp;
         die "Cannot parse `$param{'prefix'}.n'.\n" unless /^n:\s*(\d+)$/;
 
@@ -1920,6 +1936,7 @@ my $polysel_check = sub {
     open FILE, "< $f"
         or die "Cannot open `$f' for reading: $!.\n";
     while (<FILE>) {
+        s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
         if (/^No polynomial found/) {
             warn "No polynomial in file `$f'.\n".
 	     "please increase [polsel_]adrange or [polsel_]maxnorm.\n"
@@ -2024,6 +2041,7 @@ sub do_polysel {
         my $last;
         my $line;
         while ($line=<FILE>) {
+            $line =~ s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
             if ($line =~ /Murphy/ ) {
                 $last = $line;
                 last;
@@ -2210,7 +2228,8 @@ sub dup {
             or die "Cannot open `$f' for reading: $!.\n";
         my $i=0;
         while (<FILE>) {
-           if ( $_ =~ /^# (Number of primes in \S+ factor base = \d+)$/ ) {
+            s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
+            if ( $_ =~ /^# (Number of primes in \S+ factor base = \d+)$/ ) {
                 $i++;
                 last if $i==2;
             }
@@ -2238,6 +2257,7 @@ sub dup {
             open FILE, "< $param{'prefix'}.newfilelist"
                 or die "Cannot open `$param{'prefix'}.newfilelist' for reading: $!.\n";
             while (<FILE>) {
+                s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
                 chomp $_;
                 copy "$param{'wdir'}/$_", "$param{'prefix'}.nodup/0/$_"
                     or die "Cannot copy `$param{'wdir'}/$_'.\n";
@@ -2265,10 +2285,14 @@ sub dup {
     my $K = int ( 100 + (1.2 * $nrels / $nslices) );
     for (my $i=0; $i < $nslices; $i++) {
         info "removing duplicates on slice $i..." if ($verbose);
+        my $rm_param = "";
+        if ($param{'dup_rm'} != 0) {
+          $rm_param = "-rm "
+        };
         cmd("$param{'bindir'}/filter/dup2 ".
             "-K $K -out $param{'prefix'}.nodup/$i ".
             "-filelist $param{'prefix'}.filelist ".
-            "-basepath $param{'prefix'}.nodup/$i ",
+            "-basepath $param{'prefix'}.nodup/$i ". $rm_param,
             { cmdlog => 1, kill => 1,
               logfile => "$param{'prefix'}.dup2_$i.log",
             });
@@ -2296,6 +2320,7 @@ sub purge {
         open FILE, "< $f"
             or die "Cannot open `$f' for reading: $!.\n";
         while (<FILE>) {
+            s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
             if ( $_ =~ /^\s+(\d+) remaining relations/ ) {
                 $last = $1;
             }
@@ -2395,6 +2420,7 @@ sub do_sieve {
                 or die "Cannot open `$check' for writing: $!.\n";
             my $n = 10;
             while (<FILE>) {
+                s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
                 $n--, print TMP $_ unless /^#/;
                 last unless $n;
             }
@@ -2438,6 +2464,7 @@ sub do_sieve {
             my @lastq;
             my $pos = 0;
             while (<FILE>) {
+                s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
                 last unless (/^[-#0-9]/);
                 # Keep track of the last two special q's
                 if (/^### q=(\d+): roots?/) {
@@ -2616,6 +2643,7 @@ sub do_sieve_bench {
                 or die "Cannot open `$check' for writing: $!.\n";
             my $n = 10;
             while (<FILE>) {
+                s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
                 $n--, print TMP $_ unless /^#/;
                 last unless $n;
             }
@@ -2978,6 +3006,7 @@ sub do_sqrt {
         open FILE, "< $f"
             or die "Cannot open `$f' for reading: $!.\n";
         while (<FILE>) {
+            s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
             chomp($_);
             push @factors_thisdep, $_ unless ( /^Failed/ );
         }

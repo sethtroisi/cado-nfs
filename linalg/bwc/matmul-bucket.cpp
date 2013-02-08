@@ -24,6 +24,7 @@
 #include <list>
 #include <algorithm>    // sort
 #include <iostream>     // cout
+#include "macros.h"
 #include "utils.h"
 #include "bwc_config.h"
 using namespace std;

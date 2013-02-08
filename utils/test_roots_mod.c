@@ -1,10 +1,14 @@
+#include "cado.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <inttypes.h>
+#include <string.h>
 #include <gmp.h>
 #include "getprime.h"
 #include "gmp_aux.h"
 #include "rootfinder.h"
+#include "portability.h"
 
 int
 roots_mod_uint64 (uint64_t *r, uint64_t a, int d, uint64_t p);
@@ -46,10 +50,18 @@ roots_mod_mpz(uint64_t *r, uint64_t a, int d, uint64_t p)
 
 
 int main(int argc, char **argv) {
-  unsigned long a, p, d, *r1, *r2;
+  uint64_t *r1, *r2;
+  unsigned long a, p, d;
   int n1, n2, i;
   unsigned long minp = 100, maxp=10000, mina=1, maxa=100, mind=1, maxd=10;
+  int check = 1;
   
+  if (argc > 1 && strcmp(argv[1], "-nc") == 0) {
+    printf ("Checking results disabled.\n");
+    check = 0;
+    argc--;
+    argv++;
+  }
   if (argc > 1)
     minp = strtoul (argv[1], NULL, 10);
   if (argc > 2)
@@ -66,7 +78,7 @@ int main(int argc, char **argv) {
   printf ("minp = %lu, maxp = %lu, mina = %lu, maxa = %lu, mind = %lu, maxd = %lu\n",
           minp, maxp, mina, maxa, mind, maxd);
 
-  r1 = malloc (sizeof(unsigned long) * maxd);
+  r1 = malloc (sizeof(uint64_t) * maxd);
   r2 = malloc (sizeof(unsigned long) * maxd);
   
   for (p = 2; p < minp; p = getprime(p));
@@ -75,24 +87,26 @@ int main(int argc, char **argv) {
     for (a = mina; a <= maxa && a < p; a++) {
       for (d = mind; d <= maxd; d++) {
         n1 = roots_mod_uint64 (r1, a, d, p);
-        n2 = roots_mod_mpz (r2, a, d, p);
-        if (n1 != n2) {
-          fprintf (stderr, "Error: for a=%lu, d=%lu, p=%lu, roots_mod_uint64()"
-                   " reports %d roots, roots_mod_mpz() reports %d\n", 
-                   a, d, p, n1, n2);
-          exit (EXIT_FAILURE);
-        }
-        for (i = 0; i < n1 && r1[i] == r2[i]; i++);
-        if (i != n1) {
-          fprintf (stderr, "Error: for a=%lu, d=%lu, p=%lu, roots_mod_uint64()"
-                   " reports roots: ", a, d, p);
-          for (i = 0; i < n1; i++)
-            fprintf (stderr, "%lu ", r1[i]);
-          fprintf (stderr, ", roots_mod_mpz() reports ");
-          for (i = 0; i < n2; i++)
-            fprintf (stderr, "%lu ", r2[i]);
-          fprintf (stderr, "\n");
-          exit (EXIT_FAILURE);
+        if (check) {
+          n2 = roots_mod_mpz (r2, a, d, p);
+          if (n1 != n2) {
+            fprintf (stderr, "Error: for a=%lu, d=%lu, p=%lu, roots_mod_uint64()"
+                     " reports %d roots, roots_mod_mpz() reports %d\n", 
+                     a, d, p, n1, n2);
+            exit (EXIT_FAILURE);
+          }
+          for (i = 0; i < n1 && r1[i] == r2[i]; i++);
+          if (i != n1) {
+            fprintf (stderr, "Error: for a=%lu, d=%lu, p=%lu, roots_mod_uint64()"
+                     " reports roots: ", a, d, p);
+            for (i = 0; i < n1; i++)
+              fprintf (stderr, "%" PRIu64 " ", r1[i]);
+            fprintf (stderr, ", roots_mod_mpz() reports ");
+            for (i = 0; i < n2; i++)
+              fprintf (stderr, "%" PRIu64 " ", r2[i]);
+            fprintf (stderr, "\n");
+            exit (EXIT_FAILURE);
+          }
         }
       }
     }

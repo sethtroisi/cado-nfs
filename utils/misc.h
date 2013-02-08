@@ -3,10 +3,12 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdarg.h>
 #include <limits.h>
 #include <errno.h>
-#include "macros.h"
 #include <gmp.h>
+#include "macros.h"
+#include "portability.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,7 +40,15 @@ static inline void* pointer_arith(void * a, ptrdiff_t q) {
 static inline const void* pointer_arith_const(const void * a, ptrdiff_t q) {
     return (const void*)(((const char*)a)+q);
 }
-extern char * cado_strndup(const char * a, size_t n);
+
+/* MinGW's string.h does not declare a prototype for strdup if __STRICT_ANSI__
+   is defined */
+#if !defined(HAVE_STRDUP) || (defined(__MINGW32__) && defined(__STRICT_ANSI__))
+char * strdup(const char *s);
+#endif
+#ifndef HAVE_STRNDUP
+char * strndup(const char * a, size_t n);
+#endif
 
 extern char * derived_filename(const char * prefix, const char * what, const char * ext);
 extern int has_suffix(const char * path, const char * sfx);
@@ -49,6 +59,7 @@ extern void filelist_clear(char ** filelist);
 
 extern void * malloc_check(const size_t x);
 
+extern long pagesize (void);
 extern void * malloc_aligned(size_t size, size_t alignment);
 extern void free_aligned(void * ptr, size_t size, size_t alignment);
 
@@ -110,6 +121,7 @@ static inline int ctzl(unsigned long x)
 #define HAVE_ctzl_fallback
 #endif
 #endif  /* HAVE_ctzl */
+
 
 #ifdef __cplusplus
 }

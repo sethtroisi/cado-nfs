@@ -4,6 +4,7 @@
 #include <math.h>
 #include "fast_rootsieve.h"
 #include "auxiliary.h"
+#include "portability.h"
 #define PLB 2 // Prime lower bound
 #define PUB 2 // Prime upper bound
 #define DEGREE 4 

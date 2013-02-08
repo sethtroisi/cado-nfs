@@ -13,7 +13,7 @@ int lift_rootz(mpz_t * f, int d, mpz_t pk, mpz_t r);
 int mp_poly_cmp (mpz_t *f, mpz_t *g, int d);
 void mp_poly_homogeneous_eval_siui (mpz_t v, mpz_t *f, const unsigned int d, const int64_t i, const uint64_t j);
 void
-mp_poly_homography (mpz_t *fij, mpz_t *f, const int d, int32_t H[4]);
+mp_poly_homography (mpz_t *fij, mpz_t *f, const int d, int64_t H[4]);
 
 #ifdef __cplusplus
 }

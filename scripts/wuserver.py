@@ -5,6 +5,8 @@ import socketserver
 import os
 import sys
 import re
+import io
+import logging
 from urllib.parse import unquote_plus
 from workunit import Workunit
 import datetime
@@ -21,31 +23,49 @@ dbfilename='wudb'
 class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     """Handle requests in a separate thread."""
 
-debug = 1
-def diag(level, text, var = None):
-    if debug > level:
-        if var is None:
-            print (text, file=sys.stderr)
+class HttpServerLogger(object):
+    def __init__(self, level):
+        self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(level)
+        formatter = logging.Formatter(fmt='%(address_string)s - - [%(asctime)s] %(message)s')
+        ch = logging.StreamHandler()
+        ch.setFormatter(formatter)
+        self.logger.addHandler(ch)
+    
+    def log(self, lvl, *args, **kwargs):
+        self.logger.log(lvl, *args, **kwargs)
+
+class HtmlGen(io.BytesIO):
+    def __init__(self, encoding = None):
+        super().__init__()
+        if encoding is None:
+            self.encoding = 'utf-8'
         else:
-            print (text + str(var), file=sys.stderr)
-        sys.stderr.flush()
+            self.encoding = encoding
 
-class HtmlGen:
-    def __init__(self):
-        self.body = \
-            '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" ' + \
-            '"http://www.w3.org/TR/html4/strict.dtd">\n' + \
-            '<html>\n' + \
-            '<head>\n' + \
-            '<title>List of workunits</title>\n' + \
-            '</head>\n' + \
-            '<body>'
+    def header(self):
+        self.write(
+            b'<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN" ' + 
+            b'"http://www.w3.org/TR/html4/strict.dtd">\n' + 
+            b'<html>\n' + 
+            b'<head>\n' + 
+            b'<meta http-equiv="content-type" content="text/html; ' + 
+              b'charset=' + self.encoding.encode("ascii") + b'">\n' 
+            b'<title>List of workunits</title>\n' + 
+            b'</head>\n' + 
+            b'<body>')
 
-    def __str__(self):
-        return self.body + '</body>'
+    def finish(self):
+        self.write(b'</body>')
+
+    def __bytes__(self):
+        return self.getvalue()
+
+    def get_len(self):
+        return len(self.getvalue())
 
     def append(self, str):
-        self.body = self.body + str
+        self.write(str.encode(self.encoding))
 
     def start_table(self, fields):
         self.append('<table border="1">\n<tr>')
@@ -79,8 +99,29 @@ class HtmlGen:
 
 
 class MyHandler(http.server.CGIHTTPRequestHandler):
+
+    def log(self, lvl, format, *args, **kwargs):
+        """ Interface to the logger class. 
+            We add the client address (as a string) to the log record so the 
+            logger can print that """
+        e = kwargs.copy()
+        e["address_string"] = self.address_string()
+        logger.log(lvl, format, *args, extra=e)
+
+    # These three methods overwrite the corresponding methods from 
+    # http.server.BaseHTTPRequestHandler
+    # They just call self.log() with a numerical logging level added
+    def log_message(self, format, *args):
+        self.log(logging.INFO, *args, **kwargs)
+
+    def log_request(self, code='-', size='-'):
+        self.log(logging.INFO, '"%s" %s %s', self.requestline, str(code), str(size))
+
+    def log_error(self, format, *args):
+        self.log(logging.ERROR, format, *args)
+
     def send_body(self, body):
-        self.wfile.write(bytes(body, "utf-8"))
+        self.wfile.write(body)
         self.wfile.flush()
 
     def do_GET(self):
@@ -152,7 +193,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         if not clientid.isalnum():
             return self.send_error(400, "Malformed client id specified")
         
-        # wu = wudb.WuActiveRecord(db)
+        # wu = wudb.WuAccess(db)
         wu_text = db_pool.assign(clientid)
         if not wu_text:
             return self.send_error(404, "No work available")
@@ -164,13 +205,15 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         self.send_header("Content-Length", len(wu_text))
         self.send_header("Cache-Control", "no-cache")
         self.end_headers()
-        self.send_body(wu_text)
+        # FIXME: is ASCII enough for workunits? Is there any shell syntax
+        # that needs more, or should we allow non-ASCII workunit names?
+        self.send_body(bytes(wu_text, "ascii"))
 
     def send_status(self):
         self.send_query()
 
     def send_query(self):
-        diag(1, "self.cgi_info = ", self.cgi_info)
+        logging.debug("self.cgi_info = "  + str(self.cgi_info))
         filename = self.cgi_info[1]
         if "#" in filename:
             # Get rid of fragment part
@@ -184,8 +227,8 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             # Now look at individual key=value pairs
             for q in query.split("&"):
                 q = unquote_plus(q)
-                diag(1, "Processing token ", q)
-                for (name, op) in wudb.WuDb.name_to_operator.items():
+                logging.debug("Processing token " + str(q))
+                for (name, op) in wudb.MyCursor.name_to_operator.items():
                     if op in q:
                         (key, value) = q.split(op, 1)
                         if not name in conditions:
@@ -208,20 +251,21 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
 
         if not wus is None and len(wus) > 0:
             body.append(str(len(wus)) + " records match.")
-            keys = wus[0].tuple_keys()
+            keys = wus[0].keys()
             body.start_table(keys)
             for wu in wus:
-                body.wu_row(wu.as_dict(), keys, self.cwd)
+                body.wu_row(wu, keys, self.cwd)
             body.end_table()
         else:
             body.append("No records match.")
+        body.finish()
         
         self.send_response(200)
         self.send_header("Content-Type", "text/html")
         self.send_header("Cache-Control", "no-cache")
-        self.send_header("Content-Length", len(str(body)))
+        self.send_header("Content-Length", body.get_len())
         self.end_headers()
-        self.send_body(str(body))
+        self.send_body(body.__bytes__())
 
 if __name__ == '__main__':
     from sys import argv
@@ -233,6 +277,8 @@ if __name__ == '__main__':
         ServerClass = ThreadedHTTPServer
     else:
         ServerClass = http.server.HTTPServer
+
+    logger = HttpServerLogger(logging.INFO)
 
     if argv[1:]:
         PORT = int(argv[1])

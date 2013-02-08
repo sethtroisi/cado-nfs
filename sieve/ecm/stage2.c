@@ -9,6 +9,7 @@
 #include "../basicnt.h"
 #include "utils.h"
 #include "stage2.h"
+#include "portability.h"
 
 #if 0
 /* Looks for x in the sorted array a which has length l. Requires that

@@ -128,7 +128,7 @@ void mpfq_2_128_get_uipoly_wide(mpfq_2_128_dst_field, unsigned long *, mpfq_2_12
 
 /* Assignment of random values */
 static inline
-void mpfq_2_128_random(mpfq_2_128_dst_field, mpfq_2_128_dst_elt);
+void mpfq_2_128_random(mpfq_2_128_dst_field, mpfq_2_128_dst_elt, gmp_randstate_t);
 #define HAVE_mpfq_2_128_random2
 static inline
 void mpfq_2_128_random2(mpfq_2_128_dst_field, mpfq_2_128_dst_elt);
@@ -244,7 +244,7 @@ void mpfq_2_128_vec_scal_mul(mpfq_2_128_dst_field, mpfq_2_128_dst_vec, mpfq_2_12
 static inline
 void mpfq_2_128_vec_conv(mpfq_2_128_dst_field, mpfq_2_128_dst_vec, mpfq_2_128_src_vec, unsigned int, mpfq_2_128_src_vec, unsigned int);
 static inline
-void mpfq_2_128_vec_random(mpfq_2_128_dst_field, mpfq_2_128_dst_vec, unsigned int);
+void mpfq_2_128_vec_random(mpfq_2_128_dst_field, mpfq_2_128_dst_vec, unsigned int, gmp_randstate_t);
 #define HAVE_mpfq_2_128_vec_random2
 static inline
 void mpfq_2_128_vec_random2(mpfq_2_128_dst_field, mpfq_2_128_dst_vec, unsigned int);
@@ -321,7 +321,7 @@ void mpfq_2_128_poly_mod_pre(mpfq_2_128_dst_field, mpfq_2_128_dst_poly, mpfq_2_1
 /* missing poly_gcd */
 /* missing poly_xgcd */
 static inline
-void mpfq_2_128_poly_random(mpfq_2_128_dst_field, mpfq_2_128_dst_poly, unsigned int);
+void mpfq_2_128_poly_random(mpfq_2_128_dst_field, mpfq_2_128_dst_poly, unsigned int, gmp_randstate_t);
 #define HAVE_mpfq_2_128_poly_random2
 static inline
 void mpfq_2_128_poly_random2(mpfq_2_128_dst_field, mpfq_2_128_dst_poly, unsigned int);
@@ -453,9 +453,10 @@ void mpfq_2_128_get_uipoly_wide(mpfq_2_128_dst_field K MAYBE_UNUSED, unsigned lo
 
 /* *Mpfq::gf2n::trivialities::code_for_random */
 static inline
-void mpfq_2_128_random(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt r)
+void mpfq_2_128_random(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt r, gmp_randstate_t state)
 {
-    mpn_random(r, 2);
+    r[0] = gmp_urandomb_ui(state, GMP_LIMB_BITS);
+    r[1] = gmp_urandomb_ui(state, GMP_LIMB_BITS);
 }
 
 /* *Mpfq::gf2n::trivialities::code_for_random2 */
@@ -1372,11 +1373,11 @@ void mpfq_2_128_vec_conv(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_vec
 
 /* *Mpfq::defaults::vec::getset::code_for_vec_random, Mpfq::defaults::vec, Mpfq::defaults */
 static inline
-void mpfq_2_128_vec_random(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_vec w, unsigned int n)
+void mpfq_2_128_vec_random(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_vec w, unsigned int n, gmp_randstate_t state)
 {
     unsigned int i;
     for(i = 0; i < n; ++i)
-        mpfq_2_128_random(K, w[i]);
+        mpfq_2_128_random(K, w[i], state);
 }
 
 /* *Mpfq::defaults::vec::getset::code_for_vec_random2, Mpfq::defaults::vec, Mpfq::defaults */
@@ -1841,14 +1842,14 @@ void mpfq_2_128_poly_mul(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_pol
 
 /* *Mpfq::defaults::poly::code_for_poly_random */
 static inline
-void mpfq_2_128_poly_random(mpfq_2_128_dst_field k MAYBE_UNUSED, mpfq_2_128_dst_poly w, unsigned int n)
+void mpfq_2_128_poly_random(mpfq_2_128_dst_field k MAYBE_UNUSED, mpfq_2_128_dst_poly w, unsigned int n, gmp_randstate_t state)
 {
     n++;
     if (w->alloc < n) {
         mpfq_2_128_vec_reinit(k, &(w->c), w->alloc, n);
         w->alloc = n;
     }
-    mpfq_2_128_vec_random(k, w->c, n);
+    mpfq_2_128_vec_random(k, w->c, n,state);
     w->size=n;
     int wdeg = mpfq_2_128_poly_deg(k, w);
     w->size=wdeg+1;

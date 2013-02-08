@@ -10,6 +10,7 @@
 #include "matmul-common.h"
 #include "abase.h"
 #include "worker-threads.h"
+#include "portability.h"
 #include "utils.h"
 
 /* This extension is used to distinguish between several possible

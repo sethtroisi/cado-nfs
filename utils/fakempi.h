@@ -6,6 +6,7 @@
 #include <errno.h>
 #include "cado_mpi_config.h"
 #include "macros.h"
+#include "portability.h"
 
 typedef int MPI_Status;
 typedef int MPI_Datatype;

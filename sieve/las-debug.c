@@ -12,6 +12,7 @@
 #include "las-debug.h"
 #include "las-coordinates.h"
 #include "mpz_poly.h"
+#include "portability.h"
 
 #if defined(__GLIBC__) && (defined(TRACE_K) || defined(CHECK_UNDERFLOW))
 #include <execinfo.h>   /* For backtrace. Since glibc 2.1 */
@@ -77,7 +78,7 @@ int test_divisible(where_am_I_ptr w)
 {
     fbprime_t p = w->p;
     if (p==0) return 1;
-    const unsigned int logI = w->si->logI;
+    const unsigned int logI = w->si->conf->logI;
     const unsigned int I = 1U << logI;
 
     const unsigned long X = w->x + (w->N << LOG_BUCKET_REGION);

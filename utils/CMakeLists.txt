@@ -3,15 +3,15 @@ set (sources
         cado_poly.c relation.c timing.c plain_poly.c getprime.c mod_ul.c
         modredc_ul.c modredc_15ul.c modredc_2ul2.c modul_poly.c gmp_aux.c
         mpz_poly.c fpoly.c rootfinder.c params.c gcd_int64.c gcd_uint64.c
-        discriminant.c random_generation.c mpz_array.c gzip.c misc.c
+        discriminant.c mpz_array.c gzip.c misc.c
         hashpair.c poly.c crc.c purgedfile.c bit_vector.c
-        barrier.c usp.c fix-endianness.c cut_n_roots.c memusage.c
+        barrier.c usp.c fix-endianness.c memusage.c
         cachesize_cpuid.c cachesize_guess.c roots_mod.c
 )
 
 # the utils library is used by some shared objects (prominently the
 # matmul shared libs in bwc), and therefore must be shared.
-add_library (utils SHARED ${sources})
+add_library (utils ${CADO_SHARED} ${sources})
 target_link_libraries(utils pthread gmp m)
 install(TARGETS utils DESTINATION lib/${package_basename})
 
@@ -23,6 +23,7 @@ target_link_libraries(complete_rels utils)
 
 add_executable(cut_n_roots cut_n_roots.c)
 target_link_libraries(cut_n_roots utils)
+
 
 add_executable(roots roots.c)
 target_link_libraries(roots utils)

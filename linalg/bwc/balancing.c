@@ -5,6 +5,7 @@
 #include <errno.h>
 
 #include "balancing.h"
+#include "portability.h"
 #include "utils.h"
 
 void balancing_set_row_col_count(balancing_ptr bal)
@@ -56,7 +57,7 @@ void balancing_write_inner(balancing_ptr bal, const char * filename)
 {
     FILE * pfile;
     fprintf(stderr, "Writing balancing data to %s\n", filename);
-    pfile = fopen(filename, "w");
+    pfile = fopen(filename, "wb");
     if (pfile == NULL) {
         perror(filename);
         abort();

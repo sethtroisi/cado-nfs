@@ -19,24 +19,32 @@ static int abase_u64k1_impl_mpi_use_count;   /* several stacked init()/clear() p
 /* Active handler: simd_dotprod */
 /* Active handler: io */
 /* Active handler: trivialities */
-/* Active handler: simd_flat */
 /* Options used: w=64 k=1 tag=u64k1 vbase_stuff={
                  'vc:includes' => [
                                     '<stdarg.h>'
                                   ],
                  'member_templates_restrict' => {
                                                   'p_1' => [
-                                                             'p_1'
+                                                             {
+                                                               'cpp_ifdef' => 'COMPILE_MPFQ_PRIME_FIELDS',
+                                                               'tag' => 'p_1'
+                                                             }
                                                            ],
                                                   'p_4' => [
-                                                             'p_4'
+                                                             {
+                                                               'cpp_ifdef' => 'COMPILE_MPFQ_PRIME_FIELDS',
+                                                               'tag' => 'p_4'
+                                                             }
                                                            ],
                                                   'u64k2' => [
                                                                'u64k1',
                                                                'u64k2'
                                                              ],
                                                   'p_3' => [
-                                                             'p_3'
+                                                             {
+                                                               'cpp_ifdef' => 'COMPILE_MPFQ_PRIME_FIELDS',
+                                                               'tag' => 'p_3'
+                                                             }
                                                            ],
                                                   'u64k1' => $vbase_stuff->{'member_templates_restrict'}{'u64k2'}
                                                 },
@@ -624,10 +632,10 @@ static void abase_u64k1_wrapper_set_zero(abase_vbase_ptr vbase MAYBE_UNUSED, aba
     abase_u64k1_set_zero(vbase->obj, r);
 }
 
-static void abase_u64k1_wrapper_random(abase_vbase_ptr, abase_u64k1_dst_elt);
-static void abase_u64k1_wrapper_random(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k1_dst_elt r MAYBE_UNUSED)
+static void abase_u64k1_wrapper_random(abase_vbase_ptr, abase_u64k1_dst_elt, gmp_randstate_t);
+static void abase_u64k1_wrapper_random(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k1_dst_elt r MAYBE_UNUSED, gmp_randstate_t state MAYBE_UNUSED)
 {
-    abase_u64k1_random(vbase->obj, r);
+    abase_u64k1_random(vbase->obj, r, state);
 }
 
 static void abase_u64k1_wrapper_add(abase_vbase_ptr, abase_u64k1_dst_elt, abase_u64k1_src_elt, abase_u64k1_src_elt);
@@ -804,10 +812,10 @@ static void abase_u64k1_wrapper_vec_sub(abase_vbase_ptr vbase MAYBE_UNUSED, abas
     abase_u64k1_vec_sub(vbase->obj, w, u, v, n);
 }
 
-static void abase_u64k1_wrapper_vec_random(abase_vbase_ptr, abase_u64k1_dst_vec, unsigned int);
-static void abase_u64k1_wrapper_vec_random(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k1_dst_vec w MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+static void abase_u64k1_wrapper_vec_random(abase_vbase_ptr, abase_u64k1_dst_vec, unsigned int, gmp_randstate_t);
+static void abase_u64k1_wrapper_vec_random(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k1_dst_vec w MAYBE_UNUSED, unsigned int n MAYBE_UNUSED, gmp_randstate_t state MAYBE_UNUSED)
 {
-    abase_u64k1_vec_random(vbase->obj, w, n);
+    abase_u64k1_vec_random(vbase->obj, w, n, state);
 }
 
 static int abase_u64k1_wrapper_vec_cmp(abase_vbase_ptr, abase_u64k1_src_vec, abase_u64k1_src_vec, unsigned int);
@@ -1041,7 +1049,7 @@ void abase_u64k1_oo_field_init(abase_vbase_ptr vbase)
     /* missing set_mpz */
     /* missing get_mpn */
     /* missing get_mpz */
-    vbase->random = (void (*) (abase_vbase_ptr, void *)) abase_u64k1_wrapper_random;
+    vbase->random = (void (*) (abase_vbase_ptr, void *, gmp_randstate_t)) abase_u64k1_wrapper_random;
     vbase->add = (void (*) (abase_vbase_ptr, void *, const void *, const void *)) abase_u64k1_wrapper_add;
     vbase->sub = (void (*) (abase_vbase_ptr, void *, const void *, const void *)) abase_u64k1_wrapper_sub;
     vbase->neg = (void (*) (abase_vbase_ptr, void *, const void *)) abase_u64k1_wrapper_neg;
@@ -1089,7 +1097,7 @@ void abase_u64k1_oo_field_init(abase_vbase_ptr vbase)
     vbase->vec_sub = (void (*) (abase_vbase_ptr, void *, const void *, const void *, unsigned int)) abase_u64k1_wrapper_vec_sub;
     /* missing vec_scal_mul */
     /* missing vec_conv */
-    vbase->vec_random = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_u64k1_wrapper_vec_random;
+    vbase->vec_random = (void (*) (abase_vbase_ptr, void *, unsigned int, gmp_randstate_t)) abase_u64k1_wrapper_vec_random;
     vbase->vec_cmp = (int (*) (abase_vbase_ptr, const void *, const void *, unsigned int)) abase_u64k1_wrapper_vec_cmp;
     vbase->vec_is_zero = (int (*) (abase_vbase_ptr, const void *, unsigned int)) abase_u64k1_wrapper_vec_is_zero;
     vbase->vec_asprint = (void (*) (abase_vbase_ptr, char * *, const void *, unsigned int)) abase_u64k1_wrapper_vec_asprint;

@@ -4,7 +4,6 @@
 #include "parallelizing_info.h"
 #include "matmul_top.h"
 #include "select_mpi.h"
-#include "random_generation.h"
 #include "gauss.h"
 #include "gauss.h"
 #include "params.h"
@@ -14,6 +13,7 @@
 #include "filenames.h"
 #include "mpfq/mpfq.h"
 #include "mpfq/abase_vbase.h"
+#include "portability.h"
 
 void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUSED)
 {
@@ -72,11 +72,16 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
             0,
             bw->m * prep_lookahead_iterations);
 
+    gmp_randstate_t rstate;
+    gmp_randinit_default(rstate);
+    gmp_randseed_ui(rstate, bw->seed ? bw->seed : time(NULL));
+
+
     for (unsigned ntri = 0;; ntri++) {
         serialize_threads(pi->m);
 
         if (tcan_print) {
-            printf("// Generating new x,y vector pair (trial # %u -- seed %lu)\n", ntri, (unsigned long) myrand());
+            printf("// Generating new x,y vector pair (trial # %u -- seed %lu)\n", ntri, (unsigned long) rand());
         }
         if (ntri >= my_nx * 10) {
             ++my_nx;
@@ -91,7 +96,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
         // Otherwise, it's on the right.
 
         // generate indices w.r.t *unpadded* dimensions !
-        setup_x_random(xvecs, bw->m, my_nx, mmt->n0[bw->dir], pi);
+        setup_x_random(xvecs, bw->m, my_nx, mmt->n0[bw->dir], pi, rstate);
 
         /* Random generation + save is better done as writing random data
          * to a file followed by reading it: this way, seeding works
@@ -108,7 +113,7 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
              * This provides reproducibility of random choices.
              */
             if (pi->m->jrank == 0)
-                A->vec_random(A, y, mmt->n0[bw->dir]);
+                A->vec_random(A, y, mmt->n0[bw->dir], rstate);
             int err = MPI_Bcast(y,
                     mmt->n[bw->dir],
                     A->mpi_datatype(A),
@@ -203,6 +208,8 @@ void * prep_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNUS
         }
     }
 
+    gmp_randclear(rstate);
+
     save_x(xvecs, bw->m, my_nx, pi);
 
     matmul_top_clear(mmt);
@@ -232,11 +239,9 @@ int main(int argc, char * argv[])
     bw_common_init_mpi(bw, pl, &argc, &argv);
     if (param_list_warn_unused(pl)) usage();
 
-    if (bw->seed) setup_seeding(bw->seed);
-
     setvbuf(stdout,NULL,_IONBF,0);
     setvbuf(stderr,NULL,_IONBF,0);
-
+    
     pi_go(prep_prog, pl, 0);
 
     param_list_remove_key(pl, "sequential_cache_build");

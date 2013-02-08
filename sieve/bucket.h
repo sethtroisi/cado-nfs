@@ -9,6 +9,10 @@
 #include <stdint.h>
 
 // #define SAFE_BUCKETS
+#ifdef SAFE_BUCKETS
+#include <stdio.h>
+#include "portability.h"
+#endif
 
 #define ONE_BIG_MALLOC  1  // single big malloc for all the bucket_start[i]
 

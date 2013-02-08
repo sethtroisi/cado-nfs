@@ -5,6 +5,7 @@
 #include <inttypes.h>
 
 #include "hashpair.h"
+#include "portability.h"
 #include "utils.h"
 
 void

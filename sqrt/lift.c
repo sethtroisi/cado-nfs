@@ -5,6 +5,7 @@
 #include <math.h>
 #include <string.h>
 #include "utils.h"
+#include "portability.h"
 #include "macros.h"
 #include "powers_of_p.h"
 

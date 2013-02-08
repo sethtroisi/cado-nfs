@@ -5,8 +5,10 @@
  */
 
 
+#include "cado.h"
 #include "ropt_quadratic.h"
 #include "ropt.h"
+#include "portability.h"
 
 
 /**

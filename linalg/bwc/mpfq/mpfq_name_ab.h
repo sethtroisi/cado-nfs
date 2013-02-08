@@ -78,7 +78,7 @@
 #define abget_uipoly_wide(a0,a1,a2)	abcommon_name_(get_uipoly_wide) (a0,a1,a2)
 
 
-#define abrandom(a0,a1)	abcommon_name_(random) (a0,a1)
+#define abrandom(a0,a1,a2)	abcommon_name_(random) (a0,a1,a2)
 #define abrandom2(a0,a1)	abcommon_name_(random2) (a0,a1)
 
 #define abadd(a0,a1,a2,a3)	abcommon_name_(add) (a0,a1,a2,a3)
@@ -146,7 +146,7 @@
 #define abvec_sub(a0,a1,a2,a3,a4)	abcommon_name_(vec_sub) (a0,a1,a2,a3,a4)
 #define abvec_scal_mul(a0,a1,a2,a3,a4)	abcommon_name_(vec_scal_mul) (a0,a1,a2,a3,a4)
 #define abvec_conv(a0,a1,a2,a3,a4,a5)	abcommon_name_(vec_conv) (a0,a1,a2,a3,a4,a5)
-#define abvec_random(a0,a1,a2)	abcommon_name_(vec_random) (a0,a1,a2)
+#define abvec_random(a0,a1,a2,a3)	abcommon_name_(vec_random) (a0,a1,a2,a3)
 #define abvec_random2(a0,a1,a2)	abcommon_name_(vec_random2) (a0,a1,a2)
 #define abvec_cmp(a0,a1,a2,a3)	abcommon_name_(vec_cmp) (a0,a1,a2,a3)
 #define abvec_is_zero(a0,a1,a2)	abcommon_name_(vec_is_zero) (a0,a1,a2)
@@ -192,7 +192,7 @@
 #define abpoly_mod_pre(a0,a1,a2,a3,a4)	abcommon_name_(poly_mod_pre) (a0,a1,a2,a3,a4)
 #define abpoly_gcd(a0,a1,a2,a3)	abcommon_name_(poly_gcd) (a0,a1,a2,a3)
 #define abpoly_xgcd(a0,a1,a2,a3,a4,a5)	abcommon_name_(poly_xgcd) (a0,a1,a2,a3,a4,a5)
-#define abpoly_random(a0,a1,a2)	abcommon_name_(poly_random) (a0,a1,a2)
+#define abpoly_random(a0,a1,a2,a3)	abcommon_name_(poly_random) (a0,a1,a2,a3)
 #define abpoly_random2(a0,a1,a2)	abcommon_name_(poly_random2) (a0,a1,a2)
 #define abpoly_cmp(a0,a1,a2)	abcommon_name_(poly_cmp) (a0,a1,a2)
 #define abpoly_asprint(a0,a1,a2)	abcommon_name_(poly_asprint) (a0,a1,a2)

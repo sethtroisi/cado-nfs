@@ -134,7 +134,10 @@ LEXLE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
 #define EXPECT(x,val)	__builtin_expect(x,val)
 #endif
 #ifndef ATTR_PRINTF
-#define ATTR_PRINTF(a,b) __attribute__((format(printf,a,b)))
+#define ATTR_PRINTF(a,b) __attribute__((__format__(__printf__,a,b)))
+#endif
+#ifndef ATTRIBUTE
+#define ATTRIBUTE(x) __attribute__ (x)
 #endif
 #else
 #ifndef NO_INLINE
@@ -148,6 +151,9 @@ LEXLE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
 #endif
 #ifndef ATTR_PRINTF
 #define ATTR_PRINTF(a,b) /**/
+#endif
+#ifndef ATTRIBUTE
+#define ATTRIBUTE(x)
 #endif
 #endif
 

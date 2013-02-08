@@ -30,6 +30,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include "bwc_config.h"
+#include "macros.h"
 #include "utils.h"
 #include "bw-common.h"
 #include "filenames.h"

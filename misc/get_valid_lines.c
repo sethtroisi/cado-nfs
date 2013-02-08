@@ -1,6 +1,8 @@
+#include "cado.h"
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#include "portability.h"
 
 #define N 1024
 

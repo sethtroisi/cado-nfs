@@ -28,6 +28,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 
 #include <gmp.h>
 #include "mod_ul.c"
+#include "portability.h"
 #include "utils.h"
 #include "sieve/fb.h"
 
@@ -251,7 +252,7 @@ is_prime_power (uint32_t q)
 void
 addFreeRelations(char *roots, int deg)
 {
-    factorbase_degn_t *fb = fb_read(roots, 1.0, 0), *fbptr;
+    factorbase_degn_t *fb = fb_read(roots, 1.0, 0, 0, 0), *fbptr;
     fbprime_t p;
     int i;
 

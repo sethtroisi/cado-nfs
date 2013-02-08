@@ -26,6 +26,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <math.h>
 #include "gmp.h"
 #include "macros.h" /* for ASSERT_ALWAYS */
+#include "portability.h"
 #include "utils.h"
 #include "auxiliary.h"
 #include "rootsieve.h"

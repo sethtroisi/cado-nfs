@@ -1,4 +1,5 @@
 #define __STDC_LIMIT_MACROS
+#include "cado.h"
 #include <string.h>
 #include <limits.h>
 #include <math.h>               /* ceil */
@@ -11,6 +12,7 @@
 #include "las-norms.h"
 #include "utils.h"
 #include "mpz_poly.h"
+#include "portability.h"
 
 /************************** sieve info stuff *********************************/
 
@@ -24,10 +26,9 @@ sieve_info_init_lognorm (unsigned char *C, unsigned char threshold,
                          unsigned long l MAYBE_UNUSED,
                          double scale MAYBE_UNUSED)
 {
-  unsigned long k;
-
-  for (k = 0; k < 256; k++)
-    C[k] = (k <= threshold) ? 0 : 127;
+  /* for (k = 0; k < 256; k++) C[k] = (k <= threshold) ? 0 : 127; */
+  memset (C, 0, threshold + 1);
+  memset (C + threshold + 1, 127, 256 - (threshold + 1));
 
 #ifdef COFACTOR_TRICK
   {
@@ -80,9 +81,8 @@ sieve_info_init_lognorm_prob (unsigned char *C, const unsigned long *rels,
  * the norms.
  */
 void
-init_norms (sieve_info_ptr si)
+init_norms (sieve_info_ptr si, int s)
 {
-  for(int s = 0 ; s < 2 ; s++) {
       sieve_side_info_ptr sdata = si->sides[s];
 
       unsigned char *S = sdata->lognorm_table;
@@ -117,7 +117,6 @@ init_norms (sieve_info_ptr si)
               }
           }
       }
-  }
 }
 
 /* }}} */
@@ -133,171 +132,276 @@ void init_rat_norms_bucket_region(unsigned char *S,
                                  const int N,
                                  sieve_info_ptr si)
 {
-    sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
-
-    uint64_t mask = (1 << NORM_BITS) - 1;
-    union { double z; uint64_t x; } zx[1];
-    int l = NORM_BITS - (int) ceil(log2(rat->logmax));
-    /* The degree d is always 1 */
-
-    const unsigned char * L = rat->lognorm_table;
-
-    int32_t I = si->I;
-    int halfI = I / 2;
-    int logI = si->logI;
-
-    int i MAYBE_UNUSED;
-
-    unsigned int j0 = N << (LOG_BUCKET_REGION - logI);
-    unsigned int j1 = j0 + (1 << (LOG_BUCKET_REGION - logI));
-
-    /* parity means:
-     * 1 : (i,j) actually represents (real_i,real_j) = (2i+1,2j)
-     * 2 : (i,j) actually represents (real_i,real_j) = (2i,2j+1)
-     * 3 : (i,j) actually represents (real_i,real_j) = (2i+1,2j+1)
-     */
-    /* G_q(ri,rj) = g1 * (a0*ri+a1*rj) + g0 * (b0*ri+b1*rj)
-       = (g1*a0+g0*b0) * ri + (g1*a1+g0*b1) * rj
-       = gi * i + gj * rj
-       = 2 * gi * i + 2 * gj * j + some offset gc;
-     */
-
-    double u[2] = {
-        si->sides[RATIONAL_SIDE]->fijd[0],  // gj
-        si->sides[RATIONAL_SIDE]->fijd[1],  // gi
-    };
-
-    /* Note that if ratq holds, then fijd has q divided out already */
-
-    /* bucket_region is a multiple of I. Let's find the starting j
-     * corresponding to N and the last j.
-     */
-#ifdef UGLY_HACK
-    memset(S, 255, 1 << LOG_BUCKET_REGION);
-#else
-    unsigned int j = j0;
-    /* if j = 0, it will be the first value */
-    if (j == 0) {
-	// compute only the norm for i = 1. Everybody else is 255.
-        memset(S, 255, I);
-	double norm = (log2(fabs(u[1]))) * rat->scale;
-	S[halfI + 1] = GUARD + (unsigned char) (norm);
-        S+=I;
-	++j;
+  sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
+  int halfI = (si->I)>>1,
+    int_i;
+  unsigned int						\
+    j0 = N << (LOG_BUCKET_REGION - si->conf->logI),
+    j1 = j0 + (1 << (LOG_BUCKET_REGION - si->conf->logI)),
+    j = j0,
+    oy, y;
+  double						\
+    u0 = si->sides[RATIONAL_SIDE]->fijd[0], // gj
+    u1 = si->sides[RATIONAL_SIDE]->fijd[1], // gi
+    u0j = u0 * j,
+    d0_init = pow(2, -1/rat->scale),
+    g, rac, d0, d1, i;
+  size_t ts;
+  
+  /* if j = 0, it will be the first value */
+  if (!j) {
+    // compute only the norm for i = 1. Everybody else is 255.
+    memset(S, 255, halfI<<1);
+    S[halfI + 1] = trunc(log2(fabs(u1)) * rat->scale) + GUARD;
+    S+= halfI<<1;
+    j++;
+  }
+  for( ; j < j1 ; j++, u0j += u0) {
+    /* unsigned char *CS = S; */
+    __asm__("### Begin rational norm loop\n");
+    g = u0j - u1 * halfI;
+    rac = u0j / -u1;
+    d0 = d0_init;
+    d1 = (1 - d0) * rac;
+    int_i = -halfI;
+    if (g > 0) {
+      y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
+      if (rac > -halfI) goto cas1; else goto cas4;
     }
-    for( ; j < j1 ; j++) {
-	zx->z = u[0] * (double) j - u[1] * (double) halfI;
-	__asm__("### Begin rational norm loop\n");
-/* LAZY_NORMS does not seem to be so interesting on the rational side,
- * since wrong values generate a lot of additional work thereafter */
-#if 0   
-        uint64_t y;
-        unsigned char n, oldn = 0;
-        const int normstride=128; // must be a power of 2 dividing I.
-        double gii = gi * normstride;
-        for (i = 0; i < (int) si->I; i+=normstride) {
-            y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
-            n = rat->S[y & mask];
-            ASSERT (n > 0);
-            if (i > 0 && oldn != n) {
-                // the lognorm has changed: recompute more precisely the
-                // previous stride.
-                zx->z -= gii;
-                S -= normstride;
-                for (int ii = 0; ii < normstride; ++ii) {
-                    y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
-                    n = rat->S[y & mask];
-                    ASSERT (n > 0);
-                    zx->z += gi;
-                    *S++ = n;
-                }
-                y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
-                n = rat->S[y & mask];
-                ASSERT (n > 0);
-            }
-            for (int ii = 0; ii < normstride; ++ii)
-                *S++ = n; 
-            zx->z += gii;
-            oldn = n;
-        }
-#else
-#ifndef SSE_NORM_INIT
-	uint64_t y;
-	unsigned char n;
-	for (i = 0; i < (int) I; i++) {
-	    /* the double precision number 1.0 has high bit 0 (sign),
-	       then 11-bit biased exponent 1023, and 52-bit mantissa 0 */
-	    /* the magic constant here is simply 1023*2^52, where
-	       1023 is the exponent bias in binary64 */
-	    y = (zx->x - (uint64_t) 0x3FF0000000000000) >> (52 - l);
-	    n = L[y & mask];
-	    ASSERT(n > 0);
-	    *S++ = n;
-	    zx->z += u[1];
+    else {
+      g = -g;
+      y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
+      if (rac > -halfI) goto cas3; else goto cas2;
+    }
+  cas1:
+    for (i = int_i;; y--) {
+      i = i * d0 + d1;
+      ts = -int_i;
+      int_i = (int) trunc(i); 
+      if (UNLIKELY(int_i >= halfI)) {
+	ts += halfI;
+	/* fprintf (stderr, "A1.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", halfI - ts, halfI, ts, y, rac); */
+	memset((void *) S, y, ts);
+	S += ts;
+	goto finratnorm;
+      }
+      ts += int_i;
+      /* fprintf (stderr, "A1 : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", int_i - ts, int_i, ts, y, rac); */
+      if (UNLIKELY(ts <= 16))
+	switch (ts) {
+	case 16 : S[15] = y; 
+	case 15 : S[14] = y; 
+	case 14 : S[13] = y; 
+	case 13 : S[12] = y; 
+	case 12 : S[11] = y; 
+	case 11 : S[10] = y; 
+	case 10 : S[9] = y; 
+	case 9 : S[8] = y; 
+	case 8 : S[7] = y; 
+	case 7 : S[6] = y; 
+	case 6 : S[5] = y; 
+	case 5 : S[4] = y; 
+	case 4 : S[3] = y; 
+	case 3 : S[2] = y; 
+	case 2 : S[1] = y; 
+	case 1 : S[0] = y; 
+	  break;
+	case 0 : goto np1;
 	}
-#else
-	union {
-	    __v2df dble;
-	    __v2di intg;
-	    struct {
-		uint64_t y0;
-		uint64_t y1;
-	    } intpair;
-	} y_vec;
-        if ((j & 1) == 1) {
-            __v2df gi_vec = { 2*u[1], 2*u[1] };
-            __v2di mask_vec = { mask, mask };
-            __v2di cst_vec = { (uint64_t) 0x3FF0000000000000,
-                (uint64_t) 0x3FF0000000000000 };
-           
-            // in spite of the appearance, only the low word gives the shift
-            // count. The high word is ignored.
-            __v2di shift_value = { (uint64_t)(52 - l), (uint64_t)(52 - l) };
-            __v2df z_vec = { zx->z, zx->z+u[1] };
-             
-            for (i = 0; i < halfI; ++i) {
-                y_vec.dble = z_vec;
-                y_vec.intg -= cst_vec;
-                y_vec.intg = _mm_srl_epi64(y_vec.intg, shift_value);
-                y_vec.intg &= mask_vec;
-                //            *S++ = L[((uint32_t *)(&y_vec.intg))[0]];
-                //             *S++ = L[((uint32_t *)(&y_vec.intg))[2]];
-                *S++ = L[y_vec.intpair.y0];
-                *S++ = L[y_vec.intpair.y1];
-                z_vec += gi_vec;
-            }
-        } else { // skip when i and j are both even
-            __v2df gi_vec = { 4*u[1], 4*u[1] };
-            __v2di mask_vec = { mask, mask };
-            __v2di cst_vec = { (uint64_t) 0x3FF0000000000000,
-                (uint64_t) 0x3FF0000000000000 };
-
-            // in spite of the appearance, only the low word gives the shift
-            // count. The high word is ignored.
-            __v2di shift_value = { (uint64_t)(52 - l), (uint64_t)(52 - l) };
-            __v2df z_vec = { zx->z + u[1], zx->z+3*u[1] };
-
-            for (i = 0; i < halfI; i+=2) {
-                y_vec.dble = z_vec;
-                y_vec.intg -= cst_vec;
-                y_vec.intg = _mm_srl_epi64(y_vec.intg, shift_value);
-                y_vec.intg &= mask_vec;
-                //            *S++ = L[((uint32_t *)(&y_vec.intg))[0]];
-                //             *S++ = L[((uint32_t *)(&y_vec.intg))[2]];
-                *S++ = 255;
-                *S++ = L[y_vec.intpair.y0];
-                *S++ = 255;
-                *S++ = L[y_vec.intpair.y1];
-                z_vec += gi_vec;
-            }
-        }
-#endif
-#endif
-	__asm__("### End rational norm loop\n");
+      else
+	memset((void *)S, y, ts);
+      S += ts;
     }
-#endif
+  np1:
+    g = u0j + u1 * int_i;
+    if (UNLIKELY(trunc(rac) >= halfI - 1)) {
+      while (int_i < halfI) {
+	y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
+	/* fprintf (stderr, "A2.1 : i=%d, y=%u, rac=%f\n", int_i, y, rac); */
+	*S++ = y;
+	g += u1;
+	int_i++;
+      }
+      goto finratnorm;
+    }
+    while (g > 0) {
+      y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
+      /* fprintf (stderr, "A2.2 : i=%d, y=%u, rac=%f\n", int_i, y, rac); */
+      *S++ = y;
+      g += u1;
+      int_i++;
+    }
+    g = -g;
+  cas2:
+    do {
+      /* fprintf (stderr, "A3 : i=%d, y=%u, rac=%f\n", int_i, y, rac); */
+      *S++ = y;
+      int_i++;
+      if (UNLIKELY(int_i >= halfI)) {
+	ASSERT(int_i == halfI);
+	goto finratnorm;
+      }
+      oy = y;
+      g -= u1;
+      y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
+    } while (oy != y);
+    d0 = 1/d0;
+    d1 = (1 - d0) * rac;
+    y++;
+    i = rac - pow(2, (y - GUARD + 1) / rat->scale) / u1;
+    for (;; y++) {
+      ts = -int_i;
+      int_i = (int) trunc(i);
+      if (UNLIKELY(int_i >= halfI)) {
+	ts += halfI;
+	/* fprintf (stderr, "A4.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", halfI - ts, halfI, ts, y, rac); */
+	memset((void *) S, y, ts);
+	S += ts;
+	goto finratnorm;
+      }
+      ts += int_i;
+      /* fprintf (stderr, "A4 : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", int_i - ts, int_i, ts, y, rac); */
+      if (UNLIKELY(ts <= 16))
+	switch (ts) {
+	case 16 : S[15] = y; 
+	case 15 : S[14] = y; 
+	case 14 : S[13] = y; 
+	case 13 : S[12] = y; 
+	case 12 : S[11] = y; 
+	case 11 : S[10] = y; 
+	case 10 : S[9] = y; 
+	case 9 : S[8] = y; 
+	case 8 : S[7] = y; 
+	case 7 : S[6] = y; 
+	case 6 : S[5] = y; 
+	case 5 : S[4] = y; 
+	case 4 : S[3] = y; 
+	case 3 : S[2] = y; 
+	case 2 : S[1] = y; 
+	case 1 : S[0] = y;
+	}
+      else
+	memset((void *)S, y, ts);
+      S += ts;
+      i = i * d0 + d1;
+    }
+  cas3:
+    for (i = int_i;; y--) {
+      i = i * d0 + d1;
+      ts = -int_i;
+      int_i = (int) trunc(i); 
+      if (UNLIKELY(int_i >= halfI)) {
+	ts += halfI;
+	/* fprintf (stderr, "B1.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", halfI - ts, halfI, ts, y, rac); */
+	memset((void *) S, y, ts);
+	S += ts;
+	goto finratnorm;
+      }
+      ts += int_i;
+      /* fprintf (stderr, "B1 : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", int_i - ts, int_i, ts, y, rac); */
+      if (UNLIKELY(ts <= 16))
+	switch (ts) {
+	case 16 : S[15] = y; 
+	case 15 : S[14] = y; 
+	case 14 : S[13] = y; 
+	case 13 : S[12] = y; 
+	case 12 : S[11] = y; 
+	case 11 : S[10] = y; 
+	case 10 : S[9] = y; 
+	case 9 : S[8] = y; 
+	case 8 : S[7] = y; 
+	case 7 : S[6] = y; 
+	case 6 : S[5] = y; 
+	case 5 : S[4] = y; 
+	case 4 : S[3] = y; 
+	case 3 : S[2] = y; 
+	case 2 : S[1] = y; 
+	case 1 : S[0] = y; 
+	  break;
+	case 0 : goto np2;
+	}
+      else
+	memset((void *)S, y, ts);
+      S += ts;
+    }
+  np2:
+    g = -u0j - u1 * int_i;
+    if (UNLIKELY(trunc(rac) >= halfI - 1)) {
+      while (int_i < halfI) {
+	y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
+	/* fprintf (stderr, "B2.1 : i=%d, y=%u, rac=%f\n", int_i, y, rac); */
+	*S++ = y;
+	g -= u1;
+	int_i++;
+      }
+      goto finratnorm;
+    }
+    while (g > 0) {
+      y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
+      /* fprintf (stderr, "B2.2 : i=%d, y=%u, rac=%f\n", int_i, y, rac); */
+      *S++ = y;
+      g -= u1;
+      int_i++;
+    }
+    g = -g;
+  cas4:
+    do {
+      /* fprintf (stderr, "B3 : i=%d, y=%u, rac=%f\n", int_i, y, rac); */
+      *S++ = y;
+      int_i++;
+      if (UNLIKELY(int_i >= halfI)) {
+	ASSERT(int_i == halfI);
+	goto finratnorm;
+      }
+      oy = y;
+      g += u1;
+      y = (unsigned int) trunc(log2(g) * rat->scale + GUARD);
+    } while (oy != y);
+    d0 = 1/d0;
+    d1 = (1 - d0) * rac;
+    y++;
+    i = rac + pow(2, (y - GUARD + 1) / rat->scale) / u1;
+    for (;; y++) {
+      ts = -int_i;
+      int_i = (int) trunc(i);
+      if (UNLIKELY(int_i >= halfI)) {
+	ts += halfI;
+	/* fprintf (stderr, "B4.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", halfI - ts, halfI, ts, y, rac); */
+	memset((void *) S, y, ts);
+	S += ts;
+	goto finratnorm;
+      }
+      ts += int_i;
+      /* fprintf (stderr, "B4 : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", int_i - ts, int_i, ts, y, rac); */
+      if (ts <= 16)
+	switch (ts) {
+	case 16 : S[15] = y; 
+	case 15 : S[14] = y; 
+	case 14 : S[13] = y; 
+	case 13 : S[12] = y; 
+	case 12 : S[11] = y; 
+	case 11 : S[10] = y; 
+	case 10 : S[9] = y; 
+	case 9 : S[8] = y; 
+	case 8 : S[7] = y; 
+	case 7 : S[6] = y; 
+	case 6 : S[5] = y; 
+	case 5 : S[4] = y; 
+	case 4 : S[3] = y; 
+	case 3 : S[2] = y; 
+	case 2 : S[1] = y; 
+	case 1 : S[0] = y;
+	}
+      else
+	memset((void *)S, y, ts);
+      S += ts;
+      i = i * d0 + d1;
+    }
+  finratnorm:
+    /* if (S - CS != (halfI<<1)) fprintf (stderr, "END norm: cpt = %ld\n", S - CS); */
+    __asm__("### End rational norm loop\n");
+  }
 }
-
 
 /* {{{ some utility stuff */
 #ifdef SSE_NORM_INIT
@@ -362,7 +466,7 @@ init_alg_norms_bucket_region(unsigned char *S,
 
     int32_t I = si->I;
     double halfI = I / 2;
-    int logI = si->logI;
+    int logI = si->conf->logI;
     unsigned int j0 = N << (LOG_BUCKET_REGION - logI);
     unsigned int j1 = j0 + (1 << (LOG_BUCKET_REGION - logI));
 
@@ -489,8 +593,8 @@ init_alg_norms_bucket_region(unsigned char *S,
 
 /* }}} */
 
-/* return max |g(x)| for 0 <= x <= s,
-   where g(x) = g[d]*x^d + ... + g[1]*x + g[0] */
+/* return max |g(x)| for x in (0, s) where s can be negative,
+   and g(x) = g[d]*x^d + ... + g[1]*x + g[0] */
 static double
 get_maxnorm_aux (double *g, const unsigned int d, double s)
 {
@@ -513,9 +617,9 @@ get_maxnorm_aux (double *g, const unsigned int d, double s)
     for (l = 0; l <= d - k; l++)
       dg[k][l] = (l + 1) * dg[k - 1][l + 1];
   /* now dg[d-1][0]+x*dg[d-1][1] is the (d-1)-th derivative: it can have at
-     most one sign change, iff dg[d-1][0] and dg[d-1][0]+dg[d-1][1] have
-     different signs */
-  if (dg[d-1][0] * (dg[d-1][0] + dg[d-1][1]) < 0)
+     most one sign change in (0, s), this happens iff dg[d-1][0] and
+     dg[d-1][0]+s*dg[d-1][1] have different signs */
+  if (dg[d-1][0] * (dg[d-1][0] + s * dg[d-1][1]) < 0)
     {
       sign_change = 1;
       roots[0] = - dg[d-1][0] / dg[d-1][1]; /* root of (d-1)-th derivative */
@@ -559,11 +663,12 @@ get_maxnorm_aux (double *g, const unsigned int d, double s)
   return gmax;
 }
 
-/* returns the maximal value of log2 |F(a,b)/q| for
-   a = a0 * i + a1 * j, b = b0 * i + b1 * j and q >= q0,
+#if 1
+/* returns the maximal value of log2|F(a,b)/q|, or log2|F(a,b)| if ratq=0,
+   for a = a0 * i + a1 * j, b = b0 * i + b1 * j and q >= q0,
    -I/2 <= i <= I/2, 0 <= j <= I/2*min(s*B/|a1|,B/|b1|)
    where B >= sqrt(2*q/s/sqrt(3)) for all special-q in the current range
-   (s is the skewness, and B = si->B, see lattice.tex).
+   (s is the skewness, and B = l_infty_snorm_u).
 
    Since |a0| <= s*B and |b0| <= B, then
    |a0 * i + a1 * j| <= s*B*I and |b0 * i + b1 * j| <= B*I,
@@ -579,11 +684,12 @@ get_maxnorm_aux (double *g, const unsigned int d, double s)
        and is attained in (a) or (c).
 */
 static double
-get_maxnorm (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
+get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, double q0d, double l_infty_snorm_u, int qside)
 {
   unsigned int d = cpoly->alg->degree, k;
   double *fd; /* double-precision coefficients of f */
   double norm, max_norm, pows, tmp;
+  double B = l_infty_snorm_u;
 
   fd = (double*) malloc ((d + 1) * sizeof (double));
   FATAL_ERROR_CHECK(fd == NULL, "malloc failed");
@@ -611,7 +717,7 @@ get_maxnorm (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
       fd[d - k] = tmp;
     }
 
-  /* (a) determine the maximum of |g(y)| for 0 <= y <= 1 */
+  /* (a) determine the maximum of |g(y)| for 0 <= y <= 1, with g(y) = F(s,y) */
   norm = get_maxnorm_aux (fd, d, 1.0);
   if (norm > max_norm)
     max_norm = norm;
@@ -629,78 +735,144 @@ get_maxnorm (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
      as follows should not be much slower (if any), anyway the efficiency of
      that function is not critical */
   for (tmp = max_norm, k = 0; k < d; k++)
-    tmp *= si->B * (double) si->I;
+    tmp *= B * (double) si->I;
   /* divide by q0 if sieving on alg side */
-  if (!si->ratq)
-      tmp /= (double) q0;
-  tmp *= 0.5;
-  return log2 (tmp);
+  if (qside == ALGEBRAIC_SIDE)
+      tmp /= q0d;
+  return log2(tmp);
 }
-
-void sieve_info_init_norm_data(sieve_info_ptr si, unsigned long q0)
+#else
+/* simpler but less accurate version */
+static double
+get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
 {
-    for (int side = 0; side < 2; side++) {
-        int d = si->cpoly->pols[side]->degree;
-        si->sides[side]->fij = (mpz_t *) malloc((d + 1) * sizeof(mpz_t));
-        FATAL_ERROR_CHECK(si->sides[side]->fij == NULL, "malloc failed");
-        si->sides[side]->fijd = (double *) malloc((d + 1) * sizeof(double));
-        FATAL_ERROR_CHECK(si->sides[side]->fijd == NULL, "malloc failed");
-        for (int k = 0; k <= d; k++)
-            mpz_init(si->sides[side]->fij[k]);
+  unsigned int d = cpoly->alg->degree, k;
+  double *fd, maxnorm;
+
+  /* if F(a,b) = f[d]*a^d + f[d-1]*a^(d-1)*b + ... + f[0]*b^d,
+     then |F(a,b)| <= |f[d]|*|a|^d + |f[d-1]|*|a|^(d-1)*b + ... + f[0]*b^d
+     and the maximum is attained for a=s and b=1 (see above) */
+
+  fd = (double*) malloc ((d + 1) * sizeof (double));
+  FATAL_ERROR_CHECK(fd == NULL, "malloc failed");
+  for (k = 0; k <= d; k++)
+    {
+      fd[k] = fabs (mpz_get_d (cpoly->alg->f[k]));
+      fprintf (stderr, "f[%d]=%e\n", k, fd[k]);
+    }
+  maxnorm = fpoly_eval (fd, d, cpoly->skew);
+  fprintf (stderr, "s=%f maxnorm=%e\n", cpoly->skew, maxnorm);
+  free (fd);
+  for (k = 0; k < d; k++)
+    maxnorm *= si->B * (double) si->I;
+  if (!si->ratq)
+    maxnorm /= (double) q0;
+  return log2 (maxnorm);
+}
+#endif
+
+/* this function initializes the scaling factors and report bounds on the
+   rational and algebraic sides */
+void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int qside)
+{
+  for (int side = 0; side < 2; side++)
+    {
+      int d = si->cpoly->pols[side]->degree;
+      si->sides[side]->fij = (mpz_t *) malloc((d + 1) * sizeof(mpz_t));
+      FATAL_ERROR_CHECK(si->sides[side]->fij == NULL, "malloc failed");
+      si->sides[side]->fijd = (double *) malloc((d + 1) * sizeof(double));
+      FATAL_ERROR_CHECK(si->sides[side]->fijd == NULL, "malloc failed");
+      for (int k = 0; k <= d; k++)
+        mpz_init (si->sides[side]->fij[k]);
     }
 
-  double r, scale;
+  double r, maxlog2;
   unsigned char alg_bound, rat_bound;
   sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
   sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
 
-  /* initialize bounds for the norm computation, see lattice.tex */
-  si->B = sqrt (2.0 * (double) q0 / (si->cpoly->skew * sqrt (3.0)));
-  alg->logmax = get_maxnorm (si->cpoly, si, q0); /* log2(max norm) */
+  /* Let u = (a0, b0) and v = (a1, b1) the two vectors obtained from skew
+     Gauss reduction, and u' = (a0, s*b0), v' = (a1, s*b1). Assume |u'|<=|v'|.
+     We know from Gauss reduction that the vectors u' and v' form an
+     angle of at least pi/3, and their determinant is qs, thus:
+     |u'|^2 <= |u'|*|v'| <= qs/sin(pi/3) = 2/sqrt(3)*q*s.
+     Define B := sqrt(2/sqrt(3)*q/s), then |a0| <= s*B and |b0| <= B. */
 
-  /* We want some margin, (see below), so that we can set 255 to discard
-   * non-survivors.*/
-  scale = alg->logmax + si->cpoly->alg->lambda * (double) si->cpoly->alg->lpb;
+  /* this was called si->B earlier. This bounds the skewed-L\infty norm
+   * of u=(a0,b0), following |a0| <= s*B and |b0| <= B.
+   * (IMO we have another notational convention elsewhere regarding what
+   * the skewed norm is. But it's the one which is used here).
+   */
+  double B = sqrt (2.0 * q0d / (si->cpoly->skew * sqrt (3.0)));
 
-  fprintf (si->output, "# Alg. side: log2(maxnorm)=%1.2f logbase=%1.6f",
-           scale, exp2 (scale / LOG_MAX));
-  // second guard, due to the 255 trick!
-  scale = (LOG_MAX - GUARD) / scale;
-  alg_bound = (unsigned char) (si->cpoly->alg->lambda * (double) si->cpoly->alg->lpb *  scale)
-            + GUARD;
-  fprintf (si->output, " bound=%u\n", alg_bound);
-  sieve_info_init_lognorm (alg->Bound, alg_bound, si->cpoly->alg->lim, si->cpoly->alg->lpb,
-                           scale);
-  alg->scale = scale;
+  /************************** rational side **********************************/
 
-  /* similar bound on the rational size: |a| <= s*I*B and |b| <= I*B */
-  scale = fabs (mpz_get_d (si->cpoly->rat->f[1])) * si->cpoly->skew
-        + fabs (mpz_get_d (si->cpoly->rat->f[0]));
-  scale *= si->B * (double) si->I;
-  if (si->ratq)
-      scale /= (double) q0;
-  rat->logmax = scale = log2 (scale);
-  /* on the rational side, we want that the non-reports on the algebraic
-     side, which are set to 255, remain over the report bound R, even if
-     the rational norm is totally smooth. For this, we simply add R to the
-     maximal lognorm to compute the log base */
-  r = si->cpoly->rat->lambda * (double) si->cpoly->rat->lpb; /* base-2 logarithm of the
-                                                report bound */
-  fprintf (si->output, "# Rat. side: log2(maxnorm)=%1.2f ", scale);
-  fprintf (si->output, "logbase=%1.6f", exp2 (scale / LOG_MAX ));
-  /* we subtract again GUARD to avoid that non-reports overlap the report
-     region due to roundoff errors */
-  rat->scale = LOG_MAX / scale;
+  /* Since |a| <= s*I*B and |b| <= I*B, |G(a,b)| <= (|g[1]|*s+|g[0]|) * I*B */
+  r = fabs (mpz_get_d (si->cpoly->rat->f[1])) * si->cpoly->skew
+    + fabs (mpz_get_d (si->cpoly->rat->f[0]));
+  r *= B * (double) si->I;
+  /* if the special-q is on the rational side, divide by it */
+  if (qside == RATIONAL_SIDE)
+    r /= q0d;
+  rat->logmax = maxlog2 = log2 (r);
+  /* we know that |G(a,b)| < 2^(rat->logmax) when si->ratq = 0,
+     and |G(a,b)/q| < 2^(rat->logmax) when si->ratq <> 0 */
+
+  fprintf (output, "# Rat. side: log2(maxnorm)=%1.2f logbase=%1.6f",
+           maxlog2, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
+  /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
+     thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
+  rat->scale = ((1U << ((int) floor(log2(rat->logmax))+1)) - GUARD) / floor(rat->logmax) * 0.999999;
+  /* fprintf (stderr, "rat->scale, my fomula = %f\n", rat->scale); */
+  /* rat->scale = ((double) UCHAR_MAX - GUARD) / maxlog2; */
+  /* fprintf (stderr, "rat->scale, old correct fomula = %f\n", rat->scale); */
+
+  /* we want to select relations with a cofactor of less than r bits on the
+     rational side */
+  r = MIN(si->conf->sides[RATIONAL_SIDE]->lambda * (double) si->conf->sides[RATIONAL_SIDE]->lpb, maxlog2 - GUARD / rat->scale);
   rat_bound = (unsigned char) (r * rat->scale) + GUARD;
-  fprintf (si->output, " bound=%u\n", rat_bound);
-  sieve_info_init_lognorm (rat->Bound, rat_bound, si->cpoly->rat->lim, si->cpoly->rat->lpb,
-                           rat->scale);
-}
+  fprintf (output, " bound=%u\n", rat_bound);
+  double max_rlambda = (maxlog2 - GUARD / rat->scale) / si->cpoly->rat->lpb;
+  if (si->cpoly->rat->lambda > max_rlambda) {
+      fprintf(output, "# Warning, rlambda>%.1f does not make sense (capped to limit)\n", max_rlambda);
+  }
+  sieve_info_init_lognorm (rat->Bound, rat_bound, si->conf->sides[RATIONAL_SIDE]->lim,
+                           si->conf->sides[RATIONAL_SIDE]->lpb, rat->scale);
 
+  /************************** algebraic side *********************************/
+
+  alg->logmax = get_maxnorm_alg (si->cpoly, si, q0d, B, qside); /* log2(max norm) */
+  /* we know that |F(a,b)/q| < 2^(alg->logmax) when si->ratq = 0,
+     and |F(a,b)| < 2^(alg->logmax) when si->ratq <> 0 */
+
+  /* on the algebraic side, we want that the non-reports on the rational
+     side, which are set to 255, remain larger than then report bound 'r',
+     even if the algebraic norm is totally smooth. For this, we artificially
+     increase by 'r' the maximal range */
+  r = MIN(si->conf->sides[ALGEBRAIC_SIDE]->lambda * (double) si->conf->sides[ALGEBRAIC_SIDE]->lpb, alg->logmax);
+  maxlog2 = alg->logmax + r;
+
+  fprintf (output, "# Alg. side: log2(maxnorm)=%1.2f logbase=%1.6f",
+           alg->logmax, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
+  /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
+     thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
+  alg->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
+  /* we want to report relations with a remaining log2-norm after sieving of
+     at most lambda * lpb, which corresponds in the y-range to
+     y >= GUARD + lambda * lpb * scale */
+  alg_bound = (unsigned char) (r * alg->scale) + GUARD;
+  fprintf (output, " bound=%u\n", alg_bound);
+  double max_alambda = (alg->logmax) / si->cpoly->alg->lpb;
+  if (si->cpoly->alg->lambda > max_alambda) {
+      fprintf(output, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
+  }
+  sieve_info_init_lognorm (alg->Bound, alg_bound, si->conf->sides[ALGEBRAIC_SIDE]->lim,
+                           si->conf->sides[ALGEBRAIC_SIDE]->lpb, alg->scale);
+}
 
 void sieve_info_clear_norm_data(sieve_info_ptr si)
 {
-    for (int side = 0; side < 2; side++) {
+    for(int side = 0 ; side < 2 ; side++) {
         sieve_side_info_ptr s = si->sides[side];
         cado_poly_side_ptr ps = si->cpoly->pols[side];
         for (int k = 0; k <= ps->degree; k++)
@@ -710,19 +882,20 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
     }
 }
 
-void sieve_info_update_norm_data(sieve_info_ptr si)
+void
+sieve_info_update_norm_data (sieve_info_ptr si)
 {
-    int32_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
+    int64_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
     /* Update floating point version of algebraic poly (do both, while
      * we're at it...) */
     for (int side = 0; side < 2; side++) {
         sieve_side_info_ptr s = si->sides[side];
         cado_poly_side_ptr ps = si->cpoly->pols[side];
-        mp_poly_homography(s->fij, ps->f, ps->degree, H);
+        mp_poly_homography (s->fij, ps->f, ps->degree, H);
         double invq = 1.0;
-        if (si->ratq == (side == RATIONAL_SIDE))
-            invq /= si->q;
+        if (si->conf->side == side)
+            invq /= mpz_get_d(si->doing->p);
         for (int k = 0; k <= ps->degree; k++)
-            s->fijd[k] = mpz_get_d(s->fij[k]) * invq;
+            s->fijd[k] = mpz_get_d (s->fij[k]) * invq;
     }
 }

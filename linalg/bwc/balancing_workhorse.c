@@ -8,6 +8,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <math.h>
+#include "portability.h"
 
 #include "parallelizing_info.h"
 #include "select_mpi.h"

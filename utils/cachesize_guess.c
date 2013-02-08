@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <inttypes.h>
 #include "utils.h"
+#include "portability.h"
 
 int
 cachesize_guess (int verbose)

@@ -10,6 +10,7 @@
 #include "filenames.h"
 #include "mpfq/mpfq.h"
 #include "mpfq/abase_vbase.h"
+#include "portability.h"
 
 /*
  * Relatively common manipulation in fact. Move to matmul_top ?

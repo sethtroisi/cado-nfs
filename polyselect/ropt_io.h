@@ -25,10 +25,12 @@ void ropt_on_msievepoly ( FILE *file,
                           ropt_param_t param );
 
 
+#if 0
 /* parse stage 2 parameters from argv */
 void ropt_parse_param ( int argc,
                         char **argv,
                         ropt_param_t param );
+#endif
 
 
 

@@ -1,6 +1,7 @@
 #include "cado.h"
 #include <inttypes.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <time.h>
 #include <sys/types.h>
@@ -8,6 +9,7 @@
 #include <errno.h>
 #include <ctype.h>
 
+#include "portability.h"
 #include "macros.h"
 #include "mf.h"
 #include "utils.h"

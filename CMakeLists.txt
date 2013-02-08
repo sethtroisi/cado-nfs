@@ -68,7 +68,14 @@ endif(EXISTS ${CADO_NFS_SOURCE_DIR}/files.dist)
 # of e.g. warnings by the user-defined overrides.
 
 if(CMAKE_COMPILER_IS_GNUCC)
-    set (CMAKE_C_FLAGS   "-std=c99 -g -W -Wall ${CMAKE_C_FLAGS}")
+    # gcc defines __STRICT_ANSI__ with -std=c99, which under MinGW
+    # causes many prototypes and macros not to be defined. Using gnu99
+    # prevents the definition of __STRICT_ANSI__
+    if (MINGW)
+        set (CMAKE_C_FLAGS   "-std=gnu99 -g -W -Wall ${CMAKE_C_FLAGS}")
+    else (MINGW)
+        set (CMAKE_C_FLAGS   "-std=c99 -g -W -Wall ${CMAKE_C_FLAGS}")
+    endif (MINGW)
     set (CMAKE_CXX_FLAGS "-g -W -Wall ${CMAKE_CXX_FLAGS}")
 endif(CMAKE_COMPILER_IS_GNUCC)
 
@@ -80,27 +87,39 @@ include(${CADO_NFS_SOURCE_DIR}/config/gmp.cmake)
 
 #####
 
-set(GF2X_C_FLAGS "${CMAKE_C_FLAGS} -I${GMP_INCDIR}")
-set(GF2X_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${GMP_INCDIR}")
+set(GF2X_C_FLAGS "${CMAKE_C_FLAGS} -I${GMP_INCDIR} -I${CADO_NFS_SOURCE_DIR}")
+set(GF2X_CXX_FLAGS "${CMAKE_CXX_FLAGS} -I${GMP_INCDIR} -I${CADO_NFS_SOURCE_DIR}")
 set(GF2X_CONFIGURE_FLAGS --disable-shared --disable-dependency-tracking CFLAGS=${GF2X_C_FLAGS} CXXFLAGS=${GF2X_CXX_FLAGS} $ENV{GF2X_CONFIGURE_EXTRA_FLAGS})
 get_override(GF2X_CONFIGURE_FLAGS GF2X_CONFIGURE_FLAGS)
 
 #####################################################################
 # Obtain information from the host.
 
-include(CheckFunctionExists)
-
-CHECK_FUNCTION_EXISTS(posix_memalign	HAVE_POSIX_MEMALIGN)
-
-include(${CADO_NFS_SOURCE_DIR}/config/sse2.cmake)
-include(${CADO_NFS_SOURCE_DIR}/config/sse41.cmake)
-include(${CADO_NFS_SOURCE_DIR}/config/gcc-assembly.cmake)
-include(${CADO_NFS_SOURCE_DIR}/config/curl.cmake)
-include(${CADO_NFS_SOURCE_DIR}/config/alloca.cmake)
+include("${CADO_NFS_SOURCE_DIR}/config/sse2.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/sse41.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/gcc-assembly.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/curl.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/alloca.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/math.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/posix.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/rusage_thread.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/gcc-ubuntu-bug.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/sync_fetch.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/asprintf.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/mingw.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/test-rand.cmake")
+
+if(MINGW)
+    unset(BUILD_DYNAMICALLY_LINKABLE_BWC)
+else(MINGW)
+    set(BUILD_DYNAMICALLY_LINKABLE_BWC 1)
+endif(MINGW)
+
+if(BUILD_DYNAMICALLY_LINKABLE_BWC)
+    set(CADO_SHARED SHARED)
+else(BUILD_DYNAMICALLY_LINKABLE_BWC)
+    set(CADO_SHARED)
+endif(BUILD_DYNAMICALLY_LINKABLE_BWC)
 
 ######################################################################
 # Try to detect whether pthreads and/or MPI are available.
@@ -234,3 +253,7 @@ configure_file(
 
 install(PROGRAMS ${CADO_NFS_BINARY_DIR}/factor.sh DESTINATION bin)
 install(PROGRAMS ${CADO_NFS_BINARY_DIR}/fixup_params_file.sh DESTINATION bin)
+
+IF (DEFINED ENV{CMAKE_DUMP_VARIABLES})
+  include("${CADO_NFS_SOURCE_DIR}/config/variables.cmake")
+ENDIF(DEFINED ENV{CMAKE_DUMP_VARIABLES})

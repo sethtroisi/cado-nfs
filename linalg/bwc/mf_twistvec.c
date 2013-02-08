@@ -8,6 +8,7 @@
 #include <assert.h>
 #include <errno.h>
 #include "balancing.h"
+#include "portability.h"
 #include "utils.h"
 
 void usage(const char * progname)

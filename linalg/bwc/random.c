@@ -3,7 +3,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <time.h>
 #include "bwc_config.h"
+#include "portability.h"
 #include "macros.h"
 #include "utils.h"
 
@@ -12,7 +14,7 @@ int verbose = 0;
 /* Returns something centered on 1. */
 static inline double dist_func()
 {
-    long int y = random();
+    long int y = rand();
     y += y == 0;
     double x = (double) y / RAND_MAX;
     /* With this distribution, bizarrely we tend to get a density which
@@ -166,7 +168,8 @@ int main(int argc, char * argv[])
 
     int seed = 0;
     param_list_parse_int(pl, "seed", &seed);
-    if (seed) setup_seeding(seed);
+
+    srand(seed ? seed : time(NULL));
 
     param_list_parse_int(pl, "c", &maxcoeff);
 

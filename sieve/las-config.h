@@ -1,7 +1,7 @@
 #ifndef LAS_CONFIG_H_
 #define LAS_CONFIG_H_
 
-#include "cado_config.h"
+#include "cado.h"
 
 #ifdef HAVE_SSE2
 #define SSE_NORM_INIT
@@ -46,9 +46,9 @@
  * (see also las-coordinates.c)
  */
 #define xxxTRACE_K
-#define TRACE_AB { 5046103,17827 }
+// #define TRACE_AB { 2039914353344275UL,6656604L }
 // #define TRACE_IJ
-#define TRACE_Nx { 0,4849 }
+// #define TRACE_Nx { 0,1655 }
 
 /* Define CHECK_UNDERFLOW to check for underflow when subtracting
    the rounded log(p) from sieve array locations */
@@ -115,6 +115,16 @@
  */
 #define SUPPORT_I16
 
+/* This is currently used to enable some code paths specific to the
+ * descent. The mid-term plan is to remove this compile-time flag.
+ */
+#define xxxDLP_DESCENT
+#define DESCENT_GRACE_TIME_RATIO 0.4
+
+/* Define this to support larger q. This is almost mandatory for the
+ * descent. */
+#define xxxSUPPORT_LARGE_Q
+
 /* Define SKIP_GCD3 to skip updates where 3 divides gcd(i,j) in the
    bucket sieving phase. Slightly slower than not skipping them
    in single-thread mode, but might be useful for multi-threading,
@@ -149,7 +159,7 @@
 
 /* Guard for the logarithms of norms, so that the value does not wrap around
    zero due to roundoff errors. */
-#define GUARD 4
+#define GUARD 4.0
 
 /* GUARD+LOG_MAX should be as near as possible from 256, to get more accuracy
    in the norm computations, but not too much, otherwise a norm might be

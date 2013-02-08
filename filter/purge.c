@@ -57,7 +57,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 
 #include "cado.h"
 #include <gmp.h>
-#include "mod_ul.c"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -66,7 +65,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <time.h>
 #include <pthread.h>
 #include <errno.h>
+#ifdef HAVE_LIBGEN_H
+#include <libgen.h>
+#endif
 
+#include "mod_ul.c"
+#include "portability.h"
 #include "utils.h"
 #ifdef FOR_FFS
 #include "utils_ffs.h"
@@ -227,6 +231,22 @@ static buf_rel_data_t *buf_rel_data;
 static volatile unsigned long cpt_rel_a;
 static volatile unsigned long cpt_rel_b;
 static volatile unsigned int end_insertRelation = 0;
+
+/* copied from utils/antebuffer.c */
+#ifndef HAVE_NANOSLEEP
+  int nanosleep(const struct timespec *req, struct timespec *rem) {
+    if (rem == NULL) {
+      /* Dummy to shut up the warning */
+    }
+#ifdef HAVE_USLEEP
+    unsigned long usec = req->tv_sec * 1000000UL + req->tv_nsec / 1000UL;
+    usleep(usec);
+#else
+    sleep(req->tv_sec);
+#endif
+    return 0;
+  }
+#endif
 
 /* Be careful. 1<<13 = 8µs; in fact, about 30-50 µs at least
    with a very reactive machine. Use for debugging only.
@@ -2060,9 +2080,8 @@ usage (void)
   fprintf (stderr, "       -sos sosfile - to keep track of the renumbering\n");
   fprintf (stderr, "       -raw         - output relations in CADO format\n");
   fprintf (stderr, "       -npthr   nnn - threads number for suppress singletons\n");
-  fprintf (stderr, "       -inprel  file_rel_used : load actives relations\n");
-  fprintf (stderr, "       -outrel  file_rel_used : write actives relations\n");
-  fprintf (stderr, "       -npthr   nnn - threads number for suppress singletons\n");
+  fprintf (stderr, "       -inprel  file_rel_used : load active relations\n");
+  fprintf (stderr, "       -outrel  file_rel_used : write active relations\n");
   fprintf (stderr, "       -npass   nnn - number of step of clique removal (default %d)\n", DEFAULT_NPASS);
   fprintf (stderr, "       -required_excess nnn - percentage of excess required at the end of the first singleton removal step (default %.2f)\n",
   DEFAULT_REQUIRED_EXCESS);
@@ -2105,15 +2124,16 @@ approx_ffs (int d)
 #endif
 
 static void
-set_rep_cado (char *argv0) {
-  char *p;
+set_rep_cado (const char *argv0) {
+  char *p, *q;
 
-  strcpy(rep_cado, argv0);
-  p = strrchr(rep_cado, '/');
-  if (p)
-    strcpy (&(p[1]), "../");
-  else
-    strcat(rep_cado, "../");
+  p = strdup(argv0);
+  q = dirname(p); /* May modify p[...] in-place */
+  strcpy(rep_cado, q);
+  free(p);
+  p = q = NULL;
+  
+  strcat(rep_cado, "/../");
 }
 
 int
@@ -2325,8 +2345,7 @@ main (int argc, char **argv)
 
   tot_alloc0 += mysize;
   fprintf (stderr, "Allocated rel_used of %uMb (total %zuMb so far)\n",
-	   nrelmax >> 20,
-	   tot_alloc0 >> 20);
+	   nrelmax >> 20, tot_alloc0 >> 20);
 
   if (!boutfilerel) {
     SMALLOC(rel_compact, nrelmax, "main 1");
@@ -2334,8 +2353,7 @@ main (int argc, char **argv)
   tot_alloc0 += nrelmax * (sizeof (HR_T *) + sizeof (HC_T));
   /* %zu is the C99 modifier for size_t */
   fprintf (stderr, "Allocated rel_compact of %zu MB (total %zu MB so far)\n",
-	   ((size_t) nrelmax * sizeof (HR_T *)) >> 20,
-	   tot_alloc0 >> 20);
+	   ((size_t) nrelmax * sizeof (HR_T *)) >> 20, tot_alloc0 >> 20);
   }
   /* Build the file list (ugly). It is the concatenation of all
    *  b s p

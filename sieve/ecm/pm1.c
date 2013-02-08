@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "pp1.h"
 #include "pm1.h"
+#include "portability.h"
 
 /* Do we want backtracking when processing factors of 2 in E? */
 #ifndef PM1_BACKTRACKING

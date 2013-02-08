@@ -5,6 +5,7 @@
 #include <gmp.h>
 #include <math.h>
 #include "utils.h"
+#include "portability.h"
 
 /* #define DEBUG */
 

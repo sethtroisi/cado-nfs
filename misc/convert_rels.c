@@ -27,6 +27,7 @@ static const char *format_names[4] = {
 #include <assert.h>
 #include "../utils/gzip.h"
 #include "gmp.h"
+#include "portability.h"
 
 #define MAX_PRIMES 255 /* maximal number of factor base primes */
 #define MAX_LPRIMES 3  /* maximal number of large primes */

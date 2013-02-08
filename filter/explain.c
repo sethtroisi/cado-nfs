@@ -33,6 +33,7 @@ main()
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include "portability.h"
 #include "utils.h"
 
 /* copy my_malloc_int interface from purge {{{ */

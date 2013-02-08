@@ -5,6 +5,7 @@
 
 #include "bwc_config.h"
 #include "matmul.h"
+#include "portability.h"
 #include "macros.h"
 #include "mpfq/mpfq.h"
 #include "mpfq/abase_vbase.h"

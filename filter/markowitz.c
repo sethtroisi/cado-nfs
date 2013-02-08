@@ -3,6 +3,7 @@
 
 #include "merge_opts.h"
 
+#include "portability.h"
 #include "sparse.h"
 #include "filter_matrix.h"
 #include "mst.h"

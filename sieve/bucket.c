@@ -1,5 +1,6 @@
 #include "cado.h"
 #include "bucket.h"
+#include "portability.h"
 
 bucket_array_t
 init_bucket_array(const int n_bucket, const int bucket_size)

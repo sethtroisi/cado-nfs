@@ -12,6 +12,7 @@
 #include <math.h>
 #include <unistd.h>
 
+#include "portability.h"
 #include "utils.h"
 
 #include "merge_opts.h"

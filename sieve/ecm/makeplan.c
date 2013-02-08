@@ -7,6 +7,7 @@
 #include "pp1.h"
 #include "ecm.h"
 #include "prac_bc.h"
+#include "portability.h"
 
 #define PP1_DICT_NRENTRIES 6
 static size_t pp1_dict_len[PP1_DICT_NRENTRIES] = {1, 1, 2, 2, 3, 4};

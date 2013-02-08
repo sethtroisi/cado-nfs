@@ -8,7 +8,7 @@
 #include <inttypes.h>
 #include <gmp.h>
 #include <pthread.h>
-#include "cado.h"
+#include "portability.h"
 #include "utils.h"
 #include "auxiliary.h"
 #include "murphyE.h"
@@ -34,7 +34,7 @@
    NOTA: The good range is between 6 and 10. Don't use values <= 4!
    Values >= 12 are not interesting.
 */
-#define LN2SHASH_NBUCKETS 10
+#define LN2SHASH_NBUCKETS 8
 
 /* hash table slots */
 typedef struct

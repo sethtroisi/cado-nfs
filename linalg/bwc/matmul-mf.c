@@ -10,6 +10,7 @@
 #include <inttypes.h>
 #include "matmul-mf.h"
 #include "mf.h"
+#include "portability.h"
 
 /* This is some scotch tape between the balancing layer and the
  * lower-level matmul layer. It also uses some code from mf. This, in
