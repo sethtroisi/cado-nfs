@@ -31,8 +31,12 @@ class ScreenFormatter(logging.Formatter):
         logging.ERROR : ANSI.BRIGHTRED
         }
 
+    # Format string that switches to a different colour (with ANSI code 
+    # specified in the 'colour' key of the log record) for the log level name, 
+    # then back to default text rendition (ANSI code in 'nocolour')
     colourformatstr = \
         '%(padding)s%(colour)s%(levelnametitle)s%(nocolour)s:%(message)s'
+    # Format string that does not use colour changes
     nocolourformatstr = \
         '%(padding)s%(levelnametitle)s:%(message)s'
 
@@ -43,11 +47,11 @@ class ScreenFormatter(logging.Formatter):
             super().__init__(fmt=self.__class__.nocolourformatstr)
 
     def format(self, record):
-        record.colour = ScreenFormatter.colours[record.levelno]
+        # Add attributes to record that our format string expects
+        record.colour = self.__class__.colours[record.levelno]
         record.levelnametitle = record.levelname.title()
         record.nocolour = ANSI.NORMAL
         if hasattr(record, "indent"):
-            assert isinstance(record.indent, int)
             record.padding = " " * record.indent
         else:
             record.padding = ""
@@ -57,52 +61,136 @@ class FileFormatter(logging.Formatter):
     formatstr = \
        'PID%(process)s %(asctime)s %(levelnametitle)s:%(message)s' 
 
+    def format(self, record):
+        record.levelnametitle = record.levelname.title()
+        return super().format(record)
+
     def __init__(self):
         super().__init__(fmt=self.__class__.formatstr)
 
-class Logger(object):
-    @staticmethod
-    def getLogger(lvl = logging.INFO, filename=None, filelvl = logging.INFO, colour=True):
-        logger = logging.getLogger(__name__)
-        logger.setLevel(logging.DEBUG)
-        ch = logging.StreamHandler()
-        ch.setLevel(lvl)
-        screenformatter = ScreenFormatter(colour=colour)
-        ch.setFormatter(screenformatter)
-        logger.addHandler(ch)
+class HandlerRoot(object):
+    # Root class to strip off the logger argument before we reach object()
+    def __init__(self, logger, **kwargs):
+        super().__init__(**kwargs)
+
+class ScreenHandler(HandlerRoot):
+    def __init__(self, logger, lvl = logging.INFO, colour = True, **kwargs):
+        h = logging.StreamHandler()
+        h.setLevel(lvl)
+        h.setFormatter(ScreenFormatter(colour = colour))
+        logger.addHandler(h)
+        super().__init__(logger, **kwargs)
+
+class FileHandler(HandlerRoot):
+    def __init__(self, logger, filelvl = logging.DEBUG, filename = None, **kwargs):
         if not filename is None:
-            fh = logging.FileHandler(filename)
-            fh.setLevel(filelvl)
-            fileformatter = FileFormatter()
-            fh.setFormatter(fileformatter)
-            logger.addHandler(fh)
-        return logger
+            h = logging.FileHandler(filename)
+            h.setLevel(filelvl)
+            h.setFormatter(FileFormatter())
+            logger.addHandler(h)
+        super().__init__(logger, **kwargs)
+
+class Logger(HandlerRoot):
+    # We mustn't instantiate logging.Logger, but get a reference to a
+    # pre-existing instance via getLogger(). Hence no inheritance from 
+    # logging.Logger
+    def __init__(self, **kwargs):
+        self.logger = logging.getLogger(__name__)
+        # Lowest possible threshold, so handlers get to see everything.
+        # They do the filtering by themselves
+        self.logger.setLevel(logging.DEBUG)
+        # Init the various handlers which may exist as sibling classes, and
+        # tell them what our logging.Logger instance is
+        super().__init__(logger = self.logger, **kwargs)
+    # Delegate all other method calls to the logging.Logger instance we 
+    # have referenced in self.logger
+    def __getattr__(self, name):
+        return getattr(self.logger, name)
+
+# Put the pieces together
+class MyLogger(Logger, ScreenHandler, FileHandler):
+    """ Logger that outputs to both screen and disk file. """
+    pass
 
 class Command(object):
-    def __init__(self, command, logfile=None):
-        # Run the command
-        self.command = command
-        if not logfile is None:
-            f = open(logfile, "a")
-            f.write(self.command + "\n")
-        self.child = subprocess.Popen(self.command, stdout = subprocess.PIPE, 
-            stderr = subprocess.PIPE)
-        if not logfile is None:
-            f.write("# Child process has PID " + str(self.child.pid) + "\n")
-            f.close()
-        logger.info("Running command (PID=" + str(self.child.pid) + "): " + self.command)
+    def __init__(self, args, logfile=None, **kwargs):
+        self.args = args
+        self.logfile = logfile
+        self.kwargs = kwargs
+        # Convert args array to a string for printing if necessary
+        if isinstance(self.args, str):
+            self.cmdline = self.args
+        else:
+            self.cmdline = " ".join(self.args)
+        if not self.logfile is None:
+            self.f = open(logfile, "a")
+            self.f.write("# Command line for id(Command) = " + str(id(self)) + " is:\n" + self.cmdline + "\n")
+            self.f.close()
+
+        self.child = subprocess.Popen(self.args, stdout = subprocess.PIPE, 
+            stderr = subprocess.PIPE, **self.kwargs)
+        
+        if not self.logfile is None:
+            self.f = open(self.logfile, "a")
+            self.f.write("# Child process for id(Command)= " + str(id(self)) + " has PID " + str(self.child.pid) + "\n")
+            self.f.close()
+        logger.info("Running command (PID=" + str(self.child.pid) + "): " + self.cmdline)
 
     def wait(self):
+        if hasattr(self, "returncode"):
+            return self.returncode
         # Wait for command to finish executing, capturing stdout and stderr 
         # in output tuple
         (self.stdout, self.stderr) = self.child.communicate()
-        logger.info("Exit status " + str(self.child.returncode) + " for PID " + str(self.child.pid))
-        return self.child.returncode
+        if not self.logfile is None:
+            self.f = open(self.logfile, "a")
+            self.f.write("# Child process for id(Command)= " + str(id(self)) + " has return code " + str(self.child.returncode) + "\n")
+            self.f.close()
+        if self.child.returncode == 0:
+            logger.info("Process with PID " + str(self.child.pid) + " finished successfully")
+        else:
+            logger.error("Process with PID " + str(self.child.pid) + " finished with return code " + str(self.child.returncode))
+        self.returncode = self.child.returncode
+        return self.returncode
 
-logger = Logger.getLogger(filename = "log", filelvl = logging.DEBUG)
-logger.info("An Info Center!")
-logger.warn("Beware")
-logger.error("All hope abandon", extra={"indent" : 4})
-c = Command("ls", logfile = "commands")
-c.wait()
-print(c.stdout)
+class RemoteCommand(Command):
+    ssh="/usr/bin/ssh"
+    ssh_options = {
+        "ConnectTimeout": 30,
+        "ServerAliveInterval": 10,
+        "PasswordAuthentication": "no"
+    }
+    def __init__(self, command, host, port = None, ssh_options = None, **kwargs):
+        ssh_command = [self.__class__.ssh, host]
+        options = self.__class__.ssh_options.copy()
+        if not ssh_options is None:
+            options.update(ssh_options)
+        if not port is None:
+            ssh_command += ["-p", str(port)];
+        for (opt, val) in options.items():
+            if not val is None:
+                ssh_command += ["-o", opt + "=" + str(val)]
+        if isinstance(command, str):
+            ssh_command.append(command)
+        else:
+            ssh_command += command
+        super().__init__(ssh_command, **kwargs)
+
+if __name__ == '__main__':
+    logger = MyLogger(filename = "log", filelvl = logging.DEBUG, lvl=logging.INFO)
+#    logger = MyLogger(lvl=logging.INFO)
+    logger.info("An Info Center!")
+    logger.warn("Beware")
+    logger.error("All hope abandon", extra={"indent" : 4})
+
+    c = Command(["ls", "/"], logfile = "commands")
+    rc = c.wait()
+    print("Stdout: " + str(c.stdout, encoding="utf-8"))
+    print("Stderr: " + str(c.stderr, encoding="utf-8"))
+    del(c)
+
+    c = RemoteCommand(["ls", "/"], "localhost", logfile = "commands")
+    rc = c.wait()
+    print("Stdout: " + str(c.stdout, encoding="utf-8"))
+    print("Stderr: " + str(c.stderr, encoding="utf-8"))
+    del(c)

@@ -56,6 +56,14 @@ if (! defined $ENV{CADO_KEEPTTY}) {
         $can_use_tiocnotty=0;
     }
 }
+# If we are running under MSYS/MinGW, we set this to 1, otherwise 0.
+# This will influence parameters passed to some tools to avoid reliance on 
+# functionality that is not present in MinGW 
+my $on_mingw = 0;
+if (defined $ENV{MSYSTEM} && 
+    ($ENV{MSYSTEM} eq "MINGW32" || $ENV{MSYSTEM} eq "MINGW64")) {
+    $on_mingw = 1;
+}
 
 ###############################################################################
 # Message and error handling ##################################################
@@ -237,6 +245,7 @@ my @default_param = (
     coverNmax    => 100,
     nslices_log  => 1,
     filterlastrels => 1,
+    dup_rm => $on_mingw, # Give -rm parameter to dup2 when on MinGW
 
     # linalg
     linalg       => 'bwc',
@@ -2276,10 +2285,14 @@ sub dup {
     my $K = int ( 100 + (1.2 * $nrels / $nslices) );
     for (my $i=0; $i < $nslices; $i++) {
         info "removing duplicates on slice $i..." if ($verbose);
+        my $rm_param = "";
+        if ($param{'dup_rm'} != 0) {
+          $rm_param = "-rm "
+        };
         cmd("$param{'bindir'}/filter/dup2 ".
             "-K $K -out $param{'prefix'}.nodup/$i ".
             "-filelist $param{'prefix'}.filelist ".
-            "-basepath $param{'prefix'}.nodup/$i ",
+            "-basepath $param{'prefix'}.nodup/$i ". $rm_param,
             { cmdlog => 1, kill => 1,
               logfile => "$param{'prefix'}.dup2_$i.log",
             });

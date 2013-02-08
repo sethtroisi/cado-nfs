@@ -57,7 +57,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 
 #include "cado.h"
 #include <gmp.h>
-#include "mod_ul.c"
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -66,7 +65,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <time.h>
 #include <pthread.h>
 #include <errno.h>
+#ifdef HAVE_LIBGEN_H
+#include <libgen.h>
+#endif
 
+#include "mod_ul.c"
 #include "portability.h"
 #include "utils.h"
 #ifdef FOR_FFS
@@ -2121,15 +2124,16 @@ approx_ffs (int d)
 #endif
 
 static void
-set_rep_cado (char *argv0) {
-  char *p;
+set_rep_cado (const char *argv0) {
+  char *p, *q;
 
-  strcpy(rep_cado, argv0);
-  p = strrchr(rep_cado, '/');
-  if (p)
-    strcpy (&(p[1]), "../");
-  else
-    strcat(rep_cado, "../");
+  p = strdup(argv0);
+  q = dirname(p); /* May modify p[...] in-place */
+  strcpy(rep_cado, q);
+  free(p);
+  p = q = NULL;
+  
+  strcat(rep_cado, "/../");
 }
 
 int

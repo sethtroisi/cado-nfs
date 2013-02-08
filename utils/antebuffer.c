@@ -27,6 +27,10 @@
 #include <time.h>
 #include "portability.h"
 
+#ifdef HAVE_MINGW
+int _CRT_fmode = _O_BINARY; /* Binary open for stdin/out/err */
+#endif
+
 #ifndef HAVE_NANOSLEEP
   int nanosleep(const struct timespec *req, struct timespec *rem) {
     if (rem == NULL) {
@@ -86,6 +90,10 @@ int main(int argc, char **argv) {
   size_t cpy_ab_cptp;
   int r;
   unsigned int t, c, p;
+
+#ifdef HAVE_MINGW
+  _fmode = _O_BINARY;     /* Binary open for all others files */
+#endif
 
   if (argc < 3) {
   error:
