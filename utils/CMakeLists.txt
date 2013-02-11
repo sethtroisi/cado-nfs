@@ -24,6 +24,7 @@ target_link_libraries(complete_rels utils)
 add_executable(cut_n_roots cut_n_roots.c)
 target_link_libraries(cut_n_roots utils)
 
+
 add_executable(roots roots.c)
 target_link_libraries(roots utils)
 

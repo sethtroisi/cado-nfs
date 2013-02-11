@@ -829,11 +829,15 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
 
   /* we want to select relations with a cofactor of less than r bits on the
      rational side */
-  r = si->cpoly->rat->lambda * (double) si->cpoly->rat->lpb;
+  r = MIN(si->conf->sides[RATIONAL_SIDE]->lambda * (double) si->conf->sides[RATIONAL_SIDE]->lpb, maxlog2 - GUARD / rat->scale);
   rat_bound = (unsigned char) (r * rat->scale) + GUARD;
   fprintf (output, " bound=%u\n", rat_bound);
-  sieve_info_init_lognorm (rat->Bound, rat_bound, si->cpoly->rat->lim,
-                           si->cpoly->rat->lpb, rat->scale);
+  double max_rlambda = (maxlog2 - GUARD / rat->scale) / si->cpoly->rat->lpb;
+  if (si->cpoly->rat->lambda > max_rlambda) {
+      fprintf(output, "# Warning, rlambda>%.1f does not make sense (capped to limit)\n", max_rlambda);
+  }
+  sieve_info_init_lognorm (rat->Bound, rat_bound, si->conf->sides[RATIONAL_SIDE]->lim,
+                           si->conf->sides[RATIONAL_SIDE]->lpb, rat->scale);
 
   /************************** algebraic side *********************************/
 
@@ -845,11 +849,11 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
      side, which are set to 255, remain larger than then report bound 'r',
      even if the algebraic norm is totally smooth. For this, we artificially
      increase by 'r' the maximal range */
-  r = si->cpoly->alg->lambda * (double) si->cpoly->alg->lpb;
+  r = MIN(si->conf->sides[ALGEBRAIC_SIDE]->lambda * (double) si->conf->sides[ALGEBRAIC_SIDE]->lpb, alg->logmax);
   maxlog2 = alg->logmax + r;
 
   fprintf (output, "# Alg. side: log2(maxnorm)=%1.2f logbase=%1.6f",
-           maxlog2, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
+           alg->logmax, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
   /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
      thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
   alg->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
@@ -858,8 +862,12 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
      y >= GUARD + lambda * lpb * scale */
   alg_bound = (unsigned char) (r * alg->scale) + GUARD;
   fprintf (output, " bound=%u\n", alg_bound);
-  sieve_info_init_lognorm (alg->Bound, alg_bound, si->cpoly->alg->lim,
-                           si->cpoly->alg->lpb, alg->scale);
+  double max_alambda = (alg->logmax) / si->cpoly->alg->lpb;
+  if (si->cpoly->alg->lambda > max_alambda) {
+      fprintf(output, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
+  }
+  sieve_info_init_lognorm (alg->Bound, alg_bound, si->conf->sides[ALGEBRAIC_SIDE]->lim,
+                           si->conf->sides[ALGEBRAIC_SIDE]->lpb, alg->scale);
 }
 
 void sieve_info_clear_norm_data(sieve_info_ptr si)
@@ -877,7 +885,7 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
 void
 sieve_info_update_norm_data (sieve_info_ptr si)
 {
-    int32_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
+    int64_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
     /* Update floating point version of algebraic poly (do both, while
      * we're at it...) */
     for (int side = 0; side < 2; side++) {
@@ -886,7 +894,7 @@ sieve_info_update_norm_data (sieve_info_ptr si)
         mp_poly_homography (s->fij, ps->f, ps->degree, H);
         double invq = 1.0;
         if (si->conf->side == side)
-            invq /= mpz_get_d(si->q);
+            invq /= mpz_get_d(si->doing->p);
         for (int k = 0; k <= ps->degree; k++)
             s->fijd[k] = mpz_get_d (s->fij[k]) * invq;
     }

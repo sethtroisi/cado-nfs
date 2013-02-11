@@ -46,9 +46,9 @@
  * (see also las-coordinates.c)
  */
 #define xxxTRACE_K
-#define TRACE_AB { 5046103,17827 }
+// #define TRACE_AB { 2039914353344275UL,6656604L }
 // #define TRACE_IJ
-#define TRACE_Nx { 0,4849 }
+// #define TRACE_Nx { 0,1655 }
 
 /* Define CHECK_UNDERFLOW to check for underflow when subtracting
    the rounded log(p) from sieve array locations */
@@ -114,6 +114,16 @@
  * burden
  */
 #define SUPPORT_I16
+
+/* This is currently used to enable some code paths specific to the
+ * descent. The mid-term plan is to remove this compile-time flag.
+ */
+#define xxxDLP_DESCENT
+#define DESCENT_GRACE_TIME_RATIO 0.4
+
+/* Define this to support larger q. This is almost mandatory for the
+ * descent. */
+#define xxxSUPPORT_LARGE_Q
 
 /* Define SKIP_GCD3 to skip updates where 3 divides gcd(i,j) in the
    bucket sieving phase. Slightly slower than not skipping them

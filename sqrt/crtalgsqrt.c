@@ -180,7 +180,8 @@ static void WRAP_mpz_mul(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
     mpz_mul(c,a,b);
     STOPWATCH_GET();
     if (REPORT_THIS(na, nb)) {
-        logprint("<9> mpz_mul %zu %zu (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
+        logprint("<9> mpz_mul %d %d (%.1f) %.1f %.1f (%.1f%%)\n", 
+                (int) na, (int) nb, (double)na/nb, t1-t0, w1-w0, rate);
     }
 }
 
@@ -194,7 +195,8 @@ static void WRAP_mpz_invert(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
     mpz_invert(c,a,b);
     STOPWATCH_GET();
     if (REPORT_THIS(na, nb)) {
-        logprint("<9> mpz_inv %zu %zu (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
+        logprint("<9> mpz_inv %d %d (%.1f) %.1f %.1f (%.1f%%)\n", 
+                (int) na, (int) nb, (double)na/nb, t1-t0, w1-w0, rate);
     }
 }
 #endif
@@ -208,7 +210,8 @@ static void WRAP_mpz_addmul(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
     mpz_addmul(c,a,b);
     STOPWATCH_GET();
     if (REPORT_THIS(na, nb)) {
-        logprint("<9> mpz_mul %zu %zu (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
+        logprint("<9> mpz_mul %d %d (%.1f) %.1f %.1f (%.1f%%)\n", 
+                (int) na, (int) nb, (double)na/nb, t1-t0, w1-w0, rate);
     }
 }
 
@@ -221,7 +224,8 @@ static void WRAP_mpz_submul(mpz_ptr c, mpz_srcptr a, mpz_srcptr b)
     mpz_submul(c,a,b);
     STOPWATCH_GET();
     if (REPORT_THIS(na, nb)) {
-        logprint("<9> mpz_mul %zu %zu (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
+        logprint("<9> mpz_mul %d %d (%.1f) %.1f %.1f (%.1f%%)\n", 
+                (int) na, (int) nb, (double)na/nb, t1-t0, w1-w0, rate);
     }
 }
 
@@ -234,7 +238,8 @@ static void WRAP_barrett_mod(mpz_ptr c, mpz_srcptr a, mpz_srcptr p, mpz_srcptr q
     barrett_mod(c,a,p,q);
     STOPWATCH_GET();
     if (REPORT_THIS(na, nb) && na > nb + 10) {
-        logprint("<9> mpz_mod %zu %zu (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
+        logprint("<9> mpz_mod %d %d (%.1f) %.1f %.1f (%.1f%%)\n", 
+                (int) na, (int) nb, (double)na/nb, t1-t0, w1-w0, rate);
     }
 }
 
@@ -247,7 +252,8 @@ static void WRAP_mpz_mod(mpz_ptr c, mpz_srcptr a, mpz_srcptr p)
     mpz_mod(c,a,p);
     STOPWATCH_GET();
     if (REPORT_THIS(na, nb) && na > nb + 10) {
-        logprint("<9> mpz_mod %zu %zu (%.1f) %.1f %.1f (%.1f%%)\n", na, nb, (double)na/nb, t1-t0, w1-w0, rate);
+        logprint("<9> mpz_mod %d %d (%.1f) %.1f %.1f (%.1f%%)\n", 
+                (int) na, (int) nb, (double)na/nb, t1-t0, w1-w0, rate);
     }
 }
 /* }}} */
@@ -3769,7 +3775,7 @@ int main(int argc, char **argv)
     banner(); /*********************************************/
     local_square_roots(primes, i0, i1, &nab);
 
-    logprint("Number of pairs is %lu\n", nab);
+    logprint("Number of pairs is %zu\n", nab);
 
     poly_free(P);
 

@@ -26,18 +26,22 @@
 #include "las-arith.h"
 #include "las-qlattice.h"
 #include "las-smallsieve.h"
+#include "las-descent-helpers.h"
 #ifdef HAVE_SSE41
 /* #define SSE_SURVIVOR_SEARCH 1 */
 #include <smmintrin.h>
 #endif
 
-#define xxxDLP_DESCENT
-#define DESCENT_GRACE_TIME_RATIO 0.4
 
 #define LOG_SCALE 1.4426950408889634 /* 1/log(2) to 17 digits, rounded to
                                         nearest. This is enough to uniquely
                                         identify the corresponding IEEE 754
                                         double precision number */
+// #define HILIGHT_START   "\e[01;31m"
+// #define HILIGHT_END   "\e[00;30m"
+
+#define HILIGHT_START   ""
+#define HILIGHT_END   ""
 
 #ifndef HAVE_LOG2
 static double MAYBE_UNUSED log2 (double x)
@@ -58,7 +62,7 @@ static double MAYBE_UNUSED exp2 (double x)
  */
 pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER; 
 
-int timed = 0;
+int create_descent_hints = 0;
 double tt_qstart;
 
 static const int bucket_region = 1 << LOG_BUCKET_REGION;
@@ -125,6 +129,14 @@ int siever_config_cmp(siever_config_srcptr a, siever_config_srcptr b)/*{{{*/
 {
     return memcmp(a, b, sizeof(siever_config));
 }/*}}}*/
+
+/* siever_config_match only tells whether this config entry is one we
+ * want to use for a given problem size/side */
+int siever_config_match(siever_config_srcptr a, siever_config_srcptr b)/*{{{*/
+{
+    return a->side == b->side && a->bitsize == b->bitsize;
+}/*}}}*/
+
 
 
 /* sieve_info stuff */
@@ -197,16 +209,17 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
     for(int side = 0 ; side < 2 ; side++) {
         cado_poly_side_ptr pol = las->cpoly->pols[side];
         sieve_side_info_ptr sis = si->sides[side];
+        unsigned long lim = si->conf->sides[side]->lim;
         if (pol->degree > 1) {
             fbprime_t *leading_div;
             tfb = seconds ();
-            leading_div = factor_small (pol->f[pol->degree], pol->lim);
+            leading_div = factor_small (pol->f[pol->degree], lim);
             /* FIXME: fbfilename should allow *distinct* file names, of
              * course, for each side (think about the bi-algebraic case)
              */
             const char * fbfilename = param_list_lookup_string(pl, "fb");
             fprintf(las->output, "# Reading %s factor base from %s\n", sidenames[side], fbfilename);
-            sis->fb = fb_read(fbfilename, sis->scale * LOG_SCALE, 0, pol->lim, apow_lim);
+            sis->fb = fb_read(fbfilename, sis->scale * LOG_SCALE, 0, lim, apow_lim);
             ASSERT_ALWAYS(sis->fb != NULL);
             tfb = seconds () - tfb;
             fprintf (las->output, 
@@ -222,7 +235,7 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
                 printf ("# rpowthresh reduced to %d\n", rpow_lim);
               }
             sis->fb = fb_make_linear ((const mpz_t *) pol->f,
-                                    (fbprime_t) pol->lim,
+                                    (fbprime_t) lim,
                                      rpow_lim, sis->scale * LOG_SCALE, 
                                      las->verbose, 1, las->output);
             tfb = seconds () - tfb;
@@ -463,6 +476,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     memset(si, 0, sizeof(sieve_info));
     si->cpoly = las->cpoly;
     memcpy(si->conf, sc, sizeof(siever_config));
+    ASSERT_ALWAYS(sc->logI > 0);
     si->I = 1 << sc->logI;
     si->J = 1 << (sc->logI - 1);
 
@@ -495,8 +509,8 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     fprintf(las->output, "# nb_buckets = %u\n", si->nb_buckets);
 
     sieve_info_init_unsieve_data(si);
-    mpz_init(si->q);
-    mpz_init(si->rho);
+    mpz_init(si->doing->p);
+    mpz_init(si->doing->r);
 
     /* This (mildly) depends on the special q, but more importantly also
      * on the lpb/... bounds */
@@ -544,6 +558,35 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 }
 /* }}} */
 
+/* This is an ownership transfer from the current head of the todo list
+ * into si->doing.  The field todo->next is not accessed, since it does
+ * not make sense for si->doing, which is only a single item. The head of
+ * the todo list is pruned */
+void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_ptr * todo)
+{
+    poly_t f;
+    poly_alloc(f, si->cpoly->pols[(*todo)->side]->degree);
+    poly_set(f,  si->cpoly->pols[(*todo)->side]->f, si->cpoly->pols[(*todo)->side]->degree);
+    mpz_t x;
+    mpz_init(x);
+    poly_eval_mod_mpz(x, f, (*todo)->r, (*todo)->p);
+    ASSERT_ALWAYS(mpz_cmp_ui(x, 0) == 0);
+    mpz_clear(x);
+    poly_free(f);
+    mpz_clear(si->doing->p);
+    mpz_clear(si->doing->r);
+    memcpy(si->doing, *todo, sizeof(las_todo));
+    free(*todo);
+    *todo = si->doing->next;
+    si->doing->next = 0;
+    /* sanity check */
+    if (!mpz_probab_prime_p(si->doing->p, 1)) {
+        gmp_fprintf(stderr, "Error, %Zd is not prime\n", si->doing->p);
+        exit(1);
+    }
+    ASSERT_ALWAYS(si->conf->side == si->doing->side);
+}
+
 int sieve_info_adjust_IJ(sieve_info_ptr si, double skewness, int nb_threads)/*{{{*/
 {
     /* compare skewed max-norms */
@@ -559,7 +602,7 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, double skewness, int nb_threads)/*{{
     /* make sure J does not exceed I/2 */
     /* FIXME: We should not have to compute this B a second time. It
      * appears in sieve_info_init_norm_data already */
-    double B = sqrt (2.0 * mpz_get_d(si->q) / (skewness * sqrt (3.0)));
+    double B = sqrt (2.0 * mpz_get_d(si->doing->p) / (skewness * sqrt (3.0)));
     if (maxab1 >= B)
         si->J = (uint32_t) (B * skewness / maxab1 * (double) (si->I >> 1));
     else
@@ -602,8 +645,8 @@ static void sieve_info_clear (las_info_ptr las, sieve_info_ptr si)/*{{{*/
         free(si->sides[s]->fb_bucket_threads);
     }
     sieve_info_clear_norm_data(si);
-    mpz_clear(si->q);
-    mpz_clear(si->rho);
+    mpz_clear(si->doing->p);
+    mpz_clear(si->doing->r);
 }/*}}}*/
 
 /* las_info stuff */
@@ -878,24 +921,44 @@ sieve_info_ptr get_sieve_info_from_config(las_info_ptr las, siever_config_srcptr
     /* We've hit the end marker. Need to add a new config. */
     las->sievers = realloc(las->sievers, (n+2) * sizeof(sieve_info));
     si = las->sievers + n;
+    fprintf(las->output, "# Creating new sieve configuration for q~2^%d on the %s side\n",
+            sc->bitsize, sidenames[sc->side]);
     sieve_info_init_from_siever_config(las, si, sc, pl);
     memset(si + 1, 0, sizeof(sieve_info));
-    fprintf(las->output, "# Creating new sieve configuration\n");
     siever_config_display(las->output, sc);
     fprintf(las->output, "#                     skewness=%1.1f\n",
             las->cpoly->skew);
     return si;
 }/*}}}*/
 
-void las_todo_push(las_todo_ptr * d, mpz_srcptr p, mpz_srcptr r, int side)/*{{{*/
+void las_todo_push_withdepth(las_todo_ptr * d, mpz_srcptr p, mpz_srcptr r, int side, int depth)/*{{{*/
 {
     las_todo_ptr nd = malloc(sizeof(las_todo));
+    memset(nd, 0, sizeof(las_todo));
     mpz_init_set(nd->p, p);
     mpz_init_set(nd->r, r);
     nd->side = side;
+    nd->depth = depth;
     nd->next = *d;
     *d = nd;
-}/*}}}*/
+}
+void las_todo_push(las_todo_ptr * d, mpz_srcptr p, mpz_srcptr r, int side)
+{
+    las_todo_push_withdepth(d, p, r, side, 0);
+}
+void las_todo_push_closing_brace(las_todo_ptr * d, int depth)
+{
+    las_todo_ptr nd = malloc(sizeof(las_todo));
+    memset(nd, 0, sizeof(las_todo));
+    mpz_init(nd->p);
+    mpz_init(nd->r);
+    nd->side = -1;
+    nd->depth = depth;
+    nd->next = *d;
+    *d = nd;
+}
+
+/*}}}*/
 
 void las_todo_pop(las_todo_ptr * d)/*{{{*/
 {
@@ -904,7 +967,16 @@ void las_todo_pop(las_todo_ptr * d)/*{{{*/
     mpz_clear(nd->p);
     mpz_clear(nd->r);
     free(nd);
-}/*}}}*/
+}
+
+int las_todo_pop_closing_brace(las_todo_ptr * d)
+{
+    if ((*d)->side >= 0)
+        return 0;
+    las_todo_pop(d);
+    return 1;
+}
+/*}}}*/
 
 /* {{{ Populating the todo list */
 /* See below in main() for documentation about the q-range and q-list
@@ -1043,6 +1115,11 @@ int las_todo_feed_qlist(las_info_ptr las, param_list pl)
                    ASSERT_ALWAYS(f->degree == 1);
                    int nroots = poly_roots(&r, f->f, f->degree, p);
                    ASSERT_ALWAYS(nroots == 1);
+                   /* We may in fact also have the root specified. We
+                    * ignore what is in the file, the root is computed
+                    * unconditionally above */
+                   gmp_sscanf(x, "%*Zi%n", &nread);
+                   x+=nread;
                    break;
         default:
                    /* We may as well default on the command-line switch
@@ -1061,6 +1138,7 @@ int las_todo_feed_qlist(las_info_ptr las, param_list pl)
 
 int las_todo_feed(las_info_ptr las, param_list pl)
 {
+    if (las->todo) return 1; /* keep going */
     if (las->todo_list_fd)
         return las_todo_feed_qlist(las, pl);
     else
@@ -1441,7 +1519,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 
         /* If we sieve for special-q's smaller than the factor
            base bound, the prime p might equal the special-q prime q. */
-        if (UNLIKELY(mpz_cmp_ui(si->q, p) == 0))
+        if (UNLIKELY(mpz_cmp_ui(si->doing->p, p) == 0))
             continue;
 
         const uint32_t I = si->I;
@@ -1454,7 +1532,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
         fbprime_t r, R;
 
         R = fb_iterator_get_r(t);
-        r = fb_root_in_qlattice_31bits(p, R, t->fb->invp, si);
+        r = fb_root_in_qlattice(p, R, t->fb->invp, si);
         // TODO: should be line sieved in the non-bucket phase?
         // Or should we have a bucket line siever?
         if (UNLIKELY(r == 0))
@@ -1872,6 +1950,8 @@ trial_div (factor_list_t *fl, mpz_t norm, const unsigned int N, int x,
 
 /* Return 0 if the leftover norm n cannot yield a relation.
    FIXME: need to check L^k < n < B^(k+1) too.
+   XXX: In doing this, pay attention to the fact that for the descent,
+   we might have B^2<L.
 
    Possible cases, where qj represents a prime in [B,L], and rj a prime > L:
    (0) n >= 2^mfb
@@ -1895,6 +1975,9 @@ check_leftover_norm (mpz_t n, size_t lpb, mpz_t BB, mpz_t BBB, mpz_t BBBB,
   /* now n < 2^mfb */
   if (s <= lpb)
     return 1; /* case (a) */
+    /* Note also that in the descent case where L > B^2, if we're below L
+     * it's still fine of course, but we have no guarantee that our
+     * cofactor is prime... */
   /* now n >= L=2^lpb */
   if (mpz_cmp (n, BB) < 0)
     return 0; /* case (b) */
@@ -1922,7 +2005,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     cado_poly_ptr cpoly = si->cpoly;
     sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
     sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
-
     int cpt = 0;
     int surv = 0, copr = 0;
     mpz_t norm[2], BB[2], BBB[2], BBBB[2];
@@ -1930,9 +2012,12 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     mpz_array_t *f[2] = { NULL, };
     uint32_array_t *m[2] = { NULL, }; /* corresponding multiplicities */
     bucket_primes_t primes[2];
-
     mpz_t BLPrat;       /* alone ? */
-
+#ifdef  DLP_DESCENT
+    double deadline = DBL_MAX;
+    relation_t winner[1];
+    relation_init(winner);
+#endif  /* DLP_DESCENT */
     uint32_t cof_rat_bitsize = 0; /* placate gcc */
     uint32_t cof_alg_bitsize = 0; /* placate gcc */
 
@@ -1946,15 +2031,15 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
         mpz_init (BBB[side]);
         mpz_init (BBBB[side]);
 
-        unsigned long lim = (side == RATIONAL_SIDE) ? cpoly->rat->lim : cpoly->alg->lim;
+        unsigned long lim = si->conf->sides[side]->lim;
         mpz_ui_pow_ui (BB[side], lim, 2);
         mpz_mul_ui (BBB[side], BB[side], lim);
         mpz_mul_ui (BBBB[side], BBB[side], lim);
     }
 
     mpz_init (BLPrat);
-    mpz_set_ui (BLPrat, cpoly->rat->lim);
-    mpz_mul_2exp (BLPrat, BLPrat, cpoly->rat->lpb); /* fb bound * lp bound */
+    mpz_set_ui (BLPrat, si->conf->sides[RATIONAL_SIDE]->lim);
+    mpz_mul_2exp (BLPrat, BLPrat, si->conf->sides[RATIONAL_SIDE]->lpb); /* fb bound * lp bound */
 
     unsigned char * alg_S = S[ALGEBRAIC_SIDE];
     unsigned char * rat_S = S[RATIONAL_SIDE];
@@ -2070,11 +2155,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
              * log to base 2 of the sieve limits on each side, and compare the
              * bitsize of the cofactor with their double.
              */
-            double log2_fbs[2] = {log2(cpoly->pols[0]->lim), log2(cpoly->pols[1]->lim)};
-
-#ifdef  DLP_DESCENT
-            double deadline = DBL_MAX;
-#endif  /* DLP_DESCENT */
+            double log2_fbs[2] = {log2(si->conf->sides[0]->lim), log2(si->conf->sides[1]->lim)};
 
             int64_t a;
             uint64_t b;
@@ -2085,7 +2166,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             if (t >= deadline) {
                 /* Also break the outer loop (ugly!) */
                 xul = bucket_region;
-                fprintf(stderr, "#descent# Aborting, deadline passed\n");
+                fprintf(las->output, "# [descent] Aborting, deadline passed\n");
                 break;
             }
 #endif  /* DLP_DESCENT */
@@ -2115,7 +2196,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
             /* Since the q-lattice is exactly those (a, b) with
                a == rho*b (mod q), q|b  ==>  q|a  ==>  q | gcd(a,b) */
-            if (b == 0 || (mpz_cmp_ui(si->q, b) <= 0 && b % mpz_get_ui(si->q) == 0))
+            if (b == 0 || (mpz_cmp_ui(si->doing->p, b) <= 0 && b % mpz_get_ui(si->doing->p) == 0))
                 continue;
 
             copr++;
@@ -2134,14 +2215,18 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 int side = RATIONAL_SIDE ^ z;   /* start with rational */
                 mpz_t * f = cpoly->pols[side]->f;
                 int deg = cpoly->pols[side]->degree;
-                int lim = cpoly->pols[side]->lim;
-                int lpb = cpoly->pols[side]->lpb;
-                int mfb = cpoly->pols[side]->mfb;
+                int lim = si->conf->sides[side]->lim;
+                int lpb = si->conf->sides[side]->lpb;
+                int mfb = si->conf->sides[side]->mfb;
 
                 // Trial divide rational norm
                 mp_poly_homogeneous_eval_siui (norm[side], f, deg, a, b);
-                if (si->conf->side == side)
-                    mpz_divexact (norm[side], norm[side], si->q);
+                if (si->conf->side == side) {
+#ifdef  WANT_ASSERT_EXPENSIVE
+                    ASSERT(mpz_divisible_p(norm[side], si->doing->p));
+#endif
+                    mpz_divexact (norm[side], norm[side], si->doing->p);
+                }
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b)) {
                     gmp_fprintf(stderr, "# start trial division for norm=%Zd on %s side for (%"PRId64",%"PRIu64")\n",norm[side],sidenames[side],a,b);
@@ -2196,11 +2281,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
             for(int z = 0 ; pass && z < 2 ; z++) {
                 int side = first ^ z;
-                int rat = (side == RATIONAL_SIDE);
-                int lpb = rat ? cpoly->rat->lpb : cpoly->alg->lpb;
-                // gmp_fprintf(stderr, "# fln(%Zd, %d) =", norm[side], lpb);
+                int lpb = si->conf->sides[side]->lpb;
                 pass = factor_leftover_norm(norm[side], log2_fbs[side], lpb, f[side], m[side], si->sides[side]->strategy);
-                // fprintf(stderr, " %d\n", pass);
             }
             if (!pass) continue;
 
@@ -2255,7 +2337,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                  * the order of factors in printed relations. It's not so
                  * handy.
                  */
-                if (timed) {
+                if (create_descent_hints) {
                     fprintf (las->output, "(%1.4f) ", seconds() - tt_qstart);
                 }
                 fprintf (las->output, "%" PRId64 ",%" PRIu64, a, b);
@@ -2271,7 +2353,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                     }
                     if (si->conf->side == side) {
                         if (comma++) fprintf (las->output, ",");
-                        gmp_fprintf (las->output, "%Zx", si->q);
+                        gmp_fprintf (las->output, "%Zx", si->doing->p);
                     }
                 }
                 fprintf (las->output, "\n");
@@ -2279,6 +2361,10 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 #endif
                 pthread_mutex_unlock(&io_mutex);
             }
+
+            cpt++;
+            /* Build histogram of lucky S[x] values */
+            th->rep->report_sizes[S[RATIONAL_SIDE][x]][S[ALGEBRAIC_SIDE][x]]++;
 
 #ifdef  DLP_DESCENT
             /* For descent mode: compute the expected time to finish given
@@ -2298,37 +2384,106 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 double time_left = 0;
                 for(int side = 0 ; side < 2 ; side++) {
                     for (unsigned int i = 0; i < f[side]->length; ++i) {
+                        /* Currently we're assuming that the base of
+                         * precomputed logs goes at least as far as 
+                         * cpoly->pols[side]->lim, which is asserted to
+                         * exceed si->conf->sides[side]->lim). Therefore
+                         * the second if() is a no-op. */
                         if (mpz_cmp_ui(f[side]->data[i], cpoly->pols[side]->lim) <= 0)
                             continue;
+                        /*
+                        if (mpz_cmp_ui(f[side]->data[i], si->conf->sides[side]->lim) <= 0)
+                            continue;
+                            */
                         unsigned int n = mpz_sizeinbase(f[side]->data[i], 2);
                         int k = las->hint_lookups[side][n];
-                        /* Having no data is normal */
-                        if (k < 0) continue;
-                        // fprintf(stderr, "#descent# Warning: cannot estimate refactoring time for relation involving %d%c\n", n, sidenames[side][0]);
+                        if (k < 0) {
+                            /* Having no data is normal. The factor base
+                             * bound does not have to have any connection
+                             * with the database of prime ideals for
+                             * which the virtual log has been saved
+                             * already (factor base extension can enter
+                             * into play here). */
+                            // fprintf(las->output, "# [descent] Warning: cannot estimate refactoring time for relation involving %d%c\n", n, sidenames[side][0]);
+                            continue;
+                        }
                         descent_hint_ptr h = las->hint_table[k];
                         time_left += h->expected_time;
                     }
                 }
-                // fprintf(stderr, "#descent# This relation entails an additional time of %.2f for the smoothing process\n", time_left);
+                // fprintf(las->output, "# [descent] This relation entails an additional time of %.2f for the smoothing process\n", time_left);
 
                 double new_deadline = seconds() + DESCENT_GRACE_TIME_RATIO * time_left;
                 if (new_deadline < deadline) {
+                    double delta = DBL_MAX;
                     if (deadline != DBL_MAX)
-                        fprintf(stderr, "#descent# Improved ETA by %.2f\n", (deadline-new_deadline)/DESCENT_GRACE_TIME_RATIO);
+                        delta = (deadline-new_deadline)/DESCENT_GRACE_TIME_RATIO;
                     deadline = new_deadline;
+                    relation_copy(winner, rel);
+                    if (time_left == 0) {
+                        fprintf(las->output, "# [descent] Yiippee, splitting done\n");
+                        /* break both loops */
+                        xul = bucket_region;
+                        relation_clear(rel);
+                        break;
+                    } else if (delta != DBL_MAX) {
+                        fprintf(las->output, "# [descent] Improved ETA by %.2f\n", delta);
+                    }
                 }
             }
 #endif  /* DLP_DESCENT */
-
-            clear_relation(rel);
-            cpt++;
-            /* Build histogram of lucky S[x] values */
-            th->rep->report_sizes[S[RATIONAL_SIDE][x]][S[ALGEBRAIC_SIDE][x]]++;
+            relation_clear(rel);
         }
     }
 
     th->rep->survivors1 += surv;
     th->rep->survivors2 += copr;
+
+#ifdef  DLP_DESCENT
+    if (las->hint_table && cpt) {
+        /* If we've been doing the descent, and assuming we succeeded, we
+         * have to reschedule the possibly still missing large primes in the
+         * todo list */
+        mpz_t rho, q;
+        mpz_init(rho);
+        mpz_init(q);
+        for(int i = 0 ; i < winner->nb_rp ; i++) {
+            int side = RATIONAL_SIDE;
+            unsigned long p = winner->rp[i].p;
+            /* See comment above */
+            if (p <= cpoly->pols[side]->lim)
+                continue;
+            unsigned int n = ULONG_BITS - clzl(p);
+            int k = las->hint_lookups[side][n];
+            if (k < 0) continue;
+            mpz_set_ui(q, p);
+            /* Beware, cpoly->m mod p would be wrong ! */
+            /* This can't work on 32-bits */
+            mpz_set_ui(rho, findroot (winner->a, winner->b, p));
+            gmp_fprintf(las->output, "# [descent] "HILIGHT_START"pushing %s (%Zd,%Zd) [%d%c]"HILIGHT_END" to todo list\n", sidenames[side], q, rho, mpz_sizeinbase(q, 2), sidenames[side][0]);
+            las_todo_push_withdepth(&(las->todo), q, rho, side, si->doing->depth + 1);
+        }
+        computeroots(winner);
+        for(int i = 0 ; i < winner->nb_ap ; i++) {
+            int side = ALGEBRAIC_SIDE;
+            unsigned long p = winner->ap[i].p;
+            /* See comment above */
+            if (p <= cpoly->pols[side]->lim)
+                continue;
+            unsigned int n = ULONG_BITS - clzl(p);
+            int k = las->hint_lookups[side][n];
+            if (k < 0) continue;
+            mpz_set_ui(q, p);
+            mpz_set_ui(rho, winner->ap[i].r);
+            gmp_fprintf(las->output, "# [descent] "HILIGHT_START"pushing %s (%Zd,%Zd) [%d%c]"HILIGHT_END" to todo list\n", sidenames[side], q, rho, mpz_sizeinbase(q, 2), sidenames[side][0]);
+            las_todo_push_withdepth(&(las->todo), q, rho, side, si->doing->depth + 1);
+        }
+        mpz_clear(q);
+        mpz_clear(rho);
+
+        las_descent_helper_found_relation(las->descent_helper, winner);
+    }
+#endif  /* DLP_DESCENT */
 
     mpz_clear (BLPrat);
 
@@ -2699,7 +2854,7 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
         fprintf (las->output, " %lu survivors after algebraic sieve, ", rep->survivors1);
         fprintf (las->output, "coprime: %lu\n", rep->survivors2);
     }
-    gmp_fprintf (las->output, "# %lu relation(s) for (%Zd,%Zd))\n", rep->reports, si->q, si->rho);
+    gmp_fprintf (las->output, "# %lu relation(s) for %s (%Zd,%Zd)\n", rep->reports, sidenames[si->conf->side], si->doing->p, si->doing->r);
     double qtts = qt0 - rep->tn[0] - rep->tn[1] - rep->ttf;
     fprintf (las->output, "# Time for this special-q: %1.4fs [norm %1.4f+%1.4f, sieving %1.4f"
             " (%1.4f + %1.4f),"
@@ -2787,11 +2942,12 @@ int main (int argc0, char *argv0[])/*{{{*/
      * param_list_parse_switch later on */
     param_list_configure_switch(pl, "-v", NULL);
     param_list_configure_switch(pl, "-ratq", NULL);
+    param_list_configure_switch(pl, "-no-prepare-hints", NULL);
 #if 0   /* incompatible with the todo list */
     param_list_configure_switch(pl, "-bench", &bench);
     param_list_configure_switch(pl, "-bench2", &bench2);
 #endif
-    param_list_configure_switch(pl, "-timed", &timed);
+    param_list_configure_switch(pl, "-mkhint", &create_descent_hints);
     param_list_configure_alias(pl, "-skew", "-S");
 
     argv++, argc--;
@@ -2813,11 +2969,10 @@ int main (int argc0, char *argv0[])/*{{{*/
     memset(las, 0, sizeof(las_info));
     las_info_init(las, pl);    /* side effects: prints cmdline and flags */
 
-
-    /* Normal use of the descent lower steps prefers a file to provide
-     * data. However, using a q range is also OK */
-    int descent_lower MAYBE_UNUSED;
-    descent_lower = param_list_lookup_string(pl, "descent-hint") != NULL;
+    /*
+    int descent_bootstrap = param_list_lookup_string(pl, "target") != NULL;
+    */
+    int descent_lower = param_list_lookup_string(pl, "descent-hint") != NULL;
 
 #if 0   /* incompatible with the todo list */
     statsfilename = param_list_lookup_string (pl, "stats");
@@ -2842,9 +2997,21 @@ int main (int argc0, char *argv0[])/*{{{*/
      */
 
 
-    /* Create a default siever instance among las->sievers if needed */
-    if (las->default_config->bitsize)
-        get_sieve_info_from_config(las, las->default_config, pl);
+    if (!param_list_parse_switch(pl, "-no-prepare-hints")) {
+        /* Create a default siever instance among las->sievers if needed */
+        if (las->default_config->bitsize)
+            get_sieve_info_from_config(las, las->default_config, pl);
+
+        /* Create all siever configurations from the preconfigured hints */
+        /* This can also be done dynamically if needed */
+        if (las->hint_table) {
+            for(descent_hint_ptr h = las->hint_table[0] ; h->conf->bitsize ; h++) {
+                siever_config_ptr sc = h->conf;
+                get_sieve_info_from_config(las, sc, pl);
+            }
+        }
+    }
+
 
 #if 0   /* incompatible with the todo list */
     /* {{{ stats stuff */
@@ -2936,6 +3103,9 @@ int main (int argc0, char *argv0[])/*{{{*/
     where_am_I w MAYBE_UNUSED;
     WHERE_AM_I_UPDATE(w, las, las);
 
+    if (descent_lower)
+        las->descent_helper = las_descent_helper_alloc();
+
     /* {{{ Doc on todo list handling
      * The function las_todo_feed behaves in different
      * ways depending on whether we're in q-range mode or in q-list mode.
@@ -2951,32 +3121,50 @@ int main (int argc0, char *argv0[])/*{{{*/
      * the descent, which has the implication that the read occurs if and
      * only if the todo list is empty. }}} */
 
-    for( ; las_todo_feed(las, pl) ; las_todo_pop(&las->todo)) {
+    /* pop() is achieved by sieve_info_pick_todo_item */
+    for( ; las_todo_feed(las, pl) ; ) {
+        if (descent_lower && las_todo_pop_closing_brace(&(las->todo))) {
+            las_descent_helper_done_node(las->descent_helper);
+            if (las_descent_helper_current_depth(las->descent_helper) == 0)
+                las_descent_helper_display_last_tree(las->descent_helper, las->output);
+            continue;
+        }
 
         siever_config current_config;
         memcpy(current_config, las->default_config, sizeof(siever_config));
         current_config->bitsize = mpz_sizeinbase(las->todo->p, 2);
         current_config->side = las->todo->side;
 
+        /* Do we have a hint table with specifically tuned parameters,
+         * well suited to this problem size ? */
+        if (las->hint_table) {
+            for(descent_hint_ptr h = las->hint_table[0] ; h->conf->bitsize ; h++) {
+                siever_config_ptr sc = h->conf;
+                if (!siever_config_match(sc, current_config)) continue;
+                fprintf(las->output, "# Using existing sieving parameters from hint list for q~2^%d on the %s side [%d%c]\n", sc->bitsize, sidenames[sc->side], sc->bitsize, sidenames[sc->side][0]);
+                memcpy(current_config, sc, sizeof(siever_config));
+            }
+        }
+
         /* Maybe create a new siever ? */
         sieve_info_ptr si = get_sieve_info_from_config(las, current_config, pl);
         WHERE_AM_I_UPDATE(w, si, si);
 
-        /* FIXME: The (si) object itself depends on q being of some size,
-         * and on some side. */
-        mpz_set(si->q, las->todo->p);
-        ASSERT_ALWAYS(si->conf->side == las->todo->side);
-        mpz_set(si->rho, las->todo->r);
+        sieve_info_pick_todo_item(si, &(las->todo));
+
+        las_descent_helper_new_node(las->descent_helper, si->conf, si->doing->depth);
+        if (descent_lower)
+            las_todo_push_closing_brace(&(las->todo), si->doing->depth);
 #if 0
         /* I think that there is sufficient provision in las_todo_feed now */
         ASSERT_ALWAYS(mpz_cmp_ui(las->todo->r, 0) != 0);
-        if (si->cpoly->pols[si->qside]->degree == 1) {
+        if (si->cpoly->pols[si->doing->pside]->degree == 1) {
             /* compute the good rho */
             int n;
-            n = poly_roots(&si->rho, si->cpoly->pols[si->qside]->f, 1, si->q);
+            n = poly_roots(&si->doing->r, si->cpoly->pols[si->doing->pside]->f, 1, si->doing->p);
             ASSERT_ALWAYS(n);
         } else {
-            mpz_set(si->rho, las->todo->r);
+            mpz_set(si->doing->r, las->todo->r);
         }
 #endif
 
@@ -2991,8 +3179,13 @@ int main (int argc0, char *argv0[])/*{{{*/
         /* FIXME: maybe we can discard some special q's if a1/a0 is too large,
            see http://www.mersenneforum.org/showthread.php?p=130478 */
 
-        gmp_fprintf (las->output, "# Sieving q=%Zd; rho=%Zd; a0=%"PRId64"; b0=%"PRId64"; a1=%"PRId64"; b1=%"PRId64"\n",
-                si->q, si->rho, si->a0, si->b0, si->a1, si->b1);
+        gmp_fprintf (las->output, "# "HILIGHT_START"Sieving %s q=%Zd; rho=%Zd;"HILIGHT_END" a0=%"PRId64"; b0=%"PRId64"; a1=%"PRId64"; b1=%"PRId64";",
+                sidenames[si->conf->side],
+                si->doing->p, si->doing->r, si->a0, si->b0, si->a1, si->b1);
+        if (si->doing->depth) {
+            fprintf(las->output, " # within descent, currently at depth %d", si->doing->depth);
+        }
+        fprintf(las->output, "\n");
         sq ++;
         if (las->verbose)
             fprintf (las->output, "# I=%u; J=%u\n", si->I, si->J);
@@ -3059,6 +3252,11 @@ int main (int argc0, char *argv0[])/*{{{*/
             small_sieve_info(las, "resieve", side, s->rsd);
         }
 
+        /* FIXME: For the descent, the current logic is not
+         * multithread-capable, as the two threads each try to produce a
+         * winning relation. There should be a global counter with a
+         * read-write lock, or something like that.
+         */
         /* Process bucket regions in parallel */
         thread_do(thrs, &process_bucket_region, las->nb_threads);
 
@@ -3149,6 +3347,10 @@ int main (int argc0, char *argv0[])/*{{{*/
 #endif
       } // end of loop over special q ideals.
 
+    fprintf(las->output, "# Now displaying again the results of all descents\n");
+    las_descent_helper_display_all_trees(las->descent_helper, las->output);
+    las_descent_helper_free(las->descent_helper);
+
     t0 = seconds () - t0;
     fprintf (las->output, "# Average J=%1.0f for %lu special-q's, max bucket fill %f\n",
             totJ / (double) sq, sq, max_full);
@@ -3198,7 +3400,7 @@ int main (int argc0, char *argv0[])/*{{{*/
                 report->tn[RATIONAL_SIDE],
                 report->tn[ALGEBRAIC_SIDE],
                 tts, report->ttsm, tts-report->ttsm, report->ttf);
-    fprintf (las->output, "# Total %lu reports [%1.3fs/r, %1.1fr/sq]\n",
+    fprintf (las->output, "# Total %lu reports [%1.3gs/r, %1.1fr/sq]\n",
             report->reports, t0 / (double) report->reports,
             (double) report->reports / (double) sq);
     /*}}}*/
