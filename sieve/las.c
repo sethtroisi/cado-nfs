@@ -3347,9 +3347,11 @@ int main (int argc0, char *argv0[])/*{{{*/
 #endif
       } // end of loop over special q ideals.
 
-    fprintf(las->output, "# Now displaying again the results of all descents\n");
-    las_descent_helper_display_all_trees(las->descent_helper, las->output);
-    las_descent_helper_free(las->descent_helper);
+    if (descent_lower) {
+        fprintf(las->output, "# Now displaying again the results of all descents\n");
+        las_descent_helper_display_all_trees(las->descent_helper, las->output);
+        las_descent_helper_free(las->descent_helper);
+    }
 
     t0 = seconds () - t0;
     fprintf (las->output, "# Average J=%1.0f for %lu special-q's, max bucket fill %f\n",
