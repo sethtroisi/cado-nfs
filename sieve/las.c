@@ -1036,7 +1036,7 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
     }
 
     las_todo_ptr * pnext = &(las->todo);
-    for(int ahead = 10 ; ahead-- && mpz_cmp(q, q1) < 0 ; ) {
+    for( ; pushed < 10 && mpz_cmp(q, q1) < 0 ; ) {
         mpz_nextprime(q, q);
         if (mpz_cmp(q, q1) >= 0)
             break;
