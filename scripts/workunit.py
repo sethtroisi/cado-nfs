@@ -1,4 +1,4 @@
-class Workunit:
+class Workunit(object):
     # Keys that must occur only once
     SCALAR_KEYS = ("WORKUNIT",)
     # Keys that can occur multiple times
