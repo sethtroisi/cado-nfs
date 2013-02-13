@@ -2659,7 +2659,7 @@ void * process_bucket_region(thread_data_ptr th)
         ts->rsdpos = small_sieve_copy_start(ts->ssdpos, s->fb_parts_x->rs);
 
         /* local sieve region */
-        S[side] = (unsigned char *) malloc(bucket_region);
+        S[side] = (unsigned char *) malloc(bucket_region + MEMSET_MIN);
         ASSERT_ALWAYS (S != NULL);
     }
 
