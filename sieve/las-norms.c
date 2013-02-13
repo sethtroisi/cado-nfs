@@ -125,7 +125,7 @@ init_norms (sieve_info_ptr si, int s)
    Output: o , trunc(o) == trunc(log2(i)) && o <= log2(i) < o + 0.0861.
    Careful: o ~= log2(i) iif add = 0x3FF00000 & scale = 1/0x100000.
    Add & scale are need to compute o'=f(log(i)) where f is an affine function */
-inline int inttruncfastlog2(double i, double add, double scale) {
+static inline int inttruncfastlog2(double i, double add, double scale) {
 #ifdef HAVE_SSE2
   double dummy;
   int o;
