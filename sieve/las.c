@@ -1036,7 +1036,7 @@ int las_todo_feed_qrange(las_info_ptr las, param_list pl)
     }
 
     las_todo_ptr * pnext = &(las->todo);
-    for(int ahead = 10 ; ahead-- && mpz_cmp(q, q1) < 0 ; ) {
+    for( ; pushed < 10 && mpz_cmp(q, q1) < 0 ; ) {
         mpz_nextprime(q, q);
         if (mpz_cmp(q, q1) >= 0)
             break;
@@ -2659,7 +2659,7 @@ void * process_bucket_region(thread_data_ptr th)
         ts->rsdpos = small_sieve_copy_start(ts->ssdpos, s->fb_parts_x->rs);
 
         /* local sieve region */
-        S[side] = (unsigned char *) malloc(bucket_region);
+        S[side] = (unsigned char *) malloc(bucket_region + MEMSET_MIN);
         ASSERT_ALWAYS (S != NULL);
     }
 
@@ -3347,9 +3347,11 @@ int main (int argc0, char *argv0[])/*{{{*/
 #endif
       } // end of loop over special q ideals.
 
-    fprintf(las->output, "# Now displaying again the results of all descents\n");
-    las_descent_helper_display_all_trees(las->descent_helper, las->output);
-    las_descent_helper_free(las->descent_helper);
+    if (descent_lower) {
+        fprintf(las->output, "# Now displaying again the results of all descents\n");
+        las_descent_helper_display_all_trees(las->descent_helper, las->output);
+        las_descent_helper_free(las->descent_helper);
+    }
 
     t0 = seconds () - t0;
     fprintf (las->output, "# Average J=%1.0f for %lu special-q's, max bucket fill %f\n",

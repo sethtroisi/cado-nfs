@@ -177,6 +177,14 @@
 #define NOPROFILE_STATIC static
 #endif
 
+/* A memset with less MEMSET_MIN bytes is slower than an fixed memset
+   (which is inlined with special code). So, if it's possible, the optimal
+   memset is
+   if (LIKELY(ts <= MEMSET_MIN)) memset (S, i, MEMSET_MIN); else memset (S, i, ts);
+   S += ts;
+   So, all S' malloc must be increased of MEMSET_MIN. */
+#define MEMSET_MIN 64
+
 #include <stdio.h>
 
 #ifdef __cplusplus
