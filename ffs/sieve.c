@@ -286,6 +286,7 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "  reliableyield    ignore q1, run until estimated yield is reliable\n");
     fprintf(stderr, "                   that is in a +/-3%% interval with 95%% confidence level.\n");
     fprintf(stderr, "  reliablenrels    the same, but criterion is rels per sq.\n");
+    fprintf(stderr, "  reliablerange    set the 3%% to another percentage in reliable estimates.\n");
     fprintf(stderr, "Note: giving (q0,q1) is exclusive to giving (q,rho). In the latter case,\n" "    rho is optional.\n");
     fprintf(stderr, "  sqside           side (0 or 1) of the special-q (default %d)\n", SQSIDE_DEFAULT);
     fprintf(stderr, "  firstsieve       side (0 or 1) to sieve first (default %d)\n", FIRSTSIEVE_DEFAULT);
@@ -318,6 +319,7 @@ int main(int argc, char **argv)
     int gf = 0;
     int want_reliable_yield = 0;
     int want_reliable_nrels = 0;
+    double reliablerange = 0.03;
     int sqt = 3;
     int bench = 0;
     int bench_end = 0;
@@ -510,6 +512,7 @@ int main(int argc, char **argv)
     sublat_ptr sublat = &no_sublat[0];
 #endif
 
+    param_list_parse_double(pl, "reliablerange", &reliablerange);
     if (want_reliable_yield && want_reliable_nrels) {
         fprintf(stderr, "Error: -reliableyield and -reliablenrels are incompatible options.\n");
         exit(EXIT_FAILURE);
@@ -640,7 +643,7 @@ int main(int argc, char **argv)
                     printf("############################################\n");
                     printf("#   Current average nrels: %1.2f\n", av_nrels);
                     stats_nrels_print_ci(stats_yield);
-                    if (ci95/av_nrels < 0.03)
+                    if (ci95/av_nrels < reliablerange)
                         break;
                 }
             } else if (want_reliable_yield) {
@@ -651,7 +654,7 @@ int main(int argc, char **argv)
                     printf("############################################\n");
                     printf("#   Current average yield: %1.2f\n", av_yield);
                     stats_yield_print_ci(stats_yield);
-                    if (ci95/av_yield < 0.03)
+                    if (ci95/av_yield < reliablerange)
                         break;
                 }
             } else if (sq_cmp(q0, q1) >= 0) {
