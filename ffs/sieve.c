@@ -198,15 +198,21 @@ void yield_confidence_interval(double *av_yield, double * ci68, double * ci95,
 {
     long tot_rels = 0;
     *av_yield = 0;
-    int n = stats_yield->n;
-    for (int i = 0; i < n; ++i) {
+    int nn = stats_yield->n;
+    int n = 0;
+    for (int i = 0; i < nn; ++i) {
+        if (stats_yield->data[i].nrels == 0)
+            continue;
+        n++;
         tot_rels += stats_yield->data[i].nrels;
         *av_yield += stats_yield->data[i].time;
     }
     *av_yield /= tot_rels;
 
     double sigma = 0;
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < nn; ++i) {
+        if (stats_yield->data[i].nrels == 0)
+            continue;
         double diff = stats_yield->data[i].time/stats_yield->data[i].nrels
             - *av_yield;
         sigma += stats_yield->data[i].nrels*diff*diff;
@@ -936,8 +942,8 @@ int main(int argc, char **argv)
 
         if (nrels == 0) {
             no_rels_sq++;
-        } else
-            stats_yield_push(stats_yield, nrels, t_tot, qlat);
+        } 
+        stats_yield_push(stats_yield, nrels, t_tot, qlat);
     } while (1); // End of loop over special-q's
 
     free(S);
