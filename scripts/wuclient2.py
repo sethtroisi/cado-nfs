@@ -162,13 +162,16 @@ class Workunit_Processor(Workunit):
     def  __str__(self):
         return "Processor for Workunit:\n" + self.wu.__str__()
 
+    def have_terminate_request(self):
+        return "TERMINATE" in self.wu.data
+
     def get_files(self):
-        for (filename, checksum) in self.wu.data["FILE"] + self.wu.data["EXECFILE"]:
+        for (filename, checksum) in self.wu.data.get("FILE", []) + self.wu.data.get("EXECFILE", []):
             archname = Template(filename).safe_substitute({"ARCH": SETTINGS["ARCH"]})
             dlname = Template(filename).safe_substitute({"ARCH": ""})
             if not get_missing_file (archname, SETTINGS["DLDIR"] + '/' + dlname, checksum):
                 return False
-        for (filename, checksum) in self.wu.data["EXECFILE"]:
+        for (filename, checksum) in self.wu.data.get("EXECFILE", []):
             dlname = Template(filename).safe_substitute({"ARCH": ""})
             path = SETTINGS["DLDIR"] + '/' + dlname
             mode = os.stat(path).st_mode
@@ -182,7 +185,7 @@ class Workunit_Processor(Workunit):
         os.nice(int(SETTINGS["NICENESS"]))
     
     def run_commands(self):
-        for (counter, command) in enumerate(self.wu.data["COMMAND"]):
+        for (counter, command) in enumerate(self.wu.data.get("COMMAND", [])):
             command = Template(command).safe_substitute(SETTINGS)
             logging.info ("Running command for workunit " + self.wu.get_id() + ": " + command)
 
@@ -310,6 +313,11 @@ class Workunit_Processor(Workunit):
                 filepath = SETTINGS["WORKDIR"] + "/" + f
                 logging.info ("Removing result file " + filepath)
                 os.remove(filepath)
+        if "DELETE" in self.wu.data:
+            for f in self.wu.data["DELETE"]:
+                filepath = SETTINGS["WORKDIR"] + "/" + f
+                logging.info ("Removing file " + filepath)
+                os.remove(filepath)
 
     def process(self):
         # If all output files exist, send them, return WU as done
@@ -327,16 +335,20 @@ class Workunit_Processor(Workunit):
         return True
 
 def do_work():
+    rc = True
     wu_filename = SETTINGS["DLDIR"] + "/" + SETTINGS["WU_FILENAME"]
     if not get_missing_file(SETTINGS["GETWUPATH"], wu_filename, 
                             options="clientid=" + SETTINGS["CLIENTID"]):
         return False
     wu = Workunit_Processor(wu_filename, int(SETTINGS["DEBUG"]))
-    if not wu.process():
+    if wu.have_terminate_request():
+        logging.info ("Received TERMINATE, exiting")
+        rc = False
+    elif not wu.process():
         return False
     logging.info ("Removing workunit file " + wu_filename)
     os.remove(wu_filename)
-    return True
+    return rc
 
 if __name__ == '__main__':
 
