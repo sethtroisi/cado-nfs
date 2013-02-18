@@ -4,22 +4,30 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <math.h>   /* for fabs */
 #include "fpoly.h"
 #include "portability.h"
 
 /* Evaluate the poynomial f of degree deg at point x */
 double
-fpoly_eval (const double *f, const int deg, const double x)
+fpoly_eval (const double *f, const unsigned int deg, const double x)
 {
   double r;
-  int i;
-
-  r = f[deg];
-  for (i = deg - 1; i >= 0; i--)
-    r = r * x + f[i];
-  
-  return r;
+  unsigned int k;
+  switch (deg) {
+  case 0: return f[0];
+  case 1: return f[0]+x* f[1];
+  case 2: return f[0]+x*(f[1]+x* f[2]);
+  case 3: return f[0]+x*(f[1]+x*(f[2]+x* f[3]));
+  case 4: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x* f[4])));
+  case 5: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x* f[5]))));
+  case 6: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x*(f[5]+x* f[6])))));
+  case 7: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x*(f[5]+x*(f[6]+x* f[7]))))));
+  case 8: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x*(f[5]+x*(f[6]+x*(f[7]+x* f[8])))))));
+  case 9: return f[0]+x*(f[1]+x*(f[2]+x*(f[3]+x*(f[4]+x*(f[5]+x*(f[6]+x*(f[7]+x*(f[8]+x*f[9]))))))));
+  default: for (r = f[deg], k = deg - 1; k != UINT_MAX; r = r * x + f[k--]); return r;
+  }
 }
 
 /* assuming g(a)*g(b) < 0, and g has a single root in [a, b],

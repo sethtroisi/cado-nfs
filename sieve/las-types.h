@@ -124,6 +124,7 @@ struct sieve_side_info_s {
      * Only the scale is also relevant to part of the rest, since it
      * determines the logp contributions for factor base primes */
     double scale;      /* norm scale used on the algebraic side */
+    double cexp2[257]; /* for 2^X * scale + GUARD */
     double logmax;     /* norms on the alg-> side are < 2^alg->logmax */
 
     mpz_t *fij;       /* coefficients of F(a0*i+a1*j, b0*i+b1*j)  */

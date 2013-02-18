@@ -1481,11 +1481,11 @@ typedef struct thread_side_data_s * thread_side_data_ptr;
 typedef const struct thread_side_data_s * thread_side_data_srcptr;
 
 struct thread_data_s {
-    int id;
-    thread_side_data sides[2];
-    las_info_ptr las;
-    sieve_info_ptr si;
-    las_report rep;
+  int id;
+  thread_side_data sides[2];
+  las_info_ptr las;
+  sieve_info_ptr si;
+  las_report rep;
 };
 typedef struct thread_data_s thread_data[1];
 typedef struct thread_data_s * thread_data_ptr;
@@ -2815,11 +2815,11 @@ static void thread_buckets_alloc(thread_data * thrs, int n)
 
 static void thread_buckets_free(thread_data * thrs, int n)/*{{{*/
 {
-    for(int side = 0 ; side < 2 ; side++) {
-        for (int i = 0; i < n ; ++i) {
-            clear_bucket_array(thrs[i]->sides[side]->BA);
-        }
+  for(int side = 0 ; side < 2 ; side++) {
+    for (int i = 0; i < n ; ++i) {
+      clear_bucket_array(thrs[i]->sides[side]->BA);
     }
+  }
 }/*}}}*/
 
 static double thread_buckets_max_full(thread_data * thrs, int n)/*{{{*/
