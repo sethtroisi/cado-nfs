@@ -163,21 +163,56 @@ void stats_yield_push(stats_yield_ptr stats_yield, int nrels, double time,
     stats_yield->n++;
 }
 
+
+// Attempt to compute a confidence interval for the average nrels.
+void nrels_confidence_interval(double *av_nrels, double * ci68, double * ci95,
+        double * ci99, stats_yield_srcptr stats_yield)
+{
+    long tot_rels = 0;
+    int n = stats_yield->n;
+    double nn = (double) n;
+    for (int i = 0; i < n; ++i) {
+        tot_rels += stats_yield->data[i].nrels;
+    }
+    *av_nrels = (double)tot_rels / nn;
+
+    double sigma = 0;
+    for (int i = 0; i < n; ++i) {
+        double diff = stats_yield->data[i].nrels - *av_nrels;
+        sigma += diff*diff;
+    }
+    sigma /= (nn-1);  // the "-1" is supposed to give a better estimator.
+    sigma = sqrt(sigma);
+    if (ci68 != NULL) 
+        *ci68 = sigma/sqrt(nn);
+    if (ci95 != NULL) 
+        *ci95 = 2*sigma/sqrt(nn);
+    if (ci99 != NULL) 
+        *ci99 = 3*sigma/sqrt(nn);
+}
+
+
 // Attempt to compute a confidence interval for the average yield.
 void yield_confidence_interval(double *av_yield, double * ci68, double * ci95,
         double * ci99, stats_yield_srcptr stats_yield)
 {
     long tot_rels = 0;
     *av_yield = 0;
-    int n = stats_yield->n;
-    for (int i = 0; i < n; ++i) {
+    int nn = stats_yield->n;
+    int n = 0;
+    for (int i = 0; i < nn; ++i) {
+        if (stats_yield->data[i].nrels == 0)
+            continue;
+        n++;
         tot_rels += stats_yield->data[i].nrels;
         *av_yield += stats_yield->data[i].time;
     }
     *av_yield /= tot_rels;
 
     double sigma = 0;
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < nn; ++i) {
+        if (stats_yield->data[i].nrels == 0)
+            continue;
         double diff = stats_yield->data[i].time/stats_yield->data[i].nrels
             - *av_yield;
         sigma += stats_yield->data[i].nrels*diff*diff;
@@ -201,7 +236,18 @@ void yield_confidence_interval(double *av_yield, double * ci68, double * ci95,
         *ci99 = 3*sigma/sqrt(n);
 }
 
-// Attempt to compute a confidence interval for the average yield.
+void stats_nrels_print_ci(stats_yield_srcptr stats_yield)
+{
+    double ci68, ci95, ci99, av_nrels;
+    nrels_confidence_interval(&av_nrels, &ci68, &ci95, &ci99, stats_yield);
+    printf("#   Confidence interval for rels/sq at 68.2%%: [%1.4f - %1.4f]\n",
+            av_nrels - ci68, av_nrels + ci68);
+    printf("#                                   at 95.4%%: [%1.4f - %1.4f]\n",
+            av_nrels - ci95, av_nrels + ci95);
+    printf("#                                   at 99.7%%: [%1.4f - %1.4f]\n",
+            av_nrels - ci99, av_nrels + ci99);
+}
+
 void stats_yield_print_ci(stats_yield_srcptr stats_yield)
 {
     double ci68, ci95, ci99, av_yield;
@@ -245,6 +291,8 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "                   q0 and q1 are ignored.\n");
     fprintf(stderr, "  reliableyield    ignore q1, run until estimated yield is reliable\n");
     fprintf(stderr, "                   that is in a +/-3%% interval with 95%% confidence level.\n");
+    fprintf(stderr, "  reliablenrels    the same, but criterion is rels per sq.\n");
+    fprintf(stderr, "  reliablerange    set the 3%% to another percentage in reliable estimates.\n");
     fprintf(stderr, "Note: giving (q0,q1) is exclusive to giving (q,rho). In the latter case,\n" "    rho is optional.\n");
     fprintf(stderr, "  sqside           side (0 or 1) of the special-q (default %d)\n", SQSIDE_DEFAULT);
     fprintf(stderr, "  firstsieve       side (0 or 1) to sieve first (default %d)\n", FIRSTSIEVE_DEFAULT);
@@ -276,6 +324,8 @@ int main(int argc, char **argv)
     int skewness = 0;
     int gf = 0;
     int want_reliable_yield = 0;
+    int want_reliable_nrels = 0;
+    double reliablerange = 0.03;
     int sqt = 3;
     int bench = 0;
     int bench_end = 0;
@@ -286,6 +336,7 @@ int main(int argc, char **argv)
     param_list_init(pl);
     param_list_configure_knob(pl, "-sublat", &want_sublat);
     param_list_configure_knob(pl, "-reliableyield", &want_reliable_yield);
+    param_list_configure_knob(pl, "-reliablenrels", &want_reliable_nrels);
     argv++, argc--;
     for (; argc;) {
         if (param_list_update_cmdline(pl, &argc, &argv)) {
@@ -466,6 +517,12 @@ int main(int argc, char **argv)
         fprintf(stderr, "# Sorry, no sublattices in characteristic > 2. Ignoring the 'sublat' option\n");
     sublat_ptr sublat = &no_sublat[0];
 #endif
+
+    param_list_parse_double(pl, "reliablerange", &reliablerange);
+    if (want_reliable_yield && want_reliable_nrels) {
+        fprintf(stderr, "Error: -reliableyield and -reliablenrels are incompatible options.\n");
+        exit(EXIT_FAILURE);
+    }
   
     // Most of what we do is at the sublattice level. 
     // So we fix I and J accordingly.
@@ -584,7 +641,18 @@ int main(int argc, char **argv)
                 nroots = sq_roots(roots, q0, ffspol[sqside]);
             } while (nroots == 0);
 
-            if (want_reliable_yield) {
+            if (want_reliable_nrels) {
+                if (stats_yield->n > 10) {
+                    double av_nrels, ci95;
+                    nrels_confidence_interval(&av_nrels, NULL, &ci95, NULL,
+                            stats_yield);
+                    printf("############################################\n");
+                    printf("#   Current average nrels: %1.2f\n", av_nrels);
+                    stats_nrels_print_ci(stats_yield);
+                    if (ci95/av_nrels < reliablerange)
+                        break;
+                }
+            } else if (want_reliable_yield) {
                 if (stats_yield->n > 10) {
                     double av_yield, ci95;
                     yield_confidence_interval(&av_yield, NULL, &ci95, NULL,
@@ -592,7 +660,7 @@ int main(int argc, char **argv)
                     printf("############################################\n");
                     printf("#   Current average yield: %1.2f\n", av_yield);
                     stats_yield_print_ci(stats_yield);
-                    if (ci95/av_yield < 0.03)
+                    if (ci95/av_yield < reliablerange)
                         break;
                 }
             } else if (sq_cmp(q0, q1) >= 0) {
@@ -874,8 +942,8 @@ int main(int argc, char **argv)
 
         if (nrels == 0) {
             no_rels_sq++;
-        } else
-            stats_yield_push(stats_yield, nrels, t_tot, qlat);
+        } 
+        stats_yield_push(stats_yield, nrels, t_tot, qlat);
     } while (1); // End of loop over special-q's
 
     free(S);
@@ -907,9 +975,10 @@ int main(int argc, char **argv)
     fprintf(stdout, "#   %d relations found (%1.1f rel/sq)\n",
             tot_nrels, (double)tot_nrels / (double)tot_sq);
     fprintf(stdout, "#   Yield: %1.5f s/rel\n", tot_time/tot_nrels);
+    stats_nrels_print_ci(stats_yield);
     stats_yield_print_ci(stats_yield);
     if (no_rels_sq > 0) {
-        fprintf(stdout, "#   Warning: statistics are biased. There were %d special-q with no relations.\n", no_rels_sq);
+        fprintf(stdout, "#   Warning: statistics on yield are biased. There were %d special-q with no relations.\n", no_rels_sq);
     }
 #ifdef WANT_NORM_STATS
     norm_stats_print();

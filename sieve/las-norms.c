@@ -125,7 +125,7 @@ init_norms (sieve_info_ptr si, int s)
    Output: o , trunc(o) == trunc(log2(i)) && o <= log2(i) < o + 0.0861.
    Careful: o ~= log2(i) iif add = 0x3FF00000 & scale = 1/0x100000.
    Add & scale are need to compute o'=f(log(i)) where f is an affine function */
-inline int inttruncfastlog2(double i, double add, double scale) {
+static inline int inttruncfastlog2(double i, double add, double scale) {
 #ifdef HAVE_SSE2
   double dummy;
   int o;
@@ -182,16 +182,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
     g, rac, d0, d1, i;
   size_t ts;
 
-  static double cexp2[257]; /*  cexp2[UCHAR_MAX+1] INCLUDED! It may be used (not in S) */
-  static double ratscale = 0;
-  
-  if (ratscale != rat->scale) {
-    double step, i;
-    ratscale = rat->scale;
-    for (inc = 0, step = 1 / ratscale, i = -step * GUARD;
-	 inc <= 256; i += step) cexp2[inc++] = exp2(i);
-  }
-  d0_init = cexp2[((unsigned int)GUARD) - 1U];
+  d0_init = rat->cexp2[((unsigned int)GUARD) - 1U];
   if (!j) {
     // compute only the norm for i = 1. Everybody else is 255.
     memset(S, 255, halfI<<1);
@@ -225,7 +216,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
        So, it's possible if y is very near trunc(y), old_i == int_i, so ts == 0.
        We have to iterate at least one time to avoid this case => this is the
        use of inc here. */
-    for (i = rac + cexp2[y] * invu1, inc = 1;; y--) {
+    for (i = rac + rat->cexp2[y] * invu1, inc = 1;; y--) {
       ts = -int_i;
       int_i = (int) trunc(i); 
       if (UNLIKELY(int_i >= halfI)) {
@@ -288,7 +279,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
     d0 = 1.0/d0;
     d1 = rac - d0 * rac;
     y++;
-    i = rac - cexp2[(unsigned int)y + 1] * invu1;
+    i = rac - rat->cexp2[(unsigned int)y + 1] * invu1;
     for (;; y++) {
       ts = -int_i;
       int_i = (int) trunc(i);
@@ -315,7 +306,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
 
     /* Now, the same from cas1 but log2(-g): CAREFUL, not the same formula */
   cas3:
-    for (i = rac - cexp2[y] * invu1, inc = 1;; y--) {
+    for (i = rac - rat->cexp2[y] * invu1, inc = 1;; y--) {
       ts = -int_i;
       int_i = (int) trunc(i); 
       if (UNLIKELY(int_i >= halfI)) {
@@ -378,7 +369,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
     d0 = 1.0/d0;
     d1 = rac - d0 * rac;
     y++;
-    i = rac + cexp2[(unsigned int)y + 1] * invu1;
+    i = rac + rat->cexp2[(unsigned int)y + 1] * invu1;
     for (;; y++) {
       ts = -int_i;
       int_i = (int) trunc(i);
@@ -779,6 +770,7 @@ get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
    rational and algebraic sides */
 void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int qside)
 {
+  double step, begin;
   for (int side = 0; side < 2; side++)
     {
       int d = si->cpoly->pols[side]->degree;
@@ -827,10 +819,9 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
   /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
      thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
   rat->scale = ((double) UCHAR_MAX - GUARD + 1) / maxlog2 * 0.999999;
-  /* fprintf (stderr, "rat->scale, my fomula = %f\n", rat->scale); */
-  /* rat->scale = ((double) UCHAR_MAX - GUARD) / maxlog2; */
-  /* fprintf (stderr, "rat->scale, old correct fomula = %f\n", rat->scale); */
-
+  step = 1 / rat->scale;
+  begin = -step * GUARD;
+  for (unsigned int inc = 0; inc < 257; begin += step) rat->cexp2[inc++] = exp2(begin);
   /* we want to select relations with a cofactor of less than r bits on the
      rational side */
   r = MIN(si->conf->sides[RATIONAL_SIDE]->lambda * (double) si->conf->sides[RATIONAL_SIDE]->lpb, maxlog2 - GUARD / rat->scale);
@@ -861,6 +852,9 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
   /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
      thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
   alg->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
+  step = 1 / alg->scale;
+  begin = -step * GUARD;
+  for (unsigned int inc = 0; inc < 257; begin += step) alg->cexp2[inc++] = exp2(begin);
   /* we want to report relations with a remaining log2-norm after sieving of
      at most lambda * lpb, which corresponds in the y-range to
      y >= GUARD + lambda * lpb * scale */
