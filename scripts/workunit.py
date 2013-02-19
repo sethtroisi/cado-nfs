@@ -71,7 +71,7 @@ class Workunit(object):
                     wu[key] = []
                 wu[key].append(value)
         # END: for line in text.splitlines()
-        self.data = wu
+        self.wudata = wu
         # The WORKUNIT key must be given
         if not "WORKUNIT" in wu:
             raise Exception("Workunit has no WORKUNIT line")
@@ -80,24 +80,24 @@ class Workunit(object):
         """ Produce text for a WU, as could be stored in a WU file """
         str = ""
         for (key, keytype) in self.__class__.KEYS:
-            if not key in self.data:
+            if not key in self.wudata:
                 continue
             if not keytype.takes_value:
                 str = str + key + "\n"
             elif not keytype.takes_multiple:
-                str = str + key + " " + self.data[key] + "\n"
+                str = str + key + " " + self.wudata[key] + "\n"
             elif keytype.takes_checksum:
-                for (name, checksum) in self.data[key]:
+                for (name, checksum) in self.wudata[key]:
                     str = str + key + " " + name + "\n"
                     if not checksum == None:
                         str = str + "CHECKSUM " + checksum + "\n"
             else:
-                for value in self.data[key]:
+                for value in self.wudata[key]:
                     str = str + key + " " + value + "\n"
         return str
     
     def get_id(self):
-        return self.data["WORKUNIT"]
+        return self.wudata["WORKUNIT"]
 
 def wu_test():
     """ Class to test workunit parser 
