@@ -55,6 +55,7 @@ build/
 # .gitignore end
 
 14. Convert line endings to LF with
+git rm --cached -r .
 git reset --hard
 
 15. Convert link to copies of files. In working directory root, run:
