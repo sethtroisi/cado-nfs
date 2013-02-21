@@ -74,10 +74,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "utils.h"
 #ifdef FOR_FFS
 #include "utils_ffs.h"
+//#define STAT_FFS
 #endif
 
-//#define STAT_FFS
 
+#include "p_num.h"
 //#define USE_CAVALLAR_WEIGHT_FUNCTION
 
 #define MAX_FILES 1000000
@@ -682,7 +683,7 @@ compare (const void *v1, const void *v2)
 float
 weight_function_clique (HC_T w)
 {
-#ifdef USE_CAVALLAR_WEIGHT_FUNCTION
+/* #ifdef USE_CAVALLAR_WEIGHT_FUNCTION
   if (w >= 3)
     return ldexpf (1, -(w-1));
   else if (w == 2)
@@ -690,13 +691,97 @@ weight_function_clique (HC_T w)
   else
       return 0.0;
 #else
-    if (w >= 3)
+    if (w >= 3)*/
       /* we use the multiplier 5 here, so that the average weight (assumed to
          be 1) is in the middle of the Count[10] array */
-      return (float) 5.0 / (float) w;
+      //return (float) 5.0 / (float) w;
+/*      return (ldexpf (1, w-2)) / powf(3.0, (float) (w-2.0));
+    else if (w == 2)
+      return 0.125;
     else
       return 0.0;
+#endif */
+    if (w >= 3)
+    {
+#if PURGE_FIRST == 0 
+      return 1.0;
+#elif PURGE_FIRST == 1
+      return -1.0;//logf ((float) GET_HASH_P(&H,h));
+#elif PURGE_FIRST == 2
+      return ldexpf (1, -(w-2));
+#elif PURGE_FIRST == 3
+      return (float) 1.0/(w-1.0);
+#elif PURGE_FIRST == 4
+      return 1/logf ((float) (w+1));
+#elif PURGE_FIRST == 6
+      return (float) 4.0/(((float) w)*((float) w));
+#elif PURGE_FIRST == 7
+      return (ldexpf (1, w-2)) / powf(3.0, (float) (w-2.0));
+#elif PURGE_FIRST == 8
+      return 1/sqrtf((float) (w - 1.0));
+#elif PURGE_FIRST == 9
+      return 1/log2f((float) (w));
+#elif PURGE_FIRST == 10
+      return (float) 2.0/((float) w);
+#elif PURGE_FIRST == 11
+      return (float) 1.0/((float) w);
+#elif PURGE_FIRST == 12
+      return ldexpf (1, -(w-1));
+#elif PURGE_FIRST == 13
+      return powf (4.0, (float) (w-2.0)) / powf(5.0, (float) (w-2.0));
+#elif PURGE_FIRST == 14
+      return powf (4.0, (float) (w-2.0)) / powf(7.0, (float) (w-2.0));
+#elif PURGE_FIRST == 15
+      return powf (8.0, (float) (w-2.0)) / powf(9.0, (float) (w-2.0));
+#elif PURGE_FIRST == 16
+      return powf (8.0, (float) (w-2.0)) / powf(11.0, (float) (w-2.0));
+#elif PURGE_FIRST == 5
+  #if PURGE_SECOND == 0
+      return 1.0;
+  #elif PURGE_SECOND == 1
+      return 0.0; 
+  #elif PURGE_SECOND == 2
+      return (float) 1.0 / W;
+  #else // error
+      fprintf (stderr, "Wrong value of PURGE_SECOND\n");
+      exit(EXIT_FAILURE);
+  #endif
+#else // error
+      fprintf (stderr, "Wrong value of PURGE_FIRST\n");
+      exit(EXIT_FAILURE);
 #endif
+    }
+    else if (w == 2)
+    {
+#if PURGE_FIRST == 5
+  #if PURGE_SECOND == 0
+      return 0.0;
+  #elif PURGE_SECOND == 1
+      return 0.5; 
+  #elif PURGE_SECOND == 2
+      return (float) 0.5 / N;
+  #else
+      fprintf (stderr, "Wrong value of PURGE_SECOND\n");
+      exit(EXIT_FAILURE);
+  #endif
+#else
+  #if PURGE_SECOND == 1
+      return 0.25;
+  #elif PURGE_SECOND == 2
+      return 0.5; 
+  #elif PURGE_SECOND == 3
+    return 1.0;
+  #elif PURGE_SECOND == 4
+    return 0.125;
+  #elif PURGE_SECOND == 5
+    return 0.375;
+  #else // by default PURGE_SECOND == 0
+    return 0.0;
+  #endif
+#endif
+    }
+    else
+      return 0.0;
 }
 
 /* Compute connected component of row i for the relation R(i1,i2) if rows
@@ -2069,15 +2154,27 @@ prempt_scan_relations_pass_two (const char *oname,
 }
 
 static void
-usage (void)
+usage (const char *argv0)
 {
-  fprintf (stderr, "Usage: purge [options] -poly polyfile -out purgedfile -nrels nnn [-basepath <path>] [-subdirlist <sl>] [-filelist <fl>] file1 ... filen\n");
-  fprintf (stderr, "Options:\n");
+  fprintf (stderr, "Usage: %s [options] ", argv0);
+  fprintf (stderr, "[ -filelist <fl> [-basepath <path>] [-subdirlist <sl>] ");
+  fprintf (stderr, "| file1 ... filen ]\n");
+  fprintf (stderr, "Mandatory command line options: \n");
+  fprintf (stderr, "       -poly polyfile - use polynomial in polyfile\n");
+  fprintf (stderr, "       -out outfile   - write remaining relations in outfile\n");
+  fprintf (stderr, "       -nrels nnn     - number of initial relations\n");
+#ifndef FOR_FFS
+  fprintf (stderr, "\n    Other command line options: \n");
+#endif
+  fprintf (stderr, "       -outdel file - output file for deleted relations\n");
+  fprintf (stderr, "       -sos sosfile - to keep track of the renumbering\n");
+#ifdef FOR_FFS
+  fprintf (stderr, "\n    Other command line options: \n");
+#endif
   fprintf (stderr, "       -keep    nnn - prune if excess > nnn (default 160)\n");
   fprintf (stderr, "       -minpa   nnn - purge alg. primes >= nnn (default alim)\n");
   fprintf (stderr, "       -minpr   nnn - purge rat. primes >= nnn (default rlim)\n");
   fprintf (stderr, "       -nprimes nnn - expected number of prime ideals\n");
-  fprintf (stderr, "       -sos sosfile - to keep track of the renumbering\n");
   fprintf (stderr, "       -raw         - output relations in CADO format\n");
   fprintf (stderr, "       -npthr   nnn - threads number for suppress singletons\n");
   fprintf (stderr, "       -inprel  file_rel_used : load active relations\n");
@@ -2085,9 +2182,6 @@ usage (void)
   fprintf (stderr, "       -npass   nnn - number of step of clique removal (default %d)\n", DEFAULT_NPASS);
   fprintf (stderr, "       -required_excess nnn - percentage of excess required at the end of the first singleton removal step (default %.2f)\n",
   DEFAULT_REQUIRED_EXCESS);
-#ifdef FOR_FFS
-  fprintf (stderr, "       -outdel file - output file for deleted relations\n");
-#endif
   exit (1);
 }
 
@@ -2139,6 +2233,8 @@ set_rep_cado (const char *argv0) {
 int
 main (int argc, char **argv)
 {
+  char *argv0 = argv[0];
+
   int k;
   size_t mysize;
   param_list pl;
@@ -2162,7 +2258,7 @@ main (int argc, char **argv)
     if (param_list_update_cmdline(pl, &argc, &argv)) continue;
     /* Since we accept file names freeform, we decide to never abort
      * on unrecognized options */
-    if (!strcmp(*argv, "--help")) usage();
+    if (!strcmp(*argv, "--help")) usage(argv0);
     break;
   }
 
@@ -2194,10 +2290,10 @@ main (int argc, char **argv)
       if (sscanf(snpt, "%u", &x) && sscanf(&p[1], "%u", &y))
 	npt = x * y;
       else
-	usage();
+	usage(argv0);
     } else
       if (!sscanf(snpt, "%u", &npt))
-	usage();
+	usage(argv0);
   }
   param_list_parse_uint(pl, "npass", &npass);
   param_list_parse_double(pl, "required_excess", &required_excess);
@@ -2226,18 +2322,18 @@ main (int argc, char **argv)
 #endif
 
   if (param_list_warn_unused(pl)) {
-    usage();
+    usage(argv0);
   }
 
   if ((basepath || subdirlist) && !filelist) {
     fprintf(stderr, "-basepath / -subdirlist only valid with -filelist\n");
-    usage();
+    usage(argv0);
   }
 
   if (nrelmax == 0)
     {
       fprintf (stderr, "Error, missing -nrels ... option (or nrels=0)\n");
-      usage ();
+      usage (argv0);
     }
 
 #ifdef FOR_FFS /* For FFS we need to remember the renumbering of primes*/
