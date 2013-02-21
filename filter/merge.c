@@ -117,15 +117,14 @@ main (int argc, char *argv[])
 
     argv++, argc--;
 
-    if (argc == 0) /* To avoid a seg fault is no command line arg is given */
-      usage ();
-
     for( ; argc ; ) {
       if (param_list_update_cmdline(pl, &argc, &argv)) continue;
       fprintf (stderr, "Unknown option: %s\n", argv[0]);
       usage ();
     }
 
+    /* Update parameter list at least once to register argc/argv pointers. */
+    param_list_update_cmdline (pl, &argc, &argv);
     /* print command-line arguments */
     param_list_print_command_line (stdout, pl);
     fflush(stdout);
