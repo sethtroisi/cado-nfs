@@ -675,7 +675,7 @@ print_report (report_t *rep, filter_matrix_t *mat, int forbw, double bwcost)
 
 
 void
-mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
+mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
                int forbw, double ratio, double coverNmax)
 {
     double totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;

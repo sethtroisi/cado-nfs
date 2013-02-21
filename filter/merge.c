@@ -60,7 +60,6 @@ static void
 usage (void)
 {
   fprintf (stderr, "Usage: merge [options]\n");
-  fprintf (stderr, "   -v             - print some extra information\n");
   fprintf (stderr, "   -mat   xxx     - input (purged) file is xxx\n");
   fprintf (stderr, "   -out   xxx     - output (history) file is xxx\n");
   fprintf (stderr, "   -maxlevel nnn  - merge up to nnn rows (default %u)\n",
@@ -92,7 +91,6 @@ main (int argc, char *argv[])
     char *purgedname = NULL, *outname = NULL;
     char *resumename = NULL;
     int maxlevel = MAXLEVEL_DEFAULT, keep = KEEP_DEFAULT, skip = SKIP_DEFAULT;
-    int verbose = 0; /* default verbose level */
     double tt;
     double ratio = RATIO_DEFAULT; /* bound on cN_new/cN to stop the merge */
     int i, forbw = FORBW_DEFAULT;
@@ -132,11 +130,6 @@ main (int argc, char *argv[])
 	    skip = atoi(argv[2]);
 	    argc -= 2;
 	    argv += 2;
-	}
-	else if (argc > 1 && strcmp (argv[1], "-v") == 0){
-            verbose ++;
-	    argc -= 1;
-	    argv += 1;
 	}
 	else if (argc > 2 && strcmp (argv[1], "-forbw") == 0){
 	    forbw = atoi(argv[2]);
@@ -249,7 +242,7 @@ main (int argc, char *argv[])
     fillmat (mat);
 
     tt = wct_seconds ();
-    filter_matrix_read (mat, ps, verbose, skip);
+    filter_matrix_read (mat, ps, skip);
     printf ("Time for filter_matrix_read: %2.2lf\n", wct_seconds () - tt);
 
     /* initialize rep, i.e., mostly opens outname */
@@ -271,7 +264,7 @@ main (int argc, char *argv[])
     MkzInit (mat);
     printf ("Time for MkzInit: %2.2lf\n", seconds()-tt);
 
-    mergeOneByOne (rep, mat, maxlevel, verbose, forbw, ratio, coverNmax);
+    mergeOneByOne (rep, mat, maxlevel, forbw, ratio, coverNmax);
 
     gzip_close (rep->outfile, outname);
     printf ("Final matrix has N=%d nc=%d (%d) w(M)=%lu N*w(M)=%"
