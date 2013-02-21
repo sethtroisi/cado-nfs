@@ -31,7 +31,6 @@ typedef struct {
                         else <= 1 for a deleted column
                         (trick: we store -w if w > cwmax) */
   int nburied;     /* the number of buried columns */
-  unsigned long *ad;
   unsigned long weight;
   int cwmax;         /* bound on weight of j to enter the SWAR structure */
   int rwmax;         /* if a weight(row) > rwmax, kill that row */
