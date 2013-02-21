@@ -2069,15 +2069,27 @@ prempt_scan_relations_pass_two (const char *oname,
 }
 
 static void
-usage (void)
+usage (const char *argv0)
 {
-  fprintf (stderr, "Usage: purge [options] -poly polyfile -out purgedfile -nrels nnn [-basepath <path>] [-subdirlist <sl>] [-filelist <fl>] file1 ... filen\n");
-  fprintf (stderr, "Options:\n");
+  fprintf (stderr, "Usage: %s [options] ", argv0);
+  fprintf (stderr, "[ -filelist <fl> [-basepath <path>] [-subdirlist <sl>] ");
+  fprintf (stderr, "| file1 ... filen ]\n");
+  fprintf (stderr, "Mandatory command line options: \n");
+  fprintf (stderr, "       -poly polyfile - use polynomial in polyfile\n");
+  fprintf (stderr, "       -out outfile   - write remaining relations in outfile\n");
+  fprintf (stderr, "       -nrels nnn     - number of initial relations\n");
+#ifndef FOR_FFS
+  fprintf (stderr, "\n    Other command line options: \n");
+#endif
+  fprintf (stderr, "       -outdel file - output file for deleted relations\n");
+  fprintf (stderr, "       -sos sosfile - to keep track of the renumbering\n");
+#ifdef FOR_FFS
+  fprintf (stderr, "\n    Other command line options: \n");
+#endif
   fprintf (stderr, "       -keep    nnn - prune if excess > nnn (default 160)\n");
   fprintf (stderr, "       -minpa   nnn - purge alg. primes >= nnn (default alim)\n");
   fprintf (stderr, "       -minpr   nnn - purge rat. primes >= nnn (default rlim)\n");
   fprintf (stderr, "       -nprimes nnn - expected number of prime ideals\n");
-  fprintf (stderr, "       -sos sosfile - to keep track of the renumbering\n");
   fprintf (stderr, "       -raw         - output relations in CADO format\n");
   fprintf (stderr, "       -npthr   nnn - threads number for suppress singletons\n");
   fprintf (stderr, "       -inprel  file_rel_used : load active relations\n");
@@ -2085,9 +2097,6 @@ usage (void)
   fprintf (stderr, "       -npass   nnn - number of step of clique removal (default %d)\n", DEFAULT_NPASS);
   fprintf (stderr, "       -required_excess nnn - percentage of excess required at the end of the first singleton removal step (default %.2f)\n",
   DEFAULT_REQUIRED_EXCESS);
-#ifdef FOR_FFS
-  fprintf (stderr, "       -outdel file - output file for deleted relations\n");
-#endif
   exit (1);
 }
 
@@ -2139,6 +2148,8 @@ set_rep_cado (const char *argv0) {
 int
 main (int argc, char **argv)
 {
+  char *argv0 = argv[0];
+
   int k;
   size_t mysize;
   param_list pl;
@@ -2162,7 +2173,7 @@ main (int argc, char **argv)
     if (param_list_update_cmdline(pl, &argc, &argv)) continue;
     /* Since we accept file names freeform, we decide to never abort
      * on unrecognized options */
-    if (!strcmp(*argv, "--help")) usage();
+    if (!strcmp(*argv, "--help")) usage(argv0);
     break;
   }
 
@@ -2194,10 +2205,10 @@ main (int argc, char **argv)
       if (sscanf(snpt, "%u", &x) && sscanf(&p[1], "%u", &y))
 	npt = x * y;
       else
-	usage();
+	usage(argv0);
     } else
       if (!sscanf(snpt, "%u", &npt))
-	usage();
+	usage(argv0);
   }
   param_list_parse_uint(pl, "npass", &npass);
   param_list_parse_double(pl, "required_excess", &required_excess);
@@ -2226,18 +2237,18 @@ main (int argc, char **argv)
 #endif
 
   if (param_list_warn_unused(pl)) {
-    usage();
+    usage(argv0);
   }
 
   if ((basepath || subdirlist) && !filelist) {
     fprintf(stderr, "-basepath / -subdirlist only valid with -filelist\n");
-    usage();
+    usage(argv0);
   }
 
   if (nrelmax == 0)
     {
       fprintf (stderr, "Error, missing -nrels ... option (or nrels=0)\n");
-      usage ();
+      usage (argv0);
     }
 
 #ifdef FOR_FFS /* For FFS we need to remember the renumbering of primes*/

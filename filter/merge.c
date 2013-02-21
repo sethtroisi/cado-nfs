@@ -59,13 +59,13 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #define WMSTMAX_DEFAULT 7 /* relevant only if mkztype == 2 */
 
 static void
-usage (void)
+usage (const char *argv0)
 {
-  fprintf (stderr, "Usage: merge -mat xxx -out xxx [options]\n");
-  fprintf (stderr, "\n");
+  fprintf (stderr, "Usage: %s [options]\n", argv0);
+  fprintf (stderr, "\nMandatory command line options: \n");
   fprintf (stderr, "   -mat   xxx     - input (purged) file is xxx\n");
   fprintf (stderr, "   -out   xxx     - output (history) file is xxx\n");
-  fprintf (stderr, "\n");
+  fprintf (stderr, "\nOther command line options: \n");
   fprintf (stderr, "   -maxlevel nnn  - merge up to nnn rows (default %u)\n",
 	   MAXLEVEL_DEFAULT);
   fprintf (stderr, "   -keep nnn      - keep an excess of nnn (default %u)\n",
@@ -92,6 +92,8 @@ usage (void)
 int
 main (int argc, char *argv[])
 {
+    char *argv0 = argv[0];
+
     filter_matrix_t mat[1];
     report_t rep[1];
 
@@ -120,7 +122,7 @@ main (int argc, char *argv[])
     for( ; argc ; ) {
       if (param_list_update_cmdline(pl, &argc, &argv)) continue;
       fprintf (stderr, "Unknown option: %s\n", argv[0]);
-      usage ();
+      usage (argv0);
     }
 
     /* Update parameter list at least once to register argc/argv pointers. */
@@ -150,7 +152,10 @@ main (int argc, char *argv[])
 
     /* Some checks on command line arguments */
     if (purgedname == NULL || outname == NULL)
-      usage ();
+    {
+      fprintf (stderr, "Error: -mat and -out are mandatory.\n");
+      usage (argv0);
+    }
 
     if (maxlevel == 0 || maxlevel > MERGE_LEVEL_MAX)
     {
@@ -170,6 +175,9 @@ main (int argc, char *argv[])
       fprintf (stderr, "Error: -mkztype should be 0, 1, or 2.\n");
       exit (1);
     }
+
+    if (param_list_warn_unused (pl))
+      usage (argv0);
 
 
 
