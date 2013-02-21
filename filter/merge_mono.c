@@ -883,7 +883,7 @@ doAllAdds(report_t *rep, filter_matrix_t *mat, char *str)
 // resumename is a file of the type mergehis.
 // TODO: Compiles, but not really tested with Markowitz...!
 void
-resume(report_t *rep, filter_matrix_t *mat, char *resumename)
+resume(report_t *rep, filter_matrix_t *mat, const char *resumename)
 {
     FILE *resumefile = fopen(resumename, "r");
     char str[RELATION_MAX_BYTES];

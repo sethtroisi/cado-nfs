@@ -14,7 +14,7 @@ extern int addFatherToSons(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1], filt
 extern int number_of_superfluous_rows(filter_matrix_t *mat);
 extern void mergeOneByOne(report_t *rep, filter_matrix_t *mat, int maxlevel, int forbw, double ratio, double coverNmax);
 
-extern void resume(report_t *rep, filter_matrix_t *mat, char *resumename);
+extern void resume(report_t *rep, filter_matrix_t *mat, const char *resumename);
 
 #ifdef __cplusplus
 }
