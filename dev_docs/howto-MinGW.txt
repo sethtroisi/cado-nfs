@@ -45,6 +45,14 @@ directory where Git is installed):
 * eol=lf
 # .gitattributes end
 
+Check that the attributes are properly taken into account with:
+
+git check-attr -a gf2x/gf2x/gf2x-config.h.in
+
+The output should be:
+
+gf2x/gf2x/gf2x-config.h.in: eol: lf
+
 13. Create .gitignore in working directory root with contents:
 # .gitignore start
 .gitignore
@@ -55,6 +63,7 @@ build/
 # .gitignore end
 
 14. Convert line endings to LF with
+git rm --cached -r .
 git reset --hard
 
 15. Convert link to copies of files. In working directory root, run:
