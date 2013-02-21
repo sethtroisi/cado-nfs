@@ -55,6 +55,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #define FORBW_DEFAULT 0
 #define RATIO_DEFAULT 1.1
 #define COVERNMAX_DEFAULT 100.0
+#define MKZTYPE_DEFAULT 1 /* pure Markowitz */
+#define WMSTMAX_DEFAULT 7 /* relevant only if mkztype == 2 */
 
 static void
 usage (void)
@@ -75,6 +77,8 @@ usage (void)
   fprintf (stderr, "   -coverNmax nnn - with forbw=3, stop when c/N exceeds nnn (default %1.2f)\n", COVERNMAX_DEFAULT);
   fprintf (stderr, "   -itermax nnn   - if non-zero, stop when nnn columns have been removed (cf -resume)\n");
   fprintf (stderr, "   -resume xxx    - resume from history file xxx (cf -itermax)\n");
+  fprintf (stderr, "   -mkztype nnn   - controls how the weight of a merge is approximated (default %d)\n", MKZTYPE_DEFAULT);
+  fprintf (stderr, "   -wmstmax nnn   - if mkztype = 2, controls until when a mst  is used (default %d)\n", WMSTMAX_DEFAULT);
   fprintf (stderr, "\nThe different optimization functions are, where c is the total matrix weight\n");
   fprintf (stderr, "and N the number of rows (relation-sets):\n");
   fprintf (stderr, "   -forbw 0 - optimize the matrix size N (cf -ratio)\n");
@@ -95,8 +99,8 @@ main (int argc, char *argv[])
     double ratio = RATIO_DEFAULT; /* bound on cN_new/cN to stop the merge */
     int i, forbw = FORBW_DEFAULT;
     double coverNmax = COVERNMAX_DEFAULT;
-    int wmstmax = 7; /* use real MST minimum for wt[j] <= wmstmax */
-    int mkztype = 1; /* pure Markowitz */
+    int mkztype = MKZTYPE_DEFAULT;
+    int wmstmax = WMSTMAX_DEFAULT; /* use real MST minimum for wt[j] <= wmstmax*/
     int itermax = 0;
     double wct0 = wct_seconds ();
 
