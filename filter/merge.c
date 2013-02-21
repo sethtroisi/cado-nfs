@@ -94,14 +94,19 @@ main (int argc, char *argv[])
 {
     filter_matrix_t mat[1];
     report_t rep[1];
-    int maxlevel = MAXLEVEL_DEFAULT, keep = KEEP_DEFAULT, skip = SKIP_DEFAULT;
-    double tt;
+
+    uint32_t maxlevel = MAXLEVEL_DEFAULT;
+    uint32_t keep = KEEP_DEFAULT;
+    uint32_t skip = SKIP_DEFAULT;
     double ratio = RATIO_DEFAULT; /* bound on cN_new/cN to stop the merge */
-    int forbw = FORBW_DEFAULT;
+    uint32_t forbw = FORBW_DEFAULT;
     double coverNmax = COVERNMAX_DEFAULT;
-    int mkztype = MKZTYPE_DEFAULT;
-    int wmstmax = WMSTMAX_DEFAULT; /* use real MST minimum for wt[j] <= wmstmax*/
-    int itermax = 0;
+    uint32_t mkztype = MKZTYPE_DEFAULT;
+    uint32_t wmstmax = WMSTMAX_DEFAULT;
+                               /* use real MST minimum for wt[j] <= wmstmax*/
+    uint32_t itermax = 0;
+
+    double tt;
     double wct0 = wct_seconds ();
     param_list pl;
     param_list_init (pl);
@@ -131,18 +136,43 @@ main (int argc, char *argv[])
     /* to a too small value of -maxlevel                      */
     const char * resumename = param_list_lookup_string (pl, "resume");
 
-    param_list_parse_int (pl, "maxlevel", &maxlevel);
-    param_list_parse_int (pl, "keep", &keep);
-    param_list_parse_int (pl, "skip", &skip);
-    param_list_parse_int (pl, "forbw", &forbw);
+    param_list_parse_uint (pl, "maxlevel", &maxlevel);
+    param_list_parse_uint (pl, "keep", &keep);
+    param_list_parse_uint (pl, "skip", &skip);
+    param_list_parse_uint (pl, "forbw", &forbw);
 
     param_list_parse_double (pl, "ratio", &ratio);
     param_list_parse_double (pl, "coverNmax", &coverNmax);
 
-    param_list_parse_int (pl, "mkztype", &mkztype);
-    param_list_parse_int (pl, "wmstmax", &wmstmax);
+    param_list_parse_uint (pl, "mkztype", &mkztype);
+    param_list_parse_uint (pl, "wmstmax", &wmstmax);
 
-    param_list_parse_int (pl, "itermax", &itermax);
+    param_list_parse_uint (pl, "itermax", &itermax);
+
+    /* Some checks on command line arguments */
+    if (purgedname == NULL || outname == NULL)
+      usage ();
+
+    if (maxlevel == 0 || maxlevel > MERGE_LEVEL_MAX)
+    {
+      fprintf (stderr, "Error: maxlevel should be positive and less than %d\n",
+                       MERGE_LEVEL_MAX);
+      exit (1);
+    }
+
+    if (forbw > 3)
+    {
+      fprintf (stderr, "Error: -forbw should be 0, 1, 2 or 3.\n");
+      exit (1);
+    }
+
+    if (mkztype > 2)
+    {
+      fprintf (stderr, "Error: -mkztype should be 0, 1, or 2.\n");
+      exit (1);
+    }
+
+
 
     purgedfile_stream ps;
     purgedfile_stream_init(ps);
@@ -181,7 +211,7 @@ main (int argc, char *argv[])
     /* print weight counts */
     {
       unsigned long j, *nbm, total_weight = 0;
-      int w;
+      uint32_t w;
 
       nbm = (unsigned long*) malloc ((maxlevel + 1) * sizeof (unsigned long));
       memset (nbm, 0, (maxlevel + 1) * sizeof (unsigned long));
