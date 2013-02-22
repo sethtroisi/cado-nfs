@@ -1,5 +1,8 @@
 #!/usr/bin/env python2
 
+# TODO: file locking for downloading files, so several clients can use the same files (factorbase etc.) safely
+# TODO: file locking for workunit files, so name collision can be detected
+
 import sys
 import os
 import stat
@@ -65,7 +68,7 @@ SETTINGS = dict([(a,b) for (a,(b,c)) in list(REQUIRED_SETTINGS.items()) + \
 def get_file(urlpath, dlpath = None, options = None):
     # print('get_file("' + urlpath + '", "' + dlpath + '")')
     if dlpath == None:
-        dlpath = SETTINGS["DLDIR"] + "/" + os.basename(urlpath) # FIXME: should be url base name
+        dlpath = SETTINGS["DLDIR"] + os.sep + urlpath.split("/")[-1]
     url = SETTINGS["SERVER"] + "/" + urlpath
     if options:
         url = url + "?" + options
@@ -169,11 +172,11 @@ class WorkunitProcessor(Workunit):
         for (filename, checksum) in self.wudata.get("FILE", []) + self.wudata.get("EXECFILE", []):
             archname = Template(filename).safe_substitute({"ARCH": SETTINGS["ARCH"]})
             dlname = Template(filename).safe_substitute({"ARCH": ""})
-            if not get_missing_file (archname, SETTINGS["DLDIR"] + '/' + dlname, checksum):
+            if not get_missing_file (archname, SETTINGS["DLDIR"] + os.sep + dlname, checksum):
                 return False
         for (filename, checksum) in self.wudata.get("EXECFILE", []):
             dlname = Template(filename).safe_substitute({"ARCH": ""})
-            path = SETTINGS["DLDIR"] + '/' + dlname
+            path = SETTINGS["DLDIR"] + os.sep + dlname
             mode = os.stat(path).st_mode
             if mode & stat.S_IXUSR == 0:
                 logging.info ("Setting executable flag for " + path)
@@ -231,7 +234,7 @@ class WorkunitProcessor(Workunit):
                 postdata.attach(attachment)
         if "RESULT" in self.wudata:
             for f in self.wudata["RESULT"]:
-                filepath = SETTINGS["WORKDIR"] + "/" + f
+                filepath = SETTINGS["WORKDIR"] + os.sep + f
                 logging.debug ("Adding result file " + filepath + " to upload")
                 file = open(filepath, "rb")
                 filedata = file.read()
@@ -298,7 +301,7 @@ class WorkunitProcessor(Workunit):
     def result_exists(self):
         if "RESULT" in self.wudata:
             for f in self.wudata["RESULT"]:
-                filepath = SETTINGS["WORKDIR"] + "/" + f
+                filepath = SETTINGS["WORKDIR"] + os.sep + f
                 if not os.path.isfile(filepath):
                     logging.info ("Result file " + filepath + " does not exist")
                     return False
@@ -310,12 +313,12 @@ class WorkunitProcessor(Workunit):
         logging.info ("Cleaning up for workunit " + self.get_id())
         if "RESULT" in self.wudata:
             for f in self.wudata["RESULT"]:
-                filepath = SETTINGS["WORKDIR"] + "/" + f
+                filepath = SETTINGS["WORKDIR"] + os.sep + f
                 logging.info ("Removing result file " + filepath)
                 os.remove(filepath)
         if "DELETE" in self.wudata:
             for f in self.wudata["DELETE"]:
-                filepath = SETTINGS["WORKDIR"] + "/" + f
+                filepath = SETTINGS["WORKDIR"] + os.sep + f
                 logging.info ("Removing file " + filepath)
                 os.remove(filepath)
 
@@ -336,7 +339,7 @@ class WorkunitProcessor(Workunit):
 
 def do_work():
     rc = True
-    wu_filename = SETTINGS["DLDIR"] + "/" + SETTINGS["WU_FILENAME"]
+    wu_filename = SETTINGS["DLDIR"] + os.sep + SETTINGS["WU_FILENAME"]
     if not get_missing_file(SETTINGS["GETWUPATH"], wu_filename, 
                             options="clientid=" + SETTINGS["CLIENTID"]):
         return False
