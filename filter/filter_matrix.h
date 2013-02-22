@@ -45,7 +45,7 @@ typedef struct {
   int32_t *MKZQ;         /* priority queue for Markowitz stuff */    
   int32_t *MKZA;         /* MKZA[j] gives u s.t. MKZQ[2*u] = j and
                             MKZQ[2*u+1] is the Markowitz cost of column j,
-                            otherwise it is MKZ_INF if the colum is inactive
+                            otherwise it is MKZ_INF if the column is inactive
                             (either too heavy initially or deleted) */
   int wmstmax;
   int mkztype;       /* which type of count */
