@@ -52,7 +52,6 @@ filter/filter_matrix.h
 filter/markowitz.c
 filter/markowitz.h
 filter/merge.c
-filter/merge.h
 filter/merge_mono.c
 filter/merge_mono.h
 filter/merge_opts.h

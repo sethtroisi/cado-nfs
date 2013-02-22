@@ -653,7 +653,29 @@ number_of_superfluous_rows(filter_matrix_t *mat)
 }
 
 void
-mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
+print_report (report_t *rep, filter_matrix_t *mat, int forbw, double bwcost)
+{
+  printf ("N=%d (%d) w=%lu", mat->rem_nrows, mat->rem_nrows - mat->rem_ncols,
+                             mat->weight);
+  if (forbw == 2)
+    printf (" bw=%e", bwcost);
+  else if (forbw == 3)
+    printf (" w*N=%"PRIu64"",
+                        ((uint64_t)mat->rem_nrows) * ((uint64_t)mat->weight));
+  else if (forbw <= 1)
+    printf (" w*N=%e", bwcost);
+
+  printf (" w/N=%2.2lf\n", ((double)mat->weight)/((double)mat->rem_nrows));
+
+  if((forbw != 0) && (forbw != 3)) // what a trick!!!!
+    fprintf (rep->outfile, "BWCOST: %1.0f\n", bwcost);
+
+  fflush (stdout);
+}
+
+
+void
+mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
                int forbw, double ratio, double coverNmax)
 {
     double totopt = 0.0, totfill = 0.0, totMST = 0.0, totdel = 0.0;
@@ -663,9 +685,9 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
     int *nb_merges;
     int32_t dj, j, mkz;
     int useMST = 1; /* non-zero if we use minimal spanning tree */
-    int REPORT; /* controls frequency of reports */
-
-    REPORT = mat->rem_nrows / 100;
+    double REPORT = 20.0; /* threshold of w/N from which reports are done */
+                          /* on stdout                                    */
+    double FREQ_REPORT = 5.0; /* Once the threshold is exceeded, this is added */
 
     // clean things
     njrem = removeSingletons(rep, mat);
@@ -676,6 +698,9 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
     printf ("Using mergeOneByOne\n");
     ncostmax = 20; // was 5
     njproc = 0;
+
+    print_report (rep, mat, forbw, bwcost);
+
     while(1){
 	if(mat->itermax && (njproc >= mat->itermax)){
 	    printf ("itermax=%d reached, stopping!\n", mat->itermax);
@@ -702,25 +727,14 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel, int verbose,
 	njproc += old_ncols - mat->rem_ncols;
 	bwcost = my_cost ((double) mat->rem_nrows, (double) mat->weight,
                           forbw);
-	if (mat->rem_nrows % REPORT == 0){
+	//if (mat->rem_nrows % REPORT == 0)
+  if ((((double)mat->weight)/((double)mat->rem_nrows)) > REPORT)
+  {
+      REPORT += FREQ_REPORT;
 	    njrem = removeSingletons (rep, mat);
 	    ni2rem = number_of_superfluous_rows (mat);
 	    deleteSuperfluousRows (rep, mat, ni2rem, m);
-	    printf ("N=%d (%d) w=%lu", mat->rem_nrows,
-                    mat->rem_nrows - mat->rem_ncols, mat->weight);
-	    if (forbw == 2)
-              printf (" bw=%e", bwcost);
-	    else if (forbw == 3)
-              printf (" w*N=%"PRIu64"", ((uint64_t)mat->rem_nrows)
-                      * ((uint64_t)mat->weight));
-	    else if (forbw <= 1)
-		printf (" w*N=%e", bwcost);
-	    printf (" w/N=%2.2lf\n",
-		    ((double)mat->weight)/((double)mat->rem_nrows));
-	    if((forbw != 0) && (forbw != 3))
-		// what a trick!!!!
-		fprintf (rep->outfile, "BWCOST: %1.0f\n", bwcost);
-            fflush (stdout);
+      print_report (rep, mat, forbw, bwcost);
 	}
 	if((bwcostmin == 0.0) || (bwcost < bwcostmin)){
 	    bwcostmin = bwcost;
@@ -869,7 +883,7 @@ doAllAdds(report_t *rep, filter_matrix_t *mat, char *str)
 // resumename is a file of the type mergehis.
 // TODO: Compiles, but not really tested with Markowitz...!
 void
-resume(report_t *rep, filter_matrix_t *mat, char *resumename)
+resume(report_t *rep, filter_matrix_t *mat, const char *resumename)
 {
     FILE *resumefile = fopen(resumename, "r");
     char str[RELATION_MAX_BYTES];
