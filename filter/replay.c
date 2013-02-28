@@ -1116,8 +1116,8 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
         newrows[small_nrows++] = newrows[i];
 
 #if defined FOR_FFS && defined STAT_FFS
-    int count[11] = {0,0,0,0,0,0,0,0,0,0,0};
-    int nonzero = 0;
+    uint64_t count[11] = {0,0,0,0,0,0,0,0,0,0,0};
+    uint64_t nonzero = 0;
     for (int i = 0; i < small_nrows ; i++)
       {
         for(int k = 1; k <= rowLength(newrows, i); k++)
@@ -1129,11 +1129,11 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
             nonzero++;
           }
       }
-    fprintf (stderr, "# of non zero coeff: %d\n", nonzero);
+    fprintf (stderr, "# of non zero coeff: %lu\n", nonzero);
     for (int i = 1; i <= 10 ; i++)
-      fprintf (stderr, "# of %d: %d(%.2f%%)\n", i, count[i],
+      fprintf (stderr, "# of %d: %lu(%.2f%%)\n", i, count[i],
                        100 * (double) count[i]/nonzero);
-    fprintf (stderr, "# of > 10: %d(%.2f%%)\n", count[0],
+    fprintf (stderr, "# of > 10: %lu(%.2f%%)\n", count[0],
                      100 * (double) count[0]/nonzero);
 #endif
 
