@@ -34,7 +34,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
    type = 2 does nothing
 */
 void
-init_rep (report_t *rep, char *outname, filter_matrix_t *mat, int type,
+init_rep (report_t *rep, const char *outname, filter_matrix_t *mat, int type,
 	  int bufsize)
 {
     int32_t** tmp, i;
