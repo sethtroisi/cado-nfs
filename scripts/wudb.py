@@ -784,6 +784,9 @@ if __name__ == '__main__': # {
     parser.add_argument('-assign', required = False, nargs = 1, 
                         metavar = 'clientid', 
                         help = 'Assign an available WU to clientid')
+    parser.add_argument('-cancel', required = False, nargs = 1, 
+                        metavar = 'wuid', 
+                        help = 'Cancel a WU with the given id')
     parser.add_argument('-prio', required = False, nargs = 1, metavar = 'N', 
                         help = 'If used with -add, newly added WUs ' + 
                         'receive priority N')
@@ -886,6 +889,10 @@ if __name__ == '__main__': # {
     if args["assign"]:
         clientid = args["assign"][0]
         wus = db_pool.assign(clientid)
+
+    if args["cancel"]:
+        wuid = args["cancel"][0]
+        wus = db_pool.cancel(wuid)
 
     if args["result"]:
         (wuid, clientid, filename, filepath) = args["result"]
