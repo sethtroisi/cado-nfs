@@ -46,9 +46,9 @@
  * (see also las-coordinates.c)
  */
 #define xxxTRACE_K
-#define TRACE_AB { 5046103,17827 }
+// #define TRACE_AB { 2039914353344275UL,6656604L }
 // #define TRACE_IJ
-#define TRACE_Nx { 0,4849 }
+// #define TRACE_Nx { 0,1655 }
 
 /* Define CHECK_UNDERFLOW to check for underflow when subtracting
    the rounded log(p) from sieve array locations */
@@ -115,6 +115,16 @@
  */
 #define SUPPORT_I16
 
+/* This is currently used to enable some code paths specific to the
+ * descent. The mid-term plan is to remove this compile-time flag.
+ */
+#define xxxDLP_DESCENT
+#define DESCENT_GRACE_TIME_RATIO 0.4
+
+/* Define this to support larger q. This is almost mandatory for the
+ * descent. */
+#define xxxSUPPORT_LARGE_Q
+
 /* Define SKIP_GCD3 to skip updates where 3 divides gcd(i,j) in the
    bucket sieving phase. Slightly slower than not skipping them
    in single-thread mode, but might be useful for multi-threading,
@@ -166,6 +176,14 @@
 #define NOPROFILE_INLINE static inline
 #define NOPROFILE_STATIC static
 #endif
+
+/* A memset with less MEMSET_MIN bytes is slower than an fixed memset
+   (which is inlined with special code). So, if it's possible, the optimal
+   memset is
+   if (LIKELY(ts <= MEMSET_MIN)) memset (S, i, MEMSET_MIN); else memset (S, i, ts);
+   S += ts;
+   So, all S' malloc must be increased of MEMSET_MIN. */
+#define MEMSET_MIN 64
 
 #include <stdio.h>
 

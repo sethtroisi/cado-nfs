@@ -53,7 +53,8 @@ def do_upload(db, input = sys.stdin, output = sys.stdout):
     form = cgi.FieldStorage(fp = input)
     analyze(2, "form", form)
 
-    header = "Content-Type: text/plain\r\n\r\n"
+    charset = "utf-8"
+    header = "Content-Type: text/plain; charset=" + charset + "\r\n\r\n"
 
     # A nested FieldStorage instance holds the file
     message = None
@@ -128,7 +129,7 @@ def do_upload(db, input = sys.stdin, output = sys.stdout):
     if output == sys.stdout:
         output.write(header + message)
     else:
-        output.write((header + message).encode("ascii"))
+        output.write((header + message).encode(charset))
 
 
 # If this file is run directly by Python, call do_upload()

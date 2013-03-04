@@ -20,29 +20,28 @@ if (HAS_GMP_LIBDIR_OVERRIDE)
     set(GMP_LIBDIR_HINTS "$ENV{GMP_LIBDIR}"     ${GMP_LIBDIR_HINTS})
 endif(HAS_GMP_LIBDIR_OVERRIDE)
 
-find_path   (GMP_INCDIR gmp.h HINTS ${GMP_INCDIR_HINTS} DOC "Gnu MP headers" NO_DEFAULT_PATH)
-string(COMPARE EQUAL "${GMP_INCDIR}" GMP_INCDIR-NOTFOUND GMP_INCDIR_NOTOK)
-if(NOT GMP_INCDIR)
-    set(GMP_INCDIR_NOTOK 1)
+# First try overrides, really. We want cmake to shut up.
+if (NOT GMP_INCDIR)
+find_path   (GMP_INCDIR gmp.h PATHS ${GMP_INCDIR_HINTS} DOC "Gnu MP headers"
+        NO_DEFAULT_PATH
+        NO_SYSTEM_ENVIRONMENT_PATH
+        NO_CMAKE_PATH
+        NO_CMAKE_ENVIRONMENT_PATH
+        NO_CMAKE_SYSTEM_PATH
+        NO_CMAKE_FIND_ROOT_PATH)
 endif(NOT GMP_INCDIR)
-if(GMP_INCDIR_NOTOK)
+if (NOT GMP_INCDIR)
+find_path   (GMP_INCDIR gmp.h HINTS ${GMP_INCDIR_HINTS} DOC "Gnu MP headers"
+        NO_DEFAULT_PATH
+    )
+endif(NOT GMP_INCDIR)
+if (NOT GMP_INCDIR)
 find_path   (GMP_INCDIR gmp.h HINTS ${GMP_INCDIR_HINTS} DOC "Gnu MP headers")
-endif(GMP_INCDIR_NOTOK)
-string(COMPARE NOTEQUAL "${GMP_INCDIR}" GMP_INCDIR-NOTFOUND GMP_INCDIR_OK)
-if(NOT GMP_INCDIR)
-    set(GMP_INCDIR_OK 0)
 endif(NOT GMP_INCDIR)
 
 find_library(GMP_LIB    gmp   HINTS ${GMP_LIBDIR_HINTS} DOC "Gnu MP library" NO_DEFAULT_PATH)
-string(COMPARE EQUAL "${GMP_LIBDIR}" GMP_LIBDIR-NOTFOUND GMP_LIBDIR_NOTOK)
 if(NOT GMP_LIBDIR)
-    set(GMP_LIBDIR_NOTOK 1)
-endif(NOT GMP_LIBDIR)
-if(GMP_LIBDIR_NOTOK)
 find_library(GMP_LIB    gmp   HINTS ${GMP_LIBDIR_HINTS} DOC "Gnu MP library")
-endif(GMP_LIBDIR_NOTOK)
-if(NOT GMP_LIBDIR)
-    set(GMP_LIBDIR_OK 0)
 endif(NOT GMP_LIBDIR)
 
 # Yeah. CMake docs defines the ``PATH'' to a file as being its dirname. Very
@@ -50,15 +49,14 @@ endif(NOT GMP_LIBDIR)
 get_filename_component(GMP_LIBDIR ${GMP_LIB} PATH)
 message(STATUS "GMP_INCDIR=${GMP_INCDIR}")
 message(STATUS "GMP_LIBDIR=${GMP_LIBDIR}")
-string(COMPARE NOTEQUAL "${GMP_LIBDIR}" GMP_LIBDIR-NOTFOUND GMP_LIBDIR_OK)
-if(GMP_INCDIR_OK)
+if(GMP_INCDIR)
 include_directories(${GMP_INCDIR})
-else(GMP_INCDIR_OK)
+else(GMP_INCDIR)
 message(FATAL_ERROR "gmp.h cannot be found. Please install Gnu MP, and specify its install prefix in local.sh")
-endif(GMP_INCDIR_OK)
-if(GMP_LIBDIR_OK)
+endif(GMP_INCDIR)
+if(GMP_LIBDIR)
 link_directories(${GMP_LIBDIR})
-else(GMP_LIBDIR_OK)
+else(GMP_LIBDIR)
 message(FATAL_ERROR "gmp.h cannot be found. Please install Gnu MP, and specify its install prefix in local.sh")
-endif(GMP_LIBDIR_OK)
+endif(GMP_LIBDIR)
 

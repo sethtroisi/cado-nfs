@@ -25,8 +25,8 @@
     }                                                                      \
     dega = fppol##sz##_deg(a);                                             \
     if (dega < degb) {                                                     \
-      fppol##sz##_set_zero(q);                                             \
       fppol##sz##_set(r, a);                                               \
+      fppol##sz##_set_zero(q);                                             \
       return 1;                                                            \
     }                                                                      \
                                                                            \

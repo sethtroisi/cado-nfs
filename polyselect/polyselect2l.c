@@ -1021,7 +1021,6 @@ collision_on_each_sq ( header_t header,
   uint8_t vpnr, *pnr, nr, j;
   uint32_t *pprimes, i;
   int found;
-  MAYBE_UNUSED uint64_t cpt = 0, cpt1 = 0, cpt2 = 0, cpt3 = 0;
 
 #ifdef DEBUG_POLYSELECT2L
   int st = milliseconds();
@@ -1069,52 +1068,6 @@ collision_on_each_sq ( header_t header,
     cur1 = CURRENT(I); ccur1 = *cur1; *ccur1++ = I;		\
     __builtin_prefetch(ccur1, 1, 3); *cur1 = ccur1;		\
   } while (0)
-
-#if 0 /* Old algo */
-
-  for (;;) {
-    do {
-      vpnr = *pnr++;
-      pprimes++;
-    } while (!vpnr);
-    if (UNLIKELY(vpnr == 0xff)) break;
-    ppl = *pprimes;
-    __builtin_prefetch(((void *) pnr) + 0x040, 0, 3);
-    __builtin_prefetch(((void *) pprimes) + 0x100, 0, 3);
-    __builtin_prefetch(((void *) pc) + 0x280, 0, 3);
-    ppl *= ppl;
-    epc = pc + vpnr;
-    for (;;) {
-      /* v2 = nv [- ppl] insertions == nv + [ppl] insertions -/+ 1;
-	 max inserts == 4+4, min == 1+1. */
-      v1 = nv;       cur1 = CURRENT(v1); ccur1 = *cur1;
-      v2 = v1 - ppl; cur2 = CURRENT(v2); ccur2 = *cur2;
-      nv = *++pc;
-      *ccur1++ = v1; __builtin_prefetch(ccur1, 1, 3); *cur1 = ccur1;
-      *ccur2++ = v2; __builtin_prefetch(ccur2, 1, 3); *cur2 = ccur2;
-      v1 += ppl; v2 -= ppl;
-      if (v1 > umax)     goto l1v2;
-      if (v2 < neg_umax) goto l1v1;
-      INSERT_2I(v1,v2); v1 += ppl; v2 -= ppl;
-      if (v1 > umax)     goto l1v2;
-      if (v2 < neg_umax) goto l1v1;
-      INSERT_2I(v1,v2); v1 += ppl; v2 -= ppl;
-      if (LIKELY(v1 > umax))
-      l1v2: if (LIKELY(v2 < neg_umax))
-	  if (LIKELY(pc != epc)) continue; else break;
-	else {
-	  INSERT_I(v2); if (LIKELY(pc != epc)) continue; else break;
-	}
-      else if (LIKELY(v2 < neg_umax)) {
-      l1v1: INSERT_I(v1); if (LIKELY(pc != epc)) continue; else break;
-      }
-      else {
-	INSERT_2I(v1,v2); if (LIKELY(pc != epc)) continue; else break;
-      }
-    }
-  }
-    
-#else /* New Algo */
 
   int64_t b;
   b = (int64_t) ((double) umax * 0.3333333333333333);
@@ -1213,11 +1166,9 @@ collision_on_each_sq ( header_t header,
   } while (1);
 
  bend:
-#endif
 #undef INSERT_2I
 #undef INSERT_I
 
-  /* fprintf (stderr, "%lu %lu %lu %lu\n", cpt, cpt1, cpt2, cpt3); */
   for (i = 0; i < SHASH_NBUCKETS; i++) assert (H->current[i] <= H->base[i+1]);
 
   /*

@@ -21,10 +21,17 @@
 
 // Sometimes, we want our space back...!
 void
-clear_relation (relation_t *rel)
+relation_init (relation_t *rel)
+{
+    memset(rel, 0, sizeof(relation_t));
+}
+
+void
+relation_clear (relation_t *rel)
 {
     free(rel->rp); rel->rp = NULL;
     free(rel->ap); rel->ap = NULL;
+    memset(rel, 0, sizeof(relation_t));
 }
 
 /* FIXME: The following interface still strongly relies on the fact that
@@ -43,6 +50,21 @@ relation_add_prime (relation_t *rel, int side, unsigned long p)
         rel->ap[rel->nb_ap++] = (alg_prime_t) { .p=p, .e=1 };
     }
 }
+
+void relation_copy (relation_t *s, relation_t * r)
+{
+    s->a = r->a;
+    s->b = r->b;
+    s->nb_rp = r->nb_rp;
+    s->nb_ap = r->nb_ap;
+    s->nb_rp_alloc = r->nb_rp;
+    s->nb_ap_alloc = r->nb_ap;
+    s->rp = realloc(s->rp, s->nb_rp_alloc * sizeof(rat_prime_t));
+    s->ap = realloc(s->ap, s->nb_ap_alloc * sizeof(alg_prime_t));
+    memcpy(s->rp, r->rp, r->nb_rp * sizeof(rat_prime_t));
+    memcpy(s->ap, r->ap, r->nb_ap * sizeof(alg_prime_t));
+}
+
 
 void skip_relations_in_file(FILE * f, int n)
 {

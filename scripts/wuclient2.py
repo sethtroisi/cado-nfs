@@ -1,12 +1,15 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python2
+
+# TODO: file locking for downloading files, so several clients can use the same files (factorbase etc.) safely
+# TODO: file locking for workunit files, so name collision can be detected
 
 import sys
 import os
 import stat
-import argparse
+import optparse
 import shutil
 import time
-import urllib.request
+import urllib2
 import subprocess
 import hashlib
 import logging
@@ -16,28 +19,38 @@ from email.mime.text import MIMEText
 import email.encoders
 import email.generator
 from string import Template
-from io import StringIO,BytesIO
+from io import StringIO,BytesIO,open
 from workunit import Workunit
 
-class FixedBytesGenerator(email.generator.BytesGenerator):
-    def _handle_bytes(self, msg):
-        payload = msg.get_payload()
-        if payload is None:
-            return
-        if isinstance(payload, bytes):
-            # Payload is bytes, output is bytes - just write them
-            self._fp.write(payload)
-        else:
-            # Payload is neither bytes not string - this can't be right
-            raise TypeError('bytes payload expected: %s' % type(payload))
-    _writeBody = _handle_bytes
+if sys.version_info[0] == 2:
+    # In Python 2.x, use the regular email generator
+    class FixedBytesGenerator(email.generator.Generator):
+        pass
+elif sys.version_info[0] == 3 and sys.version_info[1] < 3:
+    # In Python 3.[012], use a fixed BytesGenerator which accepts a bytes 
+    # input. The fact that the BytesGenerator in Python 3.[012] does not is 
+    # a bug, see http://bugs.python.org/issue16564
+    class FixedBytesGenerator(email.generator.BytesGenerator):
+        def _handle_bytes(self, msg):
+            payload = msg.get_payload()
+            if payload is None:
+                return
+            if isinstance(payload, bytes):
+                # Payload is bytes, output is bytes - just write them
+                self._fp.write(payload)
+            elif isinstance(payload, str):
+                super(FixedBytesGenerator,self)._handle_text(msg)
+            else:
+                # Payload is neither bytes nor string - this can't be right
+                raise TypeError('bytes payload expected: %s' % type(payload))
+        _writeBody = _handle_bytes
 
 
 # Settings which we require on the command line (no defaults)
-REQUIRED_SETTINGS = {"CLIENTID" : ("", "Unique ID for this client"), 
-                     "DLDIR" : ("", "Directory for downloading files"), 
-                     "SERVER" : ("", "Base URL for WU server"), 
-                     "WORKDIR" : ("", "Directory for result files")}
+REQUIRED_SETTINGS = {"CLIENTID" : (None, "Unique ID for this client"), 
+                     "DLDIR" : (None, "Directory for downloading files"), 
+                     "SERVER" : (None, "Base URL for WU server"), 
+                     "WORKDIR" : (None, "Directory for result files")}
 # Optional settings with defaults, overrideable on command line, and a help text
 OPTIONAL_SETTINGS = {"WU_FILENAME" : (None, "Filename under which to store WU files"), 
                      "GETWUPATH" : ("/cgi-bin/getwu", "Path segment of URL for requesting WUs from server"), 
@@ -55,7 +68,7 @@ SETTINGS = dict([(a,b) for (a,(b,c)) in list(REQUIRED_SETTINGS.items()) + \
 def get_file(urlpath, dlpath = None, options = None):
     # print('get_file("' + urlpath + '", "' + dlpath + '")')
     if dlpath == None:
-        dlpath = SETTINGS["DLDIR"] + "/" + os.basename(urlpath) # FIXME: should be url base name
+        dlpath = SETTINGS["DLDIR"] + os.sep + urlpath.split("/")[-1]
     url = SETTINGS["SERVER"] + "/" + urlpath
     if options:
         url = url + "?" + options
@@ -63,14 +76,14 @@ def get_file(urlpath, dlpath = None, options = None):
     request = None
     while request == None:
         try:
-            request = urllib.request.urlopen(url)
-        except urllib.error.HTTPError as e:
-            logging.error (str(e))
+            request = urllib2.urlopen(url)
+        except urllib2.HTTPError, e:
+            logging.error (unicode(e))
             return False
-        except (NameError, urllib.error.URLError) as e:
+        except (NameError, urllib2.URLError), e:
             request = None
             wait = float(SETTINGS["DOWNLOADRETRY"])
-            logging.error("Download of " + urlpath + " failed, " + str(e))
+            logging.error("Download of " + urlpath + " failed, " + unicode(e))
             logging.error("Waiting " + str(wait) + " seconds before retrying")
             time.sleep(wait)
     file = open(dlpath, "wb")
@@ -131,7 +144,7 @@ def get_missing_file(urlpath, filename, checksum = None, options = None):
         os.remove(filename)
         last_filesum = filesum
 
-class Workunit_Processor(Workunit):
+class WorkunitProcessor(Workunit):
     
     def __init__(self, filepath, debug = 0):
         self.exitcode = 0 # will get set if any command exits with code != 0
@@ -143,24 +156,27 @@ class Workunit_Processor(Workunit):
         wu_file = open(filepath)
         wu_text = wu_file.read()
         wu_file.close()
-        self.wu = Workunit(wu_text)
-        self.WUid = self.wu.get_id()
-        logging.debug (" done, workunit ID is " + self.WUid)
+        super(WorkunitProcessor,self).__init__(wu_text)
+        self.WUid = self.get_id()
+        logging.debug (" done, workunit ID is " + self.get_id())
         self.stdout = []
         self.stderr = []
 
     def  __str__(self):
-        return "Processor for Workunit:\n" + self.wu.__str__()
+        return "Processor for Workunit:\n" + super(WorkunitProcessor,self).__str__()
+
+    def have_terminate_request(self):
+        return "TERMINATE" in self.wudata
 
     def get_files(self):
-        for (filename, checksum) in self.wu.data["FILE"] + self.wu.data["EXECFILE"]:
+        for (filename, checksum) in self.wudata.get("FILE", []) + self.wudata.get("EXECFILE", []):
             archname = Template(filename).safe_substitute({"ARCH": SETTINGS["ARCH"]})
             dlname = Template(filename).safe_substitute({"ARCH": ""})
-            if not get_missing_file (archname, SETTINGS["DLDIR"] + '/' + dlname, checksum):
+            if not get_missing_file (archname, SETTINGS["DLDIR"] + os.sep + dlname, checksum):
                 return False
-        for (filename, checksum) in self.wu.data["EXECFILE"]:
+        for (filename, checksum) in self.wudata.get("EXECFILE", []):
             dlname = Template(filename).safe_substitute({"ARCH": ""})
-            path = SETTINGS["DLDIR"] + '/' + dlname
+            path = SETTINGS["DLDIR"] + os.sep + dlname
             mode = os.stat(path).st_mode
             if mode & stat.S_IXUSR == 0:
                 logging.info ("Setting executable flag for " + path)
@@ -172,9 +188,9 @@ class Workunit_Processor(Workunit):
         os.nice(int(SETTINGS["NICENESS"]))
     
     def run_commands(self):
-        for (counter, command) in enumerate(self.wu.data["COMMAND"]):
+        for (counter, command) in enumerate(self.wudata.get("COMMAND", [])):
             command = Template(command).safe_substitute(SETTINGS)
-            logging.info ("Running command for workunit " + self.wu.get_id() + ": " + command)
+            logging.info ("Running command for workunit " + self.get_id() + ": " + command)
 
             # If niceness command line parameter was set, call self.renice() in
             # child process, before executing command
@@ -213,12 +229,12 @@ class Workunit_Processor(Workunit):
         postdata = MIMEMultipart()
         for key in ("WUid", "clientid", "exitcode", "failedcommand"):
             if not getattr(self, key, None) is None:
-                attachment = MIMEText(str(getattr(self, key)))
+                attachment = MIMEText(unicode(getattr(self, key)))
                 attachment.add_header('Content-Disposition', 'form-data', name=key)
                 postdata.attach(attachment)
-        if "RESULT" in self.wu.data:
-            for f in self.wu.data["RESULT"]:
-                filepath = SETTINGS["WORKDIR"] + "/" + f
+        if "RESULT" in self.wudata:
+            for f in self.wudata["RESULT"]:
+                filepath = SETTINGS["WORKDIR"] + os.sep + f
                 logging.debug ("Adding result file " + filepath + " to upload")
                 file = open(filepath, "rb")
                 filedata = file.read()
@@ -250,16 +266,16 @@ class Workunit_Processor(Workunit):
             print(postdata3)
 
         url = SETTINGS["SERVER"] + "/" + SETTINGS["POSTRESULTPATH"]
-        logging.info("Sending result for workunit " + self.WUid + " to " + url)
-        request = urllib.request.Request(url, data=postdata3, headers=dict(postdata.items()))
+        logging.info("Sending result for workunit " + self.get_id() + " to " + url)
+        request = urllib2.Request(url, data=postdata3, headers=dict(postdata.items()))
         conn = None;
         while conn is None:
             try:
-                conn = urllib.request.urlopen(request)
-            except (urllib.error.URLError) as e:
+                conn = urllib2.urlopen(request)
+            except (urllib2.URLError), e:
                 conn = None
                 wait = float(SETTINGS["DOWNLOADRETRY"])
-                logging.error("Upload of result failed, " + str(e))
+                logging.error("Upload of result failed, " + unicode(e))
                 logging.error("Waiting " + str(wait) + " seconds before retrying")
                 time.sleep(wait)
         response = conn.read()
@@ -267,8 +283,7 @@ class Workunit_Processor(Workunit):
         # Find out the encoding the server response uses. This may matter if 
         # the path names for the uploaded files contain special characters,
         # like accents
-        content_type = conn.getheader("Content-Type", default=None)
-        print ("Content-Type: " + content_type)
+        content_type = conn.info().get("Content-Type", default=None)
         if not content_type is None:
             # If there are multiple header lines with the same key, their 
             # values are joind with "," separators
@@ -279,14 +294,14 @@ class Workunit_Processor(Workunit):
                         encoding = f[1].strip()
         if encoding is None:
             encoding = "latin-1"
-        logging.debug ("Server response:\n" + str(response, encoding=encoding))
+        logging.debug ("Server response:\n" + unicode(response, encoding=encoding))
         conn.close()
         return True
 
     def result_exists(self):
-        if "RESULT" in self.wu.data:
-            for f in self.wu.data["RESULT"]:
-                filepath = SETTINGS["WORKDIR"] + "/" + f
+        if "RESULT" in self.wudata:
+            for f in self.wudata["RESULT"]:
+                filepath = SETTINGS["WORKDIR"] + os.sep + f
                 if not os.path.isfile(filepath):
                     logging.info ("Result file " + filepath + " does not exist")
                     return False
@@ -295,18 +310,23 @@ class Workunit_Processor(Workunit):
         return True
 
     def cleanup(self):
-        logging.info ("Cleaning up for workunit " + self.wu.get_id())
-        if "RESULT" in self.wu.data:
-            for f in self.wu.data["RESULT"]:
-                filepath = SETTINGS["WORKDIR"] + "/" + f
+        logging.info ("Cleaning up for workunit " + self.get_id())
+        if "RESULT" in self.wudata:
+            for f in self.wudata["RESULT"]:
+                filepath = SETTINGS["WORKDIR"] + os.sep + f
                 logging.info ("Removing result file " + filepath)
+                os.remove(filepath)
+        if "DELETE" in self.wudata:
+            for f in self.wudata["DELETE"]:
+                filepath = SETTINGS["WORKDIR"] + os.sep + f
+                logging.info ("Removing file " + filepath)
                 os.remove(filepath)
 
     def process(self):
         # If all output files exist, send them, return WU as done
         # Otherwise, run commands in WU. If no error and all output 
         #   files exist, send them, return WU as done
-        # print(str(wu))
+        # print(wu)
         if not self.get_files():
             return False
         if not self.result_exists():
@@ -318,38 +338,45 @@ class Workunit_Processor(Workunit):
         return True
 
 def do_work():
-    wu_filename = SETTINGS["DLDIR"] + "/" + SETTINGS["WU_FILENAME"]
+    rc = True
+    wu_filename = SETTINGS["DLDIR"] + os.sep + SETTINGS["WU_FILENAME"]
     if not get_missing_file(SETTINGS["GETWUPATH"], wu_filename, 
                             options="clientid=" + SETTINGS["CLIENTID"]):
         return False
-    wu = Workunit_Processor(wu_filename, int(SETTINGS["DEBUG"]))
-    if not wu.process():
+    wu = WorkunitProcessor(wu_filename, int(SETTINGS["DEBUG"]))
+    if wu.have_terminate_request():
+        logging.info ("Received TERMINATE, exiting")
+        rc = False
+    elif not wu.process():
         return False
     logging.info ("Removing workunit file " + wu_filename)
     os.remove(wu_filename)
-    return True
+    return rc
 
 if __name__ == '__main__':
-    # Create command line parser from the keys in SETTINGS
-    parser = argparse.ArgumentParser()
-    for arg in REQUIRED_SETTINGS.keys():
-        parser.add_argument('--' + arg.lower(), required = True,
-        help=REQUIRED_SETTINGS[arg][1])
-    for arg in OPTIONAL_SETTINGS.keys():
-        if not OPTIONAL_SETTINGS[arg][0] is None:
-            parser.add_argument('--' + arg.lower(), required = False, 
-                default=OPTIONAL_SETTINGS[arg][0], 
-                help=OPTIONAL_SETTINGS[arg][1] + " (default: " + OPTIONAL_SETTINGS[arg][0] + ")")
-        else:
-            parser.add_argument('--' + arg.lower(), required = False, 
-                help=OPTIONAL_SETTINGS[arg][1])
-    # Parse command line, store as dictionary
-    args = vars(parser.parse_args())
-    # Copy values to SETTINGS
-    for arg in SETTINGS.keys():
-        if arg.lower() in args:
-            SETTINGS[arg] = args[arg.lower()]
 
+    def parse_cmdline():
+        # Create command line parser from the keys in SETTINGS
+        parser = optparse.OptionParser()
+        for (arg, default) in REQUIRED_SETTINGS.items():
+            parser.add_option('--' + arg.lower(), help=default[1])
+        for (arg, default) in OPTIONAL_SETTINGS.items():
+            if not default[0] is None:
+                parser.add_option('--' + arg.lower(), default=default[0], 
+                    help=default[1] + " (default: " + default[0] + ")")
+            else:
+                parser.add_option('--' + arg.lower(), help=default[1])
+        # Parse command line
+        (options, args) = parser.parse_args()
+        # Copy values to SETTINGS
+        for arg in SETTINGS.keys():
+            if hasattr(options, arg.lower()):
+                SETTINGS[arg] = getattr(options, arg.lower())
+        for arg in REQUIRED_SETTINGS.keys():
+            if SETTINGS[arg] is None:
+                raise Exception("Command line parameter --" + arg.lower() + " is required")
+
+    parse_cmdline()
     # If no WU filename is given, we use "WU." + client id
     if SETTINGS["WU_FILENAME"] is None:
         SETTINGS["WU_FILENAME"] = "WU." + SETTINGS["CLIENTID"]

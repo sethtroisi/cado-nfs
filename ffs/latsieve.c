@@ -115,6 +115,9 @@ void sieveSFB(uint8_t *S, unsigned int *thr,
 
         // projective roots are handled differently
         if (gothp->proj) {
+          // large projective roots are just skipped.
+          if (UNLIKELY((unsigned)L > J))
+            continue;
           // First time round?
           if (UNLIKELY(!pos0)) {
             // Find the first line to fill. If no sublat, this is zero.

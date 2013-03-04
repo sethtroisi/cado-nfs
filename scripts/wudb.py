@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
 
+# TODO: 
+# FILES table: OBSOLETE column
+#     OBSOLETE says that this file was replaced by a newer version, for example checkrels may want to create a new file with only part of the output. 
+#     Should this be a pointer to the file that replaced the obsolete one? How to signal a file that is obsolete, but not replaced by anything?
+#     If one file is replaced by several (say, due to a data corruption in the middle), we need a 1:n relationship. If several files are replaced by one (merge), 
+#     we need n:1. What do? Do we really want an n:n relationship here? Disallow fragmenting files, or maybe simply not track it in the DB if we do?
+# FILES table: CHECKSUM column
+#     We need a fast check that the information stored in the DB still accurately reflects the file system contents. The test should also warn about files in upload/ which are not listed in DB
+
+
 # Make Python 2.7 use the print() syntax from Python 3
 from __future__ import print_function
 
@@ -24,8 +34,17 @@ def diag(level, text, var = None):
             print (text + str(var), file=sys.stderr)
 
 def join3(l, pre = None, post = None, sep = ", "):
-    """ join3 ( ('a', 'b', 'c'), pre = "+", post = "-", sep = ", ") = '+a-, +b-, +c-' 
-    If any parameter is None, it is interpreted as the empty string """
+    """ 
+    If any parameter is None, it is interpreted as the empty string 
+    >>> join3 ( ('a'), pre = "+", post = "-", sep = ", ")
+    '+a-'
+    >>> join3 ( ('a', 'b'), pre = "+", post = "-", sep = ", ")
+    '+a-, +b-'
+    >>> join3 ( ('a', 'b'))
+    'a, b'
+    >>> join3 ( ('a', 'b', 'c'), pre = "+", post = "-", sep = ", ")
+    '+a-, +b-, +c-'
+    """
     if pre is None:
         pre = ""
     if post is None:
@@ -35,8 +54,11 @@ def join3(l, pre = None, post = None, sep = ", "):
     return sep.join([pre + k + post for k in l])
 
 def dict_join3(d, sep=None, op=None, pre=None, post=None):
-    """ dict_join3 ( {"a": "1", "b": "2"}, sep = "," op = "=", pre="-", post="+") = "-a=1+,-b=2+"
-    If any parameter is None, it is interpreted as the empty string """
+    """ 
+    If any parameter is None, it is interpreted as the empty string 
+    >>> dict_join3 ( {"a": "1", "b": "2"}, sep = ",", op = "=", pre="-", post="+")
+    '-a=1+,-b=2+'
+    """
     if pre is None:
         pre = ""
     if post is None:
@@ -45,7 +67,7 @@ def dict_join3(d, sep=None, op=None, pre=None, post=None):
         sep = "";
     if op is None:
         op = ""
-    return sep.join([pre + op.join(k) + post for k in l.items()])
+    return sep.join([pre + op.join(k) + post for k in d.items()])
 
 # Dummy class for defining "constants"
 class WuStatus:
@@ -60,9 +82,9 @@ class WuStatus:
     @classmethod
     def check(cls, status):
         """ Check whether status is equal to one of the constants """
-        assert status in (WuStatus.AVAILABLE, WuStatus.ASSIGNED, WuStatus.RECEIVED_OK, 
-            WuStatus.RECEIVED_ERROR, WuStatus.VERIFIED_OK, WuStatus.VERIFIED_ERROR, 
-            WuStatus.CANCELLED)
+        assert status in (cls.AVAILABLE, cls.ASSIGNED, cls.RECEIVED_OK, 
+            cls.RECEIVED_ERROR, cls.VERIFIED_OK, cls.VERIFIED_ERROR, 
+            cls.CANCELLED)
 
 # If we try to update the status in any way other than progressive 
 # (AVAILABLE -> ASSIGNED -> ...), we raise this exception
@@ -471,13 +493,10 @@ class WuAccess(object): # {
     def _checkstatus(wu, status):
         diag (2, "WuAccess._checkstatus(" + str(wu) + ", " + str(status) + ")")
         if wu["status"] != status:
-            msg = "WU " + str(wu["wuid"]) + " has status " + str(wu["status"]) \
+            msg = "Workunit " + str(wu["wuid"]) + " has status " + str(wu["status"]) \
                 + ", expected " + str(status)
             diag (0, "WuAccess._checkstatus(): " + msg)
-            # FIXME: this raise has no effect other than returning from the 
-            # method. Why?
-            # raise wudb.StatusUpdateError(msg)
-            raise Exception(msg)
+            raise StatusUpdateError(msg)
 
     def check(self, data):
         status = data["status"]
@@ -751,10 +770,6 @@ class DbThreadPool(object):
     # timeverified is the ... of when the result was marked as verified
 
 
-def selftest():
-    assert join3 ( ('a', 'b', 'c'), pre = "+", post = "-", sep = ", ") == '+a-, +b-, +c-' 
-    assert dict_join3 ( {"a": "1", "b": "2"}, sep = ",", op = "=", pre="-", post="+") == "-a=1+,-b=2+"
-
 if __name__ == '__main__': # {
     import argparse
 
@@ -769,11 +784,14 @@ if __name__ == '__main__': # {
     parser.add_argument('-assign', required = False, nargs = 1, 
                         metavar = 'clientid', 
                         help = 'Assign an available WU to clientid')
+    parser.add_argument('-cancel', required = False, nargs = 1, 
+                        metavar = 'wuid', 
+                        help = 'Cancel a WU with the given id')
     parser.add_argument('-prio', required = False, nargs = 1, metavar = 'N', 
                         help = 'If used with -add, newly added WUs ' + 
                         'receive priority N')
     parser.add_argument('-result', required = False, nargs = 4, 
-                        metavar = ('clientid', 'wuid', 'filename', 'filepath'), 
+                        metavar = ('wuid', 'clientid', 'filename', 'filepath'), 
                         help = 'Return a result for wu from client')
     parser.add_argument('-test', action="store_true", required=False, 
                         help='Run some self tests')
@@ -792,7 +810,8 @@ if __name__ == '__main__': # {
         dbname = args["dbname"]
 
     if args["test"]:
-        selftest()
+        import doctest
+        doctest.testmod()
 
     if args["debug"]:
         debug = int(args["debug"][0])
@@ -870,6 +889,10 @@ if __name__ == '__main__': # {
     if args["assign"]:
         clientid = args["assign"][0]
         wus = db_pool.assign(clientid)
+
+    if args["cancel"]:
+        wuid = args["cancel"][0]
+        wus = db_pool.cancel(wuid)
 
     if args["result"]:
         (wuid, clientid, filename, filepath) = args["result"]

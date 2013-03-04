@@ -121,7 +121,36 @@ init_norms (sieve_info_ptr si, int s)
 
 /* }}} */
 
-/* {{{ initialize norms for bucket regions */
+/* Input: i, double. i > 0 
+   Output: o , trunc(o) == trunc(log2(i)) && o <= log2(i) < o + 0.0861.
+   Careful: o ~= log2(i) iif add = 0x3FF00000 & scale = 1/0x100000.
+   Add & scale are need to compute o'=f(log(i)) where f is an affine function */
+static inline int inttruncfastlog2(double i, double add, double scale) {
+#ifdef HAVE_SSE2
+  double dummy;
+  int o;
+
+  __asm__ ("movq %2,%1\n"
+	   "psrlq $0x20,%1\n"
+	   "cvtdq2pd %1, %1\n"
+	   "subsd %3, %1\n"
+	   "mulsd %4, %1\n"
+	   "cvttsd2si %1, %0\n"
+	   : "=r" (o), "=x" (dummy) : "x" (i), "x" (add), "x" (scale));
+  return (o);
+}
+#else
+/* Same function, but in x86 gcc needs to transfer the input i from a
+   xmm register to a classical register. No other way than use memory.
+   So this function needs at least 6 to 8 cycles more than the previous,
+   which uses ~3 cycles.
+*/
+/* dummy to avoid gcc warning: dereferencing type-punned pointer */
+  void *dummy = &i;
+  return (int) ((((double) ((*((uint64_t *) dummy)) >> 0x20)) - add) * scale);
+}
+#endif
+
 /* Initialize lognorms on the rational side for the bucket_region
  * number N.
  * For the moment, nothing clever, wrt discarding (a,b) pairs that are
@@ -132,6 +161,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
                                  const int N,
                                  sieve_info_ptr si)
 {
+  /* #define DEBUG_INIT_RAT 1 */
   sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
   int halfI = (si->I)>>1,
     int_i;
@@ -139,267 +169,232 @@ void init_rat_norms_bucket_region(unsigned char *S,
     j0 = N << (LOG_BUCKET_REGION - si->conf->logI),
     j1 = j0 + (1 << (LOG_BUCKET_REGION - si->conf->logI)),
     j = j0,
-    oy, y;
+    inc;
+  uint8_t oy, y;
   double						\
     u0 = si->sides[RATIONAL_SIDE]->fijd[0], // gj
     u1 = si->sides[RATIONAL_SIDE]->fijd[1], // gi
+    invu1 = 1.0/u1,
     u0j = u0 * j,
-    d0_init = pow(2, -1/rat->scale),
+    d0_init,
+    scale = rat->scale * (1.0/0x100000),
+    add = 0x3FF00000 - GUARD / scale,
     g, rac, d0, d1, i;
   size_t ts;
-  
-  /* if j = 0, it will be the first value */
+
+  d0_init = rat->cexp2[((unsigned int)GUARD) - 1U];
   if (!j) {
     // compute only the norm for i = 1. Everybody else is 255.
     memset(S, 255, halfI<<1);
-    S[halfI + 1] = trunc(log2(fabs(u1)) * rat->scale) + GUARD;
+    S[halfI + 1] = inttruncfastlog2(fabs(u1),add,scale);
     S+= halfI<<1;
     j++;
+    u0j += u0;
   }
+
   for( ; j < j1 ; j++, u0j += u0) {
-    /* unsigned char *CS = S; */
-    __asm__("### Begin rational norm loop\n");
-    g = u0j - u1 * halfI;
-    rac = u0j / -u1;
-    d0 = d0_init;
-    d1 = (1 - d0) * rac;
+
     int_i = -halfI;
+    g = u0j + u1 * int_i;
+    rac = u0j * (-invu1);
+    d0 = d0_init;
+    d1 = rac - d0 * rac;
     if (g > 0) {
-      y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
+      y = inttruncfastlog2 (g, add, scale);
       if (rac > -halfI) goto cas1; else goto cas4;
     }
     else {
       g = -g;
-      y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
+      y = inttruncfastlog2 (g, add, scale);
       if (rac > -halfI) goto cas3; else goto cas2;
     }
   cas1:
-    for (i = int_i;; y--) {
-      i = i * d0 + d1;
+    /* In this case, we exit from the loop when ts == 0, at the exception
+       of the first iteration. In this special case, old_i = -halfI and
+       int_i = trunc (i), where i=[inverse of the function g](trunc(y)) and
+       y=g(old_i).
+       So, it's possible if y is very near trunc(y), old_i == int_i, so ts == 0.
+       We have to iterate at least one time to avoid this case => this is the
+       use of inc here. */
+    for (i = rac + rat->cexp2[y] * invu1, inc = 1;; y--) {
       ts = -int_i;
       int_i = (int) trunc(i); 
       if (UNLIKELY(int_i >= halfI)) {
 	ts += halfI;
-	/* fprintf (stderr, "A1.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", halfI - ts, halfI, ts, y, rac); */
-	memset((void *) S, y, ts);
+#ifdef DEBUG_INIT_RAT
+	fprintf (stderr, "A1.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%e\n", halfI - ts, halfI, ts, y, rac);
+#endif
+	memset(S, y, ts);
 	S += ts;
-	goto finratnorm;
+	goto nextj;
       }
       ts += int_i;
-      /* fprintf (stderr, "A1 : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", int_i - ts, int_i, ts, y, rac); */
-      if (UNLIKELY(ts <= 16))
-	switch (ts) {
-	case 16 : S[15] = y; 
-	case 15 : S[14] = y; 
-	case 14 : S[13] = y; 
-	case 13 : S[12] = y; 
-	case 12 : S[11] = y; 
-	case 11 : S[10] = y; 
-	case 10 : S[9] = y; 
-	case 9 : S[8] = y; 
-	case 8 : S[7] = y; 
-	case 7 : S[6] = y; 
-	case 6 : S[5] = y; 
-	case 5 : S[4] = y; 
-	case 4 : S[3] = y; 
-	case 3 : S[2] = y; 
-	case 2 : S[1] = y; 
-	case 1 : S[0] = y; 
-	  break;
-	case 0 : goto np1;
-	}
-      else
-	memset((void *)S, y, ts);
+#ifdef DEBUG_INIT_RAT
+      fprintf (stderr, "A1 : i1=%ld, i2=%d, ts=%ld, y=%u, rac=%e\n", int_i - ts, int_i, ts, y, rac);
+#endif
+      if (LIKELY(ts <= MEMSET_MIN)) {
+	if (!(ts + inc)) goto np1;
+	memset(S, y, MEMSET_MIN);
+      }
+      else memset(S, y, ts);
       S += ts;
+      i = i * d0 + d1;
+      inc = 0;
     }
   np1:
     g = u0j + u1 * int_i;
     if (UNLIKELY(trunc(rac) >= halfI - 1)) {
-      while (int_i < halfI) {
-	y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
-	/* fprintf (stderr, "A2.1 : i=%d, y=%u, rac=%f\n", int_i, y, rac); */
+      for ( ; int_i < halfI; int_i++) {
+	y = inttruncfastlog2 (g, add, scale);
+#ifdef DEBUG_INIT_RAT
+	fprintf (stderr, "A2.1 : i=%d, y=%u, rac=%e\n", int_i, y, rac);
+#endif
 	*S++ = y;
 	g += u1;
-	int_i++;
       }
-      goto finratnorm;
+      goto nextj;
     }
-    while (g > 0) {
-      y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
-      /* fprintf (stderr, "A2.2 : i=%d, y=%u, rac=%f\n", int_i, y, rac); */
-      *S++ = y;
-      g += u1;
-      int_i++;
+    for (inc = 0; g > 0; g += u1) {
+      y = inttruncfastlog2 (g, add, scale);
+#ifdef DEBUG_INIT_RAT
+      fprintf (stderr, "A2.2 : i=%d, y=%u, rac=%e\n", int_i + inc, y, rac);
+#endif
+      S[inc++] = y;
     }
+    int_i += inc;
+    S += inc;
     g = -g;
+    y = inttruncfastlog2 (g, add, scale);
   cas2:
     do {
-      /* fprintf (stderr, "A3 : i=%d, y=%u, rac=%f\n", int_i, y, rac); */
+#ifdef DEBUG_INIT_RAT
+      fprintf (stderr, "A3 : i=%d, y=%u, rac=%e\n", int_i, y, rac);
+#endif
       *S++ = y;
-      int_i++;
-      if (UNLIKELY(int_i >= halfI)) {
-	ASSERT(int_i == halfI);
-	goto finratnorm;
-      }
+      if (++int_i >= halfI) goto nextj;
       oy = y;
       g -= u1;
-      y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
+      y = inttruncfastlog2 (g, add, scale);
     } while (oy != y);
-    d0 = 1/d0;
-    d1 = (1 - d0) * rac;
+    d0 = 1.0/d0;
+    d1 = rac - d0 * rac;
     y++;
-    i = rac - pow(2, (y - GUARD + 1) / rat->scale) / u1;
+    i = rac - rat->cexp2[(unsigned int)y + 1] * invu1;
     for (;; y++) {
       ts = -int_i;
       int_i = (int) trunc(i);
       if (UNLIKELY(int_i >= halfI)) {
 	ts += halfI;
-	/* fprintf (stderr, "A4.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", halfI - ts, halfI, ts, y, rac); */
-	memset((void *) S, y, ts);
+#ifdef DEBUG_INIT_RAT
+	fprintf (stderr, "A4.END : i1=%ld, i2=%d, ts=%ld, y=%u, rac=%e\n", halfI - ts, halfI, ts, y, rac);
+#endif
+	memset(S, y, ts);
 	S += ts;
-	goto finratnorm;
+	goto nextj;
       }
       ts += int_i;
-      /* fprintf (stderr, "A4 : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", int_i - ts, int_i, ts, y, rac); */
-      if (UNLIKELY(ts <= 16))
-	switch (ts) {
-	case 16 : S[15] = y; 
-	case 15 : S[14] = y; 
-	case 14 : S[13] = y; 
-	case 13 : S[12] = y; 
-	case 12 : S[11] = y; 
-	case 11 : S[10] = y; 
-	case 10 : S[9] = y; 
-	case 9 : S[8] = y; 
-	case 8 : S[7] = y; 
-	case 7 : S[6] = y; 
-	case 6 : S[5] = y; 
-	case 5 : S[4] = y; 
-	case 4 : S[3] = y; 
-	case 3 : S[2] = y; 
-	case 2 : S[1] = y; 
-	case 1 : S[0] = y;
-	}
+#ifdef DEBUG_INIT_RAT
+      fprintf (stderr, "A4 : i1=%ld, i2=%d, ts=%ld, y=%u, rac=%e\n", int_i - ts, int_i, ts, y, rac);
+#endif
+      if (LIKELY(ts <= MEMSET_MIN))
+	memset (S, y, MEMSET_MIN);
       else
-	memset((void *)S, y, ts);
+	memset(S, y, ts);
       S += ts;
       i = i * d0 + d1;
     }
+
+    /* Now, the same from cas1 but log2(-g): CAREFUL, not the same formula */
   cas3:
-    for (i = int_i;; y--) {
-      i = i * d0 + d1;
+    for (i = rac - rat->cexp2[y] * invu1, inc = 1;; y--) {
       ts = -int_i;
       int_i = (int) trunc(i); 
       if (UNLIKELY(int_i >= halfI)) {
 	ts += halfI;
-	/* fprintf (stderr, "B1.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", halfI - ts, halfI, ts, y, rac); */
-	memset((void *) S, y, ts);
+#ifdef DEBUG_INIT_RAT
+	fprintf (stderr, "B1.END : i1=%ld, i2=%d, ts=%ld, y=%u, rac=%e\n", halfI - ts, halfI, ts, y, rac);
+#endif
+	memset(S, y, ts);
 	S += ts;
-	goto finratnorm;
+	goto nextj;
       }
       ts += int_i;
-      /* fprintf (stderr, "B1 : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", int_i - ts, int_i, ts, y, rac); */
-      if (UNLIKELY(ts <= 16))
-	switch (ts) {
-	case 16 : S[15] = y; 
-	case 15 : S[14] = y; 
-	case 14 : S[13] = y; 
-	case 13 : S[12] = y; 
-	case 12 : S[11] = y; 
-	case 11 : S[10] = y; 
-	case 10 : S[9] = y; 
-	case 9 : S[8] = y; 
-	case 8 : S[7] = y; 
-	case 7 : S[6] = y; 
-	case 6 : S[5] = y; 
-	case 5 : S[4] = y; 
-	case 4 : S[3] = y; 
-	case 3 : S[2] = y; 
-	case 2 : S[1] = y; 
-	case 1 : S[0] = y; 
-	  break;
-	case 0 : goto np2;
-	}
-      else
-	memset((void *)S, y, ts);
+#ifdef DEBUG_INIT_RAT
+      fprintf (stderr, "B1 : i1=%ld, i2=%d, ts=%ld, y=%u, rac=%e\n", int_i - ts, int_i, ts, y, rac);
+#endif
+      if (LIKELY(ts <= MEMSET_MIN)) {
+	if (!(ts + inc)) goto np2;
+	memset(S, y, MEMSET_MIN);
+      }
+      else memset(S, y, ts);
       S += ts;
+      i = i * d0 + d1;
+      inc = 0;
     }
   np2:
-    g = -u0j - u1 * int_i;
+    g = -(u0j + u1 * int_i);
     if (UNLIKELY(trunc(rac) >= halfI - 1)) {
-      while (int_i < halfI) {
-	y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
-	/* fprintf (stderr, "B2.1 : i=%d, y=%u, rac=%f\n", int_i, y, rac); */
+      for ( ; int_i < halfI; int_i++) {
+	y = inttruncfastlog2 (g, add, scale);
+#ifdef DEBUG_INIT_RAT
+	fprintf (stderr, "B2.1 : i=%d, y=%u, rac=%e\n", int_i, y, rac);
+#endif
 	*S++ = y;
 	g -= u1;
-	int_i++;
       }
-      goto finratnorm;
+      goto nextj;
     }
-    while (g > 0) {
-      y = (unsigned int) trunc(log2(g) * rat->scale) + GUARD;
-      /* fprintf (stderr, "B2.2 : i=%d, y=%u, rac=%f\n", int_i, y, rac); */
-      *S++ = y;
-      g -= u1;
-      int_i++;
+    for (inc = 0; g > 0; g -= u1) {
+      y = inttruncfastlog2 (g, add, scale);
+#ifdef DEBUG_INIT_RAT
+      fprintf (stderr, "B2.2 : i=%d, y=%u, rac=%e\n", int_i + inc, y, rac);
+#endif
+      S[inc++] = y;
     }
+    int_i += inc;
+    S += inc;
     g = -g;
+    y = inttruncfastlog2 (g, add, scale);
   cas4:
     do {
-      /* fprintf (stderr, "B3 : i=%d, y=%u, rac=%f\n", int_i, y, rac); */
+#ifdef DEBUG_INIT_RAT
+      fprintf (stderr, "B3 : i=%d, y=%u, rac=%e\n", int_i, y, rac);
+#endif
       *S++ = y;
-      int_i++;
-      if (UNLIKELY(int_i >= halfI)) {
-	ASSERT(int_i == halfI);
-	goto finratnorm;
-      }
+      if (++int_i == halfI) goto nextj;
       oy = y;
       g += u1;
-      y = (unsigned int) trunc(log2(g) * rat->scale + GUARD);
+      y = inttruncfastlog2 (g, add, scale);
     } while (oy != y);
-    d0 = 1/d0;
-    d1 = (1 - d0) * rac;
+    d0 = 1.0/d0;
+    d1 = rac - d0 * rac;
     y++;
-    i = rac + pow(2, (y - GUARD + 1) / rat->scale) / u1;
+    i = rac + rat->cexp2[(unsigned int)y + 1] * invu1;
     for (;; y++) {
       ts = -int_i;
       int_i = (int) trunc(i);
       if (UNLIKELY(int_i >= halfI)) {
 	ts += halfI;
-	/* fprintf (stderr, "B4.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", halfI - ts, halfI, ts, y, rac); */
-	memset((void *) S, y, ts);
+#ifdef DEBUG_INIT_RAT
+	fprintf (stderr, "B4.END : i1=%ld i2=%d, ts=%ld, y=%u, rac=%e\n", halfI - ts, halfI, ts, y, rac);
+#endif
+	memset(S, y, ts);
 	S += ts;
-	goto finratnorm;
+	goto nextj;
       }
       ts += int_i;
-      /* fprintf (stderr, "B4 : i1=%ld i2=%d, ts=%ld, y=%u, rac=%f\n", int_i - ts, int_i, ts, y, rac); */
-      if (ts <= 16)
-	switch (ts) {
-	case 16 : S[15] = y; 
-	case 15 : S[14] = y; 
-	case 14 : S[13] = y; 
-	case 13 : S[12] = y; 
-	case 12 : S[11] = y; 
-	case 11 : S[10] = y; 
-	case 10 : S[9] = y; 
-	case 9 : S[8] = y; 
-	case 8 : S[7] = y; 
-	case 7 : S[6] = y; 
-	case 6 : S[5] = y; 
-	case 5 : S[4] = y; 
-	case 4 : S[3] = y; 
-	case 3 : S[2] = y; 
-	case 2 : S[1] = y; 
-	case 1 : S[0] = y;
-	}
+#ifdef DEBUG_INIT_RAT
+      fprintf (stderr, "B4 : i1=%ld i2=%d, ts=%ld, y=%u, rac=%e\n", int_i - ts, int_i, ts, y, rac);
+#endif
+      if (LIKELY(ts <= MEMSET_MIN)) 
+	memset(S, y, MEMSET_MIN);
       else
-	memset((void *)S, y, ts);
+	memset(S, y, ts);
       S += ts;
       i = i * d0 + d1;
     }
-  finratnorm:
-    /* if (S - CS != (halfI<<1)) fprintf (stderr, "END norm: cpt = %ld\n", S - CS); */
-    __asm__("### End rational norm loop\n");
+  nextj:
+    __asm__("# gcc needs something after a label.\n");
   }
 }
 
@@ -775,6 +770,7 @@ get_maxnorm_alg (cado_poly cpoly, sieve_info_ptr si, uint64_t q0)
    rational and algebraic sides */
 void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int qside)
 {
+  double step, begin;
   for (int side = 0; side < 2; side++)
     {
       int d = si->cpoly->pols[side]->degree;
@@ -822,18 +818,21 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
            maxlog2, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
   /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
      thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
-  rat->scale = ((1U << ((int) floor(log2(rat->logmax))+1)) - GUARD) / floor(rat->logmax) * 0.999999;
-  /* fprintf (stderr, "rat->scale, my fomula = %f\n", rat->scale); */
-  /* rat->scale = ((double) UCHAR_MAX - GUARD) / maxlog2; */
-  /* fprintf (stderr, "rat->scale, old correct fomula = %f\n", rat->scale); */
-
+  rat->scale = ((double) UCHAR_MAX - GUARD + 1) / maxlog2 * 0.999999;
+  step = 1 / rat->scale;
+  begin = -step * GUARD;
+  for (unsigned int inc = 0; inc < 257; begin += step) rat->cexp2[inc++] = exp2(begin);
   /* we want to select relations with a cofactor of less than r bits on the
      rational side */
-  r = si->cpoly->rat->lambda * (double) si->cpoly->rat->lpb;
+  r = MIN(si->conf->sides[RATIONAL_SIDE]->lambda * (double) si->conf->sides[RATIONAL_SIDE]->lpb, maxlog2 - GUARD / rat->scale);
   rat_bound = (unsigned char) (r * rat->scale) + GUARD;
   fprintf (output, " bound=%u\n", rat_bound);
-  sieve_info_init_lognorm (rat->Bound, rat_bound, si->cpoly->rat->lim,
-                           si->cpoly->rat->lpb, rat->scale);
+  double max_rlambda = (maxlog2 - GUARD / rat->scale) / si->cpoly->rat->lpb;
+  if (si->cpoly->rat->lambda > max_rlambda) {
+      fprintf(output, "# Warning, rlambda>%.1f does not make sense (capped to limit)\n", max_rlambda);
+  }
+  sieve_info_init_lognorm (rat->Bound, rat_bound, si->conf->sides[RATIONAL_SIDE]->lim,
+                           si->conf->sides[RATIONAL_SIDE]->lpb, rat->scale);
 
   /************************** algebraic side *********************************/
 
@@ -845,21 +844,28 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
      side, which are set to 255, remain larger than then report bound 'r',
      even if the algebraic norm is totally smooth. For this, we artificially
      increase by 'r' the maximal range */
-  r = si->cpoly->alg->lambda * (double) si->cpoly->alg->lpb;
+  r = MIN(si->conf->sides[ALGEBRAIC_SIDE]->lambda * (double) si->conf->sides[ALGEBRAIC_SIDE]->lpb, alg->logmax);
   maxlog2 = alg->logmax + r;
 
   fprintf (output, "# Alg. side: log2(maxnorm)=%1.2f logbase=%1.6f",
-           maxlog2, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
+           alg->logmax, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
   /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
      thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
   alg->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
+  step = 1 / alg->scale;
+  begin = -step * GUARD;
+  for (unsigned int inc = 0; inc < 257; begin += step) alg->cexp2[inc++] = exp2(begin);
   /* we want to report relations with a remaining log2-norm after sieving of
      at most lambda * lpb, which corresponds in the y-range to
      y >= GUARD + lambda * lpb * scale */
   alg_bound = (unsigned char) (r * alg->scale) + GUARD;
   fprintf (output, " bound=%u\n", alg_bound);
-  sieve_info_init_lognorm (alg->Bound, alg_bound, si->cpoly->alg->lim,
-                           si->cpoly->alg->lpb, alg->scale);
+  double max_alambda = (alg->logmax) / si->cpoly->alg->lpb;
+  if (si->cpoly->alg->lambda > max_alambda) {
+      fprintf(output, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
+  }
+  sieve_info_init_lognorm (alg->Bound, alg_bound, si->conf->sides[ALGEBRAIC_SIDE]->lim,
+                           si->conf->sides[ALGEBRAIC_SIDE]->lpb, alg->scale);
 }
 
 void sieve_info_clear_norm_data(sieve_info_ptr si)
@@ -877,7 +883,7 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
 void
 sieve_info_update_norm_data (sieve_info_ptr si)
 {
-    int32_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
+    int64_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
     /* Update floating point version of algebraic poly (do both, while
      * we're at it...) */
     for (int side = 0; side < 2; side++) {
@@ -886,7 +892,7 @@ sieve_info_update_norm_data (sieve_info_ptr si)
         mp_poly_homography (s->fij, ps->f, ps->degree, H);
         double invq = 1.0;
         if (si->conf->side == side)
-            invq /= mpz_get_d(si->q);
+            invq /= mpz_get_d(si->doing->p);
         for (int k = 0; k <= ps->degree; k++)
             s->fijd[k] = mpz_get_d (s->fij[k]) * invq;
     }

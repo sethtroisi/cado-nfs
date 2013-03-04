@@ -3,6 +3,8 @@ import logging
 import subprocess
 
 class ANSI(object):
+    """ Class defining some ANSI control sequences, for example for 
+    changing text colour """
     CSI = '\x1b[' # ANSI Control Sequence Introducer. Not the TV show
     SGR = 'm' # Set Graphics Rendition code
     NORMAL = CSI + '0' + SGR
@@ -25,11 +27,13 @@ class ANSI(object):
     WHITE = CSI + '37;1' + SGR
 
 class ScreenFormatter(logging.Formatter):
+    """ Class for formatting logger records for screen output, optionally
+    with colorized logger level name (like cadofct.pl used to). """
     colours = {
         logging.INFO : ANSI.BRIGHTGREEN,
         logging.WARNING : ANSI.BRIGHTYELLOW,
         logging.ERROR : ANSI.BRIGHTRED
-        }
+    }
 
     # Format string that switches to a different colour (with ANSI code 
     # specified in the 'colour' key of the log record) for the log level name, 
@@ -48,7 +52,10 @@ class ScreenFormatter(logging.Formatter):
 
     def format(self, record):
         # Add attributes to record that our format string expects
-        record.colour = self.__class__.colours[record.levelno]
+        if record.levelno in self.__class__.colours:
+            record.colour = self.__class__.colours[record.levelno]
+        else:
+            record.colour = ANSI.NORMAL
         record.levelnametitle = record.levelname.title()
         record.nocolour = ANSI.NORMAL
         if hasattr(record, "indent"):
@@ -58,6 +65,8 @@ class ScreenFormatter(logging.Formatter):
         return super().format(record)
 
 class FileFormatter(logging.Formatter):
+    """ Class for formatting a log record for writing to a log file. No colours 
+    here, but we add the process ID and a time stamp """
     formatstr = \
        'PID%(process)s %(asctime)s %(levelnametitle)s:%(message)s' 
 
@@ -68,84 +77,79 @@ class FileFormatter(logging.Formatter):
     def __init__(self):
         super().__init__(fmt=self.__class__.formatstr)
 
-class HandlerRoot(object):
-    # Root class to strip off the logger argument before we reach object()
-    def __init__(self, logger, **kwargs):
+class CmdFileFormatter(logging.Formatter):
+    """ Class for formatting a log record for writing to a command log file. 
+        No colours here, but we add the process ID, the spanwed process id, 
+        and a time stamp """
+    formatstr = \
+       '# PPID%(process)s PID%(childpid)s %(asctime)s\n%(message)s' 
+
+    def __init__(self):
+        super().__init__(fmt=self.__class__.formatstr)
+
+class ScreenHandler(logging.StreamHandler):
+    def __init__(self, lvl = logging.INFO, colour = True, **kwargs):
         super().__init__(**kwargs)
+        self.setLevel(lvl)
+        self.setFormatter(ScreenFormatter(colour = colour))
 
-class ScreenHandler(HandlerRoot):
-    def __init__(self, logger, lvl = logging.INFO, colour = True, **kwargs):
-        h = logging.StreamHandler()
-        h.setLevel(lvl)
-        h.setFormatter(ScreenFormatter(colour = colour))
-        logger.addHandler(h)
-        super().__init__(logger, **kwargs)
+class FileHandler(logging.FileHandler):
+    def __init__(self, filename, lvl = logging.DEBUG, **kwargs):
+        super().__init__(filename, **kwargs)
+        self.setLevel(lvl)
+        self.setFormatter(FileFormatter())
 
-class FileHandler(HandlerRoot):
-    def __init__(self, logger, filelvl = logging.DEBUG, filename = None, **kwargs):
-        if not filename is None:
-            h = logging.FileHandler(filename)
-            h.setLevel(filelvl)
-            h.setFormatter(FileFormatter())
-            logger.addHandler(h)
-        super().__init__(logger, **kwargs)
+class CmdFileHandler(logging.FileHandler):
+    def __init__(self, filename , **kwargs):
+        super().__init__(filename, **kwargs)
+        self.setLevel(0) # FIXME: how do I make it process only record with level EQUAL to some value?
+        self.setFormatter(CmdFileFormatter())
 
-class Logger(HandlerRoot):
-    # We mustn't instantiate logging.Logger, but get a reference to a
-    # pre-existing instance via getLogger(). Hence no inheritance from 
-    # logging.Logger
-    def __init__(self, **kwargs):
+class Logger(object):
+    """ Class which gets a logger with name equal to the module name (i.e., as 
+        stored in __name__) upon instantiation and sets the logging level to 
+        DEBUG. Other method calls are passed though to the logger """
+    CMDLEVEL = 51
+    def __init__(self):
+        # We mustn't instantiate logging.Logger, but get a reference to a
+        # pre-existing instance via getLogger(). Hence no inheritance from 
+        # logging.Logger
         self.logger = logging.getLogger(__name__)
-        # Lowest possible threshold, so handlers get to see everything.
+        # Use level of NOTSET, so handlers get to see everything.
         # They do the filtering by themselves
         self.logger.setLevel(logging.DEBUG)
-        # Init the various handlers which may exist as sibling classes, and
-        # tell them what our logging.Logger instance is
-        super().__init__(logger = self.logger, **kwargs)
+    
+    def cmd(self, msg, *args, **kwargs):
+        """ Log a message with a level of Logger.CMDLEVEL """
+        self.log(self.__class__.CMDLEVEL, msg, *args, **kwargs)
+    
     # Delegate all other method calls to the logging.Logger instance we 
     # have referenced in self.logger
     def __getattr__(self, name):
         return getattr(self.logger, name)
 
-# Put the pieces together
-class MyLogger(Logger, ScreenHandler, FileHandler):
-    """ Logger that outputs to both screen and disk file. """
-    pass
-
 class Command(object):
-    def __init__(self, args, logfile=None, **kwargs):
+    def __init__(self, args, **kwargs):
         self.args = args
-        self.logfile = logfile
         self.kwargs = kwargs
+        self.logger = Logger()
         # Convert args array to a string for printing if necessary
         if isinstance(self.args, str):
             self.cmdline = self.args
         else:
             self.cmdline = " ".join(self.args)
-        if not self.logfile is None:
-            self.f = open(logfile, "a")
-            self.f.write("# Command line for id(Command) = " + str(id(self)) + " is:\n" + self.cmdline + "\n")
-            self.f.close()
 
         self.child = subprocess.Popen(self.args, stdout = subprocess.PIPE, 
             stderr = subprocess.PIPE, **self.kwargs)
         
-        if not self.logfile is None:
-            self.f = open(self.logfile, "a")
-            self.f.write("# Child process for id(Command)= " + str(id(self)) + " has PID " + str(self.child.pid) + "\n")
-            self.f.close()
-        logger.info("Running command (PID=" + str(self.child.pid) + "): " + self.cmdline)
+        self.logger.info("Running command: " + self.cmdline)
+        self.logger.cmd(self.cmdline, extra={"pid": self.child.pid})
 
     def wait(self):
-        if hasattr(self, "returncode"):
-            return self.returncode
         # Wait for command to finish executing, capturing stdout and stderr 
         # in output tuple
         (self.stdout, self.stderr) = self.child.communicate()
-        if not self.logfile is None:
-            self.f = open(self.logfile, "a")
-            self.f.write("# Child process for id(Command)= " + str(id(self)) + " has return code " + str(self.child.returncode) + "\n")
-            self.f.close()
+
         if self.child.returncode == 0:
             logger.info("Process with PID " + str(self.child.pid) + " finished successfully")
         else:
@@ -161,7 +165,7 @@ class RemoteCommand(Command):
         "PasswordAuthentication": "no"
     }
     def __init__(self, command, host, port = None, ssh_options = None, **kwargs):
-        ssh_command = [self.__class__.ssh, host]
+        ssh_command = [self.__class__.ssh]
         options = self.__class__.ssh_options.copy()
         if not ssh_options is None:
             options.update(ssh_options)
@@ -170,26 +174,41 @@ class RemoteCommand(Command):
         for (opt, val) in options.items():
             if not val is None:
                 ssh_command += ["-o", opt + "=" + str(val)]
+        ssh_command.append(host)
         if isinstance(command, str):
             ssh_command.append(command)
         else:
             ssh_command += command
         super().__init__(ssh_command, **kwargs)
 
+class SendFile(Command):
+    rsync="/usr/bin/rsync"
+    rsync_options = []
+    def __init__(self, localfile, hostname, hostpath, port = None, rsync_options = None, **kwargs):
+        if hostname != "localhost":
+            target = hostname + ":"
+        if not port is None:
+            target += str(port)
+        target += hostpath
+        copy_command = [self.__class__.rsync] + self.__class__.rsync_options + [localfile, target]
+        super().__init__(copy_command, **kwargs)
+
 if __name__ == '__main__':
-    logger = MyLogger(filename = "log", filelvl = logging.DEBUG, lvl=logging.INFO)
-#    logger = MyLogger(lvl=logging.INFO)
+    logger = Logger()
+    logger.addHandler(ScreenHandler(lvl = logging.INFO))
+    logger.addHandler(FileHandler(filename = "log", lvl = logging.DEBUG))
+
     logger.info("An Info Center!")
     logger.warn("Beware")
     logger.error("All hope abandon", extra={"indent" : 4})
 
-    c = Command(["ls", "/"], logfile = "commands")
+    c = Command(["ls", "/"])
     rc = c.wait()
     print("Stdout: " + str(c.stdout, encoding="utf-8"))
     print("Stderr: " + str(c.stderr, encoding="utf-8"))
     del(c)
 
-    c = RemoteCommand(["ls", "/"], "localhost", logfile = "commands")
+    c = RemoteCommand(["ls", "/"], "localhost")
     rc = c.wait()
     print("Stdout: " + str(c.stdout, encoding="utf-8"))
     print("Stderr: " + str(c.stderr, encoding="utf-8"))

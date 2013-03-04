@@ -35,6 +35,7 @@ History: 0.1 initial release
 	 Test some more to see if any of this actually works.
 */
 
+#include "cado.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

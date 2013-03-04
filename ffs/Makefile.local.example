@@ -2,6 +2,8 @@
 # included by the main Makefile.
 # You can rename it and uncomment the appropriate lines.
 
+# To overwrite the build directory
+# BUILDDIR = ./build
 
 # You can link with gf2x (see https://gforge.inria.fr/projects/gf2x/) for
 # faster arithmetic in characteristic 2. In particular, if you have a

@@ -111,8 +111,8 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
     # These three methods overwrite the corresponding methods from 
     # http.server.BaseHTTPRequestHandler
     # They just call self.log() with a numerical logging level added
-    def log_message(self, format, *args):
-        self.log(logging.INFO, *args, **kwargs)
+    def log_message(self, format, *args, **kwargs):
+        self.log(logging.INFO, format, *args, **kwargs)
 
     def log_request(self, code='-', size='-'):
         self.log(logging.INFO, '"%s" %s %s', self.requestline, str(code), str(size))

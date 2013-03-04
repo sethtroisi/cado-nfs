@@ -205,7 +205,13 @@ int factor_base_init(large_factor_base_ptr LFB, small_factor_base_ptr SFB,
     if (max_degp && degp > max_degp) {
       break;
     }
-    ASSERT_ALWAYS(last_degp < sorted_min_degp || last_degp <= degp);
+    if (!(last_degp < sorted_min_degp || last_degp <= degp)) {
+        fprintf(stderr, "Error parsing factor base %s:\n", filename);
+        fprintf(stderr, "  It might come from the fact that powerlim was too large when running makefb.\n");
+        fprintf(stderr, "  Try rebuilding the factor base with a smaller powerlim, or try sieving with a\n");
+        fprintf(stderr, "  larger value of I.\n");
+        ASSERT_ALWAYS(last_degp < sorted_min_degp || last_degp <= degp);
+    }
     last_degp = degp;
 
     // Read ":".
