@@ -773,34 +773,43 @@ class DbThreadPool(object):
 if __name__ == '__main__': # {
     import argparse
 
+    queries = {"avail" : ("Available workunits: ", {"eq": {"status": WuStatus.AVAILABLE}}), 
+               "assigned": ("Assigned workunits: ", {"eq": {"status": WuStatus.ASSIGNED}}), 
+               "receivedok": ("Received ok workunits: ", {"eq":{"status": WuStatus.RECEIVED_OK}}), 
+               "receivederr": ("Received with error workunits: ", {"eq": {"status": WuStatus.RECEIVED_ERROR}}), 
+               "verifiedok": ("Verified ok workunits: ", {"eq": {"status": WuStatus.VERIFIED_OK}}), 
+               "verifiederr": ("Verified with error workunits: ", {"eq": {"status": WuStatus.VERIFIED_ERROR}}), 
+               "all": ("All existing workunits: ", {})
+              }
+
     use_pool = False
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-create', action="store_true", required=False, 
+    parser.add_argument('-create', action="store_true", 
                         help='Create the database tables if they do not exist')
-    parser.add_argument('-add', action="store_true", required=False, 
+    parser.add_argument('-add', action="store_true", 
                         help='Add new work units. Contents of WU(s) are ' + 
                         'read from stdin, separated by blank line')
-    parser.add_argument('-assign', required = False, nargs = 1, 
-                        metavar = 'clientid', 
+    parser.add_argument('-assign', nargs = 1, metavar = 'clientid', 
                         help = 'Assign an available WU to clientid')
-    parser.add_argument('-cancel', required = False, nargs = 1, 
-                        metavar = 'wuid', 
+    parser.add_argument('-cancel', nargs = 1, metavar = 'wuid', 
                         help = 'Cancel a WU with the given id')
-    parser.add_argument('-prio', required = False, nargs = 1, metavar = 'N', 
+    parser.add_argument('-prio', nargs = 1, metavar = 'N', 
                         help = 'If used with -add, newly added WUs ' + 
                         'receive priority N')
-    parser.add_argument('-result', required = False, nargs = 4, 
+    parser.add_argument('-result', nargs = 4, 
                         metavar = ('wuid', 'clientid', 'filename', 'filepath'), 
                         help = 'Return a result for wu from client')
-    parser.add_argument('-test', action="store_true", required=False, 
+    parser.add_argument('-test', action="store_true", 
                         help='Run some self tests')
 
-    for arg in ("avail", "assigned", "receivedok", "receivederr", "all", 
-                "dump"):
+    for arg in queries:
         parser.add_argument('-' + arg, action="store_true", required = False)
+    parser.add_argument('-dump', nargs='?', default = None, const = "all", 
+                        metavar = "FIELD", 
+                        help='Dump WU contents, optionally a single field')
     for arg in ("dbname", "debug"):
-        parser.add_argument('-' + arg, required = False, nargs = 1)
+        parser.add_argument('-' + arg, nargs = 1)
     # Parse command line, store as dictionary
     args = vars(parser.parse_args())
     # print(args)
@@ -839,52 +848,26 @@ if __name__ == '__main__': # {
         if s != "":
             wus.append(s)
         db_pool.create(wus, priority=prio)
+
     # Functions for queries
-    if args["avail"]:
-        wus = db_pool.query(eq={"status": WuStatus.AVAILABLE})
-        print("Available workunits: ")
+    for (arg, (msg, condition)) in queries.items():
+        if not args[arg]:
+            continue
+        wus = db_pool.query(**condition)
+        print(msg)
         if wus is None:
-            print(wus)
-        else:
-            print (len(wus))
-            if args["dump"]:
+            print("None")
+            continue
+        print (len(wus))
+        if args["dump"]:
+            if args["dump"] == "all":
                 print(WuAccess.to_str(wus))
-    if args["assigned"]:
-        wus = db_pool.query(eq={"status": WuStatus.ASSIGNED})
-        print("Assigned workunits: ")
-        if wus is None:
-            print(wus)
-        else:
-            print (len(wus))
-            if args["dump"]:
-                print(WuAccess.to_str(wus))
-    if args["receivedok"]:
-        wus = db_pool.query(eq={"status": WuStatus.RECEIVED_OK})
-        print("Received ok workunits: ")
-        if wus is None:
-            print(wus)
-        else:
-            print (len(wus))
-            if args["dump"]:
-                print(WuAccess.to_str(wus))
-    if args["receivederr"]:
-        wus = db_pool.query(eq={"status": WuStatus.RECEIVED_ERROR})
-        print("Received with error workunits: ")
-        if wus is None:
-            print(wus)
-        else:
-            print (len(wus))
-            if args["dump"]:
-                print(WuAccess.to_str(wus))
-    if args["all"]:
-        wus = db_pool.query()
-        print("Existing workunits: ")
-        if wus is None:
-            print(wus)
-        else:
-            print (len(wus))
-            if args["dump"]:
-                print(WuAccess.to_str(wus))
+            else:
+                field = args["dump"]
+                for wu in wus:
+                    print(wu[field])
+
+
     # Functions for testing
     if args["assign"]:
         clientid = args["assign"][0]
