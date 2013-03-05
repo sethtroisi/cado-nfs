@@ -2179,10 +2179,16 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 fprintf(stderr, "# about to print relation for (%"PRId64",%"PRIu64")\n",a,b);
             }
 #endif
-            /* since a,b both even were not sieved, either a or b should be odd */
+            /* since a,b both even were not sieved, either a or b should
+             * be odd. However, exceptionally small norms, even without
+             * sieving, may fall below the report bound (see tracker
+             * issue #15437). Therefore it is safe to continue here. */
             // ASSERT((a | b) & 1);
             if (UNLIKELY(((a | b) & 1) == 0))
             {
+                th->rep->both_even++;
+                continue;
+                /*
                 pthread_mutex_lock(&io_mutex);
                 fprintf (stderr, "# Error: a and b both even for N = %d, x = %d,\n"
                         "i = %d, j = %d, a = %ld, b = %lu\n",
@@ -2192,6 +2198,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                         (long) a, (unsigned long) b);
                 abort();
                 pthread_mutex_unlock(&io_mutex);
+                */
             }
 
             /* Since the q-lattice is exactly those (a, b) with
@@ -2856,6 +2863,9 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
     }
     gmp_fprintf (las->output, "# %lu relation(s) for %s (%Zd,%Zd)\n", rep->reports, sidenames[si->conf->side], si->doing->p, si->doing->r);
     double qtts = qt0 - rep->tn[0] - rep->tn[1] - rep->ttf;
+    if (rep->both_even) {
+        fprintf (las->output, "# Warning: found %lu hits with i,j both even (not a bug, but should be very rare)\n", rep->both_even);
+    }
     fprintf (las->output, "# Time for this special-q: %1.4fs [norm %1.4f+%1.4f, sieving %1.4f"
             " (%1.4f + %1.4f),"
             " factor %1.4f]\n", qt0,
