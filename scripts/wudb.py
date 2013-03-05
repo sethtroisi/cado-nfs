@@ -165,13 +165,11 @@ class MyCursor(sqlite3.Cursor):
             "( " + ", ".join(" ".join(k) for k in layout) + " );"
         self._exec (command)
     
-    def create_index(self, table, d):
-        """ Creates an index with fields as described in the d dictionary """
-        for (name, columns) in d.items():
-            column_names = [col[0] for col in columns]
-            command = "CREATE INDEX IF NOT EXISTS " + name + " ON " + \
-                table + "( " + ", ".join(column_names) + " );"
-            self._exec (command)
+    def create_index(self, name, table, columns):
+        """ Creates an index with fields as described in the columns list """
+        command = "CREATE INDEX IF NOT EXISTS " + name + " ON " + \
+            table + "( " + ", ".join(columns) + " );"
+        self._exec (command)
     
     def insert(self, table, d):
         """ Insert a new entry, where d is a dictionary containing the 
@@ -286,11 +284,16 @@ class DbTable(object):
             # If this table references another table, we use the primary
             # key of the referenced table as the foreign key name
             r = self.references # referenced table
-            fk = (r.primarykey, "INTEGER", "REFERENCES " + 
-                  r.getname() + " (" + r.primarykey + ") ")
+            fk = (r.getpk(), "INTEGER", "REFERENCES " + 
+                  r.getname() + " (" + r.getpk() + ") ")
             fields.append(fk)
         cursor.create_table(self.tablename, fields)
-        cursor.create_index(self.tablename, self.index)
+        if self.references:
+            # We always create an index on the foreign key
+            cursor.create_index(self.tablename + "_pkindex", r.tablename, (fk[0], ))
+        for indexname in self.index:
+            cursor.create_index(self.tablename + "_" + indexname, 
+                                self.tablename, self.index[indexname])
 
     def insert(self, cursor, values, foreign=None):
         """ Insert a new row into this table. The column:value pairs are 
@@ -341,7 +344,7 @@ class WuTable(DbTable):
     )
     primarykey = fields[0][0]
     references = None
-    index = {"wuidindex": (fields[1],), "statusindex" : (fields[2],)}
+    index = {"wuidindex": (fields[1][0],), "statusindex" : (fields[2][0],)}
 
 class FilesTable(DbTable):
     name = "files"
@@ -352,7 +355,7 @@ class FilesTable(DbTable):
     )
     primarykey = fields[0][0]
     references = WuTable()
-    index = {"wuindex": (fields[1],)}
+    index = {}
 
 
 class Mapper(object):
