@@ -509,7 +509,7 @@ class WuAccess(object): # {
             assert data["errorcode"] != 0
             return
         if status == WuStatus.RECEIVED_OK:
-            assert data["errorcode"] == 0
+            assert data["errorcode"] is None or data["errorcode"] == 0
             return
         assert data["errorcode"] is None
         assert data["timeresult"] is None
@@ -646,7 +646,7 @@ class WuAccess(object): # {
         self._checkstatus(data, WuStatus.RECEIVED_OK)
         if debug > 0:
             self.check(data)
-        d = {["timeverified"]: str(datetime.now())}
+        d = {"timeverified": str(datetime.now())}
         if ok:
             d["status"] = WuStatus.VERIFIED_OK
         else:
