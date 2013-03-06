@@ -916,7 +916,7 @@ int main(int argc, char **argv)
                 // mark survivors
                 // no need to check if this is a valid position
                 for (unsigned i = 0; i < size; ++i) {
-                  if (S[i] > threshold[side] + sublat_thr)
+                  if (S[i] > (threshold[side] + sublat_thr)>>SCALE) 
                     S[i] = 255; 
                   else 
                     S[i] = 0;

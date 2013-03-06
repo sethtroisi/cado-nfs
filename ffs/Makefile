@@ -38,7 +38,7 @@ WARNFLAGS = -Wall -Wextra -pedantic
 
 FFSREV = `./version.sh`
 
-CPPFLAGS    = -DFFSREV=\"$(FFSREV)\"
+CPPFLAGS    = -DFFSREV=\"$(FFSREV)\" -DSCALE=0
 CFLAGS      = $(OPTFLAGS) $(WARNFLAGS) -std=c99   -g
 TARGET_ARCH = -mtune=native -march=native
 LDFLAGS     = 

@@ -52,7 +52,7 @@ int next_projective_j(ij_t rj, ij_t j, ij_t *basis, int degp, int J)
 
 
 static inline
-void sieve_hit(uint8_t *S, uint8_t degp, ijpos_t pos,
+void sieve_hit(uint8_t *S, uint8_t scaledegp, ijpos_t pos,
         MAYBE_UNUSED fbprime_srcptr p,
         MAYBE_UNUSED fbprime_srcptr r,
         MAYBE_UNUSED ijpos_t pos0)
@@ -63,15 +63,15 @@ void sieve_hit(uint8_t *S, uint8_t degp, ijpos_t pos,
     fbprime_out(stderr, p); fprintf(stderr, " ");
     fbprime_out(stderr, r); fprintf(stderr, "\n");
     fprintf(stderr, "TRACE_POS(%lu): degnorm is now %d\n",
-            pos0+pos, S[pos]-degp);
+            pos0+pos, S[pos]-scaledegp);
   }
 #endif
 #ifndef NDEBUG
-  if (S[pos] < degp)
+  if (S[pos] < scaledegp)
     fprintf(stderr, "faulty pos is %lu\n", pos0+pos);
-  ASSERT(S[pos] >= degp);
+  ASSERT(S[pos] >= scaledegp);
 #endif
-  S[pos] -= degp;
+  S[pos] -= scaledegp;
 }
 
 
@@ -84,6 +84,7 @@ void sieveSFB(uint8_t *S, unsigned int *thr,
         small_fbideal_ptr gothp = FB->elts[ii];
         int L = gothp->degq;
         int degp = gothp->degp;
+        int scaledegp = degp >> SCALE;
 
         // Larger primes are left to the bucket sieve.
         ASSERT((unsigned)L < I);
@@ -148,12 +149,12 @@ void sieveSFB(uint8_t *S, unsigned int *thr,
             int rci = 1;
             for (ij_set_zero(i); rci; rci = ij_set_next(i, i, I)) {
               ijpos_t pos = start + ijvec_get_offset(i, I);
-              sieve_hit(S, degp, pos, gothp->q, gothp->r, pos0);
+              sieve_hit(S, scaledegp, pos, gothp->q, gothp->r, pos0);
             }
 #else
             // For GF(2), this becomes so simple (and Gcc does it well).
             for(int i=0; i < 1<<I; ++i)
-              S[start+i] -= degp;
+              S[start+i] -= scaledegp;
 #endif
 
             rcj = next_projective_j(j, j, gothp->projective_basis, L, J);
@@ -201,7 +202,7 @@ void sieveSFB(uint8_t *S, unsigned int *thr,
           ij_set(i, gothp->current);
           ijpos_t pos = start + ijvec_get_offset(i, I);
           if (LIKELY(pos0 || pos))
-            sieve_hit(S, degp, pos, gothp->q, gothp->r, pos0);
+            sieve_hit(S, scaledegp, pos, gothp->q, gothp->r, pos0);
 
           // Size of Gray codes to use for the inner loop.
 #         if   defined(USE_F2)
@@ -242,7 +243,7 @@ void sieveSFB(uint8_t *S, unsigned int *thr,
 #             define DOALLGRAY8 DOALLGRAY7 DOGRAY(28) DOALLGRAY7
 #             define DOALLGRAY  CAT(DOALLGRAY, ENUM_LATTICE_UNROLL)
               uint64_t ii = i[0];
-              uint8_t  dd = degp;
+              uint8_t  dd = scaledegp;
               __asm volatile( DOALLGRAY
                             : [i]   "+r" (ii)
                             : [S]    "r" (S+start),
@@ -257,7 +258,7 @@ void sieveSFB(uint8_t *S, unsigned int *thr,
                 for (unsigned k = k0; k < ngray; ++k) {
                     ij_add(i, i, gothp->basis[gray[k]]);
                     pos = start + ijvec_get_offset(i, I);
-                    sieve_hit(S, degp, pos, gothp->q, gothp->r, pos0);
+                    sieve_hit(S, scaledegp, pos, gothp->q, gothp->r, pos0);
                 }
             }
             k0 = 0;
@@ -273,7 +274,7 @@ void sieveSFB(uint8_t *S, unsigned int *thr,
               ij_diff(s, s, t);
               ij_add(i, i, gothp->basis[ij_deg(s)+ENUM_LATTICE_UNROLL]);
               pos = start + ijvec_get_offset(i, I);
-              sieve_hit(S, degp, pos, gothp->q, gothp->r, pos0);
+              sieve_hit(S, scaledegp, pos, gothp->q, gothp->r, pos0);
             }
           } while (rc);
 

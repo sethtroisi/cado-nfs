@@ -611,6 +611,11 @@ void init_norms(uint8_t * S, ffspol_srcptr ffspol, unsigned I, unsigned J,
 
       // Fast loop with constant degree of norm.
       deg -= degq;
+      deg >>= SCALE;
+      if (deg > 254) {
+          fprintf(stderr, "Error: the scaling of norms is not enough. Please a version compiled with a larger SCALE value.\n");
+          exit(EXIT_FAILURE);
+      }
       if (deg == 0)
         deg = 255;
 #if defined(USE_F2) && !defined(TRACE_POS) && !defined(WANT_NORM_STATS)
@@ -662,7 +667,7 @@ void init_norms(uint8_t * S, ffspol_srcptr ffspol, unsigned I, unsigned J,
         }
 #endif
         S[pos] |= deg;
-#ifdef WANT_NORM_STATS
+#ifdef WANT_NORM_STATS  // BROKEN IF SCALE FIXME
         if (S[pos] != 255) {
           norm_stats_n[side]++;
           norm_stats_sum[side] += deg+degq;
