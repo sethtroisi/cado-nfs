@@ -29,10 +29,11 @@ descent_init_OBJ =  $(fppol_OBJ) ffspol.o params.o polyfactor.o smoothness.o \
 
 # The binaries goes in CADO-NFS default build dirirectory.
 # Can be overwritten in Makefile.local
-BUILDDIR = ../build/`hostname`/ffs
+HOST=$(shell hostname)
+BUILDDIR = ../build/$(HOST)/ffs
 
 # Use gf2x from CADO-NFS. Can also be defined or overwritten in Makefile.local
-# GF2XPREFIX = ../build/`hostname`/gf2x
+# GF2XPREFIX = ../build/$(HOST)/gf2x
 OPTFLAGS  = 
 WARNFLAGS = -Wall -Wextra -pedantic
 
