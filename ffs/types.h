@@ -260,6 +260,13 @@ typedef struct {
     ai_t b0;
     ai_t b1;
     int side;
+    int want_longq;
+    fppol_t longq;
+    fppol_t longrho;
+    fppol_t longa0;
+    fppol_t longa1;
+    fppol_t longb0;
+    fppol_t longb1;
 } qlat_struct_t;
 
 typedef qlat_struct_t qlat_t[1];

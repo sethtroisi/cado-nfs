@@ -27,16 +27,19 @@ int factor_survivor(fppol_t a, fppol_t b,
         MAYBE_UNUSED ijpos_t pos, 
         MAYBE_UNUSED replayable_bucket_t *buckets,
         MAYBE_UNUSED large_factor_base_t *FB,
-        ffspol_t* F, int *B, sq_t q, int side) 
+        ffspol_t* F, int *B, qlat_t qlat) 
 {
     fppol_t Nab;
     fppol_init(Nab);
     for (int twice = 0; twice < 2; twice++) {
         ffspol_norm(Nab, F[twice], a, b);
-        if (side == twice) {
+        if (qlat->side == twice) {
             fppol_t qq;
             fppol_init(qq);
-            fppol_set_sq(qq, q);
+            if (!qlat->want_longq)
+                fppol_set_sq(qq, qlat->q);
+            else
+                fppol_set(qq, qlat->longq);
             fppol_div(Nab, Nab, qq);
             fppol_clear(qq);
         }
@@ -331,6 +334,7 @@ int main(int argc, char **argv)
     int bench_end = 0;
     double bench_tot_rels = 0;
     double bench_tot_time = 0;
+    int want_longq = 0;
 
     param_list pl;
     param_list_init(pl);
@@ -399,8 +403,50 @@ int main(int argc, char **argv)
     if (threshold[1] == 0) 
         threshold[1] = 2*lpb[1];
 
-    // read q0, q1
+    // Check if we want to be in "longq" mode
     {
+        const char *sqstr;
+        int noerr;
+        sqstr = param_list_lookup_string(pl, "longq");
+        if (sqstr != NULL) {
+            fppol_init(qlat->longq);
+            fppol_init(qlat->longrho);
+            fppol_init(qlat->longa0);
+            fppol_init(qlat->longa1);
+            fppol_init(qlat->longb0);
+            fppol_init(qlat->longb1);
+            want_longq = 1;
+            qlat->want_longq = 1;
+            noerr = fppol_set_str(qlat->longq, sqstr);
+            if (!noerr) {
+                fprintf(stderr, "Could not parse longq: %s\n", sqstr);
+                exit(EXIT_FAILURE);
+            }
+            if (!fppol_is_monic(qlat->longq)) {
+                fprintf(stderr, "Error: given longq is not monic: %s\n", sqstr);
+                exit(EXIT_FAILURE);
+            }
+            if (!fppol_is_irreducible(qlat->longq)) {
+                fprintf(stderr, "Error, longq is not irreducible: %s\n", sqstr);
+                exit(EXIT_FAILURE);
+            }
+            sqstr = param_list_lookup_string(pl, "longrho");
+            if (sqstr == NULL) {
+                fprintf(stderr, "Error, longrho is required with longq\n");
+                exit(EXIT_FAILURE);
+            }
+            noerr = fppol_set_str(qlat->longrho, sqstr);
+            if (!noerr) {
+                fprintf(stderr, "Could not parse longrho: %s\n", sqstr);
+                exit(EXIT_FAILURE);
+            }
+        } else {
+            qlat->want_longq = 0;
+        }
+    }
+
+    // read q0, q1
+    if (!want_longq) {
         const char *sqstr;
         int noerr;
         sqstr = param_list_lookup_string(pl, "q0");
@@ -452,7 +498,7 @@ int main(int argc, char **argv)
     // read q, rho 
     // We store them in qlat for convenience, but these will be moved
     // away before the main loop.
-    {
+    if (!want_longq) {
         const char *sqstr;
         int noerr;
         sqstr = param_list_lookup_string(pl, "q");
@@ -602,26 +648,28 @@ int main(int argc, char **argv)
     ASSERT_ALWAYS(roots != NULL);
     int nroots = 0; // number of roots still to work on for current q.
 
-    if (sq_is_zero(q0)) {
-        sq_set(q0, qlat->q);
-        sq_set(q1, qlat->q);
-    }
-    if (rho_given) {
-        nroots = 1;
-        sq_set(roots[0], qlat->rho);
-    } else {
-        if (sq_is_irreducible(q0)) {
-            nroots = sq_roots(roots, q0, ffspol[sqside]);
-            sq_set(qlat->q, q0);
-            printf("############################################\n");
-            printf("# Roots for q = "); 
-            sq_out(stdout, q0);
-            printf(":");
-            for (int i = 0; i < nroots; ++i) {
-                printf(" ");
-                sq_out(stdout, roots[i]);
+    if (!want_longq) {
+        if (sq_is_zero(q0)) {
+            sq_set(q0, qlat->q);
+            sq_set(q1, qlat->q);
+        }
+        if (rho_given) {
+            nroots = 1;
+            sq_set(roots[0], qlat->rho);
+        } else {
+            if (sq_is_irreducible(q0)) {
+                nroots = sq_roots(roots, q0, ffspol[sqside]);
+                sq_set(qlat->q, q0);
+                printf("############################################\n");
+                printf("# Roots for q = "); 
+                sq_out(stdout, q0);
+                printf(":");
+                for (int i = 0; i < nroots; ++i) {
+                    printf(" ");
+                    sq_out(stdout, roots[i]);
+                }
+                printf("\n");
             }
-            printf("\n");
         }
     }
 
@@ -632,6 +680,7 @@ int main(int argc, char **argv)
     // Begin of loop over special-q's
     //
     do {
+      if (!want_longq) {
         // Select next special-q
         if (nroots == 0) { // find next q
             do {
@@ -722,6 +771,7 @@ int main(int argc, char **argv)
             sq_set(qlat->rho, roots[nroots-1]);
             nroots--;
         }
+      } // end of selection of next sq.
 
         tot_sq++;
 
@@ -736,6 +786,10 @@ int main(int argc, char **argv)
 
         // Check the given special-q
         if (!is_valid_sq(qlat, ffspol[sqside])) {
+            if (want_longq) {
+                fprintf(stderr, "Error: the longrho is not a root mod longq\n");
+                exit(EXIT_FAILURE);
+            }
             fprintf(stderr, "Error: the rho = ");
             sq_out(stderr, qlat->rho);
             fprintf(stderr, " is not a root modulo ");
@@ -752,7 +806,7 @@ int main(int argc, char **argv)
         fflush(stdout);
 
         // If the reduced q-lattice is still too unbalanced, then skip it.
-        {
+        if (!want_longq) {
             // the optimal degree is ceiling( (s + deg(q))/2 ).
             int opt_deg = (skewness + sq_deg(qlat->q) + 1) / 2;
             int sqsize = MAX(
@@ -908,7 +962,7 @@ int main(int argc, char **argv)
                         continue;
                       ij2ab(a, b, hati, hatj, qlat);
                       nrels += factor_survivor(a, b, pos, replayable_bucket,
-                              LFB, ffspol, lpb, qlat->q, qlat->side);
+                              LFB, ffspol, lpb, qlat);
                     }
                   }
                 }
@@ -944,6 +998,9 @@ int main(int argc, char **argv)
         if (nrels == 0) {
             no_rels_sq++;
         } 
+        if (want_longq)
+            break;
+        
         stats_yield_push(stats_yield, nrels, t_tot, qlat);
     } while (1); // End of loop over special-q's
 
@@ -958,7 +1015,7 @@ int main(int argc, char **argv)
     free(replayable_bucket[1]->b);
 #endif
 
-    if (!bench) {
+    if (!want_longq && !bench) {
     tot_time = seconds()-tot_time;
     fprintf(stdout, "###### General statistics ######\n");
     fprintf(stdout, "#   Total time: %1.1f s\n", tot_time);
