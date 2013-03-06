@@ -1,5 +1,8 @@
 #!/usr/bin/env python2
 
+# TODO: file locking for downloading files, so several clients can use the same files (factorbase etc.) safely
+# TODO: file locking for workunit files, so name collision can be detected
+
 import sys
 import os
 import stat
@@ -65,7 +68,7 @@ SETTINGS = dict([(a,b) for (a,(b,c)) in list(REQUIRED_SETTINGS.items()) + \
 def get_file(urlpath, dlpath = None, options = None):
     # print('get_file("' + urlpath + '", "' + dlpath + '")')
     if dlpath == None:
-        dlpath = SETTINGS["DLDIR"] + "/" + os.basename(urlpath) # FIXME: should be url base name
+        dlpath = SETTINGS["DLDIR"] + os.sep + urlpath.split("/")[-1]
     url = SETTINGS["SERVER"] + "/" + urlpath
     if options:
         url = url + "?" + options
@@ -141,7 +144,7 @@ def get_missing_file(urlpath, filename, checksum = None, options = None):
         os.remove(filename)
         last_filesum = filesum
 
-class Workunit_Processor(Workunit):
+class WorkunitProcessor(Workunit):
     
     def __init__(self, filepath, debug = 0):
         self.exitcode = 0 # will get set if any command exits with code != 0
@@ -153,27 +156,27 @@ class Workunit_Processor(Workunit):
         wu_file = open(filepath)
         wu_text = wu_file.read()
         wu_file.close()
-        self.wu = Workunit(wu_text)
-        self.WUid = self.wu.get_id()
-        logging.debug (" done, workunit ID is " + self.WUid)
+        super(WorkunitProcessor,self).__init__(wu_text)
+        self.WUid = self.get_id()
+        logging.debug (" done, workunit ID is " + self.get_id())
         self.stdout = []
         self.stderr = []
 
     def  __str__(self):
-        return "Processor for Workunit:\n" + self.wu.__str__()
+        return "Processor for Workunit:\n" + super(WorkunitProcessor,self).__str__()
 
     def have_terminate_request(self):
-        return "TERMINATE" in self.wu.data
+        return "TERMINATE" in self.wudata
 
     def get_files(self):
-        for (filename, checksum) in self.wu.data.get("FILE", []) + self.wu.data.get("EXECFILE", []):
+        for (filename, checksum) in self.wudata.get("FILE", []) + self.wudata.get("EXECFILE", []):
             archname = Template(filename).safe_substitute({"ARCH": SETTINGS["ARCH"]})
             dlname = Template(filename).safe_substitute({"ARCH": ""})
-            if not get_missing_file (archname, SETTINGS["DLDIR"] + '/' + dlname, checksum):
+            if not get_missing_file (archname, SETTINGS["DLDIR"] + os.sep + dlname, checksum):
                 return False
-        for (filename, checksum) in self.wu.data.get("EXECFILE", []):
+        for (filename, checksum) in self.wudata.get("EXECFILE", []):
             dlname = Template(filename).safe_substitute({"ARCH": ""})
-            path = SETTINGS["DLDIR"] + '/' + dlname
+            path = SETTINGS["DLDIR"] + os.sep + dlname
             mode = os.stat(path).st_mode
             if mode & stat.S_IXUSR == 0:
                 logging.info ("Setting executable flag for " + path)
@@ -185,9 +188,9 @@ class Workunit_Processor(Workunit):
         os.nice(int(SETTINGS["NICENESS"]))
     
     def run_commands(self):
-        for (counter, command) in enumerate(self.wu.data.get("COMMAND", [])):
+        for (counter, command) in enumerate(self.wudata.get("COMMAND", [])):
             command = Template(command).safe_substitute(SETTINGS)
-            logging.info ("Running command for workunit " + self.wu.get_id() + ": " + command)
+            logging.info ("Running command for workunit " + self.get_id() + ": " + command)
 
             # If niceness command line parameter was set, call self.renice() in
             # child process, before executing command
@@ -229,9 +232,9 @@ class Workunit_Processor(Workunit):
                 attachment = MIMEText(unicode(getattr(self, key)))
                 attachment.add_header('Content-Disposition', 'form-data', name=key)
                 postdata.attach(attachment)
-        if "RESULT" in self.wu.data:
-            for f in self.wu.data["RESULT"]:
-                filepath = SETTINGS["WORKDIR"] + "/" + f
+        if "RESULT" in self.wudata:
+            for f in self.wudata["RESULT"]:
+                filepath = SETTINGS["WORKDIR"] + os.sep + f
                 logging.debug ("Adding result file " + filepath + " to upload")
                 file = open(filepath, "rb")
                 filedata = file.read()
@@ -263,7 +266,7 @@ class Workunit_Processor(Workunit):
             print(postdata3)
 
         url = SETTINGS["SERVER"] + "/" + SETTINGS["POSTRESULTPATH"]
-        logging.info("Sending result for workunit " + self.WUid + " to " + url)
+        logging.info("Sending result for workunit " + self.get_id() + " to " + url)
         request = urllib2.Request(url, data=postdata3, headers=dict(postdata.items()))
         conn = None;
         while conn is None:
@@ -296,9 +299,9 @@ class Workunit_Processor(Workunit):
         return True
 
     def result_exists(self):
-        if "RESULT" in self.wu.data:
-            for f in self.wu.data["RESULT"]:
-                filepath = SETTINGS["WORKDIR"] + "/" + f
+        if "RESULT" in self.wudata:
+            for f in self.wudata["RESULT"]:
+                filepath = SETTINGS["WORKDIR"] + os.sep + f
                 if not os.path.isfile(filepath):
                     logging.info ("Result file " + filepath + " does not exist")
                     return False
@@ -307,15 +310,15 @@ class Workunit_Processor(Workunit):
         return True
 
     def cleanup(self):
-        logging.info ("Cleaning up for workunit " + self.wu.get_id())
-        if "RESULT" in self.wu.data:
-            for f in self.wu.data["RESULT"]:
-                filepath = SETTINGS["WORKDIR"] + "/" + f
+        logging.info ("Cleaning up for workunit " + self.get_id())
+        if "RESULT" in self.wudata:
+            for f in self.wudata["RESULT"]:
+                filepath = SETTINGS["WORKDIR"] + os.sep + f
                 logging.info ("Removing result file " + filepath)
                 os.remove(filepath)
-        if "DELETE" in self.wu.data:
-            for f in self.wu.data["DELETE"]:
-                filepath = SETTINGS["WORKDIR"] + "/" + f
+        if "DELETE" in self.wudata:
+            for f in self.wudata["DELETE"]:
+                filepath = SETTINGS["WORKDIR"] + os.sep + f
                 logging.info ("Removing file " + filepath)
                 os.remove(filepath)
 
@@ -323,7 +326,7 @@ class Workunit_Processor(Workunit):
         # If all output files exist, send them, return WU as done
         # Otherwise, run commands in WU. If no error and all output 
         #   files exist, send them, return WU as done
-        # print(str(wu))
+        # print(wu)
         if not self.get_files():
             return False
         if not self.result_exists():
@@ -336,11 +339,11 @@ class Workunit_Processor(Workunit):
 
 def do_work():
     rc = True
-    wu_filename = SETTINGS["DLDIR"] + "/" + SETTINGS["WU_FILENAME"]
+    wu_filename = SETTINGS["DLDIR"] + os.sep + SETTINGS["WU_FILENAME"]
     if not get_missing_file(SETTINGS["GETWUPATH"], wu_filename, 
                             options="clientid=" + SETTINGS["CLIENTID"]):
         return False
-    wu = Workunit_Processor(wu_filename, int(SETTINGS["DEBUG"]))
+    wu = WorkunitProcessor(wu_filename, int(SETTINGS["DEBUG"]))
     if wu.have_terminate_request():
         logging.info ("Received TERMINATE, exiting")
         rc = False

@@ -55,6 +55,23 @@ void fppol_mul(fppol_ptr r, fppol_srcptr p, fppol_srcptr q)
   }
 }
 
+void fppol_addmul(fppol_ptr r, fppol_srcptr p, fppol_srcptr q) {
+  fppol_t aux;
+  fppol_init(aux);
+  fppol_mul(aux, q, p);
+  fppol_add(r, r, aux);
+  fppol_clear(aux);
+}
+
+void fppol_submul(fppol_ptr r, fppol_srcptr p, fppol_srcptr q) {
+  fppol_t aux;
+  fppol_init(aux);
+  fppol_mul(aux, q, p);
+  fppol_sub(r, r, aux);
+  fppol_clear(aux);
+}
+
+
 
 // Multiplication by an <sq>-term polynomial.
 #define __DEF_FPPOL_MUL_xx(sq)                                           \
