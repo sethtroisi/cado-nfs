@@ -42,7 +42,7 @@ void param_list_clear(param_list pl)
         free(pl->switches[i]->switchname);
     }
     free(pl->switches);
-    memset(pl, 0, sizeof(pl));
+    memset(pl, 0, sizeof(pl[0]));
 }
 
 static void make_room(param_list pl, unsigned int more)
