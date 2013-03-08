@@ -560,16 +560,18 @@ my $cmdlog;
 #  - `kill' specifies that if the command fails (non-zero exit status)
 #           we should report the error and die immediately.
 #  - `logfile' redirect both stdout and stderr to given file.
-#  - `appendlog' whether to append to redirection file.
+#  - `appendlog' whether to append to `logfile' file.
 # The return value is another pointer to a hash table:
 #  - `out'    is the captured standard output stream of the command;
 #  - `err'    is the captured standard error stream of the command;
 #  - `status' is the return code of the command.
 sub cmd {
     my ($cmd, $opt) = @_;
+    # Don't use ssh to rsync-copy files on localhost if $elide_localhost is set
     $cmd =~ s/localhost:// if $elide_localhost && $cmd =~ /rsync/;
     my $logfh;
     if ($opt->{'logfile'}) {
+	# Open `logfile', for overwrite or append
         if ($opt->{'appendlog'}) {
             open($logfh, ">>", $opt->{'logfile'}) or die;
         } else {
@@ -577,7 +579,13 @@ sub cmd {
         }
     }
     if ($logfh) {
-        select($logfh); $|=1;select(STDOUT);
+	# Set $logfh as default filehandle, remember what old default 
+        # file handle was
+        my $oldfh = select($logfh); 
+	# Enable autoflush on $logfh
+	$| = 1; 
+	# Switch back to old default filehandle
+	select($oldfh);
     }
 
     if ($verbose) {
@@ -598,7 +606,10 @@ sub cmd {
         'err' => [ *CHLD_ERR{IO}, "", 1, "" ],
     };
 
+    # while $fds[out][2] == 1 or $fds[err][2] == 1
     while (scalar grep { $_->[2] } values %$fds) {
+	# Build bitarray where fileno's of out or err are set,
+	# if they are still in waiting state
         my $rin = '';
         for my $v (values %$fds) {
             next if !$v->[2];
@@ -618,14 +629,18 @@ sub cmd {
             next unless vec($rout, fileno($v->[0]), 1);
             if (sysread $v->[0], my $x, 1024) {
                 $v->[1] .= $x;
+		# Find complete lines and remove them from $v->[1]
                 while ($v->[1]=~s/^(.*(?:\n|\r))//) {
+		    # Print them
                     print $logfh $1 if $logfh;
                     print $1 if $verbose;
                     # print "$k $1";
+		    # and append them to $v->[3]
                     $v->[3] .= $1;
                 }
             } else {
                 if (length($v->[1])) {
+		    # Process any incomplete line left in $v->[1]
                     print $logfh $v->[1] if $logfh;
                     $v->[3] .= $v->[1];
                     $v->[1] =~ s/^/$k /gm;
@@ -660,10 +675,12 @@ sub cmd {
     return $res;
 }
 
+# Takes a filename as parameter. 
+# Returns a string with the contents of that file.
 sub cat {
     my $f = shift @_;
     open my $fh, "<$f" or die "$f: $!";
-    local $/;
+    local $/; # enable "slurp" mode
     my $out=<$fh>;
     close $fh;
     return $out;
@@ -676,6 +693,7 @@ sub cat {
 #  - `timeout' specifies how many seconds to wait before giving up.
 # The return value is another pointer to a hash table:
 #  - `out'     is the captured standard output of the command;
+#  - `err'     is the captured standard error of the command;
 #  - `status'  is the exit status of the command;
 sub remote_cmd {
     my $host = shift;
@@ -685,6 +703,7 @@ sub remote_cmd {
 
     $opt->{'timeout'} = 30 unless $opt->{'timeout'};
 
+    # Escape any quote characters in cmd
     $cmd =~ s/"/\\"/g;
 
     # don't ask for a password: we don't want to fall into interactive mode
@@ -827,12 +846,15 @@ sub read_jobs {
         or die "Cannot open `$file' for reading: $!.\n";
     while (<FILE>) {
         s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
-        s/^\s+//; s/\s*(#.*)?$//;
-        next if /^$/;
+        s/^\s+//; s/\s*(#.*)?$//; # Strip off leading whitespace and any comments
+        next if /^$/; # Skip line if empty
 
+        # Split off <host> <pid> <threads> <file>, leave params in $_
         if (s/^(\S+)\s+(\d+|done)\s+(\d+)\s+(\S+)\s*//) {
             my @param = split;
-            my %job = ( host => $1, threads => $3, file => $4, param => \@param );
+            my %job = ( host => $1, threads => $3, file => $4, 
+                        param => \@param );
+            # the key 'pid' is set only if job is not done
             $job{'pid'} = $2 unless $2 eq "done";
             push @$jobs, \%job;
         } else {
@@ -861,6 +883,8 @@ sub write_jobs {
 
 
 # Job description string, with padded fields
+# Consists of file name of the binary (without extension),
+# hostname and list of parameters
 sub job_string {
     my ($job) = @_;
     my @name = split (/\./, basename($job->{'file'}));

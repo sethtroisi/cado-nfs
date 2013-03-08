@@ -26,12 +26,12 @@ In it, run
 make
 This should produce a 64-bit Windows ecm.exe file.
 
-Current status: the binary seems to work mostly, but it hangs at the P-1 -save test in the test scripts.
 
 6. To cross-compile CADO, create a build directory, e.g. cado-nfs-mingw64/.
 In it, run
 cmake -DCMAKE_TOOLCHAIN_FILE=~/sources/cado-nfs/Toolchain-MinGW64.cmake ~/sources/cado-nfs/
 The ~/sources/cado-nfs/Toolchain-MinGW64.cmake file overrides CMake variables to point at the cross-compiling toolchain.
 
-Current status: The CMake run seems to work, but compilation fails. Also, GF2x does not know about cross-compilation and 
-configures itself for the build system (Linux).
+Current status: gf2x fails with compilation errors, apparently due to assuming that unsigned long is 64 bit. 
+It is possible to compile las, however libecm.a and libutil.a need ranlib (from MinGW64) run manually. The
+resulting las.exe immediately fails with an error code, apparently before even reaching main() according to gdb.
