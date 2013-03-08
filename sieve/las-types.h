@@ -91,52 +91,53 @@ void las_todo_pop(las_todo_ptr * d);
 
 /* {{{ sieve_side_info */
 struct sieve_side_info_s {
-    unsigned char Bound[256]; /* -log(prob of relation), 127 for prob<thresh */
-    fbprime_t *trialdiv_primes;
-    trialdiv_divisor_t *trialdiv_data;
-    unsigned char lognorm_table[1 << NORM_BITS];
-    factorbase_degn_t * fb;
-    struct {
-        factorbase_degn_t * pow2[2];
-        factorbase_degn_t * pow3[2];
-        factorbase_degn_t * td[2];
-        factorbase_degn_t * rs[2];
-        factorbase_degn_t * rest[2];
-    } fb_parts[1];
-    struct {
-        int pow2[2];
-        int pow3[2];
-        int td[2];
-        int rs[2];
-        int rest[2];
-    } fb_parts_x[1];
-    /* The call to dispatch_fb from thread_data alloc splits up the main
-     * fb field into several fields, by reallocation. All fields are
-     * still owned by the sieve_info struct in the end, and stored here
-     */
-    factorbase_degn_t ** fb_bucket_threads;
-    /* When threads pick up this sieve_info structure, they should check
-     * theur bucket allocation */
-    double max_bucket_fill_ratio;
-
-
-    /* These fields are used for the norm initialization essentially.
-     * Only the scale is also relevant to part of the rest, since it
-     * determines the logp contributions for factor base primes */
-    double scale;      /* norm scale used on the algebraic side */
-    double cexp2[257]; /* for 2^X * scale + GUARD */
-    double logmax;     /* norms on the alg-> side are < 2^alg->logmax */
-
-    mpz_t *fij;       /* coefficients of F(a0*i+a1*j, b0*i+b1*j)  */
-    double *fijd;     /* coefficients of F_q (divided by q on the special q side) */
-
-    /* This updated by applying the special-q lattice transform to the
-     * factor base. */
-    small_sieve_data_t ssd[1];
-    /* And this is just created as an extraction of the above */
-    small_sieve_data_t rsd[1];
-
-    facul_strategy_t *strategy;
+  unsigned char Bound[256]; /* -log(prob of relation), 127 for prob<thresh */
+  unsigned char bound; /* New simplest threshold */
+  fbprime_t *trialdiv_primes;
+  trialdiv_divisor_t *trialdiv_data;
+  /* unsigned char lognorm_table[1 << NORM_BITS]; */
+  factorbase_degn_t * fb;
+  struct {
+    factorbase_degn_t * pow2[2];
+    factorbase_degn_t * pow3[2];
+    factorbase_degn_t * td[2];
+    factorbase_degn_t * rs[2];
+    factorbase_degn_t * rest[2];
+  } fb_parts[1];
+  struct {
+    int pow2[2];
+    int pow3[2];
+    int td[2];
+    int rs[2];
+    int rest[2];
+  } fb_parts_x[1];
+  /* The call to dispatch_fb from thread_data alloc splits up the main
+   * fb field into several fields, by reallocation. All fields are
+   * still owned by the sieve_info struct in the end, and stored here
+   */
+  factorbase_degn_t ** fb_bucket_threads;
+  /* When threads pick up this sieve_info structure, they should check
+   * theur bucket allocation */
+  double max_bucket_fill_ratio;
+  
+  
+  /* These fields are used for the norm initialization essentially.
+   * Only the scale is also relevant to part of the rest, since it
+   * determines the logp contributions for factor base primes */
+  double scale;      /* norm scale used on the algebraic side */
+  double cexp2[257]; /* for 2^X * scale + GUARD */
+  double logmax;     /* norms on the alg-> side are < 2^alg->logmax */
+  
+  mpz_t *fij;       /* coefficients of F(a0*i+a1*j, b0*i+b1*j)  */
+  double *fijd;     /* coefficients of F_q (divided by q on the special q side) */
+  
+  /* This updated by applying the special-q lattice transform to the
+   * factor base. */
+  small_sieve_data_t ssd[1];
+  /* And this is just created as an extraction of the above */
+  small_sieve_data_t rsd[1];
+  
+  facul_strategy_t *strategy;
 };
 typedef struct sieve_side_info_s * sieve_side_info_ptr;
 typedef const struct sieve_side_info_s * sieve_side_info_srcptr;

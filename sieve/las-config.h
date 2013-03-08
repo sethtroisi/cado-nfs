@@ -11,6 +11,10 @@
 #include <emmintrin.h>
 #endif
 
+#ifdef HAVE_SSE41
+#include <smmintrin.h>
+#endif
+
 /* As its name says, this is a ugly hack that initializes all lognorms to the
    maximal value (255) on the rational side. But it seems to work well, and to
    miss only about 7% to 8% relations wrt a more accurate estimation. */
@@ -22,17 +26,36 @@
  * This imposes NORM_BITS >= 8, or even >= 9 for large factorizations. */
 #define NORM_BITS 10
 
-/* Lazy norm computation: compute only one norm per NORM_STRIDE on a 
- * line, and propagate up to VERT_NORM_STRIDE rows above it. 
+/* Lazy norm computation for the algebraics: compute only one norm per
+ * 8 on a line, and propagate up to VERT_NORM_STRIDE rows above it. 
  * These approximations speed-up the norm computation, but put more 
  * pressure on the cofactorisation step, since the useless 
  * cofactorisations are more frequent. 
- * Comment the first line to get an accurate, slower, norm computation. 
+ * Comment the first line to get an accurate, slower, norm computation.
  */ 
-#define LAZY_NORMS 
+#define ALG_LAZY
 #define VERT_NORM_STRIDE 4 
-#define NORM_STRIDE 8 
- 
+
+/* If ALG_RAT is set, the algebraics norm computation is done only if
+ * the corresponding rational is <= rat->bound (~5% of the rationals).
+ * Without ALG_LAZY, all the rationals are verified, one by one, and
+ * the norm of the corresponding algebraic could be computed. It's
+ * slow, because there are many tests.
+ * With ALG_LAZY, the rationals are tested 8 by 8. If one (at least)
+ * is <= bound, the corresponding 8 algebraics (1st to 8th) are
+ * initialized by the norm computation of the 3th algebraic.
+ * By default, ALG_RAT is commented for maximal speed.
+ */
+/* #define ALG_RAT */
+
+/* Rough comparison speeds of all the combinaison on a SSE/non SEE 
+ * X86 machine with log2(I)=15 :
+ * !ALG_LAZY, !ALG_RAT : SSE: x01.9 faster,       non SSE: base (slowest)
+ * !ALG_LAZY,  ALG_RAT : SSE: x03.3 (desactived), non SSE: x6.0 
+ *  ALG_LAZY,  ALG_RAT : SSE: x10.8 faster,       non SSE: x8.5
+ *  ALG_LAZY, !ALG_RAT : SSE: x19.9 faster,       non SSE: x11.6 
+ */
+
 /* define PROFILE to keep certain function from being inlined, in order to
    make them show up on profiler output */
 //#define PROFILE

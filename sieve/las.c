@@ -528,7 +528,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
         int n = las->nb_threads;
         si->sides[s]->fb_bucket_threads = malloc(n * sizeof(factorbase_degn_t *));
         sieve_info_split_bucket_fb_for_threads(las, si, s, n);
-        init_norms (si, s); /* only depends on scale, logmax, lognorm_table */
+        /* init_norms (si, s); */ /* only depends on scale, logmax, lognorm_table */
         sieve_info_init_trialdiv(si, s); /* Init refactoring stuff */
 
         /* The strategies also depend on the special-q used within the
@@ -2708,10 +2708,9 @@ void * process_bucket_region(thread_data_ptr th)
 
             /* Init algebraic norms */
             rep->tn[side] -= seconds ();
-            /* Only the survivors of the other sieve are initialized,
-             * unless LAZY_NORMS is activated */
+
             unsigned char * xS = S[side ^ 1];
-            rep->survivors0 += init_alg_norms_bucket_region(S[side], xS, i, si);
+            /* rep->survivors0 += */ init_alg_norms_bucket_region(S[side], xS, i, si);
             rep->tn[side] += seconds ();
 
             /* Apply algebraic buckets */
@@ -2857,7 +2856,7 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
         las_report_accumulate(rep, thrs[i]->rep);
     }
     if (las->verbose) {
-        fprintf (las->output, "# %lu survivors after rational sieve,", rep->survivors0);
+      /* fprintf (las->output, "# %lu survivors after rational sieve,", rep->survivors0); */
         fprintf (las->output, " %lu survivors after algebraic sieve, ", rep->survivors1);
         fprintf (las->output, "coprime: %lu\n", rep->survivors2);
     }

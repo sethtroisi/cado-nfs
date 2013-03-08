@@ -5,7 +5,7 @@
 
 struct las_report_s {
     unsigned long reports;
-    unsigned long survivors0;
+  /* unsigned long survivors0; */ /* Obsolete */
     unsigned long survivors1;
     unsigned long survivors2;
     double tn[2];
