@@ -8,6 +8,8 @@ SET(CMAKE_RC_COMPILER x86_64-w64-mingw32-windres)
 
 # here is the target environment located
 SET(CMAKE_FIND_ROOT_PATH $ENV{HOME}/mingw-w64/)
+SET(ENV{GF2X_CONFIGURE_EXTRA_FLAGS} "--host=x86_64-w64-mingw32")
+SET(ENV{PREFIX} "$ENV{HOME}/mingw-w64/usr/local/")
 
 # adjust the default behaviour of the FIND_XXX() commands:
 # search headers and libraries in the target environment, search 
