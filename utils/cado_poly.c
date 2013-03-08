@@ -15,7 +15,7 @@ void cado_poly_init(cado_poly poly)
     int i;
 
     /* ALL fields are zero upon init, EXCEPT the degree field (which is -1) */
-    memset(poly, 0, sizeof(poly));
+    memset(poly, 0, sizeof(poly[0]));
     poly->rat = poly->pols[RATIONAL_SIDE];
     poly->alg = poly->pols[ALGEBRAIC_SIDE];
 
@@ -44,7 +44,7 @@ void cado_poly_clear(cado_poly poly)
     }
     mpz_clear(poly->n);
     mpz_clear(poly->m);
-    memset(poly, 0, sizeof(poly));
+    memset(poly, 0, sizeof(poly[0]));
 }
 
 /* p <- q */
