@@ -28,13 +28,11 @@ def do_check(acc, wu, programs):
                                      stdout = subprocess.PIPE, 
                                      stderr = subprocess.PIPE)
             (child_stdout, child_stderr) = child.communicate()
+            print ("Return code is " + str (child.returncode))
             if child.returncode == 0:
-                # acc.update({'status':wudb.WuStatus.VERIFIED_OK})
-                if result is None:
-                    result = True
+                result = True
             else:
-                # acc.update({'status':wudb.WuStatus.VERIFIED_ERROR})
-                result = False
+                return False
     return result
 
 if __name__ == "__main__":
@@ -44,7 +42,7 @@ if __name__ == "__main__":
              "Multiple programs can be specified; each program is run for any file(s) that match the respective REGEX. " + \
              "If the exit status of the PROGRAMs is zero for all tested files of a WU, the WU is considered verified ok. " + \
              "If the exit status is non-zero for any tested file, the WU is considered verified with error. " + \
-             "The database is updated accordingly only if --update is given; otherwise only screen output happens."
+             "The database is updated accordingly only if --update is given; otherwise only output to screen (and badfile if specified) happens."
 
     wudb_name = "wudb"
     parser = argparse.ArgumentParser(description=description, epilog = epilog)
@@ -55,6 +53,8 @@ if __name__ == "__main__":
                         help = "run PROGRAM on files whose names match REGEX")
     parser.add_argument('--wudb', action = 'store', default = wudb_name,
                         metavar = "FILE", help = "use FILE as Workunit DB")
+    parser.add_argument('--badfile', action = 'store', 
+                        metavar = "FILE", help = "dump text of failed workunits to FILE")
     parser.add_argument('-r', '--received', action = 'store_true',
                         help = 'Process all workunits currently marked as received without error')
     parser.add_argument('--update', action = 'store_true', 
@@ -75,6 +75,7 @@ if __name__ == "__main__":
     if args.received:
         # Test all workunits whose status is RECEIVED_OK
         received = acc.query(eq={"status": wudb.WuStatus.RECEIVED_OK})
+        badfile = None
         print ("Found " + str(len(received)) + " workunits")
         for wu in received:
             result = do_check(acc, wu, list(args.program))
@@ -86,5 +87,11 @@ if __name__ == "__main__":
                     print ("Workunit " + wu["wuid"] + " verified ok")
                 elif result == False:
                     print ("Workunit " + wu["wuid"] + " verified with error")
+                    if args.badfile:
+                        if badfile is None:
+                            badfile = open(args.badfile, "a")
+                        badfile.write(wu["wu"] + '\n')
             if args.update:
                 acc.verification(wu["wuid"], result)
+        if not badfile is None:
+            badfile.close()
