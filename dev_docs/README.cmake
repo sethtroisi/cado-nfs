@@ -40,7 +40,7 @@ called build/<hostname> from the top of the cado source tree. However
 this can bee customized (see item *local.sh below)
 
 Passing variables to makefiles is no longer possible with command-line
-overrides, or more precisely it may or may not to what you want. It is
+overrides, or more precisely it may or may not do what you want. It is
 more portable to use environment variables overrides, like:
 
 CFLAGS=-g make
@@ -93,7 +93,7 @@ Several new meta-targets are defined.
 
 * make dist
 
-This target expectably build a cado-nfs-<version>.tar.gz file. This
+This target expectably builds a cado-nfs-<version>.tar.gz file. This
 archive name may be forced to an arbitrary user-defined value by setting
 the environment variable CADO_DIST_ARCHIVE_NAME.
 
