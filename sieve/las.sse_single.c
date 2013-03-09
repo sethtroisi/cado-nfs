@@ -3829,7 +3829,7 @@ main (int argc0, char *argv0[])
       output = stdout;
     else
       {
-	output = gzip_open (outputname, "w");
+	output = fopen_maybe_compressed (outputname, "w");
 	if (output == NULL)
 	  {
 	    fprintf (stderr, "Could not open %s for writing\n", outputname);
@@ -4226,7 +4226,7 @@ main (int argc0, char *argv0[])
     free (roots);
 
     if (outputname != NULL)
-      gzip_close (output, "");
+      fclose_maybe_compressed (output, "");
 
     param_list_clear(pl);
 

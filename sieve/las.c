@@ -790,7 +790,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     /* Init output file */
     las->output = stdout;
     if (las->outputname) {
-	if (!(las->output = gzip_open(las->outputname, "w"))) {
+	if (!(las->output = fopen_maybe_compressed(las->outputname, "w"))) {
 	    fprintf(stderr, "Could not open %s for writing\n", las->outputname);
 	    exit(EXIT_FAILURE);
 	}
@@ -900,7 +900,7 @@ void las_info_clear(las_info_ptr las)/*{{{*/
     }
     free(las->sievers);
   if (las->outputname)
-      gzip_close(las->output, las->outputname);
+      fclose_maybe_compressed(las->output, las->outputname);
   mpz_clear(las->todo_q0);
   mpz_clear(las->todo_q1);
   if (las->todo_list_fd)

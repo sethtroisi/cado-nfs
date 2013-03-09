@@ -987,7 +987,7 @@ renumber (const char *sos)
     if (sos != NULL)
       {
 	fprintf (stderr, "Output renumber table in file %s\n", sos);
-	fsos = gzip_open (sos, "w");
+	fsos = fopen_maybe_compressed (sos, "w");
         fprintf (fsos, "# each row contains 3 hexadecimal values: i p r\n"
 		 "# i is the ideal index value (starting from 0)\n"
 		 "# p is the corresponding prime\n"
@@ -1019,7 +1019,7 @@ renumber (const char *sos)
 	H.hr[i] = UMAX(*(H.hr));
       }
     if (fsos)
-      gzip_close (fsos, sos);
+      fclose_maybe_compressed (fsos, sos);
     nb--;
     newnprimes = nb;
 }
@@ -1840,9 +1840,9 @@ prempt_scan_relations_pass_two (const char *oname,
 
   int pipe;
 
-  ofile = fopen_compressed_w(oname, &pipe, NULL);
+  ofile = fopen_maybe_compressed2(oname, "w", &pipe, NULL);
 #ifdef FOR_FFS
-  ofile2 = fopen_compressed_w(oname2, &pipe_2, NULL);
+  ofile2 = fopen_maybe_compressed2(oname2, "w", &pipe_2, NULL);
 #endif
   if (!raw)
     fprintf (ofile, "%lu %lu\n", (unsigned long) nrows, (unsigned long) ncols);
@@ -2332,7 +2332,7 @@ main (int argc, char **argv)
 
     fprintf (stderr, "Loading rel_used file %s, %lu bytes\n",
 	     infilerel, (unsigned long) mysize);
-    if (!(in = fopen_compressed_r (infilerel, &pipe, NULL))) {
+    if (!(in = fopen_maybe_compressed2 (infilerel, "r", &pipe, NULL))) {
       fprintf (stderr, "Purge main: rel_used file %s cannot be read.\n", infilerel);
       exit (1);
     }
@@ -2488,7 +2488,7 @@ main (int argc, char **argv)
 
     fprintf (stderr, "Relations with at least one singleton found and suppress:%lu\nNumber of primes suppress : %lu\nWriting rel_used file %s, %lu bytes\n",
 	     (unsigned long) relsup, (unsigned long) prisup, outfilerel, (unsigned long) mysize);
-    if (!(out = fopen_compressed_w (outfilerel, &pipe, NULL))) {
+    if (!(out = fopen_maybe_compressed2 (outfilerel, "w", &pipe, NULL))) {
       fprintf (stderr, "Purge main: rel_used file %s cannot be written.\n", outfilerel);
       exit (1);
     }

@@ -130,8 +130,8 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
     {
         smatname = derived_filename(base, suf->smat, zip);
         srwname  = derived_filename(base, suf->srw, zip);
-        smatfile = gzip_open(smatname, "w");
-        srwfile  = gzip_open(srwname, "w");
+        smatfile = fopen_maybe_compressed(smatname, "w");
+        srwfile  = fopen_maybe_compressed(srwname, "w");
         if (!bin)
             fprintf(smatfile, "%d %d\n", small_nrows, small_ncols - skip);
     }
@@ -146,8 +146,8 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
     if (skip) {
         dmatname = derived_filename(base, suf->dmat, zip);
         drwname  = derived_filename(base, suf->drw, zip);
-        dmatfile = gzip_open(dmatname, "w");
-        drwfile  = gzip_open(drwname, "w");
+        dmatfile = fopen_maybe_compressed(dmatname, "w");
+        drwfile  = fopen_maybe_compressed(drwname, "w");
         if (!bin)
             fprintf(dmatfile, "%d %d\n", small_nrows, skip);
     }
@@ -244,8 +244,8 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
     }
 
     {
-        gzip_close (smatfile, smatname);
-        gzip_close (srwfile, srwname);
+        fclose_maybe_compressed (smatfile, smatname);
+        fclose_maybe_compressed (srwfile, srwname);
         free(smatname);
         free(srwname);
     }
@@ -254,15 +254,15 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
                 DW, DW+W, dmatname,
                 100.0 * (double) DW / (DW+W));
 
-        gzip_close (dmatfile, dmatname);
-        gzip_close (drwfile, drwname);
+        fclose_maybe_compressed (dmatfile, dmatname);
+        fclose_maybe_compressed (drwfile, drwname);
         free(dmatname);
         free(drwname);
     }
 
     if (skip) {
         dcwname = derived_filename(base, suf->dcw, zip);
-        dcwfile = gzip_open(dcwname, "w");
+        dcwfile = fopen_maybe_compressed(dcwname, "w");
         for(int j = 0; j < skip; j++){
             uint32_t x = weights[j];
             if (bin) {
@@ -271,13 +271,13 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
                 fprintf(dcwfile, "%"PRIu32"\n", x);
             }
         }
-        gzip_close(dcwfile, dcwname);
+        fclose_maybe_compressed(dcwfile, dcwname);
         free(dcwname);
     }
 
     {
         scwname = derived_filename(base, suf->scw, zip);
-        scwfile = gzip_open(scwname, "w");
+        scwfile = fopen_maybe_compressed(scwname, "w");
         for(int j = skip; j < small_ncols; j++){
             uint32_t x = weights[j];
             if (bin) {
@@ -286,7 +286,7 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
                 fprintf(scwfile, "%"PRIu32"\n", x);
             }
         }
-        gzip_close(scwfile, scwname);
+        fclose_maybe_compressed(scwfile, scwname);
         free(scwname);
     }
 
@@ -304,7 +304,7 @@ makeIndexFile(const char *indexname, int nrows, typerow_t **newrows,
     FILE *indexfile;
     int i, j;
 
-    indexfile = gzip_open(indexname, "w");
+    indexfile = fopen_maybe_compressed(indexname, "w");
     fprintf(indexfile, "%d %d\n", small_nrows, small_ncols);
     for(i = 0; i < nrows; i++)
 	if(newrows[i] != NULL){
@@ -315,7 +315,7 @@ makeIndexFile(const char *indexname, int nrows, typerow_t **newrows,
 	    }
 	    fprintf(indexfile, "\n");
 	}
-    gzip_close(indexfile, indexname);
+    fclose_maybe_compressed(indexfile, indexname);
 }
 
 /* we also compare x[1] and y[1] to make the code deterministic
