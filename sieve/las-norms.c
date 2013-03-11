@@ -150,7 +150,7 @@ static inline void w128itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale,
 	   "shufps    $0x50,    %0,    %0\n" /* XXXX XXXX YYYY YYYY */
 	   : "=x"(i) : "x"(i));
 #ifdef _LP64
-  *(_m128d *)&addr[decal] = i; /* malloc in X86-64bits is 16 bytes aligned: this uses MOVAPD */
+  *(__m128d *)&addr[decal] = i; /* malloc in X86-64bits is 16 bytes aligned: this uses MOVAPD */
 #else
   _mm_storeu_pd ((double *)&addr[decal], i); /* malloc in X86-32bits is 8 bytes aligned : MOVUPD */
 #endif
