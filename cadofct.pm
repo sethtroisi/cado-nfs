@@ -833,9 +833,13 @@ sub parallel_remote_cmd {
 # Format:
 # <host> <pid> <threads> <file> <param1> <param2> ...
 # The PID is "done" when the job is finished.
+# Returns a reference to an array containing the jobs' statuses
+# Each array entry is a reference to a hash with keys
+# host, threads, file, param. pid is set only if not 'done'
+# param is a reference to a list with the parameters
 sub read_jobs {
     my ($file) = @_;
-    my $jobs = [];
+    my $jobs = []; # $jobs is reference to empty array
 
     if (!-f $file) {
         info "No job status file found. Creating empty one.\n";
@@ -846,7 +850,8 @@ sub read_jobs {
         or die "Cannot open `$file' for reading: $!.\n";
     while (<FILE>) {
         s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
-        s/^\s+//; s/\s*(#.*)?$//; # Strip off leading whitespace and any comments
+	# Strip off leading whitespace and any comments
+        s/^\s+//; s/\s*(#.*)?$//;
         next if /^$/; # Skip line if empty
 
         # Split off <host> <pid> <threads> <file>, leave params in $_
@@ -910,7 +915,7 @@ sub is_job_alive {
     # as returned by lsof.
     # FIXME: on some hosts lsof is not in PATH
     if (0) {
-      $ret = remote_cmd($job->{'host'}, "env lsof -Fn -a -p$job->{'pid'} -d1 | ".
+      $ret = remote_cmd($job->{'host'},"env lsof -Fn -a -p$job->{'pid'} -d1 | ".
                         "env grep ^n\\`env readlink -f $job->{'file'}\\`\$");
       return -1 if $ret->{'status'} == 255;
       return 0  if $ret->{'status'};
@@ -946,7 +951,8 @@ sub job_status {
     } elsif (!$ret->{'status'} && $ret->{'out'} =~ /$pattern/) {
         info "Finished!\n";
         $status = 0;
-    } elsif (!$ret->{'status'} && $ret->{'out'} =~ /No such file or directory$/) {
+    } elsif (!$ret->{'status'} && 
+	     $ret->{'out'} =~ /No such file or directory$/) {
         warn "The file was not found. Make sure the `tmpdir' parameter ".
             "is valid for host `$job->{'host'}'.\n";
         $status = -2;
@@ -982,7 +988,7 @@ sub job_status {
 # reachable on startup ?)
 
 # Kills a remote job.
-# The $keep argument prevents the output file to be removed on the host.
+# The $keep argument prevents the output file from being removed on the host.
 sub kill_job {
     my ($job, $keep) = @_;
     info "Killing job:  ".job_string($job)."\n";
@@ -1025,7 +1031,7 @@ sub send_file {
 }
 
 # Retrieves the output file of a finished job from a remote host.
-# The $keep argument prevents the file to be removed on the host.
+# The $keep argument prevents the file from being removed on the host.
 # Returns 1 if the download was successful, -1 if the file was not there, or
 # 0 if another error occurred (meaning that we might want to try again).
 sub get_job_output {
@@ -1157,17 +1163,21 @@ sub format_dhms {
 # Distributed tasks ###########################################################
 ###############################################################################
 
+# HERE
 # Scans a list of ranges and merges overlapping ones.
 sub merge_ranges {
     my ($ranges) = @_;
     my @merged = ();
 
+    # Process intervals [k_i,l_i] in order of non-decreasing k_i
     for my $r (sort { $a->[0] <=> $b->[0] } @$ranges) {
-        my ($a, $b) = @$r;
+        my ($a, $b) = @$r; # Process the interval [a,b]
         if (!@merged || $a > $merged[-1]->[1]) {
+	    # Does not overlap with end of merged intervals -> append it
             push @merged, $r;
             next;
         } elsif ($b > $merged[-1]->[1]) {
+	    # Overlaps with end of merged intervals -> adjust end up
             $merged[-1]->[1] = $b;
         }
     }
@@ -1254,7 +1264,7 @@ sub distribute_task {
 
     banner $opt->{'title'};
     local_time $opt->{'title'};
-	$opt->{'gzip'}=0 if (! $opt->{'gzip'});
+    $opt->{'gzip'}=0 if (! $opt->{'gzip'});
 
     # Make sure that all the output files that are already here are correct
     opendir DIR, $param{'wdir'}
