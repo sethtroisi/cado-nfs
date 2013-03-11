@@ -33,12 +33,11 @@ void las_report_accumulate(las_report_ptr p, las_report_ptr q)
     unsigned long (*ss)[256] = q->survivor_sizes;
     unsigned long (*rs)[256] = q->report_sizes;
     p->reports += q->reports;
-    p->survivors0 += q->survivors0;
+    /* p->survivors0 += q->survivors0; */
     p->survivors1 += q->survivors1;
     p->survivors2 += q->survivors2;
     p->ttsm    += q->ttsm;
     p->ttf     += q->ttf;
-    p->both_even += q->both_even;
     for(int side = 0 ; side < 2 ; side++) {
         p->tn[side]  += q->tn[side];
     }

@@ -528,7 +528,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
         int n = las->nb_threads;
         si->sides[s]->fb_bucket_threads = malloc(n * sizeof(factorbase_degn_t *));
         sieve_info_split_bucket_fb_for_threads(las, si, s, n);
-        init_norms (si, s); /* only depends on scale, logmax, lognorm_table */
+        /* init_norms (si, s); */ /* only depends on scale, logmax, lognorm_table */
         sieve_info_init_trialdiv(si, s); /* Init refactoring stuff */
 
         /* The strategies also depend on the special-q used within the
@@ -790,7 +790,7 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
     /* Init output file */
     las->output = stdout;
     if (las->outputname) {
-	if (!(las->output = fopen_maybe_compressed(las->outputname, "w"))) {
+	if (!(las->output = gzip_open(las->outputname, "w"))) {
 	    fprintf(stderr, "Could not open %s for writing\n", las->outputname);
 	    exit(EXIT_FAILURE);
 	}
@@ -900,7 +900,7 @@ void las_info_clear(las_info_ptr las)/*{{{*/
     }
     free(las->sievers);
   if (las->outputname)
-      fclose_maybe_compressed(las->output, las->outputname);
+      gzip_close(las->output, las->outputname);
   mpz_clear(las->todo_q0);
   mpz_clear(las->todo_q1);
   if (las->todo_list_fd)
@@ -2179,16 +2179,10 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 fprintf(stderr, "# about to print relation for (%"PRId64",%"PRIu64")\n",a,b);
             }
 #endif
-            /* since a,b both even were not sieved, either a or b should
-             * be odd. However, exceptionally small norms, even without
-             * sieving, may fall below the report bound (see tracker
-             * issue #15437). Therefore it is safe to continue here. */
+            /* since a,b both even were not sieved, either a or b should be odd */
             // ASSERT((a | b) & 1);
             if (UNLIKELY(((a | b) & 1) == 0))
             {
-                th->rep->both_even++;
-                continue;
-                /*
                 pthread_mutex_lock(&io_mutex);
                 fprintf (stderr, "# Error: a and b both even for N = %d, x = %d,\n"
                         "i = %d, j = %d, a = %ld, b = %lu\n",
@@ -2198,7 +2192,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                         (long) a, (unsigned long) b);
                 abort();
                 pthread_mutex_unlock(&io_mutex);
-                */
             }
 
             /* Since the q-lattice is exactly those (a, b) with
@@ -2630,6 +2623,20 @@ factor_leftover_norm (mpz_t n, double fbbits, unsigned int lpb,
   return 0;
 }/*}}}*/
 
+static inline uint64_t cputicks()
+{
+        uint64_t r;
+        __asm__ __volatile__(
+                "rdtsc\n\t"
+                "shlq $32, %%rdx\n\t"
+                "orq %%rdx, %%rax\n\t"
+                : "=a"(r)
+                :
+                : "rdx");
+        return r;
+}
+
+
 /* Move above ? */
 /* {{{ process_bucket_region
  * th->id gives the number of the thread: it is supposed to deal with the set
@@ -2708,10 +2715,10 @@ void * process_bucket_region(thread_data_ptr th)
 
             /* Init algebraic norms */
             rep->tn[side] -= seconds ();
-            /* Only the survivors of the other sieve are initialized,
-             * unless LAZY_NORMS is activated */
+
             unsigned char * xS = S[side ^ 1];
-            rep->survivors0 += init_alg_norms_bucket_region(S[side], xS, i, si);
+	    /* rep->survivors0 is obsolete */
+	    /* rep->survivors0 += */ init_alg_norms_bucket_region(S[side], xS, i, si);
             rep->tn[side] += seconds ();
 
             /* Apply algebraic buckets */
@@ -2857,15 +2864,12 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
         las_report_accumulate(rep, thrs[i]->rep);
     }
     if (las->verbose) {
-        fprintf (las->output, "# %lu survivors after rational sieve,", rep->survivors0);
+      /* fprintf (las->output, "# %lu survivors after rational sieve,", rep->survivors0); */
         fprintf (las->output, " %lu survivors after algebraic sieve, ", rep->survivors1);
         fprintf (las->output, "coprime: %lu\n", rep->survivors2);
     }
     gmp_fprintf (las->output, "# %lu relation(s) for %s (%Zd,%Zd)\n", rep->reports, sidenames[si->conf->side], si->doing->p, si->doing->r);
     double qtts = qt0 - rep->tn[0] - rep->tn[1] - rep->ttf;
-    if (rep->both_even) {
-        fprintf (las->output, "# Warning: found %lu hits with i,j both even (not a bug, but should be very rare)\n", rep->both_even);
-    }
     fprintf (las->output, "# Time for this special-q: %1.4fs [norm %1.4f+%1.4f, sieving %1.4f"
             " (%1.4f + %1.4f),"
             " factor %1.4f]\n", qt0,
