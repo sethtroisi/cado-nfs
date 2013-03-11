@@ -99,7 +99,7 @@ static inline uint8_t inttruncfastlog2(double i, double add, double scale) {
    NOTE: tg declaration is mandatory: it's the place where gcc use memory
    to do the transfert. Without it, a warning appears but the code is false!
 */
-void *tg = &io;
+void *tg = &i;
 return (uint8_t) ((((double) (*((uint64_t *)tg) >> 0x20)) - add) * scale);
 }
 #endif
