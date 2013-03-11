@@ -5,7 +5,7 @@
 
 struct las_report_s {
     unsigned long reports;
-  /* unsigned long survivors0; */ /* Obsolete */
+    unsigned long survivors0;
     unsigned long survivors1;
     unsigned long survivors2;
     double tn[2];
@@ -13,6 +13,7 @@ struct las_report_s {
     double ttf;
     unsigned long (*survivor_sizes)[256]; /* First index: rational side */
     unsigned long (*report_sizes)[256];
+    unsigned long both_even;
 };
 typedef struct las_report_s las_report[1];
 typedef struct las_report_s * las_report_ptr;

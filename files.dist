@@ -34,10 +34,6 @@ config/search_for_function.cmake
 config/variables.cmake
 config/sse2.c
 config/sse2.cmake
-config/sse3.c
-config/sse3.cmake
-config/ssse3.c
-config/ssse3.cmake
 config/sse41.c
 config/sse41.cmake
 config/sync_fetch.c
@@ -56,7 +52,6 @@ filter/filter_matrix.h
 filter/markowitz.c
 filter/markowitz.h
 filter/merge.c
-filter/merge.h
 filter/merge_mono.c
 filter/merge_mono.h
 filter/merge_opts.h

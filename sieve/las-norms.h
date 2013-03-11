@@ -19,17 +19,22 @@ init_norms (sieve_info_ptr si, int side);
 /*  initialize norms for bucket regions */
 /* Initialize lognorms on the rational side for the bucket_region
  * number N.
+ * For the moment, nothing clever, wrt discarding (a,b) pairs that are
+ * not coprime, except for the line j=0.
  */
 void
-init_rat_norms_bucket_region (unsigned char *S, unsigned int N, sieve_info_ptr si);
+init_rat_norms_bucket_region (unsigned char *S, const int N, sieve_info_ptr si);
 
 /* Initialize lognorms on the algebraic side for the bucket
  * number N.
+ * Only the survivors of the rational sieve will be initialized, the
+ * others are set to 255. Case GCD(i,j)!=1 also gets 255.
+ * return the number of reports (= number of norm initialisations)
  */
-void
+int
 init_alg_norms_bucket_region (unsigned char *alg_S, 
-                              unsigned char *rat_S, unsigned int N, 
-                              const sieve_info_ptr si);
+                              const unsigned char *rat_S, const int N, 
+                              sieve_info_ptr si);
 
 /* This prepares the auxiliary data which is used by
  * init_rat_norms_bucket_region and init_alg_norms_bucket_region
@@ -61,6 +66,7 @@ sieve_info_test_lognorm (const unsigned char *C1,
 {
   return C1[S1] + C2[S2] <= threshold;
 }
+
 
 #ifdef __cplusplus
 }
