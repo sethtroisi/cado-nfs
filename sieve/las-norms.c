@@ -78,14 +78,21 @@ sieve_info_init_lognorm_prob (unsigned char *C, const unsigned long *rels,
    Output: o , trunc(o) == trunc(log2(i)) && o <= log2(i) < o + 0.0861.
    Careful: o ~= log2(i) iif add = 0x3FF00000 & scale = 1/0x100000.
    Add & scale are need to compute o'=f(log2(i)) where f is an affine function.
+
+   NB: i must not be modified in this function because gcc cannot see the modification
+   and affect the same register for the calling parameter and i. So if i is modified,
+   the calling parameter too!
+   In fact, the best way is to modify i in the C code itself : see the next functions
+   which have not the problem because i is explicitely modified.
 */
 static inline uint8_t inttruncfastlog2(double i, double add, double scale) {
 #ifdef HAVE_SSE2
-  __asm__ (
+  double o;
+  __asm__ ( "movsd         %1, %0\n"
 	    "psrlq $0x20,  %0    \n"
 	    "cvtdq2pd      %0, %0\n" /* Mandatory in packed double even it's non packed! */
-	    : "=x" (i) : "x" (i));
-  return ((uint8_t) ((i-add)*scale));
+	    : "=x" (o) : "x" (i));
+  return ((uint8_t) ((o-add)*scale));
 }
 #else
 /* Same function, but in x86 gcc needs to transfer the input i from a
@@ -112,12 +119,13 @@ static inline void uint64truncfastlog2(double i, double add, double scale, uint8
   __asm__ ( 
 	    "psrlq $0x20,  %0                 \n"
 	    "cvtdq2pd      %0,              %0\n"
-	    "subps         %2,       %0       \n"
-	    "mulps         %3,       %0       \n"
+	    :: "x" (i));
+  i = (i - add) * scale;
+  __asm__ ( 
 	    "cvtpd2dq      %0,       %0       \n" /* 0000 0000 000x 000Y */
 	    "punpcklbw     %0,       %0       \n" /* 0000 0000 00xx 00YY */
 	    "pshuflw    $0x00,       %0,    %0\n" /* 0000 0000 YYYY YYYY */ 
-	    : "=x"(i) : "x" (i), "x" (add), "x" (scale));
+	    :: "x" (i));
   *(double *)&addr[decal] = i;
 #else
   void *tg = &i;
@@ -140,7 +148,7 @@ static inline void w128itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale,
 	   "pslld     $0x01,    %0       \n" /* Dont use pabsd! */
 	   "psrld     $0x01,    %0       \n"
 	   "cvtdq2pd  %0,       %0       \n"
-	   : "=x"(i) : "x"(i));
+	   :: "x"(i));
   i = _mm_mul_pd(_mm_sub_pd(i, add), scale);
   __asm__ (
 	   "cvtpd2dq  %0,       %0       \n" /* 0000 0000 000X 000Y */
@@ -148,7 +156,7 @@ static inline void w128itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale,
 	   "punpcklbw %0,       %0       \n" /* 0000 0000 00XX 00YY */
 	   "pshuflw   $0xA0,    %0,    %0\n" /* 0000 0000 XXXX YYYY */
 	   "shufps    $0x50,    %0,    %0\n" /* XXXX XXXX YYYY YYYY */
-	   : "=x"(i) : "x"(i));
+	   :: "x"(i));
 #ifdef _LP64
   *(__m128d *)&addr[decal] = i; /* malloc in X86-64bits is 16 bytes aligned: this uses MOVAPD */
 #else
@@ -165,7 +173,7 @@ static inline void w16itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale, 
 	   "pslld     $0x01,    %0       \n"
 	   "psrld     $0x01,    %0       \n"
 	   "cvtdq2pd  %0,       %0       \n"
-	   : "=x"(i) : "x" (i));
+	   :: "x" (i));
   i = _mm_mul_pd(_mm_sub_pd(i, add), scale);
   addr[decal] = (uint8_t) _mm_cvtsd_si32(i);
   i = _mm_unpackhi_pd(i,i);
@@ -179,7 +187,7 @@ static inline void w8ix2truncfastlog2fabs(__m128d i, __m128d add, __m128d scale,
 	   "pslld     $0x01,    %0       \n"
 	   "psrld     $0x01,    %0       \n"
 	   "cvtdq2pd  %0,       %0       \n"
-	   : "=x" (i) : "x" (i));
+	   :: "x" (i));
   i = _mm_mul_pd(_mm_sub_pd(i, add), scale);
   addr[decal1] = (uint8_t) _mm_cvtsd_si32(i);
   i = _mm_unpackhi_pd(i,i);
