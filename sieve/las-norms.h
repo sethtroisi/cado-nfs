@@ -23,17 +23,18 @@ init_norms (sieve_info_ptr si, int side);
  * not coprime, except for the line j=0.
  */
 void
-init_rat_norms_bucket_region (unsigned char *S, const int N, sieve_info_ptr si);
+init_rat_norms_bucket_region (unsigned char *S, unsigned int N, sieve_info_ptr si);
 
 /* Initialize lognorms on the algebraic side for the bucket
  * number N.
  * Only the survivors of the rational sieve will be initialized, the
  * others are set to 255. Case GCD(i,j)!=1 also gets 255.
- * return the number of reports (= number of norm initialisations)
+ * return nothing because the number of reports (= number of norm
+ * initialisations) is algorithm dependent of ALG_RAT & ALG_LAZY.
  */
-int
+void
 init_alg_norms_bucket_region (unsigned char *alg_S, 
-                              const unsigned char *rat_S, const int N, 
+                              unsigned char *rat_S,  unsigned int N, 
                               sieve_info_ptr si);
 
 /* This prepares the auxiliary data which is used by

@@ -94,7 +94,7 @@ struct sieve_side_info_s {
     unsigned char Bound[256]; /* -log(prob of relation), 127 for prob<thresh */
     fbprime_t *trialdiv_primes;
     trialdiv_divisor_t *trialdiv_data;
-    unsigned char lognorm_table[1 << NORM_BITS];
+    /* unsigned char lognorm_table[1 << NORM_BITS]; */
     factorbase_degn_t * fb;
     struct {
         factorbase_degn_t * pow2[2];
