@@ -925,7 +925,7 @@ void init_alg_norms_bucket_region(unsigned char *S,
   if (LIKELY(p > 1)) {							\
     unsigned char *mS = S + Idiv2;					\
     S -= Idiv2;								\
-    for (ih = 1; ih < p; ih++, mS += (Idiv2<<1))			\
+    for (unsigned int k = 1; k < p; ih++, mS += (Idiv2<<1))		\
       memcpy (mS, S, (Idiv2<<1));					\
     S = mS + Idiv2;							\
     j += p;								\
@@ -2028,7 +2028,7 @@ void init_alg_norms_bucket_region(unsigned char *S,
   if (LIKELY(p > 1)) {							\
     unsigned char *mS = S + Idiv2;					\
     S -= Idiv2;								\
-    for (ih = 1; ih < p; ih++, mS += (Idiv2<<1))			\
+    for (unsigned int k = 1; k < p; ih++, mS += (Idiv2<<1))		\
       memcpy (mS, S, (Idiv2<<1));					\
     S = mS + Idiv2;							\
     j += p;								\
