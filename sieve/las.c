@@ -2067,14 +2067,14 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 #ifdef TRACE_K /* {{{ */
         if (trace_on_spot_Nx(N, x)) {
             fprintf(stderr, "# alg->Bound[%u]=%u, rat->Bound[%u]=%u\n",
-                    alg_S[trace_Nx.x], alg->Bound[alg_S[x]],
-                    rat_S[trace_Nx.x], rat->Bound[rat_S[x]]);
+                    alg_S[trace_Nx.x], alg_S[x] <= alg->bound : 0 ? alg->bound,
+                    rat_S[trace_Nx.x], rat_S[x] <= rat->bound : 0 ? rat->bound);
         }
 #endif /* }}} */
         unsigned int X;
         unsigned int i, j;
 
-        if (!sieve_info_test_lognorm(alg->Bound, rat->Bound, alg_S[x], rat_S[x], 126))
+        if (!sieve_info_test_lognorm(alg->bound, rat->bound, alg_S[x], rat_S[x]))
         {
             SS[x] = 255;
             continue;
@@ -2712,8 +2712,7 @@ void * process_bucket_region(thread_data_ptr th)
             rep->tn[side] -= seconds ();
 
             unsigned char * xS = S[side ^ 1];
-	    /* rep->survivors0 is obsolete */
-            /* rep->survivors0 += */ init_alg_norms_bucket_region(S[side], xS, i, si);
+            init_alg_norms_bucket_region(S[side], xS, i, si);
             rep->tn[side] += seconds ();
 
             /* Apply algebraic buckets */

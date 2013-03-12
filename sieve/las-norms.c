@@ -4,6 +4,8 @@
 #include <limits.h>
 #include <math.h>               /* ceil */
 
+/* #undef HAVE_SSE2 */ /* Only for tests */ 
+
 #ifdef HAVE_SSE41
 #include <smmintrin.h>
 #else
@@ -27,85 +29,17 @@
 #include "mpz_poly.h"
 #include "portability.h"
 
-#undef HAVE_SSE2 /* Only for tests */
-/************************** sieve info stuff *********************************/
-
-/* initialize array C[0..255]: C[i] is zero whenever the log-norm i
-   is considered as a potential report, and 127 otherwise.
-   The large prime bound is L = 2^l.
-*/
-static void
-sieve_info_init_lognorm (unsigned char *C, unsigned char threshold,
-                         unsigned long B MAYBE_UNUSED,
-                         unsigned long l MAYBE_UNUSED,
-                         double scale MAYBE_UNUSED)
-{
-  /* for (k = 0; k < 256; k++) C[k] = (k <= threshold) ? 0 : 127; */
-  memset (C, 0, threshold + 1);
-  memset (C + threshold + 1, 127, 256 - (threshold + 1));
-
-#ifdef COFACTOR_TRICK
-  {
-    unsigned char k0, k1;
-    double lost = 6.0; /* maximal number of bits lost due to prime powers */
-
-    /* for L < R < B^2, a cofactor R cannot be L-smooth, since then it should
-       have at least two prime factors in [B,L], and then should be >= B^2.
-       Note:
-       - the lognorms S[] are GUARD larger than the real values, thus the
-         interval [L,R^2] corresponds to [k0+GUARD,k1+GUARD], but to take into
-         account the roundoff errors we consider [k0+2*GUARD,k1]
-       - 'lost' takes into account the error because we do not sieve
-         prime powers; it applies only to the lower bound, and has to be scaled
-       - the additional guard value takes into account additional errors
-    */
-    k0 = (unsigned char) (((double) l + lost) * scale) + 2 * GUARD + 2;
-    k1 = (unsigned char) (2.0 * log2 ((double) B) * scale) - 2;
-    for (k = k0; k <= k1 && k < 256; k++)
-      C[k] = 127;
-  }
-#endif
-}
-
-MAYBE_UNUSED static void
-sieve_info_init_lognorm_prob (unsigned char *C, const unsigned long *rels,
-    const unsigned long *surv, const double thresh)
-{
-  const double scale = -126./log(thresh);
-
-  /* Success probability up to thresh get values 0 (probability=1) 
-     through 126 (probability=thresh). Probabilities worse than thresh 
-     all get 127. */
-
-  for (size_t i = 0; i < 256; i++) {
-    if ((double) rels[i] < thresh * (double) surv[i]) {
-        C[i] = 127;
-    } else {
-      const double prob = (double) rels[i] / (double) surv[i];
-      C[i] = -log(prob) * scale; /* TODO: How should we round here? */
-    }
-  }
-}
-
 /* Input: i, double. i >= 0 needed!
    Output: o , trunc(o) == trunc(log2(i)) && o <= log2(i) < o + 0.0861.
    Careful: o ~= log2(i) iif add = 0x3FF00000 & scale = 1/0x100000.
    Add & scale are need to compute o'=f(log2(i)) where f is an affine function.
-
-   NB: i must not be modified in this function because gcc cannot see the modification
-   and affect the same register for the calling parameter and i. So if i is modified,
-   the calling parameter too!
-   In fact, the best way is to modify i in the C code itself : see the next functions
-   which have not the problem because i is explicitely modified.
 */
 static inline uint8_t inttruncfastlog2(double i, double add, double scale) {
 #ifdef HAVE_SSE2
-  double o;
-  __asm__ ( "movsd         %1, %0\n"
-	    "psrlq $0x20,  %0    \n"
+  __asm__ ( "psrlq $0x20,  %0    \n"
 	    "cvtdq2pd      %0, %0\n" /* Mandatory in packed double even it's non packed! */
-	    : "=x" (o) : "x" (i));
-  return ((uint8_t) ((o-add)*scale));
+	    : "+x" (i));            /* Really need + here! i is not modified in C code! */
+  return ((uint8_t) ((i-add)*scale));
 }
 #else
 /* Same function, but in x86 gcc needs to transfer the input i from a
@@ -129,16 +63,15 @@ return (uint8_t) ((((double) (*((uint64_t *)tg) >> 0x20)) - add) * scale);
 */
 static inline void uint64truncfastlog2(double i, double add, double scale, uint8_t *addr, ssize_t decal) {
 #ifdef HAVE_SSE2
-  __asm__ ( 
-	    "psrlq $0x20,  %0                 \n"
+  __asm__ ( "psrlq $0x20,  %0                 \n"
 	    "cvtdq2pd      %0,              %0\n"
-	    :: "x" (i));
+	    : "+x" (i));
   i = (i - add) * scale;
   __asm__ ( 
 	    "cvtpd2dq      %0,       %0       \n" /* 0000 0000 000x 000Y */
 	    "punpcklbw     %0,       %0       \n" /* 0000 0000 00xx 00YY */
 	    "pshuflw    $0x00,       %0,    %0\n" /* 0000 0000 YYYY YYYY */ 
-	    :: "x" (i));
+	    : "+x" (i));
   *(double *)&addr[decal] = i;
 #else
   void *tg = &i;
@@ -161,7 +94,7 @@ static inline void w128itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale,
 	   "pslld     $0x01,    %0       \n" /* Dont use pabsd! */
 	   "psrld     $0x01,    %0       \n"
 	   "cvtdq2pd  %0,       %0       \n"
-	   :: "x"(i));
+	   : "+x"(i));
   i = _mm_mul_pd(_mm_sub_pd(i, add), scale);
   __asm__ (
 	   "cvtpd2dq  %0,       %0       \n" /* 0000 0000 000X 000Y */
@@ -169,7 +102,7 @@ static inline void w128itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale,
 	   "punpcklbw %0,       %0       \n" /* 0000 0000 00XX 00YY */
 	   "pshuflw   $0xA0,    %0,    %0\n" /* 0000 0000 XXXX YYYY */
 	   "shufps    $0x50,    %0,    %0\n" /* XXXX XXXX YYYY YYYY */
-	   :: "x"(i));
+	   : "+x"(i));
   *(__m128d *)&addr[decal] = i; /* addr and decal are 16 bytes aligned: MOVAPD */
 }
 
@@ -182,7 +115,7 @@ static inline void w16itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale, 
 	   "pslld     $0x01,    %0       \n"
 	   "psrld     $0x01,    %0       \n"
 	   "cvtdq2pd  %0,       %0       \n"
-	   :: "x" (i));
+	   : "+x" (i));
   i = _mm_mul_pd(_mm_sub_pd(i, add), scale);
   addr[decal] = (uint8_t) _mm_cvtsd_si32(i);
   i = _mm_unpackhi_pd(i,i);
@@ -196,7 +129,7 @@ static inline void w8ix2truncfastlog2fabs(__m128d i, __m128d add, __m128d scale,
 	   "pslld     $0x01,    %0       \n"
 	   "psrld     $0x01,    %0       \n"
 	   "cvtdq2pd  %0,       %0       \n"
-	   :: "x" (i));
+	   : "+x" (i));
   i = _mm_mul_pd(_mm_sub_pd(i, add), scale);
   addr[decal1] = (uint8_t) _mm_cvtsd_si32(i);
   i = _mm_unpackhi_pd(i,i);
@@ -447,42 +380,17 @@ void init_rat_norms_bucket_region(unsigned char *S,
       i = i * d0 + d1;
     }
   nextj:
-    __asm__("# gcc needs something after a label.\n");
+    for (;0;); /* gcc needs something after a label */
   }
 }
 
-/* {{{ some utility stuff */
-#ifdef SSE_NORM_INIT
-static inline void init_fpoly_v2df(__v2df * F, const double *f, const int deg)
+static inline void fpoly_scale(double * u, const double * t, unsigned int d, double h)
 {
-    int i;
-    for (i = 0; i <= deg; ++i) {
-	__v2df tmp = { f[i], f[i] };
-	F[i] = tmp;
-    }
+  double hpow;
+  u[d] = t[d];
+  for (hpow = h; --d != UINT_MAX; hpow *= h) u[d] = t[d] * hpow;
 }
 
-static inline __v2df fpoly_eval_v2df(const __v2df * f, const __v2df x, int d)
-{
-    __v2df r;
-    r = f[d--];
-    for (; d >= 0; --d)
-	r = r * x + f[d];
-    return r;
-}
-#endif
-
-static inline void fpoly_scale(double * u, const double * t, int d, double h)
-{
-    u[d] = t[d];        /* This one never changes. */
-    double hpow = h;
-    u[d-1] = t[d-1] * hpow;
-    for (int k = 2; k <= d; k++) {
-        hpow *= h;
-        u[d - k] = t[d - k] * hpow;
-    }
-}
-/* }}} */
 
 /**************************************************************************
        8 algorithms for the initialization of the algebraics:
@@ -706,7 +614,7 @@ static inline void fpoly_scale(double * u, const double * t, int d, double h)
 
 #define G9 g=_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(_mm_add_pd(_mm_mul_pd(g,u9),u8),h),u7),h),u6),h),u5),h),u4),h),u3),h),u2),h),u1),h),u0)
 
-#define GD g=u[d-1];for (uint32_t k=d-1;k!=UINT32_MAX;g=_mm_add_pd(_mm_mul_pd(g,h),u[k--]))
+#define GD g=u[d-1];for (unsigned int k=d;--k!=UINT_MAX;g=_mm_add_pd(_mm_mul_pd(g,h),u[k]))
 
 #define ALG_INIT_SCALE_ADD_A						\
   __m128d scale = _mm_set1_pd(alg->scale * (1.0/0x100000)),             \
@@ -1821,7 +1729,7 @@ void init_alg_norms_bucket_region (unsigned char *S,
 
 #define ABSG9 g=fabs(u0+h*(u1+h*(u2+h*(u3+h*(u4+h*(u5+h*(u6+h*(u7+h*(u8+h*u9)))))))))
 
-#define ABSGD g=u[d]; for(uint32_t k=d-1;k!=UINT32_MAX;g=g*h+u[k--]); g=fabs(g)
+#define ABSGD g=u[d]; for(unsigned int k=d;--k!=UINT_MAX;g=g*h+u[k]); g=fabs(g)
 
 #define ALG_INIT_SCALE_ADD			\
   double scale = alg->scale * (1.0/0x100000),	\
@@ -2760,7 +2668,6 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
     }
 
   double r, maxlog2;
-  unsigned char alg_bound, rat_bound;
   sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
   sieve_side_info_ptr alg = si->sides[ALGEBRAIC_SIDE];
 
@@ -2795,21 +2702,24 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
            maxlog2, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
   /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
      thus y = GUARD + x * (UCHAR_MAX-GUARD)/maxlog2 */
-  rat->scale = ((double) UCHAR_MAX - GUARD + 1) / maxlog2 * 0.999999;
+  rat->scale = ((double) UCHAR_MAX - GUARD) / maxlog2;
   step = 1 / rat->scale;
   begin = -step * GUARD;
   for (unsigned int inc = 0; inc < 257; begin += step) rat->cexp2[inc++] = exp2(begin);
   /* we want to select relations with a cofactor of less than r bits on the
      rational side */
   r = MIN(si->conf->sides[RATIONAL_SIDE]->lambda * (double) si->conf->sides[RATIONAL_SIDE]->lpb, maxlog2 - GUARD / rat->scale);
-  rat_bound = (unsigned char) (r * rat->scale) + GUARD;
-  fprintf (output, " bound=%u\n", rat_bound);
+  rat->bound = (unsigned char) (r * rat->scale + GUARD);
+  fprintf (output, " bound=%u\n", rat->bound);
   double max_rlambda = (maxlog2 - GUARD / rat->scale) / si->cpoly->rat->lpb;
   if (si->cpoly->rat->lambda > max_rlambda) {
       fprintf(output, "# Warning, rlambda>%.1f does not make sense (capped to limit)\n", max_rlambda);
   }
-  sieve_info_init_lognorm (rat->Bound, rat_bound, si->conf->sides[RATIONAL_SIDE]->lim,
+  /* Obsolete: rat->Bound is remplaced by a single threshold alg->bound */
+  /*
+  sieve_info_init_lognorm (rat->Bound, rat->bound, si->conf->sides[RATIONAL_SIDE]->lim,
                            si->conf->sides[RATIONAL_SIDE]->lpb, rat->scale);
+  */
 
   /************************** algebraic side *********************************/
 
@@ -2835,14 +2745,17 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
   /* we want to report relations with a remaining log2-norm after sieving of
      at most lambda * lpb, which corresponds in the y-range to
      y >= GUARD + lambda * lpb * scale */
-  alg_bound = (unsigned char) (r * alg->scale) + GUARD;
-  fprintf (output, " bound=%u\n", alg_bound);
+  alg->bound = (unsigned char) (r * alg->scale + GUARD);
+  fprintf (output, " bound=%u\n", alg->bound);
   double max_alambda = (alg->logmax) / si->cpoly->alg->lpb;
   if (si->cpoly->alg->lambda > max_alambda) {
       fprintf(output, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
   }
-  sieve_info_init_lognorm (alg->Bound, alg_bound, si->conf->sides[ALGEBRAIC_SIDE]->lim,
+  /* Obsolete: alg->Bound is remplaced by a single threshold alg->bound */
+  /*
+  sieve_info_init_lognorm (alg->Bound, alg->bound, si->conf->sides[ALGEBRAIC_SIDE]->lim,
                            si->conf->sides[ALGEBRAIC_SIDE]->lpb, alg->scale);
+  */
 }
 
 void sieve_info_clear_norm_data(sieve_info_ptr si)
