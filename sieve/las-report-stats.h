@@ -9,7 +9,7 @@ struct las_report_s {
     unsigned long survivors1;
     unsigned long survivors2;
     double tn[2];
-    double ttsm;
+    double ttbuckets;        /* fill+apply buckets */
     double ttf;
     unsigned long (*survivor_sizes)[256]; /* First index: rational side */
     unsigned long (*report_sizes)[256];

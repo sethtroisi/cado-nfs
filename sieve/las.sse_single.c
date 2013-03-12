@@ -3446,7 +3446,7 @@ typedef struct {
     unsigned long survivors2;
     double tn_rat;
     double tn_alg;
-    double ttsm;
+    double ttbuckets;
     double ttf;
     unsigned long report_sizes_a[256];
     unsigned long report_sizes_r[256];
@@ -3476,7 +3476,7 @@ process_regions_one_thread(process_bucket_region_arg_t *arg)
     unsigned long report_sizes_a[256], report_sizes_r[256];
     double tn_rat = 0.0;
     double tn_alg = 0.0;
-    double ttsm = 0.0;
+    double ttbuckets = 0.0;
     double ttf = 0.0;
 
     survivors0 = survivors1 = survivors2 = 0;
@@ -3548,10 +3548,10 @@ process_regions_one_thread(process_bucket_region_arg_t *arg)
         init_rat_norms_bucket_region(rat_S, i, cpoly, si);
         tn_rat += seconds ();
         /* Apply rational buckets */
-        ttsm -= seconds();
+        ttbuckets -= seconds();
         for (j = 0; j < si->nb_threads; ++j) 
             apply_one_bucket(rat_S, rat_BA[j], i, si);
-        ttsm += seconds();
+        ttbuckets += seconds();
         /* Sieve small rational primes */
         sieve_small_bucket_region(rat_S, i, lssd_rat[0], si, 'r');
 	
@@ -3561,10 +3561,10 @@ process_regions_one_thread(process_bucket_region_arg_t *arg)
 						   cpoly, si);
         tn_alg += seconds ();
         /* Apply algebraic buckets */
-        ttsm -= seconds();
+        ttbuckets -= seconds();
         for (j = 0; j < si->nb_threads; ++j)
             apply_one_bucket(alg_S, alg_BA[j], i, si);
-        ttsm += seconds();
+        ttbuckets += seconds();
         /* Sieve small algebraic primes */
         sieve_small_bucket_region(alg_S, i, lssd_alg[0], si, 'a');
 
@@ -3603,7 +3603,7 @@ process_regions_one_thread(process_bucket_region_arg_t *arg)
     rep->survivors2 = survivors2;
     rep->tn_rat = tn_rat;
     rep->tn_alg = tn_alg;
-    rep->ttsm = ttsm;
+    rep->ttbuckets = ttbuckets;
     rep->ttf = ttf;
     for (i = 0; i < 256; i++) {
         rep->report_sizes_a[i] = report_sizes_a[i];
@@ -3625,7 +3625,7 @@ process_bucket_region_mt(bucket_array_t *alg_BA, bucket_array_t *rat_BA,
     report.survivors2 = 0;
     report.tn_rat = 0.0;
     report.tn_alg = 0.0;
-    report.ttsm = 0.0;
+    report.ttbuckets = 0.0;
     report.ttf = 0.0;
     for (i = 0; i < 256; i++) {
         report.report_sizes_a[i] = 0;
@@ -3667,7 +3667,7 @@ process_bucket_region_mt(bucket_array_t *alg_BA, bucket_array_t *rat_BA,
         report.survivors2 += rep->survivors2;
         report.tn_rat += rep->tn_rat;
         report.tn_alg += rep->tn_alg;
-        report.ttsm += rep->ttsm;
+        report.ttbuckets += rep->ttbuckets;
         report.ttf += rep->ttf;
         int j;
         for (j = 0; j < 256; j++) {
@@ -3737,7 +3737,7 @@ main (int argc0, char *argv0[])
     const char *fbfilename = NULL;
     const char *polyfilename = NULL;
     cado_poly cpoly;
-    double t0, tfb, tq, tn_rat, tn_alg, tts, ttsm, ttf;
+    double t0, tfb, tq, tn_rat, tn_alg, tts, ttbuckets, ttf;
     uint64_t q0 = 0, q1 = 0, rho = 0;
     uint64_t *roots;
     unsigned long nroots, tot_reports = 0;
@@ -4010,7 +4010,7 @@ main (int argc0, char *argv0[])
     nroots = 0;
     tot_reports = 0;
 
-    tn_rat = tn_alg = tts = ttsm = ttf = 0.0;
+    tn_rat = tn_alg = tts = ttbuckets = ttf = 0.0;
     t0 = seconds ();
     fprintf (output, "#\n");
     int rep_bench = 0;
@@ -4062,7 +4062,7 @@ main (int argc0, char *argv0[])
         totJ += (double) si.J;
 
         /* Allocate alg buckets */
-        ttsm -= seconds();
+        ttbuckets -= seconds();
         bucket_array_t alg_BA[si.nb_threads];
         for (i = 0; i < si.nb_threads; ++i)
             alg_BA[i] = init_bucket_array(si.nb_buckets, si.bucket_limit / si.nb_threads);
@@ -4087,7 +4087,7 @@ main (int argc0, char *argv0[])
             fprintf(stderr, "maxfull=%f\n", max_full);
         ASSERT (max_full < 1.);
 
-        ttsm += seconds();
+        ttbuckets += seconds();
 
         /* Initialize data for sieving small primes */
         small_sieve_data_t ssd_alg, ssd_rat;
@@ -4102,7 +4102,7 @@ main (int argc0, char *argv0[])
             tot_reports += rep.reports;
             tn_rat      += rep.tn_rat;
             tn_alg      += rep.tn_alg;
-            ttsm        += rep.ttsm;
+            ttbuckets        += rep.ttbuckets;
             ttf         += rep.ttf;
             rep_bench   += rep.reports;
             for (i = 0; i < 256; ++i) {
@@ -4200,7 +4200,7 @@ main (int argc0, char *argv0[])
     else
         fprintf (output, "# Total time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
             " (%1.1f + %1.1f),"
-             " factor %1.1f]\n", t0, tn_rat, tn_alg, tts, ttsm, tts-ttsm, ttf);
+             " factor %1.1f]\n", t0, tn_rat, tn_alg, tts, ttbuckets, tts-ttbuckets, ttf);
     fprintf (output, "# Total %lu reports [%1.3fs/r, %1.1fr/sq]\n",
              tot_reports, t0 / (double) tot_reports,
              (double) tot_reports / (double) sq);
