@@ -619,7 +619,6 @@ sieve/las-types.h
 sieve/las-unsieve.c
 sieve/las-unsieve.h
 sieve/las.c
-sieve/las.sse_single.c
 sieve/makefb.c
 sieve/makefb.sage
 sieve/test_trialdiv.c
