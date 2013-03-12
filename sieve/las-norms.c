@@ -3,8 +3,21 @@
 #include <string.h>
 #include <limits.h>
 #include <math.h>               /* ceil */
-#ifdef SSE_NORM_INIT
+
+#ifdef HAVE_SSE41
+#include <smmintrin.h>
+#else
+#ifdef HAVE_SSSE3
+#include <tmmintrin.h>
+#else
+#ifdef HAVE_SSE3
+#include <pmmintrin.h>
+#else
+#ifdef HAVE_SSE2
 #include <emmintrin.h>
+#endif
+#endif
+#endif
 #endif
 
 #include "las-config.h"
@@ -14,7 +27,7 @@
 #include "mpz_poly.h"
 #include "portability.h"
 
-/* #undef HAVE_SSE2 */ /* Only for tests */
+#undef HAVE_SSE2 /* Only for tests */
 /************************** sieve info stuff *********************************/
 
 /* initialize array C[0..255]: C[i] is zero whenever the log-norm i
@@ -157,11 +170,7 @@ static inline void w128itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale,
 	   "pshuflw   $0xA0,    %0,    %0\n" /* 0000 0000 XXXX YYYY */
 	   "shufps    $0x50,    %0,    %0\n" /* XXXX XXXX YYYY YYYY */
 	   :: "x"(i));
-#ifdef _LP64
-  *(__m128d *)&addr[decal] = i; /* malloc in X86-64bits is 16 bytes aligned: this uses MOVAPD */
-#else
-  _mm_storeu_pd ((double *)&addr[decal], i); /* malloc in X86-32bits is 8 bytes aligned : MOVUPD */
-#endif
+  *(__m128d *)&addr[decal] = i; /* addr and decal are 16 bytes aligned: MOVAPD */
 }
 
 /* 2 values are computed + fabs at the beginning. These values are written at scale+addr
@@ -483,15 +492,11 @@ static inline void fpoly_scale(double * u, const double * t, int d, double h)
        the algebraics; all the cases are independant and end by
                       a return for lisibility.
        All have a default which could replace all others cases.
-               NB: Somes SSE algorithms needs x64-64.
+     NB: Somes SSE algorithms needs __x86_64; all __x86_64 are SSE2.
 **************************************************************************/
 
 /**************** used #define from SSE2 to -41 **************************/
 #ifdef HAVE_SSE2
-
-#ifdef _LP64
-#define HAVE_SSE2_LP64 /* For some algorithms X86-64 only */
-#endif
 
 #ifdef HAVE_SSE41
 #define TSTZXMM(A) _mm_testz_si128(A,A)
@@ -1081,7 +1086,7 @@ void init_alg_norms_bucket_region(unsigned char *S,
 #endif
 
 /**************** 3: HAVE_SSE2, !ALG_LAZY, ALG_RAT **************************/
-#ifdef HAVE_SSE2_LP64_ /* For the moment, not active: code slower than non SSE version */
+#ifdef NOTDEFINED /* __x86_64 */ /* Not active: code slower than non SSE version */
 #ifndef ALG_LAZY
 #ifdef ALG_RAT
 /* Smart initialization of the algebraics : only if the corresponding
@@ -2177,7 +2182,7 @@ void init_alg_norms_bucket_region(unsigned char *S,
 #endif
 
 /********** 7: !(HAVE_SSE2 & x86-64), !ALG_LAZY, ALG_RAT **************/
-#ifndef HAVE_SSE2_LP64_ /* Active by default: SSE code slower */
+#ifndef NOTDEFINED /* __x86_64 */ /* Active by default: SSE code slower */
 #ifndef ALG_LAZY
 #ifdef ALG_RAT
 /* Smart initialization of the algebraics : only if the corresponding
@@ -2558,9 +2563,6 @@ void init_alg_norms_bucket_region(unsigned char *S,
 #undef ALG_INIT_SCALE_ADD
 #undef ALG_INIT_SCALE_ADD_T
 /***************** end of undef of all non SSE defines *****************/
-#ifdef HAVE_SSE2_LP64
-#undef HAVE_SSE2_LP64
-#endif
 /********* End of the 8 procedures init_alg_norms_bucket_region ********/
 
 /* return max |g(x)| for x in (0, s) where s can be negative,

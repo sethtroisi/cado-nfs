@@ -2666,7 +2666,7 @@ void * process_bucket_region(thread_data_ptr th)
         ts->rsdpos = small_sieve_copy_start(ts->ssdpos, s->fb_parts_x->rs);
 
         /* local sieve region */
-        S[side] = (unsigned char *) malloc(bucket_region + MEMSET_MIN);
+        S[side] = (unsigned char *) malloc_aligned(bucket_region + MEMSET_MIN, 16);
         ASSERT_ALWAYS (S != NULL);
     }
 
@@ -2747,9 +2747,8 @@ void * process_bucket_region(thread_data_ptr th)
         thread_side_data_ptr ts = th->sides[side];
         free(ts->ssdpos);
         free(ts->rsdpos);
-        free(S[side]);
+        free_aligned(S[side], bucket_region + MEMSET_MIN, 16);
     }
-
 
     return NULL;
 }/*}}}*/
