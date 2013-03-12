@@ -3211,7 +3211,16 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         trace_update_conditions(si);
 
-        report->ttbuckets_fill -= seconds();
+        /* WARNING. We're filling the report info for thread 0 for
+         * ttbuckets_fill, while in fact the cost is over all threads.
+         * The problem is always the fact that we don't have a proper
+         * per-thread timer. So short of a better solution, this is what
+         * we do. True, it's not clean.
+         * (we need this data to be caught by
+         * las_report_accumulate_threads_and_display further down, hence
+         * this hack).
+         */
+        thrs[0]->rep->ttbuckets_fill -= seconds();
 
         thread_pickup_si(thrs, si, las->nb_threads);
 
@@ -3252,7 +3261,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
 #endif /* }}} */
 
-        report->ttbuckets_fill += seconds();
+        thrs[0]->rep->ttbuckets_fill += seconds();
 
         /* This can now be factored out ! */
         for(int side = 0 ; side < 2 ; side++) {
