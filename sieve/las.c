@@ -2688,12 +2688,12 @@ void * process_bucket_region(thread_data_ptr th)
             rep->tn[side] += seconds ();
 
             /* Apply rational buckets */
-            rep->ttbuckets -= seconds();
+            rep->ttbuckets_apply -= seconds();
             for (int j = 0; j < las->nb_threads; ++j)  {
                 thread_data_ptr ot = th + j - th->id;
                 apply_one_bucket(S[side], ot->sides[side]->BA, i, w);
             }
-            rep->ttbuckets += seconds();
+            rep->ttbuckets_apply += seconds();
 
             /* Sieve small rational primes */
             sieve_small_bucket_region(S[side], i, s->ssd, ts->ssdpos, si, side, w);
@@ -2715,12 +2715,12 @@ void * process_bucket_region(thread_data_ptr th)
             rep->tn[side] += seconds ();
 
             /* Apply algebraic buckets */
-            rep->ttbuckets -= seconds();
+            rep->ttbuckets_apply -= seconds();
             for (int j = 0; j < las->nb_threads; ++j) {
                 thread_data_ptr ot = th + j - th->id;
                 apply_one_bucket(S[side], ot->sides[side]->BA, i, w);
             }
-            rep->ttbuckets += seconds();
+            rep->ttbuckets_apply += seconds();
 
             /* Sieve small algebraic primes */
             sieve_small_bucket_region(S[side], i, s->ssd, ts->ssdpos, si, side, w);
@@ -2866,11 +2866,15 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
         fprintf (las->output, "# Warning: found %lu hits with i,j both even (not a bug, but should be very rare)\n", rep->both_even);
     }
     fprintf (las->output, "# Time for this special-q: %1.4fs [norm %1.4f+%1.4f, sieving %1.4f"
-            " (%1.4f + %1.4f),"
+            " (%1.4f + %1.4f + %1.4f),"
             " factor %1.4f]\n", qt0,
             rep->tn[RATIONAL_SIDE],
             rep->tn[ALGEBRAIC_SIDE],
-            qtts, rep->ttbuckets, qtts-rep->ttbuckets, rep->ttf);
+            qtts,
+            rep->ttbuckets_fill,
+            rep->ttbuckets_apply,
+            qtts-rep->ttbuckets_fill-rep->ttbuckets_apply,
+            rep->ttf);
 #if 0   /* incompatible with the todo list */
     rep_bench += rep->reports;
 #endif
@@ -3207,7 +3211,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         trace_update_conditions(si);
 
-        report->ttbuckets -= seconds();
+        report->ttbuckets_fill -= seconds();
 
         thread_pickup_si(thrs, si, las->nb_threads);
 
@@ -3248,7 +3252,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
 #endif /* }}} */
 
-        report->ttbuckets += seconds();
+        report->ttbuckets_fill += seconds();
 
         /* This can now be factored out ! */
         for(int side = 0 ; side < 2 ; side++) {
@@ -3406,11 +3410,15 @@ int main (int argc0, char *argv0[])/*{{{*/
         fprintf (las->output, "# Total wct time %1.1fs [precise timings available only for mono-thread]\n", t0);
     else
         fprintf (las->output, "# Total time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
-                " (%1.1f + %1.1f),"
+                " (%1.1f + %1.1f + %1.1f),"
                 " factor %1.1f]\n", t0,
                 report->tn[RATIONAL_SIDE],
                 report->tn[ALGEBRAIC_SIDE],
-                tts, report->ttbuckets, tts-report->ttbuckets, report->ttf);
+                tts,
+                report->ttbuckets_fill,
+                report->ttbuckets_apply,
+                tts-report->ttbuckets_fill-report->ttbuckets_apply,
+                report->ttf);
     fprintf (las->output, "# Total %lu reports [%1.3gs/r, %1.1fr/sq]\n",
             report->reports, t0 / (double) report->reports,
             (double) report->reports / (double) sq);
