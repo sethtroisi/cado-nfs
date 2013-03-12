@@ -1627,6 +1627,8 @@ FIXME: can we find the locations to sieve? */
                        the low word of the register, but gcc does not 
                        do so - it writes the word to memory, then reads 
                        the dword back again. */
+                    /* gcc knows that maskbucket is 65535 below, so that
+                     * and+cast end up in a no-op */
                     __asm__ (
                             "movw %1, %w0\n\t"
                             : "+r" (update)
