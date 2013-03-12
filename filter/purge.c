@@ -76,6 +76,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "utils_ffs.h"
 #endif
 
+#define DEBUG 0
 //#define STAT_FFS
 
 //#define USE_CAVALLAR_WEIGHT_FUNCTION
@@ -688,12 +689,10 @@ weight_function_clique (HC_T w)
   else if (w == 2)
     return 0.25;
   else
-      return 0.0;
+    return 0.0;
 #else
     if (w >= 3)
-      /* we use the multiplier 5 here, so that the average weight (assumed to
-         be 1) is in the middle of the Count[10] array */
-      return (float) 5.0 / (float) w;
+      return (float) 1.0 / (float) w;
     else
       return 0.0;
 #endif
@@ -716,7 +715,9 @@ compute_connected_component (HR_T i)
           if (!bit_vector_getbit(Tbv, (size_t) k)) /* row k not visited yet */
             n += compute_connected_component (k);
         }
-      w_ccc += weight_function_clique (H.hc[h]);
+      /* we use the multiplier 5 here, so that the average weight (assumed to
+         be 1) is in the middle of the Count[10] array */
+      w_ccc += 5.0 * weight_function_clique (H.hc[h]);
     }
   return n;
 }
@@ -752,7 +753,7 @@ deleteHeavierRows (unsigned int npass)
   static HR_T chunk;
   comp_t *tmp = NULL; /* (weight, index) */
   HR_T *myrelcompact, i, h;
-  double W = 0.0; /* total matrix weight */
+  W = 0.0; /* total matrix weight */
   double N = 0.0; /* number of rows */
   unsigned int wceil, j, ltmp = 0, alloctmp = 0xff;
   long target;
@@ -816,6 +817,12 @@ deleteHeavierRows (unsigned int npass)
     }
   else
     target = keep; /* enough steps */
+
+#if DEBUG >= 1
+  fprintf (stderr, "DEBUG: newnrel=%u newnprimes=%u\n"
+                   "DEBUG: ltmp=%u chunk=%u target=%lu\n", newnrel,
+                   newnprimes, ltmp, chunk, target);
+#endif
 
   for (j = 0; j < ltmp && newnrel > target + newnprimes; j++)
     newnrel -= delete_connected_component (tmp[j].i);
@@ -2109,7 +2116,7 @@ approx_phi (long B)
 }
 #else
 /* estimate the number of ideals of degree <= B */
-static int
+static HR_T
 approx_ffs (int d)
 {
 #ifdef USE_F2
