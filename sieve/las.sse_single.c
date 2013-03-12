@@ -666,7 +666,7 @@ fb_root_in_qlattice (const fbprime_t p, const fbprime_t R,
 	aux2 = ((int64_t)(R - p))*((int64_t)si->a0) - ((int64_t)si->b0);
       }
     u = redc_32(aux1, p, invp); /* 0 <= u < p */
-    v = redc_32(aux2, p, invp); /* 0 <= den < p */
+    v = redc_32(aux2, p, invp); /* 0 <= v < p */
 
     add = 0;
     if (UNLIKELY(!invmod_redc_32(&v, p)))
