@@ -79,10 +79,10 @@
  * divisibility test on each sieve update. This is obviously very
  * expensive, but provides nice checking.
  */
-#ifndef NDEBUG
-#define TRACK_CODE_PATH
-#endif
+#define xxxTRACK_CODE_PATH
 #define xxxWANT_ASSERT_EXPENSIVE
+
+/* TRACE_K *requires* TRACK_CODE_PATH -- or it displays rubbish */
 #if defined(TRACE_K) && !defined(TRACK_CODE_PATH)
 #define TRACK_CODE_PATH
 #endif
