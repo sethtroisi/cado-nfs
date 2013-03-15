@@ -187,6 +187,7 @@ int main(int argc, char **argv)
        the initialization of the special-q descent is over */
 
     /* We want to output j, r and v */
+    fprintf(stdout, "Log(target) + Log(t^j) = Log(r) - Log(v)\n");
     fprintf(stdout, "j = %u\n", j);
     fprintf(stdout, "r = ");
     fppol_out(stdout, r);
@@ -195,6 +196,27 @@ int main(int argc, char **argv)
     fppol_out(stdout, v);
     fprintf(stdout, "\n");
     param_list_clear(pl);
+
+    // Factorizations of r and v
+    fppol_fact_t ff;
+    fppol_fact_init(ff);
+    fppol_factor(ff, r);
+    printf("factorization(r) =");
+    for (int i = 0; i < ff->n; ++i) {
+        printf(" ");
+        fppol_out(stdout, ff->factors[i]);
+    }
+    printf("\n");
+    fppol_fact_clear(ff);
+    fppol_fact_init(ff);
+    fppol_factor(ff, v);
+    printf("factorization(v) =");
+    for (int i = 0; i < ff->n; ++i) {
+        printf(" ");
+        fppol_out(stdout, ff->factors[i]);
+    }
+    printf("\n");
+    fppol_fact_clear(ff);
 
     // TODO: clear all fppol_t at the end...
     
