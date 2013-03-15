@@ -58,6 +58,6 @@ this assumes that all the *run-time* dependencies of cado-nfs are met
 (perl, etc).
 
 
-Issues with shared libraries (not only system ones, but those cado-nfs uses
-itself) are common. Do prevent cado-nfs from building shared libs, see
-README.shared.
+Issues with shared libraries (not only system ones, but those cado-nfs
+builds and uses itself) are common. To prevent cado-nfs from building
+shared libs, see README.shared.
