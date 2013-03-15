@@ -160,6 +160,9 @@ int main(int argc, char **argv)
         fppol_set_str(beta, polstr); */
     }
 
+    // Reduce target modulo phi
+    fppol_rem(target, target, phi);
+
     /* Randomizing target : target = target * t^j
        for j = 1, 2, 3... 
      */
