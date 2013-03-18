@@ -34,6 +34,10 @@ config/search_for_function.cmake
 config/variables.cmake
 config/sse2.c
 config/sse2.cmake
+config/sse3.c
+config/sse3.cmake
+config/ssse3.c
+config/ssse3.cmake
 config/sse41.c
 config/sse41.cmake
 config/sync_fetch.c
@@ -615,7 +619,6 @@ sieve/las-types.h
 sieve/las-unsieve.c
 sieve/las-unsieve.h
 sieve/las.c
-sieve/las.sse_single.c
 sieve/makefb.c
 sieve/makefb.sage
 sieve/test_trialdiv.c

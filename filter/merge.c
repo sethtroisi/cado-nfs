@@ -32,7 +32,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <string.h> /* for strcmp */
 
 #include "portability.h"
-#include "utils.h" /* for gzip_open */
+#include "utils.h" /* for fopen_maybe_compressed */
 
 #include "merge_opts.h"
 #include "filter_matrix.h" /* for filter_matrix_t */
@@ -264,7 +264,7 @@ main (int argc, char *argv[])
 
     mergeOneByOne (rep, mat, maxlevel, forbw, ratio, coverNmax);
 
-    gzip_close (rep->outfile, outname);
+    fclose_maybe_compressed (rep->outfile, outname);
     printf ("Final matrix has N=%d nc=%d (%d) w(M)=%lu N*w(M)=%"
             PRIu64"\n", mat->rem_nrows, mat->rem_ncols,
             mat->rem_nrows - mat->rem_ncols, mat->weight,

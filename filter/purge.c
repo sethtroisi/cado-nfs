@@ -76,6 +76,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "utils_ffs.h"
 #endif
 
+#define DEBUG 0
 //#define STAT_FFS
 
 //#define USE_CAVALLAR_WEIGHT_FUNCTION
@@ -688,12 +689,10 @@ weight_function_clique (HC_T w)
   else if (w == 2)
     return 0.25;
   else
-      return 0.0;
+    return 0.0;
 #else
     if (w >= 3)
-      /* we use the multiplier 5 here, so that the average weight (assumed to
-         be 1) is in the middle of the Count[10] array */
-      return (float) 5.0 / (float) w;
+      return (float) 1.0 / (float) w;
     else
       return 0.0;
 #endif
@@ -716,7 +715,9 @@ compute_connected_component (HR_T i)
           if (!bit_vector_getbit(Tbv, (size_t) k)) /* row k not visited yet */
             n += compute_connected_component (k);
         }
-      w_ccc += weight_function_clique (H.hc[h]);
+      /* we use the multiplier 5 here, so that the average weight (assumed to
+         be 1) is in the middle of the Count[10] array */
+      w_ccc += 5.0 * weight_function_clique (H.hc[h]);
     }
   return n;
 }
@@ -752,7 +753,7 @@ deleteHeavierRows (unsigned int npass)
   static HR_T chunk;
   comp_t *tmp = NULL; /* (weight, index) */
   HR_T *myrelcompact, i, h;
-  double W = 0.0; /* total matrix weight */
+  W = 0.0; /* total matrix weight */
   double N = 0.0; /* number of rows */
   unsigned int wceil, j, ltmp = 0, alloctmp = 0xff;
   long target;
@@ -816,6 +817,12 @@ deleteHeavierRows (unsigned int npass)
     }
   else
     target = keep; /* enough steps */
+
+#if DEBUG >= 1
+  fprintf (stderr, "DEBUG: newnrel=%u newnprimes=%u\n"
+                   "DEBUG: ltmp=%u chunk=%u target=%lu\n", newnrel,
+                   newnprimes, ltmp, chunk, target);
+#endif
 
   for (j = 0; j < ltmp && newnrel > target + newnprimes; j++)
     newnrel -= delete_connected_component (tmp[j].i);
@@ -987,7 +994,7 @@ renumber (const char *sos)
     if (sos != NULL)
       {
 	fprintf (stderr, "Output renumber table in file %s\n", sos);
-	fsos = gzip_open (sos, "w");
+	fsos = fopen_maybe_compressed (sos, "w");
         fprintf (fsos, "# each row contains 3 hexadecimal values: i p r\n"
 		 "# i is the ideal index value (starting from 0)\n"
 		 "# p is the corresponding prime\n"
@@ -1019,7 +1026,7 @@ renumber (const char *sos)
 	H.hr[i] = UMAX(*(H.hr));
       }
     if (fsos)
-      gzip_close (fsos, sos);
+      fclose_maybe_compressed (fsos, sos);
     nb--;
     newnprimes = nb;
 }
@@ -1840,9 +1847,9 @@ prempt_scan_relations_pass_two (const char *oname,
 
   int pipe;
 
-  ofile = fopen_compressed_w(oname, &pipe, NULL);
+  ofile = fopen_maybe_compressed2(oname, "w", &pipe, NULL);
 #ifdef FOR_FFS
-  ofile2 = fopen_compressed_w(oname2, &pipe_2, NULL);
+  ofile2 = fopen_maybe_compressed2(oname2, "w", &pipe_2, NULL);
 #endif
   if (!raw)
     fprintf (ofile, "%lu %lu\n", (unsigned long) nrows, (unsigned long) ncols);
@@ -2109,7 +2116,7 @@ approx_phi (long B)
 }
 #else
 /* estimate the number of ideals of degree <= B */
-static int
+static HR_T
 approx_ffs (int d)
 {
 #ifdef USE_F2
@@ -2332,7 +2339,7 @@ main (int argc, char **argv)
 
     fprintf (stderr, "Loading rel_used file %s, %lu bytes\n",
 	     infilerel, (unsigned long) mysize);
-    if (!(in = fopen_compressed_r (infilerel, &pipe, NULL))) {
+    if (!(in = fopen_maybe_compressed2 (infilerel, "r", &pipe, NULL))) {
       fprintf (stderr, "Purge main: rel_used file %s cannot be read.\n", infilerel);
       exit (1);
     }
@@ -2488,7 +2495,7 @@ main (int argc, char **argv)
 
     fprintf (stderr, "Relations with at least one singleton found and suppress:%lu\nNumber of primes suppress : %lu\nWriting rel_used file %s, %lu bytes\n",
 	     (unsigned long) relsup, (unsigned long) prisup, outfilerel, (unsigned long) mysize);
-    if (!(out = fopen_compressed_w (outfilerel, &pipe, NULL))) {
+    if (!(out = fopen_maybe_compressed2 (outfilerel, "w", &pipe, NULL))) {
       fprintf (stderr, "Purge main: rel_used file %s cannot be written.\n", outfilerel);
       exit (1);
     }

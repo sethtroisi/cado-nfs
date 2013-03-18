@@ -56,7 +56,7 @@ int split_relfile (relation_stream_ptr rs, const char *name,
 
     uint64_t h;
 
-    f_in = fopen_compressed_r(name, &p_in, &suffix_in);
+    f_in = fopen_maybe_compressed2(name, "r", &p_in, &suffix_in);
     ASSERT_ALWAYS(f_in != NULL);
 
     char * newname = strdup(name);
@@ -70,7 +70,7 @@ int split_relfile (relation_stream_ptr rs, const char *name,
                 only_ab ? "%s/%d/%s.ab%s" : "%s/%d/%s%s",
                 dirname, i, path_basename(newname), suffix_out);
         ASSERT_ALWAYS(rc >= 0);
-        ofile[i] = fopen_compressed_w(oname[i], &p_out[i], NULL);
+        ofile[i] = fopen_maybe_compressed2(oname[i], "w", &p_out[i], NULL);
         ASSERT_ALWAYS(ofile[i] != NULL);
     }
     free(newname);

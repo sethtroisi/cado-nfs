@@ -22,7 +22,7 @@ void purgedfile_stream_clear(purgedfile_stream_ptr ps)
 void purgedfile_stream_openfile(purgedfile_stream_ptr ps, const char * fname)
 {
     ASSERT_ALWAYS(ps->source == NULL);
-    ps->source = fopen_compressed_r(fname, &(ps->pipe), NULL);
+    ps->source = fopen_maybe_compressed2(fname, "r", &(ps->pipe), NULL);
     if (ps->source == NULL) {
         fprintf(stderr, "opening %s: %s\n", fname, strerror(errno));
         exit(1);

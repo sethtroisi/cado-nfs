@@ -271,11 +271,11 @@ add_executable(plingen EXCLUDE_FROM_ALL
                 bw-common.c
                 plingen.c
                 polymat.c
-                mpfq/abase_p_4.c
+                mpfq/abase_p_3.c
         )
 target_link_libraries(plingen gmp utils)
 # Only to play with it for the moment.
-set_target_properties(plingen PROPERTIES COMPILE_FLAGS "-DSELECT_ABASE_p_4")
+set_target_properties(plingen PROPERTIES COMPILE_FLAGS "-DSELECT_ABASE_p_3")
 # install(TARGETS plingen RUNTIME DESTINATION bin/linalg/bwc)
 endif (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
 

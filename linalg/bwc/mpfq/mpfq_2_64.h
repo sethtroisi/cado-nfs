@@ -46,7 +46,16 @@
 /* Active handler: Mpfq::gf2n::reduction */
 /* Active handler: Mpfq::gf2n::mul */
 /* Active handler: Mpfq::defaults::poly */
-/* Options used: w=64 n=64 table=/tmp/mpfq/gf2x/wizard.table slice=4 helper=/tmp/mpfq/gf2n/helper/helper output_path=. tag=2_64 coeffs=[64, 4, 3, 1, 0] */
+/* Options used:{
+   w=64,
+   n=64,
+   table=/tmp/mpfq-cado/gf2x/wizard.table,
+   slice=4,
+   helper=/tmp/mpfq-cado/gf2n/helper/helper,
+   output_path=.,
+   tag=2_64,
+   coeffs=[ 64, 4, 3, 1, 0, ],
+   } */
 
 typedef mpfq_2_field mpfq_2_64_field;
 typedef mpfq_2_dst_field mpfq_2_64_dst_field;
@@ -318,8 +327,10 @@ void mpfq_2_64_poly_mul(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, mpfq_2_64_src_p
 void mpfq_2_64_poly_divmod(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, mpfq_2_64_dst_poly, mpfq_2_64_src_poly, mpfq_2_64_src_poly);
 void mpfq_2_64_poly_precomp_mod(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, mpfq_2_64_src_poly);
 void mpfq_2_64_poly_mod_pre(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, mpfq_2_64_src_poly, mpfq_2_64_src_poly, mpfq_2_64_src_poly);
-/* missing poly_gcd */
-/* missing poly_xgcd */
+static inline
+void mpfq_2_64_poly_gcd(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, mpfq_2_64_src_poly, mpfq_2_64_src_poly);
+static inline
+void mpfq_2_64_poly_xgcd(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, mpfq_2_64_dst_poly, mpfq_2_64_dst_poly, mpfq_2_64_src_poly, mpfq_2_64_src_poly);
 static inline
 void mpfq_2_64_poly_random(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, unsigned int, gmp_randstate_t);
 #define HAVE_mpfq_2_64_poly_random2
@@ -1636,6 +1647,94 @@ void mpfq_2_64_poly_mul(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_poly w
     }
     mpfq_2_64_vec_conv(K, w->c, u->c, usize, v->c, vsize);
     w->size=wsize;
+}
+
+/* *Mpfq::defaults::polygcd::code_for_poly_gcd, Mpfq::defaults::poly */
+static inline
+void mpfq_2_64_poly_gcd(mpfq_2_64_dst_field k MAYBE_UNUSED, mpfq_2_64_dst_poly g, mpfq_2_64_src_poly a0, mpfq_2_64_src_poly b0)
+{
+    mpfq_2_64_poly a,b,q,r;
+    int da0=mpfq_2_64_poly_deg(k,a0), db0=mpfq_2_64_poly_deg(k,b0);
+    if (db0==-1)
+     mpfq_2_64_poly_set(k,g,a0);
+    else {
+     mpfq_2_64_poly_init(k,a,++da0);
+     mpfq_2_64_poly_init(k,b,++db0);
+     mpfq_2_64_poly_init(k,q,(da0+1));
+     mpfq_2_64_poly_init(k,r,db0);
+     mpfq_2_64_poly_set(k,a,a0);
+     mpfq_2_64_poly_set(k,b,b0);
+     while (mpfq_2_64_poly_deg(k,b)>=0) {
+      mpfq_2_64_poly_divmod(k,q,r,a,b);
+      mpfq_2_64_poly_set(k,a,b);
+      mpfq_2_64_poly_set(k,b,r); 
+     }
+     mpfq_2_64_poly_setmonic(k,g,a);
+    mpfq_2_64_poly_clear(k,a);
+    mpfq_2_64_poly_clear(k,b);
+    mpfq_2_64_poly_clear(k,q);
+    mpfq_2_64_poly_clear(k,r);
+    }
+}
+
+/* *Mpfq::defaults::polygcd::code_for_poly_xgcd, Mpfq::defaults::poly */
+static inline
+void mpfq_2_64_poly_xgcd(mpfq_2_64_dst_field k MAYBE_UNUSED, mpfq_2_64_dst_poly g, mpfq_2_64_dst_poly u, mpfq_2_64_dst_poly v, mpfq_2_64_src_poly a0, mpfq_2_64_src_poly b0)
+{
+    mpfq_2_64_poly a,b,w,x,q,r;
+    mpfq_2_64_elt c;
+    mpfq_2_64_init(k,&c);
+    int da0=mpfq_2_64_poly_deg(k,a0), db0=mpfq_2_64_poly_deg(k,b0), dega;
+    mpfq_2_64_poly_init(k,u,1);
+    mpfq_2_64_poly_init(k,v,1);
+    if (db0==-1) {
+     mpfq_2_64_poly_getcoef(k,c,a0,da0);
+     mpfq_2_64_inv(k,c,c);
+     mpfq_2_64_poly_scal_mul(k,g,a0,c);
+     mpfq_2_64_poly_setcoef(k,u,c,0);
+    }
+    else {
+     mpfq_2_64_poly_setcoef_ui(k,u,1,0);
+     mpfq_2_64_poly_init(k,a,++da0);
+     mpfq_2_64_poly_init(k,b,++db0);
+     mpfq_2_64_poly_init(k,q,(da0+1));
+     mpfq_2_64_poly_init(k,r,db0);
+     mpfq_2_64_poly_set(k,a,a0);
+     mpfq_2_64_poly_set(k,b,b0);
+     mpfq_2_64_poly_init(k,w,1);
+     mpfq_2_64_poly_init(k,x,1);
+     mpfq_2_64_poly_setcoef_ui(k,x,1,0);
+     while (mpfq_2_64_poly_deg(k,b)>=0) {
+      mpfq_2_64_poly_divmod(k,q,r,a,b);
+      mpfq_2_64_poly_set(k,a,b);
+      mpfq_2_64_poly_set(k,b,r);
+      mpfq_2_64_poly_mul(k,r,q,w);
+      mpfq_2_64_poly_sub(k,r,u,r);
+      mpfq_2_64_poly_set(k,u,w);
+      mpfq_2_64_poly_set(k,w,r);
+      mpfq_2_64_poly_mul(k,r,q,x);
+      mpfq_2_64_poly_sub(k,r,v,r);
+      mpfq_2_64_poly_set(k,v,x);
+      mpfq_2_64_poly_set(k,x,r);
+     }
+     dega=mpfq_2_64_poly_deg(k,a);
+     if (dega==-1) 
+      mpfq_2_64_poly_set(k,g,a);
+     else {
+      mpfq_2_64_poly_getcoef(k,c,a,dega);
+      mpfq_2_64_inv(k,c,c);
+      mpfq_2_64_poly_scal_mul(k,g,a,c);
+      mpfq_2_64_poly_scal_mul(k,u,u,c);
+      mpfq_2_64_poly_scal_mul(k,v,v,c);
+     }
+     mpfq_2_64_poly_clear(k,a);
+     mpfq_2_64_poly_clear(k,b);
+     mpfq_2_64_poly_clear(k,w);
+     mpfq_2_64_poly_clear(k,x);
+     mpfq_2_64_poly_clear(k,q);
+     mpfq_2_64_poly_clear(k,r);
+    }
+    mpfq_2_64_clear(k,&c);
 }
 
 /* *Mpfq::defaults::poly::code_for_poly_random */

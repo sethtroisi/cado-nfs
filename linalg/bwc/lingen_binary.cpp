@@ -612,7 +612,12 @@ void compute_f_init(polmat& A)/*{{{*/
      * from column cnum[i] of coeff exponent[i] of A which, once reduced modulo
      * the other ones, has coefficient at row pivots[i] unequal to zero.
      */
-    bcol pcols[m];
+    /* We can't use a VLA here because it's not in C++ for non-POD types,
+     * and we don't want to open up the can of worms of allowing vector<>
+     * here either, because that would mean allowing copy. We care about
+     * forbidding copies entirely.
+     */
+    bcol * pcols = new bcol[m];
     unsigned int pivots[m], exponent[m], cnum[m];
 
     unsigned int r = 0;
@@ -664,6 +669,7 @@ void compute_f_init(polmat& A)/*{{{*/
                         k,j,r,u);
         }
     }
+    delete[] pcols;
 
     t0 = exponent[r-1] + 1;
     printf("Found satisfying init data for t0=%d\n", t0);

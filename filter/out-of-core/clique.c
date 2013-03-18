@@ -254,7 +254,7 @@ fopen_compressed_w(const char * name, int* p_pipeflag, char const ** suf)
     return NULL;
 }
 
-FILE * gzip_open(const char * name, const char * mode)
+FILE * fopen_maybe_compressed(const char * name, const char * mode)
 {
     if (strcmp(mode, "r") == 0) {
         return fopen_compressed_r (name, NULL, NULL);
@@ -269,7 +269,7 @@ FILE * gzip_open(const char * name, const char * mode)
 #define MIN(l,o) ((l) < (o) ? (l) : (o))
 #endif
 
-void gzip_close(FILE * f, const char * name)
+void fclose_maybe_compressed(FILE * f, const char * name)
 {
   const char * e = name + strlen(name);
   const struct suffix_handler * r = supported_compression_formats;
@@ -540,7 +540,7 @@ pass1_one_thread (void* args)
   long a;
   uint8_t m;
   
-  f = (tab[0]->fin) ? tab[0]->fin : gzip_open(tab[0]->g, "r");
+  f = (tab[0]->fin) ? tab[0]->fin : fopen_maybe_compressed(tab[0]->g, "r");
   assert (f);
   line = 0;
   while (fgets (s, MAXLINE, f)) {
@@ -587,7 +587,7 @@ pass1_one_thread (void* args)
   tab[0]->nlines = line;
   tab[0]->busy = 1;
   sem_post(&sem_pt);
-  gzip_close (f, tab[0]->g);
+  fclose_maybe_compressed (f, tab[0]->g);
   return NULL;
 }
 
@@ -606,7 +606,7 @@ pass2_one_thread (void *args)
   unsigned int nr, na;
   uint8_t m, w;
 
-  f = (tab[0]->fin) ? tab[0]->fin : gzip_open(tab[0]->g, "r");
+  f = (tab[0]->fin) ? tab[0]->fin : fopen_maybe_compressed(tab[0]->g, "r");
   line = output = 0;
  next_line:
   while (fgets (s, MAXLINE, f)) {
@@ -682,7 +682,7 @@ pass2_one_thread (void *args)
       while (na-- > 0) insert2a (INDEX_ALG (ap[na], ar[na]), h);
     }
   }
-  gzip_close (f, tab[0]->g);
+  fclose_maybe_compressed (f, tab[0]->g);
 #ifdef HAVE_SYNC_FETCH
   __sync_fetch_and_add(&remains, output);
   __sync_fetch_and_add(&nrels, line);
@@ -714,10 +714,10 @@ pass3_one_thread (void* args)
   if ((f = tab[0]->fin))
      newf = tab[0]->fout;
   else {
-    f = gzip_open(tab[0]->g, "r");
+    f = fopen_maybe_compressed(tab[0]->g, "r");
     strcpy (newg, NEW_DIR);
     strcat (newg, tab[0]->g);
-    newf = gzip_open (newg, "w");
+    newf = fopen_maybe_compressed (newg, "w");
   }
   assert (newf);
   line = output = 0;
@@ -782,8 +782,8 @@ pass3_one_thread (void* args)
     fputs (s, newf);
     output++;
   }
-  gzip_close (f, tab[0]->g);
-  gzip_close (newf, tab[0]->g);
+  fclose_maybe_compressed (f, tab[0]->g);
+  fclose_maybe_compressed (newf, tab[0]->g);
   fprintf (stderr, "   new/%s done: remains %lu rels out of %lu\n",
            tab[0]->g, output, line);
 #ifdef HAVE_SYNC_FETCH
@@ -970,7 +970,7 @@ pass1 (int nthreads, char *filelist)
 	  pthread_create (&tid[i], NULL, pass1_one_thread, (void *) (T + i));
 	} else {
 	  avoidwarning = i;
-	  T[i]->fin = gzip_open(g, "r");
+	  T[i]->fin = fopen_maybe_compressed(g, "r");
 	}
       }
     }
@@ -1068,7 +1068,7 @@ pass2 (int nthreads, char *filelist)
 	  T[i]->fin = NULL;
 	  pthread_create (&tid[i], NULL, pass2_one_thread, (void *) (T + i));
 	} else {
-	  T[i]->fin = gzip_open(g, "r");
+	  T[i]->fin = fopen_maybe_compressed(g, "r");
 	  avoidwarning = i;
 	}
       }
@@ -1156,10 +1156,10 @@ pass3 (int nthreads, char *filelist)
 	pthread_create (&tid[i], NULL, pass3_one_thread, (void *) (T + i));
       }
       else {
-	T[i]->fin = gzip_open(g, "r");
+	T[i]->fin = fopen_maybe_compressed(g, "r");
 	strcpy (newg, NEW_DIR);
 	strcat (newg, T[i]->g);
-	T[i]->fout = gzip_open (newg, "w");
+	T[i]->fout = fopen_maybe_compressed (newg, "w");
 	avoidwarning = i;
       }
     }

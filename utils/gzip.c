@@ -171,95 +171,69 @@ prempt_open_compressed_rs (char *rep_cado, char **ficname)
 #define PIPE_CAPACITY 1UL << 20
 
 FILE*
-fopen_compressed_r (const char * name, int* p_pipeflag, char const ** suf)
+fopen_maybe_compressed2 (const char * name, const char * mode, int* p_pipeflag, char const ** suf)
 {
     const struct suffix_handler * r = supported_compression_formats;
     FILE * f;
 
     for( ; r->suffix ; r++) {
-        if (!has_suffix(name, r->suffix))
-            continue;
+        if (!has_suffix(name, r->suffix)) continue;
         if (suf) *suf = r->suffix;
-        if (r->pfmt_in) { /* this suffix has an associated deflate command */
-            char * command;
+        char * command = NULL;
+        if (strchr(mode, 'r') && r->pfmt_in) {
             int ret = asprintf(&command, r->pfmt_in, name);
             ASSERT_ALWAYS(ret >= 0);
-            f = popen(command, "r");
-            free(command);
-            if (p_pipeflag) *p_pipeflag = 1;
-            /* remove the 'xxx' to change the pipe capacity */
-#ifdef F_SETPIPE_SZxxx
-            fcntl (fileno (f), F_SETPIPE_SZ, PIPE_CAPACITY);
-#endif
-            return f;
-        } else {
-            f = fopen(name, "r");
-            if (p_pipeflag) *p_pipeflag = 0;
-            return f;
-        }
-    }
-    return NULL;
-}
-
-FILE*
-fopen_compressed_w(const char * name, int* p_pipeflag, char const ** suf)
-{
-    const struct suffix_handler * r = supported_compression_formats;
-    FILE * f;
-
-    for( ; r->suffix ; r++) {
-        if (!has_suffix(name, r->suffix))
-            continue;
-        if (suf) *suf = r->suffix;
-        if (r->pfmt_out) { /* suffix has an associated compression command */
-            char * command;
+        } else if (strchr(mode, 'w') && r->pfmt_out) {
             int ret = asprintf(&command, r->pfmt_out, name);
             ASSERT_ALWAYS(ret >= 0);
-            f = popen(command, "w");
-            free(command);
-            if (p_pipeflag) *p_pipeflag = 1;
-            /* remove the 'xxx' to change the pipe capacity */
-#ifdef F_SETPIPE_SZxxx
-            /* increase the pipe capacity (2^16 by default), thanks to
-               Alain Filbois */
-            fcntl (fileno (f), F_SETPIPE_SZ, PIPE_CAPACITY);
-#endif
-            return f;
-        } else {
-            f = fopen(name, "w");
-            if (p_pipeflag) *p_pipeflag = 0;
-            return f;
         }
+
+        if (command) {
+            f = popen(command, mode);
+            if (p_pipeflag) *p_pipeflag = 1;
+#ifdef F_SETPIPE_SZxxx
+                /* increase the pipe capacity (2^16 by default), thanks to
+                   Alain Filbois */
+                fcntl (fileno (f), F_SETPIPE_SZ, PIPE_CAPACITY);
+#endif
+            free(command);
+        } else {
+            f = fopen(name, mode);
+            if (p_pipeflag) *p_pipeflag = 0;
+        }
+        return f;
     }
+    /* If we arrive here, it's because "" is not among the suffixes */
+    abort();
     return NULL;
 }
 
-FILE * gzip_open(const char * name, const char * mode)
+
+FILE*
+fopen_maybe_compressed (const char * name, const char * mode)
 {
-    if (strcmp(mode, "r") == 0) {
-        return fopen_compressed_r(name, NULL, NULL);
-    } else if (strcmp(mode, "w") == 0) {
-        return fopen_compressed_w(name, NULL, NULL);
-    } else {
-        abort();
-    }
+    return fopen_maybe_compressed2(name, mode, NULL, NULL);
 }
 
-void gzip_close(FILE * f, const char * name)
+
+void
+fclose_maybe_compressed (FILE * f, const char * name)
 {
-    const char * e = name + strlen(name);
     const struct suffix_handler * r = supported_compression_formats;
+
     for( ; r->suffix ; r++) {
-        const char * ne = e - MIN(strlen(name), strlen(r->suffix));
-        if (strcmp(r->suffix, ne) != 0)
-            continue;
-        if (r->pfmt_out) {
+        if (!has_suffix(name, r->suffix)) continue;
+        /* It doesn't really make sense to imagine that one of these two
+         * may exist and not the other */
+        ASSERT_ALWAYS((r->pfmt_out == NULL) == (r->pfmt_in == NULL));
+        if (r->pfmt_in || r->pfmt_out) {
             pclose(f);
-            return;
         } else {
             fclose(f);
-            return;
         }
+        return;
     }
+    /* If we arrive here, it's because "" is not among the suffixes */
+    abort();
+    return;
 }
-

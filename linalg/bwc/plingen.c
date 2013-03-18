@@ -1464,6 +1464,10 @@ int main(int argc, char *argv[])
     dims * d = bm->d;
     int tune = 0;
     int ascii = 0;
+    gmp_randstate_t rstate;
+    gmp_randinit_default(rstate);
+    gmp_randseed_ui(rstate, 1);
+
 
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
@@ -1529,7 +1533,7 @@ int main(int argc, char *argv[])
             polymat_init(E, m, m+n, maxtune);
             E->size = k;
             for(unsigned int v = 0 ; v < E->m * E->n * E->size ; v++) {
-                abrandom(ab, E->x[v]);
+                abrandom(ab, E->x[v], rstate);
             }
             double tt = seconds();
             for(unsigned int j = 0 ; j < m + n ; delta[j++]=1);
@@ -1561,13 +1565,13 @@ int main(int argc, char *argv[])
             polymat_init(Er, m, m+n, sE-spi+1);
             E->size = sE;
             for(unsigned int v = 0 ; v < E->m * E->n * E->size ; v++) {
-                abrandom(ab, E->x[v]);
+                abrandom(ab, E->x[v], rstate);
             }
             piL->size = spi;
             piR->size = spi;
             for(unsigned int v = 0 ; v < piL->m * piL->n * piL->size ; v++) {
-                abrandom(ab, piL->x[v]);
-                abrandom(ab, piR->x[v]);
+                abrandom(ab, piL->x[v], rstate);
+                abrandom(ab, piR->x[v], rstate);
             }
             double ttmp = 0, ttmul = 0;
             ttmp -= seconds();
@@ -1694,6 +1698,7 @@ int main(int argc, char *argv[])
     bmstatus_clear(bm);
     bw_common_clear(bw);
     param_list_clear(pl);
+    gmp_randclear(rstate);
     return 0;
 }
 

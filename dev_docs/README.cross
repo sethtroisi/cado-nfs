@@ -32,7 +32,7 @@ For cross-compiling cado, do the following:
     export PREFIX=SYSTEM_ROOT/usr/local
 
 (of course you may wish to choose another install path on the host
-system).
+system ; see also README.shared for disabling shared libraries).
 
 Create a file $HOME/SYSTEM-toolchain.cmake, containing the following:
 
@@ -56,3 +56,8 @@ Following this, once you copy the files under SYSTEM_ROOT/usr/local to
 your target system, you should be able to run cadofactor.pl. Of course,
 this assumes that all the *run-time* dependencies of cado-nfs are met
 (perl, etc).
+
+
+Issues with shared libraries (not only system ones, but those cado-nfs
+builds and uses itself) are common. To prevent cado-nfs from building
+shared libs, see README.shared.

@@ -735,14 +735,14 @@ mpi_slave(report_t *rep, int mpi_rank, filter_matrix_t *mat, FILE *purgedfile, c
 	    tt = seconds();
 	    initMat(mat, jmin, jmax);
 	    initWeightFromFile(mat, purgedfile);
-	    gzip_close(purgedfile, purgedname);
+	    fclose_maybe_compressed(purgedfile, purgedname);
 	    fillSWAR(mat);
 	    mpi_err1("time for initializing the matrix: %d\n",
 		     (int)(seconds()-tt));
 	    tt = seconds();
-	    purgedfile = gzip_open(purgedname, "r");
+	    purgedfile = fopen_maybe_compressed(purgedname, "r");
 	    ok = readmat(mat, purgedfile);
-	    gzip_close(purgedfile, purgedname);
+	    fclose_maybe_compressed(purgedfile, purgedname);
 	    mpi_err1("time for reading the matrix: %d\n", (int)(seconds()-tt));
 	    if(resumename != NULL){
 		// resume, but never print...!
@@ -1305,6 +1305,6 @@ mpi_start_proc(char *outname, filter_matrix_t *mat, FILE *purgedfile, char *purg
     }
     else
 	mpi_slave(&rep, mpi_rank, mat, purgedfile, purgedname, resumename);
-    gzip_close(rep.outfile, str);
+    fclose_maybe_compressed(rep.outfile, str);
     free(str);
 }
