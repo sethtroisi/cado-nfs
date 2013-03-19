@@ -1691,10 +1691,10 @@ sub do_init {
         }
     }
     # It turns out that ssh, when it has neither a connected stdin, nor a
-    # controlling tty, tries to run an ssh-askpass dialog on the
-    # $DISPLAY, if that is an existing variable. Since we consider this
+    # controlling tty, tries to run the program specified in $SSH_ASKPASS,
+    # if that is an existing variable. Since we consider this
     # as essentially a nuisance, we forbid this behaviour.
-    delete $ENV{'DISPLAY'};
+    delete $ENV{'SSH_ASKPASS'};
 
 
     # Getting configuration
