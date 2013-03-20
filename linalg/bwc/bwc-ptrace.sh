@@ -7,7 +7,7 @@ top=`dirname $0`/../..
 export DEBUG=1
 # export MPI=1
 make -s -C $top -j 4
-make -s -C $top -j 4 plingen
+make -s -C $top -j 4 mpi-plingen
 eval `make -s -C $top show`
 bins=$top/$build_tree/linalg/bwc
 mats=$HOME/Local/mats
@@ -19,7 +19,7 @@ wdir=/tmp/bwcp
 if [ -d $wdir ] ; then rm -rf $wdir 2>/dev/null ; fi
 mkdir $wdir
 
-m=1 n=1
+m=8 n=4
 
 Mh=1; Mv=1;
 Th=1; Tv=1;
@@ -29,8 +29,8 @@ Nv=$((Mv*Tv))
 mpi=${Mh}x${Mv}
 thr=${Th}x${Tv}
 
-prime=109378681671075297195692480234213908123642560192251038455204252439
-bits_per_coeff=256
+prime=1009
+bits_per_coeff=64
 
 # The test matrix may be created by:
 #
@@ -41,9 +41,11 @@ bits_per_coeff=256
 # -c 10 imposes a bound on the coefficients.
 
 $bins/random  1000 -c 10 --kright 10 > $mats/t1000p.txt
-$bins/mf_scan  --ascii-in --withcoeffs --mfile $mats/t1000p.txt  --freq --binary-out --ofile $mats/t1000p.bin
-
+matrix_txt=$mats/t1000p.txt
 matrix=$mats/t1000p.bin
+
+$bins/mf_scan  --ascii-in --withcoeffs --mfile $matrix_txt  --freq --binary-out --ofile $matrix
+
 nullspace=right
 interval=50
 
@@ -94,10 +96,27 @@ done
 # which is used in production.
 $bins/bwc.pl dispatch $common save_submatrices=1 ys=0..1
 
-$bins/bwc.pl prep   $common
+if [ $n -eq 1 ] ; then
+    $bins/bwc.pl prep   $common
+    ln -s Y.0 $wdir/V0-1.0
+else
+    # Otherwise prep won't work. Let's be stupid.
+    set `head -1 $matrix_txt`
+    ncols=$2
+    nbytes=$((bits_per_coeff/8 * $2))
+    j0=0
+    while [ $j0 -lt $n ] ; do
+        let j1=$j0+1
+        echo "Generating $wdir/V${j0}-${j1}.0"
+        dd if=/dev/urandom bs=1 count=$nbytes of=$wdir/V${j0}-${j1}.0
+        j0=$j1
+    done
+    (echo 1 ; seq 0 $((m-1))) > $wdir/X
+    # TODO: create Y, too.
+fi
+
 $bins/bwc.pl secure  $common interval=$interval
 $bins/bwc.pl secure  $common interval=1
-ln -s Y.0 $wdir/V0-1.0
 # [ "$?" = 0 ] && $bins/bwc.pl :ysplit $common splits=$all_splits
 # [ "$?" = 0 ] && $bins/bwc.pl krylov  $common interval=$interval end=$interval ys=0..1 skip_online_checks=1
 $bins/bwc.pl krylov  $common interval=1 end=$interval ys=0..1 skip_online_checks=1
@@ -110,7 +129,7 @@ while [ $j0 -lt $n ] ; do
 done
 
 afile=$($bins/acollect wdir=$wdir m=$m n=$n bits-per-coeff=$bits_per_coeff --remove-old | tail -1)
-$bins/plingen lingen-threshold=10 m=$m n=$n wdir=$wdir prime=$prime afile=$afile
+$bins/mpi-plingen lingen-mpi-threshold=10000 lingen-threshold=10 m=$m n=$n wdir=$wdir prime=$prime afile=$afile
 
 ln $wdir/$afile.gen $wdir/F0-$n
 j0=0
