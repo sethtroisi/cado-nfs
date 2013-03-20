@@ -19,6 +19,7 @@ static int abase_u64k2_impl_mpi_use_count;   /* several stacked init()/clear() p
 /* Active handler: simd_dotprod */
 /* Active handler: io */
 /* Active handler: trivialities */
+/* Active handler: simd_char2 */
 /* Options used:{
    w=64,
    k=2,
@@ -405,6 +406,36 @@ void abase_u64k2_vec_ur_clear(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_
 /* missing vec_conv_ur */
 /* missing vec_reduce */
 
+/* Polynomial functions */
+/* missing poly_init */
+/* missing poly_clear */
+/* missing poly_set */
+/* missing poly_setmonic */
+/* missing poly_setcoef */
+/* missing poly_setcoef_ui */
+/* missing poly_getcoef */
+/* missing poly_deg */
+/* missing poly_add */
+/* missing poly_sub */
+/* missing poly_add_ui */
+/* missing poly_sub_ui */
+/* missing poly_neg */
+/* missing poly_scal_mul */
+/* missing poly_mul */
+/* missing poly_divmod */
+/* missing poly_precomp_mod */
+/* missing poly_mod_pre */
+/* missing poly_gcd */
+/* missing poly_xgcd */
+/* missing poly_random */
+/* missing poly_cmp */
+/* missing poly_asprint */
+/* missing poly_fprint */
+/* missing poly_print */
+/* missing poly_sscan */
+/* missing poly_fscan */
+/* missing poly_scan */
+
 /* Functions related to SIMD operation */
 /* *simd_dotprod::code_for_dotprod */
 void abase_u64k2_dotprod(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_dst_vec xw, abase_u64k2_src_vec xu1, abase_u64k2_src_vec xu0, unsigned int n)
@@ -597,6 +628,12 @@ static void abase_u64k2_wrapper_elt_ur_set(abase_vbase_ptr, abase_u64k2_dst_elt_
 static void abase_u64k2_wrapper_elt_ur_set(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k2_dst_elt_ur r MAYBE_UNUSED, abase_u64k2_src_elt_ur s MAYBE_UNUSED)
 {
     abase_u64k2_elt_ur_set(vbase->obj, r, s);
+}
+
+static void abase_u64k2_wrapper_elt_ur_set_elt(abase_vbase_ptr, abase_u64k2_dst_elt_ur, abase_u64k2_src_elt);
+static void abase_u64k2_wrapper_elt_ur_set_elt(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k2_dst_elt_ur r MAYBE_UNUSED, abase_u64k2_src_elt s MAYBE_UNUSED)
+{
+    abase_u64k2_elt_ur_set_elt(vbase->obj, r, s);
 }
 
 static void abase_u64k2_wrapper_elt_ur_set_zero(abase_vbase_ptr, abase_u64k2_dst_elt_ur);
@@ -803,6 +840,12 @@ static void abase_u64k2_wrapper_vec_ur_set_zero(abase_vbase_ptr vbase MAYBE_UNUS
     abase_u64k2_vec_ur_set_zero(vbase->obj, r, n);
 }
 
+static void abase_u64k2_wrapper_vec_ur_set_vec(abase_vbase_ptr, abase_u64k2_dst_vec_ur, abase_u64k2_src_vec, unsigned int);
+static void abase_u64k2_wrapper_vec_ur_set_vec(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k2_dst_vec_ur w MAYBE_UNUSED, abase_u64k2_src_vec u MAYBE_UNUSED, unsigned int n MAYBE_UNUSED)
+{
+    abase_u64k2_vec_ur_set_vec(vbase->obj, w, u, n);
+}
+
 static void abase_u64k2_wrapper_vec_ur_reinit(abase_vbase_ptr, abase_u64k2_vec_ur *, unsigned int, unsigned int);
 static void abase_u64k2_wrapper_vec_ur_reinit(abase_vbase_ptr vbase MAYBE_UNUSED, abase_u64k2_vec_ur * v MAYBE_UNUSED, unsigned int n MAYBE_UNUSED, unsigned int m MAYBE_UNUSED)
 {
@@ -991,6 +1034,7 @@ void abase_u64k2_oo_field_init(abase_vbase_ptr vbase)
     vbase->elt_ur_init = (void (*) (abase_vbase_ptr, void *)) abase_u64k2_wrapper_elt_ur_init;
     vbase->elt_ur_clear = (void (*) (abase_vbase_ptr, void *)) abase_u64k2_wrapper_elt_ur_clear;
     vbase->elt_ur_set = (void (*) (abase_vbase_ptr, void *, const void *)) abase_u64k2_wrapper_elt_ur_set;
+    vbase->elt_ur_set_elt = (void (*) (abase_vbase_ptr, void *, const void *)) abase_u64k2_wrapper_elt_ur_set_elt;
     vbase->elt_ur_set_zero = (void (*) (abase_vbase_ptr, void *)) abase_u64k2_wrapper_elt_ur_set_zero;
     /* missing elt_ur_set_ui */
     vbase->elt_ur_add = (void (*) (abase_vbase_ptr, void *, const void *, const void *)) abase_u64k2_wrapper_elt_ur_add;
@@ -1033,6 +1077,7 @@ void abase_u64k2_oo_field_init(abase_vbase_ptr vbase)
     vbase->vec_scan = (int (*) (abase_vbase_ptr, void *, unsigned int *)) abase_u64k2_wrapper_vec_scan;
     vbase->vec_ur_init = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_u64k2_wrapper_vec_ur_init;
     vbase->vec_ur_set_zero = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_u64k2_wrapper_vec_ur_set_zero;
+    vbase->vec_ur_set_vec = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_u64k2_wrapper_vec_ur_set_vec;
     vbase->vec_ur_reinit = (void (*) (abase_vbase_ptr, void *, unsigned int, unsigned int)) abase_u64k2_wrapper_vec_ur_reinit;
     vbase->vec_ur_clear = (void (*) (abase_vbase_ptr, void *, unsigned int)) abase_u64k2_wrapper_vec_ur_clear;
     vbase->vec_ur_set = (void (*) (abase_vbase_ptr, void *, const void *, unsigned int)) abase_u64k2_wrapper_vec_ur_set;
@@ -1044,6 +1089,34 @@ void abase_u64k2_oo_field_init(abase_vbase_ptr vbase)
     /* missing vec_conv_ur */
     /* missing vec_reduce */
     vbase->vec_elt_stride = (ptrdiff_t (*) (abase_vbase_ptr, int)) abase_u64k2_wrapper_vec_elt_stride;
+    /* missing poly_init */
+    /* missing poly_clear */
+    /* missing poly_set */
+    /* missing poly_setmonic */
+    /* missing poly_setcoef */
+    /* missing poly_setcoef_ui */
+    /* missing poly_getcoef */
+    /* missing poly_deg */
+    /* missing poly_add */
+    /* missing poly_sub */
+    /* missing poly_add_ui */
+    /* missing poly_sub_ui */
+    /* missing poly_neg */
+    /* missing poly_scal_mul */
+    /* missing poly_mul */
+    /* missing poly_divmod */
+    /* missing poly_precomp_mod */
+    /* missing poly_mod_pre */
+    /* missing poly_gcd */
+    /* missing poly_xgcd */
+    /* missing poly_random */
+    /* missing poly_cmp */
+    /* missing poly_asprint */
+    /* missing poly_fprint */
+    /* missing poly_print */
+    /* missing poly_sscan */
+    /* missing poly_fscan */
+    /* missing poly_scan */
     vbase->groupsize = (int (*) (abase_vbase_ptr)) abase_u64k2_wrapper_groupsize;
     vbase->offset = (int (*) (abase_vbase_ptr, int)) abase_u64k2_wrapper_offset;
     vbase->stride = (int (*) (abase_vbase_ptr)) abase_u64k2_wrapper_stride;

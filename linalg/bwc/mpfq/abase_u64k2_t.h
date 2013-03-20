@@ -13,6 +13,7 @@
 /* Active handler: simd_dotprod */
 /* Active handler: io */
 /* Active handler: trivialities */
+/* Active handler: simd_char2 */
 /* Options used:{
    w=64,
    k=2,
@@ -82,6 +83,8 @@
 /* Input/output functions */
 
 /* Vector functions */
+
+/* Polynomial functions */
 
 /* Functions related to SIMD operation */
 

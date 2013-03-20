@@ -87,6 +87,8 @@
 
 /* Vector functions */
 
+/* Polynomial functions */
+
 /* Functions related to SIMD operation */
 
 /* Member templates related to SIMD operation */

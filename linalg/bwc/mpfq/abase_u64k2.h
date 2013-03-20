@@ -28,6 +28,7 @@
 /* Active handler: simd_dotprod */
 /* Active handler: io */
 /* Active handler: trivialities */
+/* Active handler: simd_char2 */
 /* Options used:{
    w=64,
    k=2,
@@ -98,6 +99,15 @@ typedef abase_u64k2_elt_ur * abase_u64k2_vec_ur;
 typedef abase_u64k2_elt_ur * abase_u64k2_dst_vec_ur;
 typedef abase_u64k2_elt_ur * abase_u64k2_src_vec_ur;
 
+typedef struct {
+  abase_u64k2_vec c;
+  unsigned int alloc;
+  unsigned int size;
+} abase_u64k2_poly_struct;
+typedef abase_u64k2_poly_struct abase_u64k2_poly [1];
+typedef abase_u64k2_poly_struct * abase_u64k2_dst_poly;
+typedef abase_u64k2_poly_struct * abase_u64k2_src_poly;
+
 #ifdef  __cplusplus
 extern "C" {
 #endif
@@ -162,6 +172,8 @@ void abase_u64k2_add(abase_u64k2_dst_field, abase_u64k2_dst_elt, abase_u64k2_src
 #define abase_u64k2_elt_ur_clear(f, px)	/**/
 static inline
 void abase_u64k2_elt_ur_set(abase_u64k2_dst_field, abase_u64k2_dst_elt_ur, abase_u64k2_src_elt_ur);
+static inline
+void abase_u64k2_elt_ur_set_elt(abase_u64k2_dst_field, abase_u64k2_dst_elt_ur, abase_u64k2_src_elt);
 static inline
 void abase_u64k2_elt_ur_set_zero(abase_u64k2_dst_field, abase_u64k2_dst_elt_ur);
 /* missing elt_ur_set_ui */
@@ -231,6 +243,8 @@ int abase_u64k2_vec_fscan(abase_u64k2_dst_field, FILE *, abase_u64k2_vec *, unsi
 void abase_u64k2_vec_ur_init(abase_u64k2_dst_field, abase_u64k2_vec_ur *, unsigned int);
 static inline
 void abase_u64k2_vec_ur_set_zero(abase_u64k2_dst_field, abase_u64k2_dst_vec_ur, unsigned int);
+static inline
+void abase_u64k2_vec_ur_set_vec(abase_u64k2_dst_field, abase_u64k2_dst_vec_ur, abase_u64k2_src_vec, unsigned int);
 void abase_u64k2_vec_ur_reinit(abase_u64k2_dst_field, abase_u64k2_vec_ur *, unsigned int, unsigned int);
 void abase_u64k2_vec_ur_clear(abase_u64k2_dst_field, abase_u64k2_vec_ur *, unsigned int);
 static inline
@@ -248,6 +262,36 @@ void abase_u64k2_vec_ur_sub(abase_u64k2_dst_field, abase_u64k2_dst_vec_ur, abase
 /* missing vec_reduce */
 /* *Mpfq::defaults::flatdata::code_for_vec_elt_stride, simd_flat */
 #define abase_u64k2_vec_elt_stride(K, n)	((n)*sizeof(abase_u64k2_elt))
+
+/* Polynomial functions */
+/* missing poly_init */
+/* missing poly_clear */
+/* missing poly_set */
+/* missing poly_setmonic */
+/* missing poly_setcoef */
+/* missing poly_setcoef_ui */
+/* missing poly_getcoef */
+/* missing poly_deg */
+/* missing poly_add */
+/* missing poly_sub */
+/* missing poly_add_ui */
+/* missing poly_sub_ui */
+/* missing poly_neg */
+/* missing poly_scal_mul */
+/* missing poly_mul */
+/* missing poly_divmod */
+/* missing poly_precomp_mod */
+/* missing poly_mod_pre */
+/* missing poly_gcd */
+/* missing poly_xgcd */
+/* missing poly_random */
+/* missing poly_cmp */
+/* missing poly_asprint */
+/* missing poly_fprint */
+/* missing poly_print */
+/* missing poly_sscan */
+/* missing poly_fscan */
+/* missing poly_scan */
 
 /* Functions related to SIMD operation */
 /* *simd_u64k::code_for_groupsize */
@@ -331,6 +375,13 @@ void abase_u64k2_elt_ur_set(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_ds
     if (r != s) memcpy(r,s,sizeof(abase_u64k2_elt_ur));
 }
 
+/* *Mpfq::defaults::flatdata::code_for_elt_ur_set_elt, simd_flat */
+static inline
+void abase_u64k2_elt_ur_set_elt(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_dst_elt_ur r, abase_u64k2_src_elt s)
+{
+    memset(r, 0, sizeof(abase_u64k2_elt_ur)); memcpy(r,s,sizeof(abase_u64k2_elt));
+}
+
 /* *Mpfq::defaults::flatdata::code_for_elt_ur_set_zero, simd_flat */
 static inline
 void abase_u64k2_elt_ur_set_zero(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_dst_elt_ur r)
@@ -369,7 +420,7 @@ int abase_u64k2_is_zero(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_src_el
 static inline
 void abase_u64k2_vec_set(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_dst_vec r, abase_u64k2_src_vec s, unsigned int n)
 {
-    if (r != s) memcpy(r, s, n*sizeof(abase_u64k2_elt));
+    if (r != s) memmove(r, s, n*sizeof(abase_u64k2_elt));
 }
 
 /* *Mpfq::defaults::vec::flatdata::code_for_vec_set_zero, Mpfq::defaults::flatdata, simd_flat */
@@ -478,11 +529,20 @@ void abase_u64k2_vec_ur_set_zero(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64
     memset(r, 0, n*sizeof(abase_u64k2_elt_ur));
 }
 
+/* *Mpfq::defaults::vec::getset::code_for_vec_ur_set_vec, Mpfq::defaults::vec, Mpfq::defaults */
+static inline
+void abase_u64k2_vec_ur_set_vec(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_dst_vec_ur w, abase_u64k2_src_vec u, unsigned int n)
+{
+    unsigned int i;
+    for(i = 0; i < n; i+=1)
+        abase_u64k2_elt_ur_set_elt(K, w[i], u[i]);
+}
+
 /* *Mpfq::defaults::vec::flatdata::code_for_vec_ur_set, Mpfq::defaults::flatdata, simd_flat */
 static inline
 void abase_u64k2_vec_ur_set(abase_u64k2_dst_field K MAYBE_UNUSED, abase_u64k2_dst_vec_ur r, abase_u64k2_src_vec_ur s, unsigned int n)
 {
-    if (r != s) memcpy(r, s, n*sizeof(abase_u64k2_elt_ur));
+    if (r != s) memmove(r, s, n*sizeof(abase_u64k2_elt_ur));
 }
 
 /* *Mpfq::defaults::vec::getset::code_for_vec_ur_setcoef, Mpfq::defaults::vec, Mpfq::defaults */

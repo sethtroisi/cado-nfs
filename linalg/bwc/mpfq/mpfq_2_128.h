@@ -192,6 +192,8 @@ unsigned long mpfq_2_128_trace(mpfq_2_128_dst_field, mpfq_2_128_src_elt);
 static inline
 void mpfq_2_128_elt_ur_set(mpfq_2_128_dst_field, mpfq_2_128_dst_elt_ur, mpfq_2_128_src_elt_ur);
 static inline
+void mpfq_2_128_elt_ur_set_elt(mpfq_2_128_dst_field, mpfq_2_128_dst_elt_ur, mpfq_2_128_src_elt);
+static inline
 void mpfq_2_128_elt_ur_set_zero(mpfq_2_128_dst_field, mpfq_2_128_dst_elt_ur);
 static inline
 void mpfq_2_128_elt_ur_set_ui(mpfq_2_128_dst_field, mpfq_2_128_dst_elt_ur, unsigned long);
@@ -271,6 +273,8 @@ int mpfq_2_128_vec_fscan(mpfq_2_128_dst_field, FILE *, mpfq_2_128_vec *, unsigne
 void mpfq_2_128_vec_ur_init(mpfq_2_128_dst_field, mpfq_2_128_vec_ur *, unsigned int);
 static inline
 void mpfq_2_128_vec_ur_set_zero(mpfq_2_128_dst_field, mpfq_2_128_dst_vec_ur, unsigned int);
+static inline
+void mpfq_2_128_vec_ur_set_vec(mpfq_2_128_dst_field, mpfq_2_128_dst_vec_ur, mpfq_2_128_src_vec, unsigned int);
 void mpfq_2_128_vec_ur_reinit(mpfq_2_128_dst_field, mpfq_2_128_vec_ur *, unsigned int, unsigned int);
 void mpfq_2_128_vec_ur_clear(mpfq_2_128_dst_field, mpfq_2_128_vec_ur *, unsigned int);
 static inline
@@ -962,6 +966,13 @@ void mpfq_2_128_elt_ur_set(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_e
     if (r != s) memcpy(r,s,sizeof(mpfq_2_128_elt_ur));
 }
 
+/* *Mpfq::defaults::flatdata::code_for_elt_ur_set_elt, Mpfq::gf2n::trivialities */
+static inline
+void mpfq_2_128_elt_ur_set_elt(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt_ur r, mpfq_2_128_src_elt s)
+{
+    memset(r, 0, sizeof(mpfq_2_128_elt_ur)); memcpy(r,s,sizeof(mpfq_2_128_elt));
+}
+
 /* *Mpfq::defaults::flatdata::code_for_elt_ur_set_zero, Mpfq::gf2n::trivialities */
 static inline
 void mpfq_2_128_elt_ur_set_zero(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_elt_ur r)
@@ -1286,7 +1297,7 @@ int mpfq_2_128_is_zero(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_src_elt r
 static inline
 void mpfq_2_128_vec_set(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_vec r, mpfq_2_128_src_vec s, unsigned int n)
 {
-    if (r != s) memcpy(r, s, n*sizeof(mpfq_2_128_elt));
+    if (r != s) memmove(r, s, n*sizeof(mpfq_2_128_elt));
 }
 
 /* *Mpfq::defaults::vec::flatdata::code_for_vec_set_zero, Mpfq::defaults::flatdata, Mpfq::gf2n::trivialities */
@@ -1431,11 +1442,20 @@ void mpfq_2_128_vec_ur_set_zero(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_
     memset(r, 0, n*sizeof(mpfq_2_128_elt_ur));
 }
 
+/* *Mpfq::defaults::vec::getset::code_for_vec_ur_set_vec, Mpfq::defaults::vec, Mpfq::defaults */
+static inline
+void mpfq_2_128_vec_ur_set_vec(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_vec_ur w, mpfq_2_128_src_vec u, unsigned int n)
+{
+    unsigned int i;
+    for(i = 0; i < n; i+=1)
+        mpfq_2_128_elt_ur_set_elt(K, w[i], u[i]);
+}
+
 /* *Mpfq::defaults::vec::flatdata::code_for_vec_ur_set, Mpfq::defaults::flatdata, Mpfq::gf2n::trivialities */
 static inline
 void mpfq_2_128_vec_ur_set(mpfq_2_128_dst_field K MAYBE_UNUSED, mpfq_2_128_dst_vec_ur r, mpfq_2_128_src_vec_ur s, unsigned int n)
 {
-    if (r != s) memcpy(r, s, n*sizeof(mpfq_2_128_elt_ur));
+    if (r != s) memmove(r, s, n*sizeof(mpfq_2_128_elt_ur));
 }
 
 /* *Mpfq::defaults::vec::getset::code_for_vec_ur_setcoef, Mpfq::defaults::vec, Mpfq::defaults */
@@ -1860,9 +1880,9 @@ void mpfq_2_128_poly_gcd(mpfq_2_128_dst_field k MAYBE_UNUSED, mpfq_2_128_dst_pol
     if (db0==-1)
      mpfq_2_128_poly_set(k,g,a0);
     else {
-     mpfq_2_128_poly_init(k,a,++da0);
-     mpfq_2_128_poly_init(k,b,++db0);
-     mpfq_2_128_poly_init(k,q,(da0+1));
+     mpfq_2_128_poly_init(k,a,da0+1);
+     mpfq_2_128_poly_init(k,b,db0+1);
+     mpfq_2_128_poly_init(k,q,1);
      mpfq_2_128_poly_init(k,r,db0);
      mpfq_2_128_poly_set(k,a,a0);
      mpfq_2_128_poly_set(k,b,b0);
@@ -1881,56 +1901,64 @@ void mpfq_2_128_poly_gcd(mpfq_2_128_dst_field k MAYBE_UNUSED, mpfq_2_128_dst_pol
 
 /* *Mpfq::defaults::polygcd::code_for_poly_xgcd, Mpfq::defaults::poly */
 static inline
-void mpfq_2_128_poly_xgcd(mpfq_2_128_dst_field k MAYBE_UNUSED, mpfq_2_128_dst_poly g, mpfq_2_128_dst_poly u, mpfq_2_128_dst_poly v, mpfq_2_128_src_poly a0, mpfq_2_128_src_poly b0)
+void mpfq_2_128_poly_xgcd(mpfq_2_128_dst_field k MAYBE_UNUSED, mpfq_2_128_dst_poly g, mpfq_2_128_dst_poly u0, mpfq_2_128_dst_poly v0, mpfq_2_128_src_poly a0, mpfq_2_128_src_poly b0)
 {
-    mpfq_2_128_poly a,b,w,x,q,r;
+    mpfq_2_128_poly a,b,u,v,w,x,q,r;
     mpfq_2_128_elt c;
     mpfq_2_128_init(k,&c);
     int da0=mpfq_2_128_poly_deg(k,a0), db0=mpfq_2_128_poly_deg(k,b0), dega;
-    mpfq_2_128_poly_init(k,u,1);
-    mpfq_2_128_poly_init(k,v,1);
     if (db0==-1) {
-     mpfq_2_128_poly_getcoef(k,c,a0,da0);
-     mpfq_2_128_inv(k,c,c);
-     mpfq_2_128_poly_scal_mul(k,g,a0,c);
-     mpfq_2_128_poly_setcoef(k,u,c,0);
+     if (da0==-1) {
+      mpfq_2_128_poly_set(k,u0,a0);
+      mpfq_2_128_poly_set(k,v0,b0);
+      mpfq_2_128_poly_set(k,g,a0);
+     } else {
+      mpfq_2_128_poly_getcoef(k,c,a0,da0);
+      mpfq_2_128_inv(k,c,c);
+      mpfq_2_128_poly_scal_mul(k,g,a0,c);
+      mpfq_2_128_poly_set(k,v0,b0);
+      mpfq_2_128_poly_set(k,u0,b0);
+      mpfq_2_128_poly_setcoef(k,u0,c,0);
+     }
     }
     else {
-     mpfq_2_128_poly_setcoef_ui(k,u,1,0);
-     mpfq_2_128_poly_init(k,a,++da0);
-     mpfq_2_128_poly_init(k,b,++db0);
-     mpfq_2_128_poly_init(k,q,(da0+1));
+     mpfq_2_128_poly_init(k,a,da0+1);
+     mpfq_2_128_poly_init(k,b,db0+1);
+     mpfq_2_128_poly_init(k,q,1);
      mpfq_2_128_poly_init(k,r,db0);
      mpfq_2_128_poly_set(k,a,a0);
      mpfq_2_128_poly_set(k,b,b0);
+     mpfq_2_128_poly_init(k,u,1);
+     mpfq_2_128_poly_init(k,v,1);
      mpfq_2_128_poly_init(k,w,1);
      mpfq_2_128_poly_init(k,x,1);
+     mpfq_2_128_poly_setcoef_ui(k,u,1,0);
      mpfq_2_128_poly_setcoef_ui(k,x,1,0);
+     /* u*a_initial + v*b_initial = a */
+     /* w*a_initial + x*b_initial = b */
      while (mpfq_2_128_poly_deg(k,b)>=0) {
       mpfq_2_128_poly_divmod(k,q,r,a,b);
-      mpfq_2_128_poly_set(k,a,b);
+      mpfq_2_128_poly_set(k,a,b);  /* a,b <- b,a-qb=r */
       mpfq_2_128_poly_set(k,b,r);
       mpfq_2_128_poly_mul(k,r,q,w);
       mpfq_2_128_poly_sub(k,r,u,r);
-      mpfq_2_128_poly_set(k,u,w);
+      mpfq_2_128_poly_set(k,u,w);   /* u,w <- w,u-qw */
       mpfq_2_128_poly_set(k,w,r);
-      mpfq_2_128_poly_mul(k,r,q,x);
+      mpfq_2_128_poly_mul(k,r,q,x); /* v,x <- x,v-qx */
       mpfq_2_128_poly_sub(k,r,v,r);
       mpfq_2_128_poly_set(k,v,x);
       mpfq_2_128_poly_set(k,x,r);
      }
      dega=mpfq_2_128_poly_deg(k,a);
-     if (dega==-1) 
-      mpfq_2_128_poly_set(k,g,a);
-     else {
-      mpfq_2_128_poly_getcoef(k,c,a,dega);
-      mpfq_2_128_inv(k,c,c);
-      mpfq_2_128_poly_scal_mul(k,g,a,c);
-      mpfq_2_128_poly_scal_mul(k,u,u,c);
-      mpfq_2_128_poly_scal_mul(k,v,v,c);
-     }
+     mpfq_2_128_poly_getcoef(k,c,a,dega);
+     mpfq_2_128_inv(k,c,c);
+     mpfq_2_128_poly_scal_mul(k,g,a,c);
+     mpfq_2_128_poly_scal_mul(k,u0,u,c);
+     mpfq_2_128_poly_scal_mul(k,v0,v,c);
      mpfq_2_128_poly_clear(k,a);
      mpfq_2_128_poly_clear(k,b);
+     mpfq_2_128_poly_clear(k,u);
+     mpfq_2_128_poly_clear(k,v);
      mpfq_2_128_poly_clear(k,w);
      mpfq_2_128_poly_clear(k,x);
      mpfq_2_128_poly_clear(k,q);

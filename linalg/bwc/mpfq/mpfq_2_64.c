@@ -451,9 +451,9 @@ void mpfq_2_64_poly_setmonic(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_p
     mpfq_2_64_clear(K, &lc);
 }
 
-static void mpfq_2_64_poly_preinv(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, mpfq_2_64_src_poly, int);
+static void mpfq_2_64_poly_preinv(mpfq_2_64_dst_field, mpfq_2_64_dst_poly, mpfq_2_64_src_poly, unsigned int);
 static /* *Mpfq::defaults::poly::code_for_poly_divmod */
-void mpfq_2_64_poly_preinv(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_poly q, mpfq_2_64_src_poly p, int n)
+void mpfq_2_64_poly_preinv(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_poly q, mpfq_2_64_src_poly p, unsigned int n)
 {
     // Compute the inverse of p(x) modulo x^n
     // Newton iteration: x_{n+1} = x_n + x_n(1 - a*x_n)
@@ -524,6 +524,7 @@ void mpfq_2_64_poly_divmod(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_pol
     mpfq_2_64_elt ilb;
     mpfq_2_64_init(K, &ilb);
     if (mpfq_2_64_cmp_ui(K, (b->c)[degb], 1) == 0) {
+        mpfq_2_64_set_ui(K, ilb, 1);
         bmonic = 1;
     } else {
         mpfq_2_64_inv(K, ilb, (b->c)[degb]);
