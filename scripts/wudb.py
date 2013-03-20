@@ -250,12 +250,7 @@ class MyCursor(sqlite3.Cursor):
 
 class DbTable(object):
     """ A class template defining access methods to a database table """
-    def __init__(self):
-        self.tablename = type(self).name
-        self.fields = type(self).fields
-        self.primarykey = type(self).primarykey
-        self.references = type(self).references
-
+    
     @staticmethod
     def _subdict(d, l):
         """ Returns a dictionary of those key:value pairs of d for which key 
@@ -290,7 +285,8 @@ class DbTable(object):
         cursor.create_table(self.tablename, fields)
         if self.references:
             # We always create an index on the foreign key
-            cursor.create_index(self.tablename + "_pkindex", r.tablename, (fk[0], ))
+            cursor.create_index(self.tablename + "_pkindex", r.tablename, 
+                                (fk[0], ))
         for indexname in self.index:
             cursor.create_index(self.tablename + "_" + indexname, 
                                 self.tablename, self.index[indexname])
@@ -298,7 +294,8 @@ class DbTable(object):
     def insert(self, cursor, values, foreign=None):
         """ Insert a new row into this table. The column:value pairs are 
             specified key:value pairs of the dictionary d. 
-            The database's row id for the new entry is stored in d[primarykey] """
+            The database's row id for the new entry is stored in 
+            d[primarykey] """
         d = self.dictextract(values)
         assert self.primarykey not in d or d[self.primarykey] is None
         # If a foreign key is specified in foreign, add it to the column
@@ -325,7 +322,7 @@ class DbTable(object):
 
 
 class WuTable(DbTable):
-    name = "workunits"
+    tablename = "workunits"
     fields = (
         ("wurowid", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"), 
         ("wuid", "TEXT", "UNIQUE NOT NULL"), 
@@ -347,7 +344,7 @@ class WuTable(DbTable):
     index = {"wuidindex": (fields[1][0],), "statusindex" : (fields[2][0],)}
 
 class FilesTable(DbTable):
-    name = "files"
+    tablename = "files"
     fields = (
         ("filesrowid", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"), 
         ("filename", "TEXT", ""), 
@@ -429,7 +426,7 @@ class Mapper(object):
     
     def where(self, cursor, limit = None, order = None, **cond):
         pk = self.getpk()
-        joinsource = self.table.name
+        joinsource = self.table.tablename
         for s in self.subtables.keys():
             # FIXME: this probably breaks with more than 2 tables
             joinsource = joinsource + " LEFT JOIN " + \
