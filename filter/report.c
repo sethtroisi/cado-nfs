@@ -42,7 +42,7 @@ init_rep (report_t *rep, const char *outname, filter_matrix_t *mat, int type,
     rep->type = type;
     if (type == 2) /* do nothing...! */
       return;
-    rep->outfile = gzip_open (outname, "w");
+    rep->outfile = fopen_maybe_compressed (outname, "w");
     switch (type)
       {
       case 0: /* classical one: output to a file */

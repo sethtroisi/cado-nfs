@@ -958,7 +958,7 @@ mul1_2(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
    "    adcq    $0, %%rdx\n"
    "    movq    %%rcx, 8(%%rdi)\n"
    "    movq    %%rdx, 16(%%rdi)\n"
-  : "=m" (z)
+  : "+m" (z)
   : "m" (x), [mult] "r" (c)
   : "%rax", "%rcx", "%rdx", "%rsi", "%rdi", "memory");
 }
@@ -988,7 +988,7 @@ mul1_3(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
    "    adcq    $0, %%rdx\n"
    "    movq    %%rcx, 16(%%rdi)\n"
    "    movq    %%rdx, 24(%%rdi)\n"
-  : "=m" (z)
+  : "+m" (z)
   : "m" (x), [mult] "r" (c)
   : "%rax", "%rcx", "%rdx", "%rsi", "%rdi", "memory");
 }
@@ -1025,7 +1025,7 @@ mul1_4(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
    "    adcq    $0, %%rdx\n"
    "    movq    %%rcx, 24(%%rdi)\n"
    "    movq    %%rdx, 32(%%rdi)\n"
-  : "=m" (z)
+  : "+m" (z)
   : "m" (x), [mult] "r" (c)
   : "%rax", "%rcx", "%rdx", "%rsi", "%rdi", "memory");
 }
@@ -1069,7 +1069,7 @@ mul1_5(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
    "    adcq    $0, %%rdx\n"
    "    movq    %%rcx, 32(%%rdi)\n"
    "    movq    %%rdx, 40(%%rdi)\n"
-  : "=m" (z)
+  : "+m" (z)
   : "m" (x), [mult] "r" (c)
   : "%rax", "%rcx", "%rdx", "%rsi", "%rdi", "memory");
 }
@@ -1120,7 +1120,7 @@ mul1_6(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
    "    adcq    $0, %%rdx\n"
    "    movq    %%rcx, 40(%%rdi)\n"
    "    movq    %%rdx, 48(%%rdi)\n"
-  : "=m" (z)
+  : "+m" (z)
   : "m" (x), [mult] "r" (c)
   : "%rax", "%rcx", "%rdx", "%rsi", "%rdi", "memory");
 }
@@ -1178,7 +1178,7 @@ mul1_7(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
    "    adcq    $0, %%rdx\n"
    "    movq    %%rcx, 48(%%rdi)\n"
    "    movq    %%rdx, 56(%%rdi)\n"
-  : "=m" (z)
+  : "+m" (z)
   : "m" (x), [mult] "r" (c)
   : "%rax", "%rcx", "%rdx", "%rsi", "%rdi", "memory");
 }
@@ -1243,7 +1243,7 @@ mul1_8(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
    "    adcq    $0, %%rdx\n"
    "    movq    %%rcx, 56(%%rdi)\n"
    "    movq    %%rdx, 64(%%rdi)\n"
-  : "=m" (z)
+  : "+m" (z)
   : "m" (x), [mult] "r" (c)
   : "%rax", "%rcx", "%rdx", "%rsi", "%rdi", "memory");
 }
@@ -1315,7 +1315,7 @@ mul1_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t c)
    "    adcq    $0, %%rdx\n"
    "    movq    %%rcx, 64(%%rdi)\n"
    "    movq    %%rdx, 72(%%rdi)\n"
-  : "=m" (z)
+  : "+m" (z)
   : "m" (x), [mult] "r" (c)
   : "%rax", "%rcx", "%rdx", "%rsi", "%rdi", "memory");
 }
@@ -1903,7 +1903,7 @@ mul_2(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y)
    "    addq    %%rcx, 16(%%rdi)\n"
    "    adcq    $0, %%rdx\n"
    "    movq    %%rdx, 24(%%rdi)\n"
-  : "=m" (z)
+  : "+m" (z)
   : "m" (x), "m" (y)
   : "%rax", "%rcx", "%rdx", "%rsi", "%rdi", "%r8", "%r9", "%r10", "memory");
 }
@@ -1979,7 +1979,7 @@ mul_3(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y)
    "    addq    %%rcx, 32(%%rdi)\n"
    "    adcq    $0, %%rdx\n"
    "    movq    %%rdx, 40(%%rdi)\n"
-  : "=m" (z)
+  : "+m" (z)
   : "m" (x), "m" (y)
   : "%rax", "%rcx", "%rdx", "%rsi", "%rdi", "%r8", "%r9", "%r10", "memory");
 }
@@ -2104,7 +2104,7 @@ mul_4(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y)
    "    addq    %%rcx, 48(%%rdi)\n"
    "    adcq    $0, %%rdx\n"
    "    movq    %%rdx, 56(%%rdi)\n"
-  : "=m" (z)
+  : "+m" (z)
   : "m" (x), "m" (y)
   : "%rax", "%rcx", "%rdx", "%rsi", "%rdi", "%r8", "%r9", "%r10", "memory");
 }
@@ -2292,7 +2292,7 @@ mul_5(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y)
    "    addq    %%rcx, 64(%%rdi)\n"
    "    adcq    $0, %%rdx\n"
    "    movq    %%rdx, 72(%%rdi)\n"
-  : "=m" (z)
+  : "+m" (z)
   : "m" (x), "m" (y)
   : "%rax", "%rcx", "%rdx", "%rsi", "%rdi", "%r8", "%r9", "%r10", "memory");
 }
@@ -2557,7 +2557,7 @@ mul_6(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y)
    "    addq    %%rcx, 80(%%rdi)\n"
    "    adcq    $0, %%rdx\n"
    "    movq    %%rdx, 88(%%rdi)\n"
-  : "=m" (z)
+  : "+m" (z)
   : "m" (x), "m" (y)
   : "%rax", "%rcx", "%rdx", "%rsi", "%rdi", "%r8", "%r9", "%r10", "memory");
 }
@@ -2913,7 +2913,7 @@ mul_7(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y)
    "    addq    %%rcx, 96(%%rdi)\n"
    "    adcq    $0, %%rdx\n"
    "    movq    %%rdx, 104(%%rdi)\n"
-  : "=m" (z)
+  : "+m" (z)
   : "m" (x), "m" (y)
   : "%rax", "%rcx", "%rdx", "%rsi", "%rdi", "%r8", "%r9", "%r10", "memory");
 }
@@ -3374,7 +3374,7 @@ mul_8(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y)
    "    addq    %%rcx, 112(%%rdi)\n"
    "    adcq    $0, %%rdx\n"
    "    movq    %%rdx, 120(%%rdi)\n"
-  : "=m" (z)
+  : "+m" (z)
   : "m" (x), "m" (y)
   : "%rax", "%rcx", "%rdx", "%rsi", "%rdi", "%r8", "%r9", "%r10", "memory");
 }
@@ -3954,7 +3954,7 @@ mul_9(mp_limb_t *z, const mp_limb_t *x, const mp_limb_t *y)
    "    addq    %%rcx, 128(%%rdi)\n"
    "    adcq    $0, %%rdx\n"
    "    movq    %%rdx, 136(%%rdi)\n"
-  : "=m" (z)
+  : "+m" (z)
   : "m" (x), "m" (y)
   : "%rax", "%rcx", "%rdx", "%rsi", "%rdi", "%r8", "%r9", "%r10", "memory");
 }
@@ -3992,7 +3992,7 @@ sqr_2(mp_limb_t *z, const mp_limb_t *x)
    "	movq	%%r10, 16(%%rdi)\n"
    "	adcq    $0, %%r11\n"
    "	movq	%%r11, 24(%%rdi)\n"
-  : "=m" (z)
+  : "+m" (z)
   : "m" (x) 
   : "%rax", "%rdx", "%rdi", "%r8", "%r9", "%r10", "%r11", "memory");
 } 
@@ -4046,7 +4046,7 @@ sqr_3(mp_limb_t *z, const mp_limb_t *x)
    "	adcq	%%r10, 24(%%rdi)\n"
    "	adcq	%%rdx, 32(%%rdi)\n"
    "	adcq	$0, 40(%%rdi)\n"
-   : "=m" (z)
+   : "+m" (z)
    : "m" (x) 
    : "%rax", "%rcx", "%rdx", "%rsi", "%rdi", "%r8", "%r9", "%r10", "memory");
 }
@@ -4126,7 +4126,7 @@ sqr_4(mp_limb_t *z, const mp_limb_t *x)
    "	adcq	%%r12, 40(%%rdi)\n"
    "	adcq	%%rdx, 48(%%rdi)\n"
    "	adcq	$0, 56(%%rdi)\n"
-   : "=m" (z)
+   : "+m" (z)
    : "m" (x) 
    : "%rax", "%rcx", "%rdx", "%rsi", "%rdi", "%r8", "%r9", "%r10",
    "%r11", "%r12", "memory");

@@ -141,7 +141,7 @@ main (int argc, char **argv)
     FILE * outfile = stdout;
     int pipe = 0;
     if (outname) {
-        outfile = fopen_compressed_w(outname,&pipe,NULL);
+        outfile = fopen_maybe_compressed2(outname, "w", &pipe,NULL);
     }
 
     /* Prepare the list of (a,b) pairs */

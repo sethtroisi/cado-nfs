@@ -250,12 +250,7 @@ class MyCursor(sqlite3.Cursor):
 
 class DbTable(object):
     """ A class template defining access methods to a database table """
-    def __init__(self):
-        self.tablename = type(self).name
-        self.fields = type(self).fields
-        self.primarykey = type(self).primarykey
-        self.references = type(self).references
-
+    
     @staticmethod
     def _subdict(d, l):
         """ Returns a dictionary of those key:value pairs of d for which key 
@@ -290,7 +285,8 @@ class DbTable(object):
         cursor.create_table(self.tablename, fields)
         if self.references:
             # We always create an index on the foreign key
-            cursor.create_index(self.tablename + "_pkindex", r.tablename, (fk[0], ))
+            cursor.create_index(self.tablename + "_pkindex", r.tablename, 
+                                (fk[0], ))
         for indexname in self.index:
             cursor.create_index(self.tablename + "_" + indexname, 
                                 self.tablename, self.index[indexname])
@@ -298,7 +294,8 @@ class DbTable(object):
     def insert(self, cursor, values, foreign=None):
         """ Insert a new row into this table. The column:value pairs are 
             specified key:value pairs of the dictionary d. 
-            The database's row id for the new entry is stored in d[primarykey] """
+            The database's row id for the new entry is stored in 
+            d[primarykey] """
         d = self.dictextract(values)
         assert self.primarykey not in d or d[self.primarykey] is None
         # If a foreign key is specified in foreign, add it to the column
@@ -325,7 +322,7 @@ class DbTable(object):
 
 
 class WuTable(DbTable):
-    name = "workunits"
+    tablename = "workunits"
     fields = (
         ("wurowid", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"), 
         ("wuid", "TEXT", "UNIQUE NOT NULL"), 
@@ -347,7 +344,7 @@ class WuTable(DbTable):
     index = {"wuidindex": (fields[1][0],), "statusindex" : (fields[2][0],)}
 
 class FilesTable(DbTable):
-    name = "files"
+    tablename = "files"
     fields = (
         ("filesrowid", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"), 
         ("filename", "TEXT", ""), 
@@ -356,6 +353,67 @@ class FilesTable(DbTable):
     primarykey = fields[0][0]
     references = WuTable()
     index = {}
+
+
+class DictDbTable(DbTable):
+    fields = (
+        ("rowid", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"), 
+        ("key", "TEXT", "UNIQUE NOT NULL"),
+        ("value", "TEXT", "")
+        )
+    primarykey = fields[0][0]
+    references = None
+    index = {"keyindex": ("key",)}
+
+
+class DictDbAccess(dict):
+    """ A DB-backed flat dictionary.
+
+    Flat means that the value of each dictionary entry must be a type that
+    the underlying DB understands, like integers, strings, etc., but not
+    collections or other complex types.
+
+    A copy of all the data in the table is kept in memory; read accesses 
+    are always served from the in-memory dict. Write accesses write through
+    to the DB.
+    """
+    def __init__(self, connection, name):
+        """ Init a table for parameter access and a cursor """
+        super().__init__()
+        self.__conn = connection
+        self.__table = DictDbTable()
+        self.__table.tablename = name
+        # Create an empty table if none exists
+        self.__cursor = self.__conn.cursor(MyCursor)
+        self.__table.create(self.__cursor);
+        data = self.__getall()
+        self.update(data)
+    
+    def __del__(self):
+        """ Close tne cursor and delete the dictionary """
+        self.__cursor.close()
+        # http://docs.python.org/2/reference/datamodel.html#object.__del__
+        # dict does not have __del__, but in a complex class heirarchy, 
+        # dict may not be next in the MRO
+        if hasattr(super(), "__del__"):
+            super().__del__()
+    
+    def __getall(self):
+        """ Reads the whole table and returns it as a dict """
+        rows = self.__table.where(self.__cursor)
+        dict = {r["key"]: r["value"] for r in rows}
+        return dict
+    
+    def __setitem__(self, key, value):
+        """ Set a dict entry to a value and update the DB """
+        if key in self:
+            # Update the table row where column "key" equals key
+            self.__table.update(self.__cursor, {"value": value}, 
+                              eq={"key": key})
+        else:
+            self.__table.insert(self.__cursor, {"key": key, "value": value})   
+        self.__conn.commit()
+        super().__setitem__(key, value)
 
 
 class Mapper(object):
@@ -429,7 +487,7 @@ class Mapper(object):
     
     def where(self, cursor, limit = None, order = None, **cond):
         pk = self.getpk()
-        joinsource = self.table.name
+        joinsource = self.table.tablename
         for s in self.subtables.keys():
             # FIXME: this probably breaks with more than 2 tables
             joinsource = joinsource + " LEFT JOIN " + \

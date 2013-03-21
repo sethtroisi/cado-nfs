@@ -1163,7 +1163,6 @@ sub format_dhms {
 # Distributed tasks ###########################################################
 ###############################################################################
 
-# HERE
 # Scans a list of ranges and merges overlapping ones.
 sub merge_ranges {
     my ($ranges) = @_;
@@ -1177,7 +1176,7 @@ sub merge_ranges {
             push @merged, $r;
             next;
         } elsif ($b > $merged[-1]->[1]) {
-	    # Overlaps with end of merged intervals -> adjust end up
+	    # Overlaps with end of merged intervals -> adjust end upwards
             $merged[-1]->[1] = $b;
         }
     }
@@ -1211,6 +1210,7 @@ sub find_hole {
     # Arrange so that in all cases, the range ends at a multiple of the
     # length. Note that doing so, the range can't be empty.
     $b -= ($b % $len);
+    # This may cause the range to be longer than len
     if ($b-$a < $len / 10) {
         $b += $len;
     }
@@ -1240,7 +1240,7 @@ sub find_hole {
 #  - `files'      is a list of the files that need to be sent to each host;
 #  - `pattern'    is a regexp to match the last line of a completed job output
 #                 file;
-#  - `min', `max' the bounds on the range to process; `max' is facultative
+#  - `min', `max' the bounds on the range to process; `max' is optional
 #                 (meaning that the range will grow until we have enough data);
 #  - `len'        the maximal size of a range to be processed by a job;
 #  - `partial'    is a flag specifying if we can import partial job output
@@ -1283,8 +1283,6 @@ sub distribute_task {
         &{$opt->{'check'}}($_, 0) for (map "$param{'wdir'}/$_", sort @files);
         $tab_level--;
     }
-
-
 
     while (1) {
         my $jobs = [];
@@ -1693,10 +1691,10 @@ sub do_init {
         }
     }
     # It turns out that ssh, when it has neither a connected stdin, nor a
-    # controlling tty, tries to run an ssh-askpass dialog on the
-    # $DISPLAY, if that is an existing variable. Since we consider this
+    # controlling tty, tries to run the program specified in $SSH_ASKPASS,
+    # if that is an existing variable. Since we consider this
     # as essentially a nuisance, we forbid this behaviour.
-    delete $ENV{'DISPLAY'};
+    delete $ENV{'SSH_ASKPASS'};
 
 
     # Getting configuration

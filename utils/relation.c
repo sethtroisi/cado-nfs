@@ -722,7 +722,7 @@ void relation_stream_openfile(relation_stream_ptr rs, const char * name)
 {
     /* enforce using relation_stream_closefile, which is better practice */
     ASSERT_ALWAYS(rs->source == NULL);
-    rs->source = fopen_compressed_r(name, &(rs->pipe), NULL);
+    rs->source = fopen_maybe_compressed2(name, "r", &(rs->pipe), NULL);
     if (rs->source == NULL) {
         fprintf(stderr, "opening %s: %s\n", name, strerror(errno));
         exit(1);
