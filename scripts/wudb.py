@@ -355,6 +355,67 @@ class FilesTable(DbTable):
     index = {}
 
 
+class DictDbTable(DbTable):
+    fields = (
+        ("rowid", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"), 
+        ("key", "TEXT", "UNIQUE NOT NULL"),
+        ("value", "TEXT", "")
+        )
+    primarykey = fields[0][0]
+    references = None
+    index = {"keyindex": ("key",)}
+
+
+class DictDbAccess(dict):
+    """ A DB-backed flat dictionary.
+
+    Flat means that the value of each dictionary entry must be a type that
+    the underlying DB understands, like integers, strings, etc., but not
+    collections or other complex types.
+
+    A copy of all the data in the table is kept in memory; read accesses 
+    are always served from the in-memory dict. Write accesses write through
+    to the DB.
+    """
+    def __init__(self, connection, name):
+        """ Init a table for parameter access and a cursor """
+        super().__init__()
+        self.__conn = connection
+        self.__table = DictDbTable()
+        self.__table.tablename = name
+        # Create an empty table if none exists
+        self.__cursor = self.__conn.cursor(MyCursor)
+        self.__table.create(self.__cursor);
+        data = self.__getall()
+        self.update(data)
+    
+    def __del__(self):
+        """ Close tne cursor and delete the dictionary """
+        self.__cursor.close()
+        # http://docs.python.org/2/reference/datamodel.html#object.__del__
+        # dict does not have __del__, but in a complex class heirarchy, 
+        # dict may not be next in the MRO
+        if hasattr(super(), "__del__"):
+            super().__del__()
+    
+    def __getall(self):
+        """ Reads the whole table and returns it as a dict """
+        rows = self.__table.where(self.__cursor)
+        dict = {r["key"]: r["value"] for r in rows}
+        return dict
+    
+    def __setitem__(self, key, value):
+        """ Set a dict entry to a value and update the DB """
+        if key in self:
+            # Update the table row where column "key" equals key
+            self.__table.update(self.__cursor, {"value": value}, 
+                              eq={"key": key})
+        else:
+            self.__table.insert(self.__cursor, {"key": key, "value": value})   
+        self.__conn.commit()
+        super().__setitem__(key, value)
+
+
 class Mapper(object):
     """ This class translates between application objects, i.e., Python 
         directories, and the relational data layout in an SQL DB, i.e.,
