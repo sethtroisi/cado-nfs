@@ -1,6 +1,4 @@
-#!/usr/bin/env python3
 import logging
-import subprocess
 
 class ANSI(object):
     """ Class defining some ANSI control sequences, for example for 
@@ -128,88 +126,11 @@ class Logger(object):
     def __getattr__(self, name):
         return getattr(self.logger, name)
 
-class Command(object):
-    def __init__(self, args, **kwargs):
-        self.args = args
-        self.kwargs = kwargs
-        self.logger = Logger()
-        # Convert args array to a string for printing if necessary
-        if isinstance(self.args, str):
-            self.cmdline = self.args
-        else:
-            self.cmdline = " ".join(self.args)
-
-        self.child = subprocess.Popen(self.args, stdout = subprocess.PIPE, 
-            stderr = subprocess.PIPE, **self.kwargs)
-        
-        self.logger.info("Running command: " + self.cmdline)
-        self.logger.cmd(self.cmdline, extra={"pid": self.child.pid})
-
-    def wait(self):
-        # Wait for command to finish executing, capturing stdout and stderr 
-        # in output tuple
-        (self.stdout, self.stderr) = self.child.communicate()
-
-        if self.child.returncode == 0:
-            logger.info("Process with PID " + str(self.child.pid) + " finished successfully")
-        else:
-            logger.error("Process with PID " + str(self.child.pid) + " finished with return code " + str(self.child.returncode))
-        self.returncode = self.child.returncode
-        return self.returncode
-
-class RemoteCommand(Command):
-    ssh="/usr/bin/ssh"
-    ssh_options = {
-        "ConnectTimeout": 30,
-        "ServerAliveInterval": 10,
-        "PasswordAuthentication": "no"
-    }
-    def __init__(self, command, host, port = None, ssh_options = None, **kwargs):
-        ssh_command = [self.__class__.ssh]
-        options = self.__class__.ssh_options.copy()
-        if not ssh_options is None:
-            options.update(ssh_options)
-        if not port is None:
-            ssh_command += ["-p", str(port)];
-        for (opt, val) in options.items():
-            if not val is None:
-                ssh_command += ["-o", opt + "=" + str(val)]
-        ssh_command.append(host)
-        if isinstance(command, str):
-            ssh_command.append(command)
-        else:
-            ssh_command += command
-        super().__init__(ssh_command, **kwargs)
-
-class SendFile(Command):
-    rsync="/usr/bin/rsync"
-    rsync_options = []
-    def __init__(self, localfile, hostname, hostpath, port = None, rsync_options = None, **kwargs):
-        if hostname != "localhost":
-            target = hostname + ":"
-        if not port is None:
-            target += str(port)
-        target += hostpath
-        copy_command = [self.__class__.rsync] + self.__class__.rsync_options + [localfile, target]
-        super().__init__(copy_command, **kwargs)
-
 if __name__ == '__main__':
-    logger = Logger()
+    logger = cadologger.Logger()
     logger.addHandler(ScreenHandler(lvl = logging.INFO))
     logger.addHandler(FileHandler(filename = "log", lvl = logging.DEBUG))
 
     logger.info("An Info Center!")
     logger.warn("Beware")
     logger.error("All hope abandon", extra={"indent" : 4})
-
-    c = Command(["ls", "/"])
-    rc = c.wait()
-    print("Stdout: " + str(c.stdout, encoding="utf-8"))
-    print("Stderr: " + str(c.stderr, encoding="utf-8"))
-    del(c)
-
-    c = RemoteCommand(["ls", "/"], "localhost")
-    rc = c.wait()
-    print("Stdout: " + str(c.stdout, encoding="utf-8"))
-    print("Stderr: " + str(c.stderr, encoding="utf-8"))
-    del(c)
