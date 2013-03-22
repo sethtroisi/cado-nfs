@@ -7,6 +7,15 @@
 #include "polymat.h"
 #include "bigpolymat.h"
 
+void bigpolymat_bcast_polymat_cutoff(struct polymat_cutoff_info * slot, int root, MPI_Comm comm)
+{
+    MPI_Bcast(&slot->cut, 1, MPI_UNSIGNED, root, comm);
+    MPI_Bcast(&slot->subdivide, 1, MPI_UNSIGNED, root, comm);
+    MPI_Bcast(&slot->table_size, 1, MPI_UNSIGNED, root, comm);
+    slot->table = realloc(slot->table, slot->table_size * sizeof(unsigned int[2]));
+    MPI_Bcast(slot->table, slot->table_size * 2, MPI_UNSIGNED, root, comm);
+}
+
 /* {{{  init/zero/clear interface for bigpolymat */
 polymat_ptr bigpolymat_my_cell(bigpolymat_ptr p)
 {

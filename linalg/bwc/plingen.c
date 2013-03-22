@@ -24,6 +24,7 @@
                                  * for recovering parameters */
 #include "filenames.h"
 #include "plingen.h"
+#include "plingen-tuning.h"
 
 // #include "types.h"
 // #include "macros.h"
@@ -57,7 +58,7 @@ struct bmstatus_s {
 
     unsigned int lingen_threshold;
     unsigned int lingen_mpi_threshold;
-    int mpi_dims[2];
+    int mpi_dims[2]; /* mpi_dims[0] = mpi[0] * thr[0] */
     MPI_Comm world;     /* reordered, in fact */
 };
 typedef struct bmstatus_s bmstatus[1];
@@ -1682,13 +1683,14 @@ void bmstatus_clear(bmstatus_ptr bm)/*{{{*/
     memset(bm, 0, sizeof(bmstatus));
 }/*}}}*/
 
+
+
 int main(int argc, char *argv[])
 {
     bmstatus bm;
     dims * d = bm->d;
     int tune = 0;
     int ascii = 0;
-    gmp_randstate_t rstate;
 
     MPI_Init(&argc, &argv);
     int rank;
@@ -1696,8 +1698,6 @@ int main(int argc, char *argv[])
     MPI_Comm_size(MPI_COMM_WORLD, &size);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    gmp_randinit_default(rstate);
-    gmp_randseed_ui(rstate, 1);
 
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
@@ -1750,6 +1750,9 @@ int main(int argc, char *argv[])
     param_list_parse_uint(pl, "lingen-threshold", &(bm->lingen_threshold));
     param_list_parse_uint(pl, "lingen-mpi-threshold", &(bm->lingen_mpi_threshold));
 
+    /* }}} */
+
+    /* {{{ Parse MPI args. Make bm->world a better mpi communicator */
     bm->mpi_dims[0] = 1;
     bm->mpi_dims[1] = 1;
     param_list_parse_intxint(pl, "mpi", bm->mpi_dims);
@@ -1772,8 +1775,16 @@ int main(int argc, char *argv[])
          */
         printf("size=%d mpi=%dx%d thr=%dx%d\n", size, mpi[0], mpi[1], thr[0], thr[1]);
         ASSERT_ALWAYS(size == mpi[0] * mpi[1] * thr[0] * thr[1]);
-        /* Keep the semantics which exist for krylov and so on --
-         * even though we are not really using threads here. */
+        /* The mpi and thr command line argument lead to the same number
+         * of working processes than with krylov. Except that here, we're
+         * not really doing threads, but running real mpi jobs with their
+         * own address space (hence mpirun will need a bigger -n
+         * argument).  In a sense, here we strive to follow the semantics
+         * used in bwc otherwise.  In fact, we should probably use the
+         * pi_wiring structures as well, so that we can say that we
+         * consistently use the same infrastructure.  For simplicity of
+         * the code, we don't.
+         */
         bm->mpi_dims[0] *= thr[0];
         bm->mpi_dims[1] *= thr[1];
         int tl_grank = rank % (thr[0] * thr[1]); // thread-level global rank
@@ -1787,92 +1798,16 @@ int main(int argc, char *argv[])
         int newrank = irank * mpi[1] * thr[1] + jrank;
         MPI_Comm_split(MPI_COMM_WORLD, 0, newrank, &(bm->world));
     }
+    /* }}} */
 
     if (param_list_warn_unused(pl))
 	usage();
-    /* }}} */
 
-    /* TODO: delegate them to other functions, elsewhere... */
-    int tune_bm_basecase = tune;
-    int tune_mp = tune;
-
-    if (tune_bm_basecase) {
-        unsigned int maxtune = 10000 / (m * n);
-        for(unsigned int k = 10 ; k < maxtune ; k += k/10) {
-            unsigned int * delta = malloc((m + n) * sizeof(unsigned int));
-            polymat E, pi;
-            polymat_init(pi, 0, 0, 0);
-            polymat_init(E, m, m+n, maxtune);
-            E->size = k;
-            for(unsigned int v = 0 ; v < E->m * E->n * E->size ; v++) {
-                abrandom(ab, E->x[v], rstate);
-            }
-            double tt = seconds();
-            for(unsigned int j = 0 ; j < m + n ; delta[j++]=1);
-            bm->t = 1;
-            bw_lingen_basecase(bm, pi, E, delta);
-            printf("%zu %.2e\n", E->size, (seconds()-tt) / (k * k));
-            polymat_clear(pi);
-            polymat_clear(E);
-            free(delta);
-        }
-    }
-
-    if (tune_mp) {
-        /* Now for benching mp and plain mul */
-        unsigned int maxtune = 10000 / (m*n);
-        /* Bench the products which would come together with a k-steps
-         * basecase algorithm. IOW a 2k, one-level recursive call incurs
-         * twice the k-steps basecase, plus once the timings counted here
-         * (presently, this has Karatsuba complexity)
-         */
-        for(unsigned int k = 10 ; k < maxtune ; k+= k/10) {
-            polymat E, piL, piR, pi, Er;
-            unsigned int sE = k*(m+2*n)/(m+n);
-            unsigned int spi = k*m/(m+n);
-            polymat_init(E, m, m+n, sE);
-            polymat_init(piL, m+n, m+n, spi);
-            polymat_init(piR, m+n, m+n, spi);
-            polymat_init(pi, m+n, m+n, spi*2);
-            polymat_init(Er, m, m+n, sE-spi+1);
-            E->size = sE;
-            for(unsigned int v = 0 ; v < E->m * E->n * E->size ; v++) {
-                abrandom(ab, E->x[v], rstate);
-            }
-            piL->size = spi;
-            piR->size = spi;
-            for(unsigned int v = 0 ; v < piL->m * piL->n * piL->size ; v++) {
-                abrandom(ab, piL->x[v], rstate);
-                abrandom(ab, piR->x[v], rstate);
-            }
-            double ttmp = 0, ttmul = 0;
-            ttmp -= seconds();
-            polymat_mp(ab, Er, E, piL);
-            ttmp += seconds();
-            ttmul -= seconds();
-            polymat_mul(ab, pi, piL, piR);
-            ttmul += seconds();
-            double ttmpq = ttmp / (k*k);
-            double ttmulq = ttmul / (k*k);
-            double ttmpk = ttmp / pow(k, 1.58);
-            double ttmulk = ttmul / pow(k, 1.58);
-            printf("%u [%.2e+%.2e = %.2e] [%.2e+%.2e = %.2e]\n",
-                    k,
-                    ttmpq, ttmulq, ttmpq + ttmulq,
-                    ttmpk, ttmulk, ttmpk + ttmulk
-                    );
-            // (seconds()-tt) / (k*k)); // ((sE-spi) * spi) / (m*(m+n)*(m+n)));
-            // printf("%zu %.2e\n", E->size, (seconds()-tt) / (k*k)); // (spi * spi) / ((m+n)*(m+n)*(m+n)));
-            polymat_clear(E);
-            polymat_clear(piL);
-            polymat_clear(piR);
-            polymat_clear(pi);
-            polymat_clear(Er);
-        }
-    }
-
-    if (tune)
+    if (tune) {
+        plingen_tuning(bm->d->ab, bm->d->m, bm->d->n, bm->world, pl);
+        MPI_Finalize();
         return 0;
+    }
 
     unsigned int (*fdesc)[2] = NULL;    /* gcc is stupid */
 
@@ -1982,7 +1917,6 @@ int main(int argc, char *argv[])
     bmstatus_clear(bm);
     bw_common_clear(bw);
     param_list_clear(pl);
-    gmp_randclear(rstate);
 
     MPI_Finalize();
     return 0;

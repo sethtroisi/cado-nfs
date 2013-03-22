@@ -1,15 +1,94 @@
 #include "cado.h"
 #include "abase.h"
 #include <stdlib.h>
+#include <gmp.h>
 #include "portability.h"
 #include "macros.h"
 #include "polymat.h"
 
-#define MIDDLE_PRODUCT_KARA_THRESHOLD   10
-#define MIDDLE_PRODUCT_SUBDIVIDE_THRESHOLD      MIDDLE_PRODUCT_KARA_THRESHOLD
-#define PRODUCT_KARA_THRESHOLD   10
-#define PRODUCT_SUBDIVIDE_THRESHOLD      PRODUCT_KARA_THRESHOLD
+#define POLYMAT_MUL_KARA_CUTOFF_DEFAULT { .cut = 10, .subdivide = 10, .table = NULL, .table_size = 0}
+#define POLYMAT_MP_KARA_CUTOFF_DEFAULT { .cut = 10, .subdivide = 10, .table = NULL, .table_size = 0}
 
+/*{{{ cutoffs and such */
+struct polymat_cutoff_info polymat_mul_kara_cutoff = POLYMAT_MUL_KARA_CUTOFF_DEFAULT;
+
+/* For the middle product, this is similar, but applies to the small
+ * operand length and to the result length
+ * (A balanced middle product is n times 2*n - 1, and gives n result
+ * coefficients. Here the important data is n).
+ * */
+/* FIXME: polymat_mul_kara_threshold and polymat_mp_kara_threshold should
+ * not differ, really. The only thing is that dimensions for mp and mul
+ * are not the same, hence the difference...
+ */
+struct polymat_cutoff_info polymat_mp_kara_cutoff = POLYMAT_MP_KARA_CUTOFF_DEFAULT;
+
+
+/* This sets the cutoffs. The table, if present in new_cutoff, is copied,
+ * and hence must be freed by the caller who allocated it in the first
+ * place.
+ * The old_cutoff (if not NULL) value should be initialized already, and
+ * receives initialized data.
+ */
+
+void polymat_cutoff_info_init(struct polymat_cutoff_info * c)
+{
+    memset(c, 0, sizeof(*c));
+    c->cut = UINT_MAX;
+}
+
+void polymat_cutoff_info_clear(struct polymat_cutoff_info * c)
+{
+    if (c->table) free(c->table);
+    c->cut = UINT_MAX;
+}
+
+static void polymat_set_generic_cutoff(struct polymat_cutoff_info * slot, const struct polymat_cutoff_info * new_cutoff, struct polymat_cutoff_info * old_cutoff)
+{
+    if (old_cutoff) {
+        if (old_cutoff->table) free(old_cutoff->table);
+        memcpy(old_cutoff, slot, sizeof(struct polymat_cutoff_info));
+    }
+    memcpy(slot, new_cutoff, sizeof(struct polymat_cutoff_info));
+    if (slot->table) {
+        slot->table = malloc(slot->table_size * sizeof(struct polymat_cutoff_info));
+        memcpy(slot->table, new_cutoff->table, slot->table_size * sizeof(struct polymat_cutoff_info));
+    }
+}
+
+void polymat_set_mul_kara_cutoff(const struct polymat_cutoff_info * new_cutoff, struct polymat_cutoff_info * old_cutoff)
+{
+    polymat_set_generic_cutoff(&polymat_mul_kara_cutoff, new_cutoff, old_cutoff);
+}
+
+void polymat_set_mp_kara_cutoff(const struct polymat_cutoff_info * new_cutoff, struct polymat_cutoff_info * old_cutoff)
+{
+    polymat_set_generic_cutoff(&polymat_mp_kara_cutoff, new_cutoff, old_cutoff);
+}
+
+int polymat_cutoff_get_alg_b(const struct polymat_cutoff_info * cutoff, unsigned int s)
+{
+    if (s >= cutoff->cut) return 1;
+    if (!cutoff->table) return 0;
+    unsigned int a = 0;
+    unsigned int b = cutoff->table_size;
+    for( ; b-a > 1 ; ) {
+        unsigned int c = (a+b)/2;
+        if (s >= cutoff->table[c][0]) {
+            a = c;
+        } else {
+            b = c;
+        }
+    }
+    return cutoff->table[a][1];
+}
+
+int polymat_cutoff_get_subdivide_ub(const struct polymat_cutoff_info * cutoff, unsigned int s0, unsigned int s1)
+{
+    return MIN(s0, s1) >= cutoff->subdivide;
+}
+
+/*}}}*/
 
 int polymat_check_pre_init(polymat_srcptr p)
 {
@@ -58,6 +137,17 @@ void polymat_swap(polymat_ptr a, polymat_ptr b)
     memcpy(a, b, sizeof(polymat));
     memcpy(b, x, sizeof(polymat));
 }
+
+void polymat_fill_random(abdst_field ab MAYBE_UNUSED, polymat_ptr a, unsigned int size, gmp_randstate_t rstate)
+{
+    ASSERT_ALWAYS(size <= a->alloc);
+    a->size = size;
+
+    for(unsigned int v = 0 ; v < a->m * a->n * a->size ; v++) {
+        abrandom(ab, a->x[v], rstate);
+    }
+}
+
 
 /* }}} */
 
@@ -262,17 +352,19 @@ void polymat_mul_raw_kara(abdst_field ab,/*{{{*/
         polymat b, unsigned int xb, unsigned int nb,
         int transpose, int add)
 {
-    if (MIN(na, nb) < PRODUCT_KARA_THRESHOLD) {
+    /* This code works __only__ for kara-sized products */
+    ASSERT_ALWAYS(nb == na);
+
+    if (polymat_cutoff_get_alg_b(&polymat_mul_kara_cutoff, MIN(na, nb)) == 0) {
         polymat_mul_raw_basecase(ab, c, xc, a, xa, na, b, xb, nb, transpose, add);
         return;
     }
+
     unsigned int nc = na + nb - 1;
     ASSERT_ALWAYS(c->alloc >= xc + nc);
     if (!add) {
         bwmat_zero_coeffs(ab, polymat_part(c, 0, 0, xc), 1, c->m*c->n*nc);
     }
-    /* This code works __only__ for kara-sized products */
-    ASSERT_ALWAYS(nb == na);
     unsigned int m0 = na / 2;
     unsigned int m1 = na - m0;
 
@@ -316,7 +408,7 @@ void polymat_mul_raw_subdivide(abdst_field ab,/*{{{*/
     if (!na || !nb) {
         return;
     }
-    if (MIN(na, nb) < PRODUCT_SUBDIVIDE_THRESHOLD) {
+    if (polymat_cutoff_get_subdivide_ub(&polymat_mul_kara_cutoff, na, nb) == 0) {
         polymat_mul_raw_basecase(ab, c, xc, a, xa, na, b, xb, nb, transpose, add);
         return;
     }
@@ -371,7 +463,7 @@ void polymat_mul(abdst_field ab, polymat c, polymat a, polymat b)/*{{{*/
 }/*}}}*/
 
 /* Middle product b of a and c. This is the part of the product where
- * there are the largest number of summands used to acccumulate the terms
+ * there are the largest number of summands used to accumulate the terms
  * of the result.
  *
  * Note that the first coefficient computed is stored as the coefficient
@@ -435,8 +527,10 @@ void polymat_mp_raw_kara(abdst_field ab,/*{{{*/
         polymat c, unsigned int xc, unsigned int nc,
         int transpose, int add)
 {
+    /* This code works __only__ for kara-sized middle products */
+    ASSERT_ALWAYS(nc == 2*na - 1 || na == 2*nc - 1);
     // printf("mp_kara(%d,%d)%b\n",na,nc,transpose?'T':' ');
-    if (MIN(na, nc) < MIDDLE_PRODUCT_KARA_THRESHOLD) {
+    if (polymat_cutoff_get_alg_b(&polymat_mp_kara_cutoff, MIN(na, nc)) == 0) {
         polymat_mp_raw_basecase(ab, b, xb, a, xa, na, c, xc, nc, transpose, add);
         return;
     }
@@ -444,8 +538,6 @@ void polymat_mp_raw_kara(abdst_field ab,/*{{{*/
         polymat_mp_raw_kara(ab, b, xb, c, xc, nc, a, xa, na, !transpose, add);
         return;
     }
-    /* This code works __only__ for kara-sized middle products */
-    ASSERT_ALWAYS(nc == 2*na - 1);
     unsigned int m0 = na / 2;
     unsigned int m1 = na - m0;
     /* Spans of different chunks, in (offset, length) format */
@@ -522,13 +614,11 @@ void polymat_mp_raw_subdivide(abdst_field ab,/*{{{*/
         int transpose, int add)
 {
     // printf("mp_subdivide(%d,%d)%b\n",na,nc,transpose?'T':' ');
-    /* TODO. Presently the strategy below uses only areas of balanced
-     * size (karatsuba-friendly). This is possibly inefficient, if for
-     * example nc/na on input is classically close to a ratio which is
-     * much different. In block Wiedemann for example, nc/na is typically
-     * 1+2n/m, which may well be 3 for instance if m=n=1. In such a case,
-     * the present code will reduce our mp to 2*3 = 6 balanced middle
-     * products.
+    /* 
+     * In block Wiedemann, nc/na is typically 1+2n/m, which may well be 3
+     * for instance if m=n=1. In such a case, the present code will
+     * reduce our mp to 2*3 = 6 balanced middle products
+     * (Karatsuba-friendly).
      *
      * Other options could be to rely on e.g. a polymat_mp_raw_toom24,
      * which would use the following operations to fall back on only 5
@@ -545,35 +635,20 @@ void polymat_mp_raw_subdivide(abdst_field ab,/*{{{*/
      *  z2 = t1 + t3 + 4*t4
      *  z3 = -t1 + t2 + t3 + 8*t4
      *
-     * Another option, slightly less efficient, uses a
-     * polymat_mp_raw_toom23 to fall back on balanced middle products in
-     * 2 recursion steps. The used formulae, which absorb a ratio nc/na
-     * close to 2.5, are as follows:
-     *
-     * Formulae for MP(2k, 5k)-> 3k
-     *  t0 (x0 - x2)*y1
-     *  t1 1/2*(x1 - x2)*(y0 - y1)
-     *  t2 -(x1 - x3)*y0
-     *  t3 1/2*(x1 + x2)*(y0 + y1)
-     *  z0 t0 + t1 + t3
-     *  z1 -t1 + t3
-     *  z2 t1 + t2 + t3
-     *
      * The different options, for reaching balanced products of size
-     * k/4,2*(k/4) from something of size k,3k are:
-     *  - as we do here: Karatsuba twice, two steps: 2*3*3=18M
-     *  - using toom24, followed by Karatsuba: 5*3=15M
-     *  - using toom23 twice: 4*4=16M.
+     * k/2,2*(k/2) from something of size k,3k are:
+     *  - as we do here: Karatsuba twice: 2*3=6M
+     *  - using toom24: 5M (but note the divisions by constants !)
      */
     if (!na || !nc) {
         return;
     }
-    if (MIN(na, nc) < MIDDLE_PRODUCT_SUBDIVIDE_THRESHOLD) {
-        polymat_mp_raw_basecase(ab, b, xb, a, xa, na, c, xc, nc, transpose, add);
-        return;
-    }
     if (nc < na) {
         polymat_mp_raw_subdivide(ab, b, xb, c, xc, nc, a, xa, na, !transpose, add);
+        return;
+    }
+    if (polymat_cutoff_get_subdivide_ub(&polymat_mp_kara_cutoff, na, nc) == 0) {
+        polymat_mp_raw_basecase(ab, b, xb, a, xa, na, c, xc, nc, transpose, add);
         return;
     }
     ASSERT(nc >= na);

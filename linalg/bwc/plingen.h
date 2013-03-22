@@ -13,9 +13,4 @@
 
 typedef struct { unsigned int m,n; abfield ab; } dims;
 
-
-#ifdef __cplusplus
-}
-#endif
-
 #endif	/* PLINGEN_H_ */

@@ -271,10 +271,12 @@ if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
 add_executable(plingen EXCLUDE_FROM_ALL
                 bw-common.c
                 plingen.c
+                plingen-tuning.cpp
                 polymat.c
                 mpfq/abase_p_${plingen_prime_nwords}.c
                 bigpolymat.c
         )
+set_source_files_properties(plingen-tuning.cpp COMPILE_FLAGS "-std=c++11")
 
 target_link_libraries(plingen gmp utils)
 set_target_properties(plingen PROPERTIES

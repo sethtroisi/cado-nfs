@@ -50,6 +50,8 @@ typedef const struct bigpolymat_ur_s * bigpolymat_ur_srcptr;
 extern "C" {
 #endif
 
+void bigpolymat_bcast_polymat_cutoff(struct polymat_cutoff_info * slot, int rank, MPI_Comm comm);
+
 void bigpolymat_init(bigpolymat_ptr p, bigpolymat_srcptr model, unsigned int m, unsigned int n, int len);
 void bigpolymat_finish_init(bigpolymat_ptr p, unsigned int m, unsigned int n, int len);
 void bigpolymat_init_model(bigpolymat_ptr model, MPI_Comm comm, unsigned int m, unsigned int n);
