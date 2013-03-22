@@ -5,9 +5,9 @@ set -x
 
 top=`dirname $0`/../..
 export DEBUG=1
-# export MPI=1
+export MPI=1
 make -s -C $top -j 4
-make -s -C $top -j 4 mpi-plingen
+make -s -C $top -j 4 plingen
 eval `make -s -C $top show`
 bins=$top/$build_tree/linalg/bwc
 mats=$HOME/Local/mats
@@ -22,7 +22,7 @@ mkdir $wdir
 m=8 n=4
 
 Mh=1; Mv=1;
-Th=1; Tv=1;
+Th=2; Tv=2;
 Nh=$((Mh*Th))
 Nv=$((Mv*Tv))
 
@@ -132,12 +132,10 @@ while [ $j0 -lt $n ] ; do
 done
 
 afile=$($bins/acollect wdir=$wdir m=$m n=$n bits-per-coeff=$bits_per_coeff --remove-old | tail -1)
-$bins/plingen lingen-mpi-threshold=10000 lingen-threshold=10 m=$m n=$n wdir=$wdir prime=$prime afile=$afile
+
+mpirun -n $mpi_njobs_lingen $bins/plingen lingen-mpi-threshold=10000 lingen-threshold=10 m=$m n=$n wdir=$wdir prime=$prime afile=$afile mpi=$mpi thr=$thr
 
 ln $wdir/$afile.gen $wdir/F
-
-# Create the n sequences, for the n solutions. That makes n^2 files,
-# really!
 
 # This does the splitting as documented in mksol.c, e.g. with F on disk
 # stored as the transpose of the reversal of the F in A*F=G+O(X^t).

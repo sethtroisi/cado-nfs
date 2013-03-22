@@ -16,8 +16,8 @@
 #include "macros.h"
 #include "utils.h"
 #include "abase.h"
-#include "polymat.h"
-#include "bigpolymat.h"
+#include "lingen-polymat.h"
+#include "lingen-bigpolymat.h"
 #include "plingen.h"
 #include "plingen-tuning.h"
 

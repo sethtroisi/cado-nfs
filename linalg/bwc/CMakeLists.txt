@@ -272,9 +272,9 @@ add_executable(plingen EXCLUDE_FROM_ALL
                 bw-common.c
                 plingen.c
                 plingen-tuning.cpp
-                polymat.c
+                lingen-polymat.c
                 mpfq/abase_p_${plingen_prime_nwords}.c
-                bigpolymat.c
+                lingen-bigpolymat.c
         )
 set_source_files_properties(plingen-tuning.cpp COMPILE_FLAGS "-std=c++11")
 

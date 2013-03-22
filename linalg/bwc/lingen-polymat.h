@@ -16,17 +16,6 @@ typedef struct polymat_s polymat[1];
 typedef struct polymat_s * polymat_ptr;
 typedef const struct polymat_s * polymat_srcptr;
 
-struct polymat_ur_s {
-    unsigned int m;
-    unsigned int n;
-    size_t size;
-    size_t alloc;
-    abelt_ur * x;
-};
-typedef struct polymat_ur_s polymat_ur[1];
-typedef struct polymat_ur_s * polymat_ur_ptr;
-typedef const struct polymat_ur_s * polymat_ur_srcptr;
-
 /* {{{ cut-off structures */
 /* This structure is used to decide which algorithm to use for a given
  * input length. This essentially is a function from N*N to a finite set of
@@ -42,7 +31,7 @@ typedef const struct polymat_ur_s * polymat_ur_srcptr;
  * At the moment there is no additional table designed to improve the
  * choice.
  *
- * Cutoffs are used only by polymat.c and bigpolymat.c -- however the
+ * Cutoffs are used only by lingen-polymat.c and lingen-bigpolymat.c -- however the
  * tuning program also uses it, so we expose it here too.
  */
 /* Such a cutoff structure is used for finding which algorithm to used
@@ -75,24 +64,15 @@ extern "C" {
 #endif
 void polymat_init(polymat_ptr p, unsigned int m, unsigned int n, int len);
 int polymat_check_pre_init(polymat_srcptr p);
-void polymat_realloc(polymat_ptr p, int newalloc);
+void polymat_realloc(polymat_ptr p, size_t newalloc);
 void polymat_zero(polymat_ptr p);
 void polymat_clear(polymat_ptr p);
 void polymat_fill_random(abdst_field ab MAYBE_UNUSED, polymat_ptr a, unsigned int size, gmp_randstate_t rstate);
 void polymat_swap(polymat_ptr a, polymat_ptr b);
 static inline abelt * polymat_part(polymat_ptr p, unsigned int i, unsigned int j, unsigned int k);
 static inline abdst_elt polymat_coeff(polymat_ptr p, unsigned int i, unsigned int j, unsigned int k);
-void polymat_ur_init(polymat_ur_ptr p, unsigned int m, unsigned int n, int len);
-void polymat_ur_realloc(polymat_ur_ptr p, int newalloc);
-void polymat_ur_zero(polymat_ur_ptr p);
-void polymat_ur_clear(polymat_ur_ptr p);
-void polymat_ur_swap(polymat_ur_ptr a, polymat_ur_ptr b);
-static inline abelt_ur * polymat_ur_part(polymat_ur_ptr p, unsigned int i, unsigned int j, unsigned int k);
-static inline abdst_elt_ur polymat_ur_coeff(polymat_ur_ptr p, unsigned int i, unsigned int j, unsigned int k);
 
 
-void bwmat_copy_coeffs(abdst_field ab MAYBE_UNUSED, abelt * x0, int stride0, abelt * x1, int stride1, unsigned int n);
-void bwmat_move_coeffs(abdst_field ab MAYBE_UNUSED, abelt * x0, int stride0, abelt * x1, int stride1, unsigned int n);
 
 void polymat_addmat(abdst_field ab,
         polymat c, unsigned int kc,
@@ -104,13 +84,20 @@ void polymat_submat(abdst_field ab,
         polymat a, unsigned int ka,
         polymat b, unsigned int kb);
 
-void polymat_reducemat(abdst_field ab,
-        polymat c, unsigned int kc,
-        polymat_ur a, unsigned int ka);
+void polymat_truncate(abdst_field ab, polymat_ptr dst, polymat_ptr src, unsigned int size);
+void polymat_multiply_column_by_x(abdst_field ab, polymat_ptr pi, unsigned int j, unsigned int size);
+void polymat_extract_column(abdst_field ab,
+        polymat_ptr dst, unsigned int jdst, unsigned int kdst,
+        polymat_ptr src, unsigned int jsrc, unsigned int ksrc);
+void polymat_rshift(abdst_field ab, polymat_ptr dst, polymat_ptr src, unsigned int k);
 
 
 void polymat_mul(abdst_field ab, polymat c, polymat a, polymat b);
 void polymat_mp(abdst_field ab, polymat c, polymat a, polymat b);
+
+/* The only reason why this stays is because in bigpolymat, we do need
+ * some version with an _add flag.
+ */
 void polymat_mp_raw(abdst_field ab,
         polymat c,
         unsigned int xc,
@@ -128,20 +115,11 @@ void polymat_mp_raw(abdst_field ab,
 static inline abelt * polymat_part(polymat_ptr p, unsigned int i, unsigned int j, unsigned int k) {
     /* Assume row-major in all circumstances. Old code used to support
      * various orderings, here we don't */
+    ASSERT_ALWAYS(p->size);
     return p->x+(k*p->m+i)*p->n+j;
 }
 static inline abdst_elt polymat_coeff(polymat_ptr p, unsigned int i, unsigned int j, unsigned int k) {
     return *polymat_part(p,i,j,k);
-}
-/* }}} */
-/* {{{ access interface for polymat_ur */
-static inline abelt_ur * polymat_ur_part(polymat_ur_ptr p, unsigned int i, unsigned int j, unsigned int k) {
-    /* Assume row-major in all circumstances. Old code used to support
-     * various orderings, here we don't */
-    return p->x+(k*p->m+i)*p->n+j;
-}
-static inline abdst_elt_ur polymat_ur_coeff(polymat_ur_ptr p, unsigned int i, unsigned int j, unsigned int k) {
-    return *polymat_ur_part(p,i,j,k);
 }
 /* }}} */
 

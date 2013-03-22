@@ -4,8 +4,12 @@
 #include <unistd.h>     // getpid for debugging
 #include "portability.h"
 #include "macros.h"
-#include "polymat.h"
-#include "bigpolymat.h"
+#include "lingen-polymat.h"
+#include "lingen-bigpolymat.h"
+
+/* It's not entirely clear that I will need this, but who knows. */
+extern void bwmat_copy_coeffs(abdst_field ab MAYBE_UNUSED, abelt * x0, int stride0, abelt * x1, int stride1, unsigned int n);
+extern void bwmat_move_coeffs(abdst_field ab MAYBE_UNUSED, abelt * x0, int stride0, abelt * x1, int stride1, unsigned int n);
 
 void bigpolymat_bcast_polymat_cutoff(struct polymat_cutoff_info * slot, int root, MPI_Comm comm)
 {
@@ -127,6 +131,29 @@ void bigpolymat_clear(bigpolymat_ptr p)
     bigpolymat_clear_model(p);
 }
 
+/* Return a bitmask indicating whether bigpolymat_provision_{row,col} has
+ * been called on this matrix before. bit 0 is for row, bit 1 is for col.
+ * If the returned value is zero, then we really have only the local part
+ * of this matrix for the moment.
+ */
+int bigpolymat_provisioned(bigpolymat_ptr p)
+{
+    if (bigpolymat_check_pre_init(p)) return 0;
+    int irank;
+    int jrank;
+    MPI_Comm_rank(p->col, &irank);
+    MPI_Comm_rank(p->row, &jrank);
+    unsigned int np_row = 0;
+    unsigned int np_col = 0;
+    for(unsigned int j = 0 ; j < p->n1 ; j++)
+        np_row += bigpolymat_cell(p, irank, j)->x != NULL;
+    for(unsigned int i = 0 ; i < p->m1 ; i++)
+        np_col += bigpolymat_cell(p, i, jrank)->x != NULL;
+    ASSERT_ALWAYS(np_row == 1 || np_row == p->n1);
+    ASSERT_ALWAYS(np_col == 1 || np_col == p->m1);
+    return (np_row>1)+((np_col>1)<<1);
+}
+
 
 /* We are a left multiplicand. This is a no-op if space for our row has
  * already been allocated */
@@ -144,6 +171,25 @@ void bigpolymat_provision_row(bigpolymat_ptr p)
         polymat_init(them, p->m0, p->n0, me->alloc);
     }
 }
+/* Rarely useful. We do need it because we resort to a kludgy
+ * implementation of scatter_mat, which calls for provisioning on all
+ * rows.
+ */
+
+void bigpolymat_unprovision_row(bigpolymat_ptr p)
+{
+    int irank;
+    int jrank;
+    MPI_Comm_rank(p->col, &irank);
+    MPI_Comm_rank(p->row, &jrank);
+    for(unsigned int j = 0 ; j < p->n1 ; j++) {
+        if (j == (unsigned int) jrank) continue;
+        polymat_ptr them = bigpolymat_cell(p, irank, j);
+        if (!them->x) continue;
+        polymat_clear(them);
+    }
+}
+
 /* We are a right multiplicand. This is a no-op if space for our col has
  * already been allocated */
 void bigpolymat_provision_col(bigpolymat_ptr p)
@@ -172,9 +218,9 @@ void bigpolymat_set_size(bigpolymat_ptr p, size_t size)
     MPI_Comm_rank(p->col, &irank);
     MPI_Comm_rank(p->row, &jrank);
     polymat_ptr me = bigpolymat_my_cell(p);
+    ASSERT_ALWAYS(size <= me->alloc);
     p->size = size;
     me->size = size;
-    ASSERT_ALWAYS(me->size <= me->alloc);
     for(unsigned int j = 0 ; j < p->n1 ; j++) {
         if (j == (unsigned int) jrank) continue;
         polymat_ptr them = bigpolymat_cell(p, irank, j);
@@ -193,6 +239,7 @@ void bigpolymat_set_size(bigpolymat_ptr p, size_t size)
 
 /* If our row or col cells have already been allocated, then reallocate
  * them as well (XXX is it clear or not ?) */
+#if 0 /* This function has never been used or needed */
 void bigpolymat_realloc(bigpolymat_ptr p, int newalloc)
 {
     int irank;
@@ -214,6 +261,7 @@ void bigpolymat_realloc(bigpolymat_ptr p, int newalloc)
         polymat_realloc(them, newalloc);
     }
 }
+#endif
 
 /* This zeroes out _our_ cell */
 void bigpolymat_zero(bigpolymat_ptr p)
@@ -232,7 +280,6 @@ void bigpolymat_swap(bigpolymat_ptr a, bigpolymat_ptr b)
 }
 
 /* }}} */
-/* interface for polymat_ur is just query-replace */
 
 /* Add coefficient of degree ka in a, and kb in b, into coeff of degree
  * kc in c.
@@ -263,16 +310,30 @@ void bigpolymat_submat(abdst_field ab,
     polymat_submat(ab, lc, kc, la, ka, lb, kb);
 }
 
-#if 0
-void bigpolymat_reducemat(abdst_field ab,
-        bigpolymat c, unsigned int kc,
-        bigpolymat_ur a, unsigned int ka)
+void bigpolymat_truncate_loc(abdst_field ab, bigpolymat_ptr dst, bigpolymat_ptr src, unsigned int size)/*{{{*/
 {
-    polymat_ur_ptr la = bigpolymat_ur_my_cell(a);
-    polymat_ptr lc = bigpolymat_my_cell(c);
-    polymat_reducemat(ab, lc, kc, la, ka);
+    ASSERT_ALWAYS(bigpolymat_provisioned(src) == 0);
+    ASSERT_ALWAYS(bigpolymat_provisioned(dst) == 0);
+    if (bigpolymat_check_pre_init(dst)) {
+        bigpolymat_finish_init(dst, src->m, src->n, size);
+    }
+    polymat_truncate(ab, bigpolymat_my_cell(dst), bigpolymat_my_cell(src), size);
+    dst->size = bigpolymat_my_cell(dst)->size;
 }
-#endif
+/*}}}*/
+
+void bigpolymat_rshift(abdst_field ab, bigpolymat_ptr dst, bigpolymat_ptr src, unsigned int k)/*{{{*/
+{
+    if (bigpolymat_check_pre_init(dst)) {
+        bigpolymat_finish_init(dst, src->m, src->n, src->size - k);
+    }
+    ASSERT_ALWAYS(bigpolymat_provisioned(dst) == 0);
+    ASSERT_ALWAYS(bigpolymat_provisioned(src) == 0);
+    polymat_rshift(ab, bigpolymat_my_cell(dst), bigpolymat_my_cell(src), k);
+    dst->size = bigpolymat_my_cell(dst)->size;
+}
+/*}}}*/
+
 
 /* {{{ allgather operations */
 void bigpolymat_allgather_row(bigpolymat a)
@@ -309,9 +370,12 @@ void bigpolymat_allgather_col(bigpolymat a)
         MPI_Bcast(data->x, data->m * data->n * data->size * sizeof(abelt), MPI_BYTE, k, a->col);
     }
 }
-/* scatter from node 0 */
+/* scatter from node 0. This is not a very interesting function, in fact
+ * it's used only within bigpolymat_scatter_mat. We assume that data for
+ * all rows is currently present at node 0 in each row, and we we
+ * dispatch this data to the rows which actually do need it. */
 /* TODO: post asynchronous sends ? */
-void bigpolymat_scatter_row(bigpolymat a)
+static void bigpolymat_scatter_row(bigpolymat a)
 {
     int irank;
     int jrank;
@@ -341,43 +405,6 @@ void bigpolymat_scatter_row(bigpolymat a)
     }
 }
 /* }}} */
-
-#if 0   /* I doubt we'll need these... */
-/* This one needs communication */
-void bigpolymat_addmulmat_ur(abdst_field ab,
-        bigpolymat_ur c, unsigned int kc,
-        bigpolymat a, unsigned int ka,
-        bigpolymat b, unsigned int kb)
-{
-    int irank;
-    int jrank;
-    MPI_Comm_rank(c->col, &irank);
-    MPI_Comm_rank(c->row, &jrank);
-    bigpolymat_allgather_row(a);
-    bigpolymat_allgather_col(b);
-    polymat_ur_ptr lc = bigpolymat_ur_my_cell(c);
-    ASSERT_ALWAYS(a->n == b->m);
-    for(unsigned int k = 0 ; k < a->n ; k++) {
-        polymat_addmulmat_ur(ab, lc, kc,
-                bigpolymat_cell(a, irank, k), ka
-                bigpolymat_cell(b, k, jrank), kb);
-    }
-}
-
-void bigpolymat_mulmat(abdst_field ab,
-        bigpolymat c, unsigned int kc,
-        bigpolymat a, unsigned int ka,
-        bigpolymat b, unsigned int kb)
-{
-    bigpolymat_ur cx;
-    /* FIXME: interface-wise, having to multiply here is ugly. Prefer n1
-     * for the mpi-level sizes ? */
-    bigpolymat_ur_init(cx, c, c->m * c->m0, c->n * c->n0, 1);
-    bigpolymat_addmulmat_ur(ab, cx, 0, a, ka, b, kb);
-    bigpolymat_reducemat(ab, c, kc, cx, 0);
-    bigpolymat_ur_clear(cx);
-}
-#endif
 
 void bigpolymat_mul(abdst_field ab, bigpolymat c, bigpolymat a, bigpolymat b)/*{{{*/
 {
@@ -425,14 +452,13 @@ void bigpolymat_mp_raw(abdst_field ab,/*{{{*/
         int transpose, int add)
 {
     unsigned int nb = MAX(na, nc) - MIN(na, nc) + 1;
-    /*
     ASSERT_ALWAYS(a->n == c->m);
     ASSERT_ALWAYS(a->n1 == c->m1);
     ASSERT_ALWAYS(c->m);
     ASSERT_ALWAYS(b->m == a->m);
     ASSERT_ALWAYS(b->n == c->n);
-    // ASSERT_ALWAYS(b->alloc >= nb);
-    */
+    polymat_ptr lb = bigpolymat_my_cell(b);
+    ASSERT_ALWAYS(lb->alloc >= xb + nb);
     int irank;
     int jrank;
     MPI_Comm_rank(b->col, &irank);
@@ -446,12 +472,7 @@ void bigpolymat_mp_raw(abdst_field ab,/*{{{*/
         bigpolymat_allgather_col(a);
     }
 
-    // bigpolymat b0;
-    // bigpolymat_init(b0, b, b->m, b->n, b->size);
-    // polymat_ptr lb0 = bigpolymat_my_cell(b0);
-    polymat_ptr lb = bigpolymat_my_cell(b);
     lb->size = c->size;
-    // lb0->size = c->size;
     if (!add)
         bigpolymat_zero(b);
     bigpolymat_set_size(b, nb);
@@ -473,7 +494,19 @@ void bigpolymat_mp_raw(abdst_field ab,/*{{{*/
         }
         */
     }
-    // bigpolymat_clear(b0);
+}/*}}}*/
+void bigpolymat_mp(abdst_field ab,/*{{{*/
+        bigpolymat b, bigpolymat a, bigpolymat c)
+{
+    ASSERT_ALWAYS(a->n == c->m);
+    unsigned int mp_len = MAX(a->size,c->size) - MIN(a->size,c->size) + 1;
+    if (bigpolymat_check_pre_init(b)) {
+        bigpolymat_finish_init(b, a->m, c->n, mp_len);
+    }
+    ASSERT_ALWAYS(b->m == a->m);
+    ASSERT_ALWAYS(b->n == c->n);
+    bigpolymat_set_size(b, mp_len);
+    bigpolymat_mp_raw(ab, b, 0, a, 0, a->size, c, 0, c->size, 0, 0);
 }/*}}}*/
 
 /* Collect everything into node 0 */
@@ -496,6 +529,7 @@ void bigpolymat_gather_mat(abdst_field ab, polymat dst, bigpolymat src)
      * communication pattern.
      */
     bigpolymat_allgather_row(src);
+    dst->size = src->size;
     /* Do this on all nodes. This will aid the coding of the next gather
      * */
     unsigned int ibase = irank * src->m0;
@@ -544,7 +578,6 @@ void bigpolymat_gather_mat(abdst_field ab, polymat dst, bigpolymat src)
             src->m * src->n * src->size * sizeof(abelt),
             MPI_BYTE,
             MPI_BXOR, 0, src->col);
-    dst->size = src->size;
 }
 
 /* Exactly the converse of the previous function. */
@@ -566,7 +599,8 @@ void bigpolymat_scatter_mat(abdst_field ab, bigpolymat_ptr dst, polymat_ptr src)
         ASSERT_ALWAYS(pre_init_status[0] == 0);
     }
 
-    if (pre_init_status[1]) {   /* nodes other than root are uninitialized */
+    /* source argument src at nodes other than root are uninitialized */
+    if (pre_init_status[1]) {
         /* So, initialize them... */
         /* XXX. This is quite unelegant */
         if (irank || jrank) {
@@ -600,12 +634,14 @@ void bigpolymat_scatter_mat(abdst_field ab, bigpolymat_ptr dst, polymat_ptr src)
      */
     MPI_Bcast(
             polymat_part(src, 0, 0, 0),
-            dst->m * dst->n * dst->size * sizeof(abelt),
+            src->m * src->n * src->size * sizeof(abelt),
             MPI_BYTE,
             0,
             dst->col);
     /* Now scatter across rows */
     bigpolymat_provision_row(dst);
+    /* propagate the size info */
+    bigpolymat_set_size(dst, dst->size);
     /* Copy our polymat parts to our local bigpolymat cells. Then we'll
      * do scatter() (admittedly, this is one extra copy which we could
      * seek to avoid) */
@@ -621,8 +657,6 @@ void bigpolymat_scatter_mat(abdst_field ab, bigpolymat_ptr dst, polymat_ptr src)
             }
         }
     }
-    /* Make sure all peer cells do have the data size field correctly set
-     * up */
-    bigpolymat_set_size(dst, dst->size);
     bigpolymat_scatter_row(dst);
+    bigpolymat_unprovision_row(dst);
 }
