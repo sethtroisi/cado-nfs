@@ -1,8 +1,8 @@
 
-m:=1;
-n:=1;
+m:=8;
+n:=4;
 
-p:=109378681671075297195692480234213908123642560192251038455204252439;
+p:=1009;
 
 load "/tmp/bwcp/t.m"; M:=Matrix(GF(p),Matrix(var));
 KP<X>:=PolynomialRing(GF(p));
@@ -81,7 +81,9 @@ q:=SymmetricGroup(ncx)![preshuf(x):x in [1..ncx]];
 Q:=PermutationMatrix(GF(p),q);
 q0:=SymmetricGroup(nc)![preshuf(x):x in [1..nc]];
 Q0:=PermutationMatrix(GF(p),q0);
-Transpose(Pr*Sr)*Mt*Sc eq Mx*Q;
+
+/* Does this hold, really ? */
+print Transpose(Pr*Sr)*Mt*Sc eq Mx*Q, " (this boolean may sometimes be wrong, I think)";
 // t means twisted.
 
 /* Note that Mt being equal to Pr times Sr*Cr*M*Transpose(Cc)*Sc^-1 is a
@@ -117,7 +119,12 @@ end function;
 
 g:=group(Ceiling(Log(2^64,p)));
 
+/* No load in conditionals. Anyway we never use Y.
+if n eq 1 then
 load "/tmp/bwcp/Y0.m"; Y0:=Vector(GF(p),nr,g(var));
+end if;
+*/
+
 load "/tmp/bwcp/V0.m"; V0:=Vector(GF(p),nr,g(var));
 load "/tmp/bwcp/V1.m"; V1:=Vector(GF(p),nr,g(var));
 load "/tmp/bwcp/V2.m"; V2:=Vector(GF(p),nr,g(var));
@@ -165,21 +172,53 @@ end function;
 mcoeff:=func<M,k|Matrix(CoefficientRing(CoefficientRing(M)),Nrows(M),Ncols(M),[Coefficient(M[i,j],k):j in [1..Ncols(M)], i in [1..Nrows(M)]])>;
 mdiv:=func<M,k|Matrix(KP,Nrows(M),Ncols(M),[M[i,j] div KP.1^k:j in [1..Ncols(M)], i in [1..Nrows(M)]] where KP is CoefficientRing(M))>;
 mmod:=func<M,k|Matrix(KP,Nrows(M),Ncols(M),[M[i,j] mod KP.1^k:j in [1..Ncols(M)], i in [1..Nrows(M)]] where KP is CoefficientRing(M))>;
+mval:=func<M|Minimum([Valuation(M[i,j]):i in [1..Nrows(M)], j in [1..Ncols(M)]])>;
 
 
 load "/tmp/bwcp/A.m";
 A:=matpol_from_sequence(var,m,n);
 
 
-load "/tmp/bwcp/F0-1.m";
+load "/tmp/bwcp/F.m";
 F,Fr:=matpol_from_sequence(var,n,n);
+F:=Transpose(F);
+Fr:=Transpose(Fr);
+
+degF:=Maximum([Degree(F[i,j]):i,j in [1..n]]);
+
+if IsZero(mmod(F, 1)) then
+    print "Very weird, first coefficient in F stored as zero !?!!?";
+end if;
+
+for j in [1..n] do
+    for e in [0..10] do
+        degcol:=Maximum([Degree(Fr[i,j]):i in [1..n]]);
+        v:=mval(mdiv(A*Submatrix(Fr,1,j,n,1),degcol+e));
+        if v ge 10 then
+            printf "Solution column %o: with delta=%o+%o, found %o zeros\n",
+                j, degcol, e, v;
+            break;
+        end if;
+    end for;
+end for;
+// something like this should work.
+// IsZero(mmod(mdiv(A*Fr,degF),159));
 
 
-load "/tmp/bwcp/W.m";    W:=Vector(GF(p), nr, var);
 
-IsZero(W*Transpose(Mx*Q));
+load "/tmp/bwcp/K0.m";    K0:=Vector(GF(p), nr, var);
+
+W:=K0;
+for i in [1..10] do
+    if IsZero(W*Transpose(Mx*Q)) then break; end if;
+    printf "Now considering M^%o*W\n", i;
+    W:=W*Transpose(Mx*Q);
+end for;
+
+assert IsZero(W*Transpose(Mx*Q));
+
 assert Mt eq Pr*Sr*Mx*Q*Sc^-1;
-Mt eq P*S*Mx*Q*S^-1;
+print Mt eq P*S*Mx*Q*S^-1, " (true only for shuffled product)";
 Transpose(Pr*Sr)*Mt*Sc eq Mx*Q;
 Mx eq Cr*M*Transpose(Cc);
 

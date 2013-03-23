@@ -265,7 +265,7 @@ target_link_libraries(cleanup utils m)
 
 install(TARGETS cleanup RUNTIME DESTINATION bin/linalg/bwc)
 
-set(plingen_prime_nwords 4)
+set(plingen_prime_nwords 1)
 
 if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
 add_executable(plingen EXCLUDE_FROM_ALL

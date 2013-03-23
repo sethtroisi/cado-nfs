@@ -143,6 +143,8 @@ int bw_common_init_shared(struct bw_params * bw, param_list pl, int * p_argc, ch
         fprintf(stderr, "parameter m and/or n is missing\n");
         usage();
     }
+    bw->nsolvecs = bw->n;
+    param_list_parse_int(pl, "nsolvecs", &bw->nsolvecs);
 
     bw->number_of_check_stops = param_list_parse_int_list(pl, "check_stops", bw->check_stops, MAX_NUMBER_OF_CHECK_STOPS, ",");
     int interval_already_in_check_stops = 0;

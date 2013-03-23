@@ -1517,11 +1517,37 @@ void write_f(bmstatus_ptr bm, const char * filename, polymat f_red, unsigned int
             continue;
         sols[jj++]=j;
     }
+    /* Apparently it occurs that F can have a zero coefficient in
+     * delta[j], or at least some columns of F. This seems to have a
+     * slight potential of missing part of the solution space. Hence we
+     * check whether, for each column, the coefficients of degree
+     * delta[j] in F are zero or not. If they are all zero, we reduce
+     * delta[j] by one unit for the purpose of this function, as this
+     * will lead to the same sequence of vectors being computed in the
+     * end. Whether or not this is the _real_ delta[j], corresponding to
+     * the right-hand side having zero coefficients for degrees
+     * [delta[j]..t[, is out of our concern.
+     */
+    for(unsigned int jj = 0 ; jj < n ; jj++) {
+        unsigned int j = sols[jj];
+        unsigned int delta_orig = delta[j];
+        for(int z = 1; z && delta[j] ; delta[j]-=z) {
+            for(unsigned int i = 0 ; z && i < n ; i++) {
+                z = abis_zero(ab, polymat_coeff(f_red, i, jj, delta[j]));
+            }
+        }
+        if (delta_orig > delta[j]) {
+            printf("Reduced solution column #%u from delta=%u to delta=%u\n",
+                    j, delta_orig, delta[j]);
+        }
+    }
+
+    /* Do as we do in lingen-binary.cpp: transpose the solutions */
     if (ascii) {
         for(unsigned int k = 0 ; k < flen ; k++) {
-            for(unsigned int i = 0 ; i < n ; i++) {
-                for(unsigned int jj = 0 ; jj < n ; jj++) {
-                    if (jj) fprintf(f, " ");
+            for(unsigned int jj = 0 ; jj < n ; jj++) {
+                for(unsigned int i = 0 ; i < n ; i++) {
+                    if (i) fprintf(f, " ");
                     unsigned int j = sols[jj];
                     if (k <= delta[j]) {
                         abfprint(ab, f, polymat_coeff(f_red, i, jj, delta[j]-k));
@@ -1537,9 +1563,9 @@ void write_f(bmstatus_ptr bm, const char * filename, polymat f_red, unsigned int
         abelt tmp;
         abinit(ab, &tmp);
         for(unsigned int k = 0 ; k < flen ; k++) {
-            for(unsigned int i = 0 ; i < n ; i++) {
-                for(unsigned int jj = 0 ; jj < n ; jj++) {
-                    unsigned int j = sols[jj];
+            for(unsigned int jj = 0 ; jj < n ; jj++) {
+                unsigned int j = sols[jj];
+                for(unsigned int i = 0 ; i < n ; i++) {
                     abset_zero(ab, tmp);
                     if (k <= delta[j])
                         abset(ab, tmp, polymat_coeff(f_red, i, jj, delta[j]-k));

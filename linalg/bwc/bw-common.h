@@ -50,6 +50,13 @@ struct bw_params {
      */
     int ys[2];
 
+    /* for mksol only: by default this is n, but it is possible to have
+     * it set to a small divisor of this. Note that nothing beyond mksol
+     * itself supports this. It's also exemplified in bwc-ptrace.sh, but
+     * really don't count on this flag. It's an undocumented feature.
+     */
+    int nsolvecs;
+
     /* dir is a boolean flag equal to 1 if we are looking for the right
      * nullspace of the matrix. In matmul_top speak, it indicates where the
      * source vector is.

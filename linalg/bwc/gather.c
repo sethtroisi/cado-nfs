@@ -131,7 +131,7 @@ void * gather_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
     abase_vbase A;
     abase_vbase_oo_field_init_byfeatures(A, 
             MPFQ_PRIME_MPZ, p,
-            MPFQ_GROUPSIZE, bw->n,
+            MPFQ_GROUPSIZE, bw->nsolvecs,
             MPFQ_DONE);
     mpz_clear(p);
 
