@@ -32,6 +32,7 @@ typedef const struct polymat_ur_s * polymat_ur_srcptr;
 extern "C" {
 #endif
 void polymat_init(polymat_ptr p, unsigned int m, unsigned int n, int len);
+int polymat_check_pre_init(polymat_srcptr p);
 void polymat_realloc(polymat_ptr p, int newalloc);
 void polymat_zero(polymat_ptr p);
 void polymat_clear(polymat_ptr p);
@@ -45,8 +46,26 @@ void polymat_ur_clear(polymat_ur_ptr p);
 void polymat_ur_swap(polymat_ur_ptr a, polymat_ur_ptr b);
 static inline abelt_ur * polymat_ur_part(polymat_ur_ptr p, unsigned int i, unsigned int j, unsigned int k);
 static inline abdst_elt_ur polymat_ur_coeff(polymat_ur_ptr p, unsigned int i, unsigned int j, unsigned int k);
+
+
 void bwmat_copy_coeffs(abdst_field ab MAYBE_UNUSED, abelt * x0, int stride0, abelt * x1, int stride1, unsigned int n);
 void bwmat_move_coeffs(abdst_field ab MAYBE_UNUSED, abelt * x0, int stride0, abelt * x1, int stride1, unsigned int n);
+
+void polymat_addmat(abdst_field ab,
+        polymat c, unsigned int kc,
+        polymat a, unsigned int ka,
+        polymat b, unsigned int kb);
+
+void polymat_submat(abdst_field ab,
+        polymat c, unsigned int kc,
+        polymat a, unsigned int ka,
+        polymat b, unsigned int kb);
+
+void polymat_reducemat(abdst_field ab,
+        polymat c, unsigned int kc,
+        polymat_ur a, unsigned int ka);
+
+
 void polymat_mul(abdst_field ab, polymat c, polymat a, polymat b);
 void polymat_mp(abdst_field ab, polymat c, polymat a, polymat b);
 void polymat_mp_raw(abdst_field ab,
@@ -82,5 +101,7 @@ static inline abdst_elt_ur polymat_ur_coeff(polymat_ur_ptr p, unsigned int i, un
     return *polymat_ur_part(p,i,j,k);
 }
 /* }}} */
+
+
 
 #endif	/* POLYMAT_H_ */

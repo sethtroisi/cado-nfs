@@ -745,6 +745,8 @@ linalg/bwc/plingen.c
 linalg/bwc/plingen.h
 linalg/bwc/polymat.c
 linalg/bwc/polymat.h
+linalg/bwc/bigpolymat.c
+linalg/bwc/bigpolymat.h
 config/asprintf.c
 config/asprintf.cmake
 sieve/las-descent-helpers.cpp
