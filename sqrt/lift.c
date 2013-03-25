@@ -311,8 +311,13 @@ int main(int argc, char * argv[])
             __GMP_CC,
             __GMP_CFLAGS);
     /* These two are provided by cado_config.h */
+#ifdef  GMP_INCDIR
     fprintf(stderr, "GMP includes from %s\n", GMP_INCDIR);
     fprintf(stderr, "GMP library from %s\n", GMP_LIBDIR);
+#else
+    fprintf(stderr, "MPIR includes from %s\n", MPIR_INCDIR);
+    fprintf(stderr, "MPIR library from %s\n", MPIR_LIBDIR);
+#endif
 
 #ifdef  WITH_BARRETT
     fprintf(stderr, "This run uses barrett reduction\n");
