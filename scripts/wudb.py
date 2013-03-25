@@ -122,7 +122,7 @@ class MyCursor(sqlite3.Cursor):
             return ", " + dict_join3(d, sep=", ", op=" AS ")
     
     @classmethod
-    def where_str(cls, name, **args):
+    def _where_str(cls, name, **args):
         where = ""
         values = []
         for opname in args:
@@ -199,7 +199,7 @@ class MyCursor(sqlite3.Cursor):
         # UPDATE table SET column_1=value1, column2=value_2, ..., 
         # column_n=value_n WHERE column_n+1=value_n+1, ...,
         setstr = " SET " + join3(d.keys(), post = " = ?", sep = ", ")
-        (wherestr, wherevalues) = self.__class__.where_str("WHERE", **conditions)
+        (wherestr, wherevalues) = self._where_str("WHERE", **conditions)
         command = "UPDATE " + table + setstr + wherestr
         values = list(d.values()) + wherevalues
         self._exec(command, values)
@@ -211,7 +211,7 @@ class MyCursor(sqlite3.Cursor):
             same value in the database table """
 
         # Table/Column names cannot be substituted, so include in query directly.
-        (WHERE, values) = self.__class__.where_str("WHERE", **conditions)
+        (WHERE, values) = self._where_str("WHERE", **conditions)
 
         if order is None:
             ORDER = ""
@@ -231,6 +231,11 @@ class MyCursor(sqlite3.Cursor):
             ORDER + LIMIT + ";"
         self._exec(command, values)
         
+    def delete(self, table, **conditions):
+        """ Delete the rows specified by conditions """
+        (WHERE, values) = self._where_str("WHERE", **conditions)
+        command = "DELETE FROM " + table + WHERE + ";"
+        self._exec(command, values)
 
     def where_as_dict(self, joinsource, col_alias = None, limit = None, 
                       order = None, **conditions):
@@ -315,6 +320,10 @@ class DbTable(object):
             be written are specified key:value pairs of the dictionary d """
         cursor.update(self.tablename, d, **conditions)
 
+    def delete(self, cursor, **conditions):
+        """ Delete an existing row in this table """
+        cursor.delete(self.tablename, **conditions)
+
     def where(self, cursor, limit = None, order = None, **conditions):
         assert order is None or order[0] in self._get_colnames()
         return cursor.where_as_dict(self.tablename, limit=limit, 
@@ -390,7 +399,7 @@ class DictDbAccess(dict):
         self.update(data)
     
     def __del__(self):
-        """ Close tne cursor and delete the dictionary """
+        """ Close the cursor and delete the dictionary """
         self.__cursor.close()
         # http://docs.python.org/2/reference/datamodel.html#object.__del__
         # dict does not have __del__, but in a complex class heirarchy, 
@@ -415,6 +424,11 @@ class DictDbAccess(dict):
         self.__conn.commit()
         super().__setitem__(key, value)
 
+    def __delitem__(self, key):
+        """ Delete a key from the dictionary """
+        super().__delitem__(key)
+        self.__table.delete(self.__cursor, eq={"key": key})
+        self.__conn.commit()
 
 class Mapper(object):
     """ This class translates between application objects, i.e., Python 
