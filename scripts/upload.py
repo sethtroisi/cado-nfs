@@ -71,10 +71,12 @@ def do_upload(db, input = sys.stdin, output = sys.stdout):
         clientid = form['clientid']
         if 'errorcode' in form:
             errorcode = form['errorcode'].value
+            diag(1, "errorcode = ", errorcode)
         else:
             errorcode = None
         if 'failedcommand' in form:
             failedcommand = form['failedcommand'].value
+            diag(1, "failedcommand = ", failedcommand)
         else:
             failedcommand = None
 
@@ -84,6 +86,9 @@ def do_upload(db, input = sys.stdin, output = sys.stdout):
         elif not clientid.value:
             message = 'No client id was specified'
 
+        diag(1, "WUid = ", WUid.value)
+        diag(1, "clientid = ", clientid.value)
+
     if not message:
         filetuples = []
         if 'results' in form:
@@ -92,6 +97,7 @@ def do_upload(db, input = sys.stdin, output = sys.stdout):
                 fileitem = [fileitem] # Make it iterable
         else:
             fileitem = []
+            diag(1, 'No "results" form found')
 
         analyze (2, "fileitem", fileitem)
 
@@ -99,6 +105,7 @@ def do_upload(db, input = sys.stdin, output = sys.stdout):
         for f in fileitem:
             analyze (2, "f", f)
 
+            diag(1, "Processing file ", f.filename)
             # strip leading path from file name to avoid directory traversal attacks
             basename = os.path.basename(f.filename)
             # Make a file name which does not exist yet and create the file

@@ -100,7 +100,7 @@ class Workunit(object):
         return self.wudata["WORKUNIT"]
 
 def wu_test():
-    """ Class to test workunit parser 
+    """ Dummy function to test workunit parser 
     
     >>> Workunit("")
     Traceback (most recent call last):
@@ -161,7 +161,7 @@ def wu_test():
     Exception: Key TERMINATE with value x
 
     """
-
+    pass
 
 if __name__ == "__main__":
     import doctest
