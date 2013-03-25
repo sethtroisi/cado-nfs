@@ -18,19 +18,14 @@
 #include "macros.h"
 #include "utils.h"
 #include "abase.h"
+#include "memusage.h"
 #include "lingen-matpoly.h"
 
-/* This is just a temporary hack to avoid exposing the prototypes from
- * bigmatpoly immediately. First we change matpoly, then the rest.
- */
-#define MPI_LINGEN
-
-#ifdef  MPI_LINGEN
 #include "lingen-bigmatpoly.h"
-#endif
 
 #include "bw-common.h"		/* Handy. Allows Using global functions
                                  * for recovering parameters */
+#include "bw-common-mpi.h"
 #include "filenames.h"
 #include "plingen.h"
 #include "plingen-tuning.h"
@@ -114,9 +109,7 @@ static inline unsigned int expected_pi_length(dims * d, unsigned int len)/*{{{*/
 
 /* Forward declaration, it's used by the recursive version */
 static int bw_lingen(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta);
-#ifdef  MPI_LINGEN
 static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta);
-#endif
 
 static int bw_biglingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta);
 
@@ -397,37 +390,78 @@ static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned i
     return generator_found;
 }/*}}}*/
 
+double start_time = -1;
+void info_init_timer()
+{
+    start_time = wct_seconds();
+}
+
+static const char *size_disp(size_t s, char buf[16])
+{
+    char *prefixes = "bkMGT";
+    double ds = s;
+    const char *px = prefixes;
+    for (; px[1] && ds > 500.0;) {
+        ds /= 1024.0;
+        px++;
+    }
+    snprintf(buf, 10, "%.1f%c", ds, *px);
+    return buf;
+}
+
 void print_info_mp(unsigned int t, matpoly_ptr A, matpoly_ptr B)
 {
-    printf("t=%u, MP(%zu, %zu) --> %zu\n", t,
+    char buf1[16];
+    char buf2[16];
+    size_disp(Memusage2(), buf1);
+    size_disp(PeakMemusage(), buf2);
+    printf("[%.3f %s %s] t=%u, MP(%zu, %zu) --> %zu\n",
+            wct_seconds() - start_time, buf1, buf2,
+            t,
             A->size, B->size, MAX(A->size, B->size) - MIN(A->size, B->size) + 1);
 }
 
 void print_info_mul(unsigned int t, matpoly_ptr A, matpoly_ptr B)
 {
-    printf("t=%u, MUL(%zu, %zu) --> %zu\n", t,
+    char buf1[16];
+    char buf2[16];
+    size_disp(Memusage2(), buf1);
+    size_disp(PeakMemusage(), buf2);
+    printf("[%.3f %s %s] t=%u, MUL(%zu, %zu) --> %zu\n",
+            wct_seconds() - start_time, buf1, buf2,
+            t,
             A->size, B->size, A->size + B->size - 1);
 }
 
-#ifdef  MPI_LINGEN
 void print_info_mpi_mp(unsigned int t, bigmatpoly_ptr A, bigmatpoly_ptr B)
 {
+    char buf1[16];
+    char buf2[16];
+    size_disp(Memusage2(), buf1);
+    size_disp(PeakMemusage(), buf2);
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if (rank) return;
-    printf("t=%u, MPI-MP(%zu, %zu) --> %zu\n", t,
+    printf("[%.3f %s %s] t=%u, MPI-MP(%zu, %zu) --> %zu\n",
+            wct_seconds() - start_time, buf1, buf2,
+            t,
             A->size, B->size, MAX(A->size, B->size) - MIN(A->size, B->size) + 1);
 }
 
 void print_info_mpi_mul(unsigned int t, bigmatpoly_ptr A, bigmatpoly_ptr B)
 {
+    char buf1[16];
+    char buf2[16];
+    size_disp(Memusage2(), buf1);
+    size_disp(PeakMemusage(), buf2);
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if (rank) return;
-    printf("t=%u, MPI-MUL(%zu, %zu) --> %zu\n", t,
+    printf("[%.3f %s %s] t=%u, MPI-MUL(%zu, %zu) --> %zu\n",
+            wct_seconds() - start_time, buf1, buf2,
+            t,
             A->size, B->size, A->size + B->size - 1);
 }
-#endif
 
 static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
 {
@@ -478,7 +512,6 @@ static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
     return done;
 }/*}}}*/
 
-#ifdef MPI_LINGEN
 /* This version works over MPI */
 static int bw_lingen_bigrecursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta) /*{{{*/
 {
@@ -530,7 +563,6 @@ static int bw_lingen_bigrecursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, 
 
     return done;
 }/*}}}*/
-#endif
 
 static int bw_lingen(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
 {
@@ -549,7 +581,6 @@ static int bw_lingen(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta
     }
 }/*}}}*/
 
-#ifdef MPI_LINGEN
 static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta)/*{{{*/
 {
     dims *d = bm->d;
@@ -577,7 +608,6 @@ static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E,
     matpoly_clear(ab, sE);
     return done;
 }/*}}}*/
-#endif
 
 static int bw_biglingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta)/*{{{*/
 {
@@ -590,9 +620,7 @@ static int bw_biglingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
     unsigned int b = m + n;
     int done;
     int go_mpi = 0;
-#ifdef MPI_LINGEN
     go_mpi = E->size >= bm->lingen_mpi_threshold;
-#endif
 
     if (!go_mpi) {
         int rank;
@@ -603,7 +631,6 @@ static int bw_biglingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
         MPI_Bcast(delta, b, MPI_UNSIGNED, 0, bm->world);
         MPI_Bcast(bm->lucky, b, MPI_UNSIGNED, 0, bm->world);
         MPI_Bcast(&(bm->t), 1, MPI_UNSIGNED, 0, bm->world);
-#ifdef  MPI_LINGEN
     } else {
         /* We are going to do this collectively */
         bigmatpoly model;
@@ -622,7 +649,6 @@ static int bw_biglingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned 
         bigmatpoly_clear(ab, xE);
         bigmatpoly_clear(ab, xpi);
         bigmatpoly_clear_model(model);
-#endif
     }
     return done;
 }/*}}}*/
@@ -1072,12 +1098,6 @@ int main(int argc, char *argv[])
     int tune = 0;
     int ascii = 0;
 
-    MPI_Init(&argc, &argv);
-    int rank;
-    int size;
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
 
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
@@ -1088,7 +1108,14 @@ int main(int argc, char *argv[])
 
     param_list_configure_switch(pl, "--tune", &tune);
     param_list_configure_switch(pl, "--ascii", &ascii);
-    bw_common_init(bw, pl, &argc, &argv);
+    bw_common_init_mpi(bw, pl, &argc, &argv);
+
+    int rank;
+    int size;
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    info_init_timer();
 
     const char * afile = param_list_lookup_string(pl, "afile");
 
@@ -1130,7 +1157,7 @@ int main(int argc, char *argv[])
     bm->lingen_mpi_threshold = 1000;
     param_list_parse_uint(pl, "lingen-threshold", &(bm->lingen_threshold));
     param_list_parse_uint(pl, "lingen-mpi-threshold", &(bm->lingen_mpi_threshold));
-#ifndef MPI_LINGEN
+#if defined(FAKEMPI_H_)
     bm->lingen_mpi_threshold = UINT_MAX;
 #endif
 

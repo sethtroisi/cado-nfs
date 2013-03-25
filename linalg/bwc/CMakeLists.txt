@@ -270,6 +270,7 @@ set(plingen_prime_nwords 4)
 if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
 add_executable(plingen EXCLUDE_FROM_ALL
                 bw-common.c
+                bw-common-mpi.c
                 plingen.c
                 plingen-tuning.cpp
                 lingen-matpoly.c
