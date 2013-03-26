@@ -265,16 +265,18 @@ target_link_libraries(cleanup utils m)
 
 install(TARGETS cleanup RUNTIME DESTINATION bin/linalg/bwc)
 
-set(plingen_prime_nwords 1)
+set(plingen_prime_nwords 4)
 
 if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
 add_executable(plingen EXCLUDE_FROM_ALL
                 bw-common.c
                 plingen.c
                 plingen-tuning.cpp
+                lingen-matpoly.c
+                lingen-bigmatpoly.c
                 lingen-polymat.c
-                mpfq/abase_p_${plingen_prime_nwords}.c
                 lingen-bigpolymat.c
+                mpfq/abase_p_${plingen_prime_nwords}.c
         )
 set_source_files_properties(plingen-tuning.cpp COMPILE_FLAGS "-std=c++11")
 

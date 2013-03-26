@@ -17,6 +17,7 @@
 #include "utils.h"
 #include "abase.h"
 #include "lingen-polymat.h"
+#include "lingen-matpoly.h"
 #include "lingen-bigpolymat.h"
 #include "plingen.h"
 #include "plingen-tuning.h"
@@ -181,6 +182,7 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
      * 1 : in the end, we expect method 1 to win (kara)
      * 1 : size makes sense only for >=1
      */
+    /* TODO: support multiple values in my cutoff table finder ? */
     cutoff_finder<timer_rusage> finder(0, 1, 1);
 
     polymat_cutoff_info always_basecase[1];
@@ -195,9 +197,9 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
         /* Note: we are benching degree k, but the degree we are
          * interested in for pi is k*m/(m+n) */
         polymat pi, piL, piR;
-        polymat_init(piL, m+n, m+n, k);
-        polymat_init(piR, m+n, m+n, k);
-        polymat_init(pi, m+n, m+n, 2*k-1);
+        polymat_init(ab, piL, m+n, m+n, k);
+        polymat_init(ab, piR, m+n, m+n, k);
+        polymat_init(ab, pi, m+n, m+n, 2*k-1);
         polymat_fill_random(ab, piL, k, rstate);
         polymat_fill_random(ab, piR, k, rstate);
         double ttb;
@@ -218,12 +220,21 @@ void plingen_tune_mul(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
             polymat_mul(ab, pi, piL, piR);
             x.pop();
         }
-        printf("%d %1.6f %1.6f %1.1f\n", k, ttb, ttk, ttk/ttb);
+
+        double ttm;
+        /* The matpoly layer is just completetly different -- and gets
+         * faster quite early on... */
+        for(auto x = finder.micro_bench(ttm); x; ++x) {
+            x.push();
+            matpoly_mul(ab, (matpoly_ptr) pi, (matpoly_ptr) piL, (matpoly_ptr) piR);
+            x.pop();
+        }
+        printf("%d %1.6f %1.6f %1.6f %1.1f\n", k, ttb, ttk, ttm, ttk/ttb);
         finder.new_winner(k, ttk < ttb); /* < : kara wins: 1 */
 
-        polymat_clear(piL);
-        polymat_clear(piR);
-        polymat_clear(pi);
+        polymat_clear(ab, piL);
+        polymat_clear(ab, piR);
+        polymat_clear(ab, pi);
     }
 
     finder.export_to_cutoff_info(improved);
@@ -274,9 +285,9 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
         /* Note: we are benching degree k, but the degree we are
          * interested in for ER is k*m/(m+n) */
         polymat ER, E, piL;
-        polymat_init(E, m, m+n, 2*k + n*k/m - 1);
-        polymat_init(piL, m+n, m+n, k);
-        polymat_init(ER, m, m+n, k + n*k/m);
+        polymat_init(ab, E, m, m+n, 2*k + n*k/m - 1);
+        polymat_init(ab, piL, m+n, m+n, k);
+        polymat_init(ab, ER, m, m+n, k + n*k/m);
         polymat_fill_random(ab, E, 2*k + n*k/m - 1, rstate);
         polymat_fill_random(ab, piL, k, rstate);
         double ttb;
@@ -300,9 +311,9 @@ void plingen_tune_mp(abdst_field ab, unsigned int m, unsigned int n)/*{{{*/
         printf("%d %1.6f %1.6f %1.1f\n", k, ttb, ttk, ttk/ttb);
         finder.new_winner(k, ttk < ttb); /* < : kara wins: 1 */
 
-        polymat_clear(E);
-        polymat_clear(piL);
-        polymat_clear(ER);
+        polymat_clear(ab, E);
+        polymat_clear(ab, piL);
+        polymat_clear(ab, ER);
     }
 
     finder.export_to_cutoff_info(improved);
@@ -341,12 +352,12 @@ void plingen_tune_bigmul(abdst_field ab, unsigned int m, unsigned int n, unsigne
          * interested in for pi is k*m/(m+n) */
         polymat pi, piL, piR;
         bigpolymat bpi, bpiL, bpiR;
-        polymat_init(piL, m+n, m+n, k);
-        polymat_init(piR, m+n, m+n, k);
-        polymat_init(pi, m+n, m+n, 2*k-1);
-        bigpolymat_init(bpiL, model, m+n, m+n, k);
-        bigpolymat_init(bpiR, model, m+n, m+n, k);
-        bigpolymat_init(bpi, model, m+n, m+n, 2*k-1);
+        polymat_init(ab, piL, m+n, m+n, k);
+        polymat_init(ab, piR, m+n, m+n, k);
+        polymat_init(ab, pi, m+n, m+n, 2*k-1);
+        bigpolymat_init(ab, bpiL, model, m+n, m+n, k);
+        bigpolymat_init(ab, bpiR, model, m+n, m+n, k);
+        bigpolymat_init(ab, bpi, model, m+n, m+n, 2*k-1);
         polymat_fill_random(ab, piL, k, rstate);
         polymat_fill_random(ab, piR, k, rstate);
         polymat_fill_random(ab, bigpolymat_my_cell(bpiL), k, rstate);
@@ -372,12 +383,12 @@ void plingen_tune_bigmul(abdst_field ab, unsigned int m, unsigned int n, unsigne
             printf("%d %1.6f %1.6f %1.1f\n", k, ttloc, ttmpi, ttmpi/ttloc);
         finder.new_winner(k, ttmpi < ttloc); /* < : mpi wins: 1 */
 
-        polymat_clear(piL);
-        polymat_clear(piR);
-        polymat_clear(pi);
-        bigpolymat_clear(bpiL);
-        bigpolymat_clear(bpiR);
-        bigpolymat_clear(bpi);
+        polymat_clear(ab, piL);
+        polymat_clear(ab, piR);
+        polymat_clear(ab, pi);
+        bigpolymat_clear(ab, bpiL);
+        bigpolymat_clear(ab, bpiR);
+        bigpolymat_clear(ab, bpi);
     }
 
     bigpolymat_clear_model(model);

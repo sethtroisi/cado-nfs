@@ -743,10 +743,14 @@ linalg/bwc/mpfq/abase_p_3_t.c
 linalg/bwc/mpfq/abase_p_3_t.h
 linalg/bwc/plingen.c
 linalg/bwc/plingen.h
+linalg/bwc/lingen-matpoly.c
+linalg/bwc/lingen-matpoly.h
 linalg/bwc/lingen-polymat.c
 linalg/bwc/lingen-polymat.h
 linalg/bwc/lingen-bigpolymat.c
 linalg/bwc/lingen-bigpolymat.h
+linalg/bwc/lingen-bigmatpoly.c
+linalg/bwc/lingen-bigmatpoly.h
 config/asprintf.c
 config/asprintf.cmake
 sieve/las-descent-helpers.cpp

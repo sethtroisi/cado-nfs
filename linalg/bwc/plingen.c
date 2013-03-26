@@ -18,15 +18,15 @@
 #include "macros.h"
 #include "utils.h"
 #include "abase.h"
-#include "lingen-polymat.h"
+#include "lingen-matpoly.h"
 
 /* This is just a temporary hack to avoid exposing the prototypes from
- * bigpolymat immediately. First we change polymat, then the rest.
+ * bigmatpoly immediately. First we change matpoly, then the rest.
  */
 #define MPI_LINGEN
 
 #ifdef  MPI_LINGEN
-#include "lingen-bigpolymat.h"
+#include "lingen-bigmatpoly.h"
 #endif
 
 #include "bw-common.h"		/* Handy. Allows Using global functions
@@ -113,12 +113,12 @@ static inline unsigned int expected_pi_length(dims * d, unsigned int len)/*{{{*/
 }/*}}}*/
 
 /* Forward declaration, it's used by the recursive version */
-static int bw_lingen(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta);
+static int bw_lingen(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta);
 #ifdef  MPI_LINGEN
-static int bw_biglingen_collective(bmstatus_ptr bm, bigpolymat pi, bigpolymat E, unsigned int *delta);
+static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta);
 #endif
 
-static int bw_biglingen_single(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta);
+static int bw_biglingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta);
 
 
 /* This destructively cancels the first len coefficients of E, and
@@ -130,7 +130,7 @@ static int bw_biglingen_single(bmstatus_ptr bm, polymat pi, polymat E, unsigned 
  * that E*pi is divisible by X^len.
  */
 
-static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta) /*{{{*/
+static int bw_lingen_basecase(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
 {
     dims * d = bm->d;
     unsigned int m = d->m;
@@ -148,7 +148,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
      * soon freed anyway. Set it to identity. */
     unsigned int pi_room_base = expected_pi_length(d, E->size);
 
-    polymat_init(pi, b, b, pi_room_base);
+    matpoly_init(ab, pi, b, b, pi_room_base);
     pi->size = pi_room_base;
 
     /* Also keep track of the
@@ -156,7 +156,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
 
     unsigned int *pi_lengths = malloc(b * sizeof(unsigned int));
     for(unsigned int i = 0 ; i < b ; i++) {
-        abset_ui(ab, polymat_coeff(pi, i, i, 0), 1);
+        abset_ui(ab, matpoly_coeff(pi, i, i, 0), 1);
         pi_lengths[i] = 1;
     }
 
@@ -169,8 +169,8 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
     int * is_pivot = malloc(b * sizeof(int));
     memset(is_pivot, 0, b * sizeof(int));
 
-    polymat e;
-    polymat_init(e, m, b, 1);
+    matpoly e;
+    matpoly_init(ab, e, m, b, 1);
     e->size = 1;
 
     for (unsigned int t = 0; t < E->size ; t++, bm->t++) {
@@ -197,8 +197,8 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
                 for(unsigned int i = 0 ; i < m ; i++) {
                     for(unsigned int k = 0 ; k < b ; k++) {
                         abmul_ur(ab, tmp_ur,
-                                polymat_coeff(E, i, k, t - s),
-                                polymat_coeff(pi, k, j, s));
+                                matpoly_coeff(E, i, k, t - s),
+                                matpoly_coeff(pi, k, j, s));
                         abelt_ur_add(ab, e_ur[i*b+j], e_ur[i*b+j], tmp_ur);
                     }
                 }
@@ -209,8 +209,8 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
             if (is_pivot[j]) continue;
             unsigned int nz = 0;
             for(unsigned int i = 0 ; i < m ; i++) {
-                abreduce(ab, polymat_coeff(e, i, j, 0), e_ur[i*b+j]);
-                nz += abcmp_ui(ab, polymat_coeff(e, i, j, 0), 0) == 0;
+                abreduce(ab, matpoly_coeff(e, i, j, 0), e_ur[i*b+j]);
+                nz += abcmp_ui(ab, matpoly_coeff(e, i, j, 0), 0) == 0;
             }
             if (nz == m) {
                 newluck++, bm->lucky[j]++;
@@ -272,7 +272,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
             unsigned int u = 0;
             /* {{{ Find the pivot */
             for( ; u < m ; u++) {
-                if (abcmp_ui(ab, polymat_coeff(e, u, j, 0), 0) != 0)
+                if (abcmp_ui(ab, matpoly_coeff(e, u, j, 0), 0) != 0)
                     break;
             }
             if (u == m) continue;
@@ -283,7 +283,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
             /* {{{ Cancel this coeff in all other columns. */
             abelt inv;
             abinit(ab, &inv);
-            int rc = abinv(ab, inv, polymat_coeff(e, u, j, 0));
+            int rc = abinv(ab, inv, matpoly_coeff(e, u, j, 0));
             if (!rc) {
                 fprintf(stderr, "Error, found a factor of the modulus: ");
                 abfprint(ab, stderr, inv);
@@ -293,12 +293,12 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
             abneg(ab, inv, inv);
             for (unsigned int kl = jl + 1; kl < b ; kl++) {
                 unsigned int k = ctable[kl][1];
-                if (abcmp_ui(ab, polymat_coeff(e, u, k, 0), 0) == 0)
+                if (abcmp_ui(ab, matpoly_coeff(e, u, k, 0), 0) == 0)
                     continue;
                 // add lambda = e[u,k]*-e[u,j]^-1 times col j to col k.
                 abelt lambda;
                 abinit(ab, &lambda);
-                abmul(ab, lambda, inv, polymat_coeff(e, u, k, 0));
+                abmul(ab, lambda, inv, matpoly_coeff(e, u, k, 0));
 
                 assert(delta[j] <= delta[k]);
                 /* {{{ Apply on both e and pi */
@@ -306,10 +306,10 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
                 abinit(ab, &tmp);
                 for(unsigned int i = 0 ; i < m ; i++) {
                     /* TODO: Would be better if mpfq had an addmul */
-                    abmul(ab, tmp, lambda, polymat_coeff(e, i, j, 0));
+                    abmul(ab, tmp, lambda, matpoly_coeff(e, i, j, 0));
                     abadd(ab,
-                            polymat_coeff(e, i, k, 0),
-                            polymat_coeff(e, i, k, 0),
+                            matpoly_coeff(e, i, k, 0),
+                            matpoly_coeff(e, i, k, 0),
                             tmp);
                 }
                 if (bm->lucky[k] < 0) {
@@ -336,10 +336,10 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
                     for(unsigned int s = 0 ; s < pi_lengths[j] ; s++) {
                         /* TODO: Would be better if mpfq had an addmul */
                         abmul(ab, tmp, lambda,
-                                polymat_coeff(pi, i, j, s));
+                                matpoly_coeff(pi, i, j, s));
                         abadd(ab,
-                                polymat_coeff(pi, i, k, s),
-                                polymat_coeff(pi, i, k, s),
+                                matpoly_coeff(pi, i, k, s),
+                                matpoly_coeff(pi, i, k, s),
                                 tmp);
                     }
                 }
@@ -359,7 +359,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
             if (!is_pivot[j]) continue;
             if (pi_lengths[j] >= pi->alloc) {
                 if (!generator_found) {
-                    polymat_realloc(pi, pi->alloc + MAX(pi->alloc / (m+n), 1));
+                    matpoly_realloc(ab, pi, pi->alloc + MAX(pi->alloc / (m+n), 1));
                     printf("t=%u, expanding allocation for pi (now %zu%%) ; lengths: ",
                             bm->t,
                             100 * pi->alloc / pi_room_base);
@@ -377,7 +377,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
                     continue;
                 }
             }
-            polymat_multiply_column_by_x(ab, pi, j, pi_lengths[j]);
+            matpoly_multiply_column_by_x(ab, pi, j, pi_lengths[j]);
             pi_lengths[j]++;
             delta[j]++;
         }
@@ -389,7 +389,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
             pi->size = pi_lengths[j];
     }
     pi->size = MIN(pi->size, pi->alloc);
-    polymat_clear(e);
+    matpoly_clear(ab, e);
     free(is_pivot);
     free(pivots);
     free(pi_lengths);   /* What shall we do with this one ??? */
@@ -397,39 +397,39 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
     return generator_found;
 }/*}}}*/
 
-void print_info_mp(unsigned int t, polymat_ptr A, polymat_ptr B)
+void print_info_mp(unsigned int t, matpoly_ptr A, matpoly_ptr B)
 {
     printf("t=%u, MP(%zu, %zu) --> %zu\n", t,
             A->size, B->size, MAX(A->size, B->size) - MIN(A->size, B->size) + 1);
 }
 
-void print_info_mul(unsigned int t, polymat_ptr A, polymat_ptr B)
+void print_info_mul(unsigned int t, matpoly_ptr A, matpoly_ptr B)
 {
     printf("t=%u, MUL(%zu, %zu) --> %zu\n", t,
             A->size, B->size, A->size + B->size - 1);
 }
 
 #ifdef  MPI_LINGEN
-void print_info_mpi_mp(unsigned int t, bigpolymat_ptr A, bigpolymat_ptr B)
+void print_info_mpi_mp(unsigned int t, bigmatpoly_ptr A, bigmatpoly_ptr B)
 {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if (rank) return;
-    printf("t=%u, MP(%zu, %zu) --> %zu\n", t,
+    printf("t=%u, MPI-MP(%zu, %zu) --> %zu\n", t,
             A->size, B->size, MAX(A->size, B->size) - MIN(A->size, B->size) + 1);
 }
 
-void print_info_mpi_mul(unsigned int t, bigpolymat_ptr A, bigpolymat_ptr B)
+void print_info_mpi_mul(unsigned int t, bigmatpoly_ptr A, bigmatpoly_ptr B)
 {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     if (rank) return;
-    printf("t=%u, MUL(%zu, %zu) --> %zu\n", t,
+    printf("t=%u, MPI-MUL(%zu, %zu) --> %zu\n", t,
             A->size, B->size, A->size + B->size - 1);
 }
 #endif
 
-static int bw_lingen_recursive(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta) /*{{{*/
+static int bw_lingen_recursive(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
 {
     dims * d = bm->d;
     abdst_field ab = d->ab;
@@ -440,47 +440,47 @@ static int bw_lingen_recursive(bmstatus_ptr bm, polymat pi, polymat E, unsigned 
     size_t half = E->size - (E->size / 2);
 
     /* declare an lazy-alloc all matrices */
-    polymat E_left;
-    polymat pi_left;
-    polymat pi_right;
-    polymat E_right;
-    polymat_init(E_left, 0, 0, 0);
-    polymat_init(pi_left, 0, 0, 0);
-    polymat_init(pi_right, 0, 0, 0);
-    polymat_init(E_right, 0, 0, 0);
+    matpoly E_left;
+    matpoly pi_left;
+    matpoly pi_right;
+    matpoly E_right;
+    matpoly_init(ab, E_left, 0, 0, 0);
+    matpoly_init(ab, pi_left, 0, 0, 0);
+    matpoly_init(ab, pi_right, 0, 0, 0);
+    matpoly_init(ab, E_right, 0, 0, 0);
 
-    polymat_truncate(ab, E_left, E, half);
+    matpoly_truncate(ab, E_left, E, half);
     done = bw_lingen(bm, pi_left, E_left, delta);
     ASSERT_ALWAYS(pi_left->size);
-    polymat_clear(E_left);
+    matpoly_clear(ab, E_left);
 
     if (done) {
-        polymat_swap(pi_left, pi);
-        polymat_clear(pi_left);
+        matpoly_swap(pi_left, pi);
+        matpoly_clear(ab, pi_left);
         return 1;
     }
 
     bm->t_mp -= seconds();
-    polymat_rshift(ab, E, E, half - pi_left->size + 1);
+    matpoly_rshift(ab, E, E, half - pi_left->size + 1);
     if (E->size > display_threshold) print_info_mp(bm->t, E, pi_left);
-    polymat_mp(ab, E_right, E, pi_left);
+    matpoly_mp(ab, E_right, E, pi_left);
     bm->t_mp += seconds();
     done = bw_lingen(bm, pi_right, E_right, delta);
-    polymat_clear(E_right);
+    matpoly_clear(ab, E_right);
 
     bm->t_mp -= seconds();
     if (E->size > display_threshold) print_info_mul(bm->t, pi_left, pi_right);
-    polymat_mul(ab, pi, pi_left, pi_right);
+    matpoly_mul(ab, pi, pi_left, pi_right);
     bm->t_mp += seconds();
-    polymat_clear(pi_left);
-    polymat_clear(pi_right);
+    matpoly_clear(ab, pi_left);
+    matpoly_clear(ab, pi_right);
 
     return done;
 }/*}}}*/
 
 #ifdef MPI_LINGEN
 /* This version works over MPI */
-static int bw_lingen_bigrecursive(bmstatus_ptr bm, bigpolymat pi, bigpolymat E, unsigned int *delta) /*{{{*/
+static int bw_lingen_bigrecursive(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta) /*{{{*/
 {
     dims * d = bm->d;
     abdst_field ab = d->ab;
@@ -489,52 +489,50 @@ static int bw_lingen_bigrecursive(bmstatus_ptr bm, bigpolymat pi, bigpolymat E, 
     int rank;
     MPI_Comm_rank(bm->world, &rank);
 
-    ASSERT_ALWAYS(bigpolymat_provisioned(E) == 0);
-
     /* XXX I think we have to start with something large enough to get
      * all coefficients of E_right correct */
     size_t half = E->size - (E->size / 2);
 
     /* declare an lazy-alloc all matrices */
-    bigpolymat E_left;
-    bigpolymat E_right;
-    bigpolymat pi_left;
-    bigpolymat pi_right;
-    bigpolymat_init(E_left, E, 0, 0, 0);
-    bigpolymat_init(pi_left, pi, 0, 0, 0);
-    bigpolymat_init(pi_right, pi, 0, 0, 0);
-    bigpolymat_init(E_right, E, 0, 0, 0);
+    bigmatpoly E_left;
+    bigmatpoly E_right;
+    bigmatpoly pi_left;
+    bigmatpoly pi_right;
+    bigmatpoly_init(ab, E_left, E, 0, 0, 0);
+    bigmatpoly_init(ab, pi_left, pi, 0, 0, 0);
+    bigmatpoly_init(ab, pi_right, pi, 0, 0, 0);
+    bigmatpoly_init(ab, E_right, E, 0, 0, 0);
 
-    bigpolymat_truncate_loc(ab, E_left, E, half);
+    bigmatpoly_truncate_loc(ab, E_left, E, half);
     done = bw_biglingen_collective(bm, pi_left, E_left, delta);
-    bigpolymat_clear(E_left);
+    bigmatpoly_clear(ab, E_left);
 
     if (done) {
-        bigpolymat_swap(pi_left, pi);
-        bigpolymat_clear(pi_left);
+        bigmatpoly_swap(pi_left, pi);
+        bigmatpoly_clear(ab, pi_left);
         return 1;
     }
 
-    bigpolymat_rshift(ab, E, E, half - pi_left->size + 1);
+    bigmatpoly_rshift(ab, E, E, half - pi_left->size + 1);
     bm->t_mp -= seconds();
     if (E->size > display_threshold) print_info_mpi_mp(bm->t, E, pi_left);
-    bigpolymat_mp(ab, E_right, E, pi_left);
+    bigmatpoly_mp(ab, E_right, E, pi_left);
     bm->t_mp += seconds();
     done = bw_biglingen_collective(bm, pi_right, E_right, delta);
-    bigpolymat_clear(E_right);
+    bigmatpoly_clear(ab, E_right);
 
     bm->t_mp -= seconds();
     if (E->size > display_threshold) print_info_mpi_mul(bm->t, pi_left, pi_right);
-    bigpolymat_mul(ab, pi, pi_left, pi_right);
+    bigmatpoly_mul(ab, pi, pi_left, pi_right);
     bm->t_mp += seconds();
-    bigpolymat_clear(pi_left);
-    bigpolymat_clear(pi_right);
+    bigmatpoly_clear(ab, pi_left);
+    bigmatpoly_clear(ab, pi_right);
 
     return done;
 }/*}}}*/
 #endif
 
-static int bw_lingen(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta) /*{{{*/
+static int bw_lingen(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta) /*{{{*/
 {
     int rank;
     MPI_Comm_rank(bm->world, &rank);
@@ -552,7 +550,7 @@ static int bw_lingen(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta
 }/*}}}*/
 
 #ifdef MPI_LINGEN
-static int bw_biglingen_collective(bmstatus_ptr bm, bigpolymat pi, bigpolymat E, unsigned int *delta)/*{{{*/
+static int bw_biglingen_collective(bmstatus_ptr bm, bigmatpoly pi, bigmatpoly E, unsigned int *delta)/*{{{*/
 {
     dims *d = bm->d;
     abdst_field ab = d->ab;
@@ -567,21 +565,21 @@ static int bw_biglingen_collective(bmstatus_ptr bm, bigpolymat pi, bigpolymat E,
     /* This entails gathering E locally, computing pi locally, and
      * dispathing it back. */
 
-    polymat sE, spi;
-    polymat_init(sE, m, b, E->size);
-    polymat_init(spi, 0, 0, 0);
-    bigpolymat_gather_mat(ab, sE, E);
+    matpoly sE, spi;
+    matpoly_init(ab, sE, m, b, E->size);
+    matpoly_init(ab, spi, 0, 0, 0);
+    bigmatpoly_gather_mat(ab, sE, E);
     /* Only the master node does the local computation */
     int done = bw_biglingen_single(bm, spi, sE, delta);
-    bigpolymat_scatter_mat(ab, pi, spi);
+    bigmatpoly_scatter_mat(ab, pi, spi);
     /* Don't forget to broadcast delta from root node to others ! */
-    polymat_clear(spi);
-    polymat_clear(sE);
+    matpoly_clear(ab, spi);
+    matpoly_clear(ab, sE);
     return done;
 }/*}}}*/
 #endif
 
-static int bw_biglingen_single(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta)/*{{{*/
+static int bw_biglingen_single(bmstatus_ptr bm, matpoly pi, matpoly E, unsigned int *delta)/*{{{*/
 {
     /* This version of the code is called collectively from all nodes,
      * but with the input E on rank 0. This normally happens _only_ at
@@ -608,22 +606,22 @@ static int bw_biglingen_single(bmstatus_ptr bm, polymat pi, polymat E, unsigned 
 #ifdef  MPI_LINGEN
     } else {
         /* We are going to do this collectively */
-        bigpolymat model;
+        bigmatpoly model;
         abdst_field ab = d->ab;
-        bigpolymat xpi, xE;
+        bigmatpoly xpi, xE;
 
-        bigpolymat_init_model(model, bm->world, bm->mpi_dims[0], bm->mpi_dims[1]);
+        bigmatpoly_init_model(model, bm->world, bm->mpi_dims[0], bm->mpi_dims[1]);
         /* We prefer to allocate soon. The interface doesn't really like
          * lazy allocation at the moment */
-        bigpolymat_init(xE, model, m, b, E->size);
-        bigpolymat_init(xpi, model, 0, 0, 0);   /* pre-init for now */
-        bigpolymat_scatter_mat(ab, xE, E);
+        bigmatpoly_init(ab, xE, model, m, b, E->size);
+        bigmatpoly_init(ab, xpi, model, 0, 0, 0);   /* pre-init for now */
+        bigmatpoly_scatter_mat(ab, xE, E);
         ASSERT_ALWAYS(xE->size);
         done = bw_biglingen_collective(bm, xpi, xE, delta);
-        bigpolymat_gather_mat(ab, pi, xpi);
-        bigpolymat_clear(xE);
-        bigpolymat_clear(xpi);
-        bigpolymat_clear_model(model);
+        bigmatpoly_gather_mat(ab, pi, xpi);
+        bigmatpoly_clear(ab, xE);
+        bigmatpoly_clear(ab, xpi);
+        bigmatpoly_clear_model(model);
 #endif
     }
     return done;
@@ -631,7 +629,7 @@ static int bw_biglingen_single(bmstatus_ptr bm, polymat pi, polymat E, unsigned 
 
 /**********************************************************************/
 
-unsigned int (*compute_initial_F(bmstatus_ptr bm, polymat A))[2] /*{{{ */
+unsigned int (*compute_initial_F(bmstatus_ptr bm, matpoly A))[2] /*{{{ */
 {				
     dims *d = bm->d;
     abdst_field ab = d->ab;
@@ -650,8 +648,8 @@ unsigned int (*compute_initial_F(bmstatus_ptr bm, polymat A))[2] /*{{{ */
     /* We want to create a full rank m*m matrix M, by extracting columns
      * from the first coefficients of A */
 
-    polymat M;
-    polymat_init(M, m, m, 1);
+    matpoly M;
+    matpoly_init(ab, M, m, m, 1);
     M->size = 1;
 
     /* For each integer i between 0 and m-1, we have a column, picked
@@ -666,7 +664,7 @@ unsigned int (*compute_initial_F(bmstatus_ptr bm, polymat A))[2] /*{{{ */
     for (unsigned int k = 0; r < m && k < A->size; k++) {
 	for (unsigned int j = 0; r < m && j < n; j++) {
 	    /* Extract a full column into M */
-            polymat_extract_column(ab, M, r, 0, A, j, k);
+            matpoly_extract_column(ab, M, r, 0, A, j, k);
 
             /* Now reduce it modulo all other columns */
 	    for (unsigned int v = 0; v < r; v++) {
@@ -680,18 +678,18 @@ unsigned int (*compute_initial_F(bmstatus_ptr bm, polymat A))[2] /*{{{ */
                 for(unsigned int i = 0 ; i < m ; i++) {
                     if (i == u) continue;
                     abmul(ab, tmp,
-                              polymat_coeff(M, i, v, 0),
-                              polymat_coeff(M, u, r, 0));
-                    abadd(ab, polymat_coeff(M, i, r, 0),
-                              polymat_coeff(M, i, r, 0),
+                              matpoly_coeff(M, i, v, 0),
+                              matpoly_coeff(M, u, r, 0));
+                    abadd(ab, matpoly_coeff(M, i, r, 0),
+                              matpoly_coeff(M, i, r, 0),
                               tmp);
                 }
                 abset_zero(ab,
-                        polymat_coeff(M, u, r, 0));
+                        matpoly_coeff(M, u, r, 0));
 	    }
             unsigned int u = 0;
             for( ; u < m ; u++) {
-                if (abcmp_ui(ab, polymat_coeff(M, u, r, 0), 0) != 0)
+                if (abcmp_ui(ab, matpoly_coeff(M, u, r, 0), 0) != 0)
                     break;
             }
             if (u == m) {
@@ -711,7 +709,7 @@ unsigned int (*compute_initial_F(bmstatus_ptr bm, polymat A))[2] /*{{{ */
 	    exponents[r] = k;
 
 	    /* Multiply the column so that the pivot becomes -1 */
-            int rc = abinv(ab, tmp, polymat_coeff(M, u, r, 0));
+            int rc = abinv(ab, tmp, matpoly_coeff(M, u, r, 0));
             if (!rc) {
                 fprintf(stderr, "Error, found a factor of the modulus: ");
                 abfprint(ab, stderr, tmp);
@@ -720,8 +718,8 @@ unsigned int (*compute_initial_F(bmstatus_ptr bm, polymat A))[2] /*{{{ */
             }
             abneg(ab, tmp, tmp);
             for(unsigned int i = 0 ; i < m ; i++) {
-                abmul(ab, polymat_coeff(M, i, r, 0),
-                          polymat_coeff(M, i, r, 0),
+                abmul(ab, matpoly_coeff(M, i, r, 0),
+                          matpoly_coeff(M, i, r, 0),
                           tmp);
             }
 
@@ -753,7 +751,7 @@ unsigned int (*compute_initial_F(bmstatus_ptr bm, polymat A))[2] /*{{{ */
     free(pivots);
     free(exponents);
     free(cnum);
-    polymat_clear(M);
+    matpoly_clear(ab, M);
     abclear(ab, &tmp);
 
     return fdesc;
@@ -774,7 +772,7 @@ unsigned int get_max_delta_on_solutions(bmstatus_ptr bm, unsigned int * delta)/*
     return maxdelta;
 }/*}}}*/
 
-void compute_final_F_red(bmstatus_ptr bm, polymat f, unsigned int (*fdesc)[2], unsigned int t0, polymat pi, unsigned int * delta)/*{{{*/
+void compute_final_F_red(bmstatus_ptr bm, matpoly f, unsigned int (*fdesc)[2], unsigned int t0, matpoly pi, unsigned int * delta)/*{{{*/
 {
     dims * d = bm->d;
     unsigned int m = d->m;
@@ -808,7 +806,7 @@ void compute_final_F_red(bmstatus_ptr bm, polymat f, unsigned int (*fdesc)[2], u
     ASSERT(f->n == 0);
     ASSERT(f->alloc == 0);
 
-    polymat_init(f, n, n, flen);
+    matpoly_init(ab, f, n, n, flen);
     f->size = flen;
 
     printf("Computing value of f(X)=f0(X)pi(X) (degree %u)\n", maxdelta);
@@ -838,8 +836,8 @@ void compute_final_F_red(bmstatus_ptr bm, polymat f, unsigned int (*fdesc)[2], u
             for(unsigned int j = 0 ; j < n ; j++) {
                 unsigned int j1 = pi_colidx[j];
                 abset(ab,
-                        polymat_coeff(f, i, j, k),
-                        polymat_coeff(pi, i, j1, k));
+                        matpoly_coeff(f, i, j, k),
+                        matpoly_coeff(pi, i, j1, k));
             }
         }
     }
@@ -853,9 +851,9 @@ void compute_final_F_red(bmstatus_ptr bm, polymat f, unsigned int (*fdesc)[2], u
             for(unsigned int j = 0 ; j < n ; j++) {
                 unsigned int j1 = pi_colidx[j];
                 abadd(ab,
-                        polymat_coeff(f, c, j, k+t0-e),
-                        polymat_coeff(f, c, j, k+t0-e),
-                        polymat_coeff(pi, i+n, j1, k));
+                        matpoly_coeff(f, c, j, k+t0-e),
+                        matpoly_coeff(f, c, j, k+t0-e),
+                        matpoly_coeff(pi, i+n, j1, k));
             }
         }
     }
@@ -863,7 +861,7 @@ void compute_final_F_red(bmstatus_ptr bm, polymat f, unsigned int (*fdesc)[2], u
     free(pi_colidx);
 }/*}}}*/
 
-void write_f(bmstatus_ptr bm, const char * filename, polymat f_red, unsigned int * delta, int ascii)/*{{{*/
+void write_f(bmstatus_ptr bm, const char * filename, matpoly f_red, unsigned int * delta, int ascii)/*{{{*/
 {
     dims * d = bm->d;
     unsigned int m = d->m;
@@ -895,7 +893,7 @@ void write_f(bmstatus_ptr bm, const char * filename, polymat f_red, unsigned int
         unsigned int delta_orig = delta[j];
         for(int z = 1; z && delta[j] ; delta[j]-=z) {
             for(unsigned int i = 0 ; z && i < n ; i++) {
-                z = abis_zero(ab, polymat_coeff(f_red, i, jj, delta[j]));
+                z = abis_zero(ab, matpoly_coeff(f_red, i, jj, delta[j]));
             }
         }
         if (delta_orig > delta[j]) {
@@ -912,7 +910,7 @@ void write_f(bmstatus_ptr bm, const char * filename, polymat f_red, unsigned int
                     if (i) fprintf(f, " ");
                     unsigned int j = sols[jj];
                     if (k <= delta[j]) {
-                        abfprint(ab, f, polymat_coeff(f_red, i, jj, delta[j]-k));
+                        abfprint(ab, f, matpoly_coeff(f_red, i, jj, delta[j]-k));
                     } else {
                         printf("0");
                     }
@@ -930,7 +928,7 @@ void write_f(bmstatus_ptr bm, const char * filename, polymat f_red, unsigned int
                 for(unsigned int i = 0 ; i < n ; i++) {
                     abset_zero(ab, tmp);
                     if (k <= delta[j])
-                        abset(ab, tmp, polymat_coeff(f_red, i, jj, delta[j]-k));
+                        abset(ab, tmp, matpoly_coeff(f_red, i, jj, delta[j]-k));
                     fwrite(tmp, sizeof(abelt), 1, f);
                 }
             }
@@ -940,7 +938,7 @@ void write_f(bmstatus_ptr bm, const char * filename, polymat f_red, unsigned int
     fclose(f);
 }/*}}}*/
 
-void compute_initial_E(bmstatus_ptr bm, polymat E, polymat A, unsigned int (*fdesc)[2])/*{{{*/
+void compute_initial_E(bmstatus_ptr bm, matpoly E, matpoly A, unsigned int (*fdesc)[2])/*{{{*/
 {
     // F0 is exactly the n x n identity matrix, plus the
     // X^(s-exponent)e_{cnum} vectors. fdesc has the (exponent, cnum)
@@ -957,12 +955,12 @@ void compute_initial_E(bmstatus_ptr bm, polymat E, polymat A, unsigned int (*fde
     abdst_field ab = d->ab;
     /* Now we're ready to compute E, which is nothing more than a rewrite
      * of A, of course. */
-    polymat_init(E, m, b, A->size - t0);
+    matpoly_init(ab, E, m, b, A->size - t0);
     E->size = A->size - t0;
     for(unsigned int k = t0 ; k < A->size ; k++) {
         for(unsigned int j = 0 ; j < n ; j++) {
             /* Take column j of A, shifted by t0 positions */
-            polymat_extract_column(ab, E, j, k-t0, A, j, k);
+            matpoly_extract_column(ab, E, j, k-t0, A, j, k);
         }
         for(unsigned int j = n ; j < m + n ; j++) {
             /* Take column cnum[j-n] of coeff exponents[j-n] of A, to
@@ -971,12 +969,12 @@ void compute_initial_E(bmstatus_ptr bm, polymat E, polymat A, unsigned int (*fde
              * shift by exponents[j-n] coefficients */
             unsigned int c = fdesc[j-n][1];
             unsigned int e = fdesc[j-n][0];
-            polymat_extract_column(ab, E, j, k-t0, A, c, k-t0+e);
+            matpoly_extract_column(ab, E, j, k-t0, A, c, k-t0+e);
         }
     }
 }/*}}}*/
 
-void read_data_for_series(bmstatus_ptr bm, polymat A, /* {{{ */
+void read_data_for_series(bmstatus_ptr bm, matpoly A, /* {{{ */
 			  const char *input_file, int ascii_input)
 {
     dims * d = bm->d;
@@ -987,7 +985,7 @@ void read_data_for_series(bmstatus_ptr bm, polymat A, /* {{{ */
     unsigned int guess_len = 1000;
 
     ASSERT(!A->m && !A->n && !A->alloc);
-    polymat_init(A, m, n, guess_len);
+    matpoly_init(ab, A, m, n, guess_len);
 
     FILE *f = fopen(input_file, "r");
     DIE_ERRNO_DIAG(f == NULL, "fopen", input_file);
@@ -996,7 +994,7 @@ void read_data_for_series(bmstatus_ptr bm, polymat A, /* {{{ */
     int eof_met = 0;
     for( ; !eof_met ; k++) {
         if (k == A->alloc) {
-            polymat_realloc(A, A->alloc + A->alloc / 10);
+            matpoly_realloc(ab, A, A->alloc + A->alloc / 10);
         }
         ASSERT_ALWAYS(k < A->alloc);
         A->size = k + 1;
@@ -1009,7 +1007,7 @@ void read_data_for_series(bmstatus_ptr bm, polymat A, /* {{{ */
 	int k1 = k - ! !k;
 	for (unsigned int i = 0; i < m && !eof_met ; i++) {
 	    for (unsigned int j = 0; j < n && !eof_met ; j++) {
-                abdst_elt x = polymat_coeff(A, i, j, k1);
+                abdst_elt x = matpoly_coeff(A, i, j, k1);
 		int rc;
                 if (ascii_input) {
                     rc = abfscan(ab, f, x);
@@ -1126,11 +1124,15 @@ int main(int argc, char *argv[])
 	abfield_specify(ab, MPFQ_PRIME_MPZ, p);
 	mpz_clear(p);
     }
+    abmpi_ops_init(ab);
 
     bm->lingen_threshold = 10;
     bm->lingen_mpi_threshold = 1000;
     param_list_parse_uint(pl, "lingen-threshold", &(bm->lingen_threshold));
     param_list_parse_uint(pl, "lingen-mpi-threshold", &(bm->lingen_mpi_threshold));
+#ifndef MPI_LINGEN
+    bm->lingen_mpi_threshold = UINT_MAX;
+#endif
 
     /* }}} */
 
@@ -1198,12 +1200,12 @@ int main(int argc, char *argv[])
      * should rather do an mpi-level read. Either with only one
      * jobreading, and handing over data immediately to its peers, or
      * with several accesses to the file(s). */
-    polymat E;
-    polymat_init(E, 0, 0, 0);
+    matpoly E;
+    matpoly_init(ab, E, 0, 0, 0);
 
     if (rank == 0) { /* {{{ Read A, compute F0 and E, and keep only E */
-        polymat A;
-        polymat_init(A, 0, 0, 0);
+        matpoly A;
+        matpoly_init(ab, A, 0, 0, 0);
         printf("Reading scalar data in polynomial ``a'' from %s\n", afile);
         read_data_for_series(bm, A, afile, ascii);
 
@@ -1221,7 +1223,7 @@ int main(int argc, char *argv[])
         compute_initial_E(bm, E, A, fdesc);
 
         printf("Throwing out a(X)\n");
-        polymat_clear(A);
+        matpoly_clear(ab, A);
     } /* }}} */
     MPI_Bcast(&(bm->t), 1, MPI_UNSIGNED, 0, bm->world);
     /* This will quite probably be changed. We are playing nasty games
@@ -1239,10 +1241,10 @@ int main(int argc, char *argv[])
         delta[j] = t0;
     }
 
-    polymat pi;
-    polymat_init(pi, 0, 0, 0);
+    matpoly pi;
+    matpoly_init(ab, pi, 0, 0, 0);
     bw_biglingen_single(bm, pi, E, delta);
-    polymat_clear(E);
+    matpoly_clear(ab, E);
 
     unsigned int nlucky = 0;
     int luck_mini = expected_pi_length(d, 0);
@@ -1251,15 +1253,15 @@ int main(int argc, char *argv[])
     if (rank == 0) {
         /* TODO: consider luck only below probability 2^-64 */
         if (nlucky == n) {
-            polymat f_red;
-            polymat_init(f_red, 0, 0, 0);
+            matpoly f_red;
+            matpoly_init(ab, f_red, 0, 0, 0);
             compute_final_F_red(bm, f_red, fdesc, t0, pi, delta);
             char * f_filename;
             int rc = asprintf(&f_filename, "%s.gen", afile);
             ASSERT_ALWAYS(rc >= 0);
             write_f(bm, f_filename, f_red, delta, ascii);
             free(f_filename);
-            polymat_clear(f_red);
+            matpoly_clear(ab, f_red);
         } else {
             fprintf(stderr, "Could not find the required set of solutions (nlucky=%u)\n", nlucky);
         }
@@ -1267,10 +1269,11 @@ int main(int argc, char *argv[])
         printf("t_basecase = %.2f\n", bm->t_basecase);
         printf("t_mp = %.2f\n", bm->t_mp);
         free(delta);
-        polymat_clear(pi);
+        matpoly_clear(ab, pi);
         free(fdesc);
     }
 
+    abmpi_ops_clear(ab);
     abfield_clear(ab);
     bmstatus_clear(bm);
     bw_common_clear(bw);

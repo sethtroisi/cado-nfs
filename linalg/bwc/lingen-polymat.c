@@ -102,9 +102,9 @@ typedef struct polymat_ur_s polymat_ur[1];
 typedef struct polymat_ur_s * polymat_ur_ptr;
 typedef const struct polymat_ur_s * polymat_ur_srcptr;
 
-static void polymat_ur_init(polymat_ur_ptr p, unsigned int m, unsigned int n, int len);
-static void polymat_ur_zero(polymat_ur_ptr p);
-static void polymat_ur_clear(polymat_ur_ptr p);
+static void polymat_ur_init(abdst_field ab, polymat_ur_ptr p, unsigned int m, unsigned int n, int len);
+static void polymat_ur_zero(abdst_field ab, polymat_ur_ptr p);
+static void polymat_ur_clear(abdst_field ab, polymat_ur_ptr p);
 static inline abelt_ur * polymat_ur_part(polymat_ur_ptr p, unsigned int i, unsigned int j, unsigned int k);
 static inline abdst_elt_ur polymat_ur_coeff(polymat_ur_ptr p, unsigned int i, unsigned int j, unsigned int k);
 
@@ -135,7 +135,7 @@ int polymat_check_pre_init(polymat_srcptr p)
 }
 
 /* {{{ init/zero/clear interface for polymat */
-void polymat_init(polymat_ptr p, unsigned int m, unsigned int n, int len) {
+void polymat_init(abdst_field ab, polymat_ptr p, unsigned int m, unsigned int n, int len) {
     memset(p, 0, sizeof(polymat));
     /* As a special case, we allow a pre-init state with m==n==len==0 */
     ASSERT(!m == !n);
@@ -145,26 +145,26 @@ void polymat_init(polymat_ptr p, unsigned int m, unsigned int n, int len) {
     p->n = n;
     p->alloc = len;
     p->size = 0;
-    p->x = malloc(m*n*p->alloc*sizeof(abelt));
-    memset(p->x, 0, m*n*p->alloc*sizeof(abelt));
+    abvec_init(ab, &(p->x), m*n*p->alloc);
+    abvec_set_zero(ab, p->x, m*n*p->alloc);
 }
-void polymat_realloc(polymat_ptr p, size_t newalloc) {
+void polymat_realloc(abdst_field ab, polymat_ptr p, size_t newalloc) {
     polymat_check_pre_init(p);
-    p->x = realloc(p->x, p->m*p->n*newalloc*sizeof(abelt));
+    abvec_reinit(ab, &(p->x), p->m*p->n*p->alloc, p->m*p->n*newalloc);
     /* zero out the newly added data */
     if (newalloc > p->alloc) {
-        memset(p->x + p->m*p->n*p->alloc, 0, p->m*p->n*(newalloc - p->alloc)*sizeof(abelt));
+        abvec_set_zero(ab, p->x + p->m*p->n*p->alloc, p->m*p->n*(newalloc - p->alloc));
     } else {
         ASSERT_ALWAYS(p->size <= newalloc);
     }
     p->alloc = newalloc;
 }
-void polymat_zero(polymat_ptr p) {
+void polymat_zero(abdst_field ab, polymat_ptr p) {
     p->size = 0;
-    memset(p->x, 0, p->m*p->n*p->alloc*sizeof(abelt));
+    abvec_set_zero(ab, p->x, p->m*p->n*p->alloc);
 }
-void polymat_clear(polymat_ptr p) {
-    free(p->x);
+void polymat_clear(abdst_field ab, polymat_ptr p) {
+    abvec_clear(ab, &(p->x), p->m*p->n*p->alloc);
     memset(p, 0, sizeof(polymat));
 }
 void polymat_swap(polymat_ptr a, polymat_ptr b)
@@ -179,31 +179,28 @@ void polymat_fill_random(abdst_field ab MAYBE_UNUSED, polymat_ptr a, unsigned in
 {
     ASSERT_ALWAYS(size <= a->alloc);
     a->size = size;
-
-    for(unsigned int v = 0 ; v < a->m * a->n * a->size ; v++) {
-        abrandom(ab, a->x[v], rstate);
-    }
+    abvec_random(ab, a->x, a->m*a->n*size, rstate);
 }
 
 
 /* }}} */
 
 /* {{{ init/zero/clear interface for polymat_ur */
-static void polymat_ur_init(polymat_ur_ptr p, unsigned int m, unsigned int n, int len) {
+static void polymat_ur_init(abdst_field ab, polymat_ur_ptr p, unsigned int m, unsigned int n, int len) {
     memset(p, 0, sizeof(polymat_ur));
     p->m = m;
     p->n = n;
     p->alloc = len;
     p->size = 0;
-    p->x = malloc(m*n*p->alloc*sizeof(abelt_ur));
-    memset(p->x, 0, m*n*p->alloc*sizeof(abelt_ur));
+    abvec_ur_init(ab, &(p->x), m*n*p->alloc);
+    abvec_ur_set_zero(ab, p->x, m*n*p->alloc);
 }
-static void polymat_ur_zero(polymat_ur_ptr p) {
+static void polymat_ur_zero(abdst_field ab, polymat_ur_ptr p) {
     p->size = 0;
-    memset(p->x, 0, p->m*p->n*p->alloc*sizeof(abelt_ur));
+    abvec_ur_set_zero(ab, p->x, p->m*p->n*p->alloc);
 }
-static void polymat_ur_clear(polymat_ur_ptr p) {
-    free(p->x);
+static void polymat_ur_clear(abdst_field ab, polymat_ur_ptr p) {
+    abvec_ur_clear(ab, &(p->x), p->m*p->n*p->alloc);
     memset(p, 0, sizeof(polymat_ur));
 }
 /* }}} */
@@ -313,10 +310,10 @@ void polymat_mulmat(abdst_field ab,
         polymat b, unsigned int kb)
 {
     polymat_ur cx;
-    polymat_ur_init(cx, c->m, c->n, 1);
+    polymat_ur_init(ab, cx, c->m, c->n, 1);
     polymat_addmulmat_ur(ab, cx, 0, a, ka, b, kb);
     polymat_reducemat(ab, c, kc, cx, 0);
-    polymat_ur_clear(cx);
+    polymat_ur_clear(ab, cx);
 }
 
 void polymat_addmulmat(abdst_field ab,
@@ -325,10 +322,10 @@ void polymat_addmulmat(abdst_field ab,
         polymat b, unsigned int kb)
 {
     polymat cc;
-    polymat_init(cc, c->m, c->n, 1);
+    polymat_init(ab, cc, c->m, c->n, 1);
     polymat_mulmat(ab,cc,0,a,ka,b,kb);
     polymat_addmat(ab,c,kc,c,kc,cc,0);
-    polymat_clear(cc);
+    polymat_clear(ab, cc);
 }
 
 /* }}} */
@@ -348,8 +345,15 @@ void polymat_multiply_column_by_x(abdst_field ab, polymat_ptr pi, unsigned int j
 void polymat_truncate(abdst_field ab, polymat_ptr dst, polymat_ptr src, unsigned int size)/*{{{*/
 {
     ASSERT_ALWAYS(size <= src->alloc);
+    if (dst == src) {
+        /* Never used by the code, so far. We're leaving garbage coeffs
+         * on top, could this be a problem ? */
+        abort(); /* so that programmer becomes aware of the gotcha */
+        dst->size = size;
+        return;
+    }
     if (polymat_check_pre_init(dst)) {
-        polymat_init(dst, src->m, src->n, size);
+        polymat_init(ab, dst, src->m, src->n, size);
     }
     ASSERT_ALWAYS(dst->m == src->m);
     ASSERT_ALWAYS(dst->n == src->n);
@@ -371,13 +375,28 @@ void polymat_extract_column(abdst_field ab,/*{{{*/
             polymat_part(src, 0, jsrc, ksrc), src->n, src->m);
 }/*}}}*/
 
+void polymat_extract_row_fragment(abdst_field ab,/*{{{*/
+        polymat_ptr dst, unsigned int i1, unsigned int j1,
+        polymat_ptr src, unsigned int i0, unsigned int j0,
+        unsigned int n)
+{
+    ASSERT_ALWAYS(src->size <= dst->alloc);
+    for(unsigned int k = 0 ; k < src->size ; k++) {
+        bwmat_copy_coeffs(ab,
+                polymat_part(dst, i1, j1, k), 1,
+                polymat_part(src, i0, j0, k), 1,
+                n);
+    }
+}/*}}}*/
+
+
 void polymat_rshift(abdst_field ab, polymat_ptr dst, polymat_ptr src, unsigned int k)/*{{{*/
 {
     ASSERT_ALWAYS(k <= src->size);
     unsigned int newsize = src->size - k;
     if (dst != src) {
         if (polymat_check_pre_init(dst)) {
-            polymat_init(dst, src->m, src->n, newsize);
+            polymat_init(ab, dst, src->m, src->n, newsize);
         }
         ASSERT_ALWAYS(dst->m == src->m);
         ASSERT_ALWAYS(dst->n == src->n);
@@ -394,8 +413,7 @@ void polymat_rshift(abdst_field ab, polymat_ptr dst, polymat_ptr src, unsigned i
                 polymat_part(src,0,0,k),1,
                 src->m*src->n*newsize);
     }
-    dst->alloc = newsize;
-    dst->x = realloc(dst->x, dst->m*dst->n*dst->alloc*sizeof(abelt));
+    polymat_realloc(ab, dst, newsize);
 }/*}}}*/
 
 
@@ -409,12 +427,12 @@ void polymat_mul_raw_basecase(abdst_field ab,/*{{{*/
     ASSERT_ALWAYS(c->alloc >= xc + nc);
 
     polymat_ur tmat_ur;
-    polymat_ur_init(tmat_ur, c->m, c->n, 1);
+    polymat_ur_init(ab, tmat_ur, c->m, c->n, 1);
 
     for(unsigned int k = 0 ; k < nc ; k++) {
         unsigned int i0 = k >= nb ? k + 1 - nb : 0;
         unsigned int i1 = k + 1 < na ? k + 1 : na;
-        polymat_ur_zero(tmat_ur);
+        polymat_ur_zero(ab, tmat_ur);
         for(unsigned int i = i0 ; i < i1 ; i++) {
             unsigned int j = k - i;
             if (!transpose) {
@@ -427,14 +445,14 @@ void polymat_mul_raw_basecase(abdst_field ab,/*{{{*/
             polymat_reducemat(ab, c, xc + k, tmat_ur, 0);
         } else {
             polymat tmat;
-            polymat_init(tmat, c->m, c->n, 1);
+            polymat_init(ab, tmat, c->m, c->n, 1);
             tmat->size = 1;
             polymat_reducemat(ab, tmat, 0, tmat_ur, 0);
             polymat_addmat(ab, c, xc + k, c, xc + k, tmat, 0);
-            polymat_clear(tmat);
+            polymat_clear(ab, tmat);
         }
     }
-    polymat_ur_clear(tmat_ur);
+    polymat_ur_clear(ab, tmat_ur);
 }/*}}}*/
 
 void polymat_mul_raw_kara(abdst_field ab,/*{{{*/
@@ -460,8 +478,8 @@ void polymat_mul_raw_kara(abdst_field ab,/*{{{*/
     unsigned int m1 = na - m0;
 
     polymat q0, q2, s, t;
-    polymat_init(s, a->m, a->n, m1);
-    polymat_init(t, b->m, b->n, m1);
+    polymat_init(ab, s, a->m, a->n, m1);
+    polymat_init(ab, t, b->m, b->n, m1);
     s->size = m1;
     t->size = m1;
     for(unsigned int k = 0 ; k < m0 ; k++) {
@@ -473,12 +491,12 @@ void polymat_mul_raw_kara(abdst_field ab,/*{{{*/
         polymat_addmat(ab, t, m0, t, m0, b, xb + m0 + m0);
     }
     polymat_mul_raw_kara(ab, c, xc+m0, s, 0, m1, t, 0, m1, transpose, 1);
-    polymat_clear(s);
-    polymat_clear(t);
+    polymat_clear(ab, s);
+    polymat_clear(ab, t);
 
-    polymat_init(q0, c->m, c->n, 2*m0-1);
+    polymat_init(ab, q0, c->m, c->n, 2*m0-1);
     q0->size = 2*m0-1;
-    polymat_init(q2, c->m, c->n, 2*m1-1);
+    polymat_init(ab, q2, c->m, c->n, 2*m1-1);
     q2->size = 2*m1-1;
     polymat_mul_raw_kara(ab, q0, 0, a, xa, m0, b, xb, m0, transpose, 0);
     polymat_mul_raw_kara(ab, q2, 0, a, xa+m0, m1, b, xb+m0, m1, transpose, 0);
@@ -490,8 +508,8 @@ void polymat_mul_raw_kara(abdst_field ab,/*{{{*/
         polymat_addmat(ab, c, xc + 2 * m0 + k, c, xc + 2 * m0 + k, q2, k);
         polymat_submat(ab, c, xc + m0 + k, c, xc + m0 + k, q2, k);
     }
-    polymat_clear(q0);
-    polymat_clear(q2);
+    polymat_clear(ab, q0);
+    polymat_clear(ab, q2);
 } /* }}} */
 
 void polymat_mul_raw_subdivide(abdst_field ab,/*{{{*/
@@ -548,13 +566,26 @@ void polymat_mul(abdst_field ab, polymat c, polymat a, polymat b)/*{{{*/
 {
     ASSERT_ALWAYS(a->n == b->m);
     if (polymat_check_pre_init(c)) {
-        polymat_init(c, a->m, b->n, a->size + b->size - 1);
+        polymat_init(ab, c, a->m, b->n, a->size + b->size - 1);
     }
     ASSERT_ALWAYS(c->m == a->m);
     ASSERT_ALWAYS(c->n == b->n);
     ASSERT_ALWAYS(c->alloc >= a->size + b->size - 1);
     c->size = a->size + b->size - 1;
     polymat_mul_raw(ab, c, 0, a, 0, a->size, b, 0, b->size, 0, 0);
+}/*}}}*/
+
+void polymat_addmul(abdst_field ab, polymat c, polymat a, polymat b)/*{{{*/
+{
+    ASSERT_ALWAYS(a->n == b->m);
+    if (polymat_check_pre_init(c)) {
+        polymat_init(ab, c, a->m, b->n, a->size + b->size - 1);
+    }
+    ASSERT_ALWAYS(c->m == a->m);
+    ASSERT_ALWAYS(c->n == b->n);
+    ASSERT_ALWAYS(c->alloc >= a->size + b->size - 1);
+    c->size = a->size + b->size - 1;
+    polymat_mul_raw(ab, c, 0, a, 0, a->size, b, 0, b->size, 0, 1);
 }/*}}}*/
 
 /* Middle product b of a and c. This is the part of the product where
@@ -591,11 +622,11 @@ void polymat_mp_raw_basecase(abdst_field ab,/*{{{*/
     ASSERT_ALWAYS(b->alloc >= xb + nb);
 
     polymat_ur tmat_ur;
-    polymat_ur_init(tmat_ur, b->m, b->n, 1);
+    polymat_ur_init(ab, tmat_ur, b->m, b->n, 1);
     tmat_ur->size = 1;
 
     for(unsigned int j = 0 ; j < nb ; j++) {
-        polymat_ur_zero(tmat_ur);
+        polymat_ur_zero(ab, tmat_ur);
         for(unsigned int i = 0 ; i < na ; i++) {
             unsigned int k = j + na - 1 - i;
             if (!transpose) {
@@ -608,14 +639,14 @@ void polymat_mp_raw_basecase(abdst_field ab,/*{{{*/
             polymat_reducemat(ab, b, xb + j, tmat_ur, 0);
         } else {
             polymat tmat;
-            polymat_init(tmat, b->m, b->n, 1);
+            polymat_init(ab, tmat, b->m, b->n, 1);
             tmat->size = 1;
             polymat_reducemat(ab, tmat, 0, tmat_ur, 0);
             polymat_addmat(ab, b, xb + j, b, xb + j, tmat, 0);
-            polymat_clear(tmat);
+            polymat_clear(ab, tmat);
         }
     }
-    polymat_ur_clear(tmat_ur);
+    polymat_ur_clear(ab, tmat_ur);
 }/*}}}*/
 
 void polymat_mp_raw_kara(abdst_field ab,/*{{{*/
@@ -650,7 +681,7 @@ void polymat_mp_raw_kara(abdst_field ab,/*{{{*/
      * from a and c, of respective maximum lengths m1 and 2*m1-1 */
     /* q0 is MP(a1, b0+b11), i.e. MP(m1, 2*m1-1), which
      * produces m1 coefficients. This goes to offset 0 (well, xb) in b. */
-    polymat_init(t, c->m, c->n, 2*m1-1);
+    polymat_init(ab, t, c->m, c->n, 2*m1-1);
     t->size = 2*m1-1;
     for(unsigned int k = 0 ; k < 2*m1 - 1 ; k++) {
         polymat_addmat(ab, t, k, c, span_c0[0] + k, c, span_c11[0] + k);
@@ -659,10 +690,10 @@ void polymat_mp_raw_kara(abdst_field ab,/*{{{*/
             a, span_a1[0], span_a1[1],
             t, 0, 2*m1-1,
             transpose, add);
-    polymat_clear(t);
+    polymat_clear(ab, t);
     /* q1 is MP(a1-a0, b11), i.e. MP(m1, 2*m1-1) again */
-    polymat_init(q1, b->m, b->n, m1);
-    polymat_init(s, a->m, a->n, m1);
+    polymat_init(ab, q1, b->m, b->n, m1);
+    polymat_init(ab, s, a->m, a->n, m1);
     q1->size = m1;
     s->size = m1;
     bwmat_copy_coeffs(ab,
@@ -680,10 +711,10 @@ void polymat_mp_raw_kara(abdst_field ab,/*{{{*/
             s, 0, m1,
             c, span_c11[0], span_c11[1],
             transpose, 0);
-    polymat_clear(s);
+    polymat_clear(ab, s);
     /* q2 is MP(a0, b10+b2), i.e. MP(m0, 2*m0-1) */
     /* This goes to offset m1 in b */
-    polymat_init(t, c->m, c->n, 2*m0-1);
+    polymat_init(ab, t, c->m, c->n, 2*m0-1);
     t->size = 2*m0-1;
     for(unsigned int k = 0 ; k < 2*m0 - 1 ; k++) {
         polymat_addmat(ab, t, k, c, span_c10[0] + k, c, span_c2[0] + k);
@@ -692,7 +723,7 @@ void polymat_mp_raw_kara(abdst_field ab,/*{{{*/
             a, span_a0[0], span_a0[1],
             t, 0, 2*m0-1,
             transpose, add);
-    polymat_clear(t);
+    polymat_clear(ab, t);
 
     /* We now have to append the coefficients to form the result. Not all
      * coefficients in q1 are read for the high part of the middle
@@ -705,7 +736,7 @@ void polymat_mp_raw_kara(abdst_field ab,/*{{{*/
             polymat_addmat(ab, b, xb + m1 + k, b, xb + m1 + k, q1, k);
         }
     }
-    polymat_clear(q1);
+    polymat_clear(ab, q1);
 }/*}}}*/
 
 void polymat_mp_raw_subdivide(abdst_field ab,/*{{{*/
@@ -793,7 +824,7 @@ void polymat_mp(abdst_field ab, polymat b, polymat a, polymat c)/*{{{*/
     unsigned int nb = MAX(a->size, c->size) - MIN(a->size, c->size) + 1;
     ASSERT_ALWAYS(a->n == c->m);
     if (polymat_check_pre_init(b)) {
-        polymat_init(b, a->m, c->n, nb);
+        polymat_init(ab, b, a->m, c->n, nb);
     }
     ASSERT_ALWAYS(b->m == a->m);
     ASSERT_ALWAYS(b->n == c->n);
@@ -801,5 +832,20 @@ void polymat_mp(abdst_field ab, polymat b, polymat a, polymat c)/*{{{*/
     b->size = nb;
 
     polymat_mp_raw(ab, b, 0, a, 0, a->size, c, 0, c->size, 0, 0);
+}/*}}}*/
+
+void polymat_addmp(abdst_field ab, polymat b, polymat a, polymat c)/*{{{*/
+{
+    unsigned int nb = MAX(a->size, c->size) - MIN(a->size, c->size) + 1;
+    ASSERT_ALWAYS(a->n == c->m);
+    if (polymat_check_pre_init(b)) {
+        polymat_init(ab, b, a->m, c->n, nb);
+    }
+    ASSERT_ALWAYS(b->m == a->m);
+    ASSERT_ALWAYS(b->n == c->n);
+    ASSERT_ALWAYS(b->alloc >= nb);
+    b->size = nb;
+
+    polymat_mp_raw(ab, b, 0, a, 0, a->size, c, 0, c->size, 0, 1);
 }/*}}}*/
 

@@ -10,7 +10,7 @@ struct polymat_s {
     unsigned int n;
     size_t size;
     size_t alloc;
-    abelt * x;
+    abvec x;
 };
 typedef struct polymat_s polymat[1];
 typedef struct polymat_s * polymat_ptr;
@@ -62,11 +62,11 @@ void polymat_set_mp_kara_cutoff(const struct polymat_cutoff_info * new_cutoff, s
 #ifdef __cplusplus
 extern "C" {
 #endif
-void polymat_init(polymat_ptr p, unsigned int m, unsigned int n, int len);
+void polymat_init(abdst_field ab, polymat_ptr p, unsigned int m, unsigned int n, int len);
 int polymat_check_pre_init(polymat_srcptr p);
-void polymat_realloc(polymat_ptr p, size_t newalloc);
-void polymat_zero(polymat_ptr p);
-void polymat_clear(polymat_ptr p);
+void polymat_realloc(abdst_field ab, polymat_ptr p, size_t newalloc);
+void polymat_zero(abdst_field ab, polymat_ptr p);
+void polymat_clear(abdst_field ab, polymat_ptr p);
 void polymat_fill_random(abdst_field ab MAYBE_UNUSED, polymat_ptr a, unsigned int size, gmp_randstate_t rstate);
 void polymat_swap(polymat_ptr a, polymat_ptr b);
 static inline abelt * polymat_part(polymat_ptr p, unsigned int i, unsigned int j, unsigned int k);
@@ -89,23 +89,18 @@ void polymat_multiply_column_by_x(abdst_field ab, polymat_ptr pi, unsigned int j
 void polymat_extract_column(abdst_field ab,
         polymat_ptr dst, unsigned int jdst, unsigned int kdst,
         polymat_ptr src, unsigned int jsrc, unsigned int ksrc);
+void polymat_extract_row_fragment(abdst_field ab,
+        polymat_ptr dst, unsigned int i1, unsigned int j1,
+        polymat_ptr src, unsigned int i0, unsigned int j0,
+        unsigned int n);
 void polymat_rshift(abdst_field ab, polymat_ptr dst, polymat_ptr src, unsigned int k);
 
 
+void polymat_addmul(abdst_field ab, polymat c, polymat a, polymat b);
+void polymat_addmp(abdst_field ab, polymat c, polymat a, polymat b);
 void polymat_mul(abdst_field ab, polymat c, polymat a, polymat b);
 void polymat_mp(abdst_field ab, polymat c, polymat a, polymat b);
 
-/* The only reason why this stays is because in bigpolymat, we do need
- * some version with an _add flag.
- */
-void polymat_mp_raw(abdst_field ab,
-        polymat c,
-        unsigned int xc,
-        polymat a,
-        unsigned int xa, unsigned int na,
-        polymat b,
-        unsigned int xb, unsigned int nb,
-        int transpose, int add);
 
 #ifdef __cplusplus
 }

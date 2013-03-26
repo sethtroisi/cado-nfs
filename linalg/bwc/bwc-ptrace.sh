@@ -32,8 +32,8 @@ thr=${Th}x${Tv}
 mpi_njobs_lingen=$((Nh*Nv))
 mpi_njobs_other=$((Mh*Mv))
 
-prime=1009
-bits_per_coeff=64
+prime=4148386731260605647525186547488842396461625774241327567978137
+bits_per_coeff=256
 
 # The test matrix may be created by:
 #
