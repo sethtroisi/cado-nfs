@@ -373,6 +373,9 @@ class DictDbTable(DbTable):
     primarykey = fields[0][0]
     references = None
     index = {"keyindex": ("key",)}
+    def __init__(self, *args, name = None, **kwargs):
+        self.tablename = name
+        super().__init__(*args, **kwargs)
 
 
 class DictDbAccess(dict):
@@ -386,49 +389,75 @@ class DictDbAccess(dict):
     are always served from the in-memory dict. Write accesses write through
     to the DB.
     """
-    def __init__(self, connection, name):
-        """ Init a table for parameter access and a cursor """
-        super().__init__()
-        self.__conn = connection
-        self.__table = DictDbTable()
-        self.__table.tablename = name
+    
+    def attachdb(self, db, name):
+        ''' Attaches to a DB table and reads values stored therein. 
+        This must be called before any assignments to the dict.
+
+        We can't really pass these two parameters to __init__(), even though
+        that's where they really belong, because dict.__init__() accepts 
+        arbitrary keywords arguments and uses them as initialisers for the 
+        dict, so the semantics of DictDbAccess(db="foo") would differ from 
+        that of dict(db="foo")
+        '''
+        self._conn = sqlite3.connect(db)
+        self._table = DictDbTable(name = name)
         # Create an empty table if none exists
-        self.__cursor = self.__conn.cursor(MyCursor)
-        self.__table.create(self.__cursor);
+        cursor = self._conn.cursor(MyCursor)
+        self._table.create(cursor);
+        # Get the entries currently stored in the DB
         data = self.__getall()
         self.update(data)
+        cursor.close()
     
     def __del__(self):
         """ Close the cursor and delete the dictionary """
-        self.__cursor.close()
+        if hasattr(self, "_conn"):
+            self._conn.close()
         # http://docs.python.org/2/reference/datamodel.html#object.__del__
-        # dict does not have __del__, but in a complex class heirarchy, 
+        # dict does not have __del__, but in a complex class hierarchy, 
         # dict may not be next in the MRO
         if hasattr(super(), "__del__"):
             super().__del__()
     
     def __getall(self):
         """ Reads the whole table and returns it as a dict """
-        rows = self.__table.where(self.__cursor)
+        cursor = self._conn.cursor(MyCursor)
+        rows = self._table.where(cursor)
+        cursor.close()
         dict = {r["key"]: r["value"] for r in rows}
         return dict
     
     def __setitem__(self, key, value):
         """ Set a dict entry to a value and update the DB """
+        cursor = self._conn.cursor(MyCursor)
         if key in self:
             # Update the table row where column "key" equals key
-            self.__table.update(self.__cursor, {"value": value}, 
-                              eq={"key": key})
+            self._table.update(cursor, {"value": value}, eq={"key": key})
         else:
-            self.__table.insert(self.__cursor, {"key": key, "value": value})   
-        self.__conn.commit()
+            self._table.insert(cursor, {"key": key, "value": value})   
+        self._conn.commit()
+        cursor.close()
         super().__setitem__(key, value)
 
     def __delitem__(self, key):
         """ Delete a key from the dictionary """
         super().__delitem__(key)
-        self.__table.delete(self.__cursor, eq={"key": key})
-        self.__conn.commit()
+        cursor = self._conn.cursor(MyCursor)
+        self._table.delete(cursor, eq={"key": key})
+        self._conn.commit()
+        cursor.close()
+
+    def setdefault(self, key, default = None):
+        ''' Setdefault function that allows a dictionary as input
+        
+        Values from default dict are merged into self, *not* overwriting
+        existing values in self '''
+        if key is None and isinstance(default, dict):
+            for key in default:
+                super().setdefault(key, default[key])
+        else:
+            return super().setdefault(key, default)
 
 class Mapper(object):
     """ This class translates between application objects, i.e., Python 
