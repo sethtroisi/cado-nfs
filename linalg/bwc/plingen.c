@@ -627,7 +627,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
             if (!is_pivot[j]) continue;
             if (pi_lengths[j] >= pi->alloc) {
                 if (!generator_found) {
-                    polymat_realloc(pi, pi->alloc + pi->alloc / (m+n));
+                    polymat_realloc(pi, pi->alloc + MAX(pi->alloc / (m+n), 1));
                     printf("t=%u, expanding allocation for pi (now %zu%%) ; lengths: ",
                             bm->t,
                             100 * pi->alloc / pi_room_base);
@@ -1634,7 +1634,7 @@ void read_data_for_series(bmstatus_ptr bm, polymat A, /* {{{ */
                 } else {
                     rc = fread(x, sizeof(abelt), 1, f);
                     rc = rc == 1;
-                    abreduce(ab, x, x);
+                    abnormalize(ab, x);
                 }
 		if (!rc) {
                     if (i == 0 && j == 0) {
