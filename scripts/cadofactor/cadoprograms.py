@@ -1,4 +1,5 @@
 import cadocommand
+import cadologger
 
 class Program(object):
     ''' Sub-classes must define class variables 'binary' and 'accepts', 
@@ -8,9 +9,14 @@ class Program(object):
     
     @staticmethod
     def __shellquote(s):
+        ''' Quote a command line argument
+
+        Currently does it the hard way: always encloses the argument in single
+        quotes, and escapes any single quotes that are part of the argument
+        '''
         return "'" + s.replace("'", "'\\''") + "'"
 
-    def __init__(args, kwargs):
+    def __init__(self, args, kwargs):
         ''' Takes a list of positional parameters and a dictionary of command 
         line parameters 
         '''
@@ -19,18 +25,20 @@ class Program(object):
             self.command = self.command + ["-" + self.params[key], kwargs[key]]
         self.command += args
     
-    def __str__():
+    def __str__(self):
         ''' Returns the command line as a string '''
-        return " ".join(Program.__shellquote(self.command))
+        return " ".join([Program.__shellquote(arg) for arg in self.command])
     
-    def as_array():
+    def as_array(self):
         ''' Returns the command line as a string array '''
         return self.command
     
-    def run():
-        ''' Runs the command '''
-        child = cadocommand.Command(self.as_array())
-        return child.wait()
+    def run(self):
+        ''' Runs the command and waits for termination '''
+        self.child = cadocommand.Command(self.as_array())
+    
+    def wait(self):
+        return self.child.wait()
 
 class Polyselect2l(Program):
     binary = "polyselect2l"

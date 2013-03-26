@@ -2,33 +2,37 @@ import subprocess
 import cadologger
 
 class Command(object):
+    ''' Represents a running subprocess
+
+    The subprocess is started when the instance is initialised
+    '''
     def __init__(self, args, **kwargs):
         self.args = args
         self.kwargs = kwargs
-        self.logger = Logger()
+        self.logger = cadologger.Logger()
         # Convert args array to a string for printing if necessary
         if isinstance(self.args, str):
             self.cmdline = self.args
         else:
             self.cmdline = " ".join(self.args)
-
         self.child = subprocess.Popen(self.args, stdout = subprocess.PIPE, 
             stderr = subprocess.PIPE, **self.kwargs)
-        
         self.logger.info("Running command: " + self.cmdline)
         self.logger.cmd(self.cmdline, extra={"pid": self.child.pid})
-
+    
     def wait(self):
-        # Wait for command to finish executing, capturing stdout and stderr 
-        # in output tuple
+        ''' Wait for command to finish executing, capturing stdout and stderr 
+        in output tuple '''
         (self.stdout, self.stderr) = self.child.communicate()
-
         if self.child.returncode == 0:
-            logger.info("Process with PID " + str(self.child.pid) + " finished successfully")
+            self.logger.info("Process with PID %d finished successfully",
+                             self.child.pid)
         else:
-            logger.error("Process with PID " + str(self.child.pid) + " finished with return code " + str(self.child.returncode))
+            self.logger.error("Process with PID %d finished with return "
+                              "code %d",
+                              self.child.pid, self.child.returncode)
         self.returncode = self.child.returncode
-        return self.returncode
+        return (self.returncode, self.stdout, self.stderr)
 
 class RemoteCommand(Command):
     ssh="/usr/bin/ssh"
@@ -78,20 +82,20 @@ class SendFile(Command):
         super().__init__(copy_command, **kwargs)
 
 if __name__ == '__main__':
-    c = cadocommand.Command(["ls", "/"])
-    rc = c.wait()
-    print("Stdout: " + str(c.stdout, encoding="utf-8"))
-    print("Stderr: " + str(c.stderr, encoding="utf-8"))
+    c = Command(["ls", "/"])
+    (rc, out, err) = c.wait()
+    print("Stdout: " + str(out, encoding="utf-8"))
+    print("Stderr: " + str(err, encoding="utf-8"))
     del(c)
 
-    c = cadocommand.RemoteCommand(["ls", "/"], "localhost")
-    rc = c.wait()
-    print("Stdout: " + str(c.stdout, encoding="utf-8"))
-    print("Stderr: " + str(c.stderr, encoding="utf-8"))
+    c = RemoteCommand(["ls", "/"], "localhost")
+    (rc, out, err) = c.wait()
+    print("Stdout: " + str(out, encoding="utf-8"))
+    print("Stderr: " + str(err, encoding="utf-8"))
     del(c)
 
-    c = cadocommand.SendFile("WU", "quiche", "/tmp/foo")
-    rc = c.wait()
+    c = SendFile("WU", "quiche", "/tmp/foo")
+    (rc, out, err) = c.wait()
     print("Stdout: " + str(c.stdout, encoding="utf-8"))
     print("Stderr: " + str(c.stderr, encoding="utf-8"))
     del(c)
