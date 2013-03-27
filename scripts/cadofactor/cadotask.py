@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import datetime
 import wudb
 import cadoprograms
 import cadologger
@@ -36,16 +37,17 @@ class Task(object):
         self.param = wudb.DictDbAccess()
         self.param.attachdb(db, self.name)
         self.param_path = "tasks." + self.name
+        self.logger = cadologger.Logger()
         if defaults:
             mydefaults = defaults._myparams(self.params, self.param_path)
             self.param.setdefault(None, mydefaults)
         self.programparam = []
         for prog in self.programs:
-            name = self.name + '_' + prog.binary
+            name = self.name + '_' + prog.name
             progparam = wudb.DictDbAccess()
             progparam.attachdb(db, name)
             self.programparam.append(progparam)
-            path = self.param_path + '.' + prog.binary
+            path = self.param_path + '.' + prog.name
             if defaults:
                 mydefaults = defaults._myparams(prog.params, path)
                 progparam.setdefault(None, mydefaults)
@@ -69,27 +71,34 @@ class Task(object):
         else:
             return self.timestamp() >= other.timestamp()
 
+    def is_done(self):
+        return not (self.timestamp() is None)
+
     def mark_done(self, done):
         if not done and self.timestamp() is None:
             # Nothing to do
             return
         if done:
-            self.param["time_finished"] = gettime()
+            self.param["time_finished"] = str(datetime.now())
         else:
             self.param["time_finished"] = None
 
     def run(self):
         """ Runs the prerequisites. Sub-classes should call this. """
-        logger = cadologger.Logger()
+        self.logger.debug("Enter Task.run(" + self.name + ")")
+        self.logger.debug("Task.run(" + self.name + "): self.is_done() = " + 
+                          str(self.is_done()))
         # Check/run the prerequisites
         if not self.dependencies is None:
             for task in self.dependencies:
                 task.run()
                 # Check if prereq is newer than our timestamp
-                if not self.prereq_ok(task):
-                    logger.info("Prerequisite %s not ok, setting %s as not "
-                                "done", task.title, self.title)
+                if self.is_done() and not self.prereq_ok(task):
+                    self.logger.info(
+                        "Prerequisite %s not ok, setting %s as not done", 
+                        task.title, self.title)
                     self.mark_done(False)
+        self.logger.debug("Exit Task.run(" + self.name + ")")
 
     def submit(self, commands, inputfiles, outputfiles, tempfiles):
         ''' Submit a command that needs to be run. Returns a handle
@@ -164,77 +173,188 @@ class PolyselTask(Task):
     def run(self):
         # Make command line for polselect2l, run it. 
         # Whole range in one go for now
-        args = ()
-        kwargs = self.programparam[0]
-        p = self.programs[0](args, kwargs)
-        p.run()
-        p.wait()
+        self.logger.debug("Enter PolyselTask.run(" + self.name + ")")
+        super().run()
+        if not self.is_done():
+            args = ()
+            kwargs = self.programparam[0]
+            p = self.programs[0](args, kwargs)
+            p.run()
+            p.wait()
+            self.logger.debug("Marking " + self.name + " done")
+            self.mark_done(True)
+        self.logger.debug("Exit PolyselTask.run(" + self.name + ")")
 
 class FactorBaseTask(Task):
     """ Generates the factor base for the polynomial(s) """
     name = "factorbase"
     title = "Generate Factor Base"
-    programs = ()
+    programs = (cadoprograms.MakeFB,)
     def __init__(self, polsel, *args, **kwargs):
         super().__init__(*args, dependencies = (polsel,), **kwargs)
 
+    def run(self):
+        self.logger.debug("Enter FactorBaseTask.run(" + self.name + ")")
+        super().run()
+        if not self.is_done():
+            args = ()
+            kwargs = self.programparam[0]
+            p = self.programs[0](args, kwargs)
+            p.run()
+            p.wait()
+            self.logger.debug("Marking " + self.name + " done")
+            self.mark_done(True)
+        self.logger.debug("Exit FactorBaseTask.run(" + self.name + ")")
+        
 class FreeRelTask(Task):
     """ Generates free relations for the polynomial(s) """
     name = "freerel"
     title = "Generate Free Relations"
-    programs = ()
+    programs = (cadoprograms.FreeRel,)
     def __init__(self, polsel, *args, **kwargs):
         super().__init__(*args, dependencies = (polsel,), **kwargs)
+
+    def run(self):
+        self.logger.debug("Enter FactorBaseTask.run(" + self.name + ")")
+        super().run()
+        if not self.is_done():
+            args = ()
+            kwargs = self.programparam[0]
+            p = self.programs[0](args, kwargs)
+            p.run()
+            p.wait()
+            self.logger.debug("Marking " + self.name + " done")
+            self.mark_done(True)
+        self.logger.debug("Exit FactorBaseTask.run(" + self.name + ")")
 
 class SievingTask(Task):
     """ Does the sieving, uses client/server """
     name = "sieving"
     title = "Sieving"
-    programs = ()
+    programs = (cadoprograms.Las,)
     def __init__(self, polsel, factorbase, *args, **kwargs):
         super().__init__(*args, dependencies = (polsel, factorbase), **kwargs)
+
+    def run(self):
+        self.logger.debug("Enter FactorBaseTask.run(" + self.name + ")")
+        super().run()
+        if not self.is_done():
+            args = ()
+            kwargs = self.programparam[0]
+            p = self.programs[0](args, kwargs)
+            p.run()
+            p.wait()
+            self.logger.debug("Marking " + self.name + " done")
+            self.mark_done(True)
+        self.logger.debug("Exit FactorBaseTask.run(" + self.name + ")")
 
 class DuplicatesTask(Task):
     """ Removes duplicate relations """
     name = "duplicates"
     title = "Filtering: Duplicate Removal"
-    programs = ()
+    programs = (cadoprograms.Duplicates,)
     def __init__(self, sieving, *args, **kwargs):
         super().__init__(*args, dependencies = (sieving,), **kwargs)
+
+    def run(self):
+        self.logger.debug("Enter FactorBaseTask.run(" + self.name + ")")
+        super().run()
+        if not self.is_done():
+            args = ()
+            kwargs = self.programparam[0]
+            p = self.programs[0](args, kwargs)
+            p.run()
+            p.wait()
+            self.logger.debug("Marking " + self.name + " done")
+            self.mark_done(True)
+        self.logger.debug("Exit FactorBaseTask.run(" + self.name + ")")
 
 class SingletonsTask(Task):
     """ Removes singletons and computes excess """
     name = "singletons"
     title = "Filtering: Singleton removal"
-    programs = ()
+    programs = (cadoprograms.Singletons,)
     def __init__(self, duplicates, *args, **kwargs):
         super().__init__(*args, dependencies = (duplicates,), **kwargs)
+
+    def run(self):
+        self.logger.debug("Enter FactorBaseTask.run(" + self.name + ")")
+        super().run()
+        if not self.is_done():
+            args = ()
+            kwargs = self.programparam[0]
+            p = self.programs[0](args, kwargs)
+            p.run()
+            p.wait()
+            self.logger.debug("Marking " + self.name + " done")
+            self.mark_done(True)
+        self.logger.debug("Exit FactorBaseTask.run(" + self.name + ")")
 
 class MergeTask(Task):
     """ Merges relations """
     name = "merging"
     title = "Filtering: Merging"
-    programs = ()
+    programs = (cadoprograms.Merge,)
     def __init__(self, freerel, unique, *args, **kwargs):
         super().__init__(*args, dependencies = (freerel, unique), **kwargs)
+
+    def run(self):
+        self.logger.debug("Enter FactorBaseTask.run(" + self.name + ")")
+        super().run()
+        if not self.is_done():
+            args = ()
+            kwargs = self.programparam[0]
+            p = self.programs[0](args, kwargs)
+            p.run()
+            p.wait()
+            self.logger.debug("Marking " + self.name + " done")
+            self.mark_done(True)
+        self.logger.debug("Exit FactorBaseTask.run(" + self.name + ")")
 
 class LinAlgTask(Task):
     """ Runs the linear algebra step """
     name = "linalg"
     title = "Linear Algebra"
-    programs = ()
+    programs = (cadoprograms.BWC,)
     def __init__(self, merge, *args, **kwargs):
         super().__init__(*args, dependencies = (merge,), **kwargs)
+
+    def run(self):
+        self.logger.debug("Enter FactorBaseTask.run(" + self.name + ")")
+        super().run()
+        if not self.is_done():
+            args = ()
+            kwargs = self.programparam[0]
+            p = self.programs[0](args, kwargs)
+            p.run()
+            p.wait()
+            self.logger.debug("Marking " + self.name + " done")
+            self.mark_done(True)
+        self.logger.debug("Exit FactorBaseTask.run(" + self.name + ")")
 
 class SqrtTask(Task):
     """ Runs the square root """
     name = "sqrt"
     title = "Square Root"
-    programs = ()
+    programs = (cadoprograms.Sqrt,)
     def __init__(self, polsel, freerel, sieving, merge, linalg, 
                  *args, **kwargs):
         dep = (polsel, freerel, sieving, merge)
         super().__init__(*args, dependencies = dep, **kwargs)
+
+    def run(self):
+        self.logger.debug("Enter FactorBaseTask.run(" + self.name + ")")
+        super().run()
+        if not self.is_done():
+            args = ()
+            kwargs = self.programparam[0]
+            p = self.programs[0](args, kwargs)
+            p.run()
+            p.wait()
+            self.logger.debug("Marking " + self.name + " done")
+            self.mark_done(True)
+        self.logger.debug("Exit FactorBaseTask.run(" + self.name + ")")
+
 
 # FIXME: Is this a Task object? Probably not
 # Should this be in cadotask or in cadofactor?
