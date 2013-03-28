@@ -39,21 +39,19 @@ class Task(object):
         self.param_path = "tasks." + self.name
         self.logger = cadologger.Logger()
         if defaults:
-            mydefaults = defaults._myparams(self.params, self.param_path)
+            mydefaults = defaults._myparams(self.param, self.param_path)
             self.param.setdefault(None, mydefaults)
-        self.programparam = []
+        self.progparams = []
         for prog in self.programs:
-            name = self.name + '_' + prog.name
-            progparam = wudb.DictDbAccess()
-            progparam.attachdb(db, name)
-            self.programparam.append(progparam)
+            self.progparams.append(wudb.DictDbAccess())
+            self.progparams[-1].attachdb(db, self.name + '_' + prog.name)
             path = self.param_path + '.' + prog.name
             if defaults:
                 mydefaults = defaults._myparams(prog.params, path)
-                progparam.setdefault(None, mydefaults)
+                self.progparams[-1].setdefault(None, mydefaults)
     
     def setparam(override):
-        self.param.update(override._myparams(self.params, self.param_path))
+        self.param.update(override._myparams(self.param, self.param_path))
     
     def timestamp(self):
         """ Returns timestamp of completion, or None if not completed """
@@ -177,7 +175,7 @@ class PolyselTask(Task):
         super().run()
         if not self.is_done():
             args = ()
-            kwargs = self.programparam[0]
+            kwargs = self.progparams[0]
             p = self.programs[0](args, kwargs)
             p.run()
             p.wait()
@@ -198,7 +196,7 @@ class FactorBaseTask(Task):
         super().run()
         if not self.is_done():
             args = ()
-            kwargs = self.programparam[0]
+            kwargs = self.progparams[0]
             p = self.programs[0](args, kwargs)
             p.run()
             p.wait()
@@ -219,7 +217,7 @@ class FreeRelTask(Task):
         super().run()
         if not self.is_done():
             args = ()
-            kwargs = self.programparam[0]
+            kwargs = self.progparams[0]
             p = self.programs[0](args, kwargs)
             p.run()
             p.wait()
@@ -240,7 +238,7 @@ class SievingTask(Task):
         super().run()
         if not self.is_done():
             args = ()
-            kwargs = self.programparam[0]
+            kwargs = self.progparams[0]
             p = self.programs[0](args, kwargs)
             p.run()
             p.wait()
@@ -261,7 +259,7 @@ class DuplicatesTask(Task):
         super().run()
         if not self.is_done():
             args = ()
-            kwargs = self.programparam[0]
+            kwargs = self.progparams[0]
             p = self.programs[0](args, kwargs)
             p.run()
             p.wait()
@@ -282,7 +280,7 @@ class SingletonsTask(Task):
         super().run()
         if not self.is_done():
             args = ()
-            kwargs = self.programparam[0]
+            kwargs = self.progparams[0]
             p = self.programs[0](args, kwargs)
             p.run()
             p.wait()
@@ -303,7 +301,7 @@ class MergeTask(Task):
         super().run()
         if not self.is_done():
             args = ()
-            kwargs = self.programparam[0]
+            kwargs = self.progparams[0]
             p = self.programs[0](args, kwargs)
             p.run()
             p.wait()
@@ -324,7 +322,7 @@ class LinAlgTask(Task):
         super().run()
         if not self.is_done():
             args = ()
-            kwargs = self.programparam[0]
+            kwargs = self.progparams[0]
             p = self.programs[0](args, kwargs)
             p.run()
             p.wait()
@@ -347,7 +345,7 @@ class SqrtTask(Task):
         super().run()
         if not self.is_done():
             args = ()
-            kwargs = self.programparam[0]
+            kwargs = self.progparams[0]
             p = self.programs[0](args, kwargs)
             p.run()
             p.wait()

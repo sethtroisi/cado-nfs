@@ -4,6 +4,7 @@ import logging
 import cadologger
 import wudb
 import cadotask
+import cadoparams
 
 # TODO:
 # read parameter file and number to be factored
@@ -17,5 +18,7 @@ if __name__ == '__main__':
     logger.info ('Opening database file "%s"', wudb_file)
     # dbconn = sqlite3.connect("wudb")
     logger.info ("Beginning factorization")
-    factorjob = cadotask.CompleteFactorization(wudb_file)
+    parameters = cadoparams.Parameters()
+    parameters._readfile(open("parameters"))
+    factorjob = cadotask.CompleteFactorization(wudb_file, defaults = parameters)
     factorjob.run()

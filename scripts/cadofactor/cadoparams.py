@@ -42,21 +42,27 @@ class Parameters(dict):
     def _myparams(self, keys, path):
         ''' From the hierarchical dictionary params, generate a flat 
         dictionary with those parameters which are listed in keys and that 
-        are found along path
+        are found along path. 
+        path is specified as a string with path segments separated by the 
+        separator
         
-        >>> Parameters({'a':1, 'b':2, 'foo':{'a':3}, 'bar':{'a':4}}\
-        )._myparams(keys=("a", "b"), path = ("foo",))
+        >>> d = {'a':1,'b':2,'c':3,'foo':{'a':3},'bar':{'a':4,'baz':{'a':5}}}
+        >>> Parameters(d)._myparams(keys=('a', 'b'), path = 'foo')
         {'a': 3, 'b': 2}
+        
+        >>> Parameters(d)._myparams(keys=('a', 'b'), path = 'bar.baz')
+        {'a': 5, 'b': 2}
         '''
         result = {}
         source = self
         idx = 0
+        splitpath = path.split(self._separator)
         while source:
           tomerge = {key:source[key] for key in keys 
                      if key in source and not isinstance(source[key], dict)}
           result.update(tomerge)
-          if path and idx < len(path) and path[idx] in source:
-            source = source[path[idx]]
+          if idx < len(splitpath) and splitpath[idx] in source:
+            source = source[splitpath[idx]]
             idx = idx + 1
           else:
             source = None
