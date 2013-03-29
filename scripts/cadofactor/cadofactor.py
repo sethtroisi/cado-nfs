@@ -20,5 +20,6 @@ if __name__ == '__main__':
     logger.info ("Beginning factorization")
     parameters = cadoparams.Parameters()
     parameters._readfile(open("parameters"))
-    factorjob = cadotask.CompleteFactorization(wudb_file, defaults = parameters)
+    factorjob = cadotask.CompleteFactorization(wudb_file, 
+                                               parameters = parameters)
     factorjob.run()

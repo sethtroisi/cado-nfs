@@ -30,7 +30,10 @@ import cadologger
 class Task(object):
     """ An class that represents one task that needs to be processed. """
     
-    def __init__(self, dependencies, db = None, defaults = None):
+    def __init__(self, dependencies, db = None, parameters = None):
+        ''' Parameters passed in by parameters do not override values in the
+        DB-backed parameter dictionary 
+        '''
         self.dbconn = sqlite3.connect(db)
         self.dependencies = dependencies
         # Derived class must define name
@@ -38,17 +41,9 @@ class Task(object):
         self.param.attachdb(db, self.name)
         self.param_path = "tasks." + self.name
         self.logger = cadologger.Logger()
-        if defaults:
-            mydefaults = defaults._myparams(self.param, self.param_path)
-            self.param.setdefault(None, mydefaults)
-        self.progparams = []
-        for prog in self.programs:
-            self.progparams.append(wudb.DictDbAccess())
-            self.progparams[-1].attachdb(db, self.name + '_' + prog.name)
-            path = self.param_path + '.' + prog.name
-            if defaults:
-                mydefaults = defaults._myparams(prog.params, path)
-                self.progparams[-1].setdefault(None, mydefaults)
+        if parameters:
+            myparams = parameters._myparams(self.param, self.param_path)
+            self.param.setdefault(None, myparams)
     
     def setparam(override):
         self.param.update(override._myparams(self.param, self.param_path))
@@ -81,23 +76,39 @@ class Task(object):
         else:
             self.param["time_finished"] = None
 
-    def run(self):
-        """ Runs the prerequisites. Sub-classes should call this. """
+    def run(self, parameters = None):
+        ''' Runs the prerequisites. Sub-classes should call this.
+        
+        Parameters passed in by parameters DO override values in the
+        DB-backed parameter dictionary 
+        '''
         self.logger.debug("Enter Task.run(" + self.name + ")")
         self.logger.debug("Task.run(" + self.name + "): self.is_done() = " + 
                           str(self.is_done()))
         # Check/run the prerequisites
         if not self.dependencies is None:
             for task in self.dependencies:
-                task.run()
+                task.run(parameters)
                 # Check if prereq is newer than our timestamp
                 if self.is_done() and not self.prereq_ok(task):
                     self.logger.info(
                         "Prerequisite %s not ok, setting %s as not done", 
                         task.title, self.title)
                     self.mark_done(False)
+        
+        # Set parameters for our programs
+        self.progparams = []
+        for prog in self.programs:
+            self.progparams.append(wudb.DictDbAccess())
+            self.progparams[-1].attachdb(db, self.name + '_' + prog.name)
+            if parameters:
+                parampath = self.param_path + '.' + prog.name
+                mydefaults = defaults._myparams(prog.params, parampath)
+                self.progparams[-1].update(None, mydefaults)
+        
         self.logger.debug("Exit Task.run(" + self.name + ")")
-
+        return
+    
     def submit(self, commands, inputfiles, outputfiles, tempfiles):
         ''' Submit a command that needs to be run. Returns a handle
         which can be used for status check.
@@ -167,16 +178,17 @@ class PolyselTask(Task):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, dependencies = None, **kwargs)
-
-    def run(self):
+    
+    def run(self, *args, **kwargs):
         # Make command line for polselect2l, run it. 
         # Whole range in one go for now
         self.logger.debug("Enter PolyselTask.run(" + self.name + ")")
-        super().run()
+        super().run(*args, **kwargs)
+        
         if not self.is_done():
             args = ()
             kwargs = self.progparams[0]
-            p = self.programs[0](args, kwargs)
+            p = cadoprograms.Polyselect2l(arg, kwarg)
             p.run()
             p.wait()
             self.logger.debug("Marking " + self.name + " done")
@@ -191,9 +203,9 @@ class FactorBaseTask(Task):
     def __init__(self, polsel, *args, **kwargs):
         super().__init__(*args, dependencies = (polsel,), **kwargs)
 
-    def run(self):
+    def run(self, parameters):
         self.logger.debug("Enter FactorBaseTask.run(" + self.name + ")")
-        super().run()
+        super().run(*args, **kwargs)
         if not self.is_done():
             args = ()
             kwargs = self.progparams[0]
@@ -212,9 +224,9 @@ class FreeRelTask(Task):
     def __init__(self, polsel, *args, **kwargs):
         super().__init__(*args, dependencies = (polsel,), **kwargs)
 
-    def run(self):
+    def run(self, parameters):
         self.logger.debug("Enter FactorBaseTask.run(" + self.name + ")")
-        super().run()
+        super().run(*args, **kwargs)
         if not self.is_done():
             args = ()
             kwargs = self.progparams[0]
@@ -233,9 +245,9 @@ class SievingTask(Task):
     def __init__(self, polsel, factorbase, *args, **kwargs):
         super().__init__(*args, dependencies = (polsel, factorbase), **kwargs)
 
-    def run(self):
+    def run(self, parameters):
         self.logger.debug("Enter FactorBaseTask.run(" + self.name + ")")
-        super().run()
+        super().run(*args, **kwargs)
         if not self.is_done():
             args = ()
             kwargs = self.progparams[0]
@@ -250,13 +262,13 @@ class DuplicatesTask(Task):
     """ Removes duplicate relations """
     name = "duplicates"
     title = "Filtering: Duplicate Removal"
-    programs = (cadoprograms.Duplicates,)
+    programs = (cadoprograms.Duplicates1, cadoprograms.Duplicates2)
     def __init__(self, sieving, *args, **kwargs):
         super().__init__(*args, dependencies = (sieving,), **kwargs)
 
-    def run(self):
+    def run(self, parameters):
         self.logger.debug("Enter FactorBaseTask.run(" + self.name + ")")
-        super().run()
+        super().run(*args, **kwargs)
         if not self.is_done():
             args = ()
             kwargs = self.progparams[0]
@@ -267,17 +279,17 @@ class DuplicatesTask(Task):
             self.mark_done(True)
         self.logger.debug("Exit FactorBaseTask.run(" + self.name + ")")
 
-class SingletonsTask(Task):
+class PurgeTask(Task):
     """ Removes singletons and computes excess """
     name = "singletons"
     title = "Filtering: Singleton removal"
-    programs = (cadoprograms.Singletons,)
+    programs = (cadoprograms.Purge,)
     def __init__(self, duplicates, *args, **kwargs):
         super().__init__(*args, dependencies = (duplicates,), **kwargs)
 
-    def run(self):
+    def run(self, parameters):
         self.logger.debug("Enter FactorBaseTask.run(" + self.name + ")")
-        super().run()
+        super().run(*args, **kwargs)
         if not self.is_done():
             args = ()
             kwargs = self.progparams[0]
@@ -296,9 +308,9 @@ class MergeTask(Task):
     def __init__(self, freerel, unique, *args, **kwargs):
         super().__init__(*args, dependencies = (freerel, unique), **kwargs)
 
-    def run(self):
+    def run(self, parameters):
         self.logger.debug("Enter FactorBaseTask.run(" + self.name + ")")
-        super().run()
+        super().run(*args, **kwargs)
         if not self.is_done():
             args = ()
             kwargs = self.progparams[0]
@@ -317,9 +329,9 @@ class LinAlgTask(Task):
     def __init__(self, merge, *args, **kwargs):
         super().__init__(*args, dependencies = (merge,), **kwargs)
 
-    def run(self):
+    def run(self, parameters):
         self.logger.debug("Enter FactorBaseTask.run(" + self.name + ")")
-        super().run()
+        super().run(*args, **kwargs)
         if not self.is_done():
             args = ()
             kwargs = self.progparams[0]
@@ -340,9 +352,9 @@ class SqrtTask(Task):
         dep = (polsel, freerel, sieving, merge)
         super().__init__(*args, dependencies = dep, **kwargs)
 
-    def run(self):
+    def run(self, parameters):
         self.logger.debug("Enter FactorBaseTask.run(" + self.name + ")")
-        super().run()
+        super().run(*args, **kwargs)
         if not self.is_done():
             args = ()
             kwargs = self.progparams[0]
@@ -365,10 +377,11 @@ class CompleteFactorization(object):
         self.sieving = SievingTask(self.polysel, self.fb, *args, db=db, 
                                    **kwargs)
         self.dup = DuplicatesTask(self.sieving, *args, db=db, **kwargs)
-        self.sing = SingletonsTask(self.dup, *args, db=db, **kwargs)
+        self.sing = PurgeTask(self.dup, *args, db=db, **kwargs)
         self.merge = MergeTask(self.freerel, self.sing, *args, db=db, **kwargs)
         self.linalg = LinAlgTask(self.merge, *args, db=db, **kwargs)
         self.sqrt = SqrtTask(self.polysel, self.freerel, self.sieving, 
                              self.merge, self.linalg, *args, db=db, **kwargs)
-    def run(self):
-        self.sqrt.run()
+    
+    def run(self, *args, **kwargs):
+        self.sqrt.run(*args, **kwargs)
