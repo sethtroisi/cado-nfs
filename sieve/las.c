@@ -2938,6 +2938,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     las_info las;
     double t0, tts;
     unsigned long sq = 0;
+    int allow_largesq = 0;
     double totJ = 0.0;
     /* following command-line values override those in the polynomial file */
     int argc = argc0;
@@ -2962,6 +2963,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_switch(pl, "-v", NULL);
     param_list_configure_switch(pl, "-ratq", NULL);
     param_list_configure_switch(pl, "-no-prepare-hints", NULL);
+    param_list_configure_switch(pl, "-allow-largesq", &allow_largesq);
 #if 0   /* incompatible with the todo list */
     param_list_configure_switch(pl, "-bench", &bench);
     param_list_configure_switch(pl, "-bench2", &bench2);
@@ -3186,6 +3188,24 @@ int main (int argc0, char *argv0[])/*{{{*/
             mpz_set(si->doing->r, las->todo->r);
         }
 #endif
+
+        /* Check whether q is larger than the large prime bound.
+         * This can create some problems, for instance in characters.
+         * By default, this is not allowed, but the parameter
+         * -allow-largesq is a by-pass to this test.
+         */
+        if (!allow_largesq) {
+            if ((int)mpz_sizeinbase(si->doing->p, 2) >
+                    si->conf->sides[si->conf->side]->lpb) {
+                fprintf(stderr, "ERROR: The special q is larger than the "
+                        "large prime bound.\n");
+                fprintf(stderr, "       You can disable this check with "
+                        "the -allow-largesq argument,\n");
+                fprintf(stderr, "       It is for instance useful for the "
+                        "descent.\n");
+                exit(EXIT_FAILURE);
+            }
+        }
 
         double qt0 = seconds();
         tt_qstart = seconds();
