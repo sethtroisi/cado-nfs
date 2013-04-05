@@ -2205,17 +2205,25 @@ main (int argc, char **argv)
   /* param_list_parse_uint(pl, "npthr", (unsigned int *) &npt); */
   const char * snpt = param_list_lookup_string(pl, "npthr");
   if (snpt) {
-    char *p;
+    char *p, oldp;
     if ((p = strchr(snpt, 'x'))) {
       unsigned int x, y;
+      oldp = *p;
       *p = 0;
       if (sscanf(snpt, "%u", &x) && sscanf(&p[1], "%u", &y))
 	npt = x * y;
       else
-	usage(argv0);
+        {
+          *p = oldp;
+          fprintf (stderr, "Malformed -npthr option: %s\n", snpt);
+          usage(argv0);
+        }
     } else
       if (!sscanf(snpt, "%u", &npt))
-	usage(argv0);
+        {
+          fprintf (stderr, "Malformed -npthr option: %s\n", snpt);
+          usage(argv0);
+        }
   }
   param_list_parse_uint(pl, "npass", &npass);
   param_list_parse_double(pl, "required_excess", &required_excess);
@@ -2244,6 +2252,7 @@ main (int argc, char **argv)
 #endif
 
   if (param_list_warn_unused(pl)) {
+    fprintf (stderr, "Unused options in command-line\n");
     usage(argv0);
   }
 
