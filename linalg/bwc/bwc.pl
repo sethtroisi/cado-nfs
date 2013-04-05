@@ -158,10 +158,37 @@ sub detect_mpi {
         }
     }
 
+    my $maybe_mvapich2=1;
+    my $maybe_mpich2=1;
+    my $maybe_openmpi=1;
+
     if (defined($mpi)) {
         SEVERAL_CHECKS: {
+            # first check the alternatives system, which is fairly
+            # commonplace.
+            my $mpiexec = "$mpi/mpiexec";
+            while (-l $mpiexec) {
+                my $target=readlink($mpiexec);
+                if ($target =~ m{^/}) {
+                    $mpiexec =~ s{[^/]+$}{$target};
+                }
+                if ($mpiexec =~ /openmpi/) {
+                    $maybe_mvapich2=0;
+                    $maybe_mpich2=0;
+                } elsif ($mpiexec =~ /mpich2/) {
+                    $maybe_mvapich2=0;
+                    $maybe_openmpi=0;
+                } elsif ($mpiexec =~ /hydra/) {
+                    $maybe_mvapich2=0;
+                    $maybe_mpich2='hydra';
+                    $maybe_openmpi=0;
+                } elsif ($mpiexec =~ /mvapich2/) {
+                    $maybe_mpich2=0;
+                    $maybe_openmpi=0;
+                }
+            }
             CHECK_MVAPICH2: {
-                if (-x "$mpi/mpiname") {
+                if ($maybe_mvapich2 && -x "$mpi/mpiname") {
                     my $v = `$mpi/mpiname -n -v`;
                     chomp($v);
                     if ($v =~ /MVAPICH2\s+([\d\.]+)((?:\D\w*)?)/) {
@@ -175,7 +202,7 @@ sub detect_mpi {
                 }
             }
             CHECK_MPICH2_VERSION: {
-                if (-x "$mpi/mpich2version") {
+                if ($maybe_mpich2 && -x "$mpi/mpich2version") {
                     my $v = `$mpi/mpich2version -v`;
                     chomp($v);
                     if ($v =~ /MPICH2 Version:\s*(\d.*)$/) {
@@ -192,11 +219,15 @@ sub detect_mpi {
                         $mpi_ver .= "+hydra";
                         $needs_mpd=0;
                     }
-                        last SEVERAL_CHECKS;
+                    if ($maybe_mpich2 eq 'hydra') {
+                        $mpi_ver .= "+hydra" unless $mpi_ver =~ /hydra/;
+                        $needs_mpd=0;
+                    }
+                    last SEVERAL_CHECKS;
                 }
             }
             CHECK_OMPI_VERSION: {
-                if (-x "$mpi/ompi_info") {
+                if ($maybe_openmpi && -x "$mpi/ompi_info") {
                     my @v = `$mpi/ompi_info`;
                     my @vv = grep { /Open MPI:/; } @v;
                     last CHECK_OMPI_VERSION unless scalar @vv == 1;
