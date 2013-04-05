@@ -46,6 +46,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
   GET_HASH_P(H,h) - prime corresponding to index h
   GET_HASH_R(H,h) - root  corresponding to index h (-2 for rational prime)
   H->hashcount[h] - number of occurrences of (p, r) in current relations
+
+Exit value:
+- 0 if enough relations
+- 1 if an error occurred (then we should abort the factorization)
+- 2 if not enough relations
 */
 
 /*
@@ -948,7 +953,7 @@ remove_singletons (unsigned int npass, double required_excess)
         {
           fprintf(stderr, "excess < %.2f * #primes. See -required_excess "
                           "argument.\n", required_excess);
-          exit (1);
+          exit (2);
         }
       if (oldexcess > excess)
 	fprintf (stderr, "   [each excess row deleted %2.2lf rows]\n",
@@ -1809,7 +1814,7 @@ prempt_scan_relations_pass_one ()
 
   if (rs->nrels != nrelmax) {
     fprintf (stderr, "Error, -nrels value should match the number of scanned relations\nexpected %lu relations, found %lu\n", (unsigned long) nrelmax, rs->nrels);
-    exit (EXIT_FAILURE);
+    exit (1);
   }
 
   return 1;
@@ -2462,7 +2467,7 @@ main (int argc, char **argv)
     if (nrel <= nprimes) /* covers case nrel = nprimes = 0 */
       {
 	fprintf(stderr, "number of relations <= number of ideals\n");
-	exit (1);
+	exit (2);
       }
   }
   hashCheck (&H);
