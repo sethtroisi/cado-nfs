@@ -2599,13 +2599,14 @@ sub do_sieve {
         $$delay = 0  if ($nrels > 10000000);
         # Remove singletons and cliques
         my $ret = purge($param{'filterlastrels'});
-        if ($ret->{'status'}) {
+        if ($ret->{'status'} == 2) {
             $tab_level++;
             info "Not enough relations! Continuing sieving...\n";
             $tab_level--;
             return 0;
+        } elsif ($ret->{'status'} == 1) {
+            die "Error when calling purge ; STDERR:\n$ret->{'err'}";
         }
-
         return 1;
     };
 
