@@ -169,22 +169,33 @@ sub detect_mpi {
             my $mpiexec = "$mpi/mpiexec";
             while (-l $mpiexec) {
                 my $target=readlink($mpiexec);
+                print STDERR "readlink($mpiexec)->$target\n";
                 if ($target =~ m{^/}) {
+                    $mpiexec = $target;
+                } else {
                     $mpiexec =~ s{[^/]+$}{$target};
                 }
                 if ($mpiexec =~ /openmpi/) {
+                    print STDERR "Auto-detecting openmpi based on alternatives\n";
                     $maybe_mvapich2=0;
                     $maybe_mpich2=0;
+                    last;
                 } elsif ($mpiexec =~ /mpich2/) {
+                    print STDERR "Auto-detecting mpich2(old) based on alternatives\n";
                     $maybe_mvapich2=0;
                     $maybe_openmpi=0;
+                    last;
                 } elsif ($mpiexec =~ /hydra/) {
+                    print STDERR "Auto-detecting mpich2(hydra) based on alternatives\n";
                     $maybe_mvapich2=0;
                     $maybe_mpich2='hydra';
                     $maybe_openmpi=0;
+                    last;
                 } elsif ($mpiexec =~ /mvapich2/) {
+                    print STDERR "Auto-detecting mvapich2 based on alternatives\n";
                     $maybe_mpich2=0;
                     $maybe_openmpi=0;
+                    last;
                 }
             }
             CHECK_MVAPICH2: {
