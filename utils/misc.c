@@ -23,7 +23,11 @@ void
 {
     void *p;
     p = malloc (x);
-    ASSERT_ALWAYS(p != NULL);
+    if (p == NULL)
+      {
+        fprintf (stderr, "Error, malloc of %zu bytes failed\n", x);
+        exit (1);
+      }
     return p;
 }
 
