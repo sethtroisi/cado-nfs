@@ -2072,8 +2072,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 #ifdef TRACE_K /* {{{ */
         if (trace_on_spot_Nx(N, x)) {
             fprintf(stderr, "# alg->Bound[%u]=%u, rat->Bound[%u]=%u\n",
-                    alg_S[trace_Nx.x], alg_S[x] <= alg->bound : 0 ? alg->bound,
-                    rat_S[trace_Nx.x], rat_S[x] <= rat->bound : 0 ? rat->bound);
+                    alg_S[trace_Nx.x], alg_S[x] <= alg->bound ? 0 : alg->bound,
+                    rat_S[trace_Nx.x], rat_S[x] <= rat->bound ? 0 : rat->bound);
         }
 #endif /* }}} */
         unsigned int X;
