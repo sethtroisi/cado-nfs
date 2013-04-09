@@ -2069,7 +2069,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
     for (int x = 0; x < BUCKET_REGION; ++x)
     {
-#ifdef TRACE_Nx /* {{{ */
+#ifdef TRACE_K /* {{{ */
         if (trace_on_spot_Nx(N, x)) {
             fprintf(stderr, "# alg->Bound[%u]=%u, rat->Bound[%u]=%u\n",
                     alg_S[trace_Nx.x], alg_S[x] <= alg->bound : 0 ? alg->bound,
