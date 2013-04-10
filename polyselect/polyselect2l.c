@@ -11,7 +11,7 @@
   If the raw polynomial is not good enough, we will still stream
   it to STDERR for further reference.
 
-  Please report bugs to shi.bai AT anu.edu.au.
+  Please report bugs to shih.bai AT gmail.com.
 */
 
 #define EMIT_ADDRESSABLE_shash_add
@@ -137,7 +137,10 @@ check_parameters (mpz_t m0, unsigned long d, unsigned long lq)
 
   maxP = (double) Primes[lenPrimes - 1];
   if (2.0 * pow (maxP, 4.0) * maxq >= (double) d * mpz_get_d (m0))
-      return 0;
+    return 0;
+
+  if (maxq > pow (maxP, 2.0))
+    return 0;
 
   return 1;
 }
