@@ -46,7 +46,9 @@
 #               In the params/ subdirectory of the cado-nfs distribution
 #               there is a list of default paramfiles that you can use.
 #   <workdir>   a directory where cadofactor.pl will put all the
-#               intermediate information (relation files, log files, etc)
+#               intermediate information (relation files, log files, etc).
+#               It must be given as an absolute path /xxx/yyy/zzz, not a
+#               relative one like ./zzz.
 #   <nnn>       the number you want to factor.
 #
 # At the end of the command line, you can add parameters, in the form
