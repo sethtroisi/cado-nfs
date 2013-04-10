@@ -91,8 +91,9 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         matmul_top_save_vector(mmt, "Hx", 1, 0, unpadded);
         // compare if files are equal.
         if (pi->m->jrank == 0 && pi->m->trank == 0) {
-            char * cmd;
-            int rc = asprintf(&cmd, "diff -q %s Hx.0", tmp);
+            char cmd[1024];
+            int rc = snprintf(cmd, 80, "diff -q %s Hx.0", tmp);
+            fprintf(stderr, "rc=%d, cmd=%p\n", rc, cmd);
             ASSERT_ALWAYS(rc>=0);
             rc = system(cmd);
             if (rc) {
@@ -101,7 +102,6 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
             } else {
                 printf("Check of %s against %s: ok\n", tmp, "Hx.0");
             }
-            free(cmd);
         }
         serialize(pi->m);
         A->vec_set_zero(A, mrow->v->v, mrow->i1 - mrow->i0);
