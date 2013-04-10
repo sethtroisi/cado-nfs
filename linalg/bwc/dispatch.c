@@ -93,7 +93,6 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
         if (pi->m->jrank == 0 && pi->m->trank == 0) {
             char cmd[1024];
             int rc = snprintf(cmd, 80, "diff -q %s Hx.0", tmp);
-            fprintf(stderr, "rc=%d, cmd=%p\n", rc, cmd);
             ASSERT_ALWAYS(rc>=0);
             rc = system(cmd);
             if (rc) {
