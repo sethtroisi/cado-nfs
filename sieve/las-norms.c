@@ -4,7 +4,7 @@
 #include <limits.h>
 #include <math.h>               /* ceil */
 
-/* #undef HAVE_SSE2 */ /* Only for tests */ 
+#undef HAVE_SSE2 /* Only for tests */ 
 
 #ifdef HAVE_SSE41
 #include <smmintrin.h>
@@ -38,21 +38,20 @@ static inline uint8_t inttruncfastlog2(double i, double add, double scale) {
 #ifdef HAVE_SSE2
   __asm__ ( "psrlq $0x20,  %0    \n"
 	    "cvtdq2pd      %0, %0\n" /* Mandatory in packed double even it's non packed! */
-	    : "+x" (i));            /* Really need + here! i is not modified in C code! */
-  return ((uint8_t) ((i-add)*scale));
-}
+	    : "+x" (i));             /* Really need + here! i is not modified in C code! */
+  return (uint8_t) nearbyint((i-add)*scale);
 #else
-/* Same function, but in x86 gcc needs to transfer the input i from a
-   xmm register to a classical register. No other way than use memory.
-   So this function needs at least 6 to 8 cycles more than the previous,
-   which uses ~3 cycles.
-   NOTE: tg declaration is mandatory: it's the place where gcc use memory
-   to do the transfert. Without it, a warning appears but the code is false!
-*/
-void *tg = &i;
-return (uint8_t) ((((double) (*((uint64_t *)tg) >> 0x20)) - add) * scale);
-}
+  /* Same function, but in x86 gcc needs to transfer the input i from a
+     xmm register to a classical register. No other way than use memory.
+     So this function needs at least 6 to 8 cycles more than the previous,
+     which uses ~3 cycles.
+     NOTE: tg declaration is mandatory: it's the place where gcc use memory
+     to do the transfert. Without it, a warning appears but the code is false!
+  */
+  void *tg = &i;
+  return (uint8_t) nearbyint((((double) (*((uint64_t *)tg) >> 0x20)) - add) * scale);
 #endif
+}
 
 /* Same than previous, but the result is duplicated 8 times in a "false" double
    in SSE version, i.e. in a xmm register, or in a 64 bits general register in
@@ -68,14 +67,14 @@ static inline void uint64truncfastlog2(double i, double add, double scale, uint8
 	    : "+x" (i));
   i = (i - add) * scale;
   __asm__ ( 
-	    "cvtpd2dq      %0,       %0       \n" /* 0000 0000 000x 000Y */
-	    "punpcklbw     %0,       %0       \n" /* 0000 0000 00xx 00YY */
+	    "cvtsd2si      %0,       %0       \n" /* 0000 0000 0000 000Y */
+	    "punpcklbw     %0,       %0       \n" /* 0000 0000 0000 00YY */
 	    "pshuflw    $0x00,       %0,    %0\n" /* 0000 0000 YYYY YYYY */ 
 	    : "+x" (i));
   *(double *)&addr[decal] = i;
 #else
   void *tg = &i;
-  *(uint64_t *)&addr[decal] = 0x0101010101010101 * (uint64_t)(((double)(*(uint64_t *)tg >> 0x20) - add) * scale);
+  *(uint64_t *)&addr[decal] = 0x0101010101010101 * (uint64_t) nearbyint(((double)(*(uint64_t *)tg >> 0x20) - add) * scale);
 #endif
 }
 
