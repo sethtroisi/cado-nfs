@@ -4,7 +4,7 @@
 #include <limits.h>
 #include <math.h>               /* ceil */
 
-#undef HAVE_SSE2 /* Only for tests */ 
+/* #undef HAVE_SSE2 */ /* Only for tests */ 
 
 #ifdef HAVE_SSE41
 #include <smmintrin.h>
