@@ -67,9 +67,9 @@ static inline void uint64truncfastlog2(double i, double add, double scale, uint8
 	    : "+x" (i));
   i = (i - add) * scale;
   __asm__ ( 
-	    "cvttsd2si     %0,       %0       \n" /* 0000 0000 0000 000Y */
+	    "cvttpd2dq     %0,       %0       \n" /* 0000 0000 0000 000Y */
 	    "punpcklbw     %0,       %0       \n" /* 0000 0000 0000 00YY */
-	    "pshuflw    $0x00,       %0,    %0\n" /* 0000 0000 YYYY YYYY */ 
+	    "pshuflw    $0x00,       %0,    %0\n" /* 0000 0000 YYYY YYYY */
 	    : "+x" (i));
   *(double *)&addr[decal] = i;
 #else
