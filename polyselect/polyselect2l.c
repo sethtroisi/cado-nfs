@@ -2062,6 +2062,9 @@ main (int argc, char *argv[])
   resume = param_list_lookup_string (pl, "resume");
   out = param_list_lookup_string (pl, "out");
 
+  if (param_list_warn_unused(pl))
+    usage (argv0[0],NULL);
+
   /* print command line */
   param_list_print_command_line (stdout, pl);
 
