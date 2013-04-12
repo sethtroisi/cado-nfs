@@ -38,21 +38,20 @@ static inline uint8_t inttruncfastlog2(double i, double add, double scale) {
 #ifdef HAVE_SSE2
   __asm__ ( "psrlq $0x20,  %0    \n"
 	    "cvtdq2pd      %0, %0\n" /* Mandatory in packed double even it's non packed! */
-	    : "+x" (i));            /* Really need + here! i is not modified in C code! */
-  return ((uint8_t) ((i-add)*scale));
-}
+	    : "+x" (i));             /* Really need + here! i is not modified in C code! */
+  return (uint8_t) ((i-add)*scale);
 #else
-/* Same function, but in x86 gcc needs to transfer the input i from a
-   xmm register to a classical register. No other way than use memory.
-   So this function needs at least 6 to 8 cycles more than the previous,
-   which uses ~3 cycles.
-   NOTE: tg declaration is mandatory: it's the place where gcc use memory
-   to do the transfert. Without it, a warning appears but the code is false!
-*/
-void *tg = &i;
-return (uint8_t) ((((double) (*((uint64_t *)tg) >> 0x20)) - add) * scale);
-}
+  /* Same function, but in x86 gcc needs to transfer the input i from a
+     xmm register to a classical register. No other way than use memory.
+     So this function needs at least 6 to 8 cycles more than the previous,
+     which uses ~3 cycles.
+     NOTE: tg declaration is mandatory: it's the place where gcc use memory
+     to do the transfert. Without it, a warning appears but the code is false!
+  */
+  void *tg = &i;
+  return (uint8_t) ((((double) (*((uint64_t *)tg) >> 0x20)) - add) * scale);
 #endif
+}
 
 /* Same than previous, but the result is duplicated 8 times in a "false" double
    in SSE version, i.e. in a xmm register, or in a 64 bits general register in
@@ -68,14 +67,14 @@ static inline void uint64truncfastlog2(double i, double add, double scale, uint8
 	    : "+x" (i));
   i = (i - add) * scale;
   __asm__ ( 
-	    "cvtpd2dq      %0,       %0       \n" /* 0000 0000 000x 000Y */
-	    "punpcklbw     %0,       %0       \n" /* 0000 0000 00xx 00YY */
-	    "pshuflw    $0x00,       %0,    %0\n" /* 0000 0000 YYYY YYYY */ 
+	    "cvttpd2dq     %0,       %0       \n" /* 0000 0000 0000 000Y */
+	    "punpcklbw     %0,       %0       \n" /* 0000 0000 0000 00YY */
+	    "pshuflw    $0x00,       %0,    %0\n" /* 0000 0000 YYYY YYYY */
 	    : "+x" (i));
   *(double *)&addr[decal] = i;
 #else
   void *tg = &i;
-  *(uint64_t *)&addr[decal] = 0x0101010101010101 * (uint64_t)(((double)(*(uint64_t *)tg >> 0x20) - add) * scale);
+  *(uint64_t *)&addr[decal] = 0x0101010101010101 * (uint64_t) (((double)(*(uint64_t *)tg >> 0x20) - add) * scale);
 #endif
 }
 
@@ -97,7 +96,7 @@ static inline void w128itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale,
 	   : "+x"(i));
   i = _mm_mul_pd(_mm_sub_pd(i, add), scale);
   __asm__ (
-	   "cvtpd2dq  %0,       %0       \n" /* 0000 0000 000X 000Y */
+	   "cvttpd2dq %0,       %0       \n" /* 0000 0000 000X 000Y */
 	   "packssdw  %0,       %0       \n" /* 0000 0000 0000 0X0Y */
 	   "punpcklbw %0,       %0       \n" /* 0000 0000 00XX 00YY */
 	   "pshuflw   $0xA0,    %0,    %0\n" /* 0000 0000 XXXX YYYY */
@@ -117,9 +116,9 @@ static inline void w16itruncfastlog2fabs(__m128d i, __m128d add, __m128d scale, 
 	   "cvtdq2pd  %0,       %0       \n"
 	   : "+x" (i));
   i = _mm_mul_pd(_mm_sub_pd(i, add), scale);
-  addr[decal] = (uint8_t) _mm_cvtsd_si32(i);
+  addr[decal] = (uint8_t) _mm_cvttsd_si32(i);
   i = _mm_unpackhi_pd(i,i);
-  (&addr[decal])[1] = (uint8_t) _mm_cvtsd_si32(i);
+  (&addr[decal])[1] = (uint8_t) _mm_cvttsd_si32(i);
 }
 
 /* Same than previous, but the 2 values are written at different places */
@@ -131,9 +130,9 @@ static inline void w8ix2truncfastlog2fabs(__m128d i, __m128d add, __m128d scale,
 	   "cvtdq2pd  %0,       %0       \n"
 	   : "+x" (i));
   i = _mm_mul_pd(_mm_sub_pd(i, add), scale);
-  addr[decal1] = (uint8_t) _mm_cvtsd_si32(i);
+  addr[decal1] = (uint8_t) _mm_cvttsd_si32(i);
   i = _mm_unpackhi_pd(i,i);
-  addr[decal2] = (uint8_t) _mm_cvtsd_si32(i);
+  addr[decal2] = (uint8_t) _mm_cvttsd_si32(i);
 }
 #endif
 
@@ -199,7 +198,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
        of the first iteration. In this special case, old_i = -halfI and
        int_i = trunc (i), where i=[inverse of the function g](trunc(y)) and
        y=g(old_i).
-       So, it's possible if y is very near trunc(y), old_i == int_i, so ts == 0.
+       So, it's possible if y is very trunc trunc(y), old_i == int_i, so ts == 0.
        We have to iterate at least one time to avoid this case => this is the
        use of inc here. */
     for (i = rac + rat->cexp2[y] * invu1, inc = 1;; y--) {
