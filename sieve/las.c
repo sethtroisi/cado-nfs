@@ -2072,8 +2072,8 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 #ifdef TRACE_K /* {{{ */
         if (trace_on_spot_Nx(N, x)) {
             fprintf(stderr, "# alg->Bound[%u]=%u, rat->Bound[%u]=%u\n",
-                    alg_S[trace_Nx.x], alg_S[x] <= alg->bound : 0 ? alg->bound,
-                    rat_S[trace_Nx.x], rat_S[x] <= rat->bound : 0 ? rat->bound);
+                    alg_S[trace_Nx.x], alg_S[x] <= alg->bound ? 0 : alg->bound,
+                    rat_S[trace_Nx.x], rat_S[x] <= rat->bound ? 0 : rat->bound);
         }
 #endif /* }}} */
         unsigned int X;
@@ -2908,8 +2908,8 @@ usage (const char *argv0, const char * missing)
   fprintf (stderr, "          -alim     nnn   algebraic factor base bound nnn\n");
   fprintf (stderr, "          -lpbr     nnn   rational large prime bound 2^nnn\n");
   fprintf (stderr, "          -lpba     nnn   algebraic large prime bound 2^nnn\n");
-  fprintf (stderr, "          ->mfbr     nnn   rational cofactor bound 2^nnn\n");
-  fprintf (stderr, "          ->mfba     nnn   algebraic cofactor bound 2^nnn\n");
+  fprintf (stderr, "          -mfbr     nnn   rational cofactor bound 2^nnn\n");
+  fprintf (stderr, "          -mfba     nnn   algebraic cofactor bound 2^nnn\n");
   fprintf (stderr, "          -rlambda  nnn   rational lambda value is nnn\n");
   fprintf (stderr, "          -alambda  nnn   algebraic lambda value is nnn\n");
   fprintf (stderr, "          -S        xxx   skewness value is xxx\n");

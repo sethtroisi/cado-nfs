@@ -202,7 +202,6 @@ my @default_param = (
 
     # polyselect using Kleinjung's algorithm
     degree         => 5,
-    polsel_lq      => 1,
     polsel_nq      => 1000,
     polsel_incr    => 60,
     polsel_admin   => 0,
@@ -1560,8 +1559,7 @@ my %tasks = (
     polysel   => { name   => "polynomial selection",
                    dep    => ['init'],
                    param  => ['degree', 'polsel_incr',
-			      'polsel_admin', 'polsel_admax', 'polsel_lq',
-		              'polsel_nq'],
+			      'polsel_admin', 'polsel_admax', 'polsel_nq'],
                    files  => ['polsel_out\.[\de.]+-[\de.]+', 'poly', 'poly_tmp'],
                    resume => 1,
                    dist   => 1 },
@@ -1998,7 +1996,6 @@ my $polysel_cmd = sub {
     my ($a, $b, $m, $nthreads, $gzip) = @_;
     return "env nice -$param{'polsel_nice'} ".
            "$m->{'bindir'}/polyselect/polyselect2l -q ".
-           "-lq $param{'polsel_lq'} ".
            "-nq $param{'polsel_nq'} ".
            "-incr $param{'polsel_incr'} ".
            "-admin $a ".
@@ -2599,13 +2596,14 @@ sub do_sieve {
         $$delay = 0  if ($nrels > 10000000);
         # Remove singletons and cliques
         my $ret = purge($param{'filterlastrels'});
-        if ($ret->{'status'}) {
+        if ($ret->{'status'} == 2) {
             $tab_level++;
             info "Not enough relations! Continuing sieving...\n";
             $tab_level--;
             return 0;
+        } elsif ($ret->{'status'} == 1) {
+            die "Error when calling purge ; STDERR:\n$ret->{'err'}";
         }
-
         return 1;
     };
 

@@ -275,7 +275,7 @@ typedef struct cachefile_s * cachefile_ptr;
 
 void cachefile_vinit(cachefile_ptr c, const char * fmt, va_list ap)
 {
-    memset(c, 0, sizeof(c));
+    memset(c, 0, sizeof(*c));
     vsnprintf(c->basename, sizeof(c->basename), fmt, ap);
 }
 
