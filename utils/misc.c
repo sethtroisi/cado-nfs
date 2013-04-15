@@ -26,6 +26,7 @@ void
     if (p == NULL)
       {
         fprintf (stderr, "Error, malloc of %zu bytes failed\n", x);
+        fflush (stderr);
         exit (1);
       }
     return p;

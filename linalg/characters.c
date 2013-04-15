@@ -152,14 +152,22 @@ uint64_t eval_64chars(int64_t a, uint64_t b, alg_prime_t * chars, cado_poly_ptr 
                 modul_mul(&aux, &ub, &ch->r, &ch->p);
                 modul_add(&aux, &ua, &aux, &ch->p);
                 modul_neg(&aux, &aux, &ch->p);
-                res = modul_jacobi(&aux, &ch->p) < 0;   // -1->1, 1->0
             } else {
                 unsigned long ua = ((unsigned long) (a)) % ch->p;
                 unsigned long ub = b % ch->p;
                 modul_mul(&aux, &ub, &ch->r, &ch->p);
                 modul_sub(&aux, &ua, &aux, &ch->p);
-                res = modul_jacobi(&aux, &ch->p) < 0;   // -1->1, 1->0
             }
+            res = modul_jacobi(&aux, &ch->p); 
+            // If res is 0, it means that ch->p divides the norm, which
+            // should not be, unless the special-q has been chosen to be
+            // larger than lpb.
+            // A fix, for that case that should not happen in real life
+            // would be to artificially enlarge the large prime bound
+            // if we had to sieve beyond it, so that subsequent program
+            // (including characters) behaves correctly.
+            ASSERT_ALWAYS(res != 0);
+            res = res < 0;   // -1->1, 1->0
         }
         v |= ((uint64_t) res) << i;
     }
