@@ -1155,8 +1155,6 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j, int passtwo)
   ASSERT_ALWAYS(c == ':');
   mybufrel->rel.b = n;
 
-  if (!rs->parse_only_ab) {
-    /* Do something if we're also interested in primes */
     for ( k = 0, c = 0 ; ; ) {
     next_rat:
       if (c == ':') break;
@@ -1308,7 +1306,6 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j, int passtwo)
 	  ltmp += mybufrel->rel.nb_ap;
       }
     mybufrel->ltmp = ltmp;
-  }
 }
 
 /* We don't use memory barrier nor (pre)processor orders for portability.
