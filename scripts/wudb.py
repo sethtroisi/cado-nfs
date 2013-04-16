@@ -389,10 +389,46 @@ class DictDbAccess(dict):
     are always served from the in-memory dict. Write accesses write through
     to the DB.
     
-    >>> d = DictDbAccess(":memory:", "test")
+    >>> conn = sqlite3.connect(':memory:')
+    >>> d = DictDbAccess(conn, 'test')
     >>> d == {}
     True
-
+    >>> d['a'] = '1'
+    >>> d 
+    {'a': '1'}
+    >>> d['a'] = '2'
+    >>> d 
+    {'a': '2'}
+    >>> d['b'] = '3'
+    >>> d == {'a': '2', 'b': '3'}
+    True
+    >>> del(d)
+    >>> d = DictDbAccess(conn, 'test')
+    >>> d == {'a': '2', 'b': '3'}
+    True
+    >>> del(d['b'])
+    >>> d 
+    {'a': '2'}
+    >>> d.setdefault('a', '3')
+    '2'
+    >>> d 
+    {'a': '2'}
+    >>> d.setdefault('b', '3')
+    '3'
+    >>> d == {'a': '2', 'b': '3'}
+    True
+    >>> d.setdefault(None, {'a': '3', 'c': '4'})
+    >>> d == {'a': '2', 'b': '3', 'c': '4'}
+    True
+    >>> d.update({'a': '3', 'd': '5'})
+    >>> d == {'a': '3', 'b': '3', 'c': '4', 'd': '5'}
+    True
+    >>> del(d)
+    >>> d = DictDbAccess(conn, 'test')
+    >>> d
+    None
+    >>> d == {'a': '3', 'b': '3', 'c': '4', 'd': '5'}
+    True
     """
     
     def __init__(self, db, name):
@@ -402,7 +438,7 @@ class DictDbAccess(dict):
         sqlite3.connect()), or an open DB connection. The latter is allowed 
         primarily for making the doctest work, so we can reuse the same 
         memory-backed DB connection, but it may be useful in other contexts.
-        Note that writes to the dict cause a .commit() on the DB connection, 
+        Note that writes to the dict cause a commit() on the DB connection, 
         so sharing a DB connection may be ill-advised if you want control 
         over when commits happen.
         
@@ -411,27 +447,30 @@ class DictDbAccess(dict):
         which to initialise the dict. 
         
         However, allowing to add items to the dict before attaching it to a 
-        DB table introduces all sorts of conflicts that have to be resolved 
-        (Do items added to the dict before attaching to a DB overwrite items 
-        from the DB with equal keys or not? Should items added to the dict 
-        whose keys are not in the DB be added to the DB when attaching?)
+        DB table with a separate attachdb() method introduces all sorts of 
+        conflicts that have to be resolved (Do items added to the dict before 
+        attaching overwrite items from the DB with equal keys or not? 
+        Should items added to the dict whose keys are not in the DB be added 
+        to the DB when attaching?)
         Allowing keyword initialisers in addition to the db and name 
         parameters does not work well, either, as it is impossible to have
-        a positional parameter named "foo", and a supplying a keyword 
+        a positional parameter named "foo", and supplying a keyword 
         parameter also named "foo", so whatever names we choose for the 
         "db" and "name" parameters, there is always a chance of conflict with 
         keys of named parameters that are meant to be added to the dict, 
         as the set of valid keys of a dict is a superset of the valid names 
-        of named parameters.
-        In the end, it is easier not to allow initialisers for the dict in
+        of named parameters. 
+        In the end, it is easier not to allow initialisers for the dict in 
         this constructor. Use update() or setdefault() (the latter accepts 
         dicts in DictDbAccess()) to get the desired behaviour.
         '''
         
         if isinstance(db, str):
             self._conn = sqlite3.connect(db)
+            self._ownconn = True
         else:
             self._conn = db
+            self._ownconn = False
         self._table = DictDbTable(name = name)
         # Create an empty table if none exists
         cursor = self._conn.cursor(MyCursor)
@@ -443,7 +482,7 @@ class DictDbAccess(dict):
     
     def __del__(self):
         """ Close the DB connection and delete the dictionary """
-        if hasattr(self, "_conn"):
+        if self.ownconn:
             self._conn.close()
             del(self._conn)
         # http://docs.python.org/2/reference/datamodel.html#object.__del__
