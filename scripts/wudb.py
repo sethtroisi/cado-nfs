@@ -425,8 +425,6 @@ class DictDbAccess(dict):
     True
     >>> del(d)
     >>> d = DictDbAccess(conn, 'test')
-    >>> d
-    None
     >>> d == {'a': '3', 'b': '3', 'c': '4', 'd': '5'}
     True
     """
@@ -477,12 +475,12 @@ class DictDbAccess(dict):
         self._table.create(cursor);
         # Get the entries currently stored in the DB
         data = self.__getall()
-        self.update(data)
+        super().update(data)
         cursor.close()
     
     def __del__(self):
         """ Close the DB connection and delete the dictionary """
-        if self.ownconn:
+        if self._ownconn:
             self._conn.close()
             del(self._conn)
         # http://docs.python.org/2/reference/datamodel.html#object.__del__
@@ -506,11 +504,11 @@ class DictDbAccess(dict):
             # Update the table row where column "key" equals key
             self._table.update(cursor, {"value": value}, eq={"key": key})
         else:
-            self._table.insert(cursor, {"key": key, "value": value})   
+            self._table.insert(cursor, {"key": key, "value": value})
         self._conn.commit()
         cursor.close()
         super().__setitem__(key, value)
-
+    
     def __delitem__(self, key):
         """ Delete a key from the dictionary """
         super().__delitem__(key)
@@ -518,19 +516,36 @@ class DictDbAccess(dict):
         self._table.delete(cursor, eq={"key": key})
         self._conn.commit()
         cursor.close()
-
+    
     def setdefault(self, key, default = None):
         ''' Setdefault function that allows a dictionary as input
         
         Values from default dict are merged into self, *not* overwriting
         existing values in self '''
         if key is None and isinstance(default, dict):
+            cursor = self._conn.cursor(MyCursor)
             for (key, value) in default.items():
-                self.setdefault(key, value)
+                if not key in self:
+                    super().__setitem__(key, value)
+                    self._table.insert(cursor, {"key": key, "value": value})
+            self._conn.commit()
+            cursor.close()
             return None
         elif not key in self:
             self[key] = default
         return self[key]
+    
+    def update(self, other):
+        cursor = self._conn.cursor(MyCursor)
+        for (key, value) in other.items():
+            if key in self:
+                self._table.update(cursor, {"value": value}, eq={"key": key})
+            else:
+                self._table.insert(cursor, {"key": key, "value": value})
+            super().__setitem__(key, value)
+        self._conn.commit()
+        cursor.close()
+        
 
 class Mapper(object):
     """ This class translates between application objects, i.e., Python 
