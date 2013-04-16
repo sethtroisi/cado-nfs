@@ -445,6 +445,7 @@ class DictDbAccess(dict):
         """ Close the DB connection and delete the dictionary """
         if hasattr(self, "_conn"):
             self._conn.close()
+            del(self._conn)
         # http://docs.python.org/2/reference/datamodel.html#object.__del__
         # dict does not have __del__, but in a complex class hierarchy, 
         # dict may not be next in the MRO
@@ -485,10 +486,12 @@ class DictDbAccess(dict):
         Values from default dict are merged into self, *not* overwriting
         existing values in self '''
         if key is None and isinstance(default, dict):
-            for key in default:
-                super().setdefault(key, default[key])
-        else:
-            return super().setdefault(key, default)
+            for (key, value) in default.items():
+                self.setdefault(key, value)
+            return None
+        elif not key in self:
+            self[key] = default
+        return self[key]
 
 class Mapper(object):
     """ This class translates between application objects, i.e., Python 
