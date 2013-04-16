@@ -6,12 +6,6 @@
 void las_display_config_flags(FILE * stream)
 {
     fprintf(stream, "# las.c flags:");
-#ifdef SSE_NORM_INIT
-    fprintf(stream, " SSE_NORM_INIT");
-#endif
-#ifdef UGLY_HACK
-    fprintf(stream, " UGLY_HACK");
-#endif
 #ifdef SAFE_BUCKETS
     fprintf(stream, " SAFE_BUCKETS");
 #endif
@@ -20,9 +14,6 @@ void las_display_config_flags(FILE * stream)
 #endif
 #ifdef PROFILE
     fprintf(stream, " PROFILE");
-#endif
-#ifdef COFACTOR_TRICK
-    fprintf(stream, " COFACTOR_TRICK");
 #endif
 #ifdef UNSIEVE_NOT_COPRIME
     fprintf(stream, " UNSIEVE_NOT_COPRIME");
@@ -39,10 +30,13 @@ void las_display_config_flags(FILE * stream)
 #ifdef SUPPORT_I17
     fprintf(stream, " SUPPORT_I17");
 #endif
-#ifdef LAZY_NORMS
-    fprintf(stream, " LAZY_NORMS");
-    fprintf(stream, " NORM_STRIDE=%u", NORM_STRIDE);
-    fprintf(stream, " VERT_NORM_STRIDE=%u", VERT_NORM_STRIDE);
+#ifdef ALG_LAZY
+    fprintf(stream, " ALG_LAZY");
+    fprintf(stream, " NORM_STRIDE=8 (locked)");
+    fprintf(stream, " VERT_NORM_STRIDE=%u (max)", VERT_NORM_STRIDE);
+#endif
+#ifdef ALG_RAT
+    fprintf(stream, " ALG_RAT");
 #endif
     fprintf(stream, " NORM_BITS=%u", NORM_BITS);
     fprintf(stream, " LOG_BUCKET_REGION=%u", LOG_BUCKET_REGION);

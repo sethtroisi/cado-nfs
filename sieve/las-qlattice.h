@@ -112,7 +112,7 @@ fb_root_in_qlattice_31bits (const fbprime_t p, const fbprime_t R,
 	aux2 = ((int64_t)(R - p))*si->a0 - si->b0;
       }
     u = redc_32(aux1, p, invp); /* 0 <= u < p */
-    v = redc_32(aux2, p, invp); /* 0 <= den < p */
+    v = redc_32(aux2, p, invp); /* 0 <= v < p */
 
     add = 0;
     if (UNLIKELY(!invmod_redc_32(&v, p)))
@@ -161,7 +161,7 @@ fb_root_in_qlattice_63bits (const fbprime_t p, const fbprime_t R,
      */
     /* Do a full 64-bit redc */
     uint64_t u = redc_64(aux1, p, invp); /* 0 <= u < p */
-    uint64_t v = redc_64(aux2, p, invp); /* 0 <= den < p */
+    uint64_t v = redc_64(aux2, p, invp); /* 0 <= v < p */
 
     fbprime_t add = 0;
     if (UNLIKELY(!invmod_redc_64(&v, p)))

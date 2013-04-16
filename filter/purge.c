@@ -46,6 +46,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
   GET_HASH_P(H,h) - prime corresponding to index h
   GET_HASH_R(H,h) - root  corresponding to index h (-2 for rational prime)
   H->hashcount[h] - number of occurrences of (p, r) in current relations
+
+Exit value:
+- 0 if enough relations
+- 1 if an error occurred (then we should abort the factorization)
+- 2 if not enough relations
 */
 
 /*
@@ -948,7 +953,7 @@ remove_singletons (unsigned int npass, double required_excess)
         {
           fprintf(stderr, "excess < %.2f * #primes. See -required_excess "
                           "argument.\n", required_excess);
-          exit (1);
+          exit (2);
         }
       if (oldexcess > excess)
 	fprintf (stderr, "   [each excess row deleted %2.2lf rows]\n",
@@ -1806,7 +1811,7 @@ prempt_scan_relations_pass_one ()
 
   if (rs->nrels != nrelmax) {
     fprintf (stderr, "Error, -nrels value should match the number of scanned relations\nexpected %lu relations, found %lu\n", (unsigned long) nrelmax, rs->nrels);
-    exit (EXIT_FAILURE);
+    exit (1);
   }
 
   return 1;
@@ -2202,17 +2207,25 @@ main (int argc, char **argv)
   /* param_list_parse_uint(pl, "npthr", (unsigned int *) &npt); */
   const char * snpt = param_list_lookup_string(pl, "npthr");
   if (snpt) {
-    char *p;
+    char *p, oldp;
     if ((p = strchr(snpt, 'x'))) {
       unsigned int x, y;
+      oldp = *p;
       *p = 0;
       if (sscanf(snpt, "%u", &x) && sscanf(&p[1], "%u", &y))
 	npt = x * y;
       else
-	usage(argv0);
+        {
+          *p = oldp;
+          fprintf (stderr, "Malformed -npthr option: %s\n", snpt);
+          usage(argv0);
+        }
     } else
       if (!sscanf(snpt, "%u", &npt))
-	usage(argv0);
+        {
+          fprintf (stderr, "Malformed -npthr option: %s\n", snpt);
+          usage(argv0);
+        }
   }
   param_list_parse_uint(pl, "npass", &npass);
   param_list_parse_double(pl, "required_excess", &required_excess);
@@ -2241,6 +2254,7 @@ main (int argc, char **argv)
 #endif
 
   if (param_list_warn_unused(pl)) {
+    fprintf (stderr, "Unused options in command-line\n");
     usage(argv0);
   }
 
@@ -2450,7 +2464,7 @@ main (int argc, char **argv)
     if (nrel <= nprimes) /* covers case nrel = nprimes = 0 */
       {
 	fprintf(stderr, "number of relations <= number of ideals\n");
-	exit (1);
+	exit (2);
       }
   }
   hashCheck (&H);

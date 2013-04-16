@@ -11,11 +11,6 @@
 #include <emmintrin.h>
 #endif
 
-/* As its name says, this is a ugly hack that initializes all lognorms to the
-   maximal value (255) on the rational side. But it seems to work well, and to
-   miss only about 7% to 8% relations wrt a more accurate estimation. */
-//#define UGLY_HACK
-
 /* Number of bits used to estimate the norms
  * This should be large enough: it must be such that all norms are
  * smaller than 2^NORM_BITS.
@@ -84,18 +79,13 @@
  * divisibility test on each sieve update. This is obviously very
  * expensive, but provides nice checking.
  */
-#ifndef NDEBUG
-#define TRACK_CODE_PATH
-#endif
+#define xxxTRACK_CODE_PATH
 #define xxxWANT_ASSERT_EXPENSIVE
+
+/* TRACE_K *requires* TRACK_CODE_PATH -- or it displays rubbish */
 #if defined(TRACE_K) && !defined(TRACK_CODE_PATH)
 #define TRACK_CODE_PATH
 #endif
-
-/* Trick to discard lognorms that will probably lead to non L-smooth
-   cofactors. Disabled for now since it requires accurate sieving
-   (in particular by prime powers and bad primes). */
-// #define COFACTOR_TRICK
 
 /* This triggers code which fills bucket in several passes, one for each
  * congruence class mod 2 (three such, the trivial one leading to

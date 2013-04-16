@@ -32,6 +32,18 @@
 #include <smmintrin.h>
 #endif
 
+static inline uint64_t cputicks()
+{
+        uint64_t r;
+        __asm__ __volatile__(
+                "rdtsc\n\t"
+                "shlq $32, %%rdx\n\t"
+                "orq %%rdx, %%rax\n\t"
+                : "=a"(r)
+                :
+                : "rdx");
+        return r;
+}
 
 #define LOG_SCALE 1.4426950408889634 /* 1/log(2) to 17 digits, rounded to
                                         nearest. This is enough to uniquely
@@ -65,7 +77,7 @@ pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER;
 int create_descent_hints = 0;
 double tt_qstart;
 
-static const int bucket_region = 1 << LOG_BUCKET_REGION;
+#define BUCKET_REGION (1 << LOG_BUCKET_REGION)
 
 /* {{{ for cofactorization statistics */
 int stats = 0; /* 0: nothing, 1: write stats file, 2: read stats file,
@@ -504,8 +516,8 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     }
 #endif
 
-    si->nb_buckets = 1 + ((si->I / 2) * (si->J / 2) - 1) / bucket_region;
-    fprintf(las->output, "# bucket_region = %u\n", bucket_region);
+    si->nb_buckets = 1 + ((si->I / 2) * (si->J / 2) - 1) / BUCKET_REGION;
+    fprintf(las->output, "# bucket_region = %u\n", BUCKET_REGION);
     fprintf(las->output, "# nb_buckets = %u\n", si->nb_buckets);
 
     sieve_info_init_unsieve_data(si);
@@ -624,7 +636,7 @@ static void sieve_info_update (sieve_info_ptr si)/*{{{*/
 {
   /* update number of buckets */
   
-  si->nb_buckets = 1 + (si->I * si->J - 1) / bucket_region;
+  si->nb_buckets = 1 + (si->I * si->J - 1) / BUCKET_REGION;
   
   /* essentially update the fij polynomials */
   sieve_info_update_norm_data(si);
@@ -1511,9 +1523,9 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
     for( ; !fb_iterator_over(t) ; fb_iterator_next(t)) {
         fbprime_t p = t->fb->p;
         unsigned char logp = t->fb->plog;
-        ASSERT_ALWAYS (p % 2 == 1);
-
+        ASSERT_ALWAYS (p & 1);
         WHERE_AM_I_UPDATE(w, p, p);
+
         /* Write new set of pointers if the logp value changed */
         bucket_new_logp (&BA, logp);
 
@@ -1522,17 +1534,18 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
         if (UNLIKELY(mpz_cmp_ui(si->doing->p, p) == 0))
             continue;
 
-        const uint32_t I = si->I;
-        const int logI = si->conf->logI;
-        const uint32_t even_mask = (1U << logI) | 1U;
-        const uint32_t maskI = I-1;
-        const uint32_t maskbucket = bucket_region - 1;
-        const int shiftbucket = LOG_BUCKET_REGION;
-        const uint32_t IJ = si->I * si->J;
         fbprime_t r, R;
 
         R = fb_iterator_get_r(t);
         r = fb_root_in_qlattice(p, R, t->fb->invp, si);
+
+#define maskbucket (BUCKET_REGION - 1)
+#define shiftbucket LOG_BUCKET_REGION
+        const uint32_t I = si->I;
+        const unsigned int logI = si->conf->logI;
+	const uint32_t maskI = I-1;
+	const uint64_t even_mask = (1U << logI) | 1U;
+	const uint64_t IJ = I * si->J;
         // TODO: should be line sieved in the non-bucket phase?
         // Or should we have a bucket line siever?
         if (UNLIKELY(r == 0))
@@ -1548,7 +1561,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
             update.p = bucket_encode_prime (p);
             WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);
             WHERE_AM_I_UPDATE(w, x, update.x);
-            ASSERT(test_divisible(w));
+            ASSERT(test_divisible(w)); 
             push_bucket_update(BA, x >> shiftbucket, update);
             continue;
         }
@@ -1557,7 +1570,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
             /* r == p means root at infinity, which hits for
                j == 0 (mod p). Since q > I > J, this implies j = 0
                or j > J. This means we sieve only (i,j) = (1,0) here.
-               Since I < bucket_region, this always goes in bucket 0.
+               Since I < BUCKET_REGION, this always goes in bucket 0.
 FIXME: what about (-1,0)? It's the same (a,b) as (1,0)
 but which of these two (if any) do we sieve? */
             bucket_update_t update;
@@ -1591,70 +1604,64 @@ but which of these two (if any) do we sieve? */
 FIXME: can we find the locations to sieve? */
         }
 
-        uint32_t bound0 = plattice_bound0(&pli, si);
-        uint32_t bound1 = plattice_bound1(&pli, si);
+        unsigned int bound0 = plattice_bound0(&pli, si);
+        unsigned int bound1 = plattice_bound1(&pli, si);
 
-        for(int parity = MOD2_CLASSES_BS ; parity < (MOD2_CLASSES_BS?4:1) ; parity++) {
-
-            // The sieving point (0,0) is I/2 in x-coordinate
-            plattice_x_t x = plattice_starting_vector(&pli, si, parity);
-            // TODO: check the generated assembly, in particular, the
-            // push function should be reduced to a very simple step.
-            bucket_update_t update;
-            update.p = bucket_encode_prime (p);
-            __asm__("## Inner bucket sieving loop starts here!!!\n");
-            plattice_x_t inc_a = plattice_a(&pli, si);
-            plattice_x_t inc_c = plattice_c(&pli, si);
-            // ASSERT_ALWAYS(inc_a == pli.a);
-            // ASSERT_ALWAYS(inc_c == pli.c);
-            while (x < IJ) {
-                uint32_t i;
-                i = x & maskI;   // x mod I
-                /* if both i = x % I and j = x / I are even, then
-                   both a, b are even, thus we can't have a valid relation */
-                /* i-coordinate = (x % I) - I/2
-                   (I/2) % 3 == (-I) % 3, hence
-                   3|i-coordinate iff (x%I+I) % 3 == 0 */
-                if (MOD2_CLASSES_BS || (x & even_mask) 
+        for(unsigned int parity = MOD2_CLASSES_BS ; parity < (MOD2_CLASSES_BS?4:1) ; parity++) {
+	  // The sieving point (0,0) is I/2 in x-coordinate
+	  uint64_t x = (uint64_t) plattice_starting_vector(&pli, si, parity);
+	  if (x >= IJ) continue;
+	  unsigned int \
+	    bep = ((unsigned int) bucket_encode_prime (p)) << 16,
+            inc_a = (unsigned int) plattice_a(&pli, si),
+	    inc_c = (unsigned int) plattice_c(&pli, si);
+	  /* To put all in registers for x86_64 */
+#ifdef __x86_64
+	  __asm__ (""::"r"(maskI),"r"(even_mask),"r"(IJ),"r"(bound0),"r"(bound1),"r"(bep),"r"(inc_a),"r"(inc_c),"r"(x));
+#endif
+	  // ASSERT_ALWAYS(inc_a == pli.a);
+	  // ASSERT_ALWAYS(inc_c == pli.c);
+	  do {
+	    unsigned int i;
+	    i = x & maskI;
+	    /* i = x & maskI; */  // x mod I
+	    /* if both i = x % I and j = x / I are even, then
+	       both a, b are even, thus we can't have a valid relation */
+	    /* i-coordinate = (x % I) - I/2
+	       (I/2) % 3 == (-I) % 3, hence
+	       3|i-coordinate iff (x%I+I) % 3 == 0 */
+	    if (MOD2_CLASSES_BS || (x & even_mask) 
 #ifdef SKIP_GCD3
-                        && (!is_divisible_3_u32 (i + I) ||
-                            !is_divisible_3_u32 (x >> logI))
+		&& (!is_divisible_3_u32 (i + I) ||
+		    !is_divisible_3_u32 ((uint32_t) (x >> logI)))
 #endif
-                   )
-                {
-#if LOG_BUCKET_REGION == 16 && defined(__x86_64__) && defined(__GNUC__)
-                    /* The x value in update can be set by a write to 
-                       the low word of the register, but gcc does not 
-                       do so - it writes the word to memory, then reads 
-                       the dword back again. */
-                    __asm__ (
-                            "movw %1, %w0\n\t"
-                            : "+r" (update)
-                            : "r" ((uint16_t) (x & maskbucket))
-                            );
-#else
-                    update.x = (uint16_t) (x & maskbucket);
-#endif
-                    WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);
-                    WHERE_AM_I_UPDATE(w, x, update.x);
-                    ASSERT(test_divisible(w));
-#ifdef PROFILE
-                    /* To make it visible in profiler */
-                    *(BA.bucket_write[x >> shiftbucket])++ = update;
-#else
-                    push_bucket_update(BA, x >> shiftbucket, update);
-#endif
+		       )
+	      {
+		unsigned int u;
+		bucket_update_t **ppu, *pu;
+		ppu = &(BA.bucket_write[x >> shiftbucket]);
+		pu = *ppu;
 #ifdef TRACE_K
-                    if (trace_on_spot_x(x)) {
-                        fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
-                                (unsigned int) (x & maskbucket), logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
-                    }
+		if (trace_on_spot_x(x)) {
+		  fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
+			   (unsigned int) (x & maskbucket), logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
+		}
 #endif
-                }
-                if (i >= bound1) x += inc_a;
-                if (i < bound0)  x += inc_c;
-            }
-            __asm__("## Inner bucket sieving loop stops here!!!\n");
+#if LOG_BUCKET_REGION == 16
+		u = (unsigned int)(uint16_t)x;
+#else
+		u = ((unsigned int) x & maskbucket);
+#endif
+		u |= bep;
+		*(uint32_t *)pu++ = u;
+#ifdef __GNUC__		
+		__builtin_prefetch((void *)pu, 0, 3);
+#endif
+		*ppu = pu;
+	      }
+	    if (i >= bound1) x += inc_a;
+	    if (i < bound0)  x += inc_c;
+	  } while (x < IJ);
         }
     }
     /* Write back BA so the nr_logp etc get copied to caller */
@@ -2060,19 +2067,19 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     unsieve_not_coprime (SS, N, si);
 #endif
 
-    for (int x = 0; x < bucket_region; ++x)
+    for (int x = 0; x < BUCKET_REGION; ++x)
     {
 #ifdef TRACE_K /* {{{ */
         if (trace_on_spot_Nx(N, x)) {
             fprintf(stderr, "# alg->Bound[%u]=%u, rat->Bound[%u]=%u\n",
-                    alg_S[trace_Nx.x], alg->Bound[alg_S[x]],
-                    rat_S[trace_Nx.x], rat->Bound[rat_S[x]]);
+                    alg_S[trace_Nx.x], alg_S[x] <= alg->bound ? 0 : alg->bound,
+                    rat_S[trace_Nx.x], rat_S[x] <= rat->bound ? 0 : rat->bound);
         }
 #endif /* }}} */
         unsigned int X;
         unsigned int i, j;
 
-        if (!sieve_info_test_lognorm(alg->Bound, rat->Bound, alg_S[x], rat_S[x], 126))
+        if (!sieve_info_test_lognorm(alg->bound, rat->bound, alg_S[x], rat_S[x]))
         {
             SS[x] = 255;
             continue;
@@ -2105,7 +2112,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     for(int z = 0 ; z < 2 ; z++) {
         int side = resieve_start ^ z;
         WHERE_AM_I_UPDATE(w, side, side);
-        primes[side] = init_bucket_primes (bucket_region);
+        primes[side] = init_bucket_primes (BUCKET_REGION);
 
         for (int i = 0; i < las->nb_threads; ++i) {
             thread_data_ptr other = th + i - th->id;
@@ -2132,7 +2139,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     const int together = sizeof(unsigned long);
 #endif
 
-    for (int xul = 0; xul < bucket_region; xul += together) {
+    for (int xul = 0; xul < BUCKET_REGION; xul += together) {
 #ifdef TRACE_K
         if ((unsigned int) N == trace_Nx.N && (unsigned int) xul <= trace_Nx.x && (unsigned int) xul + sizeof (unsigned long) > trace_Nx.x) {
             fprintf(stderr, "# Slot [%u] in bucket %u has value %u\n",
@@ -2165,7 +2172,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
             if (t >= deadline) {
                 /* Also break the outer loop (ugly!) */
-                xul = bucket_region;
+                xul = BUCKET_REGION;
                 fprintf(las->output, "# [descent] Aborting, deadline passed\n");
                 break;
             }
@@ -2192,9 +2199,9 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 pthread_mutex_lock(&io_mutex);
                 fprintf (stderr, "# Error: a and b both even for N = %d, x = %d,\n"
                         "i = %d, j = %d, a = %ld, b = %lu\n",
-                        N, x, ((x + N*bucket_region) & (si->I - 1))
+                        N, x, ((x + N*BUCKET_REGION) & (si->I - 1))
                         - (si->I >> 1),
-                        (x + N*bucket_region) >> si->conf->logI,
+                        (x + N*BUCKET_REGION) >> si->conf->logI,
                         (long) a, (unsigned long) b);
                 abort();
                 pthread_mutex_unlock(&io_mutex);
@@ -2213,7 +2220,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             if (a == -6537753 && b == 1264)
                 fprintf (stderr, "# Have relation %ld,%lu at bucket nr %d, "
                         "x = %d, K = %lu\n", 
-                        a, b, N, x, (unsigned long) N * bucket_region + x);
+                        a, b, N, x, (unsigned long) N * BUCKET_REGION + x);
 #endif
 
             int pass = 1;
@@ -2430,7 +2437,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                     if (time_left == 0) {
                         fprintf(las->output, "# [descent] Yiippee, splitting done\n");
                         /* break both loops */
-                        xul = bucket_region;
+                        xul = BUCKET_REGION;
                         relation_clear(rel);
                         break;
                     } else if (delta != DBL_MAX) {
@@ -2653,8 +2660,8 @@ void * process_bucket_region(thread_data_ptr th)
 
     unsigned char * S[2];
 
-    unsigned int my_row0 = (bucket_region >> si->conf->logI) * th->id;
-    unsigned int skiprows = (bucket_region >> si->conf->logI)*(las->nb_threads-1);
+    unsigned int my_row0 = (BUCKET_REGION >> si->conf->logI) * th->id;
+    unsigned int skiprows = (BUCKET_REGION >> si->conf->logI)*(las->nb_threads-1);
 
 
     /* This is local to this thread */
@@ -2666,7 +2673,7 @@ void * process_bucket_region(thread_data_ptr th)
         ts->rsdpos = small_sieve_copy_start(ts->ssdpos, s->fb_parts_x->rs);
 
         /* local sieve region */
-        S[side] = (unsigned char *) malloc(bucket_region + MEMSET_MIN);
+        S[side] = (unsigned char *) malloc_aligned(BUCKET_REGION + MEMSET_MIN, 16);
         ASSERT_ALWAYS (S != NULL);
     }
 
@@ -2688,12 +2695,12 @@ void * process_bucket_region(thread_data_ptr th)
             rep->tn[side] += seconds ();
 
             /* Apply rational buckets */
-            rep->ttsm -= seconds();
+            rep->ttbuckets_apply -= seconds();
             for (int j = 0; j < las->nb_threads; ++j)  {
                 thread_data_ptr ot = th + j - th->id;
                 apply_one_bucket(S[side], ot->sides[side]->BA, i, w);
             }
-            rep->ttsm += seconds();
+            rep->ttbuckets_apply += seconds();
 
             /* Sieve small rational primes */
             sieve_small_bucket_region(S[side], i, s->ssd, ts->ssdpos, si, side, w);
@@ -2710,17 +2717,16 @@ void * process_bucket_region(thread_data_ptr th)
             rep->tn[side] -= seconds ();
 
             unsigned char * xS = S[side ^ 1];
-	    /* rep->survivors0 is obsolete */
-            /* rep->survivors0 += */ init_alg_norms_bucket_region(S[side], xS, i, si);
+            init_alg_norms_bucket_region(S[side], xS, i, si);
             rep->tn[side] += seconds ();
 
             /* Apply algebraic buckets */
-            rep->ttsm -= seconds();
+            rep->ttbuckets_apply -= seconds();
             for (int j = 0; j < las->nb_threads; ++j) {
                 thread_data_ptr ot = th + j - th->id;
                 apply_one_bucket(S[side], ot->sides[side]->BA, i, w);
             }
-            rep->ttsm += seconds();
+            rep->ttbuckets_apply += seconds();
 
             /* Sieve small algebraic primes */
             sieve_small_bucket_region(S[side], i, s->ssd, ts->ssdpos, si, side, w);
@@ -2747,9 +2753,8 @@ void * process_bucket_region(thread_data_ptr th)
         thread_side_data_ptr ts = th->sides[side];
         free(ts->ssdpos);
         free(ts->rsdpos);
-        free(S[side]);
+        free_aligned(S[side], BUCKET_REGION + MEMSET_MIN, 16);
     }
-
 
     return NULL;
 }/*}}}*/
@@ -2800,7 +2805,7 @@ static void thread_buckets_alloc(thread_data * thrs, int n)
         for(int side = 0 ; side < 2 ; side++) {
             thread_side_data_ptr ts = th->sides[side];
 
-            int bucket_limit = thrs[i]->si->sides[side]->max_bucket_fill_ratio * bucket_region;
+            int bucket_limit = thrs[i]->si->sides[side]->max_bucket_fill_ratio * BUCKET_REGION;
 
             ts->BA = init_bucket_array(thrs[i]->si->nb_buckets, bucket_limit);
 
@@ -2808,7 +2813,7 @@ static void thread_buckets_alloc(thread_data * thrs, int n)
             double limit_factor =
                 log(log(si->cpoly->pols[side]->lim)) -
                 log(log(si->bucket_thresh));
-            int bucket_limit_base = limit_factor * bucket_region;
+            int bucket_limit_base = limit_factor * BUCKET_REGION;
             bucket_limit_base *= BUCKET_LIMIT_FACTOR;
             bucket_limit_base /= las->nb_threads;
 
@@ -2867,11 +2872,15 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
         fprintf (las->output, "# Warning: found %lu hits with i,j both even (not a bug, but should be very rare)\n", rep->both_even);
     }
     fprintf (las->output, "# Time for this special-q: %1.4fs [norm %1.4f+%1.4f, sieving %1.4f"
-            " (%1.4f + %1.4f),"
+            " (%1.4f + %1.4f + %1.4f),"
             " factor %1.4f]\n", qt0,
             rep->tn[RATIONAL_SIDE],
             rep->tn[ALGEBRAIC_SIDE],
-            qtts, rep->ttsm, qtts-rep->ttsm, rep->ttf);
+            qtts,
+            rep->ttbuckets_fill,
+            rep->ttbuckets_apply,
+            qtts-rep->ttbuckets_fill-rep->ttbuckets_apply,
+            rep->ttf);
 #if 0   /* incompatible with the todo list */
     rep_bench += rep->reports;
 #endif
@@ -2899,8 +2908,8 @@ usage (const char *argv0, const char * missing)
   fprintf (stderr, "          -alim     nnn   algebraic factor base bound nnn\n");
   fprintf (stderr, "          -lpbr     nnn   rational large prime bound 2^nnn\n");
   fprintf (stderr, "          -lpba     nnn   algebraic large prime bound 2^nnn\n");
-  fprintf (stderr, "          ->mfbr     nnn   rational cofactor bound 2^nnn\n");
-  fprintf (stderr, "          ->mfba     nnn   algebraic cofactor bound 2^nnn\n");
+  fprintf (stderr, "          -mfbr     nnn   rational cofactor bound 2^nnn\n");
+  fprintf (stderr, "          -mfba     nnn   algebraic cofactor bound 2^nnn\n");
   fprintf (stderr, "          -rlambda  nnn   rational lambda value is nnn\n");
   fprintf (stderr, "          -alambda  nnn   algebraic lambda value is nnn\n");
   fprintf (stderr, "          -S        xxx   skewness value is xxx\n");
@@ -2929,6 +2938,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     las_info las;
     double t0, tts;
     unsigned long sq = 0;
+    int allow_largesq = 0;
     double totJ = 0.0;
     /* following command-line values override those in the polynomial file */
     int argc = argc0;
@@ -2953,6 +2963,7 @@ int main (int argc0, char *argv0[])/*{{{*/
     param_list_configure_switch(pl, "-v", NULL);
     param_list_configure_switch(pl, "-ratq", NULL);
     param_list_configure_switch(pl, "-no-prepare-hints", NULL);
+    param_list_configure_switch(pl, "-allow-largesq", &allow_largesq);
 #if 0   /* incompatible with the todo list */
     param_list_configure_switch(pl, "-bench", &bench);
     param_list_configure_switch(pl, "-bench2", &bench2);
@@ -3178,6 +3189,24 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
 #endif
 
+        /* Check whether q is larger than the large prime bound.
+         * This can create some problems, for instance in characters.
+         * By default, this is not allowed, but the parameter
+         * -allow-largesq is a by-pass to this test.
+         */
+        if (!allow_largesq) {
+            if ((int)mpz_sizeinbase(si->doing->p, 2) >
+                    si->conf->sides[si->conf->side]->lpb) {
+                fprintf(stderr, "ERROR: The special q is larger than the "
+                        "large prime bound.\n");
+                fprintf(stderr, "       You can disable this check with "
+                        "the -allow-largesq argument,\n");
+                fprintf(stderr, "       It is for instance useful for the "
+                        "descent.\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+
         double qt0 = seconds();
         tt_qstart = seconds();
 
@@ -3208,7 +3237,16 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         trace_update_conditions(si);
 
-        report->ttsm -= seconds();
+        /* WARNING. We're filling the report info for thread 0 for
+         * ttbuckets_fill, while in fact the cost is over all threads.
+         * The problem is always the fact that we don't have a proper
+         * per-thread timer. So short of a better solution, this is what
+         * we do. True, it's not clean.
+         * (we need this data to be caught by
+         * las_report_accumulate_threads_and_display further down, hence
+         * this hack).
+         */
+        thrs[0]->rep->ttbuckets_fill -= seconds();
 
         thread_pickup_si(thrs, si, las->nb_threads);
 
@@ -3249,7 +3287,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
 #endif /* }}} */
 
-        report->ttsm += seconds();
+        thrs[0]->rep->ttbuckets_fill += seconds();
 
         /* This can now be factored out ! */
         for(int side = 0 ; side < 2 ; side++) {
@@ -3407,11 +3445,15 @@ int main (int argc0, char *argv0[])/*{{{*/
         fprintf (las->output, "# Total wct time %1.1fs [precise timings available only for mono-thread]\n", t0);
     else
         fprintf (las->output, "# Total time %1.1fs [norm %1.2f+%1.1f, sieving %1.1f"
-                " (%1.1f + %1.1f),"
+                " (%1.1f + %1.1f + %1.1f),"
                 " factor %1.1f]\n", t0,
                 report->tn[RATIONAL_SIDE],
                 report->tn[ALGEBRAIC_SIDE],
-                tts, report->ttsm, tts-report->ttsm, report->ttf);
+                tts,
+                report->ttbuckets_fill,
+                report->ttbuckets_apply,
+                tts-report->ttbuckets_fill-report->ttbuckets_apply,
+                report->ttf);
     fprintf (las->output, "# Total %lu reports [%1.3gs/r, %1.1fr/sq]\n",
             report->reports, t0 / (double) report->reports,
             (double) report->reports / (double) sq);

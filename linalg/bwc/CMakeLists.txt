@@ -265,17 +265,22 @@ target_link_libraries(cleanup utils m)
 
 install(TARGETS cleanup RUNTIME DESTINATION bin/linalg/bwc)
 
+set(plingen_prime_nwords 4)
 
 if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
 add_executable(plingen EXCLUDE_FROM_ALL
                 bw-common.c
                 plingen.c
                 polymat.c
-                mpfq/abase_p_3.c
+                mpfq/abase_p_${plingen_prime_nwords}.c
+                bigpolymat.c
         )
+
 target_link_libraries(plingen gmp utils)
-# Only to play with it for the moment.
-set_target_properties(plingen PROPERTIES COMPILE_FLAGS "-DSELECT_ABASE_p_3")
+set_target_properties(plingen PROPERTIES
+    COMPILE_FLAGS "--mpi -DSELECT_ABASE_p_${plingen_prime_nwords}"
+    LINK_FLAGS "--mpi"
+    )
 # install(TARGETS plingen RUNTIME DESTINATION bin/linalg/bwc)
 endif (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
 

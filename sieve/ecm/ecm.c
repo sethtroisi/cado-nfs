@@ -680,15 +680,31 @@ Montgomery12_curve_from_k (residue_t A, residue_t x, const unsigned long k,
 
   if (k == 2)
     {
-      mod_add (a, one, one, m); /* a = 2 */
-      mod_add1 (a, a, m);       /* a = 3 */
-      mod_add (v, a, a, m);     /* v = 6 */
-      mod_add (v, v, v, m);     /* v = 12 */
-      mod_add1 (v, v, m);       /* v = 13 */
-      mod_neg (v, v, m);        /* v = -13 */
-      mod_div3 (v, v, m);       /* v = -13/3 = 1/a */
-      mod_neg (a, a, m);        /* a = -3 */
-      mod_div13 (a, a, m);      /* a = -3/13 */
+      /* For k=2, we need A=-4798/351 = -13 - 1/13 - 16/27 
+         and x=-49/39 = 1/13 - 1/3 - 1. */
+      mod_div13 (u, one, m);    /* u = 1/13 */
+      mod_div3 (v, one, m);     /* v = 1/3 */
+      mod_sub (x, u, v, m);     /* x = 1/13 - 1/3 = -10/39 */
+      mod_sub (x, x, one, m);   /* x = -10/39 - 1 = -49/39 */
+      mod_sub (A, one, v, m);   /* A = 1 - 1/3 = 2/3 */
+      mod_div3 (A, A, m);       /* A = 2/9 */
+      mod_add1 (A, A, m);       /* A = 11/9 */
+      mod_div3 (A, A, m);       /* A = 11/27 */
+      mod_sub (A, A, one, m);   /* A = -16/27 */
+      mod_sub (A, A, u, m);     /* A = -16/27 - 1/13 = -235/351 */
+      mod_add (u, one, one, m); /* u = 2 */
+      mod_add (u, u, one, m);   /* u = 3 */
+      mod_add (u, u, u, m);     /* u = 6 */
+      mod_add (u, u, u, m);     /* u = 12 */
+      mod_add1 (u, u, m);       /* u = 13 */
+      mod_sub (A, A, u, m);     /* A = -235/351 - 13 = -4798/351 */
+
+      mod_clear (one, m);
+      mod_clear (t2, m);
+      mod_clear (v, m);
+      mod_clear (u, m);
+      mod_clear (a, m);
+      return 1;
     }
   else if (k == 3)
     {

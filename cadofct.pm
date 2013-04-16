@@ -202,7 +202,6 @@ my @default_param = (
 
     # polyselect using Kleinjung's algorithm
     degree         => 5,
-    polsel_lq      => 1,
     polsel_nq      => 1000,
     polsel_incr    => 60,
     polsel_admin   => 0,
@@ -560,16 +559,18 @@ my $cmdlog;
 #  - `kill' specifies that if the command fails (non-zero exit status)
 #           we should report the error and die immediately.
 #  - `logfile' redirect both stdout and stderr to given file.
-#  - `appendlog' whether to append to redirection file.
+#  - `appendlog' whether to append to `logfile' file.
 # The return value is another pointer to a hash table:
 #  - `out'    is the captured standard output stream of the command;
 #  - `err'    is the captured standard error stream of the command;
 #  - `status' is the return code of the command.
 sub cmd {
     my ($cmd, $opt) = @_;
+    # Don't use ssh to rsync-copy files on localhost if $elide_localhost is set
     $cmd =~ s/localhost:// if $elide_localhost && $cmd =~ /rsync/;
     my $logfh;
     if ($opt->{'logfile'}) {
+	# Open `logfile', for overwrite or append
         if ($opt->{'appendlog'}) {
             open($logfh, ">>", $opt->{'logfile'}) or die;
         } else {
@@ -577,7 +578,13 @@ sub cmd {
         }
     }
     if ($logfh) {
-        select($logfh); $|=1;select(STDOUT);
+	# Set $logfh as default filehandle, remember what old default 
+        # file handle was
+        my $oldfh = select($logfh); 
+	# Enable autoflush on $logfh
+	$| = 1; 
+	# Switch back to old default filehandle
+	select($oldfh);
     }
 
     if ($verbose) {
@@ -598,7 +605,10 @@ sub cmd {
         'err' => [ *CHLD_ERR{IO}, "", 1, "" ],
     };
 
+    # while $fds[out][2] == 1 or $fds[err][2] == 1
     while (scalar grep { $_->[2] } values %$fds) {
+	# Build bitarray where fileno's of out or err are set,
+	# if they are still in waiting state
         my $rin = '';
         for my $v (values %$fds) {
             next if !$v->[2];
@@ -618,14 +628,18 @@ sub cmd {
             next unless vec($rout, fileno($v->[0]), 1);
             if (sysread $v->[0], my $x, 1024) {
                 $v->[1] .= $x;
+		# Find complete lines and remove them from $v->[1]
                 while ($v->[1]=~s/^(.*(?:\n|\r))//) {
+		    # Print them
                     print $logfh $1 if $logfh;
                     print $1 if $verbose;
                     # print "$k $1";
+		    # and append them to $v->[3]
                     $v->[3] .= $1;
                 }
             } else {
                 if (length($v->[1])) {
+		    # Process any incomplete line left in $v->[1]
                     print $logfh $v->[1] if $logfh;
                     $v->[3] .= $v->[1];
                     $v->[1] =~ s/^/$k /gm;
@@ -660,10 +674,12 @@ sub cmd {
     return $res;
 }
 
+# Takes a filename as parameter. 
+# Returns a string with the contents of that file.
 sub cat {
     my $f = shift @_;
     open my $fh, "<$f" or die "$f: $!";
-    local $/;
+    local $/; # enable "slurp" mode
     my $out=<$fh>;
     close $fh;
     return $out;
@@ -676,6 +692,7 @@ sub cat {
 #  - `timeout' specifies how many seconds to wait before giving up.
 # The return value is another pointer to a hash table:
 #  - `out'     is the captured standard output of the command;
+#  - `err'     is the captured standard error of the command;
 #  - `status'  is the exit status of the command;
 sub remote_cmd {
     my $host = shift;
@@ -685,6 +702,7 @@ sub remote_cmd {
 
     $opt->{'timeout'} = 30 unless $opt->{'timeout'};
 
+    # Escape any quote characters in cmd
     $cmd =~ s/"/\\"/g;
 
     # don't ask for a password: we don't want to fall into interactive mode
@@ -814,9 +832,13 @@ sub parallel_remote_cmd {
 # Format:
 # <host> <pid> <threads> <file> <param1> <param2> ...
 # The PID is "done" when the job is finished.
+# Returns a reference to an array containing the jobs' statuses
+# Each array entry is a reference to a hash with keys
+# host, threads, file, param. pid is set only if not 'done'
+# param is a reference to a list with the parameters
 sub read_jobs {
     my ($file) = @_;
-    my $jobs = [];
+    my $jobs = []; # $jobs is reference to empty array
 
     if (!-f $file) {
         info "No job status file found. Creating empty one.\n";
@@ -827,12 +849,16 @@ sub read_jobs {
         or die "Cannot open `$file' for reading: $!.\n";
     while (<FILE>) {
         s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
+	# Strip off leading whitespace and any comments
         s/^\s+//; s/\s*(#.*)?$//;
-        next if /^$/;
+        next if /^$/; # Skip line if empty
 
+        # Split off <host> <pid> <threads> <file>, leave params in $_
         if (s/^(\S+)\s+(\d+|done)\s+(\d+)\s+(\S+)\s*//) {
             my @param = split;
-            my %job = ( host => $1, threads => $3, file => $4, param => \@param );
+            my %job = ( host => $1, threads => $3, file => $4, 
+                        param => \@param );
+            # the key 'pid' is set only if job is not done
             $job{'pid'} = $2 unless $2 eq "done";
             push @$jobs, \%job;
         } else {
@@ -861,6 +887,8 @@ sub write_jobs {
 
 
 # Job description string, with padded fields
+# Consists of file name of the binary (without extension),
+# hostname and list of parameters
 sub job_string {
     my ($job) = @_;
     my @name = split (/\./, basename($job->{'file'}));
@@ -886,7 +914,7 @@ sub is_job_alive {
     # as returned by lsof.
     # FIXME: on some hosts lsof is not in PATH
     if (0) {
-      $ret = remote_cmd($job->{'host'}, "env lsof -Fn -a -p$job->{'pid'} -d1 | ".
+      $ret = remote_cmd($job->{'host'},"env lsof -Fn -a -p$job->{'pid'} -d1 | ".
                         "env grep ^n\\`env readlink -f $job->{'file'}\\`\$");
       return -1 if $ret->{'status'} == 255;
       return 0  if $ret->{'status'};
@@ -922,7 +950,8 @@ sub job_status {
     } elsif (!$ret->{'status'} && $ret->{'out'} =~ /$pattern/) {
         info "Finished!\n";
         $status = 0;
-    } elsif (!$ret->{'status'} && $ret->{'out'} =~ /No such file or directory$/) {
+    } elsif (!$ret->{'status'} && 
+	     $ret->{'out'} =~ /No such file or directory$/) {
         warn "The file was not found. Make sure the `tmpdir' parameter ".
             "is valid for host `$job->{'host'}'.\n";
         $status = -2;
@@ -958,7 +987,7 @@ sub job_status {
 # reachable on startup ?)
 
 # Kills a remote job.
-# The $keep argument prevents the output file to be removed on the host.
+# The $keep argument prevents the output file from being removed on the host.
 sub kill_job {
     my ($job, $keep) = @_;
     info "Killing job:  ".job_string($job)."\n";
@@ -1001,7 +1030,7 @@ sub send_file {
 }
 
 # Retrieves the output file of a finished job from a remote host.
-# The $keep argument prevents the file to be removed on the host.
+# The $keep argument prevents the file from being removed on the host.
 # Returns 1 if the download was successful, -1 if the file was not there, or
 # 0 if another error occurred (meaning that we might want to try again).
 sub get_job_output {
@@ -1138,12 +1167,15 @@ sub merge_ranges {
     my ($ranges) = @_;
     my @merged = ();
 
+    # Process intervals [k_i,l_i] in order of non-decreasing k_i
     for my $r (sort { $a->[0] <=> $b->[0] } @$ranges) {
-        my ($a, $b) = @$r;
+        my ($a, $b) = @$r; # Process the interval [a,b]
         if (!@merged || $a > $merged[-1]->[1]) {
+	    # Does not overlap with end of merged intervals -> append it
             push @merged, $r;
             next;
         } elsif ($b > $merged[-1]->[1]) {
+	    # Overlaps with end of merged intervals -> adjust end upwards
             $merged[-1]->[1] = $b;
         }
     }
@@ -1177,6 +1209,7 @@ sub find_hole {
     # Arrange so that in all cases, the range ends at a multiple of the
     # length. Note that doing so, the range can't be empty.
     $b -= ($b % $len);
+    # This may cause the range to be longer than len
     if ($b-$a < $len / 10) {
         $b += $len;
     }
@@ -1206,7 +1239,7 @@ sub find_hole {
 #  - `files'      is a list of the files that need to be sent to each host;
 #  - `pattern'    is a regexp to match the last line of a completed job output
 #                 file;
-#  - `min', `max' the bounds on the range to process; `max' is facultative
+#  - `min', `max' the bounds on the range to process; `max' is optional
 #                 (meaning that the range will grow until we have enough data);
 #  - `len'        the maximal size of a range to be processed by a job;
 #  - `partial'    is a flag specifying if we can import partial job output
@@ -1230,7 +1263,7 @@ sub distribute_task {
 
     banner $opt->{'title'};
     local_time $opt->{'title'};
-	$opt->{'gzip'}=0 if (! $opt->{'gzip'});
+    $opt->{'gzip'}=0 if (! $opt->{'gzip'});
 
     # Make sure that all the output files that are already here are correct
     opendir DIR, $param{'wdir'}
@@ -1249,8 +1282,6 @@ sub distribute_task {
         &{$opt->{'check'}}($_, 0) for (map "$param{'wdir'}/$_", sort @files);
         $tab_level--;
     }
-
-
 
     while (1) {
         my $jobs = [];
@@ -1528,8 +1559,7 @@ my %tasks = (
     polysel   => { name   => "polynomial selection",
                    dep    => ['init'],
                    param  => ['degree', 'polsel_incr',
-			      'polsel_admin', 'polsel_admax', 'polsel_lq',
-		              'polsel_nq'],
+			      'polsel_admin', 'polsel_admax', 'polsel_nq'],
                    files  => ['polsel_out\.[\de.]+-[\de.]+', 'poly', 'poly_tmp'],
                    resume => 1,
                    dist   => 1 },
@@ -1659,10 +1689,10 @@ sub do_init {
         }
     }
     # It turns out that ssh, when it has neither a connected stdin, nor a
-    # controlling tty, tries to run an ssh-askpass dialog on the
-    # $DISPLAY, if that is an existing variable. Since we consider this
+    # controlling tty, tries to run the program specified in $SSH_ASKPASS,
+    # if that is an existing variable. Since we consider this
     # as essentially a nuisance, we forbid this behaviour.
-    delete $ENV{'DISPLAY'};
+    delete $ENV{'SSH_ASKPASS'};
 
 
     # Getting configuration
@@ -1966,7 +1996,6 @@ my $polysel_cmd = sub {
     my ($a, $b, $m, $nthreads, $gzip) = @_;
     return "env nice -$param{'polsel_nice'} ".
            "$m->{'bindir'}/polyselect/polyselect2l -q ".
-           "-lq $param{'polsel_lq'} ".
            "-nq $param{'polsel_nq'} ".
            "-incr $param{'polsel_incr'} ".
            "-admin $a ".
@@ -2567,13 +2596,14 @@ sub do_sieve {
         $$delay = 0  if ($nrels > 10000000);
         # Remove singletons and cliques
         my $ret = purge($param{'filterlastrels'});
-        if ($ret->{'status'}) {
+        if ($ret->{'status'} == 2) {
             $tab_level++;
             info "Not enough relations! Continuing sieving...\n";
             $tab_level--;
             return 0;
+        } elsif ($ret->{'status'} == 1) {
+            die "Error when calling purge ; STDERR:\n$ret->{'err'}";
         }
-
         return 1;
     };
 

@@ -122,7 +122,7 @@ class MyCursor(sqlite3.Cursor):
             return ", " + dict_join3(d, sep=", ", op=" AS ")
     
     @classmethod
-    def where_str(cls, name, **args):
+    def _where_str(cls, name, **args):
         where = ""
         values = []
         for opname in args:
@@ -199,7 +199,7 @@ class MyCursor(sqlite3.Cursor):
         # UPDATE table SET column_1=value1, column2=value_2, ..., 
         # column_n=value_n WHERE column_n+1=value_n+1, ...,
         setstr = " SET " + join3(d.keys(), post = " = ?", sep = ", ")
-        (wherestr, wherevalues) = self.__class__.where_str("WHERE", **conditions)
+        (wherestr, wherevalues) = self._where_str("WHERE", **conditions)
         command = "UPDATE " + table + setstr + wherestr
         values = list(d.values()) + wherevalues
         self._exec(command, values)
@@ -211,7 +211,7 @@ class MyCursor(sqlite3.Cursor):
             same value in the database table """
 
         # Table/Column names cannot be substituted, so include in query directly.
-        (WHERE, values) = self.__class__.where_str("WHERE", **conditions)
+        (WHERE, values) = self._where_str("WHERE", **conditions)
 
         if order is None:
             ORDER = ""
@@ -231,6 +231,11 @@ class MyCursor(sqlite3.Cursor):
             ORDER + LIMIT + ";"
         self._exec(command, values)
         
+    def delete(self, table, **conditions):
+        """ Delete the rows specified by conditions """
+        (WHERE, values) = self._where_str("WHERE", **conditions)
+        command = "DELETE FROM " + table + WHERE + ";"
+        self._exec(command, values)
 
     def where_as_dict(self, joinsource, col_alias = None, limit = None, 
                       order = None, **conditions):
@@ -250,12 +255,7 @@ class MyCursor(sqlite3.Cursor):
 
 class DbTable(object):
     """ A class template defining access methods to a database table """
-    def __init__(self):
-        self.tablename = type(self).name
-        self.fields = type(self).fields
-        self.primarykey = type(self).primarykey
-        self.references = type(self).references
-
+    
     @staticmethod
     def _subdict(d, l):
         """ Returns a dictionary of those key:value pairs of d for which key 
@@ -290,7 +290,8 @@ class DbTable(object):
         cursor.create_table(self.tablename, fields)
         if self.references:
             # We always create an index on the foreign key
-            cursor.create_index(self.tablename + "_pkindex", r.tablename, (fk[0], ))
+            cursor.create_index(self.tablename + "_pkindex", r.tablename, 
+                                (fk[0], ))
         for indexname in self.index:
             cursor.create_index(self.tablename + "_" + indexname, 
                                 self.tablename, self.index[indexname])
@@ -298,7 +299,8 @@ class DbTable(object):
     def insert(self, cursor, values, foreign=None):
         """ Insert a new row into this table. The column:value pairs are 
             specified key:value pairs of the dictionary d. 
-            The database's row id for the new entry is stored in d[primarykey] """
+            The database's row id for the new entry is stored in 
+            d[primarykey] """
         d = self.dictextract(values)
         assert self.primarykey not in d or d[self.primarykey] is None
         # If a foreign key is specified in foreign, add it to the column
@@ -318,6 +320,10 @@ class DbTable(object):
             be written are specified key:value pairs of the dictionary d """
         cursor.update(self.tablename, d, **conditions)
 
+    def delete(self, cursor, **conditions):
+        """ Delete an existing row in this table """
+        cursor.delete(self.tablename, **conditions)
+
     def where(self, cursor, limit = None, order = None, **conditions):
         assert order is None or order[0] in self._get_colnames()
         return cursor.where_as_dict(self.tablename, limit=limit, 
@@ -325,7 +331,7 @@ class DbTable(object):
 
 
 class WuTable(DbTable):
-    name = "workunits"
+    tablename = "workunits"
     fields = (
         ("wurowid", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"), 
         ("wuid", "TEXT", "UNIQUE NOT NULL"), 
@@ -347,7 +353,7 @@ class WuTable(DbTable):
     index = {"wuidindex": (fields[1][0],), "statusindex" : (fields[2][0],)}
 
 class FilesTable(DbTable):
-    name = "files"
+    tablename = "files"
     fields = (
         ("filesrowid", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"), 
         ("filename", "TEXT", ""), 
@@ -357,6 +363,189 @@ class FilesTable(DbTable):
     references = WuTable()
     index = {}
 
+
+class DictDbTable(DbTable):
+    fields = (
+        ("rowid", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"), 
+        ("key", "TEXT", "UNIQUE NOT NULL"),
+        ("value", "TEXT", "")
+        )
+    primarykey = fields[0][0]
+    references = None
+    index = {"keyindex": ("key",)}
+    def __init__(self, *args, name = None, **kwargs):
+        self.tablename = name
+        super().__init__(*args, **kwargs)
+
+
+class DictDbAccess(dict):
+    """ A DB-backed flat dictionary.
+
+    Flat means that the value of each dictionary entry must be a type that
+    the underlying DB understands, like integers, strings, etc., but not
+    collections or other complex types.
+
+    A copy of all the data in the table is kept in memory; read accesses 
+    are always served from the in-memory dict. Write accesses write through
+    to the DB.
+    
+    >>> conn = sqlite3.connect(':memory:')
+    >>> d = DictDbAccess(conn, 'test')
+    >>> d == {}
+    True
+    >>> d['a'] = '1'
+    >>> d 
+    {'a': '1'}
+    >>> d['a'] = '2'
+    >>> d 
+    {'a': '2'}
+    >>> d['b'] = '3'
+    >>> d == {'a': '2', 'b': '3'}
+    True
+    >>> del(d)
+    >>> d = DictDbAccess(conn, 'test')
+    >>> d == {'a': '2', 'b': '3'}
+    True
+    >>> del(d['b'])
+    >>> d 
+    {'a': '2'}
+    >>> d.setdefault('a', '3')
+    '2'
+    >>> d 
+    {'a': '2'}
+    >>> d.setdefault('b', '3')
+    '3'
+    >>> d == {'a': '2', 'b': '3'}
+    True
+    >>> d.setdefault(None, {'a': '3', 'c': '4'})
+    >>> d == {'a': '2', 'b': '3', 'c': '4'}
+    True
+    >>> d.update({'a': '3', 'd': '5'})
+    >>> d == {'a': '3', 'b': '3', 'c': '4', 'd': '5'}
+    True
+    >>> del(d)
+    >>> d = DictDbAccess(conn, 'test')
+    >>> d == {'a': '3', 'b': '3', 'c': '4', 'd': '5'}
+    True
+    """
+    
+    def __init__(self, db, name):
+        ''' Attaches to a DB table and reads values stored therein. 
+        
+        db can be a string giving the file name for the DB (same as for 
+        sqlite3.connect()), or an open DB connection. The latter is allowed 
+        primarily for making the doctest work, so we can reuse the same 
+        memory-backed DB connection, but it may be useful in other contexts.
+        Note that writes to the dict cause a commit() on the DB connection, 
+        so sharing a DB connection may be ill-advised if you want control 
+        over when commits happen.
+        
+        Overwriting dict.__init__() like this does not follow the semantics 
+        of dict, as there is no way to supply items to the constructor with 
+        which to initialise the dict. 
+        
+        However, allowing to add items to the dict before attaching it to a 
+        DB table with a separate attachdb() method introduces all sorts of 
+        conflicts that have to be resolved (Do items added to the dict before 
+        attaching overwrite items from the DB with equal keys or not? 
+        Should items added to the dict whose keys are not in the DB be added 
+        to the DB when attaching?)
+        Allowing keyword initialisers in addition to the db and name 
+        parameters does not work well, either, as it is impossible to have
+        a positional parameter named "foo", and supplying a keyword 
+        parameter also named "foo", so whatever names we choose for the 
+        "db" and "name" parameters, there is always a chance of conflict with 
+        keys of named parameters that are meant to be added to the dict, 
+        as the set of valid keys of a dict is a superset of the valid names 
+        of named parameters. 
+        In the end, it is easier not to allow initialisers for the dict in 
+        this constructor. Use update() or setdefault() (the latter accepts 
+        dicts in DictDbAccess()) to get the desired behaviour.
+        '''
+        
+        if isinstance(db, str):
+            self._conn = sqlite3.connect(db)
+            self._ownconn = True
+        else:
+            self._conn = db
+            self._ownconn = False
+        self._table = DictDbTable(name = name)
+        # Create an empty table if none exists
+        cursor = self._conn.cursor(MyCursor)
+        self._table.create(cursor);
+        # Get the entries currently stored in the DB
+        data = self.__getall()
+        super().update(data)
+        cursor.close()
+    
+    def __del__(self):
+        """ Close the DB connection and delete the dictionary """
+        if self._ownconn:
+            self._conn.close()
+            del(self._conn)
+        # http://docs.python.org/2/reference/datamodel.html#object.__del__
+        # dict does not have __del__, but in a complex class hierarchy, 
+        # dict may not be next in the MRO
+        if hasattr(super(), "__del__"):
+            super().__del__()
+    
+    def __getall(self):
+        """ Reads the whole table and returns it as a dict """
+        cursor = self._conn.cursor(MyCursor)
+        rows = self._table.where(cursor)
+        cursor.close()
+        dict = {r["key"]: r["value"] for r in rows}
+        return dict
+    
+    def __setitem__(self, key, value):
+        """ Set a dict entry to a value and update the DB """
+        cursor = self._conn.cursor(MyCursor)
+        if key in self:
+            # Update the table row where column "key" equals key
+            self._table.update(cursor, {"value": value}, eq={"key": key})
+        else:
+            self._table.insert(cursor, {"key": key, "value": value})
+        self._conn.commit()
+        cursor.close()
+        super().__setitem__(key, value)
+    
+    def __delitem__(self, key):
+        """ Delete a key from the dictionary """
+        super().__delitem__(key)
+        cursor = self._conn.cursor(MyCursor)
+        self._table.delete(cursor, eq={"key": key})
+        self._conn.commit()
+        cursor.close()
+    
+    def setdefault(self, key, default = None):
+        ''' Setdefault function that allows a dictionary as input
+        
+        Values from default dict are merged into self, *not* overwriting
+        existing values in self '''
+        if key is None and isinstance(default, dict):
+            cursor = self._conn.cursor(MyCursor)
+            for (key, value) in default.items():
+                if not key in self:
+                    super().__setitem__(key, value)
+                    self._table.insert(cursor, {"key": key, "value": value})
+            self._conn.commit()
+            cursor.close()
+            return None
+        elif not key in self:
+            self[key] = default
+        return self[key]
+    
+    def update(self, other):
+        cursor = self._conn.cursor(MyCursor)
+        for (key, value) in other.items():
+            if key in self:
+                self._table.update(cursor, {"value": value}, eq={"key": key})
+            else:
+                self._table.insert(cursor, {"key": key, "value": value})
+            super().__setitem__(key, value)
+        self._conn.commit()
+        cursor.close()
+        
 
 class Mapper(object):
     """ This class translates between application objects, i.e., Python 
@@ -429,7 +618,7 @@ class Mapper(object):
     
     def where(self, cursor, limit = None, order = None, **cond):
         pk = self.getpk()
-        joinsource = self.table.name
+        joinsource = self.table.tablename
         for s in self.subtables.keys():
             # FIXME: this probably breaks with more than 2 tables
             joinsource = joinsource + " LEFT JOIN " + \
@@ -473,7 +662,7 @@ class WuAccess(object): # {
     def __init__(self, conn):
         self.conn = conn
         self.mapper = Mapper(WuTable(), {"files": FilesTable()})
-
+    
     @staticmethod
     def to_str(wus):
         r = []

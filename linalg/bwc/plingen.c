@@ -19,6 +19,7 @@
 #include "utils.h"
 #include "abase.h"
 #include "polymat.h"
+#include "bigpolymat.h"
 #include "bw-common.h"		/* Handy. Allows Using global functions
                                  * for recovering parameters */
 #include "filenames.h"
@@ -44,14 +45,20 @@
 // #include "master_common.h"
 // #include "ops_poly.hpp"
 
+static unsigned int display_threshold = 100;
+
 struct bmstatus_s {
     dims d[1];
     unsigned int t;
     int * lucky;
 
-    unsigned int lingen_threshold;
     double t_basecase;
     double t_mp;
+
+    unsigned int lingen_threshold;
+    unsigned int lingen_mpi_threshold;
+    int mpi_dims[2];
+    MPI_Comm world;     /* reordered, in fact */
 };
 typedef struct bmstatus_s bmstatus[1];
 typedef struct bmstatus_s *bmstatus_ptr;
@@ -726,13 +733,13 @@ static int bw_lingen_recursive(bmstatus_ptr bm, polymat pi, polymat E, unsigned 
 
     /* length of the middle product is the difference of lengths + 1 */
     unsigned mp_len = E_i1 - E_i0 - (pi_left->size - 1);
-    printf("t=%u, MP(%zu, %u) --> %u\n", bm->t, pi_left->size, E_i1 - E_i0, mp_len);
+    if (E->size > display_threshold)
+        printf("t=%u, MP(%zu, %u) --> %u\n", bm->t, pi_left->size, E_i1 - E_i0, mp_len);
 
     polymat E_right;
     polymat_init(E_right, m, b, mp_len);
     E_right->size = mp_len;
 
-    /* Note that because E_i0 */
     bm->t_mp -= seconds();
     polymat_mp_raw(ab,
             E_right, 0,
@@ -747,6 +754,8 @@ static int bw_lingen_recursive(bmstatus_ptr bm, polymat pi, polymat E, unsigned 
 
     polymat_clear(E_right);
 
+    if (E->size > display_threshold)
+        printf("t=%u, MUL(%zu, %zu) --> %zu\n", bm->t, pi_left->size, pi_right->size, pi_left->size + pi_right ->size - 1);
     bm->t_mp -= seconds();
     polymat_mul(ab, pi, pi_left, pi_right);
     bm->t_mp += seconds();
@@ -757,10 +766,223 @@ static int bw_lingen_recursive(bmstatus_ptr bm, polymat pi, polymat E, unsigned 
     return done;
 }/*}}}*/
 
+void debug_matrix_print(polymat_srcptr M, const char * fmt, ...)
+{
+    return;
+    va_list ap;
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    va_start(ap, fmt);
+    /* We have three buffers: initial message, with matrix, and with rank
+     * info prepended.
+     */
+    char * buf[3];
+    int len[3];
+    int alloc[3];
+    int pos[3];
+
+    len[0] = vasprintf(&(buf[0]), fmt, ap);
+    ASSERT_ALWAYS(len[0] >= 0);
+
+    alloc[1] = len[0] + 16 * M->m * M->n + 4*M->m;
+    buf[1] = malloc(alloc[1]);
+    pos[1] = 0;
+
+    memcpy(buf[1], buf[0], len[0] + 1);
+    pos[1] = len[0];
+
+    /* For the moment we're assuming only one unsigned long */
+    for(unsigned int i = 0 ; i < M->m ; i++) {
+        int v;
+        for(unsigned int j = 0 ; j < M->n ; j++) {
+            ASSERT_ALWAYS(pos[1] < alloc[1] - 16);
+            v = snprintf(buf[1] + pos[1], alloc[1]-pos[1],  " %4lu", ((unsigned long*)(M->x))[i*M->n + j]);
+            ASSERT_ALWAYS(v >= 0);
+            pos[1] += v;
+        }
+        ASSERT_ALWAYS(pos[1] < alloc[1] - 10);
+        v = snprintf(buf[1] + pos[1], alloc[1]-pos[1], "\n");
+        ASSERT_ALWAYS(v >= 0);
+        pos[1] += v;
+    }
+    len[1] = pos[1];
+
+    /* Prepend rank info, now */
+    alloc[2] = len[1] + 4 * M->m + len[0];
+    buf[2] = malloc(alloc[2]);
+    pos[2] = 0;
+
+    for(pos[1] = 0 ; pos[1] < len[1] ; ) {
+        int v;
+        ASSERT_ALWAYS(pos[2] < alloc[2] - 4);
+        v = snprintf(buf[2] + pos[2], alloc[2] - pos[2], "%2d: ", rank);
+        ASSERT_ALWAYS(v >= 0);
+        pos[2] += v;
+        for( ; pos[1] < len[1] ; ) {
+            ASSERT_ALWAYS(pos[2] < alloc[2]);
+            if ((buf[2][pos[2]++] = buf[1][pos[1]++]) == '\n')
+                break;
+        }
+    }
+
+    fputs(buf[2], stdout);
+    free(buf[2]);
+    free(buf[1]);
+    free(buf[0]);
+}
+
+/* This version works over MPI */
+static int bw_lingen_bigrecursive(bmstatus_ptr bm, bigpolymat pi, bigpolymat E, unsigned int *delta) /*{{{*/
+{
+    dims * d = bm->d;
+    unsigned int m = d->m;
+    unsigned int n = d->n;
+    unsigned int b = m + n;
+    unsigned int m0 = E->m0;
+    unsigned int b0 = E->n0;    /* E is m * b */
+    // unsigned int n0 = b0 - m0;
+
+    abdst_field ab = d->ab;
+    int done;
+
+        int irank;
+        int jrank;
+        MPI_Comm_rank(E->col, &irank);
+        MPI_Comm_rank(E->row, &jrank);
+
+    debug_matrix_print(bigpolymat_my_cell(E), 
+            "Entering bw_lingen_bigrecursive, size %zu/%zu\n"
+            "local matrix E at degree 0:\n", E->size, bigpolymat_my_cell(E)->size);
+
+    if (E->size < bm->lingen_mpi_threshold) {
+        /* Fall back to local code */
+        /* This entails gathering E locally, computing pi locally, and
+         * dispathing it back. */
+
+        int done;
+        polymat sE, spi;
+        polymat_init(sE, m, b, E->size);
+        polymat_init(spi, 0, 0, 0);
+        bigpolymat_gather_mat(ab, sE, E);
+        /* Only the master node does the local computation */
+        if (!irank && !jrank) {
+            debug_matrix_print(sE, "Global matrix [X^0]E at root (size %zu):\n", sE->size);
+            done = bw_lingen_recursive(bm, spi, sE, delta);
+            debug_matrix_print(spi, "Output: global matrix [X^0]pi at root (size %zu):\n", spi->size);
+        }
+        bigpolymat_scatter_mat(ab, pi, spi);
+        debug_matrix_print(bigpolymat_my_cell(pi), "Output: local matrix [X^0]pi (complete size %zu/%zu):\n", pi->size, bigpolymat_my_cell(pi)->size);
+        /* Don't forget to broadcast delta from root node to others ! */
+        MPI_Bcast(&done, 1, MPI_INT, 0, bm->world);
+        MPI_Bcast(delta, b, MPI_UNSIGNED, 0, bm->world);
+        MPI_Bcast(bm->lucky, b, MPI_UNSIGNED, 0, bm->world);
+        MPI_Bcast(&(bm->t), 1, MPI_UNSIGNED, 0, bm->world);
+        polymat_clear(spi);
+        polymat_clear(sE);
+        return done;
+    }
+
+
+    /* XXX I think we have to start with something large enough to get
+     * all coefficients of E_right correct */
+    size_t half = E->size - (E->size / 2);
+    bigpolymat E_left;
+    bigpolymat_init(E_left, E, m, b, half);
+
+    /* should be part of the interface, I guess. OTOH it remains simple
+     * enough */
+    bwmat_copy_coeffs(ab,
+            polymat_part(bigpolymat_my_cell(E_left),0,0,0),1,
+            polymat_part(bigpolymat_my_cell(E),0,0,0),1,
+            m0*b0*half);
+
+    bigpolymat_set_size(E_left, half);
+
+    bigpolymat pi_left;
+    bigpolymat_init(pi_left, pi, 0, 0, 0);      /* pre-init */
+
+    done = bw_lingen_bigrecursive(bm, pi_left, E_left, delta);
+
+    bigpolymat_clear(E_left);
+
+    if (done) {
+        bigpolymat_swap(pi_left, pi);
+        bigpolymat_clear(pi_left);
+        return 1;
+    }
+
+    /* Do a naive middle product for the moment, just to make sure I'm
+     * not speaking nonsense */
+    /* First get coefficient bounds in E */
+    /* E_i0 + (max degree in pi) = half */
+    unsigned int E_i0 = half - (pi_left->size - 1);
+    unsigned int E_i1 = E->size;
+
+    /* length of the middle product is the difference of lengths + 1 */
+    unsigned mp_len = E_i1 - E_i0 - (pi_left->size - 1);
+    if (!irank && !jrank && E->size > display_threshold)
+        printf("t=%u, MPI-MP(%zu, %u) --> %u\n", bm->t, pi_left->size, E_i1 - E_i0, mp_len);
+
+    bigpolymat E_right;
+    bigpolymat_init(E_right, E, m, b, mp_len);
+    E_right->size = mp_len;
+
+    bm->t_mp -= seconds();
+    bigpolymat_mp_raw(ab,
+            E_right, 0,
+            E, E_i0, E_i1 - E_i0,
+            pi_left, 0, pi_left->size, 0, 0);
+    bm->t_mp += seconds();
+
+    bigpolymat pi_right;
+    bigpolymat_init(pi_right, pi, 0, 0, 0);     /* pre-init */
+
+    done = bw_lingen_bigrecursive(bm, pi_right, E_right, delta);
+
+    bigpolymat_clear(E_right);
+
+    if (!irank && !jrank && E->size > display_threshold)
+        printf("t=%u, MPI-MUL(%zu, %zu) --> %zu\n", bm->t, pi_left->size, pi_right->size, pi_left->size + pi_right ->size - 1);
+    bm->t_mp -= seconds();
+    bigpolymat_mul(ab, pi, pi_left, pi_right);
+    bm->t_mp += seconds();
+    
+    bigpolymat_clear(pi_left);
+    bigpolymat_clear(pi_right);
+
+    return done;
+}/*}}}*/
+
+
 static int/*{{{*/
 bw_lingen(bmstatus_ptr bm, polymat pi, polymat E, unsigned int *delta)
 {
-    if (E->size < bm->lingen_threshold) {
+    dims *d = bm->d;
+    abdst_field ab = d->ab;
+    unsigned int m = d->m;
+    unsigned int n = d->n;
+    unsigned int b = m + n;
+
+    if (E->size >= bm->lingen_mpi_threshold) {
+        /* We are going to delegate to the MPI code */
+        bigpolymat model;
+        bigpolymat xpi, xE;
+
+        bigpolymat_init_model(model, bm->world, bm->mpi_dims[0], bm->mpi_dims[1]);
+        /* We prefer to allocate soon. The interface doesn't really like
+         * lazy allocation at the moment */
+        bigpolymat_init(xE, model, m, b, E->size);
+        bigpolymat_init(xpi, model, 0, 0, 0);   /* pre-init for now */
+        bigpolymat_scatter_mat(ab, xE, E);
+        ASSERT_ALWAYS(xE->size);
+        int res = bw_lingen_bigrecursive(bm, xpi, xE, delta);
+        bigpolymat_gather_mat(ab, pi, xpi);
+        bigpolymat_clear(xE);
+        bigpolymat_clear(xpi);
+        bigpolymat_clear_model(model);
+        return res;
+    } else if (E->size < bm->lingen_threshold) {
         bm->t_basecase -= seconds();
         int res = bw_lingen_basecase(bm, pi, E, delta);
         bm->t_basecase += seconds();
@@ -1404,13 +1626,15 @@ void read_data_for_series(bmstatus_ptr bm, polymat A, /* {{{ */
 	int k1 = k - ! !k;
 	for (unsigned int i = 0; i < m && !eof_met ; i++) {
 	    for (unsigned int j = 0; j < n && !eof_met ; j++) {
+                abdst_elt x = polymat_coeff(A, i, j, k1);
 		int rc;
                 if (ascii_input) {
-                    rc = abfscan(ab, f, polymat_coeff(A, i, j, k1));
+                    rc = abfscan(ab, f, x);
                     rc = rc == 1;
                 } else {
-                    rc = fread(polymat_coeff(A, i, j, k1), sizeof(abelt), 1, f);
+                    rc = fread(x, sizeof(abelt), 1, f);
                     rc = rc == 1;
+                    abreduce(ab, x, x);
                 }
 		if (!rc) {
                     if (i == 0 && j == 0) {
@@ -1465,9 +1689,15 @@ int main(int argc, char *argv[])
     int tune = 0;
     int ascii = 0;
     gmp_randstate_t rstate;
+
+    MPI_Init(&argc, &argv);
+    int rank;
+    int size;
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
     gmp_randinit_default(rstate);
     gmp_randseed_ui(rstate, 1);
-
 
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
@@ -1516,11 +1746,53 @@ int main(int argc, char *argv[])
     }
 
     bm->lingen_threshold = 10;
+    bm->lingen_mpi_threshold = 1000;
     param_list_parse_uint(pl, "lingen-threshold", &(bm->lingen_threshold));
+    param_list_parse_uint(pl, "lingen-mpi-threshold", &(bm->lingen_mpi_threshold));
+
+    bm->mpi_dims[0] = 1;
+    bm->mpi_dims[1] = 1;
+    param_list_parse_intxint(pl, "mpi", bm->mpi_dims);
+    {
+        /* Reorder all mpi nodes so that each node gets the given number
+         * of jobs, but close together.
+         */
+        int mpi[2] = { bm->mpi_dims[0], bm->mpi_dims[1], };
+#ifdef  FAKEMPI_H_
+        if (mpi[0]*mpi[1] > 1) {
+            fprintf(stderr, "non-trivial option mpi= can't be used with fakempi. Please do an MPI-enabled build (MPI=1)\n");
+            exit(1);
+        }
+#endif
+        int thr[2] = {1,1};
+        param_list_parse_intxint(pl, "thr", thr);
+        /* Asssume numbering in MPI_COMM_WORLD is all mpi jobs from the
+         * same node together. So we pick them by bunches of size
+         * thr[0]*thr[1].
+         */
+        printf("size=%d mpi=%dx%d thr=%dx%d\n", size, mpi[0], mpi[1], thr[0], thr[1]);
+        ASSERT_ALWAYS(size == mpi[0] * mpi[1] * thr[0] * thr[1]);
+        /* Keep the semantics which exist for krylov and so on --
+         * even though we are not really using threads here. */
+        bm->mpi_dims[0] *= thr[0];
+        bm->mpi_dims[1] *= thr[1];
+        int tl_grank = rank % (thr[0] * thr[1]); // thread-level global rank
+        int tl_irank = tl_grank / thr[1];
+        int tl_jrank = tl_grank % thr[1];
+        int ml_grank = rank / (thr[0] * thr[1]); // thread-level global rank
+        int ml_irank = ml_grank / mpi[1];
+        int ml_jrank = ml_grank % mpi[1];
+        int irank = ml_irank * thr[0] + tl_irank;
+        int jrank = ml_jrank * thr[1] + tl_jrank;
+        int newrank = irank * mpi[1] * thr[1] + jrank;
+        MPI_Comm_split(MPI_COMM_WORLD, 0, newrank, &(bm->world));
+    }
+
     if (param_list_warn_unused(pl))
 	usage();
     /* }}} */
 
+    /* TODO: delegate them to other functions, elsewhere... */
     int tune_bm_basecase = tune;
     int tune_mp = tune;
 
@@ -1602,12 +1874,17 @@ int main(int argc, char *argv[])
     if (tune)
         return 0;
 
-    unsigned int (*fdesc)[2];
+    unsigned int (*fdesc)[2] = NULL;    /* gcc is stupid */
 
+    /* For the moment we read the complete thing in local memory before
+     * dispatching, which is admittedly somewhat wasteful... Of course we
+     * should rather do an mpi-level read. Either with only one
+     * jobreading, and handing over data immediately to its peers, or
+     * with several accesses to the file(s). */
     polymat E;
     polymat_init(E, 0, 0, 0);
 
-    { /* {{{ Read A, compute F0 and E, and keep only E */
+    if (rank == 0) { /* {{{ Read A, compute F0 and E, and keep only E */
         polymat A;
         polymat_init(A, 0, 0, 0);
         printf("Reading scalar data in polynomial ``a'' from %s\n", afile);
@@ -1629,6 +1906,12 @@ int main(int argc, char *argv[])
         printf("Throwing out a(X)\n");
         polymat_clear(A);
     } /* }}} */
+    MPI_Bcast(&(bm->t), 1, MPI_UNSIGNED, 0, bm->world);
+    /* This will quite probably be changed. We are playing nasty games
+     * here, with E->size being used to draw decisions even though the is
+     * no corresponding allocation.
+     */
+    MPI_Bcast(&(E->size), 1, MPI_UNSIGNED, 0, bm->world);
 
     // bw_bbpoly piL, piR, piP;
 
@@ -1641,7 +1924,7 @@ int main(int argc, char *argv[])
 
     polymat pi;
     polymat_init(pi, 0, 0, 0);
-
+    /* At this point, we're not propagating the mpi info here */
     bw_lingen(bm, pi, E, delta);
     polymat_clear(E);
 
@@ -1649,27 +1932,28 @@ int main(int argc, char *argv[])
     int luck_mini = expected_pi_length(d, 0);
     for(unsigned int j = 0 ; j < b ; nlucky += bm->lucky[j++] >= luck_mini) ;
 
-    /* TODO: consider luck only below probability 2^-64 */
-    if (nlucky == n) {
-        polymat f_red;
-        polymat_init(f_red, 0, 0, 0);
-        compute_final_F_red(bm, f_red, fdesc, t0, pi, delta);
-        char * f_filename;
-        int rc = asprintf(&f_filename, "%s.gen", afile);
-        ASSERT_ALWAYS(rc >= 0);
-        write_f(bm, f_filename, f_red, delta, ascii);
-        free(f_filename);
-        polymat_clear(f_red);
-    } else {
-        fprintf(stderr, "Could not find the required set of solutions (nlucky=%u)\n", nlucky);
+    if (rank == 0) {
+        /* TODO: consider luck only below probability 2^-64 */
+        if (nlucky == n) {
+            polymat f_red;
+            polymat_init(f_red, 0, 0, 0);
+            compute_final_F_red(bm, f_red, fdesc, t0, pi, delta);
+            char * f_filename;
+            int rc = asprintf(&f_filename, "%s.gen", afile);
+            ASSERT_ALWAYS(rc >= 0);
+            write_f(bm, f_filename, f_red, delta, ascii);
+            free(f_filename);
+            polymat_clear(f_red);
+        } else {
+            fprintf(stderr, "Could not find the required set of solutions (nlucky=%u)\n", nlucky);
+        }
+
+        printf("t_basecase = %.2f\n", bm->t_basecase);
+        printf("t_mp = %.2f\n", bm->t_mp);
+        free(delta);
+        polymat_clear(pi);
+        free(fdesc);
     }
-
-    printf("t_basecase = %.2f\n", bm->t_basecase);
-    printf("t_mp = %.2f\n", bm->t_mp);
-    free(delta);
-    polymat_clear(pi);
-    free(fdesc);
-
 
 #if 0
     struct e_coeff *ec;
@@ -1699,6 +1983,8 @@ int main(int argc, char *argv[])
     bw_common_clear(bw);
     param_list_clear(pl);
     gmp_randclear(rstate);
+
+    MPI_Finalize();
     return 0;
 }
 
