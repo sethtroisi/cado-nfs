@@ -28,17 +28,19 @@ import cadologger
 # --defaults which does not overwrite, and --forceparam which does
 
 class Task(object):
-    """ An class that represents one task that needs to be processed. """
+    """ A base class that represents one task that needs to be processed. """
     
     def __init__(self, dependencies, db = None, parameters = None):
-        ''' Parameters passed in by parameters do not override values in the
-        DB-backed parameter dictionary 
+        ''' Sets up a database connection and a DB-backed dictionary for 
+        parameters. Reads parameters from DB, and merges with hierarchical
+        parameters in the parameters argument. Parameters passed in by 
+        parameters argument do not override values in the DB-backed 
+        parameter dictionary.
         '''
         self.dbconn = sqlite3.connect(db)
         self.dependencies = dependencies
         # Derived class must define name
-        self.param = wudb.DictDbAccess()
-        self.param.attachdb(db, self.name)
+        self.param = wudb.DictDbAccess(db, self.name)
         self.param_path = "tasks." + self.name
         self.logger = cadologger.Logger()
         if parameters:
@@ -80,7 +82,7 @@ class Task(object):
         ''' Runs the prerequisites. Sub-classes should call this.
         
         Parameters passed in by parameters DO override values in the
-        DB-backed parameter dictionary 
+        DB-backed parameter dictionary. 
         '''
         self.logger.debug("Enter Task.run(" + self.name + ")")
         self.logger.debug("Task.run(" + self.name + "): self.is_done() = " + 
@@ -99,8 +101,7 @@ class Task(object):
         # Set parameters for our programs
         self.progparams = []
         for prog in self.programs:
-            self.progparams.append(wudb.DictDbAccess())
-            self.progparams[-1].attachdb(db, self.name + '_' + prog.name)
+            self.progparams.append(wudb.DictDbAccess(db, self.name + '_' + prog.name))
             if parameters:
                 parampath = self.param_path + '.' + prog.name
                 mydefaults = defaults._myparams(prog.params, parampath)
