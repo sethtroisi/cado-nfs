@@ -618,6 +618,17 @@ void ab_source_init(ab_source_ptr ab, const char * fname, int rank, int root, MP
         } else {
             FATAL_ERROR_CHECK(1, "error in parsing filename");
         }
+    } else if ((magic = strstr(fname, ".dep.")) != NULL) {
+        // assume cado format (means only one file, so we don't need to
+        // parse, really.
+        strncpy(ab->prefix, fname, magic-fname);
+        ab->prefix[magic-fname]='\0';
+        magic++;
+        if (sscanf(magic, "dep.%d", &ab->depnum) == 1) {
+            ab->nfiles = 0;
+        } else {
+            FATAL_ERROR_CHECK(1, "error in parsing filename");
+        }
     } else {
         FATAL_ERROR_CHECK(1, "error in parsing filename");
     }
