@@ -5,6 +5,15 @@
  *
  */
 
+/*
+  Usage within CADO-NFS:
+  1) run: crtalgsqrt -v -depfile c75.dep.000 -ratdepfile c75.dep.rat.000 -polyfile c75.poly
+     and let "alg" be the last integer value printed
+  2) let "rat" be the value of the rational square root (given by sqrt)
+  3) compute gcd(alg-rat, n) and gcd(alg+rat, n)
+  4) if this fails, try another dependency
+ */
+
 /* TODO list.
  *
  * This program seems to work, but is not complete.
