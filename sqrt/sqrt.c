@@ -628,6 +628,8 @@ FindSuitableModP (poly_t F, mpz_t N)
     if (! plain_poly_fits (dF, p))
       {
         fprintf (stderr, "You are in trouble. Please contact the CADO support team at cado-nfs-commits@lists.gforge.inria.fr.\n");
+        plain_poly_clear (fp);
+        getprime (0);
         exit (1);
       }
     d = plain_poly_set_mod (fp, F->coeff, dF, p);
@@ -636,7 +638,7 @@ FindSuitableModP (poly_t F, mpz_t N)
     if (plain_poly_is_irreducible (fp, p))
       break;
     }
-  plain_poly_clear(fp);
+  plain_poly_clear (fp);
   getprime (0);
 
   return p;
