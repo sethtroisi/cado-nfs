@@ -8,7 +8,8 @@
 /*
   Usage within CADO-NFS:
   1) run: crtalgsqrt -v -depfile c75.dep.000 -ratdepfile c75.dep.rat.000 -polyfile c75.poly
-     and let "alg" be the last integer value printed
+     and let "alg" be the last integer value printed, for example 271...279:
+# [83.72] c7 (+++---++) -2 [271185940941113750637336882505937475494764983427230684073069569288946725279]
   2) let "rat" be the value of the rational square root (given by sqrt)
   3) compute gcd(alg-rat, n) and gcd(alg+rat, n)
   4) if this fails, try another dependency
