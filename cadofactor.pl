@@ -61,6 +61,10 @@
 # file params/params.c91 is an example where a lot of comments have been
 # added, describing the role of each parameter.
 #
+# Remark: if parallel=0 is set in a <paramfile>, the option
+# machines=/path/to/mach_desc will not be parsed. Please either set the
+# bindir=xxx in the cadofactor.pl options or define it in a <paramfile>.
+#
 # An important parameter, though, is machines=/path/to/mach_desc. (If not
 # given, the mach_desc file is searched in the current directory.) It
 # tells cadofactor.pl the list of available computing ressources for this

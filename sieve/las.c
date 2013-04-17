@@ -2862,8 +2862,9 @@ void las_report_accumulate_threads_and_display(las_info_ptr las, sieve_info_ptr 
         las_report_accumulate(rep, thrs[i]->rep);
     }
     if (las->verbose) {
-      /* fprintf (las->output, "# %lu survivors after rational sieve,", rep->survivors0); */
-        fprintf (las->output, " %lu survivors after algebraic sieve, ", rep->survivors1);
+        fprintf (las->output, "# ");
+      /* fprintf (las->output, "%lu survivors after rational sieve,", rep->survivors0); */
+        fprintf (las->output, "%lu survivors after algebraic sieve, ", rep->survivors1);
         fprintf (las->output, "coprime: %lu\n", rep->survivors2);
     }
     gmp_fprintf (las->output, "# %lu relation(s) for %s (%Zd,%Zd)\n", rep->reports, sidenames[si->conf->side], si->doing->p, si->doing->r);

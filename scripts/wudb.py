@@ -388,32 +388,101 @@ class DictDbAccess(dict):
     A copy of all the data in the table is kept in memory; read accesses 
     are always served from the in-memory dict. Write accesses write through
     to the DB.
+    
+    >>> conn = sqlite3.connect(':memory:')
+    >>> d = DictDbAccess(conn, 'test')
+    >>> d == {}
+    True
+    >>> d['a'] = '1'
+    >>> d 
+    {'a': '1'}
+    >>> d['a'] = '2'
+    >>> d 
+    {'a': '2'}
+    >>> d['b'] = '3'
+    >>> d == {'a': '2', 'b': '3'}
+    True
+    >>> del(d)
+    >>> d = DictDbAccess(conn, 'test')
+    >>> d == {'a': '2', 'b': '3'}
+    True
+    >>> del(d['b'])
+    >>> d 
+    {'a': '2'}
+    >>> d.setdefault('a', '3')
+    '2'
+    >>> d 
+    {'a': '2'}
+    >>> d.setdefault('b', '3')
+    '3'
+    >>> d == {'a': '2', 'b': '3'}
+    True
+    >>> d.setdefault(None, {'a': '3', 'c': '4'})
+    >>> d == {'a': '2', 'b': '3', 'c': '4'}
+    True
+    >>> d.update({'a': '3', 'd': '5'})
+    >>> d == {'a': '3', 'b': '3', 'c': '4', 'd': '5'}
+    True
+    >>> del(d)
+    >>> d = DictDbAccess(conn, 'test')
+    >>> d == {'a': '3', 'b': '3', 'c': '4', 'd': '5'}
+    True
     """
     
-    def attachdb(self, db, name):
+    def __init__(self, db, name):
         ''' Attaches to a DB table and reads values stored therein. 
-        This must be called before any assignments to the dict.
-
-        We can't really pass these two parameters to __init__(), even though
-        that's where they really belong, because dict.__init__() accepts 
-        arbitrary keywords arguments and uses them as initialisers for the 
-        dict, so the semantics of DictDbAccess(db="foo") would differ from 
-        that of dict(db="foo")
+        
+        db can be a string giving the file name for the DB (same as for 
+        sqlite3.connect()), or an open DB connection. The latter is allowed 
+        primarily for making the doctest work, so we can reuse the same 
+        memory-backed DB connection, but it may be useful in other contexts.
+        Note that writes to the dict cause a commit() on the DB connection, 
+        so sharing a DB connection may be ill-advised if you want control 
+        over when commits happen.
+        
+        Overwriting dict.__init__() like this does not follow the semantics 
+        of dict, as there is no way to supply items to the constructor with 
+        which to initialise the dict. 
+        
+        However, allowing to add items to the dict before attaching it to a 
+        DB table with a separate attachdb() method introduces all sorts of 
+        conflicts that have to be resolved (Do items added to the dict before 
+        attaching overwrite items from the DB with equal keys or not? 
+        Should items added to the dict whose keys are not in the DB be added 
+        to the DB when attaching?)
+        Allowing keyword initialisers in addition to the db and name 
+        parameters does not work well, either, as it is impossible to have
+        a positional parameter named "foo", and supplying a keyword 
+        parameter also named "foo", so whatever names we choose for the 
+        "db" and "name" parameters, there is always a chance of conflict with 
+        keys of named parameters that are meant to be added to the dict, 
+        as the set of valid keys of a dict is a superset of the valid names 
+        of named parameters. 
+        In the end, it is easier not to allow initialisers for the dict in 
+        this constructor. Use update() or setdefault() (the latter accepts 
+        dicts in DictDbAccess()) to get the desired behaviour.
         '''
-        self._conn = sqlite3.connect(db)
+        
+        if isinstance(db, str):
+            self._conn = sqlite3.connect(db)
+            self._ownconn = True
+        else:
+            self._conn = db
+            self._ownconn = False
         self._table = DictDbTable(name = name)
         # Create an empty table if none exists
         cursor = self._conn.cursor(MyCursor)
         self._table.create(cursor);
         # Get the entries currently stored in the DB
         data = self.__getall()
-        self.update(data)
+        super().update(data)
         cursor.close()
     
     def __del__(self):
-        """ Close the cursor and delete the dictionary """
-        if hasattr(self, "_conn"):
+        """ Close the DB connection and delete the dictionary """
+        if self._ownconn:
             self._conn.close()
+            del(self._conn)
         # http://docs.python.org/2/reference/datamodel.html#object.__del__
         # dict does not have __del__, but in a complex class hierarchy, 
         # dict may not be next in the MRO
@@ -435,11 +504,11 @@ class DictDbAccess(dict):
             # Update the table row where column "key" equals key
             self._table.update(cursor, {"value": value}, eq={"key": key})
         else:
-            self._table.insert(cursor, {"key": key, "value": value})   
+            self._table.insert(cursor, {"key": key, "value": value})
         self._conn.commit()
         cursor.close()
         super().__setitem__(key, value)
-
+    
     def __delitem__(self, key):
         """ Delete a key from the dictionary """
         super().__delitem__(key)
@@ -447,17 +516,36 @@ class DictDbAccess(dict):
         self._table.delete(cursor, eq={"key": key})
         self._conn.commit()
         cursor.close()
-
+    
     def setdefault(self, key, default = None):
         ''' Setdefault function that allows a dictionary as input
         
         Values from default dict are merged into self, *not* overwriting
         existing values in self '''
         if key is None and isinstance(default, dict):
-            for key in default:
-                super().setdefault(key, default[key])
-        else:
-            return super().setdefault(key, default)
+            cursor = self._conn.cursor(MyCursor)
+            for (key, value) in default.items():
+                if not key in self:
+                    super().__setitem__(key, value)
+                    self._table.insert(cursor, {"key": key, "value": value})
+            self._conn.commit()
+            cursor.close()
+            return None
+        elif not key in self:
+            self[key] = default
+        return self[key]
+    
+    def update(self, other):
+        cursor = self._conn.cursor(MyCursor)
+        for (key, value) in other.items():
+            if key in self:
+                self._table.update(cursor, {"value": value}, eq={"key": key})
+            else:
+                self._table.insert(cursor, {"key": key, "value": value})
+            super().__setitem__(key, value)
+        self._conn.commit()
+        cursor.close()
+        
 
 class Mapper(object):
     """ This class translates between application objects, i.e., Python 
@@ -574,7 +662,7 @@ class WuAccess(object): # {
     def __init__(self, conn):
         self.conn = conn
         self.mapper = Mapper(WuTable(), {"files": FilesTable()})
-
+    
     @staticmethod
     def to_str(wus):
         r = []

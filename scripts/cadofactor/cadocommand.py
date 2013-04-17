@@ -3,10 +3,11 @@ import cadologger
 
 class Command(object):
     ''' Represents a running subprocess
-
+    
     The subprocess is started when the instance is initialised
     '''
-    def __init__(self, args, **kwargs):
+    def __init__(self, args, stdin = None, stdout = subprocess.PIPE, 
+                 stderr = subprocess.PIPE, **kwargs):
         self.args = args
         self.kwargs = kwargs
         self.logger = cadologger.Logger()
@@ -15,8 +16,10 @@ class Command(object):
             self.cmdline = self.args
         else:
             self.cmdline = " ".join(self.args)
-        self.child = subprocess.Popen(self.args, stdout = subprocess.PIPE, 
-            stderr = subprocess.PIPE, **self.kwargs)
+        self.child = subprocess.Popen(
+            self.args, stdin=stdin, stdout=stdout, stderr=stderr, 
+            **self.kwargs
+            )
         self.logger.info("Running command: " + self.cmdline)
         self.logger.cmd(self.cmdline, extra={"pid": self.child.pid})
     
@@ -31,6 +34,12 @@ class Command(object):
             self.logger.error("Process with PID %d finished with return "
                               "code %d",
                               self.child.pid, self.child.returncode)
+        if self.stdout:
+            self.logger.debug("Process with PID %d stdout: %s", 
+                              self.child.pid, self.stdout)
+        if self.stderr:
+            self.logger.debug("Process with PID %d stderr: %s", 
+                              self.child.pid, self.stderr)
         self.returncode = self.child.returncode
         return (self.returncode, self.stdout, self.stderr)
 

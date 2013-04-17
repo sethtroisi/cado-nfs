@@ -1963,27 +1963,29 @@ static void
 usage (const char *argv, const char * missing)
 {
   fprintf (stderr, "Usage: %s [options] P\n", argv);
-  fprintf (stderr, "Required parameters and options:\n");
-  fprintf (stderr, "P            --- degree-1 coefficient of g(x) has\n");
-  fprintf (stderr, "                 two prime factors in [P,2P]\n");
-  fprintf (stderr, "-v           --- verbose mode\n");
-  fprintf (stderr, "-q           --- quiet mode\n");
-  fprintf (stderr, "-r           --- size-optimize polynomial only (skip ropt)\n");
-  fprintf (stderr, "-t nnn       --- use n threads (default 1)\n");
-  fprintf (stderr, "-admin nnn   --- start from ad=nnn (default 0)\n");
-  fprintf (stderr, "-admax nnn   --- stop at ad=nnn\n");
-  fprintf (stderr, "-incr nnn    --- forced factor of ad (default 60)\n");
-  fprintf (stderr, "-N nnn       --- input number\n");
-  fprintf (stderr, "-degree nnn  --- wanted polynomial degree\n");
-  fprintf (stderr, "-nq nnn      --- maximum number of special-q's considered\n");
-  fprintf (stderr, "                 for each ad (default %d)\n", INT_MAX);
-  fprintf (stderr, "-save xxx    --- save state in file xxx\n");
-  fprintf (stderr, "-resume xxx  --- resume state from file xxx\n");
-  fprintf (stderr, "-maxnorm xxx --- only optimize polynomials with norm <= xxx\n");
-  fprintf (stderr, "-maxtime xxx --- stop the search after xxx seconds\n");
-  fprintf (stderr, "-out xxx     --- for msieve-format output\n");
-  fprintf (stderr, "-s xxx       --- time intervals (seconds) for printing\n");
-  fprintf (stderr, "                 out statistics (default %d)\n", TARGET_TIME / 1000);
+  fprintf (stderr, "Required:\n");
+  fprintf (stderr, " -degree nnn  --- polynomial degree (maximum 6)\n");
+  fprintf (stderr, " -N nnn       --- input number\n");
+  fprintf (stderr, " P            --- degree-1 coefficient of g(x) has\n");
+  fprintf (stderr, "                  two prime factors in [P,2P]\n");
+  fprintf (stderr, "Optional:\n");
+  fprintf (stderr, " -admax nnn   --- stop at ad=nnn\n");
+  fprintf (stderr, " -admin nnn   --- start from ad=nnn (default 0)\n");
+  fprintf (stderr, " -incr nnn    --- forced factor of ad (default 60)\n");
+  fprintf (stderr, " -maxnorm xxx --- only optimize polynomials with norm <= xxx\n");
+  fprintf (stderr, " -maxtime xxx --- stop the search after xxx seconds\n");
+  fprintf (stderr, " -nq nnn      --- maximum number of special-q's considered\n");
+  fprintf (stderr, "                  for each ad (default %d)\n", INT_MAX);
+  fprintf (stderr, " -out xxx     --- for msieve-format output\n");
+  fprintf (stderr, " -q           --- quiet mode\n");
+  fprintf (stderr, " -r           --- size-optimize polynomial only (skip root-optimization)\n");
+  fprintf (stderr, " -resume xxx  --- resume state from file xxx\n");
+  fprintf (stderr, " -s xxx       --- time intervals (seconds) for printing\n");
+  fprintf (stderr, "                  out statistics (default %d)\n", TARGET_TIME / 1000);
+  fprintf (stderr, " -save xxx    --- save state in file xxx\n");
+  fprintf (stderr, " -t nnn       --- use n threads (default 1)\n");
+  fprintf (stderr, " -v           --- verbose mode\n");
+
   if (missing) {
       fprintf(stderr, "\nError: missing or invalid parameter \"-%s\"\n",
               missing);
