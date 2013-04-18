@@ -5,6 +5,16 @@
  *
  */
 
+/*
+  Usage within CADO-NFS:
+  1) run: crtalgsqrt -v -depfile c75.dep.000 -ratdepfile c75.dep.rat.000 -polyfile c75.poly
+     and let "alg" be the last integer value printed, for example 271...279:
+# [83.72] c7 (+++---++) -2 [271185940941113750637336882505937475494764983427230684073069569288946725279]
+  2) let "rat" be the value of the rational square root (given by sqrt)
+  3) compute gcd(alg-rat, n) and gcd(alg+rat, n)
+  4) if this fails, try another dependency
+ */
+
 /* TODO list.
  *
  * This program seems to work, but is not complete.
@@ -614,6 +624,17 @@ void ab_source_init(ab_source_ptr ab, const char * fname, int rank, int root, MP
         ab->prefix[magic-fname]='\0';
         magic++;
         if (sscanf(magic, "dep.alg.%d", &ab->depnum) == 1) {
+            ab->nfiles = 0;
+        } else {
+            FATAL_ERROR_CHECK(1, "error in parsing filename");
+        }
+    } else if ((magic = strstr(fname, ".dep.")) != NULL) {
+        // assume cado format (means only one file, so we don't need to
+        // parse, really.
+        strncpy(ab->prefix, fname, magic-fname);
+        ab->prefix[magic-fname]='\0';
+        magic++;
+        if (sscanf(magic, "dep.%d", &ab->depnum) == 1) {
             ab->nfiles = 0;
         } else {
             FATAL_ERROR_CHECK(1, "error in parsing filename");
