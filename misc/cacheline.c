@@ -22,11 +22,19 @@
    of cache line collisions. Thus we leave gaps of size bucket_skip
    between the end of a bucket and the start of the next, to make the 
    start address of the buckets not all map to the same few cache lines.
-   It does not seem to make a difference in speed, though. */
+   This did not seem to make much difference in speed.
+   Furthermore, the TLB are also set associative, and a large power-of-2
+   distance between write pointers causes very frequent mapping of the 
+   pages to which the bucket write pointers point to the same TLB set.
+   Leaving a page-sized gap fixes this, and makes a noticable difference 
+   in speed. */
 static const size_t bucket_skip = 4096;
 static const size_t fill_iter = BUCKET_SIZE * NBUCKET * 7 / 8;
 typedef void (*fillfunc_t)(unsigned int **, unsigned int);
 
+
+/* Fill buckets, without cacheline buffer. Simply one write to the bucket 
+   memory area per update */
 void fill(unsigned int **buckets, unsigned int start) {
   unsigned int loc = start;
   size_t i;
@@ -135,18 +143,21 @@ int main(int argc, char **argv) {
       do_which[0] = 0;
       argc--;
       argv++;
+      continue;
     }
     
     if (strcmp (argv[1], "-ncl") == 0) {
       do_which[1] = 0;
       argc--;
       argv++;
+      continue;
     }
 
     if (argc > 2 && strcmp (argv[1], "-i") == 0) {
       iter = atoi (argv[2]);
       argc -= 2;
       argv += 2;
+      continue;
     }
   }
   
