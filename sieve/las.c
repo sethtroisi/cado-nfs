@@ -2296,7 +2296,11 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             for(int z = 0 ; pass && z < 2 ; z++) {
                 int side = first ^ z;
                 int lpb = si->conf->sides[side]->lpb;
-                pass = factor_leftover_norm(norm[side], log2_fbs[side], lpb, f[side], m[side], si->sides[side]->strategy);
+                pass = factor_leftover_norm (norm[side], log2_fbs[side], lpb, f[side], m[side], si->sides[side]->strategy);
+#ifdef TRACE_K
+                if (trace_on_spot_ab(a, b) && pass == 0)
+                  gmp_fprintf (stderr, "# factor_leftover_norm failed on %s side for (%"PRId64",%"PRIu64"), remains %Zd unfactored\n", sidenames[side], a, b, norm[side]);
+#endif
             }
             if (!pass) continue;
 
@@ -2603,7 +2607,7 @@ factor_leftover_norm (mpz_t n, double fbbits, unsigned int lpb,
 	  unsigned long r;
 	  mpz_t t;
 	  if (ul_factors[i] & oversize_mask) /* Larger than large prime bound? */
-	    return 0;
+            return 0;
 	  r = mpz_tdiv_q_ui (n, n, ul_factors[i]);
 	  ASSERT_ALWAYS (r == 0UL);
 	  mpz_init (t);
