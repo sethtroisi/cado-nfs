@@ -2660,7 +2660,7 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
       int d = si->cpoly->pols[side]->degree;
       si->sides[side]->fij = (mpz_t *) malloc((d + 1) * sizeof(mpz_t));
       FATAL_ERROR_CHECK(si->sides[side]->fij == NULL, "malloc failed");
-      si->sides[side]->fijd = (double *) malloc((d + 1) * sizeof(double));
+      si->sides[side]->fijd = (double *) malloc_aligned((d + 1) * sizeof(double), 16);
       FATAL_ERROR_CHECK(si->sides[side]->fijd == NULL, "malloc failed");
       for (int k = 0; k <= d; k++)
         mpz_init (si->sides[side]->fij[k]);
