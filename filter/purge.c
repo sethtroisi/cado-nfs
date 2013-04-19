@@ -100,8 +100,7 @@ static char rep_cado[4096];         /* directory of cado to find utils/antebuffe
 
 static hashtable_t H;
 static HR_T **rel_compact  = NULL; /* see above */
-static uint8_t *rel_weight = NULL; /* rel_weight[i] is the total weight of
-                                      row i */
+
 static char ** fic;
 static char *pmin, *pminlessone;
 static FILE *ofile;     /* For the principal file output. */
@@ -109,7 +108,8 @@ static bit_vector rel_used, Tbv;
 static relation_stream rs;
 static HR_T *sum; /* sum of row indices for primes with weight 2 */
 static cado_poly pol;
-static double wct0, W; /* total weight for last pass */
+static double wct0;
+static double W; /* total weight of the matrix (used in second pass) */
 static size_t tot_alloc, tot_alloc0;
 static HR_T nrel,
   nprimes = 0,
@@ -592,11 +592,6 @@ insertNormalRelation (unsigned int j)
   my_br->lhk = my_br->hk - phk;
   if (!boutfilerel) {
     my_tmp[itmp] = UMAX(*my_tmp); /* sentinel */
-#ifndef FOR_FFS
-    rel_weight[my_br->num] = my_br->rel.nb_rp + my_br->rel.nb_ap;
-#else
-    rel_weight[my_br->num] = weight_rel_ffs (my_br->rel);
-#endif
     rel_compact[my_br->num] = my_tmp;
   }
 }
@@ -635,11 +630,6 @@ insertFreeRelation (unsigned int j)
   buf_rel[j].lhk = buf_rel[j].hk - phk;
   if (!boutfilerel) {
     my_tmp[itmp] = UMAX(*my_tmp);  /* sentinel */
-#ifndef FOR_FFS
-    rel_weight[buf_rel[j].num] = 1 + buf_rel[j].rel.nb_ap;
-#else
-    rel_weight[buf_rel[j].num] = weight_rel_ffs (buf_rel[j].rel);
-#endif
     rel_compact[buf_rel[j].num] = my_tmp;
   }
 }
@@ -758,7 +748,6 @@ deleteHeavierRows (unsigned int npass)
   static HR_T chunk;
   comp_t *tmp = NULL; /* (weight, index) */
   HR_T *myrelcompact, i, h;
-  W = 0.0; /* total matrix weight */
   double N = 0.0; /* number of rows */
   unsigned int wceil, j, ltmp = 0, alloctmp = 0xff;
   long target;
@@ -777,10 +766,9 @@ deleteHeavierRows (unsigned int npass)
       for (myrelcompact = rel_compact[i]; (h = *myrelcompact++) != UMAX(h); )
 	if (H.hc[h] == 2) sum[h] += i;
       N += 1.0;
-      W += rel_weight[i]; /* row weight */
     }
-  fprintf (stderr, "Step %u on %u: Matrix has %1.0f real (non null) rows "
-                   "and weight %1.0f\n", count, npass, N, W);
+  fprintf (stderr, "Step %u on %u: Matrix has %1.0f real (non null) rows\n",
+                   count, npass, N);
   ASSERT_ALWAYS(N == (double) newnrel);
 
   /* now initialize bit table for relations used */
@@ -2378,7 +2366,6 @@ main (int argc, char **argv)
 
   if (!boutfilerel) {
     SMALLOC(rel_compact, nrelmax, "main 1");
-    SMALLOC(rel_weight, nrelmax, "main 2");
   tot_alloc0 += nrelmax * (sizeof (HR_T *) + sizeof (HC_T));
   /* %zu is the C99 modifier for size_t */
   fprintf (stderr, "Allocated rel_compact of %zu MB (total %zu MB so far)\n",
@@ -2475,7 +2462,6 @@ main (int argc, char **argv)
     fprintf (stderr, "Freeing rel_compact array...\n");
     /* we do not use it anymore */
     free (rel_compact);
-    free (rel_weight);
 
     /*************************** second pass ***********************************/
 
