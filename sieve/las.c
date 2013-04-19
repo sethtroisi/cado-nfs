@@ -225,6 +225,7 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
         if (pol->degree > 1) {
             fbprime_t *leading_div;
             tfb = seconds ();
+            /* Do we actually use leading_div anywhere? */
             leading_div = factor_small (pol->f[pol->degree], lim);
             /* FIXME: fbfilename should allow *distinct* file names, of
              * course, for each side (think about the bi-algebraic case)
@@ -244,7 +245,7 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
             if (rpow_lim >= si->bucket_thresh)
               {
                 rpow_lim = si->bucket_thresh - 1;
-                printf ("# rpowthresh reduced to %d\n", rpow_lim);
+                printf ("# rpow_lim reduced to %d\n", rpow_lim);
               }
             sis->fb = fb_make_linear ((const mpz_t *) pol->f,
                                     (fbprime_t) lim,

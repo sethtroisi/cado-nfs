@@ -24,9 +24,9 @@ int uint32_comp(const void *A, const void *B) {
     uint32_t *a, *b;
     a = (uint32_t *) A;
     b = (uint32_t *) B;
-    if (a[0] < b[0]) 
+    if (a[0] < b[0])
         return -1;
-    if (a[0] > b[0]) 
+    if (a[0] > b[0])
         return 1;
     return 0;
 }
@@ -828,11 +828,13 @@ size_t
 fb_size (const factorbase_degn_t *fb)
 {
   size_t mem = 0;
-  while (fb->p != FB_END)
+  while (1)
     {
       mem += sizeof (fbprime_t) + sizeof (unsigned long)
         + 4 * sizeof (unsigned char)
         + sizeof (fbroot_t) * fb->nr_roots;
+      if (fb->p == FB_END)
+        break;
       fb = fb_next (fb);
     }
   return mem;
@@ -1119,3 +1121,51 @@ fb_read (const char *filename, const double log_scale, const int verbose, const 
     free (fb_cur);
     return fb;
 }
+
+void 
+fb_dump_degn (const factorbase_degn_t *fb, const char *filename)
+{
+    FILE *f = fopen(filename, "wb");
+    if (f == NULL) {
+        fprintf (stderr, "Could not open %s for writing: %s\n", 
+                 filename, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    size_t size = fb_size (fb);
+    size_t written = fwrite (fb, 1, size, f);
+    if (written != size) {
+        fprintf (stderr, "Could not write %zu bytes to %s: %s\n", 
+                 size, filename, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    fclose(f);
+}
+
+/* Returns NULL iff the file could not be opened, and MAP_FAILED in case of 
+   an error (incl. when mmap() is not available) */
+factorbase_degn_t *
+fb_mmap(const char *fbcache MAYBE_UNUSED)
+{
+#ifdef HAVE_MMAP
+    FILE *f = fopen(fbcache, "rb");
+    if (f == NULL) 
+        return NULL;
+    if (fseek (f, 0, SEEK_END) != 0) {
+        fprintf (stderr, "fseek on %s failed: %s", fbcache, strerror(errno));
+        return MAP_FAILED;
+    }
+    int64_t size = ftell (f);
+    ASSERT_ALWAYS(size >= 0);
+    if (fseek (f, 0, SEEK_SET) != 0) {
+        fprintf (stderr, "fseek on %s failed: %s", fbcache, strerror(errno));
+        return MAP_FAILED;
+    }
+    int fd = fileno (f);
+    factorbase_degn_t *fb = mmap (NULL, (size_t) size, PROT_READ, 
+                                  MAP_PRIVATE, fd, 0);
+    return fb;
+#else
+    return MAP_FAILED;
+#endif
+}
+
