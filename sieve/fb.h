@@ -8,6 +8,11 @@
 #include <stdio.h>
 #include <stddef.h>
 #include <string.h>
+#ifdef HAVE_SYS_MMAN_H
+#include <sys/mman.h>
+#else
+#define MAP_FAILED ((void *) -1)
+#endif
 #include <gmp.h>
 
 /* Data types */

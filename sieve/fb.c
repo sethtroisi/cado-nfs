@@ -9,9 +9,6 @@
 #include <string.h>
 #include <math.h>
 #include <ctype.h>
-#ifdef HAVE_SYS_MMAN_H
-#include <sys/mman.h>
-#endif
 #define rdtscll(x)
 #include "basicnt.h"
 #include "fb.h"
