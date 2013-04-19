@@ -2003,7 +2003,8 @@ main (int argc, char *argv[])
   double st0 = seconds (), maxtime = DBL_MAX;
   mpz_t N;
   unsigned int d = 0;
-  unsigned long P, admin = 0, admax = ULONG_MAX;
+  unsigned long P, admin, admax;
+  double admin_d, admax_d;
   int quiet = 0, tries = 0, i, nthreads = 1, st,
     target_time = TARGET_TIME, incr_target_time = TARGET_TIME;
   tab_t *T;
@@ -2055,8 +2056,14 @@ main (int argc, char *argv[])
   param_list_parse_int (pl, "s", &target_time);
   incr_target_time = target_time;
   param_list_parse_uint (pl, "degree", &d);
-  param_list_parse_ulong (pl, "admin", &admin);
-  param_list_parse_ulong (pl, "admax", &admax);
+  if (param_list_parse_double (pl, "admin", &admin_d) == 0) /* no -admin */
+    admin = 0;
+  else
+    admin = (unsigned long) admin_d;
+  if (param_list_parse_double (pl, "admax", &admax_d) == 0) /* no -admax */
+    admax = ULONG_MAX;
+  else
+    admax = (unsigned long) admax_d;
   param_list_parse_ulong (pl, "incr", &incr);
   param_list_parse_double (pl, "maxnorm", &max_norm);
   param_list_parse_double (pl, "maxtime", &maxtime);
