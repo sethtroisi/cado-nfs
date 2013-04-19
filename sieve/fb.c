@@ -24,9 +24,9 @@ int uint32_comp(const void *A, const void *B) {
     uint32_t *a, *b;
     a = (uint32_t *) A;
     b = (uint32_t *) B;
-    if (a[0] < b[0]) 
+    if (a[0] < b[0])
         return -1;
-    if (a[0] > b[0]) 
+    if (a[0] > b[0])
         return 1;
     return 0;
 }
@@ -1141,8 +1141,10 @@ fb_dump_degn (const factorbase_degn_t *fb, const char *filename)
     fclose(f);
 }
 
+/* commented out since MAP_FAILED is not defined */
+#if 0
 /* Returns NULL iff the file could not be opened, and MAP_FAILED in case of 
-   an error (incl. when mmap() is not aviailable) */
+   an error (incl. when mmap() is not available) */
 factorbase_degn_t *
 fb_mmap(const char *fbcache MAYBE_UNUSED)
 {
@@ -1168,4 +1170,4 @@ fb_mmap(const char *fbcache MAYBE_UNUSED)
     return MAP_FAILED;
 #endif
 }
-
+#endif
