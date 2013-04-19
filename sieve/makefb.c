@@ -167,6 +167,17 @@ void push_entry(entry_list *L, entry E) {
     L->list[L->len++] = E;
 }
 
+static int
+cmp_ulong (const void *A, const void *B)
+{
+  unsigned long a = *(unsigned long*) A;
+  unsigned long b = *(unsigned long*) B;
+
+  if (a < b)
+    return -1;
+  return 1;
+}
+
 int cmp_entry(const void *A, const void *B) {
     entry a, b;
     a = ((entry *)A)[0];
@@ -398,11 +409,12 @@ makefb (FILE *fp, cado_poly cpoly)
 
   for (p = 2; p <= cpoly->alg->lim; p = getprime (p))
     {
-        nroots = poly_roots_ulong(roots, cpoly->alg->f, d, p);
-        // TODO: poly_roots_ulong returns 0 if f mod p is 0.
-        // This corresponds to complicated roots that should maybe go to
-        // the factor base (hum... maybe not!)
-        // DOTO: this is now fixed in the -powers version!
+      nroots = poly_roots_ulong (roots, cpoly->alg->f, d, p);
+      qsort (roots, nroots, sizeof(roots[0]), cmp_ulong);
+      // TODO: poly_roots_ulong returns 0 if f mod p is 0.
+      // This corresponds to complicated roots that should maybe go to
+      // the factor base (hum... maybe not!)
+      // TODO: this is now fixed in the -powers version!
       if (nroots != 0)
         {
           fprintf (fp, "%lu: %lld", p, (long long int) roots[0]);
@@ -470,12 +482,11 @@ main (int argc, char *argv[])
     }
   param_list_clear(pl);
 
-  if (!no_powers) {
-      makefb_with_powers(cpoly->alg->f, cpoly->alg->degree, 
-              cpoly->alg->lim, maxbits);
-  } else {
-      makefb (stdout, cpoly);
-  }
+  if (!no_powers)
+    makefb_with_powers (cpoly->alg->f, cpoly->alg->degree, 
+                        cpoly->alg->lim, maxbits);
+  else
+    makefb (stdout, cpoly);
 
   cado_poly_clear (cpoly);
 
