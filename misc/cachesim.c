@@ -7,7 +7,7 @@
 #define UNUSED 0xFFFFFFFFFFFFFFFFUL
 
 typedef struct {
-  int associativity, lines, linesize, indices, verbose;
+  int associativity, lines, linesize, indices, verbose, size;
   size_t *cache;
   int *lru;
   unsigned long hits, misses;
@@ -136,6 +136,7 @@ void cache_init(cache_t *cache, const int lines, const int associativity,
   cache->associativity = associativity;
   cache->lines = lines;
   cache->linesize = linesize;
+  cache->size = lines * linesize;
   cache->indices = lines / associativity;
   cache->cache = malloc(lines * sizeof (size_t));
   cache->lru = malloc(lines * sizeof (int));
@@ -215,23 +216,32 @@ simulation(cache_t *cache, pages_t *pages, int argc, char **argv) {
   int i;
   int bucket_start = 123 * pages->pagesize;
   int region_start = 234 * pages->pagesize;
-  int update;
-  size_t update_stride = 4;
+  int update, update_size = 4;
+  int interleaved = 0;
+  size_t bucket_read = bucket_start;
   size_t logical_address, physical_address;
   
   if (argc > 1) {
-    update_stride = (size_t) atoi(argv[1]);
+    interleaved = atoi(argv[1]);
   }
-  printf ("Using update stride %zu\n", update_stride);
+  if (interleaved)
+    printf ("Using interleaved buckets\n");
+  else
+    printf ("Not using interleaved buckets\n");
   
   for (i = 0; i < 1000000; i++) {
     /* Read an update from the bucket */
-    logical_address = bucket_start + update_stride * i;
+    
+    logical_address = bucket_read;
+    bucket_read += update_size;
+    if (interleaved && bucket_read % cache->linesize == 0) {
+      bucket_read = bucket_read + cache->size - cache->linesize;
+    }
     physical_address = page_translate(pages, logical_address);
     access_cache (cache, physical_address);
     
     /* The address where update hits is assumed to be random in the bucket region */
-    update = random() % (cache->lines * cache->linesize);
+    update = random() % (cache->size);
     
     /* Apply that update to the bucket region */
     logical_address = update + region_start;
@@ -271,7 +281,7 @@ int main(int argc, char **argv) {
   
   cache_init (cache, lines, associativity, linesize, verbose);
   check_lru(cache);
-  pages_init(pages, 4096, 2048);
+  pages_init(pages, 4096, 1UL<<20);
 
   simulation(cache, pages, argc, argv);
   
