@@ -3,12 +3,53 @@
 #include <assert.h>
 #include <string.h>
 
-#define RAND(x) (5*(x)+1)
 #define UNUSED 0xFFFFFFFFFFFFFFFFUL
+
+/*
+Terminology:
+With a 2-way set associative cache of 64 kbytes and 64 bytes cache line size,
+there are 1024 lines and 512 cache indices, with 2 lines mapping to one index.
+
++-----------+-----------+
+| line 0    | line 512  | index 0
++-----------+-----------+
+| line 1    | line 513  | index 1
++-----------+-----------+
+...
++-----------+-----------+
+| line 511  | line 1023 | index 511
++-----------+-----------+
+
+Each line stores the 64 bytes of cached data, the 'tag' which is the the 
+memory address of the cached data (stored without the bits that are already 
+determined by cache line size and index), and least-recently-used info which 
+stores the relative 'age' since last access of each of the 2 cache lines at 
+a given index.
+
+For a memory access to address x, we first get l = floor(x/64), the line 
+aligned part of the address; this l can map to any of the 2 lines at index 
+i = l % 512. 
+
+Which of the 2 lines, if any, hold cached data for the memory address l*64 
+can be checked by comparing floor(l/512) with the cache tag for that line. 
+
+If the access hits in cache, the LRU data is updated, and nothing more 
+happens to the state of the cache. 
+
+If the access misses in cache, one cacheline worth of data is transferred 
+from memory addresses [l*64, l*64+63] to some cache line at index i. Which 
+of the 2 possible cachelines at index i is chosen is determined by a least-
+recently-used (LRU) algorithm. Any access to a cache line at index i, hit or 
+miss, updates the LRU data for all the cachelines at index i, i.e., the LRU 
+data tells the order in which the cache lines at a given index were last 
+accessed. When a miss occurs, the least-recently-used (oldest) cache line at 
+index i gets replaced, the LRU info is updated, and l/512 is written to that 
+line's tag.
+*/
 
 typedef struct {
   int associativity, lines, linesize, indices, verbose, size;
-  size_t *cache;
+  size_t *tag;
   int *lru;
   unsigned long hits, misses;
 } cache_t;
@@ -18,6 +59,8 @@ typedef struct {
   size_t *pages;
 } pages_t;
 
+/* For a given index in the cache, return the line at this index that was 
+   least recently used */
 int find_lru(const cache_t *cache, const int index)
 {
   int i;
@@ -36,6 +79,8 @@ int find_lru(const cache_t *cache, const int index)
 }
 
 
+/* Set a line's age to 0; lines in the same index that were younger 
+   before, are aged by 1  */
 void update_lru(cache_t *cache, const int line)
 {
   const int index = line % cache->indices;
@@ -54,6 +99,8 @@ void update_lru(cache_t *cache, const int line)
 }
 
 
+/* Check LRU data for integrity. Among the lines at each index,
+   each age 0, .., associativity-1 must occur exactly once */
 void check_lru(const cache_t *cache)
 {
   int i, j;
@@ -81,11 +128,12 @@ void check_lru(const cache_t *cache)
 int is_in_cache(cache_t *cache, size_t line_address)
 {
   const int index = line_address % cache->indices;
+  const size_t address_tag = line_address / cache->indices;
   int i;
   
   for (i = 0; i < cache->associativity; i++) {
     int line = index + i * cache->indices;
-    if (cache->cache[line] == line_address)
+    if (cache->tag[line] == address_tag)
       return line;
   }
   return cache->lines;
@@ -97,27 +145,30 @@ void access_cache(cache_t *cache, size_t memory_address)
 {
   const size_t line_address = memory_address / cache->linesize;
   const int index = line_address % cache->indices;
+  const size_t address_tag = line_address / cache->indices;
   size_t oldaddr;
   int line;
   
   line = is_in_cache(cache, line_address);
   if (line < cache->lines) {
+    int age = cache->lru[line];
     cache->hits++;
-    if (cache->verbose) {
-      printf ("Access to address %zu (line address %zu) hit in cache line %d\n", 
-              memory_address, line_address, line);
+    update_lru(cache, line);
+    if (cache->verbose >= 2) {
+      printf ("Access to address %zu (line address %zu) hit in cache line %d, age %d\n", 
+              memory_address, line_address, line, age);
     }
     return;
   }
 
   /* Get the oldest line in this index */
   line = find_lru(cache, index);
-  oldaddr = cache->cache[line];
-  /* and set it to this address */
-  cache->cache[line] = line_address;
+  oldaddr = cache->tag[line];
+  /* and set it to this address' tag */
+  cache->tag[line] = address_tag;
   update_lru(cache, line);
   cache->misses++;
-  if (cache->verbose) {
+  if (cache->verbose >= 2) {
     if (oldaddr == UNUSED)
       printf ("Access to address %zu (line address %zu) missed in cache, entered in line %d (was unused)\n", 
               memory_address, line_address, line);
@@ -138,7 +189,7 @@ void cache_init(cache_t *cache, const int lines, const int associativity,
   cache->linesize = linesize;
   cache->size = lines * linesize;
   cache->indices = lines / associativity;
-  cache->cache = malloc(lines * sizeof (size_t));
+  cache->tag = malloc(lines * sizeof (size_t));
   cache->lru = malloc(lines * sizeof (int));
   cache->hits = 0;
   cache->misses = 0;
@@ -152,7 +203,7 @@ void cache_init(cache_t *cache, const int lines, const int associativity,
   }
   
   for (i = 0; i < lines; i++) {
-    cache->cache[i] = UNUSED;
+    cache->tag[i] = UNUSED;
   }
 }
 
@@ -160,13 +211,15 @@ void cache_printstats(cache_t *cache)
 {
   int i;
   
-  printf ("Addresses in cache:\n");
-  for (i = 0; i < cache->lines; i++) {
-    printf ("%zu", cache->cache[i]);
-    if (i % 20 == 19)
-      printf ("\n");
-    else
-      printf ("\t");
+  if (cache->verbose >= 1) {
+    printf ("Addresses in cache:\n");
+    for (i = 0; i < cache->lines; i++) {
+      printf ("%zu", cache->tag[i]);
+      if (i % 20 == 19)
+        printf ("\n");
+      else
+        printf ("\t");
+    }
   }
   
   printf ("\n%lu hits, %lu misses\n", cache->hits, cache->misses);
@@ -174,8 +227,8 @@ void cache_printstats(cache_t *cache)
 
 void cache_clear(cache_t *cache) 
 {
-  free (cache->cache);
-  cache->cache = NULL;
+  free (cache->tag);
+  cache->tag = NULL;
   free (cache->lru);
   cache->lru = NULL;
 }
@@ -224,10 +277,14 @@ simulation(cache_t *cache, pages_t *pages, int argc, char **argv) {
   if (argc > 1) {
     interleaved = atoi(argv[1]);
   }
+  if (argc > 2) {
+    update_size = atoi(argv[2]);
+  }
   if (interleaved)
     printf ("Using interleaved buckets\n");
   else
     printf ("Not using interleaved buckets\n");
+  printf ("Using updates of size %d\n", update_size);
   
   for (i = 0; i < 1000000; i++) {
     /* Read an update from the bucket */
@@ -258,10 +315,10 @@ int main(int argc, char **argv) {
   int lines, associativity;
   int linesize = 64;
   
-  if (argc > 1 && strcmp(argv[1], "-v") == 0) {
+  while (argc > 1 && strcmp(argv[1], "-v") == 0) {
     argc--;
     argv++;
-    verbose = 1;
+    verbose++;
   }
   
   if (argc < 4) {
