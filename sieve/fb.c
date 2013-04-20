@@ -825,17 +825,16 @@ fb_read_addproj (const char *filename, const double log_scale,
 
 /* return the total size (in bytes) used by fb */
 size_t
-fb_size (const factorbase_degn_t *fb)
+fb_size (const factorbase_degn_t * const fb)
 {
+  const factorbase_degn_t *fb_cur = fb;
   size_t mem = 0;
   while (1)
     {
-      mem += sizeof (fbprime_t) + sizeof (unsigned long)
-        + 4 * sizeof (unsigned char)
-        + sizeof (fbroot_t) * fb->nr_roots;
-      if (fb->p == FB_END)
+      mem += fb_entrysize (fb_cur);
+      if (fb_cur->p == FB_END)
         break;
-      fb = fb_next (fb);
+      fb_cur = fb_next (fb_cur);
     }
   return mem;
 }
