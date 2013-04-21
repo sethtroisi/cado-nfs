@@ -4,6 +4,11 @@
 #include <stdint.h>
 #include "las-types.h"
 
+/* define EXTRA_B_FACTOR to a value larger than 1, for example 1.3, to
+   allow a larger value of J for those special-q's where the maximum J
+   would be smaller than I/2 */
+#define EXTRA_B_FACTOR 1.0
+
 #ifdef __cplusplus
 extern "C" {
 #endif

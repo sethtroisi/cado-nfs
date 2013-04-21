@@ -2682,7 +2682,7 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
    * (IMO we have another notational convention elsewhere regarding what
    * the skewed norm is. But it's the one which is used here).
    */
-  double B = sqrt (2.0 * q0d / (si->cpoly->skew * sqrt (3.0)));
+  double B = EXTRA_B_FACTOR * sqrt (2.0 * q0d / (si->cpoly->skew * sqrt (3.0)));
 
   /************************** rational side **********************************/
 
@@ -2714,7 +2714,7 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
   if (si->cpoly->rat->lambda > max_rlambda) {
       fprintf(output, "# Warning, rlambda>%.1f does not make sense (capped to limit)\n", max_rlambda);
   }
-  /* Obsolete: rat->Bound is remplaced by a single threshold alg->bound */
+  /* Obsolete: rat->Bound is replaced by a single threshold alg->bound */
   /*
   sieve_info_init_lognorm (rat->Bound, rat->bound, si->conf->sides[RATIONAL_SIDE]->lim,
                            si->conf->sides[RATIONAL_SIDE]->lpb, rat->scale);
