@@ -31,20 +31,22 @@ aligned part of the address; this l can map to any of the 2 lines at index
 i = l % 512. 
 
 Which of the 2 lines, if any, hold cached data for the memory address l*64 
-can be checked by comparing floor(l/512) with the cache tag for that line. 
+can be checked by comparing floor(l/512) with the cache tag for each of 
+those 2 lines. 
 
-If the access hits in cache, the LRU data is updated, and nothing more 
-happens to the state of the cache. 
+If there is a match, the access hits in cache, the LRU data is updated, 
+the cached data is sent to the CPU, and nothing more happens to the state 
+of the cache. 
 
 If the access misses in cache, one cacheline worth of data is transferred 
 from memory addresses [l*64, l*64+63] to some cache line at index i. Which 
-of the 2 possible cachelines at index i is chosen is determined by a least-
+of the 2 possible cachelines at index i gets chosen is determined by a least-
 recently-used (LRU) algorithm. Any access to a cache line at index i, hit or 
 miss, updates the LRU data for all the cachelines at index i, i.e., the LRU 
 data tells the order in which the cache lines at a given index were last 
-accessed. When a miss occurs, the least-recently-used (oldest) cache line at 
-index i gets replaced, the LRU info is updated, and l/512 is written to that 
-line's tag.
+accessed. When a miss occurs, the least-recently-used (oldest) one of the 
+cache lines at index i gets replaced, the LRU info is updated, and l/512 is 
+written to the replaced line's tag.
 */
 
 typedef struct {
