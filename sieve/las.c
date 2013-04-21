@@ -269,17 +269,18 @@ static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_mai
      * in the end (*fb_main gives away ownership of its contents).
      */
     /* Start by counting, unsurprisingly */
+    /* Compute the size in bytes of each of the nparts pieces */
     size_t * fb_sizes = (size_t *) malloc(nparts * sizeof(size_t));
     FATAL_ERROR_CHECK(fb_sizes == NULL, "malloc failed");
     memset(fb_sizes, 0, nparts * sizeof(size_t));
     size_t headsize = fb_diff_bytes(fb0, *fb_main);
     int i = 0;
     for(factorbase_degn_t * fb = fb0 ; fb->p != FB_END && fb->p <= pmax; fb = fb_next (fb)) {
-        size_t sz = fb_entrysize (fb); 
-        fb_sizes[i] += sz;
-        i++;
-        i %= nparts;
+        fb_sizes[i] += fb_entrysize (fb);
+        if (++i == nparts)
+          i = 0;
     }
+    /* Allocate memory for each of the nparts pieces */
     factorbase_degn_t ** fbi = (factorbase_degn_t **) malloc(nparts * sizeof(factorbase_degn_t *));
     for(i = 0 ; i < nparts ; i++) {
         // add one for end marker
@@ -289,6 +290,7 @@ static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_mai
         fbi[i] = fb_dst[i];
     }
     free(fb_sizes); fb_sizes = NULL;
+    /* Copy factorbase entries to each of the nparts pieces */
     i = 0;
     int k = 0;
     for(factorbase_degn_t * fb = fb0 ; fb->p != FB_END && fb->p <= pmax; fb = fb_next (fb)) {
@@ -296,9 +298,10 @@ static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_mai
         size_t sz = fb_entrysize (fb); 
         memcpy(fbi[i], fb, sz);
         fbi[i] = fb_next(fbi[i]);
-        i++;
-        i %= nparts;
+        if (++i == nparts)
+          i = 0;
     }
+    /* Add an end marker to each of the nparts pieces */
     for(i = 0 ; i < nparts ; i++) {
         memset(fbi[i], 0, sizeof(factorbase_degn_t));
         fbi[i]->p = FB_END;
