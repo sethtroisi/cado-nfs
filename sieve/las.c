@@ -619,7 +619,7 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, double skewness, int nb_threads)/*{{
     /* FIXME: We should not have to compute this B a second time. It
      * appears in sieve_info_init_norm_data already */
     double B = sqrt (2.0 * mpz_get_d(si->doing->p) / (skewness * sqrt (3.0)));
-    if (maxab1 >= B)
+    if (maxab1 >= B * skewness)
         si->J = (uint32_t) (B * skewness / maxab1 * (double) (si->I >> 1));
     else
         si->J = si->I >> 1;
