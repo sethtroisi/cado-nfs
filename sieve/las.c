@@ -8,6 +8,9 @@
 #include <ctype.h>
 #include <float.h>
 #include <pthread.h>
+#ifdef USE_GMPECM
+#include "ecm.h"
+#endif
 #include "fb.h"
 #include "portability.h"
 #include "utils.h"           /* lots of stuff */
@@ -2631,17 +2634,49 @@ factor_leftover_norm (mpz_t n, double fbbits, unsigned int lpb,
           append_uint32_to_array (multis, 1);
           return 1;
         }
-      /* If we still have more than two primes (or something non-smooth),
-         bail out */
-      if (s > 2*lpb)
-        return 0;
-      /* We always abort below, so let's skip the prp test
-      if (IS_PROBAB_PRIME(n))
-        return 0; */
     }
-  /* When sieving for 3 large primes, here are so many left over, non-smooth
-     numbers here that factoring them all takes a long time, for few
-     additional relations */
+#ifdef USE_GMPECM
+  {
+    mpz_t f; /* potential factor */
+    int res;
+    double B1 = 315.0; /* last curve tried in facul has B1=315 */
+
+    mpz_init (f);
+    while (1) /* assume n > 2^lpb */
+      {
+        if (IS_PROBAB_PRIME (n))
+          {
+            mpz_clear (f);
+            return 0;
+          }
+        B1 += sqrt (B1);
+        res = ecm_factor (f, n, B1, NULL);
+        if (res > 0) /* found a factor 1 < f <= n */
+          {
+            /* TODO: if n = p*q*r, it might be that f = p*q, then we should
+               replace f by n/f */
+            if (mpz_sizeinbase (f, 2) > lpb) /* include case where f = n */
+              {
+                mpz_clear (f);
+                return 0;
+              }
+            /* f < 2^lpb, thus f is prime */
+            append_mpz_to_array (factors, f);
+            append_uint32_to_array (multis, 1);
+            mpz_divexact (n, n, f);
+            unsigned int s = BITSIZE(n);
+            if (s <= lpb)
+              {
+                append_mpz_to_array (factors, n);
+                append_uint32_to_array (multis, 1);
+                mpz_clear (f);
+                return 1;
+              }
+          }
+      }
+    /* we will never go here */
+  }
+#endif
   return 0;
 }/*}}}*/
 
