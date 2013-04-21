@@ -220,7 +220,7 @@ static inline ptrdiff_t fb_iterator_diff_bytes(fb_iterator_srcptr t, fb_iterator
     ptrdiff_t n = -q->i * sizeof(fbprime_t);
     q->i = 0;
     for( ; fb_iterator_lessthan_fb(q, t->fb) ; ) {
-        n += q->fb->nr_roots * sizeof(fbprime_t) + sizeof(factorbase_degn_t);
+        n += fb_entrysize(q->fb);
         q->fb = fb_next(q->fb);
     }
     n += t->i;
