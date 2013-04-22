@@ -14,6 +14,7 @@
 #include "fb.h"
 #include "portability.h"
 #include "utils.h"
+#include "ularith.h"
 
 #if 0
 /* sorted list of prime powers < 2^32, with 6947 entries, and two sentinel
@@ -50,6 +51,20 @@ static void init_prime_powers() {
   qsort((void *) &prime_powers[0], 6949, sizeof(uint32_t), uint32_comp);
 }
 #endif
+
+/* strtoul(), but with const char ** for second argument. 
+   Otherwise it's not possible to do, e.g., strtoul(p, &p, 10) when p is 
+   of type const char *
+*/
+static unsigned long int 
+strtoul_const(const char *nptr, const char **endptr, const int base)
+{
+  char *end;
+  unsigned long r;
+  r = strtoul(nptr, &end, base);
+  *endptr = end;
+  return r;
+}
 
 void 
 fb_fprint_entry (FILE *fd, const factorbase_degn_t *fb)
@@ -279,7 +294,7 @@ fb_make_linear1 (factorbase_degn_t *fb_entry, const mpz_t *poly,
   
   fb_entry->roots[0] = modul_get_ul (r1, m) + (is_projective ? p : 0);
   if (p % 2 != 0)
-    fb_entry->invp = - modul_invmodlong (modul_getmod_ul (m));
+    fb_entry->invp = - ularith_invmod (modul_getmod_ul (m));
   
   modul_clear (r0, m);
   modul_clear (r1, m);
@@ -919,13 +934,14 @@ fb_extract_bycost (const factorbase_degn_t *fb, const fbprime_t plim,
   return primes;
 }
 
-/* Remove newline, comment, and trailing space from a line. Write a 0  
-   character to the line at the position where removed part began (i.e., 
+/* Remove newline, comment, and trailing space from a line. Write a 
+   '\0' character to the line at the position where removed part began (i.e., 
    line gets truncated). 
-   Return length in characers or remaining line, without trailing 0 character.
+   Return length in characers or remaining line, without trailing '\0' 
+   character.
 */
 static size_t 
-fb_read_strip_comment(char *const line)
+fb_read_strip_comment (char *const line)
 {
     size_t linelen, i;
   
@@ -949,8 +965,8 @@ fb_read_strip_comment(char *const line)
    linenr is used only for printing error messages in case of parsing error. 
 */
 static void
-fb_read_roots(factorbase_degn_t *fb_entry, char *lineptr, 
-              const unsigned long linenr)
+fb_read_roots (factorbase_degn_t * const fb_entry, const char *lineptr, 
+               const unsigned long linenr)
 {
     fb_entry->nr_roots = 0;
     while (*lineptr != '\0')
@@ -961,7 +977,7 @@ fb_read_roots(factorbase_degn_t *fb_entry, char *lineptr,
                     " in factor base line %lu\n", fb_entry->p, linenr);
             exit(EXIT_FAILURE);
         }
-        fbroot_t root = strtoul (lineptr, &lineptr, 10);
+        fbroot_t root = strtoul_const (lineptr, &lineptr, 10);
         
         if (fb_entry->nr_roots > 0
                 && root <= fb_entry->roots[fb_entry->nr_roots-1]) {
@@ -989,8 +1005,101 @@ fb_read_roots(factorbase_degn_t *fb_entry, char *lineptr,
     }
 }
 
+/* Parse a factorbase line. Return 1 if the line could be parsed and, 
+   if the FB entry is for a prime power, the power does not exceed powlim.
+   Otherwise return 0. */
+static int  
+fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr, 
+               const double log_scale, const unsigned long linenr, 
+               const fbprime_t powlim)
+{
+    long nlogp, oldlogp = 0;
+    fbprime_t p, q; /* q is factor base entry q = p^k */
+    
+    q = strtoul_const (lineptr, &lineptr, 10);
+    if (q == 0) {
+        fprintf(stderr, "# fb_read: prime is not an integer on line %lu\n",
+                linenr);
+        exit (EXIT_FAILURE);
+    } else if (*lineptr != ':') {
+        fprintf(stderr,
+                "# fb_read: prime is not followed by colon on line %lu",
+                linenr);
+        exit (EXIT_FAILURE);
+    }
+    
+    lineptr++; /* Skip colon after q */
+    int longversion;
+    if (strchr(lineptr, ':') == NULL)
+        longversion = 0;
+    else 
+        longversion = 1;
+
+    /* we assume q is a prime or a prime power */
+    /* NB: a short version is not possible for a prime power, so we
+     * do the test only for !longversion */
+    p = (longversion) ? fb_is_power (q) : 0;
+    if (!isprime(p != 0 ? p : q)) {
+        fprintf (stderr, "# Error, " FBPRIME_FORMAT " on line %lu in "
+                "factor base is not a prime or prime power\n",
+                q, linenr);
+        exit (EXIT_FAILURE);
+    }
+    fb_cur->p = q;
+    if (p != 0) {
+        if (powlim && fb_cur->p >= powlim)
+            return 0;
+    } else {
+        p = q; /* If q is prime, p = q */
+    }
+
+    /* read the multiple of logp, if any */
+    /* this must be of the form  q:nlogp,oldlogp: ... */
+    /* if the information is not present, it means q:1,0: ... */
+    nlogp = 1;
+    oldlogp = 0;
+    if (longversion) {
+        nlogp = strtoul_const (lineptr, &lineptr, 10);
+        /*
+        if (nlogp == 0) {
+            fprintf(stderr, "# Error in fb_read: could not parse the integer after the colon of prime " FBPRIME_FORMAT "\n", q);
+            exit (EXIT_FAILURE);
+        }*/
+        if (*lineptr != ',') {
+            fprintf(stderr, "# fb_read: nlogp is not followed by comma on line %lu", linenr);
+            exit (EXIT_FAILURE);
+        } 
+        lineptr++; /* skip comma */
+        oldlogp = strtoul_const (lineptr, &lineptr, 10);
+        /*
+        if (oldlogp == 0) {
+            fprintf(stderr, "# Error in fb_read: could not parse the integer after the comma of prime " FBPRIME_FORMAT "\n", q);
+            exit (EXIT_FAILURE);
+        }*/
+        if (*lineptr != ':') {
+            fprintf(stderr, "# fb_read: oldlogp is not followed by colon on line %lu", linenr);
+            exit (EXIT_FAILURE);
+        } 
+        lineptr++; /* skip colon */
+    }
+    ASSERT (nlogp > oldlogp);
+
+    if (nlogp == 1) /* typical case */
+        fb_cur->plog = fb_log (p, log_scale, 0.);
+    else {
+        double ol = fb_log (fb_pow (p, oldlogp), log_scale, 0.);
+        fb_cur->plog = fb_log (fb_pow (p, nlogp), log_scale, - ol);
+    }
+
+    /* Read roots */
+    fb_read_roots(fb_cur, lineptr, linenr);
+
+    return 1;
+}
+
 factorbase_degn_t *
-fb_read (const char *filename, const double log_scale, const int verbose, const fbprime_t lim, fbprime_t powlim)
+fb_read (const char * const filename, const double log_scale, 
+         const int verbose, const fbprime_t lim, const fbprime_t powlim)
 {
     factorbase_degn_t *fb = NULL, *fb_cur, *fb_new;
     FILE *fbfile;
@@ -999,14 +1108,10 @@ fb_read (const char *filename, const double log_scale, const int verbose, const 
     // it would probably be a good idea to get rid of fgets
     const size_t linesize = 1000;
     char line[linesize];
-    char *lineptr;
-    int ok;
     unsigned long linenr = 0;
     const size_t allocblocksize = 1<<20; /* Allocate in MB chunks */
-    fbprime_t p, q; /* q is factor base entry q = p^k */
     fbprime_t maxprime = 0;
     unsigned long nr_primes = 0;
-    long nlogp, oldlogp = 0;
 
     fbfile = fopen (filename, "r");
     if (fbfile == NULL) {
@@ -1031,95 +1136,14 @@ fb_read (const char *filename, const double log_scale, const int verbose, const 
             continue;
         }
 
-        /* Parse the line */
-        lineptr = line;
-        q = strtoul (lineptr, &lineptr, 10);
-        ok = 0;
-        if (q == 0)
-            fprintf(stderr, "# fb_read: prime is not an integer on line %lu\n",
-                    linenr);
-        else if (*lineptr != ':')
-            fprintf(stderr,
-                    "# fb_read: prime is not followed by colon on line %lu",
-                    linenr);
-        else
-            ok = 1;
-        if (!ok)
-            exit (EXIT_FAILURE);
-        lineptr++; /* Skip colon after q */
-        int longversion;
-        if (strchr(lineptr, ':') == NULL)
-            longversion = 0;
-        else 
-            longversion = 1;
-
-        /* we assume q is a prime or a prime power */
-        /* NB: a short version is not possible for a prime power, so we
-         * do the test only for !longversion */
-        p = (longversion) ? fb_is_power (q) : 0;
-        if (!isprime(p != 0 ? p : q)) {
-            fprintf (stderr, "# Error, " FBPRIME_FORMAT " on line %lu in "
-                    "factor base is not a prime or prime power\n",
-                    q, linenr);
+        if (fb_parse_line (fb_cur, line, log_scale, linenr, powlim) == 0)
+            continue;
+        if (lim && fb_cur->p >= lim)
             break;
-        }
-        if (p != 0) {
-            if (powlim && q >= powlim)
-                continue;
-        } else {
-            p = q; /* If q is prime, p = q */
-            if (lim && q >= lim)
-                break;
-        }
-        fb_cur->p = q;
-
-        /* read the multiple of logp, if any */
-        /* this must be of the form  q:nlogp,oldlogp: ... */
-        /* if the information is not present, it means q:1,0: ... */
-        nlogp = 1;
-        oldlogp = 0;
-        if (longversion) {
-            nlogp = strtoul (lineptr, &lineptr, 10);
-            /*
-            if (nlogp == 0) {
-                fprintf(stderr, "# Error in fb_read: could not parse the integer after the colon of prime " FBPRIME_FORMAT "\n", q);
-                exit (EXIT_FAILURE);
-            }*/
-            if (*lineptr != ',') {
-                fprintf(stderr, "# fb_read: nlogp is not followed by comma on line %lu", linenr);
-                exit (EXIT_FAILURE);
-            } 
-            lineptr++; /* skip comma */
-            oldlogp = strtoul (lineptr, &lineptr, 10);
-            /*
-            if (oldlogp == 0) {
-                fprintf(stderr, "# Error in fb_read: could not parse the integer after the comma of prime " FBPRIME_FORMAT "\n", q);
-                exit (EXIT_FAILURE);
-            }*/
-            if (*lineptr != ':') {
-                fprintf(stderr, "# fb_read: oldlogp is not followed by colon on line %lu", linenr);
-                exit (EXIT_FAILURE);
-            } 
-            lineptr++; /* skip colon */
-        }
-        ASSERT (nlogp > oldlogp);
-
-        if (nlogp == 1) /* typical case */
-            fb_cur->plog = fb_log (p, log_scale, 0.);
-        else {
-            double ol = fb_log (fb_pow (p, oldlogp), log_scale, 0.);
-            fb_cur->plog = fb_log (fb_pow (p, nlogp), log_scale, - ol);
-        }
-
-        /* Read roots */
-        fb_read_roots(fb_cur, lineptr, linenr);
 
         /* Compute invp */
         if (fb_cur->p % 2 != 0) {
-            modulusul_t m;
-            modul_initmod_ul (m, fb_cur->p);
-            fb_cur->invp = - modul_invmodlong (modul_getmod_ul (m));
-            modul_clearmod (m);
+            fb_cur->invp = - ularith_invmod ((unsigned long) fb_cur->p);
         }
 
         fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
