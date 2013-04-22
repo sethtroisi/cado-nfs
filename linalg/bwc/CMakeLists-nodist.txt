@@ -4,7 +4,7 @@ link_directories (${CADO_NFS_BINARY_DIR}/gf2x/gf2x-fft/.libs)
 include_directories(${CADO_NFS_SOURCE_DIR}/gf2x)
 include_directories(${CADO_NFS_BINARY_DIR}/gf2x)
 include_directories(${CADO_NFS_SOURCE_DIR}/cantor)
-add_executable(bench_polmatmul bench_polmatmul.cpp)
+add_executable(bench_polmatmul EXCLUDE_FROM_ALL bench_polmatmul.cpp)
 target_link_libraries(bench_polmatmul utils gf2x-fft gf2x cantor128)
 add_dependencies(bench_polmatmul gf2x-build)
 
@@ -15,7 +15,7 @@ set_target_properties(mf_dobal PROPERTIES
         LINK_FLAGS "--mpi")
 
 # This is really only for debugging.
-add_executable(test_hello ${EXCLUDE_FROM_RELEASE_BUILD} test_hello.c parallelizing_info.c)
+add_executable(test_hello EXCLUDE_FROM_ALL test_hello.c parallelizing_info.c)
 target_link_libraries(test_hello utils)
 set_target_properties(test_hello PROPERTIES
     COMPILE_FLAGS "--mpi"
