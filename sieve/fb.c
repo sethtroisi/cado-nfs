@@ -156,6 +156,7 @@ fb_log_2 (fbprime_t n)
   return k;
 }
 
+#ifndef NDEBUG  /* This is only used in an ASSERT() now */
 /* Return p^e. Trivial exponentiation for small e, no check for overflow */
 static fbprime_t 
 fb_pow (const fbprime_t p, const unsigned int e)
@@ -166,6 +167,7 @@ fb_pow (const fbprime_t p, const unsigned int e)
       r *= p;
     return r;
 }
+#endif
 
 /* Let k be the largest integer with q = p^k, return p if k > 1, 
    and 0 otherwise */

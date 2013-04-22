@@ -763,7 +763,7 @@ template<typename fft_type> struct tpolmat /* {{{ */
         po = NULL;
     }
     private:
-    tpolmat(tpolmat const& a) { }
+    tpolmat(tpolmat const&) { }
     tpolmat& operator=(tpolmat const&){ return *this;}
     public:
     ~tpolmat() {
