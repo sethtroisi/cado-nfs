@@ -57,92 +57,95 @@ typedef int MPI_Request;
 
 #define MPI_ANY_TAG     -1
 
-/* That would be quite neat, but it's too coarse (it applies to the whole
- * translation unit), and anyway it isn't supported by oldish gcc's.
-*/
+/* Adding this pragma would yield the benefit of removing all the
+ * MAYBE_UNUSED clutter which is inherent to this file. Unfortunately
+ * it's not supported by very old gcc's, and neither by some broken stuff
+ * which pretends to be gcc (happens on macs, for instance).
+ *
 #ifdef  __GNUC__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #endif
+*/
 
-static inline int MPI_Wait(MPI_Request *request , MPI_Status *status ) { return 0; }
-static inline int MPI_Abort(MPI_Comm comm , int s) { exit(s); }
-static inline int MPI_Comm_rank(int s , int  * p) { *p=0; return 0;}
-static inline int MPI_Comm_size(int s , int  * p) { *p=1; return 0;}
+static inline int MPI_Wait(MPI_Request *request MAYBE_UNUSED, MPI_Status *status MAYBE_UNUSED) { return 0; }
+static inline int MPI_Abort(MPI_Comm comm MAYBE_UNUSED, int s) { exit(s); }
+static inline int MPI_Comm_rank(int s MAYBE_UNUSED, int  * p) { *p=0; return 0;}
+static inline int MPI_Comm_size(int s MAYBE_UNUSED, int  * p) { *p=1; return 0;}
 static inline int MPI_Initialized(int  * p) { *p=1; return 0; }
-static inline int MPI_Init(int * argc , char *** argv ) { return 0; }
-static inline int MPI_Init_thread(int * argc , char *** argv , int req, int * prov) { if (prov) *prov=req; return 0; }
+static inline int MPI_Init(int * argc MAYBE_UNUSED, char *** argv MAYBE_UNUSED) { return 0; }
+static inline int MPI_Init_thread(int * argc MAYBE_UNUSED, char *** argv MAYBE_UNUSED, int req, int * prov) { if (prov) *prov=req; return 0; }
 static inline int MPI_Finalize() {return 0;}
-static inline int MPI_Op_create( MPI_User_function *function , int commute , MPI_Op *op  ){return 0;}
-static inline int MPI_Op_free(MPI_Op *op  ){return 0;}
-static inline int MPI_Send( void *buf , int count , MPI_Datatype datatype , int dest ,int tag , MPI_Comm comm  ){return 0;}
-static inline int MPI_Sendrecv( void *sbuf , int scount , MPI_Datatype sdatatype , int sdest ,int stag ,  void *rbuf , int rcount , MPI_Datatype rdatatype , int rdest ,int rtag , MPI_Comm comm  , MPI_Status *status ){return 0;}
-static inline int MPI_Isend( void *buf , int count , MPI_Datatype datatype , int dest ,int tag , MPI_Comm comm  , MPI_Request * zz ){return 0;}
-static inline int MPI_Recv( void *buf , int count , MPI_Datatype datatype , int source ,int tag , MPI_Comm comm , MPI_Status *status  ){ abort(); return 0;}
-static inline int MPI_Irecv( void *buf , int count , MPI_Datatype datatype , int source ,int tag , MPI_Comm comm , MPI_Status *status , MPI_Request * zz ){ abort(); return 0;}
-static inline int MPI_Bcast( void *buffer , int count , MPI_Datatype datatype , int root , MPI_Comm comm ){return 0;}
-static inline int MPI_Reduce ( void *sendbuf, void *recvbuf, int count,MPI_Datatype datatype, MPI_Op op , int root , MPI_Comm comm  )
+static inline int MPI_Op_create( MPI_User_function *function MAYBE_UNUSED, int commute MAYBE_UNUSED, MPI_Op *op MAYBE_UNUSED ){return 0;}
+static inline int MPI_Op_free(MPI_Op *op MAYBE_UNUSED ){return 0;}
+static inline int MPI_Send( void *buf MAYBE_UNUSED, int count MAYBE_UNUSED, MPI_Datatype datatype MAYBE_UNUSED, int dest MAYBE_UNUSED,int tag MAYBE_UNUSED, MPI_Comm comm  MAYBE_UNUSED){return 0;}
+static inline int MPI_Sendrecv( void *sbuf MAYBE_UNUSED, int scount MAYBE_UNUSED, MPI_Datatype sdatatype MAYBE_UNUSED, int sdest MAYBE_UNUSED,int stag MAYBE_UNUSED,  void *rbuf MAYBE_UNUSED, int rcount MAYBE_UNUSED, MPI_Datatype rdatatype MAYBE_UNUSED, int rdest MAYBE_UNUSED,int rtag MAYBE_UNUSED, MPI_Comm comm  MAYBE_UNUSED, MPI_Status *status MAYBE_UNUSED){return 0;}
+static inline int MPI_Isend( void *buf MAYBE_UNUSED, int count MAYBE_UNUSED, MPI_Datatype datatype MAYBE_UNUSED, int dest MAYBE_UNUSED,int tag MAYBE_UNUSED, MPI_Comm comm  MAYBE_UNUSED, MPI_Request * zz MAYBE_UNUSED){return 0;}
+static inline int MPI_Recv( void *buf MAYBE_UNUSED, int count MAYBE_UNUSED, MPI_Datatype datatype MAYBE_UNUSED, int source MAYBE_UNUSED,int tag MAYBE_UNUSED, MPI_Comm comm MAYBE_UNUSED, MPI_Status *status MAYBE_UNUSED ){ abort(); return 0;}
+static inline int MPI_Irecv( void *buf MAYBE_UNUSED, int count MAYBE_UNUSED, MPI_Datatype datatype MAYBE_UNUSED, int source MAYBE_UNUSED,int tag MAYBE_UNUSED, MPI_Comm comm MAYBE_UNUSED, MPI_Status *status MAYBE_UNUSED, MPI_Request * zz MAYBE_UNUSED){ abort(); return 0;}
+static inline int MPI_Bcast( void *buffer MAYBE_UNUSED, int count MAYBE_UNUSED, MPI_Datatype datatype MAYBE_UNUSED, int root MAYBE_UNUSED, MPI_Comm comm MAYBE_UNUSED){return 0;}
+static inline int MPI_Reduce ( void *sendbuf, void *recvbuf, int count,MPI_Datatype datatype, MPI_Op op MAYBE_UNUSED, int root MAYBE_UNUSED, MPI_Comm comm  MAYBE_UNUSED)
 {
     if (sendbuf) memcpy(recvbuf, sendbuf, count * datatype);
     return 0;
 }
 static inline int MPI_Reduce_scatter(void *sendbuf, void *recvbuf, int *recvcounts,
-                    MPI_Datatype datatype, MPI_Op op , MPI_Comm comm )
+                    MPI_Datatype datatype, MPI_Op op MAYBE_UNUSED, MPI_Comm comm MAYBE_UNUSED)
 {
     if (sendbuf) memcpy(recvbuf, sendbuf, recvcounts[0] * datatype);
     return 0;
 }
-static inline int MPI_Allreduce ( void *sendbuf, void *recvbuf, int count,MPI_Datatype datatype, MPI_Op op , MPI_Comm comm  )
+static inline int MPI_Allreduce ( void *sendbuf, void *recvbuf, int count,MPI_Datatype datatype, MPI_Op op MAYBE_UNUSED, MPI_Comm comm  MAYBE_UNUSED)
 {
     if (sendbuf) memcpy(recvbuf, sendbuf, count * datatype);
     return 0;
 }
-static inline int MPI_Comm_split (MPI_Comm x , int color , int key , MPI_Comm * y)
+static inline int MPI_Comm_split (MPI_Comm x MAYBE_UNUSED, int color MAYBE_UNUSED, int key MAYBE_UNUSED, MPI_Comm * y)
 {
     *y=0;
     return 0;
 }
-static inline int MPI_Comm_set_errhandler (MPI_Comm x , MPI_Errhandler e )
+static inline int MPI_Comm_set_errhandler (MPI_Comm x MAYBE_UNUSED, MPI_Errhandler e MAYBE_UNUSED)
 {
     return 0;
 }
-static inline int MPI_Comm_free (MPI_Comm * x ) { return 0; }
+static inline int MPI_Comm_free (MPI_Comm * x MAYBE_UNUSED) { return 0; }
 static inline int MPI_Comm_dup (MPI_Comm y, MPI_Comm * x) { *x = y; return 0; }
-static inline int MPI_Comm_set_name(MPI_Comm comm , char *comm_name ) { return 0;}
-static inline int MPI_Comm_get_name(MPI_Comm comm , char *comm_name , int * rlen) { *comm_name='\0'; *rlen=0; return 0;}
-static inline int MPI_Scatterv(void * sendbuf, int * sendcounts, int * displs,  MPI_Datatype st, void * recvbuf, int recvcount, MPI_Datatype rt, int root , MPI_Comm x ) {
+static inline int MPI_Comm_set_name(MPI_Comm comm MAYBE_UNUSED, char *comm_name MAYBE_UNUSED) { return 0;}
+static inline int MPI_Comm_get_name(MPI_Comm comm MAYBE_UNUSED, char *comm_name MAYBE_UNUSED, int * rlen) { *comm_name='\0'; *rlen=0; return 0;}
+static inline int MPI_Scatterv(void * sendbuf, int * sendcounts, int * displs,  MPI_Datatype st, void * recvbuf, int recvcount, MPI_Datatype rt, int root MAYBE_UNUSED, MPI_Comm x MAYBE_UNUSED) {
     ASSERT_ALWAYS(sendcounts[0] * st == recvcount * rt);
     memcpy(recvbuf, ((char *)sendbuf) + displs[0] * st, recvcount * rt);
     return 0;
 }
 
-static inline int MPI_Scatter(void * sendbuf, int sendcount, MPI_Datatype st, void * recvbuf, int recvcount, MPI_Datatype rt, int root , MPI_Comm x ) {
+static inline int MPI_Scatter(void * sendbuf, int sendcount, MPI_Datatype st, void * recvbuf, int recvcount, MPI_Datatype rt, int root MAYBE_UNUSED, MPI_Comm x MAYBE_UNUSED) {
     ASSERT_ALWAYS(sendcount * st == recvcount * rt);
     if (recvbuf && sendbuf)
         memcpy(recvbuf, sendbuf, recvcount * rt);
     return 0;
 }
 
-static inline int MPI_Barrier (MPI_Comm x ) { return 0; }
+static inline int MPI_Barrier (MPI_Comm x MAYBE_UNUSED) { return 0; }
 
-static inline int MPI_Gather(void * sendbuf, int sendcount,  MPI_Datatype st, void * recvbuf, int recvcount, MPI_Datatype rt, int root , MPI_Comm x ) {
+static inline int MPI_Gather(void * sendbuf, int sendcount,  MPI_Datatype st, void * recvbuf, int recvcount MAYBE_UNUSED, MPI_Datatype rt MAYBE_UNUSED, int root MAYBE_UNUSED, MPI_Comm x MAYBE_UNUSED) {
     if (sendbuf == MPI_IN_PLACE) return 0;
     memcpy(((char *)recvbuf), (char*) sendbuf, sendcount * st);
     return 0;
 }
-static inline int MPI_Gatherv(void * sendbuf, int sendcount,  MPI_Datatype st, void * recvbuf, int * recvcounts, int * displs, MPI_Datatype rt, int root , MPI_Comm x ) {
+static inline int MPI_Gatherv(void * sendbuf, int sendcount,  MPI_Datatype st, void * recvbuf, int * recvcounts, int * displs, MPI_Datatype rt, int root MAYBE_UNUSED, MPI_Comm x MAYBE_UNUSED) {
     ASSERT_ALWAYS(sendcount * st == recvcounts[0] * rt);
     memcpy(((char *)recvbuf) + displs[0] * rt, sendbuf, sendcount * st);
     return 0;
 }
-static inline int MPI_Allgather(void * sendbuf , int sendcount ,  MPI_Datatype st , void * recvbuf , int recvcount , MPI_Datatype rt , MPI_Comm x ) {
+static inline int MPI_Allgather(void * sendbuf MAYBE_UNUSED, int sendcount MAYBE_UNUSED,  MPI_Datatype st MAYBE_UNUSED, void * recvbuf MAYBE_UNUSED, int recvcount MAYBE_UNUSED, MPI_Datatype rt MAYBE_UNUSED, MPI_Comm x MAYBE_UNUSED) {
     ASSERT_ALWAYS(sendbuf == MPI_IN_PLACE || sendcount * st == recvcount * rt);
     if (sendbuf) memcpy(recvbuf, sendbuf, sendcount * st);
     return 0;
 }
-static inline int MPI_Allgatherv(void *sendbuf, int sendcount ,
-            MPI_Datatype sendtype , void *recvbuf , int *recvcount ,
-            int *displs , MPI_Datatype recvtype , MPI_Comm comm )
+static inline int MPI_Allgatherv(void *sendbuf, int sendcount MAYBE_UNUSED,
+            MPI_Datatype sendtype MAYBE_UNUSED, void *recvbuf MAYBE_UNUSED, int *recvcount MAYBE_UNUSED,
+            int *displs MAYBE_UNUSED, MPI_Datatype recvtype MAYBE_UNUSED, MPI_Comm comm MAYBE_UNUSED)
 {
     ASSERT_ALWAYS(sendbuf == MPI_IN_PLACE);
     return 0;
@@ -153,9 +156,9 @@ static inline int MPI_Type_contiguous(int count, MPI_Datatype oldtype, MPI_Datat
     *newtype = count * oldtype;
     return 0;
 }
-static inline int MPI_Type_commit(MPI_Datatype * t ) { return 0; }
-static inline int MPI_Type_free(MPI_Datatype * t ) { return 0; }
-static inline int MPI_Type_set_attr(MPI_Datatype type , int key , void *value )
+static inline int MPI_Type_commit(MPI_Datatype * t MAYBE_UNUSED) { return 0; }
+static inline int MPI_Type_free(MPI_Datatype * t MAYBE_UNUSED) { return 0; }
+static inline int MPI_Type_set_attr(MPI_Datatype type MAYBE_UNUSED, int key MAYBE_UNUSED, void *value MAYBE_UNUSED)
 {
     /* XXX We are *NOT* storing the type attribute here. This is because
      * we expect that the user function that we use, and which exploits
@@ -165,7 +168,7 @@ static inline int MPI_Type_set_attr(MPI_Datatype type , int key , void *value )
      */
     return 0;
 }
-static inline int MPI_Type_get_attr(MPI_Datatype type , int key , void *value, int * flag)
+static inline int MPI_Type_get_attr(MPI_Datatype type MAYBE_UNUSED, int key MAYBE_UNUSED, void *value, int * flag)
 {
     /* Same as above */
     // *(void**)value = NULL;
@@ -173,7 +176,7 @@ static inline int MPI_Type_get_attr(MPI_Datatype type , int key , void *value, i
     *flag=1;
     return 0;
 }
-static inline int MPI_Type_delete_attr(MPI_Datatype type , int key ) { return 0; }
+static inline int MPI_Type_delete_attr(MPI_Datatype type MAYBE_UNUSED, int key MAYBE_UNUSED) { return 0; }
 
 typedef int MPI_Type_copy_attr_function(MPI_Datatype oldtype,
            int type_keyval, void *extra_state, void *attribute_val_in,
@@ -183,10 +186,10 @@ typedef int MPI_Type_delete_attr_function(MPI_Datatype type, int type_keyval,
 #define MPI_TYPE_DUP_FN NULL
 #define MPI_TYPE_NULL_DELETE_FN NULL
 static inline int MPI_Type_create_keyval(
-        MPI_Type_copy_attr_function *type_copy_attr_fn ,
-        MPI_Type_delete_attr_function *type_delete_attr_fn ,
+        MPI_Type_copy_attr_function *type_copy_attr_fn MAYBE_UNUSED,
+        MPI_Type_delete_attr_function *type_delete_attr_fn MAYBE_UNUSED,
         int *type_keyval,
-        void *extra_state )
+        void *extra_state MAYBE_UNUSED)
 {
     /* same rationale as above: we don't care about providing usable
      * function. Only the prototypes are barely right. The rest will
@@ -195,7 +198,7 @@ static inline int MPI_Type_create_keyval(
     *type_keyval = 0;
     return 0;
 }
-static inline int MPI_Type_free_keyval(int * x )
+static inline int MPI_Type_free_keyval(int * x MAYBE_UNUSED)
 {
     return 0;
 }
@@ -207,8 +210,10 @@ static inline int MPI_Error_string(int err, char * msg, int * len)
     return *len >= 0 ? 0 : ENOMEM;
 }
 
+/* See at the beginning of this file.
 #ifdef  __GNUC__
 #pragma GCC diagnostic pop
 #endif
+*/
 
 #endif /* FAKEMPI_H_ */
