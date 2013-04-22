@@ -14,16 +14,19 @@ set_target_properties(mf_dobal PROPERTIES
         COMPILE_FLAGS "--mpi"
         LINK_FLAGS "--mpi")
 
+# This is really only for debugging.
+add_executable(test_hello ${EXCLUDE_FROM_RELEASE_BUILD} test_hello.c parallelizing_info.c)
+target_link_libraries(test_hello utils)
+set_target_properties(test_hello PROPERTIES
+    COMPILE_FLAGS "--mpi"
+    LINK_FLAGS "--mpi")
+
 # if(HAVE_GCC_STYLE_AMD64_ASM)
 # add_executable(matops matops.cpp ../gauss.c)
 # set_target_properties(matops PROPERTIES
 #         COMPILE_FLAGS "-I.")
 # target_link_libraries(matops gmp utils m)
 # endif(HAVE_GCC_STYLE_AMD64_ASM)
-
-# should be completely useless now.
-add_executable(mf_twistvec mf_twistvec.c)
-target_link_libraries(mf_twistvec bwc_base)
 
 if(HAVE_WAITPID)        # unavailable under mingw
 add_executable(shell shell.c)
