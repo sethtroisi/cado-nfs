@@ -21,12 +21,12 @@ install(TARGETS mf_bal RUNTIME DESTINATION bin/linalg/bwc)
 
 configure_file(bwc.pl ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl ESCAPE_QUOTES @ONLY)
 
-# test_hello does not compile. harmless
-#add_executable(test_hello ${EXCLUDE_FROM_RELEASE_BUILD} test_hello.c parallelizing_info.c)
-#target_link_libraries(test_hello utils)
-#set_target_properties(test_hello PROPERTIES
-#    COMPILE_FLAGS "--mpi"
-#    LINK_FLAGS "--mpi")
+# This is really only for debugging.
+add_executable(test_hello ${EXCLUDE_FROM_RELEASE_BUILD} test_hello.c parallelizing_info.c)
+target_link_libraries(test_hello utils)
+set_target_properties(test_hello PROPERTIES
+    COMPILE_FLAGS "--mpi"
+    LINK_FLAGS "--mpi")
 
 add_executable(random ${EXCLUDE_FROM_RELEASE_BUILD} random.c)
 
