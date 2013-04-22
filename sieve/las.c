@@ -606,6 +606,16 @@ void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_ptr * todo)
     ASSERT_ALWAYS(si->conf->side == si->doing->side);
 }
 
+/* return 0 if we should discard that special-q, in which case we intend
+ * to discard this special-q. For this reason, si->J is then set to an
+ * unrounded value, for diagnostic).
+ *
+ * The current check for discarding is whether we do fill one bucket or
+ * not. If we don't even achieve that, we should of course discard.
+ *
+ * Now for efficiency reasons, the ``minimum reasonable'' number of
+ * buckets should be more than that.
+ */
 int sieve_info_adjust_IJ(sieve_info_ptr si, double skewness, int nb_threads)/*{{{*/
 {
     /* compare skewed max-norms */
@@ -634,9 +644,13 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, double skewness, int nb_threads)/*{{
     ASSERT_ALWAYS(LOG_BUCKET_REGION >= si->conf->logI);
     uint32_t i = 1U << (LOG_BUCKET_REGION - si->conf->logI);
     i *= nb_threads;  /* ensures nb of bucket regions divisible by nb_threads */
-    si->J = ((si->J - 1U) / i + 1U) * i; /* Round up to multiple of i */
 
-    return 0;
+    /* Bug 15617: if we round up, we are not true to our promises */
+    uint32_t nJ = (si->J / i) * i; /* Round down to multiple of i */
+
+    /* XXX No rounding if we intend to abort */
+    if (nJ > 0) si->J = nJ;
+    return nJ > 0;
 }/*}}}*/
 
 static void sieve_info_update (sieve_info_ptr si)/*{{{*/
@@ -3257,10 +3271,20 @@ int main (int argc0, char *argv0[])/*{{{*/
         if (SkewGauss (si, si->cpoly->skew) != 0)
             continue;
 
-        sieve_info_adjust_IJ(si, si->cpoly->skew, las->nb_threads);
-
         /* FIXME: maybe we can discard some special q's if a1/a0 is too large,
-           see http://www.mersenneforum.org/showthread.php?p=130478 */
+         * see http://www.mersenneforum.org/showthread.php?p=130478 
+         *
+         * Just for correctness at the moment we're doing it in very
+         * extreme cases, see bug 15617
+         */
+        if (sieve_info_adjust_IJ(si, si->cpoly->skew, las->nb_threads) == 0) {
+            gmp_fprintf (las->output, "# "HILIGHT_START"Discarding %s q=%Zd; rho=%Zd;"HILIGHT_END" a0=%"PRId64"; b0=%"PRId64"; a1=%"PRId64"; b1=%"PRId64"; raw_J=%u;\n",
+                    sidenames[si->conf->side],
+                    si->doing->p, si->doing->r, si->a0, si->b0, si->a1, si->b1,
+                    si->J);
+            continue;
+        }
+
 
         gmp_fprintf (las->output, "# "HILIGHT_START"Sieving %s q=%Zd; rho=%Zd;"HILIGHT_END" a0=%"PRId64"; b0=%"PRId64"; a1=%"PRId64"; b1=%"PRId64";",
                 sidenames[si->conf->side],
