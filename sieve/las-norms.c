@@ -2686,7 +2686,12 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
 
   /************************** rational side **********************************/
 
-  /* Since |a| <= s*I*B and |b| <= I*B, |G(a,b)| <= (|g[1]|*s+|g[0]|) * I*B */
+  /* If J is chosen such that J<=I/2*s*B/max(a1,s*b1),
+   * then |j*a1| <= I/2*s*B, and |j*b1| <= I/2*B
+   * J is set to honour this requirement in sieve_info_adjust_IJ (but see
+   * also bug #15617).
+   * Now (a,b)=i*(a0,b0)+j*(a1,b1) with |i|<I/2 and |j|<=J gives
+   * |a| <= s*I*B and |b| <= I*B, whence |G(a,b)| <= (|g[1]|*s+|g[0]|) * I*B */
   r = fabs (mpz_get_d (si->cpoly->rat->f[1])) * si->cpoly->skew
     + fabs (mpz_get_d (si->cpoly->rat->f[0]));
   r *= B * (double) si->I;
