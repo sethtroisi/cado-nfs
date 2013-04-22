@@ -7,35 +7,6 @@
 #include "mod_ul_common.c"
 
 
-/* Compute 1/n (mod 2^wordsize).
-   Cruft: this belongs in modredc_*.h, not here  */
-unsigned long
-modul_invmodlong (unsigned long n)
-{
-  unsigned long r;
-
-  ASSERT (n % 2UL != 0UL);
-  
-  /* The square of an odd integer is always 1 (mod 8). So by
-     initing r = m, the low three bits in the approximate inverse
-     are correct. 
-     When r = 1/m (mod 16), the 4th bit of r happens to be the
-     XOR of bits 2, 3 and 4 of m. This gives us an approximate 
-     inverse with the 4 lowest bits correct, so 3 (for 32 bit) or
-     4 (for 64 bit) Newton iterations are enough. */
-  r = n ^ ((n & 4UL) << 1) ^ ((n & 2UL) << 2);
-  r = 2UL * r - r * r * n; /* Newton iteration */
-  r = 2UL * r - r * r * n;
-  r = 2UL * r - r * r * n;
-  if (sizeof (unsigned long) > 4)
-    r = 2UL * r - r * r * n;
-
-  ASSERT_EXPENSIVE (r * n == 1UL);
-
-  return r;
-}
-
-
 /* Put 1/s (mod t) in r and return 1 if s is invertible, 
    or set r to 0 and return 0 if s is not invertible */
 
