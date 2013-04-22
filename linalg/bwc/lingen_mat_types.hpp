@@ -45,7 +45,7 @@ struct bmat;
 struct polmat;
 
 struct bcol {/*{{{*/
-    friend class bmat;
+    friend struct bmat;
     unsigned int nrows;
     inline unsigned int stride() const { return BITS_TO_WORDS(nrows, ULONG_BITS); }
     private:
@@ -101,7 +101,7 @@ struct bcol {/*{{{*/
     }
 };/*}}}*/
 struct bmat { /* This is for example small-e, an m times b matrix *//*{{{*/
-    friend class polmat;
+    friend struct polmat;
     unsigned int nrows;
     unsigned int ncols;
     private:
