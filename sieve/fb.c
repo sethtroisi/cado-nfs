@@ -1107,14 +1107,8 @@ fb_read (const char *filename, const double log_scale, const int verbose, const 
         if (nlogp == 1) /* typical case */
             fb_cur->plog = fb_log (p, log_scale, 0.);
         else {
-            fbprime_t oldpk = p, pk = p;
-            for (int i = 1; i < oldlogp; ++i)
-                oldpk *= p;
-            for (int i = 1; i < nlogp; ++i)
-                pk *= p;
-            double ol;
-            ol = fb_log (oldpk, log_scale, 0.);
-            fb_cur->plog = fb_log (pk, log_scale, - ol);
+            double ol = fb_log (fb_pow (p, oldlogp), log_scale, 0.);
+            fb_cur->plog = fb_log (fb_pow (p, nlogp), log_scale, - ol);
         }
 
         /* Read roots */
