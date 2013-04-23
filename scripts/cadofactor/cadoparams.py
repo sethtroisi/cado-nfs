@@ -30,23 +30,12 @@ the node of a program is equal to the name of the binary executable.
 class Parameters(dict):
     def __init__(self, *args, **kwargs):
         super(Parameters, self).__init__(*args, **kwargs)
-        self._separator = '.'
-    
-    def set_sep(self, separator):
-        if self:
-            raise Exception("Can't change separator on non-empty Parameters "
-                            "instance")
-        self._separator = separator
-    
-    def get_sep(self):
-        return self._separator
     
     def myparams(self, keys, path):
         ''' From the hierarchical dictionary params, generate a flat 
         dictionary with those parameters which are listed in keys and that 
         are found along path. 
-        path is specified as a string with path segments separated by the 
-        separator
+        path is specified as a string with path segments separated '.'
         
         >>> d = {'a':1,'b':2,'c':3,'foo':{'a':3},'bar':{'a':4,'baz':{'a':5}}}
         >>> Parameters(d).myparams(keys=('a', 'b'), path = 'foo')
@@ -59,13 +48,13 @@ class Parameters(dict):
         source = self
         idx = 0
         # path can be an array of partial paths, i.e., each entry can contain
-        # one or more path segments separated by the separator. First join
+        # one or more path segments separated by '.'. First join
         # them all, then split them again
         if isinstance(path, str):
             joinpath = path
         else:
-            joinpath = self.get_sep().join(path)
-        splitpath = joinpath.split(self.get_sep())
+            joinpath = '.'.join(path)
+        splitpath = joinpath.split('.')
         while source:
           tomerge = {key:source[key] for key in keys 
                      if key in source and not isinstance(source[key], dict)}
@@ -78,7 +67,7 @@ class Parameters(dict):
         return result
     
     def _insertkey(self, path, value):
-        ''' path is a path with segments delimited by the separator or an 
+        ''' path is a path with segments delimited by '.' or an 
         array of pieces of the path, 
         value is inserted in the hierarchical parameters dictionary at the 
         location specified by path
@@ -107,8 +96,8 @@ class Parameters(dict):
         if isinstance(path, str):
             joinpath = path
         else:
-            joinpath = self.get_sep().join(path)
-        splitpath = joinpath.split(self.get_sep())
+            joinpath = '.'.join(path)
+        splitpath = joinpath.split('.')
         key = splitpath.pop()
         dest = self
         for segment in splitpath:
@@ -149,7 +138,7 @@ class Parameters(dict):
             self._insertkey(key, value)
     
     @staticmethod
-    def __str_internal__(dic, sep, path):
+    def __str_internal__(dic, path):
         ''' Returns all entries of the dictionary dic as key=sep strings
         in an array
         '''
@@ -159,12 +148,12 @@ class Parameters(dict):
                 result.append(path + key + " = " + dic[key])
         for key in dic:
             if isinstance(dic[key], dict):
-                result = result + Parameters.__str_internal__(dic[key], sep, 
-                                                              path + key + sep)
+                result = result + Parameters.__str_internal__(dic[key], 
+                                                              path + key + '.')
         return result
     
-    def __str__(self, sep = None):
-        r = Parameters.__str_internal__(self, self.get_sep(), "")
+    def __str__(self):
+        r = Parameters.__str_internal__(self, "")
         return "\n".join(r)
     
 DEFAULTS = (

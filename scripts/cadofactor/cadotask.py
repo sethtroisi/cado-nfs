@@ -31,8 +31,22 @@ import cadologger
 # --defaults which does not overwrite, and --forceparam which does
 
 class Task(patterns.Observable, patterns.Observer):
-    """ A base class that represents one task that needs to be processed. """
+    """ A base class that represents one task that needs to be processed. 
     
+    Sub-classes must define class variables:
+        name: the name of the task in a simple form that can be used as
+            a Python dictionary key, a directory name, part of a file name,
+            part of an SQL table name, etc. That pretty much limits it to
+            alphabetic first letter, and alphanumeric rest. 
+        title: A pretty name for the task, will be used in screen output
+        programs: A list of classes of Programs which this tasks uses
+        paramnames: A list of parameter keywords which this task uses.
+            This is used for extracting relevant parameters from the parameter
+            hierarchical dictionary.
+    """
+    # Parameters that all tasks use
+    paramnames = ("name", "workdir")
+
     def __init__(self, dependencies, *args, db = None, parameters = None,
                  **kwargs):
         ''' Sets up a database connection and a DB-backed dictionary for 
@@ -43,25 +57,32 @@ class Task(patterns.Observable, patterns.Observer):
         '''
 
         super().__init__(*args, **kwargs)
-        self.dependencies = dependencies
-        if self.dependencies:
-            for d in self.dependencies:
+        if dependencies:
+            self.dependencies = dict()
+            for d in dependencies:
+                self.dependencies[d.name] = d
                 d.subscribeObserver(self)
+        else:
+            self.dependencies = None
         self.logger = cadologger.Logger()
         self.logger.debug("Enter Task.__init__(%s)", 
                           self.name)
         if False:
             self.logger.debug("Enter Task.__init__(): parameters = %s", 
                               parameters)
-        self.parampath = "tasks" + parameters.get_sep() + self.name
         # DB-backed dictionary with parameters for this task
         self.db = db
         self.params = wudb.DictDbAccess(self.db, self.tablename())
         # Derived class must define name
         # Set default parametes for this task, if any are given
         if parameters:
+            # Add the common paramnames defined in the Task class to the 
+            # (presumably class-defined) paramnames in self, and bind the 
+            # result to an instance variable
+            self.paramnames = Task.paramnames + self.paramnames
             defaults = parameters.myparams(self.paramnames, self.parampath)
             self.params.setdefault(None, defaults)
+        self.logger.debug("%s: params = %s", self.title, self.params)
         # Set default parameters for our programs
         self.progparams = []
         for prog in self.programs:
@@ -74,17 +95,29 @@ class Task(patterns.Observable, patterns.Observer):
         self.logger.debug("Exit Task.__init__(%s)", self.name)
         return
     
-    def tablename(self):
+    @staticmethod
+    def check_tablename(name):
+        no_ = name.replace("_", "")
+        if not no_[0].isalpha() or not no_[1:].isalnum():
+            raise Exception("%s is not valid for an SQL table name" % name)
+
+    def tablename(self, extra = None):
         """ Return the table name for the DB-backed dictionary with parameters
         for the current task """
-        # Maybe replace SQL-disallowed characters here, like '.' ?
-        return self.name
+        # Maybe replace SQL-disallowed characters here, like digits and '.' ? 
+        # Could be tricky to avoid collisions
+        self.check_tablename(self.name)
+        if extra:
+            self.check_tablename(extra)
+            return self.name + '_' + extra
+        else:
+            return self.name
     
     def prog_tablename(self, prog):
         """ Return the table name for the DB-backed dictionary with parameters 
         for program prog
         """
-        return self.tablename() + '_' + prog.name
+        return self.tablename(prog.name)
     
     def is_done(self):
         return False
@@ -102,7 +135,7 @@ class Task(patterns.Observable, patterns.Observer):
                           self.name, self.is_done())
         # Check/run the prerequisites
         if not self.dependencies is None:
-            for task in self.dependencies:
+            for task in self.dependencies.values():
                 if not task.is_done():
                     self.logger.debug("Task.run(%s): Running prerequisite %s",
                                       self.name, task.name)
@@ -127,6 +160,19 @@ class Task(patterns.Observable, patterns.Observer):
         return "%s%s%s.%s.%s" % (
                 self.params["workdir"], os.sep, self.params["name"], 
                 self.name, name)
+    
+    def make_output_dirname(self, extra = None):
+        """ Make a directory name of the form workdir/jobname.taskname/ if 
+        extra is not given, or workdir/jobname.taskname/extra/ if it is
+        """
+        if extra:
+            return "%s%s%s.%s%s%s%s" % (
+                self.params["workdir"], os.sep, self.params["name"], 
+                self.name, os.sep, extra, os.sep)
+        else:
+            return "%s%s%s.%s%s" % (
+                self.params["workdir"], os.sep, self.params["name"], 
+                self.name, os.sep)
     
     def submit(self, commands, inputfiles, outputfiles, tempfiles):
         ''' Submit a command that needs to be run. Returns a handle
@@ -272,9 +318,10 @@ class Polynomial(object):
 class PolyselTask(Task):
     """ Finds a polynomial, uses client/server """
     name = "polyselect"
+    parampath = "tasks." + name
     title = "Polynomial Selection"
     programs = (cadoprograms.Polyselect2l,)
-    paramnames = ("adrange", "P", "N", "admin", "admax", "name", "workdir")
+    paramnames = ("adrange", "P", "N", "admin", "admax")
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, dependencies = None, **kwargs)
@@ -395,7 +442,7 @@ class FactorBaseOrFreerelTask(Task):
         super().run(parameters = parameters)
         
         # Get best polynomial found by polyselect
-        poly = self.dependencies[0].get_poly()
+        poly = self.dependencies["polyselect"].get_poly()
         if not poly:
             raise Exception("FactorBaseOrFreerelTask(): no polynomial received")
         
@@ -456,7 +503,8 @@ class FactorBaseTask(FactorBaseOrFreerelTask):
     name = "factorbase"
     title = "Generate Factor Base"
     programs = (cadoprograms.MakeFB,)
-    paramnames = ("workdir", "name", "alim")
+    parampath = "tasks." + name
+    paramnames = ("alim", )
     target = "roots"
 
 
@@ -465,7 +513,8 @@ class FreeRelTask(FactorBaseOrFreerelTask):
     name = "freerel"
     title = "Generate Free Relations"
     programs = (cadoprograms.FreeRel,)
-    paramnames = ("workdir", "name", "lpba")
+    parampath = "tasks." + name
+    paramnames = ("lpba", )
     target = "freerel"
 
 
@@ -474,8 +523,8 @@ class SievingTask(Task):
     name = "sieving"
     title = "Lattice Sieving"
     programs = (cadoprograms.Las,)
-    paramnames = ("workdir", "name", "qmin", "qrange", "rels_wanted") \
-        + Polynomial.paramnames
+    parampath = "tasks." + name
+    paramnames = ("qmin", "qrange", "rels_wanted") + Polynomial.paramnames
     
     def __init__(self, polsel, factorbase, *args, **kwargs):
         super().__init__(*args, dependencies = (polsel, factorbase), **kwargs)
@@ -486,10 +535,10 @@ class SievingTask(Task):
     def run(self, parameters = None):
         self.logger.debug("Enter SievingTask.run(" + self.name + ")")
         super().run(parameters = parameters)
-        files = wudb.DictDbAccess(self.db, self.tablename() + "_files")
+        files = wudb.DictDbAccess(self.db, self.tablename("files"))
 
         # Get best polynomial found by polyselect
-        poly = self.dependencies[0].get_poly()
+        poly = self.dependencies["polyselect"].get_poly()
         if not poly:
             raise Exception("SievingTask(): no polynomial received")
         # Write polynomial to a file
@@ -505,7 +554,8 @@ class SievingTask(Task):
             kwargs["q0"] = str(q0)
             kwargs["q1"] = str(q1)
             kwargs["poly"] = polyfile
-            kwargs["factorbase"] = self.dependencies[1].get_filename()
+            kwargs["factorbase"] = \
+                self.dependencies["factorbase"].get_filename()
             kwargs["out"] = outputfile
             p = self.programs[0](args, kwargs)
             p.run()
@@ -535,19 +585,20 @@ class SievingTask(Task):
         return None
     
     def get_filenames(self):
-        files = wudb.DictDbAccess(self.db, self.tablename() + "_files")
+        files = wudb.DictDbAccess(self.db, self.tablename("files"))
         return files.keys()
     
     def is_done(self):
         return int(self.params["rels_found"])>=int(self.params["rels_wanted"]) 
 
 
-class DuplicatesTask(Task):
+class Duplicates1Task(Task):
     """ Removes duplicate relations """
-    name = "duplicates"
-    title = "Filtering: Duplicate Removal"
-    programs = (cadoprograms.Duplicates1, cadoprograms.Duplicates2)
-    paramnames = ()
+    name = "duplicates1"
+    title = "Filtering: Duplicate Removal, splitting pass"
+    programs = (cadoprograms.Duplicates1,)
+    parampath = "tasks.filtering." + name
+    paramnames = ("nslices_log",)
     
     def __init__(self, sieving, *args, **kwargs):
         super().__init__(*args, dependencies = (sieving,), **kwargs)
@@ -555,8 +606,114 @@ class DuplicatesTask(Task):
     def run(self, parameters = None):
         self.logger.debug("Enter DuplicatesTask.run(" + self.name + ")")
         super().run(parameters = parameters)
-        files = dependencies[0].get_filenames()
-        already_split = wudb.DictDbAccess(self.db, self.tablename() + "_files")
+        self.parts = 2**int(self.params["nslices_log"])
+        files = self.dependencies["sieving"].get_filenames()
+        already_split_input = \
+            wudb.DictDbAccess(self.db, self.tablename("infiles"))
+        already_split_output = \
+            wudb.DictDbAccess(self.db, self.tablename("outfiles"))
+        newfiles = [f for f in files if not f in already_split_input]
+        self.logger.debug ("%s: new files to split are: %s", 
+                          self.title, newfiles)
+
+        if newfiles:
+            self.make_directories()
+            self.check_input_files(newfiles)
+            for f in newfiles:
+                self.check_output_files(f, False)
+            # Split the new files
+            for f in newfiles:
+                kwargs = self.progparams[0].copy()
+                kwargs["out"] = self.make_output_dirname()
+                p = self.programs[0]((f,), kwargs)
+                p.run()
+                p.wait()
+                self.check_output_files(f, True)
+                
+                already_split_input[f] = "1"
+                # Check that the output files exist and add them to 
+                # already_split_output table
+                for I in range(0, self.parts):
+                    filename = self.make_output_filename(f, I)
+                    if not os.path.isfile(filename):
+                        raise Exception("dup1 outputfile %s does not exist" %
+                                        filename)
+                    # Store this output file as a key in the dictionary, 
+                    # with the slice number as value
+                    already_split_output[filename] = str(I)
+
+        self.logger.debug("Exit DuplicatesTask.run(" + self.name + ")")
+        return
+
+    def make_output_filename(self, name, I):
+        """ Make an output file name corresponding to slice I of the input 
+        file named "name"
+        Overrides parent's function as we also have a slice parameter here.
+        """
+        basedir = self.make_output_dirname(str(I))
+        basefile = os.path.basename(name)
+        return basedir + basefile
+
+    def make_directories(self):
+        basedir = self.make_output_dirname()
+        if not os.path.isdir(basedir):
+            os.mkdir(basedir)
+            for I in range(0, self.parts):
+                dirname = self.make_output_dirname(str(I))
+                if not os.path.isdir(dirname):
+                    os.mkdir(dirname)
+        return
+
+    def check_input_files(self, filenames):
+        """ Check that the files in filenames exist """
+        for filename in filenames:
+            if not os.path.isfile(filename):
+                raise Exception("%s input file %s does not exist" 
+                                % (self.title, filename))
+        return
+
+    def check_output_files(self, filename, shouldexist):
+        """ Check that the output files corresponding to the input file  
+        "filename" exists or doesn't exist, according to shouldexist
+        Raise an exception if check fails, return None
+        """
+        outfilenames = (self.make_output_filename(filename, I) \
+                            for I in range(0, self.parts))
+        for f in outfilenames:
+            exists = os.path.isfile(f)
+            if shouldexist and not exists:
+                raise Exception("%s output file %s for input file %s "
+                                "does not exist" % 
+                                (self.title, f, filename))
+            elif not shouldexist and exists:
+                raise Exception("%s output file %s for input file %s "
+                                "already exists" % 
+                                (self.title, f, filename))
+        return
+    
+    def get_filenames(self, slice_nr = None):
+        files = wudb.DictDbAccess(self.db, self.tablename("outfiles"))
+        if slice:
+            return [f for f in files if int(files[f]) == slice_nr]
+        else:
+            return already_split_output.keys()
+
+class Duplicates2Task(Task):
+    """ Removes duplicate relations """
+    name = "duplicates2"
+    title = "Filtering: Duplicate Removal, removal pass"
+    programs = (cadoprograms.Duplicates2,)
+    parampath = "tasks.filtering." + name
+    paramnames = ()
+    
+    def __init__(self, dup1, *args, **kwargs):
+        super().__init__(*args, dependencies = (dup1,), **kwargs)
+
+    def run(self, parameters = None):
+        self.logger.debug("Enter DuplicatesTask.run(" + self.name + ")")
+        super().run(parameters = parameters)
+        files = self.dependencies["duplicates1"].get_filenames()
+        already_split = wudb.DictDbAccess(self.db, self.tablename("files"))
         newfiles = (f for f in files if not f in already_split)
         kwargs = self.progparams[0].copy()
         p = self.programs[0](newfiles, kwargs)
@@ -578,6 +735,7 @@ class PurgeTask(Task):
     name = "singletons"
     title = "Filtering: Singleton removal"
     programs = (cadoprograms.Purge,)
+    parampath = "tasks.filtering." + name
     paramnames = ()
     
     def __init__(self, duplicates, *args, **kwargs):
@@ -600,6 +758,7 @@ class MergeTask(Task):
     name = "merging"
     title = "Filtering: Merging"
     programs = (cadoprograms.Merge,)
+    parampath = "tasks.filtering." + name
     paramnames = ()
     
     def __init__(self, freerel, unique, *args, **kwargs):
@@ -622,6 +781,7 @@ class LinAlgTask(Task):
     name = "linalg"
     title = "Linear Algebra"
     programs = (cadoprograms.BWC,)
+    parampath = "tasks." + name
     paramnames = ()
     
     def __init__(self, merge, *args, **kwargs):
@@ -644,6 +804,7 @@ class SqrtTask(Task):
     name = "sqrt"
     title = "Square Root"
     programs = (cadoprograms.Sqrt,)
+    parampath = "tasks." + name
     paramnames = ()
     
     def __init__(self, polsel, freerel, sieving, merge, linalg, 
