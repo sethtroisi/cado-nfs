@@ -8,9 +8,6 @@
 #include <ctype.h>
 #include <float.h>
 #include <pthread.h>
-#ifdef USE_GMPECM
-#include "ecm.h"
-#endif
 #include "fb.h"
 #include "portability.h"
 #include "utils.h"           /* lots of stuff */
@@ -228,7 +225,6 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
         if (pol->degree > 1) {
             fbprime_t *leading_div;
             tfb = seconds ();
-            /* Do we actually use leading_div anywhere? */
             leading_div = factor_small (pol->f[pol->degree], lim);
             /* FIXME: fbfilename should allow *distinct* file names, of
              * course, for each side (think about the bi-algebraic case)
@@ -248,7 +244,7 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
             if (rpow_lim >= si->bucket_thresh)
               {
                 rpow_lim = si->bucket_thresh - 1;
-                printf ("# rpow_lim reduced to %d\n", rpow_lim);
+                printf ("# rpowthresh reduced to %d\n", rpow_lim);
               }
             sis->fb = fb_make_linear ((const mpz_t *) pol->f,
                                     (fbprime_t) lim,
@@ -272,18 +268,17 @@ static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_mai
      * in the end (*fb_main gives away ownership of its contents).
      */
     /* Start by counting, unsurprisingly */
-    /* Compute the size in bytes of each of the nparts pieces */
     size_t * fb_sizes = (size_t *) malloc(nparts * sizeof(size_t));
     FATAL_ERROR_CHECK(fb_sizes == NULL, "malloc failed");
     memset(fb_sizes, 0, nparts * sizeof(size_t));
     size_t headsize = fb_diff_bytes(fb0, *fb_main);
     int i = 0;
     for(factorbase_degn_t * fb = fb0 ; fb->p != FB_END && fb->p <= pmax; fb = fb_next (fb)) {
-        fb_sizes[i] += fb_entrysize (fb);
-        if (++i == nparts)
-          i = 0;
+        size_t sz = fb_entrysize (fb); 
+        fb_sizes[i] += sz;
+        i++;
+        i %= nparts;
     }
-    /* Allocate memory for each of the nparts pieces */
     factorbase_degn_t ** fbi = (factorbase_degn_t **) malloc(nparts * sizeof(factorbase_degn_t *));
     for(i = 0 ; i < nparts ; i++) {
         // add one for end marker
@@ -293,7 +288,6 @@ static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_mai
         fbi[i] = fb_dst[i];
     }
     free(fb_sizes); fb_sizes = NULL;
-    /* Copy factorbase entries to each of the nparts pieces */
     i = 0;
     int k = 0;
     for(factorbase_degn_t * fb = fb0 ; fb->p != FB_END && fb->p <= pmax; fb = fb_next (fb)) {
@@ -301,10 +295,9 @@ static void dispatch_fb(factorbase_degn_t ** fb_dst, factorbase_degn_t ** fb_mai
         size_t sz = fb_entrysize (fb); 
         memcpy(fbi[i], fb, sz);
         fbi[i] = fb_next(fbi[i]);
-        if (++i == nparts)
-          i = 0;
+        i++;
+        i %= nparts;
     }
-    /* Add an end marker to each of the nparts pieces */
     for(i = 0 ; i < nparts ; i++) {
         memset(fbi[i], 0, sizeof(factorbase_degn_t));
         fbi[i]->p = FB_END;
@@ -606,16 +599,6 @@ void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_ptr * todo)
     ASSERT_ALWAYS(si->conf->side == si->doing->side);
 }
 
-/* return 0 if we should discard that special-q, in which case we intend
- * to discard this special-q. For this reason, si->J is then set to an
- * unrounded value, for diagnostic).
- *
- * The current check for discarding is whether we do fill one bucket or
- * not. If we don't even achieve that, we should of course discard.
- *
- * Now for efficiency reasons, the ``minimum reasonable'' number of
- * buckets should be more than that.
- */
 int sieve_info_adjust_IJ(sieve_info_ptr si, double skewness, int nb_threads)/*{{{*/
 {
     /* compare skewed max-norms */
@@ -631,8 +614,8 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, double skewness, int nb_threads)/*{{
     /* make sure J does not exceed I/2 */
     /* FIXME: We should not have to compute this B a second time. It
      * appears in sieve_info_init_norm_data already */
-    double B = EXTRA_B_FACTOR * sqrt (2.0 * mpz_get_d(si->doing->p) / (skewness * sqrt (3.0)));
-    if (maxab1 >= B * skewness)
+    double B = sqrt (2.0 * mpz_get_d(si->doing->p) / (skewness * sqrt (3.0)));
+    if (maxab1 >= B)
         si->J = (uint32_t) (B * skewness / maxab1 * (double) (si->I >> 1));
     else
         si->J = si->I >> 1;
@@ -644,13 +627,9 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, double skewness, int nb_threads)/*{{
     ASSERT_ALWAYS(LOG_BUCKET_REGION >= si->conf->logI);
     uint32_t i = 1U << (LOG_BUCKET_REGION - si->conf->logI);
     i *= nb_threads;  /* ensures nb of bucket regions divisible by nb_threads */
+    si->J = ((si->J - 1U) / i + 1U) * i; /* Round up to multiple of i */
 
-    /* Bug 15617: if we round up, we are not true to our promises */
-    uint32_t nJ = (si->J / i) * i; /* Round down to multiple of i */
-
-    /* XXX No rounding if we intend to abort */
-    if (nJ > 0) si->J = nJ;
-    return nJ > 0;
+    return 0;
 }/*}}}*/
 
 static void sieve_info_update (sieve_info_ptr si)/*{{{*/
@@ -1527,7 +1506,7 @@ typedef const struct thread_data_s * thread_data_srcptr;
 
 /* {{{ fill_in_buckets */
 void
-fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
+fill_in_buckets_OLD(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 {
     WHERE_AM_I_UPDATE(w, side, side);
     sieve_info_srcptr si = th->si;
@@ -1564,6 +1543,7 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 #define shiftbucket LOG_BUCKET_REGION
         const uint32_t I = si->I;
         const unsigned int logI = si->conf->logI;
+	ASSERT_ALWAYS(logI >=10 && logI <= 20); 
 	const uint32_t maskI = I-1;
 	const uint64_t even_mask = (1U << logI) | 1U;
 	const uint64_t IJ = I * si->J;
@@ -1688,6 +1668,638 @@ FIXME: can we find the locations to sieve? */
     /* Write back BA so the nr_logp etc get copied to caller */
     th->sides[side]->BA = BA;
 }
+
+/* {{{ fill_in_buckets */
+void
+fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
+{
+  WHERE_AM_I_UPDATE(w, side, side);
+  sieve_info_srcptr si = th->si;
+  bucket_array_t BA = th->sides[side]->BA;  /* local copy */
+  // Loop over all primes in the factor base.
+  //
+  // Note that dispatch_fb already arranged so that all the primes
+  // which appear here are >= bucket_thresh and <= pmax (the latter
+  // being for the moment unconditionally set to FBPRIME_MAX by the
+  // caller of dispatch_fb).
+  
+  fb_iterator t;
+  fb_iterator_init_set_fb(t, th->sides[side]->fb_bucket);
+  bucket_update_t *ca = malloc_aligned(si->nb_buckets * 64, 64); /* Cacheline */
+  for( ; !fb_iterator_over(t) ; fb_iterator_next(t)) {
+    fbprime_t p = t->fb->p;
+    unsigned char logp = t->fb->plog;
+    ASSERT_ALWAYS (p & 1);
+    WHERE_AM_I_UPDATE(w, p, p);
+    
+    /* Write new set of pointers if the logp value changed */
+    bucket_new_logp (&BA, logp);
+    
+    /* If we sieve for special-q's smaller than the factor
+       base bound, the prime p might equal the special-q prime q. */
+    if (UNLIKELY(mpz_cmp_ui(si->doing->p, p) == 0))
+      continue;
+    
+    /* I use a uint32_t to "simulate" a bucket_update_t with u */
+    ASSERT_ALWAYS(sizeof(bucket_update_t) == 4);
+    
+    fbprime_t r, R;
+    uint32_t bep = (uint32_t) ((bucket_encode_prime (p)) << 16);
+    
+    R = fb_iterator_get_r(t);
+    r = fb_root_in_qlattice(p, R, t->fb->invp, si);
+    
+#define maskbucket (BUCKET_REGION - 1)
+#define shiftbucket LOG_BUCKET_REGION
+    const uint32_t I = si->I;
+    const unsigned int logI = si->conf->logI;
+    /* const uint32_t maskI = I-1; */
+    /* const uint64_t even_mask = (1U << logI) | 1U; */
+    const uint64_t IJ = I * si->J;
+    // TODO: should be line sieved in the non-bucket phase?
+    // Or should we have a bucket line siever?
+    if (UNLIKELY(!r)) {
+      /* If r == 0 (mod p), this prime hits for i == 0 (mod p),
+	 but since p > I, this implies i = 0 or i > I. We don't
+	 sieve i > I. Since gcd(i,j) | gcd(a,b), for i = 0 we
+	 only need to sieve j = 1 */
+      /* x = j*I + (i + I/2) = I + I/2 */
+      uint32_t u, x = I + I / 2;
+      bucket_update_t *pu, *py;
+      size_t y, z;
+      y = x >> shiftbucket;
+      pu = ++(BA.bucket_write[y]);
+      py = (bucket_update_t *)(((uint8_t *)ca) + (y << 6));
+#if LOG_BUCKET_REGION == 16
+      u = (uint32_t)(uint16_t)x;
+#else
+      u = (uint32_t)x & maskbucket;
+#endif
+      u |= bep;
+      z = (size_t)pu & 63;
+      /* *(uint32_t *)(pu-1) = u; */
+      if (LIKELY(z)) {
+	*(uint32_t *)((uint8_t *)(py-1) + z) = u;
+      }
+      else {
+	__m128i c1, c2, c3, c4;
+	*(uint32_t *)((uint8_t *)(py-1) + 64) = u;
+	c1 = _mm_load_si128((__m128i *)(py));
+	c2 = _mm_load_si128((__m128i *)((uint8_t *)py + 16));
+	c3 = _mm_load_si128((__m128i *)((uint8_t *)py + 32));
+	c4 = _mm_load_si128((__m128i *)((uint8_t *)py + 48));
+	_mm_stream_si128((__m128i *)((uint8_t *)pu - 64), c1);
+	_mm_stream_si128((__m128i *)((uint8_t *)pu - 48), c2);
+	_mm_stream_si128((__m128i *)((uint8_t *)pu - 32), c3);
+	_mm_stream_si128((__m128i *)((uint8_t *)pu - 16), c4);
+      }
+      continue;
+    }
+    if (UNLIKELY(r == p)) {
+      /* r == p means root at infinity, which hits for
+	 j == 0 (mod p). Since q > I > J, this implies j = 0
+	 or j > J. This means we sieve only (i,j) = (1,0) here.
+	 Since I < BUCKET_REGION, this always goes in bucket 0.
+	 FIXME: what about (-1,0)? It's the same (a,b) as (1,0)
+	 but which of these two (if any) do we sieve? */
+      uint32_t u, x = 1 + I / 2;
+      bucket_update_t *pu, *py;
+      size_t y, z;
+      y = x >> shiftbucket;
+      pu = ++(BA.bucket_write[y]);
+      py = (bucket_update_t *)(((uint8_t *)ca) + (y << 6));
+#if LOG_BUCKET_REGION == 16
+      u = (uint32_t)(uint16_t)x;
+#else
+      u = (uint32_t)x & maskbucket;
+#endif
+      u |= bep;
+      z = (size_t)pu & 63;
+      /* *(uint32_t *)(pu-1) = u; */
+      if (LIKELY(z)) {
+	*(uint32_t *)((uint8_t *)(py-1) + z) = u;
+      }
+      else {
+	__m128i c1, c2, c3, c4;
+	*(uint32_t *)((uint8_t *)(py-1) + 64) = u;
+	c1 = _mm_load_si128((__m128i *)(py));
+	c2 = _mm_load_si128((__m128i *)((uint8_t *)py + 16));
+	c3 = _mm_load_si128((__m128i *)((uint8_t *)py + 32));
+	c4 = _mm_load_si128((__m128i *)((uint8_t *)py + 48));
+	_mm_stream_si128((__m128i *)((uint8_t *)pu - 64), c1);
+	_mm_stream_si128((__m128i *)((uint8_t *)pu - 48), c2);
+	_mm_stream_si128((__m128i *)((uint8_t *)pu - 32), c3);
+	_mm_stream_si128((__m128i *)((uint8_t *)pu - 16), c4);
+      }
+      continue;
+    }
+    if (UNLIKELY(r > p))
+      continue;
+    
+    /* If working with congruence classes, once the loop on the
+     * parity goes at the level above, this initialization
+     * should in fact either be done for each congruence class,
+     * or saved for later use within the factor base structure.
+     */
+    plattice_info_t pli;
+    if (!reduce_plattice(&pli, p, r, si)) {
+      pthread_mutex_lock(&io_mutex);
+      fprintf (stderr, "# fill_in_buckets: reduce_plattice() "
+	       "returned 0 for p = " FBPRIME_FORMAT ", r = "
+	       FBPRIME_FORMAT "\n", p, r);
+      pthread_mutex_unlock(&io_mutex);
+      continue; /* Simply don't consider that (p,r) for now.
+		   FIXME: can we find the locations to sieve? */
+    }
+    unsigned int bound0 = plattice_bound0(&pli, si);
+    unsigned int bound1 = plattice_bound1(&pli, si);
+    
+    for(unsigned int parity = MOD2_CLASSES_BS ; parity < (MOD2_CLASSES_BS?4:1) ; parity++) {
+      // The sieving point (0,0) is I/2 in x-coordinate
+      uint64_t x = (uint64_t) plattice_starting_vector(&pli, si, parity);
+      if (x >= IJ) continue;
+      uint64_t						\
+	inc_a = (uint64_t) plattice_a(&pli, si),
+	inc_c = (uint64_t) plattice_c(&pli, si);
+      // ASSERT_ALWAYS(inc_a == pli.a);
+      // ASSERT_ALWAYS(inc_c == pli.c);
+#ifdef __x86_64
+      __asm__ (""::"r"(BA.bucket_write),"r"(ca),"r"(IJ),"r"(bound0),"r"(bound1),"r"(bep),"r"(inc_a),"r"(inc_c),"r"(x));
+#endif
+      switch (logI) {
+      case 10: do {
+	    unsigned int i;
+	    i = x & ((1<<10)-1);
+	    if (LIKELY(MOD2_CLASSES_BS || (x & ((1<<10)+1)) 
+#ifdef SKIP_GCD3
+		       && (!is_divisible_3_u32 (i + (1<<10)) ||
+			   !is_divisible_3_u32 ((uint32_t) (x >> 10)))
+#endif
+		       )) {
+	      uint32_t u;
+	      bucket_update_t *pu, *py;
+	      size_t y, z;
+	      y = x >> shiftbucket;
+	      pu = ++(BA.bucket_write[y]);
+	      py = (bucket_update_t *)(((uint8_t *)ca) + (y << 6));
+#if LOG_BUCKET_REGION == 16
+	      u = (uint32_t)(uint16_t)x;
+#else
+	      u = (uint32_t)x & maskbucket;
+#endif
+	      u |= bep;
+	      z = (size_t)pu & 63;
+	      if (LIKELY(z))
+		*(uint32_t *)((uint8_t *)(py-1) + z) = u;
+	      else {
+		__m128i c1, c2, c3, c4;
+		*(uint32_t *)((uint8_t *)(py-1) + 64) = u;
+		c1 = _mm_load_si128((__m128i *)(py));
+		c2 = _mm_load_si128((__m128i *)((uint8_t *)py + 16));
+		c3 = _mm_load_si128((__m128i *)((uint8_t *)py + 32));
+		c4 = _mm_load_si128((__m128i *)((uint8_t *)py + 48));
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 64), c1);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 48), c2);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 32), c3);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 16), c4);
+	      }
+	    }
+	    if (i >= bound1) x += inc_a;
+	    if (i < bound0)  x += inc_c;
+	  } while (x < IJ);
+	break;
+      case 11: do {
+	    unsigned int i;
+	    i = x & ((1<<11)-1);
+	    if (LIKELY(MOD2_CLASSES_BS || (x & ((1<<11)+1)) 
+#ifdef SKIP_GCD3
+		       && (!is_divisible_3_u32 (i + (1<<11)) ||
+			   !is_divisible_3_u32 ((uint32_t) (x >> 10)))
+#endif
+		       )) {
+	      uint32_t u;
+	      bucket_update_t *pu, *py;
+	      size_t y, z;
+	      y = x >> shiftbucket;
+	      pu = ++(BA.bucket_write[y]);
+	      py = (bucket_update_t *)(((uint8_t *)ca) + (y << 6));
+#if LOG_BUCKET_REGION == 16
+	      u = (uint32_t)(uint16_t)x;
+#else
+	      u = (uint32_t)x & maskbucket;
+#endif
+	      u |= bep;
+	      z = (size_t)pu & 63;
+	      if (LIKELY(z))
+		*(uint32_t *)((uint8_t *)(py-1) + z) = u;
+	      else {
+		__m128i c1, c2, c3, c4;
+		*(uint32_t *)((uint8_t *)(py-1) + 64) = u;
+		c1 = _mm_load_si128((__m128i *)(py));
+		c2 = _mm_load_si128((__m128i *)((uint8_t *)py + 16));
+		c3 = _mm_load_si128((__m128i *)((uint8_t *)py + 32));
+		c4 = _mm_load_si128((__m128i *)((uint8_t *)py + 48));
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 64), c1);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 48), c2);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 32), c3);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 16), c4);
+	      }
+	    }
+	    if (i >= bound1) x += inc_a;
+	    if (i < bound0)  x += inc_c;
+	  } while (x < IJ);
+	break;
+      case 12: do {
+	    unsigned int i;
+	    i = x & ((1<<12)-1);
+	    if (LIKELY(MOD2_CLASSES_BS || (x & ((1<<12)+1)) 
+#ifdef SKIP_GCD3
+		       && (!is_divisible_3_u32 (i + (1<<12)) ||
+			   !is_divisible_3_u32 ((uint32_t) (x >> 10)))
+#endif
+		       )) {
+	      uint32_t u;
+	      bucket_update_t *pu, *py;
+	      size_t y, z;
+	      y = x >> shiftbucket;
+	      pu = ++(BA.bucket_write[y]);
+	      py = (bucket_update_t *)(((uint8_t *)ca) + (y << 6));
+#if LOG_BUCKET_REGION == 16
+	      u = (uint32_t)(uint16_t)x;
+#else
+	      u = (uint32_t)x & maskbucket;
+#endif
+	      u |= bep;
+	      z = (size_t)pu & 63;
+	      if (LIKELY(z))
+		*(uint32_t *)((uint8_t *)(py-1) + z) = u;
+	      else {
+		__m128i c1, c2, c3, c4;
+		*(uint32_t *)((uint8_t *)(py-1) + 64) = u;
+		c1 = _mm_load_si128((__m128i *)(py));
+		c2 = _mm_load_si128((__m128i *)((uint8_t *)py + 16));
+		c3 = _mm_load_si128((__m128i *)((uint8_t *)py + 32));
+		c4 = _mm_load_si128((__m128i *)((uint8_t *)py + 48));
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 64), c1);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 48), c2);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 32), c3);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 16), c4);
+	      }
+	    }
+	    if (i >= bound1) x += inc_a;
+	    if (i < bound0)  x += inc_c;
+	  } while (x < IJ);
+	break;
+      case 13: do {
+	    unsigned int i;
+	    i = x & ((1<<13)-1);
+	    if (LIKELY(MOD2_CLASSES_BS || (x & ((1<<13)+1)) 
+#ifdef SKIP_GCD3
+		       && (!is_divisible_3_u32 (i + (1<<13)) ||
+			   !is_divisible_3_u32 ((uint32_t) (x >> 10)))
+#endif
+		       )) {
+	      uint32_t u;
+	      bucket_update_t *pu, *py;
+	      size_t y, z;
+	      y = x >> shiftbucket;
+	      pu = ++(BA.bucket_write[y]);
+	      py = (bucket_update_t *)(((uint8_t *)ca) + (y << 6));
+#if LOG_BUCKET_REGION == 16
+	      u = (uint32_t)(uint16_t)x;
+#else
+	      u = (uint32_t)x & maskbucket;
+#endif
+	      u |= bep;
+	      z = (size_t)pu & 63;
+	      if (LIKELY(z))
+		*(uint32_t *)((uint8_t *)(py-1) + z) = u;
+	      else {
+		__m128i c1, c2, c3, c4;
+		*(uint32_t *)((uint8_t *)(py-1) + 64) = u;
+		c1 = _mm_load_si128((__m128i *)(py));
+		c2 = _mm_load_si128((__m128i *)((uint8_t *)py + 16));
+		c3 = _mm_load_si128((__m128i *)((uint8_t *)py + 32));
+		c4 = _mm_load_si128((__m128i *)((uint8_t *)py + 48));
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 64), c1);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 48), c2);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 32), c3);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 16), c4);
+	      }
+	    }
+	    if (i >= bound1) x += inc_a;
+	    if (i < bound0)  x += inc_c;
+	  } while (x < IJ);
+	break;
+      case 14: do {
+	    unsigned int i;
+	    i = x & ((1<<14)-1);
+	    if (LIKELY(MOD2_CLASSES_BS || (x & ((1<<14)+1)) 
+#ifdef SKIP_GCD3
+		       && (!is_divisible_3_u32 (i + (1<<14)) ||
+			   !is_divisible_3_u32 ((uint32_t) (x >> 10)))
+#endif
+		       )) {
+	      uint32_t u;
+	      bucket_update_t *pu, *py;
+	      size_t y, z;
+	      y = x >> shiftbucket;
+	      pu = ++(BA.bucket_write[y]);
+	      py = (bucket_update_t *)(((uint8_t *)ca) + (y << 6));
+#if LOG_BUCKET_REGION == 16
+	      u = (uint32_t)(uint16_t)x;
+#else
+	      u = (uint32_t)x & maskbucket;
+#endif
+	      u |= bep;
+	      z = (size_t)pu & 63;
+	      if (LIKELY(z))
+		*(uint32_t *)((uint8_t *)(py-1) + z) = u;
+	      else {
+		__m128i c1, c2, c3, c4;
+		*(uint32_t *)((uint8_t *)(py-1) + 64) = u;
+		c1 = _mm_load_si128((__m128i *)(py));
+		c2 = _mm_load_si128((__m128i *)((uint8_t *)py + 16));
+		c3 = _mm_load_si128((__m128i *)((uint8_t *)py + 32));
+		c4 = _mm_load_si128((__m128i *)((uint8_t *)py + 48));
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 64), c1);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 48), c2);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 32), c3);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 16), c4);
+	      }
+	    }
+	    if (i >= bound1) x += inc_a;
+	    if (i < bound0)  x += inc_c;
+	  } while (x < IJ);
+	break;
+      case 15: do {
+	    unsigned int i;
+	    i = x & ((1<<15)-1);
+	    if (LIKELY(MOD2_CLASSES_BS || (x & ((1<<15)+1)) 
+#ifdef SKIP_GCD3
+		       && (!is_divisible_3_u32 (i + (1<<15)) ||
+			   !is_divisible_3_u32 ((uint32_t) (x >> 10)))
+#endif
+		       )) {
+	      uint32_t u;
+	      bucket_update_t *pu, *py;
+	      size_t y, z;
+	      y = x >> shiftbucket;
+	      pu = ++(BA.bucket_write[y]);
+	      py = (bucket_update_t *)(((uint8_t *)ca) + (y << 6));
+#if LOG_BUCKET_REGION == 16
+	      u = (uint32_t)(uint16_t)x;
+#else
+	      u = (uint32_t)x & maskbucket;
+#endif
+	      u |= bep;
+	      z = (size_t)pu & 63;
+	      if (LIKELY(z))
+		*(uint32_t *)((uint8_t *)(py-1) + z) = u;
+	      else {
+		__m128i c1, c2, c3, c4;
+		*(uint32_t *)((uint8_t *)(py-1) + 64) = u;
+		c1 = _mm_load_si128((__m128i *)(py));
+		c2 = _mm_load_si128((__m128i *)((uint8_t *)py + 16));
+		c3 = _mm_load_si128((__m128i *)((uint8_t *)py + 32));
+		c4 = _mm_load_si128((__m128i *)((uint8_t *)py + 48));
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 64), c1);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 48), c2);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 32), c3);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 16), c4);
+	      }
+	    }
+	    if (i >= bound1) x += inc_a;
+	    if (i < bound0)  x += inc_c;
+	  } while (x < IJ);
+	break;
+      case 16: do {
+	    unsigned int i;
+	    i = x & ((1<<16)-1);
+	    if (LIKELY(MOD2_CLASSES_BS || (x & ((1<<16)+1)) 
+#ifdef SKIP_GCD3
+		       && (!is_divisible_3_u32 (i + (1<<16)) ||
+			   !is_divisible_3_u32 ((uint32_t) (x >> 10)))
+#endif
+		       )) {
+	      uint32_t u;
+	      bucket_update_t *pu, *py;
+	      size_t y, z;
+	      y = x >> shiftbucket;
+	      pu = ++(BA.bucket_write[y]);
+	      py = (bucket_update_t *)(((uint8_t *)ca) + (y << 6));
+#if LOG_BUCKET_REGION == 16
+	      u = (uint32_t)(uint16_t)x;
+#else
+	      u = (uint32_t)x & maskbucket;
+#endif
+	      u |= bep;
+	      z = (size_t)pu & 63;
+	      if (LIKELY(z))
+		*(uint32_t *)((uint8_t *)(py-1) + z) = u;
+	      else {
+		__m128i c1, c2, c3, c4;
+		*(uint32_t *)((uint8_t *)(py-1) + 64) = u;
+		c1 = _mm_load_si128((__m128i *)(py));
+		c2 = _mm_load_si128((__m128i *)((uint8_t *)py + 16));
+		c3 = _mm_load_si128((__m128i *)((uint8_t *)py + 32));
+		c4 = _mm_load_si128((__m128i *)((uint8_t *)py + 48));
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 64), c1);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 48), c2);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 32), c3);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 16), c4);
+	      }
+	    }
+	    if (i >= bound1) x += inc_a;
+	    if (i < bound0)  x += inc_c;
+	  } while (x < IJ);
+	break;
+      case 17: do {
+	    unsigned int i;
+	    i = x & ((1<<17)-1);
+	    if (LIKELY(MOD2_CLASSES_BS || (x & ((1<<17)+1)) 
+#ifdef SKIP_GCD3
+		       && (!is_divisible_3_u32 (i + (1<<17)) ||
+			   !is_divisible_3_u32 ((uint32_t) (x >> 10)))
+#endif
+		       )) {
+	      uint32_t u;
+	      bucket_update_t *pu, *py;
+	      size_t y, z;
+	      y = x >> shiftbucket;
+	      pu = ++(BA.bucket_write[y]);
+	      py = (bucket_update_t *)(((uint8_t *)ca) + (y << 6));
+#if LOG_BUCKET_REGION == 16
+	      u = (uint32_t)(uint16_t)x;
+#else
+	      u = (uint32_t)x & maskbucket;
+#endif
+	      u |= bep;
+	      z = (size_t)pu & 63;
+	      if (LIKELY(z))
+		*(uint32_t *)((uint8_t *)(py-1) + z) = u;
+	      else {
+		__m128i c1, c2, c3, c4;
+		*(uint32_t *)((uint8_t *)(py-1) + 64) = u;
+		c1 = _mm_load_si128((__m128i *)(py));
+		c2 = _mm_load_si128((__m128i *)((uint8_t *)py + 16));
+		c3 = _mm_load_si128((__m128i *)((uint8_t *)py + 32));
+		c4 = _mm_load_si128((__m128i *)((uint8_t *)py + 48));
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 64), c1);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 48), c2);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 32), c3);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 16), c4);
+	      }
+	    }
+	    if (i >= bound1) x += inc_a;
+	    if (i < bound0)  x += inc_c;
+	  } while (x < IJ);
+	break;
+      case 18: do {
+	    unsigned int i;
+	    i = x & ((1<<18)-1);
+	    if (LIKELY(MOD2_CLASSES_BS || (x & ((1<<18)+1)) 
+#ifdef SKIP_GCD3
+		       && (!is_divisible_3_u32 (i + (1<<18)) ||
+			   !is_divisible_3_u32 ((uint32_t) (x >> 10)))
+#endif
+		       )) {
+	      uint32_t u;
+	      bucket_update_t *pu, *py;
+	      size_t y, z;
+	      y = x >> shiftbucket;
+	      pu = ++(BA.bucket_write[y]);
+	      py = (bucket_update_t *)(((uint8_t *)ca) + (y << 6));
+#if LOG_BUCKET_REGION == 16
+	      u = (uint32_t)(uint16_t)x;
+#else
+	      u = (uint32_t)x & maskbucket;
+#endif
+	      u |= bep;
+	      z = (size_t)pu & 63;
+	      if (LIKELY(z))
+		*(uint32_t *)((uint8_t *)(py-1) + z) = u;
+	      else {
+		__m128i c1, c2, c3, c4;
+		*(uint32_t *)((uint8_t *)(py-1) + 64) = u;
+		c1 = _mm_load_si128((__m128i *)(py));
+		c2 = _mm_load_si128((__m128i *)((uint8_t *)py + 16));
+		c3 = _mm_load_si128((__m128i *)((uint8_t *)py + 32));
+		c4 = _mm_load_si128((__m128i *)((uint8_t *)py + 48));
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 64), c1);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 48), c2);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 32), c3);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 16), c4);
+	      }
+	    }
+	    if (i >= bound1) x += inc_a;
+	    if (i < bound0)  x += inc_c;
+	  } while (x < IJ);
+	break;
+      case 19: do {
+	    unsigned int i;
+	    i = x & ((1<<19)-1);
+	    if (LIKELY(MOD2_CLASSES_BS || (x & ((1<<19)+1)) 
+#ifdef SKIP_GCD3
+		       && (!is_divisible_3_u32 (i + (1<<19)) ||
+			   !is_divisible_3_u32 ((uint32_t) (x >> 10)))
+#endif
+		       )) {
+	      uint32_t u;
+	      bucket_update_t *pu, *py;
+	      size_t y, z;
+	      y = x >> shiftbucket;
+	      pu = ++(BA.bucket_write[y]);
+	      py = (bucket_update_t *)(((uint8_t *)ca) + (y << 6));
+#if LOG_BUCKET_REGION == 16
+	      u = (uint32_t)(uint16_t)x;
+#else
+	      u = (uint32_t)x & maskbucket;
+#endif
+	      u |= bep;
+	      z = (size_t)pu & 63;
+	      if (LIKELY(z))
+		*(uint32_t *)((uint8_t *)(py-1) + z) = u;
+	      else {
+		__m128i c1, c2, c3, c4;
+		*(uint32_t *)((uint8_t *)(py-1) + 64) = u;
+		c1 = _mm_load_si128((__m128i *)(py));
+		c2 = _mm_load_si128((__m128i *)((uint8_t *)py + 16));
+		c3 = _mm_load_si128((__m128i *)((uint8_t *)py + 32));
+		c4 = _mm_load_si128((__m128i *)((uint8_t *)py + 48));
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 64), c1);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 48), c2);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 32), c3);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 16), c4);
+	      }
+	    }
+	    if (i >= bound1) x += inc_a;
+	    if (i < bound0)  x += inc_c;
+	  } while (x < IJ);
+	break;
+      case 20: do {
+	    unsigned int i;
+	    i = x & ((1<<20)-1);
+	    if (LIKELY(MOD2_CLASSES_BS || (x & ((1<<20)+1)) 
+#ifdef SKIP_GCD3
+		       && (!is_divisible_3_u32 (i + (1<<20)) ||
+			   !is_divisible_3_u32 ((uint32_t) (x >> 10)))
+#endif
+		       )) {
+	      uint32_t u;
+	      bucket_update_t *pu, *py;
+	      size_t y, z;
+	      y = x >> shiftbucket;
+	      pu = ++(BA.bucket_write[y]);
+	      py = (bucket_update_t *)(((uint8_t *)ca) + (y << 6));
+#if LOG_BUCKET_REGION == 16
+	      u = (uint32_t)(uint16_t)x;
+#else
+	      u = (uint32_t)x & maskbucket;
+#endif
+	      u |= bep;
+	      z = (size_t)pu & 63;
+	      if (LIKELY(z))
+		*(uint32_t *)((uint8_t *)(py-1) + z) = u;
+	      else {
+		__m128i c1, c2, c3, c4;
+		*(uint32_t *)((uint8_t *)(py-1) + 64) = u;
+		c1 = _mm_load_si128((__m128i *)(py));
+		c2 = _mm_load_si128((__m128i *)((uint8_t *)py + 16));
+		c3 = _mm_load_si128((__m128i *)((uint8_t *)py + 32));
+		c4 = _mm_load_si128((__m128i *)((uint8_t *)py + 48));
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 64), c1);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 48), c2);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 32), c3);
+		_mm_stream_si128((__m128i *)((uint8_t *)pu - 16), c4);
+	      }
+	    }
+	    if (i >= bound1) x += inc_a;
+	    if (i < bound0)  x += inc_c;
+	  } while (x < IJ);
+	break;
+      }
+    }
+  }
+  uint8_t *pu, *py = (uint8_t *) ca;
+  for (uint32_t i = 0; i < (uint32_t) si->nb_buckets; i++) {
+    __m128i c1, c2, c3, c4;
+    pu = (uint8_t *)((size_t) BA.bucket_write[i] & ~63);
+    c1 = _mm_load_si128((__m128i *)(py));
+    c2 = _mm_load_si128((__m128i *)(py + 16));
+    c3 = _mm_load_si128((__m128i *)(py + 32));
+    c4 = _mm_load_si128((__m128i *)(py + 48));
+    py += 64;
+    _mm_stream_si128((__m128i *)(pu), c1);
+    _mm_stream_si128((__m128i *)(pu + 16), c2);
+    _mm_stream_si128((__m128i *)(pu + 32), c3);
+    _mm_stream_si128((__m128i *)(pu + 48), c4);
+  }
+  free(ca);
+  /* Write back BA so the nr_logp etc get copied to caller */
+  th->sides[side]->BA = BA;
+}
+
 
 void * fill_in_buckets_both(thread_data_ptr th)
 {
@@ -2317,11 +2929,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             for(int z = 0 ; pass && z < 2 ; z++) {
                 int side = first ^ z;
                 int lpb = si->conf->sides[side]->lpb;
-                pass = factor_leftover_norm (norm[side], log2_fbs[side], lpb, f[side], m[side], si->sides[side]->strategy);
-#ifdef TRACE_K
-                if (trace_on_spot_ab(a, b) && pass == 0)
-                  gmp_fprintf (stderr, "# factor_leftover_norm failed on %s side for (%"PRId64",%"PRIu64"), remains %Zd unfactored\n", sidenames[side], a, b, norm[side]);
-#endif
+                pass = factor_leftover_norm(norm[side], log2_fbs[side], lpb, f[side], m[side], si->sides[side]->strategy);
             }
             if (!pass) continue;
 
@@ -2628,7 +3236,7 @@ factor_leftover_norm (mpz_t n, double fbbits, unsigned int lpb,
 	  unsigned long r;
 	  mpz_t t;
 	  if (ul_factors[i] & oversize_mask) /* Larger than large prime bound? */
-            return 0;
+	    return 0;
 	  r = mpz_tdiv_q_ui (n, n, ul_factors[i]);
 	  ASSERT_ALWAYS (r == 0UL);
 	  mpz_init (t);
@@ -2648,49 +3256,17 @@ factor_leftover_norm (mpz_t n, double fbbits, unsigned int lpb,
           append_uint32_to_array (multis, 1);
           return 1;
         }
+      /* If we still have more than two primes (or something non-smooth),
+         bail out */
+      if (s > 2*lpb)
+        return 0;
+      /* We always abort below, so let's skip the prp test
+      if (IS_PROBAB_PRIME(n))
+        return 0; */
     }
-#ifdef USE_GMPECM
-  {
-    mpz_t f; /* potential factor */
-    int res;
-    double B1 = 315.0; /* last curve tried in facul has B1=315 */
-
-    mpz_init (f);
-    while (1) /* assume n > 2^lpb */
-      {
-        if (IS_PROBAB_PRIME (n))
-          {
-            mpz_clear (f);
-            return 0;
-          }
-        B1 += sqrt (B1);
-        res = ecm_factor (f, n, B1, NULL);
-        if (res > 0) /* found a factor 1 < f <= n */
-          {
-            /* TODO: if n = p*q*r, it might be that f = p*q, then we should
-               replace f by n/f */
-            if (mpz_sizeinbase (f, 2) > lpb) /* include case where f = n */
-              {
-                mpz_clear (f);
-                return 0;
-              }
-            /* f < 2^lpb, thus f is prime */
-            append_mpz_to_array (factors, f);
-            append_uint32_to_array (multis, 1);
-            mpz_divexact (n, n, f);
-            unsigned int s = BITSIZE(n);
-            if (s <= lpb)
-              {
-                append_mpz_to_array (factors, n);
-                append_uint32_to_array (multis, 1);
-                mpz_clear (f);
-                return 1;
-              }
-          }
-      }
-    /* we will never go here */
-  }
-#endif
+  /* When sieving for 3 large primes, here are so many left over, non-smooth
+     numbers here that factoring them all takes a long time, for few
+     additional relations */
   return 0;
 }/*}}}*/
 
@@ -2863,6 +3439,12 @@ static void thread_buckets_alloc(thread_data * thrs, int n)
             thread_side_data_ptr ts = th->sides[side];
 
             int bucket_limit = thrs[i]->si->sides[side]->max_bucket_fill_ratio * BUCKET_REGION;
+	    /* bucket_limit*sizeof(bucket_update_t) must be L1 cache line aligned (64 bytes) */
+	    {
+	      ASSERT_ALWAYS(!(64 % sizeof(bucket_update_t)));
+	      const int m = 64 / sizeof(bucket_update_t);
+	      bucket_limit = ((bucket_limit + m - 1) / m) * m;
+	    }
 
             ts->BA = init_bucket_array(thrs[i]->si->nb_buckets, bucket_limit);
 
@@ -3271,20 +3853,10 @@ int main (int argc0, char *argv0[])/*{{{*/
         if (SkewGauss (si, si->cpoly->skew) != 0)
             continue;
 
-        /* FIXME: maybe we can discard some special q's if a1/a0 is too large,
-         * see http://www.mersenneforum.org/showthread.php?p=130478 
-         *
-         * Just for correctness at the moment we're doing it in very
-         * extreme cases, see bug 15617
-         */
-        if (sieve_info_adjust_IJ(si, si->cpoly->skew, las->nb_threads) == 0) {
-            gmp_fprintf (las->output, "# "HILIGHT_START"Discarding %s q=%Zd; rho=%Zd;"HILIGHT_END" a0=%"PRId64"; b0=%"PRId64"; a1=%"PRId64"; b1=%"PRId64"; raw_J=%u;\n",
-                    sidenames[si->conf->side],
-                    si->doing->p, si->doing->r, si->a0, si->b0, si->a1, si->b1,
-                    si->J);
-            continue;
-        }
+        sieve_info_adjust_IJ(si, si->cpoly->skew, las->nb_threads);
 
+        /* FIXME: maybe we can discard some special q's if a1/a0 is too large,
+           see http://www.mersenneforum.org/showthread.php?p=130478 */
 
         gmp_fprintf (las->output, "# "HILIGHT_START"Sieving %s q=%Zd; rho=%Zd;"HILIGHT_END" a0=%"PRId64"; b0=%"PRId64"; a1=%"PRId64"; b1=%"PRId64";",
                 sidenames[si->conf->side],
