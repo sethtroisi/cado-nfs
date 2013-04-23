@@ -108,7 +108,7 @@ fb_add_to (factorbase_degn_t *fb, size_t *fbsize, size_t *fballoc,
   if (*fballoc < *fbsize + fb_addsize)
     {
       size_t newalloc = *fballoc + allocblocksize;
-      newfb = (factorbase_degn_t *) realloc (fb, newsize);
+      newfb = (factorbase_degn_t *) realloc (fb, newalloc);
       if (newfb == NULL)
 	{
 	  fprintf (stderr, 
