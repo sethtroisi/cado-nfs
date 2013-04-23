@@ -107,8 +107,8 @@ fb_add_to (factorbase_degn_t *fb, size_t *fbsize, size_t *fballoc,
   /* Do we need more memory for fb? */
   if (*fballoc < *fbsize + fb_addsize)
     {
-      *fballoc += allocblocksize;
-      newfb = (factorbase_degn_t *) realloc (fb, *fballoc);
+      size_t newalloc = *fballoc + allocblocksize;
+      newfb = (factorbase_degn_t *) realloc (fb, newsize);
       if (newfb == NULL)
 	{
 	  fprintf (stderr, 
@@ -116,6 +116,7 @@ fb_add_to (factorbase_degn_t *fb, size_t *fbsize, size_t *fballoc,
 		   (unsigned long) *fballoc);
 	  return NULL;
 	}
+      *fballoc = newalloc;
     }
   memcpy (fb_skip(newfb, *fbsize), fb_add, fb_addsize);
   fb_skip(newfb, *fbsize)->size = fb_addsize;
