@@ -24,9 +24,14 @@ class Option(object):
             self.arg = config
         else:
             self.arg = arg
-
-    def get_config_keyword(self):
+    
+    def get_key(self):
         return self.config
+
+class PositionalParameter(Option):
+    ''' Positional command line parameter '''
+    def map(self, value):
+        return [value]
 
 class Parameter(Option):
     ''' Command line option that takes a parameter '''
@@ -90,8 +95,9 @@ class Program(object):
         '''
         return "'" + s.replace("'", "'\\''") + "'"
     
-    def __init__(self, args, kwargs, path = None, binary = None, stdin = None,
-                 stdout = subprocess.PIPE, stderr = subprocess.PIPE):
+    def __init__(self, args = None, kwargs = None, path = None, binary = None, 
+                 stdin = None, stdout = subprocess.PIPE, 
+                 stderr = subprocess.PIPE):
         ''' Takes a list of positional parameters and a dictionary of command 
         line parameters 
         
@@ -115,18 +121,20 @@ class Program(object):
         self.command = [self.path.rstrip(os.sep) + os.sep + self.binary]
         
         # Add keyword command line parameters
-        params_dict = self.params_dict()
-        # For each entry in kwargs, convert to command line parameter
-        for (key, value) in kwargs.items():
-            self.command += params_dict[key].map(value)
+        for p in self.params_list:
+            key = p.get_key()
+            if kwargs and key in kwargs:
+                self.command += p.map(kwargs[key])
+        
         # Add positional command line parameters
-        self.command += args
+        if args:
+            self.command += args
     
     @classmethod
     def params_dict(cls):
         """ Return the accepted parameters as a mapping from config file 
         keywords to Option instances  """
-        return {p.get_config_keyword():p for p in cls.params_list}
+        return {p.get_key():p for p in cls.params_list}
     
     def __str__(self):
         ''' Returns the command line as a string '''
@@ -185,6 +193,8 @@ class Program(object):
         self.outfile = self._open_or_not(self.stdout, "w")
         self.errfile = self._open_or_not(self.stdout, "w")
         
+        # print (self.as_array())
+
         self.child = cadocommand.Command(self.as_array(), 
                                          stdin=self.infile,
                                          stdout=self.outfile, 
@@ -214,6 +224,7 @@ class Polyselect2l(Program):
         Toggle("verbose", "v"), 
         Toggle("quiet", "q"), 
         Toggle("sizeonly", "r"), 
+        Parameter("N"), 
         Parameter("threads", "t"), 
         Parameter("admin"), 
         Parameter("admax"), 
@@ -225,14 +236,10 @@ class Polyselect2l(Program):
         Parameter("maxnorm"), 
         Parameter("maxtime"), 
         Parameter("out"), 
-        Parameter("printdelay", "s")
+        Parameter("printdelay", "s"),
+        PositionalParameter("P")
         )
     
-    def __init__(self, N, P, outputfile, parameters, path = None, 
-                 binary = None):
-        args = ("-N", str(N), str(P))
-        super().__init__(args, parameters, stdout = outputfile, path = path, 
-                         binary = binary)
 
 class MakeFB(Program):
     binary = "makefb"
@@ -288,8 +295,19 @@ class Duplicates1(Program):
         Parameter("outfmt"), 
         Toggle("bzip", "bz"), 
         Parameter("only"), 
-        Parameter("nslices", "n"), 
+        Parameter("nslices_log", "n"), 
+        Parameter("filelist"),
+        Parameter("basepath"),
         )
+    
+    # cmd("$param{'bindir'}/filter/dup1 ".
+    #     "-n $param{'nslices_log'} ".
+    #     "-out $param{'prefix'}.nodup ".
+    #     "-filelist $param{'prefix'}.newfilelist ".
+    #     "-basepath $param{'wdir'} ",
+    #     { cmdlog => 1, kill => 1,   
+    #      logfile=>"$param{'prefix'}.dup1.log" });
+
 
 class Duplicates2(Program):
     binary = "dup2"
