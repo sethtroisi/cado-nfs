@@ -352,15 +352,15 @@ class PolyselTask(Task):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, dependencies = None, **kwargs)
-        self.params.setdefault("admin", "0")
-        self.params.setdefault("adnext", "0")
-        if int(self.params["adnext"]) < int(self.params["admin"]):
-            self.params["adnext"] = self.params["admin"]
+        self.params.setdefault("admin", 0)
+        self.params.setdefault("adnext", 0)
+        if self.params["adnext"] < int(self.params["admin"]):
+            self.params["adnext"] = int(self.params["admin"])
     
     def is_done(self):
         # self.logger.debug ("PolyselTask.is_done(): Task parameters: %s", 
         #                    self.params)
-        return int(self.params["adnext"]) >= int(self.params["admax"])
+        return self.params["adnext"] >= int(self.params["admax"])
     
     def run(self, parameters = None):
         # Make command line for polselect2l, run it. 
@@ -384,7 +384,7 @@ class PolyselTask(Task):
             self.logger.info("No polynomial was previously found")
         
         while not self.is_done():
-            adstart = int(self.params["adnext"])
+            adstart = self.params["adnext"]
             adend = adstart + int(self.params["adrange"])
             polyselect_params = self.progparams[0].copy()
             polyselect_params["admin"] = str(adstart)
@@ -404,7 +404,7 @@ class PolyselTask(Task):
                                       self.programs[0].name, e)
                     outputfile = None
             
-            self.params["adnext"] = str(adend)
+            self.params["adnext"] = adend
             
             poly = None
             if outputfile:
@@ -422,7 +422,7 @@ class PolyselTask(Task):
                                   % outputfile)
             elif not bestpoly or poly.E > bestpoly.E:
                 bestpoly = poly
-                self.params["bestE"] = str(poly.E)
+                self.params["bestE"] = poly.E
                 self.params["bestpoly"] = str(poly)
                 self.params["bestfile"] = outputfile
                 self.logger.info("New best polynomial from file %s:"
@@ -560,8 +560,8 @@ class SievingTask(Task):
         self.polyselect = polyselect
         self.factorbase = factorbase
         self.params.setdefault("qmin", self.params["alim"])
-        self.params.setdefault("qnext", self.params["qmin"])
-        self.params.setdefault("rels_found", "0")
+        self.params.setdefault("qnext", int(self.params["qmin"]))
+        self.params.setdefault("rels_found", 0)
         self.files = wudb.DictDbAccess(self.db, self.tablename("files"))
     
     def run(self, parameters = None):
@@ -579,7 +579,7 @@ class SievingTask(Task):
         while not self.is_done():
             args = ()
             kwargs = self.progparams[0].copy()
-            q0 = int(self.params["qnext"])
+            q0 = self.params["qnext"]
             q1 = q0 + int(self.params["qrange"])
             outputfile = self.make_output_filename("%d-%d" % (q0, q1))
             kwargs["q0"] = str(q0)
@@ -591,13 +591,13 @@ class SievingTask(Task):
             p = self.programs[0](args, kwargs)
             p.run()
             p.wait()
-            self.params["qnext"] = str(q1)
+            self.params["qnext"] = q1
             rels = self.check_relfile(outputfile)
             if rels == None:
                 raise Exception("Siever output file %s invalid" % outputfile)
-            total = int(self.params["rels_found"]) + rels
-            self.params["rels_found"] = str(total)
-            self.files[outputfile] = str(rels)
+            total = self.params["rels_found"] + rels
+            self.params["rels_found"] = total
+            self.files[outputfile] = rels
             self.logger.info("Found %d relations in %s, total is now %d", 
                              rels, outputfile, total)
             self.notifyObservers({self.name, outputfile})
@@ -703,7 +703,7 @@ class Duplicates1Task(Task):
                     # exception
                     self.check_output_files(outfilenames.keys(),
                                             shouldexist=True)
-                self.already_split_input[f] = str(self.parts)
+                self.already_split_input[f] = self.parts
                 self.already_split_output.update(outfilenames)
         self.logger.debug("Exit Duplicates1Task.run(" + self.name + ")")
         return
@@ -721,7 +721,7 @@ class Duplicates1Task(Task):
         input file named "name" as keys, and the slice number as a string
         as value
         """
-        return {self.make_output_filename(name, I):str(I) \
+        return {self.make_output_filename(name, I):I \
                 for I in range(0, self.parts)}
     
     def make_directories(self):
