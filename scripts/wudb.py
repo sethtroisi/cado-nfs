@@ -366,8 +366,9 @@ class FilesTable(DbTable):
 
 class DictDbTable(DbTable):
     fields = (
-        ("rowid", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"), 
+        ("rowid", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"),
         ("key", "TEXT", "UNIQUE NOT NULL"),
+        ("type", "INTEGER", "NOT NULL"),
         ("value", "TEXT", "")
         )
     primarykey = fields[0][0]
@@ -396,38 +397,40 @@ class DictDbAccess(dict):
     >>> d['a'] = '1'
     >>> d 
     {'a': '1'}
-    >>> d['a'] = '2'
+    >>> d['a'] = 2
     >>> d 
-    {'a': '2'}
+    {'a': 2}
     >>> d['b'] = '3'
-    >>> d == {'a': '2', 'b': '3'}
+    >>> d == {'a': 2, 'b': '3'}
     True
     >>> del(d)
     >>> d = DictDbAccess(conn, 'test')
-    >>> d == {'a': '2', 'b': '3'}
+    >>> d == {'a': 2, 'b': '3'}
     True
     >>> del(d['b'])
     >>> d 
-    {'a': '2'}
+    {'a': 2}
     >>> d.setdefault('a', '3')
-    '2'
+    2
     >>> d 
-    {'a': '2'}
-    >>> d.setdefault('b', '3')
-    '3'
-    >>> d == {'a': '2', 'b': '3'}
+    {'a': 2}
+    >>> d.setdefault('b', 3.0)
+    3.0
+    >>> d == {'a': 2, 'b': 3.0}
     True
     >>> d.setdefault(None, {'a': '3', 'c': '4'})
-    >>> d == {'a': '2', 'b': '3', 'c': '4'}
+    >>> d == {'a': 2, 'b': 3.0, 'c': '4'}
     True
-    >>> d.update({'a': '3', 'd': '5'})
-    >>> d == {'a': '3', 'b': '3', 'c': '4', 'd': '5'}
+    >>> d.update({'a': '3', 'd': True})
+    >>> d == {'a': '3', 'b': 3.0, 'c': '4', 'd': True}
     True
     >>> del(d)
     >>> d = DictDbAccess(conn, 'test')
-    >>> d == {'a': '3', 'b': '3', 'c': '4', 'd': '5'}
+    >>> d == {'a': '3', 'b': 3.0, 'c': '4', 'd': True}
     True
     """
+
+    types = (str, int, float, bool)
     
     def __init__(self, db, name):
         ''' Attaches to a DB table and reads values stored therein. 
@@ -460,7 +463,7 @@ class DictDbAccess(dict):
         of named parameters. 
         In the end, it is easier not to allow initialisers for the dict in 
         this constructor. Use update() or setdefault() (the latter accepts 
-        dicts in DictDbAccess()) to get the desired behaviour.
+        dicts in DictDbAccess) to get the desired behaviour.
         '''
         
         if isinstance(db, str):
@@ -489,25 +492,57 @@ class DictDbAccess(dict):
         if hasattr(super(), "__del__"):
             super().__del__()
     
+    def __convert_value(self, row):
+        valuestr = row["value"]
+        valuetype = row["type"]
+        # Look up constructor for this type
+        typecon = self.types[int(valuetype)]
+        # Bool is handled separately as bool("False") == True
+        if typecon == bool:
+            if valuestr == "True":
+                return True
+            elif valuestr == "False":
+                return False
+            else:
+                raise ValueError("Value %s invalid for Bool type", valuestr)
+        return typecon(valuestr)
+    
+    def __get_type_idx(self, value):
+        valuetype = type(value)
+        for (idx, t) in enumerate(self.types):
+            if valuetype == t:
+                return idx
+        raise TypeError("Type %s not supported" % str(valuetype))
+    
     def __getall(self):
         """ Reads the whole table and returns it as a dict """
         cursor = self._conn.cursor(MyCursor)
         rows = self._table.where(cursor)
         cursor.close()
-        dict = {r["key"]: r["value"] for r in rows}
+        dict = {r["key"]: self.__convert_value(r) for r in rows}
         return dict
+    
+    def __setitem_nocommit(self, cursor, key, value):
+        """ Set dictioary key to value and update/insert into table,
+        but don't commit
+        """
+        update = {"value": str(value), "type": self.__get_type_idx(value)}
+        if key in self:
+            # Update the table row where column "key" equals key
+            self._table.update(cursor, update, eq={"key": key})
+        else:
+            # Insert a new row
+            update["key"] = key
+            self._table.insert(cursor, update)
+        # Update the in-memory dict
+        super().__setitem__(key, value)
     
     def __setitem__(self, key, value):
         """ Set a dict entry to a value and update the DB """
         cursor = self._conn.cursor(MyCursor)
-        if key in self:
-            # Update the table row where column "key" equals key
-            self._table.update(cursor, {"value": value}, eq={"key": key})
-        else:
-            self._table.insert(cursor, {"key": key, "value": value})
+        self.__setitem_nocommit(cursor, key, value)
         self._conn.commit()
         cursor.close()
-        super().__setitem__(key, value)
     
     def __delitem__(self, key):
         """ Delete a key from the dictionary """
@@ -526,8 +561,7 @@ class DictDbAccess(dict):
             cursor = self._conn.cursor(MyCursor)
             for (key, value) in default.items():
                 if not key in self:
-                    super().__setitem__(key, value)
-                    self._table.insert(cursor, {"key": key, "value": value})
+                    self.__setitem_nocommit(cursor, key, value)
             self._conn.commit()
             cursor.close()
             return None
@@ -538,11 +572,7 @@ class DictDbAccess(dict):
     def update(self, other):
         cursor = self._conn.cursor(MyCursor)
         for (key, value) in other.items():
-            if key in self:
-                self._table.update(cursor, {"value": value}, eq={"key": key})
-            else:
-                self._table.insert(cursor, {"key": key, "value": value})
-            super().__setitem__(key, value)
+            self.__setitem_nocommit(cursor, key, value)
         self._conn.commit()
         cursor.close()
         
