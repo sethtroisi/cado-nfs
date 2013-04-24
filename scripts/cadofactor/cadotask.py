@@ -174,6 +174,33 @@ class Task(patterns.Observable, patterns.Observer):
                 self.params["workdir"], os.sep, self.params["name"], 
                 self.name, os.sep)
     
+    def check_input_files(self, filenames):
+        """ Check that the files in "filenames" exist.
+        
+        Raises IOError if any files do not exists, return None
+        """
+        for filename in filenames:
+            if not os.path.isfile(filename):
+                raise IOError("%s input file %s does not exist" 
+                              % (self.title, filename))
+        return
+    
+    def check_output_files(self, filenames, shouldexist):
+        """ Check that the output files in "filenames" exist or don't exist, 
+        according to shouldexist.
+        
+        Raise IOError if any check fails, return None
+        """
+        for f in filenames:
+            exists = os.path.isfile(f)
+            if shouldexist and not exists:
+                raise IOError("%s output file %s does not exist" % 
+                                (self.title, f))
+            elif not shouldexist and exists:
+                raise IOError("%s output file %s already exists" % 
+                                (self.title, f, filename))
+        return
+    
     def submit(self, commands, inputfiles, outputfiles, tempfiles):
         ''' Submit a command that needs to be run. Returns a handle
         which can be used for status check.
@@ -620,7 +647,7 @@ class Duplicates1Task(Task):
             self.make_directories()
             self.check_input_files(newfiles)
             for f in newfiles:
-                self.check_output_files(f, False)
+                self.check_output_files(f, shouldexist=False)
             # Split the new files
             for f in newfiles:
                 kwargs = self.progparams[0].copy()
@@ -628,7 +655,7 @@ class Duplicates1Task(Task):
                 p = self.programs[0]((f,), kwargs)
                 p.run()
                 p.wait()
-                self.check_output_files(f, True)
+                self.check_output_files(f, shouldexist=True)
                 
                 already_split_input[f] = "1"
                 # Check that the output files exist and add them to 
@@ -664,32 +691,13 @@ class Duplicates1Task(Task):
                     os.mkdir(dirname)
         return
 
-    def check_input_files(self, filenames):
-        """ Check that the files in filenames exist """
-        for filename in filenames:
-            if not os.path.isfile(filename):
-                raise Exception("%s input file %s does not exist" 
-                                % (self.title, filename))
-        return
-
     def check_output_files(self, filename, shouldexist):
         """ Check that the output files corresponding to the input file  
         "filename" exists or doesn't exist, according to shouldexist
-        Raise an exception if check fails, return None
         """
         outfilenames = (self.make_output_filename(filename, I) \
                             for I in range(0, self.parts))
-        for f in outfilenames:
-            exists = os.path.isfile(f)
-            if shouldexist and not exists:
-                raise Exception("%s output file %s for input file %s "
-                                "does not exist" % 
-                                (self.title, f, filename))
-            elif not shouldexist and exists:
-                raise Exception("%s output file %s for input file %s "
-                                "already exists" % 
-                                (self.title, f, filename))
-        return
+        super().check_output_files(outfilenames, shouldexist)
     
     def get_filenames(self, slice_nr = None):
         files = wudb.DictDbAccess(self.db, self.tablename("outfiles"))
@@ -708,7 +716,7 @@ class Duplicates2Task(Task):
     
     def __init__(self, dup1, *args, **kwargs):
         super().__init__(*args, dependencies = (dup1,), **kwargs)
-
+    
     def run(self, parameters = None):
         self.logger.debug("Enter DuplicatesTask.run(" + self.name + ")")
         super().run(parameters = parameters)
