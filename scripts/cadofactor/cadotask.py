@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import sqlite3
 from datetime import datetime
 import re
@@ -47,8 +48,8 @@ class Task(patterns.Observable, patterns.Observer):
     # Parameters that all tasks use
     paramnames = ("name", "workdir")
 
-    def __init__(self, dependencies, *args, db = None, parameters = None,
-                 **kwargs):
+    def __init__(self, dependencies, *args, db = None, parameters = None, \
+                **kwargs):
         ''' Sets up a database connection and a DB-backed dictionary for 
         parameters. Reads parameters from DB, and merges with hierarchical
         parameters in the parameters argument. Parameters passed in by 
@@ -58,9 +59,8 @@ class Task(patterns.Observable, patterns.Observer):
 
         super().__init__(*args, **kwargs)
         if dependencies:
-            self.dependencies = dict()
+            self.dependencies = dependencies
             for d in dependencies:
-                self.dependencies[d.name] = d
                 d.subscribeObserver(self)
         else:
             self.dependencies = None
@@ -135,7 +135,7 @@ class Task(patterns.Observable, patterns.Observer):
                           self.name, self.is_done())
         # Check/run the prerequisites
         if not self.dependencies is None:
-            for task in self.dependencies.values():
+            for task in self.dependencies:
                 if not task.is_done():
                     self.logger.debug("Task.run(%s): Running prerequisite %s",
                                       self.name, task.name)
@@ -456,9 +456,11 @@ class FactorBaseOrFreerelTask(Task):
     the polynomial, i.e., factorbase and freerel 
     """
     
-    def __init__(self, polsel, *args, **kwargs):
-        super().__init__(*args, dependencies = (polsel,), **kwargs)
-        # Invariant:
+    def __init__(self, polyselect, *args, **kwargs):
+        super().__init__(*args, dependencies = (polyselect,), **kwargs)
+        self.polyselect = polyselect
+        # Invariant: if we have a result (in self.params[targetkey]) then we
+        # must also have a polynomial (in self.params["poly"])
         self.targetkey = self.target + "file"
         if self.targetkey in self.params:
             assert "poly" in self.params
@@ -469,7 +471,7 @@ class FactorBaseOrFreerelTask(Task):
         super().run(parameters = parameters)
         
         # Get best polynomial found by polyselect
-        poly = self.dependencies["polyselect"].get_poly()
+        poly = self.polyselect.get_poly()
         if not poly:
             raise Exception("FactorBaseOrFreerelTask(): no polynomial received")
         
@@ -553,19 +555,21 @@ class SievingTask(Task):
     parampath = "tasks." + name
     paramnames = ("qmin", "qrange", "rels_wanted") + Polynomial.paramnames
     
-    def __init__(self, polsel, factorbase, *args, **kwargs):
-        super().__init__(*args, dependencies = (polsel, factorbase), **kwargs)
+    def __init__(self, polyselect, factorbase, *args, **kwargs):
+        super().__init__(*args, dependencies = (polyselect, factorbase), **kwargs)
+        self.polyselect = polyselect
+        self.factorbase = factorbase
         self.params.setdefault("qmin", self.params["alim"])
         self.params.setdefault("qnext", self.params["qmin"])
         self.params.setdefault("rels_found", "0")
+        self.files = wudb.DictDbAccess(self.db, self.tablename("files"))
     
     def run(self, parameters = None):
         self.logger.debug("Enter SievingTask.run(" + self.name + ")")
         super().run(parameters = parameters)
-        files = wudb.DictDbAccess(self.db, self.tablename("files"))
 
         # Get best polynomial found by polyselect
-        poly = self.dependencies["polyselect"].get_poly()
+        poly = self.polyselect.get_poly()
         if not poly:
             raise Exception("SievingTask(): no polynomial received")
         # Write polynomial to a file
@@ -582,7 +586,7 @@ class SievingTask(Task):
             kwargs["q1"] = str(q1)
             kwargs["poly"] = polyfile
             kwargs["factorbase"] = \
-                self.dependencies["factorbase"].get_filename()
+                self.factorbase.get_filename()
             kwargs["out"] = outputfile
             p = self.programs[0](args, kwargs)
             p.run()
@@ -593,7 +597,7 @@ class SievingTask(Task):
                 raise Exception("Siever output file %s invalid" % outputfile)
             total = int(self.params["rels_found"]) + rels
             self.params["rels_found"] = str(total)
-            files[outputfile] = str(rels)
+            self.files[outputfile] = str(rels)
             self.logger.info("Found %d relations in %s, total is now %d", 
                              rels, outputfile, total)
             self.notifyObservers({self.name, outputfile})
@@ -612,8 +616,7 @@ class SievingTask(Task):
         return None
     
     def get_filenames(self):
-        files = wudb.DictDbAccess(self.db, self.tablename("files"))
-        return files.keys()
+        return self.files.keys()
     
     def is_done(self):
         return int(self.params["rels_found"])>=int(self.params["rels_wanted"]) 
@@ -629,82 +632,115 @@ class Duplicates1Task(Task):
     
     def __init__(self, sieving, *args, **kwargs):
         super().__init__(*args, dependencies = (sieving,), **kwargs)
-
-    def run(self, parameters = None):
-        self.logger.debug("Enter DuplicatesTask.run(" + self.name + ")")
-        super().run(parameters = parameters)
+        self.sieving = sieving
         self.parts = 2**int(self.params["nslices_log"])
-        files = self.dependencies["sieving"].get_filenames()
-        already_split_input = \
+        self.already_split_input = \
             wudb.DictDbAccess(self.db, self.tablename("infiles"))
-        already_split_output = \
+        self.already_split_output = \
             wudb.DictDbAccess(self.db, self.tablename("outfiles"))
-        newfiles = [f for f in files if not f in already_split_input]
+    
+    def run(self, parameters = None):
+        self.logger.debug("Enter Duplicates1Task.run(" + self.name + ")")
+        super().run(parameters = parameters)
+        # Check that previously split files were split into the same number
+        # of pieces that we want now
+        for (infile, parts) in self.already_split_input.items():
+            if int(parts) != self.parts:
+                # TODO: ask interactively (or by -recover) whether to delete 
+                # old output files and generate new ones, if input file is 
+                # still available
+                raise Exception("%s was previously split into %d parts, "
+                                "now %d parts requested",
+                                infile, int(parts), self.parts)
+            for outfile in self.make_output_filenames(infile):
+                if not outfile in self.already_split_output:
+                    # TODO: How to recover from this error? Just re-split again?
+                    raise Exception("Output file %s missing in database for "
+                                    "supposedly split input file %s" %
+                                    (outfile, infile))
+            
+        
+        # Check that previously split files do, in fact, exist.
+        # FIXME: Do we want this? It may be slow when there are many files.
+        # Reading the directory and comparing the lists would probably be
+        # faster than individual lookups.
+        self.check_output_files(self.get_filenames(), shouldexist=True)
+        
+        files = self.sieving.get_filenames()
+        newfiles = [f for f in files if not f in self.already_split_input]
         self.logger.debug ("%s: new files to split are: %s", 
-                          self.title, newfiles)
-
+                           self.title, newfiles)
+        
         if newfiles:
             self.make_directories()
+            # TODO: can we recover from missing input files? Ask Sieving to
+            # generate them again? Just ignore the missing ones?
             self.check_input_files(newfiles)
-            for f in newfiles:
-                self.check_output_files(f, shouldexist=False)
             # Split the new files
             for f in newfiles:
-                kwargs = self.progparams[0].copy()
-                kwargs["out"] = self.make_output_dirname()
-                p = self.programs[0]((f,), kwargs)
-                p.run()
-                p.wait()
-                self.check_output_files(f, shouldexist=True)
-                
-                already_split_input[f] = "1"
-                # Check that the output files exist and add them to 
-                # already_split_output table
-                for I in range(0, self.parts):
-                    filename = self.make_output_filename(f, I)
-                    if not os.path.isfile(filename):
-                        raise Exception("dup1 outputfile %s does not exist" %
-                                        filename)
-                    # Store this output file as a key in the dictionary, 
-                    # with the slice number as value
-                    already_split_output[filename] = str(I)
-
-        self.logger.debug("Exit DuplicatesTask.run(" + self.name + ")")
+                if self.parts == 1:
+                    # If we should split into only 1 part, we don't actually
+                    # split at all. We simply write the input file name
+                    # to the table of output files, so the next stages will 
+                    # read the original siever output file, thus avoiding 
+                    # having another copy of the data on disk
+                    outfilenames = {f:"0"}
+                else:
+                    outfilenames = self.make_output_filenames(f)
+                    # TODO: how to recover from existing output files?
+                    # Simply re-split? Check whether they all exist and assume 
+                    # they are correct if they do?
+                    self.check_output_files(outfilenames.keys(),
+                                            shouldexist=False)
+                    kwargs = self.progparams[0].copy()
+                    kwargs["out"] = self.make_output_dirname()
+                    p = self.programs[0]((f,), kwargs)
+                    p.run()
+                    p.wait()
+                    # Check that the output files exist now
+                    # TODO: How to recover from error? Presumably a dup1
+                    # process failed, but that should raise a return code
+                    # exception
+                    self.check_output_files(outfilenames.keys(),
+                                            shouldexist=True)
+                self.already_split_input[f] = str(self.parts)
+                self.already_split_output.update(outfilenames)
+        self.logger.debug("Exit Duplicates1Task.run(" + self.name + ")")
         return
-
+    
     def make_output_filename(self, name, I):
-        """ Make an output file name corresponding to slice I of the input 
+        """ Make the output file names corresponding to slice I of the input
         file named "name"
-        Overrides parent's function as we also have a slice parameter here.
         """
-        basedir = self.make_output_dirname(str(I))
         basefile = os.path.basename(name)
+        basedir = self.make_output_dirname(str(I))
         return basedir + basefile
-
+    
+    def make_output_filenames(self, name):
+        """ Make a dictioary of the output file names corresponding to the
+        input file named "name" as keys, and the slice number as a string
+        as value
+        """
+        return {self.make_output_filename(name, I):str(I) \
+                for I in range(0, self.parts)}
+    
     def make_directories(self):
         basedir = self.make_output_dirname()
         if not os.path.isdir(basedir):
             os.mkdir(basedir)
-            for I in range(0, self.parts):
-                dirname = self.make_output_dirname(str(I))
-                if not os.path.isdir(dirname):
-                    os.mkdir(dirname)
+        for I in range(0, self.parts):
+            dirname = self.make_output_dirname(str(I))
+            if not os.path.isdir(dirname):
+                os.mkdir(dirname)
         return
-
-    def check_output_files(self, filename, shouldexist):
-        """ Check that the output files corresponding to the input file  
-        "filename" exists or doesn't exist, according to shouldexist
-        """
-        outfilenames = (self.make_output_filename(filename, I) \
-                            for I in range(0, self.parts))
-        super().check_output_files(outfilenames, shouldexist)
     
     def get_filenames(self, slice_nr = None):
-        files = wudb.DictDbAccess(self.db, self.tablename("outfiles"))
-        if slice:
-            return [f for f in files if int(files[f]) == slice_nr]
-        else:
-            return already_split_output.keys()
+        """ Return an array of filenames of the already split output files
+        
+        If slice_nr is given, return only files for that slice
+        """
+        return [f for (f,s) in self.already_split_output.items() \
+                    if slice_nr is None or int(s) == slice_nr]
 
 class Duplicates2Task(Task):
     """ Removes duplicate relations """
@@ -714,23 +750,20 @@ class Duplicates2Task(Task):
     parampath = "tasks.filtering." + name
     paramnames = ()
     
-    def __init__(self, dup1, *args, **kwargs):
-        super().__init__(*args, dependencies = (dup1,), **kwargs)
+    def __init__(self, duplicates1, *args, **kwargs):
+        super().__init__(*args, dependencies = (duplicates1,), **kwargs)
+        self.duplicates1 = duplicates1
     
     def run(self, parameters = None):
-        self.logger.debug("Enter DuplicatesTask.run(" + self.name + ")")
+        self.logger.debug("Enter Duplicates2Task.run(" + self.name + ")")
         super().run(parameters = parameters)
-        files = self.dependencies["duplicates1"].get_filenames()
-        already_split = wudb.DictDbAccess(self.db, self.tablename("files"))
-        newfiles = (f for f in files if not f in already_split)
+        files = self.duplicates1.get_filenames()
         kwargs = self.progparams[0].copy()
-        p = self.programs[0](newfiles, kwargs)
+        p = self.programs[0](None, kwargs)
         p.run()
         p.wait()
-        for f in newfiles:
-            already_split[f] = "1"
         
-        self.logger.debug("Exit DuplicatesTask.run(" + self.name + ")")
+        self.logger.debug("Exit Duplicates2Task.run(" + self.name + ")")
 
     def split_files(self, filelist):
         pass
@@ -746,8 +779,9 @@ class PurgeTask(Task):
     parampath = "tasks.filtering." + name
     paramnames = ()
     
-    def __init__(self, duplicates, *args, **kwargs):
-        super().__init__(*args, dependencies = (duplicates,), **kwargs)
+    def __init__(self, duplicates2, *args, **kwargs):
+        super().__init__(*args, dependencies = (duplicates2,), **kwargs)
+        self.duplicates2 = duplicates2
 
     def run(self, parameters = None):
         self.logger.debug("Enter PurgeTask.run(" + self.name + ")")
@@ -815,9 +849,9 @@ class SqrtTask(Task):
     parampath = "tasks." + name
     paramnames = ()
     
-    def __init__(self, polsel, freerel, sieving, merge, linalg, 
+    def __init__(self, polyselect, freerel, sieving, merge, linalg, 
                  *args, **kwargs):
-        dep = (polsel, freerel, sieving, merge)
+        dep = (polyselect, freerel, sieving, merge)
         super().__init__(*args, dependencies = dep, **kwargs)
 
     def run(self, parameters = None):
