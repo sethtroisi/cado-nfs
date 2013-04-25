@@ -2249,21 +2249,6 @@ sub dup {
 
     # print number of primes in factor base
     if (scalar @files >= 2) {
-        my $f = $files[0];
-        $f = $files[1]
-            if $files[0] =~ /^$param{'name'}\.freerels.gz$/;
-        $f = "$param{'wdir'}/".$f;
-        open FILE, "gzip -dc $f|"
-            or die "Cannot open `$f' for reading: $!.\n";
-        my $i=0;
-        while (<FILE>) {
-            s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
-            if ( $_ =~ /^# (Number of primes in \S+ factor base = \d+)$/ ) {
-                $i++;
-                last if $i==2;
-            }
-        }
-        close FILE;
         # print approximate number of large primes
         my $nlpa;
         my $nlpr;
