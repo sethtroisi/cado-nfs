@@ -316,7 +316,7 @@ class Duplicates2(Program):
         Toggle("remove", "rm"),
         Parameter("out"), 
         Parameter("filelist"), 
-        Parameter("K")
+        Parameter("rel_count", "K")
         )
 
 class Purge(Program):

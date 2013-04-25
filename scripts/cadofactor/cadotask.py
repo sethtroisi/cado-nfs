@@ -198,7 +198,7 @@ class Task(patterns.Observable, patterns.Observer):
                                 (self.title, f))
             elif not shouldexist and exists:
                 raise IOError("%s output file %s already exists" % 
-                                (self.title, f, filename))
+                                (self.title, f))
         return
     
     def submit(self, commands, inputfiles, outputfiles, tempfiles):
@@ -585,8 +585,7 @@ class SievingTask(Task):
             kwargs["q0"] = str(q0)
             kwargs["q1"] = str(q1)
             kwargs["poly"] = polyfile
-            kwargs["factorbase"] = \
-                self.factorbase.get_filename()
+            kwargs["factorbase"] = self.factorbase.get_filename()
             kwargs["out"] = outputfile
             p = self.programs[0](args, kwargs)
             p.run()
@@ -618,8 +617,17 @@ class SievingTask(Task):
     def get_filenames(self):
         return self.files.keys()
     
+    def get_nrels(self, filename = None):
+        """ Return the number of relations found, either the total so far or
+        for a given file
+        """
+        if filename == None:
+            return self.params["rels_found"]
+        else:
+            return self.files[filename]
+    
     def is_done(self):
-        return int(self.params["rels_found"])>=int(self.params["rels_wanted"]) 
+        return self.params["rels_found"] >= int(self.params["rels_wanted"]) 
 
 
 class Duplicates1Task(Task):
@@ -633,11 +641,16 @@ class Duplicates1Task(Task):
     def __init__(self, sieving, *args, **kwargs):
         super().__init__(*args, dependencies = (sieving,), **kwargs)
         self.sieving = sieving
-        self.parts = 2**int(self.params["nslices_log"])
+        self.nr_slices = 2**int(self.params["nslices_log"])
         self.already_split_input = \
             wudb.DictDbAccess(self.db, self.tablename("infiles"))
         self.already_split_output = \
             wudb.DictDbAccess(self.db, self.tablename("outfiles"))
+        self.slice_relcounts = \
+            wudb.DictDbAccess(self.db, self.tablename("counts"))
+        # Default slice counts to 0, in single DB commit
+        self.slice_relcounts.setdefault(
+            None, {str(i): 0 for i in range(0, self.nr_slices)})
     
     def run(self, parameters = None):
         self.logger.debug("Enter Duplicates1Task.run(" + self.name + ")")
@@ -645,13 +658,15 @@ class Duplicates1Task(Task):
         # Check that previously split files were split into the same number
         # of pieces that we want now
         for (infile, parts) in self.already_split_input.items():
-            if int(parts) != self.parts:
+            if int(parts) != self.nr_slices:
                 # TODO: ask interactively (or by -recover) whether to delete 
                 # old output files and generate new ones, if input file is 
                 # still available
+                # If input file is not available but the previously split
+                # parts are, we could join them again... not sure if want
                 raise Exception("%s was previously split into %d parts, "
                                 "now %d parts requested",
-                                infile, int(parts), self.parts)
+                                infile, int(parts), self.nr_slices)
             for outfile in self.make_output_filenames(infile):
                 if not outfile in self.already_split_output:
                     # TODO: How to recover from this error? Just re-split again?
@@ -678,33 +693,41 @@ class Duplicates1Task(Task):
             self.check_input_files(newfiles)
             # Split the new files
             for f in newfiles:
-                if self.parts == 1:
+                if self.nr_slices == 1:
                     # If we should split into only 1 part, we don't actually
                     # split at all. We simply write the input file name
                     # to the table of output files, so the next stages will 
                     # read the original siever output file, thus avoiding 
                     # having another copy of the data on disk
-                    outfilenames = {f:"0"}
+                    outfilenames = {f:0}
+                    self.slice_relcounts["0"] += self.sieving.get_nrels(f)
                 else:
                     outfilenames = self.make_output_filenames(f)
                     # TODO: how to recover from existing output files?
                     # Simply re-split? Check whether they all exist and assume 
                     # they are correct if they do?
-                    self.check_output_files(outfilenames.keys(),
+                    self.check_output_files(outfilenames.keys(), 
                                             shouldexist=False)
                     kwargs = self.progparams[0].copy()
                     kwargs["out"] = self.make_output_dirname()
                     p = self.programs[0]((f,), kwargs)
                     p.run()
-                    p.wait()
+                    (rc, stdout, stderr) = p.wait()
                     # Check that the output files exist now
                     # TODO: How to recover from error? Presumably a dup1
                     # process failed, but that should raise a return code
                     # exception
                     self.check_output_files(outfilenames.keys(),
                                             shouldexist=True)
-                self.already_split_input[f] = self.parts
+                    stderrlines = stderr.decode("ascii").splitlines()
+                    current_counts = self.parse_slice_counts(stderrlines)
+                    for (idx, count) in enumerate(current_counts):
+                        self.slice_relcounts[str(idx)] += count
+                self.already_split_input[f] = self.nr_slices
                 self.already_split_output.update(outfilenames)
+        totals = ["%d: %d" % (i, self.slice_relcounts[str(i)])
+                  for i in range(0, self.nr_slices)]
+        self.logger.info("Relations per slice: %s", ", ".join(totals))
         self.logger.debug("Exit Duplicates1Task.run(" + self.name + ")")
         return
     
@@ -722,17 +745,39 @@ class Duplicates1Task(Task):
         as value
         """
         return {self.make_output_filename(name, I):I \
-                for I in range(0, self.parts)}
+                for I in range(0, self.nr_slices)}
     
     def make_directories(self):
         basedir = self.make_output_dirname()
         if not os.path.isdir(basedir):
             os.mkdir(basedir)
-        for I in range(0, self.parts):
+        for I in range(0, self.nr_slices):
             dirname = self.make_output_dirname(str(I))
             if not os.path.isdir(dirname):
                 os.mkdir(dirname)
         return
+    
+    def parse_slice_counts(self, text):
+        """ Takes line of text and looks for slice counts as printed by dup1
+        """
+        counts = [None] * self.nr_slices
+        for line in text:
+            print (line)
+            match = re.match('# slice (\d+) received (\d+) relations', line)
+            if match:
+                (slicenr, nrrels) = map(int, match.groups())
+                if not counts[slicenr] is None:
+                    raise Exception("Received two values for relation count "
+                                    "in slice %d" % slicenr)
+                counts[slicenr] = nrrels
+        for (slicenr, nrrels) in enumerate(counts):
+            if nrrels is None:
+                raise Exception("Received no value for relation count in "
+                                "slice %d" % slicenr)
+        return counts
+    
+    def get_nr_slices(self):
+        return self.nr_slices
     
     def get_filenames(self, slice_nr = None):
         """ Return an array of filenames of the already split output files
@@ -740,7 +785,11 @@ class Duplicates1Task(Task):
         If slice_nr is given, return only files for that slice
         """
         return [f for (f,s) in self.already_split_output.items() \
-                    if slice_nr is None or int(s) == slice_nr]
+                    if slice_nr is None or s == slice_nr]
+    
+    def get_slice_relcount(self, idx):
+        return self.slice_relcounts[str(idx)]
+    
 
 class Duplicates2Task(Task):
     """ Removes duplicate relations """
@@ -757,19 +806,19 @@ class Duplicates2Task(Task):
     def run(self, parameters = None):
         self.logger.debug("Enter Duplicates2Task.run(" + self.name + ")")
         super().run(parameters = parameters)
-        files = self.duplicates1.get_filenames()
-        kwargs = self.progparams[0].copy()
-        p = self.programs[0](None, kwargs)
-        p.run()
-        p.wait()
+        nr_slices = self.duplicates1.get_nr_slices()
+        for i in range(0, nr_slices):
+            files = self.duplicates1.get_filenames(i)
+            relcount = self.duplicates1.get_slice_relcount(i)
+            
+            files = self.duplicates1.get_filenames()
+            kwargs = self.progparams[0].copy()
+            p = self.programs[0](None, kwargs)
+            p.run()
+            p.wait()
         
         self.logger.debug("Exit Duplicates2Task.run(" + self.name + ")")
 
-    def split_files(self, filelist):
-        pass
-
-    def remove_duplicates(self, filelist):
-        pass
 
 class PurgeTask(Task):
     """ Removes singletons and computes excess """
