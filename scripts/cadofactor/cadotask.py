@@ -427,7 +427,7 @@ class PolyselTask(Task):
                 self.params["bestfile"] = outputfile
                 self.logger.info("New best polynomial from file %s:"
                                  " Murphy E = %g" % (outputfile, poly.E))
-                self.logger.debug("%s", poly)
+                self.logger.debug("New best polynomial is:\n%s", poly)
                 self.notifyObservers({self.name: bestpoly})
             else:
                 self.logger.info("Best polynomial from file %s with E=%g is "
@@ -693,16 +693,17 @@ class Duplicates1Task(Task):
             self.check_input_files(newfiles)
             # Split the new files
             for f in newfiles:
+                outfilenames = self.make_output_filenames(f)
                 if self.nr_slices == 1:
                     # If we should split into only 1 part, we don't actually
                     # split at all. We simply write the input file name
                     # to the table of output files, so the next stages will 
                     # read the original siever output file, thus avoiding 
-                    # having another copy of the data on disk
-                    outfilenames = {f:0}
-                    self.slice_relcounts["0"] += self.sieving.get_nrels(f)
+                    # having another copy of the data on disk. Since we don't
+                    # process the file at all, we need to ask the Siever task
+                    # for the relation count in this file
+                    current_counts = [self.sieving.get_nrels(f)]
                 else:
-                    outfilenames = self.make_output_filenames(f)
                     # TODO: how to recover from existing output files?
                     # Simply re-split? Check whether they all exist and assume 
                     # they are correct if they do?
@@ -721,8 +722,8 @@ class Duplicates1Task(Task):
                                             shouldexist=True)
                     stderrlines = stderr.decode("ascii").splitlines()
                     current_counts = self.parse_slice_counts(stderrlines)
-                    for (idx, count) in enumerate(current_counts):
-                        self.slice_relcounts[str(idx)] += count
+                for (idx, count) in enumerate(current_counts):
+                    self.slice_relcounts[str(idx)] += count
                 self.already_split_input[f] = self.nr_slices
                 self.already_split_output.update(outfilenames)
         totals = ["%d: %d" % (i, self.slice_relcounts[str(i)])
@@ -740,12 +741,17 @@ class Duplicates1Task(Task):
         return basedir + basefile
     
     def make_output_filenames(self, name):
-        """ Make a dictioary of the output file names corresponding to the
+        """ Make a dictionary of the output file names corresponding to the
         input file named "name" as keys, and the slice number as a string
-        as value
+        as value. If nr_slices == 1, return the input file name, as in that
+        case we do not split at all - we just pass the original file to later
+        stages.
         """
-        return {self.make_output_filename(name, I):I \
-                for I in range(0, self.nr_slices)}
+        if self.nr_slices == 1:
+            return {name: 0}
+        else:
+            return {self.make_output_filename(name, I):I \
+                    for I in range(0, self.nr_slices)}
     
     def make_directories(self):
         basedir = self.make_output_dirname()
@@ -809,11 +815,13 @@ class Duplicates2Task(Task):
         nr_slices = self.duplicates1.get_nr_slices()
         for i in range(0, nr_slices):
             files = self.duplicates1.get_filenames(i)
-            relcount = self.duplicates1.get_slice_relcount(i)
+            rel_count = self.duplicates1.get_slice_relcount(i)
             
             files = self.duplicates1.get_filenames()
             kwargs = self.progparams[0].copy()
-            p = self.programs[0](None, kwargs)
+            kwargs["rel_count"] = str(rel_count)
+            kwargs["output_directory"] = self.make_output_dirname(str(i))
+            p = self.programs[0](files, kwargs)
             p.run()
             p.wait()
         

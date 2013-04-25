@@ -314,7 +314,7 @@ class Duplicates2(Program):
     name = binary
     params_list = (
         Toggle("remove", "rm"),
-        Parameter("out"), 
+        Parameter("output_directory", "out"), 
         Parameter("filelist"), 
         Parameter("rel_count", "K")
         )
