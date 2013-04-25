@@ -40,10 +40,11 @@
 static int only_ab = 0;
 
 /* output relations in dirname/0/name, ..., dirname/31/name */
+/* Adds the number of relation added to each slice to *nr_rels */
 int split_relfile (relation_stream_ptr rs, const char *name,
                    const char *dirname, const char * outfmt,
                    int *do_slice, int nslices_log, int nslices, 
-                   unsigned int ab_base)
+                   unsigned int ab_base, unsigned long *nr_rels)
 {
     FILE * f_in;
     int p_in;
@@ -95,7 +96,7 @@ int split_relfile (relation_stream_ptr rs, const char *name,
            coprime a, b). We use here the nslices_log high bits.
         */
         int i = h >> (64 - nslices_log);
-
+        nr_rels[i]++;
         /* print relation */
         if (do_slice[i]) {
             if (only_ab) {
@@ -215,18 +216,26 @@ main (int argc, char * argv[])
     }
 
     char ** files = filelist ? filelist_from_file(basepath, filelist, 0) : argv;
+    unsigned long nr_rels[nslices];
+    memset (nr_rels, 0, sizeof(unsigned long) * nslices);
 
     relation_stream rs;
     relation_stream_init(rs);
     for (char ** fp = files ; *fp ; fp++) {
         had_error |= split_relfile (rs, *fp, dirname, outfmt, do_slice,
-                                    nslices_log, nslices, (ab_hexa)?16:10);
+                                    nslices_log, nslices, (ab_hexa)?16:10, 
+                                    nr_rels);
     }
     relation_stream_trigger_disp_progress(rs);
     fprintf (stderr,
             "# split %lu relations in %.1fs"
             " -- %.1f MB/s -- %.1f rels/s\n",
             rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
+    for (int i = 0; i < nslices; i++) {
+        fprintf (stderr,
+                "# slice %d received %lu relations\n",
+                i, nr_rels[i]);
+    }
     relation_stream_clear(rs);
 
     if (filelist) filelist_clear(files);
