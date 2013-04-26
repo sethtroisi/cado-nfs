@@ -148,24 +148,34 @@ class Task(patterns.Observable, patterns.Observer, DbDictAccess):
         self.logger.debug("Exit Task.run(" + self.name + ")")
         return
     
-    def make_output_filename(self, name):
-        """ Make a filename of the form workdir/jobname.taskname.name """
-        return "%s%s%s.%s.%s" % (
-                self.params["workdir"], os.sep, self.params["name"], 
-                self.name, name)
+    def _make_basename(self):
+        """
+        >>> class C(object):
+        ...     pass
+        >>> f = C()
+        >>> f.params = {"workdir": "/foo/bar", "name": "jobname"}
+        >>> f.name = "taskname"
+        >>> Task._make_basename(f)
+        '/foo/bar/jobname.taskname'
+        """
+        return "%s%s%s.%s" % (self.params["workdir"], os.sep,
+                              self.params["name"], self.name)
     
+    def make_output_filename(self, name, subdir = False, dirextra = None):
+        """ Make a filename of the form workdir/jobname.taskname.name """
+        if subdir:
+            return self.make_output_dirname(dirextra) + name
+        else:
+            return "%s.%s" % (self._make_basename(), name)
+        
     def make_output_dirname(self, extra = None):
         """ Make a directory name of the form workdir/jobname.taskname/ if 
         extra is not given, or workdir/jobname.taskname/extra/ if it is
         """
+        r = self._make_basename() + os.sep
         if extra:
-            return "%s%s%s.%s%s%s%s" % (
-                self.params["workdir"], os.sep, self.params["name"], 
-                self.name, os.sep, extra, os.sep)
-        else:
-            return "%s%s%s.%s%s" % (
-                self.params["workdir"], os.sep, self.params["name"], 
-                self.name, os.sep)
+            r += "%s%s" % (extra, os.sep)
+        return r
     
     def check_files_exist(self, filenames, filedesc, shouldexist):
         """ Check that the output files in "filenames" exist or don't exist, 
@@ -726,7 +736,7 @@ class Duplicates1Task(Task, FilesCreator):
                     # process failed, but that should raise a return code
                     # exception
                     self.check_files_exist(outfilenames.keys(), "output", 
-                                            shouldexist=True)
+                                           shouldexist=True)
                     stderrlines = stderr.decode("ascii").splitlines()
                     current_counts = self.parse_slice_counts(stderrlines)
                 for (idx, count) in enumerate(current_counts):
@@ -739,14 +749,6 @@ class Duplicates1Task(Task, FilesCreator):
         self.logger.debug("Exit Duplicates1Task.run(" + self.name + ")")
         return
     
-    def make_output_filename(self, name, I):
-        """ Make the output file names corresponding to slice I of the input
-        file named "name"
-        """
-        basefile = os.path.basename(name)
-        basedir = self.make_output_dirname(str(I))
-        return basedir + basefile
-    
     def make_output_filenames(self, name):
         """ Make a dictionary of the output file names corresponding to the
         input file named "name" as keys, and the slice number as a string
@@ -757,8 +759,11 @@ class Duplicates1Task(Task, FilesCreator):
         if self.nr_slices == 1:
             return {name: 0}
         else:
-            return {self.make_output_filename(name, I):I \
-                    for I in range(0, self.nr_slices)}
+            r = {}
+            basename = os.path.basename(name)
+            for i in range(0, self.nr_slices):
+                r[self.make_output_filename(basename, True, str(i))] = i
+            return r;
     
     def parse_slice_counts(self, text):
         """ Takes line of text and looks for slice counts as printed by dup1
@@ -799,7 +804,6 @@ class Duplicates2Task(Task, FilesCreator):
         self.duplicates1 = duplicates1
     
     def run(self):
-        # dup2 -K 136750 -out /tmp/cado.wNhDsCM6BS/c59.nodup/0 -filelist /tmp/cado.wNhDsCM6BS/c59.filelist -basepath /tmp/cado.wNhDsCM6BS/c59.nodup/0
         self.logger.debug("Enter Duplicates2Task.run(" + self.name + ")")
         super().run()
         nr_slices = self.duplicates1.get_nr_slices()
@@ -813,7 +817,10 @@ class Duplicates2Task(Task, FilesCreator):
             p = self.programs[0](files, kwargs)
             p.run()
             p.wait()
-        
+            for f in files:
+                basename = os.path.basename(f)
+                outfilename = self.make_output_filename(basename, True, str(i))
+                self.add_output_files({outfilename: str(i)})
         self.logger.debug("Exit Duplicates2Task.run(" + self.name + ")")
 
 
