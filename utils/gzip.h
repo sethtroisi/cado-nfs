@@ -31,14 +31,13 @@ extern int is_supported_compression_format(const char * s);
  * recognized suffix, which has been used to decide on which compression
  * method.
  */
-extern FILE * fopen_compressed_r(const char * name, int* p_pipeflag, char const ** suf);
+extern FILE * fopen_maybe_compressed2(const char * name, const char * mode, int* p_pipeflag, char const ** suf);
+extern FILE * fopen_maybe_compressed(const char * name, const char * mode);
 
-/* analogous */
-extern FILE * fopen_compressed_w(const char * name, int* p_pipeflag, char const ** suf);
-
-/* for compatibility only */
-FILE * gzip_open(const char * name, const char * mode);
-void gzip_close(FILE * f, const char * name);
+/* This one just looks at the file name, and guesses again whether popen() or
+ * fopen() was used. The file stream is then closed with pclose() or
+ * fclose() accordingly.  */
+extern void fclose_maybe_compressed(FILE *, const char * name);
 
 #ifdef __cplusplus
 }

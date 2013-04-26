@@ -196,7 +196,7 @@ fopen_compressed_w(const char * name, int* p_pipeflag, char const ** suf)
     return NULL;
 }
 
-FILE * gzip_open(const char * name, const char * mode)
+FILE * fopen_maybe_compressed(const char * name, const char * mode)
 {
     if (strcmp(mode, "r") == 0) {
         return fopen_compressed_r (name, NULL, NULL);
@@ -211,7 +211,7 @@ FILE * gzip_open(const char * name, const char * mode)
 #define MIN(l,o) ((l) < (o) ? (l) : (o))
 #endif
 
-void gzip_close(FILE * f, const char * name)
+void fclose_maybe_compressed(FILE * f, const char * name)
 {
     const char * e = name + strlen(name);
     const struct suffix_handler * r = supported_compression_formats;
@@ -367,7 +367,7 @@ foo (char *g)
   long a;
   uint64_t p, pfree;
 
-  f = gzip_open (g, "r");
+  f = fopen_maybe_compressed (g, "r");
 
   while (1)
     {
@@ -432,7 +432,7 @@ foo (char *g)
         }
     }
 
-  gzip_close (f, g);
+  fclose_maybe_compressed (f, g);
   return line;
 }
 
@@ -447,10 +447,10 @@ bar (char *g)
   int keep, nr, na;
   uint64_t rp[16], ap[16], ar[16];
 
-  f = gzip_open (g, "r");
+  f = fopen_maybe_compressed (g, "r");
   strcpy (newg, "new/");
   strcpy (newg + 4, g);
-  newf = gzip_open (newg, "w");
+  newf = fopen_maybe_compressed (newg, "w");
   assert (newf != NULL);
 
   while (1)
@@ -542,8 +542,8 @@ bar (char *g)
         }
     }
 
-  gzip_close (f, g);
-  gzip_close (newf, newg);
+  fclose_maybe_compressed (f, g);
+  fclose_maybe_compressed (newf, newg);
 
   fprintf (stderr, "   new/%s done: remains %lu rels out of %lu\n",
            g, output, line);

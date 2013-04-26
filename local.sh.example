@@ -144,6 +144,8 @@
 # MPI=/usr/local/mpich2-1.0.8p1/
 # MPI=/usr/local/openmpi-1.3.0/
 # MPI=$HOME/mpich2-1.0.8p1
+# OMPI_CC=gcc44
+# OMPI_CXX=g++44
 #
 # Some cado-nfs programs can work with MPI. To build MPI-enabled tools,
 # set $MPI to 1. The default value is unset, which effectively disables
@@ -161,3 +163,7 @@
 #
 # ``MPI=1'', ``MPI=yes'', ``MPI=on'', are equivalent.
 # ``MPI=0'', ``MPI=no'', ``MPI=off'', are equivalent.
+#
+# By default, mpicc calls the default compiler (gcc or g++) installed on your
+# computer. If this default compiler is too old or buggy, you might want to use
+# OMPI_CC and/or OMPI_CXX to specify a newer compiler (this is for Open MPI).

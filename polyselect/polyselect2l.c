@@ -11,7 +11,7 @@
   If the raw polynomial is not good enough, we will still stream
   it to STDERR for further reference.
 
-  Please report bugs to shi.bai AT anu.edu.au.
+  Please report bugs to shih.bai AT gmail.com.
 */
 
 #define EMIT_ADDRESSABLE_shash_add
@@ -137,7 +137,10 @@ check_parameters (mpz_t m0, unsigned long d, unsigned long lq)
 
   maxP = (double) Primes[lenPrimes - 1];
   if (2.0 * pow (maxP, 4.0) * maxq >= (double) d * mpz_get_d (m0))
-      return 0;
+    return 0;
+
+  if (maxq > pow (maxP, 2.0))
+    return 0;
 
   return 1;
 }
@@ -1021,7 +1024,6 @@ collision_on_each_sq ( header_t header,
   uint8_t vpnr, *pnr, nr, j;
   uint32_t *pprimes, i;
   int found;
-  MAYBE_UNUSED uint64_t cpt = 0, cpt1 = 0, cpt2 = 0, cpt3 = 0;
 
 #ifdef DEBUG_POLYSELECT2L
   int st = milliseconds();
@@ -1069,52 +1071,6 @@ collision_on_each_sq ( header_t header,
     cur1 = CURRENT(I); ccur1 = *cur1; *ccur1++ = I;		\
     __builtin_prefetch(ccur1, 1, 3); *cur1 = ccur1;		\
   } while (0)
-
-#if 0 /* Old algo */
-
-  for (;;) {
-    do {
-      vpnr = *pnr++;
-      pprimes++;
-    } while (!vpnr);
-    if (UNLIKELY(vpnr == 0xff)) break;
-    ppl = *pprimes;
-    __builtin_prefetch(((void *) pnr) + 0x040, 0, 3);
-    __builtin_prefetch(((void *) pprimes) + 0x100, 0, 3);
-    __builtin_prefetch(((void *) pc) + 0x280, 0, 3);
-    ppl *= ppl;
-    epc = pc + vpnr;
-    for (;;) {
-      /* v2 = nv [- ppl] insertions == nv + [ppl] insertions -/+ 1;
-	 max inserts == 4+4, min == 1+1. */
-      v1 = nv;       cur1 = CURRENT(v1); ccur1 = *cur1;
-      v2 = v1 - ppl; cur2 = CURRENT(v2); ccur2 = *cur2;
-      nv = *++pc;
-      *ccur1++ = v1; __builtin_prefetch(ccur1, 1, 3); *cur1 = ccur1;
-      *ccur2++ = v2; __builtin_prefetch(ccur2, 1, 3); *cur2 = ccur2;
-      v1 += ppl; v2 -= ppl;
-      if (v1 > umax)     goto l1v2;
-      if (v2 < neg_umax) goto l1v1;
-      INSERT_2I(v1,v2); v1 += ppl; v2 -= ppl;
-      if (v1 > umax)     goto l1v2;
-      if (v2 < neg_umax) goto l1v1;
-      INSERT_2I(v1,v2); v1 += ppl; v2 -= ppl;
-      if (LIKELY(v1 > umax))
-      l1v2: if (LIKELY(v2 < neg_umax))
-	  if (LIKELY(pc != epc)) continue; else break;
-	else {
-	  INSERT_I(v2); if (LIKELY(pc != epc)) continue; else break;
-	}
-      else if (LIKELY(v2 < neg_umax)) {
-      l1v1: INSERT_I(v1); if (LIKELY(pc != epc)) continue; else break;
-      }
-      else {
-	INSERT_2I(v1,v2); if (LIKELY(pc != epc)) continue; else break;
-      }
-    }
-  }
-    
-#else /* New Algo */
 
   int64_t b;
   b = (int64_t) ((double) umax * 0.3333333333333333);
@@ -1213,11 +1169,9 @@ collision_on_each_sq ( header_t header,
   } while (1);
 
  bend:
-#endif
 #undef INSERT_2I
 #undef INSERT_I
 
-  /* fprintf (stderr, "%lu %lu %lu %lu\n", cpt, cpt1, cpt2, cpt3); */
   for (i = 0; i < SHASH_NBUCKETS; i++) assert (H->current[i] <= H->base[i+1]);
 
   /*
@@ -2009,27 +1963,29 @@ static void
 usage (const char *argv, const char * missing)
 {
   fprintf (stderr, "Usage: %s [options] P\n", argv);
-  fprintf (stderr, "Required parameters and options:\n");
-  fprintf (stderr, "P            --- degree-1 coefficient of g(x) has\n");
-  fprintf (stderr, "                 two prime factors in [P,2P]\n");
-  fprintf (stderr, "-v           --- verbose mode\n");
-  fprintf (stderr, "-q           --- quiet mode\n");
-  fprintf (stderr, "-r           --- size-optimize polynomial only (skip ropt)\n");
-  fprintf (stderr, "-t nnn       --- use n threads (default 1)\n");
-  fprintf (stderr, "-admin nnn   --- start from ad=nnn (default 0)\n");
-  fprintf (stderr, "-admax nnn   --- stop at ad=nnn\n");
-  fprintf (stderr, "-incr nnn    --- forced factor of ad (default 60)\n");
-  fprintf (stderr, "-N nnn       --- input number\n");
-  fprintf (stderr, "-degree nnn  --- wanted polynomial degree\n");
-  fprintf (stderr, "-nq nnn      --- maximum number of special-q's considered\n");
-  fprintf (stderr, "                 for each ad (default %d)\n", INT_MAX);
-  fprintf (stderr, "-save xxx    --- save state in file xxx\n");
-  fprintf (stderr, "-resume xxx  --- resume state from file xxx\n");
-  fprintf (stderr, "-maxnorm xxx --- only optimize polynomials with norm <= xxx\n");
-  fprintf (stderr, "-maxtime xxx --- stop the search after xxx seconds\n");
-  fprintf (stderr, "-out xxx     --- for msieve-format output\n");
-  fprintf (stderr, "-s xxx       --- time intervals (seconds) for printing\n");
-  fprintf (stderr, "                 out statistics (default %d)\n", TARGET_TIME / 1000);
+  fprintf (stderr, "Required:\n");
+  fprintf (stderr, " -degree nnn  --- polynomial degree (maximum 6)\n");
+  fprintf (stderr, " -N nnn       --- input number\n");
+  fprintf (stderr, " P            --- degree-1 coefficient of g(x) has\n");
+  fprintf (stderr, "                  two prime factors in [P,2P]\n");
+  fprintf (stderr, "Optional:\n");
+  fprintf (stderr, " -admax nnn   --- stop at ad=nnn\n");
+  fprintf (stderr, " -admin nnn   --- start from ad=nnn (default 0)\n");
+  fprintf (stderr, " -incr nnn    --- forced factor of ad (default 60)\n");
+  fprintf (stderr, " -maxnorm xxx --- only optimize polynomials with norm <= xxx\n");
+  fprintf (stderr, " -maxtime xxx --- stop the search after xxx seconds\n");
+  fprintf (stderr, " -nq nnn      --- maximum number of special-q's considered\n");
+  fprintf (stderr, "                  for each ad (default %d)\n", INT_MAX);
+  fprintf (stderr, " -out xxx     --- for msieve-format output\n");
+  fprintf (stderr, " -q           --- quiet mode\n");
+  fprintf (stderr, " -r           --- size-optimize polynomial only (skip root-optimization)\n");
+  fprintf (stderr, " -resume xxx  --- resume state from file xxx\n");
+  fprintf (stderr, " -s xxx       --- time intervals (seconds) for printing\n");
+  fprintf (stderr, "                  out statistics (default %d)\n", TARGET_TIME / 1000);
+  fprintf (stderr, " -save xxx    --- save state in file xxx\n");
+  fprintf (stderr, " -t nnn       --- use n threads (default 1)\n");
+  fprintf (stderr, " -v           --- verbose mode\n");
+
   if (missing) {
       fprintf(stderr, "\nError: missing or invalid parameter \"-%s\"\n",
               missing);
@@ -2047,7 +2003,8 @@ main (int argc, char *argv[])
   double st0 = seconds (), maxtime = DBL_MAX;
   mpz_t N;
   unsigned int d = 0;
-  unsigned long P, admin = 0, admax = ULONG_MAX;
+  unsigned long P, admin, admax;
+  double admin_d, admax_d;
   int quiet = 0, tries = 0, i, nthreads = 1, st,
     target_time = TARGET_TIME, incr_target_time = TARGET_TIME;
   tab_t *T;
@@ -2099,14 +2056,23 @@ main (int argc, char *argv[])
   param_list_parse_int (pl, "s", &target_time);
   incr_target_time = target_time;
   param_list_parse_uint (pl, "degree", &d);
-  param_list_parse_ulong (pl, "admin", &admin);
-  param_list_parse_ulong (pl, "admax", &admax);
+  if (param_list_parse_double (pl, "admin", &admin_d) == 0) /* no -admin */
+    admin = 0;
+  else
+    admin = (unsigned long) admin_d;
+  if (param_list_parse_double (pl, "admax", &admax_d) == 0) /* no -admax */
+    admax = ULONG_MAX;
+  else
+    admax = (unsigned long) admax_d;
   param_list_parse_ulong (pl, "incr", &incr);
   param_list_parse_double (pl, "maxnorm", &max_norm);
   param_list_parse_double (pl, "maxtime", &maxtime);
   save = param_list_lookup_string (pl, "save");
   resume = param_list_lookup_string (pl, "resume");
   out = param_list_lookup_string (pl, "out");
+
+  if (param_list_warn_unused(pl))
+    usage (argv0[0],NULL);
 
   /* print command line */
   param_list_print_command_line (stdout, pl);

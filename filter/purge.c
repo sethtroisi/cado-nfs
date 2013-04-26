@@ -46,6 +46,11 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
   GET_HASH_P(H,h) - prime corresponding to index h
   GET_HASH_R(H,h) - root  corresponding to index h (-2 for rational prime)
   H->hashcount[h] - number of occurrences of (p, r) in current relations
+
+Exit value:
+- 0 if enough relations
+- 1 if an error occurred (then we should abort the factorization)
+- 2 if not enough relations
 */
 
 /*
@@ -76,6 +81,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "utils_ffs.h"
 #endif
 
+#define DEBUG 0
 //#define STAT_FFS
 
 //#define USE_CAVALLAR_WEIGHT_FUNCTION
@@ -94,8 +100,7 @@ static char rep_cado[4096];         /* directory of cado to find utils/antebuffe
 
 static hashtable_t H;
 static HR_T **rel_compact  = NULL; /* see above */
-static uint8_t *rel_weight = NULL; /* rel_weight[i] is the total weight of
-                                      row i */
+
 static char ** fic;
 static char *pmin, *pminlessone;
 static FILE *ofile;     /* For the principal file output. */
@@ -103,7 +108,8 @@ static bit_vector rel_used, Tbv;
 static relation_stream rs;
 static HR_T *sum; /* sum of row indices for primes with weight 2 */
 static cado_poly pol;
-static double wct0, W; /* total weight for last pass */
+static double wct0;
+static double W; /* total weight of the matrix (used in second pass) */
 static size_t tot_alloc, tot_alloc0;
 static HR_T nrel,
   nprimes = 0,
@@ -586,11 +592,6 @@ insertNormalRelation (unsigned int j)
   my_br->lhk = my_br->hk - phk;
   if (!boutfilerel) {
     my_tmp[itmp] = UMAX(*my_tmp); /* sentinel */
-#ifndef FOR_FFS
-    rel_weight[my_br->num] = my_br->rel.nb_rp + my_br->rel.nb_ap;
-#else
-    rel_weight[my_br->num] = weight_rel_ffs (my_br->rel);
-#endif
     rel_compact[my_br->num] = my_tmp;
   }
 }
@@ -629,11 +630,6 @@ insertFreeRelation (unsigned int j)
   buf_rel[j].lhk = buf_rel[j].hk - phk;
   if (!boutfilerel) {
     my_tmp[itmp] = UMAX(*my_tmp);  /* sentinel */
-#ifndef FOR_FFS
-    rel_weight[buf_rel[j].num] = 1 + buf_rel[j].rel.nb_ap;
-#else
-    rel_weight[buf_rel[j].num] = weight_rel_ffs (buf_rel[j].rel);
-#endif
     rel_compact[buf_rel[j].num] = my_tmp;
   }
 }
@@ -688,12 +684,10 @@ weight_function_clique (HC_T w)
   else if (w == 2)
     return 0.25;
   else
-      return 0.0;
+    return 0.0;
 #else
     if (w >= 3)
-      /* we use the multiplier 5 here, so that the average weight (assumed to
-         be 1) is in the middle of the Count[10] array */
-      return (float) 5.0 / (float) w;
+      return (float) 1.0 / (float) w;
     else
       return 0.0;
 #endif
@@ -716,7 +710,9 @@ compute_connected_component (HR_T i)
           if (!bit_vector_getbit(Tbv, (size_t) k)) /* row k not visited yet */
             n += compute_connected_component (k);
         }
-      w_ccc += weight_function_clique (H.hc[h]);
+      /* we use the multiplier 5 here, so that the average weight (assumed to
+         be 1) is in the middle of the Count[10] array */
+      w_ccc += 5.0 * weight_function_clique (H.hc[h]);
     }
   return n;
 }
@@ -752,7 +748,6 @@ deleteHeavierRows (unsigned int npass)
   static HR_T chunk;
   comp_t *tmp = NULL; /* (weight, index) */
   HR_T *myrelcompact, i, h;
-  double W = 0.0; /* total matrix weight */
   double N = 0.0; /* number of rows */
   unsigned int wceil, j, ltmp = 0, alloctmp = 0xff;
   long target;
@@ -771,10 +766,9 @@ deleteHeavierRows (unsigned int npass)
       for (myrelcompact = rel_compact[i]; (h = *myrelcompact++) != UMAX(h); )
 	if (H.hc[h] == 2) sum[h] += i;
       N += 1.0;
-      W += rel_weight[i]; /* row weight */
     }
-  fprintf (stderr, "Step %u on %u: Matrix has %1.0f real (non null) rows "
-                   "and weight %1.0f\n", count, npass, N, W);
+  fprintf (stderr, "Step %u on %u: Matrix has %1.0f real (non null) rows\n",
+                   count, npass, N);
   ASSERT_ALWAYS(N == (double) newnrel);
 
   /* now initialize bit table for relations used */
@@ -816,6 +810,12 @@ deleteHeavierRows (unsigned int npass)
     }
   else
     target = keep; /* enough steps */
+
+#if DEBUG >= 1
+  fprintf (stderr, "DEBUG: newnrel=%u newnprimes=%u\n"
+                   "DEBUG: ltmp=%u chunk=%u target=%lu\n", newnrel,
+                   newnprimes, ltmp, chunk, target);
+#endif
 
   for (j = 0; j < ltmp && newnrel > target + newnprimes; j++)
     newnrel -= delete_connected_component (tmp[j].i);
@@ -941,7 +941,7 @@ remove_singletons (unsigned int npass, double required_excess)
         {
           fprintf(stderr, "excess < %.2f * #primes. See -required_excess "
                           "argument.\n", required_excess);
-          exit (1);
+          exit (2);
         }
       if (oldexcess > excess)
 	fprintf (stderr, "   [each excess row deleted %2.2lf rows]\n",
@@ -987,7 +987,7 @@ renumber (const char *sos)
     if (sos != NULL)
       {
 	fprintf (stderr, "Output renumber table in file %s\n", sos);
-	fsos = gzip_open (sos, "w");
+	fsos = fopen_maybe_compressed (sos, "w");
         fprintf (fsos, "# each row contains 3 hexadecimal values: i p r\n"
 		 "# i is the ideal index value (starting from 0)\n"
 		 "# p is the corresponding prime\n"
@@ -1019,7 +1019,7 @@ renumber (const char *sos)
 	H.hr[i] = UMAX(*(H.hr));
       }
     if (fsos)
-      gzip_close (fsos, sos);
+      fclose_maybe_compressed (fsos, sos);
     nb--;
     newnprimes = nb;
 }
@@ -1148,8 +1148,6 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j, int passtwo)
   ASSERT_ALWAYS(c == ':');
   mybufrel->rel.b = n;
 
-  if (!rs->parse_only_ab) {
-    /* Do something if we're also interested in primes */
     for ( k = 0, c = 0 ; ; ) {
     next_rat:
       if (c == ':') break;
@@ -1301,7 +1299,6 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j, int passtwo)
 	  ltmp += mybufrel->rel.nb_ap;
       }
     mybufrel->ltmp = ltmp;
-  }
 }
 
 /* We don't use memory barrier nor (pre)processor orders for portability.
@@ -1802,7 +1799,7 @@ prempt_scan_relations_pass_one ()
 
   if (rs->nrels != nrelmax) {
     fprintf (stderr, "Error, -nrels value should match the number of scanned relations\nexpected %lu relations, found %lu\n", (unsigned long) nrelmax, rs->nrels);
-    exit (EXIT_FAILURE);
+    exit (1);
   }
 
   return 1;
@@ -1840,9 +1837,9 @@ prempt_scan_relations_pass_two (const char *oname,
 
   int pipe;
 
-  ofile = fopen_compressed_w(oname, &pipe, NULL);
+  ofile = fopen_maybe_compressed2(oname, "w", &pipe, NULL);
 #ifdef FOR_FFS
-  ofile2 = fopen_compressed_w(oname2, &pipe_2, NULL);
+  ofile2 = fopen_maybe_compressed2(oname2, "w", &pipe_2, NULL);
 #endif
   if (!raw)
     fprintf (ofile, "%lu %lu\n", (unsigned long) nrows, (unsigned long) ncols);
@@ -2069,15 +2066,27 @@ prempt_scan_relations_pass_two (const char *oname,
 }
 
 static void
-usage (void)
+usage (const char *argv0)
 {
-  fprintf (stderr, "Usage: purge [options] -poly polyfile -out purgedfile -nrels nnn [-basepath <path>] [-subdirlist <sl>] [-filelist <fl>] file1 ... filen\n");
-  fprintf (stderr, "Options:\n");
+  fprintf (stderr, "Usage: %s [options] ", argv0);
+  fprintf (stderr, "[ -filelist <fl> [-basepath <path>] [-subdirlist <sl>] ");
+  fprintf (stderr, "| file1 ... filen ]\n");
+  fprintf (stderr, "Mandatory command line options: \n");
+  fprintf (stderr, "       -poly polyfile - use polynomial in polyfile\n");
+  fprintf (stderr, "       -out outfile   - write remaining relations in outfile\n");
+  fprintf (stderr, "       -nrels nnn     - number of initial relations\n");
+#ifndef FOR_FFS
+  fprintf (stderr, "\n    Other command line options: \n");
+#endif
+  fprintf (stderr, "       -outdel file - output file for deleted relations\n");
+  fprintf (stderr, "       -sos sosfile - to keep track of the renumbering\n");
+#ifdef FOR_FFS
+  fprintf (stderr, "\n    Other command line options: \n");
+#endif
   fprintf (stderr, "       -keep    nnn - prune if excess > nnn (default 160)\n");
   fprintf (stderr, "       -minpa   nnn - purge alg. primes >= nnn (default alim)\n");
   fprintf (stderr, "       -minpr   nnn - purge rat. primes >= nnn (default rlim)\n");
   fprintf (stderr, "       -nprimes nnn - expected number of prime ideals\n");
-  fprintf (stderr, "       -sos sosfile - to keep track of the renumbering\n");
   fprintf (stderr, "       -raw         - output relations in CADO format\n");
   fprintf (stderr, "       -npthr   nnn - threads number for suppress singletons\n");
   fprintf (stderr, "       -inprel  file_rel_used : load active relations\n");
@@ -2085,9 +2094,6 @@ usage (void)
   fprintf (stderr, "       -npass   nnn - number of step of clique removal (default %d)\n", DEFAULT_NPASS);
   fprintf (stderr, "       -required_excess nnn - percentage of excess required at the end of the first singleton removal step (default %.2f)\n",
   DEFAULT_REQUIRED_EXCESS);
-#ifdef FOR_FFS
-  fprintf (stderr, "       -outdel file - output file for deleted relations\n");
-#endif
   exit (1);
 }
 
@@ -2100,7 +2106,7 @@ approx_phi (long B)
 }
 #else
 /* estimate the number of ideals of degree <= B */
-static int
+static HR_T
 approx_ffs (int d)
 {
 #ifdef USE_F2
@@ -2139,6 +2145,8 @@ set_rep_cado (const char *argv0) {
 int
 main (int argc, char **argv)
 {
+  char *argv0 = argv[0];
+
   int k;
   size_t mysize;
   param_list pl;
@@ -2162,7 +2170,7 @@ main (int argc, char **argv)
     if (param_list_update_cmdline(pl, &argc, &argv)) continue;
     /* Since we accept file names freeform, we decide to never abort
      * on unrecognized options */
-    if (!strcmp(*argv, "--help")) usage();
+    if (!strcmp(*argv, "--help")) usage(argv0);
     break;
   }
 
@@ -2187,17 +2195,25 @@ main (int argc, char **argv)
   /* param_list_parse_uint(pl, "npthr", (unsigned int *) &npt); */
   const char * snpt = param_list_lookup_string(pl, "npthr");
   if (snpt) {
-    char *p;
+    char *p, oldp;
     if ((p = strchr(snpt, 'x'))) {
       unsigned int x, y;
+      oldp = *p;
       *p = 0;
       if (sscanf(snpt, "%u", &x) && sscanf(&p[1], "%u", &y))
 	npt = x * y;
       else
-	usage();
+        {
+          *p = oldp;
+          fprintf (stderr, "Malformed -npthr option: %s\n", snpt);
+          usage(argv0);
+        }
     } else
       if (!sscanf(snpt, "%u", &npt))
-	usage();
+        {
+          fprintf (stderr, "Malformed -npthr option: %s\n", snpt);
+          usage(argv0);
+        }
   }
   param_list_parse_uint(pl, "npass", &npass);
   param_list_parse_double(pl, "required_excess", &required_excess);
@@ -2226,18 +2242,19 @@ main (int argc, char **argv)
 #endif
 
   if (param_list_warn_unused(pl)) {
-    usage();
+    fprintf (stderr, "Unused options in command-line\n");
+    usage(argv0);
   }
 
   if ((basepath || subdirlist) && !filelist) {
     fprintf(stderr, "-basepath / -subdirlist only valid with -filelist\n");
-    usage();
+    usage(argv0);
   }
 
   if (nrelmax == 0)
     {
       fprintf (stderr, "Error, missing -nrels ... option (or nrels=0)\n");
-      usage ();
+      usage (argv0);
     }
 
 #ifdef FOR_FFS /* For FFS we need to remember the renumbering of primes*/
@@ -2321,7 +2338,7 @@ main (int argc, char **argv)
 
     fprintf (stderr, "Loading rel_used file %s, %lu bytes\n",
 	     infilerel, (unsigned long) mysize);
-    if (!(in = fopen_compressed_r (infilerel, &pipe, NULL))) {
+    if (!(in = fopen_maybe_compressed2 (infilerel, "r", &pipe, NULL))) {
       fprintf (stderr, "Purge main: rel_used file %s cannot be read.\n", infilerel);
       exit (1);
     }
@@ -2349,7 +2366,6 @@ main (int argc, char **argv)
 
   if (!boutfilerel) {
     SMALLOC(rel_compact, nrelmax, "main 1");
-    SMALLOC(rel_weight, nrelmax, "main 2");
   tot_alloc0 += nrelmax * (sizeof (HR_T *) + sizeof (HC_T));
   /* %zu is the C99 modifier for size_t */
   fprintf (stderr, "Allocated rel_compact of %zu MB (total %zu MB so far)\n",
@@ -2435,7 +2451,7 @@ main (int argc, char **argv)
     if (nrel <= nprimes) /* covers case nrel = nprimes = 0 */
       {
 	fprintf(stderr, "number of relations <= number of ideals\n");
-	exit (1);
+	exit (2);
       }
   }
   hashCheck (&H);
@@ -2446,7 +2462,6 @@ main (int argc, char **argv)
     fprintf (stderr, "Freeing rel_compact array...\n");
     /* we do not use it anymore */
     free (rel_compact);
-    free (rel_weight);
 
     /*************************** second pass ***********************************/
 
@@ -2477,7 +2492,7 @@ main (int argc, char **argv)
 
     fprintf (stderr, "Relations with at least one singleton found and suppress:%lu\nNumber of primes suppress : %lu\nWriting rel_used file %s, %lu bytes\n",
 	     (unsigned long) relsup, (unsigned long) prisup, outfilerel, (unsigned long) mysize);
-    if (!(out = fopen_compressed_w (outfilerel, &pipe, NULL))) {
+    if (!(out = fopen_maybe_compressed2 (outfilerel, "w", &pipe, NULL))) {
       fprintf (stderr, "Purge main: rel_used file %s cannot be written.\n", outfilerel);
       exit (1);
     }

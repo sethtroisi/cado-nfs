@@ -1,0 +1,42 @@
+README on how to compile and run the filtering step for FFS.
+
+1. Compilation:
+===============
+
+To compile purge-ffs-f2 without gf2x, go directly to Step 1 
+
+Step 0: 
+  In ffs/Makefile, uncomment the line beginning by:
+  
+    # GF2XPREFIX = ...
+
+  In filter/CMakeLists-nodist.txt, uncomment the following lines:
+  
+    #link_directories (${CADO_NFS_BINARY_DIR}/gf2x/.libs)
+    ...
+    #target_link_libraries(purge-ffs-f2 utils pthread libfppol-f2.a gf2x)
+    ...
+    #add_dependencies(purge-ffs-f2 gf2x-build)
+
+  and comment the following line:
+  
+    target_link_libraries(purge-ffs-f2 utils pthread libfppol-f2.a)
+
+Then, in cado-nfs directory, type:
+  
+  make gf2x-build
+
+
+Step 1: in cado-nfs directory, type:
+
+  cd ffs
+  make
+  cd ..
+  make dup1 dup2 purge-ffs-f2 purge-ffs-f3 merge-ffs replay-ffs
+
+
+2. Run:
+=======
+
+To run the filtering step for FFS, see the top filter.sh script in this
+directory.

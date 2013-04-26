@@ -27,7 +27,8 @@ class HttpServerLogger(object):
     def __init__(self, level):
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(level)
-        formatter = logging.Formatter(fmt='%(address_string)s - - [%(asctime)s] %(message)s')
+        formatter = logging.Formatter(
+            fmt='%(address_string)s - - [%(asctime)s] %(message)s')
         ch = logging.StreamHandler()
         ch.setFormatter(formatter)
         self.logger.addHandler(ch)
@@ -91,7 +92,8 @@ class HtmlGen(io.BytesIO):
                     path = f["path"]
                     if path.startswith(cwd):
                         path = path[len(cwd):]
-                    s = s + '<a href="' + path + '">' + f["filename"] + '</a><br>'
+                    s = s + '<a href="' + path + '">' + f["filename"] + \
+                    '</a><br>'
                 arr.append(s)
             else:
                 arr.append(wu[k])
@@ -111,11 +113,12 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
     # These three methods overwrite the corresponding methods from 
     # http.server.BaseHTTPRequestHandler
     # They just call self.log() with a numerical logging level added
-    def log_message(self, format, *args):
-        self.log(logging.INFO, *args, **kwargs)
+    def log_message(self, format, *args, **kwargs):
+        self.log(logging.INFO, format, *args, **kwargs)
 
     def log_request(self, code='-', size='-'):
-        self.log(logging.INFO, '"%s" %s %s', self.requestline, str(code), str(size))
+        self.log(logging.INFO, '"%s" %s %s', self.requestline, str(code), 
+                 str(size))
 
     def log_error(self, format, *args):
         self.log(logging.ERROR, format, *args)
@@ -134,7 +137,8 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             elif self.is_getstatus():
                 self.send_status()
             else:
-                self.send_error(404, "GET for CGI scripts allowed only for work unit or status page request")
+                self.send_error(404, "GET for CGI scripts allowed only " + 
+                                "for work unit or status page request")
         else:
             super().do_GET()
         sys.stdout.flush()
@@ -158,7 +162,8 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
     def is_upload(self):
         """Test whether request is a file upload."""
         splitpath = http.server._url_collapse_path_split(self.path)
-        if self.command == 'POST' and self.is_cgi() and splitpath[1] in upload_keywords:
+        if self.command == 'POST' and self.is_cgi() and \
+                splitpath[1] in upload_keywords:
             return True
         return False
 
@@ -174,7 +179,8 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
 
     def guess_type(self, path):
         type = super().guess_type(path)
-        # Use text/plain for files in upload, unless the type was properly identified
+        # Use text/plain for files in upload, unless the type was properly 
+        # identified
         # FIXME: make path identification more robust
         if type == "application/octet-stream" and path.startswith(self.cwd + '/upload/'):
             return "text/plain"
@@ -198,7 +204,8 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         if not wu_text:
             return self.send_error(404, "No work available")
         
-        self.log_message("Sending work unit " + Workunit(wu_text).get_id() + " to client " + clientid)
+        self.log_message("Sending work unit " + Workunit(wu_text).get_id() + 
+                         " to client " + clientid)
         # wu_text = wu.get_wu()
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")

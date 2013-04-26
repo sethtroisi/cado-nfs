@@ -27,15 +27,19 @@ testirred_OBJ = $(fppol_OBJ) ffspol.o memusage.o timing.o params.o fqpol.o \
 descent_init_OBJ =  $(fppol_OBJ) ffspol.o params.o polyfactor.o smoothness.o \
 	    memusage.o timing.o
 
-BUILDDIR = ./build
+# The binaries goes in CADO-NFS default build dirirectory.
+# Can be overwritten in Makefile.local
+HOST=$(shell hostname)
+BUILDDIR = ../build/$(HOST)/ffs
 
-# GF2XPREFIX = <path_to_gf2x>
+# Use gf2x from CADO-NFS. Can also be defined or overwritten in Makefile.local
+# GF2XPREFIX = ../build/$(HOST)/gf2x
 OPTFLAGS  = 
 WARNFLAGS = -Wall -Wextra -pedantic
 
 FFSREV = `./version.sh`
 
-CPPFLAGS    = -DFFSREV=\"$(FFSREV)\"
+CPPFLAGS    = -DFFSREV=\"$(FFSREV)\" -DSCALE=0
 CFLAGS      = $(OPTFLAGS) $(WARNFLAGS) -std=c99   -g
 TARGET_ARCH = -mtune=native -march=native
 LDFLAGS     = 
@@ -48,8 +52,8 @@ LDLIBS      = -lm
 
 # Use GF2X?
 ifdef GF2XPREFIX
-  CPPFLAGS += -I$(GF2XPREFIX)/include -DHAVE_GF2X
-  LDFLAGS  += -L$(GF2XPREFIX)/lib
+  CPPFLAGS += -I$(GF2XPREFIX)/include -I$(GF2XPREFIX) -I../gf2x -I. -DHAVE_GF2X
+  LDFLAGS  += -L$(GF2XPREFIX)/lib -L$(GF2XPREFIX)/.libs
   LDLIBS   += -lgf2x
 endif
 

@@ -369,7 +369,7 @@ mod_2pow_ul (residue_t r, const unsigned long e, const modulus_t m)
 }
 
 
-/* Compute r = 2^e. Here, e is an unsigned long */
+/* Compute r = 3^e. Here, e is an unsigned long */
 static void
 mod_3pow_ul (residue_t r, const unsigned long e, const modulus_t m)
 {

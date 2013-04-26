@@ -27,16 +27,19 @@ int factor_survivor(fppol_t a, fppol_t b,
         MAYBE_UNUSED ijpos_t pos, 
         MAYBE_UNUSED replayable_bucket_t *buckets,
         MAYBE_UNUSED large_factor_base_t *FB,
-        ffspol_t* F, int *B, sq_t q, int side) 
+        ffspol_t* F, int *B, qlat_t qlat) 
 {
     fppol_t Nab;
     fppol_init(Nab);
     for (int twice = 0; twice < 2; twice++) {
         ffspol_norm(Nab, F[twice], a, b);
-        if (side == twice) {
+        if (qlat->side == twice) {
             fppol_t qq;
             fppol_init(qq);
-            fppol_set_sq(qq, q);
+            if (!qlat->want_longq)
+                fppol_set_sq(qq, qlat->q);
+            else
+                fppol_set(qq, qlat->longq);
             fppol_div(Nab, Nab, qq);
             fppol_clear(qq);
         }
@@ -163,21 +166,56 @@ void stats_yield_push(stats_yield_ptr stats_yield, int nrels, double time,
     stats_yield->n++;
 }
 
+
+// Attempt to compute a confidence interval for the average nrels.
+void nrels_confidence_interval(double *av_nrels, double * ci68, double * ci95,
+        double * ci99, stats_yield_srcptr stats_yield)
+{
+    long tot_rels = 0;
+    int n = stats_yield->n;
+    double nn = (double) n;
+    for (int i = 0; i < n; ++i) {
+        tot_rels += stats_yield->data[i].nrels;
+    }
+    *av_nrels = (double)tot_rels / nn;
+
+    double sigma = 0;
+    for (int i = 0; i < n; ++i) {
+        double diff = stats_yield->data[i].nrels - *av_nrels;
+        sigma += diff*diff;
+    }
+    sigma /= (nn-1);  // the "-1" is supposed to give a better estimator.
+    sigma = sqrt(sigma);
+    if (ci68 != NULL) 
+        *ci68 = sigma/sqrt(nn);
+    if (ci95 != NULL) 
+        *ci95 = 2*sigma/sqrt(nn);
+    if (ci99 != NULL) 
+        *ci99 = 3*sigma/sqrt(nn);
+}
+
+
 // Attempt to compute a confidence interval for the average yield.
 void yield_confidence_interval(double *av_yield, double * ci68, double * ci95,
         double * ci99, stats_yield_srcptr stats_yield)
 {
     long tot_rels = 0;
     *av_yield = 0;
-    int n = stats_yield->n;
-    for (int i = 0; i < n; ++i) {
+    int nn = stats_yield->n;
+    int n = 0;
+    for (int i = 0; i < nn; ++i) {
+        if (stats_yield->data[i].nrels == 0)
+            continue;
+        n++;
         tot_rels += stats_yield->data[i].nrels;
         *av_yield += stats_yield->data[i].time;
     }
     *av_yield /= tot_rels;
 
     double sigma = 0;
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < nn; ++i) {
+        if (stats_yield->data[i].nrels == 0)
+            continue;
         double diff = stats_yield->data[i].time/stats_yield->data[i].nrels
             - *av_yield;
         sigma += stats_yield->data[i].nrels*diff*diff;
@@ -201,7 +239,18 @@ void yield_confidence_interval(double *av_yield, double * ci68, double * ci95,
         *ci99 = 3*sigma/sqrt(n);
 }
 
-// Attempt to compute a confidence interval for the average yield.
+void stats_nrels_print_ci(stats_yield_srcptr stats_yield)
+{
+    double ci68, ci95, ci99, av_nrels;
+    nrels_confidence_interval(&av_nrels, &ci68, &ci95, &ci99, stats_yield);
+    printf("#   Confidence interval for rels/sq at 68.2%%: [%1.4f - %1.4f]\n",
+            av_nrels - ci68, av_nrels + ci68);
+    printf("#                                   at 95.4%%: [%1.4f - %1.4f]\n",
+            av_nrels - ci95, av_nrels + ci95);
+    printf("#                                   at 99.7%%: [%1.4f - %1.4f]\n",
+            av_nrels - ci99, av_nrels + ci99);
+}
+
 void stats_yield_print_ci(stats_yield_srcptr stats_yield)
 {
     double ci68, ci95, ci99, av_yield;
@@ -245,6 +294,8 @@ void usage(const char *argv0, const char * missing)
     fprintf(stderr, "                   q0 and q1 are ignored.\n");
     fprintf(stderr, "  reliableyield    ignore q1, run until estimated yield is reliable\n");
     fprintf(stderr, "                   that is in a +/-3%% interval with 95%% confidence level.\n");
+    fprintf(stderr, "  reliablenrels    the same, but criterion is rels per sq.\n");
+    fprintf(stderr, "  reliablerange    set the 3%% to another percentage in reliable estimates.\n");
     fprintf(stderr, "Note: giving (q0,q1) is exclusive to giving (q,rho). In the latter case,\n" "    rho is optional.\n");
     fprintf(stderr, "  sqside           side (0 or 1) of the special-q (default %d)\n", SQSIDE_DEFAULT);
     fprintf(stderr, "  firstsieve       side (0 or 1) to sieve first (default %d)\n", FIRSTSIEVE_DEFAULT);
@@ -276,16 +327,20 @@ int main(int argc, char **argv)
     int skewness = 0;
     int gf = 0;
     int want_reliable_yield = 0;
+    int want_reliable_nrels = 0;
+    double reliablerange = 0.03;
     int sqt = 3;
     int bench = 0;
     int bench_end = 0;
     double bench_tot_rels = 0;
     double bench_tot_time = 0;
+    int want_longq = 0;
 
     param_list pl;
     param_list_init(pl);
     param_list_configure_knob(pl, "-sublat", &want_sublat);
     param_list_configure_knob(pl, "-reliableyield", &want_reliable_yield);
+    param_list_configure_knob(pl, "-reliablenrels", &want_reliable_nrels);
     argv++, argc--;
     for (; argc;) {
         if (param_list_update_cmdline(pl, &argc, &argv)) {
@@ -348,8 +403,50 @@ int main(int argc, char **argv)
     if (threshold[1] == 0) 
         threshold[1] = 2*lpb[1];
 
-    // read q0, q1
+    // Check if we want to be in "longq" mode
     {
+        const char *sqstr;
+        int noerr;
+        sqstr = param_list_lookup_string(pl, "longq");
+        if (sqstr != NULL) {
+            fppol_init(qlat->longq);
+            fppol_init(qlat->longrho);
+            fppol_init(qlat->longa0);
+            fppol_init(qlat->longa1);
+            fppol_init(qlat->longb0);
+            fppol_init(qlat->longb1);
+            want_longq = 1;
+            qlat->want_longq = 1;
+            noerr = fppol_set_str(qlat->longq, sqstr);
+            if (!noerr) {
+                fprintf(stderr, "Could not parse longq: %s\n", sqstr);
+                exit(EXIT_FAILURE);
+            }
+            if (!fppol_is_monic(qlat->longq)) {
+                fprintf(stderr, "Error: given longq is not monic: %s\n", sqstr);
+                exit(EXIT_FAILURE);
+            }
+            if (!fppol_is_irreducible(qlat->longq)) {
+                fprintf(stderr, "Error, longq is not irreducible: %s\n", sqstr);
+                exit(EXIT_FAILURE);
+            }
+            sqstr = param_list_lookup_string(pl, "longrho");
+            if (sqstr == NULL) {
+                fprintf(stderr, "Error, longrho is required with longq\n");
+                exit(EXIT_FAILURE);
+            }
+            noerr = fppol_set_str(qlat->longrho, sqstr);
+            if (!noerr) {
+                fprintf(stderr, "Could not parse longrho: %s\n", sqstr);
+                exit(EXIT_FAILURE);
+            }
+        } else {
+            qlat->want_longq = 0;
+        }
+    }
+
+    // read q0, q1
+    if (!want_longq) {
         const char *sqstr;
         int noerr;
         sqstr = param_list_lookup_string(pl, "q0");
@@ -401,7 +498,7 @@ int main(int argc, char **argv)
     // read q, rho 
     // We store them in qlat for convenience, but these will be moved
     // away before the main loop.
-    {
+    if (!want_longq) {
         const char *sqstr;
         int noerr;
         sqstr = param_list_lookup_string(pl, "q");
@@ -466,6 +563,12 @@ int main(int argc, char **argv)
         fprintf(stderr, "# Sorry, no sublattices in characteristic > 2. Ignoring the 'sublat' option\n");
     sublat_ptr sublat = &no_sublat[0];
 #endif
+
+    param_list_parse_double(pl, "reliablerange", &reliablerange);
+    if (want_reliable_yield && want_reliable_nrels) {
+        fprintf(stderr, "Error: -reliableyield and -reliablenrels are incompatible options.\n");
+        exit(EXIT_FAILURE);
+    }
   
     // Most of what we do is at the sublattice level. 
     // So we fix I and J accordingly.
@@ -545,26 +648,28 @@ int main(int argc, char **argv)
     ASSERT_ALWAYS(roots != NULL);
     int nroots = 0; // number of roots still to work on for current q.
 
-    if (sq_is_zero(q0)) {
-        sq_set(q0, qlat->q);
-        sq_set(q1, qlat->q);
-    }
-    if (rho_given) {
-        nroots = 1;
-        sq_set(roots[0], qlat->rho);
-    } else {
-        if (sq_is_irreducible(q0)) {
-            nroots = sq_roots(roots, q0, ffspol[sqside]);
-            sq_set(qlat->q, q0);
-            printf("############################################\n");
-            printf("# Roots for q = "); 
-            sq_out(stdout, q0);
-            printf(":");
-            for (int i = 0; i < nroots; ++i) {
-                printf(" ");
-                sq_out(stdout, roots[i]);
+    if (!want_longq) {
+        if (sq_is_zero(q0)) {
+            sq_set(q0, qlat->q);
+            sq_set(q1, qlat->q);
+        }
+        if (rho_given) {
+            nroots = 1;
+            sq_set(roots[0], qlat->rho);
+        } else {
+            if (sq_is_irreducible(q0)) {
+                nroots = sq_roots(roots, q0, ffspol[sqside]);
+                sq_set(qlat->q, q0);
+                printf("############################################\n");
+                printf("# Roots for q = "); 
+                sq_out(stdout, q0);
+                printf(":");
+                for (int i = 0; i < nroots; ++i) {
+                    printf(" ");
+                    sq_out(stdout, roots[i]);
+                }
+                printf("\n");
             }
-            printf("\n");
         }
     }
 
@@ -575,6 +680,7 @@ int main(int argc, char **argv)
     // Begin of loop over special-q's
     //
     do {
+      if (!want_longq) {
         // Select next special-q
         if (nroots == 0) { // find next q
             do {
@@ -584,7 +690,18 @@ int main(int argc, char **argv)
                 nroots = sq_roots(roots, q0, ffspol[sqside]);
             } while (nroots == 0);
 
-            if (want_reliable_yield) {
+            if (want_reliable_nrels) {
+                if (stats_yield->n > 10) {
+                    double av_nrels, ci95;
+                    nrels_confidence_interval(&av_nrels, NULL, &ci95, NULL,
+                            stats_yield);
+                    printf("############################################\n");
+                    printf("#   Current average nrels: %1.2f\n", av_nrels);
+                    stats_nrels_print_ci(stats_yield);
+                    if (ci95/av_nrels < reliablerange)
+                        break;
+                }
+            } else if (want_reliable_yield) {
                 if (stats_yield->n > 10) {
                     double av_yield, ci95;
                     yield_confidence_interval(&av_yield, NULL, &ci95, NULL,
@@ -592,7 +709,7 @@ int main(int argc, char **argv)
                     printf("############################################\n");
                     printf("#   Current average yield: %1.2f\n", av_yield);
                     stats_yield_print_ci(stats_yield);
-                    if (ci95/av_yield < 0.03)
+                    if (ci95/av_yield < reliablerange)
                         break;
                 }
             } else if (sq_cmp(q0, q1) >= 0) {
@@ -654,6 +771,7 @@ int main(int argc, char **argv)
             sq_set(qlat->rho, roots[nroots-1]);
             nroots--;
         }
+      } // end of selection of next sq.
 
         tot_sq++;
 
@@ -668,6 +786,10 @@ int main(int argc, char **argv)
 
         // Check the given special-q
         if (!is_valid_sq(qlat, ffspol[sqside])) {
+            if (want_longq) {
+                fprintf(stderr, "Error: the longrho is not a root mod longq\n");
+                exit(EXIT_FAILURE);
+            }
             fprintf(stderr, "Error: the rho = ");
             sq_out(stderr, qlat->rho);
             fprintf(stderr, " is not a root modulo ");
@@ -684,14 +806,15 @@ int main(int argc, char **argv)
         fflush(stdout);
 
         // If the reduced q-lattice is still too unbalanced, then skip it.
-        {
-            int opt_deg = 1 + (sq_deg(qlat->q)+1)/2;
+        if (!want_longq) {
+            // the optimal degree is ceiling( (s + deg(q))/2 ).
+            int opt_deg = (skewness + sq_deg(qlat->q) + 1) / 2;
             int sqsize = MAX(
                     MAX(ai_deg(qlat->a0), ai_deg(qlat->a1)),
                     MAX(skewness+ai_deg(qlat->b0), skewness+ai_deg(qlat->b1))
                     );
             printf("#   qlat vector degree: %d\n", sqsize);
-            if (sqsize >= opt_deg + sqt) {
+            if (sqsize > opt_deg + sqt) {
                 printf("# Special-q lattice basis is too unbalanced, let's skip it!\n");
                 tot_sq--;
                 continue;
@@ -793,10 +916,23 @@ int main(int argc, char **argv)
                 // mark survivors
                 // no need to check if this is a valid position
                 for (unsigned i = 0; i < size; ++i) {
-                  if (S[i] > threshold[side] + sublat_thr)
+                  if (S[i] > (threshold[side] + sublat_thr)>>SCALE) {
                     S[i] = 255; 
-                  else 
+#ifdef TRACE_POS
+                    if (i + pos0 == TRACE_POS) {
+                        fprintf(stderr, "TRACE_POS(%" PRIu64 "): ", i + pos0);
+                        fprintf(stderr, "above threshold.\n");
+                    }
+#endif
+                  } else {
                     S[i] = 0;
+#ifdef TRACE_POS
+                    if (i + pos0 == TRACE_POS) {
+                        fprintf(stderr, "TRACE_POS(%" PRIu64 "): ", i + pos0);
+                        fprintf(stderr, "below threshold.\n");
+                    }
+#endif
+                  }
                 }
               }
 
@@ -839,7 +975,7 @@ int main(int argc, char **argv)
                         continue;
                       ij2ab(a, b, hati, hatj, qlat);
                       nrels += factor_survivor(a, b, pos, replayable_bucket,
-                              LFB, ffspol, lpb, qlat->q, qlat->side);
+                              LFB, ffspol, lpb, qlat);
                     }
                   }
                 }
@@ -874,8 +1010,11 @@ int main(int argc, char **argv)
 
         if (nrels == 0) {
             no_rels_sq++;
-        } else
-            stats_yield_push(stats_yield, nrels, t_tot, qlat);
+        } 
+        if (want_longq)
+            break;
+        
+        stats_yield_push(stats_yield, nrels, t_tot, qlat);
     } while (1); // End of loop over special-q's
 
     free(S);
@@ -889,7 +1028,7 @@ int main(int argc, char **argv)
     free(replayable_bucket[1]->b);
 #endif
 
-    if (!bench) {
+    if (!want_longq && !bench) {
     tot_time = seconds()-tot_time;
     fprintf(stdout, "###### General statistics ######\n");
     fprintf(stdout, "#   Total time: %1.1f s\n", tot_time);
@@ -907,9 +1046,10 @@ int main(int argc, char **argv)
     fprintf(stdout, "#   %d relations found (%1.1f rel/sq)\n",
             tot_nrels, (double)tot_nrels / (double)tot_sq);
     fprintf(stdout, "#   Yield: %1.5f s/rel\n", tot_time/tot_nrels);
+    stats_nrels_print_ci(stats_yield);
     stats_yield_print_ci(stats_yield);
     if (no_rels_sq > 0) {
-        fprintf(stdout, "#   Warning: statistics are biased. There were %d special-q with no relations.\n", no_rels_sq);
+        fprintf(stdout, "#   Warning: statistics on yield are biased. There were %d special-q with no relations.\n", no_rels_sq);
     }
 #ifdef WANT_NORM_STATS
     norm_stats_print();

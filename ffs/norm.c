@@ -185,22 +185,44 @@ static void ffspol_2ij(ffspol_ptr ffspol_ij, ffspol_srcptr ffspol_ab,
   
   for (int k = d - 1; k >= 0; --k) {
     /* For hh(i,j) * (a0 i + a1 j) */
-    fppol_mul_ai(ffspol_ij->coeffs[k], ffspol_ij->coeffs[k + 1], qlat->a1);
+    if (!qlat->want_longq)
+      fppol_mul_ai(ffspol_ij->coeffs[k], ffspol_ij->coeffs[k + 1], qlat->a1);
+    else 
+      fppol_mul(ffspol_ij->coeffs[k], ffspol_ij->coeffs[k + 1], qlat->longa1);
     for (int l = k + 1; l < d; ++l) {
-      fppol_mul_ai(tmp1, ffspol_ij->coeffs[l], qlat->a0);
-      fppol_mul_ai(tmp2, ffspol_ij->coeffs[l + 1], qlat->a1);
+      if (!qlat->want_longq) { 
+        fppol_mul_ai(tmp1, ffspol_ij->coeffs[l], qlat->a0);
+        fppol_mul_ai(tmp2, ffspol_ij->coeffs[l + 1], qlat->a1);
+      } else {
+        fppol_mul(tmp1, ffspol_ij->coeffs[l], qlat->longa0);
+        fppol_mul(tmp2, ffspol_ij->coeffs[l + 1], qlat->longa1);
+      }
       fppol_add(ffspol_ij->coeffs[l], tmp1, tmp2);
     }
-    fppol_mul_ai(ffspol_ij->coeffs[d], ffspol_ij->coeffs[d], qlat->a0);
+    if (!qlat->want_longq) 
+      fppol_mul_ai(ffspol_ij->coeffs[d], ffspol_ij->coeffs[d], qlat->a0);
+    else
+      fppol_mul(ffspol_ij->coeffs[d], ffspol_ij->coeffs[d], qlat->longa0);
   
     /* For (b0 i + b1 j)^{d-k} */
-    fppol_mul_ai(powb_ij[d - k], powb_ij[d - k - 1], qlat->b0);
+    if (!qlat->want_longq) 
+      fppol_mul_ai(powb_ij[d - k], powb_ij[d - k - 1], qlat->b0);
+    else
+      fppol_mul(powb_ij[d - k], powb_ij[d - k - 1], qlat->longb0);
     for (int l = d - k - 1; l > 0; --l) {
-      fppol_mul_ai(tmp1, powb_ij[l - 1], qlat->b0);
-      fppol_mul_ai(tmp2, powb_ij[l], qlat->b1);
+      if (!qlat->want_longq) {
+        fppol_mul_ai(tmp1, powb_ij[l - 1], qlat->b0);
+        fppol_mul_ai(tmp2, powb_ij[l], qlat->b1);
+      } else {
+        fppol_mul(tmp1, powb_ij[l - 1], qlat->longb0);
+        fppol_mul(tmp2, powb_ij[l], qlat->longb1);
+      }
       fppol_add(powb_ij[l], tmp1, tmp2);
     }
-    fppol_mul_ai(powb_ij[0], powb_ij[0], qlat->b1);
+    if (!qlat->want_longq) 
+      fppol_mul_ai(powb_ij[0], powb_ij[0], qlat->b1);
+    else
+      fppol_mul(powb_ij[0], powb_ij[0], qlat->longb1);
 
     /* Multiply (b0 i + b1 j)^{d-k} by f_k and add it to hh(i,j) (a0 i + a1 j) we have computed */
     for (int l = k; l <= d; ++l) {
@@ -544,8 +566,12 @@ void init_norms(uint8_t * S, ffspol_srcptr ffspol, unsigned I, unsigned J,
   ffspol_2ij(ffspol_ij, ffspol, qlat);  
 
   int degq = 0;
-  if (sqside)
-      degq = sq_deg(qlat->q);
+  if (sqside) {
+      if (!qlat->want_longq) 
+          degq = sq_deg(qlat->q);
+      else
+          degq = fppol_deg(qlat->longq);
+  }
 
   ij_t i, j, hati, hatj;
   int gap;
@@ -585,6 +611,11 @@ void init_norms(uint8_t * S, ffspol_srcptr ffspol, unsigned I, unsigned J,
 
       // Fast loop with constant degree of norm.
       deg -= degq;
+      deg >>= SCALE;
+      if (deg > 254) {
+          fprintf(stderr, "Error: the scaling of norms is not enough. Please a version compiled with a larger SCALE value.\n");
+          exit(EXIT_FAILURE);
+      }
       if (deg == 0)
         deg = 255;
 #if defined(USE_F2) && !defined(TRACE_POS) && !defined(WANT_NORM_STATS)
@@ -636,7 +667,7 @@ void init_norms(uint8_t * S, ffspol_srcptr ffspol, unsigned I, unsigned J,
         }
 #endif
         S[pos] |= deg;
-#ifdef WANT_NORM_STATS
+#ifdef WANT_NORM_STATS  // BROKEN IF SCALE FIXME
         if (S[pos] != 255) {
           norm_stats_n[side]++;
           norm_stats_sum[side] += deg+degq;

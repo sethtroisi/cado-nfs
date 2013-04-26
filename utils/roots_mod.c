@@ -297,6 +297,50 @@ tonelli_shanks(residue_t *rr, int d, uint64_t n, const modulus_t pp)
 }
 
 
+/* Tonelli-shanks for the case pp == 5 (mod 8).
+   In this case we know that 2 is a QNR. */
+static int
+tonelli_shanks5(residue_t *rr, int d, uint64_t n, const modulus_t pp)
+{
+  uint64_t q, i, k = 0;
+  residue_t dd, delta;
+  const uint64_t p =  mod_getmod_ul(pp);
+
+  /* write p-1 = q*2^s with q odd. We don't need s here */
+  q = (p-1) / 4;
+  
+  mod_init (dd, pp);
+  mod_init (delta, pp);
+  for (i = 0; i < n; i++)
+    {
+      if ((d & 3) == 0 && mod_jacobi (rr[d/2+i], pp) != 1)
+        continue;
+
+      mod_pow_ul (dd, rr[d/2+i], (q-1) / 2, pp);
+      mod_mul (delta, dd, rr[d/2+i], pp); /* delta = rr^{(q+1)/2} */
+      mod_sqr (dd, dd, pp); /* dd = rr^(q-1) */
+      mod_mul (dd, dd, rr[d/2+i], pp); /* dd = r^q */
+      if (!mod_is1 (dd, pp))
+        {
+          residue_t aa;
+          mod_init (aa, pp);
+	  mod_2pow_ul (aa, q, pp); /* aa = 2^q = \omega_4 */
+          mod_mul (rr[2*k], aa, delta, pp);
+          mod_clear (aa, pp);
+        }
+      else
+        mod_set (rr[2*k], delta, pp);
+      mod_neg (rr[2*k+1], rr[2*k], pp);
+      k++;
+    }
+
+  mod_clear (dd, pp);
+  mod_clear (delta, pp);
+
+  return k;
+}
+
+
 static void
 one_root2_V (residue_t rr, const residue_t aa, const modulus_t pp)
 {
@@ -431,6 +475,8 @@ roots2 (residue_t *rr, residue_t aa, int d, modulus_t pp)
   /* case p = 1 (mod 4). */ 
   if (0)
     k = tonelli_shanks (rr, d, n, pp);
+  else if (p % 8 == 5)
+    k = tonelli_shanks5 (rr, d, n, pp);
   else
     k = roots2_V (rr, d, n, pp);
 

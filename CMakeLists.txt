@@ -84,6 +84,8 @@ endif(CMAKE_COMPILER_IS_GNUCC)
 
 # locates gmp. Obeys the env variables GMP GMP_LIBDIR GMP_INCDIR
 include(${CADO_NFS_SOURCE_DIR}/config/gmp.cmake)
+# same for GMP-ECM
+include(${CADO_NFS_SOURCE_DIR}/config/ecm.cmake)
 
 #####
 
@@ -96,6 +98,8 @@ get_override(GF2X_CONFIGURE_FLAGS GF2X_CONFIGURE_FLAGS)
 # Obtain information from the host.
 
 include("${CADO_NFS_SOURCE_DIR}/config/sse2.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/sse3.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/ssse3.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/sse41.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/gcc-assembly.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/curl.cmake")

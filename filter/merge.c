@@ -32,7 +32,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <string.h> /* for strcmp */
 
 #include "portability.h"
-#include "utils.h" /* for gzip_open */
+#include "utils.h" /* for fopen_maybe_compressed */
 
 #include "merge_opts.h"
 #include "filter_matrix.h" /* for filter_matrix_t */
@@ -50,19 +50,22 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #endif
 
 #define MAXLEVEL_DEFAULT 10
-#define KEEP_DEFAULT 128
+#define KEEP_DEFAULT 160
 #define SKIP_DEFAULT 32
 #define FORBW_DEFAULT 0
 #define RATIO_DEFAULT 1.1
 #define COVERNMAX_DEFAULT 100.0
+#define MKZTYPE_DEFAULT 1 /* pure Markowitz */
+#define WMSTMAX_DEFAULT 7 /* relevant only if mkztype == 2 */
 
 static void
-usage (void)
+usage (const char *argv0)
 {
-  fprintf (stderr, "Usage: merge [options]\n");
-  fprintf (stderr, "   -v             - print some extra information\n");
+  fprintf (stderr, "Usage: %s [options]\n", argv0);
+  fprintf (stderr, "\nMandatory command line options: \n");
   fprintf (stderr, "   -mat   xxx     - input (purged) file is xxx\n");
   fprintf (stderr, "   -out   xxx     - output (history) file is xxx\n");
+  fprintf (stderr, "\nOther command line options: \n");
   fprintf (stderr, "   -maxlevel nnn  - merge up to nnn rows (default %u)\n",
 	   MAXLEVEL_DEFAULT);
   fprintf (stderr, "   -keep nnn      - keep an excess of nnn (default %u)\n",
@@ -76,6 +79,8 @@ usage (void)
   fprintf (stderr, "   -coverNmax nnn - with forbw=3, stop when c/N exceeds nnn (default %1.2f)\n", COVERNMAX_DEFAULT);
   fprintf (stderr, "   -itermax nnn   - if non-zero, stop when nnn columns have been removed (cf -resume)\n");
   fprintf (stderr, "   -resume xxx    - resume from history file xxx (cf -itermax)\n");
+  fprintf (stderr, "   -mkztype nnn   - controls how the weight of a merge is approximated (default %d)\n", MKZTYPE_DEFAULT);
+  fprintf (stderr, "   -wmstmax nnn   - if mkztype = 2, controls until when a mst is used (default %d)\n", WMSTMAX_DEFAULT);
   fprintf (stderr, "\nThe different optimization functions are, where c is the total matrix weight\n");
   fprintf (stderr, "and N the number of rows (relation-sets):\n");
   fprintf (stderr, "   -forbw 0 - optimize the matrix size N (cf -ratio)\n");
@@ -87,108 +92,94 @@ usage (void)
 int
 main (int argc, char *argv[])
 {
+    char *argv0 = argv[0];
+
     filter_matrix_t mat[1];
     report_t rep[1];
-    char *purgedname = NULL, *outname = NULL;
-    char *resumename = NULL;
-    int maxlevel = MAXLEVEL_DEFAULT, keep = KEEP_DEFAULT, skip = SKIP_DEFAULT;
-    int verbose = 0; /* default verbose level */
-    double tt;
-    double ratio = RATIO_DEFAULT; /* bound on cN_new/cN to stop the merge */
-    int i, forbw = FORBW_DEFAULT;
-    double coverNmax = COVERNMAX_DEFAULT;
-    int wmstmax = 7; /* use real MST minimum for wt[j] <= wmstmax */
-    int mkztype = 1; /* pure Markowitz */
-    int itermax = 0;
-    double wct0 = wct_seconds ();
 
-    /* print command-line arguments */
-    printf ("%s.r%s", argv[0], CADO_REV);
-    for (i = 1; i < argc; i++)
-      printf (" %s", argv[i]);
-    printf ("\n");
-    fflush (stdout);
+    uint32_t maxlevel = MAXLEVEL_DEFAULT;
+    uint32_t keep = KEEP_DEFAULT;
+    uint32_t skip = SKIP_DEFAULT;
+    double ratio = RATIO_DEFAULT; /* bound on cN_new/cN to stop the merge */
+    uint32_t forbw = FORBW_DEFAULT;
+    double coverNmax = COVERNMAX_DEFAULT;
+    uint32_t mkztype = MKZTYPE_DEFAULT;
+    uint32_t wmstmax = WMSTMAX_DEFAULT;
+                               /* use real MST minimum for wt[j] <= wmstmax*/
+    uint32_t itermax = 0;
+
+    double tt;
+    double wct0 = wct_seconds ();
+    param_list pl;
+    param_list_init (pl);
+
 #ifdef USE_MPI
     MPI_Init(&argc, &argv);
 #endif
 
-    while(argc > 1 && argv[1][0] == '-'){
-        if (argc > 2 && strcmp (argv[1], "-mat") == 0){
-	    purgedname = argv[2];
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-maxlevel") == 0){
-	    maxlevel = atoi(argv[2]);
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-keep") == 0){
-	    keep = atoi(argv[2]);
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-skip") == 0){
-	    skip = atoi(argv[2]);
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 1 && strcmp (argv[1], "-v") == 0){
-            verbose ++;
-	    argc -= 1;
-	    argv += 1;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-forbw") == 0){
-	    forbw = atoi(argv[2]);
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-ratio") == 0){
-	    ratio = strtod(argv[2], NULL);
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-coverNmax") == 0){
-	    coverNmax = atof (argv[2]);
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-out") == 0){
-	    outname = argv[2];
-	    argc -= 2;
-	    argv += 2;
-	}
-	/* -resume can be useful to continue a merge stopped due
-	   to a too small value of -maxlevel */
-	else if (argc > 2 && strcmp (argv[1], "-resume") == 0){
-	    resumename = argv[2];
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-wmstmax") == 0){
-	    wmstmax = atoi(argv[2]);
-	    argc -= 2;
-	    argv += 2;
-	}
-	else if (argc > 2 && strcmp (argv[1], "-mkztype") == 0){
-	    mkztype = atoi(argv[2]);
-	    argc -= 2;
-	    argv += 2;
-	}
-	/* -itermax can be used with -resume, for example:
-	   merge -itermax 1000 -out his.tmp
-           merge -resume his.tmp -out his.final */
-	else if (argc > 2 && strcmp (argv[1], "-itermax") == 0){
-	    itermax = atoi(argv[2]);
-	    argc -= 2;
-	    argv += 2;
-	}
-	else
-          {
-            fprintf (stderr, "Unknown option %s\n", argv[1]);
-            usage ();
-          }
+    argv++, argc--;
+
+    for( ; argc ; ) {
+      if (param_list_update_cmdline(pl, &argc, &argv)) continue;
+      fprintf (stderr, "Unknown option: %s\n", argv[0]);
+      usage (argv0);
     }
+
+    /* Update parameter list at least once to register argc/argv pointers. */
+    param_list_update_cmdline (pl, &argc, &argv);
+    /* print command-line arguments */
+    param_list_print_command_line (stdout, pl);
+    fflush(stdout);
+
+    const char * purgedname = param_list_lookup_string (pl, "mat");
+    const char * outname = param_list_lookup_string (pl, "out");
+    /* -resume can be useful to continue a merge stopped due  */
+    /* to a too small value of -maxlevel                      */
+    const char * resumename = param_list_lookup_string (pl, "resume");
+
+    param_list_parse_uint (pl, "maxlevel", &maxlevel);
+    param_list_parse_uint (pl, "keep", &keep);
+    param_list_parse_uint (pl, "skip", &skip);
+    param_list_parse_uint (pl, "forbw", &forbw);
+
+    param_list_parse_double (pl, "ratio", &ratio);
+    param_list_parse_double (pl, "coverNmax", &coverNmax);
+
+    param_list_parse_uint (pl, "mkztype", &mkztype);
+    param_list_parse_uint (pl, "wmstmax", &wmstmax);
+
+    param_list_parse_uint (pl, "itermax", &itermax);
+
+    /* Some checks on command line arguments */
+    if (purgedname == NULL || outname == NULL)
+    {
+      fprintf (stderr, "Error: -mat and -out are mandatory.\n");
+      usage (argv0);
+    }
+
+    if (maxlevel == 0 || maxlevel > MERGE_LEVEL_MAX)
+    {
+      fprintf (stderr, "Error: maxlevel should be positive and less than %d\n",
+                       MERGE_LEVEL_MAX);
+      exit (1);
+    }
+
+    if (forbw > 3)
+    {
+      fprintf (stderr, "Error: -forbw should be 0, 1, 2 or 3.\n");
+      exit (1);
+    }
+
+    if (mkztype > 2)
+    {
+      fprintf (stderr, "Error: -mkztype should be 0, 1, or 2.\n");
+      exit (1);
+    }
+
+    if (param_list_warn_unused (pl))
+      usage (argv0);
+
+
 
     purgedfile_stream ps;
     purgedfile_stream_init(ps);
@@ -227,7 +218,7 @@ main (int argc, char *argv[])
     /* print weight counts */
     {
       unsigned long j, *nbm, total_weight = 0;
-      int w;
+      uint32_t w;
 
       nbm = (unsigned long*) malloc ((maxlevel + 1) * sizeof (unsigned long));
       memset (nbm, 0, (maxlevel + 1) * sizeof (unsigned long));
@@ -249,7 +240,7 @@ main (int argc, char *argv[])
     fillmat (mat);
 
     tt = wct_seconds ();
-    filter_matrix_read (mat, ps, verbose, skip);
+    filter_matrix_read (mat, ps, skip);
     printf ("Time for filter_matrix_read: %2.2lf\n", wct_seconds () - tt);
 
     /* initialize rep, i.e., mostly opens outname */
@@ -271,9 +262,9 @@ main (int argc, char *argv[])
     MkzInit (mat);
     printf ("Time for MkzInit: %2.2lf\n", seconds()-tt);
 
-    mergeOneByOne (rep, mat, maxlevel, verbose, forbw, ratio, coverNmax);
+    mergeOneByOne (rep, mat, maxlevel, forbw, ratio, coverNmax);
 
-    gzip_close (rep->outfile, outname);
+    fclose_maybe_compressed (rep->outfile, outname);
     printf ("Final matrix has N=%d nc=%d (%d) w(M)=%lu N*w(M)=%"
             PRIu64"\n", mat->rem_nrows, mat->rem_ncols,
             mat->rem_nrows - mat->rem_ncols, mat->weight,
@@ -283,6 +274,8 @@ main (int argc, char *argv[])
     clearMat (mat);
     purgedfile_stream_closefile (ps);
     purgedfile_stream_clear (ps);
+
+    param_list_clear (pl);
 
     printf ("Total merge time: %1.0f seconds\n", seconds ());
 

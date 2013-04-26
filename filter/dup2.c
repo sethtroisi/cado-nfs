@@ -80,7 +80,7 @@ uint32_t * H, unsigned long K, unsigned int ab_base)
     for( ; *files ; files++) {
         const char * name = *files;
 
-        f_in = fopen_compressed_r(name, &p_in, &suffix_in);
+        f_in = fopen_maybe_compressed2(name, "r", &p_in, &suffix_in);
         ASSERT_ALWAYS(f_in != NULL);
 
         suffix_out = outfmt ? outfmt : suffix_in;
@@ -97,8 +97,12 @@ uint32_t * H, unsigned long K, unsigned int ab_base)
             rc = asprintf(&oname, "%s/%s%s", dirname, path_basename(newname), suffix_out);
             ASSERT_ALWAYS(rc >= 0);
 
-            f_out = fopen_compressed_w(oname_tmp, &p_out, NULL);
-            ASSERT_ALWAYS(f_out != NULL);
+            f_out = fopen_maybe_compressed2(oname_tmp, "w", &p_out, NULL);
+            if (f_out == NULL) {
+              fprintf (stderr, "Could not open file %s for writing: %s\n", 
+                       oname_tmp, strerror(errno));
+              exit (EXIT_FAILURE);
+            }
         } else {
             f_out = NULL;
         }

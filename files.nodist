@@ -98,7 +98,6 @@ scripts/cluster/bwc-cluster-oar.sh
 scripts/cluster/bwc-fetchfiles.pl
 scripts/cluster/oarsh_wrap.sh
 scripts/cluster/trampoline-git.sh
-linalg/bwc/mf_twistvec.c
 linalg/bwc/test_hello.c
 linalg/bwc/shell.c
 linalg/bwc/tool.sh

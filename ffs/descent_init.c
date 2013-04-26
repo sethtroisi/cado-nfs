@@ -160,33 +160,35 @@ int main(int argc, char **argv)
         fppol_set_str(beta, polstr); */
     }
 
+    // Reduce target modulo phi
+    fppol_rem(target, target, phi);
+
+    /* Randomizing target : target = target * t^j
+       for j = 1, 2, 3... 
+     */
     fppol_t r, v;
-    do {
-       fppol_inits(r, v, NULL);
-    /* Randomizing target : target = target * beta^j
-       form some j and beta being the generator of the subgroup
-       the initial target belongs to */
-      
-      /* Do we pick j at random? Which random ? 
-       For the moment j is taken equal to 1 and at each trial
-       target is multipleid by t^j */
-      unsigned int j = 1;
-      for (unsigned int i = 0; i < j; ++i) 
-	fppol_multmod(target, target, phi);
-      
+    fppol_inits(r, v, NULL);
+    unsigned int j;
+    for (j = 0; ; ++j) {
       /* Applying an extended Euclidian algoritm to target and phi
        to stop when u.phi + v. target = r whit deg(v) ~ deg(r) ~ n/2 */
-      
       fppol_half_extended_Euclidian(r, v, target, phi);
 	
       /* Apply a smoothness test on v and r to check if they are lpb-smooth */
-    } while( !(fppol_is_smooth(r, lpb) && fppol_is_smooth(v, lpb)));  
+      if (fppol_is_smooth(r, lpb) && fppol_is_smooth(v, lpb))  
+         break;
+      
+      /* multiply target by t for next try */
+      fppol_multmod(target, target, phi);
+    }
 
-    /* If v and r are lpb-smooth, we get log target = log r - log v 
+    /* If v and r are lpb-smooth, we get log target + j = log r - log v 
        which involves only polynomials of degree less than lpb:
        the initialization of the special-q descent is over */
 
-    /* We want to output r and v */
+    /* We want to output j, r and v */
+    fprintf(stdout, "Log(target) + Log(t^j) = Log(r) - Log(v)\n");
+    fprintf(stdout, "j = %u\n", j);
     fprintf(stdout, "r = ");
     fppol_out(stdout, r);
     fprintf(stdout, "\n");
@@ -194,6 +196,29 @@ int main(int argc, char **argv)
     fppol_out(stdout, v);
     fprintf(stdout, "\n");
     param_list_clear(pl);
+
+    // Factorizations of r and v
+    fppol_fact_t ff;
+    fppol_fact_init(ff);
+    fppol_factor(ff, r);
+    printf("factorization(r) =");
+    for (int i = 0; i < ff->n; ++i) {
+        printf(" ");
+        fppol_out(stdout, ff->factors[i]);
+    }
+    printf("\n");
+    fppol_fact_clear(ff);
+    fppol_fact_init(ff);
+    fppol_factor(ff, v);
+    printf("factorization(v) =");
+    for (int i = 0; i < ff->n; ++i) {
+        printf(" ");
+        fppol_out(stdout, ff->factors[i]);
+    }
+    printf("\n");
+    fppol_fact_clear(ff);
+
+    // TODO: clear all fppol_t at the end...
     
     return EXIT_SUCCESS;
 }

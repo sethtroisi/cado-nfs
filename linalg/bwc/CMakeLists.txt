@@ -21,13 +21,6 @@ install(TARGETS mf_bal RUNTIME DESTINATION bin/linalg/bwc)
 
 configure_file(bwc.pl ${CMAKE_CURRENT_BINARY_DIR}/bwc.pl ESCAPE_QUOTES @ONLY)
 
-# test_hello does not compile. harmless
-#add_executable(test_hello ${EXCLUDE_FROM_RELEASE_BUILD} test_hello.c parallelizing_info.c)
-#target_link_libraries(test_hello utils)
-#set_target_properties(test_hello PROPERTIES
-#    COMPILE_FLAGS "--mpi"
-#    LINK_FLAGS "--mpi")
-
 add_executable(random ${EXCLUDE_FROM_RELEASE_BUILD} random.c)
 
 # balancing.c itself is in fact standalone, and lightweight. We prefer to
@@ -265,17 +258,22 @@ target_link_libraries(cleanup utils m)
 
 install(TARGETS cleanup RUNTIME DESTINATION bin/linalg/bwc)
 
+set(plingen_prime_nwords 4)
 
 if (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
 add_executable(plingen EXCLUDE_FROM_ALL
                 bw-common.c
                 plingen.c
                 polymat.c
-                mpfq/abase_p_4.c
+                mpfq/abase_p_${plingen_prime_nwords}.c
+                bigpolymat.c
         )
+
 target_link_libraries(plingen gmp utils)
-# Only to play with it for the moment.
-set_target_properties(plingen PROPERTIES COMPILE_FLAGS "-DSELECT_ABASE_p_4")
+set_target_properties(plingen PROPERTIES
+    COMPILE_FLAGS "--mpi -DSELECT_ABASE_p_${plingen_prime_nwords}"
+    LINK_FLAGS "--mpi"
+    )
 # install(TARGETS plingen RUNTIME DESTINATION bin/linalg/bwc)
 endif (ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG)
 

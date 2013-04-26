@@ -812,7 +812,4 @@ int modul_isprime (const modulusul_t);
 int modul_inv (residueul_t, const residueul_t, const modulusul_t);
 int modul_jacobi (const residueul_t, const modulusul_t);
 
-/* Cruft: this belongs in modredc_*.h, not here  */
-unsigned long modul_invmodlong (unsigned long n);
-
 #endif  /* MOD_UL_H */

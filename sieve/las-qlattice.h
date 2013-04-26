@@ -6,6 +6,8 @@
 #include "fb.h"         /* fbprime_t */
 #include "portability.h"
 
+/* implementations for inlines */
+#include "las-arith.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,7 +32,7 @@ fb_root_in_qlattice_63bits (const fbprime_t p, const fbprime_t R,
 #if defined(DLP_DESCENT) || defined(SUPPORT_LARGE_Q)
 #ifndef  HAVE_redc_64
 #error  "Please implement redc_64"
-#endif
+#else
 /* The reason why the special-q is constrained to some limit is quite
  * clearly linked to the fb_root_in_qlattice variant being used. However,
  * it does not seem to be exactly 31 or 63 bits. This should be
@@ -51,6 +53,7 @@ fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
 {
     return fb_root_in_qlattice_63bits(p, R, invp, si);
 }
+#endif
 
 #else
 
@@ -71,9 +74,6 @@ fb_root_in_qlattice(const fbprime_t p, const fbprime_t R,
     return fb_root_in_qlattice_31bits(p, R, invp, si);
 }
 #endif
-
-/* implementations for inlines */
-#include "las-arith.h"
 
 /* The version fb_root_in_qlattice_31bits mandates that the coordinates
  * of the q-lattice are at most 31 bits, so that combinations such as
@@ -112,7 +112,7 @@ fb_root_in_qlattice_31bits (const fbprime_t p, const fbprime_t R,
 	aux2 = ((int64_t)(R - p))*si->a0 - si->b0;
       }
     u = redc_32(aux1, p, invp); /* 0 <= u < p */
-    v = redc_32(aux2, p, invp); /* 0 <= den < p */
+    v = redc_32(aux2, p, invp); /* 0 <= v < p */
 
     add = 0;
     if (UNLIKELY(!invmod_redc_32(&v, p)))
@@ -161,7 +161,7 @@ fb_root_in_qlattice_63bits (const fbprime_t p, const fbprime_t R,
      */
     /* Do a full 64-bit redc */
     uint64_t u = redc_64(aux1, p, invp); /* 0 <= u < p */
-    uint64_t v = redc_64(aux2, p, invp); /* 0 <= den < p */
+    uint64_t v = redc_64(aux2, p, invp); /* 0 <= v < p */
 
     fbprime_t add = 0;
     if (UNLIKELY(!invmod_redc_64(&v, p)))

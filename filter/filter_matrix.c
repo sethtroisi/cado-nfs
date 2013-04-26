@@ -81,7 +81,6 @@ checkData(filter_matrix_t *mat)
    in file purgedfile.
    Assume mat->wt is initialized to 0 (as done by initMat).
    Assume we have already read the 1st line of purgedfile (nrows, ncols).
-   If skipfirst is non-zero, skip the 1st entry of each line.
 */
 void
 filter_matrix_read_weights(filter_matrix_t * mat, purgedfile_stream_ptr ps)
@@ -146,8 +145,7 @@ fillmat (filter_matrix_t *mat)
    when skipheavycols will be activated.
 */
 int
-filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps,
-                    int verbose MAYBE_UNUSED, int skip)
+filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr ps, int skip)
 {
     int lbuf = 100; 
     typerow_t *buf;

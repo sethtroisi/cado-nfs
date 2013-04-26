@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
 
+# TODO: 
+# FILES table: OBSOLETE column
+#     OBSOLETE says that this file was replaced by a newer version, for example checkrels may want to create a new file with only part of the output. 
+#     Should this be a pointer to the file that replaced the obsolete one? How to signal a file that is obsolete, but not replaced by anything?
+#     If one file is replaced by several (say, due to a data corruption in the middle), we need a 1:n relationship. If several files are replaced by one (merge), 
+#     we need n:1. What do? Do we really want an n:n relationship here? Disallow fragmenting files, or maybe simply not track it in the DB if we do?
+# FILES table: CHECKSUM column
+#     We need a fast check that the information stored in the DB still accurately reflects the file system contents. The test should also warn about files in upload/ which are not listed in DB
+
+
 # Make Python 2.7 use the print() syntax from Python 3
 from __future__ import print_function
 
@@ -24,8 +34,17 @@ def diag(level, text, var = None):
             print (text + str(var), file=sys.stderr)
 
 def join3(l, pre = None, post = None, sep = ", "):
-    """ join3 ( ('a', 'b', 'c'), pre = "+", post = "-", sep = ", ") = '+a-, +b-, +c-' 
-    If any parameter is None, it is interpreted as the empty string """
+    """ 
+    If any parameter is None, it is interpreted as the empty string 
+    >>> join3 ( ('a'), pre = "+", post = "-", sep = ", ")
+    '+a-'
+    >>> join3 ( ('a', 'b'), pre = "+", post = "-", sep = ", ")
+    '+a-, +b-'
+    >>> join3 ( ('a', 'b'))
+    'a, b'
+    >>> join3 ( ('a', 'b', 'c'), pre = "+", post = "-", sep = ", ")
+    '+a-, +b-, +c-'
+    """
     if pre is None:
         pre = ""
     if post is None:
@@ -35,8 +54,11 @@ def join3(l, pre = None, post = None, sep = ", "):
     return sep.join([pre + k + post for k in l])
 
 def dict_join3(d, sep=None, op=None, pre=None, post=None):
-    """ dict_join3 ( {"a": "1", "b": "2"}, sep = "," op = "=", pre="-", post="+") = "-a=1+,-b=2+"
-    If any parameter is None, it is interpreted as the empty string """
+    """ 
+    If any parameter is None, it is interpreted as the empty string 
+    >>> dict_join3 ( {"a": "1", "b": "2"}, sep = ",", op = "=", pre="-", post="+")
+    '-a=1+,-b=2+'
+    """
     if pre is None:
         pre = ""
     if post is None:
@@ -45,7 +67,7 @@ def dict_join3(d, sep=None, op=None, pre=None, post=None):
         sep = "";
     if op is None:
         op = ""
-    return sep.join([pre + op.join(k) + post for k in l.items()])
+    return sep.join([pre + op.join(k) + post for k in d.items()])
 
 # Dummy class for defining "constants"
 class WuStatus:
@@ -60,9 +82,9 @@ class WuStatus:
     @classmethod
     def check(cls, status):
         """ Check whether status is equal to one of the constants """
-        assert status in (WuStatus.AVAILABLE, WuStatus.ASSIGNED, WuStatus.RECEIVED_OK, 
-            WuStatus.RECEIVED_ERROR, WuStatus.VERIFIED_OK, WuStatus.VERIFIED_ERROR, 
-            WuStatus.CANCELLED)
+        assert status in (cls.AVAILABLE, cls.ASSIGNED, cls.RECEIVED_OK, 
+            cls.RECEIVED_ERROR, cls.VERIFIED_OK, cls.VERIFIED_ERROR, 
+            cls.CANCELLED)
 
 # If we try to update the status in any way other than progressive 
 # (AVAILABLE -> ASSIGNED -> ...), we raise this exception
@@ -100,7 +122,7 @@ class MyCursor(sqlite3.Cursor):
             return ", " + dict_join3(d, sep=", ", op=" AS ")
     
     @classmethod
-    def where_str(cls, name, **args):
+    def _where_str(cls, name, **args):
         where = ""
         values = []
         for opname in args:
@@ -143,13 +165,11 @@ class MyCursor(sqlite3.Cursor):
             "( " + ", ".join(" ".join(k) for k in layout) + " );"
         self._exec (command)
     
-    def create_index(self, table, d):
-        """ Creates an index with fields as described in the d dictionary """
-        for (name, columns) in d.items():
-            column_names = [col[0] for col in columns]
-            command = "CREATE INDEX IF NOT EXISTS " + name + " ON " + \
-                table + "( " + ", ".join(column_names) + " );"
-            self._exec (command)
+    def create_index(self, name, table, columns):
+        """ Creates an index with fields as described in the columns list """
+        command = "CREATE INDEX IF NOT EXISTS " + name + " ON " + \
+            table + "( " + ", ".join(columns) + " );"
+        self._exec (command)
     
     def insert(self, table, d):
         """ Insert a new entry, where d is a dictionary containing the 
@@ -179,7 +199,7 @@ class MyCursor(sqlite3.Cursor):
         # UPDATE table SET column_1=value1, column2=value_2, ..., 
         # column_n=value_n WHERE column_n+1=value_n+1, ...,
         setstr = " SET " + join3(d.keys(), post = " = ?", sep = ", ")
-        (wherestr, wherevalues) = self.__class__.where_str("WHERE", **conditions)
+        (wherestr, wherevalues) = self._where_str("WHERE", **conditions)
         command = "UPDATE " + table + setstr + wherestr
         values = list(d.values()) + wherevalues
         self._exec(command, values)
@@ -191,7 +211,7 @@ class MyCursor(sqlite3.Cursor):
             same value in the database table """
 
         # Table/Column names cannot be substituted, so include in query directly.
-        (WHERE, values) = self.__class__.where_str("WHERE", **conditions)
+        (WHERE, values) = self._where_str("WHERE", **conditions)
 
         if order is None:
             ORDER = ""
@@ -211,6 +231,11 @@ class MyCursor(sqlite3.Cursor):
             ORDER + LIMIT + ";"
         self._exec(command, values)
         
+    def delete(self, table, **conditions):
+        """ Delete the rows specified by conditions """
+        (WHERE, values) = self._where_str("WHERE", **conditions)
+        command = "DELETE FROM " + table + WHERE + ";"
+        self._exec(command, values)
 
     def where_as_dict(self, joinsource, col_alias = None, limit = None, 
                       order = None, **conditions):
@@ -230,12 +255,7 @@ class MyCursor(sqlite3.Cursor):
 
 class DbTable(object):
     """ A class template defining access methods to a database table """
-    def __init__(self):
-        self.tablename = type(self).name
-        self.fields = type(self).fields
-        self.primarykey = type(self).primarykey
-        self.references = type(self).references
-
+    
     @staticmethod
     def _subdict(d, l):
         """ Returns a dictionary of those key:value pairs of d for which key 
@@ -264,16 +284,23 @@ class DbTable(object):
             # If this table references another table, we use the primary
             # key of the referenced table as the foreign key name
             r = self.references # referenced table
-            fk = (r.primarykey, "INTEGER", "REFERENCES " + 
-                  r.getname() + " (" + r.primarykey + ") ")
+            fk = (r.getpk(), "INTEGER", "REFERENCES " + 
+                  r.getname() + " (" + r.getpk() + ") ")
             fields.append(fk)
         cursor.create_table(self.tablename, fields)
-        cursor.create_index(self.tablename, self.index)
+        if self.references:
+            # We always create an index on the foreign key
+            cursor.create_index(self.tablename + "_pkindex", r.tablename, 
+                                (fk[0], ))
+        for indexname in self.index:
+            cursor.create_index(self.tablename + "_" + indexname, 
+                                self.tablename, self.index[indexname])
 
     def insert(self, cursor, values, foreign=None):
         """ Insert a new row into this table. The column:value pairs are 
             specified key:value pairs of the dictionary d. 
-            The database's row id for the new entry is stored in d[primarykey] """
+            The database's row id for the new entry is stored in 
+            d[primarykey] """
         d = self.dictextract(values)
         assert self.primarykey not in d or d[self.primarykey] is None
         # If a foreign key is specified in foreign, add it to the column
@@ -293,6 +320,10 @@ class DbTable(object):
             be written are specified key:value pairs of the dictionary d """
         cursor.update(self.tablename, d, **conditions)
 
+    def delete(self, cursor, **conditions):
+        """ Delete an existing row in this table """
+        cursor.delete(self.tablename, **conditions)
+
     def where(self, cursor, limit = None, order = None, **conditions):
         assert order is None or order[0] in self._get_colnames()
         return cursor.where_as_dict(self.tablename, limit=limit, 
@@ -300,7 +331,7 @@ class DbTable(object):
 
 
 class WuTable(DbTable):
-    name = "workunits"
+    tablename = "workunits"
     fields = (
         ("wurowid", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"), 
         ("wuid", "TEXT", "UNIQUE NOT NULL"), 
@@ -319,10 +350,10 @@ class WuTable(DbTable):
     )
     primarykey = fields[0][0]
     references = None
-    index = {"wuidindex": (fields[1],), "statusindex" : (fields[2],)}
+    index = {"wuidindex": (fields[1][0],), "statusindex" : (fields[2][0],)}
 
 class FilesTable(DbTable):
-    name = "files"
+    tablename = "files"
     fields = (
         ("filesrowid", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"), 
         ("filename", "TEXT", ""), 
@@ -330,8 +361,221 @@ class FilesTable(DbTable):
     )
     primarykey = fields[0][0]
     references = WuTable()
-    index = {"wuindex": (fields[1],)}
+    index = {}
 
+
+class DictDbTable(DbTable):
+    fields = (
+        ("rowid", "INTEGER PRIMARY KEY ASC", "UNIQUE NOT NULL"),
+        ("key", "TEXT", "UNIQUE NOT NULL"),
+        ("type", "INTEGER", "NOT NULL"),
+        ("value", "TEXT", "")
+        )
+    primarykey = fields[0][0]
+    references = None
+    index = {"keyindex": ("key",)}
+    def __init__(self, *args, name = None, **kwargs):
+        self.tablename = name
+        super().__init__(*args, **kwargs)
+
+
+class DictDbAccess(dict):
+    """ A DB-backed flat dictionary.
+
+    Flat means that the value of each dictionary entry must be a type that
+    the underlying DB understands, like integers, strings, etc., but not
+    collections or other complex types.
+
+    A copy of all the data in the table is kept in memory; read accesses 
+    are always served from the in-memory dict. Write accesses write through
+    to the DB.
+    
+    >>> conn = sqlite3.connect(':memory:')
+    >>> d = DictDbAccess(conn, 'test')
+    >>> d == {}
+    True
+    >>> d['a'] = '1'
+    >>> d 
+    {'a': '1'}
+    >>> d['a'] = 2
+    >>> d 
+    {'a': 2}
+    >>> d['b'] = '3'
+    >>> d == {'a': 2, 'b': '3'}
+    True
+    >>> del(d)
+    >>> d = DictDbAccess(conn, 'test')
+    >>> d == {'a': 2, 'b': '3'}
+    True
+    >>> del(d['b'])
+    >>> d 
+    {'a': 2}
+    >>> d.setdefault('a', '3')
+    2
+    >>> d 
+    {'a': 2}
+    >>> d.setdefault('b', 3.0)
+    3.0
+    >>> d == {'a': 2, 'b': 3.0}
+    True
+    >>> d.setdefault(None, {'a': '3', 'c': '4'})
+    >>> d == {'a': 2, 'b': 3.0, 'c': '4'}
+    True
+    >>> d.update({'a': '3', 'd': True})
+    >>> d == {'a': '3', 'b': 3.0, 'c': '4', 'd': True}
+    True
+    >>> del(d)
+    >>> d = DictDbAccess(conn, 'test')
+    >>> d == {'a': '3', 'b': 3.0, 'c': '4', 'd': True}
+    True
+    """
+
+    types = (str, int, float, bool)
+    
+    def __init__(self, db, name):
+        ''' Attaches to a DB table and reads values stored therein. 
+        
+        db can be a string giving the file name for the DB (same as for 
+        sqlite3.connect()), or an open DB connection. The latter is allowed 
+        primarily for making the doctest work, so we can reuse the same 
+        memory-backed DB connection, but it may be useful in other contexts.
+        Note that writes to the dict cause a commit() on the DB connection, 
+        so sharing a DB connection may be ill-advised if you want control 
+        over when commits happen.
+        
+        Overwriting dict.__init__() like this does not follow the semantics 
+        of dict, as there is no way to supply items to the constructor with 
+        which to initialise the dict. 
+        
+        However, allowing to add items to the dict before attaching it to a 
+        DB table with a separate attachdb() method introduces all sorts of 
+        conflicts that have to be resolved (Do items added to the dict before 
+        attaching overwrite items from the DB with equal keys or not? 
+        Should items added to the dict whose keys are not in the DB be added 
+        to the DB when attaching?)
+        Allowing keyword initialisers in addition to the db and name 
+        parameters does not work well, either, as it is impossible to have
+        a positional parameter named "foo", and supplying a keyword 
+        parameter also named "foo", so whatever names we choose for the 
+        "db" and "name" parameters, there is always a chance of conflict with 
+        keys of named parameters that are meant to be added to the dict, 
+        as the set of valid keys of a dict is a superset of the valid names 
+        of named parameters. 
+        In the end, it is easier not to allow initialisers for the dict in 
+        this constructor. Use update() or setdefault() (the latter accepts 
+        dicts in DictDbAccess) to get the desired behaviour.
+        '''
+        
+        if isinstance(db, str):
+            self._conn = sqlite3.connect(db)
+            self._ownconn = True
+        else:
+            self._conn = db
+            self._ownconn = False
+        self._table = DictDbTable(name = name)
+        # Create an empty table if none exists
+        cursor = self._conn.cursor(MyCursor)
+        self._table.create(cursor);
+        # Get the entries currently stored in the DB
+        data = self.__getall()
+        super().update(data)
+        cursor.close()
+    
+    def __del__(self):
+        """ Close the DB connection and delete the dictionary """
+        if self._ownconn:
+            self._conn.close()
+            del(self._conn)
+        # http://docs.python.org/2/reference/datamodel.html#object.__del__
+        # dict does not have __del__, but in a complex class hierarchy, 
+        # dict may not be next in the MRO
+        if hasattr(super(), "__del__"):
+            super().__del__()
+    
+    def __convert_value(self, row):
+        valuestr = row["value"]
+        valuetype = row["type"]
+        # Look up constructor for this type
+        typecon = self.types[int(valuetype)]
+        # Bool is handled separately as bool("False") == True
+        if typecon == bool:
+            if valuestr == "True":
+                return True
+            elif valuestr == "False":
+                return False
+            else:
+                raise ValueError("Value %s invalid for Bool type", valuestr)
+        return typecon(valuestr)
+    
+    def __get_type_idx(self, value):
+        valuetype = type(value)
+        for (idx, t) in enumerate(self.types):
+            if valuetype == t:
+                return idx
+        raise TypeError("Type %s not supported" % str(valuetype))
+    
+    def __getall(self):
+        """ Reads the whole table and returns it as a dict """
+        cursor = self._conn.cursor(MyCursor)
+        rows = self._table.where(cursor)
+        cursor.close()
+        dict = {r["key"]: self.__convert_value(r) for r in rows}
+        return dict
+    
+    def __setitem_nocommit(self, cursor, key, value):
+        """ Set dictioary key to value and update/insert into table,
+        but don't commit
+        """
+        update = {"value": str(value), "type": self.__get_type_idx(value)}
+        if key in self:
+            # Update the table row where column "key" equals key
+            self._table.update(cursor, update, eq={"key": key})
+        else:
+            # Insert a new row
+            update["key"] = key
+            self._table.insert(cursor, update)
+        # Update the in-memory dict
+        super().__setitem__(key, value)
+    
+    def __setitem__(self, key, value):
+        """ Set a dict entry to a value and update the DB """
+        cursor = self._conn.cursor(MyCursor)
+        self.__setitem_nocommit(cursor, key, value)
+        self._conn.commit()
+        cursor.close()
+    
+    def __delitem__(self, key):
+        """ Delete a key from the dictionary """
+        super().__delitem__(key)
+        cursor = self._conn.cursor(MyCursor)
+        self._table.delete(cursor, eq={"key": key})
+        self._conn.commit()
+        cursor.close()
+    
+    def setdefault(self, key, default = None):
+        ''' Setdefault function that allows a dictionary as input
+        
+        Values from default dict are merged into self, *not* overwriting
+        existing values in self '''
+        if key is None and isinstance(default, dict):
+            cursor = self._conn.cursor(MyCursor)
+            for (key, value) in default.items():
+                if not key in self:
+                    self.__setitem_nocommit(cursor, key, value)
+            self._conn.commit()
+            cursor.close()
+            return None
+        elif not key in self:
+            self[key] = default
+        return self[key]
+    
+    def update(self, other):
+        cursor = self._conn.cursor(MyCursor)
+        for (key, value) in other.items():
+            self.__setitem_nocommit(cursor, key, value)
+        self._conn.commit()
+        cursor.close()
+        
 
 class Mapper(object):
     """ This class translates between application objects, i.e., Python 
@@ -404,7 +648,7 @@ class Mapper(object):
     
     def where(self, cursor, limit = None, order = None, **cond):
         pk = self.getpk()
-        joinsource = self.table.name
+        joinsource = self.table.tablename
         for s in self.subtables.keys():
             # FIXME: this probably breaks with more than 2 tables
             joinsource = joinsource + " LEFT JOIN " + \
@@ -448,7 +692,7 @@ class WuAccess(object): # {
     def __init__(self, conn):
         self.conn = conn
         self.mapper = Mapper(WuTable(), {"files": FilesTable()})
-
+    
     @staticmethod
     def to_str(wus):
         r = []
@@ -471,13 +715,10 @@ class WuAccess(object): # {
     def _checkstatus(wu, status):
         diag (2, "WuAccess._checkstatus(" + str(wu) + ", " + str(status) + ")")
         if wu["status"] != status:
-            msg = "WU " + str(wu["wuid"]) + " has status " + str(wu["status"]) \
+            msg = "Workunit " + str(wu["wuid"]) + " has status " + str(wu["status"]) \
                 + ", expected " + str(status)
             diag (0, "WuAccess._checkstatus(): " + msg)
-            # FIXME: this raise has no effect other than returning from the 
-            # method. Why?
-            # raise wudb.StatusUpdateError(msg)
-            raise Exception(msg)
+            raise StatusUpdateError(msg)
 
     def check(self, data):
         status = data["status"]
@@ -490,7 +731,7 @@ class WuAccess(object): # {
             assert data["errorcode"] != 0
             return
         if status == WuStatus.RECEIVED_OK:
-            assert data["errorcode"] == 0
+            assert data["errorcode"] is None or data["errorcode"] == 0
             return
         assert data["errorcode"] is None
         assert data["timeresult"] is None
@@ -627,7 +868,7 @@ class WuAccess(object): # {
         self._checkstatus(data, WuStatus.RECEIVED_OK)
         if debug > 0:
             self.check(data)
-        d = {["timeverified"]: str(datetime.now())}
+        d = {"timeverified": str(datetime.now())}
         if ok:
             d["status"] = WuStatus.VERIFIED_OK
         else:
@@ -751,38 +992,46 @@ class DbThreadPool(object):
     # timeverified is the ... of when the result was marked as verified
 
 
-def selftest():
-    assert join3 ( ('a', 'b', 'c'), pre = "+", post = "-", sep = ", ") == '+a-, +b-, +c-' 
-    assert dict_join3 ( {"a": "1", "b": "2"}, sep = ",", op = "=", pre="-", post="+") == "-a=1+,-b=2+"
-
 if __name__ == '__main__': # {
     import argparse
+
+    queries = {"avail" : ("Available workunits: ", {"eq": {"status": WuStatus.AVAILABLE}}), 
+               "assigned": ("Assigned workunits: ", {"eq": {"status": WuStatus.ASSIGNED}}), 
+               "receivedok": ("Received ok workunits: ", {"eq":{"status": WuStatus.RECEIVED_OK}}), 
+               "receivederr": ("Received with error workunits: ", {"eq": {"status": WuStatus.RECEIVED_ERROR}}), 
+               "verifiedok": ("Verified ok workunits: ", {"eq": {"status": WuStatus.VERIFIED_OK}}), 
+               "verifiederr": ("Verified with error workunits: ", {"eq": {"status": WuStatus.VERIFIED_ERROR}}), 
+               "all": ("All existing workunits: ", {})
+              }
 
     use_pool = False
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('-create', action="store_true", required=False, 
+    parser.add_argument('-create', action="store_true", 
                         help='Create the database tables if they do not exist')
-    parser.add_argument('-add', action="store_true", required=False, 
+    parser.add_argument('-add', action="store_true", 
                         help='Add new work units. Contents of WU(s) are ' + 
                         'read from stdin, separated by blank line')
-    parser.add_argument('-assign', required = False, nargs = 1, 
-                        metavar = 'clientid', 
+    parser.add_argument('-assign', nargs = 1, metavar = 'clientid', 
                         help = 'Assign an available WU to clientid')
-    parser.add_argument('-prio', required = False, nargs = 1, metavar = 'N', 
+    parser.add_argument('-cancel', nargs = 1, metavar = 'wuid', 
+                        help = 'Cancel a WU with the given id')
+    parser.add_argument('-prio', nargs = 1, metavar = 'N', 
                         help = 'If used with -add, newly added WUs ' + 
                         'receive priority N')
-    parser.add_argument('-result', required = False, nargs = 4, 
-                        metavar = ('clientid', 'wuid', 'filename', 'filepath'), 
+    parser.add_argument('-result', nargs = 4, 
+                        metavar = ('wuid', 'clientid', 'filename', 'filepath'), 
                         help = 'Return a result for wu from client')
-    parser.add_argument('-test', action="store_true", required=False, 
+    parser.add_argument('-test', action="store_true", 
                         help='Run some self tests')
 
-    for arg in ("avail", "assigned", "receivedok", "receivederr", "all", 
-                "dump"):
+    for arg in queries:
         parser.add_argument('-' + arg, action="store_true", required = False)
+    parser.add_argument('-dump', nargs='?', default = None, const = "all", 
+                        metavar = "FIELD", 
+                        help='Dump WU contents, optionally a single field')
     for arg in ("dbname", "debug"):
-        parser.add_argument('-' + arg, required = False, nargs = 1)
+        parser.add_argument('-' + arg, nargs = 1)
     # Parse command line, store as dictionary
     args = vars(parser.parse_args())
     # print(args)
@@ -792,7 +1041,8 @@ if __name__ == '__main__': # {
         dbname = args["dbname"]
 
     if args["test"]:
-        selftest()
+        import doctest
+        doctest.testmod()
 
     if args["debug"]:
         debug = int(args["debug"][0])
@@ -820,56 +1070,34 @@ if __name__ == '__main__': # {
         if s != "":
             wus.append(s)
         db_pool.create(wus, priority=prio)
+
     # Functions for queries
-    if args["avail"]:
-        wus = db_pool.query(eq={"status": WuStatus.AVAILABLE})
-        print("Available workunits: ")
+    for (arg, (msg, condition)) in queries.items():
+        if not args[arg]:
+            continue
+        wus = db_pool.query(**condition)
+        print(msg)
         if wus is None:
-            print(wus)
-        else:
-            print (len(wus))
-            if args["dump"]:
+            print("None")
+            continue
+        print (len(wus))
+        if args["dump"]:
+            if args["dump"] == "all":
                 print(WuAccess.to_str(wus))
-    if args["assigned"]:
-        wus = db_pool.query(eq={"status": WuStatus.ASSIGNED})
-        print("Assigned workunits: ")
-        if wus is None:
-            print(wus)
-        else:
-            print (len(wus))
-            if args["dump"]:
-                print(WuAccess.to_str(wus))
-    if args["receivedok"]:
-        wus = db_pool.query(eq={"status": WuStatus.RECEIVED_OK})
-        print("Received ok workunits: ")
-        if wus is None:
-            print(wus)
-        else:
-            print (len(wus))
-            if args["dump"]:
-                print(WuAccess.to_str(wus))
-    if args["receivederr"]:
-        wus = db_pool.query(eq={"status": WuStatus.RECEIVED_ERROR})
-        print("Received with error workunits: ")
-        if wus is None:
-            print(wus)
-        else:
-            print (len(wus))
-            if args["dump"]:
-                print(WuAccess.to_str(wus))
-    if args["all"]:
-        wus = db_pool.query()
-        print("Existing workunits: ")
-        if wus is None:
-            print(wus)
-        else:
-            print (len(wus))
-            if args["dump"]:
-                print(WuAccess.to_str(wus))
+            else:
+                field = args["dump"]
+                for wu in wus:
+                    print(wu[field])
+
+
     # Functions for testing
     if args["assign"]:
         clientid = args["assign"][0]
         wus = db_pool.assign(clientid)
+
+    if args["cancel"]:
+        wuid = args["cancel"][0]
+        wus = db_pool.cancel(wuid)
 
     if args["result"]:
         (wuid, clientid, filename, filepath) = args["result"]

@@ -24,7 +24,8 @@ typedef int MPI_Request;
 #define MPI_DOUBLE      sizeof(double)
 #define MPI_UNSIGNED_LONG sizeof(unsigned long)
 #define MPI_LONG        sizeof(long)
-#define MPI_UNSIGNED_INT  sizeof(unsigned int)
+/* It seems that MPI_UNSIGNED_INT is in fact unspecified */
+// #define MPI_UNSIGNED_INT  sizeof(unsigned int)
 #define MPI_UNSIGNED      sizeof(unsigned int)
 
 #define MPI_Type_size(x, s)     *(s)=(x)
@@ -56,9 +57,13 @@ typedef int MPI_Request;
 
 #define MPI_ANY_TAG     -1
 
-/* That would be quite neat, but it's too coarse (it applies to the whole
- * translation unit), and anyway it isn't supported by oldish gcc's.
+/* Adding this pragma would yield the benefit of removing all the
+ * MAYBE_UNUSED clutter which is inherent to this file. Unfortunately
+ * it's not supported by very old gcc's, and neither by some broken stuff
+ * which pretends to be gcc (happens on macs, for instance).
+ *
 #ifdef  __GNUC__
+#pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #endif
 */
@@ -123,6 +128,11 @@ static inline int MPI_Scatter(void * sendbuf, int sendcount, MPI_Datatype st, vo
 
 static inline int MPI_Barrier (MPI_Comm x MAYBE_UNUSED) { return 0; }
 
+static inline int MPI_Gather(void * sendbuf, int sendcount,  MPI_Datatype st, void * recvbuf, int recvcount MAYBE_UNUSED, MPI_Datatype rt MAYBE_UNUSED, int root MAYBE_UNUSED, MPI_Comm x MAYBE_UNUSED) {
+    if (sendbuf == MPI_IN_PLACE) return 0;
+    memcpy(((char *)recvbuf), (char*) sendbuf, sendcount * st);
+    return 0;
+}
 static inline int MPI_Gatherv(void * sendbuf, int sendcount,  MPI_Datatype st, void * recvbuf, int * recvcounts, int * displs, MPI_Datatype rt, int root MAYBE_UNUSED, MPI_Comm x MAYBE_UNUSED) {
     ASSERT_ALWAYS(sendcount * st == recvcounts[0] * rt);
     memcpy(((char *)recvbuf) + displs[0] * rt, sendbuf, sendcount * st);
@@ -200,6 +210,10 @@ static inline int MPI_Error_string(int err, char * msg, int * len)
     return *len >= 0 ? 0 : ENOMEM;
 }
 
-
+/* See at the beginning of this file.
+#ifdef  __GNUC__
+#pragma GCC diagnostic pop
+#endif
+*/
 
 #endif /* FAKEMPI_H_ */

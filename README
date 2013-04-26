@@ -38,7 +38,7 @@ Required software tools:
     including gmp.h, which is not installed by default).
     Note: make sure to configure GMP with --enable-shared so that a shared
     library is installed (libgmp.so under Linux) otherwise CADO-NFS might not
-    compile.
+    compile. GMP 5 (or newer) is required.
 *) The GCC compiler works ; some others might, but it is untested. C and
    C++ are required, with C99 support.
 *) GNU make and CMake for building (CMake is installed on the fly if missing
@@ -250,6 +250,7 @@ under Windows:
 * if you want a binary without any dependency, you might try MinGW. The INSTALL
   file from GNU MPFR contains detailed instructions on how to compile MPFR
   under Windows. Those instructions should work for CADO-NFS too.
+  See howto-MinGW.txt.
 
 * you might try to use MPIR (mpir.org) instead of GMP. MPIR is a fork of GMP,
   which claims to be more portable under Windows.

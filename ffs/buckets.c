@@ -503,24 +503,25 @@ void bucket_apply(uint8_t *S, buckets_srcptr buckets, unsigned k)
 
   // Iterate through each group of updates having same deg(gothp).
   update_packed_t **end = buckets->degp_end+k;
+  unsigned dd = buckets->min_degp>>SCALE;
   for (unsigned degp = buckets->min_degp; degp < buckets->max_degp;
-       ++degp, end += buckets->n) {
+       ++degp, dd = degp>>SCALE, end += buckets->n) {
     while (ptr != *end) {
       update_t update = update_unpack(*ptr++);
       pos_t    pos    = update_get_pos(update);
 #ifdef TRACE_POS
       if (pos0+pos == TRACE_POS) {
         fprintf(stderr, "TRACE_POS(%lu): [%u]\n", pos0+pos, degp);
-        fprintf(stderr, "TRACE_POS(%lu): degnorm is now %d\n",
-                pos0+pos, S[pos]-degp);
+        fprintf(stderr, "TRACE_POS(%lu): degnorm is now %u (was %u)\n",
+                pos0+pos, S[pos]-dd, S[pos]); 
       }
 #endif
 #ifndef NDEBUG
-      if (S[pos] < degp)
+      if (S[pos] < dd) 
         fprintf(stderr, "faulty pos is %lu\n", pos0+pos);
-      ASSERT(S[pos] >= degp);
+      ASSERT(S[pos] >= dd); 
 #endif
-      S[pos] -= degp;
+      S[pos] -= dd;
     }
   }
 }

@@ -31,7 +31,6 @@ typedef struct {
                         else <= 1 for a deleted column
                         (trick: we store -w if w > cwmax) */
   int nburied;     /* the number of buried columns */
-  unsigned long *ad;
   unsigned long weight;
   int cwmax;         /* bound on weight of j to enter the SWAR structure */
   int rwmax;         /* if a weight(row) > rwmax, kill that row */
@@ -45,7 +44,7 @@ typedef struct {
   int32_t *MKZQ;         /* priority queue for Markowitz stuff */    
   int32_t *MKZA;         /* MKZA[j] gives u s.t. MKZQ[2*u] = j and
                             MKZQ[2*u+1] is the Markowitz cost of column j,
-                            otherwise it is MKZ_INF if the colum is inactive
+                            otherwise it is MKZ_INF if the column is inactive
                             (either too heavy initially or deleted) */
   int wmstmax;
   int mkztype;       /* which type of count */
@@ -67,7 +66,7 @@ extern void clearMat (filter_matrix_t *mat);
 extern void filter_matrix_read_weights(filter_matrix_t *mat, purgedfile_stream_ptr);
 extern void fillmat(filter_matrix_t *mat);
 extern int filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr,
-                               int verbose, int skip);
+                               int skip);
 
 extern void remove_j_from_row(filter_matrix_t *mat, int i, int j);
 extern void print_row(filter_matrix_t *mat, int i);

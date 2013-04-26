@@ -21,7 +21,16 @@
 /* Active handler: Mpfq::gf2n::reduction */
 /* Active handler: Mpfq::gf2n::mul */
 /* Active handler: Mpfq::defaults::poly */
-/* Options used: w=64 n=64 table=/tmp/mpfq/gf2x/wizard.table slice=4 helper=/tmp/mpfq/gf2n/helper/helper output_path=. tag=2_64 coeffs=[64, 4, 3, 1, 0] */
+/* Options used:{
+   w=64,
+   n=64,
+   table=/tmp/mpfq-cado/gf2x/wizard.table,
+   slice=4,
+   helper=/tmp/mpfq-cado/gf2n/helper/helper,
+   output_path=.,
+   tag=2_64,
+   coeffs=[ 64, 4, 3, 1, 0, ],
+   } */
 
 
 /* Functions operating on the field structure */
@@ -596,7 +605,5 @@ void mpfq_2_64_poly_mod_pre(mpfq_2_64_dst_field K MAYBE_UNUSED, mpfq_2_64_dst_po
     mpfq_2_64_poly_clear(K, revq);
 }
 
-/* missing poly_gcd */
-/* missing poly_xgcd */
 
 /* vim:set ft=cpp: */

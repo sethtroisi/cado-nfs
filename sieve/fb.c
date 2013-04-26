@@ -14,6 +14,7 @@
 #include "fb.h"
 #include "portability.h"
 #include "utils.h"
+#include "ularith.h"
 
 #if 0
 /* sorted list of prime powers < 2^32, with 6947 entries, and two sentinel
@@ -24,9 +25,9 @@ int uint32_comp(const void *A, const void *B) {
     uint32_t *a, *b;
     a = (uint32_t *) A;
     b = (uint32_t *) B;
-    if (a[0] < b[0]) 
+    if (a[0] < b[0])
         return -1;
-    if (a[0] > b[0]) 
+    if (a[0] > b[0])
         return 1;
     return 0;
 }
@@ -51,11 +52,25 @@ static void init_prime_powers() {
 }
 #endif
 
-void 
+/* strtoul(), but with const char ** for second argument.
+   Otherwise it's not possible to do, e.g., strtoul(p, &p, 10) when p is
+   of type const char *
+*/
+static unsigned long int
+strtoul_const(const char *nptr, const char **endptr, const int base)
+{
+  char *end;
+  unsigned long r;
+  r = strtoul(nptr, &end, base);
+  *endptr = end;
+  return r;
+}
+
+void
 fb_fprint_entry (FILE *fd, const factorbase_degn_t *fb)
 {
   int i;
-  fprintf (fd, "Prime " FBPRIME_FORMAT " with rounded log %d and roots ", 
+  fprintf (fd, "Prime " FBPRIME_FORMAT " with rounded log %d and roots ",
 	   fb->p, (int) fb->plog);
   for (i = 0; i < fb->nr_roots; i++)
     {
@@ -66,7 +81,7 @@ fb_fprint_entry (FILE *fd, const factorbase_degn_t *fb)
   fprintf (fd, "\n");
 }
 
-void 
+void
 fb_fprint (FILE *fd, const factorbase_degn_t *fb)
 {
   while (fb->p != FB_END)
@@ -83,7 +98,7 @@ static factorbase_degn_t *
 fb_add_to (factorbase_degn_t *fb, size_t *fbsize, size_t *fballoc,
 	   const size_t allocblocksize, factorbase_degn_t *fb_add)
 {
-  const size_t fb_addsize  = fb_entrysize (fb_add); 
+  const size_t fb_addsize  = fb_entrysize (fb_add);
   factorbase_degn_t *newfb = fb;
 
   ASSERT(fb_addsize <= allocblocksize); /* Otherwise we still might not have
@@ -92,19 +107,20 @@ fb_add_to (factorbase_degn_t *fb, size_t *fbsize, size_t *fballoc,
   /* Do we need more memory for fb? */
   if (*fballoc < *fbsize + fb_addsize)
     {
-      *fballoc += allocblocksize;
-      newfb = (factorbase_degn_t *) realloc (fb, *fballoc);
+      size_t newalloc = *fballoc + allocblocksize;
+      newfb = (factorbase_degn_t *) realloc (fb, newalloc);
       if (newfb == NULL)
 	{
-	  fprintf (stderr, 
+	  fprintf (stderr,
 		   "Could not reallocate factor base to %lu bytes\n",
 		   (unsigned long) *fballoc);
 	  return NULL;
 	}
+      *fballoc = newalloc;
     }
   memcpy (fb_skip(newfb, *fbsize), fb_add, fb_addsize);
   fb_skip(newfb, *fbsize)->size = fb_addsize;
-  
+
   *fbsize += fb_addsize;
 
   return newfb;
@@ -147,20 +163,42 @@ fb_log (double n, double log_scale, double offset)
   return (unsigned char) floor (log (n) * log_scale + offset + 0.5);
 }
 
-/* Assuming q is a prime or a prime power, let k be the largest integer with
-   q = p^k, return p if k > 1, 0 otherwise */
-static uint32_t
-is_prime_power (uint32_t q)
+/* Returns floor(log_2(n)) for n > 0, and 0 for n == 0 */
+static unsigned int
+fb_log_2 (fbprime_t n)
+{
+  unsigned int k;
+  for (k = 0; n > 1; n /= 2, k++);
+  return k;
+}
+
+/* Return p^e. Trivial exponentiation for small e, no check for overflow */
+static fbprime_t
+fb_pow (const fbprime_t p, const unsigned int e)
+{
+    fbprime_t r = 1;
+
+    for (unsigned int i = 0; i < e; i++)
+      r *= p;
+    return r;
+}
+
+/* Let k be the largest integer with q = p^k, return p if k > 1,
+   and 0 otherwise */
+static fbprime_t
+fb_is_power (fbprime_t q)
 {
   unsigned int maxk, k;
   uint32_t p;
 
-  for (maxk = 0, p = q; p > 1; p /= 2, maxk ++);
+  maxk = fb_log_2(q);
   for (k = maxk; k >= 2; k--)
     {
       p = (uint32_t) (pow ((double) q, 1.0 / (double) k) + 0.5);
-      if (q % p == 0)
+      if (q % p == 0) {
+        ASSERT (fb_pow (p, k) == q);
         return p;
+      }
     }
   return 0;
 }
@@ -196,7 +234,7 @@ is_prime_power_fast (uint32_t q)
   if (q == prime_powers[a])
     {
       a = a + 1; /* the next q will be larger */
-      return is_prime_power (q);
+      return fb_is_power (q);
     }
   else
     return 0;
@@ -205,35 +243,35 @@ is_prime_power_fast (uint32_t q)
 
 /* Make one factor base entry for a linear polynomial poly[1] * x + poly[0]
    and the prime (power) q. We assume that poly[0] and poly[1] are coprime.
-   Non-projective roots a/b such that poly[1] * a + poly[0] * b == 0 (mod q) 
+   Non-projective roots a/b such that poly[1] * a + poly[0] * b == 0 (mod q)
    with gcd(poly[1], q) = 1 are stored as a/b mod q.
-   If do_projective != 0, also stores projective roots with gcd(q, f_1) > 1, 
+   If do_projective != 0, also stores projective roots with gcd(q, f_1) > 1,
    but stores the reciprocal root plus p, p + b/a mod p^k.
-   If no root was stored (projective root with do_projective = 0) returns 0, 
+   If no root was stored (projective root with do_projective = 0) returns 0,
    returns 1 otherwise. */
 
 static int
 fb_make_linear1 (factorbase_degn_t *fb_entry, const mpz_t *poly,
-		 const fbprime_t p, const unsigned char logp, 
+		 const fbprime_t p, const unsigned char logp,
 		 const int do_projective)
 {
   modulusul_t m;
   residueul_t r0, r1;
   modintul_t gcd;
   int is_projective, rc;
-  
+
   fb_entry->p = p;
   fb_entry->plog = logp;
-  
+
   modul_initmod_ul (m, p);
   modul_init_noset0 (r0, m);
   modul_init_noset0 (r1, m);
-  
+
   modul_set_ul_reduced (r0, mpz_fdiv_ui (poly[0], p), m);
   modul_set_ul_reduced (r1, mpz_fdiv_ui (poly[1], p), m);
   modul_gcd (gcd, r1, m);
   is_projective = (modul_intcmp_ul (gcd, 1UL) > 0);
-  
+
   if (is_projective)
     {
       if (!do_projective)
@@ -245,33 +283,33 @@ fb_make_linear1 (factorbase_degn_t *fb_entry, const mpz_t *poly,
 	}
       modul_swap (r0, r1, m);
     }
-  
-  /* We want poly[1] * a + poly[0] * b == 0 <=> 
+
+  /* We want poly[1] * a + poly[0] * b == 0 <=>
      a/b == - poly[0] / poly[1] */
   rc = modul_inv (r1, r1, m); /* r1 = 1 / poly[1] */
   ASSERT_ALWAYS (rc != 0);
   modul_mul (r1, r0, r1, m); /* r1 = poly[0] / poly[1] */
   modul_neg (r1, r1, m); /* r1 = - poly[0] / poly[1] */
-  
+
   fb_entry->roots[0] = modul_get_ul (r1, m) + (is_projective ? p : 0);
   if (p % 2 != 0)
-    fb_entry->invp = - modul_invmodlong (modul_getmod_ul (m));
-  
+    fb_entry->invp = - ularith_invmod (modul_getmod_ul (m));
+
   modul_clear (r0, m);
   modul_clear (r1, m);
   modul_clearmod (m);
-  
+
   return 1;
 }
 
 
-/* Generate a factor base with primes <= bound and prime powers <= powbound 
-   for a linear polynomial. If projective != 0, adds projective roots 
+/* Generate a factor base with primes <= bound and prime powers <= powbound
+   for a linear polynomial. If projective != 0, adds projective roots
    (for primes that divide leading coefficient) */
 
 factorbase_degn_t *
-fb_make_linear (const mpz_t *poly, const fbprime_t bound, 
-		const fbprime_t powbound, const double log_scale, 
+fb_make_linear (const mpz_t *poly, const fbprime_t bound,
+		const fbprime_t powbound, const double log_scale,
 		const int verbose, const int projective, FILE *output)
 {
   fbprime_t p;
@@ -280,8 +318,8 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
   const size_t allocblocksize = 1 << 20;
   unsigned long logp;
   int had_proj_root = 0;
-  fbprime_t *powers = NULL, min_pow = 0; /* List of prime powers that yet 
-					    need to be included, and the 
+  fbprime_t *powers = NULL, min_pow = 0; /* List of prime powers that yet
+					    need to be included, and the
 					    minimum among them */
 
   rdtscll (tsc1);
@@ -292,12 +330,12 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
   fb_cur->size = fb_entrysize_uc (1);
 
   if (verbose)
-    gmp_fprintf (output, 
+    gmp_fprintf (output,
 		 "# Making factor base for polynomial g(x) = %Zd * x + %Zd,\n"
-		 "# including primes up to " FBPRIME_FORMAT 
+		 "# including primes up to " FBPRIME_FORMAT
 		 " and prime powers up to " FBPRIME_FORMAT ".\n",
 		 poly[1], poly[0], bound, powbound);
-  
+
   p = 2;
   while (p <= bound)
     {
@@ -306,14 +344,14 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
       if (pow_len > 0 && min_pow < p)
 	{
 	  size_t i;
-	  /* Find this p^k in the list of prime powers and replace it 
+	  /* Find this p^k in the list of prime powers and replace it
 	     by p^(k+1) if p^(k+1) does not exceed powbound, otherwise
 	     remove p^k from the list */
 	  for (i = 0; i < pow_len && powers[i] != min_pow; i++);
 	  ASSERT_ALWAYS (i < pow_len);
-	  q = is_prime_power (min_pow);
+	  q = fb_is_power (min_pow);
 	  ASSERT (min_pow / q >= q && min_pow % (q*q) == 0);
-	  logp = fb_log (min_pow, log_scale, 0.) - 
+	  logp = fb_log (min_pow, log_scale, 0.) -
 	         fb_log (min_pow / q, log_scale, 0.);
 	  if (powers[i] <= powbound / q)
 	    powers[i] *= q; /* Increase exponent */
@@ -350,11 +388,11 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
 	    }
 	  p = getprime (p);
 	}
-      
+
       if (!fb_make_linear1 (fb_cur, poly, q, logp, projective))
-	continue; /* If root is projective and we don't want those, 
+	continue; /* If root is projective and we don't want those,
 		     skip to next prime */
-      
+
       if (verbose && fb_cur->p > q)
 	{
 	  if (!had_proj_root)
@@ -364,7 +402,7 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
 	    }
 	  fprintf (output, " " FBPRIME_FORMAT , q);
 	}
-      
+
       fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
       if (fb_new == NULL)
 	{
@@ -374,7 +412,7 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
 	}
       /* fb_fprint_entry (stdout, fb_cur); */
       fb = fb_new;
-      
+
       /* FIXME: handle prime powers */
     }
 
@@ -407,9 +445,9 @@ static int fb_comp(const void *a, const void *b) {
   factorbase_degn_t *pa, *pb;
   pa = (factorbase_degn_t *)a;
   pb = (factorbase_degn_t *)b;
-  if (pa->p < pb->p) 
+  if (pa->p < pb->p)
     return -1;
-  if (pa->p > pb->p) 
+  if (pa->p > pb->p)
     return 1;
   return 0;
 }
@@ -418,14 +456,14 @@ static int fb_comp(const void *a, const void *b) {
 #if 0
 /* Generate a factor base with prime powers <= bound for a linear polynomial */
 static factorbase_degn_t *
-fb_make_linear_powers (mpz_t *poly, const fbprime_t bound, const double log_scale, 
+fb_make_linear_powers (mpz_t *poly, const fbprime_t bound, const double log_scale,
 		const int verbose)
 {
   fbprime_t p;
   factorbase_degn_t *fb = NULL, *fb_cur, *fb_new;
   size_t fbsize = 0, fballoc = 0;
   const size_t allocblocksize = 1 << 20;
-  
+
   rdtscll (tsc1);
   fb_cur = (factorbase_degn_t *) malloc (fb_entrysize_uc (1));
   ASSERT (fb_cur != NULL);
@@ -470,16 +508,16 @@ fb_make_linear_powers (mpz_t *poly, const fbprime_t bound, const double log_scal
 	modul_init_noset0 (r1, m);
 	modul_init_noset0 (r2, m);
 
-	/* We want f_1 * a + f_0 * b == 0 (mod p^k) 
+	/* We want f_1 * a + f_0 * b == 0 (mod p^k)
 	   with a, b coprime and f_1, f_0 coprime
 
 	   p^m = gcd (f_1, p^k)
 
 	   p^k | F(a,b) <=>
-	   ( f_0 * b == 0 (mod p^m) <=> b == 0 (mod p^m)  && 
+	   ( f_0 * b == 0 (mod p^m) <=> b == 0 (mod p^m)  &&
 	   (f_1/p^m) * a + f_0 * (b/p^m) == 0 (mod p^(k-m)) )
 
-	   p^m = (p^k, f_1) => 
+	   p^m = (p^k, f_1) =>
 	   p^k | F(a,b) <=> p^m | b && f(a/b) == 0 (mod p^(k-m))
 
 */
@@ -557,7 +595,7 @@ fb_make_linear_powers (mpz_t *poly, const fbprime_t bound, const double log_scal
 }
 
 factorbase_degn_t *
-fb_read_addproj (const char *filename, const double log_scale, 
+fb_read_addproj (const char *filename, const double log_scale,
                  const int verbose, const fbprime_t *proj_primes)
 {
   factorbase_degn_t *fb = NULL, *fb_cur, *fb_new;
@@ -584,7 +622,7 @@ fb_read_addproj (const char *filename, const double log_scale,
       return NULL;
     }
 
-  fb_cur = (factorbase_degn_t *) malloc (sizeof (factorbase_degn_t) + 
+  fb_cur = (factorbase_degn_t *) malloc (sizeof (factorbase_degn_t) +
 				      MAXDEGREE * sizeof(fbroot_t));
   if (fb_cur == NULL)
     {
@@ -615,7 +653,7 @@ fb_read_addproj (const char *filename, const double log_scale,
       q = strtoul (lineptr, &lineptr, 10);
       ok = 0;
       if (q == 0)
-	fprintf (stderr, "# fb_read: prime is not an integer on line %lu\n", 
+	fprintf (stderr, "# fb_read: prime is not an integer on line %lu\n",
 		 linenr);
       else if (*lineptr != ':')
 	fprintf (stderr, "# fb_read: prime is not followed by colon on line %lu",
@@ -646,14 +684,14 @@ fb_read_addproj (const char *filename, const double log_scale,
               fprintf (stderr, "# Error, " FBPRIME_FORMAT " on line %lu in "
                        "factor base is not a prime or prime power\n",
                        q, linenr);
-              break;                       
+              break;
             }
         }
       else
 	p = q; /* If q is prime, p = q */
 
-      /* We have a valid prime or prime power for q. 
-         Maybe there's one (or several) prime with only a projective root 
+      /* We have a valid prime or prime power for q.
+         Maybe there's one (or several) prime with only a projective root
 	 smaller than q that we need to add to the factor base first. */
       while (proj_primes != NULL && *proj_primes != 0 && *proj_primes < q)
         {
@@ -665,12 +703,12 @@ fb_read_addproj (const char *filename, const double log_scale,
 	  if (fb_cur->p % 2 != 0)
 	    {
 	      modulusul_t m;
-	      
+	
 	      modul_initmod_ul (m, fb_cur->p);
 	      fb_cur->invp = - modul_invmodlong (modul_getmod_ul (m));
 	      modul_clearmod (m);
 	    }
-	  
+	
           fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
           if (fb_new == NULL)
             {
@@ -690,8 +728,8 @@ fb_read_addproj (const char *filename, const double log_scale,
       else
 	{
 	  /* Take into account the logs of the smaller powers of p that
-	     have been added already. We should not just use 
-	     fb_cur->plog = log(p) as that would allow rounding errors to 
+	     have been added already. We should not just use
+	     fb_cur->plog = log(p) as that would allow rounding errors to
 	     accumulate. */
 	  double oldlog;
 	  oldlog = fb_log (fb_cur->p / p, log_scale, 0.);
@@ -706,7 +744,7 @@ fb_read_addproj (const char *filename, const double log_scale,
 	{
 	  if (fb_cur->nr_roots == MAXDEGREE)
             {
-              fprintf (stderr, "# Error, too many roots for prime " FBPRIME_FORMAT 
+              fprintf (stderr, "# Error, too many roots for prime " FBPRIME_FORMAT
                       " in factor base line %lu\n", fb_cur->p, linenr);
               ok = 0;
               break;
@@ -722,7 +760,7 @@ fb_read_addproj (const char *filename, const double log_scale,
 	  if (*lineptr == ',')
 	    lineptr++;
 	}
-      
+
       if (fb_cur->nr_roots == 0)
         {
           fprintf (stderr, "# Error, no root for prime " FBPRIME_FORMAT
@@ -740,8 +778,8 @@ fb_read_addproj (const char *filename, const double log_scale,
           if (i == fb_cur->nr_roots) /* No, need to add it */
             {
               if (fb_cur->nr_roots == MAXDEGREE)
-                fprintf (stderr, "# Error, can't add projective root for " 
-                         FBPRIME_FORMAT ", already has %d roots\n", 
+                fprintf (stderr, "# Error, can't add projective root for "
+                         FBPRIME_FORMAT ", already has %d roots\n",
                         fb_cur->p, fb_cur->nr_roots);
               else
                 fb_cur->roots[fb_cur->nr_roots++] = fb_cur->p;
@@ -756,7 +794,7 @@ fb_read_addproj (const char *filename, const double log_scale,
 	  exit (EXIT_FAILURE);
 	}
 
-      /* Sort the roots into ascending order. We assume that fbprime_t and 
+      /* Sort the roots into ascending order. We assume that fbprime_t and
          fbroot_t are typecast compatible. This is ugly. */
       ASSERT_ALWAYS (sizeof (fbprime_t) == sizeof (fbroot_t));
       fb_sortprimes ((fbprime_t *) fb_cur->roots, fb_cur->nr_roots);
@@ -767,7 +805,7 @@ fb_read_addproj (const char *filename, const double log_scale,
           {
             if (fb_cur->roots[i] == fb_cur->roots[j])
               {
-                fprintf (stderr, "Warning, factor base has repeated root " 
+                fprintf (stderr, "Warning, factor base has repeated root "
                          FBROOT_FORMAT " for prime " FBPRIME_FORMAT ". "
                          "Keeping only one.\n", fb_cur->roots[i], fb_cur->p);
               }
@@ -776,12 +814,12 @@ fb_read_addproj (const char *filename, const double log_scale,
           }
           fb_cur->nr_roots = i + 1;
       }
-      
+
       /* Compute invp */
       if (fb_cur->p % 2 != 0)
 	{
 	  modulusul_t m;
-	  
+	
 	  modul_initmod_ul (m, fb_cur->p);
 	  fb_cur->invp = - modul_invmodlong (modul_getmod_ul (m));
 	  modul_clearmod (m);
@@ -798,7 +836,7 @@ fb_read_addproj (const char *filename, const double log_scale,
       fb = fb_new;
       maxprime = fb_cur->p;
       nr_primes++;
-    }      
+    }
 
   if (fb != NULL) /* If nothing went wrong so far, put the end-of-fb mark */
     {
@@ -816,7 +854,7 @@ fb_read_addproj (const char *filename, const double log_scale,
       printf ("# Factor base sucessfully read, %lu primes, largest was "
 	      FBPRIME_FORMAT "\n", nr_primes, maxprime);
     }
-  
+
   fclose (fbfile);
   free (fb_cur);
   return fb;
@@ -825,15 +863,16 @@ fb_read_addproj (const char *filename, const double log_scale,
 
 /* return the total size (in bytes) used by fb */
 size_t
-fb_size (const factorbase_degn_t *fb)
+fb_size (const factorbase_degn_t * const fb)
 {
+  const factorbase_degn_t *fb_cur = fb;
   size_t mem = 0;
-  while (fb->p != FB_END)
+  while (1)
     {
-      mem += sizeof (fbprime_t) + sizeof (unsigned long)
-        + 4 * sizeof (unsigned char)
-        + sizeof (fbroot_t) * fb->nr_roots;
-      fb = fb_next (fb);
+      mem += fb_entrysize (fb_cur);
+      if (fb_cur->p == FB_END)
+        break;
+      fb_cur = fb_next (fb_cur);
     }
   return mem;
 }
@@ -850,23 +889,23 @@ fb_nroots_total (const factorbase_degn_t *fb)
 
 
 /* For all primes p that divide b, disable p and powers of p in fb */
-/* Extracts primes (not prime powers) p <= plim with 
+/* Extracts primes (not prime powers) p <= plim with
    p/nr_roots <= costlim. List ends with FB_END. Allocates memory */
 fbprime_t *
-fb_extract_bycost (const factorbase_degn_t *fb, const fbprime_t plim, 
+fb_extract_bycost (const factorbase_degn_t *fb, const fbprime_t plim,
                    const fbprime_t costlim)
 {
   const factorbase_degn_t *fb_ptr;
   fbprime_t *primes;
   fbprime_t old_prime = 1;
   int i;
-  
+
   fb_ptr = fb;
   i = 0;
-  while (fb_ptr->p != FB_END && fb_ptr->p <= plim)  
+  while (fb_ptr->p != FB_END && fb_ptr->p <= plim)
     {
       if (fb_ptr->p <= costlim * fb_ptr->nr_roots &&
-	  !is_prime_power(fb_ptr->p) && old_prime!=fb_ptr->p) {
+	  !fb_is_power(fb_ptr->p) && old_prime!=fb_ptr->p) {
         i++;
         old_prime = fb_ptr->p;
       }
@@ -879,10 +918,10 @@ fb_extract_bycost (const factorbase_degn_t *fb, const fbprime_t plim,
   fb_ptr = fb;
   i = 0;
   old_prime = 1;
-  while (fb_ptr->p != FB_END && fb_ptr->p <= plim)  
+  while (fb_ptr->p != FB_END && fb_ptr->p <= plim)
     {
       if (fb_ptr->p <= costlim * fb_ptr->nr_roots &&
-	  !is_prime_power(fb_ptr->p) && old_prime!=fb_ptr->p) {
+	  !fb_is_power(fb_ptr->p) && old_prime!=fb_ptr->p) {
         primes[i++] = fb_ptr->p;
         old_prime = fb_ptr->p;
       }
@@ -890,12 +929,176 @@ fb_extract_bycost (const factorbase_degn_t *fb, const fbprime_t plim,
     }
 
   primes[i] = FB_END;
-  
+
   return primes;
 }
 
+/* Remove newline, comment, and trailing space from a line. Write a
+   '\0' character to the line at the position where removed part began (i.e.,
+   line gets truncated).
+   Return length in characters or remaining line, without trailing '\0'
+   character.
+*/
+static size_t
+fb_read_strip_comment (char *const line)
+{
+    size_t linelen, i;
+
+    linelen = strlen (line);
+    if (linelen > 0 && line[linelen - 1] == '\n')
+        linelen--; /* Remove newline */
+    for (i = 0; i < linelen; i++) /* Skip comments */
+        if (line[i] == '#') {
+            linelen = i;
+            break;
+        }
+    while (linelen > 0 && isspace((int)(unsigned char)line[linelen - 1]))
+        linelen--; /* Skip whitespace at end of line */
+    line[linelen] = '\0';
+
+    return linelen;
+}
+
+/* Read roots from a factor base file line and store them in fb_entry.
+   line must point at the first character of the first root on the line.
+   linenr is used only for printing error messages in case of parsing error.
+*/
+static void
+fb_read_roots (factorbase_degn_t * const fb_entry, const char *lineptr,
+               const unsigned long linenr)
+{
+    fb_entry->nr_roots = 0;
+    while (*lineptr != '\0')
+    {
+        if (fb_entry->nr_roots == MAXDEGREE) {
+            fprintf (stderr,
+                    "# Error, too many roots for prime " FBPRIME_FORMAT
+                    " in factor base line %lu\n", fb_entry->p, linenr);
+            exit(EXIT_FAILURE);
+        }
+        fbroot_t root = strtoul_const (lineptr, &lineptr, 10);
+
+        if (fb_entry->nr_roots > 0
+                && root <= fb_entry->roots[fb_entry->nr_roots-1]) {
+            fprintf (stderr,
+                "# Error, roots must be sorted in the fb file, line %lu\n",
+                linenr);
+            exit(EXIT_FAILURE);
+        }
+
+        fb_entry->roots[fb_entry->nr_roots++] = root;
+        if (*lineptr != '\0' && *lineptr != ',') {
+            fprintf(stderr,
+                    "# Incorrect format in factor base file line %lu\n",
+                    linenr);
+            exit(EXIT_FAILURE);
+        }
+        if (*lineptr == ',')
+            lineptr++;
+    }
+
+    if (fb_entry->nr_roots == 0) {
+        fprintf (stderr, "# Error, no root for prime " FBPRIME_FORMAT
+                " in factor base line %lu\n", fb_entry->p, linenr - 1);
+        exit(EXIT_FAILURE);
+    }
+}
+
+/* Parse a factorbase line. Return 1 if the line could be parsed and,
+   if the FB entry is for a prime power, the power does not exceed powlim.
+   Otherwise return 0. */
+static int
+fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
+               const double log_scale, const unsigned long linenr,
+               const fbprime_t powlim)
+{
+    long nlogp, oldlogp = 0;
+    fbprime_t p, q; /* q is factor base entry q = p^k */
+
+    q = strtoul_const (lineptr, &lineptr, 10);
+    if (q == 0) {
+        fprintf(stderr, "# fb_read: prime is not an integer on line %lu\n",
+                linenr);
+        exit (EXIT_FAILURE);
+    } else if (*lineptr != ':') {
+        fprintf(stderr,
+                "# fb_read: prime is not followed by colon on line %lu",
+                linenr);
+        exit (EXIT_FAILURE);
+    }
+
+    lineptr++; /* Skip colon after q */
+    int longversion;
+    if (strchr(lineptr, ':') == NULL)
+        longversion = 0;
+    else
+        longversion = 1;
+
+    /* we assume q is a prime or a prime power */
+    /* NB: a short version is not possible for a prime power, so we
+     * do the test only for !longversion */
+    p = (longversion) ? fb_is_power (q) : 0;
+    if (!isprime(p != 0 ? p : q)) {
+        fprintf (stderr, "# Error, " FBPRIME_FORMAT " on line %lu in "
+                "factor base is not a prime or prime power\n",
+                q, linenr);
+        exit (EXIT_FAILURE);
+    }
+    fb_cur->p = q;
+    if (p != 0) {
+        if (powlim && fb_cur->p >= powlim)
+            return 0;
+    } else {
+        p = q; /* If q is prime, p = q */
+    }
+
+    /* read the multiple of logp, if any */
+    /* this must be of the form  q:nlogp,oldlogp: ... */
+    /* if the information is not present, it means q:1,0: ... */
+    nlogp = 1;
+    oldlogp = 0;
+    if (longversion) {
+        nlogp = strtoul_const (lineptr, &lineptr, 10);
+        /*
+        if (nlogp == 0) {
+            fprintf(stderr, "# Error in fb_read: could not parse the integer after the colon of prime " FBPRIME_FORMAT "\n", q);
+            exit (EXIT_FAILURE);
+        }*/
+        if (*lineptr != ',') {
+            fprintf(stderr, "# fb_read: nlogp is not followed by comma on line %lu", linenr);
+            exit (EXIT_FAILURE);
+        }
+        lineptr++; /* skip comma */
+        oldlogp = strtoul_const (lineptr, &lineptr, 10);
+        /*
+        if (oldlogp == 0) {
+            fprintf(stderr, "# Error in fb_read: could not parse the integer after the comma of prime " FBPRIME_FORMAT "\n", q);
+            exit (EXIT_FAILURE);
+        }*/
+        if (*lineptr != ':') {
+            fprintf(stderr, "# fb_read: oldlogp is not followed by colon on line %lu", linenr);
+            exit (EXIT_FAILURE);
+        }
+        lineptr++; /* skip colon */
+    }
+    ASSERT (nlogp > oldlogp);
+
+    if (nlogp == 1) /* typical case */
+        fb_cur->plog = fb_log (p, log_scale, 0.);
+    else {
+        double ol = fb_log (fb_pow (p, oldlogp), log_scale, 0.);
+        fb_cur->plog = fb_log (fb_pow (p, nlogp), log_scale, - ol);
+    }
+
+    /* Read roots */
+    fb_read_roots(fb_cur, lineptr, linenr);
+
+    return 1;
+}
+
 factorbase_degn_t *
-fb_read (const char *filename, const double log_scale, const int verbose, const fbprime_t lim, fbprime_t powlim)
+fb_read (const char * const filename, const double log_scale,
+         const int verbose, const fbprime_t lim, const fbprime_t powlim)
 {
     factorbase_degn_t *fb = NULL, *fb_cur, *fb_new;
     FILE *fbfile;
@@ -903,17 +1106,11 @@ fb_read (const char *filename, const double log_scale, const int verbose, const 
     // too small linesize led to a problem with rsa768;
     // it would probably be a good idea to get rid of fgets
     const size_t linesize = 1000;
-    size_t linelen;
     char line[linesize];
-    char *lineptr;
-    int ok;
-    unsigned int i;
     unsigned long linenr = 0;
     const size_t allocblocksize = 1<<20; /* Allocate in MB chunks */
-    fbprime_t p, q; /* q is factor base entry q = p^k */
     fbprime_t maxprime = 0;
     unsigned long nr_primes = 0;
-    long nlogp, oldlogp = 0;
 
     fbfile = fopen (filename, "r");
     if (fbfile == NULL) {
@@ -921,7 +1118,7 @@ fb_read (const char *filename, const double log_scale, const int verbose, const 
         return NULL;
     }
 
-    fb_cur = (factorbase_degn_t *) malloc (sizeof (factorbase_degn_t) + 
+    fb_cur = (factorbase_degn_t *) malloc (sizeof (factorbase_degn_t) +
             MAXDEGREE * sizeof(fbroot_t));
     if (fb_cur == NULL) {
         fprintf (stderr, "# Could not allocate memory for factor base\n");
@@ -933,158 +1130,19 @@ fb_read (const char *filename, const double log_scale, const int verbose, const 
         if (fgets (line, linesize, fbfile) == NULL)
             break;
         linenr++;
-        linelen = strlen (line);
-        if (linelen > 0 && line[linelen - 1] == '\n')
-            linelen--; /* Remove newline */
-        for (i = 0; i < linelen; i++) /* Skip comments */
-            if (line[i] == '#') {
-                linelen = i;
-                break;
-            }
-        while (linelen > 0 && isspace((int)(unsigned char)line[linelen - 1]))
-            linelen--; /* Skip whitespace at end of line */
-        if (linelen == 0) /* Skip empty/comment lines */
+        if (fb_read_strip_comment(line) == (size_t) 0) {
+            /* Skip empty/comment lines */
             continue;
-        line[linelen] = '\0';
-
-        /* Parse the line */
-        lineptr = line;
-        q = strtoul (lineptr, &lineptr, 10);
-        ok = 0;
-        if (q == 0)
-            fprintf(stderr, "# fb_read: prime is not an integer on line %lu\n",
-                    linenr);
-        else if (*lineptr != ':')
-            fprintf(stderr,
-                    "# fb_read: prime is not followed by colon on line %lu",
-                    linenr);
-        else
-            ok = 1;
-        if (!ok)
-            exit (EXIT_FAILURE);
-        lineptr++; /* Skip colon after q */
-        int longversion;
-        if (strchr(lineptr, ':') == NULL)
-            longversion = 0;
-        else 
-            longversion = 1;
-
-        /* we assume q is a prime or a prime power */
-        /* NB: a short version is not possible for a prime power, so we
-         * do the test only for !longversion */
-        if (longversion) {
-            p = is_prime_power (q); 
-        } else {
-            p = 0;
-        }
-        if (p) {
-            fbprime_t cof = q;
-            while (cof % p == 0)
-                cof /= p;
-            if (cof != 1)
-            {
-                fprintf (stderr, "# Error, " FBPRIME_FORMAT " on line %lu in "
-                        "factor base is not a prime or prime power\n",
-                        q, linenr);
-                break;                       
-            }
-            if (powlim && q >= powlim)
-                break;
-        } else {
-            p = q; /* If q is prime, p = q */
-            if (lim && q >= lim)
-                break;
-        }
-        fb_cur->p = q;
-
-
-        /* read the multiple of logp, if any */
-        /* this must be of the form  q:nlogp,oldlogp: ... */
-        /* if the information is not present, it means q:1,0: ... */
-        nlogp = 1;
-        oldlogp = 0;
-        if (longversion) {
-            nlogp = strtoul (lineptr, &lineptr, 10);
-            /*
-            if (nlogp == 0) {
-                fprintf(stderr, "# Error in fb_read: could not parse the integer after the colon of prime " FBPRIME_FORMAT "\n", q);
-                exit (EXIT_FAILURE);
-            }*/
-            if (*lineptr != ',') {
-                fprintf(stderr, "# fb_read: nlogp is not followed by comma on line %lu", linenr);
-                exit (EXIT_FAILURE);
-            } 
-            lineptr++; /* skip comma */
-            oldlogp = strtoul (lineptr, &lineptr, 10);
-            /*
-            if (oldlogp == 0) {
-                fprintf(stderr, "# Error in fb_read: could not parse the integer after the comma of prime " FBPRIME_FORMAT "\n", q);
-                exit (EXIT_FAILURE);
-            }*/
-            if (*lineptr != ':') {
-                fprintf(stderr, "# fb_read: oldlogp is not followed by colon on line %lu", linenr);
-                exit (EXIT_FAILURE);
-            } 
-            lineptr++; /* skip colon */
-        }
-        ASSERT (nlogp > oldlogp);
-
-        if (nlogp == 1) /* typical case */
-            fb_cur->plog = fb_log (p, log_scale, 0.);
-        else {
-            fbprime_t oldpk = p, pk = p;
-            for (int i = 1; i < oldlogp; ++i)
-                oldpk *= p;
-            for (int i = 1; i < nlogp; ++i)
-                pk *= p;
-            double ol;
-            ol = fb_log (oldpk, log_scale, 0.);
-            fb_cur->plog = fb_log (pk, log_scale, - ol);
         }
 
-        fb_cur->nr_roots = 0;
-        /* Read roots */
-        while (*lineptr != '\0')
-        {
-            if (fb_cur->nr_roots == MAXDEGREE) {
-                fprintf (stderr, 
-                        "# Error, too many roots for prime " FBPRIME_FORMAT 
-                        " in factor base line %lu\n", fb_cur->p, linenr);
-                exit(EXIT_FAILURE);
-            }
-            fbroot_t root = strtoul (lineptr, &lineptr, 10);
-            
-            if (fb_cur->nr_roots > 0
-                    && root <= fb_cur->roots[fb_cur->nr_roots-1]) {
-                fprintf (stderr,
-                    "# Error, roots must be sorted in the fb file, line %lu\n",
-                    linenr);
-                exit(EXIT_FAILURE);
-            }
-            
-            fb_cur->roots[fb_cur->nr_roots++] = root;
-            if (*lineptr != '\0' && *lineptr != ',') {
-                fprintf(stderr,
-                        "# Incorrect format in factor base file line %lu\n",
-                        linenr);
-                exit(EXIT_FAILURE);
-            }
-            if (*lineptr == ',')
-                lineptr++;
-        }
-
-        if (fb_cur->nr_roots == 0) {
-            fprintf (stderr, "# Error, no root for prime " FBPRIME_FORMAT
-                    " in factor base line %lu\n", fb_cur->p, linenr - 1);
-            exit(EXIT_FAILURE);
-        }
+        if (fb_parse_line (fb_cur, line, log_scale, linenr, powlim) == 0)
+            continue;
+        if (lim && fb_cur->p >= lim)
+            break;
 
         /* Compute invp */
         if (fb_cur->p % 2 != 0) {
-            modulusul_t m;
-            modul_initmod_ul (m, fb_cur->p);
-            fb_cur->invp = - modul_invmodlong (modul_getmod_ul (m));
-            modul_clearmod (m);
+            fb_cur->invp = - ularith_invmod ((unsigned long) fb_cur->p);
         }
 
         fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
@@ -1119,3 +1177,51 @@ fb_read (const char *filename, const double log_scale, const int verbose, const 
     free (fb_cur);
     return fb;
 }
+
+void
+fb_dump_degn (const factorbase_degn_t *fb, const char *filename)
+{
+    FILE *f = fopen(filename, "wb");
+    if (f == NULL) {
+        fprintf (stderr, "Could not open %s for writing: %s\n",
+                 filename, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    size_t size = fb_size (fb);
+    size_t written = fwrite (fb, 1, size, f);
+    if (written != size) {
+        fprintf (stderr, "Could not write %zu bytes to %s: %s\n",
+                 size, filename, strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    fclose(f);
+}
+
+/* Returns NULL iff the file could not be opened, and MAP_FAILED in case of
+   an error (incl. when mmap() is not available) */
+factorbase_degn_t *
+fb_mmap(const char *fbcache MAYBE_UNUSED)
+{
+#ifdef HAVE_MMAP
+    FILE *f = fopen(fbcache, "rb");
+    if (f == NULL)
+        return NULL;
+    if (fseek (f, 0, SEEK_END) != 0) {
+        fprintf (stderr, "fseek on %s failed: %s", fbcache, strerror(errno));
+        return MAP_FAILED;
+    }
+    int64_t size = ftell (f);
+    ASSERT_ALWAYS(size >= 0);
+    if (fseek (f, 0, SEEK_SET) != 0) {
+        fprintf (stderr, "fseek on %s failed: %s", fbcache, strerror(errno));
+        return MAP_FAILED;
+    }
+    int fd = fileno (f);
+    factorbase_degn_t *fb = mmap (NULL, (size_t) size, PROT_READ,
+                                  MAP_PRIVATE, fd, 0);
+    return fb;
+#else
+    return MAP_FAILED;
+#endif
+}
+

@@ -614,6 +614,7 @@ FindSuitableModP (poly_t F, mpz_t N)
 {
   unsigned long p = 2;
   int dF = F->deg;
+  int ntries = 0;
 
   plain_poly_t fp;
 
@@ -623,11 +624,14 @@ FindSuitableModP (poly_t F, mpz_t N)
     int d;
 
     p = getprime (p);
+    ntries ++;
     if (mpz_gcd_ui(NULL, N, p) != 1)
       continue;
-    if (! plain_poly_fits (dF, p))
+    if (! plain_poly_fits (dF, p) || ntries > 100)
       {
         fprintf (stderr, "You are in trouble. Please contact the CADO support team at cado-nfs-commits@lists.gforge.inria.fr.\n");
+        plain_poly_clear (fp);
+        getprime (0);
         exit (1);
       }
     d = plain_poly_set_mod (fp, F->coeff, dF, p);
@@ -636,7 +640,7 @@ FindSuitableModP (poly_t F, mpz_t N)
     if (plain_poly_is_irreducible (fp, p))
       break;
     }
-  plain_poly_clear(fp);
+  plain_poly_clear (fp);
   getprime (0);
 
   return p;

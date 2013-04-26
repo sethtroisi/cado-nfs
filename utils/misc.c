@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <stddef.h>
 #include <string.h>
+#include <stdint.h>
 #include <errno.h>
 #include <unistd.h>
 #include <ctype.h>
@@ -22,7 +23,12 @@ void
 {
     void *p;
     p = malloc (x);
-    ASSERT_ALWAYS(p != NULL);
+    if (p == NULL)
+      {
+        fprintf (stderr, "Error, malloc of %zu bytes failed\n", x);
+        fflush (stderr);
+        exit (1);
+      }
     return p;
 }
 
@@ -46,10 +52,10 @@ void *malloc_aligned(size_t size, size_t alignment)
     char * res;
     res = malloc(size + sizeof(size_t) + alignment);
     res += sizeof(size_t);
-    size_t displ = alignment - ((unsigned long) res) % alignment;
+    size_t displ = alignment - ((uintptr_t) res) % alignment;
     res += displ;
     memcpy(res - sizeof(size_t), &displ, sizeof(size_t));
-    ASSERT_ALWAYS((((unsigned long) res) % alignment) == 0);
+    ASSERT_ALWAYS((((uintptr_t) res) % alignment) == 0);
     return (void*) res;
 #endif
 }
@@ -60,11 +66,11 @@ void free_aligned(void * p, size_t size MAYBE_UNUSED, size_t alignment MAYBE_UNU
     free(p);
 #else
     char * res = (char *) p;
-    ASSERT_ALWAYS((((unsigned long) res) % alignment) == 0);
+    ASSERT_ALWAYS((((uintptr_t) res) % alignment) == 0);
     size_t displ;
     memcpy(&displ, res - sizeof(size_t), sizeof(size_t));
     res -= displ;
-    ASSERT_ALWAYS(displ == alignment - ((unsigned long) res) % alignment);
+    ASSERT_ALWAYS(displ == alignment - ((uintptr_t) res) % alignment);
     res -= sizeof(size_t);
     free(res);
 #endif

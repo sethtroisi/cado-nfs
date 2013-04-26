@@ -11,6 +11,16 @@
 #define PRODUCT_SUBDIVIDE_THRESHOLD      PRODUCT_KARA_THRESHOLD
 
 
+int polymat_check_pre_init(polymat_srcptr p)
+{
+    if (p->m && p->n && p->alloc)
+        return 0;
+    if (!p->m && !p->n && !p->alloc)
+        return 1;
+    abort();
+    return 0;
+}
+
 /* {{{ init/zero/clear interface for polymat */
 void polymat_init(polymat_ptr p, unsigned int m, unsigned int n, int len) {
     memset(p, 0, sizeof(polymat));
@@ -26,6 +36,7 @@ void polymat_init(polymat_ptr p, unsigned int m, unsigned int n, int len) {
     memset(p->x, 0, m*n*p->alloc*sizeof(abelt));
 }
 void polymat_realloc(polymat_ptr p, int newalloc) {
+    polymat_check_pre_init(p);
     p->x = realloc(p->x, p->m*p->n*newalloc*sizeof(abelt));
     /* We should be copying only from p->size onwards. However our
      * tracking of the ->size field is not accurate. */
@@ -349,8 +360,7 @@ void polymat_mul_raw(abdst_field ab,/*{{{*/
 void polymat_mul(abdst_field ab, polymat c, polymat a, polymat b)/*{{{*/
 {
     ASSERT_ALWAYS(a->n == b->m);
-    if (!c->m) {
-        ASSERT_ALWAYS(!c->m && !c->n && !c->size);
+    if (polymat_check_pre_init(c)) {
         polymat_init(c, a->m, b->n, a->size + b->size - 1);
     }
     ASSERT_ALWAYS(c->m == a->m);
@@ -606,8 +616,7 @@ void polymat_mp(abdst_field ab, polymat b, polymat a, polymat c)/*{{{*/
 {
     unsigned int nb = MAX(a->size, c->size) - MIN(a->size, c->size) + 1;
     ASSERT_ALWAYS(a->n == c->m);
-    if (!b->m) {
-        ASSERT_ALWAYS(!b->m && !b->n && !b->size);
+    if (polymat_check_pre_init(b)) {
         polymat_init(b, b->m, b->n, nb);
     }
     ASSERT_ALWAYS(b->m == a->m);
