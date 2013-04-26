@@ -47,7 +47,7 @@ class Task(patterns.Observable, patterns.Observer):
     """
     # Parameters that all tasks use
     paramnames = ("name", "workdir")
-
+    
     def __init__(self, dependencies, *args, db = None, parameters = None, \
                 **kwargs):
         ''' Sets up a database connection and a DB-backed dictionary for 
@@ -70,9 +70,10 @@ class Task(patterns.Observable, patterns.Observer):
         if False:
             self.logger.debug("Enter Task.__init__(): parameters = %s", 
                               parameters)
-        # DB-backed dictionary with parameters for this task
+        # DB-backed dictionary with the state of this task
         self.db = db
-        self.params = wudb.DictDbAccess(self.db, self.tablename())
+        self.state = wudb.DictDbAccess(self.db, self.tablename())
+        self.logger.debug("%s: state = %s", self.title, self.state)
         # Derived class must define name
         # Set default parametes for this task, if any are given
         if parameters:
@@ -80,18 +81,17 @@ class Task(patterns.Observable, patterns.Observer):
             # (presumably class-defined) paramnames in self, and bind the 
             # result to an instance variable
             self.paramnames = Task.paramnames + self.paramnames
-            defaults = parameters.myparams(self.paramnames, self.parampath)
-            self.params.setdefault(None, defaults)
-        self.logger.debug("%s: params = %s", self.title, self.params)
+            self.params = parameters.myparams(self.paramnames, self.parampath)
+            self.logger.debug("%s: params = %s", self.title, self.params)
         # Set default parameters for our programs
         self.progparams = []
         for prog in self.programs:
-            progparams = wudb.DictDbAccess(self.db, self.prog_tablename(prog))
+            progparams = {}
             self.progparams.append(progparams)
             if parameters:
-                defaults = parameters.myparams(
+                update = parameters.myparams(
                     prog.params_dict(), [self.parampath, prog.name])
-                progparams.setdefault(None, defaults)
+                progparams.update(update)
         self.logger.debug("Exit Task.__init__(%s)", self.name)
         return
     
@@ -102,7 +102,7 @@ class Task(patterns.Observable, patterns.Observer):
             raise Exception("%s is not valid for an SQL table name" % name)
 
     def tablename(self, extra = None):
-        """ Return the table name for the DB-backed dictionary with parameters
+        """ Return the table name for the DB-backed dictionary with the state
         for the current task """
         # Maybe replace SQL-disallowed characters here, like digits and '.' ? 
         # Could be tricky to avoid collisions
@@ -113,24 +113,14 @@ class Task(patterns.Observable, patterns.Observer):
         else:
             return self.name
     
-    def prog_tablename(self, prog):
-        """ Return the table name for the DB-backed dictionary with parameters 
-        for program prog
-        """
-        return self.tablename(prog.name)
-    
     def is_done(self):
         return False
     
-    def run(self, parameters = None):
+    def run(self):
         ''' Runs the prerequisites. Sub-classes should call this first in 
         their run() method.
-        
-        Parameters passed in by parameters DO override values in the
-        DB-backed parameter dictionary. 
-        '''
-        self.logger.debug("Enter Task.run(%s), parameters = %s", 
-                          self.name, parameters)
+                '''
+        self.logger.debug("Enter Task.run(%s)", self.name)
         self.logger.debug("Task.run(%s): self.is_done() = %s", 
                           self.name, self.is_done())
         # Check/run the prerequisites
@@ -139,18 +129,7 @@ class Task(patterns.Observable, patterns.Observer):
                 if not task.is_done():
                     self.logger.debug("Task.run(%s): Running prerequisite %s",
                                       self.name, task.name)
-                    task.run(parameters)
-        
-        # Set parameters for our task and programs
-        if parameters:
-            # Override this task's parameters, if parameters are given
-            update = parameters.myparams(self.paramnames, self.parampath)
-            self.params.update(None, update)
-            # Override the programs' parameters, if parameters are given
-            for (index, prog) in enumerate(self.programs):
-                update = parameters.myparams(
-                    prog.params_dict(), [self.parampath, prog.name])
-                self.progparams[index].update(None, update)
+                    task.run()
         
         self.logger.debug("Exit Task.run(" + self.name + ")")
         return
@@ -205,7 +184,7 @@ class Task(patterns.Observable, patterns.Observer):
         ''' Submit a command that needs to be run. Returns a handle
         which can be used for status check.
 
-        The inputfiles parameters is a list of input files that program 
+        The inputfiles parameter is a list of input files that program 
         needs; they are not automatically filled into the command line(s),
         but need to be listed on the command line(s) explicitly. The are 
         input files list is used to generate FILE lines in work units, 
@@ -352,39 +331,39 @@ class PolyselTask(Task):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, dependencies = None, **kwargs)
-        self.params.setdefault("admin", 0)
-        self.params.setdefault("adnext", 0)
-        if self.params["adnext"] < int(self.params["admin"]):
-            self.params["adnext"] = int(self.params["admin"])
+        self.state["adnext"] = \
+            max(self.state.get("adnext", 0), int(self.params.get("admin", 0)))
     
     def is_done(self):
         # self.logger.debug ("PolyselTask.is_done(): Task parameters: %s", 
         #                    self.params)
-        return self.params["adnext"] >= int(self.params["admax"])
+        return self.state["adnext"] >= int(self.params["admax"])
     
-    def run(self, parameters = None):
+    def run(self):
         # Make command line for polselect2l, run it. 
         # Whole range in one go for now
         self.logger.debug("Enter PolyselTask.run(" + self.name + ")")
-        super().run(parameters = parameters)
+        super().run()
         
         self.logger.info("Beginning %s", self.title)
+        self.logger.debug("PolyselTask.run(): Task state: %s", 
+                          self.state)
         self.logger.debug("PolyselTask.run(): Task parameters: %s", 
                           self.params)
         
-        if "bestpoly" in self.params:
-            bestpoly = Polynomial(self.params["bestpoly"].splitlines())
-            bestpoly.setE(self.params["bestE"])
+        if "bestpoly" in self.state:
+            bestpoly = Polynomial(self.state["bestpoly"].splitlines())
+            bestpoly.setE(self.state["bestE"])
             self.logger.info("Best polynomial previously found in %s has "
                              "Murphy_E = %g", 
-                             self.params["bestfile"], bestpoly.E)
+                             self.state["bestfile"], bestpoly.E)
             self.notifyObservers({"poly": bestpoly})
         else:
             bestpoly = None
             self.logger.info("No polynomial was previously found")
         
         while not self.is_done():
-            adstart = self.params["adnext"]
+            adstart = self.state["adnext"]
             adend = adstart + int(self.params["adrange"])
             polyselect_params = self.progparams[0].copy()
             polyselect_params["admin"] = str(adstart)
@@ -404,7 +383,7 @@ class PolyselTask(Task):
                                       self.programs[0].name, e)
                     outputfile = None
             
-            self.params["adnext"] = adend
+            self.state["adnext"] = adend
             
             poly = None
             if outputfile:
@@ -422,9 +401,9 @@ class PolyselTask(Task):
                                   % outputfile)
             elif not bestpoly or poly.E > bestpoly.E:
                 bestpoly = poly
-                self.params["bestE"] = poly.E
-                self.params["bestpoly"] = str(poly)
-                self.params["bestfile"] = outputfile
+                self.state["bestE"] = poly.E
+                self.state["bestpoly"] = str(poly)
+                self.state["bestfile"] = outputfile
                 self.logger.info("New best polynomial from file %s:"
                                  " Murphy E = %g" % (outputfile, poly.E))
                 self.logger.debug("New best polynomial is:\n%s", poly)
@@ -440,13 +419,13 @@ class PolyselTask(Task):
             self.logger.error ("No polynomial found")
             return
         self.logger.info("Best polynomial from %s has Murphy_E =  %g", 
-                          self.params["bestfile"] , bestpoly.E)
+                          self.state["bestfile"] , bestpoly.E)
         self.logger.debug("Exit PolyselTask.run(" + self.name + ")")
         return
     
     def get_poly(self):
-        if "bestpoly" in self.params:
-            return Polynomial(self.params["bestpoly"].splitlines())
+        if "bestpoly" in self.state:
+            return Polynomial(self.state["bestpoly"].splitlines())
         else:
             return None
 
@@ -459,31 +438,31 @@ class FactorBaseOrFreerelTask(Task):
     def __init__(self, polyselect, *args, **kwargs):
         super().__init__(*args, dependencies = (polyselect,), **kwargs)
         self.polyselect = polyselect
-        # Invariant: if we have a result (in self.params[targetkey]) then we
-        # must also have a polynomial (in self.params["poly"])
-        self.targetkey = self.target + "file"
-        if self.targetkey in self.params:
-            assert "poly" in self.params
+        # Invariant: if we have a result (in self.state["outputfile"]) then we
+        # must also have a polynomial (in self.state["poly"])
+        if "outputfile" in self.state:
+            assert "poly" in self.state
             # The target file must correspond to the polynomial "poly"
     
-    def run(self, parameters = None):
+    def run(self):
         self.logger.debug("Enter FactorBaseOrFreerelTask.run(%s)", self.name)
-        super().run(parameters = parameters)
+        super().run()
         
         # Get best polynomial found by polyselect
         poly = self.polyselect.get_poly()
         if not poly:
-            raise Exception("FactorBaseOrFreerelTask(): no polynomial received")
+            raise Exception("FactorBaseOrFreerelTask(): no polynomial "
+                            "received from PolyselTask")
         
         # Check if we have already computed the target file for this polynomial
-        if "poly" in self.params:
-            prevpoly = Polynomial(self.params["poly"].splitlines())
+        if "poly" in self.state:
+            prevpoly = Polynomial(self.state["poly"].splitlines())
             if poly != prevpoly:
-                if self.targetkey in self.params:
-                    del(self.params[self.targetkey])
-                self.params["poly"] = str(poly)
+                if "outputfile" in self.state:
+                    del(self.state["outputfile"])
+                self.state["poly"] = str(poly)
         else:
-            self.params["poly"] = str(poly)
+            self.state["poly"] = str(poly)
         
         if not self.is_done():
             # Write polynomial to a file
@@ -503,17 +482,17 @@ class FactorBaseOrFreerelTask(Task):
             p.run()
             p.wait()
             
-            self.params[self.targetkey] = os.path.realpath(outputfile)
+            self.state["outputfile"] = os.path.realpath(outputfile)
             self.notifyObservers({self.name: outputfile})
         self.logger.debug("Exit FactorBaseOrFreerelTask.run(%s)", self.name)
     
     def is_done(self):
-        if self.targetkey in self.params \
-                and not os.path.isfile(self.params[self.targetkey]):
+        if "outputfile" in self.state\
+                and not os.path.isfile(self.state["outputfile"]):
             raise Exception("FactorBaseOrFreerelTask.is_done(%s): marked "
                             "as done but target file %s does not exist" % 
-                            (self.name, self.params[self.targetkey]))
-        return self.targetkey in self.params
+                            (self.name, self.state["outputfile"]))
+        return "outputfile" in self.state
     
     def updateObserver(self, message):
         if isinstance(message, Polynomial):
@@ -522,8 +501,8 @@ class FactorBaseOrFreerelTask(Task):
             pass
     
     def get_filename(self):
-        if self.targetkey in self.params:
-            return self.params[self.targetkey]
+        if "outputfile" in self.state:
+            return self.state["outputfile"]
         else:
             return None
 
@@ -559,15 +538,17 @@ class SievingTask(Task):
         super().__init__(*args, dependencies = (polyselect, factorbase), **kwargs)
         self.polyselect = polyselect
         self.factorbase = factorbase
-        self.params.setdefault("qmin", self.params["alim"])
-        self.params.setdefault("qnext", int(self.params["qmin"]))
-        self.params.setdefault("rels_found", 0)
+        # qmin is optional, but if it exists, should be use in preference to alim
+        if "qmin" in self.params:
+            self.state.setdefault("qnext", int(self.params["qmin"]))
+        self.state.setdefault("qnext", int(self.params["alim"]))
+        self.state.setdefault("rels_found", 0)
         self.files = wudb.DictDbAccess(self.db, self.tablename("files"))
     
-    def run(self, parameters = None):
+    def run(self):
         self.logger.debug("Enter SievingTask.run(" + self.name + ")")
-        super().run(parameters = parameters)
-
+        super().run()
+        
         # Get best polynomial found by polyselect
         poly = self.polyselect.get_poly()
         if not poly:
@@ -579,7 +560,7 @@ class SievingTask(Task):
         while not self.is_done():
             args = ()
             kwargs = self.progparams[0].copy()
-            q0 = self.params["qnext"]
+            q0 = self.state["qnext"]
             q1 = q0 + int(self.params["qrange"])
             outputfile = self.make_output_filename("%d-%d" % (q0, q1))
             kwargs["q0"] = str(q0)
@@ -590,11 +571,11 @@ class SievingTask(Task):
             p = self.programs[0](args, kwargs)
             p.run()
             p.wait()
-            self.params["qnext"] = q1
+            self.state["qnext"] = q1
             self.add_files([outputfile])
             self.logger.info("Found %d relations in %s, total is now %d", 
                              self.files[outputfile], outputfile, 
-                             self.params["rels_found"])
+                             self.state["rels_found"])
             self.notifyObservers({self.name, outputfile})
         self.logger.debug("Exit SievingTask.run(" + self.name + ")")
         return
@@ -618,7 +599,7 @@ class SievingTask(Task):
             if rels == None:
                 raise Exception("Siever output file %s invalid" % filename)
             self.files[filename] = rels
-            self.params["rels_found"] += rels
+            self.state["rels_found"] += rels
     
     def get_filenames(self):
         return self.files.keys()
@@ -628,12 +609,12 @@ class SievingTask(Task):
         for a given file
         """
         if filename == None:
-            return self.params["rels_found"]
+            return self.state["rels_found"]
         else:
             return self.files[filename]
     
     def is_done(self):
-        return self.params["rels_found"] >= int(self.params["rels_wanted"]) 
+        return self.state["rels_found"] >= int(self.params["rels_wanted"]) 
 
 
 class Duplicates1Task(Task):
@@ -658,9 +639,9 @@ class Duplicates1Task(Task):
         self.slice_relcounts.setdefault(
             None, {str(i): 0 for i in range(0, self.nr_slices)})
     
-    def run(self, parameters = None):
+    def run(self):
         self.logger.debug("Enter Duplicates1Task.run(" + self.name + ")")
-        super().run(parameters = parameters)
+        super().run()
         # Check that previously split files were split into the same number
         # of pieces that we want now
         for (infile, parts) in self.already_split_input.items():
@@ -815,9 +796,9 @@ class Duplicates2Task(Task):
         super().__init__(*args, dependencies = (duplicates1,), **kwargs)
         self.duplicates1 = duplicates1
     
-    def run(self, parameters = None):
+    def run(self):
         self.logger.debug("Enter Duplicates2Task.run(" + self.name + ")")
-        super().run(parameters = parameters)
+        super().run()
         nr_slices = self.duplicates1.get_nr_slices()
         for i in range(0, nr_slices):
             files = self.duplicates1.get_filenames(i)
@@ -846,9 +827,9 @@ class PurgeTask(Task):
         super().__init__(*args, dependencies = (duplicates2,), **kwargs)
         self.duplicates2 = duplicates2
 
-    def run(self, parameters = None):
+    def run(self):
         self.logger.debug("Enter PurgeTask.run(" + self.name + ")")
-        super().run(parameters = parameters)
+        super().run()
         if not self.is_done():
             args = ()
             kwargs = self.progparams[0].copy()
@@ -869,9 +850,9 @@ class MergeTask(Task):
     def __init__(self, freerel, unique, *args, **kwargs):
         super().__init__(*args, dependencies = (freerel, unique), **kwargs)
 
-    def run(self, parameters = None):
+    def run(self):
         self.logger.debug("Enter MergeTask.run(" + self.name + ")")
-        super().run(parameters = parameters)
+        super().run()
         if not self.is_done():
             args = ()
             kwargs = self.progparams[0].copy()
@@ -892,9 +873,9 @@ class LinAlgTask(Task):
     def __init__(self, merge, *args, **kwargs):
         super().__init__(*args, dependencies = (merge,), **kwargs)
 
-    def run(self, parameters = None):
+    def run(self):
         self.logger.debug("Enter LinAlgTask.run(" + self.name + ")")
-        super().run(parameters = parameters)
+        super().run()
         if not self.is_done():
             args = ()
             kwargs = self.progparams[0].copy()
@@ -917,9 +898,9 @@ class SqrtTask(Task):
         dep = (polyselect, freerel, sieving, merge)
         super().__init__(*args, dependencies = dep, **kwargs)
 
-    def run(self, parameters = None):
+    def run(self):
         self.logger.debug("Enter SqrtTask.run(" + self.name + ")")
-        super().run(parameters = parameters)
+        super().run()
         if not self.is_done():
             args = ()
             kwargs = self.progparams[0].copy()
