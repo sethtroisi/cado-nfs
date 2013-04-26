@@ -1083,12 +1083,17 @@ fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
     }
     ASSERT (nlogp > oldlogp);
 
-    if (nlogp == 1) /* typical case */
+    if (nlogp == 1) /* typical case: this is the first occurrence of p */
         fb_cur->plog = fb_log (p, log_scale, 0.);
-    else {
+    else
+      /* p already occurred before, and was taken into account to the power
+         'oldlogp', with bias 'ol' since it was rounded to an integer.
+         We now want to take into account the extra contribution from
+         p^oldlogp to p^nlogp. */
+      {
         double ol = fb_log (fb_pow (p, oldlogp), log_scale, 0.);
         fb_cur->plog = fb_log (fb_pow (p, nlogp), log_scale, - ol);
-    }
+      }
 
     /* Read roots */
     fb_read_roots(fb_cur, lineptr, linenr);
