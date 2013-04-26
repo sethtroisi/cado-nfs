@@ -98,7 +98,11 @@ uint32_t * H, unsigned long K, unsigned int ab_base)
             ASSERT_ALWAYS(rc >= 0);
 
             f_out = fopen_maybe_compressed2(oname_tmp, "w", &p_out, NULL);
-            ASSERT_ALWAYS(f_out != NULL);
+            if (f_out == NULL) {
+              fprintf (stderr, "Could not open file %s for writing: %s\n", 
+                       oname_tmp, strerror(errno));
+              exit (EXIT_FAILURE);
+            }
         } else {
             f_out = NULL;
         }
