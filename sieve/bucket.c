@@ -23,7 +23,8 @@ init_bucket_array(const int n_bucket, const int bucket_size)
       malloc_check (n_bucket * sizeof(bucket_update_t *));
 
 #ifdef  ONE_BIG_MALLOC
-    *BA.bucket_start = malloc_aligned (n_bucket * bucket_size * sizeof(bucket_update_t), 64);
+    BA.bucket_start[0] = (bucket_update_t *)
+      malloc_check (n_bucket * bucket_size * sizeof(bucket_update_t));
 #endif
 
     for (i = 0; i < n_bucket; ++i) {
@@ -33,7 +34,8 @@ init_bucket_array(const int n_bucket, const int bucket_size)
 #ifdef  ONE_BIG_MALLOC
         BA.bucket_start[i] = BA.bucket_start[0] + i * bucket_size;
 #else
-   	BA.bucket_start[i] = malloc_aligned (bucket_size * sizeof(bucket_update_t), 64);
+        BA.bucket_start[i] = (bucket_update_t *)
+          malloc_check (bucket_size * sizeof(bucket_update_t));
 #endif
         BA.bucket_write[i] = BA.bucket_start[i];
         BA.bucket_read[i] = BA.bucket_start[i];
