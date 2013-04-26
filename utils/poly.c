@@ -303,7 +303,7 @@ void poly_set_zero(poly_t f) {
   f->deg = -1;
 }
 
-/* Set coefficient for the i-th term. */
+/* Set mpz_t coefficient for the i-th term. */
 void poly_setcoeff(poly_t f, int i, const mpz_t z) {
   int j;
   if (i >= f->alloc) {
@@ -314,6 +314,21 @@ void poly_setcoeff(poly_t f, int i, const mpz_t z) {
     f->alloc = i+1;
   }
   mpz_set(f->coeff[i], z);
+  if (i >= f->deg)
+    cleandeg(f, i);
+}
+
+/* Set signed int coefficient for the i-th term. */
+void poly_setcoeff_si(poly_t f, int i, int z) {
+  int j;
+  if (i >= f->alloc) {
+    f->coeff = (mpz_t *)realloc(f->coeff, (i+1)*sizeof(mpz_t));
+    ASSERT (f->coeff != NULL);
+    for (j = f->alloc; j <= i; ++j)
+      mpz_init(f->coeff[j]);
+    f->alloc = i+1;
+  }
+  mpz_set_si(f->coeff[i], z);
   if (i >= f->deg)
     cleandeg(f, i);
 }
