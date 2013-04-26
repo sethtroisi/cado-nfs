@@ -31,7 +31,22 @@ import cadologger
 # that don't overwrite. Or maybe two ways to specify external params:
 # --defaults which does not overwrite, and --forceparam which does
 
-class Task(patterns.Observable, patterns.Observer):
+class DbDictAccess(object):
+    """ Base class that lets subclasses create DB-backed dictionaries
+    on a database whose name is specified in the db parameter to __init__
+    """
+    
+    def __init__(self, db, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if db is None:
+            raise Exception("The db parameter is required")
+        self.__db = db
+
+    def make_db_dict(self, name):
+        return wudb.DictDbAccess(self.__db, name)
+
+
+class Task(patterns.Observable, patterns.Observer, DbDictAccess):
     """ A base class that represents one task that needs to be processed. 
     
     Sub-classes must define class variables:
@@ -48,7 +63,7 @@ class Task(patterns.Observable, patterns.Observer):
     # Parameters that all tasks use
     paramnames = ("name", "workdir")
     
-    def __init__(self, dependencies, *args, db = None, parameters = None, \
+    def __init__(self, dependencies, *args, parameters = None, \
                 **kwargs):
         ''' Sets up a database connection and a DB-backed dictionary for 
         parameters. Reads parameters from DB, and merges with hierarchical
@@ -56,7 +71,7 @@ class Task(patterns.Observable, patterns.Observer):
         parameters argument do not override values in the DB-backed 
         parameter dictionary.
         '''
-
+        
         super().__init__(*args, **kwargs)
         if dependencies:
             self.dependencies = dependencies
@@ -71,8 +86,7 @@ class Task(patterns.Observable, patterns.Observer):
             self.logger.debug("Enter Task.__init__(): parameters = %s", 
                               parameters)
         # DB-backed dictionary with the state of this task
-        self.db = db
-        self.state = wudb.DictDbAccess(self.db, self.tablename())
+        self.state = self.make_db_dict(self.tablename())
         self.logger.debug("%s: state = %s", self.title, self.state)
         # Derived class must define name
         # Set default parametes for this task, if any are given
@@ -153,18 +167,7 @@ class Task(patterns.Observable, patterns.Observer):
                 self.params["workdir"], os.sep, self.params["name"], 
                 self.name, os.sep)
     
-    def check_input_files(self, filenames):
-        """ Check that the files in "filenames" exist.
-        
-        Raises IOError if any files do not exists, return None
-        """
-        for filename in filenames:
-            if not os.path.isfile(filename):
-                raise IOError("%s input file %s does not exist" 
-                              % (self.title, filename))
-        return
-    
-    def check_output_files(self, filenames, shouldexist):
+    def check_files_exist(self, filenames, filedesc, shouldexist):
         """ Check that the output files in "filenames" exist or don't exist, 
         according to shouldexist.
         
@@ -173,11 +176,22 @@ class Task(patterns.Observable, patterns.Observer):
         for f in filenames:
             exists = os.path.isfile(f)
             if shouldexist and not exists:
-                raise IOError("%s output file %s does not exist" % 
-                                (self.title, f))
+                raise IOError("%s %s file %s does not exist" % 
+                                (self.title, filedesc, f))
             elif not shouldexist and exists:
-                raise IOError("%s output file %s already exists" % 
-                                (self.title, f))
+                raise IOError("%s %s file %s already exists" % 
+                                (self.title, filedesc, f))
+        return
+    
+    def make_directories(self, extra = None):
+        basedir = self.make_output_dirname()
+        if not os.path.isdir(basedir):
+            os.mkdir(basedir)
+        if extra:
+            for subdir in extra:
+                dirname = self.make_output_dirname(subdir)
+                if not os.path.isdir(dirname):
+                    os.mkdir(dirname)
         return
     
     def submit(self, commands, inputfiles, outputfiles, tempfiles):
@@ -219,6 +233,28 @@ class Task(patterns.Observable, patterns.Observer):
     def updateObserver(self, message):
         pass
 
+class FilesCreator(DbDictAccess):
+    """ A base class for classes that produce a list of output files, with
+    some information stored with each file (e.g., nr. of relations). This
+    info is stored in the form of a DB-backed dictionary
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.output_files = self.make_db_dict(self.tablename("outputfiles"))
+    
+    def add_output_files(self, filenames):
+        """ Adds a dict of files to the list of existing output files """
+        for (filename, value) in filenames.items():
+            if filename in self.output_files:
+                raise Exception("%s already in output files table" % filename)
+            self.output_files[filename] = value
+    
+    def get_output_filenames(self, condition = None):
+        if condition is None:
+            return self.output_files.keys()
+        else:
+            return [f for (f,s) in self.output_files.items() if s == condition]
+    
 
 class ClientServerTask(Task):
     def __init__(self, server = None, *args, **kwargs):
@@ -526,7 +562,7 @@ class FreeRelTask(FactorBaseOrFreerelTask):
     target = "freerel"
 
 
-class SievingTask(Task):
+class SievingTask(Task, FilesCreator):
     """ Does the sieving, uses client/server """
     name = "sieving"
     title = "Lattice Sieving"
@@ -543,7 +579,6 @@ class SievingTask(Task):
             self.state.setdefault("qnext", int(self.params["qmin"]))
         self.state.setdefault("qnext", int(self.params["alim"]))
         self.state.setdefault("rels_found", 0)
-        self.files = wudb.DictDbAccess(self.db, self.tablename("files"))
     
     def run(self):
         self.logger.debug("Enter SievingTask.run(" + self.name + ")")
@@ -563,6 +598,7 @@ class SievingTask(Task):
             q0 = self.state["qnext"]
             q1 = q0 + int(self.params["qrange"])
             outputfile = self.make_output_filename("%d-%d" % (q0, q1))
+            self.check_files_exist([outputfile], "output", shouldexist=False)
             kwargs["q0"] = str(q0)
             kwargs["q1"] = str(q1)
             kwargs["poly"] = polyfile
@@ -572,16 +608,17 @@ class SievingTask(Task):
             p.run()
             p.wait()
             self.state["qnext"] = q1
-            self.add_files([outputfile])
+            rels = self.parse_output_file(outputfile)
+            self.add_output_files({outputfile: rels})
+            self.state["rels_found"] += rels
             self.logger.info("Found %d relations in %s, total is now %d", 
-                             self.files[outputfile], outputfile, 
-                             self.state["rels_found"])
+                             rels, outputfile, self.state["rels_found"])
             self.notifyObservers({self.name, outputfile})
         self.logger.debug("Exit SievingTask.run(" + self.name + ")")
         return
     
     @staticmethod
-    def check_relfile(filename):
+    def parse_output_file(filename):
         size = os.path.getsize(filename)
         with open(filename, "r") as f:
             f.seek(max(size - 1000, 0))
@@ -591,19 +628,6 @@ class SievingTask(Task):
                     return int(match.group(1))
         return None
     
-    def add_files(self, filenames):
-        """ Adds a list of files to the list of existing output files and
-        adds the relation count of those files to the running total """
-        for filename in filenames:
-            rels = self.check_relfile(filename)
-            if rels == None:
-                raise Exception("Siever output file %s invalid" % filename)
-            self.files[filename] = rels
-            self.state["rels_found"] += rels
-    
-    def get_filenames(self):
-        return self.files.keys()
-    
     def get_nrels(self, filename = None):
         """ Return the number of relations found, either the total so far or
         for a given file
@@ -611,13 +635,13 @@ class SievingTask(Task):
         if filename == None:
             return self.state["rels_found"]
         else:
-            return self.files[filename]
+            return self.output_files[filename]
     
     def is_done(self):
         return self.state["rels_found"] >= int(self.params["rels_wanted"]) 
 
 
-class Duplicates1Task(Task):
+class Duplicates1Task(Task, FilesCreator):
     """ Removes duplicate relations """
     name = "duplicates1"
     title = "Filtering: Duplicate Removal, splitting pass"
@@ -629,12 +653,8 @@ class Duplicates1Task(Task):
         super().__init__(*args, dependencies = (sieving,), **kwargs)
         self.sieving = sieving
         self.nr_slices = 2**int(self.params["nslices_log"])
-        self.already_split_input = \
-            wudb.DictDbAccess(self.db, self.tablename("infiles"))
-        self.already_split_output = \
-            wudb.DictDbAccess(self.db, self.tablename("outfiles"))
-        self.slice_relcounts = \
-            wudb.DictDbAccess(self.db, self.tablename("counts"))
+        self.already_split_input = self.make_db_dict(self.tablename("infiles"))
+        self.slice_relcounts = self.make_db_dict(self.tablename("counts"))
         # Default slice counts to 0, in single DB commit
         self.slice_relcounts.setdefault(
             None, {str(i): 0 for i in range(0, self.nr_slices)})
@@ -655,29 +675,29 @@ class Duplicates1Task(Task):
                                 "now %d parts requested",
                                 infile, int(parts), self.nr_slices)
             for outfile in self.make_output_filenames(infile):
-                if not outfile in self.already_split_output:
+                if not outfile in self.output_files:
                     # TODO: How to recover from this error? Just re-split again?
                     raise Exception("Output file %s missing in database for "
                                     "supposedly split input file %s" %
                                     (outfile, infile))
-            
         
         # Check that previously split files do, in fact, exist.
         # FIXME: Do we want this? It may be slow when there are many files.
         # Reading the directory and comparing the lists would probably be
         # faster than individual lookups.
-        self.check_output_files(self.get_filenames(), shouldexist=True)
+        self.check_files_exist(self.get_output_filenames(), "output",
+                               shouldexist=True)
         
-        files = self.sieving.get_filenames()
+        files = self.sieving.get_output_filenames()
         newfiles = [f for f in files if not f in self.already_split_input]
         self.logger.debug ("%s: new files to split are: %s", 
                            self.title, newfiles)
         
         if newfiles:
-            self.make_directories()
+            self.make_directories(map(str, range(0, self.nr_slices)))
             # TODO: can we recover from missing input files? Ask Sieving to
             # generate them again? Just ignore the missing ones?
-            self.check_input_files(newfiles)
+            self.check_files_exist(newfiles, "input", shouldexist = True)
             # Split the new files
             for f in newfiles:
                 outfilenames = self.make_output_filenames(f)
@@ -694,7 +714,7 @@ class Duplicates1Task(Task):
                     # TODO: how to recover from existing output files?
                     # Simply re-split? Check whether they all exist and assume 
                     # they are correct if they do?
-                    self.check_output_files(outfilenames.keys(), 
+                    self.check_files_exist(outfilenames.keys(), "output", 
                                             shouldexist=False)
                     kwargs = self.progparams[0].copy()
                     kwargs["out"] = self.make_output_dirname()
@@ -705,14 +725,14 @@ class Duplicates1Task(Task):
                     # TODO: How to recover from error? Presumably a dup1
                     # process failed, but that should raise a return code
                     # exception
-                    self.check_output_files(outfilenames.keys(),
+                    self.check_files_exist(outfilenames.keys(), "output", 
                                             shouldexist=True)
                     stderrlines = stderr.decode("ascii").splitlines()
                     current_counts = self.parse_slice_counts(stderrlines)
                 for (idx, count) in enumerate(current_counts):
                     self.slice_relcounts[str(idx)] += count
                 self.already_split_input[f] = self.nr_slices
-                self.already_split_output.update(outfilenames)
+                self.add_output_files(outfilenames)
         totals = ["%d: %d" % (i, self.slice_relcounts[str(i)])
                   for i in range(0, self.nr_slices)]
         self.logger.info("Relations per slice: %s", ", ".join(totals))
@@ -740,16 +760,6 @@ class Duplicates1Task(Task):
             return {self.make_output_filename(name, I):I \
                     for I in range(0, self.nr_slices)}
     
-    def make_directories(self):
-        basedir = self.make_output_dirname()
-        if not os.path.isdir(basedir):
-            os.mkdir(basedir)
-        for I in range(0, self.nr_slices):
-            dirname = self.make_output_dirname(str(I))
-            if not os.path.isdir(dirname):
-                os.mkdir(dirname)
-        return
-    
     def parse_slice_counts(self, text):
         """ Takes line of text and looks for slice counts as printed by dup1
         """
@@ -772,19 +782,11 @@ class Duplicates1Task(Task):
     def get_nr_slices(self):
         return self.nr_slices
     
-    def get_filenames(self, slice_nr = None):
-        """ Return an array of filenames of the already split output files
-        
-        If slice_nr is given, return only files for that slice
-        """
-        return [f for (f,s) in self.already_split_output.items() \
-                    if slice_nr is None or s == slice_nr]
-    
     def get_slice_relcount(self, idx):
         return self.slice_relcounts[str(idx)]
     
 
-class Duplicates2Task(Task):
+class Duplicates2Task(Task, FilesCreator):
     """ Removes duplicate relations """
     name = "duplicates2"
     title = "Filtering: Duplicate Removal, removal pass"
@@ -797,16 +799,16 @@ class Duplicates2Task(Task):
         self.duplicates1 = duplicates1
     
     def run(self):
+        # dup2 -K 136750 -out /tmp/cado.wNhDsCM6BS/c59.nodup/0 -filelist /tmp/cado.wNhDsCM6BS/c59.filelist -basepath /tmp/cado.wNhDsCM6BS/c59.nodup/0
         self.logger.debug("Enter Duplicates2Task.run(" + self.name + ")")
         super().run()
         nr_slices = self.duplicates1.get_nr_slices()
         for i in range(0, nr_slices):
-            files = self.duplicates1.get_filenames(i)
+            files = self.duplicates1.get_output_filenames(i)
             rel_count = self.duplicates1.get_slice_relcount(i)
-            
-            files = self.duplicates1.get_filenames()
+            self.make_directories(str(i))
             kwargs = self.progparams[0].copy()
-            kwargs["rel_count"] = str(rel_count)
+            kwargs["rel_count"] = str(rel_count * 12 // 10)
             kwargs["output_directory"] = self.make_output_dirname(str(i))
             p = self.programs[0](files, kwargs)
             p.run()
