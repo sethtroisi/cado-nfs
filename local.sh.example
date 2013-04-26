@@ -166,4 +166,4 @@
 #
 # By default, mpicc calls the default compiler (gcc or g++) installed on your
 # computer. If this default compiler is too old or buggy, you might want to use
-# OMPI_CC and/or OMPI_CXX to specify a newer compiler.
+# OMPI_CC and/or OMPI_CXX to specify a newer compiler (this is for Open MPI).
