@@ -591,14 +591,10 @@ class SievingTask(Task):
             p.run()
             p.wait()
             self.params["qnext"] = q1
-            rels = self.check_relfile(outputfile)
-            if rels == None:
-                raise Exception("Siever output file %s invalid" % outputfile)
-            total = self.params["rels_found"] + rels
-            self.params["rels_found"] = total
-            self.files[outputfile] = rels
+            self.add_files([outputfile])
             self.logger.info("Found %d relations in %s, total is now %d", 
-                             rels, outputfile, total)
+                             self.files[outputfile], outputfile, 
+                             self.params["rels_found"])
             self.notifyObservers({self.name, outputfile})
         self.logger.debug("Exit SievingTask.run(" + self.name + ")")
         return
@@ -613,6 +609,16 @@ class SievingTask(Task):
                 if match:
                     return int(match.group(1))
         return None
+    
+    def add_files(self, filenames):
+        """ Adds a list of files to the list of existing output files and
+        adds the relation count of those files to the running total """
+        for filename in filenames:
+            rels = self.check_relfile(filename)
+            if rels == None:
+                raise Exception("Siever output file %s invalid" % filename)
+            self.files[filename] = rels
+            self.params["rels_found"] += rels
     
     def get_filenames(self):
         return self.files.keys()
