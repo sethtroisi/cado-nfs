@@ -91,15 +91,14 @@ fb_fprint (FILE *fd, const factorbase_degn_t *fb)
     }
 }
 
-/* Add fb_add to (void *)fb + fbsize. If a realloc failed, returns NULL.
+/* Add fb_add to (void *)fb + fbsize. Return 1 on success, 0 if realloc failed
    fb_add->size need not be set by caller, this function does it */
 
-static factorbase_degn_t *
-fb_add_to (factorbase_degn_t *fb, size_t *fbsize, size_t *fballoc,
+static int 
+fb_add_to (factorbase_degn_t **fb, size_t *fbsize, size_t *fballoc,
 	   const size_t allocblocksize, factorbase_degn_t *fb_add)
 {
-  const size_t fb_addsize  = fb_entrysize (fb_add);
-  factorbase_degn_t *newfb = fb;
+  const size_t fb_addsize = fb_entrysize (fb_add);
 
   ASSERT(fb_addsize <= allocblocksize); /* Otherwise we still might not have
 					   enough mem after the realloc */
@@ -107,23 +106,25 @@ fb_add_to (factorbase_degn_t *fb, size_t *fbsize, size_t *fballoc,
   /* Do we need more memory for fb? */
   if (*fballoc < *fbsize + fb_addsize)
     {
+      factorbase_degn_t *newfb;
       size_t newalloc = *fballoc + allocblocksize;
-      newfb = (factorbase_degn_t *) realloc (fb, newalloc);
+      newfb = (factorbase_degn_t *) realloc (*fb, newalloc);
       if (newfb == NULL)
 	{
 	  fprintf (stderr,
-		   "Could not reallocate factor base to %lu bytes\n",
-		   (unsigned long) *fballoc);
-	  return NULL;
+		   "Could not reallocate factor base to %zu bytes\n",
+		   *fballoc);
+	  return 0;
 	}
       *fballoc = newalloc;
+      *fb = newfb;
     }
-  memcpy (fb_skip(newfb, *fbsize), fb_add, fb_addsize);
-  fb_skip(newfb, *fbsize)->size = fb_addsize;
+  memcpy (fb_skip(*fb, *fbsize), fb_add, fb_addsize);
+  fb_skip(*fb, *fbsize)->size = fb_addsize;
 
   *fbsize += fb_addsize;
 
-  return newfb;
+  return 1;
 }
 
 /* Sort n primes in array *primes into ascending order */
@@ -313,7 +314,7 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
 		const int verbose, const int projective, FILE *output)
 {
   fbprime_t p;
-  factorbase_degn_t *fb = NULL, *fb_cur, *fb_new;
+  factorbase_degn_t *fb = NULL, *fb_cur;
   size_t fbsize = 0, fballoc = 0, pow_len = 0;
   const size_t allocblocksize = 1 << 20;
   unsigned long logp;
@@ -403,15 +404,13 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
 	  fprintf (output, " " FBPRIME_FORMAT , q);
 	}
 
-      fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
-      if (fb_new == NULL)
+      if (!fb_add_to (&fb, &fbsize, &fballoc, allocblocksize, fb_cur))
 	{
 	  free (fb);
 	  fb = NULL;
 	  break;
 	}
       /* fb_fprint_entry (stdout, fb_cur); */
-      fb = fb_new;
 
       /* FIXME: handle prime powers */
     }
@@ -423,10 +422,10 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
       fb_cur->p = FB_END;
       fb_cur->invp = -1L;
       fb_cur->nr_roots = 0;
-      fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
-      if (fb_new == NULL)
+      if (!fb_add_to (&fb, &fbsize, &fballoc, allocblocksize, fb_cur)) {
 	free (fb);
-      fb = fb_new;
+	fb = NULL;
+      }
     }
 
   free (fb_cur);
@@ -460,7 +459,7 @@ fb_make_linear_powers (mpz_t *poly, const fbprime_t bound, const double log_scal
 		const int verbose)
 {
   fbprime_t p;
-  factorbase_degn_t *fb = NULL, *fb_cur, *fb_new;
+  factorbase_degn_t *fb = NULL, *fb_cur;
   size_t fbsize = 0, fballoc = 0;
   const size_t allocblocksize = 1 << 20;
 
@@ -556,15 +555,13 @@ fb_make_linear_powers (mpz_t *poly, const fbprime_t bound, const double log_scal
 	modul_clear (r2, m);
 	modul_clearmod (m);
 
-	fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
-	if (fb_new == NULL)
+	if (!fb_add_to (&fb, &fbsize, &fballoc, allocblocksize, fb_cur))
 	{
 	  free (fb);
 	  fb = NULL;
 	  break;
 	}
 	/* fb_fprint_entry (stdout, fb_cur); */
-	fb = fb_new;
 
 	/* get next power of p */
 	llq *= (uint64_t)p;
@@ -581,10 +578,10 @@ fb_make_linear_powers (mpz_t *poly, const fbprime_t bound, const double log_scal
       fb_cur->p = FB_END;
       fb_cur->invp = -1L;
       fb_cur->nr_roots = 0;
-      fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
-      if (fb_new == NULL)
+      if (!fb_add_to (&fb, &fbsize, &fballoc, allocblocksize, fb_cur)) {
 	free (fb);
-      fb = fb_new;
+	fb = NULL;
+      }
     }
 
   free (fb_cur);
@@ -598,7 +595,7 @@ factorbase_degn_t *
 fb_read_addproj (const char *filename, const double log_scale,
                  const int verbose, const fbprime_t *proj_primes)
 {
-  factorbase_degn_t *fb = NULL, *fb_cur, *fb_new;
+  factorbase_degn_t *fb = NULL, *fb_cur;
   FILE *fbfile;
   size_t fbsize = 0, fballoc = 0;
   // too small linesize led to a problem with rsa768;
@@ -709,15 +706,13 @@ fb_read_addproj (const char *filename, const double log_scale,
 	      modul_clearmod (m);
 	    }
 	
-          fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
-          if (fb_new == NULL)
+          if (!fb_add_to (&fb, &fbsize, &fballoc, allocblocksize, fb_cur))
             {
               free (fb);
               fb = NULL;
               break;
             }
           /* fb_fprint_entry (stdout, fb_cur); */
-          fb = fb_new;
           maxprime = fb_cur->p;
           nr_primes++;
         }
@@ -825,15 +820,13 @@ fb_read_addproj (const char *filename, const double log_scale,
 	  modul_clearmod (m);
 	}
 
-      fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
-      if (fb_new == NULL)
+      if (!fb_add_to (&fb, &fbsize, &fballoc, allocblocksize, fb_cur))
 	{
 	  free (fb);
 	  fb = NULL;
 	  break;
 	}
       /* fb_fprint_entry (stdout, fb_cur); */
-      fb = fb_new;
       maxprime = fb_cur->p;
       nr_primes++;
     }
@@ -843,10 +836,10 @@ fb_read_addproj (const char *filename, const double log_scale,
       fb_cur->p = FB_END;
       fb_cur->invp = -1L;
       fb_cur->nr_roots = 0;
-      fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
-      if (fb_new == NULL)
+      if (!fb_add_to (&fb, &fbsize, &fballoc, allocblocksize, fb_cur)) {
 	free (fb);
-      fb = fb_new;
+	fb = NULL;
+      }
     }
 
   if (fb != NULL && verbose)
@@ -1106,23 +1099,24 @@ fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
    Primes and prime powers up to smalllim go into fb_small. If smalllim is 0,
    all primes go into fb_small, and nothing is written to fb_pieces.
    
-   If fb_small is not zero, then nr_pieces separate factor bases are made for
-   primes/powers > fb_small; factor base entries from the file are written to 
+   If smalllim is not 0, then nr_pieces separate factor bases are made for
+   primes/powers > smalllim; factor base entries from the file are written to 
    these pieces in round-robin manner.
 
    Pointers to the allocated memory of the factorbases are written to fb_small 
    and, if smalllim > 0, to fb_pieces[0, ..., nr_pieces-1].
 */
 
-void 
+int  
 fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces, 
                const char * const filename, const double log_scale, 
                const fbprime_t smalllim, const int nr_pieces, 
                const int verbose, const fbprime_t lim, const fbprime_t powlim)
 {
-    factorbase_degn_t *fb_cur, *fb_new, **target_fb;
+    factorbase_degn_t *fb_cur;
     FILE *fbfile;
     size_t fbsize = 0, fballoc = 0;
+    size_t *piece_size = NULL, *piece_alloc = NULL;
     // too small linesize led to a problem with rsa768;
     // it would probably be a good idea to get rid of fgets
     const size_t linesize = 1000;
@@ -1136,7 +1130,7 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces,
     fbfile = fopen (filename, "r");
     if (fbfile == NULL) {
         fprintf (stderr, "# Could not open file %s for reading\n", filename);
-        return NULL;
+        return 0;
     }
 
     fb_cur = (factorbase_degn_t *) malloc (sizeof (factorbase_degn_t) +
@@ -1144,7 +1138,28 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces,
     if (fb_cur == NULL) {
         fprintf (stderr, "# Could not allocate memory for factor base\n");
         fclose (fbfile);
-        return NULL;
+        return 0;
+    }
+
+    *fb_small = NULL; /* To make realloc() allocate */
+    if (smalllim > 0) {
+        int i;
+        piece_size = malloc(nr_pieces * sizeof(size_t));
+        piece_alloc = malloc(nr_pieces * sizeof(size_t));
+        if (piece_size == NULL || piece_alloc == NULL) {
+            fprintf (stderr, "# %s(): could not allocate memory for "
+                     "piece_size or piece_alloc\n", __func__);
+            free (piece_size);
+            free (piece_alloc);
+            free (fb_cur);
+            fclose (fbfile);
+            return 0;
+        }
+        for (i = 0; i < nr_pieces; i++) {
+            fb_pieces[i] = NULL;
+            piece_size[i] = 0;
+            piece_alloc[i] = 0;
+        }
     }
 
     while (!feof(fbfile)) {
@@ -1167,22 +1182,22 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces,
         }
 
         /* To which factor base do we add? */
-        if (smalllim == 0 || fb_cur->p <= smalllim)
-            target_fb = fb_small;
-        else {
-            target_fb = &fb_pieces[nextpiece++];
-            if (nextpiece == nr_pieces)
+        if (smalllim == 0 || fb_cur->p <= smalllim) {
+            if (!fb_add_to (fb_small, &fbsize, &fballoc, allocblocksize, fb_cur)) {
+                error = 1;
+                break;
+            }
+        } else {
+            if (!fb_add_to (&fb_pieces[nextpiece], &piece_size[nextpiece], 
+                            &piece_alloc[nextpiece], allocblocksize, fb_cur)) {
+                error = 1;
+                break;
+            }
+            if (++nextpiece == nr_pieces)
               nextpiece = 0;
         }
 
-        fb_new = fb_add_to (*target_fb, &fbsize, &fballoc, allocblocksize, 
-                            fb_cur);
-        if (fb_new == NULL) {
-            error = 1;
-            break;
-        }
         /* fb_fprint_entry (stdout, fb_cur); */
-        *target_fb = fb_new;
         maxprime = fb_cur->p;
         nr_primes++;
     }
@@ -1193,22 +1208,15 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces,
         fb_cur->invp = -1L;
         fb_cur->nr_roots = 0;
         
-        fb_new = fb_add_to (*fb_small, &fbsize, &fballoc, allocblocksize, 
-                            fb_cur);
-        if (fb_new == NULL)
+        
+        if (!fb_add_to (fb_small, &fbsize, &fballoc, allocblocksize, fb_cur))
             error = 1;
-        else
-            *fb_small = fb_new;
-        for (nextpiece = 0; smalllim > 0 && nextpiece < nr_pieces;
-             nextpiece++) {
-            fb_new = fb_add_to (fb_pieces[nextpiece], &fbsize, &fballoc, 
-                                allocblocksize, fb_cur);
-            if (fb_new == NULL) {
-                error = 1;
-                break;
+        if (smalllim > 0) {
+            for (nextpiece = 0; !error && nextpiece < nr_pieces; nextpiece++) {
+                if (!fb_add_to (&fb_pieces[nextpiece], &fbsize, &fballoc, 
+                    allocblocksize, fb_cur))
+                    error = 1;
             }
-            else
-                fb_pieces[nextpiece] = fb_new;
         }
     }
     
@@ -1228,8 +1236,14 @@ fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces,
                 FBPRIME_FORMAT "\n", nr_primes, maxprime);
     }
 
+    if (smalllim > 0) {
+        free (piece_size);
+        free (piece_alloc);
+    }
+
     fclose (fbfile);
     free (fb_cur);
+    return 1;
 }
 
 
@@ -1237,7 +1251,11 @@ factorbase_degn_t *
 fb_read (const char * const filename, const double log_scale, 
          const int verbose, const fbprime_t lim, const fbprime_t powlim)
 {
-  fb_read_split();
+    factorbase_degn_t *fb;
+    if (!fb_read_split (&fb, NULL, filename, log_scale, 0, 0, verbose, lim, 
+                        powlim))
+        return NULL;
+    return fb;
 }
 
 
