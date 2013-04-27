@@ -1101,11 +1101,26 @@ fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
     return 1;
 }
 
-factorbase_degn_t *
-fb_read (const char * const filename, const double log_scale,
-         const int verbose, const fbprime_t lim, const fbprime_t powlim)
+/* Read a factor base file, splitting it into pieces.
+   
+   Primes and prime powers up to smalllim go into fb_small. If smalllim is 0,
+   all primes go into fb_small, and nothing is written to fb_pieces.
+   
+   If fb_small is not zero, then nr_pieces separate factor bases are made for
+   primes/powers > fb_small; factor base entries from the file are written to 
+   these pieces in round-robin manner.
+
+   Pointers to the allocated memory of the factorbases are written to fb_small 
+   and, if smalllim > 0, to fb_pieces[0, ..., nr_pieces-1].
+*/
+
+void 
+fb_read_split (factorbase_degn_t **fb_small, factorbase_degn_t **fb_pieces, 
+               const char * const filename, const double log_scale, 
+               const fbprime_t smalllim, const int nr_pieces, 
+               const int verbose, const fbprime_t lim, const fbprime_t powlim)
 {
-    factorbase_degn_t *fb = NULL, *fb_cur, *fb_new;
+    factorbase_degn_t *fb_cur, *fb_new, **target_fb;
     FILE *fbfile;
     size_t fbsize = 0, fballoc = 0;
     // too small linesize led to a problem with rsa768;
@@ -1116,6 +1131,7 @@ fb_read (const char * const filename, const double log_scale,
     const size_t allocblocksize = 1<<20; /* Allocate in MB chunks */
     fbprime_t maxprime = 0;
     unsigned long nr_primes = 0;
+    int nextpiece = 0, error = 0;
 
     fbfile = fopen (filename, "r");
     if (fbfile == NULL) {
@@ -1150,29 +1166,63 @@ fb_read (const char * const filename, const double log_scale,
             fb_cur->invp = - ularith_invmod ((unsigned long) fb_cur->p);
         }
 
-        fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
+        /* To which factor base do we add? */
+        if (smalllim == 0 || fb_cur->p <= smalllim)
+            target_fb = fb_small;
+        else {
+            target_fb = &fb_pieces[nextpiece++];
+            if (nextpiece == nr_pieces)
+              nextpiece = 0;
+        }
+
+        fb_new = fb_add_to (*target_fb, &fbsize, &fballoc, allocblocksize, 
+                            fb_cur);
         if (fb_new == NULL) {
-            free (fb);
-            fb = NULL;
+            error = 1;
             break;
         }
         /* fb_fprint_entry (stdout, fb_cur); */
-        fb = fb_new;
+        *target_fb = fb_new;
         maxprime = fb_cur->p;
         nr_primes++;
     }
 
-    if (fb != NULL) { /* If nothing went wrong so far, put the end-of-fb mark */
+    if (!error) {
+        /* If nothing went wrong so far, put the end-of-fb markers */
         fb_cur->p = FB_END;
         fb_cur->invp = -1L;
         fb_cur->nr_roots = 0;
-        fb_new = fb_add_to (fb, &fbsize, &fballoc, allocblocksize, fb_cur);
+        
+        fb_new = fb_add_to (*fb_small, &fbsize, &fballoc, allocblocksize, 
+                            fb_cur);
         if (fb_new == NULL)
-            free (fb);
-        fb = fb_new;
+            error = 1;
+        else
+            *fb_small = fb_new;
+        for (nextpiece = 0; smalllim > 0 && nextpiece < nr_pieces;
+             nextpiece++) {
+            fb_new = fb_add_to (fb_pieces[nextpiece], &fbsize, &fballoc, 
+                                allocblocksize, fb_cur);
+            if (fb_new == NULL) {
+                error = 1;
+                break;
+            }
+            else
+                fb_pieces[nextpiece] = fb_new;
+        }
     }
-
-    if (fb != NULL && verbose)
+    
+    /* If there was any error, free all the allocated memory */
+    if (error) {
+        free (*fb_small);
+        *fb_small = NULL;
+        for (nextpiece = 0; smalllim > 0 && nextpiece < nr_pieces; 
+             nextpiece++) {
+            free(fb_pieces[nextpiece]);
+            fb_pieces[nextpiece] = NULL;
+        }
+    }
+    if (!error && verbose)
     {
         printf ("# Factor base sucessfully read, %lu primes, largest was "
                 FBPRIME_FORMAT "\n", nr_primes, maxprime);
@@ -1180,10 +1230,18 @@ fb_read (const char * const filename, const double log_scale,
 
     fclose (fbfile);
     free (fb_cur);
-    return fb;
 }
 
-void
+
+factorbase_degn_t *
+fb_read (const char * const filename, const double log_scale, 
+         const int verbose, const fbprime_t lim, const fbprime_t powlim)
+{
+  fb_read_split();
+}
+
+
+void 
 fb_dump_degn (const factorbase_degn_t *fb, const char *filename)
 {
     FILE *f = fopen(filename, "wb");
