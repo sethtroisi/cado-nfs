@@ -58,7 +58,8 @@ print_pointorder (const unsigned long p, const unsigned long s,
 
 static int
 tryfactor (mpz_t N, const facul_strategy_t *strategy, 
-           const int verbose, const int printfactors, const int printnonfactors)
+           const int verbose, const int printfactors, const int printnonfactors, 
+           const int printcofactors)
 {
   unsigned long f[16];
   int facul_code;
@@ -73,6 +74,14 @@ tryfactor (mpz_t N, const facul_strategy_t *strategy,
       int j;
       for (j = 0; j < facul_code; j++)
         printf ("%lu ", f[j]);
+      if (printcofactors) {
+        mpz_t c;
+        mpz_init_set (c, N);
+        for (j = 0; j < facul_code; j++)
+          mpz_divexact_ui (c, c, f[j]);
+        gmp_printf ("%Zd", c);
+        mpz_clear (c);
+      }
       printf ("\n");
     }
   
@@ -108,6 +117,7 @@ void print_help (char *programname)
           "         numbers that are tried. Three: internal info from strategies\n");
   printf ("-vf      Print factors that are found\n");
   printf ("-vnf     Print input numbers where no factor was found\n");
+  printf ("-vcf     Print cofactor if any factors were found\n");
   printf ("-cof <n> Multiply each number to test by <num> before calling facul.\n"
 	  "         NOTE: facul does not report input numbers as factors,\n"
 	  "         with -p you MUST use -cof or no factors will be found\n");
@@ -130,6 +140,7 @@ int main (int argc, char **argv)
   int only_primes = 0, verbose = 0, quiet = 0;
   int printfactors = 0;
   int printnonfactors = 0;
+  int printcofactors = 0;
   int do_pointorder = 0;
   unsigned long po_sigma = 0, po_parameterization = 0;
   int inp_raw = 0;
@@ -288,6 +299,12 @@ int main (int argc, char **argv)
 	  argc -= 1;
 	  argv += 1;
 	}
+      else if (argc > 1 && strcmp (argv[1], "-vcf") == 0)
+	{
+	  printcofactors = 1;
+	  argc -= 1;
+	  argv += 1;
+	}
       else if (argc > 2 && strcmp (argv[1], "-inpstop") == 0)
 	{
 	  inpstop = strtoul (argv[2], NULL, 10);
@@ -387,7 +404,7 @@ int main (int argc, char **argv)
           else
 	    {
               mpz_mul_ui (N, cof, i);
-              if (tryfactor (N, strategy, verbose, printfactors, printnonfactors))
+              if (tryfactor (N, strategy, verbose, printfactors, printnonfactors, printcofactors))
                 {
                   hits++;
                   if (mod > 0)
@@ -429,7 +446,7 @@ int main (int argc, char **argv)
         else
           {
             mpz_mul (N, N, cof);
-            if (tryfactor (N, strategy, verbose, printfactors, printnonfactors))
+            if (tryfactor (N, strategy, verbose, printfactors, printnonfactors, printcofactors))
               hits++;
           }
       }
