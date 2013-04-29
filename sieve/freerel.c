@@ -132,11 +132,12 @@ Date:   Tue Feb 12 12:41:46 2008 +0000
     git-svn-id: svn+ssh://scm.gforge.inria.fr/svn/cado/trunk@801 de4796e2-0b1e-0
  */
 
-void
+unsigned long
 largeFreeRelations (cado_poly pol, char **fic, int verbose)
 {
     hashtable_t H;
-    int Hsizea, nprimes_alg = 0, nfree = 0;
+    int Hsizea, nprimes_alg = 0;
+    unsigned long nfree = 0;
     /*
     int need64 = (pol->rat->lpb > 32) || (pol->alg->lpb > 32);
     */
@@ -183,17 +184,17 @@ largeFreeRelations (cado_poly pol, char **fic, int verbose)
     if (verbose)
       fprintf (stderr, "nprimes_alg = %d\n", nprimes_alg);
     nfree = findFreeRelations(&H, pol, nprimes_alg);
-    if (verbose)
-      fprintf (stderr, "Found %d usable free relations\n", nfree);
     hashFree(&H);
+    return nfree;
 }
 
-int
+unsigned long 
 countFreeRelations(int *deg, char *roots)
 {
     FILE *ifile = fopen(roots, "r");
     char str[1024], str0[128], str1[128], str2[128], *t;
-    int nfree = 0, nroots;
+    int nroots;
+    unsigned long nfree = 0;
 
     *deg = -1;
     // look for the degree
@@ -274,27 +275,27 @@ addFreeRelations(char *roots, int deg)
     }
 }
 
-static void MAYBE_UNUSED
+static unsigned long MAYBE_UNUSED
 smallFreeRelations (char *fbfilename)
 {
     int deg;
-    int nfree = countFreeRelations (&deg, fbfilename);
-    fprintf (stderr, "# Free relations: %d\n", nfree);
+    unsigned long nfree = countFreeRelations (&deg, fbfilename);
     
     fprintf (stderr, "Handling free relations...\n");
     addFreeRelations (fbfilename, deg);
+    return nfree;
 }
 
 /* generate all free relations up to the large prime bound */
 
-static void MAYBE_UNUSED
+static unsigned long MAYBE_UNUSED
 allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax)
 {
-  unsigned long lpb, p, *roots;
+  unsigned long lpb, p, *roots, nfree = 0;
   int d = pol->alg->degree, i, n, proj;
 
   /* we generate all free relations up to the *minimum* of the two large
-     prime bounds, since larger primes will never occur on at least one side */
+     prime bounds, since larger primes will never occur on both sides */
   lpb = (pol->rat->lpb < pol->alg->lpb) ? pol->rat->lpb : pol->alg->lpb;
   ASSERT_ALWAYS(lpb < sizeof(unsigned long) * CHAR_BIT);
   lpb = 1UL << lpb;
@@ -318,11 +319,13 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax)
               if (proj)
                 printf (",%lx", p);
               printf ("\n");
+              nfree++;
             }
         }
     }
   getprime (0);
   free (roots);
+  return nfree;
 }
 
 static void
@@ -341,7 +344,7 @@ main (int argc, char *argv[])
     cado_poly cpoly;
     int nfic MAYBE_UNUSED;
     int verbose = 0, k;
-    unsigned long pmin = 2, pmax = 0;
+    unsigned long pmin = 2, pmax = 0, nfree;
 
     fbfilename = NULL;
     fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
@@ -406,13 +409,14 @@ main (int argc, char *argv[])
       {
         if (fbfilename == NULL)
           usage (argv0);
-	smallFreeRelations(fbfilename);
+	nfree = smallFreeRelations(fbfilename);
       }
     else
-      largeFreeRelations(cpoly, fic, verbose);
+      nfree = largeFreeRelations(cpoly, fic, verbose);
 #else
-    allFreeRelations (cpoly, pmin, pmax);
+    nfree = allFreeRelations (cpoly, pmin, pmax);
 #endif
+    fprintf (stderr, "# Free relations: %lu\n", nfree);
 
     cado_poly_clear (cpoly);
 
