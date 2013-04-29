@@ -264,7 +264,11 @@ class FilesCreator(DbDictAccess):
             return self.output_files.keys()
         else:
             return [f for (f,s) in self.output_files.items() if s == condition]
-    
+
+    def forget_output_filenames(self, filenames):
+        for f in filenames:
+            del(self.output_files[f])
+
 
 class ClientServerTask(Task):
     def __init__(self, server = None, *args, **kwargs):
@@ -526,7 +530,8 @@ class FactorBaseOrFreerelTask(Task):
                 kwargs.setdefault("pmax", str(2**int(self.params["lpba"])))
             p = self.programs[0](kwargs = kwargs, stdout = outputfile)
             p.run()
-            p.wait()
+            (rc, stdout, stderr) = p.wait()
+            self.parse_stderr(stderr)
             
             self.state["outputfile"] = os.path.realpath(outputfile)
             self.notifyObservers({self.name: outputfile})
@@ -552,6 +557,10 @@ class FactorBaseOrFreerelTask(Task):
         else:
             return None
 
+    def parse_stderr(self, stderr):
+        pass
+
+
 class FactorBaseTask(FactorBaseOrFreerelTask):
     """ Generates the factor base for the polynomial(s) """
     name = "factorbase"
@@ -571,6 +580,22 @@ class FreeRelTask(FactorBaseOrFreerelTask):
     paramnames = ("lpba", )
     target = "freerel"
 
+    def parse_stderr(self, stderr):
+        if "nfree" in self.state:
+            del(self.state["nfree"])
+        for line in stderr.decode("ascii").splitlines():
+            match = re.match('# Free relations: (\d+)', line)
+            if match:
+                if "nfree" in self.state:
+                    raise Exception("Received two values for number of free relations")
+                self.state["nfree"] = int(match.group(1))
+        if not self.state["nfree"]:
+            raise Exception("Received no value for number of free relations")
+        return
+    
+    def get_nrels(self):
+        return self.state["nfree"]
+    
 
 class SievingTask(Task, FilesCreator):
     """ Does the sieving, uses client/server """
@@ -737,8 +762,7 @@ class Duplicates1Task(Task, FilesCreator):
                     # exception
                     self.check_files_exist(outfilenames.keys(), "output", 
                                            shouldexist=True)
-                    stderrlines = stderr.decode("ascii").splitlines()
-                    current_counts = self.parse_slice_counts(stderrlines)
+                    current_counts = self.parse_slice_counts(stderr)
                 for (idx, count) in enumerate(current_counts):
                     self.slice_relcounts[str(idx)] += count
                 self.already_split_input[f] = self.nr_slices
@@ -765,12 +789,11 @@ class Duplicates1Task(Task, FilesCreator):
                 r[self.make_output_filename(basename, True, str(i))] = i
             return r;
     
-    def parse_slice_counts(self, text):
+    def parse_slice_counts(self, stderr):
         """ Takes line of text and looks for slice counts as printed by dup1
         """
         counts = [None] * self.nr_slices
-        for line in text:
-            print (line)
+        for line in stderr.decode("ascii").splitlines():
             match = re.match('# slice (\d+) received (\d+) relations', line)
             if match:
                 (slicenr, nrrels) = map(int, match.groups())
@@ -797,18 +820,35 @@ class Duplicates2Task(Task, FilesCreator):
     title = "Filtering: Duplicate Removal, removal pass"
     programs = (cadoprograms.Duplicates2,)
     parampath = "tasks.filtering." + name
-    paramnames = ()
+    paramnames = ("nslices_log",)
     
     def __init__(self, duplicates1, *args, **kwargs):
         super().__init__(*args, dependencies = (duplicates1,), **kwargs)
         self.duplicates1 = duplicates1
+        self.nr_slices = 2**int(self.params["nslices_log"])
+        self.already_done_input = self.make_db_dict(self.tablename("infiles"))
+        self.slice_relcounts = self.make_db_dict(self.tablename("counts"))
+        self.slice_relcounts.setdefault(
+            None, {str(i): 0 for i in range(0, self.nr_slices)})
     
     def run(self):
         self.logger.debug("Enter Duplicates2Task.run(" + self.name + ")")
         super().run()
-        nr_slices = self.duplicates1.get_nr_slices()
-        for i in range(0, nr_slices):
+        
+        for i in range(0, self.nr_slices):
             files = self.duplicates1.get_output_filenames(i)
+            newfiles = [f for f in files if not f in self.already_done_input]
+            if not newfiles:
+                self.logger.info("No new files for slice %d, nothing to do", i)
+                continue
+            # If there are any new files in a slice, we remove duplicates on
+            # the whole file set of the slice, as we currently cannot store
+            # the duplicate removal state to be able to add more relations
+            # in another pass
+            # Forget about the previous output filenames of this slice
+            # FIXME: Should we delete the files, too?
+            self.forget_output_filenames(self.get_output_filenames(i))
+            del(self.slice_relcounts[str(i)])
             rel_count = self.duplicates1.get_slice_relcount(i)
             self.make_directories(str(i))
             kwargs = self.progparams[0].copy()
@@ -816,12 +856,35 @@ class Duplicates2Task(Task, FilesCreator):
             kwargs["output_directory"] = self.make_output_dirname(str(i))
             p = self.programs[0](files, kwargs)
             p.run()
-            p.wait()
+            (rc, stdout, stderr) = p.wait()
+            nr_rels = self.parse_remaining(stderr.decode("ascii").splitlines())
+            # Mark input file names and output file names
             for f in files:
-                basename = os.path.basename(f)
-                outfilename = self.make_output_filename(basename, True, str(i))
-                self.add_output_files({outfilename: str(i)})
+                self.already_done_input[f] = i
+            outfilenames = {self.make_output_filename(f, i):i for f in files}
+            self.add_output_files(outfilenames)
+            self.logger.info("%d unique relations remain on slice %d", nr_rels, i)
+            self.slice_relcounts[str(i)] = nr_rels
+        self.logger.info("%d unique relations remain in total", self.get_relcount())
         self.logger.debug("Exit Duplicates2Task.run(" + self.name + ")")
+    
+    def make_output_filename(self, f, i):
+        basename = os.path.basename(f)
+        return super().make_output_filename(basename, True, str(i))
+    
+    def parse_remaining(self, text):
+        # "     112889 remaining relations"
+        for line in text:
+            match = re.match('\s*(\d+) remaining relations', line)
+            if match:
+                return int(match.group(1))
+        raise Exception("Received no value for remaining relation count")
+
+    def get_relcount(self):
+        nrels = 0
+        for i in range(0, self.nr_slices):
+            nrels += self.slice_relcounts[str(i)]
+        return nrels
 
 
 class PurgeTask(Task):
@@ -830,22 +893,41 @@ class PurgeTask(Task):
     title = "Filtering: Singleton removal"
     programs = (cadoprograms.Purge,)
     parampath = "tasks.filtering." + name
-    paramnames = ()
+    paramnames = ("keep", ) + Polynomial.paramnames
     
-    def __init__(self, duplicates2, *args, **kwargs):
+    # purge -poly c59.poly -keep 160 -nrels 226167 -out c59.purged.gz -npthr 1x1 -basepath /tmp/cado.wNhDsCM6BS -subdirlist c59.subdirlist -filelist c59.filelist
+    
+    def __init__(self, polyselect, freerel, duplicates2, *args, **kwargs):
         super().__init__(*args, dependencies = (duplicates2,), **kwargs)
+        self.polyselect = polyselect
+        self.freerel = freerel
         self.duplicates2 = duplicates2
-
+    
     def run(self):
         self.logger.debug("Enter PurgeTask.run(" + self.name + ")")
         super().run()
         if not self.is_done():
-            args = ()
+            poly = self.polyselect.get_poly()
+            polyfile = self.make_output_filename("poly")
+            poly.create_file(polyfile, self.params)
+            nrels = self.freerel.get_nrels() + self.duplicates2.get_relcount()
+            if not nrels:
+                raise Exception("No relation count received from %s", self.duplicates2.title)
+            outputfile = self.make_output_filename("purged.gz")
+            args = list(self.duplicates2.get_output_filenames()) + [self.freerel.get_filename()]
             kwargs = self.progparams[0].copy()
+            kwargs["poly"] = polyfile
+            kwargs["keep"] = self.params["keep"]
+            kwargs["nrels"] = str(nrels)
+            kwargs["out"] = outputfile
             p = self.programs[0](args, kwargs)
             p.run()
-            p.wait()
+            (rc, stdout, stderr) = p.wait()
+            self.state["outputfile"] = outputfile
         self.logger.debug("Exit PurgeTask.run(" + self.name + ")")
+    
+    def get_output_filename(self):
+        return self.state["outputfile"]
 
 
 class MergeTask(Task):
@@ -854,20 +936,27 @@ class MergeTask(Task):
     title = "Filtering: Merging"
     programs = (cadoprograms.Merge,)
     parampath = "tasks.filtering." + name
-    paramnames = ()
+    paramnames = ("skip", "forbw", "coverNmax", "keep", "maxlevel", "ratio")
     
-    def __init__(self, freerel, unique, *args, **kwargs):
-        super().__init__(*args, dependencies = (freerel, unique), **kwargs)
+    def __init__(self, purged, *args, **kwargs):
+        super().__init__(*args, dependencies = (purged, ), **kwargs)
+        self.purged = purged
 
     def run(self):
+        # merge -out c59.merge.his -mat c59.purged.gz -skip 32 -forbw 3 -coverNmax 100 -keep 160 -maxlevel 15 -ratio 1.1
+        # replay --binary -skip 32 -purged c59.purged.gz -his c59.merge.his -index c59.index -out c59.small.bin
         self.logger.debug("Enter MergeTask.run(" + self.name + ")")
         super().run()
         if not self.is_done():
+            outputfile = self.make_output_filename("his")
             args = ()
             kwargs = self.progparams[0].copy()
+            kwargs["mat"] = self.purged.get_output_filename()
+            kwargs["out"] = outputfile
             p = self.programs[0](args, kwargs)
             p.run()
             p.wait()
+            self.state["outputfile"] = outputfile
         self.logger.debug("Exit MergeTask.run(" + self.name + ")")
 
 

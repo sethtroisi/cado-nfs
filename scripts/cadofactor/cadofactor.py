@@ -21,9 +21,8 @@ class CompleteFactorization(object):
                                              **kwargs)
         self.dup2 = cadotask.Duplicates2Task(self.dup1, *args, db=db, 
                                              **kwargs)
-        self.sing = cadotask.PurgeTask(self.dup2, *args, db=db, **kwargs)
-        self.merge = cadotask.MergeTask(self.freerel, self.sing, *args, db=db, 
-                                        **kwargs)
+        self.sing = cadotask.PurgeTask(self.polysel, self.freerel, self.dup2, *args, db=db, **kwargs)
+        self.merge = cadotask.MergeTask(self.sing, *args, db=db, **kwargs)
         self.linalg = cadotask.LinAlgTask(self.merge, *args, db=db, **kwargs)
         self.sqrt = cadotask.SqrtTask(self.polysel, self.freerel, self.sieving, 
                              self.merge, self.linalg, *args, db=db, **kwargs)
