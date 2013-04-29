@@ -36,7 +36,7 @@ int generic_skew_gauss(mpz_t a[2], mpz_t b[2], double skewness)
     // integer times a power of two, which is presumably larger than
     // 2^-53 in the most common case, since we expect skewness > 1.
     double mantissa;
-    long mantissa_z;
+    int64_t mantissa_z;
     int exponent;
     /* These are provided by c99 */
     mantissa = frexp(skewness * skewness, &exponent);
@@ -56,7 +56,7 @@ int generic_skew_gauss(mpz_t a[2], mpz_t b[2], double skewness)
     mpz_mul(tmp, b[i0], b[i1]);						\
     if (exponent < 0) mpz_mul_2exp(dst, dst, -exponent);		\
     if (exponent > 0) mpz_mul_2exp(tmp, tmp, exponent);			\
-    mpz_addmul_si(dst, tmp, mantissa_z);				\
+    mpz_addmul_int64(dst, tmp, mantissa_z);				\
 } while (0)
     
     QUADFORM(N[0], 0, 0);
@@ -122,33 +122,32 @@ int generic_skew_gauss(mpz_t a[2], mpz_t b[2], double skewness)
     return 1;
 }
 
-int SkewGauss(sieve_info_ptr si, double skewness)
+int
+SkewGauss (sieve_info_ptr si, double skewness)
 {
     mpz_t a[2], b[2];
-    mpz_init_set(a[0], si->doing->p);
-    mpz_init_set(a[1], si->doing->r);
-    mpz_init_set_ui(b[0], 0);
-    mpz_init_set_ui(b[1], 1);
-    generic_skew_gauss(a, b, skewness);
-    int fits = 1;
-    fits = fits && mpz_fits_int64_p(a[0]);
-    fits = fits && mpz_fits_int64_p(b[0]);
-    fits = fits && mpz_fits_int64_p(a[1]);
-    fits = fits && mpz_fits_int64_p(b[1]);
-    fits = fits && mpz_fits_int64_p(a[0]);
-    fits = fits && mpz_fits_int64_p(b[0]);
-    fits = fits && mpz_fits_int64_p(a[1]);
-    fits = fits && mpz_fits_int64_p(b[1]);
-    if (fits) {
-        si->a0 = mpz_get_int64(a[0]);
-        si->a1 = mpz_get_int64(a[1]);
-        si->b0 = mpz_get_int64(b[0]);
-        si->b1 = mpz_get_int64(b[1]);
-    }
-    mpz_clear(a[0]);
-    mpz_clear(a[1]);
-    mpz_clear(b[0]);
-    mpz_clear(b[1]);
+    int fits;
+
+    mpz_init_set (a[0], si->doing->p);
+    mpz_init_set (a[1], si->doing->r);
+    mpz_init_set_ui (b[0], 0);
+    mpz_init_set_ui (b[1], 1);
+    generic_skew_gauss (a, b, skewness);
+    fits = mpz_fits_int64_p (a[0]);
+    fits = fits && mpz_fits_int64_p (b[0]);
+    fits = fits && mpz_fits_int64_p (a[1]);
+    fits = fits && mpz_fits_int64_p (b[1]);
+    if (fits)
+      {
+        si->a0 = mpz_get_int64 (a[0]);
+        si->a1 = mpz_get_int64 (a[1]);
+        si->b0 = mpz_get_int64 (b[0]);
+        si->b1 = mpz_get_int64 (b[1]);
+      }
+    mpz_clear (a[0]);
+    mpz_clear (a[1]);
+    mpz_clear (b[0]);
+    mpz_clear (b[1]);
     /* FIXME: That error convention looks odd */
     return fits ? 0 : 1;
 }
