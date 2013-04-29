@@ -315,7 +315,7 @@ ularith_sub_ul_ul_ge (unsigned long *r, const unsigned long a)
 #elif !defined (ULARITH_NO_ASM) && defined(__i386__) && defined(__GNUC__)
   __asm__ ( "subl %2, %0\n\t"
 	    "cmovc %1, %0\n\t"
-            : "+&r" (*r), 
+            : "+&r" (*r)
             : "r" (t), "g" (a)
             : "cc");
 #else
