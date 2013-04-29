@@ -90,10 +90,9 @@ prempt_open_compressed_rs (char *rep_cado, char **ficname)
   char *antebuffer_realpath, *fic_realpath;
 
   if (!(cmd = calloc (s_cmds, sizeof(unsigned char *)))) {
-    fprintf (stderr, "fopen_compressed_rs: calloc erreur : %s\n", strerror(errno));
+    fprintf (stderr, "fopen_compressed_rs: calloc error : %s\n", strerror(errno));
     exit (1);
   }
-  fic_realpath = (char *) malloc(PATH_MAX * sizeof(char));
   antebuffer_realpath = (char *) malloc(PATH_MAX * sizeof(char));
   fic_realpath = (char *) malloc(PATH_MAX * sizeof(char));
   if (fic_realpath == NULL || antebuffer_realpath == NULL || fic_realpath == NULL) {
@@ -107,7 +106,8 @@ prempt_open_compressed_rs (char *rep_cado, char **ficname)
   strcat (fic_realpath, EXECUTABLE_SUFFIX);
 #endif
   if (realpath(fic_realpath, antebuffer_realpath) == NULL) {
-    fprintf (stderr, "fopen_compressed_rs: realpath error : %s\n", strerror(errno));
+    fprintf (stderr, "fopen_compressed_rs: realpath(%s) error : %s\n", 
+             fic_realpath, strerror(errno));
     exit (1);
   }
   while (*ficname) {

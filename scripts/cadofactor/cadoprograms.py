@@ -191,7 +191,7 @@ class Program(object):
         # to the command
         self.infile = self._open_or_not(self.stdin, "r")
         self.outfile = self._open_or_not(self.stdout, "w")
-        self.errfile = self._open_or_not(self.stdout, "w")
+        self.errfile = self._open_or_not(self.stderr, "w")
         
         # print (self.as_array())
 
