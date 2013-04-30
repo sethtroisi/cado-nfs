@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import sqlite3
+import argparse
 import logging
 import cadologger
 import wudb
@@ -31,12 +32,30 @@ class CompleteFactorization(object):
         self.sqrt.run(*args, **kwargs)
 
 if __name__ == '__main__':
-    logger = cadologger.Logger()
-    logger.addHandler(cadologger.ScreenHandler(lvl = logging.DEBUG))
-    # logger.addHandler(cadologger.FileHandler(filename = "log", lvl = logging.DEBUG))
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Integer Factorisation with the Number Field Sieve')
+    parser.add_argument("--screenlog", help="Screen logging level", default="INFO", metavar="LEVEL")
+    parser.add_argument("parameters", help="A file with the parameters to use")
+    args = parser.parse_args()
+    paramfile = args.parameters
+    screenlvlname = args.screenlog
+    
     parameters = cadoparams.Parameters()
-    parameters._readfile(open("parameters"))
+    parameters._readfile(open(paramfile))
     tasksparams = parameters.myparams(("workdir", "name"), "tasks")
+    
+    try:
+        screenlvl = int(screenlvlname)
+    except ValueError:
+        screenlvl = None
+    if screenlvl is None:
+        screenlvl = getattr(logging, screenlvlname.upper(), None)
+        if not isinstance(screenlvl, int):
+            raise ValueError('Invalid log level: %s' %  screenlvlname)
+    logger = cadologger.Logger()
+    logger.addHandler(cadologger.ScreenHandler(lvl = screenlvl))
+    
+     # logger.addHandler(cadologger.FileHandler(filename = "log", lvl = logging.DEBUG))
     wudb_file = tasksparams["workdir"] + os.sep + tasksparams["name"] + ".db"
     logger.info ('Opening database file "%s"', wudb_file)
     # dbconn = sqlite3.connect("wudb")
