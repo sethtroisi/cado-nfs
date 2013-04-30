@@ -881,47 +881,42 @@ fb_nroots_total (const factorbase_degn_t *fb)
 }
 
 
-/* For all primes p that divide b, disable p and powers of p in fb */
-/* Extracts primes (not prime powers) p <= plim with
-   p/nr_roots <= costlim. List ends with FB_END. Allocates memory */
+/* Extracts primes (not prime powers) p with p/nr_roots <= costlim up to and 
+   exluding the first prime p > plim. Prime powers in the factor base are 
+   ignored. List ends with FB_END. Allocates memory */
 fbprime_t *
 fb_extract_bycost (const factorbase_degn_t *fb, const fbprime_t plim,
                    const fbprime_t costlim)
 {
-  const factorbase_degn_t *fb_ptr;
   fbprime_t *primes;
-  fbprime_t old_prime = 1;
-  int i;
 
-  fb_ptr = fb;
-  i = 0;
-  while (fb_ptr->p != FB_END && fb_ptr->p <= plim)
-    {
-      if (fb_ptr->p <= costlim * fb_ptr->nr_roots &&
-	  !fb_is_power(fb_ptr->p) && old_prime!=fb_ptr->p) {
+  /* First pass counts primes and allocates memory, second pass writes 
+     primes to the allocated memory */
+  for (int pass = 0; pass < 2; pass++) {
+    const factorbase_degn_t *fb_ptr;
+    size_t i = 0;
+    fbprime_t old_prime = 1;
+    for (fb_ptr = fb; fb_ptr->p != FB_END; fb_ptr = fb_next (fb_ptr)) {
+      /* Prime powers p^k are neither added to the array of extracted primes, 
+         nor do they stop the loop if p^k > plim */
+      if (fb_is_power(fb_ptr->p))
+        continue;
+      if (fb_ptr->p > plim)
+        break;
+      if (fb_ptr->p <= costlim * fb_ptr->nr_roots && old_prime!=fb_ptr->p) {
+        if (pass == 1)
+          primes[i] = fb_ptr->p;
         i++;
         old_prime = fb_ptr->p;
       }
-      fb_ptr = fb_next (fb_ptr);
     }
-
-  primes = (fbprime_t *) malloc ((i + 1) * sizeof (fbprime_t));
-  ASSERT (primes != NULL);
-
-  fb_ptr = fb;
-  i = 0;
-  old_prime = 1;
-  while (fb_ptr->p != FB_END && fb_ptr->p <= plim)
-    {
-      if (fb_ptr->p <= costlim * fb_ptr->nr_roots &&
-	  !fb_is_power(fb_ptr->p) && old_prime!=fb_ptr->p) {
-        primes[i++] = fb_ptr->p;
-        old_prime = fb_ptr->p;
-      }
-      fb_ptr = fb_next (fb_ptr);
+    if (pass == 0) {
+      primes = (fbprime_t *) malloc ((i + 1) * sizeof (fbprime_t));
+      ASSERT_ALWAYS (primes != NULL);
+    } else {
+      primes[i] = FB_END;
     }
-
-  primes[i] = FB_END;
+  }
 
   return primes;
 }
@@ -1105,6 +1100,9 @@ fb_parse_line (factorbase_degn_t *const fb_cur, const char * lineptr,
 
    Pointers to the allocated memory of the factorbases are written to fb_small 
    and, if smalllim > 0, to fb_pieces[0, ..., nr_pieces-1].
+
+   Returns 1 if everything worked, and 0 if not (i.e., if the file could not be 
+   opened, or memory allocation failed)
 */
 
 int  
