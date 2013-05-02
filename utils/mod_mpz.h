@@ -561,7 +561,7 @@ modmpz_2pow_mp (residuempz_t r, const unsigned long *e, const int l,
 }
 
 static inline int 
-modmpz_sprp (const residuempz_t a, const modulusmpz_t m)
+modmpz_sprp (const residuempz_t a MAYBE_UNUSED, const modulusmpz_t m)
 {
   /* FIXME */
   return mpz_probab_prime_p(m, 3);
