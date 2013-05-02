@@ -18,7 +18,7 @@
 #define ASSERT_EXPENSIVE(x)
 #endif
 
-#define MODUL_MAXBITS LONG_MAX
+#define MODMPZ_MAXBITS LONG_MAX
 
 #define ASSERT_INPUT(x) ASSERT_EXPENSIVE (mpz_cmp(m, x) > 0);
 #define ASSERT_INPUT_UL(x) ASSERT_EXPENSIVE (mpz_cmp_ui(m, x) > 0);
