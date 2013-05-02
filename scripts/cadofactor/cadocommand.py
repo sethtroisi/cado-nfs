@@ -21,7 +21,7 @@ class Command(object):
             **self.kwargs
             )
         self.logger.info("Running command: " + self.cmdline)
-        self.logger.cmd(self.cmdline, extra={"pid": self.child.pid})
+        self.logger.cmd(self.cmdline, self.child.pid)
     
     def wait(self):
         ''' Wait for command to finish executing, capturing stdout and stderr 

@@ -193,8 +193,7 @@ class Task(patterns.Observable, patterns.Observer, DbDictAccess):
                                 (self.title, filedesc, f))
         return
     
-    def make_directories(self, extra = None):
-        basedir = self.make_output_dirname()
+    def make_directories(self, basedir, extra = None):
         if not os.path.isdir(basedir):
             os.mkdir(basedir)
         if extra:
@@ -509,6 +508,8 @@ class FactorBaseOrFreerelTask(Task):
             prevpoly = Polynomial(self.state["poly"].splitlines())
             if poly != prevpoly:
                 if "outputfile" in self.state:
+                    self.logger.info("Received different polynomial from %s, discarding old one",
+                                     self.polyselect.title)
                     del(self.state["outputfile"])
                 self.state["poly"] = str(poly)
         else:
@@ -533,7 +534,7 @@ class FactorBaseOrFreerelTask(Task):
             (rc, stdout, stderr) = p.wait()
             self.parse_stderr(stderr)
             
-            self.state["outputfile"] = os.path.realpath(outputfile)
+            self.state["outputfile"] = outputfile
             self.notifyObservers({self.name: outputfile})
         self.logger.debug("Exit FactorBaseOrFreerelTask.run(%s)", self.name)
     
@@ -729,7 +730,8 @@ class Duplicates1Task(Task, FilesCreator):
                            self.title, newfiles)
         
         if newfiles:
-            self.make_directories(map(str, range(0, self.nr_slices)))
+            basedir = self.make_output_dirname()
+            self.make_directories(basedir, map(str, range(0, self.nr_slices)))
             # TODO: can we recover from missing input files? Ask Sieving to
             # generate them again? Just ignore the missing ones?
             self.check_files_exist(newfiles, "input", shouldexist = True)
@@ -850,7 +852,8 @@ class Duplicates2Task(Task, FilesCreator):
             self.forget_output_filenames(self.get_output_filenames(i))
             del(self.slice_relcounts[str(i)])
             rel_count = self.duplicates1.get_slice_relcount(i)
-            self.make_directories(str(i))
+            basedir = self.make_output_dirname()
+            self.make_directories(basedir, str(i))
             kwargs = self.progparams[0].copy()
             kwargs["rel_count"] = str(rel_count * 12 // 10)
             kwargs["output_directory"] = self.make_output_dirname(str(i))
@@ -913,28 +916,31 @@ class PurgeTask(Task):
             nrels = self.freerel.get_nrels() + self.duplicates2.get_relcount()
             if not nrels:
                 raise Exception("No relation count received from %s", self.duplicates2.title)
-            outputfile = self.make_output_filename("purged.gz")
+            purgedfile = self.make_output_filename("purged.gz")
             args = list(self.duplicates2.get_output_filenames()) + [self.freerel.get_filename()]
             kwargs = self.progparams[0].copy()
             kwargs["poly"] = polyfile
             kwargs["keep"] = self.params["keep"]
             kwargs["nrels"] = str(nrels)
-            kwargs["out"] = outputfile
+            kwargs["out"] = purgedfile
             p = self.programs[0](args, kwargs)
             p.run()
             (rc, stdout, stderr) = p.wait()
-            self.state["outputfile"] = outputfile
+            self.state["purgedfile"] = purgedfile
         self.logger.debug("Exit PurgeTask.run(" + self.name + ")")
     
-    def get_output_filename(self):
-        return self.state["outputfile"]
-
+    def get_purged_filename(self):
+        return self.state["purgedfile"]
+    
+    def is_done(self):
+        return "purgedfile" in self.state
+    
 
 class MergeTask(Task):
     """ Merges relations """
     name = "merging"
     title = "Filtering: Merging"
-    programs = (cadoprograms.Merge,)
+    programs = (cadoprograms.Merge, cadoprograms.Replay)
     parampath = "tasks.filtering." + name
     paramnames = ("skip", "forbw", "coverNmax", "keep", "maxlevel", "ratio")
     
@@ -948,16 +954,58 @@ class MergeTask(Task):
         self.logger.debug("Enter MergeTask.run(" + self.name + ")")
         super().run()
         if not self.is_done():
-            outputfile = self.make_output_filename("his")
+            if "indexfile" in self.state:
+                del(self.state["indexfile"])
+            if "mergedfile" in self.state:
+                del(self.state["mergedfile"])
+            if "densefile" in self.state:
+                del(self.state["densefile"])
+            
+            historyfile = self.make_output_filename("history")
             args = ()
             kwargs = self.progparams[0].copy()
-            kwargs["mat"] = self.purged.get_output_filename()
-            kwargs["out"] = outputfile
+            kwargs["mat"] = self.purged.get_purged_filename()
+            kwargs["out"] = historyfile
             p = self.programs[0](args, kwargs)
             p.run()
             p.wait()
-            self.state["outputfile"] = outputfile
+            
+            indexfile = self.make_output_filename("index")
+            mergedfile = self.make_output_filename("small.bin")
+            args = ()
+            kwargs = self.progparams[1].copy()
+            kwargs["binary"] = "1"
+            kwargs["purged"] = self.purged.get_purged_filename()
+            kwargs["history"] = historyfile
+            kwargs["index"] = indexfile
+            kwargs["out"] = mergedfile
+            p = self.programs[1](args, kwargs)
+            p.run()
+            p.wait()
+            
+            if not os.path.isfile(indexfile):
+                raise Exception("Output file %s does not exist" % indexfile)
+            if not os.path.isfile(mergedfile):
+                raise Exception("Output file %s does not exist" % mergedfile)
+            self.state["indexfile"] = indexfile
+            self.state["mergedfile"] = mergedfile
+            densefilename = self.make_output_filename("small.dense.bin")
+            if os.path.isfile(densefilename):
+                self.state["densefile"] = densefilename
+            
         self.logger.debug("Exit MergeTask.run(" + self.name + ")")
+    
+    def get_index_filename(self):
+        return self.state.get("indexfile", None)
+    
+    def get_merged_filename(self):
+        return self.state.get("mergedfile", None)
+    
+    def get_dense_filename(self):
+        return self.state.get("densefile", None)
+    
+    def is_done(self):
+        return "mergedfile" in self.state
 
 
 class LinAlgTask(Task):
@@ -967,20 +1015,125 @@ class LinAlgTask(Task):
     programs = (cadoprograms.BWC,)
     parampath = "tasks." + name
     paramnames = ()
-    
+    # bwc.pl :complete seed=1 thr=1x1 mpi=1x1 matrix=c59.small.bin nullspace=left mm_impl=bucket interleaving=0 interval=100 mn=64 wdir=c59.bwc shuffled_product=1 bwc_bindir=/localdisk/kruppaal/build/cado-nfs/normal/linalg/bwc
     def __init__(self, merge, *args, **kwargs):
         super().__init__(*args, dependencies = (merge,), **kwargs)
-
+        self.merge = merge
+    
     def run(self):
         self.logger.debug("Enter LinAlgTask.run(" + self.name + ")")
         super().run()
         if not self.is_done():
+            workdir = self.make_output_dirname()
+            self.make_directories(workdir)
+            mergedfile = self.merge.get_merged_filename()
             args = ()
             kwargs = self.progparams[0].copy()
+            kwargs["complete"] = "1"
+            kwargs["matrix"] = os.path.realpath(mergedfile)
+            kwargs["wdir"] = os.path.realpath(workdir)
+            kwargs.setdefault("nullspace", "left")
             p = self.programs[0](args, kwargs)
             p.run()
             p.wait()
+            dependencyfilename = self.make_output_filename("W", subdir = True)
+            if not os.path.isfile(dependencyfilename):
+                raise Exception("Kernel file %s does not exist" % dependencyfilename)
+            self.state["dependency"] =  dependencyfilename
         self.logger.debug("Exit LinAlgTask.run(" + self.name + ")")
+
+    def is_done(self):
+        return "dependency" in self.state
+    
+    def get_dependency_filename(self):
+        return self.state.get("dependency", None)
+    
+    def get_prefix(self):
+        return "%s%s%s.%s" % (self.params["workdir"], os.sep,
+                              self.params["name"], "dep")
+    
+    
+class CharactersTask(Task):
+#my $ndep;
+#
+#sub do_chars {
+#    info "Adding characters...\n";
+#    $tab_level++;
+#
+#    my $cmd = "$param{'bindir'}/linalg/characters ".
+#              "-poly $param{'prefix'}.poly ".
+#              "-purged $param{'prefix'}.purged.gz ".
+#              "-index $param{'prefix'}.index ".
+#              # Note: one can omit the -heavyblock option, but in that case
+#              # one should add -nratchars nnn (with nnn=16 for example) to fix
+#              # the rational characters, since -nchar only fixes the algebraic
+#              # characters
+#              "-heavyblock $param{'prefix'}.small.dense.bin ".
+#              "-nchar $param{'nchar'} ".
+#              "-t $param{'nthchar'} ".  
+#              "-out $param{'prefix'}.ker " .
+#              "$param{'prefix'}.bwc/W";
+#
+#    my $res = cmd($cmd, { cmdlog => 1, kill => 1,
+#            logfile=>"$param{'prefix'}.characters.log" });
+#
+#    $res->{'err'} =~ /^Wrote (\d+) non-zero dependencies/m or die;
+#    my $ndep = $1;
+#    info "$ndep vectors remaining after characters.\n";
+#
+#    $tab_level--;
+#}
+    """ Computes Quadratic Characters """
+    name = "characters"
+    title = "Quadratic Characters"
+    programs = (cadoprograms.Characters,)
+    parampath = "tasks.linalg." + name
+    paramnames = () + Polynomial.paramnames
+
+    def __init__(self, polyselect, purge, merge, linalg, *args, **kwargs):
+        self.polyselect = polyselect
+        self.purge = purge
+        self.merge = merge
+        self.linalg = linalg
+        super().__init__(*args, dependencies = (polyselect, purge, merge, linalg), **kwargs)
+    
+    def run(self):
+        self.logger.debug("Enter CharactersTask.run(" + self.name + ")")
+        super().run()
+        if not self.is_done():
+            polyfilename = self.make_output_filename("poly")
+            poly = self.polyselect.get_poly()
+            poly.create_file(polyfilename, self.params)
+            kernelfilename = self.make_output_filename("kernel")
+            
+            purgedfilename = self.purge.get_purged_filename()
+            indexfilename = self.merge.get_index_filename()
+            densefilename = self.merge.get_dense_filename()
+            dependencyfilename = self.linalg.get_dependency_filename()
+            
+            args = ()
+            kwargs = self.progparams[0].copy()
+            kwargs["poly"] = polyfilename
+            kwargs["purged"] = purgedfilename
+            kwargs["index"] = indexfilename
+            kwargs["wfile"] = dependencyfilename
+            kwargs["out"] = kernelfilename
+            if not densefilename is None:
+                kwargs["heavyblock"] = densefilename
+            p = self.programs[0](args, kwargs)
+            p.run()
+            p.wait()
+            if not os.path.isfile(kernelfilename):
+                raise Exception("Output file %s does not exist" % kernelfilename)
+            self.state["kernel"] = kernelfilename
+        self.logger.debug("Exit CharactersTask.run(" + self.name + ")")
+        return
+    
+    def is_done(self):
+        return "kernel" in self.state
+    
+    def get_kernel_filename(self):
+        return self.state.get("kernel")
 
 
 class SqrtTask(Task):
@@ -990,21 +1143,38 @@ class SqrtTask(Task):
     programs = (cadoprograms.Sqrt,)
     parampath = "tasks." + name
     paramnames = ()
-    
-    def __init__(self, polyselect, freerel, sieving, merge, linalg, 
-                 *args, **kwargs):
-        dep = (polyselect, freerel, sieving, merge)
+    # /localdisk/kruppaal/build/cado-nfs/normal/sqrt/sqrt -poly /tmp/cado.70R4ygt5PZ/c59.poly -prefix /tmp/cado.70R4ygt5PZ/c59.dep -dep 0 -rat -alg -gcd -purged /tmp/cado.70R4ygt5PZ/c59.purged.gz -index /tmp/cado.70R4ygt5PZ/c59.index -ker /tmp/cado.70R4ygt5PZ/c59.ker > /tmp/cado.70R4ygt5PZ/c59.fact.000
+    # /localdisk/kruppaal/build/cado-nfs/normal/sqrt/sqrt -poly /tmp/cado.70R4ygt5PZ/c59.poly -prefix /tmp/cado.70R4ygt5PZ/c59.dep -dep 1 -rat -alg -gcd -purged /tmp/cado.70R4ygt5PZ/c59.purged.gz -index /tmp/cado.70R4ygt5PZ/c59.index -ker /tmp/cado.70R4ygt5PZ/c59.ker > /tmp/cado.70R4ygt5PZ/c59.fact.001
+    def __init__(self, polyselect, freerel, purge, merge, linalg, characters, *args, **kwargs):
+        self.polyselect = polyselect
+        self.freerel = freerel
+        self.purge = purge
+        self.merge = merge
+        self.linalg = linalg
+        self.characters = characters
+        dep = (polyselect, freerel, purge, merge, linalg, characters)
         super().__init__(*args, dependencies = dep, **kwargs)
-
+    
     def run(self):
         self.logger.debug("Enter SqrtTask.run(" + self.name + ")")
         super().run()
         if not self.is_done():
+            polyfilename = self.make_output_filename("poly")
+            poly = self.polyselect.get_poly()
+            poly.create_file(polyfilename, self.params)
+            purgedfilename = self.purge.get_purged_filename()
+            indexfilename = self.merge.get_index_filename()
+            kernelfilename = self.linalg.get_dependency_filename()
+            prefix = self.linalg.get_prefix()
             args = ()
             kwargs = self.progparams[0].copy()
+            kwargs["ab"] = "1"
+            kwargs["poly"] = polyfilename
+            kwargs["purged"] = purgedfilename
+            kwargs["index"] = indexfilename
+            kwargs["kernel"] = kernelfilename
+            kwargs["prefix"] = prefix
             p = self.programs[0](args, kwargs)
             p.run()
             p.wait()
         self.logger.debug("Exit SqrtTask.run(" + self.name + ")")
-
-

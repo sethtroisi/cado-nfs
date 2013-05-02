@@ -379,6 +379,20 @@ class BWC(Program):
         ParameterEq("bwc_bindir")
         )
 
+class Characters(Program):
+    binary= "characters"
+    name = binary
+    params_list = (
+        Parameter("poly"),
+        Parameter("purged"),
+        Parameter("index"),
+        Parameter("heavyblock"),
+        Parameter("nchar"),
+        Parameter("nthchar", "t"),
+        Parameter("out"),
+        PositionalParameter("wfile")
+    )
+
 class Sqrt(Program):
     binary = "sqrt"
     name = binary
@@ -392,5 +406,5 @@ class Sqrt(Program):
         Parameter("dep"),
         Parameter("purged"),
         Parameter("index"),
-        Parameter("ker")
+        Parameter("kernel", "ker")
         )
