@@ -6,7 +6,7 @@ set (sources
         discriminant.c mpz_array.c gzip.c misc.c
         hashpair.c poly.c crc.c purgedfile.c bit_vector.c
         barrier.c usp.c fix-endianness.c memusage.c
-        cachesize_cpuid.c cachesize_guess.c roots_mod.c
+        cachesize_cpuid.c cachesize_guess.c roots_mod.c mod_mpz.c
 )
 
 # the utils library is used by some shared objects (prominently the

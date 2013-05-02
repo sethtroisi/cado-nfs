@@ -700,6 +700,9 @@ utils/modredc_2ul_common.c
 utils/modredc_ul.c
 utils/modredc_ul.h
 utils/modredc_ul_default.h
+utils/mod_mpz.h
+utils/mod_mpz.c
+utils/mod_mpz_default.h
 utils/modul_poly.c
 utils/modul_poly.h
 utils/mpz_array.c

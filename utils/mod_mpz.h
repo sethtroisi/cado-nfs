@@ -6,10 +6,25 @@
 #include <gmp.h>
 #include "macros.h"
 
+#ifndef ASSERT
+#define ASSERT(x)	assert(x)
+#endif
+
+/* Even simple assertions are relatively expensive in very simple functions.
+   If we want them anyway to hunt a bug, define WANT_ASSERT_EXPENSIVE */
+#ifdef WANT_ASSERT_EXPENSIVE
+#define ASSERT_EXPENSIVE(x) ASSERT(x)
+#else
+#define ASSERT_EXPENSIVE(x)
+#endif
+
 #define MODUL_MAXBITS LONG_MAX
 
 #define ASSERT_INPUT(x) ASSERT_EXPENSIVE (mpz_cmp(m, x) > 0);
 #define ASSERT_INPUT_UL(x) ASSERT_EXPENSIVE (mpz_cmp_ui(m, x) > 0);
+
+/* A macro for function renaming. All functions here start with modmpz_ */
+#define MODMPZ_RENAME(x) modmpz_##x
 
 typedef mpz_t residuempz_t;
 typedef mpz_t modintmpz_t;
@@ -35,6 +50,7 @@ MAYBE_UNUSED
 static inline unsigned long 
 modmpz_intget_ul (const modintmpz_t s)
 {
+  ASSERT (mpz_fits_ulong_p (s));
   return mpz_get_ui(s);
 }
 
@@ -43,7 +59,7 @@ MAYBE_UNUSED
 static inline int
 modmpz_intequal (const modintmpz_t a, const modintmpz_t b)
 {
-  return (mpz_cmp(a,b) == 0);
+  return (mpz_cmp(a, b) == 0);
 }
 
 
@@ -51,7 +67,7 @@ MAYBE_UNUSED
 static inline int
 modmpz_intequal_ul (const modintmpz_t a, const unsigned long b)
 {
-  return (mpz_cmp_ui (a,b) == 0);
+  return (mpz_cmp_ui (a, b) == 0);
 }
 
 
@@ -59,7 +75,7 @@ MAYBE_UNUSED
 static inline int
 modmpz_intcmp (const modintmpz_t a, const modintmpz_t b)
 {
-  return (mpz_cmp(a,b));
+  return (mpz_cmp(a, b));
 }
 
 
@@ -141,7 +157,7 @@ MAYBE_UNUSED
 static inline void
 modmpz_initmod_uls (modulusmpz_t m, const modintmpz_t s)
 {
-  FIXME
+  mpz_set (m, s);
 }
 
 
@@ -149,7 +165,8 @@ MAYBE_UNUSED
 static inline unsigned long
 modmpz_getmod_ul (const modulusmpz_t m)
 {
-  FIXME
+  ASSERT(mpz_fits_ulong_p(m));
+  return mpz_get_ui (m);
 }
 
 
@@ -157,9 +174,8 @@ MAYBE_UNUSED
 static inline void
 modmpz_getmod_uls (modintmpz_t r, const modulusmpz_t m)
 {
-  FIXME
+  mpz_set (r, m);
 }
-
 
 
 MAYBE_UNUSED
@@ -236,9 +252,10 @@ modmpz_set_ul_reduced (residuempz_t r, const unsigned long s,
 MAYBE_UNUSED
 static inline void
 modmpz_set_uls (residuempz_t r, const modintmpz_t s, 
-		   const modulusmpz_t m)
+		const modulusmpz_t m)
 {
-  FIXME
+  mpz_set (r, s);
+  mpz_mod (r, r, m);
 }
 
 
@@ -247,7 +264,8 @@ static inline void
 modmpz_set_uls_reduced (residuempz_t r, const modintmpz_t s, 
 		       const modulusmpz_t m MAYBE_UNUSED)
 {
-  FIXME
+  ASSERT_INPUT(s);
+  mpz_set (r, s);
 }
 
 
@@ -271,7 +289,6 @@ modmpz_set1 (residuempz_t r, const modulusmpz_t m MAYBE_UNUSED)
 
 
 /* Exchanges the values of the two arguments */
-
 MAYBE_UNUSED
 static inline void
 modmpz_swap (residuempz_t a, residuempz_t b, 
@@ -296,14 +313,14 @@ static inline void
 modmpz_get_uls (modintmpz_t r, const residuempz_t s, 
 		   const modulusmpz_t m MAYBE_UNUSED)
 {
-  FIXME
+  mpz_set (r, s);
 }
 
 
 MAYBE_UNUSED
 static inline int
 modmpz_equal (const residuempz_t a, const residuempz_t b, 
-             const modulusmpz_t m MAYBE_UNUSED)
+	      const modulusmpz_t m MAYBE_UNUSED)
 {
   ASSERT_INPUT (a);
   ASSERT_INPUT (b);
@@ -344,30 +361,27 @@ modmpz_add (residuempz_t r, const residuempz_t a, const residuempz_t b,
 
 MAYBE_UNUSED
 static inline void
-modmpz_add1 (residuempz_t r, const residuempz_t a, const modulusmpz_t m)
-{
-  ASSERT_INPUT (a);
-  mpz_add_ui (r, a, 1);
-  if (mpz_cmp(r, m) >= 0)
-    mpz_sub (r, r, m);
-}
-
-
-MAYBE_UNUSED
-static inline void
 modmpz_add_ul (residuempz_t r, const residuempz_t a, const unsigned long b, 
 	      const modulusmpz_t m)
 {
   ASSERT_INPUT (a);
-  mpz_add (r, a, b);
+  mpz_add_ui (r, a, b);
   mpz_mod (r, r, m);
 }
 
 
 MAYBE_UNUSED
 static inline void
+modmpz_add1 (residuempz_t r, const residuempz_t a, const modulusmpz_t m)
+{
+  modmpz_add_ul (r, a, 1, m);
+}
+
+
+MAYBE_UNUSED
+static inline void
 modmpz_sub (residuempz_t r, const residuempz_t a, const residuempz_t b, 
-	   const modulusmpz_t m)
+	    const modulusmpz_t m)
 {
   ASSERT_INPUT (a);
   ASSERT_INPUT (b);
@@ -380,10 +394,10 @@ modmpz_sub (residuempz_t r, const residuempz_t a, const residuempz_t b,
 MAYBE_UNUSED
 static inline void
 modmpz_sub_ul (residuempz_t r, const residuempz_t a, const unsigned long b, 
-	      const modulusmpz_t m)
+	       const modulusmpz_t m)
 {
   ASSERT_INPUT (a);
-  mpz_sub (r, a, b);
+  mpz_sub_ui (r, a, b);
   mpz_mod (r, r, m);
 }
 
@@ -417,7 +431,7 @@ static inline void
 modmpz_sqr (residuempz_t r, const residuempz_t a, const modulusmpz_t m)
 {
   ASSERT_INPUT (a);
-  mpz_mul (r, a, b);
+  mpz_mul (r, a, a);
   mpz_mod (r, r, m);
 }
 
@@ -429,19 +443,19 @@ modmpz_div2 (residuempz_t r, const residuempz_t a, const modulusmpz_t m)
   ASSERT_INPUT (a);
   ASSERT_EXPENSIVE (mpz_odd_p (m));
   if (mpz_even_p(a)) {
-    mpz_tdiv_2exp (r, a, 1);
+    mpz_tdiv_q_2exp (r, a, 1);
   } else {
     mpz_add (r, a, m);
-    mpz_tdiv_2exp (r, r, 1);
+    mpz_tdiv_q_2exp (r, r, 1);
   }
 }
 
 
 MAYBE_UNUSED
 static inline int
-modmpz_next (residuempz_t a, const modulusmpz_t m)
+modmpz_next (residuempz_t r, const modulusmpz_t m)
 {
-  ASSERT_INPUT (a);
+  ASSERT_INPUT (r);
   mpz_add_ui (r, r, 1);
   return (mpz_cmp(r, m) == 0);
 }
@@ -452,7 +466,7 @@ static inline int
 modmpz_finished (const residuempz_t a, const modulusmpz_t m)
 {
   ASSERT_INPUT (a);
-  return (mpz_cmp(r, m) == 0);
+  return (mpz_cmp(a, m) == 0);
 }
 
 
@@ -509,6 +523,7 @@ void modmpz_gcd (modintmpz_t r, const residuempz_t a, const modulusmpz_t m)
   mpz_gcd (r, a, m);
 }
 
+#define MOD_NO_SHARED_MOD_POW_UL 1
 static inline void 
 modmpz_pow_ul (residuempz_t r, const residuempz_t a, const unsigned long e, 
               const modulusmpz_t m)
@@ -517,6 +532,7 @@ modmpz_pow_ul (residuempz_t r, const residuempz_t a, const unsigned long e,
   mpz_powm_ui (r, a, e, m);
 }
 
+#define MOD_NO_SHARED_MOD_POW_MP 1
 static inline void 
 modmpz_2pow_ul (residuempz_t r, const unsigned long e, const modulusmpz_t m)
 {
@@ -544,43 +560,28 @@ modmpz_2pow_mp (residuempz_t r, const unsigned long *e, const int l,
   modmpz_pow_mp (r, r, e, l, m);
 }
 
-static inlien void 
-modmpz_V_mp (residuempz_t r, const residuempz_t a, const unsigned long *e,
-            const int l, const modulusmpz_t m)
-{
-  FIXME
-}
-
-static inline void 
-modmpz_V_ul (residuempz_t r, const residuempz_t a, const unsigned long e, 
-                 const modulusmpz_t m)
-{
-  ASSERT_INPUT (a);
-  modmpz_V_mp (r, a, e, l, m);
-}
-
 static inline int 
 modmpz_sprp (const residuempz_t a, const modulusmpz_t m)
 {
   /* FIXME */
-  return mpz_probab_prime_p(m);
+  return mpz_probab_prime_p(m, 3);
 }
 
 static inline int 
-modmpz_sprp2 (const modulusmpz_t)
+modmpz_sprp2 (const modulusmpz_t m)
 {
-  return mpz_probab_prime_p(m);
+  return mpz_probab_prime_p(m, 1);
 }
 
 static inline int 
-modmpz_isprime (const modulusmpz_t)
+modmpz_isprime (const modulusmpz_t m)
 {
-  return mpz_probab_prime_p(m);
+  return mpz_probab_prime_p(m, 5);
 }
 
 int modmpz_inv (residuempz_t r, const residuempz_t a, const modulusmpz_t m)
 {
-  mpz_invert (r, a, m);
+  return mpz_invert (r, a, m);
 }
 
 static inline int 
@@ -588,5 +589,13 @@ modmpz_jacobi (const residuempz_t a, const modulusmpz_t m)
 {
   return mpz_jacobi(a, m);
 }
+
+/* Prototypes */
+void 
+modmpz_V_mp (residuempz_t, const residuempz_t, const unsigned long *,
+	     int, const modulusmpz_t);
+void 
+modmpz_V_ul (residuempz_t, const residuempz_t, unsigned long, 
+	     const modulusmpz_t);
 
 #endif  /* MOD_MPZ_H */
