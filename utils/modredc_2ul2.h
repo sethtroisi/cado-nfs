@@ -144,6 +144,14 @@ modredc2ul2_intset_ul (modintredc2ul2_t r, const unsigned long s)
 }
 
 MAYBE_UNUSED
+static inline unsigned long 
+modredc2ul2_intget_ul (modintredc2ul2_t r)
+{
+  ASSERT(r[1] == 0);
+  return r[0];
+}
+
+MAYBE_UNUSED
 static inline int
 modredc2ul2_intequal (const modintredc2ul2_t a, const modintredc2ul2_t b)
 {
