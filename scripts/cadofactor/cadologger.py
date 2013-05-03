@@ -24,37 +24,43 @@ class ANSI(object):
     # Not sure if it is any different from "30;1" aka "bright black"
     WHITE = CSI + '37;1' + SGR
 
+COMMAND = logging.DEBUG + 1
+
 class ScreenFormatter(logging.Formatter):
     """ Class for formatting logger records for screen output, optionally
     with colorized logger level name (like cadofct.pl used to). """
     colours = {
         logging.INFO : ANSI.BRIGHTGREEN,
         logging.WARNING : ANSI.BRIGHTYELLOW,
-        logging.ERROR : ANSI.BRIGHTRED
+        logging.ERROR : ANSI.BRIGHTRED,
+        COMMAND : ANSI.BRIGHTBLUE
     }
     
     # Format string that switches to a different colour (with ANSI code 
     # specified in the 'colour' key of the log record) for the log level name, 
     # then back to default text rendition (ANSI code in 'nocolour')
     colourformatstr = \
-        '%(padding)s%(colour)s%(levelnametitle)s%(nocolour)s:%(message)s'
+        '%(padding)s%(colour)s%(levelnametitle)s%(nocolour)s: %(message)s'
     # Format string that does not use colour changes
     nocolourformatstr = \
-        '%(padding)s%(levelnametitle)s:%(message)s'
+        '%(padding)s%(levelnametitle)s: %(message)s'
     
     def __init__(self, colour = True):
         if colour:
-            super().__init__(fmt=self.__class__.colourformatstr)
+            super().__init__(fmt=self.colourformatstr)
         else:
-            super().__init__(fmt=self.__class__.nocolourformatstr)
+            super().__init__(fmt=self.nocolourformatstr)
     
     def format(self, record):
         # Add attributes to record that our format string expects
-        if record.levelno in self.__class__.colours:
-            record.colour = self.__class__.colours[record.levelno]
+        if record.levelno in self.colours:
+            record.colour = self.colours[record.levelno]
         else:
             record.colour = ANSI.NORMAL
-        record.levelnametitle = record.levelname.title()
+        if record.levelno == COMMAND:
+            record.levelnametitle = 'Running Command'
+        else:
+            record.levelnametitle = record.levelname.title()
         record.nocolour = ANSI.NORMAL
         if hasattr(record, "indent"):
             record.padding = " " * record.indent
@@ -104,7 +110,7 @@ class FileHandler(logging.FileHandler):
 
 class CmdFileFilter(logging.Filter):
     def filter(self, record):
-        return record.levelno == Logger.CMDLEVEL
+        return record.levelno == COMMAND
 
 
 class CmdFileHandler(logging.FileHandler):
@@ -119,7 +125,6 @@ class Logger(object):
     """ Class which gets a logger with name equal to the module name (i.e., as 
         stored in __name__) upon instantiation and sets the logging level to 
         DEBUG. Other method calls are passed though to the logger """
-    CMDLEVEL = 51
     def __init__(self):
         # We mustn't instantiate logging.Logger, but get a reference to a
         # pre-existing instance via getLogger(). Hence no inheritance from 
@@ -130,13 +135,27 @@ class Logger(object):
         self.logger.setLevel(logging.NOTSET)
     
     def cmd(self, msg, pid, *args, **kwargs):
-        """ Log a message with a level of Logger.CMDLEVEL """
-        self.log(Logger.CMDLEVEL, msg, extra = {"childpid": pid}, *args, **kwargs)
+        """ Log a message with a level of cadologger.COMMAND """
+        self.log(COMMAND, msg, extra = {"childpid": pid}, *args, **kwargs)
     
     # Delegate all other method calls to the logging.Logger instance we 
     # have referenced in self.logger
     def __getattr__(self, name):
         return getattr(self.logger, name)
+    
+    @classmethod
+    def translate_level(cls, levelname):
+        try:
+            level = int(levelname)
+        except ValueError:
+            level = None
+        if level is None:
+            level = getattr(logging, levelname.upper(), None)
+        if level is None and levelname.upper() == 'COMMAND':
+            level = COMMAND
+        if not isinstance(level, int):
+            raise ValueError('Invalid log level: %s' %  levelname)
+        return level
 
 
 if __name__ == '__main__':

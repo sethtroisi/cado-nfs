@@ -39,7 +39,7 @@ class CompleteFactorization(object):
 if __name__ == '__main__':
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Integer Factorisation with the Number Field Sieve')
-    parser.add_argument("--screenlog", help="Screen logging level", default="INFO", metavar="LEVEL")
+    parser.add_argument("--screenlog", help="Screen logging level, e.g., INFO/COMMAND/DEBUG", default="INFO", metavar="LEVEL")
     parser.add_argument("parameters", help="A file with the parameters to use")
     args = parser.parse_args()
     paramfile = args.parameters
@@ -49,14 +49,7 @@ if __name__ == '__main__':
     parameters._readfile(open(paramfile))
     tasksparams = parameters.myparams(("workdir", "name"), "tasks")
     
-    try:
-        screenlvl = int(screenlvlname)
-    except ValueError:
-        screenlvl = None
-    if screenlvl is None:
-        screenlvl = getattr(logging, screenlvlname.upper(), None)
-        if not isinstance(screenlvl, int):
-            raise ValueError('Invalid log level: %s' %  screenlvlname)
+    screenlvl = cadologger.Logger.translate_level(screenlvlname)
     logger = cadologger.Logger()
     logger.addHandler(cadologger.ScreenHandler(lvl = screenlvl))
     cmdfilename = tasksparams["workdir"] + os.sep + tasksparams["name"] + ".cmd"
