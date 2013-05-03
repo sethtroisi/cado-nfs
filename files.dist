@@ -685,6 +685,7 @@ utils/memusage.h
 utils/misc.c
 utils/misc.h
 utils/mod_rename.h
+utils/mod_common.c
 utils/mod_ul.c
 utils/mod_ul.h
 utils/mod_ul_common.c
@@ -699,6 +700,9 @@ utils/modredc_2ul_common.c
 utils/modredc_ul.c
 utils/modredc_ul.h
 utils/modredc_ul_default.h
+utils/mod_mpz.h
+utils/mod_mpz.c
+utils/mod_mpz_default.h
 utils/modul_poly.c
 utils/modul_poly.h
 utils/mpz_array.c

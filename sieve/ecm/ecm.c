@@ -1595,7 +1595,7 @@ ell_pointorder (const residue_t sigma, const int parameterization,
       mod_get_uls (tx, x, m);
       /* FIXME need multiple precision print */
       printf ("Curve parameters: A = %lu, x = %ld (mod %ld)\n", 
-              tA[0], tx[0], tm[0]); 
+              mod_intget_ul(tA), mod_intget_ul(tx), mod_intget_ul(tm)); 
     }
 
   if (curveW_from_Montgomery (a, P, x, A, m) == 0)
@@ -1610,13 +1610,14 @@ ell_pointorder (const residue_t sigma, const int parameterization,
       /* FIXME need multiple precision print */
       printf ("Finding order of point (%ld, %ld) on curve "
               "y^2 = x^3 + %ld * x + b (mod %ld)\n", 
-              tx1[0], ty1[0], ta[0], tm[0]);
+              mod_intget_ul(tx1), mod_intget_ul(ty1), mod_intget_ul(ta), 
+              mod_intget_ul(tm));
     }
   
   /* FIXME deal with multiple precision modulus */
-  i = (unsigned long) (2. * sqrt((double) tm[0]));
-  min = tm[0] - i;
-  max = tm[0] + i;
+  i = (unsigned long) (2. * sqrt((double) mod_intget_ul(tm)));
+  min = mod_intget_ul(tm) - i;
+  max = mod_intget_ul(tm) + i;
 
   /* Giant steps visit values == r (mod m), baby steps values == 0 (mod m) */
   giant_step = ceil(sqrt(2.*(double)i / (double) known_m));
@@ -1712,7 +1713,7 @@ ell_pointorder (const residue_t sigma, const int parameterization,
   {
       fprintf (stderr, "ell_order: Error, no match found for p = %lu, "
                "min = %lu, max = %lu, giant_step = %lu, giant_min = %lu\n", 
-               tm[0], min, max, giant_step, giant_min);
+               mod_intget_ul(tm), min, max, giant_step, giant_min);
       abort ();
   }
 
@@ -1724,9 +1725,11 @@ found_inf:
       modint_t tx1, ty1;
       mod_get_uls (tx1, P[0].x, m);
       mod_get_uls (ty1, P[0].y, m);
+#ifndef MODMPZ_MAXBITS
       fprintf (stderr, "ell_order: Error, %ld*(%ld, %ld) (mod %ld) is "
                "not the point at infinity\n", 
                i, tx1[0], ty1[0], tm[0]);
+#endif
       return 0UL;
     }
   

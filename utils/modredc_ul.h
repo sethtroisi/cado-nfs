@@ -200,6 +200,14 @@ modredcul_intset_ul (modintredcul_t r, const unsigned long s)
 
 
 MAYBE_UNUSED
+static inline unsigned long
+modredcul_intget_ul (const residueredcul_t s)
+{
+  return s[0];
+}
+
+
+MAYBE_UNUSED
 static inline int
 modredcul_intequal (const modintredcul_t a, const modintredcul_t b)
 {
@@ -504,15 +512,6 @@ modredcul_get_ul (const residueredcul_t s,
   ASSERT_EXPENSIVE (s[0] < m[0].m);
   modredcul_frommontgomery (&t, s, m);
   return t;
-}
-
-
-MAYBE_UNUSED
-static inline unsigned long
-modredcul_intget_ul (const residueredcul_t s,
-                     const modulusredcul_t m MAYBE_UNUSED)
-{
-  return s[0];
 }
 
 

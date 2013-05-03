@@ -1297,7 +1297,7 @@ collision_on_each_sq_r ( header_t header,
         modredcul_sub (res_rp, res_rp, res_rqi, modpp);
         /* res_rp = (rp - rq) / q[i]^2 */
         modredcul_mul (res_rp, res_rp, res_tmp, modpp);
-        tinv_qq[k][c] = modredcul_intget_ul (res_rp, modpp);
+        tinv_qq[k][c] = modredcul_intget_ul (res_rp);
       }
       c -= nr;
     }
@@ -1489,7 +1489,7 @@ collision_on_batch_sq ( header_t header,
     modredcul_sqr (qq, tmp, modpp);
     /* B/q^2 (mod pp) */
     modredcul_intinv (tmp, qq, modpp);
-    invqq[nprimes] = modredcul_intget_ul (tmp, modpp);
+    invqq[nprimes] = modredcul_intget_ul (tmp);
 
     modredcul_clear (tmp, modpp);
     modredcul_clear (qq, modpp);
