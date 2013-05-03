@@ -108,23 +108,28 @@ int test_divisible(where_am_I_ptr w)
 
 /* {{{ helper: sieve_decrease */
 /* Decrease the sieve array entry *S by logp, with underflow checking 
-   and tracing if desired. Variables x, bucket_nr, p, si, and caller 
+   and tracing if desired. Variables x, bucket_nr, p, and si
    are used only for trace test and output */
 
 #ifdef CHECK_UNDERFLOW
 void sieve_decrease_underflow_trap(unsigned char *S, const unsigned char logp, where_am_I_ptr w)
 {
-    abort();			/* FIXME: check */
     int i;
     unsigned int j;
     int64_t a;
     uint64_t b;
-    NxToIJ(&i, &j, N, x, si);
-    IJToAB(&a, &b, i, j, si);
-    fprintf(stderr, "# Error, underflow (%d) at (N,x)=(%u, %u), "
-            "(i,j)=(%d, %u), (a,b)=(%ld, %lu), S[x] = %hhu, log("
-            FBPRIME_FORMAT ") = %hhu\n",
-            caller, N, x, i, j, a, b, S, p, logp);
+    static unsigned char maxdiff = 0;
+
+    NxToIJ(&i, &j, w->N, w->x, w->si);
+    IJToAB(&a, &b, i, j, w->si);
+    if (logp - *S > maxdiff)
+      {
+        maxdiff = logp - *S;
+        fprintf(stderr, "# Error, underflow at (N,x)=(%u, %u), "
+                "(i,j)=(%d, %u), (a,b)=(%ld, %lu), S[x] = %hhu, log("
+                FBPRIME_FORMAT ") = %hhu\n",
+                w->N, w->x, i, j, a, b, *S, w->p, logp);
+      }
     /* arrange so that the unconditional decrease which comes next
      * has the effect of taking the result to zero */
     *S = logp;
