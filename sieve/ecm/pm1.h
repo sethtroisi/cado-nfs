@@ -1,7 +1,6 @@
 #include "modredc_ul.h"
 #include "modredc_15ul.h"
 #include "modredc_2ul2.h"
-#include "mod_mpz.h"
 #include "stage2.h"
 
 typedef struct {
@@ -45,10 +44,5 @@ int pm1_15ul (modintredc15ul_t, const modulusredc15ul_t, const pm1_plan_t *);
 void pm1_stage1_2ul2 (residueredc2ul2_t, const unsigned long *, const int, 
                     const modulusredc2ul2_t);
 int pm1_2ul2 (modintredc2ul2_t, const modulusredc2ul2_t, const pm1_plan_t *);
-
-void pm1_stage1_mpz (residuempz_t, const unsigned long *, const int, 
-                     const modulusmpz_t);
-int pm1_mpz (modintmpz_t, const modulusmpz_t, const pm1_plan_t *);
-
 void pm1_make_plan (pm1_plan_t *, const unsigned int, const unsigned int, int);
 void pm1_clear_plan (pm1_plan_t *);

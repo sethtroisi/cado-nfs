@@ -40,10 +40,6 @@ add_library(facul
         pm1_2ul2.c
         pp1_2ul2.c
         facul_doit_2ul2.c
-        ecm_mpz.c
-        pm1_mpz.c
-        pp1_mpz.c
-        facul_doit_mpz.c
         stage2.c prac_bc.c
 	makeplan.c facul.c)
 
