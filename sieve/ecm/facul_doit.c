@@ -64,8 +64,10 @@ facul_doit (unsigned long *factors, const modulus_t m,
          machine-dependent. However it would be better if the early abort
          test depends on the size of the number we are trying to factor,
          since for a large number we can invest more in cofactorization. */
+#if 0
       if (i > 3 && mod_intbits (n) > 64)
         break;
+#endif
       
       if (i < STATS_LEN)
 	  stats_called[i]++;
