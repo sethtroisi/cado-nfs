@@ -888,7 +888,7 @@ fbprime_t *
 fb_extract_bycost (const factorbase_degn_t *fb, const fbprime_t plim,
                    const fbprime_t costlim)
 {
-  fbprime_t *primes;
+  fbprime_t *primes = NULL;
 
   /* First pass counts primes and allocates memory, second pass writes 
      primes to the allocated memory */
