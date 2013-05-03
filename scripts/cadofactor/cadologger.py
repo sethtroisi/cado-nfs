@@ -111,7 +111,7 @@ class CmdFileHandler(logging.FileHandler):
     def __init__(self, filename , **kwargs):
         super().__init__(filename, **kwargs)
         cmdfilter = CmdFileFilter()
-        self.addFilter(cmdfilter) # FIXME: how do I make it process only record with level EQUAL to some value?
+        self.addFilter(cmdfilter)
         self.setFormatter(CmdFileFormatter())
 
 
@@ -124,7 +124,7 @@ class Logger(object):
         # We mustn't instantiate logging.Logger, but get a reference to a
         # pre-existing instance via getLogger(). Hence no inheritance from 
         # logging.Logger
-        self.logger = logging.getLogger(__name__)
+        self.logger = logging.getLogger()
         # Use level of NOTSET, so handlers get to see everything.
         # They do the filtering by themselves
         self.logger.setLevel(logging.NOTSET)
