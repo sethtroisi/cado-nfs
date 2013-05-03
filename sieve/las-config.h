@@ -87,6 +87,11 @@
 #define TRACK_CODE_PATH
 #endif
 
+/* idem for CHECK_UNDERFLOW */
+#if defined(CHECK_UNDERFLOW) && !defined(TRACK_CODE_PATH)
+#define TRACK_CODE_PATH
+#endif
+
 /* This triggers code which fills bucket in several passes, one for each
  * congruence class mod 2 (three such, the trivial one leading to
  * spurious reports). It's currently only part of the story, and at the
