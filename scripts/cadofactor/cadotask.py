@@ -3,6 +3,8 @@ import sqlite3
 from datetime import datetime
 import re
 import os.path
+from fractions import gcd
+import random
 import wudb
 import patterns
 import cadoprograms
@@ -1142,7 +1144,7 @@ class SqrtTask(Task):
     title = "Square Root"
     programs = (cadoprograms.Sqrt,)
     parampath = "tasks." + name
-    paramnames = ()
+    paramnames = ("N",)
     # /localdisk/kruppaal/build/cado-nfs/normal/sqrt/sqrt -poly /tmp/cado.70R4ygt5PZ/c59.poly -prefix /tmp/cado.70R4ygt5PZ/c59.dep -dep 0 -rat -alg -gcd -purged /tmp/cado.70R4ygt5PZ/c59.purged.gz -index /tmp/cado.70R4ygt5PZ/c59.index -ker /tmp/cado.70R4ygt5PZ/c59.ker > /tmp/cado.70R4ygt5PZ/c59.fact.000
     # /localdisk/kruppaal/build/cado-nfs/normal/sqrt/sqrt -poly /tmp/cado.70R4ygt5PZ/c59.poly -prefix /tmp/cado.70R4ygt5PZ/c59.dep -dep 1 -rat -alg -gcd -purged /tmp/cado.70R4ygt5PZ/c59.purged.gz -index /tmp/cado.70R4ygt5PZ/c59.index -ker /tmp/cado.70R4ygt5PZ/c59.ker > /tmp/cado.70R4ygt5PZ/c59.fact.001
     def __init__(self, polyselect, freerel, purge, merge, linalg, characters, *args, **kwargs):
@@ -1154,6 +1156,8 @@ class SqrtTask(Task):
         self.characters = characters
         dep = (polyselect, freerel, purge, merge, linalg, characters)
         super().__init__(*args, dependencies = dep, **kwargs)
+        self.factors = self.make_db_dict(self.tablename("factors"))
+        self.add_factors([int(self.params["N"])])
     
     def run(self):
         self.logger.debug("Enter SqrtTask.run(" + self.name + ")")
@@ -1164,7 +1168,7 @@ class SqrtTask(Task):
             poly.create_file(polyfilename, self.params)
             purgedfilename = self.purge.get_purged_filename()
             indexfilename = self.merge.get_index_filename()
-            kernelfilename = self.linalg.get_dependency_filename()
+            kernelfilename = self.characters.get_kernel_filename()
             prefix = self.linalg.get_prefix()
             args = ()
             kwargs = self.progparams[0].copy()
@@ -1177,4 +1181,78 @@ class SqrtTask(Task):
             p = self.programs[0](args, kwargs)
             p.run()
             p.wait()
+            
+            while not self.is_done():
+                self.state.setdefault("next_dep", 0)
+                kwargs["ab"] = "0"
+                kwargs["rat"] = "1"
+                kwargs["alg"] = "1"
+                kwargs["gcd"] = "1"
+                kwargs["dep"] = str(self.state["next_dep"])
+                p = self.programs[0](args, kwargs)
+                p.run()
+                (rc, stdout, stderr) = p.wait()
+                if not stdout.decode("ascii").strip() == "Failed":
+                    factorlist = list(map(int,stdout.decode("ascii").split()))
+                    self.add_factors(factorlist)
+                self.state["next_dep"] += 1
+        
+        self.logger.info("Factors: %s" % " ".join(self.factors.keys()))
         self.logger.debug("Exit SqrtTask.run(" + self.name + ")")
+
+    def is_done(self):
+        for (factor, isprime) in self.factors.items():
+            if not isprime:
+                return False
+        return True
+    
+    def add_factors(self, factorlist):
+        newfactorlist = [f for f in factorlist if not str(f) in self.factors]
+        for newfac in newfactorlist:
+            assert newfac > 0
+            for oldfac in list(map(int, self.factors.keys())):
+                g = gcd(newfac, oldfac)
+                if 1 < g and g < newfac:
+                    self.add_factors([g, newfac // g])
+                    break
+                if 1 < g and g < oldfac:
+                    # We get here only if newfac is a proper factor of oldfac
+                    assert newfac == g
+                    del(self.factors[str(oldfac)])
+                    self.add_factors([g, oldfac // g])
+                    break
+            else:
+                isprime = SqrtTask.miller_rabin_tests(newfac, 10)
+                self.factors[str(newfac)] = isprime
+    
+    @staticmethod
+    def miller_rabin_pass(number):
+        if number <= 3:
+            return number >= 2
+        if number % 2 == 0:
+            return False
+        # random.randrange(n) produces random integer in [0, n-1]. We want [2, n-2]
+        base = random.randrange(number - 3) + 2
+        po2 = 0
+        exponent = number - 1
+        while exponent % 2 == 0:
+            exponent >>= 1
+            po2 += 1
+        
+        result = pow(base, exponent, number)
+        if result == 1:
+            return True
+        for i in range(0, po2 - 1):
+            if result == number - 1:
+                return True
+            result = pow(result, 2, number)
+        return result == number - 1
+    
+    @staticmethod
+    def miller_rabin_tests(number, passes):
+        for i in range(0, passes):
+            if not SqrtTask.miller_rabin_pass(number):
+                return False
+        return True
+        
+    
