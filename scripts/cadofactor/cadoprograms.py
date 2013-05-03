@@ -86,6 +86,7 @@ class Program(object):
       map to an instance Parameter("-t")
     '''
     
+    params_list = ("execpath", "execbin")
     path = "programs"
     
     @staticmethod
@@ -97,7 +98,7 @@ class Program(object):
         '''
         return "'" + s.replace("'", "'\\''") + "'"
     
-    def __init__(self, args = None, kwargs = None, path = None, binary = None, 
+    def __init__(self, args = None, kwargs = None, 
                  stdin = None, stdout = subprocess.PIPE, 
                  stderr = subprocess.PIPE):
         ''' Takes a list of positional parameters and a dictionary of command 
@@ -111,16 +112,14 @@ class Program(object):
         generation, the file name is used for shell redirection.
         '''
         
-        if not path is None:
-            self.path = path
-        if not binary is None:
-            self.binary = binary
+        path = kwargs.get("execpath", self.path)
+        binary = kwargs.get("execbin", self.binary)
         
         self.stdin = stdin
         self.stdout = stdout
         self.stderr = stderr
         # Begin command line with program to execute
-        self.command = [self.path.rstrip(os.sep) + os.sep + self.binary]
+        self.command = [path.rstrip(os.sep) + os.sep + binary]
         
         # Add keyword command line parameters
         for p in self.params_list:
@@ -133,10 +132,11 @@ class Program(object):
             self.command += args
     
     @classmethod
-    def params_dict(cls):
+    def get_params_list(cls):
         """ Return the accepted parameters as a mapping from config file 
         keywords to Option instances  """
-        return {p.get_key():p for p in cls.params_list}
+        l = list(Program.params_list) + [opt.get_key() for opt in cls.params_list]
+        return l
     
     def __str__(self):
         ''' Returns the command line as a string '''
@@ -145,7 +145,7 @@ class Program(object):
     def as_array(self):
         ''' Returns the command line as a string array '''
         return self.command
-
+    
     def as_wu():
         # TODO: Make workunit text from a program instance
         # This allows running program instances either directly with run(),

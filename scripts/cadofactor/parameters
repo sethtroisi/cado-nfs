@@ -1,6 +1,7 @@
 N = 90377629292003121684002147101760858109247336549001090677693
 name = testrun
 workdir = work
+
 tasks.verbose = 1
 tasks.rlim=50000
 tasks.alim=100000
@@ -14,11 +15,13 @@ tasks.polyselect.degree = 4
 tasks.polyselect.admin = 0
 tasks.polyselect.admax = 10000
 tasks.polyselect.adrange = 5000
+tasks.polyselect.execpath = /users/caramel/kruppaal/build/cado-nfs/normal/polyselect/
 tasks.sieving.rels_wanted = 222540
 tasks.sieving.qrange = 2000
 tasks.sieving.I = 11
 tasks.sieving.rlambda=1.2
 tasks.sieving.alambda=1.2
+tasks.sieving.execpath = /users/caramel/kruppaal/build/cado-nfs/normal/sieve/
 tasks.filtering.nslices_log=1
 tasks.filtering.keep = 160
 tasks.filtering.skip = 32
@@ -26,10 +29,11 @@ tasks.filtering.forbw = 3
 tasks.filtering.coverNmax  = 100
 tasks.filtering.maxlevel = 15
 tasks.filtering.ratio = 1.1
+tasks.filtering.execpath = /users/caramel/kruppaal/build/cado-nfs/normal/filter/
 tasks.linalg.mn = 64
 tasks.linalg.verbose = 0
 tasks.linalg.nchar = 64
-tasks.linalg.bwc_bindir = /localdisk/kruppaal/build/cado-nfs/normal/linalg/bwc
-hosts.talc.threads = 4
-hosts.talc.use = 1
-hosts.caramel=threads=2
+tasks.linalg.bwc_bindir = /users/caramel/kruppaal/build/cado-nfs/normal/linalg/bwc/
+tasks.linalg.execpath =   /users/caramel/kruppaal/build/cado-nfs/normal/linalg/
+tasks.linalg.bwc.execpath = /users/caramel/kruppaal/build/cado-nfs/normal/linalg/bwc/
+tasks.sqrt.execpath =   /users/caramel/kruppaal/build/cado-nfs/normal/sqrt/

@@ -62,6 +62,8 @@ if __name__ == '__main__':
     cmdfilename = tasksparams["workdir"] + os.sep + tasksparams["name"] + ".cmd"
     logger.addHandler(cadologger.CmdFileHandler(cmdfilename))
     
+    logger.debug("Root parameter dictionary:\n%s" % parameters)
+    
      # logger.addHandler(cadologger.FileHandler(filename = "log", lvl = logging.DEBUG))
     wudb_file = tasksparams["workdir"] + os.sep + tasksparams["name"] + ".db"
     logger.info ('Opening database file "%s"', wudb_file)

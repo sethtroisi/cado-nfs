@@ -106,7 +106,7 @@ class Task(patterns.Observable, patterns.Observer, DbDictAccess):
             self.progparams.append(progparams)
             if parameters:
                 update = parameters.myparams(
-                    prog.params_dict(), [self.parampath, prog.name])
+                    prog.get_params_list(), [self.parampath, prog.name])
                 progparams.update(update)
         self.logger.debug("Exit Task.__init__(%s)", self.name)
         return
@@ -527,9 +527,9 @@ class FactorBaseOrFreerelTask(Task):
             args = ()
             kwargs = self.progparams[0].copy()
             kwargs["poly"] = polyfile
-            if "pmin" in self.programs[0].params_dict():
+            if "pmin" in self.programs[0].get_params_list():
                 kwargs.setdefault("pmin", "1")
-            if "pmax" in self.programs[0].params_dict():
+            if "pmax" in self.programs[0].get_params_list():
                 kwargs.setdefault("pmax", str(2**int(self.params["lpba"])))
             p = self.programs[0](kwargs = kwargs, stdout = outputfile)
             p.run()
@@ -569,7 +569,7 @@ class FactorBaseTask(FactorBaseOrFreerelTask):
     name = "factorbase"
     title = "Generate Factor Base"
     programs = (cadoprograms.MakeFB,)
-    parampath = "tasks." + name
+    parampath = "tasks.sieving." + name
     paramnames = ("alim", )
     target = "roots"
 
@@ -579,7 +579,7 @@ class FreeRelTask(FactorBaseOrFreerelTask):
     name = "freerel"
     title = "Generate Free Relations"
     programs = (cadoprograms.FreeRel,)
-    parampath = "tasks." + name
+    parampath = "tasks.sieving." + name
     paramnames = ("lpba", )
     target = "freerel"
 
@@ -605,7 +605,7 @@ class SievingTask(Task, FilesCreator):
     name = "sieving"
     title = "Lattice Sieving"
     programs = (cadoprograms.Las,)
-    parampath = "tasks." + name
+    parampath = "tasks.sieving." + name
     paramnames = ("qmin", "qrange", "rels_wanted") + Polynomial.paramnames
     
     def __init__(self, polyselect, factorbase, *args, **kwargs):
@@ -910,8 +910,8 @@ class PurgeTask(Task):
     
     def run(self):
         self.logger.debug("Enter PurgeTask.run(" + self.name + ")")
-        super().run()
         if not self.is_done():
+            super().run()
             poly = self.polyselect.get_poly()
             polyfile = self.make_output_filename("poly")
             poly.create_file(polyfile, self.params)
@@ -954,8 +954,8 @@ class MergeTask(Task):
         # merge -out c59.merge.his -mat c59.purged.gz -skip 32 -forbw 3 -coverNmax 100 -keep 160 -maxlevel 15 -ratio 1.1
         # replay --binary -skip 32 -purged c59.purged.gz -his c59.merge.his -index c59.index -out c59.small.bin
         self.logger.debug("Enter MergeTask.run(" + self.name + ")")
-        super().run()
         if not self.is_done():
+            super().run()
             if "indexfile" in self.state:
                 del(self.state["indexfile"])
             if "mergedfile" in self.state:
@@ -1012,10 +1012,10 @@ class MergeTask(Task):
 
 class LinAlgTask(Task):
     """ Runs the linear algebra step """
-    name = "linalg"
+    name = "bwc"
     title = "Linear Algebra"
     programs = (cadoprograms.BWC,)
-    parampath = "tasks." + name
+    parampath = "tasks.linalg." + name
     paramnames = ()
     # bwc.pl :complete seed=1 thr=1x1 mpi=1x1 matrix=c59.small.bin nullspace=left mm_impl=bucket interleaving=0 interval=100 mn=64 wdir=c59.bwc shuffled_product=1 bwc_bindir=/localdisk/kruppaal/build/cado-nfs/normal/linalg/bwc
     def __init__(self, merge, *args, **kwargs):
@@ -1024,8 +1024,8 @@ class LinAlgTask(Task):
     
     def run(self):
         self.logger.debug("Enter LinAlgTask.run(" + self.name + ")")
-        super().run()
         if not self.is_done():
+            super().run()
             workdir = self.make_output_dirname()
             self.make_directories(workdir)
             mergedfile = self.merge.get_merged_filename()
@@ -1056,35 +1056,6 @@ class LinAlgTask(Task):
     
     
 class CharactersTask(Task):
-#my $ndep;
-#
-#sub do_chars {
-#    info "Adding characters...\n";
-#    $tab_level++;
-#
-#    my $cmd = "$param{'bindir'}/linalg/characters ".
-#              "-poly $param{'prefix'}.poly ".
-#              "-purged $param{'prefix'}.purged.gz ".
-#              "-index $param{'prefix'}.index ".
-#              # Note: one can omit the -heavyblock option, but in that case
-#              # one should add -nratchars nnn (with nnn=16 for example) to fix
-#              # the rational characters, since -nchar only fixes the algebraic
-#              # characters
-#              "-heavyblock $param{'prefix'}.small.dense.bin ".
-#              "-nchar $param{'nchar'} ".
-#              "-t $param{'nthchar'} ".  
-#              "-out $param{'prefix'}.ker " .
-#              "$param{'prefix'}.bwc/W";
-#
-#    my $res = cmd($cmd, { cmdlog => 1, kill => 1,
-#            logfile=>"$param{'prefix'}.characters.log" });
-#
-#    $res->{'err'} =~ /^Wrote (\d+) non-zero dependencies/m or die;
-#    my $ndep = $1;
-#    info "$ndep vectors remaining after characters.\n";
-#
-#    $tab_level--;
-#}
     """ Computes Quadratic Characters """
     name = "characters"
     title = "Quadratic Characters"
@@ -1101,8 +1072,8 @@ class CharactersTask(Task):
     
     def run(self):
         self.logger.debug("Enter CharactersTask.run(" + self.name + ")")
-        super().run()
         if not self.is_done():
+            super().run()
             polyfilename = self.make_output_filename("poly")
             poly = self.polyselect.get_poly()
             poly.create_file(polyfilename, self.params)
@@ -1161,8 +1132,8 @@ class SqrtTask(Task):
     
     def run(self):
         self.logger.debug("Enter SqrtTask.run(" + self.name + ")")
-        super().run()
         if not self.is_done():
+            super().run()
             polyfilename = self.make_output_filename("poly")
             poly = self.polyselect.get_poly()
             poly.create_file(polyfilename, self.params)
@@ -1193,7 +1164,7 @@ class SqrtTask(Task):
                 p.run()
                 (rc, stdout, stderr) = p.wait()
                 if not stdout.decode("ascii").strip() == "Failed":
-                    factorlist = list(map(int,stdout.decode("ascii").split()))
+                    factorlist = list(map(int,stdout.decode("ascii").split()))[:1]
                     self.add_factors(factorlist)
                 self.state["next_dep"] += 1
         
