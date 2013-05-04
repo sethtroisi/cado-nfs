@@ -173,7 +173,7 @@ modul_initmod_ul (modulusul_t m, const unsigned long s)
 
 MAYBE_UNUSED
 static inline void
-modul_initmod_uls (modulusul_t m, const modintul_t s)
+modul_initmod_int (modulusul_t m, const modintul_t s)
 {
   m[0] = s[0];
 }
@@ -189,7 +189,7 @@ modul_getmod_ul (const modulusul_t m)
 
 MAYBE_UNUSED
 static inline void
-modul_getmod_uls (modintul_t r, const modulusul_t m)
+modul_getmod_int (modintul_t r, const modulusul_t m)
 {
   r[0] = m[0];
 }
@@ -268,7 +268,7 @@ modul_set_ul_reduced (residueul_t r, const unsigned long s,
 
 MAYBE_UNUSED
 static inline void
-modul_set_uls (residueul_t r, const modintul_t s, 
+modul_set_int (residueul_t r, const modintul_t s, 
 		   const modulusul_t m)
 {
   r[0] = s[0] % m[0];
@@ -277,7 +277,7 @@ modul_set_uls (residueul_t r, const modintul_t s,
 
 MAYBE_UNUSED
 static inline void
-modul_set_uls_reduced (residueul_t r, const modintul_t s, 
+modul_set_int_reduced (residueul_t r, const modintul_t s, 
 		       const modulusul_t m MAYBE_UNUSED)
 {
   ASSERT (s[0] < m[0]);
@@ -335,7 +335,7 @@ modul_get_ul (const residueul_t s, const modulusul_t m MAYBE_UNUSED)
 
 MAYBE_UNUSED
 static inline void
-modul_get_uls (modintul_t r, const residueul_t s, 
+modul_get_int (modintul_t r, const residueul_t s, 
 		   const modulusul_t m MAYBE_UNUSED)
 {
   ASSERT_EXPENSIVE (s[0] < m[0]);
