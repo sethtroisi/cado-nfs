@@ -53,7 +53,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
 #endif
   } f_arith = CHOOSE_UL, cf_arith = CHOOSE_UL;
   
-  mod_getmod_uls (n, m);
+  mod_getmod_int (n, m);
   mod_intset_ul (f, 1UL);
   mod_init (r, m);
   
@@ -196,14 +196,14 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	  if (mod_intbits (f) <= MODREDCUL_MAXBITS)
 	    {
 	      f_arith = CHOOSE_UL;
-	      modredcul_initmod_uls (fm_ul, f);
+	      modredcul_initmod_int (fm_ul, f);
 	      fprime = primetest_ul (fm_ul);
             }
 #if     MOD_MAXBITS > MODREDCUL_MAXBITS
           else if (mod_intbits (f) <= MODREDC15UL_MAXBITS)
             {
               f_arith = CHOOSE_15UL;
-	      modredc15ul_initmod_uls (fm_15ul, f);
+	      modredc15ul_initmod_int (fm_15ul, f);
 	      fprime = primetest_15ul (fm_15ul);
             }
 #endif
@@ -211,7 +211,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	  else if (mod_intbits (f) <= MODREDC2UL2_MAXBITS)
             {
               f_arith = CHOOSE_2UL2;
-	      modredc2ul2_initmod_uls (fm_2ul2, f);
+	      modredc2ul2_initmod_int (fm_2ul2, f);
 	      fprime = primetest_2ul2 (fm_2ul2);
             }
 #endif
@@ -231,14 +231,14 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	  if (mod_intbits (n) <= MODREDCUL_MAXBITS)
 	    {
 	      cf_arith = CHOOSE_UL;
-	      modredcul_initmod_uls (cfm_ul, n);
+	      modredcul_initmod_int (cfm_ul, n);
 	      cfprime = primetest_ul (cfm_ul);
             }
 #if     MOD_MAXBITS > MODREDCUL_MAXBITS
 	  else if (mod_intbits (n) <= MODREDC15UL_MAXBITS)
 	    {
 	      cf_arith = CHOOSE_15UL;
-	      modredc15ul_initmod_uls (cfm_15ul, n);
+	      modredc15ul_initmod_int (cfm_15ul, n);
 	      cfprime = primetest_15ul (cfm_15ul);
             }
 #endif
@@ -246,7 +246,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	  else if (mod_intbits (n) <= MODREDC2UL2_MAXBITS)
             {
               cf_arith = CHOOSE_2UL2;
-	      modredc2ul2_initmod_uls (cfm_2ul2, n);
+	      modredc2ul2_initmod_int (cfm_2ul2, n);
 	      cfprime = primetest_2ul2 (cfm_2ul2);
             }
 #endif

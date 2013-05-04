@@ -66,7 +66,7 @@ static inline void
 modredc2ul2_add (residueredc2ul2_t r, const residueredc2ul2_t a, 
 		 const residueredc2ul2_t b, const modulusredc2ul2_t m);
 static inline void
-modredc2ul2_get_uls (modintredc2ul2_t r, const residueredc2ul2_t s, 
+modredc2ul2_get_int (modintredc2ul2_t r, const residueredc2ul2_t s, 
 		     const modulusredc2ul2_t m MAYBE_UNUSED);
 static inline void
 modredc2ul2_intset (modintredc2ul2_t r, const modintredc2ul2_t s);
@@ -382,7 +382,7 @@ modredc2ul2_intmod (modintredc2ul2_t r, const modintredc2ul2_t n,
    and s[1] is the high word. */
 MAYBE_UNUSED
 static inline void
-modredc2ul2_initmod_uls (modulusredc2ul2_t m, const modintredc2ul2_t s)
+modredc2ul2_initmod_int (modulusredc2ul2_t m, const modintredc2ul2_t s)
 {
   ASSERT (s[1] > 0UL);
   ASSERT (s[1] < (1UL << (LONG_BIT - 2)));
@@ -396,7 +396,7 @@ modredc2ul2_initmod_uls (modulusredc2ul2_t m, const modintredc2ul2_t s)
 #ifdef WANT_ASSERT_EXPENSIVE
   {
     modintredc2ul2_t t;
-    modredc2ul2_get_uls (t, m[0].one, m);
+    modredc2ul2_get_int (t, m[0].one, m);
     ASSERT_EXPENSIVE (modredc2ul2_intequal_ul (t, 1UL));
   }
 #endif
@@ -406,7 +406,7 @@ modredc2ul2_initmod_uls (modulusredc2ul2_t m, const modintredc2ul2_t s)
 /* Returns the modulus to an array of unsigned longs. */
 MAYBE_UNUSED
 static inline void
-modredc2ul2_getmod_uls (modintredc2ul2_t r, const modulusredc2ul2_t m)
+modredc2ul2_getmod_int (modintredc2ul2_t r, const modulusredc2ul2_t m)
 {
   modredc2ul2_intset (r, m[0].m);
 }
@@ -471,7 +471,7 @@ modredc2ul2_set_ul (residueredc2ul2_t r, const unsigned long s,
 #ifdef WANT_ASSERT_EXPENSIVE
   {
     modintredc2ul2_t t;
-    modredc2ul2_get_uls (t, r, m);
+    modredc2ul2_get_int (t, r, m);
     ASSERT_EXPENSIVE (t[0] == s && t[1] == 0UL);
   }
 #endif
@@ -492,7 +492,7 @@ modredc2ul2_set_ul_reduced (residueredc2ul2_t r, const unsigned long s,
 
 MAYBE_UNUSED
 static inline void
-modredc2ul2_set_uls (residueredc2ul2_t r, const modintredc2ul2_t s, 
+modredc2ul2_set_int (residueredc2ul2_t r, const modintredc2ul2_t s, 
 		     const modulusredc2ul2_t m)
 {
   if (!modredc2ul2_intlt (s, m[0].m))
@@ -506,7 +506,7 @@ modredc2ul2_set_uls (residueredc2ul2_t r, const modintredc2ul2_t s,
 
 MAYBE_UNUSED
 static inline void
-modredc2ul2_set_uls_reduced (residueredc2ul2_t r, const modintredc2ul2_t s, 
+modredc2ul2_set_int_reduced (residueredc2ul2_t r, const modintredc2ul2_t s, 
 			     const modulusredc2ul2_t m)
 {
   ASSERT (modredc2ul2_intlt (s, m[0].m));
@@ -567,7 +567,7 @@ modredc2ul2_get_ul (const residueredc2ul2_t s,
 
 MAYBE_UNUSED
 static inline void
-modredc2ul2_get_uls (modintredc2ul2_t r, const residueredc2ul2_t s, 
+modredc2ul2_get_int (modintredc2ul2_t r, const residueredc2ul2_t s, 
 		     const modulusredc2ul2_t m MAYBE_UNUSED)
 {
   ASSERT_EXPENSIVE (modredc2ul2_intlt (s, m[0].m));

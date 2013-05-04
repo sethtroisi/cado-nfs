@@ -21,7 +21,7 @@ tryecm (const unsigned long p, const ecm_plan_t *plan)
   int r;
   
   mod_intset_ul (f, p);
-  mod_initmod_uls (m, f);
+  mod_initmod_int (m, f);
   r = ecm_ul (f, m, plan);
   mod_clearmod (m);
   return r || mod_intequal_ul (f, p);

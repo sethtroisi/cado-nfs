@@ -162,17 +162,17 @@ tests_mod_intmod (int iter)
 
 
 static void
-test_mod_set_uls(const modint_t la, const modint_t lm)
+test_mod_set_int(const modint_t la, const modint_t lm)
 {
   modulus_t m;
   residue_t r;
   modint_t s;
   mpz_t mm, ma, mr, ms;
 
-  mod_initmod_uls (m, lm);
+  mod_initmod_int (m, lm);
   mod_init (r, m);
-  mod_set_uls (r, la, m);
-  mod_get_uls (s, r, m);
+  mod_set_int (r, la, m);
+  mod_get_int (s, r, m);
 
   mpz_init (mm);
   mpz_init (ma);
@@ -199,7 +199,7 @@ test_mod_set_uls(const modint_t la, const modint_t lm)
 
 
 void
-tests_mod_set_uls(int iter)
+tests_mod_set_int(int iter)
 {
   modint_t tm, tr;
   int i, j;
@@ -212,10 +212,10 @@ tests_mod_set_uls(int iter)
   for (i = 1; i < 100; i++) /* Test i/2 and (m-i)/2 for i=0, ..., 99 */
     {
       mod_intset_ul (tr, (unsigned long) i);
-      test_mod_set_uls (tr, tm);
+      test_mod_set_int (tr, tm);
       mod_intset (tr, tm);
       tr[0] -= i;
-      test_mod_set_uls (tr, tm);
+      test_mod_set_int (tr, tm);
     }
   
   for (i = 0; i < iter; i++)
@@ -224,18 +224,18 @@ tests_mod_set_uls(int iter)
 
       /* Test 0, 1 and -1 residue */
       mod_intset_ul (tr, 0UL);
-      test_mod_set_uls (tr, tm);
+      test_mod_set_int (tr, tm);
       mod_intset_ul (tr, 1UL);
-      test_mod_set_uls (tr, tm);
+      test_mod_set_int (tr, tm);
       mod_intset (tr, tm);
       tr[0]--;
-      test_mod_set_uls (tr, tm);
+      test_mod_set_int (tr, tm);
 
       /* Test 10 random residues */
       for (j = 0; j < 10; j++)
 	{
 	  random_integer (tr);
-	  test_mod_set_uls (tr, tm);
+	  test_mod_set_int (tr, tm);
 	}
     }
 }
@@ -247,11 +247,11 @@ test_mod_divn(const modint_t la, const modint_t lm, const unsigned long n)
   modulus_t m;
   residue_t r, s, t;
 
-  mod_initmod_uls (m, lm);
+  mod_initmod_int (m, lm);
   mod_init (r, m);
   mod_init (s, m);
   mod_init (t, m);
-  mod_set_uls (r, la, m);
+  mod_set_int (r, la, m);
   if (n == 2UL)
     mod_div2 (s, r, m);   /* s = r/n */
   else if (n == 3UL)
@@ -344,9 +344,9 @@ test_mod_gcd (const modint_t la, const modint_t lm)
   modint_t lt;
   mpz_t mt, ma, mr, mm;
 
-  mod_initmod_uls (m, lm);
+  mod_initmod_int (m, lm);
   mod_init (a, m);
-  mod_set_uls (a, la, m);
+  mod_set_int (a, la, m);
   
   mod_gcd (lt, a, m);
   
@@ -412,13 +412,13 @@ test_mod_pow_ul (const modint_t la, const modint_t lm,
   modint_t lt;
   mpz_t mt, ma, mr, mm;
 
-  mod_initmod_uls (m, lm);
+  mod_initmod_int (m, lm);
   mod_init (a, m);
-  mod_set_uls (a, la, m);
+  mod_set_int (a, la, m);
   mod_init (r, m);
   
   mod_pow_ul (r, a, e, m); /* s = a^e % m */
-  mod_get_uls (lt, r, m);   /* result as integer in t */
+  mod_get_int (lt, r, m);   /* result as integer in t */
   
   mpz_init (mm);
   mpz_init (ma);
@@ -485,11 +485,11 @@ test_mod_2pow_ul (const modint_t lm, const unsigned long e)
   modint_t lt;
   mpz_t mt, mr, mm, m2;
 
-  mod_initmod_uls (m, lm);
+  mod_initmod_int (m, lm);
   mod_init (r, m);
   
   mod_2pow_ul (r, e, m);  /* s = 2^e % m */
-  mod_get_uls (lt, r, m); /* result as integer in t */
+  mod_get_int (lt, r, m); /* result as integer in t */
   
   mpz_init (mm);
   mpz_init (mr);
@@ -547,13 +547,13 @@ test_mod_inv (const modint_t la, const modint_t lm)
   mpz_t mr, ma, mm, mt;
   int ok1, ok2;
 
-  mod_initmod_uls (m, lm);
+  mod_initmod_int (m, lm);
   mod_init (a, m);
-  mod_set_uls (a, la, m);
+  mod_set_int (a, la, m);
   mod_init (r, m);
   
   ok1 = mod_inv (r, a, m) ? 1 : 0; /* r = 1/a (mod lm) */
-  mod_get_uls (lt, r, m);
+  mod_get_int (lt, r, m);
   
   mpz_init (ma);
   mpz_init (mr);
@@ -628,9 +628,9 @@ test_mod_jacobi (const modint_t la, const modint_t lm)
   mpz_t ma, mm;
   int j1, j2;
 
-  mod_initmod_uls (m, lm);
+  mod_initmod_int (m, lm);
   mod_init (a, m);
-  mod_set_uls (a, la, m);
+  mod_set_int (a, la, m);
   
   j1 = mod_jacobi (a, m);
   
@@ -695,8 +695,8 @@ int main(int argc, char **argv)
 
   printf ("Testing mod_intmod()\n");
   tests_mod_intmod (iter);
-  printf ("Testing mod_set_uls()\n");
-  tests_mod_set_uls (iter);
+  printf ("Testing mod_set_int()\n");
+  tests_mod_set_int (iter);
   printf ("Testing mod_div2()\n");
   tests_mod_divn (iter, 2);
   printf ("Testing mod_div3()\n");
