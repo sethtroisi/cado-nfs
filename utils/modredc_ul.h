@@ -201,10 +201,31 @@ modredcul_intset_ul (modintredcul_t r, const unsigned long s)
 
 
 MAYBE_UNUSED
+static inline void
+modredcul_intset_uls (modintredcul_t r, const unsigned long *s, const size_t n)
+{
+  ASSERT_ALWAYS(n <= MODREDCUL_SIZE);
+  if (n == 0)
+    r[0] = 0;
+  else
+    r[0] = s[0];
+}
+
+
+MAYBE_UNUSED
 static inline unsigned long
 modredcul_intget_ul (const residueredcul_t s)
 {
   return s[0];
+}
+
+
+MAYBE_UNUSED
+static inline size_t  
+modredcul_intget_uls (unsigned long *r, const residueredcul_t s)
+{
+  r[0] = s[0];
+  return 1;
 }
 
 

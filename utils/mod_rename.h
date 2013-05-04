@@ -3,7 +3,9 @@
 
 #undef mod_intset
 #undef mod_intset_ul
+#undef mod_intset_uls
 #undef mod_intget_ul
+#undef mod_intget_uls
 #undef mod_intequal
 #undef mod_intequal_ul
 #undef mod_intcmp
@@ -69,7 +71,9 @@
 
 #define mod_intset           MOD_RENAME(intset)
 #define mod_intset_ul        MOD_RENAME(intset_ul)
+#define mod_intset_uls       MOD_RENAME(intset_ul)
 #define mod_intget_ul        MOD_RENAME(intget_ul)
+#define mod_intget_uls       MOD_RENAME(intget_ul)
 #define mod_intequal         MOD_RENAME(intequal)
 #define mod_intequal_ul      MOD_RENAME(intequal_ul)
 #define mod_intcmp           MOD_RENAME(intcmp)
@@ -142,7 +146,9 @@ mod_test_if_functions_exist()
   void *p;
   p = &mod_intset;
   p = &mod_intset_ul;
+  p = &mod_intset_uls;
   p = &mod_intget_ul;
+  p = &mod_intget_uls;
   p = &mod_intequal;
   p = &mod_intequal_ul;
   p = &mod_intcmp;

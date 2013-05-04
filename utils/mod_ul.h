@@ -62,11 +62,38 @@ modul_intset_ul (modintul_t r, const unsigned long s)
 }
 
 
+/* The two mod*_uls() functions import/export modint_t from/to an array of 
+   unsigned longs. For modul_intset_ul, the size of the array is passed as
+   a parameter n. For mod_intget_uls(), the required array size can be 
+   determined via mod_intbits(); if the modint_t is zero, mod_intget_uls()
+   writes 0 to the first output unsigned long. It returns the number of 
+   unsigned longs written. */
+MAYBE_UNUSED
+static inline void
+modul_intset_uls (modintul_t r, const unsigned long *s, const size_t n)
+{
+  ASSERT_ALWAYS(n <= MODUL_SIZE);
+  if (n == 0)
+    r[0] = 0;
+  else
+    r[0] = s[0];
+}
+
+
 MAYBE_UNUSED
 static inline unsigned long 
 modul_intget_ul (const modintul_t s)
 {
   return s[0];
+}
+
+
+MAYBE_UNUSED
+static inline size_t 
+modul_intget_uls (unsigned long *r, const modintul_t s)
+{
+  r[0] = s[0];
+  return 1;
 }
 
 

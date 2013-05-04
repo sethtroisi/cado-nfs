@@ -48,11 +48,33 @@ modmpz_intset_ul (modintmpz_t r, const unsigned long s)
 
 
 MAYBE_UNUSED
+static inline void
+modmpz_intset_uls (modintmpz_t r, const unsigned long *s, const size_t n)
+{
+  mpz_import (r, n, -1, sizeof(*s), 0, 0, s);
+}
+
+
+MAYBE_UNUSED
 static inline unsigned long 
 modmpz_intget_ul (const modintmpz_t s)
 {
   ASSERT (mpz_fits_ulong_p (s));
   return mpz_get_ui(s);
+}
+
+
+MAYBE_UNUSED
+static inline size_t  
+modmpz_intget_uls (unsigned long *r, const modintmpz_t s)
+{
+  size_t count;
+  if (mpz_sgn(s) == 0) {
+    r[0] = 0;
+    return 1;
+  }
+  mpz_export (r, &count, -1, sizeof(*r), 0, 0, s);
+  return count;
 }
 
 

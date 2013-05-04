@@ -152,11 +152,41 @@ modredc15ul_intset_ul (modintredc15ul_t r, const unsigned long s)
 }
 
 MAYBE_UNUSED
-static inline unsigned long 
-modredc15ul_intget_ul (modintredc15ul_t r)
+static inline void
+modredc15ul_intset_uls (modintredc15ul_t r, const unsigned long *s, 
+                        const size_t n)
 {
-  ASSERT(r[1] == 0);
-  return r[0];
+  if (n == 0) {
+    r[0] = 0;
+    r[1] = 0;
+  } else if (n == 1) {
+    r[0] = s[0];
+    r[1] = 0;
+  } else if (n == 2) {
+    r[0] = s[0];
+    r[1] = s[1];
+  } else
+    abort();
+}
+
+MAYBE_UNUSED
+static inline unsigned long 
+modredc15ul_intget_ul (const modintredc15ul_t s)
+{
+  ASSERT(s[1] == 0);
+  return s[0];
+}
+
+MAYBE_UNUSED
+static inline size_t  
+modredc15ul_intget_uls (unsigned long *r, const modintredc15ul_t s)
+{
+  r[0] = s[0];
+  if (s[1] != 0) {
+    r[1] = s[1];
+    return 2;
+  }
+  return 1;
 }
 
 MAYBE_UNUSED

@@ -145,11 +145,41 @@ modredc2ul2_intset_ul (modintredc2ul2_t r, const unsigned long s)
 }
 
 MAYBE_UNUSED
+static inline void
+modredc2ul2_intset_uls (modintredc2ul2_t r, const unsigned long *s,
+                        const size_t n)
+{
+  if (n == 0) {
+    r[0] = 0;
+    r[1] = 0;
+  } else if (n == 1) {
+    r[0] = s[0];
+    r[1] = 0;
+  } else if (n == 2) {
+    r[0] = s[0];
+    r[1] = s[1];
+  } else
+    abort();
+}
+
+MAYBE_UNUSED
 static inline unsigned long 
 modredc2ul2_intget_ul (modintredc2ul2_t r)
 {
   ASSERT(r[1] == 0);
   return r[0];
+}
+
+MAYBE_UNUSED
+static inline size_t  
+modredc2ul2_intget_uls (unsigned long *r, const modintredc2ul2_t s)
+{
+  r[0] = s[0];
+  if (s[1] != 0) {
+    r[1] = s[1];
+    return 2;
+  }
+  return 1;
 }
 
 MAYBE_UNUSED
