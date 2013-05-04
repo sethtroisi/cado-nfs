@@ -71,9 +71,9 @@
 
 #define mod_intset           MOD_RENAME(intset)
 #define mod_intset_ul        MOD_RENAME(intset_ul)
-#define mod_intset_uls       MOD_RENAME(intset_ul)
+#define mod_intset_uls       MOD_RENAME(intset_uls)
 #define mod_intget_ul        MOD_RENAME(intget_ul)
-#define mod_intget_uls       MOD_RENAME(intget_ul)
+#define mod_intget_uls       MOD_RENAME(intget_uls)
 #define mod_intequal         MOD_RENAME(intequal)
 #define mod_intequal_ul      MOD_RENAME(intequal_ul)
 #define mod_intcmp           MOD_RENAME(intcmp)
