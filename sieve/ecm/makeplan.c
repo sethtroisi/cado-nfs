@@ -171,7 +171,7 @@ pp1_clear_plan (pp1_plan_t *plan)
    stage 2. Parameterization chooses Brent-Suyama curves with order divisible
    by 12 (BRENT12), Montgomery with torsion 12 over Q (MONTY12) or Montgomery
    with torsion 16 over Q (MONTY16), sigma is the associated parameter.
-   Extra primes controls whether some primes should be added (or left out!)
+   "extra_primes" controls whether some primes should be added (or left out!)
    on top of the primes and prime powers <= B1, for example to take into 
    account the known factors in the group order. */
 
