@@ -2,6 +2,7 @@
 #define FACUL_H
 
 #include <stdio.h>
+#include <stdint.h>
 #include <gmp.h>
 
 #define PM1_METHOD 1
@@ -26,7 +27,11 @@ typedef struct {
 typedef struct {
   unsigned long lpb;        /* Large prime bound as an unsigned long 
 			       (the integer value, not the bit size!) */
-  unsigned long fbb2[2];    /* The factor basis bound squared */
+  uint64_t assume_prime_thresh; /* The factor base bound squared. If the 
+                               square exceeds UINT64_MAX, store UINT64_MAX. 
+                               We assume that primes <= fbb have already been 
+                               removed, thus any factor <= assume_prime_thresh 
+                               is assumed prime without further test. */
   facul_method_t *methods;  /* List of methods to try */
 } facul_strategy_t;
 

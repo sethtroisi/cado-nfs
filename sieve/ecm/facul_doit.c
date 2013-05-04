@@ -172,7 +172,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
       
       /* A quick test if the factor is <= fbb^2 and >lpb */
       /* FIXME: must always use same width for comparison */
-      fprime = (mod_intcmp (f, strategy->fbb2) <= 0); 
+      fprime = (mod_intcmp_uint64 (f, strategy->assume_prime_thresh) <= 0); 
       if (fprime && mod_intcmp_ul (f, strategy->lpb) > 0)
 	{
 	  found = FACUL_NOT_SMOOTH; /* A prime > lpb, not smooth */
@@ -183,7 +183,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
       mod_intdivexact (n, n, f);
       
       /* See if cofactor is <= fbb^2 and > lpb */
-      cfprime = (mod_intcmp (n, strategy->fbb2) <= 0);
+      cfprime = (mod_intcmp_uint64 (n, strategy->assume_prime_thresh) <= 0);
       if (cfprime && mod_intcmp_ul (n, strategy->lpb) > 0)
 	{
 	  found = FACUL_NOT_SMOOTH; /* A prime > lpb, not smooth */
@@ -264,7 +264,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	 or is composite */
 
       if (fprime)
-	factors[found++] = f[0]; /* f < lp, so it fits in 1 unsigned long */
+	factors[found++] = mod_intget_ul(f); /* f < lp, so it fits in 1 unsigned long */
       else
 	{
             int f2 = FACUL_NOT_SMOOTH;    /* placate gcc (!) */

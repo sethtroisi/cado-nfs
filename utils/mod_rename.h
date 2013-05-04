@@ -8,6 +8,7 @@
 #undef mod_intequal_ul
 #undef mod_intcmp
 #undef mod_intcmp_ul
+#undef mod_intcmp_uint64
 #undef mod_intfits_ul
 #undef mod_intadd
 #undef mod_intsub
@@ -73,6 +74,7 @@
 #define mod_intequal_ul      MOD_RENAME(intequal_ul)
 #define mod_intcmp           MOD_RENAME(intcmp)
 #define mod_intcmp_ul        MOD_RENAME(intcmp_ul)
+#define mod_intcmp_uint64    MOD_RENAME(intcmp_uint64)
 #define mod_intfits_ul       MOD_RENAME(intfits_ul)
 #define mod_intadd           MOD_RENAME(intadd)
 #define mod_intsub           MOD_RENAME(intsub)
@@ -130,3 +132,82 @@
 #define mod_set1             MOD_RENAME(set1)
 #define mod_next             MOD_RENAME(next)
 #define mod_finished         MOD_RENAME(finished)
+
+/* A function that is not used anywhere. The purpose is solely generating 
+   compilation errors if any of the renamed functions, which constitute  
+   kind of a definition of the API, are not implemented. */
+static inline void * 
+mod_test_if_functions_exist()
+{
+  void *p;
+  p = &mod_intset;
+  p = &mod_intset_ul;
+  p = &mod_intget_ul;
+  p = &mod_intequal;
+  p = &mod_intequal_ul;
+  p = &mod_intcmp;
+  p = &mod_intcmp_ul;
+  p = &mod_intcmp_uint64;
+  p = &mod_intfits_ul;
+  p = &mod_intadd;
+  p = &mod_intsub;
+  p = &mod_intbits;
+  p = &mod_intshr;
+  p = &mod_intshl;
+  p = &mod_intdivexact;
+  p = &mod_intmod;
+  p = &mod_init;
+  p = &mod_init_noset0;
+  p = &mod_clear;
+  p = &mod_set;
+  p = &mod_set_ul;
+  p = &mod_set_ul_reduced;
+  p = &mod_set_int;
+  p = &mod_set_int_reduced;
+  p = &mod_swap;
+  /* This is implemented only for 1-word arithmetic.
+     FIXME: Since these functions are not generally available, they probably 
+     should not be renamed, either.
+  p = &mod_initmod_ul; 
+  p = &mod_getmod_ul;
+  */
+  p = &mod_initmod_int;
+  p = &mod_getmod_int;
+  p = &mod_clearmod;
+  p = &mod_get_ul;
+  p = &mod_get_int;
+  p = &mod_equal;
+  p = &mod_is0;
+  p = &mod_is1;
+  p = &mod_add;
+  p = &mod_add1;
+  p = &mod_add_ul;
+  p = &mod_sub;
+  p = &mod_sub_ul;
+  p = &mod_neg;
+  p = &mod_mul;
+  p = &mod_sqr;
+  p = &mod_div2;
+  p = &mod_div3;
+  p = &mod_div5;
+  p = &mod_div7;
+  p = &mod_div11;
+  p = &mod_div13;
+  p = &mod_pow_ul;
+  p = &mod_2pow_ul;
+  p = &mod_pow_mp;
+  p = &mod_2pow_mp;
+  p = &mod_V_ul;
+  p = &mod_V_mp;
+  p = &mod_sprp;
+  p = &mod_sprp2;
+  p = &mod_isprime;
+  p = &mod_gcd;
+  p = &mod_inv;
+  p = &mod_jacobi;
+  p = &mod_set0;
+  p = &mod_set1;
+  p = &mod_next;
+  p = &mod_finished;
+  return p;
+}

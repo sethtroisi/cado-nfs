@@ -3,6 +3,7 @@
 
 #include <assert.h>
 #include <limits.h>
+#include <stdint.h>
 #include <gmp.h>
 #include "macros.h"
 
@@ -89,6 +90,25 @@ modmpz_intcmp_ul (const modintmpz_t a, const unsigned long b)
 
 MAYBE_UNUSED
 static inline int
+modmpz_intcmp_uint64 (const modintmpz_t a, const uint64_t b)
+{
+  ASSERT(ULONG_MAX == UINT32_MAX || ULONG_MAX == UINT64_MAX);
+  if (ULONG_MAX == UINT32_MAX) {
+    mpz_t t;
+    int r;
+    mpz_init(t);
+    mpz_import (t, 1, 1, sizeof(uint64_t), 0, 0, &b);
+    r = mpz_cmp (a, t);
+    mpz_clear(t);
+    return r;
+  } else {
+    return (mpz_cmp_ui(a, b));
+  }
+}
+
+
+MAYBE_UNUSED
+static inline int
 modmpz_intfits_ul (const modintmpz_t a)
 {
   return (mpz_fits_ulong_p(a));
@@ -108,6 +128,22 @@ static inline void
 modmpz_intsub (modintmpz_t r, const modintmpz_t a, const modintmpz_t b)
 {
   mpz_sub (r, a, b);
+}
+
+
+MAYBE_UNUSED
+static inline void
+modmpz_intshr (modintmpz_t r, const modintmpz_t s, const int i)
+{
+  mpz_tdiv_q_2exp (r, s, i);
+}
+
+
+MAYBE_UNUSED
+static inline void
+modmpz_intshl (modintmpz_t r, const modintmpz_t s, const int i)
+{
+  mpz_mul_2exp (r, s, i);
 }
 
 

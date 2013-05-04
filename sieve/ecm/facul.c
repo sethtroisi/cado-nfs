@@ -51,8 +51,11 @@ facul_make_strategy (const int n, const unsigned long fbb,
   strategy->lpb = 1UL << lpb;
   if (lpb == ULONG_BITS)
       strategy->lpb = ~0UL;
-  /* Store fbb^2 in fbb2 */
-  ularith_mul_ul_ul_2ul (&(strategy->fbb2[0]), &(strategy->fbb2[1]), fbb, fbb);
+  /* Store fbb^2 in assume_prime_thresh */
+  if (fbb > UINT32_MAX)
+    strategy->assume_prime_thresh = UINT64_MAX;
+  else
+    strategy->assume_prime_thresh = (uint64_t) fbb * (uint64_t) fbb;
 
   methods = malloc ((n + 4) * sizeof (facul_method_t));
   strategy->methods = methods;

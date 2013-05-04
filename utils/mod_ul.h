@@ -13,6 +13,7 @@
 /**********************************************************************/
 #include <assert.h>
 #include <limits.h>
+#include <stdint.h>
 #include "macros.h"
 #include "ularith.h"
 
@@ -103,6 +104,16 @@ modul_intcmp_ul (const modintul_t a, const unsigned long b)
 
 MAYBE_UNUSED
 static inline int
+modul_intcmp_uint64 (const modintul_t a, const uint64_t b)
+{
+  if (b > ULONG_MAX)
+    return -1;
+  return (a[0] < b) ? -1 : (a[0] == b) ? 0 : 1;
+}
+
+
+MAYBE_UNUSED
+static inline int
 modul_intfits_ul (const modintul_t a MAYBE_UNUSED)
 {
   return 1;
@@ -122,6 +133,22 @@ static inline void
 modul_intsub (modintul_t r, const modintul_t a, const modintul_t b)
 {
   r[0] = a[0] - b[0];
+}
+
+
+MAYBE_UNUSED
+static inline void
+modul_intshr (modintul_t r, const modintul_t s, const int i)
+{
+  r[0] = s[0] >> i;
+}
+
+
+MAYBE_UNUSED
+static inline void
+modul_intshl (modintul_t r, const modintul_t s, const int i)
+{
+  r[0] = s[0] << i;
 }
 
 

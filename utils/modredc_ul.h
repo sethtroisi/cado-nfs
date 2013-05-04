@@ -14,6 +14,7 @@
 /**********************************************************************/
 #include <assert.h>
 #include <limits.h>
+#include <stdint.h>
 #include "macros.h"
 #include "ularith.h"
 
@@ -235,6 +236,15 @@ MAYBE_UNUSED
 static inline int
 modredcul_intcmp_ul (const modintredcul_t a, const unsigned long b)
 {
+  return (a[0] < b) ? -1 : (a[0] == b) ? 0 : 1;
+}
+
+MAYBE_UNUSED
+static inline int
+modredcul_intcmp_uint64 (const modintredcul_t a, const uint64_t b)
+{
+  if (b > ULONG_MAX)
+    return -1;
   return (a[0] < b) ? -1 : (a[0] == b) ? 0 : 1;
 }
 
