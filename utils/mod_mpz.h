@@ -575,7 +575,8 @@ modmpz_div13 (residuempz_t r, const residuempz_t a, const modulusmpz_t m)
   return modmpz_div_ul(r, a, 13, m);
 }
 
-void modmpz_gcd (modintmpz_t r, const residuempz_t a, const modulusmpz_t m)
+static inline void 
+modmpz_gcd (modintmpz_t r, const residuempz_t a, const modulusmpz_t m)
 {
   ASSERT_INPUT (a);
   mpz_gcd (r, a, m);
@@ -637,7 +638,8 @@ modmpz_isprime (const modulusmpz_t m)
   return mpz_probab_prime_p(m, 5);
 }
 
-int modmpz_inv (residuempz_t r, const residuempz_t a, const modulusmpz_t m)
+static inline int 
+modmpz_inv (residuempz_t r, const residuempz_t a, const modulusmpz_t m)
 {
   return mpz_invert (r, a, m);
 }
