@@ -196,22 +196,32 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	  if (mod_intbits (f) <= MODREDCUL_MAXBITS)
 	    {
 	      f_arith = CHOOSE_UL;
-	      modredcul_initmod_int (fm_ul, f);
+	      modredcul_initmod_ul (fm_ul, mod_intget_ul(f));
 	      fprime = primetest_ul (fm_ul);
             }
 #if     MOD_MAXBITS > MODREDCUL_MAXBITS
           else if (mod_intbits (f) <= MODREDC15UL_MAXBITS)
             {
+              unsigned long t1[2];
+              modintredc15ul_t t2;
+              size_t nr_words = mod_intget_uls(t1, f);
+              ASSERT_ALWAYS(nr_words <= 2);
+              modredc15ul_intset_uls (t2, t1, nr_words);
               f_arith = CHOOSE_15UL;
-	      modredc15ul_initmod_int (fm_15ul, f);
+	      modredc15ul_initmod_int (fm_15ul, t2);
 	      fprime = primetest_15ul (fm_15ul);
             }
 #endif
 #if     MOD_MAXBITS > MODREDC15UL_MAXBITS
 	  else if (mod_intbits (f) <= MODREDC2UL2_MAXBITS)
             {
+              unsigned long t1[2];
+              modintredc2ul2_t t2;
+              size_t nr_words = mod_intget_uls(t1, f);
+              ASSERT_ALWAYS(nr_words <= 2);
+              modredc2ul2_intset_uls (t2, t1, nr_words);
               f_arith = CHOOSE_2UL2;
-	      modredc2ul2_initmod_int (fm_2ul2, f);
+	      modredc2ul2_initmod_int (fm_2ul2, t2);
 	      fprime = primetest_2ul2 (fm_2ul2);
             }
 #endif
@@ -231,22 +241,32 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	  if (mod_intbits (n) <= MODREDCUL_MAXBITS)
 	    {
 	      cf_arith = CHOOSE_UL;
-	      modredcul_initmod_int (cfm_ul, n);
+	      modredcul_initmod_ul (cfm_ul, mod_intget_ul(n));
 	      cfprime = primetest_ul (cfm_ul);
             }
 #if     MOD_MAXBITS > MODREDCUL_MAXBITS
 	  else if (mod_intbits (n) <= MODREDC15UL_MAXBITS)
 	    {
+              unsigned long t1[2];
+              modintredc15ul_t t2;
+              size_t nr_words = mod_intget_uls(t1, n);
+              ASSERT_ALWAYS(nr_words <= 2);
+              modredc15ul_intset_uls (t2, t1, nr_words);
 	      cf_arith = CHOOSE_15UL;
-	      modredc15ul_initmod_int (cfm_15ul, n);
+	      modredc15ul_initmod_int (cfm_15ul, t2);
 	      cfprime = primetest_15ul (cfm_15ul);
             }
 #endif
 #if     MOD_MAXBITS > MODREDC15UL_MAXBITS
 	  else if (mod_intbits (n) <= MODREDC2UL2_MAXBITS)
             {
+              unsigned long t1[2];
+              modintredc2ul2_t t2;
+              size_t nr_words = mod_intget_uls(t1, n);
+              ASSERT_ALWAYS(nr_words <= 2);
+              modredc2ul2_intset_uls (t2, t1, nr_words);
               cf_arith = CHOOSE_2UL2;
-	      modredc2ul2_initmod_int (cfm_2ul2, n);
+	      modredc2ul2_initmod_int (cfm_2ul2, t2);
 	      cfprime = primetest_2ul2 (cfm_2ul2);
             }
 #endif
@@ -295,7 +315,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	}
 
       if (cfprime)
-	factors[found++] = n[0]; /* n < lp, so it fits in 1 unsigned long */
+	factors[found++] = mod_intget_ul(n); /* n < lp, so it fits in 1 unsigned long */
       else
 	{
 	  int f2 = FACUL_NOT_SMOOTH;    /* placate gcc (!) */
