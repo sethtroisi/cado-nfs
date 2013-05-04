@@ -130,6 +130,23 @@ modredc2ul2_frommontgomery (residueredc2ul2_t r, const residueredc2ul2_t s,
 
 MAYBE_UNUSED
 static inline void
+modredc2ul2_intinit (modintredc2ul2_t r)
+{
+  r[0] = 0;
+  r[1] = 0;
+}
+
+
+MAYBE_UNUSED
+static inline void
+modredc2ul2_intclear (modintredc2ul2_t r MAYBE_UNUSED)
+{
+  return;
+}
+
+
+MAYBE_UNUSED
+static inline void
 modredc2ul2_intset (modintredc2ul2_t r, const modintredc2ul2_t s)
 {
   r[0] = s[0];

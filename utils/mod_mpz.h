@@ -31,6 +31,23 @@ typedef mpz_t residuempz_t;
 typedef mpz_t modintmpz_t;
 typedef mpz_t modulusmpz_t;
 
+
+MAYBE_UNUSED
+static inline void
+modmpz_intinit (modintmpz_t r)
+{
+  mpz_init (r);
+}
+
+
+MAYBE_UNUSED
+static inline void
+modmpz_intclear (modintmpz_t r)
+{
+  mpz_clear (r);
+}
+
+
 MAYBE_UNUSED
 static inline void
 modmpz_intset (modintmpz_t r, const modintmpz_t s)

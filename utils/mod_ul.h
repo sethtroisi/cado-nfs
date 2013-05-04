@@ -48,6 +48,22 @@ typedef unsigned long modulusul_t[MODUL_SIZE];
 
 MAYBE_UNUSED
 static inline void
+modul_intinit (modintul_t r)
+{
+  r[0] = 0;
+}
+
+
+MAYBE_UNUSED
+static inline void
+modul_intclear (modintul_t r MAYBE_UNUSED)
+{
+  return;
+}
+
+
+MAYBE_UNUSED
+static inline void
 modul_intset (modintul_t r, const modintul_t s)
 {
   r[0] = s[0];

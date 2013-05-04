@@ -137,6 +137,23 @@ modredc15ul_redc1 (residueredc15ul_t r, const residueredc15ul_t s,
 
 MAYBE_UNUSED
 static inline void
+modredc15ul_intinit (modintredc15ul_t r)
+{
+  r[0] = 0;
+  r[1] = 0;
+}
+
+
+MAYBE_UNUSED
+static inline void
+modredc15ul_intclear (modintredc15ul_t r MAYBE_UNUSED)
+{
+  return;
+}
+
+
+MAYBE_UNUSED
+static inline void
 modredc15ul_intset (modintredc15ul_t r, const modintredc15ul_t s)
 {
   r[0] = s[0];

@@ -186,6 +186,22 @@ modredcul_redc_semi (residueredcul_t r, const unsigned long plow,
 
 MAYBE_UNUSED
 static inline void
+modredcul_intinit (modintredcul_t r)
+{
+  r[0] = 0;
+}
+
+
+MAYBE_UNUSED
+static inline void
+modredcul_intclear (modintredcul_t r MAYBE_UNUSED)
+{
+  return;
+}
+
+
+MAYBE_UNUSED
+static inline void
 modredcul_intset (modintredcul_t r, const modintredcul_t s)
 {
   r[0] = s[0];

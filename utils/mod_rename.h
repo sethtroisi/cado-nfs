@@ -1,6 +1,8 @@
 /* Renames mod_ function names so that the function for the desired
    arithmetic type/width is used */
 
+#undef mod_intinit
+#undef mod_intclear
 #undef mod_intset
 #undef mod_intset_ul
 #undef mod_intset_uls
@@ -69,6 +71,8 @@
 #undef mod_next
 #undef mod_finished
 
+#define mod_intinit          MOD_RENAME(intinit)
+#define mod_intclear         MOD_RENAME(intclear)
 #define mod_intset           MOD_RENAME(intset)
 #define mod_intset_ul        MOD_RENAME(intset_ul)
 #define mod_intset_uls       MOD_RENAME(intset_uls)
@@ -144,6 +148,8 @@ static inline void *
 mod_test_if_functions_exist()
 {
   void *p;
+  p = &mod_intinit;
+  p = &mod_intclear;
   p = &mod_intset;
   p = &mod_intset_ul;
   p = &mod_intset_uls;
