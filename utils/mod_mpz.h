@@ -224,7 +224,7 @@ MAYBE_UNUSED
 static inline void
 modmpz_initmod_ul (modulusmpz_t m, const unsigned long s)
 {
-  mpz_set_ui (m, s);
+  mpz_init_set_ui (m, s);
 }
 
 
@@ -232,7 +232,7 @@ MAYBE_UNUSED
 static inline void
 modmpz_initmod_int (modulusmpz_t m, const modintmpz_t s)
 {
-  mpz_set (m, s);
+  mpz_init_set (m, s);
 }
 
 
