@@ -53,6 +53,8 @@ facul_doit (unsigned long *factors, const modulus_t m,
 #endif
   } f_arith = CHOOSE_UL, cf_arith = CHOOSE_UL;
   
+  mod_intinit (n);
+  mod_intinit (f);
   mod_getmod_int (n, m);
   mod_intset_ul (f, 1UL);
   mod_init (r, m);
@@ -351,5 +353,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
     }
   
   mod_clear (r, m);
+  mod_intclear (n);
+  mod_intclear (f);
   return found;
 }

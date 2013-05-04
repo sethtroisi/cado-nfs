@@ -20,11 +20,14 @@ tryecm (const unsigned long p, const ecm_plan_t *plan)
   modint_t f;
   int r;
   
+  mod_intinit (f);
   mod_intset_ul (f, p);
   mod_initmod_int (m, f);
   r = ecm_ul (f, m, plan);
+  r = r || mod_intequal_ul (f, p);
   mod_clearmod (m);
-  return r || mod_intequal_ul (f, p);
+  mod_intclear (f);
+  return r;
 }
 
 int
