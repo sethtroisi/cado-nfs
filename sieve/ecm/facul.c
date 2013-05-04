@@ -177,7 +177,7 @@ facul (unsigned long *factors, const mpz_t N, const facul_strategy_t *strategy)
   /* If the composite does not fit into our modular arithmetic, return
      no factor */
   bits = mpz_sizeinbase (N, 2);
-  if (bits > MODREDC2UL2_MAXBITS)
+  if (bits > MODMPZ_MAXBITS)
     return 0;
   
   /* Use the fastest modular arithmetic that's large enough for this input */
@@ -214,7 +214,9 @@ facul (unsigned long *factors, const mpz_t N, const facul_strategy_t *strategy)
       modredc2ul2_initmod_int (m, n);
       found = facul_doit_2ul2 (factors, m, strategy, 0);
       modredc2ul2_clearmod (m);
-    } else {
+    } 
+  else 
+    {
       modulusmpz_t m;
       modmpz_initmod_int (m, N);
       found = facul_doit_mpz (factors, m, strategy, 0);
