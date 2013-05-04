@@ -360,7 +360,8 @@ int main (int argc, char **argv)
 
   if (strat)
     {
-      facul_clear_strategy (strategy);
+      free(strategy->methods);
+      free(strategy);
       strategy = facul_make_strategy (15, fbb, (lpb == 0) ? 0 : 1UL << lpb);
     }
   else
