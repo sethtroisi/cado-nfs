@@ -97,7 +97,7 @@ modmpz_intcmp_uint64 (const modintmpz_t a, const uint64_t b)
     mpz_t t;
     int r;
     mpz_init(t);
-    mpz_import (t, 1, 1, sizeof(uint64_t), 0, 0, &b);
+    mpz_import (t, 1, -1, sizeof(uint64_t), 0, 0, &b);
     r = mpz_cmp (a, t);
     mpz_clear(t);
     return r;
