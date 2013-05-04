@@ -61,7 +61,7 @@ static inline void
 modredc15ul_add (residueredc15ul_t r, const residueredc15ul_t a, 
 		 const residueredc15ul_t b, const modulusredc15ul_t m);
 static inline void
-modredc15ul_get_uls (modintredc15ul_t r, const residueredc15ul_t s, 
+modredc15ul_get_int (modintredc15ul_t r, const residueredc15ul_t s, 
 		     const modulusredc15ul_t m MAYBE_UNUSED);
 
 MAYBE_UNUSED
@@ -394,7 +394,7 @@ modredc15ul_intmod (modintredc15ul_t r, const modintredc15ul_t n,
    and s[1] is the high word. */
 MAYBE_UNUSED
 static inline void
-modredc15ul_initmod_uls (modulusredc15ul_t m, const modintredc15ul_t s)
+modredc15ul_initmod_int (modulusredc15ul_t m, const modintredc15ul_t s)
 {
   ASSERT (s[1] > 0UL);
   ASSERT (s[1] < (1UL << (LONG_BIT / 2)));
@@ -408,7 +408,7 @@ modredc15ul_initmod_uls (modulusredc15ul_t m, const modintredc15ul_t s)
 #ifdef WANT_ASSERT_EXPENSIVE
   {
     modintredc15ul_t t;
-    modredc15ul_get_uls (t, m[0].one, m);
+    modredc15ul_get_int (t, m[0].one, m);
     ASSERT_EXPENSIVE (modredc15ul_intequal_ul (t, 1UL));
   }
 #endif
@@ -418,7 +418,7 @@ modredc15ul_initmod_uls (modulusredc15ul_t m, const modintredc15ul_t s)
 /* Returns the modulus to an array of unsigned longs. */
 MAYBE_UNUSED
 static inline void
-modredc15ul_getmod_uls (modintredc15ul_t r, const modulusredc15ul_t m)
+modredc15ul_getmod_int (modintredc15ul_t r, const modulusredc15ul_t m)
 {
   modredc15ul_intset (r, m[0].m);
 }
@@ -483,7 +483,7 @@ modredc15ul_set_ul (residueredc15ul_t r, const unsigned long s,
 #ifdef WANT_ASSERT_EXPENSIVE
   {
     modintredc15ul_t t;
-    modredc15ul_get_uls (t, r, m);
+    modredc15ul_get_int (t, r, m);
     ASSERT_EXPENSIVE (t[0] == s && t[1] == 0UL);
   }
 #endif
@@ -504,7 +504,7 @@ modredc15ul_set_ul_reduced (residueredc15ul_t r, const unsigned long s,
 
 MAYBE_UNUSED
 static inline void
-modredc15ul_set_uls (residueredc15ul_t r, const modintredc15ul_t s, 
+modredc15ul_set_int (residueredc15ul_t r, const modintredc15ul_t s, 
 		     const modulusredc15ul_t m)
 {
   if (!modredc15ul_intlt (s, m[0].m))
@@ -518,7 +518,7 @@ modredc15ul_set_uls (residueredc15ul_t r, const modintredc15ul_t s,
 
 MAYBE_UNUSED
 static inline void
-modredc15ul_set_uls_reduced (residueredc15ul_t r, const modintredc15ul_t s, 
+modredc15ul_set_int_reduced (residueredc15ul_t r, const modintredc15ul_t s, 
 			     const modulusredc15ul_t m)
 {
   ASSERT (modredc15ul_intlt (s, m[0].m));
@@ -579,7 +579,7 @@ modredc15ul_get_ul (const residueredc15ul_t s,
 
 MAYBE_UNUSED
 static inline void
-modredc15ul_get_uls (modintredc15ul_t r, const residueredc15ul_t s, 
+modredc15ul_get_int (modintredc15ul_t r, const residueredc15ul_t s, 
 		     const modulusredc15ul_t m MAYBE_UNUSED)
 {
   ASSERT_EXPENSIVE (modredc15ul_intlt (s, m[0].m));

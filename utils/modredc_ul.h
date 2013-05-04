@@ -338,7 +338,7 @@ modredcul_initmod_ul_raw (modulusredcul_t m, const unsigned long s)
 
 MAYBE_UNUSED
 static inline void
-modredcul_initmod_uls (modulusredcul_t m, const modintredcul_t s)
+modredcul_initmod_int (modulusredcul_t m, const modintredcul_t s)
 {
   m[0].m = s[0];
   m[0].invm = -ularith_invmod (s[0]);
@@ -362,7 +362,7 @@ modredcul_getmod_ul (const modulusredcul_t m)
 
 MAYBE_UNUSED
 static inline void
-modredcul_getmod_uls (modintredcul_t r, const modulusredcul_t m)
+modredcul_getmod_int (modintredcul_t r, const modulusredcul_t m)
 {
   r[0] = m[0].m;
 }
@@ -449,7 +449,7 @@ modredcul_set_ul_reduced (residueredcul_t r, const unsigned long s,
 
 MAYBE_UNUSED
 static inline void
-modredcul_set_uls (residueredcul_t r, const modintredcul_t s,
+modredcul_set_int (residueredcul_t r, const modintredcul_t s,
 		   const modulusredcul_t m)
 {
   r[0] = s[0] % m[0].m;
@@ -459,7 +459,7 @@ modredcul_set_uls (residueredcul_t r, const modintredcul_t s,
 
 MAYBE_UNUSED
 static inline void
-modredcul_set_uls_reduced (residueredcul_t r, const modintredcul_t s,
+modredcul_set_int_reduced (residueredcul_t r, const modintredcul_t s,
 			   const modulusredcul_t m)
 {
   ASSERT (s[0] < m[0].m);
@@ -517,7 +517,7 @@ modredcul_get_ul (const residueredcul_t s,
 
 MAYBE_UNUSED
 static inline void
-modredcul_get_uls (modintredcul_t r, const residueredcul_t s,
+modredcul_get_int (modintredcul_t r, const residueredcul_t s,
 		   const modulusredcul_t m MAYBE_UNUSED)
 {
   ASSERT_EXPENSIVE (s[0] < m[0].m);

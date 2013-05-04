@@ -100,7 +100,7 @@ uint32_t **cof_succ; /* cof_succ[r][a] is the corresponding number of
 
 #ifdef USE_GMPECM
 unsigned long gmpecm_call = 0;
-unsigned long gmpecm_calls = 0, gmpecm_smooth = 0, gmpecm_failures = 0;
+unsigned long gmpecm_calls = 0, gmpecm_smooth = 0, gmpecm_nonsmooth = 0;
 #endif
 /* }}} */
 
@@ -114,6 +114,12 @@ int factor_leftover_norm (mpz_t n,
                           mpz_array_t* const factors,
 			  uint32_array_t* const multis,
                           sieve_info_ptr si, int side);
+#ifdef USE_GMPECM
+int factor_leftover_norm2 (mpz_t n,
+                          mpz_array_t* const factors,
+			  uint32_array_t* const multis,
+                          sieve_info_ptr si, int side);
+#endif
 /* }}} */
 
 /*****************************/
@@ -2313,21 +2319,47 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
             }
 
             /* if norm[RATIONAL_SIDE] is above BLPrat, then it might not
-             * be smooth. We factor it first. Otherwise we factor it
-             * last.
+             * be smooth. We factor it first. Otherwise we factor it last.
              */
             int first = mpz_cmp(norm[RATIONAL_SIDE], BLPrat) > 0 ? RATIONAL_SIDE : ALGEBRAIC_SIDE;
+            int ok[2];
 
-            for(int z = 0 ; pass && z < 2 ; z++) {
+            for (int z = 0 ; pass && z < 2 ; z++)
+              {
                 int side = first ^ z;
-                pass = factor_leftover_norm (norm[side], f[side], m[side], si,
-                                             side);
+                ok[side] = factor_leftover_norm (norm[side], f[side], m[side],
+                                                 si, side);
 #ifdef TRACE_K
-                if (trace_on_spot_ab(a, b) && pass == 0)
+                if (trace_on_spot_ab(a, b) && ok[side] == 0)
                   gmp_fprintf (stderr, "# factor_leftover_norm failed on %s side for (%"PRId64",%"PRIu64"), remains %Zd unfactored\n", sidenames[side], a, b, norm[side]);
 #endif
-            }
-            if (!pass) continue;
+#ifdef USE_GMPECM
+                pass = ok[side] >= 0; /* allow incomplete factorizations */
+#else
+                pass = ok[side] > 0;  /* require complete factorizations */
+#endif
+              }
+
+            if (pass == 0) continue; /* a factor was > 2^lpb */
+
+#ifdef USE_GMPECM
+            /* now try with GMP-ECM */
+            for (int z = 0 ; pass && z < 2 ; z++)
+              {
+                int side = first ^ z;
+                if (ok[side] == 0) /* not completely factored */
+                  ok[side] = factor_leftover_norm2 (norm[side], f[side],
+                                                    m[side], si, side);
+#ifdef TRACE_K
+                if (trace_on_spot_ab(a, b) && ok[side] == 0)
+                  gmp_fprintf (stderr, "# factor_leftover_norm2 failed on %s side for (%"PRId64",%"PRIu64"), remains %Zd unfactored\n", sidenames[side], a, b, norm[side]);
+#endif
+                pass = ok[side] > 0;
+              }
+
+            if (pass == 0) continue; /* a factor was > 2^lpb, or we were not
+                                        able to fully factor the norm */
+#endif
 
             /* yippee: we found a relation! */
 
@@ -2564,8 +2596,9 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
           L - large prime bound is L=2^l
    Assumes n > 0.
    Return value:
-          0 if n has a prime factor larger than L
+          -1 if n has a prime factor larger than L
           1 if all prime factors of n are < L
+          0 if n could not be completely factored
    Output:
           the prime factors of n are factors->data[0..factors->length-1],
           with corresponding multiplicities multis[0..factors->length-1].
@@ -2579,7 +2612,7 @@ factor_leftover_norm (mpz_t n, mpz_array_t* const factors,
   facul_strategy_t *strategy = si->sides[side]->strategy;
   uint32_t i, nr_factors;
   unsigned long ul_factors[16];
-  int facul_code, res = 0;
+  int facul_code;
 
   /* For the moment this code can't cope with too large factors */
   ASSERT(lpb <= ULONG_BITS);
@@ -2590,9 +2623,9 @@ factor_leftover_norm (mpz_t n, mpz_array_t* const factors,
   /* If n < B^2, then n is prime, since all primes < B have been removed */
   if (mpz_cmp (n, si->BB[side]) < 0)
     {
-      /* if n > L, return 0 */
+      /* if n > L, return -1 */
       if (mpz_sizeinbase (n, 2) > lpb)
-        return 0;
+        return -1;
 
       if (mpz_cmp_ui (n, 1) > 0) /* 1 is special */
         {
@@ -2607,7 +2640,7 @@ factor_leftover_norm (mpz_t n, mpz_array_t* const factors,
   facul_code = facul (ul_factors, n, strategy);
 
   if (facul_code == FACUL_NOT_SMOOTH)
-    return 0;
+    return -1;
 
   ASSERT (facul_code == 0 || mpz_cmp_ui (n, ul_factors[0]) != 0);
 
@@ -2623,7 +2656,7 @@ factor_leftover_norm (mpz_t n, mpz_array_t* const factors,
 	  unsigned long r;
 	  mpz_t t;
 	  if (ul_factors[i] & oversize_mask) /* Larger than large prime bound? */
-            return 0;
+            return -1;
 	  r = mpz_tdiv_q_ui (n, n, ul_factors[i]);
 	  ASSERT_ALWAYS (r == 0UL);
 	  mpz_init (t);
@@ -2637,7 +2670,7 @@ factor_leftover_norm (mpz_t n, mpz_array_t* const factors,
       if (mpz_cmp (n, si->BB[side]) < 0)
         {
           if (mpz_sizeinbase (n, 2) > lpb)
-            return 0;
+            return -1;
 
           if (mpz_cmp_ui (n, 1) > 0) /* 1 is special */
             {
@@ -2648,92 +2681,102 @@ factor_leftover_norm (mpz_t n, mpz_array_t* const factors,
         }
 
       if (check_leftover_norm (n, si, side) == 0)
-        return 0;
+        return -1;
     }
+  return 0; /* unable to completely factor n */
+}
+
 #ifdef USE_GMPECM
-  {
-    mpz_t f; /* potential factor */
-    double B1 = 315.0; /* last curve tried in facul has B1=315 */
-    ecm_params params;
+/* same then factor_leftover_norm, but with GMP-ECM instead of facul */
+int
+factor_leftover_norm2 (mpz_t n, mpz_array_t* const factors,
+                      uint32_array_t* const multis,
+                      sieve_info_ptr si, int side)
+{
+  unsigned int lpb = si->conf->sides[side]->lpb;
+  int res = 0;
+  mpz_t f; /* potential factor */
+  double B1 = 315.0; /* last curve tried in facul has B1=315 */
+  ecm_params params;
 
-    //gmp_printf ("try GMP_ECM on %Zd (%lu bits)\n", n, mpz_sizeinbase (n, 2));
+  //gmp_printf ("try GMP_ECM on %Zd (%lu bits)\n", n, mpz_sizeinbase (n, 2));
 
-    ASSERT_ALWAYS (check_leftover_norm (n, si, side) != 0);
+  ASSERT_ALWAYS (check_leftover_norm (n, si, side) != 0);
 
-    mpz_init (f);
-    ecm_init (params);
-    mpz_set_ui (params->sigma, 11);
-    params->S = 1;
-    params->param = ECM_PARAM_BATCH_SQUARE;
-    gmpecm_call ++;
-    while (1) /* assume n > 2^lpb */
-      {
-        if (IS_PROBAB_PRIME (n))
-          {
-            res = 0;
-            goto clear_and_return;
-          }
-        B1 += sqrt (B1);
-        mpz_add_ui (params->sigma, params->sigma, 1); /* new curve */
-        mpz_set_ui (params->x, 2);
-        gmpecm_calls ++;
-        res = ecm_factor (f, n, B1, params);
-        if (res == ECM_ERROR)
-          {
-            fprintf (stderr, "Error in GMP-ECM, aborting.\n");
-            exit (1);
-          }
-        if (res > 0 && mpz_cmp (f, n) < 0) /* found a factor 1 < f < n */
-          {
-            /* if f is large, try n/f instead */
-            if (mpz_cmp (f, si->BB[side]) >= 0 &&
-                2 * mpz_sizeinbase (f, 2) > mpz_sizeinbase (n, 2))
-              mpz_divexact (f, n, f);
+  mpz_init (f);
+  ecm_init (params);
+  mpz_set_ui (params->sigma, 11);
+  params->S = 1;
+  params->param = ECM_PARAM_BATCH_SQUARE;
+  gmpecm_call ++;
+  while (1) /* assume n > 2^lpb */
+    {
+      if (IS_PROBAB_PRIME (n))
+        {
+          res = -1; /* n > 2^lpb and is prime */
+          goto clear_and_return;
+        }
+      B1 += sqrt (B1);
+      mpz_add_ui (params->sigma, params->sigma, 1); /* new curve */
+      mpz_set_ui (params->x, 2);
+      gmpecm_calls ++;
+      res = ecm_factor (f, n, B1, params);
+      if (res == ECM_ERROR)
+        {
+          fprintf (stderr, "Error in GMP-ECM, aborting.\n");
+          exit (1);
+        }
+      if (res > 0 && mpz_cmp (f, n) < 0) /* found a factor 1 < f < n */
+        {
+          /* if f is large, try n/f instead */
+          if (mpz_cmp (f, si->BB[side]) >= 0 &&
+              2 * mpz_sizeinbase (f, 2) > mpz_sizeinbase (n, 2))
+            mpz_divexact (f, n, f);
 
-            if (mpz_cmp (f, si->BB[side]) >= 0 || mpz_sizeinbase (f, 2) > lpb)
-              {
-                res = 0;
-                if (IS_PROBAB_PRIME (f) == 0)
-                  {
-                    gmp_fprintf (stderr, "Failed to factor n=%Zd (f=%Zd)\n",
-                                 n, f);
-                    exit (1);
-                  }
-                goto clear_and_return;
-              }
+          if (mpz_cmp (f, si->BB[side]) >= 0 || mpz_sizeinbase (f, 2) > lpb)
+            {
+              res = -1;
+              if (IS_PROBAB_PRIME (f) == 0)
+                {
+                  gmp_fprintf (stderr, "Failed to factor n=%Zd (f=%Zd)\n",
+                               n, f);
+                  exit (1);
+                }
+              goto clear_and_return;
+            }
 
-            /* now f < B^2, thus f is prime, and f < L */
+          /* now f < B^2, thus f is prime, and f < L */
 
-            //gmp_printf ("found factor %Zd of %lu bits\n", f, mpz_sizeinbase (f, 2));
-            append_mpz_to_array (factors, f);
-            append_uint32_to_array (multis, 1);
-            mpz_divexact (n, n, f);
-            unsigned int s = BITSIZE(n);
-            if (s <= lpb)
-              {
-                append_mpz_to_array (factors, n);
-                append_uint32_to_array (multis, 1);
-                res = 1;
-                goto clear_and_return;
-              }
-            if (mpz_cmp (n, si->BB[side]) < 0) /* n is a prime > L */
-              {
-                res = 0;
-                goto clear_and_return;
-              }
-          }
-      }
-  clear_and_return:
-    mpz_clear (f);
-    ecm_clear (params);
-  }
-  if (res == 0)
-    gmpecm_failures ++;
+          //gmp_printf ("found factor %Zd of %lu bits\n", f, mpz_sizeinbase (f, 2));
+          append_mpz_to_array (factors, f);
+          append_uint32_to_array (multis, 1);
+          mpz_divexact (n, n, f);
+          unsigned int s = BITSIZE(n);
+          if (s <= lpb)
+            {
+              append_mpz_to_array (factors, n);
+              append_uint32_to_array (multis, 1);
+              res = 1;
+              goto clear_and_return;
+            }
+          if (mpz_cmp (n, si->BB[side]) < 0) /* n is a prime > L */
+            {
+              res = -1;
+              goto clear_and_return;
+            }
+        }
+    }
+ clear_and_return:
+  mpz_clear (f);
+  ecm_clear (params);
+  if (res == -1)
+    gmpecm_nonsmooth ++;
   else
     gmpecm_smooth ++;
-#endif
   return res;
-}/*}}}*/
+}
+#endif
+/*}}}*/
 
 /* Move above ? */
 /* {{{ process_bucket_region
@@ -3566,7 +3609,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
 #ifdef USE_GMPECM
     fprintf (las->output, "# GMP-ECM calls: %lu (%lu), smooth: %lu, non-smooth: %lu\n",
-             gmpecm_call, gmpecm_calls, gmpecm_smooth, gmpecm_failures);
+             gmpecm_call, gmpecm_calls, gmpecm_smooth, gmpecm_nonsmooth);
 #endif
 
     fprintf (las->output, "# Total %lu reports [%1.3gs/r, %1.1fr/sq]\n",

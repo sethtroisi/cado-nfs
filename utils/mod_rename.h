@@ -22,16 +22,16 @@
 #undef mod_set
 #undef mod_set_ul
 #undef mod_set_ul_reduced
-#undef mod_set_uls
-#undef mod_set_uls_reduced
+#undef mod_set_int
+#undef mod_set_int_reduced
 #undef mod_swap
 #undef mod_initmod_ul
-#undef mod_initmod_uls
+#undef mod_initmod_int
 #undef mod_getmod_ul
-#undef mod_getmod_uls
+#undef mod_getmod_int
 #undef mod_clearmod
 #undef mod_get_ul
-#undef mod_get_uls
+#undef mod_get_int
 #undef mod_equal
 #undef mod_is0
 #undef mod_is1
@@ -87,16 +87,16 @@
 #define mod_set              MOD_RENAME(set)
 #define mod_set_ul           MOD_RENAME(set_ul)
 #define mod_set_ul_reduced   MOD_RENAME(set_ul_reduced)
-#define mod_set_uls          MOD_RENAME(set_uls)
-#define mod_set_uls_reduced  MOD_RENAME(set_uls_reduced)
+#define mod_set_int          MOD_RENAME(set_int)
+#define mod_set_int_reduced  MOD_RENAME(set_int_reduced)
 #define mod_swap             MOD_RENAME(swap)
 #define mod_initmod_ul       MOD_RENAME(initmod_ul)
-#define mod_initmod_uls      MOD_RENAME(initmod_uls)
+#define mod_initmod_int      MOD_RENAME(initmod_int)
 #define mod_getmod_ul        MOD_RENAME(getmod_ul)
-#define mod_getmod_uls       MOD_RENAME(getmod_uls)
+#define mod_getmod_int       MOD_RENAME(getmod_int)
 #define mod_clearmod         MOD_RENAME(clearmod)
 #define mod_get_ul           MOD_RENAME(get_ul)
-#define mod_get_uls          MOD_RENAME(get_uls)
+#define mod_get_int          MOD_RENAME(get_int)
 #define mod_equal            MOD_RENAME(equal)
 #define mod_is0              MOD_RENAME(is0)
 #define mod_is1              MOD_RENAME(is1)

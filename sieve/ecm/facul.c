@@ -188,14 +188,14 @@ facul (unsigned long *factors, const mpz_t N, const facul_strategy_t *strategy)
   if (i <= MODREDCUL_MAXBITS)
     {
       modulusredcul_t m;
-      modredcul_initmod_uls (m, n);
+      modredcul_initmod_int (m, n);
       found = facul_doit_ul (factors, m, strategy, 0);
       modredcul_clearmod (m);
     }
   else if (i <= MODREDC15UL_MAXBITS)
     {
       modulusredc15ul_t m;
-      modredc15ul_initmod_uls (m, n);
+      modredc15ul_initmod_int (m, n);
       found = facul_doit_15ul (factors, m, strategy, 0);
       modredc15ul_clearmod (m);
     }
@@ -203,7 +203,7 @@ facul (unsigned long *factors, const mpz_t N, const facul_strategy_t *strategy)
     {
       modulusredc2ul2_t m;
       ASSERT (i <= MODREDC2UL2_MAXBITS);
-      modredc2ul2_initmod_uls (m, n);
+      modredc2ul2_initmod_int (m, n);
       found = facul_doit_2ul2 (factors, m, strategy, 0);
       modredc2ul2_clearmod (m);
     }

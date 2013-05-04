@@ -416,7 +416,7 @@ mod_sprp (const residue_t b, const modulus_t m)
   int i = 0, po2 = 0;
   modint_t mm1;
 
-  mod_getmod_uls (mm1, m);
+  mod_getmod_int (mm1, m);
 
   if (mod_intequal_ul (mm1, 1UL))
     return 0;
@@ -462,7 +462,7 @@ mod_sprp2 (const modulus_t m)
   int i = 0, po2 = 0;
   modint_t mm1;
 
-  mod_getmod_uls (mm1, m);
+  mod_getmod_int (mm1, m);
 
   /* Let m-1 = 2^l * k, k odd. Set mm1 = k, po2 = l */
   mm1[0]--; /* No borrow since m is odd */
@@ -504,7 +504,7 @@ mod_isprime (const modulus_t m)
   modint_t n, mm1;
   int r = 0, po2 = 0, i;
   
-  mod_getmod_uls (n, m);
+  mod_getmod_int (n, m);
 
   if (mod_intcmp_ul (n, 1UL) == 0)
     return 0;
@@ -700,8 +700,8 @@ mod_jacobi (const residue_t a_par, const modulus_t m_par)
   modint_t a, m, s;
   int t = 1;
 
-  mod_get_uls (a, a_par, m_par);
-  mod_getmod_uls (m, m_par);
+  mod_get_int (a, a_par, m_par);
+  mod_getmod_int (m, m_par);
   
   while (!mod_intequal_ul (a, 0UL))
   {
