@@ -16,12 +16,14 @@
 #ifdef WANT_ASSERT_EXPENSIVE
 #include <valgrind/memcheck.h>
 #undef ASSERT_EXPENSIVE
+#define SET_MPZ_UNDEF(x) VALGRIND_MAKE_MEM_UNDEFINED(x, sizeof(x[0]));
 #define ASSERT_EXPENSIVE(x) ASSERT(x)
 #define ASSERT_DEFINED(x) VALGRIND_CHECK_VALUE_IS_DEFINED(x); 
 #define ASSERT_MPZ(x) ASSERT_DEFINED(x[0]); VALGRIND_CHECK_MEM_IS_DEFINED(x->_mp_d, llabs(x->_mp_size)); VALGRIND_CHECK_MEM_IS_ADDRESSABLE(x->_mp_d, llabs(x->_mp_alloc));
 #define ASSERT_MPZ_RES(x) ASSERT_MPZ(x); ASSERT_EXPENSIVE (mpz_cmp(m, x) > 0);
 #define ASSERT_UL_RES(x) ASSERT_DEFINED(x); ASSERT_EXPENSIVE (mpz_cmp_ui(m, x) > 0);
 #else
+#define SET_MPZ_UNDEF(x)
 #define ASSERT_EXPENSIVE(x)
 #define ASSERT_DEFINED(x)
 #define ASSERT_MPZ(x)
@@ -53,7 +55,7 @@ modmpz_intclear (modintmpz_t r)
 {
   ASSERT_MPZ(r);
   mpz_clear (r);
-  VALGRIND_MAKE_MEM_UNDEFINED(r, sizeof(r[0]));
+  SET_MPZ_UNDEF(r);
 }
 
 
@@ -300,7 +302,7 @@ modmpz_clearmod (modulusmpz_t m MAYBE_UNUSED)
 {
   ASSERT_MPZ(m);
   mpz_clear(m);
-  VALGRIND_MAKE_MEM_UNDEFINED(m, sizeof(m[0]));
+  SET_MPZ_UNDEF(m);
 }
 
 
@@ -336,7 +338,7 @@ modmpz_clear (residuempz_t r MAYBE_UNUSED,
   ASSERT_MPZ_RES(r);
   ASSERT_MPZ(m);
   mpz_clear (r);
-  VALGRIND_MAKE_MEM_UNDEFINED(r, sizeof(r[0]));
+  SET_MPZ_UNDEF(r);
 }
 
 
