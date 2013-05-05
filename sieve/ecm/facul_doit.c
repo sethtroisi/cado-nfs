@@ -350,6 +350,8 @@ facul_doit (unsigned long *factors, const modulus_t m,
             clear_modset (&cfm);
 	  if (cfprime && mod_intcmp_ul (n, strategy->lpb) > 0)
 	    {
+	      if (!fprime)
+	        clear_modset (&fm);
 	      found = FACUL_NOT_SMOOTH; /* A prime > lpb, not smooth */
 	      break;
 	    }
