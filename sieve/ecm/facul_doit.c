@@ -42,6 +42,9 @@ facul_doit (unsigned long *factors, const modulus_t m,
 #if     MOD_MAXBITS > MODREDC15UL_MAXBITS
   modulusredc2ul2_t fm_2ul2, cfm_2ul2; /* Modulus for factor and cofactor */
 #endif
+#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
+  modulusmpz_t fm_mpz, cfm_mpz;
+#endif
   int i, found = 0, bt, fprime, cfprime;
   enum {
       CHOOSE_UL,
@@ -50,6 +53,9 @@ facul_doit (unsigned long *factors, const modulus_t m,
 #endif
 #if     MOD_MAXBITS > MODREDC15UL_MAXBITS
       CHOOSE_2UL2,
+#endif
+#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
+      CHOOSE_MPZ,
 #endif
   } f_arith = CHOOSE_UL, cf_arith = CHOOSE_UL;
   
@@ -195,14 +201,16 @@ facul_doit (unsigned long *factors, const modulus_t m,
       /* Determine for certain if the factor is prime */
       if (!fprime)
 	{
-	  if (mod_intbits (f) <= MODREDCUL_MAXBITS)
+	  const size_t bits = mod_intbits (f);
+	  ASSERT(bits <= MOD_MAXBITS);
+	  if (bits <= MODREDCUL_MAXBITS)
 	    {
 	      f_arith = CHOOSE_UL;
 	      modredcul_initmod_ul (fm_ul, mod_intget_ul(f));
 	      fprime = primetest_ul (fm_ul);
             }
 #if     MOD_MAXBITS > MODREDCUL_MAXBITS
-          else if (mod_intbits (f) <= MODREDC15UL_MAXBITS)
+          else if (bits <= MODREDC15UL_MAXBITS)
             {
               unsigned long t1[2];
               modintredc15ul_t t2;
@@ -215,7 +223,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
             }
 #endif
 #if     MOD_MAXBITS > MODREDC15UL_MAXBITS
-	  else if (mod_intbits (f) <= MODREDC2UL2_MAXBITS)
+	  else if (bits <= MODREDC2UL2_MAXBITS)
             {
               unsigned long t1[2];
               modintredc2ul2_t t2;
@@ -225,6 +233,15 @@ facul_doit (unsigned long *factors, const modulus_t m,
               f_arith = CHOOSE_2UL2;
 	      modredc2ul2_initmod_int (fm_2ul2, t2);
 	      fprime = primetest_2ul2 (fm_2ul2);
+            }
+#endif
+#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
+	  else if (bits <= MODMPZ_MAXBITS)
+            {
+              /* We assume for now that f is a modintmpz_t */
+              f_arith = CHOOSE_MPZ;
+	      modmpz_initmod_int (fm_mpz, f);
+	      fprime = primetest_mpz (fm_mpz);
             }
 #endif
           else
@@ -240,14 +257,16 @@ facul_doit (unsigned long *factors, const modulus_t m,
       /* Determine for certain if the cofactor is prime */
       if (!cfprime)
 	{
-	  if (mod_intbits (n) <= MODREDCUL_MAXBITS)
+	  const size_t bits = mod_intbits (n);
+	  ASSERT (bits <= MOD_MAXBITS);
+	  if (bits <= MODREDCUL_MAXBITS)
 	    {
 	      cf_arith = CHOOSE_UL;
 	      modredcul_initmod_ul (cfm_ul, mod_intget_ul(n));
 	      cfprime = primetest_ul (cfm_ul);
             }
 #if     MOD_MAXBITS > MODREDCUL_MAXBITS
-	  else if (mod_intbits (n) <= MODREDC15UL_MAXBITS)
+	  else if (bits <= MODREDC15UL_MAXBITS)
 	    {
               unsigned long t1[2];
               modintredc15ul_t t2;
@@ -260,7 +279,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
             }
 #endif
 #if     MOD_MAXBITS > MODREDC15UL_MAXBITS
-	  else if (mod_intbits (n) <= MODREDC2UL2_MAXBITS)
+	  else if (bits <= MODREDC2UL2_MAXBITS)
             {
               unsigned long t1[2];
               modintredc2ul2_t t2;
@@ -270,6 +289,15 @@ facul_doit (unsigned long *factors, const modulus_t m,
               cf_arith = CHOOSE_2UL2;
 	      modredc2ul2_initmod_int (cfm_2ul2, t2);
 	      cfprime = primetest_2ul2 (cfm_2ul2);
+            }
+#endif
+#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
+	  else if (bits <= MODMPZ_MAXBITS)
+            {
+              /* We assume for now that f is a modintmpz_t */
+              cf_arith = CHOOSE_MPZ;
+	      modmpz_initmod_int (cfm_mpz, n);
+	      cfprime = primetest_mpz (cfm_mpz);
             }
 #endif
           else
@@ -286,7 +314,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	 or is composite */
 
       if (fprime)
-	factors[found++] = mod_intget_ul(f); /* f < lp, so it fits in 1 unsigned long */
+	factors[found++] = mod_intget_ul(f); /* f < lpb, so it fits in 1 unsigned long */
       else
 	{
             int f2 = FACUL_NOT_SMOOTH;    /* placate gcc (!) */
@@ -295,17 +323,27 @@ facul_doit (unsigned long *factors, const modulus_t m,
           switch (f_arith) {
               case CHOOSE_UL:
                   f2 = facul_doit_ul (factors + found, fm_ul, strategy, i);
+                  modredcul_clearmod (fm_ul);
                   break;
 #if     MOD_MAXBITS > MODREDCUL_MAXBITS
               case CHOOSE_15UL:
                   f2 = facul_doit_15ul (factors + found, fm_15ul, strategy, i);
+                  modredc15ul_clearmod (fm_15ul);
                   break;
 #endif
 #if     MOD_MAXBITS > MODREDC15UL_MAXBITS
               case CHOOSE_2UL2:
                   f2 = facul_doit_2ul2 (factors + found, fm_2ul2, strategy, i);
+                  modredc2ul2_clearmod (fm_2ul2);
                   break;
 #endif
+#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
+              case CHOOSE_MPZ:
+                  f2 = facul_doit_mpz (factors + found, fm_mpz, strategy, i);
+                  modmpz_clearmod (fm_mpz);
+                  break;
+#endif
+              default: abort();
           }
           
 	  if (f2 == FACUL_NOT_SMOOTH)
@@ -325,17 +363,27 @@ facul_doit (unsigned long *factors, const modulus_t m,
           switch(cf_arith) {
               case CHOOSE_UL:
                   f2 = facul_doit_ul (factors + found, cfm_ul, strategy, i + 1);
+                  modredcul_clearmod (cfm_ul);
                   break;
 #if     MOD_MAXBITS > MODREDCUL_MAXBITS
               case CHOOSE_15UL:
                   f2 = facul_doit_15ul (factors + found, cfm_15ul, strategy, i + 1);
+                  modredc15ul_clearmod (cfm_15ul);
                   break;
-#endif    
+#endif
 #if     MOD_MAXBITS > MODREDC15UL_MAXBITS
               case CHOOSE_2UL2:
                   f2 = facul_doit_2ul2 (factors + found, cfm_2ul2, strategy, i + 1);
+                  modredc2ul2_clearmod (cfm_2ul2);
                   break;
 #endif
+#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
+              case CHOOSE_MPZ:
+                  f2 = facul_doit_mpz (factors + found, cfm_mpz, strategy, i+1);
+                  modmpz_clearmod (cfm_mpz);
+                  break;
+#endif
+              default: abort();
           }
           
 	  if (f2 == FACUL_NOT_SMOOTH)
