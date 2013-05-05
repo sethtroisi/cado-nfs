@@ -367,6 +367,7 @@ ellW_add (ellW_point_t R, const ellW_point_t P, const ellW_point_t Q,
 
   mod_init_noset0 (u, m);
   mod_init_noset0 (v, m);
+  mod_init_noset0 (lambda, m);
 
   mod_sub (u, Q->y, P->y, m);
   mod_sub (v, Q->x, P->x, m);
@@ -403,6 +404,7 @@ ellW_add (ellW_point_t R, const ellW_point_t P, const ellW_point_t Q,
       r = 1;
   }
 
+  mod_clear (lambda, m);
   mod_clear (v, m);
   mod_clear (u, m);
   return r;
@@ -1191,9 +1193,9 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
           }
       }
     
+    ellM_init (Pd, m);
 #if 0
     /* Also compute Pd = d*P while we've got 6*P */
-    ellM_init (Pd, m);
     ellM_mul_ul (Pd, P6, plan->d / 6, m, b); /* slow! */
 #else
     ASSERT ((unsigned) (i1 + i5) == plan->d);
@@ -1269,6 +1271,7 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
         k++; i++;
       }
 
+    ellM_clear (Pd, m);
     ellM_clear (Pid, m);
     ellM_clear (Pid1, m);
   }
@@ -1365,27 +1368,26 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
   mod_set (r, a, m);
   
   /* Clear everything */
-  for (i = 0; i < plan->s1; i++)
-    mod_clear (Pj_z[i], m);
-  free (Pj_z);
-  Pj_z = NULL;
-  for (i = 0; i < plan->i1 - plan->i0; i++)
-    mod_clear (Pid_z[i], m);
-  free (Pid_z);
-  Pid_z = NULL;
   
-   for (i = 0; i < plan->s1; i++)
+  for (i = 0; i < plan->s1; i++)
     {
-      mod_clear (Pj_x[k], m);
-      mod_clear (Pj_z[k], m);
-    }
- for (i = 0; i < plan->i1 - plan->i0; i++)
-    {
-      mod_clear (Pid_x[k], m);
-      mod_clear (Pid_z[k], m);
+      mod_clear (Pj_x[i], m);
+      mod_clear (Pj_z[i], m);
     }
   free (Pj_x);
+  Pj_x = NULL;
+  free (Pj_z);
+  Pj_z = NULL;
+
+  for (i = 0; i < plan->i1 - plan->i0; i++)
+    {
+      mod_clear (Pid_x[i], m);
+      mod_clear (Pid_z[i], m);
+    }
   free (Pid_x);
+  Pid_x = NULL;
+  free (Pid_z);
+  Pid_z = NULL;
   
   ellM_clear (Pt, m);
   mod_clear (t, m);
