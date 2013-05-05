@@ -372,8 +372,6 @@ pp1_stage2 (residue_t r, const residue_t X, const stage2_plan_t *plan,
 
   free (Xj);
 
-  for (k = 0; k < plan->s1; k++)
-    mod_clear (Xj[k], m);
   mod_clear (Xd, m);
   mod_clear (Xid, m);
   mod_clear (Xid1, m);
