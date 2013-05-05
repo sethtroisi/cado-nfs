@@ -86,6 +86,16 @@ facul_make_strategy (const int n, const unsigned long fbb,
       ecm_make_plan (methods[i].plan, 315, 5355, MONTY12, i - 1, 1, 0);
     }
 
+#if 0
+  /* add a new curve: the stage 2 giant step length is 210, and the k-th giant
+     step covers [210 k - 105, 210 k + 105[, thus we choose B1 and B2 of the
+     form 105*(2k + 1). */
+  methods[i].method = EC_METHOD;
+  methods[i].plan = malloc (sizeof (ecm_plan_t));
+  ecm_make_plan (methods[i].plan, 525, 12075, MONTY12, i - 1, 1, 0);
+  i++;
+#endif
+
   methods[n + 3].method = 0;
   methods[n + 3].plan = NULL;
 
