@@ -46,7 +46,12 @@ facul_doit (unsigned long *factors, const modulus_t m,
   modulusmpz_t fm_mpz, cfm_mpz;
 #endif
   int i, found = 0, bt, fprime, cfprime;
+  /* The f_arith and cf_arith variables tell which modulus type has been 
+     initiaised for arithmetic on the factor and the cofactor, resp. 
+     The have a value of CHOOSE_NONE if no modulus for factor resp. 
+     cofactor is currently initialised. */
   enum {
+      CHOOSE_NONE,
       CHOOSE_UL,
 #if     MOD_MAXBITS > MODREDCUL_MAXBITS
       CHOOSE_15UL,
@@ -57,7 +62,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
 #if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
       CHOOSE_MPZ,
 #endif
-  } f_arith = CHOOSE_UL, cf_arith = CHOOSE_UL;
+  } f_arith = CHOOSE_NONE, cf_arith = CHOOSE_NONE;
   
   mod_intinit (n);
   mod_intinit (f);
@@ -324,23 +329,27 @@ facul_doit (unsigned long *factors, const modulus_t m,
               case CHOOSE_UL:
                   f2 = facul_doit_ul (factors + found, fm_ul, strategy, i);
                   modredcul_clearmod (fm_ul);
+                  f_arith = CHOOSE_NONE;
                   break;
 #if     MOD_MAXBITS > MODREDCUL_MAXBITS
               case CHOOSE_15UL:
                   f2 = facul_doit_15ul (factors + found, fm_15ul, strategy, i);
                   modredc15ul_clearmod (fm_15ul);
+                  f_arith = CHOOSE_NONE;
                   break;
 #endif
 #if     MOD_MAXBITS > MODREDC15UL_MAXBITS
               case CHOOSE_2UL2:
                   f2 = facul_doit_2ul2 (factors + found, fm_2ul2, strategy, i);
                   modredc2ul2_clearmod (fm_2ul2);
+                  f_arith = CHOOSE_NONE;
                   break;
 #endif
 #if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
               case CHOOSE_MPZ:
                   f2 = facul_doit_mpz (factors + found, fm_mpz, strategy, i);
                   modmpz_clearmod (fm_mpz);
+                  f_arith = CHOOSE_NONE;
                   break;
 #endif
               default: abort();
@@ -364,23 +373,27 @@ facul_doit (unsigned long *factors, const modulus_t m,
               case CHOOSE_UL:
                   f2 = facul_doit_ul (factors + found, cfm_ul, strategy, i + 1);
                   modredcul_clearmod (cfm_ul);
+                  cf_arith = CHOOSE_NONE;
                   break;
 #if     MOD_MAXBITS > MODREDCUL_MAXBITS
               case CHOOSE_15UL:
                   f2 = facul_doit_15ul (factors + found, cfm_15ul, strategy, i + 1);
                   modredc15ul_clearmod (cfm_15ul);
+                  cf_arith = CHOOSE_NONE;
                   break;
 #endif
 #if     MOD_MAXBITS > MODREDC15UL_MAXBITS
               case CHOOSE_2UL2:
                   f2 = facul_doit_2ul2 (factors + found, cfm_2ul2, strategy, i + 1);
                   modredc2ul2_clearmod (cfm_2ul2);
+                  cf_arith = CHOOSE_NONE;
                   break;
 #endif
 #if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
               case CHOOSE_MPZ:
                   f2 = facul_doit_mpz (factors + found, cfm_mpz, strategy, i+1);
                   modmpz_clearmod (cfm_mpz);
+                  cf_arith = CHOOSE_NONE;
                   break;
 #endif
               default: abort();
@@ -397,8 +410,42 @@ facul_doit (unsigned long *factors, const modulus_t m,
       /* We found a non-trivial factorization and any composite 
 	 factors/cofactors have been treated in recursive calls, 
 	 so we can stop here */
+      ASSERT_ALWAYS(f_arith == CHOOSE_NONE);
+      ASSERT_ALWAYS(cf_arith == CHOOSE_NONE);
       break;
     }
+
+  /* The breaks in the loop may leave initialised moduli behind */
+  if (f_arith == CHOOSE_UL)
+    modredcul_clearmod (fm_ul);
+#if     MOD_MAXBITS > MODREDCUL_MAXBITS
+  else if (f_arith == CHOOSE_15UL)
+    modredc15ul_clearmod (fm_15ul);
+#endif
+#if     MOD_MAXBITS > MODREDC15UL_MAXBITS
+  else if (f_arith == CHOOSE_2UL2)
+    modredc2ul2_clearmod (fm_2ul2);
+#endif
+#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
+  else if (f_arith == CHOOSE_MPZ)
+    modmpz_clearmod (fm_mpz);
+#endif
+
+  if (cf_arith == CHOOSE_UL)
+    modredcul_clearmod (cfm_ul);
+#if     MOD_MAXBITS > MODREDCUL_MAXBITS
+  else if (cf_arith == CHOOSE_15UL)
+    modredc15ul_clearmod (cfm_15ul);
+#endif
+#if     MOD_MAXBITS > MODREDC15UL_MAXBITS
+  else if (cf_arith == CHOOSE_2UL2)
+    modredc2ul2_clearmod (cfm_2ul2);
+#endif
+#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
+  else if (cf_arith == CHOOSE_MPZ)
+    modmpz_clearmod (cfm_mpz);
+#endif
+  
   
   mod_clear (r, m);
   mod_intclear (n);
