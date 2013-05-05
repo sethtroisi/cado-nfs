@@ -86,11 +86,8 @@ tryfactor (mpz_t N, const facul_strategy_t *strategy,
       printf ("\n");
     }
   
-  if (printnonfactors && facul_code == 0)
+  if (printnonfactors && (facul_code == 0 || facul_code == FACUL_NOT_SMOOTH))
     {
-      int j;
-      for (j = 0; j < facul_code; j++)
-        mpz_tdiv_q_ui (N, N, f[j]);
       gmp_printf ("%Zd\n", N);
     }
   
