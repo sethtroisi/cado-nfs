@@ -29,21 +29,12 @@ primetest (const modulus_t m)
   return isprime;
 }
 
-int
-facul_doit (unsigned long *factors, const modulus_t m, 
-	    const facul_strategy_t *strategy, const int method_start)
-{
-  residue_t r;
-  modint_t n, f;
-  modulusredcul_t fm_ul, cfm_ul;
-#if     MOD_MAXBITS > MODREDCUL_MAXBITS
-  modulusredc15ul_t fm_15ul, cfm_15ul;
-#endif
-#if     MOD_MAXBITS > MODREDC15UL_MAXBITS
-  modulusredc2ul2_t fm_2ul2, cfm_2ul2; /* Modulus for factor and cofactor */
-#endif
-  int i, found = 0, bt, fprime, cfprime;
+typedef struct {
+  /* The arith variable tells which modulus type has been initiaised for 
+     arithmetic. It has a value of CHOOSE_NONE if no modulus currently 
+     initialised. */
   enum {
+      CHOOSE_NONE,
       CHOOSE_UL,
 #if     MOD_MAXBITS > MODREDCUL_MAXBITS
       CHOOSE_15UL,
@@ -51,11 +42,115 @@ facul_doit (unsigned long *factors, const modulus_t m,
 #if     MOD_MAXBITS > MODREDC15UL_MAXBITS
       CHOOSE_2UL2,
 #endif
-  } f_arith = CHOOSE_UL, cf_arith = CHOOSE_UL;
+#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
+      CHOOSE_MPZ,
+#endif
+  } arith;
+
+  modulusredcul_t m_ul;
+#if     MOD_MAXBITS > MODREDCUL_MAXBITS
+  modulusredc15ul_t m_15ul;
+#endif
+#if     MOD_MAXBITS > MODREDC15UL_MAXBITS
+  modulusredc2ul2_t m_2ul2;
+#endif
+#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
+  modulusmpz_t m_mpz;
+#endif
+} modset_t;
+
+static inline void 
+init_modset (modset_t *modset, modint_t m)
+{
+  const size_t bits = mod_intbits (m);
+  ASSERT(bits <= MOD_MAXBITS);
+  ASSERT_ALWAYS(modset->arith == CHOOSE_NONE);
+  if (bits <= MODREDCUL_MAXBITS)
+    {
+      modset->arith = CHOOSE_UL;
+      modredcul_initmod_ul (modset->m_ul, mod_intget_ul(m));
+    }
+#if     MOD_MAXBITS > MODREDCUL_MAXBITS
+  else if (bits <= MODREDC15UL_MAXBITS)
+    {
+      unsigned long t1[2];
+      modintredc15ul_t t2;
+      size_t nr_words = mod_intget_uls(t1, m);
+      ASSERT_ALWAYS(nr_words <= 2);
+      modredc15ul_intset_uls (t2, t1, nr_words);
+      modset->arith = CHOOSE_15UL;
+      modredc15ul_initmod_int (modset->m_15ul, t2);
+    }
+#endif
+#if     MOD_MAXBITS > MODREDC15UL_MAXBITS
+  else if (bits <= MODREDC2UL2_MAXBITS)
+    {
+      unsigned long t1[2];
+      modintredc2ul2_t t2;
+      size_t nr_words = mod_intget_uls(t1, m);
+      ASSERT_ALWAYS(nr_words <= 2);
+      modredc2ul2_intset_uls (t2, t1, nr_words);
+      modset->arith = CHOOSE_2UL2;
+      modredc2ul2_initmod_int (modset->m_2ul2, t2);
+    }
+#endif
+#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
+  else if (bits <= MODMPZ_MAXBITS)
+    {
+      /* We assume for now that m is a modintmpz_t */
+      modset->arith = CHOOSE_MPZ;
+      modmpz_initmod_int (modset->m_mpz, m);
+    }
+#endif
+  else
+      abort();
+}
+
+static inline void 
+clear_modset (modset_t *modset)
+{
+  ASSERT_ALWAYS(modset->arith != CHOOSE_NONE);
+  switch (modset->arith) {
+    case CHOOSE_UL:
+      modredcul_clearmod (modset->m_ul);
+      break;
+#if     MOD_MAXBITS > MODREDCUL_MAXBITS
+    case CHOOSE_15UL:
+      modredc15ul_clearmod (modset->m_15ul);
+      break;
+#endif
+#if     MOD_MAXBITS > MODREDC15UL_MAXBITS
+    case CHOOSE_2UL2:
+      modredc2ul2_clearmod (modset->m_2ul2);
+      break;
+#endif
+#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
+    case CHOOSE_MPZ:
+      modmpz_clearmod (modset->m_mpz);
+      break;
+#endif
+    default:
+        abort();
+  }
+  modset->arith = CHOOSE_NONE;
+}
+
+int
+facul_doit (unsigned long *factors, const modulus_t m, 
+	    const facul_strategy_t *strategy, const int method_start)
+{
+  residue_t r;
+  modint_t n, f;
+  modset_t fm, cfm;
+  int i, found = 0, bt, fprime, cfprime;
   
+  mod_intinit (n);
+  mod_intinit (f);
   mod_getmod_int (n, m);
   mod_intset_ul (f, 1UL);
   mod_init (r, m);
+  fm.arith = CHOOSE_NONE;
+  cfm.arith = CHOOSE_NONE;
   
   for (i = method_start; strategy->methods[i].method != 0; i++)
     {
@@ -81,8 +176,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
       else 
 	{
 	  /* A method value we don't know about. Something's wrong, bail out */
-	  found = -1;
-	  break;
+	  abort();
 	}
       
       /* The following possibilities exist:
@@ -172,7 +266,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
       
       /* A quick test if the factor is <= fbb^2 and >lpb */
       /* FIXME: must always use same width for comparison */
-      fprime = (mod_intcmp (f, strategy->fbb2) <= 0); 
+      fprime = (mod_intcmp_uint64 (f, strategy->assume_prime_thresh) <= 0); 
       if (fprime && mod_intcmp_ul (f, strategy->lpb) > 0)
 	{
 	  found = FACUL_NOT_SMOOTH; /* A prime > lpb, not smooth */
@@ -183,7 +277,7 @@ facul_doit (unsigned long *factors, const modulus_t m,
       mod_intdivexact (n, n, f);
       
       /* See if cofactor is <= fbb^2 and > lpb */
-      cfprime = (mod_intcmp (n, strategy->fbb2) <= 0);
+      cfprime = (mod_intcmp_uint64 (n, strategy->assume_prime_thresh) <= 0);
       if (cfprime && mod_intcmp_ul (n, strategy->lpb) > 0)
 	{
 	  found = FACUL_NOT_SMOOTH; /* A prime > lpb, not smooth */
@@ -193,31 +287,31 @@ facul_doit (unsigned long *factors, const modulus_t m,
       /* Determine for certain if the factor is prime */
       if (!fprime)
 	{
-	  if (mod_intbits (f) <= MODREDCUL_MAXBITS)
-	    {
-	      f_arith = CHOOSE_UL;
-	      modredcul_initmod_int (fm_ul, f);
-	      fprime = primetest_ul (fm_ul);
-            }
+	  init_modset (&fm, f);
+	  switch (fm.arith) {
+	    case CHOOSE_UL:
+	      fprime = primetest_ul (fm.m_ul);
+	      break;
 #if     MOD_MAXBITS > MODREDCUL_MAXBITS
-          else if (mod_intbits (f) <= MODREDC15UL_MAXBITS)
-            {
-              f_arith = CHOOSE_15UL;
-	      modredc15ul_initmod_int (fm_15ul, f);
-	      fprime = primetest_15ul (fm_15ul);
-            }
+            case CHOOSE_15UL:
+	      fprime = primetest_15ul (fm.m_15ul);
+	      break;
 #endif
 #if     MOD_MAXBITS > MODREDC15UL_MAXBITS
-	  else if (mod_intbits (f) <= MODREDC2UL2_MAXBITS)
-            {
-              f_arith = CHOOSE_2UL2;
-	      modredc2ul2_initmod_int (fm_2ul2, f);
-	      fprime = primetest_2ul2 (fm_2ul2);
-            }
+            case CHOOSE_2UL2:
+                fprime = primetest_2ul2 (fm.m_2ul2);
+                break;
 #endif
-          else
-              abort();
-
+#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
+            case CHOOSE_MPZ:
+                fprime = primetest_mpz (fm.m_mpz);
+                break;
+#endif
+            default:
+                abort();
+          }
+          if (fprime) 
+            clear_modset (&fm);
 	  if (fprime && mod_intcmp_ul (f, strategy->lpb) > 0)
 	    {
 	      found = FACUL_NOT_SMOOTH; /* A prime > lpb, not smooth */
@@ -228,33 +322,36 @@ facul_doit (unsigned long *factors, const modulus_t m,
       /* Determine for certain if the cofactor is prime */
       if (!cfprime)
 	{
-	  if (mod_intbits (n) <= MODREDCUL_MAXBITS)
-	    {
-	      cf_arith = CHOOSE_UL;
-	      modredcul_initmod_int (cfm_ul, n);
-	      cfprime = primetest_ul (cfm_ul);
-            }
+	  init_modset (&cfm, n);
+	  switch (cfm.arith) {
+	    case CHOOSE_UL:
+	      cfprime = primetest_ul (cfm.m_ul);
+	      break;
 #if     MOD_MAXBITS > MODREDCUL_MAXBITS
-	  else if (mod_intbits (n) <= MODREDC15UL_MAXBITS)
-	    {
-	      cf_arith = CHOOSE_15UL;
-	      modredc15ul_initmod_int (cfm_15ul, n);
-	      cfprime = primetest_15ul (cfm_15ul);
-            }
+            case CHOOSE_15UL:
+	      cfprime = primetest_15ul (cfm.m_15ul);
+	      break;
 #endif
 #if     MOD_MAXBITS > MODREDC15UL_MAXBITS
-	  else if (mod_intbits (n) <= MODREDC2UL2_MAXBITS)
-            {
-              cf_arith = CHOOSE_2UL2;
-	      modredc2ul2_initmod_int (cfm_2ul2, n);
-	      cfprime = primetest_2ul2 (cfm_2ul2);
-            }
+            case CHOOSE_2UL2:
+	      cfprime = primetest_2ul2 (cfm.m_2ul2);
+	      break;
 #endif
-          else
-            abort ();
+#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
+            case CHOOSE_MPZ:
+	      cfprime = primetest_mpz (cfm.m_mpz);
+	      break;
+#endif
+            default:
+              abort ();
+          }
 
+          if (cfprime)
+            clear_modset (&cfm);
 	  if (cfprime && mod_intcmp_ul (n, strategy->lpb) > 0)
 	    {
+	      if (!fprime)
+	        clear_modset (&fm);
 	      found = FACUL_NOT_SMOOTH; /* A prime > lpb, not smooth */
 	      break;
 	    }
@@ -263,73 +360,95 @@ facul_doit (unsigned long *factors, const modulus_t m,
       /* So each of factor and cofactor is either a prime < lpb, 
 	 or is composite */
 
-      if (fprime)
-	factors[found++] = f[0]; /* f < lp, so it fits in 1 unsigned long */
+      if (fprime) {
+	  factors[found++] = mod_intget_ul(f); /* f < lpb, so it fits in 1 unsigned long */
+	}
       else
 	{
-            int f2 = FACUL_NOT_SMOOTH;    /* placate gcc (!) */
+            int found2 = FACUL_NOT_SMOOTH;    /* placate gcc (!) */
 	  /* Factor the composite factor. Use the same method again so that
 	     backtracking can separate the factors */
-          switch (f_arith) {
+          switch (fm.arith) {
               case CHOOSE_UL:
-                  f2 = facul_doit_ul (factors + found, fm_ul, strategy, i);
+                  found2 = facul_doit_ul (factors + found, fm.m_ul, strategy, i);
                   break;
 #if     MOD_MAXBITS > MODREDCUL_MAXBITS
               case CHOOSE_15UL:
-                  f2 = facul_doit_15ul (factors + found, fm_15ul, strategy, i);
+                  found2 = facul_doit_15ul (factors + found, fm.m_15ul, strategy, i);
                   break;
 #endif
 #if     MOD_MAXBITS > MODREDC15UL_MAXBITS
               case CHOOSE_2UL2:
-                  f2 = facul_doit_2ul2 (factors + found, fm_2ul2, strategy, i);
+                  found2 = facul_doit_2ul2 (factors + found, fm.m_2ul2, strategy, i);
                   break;
 #endif
+#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
+              case CHOOSE_MPZ:
+                  found2 = facul_doit_mpz (factors + found, fm.m_mpz, strategy, i);
+                  break;
+#endif
+              default: abort();
           }
           
-	  if (f2 == FACUL_NOT_SMOOTH)
-	    {
-	      found = FACUL_NOT_SMOOTH;
-	      break;
-	    }
-	  found += f2;
+          clear_modset (&fm);
+	  if (found2 == FACUL_NOT_SMOOTH) {
+            found = FACUL_NOT_SMOOTH;
+            break;
+          }
+            found += found2;
 	}
-
-      if (cfprime)
-	factors[found++] = n[0]; /* n < lp, so it fits in 1 unsigned long */
+      
+      if (cfprime) {
+	  factors[found++] = mod_intget_ul(n); /* n < lp, so it fits in 1 unsigned long */
+        }
       else
 	{
-	  int f2 = FACUL_NOT_SMOOTH;    /* placate gcc (!) */
+	  int found2 = FACUL_NOT_SMOOTH;    /* placate gcc (!) */
 	  /* Factor the composite cofactor */
-          switch(cf_arith) {
+          switch (cfm.arith) {
               case CHOOSE_UL:
-                  f2 = facul_doit_ul (factors + found, cfm_ul, strategy, i + 1);
+                  found2 = facul_doit_ul (factors + found, cfm.m_ul, strategy, i + 1);
                   break;
 #if     MOD_MAXBITS > MODREDCUL_MAXBITS
               case CHOOSE_15UL:
-                  f2 = facul_doit_15ul (factors + found, cfm_15ul, strategy, i + 1);
-                  break;
-#endif    
-#if     MOD_MAXBITS > MODREDC15UL_MAXBITS
-              case CHOOSE_2UL2:
-                  f2 = facul_doit_2ul2 (factors + found, cfm_2ul2, strategy, i + 1);
+                  found2 = facul_doit_15ul (factors + found, cfm.m_15ul, strategy, i + 1);
                   break;
 #endif
+#if     MOD_MAXBITS > MODREDC15UL_MAXBITS
+              case CHOOSE_2UL2:
+                  found2 = facul_doit_2ul2 (factors + found, cfm.m_2ul2, strategy, i + 1);
+                  break;
+#endif
+#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
+              case CHOOSE_MPZ:
+                  found2 = facul_doit_mpz (factors + found, cfm.m_mpz, strategy, i+1);
+                  break;
+#endif
+              default: abort();
           }
+          clear_modset (&cfm);          
           
-	  if (f2 == FACUL_NOT_SMOOTH)
+	  if (found2 == FACUL_NOT_SMOOTH)
 	    {
 	      found = FACUL_NOT_SMOOTH;
 	      break;
 	    }
-	  found += f2;
+	  found += found2;
 	}
       
       /* We found a non-trivial factorization and any composite 
 	 factors/cofactors have been treated in recursive calls, 
 	 so we can stop here */
+      ASSERT_ALWAYS(fm.arith == CHOOSE_NONE);
+      ASSERT_ALWAYS(cfm.arith == CHOOSE_NONE);
       break;
     }
+
+  ASSERT_ALWAYS(fm.arith == CHOOSE_NONE);
+  ASSERT_ALWAYS(cfm.arith == CHOOSE_NONE);
   
   mod_clear (r, m);
+  mod_intclear (n);
+  mod_intclear (f);
   return found;
 }

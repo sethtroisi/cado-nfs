@@ -51,8 +51,11 @@ facul_make_strategy (const int n, const unsigned long fbb,
   strategy->lpb = 1UL << lpb;
   if (lpb == ULONG_BITS)
       strategy->lpb = ~0UL;
-  /* Store fbb^2 in fbb2 */
-  ularith_mul_ul_ul_2ul (&(strategy->fbb2[0]), &(strategy->fbb2[1]), fbb, fbb);
+  /* Store fbb^2 in assume_prime_thresh */
+  if (fbb > UINT32_MAX)
+    strategy->assume_prime_thresh = UINT64_MAX;
+  else
+    strategy->assume_prime_thresh = (uint64_t) fbb * (uint64_t) fbb;
 
   methods = malloc ((n + 4) * sizeof (facul_method_t));
   strategy->methods = methods;
@@ -169,8 +172,8 @@ void facul_print_stats (FILE *stream)
 int
 facul (unsigned long *factors, const mpz_t N, const facul_strategy_t *strategy)
 {
-  modintredc2ul2_t n;
-  int i, found = 0;
+  int found = 0;
+  size_t bits;
   
 #ifdef PARI
   gmp_fprintf (stderr, "%Zd", N);
@@ -183,39 +186,51 @@ facul (unsigned long *factors, const mpz_t N, const facul_strategy_t *strategy)
   
   /* If the composite does not fit into our modular arithmetic, return
      no factor */
-  if (mpz_sizeinbase (N, 2) > MODREDC2UL2_MAXBITS)
+  bits = mpz_sizeinbase (N, 2);
+  if (bits > MODMPZ_MAXBITS)
     return 0;
   
-  {
-    size_t written;
-    mpz_export (n, &written, -1, sizeof(unsigned long), 0, 0, N);
-    for (i = written; i < MODREDC2UL2_SIZE; i++)
-      n[i] = 0UL;
-  }
-  
   /* Use the fastest modular arithmetic that's large enough for this input */
-  i = modredc2ul2_intbits (n);
-  if (i <= MODREDCUL_MAXBITS)
+  if (bits <= MODREDCUL_MAXBITS)
     {
       modulusredcul_t m;
-      modredcul_initmod_int (m, n);
+      ASSERT(mpz_fits_ulong_p(N));
+      modredcul_initmod_ul (m, mpz_get_ui(N));
       found = facul_doit_ul (factors, m, strategy, 0);
       modredcul_clearmod (m);
     }
-  else if (i <= MODREDC15UL_MAXBITS)
+  else if (bits <= MODREDC15UL_MAXBITS)
     {
       modulusredc15ul_t m;
+      unsigned long t[2];
+      modintredc15ul_t n;
+      size_t written;
+      mpz_export (t, &written, -1, sizeof(unsigned long), 0, 0, N);
+      ASSERT_ALWAYS(written <= 2);
+      modredc15ul_intset_uls (n, t, written);
       modredc15ul_initmod_int (m, n);
       found = facul_doit_15ul (factors, m, strategy, 0);
       modredc15ul_clearmod (m);
     }
-  else 
+  else if (bits <= MODREDC2UL2_MAXBITS)
     {
       modulusredc2ul2_t m;
-      ASSERT (i <= MODREDC2UL2_MAXBITS);
+      unsigned long t[2];
+      modintredc2ul2_t n;
+      size_t written;
+      mpz_export (t, &written, -1, sizeof(unsigned long), 0, 0, N);
+      ASSERT_ALWAYS(written <= 2);
+      modredc2ul2_intset_uls (n, t, written);
       modredc2ul2_initmod_int (m, n);
       found = facul_doit_2ul2 (factors, m, strategy, 0);
       modredc2ul2_clearmod (m);
+    } 
+  else 
+    {
+      modulusmpz_t m;
+      modmpz_initmod_int (m, N);
+      found = facul_doit_mpz (factors, m, strategy, 0);
+      modmpz_clearmod (m);
     }
   
   if (found > 1)

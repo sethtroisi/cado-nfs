@@ -367,6 +367,7 @@ ellW_add (ellW_point_t R, const ellW_point_t P, const ellW_point_t Q,
 
   mod_init_noset0 (u, m);
   mod_init_noset0 (v, m);
+  mod_init_noset0 (lambda, m);
 
   mod_sub (u, Q->y, P->y, m);
   mod_sub (v, Q->x, P->x, m);
@@ -403,6 +404,7 @@ ellW_add (ellW_point_t R, const ellW_point_t P, const ellW_point_t Q,
       r = 1;
   }
 
+  mod_clear (lambda, m);
   mod_clear (v, m);
   mod_clear (u, m);
   return r;
@@ -1191,9 +1193,9 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
           }
       }
     
+    ellM_init (Pd, m);
 #if 0
     /* Also compute Pd = d*P while we've got 6*P */
-    ellM_init (Pd, m);
     ellM_mul_ul (Pd, P6, plan->d / 6, m, b); /* slow! */
 #else
     ASSERT ((unsigned) (i1 + i5) == plan->d);
@@ -1269,6 +1271,7 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
         k++; i++;
       }
 
+    ellM_clear (Pd, m);
     ellM_clear (Pid, m);
     ellM_clear (Pid1, m);
   }
@@ -1365,27 +1368,26 @@ ecm_stage2 (residue_t r, const ellM_point_t P, const stage2_plan_t *plan,
   mod_set (r, a, m);
   
   /* Clear everything */
-  for (i = 0; i < plan->s1; i++)
-    mod_clear (Pj_z[i], m);
-  free (Pj_z);
-  Pj_z = NULL;
-  for (i = 0; i < plan->i1 - plan->i0; i++)
-    mod_clear (Pid_z[i], m);
-  free (Pid_z);
-  Pid_z = NULL;
   
-   for (i = 0; i < plan->s1; i++)
+  for (i = 0; i < plan->s1; i++)
     {
-      mod_clear (Pj_x[k], m);
-      mod_clear (Pj_z[k], m);
-    }
- for (i = 0; i < plan->i1 - plan->i0; i++)
-    {
-      mod_clear (Pid_x[k], m);
-      mod_clear (Pid_z[k], m);
+      mod_clear (Pj_x[i], m);
+      mod_clear (Pj_z[i], m);
     }
   free (Pj_x);
+  Pj_x = NULL;
+  free (Pj_z);
+  Pj_z = NULL;
+
+  for (i = 0; i < plan->i1 - plan->i0; i++)
+    {
+      mod_clear (Pid_x[i], m);
+      mod_clear (Pid_z[i], m);
+    }
   free (Pid_x);
+  Pid_x = NULL;
+  free (Pid_z);
+  Pid_z = NULL;
   
   ellM_clear (Pt, m);
   mod_clear (t, m);
@@ -1564,6 +1566,7 @@ ell_pointorder (const residue_t sigma, const int parameterization,
 
   ASSERT (known_r < known_m);
 
+  mod_intinit (tm);
   mod_getmod_int (tm, m);
   mod_init (A, m);
   mod_init (x, m);
@@ -1591,11 +1594,15 @@ ell_pointorder (const residue_t sigma, const int parameterization,
   if (verbose >= 2)
     {
       modint_t tA, tx;
+      mod_intinit (tA);
+      mod_intinit (tx);
       mod_get_int (tA, A, m);
       mod_get_int (tx, x, m);
       /* FIXME need multiple precision print */
       printf ("Curve parameters: A = %lu, x = %ld (mod %ld)\n", 
               mod_intget_ul(tA), mod_intget_ul(tx), mod_intget_ul(tm)); 
+      mod_intclear (tA);
+      mod_intclear (tx);
     }
 
   if (curveW_from_Montgomery (a, P, x, A, m) == 0)
@@ -1604,6 +1611,9 @@ ell_pointorder (const residue_t sigma, const int parameterization,
   if (verbose >= 2)
     {
       modint_t tx1, ty1, ta;
+      mod_intinit (tx1);
+      mod_intinit (ty1);
+      mod_intinit (ta);
       mod_get_int (tx1, P[0].x, m);
       mod_get_int (ty1, P[0].y, m);
       mod_get_int (ta, a, m);
@@ -1612,6 +1622,9 @@ ell_pointorder (const residue_t sigma, const int parameterization,
               "y^2 = x^3 + %ld * x + b (mod %ld)\n", 
               mod_intget_ul(tx1), mod_intget_ul(ty1), mod_intget_ul(ta), 
               mod_intget_ul(tm));
+      mod_intclear (tx1);
+      mod_intclear (ty1);
+      mod_intclear (ta);
     }
   
   /* FIXME deal with multiple precision modulus */
@@ -1723,6 +1736,8 @@ found_inf:
   if (ellW_mul_ui (Pi, i, a, m) != 0)
     {
       modint_t tx1, ty1;
+      mod_intinit (tx1); 
+      mod_intinit (ty1); 
       mod_get_int (tx1, P[0].x, m);
       mod_get_int (ty1, P[0].y, m);
 #ifndef MODMPZ_MAXBITS
@@ -1730,6 +1745,8 @@ found_inf:
                "not the point at infinity\n", 
                i, tx1[0], ty1[0], tm[0]);
 #endif
+      mod_intclear (tx1); 
+      mod_intclear (ty1); 
       return 0UL;
     }
   
@@ -1777,10 +1794,14 @@ found_inf:
   if (ellW_mul_ui (Pi, order, a, m) != 0)
     {
       modint_t tx1, ty1;
+      mod_intinit (tx1); 
+      mod_intinit (ty1); 
       mod_get_int (tx1, P[0].x, m);
       mod_get_int (ty1, P[0].y, m);
       fprintf (stderr, "ell_order: Error, final order %ld is wrong\n", 
                order);
+      mod_intclear (tx1); 
+      mod_intclear (ty1); 
       abort ();
     }
   
@@ -1791,6 +1812,7 @@ found_inf:
   mod_clear (A, m);
   mod_clear (x, m);
   mod_clear (a, m);
+  mod_intclear (tm);
   ellW_clear (P, m);
   ellW_clear (Pi, m);
   ellW_clear (Pg, m);

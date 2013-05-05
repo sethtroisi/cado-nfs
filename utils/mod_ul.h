@@ -13,6 +13,7 @@
 /**********************************************************************/
 #include <assert.h>
 #include <limits.h>
+#include <stdint.h>
 #include "macros.h"
 #include "ularith.h"
 
@@ -47,6 +48,22 @@ typedef unsigned long modulusul_t[MODUL_SIZE];
 
 MAYBE_UNUSED
 static inline void
+modul_intinit (modintul_t r)
+{
+  r[0] = 0;
+}
+
+
+MAYBE_UNUSED
+static inline void
+modul_intclear (modintul_t r MAYBE_UNUSED)
+{
+  return;
+}
+
+
+MAYBE_UNUSED
+static inline void
 modul_intset (modintul_t r, const modintul_t s)
 {
   r[0] = s[0];
@@ -61,11 +78,38 @@ modul_intset_ul (modintul_t r, const unsigned long s)
 }
 
 
+/* The two mod*_uls() functions import/export modint_t from/to an array of 
+   unsigned longs. For modul_intset_ul, the size of the array is passed as
+   a parameter n. For mod_intget_uls(), the required array size can be 
+   determined via mod_intbits(); if the modint_t is zero, mod_intget_uls()
+   writes 0 to the first output unsigned long. It returns the number of 
+   unsigned longs written. */
+MAYBE_UNUSED
+static inline void
+modul_intset_uls (modintul_t r, const unsigned long *s, const size_t n)
+{
+  ASSERT_ALWAYS(n <= MODUL_SIZE);
+  if (n == 0)
+    r[0] = 0;
+  else
+    r[0] = s[0];
+}
+
+
 MAYBE_UNUSED
 static inline unsigned long 
 modul_intget_ul (const modintul_t s)
 {
   return s[0];
+}
+
+
+MAYBE_UNUSED
+static inline size_t 
+modul_intget_uls (unsigned long *r, const modintul_t s)
+{
+  r[0] = s[0];
+  return 1;
 }
 
 
@@ -103,6 +147,16 @@ modul_intcmp_ul (const modintul_t a, const unsigned long b)
 
 MAYBE_UNUSED
 static inline int
+modul_intcmp_uint64 (const modintul_t a, const uint64_t b)
+{
+  if (b > ULONG_MAX)
+    return -1;
+  return (a[0] < b) ? -1 : (a[0] == b) ? 0 : 1;
+}
+
+
+MAYBE_UNUSED
+static inline int
 modul_intfits_ul (const modintul_t a MAYBE_UNUSED)
 {
   return 1;
@@ -122,6 +176,22 @@ static inline void
 modul_intsub (modintul_t r, const modintul_t a, const modintul_t b)
 {
   r[0] = a[0] - b[0];
+}
+
+
+MAYBE_UNUSED
+static inline void
+modul_intshr (modintul_t r, const modintul_t s, const int i)
+{
+  r[0] = s[0] >> i;
+}
+
+
+MAYBE_UNUSED
+static inline void
+modul_intshl (modintul_t r, const modintul_t s, const int i)
+{
+  r[0] = s[0] << i;
 }
 
 

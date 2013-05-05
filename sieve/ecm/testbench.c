@@ -20,6 +20,7 @@
 #include "cado.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <string.h>
 #include <gmp.h>
 #include "facul.h"
@@ -85,11 +86,8 @@ tryfactor (mpz_t N, const facul_strategy_t *strategy,
       printf ("\n");
     }
   
-  if (printnonfactors && facul_code == 0)
+  if (printnonfactors && (facul_code == 0 || facul_code == FACUL_NOT_SMOOTH))
     {
-      int j;
-      for (j = 0; j < facul_code; j++)
-        mpz_tdiv_q_ui (N, N, f[j]);
       gmp_printf ("%Zd\n", N);
     }
   
@@ -131,7 +129,7 @@ int main (int argc, char **argv)
 {
   unsigned long start, stop, i, mod = 0UL, inpstop = ULONG_MAX;
   unsigned long hits = 0, total = 0;
-  unsigned long fbb = 0, lpb = ~(0UL);
+  unsigned long fbb = 0, lpb = 0;
   char *inp_fn = NULL;
   FILE *inp;
   mpz_t N, cof;
@@ -152,8 +150,7 @@ int main (int argc, char **argv)
   strategy = malloc (sizeof(facul_strategy_t));
   strategy->methods = malloc ((MAX_METHODS + 1) * sizeof (facul_method_t));
   strategy->lpb = ~(0UL);
-  strategy->fbb2[0] = 0UL;
-  strategy->fbb2[1] = 0UL;
+  strategy->assume_prime_thresh = 0;
 
   /* Parse options */
   mpz_init (N);
@@ -252,8 +249,10 @@ int main (int argc, char **argv)
       else if (argc > 2 && strcmp (argv[1], "-fbb") == 0)
 	{
 	  fbb = strtoul (argv[2], NULL, 10);
-	  ularith_mul_ul_ul_2ul (&(strategy->fbb2[0]), &(strategy->fbb2[1]), 
-	                         fbb, fbb);
+	  if (fbb > UINT32_MAX)
+	    strategy->assume_prime_thresh = UINT64_MAX;
+	  else
+	    strategy->assume_prime_thresh = (uint64_t) fbb * (uint64_t) fbb;
 	  argc -= 2;
 	  argv += 2;
 	}
@@ -358,12 +357,15 @@ int main (int argc, char **argv)
 
   if (strat)
     {
-      facul_clear_strategy (strategy);
-      strategy = facul_make_strategy (15, fbb, (lpb == 0) ? 0 : 1UL << lpb);
+      free(strategy->methods);
+      free(strategy);
+      strategy = facul_make_strategy (15, fbb, (lpb == 0) ? ~0UL : 1UL << lpb);
     }
   else
     {
       if (!quiet) printf ("Strategy has %d methods\n", nr_methods);
+      if (lpb != 0)
+        strategy->lpb = 1UL << lpb;
       strategy->methods[nr_methods].method = 0;
     }
 

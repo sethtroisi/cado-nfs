@@ -14,6 +14,7 @@
 /**********************************************************************/
 #include <assert.h>
 #include <limits.h>
+#include <stdint.h>
 #include "macros.h"
 #include "ularith.h"
 
@@ -185,6 +186,22 @@ modredcul_redc_semi (residueredcul_t r, const unsigned long plow,
 
 MAYBE_UNUSED
 static inline void
+modredcul_intinit (modintredcul_t r)
+{
+  r[0] = 0;
+}
+
+
+MAYBE_UNUSED
+static inline void
+modredcul_intclear (modintredcul_t r MAYBE_UNUSED)
+{
+  return;
+}
+
+
+MAYBE_UNUSED
+static inline void
 modredcul_intset (modintredcul_t r, const modintredcul_t s)
 {
   r[0] = s[0];
@@ -200,10 +217,31 @@ modredcul_intset_ul (modintredcul_t r, const unsigned long s)
 
 
 MAYBE_UNUSED
+static inline void
+modredcul_intset_uls (modintredcul_t r, const unsigned long *s, const size_t n)
+{
+  ASSERT_ALWAYS(n <= MODREDCUL_SIZE);
+  if (n == 0)
+    r[0] = 0;
+  else
+    r[0] = s[0];
+}
+
+
+MAYBE_UNUSED
 static inline unsigned long
 modredcul_intget_ul (const residueredcul_t s)
 {
   return s[0];
+}
+
+
+MAYBE_UNUSED
+static inline size_t  
+modredcul_intget_uls (unsigned long *r, const residueredcul_t s)
+{
+  r[0] = s[0];
+  return 1;
 }
 
 
@@ -235,6 +273,15 @@ MAYBE_UNUSED
 static inline int
 modredcul_intcmp_ul (const modintredcul_t a, const unsigned long b)
 {
+  return (a[0] < b) ? -1 : (a[0] == b) ? 0 : 1;
+}
+
+MAYBE_UNUSED
+static inline int
+modredcul_intcmp_uint64 (const modintredcul_t a, const uint64_t b)
+{
+  if (b > ULONG_MAX)
+    return -1;
   return (a[0] < b) ? -1 : (a[0] == b) ? 0 : 1;
 }
 
