@@ -129,7 +129,7 @@ int main (int argc, char **argv)
 {
   unsigned long start, stop, i, mod = 0UL, inpstop = ULONG_MAX;
   unsigned long hits = 0, total = 0;
-  unsigned long fbb = 0, lpb = ~(0UL);
+  unsigned long fbb = 0, lpb = 0;
   char *inp_fn = NULL;
   FILE *inp;
   mpz_t N, cof;
@@ -359,11 +359,13 @@ int main (int argc, char **argv)
     {
       free(strategy->methods);
       free(strategy);
-      strategy = facul_make_strategy (15, fbb, (lpb == 0) ? 0 : 1UL << lpb);
+      strategy = facul_make_strategy (15, fbb, (lpb == 0) ? ~0UL : 1UL << lpb);
     }
   else
     {
       if (!quiet) printf ("Strategy has %d methods\n", nr_methods);
+      if (lpb != 0)
+        strategy->lpb = 1UL << lpb;
       strategy->methods[nr_methods].method = 0;
     }
 
