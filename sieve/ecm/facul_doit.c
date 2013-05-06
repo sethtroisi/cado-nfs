@@ -60,7 +60,7 @@ typedef struct {
 } modset_t;
 
 static inline void 
-init_modset (modset_t *modset, modint_t m)
+modset_init (modset_t *modset, modint_t m)
 {
   const size_t bits = mod_intbits (m);
   ASSERT(bits <= MOD_MAXBITS);
@@ -107,7 +107,7 @@ init_modset (modset_t *modset, modint_t m)
 }
 
 static inline void 
-clear_modset (modset_t *modset)
+modset_clear (modset_t *modset)
 {
   ASSERT_ALWAYS(modset->arith != CHOOSE_NONE);
   switch (modset->arith) {
@@ -133,6 +133,56 @@ clear_modset (modset_t *modset)
         abort();
   }
   modset->arith = CHOOSE_NONE;
+}
+
+/* Run the primetest() function, using the arithmetic selected in the modset */
+static inline int 
+modset_primetest (modset_t *modset)
+{
+  switch (modset->arith) {
+    case CHOOSE_UL:
+      return primetest_ul (modset->m_ul);
+#if     MOD_MAXBITS > MODREDCUL_MAXBITS
+    case CHOOSE_15UL:
+      return primetest_15ul (modset->m_15ul);
+#endif
+#if     MOD_MAXBITS > MODREDC15UL_MAXBITS
+    case CHOOSE_2UL2:
+        return primetest_2ul2 (modset->m_2ul2);
+#endif
+#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
+    case CHOOSE_MPZ:
+        return primetest_mpz (modset->m_mpz);
+#endif
+    default:
+        abort();
+  }
+}
+
+static inline int 
+modset_call_facul(unsigned long *factors, const modset_t *modset, 
+                  const facul_strategy_t *strategy, const int method_start)
+{
+  switch (modset.arith) {
+      case CHOOSE_UL:
+          return facul_doit_ul (factors, modset->m_ul, strategy, method_start);
+#if     MOD_MAXBITS > MODREDCUL_MAXBITS
+      case CHOOSE_15UL:
+          return facul_doit_15ul (factors, modset->m_15ul, strategy, method_start);
+          break;
+#endif
+#if     MOD_MAXBITS > MODREDC15UL_MAXBITS
+      case CHOOSE_2UL2:
+          return facul_doit_2ul2 (factors, modset->m_2ul2, strategy, method_start);
+          break;
+#endif
+#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
+      case CHOOSE_MPZ:
+          return facul_doit_mpz (factors, modset->m_mpz, strategy, method_start);
+          break;
+#endif
+      default: abort();
+  }
 }
 
 int
@@ -287,31 +337,10 @@ facul_doit (unsigned long *factors, const modulus_t m,
       /* Determine for certain if the factor is prime */
       if (!fprime)
 	{
-	  init_modset (&fm, f);
-	  switch (fm.arith) {
-	    case CHOOSE_UL:
-	      fprime = primetest_ul (fm.m_ul);
-	      break;
-#if     MOD_MAXBITS > MODREDCUL_MAXBITS
-            case CHOOSE_15UL:
-	      fprime = primetest_15ul (fm.m_15ul);
-	      break;
-#endif
-#if     MOD_MAXBITS > MODREDC15UL_MAXBITS
-            case CHOOSE_2UL2:
-                fprime = primetest_2ul2 (fm.m_2ul2);
-                break;
-#endif
-#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
-            case CHOOSE_MPZ:
-                fprime = primetest_mpz (fm.m_mpz);
-                break;
-#endif
-            default:
-                abort();
-          }
+	  modset_init (&fm, f);
+	  fprime = modset_primetest (&fm);
           if (fprime) 
-            clear_modset (&fm);
+            modset_clear (&fm);
 	  if (fprime && mod_intcmp_ul (f, strategy->lpb) > 0)
 	    {
 	      found = FACUL_NOT_SMOOTH; /* A prime > lpb, not smooth */
@@ -322,36 +351,15 @@ facul_doit (unsigned long *factors, const modulus_t m,
       /* Determine for certain if the cofactor is prime */
       if (!cfprime)
 	{
-	  init_modset (&cfm, n);
-	  switch (cfm.arith) {
-	    case CHOOSE_UL:
-	      cfprime = primetest_ul (cfm.m_ul);
-	      break;
-#if     MOD_MAXBITS > MODREDCUL_MAXBITS
-            case CHOOSE_15UL:
-	      cfprime = primetest_15ul (cfm.m_15ul);
-	      break;
-#endif
-#if     MOD_MAXBITS > MODREDC15UL_MAXBITS
-            case CHOOSE_2UL2:
-	      cfprime = primetest_2ul2 (cfm.m_2ul2);
-	      break;
-#endif
-#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
-            case CHOOSE_MPZ:
-	      cfprime = primetest_mpz (cfm.m_mpz);
-	      break;
-#endif
-            default:
-              abort ();
-          }
+	  modset_init (&cfm, n);
+	  cfprime = modset_primetest (&cfm);
 
           if (cfprime)
-            clear_modset (&cfm);
+            modset_clear (&cfm);
 	  if (cfprime && mod_intcmp_ul (n, strategy->lpb) > 0)
 	    {
 	      if (!fprime)
-	        clear_modset (&fm);
+	        modset_clear (&fm);
 	      found = FACUL_NOT_SMOOTH; /* A prime > lpb, not smooth */
 	      break;
 	    }
@@ -365,32 +373,11 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	}
       else
 	{
-            int found2 = FACUL_NOT_SMOOTH;    /* placate gcc (!) */
+          int found2 = FACUL_NOT_SMOOTH;    /* placate gcc (!) */
 	  /* Factor the composite factor. Use the same method again so that
 	     backtracking can separate the factors */
-          switch (fm.arith) {
-              case CHOOSE_UL:
-                  found2 = facul_doit_ul (factors + found, fm.m_ul, strategy, i);
-                  break;
-#if     MOD_MAXBITS > MODREDCUL_MAXBITS
-              case CHOOSE_15UL:
-                  found2 = facul_doit_15ul (factors + found, fm.m_15ul, strategy, i);
-                  break;
-#endif
-#if     MOD_MAXBITS > MODREDC15UL_MAXBITS
-              case CHOOSE_2UL2:
-                  found2 = facul_doit_2ul2 (factors + found, fm.m_2ul2, strategy, i);
-                  break;
-#endif
-#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
-              case CHOOSE_MPZ:
-                  found2 = facul_doit_mpz (factors + found, fm.m_mpz, strategy, i);
-                  break;
-#endif
-              default: abort();
-          }
-          
-          clear_modset (&fm);
+          found2 = modset_call_facul (factors + found, &fm, strategy, i);
+          modset_clear (&fm);
 	  if (found2 == FACUL_NOT_SMOOTH) {
             found = FACUL_NOT_SMOOTH;
             break;
@@ -405,28 +392,8 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	{
 	  int found2 = FACUL_NOT_SMOOTH;    /* placate gcc (!) */
 	  /* Factor the composite cofactor */
-          switch (cfm.arith) {
-              case CHOOSE_UL:
-                  found2 = facul_doit_ul (factors + found, cfm.m_ul, strategy, i + 1);
-                  break;
-#if     MOD_MAXBITS > MODREDCUL_MAXBITS
-              case CHOOSE_15UL:
-                  found2 = facul_doit_15ul (factors + found, cfm.m_15ul, strategy, i + 1);
-                  break;
-#endif
-#if     MOD_MAXBITS > MODREDC15UL_MAXBITS
-              case CHOOSE_2UL2:
-                  found2 = facul_doit_2ul2 (factors + found, cfm.m_2ul2, strategy, i + 1);
-                  break;
-#endif
-#if     MOD_MAXBITS > MODREDC2UL2_MAXBITS
-              case CHOOSE_MPZ:
-                  found2 = facul_doit_mpz (factors + found, cfm.m_mpz, strategy, i+1);
-                  break;
-#endif
-              default: abort();
-          }
-          clear_modset (&cfm);          
+	  found2 = modset_call_facul (factors + found, &cfm, strategy, i + 1);
+          modset_clear (&cfm);          
           
 	  if (found2 == FACUL_NOT_SMOOTH)
 	    {
