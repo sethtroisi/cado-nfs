@@ -1164,37 +1164,43 @@ class SqrtTask(Task):
                 p.run()
                 (rc, stdout, stderr) = p.wait()
                 if not stdout.decode("ascii").strip() == "Failed":
-                    factorlist = list(map(int,stdout.decode("ascii").split()))[:1]
-                    self.add_factors(factorlist)
+                    factorlist = list(map(int,stdout.decode("ascii").split()))
+                    # FIXME: Can sqrt print more/less than 2 factors?
+                    assert len(factorlist) == 2
+                    self.add_factors(factorlist[0])
                 self.state["next_dep"] += 1
         
         self.logger.info("Factors: %s" % " ".join(self.factors.keys()))
         self.logger.debug("Exit SqrtTask.run(" + self.name + ")")
-
+    
     def is_done(self):
         for (factor, isprime) in self.factors.items():
             if not isprime:
                 return False
         return True
     
-    def add_factors(self, factorlist):
-        newfactorlist = [f for f in factorlist if not str(f) in self.factors]
-        for newfac in newfactorlist:
-            assert newfac > 0
-            for oldfac in list(map(int, self.factors.keys())):
-                g = gcd(newfac, oldfac)
-                if 1 < g and g < newfac:
-                    self.add_factors([g, newfac // g])
-                    break
-                if 1 < g and g < oldfac:
-                    # We get here only if newfac is a proper factor of oldfac
-                    assert newfac == g
-                    del(self.factors[str(oldfac)])
-                    self.add_factors([g, oldfac // g])
-                    break
-            else:
-                isprime = SqrtTask.miller_rabin_tests(newfac, 10)
-                self.factors[str(newfac)] = isprime
+    def add_factor(self, factor):
+        assert factor > 0
+        if str(factor) in self.factors:
+            return
+        for oldfac in list(map(int, self.factors.keys())):
+            g = gcd(factor, oldfac)
+            if 1 < g and g < factor:
+                self.add_factors(g)
+                self.add_factors(factor // g)
+                break
+            if 1 < g and g < oldfac:
+                # We get here only if newfac is a proper factor of oldfac
+                assert factor == g
+                del(self.factors[str(oldfac)])
+                self.add_factors(g)
+                self.add_factors(oldfac // g)
+                break
+        else:
+            # We get here if the new factor is coprime to all previously
+            # known factors
+            isprime = SqrtTask.miller_rabin_tests(newfac, 10)
+            self.factors[str(newfac)] = isprime
     
     @staticmethod
     def miller_rabin_pass(number):
