@@ -2682,11 +2682,11 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
    * (IMO we have another notational convention elsewhere regarding what
    * the skewed norm is. But it's the one which is used here).
    */
-  double B = EXTRA_B_FACTOR * sqrt (2.0 * q0d / (si->cpoly->skew * sqrt (3.0)));
+  double B = sqrt (2.0 * q0d / (si->cpoly->skew * sqrt (3.0)));
 
   /************************** rational side **********************************/
 
-  /* If J is chosen such that J<=I/2*s*B/max(a1,s*b1),
+  /* If J is chosen such that J<=I/2*s*B/max(|a1|,s*|b1|),
    * then |j*a1| <= I/2*s*B, and |j*b1| <= I/2*B
    * J is set to honour this requirement in sieve_info_adjust_IJ (but see
    * also bug #15617).
@@ -2774,10 +2774,49 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
     }
 }
 
+/* return largest possible J by simply bounding the Fij and Gij polynomials */
+double
+sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
+{
+  double Jmax = si->I >> 1;
+  double F[9];
+  for (int side = 0; side < 2; side++)
+    {
+      sieve_side_info_ptr s = si->sides[side];
+      cado_poly_side_ptr ps = si->cpoly->pols[side];
+      double maxnorm = pow (2.0, s->logmax), v, powI = 1.0;
+      ASSERT_ALWAYS(ps->degree < 9);
+      for (int k = 0; k <= ps->degree; k++)
+        {
+          F[ps->degree - k] = fabs (s->fijd[k]) * powI;
+          powI *= (double) si->I;
+        }
+      v = fpoly_eval (F, ps->degree, Jmax);
+      if (v > maxnorm)
+        { /* use dichotomy to determine largest Jmax */
+          double a, b, c;
+          a = 0.0;
+          b = Jmax;
+          while (b - a > 1.0)
+            {
+              c = (a + b) * 0.5;
+              v = fpoly_eval (F, ps->degree, c);
+              if (v < maxnorm)
+                a = c;
+              else
+                b = c;
+            }
+          Jmax = a;
+        }
+    }
+  return (unsigned int) Jmax;
+}
+
 void
-sieve_info_update_norm_data (sieve_info_ptr si)
+sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
 {
     int64_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
+
     /* Update floating point version of algebraic poly (do both, while
      * we're at it...) */
     for (int side = 0; side < 2; side++) {
@@ -2790,4 +2829,19 @@ sieve_info_update_norm_data (sieve_info_ptr si)
         for (int k = 0; k <= ps->degree; k++)
             s->fijd[k] = mpz_get_d (s->fij[k]) * invq;
     }
+
+    /* improve bound on J if possible */
+    unsigned int Jmax;
+    Jmax = sieve_info_update_norm_data_Jmax (si);
+    if (Jmax > si->J)
+      {
+        /* see sieve_info_adjust_IJ */
+        ASSERT_ALWAYS(LOG_BUCKET_REGION >= si->conf->logI);
+        uint32_t i = 1U << (LOG_BUCKET_REGION - si->conf->logI);
+        i *= nb_threads;
+        si->J = (Jmax / i) * i; /* cannot be zero since the previous value
+                                   of si->J was already a multiple of i,
+                                   and this new value is larger */
+      }
 }
+

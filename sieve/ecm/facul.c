@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 #include "utils.h"      /* Happens to define ULONG_BITS, which we use */
 #include "portability.h"
 #include "pm1.h"
@@ -82,22 +83,23 @@ facul_make_strategy (const int n, const unsigned long fbb,
       ecm_make_plan (methods[3].plan, 315, 5355, BRENT12, 11, 1, 0);
     }
 
+  /* heuristic strategy where B1 is increased by sqrt(B1) at each curve */
+  double B1 = 105.0;
   for (i = 4; i < n + 3; i++)
     {
+      double B2;
+      unsigned int k;
+
+      B1 += sqrt (B1);
+      B2 = 17.0 * B1;
+      /* we round B2 to (2k+1)*105, thus k is the integer nearest to
+         B2/210-0.5 */
+      k = B2 / 210.0;
       methods[i].method = EC_METHOD;
       methods[i].plan = malloc (sizeof (ecm_plan_t));
-      ecm_make_plan (methods[i].plan, 315, 5355, MONTY12, i - 1, 1, 0);
+      ecm_make_plan (methods[i].plan, (unsigned int) B1, (2 * k + 1) * 105,
+                     MONTY12, i - 1, 1, 0);
     }
-
-#if 0
-  /* add a new curve: the stage 2 giant step length is 210, and the k-th giant
-     step covers [210 k - 105, 210 k + 105[, thus we choose B1 and B2 of the
-     form 105*(2k + 1). */
-  methods[i].method = EC_METHOD;
-  methods[i].plan = malloc (sizeof (ecm_plan_t));
-  ecm_make_plan (methods[i].plan, 525, 12075, MONTY12, i - 1, 1, 0);
-  i++;
-#endif
 
   methods[n + 3].method = 0;
   methods[n + 3].plan = NULL;

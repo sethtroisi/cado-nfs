@@ -91,6 +91,8 @@ uint32_t **cof_call; /* cof_call[r][a] is the number of calls of the
                         the rational side, and a bits on the algebraic side */
 uint32_t **cof_succ; /* cof_succ[r][a] is the corresponding number of
                         successes, i.e., of call that lead to a relation */
+double cof_calls[2][256] = {{0},{0}};
+double cof_fails[2][256] = {{0},{0}};
 /* }}} */
 
 /* {{{ Forward decl of some functions  */
@@ -557,7 +559,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
                 sc->bitsize, sidenames[sc->side][0], sidenames[s],
                 sc->sides[s]->lim, sc->sides[s]->lpb);
         si->sides[s]->strategy = facul_make_strategy(
-                15, sc->sides[s]->lim, sc->sides[s]->lpb);
+                20, sc->sides[s]->lim, sc->sides[s]->lpb);
         reorder_fb(si, s);
         if (las->verbose) {
             fprintf(las->output, "# small %s factor base", sidenames[s]);
@@ -609,7 +611,7 @@ void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_ptr * todo)
 
 /* return 0 if we should discard that special-q, in which case we intend
  * to discard this special-q. For this reason, si->J is then set to an
- * unrounded value, for diagnostic).
+ * unrounded value, for diagnostic.
  *
  * The current check for discarding is whether we do fill one bucket or
  * not. If we don't even achieve that, we should of course discard.
@@ -619,20 +621,34 @@ void sieve_info_pick_todo_item(sieve_info_ptr si, las_todo_ptr * todo)
  */
 int sieve_info_adjust_IJ(sieve_info_ptr si, double skewness, int nb_threads)/*{{{*/
 {
-    /* compare skewed max-norms */
-    double maxab1 = MAX(fabs(si->a1), fabs(si->b1) * skewness);
-    double maxab0 = MAX(fabs(si->a0), fabs(si->b0) * skewness);
-    if (maxab0 > maxab1) {
+    /* compare skewed max-norms: let u = [a0, b0] and v = [a1, b1],
+       and u' = [a0, s*b0], v' = [a1, s*b1] where s is the skewness.
+       Assume |u'| <= |v'|.
+       We know from Gauss reduction that u' and v' form an angle of at
+       least pi/3, thus since their determinant is q*s, we have
+       |u'|^2 <= |u'| * |v'| <= q*s/sin(pi/3) = 2*q*s/sqrt(3).
+       Define B := sqrt(2/sqrt(3)*q/s), then |a0| <= s*B and |b0| <= B.
+
+       If we take J <= I/2*min(s*B/|a1|, B/|b1|), then for any j <= J:
+       |a1|*J <= I/2*s*B and |b1|*J <= I/2*B, thus
+       |a| = |a0*i+a1*j| <= s*B*I and |b| <= |b0*i+b1*j| <= B*I.
+    */
+    double maxab1, maxab0;
+    maxab1 = si->b1 * skewness;
+    maxab1 = maxab1 * maxab1 + si->a1 * si->a1;
+    maxab0 = si->b0 * skewness;
+    maxab0 = maxab0 * maxab0 + si->a0 * si->a0;
+    if (maxab0 > maxab1) { /* exchange u and v, thus I and J */
         int64_t oa[2] = { si->a0, si->a1 };
         int64_t ob[2] = { si->b0, si->b1 };
         si->a0 = oa[1]; si->a1 = oa[0];
         si->b0 = ob[1]; si->b1 = ob[0];
-        maxab1 = maxab0;
     }
+    maxab1 = MAX(fabs(si->a1), fabs(si->b1) * skewness);
     /* make sure J does not exceed I/2 */
     /* FIXME: We should not have to compute this B a second time. It
      * appears in sieve_info_init_norm_data already */
-    double B = EXTRA_B_FACTOR * sqrt (2.0 * mpz_get_d(si->doing->p) / (skewness * sqrt (3.0)));
+    double B = sqrt (2.0 * mpz_get_d(si->doing->p) / (skewness * sqrt (3.0)));
     if (maxab1 >= B * skewness)
         si->J = (uint32_t) (B * skewness / maxab1 * (double) (si->I >> 1));
     else
@@ -654,14 +670,13 @@ int sieve_info_adjust_IJ(sieve_info_ptr si, double skewness, int nb_threads)/*{{
     return nJ > 0;
 }/*}}}*/
 
-static void sieve_info_update (sieve_info_ptr si)/*{{{*/
+static void sieve_info_update (sieve_info_ptr si, int nb_threads)/*{{{*/
 {
-  /* update number of buckets */
-  
-  si->nb_buckets = 1 + (si->I * si->J - 1) / BUCKET_REGION;
-  
   /* essentially update the fij polynomials */
-  sieve_info_update_norm_data(si);
+  sieve_info_update_norm_data(si, nb_threads);
+
+  /* update number of buckets */
+  si->nb_buckets = 1 + (si->I * si->J - 1) / BUCKET_REGION;
 }/*}}}*/
 
 static void sieve_info_clear (las_info_ptr las, sieve_info_ptr si)/*{{{*/
@@ -2301,16 +2316,34 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 }
             }
 
-            /* if norm[RATIONAL_SIDE] is above BLPrat, then it might not
-             * be smooth. We factor it first. Otherwise we factor it last.
-             */
-            int first = mpz_cmp(norm[RATIONAL_SIDE], BLPrat) > 0 ? RATIONAL_SIDE : ALGEBRAIC_SIDE;
+            unsigned int nbits[2];
+            int first;
+
+            for (int z = 0; z < 2; z++)
+              nbits[z] = mpz_sizeinbase (norm[z], 2);
+
+            if (cof_calls[0][nbits[0]] > 0 && cof_calls[1][nbits[1]] > 0)
+              {
+                if (cof_fails[0][nbits[0]] / cof_calls[0][nbits[0]] >
+                    cof_fails[1][nbits[1]] / cof_calls[1][nbits[1]])
+                  first = 0;
+                else
+                  first = 1;
+              }
+            else
+              /* if norm[RATIONAL_SIDE] is above BLPrat, then it might not
+               * be smooth. We factor it first. Otherwise we factor it last. */
+              first = mpz_cmp (norm[RATIONAL_SIDE], BLPrat) > 0
+                ? RATIONAL_SIDE : ALGEBRAIC_SIDE;
 
             for (int z = 0 ; pass > 0 && z < 2 ; z++)
               {
                 int side = first ^ z;
+                cof_calls[side][nbits[side]] ++;
                 pass = factor_leftover_norm (norm[side], f[side], m[side],
                                              si, side);
+                if (pass <= 0)
+                  cof_fails[side][nbits[side]] ++;
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b) && pass == 0)
                   gmp_fprintf (stderr, "# factor_leftover_norm failed on %s side for (%"PRId64",%"PRIu64"), remains %Zd unfactored\n", sidenames[side], a, b, norm[side]);
@@ -3250,7 +3283,7 @@ int main (int argc0, char *argv0[])/*{{{*/
         /* checks the value of J,
          * precompute the skewed polynomials of f(x) and g(x), and also
          * their floating-point versions */
-        sieve_info_update (si);
+        sieve_info_update (si, las->nb_threads);
         totJ += (double) si->J;
 
         trace_update_conditions(si);
@@ -3476,6 +3509,20 @@ int main (int argc0, char *argv0[])/*{{{*/
     fprintf (las->output, "# Total %lu reports [%1.3gs/r, %1.1fr/sq]\n",
             report->reports, t0 / (double) report->reports,
             (double) report->reports / (double) sq);
+#if 0
+    fprintf (stderr, "rat:");
+    for (int i = 0; i < 256; i++)
+      if (cof_calls[RATIONAL_SIDE][i] > 0)
+        fprintf (stderr, " %d:%1.0f/%1.0f", i, cof_fails[RATIONAL_SIDE][i],
+                 cof_calls[RATIONAL_SIDE][i]);
+    fprintf (stderr, "\n");
+    fprintf (stderr, "alg:");
+    for (int i = 0; i < 256; i++)
+      if (cof_calls[ALGEBRAIC_SIDE][i] > 0)
+        fprintf (stderr, " %d:%1.0f/%1.0f", i, cof_fails[ALGEBRAIC_SIDE][i],
+                 cof_calls[ALGEBRAIC_SIDE][i]);
+    fprintf (stderr, "\n");
+#endif
     /*}}}*/
 #if 0   /* incompatible with the todo list */
     /* {{{ stats */
