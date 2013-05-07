@@ -163,7 +163,7 @@ static inline int
 modset_call_facul(unsigned long *factors, const modset_t *modset, 
                   const facul_strategy_t *strategy, const int method_start)
 {
-  switch (modset.arith) {
+  switch (modset->arith) {
       case CHOOSE_UL:
           return facul_doit_ul (factors, modset->m_ul, strategy, method_start);
 #if     MOD_MAXBITS > MODREDCUL_MAXBITS
