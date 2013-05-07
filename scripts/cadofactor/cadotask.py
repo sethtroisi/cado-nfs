@@ -1203,13 +1203,12 @@ class SqrtTask(Task):
             self.factors[str(newfac)] = isprime
     
     @staticmethod
-    def miller_rabin_pass(number):
+    def miller_rabin_pass(number, base):
         if number <= 3:
             return number >= 2
         if number % 2 == 0:
             return False
         # random.randrange(n) produces random integer in [0, n-1]. We want [2, n-2]
-        base = random.randrange(number - 3) + 2
         po2 = 0
         exponent = number - 1
         while exponent % 2 == 0:
@@ -1228,8 +1227,8 @@ class SqrtTask(Task):
     @staticmethod
     def miller_rabin_tests(number, passes):
         for i in range(0, passes):
-            if not SqrtTask.miller_rabin_pass(number):
+            base = random.randrange(number - 3) + 2
+            if not SqrtTask.miller_rabin_pass(number, base):
                 return False
         return True
-        
-    
+
