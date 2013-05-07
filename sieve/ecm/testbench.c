@@ -359,7 +359,7 @@ int main (int argc, char **argv)
     {
       free(strategy->methods);
       free(strategy);
-      strategy = facul_make_strategy (15, fbb, (lpb == 0) ? ~0UL : 1UL << lpb);
+      strategy = facul_make_strategy (15, fbb, (lpb == 0) ? (const unsigned int) ~0UL : (const unsigned int) (1UL << lpb));
     }
   else
     {
