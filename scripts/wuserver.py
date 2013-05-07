@@ -7,7 +7,7 @@ import sys
 import re
 import io
 import logging
-from urllib.parse import unquote_plus
+import urllib.parse
 from workunit import Workunit
 import datetime
 import wudb
@@ -16,7 +16,7 @@ import upload
 # Get the shell environment variable name in which we should store the path 
 # to the upload directory
 
-upload_keywords = ['upload.py']
+upload_keywords = ['/upload.py']
 uploaddir='upload/' # Upload CGI script puts files in this directory
 dbfilename='wudb'
 
@@ -161,9 +161,9 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
 
     def is_upload(self):
         """Test whether request is a file upload."""
-        splitpath = http.server._url_collapse_path_split(self.path)
+        splitpath = urllib.parse.urlsplit(self.path)
         if self.command == 'POST' and self.is_cgi() and \
-                splitpath[1] in upload_keywords:
+                splitpath.path in upload_keywords:
             return True
         return False
 
@@ -233,7 +233,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             conditions = {}
             # Now look at individual key=value pairs
             for q in query.split("&"):
-                q = unquote_plus(q)
+                q = urllib.parse.unquote_plus(q)
                 logging.debug("Processing token " + str(q))
                 for (name, op) in wudb.MyCursor.name_to_operator.items():
                     if op in q:
