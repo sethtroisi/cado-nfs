@@ -592,7 +592,7 @@ class FreeRelTask(FactorBaseOrFreerelTask):
                 if "nfree" in self.state:
                     raise Exception("Received two values for number of free relations")
                 self.state["nfree"] = int(match.group(1))
-        if not self.state["nfree"]:
+        if not "nfree" in self.state:
             raise Exception("Received no value for number of free relations")
         return
     
