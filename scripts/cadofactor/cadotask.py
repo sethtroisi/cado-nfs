@@ -1204,6 +1204,33 @@ class SqrtTask(Task):
     
     @staticmethod
     def miller_rabin_pass(number, base):
+        """
+        >>> SqrtTask.miller_rabin_pass(3, 2)
+        True
+        >>> SqrtTask.miller_rabin_pass(9, 2)
+        False
+        >>> SqrtTask.miller_rabin_pass(91, 2)
+        False
+        >>> SqrtTask.miller_rabin_pass(1009, 2)
+        True
+        >>> SqrtTask.miller_rabin_pass(10000000019, 2)
+        True
+        >>> SqrtTask.miller_rabin_pass(10000000019*10000000021, 2)
+        False
+        
+        # Check some pseudoprimes. First a Fermat pseudoprime which
+        # Miller-Rabin should recognize as composite
+        >>> SqrtTask.miller_rabin_pass(341, 2)
+        False
+        
+        # Now some strong pseudo-primes
+        >>> SqrtTask.miller_rabin_pass(2047, 2)
+        True
+        >>> SqrtTask.miller_rabin_pass(703, 3)
+        True
+        >>> SqrtTask.miller_rabin_pass(781, 5)
+        True
+        """
         if number <= 3:
             return number >= 2
         if number % 2 == 0:
