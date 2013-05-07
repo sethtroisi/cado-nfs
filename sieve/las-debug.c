@@ -183,7 +183,7 @@ void sieve_decrease(unsigned char *S, const unsigned char logp, where_am_I_ptr w
 #ifdef CHECK_UNDERFLOW
     sieve_decrease_underflow_trap(S, logp, w);
 #endif
-    *S -= logp;
+    *S = (*S < logp) ? 0 : (*S - logp);
 }
 #endif
 /* }}} */
