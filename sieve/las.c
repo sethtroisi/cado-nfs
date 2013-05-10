@@ -72,7 +72,7 @@ static double MAYBE_UNUSED exp2 (double x)
 /* This global mutex should be locked in multithreaded parts when a
  * thread does a read / write, especially on stdout, stderr...
  */
-pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER; 
+pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int create_descent_hints = 0;
 double tt_qstart;
@@ -2732,14 +2732,13 @@ void * process_bucket_region(thread_data_ptr th)
             /* Init rational norms */
             rep->tn[side] -= seconds ();
 #if defined(TRACE_K) && defined(TRACE_Nx)
-            unsigned int Nx[2] = TRACE_Nx;
-            if (w->N == Nx[0])
-              fprintf (stderr, "before init_rat_norms_bucket_region, N=%u S[%u]=%u\n", w->N, Nx[1], S[side][Nx[1]]);
+            if (trace_on_spot_N(w->N))
+              fprintf (stderr, "before init_rat_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
             init_rat_norms_bucket_region(S[side], i, si);
 #if defined(TRACE_K) && defined(TRACE_Nx)
-            if (w->N == Nx[0])
-              fprintf (stderr, "after init_rat_norms_bucket_region, N=%u S[%u]=%u\n", w->N, Nx[1], S[side][Nx[1]]);
+            if (trace_on_spot_N(w->N))
+              fprintf (stderr, "after init_rat_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
 #endif
             rep->tn[side] += seconds ();
 
