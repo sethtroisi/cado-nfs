@@ -380,9 +380,11 @@ facul_doit (unsigned long *factors, const modulus_t m,
           modset_clear (&fm);
 	  if (found2 == FACUL_NOT_SMOOTH) {
             found = FACUL_NOT_SMOOTH;
+            if (!cfprime)
+              modset_clear (&cfm);
             break;
           }
-            found += found2;
+          found += found2;
 	}
       
       if (cfprime) {
