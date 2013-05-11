@@ -107,7 +107,7 @@ int test_divisible(where_am_I_ptr w)
 #endif
 
 /* {{{ helper: sieve_decrease */
-/* Decrease the sieve array entry *S by logp, with underflow checking 
+/* Decrease the sieve array entry *S by logp, with underflow checking
    and tracing if desired. Variables x, bucket_nr, p, and si
    are used only for trace test and output */
 
@@ -183,7 +183,7 @@ void sieve_decrease(unsigned char *S, const unsigned char logp, where_am_I_ptr w
 #ifdef CHECK_UNDERFLOW
     sieve_decrease_underflow_trap(S, logp, w);
 #endif
-    *S = (*S < logp) ? 0 : (*S - logp);
+    *S -= logp;
 }
 #endif
 /* }}} */
