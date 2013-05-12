@@ -915,11 +915,16 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
         sc->sides[s]->mfb = las->cpoly->pols[s]->mfb;
         sc->sides[s]->lambda = las->cpoly->pols[s]->lambda;
     }
+    /* We used to print the default config unconditionally. It's in fact
+     * useless, as this bit of configuration will be printed anyway, and
+     * printing it twice causes unnecessary clutter.
     if (sc->bitsize) {
         siever_config_display(las->output, sc);
         fprintf(las->output, "#                     skewness=%1.1f\n",
                 las->cpoly->skew);
     }
+     */
+
     /* }}} */
 
     /* {{{ Init and parse info regarding work to be done by the siever */
