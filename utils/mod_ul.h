@@ -201,14 +201,9 @@ MAYBE_UNUSED
 static inline size_t 
 modul_intbits (const modintul_t a)
 {
-  int bits = 0;
-  unsigned long n = a[0];
-  while (n > 0UL) /* TODO: use clzl */
-    {
-      bits++;
-      n >>= 1;
-    }
-  return bits;
+  if (a[0] == 0)
+    return 0;
+  return LONG_BIT - ularith_clz (a[0]);
 }
 
 
