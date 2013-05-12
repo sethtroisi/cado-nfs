@@ -314,23 +314,22 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	 cofactor is prime, and if one of them is, whether they are too
 	 large for our smoothness bounds */
       
-      /* A quick test if the factor is <= fbb^2 and >lpb */
-      /* FIXME: must always use same width for comparison */
+      /* A quick test if the factor is <= fbb^2 and >2^lpb */
       fprime = (mod_intcmp_uint64 (f, strategy->assume_prime_thresh) <= 0); 
-      if (fprime && mod_intcmp_ul (f, strategy->lpb) > 0)
+      if (fprime && mod_intbits (f) > strategy->lpb)
 	{
-	  found = FACUL_NOT_SMOOTH; /* A prime > lpb, not smooth */
+	  found = FACUL_NOT_SMOOTH; /* A prime > 2^lpb, not smooth */
 	  break;
 	}
       
       /* Compute the cofactor */
       mod_intdivexact (n, n, f);
       
-      /* See if cofactor is <= fbb^2 and > lpb */
+      /* See if cofactor is <= fbb^2 and > 2^lpb */
       cfprime = (mod_intcmp_uint64 (n, strategy->assume_prime_thresh) <= 0);
-      if (cfprime && mod_intcmp_ul (n, strategy->lpb) > 0)
+      if (cfprime && mod_intbits (n) > strategy->lpb)
 	{
-	  found = FACUL_NOT_SMOOTH; /* A prime > lpb, not smooth */
+	  found = FACUL_NOT_SMOOTH; /* A prime > 2^lpb, not smooth */
 	  break;
 	}
       
@@ -341,9 +340,9 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	  fprime = modset_primetest (&fm);
           if (fprime) 
             modset_clear (&fm);
-	  if (fprime && mod_intcmp_ul (f, strategy->lpb) > 0)
+	  if (fprime && mod_intbits (f) > strategy->lpb)
 	    {
-	      found = FACUL_NOT_SMOOTH; /* A prime > lpb, not smooth */
+	      found = FACUL_NOT_SMOOTH; /* A prime > 2^lpb, not smooth */
 	      break;
 	    }
 	}
@@ -356,20 +355,21 @@ facul_doit (unsigned long *factors, const modulus_t m,
 
           if (cfprime)
             modset_clear (&cfm);
-	  if (cfprime && mod_intcmp_ul (n, strategy->lpb) > 0)
+	  if (cfprime && mod_intbits (n) > strategy->lpb)
 	    {
 	      if (!fprime)
 	        modset_clear (&fm);
-	      found = FACUL_NOT_SMOOTH; /* A prime > lpb, not smooth */
+	      found = FACUL_NOT_SMOOTH; /* A prime > 2^lpb, not smooth */
 	      break;
 	    }
 	}
       
-      /* So each of factor and cofactor is either a prime < lpb, 
+      /* So each of factor and cofactor is either a prime < 2^lpb, 
 	 or is composite */
 
       if (fprime) {
-	  factors[found++] = mod_intget_ul(f); /* f < lpb, so it fits in 1 unsigned long */
+          if (mod_intfits_ul(f))
+	    factors[found++] = mod_intget_ul(f);
 	}
       else
 	{
@@ -388,7 +388,8 @@ facul_doit (unsigned long *factors, const modulus_t m,
 	}
       
       if (cfprime) {
-	  factors[found++] = mod_intget_ul(n); /* n < lp, so it fits in 1 unsigned long */
+          if (mod_intfits_ul(n))
+	    factors[found++] = mod_intget_ul(n);
         }
       else
 	{
