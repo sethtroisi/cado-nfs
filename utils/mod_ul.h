@@ -198,7 +198,7 @@ modul_intshl (modintul_t r, const modintul_t s, const int i)
 /* Returns the number of bits in a, that is, floor(log_2(n))+1. 
    For n==0 returns 0. */
 MAYBE_UNUSED
-static inline int
+static inline size_t 
 modul_intbits (const modintul_t a)
 {
   int bits = 0;

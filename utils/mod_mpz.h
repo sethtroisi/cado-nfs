@@ -223,7 +223,7 @@ modmpz_intshl (modintmpz_t r, const modintmpz_t s, const int i)
 /* Returns the number of bits in a, that is, floor(log_2(n))+1. 
    For n==0 returns 0. */
 MAYBE_UNUSED
-static inline int
+static inline size_t 
 modmpz_intbits (const modintmpz_t a)
 {
   ASSERT_MPZ(a);
