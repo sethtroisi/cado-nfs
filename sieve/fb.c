@@ -195,10 +195,14 @@ fb_is_power (fbprime_t q)
   maxk = fb_log_2(q);
   for (k = maxk; k >= 2; k--)
     {
-      p = (uint32_t) (pow ((double) q, 1.0 / (double) k) + 0.5);
-      if (q % p == 0) {
-        ASSERT (fb_pow (p, k) == q);
-        return p;
+      double dp = pow ((double) q, 1.0 / (double) k);
+      double rdp = trunc(dp + 0.5);
+      if (fabs(dp - rdp) < 0.001) {
+        p = (uint32_t) rdp ;
+        if (q % p == 0) {
+          ASSERT (fb_pow (p, k) == q);
+          return p;
+        }
       }
     }
   return 0;
