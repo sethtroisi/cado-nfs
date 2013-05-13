@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <limits.h>
 #include <gmp.h>
 #include "facul.h"
 #include "pm1.h"
@@ -70,6 +71,9 @@ tryfactor (mpz_t N, const facul_strategy_t *strategy,
 
   facul_code = facul (f, N, strategy);
   
+  if (verbose >= 2)
+    gmp_printf ("facul returned code %d\n", facul_code);
+
   if (printfactors && facul_code > 0)
     {
       int j;
@@ -129,7 +133,7 @@ int main (int argc, char **argv)
 {
   unsigned long start, stop, i, mod = 0UL, inpstop = ULONG_MAX;
   unsigned long hits = 0, total = 0;
-  unsigned long fbb = 0, lpb = 0;
+  unsigned long fbb = 0, lpb = ULONG_MAX;
   char *inp_fn = NULL;
   FILE *inp;
   mpz_t N, cof;
@@ -149,7 +153,6 @@ int main (int argc, char **argv)
 
   strategy = malloc (sizeof(facul_strategy_t));
   strategy->methods = malloc ((MAX_METHODS + 1) * sizeof (facul_method_t));
-  strategy->lpb = ~(0UL);
   strategy->assume_prime_thresh = 0;
 
   /* Parse options */
@@ -359,13 +362,12 @@ int main (int argc, char **argv)
     {
       free(strategy->methods);
       free(strategy);
-      strategy = facul_make_strategy (15, fbb, (lpb == 0) ? (const unsigned int) ~0UL : (const unsigned int) (1UL << lpb));
+      strategy = facul_make_strategy (15, fbb, lpb);
     }
   else
     {
       if (!quiet) printf ("Strategy has %d methods\n", nr_methods);
-      if (lpb != 0)
-        strategy->lpb = 1UL << lpb;
+      strategy->lpb = lpb;
       strategy->methods[nr_methods].method = 0;
     }
 
@@ -443,8 +445,13 @@ int main (int argc, char **argv)
 	  continue;
 	total++;
 
-        if (do_pointorder && mpz_fits_ulong_p (N))
-          print_pointorder (mpz_get_ui (N), po_sigma, po_parameterization, verbose);
+        if (do_pointorder)
+          {
+            if (mpz_fits_ulong_p (N))
+              print_pointorder (mpz_get_ui (N), po_sigma, po_parameterization, verbose);
+            else
+              gmp_fprintf (stderr, "%Zd does not fit into an unsigned long, not computing group order\n", N);
+          }
         else
           {
             mpz_mul (N, N, cof);

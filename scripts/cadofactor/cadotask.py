@@ -592,7 +592,7 @@ class FreeRelTask(FactorBaseOrFreerelTask):
                 if "nfree" in self.state:
                     raise Exception("Received two values for number of free relations")
                 self.state["nfree"] = int(match.group(1))
-        if not self.state["nfree"]:
+        if not "nfree" in self.state:
             raise Exception("Received no value for number of free relations")
         return
     
@@ -1164,46 +1164,78 @@ class SqrtTask(Task):
                 p.run()
                 (rc, stdout, stderr) = p.wait()
                 if not stdout.decode("ascii").strip() == "Failed":
-                    factorlist = list(map(int,stdout.decode("ascii").split()))[:1]
-                    self.add_factors(factorlist)
+                    factorlist = list(map(int,stdout.decode("ascii").split()))
+                    # FIXME: Can sqrt print more/less than 2 factors?
+                    assert len(factorlist) == 2
+                    self.add_factors(factorlist[0])
                 self.state["next_dep"] += 1
         
         self.logger.info("Factors: %s" % " ".join(self.factors.keys()))
         self.logger.debug("Exit SqrtTask.run(" + self.name + ")")
-
+    
     def is_done(self):
         for (factor, isprime) in self.factors.items():
             if not isprime:
                 return False
         return True
     
-    def add_factors(self, factorlist):
-        newfactorlist = [f for f in factorlist if not str(f) in self.factors]
-        for newfac in newfactorlist:
-            assert newfac > 0
-            for oldfac in list(map(int, self.factors.keys())):
-                g = gcd(newfac, oldfac)
-                if 1 < g and g < newfac:
-                    self.add_factors([g, newfac // g])
-                    break
-                if 1 < g and g < oldfac:
-                    # We get here only if newfac is a proper factor of oldfac
-                    assert newfac == g
-                    del(self.factors[str(oldfac)])
-                    self.add_factors([g, oldfac // g])
-                    break
-            else:
-                isprime = SqrtTask.miller_rabin_tests(newfac, 10)
-                self.factors[str(newfac)] = isprime
+    def add_factor(self, factor):
+        assert factor > 0
+        if str(factor) in self.factors:
+            return
+        for oldfac in list(map(int, self.factors.keys())):
+            g = gcd(factor, oldfac)
+            if 1 < g and g < factor:
+                self.add_factors(g)
+                self.add_factors(factor // g)
+                break
+            if 1 < g and g < oldfac:
+                # We get here only if newfac is a proper factor of oldfac
+                assert factor == g
+                del(self.factors[str(oldfac)])
+                self.add_factors(g)
+                self.add_factors(oldfac // g)
+                break
+        else:
+            # We get here if the new factor is coprime to all previously
+            # known factors
+            isprime = SqrtTask.miller_rabin_tests(newfac, 10)
+            self.factors[str(newfac)] = isprime
     
     @staticmethod
-    def miller_rabin_pass(number):
+    def miller_rabin_pass(number, base):
+        """
+        >>> SqrtTask.miller_rabin_pass(3, 2)
+        True
+        >>> SqrtTask.miller_rabin_pass(9, 2)
+        False
+        >>> SqrtTask.miller_rabin_pass(91, 2)
+        False
+        >>> SqrtTask.miller_rabin_pass(1009, 2)
+        True
+        >>> SqrtTask.miller_rabin_pass(10000000019, 2)
+        True
+        >>> SqrtTask.miller_rabin_pass(10000000019*10000000021, 2)
+        False
+        
+        # Check some pseudoprimes. First a Fermat pseudoprime which
+        # Miller-Rabin should recognize as composite
+        >>> SqrtTask.miller_rabin_pass(341, 2)
+        False
+        
+        # Now some strong pseudo-primes
+        >>> SqrtTask.miller_rabin_pass(2047, 2)
+        True
+        >>> SqrtTask.miller_rabin_pass(703, 3)
+        True
+        >>> SqrtTask.miller_rabin_pass(781, 5)
+        True
+        """
         if number <= 3:
             return number >= 2
         if number % 2 == 0:
             return False
         # random.randrange(n) produces random integer in [0, n-1]. We want [2, n-2]
-        base = random.randrange(number - 3) + 2
         po2 = 0
         exponent = number - 1
         while exponent % 2 == 0:
@@ -1222,8 +1254,8 @@ class SqrtTask(Task):
     @staticmethod
     def miller_rabin_tests(number, passes):
         for i in range(0, passes):
-            if not SqrtTask.miller_rabin_pass(number):
+            base = random.randrange(number - 3) + 2
+            if not SqrtTask.miller_rabin_pass(number, base):
                 return False
         return True
-        
-    
+
