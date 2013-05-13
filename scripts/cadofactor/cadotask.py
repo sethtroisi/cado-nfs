@@ -1116,8 +1116,7 @@ class SqrtTask(Task):
     programs = (cadoprograms.Sqrt,)
     parampath = "tasks." + name
     paramnames = ("N",)
-    # /localdisk/kruppaal/build/cado-nfs/normal/sqrt/sqrt -poly /tmp/cado.70R4ygt5PZ/c59.poly -prefix /tmp/cado.70R4ygt5PZ/c59.dep -dep 0 -rat -alg -gcd -purged /tmp/cado.70R4ygt5PZ/c59.purged.gz -index /tmp/cado.70R4ygt5PZ/c59.index -ker /tmp/cado.70R4ygt5PZ/c59.ker > /tmp/cado.70R4ygt5PZ/c59.fact.000
-    # /localdisk/kruppaal/build/cado-nfs/normal/sqrt/sqrt -poly /tmp/cado.70R4ygt5PZ/c59.poly -prefix /tmp/cado.70R4ygt5PZ/c59.dep -dep 1 -rat -alg -gcd -purged /tmp/cado.70R4ygt5PZ/c59.purged.gz -index /tmp/cado.70R4ygt5PZ/c59.index -ker /tmp/cado.70R4ygt5PZ/c59.ker > /tmp/cado.70R4ygt5PZ/c59.fact.001
+    
     def __init__(self, polyselect, freerel, purge, merge, linalg, characters, *args, **kwargs):
         self.polyselect = polyselect
         self.freerel = freerel
@@ -1134,6 +1133,7 @@ class SqrtTask(Task):
         self.logger.debug("Enter SqrtTask.run(" + self.name + ")")
         if not self.is_done():
             super().run()
+            self.logger.info("Beginning %s" % self.title)
             polyfilename = self.make_output_filename("poly")
             poly = self.polyselect.get_poly()
             poly.create_file(polyfilename, self.params)
@@ -1169,6 +1169,7 @@ class SqrtTask(Task):
                     assert len(factorlist) == 2
                     self.add_factors(factorlist[0])
                 self.state["next_dep"] += 1
+            self.logger.info("%s has finished" % self.title)
         
         self.logger.info("Factors: %s" % " ".join(self.factors.keys()))
         self.logger.debug("Exit SqrtTask.run(" + self.name + ")")
@@ -1218,9 +1219,13 @@ class SqrtTask(Task):
         >>> SqrtTask.miller_rabin_pass(10000000019*10000000021, 2)
         False
         
-        # Check some pseudoprimes. First a Fermat pseudoprime which
+        # Check some pseudoprimes. First a few Fermat pseudoprimes which
         # Miller-Rabin should recognize as composite
         >>> SqrtTask.miller_rabin_pass(341, 2)
+        False
+        >>> SqrtTask.miller_rabin_pass(561, 2)
+        False
+        >>> SqrtTask.miller_rabin_pass(645, 2)
         False
         
         # Now some strong pseudo-primes
@@ -1258,4 +1263,3 @@ class SqrtTask(Task):
             if not SqrtTask.miller_rabin_pass(number, base):
                 return False
         return True
-
