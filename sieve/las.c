@@ -229,6 +229,14 @@ void sieve_info_init_factor_bases(las_info_ptr las, sieve_info_ptr si, param_lis
              * course, for each side (think about the bi-algebraic case)
              */
             const char * fbfilename = param_list_lookup_string(pl, "fb");
+            /* If apowlim is not given, or if it is too large, set it to
+             * its maximum allowed value */
+            if (apow_lim >= si->bucket_thresh) {
+                apow_lim = si->bucket_thresh - 1;
+                printf ("# apow_lim reduced to %d\n", apow_lim);
+            }
+            if (apow_lim == 0) 
+                apow_lim = si->bucket_thresh - 1;
             fprintf(las->output, "# Reading %s factor base from %s\n", sidenames[side], fbfilename);
             sis->fb = fb_read(fbfilename, sis->scale * LOG_SCALE, 0, lim, apow_lim);
             ASSERT_ALWAYS(sis->fb != NULL);
@@ -2966,6 +2974,8 @@ usage (const char *argv0, const char * missing)
   fprintf (stderr, "          -mfba     nnn   algebraic cofactor bound 2^nnn\n");
   fprintf (stderr, "          -rlambda  nnn   rational lambda value is nnn\n");
   fprintf (stderr, "          -alambda  nnn   algebraic lambda value is nnn\n");
+  fprintf (stderr, "          -rpowlim  xxx   limit on powers on rat side is nnn\n");
+  fprintf (stderr, "          -apowlim  xxx   limit on powers on alg side is nnn\n");
   fprintf (stderr, "          -S        xxx   skewness value is xxx\n");
   fprintf (stderr, "          -v              be verbose (print some sieving statistics)\n");
   fprintf (stderr, "          -out filename   write relations to filename instead of stdout\n");
