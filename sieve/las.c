@@ -1773,45 +1773,41 @@ NOPROFILE_STATIC void
 apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
         where_am_I_ptr w)
 {
-    int j = nb_of_updates(BA, i);
-    int next_logp_j = 0;
-    unsigned char logp = 0;
-    bucket_update_t *next_logp_change, *read_ptr;
+  unsigned int next_logp_j;
+  unsigned char logp;
+  bucket_update_t *next_logp_change, **pnlc, *read_ptr;
+  uint16_t x;
+  
+#define SIEVE_DECREASE(D)				\
+  x = read_ptr[D].x;					\
+  WHERE_AM_I_UPDATE(w, x, x);				\
+  sieve_decrease (S + x, logp, w);
 
-    /* Having the read_ptr here defeats the whole idea of having 
-       nice inline functions to handle all the BA stuff, but I yet 
-       need to figure out how to keep gcc from writing 
-       BA.bucket_read[i] back to memory and reading it from memory again
-       on every get_next_bucket_update()  */
-    read_ptr = BA.bucket_read[i];
-
-    /* Init so that first access fetches logp */
-    next_logp_j = 0;
-    next_logp_change = read_ptr;
-
-    WHERE_AM_I_UPDATE(w, p, 0);
-
-    for (; j > 0; --j) {
-       uint16_t x;
-
-       /* Do we need a new logp ? */
-       if (read_ptr >= next_logp_change)
-         {
-           ASSERT_ALWAYS (next_logp_j < BA.nr_logp);
-           ASSERT_ALWAYS (BA.logp_idx[next_logp_j * BA.n_bucket + i] 
-                           == next_logp_change);
-           logp = BA.logp_val[next_logp_j++];
-           /* Get pointer telling when to fetch new logp next time */
-           if (next_logp_j < BA.nr_logp)
-             next_logp_change = BA.logp_idx[next_logp_j * BA.n_bucket + i];
-           else
-             next_logp_change = BA.bucket_write[i]; /* effectively: never */
-         }
-       
-       x = (read_ptr++)->x;
-       WHERE_AM_I_UPDATE(w, x, x);
-       sieve_decrease (S + x, logp, w);
+  read_ptr = BA.bucket_read[i];
+  pnlc = BA.logp_idx + i + BA.n_bucket;
+  next_logp_j = 0;
+  WHERE_AM_I_UPDATE(w, p, 0);
+  while (read_ptr < BA.bucket_write[i]) {
+    logp = BA.logp_val[next_logp_j++];
+    if (LIKELY(next_logp_j < (unsigned int) BA.nr_logp)) {
+      next_logp_change = *pnlc;
+      pnlc += BA.n_bucket;
     }
+    else
+      next_logp_change = BA.bucket_write[i];
+    while (read_ptr + 16 <= next_logp_change) {
+      SIEVE_DECREASE(0); SIEVE_DECREASE(1); SIEVE_DECREASE(2); SIEVE_DECREASE(3);
+      SIEVE_DECREASE(4); SIEVE_DECREASE(5); SIEVE_DECREASE(6); SIEVE_DECREASE(7);
+      SIEVE_DECREASE(8); SIEVE_DECREASE(9); SIEVE_DECREASE(10);SIEVE_DECREASE(11);
+      SIEVE_DECREASE(12);SIEVE_DECREASE(13);SIEVE_DECREASE(14);SIEVE_DECREASE(15);
+      read_ptr += 16;
+      }
+    while (read_ptr < next_logp_change) {
+      SIEVE_DECREASE(0);
+      read_ptr++;
+    }
+  }
+#undef SIEVE_DECREASE
 }
 /* }}} */
 
