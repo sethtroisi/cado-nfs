@@ -18,6 +18,11 @@ struct trace_Nx_t trace_Nx;
 struct trace_ab_t trace_ab;
 struct trace_ij_t trace_ij;
 
+static inline int trace_on_spot_N(unsigned int N) {
+    if (trace_Nx.x == UINT_MAX) return 0;
+    return N == trace_Nx.N;
+}
+
 static inline int trace_on_spot_Nx(unsigned int N, unsigned int x) {
     if (trace_Nx.x == UINT_MAX) return 0;
     return N == trace_Nx.N && x == trace_Nx.x;

@@ -291,7 +291,7 @@ modredc2ul2_intsub (modintredc2ul2_t r, const modintredc2ul2_t a,
 /* Returns the number of bits in a, that is, floor(log_2(a))+1. 
    For a == 0 returns 0. */
 MAYBE_UNUSED
-static inline int
+static inline size_t 
 modredc2ul2_intbits (const modintredc2ul2_t a)
 {
   if (a[1] > 0UL)

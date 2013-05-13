@@ -72,7 +72,7 @@ static double MAYBE_UNUSED exp2 (double x)
 /* This global mutex should be locked in multithreaded parts when a
  * thread does a read / write, especially on stdout, stderr...
  */
-pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER; 
+pthread_mutex_t io_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 int create_descent_hints = 0;
 double tt_qstart;
@@ -915,11 +915,16 @@ static void las_info_init(las_info_ptr las, param_list pl)/*{{{*/
         sc->sides[s]->mfb = las->cpoly->pols[s]->mfb;
         sc->sides[s]->lambda = las->cpoly->pols[s]->lambda;
     }
+    /* We used to print the default config unconditionally. It's in fact
+     * useless, as this bit of configuration will be printed anyway, and
+     * printing it twice causes unnecessary clutter.
     if (sc->bitsize) {
         siever_config_display(las->output, sc);
         fprintf(las->output, "#                     skewness=%1.1f\n",
                 las->cpoly->skew);
     }
+     */
+
     /* }}} */
 
     /* {{{ Init and parse info regarding work to be done by the siever */
@@ -2731,7 +2736,15 @@ void * process_bucket_region(thread_data_ptr th)
         
             /* Init rational norms */
             rep->tn[side] -= seconds ();
+#if defined(TRACE_K) && defined(TRACE_Nx)
+            if (trace_on_spot_N(w->N))
+              fprintf (stderr, "before init_rat_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
+#endif
             init_rat_norms_bucket_region(S[side], i, si);
+#if defined(TRACE_K) && defined(TRACE_Nx)
+            if (trace_on_spot_N(w->N))
+              fprintf (stderr, "after init_rat_norms_bucket_region, N=%u S[%u]=%u\n", w->N, trace_Nx.x, S[side][trace_Nx.x]);
+#endif
             rep->tn[side] += seconds ();
 
             /* Apply rational buckets */

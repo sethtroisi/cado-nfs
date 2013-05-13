@@ -312,7 +312,7 @@ modredcul_intsub (modintredcul_t r, const modintredcul_t a,
 /* Returns the number of bits in a, that is, floor(log_2(a))+1.
    For a == 0 returns 0. */
 MAYBE_UNUSED
-static inline int
+static inline size_t 
 modredcul_intbits (const modintredcul_t a)
 {
   if (a[0] == 0)
