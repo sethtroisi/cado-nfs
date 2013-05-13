@@ -45,6 +45,7 @@ void las_display_config_flags(FILE * stream)
     fprintf(stream, " BUCKET_LIMIT_ADD=%u", BUCKET_LIMIT_ADD);
     fprintf(stream, " GUARD=%1.2f", GUARD);
     fprintf(stream, " LOG_MAX=%.1f", LOG_MAX);
+    fprintf(stream, " NB_CURVES=%u", NB_CURVES);
     fprintf(stream, "\n");
 }				/* }}} */
 
