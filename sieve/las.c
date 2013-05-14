@@ -2970,8 +2970,8 @@ usage (const char *argv0, const char * missing)
   fprintf (stderr, "          -mfba     nnn   algebraic cofactor bound 2^nnn\n");
   fprintf (stderr, "          -rlambda  nnn   rational lambda value is nnn\n");
   fprintf (stderr, "          -alambda  nnn   algebraic lambda value is nnn\n");
-  fprintf (stderr, "          -rpowlim  xxx   limit on powers on rat side is nnn\n");
-  fprintf (stderr, "          -apowlim  xxx   limit on powers on alg side is nnn\n");
+  fprintf (stderr, "          -rpowlim  nnn   limit on powers on rat side is nnn\n");
+  fprintf (stderr, "          -apowlim  nnn   limit on powers on alg side is nnn\n");
   fprintf (stderr, "          -S        xxx   skewness value is xxx\n");
   fprintf (stderr, "          -v              be verbose (print some sieving statistics)\n");
   fprintf (stderr, "          -out filename   write relations to filename instead of stdout\n");
