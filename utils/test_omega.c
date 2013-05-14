@@ -10,7 +10,7 @@
 void omega (residue_t o, residue_t b, const unsigned long k, const modulus_t pp);
 
 int main(int argc, char **argv) {
-  unsigned long p, minp, maxp;
+  unsigned long p, minp = 3, maxp = ~0UL;
   enumeratediv_t div;
   
   if (argc > 1)
