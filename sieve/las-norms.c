@@ -2802,18 +2802,18 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
 double
 sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
 {
-  double Jmax = si->I >> 1;
-  double F[9];
+  double Iover2 = (double) (si->I >> 1);
+  double Jmax = Iover2;
+  double F[MAXDEGREE + 1];
   for (int side = 0; side < 2; side++)
     {
       sieve_side_info_ptr s = si->sides[side];
       cado_poly_side_ptr ps = si->cpoly->pols[side];
-      double maxnorm = pow (2.0, s->logmax), v, powI = 1.0;
-      ASSERT_ALWAYS(ps->degree < 9);
+      double maxnorm = pow (2.0, s->logmax), v, powIover2 = 1.0;
       for (int k = 0; k <= ps->degree; k++)
         {
-          F[ps->degree - k] = fabs (s->fijd[k]) * powI;
-          powI *= (double) si->I;
+          F[ps->degree - k] = fabs (s->fijd[k]) * powIover2;
+          powIover2 *= Iover2;
         }
       v = fpoly_eval (F, ps->degree, Jmax);
       if (v > maxnorm)
