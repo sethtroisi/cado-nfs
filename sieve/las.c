@@ -2256,14 +2256,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
             copr++;
 
-            /* For hunting missed relations */
-#if 0
-            if (a == -6537753 && b == 1264)
-                fprintf (stderr, "# Have relation %ld,%lu at bucket nr %d, "
-                        "x = %d, K = %lu\n", 
-                        a, b, N, x, (unsigned long) N * BUCKET_REGION + x);
-#endif
-
             int pass = 1;
 
             for(int z = 0 ; pass && z < 2 ; z++) {
