@@ -168,6 +168,9 @@ void sieve_decrease_logging_backend(unsigned char *S, const unsigned char logp, 
             caller = opening + 1;
         }
     }
+    if (!*caller) {
+        caller="<no symbol (static?)>";
+    }
 #else
     const char * caller = "";
 #endif

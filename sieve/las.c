@@ -1772,7 +1772,11 @@ void thread_do(thread_data * thrs, void * (*f) (thread_data_ptr), int n)/*{{{*/
 }/*}}}*/
 
 /* {{{ apply_buckets */
-NOPROFILE_STATIC void
+#ifndef TRACE_K
+/* backtrace display can't work for static symbols (see backtrace_symbols) */
+NOPROFILE_STATIC
+#endif
+void
 apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
         where_am_I_ptr w)
 {
@@ -2058,7 +2062,7 @@ check_leftover_norm (mpz_t n, sieve_info_ptr si, int side)
 /* Adds the number of sieve reports to *survivors,
    number of survivors with coprime a, b to *coprimes */
 
-    NOPROFILE_STATIC int
+NOPROFILE_STATIC int
 factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_ptr w MAYBE_UNUSED)
 {
     las_info_ptr las = th->las;
