@@ -60,6 +60,7 @@ void		fb_fprint_entry (FILE *, const factorbase_degn_t *);
 void            fb_fprint (FILE *, const factorbase_degn_t *);
 void            fb_sortprimes (fbprime_t *, const unsigned int);
 unsigned char	fb_log (double, double, double);
+fbprime_t       fb_is_power (fbprime_t);
 factorbase_degn_t * 	fb_make_linear (const mpz_t *, const fbprime_t, 
 					const fbprime_t, const double, 
 					const int, const int, FILE *);

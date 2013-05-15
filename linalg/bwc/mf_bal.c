@@ -478,6 +478,9 @@ int main(int argc, char * argv[])
             ASSERT(rx < bal->h->ncols);
         }
         uint32_t w = colweights[rx];
+#ifdef HAVE_MINGW
+        fprintf (stderr, "read w=%u from dcwfile\n", w);
+#endif
         tw += w;
         double x = w;
         bal->colperm[2*r]=w;
