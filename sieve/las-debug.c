@@ -37,26 +37,42 @@ struct trace_ij_t trace_ij = TRACE_IJ;
 struct trace_ij_t trace_ij = { 0, UINT_MAX, };
 #endif
 
+#ifdef TRACE_K
+#if defined(TRACE_AB) + defined(TRACE_IJ) + defined(TRACE_Nx) != 1
+#error "when TRACE_K is defined, exactly one of TRACE_(AB|IJ|Nx) must be defined"
+#endif
+#else
+#if defined(TRACE_AB) || defined(TRACE_IJ) || defined(TRACE_Nx)
+#warning "TRACE_(AB|IJ|Nx) values are ignored unless TRACE_K is defined"
+#endif
+#endif
+
+/* This fills all the trace_* structures from the main one. Which
+ * structure is the main structure depends on which among the TRACE_*
+ * flags has been defined */
 void trace_update_conditions(sieve_info_srcptr si MAYBE_UNUSED)
 {
 #ifdef TRACE_K
-    if (trace_ab.a || trace_ab.b) {
-        if (!ABToIJ(&trace_ij.i, &trace_ij.j, trace_ab.a, trace_ab.b, si)) {
-            fprintf(stderr, "# Relation (%"PRId64",%"PRIu64") to be traced is outside of the current q-lattice\n", trace_ab.a, trace_ab.b);
-            trace_ij.i=0;
-            trace_ij.j=UINT_MAX;
-            trace_Nx.N=0;
-            trace_Nx.x=UINT_MAX;
-        } else {
-            IJToNx(&trace_Nx.N, &trace_Nx.x, trace_ij.i, trace_ij.j, si);
-        }
-    } else if (trace_ij.i || trace_ij.j < UINT_MAX) {
-        IJToAB(&trace_ab.a, &trace_ab.b, trace_ij.i, trace_ij.j, si);
+
+#if     defined(TRACE_AB)
+    /* can possibly fall outside the q-lattice. We have to check for it */
+    if (ABToIJ(&trace_ij.i, &trace_ij.j, trace_ab.a, trace_ab.b, si)) {
         IJToNx(&trace_Nx.N, &trace_Nx.x, trace_ij.i, trace_ij.j, si);
-    } else if (trace_Nx.N || trace_Nx.x < UINT_MAX) {
-        NxToIJ(&trace_ij.i, &trace_ij.j, trace_Nx.N, trace_Nx.x, si);
-        IJToAB(&trace_ab.a, &trace_ab.b, trace_ij.i, trace_ij.j, si);
+    } else {
+        fprintf(stderr, "# Relation (%"PRId64",%"PRIu64") to be traced is outside of the current q-lattice\n", trace_ab.a, trace_ab.b);
+        trace_ij.i=0;
+        trace_ij.j=UINT_MAX;
+        trace_Nx.N=0;
+        trace_Nx.x=UINT_MAX;
     }
+#elif   defined(TRACE_IJ)
+    IJToAB(&trace_ab.a, &trace_ab.b, trace_ij.i, trace_ij.j, si);
+    IJToNx(&trace_Nx.N, &trace_Nx.x, trace_ij.i, trace_ij.j, si);
+#elif   defined(TRACE_Nx)
+    NxToIJ(&trace_ij.i, &trace_ij.j, trace_Nx.N, trace_Nx.x, si);
+    IJToAB(&trace_ab.a, &trace_ab.b, trace_ij.i, trace_ij.j, si);
+#endif
+
     if (trace_ij.j < UINT_MAX && trace_ij.j >= si->J) {
         fprintf(stderr, "# Relation (%"PRId64",%"PRIu64") to be traced is outside of the current (i,j)-rectangle (j=%u)\n", trace_ab.a, trace_ab.b, trace_ij.j);
         trace_ij.i=0;
