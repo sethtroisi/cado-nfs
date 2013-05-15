@@ -30,15 +30,16 @@ if __name__ == '__main__':
     # Make working directory, if it does not exist
     directory = tasksparams["workdir"]
     if not os.path.isdir(directory):
-        os.mkdir(directory)
- 
+        os.makedirs(directory)
+    
     # Add a logger to capture the command lines of programs we run
     cmdfilename = tasksparams["workdir"] + os.sep + tasksparams["name"] + ".cmd"
     logger.addHandler(cadologger.CmdFileHandler(cmdfilename))
-
+    
     # Add a logger to write debugging information to a log file
-    logger.addHandler(cadologger.FileHandler(filename = "log", lvl = logging.DEBUG))
-
+    logfilename = tasksparams["workdir"] + os.sep + tasksparams["name"] + ".log"
+    logger.addHandler(cadologger.FileHandler(filename = logfilename, lvl = logging.DEBUG))
+    
     wudb_file = tasksparams["workdir"] + os.sep + tasksparams["name"] + ".db"
     factorjob = cadotask.CompleteFactorization(db=wudb_file, parameters = parameters)
     factorjob.run()
