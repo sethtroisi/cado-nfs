@@ -19,9 +19,16 @@
 
 use strict;
 use warnings;
-use UUID;       # Or any simple way of creating MIME delimiters, really.
 use File::Basename;
 use POSIX;
+
+# gforge's nsswitch.conf maps pgsql, which causes problems.
+BEGIN {
+open SAVED_STDERR, ">&STDERR";
+open STDERR, ">/dev/null";
+}
+use Net::SMTP;
+open STDERR, ">&SAVED_STDERR";
 
 $ENV{'PATH'}="/bin:/usr/bin:/usr/sbin";
 
@@ -48,6 +55,12 @@ my $gitweb=config_get('hooks.gitweb');
 chomp($gitweb);
 my $recipient=config_get('hooks.mailinglist', '!');
 my $sender=config_get('hooks.envelopesender', '!');
+if(!defined($sender) || $sender eq '' || $sender eq '!') {
+    $sender = $ENV{USER};
+    if(defined(my $domain = config_get('hooks.maildomain'))) {
+            $sender .= "@" . $domain;
+    }
+}
 my $subj_prefix=config_get('hooks.emailprefix', "[$repo-commits] ");
 
 sub commit_link {
@@ -63,7 +76,10 @@ my $total_text_html='';
 my $total_nc = 0;
 my $last_subject;
 
-sub boundary { UUID::generate($_);UUID::unparse($_, my $x); $x; }
+sub boundary { 
+    my $x = join("", map { int(rand()*100000) } (0..6));
+    return $x;
+}
 
 my $mainbound = boundary();
 
@@ -80,7 +96,8 @@ while (defined($_=<STDIN>)) {
     my $new = $1;
     # For new branches, the question is how we can infer the branch point...
     # Could even be quite far. And there's no clear way to guess where this
-    # was branched from.
+    # was branched from. We're using a kludge which excludes the history
+    # of all other branches.
     # next if $old =~ /^0+$/;
     if ($new =~ /^0+$/) {
 	# print STDERR "Deleted branch $_ ?\n";
@@ -167,6 +184,7 @@ Content-Disposition: attachment; filename="$2.patch"
 $1/gm;
 
     my $now = POSIX::strftime( "%Y%m%d%H%M%S", localtime);
+
     $patches_mboxes .= <<EOF;
 --$mainbound
 Content-Type: multipart/mixed; boundary=$bound
@@ -223,24 +241,53 @@ EOF
 my $bodylength = length($body);
 my $bodylines = eval { @_=split(/^/m, $body);scalar @_; };
 
-if (@ARGV && $ARGV[0] eq '-d') {
-    open SMTP, ">&STDOUT";
-    my $now=strftime("%a %b %d %H:%M:%S %Y", localtime);
-    print SMTP "From root $now\n";
-} else {
-    open SMTP, "| exim -f '$sender' '$recipient'";
-}
-
-print SMTP <<EOF;
-$header
+$header .= <<EOF;
 MIME-Version: 1.0
 Content-Type: multipart/mixed; boundary=$mainbound
 Content-Transfer-Encoding: 8bit
 Content-Disposition: inline
 Content-Length: $bodylength
 Lines: $bodylines
-
-$body
 EOF
-close SMTP;
 
+# We know of several distinct ways to send the mail. The first one works
+# fine if we have access to a shell MTA (sendmail, exim)
+
+# if (@ARGV && $ARGV[0] eq '-d') {
+#     open SMTP, ">&STDOUT";
+#     my $now=strftime("%a %b %d %H:%M:%S %Y", localtime);
+#     print SMTP "From root $now\n";
+# } else {
+#     open SMTP, "| exim -f '$sender' '$recipient'";
+# }
+# 
+# print SMTP <<EOF;
+# $header
+# 
+# $body
+# EOF
+# close SMTP;
+ 
+
+# This second method connects to 127.0.0.1 port 25, which happens to be
+# ok on gforge.
+
+my $smtp = Net::SMTP->new('127.0.0.1');
+print STDERR "$sender --> $recipient: $subject\n";
+sub handle_smtp_error
+{
+  my ($smtp, $retval) = @_;
+  if (not $retval)
+    {
+      die "$0: SMTP Error: " . $smtp->message() . "\n";
+    }
+}
+
+handle_smtp_error($smtp, $smtp->mail($sender));
+handle_smtp_error($smtp, $smtp->to($recipient));
+handle_smtp_error($smtp, $smtp->data());
+handle_smtp_error($smtp, $smtp->datasend($header));
+handle_smtp_error($smtp, $smtp->datasend("\n"));
+handle_smtp_error($smtp, $smtp->datasend($body));
+handle_smtp_error($smtp, $smtp->dataend());
+handle_smtp_error($smtp, $smtp->quit());
