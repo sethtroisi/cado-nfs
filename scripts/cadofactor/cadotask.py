@@ -4,6 +4,7 @@ from datetime import datetime
 import re
 import os.path
 from fractions import gcd
+import abc
 import random
 import wudb
 import patterns
@@ -33,9 +34,12 @@ import cadologger
 # that don't overwrite. Or maybe two ways to specify external params:
 # --defaults which does not overwrite, and --forceparam which does
 
-class DbDictAccess(object):
+class DbAccess(object):
     """ Base class that lets subclasses create DB-backed dictionaries
-    on a database whose name is specified in the db parameter to __init__
+    on a database whose name is specified in the db parameter to __init__.
+    Meant to be used as a cooperative class; it strips the db parameter from
+    the named parameter list and remembers it in a private variable so that
+    it can later be used to open DB connections.
     """
     
     def __init__(self, db, *args, **kwargs):
@@ -43,12 +47,12 @@ class DbDictAccess(object):
         if db is None:
             raise Exception("The db parameter is required")
         self.__db = db
-
+    
     def make_db_dict(self, name):
         return wudb.DictDbAccess(self.__db, name)
 
 
-class Task(patterns.Observable, patterns.Observer, DbDictAccess):
+class Task(patterns.Observable, patterns.Observer, DbAccess):
     """ A base class that represents one task that needs to be processed. 
     
     Sub-classes must define class variables:
@@ -62,8 +66,27 @@ class Task(patterns.Observable, patterns.Observer, DbDictAccess):
             This is used for extracting relevant parameters from the parameter
             hierarchical dictionary.
     """
-    # Parameters that all tasks use
-    paramnames = ("name", "workdir")
+    
+    # Properties that subclasses need to define
+    @abc.abstractproperty
+    def name(self):
+        pass
+    @abc.abstractproperty
+    def parampath(self):
+        pass
+    @abc.abstractproperty
+    def title(self):
+        pass
+    @abc.abstractproperty
+    def programs(self):
+        pass
+    @abc.abstractproperty
+    def paramnames(self):
+        """ Sub-classes need to define a property 'paramnames' which returns a
+        list of parameters they accept, plus super()'s paramnames list
+        """
+        # Parameters that all tasks use
+        return ("name", "workdir")
     
     def __init__(self, dependencies, *args, parameters = None, \
                 **kwargs):
@@ -88,26 +111,22 @@ class Task(patterns.Observable, patterns.Observer, DbDictAccess):
             self.logger.debug("Enter Task.__init__(): parameters = %s", 
                               parameters)
         # DB-backed dictionary with the state of this task
-        self.state = self.make_db_dict(self.tablename())
+        self.state = self.make_db_dict(self.make_tablename())
         self.logger.debug("%s: state = %s", self.title, self.state)
         # Derived class must define name
         # Set default parametes for this task, if any are given
         if parameters:
-            # Add the common paramnames defined in the Task class to the 
-            # (presumably class-defined) paramnames in self, and bind the 
-            # result to an instance variable
-            self.paramnames = Task.paramnames + self.paramnames
             self.params = parameters.myparams(self.paramnames, self.parampath)
             self.logger.debug("%s: params = %s", self.title, self.params)
         # Set default parameters for our programs
         self.progparams = []
         for prog in self.programs:
-            progparams = {}
-            self.progparams.append(progparams)
             if parameters:
-                update = parameters.myparams(
+                progparams = parameters.myparams(
                     prog.get_params_list(), [self.parampath, prog.name])
-                progparams.update(update)
+            else:
+                progparams = {}
+            self.progparams.append(progparams)
         self.logger.debug("Exit Task.__init__(%s)", self.name)
         return
     
@@ -116,18 +135,17 @@ class Task(patterns.Observable, patterns.Observer, DbDictAccess):
         no_ = name.replace("_", "")
         if not no_[0].isalpha() or not no_[1:].isalnum():
             raise Exception("%s is not valid for an SQL table name" % name)
-
-    def tablename(self, extra = None):
+    
+    def make_tablename(self, extra = None):
         """ Return the table name for the DB-backed dictionary with the state
         for the current task """
         # Maybe replace SQL-disallowed characters here, like digits and '.' ? 
         # Could be tricky to avoid collisions
-        self.check_tablename(self.name)
+        name = self.name
         if extra:
-            self.check_tablename(extra)
-            return self.name + '_' + extra
-        else:
-            return self.name
+            name = name + '_' + extra
+        self.check_tablename(name)
+        return name
     
     def is_done(self):
         return False
@@ -179,7 +197,8 @@ class Task(patterns.Observable, patterns.Observer, DbDictAccess):
             r += "%s%s" % (extra, os.sep)
         return r
     
-    def check_files_exist(self, filenames, filedesc, shouldexist):
+    @staticmethod
+    def check_files_exist(filenames, filedesc, shouldexist):
         """ Check that the output files in "filenames" exist or don't exist, 
         according to shouldexist.
         
@@ -244,14 +263,14 @@ class Task(patterns.Observable, patterns.Observer, DbDictAccess):
     def updateObserver(self, message):
         pass
 
-class FilesCreator(DbDictAccess):
+class FilesCreator(DbAccess, metaclass=abc.ABCMeta):
     """ A base class for classes that produce a list of output files, with
     some information stored with each file (e.g., nr. of relations). This
     info is stored in the form of a DB-backed dictionary
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.output_files = self.make_db_dict(self.tablename("outputfiles"))
+        self.output_files = self.make_db_dict(self.make_tablename("outputfiles"))
     
     def add_output_files(self, filenames):
         """ Adds a dict of files to the list of existing output files """
@@ -264,11 +283,15 @@ class FilesCreator(DbDictAccess):
         if condition is None:
             return self.output_files.keys()
         else:
-            return [f for (f,s) in self.output_files.items() if s == condition]
+            return [f for (f,s) in self.output_files.items() if condition(s)]
 
     def forget_output_filenames(self, filenames):
         for f in filenames:
             del(self.output_files[f])
+    
+    @abc.abstractclassmethod
+    def make_tablename(self, name):
+        pass
 
 
 class ClientServerTask(Task):
@@ -300,11 +323,12 @@ class Polynomial(object):
     # Keys that can occur in a polynomial file in their preferred ordering,
     # and whether the key is mandatory or not. The preferred ordering is used
     # when turning a polynomial back into a string. 
+    
     paramnames = ("rlim", "alim", "lpbr", "lpba", "mfbr", "mfba", "rlambda", 
-                  "alambda")
+        "alambda")
     keys = ( ("n", True), ("Y0", True), ("Y1", True), ("c0", True), 
-             ("c1", True), ("c2", True), ("c3", True), ("c4", True),
-             ("c5", False), ("c6", False), ("m", True), ("skew", True) )
+            ("c1", True), ("c2", True), ("c3", True), ("c4", True),
+            ("c5", False), ("c6", False), ("m", True), ("skew", True) )
     
     def __init__(self, lines):
         """ Parse a polynomial file in the syntax as produced by polyselect2l 
@@ -374,11 +398,22 @@ class Polynomial(object):
 
 class PolyselTask(Task):
     """ Finds a polynomial, uses client/server """
-    name = "polyselect"
-    parampath = "tasks." + name
-    title = "Polynomial Selection"
-    programs = (cadoprograms.Polyselect2l,)
-    paramnames = ("adrange", "P", "N", "admin", "admax")
+    @property
+    def name(self):
+        return "polyselect"
+    @property
+    def parampath(self):
+        return "tasks." + self.name
+    @property
+    def title(self):
+        return "Polynomial Selection"
+    @property
+    def programs(self):
+        return (cadoprograms.Polyselect2l,)
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            ("adrange", "P", "N", "admin", "admax")
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, dependencies = None, **kwargs)
@@ -567,21 +602,43 @@ class FactorBaseOrFreerelTask(Task):
 
 class FactorBaseTask(FactorBaseOrFreerelTask):
     """ Generates the factor base for the polynomial(s) """
-    name = "factorbase"
-    title = "Generate Factor Base"
-    programs = (cadoprograms.MakeFB,)
-    parampath = "tasks.sieving." + name
-    paramnames = ("alim", )
+    @property
+    def name(self):
+        return "factorbase"
+    @property
+    def title(self):
+        return "Generate Factor Base"
+    @property
+    def programs(self):
+        return (cadoprograms.MakeFB,)
+    @property
+    def parampath(self):
+        return "tasks.sieving." + self.name
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            ("alim", )
     target = "roots"
 
 
 class FreeRelTask(FactorBaseOrFreerelTask):
     """ Generates free relations for the polynomial(s) """
-    name = "freerel"
-    title = "Generate Free Relations"
-    programs = (cadoprograms.FreeRel,)
-    parampath = "tasks.sieving." + name
-    paramnames = ("lpba", )
+    @property
+    def name(self):
+        return "freerel"
+    @property
+    def title(self):
+        return "Generate Free Relations"
+    @property
+    def programs(self):
+        return (cadoprograms.FreeRel,)
+    @property
+    def parampath(self):
+        return "tasks.sieving." + self.name
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            ("lpba", )
     target = "freerel"
 
     def parse_stderr(self, stderr):
@@ -603,11 +660,22 @@ class FreeRelTask(FactorBaseOrFreerelTask):
 
 class SievingTask(Task, FilesCreator):
     """ Does the sieving, uses client/server """
-    name = "sieving"
-    title = "Lattice Sieving"
-    programs = (cadoprograms.Las,)
-    parampath = "tasks.sieving." + name
-    paramnames = ("qmin", "qrange", "rels_wanted") + Polynomial.paramnames
+    @property
+    def name(self):
+        return "sieving"
+    @property
+    def title(self):
+        return "Lattice Sieving"
+    @property
+    def programs(self):
+        return (cadoprograms.Las,)
+    @property
+    def parampath(self):
+        return "tasks.sieving." + self.name
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            ("qmin", "qrange", "rels_wanted") + Polynomial.paramnames
     
     def __init__(self, polyselect, factorbase, *args, **kwargs):
         super().__init__(*args, dependencies = (polyselect, factorbase), **kwargs)
@@ -683,18 +751,29 @@ class SievingTask(Task, FilesCreator):
 
 class Duplicates1Task(Task, FilesCreator):
     """ Removes duplicate relations """
-    name = "duplicates1"
-    title = "Filtering: Duplicate Removal, splitting pass"
-    programs = (cadoprograms.Duplicates1,)
-    parampath = "tasks.filtering." + name
-    paramnames = ("nslices_log",)
+    @property
+    def name(self):
+        return "duplicates1"
+    @property
+    def title(self):
+        return "Filtering: Duplicate Removal, splitting pass"
+    @property
+    def programs(self):
+        return (cadoprograms.Duplicates1,)
+    @property
+    def parampath(self):
+        return "tasks.filtering." + self.name
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            ("nslices_log",)
     
     def __init__(self, sieving, *args, **kwargs):
         super().__init__(*args, dependencies = (sieving,), **kwargs)
         self.sieving = sieving
         self.nr_slices = 2**int(self.params["nslices_log"])
-        self.already_split_input = self.make_db_dict(self.tablename("infiles"))
-        self.slice_relcounts = self.make_db_dict(self.tablename("counts"))
+        self.already_split_input = self.make_db_dict(self.make_tablename("infiles"))
+        self.slice_relcounts = self.make_db_dict(self.make_tablename("counts"))
         # Default slice counts to 0, in single DB commit
         self.slice_relcounts.setdefault(
             None, {str(i): 0 for i in range(0, self.nr_slices)})
@@ -823,18 +902,29 @@ class Duplicates1Task(Task, FilesCreator):
 
 class Duplicates2Task(Task, FilesCreator):
     """ Removes duplicate relations """
-    name = "duplicates2"
-    title = "Filtering: Duplicate Removal, removal pass"
-    programs = (cadoprograms.Duplicates2,)
-    parampath = "tasks.filtering." + name
-    paramnames = ("nslices_log",)
+    @property
+    def name(self):
+        return "duplicates2"
+    @property
+    def title(self):
+        return "Filtering: Duplicate Removal, removal pass"
+    @property
+    def programs(self):
+        return (cadoprograms.Duplicates2,)
+    @property
+    def parampath(self):
+        return "tasks.filtering." + self.name
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            ("nslices_log",)
     
     def __init__(self, duplicates1, *args, **kwargs):
         super().__init__(*args, dependencies = (duplicates1,), **kwargs)
         self.duplicates1 = duplicates1
         self.nr_slices = 2**int(self.params["nslices_log"])
-        self.already_done_input = self.make_db_dict(self.tablename("infiles"))
-        self.slice_relcounts = self.make_db_dict(self.tablename("counts"))
+        self.already_done_input = self.make_db_dict(self.make_tablename("infiles"))
+        self.slice_relcounts = self.make_db_dict(self.make_tablename("counts"))
         self.slice_relcounts.setdefault(
             None, {str(i): 0 for i in range(0, self.nr_slices)})
     
@@ -844,7 +934,7 @@ class Duplicates2Task(Task, FilesCreator):
         
         self.logger.info("Beginning %s", self.title)
         for i in range(0, self.nr_slices):
-            files = self.duplicates1.get_output_filenames(i)
+            files = self.duplicates1.get_output_filenames(i.__eq__)
             newfiles = [f for f in files if not f in self.already_done_input]
             if not newfiles:
                 self.logger.info("No new files for slice %d, nothing to do", i)
@@ -855,7 +945,7 @@ class Duplicates2Task(Task, FilesCreator):
             # in another pass
             # Forget about the previous output filenames of this slice
             # FIXME: Should we delete the files, too?
-            self.forget_output_filenames(self.get_output_filenames(i))
+            self.forget_output_filenames(self.get_output_filenames(i.__eq__))
             del(self.slice_relcounts[str(i)])
             rel_count = self.duplicates1.get_slice_relcount(i)
             basedir = self.make_output_dirname()
@@ -898,11 +988,22 @@ class Duplicates2Task(Task, FilesCreator):
 
 class PurgeTask(Task):
     """ Removes singletons and computes excess """
-    name = "singletons"
-    title = "Filtering: Singleton removal"
-    programs = (cadoprograms.Purge,)
-    parampath = "tasks.filtering." + name
-    paramnames = ("keep", ) + Polynomial.paramnames
+    @property
+    def name(self):
+        return "singletons"
+    @property
+    def title(self):
+        return "Filtering: Singleton removal"
+    @property
+    def programs(self):
+        return (cadoprograms.Purge,)
+    @property
+    def parampath(self):
+        return "tasks.filtering." + self.name
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            ("keep", ) + Polynomial.paramnames
     
     # purge -poly c59.poly -keep 160 -nrels 226167 -out c59.purged.gz -npthr 1x1 -basepath /tmp/cado.wNhDsCM6BS -subdirlist c59.subdirlist -filelist c59.filelist
     
@@ -945,11 +1046,22 @@ class PurgeTask(Task):
 
 class MergeTask(Task):
     """ Merges relations """
-    name = "merging"
-    title = "Filtering: Merging"
-    programs = (cadoprograms.Merge, cadoprograms.Replay)
-    parampath = "tasks.filtering." + name
-    paramnames = ("skip", "forbw", "coverNmax", "keep", "maxlevel", "ratio")
+    @property
+    def name(self):
+        return "merging"
+    @property
+    def title(self):
+        return "Filtering: Merging"
+    @property
+    def programs(self):
+        return (cadoprograms.Merge, cadoprograms.Replay)
+    @property
+    def parampath(self):
+        return "tasks.filtering." + self.name
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            ("skip", "forbw", "coverNmax", "keep", "maxlevel", "ratio")
     
     def __init__(self, purged, *args, **kwargs):
         super().__init__(*args, dependencies = (purged, ), **kwargs)
@@ -1018,11 +1130,22 @@ class MergeTask(Task):
 
 class LinAlgTask(Task):
     """ Runs the linear algebra step """
-    name = "bwc"
-    title = "Linear Algebra"
-    programs = (cadoprograms.BWC,)
-    parampath = "tasks.linalg." + name
-    paramnames = ()
+    @property
+    def name(self):
+        return "bwc"
+    @property
+    def title(self):
+        return "Linear Algebra"
+    @property
+    def programs(self):
+        return (cadoprograms.BWC,)
+    @property
+    def parampath(self):
+        return "tasks.linalg." + self.name
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            ()
     # bwc.pl :complete seed=1 thr=1x1 mpi=1x1 matrix=c59.small.bin nullspace=left mm_impl=bucket interleaving=0 interval=100 mn=64 wdir=c59.bwc shuffled_product=1 bwc_bindir=/localdisk/kruppaal/build/cado-nfs/normal/linalg/bwc
     def __init__(self, merge, *args, **kwargs):
         super().__init__(*args, dependencies = (merge,), **kwargs)
@@ -1064,11 +1187,22 @@ class LinAlgTask(Task):
     
 class CharactersTask(Task):
     """ Computes Quadratic Characters """
-    name = "characters"
-    title = "Quadratic Characters"
-    programs = (cadoprograms.Characters,)
-    parampath = "tasks.linalg." + name
-    paramnames = () + Polynomial.paramnames
+    @property
+    def name(self):
+        return "characters"
+    @property
+    def title(self):
+        return "Quadratic Characters"
+    @property
+    def programs(self):
+        return (cadoprograms.Characters,)
+    @property
+    def parampath(self):
+        return "tasks.linalg." + self.name
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            Polynomial.paramnames
 
     def __init__(self, polyselect, purge, merge, linalg, *args, **kwargs):
         self.polyselect = polyselect
@@ -1119,11 +1253,22 @@ class CharactersTask(Task):
 
 class SqrtTask(Task):
     """ Runs the square root """
-    name = "sqrt"
-    title = "Square Root"
-    programs = (cadoprograms.Sqrt,)
-    parampath = "tasks." + name
-    paramnames = ("N",)
+    @property
+    def name(self):
+        return "sqrt"
+    @property
+    def title(self):
+        return "Square Root"
+    @property
+    def programs(self):
+        return (cadoprograms.Sqrt,)
+    @property
+    def parampath(self):
+        return "tasks." + self.name
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            ("N",)
     
     def __init__(self, polyselect, freerel, purge, merge, linalg, characters, *args, **kwargs):
         self.polyselect = polyselect
@@ -1134,7 +1279,7 @@ class SqrtTask(Task):
         self.characters = characters
         dep = (polyselect, freerel, purge, merge, linalg, characters)
         super().__init__(*args, dependencies = dep, **kwargs)
-        self.factors = self.make_db_dict(self.tablename("factors"))
+        self.factors = self.make_db_dict(self.make_tablename("factors"))
         self.add_factor(int(self.params["N"]))
     
     def run(self):
