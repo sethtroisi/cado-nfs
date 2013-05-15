@@ -59,8 +59,8 @@
  *
  * (see also las-coordinates.c)
  */
-#define TRACE_K
-#define TRACE_AB { 29931UL,8051L }
+#define xxxTRACE_K
+// #define TRACE_AB { 2039914353344275UL,6656604L }
 // #define TRACE_IJ
 // #define TRACE_Nx { 0,1655 }
 
