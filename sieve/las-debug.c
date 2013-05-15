@@ -73,7 +73,7 @@ void trace_update_conditions(sieve_info_srcptr si MAYBE_UNUSED)
 #endif
 }
 
-#if defined(TRACK_CODE_PATH) && defined(WANT_ASSERT_EXPENSIVE)
+#if defined(TRACK_CODE_PATH)
 int test_divisible(where_am_I_ptr w)
 {
     fbprime_t p = w->p;
@@ -140,9 +140,10 @@ void sieve_decrease_underflow_trap(unsigned char *S, const unsigned char logp, w
 /* Do this so that the _real_ caller is always 2 floors up */
 void sieve_decrease_logging_backend(unsigned char *S, const unsigned char logp, where_am_I_ptr w)
 {
-    ASSERT(test_divisible(w));
     if (!trace_on_spot_Nx(w->N, w->x))
         return;
+
+    ASSERT_ALWAYS(test_divisible(w));
 
 #ifdef __GLIBC__
     void * callers_addresses[3];
