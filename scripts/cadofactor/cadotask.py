@@ -88,8 +88,7 @@ class Task(patterns.Observable, patterns.Observer, DbAccess):
         # Parameters that all tasks use
         return ("name", "workdir")
     
-    def __init__(self, dependencies, *args, parameters = None, \
-                **kwargs):
+    def __init__(self, dependencies, *args, parameters = None, **kwargs):
         ''' Sets up a database connection and a DB-backed dictionary for 
         parameters. Reads parameters from DB, and merges with hierarchical
         parameters in the parameters argument. Parameters passed in by 
@@ -214,12 +213,13 @@ class Task(patterns.Observable, patterns.Observer, DbAccess):
                                 (self.title, filedesc, f))
         return
     
-    def make_directories(self, basedir, extra = None):
+    @staticmethod
+    def make_directories(basedir, extra = None):
         if not os.path.isdir(basedir):
             os.mkdir(basedir)
         if extra:
             for subdir in extra:
-                dirname = self.make_output_dirname(subdir)
+                dirname = basedir + os.sep + subdir
                 if not os.path.isdir(dirname):
                     os.mkdir(dirname)
         return
@@ -1416,3 +1416,46 @@ class SqrtTask(Task):
             if not SqrtTask.miller_rabin_pass(number, base):
                 return False
         return True
+
+# FIXME: Is this a Task object? Probably not
+# Should this be in cadotask or in cadofactor?
+class CompleteFactorization(Task):
+    """ The complete factorization, aggregate of the individual tasks """
+    """ Runs the square root """
+    @property
+    def name(self):
+        return "factorization"
+    @property
+    def title(self):
+        return "Factorization"
+    @property
+    def programs(self):
+        return ()
+    @property
+    def parampath(self):
+        return "tasks"
+    @property
+    def paramnames(self):
+        return super().paramnames
+    
+    def __init__ (self, *args, **kwargs):
+        self.polysel = PolyselTask(*args, **kwargs)
+        self.fb = FactorBaseTask(self.polysel, *args, **kwargs)
+        self.freerel = FreeRelTask(self.polysel, *args, **kwargs)
+        self.sieving = SievingTask(self.polysel, self.fb, *args, **kwargs)
+        self.dup1 = Duplicates1Task(self.sieving, *args, **kwargs)
+        self.dup2 = Duplicates2Task(self.dup1, *args, **kwargs)
+        self.purge = PurgeTask(self.polysel, self.freerel, self.dup2,
+                               *args, **kwargs)
+        self.merge = MergeTask(self.purge, *args, **kwargs)
+        self.linalg = LinAlgTask(self.merge, *args, **kwargs)
+        self.characters = CharactersTask(self.polysel, self.purge, self.merge,
+                                         self.linalg, *args, **kwargs)
+        self.sqrt = SqrtTask(self.polysel, self.freerel, self.purge,
+                             self.merge, self.linalg, self.characters,
+                             *args, **kwargs)
+        super().__init__(*args, dependencies = (self.sqrt,), **kwargs)
+    
+    def run(self, *args, **kwargs):
+        self.logger.info("Beginning %s" % self.title)
+        super().run(*args, **kwargs)
