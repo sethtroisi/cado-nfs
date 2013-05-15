@@ -193,7 +193,7 @@ bin_gcd_safe (int64_t a, int64_t b)
       a = ((a ^ b) & 2) ? a + b : a - b;
       /* if a was even, then since b is now odd, the new a is odd */
       if (a == 0)
-        return (b > 0) ? b : -b;
+        return (b > 0) ? (b << s) : ((-b) << s);
       a >>= ctzl (a);
       /* from here on, a and b are odd (or zero) */
       ASSERT(a & 1);

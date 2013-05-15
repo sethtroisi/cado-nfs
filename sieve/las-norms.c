@@ -2755,8 +2755,11 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
   /* we know that |F(a,b)/q| < 2^(alg->logmax) when si->ratq = 0,
      and |F(a,b)| < 2^(alg->logmax) when si->ratq <> 0 */
 
+  /* we increase artificially the logmax by 1, to allow larger values of J */
+  alg->logmax += 1.0;
+
   /* on the algebraic side, we want that the non-reports on the rational
-     side, which are set to 255, remain larger than then report bound 'r',
+     side, which are set to 255, remain larger than the report bound 'r',
      even if the algebraic norm is totally smooth. For this, we artificially
      increase by 'r' the maximal range */
   r = MIN(si->conf->sides[ALGEBRAIC_SIDE]->lambda * (double) si->conf->sides[ALGEBRAIC_SIDE]->lpb, alg->logmax);
@@ -2821,7 +2824,7 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
           double a, b, c;
           a = 0.0;
           b = Jmax;
-          while (b - a > 1.0)
+          while (trunc (a) != trunc (b))
             {
               c = (a + b) * 0.5;
               v = fpoly_eval (F, ps->degree, c);
@@ -2830,7 +2833,7 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
               else
                 b = c;
             }
-          Jmax = a;
+          Jmax = trunc (a) + 1; /* +1 since we don't sieve for j = Jmax */
         }
     }
   return (unsigned int) Jmax;
