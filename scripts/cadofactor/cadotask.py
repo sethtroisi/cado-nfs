@@ -86,7 +86,7 @@ class Task(patterns.Observable, patterns.Observer, DbAccess):
         list of parameters they accept, plus super()'s paramnames list
         """
         # Parameters that all tasks use
-        return ("name", "workdir")
+        return ("name", "workdir", "remove")
     
     def __init__(self, dependencies, *args, parameters = None, **kwargs):
         ''' Sets up a database connection and a DB-backed dictionary for 
@@ -117,6 +117,7 @@ class Task(patterns.Observable, patterns.Observer, DbAccess):
         if parameters:
             self.params = parameters.myparams(self.paramnames, self.parampath)
             self.logger.debug("%s: params = %s", self.title, self.params)
+            self.params.setdefault("remove", False)
         # Set default parameters for our programs
         self.progparams = []
         for prog in self.programs:
@@ -177,7 +178,7 @@ class Task(patterns.Observable, patterns.Observer, DbAccess):
         >>> Task._make_basename(f)
         '/foo/bar/jobname.taskname'
         """
-        return "%s%s%s.%s" % (self.params["workdir"], os.sep,
+        return "%s%s%s.%s" % (self.params["workdir"].rstrip(os.sep), os.sep,
                               self.params["name"], self.name)
     
     def make_output_filename(self, name, subdir = False, dirextra = None):
@@ -206,11 +207,9 @@ class Task(patterns.Observable, patterns.Observer, DbAccess):
         for f in filenames:
             exists = os.path.isfile(f)
             if shouldexist and not exists:
-                raise IOError("%s %s file %s does not exist" % 
-                                (self.title, filedesc, f))
+                raise IOError("%s file %s does not exist" % (filedesc, f))
             elif not shouldexist and exists:
-                raise IOError("%s %s file %s already exists" % 
-                                (self.title, filedesc, f))
+                raise IOError("%s file %s already exists" % (filedesc, f))
         return
     
     @staticmethod
@@ -504,7 +503,7 @@ class PolyselTask(Task):
         if not bestpoly:
             self.logger.error ("No polynomial found")
             return
-        self.logger.info("Best polynomial from %s has Murphy_E =  %g", 
+        self.logger.info("Best polynomial from %s has Murphy_E = %g", 
                           self.state["bestfile"] , bestpoly.E)
         self.logger.debug("Exit PolyselTask.run(" + self.name + ")")
         return
@@ -640,7 +639,11 @@ class FreeRelTask(FactorBaseOrFreerelTask):
         return super().paramnames + \
             ("lpba", )
     target = "freerel"
-
+    
+    def run(self):
+        super().run()
+        self.logger.info("Found %d free relations" % self.state["nfree"])
+    
     def parse_stderr(self, stderr):
         if "nfree" in self.state:
             del(self.state["nfree"])
@@ -1021,7 +1024,11 @@ class PurgeTask(Task):
             poly = self.polyselect.get_poly()
             polyfile = self.make_output_filename("poly")
             poly.create_file(polyfile, self.params)
-            nrels = self.freerel.get_nrels() + self.duplicates2.get_relcount()
+            nfree = self.freerel.get_nrels()
+            nunique = self.duplicates2.get_relcount()
+            nrels = nfree + nunique
+            self.logger.info("Reading %d unique and %d free relations, total %d"
+                             % (nunique, nfree, nrels))
             if not nrels:
                 raise Exception("No relation count received from %s", self.duplicates2.title)
             purgedfile = self.make_output_filename("purged.gz")
@@ -1034,6 +1041,9 @@ class PurgeTask(Task):
             p = self.programs[0](args, kwargs)
             p.run()
             (rc, stdout, stderr) = p.wait()
+            [nrows, weight, excess] = self.parse_stdout(stdout)
+            self.logger.info("After purge, %d relations remain with weight %s and excess %s"
+                             % (nrows, weight, excess))
             self.state["purgedfile"] = purgedfile
         self.logger.debug("Exit PurgeTask.run(" + self.name + ")")
     
@@ -1043,6 +1053,22 @@ class PurgeTask(Task):
     def is_done(self):
         return "purgedfile" in self.state
     
+    def parse_stdout(self, stdout):
+        # Program output is expected in the form:
+        # b'NROWS:27372 WEIGHT:406777 WEIGHT*NROWS=1.11e+10\nEXCESS: 160\n'
+        # but we allow some extra whitespace
+        r = {}
+        keys = ("NROWS", "WEIGHT", "EXCESS")
+        for line in stdout.decode("ascii").splitlines():
+            for key in keys:
+                match = re.search("%s\s*:\s*(\d+)" % key, line)
+                if match:
+                    r[key] = int(match.group(1))
+        for key in keys:
+            if not key in r:
+                raise Exception("%s: output of %s did not contain value for %s: %s"
+                                % (self.title, self.programs[0].name, key, stdout))
+        return [r[key] for key in keys]
 
 class MergeTask(Task):
     """ Merges relations """
@@ -1181,7 +1207,7 @@ class LinAlgTask(Task):
         return self.state.get("dependency", None)
     
     def get_prefix(self):
-        return "%s%s%s.%s" % (self.params["workdir"], os.sep,
+        return "%s%s%s.%s" % (self.params["workdir"].rstrip(os.sep), os.sep,
                               self.params["name"], "dep")
     
     
