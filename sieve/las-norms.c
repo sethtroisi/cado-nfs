@@ -2755,8 +2755,11 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
   /* we know that |F(a,b)/q| < 2^(alg->logmax) when si->ratq = 0,
      and |F(a,b)| < 2^(alg->logmax) when si->ratq <> 0 */
 
+  /* we increase artificially the logmax by 1, to allow larger values of J */
+  alg->logmax += 1.0;
+
   /* on the algebraic side, we want that the non-reports on the rational
-     side, which are set to 255, remain larger than then report bound 'r',
+     side, which are set to 255, remain larger than the report bound 'r',
      even if the algebraic norm is totally smooth. For this, we artificially
      increase by 'r' the maximal range */
   r = MIN(si->conf->sides[ALGEBRAIC_SIDE]->lambda * (double) si->conf->sides[ALGEBRAIC_SIDE]->lpb, alg->logmax);
@@ -2802,18 +2805,18 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
 double
 sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
 {
-  double Jmax = si->I >> 1;
-  double F[9];
+  double Iover2 = (double) (si->I >> 1);
+  double Jmax = Iover2;
+  double F[MAXDEGREE + 1];
   for (int side = 0; side < 2; side++)
     {
       sieve_side_info_ptr s = si->sides[side];
       cado_poly_side_ptr ps = si->cpoly->pols[side];
-      double maxnorm = pow (2.0, s->logmax), v, powI = 1.0;
-      ASSERT_ALWAYS(ps->degree < 9);
+      double maxnorm = pow (2.0, s->logmax), v, powIover2 = 1.0;
       for (int k = 0; k <= ps->degree; k++)
         {
-          F[ps->degree - k] = fabs (s->fijd[k]) * powI;
-          powI *= (double) si->I;
+          F[ps->degree - k] = fabs (s->fijd[k]) * powIover2;
+          powIover2 *= Iover2;
         }
       v = fpoly_eval (F, ps->degree, Jmax);
       if (v > maxnorm)
@@ -2821,7 +2824,7 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
           double a, b, c;
           a = 0.0;
           b = Jmax;
-          while (b - a > 1.0)
+          while (trunc (a) != trunc (b))
             {
               c = (a + b) * 0.5;
               v = fpoly_eval (F, ps->degree, c);
@@ -2830,7 +2833,7 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
               else
                 b = c;
             }
-          Jmax = a;
+          Jmax = trunc (a) + 1; /* +1 since we don't sieve for j = Jmax */
         }
     }
   return (unsigned int) Jmax;
