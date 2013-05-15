@@ -214,6 +214,7 @@ Subject: $subj_prefix($refs) $subject
 EOF
 
 $header=~s/\n$//m;
+$header .= "\n";
 
 my $textbound = boundary();
 
