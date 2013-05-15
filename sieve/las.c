@@ -3296,14 +3296,14 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
         fprintf(las->output, "\n");
         sq ++;
-        if (las->verbose)
-            fprintf (las->output, "# I=%u; J=%u\n", si->I, si->J);
 
         /* checks the value of J,
          * precompute the skewed polynomials of f(x) and g(x), and also
          * their floating-point versions */
         sieve_info_update (si, las->nb_threads);
         totJ += (double) si->J;
+        if (las->verbose)
+            fprintf (las->output, "# I=%u; J=%u\n", si->I, si->J);
 
         trace_update_conditions(si);
 
