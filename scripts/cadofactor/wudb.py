@@ -17,6 +17,7 @@ import sys
 import sqlite3
 import threading
 import traceback
+import collections
 from datetime import datetime
 from workunit import Workunit
 if sys.version_info.major == 3:
@@ -379,13 +380,13 @@ class DictDbTable(DbTable):
         super().__init__(*args, **kwargs)
 
 
-class DictDbAccess(dict):
+class DictDbAccess(collections.MutableMapping):
     """ A DB-backed flat dictionary.
-
+    
     Flat means that the value of each dictionary entry must be a type that
     the underlying DB understands, like integers, strings, etc., but not
     collections or other complex types.
-
+    
     A copy of all the data in the table is kept in memory; read accesses 
     are always served from the in-memory dict. Write accesses write through
     to the DB.
@@ -395,11 +396,11 @@ class DictDbAccess(dict):
     >>> d == {}
     True
     >>> d['a'] = '1'
-    >>> d 
-    {'a': '1'}
+    >>> d == {'a': '1'}
+    True
     >>> d['a'] = 2
-    >>> d 
-    {'a': 2}
+    >>> d == {'a': 2}
+    True
     >>> d['b'] = '3'
     >>> d == {'a': 2, 'b': '3'}
     True
@@ -408,12 +409,12 @@ class DictDbAccess(dict):
     >>> d == {'a': 2, 'b': '3'}
     True
     >>> del(d['b'])
-    >>> d 
-    {'a': 2}
+    >>> d == {'a': 2}
+    True
     >>> d.setdefault('a', '3')
     2
-    >>> d 
-    {'a': 2}
+    >>> d == {'a': 2}
+    True
     >>> d.setdefault('b', 3.0)
     3.0
     >>> d == {'a': 2, 'b': 3.0}
@@ -429,7 +430,7 @@ class DictDbAccess(dict):
     >>> d == {'a': '3', 'b': 3.0, 'c': '4', 'd': True}
     True
     """
-
+    
     types = (str, int, float, bool)
     
     def __init__(self, db, name):
@@ -442,28 +443,6 @@ class DictDbAccess(dict):
         Note that writes to the dict cause a commit() on the DB connection, 
         so sharing a DB connection may be ill-advised if you want control 
         over when commits happen.
-        
-        Overwriting dict.__init__() like this does not follow the semantics 
-        of dict, as there is no way to supply items to the constructor with 
-        which to initialise the dict. 
-        
-        However, allowing to add items to the dict before attaching it to a 
-        DB table with a separate attachdb() method introduces all sorts of 
-        conflicts that have to be resolved (Do items added to the dict before 
-        attaching overwrite items from the DB with equal keys or not? 
-        Should items added to the dict whose keys are not in the DB be added 
-        to the DB when attaching?)
-        Allowing keyword initialisers in addition to the db and name 
-        parameters does not work well, either, as it is impossible to have
-        a positional parameter named "foo", and supplying a keyword 
-        parameter also named "foo", so whatever names we choose for the 
-        "db" and "name" parameters, there is always a chance of conflict with 
-        keys of named parameters that are meant to be added to the dict, 
-        as the set of valid keys of a dict is a superset of the valid names 
-        of named parameters. 
-        In the end, it is easier not to allow initialisers for the dict in 
-        this constructor. Use update() or setdefault() (the latter accepts 
-        dicts in DictDbAccess) to get the desired behaviour.
         '''
         
         if isinstance(db, str):
@@ -477,18 +456,29 @@ class DictDbAccess(dict):
         cursor = self._conn.cursor(MyCursor)
         self._table.create(cursor);
         # Get the entries currently stored in the DB
-        data = self.__getall()
-        super().update(data)
+        self._data = self._getall()
         cursor.close()
+    
+    # Implement the abstract methods defined by collections.MutableMapping
+    # All but __del__ and __setitem__ are simply passed through to the self._data
+    # dictionary
+    
+    def __getitem__(self, key):
+        return self._data.__getitem__(key)
+    
+    def __iter__(self):
+        return self._data.__iter__()
+    
+    def  __len__(self):
+        return self._data.__len__()
     
     def __del__(self):
         """ Close the DB connection and delete the dictionary """
         if self._ownconn:
             self._conn.close()
-            del(self._conn)
         # http://docs.python.org/2/reference/datamodel.html#object.__del__
-        # dict does not have __del__, but in a complex class hierarchy, 
-        # dict may not be next in the MRO
+        # MutableMapping does not have __del__, but in a complex class 
+        # hierarchy, it may not be next in the MRO
         if hasattr(super(), "__del__"):
             super().__del__()
     
@@ -514,7 +504,7 @@ class DictDbAccess(dict):
                 return idx
         raise TypeError("Type %s not supported" % str(valuetype))
     
-    def __getall(self):
+    def _getall(self):
         """ Reads the whole table and returns it as a dict """
         cursor = self._conn.cursor(MyCursor)
         rows = self._table.where(cursor)
@@ -527,7 +517,7 @@ class DictDbAccess(dict):
         but don't commit
         """
         update = {"value": str(value), "type": self.__get_type_idx(value)}
-        if key in self:
+        if key in self._data:
             # Update the table row where column "key" equals key
             self._table.update(cursor, update, eq={"key": key})
         else:
@@ -535,7 +525,7 @@ class DictDbAccess(dict):
             update["key"] = key
             self._table.insert(cursor, update)
         # Update the in-memory dict
-        super().__setitem__(key, value)
+        self._data[key] = value
     
     def __setitem__(self, key, value):
         """ Set a dict entry to a value and update the DB """
@@ -546,18 +536,18 @@ class DictDbAccess(dict):
     
     def __delitem__(self, key):
         """ Delete a key from the dictionary """
-        super().__delitem__(key)
+        del(self._data[key])
         cursor = self._conn.cursor(MyCursor)
         self._table.delete(cursor, eq={"key": key})
         self._conn.commit()
         cursor.close()
     
     def setdefault(self, key, default = None):
-        ''' Setdefault function that allows a dictionary as input
+        ''' Setdefault function that allows a mapping as input
         
         Values from default dict are merged into self, *not* overwriting
         existing values in self '''
-        if key is None and isinstance(default, dict):
+        if key is None and isinstance(default, collections.Mapping):
             cursor = self._conn.cursor(MyCursor)
             for (key, value) in default.items():
                 if not key in self:
@@ -566,8 +556,8 @@ class DictDbAccess(dict):
             cursor.close()
             return None
         elif not key in self:
-            self[key] = default
-        return self[key]
+            self.__setitem__(key, default)
+        return self._data[key]
     
     def update(self, other):
         cursor = self._conn.cursor(MyCursor)
