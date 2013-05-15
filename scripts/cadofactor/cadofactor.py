@@ -3,8 +3,8 @@ import os
 import sqlite3
 import argparse
 import logging
+import sys
 import cadologger
-import wudb
 import cadotask
 import cadoparams
 

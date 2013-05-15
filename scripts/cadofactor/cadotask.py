@@ -1324,7 +1324,6 @@ class SqrtTask(Task):
                 self.state["next_dep"] += 1
             self.logger.info("%s has finished" % self.title)
         
-        self.logger.info("Factors: %s" % " ".join(self.factors.keys()))
         self.logger.debug("Exit SqrtTask.run(" + self.name + ")")
     
     def is_done(self):
@@ -1355,6 +1354,10 @@ class SqrtTask(Task):
             # known factors
             isprime = SqrtTask.miller_rabin_tests(factor, 10)
             self.factors[str(factor)] = isprime
+    
+    def get_factors(self):
+        return self.factors.keys()
+    
     
     @staticmethod
     def miller_rabin_pass(number, base):
@@ -1459,3 +1462,4 @@ class CompleteFactorization(Task):
     def run(self, *args, **kwargs):
         self.logger.info("Beginning %s" % self.title)
         super().run(*args, **kwargs)
+        self.logger.info("Factors: %s" % " ".join(self.sqrt.get_factors()))
