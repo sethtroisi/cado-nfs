@@ -80,7 +80,24 @@ static inline void sieve_decrease(unsigned char *S, const unsigned char logp, wh
     if (*S < logp)
     sieve_decrease_underflow_trap(S, logp, w);
 #endif  /* CHECK_UNDERFLOW */
-    *S -= logp;
+    unsigned int s = *S, t = s - logp;
+
+    /* version with conditional affectation: no jump at all */
+    *S = (UNLIKELY(t >> 31)) ? 0 : t;
+
+    /* version with 1 jump vhen *S < logp, but *S is not updated. Correct ? */
+    /*
+    if (LIKELY(!(t >> 31))) *S = t;
+    */
+
+    /* version with 2 jumps when *S < logp, *S is updated */
+    /*
+    if (UNLIKELY(t >> 31)) {
+      if (UNLIKELY(s))
+	*S = 0;
+    } else
+      *S = t;
+    */
 }
 
 #endif  /* TRACE_K */
