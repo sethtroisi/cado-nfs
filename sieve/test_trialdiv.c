@@ -39,7 +39,8 @@ trialdiv_stdinput(const unsigned long pmax, const int verbose)
     size_t t, i;
     mp_bitcnt_t bit;
     
-    mpz_inp_str (N, stdin, 10);
+    if (mpz_inp_str (N, stdin, 10) == 0)
+      break;
     
     if (mpz_sgn(N) == 0)
       break;
