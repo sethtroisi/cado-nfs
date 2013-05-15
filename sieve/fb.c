@@ -186,7 +186,7 @@ fb_pow (const fbprime_t p, const unsigned int e)
 
 /* Let k be the largest integer with q = p^k, return p if k > 1,
    and 0 otherwise */
-static fbprime_t
+fbprime_t
 fb_is_power (fbprime_t q)
 {
   unsigned int maxk, k;

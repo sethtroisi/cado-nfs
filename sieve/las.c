@@ -2256,14 +2256,6 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
             copr++;
 
-            /* For hunting missed relations */
-#if 0
-            if (a == -6537753 && b == 1264)
-                fprintf (stderr, "# Have relation %ld,%lu at bucket nr %d, "
-                        "x = %d, K = %lu\n", 
-                        a, b, N, x, (unsigned long) N * BUCKET_REGION + x);
-#endif
-
             int pass = 1;
 
             for(int z = 0 ; pass && z < 2 ; z++) {
@@ -3296,14 +3288,14 @@ int main (int argc0, char *argv0[])/*{{{*/
         }
         fprintf(las->output, "\n");
         sq ++;
-        if (las->verbose)
-            fprintf (las->output, "# I=%u; J=%u\n", si->I, si->J);
 
         /* checks the value of J,
          * precompute the skewed polynomials of f(x) and g(x), and also
          * their floating-point versions */
         sieve_info_update (si, las->nb_threads);
         totJ += (double) si->J;
+        if (las->verbose)
+            fprintf (las->output, "# I=%u; J=%u\n", si->I, si->J);
 
         trace_update_conditions(si);
 
