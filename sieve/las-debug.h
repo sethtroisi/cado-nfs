@@ -49,7 +49,7 @@ extern void test_divisible_x (const fbprime_t p, const unsigned long x, const in
 		       sieve_info_srcptr si, int side);
 extern void trace_update_conditions(sieve_info_srcptr si);
 
-#if defined(TRACK_CODE_PATH)
+#if defined(TRACK_CODE_PATH) && (defined(TRACE_AB) || defined(TRACE_IJ) || defined(TRACE_Nx))
 extern int test_divisible(where_am_I_ptr w);
 #else
 static inline int test_divisible(where_am_I_ptr w MAYBE_UNUSED) { return 1; }

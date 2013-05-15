@@ -73,9 +73,13 @@ void trace_update_conditions(sieve_info_srcptr si MAYBE_UNUSED)
 #endif
 }
 
-#if defined(TRACK_CODE_PATH)
+#if defined(TRACK_CODE_PATH) && (defined(TRACE_AB) || defined(TRACE_IJ) || defined(TRACE_Nx))
 int test_divisible(where_am_I_ptr w)
 {
+  /* we only check divisibility for the given (N,x) value */
+  if (!trace_on_spot_Nx(w->N, w->x))
+    return 1;
+
     fbprime_t p = w->p;
     if (p==0) return 1;
     const unsigned int logI = w->si->conf->logI;
@@ -84,23 +88,45 @@ int test_divisible(where_am_I_ptr w)
     const unsigned long X = w->x + (w->N << LOG_BUCKET_REGION);
     long i = (long) (X & (I-1)) - (long) (I/2);
     unsigned long j = X >> logI;
-    mpz_t v;
+    static int init = 0;
+    static mpz_t v[2];
+    static int64_t a0 = 0, b0 = 0, a1 = 0, b1 = 0;
+    fbprime_t q;
 
-    mpz_init(v);
-    mp_poly_homogeneous_eval_siui(v,
-            w->si->sides[w->side]->fij,
-            w->si->cpoly->pols[w->side]->degree, i, j);
+    q = fb_is_power (p);
+    if (q == 0)
+      q = p;
 
-    int rc = mpz_divisible_ui_p(v, (unsigned long) p);
+    if (init == 0)
+      {
+        /* those won't be cleared, but this is not really a problem in debug
+           mode (TRACE_K defined) */
+        mpz_init (v[0]);
+        mpz_init (v[1]);
+        init = 1;
+      }
 
-    if (!rc) {
-        gmp_fprintf(stderr, "# FAILED test_divisible(" FBPRIME_FORMAT
-                ", %d, %lu, %.3s): i = %ld, j = %lu, norm = %Zd\n",
-                w->p, w->N, w->x, sidenames[w->side], i, j, v);
-    }
-    mpz_clear(v);
+    if (w->si->a0 != a0 || w->si->b0 != b0 || w->si->a1 != a1 ||
+        w->si->b1 != b1)
+      {
+        mp_poly_homogeneous_eval_siui(v[0], w->si->sides[0]->fij,
+                                      w->si->cpoly->pols[0]->degree, i, j);
+        mp_poly_homogeneous_eval_siui(v[1], w->si->sides[1]->fij,
+                                      w->si->cpoly->pols[1]->degree, i, j);
+        a0 = w->si->a0;
+        b0 = w->si->b0;
+        a1 = w->si->a1;
+        b1 = w->si->b1;
+      }
 
-    ASSERT(rc);
+    int rc = mpz_divisible_ui_p (v[w->side], (unsigned long) q);
+
+    if (rc)
+      mpz_divexact_ui (v[w->side], v[w->side], (unsigned long) q);
+    else
+      gmp_fprintf(stderr, "# FAILED test_divisible(p=" FBPRIME_FORMAT
+                  ", N=%d, x=%lu, %.3s): i = %ld, j = %lu, norm = %Zd\n",
+                  w->p, w->N, w->x, sidenames[w->side], i, j, v);
 
     return rc;
 }
