@@ -265,9 +265,6 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
         dcwfile = fopen_maybe_compressed(dcwname, "w");
         for(int j = 0; j < skip; j++){
             uint32_t x = weights[j];
-#ifdef HAVE_MINGW
-            fprintf (stderr, "print x=%u to dcwfile\n", x);
-#endif
             if (bin) {
                 fwrite32_little(&x, 1, dcwfile);
             } else {
