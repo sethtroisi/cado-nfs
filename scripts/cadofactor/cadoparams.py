@@ -27,9 +27,15 @@ other programs run during the sieving tasks, if there are any. The name of
 the node of a program is equal to the name of the binary executable.
 """
 
-class Parameters(dict):
+class Parameters(object):
+    # TODO: Add a self.used dictionary with the same structure and keys as
+    # self.data, but booleans as the values which indicate whether a parameter
+    # has ever been access with myparams(). Add a function that tests that
+    # all parameters have been accessed, so that a warning can be printed
+    # about parameters in the parameter file that are not used by anything,
+    # which might indicate a misspelling, etc.
     def __init__(self, *args, **kwargs):
-        super(Parameters, self).__init__(*args, **kwargs)
+        self.data = dict(*args, **kwargs)
     
     def myparams(self, keys, path):
         ''' From the hierarchical dictionary params, generate a flat 
@@ -44,9 +50,6 @@ class Parameters(dict):
         >>> Parameters(d).myparams(keys=('a', 'b'), path = 'bar.baz')
         {'a': 5, 'b': 2}
         '''
-        result = {}
-        source = self
-        idx = 0
         # path can be an array of partial paths, i.e., each entry can contain
         # one or more path segments separated by '.'. First join
         # them all, then split them again
@@ -55,16 +58,20 @@ class Parameters(dict):
         else:
             joinpath = '.'.join(path)
         splitpath = joinpath.split('.')
-        while source:
-          tomerge = {key:source[key] for key in keys 
-                     if key in source and not isinstance(source[key], dict)}
-          result.update(tomerge)
-          if idx < len(splitpath) and splitpath[idx] in source:
-            source = source[splitpath[idx]]
-            idx = idx + 1
-          else:
-            source = None
+        
+        source = self.data
+        result = self._extract_by_keys(source, keys)
+        for segment in splitpath:
+            if not segment in source:
+                break
+            source = source[segment]
+            result.update(self._extract_by_keys(source, keys))
         return result
+    
+    @staticmethod
+    def _extract_by_keys(source, keys):
+        return {key:source[key] for key in keys 
+                if key in source and not isinstance(source[key], dict)}
     
     def _insertkey(self, path, value):
         ''' path is a path with segments delimited by '.' or an 
@@ -77,13 +84,13 @@ class Parameters(dict):
         
         >>> p=Parameters({'a':1, 'b':2, 'foo':{'a':3}, 'bar':{'a':4}})
         >>> p._insertkey('c', 3)
-        >>> p == {'a': 1, 'b': 2, 'c': 3, 'bar': {'a': 4}, 'foo': {'a': 3}}
+        >>> p.data == {'a': 1, 'b': 2, 'c': 3, 'bar': {'a': 4}, 'foo': {'a': 3}}
         True
         >>> p._insertkey('bar.c', 5)
-        >>> p == {'a': 1, 'b': 2, 'c': 3, 'bar': {'a': 4, 'c': 5}, 'foo': {'a': 3}}
+        >>> p.data == {'a': 1, 'b': 2, 'c': 3, 'bar': {'a': 4, 'c': 5}, 'foo': {'a': 3}}
         True
         >>> p._insertkey('bar.baz.c', 6)
-        >>> p == {'a': 1, 'b': 2, 'c': 3, 'bar': {'a': 4, 'c': 5, 'baz': {'c': 6}}, 'foo': {'a': 3}}
+        >>> p.data == {'a': 1, 'b': 2, 'c': 3, 'bar': {'a': 4, 'c': 5, 'baz': {'c': 6}}, 'foo': {'a': 3}}
         True
         >>> p._insertkey('bar.baz.c.d', 6)
         Traceback (most recent call last):
@@ -99,7 +106,7 @@ class Parameters(dict):
             joinpath = '.'.join(path)
         splitpath = joinpath.split('.')
         key = splitpath.pop()
-        dest = self
+        dest = self.data
         for segment in splitpath:
             if segment in dest.keys():
                 if not isinstance(dest[segment], dict):
@@ -120,7 +127,7 @@ class Parameters(dict):
 
         >>> p = Parameters()
         >>> p._readfile(DEFAULTS)
-        >>> p["tasks"]["parallel"]
+        >>> p.data["tasks"]["parallel"]
         '0'
         >>> p.myparams(["degree", "incr", "parallel"], "tasks.polyselect") == \
         {'parallel': '0', 'incr': '60', 'degree': '5'}
@@ -153,7 +160,7 @@ class Parameters(dict):
         return result
     
     def __str__(self):
-        r = Parameters.__str_internal__(self, "")
+        r = Parameters.__str_internal__(self.data, "")
         return "\n".join(r)
     
 DEFAULTS = (
