@@ -8,6 +8,7 @@
 #include <ctype.h>
 #include <float.h>
 #include <pthread.h>
+#include <fcntl.h>   /* for _O_BINARY */
 #include "fb.h"
 #include "portability.h"
 #include "utils.h"           /* lots of stuff */
@@ -3039,6 +3040,10 @@ int main (int argc0, char *argv0[])/*{{{*/
     double bench_tot_time = 0.0;
     const char *statsfilename = NULL;
     const char *sievestatsfilename = NULL;
+#endif
+
+#ifdef HAVE_MINGW
+    _fmode = _O_BINARY;     /* Binary open for all files */
 #endif
 
     param_list pl;

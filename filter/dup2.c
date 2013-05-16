@@ -35,6 +35,7 @@
 #include <unistd.h>     // for unlink
 #include <inttypes.h>
 #include <ctype.h>  // for isspace
+#include <fcntl.h>   /* for _O_BINARY */
 #include "utils.h"
 #include "relation.h"
 
@@ -264,6 +265,10 @@ int main (int argc, char *argv[])
     param_list_configure_switch(pl, "bz", &bz);
     param_list_configure_switch(pl, "rm", &rm);
     param_list_configure_switch(pl, "abhexa", &ab_hexa);
+
+#ifdef HAVE_MINGW
+    _fmode = _O_BINARY;     /* Binary open for all files */
+#endif
 
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
