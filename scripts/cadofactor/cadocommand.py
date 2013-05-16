@@ -8,36 +8,34 @@ class Command(object):
     '''
     def __init__(self, args, stdin = None, stdout = subprocess.PIPE, 
                  stderr = subprocess.PIPE, **kwargs):
-        self.args = args
-        self.kwargs = kwargs
         self.logger = cadologger.Logger()
         # Convert args array to a string for printing if necessary
-        if isinstance(self.args, str):
-            self.cmdline = self.args
+        if isinstance(args, str):
+            self.cmdline = args
         else:
-            self.cmdline = " ".join(self.args)
+            self.cmdline = " ".join(args)
         self.child = subprocess.Popen(
-            self.args, stdin=stdin, stdout=stdout, stderr=stderr, 
-            **self.kwargs
+            args, stdin=stdin, stdout=stdout, stderr=stderr, 
+            **kwargs
             )
         self.logger.cmd(self.cmdline, self.child.pid)
     
     def wait(self):
         ''' Wait for command to finish executing, capturing stdout and stderr 
         in output tuple '''
-        (self.stdout, self.stderr) = self.child.communicate()
+        (stdout, stderr) = self.child.communicate()
         if self.child.returncode != 0:
             self.logger.error("Process with PID %d finished with return "
                               "code %d",
                               self.child.pid, self.child.returncode)
-        if self.stdout:
+        if stdout:
             self.logger.debug("Process with PID %d stdout: %s", 
-                              self.child.pid, self.stdout)
-        if self.stderr:
+                              self.child.pid, stdout)
+        if stderr:
             self.logger.debug("Process with PID %d stderr: %s", 
-                              self.child.pid, self.stderr)
+                              self.child.pid, stderr)
         self.returncode = self.child.returncode
-        return (self.returncode, self.stdout, self.stderr)
+        return (self.returncode, stdout, stderr)
 
 class RemoteCommand(Command):
     ssh="/usr/bin/ssh"
@@ -51,8 +49,8 @@ class RemoteCommand(Command):
     def __init__(self, command, host, port = None, ssh_options = None, 
                  **kwargs):
         # ssh_command is list of strings, like argv
-        ssh_command = [self.__class__.ssh]
-        options = self.__class__.ssh_options.copy()
+        ssh_command = [self.ssh]
+        options = self.ssh_options.copy()
         if not ssh_options is None:
             options.update(ssh_options)
         if not port is None:
@@ -82,7 +80,7 @@ class SendFile(Command):
             if not port is None:
                 target += str(port)
         target += hostpath
-        copy_command = [self.__class__.rsync] + self.__class__.rsync_options \
+        copy_command = [self.rsync] + self.rsync_options \
             + [localfile, target]
         super().__init__(copy_command, **kwargs)
 
@@ -101,6 +99,6 @@ if __name__ == '__main__':
 
     c = SendFile("WU", "quiche", "/tmp/foo")
     (rc, out, err) = c.wait()
-    print("Stdout: " + str(c.stdout, encoding="utf-8"))
-    print("Stderr: " + str(c.stderr, encoding="utf-8"))
+    print("Stdout: " + str(out, encoding="utf-8"))
+    print("Stderr: " + str(err, encoding="utf-8"))
     del(c)
