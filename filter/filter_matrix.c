@@ -14,6 +14,14 @@
 
 #define DEBUG 0
 
+unsigned int weight_ffs (int e)
+{
+  if (e == 0)
+      return 0;
+  else
+      return 1; /* Should depend on e, for now jsut constant*/
+}
+
 int
 decrS (int w)
 {
