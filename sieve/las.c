@@ -1697,8 +1697,11 @@ FIXME: can we find the locations to sieve? */
 		pu = *ppu;
 #ifdef TRACE_K
 		if (trace_on_spot_x(x)) {
+                  WHERE_AM_I_UPDATE(w, N, x >> shiftbucket);
+                  WHERE_AM_I_UPDATE(w, x, x & maskbucket);
 		  fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
 			   (unsigned int) (x & maskbucket), logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
+                  ASSERT(test_divisible(w));
 		}
 #endif
 #if LOG_BUCKET_REGION == 16
@@ -1769,19 +1772,17 @@ void thread_do(thread_data * thrs, void * (*f) (thread_data_ptr), int n)/*{{{*/
 }/*}}}*/
 
 /* {{{ apply_buckets */
-NOPROFILE_STATIC void
+#ifndef TRACE_K
+/* backtrace display can't work for static symbols (see backtrace_symbols) */
+NOPROFILE_STATIC
+#endif
+void
 apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
         where_am_I_ptr w)
 {
   unsigned int next_logp_j;
   unsigned char logp;
-  bucket_update_t *next_logp_change, **pnlc, *read_ptr;
-  uint16_t x;
-  
-#define SIEVE_DECREASE(D)				\
-  x = read_ptr[D].x;					\
-  WHERE_AM_I_UPDATE(w, x, x);				\
-  sieve_decrease (S + x, logp, w);
+  bucket_update_t *next_logp_change, *next_align, **pnlc, *read_ptr;
 
   read_ptr = BA.bucket_read[i];
   pnlc = BA.logp_idx + i + BA.n_bucket;
@@ -1795,19 +1796,51 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
     }
     else
       next_logp_change = BA.bucket_write[i];
+    next_align = (bucket_update_t *) (((size_t) read_ptr + 0x3F) & ~((size_t) 0x3F));
+    if (UNLIKELY(next_align > next_logp_change)) next_align = next_logp_change;
+    while (read_ptr < next_align) {
+      uint16_t x;
+      x = (read_ptr++)->x;
+      WHERE_AM_I_UPDATE(w, x, x);
+      sieve_decrease(S + x, logp, w);
+    }
     while (read_ptr + 16 <= next_logp_change) {
-      SIEVE_DECREASE(0); SIEVE_DECREASE(1); SIEVE_DECREASE(2); SIEVE_DECREASE(3);
-      SIEVE_DECREASE(4); SIEVE_DECREASE(5); SIEVE_DECREASE(6); SIEVE_DECREASE(7);
-      SIEVE_DECREASE(8); SIEVE_DECREASE(9); SIEVE_DECREASE(10);SIEVE_DECREASE(11);
-      SIEVE_DECREASE(12);SIEVE_DECREASE(13);SIEVE_DECREASE(14);SIEVE_DECREASE(15);
+      uint64_t x0, x1, x2, x3, x4, x5, x6, x7;
+      uint16_t x;
+      x0 = ((uint64_t *) read_ptr)[0];
+      x1 = ((uint64_t *) read_ptr)[1];
+      x2 = ((uint64_t *) read_ptr)[2];
+      x3 = ((uint64_t *) read_ptr)[3];
+      x4 = ((uint64_t *) read_ptr)[4];
+      x5 = ((uint64_t *) read_ptr)[5];
+      x6 = ((uint64_t *) read_ptr)[6];
+      x7 = ((uint64_t *) read_ptr)[7];
       read_ptr += 16;
-      }
+      __asm__ __volatile__ (""); /* To be sure all x? are read together in one operation */
+      x = (uint16_t) (x0 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
+      x = (uint16_t) (x0 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
+      x = (uint16_t) (x1 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
+      x = (uint16_t) (x1 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
+      x = (uint16_t) (x2 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
+      x = (uint16_t) (x2 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
+      x = (uint16_t) (x3 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
+      x = (uint16_t) (x3 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
+      x = (uint16_t) (x4 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
+      x = (uint16_t) (x4 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
+      x = (uint16_t) (x5 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
+      x = (uint16_t) (x5 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
+      x = (uint16_t) (x6 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
+      x = (uint16_t) (x6 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
+      x = (uint16_t) (x7 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
+      x = (uint16_t) (x7 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
+    }
     while (read_ptr < next_logp_change) {
-      SIEVE_DECREASE(0);
-      read_ptr++;
+      uint16_t x;
+      x = (read_ptr++)->x;
+      WHERE_AM_I_UPDATE(w, x, x);
+      sieve_decrease(S + x, logp, w);
     }
   }
-#undef SIEVE_DECREASE
 }
 /* }}} */
 
@@ -2055,7 +2088,7 @@ check_leftover_norm (mpz_t n, sieve_info_ptr si, int side)
 /* Adds the number of sieve reports to *survivors,
    number of survivors with coprime a, b to *coprimes */
 
-    NOPROFILE_STATIC int
+NOPROFILE_STATIC int
 factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_ptr w MAYBE_UNUSED)
 {
     las_info_ptr las = th->las;
@@ -2097,6 +2130,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
     if (trace_on_spot_Nx(N, trace_Nx.x)) {
         fprintf(stderr, "# When entering factor_survivors for bucket %u, alg_S[%u]=%u, rat_S[%u]=%u\n",
                 trace_Nx.N, trace_Nx.x, alg_S[trace_Nx.x], trace_Nx.x, rat_S[trace_Nx.x]);
+        gmp_fprintf(stderr, "# Remaining norms which have not been accounted for in sieving: (%Zd, %Zd)\n", traced_norms[0], traced_norms[1]);
     }
 #endif  /* }}} */
 
@@ -3297,7 +3331,11 @@ int main (int argc0, char *argv0[])/*{{{*/
         if (las->verbose)
             fprintf (las->output, "# I=%u; J=%u\n", si->I, si->J);
 
-        trace_update_conditions(si);
+        /* Only when tracing. This function gets called once per
+         * special-q only. Here we compute the two norms corresponding to
+         * the traced (a,b) pair, and start by dividing out the special-q
+         * from the one where it should divide */
+        trace_per_sq_init(si);
 
         /* WARNING. We're filling the report info for thread 0 for
          * ttbuckets_fill, while in fact the cost is over all threads.
@@ -3382,6 +3420,7 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         thread_buckets_free(thrs, las->nb_threads);
 
+        trace_per_sq_clear(si);
 #if 0   /* incompatible with the todo list */
         /* {{{ bench stats */
         if (bench) {

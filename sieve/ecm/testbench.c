@@ -77,14 +77,15 @@ tryfactor (mpz_t N, const facul_strategy_t *strategy,
   if (printfactors && facul_code > 0)
     {
       int j;
-      for (j = 0; j < facul_code; j++)
-        printf ("%lu ", f[j]);
+      printf ("%lu", f[0]);
+      for (j = 1; j < facul_code; j++)
+        printf (" %lu ", f[j]);
       if (printcofactors) {
         mpz_t c;
         mpz_init_set (c, N);
         for (j = 0; j < facul_code; j++)
           mpz_divexact_ui (c, c, f[j]);
-        gmp_printf ("%Zd", c);
+        gmp_printf (" %Zd", c);
         mpz_clear (c);
       }
       printf ("\n");

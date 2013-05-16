@@ -794,6 +794,11 @@ void sieve_small_bucket_region(unsigned char *S, int N,
             for (j = 0; j < nj; j++) {
                 WHERE_AM_I_UPDATE(w, j, j);
                 if (i0 < I) {
+                    // At the start of the bucket region, we are not sure
+                    // that i0 is reduced mod p when we enter here.
+                    // (see comment at the end of small_sieve_skip_stride()).
+                    // Hence, we have to do this reduction here:
+                    i0 &= (p-1);
                     ASSERT(i0 < p);
                     ASSERT ((nj * N + j) % 2 == 1);
                     for (unsigned int i = i0; i < I; i += p) {

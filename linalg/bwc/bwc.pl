@@ -324,16 +324,33 @@ while (defined($_ = shift @ARGV)) {
     }
 }
 
+# If number of threads is given as a single integer, we split it into factors 
+# as close as possible to to the square root, smaller one first.
 sub set_mpithr_param {
     my $v = shift @_;
+    if ($v=~/^(\d+)$/) {
+        my $nthreads = $1;
+        my $s = int(sqrt($nthreads));
+        for (; $s >= 1; $s--) {
+            $nthreads % $s or return ($s, $nthreads / $s);
+        }
+        die "No possible thread split?";
+    }
     $v=~/(\d+)x(\d+)$/ or usage "bad splitting value '$v'";
     return ($1, $2);
 }
 
 # Some parameters are more important than the others because they
 # participate to the default value for wdir.
-if ($param->{'mpi'}) { @mpi_split = set_mpithr_param $param->{'mpi'}; }
-if ($param->{'thr'}) { @thr_split = set_mpithr_param $param->{'thr'}; }
+if ($param->{'mpi'}) { 
+    @mpi_split = set_mpithr_param $param->{'mpi'}; 
+    # Write back to params as that may have been a single int
+    $param->{'mpi'} = join "x", @mpi_split;
+}
+if ($param->{'thr'}) { 
+    @thr_split = set_mpithr_param $param->{'thr'}; 
+    $param->{'thr'} = join "x", @thr_split;
+}
 if ($param->{'wdir'}) { $wdir=$param->{'wdir'}; }
 if ($param->{'matrix'}) { $matrix=$param->{'matrix'}; }
 if ($param->{'matpath'}) { $matpath=$param->{'matpath'}; }
