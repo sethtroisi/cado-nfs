@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>   /* for _O_BINARY */
 
 #include "portability.h"
 #include "utils.h"

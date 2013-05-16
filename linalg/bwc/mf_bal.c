@@ -240,10 +240,6 @@ int main(int argc, char * argv[])
     // const char * ref_balance = NULL;
     int display_correlation = 0;
 
-#ifdef HAVE_MINGW
-    _fmode = _O_BINARY;     /* Binary open for all files */
-#endif
-
     param_list_init(pl);
     argv++,argc--;
     param_list_configure_switch(pl, "--quiet", &quiet);
