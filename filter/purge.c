@@ -70,6 +70,7 @@ Exit value:
 #include <time.h>
 #include <pthread.h>
 #include <errno.h>
+#include <fcntl.h>   /* for _O_BINARY */
 #ifdef HAVE_LIBGEN_H
 #include <libgen.h>
 #endif
@@ -2152,6 +2153,10 @@ main (int argc, char **argv)
   param_list pl;
   unsigned int npass = DEFAULT_NPASS;
   double required_excess = DEFAULT_REQUIRED_EXCESS;
+
+#ifdef HAVE_MINGW
+    _fmode = _O_BINARY;     /* Binary open for all files */
+#endif
 
   set_rep_cado(argv[0]);
   wct0 = wct_seconds ();
