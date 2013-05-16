@@ -364,9 +364,11 @@ class BWC(Program):
     name = "bwc"
     params_list = (
         Toggle("complete", prefix=":"),
+        Toggle("wipeout", prefix=":"),
         Toggle("dryrun", "d"), 
         Toggle("verbose", "v"),
         ParameterEq("mpi"),
+        ParameterEq("threads", "thr"),
         ParameterEq("mn"),
         ParameterEq("nullspace"),
         ParameterEq("interval"),
