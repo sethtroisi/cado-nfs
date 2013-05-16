@@ -74,10 +74,14 @@ Exit value:
 #include <libgen.h>
 #endif
 
+#if (defined FOR_FFS) || (defined FOR_NFS_DL)
+#define FOR_DL
+#endif
+
 #include "mod_ul.c"
 #include "portability.h"
 #include "utils.h"
-#ifdef FOR_FFS
+#ifdef FOR_DL
 #include "utils_ffs.h"
 #endif
 
@@ -131,7 +135,7 @@ static float w_ccc;
 static uint8_t binfilerel;    /* True (1) if a rel_used relations file must be read */
 static uint8_t boutfilerel;   /* True (1) if a rel_used relations file must be written */
 
-#ifdef FOR_FFS
+#ifdef FOR_DL
 static FILE *ofile2;
 static int pipe_2;
 #ifdef STAT_FFS
@@ -338,6 +342,28 @@ my_malloc_free_all (void)
   relcompact_size = 0;
 }
 
+unsigned int weight_ffs (int e)
+{
+  if (e == 0)
+      return 0;
+  else
+      return 1; /* Should depend on e, for now jsut constant*/
+}
+
+unsigned int weight_rel_ffs (relation_t rel)
+{
+  int i;
+  unsigned int w = 0;
+
+  for (i = 0; i < rel.nb_rp; i++)
+    w += weight_ffs (rel.rp[i].e);
+
+  for (i = 0; i < rel.nb_ap; i++)
+    w += weight_ffs (rel.ap[i].e);
+
+  return w;
+}
+
 /*****************************************************************************/
 
 /* Print the relation 'rel' in matrix format, i.e., a line of the form:
@@ -385,7 +411,7 @@ fprint_rel_row (FILE *file, buf_rel_t *my_buf_rel)
   p = d64toa10(p,   (int64_t)  my_buf_rel->rel.a); *p++ = ' ';
   p = u64toa10(p,   (uint64_t) my_buf_rel->rel.b); *p++ = ' ';
 
-#ifndef FOR_FFS
+#ifndef FOR_DL
   nb_coeff = my_buf_rel->rel.nb_ap + (my_buf_rel->rel.b ? my_buf_rel->rel.nb_rp : 1);
 #else
   if (my_buf_rel->rel.b) {
@@ -406,7 +432,7 @@ fprint_rel_row (FILE *file, buf_rel_t *my_buf_rel)
 #endif
   p = u64toa10(p, (uint64_t) nb_coeff);
 
-#ifndef FOR_FFS
+#ifndef FOR_DL
   if (my_buf_rel->rel.b) {
     for (prp =  my_buf_rel->rel.rp;
          prp != &(my_buf_rel->rel.rp[my_buf_rel->rel.nb_rp]);
@@ -477,7 +503,7 @@ fprint_rel_row (FILE *file, buf_rel_t *my_buf_rel)
   *p = '\n'; p[1] = 0;
   fputs(buf, file);
 
-#ifndef FOR_FFS
+#ifndef FOR_DL
   return nb_coeff;
 #else
   return weight_rel_ffs (my_buf_rel->rel);
@@ -1094,7 +1120,7 @@ prempt_load (prempt_t prempt_data) {
 }
 
 static inline void
-#ifndef FOR_FFS
+#ifndef FOR_DL
 relation_stream_get_fast (prempt_t prempt_data, unsigned int j)
 #else
 relation_stream_get_fast (prempt_t prempt_data, unsigned int j, int passtwo)
@@ -1165,8 +1191,8 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j, int passtwo)
 	  {
 	  if (mybufrel->rel.rp[i].p == pr)
 	    {
-#ifdef FOR_FFS
-	      /* FOR_FFS, all .e != 0 must set to one in pass 1.
+#ifdef FOR_DL
+	      /* FOR_DL, all .e != 0 must set to one in pass 1.
 		 In passtwo, all .e must be keeped. */
 	      if (passtwo)
 #endif
@@ -1210,7 +1236,7 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j, int passtwo)
 	  {
 	    if (mybufrel->rel.ap[i].p == pr)
 	      {
-#ifdef FOR_FFS
+#ifdef FOR_DL
 		if (passtwo)
 #endif
 		  mybufrel->rel.ap[i].e++;
@@ -1239,7 +1265,7 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j, int passtwo)
     if (mybufrel->rel.b > 0)
       {
 	ltmp = 1;
-#ifndef FOR_FFS
+#ifndef FOR_DL
 	for (k = 0, i = 0; i < mybufrel->rel.nb_rp; i++)
 	  {
 	    if (mybufrel->rel.rp[i].e & 1)
@@ -1397,7 +1423,7 @@ printrel() {
 	if (!boutfilerel)
 	  W += (double) fprint_rel_row(ofile, &(buf_rel[j]));
     }
-#ifdef FOR_FFS
+#ifdef FOR_DL
     else
       if (!boutfilerel)
 	fprint_relation_raw(ofile2, &(buf_rel[j].rel));
@@ -1435,7 +1461,7 @@ static void threadfindroot(fr_t *mfr) {
 	{
 	  mybufrel = &(buf_rel[j]);
 	  if
-#ifdef FOR_FFS
+#ifdef FOR_DL
 	    (!boutfilerel || bit_vector_getbit(rel_used, (size_t) mybufrel->num))
 #else
 	    (bit_vector_getbit(rel_used, (size_t) mybufrel->num))
@@ -1696,7 +1722,7 @@ prempt_scan_relations_pass_one ()
 	  if (cpy_cpt_rel_a + 1 == cpt_rel_b + T_REL) nanosleep(&wait_classical, NULL);
 	  buf_rel[k].num = rs->nrels++;
 
-#ifndef FOR_FFS
+#ifndef FOR_DL
 	  if (bit_vector_getbit(rel_used, (size_t) buf_rel[k].num))
 	    relation_stream_get_fast (prempt_data, k);
 #else
@@ -1818,7 +1844,7 @@ prempt_scan_relations_pass_one ()
  */
 static int
 prempt_scan_relations_pass_two (const char *oname,
-#ifdef FOR_FFS
+#ifdef FOR_DL
 				const char *oname2,
 #else
 				bit_vector_srcptr rel_used,
@@ -1838,7 +1864,7 @@ prempt_scan_relations_pass_two (const char *oname,
   int pipe;
 
   ofile = fopen_maybe_compressed2(oname, "w", &pipe, NULL);
-#ifdef FOR_FFS
+#ifdef FOR_DL
   ofile2 = fopen_maybe_compressed2(oname2, "w", &pipe_2, NULL);
 #endif
   if (!raw)
@@ -1946,7 +1972,7 @@ prempt_scan_relations_pass_two (const char *oname,
 	  if (cpy_cpt_rel_a + 1 == cpt_rel_b + T_REL) nanosleep(&wait_classical, NULL);
 	  buf_rel[k].num = rs->nrels++;
 
-#ifndef	FOR_FFS
+#ifndef FOR_DL
 	  if (bit_vector_getbit(rel_used, (size_t) buf_rel[k].num))
 	    relation_stream_get_fast (prempt_data, k);
 #else		
@@ -2058,7 +2084,7 @@ prempt_scan_relations_pass_two (const char *oname,
   relation_stream_clear(rs);
 
   if (pipe)  pclose(ofile);  else fclose(ofile);
-#ifdef FOR_FFS
+#ifdef FOR_DL
   if (pipe_2) pclose(ofile2); else fclose(ofile2);
 #endif
 
@@ -2075,12 +2101,12 @@ usage (const char *argv0)
   fprintf (stderr, "       -poly polyfile - use polynomial in polyfile\n");
   fprintf (stderr, "       -out outfile   - write remaining relations in outfile\n");
   fprintf (stderr, "       -nrels nnn     - number of initial relations\n");
-#ifndef FOR_FFS
+#ifndef FOR_DL
   fprintf (stderr, "\n    Other command line options: \n");
 #endif
   fprintf (stderr, "       -outdel file - output file for deleted relations\n");
   fprintf (stderr, "       -sos sosfile - to keep track of the renumbering\n");
-#ifdef FOR_FFS
+#ifdef FOR_DL
   fprintf (stderr, "\n    Other command line options: \n");
 #endif
   fprintf (stderr, "       -keep    nnn - prune if excess > nnn (default 160)\n");
@@ -2224,7 +2250,7 @@ main (int argc, char **argv)
   const char * sos = param_list_lookup_string(pl, "sos");
   const char * infilerel = param_list_lookup_string(pl, "inrel");
   const char * outfilerel = param_list_lookup_string(pl, "outrel");
-#ifdef FOR_FFS
+#ifdef FOR_DL
   const char * deletedname = param_list_lookup_string(pl, "outdel");
 #endif
   binfilerel = (infilerel != 0);
@@ -2257,7 +2283,7 @@ main (int argc, char **argv)
       usage (argv0);
     }
 
-#ifdef FOR_FFS /* For FFS we need to remember the renumbering of primes*/
+#ifdef FOR_DL /* For FFS we need to remember the renumbering of primes*/
   if (sos == NULL)
     {
       fprintf (stderr, "Error, missing -sos option.\n");
@@ -2474,7 +2500,7 @@ main (int argc, char **argv)
   relsup = 0;
   prisup = 0;
 
-#ifndef FOR_FFS
+#ifndef FOR_DL
   /* reread (purgedname, fic, rel_used, nrel_new, nprimes_new, raw); */
   prempt_scan_relations_pass_two (purgedname, rel_used, nrel, nprimes, raw);
 #else

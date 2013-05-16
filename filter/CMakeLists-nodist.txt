@@ -14,6 +14,11 @@ include_directories (${CADO_NFS_SOURCE_DIR}/ffs)
 #add_executable(purge_heap purge_heap.c)
 #target_link_libraries(purge_heap utils pthread)
 
+add_executable(purge-nfs-dl EXCLUDE_FROM_ALL purge.c)
+target_link_libraries(purge-nfs-dl utils pthread)
+set_property(TARGET purge-nfs-dl APPEND PROPERTY COMPILE_FLAGS "-DFOR_NFS_DL")
+add_dependencies(purge-nfs-dl antebuffer)
+
 add_executable(purge-ffs-f2 EXCLUDE_FROM_ALL purge.c utils_ffs.c)
 #target_link_libraries(purge-ffs-f2 utils pthread libfppol-f2.a gf2x)
 target_link_libraries(purge-ffs-f2 utils pthread libfppol-f2.a)
@@ -31,9 +36,6 @@ add_executable(merge-ffs EXCLUDE_FROM_ALL merge.c markowitz.c mst.c report.c mer
 #functions
 target_link_libraries(merge-ffs utils libfppol-f3.a)
 set_property(TARGET merge-ffs APPEND PROPERTY COMPILE_FLAGS "-DFOR_FFS -DUSE_F3")
-
-#add_executable(purge_merge purge_merge.c markowitz.c mst.c report.c purge_merge_mono.c filter_matrix.c sparse.c)
-#target_link_libraries(purge_merge utils)
 
 add_executable(replay-ffs EXCLUDE_FROM_ALL replay.c sparse.c utils_ffs.c)
 #here we do not care about the characteristic because we only use non specific

@@ -8,28 +8,6 @@
 #include "sparse.h"
 #include "utils_ffs.h"
 
-unsigned int weight_ffs (int e)
-{
-  if (e == 0)
-      return 0;
-  else
-      return 1; /* Should depend on e, for now jsut constant*/
-}
-
-unsigned int weight_rel_ffs (relation_t rel)
-{
-  int i;
-  unsigned int w = 0;
-
-  for (i = 0; i < rel.nb_rp; i++)
-    w += weight_ffs (rel.rp[i].e);
-
-  for (i = 0; i < rel.nb_ap; i++)
-    w += weight_ffs (rel.ap[i].e);
-
-  return w;
-}
-
 /* return a/b mod p, and p when gcd(b,p) <> 1: this corresponds to a
    projective root */
 HT_T
