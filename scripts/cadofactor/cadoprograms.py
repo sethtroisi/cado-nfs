@@ -11,11 +11,11 @@ class Option(object):
     # TODO: decide whether we need '-' or '/' as command line option prefix 
     # character under Windows. Currently: use "-'
     if False and platform.system() == "Windows":
-        prefix_char = '/'
+        prefix = '/'
     else:
-        prefix_char = '-'
+        prefix = '-'
     
-    def __init__(self, config, arg = None):
+    def __init__(self, config, arg = None, prefix  = None):
         # Set config to the name of the parameter in the configuration file,
         # e.g., "verbose", and arg to the command line parameter, e.g., "v"
         # If arg is not given, its default is the same as config
@@ -24,6 +24,8 @@ class Option(object):
             self.arg = config
         else:
             self.arg = arg
+        if prefix:
+            self.prefix = prefix
     
     def get_key(self):
         return self.config
@@ -36,7 +38,7 @@ class PositionalParameter(Option):
 class Parameter(Option):
     ''' Command line option that takes a parameter '''
     def map(self, value):
-        return [self.prefix_char + self.arg, value]
+        return [self.prefix + self.arg, value]
 
 class ParameterEq(Option):
     ''' Command line option that takes a parameter, used on command line in 
@@ -50,7 +52,7 @@ class Toggle(Option):
     '''
     def map(self, value):
         if value.lower() in ["yes", "true", "on", "1"]:
-            return [self.prefix_char + self.arg]
+            return [self.prefix + self.arg]
         elif value.lower() in ["no", "false", "off", "0"]:
             return []
         else:
@@ -84,6 +86,7 @@ class Program(object):
       map to an instance Parameter("-t")
     '''
     
+    params_list = ("execpath", "execbin")
     path = "programs"
     
     @staticmethod
@@ -95,7 +98,7 @@ class Program(object):
         '''
         return "'" + s.replace("'", "'\\''") + "'"
     
-    def __init__(self, args = None, kwargs = None, path = None, binary = None, 
+    def __init__(self, args = None, kwargs = None, 
                  stdin = None, stdout = subprocess.PIPE, 
                  stderr = subprocess.PIPE):
         ''' Takes a list of positional parameters and a dictionary of command 
@@ -109,16 +112,14 @@ class Program(object):
         generation, the file name is used for shell redirection.
         '''
         
-        if not path is None:
-            self.path = path
-        if not binary is None:
-            self.binary = binary
+        path = kwargs.get("execpath", self.path)
+        binary = kwargs.get("execbin", self.binary)
         
         self.stdin = stdin
         self.stdout = stdout
         self.stderr = stderr
         # Begin command line with program to execute
-        self.command = [self.path.rstrip(os.sep) + os.sep + self.binary]
+        self.command = [path.rstrip(os.sep) + os.sep + binary]
         
         # Add keyword command line parameters
         for p in self.params_list:
@@ -131,10 +132,11 @@ class Program(object):
             self.command += args
     
     @classmethod
-    def params_dict(cls):
+    def get_params_list(cls):
         """ Return the accepted parameters as a mapping from config file 
         keywords to Option instances  """
-        return {p.get_key():p for p in cls.params_list}
+        l = list(Program.params_list) + [opt.get_key() for opt in cls.params_list]
+        return l
     
     def __str__(self):
         ''' Returns the command line as a string '''
@@ -143,7 +145,7 @@ class Program(object):
     def as_array(self):
         ''' Returns the command line as a string array '''
         return self.command
-
+    
     def as_wu():
         # TODO: Make workunit text from a program instance
         # This allows running program instances either directly with run(),
@@ -202,11 +204,6 @@ class Program(object):
     
     def wait(self):
         (rc, stdout, stderr) = self.child.wait()
-        if stdout:
-            print("Stdout: " + str(stdout))
-        if stderr:
-            print("Stderr: " + str(stderr))
-        sys.stdout.flush()
         
         if isinstance(self.stdin, str):
             self.infile.close()
@@ -299,14 +296,6 @@ class Duplicates1(Program):
         Parameter("filelist"),
         Parameter("basepath"),
         )
-    
-    # cmd("$param{'bindir'}/filter/dup1 ".
-    #     "-n $param{'nslices_log'} ".
-    #     "-out $param{'prefix'}.nodup ".
-    #     "-filelist $param{'prefix'}.newfilelist ".
-    #     "-basepath $param{'wdir'} ",
-    #     { cmdlog => 1, kill => 1,   
-    #      logfile=>"$param{'prefix'}.dup1.log" });
 
 
 class Duplicates2(Program):
@@ -355,15 +344,28 @@ class Merge(Program):
         Parameter("itermax"), 
         Parameter("resume"), 
         Parameter("mkztype"), 
-        Parameter("wmstmax"), 
+        Parameter("wmstmax")
         )
+
+class Replay(Program):
+    binary= "replay"
+    name = binary
+    params_list = (
+        Toggle("binary", prefix = "--"),
+        Parameter("skip"),
+        Parameter("purged"),
+        Parameter("history", "his"),
+        Parameter("index"),
+        Parameter("out")
+    )
 
 class BWC(Program):
     binary = "bwc.pl"
     name = "bwc"
     params_list = (
+        Toggle("complete", prefix=":"),
         Toggle("dryrun", "d"), 
-        Toggle("verbose", "v"), 
+        Toggle("verbose", "v"),
         ParameterEq("mpi"),
         ParameterEq("mn"),
         ParameterEq("nullspace"),
@@ -374,7 +376,22 @@ class BWC(Program):
         ParameterEq("mpiexec"),
         ParameterEq("hosts"),
         ParameterEq("hostfile"),
+        ParameterEq("bwc_bindir")
         )
+
+class Characters(Program):
+    binary= "characters"
+    name = binary
+    params_list = (
+        Parameter("poly"),
+        Parameter("purged"),
+        Parameter("index"),
+        Parameter("heavyblock"),
+        Parameter("nchar"),
+        Parameter("nthchar", "t"),
+        Parameter("out"),
+        PositionalParameter("wfile")
+    )
 
 class Sqrt(Program):
     binary = "sqrt"
@@ -389,5 +406,5 @@ class Sqrt(Program):
         Parameter("dep"),
         Parameter("purged"),
         Parameter("index"),
-        Parameter("ker")
+        Parameter("kernel", "ker")
         )

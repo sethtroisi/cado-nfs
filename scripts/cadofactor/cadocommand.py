@@ -20,17 +20,13 @@ class Command(object):
             self.args, stdin=stdin, stdout=stdout, stderr=stderr, 
             **self.kwargs
             )
-        self.logger.info("Running command: " + self.cmdline)
-        self.logger.cmd(self.cmdline, extra={"pid": self.child.pid})
+        self.logger.cmd(self.cmdline, self.child.pid)
     
     def wait(self):
         ''' Wait for command to finish executing, capturing stdout and stderr 
         in output tuple '''
         (self.stdout, self.stderr) = self.child.communicate()
-        if self.child.returncode == 0:
-            self.logger.info("Process with PID %d finished successfully",
-                             self.child.pid)
-        else:
+        if self.child.returncode != 0:
             self.logger.error("Process with PID %d finished with return "
                               "code %d",
                               self.child.pid, self.child.returncode)

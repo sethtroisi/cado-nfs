@@ -146,7 +146,8 @@ void init_rat_norms_bucket_region(unsigned char *S,
                                  unsigned int j,
                                  sieve_info_ptr si)
 {
-  /* #define DEBUG_INIT_RAT 1 */
+  /* #define DEBUG_INIT_RAT 1 */ /* For internal debug: trace all */
+  /* #define CHECK_INIT_RAT 1 */ /* For internal debug: control all */
   sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
   int halfI = (si->I)>>1,
     int_i;
@@ -155,7 +156,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
     u0 = si->sides[RATIONAL_SIDE]->fijd[0], // gj
     u1 = si->sides[RATIONAL_SIDE]->fijd[1], // gi
     invu1 = 1.0/u1,
-    u0j = u0 * j,
+    u0j,
     d0_init,
     scale = rat->scale * (1.0/0x100000),
     add = 0x3FF00000 - GUARD / scale,
@@ -167,6 +168,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
 
   j = j << j1;
   j1 = (1U << j1) + j;
+  u0j = u0 * j;
   d0_init = rat->cexp2[((unsigned int)GUARD) - 1U];
   if (!j) {
     // compute only the norm for i = 1. Everybody else is 255.
@@ -176,9 +178,11 @@ void init_rat_norms_bucket_region(unsigned char *S,
     j++;
     u0j += u0;
   }
-
   for( ; j < j1 ; j++, u0j += u0) {
-
+#ifdef CHECK_INIT_RAT
+    unsigned char *cS = S + halfI;
+    memset (S, 0, halfI<<1);
+#endif
     int_i = -halfI;
     g = u0j + u1 * int_i;
     rac = u0j * (-invu1);
@@ -380,6 +384,26 @@ void init_rat_norms_bucket_region(unsigned char *S,
     }
   nextj:
     for (;0;); /* gcc needs something after a label */
+#ifdef CHECK_INIT_RAT 
+    /* This code checks the complete line init with the real formula */
+    if (UNLIKELY(cS + halfI != S)) {
+      fprintf (stderr, "init_rat_norms_bucket_region: S control Error: OldS(%p) + I(%d) != S(%p)", cS - halfI, si->I, S);
+      exit (1);
+    }
+    unsigned int arret = 0;
+    int_i = -halfI;
+    g = u0j + u1 * int_i;
+    while (LIKELY(int_i < halfI)) {
+      y = log2(fabs(g)))*rat->scale+GUARD;
+      if (UNLIKELY(fabs(cS[int_i] - y) > 1.)) {
+	fprintf (stderr, "init_rat_norms_bucket_region: S control BUG, offset %d: real value=%d, S value=%d, rat->scale=%e\n", int_i, y, cS[int_i], rat->scale);
+	arret = 1;
+      }
+      int_i++;
+      g += u1;
+    }
+    if (UNLIKELY(arret)) exit(1);
+#endif
   }
 }
 
@@ -2682,11 +2706,11 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
    * (IMO we have another notational convention elsewhere regarding what
    * the skewed norm is. But it's the one which is used here).
    */
-  double B = EXTRA_B_FACTOR * sqrt (2.0 * q0d / (si->cpoly->skew * sqrt (3.0)));
+  double B = sqrt (2.0 * q0d / (si->cpoly->skew * sqrt (3.0)));
 
   /************************** rational side **********************************/
 
-  /* If J is chosen such that J<=I/2*s*B/max(a1,s*b1),
+  /* If J is chosen such that J<=I/2*s*B/max(|a1|,s*|b1|),
    * then |j*a1| <= I/2*s*B, and |j*b1| <= I/2*B
    * J is set to honour this requirement in sieve_info_adjust_IJ (but see
    * also bug #15617).
@@ -2731,8 +2755,11 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
   /* we know that |F(a,b)/q| < 2^(alg->logmax) when si->ratq = 0,
      and |F(a,b)| < 2^(alg->logmax) when si->ratq <> 0 */
 
+  /* we increase artificially the logmax by 1, to allow larger values of J */
+  alg->logmax += 1.0;
+
   /* on the algebraic side, we want that the non-reports on the rational
-     side, which are set to 255, remain larger than then report bound 'r',
+     side, which are set to 255, remain larger than the report bound 'r',
      even if the algebraic norm is totally smooth. For this, we artificially
      increase by 'r' the maximal range */
   r = MIN(si->conf->sides[ALGEBRAIC_SIDE]->lambda * (double) si->conf->sides[ALGEBRAIC_SIDE]->lpb, alg->logmax);
@@ -2774,10 +2801,49 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
     }
 }
 
+/* return largest possible J by simply bounding the Fij and Gij polynomials */
+double
+sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
+{
+  double Iover2 = (double) (si->I >> 1);
+  double Jmax = Iover2;
+  double F[MAXDEGREE + 1];
+  for (int side = 0; side < 2; side++)
+    {
+      sieve_side_info_ptr s = si->sides[side];
+      cado_poly_side_ptr ps = si->cpoly->pols[side];
+      double maxnorm = pow (2.0, s->logmax), v, powIover2 = 1.0;
+      for (int k = 0; k <= ps->degree; k++)
+        {
+          F[ps->degree - k] = fabs (s->fijd[k]) * powIover2;
+          powIover2 *= Iover2;
+        }
+      v = fpoly_eval (F, ps->degree, Jmax);
+      if (v > maxnorm)
+        { /* use dichotomy to determine largest Jmax */
+          double a, b, c;
+          a = 0.0;
+          b = Jmax;
+          while (trunc (a) != trunc (b))
+            {
+              c = (a + b) * 0.5;
+              v = fpoly_eval (F, ps->degree, c);
+              if (v < maxnorm)
+                a = c;
+              else
+                b = c;
+            }
+          Jmax = trunc (a) + 1; /* +1 since we don't sieve for j = Jmax */
+        }
+    }
+  return (unsigned int) Jmax;
+}
+
 void
-sieve_info_update_norm_data (sieve_info_ptr si)
+sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
 {
     int64_t H[4] = { si->a0, si->b0, si->a1, si->b1 };
+
     /* Update floating point version of algebraic poly (do both, while
      * we're at it...) */
     for (int side = 0; side < 2; side++) {
@@ -2790,4 +2856,19 @@ sieve_info_update_norm_data (sieve_info_ptr si)
         for (int k = 0; k <= ps->degree; k++)
             s->fijd[k] = mpz_get_d (s->fij[k]) * invq;
     }
+
+    /* improve bound on J if possible */
+    unsigned int Jmax;
+    Jmax = sieve_info_update_norm_data_Jmax (si);
+    if (Jmax > si->J)
+      {
+        /* see sieve_info_adjust_IJ */
+        ASSERT_ALWAYS(LOG_BUCKET_REGION >= si->conf->logI);
+        uint32_t i = 1U << (LOG_BUCKET_REGION - si->conf->logI);
+        i *= nb_threads;
+        si->J = (Jmax / i) * i; /* cannot be zero since the previous value
+                                   of si->J was already a multiple of i,
+                                   and this new value is larger */
+      }
 }
+

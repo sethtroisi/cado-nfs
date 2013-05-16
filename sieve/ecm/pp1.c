@@ -165,6 +165,7 @@ pp1_stage2 (residue_t r, const residue_t X, const stage2_plan_t *plan,
   unsigned int id;
 #endif
   
+  mod_init_noset0 (Xd, m);
   mod_init_noset0 (t, m);
 
 #define FAST_XJ_INIT
@@ -301,7 +302,6 @@ pp1_stage2 (residue_t r, const residue_t X, const stage2_plan_t *plan,
     mod_clear (ap5_0, m);
     mod_clear (ap5_1, m);
     mod_clear (X6, m);
-    mod_clear (X2, m);
   }
 #endif /* if FAST_XJ_INIT */
   
@@ -372,8 +372,7 @@ pp1_stage2 (residue_t r, const residue_t X, const stage2_plan_t *plan,
 
   free (Xj);
 
-  for (k = 0; k < plan->s1; k++)
-    mod_clear (Xj[k], m);
+  mod_clear (Xd, m);
   mod_clear (Xid, m);
   mod_clear (Xid1, m);
   mod_clear (a, m);

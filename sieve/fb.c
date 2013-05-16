@@ -186,7 +186,7 @@ fb_pow (const fbprime_t p, const unsigned int e)
 
 /* Let k be the largest integer with q = p^k, return p if k > 1,
    and 0 otherwise */
-static fbprime_t
+fbprime_t
 fb_is_power (fbprime_t q)
 {
   unsigned int maxk, k;
@@ -195,10 +195,14 @@ fb_is_power (fbprime_t q)
   maxk = fb_log_2(q);
   for (k = maxk; k >= 2; k--)
     {
-      p = (uint32_t) (pow ((double) q, 1.0 / (double) k) + 0.5);
-      if (q % p == 0) {
-        ASSERT (fb_pow (p, k) == q);
-        return p;
+      double dp = pow ((double) q, 1.0 / (double) k);
+      double rdp = trunc(dp + 0.5);
+      if (fabs(dp - rdp) < 0.001) {
+        p = (uint32_t) rdp ;
+        if (q % p == 0) {
+          ASSERT (fb_pow (p, k) == q);
+          return p;
+        }
       }
     }
   return 0;
@@ -888,7 +892,7 @@ fbprime_t *
 fb_extract_bycost (const factorbase_degn_t *fb, const fbprime_t plim,
                    const fbprime_t costlim)
 {
-  fbprime_t *primes;
+  fbprime_t *primes = NULL;
 
   /* First pass counts primes and allocates memory, second pass writes 
      primes to the allocated memory */

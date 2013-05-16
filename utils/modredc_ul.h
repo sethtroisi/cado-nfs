@@ -14,6 +14,7 @@
 /**********************************************************************/
 #include <assert.h>
 #include <limits.h>
+#include <stdint.h>
 #include "macros.h"
 #include "ularith.h"
 
@@ -185,6 +186,22 @@ modredcul_redc_semi (residueredcul_t r, const unsigned long plow,
 
 MAYBE_UNUSED
 static inline void
+modredcul_intinit (modintredcul_t r)
+{
+  r[0] = 0;
+}
+
+
+MAYBE_UNUSED
+static inline void
+modredcul_intclear (modintredcul_t r MAYBE_UNUSED)
+{
+  return;
+}
+
+
+MAYBE_UNUSED
+static inline void
 modredcul_intset (modintredcul_t r, const modintredcul_t s)
 {
   r[0] = s[0];
@@ -196,6 +213,35 @@ static inline void
 modredcul_intset_ul (modintredcul_t r, const unsigned long s)
 {
   r[0] = s;
+}
+
+
+MAYBE_UNUSED
+static inline void
+modredcul_intset_uls (modintredcul_t r, const unsigned long *s, const size_t n)
+{
+  ASSERT_ALWAYS(n <= MODREDCUL_SIZE);
+  if (n == 0)
+    r[0] = 0;
+  else
+    r[0] = s[0];
+}
+
+
+MAYBE_UNUSED
+static inline unsigned long
+modredcul_intget_ul (const residueredcul_t s)
+{
+  return s[0];
+}
+
+
+MAYBE_UNUSED
+static inline size_t  
+modredcul_intget_uls (unsigned long *r, const residueredcul_t s)
+{
+  r[0] = s[0];
+  return 1;
 }
 
 
@@ -232,6 +278,15 @@ modredcul_intcmp_ul (const modintredcul_t a, const unsigned long b)
 
 MAYBE_UNUSED
 static inline int
+modredcul_intcmp_uint64 (const modintredcul_t a, const uint64_t b)
+{
+  if (b > ULONG_MAX)
+    return -1;
+  return (a[0] < b) ? -1 : (a[0] == b) ? 0 : 1;
+}
+
+MAYBE_UNUSED
+static inline int
 modredcul_intfits_ul (const modintredcul_t a MAYBE_UNUSED)
 {
   return 1;
@@ -257,7 +312,7 @@ modredcul_intsub (modintredcul_t r, const modintredcul_t a,
 /* Returns the number of bits in a, that is, floor(log_2(a))+1.
    For a == 0 returns 0. */
 MAYBE_UNUSED
-static inline int
+static inline size_t 
 modredcul_intbits (const modintredcul_t a)
 {
   if (a[0] == 0)
@@ -330,7 +385,7 @@ modredcul_initmod_ul_raw (modulusredcul_t m, const unsigned long s)
 
 MAYBE_UNUSED
 static inline void
-modredcul_initmod_uls (modulusredcul_t m, const modintredcul_t s)
+modredcul_initmod_int (modulusredcul_t m, const modintredcul_t s)
 {
   m[0].m = s[0];
   m[0].invm = -ularith_invmod (s[0]);
@@ -354,7 +409,7 @@ modredcul_getmod_ul (const modulusredcul_t m)
 
 MAYBE_UNUSED
 static inline void
-modredcul_getmod_uls (modintredcul_t r, const modulusredcul_t m)
+modredcul_getmod_int (modintredcul_t r, const modulusredcul_t m)
 {
   r[0] = m[0].m;
 }
@@ -441,7 +496,7 @@ modredcul_set_ul_reduced (residueredcul_t r, const unsigned long s,
 
 MAYBE_UNUSED
 static inline void
-modredcul_set_uls (residueredcul_t r, const modintredcul_t s,
+modredcul_set_int (residueredcul_t r, const modintredcul_t s,
 		   const modulusredcul_t m)
 {
   r[0] = s[0] % m[0].m;
@@ -451,7 +506,7 @@ modredcul_set_uls (residueredcul_t r, const modintredcul_t s,
 
 MAYBE_UNUSED
 static inline void
-modredcul_set_uls_reduced (residueredcul_t r, const modintredcul_t s,
+modredcul_set_int_reduced (residueredcul_t r, const modintredcul_t s,
 			   const modulusredcul_t m)
 {
   ASSERT (s[0] < m[0].m);
@@ -508,17 +563,8 @@ modredcul_get_ul (const residueredcul_t s,
 
 
 MAYBE_UNUSED
-static inline unsigned long
-modredcul_intget_ul (const residueredcul_t s,
-                     const modulusredcul_t m MAYBE_UNUSED)
-{
-  return s[0];
-}
-
-
-MAYBE_UNUSED
 static inline void
-modredcul_get_uls (modintredcul_t r, const residueredcul_t s,
+modredcul_get_int (modintredcul_t r, const residueredcul_t s,
 		   const modulusredcul_t m MAYBE_UNUSED)
 {
   ASSERT_EXPENSIVE (s[0] < m[0].m);

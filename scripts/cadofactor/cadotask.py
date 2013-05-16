@@ -3,6 +3,9 @@ import sqlite3
 from datetime import datetime
 import re
 import os.path
+from fractions import gcd
+import abc
+import random
 import wudb
 import patterns
 import cadoprograms
@@ -31,9 +34,12 @@ import cadologger
 # that don't overwrite. Or maybe two ways to specify external params:
 # --defaults which does not overwrite, and --forceparam which does
 
-class DbDictAccess(object):
+class DbAccess(object):
     """ Base class that lets subclasses create DB-backed dictionaries
-    on a database whose name is specified in the db parameter to __init__
+    on a database whose name is specified in the db parameter to __init__.
+    Meant to be used as a cooperative class; it strips the db parameter from
+    the named parameter list and remembers it in a private variable so that
+    it can later be used to open DB connections.
     """
     
     def __init__(self, db, *args, **kwargs):
@@ -41,12 +47,12 @@ class DbDictAccess(object):
         if db is None:
             raise Exception("The db parameter is required")
         self.__db = db
-
+    
     def make_db_dict(self, name):
         return wudb.DictDbAccess(self.__db, name)
 
 
-class Task(patterns.Observable, patterns.Observer, DbDictAccess):
+class Task(patterns.Observable, patterns.Observer, DbAccess):
     """ A base class that represents one task that needs to be processed. 
     
     Sub-classes must define class variables:
@@ -60,11 +66,29 @@ class Task(patterns.Observable, patterns.Observer, DbDictAccess):
             This is used for extracting relevant parameters from the parameter
             hierarchical dictionary.
     """
-    # Parameters that all tasks use
-    paramnames = ("name", "workdir")
     
-    def __init__(self, dependencies, *args, parameters = None, \
-                **kwargs):
+    # Properties that subclasses need to define
+    @abc.abstractproperty
+    def name(self):
+        pass
+    @abc.abstractproperty
+    def parampath(self):
+        pass
+    @abc.abstractproperty
+    def title(self):
+        pass
+    @abc.abstractproperty
+    def programs(self):
+        pass
+    @abc.abstractproperty
+    def paramnames(self):
+        """ Sub-classes need to define a property 'paramnames' which returns a
+        list of parameters they accept, plus super()'s paramnames list
+        """
+        # Parameters that all tasks use
+        return ("name", "workdir", "remove")
+    
+    def __init__(self, dependencies, *args, parameters = None, **kwargs):
         ''' Sets up a database connection and a DB-backed dictionary for 
         parameters. Reads parameters from DB, and merges with hierarchical
         parameters in the parameters argument. Parameters passed in by 
@@ -86,26 +110,23 @@ class Task(patterns.Observable, patterns.Observer, DbDictAccess):
             self.logger.debug("Enter Task.__init__(): parameters = %s", 
                               parameters)
         # DB-backed dictionary with the state of this task
-        self.state = self.make_db_dict(self.tablename())
+        self.state = self.make_db_dict(self.make_tablename())
         self.logger.debug("%s: state = %s", self.title, self.state)
         # Derived class must define name
         # Set default parametes for this task, if any are given
         if parameters:
-            # Add the common paramnames defined in the Task class to the 
-            # (presumably class-defined) paramnames in self, and bind the 
-            # result to an instance variable
-            self.paramnames = Task.paramnames + self.paramnames
             self.params = parameters.myparams(self.paramnames, self.parampath)
             self.logger.debug("%s: params = %s", self.title, self.params)
+            self.params.setdefault("remove", False)
         # Set default parameters for our programs
         self.progparams = []
         for prog in self.programs:
-            progparams = {}
-            self.progparams.append(progparams)
             if parameters:
-                update = parameters.myparams(
-                    prog.params_dict(), [self.parampath, prog.name])
-                progparams.update(update)
+                progparams = parameters.myparams(
+                    prog.get_params_list(), [self.parampath, prog.name])
+            else:
+                progparams = {}
+            self.progparams.append(progparams)
         self.logger.debug("Exit Task.__init__(%s)", self.name)
         return
     
@@ -114,18 +135,17 @@ class Task(patterns.Observable, patterns.Observer, DbDictAccess):
         no_ = name.replace("_", "")
         if not no_[0].isalpha() or not no_[1:].isalnum():
             raise Exception("%s is not valid for an SQL table name" % name)
-
-    def tablename(self, extra = None):
+    
+    def make_tablename(self, extra = None):
         """ Return the table name for the DB-backed dictionary with the state
         for the current task """
         # Maybe replace SQL-disallowed characters here, like digits and '.' ? 
         # Could be tricky to avoid collisions
-        self.check_tablename(self.name)
+        name = self.name
         if extra:
-            self.check_tablename(extra)
-            return self.name + '_' + extra
-        else:
-            return self.name
+            name = name + '_' + extra
+        self.check_tablename(name)
+        return name
     
     def is_done(self):
         return False
@@ -158,7 +178,7 @@ class Task(patterns.Observable, patterns.Observer, DbDictAccess):
         >>> Task._make_basename(f)
         '/foo/bar/jobname.taskname'
         """
-        return "%s%s%s.%s" % (self.params["workdir"], os.sep,
+        return "%s%s%s.%s" % (self.params["workdir"].rstrip(os.sep), os.sep,
                               self.params["name"], self.name)
     
     def make_output_filename(self, name, subdir = False, dirextra = None):
@@ -177,7 +197,8 @@ class Task(patterns.Observable, patterns.Observer, DbDictAccess):
             r += "%s%s" % (extra, os.sep)
         return r
     
-    def check_files_exist(self, filenames, filedesc, shouldexist):
+    @staticmethod
+    def check_files_exist(filenames, filedesc, shouldexist):
         """ Check that the output files in "filenames" exist or don't exist, 
         according to shouldexist.
         
@@ -186,20 +207,18 @@ class Task(patterns.Observable, patterns.Observer, DbDictAccess):
         for f in filenames:
             exists = os.path.isfile(f)
             if shouldexist and not exists:
-                raise IOError("%s %s file %s does not exist" % 
-                                (self.title, filedesc, f))
+                raise IOError("%s file %s does not exist" % (filedesc, f))
             elif not shouldexist and exists:
-                raise IOError("%s %s file %s already exists" % 
-                                (self.title, filedesc, f))
+                raise IOError("%s file %s already exists" % (filedesc, f))
         return
     
-    def make_directories(self, extra = None):
-        basedir = self.make_output_dirname()
+    @staticmethod
+    def make_directories(basedir, extra = None):
         if not os.path.isdir(basedir):
             os.mkdir(basedir)
         if extra:
             for subdir in extra:
-                dirname = self.make_output_dirname(subdir)
+                dirname = basedir + os.sep + subdir
                 if not os.path.isdir(dirname):
                     os.mkdir(dirname)
         return
@@ -243,14 +262,14 @@ class Task(patterns.Observable, patterns.Observer, DbDictAccess):
     def updateObserver(self, message):
         pass
 
-class FilesCreator(DbDictAccess):
+class FilesCreator(DbAccess, metaclass=abc.ABCMeta):
     """ A base class for classes that produce a list of output files, with
     some information stored with each file (e.g., nr. of relations). This
     info is stored in the form of a DB-backed dictionary
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.output_files = self.make_db_dict(self.tablename("outputfiles"))
+        self.output_files = self.make_db_dict(self.make_tablename("outputfiles"))
     
     def add_output_files(self, filenames):
         """ Adds a dict of files to the list of existing output files """
@@ -263,11 +282,15 @@ class FilesCreator(DbDictAccess):
         if condition is None:
             return self.output_files.keys()
         else:
-            return [f for (f,s) in self.output_files.items() if s == condition]
+            return [f for (f,s) in self.output_files.items() if condition(s)]
 
     def forget_output_filenames(self, filenames):
         for f in filenames:
             del(self.output_files[f])
+    
+    @abc.abstractclassmethod
+    def make_tablename(self, name):
+        pass
 
 
 class ClientServerTask(Task):
@@ -299,11 +322,12 @@ class Polynomial(object):
     # Keys that can occur in a polynomial file in their preferred ordering,
     # and whether the key is mandatory or not. The preferred ordering is used
     # when turning a polynomial back into a string. 
+    
     paramnames = ("rlim", "alim", "lpbr", "lpba", "mfbr", "mfba", "rlambda", 
-                  "alambda")
+        "alambda")
     keys = ( ("n", True), ("Y0", True), ("Y1", True), ("c0", True), 
-             ("c1", True), ("c2", True), ("c3", True), ("c4", True),
-             ("c5", False), ("c6", False), ("m", True), ("skew", True) )
+            ("c1", True), ("c2", True), ("c3", True), ("c4", True),
+            ("c5", False), ("c6", False), ("m", True), ("skew", True) )
     
     def __init__(self, lines):
         """ Parse a polynomial file in the syntax as produced by polyselect2l 
@@ -373,11 +397,22 @@ class Polynomial(object):
 
 class PolyselTask(Task):
     """ Finds a polynomial, uses client/server """
-    name = "polyselect"
-    parampath = "tasks." + name
-    title = "Polynomial Selection"
-    programs = (cadoprograms.Polyselect2l,)
-    paramnames = ("adrange", "P", "N", "admin", "admax")
+    @property
+    def name(self):
+        return "polyselect"
+    @property
+    def parampath(self):
+        return "tasks." + self.name
+    @property
+    def title(self):
+        return "Polynomial Selection"
+    @property
+    def programs(self):
+        return (cadoprograms.Polyselect2l,)
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            ("adrange", "P", "N", "admin", "admax")
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, dependencies = None, **kwargs)
@@ -468,7 +503,7 @@ class PolyselTask(Task):
         if not bestpoly:
             self.logger.error ("No polynomial found")
             return
-        self.logger.info("Best polynomial from %s has Murphy_E =  %g", 
+        self.logger.info("Best polynomial from %s has Murphy_E = %g", 
                           self.state["bestfile"] , bestpoly.E)
         self.logger.debug("Exit PolyselTask.run(" + self.name + ")")
         return
@@ -498,6 +533,7 @@ class FactorBaseOrFreerelTask(Task):
         self.logger.debug("Enter FactorBaseOrFreerelTask.run(%s)", self.name)
         super().run()
         
+        self.logger.info("Beginning %s", self.title)
         # Get best polynomial found by polyselect
         poly = self.polyselect.get_poly()
         if not poly:
@@ -509,6 +545,8 @@ class FactorBaseOrFreerelTask(Task):
             prevpoly = Polynomial(self.state["poly"].splitlines())
             if poly != prevpoly:
                 if "outputfile" in self.state:
+                    self.logger.info("Received different polynomial from %s, discarding old one",
+                                     self.polyselect.title)
                     del(self.state["outputfile"])
                 self.state["poly"] = str(poly)
         else:
@@ -524,16 +562,16 @@ class FactorBaseOrFreerelTask(Task):
             args = ()
             kwargs = self.progparams[0].copy()
             kwargs["poly"] = polyfile
-            if "pmin" in self.programs[0].params_dict():
+            if "pmin" in self.programs[0].get_params_list():
                 kwargs.setdefault("pmin", "1")
-            if "pmax" in self.programs[0].params_dict():
+            if "pmax" in self.programs[0].get_params_list():
                 kwargs.setdefault("pmax", str(2**int(self.params["lpba"])))
             p = self.programs[0](kwargs = kwargs, stdout = outputfile)
             p.run()
             (rc, stdout, stderr) = p.wait()
             self.parse_stderr(stderr)
             
-            self.state["outputfile"] = os.path.realpath(outputfile)
+            self.state["outputfile"] = outputfile
             self.notifyObservers({self.name: outputfile})
         self.logger.debug("Exit FactorBaseOrFreerelTask.run(%s)", self.name)
     
@@ -563,23 +601,49 @@ class FactorBaseOrFreerelTask(Task):
 
 class FactorBaseTask(FactorBaseOrFreerelTask):
     """ Generates the factor base for the polynomial(s) """
-    name = "factorbase"
-    title = "Generate Factor Base"
-    programs = (cadoprograms.MakeFB,)
-    parampath = "tasks." + name
-    paramnames = ("alim", )
+    @property
+    def name(self):
+        return "factorbase"
+    @property
+    def title(self):
+        return "Generate Factor Base"
+    @property
+    def programs(self):
+        return (cadoprograms.MakeFB,)
+    @property
+    def parampath(self):
+        return "tasks.sieving." + self.name
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            ("alim", )
     target = "roots"
 
 
 class FreeRelTask(FactorBaseOrFreerelTask):
     """ Generates free relations for the polynomial(s) """
-    name = "freerel"
-    title = "Generate Free Relations"
-    programs = (cadoprograms.FreeRel,)
-    parampath = "tasks." + name
-    paramnames = ("lpba", )
+    @property
+    def name(self):
+        return "freerel"
+    @property
+    def title(self):
+        return "Generate Free Relations"
+    @property
+    def programs(self):
+        return (cadoprograms.FreeRel,)
+    @property
+    def parampath(self):
+        return "tasks.sieving." + self.name
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            ("lpba", )
     target = "freerel"
-
+    
+    def run(self):
+        super().run()
+        self.logger.info("Found %d free relations" % self.state["nfree"])
+    
     def parse_stderr(self, stderr):
         if "nfree" in self.state:
             del(self.state["nfree"])
@@ -589,7 +653,7 @@ class FreeRelTask(FactorBaseOrFreerelTask):
                 if "nfree" in self.state:
                     raise Exception("Received two values for number of free relations")
                 self.state["nfree"] = int(match.group(1))
-        if not self.state["nfree"]:
+        if not "nfree" in self.state:
             raise Exception("Received no value for number of free relations")
         return
     
@@ -599,11 +663,22 @@ class FreeRelTask(FactorBaseOrFreerelTask):
 
 class SievingTask(Task, FilesCreator):
     """ Does the sieving, uses client/server """
-    name = "sieving"
-    title = "Lattice Sieving"
-    programs = (cadoprograms.Las,)
-    parampath = "tasks." + name
-    paramnames = ("qmin", "qrange", "rels_wanted") + Polynomial.paramnames
+    @property
+    def name(self):
+        return "sieving"
+    @property
+    def title(self):
+        return "Lattice Sieving"
+    @property
+    def programs(self):
+        return (cadoprograms.Las,)
+    @property
+    def parampath(self):
+        return "tasks.sieving." + self.name
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            ("qmin", "qrange", "rels_wanted") + Polynomial.paramnames
     
     def __init__(self, polyselect, factorbase, *args, **kwargs):
         super().__init__(*args, dependencies = (polyselect, factorbase), **kwargs)
@@ -619,6 +694,7 @@ class SievingTask(Task, FilesCreator):
         self.logger.debug("Enter SievingTask.run(" + self.name + ")")
         super().run()
         
+        self.logger.info("Beginning %s", self.title)
         # Get best polynomial found by polyselect
         poly = self.polyselect.get_poly()
         if not poly:
@@ -678,18 +754,29 @@ class SievingTask(Task, FilesCreator):
 
 class Duplicates1Task(Task, FilesCreator):
     """ Removes duplicate relations """
-    name = "duplicates1"
-    title = "Filtering: Duplicate Removal, splitting pass"
-    programs = (cadoprograms.Duplicates1,)
-    parampath = "tasks.filtering." + name
-    paramnames = ("nslices_log",)
+    @property
+    def name(self):
+        return "duplicates1"
+    @property
+    def title(self):
+        return "Filtering: Duplicate Removal, splitting pass"
+    @property
+    def programs(self):
+        return (cadoprograms.Duplicates1,)
+    @property
+    def parampath(self):
+        return "tasks.filtering." + self.name
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            ("nslices_log",)
     
     def __init__(self, sieving, *args, **kwargs):
         super().__init__(*args, dependencies = (sieving,), **kwargs)
         self.sieving = sieving
         self.nr_slices = 2**int(self.params["nslices_log"])
-        self.already_split_input = self.make_db_dict(self.tablename("infiles"))
-        self.slice_relcounts = self.make_db_dict(self.tablename("counts"))
+        self.already_split_input = self.make_db_dict(self.make_tablename("infiles"))
+        self.slice_relcounts = self.make_db_dict(self.make_tablename("counts"))
         # Default slice counts to 0, in single DB commit
         self.slice_relcounts.setdefault(
             None, {str(i): 0 for i in range(0, self.nr_slices)})
@@ -697,6 +784,7 @@ class Duplicates1Task(Task, FilesCreator):
     def run(self):
         self.logger.debug("Enter Duplicates1Task.run(" + self.name + ")")
         super().run()
+        self.logger.info("Beginning %s", self.title)
         # Check that previously split files were split into the same number
         # of pieces that we want now
         for (infile, parts) in self.already_split_input.items():
@@ -729,7 +817,8 @@ class Duplicates1Task(Task, FilesCreator):
                            self.title, newfiles)
         
         if newfiles:
-            self.make_directories(map(str, range(0, self.nr_slices)))
+            basedir = self.make_output_dirname()
+            self.make_directories(basedir, map(str, range(0, self.nr_slices)))
             # TODO: can we recover from missing input files? Ask Sieving to
             # generate them again? Just ignore the missing ones?
             self.check_files_exist(newfiles, "input", shouldexist = True)
@@ -816,18 +905,29 @@ class Duplicates1Task(Task, FilesCreator):
 
 class Duplicates2Task(Task, FilesCreator):
     """ Removes duplicate relations """
-    name = "duplicates2"
-    title = "Filtering: Duplicate Removal, removal pass"
-    programs = (cadoprograms.Duplicates2,)
-    parampath = "tasks.filtering." + name
-    paramnames = ("nslices_log",)
+    @property
+    def name(self):
+        return "duplicates2"
+    @property
+    def title(self):
+        return "Filtering: Duplicate Removal, removal pass"
+    @property
+    def programs(self):
+        return (cadoprograms.Duplicates2,)
+    @property
+    def parampath(self):
+        return "tasks.filtering." + self.name
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            ("nslices_log",)
     
     def __init__(self, duplicates1, *args, **kwargs):
         super().__init__(*args, dependencies = (duplicates1,), **kwargs)
         self.duplicates1 = duplicates1
         self.nr_slices = 2**int(self.params["nslices_log"])
-        self.already_done_input = self.make_db_dict(self.tablename("infiles"))
-        self.slice_relcounts = self.make_db_dict(self.tablename("counts"))
+        self.already_done_input = self.make_db_dict(self.make_tablename("infiles"))
+        self.slice_relcounts = self.make_db_dict(self.make_tablename("counts"))
         self.slice_relcounts.setdefault(
             None, {str(i): 0 for i in range(0, self.nr_slices)})
     
@@ -835,8 +935,9 @@ class Duplicates2Task(Task, FilesCreator):
         self.logger.debug("Enter Duplicates2Task.run(" + self.name + ")")
         super().run()
         
+        self.logger.info("Beginning %s", self.title)
         for i in range(0, self.nr_slices):
-            files = self.duplicates1.get_output_filenames(i)
+            files = self.duplicates1.get_output_filenames(i.__eq__)
             newfiles = [f for f in files if not f in self.already_done_input]
             if not newfiles:
                 self.logger.info("No new files for slice %d, nothing to do", i)
@@ -847,10 +948,11 @@ class Duplicates2Task(Task, FilesCreator):
             # in another pass
             # Forget about the previous output filenames of this slice
             # FIXME: Should we delete the files, too?
-            self.forget_output_filenames(self.get_output_filenames(i))
+            self.forget_output_filenames(self.get_output_filenames(i.__eq__))
             del(self.slice_relcounts[str(i)])
             rel_count = self.duplicates1.get_slice_relcount(i)
-            self.make_directories(str(i))
+            basedir = self.make_output_dirname()
+            self.make_directories(basedir, str(i))
             kwargs = self.progparams[0].copy()
             kwargs["rel_count"] = str(rel_count * 12 // 10)
             kwargs["output_directory"] = self.make_output_dirname(str(i))
@@ -889,11 +991,22 @@ class Duplicates2Task(Task, FilesCreator):
 
 class PurgeTask(Task):
     """ Removes singletons and computes excess """
-    name = "singletons"
-    title = "Filtering: Singleton removal"
-    programs = (cadoprograms.Purge,)
-    parampath = "tasks.filtering." + name
-    paramnames = ("keep", ) + Polynomial.paramnames
+    @property
+    def name(self):
+        return "singletons"
+    @property
+    def title(self):
+        return "Filtering: Singleton removal"
+    @property
+    def programs(self):
+        return (cadoprograms.Purge,)
+    @property
+    def parampath(self):
+        return "tasks.filtering." + self.name
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            ("keep", ) + Polynomial.paramnames
     
     # purge -poly c59.poly -keep 160 -nrels 226167 -out c59.purged.gz -npthr 1x1 -basepath /tmp/cado.wNhDsCM6BS -subdirlist c59.subdirlist -filelist c59.filelist
     
@@ -905,38 +1018,76 @@ class PurgeTask(Task):
     
     def run(self):
         self.logger.debug("Enter PurgeTask.run(" + self.name + ")")
-        super().run()
         if not self.is_done():
+            super().run()
+            self.logger.info("Beginning %s", self.title)
             poly = self.polyselect.get_poly()
             polyfile = self.make_output_filename("poly")
             poly.create_file(polyfile, self.params)
-            nrels = self.freerel.get_nrels() + self.duplicates2.get_relcount()
+            nfree = self.freerel.get_nrels()
+            nunique = self.duplicates2.get_relcount()
+            nrels = nfree + nunique
+            self.logger.info("Reading %d unique and %d free relations, total %d"
+                             % (nunique, nfree, nrels))
             if not nrels:
                 raise Exception("No relation count received from %s", self.duplicates2.title)
-            outputfile = self.make_output_filename("purged.gz")
+            purgedfile = self.make_output_filename("purged.gz")
             args = list(self.duplicates2.get_output_filenames()) + [self.freerel.get_filename()]
             kwargs = self.progparams[0].copy()
             kwargs["poly"] = polyfile
             kwargs["keep"] = self.params["keep"]
             kwargs["nrels"] = str(nrels)
-            kwargs["out"] = outputfile
+            kwargs["out"] = purgedfile
             p = self.programs[0](args, kwargs)
             p.run()
             (rc, stdout, stderr) = p.wait()
-            self.state["outputfile"] = outputfile
+            [nrows, weight, excess] = self.parse_stdout(stdout)
+            self.logger.info("After purge, %d relations remain with weight %s and excess %s"
+                             % (nrows, weight, excess))
+            self.state["purgedfile"] = purgedfile
         self.logger.debug("Exit PurgeTask.run(" + self.name + ")")
     
-    def get_output_filename(self):
-        return self.state["outputfile"]
-
+    def get_purged_filename(self):
+        return self.state["purgedfile"]
+    
+    def is_done(self):
+        return "purgedfile" in self.state
+    
+    def parse_stdout(self, stdout):
+        # Program output is expected in the form:
+        # b'NROWS:27372 WEIGHT:406777 WEIGHT*NROWS=1.11e+10\nEXCESS: 160\n'
+        # but we allow some extra whitespace
+        r = {}
+        keys = ("NROWS", "WEIGHT", "EXCESS")
+        for line in stdout.decode("ascii").splitlines():
+            for key in keys:
+                match = re.search("%s\s*:\s*(\d+)" % key, line)
+                if match:
+                    r[key] = int(match.group(1))
+        for key in keys:
+            if not key in r:
+                raise Exception("%s: output of %s did not contain value for %s: %s"
+                                % (self.title, self.programs[0].name, key, stdout))
+        return [r[key] for key in keys]
 
 class MergeTask(Task):
     """ Merges relations """
-    name = "merging"
-    title = "Filtering: Merging"
-    programs = (cadoprograms.Merge,)
-    parampath = "tasks.filtering." + name
-    paramnames = ("skip", "forbw", "coverNmax", "keep", "maxlevel", "ratio")
+    @property
+    def name(self):
+        return "merging"
+    @property
+    def title(self):
+        return "Filtering: Merging"
+    @property
+    def programs(self):
+        return (cadoprograms.Merge, cadoprograms.Replay)
+    @property
+    def parampath(self):
+        return "tasks.filtering." + self.name
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            ("skip", "forbw", "coverNmax", "keep", "maxlevel", "ratio")
     
     def __init__(self, purged, *args, **kwargs):
         super().__init__(*args, dependencies = (purged, ), **kwargs)
@@ -946,65 +1097,395 @@ class MergeTask(Task):
         # merge -out c59.merge.his -mat c59.purged.gz -skip 32 -forbw 3 -coverNmax 100 -keep 160 -maxlevel 15 -ratio 1.1
         # replay --binary -skip 32 -purged c59.purged.gz -his c59.merge.his -index c59.index -out c59.small.bin
         self.logger.debug("Enter MergeTask.run(" + self.name + ")")
-        super().run()
         if not self.is_done():
-            outputfile = self.make_output_filename("his")
+            super().run()
+            self.logger.info("Beginning %s", self.title)
+            if "indexfile" in self.state:
+                del(self.state["indexfile"])
+            if "mergedfile" in self.state:
+                del(self.state["mergedfile"])
+            if "densefile" in self.state:
+                del(self.state["densefile"])
+            
+            historyfile = self.make_output_filename("history")
             args = ()
             kwargs = self.progparams[0].copy()
-            kwargs["mat"] = self.purged.get_output_filename()
-            kwargs["out"] = outputfile
+            kwargs["mat"] = self.purged.get_purged_filename()
+            kwargs["out"] = historyfile
             p = self.programs[0](args, kwargs)
             p.run()
             p.wait()
-            self.state["outputfile"] = outputfile
+            
+            indexfile = self.make_output_filename("index")
+            mergedfile = self.make_output_filename("small.bin")
+            args = ()
+            kwargs = self.progparams[1].copy()
+            kwargs["binary"] = "1"
+            kwargs["purged"] = self.purged.get_purged_filename()
+            kwargs["history"] = historyfile
+            kwargs["index"] = indexfile
+            kwargs["out"] = mergedfile
+            p = self.programs[1](args, kwargs)
+            p.run()
+            p.wait()
+            
+            if not os.path.isfile(indexfile):
+                raise Exception("Output file %s does not exist" % indexfile)
+            if not os.path.isfile(mergedfile):
+                raise Exception("Output file %s does not exist" % mergedfile)
+            self.state["indexfile"] = indexfile
+            self.state["mergedfile"] = mergedfile
+            densefilename = self.make_output_filename("small.dense.bin")
+            if os.path.isfile(densefilename):
+                self.state["densefile"] = densefilename
+            
         self.logger.debug("Exit MergeTask.run(" + self.name + ")")
+    
+    def get_index_filename(self):
+        return self.state.get("indexfile", None)
+    
+    def get_merged_filename(self):
+        return self.state.get("mergedfile", None)
+    
+    def get_dense_filename(self):
+        return self.state.get("densefile", None)
+    
+    def is_done(self):
+        return "mergedfile" in self.state
 
 
 class LinAlgTask(Task):
     """ Runs the linear algebra step """
-    name = "linalg"
-    title = "Linear Algebra"
-    programs = (cadoprograms.BWC,)
-    parampath = "tasks." + name
-    paramnames = ()
-    
+    @property
+    def name(self):
+        return "bwc"
+    @property
+    def title(self):
+        return "Linear Algebra"
+    @property
+    def programs(self):
+        return (cadoprograms.BWC,)
+    @property
+    def parampath(self):
+        return "tasks.linalg." + self.name
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            ()
+    # bwc.pl :complete seed=1 thr=1x1 mpi=1x1 matrix=c59.small.bin nullspace=left mm_impl=bucket interleaving=0 interval=100 mn=64 wdir=c59.bwc shuffled_product=1 bwc_bindir=/localdisk/kruppaal/build/cado-nfs/normal/linalg/bwc
     def __init__(self, merge, *args, **kwargs):
         super().__init__(*args, dependencies = (merge,), **kwargs)
-
+        self.merge = merge
+    
     def run(self):
         self.logger.debug("Enter LinAlgTask.run(" + self.name + ")")
-        super().run()
         if not self.is_done():
+            super().run()
+            self.logger.info("Beginning %s", self.title)
+            workdir = self.make_output_dirname()
+            self.make_directories(workdir)
+            mergedfile = self.merge.get_merged_filename()
             args = ()
             kwargs = self.progparams[0].copy()
+            kwargs["complete"] = "1"
+            kwargs["matrix"] = os.path.realpath(mergedfile)
+            kwargs["wdir"] = os.path.realpath(workdir)
+            kwargs.setdefault("nullspace", "left")
             p = self.programs[0](args, kwargs)
             p.run()
             p.wait()
+            dependencyfilename = self.make_output_filename("W", subdir = True)
+            if not os.path.isfile(dependencyfilename):
+                raise Exception("Kernel file %s does not exist" % dependencyfilename)
+            self.state["dependency"] =  dependencyfilename
         self.logger.debug("Exit LinAlgTask.run(" + self.name + ")")
+
+    def is_done(self):
+        return "dependency" in self.state
+    
+    def get_dependency_filename(self):
+        return self.state.get("dependency", None)
+    
+    def get_prefix(self):
+        return "%s%s%s.%s" % (self.params["workdir"].rstrip(os.sep), os.sep,
+                              self.params["name"], "dep")
+    
+    
+class CharactersTask(Task):
+    """ Computes Quadratic Characters """
+    @property
+    def name(self):
+        return "characters"
+    @property
+    def title(self):
+        return "Quadratic Characters"
+    @property
+    def programs(self):
+        return (cadoprograms.Characters,)
+    @property
+    def parampath(self):
+        return "tasks.linalg." + self.name
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            Polynomial.paramnames
+
+    def __init__(self, polyselect, purge, merge, linalg, *args, **kwargs):
+        self.polyselect = polyselect
+        self.purge = purge
+        self.merge = merge
+        self.linalg = linalg
+        super().__init__(*args, dependencies = (polyselect, purge, merge, linalg), **kwargs)
+    
+    def run(self):
+        self.logger.debug("Enter CharactersTask.run(" + self.name + ")")
+        if not self.is_done():
+            super().run()
+            self.logger.info("Beginning %s", self.title)
+            polyfilename = self.make_output_filename("poly")
+            poly = self.polyselect.get_poly()
+            poly.create_file(polyfilename, self.params)
+            kernelfilename = self.make_output_filename("kernel")
+            
+            purgedfilename = self.purge.get_purged_filename()
+            indexfilename = self.merge.get_index_filename()
+            densefilename = self.merge.get_dense_filename()
+            dependencyfilename = self.linalg.get_dependency_filename()
+            
+            args = ()
+            kwargs = self.progparams[0].copy()
+            kwargs["poly"] = polyfilename
+            kwargs["purged"] = purgedfilename
+            kwargs["index"] = indexfilename
+            kwargs["wfile"] = dependencyfilename
+            kwargs["out"] = kernelfilename
+            if not densefilename is None:
+                kwargs["heavyblock"] = densefilename
+            p = self.programs[0](args, kwargs)
+            p.run()
+            p.wait()
+            if not os.path.isfile(kernelfilename):
+                raise Exception("Output file %s does not exist" % kernelfilename)
+            self.state["kernel"] = kernelfilename
+        self.logger.debug("Exit CharactersTask.run(" + self.name + ")")
+        return
+    
+    def is_done(self):
+        return "kernel" in self.state
+    
+    def get_kernel_filename(self):
+        return self.state.get("kernel")
 
 
 class SqrtTask(Task):
     """ Runs the square root """
-    name = "sqrt"
-    title = "Square Root"
-    programs = (cadoprograms.Sqrt,)
-    parampath = "tasks." + name
-    paramnames = ()
+    @property
+    def name(self):
+        return "sqrt"
+    @property
+    def title(self):
+        return "Square Root"
+    @property
+    def programs(self):
+        return (cadoprograms.Sqrt,)
+    @property
+    def parampath(self):
+        return "tasks." + self.name
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            ("N",)
     
-    def __init__(self, polyselect, freerel, sieving, merge, linalg, 
-                 *args, **kwargs):
-        dep = (polyselect, freerel, sieving, merge)
+    def __init__(self, polyselect, freerel, purge, merge, linalg, characters, *args, **kwargs):
+        self.polyselect = polyselect
+        self.freerel = freerel
+        self.purge = purge
+        self.merge = merge
+        self.linalg = linalg
+        self.characters = characters
+        dep = (polyselect, freerel, purge, merge, linalg, characters)
         super().__init__(*args, dependencies = dep, **kwargs)
-
+        self.factors = self.make_db_dict(self.make_tablename("factors"))
+        self.add_factor(int(self.params["N"]))
+    
     def run(self):
         self.logger.debug("Enter SqrtTask.run(" + self.name + ")")
-        super().run()
         if not self.is_done():
+            super().run()
+            self.logger.info("Beginning %s" % self.title)
+            polyfilename = self.make_output_filename("poly")
+            poly = self.polyselect.get_poly()
+            poly.create_file(polyfilename, self.params)
+            purgedfilename = self.purge.get_purged_filename()
+            indexfilename = self.merge.get_index_filename()
+            kernelfilename = self.characters.get_kernel_filename()
+            prefix = self.linalg.get_prefix()
             args = ()
             kwargs = self.progparams[0].copy()
+            kwargs["ab"] = "1"
+            kwargs["poly"] = polyfilename
+            kwargs["purged"] = purgedfilename
+            kwargs["index"] = indexfilename
+            kwargs["kernel"] = kernelfilename
+            kwargs["prefix"] = prefix
             p = self.programs[0](args, kwargs)
             p.run()
             p.wait()
+            
+            while not self.is_done():
+                self.state.setdefault("next_dep", 0)
+                kwargs["ab"] = "0"
+                kwargs["rat"] = "1"
+                kwargs["alg"] = "1"
+                kwargs["gcd"] = "1"
+                kwargs["dep"] = str(self.state["next_dep"])
+                p = self.programs[0](args, kwargs)
+                p.run()
+                (rc, stdout, stderr) = p.wait()
+                if not stdout.decode("ascii").strip() == "Failed":
+                    factorlist = list(map(int,stdout.decode("ascii").split()))
+                    # FIXME: Can sqrt print more/less than 2 factors?
+                    assert len(factorlist) == 2
+                    self.add_factor(factorlist[0])
+                self.state["next_dep"] += 1
+            self.logger.info("%s has finished" % self.title)
+        
         self.logger.debug("Exit SqrtTask.run(" + self.name + ")")
+    
+    def is_done(self):
+        for (factor, isprime) in self.factors.items():
+            if not isprime:
+                return False
+        return True
+    
+    def add_factor(self, factor):
+        assert factor > 0
+        if str(factor) in self.factors:
+            return
+        for oldfac in list(map(int, self.factors.keys())):
+            g = gcd(factor, oldfac)
+            if 1 < g and g < factor:
+                self.add_factor(g)
+                self.add_factor(factor // g)
+                break
+            if 1 < g and g < oldfac:
+                # We get here only if newfac is a proper factor of oldfac
+                assert factor == g
+                del(self.factors[str(oldfac)])
+                self.add_factor(g)
+                self.add_factor(oldfac // g)
+                break
+        else:
+            # We get here if the new factor is coprime to all previously
+            # known factors
+            isprime = SqrtTask.miller_rabin_tests(factor, 10)
+            self.factors[str(factor)] = isprime
+    
+    def get_factors(self):
+        return self.factors.keys()
+    
+    
+    @staticmethod
+    def miller_rabin_pass(number, base):
+        """
+        >>> SqrtTask.miller_rabin_pass(3, 2)
+        True
+        >>> SqrtTask.miller_rabin_pass(9, 2)
+        False
+        >>> SqrtTask.miller_rabin_pass(91, 2)
+        False
+        >>> SqrtTask.miller_rabin_pass(1009, 2)
+        True
+        >>> SqrtTask.miller_rabin_pass(10000000019, 2)
+        True
+        >>> SqrtTask.miller_rabin_pass(10000000019*10000000021, 2)
+        False
+        
+        # Check some pseudoprimes. First a few Fermat pseudoprimes which
+        # Miller-Rabin should recognize as composite
+        >>> SqrtTask.miller_rabin_pass(341, 2)
+        False
+        >>> SqrtTask.miller_rabin_pass(561, 2)
+        False
+        >>> SqrtTask.miller_rabin_pass(645, 2)
+        False
+        
+        # Now some strong pseudo-primes
+        >>> SqrtTask.miller_rabin_pass(2047, 2)
+        True
+        >>> SqrtTask.miller_rabin_pass(703, 3)
+        True
+        >>> SqrtTask.miller_rabin_pass(781, 5)
+        True
+        """
+        if number <= 3:
+            return number >= 2
+        if number % 2 == 0:
+            return False
+        # random.randrange(n) produces random integer in [0, n-1]. We want [2, n-2]
+        po2 = 0
+        exponent = number - 1
+        while exponent % 2 == 0:
+            exponent >>= 1
+            po2 += 1
+        
+        result = pow(base, exponent, number)
+        if result == 1:
+            return True
+        for i in range(0, po2 - 1):
+            if result == number - 1:
+                return True
+            result = pow(result, 2, number)
+        return result == number - 1
+    
+    @staticmethod
+    def miller_rabin_tests(number, passes):
+        for i in range(0, passes):
+            base = random.randrange(number - 3) + 2
+            if not SqrtTask.miller_rabin_pass(number, base):
+                return False
+        return True
 
-
+# FIXME: Is this a Task object? Probably not
+# Should this be in cadotask or in cadofactor?
+class CompleteFactorization(Task):
+    """ The complete factorization, aggregate of the individual tasks """
+    """ Runs the square root """
+    @property
+    def name(self):
+        return "factorization"
+    @property
+    def title(self):
+        return "Factorization"
+    @property
+    def programs(self):
+        return ()
+    @property
+    def parampath(self):
+        return "tasks"
+    @property
+    def paramnames(self):
+        return super().paramnames
+    
+    def __init__ (self, *args, **kwargs):
+        self.polysel = PolyselTask(*args, **kwargs)
+        self.fb = FactorBaseTask(self.polysel, *args, **kwargs)
+        self.freerel = FreeRelTask(self.polysel, *args, **kwargs)
+        self.sieving = SievingTask(self.polysel, self.fb, *args, **kwargs)
+        self.dup1 = Duplicates1Task(self.sieving, *args, **kwargs)
+        self.dup2 = Duplicates2Task(self.dup1, *args, **kwargs)
+        self.purge = PurgeTask(self.polysel, self.freerel, self.dup2,
+                               *args, **kwargs)
+        self.merge = MergeTask(self.purge, *args, **kwargs)
+        self.linalg = LinAlgTask(self.merge, *args, **kwargs)
+        self.characters = CharactersTask(self.polysel, self.purge, self.merge,
+                                         self.linalg, *args, **kwargs)
+        self.sqrt = SqrtTask(self.polysel, self.freerel, self.purge,
+                             self.merge, self.linalg, self.characters,
+                             *args, **kwargs)
+        super().__init__(*args, dependencies = (self.sqrt,), **kwargs)
+    
+    def run(self, *args, **kwargs):
+        self.logger.info("Beginning %s" % self.title)
+        super().run(*args, **kwargs)
+        self.logger.info("Factors: %s" % " ".join(self.sqrt.get_factors()))

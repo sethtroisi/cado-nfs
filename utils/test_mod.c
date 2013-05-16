@@ -43,8 +43,9 @@ random_modulus (modint_t m)
 #ifdef MOD_MINBITS
   modint_t minmod;
 
-  mod_intset_ul (minmod, 0UL);
-  minmod[MOD_MINBITS / LONG_BIT] = 1UL << (MOD_MINBITS % LONG_BIT);
+  mod_intinit (minmod);
+  mod_intset_ul (minmod, 1);
+  mod_intshl (minmod, minmod, MOD_MINBITS);
   do {
 #endif
 
@@ -60,6 +61,7 @@ random_modulus (modint_t m)
 
 #ifdef MOD_MINBITS
   } while (mod_intcmp (m, minmod) < 0);
+  mod_intclear (minmod);
 #endif
   
 
@@ -98,6 +100,7 @@ test_mod_intmod (const modint_t la, const modint_t lm)
   modint_t s;
   mpz_t mm, ma, mr, ms;
   
+  mod_intinit (s);
   mod_intmod (s, la, lm);
   
   mpz_init (mm);
@@ -121,6 +124,7 @@ test_mod_intmod (const modint_t la, const modint_t lm)
   mpz_clear (ma);
   mpz_clear (mr);
   mpz_clear (ms);
+  mod_intclear (s);
 }
 
 void
@@ -129,6 +133,8 @@ tests_mod_intmod (int iter)
   modint_t tm, tr;
   int i, j;
   
+  mod_intinit (tm);
+  mod_intinit (tr);
   /* Test large moduli */
   for (i = 0; i < MOD_SIZE; i++)
     tm[i] = ULONG_MAX;
@@ -158,21 +164,24 @@ tests_mod_intmod (int iter)
 	  test_mod_intmod (tr, tm);
 	}
     }
+  mod_intclear (tm);
+  mod_intclear (tr);
 }
 
 
 static void
-test_mod_set_uls(const modint_t la, const modint_t lm)
+test_mod_set_int(const modint_t la, const modint_t lm)
 {
   modulus_t m;
   residue_t r;
   modint_t s;
   mpz_t mm, ma, mr, ms;
 
-  mod_initmod_uls (m, lm);
+  mod_intinit (s);
+  mod_initmod_int (m, lm);
   mod_init (r, m);
-  mod_set_uls (r, la, m);
-  mod_get_uls (s, r, m);
+  mod_set_int (r, la, m);
+  mod_get_int (s, r, m);
 
   mpz_init (mm);
   mpz_init (ma);
@@ -195,15 +204,18 @@ test_mod_set_uls(const modint_t la, const modint_t lm)
   mpz_clear (ms);
   mod_clear (r, m);
   mod_clearmod (m);
+  mod_intclear (s);
 }
 
 
 void
-tests_mod_set_uls(int iter)
+tests_mod_set_int(int iter)
 {
   modint_t tm, tr;
   int i, j;
   
+  mod_intinit (tm);
+  mod_intinit (tr);
   /* Test large moduli */
   for (i = 0; i < MOD_SIZE; i++)
     tm[i] = ULONG_MAX;
@@ -212,10 +224,10 @@ tests_mod_set_uls(int iter)
   for (i = 1; i < 100; i++) /* Test i/2 and (m-i)/2 for i=0, ..., 99 */
     {
       mod_intset_ul (tr, (unsigned long) i);
-      test_mod_set_uls (tr, tm);
+      test_mod_set_int (tr, tm);
       mod_intset (tr, tm);
       tr[0] -= i;
-      test_mod_set_uls (tr, tm);
+      test_mod_set_int (tr, tm);
     }
   
   for (i = 0; i < iter; i++)
@@ -224,20 +236,22 @@ tests_mod_set_uls(int iter)
 
       /* Test 0, 1 and -1 residue */
       mod_intset_ul (tr, 0UL);
-      test_mod_set_uls (tr, tm);
+      test_mod_set_int (tr, tm);
       mod_intset_ul (tr, 1UL);
-      test_mod_set_uls (tr, tm);
+      test_mod_set_int (tr, tm);
       mod_intset (tr, tm);
       tr[0]--;
-      test_mod_set_uls (tr, tm);
+      test_mod_set_int (tr, tm);
 
       /* Test 10 random residues */
       for (j = 0; j < 10; j++)
 	{
 	  random_integer (tr);
-	  test_mod_set_uls (tr, tm);
+	  test_mod_set_int (tr, tm);
 	}
     }
+  mod_intclear (tm);
+  mod_intclear (tr);
 }
 
 
@@ -247,11 +261,11 @@ test_mod_divn(const modint_t la, const modint_t lm, const unsigned long n)
   modulus_t m;
   residue_t r, s, t;
 
-  mod_initmod_uls (m, lm);
+  mod_initmod_int (m, lm);
   mod_init (r, m);
   mod_init (s, m);
   mod_init (t, m);
-  mod_set_uls (r, la, m);
+  mod_set_int (r, la, m);
   if (n == 2UL)
     mod_div2 (s, r, m);   /* s = r/n */
   else if (n == 3UL)
@@ -287,6 +301,8 @@ tests_mod_divn(const int iter, const unsigned long n)
   int i, j;
   mpz_t mod;
 
+  mod_intinit (tm);
+  mod_intinit (tr);
   mpz_init (mod);
   
   /* Test large moduli */
@@ -332,6 +348,8 @@ tests_mod_divn(const int iter, const unsigned long n)
 	  test_mod_divn (tr, tm, n);
 	}
     }
+  mod_intclear (tm);
+  mod_intclear (tr);
   mpz_clear (mod);
 }
 
@@ -344,9 +362,10 @@ test_mod_gcd (const modint_t la, const modint_t lm)
   modint_t lt;
   mpz_t mt, ma, mr, mm;
 
-  mod_initmod_uls (m, lm);
+  mod_intinit (lt);
+  mod_initmod_int (m, lm);
   mod_init (a, m);
-  mod_set_uls (a, la, m);
+  mod_set_int (a, la, m);
   
   mod_gcd (lt, a, m);
   
@@ -371,6 +390,7 @@ test_mod_gcd (const modint_t la, const modint_t lm)
   
   mod_clear (a, m);
   mod_clearmod (m);
+  mod_intclear (lt);
 }
 
 
@@ -380,6 +400,8 @@ tests_mod_gcd (int iter)
   modint_t tm, tr;
   int i, j;
   
+  mod_intinit (tm);
+  mod_intinit (tr);
   for (i = 0; i < iter; i++)
     {
       random_modulus (tm);
@@ -400,6 +422,8 @@ tests_mod_gcd (int iter)
 	  test_mod_gcd (tr, tm);
 	}
     }
+  mod_intclear (tm);
+  mod_intclear (tr);
 }
 
 
@@ -412,13 +436,14 @@ test_mod_pow_ul (const modint_t la, const modint_t lm,
   modint_t lt;
   mpz_t mt, ma, mr, mm;
 
-  mod_initmod_uls (m, lm);
+  mod_intinit (lt);
+  mod_initmod_int (m, lm);
   mod_init (a, m);
-  mod_set_uls (a, la, m);
+  mod_set_int (a, la, m);
   mod_init (r, m);
   
   mod_pow_ul (r, a, e, m); /* s = a^e % m */
-  mod_get_uls (lt, r, m);   /* result as integer in t */
+  mod_get_int (lt, r, m);   /* result as integer in t */
   
   mpz_init (mm);
   mpz_init (ma);
@@ -443,6 +468,7 @@ test_mod_pow_ul (const modint_t la, const modint_t lm,
   mod_clear (a, m);
   mod_clear (r, m);
   mod_clearmod (m);
+  mod_intclear (lt);
 }
 
 
@@ -485,11 +511,12 @@ test_mod_2pow_ul (const modint_t lm, const unsigned long e)
   modint_t lt;
   mpz_t mt, mr, mm, m2;
 
-  mod_initmod_uls (m, lm);
+  mod_intinit (lt);
+  mod_initmod_int (m, lm);
   mod_init (r, m);
   
   mod_2pow_ul (r, e, m);  /* s = 2^e % m */
-  mod_get_uls (lt, r, m); /* result as integer in t */
+  mod_get_int (lt, r, m); /* result as integer in t */
   
   mpz_init (mm);
   mpz_init (mr);
@@ -513,6 +540,7 @@ test_mod_2pow_ul (const modint_t lm, const unsigned long e)
   
   mod_clear (r, m);
   mod_clearmod (m);
+  mod_intclear (lt);
 }
 
 
@@ -523,6 +551,7 @@ tests_mod_2pow_ul (int iter)
   unsigned long e;
   int i;
   
+  mod_intinit (tm);
   for (i = 0; i < iter; i++)
     {
       random_modulus (tm);
@@ -535,6 +564,7 @@ tests_mod_2pow_ul (int iter)
       e = (unsigned long) rand ();
       test_mod_2pow_ul (tm, e);
     }
+  mod_intclear (tm);
 }
 
 
@@ -547,13 +577,14 @@ test_mod_inv (const modint_t la, const modint_t lm)
   mpz_t mr, ma, mm, mt;
   int ok1, ok2;
 
-  mod_initmod_uls (m, lm);
+  mod_intinit (lt);
+  mod_initmod_int (m, lm);
   mod_init (a, m);
-  mod_set_uls (a, la, m);
+  mod_set_int (a, la, m);
   mod_init (r, m);
   
   ok1 = mod_inv (r, a, m) ? 1 : 0; /* r = 1/a (mod lm) */
-  mod_get_uls (lt, r, m);
+  mod_get_int (lt, r, m);
   
   mpz_init (ma);
   mpz_init (mr);
@@ -588,6 +619,7 @@ test_mod_inv (const modint_t la, const modint_t lm)
   mod_clear (a, m);
   mod_clear (r, m);
   mod_clearmod (m); 
+  mod_intclear (lt);
 }
 
 
@@ -597,6 +629,8 @@ tests_mod_inv (int iter)
   modint_t tm, tr;
   int i, j;
   
+  mod_intinit (tm);
+  mod_intinit (tr);
   for (i = 0; i < iter; i++)
     {
       random_modulus (tm);
@@ -617,6 +651,8 @@ tests_mod_inv (int iter)
 	  test_mod_inv (tr, tm);
 	}
     }
+  mod_intclear (tm);
+  mod_intclear (tr);
 }
 
 
@@ -628,9 +664,9 @@ test_mod_jacobi (const modint_t la, const modint_t lm)
   mpz_t ma, mm;
   int j1, j2;
 
-  mod_initmod_uls (m, lm);
+  mod_initmod_int (m, lm);
   mod_init (a, m);
-  mod_set_uls (a, la, m);
+  mod_set_int (a, la, m);
   
   j1 = mod_jacobi (a, m);
   
@@ -661,6 +697,8 @@ tests_mod_jacobi (int iter)
   modint_t tm, tr;
   int i, j;
   
+  mod_intinit (tm);
+  mod_intinit (tr);
   for (i = 0; i < iter; i++)
     {
       random_modulus (tm);
@@ -681,6 +719,8 @@ tests_mod_jacobi (int iter)
 	  test_mod_jacobi (tr, tm);
 	}
     }
+  mod_intclear (tm);
+  mod_intclear (tr);
 }
 
 
@@ -695,8 +735,8 @@ int main(int argc, char **argv)
 
   printf ("Testing mod_intmod()\n");
   tests_mod_intmod (iter);
-  printf ("Testing mod_set_uls()\n");
-  tests_mod_set_uls (iter);
+  printf ("Testing mod_set_int()\n");
+  tests_mod_set_int (iter);
   printf ("Testing mod_div2()\n");
   tests_mod_divn (iter, 2);
   printf ("Testing mod_div3()\n");

@@ -22,7 +22,7 @@ Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
 /* This header file defines macros (and perhaps static functions) to improve 
-   portability of the CADO code. They aim to provide a wrappers for some C99 
+   portability of the CADO code. They aim to provide a wrapper for some C99
    and POSIX functionality for systems that lack those. */
 
 #ifndef CADO_PORTABILITY_H_

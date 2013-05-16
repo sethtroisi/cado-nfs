@@ -24,6 +24,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <fcntl.h>   /* for _O_BINARY */
 
 #include "portability.h"
 #include "utils.h"
@@ -1173,6 +1174,10 @@ main(int argc, char *argv[])
     int noindex = 0;
     char *rp, str[STRLENMAX];
     double wct0 = wct_seconds ();
+
+#ifdef HAVE_MINGW
+    _fmode = _O_BINARY;     /* Binary open for all files */
+#endif
 
     setbuf(stdout, NULL);
     setbuf(stderr, NULL);

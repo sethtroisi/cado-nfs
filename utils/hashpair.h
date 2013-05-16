@@ -3,10 +3,12 @@
 
 #include <stdint.h>
 
+/* data type to store the (p,r) values */
 #ifndef HT
 #define HT 32
 #endif
 
+/* data type to store the renumber table */
 #ifndef HR
 #define HR 32
 #endif

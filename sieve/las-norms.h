@@ -4,11 +4,6 @@
 #include <stdint.h>
 #include "las-types.h"
 
-/* define EXTRA_B_FACTOR to a value larger than 1, for example 1.3, to
-   allow a larger value of J for those special-q's where the maximum J
-   would be smaller than I/2 */
-#define EXTRA_B_FACTOR 1.0
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -49,7 +44,7 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
 
 void sieve_info_clear_norm_data(sieve_info_ptr si);
 
-void sieve_info_update_norm_data(sieve_info_ptr si);
+void sieve_info_update_norm_data(sieve_info_ptr si, int nb_threads);
 void sieve_info_init_norm_data_sq (sieve_info_ptr si, unsigned long q);
 
 static inline int 

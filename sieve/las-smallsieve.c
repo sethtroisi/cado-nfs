@@ -311,7 +311,8 @@ int * small_sieve_start(small_sieve_data_t *ssd, unsigned int j0, sieve_info_src
             /* Compute the next multiple of g above j0 */
             unsigned int j1 = j0 - (j0 % ssp->g);
             unsigned int compensate = si->I / 2;
-            if (j0) { /* most often j1 is < j0 -- in this case,
+            // FIXME: is it (j1<j0) the right condition ?
+            if (j1<j0) { /* most often j1 is < j0 -- in this case,
                          the j1 we're looking for needs +g */
                 j1 += ssp->g;
             }
@@ -323,7 +324,7 @@ int * small_sieve_start(small_sieve_data_t *ssd, unsigned int j0, sieve_info_src
             if (j1 == 0) {
                 j1 += ssp->g;
             }
-            compensate += j1 * ssp->U;
+            compensate += (j1/ssp->g) * ssp->U;
             ssdpos[i] = (j1-j0) * si->I + compensate % ssp->q;
         } else if (event & SSP_POW2) {
             /* For powers of 2, we sieve only odd lines (*) and 
@@ -793,6 +794,11 @@ void sieve_small_bucket_region(unsigned char *S, int N,
             for (j = 0; j < nj; j++) {
                 WHERE_AM_I_UPDATE(w, j, j);
                 if (i0 < I) {
+                    // At the start of the bucket region, we are not sure
+                    // that i0 is reduced mod p when we enter here.
+                    // (see comment at the end of small_sieve_skip_stride()).
+                    // Hence, we have to do this reduction here:
+                    i0 &= (p-1);
                     ASSERT(i0 < p);
                     ASSERT ((nj * N + j) % 2 == 1);
                     for (unsigned int i = i0; i < I; i += p) {
