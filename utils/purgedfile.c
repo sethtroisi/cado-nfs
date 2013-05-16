@@ -208,11 +208,6 @@ another_line:
                 }
             }
         }
-        if (c != '\n')
-          {
-            fprintf (stderr, "expected '\n', got '%c'\n", c);
-            exit (1);
-          }
         ASSERT_ALWAYS(c == '\n');
     }
 
