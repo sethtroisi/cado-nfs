@@ -341,9 +341,15 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   /* raw poly */
   if (logmu <= max_norm)
     {
+#ifdef MAX_THREADS
+		  pthread_mutex_lock (&lock);
+#endif
       printf ("# Raw polynomial:\n");
       gmp_printf ("n: %Zd\n", N);
       print_poly_info (fold, d, gold, 1);
+#ifdef MAX_THREADS
+  pthread_mutex_unlock (&lock);
+#endif
     }
 
   /* for degree 6 polynomials, find bottleneck coefficient */
@@ -490,6 +496,9 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     /* print optimized (maybe size- or size-root- optimized) polynomial */
     if (verbose >= 0)
       {
+#ifdef MAX_THREADS
+		  pthread_mutex_lock (&lock);
+#endif
         if (d == 6 && verbose >= 1)
           gmp_printf ("# noc4/noc3: %.2f/%.2f (%.2f)\n",
                       logmu0c4, logmu0c3, logmu0c4/logmu0c3);
@@ -500,16 +509,25 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
                 BOUND_F, BOUND_G, AREA, E, best_E);
         printf ("\n");
         fflush (stdout);
+#ifdef MAX_THREADS
+		  pthread_mutex_unlock (&lock);
+#endif
       }
   }
   else {
     if (verbose >= 1) {
+#ifdef MAX_THREADS
+		  pthread_mutex_lock (&lock);
+#endif
       if (d == 6)
         gmp_printf ("# Skip polynomial: %.2f, ad: %"PRIu64", l: %Zd, m: %Zd, noc4/noc3: %.2f/%.2f (%.2f)\n",
                     logmu, ad, l, m, logmu0c4, logmu0c3, logmu0c4/logmu0c3);
       else
         gmp_printf ("# Skip polynomial: %.2f, ad: %"PRIu64", l: %Zd, m: %Zd\n",
                     logmu, ad, l, m);
+#ifdef MAX_THREADS
+		  pthread_mutex_unlock (&lock);
+#endif
     }
   }
 
@@ -830,9 +848,6 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       fclose (fp);
     }
     found ++;
-#ifdef MAX_THREADS
-		  pthread_mutex_unlock (&lock);
-#endif
 
     /* raw poly */
     if (raw) {
@@ -855,9 +870,15 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
         printf ("\n");
         fflush (stdout);
       }
+#ifdef MAX_THREADS
+    pthread_mutex_unlock (&lock);
+#endif
   }
   else {
     if (verbose >= 0) {
+#ifdef MAX_THREADS
+		  pthread_mutex_lock (&lock);
+#endif
       if (d == 6)
         gmp_printf ("# Skip polynomial: %.2f, ad: %"PRIu64", l: %Zd, m: %Zd, noc3: %.2f, noc4: %.2f\n",
                     logmu, ad, l, m, logmu0c3, logmu0c4);
@@ -865,6 +886,9 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
         gmp_printf ("# Skip polynomial: %.2f, ad: %"PRIu64", l: %Zd, m: %Zd\n",
                     logmu, ad, l, m);
     }
+#ifdef MAX_THREADS
+    pthread_mutex_unlock (&lock);
+#endif
   }
 
   mpz_clear (tmp);
