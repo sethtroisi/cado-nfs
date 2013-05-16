@@ -809,9 +809,6 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       min_opt_lognorm = logmu;
     if (logmu > max_opt_lognorm)
       max_opt_lognorm = logmu;
-#ifdef MAX_THREADS
-    pthread_mutex_unlock (&lock);
-#endif
 
     /* MurphyE */
     mpz_set (curr_poly->rat->f[0], g[0]);
@@ -823,9 +820,6 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 
     mpz_neg (m, g[0]);
 
-#ifdef MAX_THREADS
-		  pthread_mutex_lock (&lock);
-#endif
     if (E > best_E)
     {
       best_E = E;
@@ -885,10 +879,10 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       else
         gmp_printf ("# Skip polynomial: %.2f, ad: %"PRIu64", l: %Zd, m: %Zd\n",
                     logmu, ad, l, m);
-    }
 #ifdef MAX_THREADS
     pthread_mutex_unlock (&lock);
 #endif
+    }
   }
 
   mpz_clear (tmp);
