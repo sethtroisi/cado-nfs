@@ -1808,6 +1808,9 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
     while (read_ptr + 16 <= next_logp_change) {
       uint64_t x0, x1, x2, x3, x4, x5, x6, x7;
       uint16_t x;
+#ifdef HAVE_SSE2
+      _mm_prefetch(((void *) read_ptr)+256, _MM_HINT_NTA);
+#endif
       x0 = ((uint64_t *) read_ptr)[0];
       x1 = ((uint64_t *) read_ptr)[1];
       x2 = ((uint64_t *) read_ptr)[2];
