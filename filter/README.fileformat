@@ -60,3 +60,25 @@ For DL, each entry is of the form id:e, where id is the index in the
 purged.gz file, and e is the exponent of the corresponding relation in
 the relation-set.
 
+File XXX.small.*.{txt|bin}
+==========================
+
+This is the set of files that describe the "small" matrix that is passed
+to the linalg machinery. They are created by replay.
+
+They exist in 2 different formats: txt or bin, the later is more compact.
+We describe only the "txt" format, which is human-readable.
+
+The matrix main file is XXX.small.txt. Its first line contains the number
+of rows and columns. Then each line gives a row in the following format.
+The first integer is the number of non-zero entries for this row. Then
+the list of entries is given. In the case of factorization, an entry is
+just a column index, and for DL, it is accompanied with its positive or
+negative value.
+
+The files XXX.small.rw.txt and XXX.small.cw.txt contains the row and
+column weights.
+
+If the parameter "skip" is non-zero, then the matrix is separated in a
+dense and a sparse parts, so that additionnally to the previously
+mentionned files, there are also "dense" versions.
