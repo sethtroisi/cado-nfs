@@ -24,8 +24,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "portability.h"
 #include "utils.h"
 #include "gzip.h"
-#include "sparse.h"
 #include "filter_matrix.h"
+#include "sparse.h"
 #include "report.h"
 
 /* initialize the rep data structure

@@ -14,7 +14,9 @@
 #include <string.h>
 #include "portability.h"
 #include "macros.h"
+#include "filter_matrix.h"
 #include "sparse.h"
+#include "utils.h"
 
 #define DEBUG 0
 

@@ -3,9 +3,10 @@
 
 #include "purgedfile.h"
 
-#ifdef FOR_FFS
-#include "utils_ffs.h"
-#endif
+typedef struct {
+  int32_t id;
+  int32_t e;
+} ideal_merge_ffs_t;
 
 #define TRACE_COL -1 // 253224 // 231 // put to -1 if not...!
 #define TRACE_ROW -1 // 59496 // put to -1 if not...!
