@@ -2379,9 +2379,12 @@ sub do_purge {
 # sieve
 my $sieve_cmd = sub {
     my ($a, $b, $m, $nthreads, $gzip) = @_;
+    my $powlim = (1 << $param{'I'}) - 1;
     my $cmd = "env nice -$param{'sievenice'} ".
         "$m->{'bindir'}/sieve/las ".
         "-I $param{'I'} ".
+        "-rpowlim $powlim ".
+        "-apowlim $powlim ".
         "-poly $m->{'prefix'}.poly ".
         "-fb $m->{'prefix'}.roots ".
         "-q0 $a ".
