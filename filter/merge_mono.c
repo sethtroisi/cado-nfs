@@ -16,8 +16,8 @@
 #include "utils.h"
 
 #include "merge_opts.h"
-#include "sparse.h"
 #include "filter_matrix.h"
+#include "sparse.h"
 #include "mst.h"
 #include "report.h"
 

@@ -8,7 +8,6 @@
 #define rowLength(rows, i) rows[(i)][0]
 #define rowCell(rows, i, k) rows[(i)][(k)]
 #else
-#include "utils_ffs.h"
 #define typerow_t ideal_merge_ffs_t
 #define rowLength(rows, i) rows[(i)][0].id
 #define rowCell(rows, i, k) rows[(i)][(k)].id
