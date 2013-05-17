@@ -1,4 +1,6 @@
 import sys
+import os
+import re
 
 """
 Parameter file format
@@ -142,6 +144,16 @@ class Parameters(object):
             # Which one is worse?
             # (key, value) = re.match(r'(\S+)\s*=\s*(\S+)', line).groups()
             (key, value) = (s.strip() for s in line2.split('=', 1))
+            # Substitute shell environment variables
+            while True:
+                match = re.search("^(.*)\$\{(.*)\}(.*)$", value)
+                if not match:
+                    break
+                (prefix, varname, postfix) = match.groups()
+                if not varname in os.environ:
+                    raise KeyError('Shell environment variable ${%s} referenced '
+                                   'in key %s is not defined' % (varname, key))
+                value = prefix + os.environ[varname] + postfix
             self._insertkey(key, value)
     
     @staticmethod
