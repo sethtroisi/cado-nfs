@@ -18,7 +18,8 @@
 // Structures for the data to create the index file.
 // This is an array of relation-sets.
 // One relation-set is an array of pairs (relation,multiplicity).
-// FIXME: the reason why it's here is because the addRows function is
+//
+// Note: the reason why it's here is because the addRows function is
 // shared by merge and replay, and needs to know about it.
 
 typedef struct {
@@ -47,6 +48,7 @@ extern int parse_hisfile_line (int32_t *ind, char *t, int32_t *j);
 extern void addRowsUpdateIndex(typerow_t **rows, index_data_t index_data_t,
         int i1, int i2, int32_t j);
 
+// The following version without index updating, is for merge.
 static inline void addRows(typerow_t **rows, int i1, int i2, int32_t j) {
     addRowsUpdateIndex(rows, NULL, i1, i2, j);
 }
