@@ -119,7 +119,7 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
     char wmode[3] = "w";
 #ifdef HAVE_MINGW
     if (bin)
-      wmode = "wb";
+      strcpy (wmode, "wb");
 #endif
 
     char * base = strdup(sparsename);
