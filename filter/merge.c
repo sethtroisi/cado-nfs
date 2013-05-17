@@ -30,7 +30,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h> /* for strcmp */
-#include <fcntl.h>   /* for _O_BINARY */
 
 #include "portability.h"
 #include "utils.h" /* for fopen_maybe_compressed */
@@ -113,10 +112,6 @@ main (int argc, char *argv[])
     double wct0 = wct_seconds ();
     param_list pl;
     param_list_init (pl);
-
-#ifdef HAVE_MINGW
-    _fmode = _O_BINARY;     /* Binary open for all files */
-#endif
 
 #ifdef USE_MPI
     MPI_Init(&argc, &argv);

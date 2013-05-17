@@ -24,7 +24,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <fcntl.h>   /* for _O_BINARY */
 
 #include "portability.h"
 #include "utils.h"
@@ -263,6 +262,11 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
 
     if (skip) {
         dcwname = derived_filename(base, suf->dcw, zip);
+#ifdef HAVE_MINGW
+        if (bin)
+          dcwfile = fopen_maybe_compressed(dcwname, "wb");
+        else
+#endif
         dcwfile = fopen_maybe_compressed(dcwname, "w");
         for(int j = 0; j < skip; j++){
             uint32_t x = weights[j];
@@ -1174,10 +1178,6 @@ main(int argc, char *argv[])
     int noindex = 0;
     char *rp, str[STRLENMAX];
     double wct0 = wct_seconds ();
-
-#ifdef HAVE_MINGW
-    _fmode = _O_BINARY;     /* Binary open for all files */
-#endif
 
     setbuf(stdout, NULL);
     setbuf(stderr, NULL);
