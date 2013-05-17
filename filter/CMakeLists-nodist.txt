@@ -32,9 +32,7 @@ add_executable(merge-ffs EXCLUDE_FROM_ALL merge.c markowitz.c mst.c report.c mer
 target_link_libraries(merge-ffs utils)
 set_property(TARGET merge-ffs APPEND PROPERTY COMPILE_FLAGS "-DFOR_FFS -DUSE_F3")
 
-add_executable(replay-ffs EXCLUDE_FROM_ALL replay.c sparse.c utils_ffs.c)
-#here we do not care about the characteristic because we only use non specific
-#functions
-target_link_libraries(replay-ffs utils libfppol-f3.a)
+add_executable(replay-ffs EXCLUDE_FROM_ALL replay.c sparse.c)
+target_link_libraries(replay-ffs utils)
 set_property(TARGET replay-ffs APPEND PROPERTY COMPILE_FLAGS "-DFOR_FFS -DUSE_F3")
 # vim: ft=cmake:
