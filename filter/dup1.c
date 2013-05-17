@@ -28,6 +28,7 @@
 #include <limits.h> /* for CHAR_BIT */
 #include <unistd.h>
 #include <assert.h>
+#include <fcntl.h>   /* for _O_BINARY */
 
 #include "portability.h"
 #include "macros.h"
@@ -156,6 +157,10 @@ main (int argc, char * argv[])
     param_list_configure_switch(pl, "bz", &bz);
     param_list_configure_switch(pl, "ab", &only_ab);
     param_list_configure_switch(pl, "abhexa", &ab_hexa);
+
+#ifdef HAVE_MINGW
+    _fmode = _O_BINARY;     /* Binary open for all files */
+#endif
 
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }

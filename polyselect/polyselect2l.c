@@ -338,20 +338,6 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
   skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
   logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
 
-  /* raw poly */
-  if (logmu <= max_norm)
-    {
-#ifdef MAX_THREADS
-		  pthread_mutex_lock (&lock);
-#endif
-      printf ("# Raw polynomial:\n");
-      gmp_printf ("n: %Zd\n", N);
-      print_poly_info (fold, d, gold, 1);
-#ifdef MAX_THREADS
-  pthread_mutex_unlock (&lock);
-#endif
-    }
-
   /* for degree 6 polynomials, find bottleneck coefficient */
   double skewtmp = 0.0, logmu0c4 = 0.0, logmu0c3 = 0.0;
   if (d == 6) {
@@ -499,6 +485,9 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 #ifdef MAX_THREADS
 		  pthread_mutex_lock (&lock);
 #endif
+        printf ("# Raw polynomial:\n");
+        gmp_printf ("n: %Zd\n", N);
+        print_poly_info (fold, d, gold, 1);
         if (d == 6 && verbose >= 1)
           gmp_printf ("# noc4/noc3: %.2f/%.2f (%.2f)\n",
                       logmu0c4, logmu0c3, logmu0c4/logmu0c3);
@@ -809,6 +798,9 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       min_opt_lognorm = logmu;
     if (logmu > max_opt_lognorm)
       max_opt_lognorm = logmu;
+#ifdef MAX_THREADS
+    pthread_mutex_unlock (&lock);
+#endif
 
     /* MurphyE */
     mpz_set (curr_poly->rat->f[0], g[0]);
@@ -820,6 +812,9 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 
     mpz_neg (m, g[0]);
 
+#ifdef MAX_THREADS
+		pthread_mutex_lock (&lock);
+#endif
     if (E > best_E)
     {
       best_E = E;
@@ -842,9 +837,15 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       fclose (fp);
     }
     found ++;
+#ifdef MAX_THREADS
+		  pthread_mutex_unlock (&lock);
+#endif
 
-    /* raw poly */
-    if (raw) {
+    /* print optimized (maybe size- or size-root- optimized) polynomial */
+      if (verbose >= 0) {
+#ifdef MAX_THREADS
+		  pthread_mutex_lock (&lock);
+#endif
       printf ("# Raw polynomial:\n");
       gmp_printf ("n: %Zd\n", N);
       print_poly_info (fold, d, gold, 1);
@@ -852,24 +853,19 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
         gmp_printf ("# noc4/noc3: %.2f/%.2f (%.2f)\n",
                     logmu0c4, logmu0c3, logmu0c4/logmu0c3);
       gmp_printf ("# Optimized polynomial:\n");
-    }
-
-    /* print optimized (maybe size- or size-root- optimized) polynomial */
-    if (verbose >= 0)
-      {
-        gmp_printf ("n: %Zd\n", N);
-        print_poly_info (f, d, g, 0);
-        printf ("# Murphy's E(Bf=%.0f,Bg=%.0f,area=%.2e)=%1.2e (best so far %1.2e)\n",
-                BOUND_F, BOUND_G, AREA, E, best_E);
-        printf ("\n");
-        fflush (stdout);
-      }
+      gmp_printf ("n: %Zd\n", N);
+      print_poly_info (f, d, g, 0);
+      printf ("# Murphy's E(Bf=%.0f,Bg=%.0f,area=%.2e)=%1.2e (best so far %1.2e)\n",
+              BOUND_F, BOUND_G, AREA, E, best_E);
+      printf ("\n");
+      fflush (stdout);
 #ifdef MAX_THREADS
-    pthread_mutex_unlock (&lock);
+		  pthread_mutex_unlock (&lock);
 #endif
+      }
   }
   else {
-    if (verbose >= 0) {
+    if (verbose >= 1) {
 #ifdef MAX_THREADS
 		  pthread_mutex_lock (&lock);
 #endif
