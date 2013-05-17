@@ -25,7 +25,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <fcntl.h>   /* for _O_BINARY */
 
 #include "portability.h"
 #include "utils.h"
@@ -86,6 +85,12 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
     ASSERT_ALWAYS(weights != NULL);
     memset(weights, 0, small_ncols * sizeof(uint32_t));
 
+    char wmode[3] = "w";
+#ifdef HAVE_MINGW
+    if (bin)
+      strcpy (wmode, "wb");
+#endif
+
     char * base = strdup(sparsename);
     if (zip) { base[strlen(base)-3]='\0'; }
     if (has_suffix(base, suf->ext)) { base[strlen(base)-4]='\0'; }
@@ -100,8 +105,8 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
     {
         smatname = derived_filename(base, suf->smat, zip);
         srwname  = derived_filename(base, suf->srw, zip);
-        smatfile = fopen_maybe_compressed(smatname, "w");
-        srwfile  = fopen_maybe_compressed(srwname, "w");
+        smatfile = fopen_maybe_compressed(smatname, wmode);
+        srwfile  = fopen_maybe_compressed(srwname, wmode);
         if (!bin)
             fprintf(smatfile, "%d %d\n", small_nrows, small_ncols - skip);
     }
@@ -116,8 +121,8 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
     if (skip) {
         dmatname = derived_filename(base, suf->dmat, zip);
         drwname  = derived_filename(base, suf->drw, zip);
-        dmatfile = fopen_maybe_compressed(dmatname, "w");
-        drwfile  = fopen_maybe_compressed(drwname, "w");
+        dmatfile = fopen_maybe_compressed(dmatname, wmode);
+        drwfile  = fopen_maybe_compressed(drwname, wmode);
         if (!bin)
             fprintf(dmatfile, "%d %d\n", small_nrows, skip);
     }
@@ -232,7 +237,7 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
 
     if (skip) {
         dcwname = derived_filename(base, suf->dcw, zip);
-        dcwfile = fopen_maybe_compressed(dcwname, "w");
+        dcwfile = fopen_maybe_compressed(dcwname, wmode);
         for(int j = 0; j < skip; j++){
             uint32_t x = weights[j];
             if (bin) {
@@ -247,7 +252,7 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
 
     {
         scwname = derived_filename(base, suf->scw, zip);
-        scwfile = fopen_maybe_compressed(scwname, "w");
+        scwfile = fopen_maybe_compressed(scwname, wmode);
         for(int j = skip; j < small_ncols; j++){
             uint32_t x = weights[j];
             if (bin) {
@@ -669,10 +674,6 @@ main(int argc, char *argv[])
     int noindex = 0;
     char *rp, str[STRLENMAX];
     double wct0 = wct_seconds ();
-
-#ifdef HAVE_MINGW
-    _fmode = _O_BINARY;     /* Binary open for all files */
-#endif
 
     setbuf(stdout, NULL);
     setbuf(stderr, NULL);

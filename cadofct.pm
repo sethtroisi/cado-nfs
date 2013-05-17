@@ -2165,8 +2165,10 @@ sub do_factbase {
     info "Generating factor base...\n";
     $tab_level++;
 
+    my $maxbits = $param{'I'} - 1;
     my $cmd = "$param{'bindir'}/sieve/makefb ".
               "-poly $param{'prefix'}.poly ".
+              "-maxbits $maxbits ".
               "> $param{'prefix'}.roots ";
     cmd($cmd, { cmdlog => 1, kill => 1,
             logfile=>"$param{'prefix'}.makefb.log" });
@@ -2377,9 +2379,12 @@ sub do_purge {
 # sieve
 my $sieve_cmd = sub {
     my ($a, $b, $m, $nthreads, $gzip) = @_;
+    my $powlim = (1 << $param{'I'}) - 1;
     my $cmd = "env nice -$param{'sievenice'} ".
         "$m->{'bindir'}/sieve/las ".
         "-I $param{'I'} ".
+        "-rpowlim $powlim ".
+        "-apowlim $powlim ".
         "-poly $m->{'prefix'}.poly ".
         "-fb $m->{'prefix'}.roots ".
         "-q0 $a ".
