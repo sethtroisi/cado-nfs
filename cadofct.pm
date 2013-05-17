@@ -2165,8 +2165,10 @@ sub do_factbase {
     info "Generating factor base...\n";
     $tab_level++;
 
+    my $maxbits = $param{'I'} - 1;
     my $cmd = "$param{'bindir'}/sieve/makefb ".
               "-poly $param{'prefix'}.poly ".
+              "-maxbits $maxbits ".
               "> $param{'prefix'}.roots ";
     cmd($cmd, { cmdlog => 1, kill => 1,
             logfile=>"$param{'prefix'}.makefb.log" });
