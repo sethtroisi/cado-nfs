@@ -75,6 +75,18 @@ class Parameters(object):
         return {key:source[key] for key in keys 
                 if key in source and not isinstance(source[key], dict)}
     
+    def __iter__(self):
+        return self._recurse_iter(self.data, [])
+    
+    @staticmethod
+    def _recurse_iter(dic, path):
+        for key in dic:
+            if isinstance(dic[key], dict):
+                for y in Parameters._recurse_iter(dic[key], path + [key]):
+                    yield y
+            else:
+                yield (path, dic, key, dic[key])
+    
     def _insertkey(self, path, value):
         ''' path is a path with segments delimited by '.' or an 
         array of pieces of the path, 
@@ -122,11 +134,57 @@ class Parameters(object):
             raise KeyError('Key %s already exists as subdictionary' % key)
         dest[key] = value
     
+    @staticmethod
+    def subst_env_var(fqn, value):
+        """ Substitute strings like '${HOME}' in value by the corresponding
+        shell environment variables
+        """
+        while True:
+            match = re.search("^(.*)\$\{(.*)\}(.*)$", value)
+            if not match:
+                break
+            (prefix, varname, postfix) = match.groups()
+            if not varname in os.environ:
+                raise KeyError('Shell environment variable ${%s} referenced '
+                               'in key %s is not defined' % (varname, fqn))
+            value = prefix + os.environ[varname] + postfix
+        return value
+    
+    def _subst_reference(self, path, key, value):
+        """ Substitute strings like '$(somekey)' in a value by the value of
+        "somekey" found along the current path, e.g.,
+        foo.bar.k = $(m)
+        foo.m = 5
+        k = $(m)
+        m = 3
+        results in foo.bar.k = 5 and k = 3
+        """
+        while True:
+            match = re.search("^(.*)\$\((.*)\)(.*)$", value)
+            if not match:
+                break
+            (prefix, varname, postfix) = match.groups()
+            if key == varname:
+                raise KeyError("Self-referential substitution $(%s) in key %s")
+            result = self.myparams([varname], path)
+            if not result:
+                raise KeyError('Key $(%s) referenced in key %s is not defined'
+                               % (varname, '.'.join(path + [key])))
+            value = prefix + result[varname] + postfix
+        return value
+    
+    def _subst_references(self, dic, path):
+        for key in dic:
+            if isinstance(dic[key], dict):
+                self._subst_references(dic[key], path + [key])
+            else:
+                dic[key] = self._subst_reference(path, key, dic[key])
+    
     def _readfile(self, infile):
         """ 
         Read configuration file lines from infile, which must be an iterable.
         An open file handle, or an array of strings, work.
-
+        
         >>> p = Parameters()
         >>> p._readfile(DEFAULTS)
         >>> p.data["tasks"]["parallel"]
@@ -144,17 +202,9 @@ class Parameters(object):
             # Which one is worse?
             # (key, value) = re.match(r'(\S+)\s*=\s*(\S+)', line).groups()
             (key, value) = (s.strip() for s in line2.split('=', 1))
-            # Substitute shell environment variables
-            while True:
-                match = re.search("^(.*)\$\{(.*)\}(.*)$", value)
-                if not match:
-                    break
-                (prefix, varname, postfix) = match.groups()
-                if not varname in os.environ:
-                    raise KeyError('Shell environment variable ${%s} referenced '
-                                   'in key %s is not defined' % (varname, key))
-                value = prefix + os.environ[varname] + postfix
+            value = self.subst_env_var(key, value)
             self._insertkey(key, value)
+        self._subst_references(self.data, [])
     
     @staticmethod
     def __str_internal__(dic, path):
