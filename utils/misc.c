@@ -224,9 +224,12 @@ int mkdir_with_parents(const char * dir, int fatal)
 /* MinGW's mkdir has only one argument,
    cf http://lists.gnu.org/archive/html/bug-gnulib/2008-04/msg00259.html */
 #if (defined _WIN32 || defined __WIN32__) && ! defined __CYGWIN__
-            fprintf(stderr, "try mkdir(%s)\n", tmp);
-            rc = mkdir (tmp);
-            if (rc >= 0) fprintf(stderr, "success\n");
+            if (strcmp (tmp, "C:"))
+              {
+                fprintf(stderr, "try mkdir(%s)\n", tmp);
+                rc = mkdir (tmp);
+                if (rc >= 0) fprintf(stderr, "success\n");
+              }
 #else
             rc = mkdir (tmp, 0777);
 #endif
