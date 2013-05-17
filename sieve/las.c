@@ -8,6 +8,7 @@
 #include <ctype.h>
 #include <float.h>
 #include <pthread.h>
+#include <fcntl.h>   /* for _O_BINARY */
 #include "fb.h"
 #include "portability.h"
 #include "utils.h"           /* lots of stuff */
@@ -1807,6 +1808,9 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
     while (read_ptr + 16 <= next_logp_change) {
       uint64_t x0, x1, x2, x3, x4, x5, x6, x7;
       uint16_t x;
+#ifdef HAVE_SSE2
+      _mm_prefetch(((void *) read_ptr)+256, _MM_HINT_NTA);
+#endif
       x0 = ((uint64_t *) read_ptr)[0];
       x1 = ((uint64_t *) read_ptr)[1];
       x2 = ((uint64_t *) read_ptr)[2];
@@ -3039,6 +3043,10 @@ int main (int argc0, char *argv0[])/*{{{*/
     double bench_tot_time = 0.0;
     const char *statsfilename = NULL;
     const char *sievestatsfilename = NULL;
+#endif
+
+#ifdef HAVE_MINGW
+    _fmode = _O_BINARY;     /* Binary open for all files */
 #endif
 
     param_list pl;

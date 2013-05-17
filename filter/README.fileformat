@@ -1,0 +1,84 @@
+File XXX.purged.gz
+==================
+
+It is created by purge, and contains a set of relations without
+singleton, and where all or almost all the excess has been used.
+
+The first line gives number of rows (relations) and columns (ideals).
+
+Then, each line of the file corresponds to one relation:
+- first entry is the index in the original relation file (which one?)
+- second and third entries give the (a,b) pair
+- fourth entry gives the number of ideals
+- the rest of the line lists the indices of the ideals that occur for
+  this pair (for NFS-IF, reduced mod 2, for DL, with multiplicities).
+
+File XXX.merge.his
+==================
+
+It is created by merge, and contains the sequence of operations that must
+be done on the lines to replay the merge and create the matrix given to
+linalg.
+
+The first line gives number of rows (relations) and columns (ideals)
+before the merge (so it must be identical to the first line of
+purged.gz).
+
+From time to time, a diagnostic line starting with BWCOST can be found.
+It gives hints to replay if it wants to replay only some part of the
+merge. (is it still really used ?????)
+
+Otherwise here is the format (taken from a comment in replay.c):
+   A line is "i i1 ... ik".
+   If i >= 0 then
+       row[i] is to be added to rows i1...ik and destroyed at the end of
+       the process.
+       Works also is i is alone (hence: destroyed row).
+   If i < 0 then
+       row[-i-1] is to be added to rows i1...ik and NOT destroyed.
+
+For DL, the line ends with an additional "#j" entry, where j
+is the index of the column that is used for pivoting.
+
+File XXX.index
+==============
+
+Is is created by replay, and contains the link between the rows of the
+small matrix (coming out from merge/replay) and the relation sets to
+which they correspond.
+
+The first line gives number of rows (relation-sets) and columns (ideals)
+after the merge/replay.
+
+Then, each line of the file corresponds to a line of the small matrix:
+the first entry is an integer giving the number of relations in the
+relation-set, and the rest of the line gives the indices of the relations
+(in hexadecimal). These indices relate to the numbers of the lines in the
+purged.gz file.
+
+For DL, each entry is of the form id:e, where id is the index in the
+purged.gz file, and e is the exponent of the corresponding relation in
+the relation-set.
+
+File XXX.small.*.{txt|bin}
+==========================
+
+This is the set of files that describe the "small" matrix that is passed
+to the linalg machinery. They are created by replay.
+
+They exist in 2 different formats: txt or bin, the later is more compact.
+We describe only the "txt" format, which is human-readable.
+
+The matrix main file is XXX.small.txt. Its first line contains the number
+of rows and columns. Then each line gives a row in the following format.
+The first integer is the number of non-zero entries for this row. Then
+the list of entries is given. In the case of factorization, an entry is
+just a column index, and for DL, it is accompanied with its positive or
+negative value.
+
+The files XXX.small.rw.txt and XXX.small.cw.txt contains the row and
+column weights.
+
+If the parameter "skip" is non-zero, then the matrix is separated in a
+dense and a sparse parts, so that additionnally to the previously
+mentionned files, there are also "dense" versions.
