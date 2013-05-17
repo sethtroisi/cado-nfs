@@ -230,6 +230,8 @@ int mkdir_with_parents(const char * dir, int fatal)
                 rc = mkdir (tmp);
                 if (rc >= 0) fprintf(stderr, "success\n");
               }
+            else
+              fprintf(stderr, "%s: rc=%d\n", tmp, rc);
 #else
             rc = mkdir (tmp, 0777);
 #endif
