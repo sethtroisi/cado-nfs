@@ -1,7 +1,8 @@
 /* replay --- replaying history of merges to build the small matrix
 
-Copyright 2008, 2009, 2010, 2011, 2012 Francois Morain, Emmanuel Thome,
-                                       Paul Zimmermann
+Copyright 2008, 2009, 2010, 2011, 2012, 2013
+          Francois Morain, Emmanuel Thome, Paul Zimmermann,
+          Cyril Bouvier, Pierrick Gaudry
 
 This file is part of CADO-NFS.
 
