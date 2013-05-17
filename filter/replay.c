@@ -386,7 +386,7 @@ renumber (int *small_ncols, int *colweight, int ncols,
     free(tmp);
 }
 
-// A line is "i i1 ... ik".
+// A line is "i i1 ... ik [#j]".
 // If i >= 0 then
 //     row[i] is to be added to rows i1...ik and destroyed at the end of
 //     the process.
@@ -394,8 +394,10 @@ renumber (int *small_ncols, int *colweight, int ncols,
 // If i < 0 then
 //     row[-i-1] is to be added to rows i1...ik and NOT destroyed.
 //
+// If given, j is the index of the column used for pivoting (used in DL).
 static void
-doAllAdds(typerow_t **newrows, char *str, MAYBE_UNUSED FILE *outdelfile)
+doAllAdds(typerow_t **newrows, char *str, MAYBE_UNUSED FILE *outdelfile,
+        index_data_t index_data)
 {
   int32_t j;
   int32_t ind[MERGE_LEVEL_MAX], i0;
@@ -418,11 +420,11 @@ doAllAdds(typerow_t **newrows, char *str, MAYBE_UNUSED FILE *outdelfile)
 #endif
 
   for (int k = 1; k < ni; k++)
-		addRows(newrows, ind[k], i0, j);
+      addRowsUpdateIndex(newrows, index_data, ind[k], i0, j);
 
   if(destroy)
     {
-	    //destroy initial row!
+      //destroy initial row!
 #ifdef FOR_FFS
       fprintf (outdelfile, "%x %d", j, rowLength(newrows, i0));
       for (int k = 1; k <= rowLength(newrows, i0); k++)
@@ -431,42 +433,13 @@ doAllAdds(typerow_t **newrows, char *str, MAYBE_UNUSED FILE *outdelfile)
 #endif
       free(newrows[i0]);
       newrows[i0] = NULL;
-    }
- }
- #if 0
- {
-    char *t = str;
-    int i, ii, destroy = 1;
-
-    if(*t == '-'){
-	destroy = 0;
-	t++;
-    }
-    for(i = 0; (*t != ' ') && (*t != '\n'); t++)
-	i = 10 * i + (*t - '0');
-    if(!destroy)
-	i--; // what a trick, man!
-    if(*t != '\n'){
-	++t;
-	ii = 0;
-	while(1){
-	    if((*t == '\n') || (*t == ' ')){
-#if DEBUG >= 1
-		fprintf(stderr, "next ii is %d\n", ii);
-                row_additions ++;
-#endif
-		addRows(newrows, ii, i, -1);
-		ii = 0;
-	    }
-	    else
-		ii = 10 * ii + (*t - '0');
-	    if(*t == '\n')
-		break;
-	    t++;
-	}
+      index_data[i0].n = 0;
+      free(index_data[i0].rels);
+      index_data[i0].rels = NULL;
     }
 }
-#endif
+
+
 #define STRLENMAX 2048
 
 // sparsemat is small_nrows x small_ncols, after small_ncols is found using
@@ -495,7 +468,7 @@ toFlush (const char *sparsename, typerow_t **sparsemat, int *colweight,
 
 static void
 build_newrows_from_file(typerow_t **newrows, FILE *hisfile, uint64_t bwcostmin,
-                        const char* outdelfilename)
+                        const char* outdelfilename, index_data_t index_data)
 {
     uint64_t bwcost;
     unsigned long addread = 0;
@@ -524,7 +497,7 @@ build_newrows_from_file(typerow_t **newrows, FILE *hisfile, uint64_t bwcostmin,
 	    break;
 	}
 	if(strncmp(str, "BWCOST", 6) != 0)
-	    doAllAdds(newrows, str, outdelfile);
+	    doAllAdds(newrows, str, outdelfile, index_data);
 	else{
 	    if(strncmp(str, "BWCOSTMIN", 9) != 0){
 		sscanf(str+8, "%"PRIu64"", &bwcost);
@@ -590,6 +563,35 @@ readPurged(typerow_t **sparsemat, purgedfile_stream ps, int verbose)
   }
 }
 
+static void 
+writeIndex(const char *indexname, index_data_t index_data,
+        int small_nrows, int small_ncols)
+{
+    FILE *indexfile;
+    indexfile = fopen_maybe_compressed(indexname, "w");
+    fprintf(indexfile, "%d %d\n", small_nrows, small_ncols);
+
+    for (int i = 0; i < small_nrows; ++i) {
+        ASSERT (index_data[i].n > 0);
+        fprintf(indexfile, "%d", index_data[i].n);
+        for (int j = 0; j < index_data[i].n; ++j) {
+#ifdef FOR_FFS
+            fprintf(indexfile, " " PURGE_INT_FORMAT ":%d",
+                    index_data[i].rels[j].ind_row,
+                    index_data[i].rels[j].e);
+#else
+            ASSERT (index_data[i].rels[j].e == 1);
+            fprintf(indexfile, " " PURGE_INT_FORMAT,
+                    index_data[i].rels[j].ind_row);
+#endif
+        }
+        fprintf(indexfile, "\n");
+    }
+    fclose_maybe_compressed(indexfile, indexname);
+}
+
+
+
 static void
 toIndex(typerow_t **newrows, const char *indexname, FILE *hisfile,
 	uint64_t bwcostmin, int nrows, int small_nrows, int small_ncols)
@@ -612,7 +614,7 @@ toIndex(typerow_t **newrows, const char *indexname, FILE *hisfile,
 	rowCell(newrows, i, 1) = i;
     }
     // replay hisfile
-    build_newrows_from_file(newrows, hisfile, bwcostmin, NULL);
+    build_newrows_from_file(newrows, hisfile, bwcostmin, NULL, NULL);
     // re-determining small_nrows to check
     small_nrows2 = 0;
     for(int i = 0; i < nrows; i++)
@@ -752,8 +754,8 @@ weight_row (typerow_t **newrows, int i, int skip)
 
 /* row cols[j][i] += cols[j][k] */
 static void
-do_merge (typerow_t **newrows, int **cols, int *len_col, int j, int i, int k,
-          int skip, FILE *hisfile)
+do_merge (typerow_t **newrows, index_data_t index_data,
+        int **cols, int *len_col, int j, int i, int k, int skip, FILE *hisfile)
 {
   int ii, kk, li, lk, ni, nk, ltmp;
   typerow_t *tmp;
@@ -764,6 +766,13 @@ do_merge (typerow_t **newrows, int **cols, int *len_col, int j, int i, int k,
   fflush (hisfile);
   ASSERT(newrows[ii] != NULL);
   ASSERT(newrows[kk] != NULL);
+
+  // Have to update index_data.
+  if (index_data != NULL) {
+      // FIXME: Do it!!!
+      ASSERT_ALWAYS(0);
+  }
+
   li = rowLength(newrows, ii);
   lk = rowLength(newrows, kk);
   ASSERT(weight_row (newrows, ii, skip) >= weight_row (newrows, kk, skip));
@@ -810,8 +819,8 @@ do_merge (typerow_t **newrows, int **cols, int *len_col, int j, int i, int k,
 }
 
 static int
-try_merge (typerow_t **newrows, int **cols, int *len_col, int j, int skip,
-           FILE *hisfile)
+try_merge (typerow_t **newrows, index_data_t index_data,
+        int **cols, int *len_col, int j, int skip, FILE *hisfile)
 {
   int i, k, gain, gain_max, imax, kmax, *W, ii, kk, *J, s, t;
   mpz_t *M, and;
@@ -902,7 +911,7 @@ try_merge (typerow_t **newrows, int **cols, int *len_col, int j, int skip,
   free (J);
   free (W);
   if (gain_max > 0)
-    do_merge (newrows, cols, len_col, j, imax, kmax, skip, hisfile);
+    do_merge (newrows, index_data, cols, len_col, j, imax, kmax, skip, hisfile);
   return gain_max;
 }
 
@@ -917,8 +926,8 @@ cmp_ge (const void *p, const void *q)
 /* we append the new merges in file 'hisname', so that they are considered
    when writing the index file afterwards */
 static void
-optimize (typerow_t **newrows, int nrows, int *colweight, int ncols, int skip,
-          const char *hisname)
+optimize (typerow_t **newrows, index_data_t index_data, int nrows,
+        int *colweight, int ncols, int skip, const char *hisname)
 {
   int **cols, *len_col, i, j, k, small_ncols, pass = 0, *perm_cols,
     small_nrows;
@@ -1029,7 +1038,8 @@ optimize (typerow_t **newrows, int nrows, int *colweight, int ncols, int skip,
       for (j = skip; j < ncols; j++)
         if (len_col[j] <= pass + 1 && bit_vector_getbit (active, j))
           {
-            gain = try_merge (newrows, cols, len_col, j, skip, hisfile);
+            gain = try_merge (newrows, index_data, cols, len_col, j,
+                    skip, hisfile);
             if (gain == 0) /* we assume a column which does not give any
                               gain will never give a gain in the future */
               bit_vector_clearbit (active, j);
@@ -1077,6 +1087,7 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
     int *colweight;
     int small_nrows, small_ncols;
     char str[STRLENMAX], *rp MAYBE_UNUSED;
+    index_data_t index_data = NULL;
 
     hisfile = fopen (hisname, "r");
     ASSERT_ALWAYS(hisfile != NULL);
@@ -1086,6 +1097,7 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
     // 1st pass: read the relations in *.purged and put them in newrows[][]
     readPurged(newrows, ps, 1);
 #if DEBUG >= 1
+    // [PG]: FIXME: seems to be broken for FFS ?
     for(int i = 0; i < nrows; i++){
 	printf("row[%d]=", i);
 	for(int k = 1; k <= newrows[i][0]; k++)
@@ -1094,8 +1106,21 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
     }
 #endif
 
+    if (writeindex) {
+        // At the beginning, the index_data consists of relsets that
+        // are just single relations.
+        index_data = (relset_t *) malloc (nrows*sizeof(relset_t));
+        for (int i = 0; i < nrows; ++i) {
+            index_data[i].n = 1;
+            index_data[i].rels = (multirel_t *)malloc(sizeof(multirel_t));
+            index_data[i].rels[0].ind_row = i;
+            index_data[i].rels[0].e = 1;
+        }
+    }
+
     // read merges in the *.merge.his file and replay them
-    build_newrows_from_file(newrows, hisfile, bwcostmin, outdelfilename);
+    build_newrows_from_file(newrows, hisfile, bwcostmin, outdelfilename,
+            index_data);
 
     /* compute column weights */
     colweight = (int*) malloc (ncols * sizeof(int *));
@@ -1108,13 +1133,22 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
 
     /* comment out the following line to disable cycle optimization */
 #ifndef FOR_FFS /* FIXME optimize create a bug for FFS*/
-    optimize (newrows, nrows, colweight, ncols, skip, hisname);
+    // optimize (newrows, index_data, nrows, colweight, ncols, skip, hisname);
 #endif
 
     /* crunch empty rows */
     for (int i = small_nrows = 0; i < nrows; i++)
       if (newrows[i] != NULL)
         newrows[small_nrows++] = newrows[i];
+    if (writeindex) {
+        int ii = 0;
+        for (int i = 0; i < nrows; i++) 
+            if (index_data[i].n > 0) 
+                index_data[ii++] = index_data[i];
+            else
+                free(index_data[i].rels);
+        ASSERT (ii == small_nrows);
+    }
 
 #if defined FOR_FFS && defined STAT_FFS
     uint64_t count[11] = {0,0,0,0,0,0,0,0,0,0,0};
@@ -1142,15 +1176,20 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
     small_ncols = toFlush(sparsename, newrows, colweight, ncols,
 			  small_nrows, skip, bin, idealsfilename);
     free (colweight);
-    if(writeindex)
-        toIndex(newrows, indexname, hisfile, bwcostmin, nrows,
-                small_nrows, small_ncols);
-    for(int i = 0; i < nrows; i++)
-      /* If writeindex is false, we free only the "crunched" part */
-      if (writeindex || i < small_nrows)
-        if(newrows[i] != NULL)
-          free (newrows[i]);
+
+    // Create the index
+    if (writeindex) 
+        writeIndex(indexname, index_data, small_nrows, small_ncols);
+
+    // Free.
+    for(int i = 0; i < small_nrows; i++)
+        free (newrows[i]);
     free(newrows);
+    if (writeindex) {
+        for (int i = 0; i < small_nrows; ++i) 
+            free(index_data[i].rels);
+        free(index_data);
+    }
 
     fclose (hisfile);
 }
