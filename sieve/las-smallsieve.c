@@ -464,6 +464,11 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 const fbprime_t p = ssd->ssp[n].p;
                 unsigned int i0 = ssdpos[n];
                 if (i0 < I) {
+                    // At the start of the bucket region, we are not sure
+                    // that i0 is reduced mod p when we enter here.
+                    // (see comment at the end of small_sieve_skip_stride()).
+                    // Hence, we have to do this reduction here:
+                    i0 &= (p-1);
                     ASSERT (i0 < p);
                     ASSERT ((nj * N + j) % 2 == 1);
                     for (unsigned int i = i0; i < pattern2_size; i += p)
