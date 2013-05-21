@@ -2,10 +2,11 @@ import os
 import sys
 import platform
 import subprocess
+import abc
 import cadocommand
 import cadologger
 
-class Option(object):
+class Option(metaclass=abc.ABCMeta):
     ''' Base class for command line options that may or may not take parameters
     '''
     # TODO: decide whether we need '-' or '/' as command line option prefix 
@@ -15,20 +16,36 @@ class Option(object):
     else:
         prefix = '-'
     
-    def __init__(self, config, arg = None, prefix  = None):
-        # Set config to the name of the parameter in the configuration file,
-        # e.g., "verbose", and arg to the command line parameter, e.g., "v"
-        # If arg is not given, its default is the same as config
+    def __init__(self, config, arg = None, prefix  = None, is_input_file = False, is_output_file = False):
+        """ Define a mapping from a parameter dictionary to command line parameters.
+        
+        config is the key name of the parameter in the parameter dictionary, e.g., 'verbose', or 'threads'
+        arg is the command line parameter to which this should map, e.g., 'v' or 'thr'. If not specified,
+            it defaults to the same string as config.
+        prefix is the command line parameter prefix to use; the default is the class variable which currently is '-'.
+            Some programs, e.g. bwc.pl, want some parameters with a different prefix, e.g., ':complete'
+        is_input_file must be set to True if this parameter gives the filename of an input file to the command.
+            This will be used to generate FILE lines in workunits.
+        is_output_file must be set to True if this parameter gives the filename of an output file of the command.
+            This will be used to generate RESULT lines in workunits.
+        """
         self.config = config
+        self.is_input_file = is_input_file
+        self.is_output_file = is_output_file
         if arg is None:
             self.arg = config
         else:
             self.arg = arg
         if prefix:
-            self.prefix = prefix
+            self.prefix = prefix # hides the class variable
     
     def get_key(self):
         return self.config
+    
+    @abc.abstractmethod
+    def  map(self, value):
+        pass
+
 
 class PositionalParameter(Option):
     ''' Positional command line parameter '''
@@ -119,22 +136,29 @@ class Program(object):
         self.stdout = stdout
         self.stderr = stderr
         # Begin command line with program to execute
-        self.command = [path.rstrip(os.sep) + os.sep + binary]
+        self.exec_files = [path.rstrip(os.sep) + os.sep + binary]
+        self.command = [self.exec_files[0]]
+        self.input_files = []
+        self.output_files = []
         
         # Add keyword command line parameters
         for p in self.params_list:
             key = p.get_key()
             if kwargs and key in kwargs:
                 self.command += p.map(kwargs[key])
+                if p.is_input_file:
+                    self.input_files.append(kwargs[key])
+                if p.is_output_file:
+                    self.output_files.append(kwargs[key])
         
         # Add positional command line parameters
+        # FIXME: how to identify input/output files here?
         if args:
             self.command += args
     
     @classmethod
     def get_params_list(cls):
-        """ Return the accepted parameters as a mapping from config file 
-        keywords to Option instances  """
+        """ Return the accepted parameters as list of config file keywords """
         l = list(Program.params_list) + [opt.get_key() for opt in cls.params_list]
         return l
     
@@ -146,7 +170,27 @@ class Program(object):
         ''' Returns the command line as a string array '''
         return self.command
     
-    def as_wu():
+    def get_input_files(self):
+        return self.input_files
+    
+    def get_output_files(self):
+        return self.output_files
+    
+    def get_exec_files(self):
+        return self.exec_files
+    
+    def make_cmdline(self):
+        cmdline = str(self)
+        if isinstance(self.stdin, str):
+            cmdline += ' < ' + self.stdin
+        if isinstance(self.stdout, str):
+            cmdline += ' > ' + self.stdout
+        if isinstance(self.stderr, str):
+            cmdline += ' 2> ' + self.stdout
+        if self.stderr is subprocess.STDOUT:
+            cmdline += ' 2>&1'
+        return cmdline
+    
         # TODO: Make workunit text from a program instance
         # This allows running program instances either directly with run(),
         # or adding them to the WU database table. 
@@ -196,7 +240,9 @@ class Program(object):
         self.errfile = self._open_or_not(self.stderr, "w")
         
         # print (self.as_array())
-
+        print (self.make_cmdline())
+        print ("Input files: %s" % ", ".join(self.input_files))
+        print ("Output files: %s" % ", ".join(self.output_files))
         self.child = cadocommand.Command(self.as_array(), 
                                          stdin=self.infile,
                                          stdout=self.outfile, 
@@ -213,7 +259,8 @@ class Program(object):
             self.errfile.close()
         
         return (rc, stdout, stderr)
-
+    
+    
 class Polyselect2l(Program):
     binary = "polyselect2l"
     name = binary
@@ -228,24 +275,25 @@ class Polyselect2l(Program):
         Parameter("incr"), 
         Parameter("degree"), 
         Parameter("nq"), 
-        Parameter("save"), 
-        Parameter("resume"), 
+        Parameter("save", is_output_file = True), 
+        Parameter("resume", is_input_file = True), 
         Parameter("maxnorm"), 
         Parameter("maxtime"), 
         Parameter("out"), 
         Parameter("printdelay", "s"),
         PositionalParameter("P")
         )
-    
+
 
 class MakeFB(Program):
     binary = "makefb"
     name = binary
     params_list = (
         Toggle("nopowers"), 
-        Parameter("poly"), 
+        Parameter("poly", is_input_file = True), 
         Parameter("maxbits")
         )
+
 
 class FreeRel(Program):
     binary = "freerel"
@@ -254,7 +302,7 @@ class FreeRel(Program):
         Toggle("verbose", "v"), 
         Parameter("pmin"), 
         Parameter("pmax"),
-        Parameter("poly")
+        Parameter("poly", is_input_file = True)
         )
 
 class Las(Program):
@@ -262,8 +310,8 @@ class Las(Program):
     name = binary
     params_list = (
         Parameter("I"), 
-        Parameter("poly"), 
-        Parameter("factorbase", "fb"),
+        Parameter("poly", is_input_file = True), 
+        Parameter("factorbase", "fb", is_input_file = True),
         Parameter("q0"), 
         Parameter("q1"), 
         Parameter("rho"), 
@@ -279,7 +327,7 @@ class Las(Program):
         Parameter("alambda"),
         Parameter("skewness", "S"),
         Toggle("verbose", "v"),
-        Parameter("out"),
+        Parameter("out", is_output_file = True),
         Parameter("threads", "mt"),
         Toggle("ratq")
         )
@@ -293,7 +341,7 @@ class Duplicates1(Program):
         Toggle("bzip", "bz"), 
         Parameter("only"), 
         Parameter("nslices_log", "n"), 
-        Parameter("filelist"),
+        Parameter("filelist", is_input_file = True),
         Parameter("basepath"),
         )
 
@@ -304,7 +352,7 @@ class Duplicates2(Program):
     params_list = (
         Toggle("remove", "rm"),
         Parameter("output_directory", "out"), 
-        Parameter("filelist"), 
+        Parameter("filelist", is_input_file = True), 
         Parameter("rel_count", "K")
         )
 
@@ -312,19 +360,19 @@ class Purge(Program):
     binary = "purge"
     name = binary
     params_list = (
-        Parameter("poly"),
-        Parameter("out"), 
+        Parameter("poly", is_input_file = True),
+        Parameter("out", is_output_file = True), 
         Parameter("nrels"), 
-        Parameter("outdel"), 
-        Parameter("sos"), 
+        Parameter("outdel", is_output_file = True), 
+        Parameter("sos", is_output_file = True), 
         Parameter("keep"), 
         Parameter("minpa"), 
         Parameter("minpr"), 
         Parameter("nprimes"), 
         Toggle("raw"), 
         Parameter("npthr"), 
-        Parameter("inprel"), 
-        Parameter("outrel"), 
+        Parameter("inprel", is_input_file = True), 
+        Parameter("outrel", is_output_file = True), 
         Parameter("npass"), 
         Parameter("required_excess")
         )
@@ -333,8 +381,8 @@ class Merge(Program):
     binary = "merge"
     name = binary
     params_list = (
-        Parameter("mat"), 
-        Parameter("out"), 
+        Parameter("mat", is_input_file = True), 
+        Parameter("out", is_output_file = True), 
         Parameter("maxlevel"), 
         Parameter("keep"), 
         Parameter("skip"), 
