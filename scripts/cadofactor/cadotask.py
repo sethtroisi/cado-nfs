@@ -280,7 +280,7 @@ class FilesCreator(DbAccess, metaclass=abc.ABCMeta):
     
     def get_output_filenames(self, condition = None):
         if condition is None:
-            return self.output_files.keys()
+            return list(self.output_files.keys())
         else:
             return [f for (f,s) in self.output_files.items() if condition(s)]
 
@@ -612,7 +612,7 @@ class FactorBaseTask(FactorBaseOrFreerelTask):
         return (cadoprograms.MakeFB,)
     @property
     def parampath(self):
-        return "tasks.sieving." + self.name
+        return "tasks.sieve." + self.name
     @property
     def paramnames(self):
         return super().paramnames + \
@@ -633,7 +633,7 @@ class FreeRelTask(FactorBaseOrFreerelTask):
         return (cadoprograms.FreeRel,)
     @property
     def parampath(self):
-        return "tasks.sieving." + self.name
+        return "tasks.sieve." + self.name
     @property
     def paramnames(self):
         return super().paramnames + \
@@ -674,7 +674,7 @@ class SievingTask(Task, FilesCreator):
         return (cadoprograms.Las,)
     @property
     def parampath(self):
-        return "tasks.sieving." + self.name
+        return "tasks.sieve." + self.name
     @property
     def paramnames(self):
         return super().paramnames + \
@@ -765,7 +765,7 @@ class Duplicates1Task(Task, FilesCreator):
         return (cadoprograms.Duplicates1,)
     @property
     def parampath(self):
-        return "tasks.filtering." + self.name
+        return "tasks.filter." + self.name
     @property
     def paramnames(self):
         return super().paramnames + \
@@ -916,7 +916,7 @@ class Duplicates2Task(Task, FilesCreator):
         return (cadoprograms.Duplicates2,)
     @property
     def parampath(self):
-        return "tasks.filtering." + self.name
+        return "tasks.filter." + self.name
     @property
     def paramnames(self):
         return super().paramnames + \
@@ -1002,7 +1002,7 @@ class PurgeTask(Task):
         return (cadoprograms.Purge,)
     @property
     def parampath(self):
-        return "tasks.filtering." + self.name
+        return "tasks.filter." + self.name
     @property
     def paramnames(self):
         return super().paramnames + \
@@ -1032,7 +1032,7 @@ class PurgeTask(Task):
             if not nrels:
                 raise Exception("No relation count received from %s", self.duplicates2.title)
             purgedfile = self.make_output_filename("purged.gz")
-            args = list(self.duplicates2.get_output_filenames()) + [self.freerel.get_filename()]
+            args = self.duplicates2.get_output_filenames() + [self.freerel.get_filename()]
             kwargs = self.progparams[0].copy()
             kwargs["poly"] = polyfile
             kwargs["keep"] = self.params["keep"]
@@ -1083,7 +1083,7 @@ class MergeTask(Task):
         return (cadoprograms.Merge, cadoprograms.Replay)
     @property
     def parampath(self):
-        return "tasks.filtering." + self.name
+        return "tasks.filter." + self.name
     @property
     def paramnames(self):
         return super().paramnames + \
