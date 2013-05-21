@@ -52,7 +52,38 @@ class DbAccess(object):
         return wudb.DictDbAccess(self.__db, name)
 
 
-class Task(patterns.Observable, patterns.Observer, DbAccess):
+class FilesCreator(DbAccess, metaclass=abc.ABCMeta):
+    """ A base class for classes that produce a list of output files, with
+    some information stored with each file (e.g., nr. of relations). This
+    info is stored in the form of a DB-backed dictionary
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.output_files = self.make_db_dict(self.make_tablename("outputfiles"))
+    
+    def add_output_files(self, filenames):
+        """ Adds a dict of files to the list of existing output files """
+        for (filename, value) in filenames.items():
+            if filename in self.output_files:
+                raise Exception("%s already in output files table" % filename)
+            self.output_files[filename] = value
+    
+    def get_output_filenames(self, condition = None):
+        if condition is None:
+            return list(self.output_files.keys())
+        else:
+            return [f for (f,s) in self.output_files.items() if condition(s)]
+
+    def forget_output_filenames(self, filenames):
+        for f in filenames:
+            del(self.output_files[f])
+    
+    @abc.abstractclassmethod
+    def make_tablename(self, name):
+        pass
+
+
+class Task(patterns.Observable, patterns.Observer, DbAccess, metaclass=abc.ABCMeta):
     """ A base class that represents one task that needs to be processed. 
     
     Sub-classes must define class variables:
@@ -154,7 +185,7 @@ class Task(patterns.Observable, patterns.Observer, DbAccess):
         ''' Runs the prerequisites. Sub-classes should call this first in 
         their run() method.
                 '''
-        self.logger.debug("Enter Task.run(%s)", self.name)
+        self.logger.debug("Enter Task.run(%s)" % type(self))
         self.logger.debug("Task.run(%s): self.is_done() = %s", 
                           self.name, self.is_done())
         # Check/run the prerequisites
@@ -165,7 +196,7 @@ class Task(patterns.Observable, patterns.Observer, DbAccess):
                                       self.name, task.name)
                     task.run()
         
-        self.logger.debug("Exit Task.run(" + self.name + ")")
+        self.logger.debug("Exit Task.run(%s)" % type(self))
         return
     
     def _make_basename(self):
@@ -187,7 +218,7 @@ class Task(patterns.Observable, patterns.Observer, DbAccess):
             return self.make_output_dirname(dirextra) + name
         else:
             return "%s.%s" % (self._make_basename(), name)
-        
+    
     def make_output_dirname(self, extra = None):
         """ Make a directory name of the form workdir/jobname.taskname/ if 
         extra is not given, or workdir/jobname.taskname/extra/ if it is
@@ -196,6 +227,9 @@ class Task(patterns.Observable, patterns.Observer, DbAccess):
         if extra:
             r += "%s%s" % (extra, os.sep)
         return r
+    
+    def translate_input_filename(self, filename):
+        return filename
     
     @staticmethod
     def check_files_exist(filenames, filedesc, shouldexist):
@@ -223,91 +257,30 @@ class Task(patterns.Observable, patterns.Observer, DbAccess):
                     os.mkdir(dirname)
         return
     
-    def submit(self, commands, inputfiles, outputfiles, tempfiles):
-        ''' Submit a command that needs to be run. Returns a handle
-        which can be used for status check.
-
-        The inputfiles parameter is a list of input files that program 
-        needs; they are not automatically filled into the command line(s),
-        but need to be listed on the command line(s) explicitly. The are 
-        input files list is used to generate FILE lines in work units, 
-        for example.
-        
-        The outputfiles parameter lists the output files that running the 
-        command will produce. They are used to produce RESULT lines in 
-        workunits. Note that the final file names of the output files may 
-        differ, for example, when the output files are uploaded to the server
-        and stored under a unique file name.
-
-        The tempfiles parameter lists temporary files that should be deleted 
-        after the commands ran successfully. There are used to generate DELETE 
-        lines in work units.
+    def submit_command(self, command):
+        ''' Submit a command that needs to be run. Uses client/server.
+        Returns an index which can be used for status check
         '''
-        
-        # We should actually generate the workunits here and feed them
-        # to the workunit processor. Avoids duplicate code and tests 
-        # more of the code path. Status of the workunits should be kept
-        # in a wudb, just like the server would. I.e., we do everything
-        # here as in the client/server setup, except we skip the server
-        # and handing WUs to the wu processor directly
-        pass
+        command.run()
+        return command.wait()
     
-    def status(self, handle):
-        ''' Check status of previously submitted commands 
-        
-        Returns the execution status and the list of output files produced
-        '''
-        return (status, outputfiles)
-
-    def updateObserver(self, message):
-        pass
-
-class FilesCreator(DbAccess, metaclass=abc.ABCMeta):
-    """ A base class for classes that produce a list of output files, with
-    some information stored with each file (e.g., nr. of relations). This
-    info is stored in the form of a DB-backed dictionary
-    """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.output_files = self.make_db_dict(self.make_tablename("outputfiles"))
-    
-    def add_output_files(self, filenames):
-        """ Adds a dict of files to the list of existing output files """
-        for (filename, value) in filenames.items():
-            if filename in self.output_files:
-                raise Exception("%s already in output files table" % filename)
-            self.output_files[filename] = value
-    
-    def get_output_filenames(self, condition = None):
-        if condition is None:
-            return list(self.output_files.keys())
-        else:
-            return [f for (f,s) in self.output_files.items() if condition(s)]
-
-    def forget_output_filenames(self, filenames):
-        for f in filenames:
-            del(self.output_files[f])
-    
-    @abc.abstractclassmethod
-    def make_tablename(self, name):
-        pass
-
 
 class ClientServerTask(Task):
     def __init__(self, server = None, *args, **kwargs):
         self.server = server
         super().__init__(*args, **kwargs)
 
-    def submit(self, commands, inputfiles, outputfiles, tempfiles):
+    def submit_command(self, command, notification):
         ''' Submit a command that needs to be run. Uses client/server.
         Returns an index which can be used for status check
         '''
-        pass
+        command.run()
+        return command.wait()
     
-    def status(self, index):
-        ''' Check status of previously submitted commands '''
-        pass
-
+    def translate_input_filename(self, filename):
+        # server.register_file(filename)
+        return "${DLDIR}" + os.sep + os.path.basename(filename)
+    
 
 # Each task has positional parameters with references to the tasks from 
 # which it receives its inputs. This will be used to query the referenced 
@@ -422,11 +395,10 @@ class PolyselTask(Task):
     def is_done(self):
         # self.logger.debug ("PolyselTask.is_done(): Task parameters: %s", 
         #                    self.params)
-        return self.state["adnext"] >= int(self.params["admax"])
+        return "bestpoly" in self.state and self.state["adnext"] >= int(self.params["admax"])
     
     def run(self):
         # Make command line for polselect2l, run it. 
-        # Whole range in one go for now
         self.logger.debug("Enter PolyselTask.run(" + self.name + ")")
         super().run()
         
@@ -461,8 +433,7 @@ class PolyselTask(Task):
                 try:
                     p = self.programs[0](stdout = outputfile, 
                                          kwargs = polyselect_params)
-                    p.run()
-                    p.wait()
+                    (rc, stdout, stderr) = self.submit_command(p)
                 except Exception as e:
                     self.logger.error("Error running %s: %s", 
                                       self.programs[0].name, e)
@@ -567,8 +538,7 @@ class FactorBaseOrFreerelTask(Task):
             if "pmax" in self.programs[0].get_params_list():
                 kwargs.setdefault("pmax", str(2**int(self.params["lpba"])))
             p = self.programs[0](kwargs = kwargs, stdout = outputfile)
-            p.run()
-            (rc, stdout, stderr) = p.wait()
+            (rc, stdout, stderr) = self.submit_command(p)
             self.parse_stderr(stderr)
             
             self.state["outputfile"] = outputfile
@@ -716,8 +686,7 @@ class SievingTask(Task, FilesCreator):
             kwargs["factorbase"] = self.factorbase.get_filename()
             kwargs["out"] = outputfile
             p = self.programs[0](args, kwargs)
-            p.run()
-            p.wait()
+            (rc, stdout, stderr) = self.submit_command(p)
             self.state["qnext"] = q1
             rels = self.parse_output_file(outputfile)
             self.add_output_files({outputfile: rels})
@@ -843,8 +812,7 @@ class Duplicates1Task(Task, FilesCreator):
                     kwargs = self.progparams[0].copy()
                     kwargs["out"] = self.make_output_dirname()
                     p = self.programs[0]((f,), kwargs)
-                    p.run()
-                    (rc, stdout, stderr) = p.wait()
+                    (rc, stdout, stderr) = self.submit_command(p)
                     # Check that the output files exist now
                     # TODO: How to recover from error? Presumably a dup1
                     # process failed, but that should raise a return code
@@ -957,8 +925,7 @@ class Duplicates2Task(Task, FilesCreator):
             kwargs["rel_count"] = str(rel_count * 12 // 10)
             kwargs["output_directory"] = self.make_output_dirname(str(i))
             p = self.programs[0](files, kwargs)
-            p.run()
-            (rc, stdout, stderr) = p.wait()
+            (rc, stdout, stderr) = self.submit_command(p)
             nr_rels = self.parse_remaining(stderr.decode("ascii").splitlines())
             # Mark input file names and output file names
             for f in files:
@@ -1039,8 +1006,7 @@ class PurgeTask(Task):
             kwargs["nrels"] = str(nrels)
             kwargs["out"] = purgedfile
             p = self.programs[0](args, kwargs)
-            p.run()
-            (rc, stdout, stderr) = p.wait()
+            (rc, stdout, stderr) = self.submit_command(p)
             [nrows, weight, excess] = self.parse_stdout(stdout)
             self.logger.info("After purge, %d relations remain with weight %s and excess %s"
                              % (nrows, weight, excess))
@@ -1113,8 +1079,7 @@ class MergeTask(Task):
             kwargs["mat"] = self.purged.get_purged_filename()
             kwargs["out"] = historyfile
             p = self.programs[0](args, kwargs)
-            p.run()
-            p.wait()
+            (rc, stdout, stderr) = self.submit_command(p)
             
             indexfile = self.make_output_filename("index")
             mergedfile = self.make_output_filename("small.bin")
@@ -1126,8 +1091,7 @@ class MergeTask(Task):
             kwargs["index"] = indexfile
             kwargs["out"] = mergedfile
             p = self.programs[1](args, kwargs)
-            p.run()
-            p.wait()
+            (rc, stdout, stderr) = self.submit_command(p)
             
             if not os.path.isfile(indexfile):
                 raise Exception("Output file %s does not exist" % indexfile)
@@ -1192,8 +1156,7 @@ class LinAlgTask(Task):
             kwargs["wdir"] = os.path.realpath(workdir)
             kwargs.setdefault("nullspace", "left")
             p = self.programs[0](args, kwargs)
-            p.run()
-            p.wait()
+            (rc, stdout, stderr) = self.submit_command(p)
             dependencyfilename = self.make_output_filename("W", subdir = True)
             if not os.path.isfile(dependencyfilename):
                 raise Exception("Kernel file %s does not exist" % dependencyfilename)
@@ -1262,8 +1225,7 @@ class CharactersTask(Task):
             if not densefilename is None:
                 kwargs["heavyblock"] = densefilename
             p = self.programs[0](args, kwargs)
-            p.run()
-            p.wait()
+            (rc, stdout, stderr) = self.submit_command(p)
             if not os.path.isfile(kernelfilename):
                 raise Exception("Output file %s does not exist" % kernelfilename)
             self.state["kernel"] = kernelfilename
@@ -1329,8 +1291,7 @@ class SqrtTask(Task):
             kwargs["kernel"] = kernelfilename
             kwargs["prefix"] = prefix
             p = self.programs[0](args, kwargs)
-            p.run()
-            p.wait()
+            (rc, stdout, stderr) = self.submit_command(p)
             
             while not self.is_done():
                 self.state.setdefault("next_dep", 0)
