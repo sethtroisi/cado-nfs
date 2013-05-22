@@ -83,7 +83,7 @@ class FilesCreator(DbAccess, metaclass=abc.ABCMeta):
         pass
 
 
-class Task(patterns.Observable, patterns.Observer, DbAccess, metaclass=abc.ABCMeta):
+class Task(DbAccess, metaclass=abc.ABCMeta):
     """ A base class that represents one task that needs to be processed. 
     
     Sub-classes must define class variables:
@@ -130,8 +130,8 @@ class Task(patterns.Observable, patterns.Observer, DbAccess, metaclass=abc.ABCMe
         super().__init__(*args, **kwargs)
         if dependencies:
             self.dependencies = dependencies
-            for d in dependencies:
-                d.subscribeObserver(self)
+            # for d in dependencies:
+            #    d.subscribeObserver(self)
         else:
             self.dependencies = None
         self.logger = cadologger.Logger()
@@ -257,12 +257,35 @@ class Task(patterns.Observable, patterns.Observer, DbAccess, metaclass=abc.ABCMe
                     os.mkdir(dirname)
         return
     
-    def submit_command(self, command):
-        ''' Submit a command that needs to be run. Uses client/server.
-        Returns an index which can be used for status check
+    def submit_command(self, command, identifier):
+        ''' Run a command.
+        Return the result tuple. If the caller is an Observer, also send
+        result to updateObserver().
         '''
+        wuname = ' '.join([self.params["name"], self.name, identifier])
         command.run()
-        return command.wait()
+        (rc, stdout, stderr) = command.wait()
+        result = [wuname, rc, stdout, stderr]
+        result.append(command.get_output_files())
+        if isinstance(self, patterns.Observer):
+            self.updateObserver(result)
+        return result
+    
+    def filter_notification(self, wuname, rc, stdout, stderr, output_files):
+        self.logger.info("%s: received notification for WU: %s", self.name, wuname)
+        if rc != 0:
+            self.logger.error("Return code is: %d", rc)
+        if stdout:
+            self.logger.info("stdout is: %s", stdout)
+        if stderr:
+            self.logger.error("stderr is: %s", stderr)
+        if output_files:
+            self.logger.info("Output files are: %s", ", ".join(output_files))
+        (name, task, identifier) = wuname.split()
+        if name != self.params["name"] or task != self.name:
+            # This notification is not for me
+            return
+        return identifier
     
 
 class ClientServerTask(Task):
@@ -270,17 +293,6 @@ class ClientServerTask(Task):
         self.server = server
         super().__init__(*args, **kwargs)
 
-    def submit_command(self, command, notification):
-        ''' Submit a command that needs to be run. Uses client/server.
-        Returns an index which can be used for status check
-        '''
-        command.run()
-        return command.wait()
-    
-    def translate_input_filename(self, filename):
-        # server.register_file(filename)
-        return "${DLDIR}" + os.sep + os.path.basename(filename)
-    
 
 # Each task has positional parameters with references to the tasks from 
 # which it receives its inputs. This will be used to query the referenced 
@@ -368,7 +380,7 @@ class Polynomial(object):
                     f.write(key + ": %s\n" % params[key])
 
 
-class PolyselTask(Task):
+class PolyselTask(Task, patterns.Observer):
     """ Finds a polynomial, uses client/server """
     @property
     def name(self):
@@ -409,14 +421,13 @@ class PolyselTask(Task):
                           self.params)
         
         if "bestpoly" in self.state:
-            bestpoly = Polynomial(self.state["bestpoly"].splitlines())
-            bestpoly.setE(self.state["bestE"])
+            self.bestpoly = Polynomial(self.state["bestpoly"].splitlines())
+            self.bestpoly.setE(self.state["bestE"])
             self.logger.info("Best polynomial previously found in %s has "
                              "Murphy_E = %g", 
-                             self.state["bestfile"], bestpoly.E)
-            self.notifyObservers({"poly": bestpoly})
+                             self.state["bestfile"], self.bestpoly.E)
         else:
-            bestpoly = None
+            self.bestpoly = None
             self.logger.info("No polynomial was previously found")
         
         while not self.is_done():
@@ -430,54 +441,58 @@ class PolyselTask(Task):
                 self.logger.info("%s already exists, won't generate again",
                                  outputfile)
             else:
-                try:
-                    p = self.programs[0](stdout = outputfile, 
-                                         kwargs = polyselect_params)
-                    (rc, stdout, stderr) = self.submit_command(p)
-                except Exception as e:
-                    self.logger.error("Error running %s: %s", 
-                                      self.programs[0].name, e)
-                    outputfile = None
-            
+                p = self.programs[0](stdout = outputfile, 
+                                     kwargs = polyselect_params)
+                self.submit_command(p, "%d-%d" % (adstart, adend))
+                # self.parse_poly(outputfile)
             self.state["adnext"] = adend
-            
-            poly = None
-            if outputfile:
-                with open(outputfile, "r") as f:
-                    try:
-                        poly = Polynomial(f)
-                    except Exception as e:
-                        self.logger.error("Invalid polyselect file %s: %s", 
-                                          outputfile, e)
-            
-            if not poly or not poly.is_valid():
-                self.logger.info('No polynomial found in %s', outputfile)
-            elif not poly.E:
-                self.logger.error("Polynomial in file %s has no Murphy E value" 
-                                  % outputfile)
-            elif not bestpoly or poly.E > bestpoly.E:
-                bestpoly = poly
-                self.state["bestE"] = poly.E
-                self.state["bestpoly"] = str(poly)
-                self.state["bestfile"] = outputfile
-                self.logger.info("New best polynomial from file %s:"
-                                 " Murphy E = %g" % (outputfile, poly.E))
-                self.logger.debug("New best polynomial is:\n%s", poly)
-                self.notifyObservers({self.name: bestpoly})
-            else:
-                self.logger.info("Best polynomial from file %s with E=%g is "
-                                 "no better than current best with E=%g",
-                                 outputfile, poly.E, bestpoly.E)
-            # print(poly)
         
         self.logger.info("%s finished", self.title)
-        if not bestpoly:
+        if not self.bestpoly:
             self.logger.error ("No polynomial found")
             return
         self.logger.info("Best polynomial from %s has Murphy_E = %g", 
-                          self.state["bestfile"] , bestpoly.E)
+                          self.state["bestfile"] , self.bestpoly.E)
         self.logger.debug("Exit PolyselTask.run(" + self.name + ")")
         return
+    
+    def updateObserver(self, message):
+        (wuname, rc, stdout, stderr, output_files) = message
+        identifier = self.filter_notification(wuname, rc, stdout, stderr, output_files)
+        if not identifier:
+            # This notification was not for me
+            return
+        assert len(output_files) == 1
+        self.parse_poly(output_files[0])
+    
+    def parse_poly(self, outputfile):
+        poly = None
+        if outputfile:
+            with open(outputfile, "r") as f:
+                try:
+                    poly = Polynomial(f)
+                except Exception as e:
+                    self.logger.error("Invalid polyselect file %s: %s", 
+                                      outputfile, e)
+        
+        if not poly or not poly.is_valid():
+            self.logger.info('No polynomial found in %s', outputfile)
+        elif not poly.E:
+            self.logger.error("Polynomial in file %s has no Murphy E value" 
+                              % outputfile)
+        elif not self.bestpoly or poly.E > self.bestpoly.E:
+            self.bestpoly = poly
+            self.state["bestE"] = poly.E
+            self.state["bestpoly"] = str(poly)
+            self.state["bestfile"] = outputfile
+            self.logger.info("New best polynomial from file %s:"
+                             " Murphy E = %g" % (outputfile, poly.E))
+            self.logger.debug("New best polynomial is:\n%s", poly)
+        else:
+            self.logger.info("Best polynomial from file %s with E=%g is "
+                             "no better than current best with E=%g",
+                             outputfile, poly.E, self.bestpoly.E)
+        # print(poly)
     
     def get_poly(self):
         if "bestpoly" in self.state:
@@ -538,11 +553,10 @@ class FactorBaseOrFreerelTask(Task):
             if "pmax" in self.programs[0].get_params_list():
                 kwargs.setdefault("pmax", str(2**int(self.params["lpba"])))
             p = self.programs[0](kwargs = kwargs, stdout = outputfile)
-            (rc, stdout, stderr) = self.submit_command(p)
+            (idenrifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             self.parse_stderr(stderr)
             
             self.state["outputfile"] = outputfile
-            self.notifyObservers({self.name: outputfile})
         self.logger.debug("Exit FactorBaseOrFreerelTask.run(%s)", self.name)
     
     def is_done(self):
@@ -631,7 +645,7 @@ class FreeRelTask(FactorBaseOrFreerelTask):
         return self.state["nfree"]
     
 
-class SievingTask(Task, FilesCreator):
+class SievingTask(Task, FilesCreator, patterns.Observer):
     """ Does the sieving, uses client/server """
     @property
     def name(self):
@@ -649,6 +663,8 @@ class SievingTask(Task, FilesCreator):
     def paramnames(self):
         return super().paramnames + \
             ("qmin", "qrange", "rels_wanted") + Polynomial.paramnames
+    # We seek to this many bytes before the EOF to look for the "Total xxx reports" message
+    file_end_offset = 1000
     
     def __init__(self, polyselect, factorbase, *args, **kwargs):
         super().__init__(*args, dependencies = (polyselect, factorbase), **kwargs)
@@ -686,27 +702,34 @@ class SievingTask(Task, FilesCreator):
             kwargs["factorbase"] = self.factorbase.get_filename()
             kwargs["out"] = outputfile
             p = self.programs[0](args, kwargs)
-            (rc, stdout, stderr) = self.submit_command(p)
+            self.submit_command(p, "%d-%d" % (q0, q1))
             self.state["qnext"] = q1
-            rels = self.parse_output_file(outputfile)
-            self.add_output_files({outputfile: rels})
-            self.state["rels_found"] += rels
-            self.logger.info("Found %d relations in %s, total is now %d", 
-                             rels, outputfile, self.state["rels_found"])
-            self.notifyObservers({self.name, outputfile})
         self.logger.debug("Exit SievingTask.run(" + self.name + ")")
         return
     
-    @staticmethod
-    def parse_output_file(filename):
+    def updateObserver(self, message):
+        (wuname, rc, stdout, stderr, output_files) = message
+        identifier = self.filter_notification(wuname, rc, stdout, stderr, output_files)
+        if not identifier:
+            # This notification was not for me
+            return
+        assert len(output_files) == 1
+        self.parse_output_file(output_files[0])
+    
+    def parse_output_file(self, filename):
         size = os.path.getsize(filename)
         with open(filename, "r") as f:
-            f.seek(max(size - 1000, 0))
+            f.seek(max(size - self.file_end_offset, 0))
             for line in f:
                 match = re.match("# Total (\d+) reports ", line)
                 if match:
-                    return int(match.group(1))
-        return None
+                    rels = int(match.group(1))
+                    self.add_output_files({filename: rels})
+                    self.state["rels_found"] += rels
+                    self.logger.info("Found %d relations in %s, total is now %d",
+                                     rels, filename, self.state["rels_found"])
+                    return
+        self.logger.error("Number of relations message not found in file %s", filename)
     
     def get_nrels(self, filename = None):
         """ Return the number of relations found, either the total so far or
@@ -812,7 +835,7 @@ class Duplicates1Task(Task, FilesCreator):
                     kwargs = self.progparams[0].copy()
                     kwargs["out"] = self.make_output_dirname()
                     p = self.programs[0]((f,), kwargs)
-                    (rc, stdout, stderr) = self.submit_command(p)
+                    (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
                     # Check that the output files exist now
                     # TODO: How to recover from error? Presumably a dup1
                     # process failed, but that should raise a return code
@@ -925,7 +948,7 @@ class Duplicates2Task(Task, FilesCreator):
             kwargs["rel_count"] = str(rel_count * 12 // 10)
             kwargs["output_directory"] = self.make_output_dirname(str(i))
             p = self.programs[0](files, kwargs)
-            (rc, stdout, stderr) = self.submit_command(p)
+            (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             nr_rels = self.parse_remaining(stderr.decode("ascii").splitlines())
             # Mark input file names and output file names
             for f in files:
@@ -1006,7 +1029,7 @@ class PurgeTask(Task):
             kwargs["nrels"] = str(nrels)
             kwargs["out"] = purgedfile
             p = self.programs[0](args, kwargs)
-            (rc, stdout, stderr) = self.submit_command(p)
+            (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             [nrows, weight, excess] = self.parse_stdout(stdout)
             self.logger.info("After purge, %d relations remain with weight %s and excess %s"
                              % (nrows, weight, excess))
@@ -1079,7 +1102,7 @@ class MergeTask(Task):
             kwargs["mat"] = self.purged.get_purged_filename()
             kwargs["out"] = historyfile
             p = self.programs[0](args, kwargs)
-            (rc, stdout, stderr) = self.submit_command(p)
+            (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             
             indexfile = self.make_output_filename("index")
             mergedfile = self.make_output_filename("small.bin")
@@ -1091,7 +1114,7 @@ class MergeTask(Task):
             kwargs["index"] = indexfile
             kwargs["out"] = mergedfile
             p = self.programs[1](args, kwargs)
-            (rc, stdout, stderr) = self.submit_command(p)
+            (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             
             if not os.path.isfile(indexfile):
                 raise Exception("Output file %s does not exist" % indexfile)
@@ -1156,7 +1179,7 @@ class LinAlgTask(Task):
             kwargs["wdir"] = os.path.realpath(workdir)
             kwargs.setdefault("nullspace", "left")
             p = self.programs[0](args, kwargs)
-            (rc, stdout, stderr) = self.submit_command(p)
+            (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             dependencyfilename = self.make_output_filename("W", subdir = True)
             if not os.path.isfile(dependencyfilename):
                 raise Exception("Kernel file %s does not exist" % dependencyfilename)
@@ -1225,7 +1248,7 @@ class CharactersTask(Task):
             if not densefilename is None:
                 kwargs["heavyblock"] = densefilename
             p = self.programs[0](args, kwargs)
-            (rc, stdout, stderr) = self.submit_command(p)
+            (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             if not os.path.isfile(kernelfilename):
                 raise Exception("Output file %s does not exist" % kernelfilename)
             self.state["kernel"] = kernelfilename
@@ -1291,7 +1314,7 @@ class SqrtTask(Task):
             kwargs["kernel"] = kernelfilename
             kwargs["prefix"] = prefix
             p = self.programs[0](args, kwargs)
-            (rc, stdout, stderr) = self.submit_command(p)
+            (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             
             while not self.is_done():
                 self.state.setdefault("next_dep", 0)
