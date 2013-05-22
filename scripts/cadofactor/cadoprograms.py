@@ -140,6 +140,10 @@ class Program(object):
         self.command = [self.exec_files[0]]
         self.input_files = []
         self.output_files = []
+        if isinstance(self.stdout, str):
+            self.output_files.append(self.stdout)
+        if isinstance(self.stderr, str):
+            self.output_files.append(self.stderr)
         
         # Add keyword command line parameters
         for p in self.params_list:
