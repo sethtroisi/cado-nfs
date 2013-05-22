@@ -142,10 +142,10 @@ int test_divisible(where_am_I_ptr w)
     return rc;
 }
 
-/* {{{ helper: sieve_decrease */
+/* {{{ helper: sieve_increase */
 
 /* Do this so that the _real_ caller is always 2 floors up */
-void sieve_decrease_logging_backend(unsigned char *S, const unsigned char logp, where_am_I_ptr w)
+void sieve_increase_logging_backend(unsigned char *S, const unsigned char logp, where_am_I_ptr w)
 {
     if (!trace_on_spot_Nx(w->N, w->x))
         return;
@@ -174,29 +174,29 @@ void sieve_decrease_logging_backend(unsigned char *S, const unsigned char logp, 
 #else
     const char * caller = "";
 #endif
-    fprintf(stderr, "# Subtract log(" FBPRIME_FORMAT ",%.3s) = %u from "
+    fprintf(stderr, "# Add log(" FBPRIME_FORMAT ",%.3s) = %u from "
             "S[%u] = %hhu, from BA[%u] -> %hhu [%s]\n",
-            w->p, sidenames[w->side], logp, w->x, *S, w->N, *S-logp, caller);
+            w->p, sidenames[w->side], logp, w->x, *S, w->N, *S+logp, caller);
 #ifdef __GLIBC__
     free(freeme);
 #endif
 }
 
-void sieve_decrease_logging(unsigned char *S, const unsigned char logp, where_am_I_ptr w)
+void sieve_increase_logging(unsigned char *S, const unsigned char logp, where_am_I_ptr w)
 {
-    sieve_decrease_logging_backend(S, logp, w);
+    sieve_increase_logging_backend(S, logp, w);
 }
 
-/* Decrease the sieve array entry *S by logp, with underflow checking
+/* Increase the sieve array entry *S by logp, with underflow checking
  * and tracing if desired. w is used only for trace test and output */
 
-void sieve_decrease(unsigned char *S, const unsigned char logp, where_am_I_ptr w)
+void sieve_increase(unsigned char *S, const unsigned char logp, where_am_I_ptr w)
 {
-    sieve_decrease_logging_backend(S, logp, w);
+    sieve_increase_logging_backend(S, logp, w);
 #ifdef CHECK_UNDERFLOW
-    sieve_decrease_underflow_trap(S, logp, w);
+    sieve_increase_underflow_trap(S, logp, w);
 #endif
-    *S -= logp;
+    *S += logp;
 }
 
 #endif  /* TRACE_K */
@@ -205,17 +205,17 @@ void sieve_decrease(unsigned char *S, const unsigned char logp, where_am_I_ptr w
  * controlling it is CHECK_UNDERFLOW
  */
 #ifdef CHECK_UNDERFLOW
-void sieve_decrease_underflow_trap(unsigned char *S, const unsigned char logp, where_am_I_ptr w)
+void sieve_increase_underflow_trap(unsigned char *S, const unsigned char logp, where_am_I_ptr w)
 {
     int i;
     unsigned int j;
     int64_t a;
     uint64_t b;
-    static unsigned char maxdiff = 0;
+    static unsigned char maxdiff = ~0;
 
     NxToIJ(&i, &j, w->N, w->x, w->si);
     IJToAB(&a, &b, i, j, w->si);
-    if (logp - *S > maxdiff)
+    if ((unsigned int) logp + *S > maxdiff)
       {
         maxdiff = logp - *S;
         fprintf(stderr, "# Error, underflow at (N,x)=(%u, %u), "
@@ -223,9 +223,9 @@ void sieve_decrease_underflow_trap(unsigned char *S, const unsigned char logp, w
                 FBPRIME_FORMAT ") = %hhu\n",
                 w->N, w->x, i, j, a, b, *S, w->p, logp);
       }
-    /* arrange so that the unconditional decrease which comes next
-     * has the effect of taking the result to zero */
-    *S = logp;
+    /* arrange so that the unconditional increase which comes next
+     * has the effect of taking the result to maxdiff */
+    *S = maxdiff - logp;
 }
 #endif
 
