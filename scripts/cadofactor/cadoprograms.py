@@ -140,6 +140,8 @@ class Program(object):
         self.command = [self.exec_files[0]]
         self.input_files = []
         self.output_files = []
+        if isinstance(self.stdin, str):
+            self.input_files.append(self.stdin)
         if isinstance(self.stdout, str):
             self.output_files.append(self.stdout)
         if isinstance(self.stderr, str):
@@ -244,7 +246,7 @@ class Program(object):
         self.errfile = self._open_or_not(self.stderr, "w")
         
         # print (self.as_array())
-        print (self.make_cmdline())
+        print ("%s.Program.run(): cmdline = %s" % (__file__, self.make_cmdline()))
         print ("Input files: %s" % ", ".join(self.input_files))
         print ("Output files: %s" % ", ".join(self.output_files))
         self.child = cadocommand.Command(self.as_array(), 
