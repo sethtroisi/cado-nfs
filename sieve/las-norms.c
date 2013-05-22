@@ -2719,13 +2719,20 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
   r = fabs (mpz_get_d (si->cpoly->rat->f[1])) * si->cpoly->skew
     + fabs (mpz_get_d (si->cpoly->rat->f[0]));
   r *= B * (double) si->I;
+
   /* if the special-q is on the rational side, divide by it */
   if (qside == RATIONAL_SIDE)
     r /= q0d;
-  rat->logmax = maxlog2 = log2 (r);
+
+  rat->logmax = log2 (r);
+
+  /* we increase artificially 'logmax', to allow larger values of J */
+  rat->logmax += 1.0;
+
   /* we know that |G(a,b)| < 2^(rat->logmax) when si->ratq = 0,
      and |G(a,b)/q| < 2^(rat->logmax) when si->ratq <> 0 */
 
+  maxlog2 = rat->logmax;
   fprintf (output, "# Rat. side: log2(maxnorm)=%1.2f logbase=%1.6f",
            maxlog2, exp2 (maxlog2 / ((double) UCHAR_MAX - GUARD)));
   /* we want to map 0 <= x < maxlog2 to GUARD <= y < UCHAR_MAX,
@@ -2755,8 +2762,8 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
   /* we know that |F(a,b)/q| < 2^(alg->logmax) when si->ratq = 0,
      and |F(a,b)| < 2^(alg->logmax) when si->ratq <> 0 */
 
-  /* we increase artificially the logmax by 1, to allow larger values of J */
-  alg->logmax += 1.0;
+  /* we increase artificially 'logmax', to allow larger values of J */
+  alg->logmax += 2.0;
 
   /* on the algebraic side, we want that the non-reports on the rational
      side, which are set to 255, remain larger than the report bound 'r',
@@ -2801,7 +2808,8 @@ void sieve_info_clear_norm_data(sieve_info_ptr si)
     }
 }
 
-/* return largest possible J by simply bounding the Fij and Gij polynomials */
+/* return largest possible J by simply bounding the Fij and Gij polynomials
+   using the absolute value of their coefficients */
 double
 sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
 {
@@ -2815,6 +2823,7 @@ sieve_info_update_norm_data_Jmax (sieve_info_ptr si)
       double maxnorm = pow (2.0, s->logmax), v, powIover2 = 1.0;
       for (int k = 0; k <= ps->degree; k++)
         {
+          /* reverse the coefficients since fij[k] goes with i^k but j^(d-k) */
           F[ps->degree - k] = fabs (s->fijd[k]) * powIover2;
           powIover2 *= Iover2;
         }
