@@ -56,8 +56,8 @@ static inline int trace_on_spot_ij(int i, unsigned int j) {
     return i == trace_ij.i && j == trace_ij.j;
 }
 
-void sieve_decrease_logging(unsigned char *S, const unsigned char logp, where_am_I_ptr w);
-void sieve_decrease(unsigned char *S, const unsigned char logp, where_am_I_ptr w);
+void sieve_increase_logging(unsigned char *S, const unsigned char logp, where_am_I_ptr w);
+void sieve_increase(unsigned char *S, const unsigned char logp, where_am_I_ptr w);
 
 #else
 static inline int test_divisible(where_am_I_ptr w MAYBE_UNUSED) { return 1; }
@@ -71,33 +71,16 @@ static inline int trace_on_spot_ab(int64_t a MAYBE_UNUSED, uint64_t b MAYBE_UNUS
 static inline int trace_on_spot_ij(int i MAYBE_UNUSED, unsigned int j MAYBE_UNUSED) { return 0; }
 
 #ifdef CHECK_UNDERFLOW
-void sieve_decrease_underflow_trap(unsigned char *S, const unsigned char logp, where_am_I_ptr w);
+void sieve_increase_underflow_trap(unsigned char *S, const unsigned char logp, where_am_I_ptr w);
 #endif  /* CHECK_UNDERFLOW */
 
-static inline void sieve_decrease(unsigned char *S, const unsigned char logp, where_am_I_ptr w MAYBE_UNUSED)
+static inline void sieve_increase(unsigned char *S, const unsigned char logp, where_am_I_ptr w MAYBE_UNUSED)
 {
 #ifdef CHECK_UNDERFLOW
-    if (*S < logp)
-    sieve_decrease_underflow_trap(S, logp, w);
+  if (*S + (unsigned int) logp > (unsigned char) ~0)
+    sieve_increase_underflow_trap(S, logp, w);
 #endif  /* CHECK_UNDERFLOW */
-    unsigned int s = *S, t = s - logp;
-
-    /* version with conditional affectation: no jump at all */
-    *S = (UNLIKELY(t >> 31)) ? 0 : t;
-
-    /* version with 1 jump vhen *S < logp, but *S is not updated. Correct ? */
-    /*
-    if (LIKELY(!(t >> 31))) *S = t;
-    */
-
-    /* version with 2 jumps when *S < logp, *S is updated */
-    /*
-    if (UNLIKELY(t >> 31)) {
-      if (UNLIKELY(s))
-	*S = 0;
-    } else
-      *S = t;
-    */
+    *S += logp;
 }
 
 #endif  /* TRACE_K */

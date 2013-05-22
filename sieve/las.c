@@ -1803,7 +1803,7 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
       uint16_t x;
       x = (read_ptr++)->x;
       WHERE_AM_I_UPDATE(w, x, x);
-      sieve_decrease(S + x, logp, w);
+      sieve_increase(S + x, logp, w);
     }
     while (read_ptr + 16 <= next_logp_change) {
       uint64_t x0, x1, x2, x3, x4, x5, x6, x7;
@@ -1821,28 +1821,28 @@ apply_one_bucket (unsigned char *S, bucket_array_t BA, const int i,
       x7 = ((uint64_t *) read_ptr)[7];
       read_ptr += 16;
       __asm__ __volatile__ (""); /* To be sure all x? are read together in one operation */
-      x = (uint16_t) (x0 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
-      x = (uint16_t) (x0 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
-      x = (uint16_t) (x1 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
-      x = (uint16_t) (x1 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
-      x = (uint16_t) (x2 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
-      x = (uint16_t) (x2 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
-      x = (uint16_t) (x3 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
-      x = (uint16_t) (x3 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
-      x = (uint16_t) (x4 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
-      x = (uint16_t) (x4 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
-      x = (uint16_t) (x5 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
-      x = (uint16_t) (x5 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
-      x = (uint16_t) (x6 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
-      x = (uint16_t) (x6 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
-      x = (uint16_t) (x7 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
-      x = (uint16_t) (x7 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_decrease(S + x, logp, w);
+      x = (uint16_t) (x0 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x0 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x1 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x1 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x2 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x2 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x3 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x3 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x4 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x4 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x5 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x5 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x6 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x6 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x7 >> 00); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
+      x = (uint16_t) (x7 >> 32); WHERE_AM_I_UPDATE(w, x, x); sieve_increase(S + x, logp, w);
     }
     while (read_ptr < next_logp_change) {
       uint16_t x;
       x = (read_ptr++)->x;
       WHERE_AM_I_UPDATE(w, x, x);
-      sieve_decrease(S + x, logp, w);
+      sieve_increase(S + x, logp, w);
     }
   }
 }
@@ -2716,6 +2716,78 @@ factor_leftover_norm (mpz_t n, mpz_array_t* const factors,
 }
 /*}}}*/
 
+MAYBE_UNUSED static inline void subusb(unsigned char *S1, unsigned char *S2, ssize_t offset)
+{
+  int ex = (unsigned int) S1[offset] - (unsigned int) S2[offset];
+  if (UNLIKELY(ex < 0)) S1[offset] = 0; else S1[offset] = ex;	     
+}
+
+/* S1 = S1 - S2, with "-" in saturated arithmetical,
+ * and memset(S2, 0, EndS1-S1).
+ */
+void SminusS (unsigned char *S1, unsigned char *EndS1, unsigned char *S2) {
+#ifndef HAVE_SSE2
+  ssize_t mysize = EndS1 - S1;
+  unsigned char *cS2 = S2;
+  while (S1 < EndS1) {
+    subusb(S1,S2,0);
+    subusb(S1,S2,1);
+    subusb(S1,S2,2);
+    subusb(S1,S2,3);
+    subusb(S1,S2,4);
+    subusb(S1,S2,5);
+    subusb(S1,S2,6);
+    subusb(S1,S2,7);
+    S1 += 8; S2 += 8;
+  }
+  memset(cS2, 0, mysize);
+#else
+  __m128i *S1i = (__m128i *) S1, *EndS1i = (__m128i *) EndS1, *S2i = (__m128i *) S2,
+    z = _mm_setzero_si128();
+  while (S1i < EndS1i) {
+    __asm__
+      ("prefetchnta 0x100(%0)\n"
+       "prefetcht0 0x100(%1)\n"
+       "movdqa (%0),%%xmm0\n"
+       "movdqa 0x10(%0),%%xmm1\n"
+       "movdqa 0x20(%0),%%xmm2\n"
+       "movdqa 0x30(%0),%%xmm3\n"
+       "psubusb (%1),%%xmm0\n"
+       "psubusb 0x10(%1),%%xmm1\n"
+       "psubusb 0x20(%1),%%xmm2\n"
+       "psubusb 0x30(%1),%%xmm3\n"
+       "movdqa %2,(%1)\n"
+       "movdqa %2,0x10(%1)\n"
+       "movdqa %2,0x20(%1)\n"
+       "movdqa %2,0x30(%1)\n"
+       "movdqa %%xmm0,(%0)\n"
+       "movdqa %%xmm1,0x10(%0)\n"
+       "movdqa %%xmm2,0x20(%0)\n"
+       "movdqa %%xmm3,0x30(%0)\n"
+       "add $0x40,%0\n"
+       "add $0x40,%1\n"
+       : "+r"(S1i), "+r"(S2i) : "x"(z) : "%xmm0", "%xmm1", "%xmm2", "%xmm3");
+    /* I prefer use ASM than intrinsics to be sure each 4 instructions which
+     * use exactly a cache line are together. I'm 99% sure it's not useful...
+     * but it's more beautiful :-)
+     */
+    /*
+    __m128i x0, x1, x2, x3;
+    _mm_prefetch(S1i + 16, _MM_HINT_NTA); _mm_prefetch(S2i + 16, _MM_HINT_T0);
+    x0 = _mm_load_si128(S1i + 0);         x1 = _mm_load_si128(S1i + 1);
+    x2 = _mm_load_si128(S1i + 2);         x3 = _mm_load_si128(S1i + 3);
+    x0 = _mm_subs_epu8(S2i[0], x0);       x1 = _mm_subs_epu8(S2i[1], x1);
+    x2 = _mm_subs_epu8(S2i[2], x2);       x3 = _mm_subs_epu8(S2i[3], x3);
+    _mm_store_si128(S2i + 0, z);          _mm_store_si128(S1i + 1, z);
+    _mm_store_si128(S2i + 2, z);          _mm_store_si128(S1i + 3, z);
+    _mm_store_si128(S1i + 0, x0);         _mm_store_si128(S1i + 1, x1);
+    _mm_store_si128(S1i + 2, x2);         _mm_store_si128(S1i + 3, x3);
+    S1i += 4; S2i += 4;
+    */
+  }
+#endif 
+}
+
 /* Move above ? */
 /* {{{ process_bucket_region
  * th->id gives the number of the thread: it is supposed to deal with the set
@@ -2752,9 +2824,10 @@ void * process_bucket_region(thread_data_ptr th)
         ts->rsdpos = small_sieve_copy_start(ts->ssdpos, s->fb_parts_x->rs);
 
         /* local sieve region */
-        S[side] = (unsigned char *) malloc_aligned(BUCKET_REGION + MEMSET_MIN, 16);
-        ASSERT_ALWAYS (S != NULL);
+        S[side] = (unsigned char *) malloc_pagealigned(BUCKET_REGION + MEMSET_MIN);
     }
+    unsigned char *SS = malloc_pagealigned(BUCKET_REGION);
+    memset(SS, 0, BUCKET_REGION);
 
     /* loop over appropriate set of sieve regions */
     for (int i = th->id; i < si->nb_buckets; i += las->nb_threads) 
@@ -2785,12 +2858,14 @@ void * process_bucket_region(thread_data_ptr th)
             rep->ttbuckets_apply -= seconds();
             for (int j = 0; j < las->nb_threads; ++j)  {
                 thread_data_ptr ot = th + j - th->id;
-                apply_one_bucket(S[side], ot->sides[side]->BA, i, w);
+                apply_one_bucket(SS, ot->sides[side]->BA, i, w);
             }
+	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
             rep->ttbuckets_apply += seconds();
 
             /* Sieve small rational primes */
-            sieve_small_bucket_region(S[side], i, s->ssd, ts->ssdpos, si, side, w);
+            sieve_small_bucket_region(SS, i, s->ssd, ts->ssdpos, si, side, w);
+	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
         }
 
         {
@@ -2811,12 +2886,14 @@ void * process_bucket_region(thread_data_ptr th)
             rep->ttbuckets_apply -= seconds();
             for (int j = 0; j < las->nb_threads; ++j) {
                 thread_data_ptr ot = th + j - th->id;
-                apply_one_bucket(S[side], ot->sides[side]->BA, i, w);
+                apply_one_bucket(SS, ot->sides[side]->BA, i, w);
             }
+	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
             rep->ttbuckets_apply += seconds();
 
             /* Sieve small algebraic primes */
-            sieve_small_bucket_region(S[side], i, s->ssd, ts->ssdpos, si, side, w);
+            sieve_small_bucket_region(SS, i, s->ssd, ts->ssdpos, si, side, w);
+	    SminusS(S[side], S[side] + BUCKET_REGION, SS);
         }
 
         /* Factor survivors */
@@ -2835,6 +2912,7 @@ void * process_bucket_region(thread_data_ptr th)
             memcpy(ts->rsdpos, ts->ssdpos + b[0], (b[1]-b[0]) * sizeof(int));
         }
       }
+    free_aligned(SS, BUCKET_REGION, pagesize());
 
     for(int side = 0 ; side < 2 ; side++) {
         thread_side_data_ptr ts = th->sides[side];

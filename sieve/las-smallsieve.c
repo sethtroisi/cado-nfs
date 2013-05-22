@@ -476,7 +476,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
 #ifdef UGLY_DEBUGGING
                     for (unsigned int j = i0; j < I ; j+= p) {
                         WHERE_AM_I_UPDATE(w, x, (w->j << si->conf->logI) + j);
-                        sieve_decrease(S + j, ssd->logp[n], w);
+                        sieve_increase(S + j, ssd->logp[n], w);
                         /* cancel the above action */
                         S[j] += ssd->logp[n];
                     }
@@ -510,17 +510,17 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 unsigned int v = (((unsigned char *)(pattern+((k/sizeof(unsigned long))&1)))[k%sizeof(unsigned long)]);
                 if (v) {
                     WHERE_AM_I_UPDATE(w, x, x);
-                    sieve_decrease_logging(S + x, v, w);
+                    sieve_increase_logging(S + x, v, w);
                 }
             }
 #endif /* }}} */
 
             while (S_ptr < end)
             {
-                *(S_ptr) -= pattern[0];
-                *(S_ptr + 1) -= pattern[1];
-                *(S_ptr + 2) -= pattern[0];
-                *(S_ptr + 3) -= pattern[1];
+                *(S_ptr) += pattern[0];
+                *(S_ptr + 1) += pattern[1];
+                *(S_ptr + 2) += pattern[0];
+                *(S_ptr + 3) += pattern[1];
                 S_ptr += 4;
             }
         }
@@ -596,24 +596,24 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 unsigned int v = (((unsigned char *)(pattern+((k/sizeof(unsigned long))%3)))[k%sizeof(unsigned long)]);
                 if (v) {
                     WHERE_AM_I_UPDATE(w, x, x);
-                    sieve_decrease_logging(S + x, v, w);
+                    sieve_increase_logging(S + x, v, w);
                 }
             }
 #endif /* }}} */
 
             while (S_ptr < end)
             {
-                *(S_ptr) -= pattern[0];
-                *(S_ptr + 1) -= pattern[1];
-                *(S_ptr + 2) -= pattern[2];
+                *(S_ptr) += pattern[0];
+                *(S_ptr + 1) += pattern[1];
+                *(S_ptr + 2) += pattern[2];
                 S_ptr += 3;
             }
 
             end += 2;
             if (S_ptr < end)
-                *(S_ptr++) -= pattern[0];
+                *(S_ptr++) += pattern[0];
             if (S_ptr < end)
-                *(S_ptr) -= pattern[1];
+                *(S_ptr) += pattern[1];
         }
     }
 
@@ -662,7 +662,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                 }
                 for ( ; i < I; i += twop) {
                     WHERE_AM_I_UPDATE(w, x, j * I + i);
-                    sieve_decrease (S_ptr + i, logp, w);
+                    sieve_increase (S_ptr + i, logp, w);
                 }
                 i0 += r;
                 if (i0 >= p)
@@ -726,15 +726,15 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                         unsigned int x = trace_Nx.x;
                         unsigned int k = x % I;
                         unsigned int v = (((unsigned char *)(&logps2))[k%sizeof(unsigned long)]);
-                        sieve_decrease_logging(S + w->x, v, w);
+                        sieve_increase_logging(S + w->x, v, w);
                     }
 #endif
                     while (S_ptr < end)
                     {
-                        *(S_ptr) -= logps2;
-                        *(S_ptr + 1) -= logps2;
-                        *(S_ptr + 2) -= logps2;
-                        *(S_ptr + 3) -= logps2;
+                        *(S_ptr) += logps2;
+                        *(S_ptr + 1) += logps2;
+                        *(S_ptr + 2) += logps2;
+                        *(S_ptr + 3) += logps2;
                         S_ptr += 4;
                     }
                     i0 += ssp->g * I;
@@ -760,7 +760,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                             for ( ; i < I; i += evenq)
                             {
                                 WHERE_AM_I_UPDATE(w, x, linestart + i);
-                                sieve_decrease (S + linestart + i, logp, w);
+                                sieve_increase (S + linestart + i, logp, w);
                             }
                     }
                     else
@@ -768,7 +768,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                         for ( ; i < I; i += q)
                         {
                             WHERE_AM_I_UPDATE(w, x, linestart + i);
-                            sieve_decrease (S + linestart + i, logp, w);
+                            sieve_increase (S + linestart + i, logp, w);
                         }
                     }
 
@@ -808,7 +808,7 @@ void sieve_small_bucket_region(unsigned char *S, int N,
                     ASSERT ((nj * N + j) % 2 == 1);
                     for (unsigned int i = i0; i < I; i += p) {
                         WHERE_AM_I_UPDATE(w, x, j * I + i);
-                        sieve_decrease (S_ptr + i, logp, w);
+                        sieve_increase (S_ptr + i, logp, w);
                     }
                     // odd lines only.
                     i0 = ((i0 + 2 * r) & (p - 1)) + 2 * I;
