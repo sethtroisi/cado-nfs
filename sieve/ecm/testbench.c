@@ -79,13 +79,14 @@ tryfactor (mpz_t N, const facul_strategy_t *strategy,
       int j;
       printf ("%lu", f[0]);
       for (j = 1; j < facul_code; j++)
-        printf (" %lu ", f[j]);
+        printf (" %lu", f[j]);
       if (printcofactors) {
         mpz_t c;
         mpz_init_set (c, N);
         for (j = 0; j < facul_code; j++)
           mpz_divexact_ui (c, c, f[j]);
-        gmp_printf (" %Zd", c);
+        if (mpz_cmp_ui (c, 1) != 0)
+          gmp_printf (" %Zd", c);
         mpz_clear (c);
       }
       printf ("\n");
@@ -345,7 +346,7 @@ int main (int argc, char **argv)
 	}
       else
         {
-	  printf ("Unrecoglized option: %s\n", argv[1]);
+	  printf ("Unrecognized option: %s\n", argv[1]);
 	  exit (EXIT_FAILURE);
         }
     }
