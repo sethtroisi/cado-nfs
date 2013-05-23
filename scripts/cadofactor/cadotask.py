@@ -11,21 +11,6 @@ import patterns
 import cadoprograms
 import cadologger
 
-# TODO:
-# Job status. Should probably be in the DB - no need to have another file sitting around with another file format to parse
-# Check which tasks need to be done:
-#   1. Parameter generation
-#   2. Polynomial selection (add WUs to DB until enough polynomials checked/good enough found)
-#   3. Factorbase (if hosted on server)
-#   4. Free relations
-#   5. Sieving until enough relations received (generating WUs on the fly, adding to DB, distributing to clients, checking results)
-#   6. Remove duplicates
-#   7. Remove singletons, check, go back to Sieving if necessary (simply increase rels_wanted)
-#   8. Merge
-#   9. Call BWC
-#   10. SQRT
-#   11. Check complete factorization
-
 # Some parameters are provided by the param file but can change during
 # the factorization, like rels_wanted. On one hand, we want automatic 
 # updates to parameters to be stored in the DB, otoh, we want to allow
@@ -42,20 +27,24 @@ class DbAccess(object):
     it can later be used to open DB connections.
     """
     
-    def __init__(self, db, *args, **kwargs):
+    def __init__(self, dbfilename, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if db is None:
+        if dbfilename is None:
             raise Exception("The db parameter is required")
-        self.__db = db
+        self.__dbfilename = dbfilename
     
     def make_db_dict(self, name):
-        return wudb.DictDbAccess(self.__db, name)
-
+        return wudb.DictDbAccess(self.__dbfilename, name)
+    
+    def make_wu_access(self):
+        return wudb.WuAccess(self.__dbfilename)
+    
 
 class FilesCreator(DbAccess, metaclass=abc.ABCMeta):
     """ A base class for classes that produce a list of output files, with
-    some information stored with each file (e.g., nr. of relations). This
-    info is stored in the form of a DB-backed dictionary
+    some auxiliary information stored with each file (e.g., nr. of relations).
+    This info is stored in the form of a DB-backed dictionary, with the file
+    name as the key and the auxiliary data as the value.
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -65,15 +54,22 @@ class FilesCreator(DbAccess, metaclass=abc.ABCMeta):
         """ Adds a dict of files to the list of existing output files """
         for (filename, value) in filenames.items():
             if filename in self.output_files:
-                raise Exception("%s already in output files table" % filename)
+                raise KeyError("%s already in output files table" % filename)
             self.output_files[filename] = value
     
     def get_output_filenames(self, condition = None):
+        """ Return output file names, optionally those that match a condition
+        
+        If a condition is given, it must be callable with 1 parameter and
+        boolean return type; then only those filenames are returned where
+        for the auxiliary data s (i.e., the value stored in the dictionary
+        with the file name as key) satisfies condition(s) == True.
+        """
         if condition is None:
             return list(self.output_files.keys())
         else:
             return [f for (f,s) in self.output_files.items() if condition(s)]
-
+    
     def forget_output_filenames(self, filenames):
         for f in filenames:
             del(self.output_files[f])
@@ -87,35 +83,34 @@ class Task(DbAccess, metaclass=abc.ABCMeta):
     """ A base class that represents one task that needs to be processed. 
     
     Sub-classes must define class variables:
-        name: the name of the task in a simple form that can be used as
-            a Python dictionary key, a directory name, part of a file name,
-            part of an SQL table name, etc. That pretty much limits it to
-            alphabetic first letter, and alphanumeric rest. 
-        title: A pretty name for the task, will be used in screen output
-        programs: A list of classes of Programs which this tasks uses
-        paramnames: A list of parameter keywords which this task uses.
-            This is used for extracting relevant parameters from the parameter
-            hierarchical dictionary.
     """
     
     # Properties that subclasses need to define
     @abc.abstractproperty
     def name(self):
+        # The name of the task in a simple form that can be used as
+        # a Python dictionary key, a directory name, part of a file name,
+        # part of an SQL table name, etc. That pretty much limits it to
+        # alphabetic first letter, and alphanumeric rest. 
         pass
     @abc.abstractproperty
     def parampath(self):
         pass
     @abc.abstractproperty
     def title(self):
+        # A pretty name for the task, will be used in screen output
         pass
     @abc.abstractproperty
     def programs(self):
+        # A list of classes of Programs which this tasks uses
         pass
     @abc.abstractproperty
     def paramnames(self):
-        """ Sub-classes need to define a property 'paramnames' which returns a
-        list of parameters they accept, plus super()'s paramnames list
-        """
+        # A list of parameter keywords which this task uses.
+        # This is used for extracting relevant parameters from the parameter
+        # hierarchical dictionary.
+        # Sub-classes need to define a property 'paramnames' which returns a
+        # list of parameters they accept, plus super()'s paramnames list
         # Parameters that all tasks use
         return ("name", "workdir", "remove")
     
@@ -217,8 +212,9 @@ class Task(DbAccess, metaclass=abc.ABCMeta):
         if subdir:
             return self.make_output_dirname(dirextra) + name
         else:
+            assert dirextra == None
             return "%s.%s" % (self._make_basename(), name)
-    
+
     def make_output_dirname(self, extra = None):
         """ Make a directory name of the form workdir/jobname.taskname/ if 
         extra is not given, or workdir/jobname.taskname/extra/ if it is
@@ -230,6 +226,9 @@ class Task(DbAccess, metaclass=abc.ABCMeta):
     
     def translate_input_filename(self, filename):
         return filename
+
+    def test_outputfile_exists(self, filename):
+        return os.path.isfile(filename)
     
     @staticmethod
     def check_files_exist(filenames, filedesc, shouldexist):
@@ -256,13 +255,26 @@ class Task(DbAccess, metaclass=abc.ABCMeta):
                 if not os.path.isdir(dirname):
                     os.mkdir(dirname)
         return
+
+    # These two function go together, one produces a workunit name from the 
+    # name of the factorization, the task name, and a task-provided identifier,
+    # and the other function splits them again
+    wu_paste_char = '_'
+    def make_wuname(self, identifier):
+        assert not self.wu_paste_char in self.params["name"]
+        assert not self.wu_paste_char in self.name
+        assert not self.wu_paste_char in identifier
+        return self.wu_paste_char.join([self.params["name"], self.name, identifier])
+    
+    def split_wuname(self, wuname):
+        return wuname.split(self.wu_paste_char)
     
     def submit_command(self, command, identifier):
         ''' Run a command.
         Return the result tuple. If the caller is an Observer, also send
         result to updateObserver().
         '''
-        wuname = ' '.join([self.params["name"], self.name, identifier])
+        wuname = self.make_wuname(identifier)
         command.run()
         (rc, stdout, stderr) = command.wait()
         result = [wuname, rc, stdout, stderr]
@@ -281,7 +293,7 @@ class Task(DbAccess, metaclass=abc.ABCMeta):
             self.logger.error("stderr is: %s", stderr)
         if output_files:
             self.logger.info("Output files are: %s", ", ".join(output_files))
-        (name, task, identifier) = wuname.split()
+        (name, task, identifier) = self.split_wuname(wuname)
         if name != self.params["name"] or task != self.name:
             # This notification is not for me
             return
@@ -289,10 +301,27 @@ class Task(DbAccess, metaclass=abc.ABCMeta):
     
 
 class ClientServerTask(Task):
-    def __init__(self, server = None, *args, **kwargs):
-        self.server = server
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
+        self.wuar = self.make_wu_access()
+        self.wuar.create_tables()
+    
+    def submit_command(self, command, identifier):
+        ''' Submit a workunit to the database.
+        Return the result tuple. If the caller is an Observer, also send
+        result to updateObserver().
+        '''
+        
+        wuname = self.make_wuname(identifier)
+        wutext = command.make_wu(wuname)
+        print ("WU:\n%s" % wutext)
+        self.wuar.create(wutext)
+        return super().submit_command(command, identifier)
+    
+    def test_outputfile_exists(self, filename):
+        # Can't test
+        return False
+    
 
 # Each task has positional parameters with references to the tasks from 
 # which it receives its inputs. This will be used to query the referenced 
@@ -380,7 +409,7 @@ class Polynomial(object):
                     f.write(key + ": %s\n" % params[key])
 
 
-class PolyselTask(Task, patterns.Observer):
+class PolyselTask(ClientServerTask, patterns.Observer):
     """ Finds a polynomial, uses client/server """
     @property
     def name(self):
@@ -437,14 +466,12 @@ class PolyselTask(Task, patterns.Observer):
             polyselect_params["admin"] = str(adstart)
             polyselect_params["admax"] = str(adend)
             outputfile = self.make_output_filename("%d-%d" % (adstart, adend))
-            if os.path.isfile(outputfile):
+            if self.test_outputfile_exists(outputfile):
                 self.logger.info("%s already exists, won't generate again",
                                  outputfile)
             else:
-                p = self.programs[0](stdout = outputfile, 
-                                     kwargs = polyselect_params)
+                p = self.programs[0](None, polyselect_params, stdout = outputfile)
                 self.submit_command(p, "%d-%d" % (adstart, adend))
-                # self.parse_poly(outputfile)
             self.state["adnext"] = adend
         
         self.logger.info("%s finished", self.title)
@@ -552,8 +579,8 @@ class FactorBaseOrFreerelTask(Task):
                 kwargs.setdefault("pmin", "1")
             if "pmax" in self.programs[0].get_params_list():
                 kwargs.setdefault("pmax", str(2**int(self.params["lpba"])))
-            p = self.programs[0](kwargs = kwargs, stdout = outputfile)
-            (idenrifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
+            p = self.programs[0](None, kwargs, stdout = outputfile)
+            (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             self.parse_stderr(stderr)
             
             self.state["outputfile"] = outputfile
@@ -645,7 +672,7 @@ class FreeRelTask(FactorBaseOrFreerelTask):
         return self.state["nfree"]
     
 
-class SievingTask(Task, FilesCreator, patterns.Observer):
+class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
     """ Does the sieving, uses client/server """
     @property
     def name(self):
