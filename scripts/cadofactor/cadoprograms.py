@@ -115,7 +115,7 @@ class Program(object):
         '''
         return "'" + s.replace("'", "'\\''") + "'"
     
-    def __init__(self, args = None, kwargs = None, 
+    def __init__(self, args, parameters, 
                  stdin = None, stdout = subprocess.PIPE, 
                  stderr = subprocess.PIPE):
         ''' Takes a list of positional parameters and a dictionary of command 
@@ -129,38 +129,45 @@ class Program(object):
         generation, the file name is used for shell redirection.
         '''
         
-        path = kwargs.get("execpath", self.path)
-        binary = kwargs.get("execbin", self.binary)
+        self.args = args
+        self.parameters = parameters
         
         self.stdin = stdin
         self.stdout = stdout
         self.stderr = stderr
+        
+        self.command = self.make_command_array()
+    
+    @staticmethod
+    def translate_path(filename, path = None):
+        if not path:
+            return filename
+        else:
+            return path.rstrip(os.sep) + os.sep + os.path.basename(filename)
+    
+    def make_command_array(self, binpath = None, inputpath = None, outputpath = None):
         # Begin command line with program to execute
-        self.exec_files = [path.rstrip(os.sep) + os.sep + binary]
-        self.command = [self.exec_files[0]]
-        self.input_files = []
-        self.output_files = []
-        if isinstance(self.stdin, str):
-            self.input_files.append(self.stdin)
-        if isinstance(self.stdout, str):
-            self.output_files.append(self.stdout)
-        if isinstance(self.stderr, str):
-            self.output_files.append(self.stderr)
+        command = [self.translate_path(self.get_exec_files()[0], binpath)]
         
         # Add keyword command line parameters
         for p in self.params_list:
             key = p.get_key()
-            if kwargs and key in kwargs:
-                self.command += p.map(kwargs[key])
+            if key in self.parameters:
+                assert not (p.is_input_file and p.is_output_file)
+                argument = self.parameters[key]
+                # If this is an input or an output file name, we may have to
+                # translate it, e.g., for workunits
                 if p.is_input_file:
-                    self.input_files.append(kwargs[key])
-                if p.is_output_file:
-                    self.output_files.append(kwargs[key])
+                    argument = self.translate_path(self.parameters[key], inputpath)
+                elif p.is_output_file:
+                    argument = self.translate_path(self.parameters[key], outputpath)
+                command += p.map(argument)
         
         # Add positional command line parameters
         # FIXME: how to identify input/output files here?
-        if args:
-            self.command += args
+        if self.args:
+            command += self.args
+        return command
     
     @classmethod
     def get_params_list(cls):
@@ -168,34 +175,60 @@ class Program(object):
         l = list(Program.params_list) + [opt.get_key() for opt in cls.params_list]
         return l
     
-    def __str__(self):
-        ''' Returns the command line as a string '''
-        return " ".join([Program.__shellquote(arg) for arg in self.command])
-    
-    def as_array(self):
-        ''' Returns the command line as a string array '''
-        return self.command
-    
     def get_input_files(self):
-        return self.input_files
+        input_files = []
+        if isinstance(self.stdin, str):
+            input_files.append(self.stdin)
+        for p in self.params_list:
+            key = p.get_key()
+            if key in self.parameters:
+                if p.is_input_file:
+                    input_files.append(self.parameters[key])
+        return input_files
     
     def get_output_files(self):
-        return self.output_files
+        output_files = []
+        if isinstance(self.stdout, str):
+            output_files.append(self.stdout)
+        if isinstance(self.stderr, str):
+            output_files.append(self.stderr)
+        for p in self.params_list:
+            key = p.get_key()
+            if key in self.parameters:
+                if p.is_output_file:
+                    output_files.append(self.parameters[key])
+        return output_files
     
     def get_exec_files(self):
-        return self.exec_files
+        path = self.parameters.get("execpath", self.path)
+        binary = self.parameters.get("execbin", self.binary)
+        execfile = path.rstrip(os.sep) + os.sep + binary
+        return [execfile]
     
-    def make_cmdline(self):
-        cmdline = str(self)
+    def make_cmdline(self, binpath = None, inputpath = None, outputpath = None):
+        cmdarr = self.make_command_array(binpath, inputpath, outputpath)
+        cmdline = " ".join([Program.__shellquote(arg) for arg in cmdarr])
         if isinstance(self.stdin, str):
-            cmdline += ' < ' + self.stdin
+            cmdline += ' < ' + Program.__shellquote(self.translate_path(self.stdin, inputpath))
         if isinstance(self.stdout, str):
-            cmdline += ' > ' + self.stdout
+            cmdline += ' > ' + Program.__shellquote(self.translate_path(self.stdout, outputpath))
         if isinstance(self.stderr, str):
-            cmdline += ' 2> ' + self.stdout
+            cmdline += ' 2> ' + Program.__shellquote(self.translate_path(self.stdout, outputpath))
         if self.stderr is subprocess.STDOUT:
             cmdline += ' 2>&1'
         return cmdline
+    
+    def make_wu(self, wuname):
+        wu = ['WORKUNIT %s' % wuname]
+        for f in self.get_input_files():
+            wu.append('FILE %s' % os.path.basename(f))
+        for f in self.get_exec_files():
+            wu.append('EXECFILE %s' % os.path.basename(f))
+        wu.append('COMMAND %s' % self.make_cmdline(binpath = "${DLDIR}", inputpath = "${DLDIR}", outputpath = "${WORKDIR}"))
+        for f in self.get_output_files():
+            wu.append('RESULT %s' % os.path.basename(f))
+        wu.append("") # Make a trailing newline
+        return '\n'.join(wu)
     
         # TODO: Make workunit text from a program instance
         # This allows running program instances either directly with run(),
@@ -245,11 +278,11 @@ class Program(object):
         self.outfile = self._open_or_not(self.stdout, "w")
         self.errfile = self._open_or_not(self.stderr, "w")
         
-        # print (self.as_array())
-        print ("%s.Program.run(): cmdline = %s" % (__file__, self.make_cmdline()))
-        print ("Input files: %s" % ", ".join(self.input_files))
-        print ("Output files: %s" % ", ".join(self.output_files))
-        self.child = cadocommand.Command(self.as_array(), 
+        # print (self.make_command_array()
+        # print ("%s.Program.run(): cmdline = %s" % (__file__, self.make_cmdline()))
+        # print ("Input files: %s" % ", ".join(self.get_input_files()))
+        # print ("Output files: %s" % ", ".join(self.get_output_files()))
+        self.child = cadocommand.Command(self.make_command_array(), 
                                          stdin=self.infile,
                                          stdout=self.outfile, 
                                          stderr=self.errfile)
