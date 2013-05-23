@@ -141,9 +141,9 @@ void balancing_read_header(balancing_ptr bal, const char * filename)
     FILE * pfile;
     char * derived = derived_filename(filename, "hdr", ".bin");
     ASSERT_ALWAYS(filename);
-    pfile = fopen(filename, "r");
+    pfile = fopen(filename, "rb");
     if (pfile == NULL) {
-        pfile = fopen(derived, "r");
+        pfile = fopen(derived, "rb");
         if (pfile == NULL) {
             fprintf(stderr, "Cannot read %s nor %s: %s\n",
                     filename, derived, strerror(errno));
@@ -159,8 +159,9 @@ void balancing_read_header(balancing_ptr bal, const char * filename)
 void balancing_read(balancing_ptr bal, const char * filename)
 {
     FILE * pfile;
+
     ASSERT_ALWAYS(filename);
-    pfile = fopen(filename, "r");
+    pfile = fopen (filename, "rb");
     if (pfile == NULL) {
         perror(filename);
         abort();
