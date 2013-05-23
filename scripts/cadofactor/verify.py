@@ -64,8 +64,7 @@ if __name__ == "__main__":
     if "wudb" in args:
         wudb_name = args.wudb
 
-    conn = sqlite3.connect(wudb_name)
-    acc = wudb.WuAccess(conn)
+    acc = wudb.WuAccess(wudb_name)
 
     if "file" in args:
         # find wu for this file

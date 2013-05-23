@@ -679,9 +679,12 @@ class WuAccess(object): # {
         of as if the WuAccess instance were itself a persistent 
         storage device """
     
-    def __init__(self, conn):
-        self.conn = conn
+    def __init__(self, dbfilename):
+        self.conn = sqlite3.connect(dbfilename)
         self.mapper = Mapper(WuTable(), {"files": FilesTable()})
+    
+    def __del__(self):
+        self.conn.close()
     
     @staticmethod
     def to_str(wus):
@@ -893,7 +896,7 @@ class DbWorker(threading.Thread):
     def run(self):
         # One DB connection per thread. Created inside the new thread to make
         # sqlite happy
-        self.connection = sqlite3.connect(self.dbfilename)
+        wuar = WuAccess(self.dbfilename)
         while True:
             # We expect a 4-tuple in the task queue. The elements of the tuple:
             # a 2-array, where element [0] receives the result of the DB call, 
@@ -906,7 +909,6 @@ class DbWorker(threading.Thread):
             if fn_name == "terminate":
                 break
             ev = result_tuple[1]
-            wuar = WuAccess(self.connection)
             # Assign to tuple in-place, so result is visible to caller. 
             # No slice etc. here which would create a copy of the array
             try: result_tuple[0] = getattr(wuar, fn_name)(*args, **kargs)
@@ -914,7 +916,6 @@ class DbWorker(threading.Thread):
                 traceback.print_exc()
             ev.set()
             self.taskqueue.task_done()
-        self.connection.close()
 
 class DbRequest(object):
     """ Class that represents a request to a given WuAccess function.
@@ -1043,8 +1044,7 @@ if __name__ == '__main__': # {
     if use_pool:
         db_pool = DbThreadPool(dbname)
     else:
-        conn = sqlite3.connect(dbname)
-        db_pool = WuAccess(conn)
+        db_pool = WuAccess(dbname)
     
     if args["create"]:
         db_pool.create_tables()

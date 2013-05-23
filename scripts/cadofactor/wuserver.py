@@ -152,7 +152,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             os.environ[upload.DBFILENAMEKEY] = dbfilename
             if False:
                 self.send_response(200, "Script output follows")
-                upload.do_upload(db, input = self.rfile, output = self.wfile)
+                upload.do_upload(dbfilename, input = self.rfile, output = self.wfile)
             else:
                 http.server.CGIHTTPRequestHandler.do_POST(self)
         else:
@@ -199,7 +199,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         if not clientid.isalnum():
             return self.send_error(400, "Malformed client id specified")
         
-        # wu = wudb.WuAccess(db)
+        # wu = wudb.WuAccess(dbfilename)
         wu_text = db_pool.assign(clientid)
         if not wu_text:
             return self.send_error(404, "No work available")
