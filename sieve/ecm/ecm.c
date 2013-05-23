@@ -641,7 +641,7 @@ Brent12_curve_from_sigma (residue_t A, residue_t x, const residue_t sigma,
    Return 1 if it worked, 0 if a modular inverse failed. 
    If a modular inverse failed, the non-invertible value is stored in x.
 
-   The elliptic curve is B y^2 = x^2 + A x^2 + x
+   The elliptic curve is B y^2 = x^3 + A x^2 + x
    
    with A = (-3*a^4-6*a^2+1)/(4*a^3) = (1/a - 3*a*(a^2 + 2))/(2*a)^2
    and B = (a^2-1)^2/(4*a^3).
@@ -651,9 +651,20 @@ Brent12_curve_from_sigma (residue_t A, residue_t x, const residue_t sigma,
    A and x are obtained from u and v such that (u,v) = k*P on the curve
    v^2 = u^3 - 12*u, where P = (-2, 4).
 
+   In Sage notation:
+   E=EllipticCurve([-12,0])
+   P=E(-2,4)
+   k=2
+   kP=k*P; u=kP[0]; v=kP[1]
+   t2 = (u^2-12)/(4*u)
+   a = (u^2 - 4*u - 12)/(u^2 + 12*u - 12)
+   A = (-3*a^4-6*a^2+1)/(4*a^3)
+   B = (a^2-1)^2/(4*a^3)
+   x = (3*a^2+1)/(4*a)
+
    We want t^2 = (u^2-12)/4u, and a=(t^2-1)/(t^2+3), thus
    a = (u^2 - 4*u - 12)/(u^2 + 12*u - 12). 
-   We need both $a$ and $1/a$, so we can compute the inverses of both
+   We need both a and 1/a, so we can compute the inverses of both
    u^2 - 4*u - 12 and u^2 + 12*u - 12 with a single batch inversion.
 
    For k=2, we get u=4, v=-4, t=-1/2, a=-3/13, 
