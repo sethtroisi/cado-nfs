@@ -115,6 +115,11 @@ class WorkunitProcessor(Workunit):
 
     def renice(self):
         os.nice(int(self.settings["NICENESS"]))
+
+    @staticmethod
+    def paste_path(*arr):
+        arr2 = [p.rstrip(os.sep) for p in arr[:-1]] + [arr[-1]]
+        return os.sep.join(arr2)
     
     def run_commands(self):
         for (counter, command) in enumerate(self.wudata.get("COMMAND", [])):
@@ -156,7 +161,7 @@ class WorkunitProcessor(Workunit):
         '''
         if "RESULT" in self.wudata:
             for filename in self.wudata["RESULT"]:
-                filepath = self.settings["WORKDIR"] + os.sep + filename
+                filepath = self.paste_path(self.settings["WORKDIR"], filename)
                 if not os.path.isfile(filepath):
                     logging.info ("Result file %s does not exist", filepath)
                     return False
@@ -169,12 +174,12 @@ class WorkunitProcessor(Workunit):
         logging.info ("Cleaning up for workunit %s", self.get_id())
         if "RESULT" in self.wudata:
             for filename in self.wudata["RESULT"]:
-                filepath = self.settings["WORKDIR"] + os.sep + filename
+                filepath = self.paste_path(self.settings["WORKDIR"], filename)
                 logging.info ("Removing result file %s", filepath)
                 os.remove(filepath)
         if "DELETE" in self.wudata:
             for filename in self.wudata["DELETE"]:
-                filepath = self.settings["WORKDIR"] + os.sep + filename
+                filepath = self.paste_path(self.settings["WORKDIR"], filename)
                 logging.info ("Removing file %s", filepath)
                 os.remove(filepath)
 
@@ -183,8 +188,7 @@ class WorkunitProcessorClient(WorkunitProcessor):
         self.settings = settings
         # Download the WU file if none exists
         url = self.settings["GETWUPATH"]
-        self.wu_filename = self.settings["DLDIR"] + os.sep + \
-            self.settings["WU_FILENAME"]
+        self.wu_filename = self.paste_path(self.settings["DLDIR"], self.settings["WU_FILENAME"])
         options = "clientid=" + self.settings["CLIENTID"]
         if not self.get_missing_file(url, self.wu_filename, options=options):
             raise Exception("Error downloading workunit file")
@@ -223,7 +227,7 @@ class WorkunitProcessorClient(WorkunitProcessor):
     def get_file(self, urlpath, dlpath = None, options = None):
         # print('get_file("' + urlpath + '", "' + dlpath + '")')
         if dlpath == None:
-            dlpath = self.settings["DLDIR"] + os.sep + urlpath.split("/")[-1]
+            dlpath = self.paste_path(self.settings["DLDIR"], urlpath.split("/")[-1])
         url = self.settings["SERVER"] + "/" + urlpath
         if options:
             url = url + "?" + options
@@ -281,7 +285,7 @@ class WorkunitProcessorClient(WorkunitProcessor):
             templ = Template(filename)
             archname = templ.safe_substitute({"ARCH": self.settings["ARCH"]})
             dlname = templ.safe_substitute({"ARCH": ""})
-            dlpath = self.settings["DLDIR"] + os.sep + dlname
+            dlpath = self.paste_path(self.settings["DLDIR"], dlname)
             if not self.get_missing_file (archname, dlpath, checksum):
                 return False
             if filename in dict(self.wudata.get("EXECFILE", [])):
@@ -316,7 +320,7 @@ class WorkunitProcessorClient(WorkunitProcessor):
             mimedata.attach_key("failedcommand", self.failedcommand)
         if "RESULT" in self.wudata:
             for filename in self.wudata["RESULT"]:
-                filepath = self.settings["WORKDIR"] + os.sep + filename
+                filepath = self.paste_path(self.settings["WORKDIR"], filename)
                 mimedata.attach_file("results", filename, filepath)
         for name in self.stdio:
             for (counter, data) in enumerate(self.stdio[name]):
