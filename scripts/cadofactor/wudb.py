@@ -883,15 +883,62 @@ class WuAccess(object): # {
         r = self.mapper.where(cursor, limit=limit, **conditions)
         cursor.close()
         return r
+
+    def get_one_result(self):
+        r = self.query(limit = 1, eq={"status": WuStatus.RECEIVED_OK})
+        if not r:
+            r = self.query(limit = 1, eq={"status": WuStatus.RECEIVED_ERROR})
+        if not r:
+            return None
+        else:
+            return r[0]
 #}
 
 
+class ResultInfo(object):
+    def __init__(self, record):
+        # record looks like this:
+        # {'status': 0, 'errorcode': None, 'timeresult': None, 'wuid': 'testrun_polyselect_0-5000', 
+        #  'wurowid': 1, 'timecreated': '2013-05-23 22:28:08.333310', 'timeverified': None, 
+        #  'failedcommand': None, 'priority': None, 'wu': "WORKUNIT [..rest of workunit text...] \n", 
+        #  'assignedclient': None, 'retryof': None, 'timeassigned': None, 'resultclient': None, 
+        #  'files': None}
+        self.record = record
+    
+    def get_files(self):
+        files = []
+        for f in self.record["files"]:
+            if not f["filename"].startswith("stdout") and not f["filename"].startswith("stderr"):
+                files.append([f["filename"], f["path"]])
+        return files
+    
+    def get_file(self, filename):
+        for f in self.record["files"]:
+            if f["filename"] == "filename"
+                return f["path"]
+        return None
+
+    def get_stdout(self, command_nr):
+        return self.get_file("stdout%d" % command_nr, command_nr)
+    
+    def get_stderr(self, command_nr):
+        return self.get_file("stderr%d" % command_nr, command_nr)
+    
+    def get_exitcode(self, command_nr):
+        if not self.record["failedcommand"] is None \
+                and command_nr == int(self.record["failedcommand"]):
+            return int(self.record["errorcode"])
+        else:
+            return 0
+
+
 class DbAccess(object):
-    """ Base class that lets subclasses create DB-backed dictionaries on 
-    a database whose file name is specified in the db parameter to __init__.
+    """ Base class that lets subclasses create DB-backed dictionaries or 
+    WuAccess instances on a database whose file name is specified in the db 
+    parameter to __init__.
     Meant to be used as a cooperative class; it strips the db parameter from
-    the named parameter list and remembers it in a private variable so that
-    it can later be used to open DB connections.
+    the parameter list and remembers it in a private variable so that it can 
+    later be used to open DB connections.
     """
     
     def __init__(self, db, *args, **kwargs):
@@ -905,7 +952,7 @@ class DbAccess(object):
         return WuAccess(self.__db)
 
 
-class DbWorker(threading.Thread, DbAccess):
+class DbWorker(DbAccess, threading.Thread):
     """Thread executing WuAccess requests from a given tasks queue"""
     def __init__(self, taskqueue, *args, **kwargs):
         super().__init__(*args, **kwargs)

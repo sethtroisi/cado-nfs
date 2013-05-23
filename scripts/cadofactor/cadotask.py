@@ -59,6 +59,20 @@ class FilesCreator(wudb.DbAccess, metaclass=abc.ABCMeta):
         pass
 
 
+class DbListener(patterns.Observable, wudb.DbAccess)
+    def __init__(*args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.wuar = self.make_wu_access()
+    
+    def poll():
+        # Check for results
+        r = self.wuar.get_one_result()
+        if not r:
+            return
+        message = wudb.ResultInfo(r)
+        self.notifyObservers(message)
+    
+
 class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
     """ A base class that represents one task that needs to be processed. 
     
@@ -278,7 +292,6 @@ class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
             # This notification is not for me
             return
         return identifier
-    
 
 class ClientServerTask(Task):
     def __init__(self, *args, **kwargs):
@@ -301,7 +314,7 @@ class ClientServerTask(Task):
     def test_outputfile_exists(self, filename):
         # Can't test
         return False
-    
+        
 
 # Each task has positional parameters with references to the tasks from 
 # which it receives its inputs. This will be used to query the referenced 
@@ -412,11 +425,16 @@ class PolyselTask(ClientServerTask, patterns.Observer):
         super().__init__(*args, dependencies = None, **kwargs)
         self.state["adnext"] = \
             max(self.state.get("adnext", 0), int(self.params.get("admin", 0)))
+        self.state.setdefault("wu_submitted", 0)
+        self.state.setdefault("wu_received", 0)
+        assert self.state["wu_received"] <= self.state["wu_submitted"]
     
     def is_done(self):
         # self.logger.debug ("PolyselTask.is_done(): Task parameters: %s", 
         #                    self.params)
-        return "bestpoly" in self.state and self.state["adnext"] >= int(self.params["admax"])
+        return "bestpoly" in self.state and \
+               self.state["adnext"] >= int(self.params["admax"]) \ 
+               self.state["wu_received"] == self.state["wu_submitted"]
     
     def run(self):
         # Make command line for polselect2l, run it. 
@@ -439,7 +457,7 @@ class PolyselTask(ClientServerTask, patterns.Observer):
             self.bestpoly = None
             self.logger.info("No polynomial was previously found")
         
-        while not self.is_done():
+        while self.state["adnext"] <= int(self.params["admax"]):
             adstart = self.state["adnext"]
             adend = adstart + int(self.params["adrange"])
             polyselect_params = self.progparams[0].copy()
@@ -452,8 +470,12 @@ class PolyselTask(ClientServerTask, patterns.Observer):
             else:
                 p = self.programs[0](None, polyselect_params, stdout = outputfile)
                 self.submit_command(p, "%d-%d" % (adstart, adend))
+            self.state["wu_submitted"] += 1
             self.state["adnext"] = adend
         
+        while self.state["wu_received"] < self.state["wu_submitted"]:
+            self.wait()
+
         self.logger.info("%s finished", self.title)
         if not self.bestpoly:
             self.logger.error ("No polynomial found")
@@ -470,6 +492,7 @@ class PolyselTask(ClientServerTask, patterns.Observer):
             # This notification was not for me
             return
         assert len(output_files) == 1
+        self.state["wu_received"] += 1
         self.parse_poly(output_files[0])
     
     def parse_poly(self, outputfile):
