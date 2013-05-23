@@ -16,10 +16,6 @@ import upload
 # Get the shell environment variable name in which we should store the path 
 # to the upload directory
 
-upload_keywords = ['/upload.py']
-uploaddir='upload/' # Upload CGI script puts files in this directory
-dbfilename='wudb'
-
 class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     """Handle requests in a separate thread."""
 
@@ -101,6 +97,7 @@ class HtmlGen(io.BytesIO):
 
 
 class MyHandler(http.server.CGIHTTPRequestHandler):
+    upload_keywords = ['/upload.py']
 
     def log(self, lvl, format, *args, **kwargs):
         """ Interface to the logger class. 
@@ -148,11 +145,9 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
            and call CGI handler to run upload CGI script"""
         self.cwd = os.getcwd()
         if self.is_upload():
-            os.environ[upload.UPLOADDIRKEY] = uploaddir
-            os.environ[upload.DBFILENAMEKEY] = dbfilename
             if False:
                 self.send_response(200, "Script output follows")
-                upload.do_upload(dbfilename, input = self.rfile, output = self.wfile)
+                upload.do_upload(self.dbfilename, input = self.rfile, output = self.wfile)
             else:
                 http.server.CGIHTTPRequestHandler.do_POST(self)
         else:
@@ -163,7 +158,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         """Test whether request is a file upload."""
         splitpath = urllib.parse.urlsplit(self.path)
         if self.command == 'POST' and self.is_cgi() and \
-                splitpath.path in upload_keywords:
+                splitpath.path in self.upload_keywords:
             return True
         return False
 
@@ -199,7 +194,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         if not clientid.isalnum():
             return self.send_error(400, "Malformed client id specified")
         
-        # wu = wudb.WuAccess(dbfilename)
+        # wu = wudb.WuAccess(self.dbfilename)
         wu_text = db_pool.assign(clientid)
         if not wu_text:
             return self.send_error(404, "No work available")
@@ -275,24 +270,41 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         self.send_body(body.__bytes__())
 
 if __name__ == '__main__':
-    from sys import argv
-    PORT = 8001
-    HTTP = "" # address on which to listen
-    want_threaded = 1
+    import argparse
 
-    if want_threaded:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-address", help="Listen address", default="localhost")
+    parser.add_argument("-port", help="Listen port", default="8001")
+    parser.add_argument("-uploaddir", help="Upload directory", default="upload/")
+    parser.add_argument("-dbfile", help="Database file name", required=True)
+    parser.add_argument("-threaded", help="Use threaded server", action="store_true", default=False)
+    args = parser.parse_args()
+
+    if args.threaded:
+        print("Using threaded server")
         ServerClass = ThreadedHTTPServer
     else:
+        print("Not using threaded server")
         ServerClass = http.server.HTTPServer
 
     logger = HttpServerLogger(logging.INFO)
 
-    if argv[1:]:
-        PORT = int(argv[1])
+    PORT = int(args.port)
+    HTTP = args.address
+    dbfilename = args.dbfile
+    # Set shell environment variables which the upload.py script spawned as 
+    # subprocess needs
+    os.environ[upload.DBFILENAMEKEY] = dbfilename
+    os.environ[upload.UPLOADDIRKEY] = args.uploaddir
+
+    if not os.path.isdir(args.uploaddir):
+        os.mkdir(args.uploaddir)
 
     db_pool = wudb.DbThreadPool(dbfilename, 1)
 
     HandlerClass = MyHandler
+    HandlerClass.dbfilename = dbfilename
+
     httpd = ServerClass((HTTP, PORT), HandlerClass)
     httpd.server_name = "test"
 
