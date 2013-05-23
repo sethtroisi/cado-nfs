@@ -181,7 +181,7 @@
 #define LOG_MAX (255.9 - (double) GUARD)
 
 /* total number of curves used in cofactorization is NB_CURVES+3 */
-#define NB_CURVES 20
+#define NB_CURVES 24
 
 /* See PROFILE flag above */
 /* Some functions should not be inlined when we profile or it's hard or
