@@ -1001,14 +1001,14 @@ if __name__ == '__main__': # {
     parser.add_argument('-create', action="store_true", 
                         help='Create the database tables if they do not exist')
     parser.add_argument('-add', action="store_true", 
-                        help='Add new work units. Contents of WU(s) are ' + 
+                        help='Add new work units. Contents of WU(s) are ' 
                         'read from stdin, separated by blank line')
     parser.add_argument('-assign', nargs = 1, metavar = 'clientid', 
                         help = 'Assign an available WU to clientid')
     parser.add_argument('-cancel', nargs = 1, metavar = 'wuid', 
                         help = 'Cancel a WU with the given id')
-    parser.add_argument('-prio', nargs = 1, metavar = 'N', 
-                        help = 'If used with -add, newly added WUs ' + 
+    parser.add_argument('-prio', metavar = 'N', 
+                        help = 'If used with -add, newly added WUs ' 
                         'receive priority N')
     parser.add_argument('-result', nargs = 4, 
                         metavar = ('wuid', 'clientid', 'filename', 'filepath'), 
@@ -1022,7 +1022,7 @@ if __name__ == '__main__': # {
                         metavar = "FIELD", 
                         help='Dump WU contents, optionally a single field')
     for arg in ("dbname", "debug"):
-        parser.add_argument('-' + arg, nargs = 1)
+        parser.add_argument('-' + arg)
     # Parse command line, store as dictionary
     args = vars(parser.parse_args())
     # print(args)
@@ -1036,7 +1036,7 @@ if __name__ == '__main__': # {
         doctest.testmod()
 
     if args["debug"]:
-        debug = int(args["debug"][0])
+        debug = int(args["debug"])
     prio = 0
     if args["prio"]:
         prio = int(args["prio"][0])
