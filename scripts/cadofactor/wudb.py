@@ -883,20 +883,39 @@ class WuAccess(object): # {
         r = self.mapper.where(cursor, limit=limit, **conditions)
         cursor.close()
         return r
+#}
 
 
-class DbWorker(threading.Thread):
+class DbAccess(object):
+    """ Base class that lets subclasses create DB-backed dictionaries on 
+    a database whose file name is specified in the db parameter to __init__.
+    Meant to be used as a cooperative class; it strips the db parameter from
+    the named parameter list and remembers it in a private variable so that
+    it can later be used to open DB connections.
+    """
+    
+    def __init__(self, db, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__db = db
+    
+    def make_db_dict(self, name):
+        return DictDbAccess(self.__db, name)
+    
+    def make_wu_access(self):
+        return WuAccess(self.__db)
+
+
+class DbWorker(threading.Thread, DbAccess):
     """Thread executing WuAccess requests from a given tasks queue"""
-    def __init__(self, dbfilename, taskqueue):
-        threading.Thread.__init__(self)
-        self.dbfilename = dbfilename
+    def __init__(self, taskqueue, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.taskqueue = taskqueue
         self.start()
     
     def run(self):
         # One DB connection per thread. Created inside the new thread to make
         # sqlite happy
-        wuar = WuAccess(self.dbfilename)
+        wuar = self.make_wu_access()
         while True:
             # We expect a 4-tuple in the task queue. The elements of the tuple:
             # a 2-array, where element [0] receives the result of the DB call, 
@@ -940,7 +959,7 @@ class DbThreadPool(object):
         self.taskqueue = Queue(num_threads)
         self.pool = []
         for _ in range(num_threads): 
-            self.pool.append(DbWorker(dbfilename, self.taskqueue))
+            self.pool.append(DbWorker(self.taskqueue, db=dbfilename))
 
     def terminate(self):
         for t in self.pool:
@@ -1095,8 +1114,6 @@ if __name__ == '__main__': # {
     
     if use_pool:
         db_pool.terminate()
-    else:
-        conn.close()
 # }
 
 # Local Variables:

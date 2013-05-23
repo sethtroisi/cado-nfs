@@ -19,28 +19,8 @@ import cadologger
 # that don't overwrite. Or maybe two ways to specify external params:
 # --defaults which does not overwrite, and --forceparam which does
 
-class DbAccess(object):
-    """ Base class that lets subclasses create DB-backed dictionaries
-    on a database whose name is specified in the db parameter to __init__.
-    Meant to be used as a cooperative class; it strips the db parameter from
-    the named parameter list and remembers it in a private variable so that
-    it can later be used to open DB connections.
-    """
-    
-    def __init__(self, dbfilename, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if dbfilename is None:
-            raise Exception("The db parameter is required")
-        self.__dbfilename = dbfilename
-    
-    def make_db_dict(self, name):
-        return wudb.DictDbAccess(self.__dbfilename, name)
-    
-    def make_wu_access(self):
-        return wudb.WuAccess(self.__dbfilename)
-    
 
-class FilesCreator(DbAccess, metaclass=abc.ABCMeta):
+class FilesCreator(wudb.DbAccess, metaclass=abc.ABCMeta):
     """ A base class for classes that produce a list of output files, with
     some auxiliary information stored with each file (e.g., nr. of relations).
     This info is stored in the form of a DB-backed dictionary, with the file
@@ -79,7 +59,7 @@ class FilesCreator(DbAccess, metaclass=abc.ABCMeta):
         pass
 
 
-class Task(DbAccess, metaclass=abc.ABCMeta):
+class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
     """ A base class that represents one task that needs to be processed. 
     
     Sub-classes must define class variables:
