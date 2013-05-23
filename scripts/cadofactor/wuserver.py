@@ -127,7 +127,6 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
     def do_GET(self):
         """Generates a work unit if request is cgi-bin/getwu, otherwise calls
            parent class' do_GET()"""
-        self.cwd = os.getcwd()
         if self.is_cgi():
             if self.is_getwu():
                 self.send_WU()
@@ -143,13 +142,12 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
     def do_POST(self):
         """Set environment variable telling the upload directory 
            and call CGI handler to run upload CGI script"""
-        self.cwd = os.getcwd()
         if self.is_upload():
             if False:
                 self.send_response(200, "Script output follows")
                 upload.do_upload(self.dbfilename, input = self.rfile, output = self.wfile)
             else:
-                http.server.CGIHTTPRequestHandler.do_POST(self)
+                super().do_POST()
         else:
             self.send_error(404, "POST request allowed only for uploads")
         sys.stdout.flush()
@@ -177,7 +175,8 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         # Use text/plain for files in upload, unless the type was properly 
         # identified
         # FIXME: make path identification more robust
-        if type == "application/octet-stream" and path.startswith(self.cwd + '/upload/'):
+        cwd = os.getcwd().rstrip(os.sep)
+        if type == "application/octet-stream" and path.startswith(cwd + os.sep + 'upload' + os.sep):
             return "text/plain"
         return type
 
@@ -252,11 +251,12 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         body.append("<p>Query for conditions = " + str(conditions) + "</p>")
 
         if not wus is None and len(wus) > 0:
+            cwd = os.getcwd()
             body.append(str(len(wus)) + " records match.")
             keys = wus[0].keys()
             body.start_table(keys)
             for wu in wus:
-                body.wu_row(wu, keys, self.cwd)
+                body.wu_row(wu, keys, cwd)
             body.end_table()
         else:
             body.append("No records match.")
