@@ -70,7 +70,7 @@ void free_aligned(void * p, size_t size MAYBE_UNUSED, size_t alignment MAYBE_UNU
     size_t displ;
     memcpy(&displ, res - sizeof(size_t), sizeof(size_t));
     res -= displ;
-    ASSERT_ALWAYS(displ == alignment - ((uintptr_t) res) % alignment);
+    ASSERT_ALWAYS((displ + (uintptr_t) res) % alignment == 0);
     res -= sizeof(size_t);
     free(res);
 #endif

@@ -1497,7 +1497,7 @@ data_dest_ptr master_dispatcher_alloc(master_data m, parallelizing_info_ptr pi, 
 void master_dispatcher_setup_check_vector(data_dest_ptr xd, const char * name)
 {
     master_dispatcher_ptr d = (master_dispatcher_ptr) xd;
-    d->check_vector = fopen(name, "w");
+    d->check_vector = fopen(name, "wb");
     ASSERT_ALWAYS(d->check_vector != NULL);
 }
 

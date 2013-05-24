@@ -9,7 +9,7 @@ uint64_t a[2], b[2] = { 0x0C0B0A0908070605, 0x14131211100F0E0D };
 
 int main() {
   y = _mm_alignr_epi8(y, x, 0x5);
-  memcpy (a, &y, 16); 
+  memcpy (a, &y, 16);
   return(a[0] != b[0] || a[1] != b[1]);
 }
 
