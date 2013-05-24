@@ -1241,7 +1241,11 @@ int pi_save_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
         int rc;
         rc = asprintf(&filename, "%s.%u", name, iter);
         FATAL_ERROR_CHECK(rc < 0, "out of memory");
-        fd = open(filename, O_RDWR|O_CREAT, 0666);
+#ifdef HAVE_MINGW
+        fd = open(filename, O_RDWR | O_CREAT | O_BINARY, 0666);
+#else
+        fd = open(filename, O_RDWR | O_CREAT, 0666);
+#endif
         if (fd < 0) {
             fprintf(stderr, "fopen(%s): %s\n", filename, strerror(errno));
             goto pi_save_file_leader_init_done;
