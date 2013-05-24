@@ -70,6 +70,13 @@ void free_aligned(void * p, size_t size MAYBE_UNUSED, size_t alignment MAYBE_UNU
     size_t displ;
     memcpy(&displ, res - sizeof(size_t), sizeof(size_t));
     res -= displ;
+    if (displ != alignment - ((uintptr_t) res) % alignment)
+      {
+        fprintf (stderr, "res=%lx sizeof(size_t)=%lx displ=%zu alignment=%zu alignment - ((uintptr_t) res) % alignment=%zu\n",
+                 res, sizeof(size_t), displ, alignment,
+                 alignment - ((uintptr_t) res) % alignment);
+        fflush (stderr);
+      }
     ASSERT_ALWAYS(displ == alignment - ((uintptr_t) res) % alignment);
     res -= sizeof(size_t);
     free(res);
