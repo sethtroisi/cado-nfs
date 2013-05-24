@@ -31,9 +31,6 @@ class Observer(object):
     This is an abstract base class; the subclass must implement 
     updateObserver. 
     """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     @abc.abstractmethod
     def updateObserver(self, message):
         # Subclasses should implement this
