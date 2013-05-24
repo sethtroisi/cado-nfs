@@ -7,7 +7,7 @@
  */
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h> /* for WEXITSTATUS */
+#include <sys/wait.h> /* for WEXITSTATUS */
 #include "bwc_config.h"
 #include "parallelizing_info.h"
 #include "matmul_top.h"
