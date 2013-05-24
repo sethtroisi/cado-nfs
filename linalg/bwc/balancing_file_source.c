@@ -41,7 +41,7 @@ data_source_ptr file_source_alloc(const char * filename, size_t esz)
     file_source_ptr p = malloc(sizeof(file_source));
     memset(p, 0, sizeof(file_source)); 
     p->filename = filename;
-    p->f = fopen(filename, "r");
+    p->f = fopen(filename, "rb");
     if (p->f == NULL) {
 	perror(filename);
 	exit(1);
