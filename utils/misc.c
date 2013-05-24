@@ -72,7 +72,7 @@ void free_aligned(void * p, size_t size MAYBE_UNUSED, size_t alignment MAYBE_UNU
     res -= displ;
     if (displ != alignment - ((uintptr_t) res) % alignment)
       {
-        fprintf (stderr, "res=%lx sizeof(size_t)=%lx displ=%zu alignment=%zu alignment - ((uintptr_t) res) % alignment=%zu\n",
+        fprintf (stderr, "res=%lx sizeof(size_t)=%lx displ=%zu alignment=%zu alignment - ((uintptr_t) res) %% alignment=%zu\n",
                  res, sizeof(size_t), displ, alignment,
                  alignment - ((uintptr_t) res) % alignment);
         fflush (stderr);
