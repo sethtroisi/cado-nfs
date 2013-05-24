@@ -147,7 +147,7 @@ class Program(object):
     
     def make_command_array(self, binpath = None, inputpath = None, outputpath = None):
         # Begin command line with program to execute
-        command = [self.translate_path(self.get_exec_files()[0], binpath)]
+        command = [self.translate_path(self.get_exec_file(), binpath)]
         
         # Add keyword command line parameters
         for p in self.params_list:
@@ -199,11 +199,14 @@ class Program(object):
                     output_files.append(self.parameters[key])
         return output_files
     
-    def get_exec_files(self):
+    def get_exec_file(self):
         path = self.parameters.get("execpath", self.path)
         binary = self.parameters.get("execbin", self.binary)
         execfile = path.rstrip(os.sep) + os.sep + binary
-        return [execfile]
+        return execfile
+    
+    def get_exec_files(self):
+        return [self.get_exec_file()]
     
     def make_cmdline(self, binpath = None, inputpath = None, outputpath = None):
         cmdarr = self.make_command_array(binpath, inputpath, outputpath)
@@ -222,8 +225,7 @@ class Program(object):
         wu = ['WORKUNIT %s' % wuname]
         for f in self.get_input_files():
             wu.append('FILE %s' % os.path.basename(f))
-        for f in self.get_exec_files():
-            wu.append('EXECFILE %s' % os.path.basename(f))
+        wu.append('EXECFILE %s' % os.path.basename(self.get_exec_file()))
         wu.append('COMMAND %s' % self.make_cmdline(binpath = "${DLDIR}", inputpath = "${DLDIR}", outputpath = "${WORKDIR}"))
         for f in self.get_output_files():
             wu.append('RESULT %s' % os.path.basename(f))
@@ -256,7 +258,6 @@ class Program(object):
         #   referenced by ${WORKDIR}/, and on the server, the file name given
         #   to subsequent tasks must be that of the uploaded file in the 
         #   server's upload directory.
-        pass
     
     @staticmethod
     def _open_or_not(fn, mode):
@@ -434,6 +435,7 @@ class Merge(Program):
         Parameter("wmstmax")
         )
 
+# Todo: define is_input_file/is_output_file for remaining programs
 class Replay(Program):
     binary= "replay"
     name = binary

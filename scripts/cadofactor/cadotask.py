@@ -6,6 +6,7 @@ import os.path
 from fractions import gcd
 import abc
 import random
+import time
 import wudb
 import patterns
 import cadoprograms
@@ -58,20 +59,6 @@ class FilesCreator(wudb.DbAccess, metaclass=abc.ABCMeta):
     def make_tablename(self, name):
         pass
 
-
-class DbListener(patterns.Observable, wudb.DbAccess)
-    def __init__(*args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.wuar = self.make_wu_access()
-    
-    def poll():
-        # Check for results
-        r = self.wuar.get_one_result()
-        if not r:
-            return
-        message = wudb.ResultInfo(r)
-        self.notifyObservers(message)
-    
 
 class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
     """ A base class that represents one task that needs to be processed. 
@@ -263,6 +250,27 @@ class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
     def split_wuname(self, wuname):
         return wuname.split(self.wu_paste_char)
     
+    class ResultInfo(wudb.WuResultMessage):
+        def __init__(self, wuid, rc, stdout, stderr, output_files):
+            self.wuid = wuid
+            self.rc = rc
+            self.stdout = stdout
+            self.stderr = stderr
+            self.output_files = output_files
+        def get_wu_id(self):
+            return self.wuid
+        def get_output_files(self):
+            return self.output_files
+        def get_stdout(self, command_nr):
+            assert command_nr == 0
+            return self.stdout
+        def get_stderr(self, command_nr):
+            assert command_nr == 0
+            return self.stderr
+        def get_exitcode(self, command_nr):
+            assert command_nr == 0
+            return self.rc
+    
     def submit_command(self, command, identifier):
         ''' Run a command.
         Return the result tuple. If the caller is an Observer, also send
@@ -274,11 +282,19 @@ class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
         result = [wuname, rc, stdout, stderr]
         result.append(command.get_output_files())
         if isinstance(self, patterns.Observer):
-            self.updateObserver(result)
+            message = Task.ResultInfo(wuname, rc, stdout, stderr,
+                                      command.get_output_files())
+            self.updateObserver(message)
         return result
     
-    def filter_notification(self, wuname, rc, stdout, stderr, output_files):
-        self.logger.info("%s: received notification for WU: %s", self.name, wuname)
+    def filter_notification(self, message):
+        wuid = message.get_wu_id()
+        rc = message.get_exitcode(0)
+        stdout = message.get_stdout(0)
+        stderr = message.get_stderr(0)
+        output_files = message.get_output_files()
+        self.logger.info("%s: received notification for wuid=%s, rc=%d, output_files=[%s]",
+                         self.name, wuid, rc, ", ".join(output_files))
         if rc != 0:
             self.logger.error("Return code is: %d", rc)
         if stdout:
@@ -287,17 +303,27 @@ class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
             self.logger.error("stderr is: %s", stderr)
         if output_files:
             self.logger.info("Output files are: %s", ", ".join(output_files))
-        (name, task, identifier) = self.split_wuname(wuname)
+        (name, task, identifier) = self.split_wuname(wuid)
         if name != self.params["name"] or task != self.name:
             # This notification is not for me
             return
         return identifier
 
-class ClientServerTask(Task):
-    def __init__(self, *args, **kwargs):
+class ClientServerTask(Task, patterns.Observer):
+    @abc.abstractproperty
+    def paramnames(self):
+        return super().paramnames + ("maxwu",)
+    
+    def __init__(self, db_listener, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.wuar = self.make_wu_access()
         self.wuar.create_tables()
+        self.db_listener = db_listener
+        self.db_listener.subscribeObserver(self)
+        self.state.setdefault("wu_submitted", 0)
+        self.state.setdefault("wu_received", 0)
+        self.params.setdefault("maxwu", 10)
+        assert self.state["wu_received"] <= self.state["wu_submitted"]
     
     def submit_command(self, command, identifier):
         ''' Submit a workunit to the database.
@@ -305,16 +331,34 @@ class ClientServerTask(Task):
         result to updateObserver().
         '''
         
-        wuname = self.make_wuname(identifier)
-        wutext = command.make_wu(wuname)
-        print ("WU:\n%s" % wutext)
+        while self.state["wu_submitted"] - self.state["wu_received"] >= self.params["maxwu"]:
+            self.wait()
+        wuid = self.make_wuname(identifier)
+        wutext = command.make_wu(wuid)
+        self.logger.info("Adding workunit %s to database", wuid)
+        # print ("WU:\n%s" % wutext)
         self.wuar.create(wutext)
-        return super().submit_command(command, identifier)
+        self.state["wu_submitted"] += 1
+        # return super().submit_command(command, identifier)
+    
+    def verification(self, message, ok):
+        not_str = "ok"
+        wuid = message.get_wu_id()
+        if not ok:
+            not_str = "not ok"
+        self.logger.info("Marking workunit %s as %s", wuid, not_str)
+        self.wuar.verification(message.get_wu_id(), ok)
     
     def test_outputfile_exists(self, filename):
         # Can't test
         return False
-        
+    
+    def wait(self):
+        # If we get notification on new results reliably, we might not
+        # need this poll. But they probably won't be totally reliable
+        if not self.db_listener.send_result():
+            time.sleep(1)
+
 
 # Each task has positional parameters with references to the tasks from 
 # which it receives its inputs. This will be used to query the referenced 
@@ -402,7 +446,7 @@ class Polynomial(object):
                     f.write(key + ": %s\n" % params[key])
 
 
-class PolyselTask(ClientServerTask, patterns.Observer):
+class PolyselTask(ClientServerTask):
     """ Finds a polynomial, uses client/server """
     @property
     def name(self):
@@ -425,15 +469,12 @@ class PolyselTask(ClientServerTask, patterns.Observer):
         super().__init__(*args, dependencies = None, **kwargs)
         self.state["adnext"] = \
             max(self.state.get("adnext", 0), int(self.params.get("admin", 0)))
-        self.state.setdefault("wu_submitted", 0)
-        self.state.setdefault("wu_received", 0)
-        assert self.state["wu_received"] <= self.state["wu_submitted"]
     
     def is_done(self):
         # self.logger.debug ("PolyselTask.is_done(): Task parameters: %s", 
         #                    self.params)
         return "bestpoly" in self.state and \
-               self.state["adnext"] >= int(self.params["admax"]) \ 
+               self.state["adnext"] >= int(self.params["admax"]) and \
                self.state["wu_received"] == self.state["wu_submitted"]
     
     def run(self):
@@ -470,12 +511,11 @@ class PolyselTask(ClientServerTask, patterns.Observer):
             else:
                 p = self.programs[0](None, polyselect_params, stdout = outputfile)
                 self.submit_command(p, "%d-%d" % (adstart, adend))
-            self.state["wu_submitted"] += 1
             self.state["adnext"] = adend
         
         while self.state["wu_received"] < self.state["wu_submitted"]:
             self.wait()
-
+        
         self.logger.info("%s finished", self.title)
         if not self.bestpoly:
             self.logger.error ("No polynomial found")
@@ -486,14 +526,15 @@ class PolyselTask(ClientServerTask, patterns.Observer):
         return
     
     def updateObserver(self, message):
-        (wuname, rc, stdout, stderr, output_files) = message
-        identifier = self.filter_notification(wuname, rc, stdout, stderr, output_files)
+        identifier = self.filter_notification(message)
         if not identifier:
             # This notification was not for me
             return
+        output_files = message.get_output_files()
         assert len(output_files) == 1
         self.state["wu_received"] += 1
-        self.parse_poly(output_files[0])
+        ok = self.parse_poly(output_files[0])
+        self.verification(message, ok)
     
     def parse_poly(self, outputfile):
         poly = None
@@ -504,13 +545,16 @@ class PolyselTask(ClientServerTask, patterns.Observer):
                 except Exception as e:
                     self.logger.error("Invalid polyselect file %s: %s", 
                                       outputfile, e)
+                    return False
         
         if not poly or not poly.is_valid():
             self.logger.info('No polynomial found in %s', outputfile)
-        elif not poly.E:
+            return False
+        if not poly.E:
             self.logger.error("Polynomial in file %s has no Murphy E value" 
                               % outputfile)
-        elif not self.bestpoly or poly.E > self.bestpoly.E:
+            return False
+        if not self.bestpoly or poly.E > self.bestpoly.E:
             self.bestpoly = poly
             self.state["bestE"] = poly.E
             self.state["bestpoly"] = str(poly)
@@ -523,6 +567,7 @@ class PolyselTask(ClientServerTask, patterns.Observer):
                              "no better than current best with E=%g",
                              outputfile, poly.E, self.bestpoly.E)
         # print(poly)
+        return True
     
     def get_poly(self):
         if "bestpoly" in self.state:
@@ -675,7 +720,7 @@ class FreeRelTask(FactorBaseOrFreerelTask):
         return self.state["nfree"]
     
 
-class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
+class SievingTask(ClientServerTask, FilesCreator):
     """ Does the sieving, uses client/server """
     @property
     def name(self):
@@ -705,6 +750,7 @@ class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
             self.state.setdefault("qnext", int(self.params["qmin"]))
         self.state.setdefault("qnext", int(self.params["alim"]))
         self.state.setdefault("rels_found", 0)
+        self.params.setdefault("max_wus", 10)
     
     def run(self):
         self.logger.debug("Enter SievingTask.run(" + self.name + ")")
@@ -738,13 +784,15 @@ class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
         return
     
     def updateObserver(self, message):
-        (wuname, rc, stdout, stderr, output_files) = message
-        identifier = self.filter_notification(wuname, rc, stdout, stderr, output_files)
+        identifier = self.filter_notification(message)
         if not identifier:
             # This notification was not for me
             return
+        self.state["wu_received"] += 1
+        output_files = message.get_output_files()
         assert len(output_files) == 1
-        self.parse_output_file(output_files[0])
+        ok = self.parse_output_file(output_files[0])
+        self.verification(message, ok)
     
     def parse_output_file(self, filename):
         size = os.path.getsize(filename)
@@ -758,8 +806,9 @@ class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
                     self.state["rels_found"] += rels
                     self.logger.info("Found %d relations in %s, total is now %d",
                                      rels, filename, self.state["rels_found"])
-                    return
+                    return True
         self.logger.error("Number of relations message not found in file %s", filename)
+        return False
     
     def get_nrels(self, filename = None):
         """ Return the number of relations found, either the total so far or
@@ -771,8 +820,8 @@ class SievingTask(ClientServerTask, FilesCreator, patterns.Observer):
             return self.output_files[filename]
     
     def is_done(self):
-        return self.state["rels_found"] >= int(self.params["rels_wanted"]) 
-
+        return self.state["rels_found"] >= int(self.params["rels_wanted"])
+    
 
 class Duplicates1Task(Task, FilesCreator):
     """ Removes duplicate relations """
@@ -1363,7 +1412,7 @@ class SqrtTask(Task):
                     self.add_factor(factorlist[0])
                 self.state["next_dep"] += 1
             self.logger.info("%s has finished" % self.title)
-        
+        self.logger.info("Factors: %s" % " ".join(self.get_factors()))
         self.logger.debug("Exit SqrtTask.run(" + self.name + ")")
     
     def is_done(self):
@@ -1461,8 +1510,8 @@ class SqrtTask(Task):
         return True
 
 # FIXME: Is this a Task object? Probably not
-# Should this be in cadotask or in cadofactor?
-class CompleteFactorization(Task):
+# Should this be in cadotask or in cadofactor? Probably cadotask
+class CompleteFactorization(wudb.DbAccess):
     """ The complete factorization, aggregate of the individual tasks """
     """ Runs the square root """
     @property
@@ -1481,25 +1530,24 @@ class CompleteFactorization(Task):
     def paramnames(self):
         return super().paramnames
     
-    def __init__ (self, *args, **kwargs):
-        self.polysel = PolyselTask(*args, **kwargs)
-        self.fb = FactorBaseTask(self.polysel, *args, **kwargs)
-        self.freerel = FreeRelTask(self.polysel, *args, **kwargs)
-        self.sieving = SievingTask(self.polysel, self.fb, *args, **kwargs)
-        self.dup1 = Duplicates1Task(self.sieving, *args, **kwargs)
-        self.dup2 = Duplicates2Task(self.dup1, *args, **kwargs)
+    def __init__ (self, parameters, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.db_listener = self.make_db_listener()
+        self.polysel = PolyselTask(*args, parameters = parameters, db_listener = self.db_listener, **kwargs)
+        self.fb = FactorBaseTask(self.polysel, *args, parameters = parameters, **kwargs)
+        self.freerel = FreeRelTask(self.polysel, *args, parameters = parameters, **kwargs)
+        self.sieving = SievingTask(self.polysel, self.fb, *args, parameters = parameters, db_listener = self.db_listener, **kwargs)
+        self.dup1 = Duplicates1Task(self.sieving, *args, parameters = parameters, **kwargs)
+        self.dup2 = Duplicates2Task(self.dup1, *args, parameters = parameters, **kwargs)
         self.purge = PurgeTask(self.polysel, self.freerel, self.dup2,
-                               *args, **kwargs)
-        self.merge = MergeTask(self.purge, *args, **kwargs)
-        self.linalg = LinAlgTask(self.merge, *args, **kwargs)
+                               *args, parameters = parameters, **kwargs)
+        self.merge = MergeTask(self.purge, *args, parameters = parameters, **kwargs)
+        self.linalg = LinAlgTask(self.merge, *args, parameters = parameters, **kwargs)
         self.characters = CharactersTask(self.polysel, self.purge, self.merge,
-                                         self.linalg, *args, **kwargs)
+                                         self.linalg, *args, parameters = parameters, **kwargs)
         self.sqrt = SqrtTask(self.polysel, self.freerel, self.purge,
                              self.merge, self.linalg, self.characters,
-                             *args, **kwargs)
-        super().__init__(*args, dependencies = (self.sqrt,), **kwargs)
+                             *args, parameters = parameters, **kwargs)
     
     def run(self, *args, **kwargs):
-        self.logger.info("Beginning %s" % self.title)
-        super().run(*args, **kwargs)
-        self.logger.info("Factors: %s" % " ".join(self.sqrt.get_factors()))
+        self.sqrt.run(*args, **kwargs)

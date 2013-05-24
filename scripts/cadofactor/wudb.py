@@ -18,12 +18,15 @@ import sqlite3
 import threading
 import traceback
 import collections
+import abc
 from datetime import datetime
 from workunit import Workunit
 if sys.version_info.major == 3:
     from queue import Queue
 else:
     from Queue import Queue
+import patterns
+import signalhandler
 
 debug = 1
 
@@ -894,8 +897,24 @@ class WuAccess(object): # {
             return r[0]
 #}
 
+class WuResultMessage(metaclass=abc.ABCMeta):
+    @abc.abstractmethod
+    def get_wu_id(self):
+        pass
+    @abc.abstractmethod
+    def get_output_files(self):
+        pass
+    @abc.abstractmethod
+    def get_stdout(self, command_nr):
+        pass
+    @abc.abstractmethod
+    def get_stderr(self, command_nr):
+        pass
+    @abc.abstractmethod
+    def get_exitcode(self, command_nr):
+        pass
 
-class ResultInfo(object):
+class ResultInfo(WuResultMessage):
     def __init__(self, record):
         # record looks like this:
         # {'status': 0, 'errorcode': None, 'timeresult': None, 'wuid': 'testrun_polyselect_0-5000', 
@@ -905,31 +924,74 @@ class ResultInfo(object):
         #  'files': None}
         self.record = record
     
-    def get_files(self):
+    def get_wu_id(self):
+        return self.record["wuid"]
+    
+    def get_output_files(self):
+        """ Returns the list of output files of this workunit
+        
+        Only files that were specified in RESULT lines appear here;
+        automatically captured stdout and stderr does not. 
+        """
         files = []
         for f in self.record["files"]:
             if not f["filename"].startswith("stdout") and not f["filename"].startswith("stderr"):
-                files.append([f["filename"], f["path"]])
+                files.append(f["path"])
         return files
     
     def get_file(self, filename):
+        """ Get the file location of the file that was uploaded under the
+        name filename. Used internally.
+        """
         for f in self.record["files"]:
-            if f["filename"] == "filename"
+            if f["filename"] == "filename":
                 return f["path"]
         return None
-
+    
     def get_stdout(self, command_nr):
-        return self.get_file("stdout%d" % command_nr, command_nr)
+        """ Return the path to the file that captured stdout of the 
+        command_nr-th COMMAND in the workunit, or None if there was no stdout 
+        output. Note that explicitly redirected stdout that was uploaded via 
+        RESULT does not appear here, but in get_files()
+        """
+        return self.get_file("stdout%d" % command_nr)
     
     def get_stderr(self, command_nr):
-        return self.get_file("stderr%d" % command_nr, command_nr)
+        """ Like get_stdout(), but for stderr """
+        return self.get_file("stderr%d" % command_nr)
     
     def get_exitcode(self, command_nr):
+        """ Return the exit code of the command_nr-th command """
         if not self.record["failedcommand"] is None \
                 and command_nr == int(self.record["failedcommand"]):
             return int(self.record["errorcode"])
         else:
             return 0
+
+
+class DbListener(patterns.Observable, patterns.Observer):
+    """ Class that queries the Workunit database for available results
+    and sends them to its Observers.
+    
+    The query is triggered by receiving a SIGUSR1 (the instance subscribes to
+    the signal handler relay), or by calling send_result().
+    """
+    def __init__(self, db, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.wuar = WuAccess(db)
+        signalhandler.signal_usr1_relay.subscribeObserver(self)
+    
+    def updateObserver(self, message):
+        self.send_result()
+    
+    def send_result(self):
+        # Check for results
+        r = self.wuar.get_one_result()
+        if not r:
+            return False
+        message = ResultInfo(r)
+        self.notifyObservers(message)
+        return True
 
 
 class DbAccess(object):
@@ -950,6 +1012,9 @@ class DbAccess(object):
     
     def make_wu_access(self):
         return WuAccess(self.__db)
+    
+    def make_db_listener(self):
+        return DbListener(self.__db)
 
 
 class DbWorker(DbAccess, threading.Thread):
