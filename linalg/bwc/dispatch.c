@@ -96,7 +96,8 @@ void * dispatch_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_
             ASSERT_ALWAYS(rc>=0);
             rc = system(cmd);
             if (rc) {
-                fprintf(stderr, "%s returned %d\n", cmd, rc >> 8);
+                fprintf (stderr, "%s returned %d\n", cmd, rc);
+                fflush (stderr);
                 exit(1);
             } else {
                 printf("Check of %s against %s: ok\n", tmp, "Hx.0");
