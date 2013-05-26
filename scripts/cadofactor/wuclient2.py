@@ -190,8 +190,11 @@ class WorkunitProcessorClient(WorkunitProcessor):
         url = self.settings["GETWUPATH"]
         self.wu_filename = self.paste_path(self.settings["DLDIR"], self.settings["WU_FILENAME"])
         options = "clientid=" + self.settings["CLIENTID"]
-        if not self.get_missing_file(url, self.wu_filename, options=options):
-            raise Exception("Error downloading workunit file")
+        while not self.get_missing_file(url, self.wu_filename, options=options):
+            logging.error("Error downloading workunit file")
+            wait = float(self.settings["DOWNLOADRETRY"])
+            logging.error("Waiting %s seconds before retrying", wait)
+            time.sleep(wait)
 
         # Parse the contents of the WU file
         logging.debug ("Parsing workunit from file %s", self.wu_filename)
