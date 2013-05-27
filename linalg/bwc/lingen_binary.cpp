@@ -367,7 +367,7 @@ void read_data_for_series(polmat& A MAYBE_UNUSED, unsigned int ondisk_length)
 
     printf("Using A(X) div X in order to consider Y as starting point\n");
     rz = fread(buf, sizeof(unsigned long), ulongs_per_mat, f);
-    NEVER_HAPPENS(rz != ulongs_per_mat, exit(1););
+    NEVER_HAPPENS(rz != ulongs_per_mat, abort(););
     sequence_length--;
 
     polmat a(m, n, sequence_length);
@@ -379,7 +379,7 @@ void read_data_for_series(polmat& A MAYBE_UNUSED, unsigned int ondisk_length)
     unsigned int offset = 0;
     for(unsigned int k = 0 ; k < sequence_length ; k++) {
         rz = fread(buf, sizeof(unsigned long), ulongs_per_mat, f);
-        NEVER_HAPPENS(rz != ulongs_per_mat, exit(1););
+        NEVER_HAPPENS(rz != ulongs_per_mat, abort(););
 
         unsigned long * v = buf;
         unsigned long lmask = 1UL;
@@ -481,7 +481,7 @@ void bw_commit_f(polmat& F)
         }
 
         rz = fwrite(buf, sizeof(unsigned long), ulongs_per_mat, f);
-        NEVER_HAPPENS(rz != ulongs_per_mat, exit(1););
+        NEVER_HAPPENS(rz != ulongs_per_mat, abort(););
 
         for(unsigned int i = 0 ; i < nres ; i++) {
             if (foffsets[i] == UINT_MAX)
