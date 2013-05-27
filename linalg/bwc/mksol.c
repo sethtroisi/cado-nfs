@@ -225,6 +225,8 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
 
             for(int i = 0 ; i < bw->interval ; i++) {
                 rc = fread(ahead->v, A->vec_elt_stride(A,1), bw->n, f);
+                fprintf (stderr, "rc=%d bw->n=%d\n", rc, bw->n);
+                fflush (stderr);
                 ASSERT_ALWAYS(rc == 0 || rc == bw->n);
                 if (rc == 0) {
                     printf("Exhausted F data after %d coefficients\n", s+i);

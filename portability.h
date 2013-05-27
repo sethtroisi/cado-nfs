@@ -197,8 +197,8 @@ fprintf_subst_zu (FILE * const stream, const char * const format, ...)
   return r;
 }
 
-#define printf  printf_subst_zu
-#define fprintf fprintf_subst_zu
+// #define printf  printf_subst_zu
+// #define fprintf fprintf_subst_zu
 
 #endif /* ifdef HAVE_MINGW */
 
