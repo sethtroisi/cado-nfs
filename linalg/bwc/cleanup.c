@@ -61,12 +61,7 @@ int main(int argc, char **argv)
     for(int i = 0 ; i < argc ; i++) {
         struct stat sbuf[1];
         int rc = stat(argv[i], sbuf);
-        if (rc < 0)
-          {
-            fprintf (stderr, "Error, file %s not found\n", argv[i]);
-            fflush (stderr);
-            exit(1);
-          }
+        if (rc < 0) { perror(argv[i]); exit(1); }
         ASSERT_ALWAYS(sbuf->st_size % (ncols/8) == 0);
         unsigned int nrows = sbuf->st_size / (ncols/8);
         fprintf(stderr, "%s: %u x %u\n", argv[i], nrows, ncols);
