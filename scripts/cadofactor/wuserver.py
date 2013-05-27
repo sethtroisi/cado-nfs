@@ -139,8 +139,10 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         # Path in url always starts with '/'
         relpath = self.path.lstrip('/')
         if relpath in self.registered_filenames:
+            self.log(logging.DEBUG, "Translated file name %s to %s", relpath, self.registered_filenames[relpath])
             return self.registered_filenames[relpath]
         else:
+            self.log(logging.DEBUG, "Not translating file name %s ", relpath)
             return super().translate_path(path)
     
     def do_GET(self):
