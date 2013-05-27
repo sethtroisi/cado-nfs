@@ -166,13 +166,13 @@ int main(int argc, char * argv[])
         exit(1);
     }
     /*
-    FILE * m = fopen(argv[1], "r");
+    FILE * m = fopen(argv[1], "rb");
     if (m == NULL) {
         perror(argv[1]);
         exit(1);
     }
     */
-    FILE * v = fopen(argv[2], "r");
+    FILE * v = fopen(argv[2], "rb");
     if (v == NULL) {
         perror(argv[1]);
         exit(1);

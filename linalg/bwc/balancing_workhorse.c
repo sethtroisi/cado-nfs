@@ -848,7 +848,7 @@ void set_slave_variables(slave_data s, param_list pl, parallelizing_info_ptr pi)
 	// we'll use an auxiliary file. In this case, we only care about
 	// having the write window reasonably large.
 	s->rq_size = disk_io_window_size;
-	s->auxfile = fopen(s->tmatfile_aux, "w");
+	s->auxfile = fopen(s->tmatfile_aux, "wb");
 	FATAL_ERROR_CHECK(rc < 0, "out of memory");
     }
     */

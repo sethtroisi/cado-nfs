@@ -61,7 +61,7 @@ static int statfields(pid_t t, ...)
     int rc = asprintf(&tmp,"/proc/%d/stat",t);
     if (rc < 0) return 0;
     char buf[1024];
-    FILE * f = fopen(tmp,"r");
+    FILE * f = fopen(tmp,"rb");
     char * s = fgets(buf, sizeof(buf), f);
     if (s == NULL) return 0;
     int j = va_arg(ap, int);

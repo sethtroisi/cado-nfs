@@ -153,7 +153,7 @@ int main(int argc, char * argv[])
         mfile = NULL;
         m_in->f = stdin;
     } else {
-        m_in->f = fopen(mfile, "r");
+        m_in->f = fopen(mfile, "rb");
         if (m_in->f == NULL) { perror(mfile); exit(1); }
     }
     if (mfile) freq_default_prefix=mfile;
@@ -173,7 +173,7 @@ int main(int argc, char * argv[])
             ofile = NULL;
             m_out->f = stdout;
         } else {
-            m_out->f = fopen(ofile, "w");
+            m_out->f = fopen(ofile, "wb");
         }
         if (ascii_out || binary_out) {
             m_out->ascii = ascii_out;
@@ -221,8 +221,8 @@ int main(int argc, char * argv[])
         }
     }
 
-    if (rwfile) rw->f = fopen(rwfile, "w");
-    if (cwfile) cw->f = fopen(cwfile, "w");
+    if (rwfile) rw->f = fopen(rwfile, "wb");
+    if (cwfile) cw->f = fopen(cwfile, "wb");
 
     matrix_read_pass(m_in,
             m_out->f ? m_out : NULL,
