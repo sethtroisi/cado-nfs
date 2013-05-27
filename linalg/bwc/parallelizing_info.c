@@ -1355,7 +1355,11 @@ int pi_save_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
         int rc;
         rc = asprintf(&filename, "%s.%u", name, iter);
         FATAL_ERROR_CHECK(rc < 0, "out of memory");
-        fd = open(filename, O_RDWR|O_CREAT, 0666);
+#ifdef HAVE_MINGW
+        fd = open(filename, O_RDWR | O_CREAT | O_BINARY, 0666);
+#else
+        fd = open(filename, O_RDWR | O_CREAT, 0666);
+#endif
         if (fd < 0) {
             fprintf(stderr, "fopen(%s): %s\n", filename, strerror(errno));
             goto pi_save_file_2d_leader_init_done;
@@ -1462,7 +1466,11 @@ int pi_load_file(pi_wiring_ptr w, const char * name, unsigned int iter, void * b
         int rc;
         rc = asprintf(&filename, "%s.%u", name, iter);
         FATAL_ERROR_CHECK(rc < 0, "out of memory");
+#ifdef HAVE_MINGW
+        fd = open(filename, O_RDONLY | O_BINARY, 0666);
+#else
         fd = open(filename, O_RDONLY, 0666);
+#endif
         DIE_ERRNO_DIAG(fd < 0, "fopen", filename);
 #ifdef HAVE_MMAN_H
         sendbuf = mmap(NULL, wsiz, PROT_READ, MAP_SHARED, fd, 0);
@@ -1587,7 +1595,11 @@ int pi_load_file_2d(parallelizing_info_ptr pi, int d, const char * name, unsigne
         int rc;
         rc = asprintf(&filename, "%s.%u", name, iter);
         FATAL_ERROR_CHECK(rc < 0, "out of memory");
+#ifdef HAVE_MINGW
+        fd = open(filename, O_RDONLY | O_BINARY, 0666);
+#else
         fd = open(filename, O_RDONLY, 0666);
+#endif
         DIE_ERRNO_DIAG(fd < 0, "fopen", filename);
 #ifdef HAVE_MMAN_H
         sendbuf = mmap(NULL, wsiz, PROT_READ, MAP_SHARED, fd, 0);

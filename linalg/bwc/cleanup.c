@@ -30,6 +30,7 @@ int main(int argc, char **argv)
     param_list_parse_uint(pl, "ncols", &ncols);
     if (param_list_warn_unused(pl) || ncols == 0 || outfile == 0) {
         fprintf(stderr, "Usage: ./cleanup -ncols <N> -out <file> <file.0> <file.1> ...\n");
+        fflush (stderr);
         exit(1);
     }
 

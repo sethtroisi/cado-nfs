@@ -170,13 +170,13 @@ int main(int argc, char * argv[])
         if (k1-k0 == 1)
             continue;
         did_merge++;
-        FILE * f = fopen("A.temp", "w");
+        FILE * f = fopen("A.temp", "wb");
         for(int k = k0 ; k < k1 ; k++) {
             char * tmp;
             int rc = asprintf(&tmp, A_FILE_PATTERN,
                     a->a[k]->n0,a->a[k]->n1,a->a[k]->j0,a->a[k]->j1);
             ASSERT_ALWAYS(rc >= 0);
-            FILE * g = fopen(tmp, "r");
+            FILE * g = fopen(tmp, "rb");
             char buf[BUFSIZ];
             for( ; ; ) {
                 int nr = fread(buf, 1, BUFSIZ, g);
@@ -238,7 +238,7 @@ int main(int argc, char * argv[])
     if (read_afiles(a) == 0)
         return 0;
 
-    FILE * f = fopen("A.temp", "w");
+    FILE * f = fopen("A.temp", "wb");
     for(int k0=0, k1 ; k0 < a->n ; k0 = k1) {
         unsigned int j0 = a->a[k0]->j0;
         unsigned int j1 = a->a[k0]->j1;
@@ -276,7 +276,7 @@ int main(int argc, char * argv[])
             int rc = asprintf(&tmp, A_FILE_PATTERN,
                     a->a[k]->n0,a->a[k]->n1,a->a[k]->j0,a->a[k]->j1);
             ASSERT_ALWAYS(rc >= 0);
-            rs[k - k0] = fopen(tmp, "r");
+            rs[k - k0] = fopen(tmp, "rb");
             if (rs[k-k0] == NULL) {
                 fprintf(stderr, "fopen(%s): %s\n", tmp, strerror(errno));
                 exit(1);

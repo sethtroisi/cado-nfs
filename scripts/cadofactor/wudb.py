@@ -1007,6 +1007,9 @@ class DbAccess(object):
         super().__init__(*args, **kwargs)
         self.__db = db
     
+    def get_db_filename(self):
+        return self.__db
+    
     def make_db_dict(self, name):
         return DictDbAccess(self.__db, name)
     

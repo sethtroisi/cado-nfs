@@ -392,7 +392,7 @@ int main(int argc, char * argv[])
         }
         A->vec_set_zero(A, p->colvec, p->mm->dim[1]);
         A->vec_set_zero(A, p->rowvec, p->mm->dim[0]);
-        FILE * f = fopen(tmp, "r");
+        FILE * f = fopen(tmp, "rb");
         if (f == NULL) {
             fprintf(stderr, "fopen(%s): %s\n", tmp, strerror(errno));
             exit(1);
@@ -414,7 +414,7 @@ int main(int argc, char * argv[])
         char * dstfile;
         int rc = asprintf(&dstfile, "%s.dst", tmp);
         ASSERT_ALWAYS(rc >= 0);
-        f = fopen(dstfile, "w");
+        f = fopen(dstfile, "wb");
         int nw = p->mm->dim[0 ^ ba->transpose];
         fprintf(stderr, "writing %zu bytes to %s\n",
                 nw * sizeof(uint64_t), dstfile);

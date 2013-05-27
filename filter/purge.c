@@ -100,7 +100,8 @@ typedef struct {
 } fr_t;
 
 /* Main variables */
-static char rep_cado[4096];         /* directory of cado to find utils/antebuffer */
+static char antebuffer[PATH_MAX];         /* "directory/antebuffer" or "cat" */
+static char rep_cado[PATH_MAX];
 
 static hashtable_t H;
 static HR_T **rel_compact  = NULL; /* see above */
@@ -1628,7 +1629,7 @@ prempt_scan_relations_pass_one ()
   rs->pipe = 1;
   length_line = 0;
 
-  prempt_data->files = prempt_open_compressed_rs (rep_cado, fic);
+  prempt_data->files = prempt_open_compressed_rs (antebuffer, fic);
 
   SMALLOC (prempt_data->buf, PREMPT_BUF, "prempt_scan_relations_pass_one 3");
   pmin = prempt_data->buf;
@@ -1891,7 +1892,7 @@ prempt_scan_relations_pass_two (const char *oname,
   rs->pipe = 1;
   length_line = 0;
 
-  prempt_data->files = prempt_open_compressed_rs (rep_cado, fic);
+  prempt_data->files = prempt_open_compressed_rs (antebuffer, fic);
 
   SMALLOC(prempt_data->buf, PREMPT_BUF, "prempt_scan_relations_pass_two 3");
   pmin = prempt_data->buf;
@@ -2168,6 +2169,40 @@ set_rep_cado (const char *argv0) {
   strcat(rep_cado, "/../");
 }
 
+static char *
+search_real_exec_in_path (const char *executable, char *real_path) {
+  char dummy[PATH_MAX];
+  char *p = getenv("PATH");
+  char *path = (p == NULL || strlen(p) == 0) ? strdup(".") : strdup(p);
+  char *pp = path;
+  unsigned int end = 0;
+  while (!end) {
+    char *ppe = strchr(pp, ':');
+    if (UNLIKELY(!ppe))
+      ppe = pp + strlen (pp);
+    if (LIKELY(ppe != pp)) {
+      memcpy (dummy, pp, ppe - pp);
+      dummy[ppe - pp] = '/';
+      dummy[ppe - pp + 1] = 0;
+    }
+    else
+      strcpy (dummy, "./");
+    strcat(dummy, executable);
+#ifdef EXECUTABLE_SUFFIX
+    strcat (dummy, EXECUTABLE_SUFFIX);
+#endif
+    if (LIKELY(*ppe))
+      pp = ppe + 1;
+    else
+      end = 1;
+    if (UNLIKELY(realpath(dummy, real_path) != NULL))
+      end = 2;
+  }
+  free (path);
+  if (end != 2) *real_path = 0;
+  return(real_path);
+}
+
 int
 main (int argc, char **argv)
 {
@@ -2243,6 +2278,7 @@ main (int argc, char **argv)
   }
   param_list_parse_uint(pl, "npass", &npass);
   param_list_parse_double(pl, "required_excess", &required_excess);
+  const char * path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
   const char * filelist = param_list_lookup_string(pl, "filelist");
   const char * basepath = param_list_lookup_string(pl, "basepath");
   const char * subdirlist = param_list_lookup_string(pl, "subdirlist");
@@ -2253,6 +2289,47 @@ main (int argc, char **argv)
 #ifdef FOR_DL
   const char * deletedname = param_list_lookup_string(pl, "outdel");
 #endif
+
+  *antebuffer = 0;
+  /* First, if we have path_antebuffer, we must have antebuffer or error */
+  if (path_antebuffer != NULL) {
+    char dummy[PATH_MAX];
+    strcpy(dummy, path_antebuffer);
+    strcat(dummy, "/antebuffer");
+#ifdef EXECUTABLE_SUFFIX
+    strcat (dummy, EXECUTABLE_SUFFIX);
+#endif
+    if (realpath(dummy, antebuffer) == NULL) {
+      fprintf (stderr, "antebuffer path (%s) error : %s\n", dummy, strerror(errno));
+      exit (1);
+    }
+  }
+  /* Second, we search antebuffer in cado directory */
+  if (!*antebuffer) {
+    char dummy[PATH_MAX];
+    strcpy(dummy, rep_cado);
+    strcat(dummy, "utils/antebuffer");
+#ifdef EXECUTABLE_SUFFIX
+    strcat (dummy, EXECUTABLE_SUFFIX);
+#endif
+    if (realpath(dummy, antebuffer) == NULL) *antebuffer = 0;
+  }
+  /* 3th, we try the PATH */
+  if (!*antebuffer)
+    search_real_exec_in_path ("antebuffer", antebuffer);
+  /* 4th, OK, antebuffer is not here. cat is need to replace it */
+  if (!*antebuffer) {
+    search_real_exec_in_path ("cat", antebuffer);
+    if (!*antebuffer) {
+      fprintf (stderr, "antebuffer or cat paths not found: %s\n", strerror(errno));
+      exit (1);
+    }
+    /* cat needs no argument... except a space after its name! */
+    strcat (antebuffer, " ");
+  }
+  else /* real antebuffer is found : strcat its arguments */
+    strcat (antebuffer, " 24 ");
+
   binfilerel = (infilerel != 0);
   boutfilerel = (outfilerel != 0);
 

@@ -256,7 +256,7 @@ void * krylov_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UN
         if (pi->m->trank == 0 && pi->m->jrank == 0) {
             char * tmp;
             rc = asprintf(&tmp, A_FILE_PATTERN, ys[0], ys[1], s, s+bw->interval);
-            FILE * f = fopen(tmp, "w");
+            FILE * f = fopen(tmp, "wb");
             rc = fwrite(xymats->v, A->vec_elt_stride(A, 1), bw->m*bw->interval, f);
             if (rc != bw->m*bw->interval) {
                 fprintf(stderr, "Ayee -- short write\n");

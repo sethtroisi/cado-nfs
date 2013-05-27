@@ -272,7 +272,7 @@ blockmatrix_read_from_flat_file (blockmatrix k, int i0, int j0,
                                  const char * name, unsigned int fnrows,
                                  unsigned int fncols)
 {
-    FILE * f = fopen(name, "r");
+    FILE * f = fopen(name, "rb");
     ASSERT_ALWAYS(f);
     ASSERT_ALWAYS(i0 + fnrows <= k->nrows);
     ASSERT_ALWAYS(j0 + fncols <= k->ncols);
@@ -294,7 +294,7 @@ blockmatrix_read_from_flat_file (blockmatrix k, int i0, int j0,
 #if 1
 void blockmatrix_read_transpose_from_flat_file(blockmatrix k, int i0, int j0, const char * name, unsigned int fnrows, unsigned int fncols)
 {
-    FILE * f = fopen(name, "r");
+    FILE * f = fopen(name, "rb");
     ASSERT_ALWAYS(f);
     ASSERT_ALWAYS(i0 + fncols <= k->nrows);
     ASSERT_ALWAYS(j0 + fnrows <= k->ncols);
@@ -326,7 +326,7 @@ void blockmatrix_read_transpose_from_flat_file(blockmatrix k, int i0, int j0, co
 
 void blockmatrix_write_to_flat_file(const char * name, blockmatrix k, int i0, int j0, unsigned int fnrows, unsigned int fncols)
 {
-    FILE * f = fopen(name, "w");
+    FILE * f = fopen(name, "wb");
     ASSERT_ALWAYS(f);
     ASSERT_ALWAYS(i0 + fnrows <= k->nrows);
     ASSERT_ALWAYS(j0 + fncols <= k->ncols);

@@ -11,6 +11,7 @@ import wudb
 import patterns
 import cadoprograms
 import cadologger
+import wuserver
 
 # Some parameters are provided by the param file but can change during
 # the factorization, like rels_wanted. On one hand, we want automatic 
@@ -119,7 +120,6 @@ class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
         # DB-backed dictionary with the state of this task
         self.state = self.make_db_dict(self.make_tablename())
         self.logger.debug("%s: state = %s", self.title, self.state)
-        # Derived class must define name
         # Set default parametes for this task, if any are given
         if parameters:
             self.params = parameters.myparams(self.paramnames, self.parampath)
@@ -293,20 +293,22 @@ class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
         stdout = message.get_stdout(0)
         stderr = message.get_stderr(0)
         output_files = message.get_output_files()
-        self.logger.info("%s: received notification for wuid=%s, rc=%d, output_files=[%s]",
+        self.logger.debug("%s: Received notification for wuid=%s, rc=%d, output_files=[%s]",
                          self.name, wuid, rc, ", ".join(output_files))
         if rc != 0:
             self.logger.error("Return code is: %d", rc)
         if stdout:
-            self.logger.info("stdout is: %s", stdout)
+            self.logger.debug("stdout is: %s", stdout)
         if stderr:
             self.logger.error("stderr is: %s", stderr)
         if output_files:
-            self.logger.info("Output files are: %s", ", ".join(output_files))
+            self.logger.debug("Output files are: %s", ", ".join(output_files))
         (name, task, identifier) = self.split_wuname(wuid)
         if name != self.params["name"] or task != self.name:
             # This notification is not for me
+            self.logger.debug("%s: Notification is not for me")
             return
+        self.logger.debug("%s: Notification is for me")
         return identifier
 
 class ClientServerTask(Task, patterns.Observer):
@@ -314,10 +316,11 @@ class ClientServerTask(Task, patterns.Observer):
     def paramnames(self):
         return super().paramnames + ("maxwu",)
     
-    def __init__(self, db_listener, *args, **kwargs):
+    def __init__(self, db_listener, registered_filenames, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.wuar = self.make_wu_access()
         self.wuar.create_tables()
+        self.registered_filenames = registered_filenames
         self.db_listener = db_listener
         self.db_listener.subscribeObserver(self)
         self.state.setdefault("wu_submitted", 0)
@@ -335,11 +338,20 @@ class ClientServerTask(Task, patterns.Observer):
             self.wait()
         wuid = self.make_wuname(identifier)
         wutext = command.make_wu(wuid)
+        for filename in command.get_exec_files() + command.get_input_files():
+            basename = os.path.basename(filename)
+            if not basename in self.registered_filenames:
+                self.logger.debug("Registering file name %s with target %s", basename, filename)
+                self.registered_filenames.setdefault(basename, filename)
+            # If it was already defined with a different target, error
+            if not self.registered_filenames[basename] == filename:
+                raise Exception("Filename %s, to be registered for target %s, already registered for target %s" %
+                                basename, filename, self.registered_filenames[basename])
+        
         self.logger.info("Adding workunit %s to database", wuid)
         # print ("WU:\n%s" % wutext)
         self.wuar.create(wutext)
         self.state["wu_submitted"] += 1
-        # return super().submit_command(command, identifier)
     
     def verification(self, message, ok):
         not_str = "ok"
@@ -359,15 +371,6 @@ class ClientServerTask(Task, patterns.Observer):
         if not self.db_listener.send_result():
             time.sleep(1)
 
-
-# Each task has positional parameters with references to the tasks from 
-# which it receives its inputs. This will be used to query the referenced 
-# tasks' parameters, list of output files, etc. - all the info the current 
-# task needs to run and which is produced by previous tasks. Since the 
-# dependencies are an intrinsic property of a given task, they are passed 
-# as positional parameters rather than as, say, a list. The abstract 
-# superclass Task receives the dependecies as a list; this list is stored 
-# and used for graph traversal which is implemented in Task.
 
 class Polynomial(object):
     # Keys that can occur in a polynomial file in their preferred ordering,
@@ -750,7 +753,13 @@ class SievingTask(ClientServerTask, FilesCreator):
             self.state.setdefault("qnext", int(self.params["qmin"]))
         self.state.setdefault("qnext", int(self.params["alim"]))
         self.state.setdefault("rels_found", 0)
+        self.state.setdefault("rels_wanted", 0)
         self.params.setdefault("max_wus", 10)
+        if "rels_wanted" in self.params:
+            self.state["rels_wanted"] = max(self.state["rels_wanted"], int(self.params["rels_wanted"]))
+        else:
+            # Choose sensible default value
+            pass
     
     def run(self):
         self.logger.debug("Enter SievingTask.run(" + self.name + ")")
@@ -818,9 +827,12 @@ class SievingTask(ClientServerTask, FilesCreator):
             return self.state["rels_found"]
         else:
             return self.output_files[filename]
+
+    def request_more_relations(self, additional):
+        self.state["rels_wanted"] += additional
     
     def is_done(self):
-        return self.state["rels_found"] >= int(self.params["rels_wanted"])
+        return self.state["rels_found"] >= int(self.state["rels_wanted"])
     
 
 class Duplicates1Task(Task, FilesCreator):
@@ -1079,10 +1091,11 @@ class PurgeTask(Task):
     
     # purge -poly c59.poly -keep 160 -nrels 226167 -out c59.purged.gz -npthr 1x1 -basepath /tmp/cado.wNhDsCM6BS -subdirlist c59.subdirlist -filelist c59.filelist
     
-    def __init__(self, polyselect, freerel, duplicates2, *args, **kwargs):
+    def __init__(self, polyselect, freerel, sieving, duplicates2, *args, **kwargs):
         super().__init__(*args, dependencies = (duplicates2,), **kwargs)
         self.polyselect = polyselect
         self.freerel = freerel
+        self.sieving = sieving
         self.duplicates2 = duplicates2
     
     def run(self):
@@ -1109,10 +1122,13 @@ class PurgeTask(Task):
             kwargs["out"] = purgedfile
             p = self.programs[0](args, kwargs)
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
-            [nrows, weight, excess] = self.parse_stdout(stdout)
-            self.logger.info("After purge, %d relations remain with weight %s and excess %s"
-                             % (nrows, weight, excess))
-            self.state["purgedfile"] = purgedfile
+            if self.parse_stderr(stderr):
+                [nrows, weight, excess] = self.parse_stdout(stdout)
+                self.logger.info("After purge, %d relations remain with weight %s and excess %s"
+                                 % (nrows, weight, excess))
+                self.state["purgedfile"] = purgedfile
+            else:
+                self.sieving.request_more_relations(int(self.sieving.get_nrels() * 1.1))
         self.logger.debug("Exit PurgeTask.run(" + self.name + ")")
     
     def get_purged_filename(self):
@@ -1121,10 +1137,23 @@ class PurgeTask(Task):
     def is_done(self):
         return "purgedfile" in self.state
     
+    def parse_stderr(self, stderr):
+        # If stderr ends with 
+        # b'excess < 0.10 * #primes. See -required_excess argument.'
+        # then we need more relations from filtering and return False
+        for line in stderr.decode("ascii").splitlines():
+            if re.match("excess < \d+.\d+ \* #primes", line):
+                self.logger.info("%s: not enough relations" % self.title)
+                return False
+        return True
+    
     def parse_stdout(self, stdout):
         # Program output is expected in the form:
         # b'NROWS:27372 WEIGHT:406777 WEIGHT*NROWS=1.11e+10\nEXCESS: 160\n'
         # but we allow some extra whitespace
+        # If output ends with 
+        # b'excess < 0.10 * #primes. See -required_excess argument.'
+        # then we need more relations from filtering and return False
         r = {}
         keys = ("NROWS", "WEIGHT", "EXCESS")
         for line in stdout.decode("ascii").splitlines():
@@ -1532,14 +1561,25 @@ class CompleteFactorization(wudb.DbAccess):
     
     def __init__ (self, parameters, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.params = parameters.myparams(("name", "workdir"), "tasks")
         self.db_listener = self.make_db_listener()
-        self.polysel = PolyselTask(*args, parameters = parameters, db_listener = self.db_listener, **kwargs)
+        registered_filenames = self.make_db_dict(self.params["name"] + '_server_registered_filenames')
+        
+        # Set up WU server
+        uploaddir = self.params["workdir"].rstrip(os.sep) + os.sep + self.params["name"] + ".upload/"
+        self.server = wuserver.ServerLauncher("localhost", 8001, False, self.get_db_filename(), 
+            registered_filenames, uploaddir, bg = True)
+        self.server.serve()
+        
+        self.polysel = PolyselTask(*args, parameters = parameters, db_listener = self.db_listener,
+                                   registered_filenames = registered_filenames, **kwargs)
         self.fb = FactorBaseTask(self.polysel, *args, parameters = parameters, **kwargs)
         self.freerel = FreeRelTask(self.polysel, *args, parameters = parameters, **kwargs)
-        self.sieving = SievingTask(self.polysel, self.fb, *args, parameters = parameters, db_listener = self.db_listener, **kwargs)
+        self.sieving = SievingTask(self.polysel, self.fb, *args, parameters = parameters,
+                                   db_listener = self.db_listener, registered_filenames = registered_filenames, **kwargs)
         self.dup1 = Duplicates1Task(self.sieving, *args, parameters = parameters, **kwargs)
         self.dup2 = Duplicates2Task(self.dup1, *args, parameters = parameters, **kwargs)
-        self.purge = PurgeTask(self.polysel, self.freerel, self.dup2,
+        self.purge = PurgeTask(self.polysel, self.freerel, self.sieving, self.dup2,
                                *args, parameters = parameters, **kwargs)
         self.merge = MergeTask(self.purge, *args, parameters = parameters, **kwargs)
         self.linalg = LinAlgTask(self.merge, *args, parameters = parameters, **kwargs)
@@ -1551,3 +1591,4 @@ class CompleteFactorization(wudb.DbAccess):
     
     def run(self, *args, **kwargs):
         self.sqrt.run(*args, **kwargs)
+        self.server.shutdown()

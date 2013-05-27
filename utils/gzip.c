@@ -79,7 +79,7 @@ int is_supported_compression_format(const char * s)
    [empty string]
 */
 char **
-prempt_open_compressed_rs (char *rep_cado, char **ficname)
+prempt_open_compressed_rs (char *antebuffer, char **ficname)
 {
   const struct suffix_handler *cp_r = NULL, *r = supported_compression_formats;
   char **cmd;
@@ -93,27 +93,15 @@ prempt_open_compressed_rs (char *rep_cado, char **ficname)
     fprintf (stderr, "fopen_compressed_rs: calloc error : %s\n", strerror(errno));
     exit (1);
   }
-  antebuffer_realpath = (char *) malloc(PATH_MAX * sizeof(char));
   fic_realpath = (char *) malloc(PATH_MAX * sizeof(char));
-  if (fic_realpath == NULL || antebuffer_realpath == NULL || fic_realpath == NULL) {
+  if ((fic_realpath = (char *) malloc(PATH_MAX * sizeof(char))) == NULL) {
     fprintf (stderr, "fopen_compressed_rs: malloc error : %s\n", strerror(errno));
-    exit (1);
-  }
-  /* Use fic_realpath as temp storage for un-normalized path to antebuffer */
-  strcpy (fic_realpath, rep_cado);
-  strcat (fic_realpath, "utils/antebuffer");
-#ifdef EXECUTABLE_SUFFIX
-  strcat (fic_realpath, EXECUTABLE_SUFFIX);
-#endif
-  if (realpath(fic_realpath, antebuffer_realpath) == NULL) {
-    fprintf (stderr, "fopen_compressed_rs: realpath(%s) error : %s\n", 
-             fic_realpath, strerror(errno));
     exit (1);
   }
   while (*ficname) {
     if (realpath(*ficname, fic_realpath) == NULL) {
-        fprintf (stderr, "fopen_compressed_rs: realpath error : %s\n", strerror(errno));
-        exit (1);
+      fprintf (stderr, "fopen_compressed_rs: realpath error : %s\n", strerror(errno));
+      exit (1);
     }
     if (!suffix_choice) {
       if (p_cmds + 1 >= s_cmds) {
@@ -130,8 +118,7 @@ prempt_open_compressed_rs (char *rep_cado, char **ficname)
       }
       for (cp_r = r ; cp_r->suffix ; cp_r++)
 	if (has_suffix (fic_realpath, cp_r->suffix)) break;
-      strcpy (cmd[p_cmds], antebuffer_realpath);
-      strcat (cmd[p_cmds], " 24 ");
+      strcpy (cmd[p_cmds], antebuffer);
       strcpy (lastcom, " | ");
       strcat (lastcom, cp_r->pfmt_in ? cp_r->pfmt_in : "cat %s");
       strcpy (&(lastcom[strlen(lastcom)-2]), "-"); /* "%s" remplaces by "-" */
@@ -162,6 +149,7 @@ prempt_open_compressed_rs (char *rep_cado, char **ficname)
     strcat (cmd[p_cmds], lastcom);
   free (antebuffer_realpath);  
   free (fic_realpath);  
+  /* fprintf (stderr, "ALM %s\n", cmd[0]); */
   return cmd;
 }
 

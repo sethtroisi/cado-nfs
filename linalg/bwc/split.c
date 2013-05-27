@@ -110,7 +110,7 @@ int main(int argc, char * argv[])
                 ifile, (long) sbuf->st_size, splits[nsplits]);
     }
 
-    FILE * f = fopen(ifile, "r");
+    FILE * f = fopen(ifile, "rb");
     if (f == NULL) {
         fprintf(stderr,"%s: %s\n", ifile, strerror(errno));
         exit(1);
@@ -158,7 +158,7 @@ int main(int argc, char * argv[])
             fprintf(stderr,"%s: %s\n", fname, strerror(errno));
             exit(1);
         }
-        files[i] = fopen(fname, "w");
+        files[i] = fopen(fname, "wb");
         if (files[i] == NULL) {
             fprintf(stderr,"%s: %s\n", fname, strerror(errno));
             exit(1);

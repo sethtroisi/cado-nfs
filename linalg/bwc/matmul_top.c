@@ -1547,7 +1547,7 @@ static int export_cache_list_if_requested(matmul_top_data_ptr mmt, param_list pl
                 info, mmt->pi->m->ncores * (len+1), MPI_BYTE,
                 mmt->pi->m->pals);
         if (mmt->pi->m->jrank == 0) {
-            FILE * f = fopen(cachelist, "w");
+            FILE * f = fopen(cachelist, "wb");
             DIE_ERRNO_DIAG(f == NULL, "fopen", cachelist);
             for(unsigned int j = 0 ; j < mmt->pi->m->njobs ; j++) {
                 unsigned int j0 = j * mmt->pi->m->ncores;
@@ -1658,7 +1658,7 @@ static void matmul_top_read_submatrix(matmul_top_data_ptr mmt, param_list pl, in
         param_list_parse_int(pl, "save_submatrices", &ssm);
         if (ssm) {
             fprintf(stderr, "DEBUG: creating %s\n", mmt->locfile);
-            FILE * f = fopen(mmt->locfile, "w");
+            FILE * f = fopen(mmt->locfile, "wb");
             fwrite(m->p, sizeof(uint32_t), m->size, f);
             fclose(f);
         }

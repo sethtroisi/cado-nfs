@@ -29,8 +29,14 @@ class HttpServerLogger(object):
         ch.setFormatter(formatter)
         self.logger.addHandler(ch)
     
-    def log(self, lvl, *args, **kwargs):
-        self.logger.log(lvl, *args, **kwargs)
+    def log(self, lvl, *args, extra = {}, **kwargs):
+        if not "address_string" in extra:
+            extra = extra.copy()
+            extra["address_string"] = ""
+        self.logger.log(lvl, *args, extra = extra, **kwargs)
+
+    def info(self, *args, **kwargs):
+        self.log(logging.INFO, *args, **kwargs)
 
 class HtmlGen(io.BytesIO):
     def __init__(self, encoding = None):
@@ -103,9 +109,10 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         """ Interface to the logger class. 
             We add the client address (as a string) to the log record so the 
             logger can print that """
-        e = kwargs.copy()
-        e["address_string"] = self.address_string()
-        logger.log(lvl, format, *args, extra=e)
+        if self.logger:
+            e = kwargs.copy()
+            e["address_string"] = self.address_string()
+            self.logger.log(lvl, format, *args, extra=e)
 
     # These three methods overwrite the corresponding methods from 
     # http.server.BaseHTTPRequestHandler
@@ -123,7 +130,21 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
     def send_body(self, body):
         self.wfile.write(body)
         self.wfile.flush()
-
+    
+    def translate_path(self, path):
+        """ Translate path in request URL to local file system, taking into 
+        account registered file names.
+        Overrides SimpleHTTPRequestHandler.translate_path()
+        """
+        # Path in url always starts with '/'
+        relpath = self.path.lstrip('/')
+        if relpath in self.registered_filenames:
+            self.log(logging.DEBUG, "Translated file name %s to %s", relpath, self.registered_filenames[relpath])
+            return self.registered_filenames[relpath]
+        else:
+            self.log(logging.DEBUG, "Not translating file name %s ", relpath)
+            return super().translate_path(path)
+    
     def do_GET(self):
         """Generates a work unit if request is cgi-bin/getwu, otherwise calls
            parent class' do_GET()"""
@@ -193,8 +214,10 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         if not clientid.isalnum():
             return self.send_error(400, "Malformed client id specified")
         
-        # wu = wudb.WuAccess(self.dbfilename)
-        wu_text = db_pool.assign(clientid)
+        if self.db_pool:
+            wu_text = self.db_pool.assign(clientid)
+        else:
+            wu_text = wudb.WuAccess(self.dbfilename).assign(clientid)
         if not wu_text:
             return self.send_error(404, "No work available")
         
@@ -212,7 +235,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
 
     def send_status(self):
         self.send_query()
-
+    
     def send_query(self):
         logging.debug("self.cgi_info = "  + str(self.cgi_info))
         filename = self.cgi_info[1]
@@ -243,7 +266,10 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
                             value = str(datetime.datetime.now() + td)
                         conditions[name][key] = value
                         break
-        wus = db_pool.query(**conditions)
+        if self.db_pool:
+            wus = self.db_pool.query(**conditions)
+        else:
+            wus = wudb.WuAccess(self.dbfilename).query(**conditions)
 
         body = HtmlGen()
 
@@ -269,6 +295,63 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         self.end_headers()
         self.send_body(body.__bytes__())
 
+class ServerLauncher(object):
+    def __init__(self, address, port, threaded, dbfilename,
+                registered_filenames, uploaddir, bg = False,
+                use_db_pool = True):
+        
+        self.logger = HttpServerLogger(logging.INFO)
+        self.bg = bg
+        if threaded:
+            self.logger.info("Using threaded server")
+            ServerClass = ThreadedHTTPServer
+        else:
+            self.logger.info("Not using threaded server")
+            ServerClass = http.server.HTTPServer
+        if use_db_pool:
+            self.db_pool = wudb.DbThreadPool(dbfilename, 1)
+        else:
+            self.db_pool = None
+        # Generate a class with parameters stored in class variables
+        handler_params = {
+            "registered_filenames": registered_filenames,
+            "logger": self.logger,
+            "dbfilename": dbfilename,
+            "db_pool": self.db_pool, 
+            "uploaddir": uploaddir
+        }
+        MyHandlerWithParams = type("MyHandlerWithParams", (MyHandler, ), handler_params)
+        
+        # Set shell environment variables which the upload.py script needs if
+        # spawned as subprocess
+        os.environ[upload.DBFILENAMEKEY] = dbfilename
+        os.environ[upload.UPLOADDIRKEY] = uploaddir
+        if not os.path.isdir(uploaddir):
+            os.mkdir(uploaddir)
+        
+        self.httpd = ServerClass((address, port), MyHandlerWithParams, )
+        self.httpd.server_name = "Workunit Sever"
+    
+    def serve(self):
+        self.logger.info("serving at %s:%d", self.httpd.server_address, self.httpd.server_port)
+        
+        if self.bg:
+            from threading import Thread
+            self.thread = Thread(target=self.httpd.serve_forever,
+                                 name="HTTP server")
+            self.thread.daemon = True
+            self.thread.start()
+        else:
+            self.httpd.serve_forever()
+    
+    def shutdown(self):
+        self.logger.info("Shutting down HTTP server")
+        self.httpd.shutdown()
+        if self.bg:
+            self.thread.join()
+        if self.db_pool:
+            self.db_pool.terminate()
+
 if __name__ == '__main__':
     import argparse
 
@@ -280,38 +363,17 @@ if __name__ == '__main__':
     parser.add_argument("-threaded", help="Use threaded server", action="store_true", default=False)
     args = parser.parse_args()
 
-    if args.threaded:
-        print("Using threaded server")
-        ServerClass = ThreadedHTTPServer
-    else:
-        print("Not using threaded server")
-        ServerClass = http.server.HTTPServer
-
-    logger = HttpServerLogger(logging.INFO)
-
     PORT = int(args.port)
     HTTP = args.address
     dbfilename = args.dbfile
-    # Set shell environment variables which the upload.py script spawned as 
-    # subprocess needs
-    os.environ[upload.DBFILENAMEKEY] = dbfilename
-    os.environ[upload.UPLOADDIRKEY] = args.uploaddir
+    registered_filenames = {}
 
-    if not os.path.isdir(args.uploaddir):
-        os.mkdir(args.uploaddir)
-
-    db_pool = wudb.DbThreadPool(dbfilename, 1)
-
-    HandlerClass = MyHandler
-    HandlerClass.dbfilename = dbfilename
-
-    httpd = ServerClass((HTTP, PORT), HandlerClass)
-    httpd.server_name = "test"
-
-    print ("serving at " + HTTP + ":" + str(PORT))
+    httpd = ServerLauncher(HTTP, PORT, args.threaded, dbfilename, registered_filenames, args.uploaddir)
+    
     try:
-        httpd.serve_forever()
+        httpd.serve()
     except KeyboardInterrupt:
-        db_pool.terminate()
+        pass
     else:
         raise
+    httpd.shutdown()

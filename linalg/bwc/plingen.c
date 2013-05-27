@@ -116,7 +116,7 @@ static int save_pi(struct t_poly *pi, int t_start, int t_middle, int t_end)
     int res;
 
     sprintf(filename, pi_meta_filename, t_start, t_end);
-    f = fopen(filename, "w");
+    f = fopen(filename, "wb");
     if (f == NULL)
 	return -1;
     res = tp_write(f, pi);
@@ -252,7 +252,7 @@ static int retrieve_pi_files(struct t_poly **p_pi, int t_start)
 
 	sprintf(filename, pi_meta_filename, t_start, t_max);
 	printf("trying %s\n", filename);
-	f = fopen(filename, "r");
+	f = fopen(filename, "rb");
 	if (f == NULL) {
 	    perror(filename);
 	    pi_files[best].e = -1;
@@ -1506,7 +1506,7 @@ void write_f(bmstatus_ptr bm, const char * filename, polymat f_red, unsigned int
     unsigned int m = d->m;
     unsigned int n = d->n;
     abdst_field ab = d->ab;
-    FILE * f = fopen(filename, "w");
+    FILE * f = fopen(filename, ascii ? "w" : "wb");
     DIE_ERRNO_DIAG(f == NULL, "fopen", filename);
     unsigned int maxdelta = get_max_delta_on_solutions(bm, delta);
     unsigned int flen = maxdelta + 1;
@@ -1608,7 +1608,7 @@ void read_data_for_series(bmstatus_ptr bm, polymat A, /* {{{ */
     ASSERT(!A->m && !A->n && !A->alloc);
     polymat_init(A, m, n, guess_len);
 
-    FILE *f = fopen(input_file, "r");
+    FILE *f = fopen(input_file, ascii_input ? "r" : "rb");
     DIE_ERRNO_DIAG(f == NULL, "fopen", input_file);
 
     unsigned int k = 0;
