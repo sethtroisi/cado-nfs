@@ -153,7 +153,19 @@ int main(int argc, char * argv[])
         mfile = NULL;
         m_in->f = stdin;
     } else {
+#ifdef  HAVE_MINGW
+        if (ascii_in) {
+            m_in->f = fopen(mfile, "r");
+        } else if (binary_in) {
+            m_in->f = fopen(mfile, "rb");
+        } else {
+            fprintf(stderr, "Under MinGW, please specify explicitly --binary-in or --ascii-in\n");
+            exit(1);
+        }
+#else
+        /* Then we probably don't care */
         m_in->f = fopen(mfile, "rb");
+#endif
         if (m_in->f == NULL) { perror(mfile); exit(1); }
     }
     if (mfile) freq_default_prefix=mfile;
@@ -173,7 +185,19 @@ int main(int argc, char * argv[])
             ofile = NULL;
             m_out->f = stdout;
         } else {
+#ifdef  HAVE_MINGW
+            if (ascii_out) {
+                m_out->f = fopen(ofile, "w");
+            } else if (binary_out) {
+                m_out->f = fopen(ofile, "wb");
+            } else {
+                fprintf(stderr, "Under MinGW, please specify explicitly --binary-out or --ascii-out\n");
+                exit(1);
+            }
+#else
+            /* Then we probably don't care */
             m_out->f = fopen(ofile, "wb");
+#endif
         }
         if (ascii_out || binary_out) {
             m_out->ascii = ascii_out;

@@ -67,7 +67,7 @@ void load_x(uint32_t ** xs, unsigned int m, unsigned int *pnx,
 
     /* pretty much the same deal as above */
     if (pi->m->trank == 0 && pi->m->jrank == 0) {
-        f = fopen(X_FILE_BASE_PATTERN, "rb");
+        f = fopen(X_FILE_BASE_PATTERN, "r");
         FATAL_ERROR_CHECK(f == NULL, "Cannot open "X_FILE_BASE_PATTERN" for reading");
         rc = fscanf(f, "%u", pnx);
         FATAL_ERROR_CHECK(rc != 1, "short read in file X");
@@ -92,7 +92,7 @@ void save_x(uint32_t * xs, unsigned int m, unsigned int nx, parallelizing_info_p
      */
     if (pi->m->trank == 0 && pi->m->jrank == 0) {
         // write the X vector
-        FILE * fx = fopen(X_FILE_BASE_PATTERN,"wb");
+        FILE * fx = fopen(X_FILE_BASE_PATTERN,"w");
         FATAL_ERROR_CHECK(fx == NULL, "Cannot open "X_FILE_BASE_PATTERN" for writing");
         fprintf(fx,"%u\n",nx);
         for(unsigned int i = 0 ; i < m ; i++) {

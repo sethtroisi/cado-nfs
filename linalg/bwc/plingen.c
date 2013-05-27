@@ -1506,7 +1506,7 @@ void write_f(bmstatus_ptr bm, const char * filename, polymat f_red, unsigned int
     unsigned int m = d->m;
     unsigned int n = d->n;
     abdst_field ab = d->ab;
-    FILE * f = fopen(filename, "wb");
+    FILE * f = fopen(filename, ascii ? "w" : "wb");
     DIE_ERRNO_DIAG(f == NULL, "fopen", filename);
     unsigned int maxdelta = get_max_delta_on_solutions(bm, delta);
     unsigned int flen = maxdelta + 1;
@@ -1608,7 +1608,7 @@ void read_data_for_series(bmstatus_ptr bm, polymat A, /* {{{ */
     ASSERT(!A->m && !A->n && !A->alloc);
     polymat_init(A, m, n, guess_len);
 
-    FILE *f = fopen(input_file, "rb");
+    FILE *f = fopen(input_file, ascii_input ? "r" : "rb");
     DIE_ERRNO_DIAG(f == NULL, "fopen", input_file);
 
     unsigned int k = 0;
