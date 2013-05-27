@@ -316,10 +316,11 @@ class ClientServerTask(Task, patterns.Observer):
     def paramnames(self):
         return super().paramnames + ("maxwu",)
     
-    def __init__(self, db_listener, *args, **kwargs):
+    def __init__(self, db_listener, registered_filenames, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.wuar = self.make_wu_access()
         self.wuar.create_tables()
+        self.registered_filenames = registered_filenames
         self.db_listener = db_listener
         self.db_listener.subscribeObserver(self)
         self.state.setdefault("wu_submitted", 0)
@@ -337,11 +338,20 @@ class ClientServerTask(Task, patterns.Observer):
             self.wait()
         wuid = self.make_wuname(identifier)
         wutext = command.make_wu(wuid)
+        for filename in command.get_exec_files() + command.get_input_files():
+            basename = os.path.basename(filename)
+            if not basename in self.registered_filenames:
+                self.logger.debug("Registering file name %s with target %s", basename, filename)
+                self.registered_filenames.setdefault(basename, filename)
+            # If it was already defined with a different target, error
+            if not self.registered_filenames[basename] == filename:
+                raise Exception("Filename %s, to be registered for target %s, already registered for target %s" %
+                                basename, filename, self.registered_filenames[basename])
+        
         self.logger.info("Adding workunit %s to database", wuid)
         # print ("WU:\n%s" % wutext)
         self.wuar.create(wutext)
         self.state["wu_submitted"] += 1
-        # return super().submit_command(command, identifier)
     
     def verification(self, message, ok):
         not_str = "ok"
@@ -1553,18 +1563,20 @@ class CompleteFactorization(wudb.DbAccess):
         super().__init__(*args, **kwargs)
         self.params = parameters.myparams(("name", "workdir"), "tasks")
         self.db_listener = self.make_db_listener()
-        self.registered_filenames = self.make_db_dict(self.params["name"] + '_server_registered_filenames')
+        registered_filenames = self.make_db_dict(self.params["name"] + '_server_registered_filenames')
         
         # Set up WU server
-        uploaddir = self.params["workdir"].rstrip(os.sep) + os.sep + "upload/"
+        uploaddir = self.params["workdir"].rstrip(os.sep) + os.sep + self.params["name"] + ".upload/"
         self.server = wuserver.ServerLauncher("localhost", 8001, False, self.get_db_filename(), 
-            self.registered_filenames, uploaddir, bg = True)
+            registered_filenames, uploaddir, bg = True)
         self.server.serve()
         
-        self.polysel = PolyselTask(*args, parameters = parameters, db_listener = self.db_listener, **kwargs)
+        self.polysel = PolyselTask(*args, parameters = parameters, db_listener = self.db_listener,
+                                   registered_filenames = registered_filenames, **kwargs)
         self.fb = FactorBaseTask(self.polysel, *args, parameters = parameters, **kwargs)
         self.freerel = FreeRelTask(self.polysel, *args, parameters = parameters, **kwargs)
-        self.sieving = SievingTask(self.polysel, self.fb, *args, parameters = parameters, db_listener = self.db_listener, **kwargs)
+        self.sieving = SievingTask(self.polysel, self.fb, *args, parameters = parameters,
+                                   db_listener = self.db_listener, registered_filenames = registered_filenames, **kwargs)
         self.dup1 = Duplicates1Task(self.sieving, *args, parameters = parameters, **kwargs)
         self.dup2 = Duplicates2Task(self.dup1, *args, parameters = parameters, **kwargs)
         self.purge = PurgeTask(self.polysel, self.freerel, self.sieving, self.dup2,
