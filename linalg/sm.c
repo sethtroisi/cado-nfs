@@ -30,6 +30,7 @@ Output
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "utils.h"
+#include "timing.h"
 
 
 typedef struct {
@@ -201,6 +202,10 @@ void shirokauer_maps(const char * outname, relset_srcptr rels, int sr, poly_t F,
   fclose(out);
 }
 
+void usage(const char * me)
+{
+  fprintf(stderr, "Usage: %s --poly polyname --purged purgedname --index indexname --out outname --gorder group-order --smexp sm-exponent\n", me);
+}
 
 int main (int argc, char **argv)
 {
@@ -219,7 +224,10 @@ int main (int argc, char **argv)
   relset_ptr rels;
   int sr;
   mpz_t ell, eps;
-  
+
+  double t0;
+
+  char * me = *argv;
   /* print the command line */
   fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
   for (int i = 1; i < argc; i++)
@@ -228,11 +236,23 @@ int main (int argc, char **argv)
 
   param_list_init(pl);
   argc--,argv++;
-  
+
+  if (!argc) {
+      usage(me);
+      exit(1);
+  }
   for( ; argc ; ) {
     if (param_list_update_cmdline(pl, &argc, &argv)) continue;
-    argv++,argc--;
+    if (strcmp(*argv, "--help") == 0) {
+      usage(me);
+      exit(0);
+    } else {
+      fprintf(stderr, "unexpected argument: %s\n", *argv);
+      usage(me);
+      exit(1);
+    }
   }
+  
   purgedname = param_list_lookup_string(pl, "purged");
   indexname = param_list_lookup_string(pl, "index");
   outname = param_list_lookup_string(pl, "out");
@@ -265,6 +285,8 @@ int main (int argc, char **argv)
   ASSERT_ALWAYS(group_order != NULL);
   ASSERT_ALWAYS(sm_exponent != NULL);
 
+  t0 = seconds();
+
   /* read ell from command line (assuming radix 10) */
   mpz_init_set_str(ell, group_order, 10);
 
@@ -274,14 +296,15 @@ int main (int argc, char **argv)
 
   rels = build_rel_sets(purgedname, indexname, &sr, F, ell);
 
+  fprintf(stderr, "Building %d relation sets took %lf seconds\n", sr, seconds() - t0);
+
   /* SM exponent from command line (assuming radix 10) */
   mpz_init_set_str(eps, sm_exponent, 10);
 
-  /* fprintf(stderr, "eps = "); */
-  /* mpz_out_str(stderr, 10, eps); */
-  /* printf("\n"); */
-
   shirokauer_maps(outname, rels, sr, F, eps, ell);
+
+  fprintf(stderr, "Computing Shirokauer maps for %d relations took %2.2lf seconds\n", sr, seconds() - t0);
+
 
   cado_poly_clear(pol);
   param_list_clear(pl);
