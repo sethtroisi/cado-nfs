@@ -14,7 +14,7 @@ const char * rowcol[2] = { "row", "col", };
 
 FILE * matmul_common_reload_cache_fopen(size_t stride, struct matmul_public_s * mm, uint32_t magic)
 {
-    FILE * f = fopen(mm->cachefile_name, "r");
+    FILE * f = fopen(mm->cachefile_name, "rb");
     if (f == NULL) return NULL;
 
     // mm->cachefile_name is a cache file for mm->locfile (which in
@@ -62,7 +62,7 @@ FILE * matmul_common_reload_cache_fopen(size_t stride, struct matmul_public_s * 
 
 FILE * matmul_common_save_cache_fopen(size_t stride, struct matmul_public_s * mm, uint32_t magic)
 {
-    FILE * f = fopen(mm->cachefile_name, "w");
+    FILE * f = fopen(mm->cachefile_name, "wb");
     if (f == NULL) {
         fprintf(stderr, "Cannot open %s for writing: %s\n", mm->cachefile_name, strerror(errno));
         abort();
