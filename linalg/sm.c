@@ -30,6 +30,7 @@ Output
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "utils.h"
+#include "timing.h"
 
 
 typedef struct {
@@ -40,7 +41,6 @@ typedef struct {
 typedef relset_struct_t relset_t[1];
 typedef relset_struct_t * relset_ptr;
 typedef const relset_struct_t * relset_srcptr;
-
 
 
 relset_ptr build_rel_sets(const char * purgedname, const char * indexname , int * small_nrows, poly_t F, mpz_t ell)
@@ -64,19 +64,10 @@ relset_ptr build_rel_sets(const char * purgedname, const char * indexname , int 
   mpz_init(ell2);
   mpz_mul(ell2, ell, ell);
 
-  /* fprintf(stderr, "ell^2 = "); */
-  /* mpz_out_str(stderr, 10, ell2); */
-  /* fprintf(stderr, "\n"); */
-
-  /* fprintf(stderr, "Opening %s\n", purgedname); */
-
   purgedfile_stream_init(ps);
   purgedfile_stream_openfile(ps, purgedname);
 
-  /* fprintf(stderr, "Parsing %u (a,b) pairs\n", ps->nrows); */
-
   pairs = (poly_t *) malloc(ps->nrows * sizeof(poly_t));
-
 
   /* Parse purgedfile (a,b)-pairs only*/
   ps->parse_only_ab = 1;
@@ -88,14 +79,10 @@ relset_ptr build_rel_sets(const char * purgedname, const char * indexname , int 
     poly_setcoeff_si(pairs[i], 1, -ps->b);
   }
 
-  /* fprintf(stderr, "Opening %s\n", indexname); */
-
   /* small_ncols isn't used here: we don't care. */
   int small_ncols;
   int ret = fscanf(ix, "%d %d", small_nrows, &small_ncols);
   ASSERT(ret == 2);
-
-  /* fprintf(stderr, "Allocating rels[%d] array\n", *small_nrows); */
 
   rels = malloc(*small_nrows * sizeof(relset_t));
 
@@ -104,8 +91,6 @@ relset_ptr build_rel_sets(const char * purgedname, const char * indexname , int 
     poly_alloc(rels[k].denom, F->deg);
   }
     
-  /* fprintf(stderr, "Parsing %s\n", indexname); */
-
   unsigned int ridx;
   long e, nc;
   poly_t tmp;
@@ -129,25 +114,21 @@ relset_ptr build_rel_sets(const char * purgedname, const char * indexname , int 
       ASSERT_ALWAYS(e != 0);
 
       if (e > 0) {
-	mpz_set_si(ee, e);
-	/* TODO: poly_long_power_mod_f_mod_mpz */
-	poly_power_mod_f_mod_mpz(tmp, pairs[ridx], F, ee, ell2);
-	poly_mul_mod_f_mod_mpz(rels[i].num, rels[i].num, tmp, F, ell2, NULL);
+	  mpz_set_si(ee, e);
+	  /* TODO: poly_long_power_mod_f_mod_mpz */
+	  poly_power_mod_f_mod_mpz(tmp, pairs[ridx], F, ee, ell2);
+	  poly_mul_mod_f_mod_mpz(rels[i].num, rels[i].num, tmp, F, ell2, NULL);
       }
       else {
-	mpz_set_si(ee, -e);
-	/* TODO: poly_long_power_mod_f_mod_mpz */
-	poly_power_mod_f_mod_mpz(tmp, pairs[ridx], F, ee, ell2);
-	poly_mul_mod_f_mod_mpz(rels[i].num, rels[i].num, tmp, F, ell2, NULL);
+	  mpz_set_si(ee, -e);
+	  /* TODO: poly_long_power_mod_f_mod_mpz */
+	  poly_power_mod_f_mod_mpz(tmp, pairs[ridx], F, ee, ell2);
+	  poly_mul_mod_f_mod_mpz(rels[i].num, rels[i].num, tmp, F, ell2, NULL);
       }
     }
   }
-  
-  /* fprintf(stderr, "Closing %s\n", indexname); */
-  
+ 
   fclose(ix);
-  
-  /* fprintf(stderr, "Closing %s\n", purgedname); */
   purgedfile_stream_closefile(ps);
   purgedfile_stream_clear(ps);
   
@@ -160,7 +141,8 @@ void shirokauer_maps(const char * outname, relset_srcptr rels, int sr, poly_t F,
   FILE * out = fopen(outname, "w");
   int i;
   poly_t SMn, SMd, SM;
-    mpz_t l2, tmp;
+  mpz_t l2, tmp;
+  
   mpz_init(l2);
   mpz_init(tmp);
 
@@ -202,6 +184,11 @@ void shirokauer_maps(const char * outname, relset_srcptr rels, int sr, poly_t F,
 }
 
 
+void usage(const char * me)
+{
+  fprintf(stderr, "Usage: %s --poly polyname --purged purgedname --index indexname --out outname --gorder group-order --smexp sm-exponent\n", me);
+}
+
 int main (int argc, char **argv)
 {
   
@@ -219,7 +206,10 @@ int main (int argc, char **argv)
   relset_ptr rels;
   int sr;
   mpz_t ell, eps;
-  
+
+  double t0;
+
+  char * me = *argv;
   /* print the command line */
   fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
   for (int i = 1; i < argc; i++)
@@ -228,11 +218,23 @@ int main (int argc, char **argv)
 
   param_list_init(pl);
   argc--,argv++;
-  
+
+  if (!argc) {
+      usage(me);
+      exit(1);
+  }
   for( ; argc ; ) {
     if (param_list_update_cmdline(pl, &argc, &argv)) continue;
-    argv++,argc--;
+    if (strcmp(*argv, "--help") == 0) {
+      usage(me);
+      exit(0);
+    } else {
+      fprintf(stderr, "unexpected argument: %s\n", *argv);
+      usage(me);
+      exit(1);
+    }
   }
+  
   purgedname = param_list_lookup_string(pl, "purged");
   indexname = param_list_lookup_string(pl, "index");
   outname = param_list_lookup_string(pl, "out");
@@ -254,9 +256,6 @@ int main (int argc, char **argv)
   for (int i = deg; i >= 0; --i)
     poly_setcoeff (F, i, f[i]);
 
-  /* fprintf(stderr, "f = "); */
-  /* fprint_polynomial(stderr, pol->alg->f, pol->alg->degree); */
-
   if (param_list_warn_unused(pl))
     exit(1);
 
@@ -265,23 +264,21 @@ int main (int argc, char **argv)
   ASSERT_ALWAYS(group_order != NULL);
   ASSERT_ALWAYS(sm_exponent != NULL);
 
+  t0 = seconds();
+
   /* read ell from command line (assuming radix 10) */
   mpz_init_set_str(ell, group_order, 10);
 
-  /* fprintf(stderr,"ell = "); */
-  /* mpz_out_str(stderr, 10, ell); */
-  /* fprintf(stderr,"\n"); */
-
   rels = build_rel_sets(purgedname, indexname, &sr, F, ell);
+
+  fprintf(stderr, "Building %d relation sets took %lf seconds\n", sr, seconds() - t0);
 
   /* SM exponent from command line (assuming radix 10) */
   mpz_init_set_str(eps, sm_exponent, 10);
 
-  /* fprintf(stderr, "eps = "); */
-  /* mpz_out_str(stderr, 10, eps); */
-  /* printf("\n"); */
-
   shirokauer_maps(outname, rels, sr, F, eps, ell);
+
+  fprintf(stderr, "Computing Shirokauer maps for %d relations took %2.2lf seconds\n", sr, seconds() - t0);
 
   cado_poly_clear(pol);
   param_list_clear(pl);

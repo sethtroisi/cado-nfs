@@ -1217,10 +1217,10 @@ int main(int argc, char *argv[])
          * together -- should be enough for our purposes, even if we do
          * have more dependencies !
          */
-        create_dependencies(prefix, indexname, purgedname, kername);
         ASSERT_ALWAYS(indexname != NULL);
         ASSERT_ALWAYS(purgedname != NULL);
         ASSERT_ALWAYS(kername != NULL);
+        create_dependencies(prefix, indexname, purgedname, kername);
     }
 
     if (opt_rat) {

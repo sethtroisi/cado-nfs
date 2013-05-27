@@ -169,6 +169,37 @@ sscanf_subst_zu (const char * const str, const char * const format, ...)
 #define fscanf fscanf_subst_zu
 #define sscanf sscanf_subst_zu
 
+static inline int
+printf_subst_zu (const char * const format, ...)
+{
+  va_list ap;
+  const char * const subst_format = subst_zu (format);
+  int r;
+
+  va_start (ap, format);
+  r = vprintf (subst_format, ap);
+  free ((void *)subst_format);
+  va_end (ap);
+  return r;
+}
+
+static inline int
+fprintf_subst_zu (FILE * const stream, const char * const format, ...)
+{
+  va_list ap;
+  const char * const subst_format = subst_zu (format);
+  int r;
+
+  va_start (ap, format);
+  r = vfprintf (stream, subst_format, ap);
+  free ((void *)subst_format);
+  va_end (ap);
+  return r;
+}
+
+#define printf  printf_subst_zu
+#define fprintf fprintf_subst_zu
+
 #endif /* ifdef HAVE_MINGW */
 
 #ifndef HAVE_ASPRINTF
