@@ -98,6 +98,7 @@ class HtmlGen(io.BytesIO):
 
 class MyHandler(http.server.CGIHTTPRequestHandler):
     upload_keywords = ['/upload.py']
+    registered_filenames = {}
 
     def log(self, lvl, format, *args, **kwargs):
         """ Interface to the logger class. 
@@ -123,7 +124,19 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
     def send_body(self, body):
         self.wfile.write(body)
         self.wfile.flush()
-
+    
+    def translate_path(self, path):
+        """ Translate path in request URL to local file system, taking into 
+        account registered file names.
+        Overrides SimpleHTTPRequestHandler.translate_path()
+        """
+        # Path in url always starts with '/'
+        relpath = self.path.lstrip('/')
+        if relpath in self.registered_filenames:
+            return self.registered_filenames[relpath]
+        else:
+            return super().translate_path(path)
+    
     def do_GET(self):
         """Generates a work unit if request is cgi-bin/getwu, otherwise calls
            parent class' do_GET()"""
