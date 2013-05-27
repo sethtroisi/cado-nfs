@@ -354,7 +354,7 @@ void read_data_for_series(polmat& A MAYBE_UNUSED, unsigned int ondisk_length)
     } /* }}} */
 
     /* We've got matrices of m times n bits. */
-    FILE * f = fopen(input_file, "r");
+    FILE * f = fopen(input_file, "rb");
     DIE_ERRNO_DIAG(f == NULL, "fopen", input_file);
 
 
@@ -367,7 +367,7 @@ void read_data_for_series(polmat& A MAYBE_UNUSED, unsigned int ondisk_length)
 
     printf("Using A(X) div X in order to consider Y as starting point\n");
     rz = fread(buf, sizeof(unsigned long), ulongs_per_mat, f);
-    NEVER_HAPPENS(rz != ulongs_per_mat, abort(););
+    ASSERT_ALWAYS(rz == ulongs_per_mat);
     sequence_length--;
 
     polmat a(m, n, sequence_length);
@@ -379,7 +379,7 @@ void read_data_for_series(polmat& A MAYBE_UNUSED, unsigned int ondisk_length)
     unsigned int offset = 0;
     for(unsigned int k = 0 ; k < sequence_length ; k++) {
         rz = fread(buf, sizeof(unsigned long), ulongs_per_mat, f);
-        NEVER_HAPPENS(rz != ulongs_per_mat, abort(););
+        ASSERT_ALWAYS(rz == ulongs_per_mat);
 
         unsigned long * v = buf;
         unsigned long lmask = 1UL;
@@ -439,7 +439,7 @@ void bw_commit_f(polmat& F)
     unsigned long * buf;
     size_t rz;
 
-    FILE * f = fopen(LINGEN_F_FILE, "w");
+    FILE * f = fopen(LINGEN_F_FILE, "wb");
     DIE_ERRNO_DIAG(f == NULL, "fopen", LINGEN_F_FILE);
 
     buf = (unsigned long *) malloc(ulongs_per_mat * sizeof(unsigned long));
@@ -481,7 +481,7 @@ void bw_commit_f(polmat& F)
         }
 
         rz = fwrite(buf, sizeof(unsigned long), ulongs_per_mat, f);
-        NEVER_HAPPENS(rz != ulongs_per_mat, abort(););
+        ASSERT_ALWAYS(rz == ulongs_per_mat);
 
         for(unsigned int i = 0 ; i < nres ; i++) {
             if (foffsets[i] == UINT_MAX)
@@ -505,7 +505,7 @@ void bw_commit_f(polmat& F)
 /* This changes from the format used pre-bwc. */
 void write_polmat(polmat const& P, const char * fn)/*{{{*/
 {
-    FILE * f = fopen(fn, "w");
+    FILE * f = fopen(fn, "wb");
     if (f == NULL) {
         perror(fn);
         exit(1);
@@ -524,7 +524,7 @@ void write_polmat(polmat const& P, const char * fn)/*{{{*/
     for(unsigned int i = 0 ; i < P.nrows ; i++) {
         for(unsigned int j = 0 ; j < P.ncols ; j++) {
             rz = fwrite(P.poly(i,j), sizeof(unsigned long), nw, f);
-            NEVER_HAPPENS(rz != nw, );
+            ASSERT_ALWAYS(rz == nw);
         }
     }
     fclose(f);
@@ -536,7 +536,7 @@ void write_pi(polmat const& P, unsigned int t1, unsigned int t2)
 {
     char * tmp;
     int rc = asprintf(&tmp, LINGEN_PI_PATTERN, t1, t2);
-    NEVER_HAPPENS(rc < 0, return;);
+    ASSERT_ALWAYS(rc >= 0);
     write_polmat(P, tmp);
     // printf("written %s\n", tmp);
     free(tmp);
@@ -546,7 +546,7 @@ void unlink_pi(unsigned int t1, unsigned int t2)
 {
     char * tmp;
     int rc = asprintf(&tmp, LINGEN_PI_PATTERN, t1, t2);
-    NEVER_HAPPENS(rc < 0, return;);
+    ASSERT_ALWAYS(rc >= 0);
     rc = unlink(tmp);
     WARN_ERRNO_DIAG(rc < 0, "unlink", tmp);
     free(tmp);
@@ -964,7 +964,7 @@ static int retrieve_pi_files(struct t_poly ** p_pi, int t_start)
 
         sprintf(filename,pi_meta_filename,t_start,t_max);
         printf("trying %s\n", filename);
-        f=fopen(filename,"r");
+        f=fopen(filename,"rb");
         if (f==NULL) {
             perror(filename);
             pi_files[best].e=-1;
@@ -1427,18 +1427,18 @@ struct recursive_tree_timer_t {
         if (leaf) {
             rc = asprintf(&buf, "[%u]: %.1f/%.1f",
                     level, spent[level].proper, spent[level].proper / pct_loc);
-            NEVER_HAPPENS(rc < 0, return;);
+            ASSERT_ALWAYS(rc >= 0);
         } else {
             rc = asprintf(&buf, "[%u,%u+]: %.1f/%.1f,%.1f",
                     level, level, spent[level].proper, spent[level].proper / pct_loc,
                     estim_above);
-            NEVER_HAPPENS(rc < 0, return;);
+            ASSERT_ALWAYS(rc >= 0);
         }
         printf("%-36s", buf);
         free(buf);
         rc = asprintf(&buf, "[%u+]: %.1f/%.1f (%.0f%%)",
                 outermost, spent_tot, estim_tot, 100.0 * spent_tot/estim_tot);
-        NEVER_HAPPENS(rc < 0, return;);
+        ASSERT_ALWAYS(rc >= 0);
         printf("%-27s", buf);
             free(buf);
         printf("\n");
