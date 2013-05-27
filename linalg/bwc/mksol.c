@@ -216,7 +216,7 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             char * tmp;
             rc = asprintf(&tmp, F_FILE_SLICE_PATTERN, ys[0], ys[1]);
 
-            FILE * f = fopen(tmp, "r");
+            FILE * f = fopen(tmp, "rb");
             DIE_ERRNO_DIAG(f == NULL, "fopen", tmp);
             rc = fseek(f, A->vec_elt_stride(A, s * bw->n), SEEK_SET);
             if (rc < 0) {
