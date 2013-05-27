@@ -38,6 +38,9 @@
 #include "gf2x-fft.h"
 #include "lingen_mat_types.hpp"
 
+/* Provide workalikes of usual interfaces for some ungifted systems */
+#include "portability.h"
+
 /* Name of the source a file */
 char input_file[FILENAME_MAX];
 
