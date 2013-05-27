@@ -331,12 +331,13 @@ class ServerLauncher(object):
         self.httpd.server_name = "Workunit Sever"
     
     def serve(self):
-        self.logger.info("serving at %s:%d", HTTP, PORT)
+        self.logger.info("serving at %s:%d", self.httpd.server_address, self.httpd.server_port)
         
         if self.bg:
             from threading import Thread
             self.thread = Thread(target=self.httpd.serve_forever,
-                                 name="HTTP server", daemon = True)
+                                 name="HTTP server")
+            self.thread.daemon = True
             self.thread.start()
         else:
             self.httpd.serve_forever()
