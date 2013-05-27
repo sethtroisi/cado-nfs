@@ -351,7 +351,7 @@ static blockmatrix small_character_matrix(blockmatrix bcmat, const char * indexn
 static blockmatrix
 read_heavyblock_matrix_binary(const char * heavyblockname)
 {
-    FILE * f = fopen(heavyblockname, "r");
+    FILE * f = fopen(heavyblockname, "rb");
 
     if (f == NULL) {
         fprintf(stderr, "Warning: %s not found, assuming empty\n", heavyblockname);
