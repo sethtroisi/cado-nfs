@@ -38,6 +38,7 @@ typedef struct {
   poly_t denom;
 } relset_struct_t;
 
+
 typedef relset_struct_t relset_t[1];
 typedef relset_struct_t * relset_ptr;
 typedef const relset_struct_t * relset_srcptr;
@@ -139,7 +140,6 @@ relset_ptr build_rel_sets(const char * purgedname, const char * indexname , int 
 void shirokauer_maps(const char * outname, relset_srcptr rels, int sr, poly_t F, mpz_t eps, mpz_t ell)
 {
   FILE * out = fopen(outname, "w");
-  int i;
   poly_t SMn, SMd, SM;
   mpz_t l2, tmp;
   
