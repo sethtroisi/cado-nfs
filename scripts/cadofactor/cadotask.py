@@ -110,7 +110,7 @@ class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
             # for d in dependencies:
             #    d.subscribeObserver(self)
         else:
-            self.dependencies = None
+            self.dependencies = {}
         self.logger = cadologger.Logger()
         self.logger.debug("Enter Task.__init__(%s)", 
                           self.name)
@@ -155,7 +155,10 @@ class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
         return name
     
     def is_done(self):
-        return False
+        for d in self.dependencies:
+            if not d.is_done():
+                return False
+        return True
     
     def run(self):
         ''' Runs the prerequisites. Sub-classes should call this first in 
@@ -165,12 +168,11 @@ class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
         self.logger.debug("Task.run(%s): self.is_done() = %s", 
                           self.name, self.is_done())
         # Check/run the prerequisites
-        if not self.dependencies is None:
-            for task in self.dependencies:
-                if not task.is_done():
-                    self.logger.debug("Task.run(%s): Running prerequisite %s",
-                                      self.name, task.name)
-                    task.run()
+        for task in self.dependencies:
+            if not task.is_done():
+                self.logger.debug("Task.run(%s): Running prerequisite %s",
+                                  self.name, task.name)
+                task.run()
         
         self.logger.debug("Exit Task.run(%s)" % type(self))
         return
@@ -306,9 +308,9 @@ class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
         (name, task, identifier) = self.split_wuname(wuid)
         if name != self.params["name"] or task != self.name:
             # This notification is not for me
-            self.logger.debug("%s: Notification is not for me")
+            self.logger.debug("%s: Notification is not for me", self.name)
             return
-        self.logger.debug("%s: Notification is for me")
+        self.logger.debug("%s: Notification is for me", self.name)
         return identifier
 
 class ClientServerTask(Task, patterns.Observer):
@@ -476,7 +478,8 @@ class PolyselTask(ClientServerTask):
     def is_done(self):
         # self.logger.debug ("PolyselTask.is_done(): Task parameters: %s", 
         #                    self.params)
-        return "bestpoly" in self.state and \
+        return super().is_done() and \
+               "bestpoly" in self.state and \
                self.state["adnext"] >= int(self.params["admax"]) and \
                self.state["wu_received"] == self.state["wu_submitted"]
     
@@ -643,7 +646,7 @@ class FactorBaseOrFreerelTask(Task):
             raise Exception("FactorBaseOrFreerelTask.is_done(%s): marked "
                             "as done but target file %s does not exist" % 
                             (self.name, self.state["outputfile"]))
-        return "outputfile" in self.state
+        return super().is_done() and "outputfile" in self.state
     
     def updateObserver(self, message):
         if isinstance(message, Polynomial):
@@ -830,9 +833,12 @@ class SievingTask(ClientServerTask, FilesCreator):
 
     def request_more_relations(self, additional):
         self.state["rels_wanted"] += additional
+        self.logger.info("%s: New goal for number of relations is %d",
+                         self.title, self.state["rels_wanted"])
     
     def is_done(self):
-        return self.state["rels_found"] >= int(self.state["rels_wanted"])
+        return super().is_done() and \
+               self.state["rels_found"] >= int(self.state["rels_wanted"])
     
 
 class Duplicates1Task(Task, FilesCreator):
@@ -1128,21 +1134,22 @@ class PurgeTask(Task):
                                  % (nrows, weight, excess))
                 self.state["purgedfile"] = purgedfile
             else:
-                self.sieving.request_more_relations(int(self.sieving.get_nrels() * 1.1))
+                self.sieving.request_more_relations(int(self.sieving.get_nrels() * 0.1))
         self.logger.debug("Exit PurgeTask.run(" + self.name + ")")
     
     def get_purged_filename(self):
         return self.state["purgedfile"]
     
     def is_done(self):
-        return "purgedfile" in self.state
+        return super().is_done() and "purgedfile" in self.state
     
     def parse_stderr(self, stderr):
         # If stderr ends with 
         # b'excess < 0.10 * #primes. See -required_excess argument.'
         # then we need more relations from filtering and return False
         for line in stderr.decode("ascii").splitlines():
-            if re.match("excess < \d+.\d+ \* #primes", line):
+            if re.match("excess < \d+.\d+ \* #primes", line) or \
+                    re.match("number of relations <= number of ideals", line):
                 self.logger.info("%s: not enough relations" % self.title)
                 return False
         return True
@@ -1246,7 +1253,7 @@ class MergeTask(Task):
         return self.state.get("densefile", None)
     
     def is_done(self):
-        return "mergedfile" in self.state
+        return super().is_done() and "mergedfile" in self.state
 
 
 class LinAlgTask(Task):
@@ -1295,7 +1302,7 @@ class LinAlgTask(Task):
         self.logger.debug("Exit LinAlgTask.run(" + self.name + ")")
 
     def is_done(self):
-        return "dependency" in self.state
+        return super().is_done() and "dependency" in self.state
     
     def get_dependency_filename(self):
         return self.state.get("dependency", None)
@@ -1364,7 +1371,7 @@ class CharactersTask(Task):
         return
     
     def is_done(self):
-        return "kernel" in self.state
+        return super().is_done() and "kernel" in self.state
     
     def get_kernel_filename(self):
         return self.state.get("kernel")
@@ -1448,7 +1455,7 @@ class SqrtTask(Task):
         for (factor, isprime) in self.factors.items():
             if not isprime:
                 return False
-        return True
+        return super().is_done()
     
     def add_factor(self, factor):
         assert factor > 0
