@@ -991,7 +991,7 @@ void create_dependencies(const char * prefix, const char * indexname, const char
     size_t ker_stride;
     /* Check that kername has consistent size */
     {
-        ker = fopen(kername, "r");
+        ker = fopen(kername, "rb");
         if (ker == NULL) { perror(kername); exit(errno); }
         struct stat sbuf[1];
         ret = fstat(fileno(ker), sbuf);
