@@ -179,9 +179,6 @@ prempt_open_compressed_rs (char *antebuffer, char **ficname)
   char lastcom[256];
   char *fic_realpath;
   
-  fprintf (stderr, "**************************\n**************************\n**************************\n**************************\n\n\n PREMPT_OPEN \n\n\n**************************\n**************************\n**************************\n**************************\n");
-  exit (1);
-
   if (!(cmd = calloc (s_cmds, sizeof(unsigned char *)))) {
     fprintf (stderr, "fopen_compressed_rs: calloc error : %s\n", strerror(errno));
     exit (1);
