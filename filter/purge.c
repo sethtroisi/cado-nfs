@@ -101,7 +101,7 @@ typedef struct {
 
 /* Main variables */
 static char antebuffer[PATH_MAX];         /* "directory/antebuffer" or "cat" */
-static char rep_cado[PATH_MAX];
+static char rep_cado[PATH_MAX];           /* directory of cado */
 
 static hashtable_t H;
 static HR_T **rel_compact  = NULL; /* see above */
@@ -2156,53 +2156,6 @@ approx_ffs (int d)
 }
 #endif
 
-static void
-set_rep_cado (const char *argv0) {
-  char *p, *q;
-
-  p = strdup(argv0);
-  q = dirname(p); /* May modify p[...] in-place */
-  strcpy(rep_cado, q);
-  free(p);
-  p = q = NULL;
-  
-  strcat(rep_cado, "/../");
-}
-
-static char *
-search_real_exec_in_path (const char *executable, char *real_path) {
-  char dummy[PATH_MAX];
-  char *p = getenv("PATH");
-  char *path = (p == NULL || strlen(p) == 0) ? strdup(".") : strdup(p);
-  char *pp = path;
-  unsigned int end = 0;
-  while (!end) {
-    char *ppe = strchr(pp, ':');
-    if (UNLIKELY(!ppe))
-      ppe = pp + strlen (pp);
-    if (LIKELY(ppe != pp)) {
-      memcpy (dummy, pp, ppe - pp);
-      dummy[ppe - pp] = '/';
-      dummy[ppe - pp + 1] = 0;
-    }
-    else
-      strcpy (dummy, "./");
-    strcat(dummy, executable);
-#ifdef EXECUTABLE_SUFFIX
-    strcat (dummy, EXECUTABLE_SUFFIX);
-#endif
-    if (LIKELY(*ppe))
-      pp = ppe + 1;
-    else
-      end = 1;
-    if (UNLIKELY(realpath(dummy, real_path) != NULL))
-      end = 2;
-  }
-  free (path);
-  if (end != 2) *real_path = 0;
-  return(real_path);
-}
-
 int
 main (int argc, char **argv)
 {
@@ -2214,7 +2167,7 @@ main (int argc, char **argv)
   unsigned int npass = DEFAULT_NPASS;
   double required_excess = DEFAULT_REQUIRED_EXCESS;
 
-  set_rep_cado(argv[0]);
+  set_rep_cado(argv[0], rep_cado);
   wct0 = wct_seconds ();
   fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
   for (k = 1; k < argc; k++)
@@ -2290,45 +2243,7 @@ main (int argc, char **argv)
   const char * deletedname = param_list_lookup_string(pl, "outdel");
 #endif
 
-  *antebuffer = 0;
-  /* First, if we have path_antebuffer, we must have antebuffer or error */
-  if (path_antebuffer != NULL) {
-    char dummy[PATH_MAX];
-    strcpy(dummy, path_antebuffer);
-    strcat(dummy, "/antebuffer");
-#ifdef EXECUTABLE_SUFFIX
-    strcat (dummy, EXECUTABLE_SUFFIX);
-#endif
-    if (realpath(dummy, antebuffer) == NULL) {
-      fprintf (stderr, "antebuffer path (%s) error : %s\n", dummy, strerror(errno));
-      exit (1);
-    }
-  }
-  /* Second, we search antebuffer in cado directory */
-  if (!*antebuffer) {
-    char dummy[PATH_MAX];
-    strcpy(dummy, rep_cado);
-    strcat(dummy, "utils/antebuffer");
-#ifdef EXECUTABLE_SUFFIX
-    strcat (dummy, EXECUTABLE_SUFFIX);
-#endif
-    if (realpath(dummy, antebuffer) == NULL) *antebuffer = 0;
-  }
-  /* 3th, we try the PATH */
-  if (!*antebuffer)
-    search_real_exec_in_path ("antebuffer", antebuffer);
-  /* 4th, OK, antebuffer is not here. cat is need to replace it */
-  if (!*antebuffer) {
-    search_real_exec_in_path ("cat", antebuffer);
-    if (!*antebuffer) {
-      fprintf (stderr, "antebuffer or cat paths not found: %s\n", strerror(errno));
-      exit (1);
-    }
-    /* cat needs no argument... except a space after its name! */
-    strcat (antebuffer, " ");
-  }
-  else /* real antebuffer is found : strcat its arguments */
-    strcat (antebuffer, " 24 ");
+  search_antebuffer (rep_cado, path_antebuffer, antebuffer);
 
   binfilerel = (infilerel != 0);
   boutfilerel = (outfilerel != 0);

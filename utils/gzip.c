@@ -72,6 +72,96 @@ int is_supported_compression_format(const char * s)
     return 0;
 }
 
+/* Put the directory of cado in rep_cado */
+void set_rep_cado (const char *argv0, char *rep_cado) {
+  char *p, *q;
+  p = strdup(argv0);
+  q = dirname(p);
+  strcpy(rep_cado, q);
+  strcat(rep_cado, "/../");
+  free(p);
+}
+
+/* Search the executable in PATH and, if found, return in real_path the
+   complete path WITH the executable in the end */
+char *
+search_real_exec_in_path (const char *executable, char *real_path) {
+  char dummy[PATH_MAX];
+  char *p = getenv("PATH");
+  char *path = (p == NULL || strlen(p) == 0) ? strdup(".") : strdup(p);
+  char *pp = path;
+  unsigned int end = 0;
+  while (!end) {
+    char *ppe = strchr(pp, ':');
+    if (UNLIKELY(!ppe))
+      ppe = pp + strlen (pp);
+    if (LIKELY(ppe != pp)) {
+      memcpy (dummy, pp, ppe - pp);
+      dummy[ppe - pp] = '/';
+      dummy[ppe - pp + 1] = 0;
+    }
+    else
+      strcpy (dummy, "./");
+    strcat(dummy, executable);
+#ifdef EXECUTABLE_SUFFIX
+    strcat (dummy, EXECUTABLE_SUFFIX);
+#endif
+    if (LIKELY(*ppe))
+      pp = ppe + 1;
+    else
+      end = 1;
+    if (UNLIKELY(realpath(dummy, real_path) != NULL))
+      end = 2;
+  }
+  free (path);
+  if (end != 2) *real_path = 0;
+  return(real_path);
+}
+
+/* Search the path for antebuffer. Must be call one time before all I/O by
+   executable, but after the computation of rep_cado */
+void search_antebuffer (const char *rep_cado, const char *path_antebuffer, char *antebuffer) {
+  *antebuffer = 0;
+  /* First, if we have path_antebuffer, we must have antebuffer or error */
+  if (path_antebuffer != NULL) {
+    char dummy[PATH_MAX];
+    strcpy(dummy, path_antebuffer);
+    strcat(dummy, "/antebuffer");
+#ifdef EXECUTABLE_SUFFIX
+    strcat (dummy, EXECUTABLE_SUFFIX);
+#endif
+    if (realpath(dummy, antebuffer) == NULL) {
+      fprintf (stderr, "search_antebuffer: antebuffer path (%s) error : %s\n", dummy, strerror(errno));
+      exit (1);
+    }
+  }
+  /* Second, we search antebuffer in cado directory */
+  if (!*antebuffer) {
+    char dummy[PATH_MAX];
+    strcpy(dummy, rep_cado);
+    strcat(dummy, "utils/antebuffer");
+#ifdef EXECUTABLE_SUFFIX
+    strcat (dummy, EXECUTABLE_SUFFIX);
+#endif
+    if (realpath(dummy, antebuffer) == NULL) *antebuffer = 0;
+  }
+  /* 3th, we try the PATH */
+  if (!*antebuffer)
+    search_real_exec_in_path ("antebuffer", antebuffer);
+  /* 4th, OK, antebuffer is not here. cat is need to replace it */
+  if (!*antebuffer) {
+    search_real_exec_in_path ("cat", antebuffer);
+    if (!*antebuffer) {
+      fprintf (stderr, "search_antebuffer: antebuffer or cat paths not found: %s\n", strerror(errno));
+      exit (1);
+    }
+    /* cat needs no argument... except a space after its name! */
+    strcat (antebuffer, " ");
+  }
+  else /* real antebuffer is found : add its arguments */
+    strcat (antebuffer, " 24 ");
+}
+
 /* Return a unix commands list. Exemple :
    cat file_relation1
    gzip -dc file_relation2.gz file_relation3.gz
@@ -87,7 +177,10 @@ prempt_open_compressed_rs (char *antebuffer, char **ficname)
   size_t p_cmds = 0;
   int suffix_choice = 0;
   char lastcom[256];
-  char *antebuffer_realpath, *fic_realpath;
+  char *fic_realpath;
+  
+  fprintf (stderr, "**************************\n**************************\n**************************\n**************************\n\n\n PREMPT_OPEN \n\n\n**************************\n**************************\n**************************\n**************************\n");
+  exit (1);
 
   if (!(cmd = calloc (s_cmds, sizeof(unsigned char *)))) {
     fprintf (stderr, "fopen_compressed_rs: calloc error : %s\n", strerror(errno));
@@ -147,9 +240,7 @@ prempt_open_compressed_rs (char *antebuffer, char **ficname)
   }
   if (cmd[p_cmds][strlen(cmd[p_cmds])-1] != '-')
     strcat (cmd[p_cmds], lastcom);
-  free (antebuffer_realpath);  
   free (fic_realpath);  
-  /* fprintf (stderr, "ALM %s\n", cmd[0]); */
   return cmd;
 }
 

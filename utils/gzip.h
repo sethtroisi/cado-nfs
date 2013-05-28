@@ -2,11 +2,26 @@
 #define GZIP_H_
 
 #include <stdio.h>
+#include <libgen.h>
 #include "prempt.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+
+/* Put the directory of cado in rep_cado */
+void set_rep_cado(const char *argv0, char *rep_cado);
+
+/* Search the executable in PATH and, if found, return in real_path the
+   complete path WITH the executable in the end */
+char * search_real_exec_in_path(const char *executable, char *real_path);
+
+/* Search the path of antebuffer and put the complete path + name of
+   the executable ("antebuffer" or, if not found, cat) in antebuffer.
+   Needs in rep_cado the cado directory, and, if it's given, in path_antebuffer
+   the argument -path_antebuffer */
+void search_antebuffer (const char *rep_cado, const char *path_antebuffer, char *antebuffer);
 
 /* There are of course scores of existing basename() codes accessible,
  * starting with POSIX basename. However we fear posible inconsistencies
