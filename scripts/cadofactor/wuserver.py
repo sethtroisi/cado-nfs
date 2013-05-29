@@ -85,8 +85,8 @@ class HtmlGen(io.BytesIO):
 
 
 class MyHandler(http.server.CGIHTTPRequestHandler):
-    upload_keywords = ['/upload.py']
-
+    cgi_directories = ['/cgi-bin']
+    
     def log(self, lvl, format, *args, **kwargs):
         """ Interface to the logger class. 
             We add the client address (as a string) to the log record so the 
@@ -120,6 +120,12 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         """
         # Path in url always starts with '/'
         relpath = self.path.lstrip('/')
+        # We always translate path == /cgi-bin/upload.py to just upload.py
+        # so that no cgi-bin/ directory needs to be created. TODO: should we
+        # allow specifying the directory where upload.py lives? Currently
+        # assumed the current working directory
+        if self.is_upload():
+            return "upload.py"
         if relpath in self.registered_filenames:
             self.log(logging.DEBUG, "Translated file name %s to %s", relpath, self.registered_filenames[relpath])
             return self.registered_filenames[relpath]
@@ -130,6 +136,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
     def do_GET(self):
         """Generates a work unit if request is cgi-bin/getwu, otherwise calls
            parent class' do_GET()"""
+        self.splitpath = urllib.parse.urlsplit(self.path)
         if self.is_cgi():
             if self.is_getwu():
                 self.send_WU()
@@ -145,6 +152,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
     def do_POST(self):
         """Set environment variable telling the upload directory 
            and call CGI handler to run upload CGI script"""
+        self.splitpath = urllib.parse.urlsplit(self.path)
         if self.is_upload():
             if False:
                 self.send_response(200, "Script output follows")
@@ -152,26 +160,23 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             else:
                 super().do_POST()
         else:
-            self.send_error(404, "POST request allowed only for uploads")
+            self.send_error(501, "POST request allowed only for uploads")
         sys.stdout.flush()
 
     def is_upload(self):
         """Test whether request is a file upload."""
-        splitpath = urllib.parse.urlsplit(self.path)
         if self.command == 'POST' and self.is_cgi() and \
-                splitpath.path in self.upload_keywords:
+                self.splitpath.path in ['/upload.py']:
             return True
         return False
 
     def is_getwu(self):
         """Test whether request is for a new WU."""
-        filename=self.cgi_info[1].split("?", 1)[0]
-        return self.command == 'GET' and filename in ['getwu']
+        return self.command == 'GET' and self.splitpath.path in ['/getwu']
 
     def is_getstatus(self):
         """Test whether request is for a a status page."""
-        filename=self.cgi_info[1].split("?", 1)[0]
-        return self.command == 'GET' and filename in ['status']
+        return self.command == 'GET' and self.splitpath.path in ['/status']
 
     def guess_type(self, path):
         type = super().guess_type(path)
