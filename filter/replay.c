@@ -544,6 +544,38 @@ writeIndex(const char *indexname, index_data_t index_data,
     fclose_maybe_compressed(indexfile, indexname);
 }
 
+#ifdef FOR_MSIEVE
+void
+generate_cyc (const char *outname, typerow_t **rows, uint32_t nrows)
+{
+  FILE *outfile;
+  uint32_t t, u, i, k;
+
+  outfile = fopen (outname, "w");
+  ASSERT_ALWAYS(outfile != NULL);
+
+  /* first write the number of relations as a 32-bit integer */
+  t = nrows;
+  fwrite (&t, sizeof(uint32_t), 1, outfile);
+
+  /* then for each relation-set write a 32-bit integer giving the number k
+     of its element, followed by those k elements */
+  for (i = 0; i < nrows; i++)
+    {
+      t = rowLength(rows, i);
+      ASSERT_ALWAYS(t != 0);
+      fwrite (&t, sizeof(uint32_t), 1, outfile);
+      for (k = 1; k <= t; k++)
+        {
+          u = rowCell(rows, i, k);
+          fwrite (&u, sizeof(uint32_t), 1, outfile);
+        }
+    }
+
+  fclose (outfile);
+}
+#endif /* FOR_MSIEVE */
+
 static void
 fasterVersion(typerow_t **newrows, const char *sparsename,
               const char *indexname, const char *hisname, purgedfile_stream ps,
@@ -634,23 +666,28 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
                      100 * (double) count[0]/nonzero);
 #endif
 
+#ifdef FOR_MSIEVE
+    /* generate the <dat_file_name>.cyc file in "indexname" */
+    ASSERT_ALWAYS(skip == 0); /* for simplicity */
+    generate_cyc (sparsename, newrows, small_nrows);
+#else
     /* renumber columns after sorting them by decreasing weight */
     small_ncols = toFlush(sparsename, newrows, colweight, ncols,
 			  small_nrows, skip, bin, idealsfilename);
-    free (colweight);
-
     // Create the index
     if (indexname != NULL) 
         writeIndex(indexname, index_data, small_nrows, small_ncols);
+#endif /* FOR_MSIEVE */
 
     // Free.
+    free (colweight);
     for(int i = 0; i < small_nrows; i++)
         free (newrows[i]);
-    free(newrows);
+    free (newrows);
     if (index_data != NULL) {
         for (int i = 0; i < small_nrows; ++i) 
-            free(index_data[i].rels);
-        free(index_data);
+            free (index_data[i].rels);
+        free (index_data);
     }
 
     fclose (hisfile);
@@ -712,9 +749,15 @@ main(int argc, char *argv[])
         bin=1;
 
     if (noindex && indexname != NULL) {
-        indexname = NULL;
-        fprintf (stderr, "Warning: --noindex was switched on, but a "
-                "name for the index file was given. I ignore it.\n");
+        fprintf (stderr, "Error: --noindex was switched on, but a "
+                "name for the index file was given.\n");
+        exit (1);
+    }
+
+    if (noindex == 0 && indexname == NULL) {
+        fprintf (stderr, "Error: --noindex was not given, but no "
+                "index file was given.\n");
+        exit (1);
     }
 
 #ifdef FOR_FFS
