@@ -103,8 +103,7 @@ class Program(object):
       map to an instance Parameter("-t")
     '''
     
-    params_list = ("execpath", "execbin")
-    path = "programs"
+    params_list = ("execpath", "execsubdir", "execbin")
     
     @staticmethod
     def __shellquote(s):
@@ -136,7 +135,61 @@ class Program(object):
         self.stdout = stdout
         self.stderr = stderr
         
-        self.command = self.make_command_array()
+        # Look for location of the binary executable at __init__, to avoid 
+        # calling os.path.isfile() multiple times
+        path = self.parameters.get("execpath", ".")
+        subdir = self.parameters.get("execsubdir", self.subdir)
+        binary = self.parameters.get("execbin", self.binary)
+        execfile = os.path.normpath(os.sep.join([path, binary]))
+        execsubfile = os.path.normpath(os.sep.join([path, subdir, binary]))
+        if execsubfile != execfile and os.path.isfile(execsubfile):
+            # print ("Found %s in %s" % (binary, execsubfile))
+            self.execfile = execsubfile
+        else:
+            self.execfile = execfile
+    
+    @classmethod
+    def get_param_keys(cls):
+        """ Return the config file keys which map to command line arguments for this program """
+        return [opt.get_key() for opt in cls.params_list]
+    
+    @classmethod
+    def get_config_keys(cls):
+        """ Return all config file keys which can be used by this program, including those that don't
+        directly map to command line parameters, like those specifying search paths.
+        """
+        l = list(Program.params_list) + cls.get_param_keys()
+        return l
+    
+    def get_input_files(self):
+        input_files = []
+        if isinstance(self.stdin, str):
+            input_files.append(self.stdin)
+        for p in self.params_list:
+            key = p.get_key()
+            if key in self.parameters:
+                if p.is_input_file:
+                    input_files.append(self.parameters[key])
+        return input_files
+    
+    def get_output_files(self):
+        output_files = []
+        if isinstance(self.stdout, str):
+            output_files.append(self.stdout)
+        if isinstance(self.stderr, str):
+            output_files.append(self.stderr)
+        for p in self.params_list:
+            key = p.get_key()
+            if key in self.parameters:
+                if p.is_output_file:
+                    output_files.append(self.parameters[key])
+        return output_files
+    
+    def get_exec_file(self):
+        return self.execfile
+    
+    def get_exec_files(self):
+        return [self.get_exec_file()]
     
     @staticmethod
     def translate_path(filename, path = None):
@@ -169,46 +222,12 @@ class Program(object):
             command += self.args
         return command
     
-    @classmethod
-    def get_params_list(cls):
-        """ Return the accepted parameters as list of config file keywords """
-        l = list(Program.params_list) + [opt.get_key() for opt in cls.params_list]
-        return l
-    
-    def get_input_files(self):
-        input_files = []
-        if isinstance(self.stdin, str):
-            input_files.append(self.stdin)
-        for p in self.params_list:
-            key = p.get_key()
-            if key in self.parameters:
-                if p.is_input_file:
-                    input_files.append(self.parameters[key])
-        return input_files
-    
-    def get_output_files(self):
-        output_files = []
-        if isinstance(self.stdout, str):
-            output_files.append(self.stdout)
-        if isinstance(self.stderr, str):
-            output_files.append(self.stderr)
-        for p in self.params_list:
-            key = p.get_key()
-            if key in self.parameters:
-                if p.is_output_file:
-                    output_files.append(self.parameters[key])
-        return output_files
-    
-    def get_exec_file(self):
-        path = self.parameters.get("execpath", self.path)
-        binary = self.parameters.get("execbin", self.binary)
-        execfile = path.rstrip(os.sep) + os.sep + binary
-        return execfile
-    
-    def get_exec_files(self):
-        return [self.get_exec_file()]
-    
-    def make_cmdline(self, binpath = None, inputpath = None, outputpath = None):
+    def make_command_line(self, binpath = None, inputpath = None, outputpath = None):
+        """ Make a shell command line for this program.
+        
+        If files are given for stdio redirection, the corresponding redirection tokens
+        are added to the command line.
+        """
         cmdarr = self.make_command_array(binpath, inputpath, outputpath)
         cmdline = " ".join([Program.__shellquote(arg) for arg in cmdarr])
         if isinstance(self.stdin, str):
@@ -226,39 +245,12 @@ class Program(object):
         for f in self.get_input_files():
             wu.append('FILE %s' % os.path.basename(f))
         wu.append('EXECFILE %s' % os.path.basename(self.get_exec_file()))
-        wu.append('COMMAND %s' % self.make_cmdline(binpath = "${DLDIR}", inputpath = "${DLDIR}", outputpath = "${WORKDIR}"))
+        wu.append('COMMAND %s' % self.make_command_line(binpath = "${DLDIR}", inputpath = "${DLDIR}", outputpath = "${WORKDIR}"))
         for f in self.get_output_files():
             wu.append('RESULT %s' % os.path.basename(f))
         wu.append("") # Make a trailing newline
         return '\n'.join(wu)
-    
-        # TODO: Make workunit text from a program instance
-        # This allows running program instances either directly with run(),
-        # or adding them to the WU database table. 
-        # Making a WU will require knowledge of which input file the program
-        # needs, which output files it produces, and which command line needs 
-        # to be run. Input files should probably be mandatory parameters to
-        # __init__(). 
-        # When we run a command locally: 
-        #   We give the input files directly on the command line, with the 
-        #   correct path (produced by whichever program generated the input 
-        #   file, probably the path points at the working directory). 
-        #   The binary file is called with the program path and the binary 
-        #   file name. 
-        #   Output files are placed in the working directory, under the given 
-        #   output file name.
-        # When we generate a WU: 
-        #   We have to give the input file in a FILE line, place the file in 
-        #   the upload directory, and use it on the command line with path
-        #   ${DLDIR}/. 
-        #   Binary files are given with EXECFILE lines, and are used on the 
-        #   commandline with path ${DLDIR}/.
-        #   Output files are produced in the client workdir, and are uploaded
-        #   to the server upload dir. On the command line, they must be 
-        #   referenced by ${WORKDIR}/, and on the server, the file name given
-        #   to subsequent tasks must be that of the uploaded file in the 
-        #   server's upload directory.
-    
+        
     @staticmethod
     def _open_or_not(fn, mode):
         """ If fn is a string, opens a file handle to a file with fn as 
@@ -280,7 +272,7 @@ class Program(object):
         self.errfile = self._open_or_not(self.stderr, "w")
         
         # print (self.make_command_array()
-        # print ("%s.Program.run(): cmdline = %s" % (__file__, self.make_cmdline()))
+        # print ("%s.Program.run(): cmdline = %s" % (__file__, self.make_command_line()))
         # print ("Input files: %s" % ", ".join(self.get_input_files()))
         # print ("Output files: %s" % ", ".join(self.get_output_files()))
         self.child = cadocommand.Command(self.make_command_array(), 
@@ -304,6 +296,7 @@ class Program(object):
 class Polyselect2l(Program):
     binary = "polyselect2l"
     name = binary
+    subdir = "polyselect"
     params_list = (
         Toggle("verbose", "v"), 
         Toggle("quiet", "q"), 
@@ -328,6 +321,7 @@ class Polyselect2l(Program):
 class MakeFB(Program):
     binary = "makefb"
     name = binary
+    subdir = "sieve"
     params_list = (
         Toggle("nopowers"), 
         Parameter("poly", is_input_file = True), 
@@ -338,6 +332,7 @@ class MakeFB(Program):
 class FreeRel(Program):
     binary = "freerel"
     name = binary
+    subdir = "sieve"
     params_list = (
         Toggle("verbose", "v"), 
         Parameter("pmin"), 
@@ -348,6 +343,7 @@ class FreeRel(Program):
 class Las(Program):
     binary = "las"
     name = binary
+    subdir = "sieve"
     params_list = (
         Parameter("I"), 
         Parameter("poly", is_input_file = True), 
@@ -375,6 +371,7 @@ class Las(Program):
 class Duplicates1(Program):
     binary = "dup1"
     name = binary
+    subdir = "filter"
     params_list = (
         Parameter("out"), 
         Parameter("outfmt"), 
@@ -389,6 +386,7 @@ class Duplicates1(Program):
 class Duplicates2(Program):
     binary = "dup2"
     name = binary
+    subdir = "filter"
     params_list = (
         Toggle("remove", "rm"),
         Parameter("output_directory", "out"), 
@@ -399,6 +397,7 @@ class Duplicates2(Program):
 class Purge(Program):
     binary = "purge"
     name = binary
+    subdir = "filter"
     params_list = (
         Parameter("poly", is_input_file = True),
         Parameter("out", is_output_file = True), 
@@ -420,6 +419,7 @@ class Purge(Program):
 class Merge(Program):
     binary = "merge"
     name = binary
+    subdir = "filter"
     params_list = (
         Parameter("mat", is_input_file = True), 
         Parameter("out", is_output_file = True), 
@@ -439,6 +439,7 @@ class Merge(Program):
 class Replay(Program):
     binary= "replay"
     name = binary
+    subdir = "filter"
     params_list = (
         Toggle("binary", prefix = "--"),
         Parameter("skip"),
@@ -451,6 +452,7 @@ class Replay(Program):
 class BWC(Program):
     binary = "bwc.pl"
     name = "bwc"
+    subdir = "linalg/bwc"
     params_list = (
         Toggle("complete", prefix=":"),
         Toggle("wipeout", prefix=":"),
@@ -473,6 +475,7 @@ class BWC(Program):
 class Characters(Program):
     binary= "characters"
     name = binary
+    subdir = "linalg"
     params_list = (
         Parameter("poly"),
         Parameter("purged"),
@@ -487,6 +490,7 @@ class Characters(Program):
 class Sqrt(Program):
     binary = "sqrt"
     name = binary
+    subdir = "sqrt"
     params_list = (
         Toggle("ab"),
         Toggle("rat"),

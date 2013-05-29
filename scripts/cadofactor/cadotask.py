@@ -130,7 +130,7 @@ class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
         for prog in self.programs:
             if parameters:
                 progparams = parameters.myparams(
-                    prog.get_params_list(), [self.parampath, prog.name])
+                    prog.get_config_keys(), [self.parampath, prog.name])
             else:
                 progparams = {}
             self.progparams.append(progparams)
@@ -628,9 +628,9 @@ class FactorBaseOrFreerelTask(Task):
             args = ()
             kwargs = self.progparams[0].copy()
             kwargs["poly"] = polyfile
-            if "pmin" in self.programs[0].get_params_list():
+            if "pmin" in self.programs[0].get_config_keys():
                 kwargs.setdefault("pmin", "1")
-            if "pmax" in self.programs[0].get_params_list():
+            if "pmax" in self.programs[0].get_config_keys():
                 kwargs.setdefault("pmax", str(2**int(self.params["lpba"])))
             p = self.programs[0](None, kwargs, stdout = outputfile)
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
