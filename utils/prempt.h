@@ -15,13 +15,6 @@ typedef struct {
 } __prempt_t;
 typedef __prempt_t prempt_t[1];
 
-typedef struct {
-  char *cmd, *fics;
-  int pipefd[2];
-  char *pt_fin;
-} __pfic_t;
-typedef __pfic_t pfic_t[1];
-
 /* Return a unix commands list with antebuffer. Example:
    antebuffer X file_relation1 | cat -
    antebuffer X file_relation2.gz file_relation3.gz | gzip -dc -

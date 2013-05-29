@@ -713,10 +713,12 @@ weight_function_clique (HC_T w)
   else
     return 0.0;
 #else
-    if (w >= 3)
-      return (float) 1.0 / (float) w;
-    else
-      return 0.0;
+  if (w >= 3)
+    return powf(0.8, (float) (w-2.0));
+  else if (w == 2)
+    return 0.125;
+  else
+    return 0.0;
 #endif
 }
 
