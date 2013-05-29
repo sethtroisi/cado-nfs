@@ -4,6 +4,7 @@ import platform
 import subprocess
 import abc
 import logging
+import re
 import cadocommand
 
 class Option(metaclass=abc.ABCMeta):
@@ -106,12 +107,15 @@ class Program(object):
     params_list = ("execpath", "execsubdir", "execbin")
     
     @staticmethod
-    def __shellquote(s):
+    def _shellquote(s):
         ''' Quote a command line argument
         
-        Currently does it the hard way: always encloses the argument in single
+        Currently does it the hard way: encloses the argument in single
         quotes, and escapes any single quotes that are part of the argument
         '''
+        # If only characters that are known to be shell-safe occur, don't quote
+        if re.match("^[a-zA-Z0-9+-_.:@/]*$", s):
+            return s
         return "'" + s.replace("'", "'\\''") + "'"
     
     def __init__(self, args, parameters, 
@@ -229,13 +233,13 @@ class Program(object):
         are added to the command line.
         """
         cmdarr = self.make_command_array(binpath, inputpath, outputpath)
-        cmdline = " ".join([Program.__shellquote(arg) for arg in cmdarr])
+        cmdline = " ".join([Program._shellquote(arg) for arg in cmdarr])
         if isinstance(self.stdin, str):
-            cmdline += ' < ' + Program.__shellquote(self.translate_path(self.stdin, inputpath))
+            cmdline += ' < ' + Program._shellquote(self.translate_path(self.stdin, inputpath))
         if isinstance(self.stdout, str):
-            cmdline += ' > ' + Program.__shellquote(self.translate_path(self.stdout, outputpath))
+            cmdline += ' > ' + Program._shellquote(self.translate_path(self.stdout, outputpath))
         if isinstance(self.stderr, str):
-            cmdline += ' 2> ' + Program.__shellquote(self.translate_path(self.stdout, outputpath))
+            cmdline += ' 2> ' + Program._shellquote(self.translate_path(self.stdout, outputpath))
         if self.stderr is subprocess.STDOUT:
             cmdline += ' 2>&1'
         return cmdline
