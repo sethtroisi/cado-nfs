@@ -1,5 +1,5 @@
 import subprocess
-import cadologger
+import logging
 
 class Command(object):
     ''' Represents a running subprocess
@@ -8,7 +8,7 @@ class Command(object):
     '''
     def __init__(self, args, stdin = None, stdout = subprocess.PIPE, 
                  stderr = subprocess.PIPE, **kwargs):
-        self.logger = cadologger.Logger()
+        self.logger = logging.getLogger("Command")
         # Convert args array to a string for printing if necessary
         if isinstance(args, str):
             self.cmdline = args

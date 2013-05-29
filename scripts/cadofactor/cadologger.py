@@ -1,5 +1,10 @@
 import logging
 
+from logging import DEBUG, INFO, WARNING, ERROR, CRITICAL
+COMMAND = DEBUG + 1
+logging.addLevelName(COMMAND, "COMMAND")
+
+
 class ANSI(object):
     """ Class defining some ANSI control sequences, for example for 
     changing text colour """
@@ -24,8 +29,6 @@ class ANSI(object):
     # Not sure if it is any different from "30;1" aka "bright black"
     WHITE = CSI + '37;1' + SGR
 
-COMMAND = logging.DEBUG + 1
-
 class ScreenFormatter(logging.Formatter):
     """ Class for formatting logger records for screen output, optionally
     with colorized logger level name (like cadofct.pl used to). """
@@ -40,10 +43,10 @@ class ScreenFormatter(logging.Formatter):
     # specified in the 'colour' key of the log record) for the log level name, 
     # then back to default text rendition (ANSI code in 'nocolour')
     colourformatstr = \
-        '%(padding)s%(colour)s%(levelnametitle)s%(nocolour)s: %(message)s'
+        '%(padding)s%(colour)s%(levelnametitle)s%(nocolour)s:%(name)s: %(message)s'
     # Format string that does not use colour changes
     nocolourformatstr = \
-        '%(padding)s%(levelnametitle)s: %(message)s'
+        '%(padding)s%(levelnametitle)s:%(name)s: %(message)s'
     
     def __init__(self, colour = True):
         if colour:
@@ -73,7 +76,7 @@ class FileFormatter(logging.Formatter):
     """ Class for formatting a log record for writing to a log file. No colours 
     here, but we add the process ID and a time stamp """
     formatstr = \
-       'PID%(process)s %(asctime)s %(levelnametitle)s:%(message)s' 
+       'PID%(process)s %(asctime)s %(levelnametitle)s:%(name)s:%(message)s' 
     
     def format(self, record):
         record.levelnametitle = record.levelname.title()
@@ -121,42 +124,21 @@ class CmdFileHandler(logging.FileHandler):
         self.setFormatter(CmdFileFormatter())
 
 
-class Logger(object):
-    """ Class which gets a logger with name equal to the module name (i.e., as 
-        stored in __name__) upon instantiation and sets the logging level to 
-        DEBUG. Other method calls are passed though to the logger """
-    def __init__(self):
-        # We mustn't instantiate logging.Logger, but get a reference to a
-        # pre-existing instance via getLogger(). Hence no inheritance from 
-        # logging.Logger
-        self.logger = logging.getLogger()
-        # Use level of NOTSET, so handlers get to see everything.
-        # They do the filtering by themselves
-        self.logger.setLevel(logging.NOTSET)
-    
-    def cmd(self, msg, pid, *args, **kwargs):
+class MyLogger(logging.Logger):
+    def cmd(self, msg, pid, *args, extra = None, **kwargs):
         """ Log a message with a level of cadologger.COMMAND """
-        self.log(COMMAND, msg, extra = {"childpid": pid}, *args, **kwargs)
-    
-    # Delegate all other method calls to the logging.Logger instance we 
-    # have referenced in self.logger
-    def __getattr__(self, name):
-        return getattr(self.logger, name)
-    
-    @classmethod
-    def translate_level(cls, levelname):
-        try:
-            level = int(levelname)
-        except ValueError:
-            level = None
-        if level is None:
-            level = getattr(logging, levelname.upper(), None)
-        if level is None and levelname.upper() == 'COMMAND':
-            level = COMMAND
-        if not isinstance(level, int):
-            raise ValueError('Invalid log level: %s' %  levelname)
-        return level
+        if not extra is None:
+            extra = extra.copy()
+        else:
+            extra = {}
+        extra["childpid"] = pid
+        
+        self.log(COMMAND, msg, *args, extra=extra, **kwargs)
 
+logging.setLoggerClass(MyLogger)
+root = logging.getLogger()
+root.setLevel(logging.NOTSET)
+del(root)
 
 if __name__ == '__main__':
     logger = cadologger.Logger()

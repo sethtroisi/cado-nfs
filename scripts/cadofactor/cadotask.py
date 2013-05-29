@@ -8,9 +8,9 @@ import abc
 import random
 import time
 import wudb
+import logging
 import patterns
 import cadoprograms
-import cadologger
 import wuserver
 
 # Some parameters are provided by the param file but can change during
@@ -111,7 +111,7 @@ class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
             #    d.subscribeObserver(self)
         else:
             self.dependencies = {}
-        self.logger = cadologger.Logger()
+        self.logger = logging.getLogger(self.title)
         self.logger.debug("Enter Task.__init__(%s)", 
                           self.name)
         if False:
@@ -175,6 +175,7 @@ class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
                 task.run()
         
         self.logger.debug("Exit Task.run(%s)" % type(self))
+        self.logger.info("Starting")
         return
     
     def _make_basename(self):
@@ -488,7 +489,6 @@ class PolyselTask(ClientServerTask):
         self.logger.debug("Enter PolyselTask.run(" + self.name + ")")
         super().run()
         
-        self.logger.info("Beginning %s", self.title)
         self.logger.debug("PolyselTask.run(): Task state: %s", 
                           self.state)
         self.logger.debug("PolyselTask.run(): Task parameters: %s", 
@@ -522,7 +522,7 @@ class PolyselTask(ClientServerTask):
         while self.state["wu_received"] < self.state["wu_submitted"]:
             self.wait()
         
-        self.logger.info("%s finished", self.title)
+        self.logger.info("finished")
         if not self.bestpoly:
             self.logger.error ("No polynomial found")
             return
@@ -600,7 +600,6 @@ class FactorBaseOrFreerelTask(Task):
         self.logger.debug("Enter FactorBaseOrFreerelTask.run(%s)", self.name)
         super().run()
         
-        self.logger.info("Beginning %s", self.title)
         # Get best polynomial found by polyselect
         poly = self.polyselect.get_poly()
         if not poly:
@@ -768,7 +767,6 @@ class SievingTask(ClientServerTask, FilesCreator):
         self.logger.debug("Enter SievingTask.run(" + self.name + ")")
         super().run()
         
-        self.logger.info("Beginning %s", self.title)
         # Get best polynomial found by polyselect
         poly = self.polyselect.get_poly()
         if not poly:
@@ -873,7 +871,6 @@ class Duplicates1Task(Task, FilesCreator):
     def run(self):
         self.logger.debug("Enter Duplicates1Task.run(" + self.name + ")")
         super().run()
-        self.logger.info("Beginning %s", self.title)
         # Check that previously split files were split into the same number
         # of pieces that we want now
         for (infile, parts) in self.already_split_input.items():
@@ -1023,7 +1020,6 @@ class Duplicates2Task(Task, FilesCreator):
         self.logger.debug("Enter Duplicates2Task.run(" + self.name + ")")
         super().run()
         
-        self.logger.info("Beginning %s", self.title)
         for i in range(0, self.nr_slices):
             files = self.duplicates1.get_output_filenames(i.__eq__)
             newfiles = [f for f in files if not f in self.already_done_input]
@@ -1108,7 +1104,6 @@ class PurgeTask(Task):
         self.logger.debug("Enter PurgeTask.run(" + self.name + ")")
         if not self.is_done():
             super().run()
-            self.logger.info("Beginning %s", self.title)
             poly = self.polyselect.get_poly()
             polyfile = self.make_output_filename("poly")
             poly.create_file(polyfile, self.params)
@@ -1203,7 +1198,6 @@ class MergeTask(Task):
         self.logger.debug("Enter MergeTask.run(" + self.name + ")")
         if not self.is_done():
             super().run()
-            self.logger.info("Beginning %s", self.title)
             if "indexfile" in self.state:
                 del(self.state["indexfile"])
             if "mergedfile" in self.state:
@@ -1283,7 +1277,6 @@ class LinAlgTask(Task):
         self.logger.debug("Enter LinAlgTask.run(" + self.name + ")")
         if not self.is_done():
             super().run()
-            self.logger.info("Beginning %s", self.title)
             workdir = self.make_output_dirname()
             self.make_directories(workdir)
             mergedfile = self.merge.get_merged_filename()
@@ -1342,7 +1335,6 @@ class CharactersTask(Task):
         self.logger.debug("Enter CharactersTask.run(" + self.name + ")")
         if not self.is_done():
             super().run()
-            self.logger.info("Beginning %s", self.title)
             polyfilename = self.make_output_filename("poly")
             poly = self.polyselect.get_poly()
             poly.create_file(polyfilename, self.params)
@@ -1412,7 +1404,6 @@ class SqrtTask(Task):
         self.logger.debug("Enter SqrtTask.run(" + self.name + ")")
         if not self.is_done():
             super().run()
-            self.logger.info("Beginning %s" % self.title)
             polyfilename = self.make_output_filename("poly")
             poly = self.polyselect.get_poly()
             poly.create_file(polyfilename, self.params)

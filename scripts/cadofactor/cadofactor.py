@@ -21,8 +21,8 @@ if __name__ == '__main__':
     parameters._readfile(open(paramfile))
     tasksparams = parameters.myparams(("workdir", "name"), "tasks")
     
-    screenlvl = cadologger.Logger.translate_level(screenlvlname)
-    logger = cadologger.Logger()
+    screenlvl = getattr(cadologger, screenlvlname.upper())
+    logger = logging.getLogger()
     logger.addHandler(cadologger.ScreenHandler(lvl = screenlvl))
     
     logger.debug("Root parameter dictionary:\n%s" % parameters)

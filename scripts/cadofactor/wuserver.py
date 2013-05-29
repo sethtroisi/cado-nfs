@@ -19,24 +19,6 @@ import upload
 class ThreadedHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
     """Handle requests in a separate thread."""
 
-class HttpServerLogger(object):
-    def __init__(self, level):
-        self.logger = logging.getLogger(__name__)
-        self.logger.setLevel(level)
-        formatter = logging.Formatter(
-            fmt='%(address_string)s - - [%(asctime)s] %(message)s')
-        ch = logging.StreamHandler()
-        ch.setFormatter(formatter)
-        self.logger.addHandler(ch)
-    
-    def log(self, lvl, *args, extra = {}, **kwargs):
-        if not "address_string" in extra:
-            extra = extra.copy()
-            extra["address_string"] = ""
-        self.logger.log(lvl, *args, extra = extra, **kwargs)
-
-    def info(self, *args, **kwargs):
-        self.log(logging.INFO, *args, **kwargs)
 
 class HtmlGen(io.BytesIO):
     def __init__(self, encoding = None):
@@ -109,10 +91,10 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         """ Interface to the logger class. 
             We add the client address (as a string) to the log record so the 
             logger can print that """
-        if self.logger:
-            e = kwargs.copy()
-            e["address_string"] = self.address_string()
-            self.logger.log(lvl, format, *args, extra=e)
+        # e = kwargs.copy()
+        # e["address_string"] = self.address_string()
+        format = self.address_string() + ' ' + format
+        self.logger.log(lvl, format, *args, **kwargs)
 
     # These three methods overwrite the corresponding methods from 
     # http.server.BaseHTTPRequestHandler
@@ -300,13 +282,22 @@ class ServerLauncher(object):
                 registered_filenames, uploaddir, bg = False,
                 use_db_pool = True):
         
-        self.logger = HttpServerLogger(logging.INFO)
+        self.name = "HTTP server"
+        self.logger = logging.getLogger(self.name)
+        self.logger.setLevel(logging.INFO)
+        formatter = logging.Formatter(
+            fmt='%(address_string)s - - [%(asctime)s] %(message)s')
+        #self.ch = logging.StreamHandler()
+        #self.ch.setFormatter(formatter)
+        #self.logger.addHandler(self.ch)
+        #self.logger.propagate = False
+        
         self.bg = bg
         if threaded:
-            self.logger.info("Using threaded server")
+            logging.info("Using threaded server")
             ServerClass = ThreadedHTTPServer
         else:
-            self.logger.info("Not using threaded server")
+            logging.info("Not using threaded server")
             ServerClass = http.server.HTTPServer
         if use_db_pool:
             self.db_pool = wudb.DbThreadPool(dbfilename, 1)
@@ -330,27 +321,29 @@ class ServerLauncher(object):
             os.mkdir(uploaddir)
         
         self.httpd = ServerClass((address, port), MyHandlerWithParams, )
-        self.httpd.server_name = "Workunit Sever"
+        self.httpd.server_name = self.name
     
     def serve(self):
-        self.logger.info("serving at %s:%d", self.httpd.server_address, self.httpd.server_port)
+        logging.info("serving at %s:%d", self.httpd.server_address, self.httpd.server_port)
         
         if self.bg:
             from threading import Thread
             self.thread = Thread(target=self.httpd.serve_forever,
-                                 name="HTTP server")
+                                 name=self.name)
             self.thread.daemon = True
             self.thread.start()
         else:
             self.httpd.serve_forever()
     
     def shutdown(self):
-        self.logger.info("Shutting down HTTP server")
+        logging.info("Shutting down HTTP server")
         self.httpd.shutdown()
         if self.bg:
             self.thread.join()
         if self.db_pool:
             self.db_pool.terminate()
+        #self.logger.removeHandler(self.ch)
+        
 
 if __name__ == '__main__':
     import argparse
