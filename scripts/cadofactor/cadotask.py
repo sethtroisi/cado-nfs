@@ -61,6 +61,83 @@ class FilesCreator(wudb.DbAccess, metaclass=abc.ABCMeta):
         pass
 
 
+class Polynomial(object):
+    # Keys that can occur in a polynomial file in their preferred ordering,
+    # and whether the key is mandatory or not. The preferred ordering is used
+    # when turning a polynomial back into a string. 
+    
+    paramnames = ("rlim", "alim", "lpbr", "lpba", "mfbr", "mfba", "rlambda", 
+        "alambda")
+    keys = ( ("n", True), ("Y0", True), ("Y1", True), ("c0", True), 
+            ("c1", True), ("c2", True), ("c3", True), ("c4", True),
+            ("c5", False), ("c6", False), ("m", True), ("skew", True) )
+    
+    def __init__(self, lines):
+        """ Parse a polynomial file in the syntax as produced by polyselect2l 
+        """
+        self.poly = None
+        self.E = 0.
+        poly = {}
+        for line in lines:
+            # print ("Parsing line: >%s<" % line)
+            # If there is a "No polynomial found" message anywhere in the
+            # file, we assume that there is no polynomial. This assumption
+            # will be false if, e.g., files get concatenated
+            if re.match("No polynomial found", line):
+                return
+            # If this is a comment line telling the Murphy E value, 
+            # extract the value and store it
+            match = re.match("\s*#\s*MurphyE\s*\(.*\)=(.*)$", line)
+            if match:
+                self.E = float(match.group(1))
+                continue
+            # Drop comment, strip whitespace
+            l = line.split('#', 1)[0].strip()
+            # If nothing is left, process next line
+            if not l:
+                continue
+            # All remaining lines must be of the form "x: y"
+            a = l.split(":")
+            if not len(a) == 2:
+                raise Exception("Invalid line %s" % l)
+            key = a[0].strip()
+            value = a[1].strip()
+            if not key in dict(self.keys):
+                raise Exception("Invalid key %s in line %s" %
+                                (key, l))
+            poly[key] = value
+        for (key, isrequired) in self.keys:
+            if isrequired and not key in poly:
+                raise Exception("Key %s missing" % key)
+        self.poly = poly
+        return
+    
+    def __str__(self):
+        arr = [(key + ": " + self.poly[key] + '\n')
+               for (key,req) in self.keys if key in self.poly]
+        return "".join(arr)
+
+    def __eq__(self, other):
+        return self.poly == other.poly
+    def __ne__(self, other):
+        return self.poly != other.poly
+
+    def is_valid(self):
+        return not self.poly is None
+    
+    def setE(self, E):
+        self.E = float(E)
+    
+    def create_file(self, filename, params):
+        # Write polynomial to a file, and add lines with parameters such as 
+        # "alim" if supplied in params 
+        with open(filename, "w") as f:
+            f.write(str(self))
+            for key in self.paramnames:
+                if key in params:
+                    f.write(key + ": %s\n" % params[key])
+
+
 class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
     """ A base class that represents one task that needs to be processed. 
     
@@ -96,7 +173,7 @@ class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
         # Parameters that all tasks use
         return ("name", "workdir", "remove")
     
-    def __init__(self, dependencies, *args, parameters = None, **kwargs):
+    def __init__(self, *args, parameters = None, **kwargs):
         ''' Sets up a database connection and a DB-backed dictionary for 
         parameters. Reads parameters from DB, and merges with hierarchical
         parameters in the parameters argument. Parameters passed in by 
@@ -105,25 +182,16 @@ class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
         '''
         
         super().__init__(*args, **kwargs)
-        if dependencies:
-            self.dependencies = dependencies
-            # for d in dependencies:
-            #    d.subscribeObserver(self)
-        else:
-            self.dependencies = {}
         self.logger = logging.getLogger(self.title)
         self.logger.debug("Enter Task.__init__(%s)", 
                           self.name)
-        if False:
-            self.logger.debug("Enter Task.__init__(): parameters = %s", 
-                              parameters)
         # DB-backed dictionary with the state of this task
         self.state = self.make_db_dict(self.make_tablename())
-        self.logger.debug("%s: state = %s", self.title, self.state)
+        self.logger.debug("state = %s", self.state)
         # Set default parametes for this task, if any are given
         if parameters:
             self.params = parameters.myparams(self.paramnames, self.parampath)
-            self.logger.debug("%s: params = %s", self.title, self.params)
+            self.logger.debug("params = %s", self.params)
             self.params.setdefault("remove", False)
         # Set default parameters for our programs
         self.progparams = []
@@ -136,7 +204,7 @@ class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
             self.progparams.append(progparams)
         self.logger.debug("Exit Task.__init__(%s)", self.name)
         return
-    
+
     @staticmethod
     def check_tablename(name):
         no_ = name.replace("_", "")
@@ -153,30 +221,6 @@ class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
             name = name + '_' + extra
         self.check_tablename(name)
         return name
-    
-    def is_done(self):
-        for d in self.dependencies:
-            if not d.is_done():
-                return False
-        return True
-    
-    def run(self):
-        ''' Runs the prerequisites. Sub-classes should call this first in 
-        their run() method.
-                '''
-        self.logger.debug("Enter Task.run(%s)" % type(self))
-        self.logger.debug("Task.run(%s): self.is_done() = %s", 
-                          self.name, self.is_done())
-        # Check/run the prerequisites
-        for task in self.dependencies:
-            if not task.is_done():
-                self.logger.debug("Task.run(%s): Running prerequisite %s",
-                                  self.name, task.name)
-                task.run()
-        
-        self.logger.debug("Exit Task.run(%s)" % type(self))
-        self.logger.info("Starting")
-        return
     
     def _make_basename(self):
         """
@@ -196,7 +240,7 @@ class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
         if subdir:
             return self.make_output_dirname(dirextra) + name
         else:
-            assert dirextra == None
+            assert dirextra is None
             return "%s.%s" % (self._make_basename(), name)
 
     def make_output_dirname(self, extra = None):
@@ -329,7 +373,7 @@ class ClientServerTask(Task, patterns.Observer):
         self.state.setdefault("wu_submitted", 0)
         self.state.setdefault("wu_received", 0)
         self.params.setdefault("maxwu", 10)
-        assert self.state["wu_received"] <= self.state["wu_submitted"]
+        assert self.get_number_outstanding_wus() >= 0
     
     def submit_command(self, command, identifier):
         ''' Submit a workunit to the database.
@@ -337,19 +381,21 @@ class ClientServerTask(Task, patterns.Observer):
         result to updateObserver().
         '''
         
-        while self.state["wu_submitted"] - self.state["wu_received"] >= self.params["maxwu"]:
+        while self.get_number_outstanding_wus() >= self.params["maxwu"]:
             self.wait()
         wuid = self.make_wuname(identifier)
         wutext = command.make_wu(wuid)
         for filename in command.get_exec_files() + command.get_input_files():
             basename = os.path.basename(filename)
             if not basename in self.registered_filenames:
-                self.logger.debug("Registering file name %s with target %s", basename, filename)
+                self.logger.debug("Registering file name %s with target %s",
+                                  basename, filename)
                 self.registered_filenames.setdefault(basename, filename)
             # If it was already defined with a different target, error
             if not self.registered_filenames[basename] == filename:
-                raise Exception("Filename %s, to be registered for target %s, already registered for target %s" %
-                                basename, filename, self.registered_filenames[basename])
+                raise Exception("Filename %s, to be registered for target %s, "
+                                "already registered for target %s" %
+                                (basename, filename, self.registered_filenames[basename]))
         
         self.logger.info("Adding workunit %s to database", wuid)
         # print ("WU:\n%s" % wutext)
@@ -362,7 +408,13 @@ class ClientServerTask(Task, patterns.Observer):
         if not ok:
             not_str = "not ok"
         self.logger.info("Marking workunit %s as %s", wuid, not_str)
+        assert self.get_number_outstanding_wus() >= 1
+        # FIXME: these two should be updated atomically
+        self.state["wu_received"] += 1
         self.wuar.verification(message.get_wu_id(), ok)
+    
+    def get_number_outstanding_wus(self):
+        return self.state["wu_submitted"] - self.state["wu_received"]
     
     def test_outputfile_exists(self, filename):
         # Can't test
@@ -373,84 +425,7 @@ class ClientServerTask(Task, patterns.Observer):
         # need this poll. But they probably won't be totally reliable
         if not self.db_listener.send_result():
             time.sleep(1)
-
-
-class Polynomial(object):
-    # Keys that can occur in a polynomial file in their preferred ordering,
-    # and whether the key is mandatory or not. The preferred ordering is used
-    # when turning a polynomial back into a string. 
-    
-    paramnames = ("rlim", "alim", "lpbr", "lpba", "mfbr", "mfba", "rlambda", 
-        "alambda")
-    keys = ( ("n", True), ("Y0", True), ("Y1", True), ("c0", True), 
-            ("c1", True), ("c2", True), ("c3", True), ("c4", True),
-            ("c5", False), ("c6", False), ("m", True), ("skew", True) )
-    
-    def __init__(self, lines):
-        """ Parse a polynomial file in the syntax as produced by polyselect2l 
-        """
-        self.poly = None
-        self.E = 0.
-        poly = {}
-        for line in lines:
-            # print ("Parsing line: >%s<" % line)
-            # If there is a "No polynomial found" message anywhere in the
-            # file, we assume that there is no polynomial. This assumption
-            # will be false if, e.g., files get concatenated
-            if re.match("No polynomial found", line):
-                return
-            # If this is a comment line telling the Murphy E value, 
-            # extract the value and store it
-            match = re.match("\s*#\s*MurphyE\s*\(.*\)=(.*)$", line)
-            if match:
-                self.E = float(match.group(1))
-                continue
-            # Drop comment, strip whitespace
-            l = line.split('#', 1)[0].strip()
-            # If nothing is left, process next line
-            if not l:
-                continue
-            # All remaining lines must be of the form "x: y"
-            a = l.split(":")
-            if not len(a) == 2:
-                raise Exception("Invalid line %s" % l)
-            key = a[0].strip()
-            value = a[1].strip()
-            if not key in dict(self.keys):
-                raise Exception("Invalid key %s in line %s" %
-                                (key, l))
-            poly[key] = value
-        for (key, isrequired) in self.keys:
-            if isrequired and not key in poly:
-                raise Exception("Key %s missing" % key)
-        self.poly = poly
-        return
-    
-    def __str__(self):
-        arr = [(key + ": " + self.poly[key] + '\n')
-               for (key,req) in self.keys if key in self.poly]
-        return "".join(arr)
-
-    def __eq__(self, other):
-        return self.poly == other.poly
-    def __ne__(self, other):
-        return self.poly != other.poly
-
-    def is_valid(self):
-        return not self.poly is None
-    
-    def setE(self, E):
-        self.E = float(E)
-    
-    def create_file(self, filename, params):
-        # Write polynomial to a file, and add lines with parameters such as 
-        # "alim" if supplied in params 
-        with open(filename, "w") as f:
-            f.write(str(self))
-            for key in self.paramnames:
-                if key in params:
-                    f.write(key + ": %s\n" % params[key])
-
+ 
 
 class PolyselTask(ClientServerTask):
     """ Finds a polynomial, uses client/server """
@@ -472,27 +447,17 @@ class PolyselTask(ClientServerTask):
             ("adrange", "P", "N", "admin", "admax")
     
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, dependencies = None, **kwargs)
+        super().__init__(*args, **kwargs)
         self.state["adnext"] = \
             max(self.state.get("adnext", 0), int(self.params.get("admin", 0)))
     
-    def is_done(self):
-        # self.logger.debug ("PolyselTask.is_done(): Task parameters: %s", 
-        #                    self.params)
-        return super().is_done() and \
-               "bestpoly" in self.state and \
-               self.state["adnext"] >= int(self.params["admax"]) and \
-               self.state["wu_received"] == self.state["wu_submitted"]
-    
     def run(self):
-        # Make command line for polselect2l, run it. 
-        self.logger.debug("Enter PolyselTask.run(" + self.name + ")")
-        super().run()
-        
-        self.logger.debug("PolyselTask.run(): Task state: %s", 
+        if "bestpoly" in self.state and not self.need_more_wus() and \
+                self.get_number_outstanding_wus() == 0:
+            return
+        self.logger.info("Starting")
+        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
-        self.logger.debug("PolyselTask.run(): Task parameters: %s", 
-                          self.params)
         
         if "bestpoly" in self.state:
             self.bestpoly = Polynomial(self.state["bestpoly"].splitlines())
@@ -504,31 +469,20 @@ class PolyselTask(ClientServerTask):
             self.bestpoly = None
             self.logger.info("No polynomial was previously found")
         
-        while self.state["adnext"] <= int(self.params["admax"]):
-            adstart = self.state["adnext"]
-            adend = adstart + int(self.params["adrange"])
-            polyselect_params = self.progparams[0].copy()
-            polyselect_params["admin"] = str(adstart)
-            polyselect_params["admax"] = str(adend)
-            outputfile = self.make_output_filename("%d-%d" % (adstart, adend))
-            if self.test_outputfile_exists(outputfile):
-                self.logger.info("%s already exists, won't generate again",
-                                 outputfile)
-            else:
-                p = self.programs[0](None, polyselect_params, stdout = outputfile)
-                self.submit_command(p, "%d-%d" % (adstart, adend))
-            self.state["adnext"] = adend
+        # Submit all the WUs we need to reach admax
+        while self.need_more_wus():
+            self.submit_one_wu()
         
-        while self.state["wu_received"] < self.state["wu_submitted"]:
+        # Wait for all the WUs to finish
+        while self.get_number_outstanding_wus() > 0:
             self.wait()
         
-        self.logger.info("finished")
         if not self.bestpoly:
-            self.logger.error ("No polynomial found")
+            self.logger.error ("No polynomial found. Consider increasing the "
+                               "search range bound admax, or maxnorm")
             return
-        self.logger.info("Best polynomial from %s has Murphy_E = %g", 
-                          self.state["bestfile"] , self.bestpoly.E)
-        self.logger.debug("Exit PolyselTask.run(" + self.name + ")")
+        self.logger.info("Finished, best polynomial from file %s has Murphy_E "
+                         "= %g", self.state["bestfile"] , self.bestpoly.E)
         return
     
     def updateObserver(self, message):
@@ -538,7 +492,6 @@ class PolyselTask(ClientServerTask):
             return
         output_files = message.get_output_files()
         assert len(output_files) == 1
-        self.state["wu_received"] += 1
         ok = self.parse_poly(output_files[0])
         self.verification(message, ok)
     
@@ -580,15 +533,34 @@ class PolyselTask(ClientServerTask):
             return Polynomial(self.state["bestpoly"].splitlines())
         else:
             return None
+    
+    def need_more_wus(self):
+        return self.state["adnext"] < int(self.params["admax"])
+    
+    def submit_one_wu(self):
+        adstart = self.state["adnext"]
+        adend = adstart + int(self.params["adrange"])
+        adend = min(adend, int(self.params["admax"]))
+        polyselect_params = self.progparams[0].copy()
+        polyselect_params["admin"] = str(adstart)
+        polyselect_params["admax"] = str(adend)
+        outputfile = self.make_output_filename("%d-%d" % (adstart, adend))
+        if self.test_outputfile_exists(outputfile):
+            self.logger.info("%s already exists, won't generate again",
+                             outputfile)
+        else:
+            p = self.programs[0](None, polyselect_params, stdout = outputfile)
+            self.submit_command(p, "%d-%d" % (adstart, adend))
+        self.state["adnext"] = adend
 
 
-class FactorBaseOrFreerelTask(Task):
+class FactorBaseOrFreerelTask(Task, metaclass=abc.ABCMeta):
     """ Common base class for programs that produce one output file from 
     the polynomial, i.e., factorbase and freerel 
     """
     
     def __init__(self, polyselect, *args, **kwargs):
-        super().__init__(*args, dependencies = (polyselect,), **kwargs)
+        super().__init__(*args, **kwargs)
         self.polyselect = polyselect
         # Invariant: if we have a result (in self.state["outputfile"]) then we
         # must also have a polynomial (in self.state["poly"])
@@ -597,8 +569,9 @@ class FactorBaseOrFreerelTask(Task):
             # The target file must correspond to the polynomial "poly"
     
     def run(self):
-        self.logger.debug("Enter FactorBaseOrFreerelTask.run(%s)", self.name)
-        super().run()
+        self.polyselect.run()
+        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
+                          self.state)
         
         # Get best polynomial found by polyselect
         poly = self.polyselect.get_poly()
@@ -618,14 +591,16 @@ class FactorBaseOrFreerelTask(Task):
         else:
             self.state["poly"] = str(poly)
         
-        if not self.is_done():
+        if not "outputfile" in self.state:
+            self.logger.info("Starting")
             # Write polynomial to a file
             polyfile = self.make_output_filename("poly")
             poly.create_file(polyfile, self.params)
             
-            # Make file name for factor base file
+            # Make file name for factor base/free relations file
             outputfile = self.make_output_filename(self.target)
-            args = ()
+
+            # Run command to generate factor base/free relations file
             kwargs = self.progparams[0].copy()
             kwargs["poly"] = polyfile
             if "pmin" in self.programs[0].get_config_keys():
@@ -637,28 +612,18 @@ class FactorBaseOrFreerelTask(Task):
             self.parse_stderr(stderr)
             
             self.state["outputfile"] = outputfile
-        self.logger.debug("Exit FactorBaseOrFreerelTask.run(%s)", self.name)
-    
-    def is_done(self):
-        if "outputfile" in self.state\
-                and not os.path.isfile(self.state["outputfile"]):
-            raise Exception("FactorBaseOrFreerelTask.is_done(%s): marked "
-                            "as done but target file %s does not exist" % 
-                            (self.name, self.state["outputfile"]))
-        return super().is_done() and "outputfile" in self.state
-    
-    def updateObserver(self, message):
-        if isinstance(message, Polynomial):
-            # We might start factorbase computation while polynomial 
-            # selection is still running
-            pass
+            self.logger.info("Finished")
+
+        self.check_files_exist([self.state["outputfile"]], "output", 
+                               shouldexist=True)
     
     def get_filename(self):
         if "outputfile" in self.state:
             return self.state["outputfile"]
         else:
             return None
-
+    
+    @abc.abstractmethod
     def parse_stderr(self, stderr):
         pass
 
@@ -682,6 +647,8 @@ class FactorBaseTask(FactorBaseOrFreerelTask):
         return super().paramnames + \
             ("alim", )
     target = "roots"
+    def parse_stderr(self, stderr):
+        pass
 
 
 class FreeRelTask(FactorBaseOrFreerelTask):
@@ -704,10 +671,6 @@ class FreeRelTask(FactorBaseOrFreerelTask):
             ("lpba", )
     target = "freerel"
     
-    def run(self):
-        super().run()
-        self.logger.info("Found %d free relations" % self.state["nfree"])
-    
     def parse_stderr(self, stderr):
         if "nfree" in self.state:
             del(self.state["nfree"])
@@ -719,6 +682,7 @@ class FreeRelTask(FactorBaseOrFreerelTask):
                 self.state["nfree"] = int(match.group(1))
         if not "nfree" in self.state:
             raise Exception("Received no value for number of free relations")
+        self.logger.info("Found %d free relations" % self.state["nfree"])
         return
     
     def get_nrels(self):
@@ -747,25 +711,30 @@ class SievingTask(ClientServerTask, FilesCreator):
     file_end_offset = 1000
     
     def __init__(self, polyselect, factorbase, *args, **kwargs):
-        super().__init__(*args, dependencies = (polyselect, factorbase), **kwargs)
+        super().__init__(*args, **kwargs)
         self.polyselect = polyselect
         self.factorbase = factorbase
-        # qmin is optional, but if it exists, should be use in preference to alim
-        if "qmin" in self.params:
-            self.state.setdefault("qnext", int(self.params["qmin"]))
-        self.state.setdefault("qnext", int(self.params["alim"]))
+        qmin = int(self.params.get("qmin", 0))
+        if "qnext" in self.state:
+            self.state["qnext"] = max(self.state["qnext"], qmin)
+        else:
+            self.state["qnext"] = int(self.params.get("qmin", self.params["alim"]))
+            
         self.state.setdefault("rels_found", 0)
         self.state.setdefault("rels_wanted", 0)
         self.params.setdefault("max_wus", 10)
-        if "rels_wanted" in self.params:
-            self.state["rels_wanted"] = max(self.state["rels_wanted"], int(self.params["rels_wanted"]))
-        else:
+        self.state["rels_wanted"] = max(self.state.get("rels_wanted", 0), 
+                                        int(self.params.get("rels_wanted", 0)))
+        if self.state["rels_wanted"] == 0:
             # Choose sensible default value
             pass
     
     def run(self):
-        self.logger.debug("Enter SievingTask.run(" + self.name + ")")
-        super().run()
+        self.polyselect.run()
+        self.factorbase.run()
+        self.logger.info("Starting")
+        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
+                          self.state)
         
         # Get best polynomial found by polyselect
         poly = self.polyselect.get_poly()
@@ -775,8 +744,7 @@ class SievingTask(ClientServerTask, FilesCreator):
         polyfile = self.make_output_filename("poly")
         poly.create_file(polyfile, self.params)
         
-        while not self.is_done():
-            args = ()
+        while self.state["rels_found"] < int(self.state["rels_wanted"]):
             kwargs = self.progparams[0].copy()
             q0 = self.state["qnext"]
             q1 = q0 + int(self.params["qrange"])
@@ -787,9 +755,11 @@ class SievingTask(ClientServerTask, FilesCreator):
             kwargs["poly"] = polyfile
             kwargs["factorbase"] = self.factorbase.get_filename()
             kwargs["out"] = outputfile
-            p = self.programs[0](args, kwargs)
+            p = self.programs[0](None, kwargs)
             self.submit_command(p, "%d-%d" % (q0, q1))
             self.state["qnext"] = q1
+        self.logger.info("Reached target of %s relations, now have %d",
+                         int(self.state["rels_wanted"]), self.state["rels_found"])
         self.logger.debug("Exit SievingTask.run(" + self.name + ")")
         return
     
@@ -798,7 +768,6 @@ class SievingTask(ClientServerTask, FilesCreator):
         if not identifier:
             # This notification was not for me
             return
-        self.state["wu_received"] += 1
         output_files = message.get_output_files()
         assert len(output_files) == 1
         ok = self.parse_output_file(output_files[0])
@@ -824,20 +793,17 @@ class SievingTask(ClientServerTask, FilesCreator):
         """ Return the number of relations found, either the total so far or
         for a given file
         """
-        if filename == None:
+        if filename is None:
             return self.state["rels_found"]
         else:
             return self.output_files[filename]
-
+    
     def request_more_relations(self, additional):
-        self.state["rels_wanted"] += additional
-        self.logger.info("%s: New goal for number of relations is %d",
-                         self.title, self.state["rels_wanted"])
-    
-    def is_done(self):
-        return super().is_done() and \
-               self.state["rels_found"] >= int(self.state["rels_wanted"])
-    
+        if additional > 0:
+            self.state["rels_wanted"] += additional
+        self.logger.info("New goal for number of relations is %d",
+                         self.state["rels_wanted"])
+
 
 class Duplicates1Task(Task, FilesCreator):
     """ Removes duplicate relations """
@@ -846,7 +812,7 @@ class Duplicates1Task(Task, FilesCreator):
         return "duplicates1"
     @property
     def title(self):
-        return "Filtering: Duplicate Removal, splitting pass"
+        return "Filtering - Duplicate Removal, splitting pass"
     @property
     def programs(self):
         return (cadoprograms.Duplicates1,)
@@ -859,7 +825,7 @@ class Duplicates1Task(Task, FilesCreator):
             ("nslices_log",)
     
     def __init__(self, sieving, *args, **kwargs):
-        super().__init__(*args, dependencies = (sieving,), **kwargs)
+        super().__init__(*args, **kwargs)
         self.sieving = sieving
         self.nr_slices = 2**int(self.params["nslices_log"])
         self.already_split_input = self.make_db_dict(self.make_tablename("infiles"))
@@ -869,8 +835,10 @@ class Duplicates1Task(Task, FilesCreator):
             None, {str(i): 0 for i in range(0, self.nr_slices)})
     
     def run(self):
-        self.logger.debug("Enter Duplicates1Task.run(" + self.name + ")")
-        super().run()
+        self.sieving.run()
+        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
+                          self.state)
+        
         # Check that previously split files were split into the same number
         # of pieces that we want now
         for (infile, parts) in self.already_split_input.items():
@@ -897,12 +865,14 @@ class Duplicates1Task(Task, FilesCreator):
         self.check_files_exist(self.get_output_filenames(), "output",
                                shouldexist=True)
         
-        files = self.sieving.get_output_filenames()
-        newfiles = [f for f in files if not f in self.already_split_input]
-        self.logger.debug ("%s: new files to split are: %s", 
-                           self.title, newfiles)
+        newfiles = [f for f in self.sieving.get_output_filenames() 
+                    if not f in self.already_split_input]
+        self.logger.debug ("new files to split are: %s", newfiles)
         
-        if newfiles:
+        if not newfiles:
+            self.logger.info("No new files to split")
+        else:
+            self.logger.info("Starting")
             basedir = self.make_output_dirname()
             self.make_directories(basedir, map(str, range(0, self.nr_slices)))
             # TODO: can we recover from missing input files? Ask Sieving to
@@ -964,7 +934,7 @@ class Duplicates1Task(Task, FilesCreator):
             return r;
     
     def parse_slice_counts(self, stderr):
-        """ Takes line of text and looks for slice counts as printed by dup1
+        """ Takes lines of text and looks for slice counts as printed by dup1
         """
         counts = [None] * self.nr_slices
         for line in stderr.decode("ascii").splitlines():
@@ -987,6 +957,8 @@ class Duplicates1Task(Task, FilesCreator):
     def get_slice_relcount(self, idx):
         return self.slice_relcounts[str(idx)]
     
+    def request_more_relations(self, additional):
+        self.sieving.request_more_relations(additional)
 
 class Duplicates2Task(Task, FilesCreator):
     """ Removes duplicate relations """
@@ -995,7 +967,7 @@ class Duplicates2Task(Task, FilesCreator):
         return "duplicates2"
     @property
     def title(self):
-        return "Filtering: Duplicate Removal, removal pass"
+        return "Filtering - Duplicate Removal, removal pass"
     @property
     def programs(self):
         return (cadoprograms.Duplicates2,)
@@ -1008,7 +980,7 @@ class Duplicates2Task(Task, FilesCreator):
             ("nslices_log",)
     
     def __init__(self, duplicates1, *args, **kwargs):
-        super().__init__(*args, dependencies = (duplicates1,), **kwargs)
+        super().__init__(*args, **kwargs)
         self.duplicates1 = duplicates1
         self.nr_slices = 2**int(self.params["nslices_log"])
         self.already_done_input = self.make_db_dict(self.make_tablename("infiles"))
@@ -1017,9 +989,11 @@ class Duplicates2Task(Task, FilesCreator):
             None, {str(i): 0 for i in range(0, self.nr_slices)})
     
     def run(self):
-        self.logger.debug("Enter Duplicates2Task.run(" + self.name + ")")
-        super().run()
+        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
+                          self.state)
         
+        self.duplicates1.run()
+        self.logger.info("Starting")
         for i in range(0, self.nr_slices):
             files = self.duplicates1.get_output_filenames(i.__eq__)
             newfiles = [f for f in files if not f in self.already_done_input]
@@ -1045,7 +1019,7 @@ class Duplicates2Task(Task, FilesCreator):
             nr_rels = self.parse_remaining(stderr.decode("ascii").splitlines())
             # Mark input file names and output file names
             for f in files:
-                self.already_done_input[f] = i
+                self.already_done_input[f] = True
             outfilenames = {self.make_output_filename(f, i):i for f in files}
             self.add_output_files(outfilenames)
             self.logger.info("%d unique relations remain on slice %d", nr_rels, i)
@@ -1071,6 +1045,10 @@ class Duplicates2Task(Task, FilesCreator):
             nrels += self.slice_relcounts[str(i)]
         return nrels
 
+    def request_more_relations(self, additional):
+        # TODO: Estimate how many more raw relations we need
+        self.duplicates1.request_more_relations(additional)
+
 
 class PurgeTask(Task):
     """ Removes singletons and computes excess """
@@ -1079,7 +1057,7 @@ class PurgeTask(Task):
         return "singletons"
     @property
     def title(self):
-        return "Filtering: Singleton removal"
+        return "Filtering - Singleton removal"
     @property
     def programs(self):
         return (cadoprograms.Purge,)
@@ -1093,17 +1071,20 @@ class PurgeTask(Task):
     
     # purge -poly c59.poly -keep 160 -nrels 226167 -out c59.purged.gz -npthr 1x1 -basepath /tmp/cado.wNhDsCM6BS -subdirlist c59.subdirlist -filelist c59.filelist
     
-    def __init__(self, polyselect, freerel, sieving, duplicates2, *args, **kwargs):
-        super().__init__(*args, dependencies = (duplicates2,), **kwargs)
+    def __init__(self, polyselect, freerel, duplicates2, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.polyselect = polyselect
         self.freerel = freerel
-        self.sieving = sieving
         self.duplicates2 = duplicates2
     
     def run(self):
-        self.logger.debug("Enter PurgeTask.run(" + self.name + ")")
-        if not self.is_done():
-            super().run()
+        self.freerel.run()
+        self.duplicates2.run()
+        self.logger.info("Starting")
+        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
+                          self.state)
+        
+        while not "purgedfile" in self.state:
             poly = self.polyselect.get_poly()
             polyfile = self.make_output_filename("poly")
             poly.create_file(polyfile, self.params)
@@ -1129,14 +1110,16 @@ class PurgeTask(Task):
                                  % (nrows, weight, excess))
                 self.state["purgedfile"] = purgedfile
             else:
-                self.sieving.request_more_relations(int(self.sieving.get_nrels() * 0.1))
+                self.request_more_relations(int(self.duplicates2.get_relcount() * 0.1))
+                self.duplicates2.run()
         self.logger.debug("Exit PurgeTask.run(" + self.name + ")")
+    
+    def request_more_relations(self, additional):
+        # TODO: Estimate how many more unique relations we need
+        self.duplicates2.request_more_relations(additional)
     
     def get_purged_filename(self):
         return self.state["purgedfile"]
-    
-    def is_done(self):
-        return super().is_done() and "purgedfile" in self.state
     
     def parse_stderr(self, stderr):
         # If stderr ends with 
@@ -1145,7 +1128,7 @@ class PurgeTask(Task):
         for line in stderr.decode("ascii").splitlines():
             if re.match("excess < \d+.\d+ \* #primes", line) or \
                     re.match("number of relations <= number of ideals", line):
-                self.logger.info("%s: not enough relations" % self.title)
+                self.logger.info("not enough relations")
                 return False
         return True
     
@@ -1176,7 +1159,7 @@ class MergeTask(Task):
         return "merging"
     @property
     def title(self):
-        return "Filtering: Merging"
+        return "Filtering - Merging"
     @property
     def programs(self):
         return (cadoprograms.Merge, cadoprograms.Replay)
@@ -1188,16 +1171,17 @@ class MergeTask(Task):
         return super().paramnames + \
             ("skip", "forbw", "coverNmax", "keep", "maxlevel", "ratio")
     
-    def __init__(self, purged, *args, **kwargs):
-        super().__init__(*args, dependencies = (purged, ), **kwargs)
-        self.purged = purged
+    def __init__(self, purge, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.purge = purge
 
     def run(self):
-        # merge -out c59.merge.his -mat c59.purged.gz -skip 32 -forbw 3 -coverNmax 100 -keep 160 -maxlevel 15 -ratio 1.1
-        # replay --binary -skip 32 -purged c59.purged.gz -his c59.merge.his -index c59.index -out c59.small.bin
-        self.logger.debug("Enter MergeTask.run(" + self.name + ")")
-        if not self.is_done():
-            super().run()
+        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
+                          self.state)
+        
+        if not "mergedfile" in self.state:
+            self.purge.run()
+            self.logger.info("Starting")
             if "indexfile" in self.state:
                 del(self.state["indexfile"])
             if "mergedfile" in self.state:
@@ -1208,7 +1192,7 @@ class MergeTask(Task):
             historyfile = self.make_output_filename("history")
             args = ()
             kwargs = self.progparams[0].copy()
-            kwargs["mat"] = self.purged.get_purged_filename()
+            kwargs["mat"] = self.purge.get_purged_filename()
             kwargs["out"] = historyfile
             p = self.programs[0](args, kwargs)
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
@@ -1218,7 +1202,7 @@ class MergeTask(Task):
             args = ()
             kwargs = self.progparams[1].copy()
             kwargs["binary"] = "1"
-            kwargs["purged"] = self.purged.get_purged_filename()
+            kwargs["purged"] = self.purge.get_purged_filename()
             kwargs["history"] = historyfile
             kwargs["index"] = indexfile
             kwargs["out"] = mergedfile
@@ -1246,9 +1230,6 @@ class MergeTask(Task):
     def get_dense_filename(self):
         return self.state.get("densefile", None)
     
-    def is_done(self):
-        return super().is_done() and "mergedfile" in self.state
-
 
 class LinAlgTask(Task):
     """ Runs the linear algebra step """
@@ -1270,13 +1251,16 @@ class LinAlgTask(Task):
             ()
     # bwc.pl :complete seed=1 thr=1x1 mpi=1x1 matrix=c59.small.bin nullspace=left mm_impl=bucket interleaving=0 interval=100 mn=64 wdir=c59.bwc shuffled_product=1 bwc_bindir=/localdisk/kruppaal/build/cado-nfs/normal/linalg/bwc
     def __init__(self, merge, *args, **kwargs):
-        super().__init__(*args, dependencies = (merge,), **kwargs)
+        super().__init__(*args, **kwargs)
         self.merge = merge
     
     def run(self):
-        self.logger.debug("Enter LinAlgTask.run(" + self.name + ")")
-        if not self.is_done():
-            super().run()
+        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
+                          self.state)
+        
+        if not "dependency" in self.state:
+            self.merge.run()
+            self.logger.info("Starting")
             workdir = self.make_output_dirname()
             self.make_directories(workdir)
             mergedfile = self.merge.get_merged_filename()
@@ -1294,17 +1278,14 @@ class LinAlgTask(Task):
             self.state["dependency"] =  dependencyfilename
         self.logger.debug("Exit LinAlgTask.run(" + self.name + ")")
 
-    def is_done(self):
-        return super().is_done() and "dependency" in self.state
-    
     def get_dependency_filename(self):
         return self.state.get("dependency", None)
     
     def get_prefix(self):
         return "%s%s%s.%s" % (self.params["workdir"].rstrip(os.sep), os.sep,
                               self.params["name"], "dep")
-    
-    
+
+
 class CharactersTask(Task):
     """ Computes Quadratic Characters """
     @property
@@ -1329,12 +1310,15 @@ class CharactersTask(Task):
         self.purge = purge
         self.merge = merge
         self.linalg = linalg
-        super().__init__(*args, dependencies = (polyselect, purge, merge, linalg), **kwargs)
+        super().__init__(*args, **kwargs)
     
     def run(self):
-        self.logger.debug("Enter CharactersTask.run(" + self.name + ")")
-        if not self.is_done():
-            super().run()
+        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
+                          self.state)
+        
+        if not "kernel" in self.state:
+            self.linalg.run()
+            self.logger.info("Starting")
             polyfilename = self.make_output_filename("poly")
             poly = self.polyselect.get_poly()
             poly.create_file(polyfilename, self.params)
@@ -1361,9 +1345,6 @@ class CharactersTask(Task):
             self.state["kernel"] = kernelfilename
         self.logger.debug("Exit CharactersTask.run(" + self.name + ")")
         return
-    
-    def is_done(self):
-        return super().is_done() and "kernel" in self.state
     
     def get_kernel_filename(self):
         return self.state.get("kernel")
@@ -1395,15 +1376,16 @@ class SqrtTask(Task):
         self.merge = merge
         self.linalg = linalg
         self.characters = characters
-        dep = (polyselect, freerel, purge, merge, linalg, characters)
-        super().__init__(*args, dependencies = dep, **kwargs)
+        super().__init__(*args, **kwargs)
         self.factors = self.make_db_dict(self.make_tablename("factors"))
         self.add_factor(int(self.params["N"]))
     
     def run(self):
-        self.logger.debug("Enter SqrtTask.run(" + self.name + ")")
+        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
+                          self.state)
         if not self.is_done():
-            super().run()
+            self.characters.run()
+            self.logger.info("Starting")
             polyfilename = self.make_output_filename("poly")
             poly = self.polyselect.get_poly()
             poly.create_file(polyfilename, self.params)
@@ -1438,7 +1420,7 @@ class SqrtTask(Task):
                     assert len(factorlist) == 2
                     self.add_factor(factorlist[0])
                 self.state["next_dep"] += 1
-            self.logger.info("%s has finished" % self.title)
+            self.logger.info("finished")
         self.logger.info("Factors: %s" % " ".join(self.get_factors()))
         self.logger.debug("Exit SqrtTask.run(" + self.name + ")")
     
@@ -1446,7 +1428,7 @@ class SqrtTask(Task):
         for (factor, isprime) in self.factors.items():
             if not isprime:
                 return False
-        return super().is_done()
+        return True
     
     def add_factor(self, factor):
         assert factor > 0
@@ -1577,7 +1559,7 @@ class CompleteFactorization(wudb.DbAccess):
                                    db_listener = self.db_listener, registered_filenames = registered_filenames, **kwargs)
         self.dup1 = Duplicates1Task(self.sieving, *args, parameters = parameters, **kwargs)
         self.dup2 = Duplicates2Task(self.dup1, *args, parameters = parameters, **kwargs)
-        self.purge = PurgeTask(self.polysel, self.freerel, self.sieving, self.dup2,
+        self.purge = PurgeTask(self.polysel, self.freerel, self.dup2,
                                *args, parameters = parameters, **kwargs)
         self.merge = MergeTask(self.purge, *args, parameters = parameters, **kwargs)
         self.linalg = LinAlgTask(self.merge, *args, parameters = parameters, **kwargs)
