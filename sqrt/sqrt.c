@@ -177,7 +177,6 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
 
   depfile = fopen_maybe_compressed (depname, "rb");
   ASSERT_ALWAYS(depfile != NULL);
-  free (depname);
     
   line_number = 2;
   for (;;)
@@ -216,9 +215,10 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
         if (feof (depfile))
           break;
       }
-    fprintf (stderr, "SqrtRat: %lu (a,b) pairs\n", line_number);
+  fprintf (stderr, "SqrtRat: %lu (a,b) pairs\n", line_number);
 
-    fclose (depfile);
+  fclose_maybe_compressed (depfile, depname);
+  free (depname);
 
   fprintf (stderr, "SqrtRat: read %lu (a,b) pairs, including %lu free\n",
            ab_pairs, freerels);
@@ -294,9 +294,9 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
   mpz_mod (prd[0], prd[0], Np);
   
   ratfile = fopen_maybe_compressed (ratname, "wb");
-  free (ratname);
   gmp_fprintf (ratfile, "%Zd\n", prd[0]);
-  fclose(ratfile);
+  fclose_maybe_compressed (ratfile, ratname);
+  free (ratname);
 
   gmp_fprintf (stderr, "rational square root is %Zd\n", prd[0]);
 
@@ -751,7 +751,6 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
     algname = get_depratname (prefix, numdep);
   depfile = fopen_maybe_compressed (depname, "rb");
   ASSERT_ALWAYS(depfile != NULL);
-  free (depname);
 
   deg = pol->pols[(side == 0) ? ALGEBRAIC_SIDE : RATIONAL_SIDE]->degree;
   f = pol->pols[(side == 0) ? ALGEBRAIC_SIDE : RATIONAL_SIDE]->f;
@@ -830,7 +829,8 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
        *      denominator, and the algorithm can continue.
        */
       accumulate_fast_F_end (prd_tab, F, lprd);
-      fclose(depfile);
+      fclose_maybe_compressed (depfile, depname);
+      free (depname);
   
       poly_copy(prd->p, prd_tab[0]->p);
       prd->v = prd_tab[0]->v;
@@ -862,7 +862,7 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
   
     algfile = fopen_maybe_compressed (algname, "wb");
     gmp_fprintf (algfile, "%Zd\n", algsqrt);
-    fclose(algfile);
+    fclose_maybe_compressed (algfile, algname);
     free (algname);
 
     gmp_fprintf(stderr, "algebraic square root is: %Zd\n", algsqrt);
@@ -957,15 +957,15 @@ calculateGcd(const char *prefix, int numdep, mpz_t Np)
     mpz_init(g2);
   
     ratfile = fopen_maybe_compressed (ratname, "rb");
-    free (ratname);
     algfile = fopen_maybe_compressed (algname, "rb");
-    free (algname);
     ASSERT_ALWAYS(ratfile != NULL);
     ASSERT_ALWAYS(algfile != NULL);
     gmp_fscanf(ratfile, "%Zd", ratsqrt);
     gmp_fscanf(algfile, "%Zd", algsqrt);
-    fclose(ratfile);
-    fclose(algfile);
+    fclose_maybe_compressed (ratfile, ratname);
+    free (ratname);
+    fclose_maybe_compressed (algfile, algname);
+    free (algname);
 
     // reduce mod Np
     mpz_mod(ratsqrt, ratsqrt, Np);
@@ -1115,8 +1115,8 @@ void create_dependencies(const char * prefix, const char * indexname, const char
     fprintf(stderr, "Written %u dependencies files\n", nonzero_deps);
     for(unsigned int i = 0 ; i < nonzero_deps ; i++) {
         fprintf(stderr, "%s : %u (a,b) pairs\n", dep_names[i], dep_counts[i]);
-        fclose(dep_files[i]);
-        free(dep_names[i]);
+        fclose_maybe_compressed (dep_files[i], dep_names[i]);
+        free (dep_names[i]);
     }
     free (abs);
 }
