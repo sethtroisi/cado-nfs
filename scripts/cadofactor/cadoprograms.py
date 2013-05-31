@@ -6,6 +6,7 @@ import abc
 import logging
 import re
 import cadocommand
+import cadologger
 
 class Option(metaclass=abc.ABCMeta):
     ''' Base class for command line options that may or may not take parameters
