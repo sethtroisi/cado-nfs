@@ -239,7 +239,7 @@ class Program(object):
         if isinstance(self.stdout, str):
             cmdline += ' > ' + Program._shellquote(self.translate_path(self.stdout, outputpath))
         if isinstance(self.stderr, str):
-            cmdline += ' 2> ' + Program._shellquote(self.translate_path(self.stdout, outputpath))
+            cmdline += ' 2> ' + Program._shellquote(self.translate_path(self.stderr, outputpath))
         if self.stderr is subprocess.STDOUT:
             cmdline += ' 2>&1'
         return cmdline
