@@ -1548,9 +1548,9 @@ sub distribute_task {
 #             the jobs when cleaning up.
 #
 # Some fields will be added during the execution of the script:
-#  - `rdep'    is the list of reverse dependecies, i.e. the tasks that depend
+#  - `rdep'    is the list of reverse dependencies, i.e. the tasks that depend
 #              on this one;
-#  - `rreq'    is the list of reverse order-only dependecies;
+#  - `rreq'    is the list of reverse order-only dependencies;
 #  - `visited' is used by graph traversal algorithms;
 #  - `done'    is the time at which the task has been completed (if any).
 my %tasks = (
