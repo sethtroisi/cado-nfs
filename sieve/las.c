@@ -527,7 +527,9 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     }
 #endif
 
-    si->nb_buckets = 1 + ((si->I / 2) * (si->J / 2) - 1) / BUCKET_REGION;
+    /* this is the maximal value of the number of buckets (might be less
+       for a given special-q if J is smaller) */
+    si->nb_buckets = 1 + (si->I * si->J - 1) / BUCKET_REGION;
     fprintf(las->output, "# bucket_region = %u\n", BUCKET_REGION);
     fprintf(las->output, "# nb_buckets = %u\n", si->nb_buckets);
 
