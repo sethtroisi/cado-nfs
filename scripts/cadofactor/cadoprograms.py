@@ -154,17 +154,21 @@ class Program(object):
             # print ("Found %s in %s" % (binary, execsubfile))
             self.execfile = execsubfile
         else:
+            # FIXME Should we check that the file exists?
             self.execfile = execfile
     
     @classmethod
     def get_param_keys(cls):
-        """ Return the config file keys which map to command line arguments for this program """
+        """ Return the config file keys which map to command line arguments for
+        this program
+        """
         return [opt.get_key() for opt in cls.params_list]
     
     @classmethod
     def get_config_keys(cls):
-        """ Return all config file keys which can be used by this program, including those that don't
-        directly map to command line parameters, like those specifying search paths.
+        """ Return all config file keys which can be used by this program,
+        including those that don't directly map to command line parameters,
+        like those specifying search paths.
         """
         l = list(Program.params_list) + cls.get_param_keys()
         return l
@@ -253,12 +257,14 @@ class Program(object):
         for f in self.get_input_files():
             wu.append('FILE %s' % os.path.basename(f))
         wu.append('EXECFILE %s' % os.path.basename(self.get_exec_file()))
-        wu.append('COMMAND %s' % self.make_command_line(binpath = "${DLDIR}", inputpath = "${DLDIR}", outputpath = "${WORKDIR}"))
+        cmdline = self.make_command_line(binpath = "${DLDIR}",
+            inputpath = "${DLDIR}", outputpath = "${WORKDIR}")
+        wu.append('COMMAND %s' % cmdline)
         for f in self.get_output_files():
             wu.append('RESULT %s' % os.path.basename(f))
         wu.append("") # Make a trailing newline
         return '\n'.join(wu)
-        
+    
     @staticmethod
     def _open_or_not(fn, mode):
         """ If fn is a string, opens a file handle to a file with fn as 
