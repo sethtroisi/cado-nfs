@@ -70,9 +70,11 @@ class Toggle(Option):
     value is interpreted as a truth value, the option is either added or not 
     '''
     def map(self, value):
-        if value.lower() in ["yes", "true", "on", "1"]:
+        if value is True or isinstance(value, str) and \
+                value.lower() in ["yes", "true", "on", "1"]:
             return [self.prefix + self.arg]
-        elif value.lower() in ["no", "false", "off", "0"]:
+        elif value is False or isinstance(value, str) and \
+                value.lower() in ["no", "false", "off", "0"]:
             return []
         else:
             raise ValueError("Toggle.map() requires a boolean type argument")
