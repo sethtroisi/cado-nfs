@@ -289,10 +289,7 @@ class Program(object):
         # print ("%s.Program.run(): cmdline = %s" % (__file__, self.make_command_line()))
         # print ("Input files: %s" % ", ".join(self.get_input_files()))
         # print ("Output files: %s" % ", ".join(self.get_output_files()))
-        self.child = cadocommand.Command(self.make_command_array(), 
-                                         stdin=self.infile,
-                                         stdout=self.outfile, 
-                                         stderr=self.errfile)
+        self.child = cadocommand.Command(self)
     
     def wait(self):
         (rc, stdout, stderr) = self.child.wait()
