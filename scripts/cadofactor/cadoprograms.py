@@ -507,3 +507,23 @@ class Sqrt(Program):
         Parameter("index"),
         Parameter("kernel", "ker")
         )
+
+class WuClient(Program):
+    binary = "wuclient2.py"
+    name = "wuclient"
+    subdir = "scripts/cadofactor"
+    params_list = (
+        Parameter("dldir", prefix='--'),
+        Parameter("workdir", prefix='--'),
+        Parameter("clientid", prefix='--'),
+        Parameter("server", prefix='--'),
+        Parameter("getwupath", prefix='--'),
+        Parameter("loglevel", prefix='--'),
+        Parameter("postresultpath", prefix='--'),
+        Parameter("downloadretry", prefix='--'),
+        Parameter("logfile", prefix='--'),
+        Parameter("debug", prefix='--'),
+        Parameter("niceness", prefix='--'),
+        Parameter("wu_filename", prefix='--'),
+        Parameter("arch", prefix='--'),
+    )
