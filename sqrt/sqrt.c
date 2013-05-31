@@ -106,13 +106,45 @@ stats (mpz_t *prd, unsigned long lprd)
   return s;
 }
 
+static char*
+get_depname (const char *prefix, const char *algrat, int numdep)
+{
+  char *depname;
+  char* suffixes[] = {".gz", ".bz2", ".lzma", ""};
+  char *suffix;
+  char *prefix_base;
+  int ret;
+
+  for (int i = 0; strlen (suffix = suffixes[i]) != 0; i++)
+    if (strcmp (prefix + strlen (prefix) - strlen (suffix), suffix) == 0)
+      break;
+  prefix_base = malloc (strlen (prefix) - strlen (suffix) + 1);
+  strncpy (prefix_base, prefix, strlen (prefix) - strlen (suffix));
+  prefix_base[strlen (prefix) - strlen (suffix)] = '\0';
+  ret = asprintf (&depname, "%s.%s%03d%s", prefix_base, algrat, numdep, suffix);
+  ASSERT_ALWAYS(ret > 0);
+  free (prefix_base);
+  return depname;
+}
+
+static char*
+get_depratname (const char *prefix, int numdep)
+{
+  return get_depname (prefix, "rat.", numdep);
+}
+
+static char*
+get_depalgname (const char *prefix, int numdep)
+{
+  return get_depname (prefix, "alg.", numdep);
+}
+
 int 
 calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
 {
-  char depname[200];
-  char ratname[200];
-  snprintf(depname, sizeof(depname), "%s.%03d", prefix, numdep);
-  snprintf(ratname, sizeof(ratname), "%s.rat.%03d", prefix, numdep);
+  char *depname, *ratname;
+  depname = get_depname (prefix, "", numdep);
+  ratname = get_depratname (prefix, numdep);
   FILE *depfile = NULL;
   FILE *ratfile;
   //int sign;
@@ -143,8 +175,9 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
   prd = (mpz_t*) malloc (lprd * sizeof (mpz_t));
   mpz_init_set_ui (prd[0], 1);
 
-  depfile = fopen (depname, "r");
+  depfile = fopen_maybe_compressed (depname, "rb");
   ASSERT_ALWAYS(depfile != NULL);
+  free (depname);
     
   line_number = 2;
   for (;;)
@@ -260,7 +293,8 @@ calculateSqrtRat (const char *prefix, int numdep, cado_poly pol, mpz_t Np)
   mpz_mul (prd[0], prd[0], v);
   mpz_mod (prd[0], prd[0], Np);
   
-  ratfile = fopen (ratname, "w");
+  ratfile = fopen_maybe_compressed (ratname, "wb");
+  free (ratname);
   gmp_fprintf (ratfile, "%Zd\n", prd[0]);
   fclose(ratfile);
 
@@ -694,8 +728,7 @@ int
 calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side, 
         mpz_t Np)
 {
-  char depname[200];
-  char algname[200];
+  char *depname, *algname;
   FILE *depfile = NULL;
   FILE *algfile;
   poly_t F;
@@ -711,13 +744,14 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
 
   ASSERT_ALWAYS(side == 0 || side == 1);
 
-  sprintf (depname, "%s.%03d", prefix, numdep);
+  depname = get_depname (prefix, "", numdep);
   if (side == 0)
-    sprintf (algname, "%s.alg.%03d", prefix, numdep);
+    algname = get_depalgname (prefix, numdep);
   else
-    sprintf (algname, "%s.rat.%03d", prefix, numdep);
-  depfile = fopen (depname, "r");
+    algname = get_depratname (prefix, numdep);
+  depfile = fopen_maybe_compressed (depname, "rb");
   ASSERT_ALWAYS(depfile != NULL);
+  free (depname);
 
   deg = pol->pols[(side == 0) ? ALGEBRAIC_SIDE : RATIONAL_SIDE]->degree;
   f = pol->pols[(side == 0) ? ALGEBRAIC_SIDE : RATIONAL_SIDE]->f;
@@ -826,9 +860,10 @@ calculateSqrtAlg (const char *prefix, int numdep, cado_poly_ptr pol, int side,
     mpz_mul(algsqrt, algsqrt, aux);
     mpz_mod(algsqrt, algsqrt, Np);
   
-    algfile = fopen (algname, "w");
+    algfile = fopen_maybe_compressed (algname, "wb");
     gmp_fprintf (algfile, "%Zd\n", algsqrt);
     fclose(algfile);
+    free (algname);
 
     gmp_fprintf(stderr, "algebraic square root is: %Zd\n", algsqrt);
     fprintf (stderr, "Algebraic square root time is %2.2lf\n", seconds() - t0);
@@ -908,10 +943,9 @@ void print_factor(mpz_t N)
 int
 calculateGcd(const char *prefix, int numdep, mpz_t Np)
 {
-    char ratname[200];
-    char algname[200];
-    snprintf(ratname, sizeof(ratname), "%s.rat.%03d", prefix, numdep);
-    snprintf(algname, sizeof(algname), "%s.alg.%03d", prefix, numdep);
+    char *ratname, *algname;
+    ratname = get_depratname (prefix, numdep);
+    algname = get_depalgname (prefix, numdep);
     FILE *ratfile = NULL;
     FILE *algfile = NULL;
     int found = 0;
@@ -922,8 +956,10 @@ calculateGcd(const char *prefix, int numdep, mpz_t Np)
     mpz_init(g1);
     mpz_init(g2);
   
-    ratfile = fopen(ratname, "r");
-    algfile = fopen(algname, "r");
+    ratfile = fopen_maybe_compressed (ratname, "rb");
+    free (ratname);
+    algfile = fopen_maybe_compressed (algname, "rb");
+    free (algname);
     ASSERT_ALWAYS(ratfile != NULL);
     ASSERT_ALWAYS(algfile != NULL);
     gmp_fscanf(ratfile, "%Zd", ratsqrt);
@@ -1051,9 +1087,8 @@ void create_dependencies(const char * prefix, const char * indexname, const char
     }
     fprintf(stderr, "Total: %u non-zero dependencies\n", nonzero_deps);
     for(unsigned int i = 0 ; i < nonzero_deps ; i++) {
-        ret = asprintf(&dep_names[i], "%s.%03d", prefix, i);
-        ASSERT_ALWAYS(ret >= 0);
-        dep_files[i] = fopen(dep_names[i], "w");
+        dep_names[i] = get_depname (prefix, "", i);
+        dep_files[i] = fopen_maybe_compressed (dep_names[i], "wb");
         ASSERT_ALWAYS(dep_files[i] != NULL);
     }
     ps->parse_only_ab = 1;

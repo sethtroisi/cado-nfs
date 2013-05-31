@@ -2982,10 +2982,13 @@ sub do_sqrt {
 
     {
         # First prepare all deps files
+        # with -prefix xxx.dep.gz, the dependency files will
+        # be compressed with gzip (idem for suffix .bz2 or .lzma)
+        # in that case also put the same suffix in the 2nd call to sqrt below
         info "Preparing $ndep dependency files\n";
         my $cmd = "$param{'bindir'}/sqrt/sqrt ".
             "-poly $param{'prefix'}.poly ".
-            "-prefix $param{'prefix'}.dep " .
+            "-prefix $param{'prefix'}.dep.gz " .
             "-ab " .
             "-purged $param{'prefix'}.purged.gz ".
             "-index $param{'prefix'}.index ".
@@ -3004,7 +3007,7 @@ sub do_sqrt {
         $tab_level++;
         my $cmd = "$param{'bindir'}/sqrt/sqrt ".
             "-poly $param{'prefix'}.poly ".
-            "-prefix $param{'prefix'}.dep " .
+            "-prefix $param{'prefix'}.dep.gz " .
             "-dep $numdep " .
             "-rat -alg -gcd " .
             "-purged $param{'prefix'}.purged.gz ".
