@@ -108,6 +108,7 @@ class Program(object):
     '''
     
     params_list = ("execpath", "execsubdir", "execbin")
+    path = '.'
     
     @staticmethod
     def _shellquote(s):
@@ -144,7 +145,7 @@ class Program(object):
         
         # Look for location of the binary executable at __init__, to avoid 
         # calling os.path.isfile() multiple times
-        path = self.parameters.get("execpath", ".")
+        path = self.parameters.get("execpath", self.path)
         subdir = self.parameters.get("execsubdir", self.subdir)
         binary = self.parameters.get("execbin", self.binary)
         execfile = os.path.normpath(os.sep.join([path, binary]))
@@ -529,4 +530,28 @@ class WuClient(Program):
         Parameter("niceness", prefix='--'),
         Parameter("wu_filename", prefix='--'),
         Parameter("arch", prefix='--'),
+    )
+
+class SSH(Program):
+    binary = "ssh"
+    name = binary
+    subdir = ""
+    path = "/usr/bin"
+    params_list = (
+        Toggle("compression", "C"),
+        Toggle("verbose", "v"),
+        Parameter("cipher", "c"),
+        Parameter("configfile", "F"),
+        Parameter("identity_file", "i"),
+        Parameter("login_name", "l"),
+        Parameter("port", "p"),
+    )
+
+class Ls(Program):
+    binary = "ls"
+    name = binary
+    subdir = ""
+    path = "/bin"
+    params_list = (
+        Toggle("long", "l"),
     )
