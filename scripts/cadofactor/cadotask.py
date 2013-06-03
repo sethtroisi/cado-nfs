@@ -153,9 +153,6 @@ class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
         # alphabetic first letter, and alphanumeric rest. 
         pass
     @abc.abstractproperty
-    def parampath(self):
-        pass
-    @abc.abstractproperty
     def title(self):
         # A pretty name for the task, will be used in screen output
         pass
@@ -173,7 +170,7 @@ class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
         # Parameters that all tasks use
         return ("name", "workdir", "remove")
     
-    def __init__(self, *args, parameters = None, **kwargs):
+    def __init__(self, parameters, path_prefix, *args, **kwargs):
         ''' Sets up a database connection and a DB-backed dictionary for 
         parameters. Reads parameters from DB, and merges with hierarchical
         parameters in the parameters argument. Parameters passed in by 
@@ -189,10 +186,10 @@ class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
         self.state = self.make_db_dict(self.make_tablename())
         self.logger.debug("state = %s", self.state)
         # Set default parametes for this task, if any are given
-        if parameters:
-            self.params = parameters.myparams(self.paramnames, self.parampath)
-            self.logger.debug("params = %s", self.params)
-            self.params.setdefault("remove", False)
+        self.parampath = ".".join(path_prefix + [self.name])
+        self.params = parameters.myparams(self.paramnames, self.parampath)
+        self.logger.debug("params = %s", self.params)
+        self.params.setdefault("remove", False)
         # Set default parameters for our programs
         self.progparams = []
         for prog in self.programs:
@@ -433,9 +430,6 @@ class PolyselTask(ClientServerTask):
     def name(self):
         return "polyselect"
     @property
-    def parampath(self):
-        return "tasks." + self.name
-    @property
     def title(self):
         return "Polynomial Selection"
     @property
@@ -640,9 +634,6 @@ class FactorBaseTask(FactorBaseOrFreerelTask):
     def programs(self):
         return (cadoprograms.MakeFB,)
     @property
-    def parampath(self):
-        return "tasks.sieve." + self.name
-    @property
     def paramnames(self):
         return super().paramnames + \
             ("alim", )
@@ -662,9 +653,6 @@ class FreeRelTask(FactorBaseOrFreerelTask):
     @property
     def programs(self):
         return (cadoprograms.FreeRel,)
-    @property
-    def parampath(self):
-        return "tasks.sieve." + self.name
     @property
     def paramnames(self):
         return super().paramnames + \
@@ -700,9 +688,6 @@ class SievingTask(ClientServerTask, FilesCreator):
     @property
     def programs(self):
         return (cadoprograms.Las,)
-    @property
-    def parampath(self):
-        return "tasks.sieve." + self.name
     @property
     def paramnames(self):
         return super().paramnames + \
@@ -816,9 +801,6 @@ class Duplicates1Task(Task, FilesCreator):
     @property
     def programs(self):
         return (cadoprograms.Duplicates1,)
-    @property
-    def parampath(self):
-        return "tasks.filter." + self.name
     @property
     def paramnames(self):
         return super().paramnames + \
@@ -972,9 +954,6 @@ class Duplicates2Task(Task, FilesCreator):
     def programs(self):
         return (cadoprograms.Duplicates2,)
     @property
-    def parampath(self):
-        return "tasks.filter." + self.name
-    @property
     def paramnames(self):
         return super().paramnames + \
             ("nslices_log",)
@@ -1061,9 +1040,6 @@ class PurgeTask(Task):
     @property
     def programs(self):
         return (cadoprograms.Purge,)
-    @property
-    def parampath(self):
-        return "tasks.filter." + self.name
     @property
     def paramnames(self):
         return super().paramnames + \
@@ -1164,9 +1140,6 @@ class MergeTask(Task):
     def programs(self):
         return (cadoprograms.Merge, cadoprograms.Replay)
     @property
-    def parampath(self):
-        return "tasks.filter." + self.name
-    @property
     def paramnames(self):
         return super().paramnames + \
             ("skip", "forbw", "coverNmax", "keep", "maxlevel", "ratio")
@@ -1243,9 +1216,6 @@ class LinAlgTask(Task):
     def programs(self):
         return (cadoprograms.BWC,)
     @property
-    def parampath(self):
-        return "tasks.linalg." + self.name
-    @property
     def paramnames(self):
         return super().paramnames + \
             ()
@@ -1297,9 +1267,6 @@ class CharactersTask(Task):
     @property
     def programs(self):
         return (cadoprograms.Characters,)
-    @property
-    def parampath(self):
-        return "tasks.linalg." + self.name
     @property
     def paramnames(self):
         return super().paramnames + \
@@ -1361,9 +1328,6 @@ class SqrtTask(Task):
     @property
     def programs(self):
         return (cadoprograms.Sqrt,)
-    @property
-    def parampath(self):
-        return "tasks." + self.name
     @property
     def paramnames(self):
         return super().paramnames + \
@@ -1533,17 +1497,20 @@ class CompleteFactorization(wudb.DbAccess):
     def programs(self):
         return ()
     @property
-    def parampath(self):
-        return "tasks"
-    @property
     def paramnames(self):
         return super().paramnames
     
     def __init__ (self, parameters, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        parampath = ["tasks"]
         self.params = parameters.myparams(("name", "workdir"), "tasks")
         self.db_listener = self.make_db_listener()
         registered_filenames = self.make_db_dict(self.params["name"] + '_server_registered_filenames')
+        
+        # Init WU DB
+        wuar = self.make_wu_access()
+        wuar.create_tables()
+        del(wuar)
         
         # Set up WU server
         uploaddir = self.params["workdir"].rstrip(os.sep) + os.sep + self.params["name"] + ".upload/"
@@ -1551,23 +1518,37 @@ class CompleteFactorization(wudb.DbAccess):
             registered_filenames, uploaddir, bg = True)
         self.server.serve()
         
-        self.polysel = PolyselTask(*args, parameters = parameters, db_listener = self.db_listener,
-                                   registered_filenames = registered_filenames, **kwargs)
-        self.fb = FactorBaseTask(self.polysel, *args, parameters = parameters, **kwargs)
-        self.freerel = FreeRelTask(self.polysel, *args, parameters = parameters, **kwargs)
-        self.sieving = SievingTask(self.polysel, self.fb, *args, parameters = parameters,
-                                   db_listener = self.db_listener, registered_filenames = registered_filenames, **kwargs)
-        self.dup1 = Duplicates1Task(self.sieving, *args, parameters = parameters, **kwargs)
-        self.dup2 = Duplicates2Task(self.dup1, *args, parameters = parameters, **kwargs)
+        sievepath = parampath + ['sieve']
+        filterpath = parampath + ['filter']
+        linalgpath = parampath + ['linalg']
+        
+        self.polysel = PolyselTask(*args, 
+            parameters = parameters, path_prefix = parampath, db_listener = self.db_listener,
+            registered_filenames = registered_filenames, **kwargs)
+        self.fb = FactorBaseTask(self.polysel, *args, parameters = parameters, path_prefix = sievepath, 
+                                 **kwargs)
+        self.freerel = FreeRelTask(self.polysel, *args, parameters = parameters, path_prefix = sievepath,
+                                   **kwargs)
+        self.sieving = SievingTask(
+            self.polysel, self.fb, *args, parameters = parameters, path_prefix = sievepath, 
+            db_listener = self.db_listener,
+            registered_filenames = registered_filenames, **kwargs)
+        self.dup1 = Duplicates1Task(self.sieving, *args, parameters = parameters, path_prefix = filterpath,
+                                    **kwargs)
+        self.dup2 = Duplicates2Task(self.dup1, *args, parameters = parameters, path_prefix = filterpath,
+                                    **kwargs)
         self.purge = PurgeTask(self.polysel, self.freerel, self.dup2,
-                               *args, parameters = parameters, **kwargs)
-        self.merge = MergeTask(self.purge, *args, parameters = parameters, **kwargs)
-        self.linalg = LinAlgTask(self.merge, *args, parameters = parameters, **kwargs)
+                               *args, parameters = parameters, path_prefix = filterpath, **kwargs)
+        self.merge = MergeTask(self.purge, *args, parameters = parameters, path_prefix = filterpath, 
+                               **kwargs)
+        self.linalg = LinAlgTask(self.merge, *args, parameters = parameters, path_prefix = linalgpath, 
+                                 **kwargs)
         self.characters = CharactersTask(self.polysel, self.purge, self.merge,
-                                         self.linalg, *args, parameters = parameters, **kwargs)
-        self.sqrt = SqrtTask(self.polysel, self.freerel, self.purge,
+                                         self.linalg, *args, parameters = parameters, path_prefix = linalgpath, **kwargs)
+        self.sqrt = SqrtTask(
+            self.polysel, self.freerel, self.purge,
                              self.merge, self.linalg, self.characters,
-                             *args, parameters = parameters, **kwargs)
+                             *args, parameters = parameters, path_prefix = parampath, **kwargs)
     
     def run(self, *args, **kwargs):
         self.sqrt.run(*args, **kwargs)
