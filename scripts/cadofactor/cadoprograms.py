@@ -253,7 +253,7 @@ class Program(object):
             cmdline += ' > ' + Program._shellquote(self.translate_path(self.stdout, outputpath))
         if isinstance(self.stderr, str):
             cmdline += ' 2> ' + Program._shellquote(self.translate_path(self.stderr, outputpath))
-        if self.stderr is self.stdout:
+        if not self.stderr is None and self.stderr is self.stdout:
             cmdline += ' 2>&1'
         return cmdline
     
