@@ -40,5 +40,6 @@
 #include "fix-endianness.h"
 #include "memusage.h"
 #include "bit_vector.h"
+#include "renumber.h"
 
 #endif	/* CADO_UTILS_H_ */
