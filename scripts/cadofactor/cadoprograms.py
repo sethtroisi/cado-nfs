@@ -1,7 +1,6 @@
 import os
 import sys
 import platform
-import subprocess
 import abc
 import logging
 import re
@@ -122,18 +121,15 @@ class Program(object):
             return s
         return "'" + s.replace("'", "'\\''") + "'"
     
-    def __init__(self, args, parameters, 
-                 stdin = None, stdout = subprocess.PIPE, 
-                 stderr = subprocess.PIPE):
+    def __init__(self, args, parameters, stdin = None, stdout = None,
+                 stderr = None):
         ''' Takes a list of positional parameters and a dictionary of command 
         line parameters 
         
-        The stdin, stdout, and stderr parameters accept the same parameters 
-        as subprocess.popen(), but also accept strings. If a string is given,
-        it is interpreted as the file name to use for redirecting that stdio
-        stream. In direct execution, the file is opened for reading or writing,
-        resp., and the file handle is passed to popen(). In workunit 
-        generation, the file name is used for shell redirection.
+        The stdin, stdout, and stderr parameters accept strings. If a string is
+        given, it is interpreted as the file name to use for redirecting that
+        stdio stream. In workunit generation, the file name is used for shell
+        redirection.
         '''
         
         self.args = args
@@ -173,6 +169,15 @@ class Program(object):
         l = list(Program.params_list) + cls.get_param_keys()
         return l
     
+    def get_stdin(self):
+        return self.stdin
+    
+    def get_stdout(self):
+        return self.stdout
+    
+    def get_stderr(self):
+        return self.stderr
+
     def get_input_files(self):
         input_files = []
         if isinstance(self.stdin, str):
@@ -248,7 +253,7 @@ class Program(object):
             cmdline += ' > ' + Program._shellquote(self.translate_path(self.stdout, outputpath))
         if isinstance(self.stderr, str):
             cmdline += ' 2> ' + Program._shellquote(self.translate_path(self.stderr, outputpath))
-        if self.stderr is subprocess.STDOUT:
+        if self.stderr is self.stdout:
             cmdline += ' 2>&1'
         return cmdline
     
@@ -265,43 +270,12 @@ class Program(object):
         wu.append("") # Make a trailing newline
         return '\n'.join(wu)
     
-    @staticmethod
-    def _open_or_not(fn, mode):
-        """ If fn is a string, opens a file handle to a file with fn as 
-        the name, using mode as the file mode. Otherwise returns fn.
-        """
-        if isinstance(fn, str):
-            return open(fn, mode)
-        else:
-            return fn
-
     def run(self):
         ''' Runs the command and waits for termination '''
-
-        # If we run a command locally, and file names were given for stdin,
-        # stdout or stderr, we open the corresponding file and pass it 
-        # to the command
-        self.infile = self._open_or_not(self.stdin, "r")
-        self.outfile = self._open_or_not(self.stdout, "w")
-        self.errfile = self._open_or_not(self.stderr, "w")
-        
-        # print (self.make_command_array()
-        # print ("%s.Program.run(): cmdline = %s" % (__file__, self.make_command_line()))
-        # print ("Input files: %s" % ", ".join(self.get_input_files()))
-        # print ("Output files: %s" % ", ".join(self.get_output_files()))
         self.child = cadocommand.Command(self)
     
     def wait(self):
-        (rc, stdout, stderr) = self.child.wait()
-        
-        if isinstance(self.stdin, str):
-            self.infile.close()
-        if isinstance(self.stdout, str):
-            self.outfile.close()
-        if isinstance(self.stderr, str):
-            self.errfile.close()
-        
-        return (rc, stdout, stderr)
+        return self.child.wait()
     
     
 class Polyselect2l(Program):
@@ -549,6 +523,13 @@ class SSH(Program):
         Parameter("login_name", "l"),
         Parameter("port", "p"),
     )
+
+class RSync(Program):
+    binary = "rsync"
+    name = binary
+    subdir = ""
+    path = "/usr/bin"
+    params_list = ()
 
 class Ls(Program):
     binary = "ls"
