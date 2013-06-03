@@ -66,7 +66,7 @@ int
 findFreeRelations(hashtable_t *H, cado_poly pol, int nprimes)
 {
     unsigned long *tmp = (unsigned long *)malloc((2+(nprimes<<1)) * sizeof(unsigned long));
-    HR_T i;
+    p_r_values_t i;
     unsigned int j, k, ntmp = 0;
     int pdeg, nfree;
 

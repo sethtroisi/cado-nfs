@@ -166,27 +166,25 @@ LEXLE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
 
 
 /* data type to store the (p,r) values */
-#ifndef HT
-#define HT 32
+#ifndef p_r_values_size
+#define p_r_values_size 32
 #endif
 
 /* data type to store the renumber table */
-#ifndef HR
-#define HR 32
+#ifndef index_size
+#define index_size 32
 #endif
 
-#if HR == 32
-#define HR_T uint32_t
+#if p_r_values_size == 32
+#define p_r_values_t uint32_t
 #else
-#define HR_T uint64_t
+#define p_r_values_t uint64_t
 #endif
 
-#if HT == 32
-#define HT_T uint32_t
+#if index_size == 32
+#define index_t uint32_t
 #else
-#define HT_T uint64_t
+#define index_t uint64_t
 #endif 
-
-/* Hashtable data (p,r). */
 
 #endif	/* CADO_MACROS_H_ */
