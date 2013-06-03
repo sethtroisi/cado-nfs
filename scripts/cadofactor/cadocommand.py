@@ -87,16 +87,15 @@ class Command(object):
         return (self.returncode, stdout, stderr)
 
 class RemoteCommand(Command):
-    def __init__(self, program, host, parameters, *args, **kwargs):
-        # The remote command line. Need not be quoted as it is given to ssh
-        # as an array element. 
+    def __init__(self, program, host, parameters, path_prefix, *args, **kwargs):
         # We use a shell command line instead of an array so that, e.g., stdio
         # redirection to files specified in program can be added to the command
         # line with and the redirection happens on the remote host
         cmdline = program.make_command_line()
-        # Hostname should likewise be quoted, even though we probably won't
-        # use user or host names with shell meta characters
-        ssh = cadoprograms.SSH([self._shellquote(host), cmdline], parameters)
+        self.prog = cadoprograms.SSH
+        progparams = parameters.myparams(self.prog.get_config_keys(),
+                                         path_prefix + [self.prog.name])
+        ssh = self.prog([host, cmdline], progparams)
         super().__init__(ssh, *args, **kwargs)
 
 class SendFile(Command):
@@ -111,17 +110,21 @@ class SendFile(Command):
         super().__init__(rsync, *args, **kwargs)
 
 if __name__ == '__main__':
+    import cadoparams
+
     parameters = {"long": True}
     program = cadoprograms.Ls("/", parameters)
     c = Command(program)
     (rc, out, err) = c.wait()
-    print("Stdout: " + str(out, encoding="utf-8"))
-    print("Stderr: " + str(err, encoding="utf-8"))
+    if out:
+        print("Stdout: " + str(out, encoding="utf-8"))
+    if err:
+        print("Stderr: " + str(err, encoding="utf-8"))
     del(c)
 
     program = cadoprograms.Ls("/", parameters, stdout = "ls.out")
-    ssh_parameters = {"verbose": False}
-    c = RemoteCommand(program, "localhost", ssh_parameters)
+    ssh_parameters = cadoparams.Parameters({"verbose": False})
+    c = RemoteCommand(program, "localhost", ssh_parameters, [])
     (rc, out, err) = c.wait()
     print("Stdout: " + str(out, encoding="utf-8"))
     print("Stderr: " + str(err, encoding="utf-8"))
