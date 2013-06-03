@@ -265,7 +265,10 @@ fopen_maybe_compressed2 (const char * name, const char * mode, int* p_pipeflag, 
         }
 
         if (command) {
-            f = popen(command, mode);
+          /* apparently popen() under Linux does not accept the 'b' modifier */
+            char pmode[2] = "x";
+            pmode[0] = mode[0];
+            f = popen(command, pmode);
             if (p_pipeflag) *p_pipeflag = 1;
 #ifdef F_SETPIPE_SZxxx
                 /* increase the pipe capacity (2^16 by default), thanks to

@@ -373,9 +373,10 @@ unsigned int weight_rel_ffs (relation_t rel)
 
    i (decimal) is the row index from the nodup file (starting at 0)
    a (signed decimal) is a
-   b (signed decimal) is b
-   k (decimal) is the number of rational and algebraic primes in the relation
-   t_1 ... t_k (hexadecimal) are the indices of the primes (starting at 0)
+   b (nonnegative decimal) is b
+   k (nonnegative decimal) is the number of rational and algebraic ideals in
+     the relation
+   t_1 ... t_k (hexadecimal) are the indices of the ideals (starting at 0)
 
    Return the weight of the relation.
 
