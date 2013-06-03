@@ -270,13 +270,6 @@ class Program(object):
         wu.append("") # Make a trailing newline
         return '\n'.join(wu)
     
-    def run(self):
-        ''' Runs the command and waits for termination '''
-        self.child = cadocommand.Command(self)
-    
-    def wait(self):
-        return self.child.wait()
-    
     
 class Polyselect2l(Program):
     binary = "polyselect2l"

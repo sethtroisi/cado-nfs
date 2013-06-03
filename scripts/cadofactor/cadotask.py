@@ -11,6 +11,7 @@ import wudb
 import logging
 import patterns
 import cadoprograms
+import cadocommand
 import wuserver
 
 # Some parameters are provided by the param file but can change during
@@ -321,8 +322,8 @@ class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
         result to updateObserver().
         '''
         wuname = self.make_wuname(identifier)
-        command.run()
-        (rc, stdout, stderr) = command.wait()
+        process = cadocommand.Command(command)
+        (rc, stdout, stderr) = process.wait()
         result = [wuname, rc, stdout, stderr]
         result.append(command.get_output_files())
         if isinstance(self, patterns.Observer):
