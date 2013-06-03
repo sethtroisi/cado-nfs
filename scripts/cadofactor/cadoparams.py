@@ -79,13 +79,29 @@ class Parameters(object):
         return self._recurse_iter(self.data, [])
     
     @staticmethod
-    def _recurse_iter(dic, path):
-        for key in dic:
-            if isinstance(dic[key], dict):
-                for y in Parameters._recurse_iter(dic[key], path + [key]):
+    def _recurse_iter(source, path):
+        for key in source:
+            if isinstance(source[key], dict):
+                for y in Parameters._recurse_iter(source[key], path + [key]):
                     yield y
             else:
-                yield (path, dic, key, dic[key])
+                yield (path, key, source[key])
+    
+    def _get_subdict(self, path):
+        source = self.data
+        for d in path:
+            assert d in source
+            assert isinstance(source[d], dict)
+            source = source[d]
+        return source
+    
+    def find(self, path, key):
+        source = self._get_subdict(path)
+        result = []
+        for l in self._recurse_iter(source, path):
+            if l[1] == key:
+                result.append(l[0] + [l[1]])
+        return result
     
     def _insertkey(self, path, value):
         ''' path is a path with segments delimited by '.' or an 
@@ -277,7 +293,7 @@ DEFAULTS = (
     "tasks.linalg.algo = bwc",
     "tasks.linalg.threads = 2",
     "tasks.linalg.mpi = 0",
-    "tasks.linalg.hosts = """,
+    "tasks.linalg.hosts = foo",
     "tasks.linalg.bwc.interval = 1000",
     "tasks.linalg.bwc.mm_impl = 'bucket'",
     "tasks.linalg.bwc.interleaving = 0",
