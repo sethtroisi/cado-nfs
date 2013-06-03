@@ -1377,8 +1377,8 @@ class SqrtTask(Task):
                 kwargs["gcd"] = "1"
                 kwargs["dep"] = str(self.state["next_dep"])
                 p = self.programs[0](args, kwargs)
-                p.run()
-                (rc, stdout, stderr) = p.wait()
+                (identifier, rc, stdout, stderr, output_files) = \
+                    self.submit_command(p, "dep%d" % self.state["next_dep"])
                 if not stdout.decode("ascii").strip() == "Failed":
                     factorlist = list(map(int,stdout.decode("ascii").split()))
                     # FIXME: Can sqrt print more/less than 2 factors?
