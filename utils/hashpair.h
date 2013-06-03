@@ -2,33 +2,12 @@
 #define CADO_LINALG_HASH_PAIR_H_
 
 #include <stdint.h>
-
-/* data type to store the (p,r) values */
-#ifndef HT
-#define HT 32
-#endif
-
-/* data type to store the renumber table */
-#ifndef HR
-#define HR 32
-#endif
+#include "macros.h"
 
 #define HC_T uint8_t
 #define HCM UMAX(HC_T) /* maximal value of TYPE_HASHCOUNT */
 
-#if HR == 32
-#define HR_T uint32_t
-#else
-#define HR_T uint64_t
-#endif
 
-#if HT == 32
-#define HT_T uint32_t
-#else
-#define HT_T uint64_t
-#endif 
-
-/* Hashtable data (p,r). */
 typedef struct {
   HT_T p, r;
 } ht_t;

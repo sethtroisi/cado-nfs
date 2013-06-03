@@ -164,4 +164,29 @@ LEXLE3(__GNUC__,__GNUC_MINOR__,__GNUC_PATCHLEVEL__,X,Y,Z)
 #define UNLIKELY(x)	EXPECT(x,0)
 #endif
 
+
+/* data type to store the (p,r) values */
+#ifndef HT
+#define HT 32
+#endif
+
+/* data type to store the renumber table */
+#ifndef HR
+#define HR 32
+#endif
+
+#if HR == 32
+#define HR_T uint32_t
+#else
+#define HR_T uint64_t
+#endif
+
+#if HT == 32
+#define HT_T uint32_t
+#else
+#define HT_T uint64_t
+#endif 
+
+/* Hashtable data (p,r). */
+
 #endif	/* CADO_MACROS_H_ */
