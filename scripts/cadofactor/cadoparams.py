@@ -95,12 +95,13 @@ class Parameters(object):
             source = source[d]
         return source
     
-    def find(self, path, key):
+    def find(self, path, regex):
         source = self._get_subdict(path)
         result = []
+        pattern = re.compile(regex)
         for l in self._recurse_iter(source, path):
-            if l[1] == key:
-                result.append(l[0] + [l[1]])
+            if pattern.search(l[1]):
+                result.append([l[0], l[1]])
         return result
     
     def _insertkey(self, path, value):
