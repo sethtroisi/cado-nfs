@@ -24,21 +24,21 @@ class Command(object):
         return "'" + s.replace("'", "'\\''") + "'"
     
     @staticmethod
-    def _open_or_not(fn, mode):
-        """ If fn is None, return subprocess.PIPE. If fn is a string, opens a
-        file handle to a file with fn as the name, using mode as the file mode.
-        Otherwise returns fn.
-        """
+    def is_same(a,b):
+        """ Return true if a and b are the same object and not None """
+        return (not a is None and a is b)
+    
+    @staticmethod
+    def _open(fn, is_output):
+        none = [None, subprocess.PIPE]
+        mode = ["r", "w"]
         if fn is None:
-            return subprocess.PIPE
-        elif isinstance(fn, str):
-            return open(fn, mode)
-        else:
-            return fn
+            return none[int(is_output)]
+        return open(fn, mode[int(is_output)])
     
     @staticmethod
     def _close_or_not(fd, ref):
-        if not fd in [subprocess.PIPE, subprocess.STDOUT, ref]:
+        if not fd in [None, subprocess.PIPE, subprocess.STDOUT, ref]:
             fd.close()
     
     def __init__(self, program, *args, **kwargs):
@@ -50,13 +50,12 @@ class Command(object):
         # - subprocess.STDOUT for stderr if program.get_stdout() and
         #   program.get_stdin() return the same object
         # - a newly opened file handle which needs to be closed later
-        self.stdin = self._open_or_not(self.program.get_stdin(), "r")
-        self.stdout = self._open_or_not(self.program.get_stdout(), "w")
-        if not self.program.get_stderr() is None and \
-                self.program.get_stdout() is self.program.get_stderr():
+        self.stdin = self._open(self.program.get_stdin(), False)
+        self.stdout = self._open(self.program.get_stdout(), True)
+        if self.is_same(self.program.get_stdout(), self.program.get_stderr()):
             self.stderr = subprocess.STDOUT
         else:
-            self.stderr = self._open_or_not(self.program.get_stderr(), "w")
+            self.stderr = self._open(self.program.get_stderr(), True)
         
         self.child = subprocess.Popen(progargs, *args, stdin=self.stdin,
             stdout=self.stdout, stderr=self.stderr, **kwargs)
