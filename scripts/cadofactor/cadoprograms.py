@@ -494,6 +494,7 @@ class WuClient(Program):
         Parameter("dldir", prefix='--'),
         Parameter("workdir", prefix='--'),
         Parameter("clientid", prefix='--'),
+        Parameter("basepath", prefix='--'),
         Parameter("server", prefix='--'),
         Parameter("getwupath", prefix='--'),
         Parameter("loglevel", prefix='--'),
