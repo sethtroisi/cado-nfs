@@ -1,22 +1,37 @@
 /* dup2: 2nd pass
 
-   Usage: dup2 [-out <dir>] [-rm] [-filelist <fl>] -K <K> file1 ... filen
+   Usage: dup2 -poly name.poly [-basepath <dir>] [-filelist <fl>]
+          -K <K> -renumber xxx file1 ... filen
 
-   Puts non-duplicate files (among file1 ... filen only) into:
+   Put non-duplicate files (among file1 ... filen only) into:
    <dir>/file1 ... <dir>/filen
 
-   If -out <dir> is missing, no output is done.
-
    Input files can be given on command line, or via a filelist file.
-   (it is possible to do both)
 
-   If -rm is given, the input files are removed after having been treated.
-   This is also the case if -out . is given.
+   In case a filelist is given, the -basepath option enables to tell in which
+   directory those files are. Note that input files will be replaced in-place.
 
    By default, the output will be bzipped/gzipped according to the status
    of the input file.
 
    Allocates a hash-table of 2^k 32-bit entries.
+
+   The relations are renumbered according to the file xxx, as input we have:
+
+       a,b:p1,p2,...,pj:q1,q2,...,qk                                 (*)
+
+   where p1,p2,...,pj are rational ideals (possibly duplicate), and
+   q1,q2,...,qk are algebraic ideals (possibly duplicate). Output is:
+
+       a,b:r1,r2,...,rm                                              (**)
+
+   where each index r1,r2,...,rm appears only once, and refers to either
+   a rational or to an algebraic ideal.
+
+   The format of each file is recognized by counting the number of ':' in the
+   first line: if two we have the raw format (*), if only one we have the
+   renumbered format (**). It is assumed that all files in renumbered format
+   come first.
 
    Algorithm: for each (a,b) pair, we compute h(a,b) = (CA*a+CB*b) % 2^64.
 
@@ -58,13 +73,12 @@ unsigned long sanity_checked = 0;
 unsigned long sanity_collisions = 0;
 /* end sanity check */
 
-int rm = 0;
-
 /* infile is the input file
    if dirname is NULL, no output is done */
 unsigned long
 remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
-uint32_t * H, unsigned long K, unsigned int ab_base)
+                     uint32_t * H, unsigned long K, unsigned int ab_base,
+                     renumber_t renumber_table)
 {
     FILE * f_in;
     int p_in;
@@ -80,18 +94,44 @@ uint32_t * H, unsigned long K, unsigned int ab_base)
 
     for( ; *files ; files++) {
         const char * name = *files;
+        int raw = 0;
 
-        f_in = fopen_maybe_compressed2(name, "r", &p_in, &suffix_in);
+        f_in = fopen_maybe_compressed2 (name, "r", &p_in, &suffix_in);
+        ASSERT_ALWAYS(f_in != NULL);
+
+        /* check if f_in is in raw format a,b:...:... or in renumbered format
+           a,b:... */
+        char s[1024];
+        char *ret = fgets (s, 1024, f_in);
+        if (ret == NULL)
+          {
+            fprintf (stderr, "Error while reading %s\n", name);
+            exit (1);
+          }
+        if (strlen (s) >= 1023)
+          {
+            fprintf (stderr, "Too long line while reading %s\n", name);
+            exit (1);
+          }
+        for (unsigned int i = 0; i < strlen (s); i++)
+          raw += s[i] == ':';
+        raw = (raw == 2) ? 1 : 0;
+
+        /* close and reopen the file */
+        if (p_in) pclose(f_in); else fclose(f_in);
+        f_in = fopen_maybe_compressed2 (name, "r", &p_in, &suffix_in);
         ASSERT_ALWAYS(f_in != NULL);
 
         suffix_out = outfmt ? outfmt : suffix_in;
         char * newname = strdup(name);
         ASSERT_ALWAYS(strlen(suffix_in) <= strlen(newname));
         newname[strlen(newname)-strlen(suffix_in)]='\0';
-        int only_ab = has_suffix(newname, ".ab");
+
         char * oname = NULL;
         char * oname_tmp = NULL;
-        if (dirname) {
+        /* if raw = 0, the input file is already in the new format, no need
+           to write it again */
+        if (dirname && raw) {
             int rc;
             rc = asprintf(&oname_tmp, "%s/pre-%s%s", dirname, path_basename(newname), suffix_out);
             ASSERT_ALWAYS(rc >= 0);
@@ -118,24 +158,12 @@ uint32_t * H, unsigned long K, unsigned int ab_base)
 
         for (;;) {
             char line[RELATION_MAX_BYTES];
-            struct {
-                int64_t a;
-                uint64_t b;
-                size_t pos;
-            } desc;
 
-            if (only_ab) {
-                int readbytes = fread(&desc, sizeof(desc), 1, f_in);
-                if (readbytes == 0)
-                    break;
-                rs->pos += readbytes * sizeof(desc);
-                rs->nrels++;
-                rs->rel.a = desc.a;
-                rs->rel.b = desc.b;
-            } else {
-                if (relation_stream_get(rs, line, 0, ab_base) < 0)
-                    break;
-            }
+            /* if raw = 0, i.e., the file contains lines a,b:..., then it was
+               already renumbered, thus we only need to read a,b */
+            rs->parse_only_ab = (raw == 0);
+            if (relation_stream_get (rs, line, 0, ab_base) < 0)
+              break;
 
             h = CA * (uint64_t) rs->rel.a + CB * rs->rel.b;
             /* dup1 uses the high 5 bits of h to identify the slices
@@ -190,13 +218,47 @@ uint32_t * H, unsigned long K, unsigned int ab_base)
             }
             /* now H[i] = 0 */
             H[i] = j;
-            if (f_out) {
-                if (only_ab) {
-                    fwrite(&desc, sizeof(desc), 1, f_out);
-                } else {
-                    fputs(line, f_out);
-                }
-            }
+
+            if (f_out) /* output renumbered relation */
+              {
+                int first = 1;
+
+                fprintf (f_out, "%" PRId64 ",%" PRIu64 ":",
+                         rs->rel.a, rs->rel.b);
+#if (!defined FOR_FFS) && (!defined FOR_NFS_DL)
+                reduce_exponents_mod2 (&(rs->rel));
+#endif
+                for (int i = 0; i < rs->rel.nb_rp; i++)
+                  {
+                    unsigned long j;
+                    j = renumber_get_index_from_p_r (renumber_table,
+                                                     rs->rel.rp[i].p, 0, 0);
+                    for (int k = 0; k < rs->rel.rp[i].e; k++)
+                      {
+                        if (first)
+                          first = 0;
+                        else
+                          fputc (',', f_out);
+                        fprintf (f_out, "%lu", j);
+                      }
+                  }
+                for (int i = 0; i < rs->rel.nb_ap; i++)
+                  {
+                    unsigned long j;
+                    j = renumber_get_index_from_p_r (renumber_table,
+                                          rs->rel.ap[i].p, rs->rel.ap[i].r, 1);
+                    for (int k = 0; k < rs->rel.ap[i].e; k++)
+                      {
+                        if (first)
+                          first = 0;
+                        else
+                          fputc (',', f_out);
+                        fprintf (f_out, "%lu", j);
+                      }
+                  }
+                fprintf (f_out, "\n");
+              }
+
 
             if (relation_stream_disp_progress_now_p(rs)) {
                 fprintf(stderr,
@@ -214,15 +276,7 @@ uint32_t * H, unsigned long K, unsigned int ab_base)
         if (p_in) pclose(f_in); else fclose(f_in);
 
 
-        if (dirname) {
-            if (rm || (strcmp(dirname, ".") == 0)) {
-                fprintf(stderr, "Removing old file %s\n", name);
-                int ret = unlink(name);
-                if (ret) {
-                    perror("Problem removing file");
-                    fprintf(stderr, "Let's hope that it's ok to continue!\n");
-                }
-            }
+        if (dirname && raw) {
             fprintf(stderr, "%s/{%s => %s}\n",
                     dirname, path_basename(oname_tmp), path_basename(oname));
             int ret = rename(oname_tmp, oname);
@@ -247,14 +301,23 @@ uint32_t * H, unsigned long K, unsigned int ab_base)
 
 void usage()
 {
-    fprintf (stderr, "Usage: dup2 [-rm] [-out <dir>] [-filelist <fl>] -K <K> file1 ... filen\n");
+    fprintf (stderr, "Usage: dup2 -poly xxx [-out <dir>] [-basepath <dir>] [-filelist <fl>] -renumber xxx -K <K> file1 ... filen\n");
     exit (1);
 }
 
-int main (int argc, char *argv[])
+int
+main (int argc, char *argv[])
 {
     unsigned long K = 0;
     uint32_t *H;
+    const char *renumberfilename = NULL;
+    cado_poly cpoly;
+
+    /* print command line */
+    fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
+    for (int k = 1; k < argc; k++)
+      fprintf (stderr, " %s", argv[k]);
+    fprintf (stderr, "\n");
 
     param_list pl;
     param_list_init(pl);
@@ -263,7 +326,6 @@ int main (int argc, char *argv[])
     int bz = 0;
     int ab_hexa = 0;
     param_list_configure_switch(pl, "bz", &bz);
-    param_list_configure_switch(pl, "rm", &rm);
     param_list_configure_switch(pl, "abhexa", &ab_hexa);
 
 #ifdef HAVE_MINGW
@@ -279,16 +341,23 @@ int main (int argc, char *argv[])
         // abort();
     }
 
-    const char * dirname = param_list_lookup_string(pl, "out");
+    const char * polyfilename = param_list_lookup_string(pl, "poly");
     const char * outfmt = param_list_lookup_string(pl, "outfmt");
     const char * filelist = param_list_lookup_string(pl, "filelist");
     const char * basepath = param_list_lookup_string(pl, "basepath");
+    renumberfilename = param_list_lookup_string(pl, "renumber");
 
     param_list_parse_ulong(pl, "K", &K);
 
-    if (param_list_warn_unused(pl)) {
-        usage();
-    }
+    if (param_list_warn_unused(pl) || polyfilename == NULL)
+      usage();
+
+    cado_poly_init (cpoly);
+    if (!cado_poly_read (cpoly, polyfilename))
+      {
+        fprintf (stderr, "Error reading polynomial file\n");
+        exit (EXIT_FAILURE);
+      }
 
     if (basepath && !filelist) {
         fprintf(stderr, "-basepath only valid with -filelist\n");
@@ -311,6 +380,15 @@ int main (int argc, char *argv[])
         usage();
     }
 
+    if (renumberfilename == NULL)
+      {
+        fprintf (stderr, "Missing -renumber option\n");
+        exit (1);
+      }
+
+    renumber_t renumber_table;
+    renumber_init (renumber_table, cpoly);
+    renumber_read_table (renumber_table, renumberfilename);
 
   /* sanity check: since we allocate two 64-bit words for each, instead of
      one 32-bit word for the hash table, taking K/100 will use 2.5% extra
@@ -349,9 +427,9 @@ int main (int argc, char *argv[])
       usage();
   }
 
-  char ** files = filelist ? filelist_from_file(basepath, filelist, 0) : argv;
-  unsigned long rread = remove_dup_in_files (files, dirname, outfmt, H, K, 
-                                                               (ab_hexa)?16:10);
+  char ** files = filelist ? filelist_from_file (basepath, filelist, 0) : argv;
+  unsigned long rread = remove_dup_in_files (files, basepath, outfmt, H, K,
+                                             (ab_hexa)?16:10, renumber_table);
   if (filelist) filelist_clear(files);
 
 
@@ -371,5 +449,7 @@ int main (int argc, char *argv[])
            sanity_collisions, sanity_checked);
 
   param_list_clear(pl);
+  renumber_free (renumber_table);
+  cado_poly_clear (cpoly);
   return 0;
 }

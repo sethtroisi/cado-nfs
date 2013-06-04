@@ -244,7 +244,6 @@ my @default_param = (
     coverNmax    => 100,
     nslices_log  => 1,
     filterlastrels => 1,
-    dup_rm => $on_mingw, # Give -rm parameter to dup2 when on MinGW
 
     # linalg
     linalg       => 'bwc',
@@ -2302,14 +2301,11 @@ sub dup {
     my $K = int ( 100 + (1.2 * $nrels / $nslices) );
     for (my $i=0; $i < $nslices; $i++) {
         info "removing duplicates on slice $i..." if ($verbose);
-        my $rm_param = "";
-        if ($param{'dup_rm'} != 0) {
-          $rm_param = "-rm "
-        };
         cmd("$param{'bindir'}/filter/dup2 ".
-            "-K $K -out $param{'prefix'}.nodup/$i ".
+            "-K $K -poly $param{'prefix'}.poly ".
             "-filelist $param{'prefix'}.filelist ".
-            "-basepath $param{'prefix'}.nodup/$i ". $rm_param,
+            "-renumber $param{'prefix'}.renumber ".
+            "-basepath $param{'prefix'}.nodup/$i ",
             { cmdlog => 1, kill => 1,
               logfile => "$param{'prefix'}.dup2_$i.log",
             });

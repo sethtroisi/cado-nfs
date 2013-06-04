@@ -237,6 +237,7 @@ fprint_relation (FILE *file, relation_t * rel)
   fwrite (buf, sizeof(*buf), p - buf, file);
 }
 
+/* same as fprint_relation, but assumes all exponents are > 0 */
 void
 fprint_relation_raw (FILE *file, relation_t * rel)
 {
@@ -263,76 +264,20 @@ fprint_relation_raw (FILE *file, relation_t * rel)
     }
   p[-1] = ':';
   for (i = 0; i < rel->nb_ap; ++i)
-    if (rel->ap[i].e)
-      {
-	ASSERT (rel->ap[i].e);
-	op = p;
-	p = u64toa16 (p, rel->ap[i].p);
-	*p++ = ',';
-	lg = (p - op);
-	for (j = 0; j < rel->ap[i].e - 1; j++)
-	  {
-	    memcpy (p, op, lg);
-	    p += lg;
-	  }
-      }
+    {
+      ASSERT (rel->ap[i].e);
+      op = p;
+      p = u64toa16 (p, rel->ap[i].p);
+      *p++ = ',';
+      lg = (p - op);
+      for (j = 0; j < rel->ap[i].e - 1; j++)
+        {
+          memcpy (p, op, lg);
+          p += lg;
+        }
+    }
   p[-1] = '\n';
   fwrite (buf, sizeof(*buf), p - buf, file);
-}
-
-void
-fprint_relation_old (FILE *file, relation_t * rel)
-{
-  int i, j;
-
-  fprintf(file, "%" PRId64 ",%" PRIu64 ":", rel->a, rel->b);
-  for (i = 0; i < rel->nb_rp - 1; ++i)
-    for (j = 0; j < rel->rp[i].e; j++)
-      fprintf (file, "%lx,", rel->rp[i].p);
-  /* now i = rel->nb_rp - 1 */
-  for (j = 0; j < rel->rp[i].e - 1; j++)
-    fprintf (file, "%lx,", rel->rp[i].p);
-  fprintf (file, "%lx:", rel->rp[i].p);
-  for (i = 0; i < rel->nb_ap - 1; ++i)
-    for (j = 0; j < rel->ap[i].e; j++)
-      fprintf (file, "%lx,", rel->ap[i].p);
-  /* now i = rel->nb_ap - 1 */
-  for (j = 0; j < rel->ap[i].e - 1; j++)
-    fprintf (file, "%lx,", rel->ap[i].p);
-  fprintf (file, "%lx\n", rel->ap[i].p);
-}
-
-/* same as fprint_relation, but exponents > 1 are allowed */
-void
-fprint_relation_raw_old (FILE *file, relation_t * rel)
-{
-  int i, j;
-
-  fprintf (file, "%" PRId64 ",%" PRIu64 ":", rel->a, rel->b);
-  for (i = 0; i < rel->nb_rp; ++i)
-    {
-      ASSERT (rel->rp[i].e >= 1);
-      for (j = 0; j < rel->rp[i].e; j++)
-        {
-          fprintf (file, "%lx", rel->rp[i].p);
-          if (i + 1 != rel->nb_rp || j + 1 != rel->rp[i].e)
-            fprintf (file, ",");
-          else
-            fprintf (file, ":");
-        }
-    }
-  for (i = 0; i < rel->nb_ap; ++i)
-    {
-      ASSERT (rel->ap[i].e >= 1);
-      for (j = 0; j < rel->ap[i].e; j++)
-        {
-          fprintf (file, "%lx", rel->ap[i].p);
-          if (i + 1 != rel->nb_ap || j + 1 != rel->ap[i].e)
-            fprintf (file, ",");
-          else
-            fprintf (file, "\n");
-        }
-    }
 }
 
 /* reduces exponents mod 2, and discards primes with even exponent */
