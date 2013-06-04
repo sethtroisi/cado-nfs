@@ -374,7 +374,7 @@ static void
 usage (char *argv0)
 {
   fprintf (stderr, "Usage: %s [-v] [-pmin nnn] [-pmax nnn] -poly xxx.poly "
-                   "-renumberfile outfile\n", argv0);
+                   "-renumber outfile\n", argv0);
 #if 0
   fprintf (stderr, "or     %s [-v] -poly xxx.poly -fb xxx.roots xxx.rels1 xxx.rels2 ... xxx.relsk\n", argv0);
 #endif
@@ -419,7 +419,7 @@ main (int argc, char *argv[])
             argc -= 2;
             argv += 2;
           }
-        else if (argc > 2 && strcmp (argv[1], "-renumberfile") == 0)
+        else if (argc > 2 && strcmp (argv[1], "-renumber") == 0)
           {
             renumberfilename = argv[2];
             argc -= 2;
