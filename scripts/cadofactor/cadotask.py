@@ -11,6 +11,7 @@ import wudb
 import logging
 import patterns
 import cadoprograms
+import cadoparams
 import cadocommand
 import wuserver
 
@@ -139,7 +140,7 @@ class Polynomial(object):
                     f.write(key + ": %s\n" % params[key])
 
 
-class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
+class Task(wudb.DbAccess, cadoparams.UseParameters, metaclass=abc.ABCMeta):
     """ A base class that represents one task that needs to be processed. 
     
     Sub-classes must define class variables:
@@ -171,7 +172,7 @@ class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
         # Parameters that all tasks use
         return ("name", "workdir", "remove")
     
-    def __init__(self, parameters, path_prefix, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         ''' Sets up a database connection and a DB-backed dictionary for 
         parameters. Reads parameters from DB, and merges with hierarchical
         parameters in the parameters argument. Parameters passed in by 
@@ -187,18 +188,13 @@ class Task(wudb.DbAccess, metaclass=abc.ABCMeta):
         self.state = self.make_db_dict(self.make_tablename())
         self.logger.debug("state = %s", self.state)
         # Set default parametes for this task, if any are given
-        self.parampath = ".".join(path_prefix + [self.name])
-        self.params = parameters.myparams(self.paramnames, self.parampath)
+        self.params = self.myparams(self.paramnames)
         self.logger.debug("params = %s", self.params)
         self.params.setdefault("remove", False)
         # Set default parameters for our programs
         self.progparams = []
         for prog in self.programs:
-            if parameters:
-                progparams = parameters.myparams(
-                    prog.get_config_keys(), [self.parampath, prog.name])
-            else:
-                progparams = {}
+            progparams = self.myparams(prog.get_config_keys(), prog.name)
             self.progparams.append(progparams)
         self.logger.debug("Exit Task.__init__(%s)", self.name)
         return
@@ -1499,10 +1495,8 @@ class StartClientsTask(Task):
         return super().paramnames + \
             ('hostnames', 'scriptpath', "nrclients")
     
-    def __init__(self, address, port, parameters, path_prefix, *args, **kwargs):
-        super().__init__(parameters, path_prefix, *args, **kwargs)
-        self.parameters = parameters
-        self.path_prefix = path_prefix
+    def __init__(self, address, port, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.used_ids = {}
         self.pids = self.make_db_dict(self.make_tablename("client_pids"))
         self.hosts = self.make_db_dict(self.make_tablename("client_hosts"))
@@ -1525,11 +1519,7 @@ class StartClientsTask(Task):
         # Simplistic: just test if process with that pid exists and accepts
         # signals from us. TODO: better testing here, probably with ps|grep
         # or some such
-        pid = self.pids[clientid]
-        host = self.hosts[clientid]
-        kill = cadoprograms.Kill((pid,), {"signal": "0"})
-        process = cadocommand.RemoteCommand(kill, host, self.parameters, self.path_prefix)
-        (rc, stdout, stderr) = process.wait()
+        (rc, stdout, stderr) = self.kill_client(clientid, signal=0)
         return (rc == 0)
     
     def launch_hosts(self, hosts):
@@ -1593,10 +1583,13 @@ class StartClientsTask(Task):
                 self.logger.warning("Stopping client %s (Host %s, PID %d) failed",
                                     clientid, self.hosts[clientid], self.pids[clientid])
     
-    def kill_client(self, clientid):
+    def kill_client(self, clientid, signal = None):
         pid = self.pids[clientid]
         host = self.hosts[clientid]
-        kill = cadoprograms.Kill((pid,), {})
+        params = {}
+        if not signal is None:
+            params["signal"] = str(signal)
+        kill = cadoprograms.Kill((pid,), params)
         process = cadocommand.RemoteCommand(kill, host, self.parameters, self.path_prefix)
         return process.wait()
 
