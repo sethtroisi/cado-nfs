@@ -122,7 +122,7 @@ class Program(object):
         return "'" + s.replace("'", "'\\''") + "'"
     
     def __init__(self, args, parameters, stdin = None, stdout = None,
-                 stderr = None):
+                 stderr = None, bg = False):
         ''' Takes a list of positional parameters and a dictionary of command 
         line parameters 
         
@@ -138,6 +138,8 @@ class Program(object):
         self.stdin = stdin
         self.stdout = stdout
         self.stderr = stderr
+        
+        self.bg = bg
         
         # Look for location of the binary executable at __init__, to avoid 
         # calling os.path.isfile() multiple times
@@ -255,6 +257,8 @@ class Program(object):
             cmdline += ' 2> ' + Program._shellquote(self.translate_path(self.stderr, outputpath))
         if not self.stderr is None and self.stderr is self.stdout:
             cmdline += ' 2>&1'
+        if self.bg:
+            cmdline += " &"
         return cmdline
     
     def make_wu(self, wuname):
