@@ -297,7 +297,7 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
 {
   unsigned long lpb[2], p, *roots[2], nfree = 0;
   int d[2], k[2], i, min_side, max_side, rat_side, alg_side;
-  index_t MAYBE_UNUSED old_table_size = 0;
+  index_t old_table_size = 0;
 
   rat_side = renumber_table->rat;
   alg_side = 1 - rat_side;
@@ -345,20 +345,11 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
     if (p >= pmin && p <= pmax && k[alg_side] == d[alg_side])
     {
       //print the free rels
-#if 0
-  // To use when the renumbering is done in dup2. Free rels are already in
-  // renumbered
       index_t l;
       printf ("%lu,0:%lx", p, (unsigned long) old_table_size);
       for (l = old_table_size + 1; l < renumber_table->size; l++)
         printf (",%lx", (unsigned long) l);
       printf ("\n");
-#else
-      printf ("%lu,0:%lx:%lx", p, p, roots[alg_side][0]);
-      for (i = 1; i < k[alg_side]; i++)
-        printf (",%lx", roots[alg_side][i]);
-      printf ("\n");
-#endif
       nfree++;
     }
     old_table_size = renumber_table->size;
@@ -444,16 +435,8 @@ main (int argc, char *argv[])
     fic = argv+1;
     nfic = argc-1;
 
-#if 0
-  // To use when the renumbering is done in dup2. Free rels are already in
     if (polyfilename == NULL || renumberfilename == NULL)
       usage (argv0);
-#else
-    if (polyfilename == NULL)
-      usage (argv0);
-    if (renumberfilename == NULL)
-      renumberfilename = "/dev/null"; 
-#endif
 
     cado_poly_init(cpoly);
     if (!cado_poly_read (cpoly, polyfilename))
