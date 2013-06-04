@@ -3,7 +3,7 @@ name = testrun
 workdir = work
 
 # Adjust execpath to point to the root of your CADO build directory
-execpath=${HOME}/build/cado-nfs/normal
+tasks.execpath=${HOME}/build/cado-nfs/normal
 tasks.verbose = 1
 tasks.rlim=50000
 tasks.alim=100000
@@ -34,3 +34,7 @@ tasks.filter.ratio = 1.1
 tasks.linalg.mn = 64
 tasks.linalg.verbose = 0
 tasks.linalg.nchar = 64
+
+slaves.caramel.hostnames = quiche, quiche
+slaves.caramel.scriptpath = /users/caramel/kruppaal/git/cado-nfs/scripts/cadofactor
+slaves.caramel.downloadretry = 10

@@ -1483,6 +1483,53 @@ class SqrtTask(Task):
                 return False
         return True
 
+class StartClientsTask(Task):
+    """ Starts clients on slave machines """
+    @property
+    def name(self):
+        return "slaves"
+    @property
+    def title(self):
+        return "Client Launcher"
+    @property
+    def programs(self):
+        return (cadoprograms.WuClient,)
+    @property
+    def paramnames(self):
+        return super().paramnames + \
+            ('hostnames', 'scriptpath')
+    
+    def __init__(self, address, port, parameters, path_prefix, *args, **kwargs):
+        super().__init__(parameters, path_prefix, *args, **kwargs)
+        for key in self.state:
+            # Fixme: Check if clients are running and keep them
+            del(self.state[key])
+        
+        self.progparams[0].setdefault('server', "http://%s:%d" % (address, port))
+        
+        print ("Hostnames: %s" % self.params["hostnames"])
+        if self.params["hostnames"].startswith('@'):
+            pass
+        else:
+            hosts = map(str.strip, self.params["hostnames"].split(","))
+            self.launch_hosts(hosts, parameters, path_prefix)
+    
+    def launch_hosts(self, hosts, parameters, path_prefix):
+        for host in hosts:
+            if 'scriptpath' in self.params:
+                self.progparams[0]['execpath'] = self.params['scriptpath']
+            clientid = host
+            i = 1
+            while clientid in self.state:
+                i += 1
+                clientid = "%s%d" % (host, i)
+            self.progparams[0]['clientid'] = clientid
+            self.state[clientid] = True
+            wuclient = cadoprograms.WuClient([], self.progparams[0], stdout = "/dev/null", stderr = "/dev/null", bg=True)
+            process = cadocommand.RemoteCommand(wuclient, host, parameters, path_prefix)
+            process.wait()
+
+
 # FIXME: Is this a Task object? Probably not
 # Should this be in cadotask or in cadofactor? Probably cadotask
 class CompleteFactorization(wudb.DbAccess):
@@ -1514,14 +1561,21 @@ class CompleteFactorization(wudb.DbAccess):
         del(wuar)
         
         # Set up WU server
+        serveraddress = "localhost"
+        serverport = 8001
         uploaddir = self.params["workdir"].rstrip(os.sep) + os.sep + self.params["name"] + ".upload/"
-        self.server = wuserver.ServerLauncher("localhost", 8001, False, self.get_db_filename(), 
+        self.server = wuserver.ServerLauncher(serveraddress, serverport, False, self.get_db_filename(), 
             registered_filenames, uploaddir, bg = True)
         self.server.serve()
         
         sievepath = parampath + ['sieve']
         filterpath = parampath + ['filter']
         linalgpath = parampath + ['linalg']
+        
+        # Start clients
+        clients = []
+        for (path, key) in parameters.find(['slaves'], 'hostnames'):
+            clients.append(StartClientsTask(serveraddress, serverport, *args, parameters = parameters, path_prefix = path, **kwargs))
         
         self.polysel = PolyselTask(*args, 
             parameters = parameters, path_prefix = parampath, db_listener = self.db_listener,
