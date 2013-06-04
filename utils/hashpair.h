@@ -2,43 +2,22 @@
 #define CADO_LINALG_HASH_PAIR_H_
 
 #include <stdint.h>
-
-/* data type to store the (p,r) values */
-#ifndef HT
-#define HT 32
-#endif
-
-/* data type to store the renumber table */
-#ifndef HR
-#define HR 32
-#endif
+#include "macros.h"
 
 #define HC_T uint8_t
 #define HCM UMAX(HC_T) /* maximal value of TYPE_HASHCOUNT */
 
-#if HR == 32
-#define HR_T uint32_t
-#else
-#define HR_T uint64_t
-#endif
 
-#if HT == 32
-#define HT_T uint32_t
-#else
-#define HT_T uint64_t
-#endif 
-
-/* Hashtable data (p,r). */
 typedef struct {
-  HT_T p, r;
+  index_t p, r;
 } ht_t;
 
 typedef struct {
   ht_t *ht; /* p, r */
   HC_T *hc; /* Occurrences of (p,r) */
-  HR_T *hr; /* Renumber table. Size = nrels. Type of elements: depend of
+  p_r_values_t *hr; /* Renumber table. Size = nrels. Type of elements: depend of
 	       hm: if >= 2^32, uin64_t, otherwise uint32_t. */
-  HR_T  hm; /* Size of ht and hc array. with n = number of relations (in argument),
+  p_r_values_t  hm; /* Size of ht and hc array. with n = number of relations (in argument),
 	       hm = ulong_nextprime ((unsigned long) ((n>>1)*3)) */
 } hashtable_t;
 
@@ -58,20 +37,20 @@ typedef struct {
 #define HC0 ((sizeof(unsigned long)>4) ? (HC0_64) : (HC0_32))
 #define HC1 ((sizeof(unsigned long)>4) ? (HC1_64) : (HC1_32))
 #define HK(A,B) (((unsigned long)(A))*HC0+((unsigned long)(B))*HC1)
-#define HKM(A,B,M) ((HR_T) (HK(A,B)%((unsigned long) (M))))
+#define HKM(A,B,M) ((p_r_values_t) (HK(A,B)%((unsigned long) (M))))
 #define HASHINSERT(H,P,R,F) \
-  hashInsertWithKey(H, (HT_T) P, (HT_T) R, (HR_T) HKM(P,R,(H)->hm), (unsigned int *) F)
+  hashInsertWithKey(H, (index_t) P, (index_t) R, (p_r_values_t) HKM(P,R,(H)->hm), (unsigned int *) F)
 
 #ifdef  __cplusplus
 extern "C" { 
 #endif
 
   extern void hashClear (hashtable_t *);
-  extern void hashInit (hashtable_t *, HR_T, unsigned int);
+  extern void hashInit (hashtable_t *, p_r_values_t, unsigned int);
   extern void hashFree (hashtable_t *);
   extern void hashCheck (hashtable_t *);
-  extern HR_T hashInsert (hashtable_t *, HT_T, HT_T, unsigned int *);
-  extern HR_T hashInsertWithKey (hashtable_t *, HT_T, HT_T, HR_T, unsigned int *);
+  extern p_r_values_t hashInsert (hashtable_t *, index_t, index_t, unsigned int *);
+  extern p_r_values_t hashInsertWithKey (hashtable_t *, index_t, index_t, p_r_values_t, unsigned int *);
 
 #ifdef	__cplusplus
 }	/* extern "C" */

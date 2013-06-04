@@ -10,8 +10,8 @@
 
 /* return a/b mod p, and p when gcd(b,p) <> 1: this corresponds to a
    projective root */
-HT_T
-findroot_ffs (int64_t a, uint64_t b, HT_T p)
+index_t
+findroot_ffs (int64_t a, uint64_t b, index_t p)
 {
   fppol64_t pol_a, pol_b, pol_p;
   fppol64_t pol_r;
@@ -30,11 +30,11 @@ findroot_ffs (int64_t a, uint64_t b, HT_T p)
   fppol64_rem (pol_a, pol_a, pol_p);
   fppol64_rem (pol_b, pol_b, pol_p);
   if (!fppol64_invmod (pol_b, pol_b, pol_p))
-      return (HT_T) p;
+      return (index_t) p;
 
   fppol64_mulmod (pol_r, pol_a, pol_b, pol_p);
 
-  return (HT_T) fppol64_get_ui_sparse(pol_r);
+  return (index_t) fppol64_get_ui_sparse(pol_r);
 }
 
 int ffs_poly_set_plist(cado_poly poly, param_list pl)

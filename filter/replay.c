@@ -387,9 +387,13 @@ doAllAdds(typerow_t **newrows, char *str, MAYBE_UNUSED FILE *outdelfile,
 #endif
       free(newrows[i0]);
       newrows[i0] = NULL;
-      index_data[i0].n = 0;
-      free(index_data[i0].rels);
-      index_data[i0].rels = NULL;
+
+      if (index_data != NULL) // ie we want an index
+      {
+        index_data[i0].n = 0;
+        free(index_data[i0].rels);
+        index_data[i0].rels = NULL;
+      }
     }
 }
 
@@ -616,6 +620,8 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
             index_data[i].rels[0].e = 1;
         }
     }
+    else
+      index_data = NULL;
 
     // read merges in the *.merge.his file and replay them
     build_newrows_from_file(newrows, hisfile, bwcostmin, outdelfilename,
