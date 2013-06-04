@@ -2188,7 +2188,7 @@ sub do_freerels {
     my $cmd = "$param{'bindir'}/sieve/freerel ".
               "-poly $param{'prefix'}.poly ".
               "-fb $param{'prefix'}.roots ".
-              "-renumberfile $param{'prefix'}.renumber ".
+              "-renumber $param{'prefix'}.renumber ".
               "> $param{'prefix'}.freerels ";
 
     cmd($cmd, { cmdlog => 1, kill => 1,
