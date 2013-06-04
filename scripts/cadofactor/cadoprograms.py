@@ -108,6 +108,7 @@ class Program(object):
     
     params_list = ("execpath", "execsubdir", "execbin")
     path = '.'
+    subdir = ""
     
     @staticmethod
     def _shellquote(s):
@@ -139,7 +140,13 @@ class Program(object):
         self.stdout = stdout
         self.stderr = stderr
         
+        # If we are to run in background, we add " & echo $!" to the command
+        # line to print the pid of the spawned process. We require that stdout
+        # and stderr are redirected to files.
         self.bg = bg
+        if bg and (stdout is None or stderr is None):
+            raise Exception("Programs to run in background must redirect "
+                            "stdout and stderr")
         
         # Look for location of the binary executable at __init__, to avoid 
         # calling os.path.isfile() multiple times
@@ -258,7 +265,7 @@ class Program(object):
         if not self.stderr is None and self.stderr is self.stdout:
             cmdline += ' 2>&1'
         if self.bg:
-            cmdline += " &"
+            cmdline += " & echo $!"
         return cmdline
     
     def make_wu(self, wuname):
@@ -510,7 +517,6 @@ class WuClient(Program):
 class SSH(Program):
     binary = "ssh"
     name = binary
-    subdir = ""
     path = "/usr/bin"
     params_list = (
         Toggle("compression", "C"),
@@ -525,15 +531,24 @@ class SSH(Program):
 class RSync(Program):
     binary = "rsync"
     name = binary
-    subdir = ""
     path = "/usr/bin"
     params_list = ()
 
 class Ls(Program):
     binary = "ls"
     name = binary
-    subdir = ""
     path = "/bin"
     params_list = (
         Toggle("long", "l"),
     )
+
+class Kill(Program):
+    binary = "kill"
+    name = binary
+    path = "/bin"
+    params_list = (
+        Parameter("signal", "s"),
+    )
+    # Make Kill accept integers as argument list
+    def __init__(self, arglist, *args, **kwargs):
+        super().__init__(map(str, arglist), *args, **kwargs)
