@@ -1497,37 +1497,108 @@ class StartClientsTask(Task):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ('hostnames', 'scriptpath')
+            ('hostnames', 'scriptpath', "nrclients")
     
     def __init__(self, address, port, parameters, path_prefix, *args, **kwargs):
         super().__init__(parameters, path_prefix, *args, **kwargs)
-        for key in self.state:
-            # Fixme: Check if clients are running and keep them
-            del(self.state[key])
+        self.parameters = parameters
+        self.path_prefix = path_prefix
+        self.used_ids = {}
+        self.pids = self.make_db_dict(self.make_tablename("client_pids"))
+        self.hosts = self.make_db_dict(self.make_tablename("client_hosts"))
         
+        if 'scriptpath' in self.params:
+            self.progparams[0]['execpath'] = self.params['scriptpath']
         self.progparams[0].setdefault('server', "http://%s:%d" % (address, port))
         
-        print ("Hostnames: %s" % self.params["hostnames"])
-        if self.params["hostnames"].startswith('@'):
-            pass
+        # If hostnames are of the form @file, read host names from file,
+        # one host name per line
+        match = re.match("@(.*)", self.params["hostnames"])
+        if match:
+            with open(match.group(1)) as f:
+                self.launch_hosts(f)
         else:
             hosts = map(str.strip, self.params["hostnames"].split(","))
-            self.launch_hosts(hosts, parameters, path_prefix)
+            self.launch_hosts(hosts)
     
-    def launch_hosts(self, hosts, parameters, path_prefix):
+    def is_alive(self, clientid):
+        # Simplistic: just test if process with that pid exists and accepts
+        # signals from us. TODO: better testing here, probably with ps|grep
+        # or some such
+        pid = self.pids[clientid]
+        host = self.hosts[clientid]
+        kill = cadoprograms.Kill((pid,), {"signal": "0"})
+        process = cadocommand.RemoteCommand(kill, host, self.parameters, self.path_prefix)
+        (rc, stdout, stderr) = process.wait()
+        return (rc == 0)
+    
+    def launch_hosts(self, hosts):
         for host in hosts:
-            if 'scriptpath' in self.params:
-                self.progparams[0]['execpath'] = self.params['scriptpath']
-            clientid = host
-            i = 1
-            while clientid in self.state:
-                i += 1
-                clientid = "%s%d" % (host, i)
-            self.progparams[0]['clientid'] = clientid
-            self.state[clientid] = True
-            wuclient = cadoprograms.WuClient([], self.progparams[0], stdout = "/dev/null", stderr = "/dev/null", bg=True)
-            process = cadocommand.RemoteCommand(wuclient, host, parameters, path_prefix)
-            process.wait()
+            self.launch_host(host)
+        s = ", ".join(["%s (Host %s, PID %d)" % (cid, self.hosts[cid], self.pids[cid]) for cid in self.pids])
+        self.logger.info("Launched client ids %s" % s)
+    
+    def make_unique_id(self, host):
+        # Make a unique client id for host
+        clientid = host
+        i = 1
+        while clientid in self.used_ids:
+            assert clientid in self.pids
+            assert clientid in self.hosts
+            i += 1
+            clientid = "%s%d" % (host, i)
+        self.used_ids[clientid] = True
+        return clientid
+    
+    # Cases:
+    # Client was never started. Start it, add to state
+    # Client was started, but does not exist any more. Remove from state, then start and add again
+    # Client was started, and does still exists. Nothing to do.
+    
+    def launch_host(self, host):
+        clientid = self.make_unique_id(host)
+        # Check if client is already running
+        if clientid in self.pids:
+            assert self.hosts[clientid] == host
+            if self.is_alive(clientid):
+                self.logger.info("Client %s on host %s with PID %d already running",
+                                 clientid, host, self.pids[clientid])
+                return
+            else:
+                del(self.pids[clientid])
+                del(self.hosts[clientid])
+        
+        self.logger.info("Starting client id %s on host %s", clientid, host)
+        self.progparams[0]['clientid'] = clientid
+        wuclient = cadoprograms.WuClient([], self.progparams[0], stdout = "/dev/null", stderr = "/dev/null", bg=True)
+        process = cadocommand.RemoteCommand(wuclient, host, self.parameters, self.path_prefix)
+        (rc, stdout, stderr) = process.wait()
+        if rc != 0:
+            self.logger.warning("Starting client on %(host)s failed. "
+                                "Consult log file for details." % host)
+            return
+        self.pids[clientid] = int(stdout)
+        self.hosts[clientid] = host
+
+    def kill_all_clients(self):
+        # Need the keys() to make a copy as dict will change in loop body
+        for clientid in list(self.pids.keys()):
+            (rc, stdout, stderr) = self.kill_client(clientid)
+            if rc == 0:
+                self.logger.info("Stopped client %s (Host %s, PID %d)",
+                                 clientid, self.hosts[clientid], self.pids[clientid])
+                del(self.pids[clientid])
+                del(self.hosts[clientid])
+            else:
+                self.logger.warning("Stopping client %s (Host %s, PID %d) failed",
+                                    clientid, self.hosts[clientid], self.pids[clientid])
+    
+    def kill_client(self, clientid):
+        pid = self.pids[clientid]
+        host = self.hosts[clientid]
+        kill = cadoprograms.Kill((pid,), {})
+        process = cadocommand.RemoteCommand(kill, host, self.parameters, self.path_prefix)
+        return process.wait()
 
 
 # FIXME: Is this a Task object? Probably not
@@ -1573,9 +1644,9 @@ class CompleteFactorization(wudb.DbAccess):
         linalgpath = parampath + ['linalg']
         
         # Start clients
-        clients = []
+        self.clients = []
         for (path, key) in parameters.find(['slaves'], 'hostnames'):
-            clients.append(StartClientsTask(serveraddress, serverport, *args, parameters = parameters, path_prefix = path, **kwargs))
+            self.clients.append(StartClientsTask(serveraddress, serverport, *args, parameters = parameters, path_prefix = path, **kwargs))
         
         self.polysel = PolyselTask(*args, 
             parameters = parameters, path_prefix = parampath, db_listener = self.db_listener,
@@ -1608,3 +1679,6 @@ class CompleteFactorization(wudb.DbAccess):
     def run(self, *args, **kwargs):
         self.sqrt.run(*args, **kwargs)
         self.server.shutdown()
+        for c in self.clients:
+            c.kill_all_clients()
+        
