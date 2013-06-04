@@ -1524,9 +1524,9 @@ class StartClientsTask(Task):
     
     def launch_hosts(self, hosts):
         for host in hosts:
-            self.launch_host(host)
+            self.launch_host(host.strip())
         s = ", ".join(["%s (Host %s, PID %d)" % (cid, self.hosts[cid], self.pids[cid]) for cid in self.pids])
-        self.logger.info("Launched client ids %s" % s)
+        self.logger.info("Launched clients: %s" % s)
     
     def make_unique_id(self, host):
         # Make a unique client id for host
