@@ -1,6 +1,7 @@
 import sys
 import os
 import re
+import abc
 
 """
 Parameter file format
@@ -241,7 +242,26 @@ class Parameters(object):
     def __str__(self):
         r = Parameters.__str_internal__(self.data, "")
         return "\n".join(r)
+
+class UseParameters(object, metaclass=abc.ABCMeta):
+    @abc.abstractproperty
+    def name(self):
+        pass
     
+    def __init__(self, parameters, path_prefix):
+        self.parameters = parameters
+        self.path_prefix = path_prefix
+        self.parampath = path_prefix + [self.name]
+    
+    def myparams(self, keys, extrapath = None):
+        path = self.parampath
+        if not extrapath is None:
+            if isinstance(extrapath, str):
+                path += [extrapath]
+            else:
+                path += extrapath
+        return self.parameters.myparams(keys, path)
+
 DEFAULTS = (
     "logfile = cado.log",
     "tasks.parallel = 0",
