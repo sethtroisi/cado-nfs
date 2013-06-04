@@ -2328,6 +2328,8 @@ sub purge {
     $nslices = 2**$param{'nslices_log'};
     my $nbrels = 0;
     my $last = 0;
+    my $nprimes = 0;
+    my $min_index = 0;
     for (my $i=0; $i < $nslices; $i++) {
         my $f = "$param{'prefix'}.dup2_$i.log";
         open FILE, "< $f"
@@ -2336,6 +2338,12 @@ sub purge {
             s/\015\012|\015|\012/\n/g; # Convert LF, CR, and CRLF to logical NL
             if ( $_ =~ /^\s+(\d+) remaining relations/ ) {
                 $last = $1;
+            }
+            if ( $_ =~ /size=(\d+), nb_bytes=/ ) {
+                $nprimes = $1;
+            }
+            if ( $_ =~ /min_index=(\d+)/ ) {
+                $min_index = $1;
             }
         }
         close FILE;
@@ -2349,6 +2357,7 @@ sub purge {
     my $cmd = cmd("$param{'bindir'}/filter/purge ".
                   "-poly $param{'prefix'}.poly -keep $param{'keeppurge'} ".
                   "-nrels $nbrels -out $param{'prefix'}.purged.gz ".
+                  "-nprimes $nprimes -minindex $min_index ".
                   "-npthr $param{'bwmt'} -basepath $param{'wdir'} ".
                   "-subdirlist $param{'prefix'}.subdirlist ".
                   "-filelist $param{'prefix'}.filelist ",

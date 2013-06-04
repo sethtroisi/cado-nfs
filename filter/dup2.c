@@ -448,6 +448,18 @@ main (int argc, char *argv[])
   fprintf (stderr, "[found %lu true duplicates on sample of %lu relations]\n",
            sanity_collisions, sanity_checked);
 
+  // Find the index that corresponds to the min value of alim and rlim (for
+  // purge)
+  p_r_values_t min = MIN(cpoly->rat->lim, cpoly->alg->lim);
+  float hint = 2.0 * (((float) min) / logf ((float) min));
+  index_t min_index;
+  if (hint > 0.0)
+    min_index = (index_t) hint;
+  else
+    min_index = 0;
+  fprintf (stderr, "Renumbering struct: min_index=%lu\n", (uint64_t) min_index);
+
+
   param_list_clear(pl);
   renumber_free (renumber_table);
   cado_poly_clear (cpoly);
