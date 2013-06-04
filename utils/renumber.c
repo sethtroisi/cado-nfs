@@ -220,6 +220,10 @@ renumber_write_p (renumber_t renumber_info, unsigned long p, unsigned long*r[2],
   }
 }
 
+/* side is 0 if (p,r) corresponds to the left part in the relation,
+   side is 1 if (p,r) corresponds to the right part.
+   For NFS the rational part (if any) corresponds to side 0, and we can
+   give any value of r. */
 index_t 
 renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p, 
                              p_r_values_t r, int side)
@@ -232,7 +236,7 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
   index_t max = renumber_info->size, min = 0;
 
   p_r_values_t *tab = renumber_info->table;
-  p_r_values_t vr, vp; /* values of r and p as thay are stored in the table*/
+  p_r_values_t vr, vp; /* values of r and p as they are stored in the table*/
 
 
   if (renumber_info->rat == -1)
@@ -246,8 +250,8 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
     vr = (side == renumber_info->rat) ? vp : r; 
   }
   
-  /* Looking for vp : the values of vp are order in increasing order and are 
-  always at the beggining of a descreasing sequence */
+  /* Looking for vp: the values of vp are ordered in increasing order and are
+     always at the beginning of a decreasing sequence */
   while (1)
   {
     while (i > 0 && tab[i-1] > tab[i])
