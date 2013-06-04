@@ -88,9 +88,10 @@ class Command(object):
 
 class RemoteCommand(Command):
     def __init__(self, program, host, parameters, path_prefix, *args, **kwargs):
-        # We use a shell command line instead of an array so that, e.g., stdio
-        # redirection to files specified in program can be added to the command
-        # line with and the redirection happens on the remote host
+        # We use a make_command_line() instead of make_command_array() so that,
+        # e.g., stdio redirection to files specified in program can be added
+        # to the command line with and the redirection happens on the remote
+        # host
         cmdline = program.make_command_line()
         self.prog = cadoprograms.SSH
         progparams = parameters.myparams(self.prog.get_config_keys(),
