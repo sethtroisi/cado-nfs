@@ -229,7 +229,7 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
   // TODO Better int for small prime (up to 2^16?) store the i corresponding to
   // vp in redirection table
 
-  index_t max = renumber_info->size, min = 0;
+  index_t max = renumber_info->size - 1, min = 0;
 
   p_r_values_t *tab = renumber_info->table;
   p_r_values_t vr, vp; /* values of r and p as thay are stored in the table*/
@@ -237,7 +237,7 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
 
   if (renumber_info->rat == -1)
   {
-    vp = (p < 1) + 1;
+    vp = (p << 1) + 1;
     vr = (side == 1) ? (p + 1 + r) : r; 
   }
   else
@@ -250,6 +250,8 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
   always at the beggining of a descreasing sequence */
   while (1)
   {
+    index_t old_i = i;
+
     while (i > 0 && tab[i-1] > tab[i])
       i--;
 
@@ -257,13 +259,13 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
       break;
     else if (tab[i] < vp)
     {
-      min = i;
-      i = (i + max)/2;
+      min = old_i;
+      i = (old_i + max)/2;
     }
     else
     {
-      max = i;
-      i = (i + min)/2;
+      max = old_i;
+      i = (old_i + min)/2;
     }
   }
 
