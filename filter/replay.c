@@ -483,6 +483,7 @@ readPurged(typerow_t **sparsemat, purgedfile_stream ps, int verbose)
 	    if(ps->nc == 0)
           fprintf(stderr, "Hard to believe: row[%d] is NULL\n", i);
       qsort(ps->cols, ps->nc, sizeof(int), cmp);
+#ifndef FOR_MSIEVE
 #ifdef FOR_FFS
       sparsemat[i] = (typerow_t *)malloc((ps->nc+2) * sizeof(typerow_t));
       int j = 0;
@@ -490,8 +491,14 @@ readPurged(typerow_t **sparsemat, purgedfile_stream ps, int verbose)
 #else
       sparsemat[i] = (typerow_t *)malloc((ps->nc+1) * sizeof(typerow_t));
       int j = ps->nc;
-#endif
+#endif /* FOR_FFS */
+#else
+      sparsemat[i] = (typerow_t *) malloc(2 * sizeof(typerow_t));
+      int j = 1;
+      rowCell(sparsemat, i, 1) = i;
+#endif /* FOR_MSIEVE */
       ASSERT_ALWAYS(sparsemat[i] != NULL);
+#ifndef FOR_MSIEVE
       for(int k = 0; k < ps->nc; k++)
         {
 #ifdef FOR_FFS
@@ -507,7 +514,7 @@ readPurged(typerow_t **sparsemat, purgedfile_stream ps, int verbose)
           previous = ps->cols[k];
 #else
           rowCell(sparsemat, i, k+1) = ps->cols[k];
-#endif
+#endif /* FOR_FFS */
         }
 #ifdef FOR_FFS
       if (ps->b != 0)
@@ -516,7 +523,8 @@ readPurged(typerow_t **sparsemat, purgedfile_stream ps, int verbose)
           rowCell(sparsemat, i, j) = ps->ncols - 1;
           sparsemat[i][j].e = 1;
         }
-#endif
+#endif /* FOR_FFS */
+#endif /* FOR_MSIEVE */
       rowLength(sparsemat, i) = j;
   }
 }
