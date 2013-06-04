@@ -6,6 +6,7 @@
 #include <string.h>
 #include "hashpair.h"
 #include "cado_poly.h"
+#include "rootfinder.h"
 #include "misc.h"
 #include "timing.h"
 #include "math.h"
@@ -33,9 +34,10 @@ void renumber_free (renumber_t);
 void renumber_init_write (renumber_t, const char *);
 void renumber_close_write (renumber_t);
 void renumber_read_table (renumber_t, const char *);
-void renumber_write_p (renumber_t, unsigned long, unsigned long * [2], 
-                                                           unsigned int [2]);
+void renumber_write_p (renumber_t, unsigned long, unsigned long * [2], int [2]);
 index_t renumber_get_index_from_p_r (renumber_t, p_r_values_t, p_r_values_t,int);
 void renumber_get_p_r_from_index (renumber_t, p_r_values_t *, p_r_values_t *,
                                                             index_t, cado_poly);
+//for DEBUG, should be remove later 
+void renumber_debug_print_tab (FILE *, const char *, cado_poly);
 #endif

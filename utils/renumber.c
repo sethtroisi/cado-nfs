@@ -34,9 +34,9 @@ void
 renumber_print_info (FILE * f, renumber_t renumber_info)
 {
   fprintf (f, "Renumbering struct: size=%lu, nb_bytes=%u, sizeof(*table)=%lu, "
-              "rat=%d\n", 
-              (uint64_t) renumber_info->size, renumber_info->nb_bytes,
-              sizeof(*(renumber_info->table)), renumber_info->rat);
+              "rat=%d\n", (uint64_t) renumber_info->size,
+              renumber_info->nb_bytes, sizeof(*(renumber_info->table)),
+              renumber_info->rat);
 }
 
 void 
@@ -129,14 +129,20 @@ renumber_read_table (renumber_t renumber_info, const char * filename)
     {
       report = ret;
       dt = wct_seconds () - t;
-      mb_s = ((double) (ret * renumber_info->nb_bytes) / (double) dt) *1.0e6;
+      if (dt > 0.01)
+        mb_s = ((double) (ret * renumber_info->nb_bytes) / (double) dt) *1.0e6;
+      else
+        mb_s = 0.0;
       fprintf(stderr, "Renumbering table: read %lu values from file in %.1fs "
                       "-- %.1f MB/s\n", (uint64_t) ret, dt, mb_s);
     }
   }
   
   dt = wct_seconds () - t;
-  mb_s = ((double) (ret * renumber_info->nb_bytes) / (double) dt) *1.0e6;
+  if (dt > 0.01)
+    mb_s = ((double) (ret * renumber_info->nb_bytes) / (double) dt) *1.0e6;
+  else
+    mb_s = 0.0;
   fprintf(stderr, "Renumbering table: end of read. Read %lu values from file "
                   "in %.1fs -- %.1f MB/s\n", (uint64_t) ret, dt, mb_s);
   ASSERT_ALWAYS(ret == renumber_info->size);
@@ -146,9 +152,9 @@ renumber_read_table (renumber_t renumber_info, const char * filename)
 
 /* sort in decreasing order */
 static void
-sort (unsigned long *r, unsigned int n)
+sort (unsigned long *r, int n)
 {
-  unsigned int i, j;
+  int i, j;
   unsigned long v;
 
   for (i = 1; i < n; i++)
@@ -163,10 +169,10 @@ sort (unsigned long *r, unsigned int n)
 
 void 
 renumber_write_p (renumber_t renumber_info, unsigned long p, unsigned long*r[2], 
-                  unsigned int k[2])
+                  int k[2])
 {
   unsigned long add_value = p+1; 
-  unsigned int i;
+  int i;
 
   // We sort roots by decreasing order
   sort(r[0], k[0]);
@@ -280,6 +286,7 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
   return i;
 }
 
+// TODO should also return side in the case where there are two alg sides
 void
 renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p, 
                              p_r_values_t * r, index_t i, cado_poly pol)
@@ -314,10 +321,51 @@ renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p,
     *p = tab[j] - 1;
     if (*p > (1UL << pol->rat->lpb) && i == j)
     {
-      // TODO CASE were there is only alg side (rat is less than lpb)
-      // *r = largest roots of alg pol
+      // Case where there is only alg side (p >= lpbr) and we are on the largest
+      // root on alg side (i == j)
+      int k, d = pol->alg->degree;
+      unsigned long *roots;
+
+      // if there is a proj root, this the largest (r = p by convention)
+      if (mpz_divisible_ui_p (pol->alg->f[d], *p)) 
+        *r = *p;
+      else
+      {
+        roots = (unsigned long*) malloc (d * sizeof (unsigned long));
+        k = poly_roots_ulong(roots, pol->alg->f, d, *p);
+        ASSERT_ALWAYS (k > 0);
+        sort(roots, k);
+        *r = roots[0];
+      }
     }
     else
       *r = tab[i];
   }
+}
+
+//for DEBUG, should be remove later 
+void renumber_debug_print_tab (FILE *output, const char *filename, 
+                                    cado_poly pol)
+{
+  renumber_t tab;
+  index_t i;
+  p_r_values_t p, r;
+
+  renumber_init (tab, pol);
+  renumber_read_table (tab, filename);
+    
+  for (i = 0; i < tab->size; i++)
+  {
+    renumber_get_p_r_from_index (tab, &p, &r, i, pol);
+    fprintf (output, "i=%u\ttab[i]=%u\tp=%u\t", i, tab->table[i], p);
+    if (r == p + 1)
+      fprintf (output, "rat side\n");
+    else if (r == p)
+      fprintf (output, "alg side proj\n");
+    else
+      fprintf (output, "alg side r=%u \n", r);
+  }
+  
+  
+  renumber_free(tab);
 }
