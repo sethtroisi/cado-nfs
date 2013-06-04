@@ -994,6 +994,22 @@ class DbListener(patterns.Observable, patterns.Observer):
         return True
 
 
+class IdMap(object):
+    """ Identity map. Ensures that DB-backed dictionaries on the same DB and
+    of the same table name are instanciated only once. """
+    def __init__(self):
+        self.db_dicts = {}
+    
+    def make_db_dict(self, db, name):
+        assert isinstance(db, str)
+        key = (db, name)
+        if not key in self.db_dicts:
+            self.db_dicts[key] = DictDbAccess(db, name)
+        return self.db_dicts[key]
+
+# Singleton instance of IdMap
+idmap = IdMap()
+
 class DbAccess(object):
     """ Base class that lets subclasses create DB-backed dictionaries or 
     WuAccess instances on a database whose file name is specified in the db 
@@ -1011,7 +1027,7 @@ class DbAccess(object):
         return self.__db
     
     def make_db_dict(self, name):
-        return DictDbAccess(self.__db, name)
+        return idmap.make_db_dict(self.__db, name)
     
     def make_wu_access(self):
         return WuAccess(self.__db)
