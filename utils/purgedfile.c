@@ -99,14 +99,6 @@ void purgedfile_stream_rewind(purgedfile_stream_ptr ps)
 }
 
 
-static void purgedfile_stream_provision_for_primes(purgedfile_stream_ptr ps, int nc)
-{
-    if (nc > 0 && ps->nc_alloc < nc) {
-        ps->nc_alloc = nc + nc / 2;
-        ps->cols = (int *) realloc(ps->cols, ps->nc_alloc * sizeof(int));
-    }
-}
-
 #define STORE(p, v)     do { if (p) *p++=(v); else (v);  nread++; } while (0)
 
 int purgedfile_stream_get(purgedfile_stream_ptr ps, char * line)
