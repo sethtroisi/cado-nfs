@@ -124,7 +124,7 @@ void siever_config_display(FILE * o, siever_config_srcptr sc)/*{{{*/
             sc->sides[RATIONAL_SIDE]->lpb,
 	    sc->sides[ALGEBRAIC_SIDE]->lpb);
     fprintf(o,
-	    "#                     rat->mfb=%d alg->mfb=%d rlambda=%1.1f alambda=%1.1f\n",
+	    "#                     mfbr=%d mfba=%d rlambda=%1.1f alambda=%1.1f\n",
 	    sc->sides[RATIONAL_SIDE]->mfb,
             sc->sides[ALGEBRAIC_SIDE]->mfb,
             sc->sides[RATIONAL_SIDE]->lambda,
@@ -485,7 +485,8 @@ void sieve_info_split_bucket_fb_for_threads(las_info_ptr las, sieve_info_ptr si,
     }
     fprintf(las->output, " [hit jitter %.2f%%]\n",
             100 * (max_bucket_fill_ratio / min_bucket_fill_ratio - 1));
-    s->max_bucket_fill_ratio = max_bucket_fill_ratio;
+    /* enable some margin in the bucket size */
+    s->max_bucket_fill_ratio = max_bucket_fill_ratio * 1.05;
     free(nn);
 }
 /*}}}*/
@@ -3445,7 +3446,8 @@ int main (int argc0, char *argv0[])/*{{{*/
         thread_do(thrs, &fill_in_buckets_both, las->nb_threads);
 
         max_full = MAX(max_full, thread_buckets_max_full(thrs, las->nb_threads));
-        ASSERT_ALWAYS(max_full <= 1.0); /* see commented code below */
+        ASSERT_ALWAYS(max_full <= 1.0 || /* see commented code below */
+                 fprintf (stderr, "max_full=%f, see #14987\n", max_full) == 0);
 #if 0   /* {{{ I no longer believe we can save something if this happens */
         /* See bug #14987 on the tracker */
         if (max_full >= 1.0) {
