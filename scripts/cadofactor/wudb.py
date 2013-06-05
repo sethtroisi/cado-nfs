@@ -875,9 +875,12 @@ class WuAccess(object): # {
         cursor.close()
 
     def cancel(self, wuid):
+        self.cancel_by_condition(eq={"wuid":wuid})
+    
+    def cancel_by_condition(self, **conditions):
         cursor = self.conn.cursor(MyCursor)
         d = {"status": WuStatus.CANCELLED}
-        self.mapper.table.update(cursor, d, eq={"wuid": wuid})
+        self.mapper.table.update(cursor, d, **conditions)
         self.conn.commit()
         cursor.close()
 
@@ -1237,7 +1240,10 @@ if __name__ == '__main__': # {
 
     if args["cancel"]:
         wuid = args["cancel"][0]
-        wus = db_pool.cancel(wuid)
+        if wuid == "available":
+            wus = db_pool.cancel_by_condition(eq={"status": 0})
+        else:
+            wus = db_pool.cancel(wuid)
 
     if args["result"]:
         (wuid, clientid, filename, filepath) = args["result"]
