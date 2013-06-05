@@ -261,6 +261,16 @@ class UseParameters(object, metaclass=abc.ABCMeta):
             else:
                 path += extrapath
         return self.parameters.myparams(keys, path)
+    
+    def get_param_prefix(self):
+        return self.path_prefix
+    
+    def get_param_path(self):
+        return self.parampath
+    
+    def get_parameters(self):
+        return self.parameters
+    
 
 DEFAULTS = (
     "logfile = cado.log",
