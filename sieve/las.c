@@ -479,7 +479,7 @@ void sieve_info_split_bucket_fb_for_threads(las_info_ptr las, sieve_info_ptr si,
     double min_bucket_fill_ratio = bucket_fill_ratio[n-1];
     double max_bucket_fill_ratio = bucket_fill_ratio[0];
     for(int i = 0 ; i < n ; i++) {
-        double r = bucket_fill_ratio[0];
+        double r = bucket_fill_ratio[i];
         if (r < min_bucket_fill_ratio) min_bucket_fill_ratio = r;
         if (r > max_bucket_fill_ratio) max_bucket_fill_ratio = r;
     }
