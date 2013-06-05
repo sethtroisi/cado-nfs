@@ -877,6 +877,9 @@ class WuAccess(object): # {
     def cancel(self, wuid):
         self.cancel_by_condition(eq={"wuid":wuid})
     
+    def cancel_all_available(self):
+        self.cancel_by_condition(eq={"status": 0})
+    
     def cancel_by_condition(self, **conditions):
         cursor = self.conn.cursor(MyCursor)
         d = {"status": WuStatus.CANCELLED}
@@ -1241,7 +1244,7 @@ if __name__ == '__main__': # {
     if args["cancel"]:
         wuid = args["cancel"][0]
         if wuid == "available":
-            wus = db_pool.cancel_by_condition(eq={"status": 0})
+            wus = db_pool.cancel_all_available()
         else:
             wus = db_pool.cancel(wuid)
 
