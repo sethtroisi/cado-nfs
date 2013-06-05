@@ -239,7 +239,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
                           first = 0;
                         else
                           fputc (',', f_out);
-                        fprintf (f_out, "%lu", j);
+                        fprintf (f_out, "%lx", j);
                       }
                   }
                 for (int i = 0; i < rs->rel.nb_ap; i++)
@@ -253,7 +253,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
                           first = 0;
                         else
                           fputc (',', f_out);
-                        fprintf (f_out, "%lu", j);
+                        fprintf (f_out, "%lx", j);
                       }
                   }
                 fprintf (f_out, "\n");
