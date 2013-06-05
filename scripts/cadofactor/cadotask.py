@@ -140,7 +140,7 @@ class Polynomial(object):
                     f.write(key + ": %s\n" % params[key])
 
 
-class Task(wudb.DbAccess, cadoparams.UseParameters, metaclass=abc.ABCMeta):
+class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters, metaclass=abc.ABCMeta):
     """ A base class that represents one task that needs to be processed. 
     
     Sub-classes must define class variables:
@@ -170,7 +170,7 @@ class Task(wudb.DbAccess, cadoparams.UseParameters, metaclass=abc.ABCMeta):
         # Sub-classes need to define a property 'paramnames' which returns a
         # list of parameters they accept, plus super()'s paramnames list
         # Parameters that all tasks use
-        return ("name", "workdir", "remove")
+        return ("name", "workdir")
     
     def __init__(self, *args, **kwargs):
         ''' Sets up a database connection and a DB-backed dictionary for 
@@ -190,7 +190,6 @@ class Task(wudb.DbAccess, cadoparams.UseParameters, metaclass=abc.ABCMeta):
         # Set default parametes for this task, if any are given
         self.params = self.myparams(self.paramnames)
         self.logger.debug("params = %s", self.params)
-        self.params.setdefault("remove", False)
         # Set default parameters for our programs
         self.progparams = []
         for prog in self.programs:
@@ -198,7 +197,7 @@ class Task(wudb.DbAccess, cadoparams.UseParameters, metaclass=abc.ABCMeta):
             self.progparams.append(progparams)
         self.logger.debug("Exit Task.__init__(%s)", self.name)
         return
-
+    
     @staticmethod
     def check_tablename(name):
         no_ = name.replace("_", "")
@@ -351,17 +350,29 @@ class Task(wudb.DbAccess, cadoparams.UseParameters, metaclass=abc.ABCMeta):
             return
         self.logger.debug("%s: Notification is for me", self.name)
         return identifier
+    
+    def send_notification(self, key, value):
+        """ Wrapper around Colleague.send_notification() that instantiates a
+        Notification with self as the sender
+        """
+        notification = Notification(self, key, value)
+        super().send_notification(notification)
+    
+    def send_request(self, key, *args):
+        """ Wrapper around Colleague.send_request() that instantiates a
+        Request with self as the sender
+        """
+        request = Request(self, key, *args)
+        return super().send_request(request)
+
 
 class ClientServerTask(Task, patterns.Observer):
     @abc.abstractproperty
     def paramnames(self):
         return super().paramnames + ("maxwu",)
     
-    def __init__(self, db_listener, registered_filenames, *args, **kwargs):
+    def __init__(self, db_listener, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.wuar = self.make_wu_access()
-        self.wuar.create_tables()
-        self.registered_filenames = registered_filenames
         self.db_listener = db_listener
         self.db_listener.subscribeObserver(self)
         self.state.setdefault("wu_submitted", 0)
@@ -381,35 +392,26 @@ class ClientServerTask(Task, patterns.Observer):
         wutext = command.make_wu(wuid)
         for filename in command.get_exec_files() + command.get_input_files():
             basename = os.path.basename(filename)
-            if not basename in self.registered_filenames:
-                self.logger.debug("Registering file name %s with target %s",
-                                  basename, filename)
-                self.registered_filenames.setdefault(basename, filename)
-            # If it was already defined with a different target, error
-            if not self.registered_filenames[basename] == filename:
-                raise Exception("Filename %s, to be registered for target %s, "
-                                "already registered for target %s" %
-                                (basename, filename, self.registered_filenames[basename]))
+            self.send_notification(Notification.REGISTER_FILENAME, {basename:filename})
         
         self.logger.info("Adding workunit %s to database", wuid)
-        # print ("WU:\n%s" % wutext)
-        self.wuar.create(wutext)
+        self.send_notification(Notification.SUBMIT_WU, wutext)
         self.state["wu_submitted"] += 1
     
     def verification(self, message, ok):
-        not_str = "ok"
         wuid = message.get_wu_id()
+        not_str = "ok"
         if not ok:
             not_str = "not ok"
         self.logger.info("Marking workunit %s as %s", wuid, not_str)
         assert self.get_number_outstanding_wus() >= 1
         # FIXME: these two should be updated atomically
         self.state["wu_received"] += 1
-        self.wuar.verification(message.get_wu_id(), ok)
+        self.send_notification(Notification.VERIFY_WU, {message.get_wu_id(): ok})
     
     def get_number_outstanding_wus(self):
         return self.state["wu_submitted"] - self.state["wu_received"]
-    
+
     def test_outputfile_exists(self, filename):
         # Can't test
         return False
@@ -441,11 +443,11 @@ class PolyselTask(ClientServerTask):
         super().__init__(*args, **kwargs)
         self.state["adnext"] = \
             max(self.state.get("adnext", 0), int(self.params.get("admin", 0)))
+        if not self.is_done():
+            self.send_notification(Notification.WANT_TO_RUN, None)
     
     def run(self):
-        if "bestpoly" in self.state and not self.need_more_wus() and \
-                self.get_number_outstanding_wus() == 0:
-            return
+        assert not self.is_done()
         self.logger.info("Starting")
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
@@ -475,6 +477,10 @@ class PolyselTask(ClientServerTask):
         self.logger.info("Finished, best polynomial from file %s has Murphy_E "
                          "= %g", self.state["bestfile"] , self.bestpoly.E)
         return
+    
+    def is_done(self):
+        return "bestpoly" in self.state and not self.need_more_wus() and \
+            self.get_number_outstanding_wus() == 0
     
     def updateObserver(self, message):
         identifier = self.filter_notification(message)
@@ -550,22 +556,21 @@ class FactorBaseOrFreerelTask(Task, metaclass=abc.ABCMeta):
     the polynomial, i.e., factorbase and freerel 
     """
     
-    def __init__(self, polyselect, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.polyselect = polyselect
         # Invariant: if we have a result (in self.state["outputfile"]) then we
         # must also have a polynomial (in self.state["poly"])
         if "outputfile" in self.state:
             assert "poly" in self.state
             # The target file must correspond to the polynomial "poly"
+        self.send_notification(Notification.WANT_TO_RUN, None)
     
     def run(self):
-        self.polyselect.run()
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
         
         # Get best polynomial found by polyselect
-        poly = self.polyselect.get_poly()
+        poly = self.send_request(Request.GET_POLYNOMIAL)
         if not poly:
             raise Exception("FactorBaseOrFreerelTask(): no polynomial "
                             "received from PolyselTask")
@@ -575,8 +580,7 @@ class FactorBaseOrFreerelTask(Task, metaclass=abc.ABCMeta):
             prevpoly = Polynomial(self.state["poly"].splitlines())
             if poly != prevpoly:
                 if "outputfile" in self.state:
-                    self.logger.info("Received different polynomial from %s, discarding old one",
-                                     self.polyselect.title)
+                    self.logger.info("Received different polynomial, discarding old one")
                     del(self.state["outputfile"])
                 self.state["poly"] = str(poly)
         else:
@@ -672,7 +676,7 @@ class FreeRelTask(FactorBaseOrFreerelTask):
     
     def get_nrels(self):
         return self.state["nfree"]
-    
+
 
 class SievingTask(ClientServerTask, FilesCreator):
     """ Does the sieving, uses client/server """
@@ -692,10 +696,8 @@ class SievingTask(ClientServerTask, FilesCreator):
     # We seek to this many bytes before the EOF to look for the "Total xxx reports" message
     file_end_offset = 1000
     
-    def __init__(self, polyselect, factorbase, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.polyselect = polyselect
-        self.factorbase = factorbase
         qmin = int(self.params.get("qmin", 0))
         if "qnext" in self.state:
             self.state["qnext"] = max(self.state["qnext"], qmin)
@@ -708,18 +710,17 @@ class SievingTask(ClientServerTask, FilesCreator):
         self.state["rels_wanted"] = max(self.state.get("rels_wanted", 0), 
                                         int(self.params.get("rels_wanted", 0)))
         if self.state["rels_wanted"] == 0:
-            # Choose sensible default value
+            # TODO: Choose sensible default value
             pass
+        self.send_notification(Notification.WANT_TO_RUN, None)
     
     def run(self):
-        self.polyselect.run()
-        self.factorbase.run()
         self.logger.info("Starting")
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
         
         # Get best polynomial found by polyselect
-        poly = self.polyselect.get_poly()
+        poly = self.send_request(Request.GET_POLYNOMIAL)
         if not poly:
             raise Exception("SievingTask(): no polynomial received")
         # Write polynomial to a file
@@ -735,7 +736,7 @@ class SievingTask(ClientServerTask, FilesCreator):
             kwargs["q0"] = str(q0)
             kwargs["q1"] = str(q1)
             kwargs["poly"] = polyfile
-            kwargs["factorbase"] = self.factorbase.get_filename()
+            kwargs["factorbase"] = self.send_request(Request.GET_FACTORBASE_FILENAME)
             kwargs["out"] = outputfile
             p = self.programs[0](None, kwargs)
             self.submit_command(p, "%d-%d" % (q0, q1))
@@ -783,8 +784,10 @@ class SievingTask(ClientServerTask, FilesCreator):
     def request_more_relations(self, additional):
         if additional > 0:
             self.state["rels_wanted"] += additional
-        self.logger.info("New goal for number of relations is %d",
-                         self.state["rels_wanted"])
+            self.logger.info("New goal for number of relations is %d",
+                             self.state["rels_wanted"])
+        if self.state["rels_wanted"] > self.state["rels_found"]:
+            self.send_notification(Notification.WANT_TO_RUN, None)
 
 
 class Duplicates1Task(Task, FilesCreator):
@@ -803,18 +806,18 @@ class Duplicates1Task(Task, FilesCreator):
         return super().paramnames + \
             ("nslices_log",)
     
-    def __init__(self, sieving, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.sieving = sieving
         self.nr_slices = 2**int(self.params["nslices_log"])
         self.already_split_input = self.make_db_dict(self.make_tablename("infiles"))
         self.slice_relcounts = self.make_db_dict(self.make_tablename("counts"))
         # Default slice counts to 0, in single DB commit
         self.slice_relcounts.setdefault(
             None, {str(i): 0 for i in range(0, self.nr_slices)})
+        self.send_notification(Notification.WANT_TO_RUN, None)
     
     def run(self):
-        self.sieving.run()
+        self.logger.info("Starting")
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
         
@@ -844,7 +847,8 @@ class Duplicates1Task(Task, FilesCreator):
         self.check_files_exist(self.get_output_filenames(), "output",
                                shouldexist=True)
         
-        newfiles = [f for f in self.sieving.get_output_filenames() 
+        siever_files = self.send_request(Request.GET_SIEVER_FILENAMES)
+        newfiles = [f for f in siever_files
                     if not f in self.already_split_input]
         self.logger.debug ("new files to split are: %s", newfiles)
         
@@ -868,7 +872,7 @@ class Duplicates1Task(Task, FilesCreator):
                     # having another copy of the data on disk. Since we don't
                     # process the file at all, we need to ask the Siever task
                     # for the relation count in this file
-                    current_counts = [self.sieving.get_nrels(f)]
+                    current_counts = [self.send_request(Request.GET_SIEVER_RELNUMBER, f)]
                 else:
                     # TODO: how to recover from existing output files?
                     # Simply re-split? Check whether they all exist and assume 
@@ -933,11 +937,13 @@ class Duplicates1Task(Task, FilesCreator):
     def get_nr_slices(self):
         return self.nr_slices
     
-    def get_slice_relcount(self, idx):
+    def get_nrels(self, idx):
         return self.slice_relcounts[str(idx)]
     
     def request_more_relations(self, additional):
-        self.sieving.request_more_relations(additional)
+        # TODO: Estimate how many more raw relations we need
+        self.send_notification(Notification.WANT_MORE_RELATIONS, additional)
+        self.send_notification(Notification.WANT_TO_RUN, None)
 
 class Duplicates2Task(Task, FilesCreator):
     """ Removes duplicate relations """
@@ -955,23 +961,22 @@ class Duplicates2Task(Task, FilesCreator):
         return super().paramnames + \
             ("nslices_log",)
     
-    def __init__(self, duplicates1, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.duplicates1 = duplicates1
         self.nr_slices = 2**int(self.params["nslices_log"])
         self.already_done_input = self.make_db_dict(self.make_tablename("infiles"))
         self.slice_relcounts = self.make_db_dict(self.make_tablename("counts"))
         self.slice_relcounts.setdefault(
             None, {str(i): 0 for i in range(0, self.nr_slices)})
+        self.send_notification(Notification.WANT_TO_RUN, None)
     
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
         
-        self.duplicates1.run()
         self.logger.info("Starting")
         for i in range(0, self.nr_slices):
-            files = self.duplicates1.get_output_filenames(i.__eq__)
+            files = self.send_request(Request.GET_DUP1_FILENAMES, i.__eq__)
             newfiles = [f for f in files if not f in self.already_done_input]
             if not newfiles:
                 self.logger.info("No new files for slice %d, nothing to do", i)
@@ -984,7 +989,7 @@ class Duplicates2Task(Task, FilesCreator):
             # FIXME: Should we delete the files, too?
             self.forget_output_filenames(self.get_output_filenames(i.__eq__))
             del(self.slice_relcounts[str(i)])
-            rel_count = self.duplicates1.get_slice_relcount(i)
+            rel_count = self.send_request(Request.GET_DUP1_RELCOUNT, i)
             basedir = self.make_output_dirname()
             self.make_directories(basedir, str(i))
             kwargs = self.progparams[0].copy()
@@ -1000,7 +1005,7 @@ class Duplicates2Task(Task, FilesCreator):
             self.add_output_files(outfilenames)
             self.logger.info("%d unique relations remain on slice %d", nr_rels, i)
             self.slice_relcounts[str(i)] = nr_rels
-        self.logger.info("%d unique relations remain in total", self.get_relcount())
+        self.logger.info("%d unique relations remain in total", self.get_nrels())
         self.logger.debug("Exit Duplicates2Task.run(" + self.name + ")")
     
     def make_output_filename(self, f, i):
@@ -1015,7 +1020,7 @@ class Duplicates2Task(Task, FilesCreator):
                 return int(match.group(1))
         raise Exception("Received no value for remaining relation count")
 
-    def get_relcount(self):
+    def get_nrels(self):
         nrels = 0
         for i in range(0, self.nr_slices):
             nrels += self.slice_relcounts[str(i)]
@@ -1023,7 +1028,8 @@ class Duplicates2Task(Task, FilesCreator):
 
     def request_more_relations(self, additional):
         # TODO: Estimate how many more raw relations we need
-        self.duplicates1.request_more_relations(additional)
+        self.send_notification(Notification.WANT_MORE_RELATIONS, additional)
+        self.send_notification(Notification.WANT_TO_RUN, None)
 
 
 class PurgeTask(Task):
@@ -1042,54 +1048,55 @@ class PurgeTask(Task):
         return super().paramnames + \
             ("keep", ) + Polynomial.paramnames
     
-    # purge -poly c59.poly -keep 160 -nrels 226167 -out c59.purged.gz -npthr 1x1 -basepath /tmp/cado.wNhDsCM6BS -subdirlist c59.subdirlist -filelist c59.filelist
-    
-    def __init__(self, polyselect, freerel, duplicates2, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.polyselect = polyselect
-        self.freerel = freerel
-        self.duplicates2 = duplicates2
+        self.send_notification(Notification.WANT_TO_RUN, None)
     
     def run(self):
-        self.freerel.run()
-        self.duplicates2.run()
         self.logger.info("Starting")
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
         
-        while not "purgedfile" in self.state:
-            poly = self.polyselect.get_poly()
-            polyfile = self.make_output_filename("poly")
-            poly.create_file(polyfile, self.params)
-            nfree = self.freerel.get_nrels()
-            nunique = self.duplicates2.get_relcount()
-            nrels = nfree + nunique
-            self.logger.info("Reading %d unique and %d free relations, total %d"
-                             % (nunique, nfree, nrels))
-            if not nrels:
-                raise Exception("No relation count received from %s", self.duplicates2.title)
-            purgedfile = self.make_output_filename("purged.gz")
-            args = self.duplicates2.get_output_filenames() + [self.freerel.get_filename()]
-            kwargs = self.progparams[0].copy()
-            kwargs["poly"] = polyfile
-            kwargs["keep"] = self.params["keep"]
-            kwargs["nrels"] = str(nrels)
-            kwargs["out"] = purgedfile
-            p = self.programs[0](args, kwargs)
-            (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
-            if self.parse_stderr(stderr):
-                [nrows, weight, excess] = self.parse_stdout(stdout)
-                self.logger.info("After purge, %d relations remain with weight %s and excess %s"
-                                 % (nrows, weight, excess))
-                self.state["purgedfile"] = purgedfile
-            else:
-                self.request_more_relations(int(self.duplicates2.get_relcount() * 0.1))
-                self.duplicates2.run()
+        if "purgedfile" in self.state:
+            self.logger.info("Already have purged file")
+            return
+        
+        poly = self.send_request(Request.GET_POLYNOMIAL)
+        polyfile = self.make_output_filename("poly")
+        poly.create_file(polyfile, self.params)
+        nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
+        nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
+        if not nunique:
+            raise Exception("No unique relation count received")
+        nrels = nfree + nunique
+        self.logger.info("Reading %d unique and %d free relations, total %d"
+                         % (nunique, nfree, nrels))
+        purgedfile = self.make_output_filename("purged.gz")
+        freerel_filename = self.send_request(Request.GET_FREEREL_FILENAME)
+        unique_filenames = self.send_request(Request.GET_UNIQUE_FILENAMES)
+        args = unique_filenames + [freerel_filename]
+        kwargs = self.progparams[0].copy()
+        kwargs["poly"] = polyfile
+        kwargs["keep"] = self.params["keep"]
+        kwargs["nrels"] = str(nrels)
+        kwargs["out"] = purgedfile
+        p = self.programs[0](args, kwargs)
+        (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
+        if self.parse_stderr(stderr):
+            [nrows, weight, excess] = self.parse_stdout(stdout)
+            self.logger.info("After purge, %d relations remain with weight %s and excess %s"
+                             % (nrows, weight, excess))
+            self.state["purgedfile"] = purgedfile
+            self.send_notification(Notification.HAVE_ENOUGH_RELATIONS, None)
+        else:
+            self.logger.info("Not enough relations, requesting more")
+            self.request_more_relations(int(nunique * 0.1))
         self.logger.debug("Exit PurgeTask.run(" + self.name + ")")
     
     def request_more_relations(self, additional):
         # TODO: Estimate how many more unique relations we need
-        self.duplicates2.request_more_relations(additional)
+        self.send_notification(Notification.WANT_MORE_RELATIONS, additional)
+        self.send_notification(Notification.WANT_TO_RUN, None)
     
     def get_purged_filename(self):
         return self.state["purgedfile"]
@@ -1101,7 +1108,6 @@ class PurgeTask(Task):
         for line in stderr.decode("ascii").splitlines():
             if re.match("excess < \d+.\d+ \* #primes", line) or \
                     re.match("number of relations <= number of ideals", line):
-                self.logger.info("not enough relations")
                 return False
         return True
     
@@ -1141,16 +1147,15 @@ class MergeTask(Task):
         return super().paramnames + \
             ("skip", "forbw", "coverNmax", "keep", "maxlevel", "ratio")
     
-    def __init__(self, purge, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.purge = purge
+        self.send_notification(Notification.WANT_TO_RUN, None)
 
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
         
         if not "mergedfile" in self.state:
-            self.purge.run()
             self.logger.info("Starting")
             if "indexfile" in self.state:
                 del(self.state["indexfile"])
@@ -1159,10 +1164,11 @@ class MergeTask(Task):
             if "densefile" in self.state:
                 del(self.state["densefile"])
             
+            purged_filename = self.send_request(Request.GET_PURGED_FILENAME)
             historyfile = self.make_output_filename("history")
             args = ()
             kwargs = self.progparams[0].copy()
-            kwargs["mat"] = self.purge.get_purged_filename()
+            kwargs["mat"] = purged_filename
             kwargs["out"] = historyfile
             p = self.programs[0](args, kwargs)
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
@@ -1172,7 +1178,7 @@ class MergeTask(Task):
             args = ()
             kwargs = self.progparams[1].copy()
             kwargs["binary"] = "1"
-            kwargs["purged"] = self.purge.get_purged_filename()
+            kwargs["purged"] = purged_filename
             kwargs["history"] = historyfile
             kwargs["index"] = indexfile
             kwargs["out"] = mergedfile
@@ -1217,20 +1223,19 @@ class LinAlgTask(Task):
         return super().paramnames + \
             ()
     # bwc.pl :complete seed=1 thr=1x1 mpi=1x1 matrix=c59.small.bin nullspace=left mm_impl=bucket interleaving=0 interval=100 mn=64 wdir=c59.bwc shuffled_product=1 bwc_bindir=/localdisk/kruppaal/build/cado-nfs/normal/linalg/bwc
-    def __init__(self, merge, *args, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.merge = merge
+        self.send_notification(Notification.WANT_TO_RUN, None)
     
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
         
         if not "dependency" in self.state:
-            self.merge.run()
             self.logger.info("Starting")
             workdir = self.make_output_dirname()
             self.make_directories(workdir)
-            mergedfile = self.merge.get_merged_filename()
+            mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
             args = ()
             kwargs = self.progparams[0].copy()
             kwargs["complete"] = "1"
@@ -1269,29 +1274,25 @@ class CharactersTask(Task):
         return super().paramnames + \
             Polynomial.paramnames
 
-    def __init__(self, polyselect, purge, merge, linalg, *args, **kwargs):
-        self.polyselect = polyselect
-        self.purge = purge
-        self.merge = merge
-        self.linalg = linalg
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.send_notification(Notification.WANT_TO_RUN, None)
     
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
         
         if not "kernel" in self.state:
-            self.linalg.run()
             self.logger.info("Starting")
             polyfilename = self.make_output_filename("poly")
-            poly = self.polyselect.get_poly()
+            poly = self.send_request(Request.GET_POLYNOMIAL)
             poly.create_file(polyfilename, self.params)
             kernelfilename = self.make_output_filename("kernel")
             
-            purgedfilename = self.purge.get_purged_filename()
-            indexfilename = self.merge.get_index_filename()
-            densefilename = self.merge.get_dense_filename()
-            dependencyfilename = self.linalg.get_dependency_filename()
+            purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
+            indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
+            densefilename = self.send_request(Request.GET_DENSE_FILENAME)
+            dependencyfilename = self.send_request(Request.GET_DEPENDENCY_FILENAME)
             
             args = ()
             kwargs = self.progparams[0].copy()
@@ -1330,30 +1331,25 @@ class SqrtTask(Task):
         return super().paramnames + \
             ("N",)
     
-    def __init__(self, polyselect, freerel, purge, merge, linalg, characters, *args, **kwargs):
-        self.polyselect = polyselect
-        self.freerel = freerel
-        self.purge = purge
-        self.merge = merge
-        self.linalg = linalg
-        self.characters = characters
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.factors = self.make_db_dict(self.make_tablename("factors"))
         self.add_factor(int(self.params["N"]))
+        self.send_notification(Notification.WANT_TO_RUN, None)
     
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
         if not self.is_done():
-            self.characters.run()
             self.logger.info("Starting")
             polyfilename = self.make_output_filename("poly")
-            poly = self.polyselect.get_poly()
+            poly = self.send_request(Request.GET_POLYNOMIAL)
             poly.create_file(polyfilename, self.params)
-            purgedfilename = self.purge.get_purged_filename()
-            indexfilename = self.merge.get_index_filename()
-            kernelfilename = self.characters.get_kernel_filename()
-            prefix = self.linalg.get_prefix()
+            
+            purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
+            indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
+            kernelfilename = self.send_request(Request.GET_KERNEL_FILENAME)
+            prefix = self.send_request(Request.GET_LINALG_PREFIX)
             args = ()
             kwargs = self.progparams[0].copy()
             kwargs["ab"] = "1"
@@ -1510,10 +1506,9 @@ class StartClientsTask(Task):
         match = re.match("@(.*)", self.params["hostnames"])
         if match:
             with open(match.group(1)) as f:
-                self.launch_hosts(f)
+                self.hosts_to_launch = [line for line in f]
         else:
-            hosts = map(str.strip, self.params["hostnames"].split(","))
-            self.launch_hosts(hosts)
+            self.hosts_to_launch = self.params["hostnames"].split(",")
     
     def is_alive(self, clientid):
         # Simplistic: just test if process with that pid exists and accepts
@@ -1522,8 +1517,8 @@ class StartClientsTask(Task):
         (rc, stdout, stderr) = self.kill_client(clientid, signal=0)
         return (rc == 0)
     
-    def launch_hosts(self, hosts):
-        for host in hosts:
+    def launch_clients(self):
+        for host in self.hosts_to_launch:
             self.launch_host(host.strip())
         s = ", ".join(["%s (Host %s, PID %d)" % (cid, self.hosts[cid], self.pids[cid]) for cid in self.pids])
         self.logger.info("Launched clients: %s" % s)
@@ -1593,85 +1588,289 @@ class StartClientsTask(Task):
         process = cadocommand.RemoteCommand(kill, host, self.parameters, self.path_prefix)
         return process.wait()
 
+class Message(object, metaclass = abc.ABCMeta):
+    def __init__(self, sender, key, value):
+        self.sender = sender
+        self.key = key
+        self.value = value
+    def get_sender(self):
+        return self.sender
+    def get_key(self):
+        return self.key
+    def get_value(self):
+        return self.value
 
-# FIXME: Is this a Task object? Probably not
-# Should this be in cadotask or in cadofactor? Probably cadotask
-class CompleteFactorization(wudb.DbAccess):
+class Notification(Message):
+    FINISHED_POLYNOMIAL_SELECTION = 0
+    WANT_MORE_RELATIONS = 1
+    HAVE_ENOUGH_RELATIONS = 2
+    REGISTER_FILENAME = 3
+    SUBMIT_WU = 4
+    VERIFY_WU = 5
+    WANT_TO_RUN = 6
+
+class Request(Message):
+    GET_POLYNOMIAL = 0
+    GET_FACTORBASE_FILENAME = 1
+    GET_FREEREL_FILENAME = 2
+    GET_FREEREL_RELCOUNT = 3
+    GET_SIEVER_FILENAMES = 4
+    GET_SIEVER_RELCOUNT = 5
+    GET_DUP1_FILENAMES = 6
+    GET_DUP1_RELCOUNT = 7
+    GET_UNIQUE_RELCOUNT = 8
+    GET_UNIQUE_FILENAMES = 9
+    GET_PURGED_FILENAME = 10
+    GET_MERGED_FILENAME = 11
+    GET_INDEX_FILENAME = 12
+    GET_DENSE_FILENAME = 13
+    GET_DEPENDENCY_FILENAME = 14
+    GET_LINALG_PREFIX = 15
+    GET_KERNEL_FILENAME = 16
+    def __init__(self, sender, key, value = None):
+        super().__init__(sender, key, value)
+
+
+class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Mediator):
     """ The complete factorization, aggregate of the individual tasks """
     """ Runs the square root """
     @property
     def name(self):
-        return "factorization"
-    @property
-    def title(self):
-        return "Factorization"
-    @property
-    def programs(self):
-        return ()
-    @property
-    def paramnames(self):
-        return super().paramnames
+        return "tasks"
+
+    CAN_CANCEL_WUS = 0
     
-    def __init__ (self, parameters, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        parampath = ["tasks"]
-        self.params = parameters.myparams(("name", "workdir"), "tasks")
+    def __init__ (self, path_prefix, *args, **kwargs):
+        super().__init__(*args, path_prefix = path_prefix, **kwargs)
+        self.logger = logging.getLogger("Complete Factorization")
+        self.params = self.myparams(("name", "workdir"))
         self.db_listener = self.make_db_listener()
-        registered_filenames = self.make_db_dict(self.params["name"] + '_server_registered_filenames')
+        self.registered_filenames = self.make_db_dict(self.params["name"] + '_server_registered_filenames')
+        self.chores = []
+        self.tasks_that_want_to_run = []
         
         # Init WU DB
-        wuar = self.make_wu_access()
-        wuar.create_tables()
-        del(wuar)
+        self.wuar = self.make_wu_access()
+        self.wuar.create_tables()
         
         # Set up WU server
         serveraddress = "localhost"
         serverport = 8001
         uploaddir = self.params["workdir"].rstrip(os.sep) + os.sep + self.params["name"] + ".upload/"
         self.server = wuserver.ServerLauncher(serveraddress, serverport, False, self.get_db_filename(), 
-            registered_filenames, uploaddir, bg = True)
-        self.server.serve()
+            self.registered_filenames, uploaddir, bg = True)
         
+        # Init client lists
+        self.clients = []
+        for (path, key) in self.get_parameters().find(['slaves'], 'hostnames'):
+            self.clients.append(StartClientsTask(serveraddress, serverport, *args, 
+                                                 mediator = self,
+                                                 path_prefix = path, **kwargs))
+        
+        parampath = self.get_param_path()
         sievepath = parampath + ['sieve']
         filterpath = parampath + ['filter']
         linalgpath = parampath + ['linalg']
         
-        # Start clients
-        self.clients = []
-        for (path, key) in parameters.find(['slaves'], 'hostnames'):
-            self.clients.append(StartClientsTask(serveraddress, serverport, *args, parameters = parameters, path_prefix = path, **kwargs))
-        
-        self.polysel = PolyselTask(*args, 
-            parameters = parameters, path_prefix = parampath, db_listener = self.db_listener,
-            registered_filenames = registered_filenames, **kwargs)
-        self.fb = FactorBaseTask(self.polysel, *args, parameters = parameters, path_prefix = sievepath, 
-                                 **kwargs)
-        self.freerel = FreeRelTask(self.polysel, *args, parameters = parameters, path_prefix = sievepath,
+        self.polysel = PolyselTask(*args,
+                                   mediator = self,
+                                   path_prefix = parampath,
+                                   db_listener = self.db_listener,
                                    **kwargs)
-        self.sieving = SievingTask(
-            self.polysel, self.fb, *args, parameters = parameters, path_prefix = sievepath, 
-            db_listener = self.db_listener,
-            registered_filenames = registered_filenames, **kwargs)
-        self.dup1 = Duplicates1Task(self.sieving, *args, parameters = parameters, path_prefix = filterpath,
-                                    **kwargs)
-        self.dup2 = Duplicates2Task(self.dup1, *args, parameters = parameters, path_prefix = filterpath,
-                                    **kwargs)
-        self.purge = PurgeTask(self.polysel, self.freerel, self.dup2,
-                               *args, parameters = parameters, path_prefix = filterpath, **kwargs)
-        self.merge = MergeTask(self.purge, *args, parameters = parameters, path_prefix = filterpath, 
-                               **kwargs)
-        self.linalg = LinAlgTask(self.merge, *args, parameters = parameters, path_prefix = linalgpath, 
+        self.fb = FactorBaseTask(*args,
+                                 mediator = self,
+                                 path_prefix = sievepath, 
                                  **kwargs)
-        self.characters = CharactersTask(self.polysel, self.purge, self.merge,
-                                         self.linalg, *args, parameters = parameters, path_prefix = linalgpath, **kwargs)
-        self.sqrt = SqrtTask(
-            self.polysel, self.freerel, self.purge,
-                             self.merge, self.linalg, self.characters,
-                             *args, parameters = parameters, path_prefix = parampath, **kwargs)
+        self.freerel = FreeRelTask(*args,
+                                   mediator = self,
+                                   path_prefix = sievepath,
+                                   **kwargs)
+        self.sieving = SievingTask(*args,
+                                   mediator = self,
+                                   path_prefix = sievepath,
+                                   db_listener = self.db_listener,
+                                   **kwargs)
+        self.dup1 = Duplicates1Task(*args,
+                                    mediator = self,
+                                    path_prefix = filterpath,
+                                    **kwargs)
+        self.dup2 = Duplicates2Task(*args,
+                                    mediator = self,
+                                    path_prefix = filterpath,
+                                    **kwargs)
+        self.purge = PurgeTask(*args,
+                               mediator = self,
+                               path_prefix = filterpath,
+                               **kwargs)
+        self.merge = MergeTask(*args,
+                               mediator = self,
+                               path_prefix = filterpath, 
+                               **kwargs)
+        self.linalg = LinAlgTask(*args,
+                                 mediator = self,
+                                 path_prefix = linalgpath, 
+                                 **kwargs)
+        self.characters = CharactersTask(*args,
+                                         mediator = self,
+                                         path_prefix = linalgpath,
+                                         **kwargs)
+        self.sqrt = SqrtTask(*args,
+                             mediator = self,
+                             path_prefix = parampath,
+                             **kwargs)
+        
+        # Defines an order on tasks in which tasks that want to run should be run
+        self.tasks = (self.polysel, self.fb, self.freerel, self.sieving,
+                      self.dup1, self.dup2, self.purge, self.merge,
+                      self.linalg, self.characters, self.sqrt)
     
-    def run(self, *args, **kwargs):
-        self.sqrt.run(*args, **kwargs)
-        self.server.shutdown()
+        self.request_map = {
+            Request.GET_POLYNOMIAL: self.polysel.get_poly,
+            Request.GET_FACTORBASE_FILENAME: self.fb.get_filename,
+            Request.GET_FREEREL_FILENAME: self.freerel.get_filename,
+            Request.GET_FREEREL_RELCOUNT: self.freerel.get_nrels,
+            Request.GET_SIEVER_FILENAMES: self.sieving.get_output_filenames,
+            Request.GET_SIEVER_RELCOUNT: self.sieving.get_nrels,
+            Request.GET_DUP1_FILENAMES: self.dup1.get_output_filenames,
+            Request.GET_DUP1_RELCOUNT: self.dup1.get_nrels,
+            Request.GET_UNIQUE_RELCOUNT: self.dup2.get_nrels,
+            Request.GET_UNIQUE_FILENAMES: self.dup2.get_output_filenames,
+            Request.GET_PURGED_FILENAME: self.purge.get_purged_filename,
+            Request.GET_MERGED_FILENAME: self.merge.get_merged_filename,
+            Request.GET_INDEX_FILENAME: self.merge.get_index_filename,
+            Request.GET_DENSE_FILENAME: self.merge.get_dense_filename,
+            Request.GET_DEPENDENCY_FILENAME: self.linalg.get_dependency_filename,
+            Request.GET_LINALG_PREFIX: self.linalg.get_prefix,
+            Request.GET_KERNEL_FILENAME: self.characters.get_kernel_filename
+        }
+    
+    def run(self):
+        self.server.serve()
+        
+        for clients in self.clients:
+            clients.launch_clients()
+        
+        while self.run_next_task():
+            self.do_chores()
+        
+        self.do_chores()
+        
         for c in self.clients:
             c.kill_all_clients()
         
+        self.server.shutdown()
+    
+    def run_next_task(self):
+        for task in self.tasks:
+            if task in self.tasks_that_want_to_run:
+                self.logger.info("Next task that wants to run: %s", task.title)
+                self.tasks_that_want_to_run.remove(task)
+                task.run()
+                return True
+        return False
+    
+    def do_chores(self):
+        if self.chores:
+            chore = self.chores.pop()
+            if chore == self.CAN_CANCEL_WUS:
+                self.logger.info("Cancelling remaining workunits")
+                self.cancel_available_wus()
+            else:
+                raise Exception("Unknown chore %s" % chore)
+    
+    def add_wu(self, wutext):
+        # print ("WU:\n%s" % wutext)
+        self.wuar.create(wutext)
+    
+    def verify_wu(self, wuinfo):
+        for wuid in wuinfo:
+            self.wuar.verification(wuid, wuinfo[wuid])
+    
+    def cancel_available_wus(self):
+        self.wuar.cancel_all_available()
+    
+    def register_filename(self, d):
+        for key in d:
+            if not key in self.registered_filenames:
+                self.logger.debug("Registering file name %s with target %s",
+                                  key, d[key])
+                self.registered_filenames[key] = d[key]
+            elif d[key] != self.registered_filenames[key]:
+                # It was already defined with a different target, error
+                raise Exception("Filename %s, to be registered for target %s, "
+                                "already registered for target %s" %
+                                (key, d[key], self.registered_filenames[key]))
+            else:
+                # Was already registered with the same target. Nothing to do
+                pass
+    
+    def relay_notification(self, message):
+        assert isinstance(message, Notification)
+        sender = message.get_sender()
+        key = message.get_key()
+        value = message.get_value()
+        self.logger.debug("Received notification from %s, key = %s, values = %s",
+                           sender, key, value)
+        """ The relay for letting Tasks talk to us and each other """
+        if key == Notification.WANT_MORE_RELATIONS:
+            if sender is self.purge:
+                self.dup2.request_more_relations(value)
+            elif sender is self.dup2:
+                self.dup1.request_more_relations(value)
+            elif sender is self.dup1:
+                self.sieving.request_more_relations(value)
+            else:
+                raise Exception("Got WANT_MORE_RELATIONS from unknown sender")
+        elif key == Notification.HAVE_ENOUGH_RELATIONS:
+            if sender is self.purge:
+                # TODO: cancel only sieving WUs?
+                self.chores.append(self.CAN_CANCEL_WUS)
+            else:
+                raise Exception("Got HAVE_ENOUGH_RELATIONS from unknown sender")
+        elif key == Notification.REGISTER_FILENAME:
+            if isinstance(sender, ClientServerTask):
+                self.register_filename(value)
+            else:
+              raise Exception("Got REGISTER_FILENAME, but not from a ClientServerTask")
+        elif key == Notification.SUBMIT_WU:
+            if isinstance(sender, ClientServerTask):
+                self.add_wu(value)
+            else:
+              raise Exception("Got SUBMIT_WU, but not from a ClientServerTask")
+        elif key == Notification.VERIFY_WU:
+            if isinstance(sender, ClientServerTask):
+                self.verify_wu(value)
+            else:
+              raise Exception("Got VERIFY_WU, but not from a ClientServerTask")
+        elif key == Notification.WANT_TO_RUN:
+            if sender in self.tasks_that_want_to_run:
+                raise Exception("Got request from %s to run, but it was in run queue already",
+                                sender)
+            else:
+                self.tasks_that_want_to_run.append(sender)
+        else:
+            raise KeyError("Notification from %s has unknown key %s" % (sender, key))
+    
+    def answer_request(self, request):
+        assert isinstance(request, Request)
+        sender = request.get_sender()
+        key = request.get_key()
+        value = request.get_value()
+        self.logger.debug("Received request from %s, key = %s, values = %s",
+                           sender, key, value)
+        if key in self.request_map:
+            if value is None:
+                return self.request_map[key]()
+            else:
+                return self.request_map[key](value)
+        else:
+            raise KeyError("Unknown Request key %s from sender %s" %
+                           (str(key), str(sender)))
+    
+    def handle_message(self, message):
+        if isinstance(message, Notification):
+            self.relay_notification(Notification)
+        elif isinstance(message, Request):
+            return self.answer_request(message)
+        else:
+            raise TypeError("Message is neither Notification nor Request")
