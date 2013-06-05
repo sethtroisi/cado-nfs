@@ -41,5 +41,5 @@ if __name__ == '__main__':
     logger.addHandler(cadologger.FileHandler(filename = logfilename, lvl = logging.DEBUG))
     
     wudb_file = tasksparams["workdir"] + os.sep + tasksparams["name"] + ".db"
-    factorjob = cadotask.CompleteFactorization(db=wudb_file, parameters = parameters)
+    factorjob = cadotask.CompleteFactorization(db=wudb_file, parameters = parameters, path_prefix = [])
     factorjob.run()
