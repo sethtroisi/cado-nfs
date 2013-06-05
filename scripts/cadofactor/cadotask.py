@@ -409,6 +409,9 @@ class ClientServerTask(Task, patterns.Observer):
     
     def get_number_outstanding_wus(self):
         return self.state["wu_submitted"] - self.state["wu_received"]
+
+    def cancel_available_wus(self):
+        self.wuar.cancel_all_available()
     
     def test_outputfile_exists(self, filename):
         # Can't test
@@ -708,7 +711,7 @@ class SievingTask(ClientServerTask, FilesCreator):
         self.state["rels_wanted"] = max(self.state.get("rels_wanted", 0), 
                                         int(self.params.get("rels_wanted", 0)))
         if self.state["rels_wanted"] == 0:
-            # Choose sensible default value
+            # TODO: Choose sensible default value
             pass
     
     def run(self):
@@ -781,7 +784,10 @@ class SievingTask(ClientServerTask, FilesCreator):
             return self.output_files[filename]
     
     def request_more_relations(self, additional):
-        if additional > 0:
+        if additional is None:
+            self.logger.info("No more relations needed. Cancelling remaining WUs.")
+            self.cancel_available_wus()
+        elif additional > 0:
             self.state["rels_wanted"] += additional
         self.logger.info("New goal for number of relations is %d",
                          self.state["rels_wanted"])
@@ -937,7 +943,11 @@ class Duplicates1Task(Task, FilesCreator):
         return self.slice_relcounts[str(idx)]
     
     def request_more_relations(self, additional):
-        self.sieving.request_more_relations(additional)
+        if additional is None:
+            self.sieving.request_more_relations(None)
+        else:
+            # TODO: Estimate how many more raw relations we need
+            self.sieving.request_more_relations(additional)
 
 class Duplicates2Task(Task, FilesCreator):
     """ Removes duplicate relations """
@@ -1022,8 +1032,11 @@ class Duplicates2Task(Task, FilesCreator):
         return nrels
 
     def request_more_relations(self, additional):
-        # TODO: Estimate how many more raw relations we need
-        self.duplicates1.request_more_relations(additional)
+        if additional is None:
+            self.duplicates1.request_more_relations(None)
+        else:
+            # TODO: Estimate how many more raw relations we need
+            self.duplicates1.request_more_relations(additional)
 
 
 class PurgeTask(Task):
@@ -1041,8 +1054,6 @@ class PurgeTask(Task):
     def paramnames(self):
         return super().paramnames + \
             ("keep", ) + Polynomial.paramnames
-    
-    # purge -poly c59.poly -keep 160 -nrels 226167 -out c59.purged.gz -npthr 1x1 -basepath /tmp/cado.wNhDsCM6BS -subdirlist c59.subdirlist -filelist c59.filelist
     
     def __init__(self, polyselect, freerel, duplicates2, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -1082,6 +1093,7 @@ class PurgeTask(Task):
                 self.logger.info("After purge, %d relations remain with weight %s and excess %s"
                                  % (nrows, weight, excess))
                 self.state["purgedfile"] = purgedfile
+                self.request_more_relations(None)
             else:
                 self.request_more_relations(int(self.duplicates2.get_relcount() * 0.1))
                 self.duplicates2.run()
