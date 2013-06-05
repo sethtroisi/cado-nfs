@@ -10,6 +10,7 @@
 #include "misc.h"
 #include "timing.h"
 #include "math.h"
+#include "typedefs.h"
 
 struct __renumber_t
 {
