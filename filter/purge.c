@@ -95,6 +95,7 @@ typedef struct {
   unsigned int num, end;
 } fr_t;
 
+
 /* Main variables */
 static char antebuffer[PATH_MAX];         /* "directory/antebuffer" or "cat" */
 static char rep_cado[PATH_MAX];           /* directory of cado */
@@ -102,7 +103,7 @@ static char rep_cado[PATH_MAX];           /* directory of cado */
 static index_t **rel_compact  = NULL; /* see above */
 
 #define DECR_SATURATED_WEIGHT(o,n) if (*o < UMAX(*o) && !(--(*o))) n--;
-uint8_t *ideals_weight = NULL;
+weight_t *ideals_weight = NULL;
 
 index_t *newindex;
 
@@ -129,8 +130,8 @@ static uint64_t nrelmax = 0,
 static int raw = 0;
 static unsigned int npt = 4;
 static float w_ccc;
-static uint8_t binfilerel;    /* True (1) if a rel_used relations file must be read */
-static uint8_t boutfilerel;   /* True (1) if a rel_used relations file must be written */
+static uint8_t binfilerel; /* True (1) if a rel_used file must be read */
+static uint8_t boutfilerel;/* True (1) if a rel_used file must be written */
 
 #ifdef FOR_DL
 static FILE *ofile2;
@@ -218,36 +219,22 @@ static const struct timespec wait_classical = { 0, 1<<21 };
 
 typedef struct {
   index_t h;
-  uint8_t e;
+  exponent_t e;
 } prime_t;
 
 typedef struct {
   int64_t a;
   uint64_t b;
-  prime_t *primes;
+  prime_t *primes; /*if nb<=NB_PRIME_OPT, contains the address of primes_data*/
   prime_t primes_data[NB_PRIMES_OPT];
-  uint8_t nb;           /* number of primes */
-  uint8_t nb_alloc;     /* allocated space for primes */
-  uint8_t nb_above_min_index; /*nb of primes above min_index, is less than nb*/
+  weight_t nb;           /* number of primes */
+  weight_t nb_alloc;     /* allocated space for primes */
+  weight_t nb_above_min_index; /* nb of primes above min_index, must be <=nb */
   index_t num;          /* Relation number */
-
-  //index_t *hk;          /* The renumbers of primes in the rel. */
-  //relation_t rel;    /* Relation itself */
-  //unsigned int lhk;  /* Actual number of hk */
-  //unsigned int mhk;  /* Size max of the local hk; after free + malloc again */
-  //unsigned int ltmp; /* Size of renumbers for rel_compact */
 } buf_rel_t;
 
 
 static buf_rel_t *buf_rel;
-/*
-typedef struct {
-  rat_prime_t rp[NB_RATP_OPT];
-  alg_prime_t ap[NB_ALGP_OPT];
-  index_t hk[NB_HK_OPT];
-} buf_rel_data_t;
-static buf_rel_data_t *buf_rel_data;
-*/
 
 /* For the multithread sync */
 static volatile unsigned long cpt_rel_a;
@@ -269,38 +256,6 @@ static volatile unsigned int end_insertRelation = 0;
     return 0;
   }
 #endif
-
-/* Be careful. 1<<13 = 8µs; in fact, about 30-50 µs at least
-   with a very reactive machine. Use for debugging only.
-*/
-inline void attente_minimale_passive ()
-{
-  static const struct timespec wait_min = { 0, 1<<13 };
-  nanosleep(&wait_min, NULL);
-}
-
-/* Don't use it, it's a CPU waste. */
-inline void attente_minimale_active ()
-{
-  /* about 1 (for a nehalem 3 Ghz) to 5 µs */
-  unsigned int i = (1<<6);
-  while (i--)
-    __asm__ volatile ( "\
-nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
-nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
-nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
-nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
-nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
-nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
-nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
-nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
-nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
-nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
-nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
-nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
-nop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\nnop\t\n\
-" : : );
-}
 
 /********************** own memory allocation routines ***********************/
 
@@ -358,13 +313,10 @@ my_malloc_free_all (void)
 
 /* Print the relation 'rel' in matrix format, i.e., a line of the form:
 
-   i a b k t_1 t_2 ... t_k
+   a,b:t_1,t_2,...,t_k
 
-   i (decimal) is the row index from the nodup file (starting at 0)
    a (signed decimal) is a
    b (nonnegative decimal) is b
-   k (nonnegative decimal) is the number of rational and algebraic ideals in
-     the relation
    t_1 ... t_k (hexadecimal) are the indices of the ideals (starting at 0)
 
    Return the weight of the relation.
@@ -383,7 +335,7 @@ fprint_rel_row (FILE *file, buf_rel_t *my_buf_rel)
   size_t t;
   unsigned int i, j;
   index_t h;
-  uint8_t e;
+  exponent_t e;
 
   p = d64toa10(buf, my_buf_rel->a);
   *p++ = ',';
@@ -410,16 +362,10 @@ fprint_rel_row (FILE *file, buf_rel_t *my_buf_rel)
   return nb_coeff;
 }
 
-/* First we count the number of large primes; then we store all primes in
-   the hash table, but not in the relations. This might end up with singletons
-   here and there, but we don't care, since they will be dealt with in
-   merge.
-
-   Meaning of the different parameters:
-   minpr, minpa: only ideals > minpr (resp. minpa) are considered on the
-                 rational (resp. algebraic) side. This means that the output
-                 might contain ideals <= minpr or minpa appearing only once.
-*/
+ /* Write relation j from buffer to rel_compact
+    We put in rel_compact only primes such that their index h is greater or
+    equal to min_index
+ */
 
 static inline void
 insertNormalRelation (unsigned int j)
@@ -441,7 +387,7 @@ insertNormalRelation (unsigned int j)
       ideals_weight[h] = 1;
       nprimes++;
     }
-    else if (ideals_weight[h] != UMAX (uint8_t))
+    else if (ideals_weight[h] != UMAX (weight_t))
       ideals_weight[h]++;
 
     if (!boutfilerel && h >= min_index)
@@ -456,9 +402,9 @@ insertNormalRelation (unsigned int j)
 }
 
 /* Delete a relation: set rel_used[i] to 0, update the count of primes
-   in that relation, and set rel_compact[i] to NULL.
+   in that relation.
    Warning: we only update the count of primes that we consider, i.e.,
-   rational primes >= minpr and algebraic primes >= minpa.
+   primes with index >= min_index.
 */
 static void
 delete_relation (index_t i)
@@ -477,12 +423,16 @@ delete_relation (index_t i)
   bit_vector_clearbit(rel_used, (size_t) i);
 }
 
-/* New pruning code, which optimizes the decrease of N*W where N is the number
-   of rows, and W is the total weight. We consider the connected
-   components of the relation R(i1,i2) iff i1 and i2 share a prime
-   of weight 2. If we remove one component of n rows and total weight w,
-   then we save w*N+n*W (neglecting 2nd order terms), thus we remove
-   first the components with the largest value of n/N + w/W. */
+
+
+/*****************************************************************************/
+/* Code for clique removal.
+   A clique is a connected components of the relation R, where R(i1,i2) iff
+   i1 and i2 share a prime of weight 2.
+   We remove the heaviest cliques.
+   Each ideal h contributes to the weight of the cliques depending on its
+   weight (see weight_function_clique).
+*/
 
 typedef struct {
   float w;
@@ -650,6 +600,11 @@ deleteHeavierRows (unsigned int npass)
   free (tmp);
 }
 
+/*****************************************************************************/
+/* Code for singletons removal.
+   Exist in multithread if __sync_sub_and_fetch exists.
+*/
+
 #ifndef HAVE_SYNC_FETCH
 static void
 onepass_singleton_removal ()
@@ -796,6 +751,7 @@ remove_singletons (unsigned int npass, double required_excess)
   nprimes = newnprimes;
 }
 
+/*****************************************************************************/
 /* This function renumbers used primes (those with H->hashcount[i] > 1)
    and puts the corresponding index in H->hashcount[i].
 
@@ -809,7 +765,7 @@ static void
 renumber (const char *sos)
 {
   FILE *fsos = NULL;
-  index_t i, nb = 0; 
+  index_t i, nb = 0;
   static int count = 0;
 
   SMALLOC(newindex, nprimemax, "renumber 1");
@@ -822,10 +778,10 @@ renumber (const char *sos)
     "# n is the new ideal index (for merge and replay)\n"
     "# i is the ideal index value in the renumber file\n");
   }
-  
+
   for (i = 0; i < nprimemax; i++)
   {
-    if (ideals_weight[i]) 
+    if (ideals_weight[i])
     {
     /* Since we consider only primes >= minpr or minpa,
        smaller primes might appear only once here, thus we can't
@@ -838,7 +794,7 @@ renumber (const char *sos)
           fprintf (stderr, "Warning: ");
         else
           fprintf (stderr, "WARNING (probably an error): ");
-        
+
         fprintf (stderr, "singleton prime with index %lu\n", (unsigned long) i);
         count++;
       }
@@ -846,10 +802,10 @@ renumber (const char *sos)
 
       if (fsos)
         fprintf(fsos, "%lx %lx\n", (unsigned long) nb, (unsigned long) i);
-    
+
       newindex[i] = nb++;
     }
-    else 
+    else
     {
       newindex[i] = UMAX(index_t);
     }
@@ -862,6 +818,34 @@ renumber (const char *sos)
 #endif
 }
 
+/* singleton removal when binary out (or in ??) file is requested */
+static int
+no_singleton(buf_rel_t *br)
+{
+  weight_t i;
+  index_t h;
+
+  for (i = 0; i < br->nb; i++)
+  {
+    if (ideals_weight[br->primes[i].h] == 1)
+    {
+      relsup++;
+
+      for (i = 0; i < br->nb; i++)
+      {
+        h = br->primes[i].h;
+        if (ideals_weight[h] != UMAX(weight_t) && !(--(ideals_weight[h])))
+          prisup++;
+      }
+      return 0;
+    }
+  }
+  return 1;
+}
+
+
+/*****************************************************************************/
+/* I/O functions */
 static void
 prempt_load (prempt_t prempt_data) {
   char **p_files = prempt_data->files, *pprod;
@@ -914,8 +898,6 @@ prempt_load (prempt_t prempt_data) {
     pprod = (char *) prempt_data->pprod;
     for ( ; ; )
     {
-      //fprintf (stderr, "pprod=%p pcons=%p pmin=%p\n", pprod,
-      //                 prempt_data->pcons, pmin);
       if ((pprod != prempt_data->pcons) &&
     (((((PREMPT_BUF + ((size_t) prempt_data->pcons))) - ((size_t) pprod)) &
       (PREMPT_BUF - 1)) <= PREMPT_ONE_READ))
@@ -929,7 +911,6 @@ prempt_load (prempt_t prempt_data) {
         if ((load = fread (pprod, 1, try_load, f)))
         {
           pprod += load;
-          //fprintf (stderr, "line %d load = %lu\n", __LINE__, load);
           if (pprod == pmax)
             pprod = pmin;
           prempt_data->pprod = pprod;
@@ -967,7 +948,8 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j, int passtwo)
   unsigned int nb_primes_read;
   unsigned long pr;
   unsigned char c, v;
-  uint8_t ltmp = 1; // count the -1 at the end of the relations in rel_compact
+  weight_t nb_above_index = 1; // count the -1 at the end of the relations
+                                // in rel_compact
 #ifdef FOR_FFS
   unsigned int basis_ab = 16;
 #else
@@ -1039,16 +1021,16 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j, int passtwo)
         else
           mybufrel->primes = (prime_t *)
             realloc (mybufrel->primes, mybufrel->nb_alloc * sizeof(prime_t));
-        fprintf (stderr, "nb_alloc = %u\n", mybufrel->nb_alloc); 
+        fprintf (stderr, "nb_alloc = %u\n", mybufrel->nb_alloc);
       }
 
-      ltmp += (uint8_t) (pr >= min_index);
+      nb_above_index += (weight_t) (pr >= min_index);
       mybufrel->primes[nb_primes_read++] = (prime_t) { .h = pr, .e = 1};
     }
   }
 
   mybufrel->nb = nb_primes_read;
-  mybufrel->nb_above_min_index = ltmp;
+  mybufrel->nb_above_min_index = nb_above_index;
 
 #ifdef STAT_FFS
   unsigned int i;
@@ -1084,14 +1066,12 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j, int passtwo)
    It's very dirty!
 */
 
-void insertRelation() {
+void
+insertRelation()
+{
   unsigned int j;
   unsigned long cpy_cpt_rel_b;
 
-  /*
-  pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
-  pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-  */
   cpy_cpt_rel_b = cpt_rel_b;
   for ( ; ; )
   {
@@ -1099,7 +1079,8 @@ void insertRelation() {
     {
       if (!end_insertRelation)
         nanosleep (&wait_classical, NULL);
-      else if (cpt_rel_a == cpy_cpt_rel_b)
+      //else if (cpt_rel_a == cpy_cpt_rel_b)
+      else
         pthread_exit(NULL);
     }
 
@@ -1120,39 +1101,12 @@ void insertRelation() {
   }
 }
 
-static int
-no_singleton(buf_rel_t *br) {
-  uint8_t i;
-  index_t h;
-
-  for (i = 0; i < br->nb; i++)
-  {
-    if (ideals_weight[br->primes[i].h] == 1)
-    {
-      relsup++;
-
-      for (i = 0; i < br->nb; i++)
-      {
-        h = br->primes[i].h;
-        if (ideals_weight[h] != UMAX(uint8_t) && !(--(ideals_weight[h])))
-          prisup++;
-      }
-      return 0;
-    }
-  }
-  return 1;
-}
-
-
 static void
-printrel() {
+printrel()
+{
   unsigned int j, aff;
   unsigned long cpy_cpt_rel_b;
 
-  /*
-  pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
-  pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-  */
   cpy_cpt_rel_b = cpt_rel_b;
   for ( ; ; )
   {
@@ -1189,32 +1143,6 @@ printrel() {
   }
 }
 
-static void threadfindroot(fr_t *mfr)
-{
-  unsigned int j;
-
-  for (;;)
-  {
-    switch(mfr->ok)
-    {
-      case 0:
-        nanosleep (&wait_classical, NULL);
-        break;
-      case 1:
-        for (j = mfr->num; j <= mfr->end; j++)
-	      {
-          //nanosleep (&wait_classical, NULL);
-          //do nothing
-	      }
-        mfr->ok = 0;
-        break;
-      case 2:
-        mfr->ok = 3;
-        pthread_exit(NULL);
-    }
-  }
-}
-
 /* Read all relations from file, and fills the rel_used and rel_compact arrays
    for each relation i:
    - rel_used[i] = 0 if the relation i is deleted
@@ -1229,15 +1157,13 @@ prempt_scan_relations_pass_one ()
 {
   char *pcons, *pcons_old, *pcons_max, *p, **ff;
   pthread_attr_t attr;
-  pthread_t thread_load, thread_relation, thread_fr[(1<<NFR)];
-  fr_t fr[(1<<NFR)];
+  pthread_t thread_load, thread_relation;
   prempt_t prempt_data;
   unsigned long cpy_cpt_rel_a;
   unsigned int length_line, i, k;
   int err;
   char c;
 
-  memset (fr, 0, (1<<NFR) * sizeof(*fr));
   end_insertRelation = 0;
 
   SMALLOC (buf_rel, T_REL, "prempt_scan_relations_pass_one 1");
@@ -1276,12 +1202,6 @@ prempt_scan_relations_pass_one ()
     fprintf (stderr, "prempt_scan_relations_pass_one: pthread_create error 2: %d. %s\n", err, strerror (errno));
     exit (1);
     }
-  for (i = 0; i < (1<<NFR); i++)
-    if ((err = pthread_create (&(thread_fr[i]), &attr, (void *) threadfindroot, &(fr[i]))))
-      {
-    fprintf (stderr, "prempt_scan_relations_pass_one: pthread_create error 3: %d. %s\n", err, strerror (errno));
-    exit (1);
-      }
 
   pcons = (char *) prempt_data->pcons;
   for ( ; ; )
@@ -1365,19 +1285,6 @@ prempt_scan_relations_pass_one ()
         /* Delayed find root computation by block of 1<<NNFR */
         if (cpy_cpt_rel_a && !(k & ((1<<NNFR)-1)))
         {
-          i = (k>>NNFR) & ((1<<NFR)-1);
-          while (fr[i].ok) nanosleep(&wait_classical, NULL);
-          if (k)
-          {
-            fr[i].num = k - (1<<NNFR);
-            fr[i].end = k - 1;
-          }
-          else
-          {
-            fr[i].num = T_REL - (1<<NNFR);
-            fr[i].end = T_REL - 1;
-          }
-          fr[i].ok = 1;
           if (cpy_cpt_rel_a > (1<<(NFR+NNFR)))
           cpt_rel_a = cpy_cpt_rel_a - (1<<(NFR+NNFR));
         }
@@ -1416,21 +1323,6 @@ prempt_scan_relations_pass_one ()
   }
 
  end_of_files:
-  if (cpy_cpt_rel_a) {
-    k = (unsigned int) ((cpy_cpt_rel_a - 1) & (T_REL - 1));
-    if (k & ((1<<NNFR)-1)) {
-      i = ((k>>NNFR)+1) & ((1<<NFR)-1);
-      while (fr[i].ok) nanosleep(&wait_classical, NULL);
-      fr[i].num = k & ~((1<<NNFR)-1);
-      fr[i].end = k;
-      fr[i].ok = 1;
-    }
-  }
-  for (i = 0; i < (1<<NFR); i++) {
-    while (fr[i].ok) nanosleep(&wait_classical, NULL);
-    fr[i].ok = 2;
-    pthread_join(thread_fr[i], NULL);
-  }
   cpt_rel_a = cpy_cpt_rel_a;
   while (cpy_cpt_rel_a != cpt_rel_b)
     nanosleep(&wait_classical, NULL);
@@ -1485,8 +1377,7 @@ prempt_scan_relations_pass_two (const char *oname,
 {
   char *pcons, *pcons_old, *pcons_max, *p, **f;
   pthread_attr_t attr;
-  pthread_t thread_load, thread_printrel, thread_fr[(1<<NFR)];
-  fr_t fr[(1<<NFR)];
+  pthread_t thread_load, thread_printrel;
   prempt_t prempt_data;
   unsigned long cpy_cpt_rel_a;
   unsigned int length_line, i, k;
@@ -1502,7 +1393,6 @@ prempt_scan_relations_pass_two (const char *oname,
   if (!raw)
     fprintf (ofile, "%lu %lu\n", (unsigned long) nrows, (unsigned long) ncols);
   fprintf (stderr, "Final pass:\n");
-  MEMSETZERO(fr, 1<<NFR);
   end_insertRelation = 0;
 
   SMALLOC(buf_rel, T_REL, "prempt_scan_relations_pass_two 1");
@@ -1542,12 +1432,6 @@ prempt_scan_relations_pass_two (const char *oname,
     fprintf (stderr, "prempt_scan_relations_pass_two: pthread_create error 2: %d. %s\n", err, strerror (errno));
     exit (1);
     }
-  for (i = 0; i < (1<<NFR); i++)
-    if ((err = pthread_create (&(thread_fr[i]), &attr, (void *) threadfindroot, &(fr[i]))))
-      {
-    fprintf (stderr, "prempt_scan_relations_pass_one: pthread_create error 3: %d. %s\n", err, strerror (errno));
-    exit (1);
-      }
 
   pcons = (char *) prempt_data->pcons;
   for ( ; ; )
@@ -1609,19 +1493,6 @@ prempt_scan_relations_pass_two (const char *oname,
     /* Delayed find root computation by block of 1<<NNFR */
     if (cpy_cpt_rel_a && !(k & ((1<<NNFR)-1)))
       {
-        i = (k>>NNFR) & ((1<<NFR)-1);
-        while (fr[i].ok) nanosleep(&wait_classical, NULL);
-        if (k)
-    {
-      fr[i].num = k - (1<<NNFR);
-      fr[i].end = k - 1;
-    }
-        else
-    {
-      fr[i].num = T_REL - (1<<NNFR);
-      fr[i].end = T_REL - 1;
-    }
-        fr[i].ok = 1;
         if (cpy_cpt_rel_a > (1<<(NFR+NNFR)))
     cpt_rel_a = cpy_cpt_rel_a - (1<<(NFR+NNFR));
       }
@@ -1652,21 +1523,6 @@ prempt_scan_relations_pass_two (const char *oname,
     }
 
  end_of_files:
-  if (cpy_cpt_rel_a) {
-    k = (unsigned int) ((cpy_cpt_rel_a - 1) & (T_REL - 1));
-    if (k & ((1<<NNFR)-1)) {
-      i = ((k>>NNFR)+1) & ((1<<NFR)-1);
-      while (fr[i].ok) nanosleep(&wait_classical, NULL);
-      fr[i].num = k & ~((1<<NNFR)-1);
-      fr[i].end = k;
-      fr[i].ok = 1;
-    }
-  }
-  for (i = 0; i < (1<<NFR); i++) {
-    while (fr[i].ok) nanosleep(&wait_classical, NULL);
-    fr[i].ok = 2;
-    pthread_join(thread_fr[i], NULL);
-  }
   cpt_rel_a = cpy_cpt_rel_a;
   while (cpy_cpt_rel_a != cpt_rel_b)
     nanosleep(&wait_classical, NULL);
@@ -1894,7 +1750,7 @@ main (int argc, char **argv)
                    "%lu\n", nprimemax);
 
   SMALLOC(ideals_weight, nprimemax, "ideals_weight");
-  tot_alloc_bytes = nprimemax * sizeof(uint8_t);
+  tot_alloc_bytes = nprimemax * sizeof(weight_t);
   /* %zu is the C99 modifier for size_t */
   fprintf (stderr, "Allocated ideals_weight of %luMb (total %zuMb so far)\n",
                    nprimemax >> 20, tot_alloc_bytes >> 20);

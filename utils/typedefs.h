@@ -23,6 +23,9 @@
 #define index_t uint64_t
 #endif 
 
+/* The weight of ideals saturates at 255 */
+/* For relations, we hope that there will never be more */
+/* than 255 ideals per relation */
 #define weight_t uint8_t
 #define exponent_t uint8_t
 
