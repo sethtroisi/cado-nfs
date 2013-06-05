@@ -245,6 +245,10 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
                 for (int i = 0; i < rs->rel.nb_ap; i++)
                   {
                     unsigned long j;
+                    /* Warning on alg side the r values is not computed by */
+                    /* relation_stream_get */
+                    rs->rel.ap[i].r = findroot(rs->rel.a, rs->rel.b,
+                                               rs->rel.ap[i].p);
                     j = renumber_get_index_from_p_r (renumber_table,
                                           rs->rel.ap[i].p, rs->rel.ap[i].r, 1);
                     for (int k = 0; k < rs->rel.ap[i].e; k++)

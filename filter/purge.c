@@ -103,6 +103,8 @@ static index_t **rel_compact  = NULL; /* see above */
 #define DECR_SATURATED_WEIGHT(o,n) if (*o < UMAX(*o) && !(--(*o))) n--;
 uint8_t *ideals_weight = NULL;
 
+index_t *newindex;
+
 static char ** fic;
 static char *pmin, *pminlessone;
 static FILE *ofile;     /* For the principal file output. */
@@ -379,6 +381,7 @@ fprint_rel_row (FILE *file, buf_rel_t *my_buf_rel)
   char *op;
   size_t t;
   unsigned int i, j;
+  index_t h;
   uint8_t e;
 
   p = d64toa10(buf, my_buf_rel->a);
@@ -390,13 +393,14 @@ fprint_rel_row (FILE *file, buf_rel_t *my_buf_rel)
   for (i = 0; i < my_buf_rel->nb; i++)
   {
     e = my_buf_rel->primes[i].e;
-    nb_coeff += e;
+    h = newindex[my_buf_rel->primes[i].h];
 
     op = p;
-    p = u64toa16(p, (uint64_t) (my_buf_rel->primes[i].h));
+    p = u64toa16(p, (uint64_t) h);
     *p++ = ',';
     FFSCOPYDATA(e);
   }
+  nb_coeff += i;
 
   *(--p) = '\n';
   p[1] = 0;
@@ -438,9 +442,6 @@ insertNormalRelation (unsigned int j)
     }
     else if (ideals_weight[h] != UMAX (uint8_t))
       ideals_weight[h]++;
-
-    if (h == 0x26061)
-      fprintf (stderr, "h=%x j=%u w=%u\n", h, j, ideals_weight[h]);
 
     if (!boutfilerel && h >= min_index)
       my_tmp[itmp++] = h;
@@ -802,55 +803,63 @@ remove_singletons (unsigned int npass, double required_excess)
    We locate used primes and do not try to do fancy things as sorting w.r.t.
    weight, since this will probably be done later on.
    All rows will be 1 more that needed -> subtract 1 in fprint...! */
-#if 0
+
 static void
 renumber (const char *sos)
 {
-    FILE *fsos = NULL;
-    index_t i, nb = 1; /* we start at 1 here, but subtract 1 in fprint_rel_row */
-
-    SMALLOC(H.hr, nprimesmax, "renumber 1");
-
-    if (sos != NULL)
-      {
-  fprintf (stderr, "Output renumber table in file %s\n", sos);
-  fsos = fopen_maybe_compressed (sos, "w");
-        fprintf (fsos, "# each row contains 3 hexadecimal values: i p r\n"
-     "# i is the ideal index value (starting from 0)\n"
-     "# p is the corresponding prime\n"
-     "# r is the corresponding root (p+1 on the rational side)\n");
-      }
-    for (i = 0; i < H.hm; i++)
-      if (ideals_weight[i]) {
-  /* Since we consider only primes >= minpr or minpa,
-     smaller primes might appear only once here, thus we can't
-     assert H->hashcount[i] > 1, but H->hashcount[i] = 1 should
-     be rare if minpr/minpa are well chosen (not too large). */
+  FILE *fsos = NULL;
+  index_t i, nb = 0; 
   static int count = 0;
-  if (ideals_weight[i] == 1 && (count ++ < 10))
+
+  SMALLOC(newindex, nprimemax, "renumber 1");
+
+  if (sos != NULL)
+  {
+    fprintf (stderr, "Output renumber table in file %s\n", sos);
+    fsos = fopen_maybe_compressed (sos, "w");
+    fprintf (fsos, "# each row contains 2 hexadecimal values: n i\n"
+    "# n is the new ideal index (for merge and replay)\n"
+    "# i is the ideal index value in the renumber file\n");
+  }
+  
+  for (i = 0; i < nprimemax; i++)
+  {
+    if (ideals_weight[i]) 
     {
-      if (GET_HASH_P(&H,i) == GET_HASH_R(&H,i) - 1)
-        fprintf (stderr, "Warning: singleton rational prime %lu\n",
-           (unsigned long) GET_HASH_P(&H,i));
-      else
-        fprintf (stderr, "Warning: singleton algebraic ideal (%lu,%lu)\n",
-           (unsigned long) GET_HASH_P(&H,i), (unsigned long) GET_HASH_R(&H,i));
+    /* Since we consider only primes >= minpr or minpa,
+       smaller primes might appear only once here, thus we can't
+       assert H->hashcount[i] > 1, but H->hashcount[i] = 1 should
+       be rare if minpr/minpa are well chosen (not too large). */
+#if DEBUG >= 1
+      if (ideals_weight[i] == 1)
+      {
+        if (i < min_index)
+          fprintf (stderr, "Warning: ");
+        else
+          fprintf (stderr, "WARNING (probably an error): ");
+        
+        fprintf (stderr, "singleton prime with index %lu\n", (unsigned long) i);
+        count++;
+      }
+#endif
+
+      if (fsos)
+        fprintf(fsos, "%lx %lx\n", (unsigned long) nb, (unsigned long) i);
+    
+      newindex[i] = nb++;
     }
-  if (fsos)
-    fprintf(fsos, "%lx %lx %lx\n", (unsigned long) (nb - 1),
-      (unsigned long) GET_HASH_P(&H,i), (unsigned long) GET_HASH_R(&H,i));
-  H.hr[i] = nb++;
-      }
-      else {
-  //H.hc[i] = UMAX(*(H.hc)); /* for getHashAddrAux */
-  //H.hr[i] = UMAX(*(H.hr));
-      }
+    else 
+    {
+      newindex[i] = UMAX(index_t);
+    }
+  }
     if (fsos)
       fclose_maybe_compressed (fsos, sos);
-    nb--;
     newnprimes = nb;
-}
+#if DEBUG >= 1
+  fprintf (stderr, "Warning: %d singleton primes at the end of purge\n",count);
 #endif
+}
 
 static void
 prempt_load (prempt_t prempt_data) {
@@ -1029,6 +1038,7 @@ relation_stream_get_fast (prempt_t prempt_data, unsigned int j, int passtwo)
         else
           mybufrel->primes = (prime_t *)
             realloc (mybufrel->primes, mybufrel->nb_alloc * sizeof(prime_t));
+        fprintf (stderr, "nb_alloc = %u\n", mybufrel->nb_alloc); 
       }
 
       ltmp += (uint8_t) (pr >= min_index);
@@ -2025,7 +2035,7 @@ main (int argc, char **argv)
     /*************************** second pass ***********************************/
 
     /* we renumber the primes in order of apparition in the hashtable */
-    //renumber (sos);
+    renumber (sos);
 
     /* reread the relation files and convert them to the new coding */
     fprintf (stderr, "Storing remaining relations...\n");
@@ -2062,6 +2072,7 @@ main (int argc, char **argv)
 
   bit_vector_clear(rel_used);
   SFREE(sum);
+  SFREE(newindex);
   cado_poly_clear (pol);
 
   if (filelist) filelist_clear(fic);
