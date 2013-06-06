@@ -784,11 +784,15 @@ class SievingTask(ClientServerTask, FilesCreator):
     def request_more_relations(self, additional):
         if additional > 0:
             self.state["rels_wanted"] += additional
-            self.logger.info("New goal for number of relations is %d",
-                             self.state["rels_wanted"])
         if self.state["rels_wanted"] > self.state["rels_found"]:
             self.send_notification(Notification.WANT_TO_RUN, None)
-
+            self.logger.info("New goal for number of relations is %d, "
+                             "need to sieve more",
+                             self.state["rels_wanted"])
+        else:
+            self.logger.info("New goal for number of relations is %d, but "
+                             "already have %d. No need to sieve more",
+                             self.state["rels_wanted"], self.state["rels_found"])
 
 class Duplicates1Task(Task, FilesCreator):
     """ Removes duplicate relations """
