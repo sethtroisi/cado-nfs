@@ -1056,10 +1056,6 @@ class PurgeTask(Task):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
         
-        if "purgedfile" in self.state:
-            self.logger.info("Already have purged file")
-            return
-        
         poly = self.send_request(Request.GET_POLYNOMIAL)
         polyfile = self.make_output_filename("poly")
         poly.create_file(polyfile, self.params)
@@ -1068,6 +1064,15 @@ class PurgeTask(Task):
         if not nunique:
             raise Exception("No unique relation count received")
         nrels = nfree + nunique
+        
+        if "purgedfile" in self.state and nrels == self.state["input_nrels"]:
+            self.logger.info("Already have a purged file, and no new input "
+                             "relations available. Nothing to do")
+            return
+        
+        self.state.pop("purgedfile", None)
+        self.state.pop("input_nrels", None)
+        
         self.logger.info("Reading %d unique and %d free relations, total %d"
                          % (nunique, nfree, nrels))
         purgedfile = self.make_output_filename("purged.gz")
@@ -1085,7 +1090,9 @@ class PurgeTask(Task):
             [nrows, weight, excess] = self.parse_stdout(stdout)
             self.logger.info("After purge, %d relations remain with weight %s and excess %s"
                              % (nrows, weight, excess))
-            self.state["purgedfile"] = purgedfile
+            # Update both atomically
+            self.state.update({"purgedfile": purgedfile, "input_nrels": nrels})
+            self.logger.info("Have enough relations")
             self.send_notification(Notification.HAVE_ENOUGH_RELATIONS, None)
         else:
             self.logger.info("Not enough relations, requesting more")
