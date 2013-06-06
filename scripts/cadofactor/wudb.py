@@ -1025,7 +1025,7 @@ class DbAccess(object):
     later be used to open DB connections.
     """
     
-    def __init__(self, db, *args, **kwargs):
+    def __init__(self, *args, db, **kwargs):
         super().__init__(*args, **kwargs)
         self.__db = db
     

@@ -371,7 +371,7 @@ class ClientServerTask(Task, patterns.Observer):
     def paramnames(self):
         return super().paramnames + ("maxwu",)
     
-    def __init__(self, db_listener, *args, **kwargs):
+    def __init__(self, *args, db_listener, **kwargs):
         super().__init__(*args, **kwargs)
         self.db_listener = db_listener
         self.db_listener.subscribeObserver(self)
@@ -1642,7 +1642,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
     
     CAN_CANCEL_WUS = 0
     
-    def __init__ (self, path_prefix, *args, **kwargs):
+    def __init__ (self, *args, path_prefix, **kwargs):
         super().__init__(*args, path_prefix = path_prefix, **kwargs)
         self.logger = logging.getLogger("Complete Factorization")
         self.params = self.myparams(("name", "workdir"))
