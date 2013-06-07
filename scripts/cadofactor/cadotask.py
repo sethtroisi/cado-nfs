@@ -1561,7 +1561,7 @@ class StartClientsTask(Task):
         process = cadocommand.RemoteCommand(wuclient, host, self.parameters, self.path_prefix)
         (rc, stdout, stderr) = process.wait()
         if rc != 0:
-            self.logger.warning("Starting client on %(host)s failed. "
+            self.logger.warning("Starting client on %s failed. "
                                 "Consult log file for details." % host)
             return
         self.pids[clientid] = int(stdout)
