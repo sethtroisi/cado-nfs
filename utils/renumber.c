@@ -71,7 +71,7 @@ renumber_close_write (renumber_t renumber_info)
   rewind (renumber_info->file);
   fwrite (&(renumber_info->size), sizeof(renumber_info->size), 1, 
           renumber_info->file);
-  fprintf (stderr, "Renumbering struct: size=%"PRid"lu\n", renumber_info->size);
+  fprintf (stderr, "Renumbering struct: size=%"PRid"\n", renumber_info->size);
   
   fclose(renumber_info->file);
 }
@@ -132,7 +132,7 @@ renumber_read_table (renumber_t renumber_info, const char * filename)
         mb_s = ((double) (ret * renumber_info->nb_bytes) / (double) dt) *1.0e6;
       else
         mb_s = 0.0;
-      fprintf(stderr, "Renumbering table: read %"PRid"lu values from file "
+      fprintf(stderr, "Renumbering table: read %"PRid" values from file "
                       "in %.1fs -- %.1f MB/s\n", ret, dt, mb_s);
     }
   }
@@ -142,7 +142,7 @@ renumber_read_table (renumber_t renumber_info, const char * filename)
     mb_s = ((double) (ret * renumber_info->nb_bytes) / (double) dt) *1.0e6;
   else
     mb_s = 0.0;
-  fprintf(stderr, "Renumbering table: end of read. Read %"PRid"lu values from "
+  fprintf(stderr, "Renumbering table: end of read. Read %"PRid" values from "
                   "file in %.1fs -- %.1f MB/s\n", ret, dt, mb_s);
   ASSERT_ALWAYS(ret == renumber_info->size);
 
