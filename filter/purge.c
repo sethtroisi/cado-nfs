@@ -81,6 +81,7 @@ Exit value:
 #include "mod_ul.c"
 #include "portability.h"
 #include "utils.h"
+#include "typedefs.h"
 #ifdef FOR_DL
 #include "utils_ffs.h"
 #endif

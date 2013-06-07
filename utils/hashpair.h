@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "macros.h"
+#include "typedefs.h"
 
 #define HC_T uint8_t
 #define HCM UMAX(HC_T) /* maximal value of TYPE_HASHCOUNT */
