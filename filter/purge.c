@@ -73,8 +73,9 @@ Exit value:
 #include "utils.h"
 #include "typedefs.h"
 
-#define DEBUG 1
-//#define STAT_FFS
+#define DEBUG 0
+//#define STAT
+//#define STAT_VALUES_COEFF //STAT must be defined. Interesting only DL
 
 //#define USE_CAVALLAR_WEIGHT_FUNCTION
 
@@ -88,8 +89,20 @@ Exit value:
    SMALLOC(p, n, id);                          \
    count += n * sizeof(*p);                    \
    /* %zu is the C99 modifier for size_t */    \
-   fprintf (stderr, "Allocated %s of %luMb (total %zuMb so far)\n",  \
+   fprintf (stderr, "Allocated %s of %zuMb (total %zuMb so far)\n",  \
                     id, (n * sizeof(*p)) >> 20, count >> 20); \
+ } while (0)
+
+#define SMALLOC_BIT_VECTOR(bv,n,id,count) do { \
+  size_t tmp = (n + 7) >> 3;                   \
+  bit_vector_init(bv, n);                      \
+  if (!bv->p) {                                \
+    fprintf (stderr, "%s: malloc error (%zu MB)\n",id,tmp>>20); \
+    exit (1);                                  \
+  }                                            \
+  count += tmp;                                \
+  fprintf (stderr, "Allocated %s of %zuMB (total %zuMB so far)\n",   \
+                   id, tmp >> 20, count >> 20);                      \
  } while (0)
 
 /* Main variables */
@@ -101,21 +114,20 @@ static index_t **rel_compact  = NULL; /* see above */
 
 #define DECR_SATURATED_WEIGHT(o,remove) if (*o<UMAX(*o) && !(--(*o))) remove++;
 weight_t *ideals_weight = NULL;
-index_t *newindex;
+index_t *newindex = NULL;
 
 static char ** fic;
 static char *pmin, *pminlessone;
 static bit_vector rel_used, Tbv;
 static relation_stream rs;
-static index_t *sum2_index; /* sum of row indices for primes with weight 2 */
+static index_t *sum2_index = NULL; /*sum of rows index for primes of weight 2*/
 static double wct0;
-static size_t tot_alloc_bytes = 0;
-//static index_t relsup, prisup, newnrel, newnprimes;
+static size_t tot_alloc_bytes = 0, my_malloc_bytes = 0;
 static index_t relsup, prisup;
 
 static uint64_t nrelmax = 0,
-                nprimemax = 0,
-                keep = DEFAULT_KEEP; /* default maximun final excess */
+                nprimemax = 0;
+static int64_t keep = DEFAULT_KEEP; /* maximun final excess */
 static unsigned int npass = DEFAULT_NPASS;
 static double required_excess = DEFAULT_REQUIRED_EXCESS;
 static unsigned int npt = DEFAULT_NPT;
@@ -124,10 +136,14 @@ static float w_ccc;
 static uint8_t binfilerel; /* True (1) if a rel_used file must be read */
 static uint8_t boutfilerel;/* True (1) if a rel_used file must be written */
 
-#ifdef STAT_FFS
-uint64_t __stat_count[11] = {0,0,0,0,0,0,0,0,0,0,0};
-uint64_t __stat_nonzero = 0;
+#ifdef STAT
+uint64_t __stat_weight;
+#ifdef STAT_VALUES_COEFF
+#define STAT_VALUES_COEFF_LEN 10
+uint64_t __stat_nbcoeffofvalue[STAT_VALUES_COEFF_LEN+1];
 #endif
+#endif
+
 
 static const unsigned char ugly[256] = {
   255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
@@ -216,8 +232,8 @@ typedef struct {
 typedef struct {
   index_t nrels;       // nb of rels read
   index_t nprimes;     // nb of primes read
-  index_t min_index;   // store only primes with index>min_index
-  double W;            // W of the active part of the matrix
+  index_t min_index;   // store only primes with index >= min_index
+  double W;            // Weight (nb of non-zero) of primes >= min_index
   FILE *f_remaining;   // File for writing remaining rels
   FILE *f_deleted;     // File for writing deleted rels
   buf_rel_t *buf_data; // buffer for I/O
@@ -265,32 +281,39 @@ my_malloc (unsigned int n)
 {
   index_t *ptr;
 
-  if (relcompact_used + n > BLOCK_SIZE) {
+  if (relcompact_used + n > BLOCK_SIZE) 
+  {
     relcompact_used = 0;
-    if (((unsigned int) (++relcompact_current)) == relcompact_size) {
+    if (((unsigned int) (++relcompact_current)) == relcompact_size) 
+    {
+      my_malloc_bytes -= relcompact_size * sizeof (index_t *);
       relcompact_size = relcompact_size ? (relcompact_size << 1) : (1<<16);
-      if (!(relcompact_list = (index_t **) realloc(relcompact_list, relcompact_size * sizeof(index_t *)))) {
-    fprintf (stderr, "my_malloc_int: realloc error : %s\n", strerror (errno));
-    exit (1);
-  }
+      size_t tmp_size = relcompact_size * sizeof(index_t *);
+      if (!(relcompact_list = (index_t **) realloc(relcompact_list, tmp_size))) 
+      {
+        fprintf (stderr, "my_malloc_int: realloc error: %s\n",strerror(errno));
+        exit (1);
       }
+      my_malloc_bytes += tmp_size;
+    }
     SMALLOC(relcompact_list[relcompact_current], BLOCK_SIZE, "my_malloc_int 1");
     myrelcompact = relcompact_list[relcompact_current];
+    my_malloc_bytes += BLOCK_SIZE * sizeof (index_t);
   }
   ptr = &(myrelcompact[relcompact_used]);
   relcompact_used += n;
-  tot_alloc_bytes += n * sizeof (index_t);
   return ptr;
 }
 
 static void
 my_malloc_free_all (void)
 {
-  while (relcompact_current >= 0) {
-    SFREE (relcompact_list[relcompact_current]);
+  for ( ; relcompact_current >= 0; relcompact_current--)
+  {
+    SFREE(relcompact_list[relcompact_current]);
     relcompact_current--;
   }
-  SFREE (relcompact_list);
+  SFREE(relcompact_list);
   relcompact_list = NULL;
   relcompact_used = BLOCK_SIZE;
   relcompact_size = 0;
@@ -309,15 +332,10 @@ my_malloc_free_all (void)
    Return the weight of the relation.
 */
 
-#define FFSCOPYDATA(E)       \
-  t = p - op;                \
-  for (j = (unsigned int) ((E) - 1); j--; p += t) memcpy (p, op, t)
-
-static int
+static void
 fprint_rel_row (FILE *file, buf_rel_t *my_buf_rel)
 {
   char buf[1<<12], *p;
-  unsigned int nb_coeff = 0;
   char *op;
   size_t t;
   unsigned int i, j;
@@ -338,15 +356,14 @@ fprint_rel_row (FILE *file, buf_rel_t *my_buf_rel)
     op = p;
     p = u64toa16(p, (uint64_t) h);
     *p++ = ',';
-    FFSCOPYDATA(e);
+    t = p - op;
+    for (j = (unsigned int) ((e) - 1); j--; p += t)
+      memcpy (p, op, t);
   }
-  nb_coeff += i;
 
   *(--p) = '\n';
   p[1] = 0;
   fputs(buf, file);
-
-  return nb_coeff;
 }
 
  /* Write relation j from buffer to rel_compact
@@ -508,9 +525,9 @@ delete_connected_component (index_t i, index_t *nprimes)
 }
 
 static void
-deleteHeavierRows (index_t target_excess, index_t *nrels, index_t *nprimes)
+cliques_removal (index_t target_excess, index_t *nrels, index_t *nprimes)
 {
-  int64_t excess = (int64_t) (((int64_t) *nrels) - *nprimes);
+  int64_t excess = (((int64_t) *nrels) - *nprimes);
   index_t chunk;
   comp_t *tmp = NULL; /* (weight, index) */
   index_t *myrelcompact, i, h;
@@ -519,7 +536,7 @@ deleteHeavierRows (index_t target_excess, index_t *nrels, index_t *nprimes)
 #define MAX_WEIGHT 10
   unsigned int Count[MAX_WEIGHT], *pc; /* Count[w] is the # of components of weight >= w */
 
-  if (target_excess <= keep || excess <= target_excess)
+  if (excess <=  keep || excess <= target_excess)
     return;
 
   chunk = excess - target_excess;
@@ -538,7 +555,6 @@ deleteHeavierRows (index_t target_excess, index_t *nrels, index_t *nprimes)
   ASSERT_ALWAYS(N == (double) *nrels);
 
   /* now initialize bit table for relations used */
-  bit_vector_init(Tbv, (size_t) nrelmax);
   bit_vector_neg (Tbv, rel_used);
   memset(Count, 0, sizeof(unsigned int) * MAX_WEIGHT);
   SMALLOC(tmp, alloctmp, "deleteHeavierRows 2");
@@ -579,7 +595,6 @@ deleteHeavierRows (index_t target_excess, index_t *nrels, index_t *nprimes)
                    *nprimes, ltmp, chunk, target_excess);
 #endif
 
-  bit_vector_clear(Tbv);
   free (tmp);
 }
 
@@ -590,21 +605,30 @@ deleteHeavierRows (index_t target_excess, index_t *nrels, index_t *nprimes)
 
 #ifndef HAVE_SYNC_FETCH
 static void
-onepass_singleton_removal ()
+onepass_singleton_removal (index_t *nrels, index_t *nprimes)
 {
   index_t *tab, i;
   index_t nremoverels = 0;
+  index_t nremoveprimes = 0;
 
   for (i = 0; i < nrelmax; i++)
+  {
     if (bit_vector_getbit(rel_used, (size_t) i))
+    {
       for (tab = rel_compact[i]; *tab != UMAX(*tab); tab++)
-  if (ideals_weight[*tab] == 1) {
-    delete_relation(i);
-    nremoverels++;
-    break;
+      {  
+        if (ideals_weight[*tab] == 1) 
+        {
+          nremoveprimes += delete_relation(i);
+          nremoverels++;
+          break;
+        }
+      }
+    }
   }
 
-  return nremoverels;
+  *nrels -= nremoverels;
+  *nprimes -= nremoveprimes;
 }
 
 #else /* ifndef HAVE_SYNC_FETCH */
@@ -636,12 +660,11 @@ onepass_thread_singleton_removal (ti_t *mti)
           for (tab = rel_compact[i]; *tab != UMAX(*tab); tab++)
           {
             o = &(ideals_weight[*tab]);
-            //fprintf (stderr, "i=%u h=%x o=%d\n", i, *tab, *o);
             ASSERT(*o);
             if (*o < UMAX(*o) && !__sync_sub_and_fetch(o, 1))
               (mti->sup_npri)++;
           }
-          /* rel_compact[i] = NULL; */
+          /* rel_compact[i] is not freed , it is freed with my_malloc_free_all*/
           rel_used->p[i>>LN2_BV_BITS] &= ~j;
           (mti->sup_nrel)++;
           break;
@@ -694,9 +717,9 @@ static void
 remove_all_singletons (index_t *nrels, index_t *nprimes, int64_t *excess)
 {
   index_t oldnrels;
-  *excess = (int64_t) (((int64_t) *nrels) - *nprimes);
-  fprintf (stderr, "   nrels=%lu, nprimes=%lu; excess=%ld\n", 
-                   (unsigned long) *nrels, (unsigned long) *nprimes, (long) *excess);
+  *excess = (((int64_t) *nrels) - *nprimes);
+  fprintf (stderr, "  nrels=%"PRid" nprimes=%"PRid" excess=%"PRId64"\n",
+                   *nrels, *nprimes, *excess);
   do 
   {
     oldnrels = *nrels;
@@ -704,17 +727,16 @@ remove_all_singletons (index_t *nrels, index_t *nprimes, int64_t *excess)
     ASSERT(npt);
     onepass_singleton_parallel_removal(npt, nrels, nprimes);
 #else
-    //FIXME should have the same syntax as above (without npt)
-    onepass_singleton_removal();
+    onepass_singleton_removal(nrels, nprimes);
 #endif
-    *excess = (int64_t) (((int64_t) *nrels) - *nprimes);
-    fprintf (stderr, "   new_nrows=%lu new_ncols=%lu (%ld) at %2.2lf\n",
-       (unsigned long) *nrels, (unsigned long) *nprimes, (long) *excess, 
-       seconds());
+    *excess = (((int64_t) *nrels) - *nprimes);
+    fprintf (stderr, "  new_nrels=%"PRid" new_nprimes=%"PRid" excess=%"PRId64""
+                     " at %2.2lf\n", *nrels, *nprimes, *excess, seconds());
   } while (oldnrels != *nrels);
 }
+
 static void
-remove_singletons (index_t *nrels, index_t *nprimes)
+singletons_and_cliques_removal (index_t *nrels, index_t *nprimes)
 {
   index_t oldnrels = 0;
   int64_t oldexcess, excess, target_excess;
@@ -731,7 +753,7 @@ remove_singletons (index_t *nrels, index_t *nprimes)
 
   if ((double) excess < required_excess * ((double) *nprimes))
   {
-    fprintf(stderr, "(excess / #primes) = %.2f < %.2f. See -required_excess "
+    fprintf(stderr, "(excess / nprimes) = %.2f < %.2f. See -required_excess "
                     "argument.\n", ((double) excess / (double) *nprimes), 
                     required_excess);
     exit (2);
@@ -745,15 +767,15 @@ remove_singletons (index_t *nrels, index_t *nprimes)
     oldnrels = *nrels;
     oldexcess = excess;
     target_excess = excess - chunk;
-    if (target_excess < (int64_t) keep)
-      target_excess = (int64_t) keep;
-    fprintf (stderr, "Step %u on %u: %lu real (non null) rels remain\n"
-                     "   excess is %ld, target excess is %ld\n",
-                     count, npass, (unsigned long) *nrels, excess, target_excess);
-    deleteHeavierRows (target_excess, nrels, nprimes);
+    if (target_excess <  keep)
+      target_excess = keep;
+    fprintf (stderr, "Step %u on %u: %"PRid" real (non null) rels remain\n"
+                     "  excess is %"PRId64", target excess is %"PRId64"\n",
+                     count, npass, *nrels, excess, target_excess);
+    cliques_removal (target_excess, nrels, nprimes);
 
     remove_all_singletons(nrels, nprimes, &excess);
-    fprintf (stderr, "   [each excess row deleted %2.2lf rows]\n",
+    fprintf (stderr, "  [each excess row deleted %2.2lf rows]\n",
                 (double) (oldnrels - *nrels) / (double) (oldexcess - excess));
   }
 
@@ -762,14 +784,20 @@ remove_singletons (index_t *nrels, index_t *nprimes)
     still larger than keep. It may happen due to the fact that each clique does
     not make the excess go down by one but can (rarely) left the excess 
     unchanged. */
-  if (excess > (int64_t) keep)
+  if (excess > keep)
   {
     oldnrels = *nrels;
     oldexcess = excess;
-    target_excess = (int64_t) keep;
-    deleteHeavierRows (target_excess, nrels, nprimes);
+    target_excess = excess - chunk;
+    target_excess = keep;
+
+    fprintf (stderr, "Step extra: %"PRid" real (non null) rels remain\n"
+                     "  excess is %"PRId64", target excess is %"PRId64"\n",
+                     *nrels, excess, target_excess);
+    cliques_removal (target_excess, nrels, nprimes);
+
     remove_all_singletons(nrels, nprimes, &excess);
-    fprintf (stderr, "   [each excess row deleted %2.2lf rows]\n",
+    fprintf (stderr, "  [each excess row deleted %2.2lf rows]\n",
                 (double) (oldnrels - *nrels) / (double) (oldexcess - excess));
   }
 }
@@ -789,13 +817,17 @@ renumber (const char *sos, index_t min_index, index_t nprimes)
 {
   FILE *fsos = NULL;
   index_t i, nb = 0;
-  static int count = 0;
+  unsigned int count = 0;
 
 
   if (sos != NULL)
   {
     fprintf (stderr, "Output renumber table in file %s\n", sos);
-    fsos = fopen_maybe_compressed (sos, "w");
+    if (!(fsos = fopen_maybe_compressed (sos, "w")))
+    {
+      fprintf (stderr, "Error, cannot open file %s for writing.\n", sos);
+      exit (1);
+    }
     fprintf (fsos, "# each row contains 2 hexadecimal values: n i\n"
     "# n is the new ideal index (for merge and replay)\n"
     "# i is the ideal index value in the renumber file\n");
@@ -817,13 +849,13 @@ renumber (const char *sos, index_t min_index, index_t nprimes)
         else
           fprintf (stderr, "WARNING (probably an error): ");
 
-        fprintf (stderr, "singleton prime with index %lu\n", (unsigned long) i);
+        fprintf (stderr, "singleton prime with index %"PRid"\n", i);
         count++;
       }
 #endif
 
       if (fsos)
-        fprintf(fsos, "%lx %lx\n", (unsigned long) nb, (unsigned long) i);
+        fprintf(fsos, "%"PRxid" %"PRxid"\n", nb, i);
 
       newindex[i] = nb++;
     }
@@ -837,11 +869,12 @@ renumber (const char *sos, index_t min_index, index_t nprimes)
   
   ASSERT_ALWAYS(nprimes == nb);
 #if DEBUG >= 1
-  fprintf (stderr, "Warning: %d singleton primes at the end of purge\n",count);
+  if (count)
+    fprintf (stderr, "Warning: %u singleton(s) at the end of purge\n", count);
 #endif
 }
 
-/* singleton removal when binary out (or in ??) file is requested */
+/* singleton removal when binary out file (boutfilerel) is requested */
 static int
 no_singleton(buf_rel_t *br)
 {
@@ -1040,7 +1073,7 @@ relation_stream_get_fast (prempt_t prempt_data, buf_rel_t *mybufrel,
         else
           mybufrel->primes = (prime_t *)
             realloc (mybufrel->primes, mybufrel->nb_alloc * sizeof(prime_t));
-        fprintf (stderr, "nb_alloc = %u\n", mybufrel->nb_alloc);
+        fprintf (stderr, "nb_alloc = %u\n", mybufrel->nb_alloc); //FIXME
       }
 
       nb_above_index += (weight_t) (pr >= min_index);
@@ -1051,19 +1084,23 @@ relation_stream_get_fast (prempt_t prempt_data, buf_rel_t *mybufrel,
   mybufrel->nb = nb_primes_read;
   mybufrel->nb_above_min_index = nb_above_index;
 
-#ifdef STAT_FFS
-  unsigned int i;
-  for (i = 0; i < mybufrel->nb; i++)
+#ifdef STAT
+  __stat_weight += nb_primes_read;
+#ifdef STAT_VALUES_COEFF
   {
-    if (bit_vector_getbit(rel_used, (size_t) mybufrel->num))
+    unsigned int i;
+    for (i = 0; i < mybufrel->nb; i++)
     {
-      __stat_nonzero++;
-      if (abs(mybufrel->rel.primes[i].e) > 10)
-        __stat_count[0]++;
-      else
-        __stat_count[abs(mybufrel->rel.rp[i].e)]++;
+      if (bit_vector_getbit(rel_used, (size_t) mybufrel->num))
+      {
+        if (abs(mybufrel->primes[i].e) > STAT_VALUES_COEFF_LEN)
+          __stat_nbcoeffofvalue[0]++;
+        else
+          __stat_nbcoeffofvalue[abs(mybufrel->primes[i].e)]++;
+      }
     }
   }
+#endif
 #endif
 }
 
@@ -1108,10 +1145,15 @@ insertRelation (buf_arg_t *arg)
       nanosleep (&wait_classical, NULL);
 
     if (bit_vector_getbit(rel_used, (size_t) arg->buf_data[j].num))
+    {
       arg->nprimes+=insertNormalRelation (&(arg->buf_data[j]), arg->min_index);
+#ifdef STAT
+      arg->W += (double) arg->buf_data[j].nb_above_min_index;
+#endif
+    }
 
     if (relation_stream_disp_progress_now_p(rs))
-      fprintf(stderr, "read useful %lu relations in %.1fs"
+      fprintf(stderr, "read useful %"PRid" relations in %.1fs"
                       " -- %.1f MB/s -- %.1f rels/s\n",
                       rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
     cpy_cpt_rel_b++;
@@ -1148,12 +1190,15 @@ printrel(buf_arg_t *arg)
         bit_vector_clearbit(rel_used, (size_t) my_rel->num);
     }
     else if (aff)
-      arg->W += (double) fprint_rel_row (arg->f_remaining, my_rel);
+    {
+      arg->W += (double) my_rel->nb;
+      fprint_rel_row (arg->f_remaining, my_rel);
+    }
     else if (!boutfilerel && arg->f_deleted != NULL)
       fprint_rel_row (arg->f_deleted, my_rel);
 
     if (relation_stream_disp_progress_now_p(rs))
-      fprintf(stderr, "re-read & print useful %lu relations in %.1fs"
+      fprintf(stderr, "re-read & print useful %"PRid" relations in %.1fs"
         " -- %.1f MB/s -- %.1f rels/s\n", rs->nrels, rs->dt, rs->mb_s,
         rs->rels_s);
     cpy_cpt_rel_b++;
@@ -1187,6 +1232,14 @@ prempt_scan_relations (void * (*callback_fct)(buf_arg_t *),
   callback_arg->nrels = 0;
   callback_arg->nprimes = 0;
   callback_arg->W = 0.0;
+
+#ifdef STAT
+  __stat_weight = 0;
+#ifdef STAT_VALUES_COEFF
+  for (int i = 0; i < STAT_VALUES_COEFF_LEN; i++)
+    __stat_nbcoeffofvalue[i] = 0;
+#endif
+#endif
 
   fprintf (stderr, "Begin reading all relations\n");
   
@@ -1373,24 +1426,40 @@ prempt_scan_relations (void * (*callback_fct)(buf_arg_t *),
     if (buf_rel[i].nb_alloc != NB_PRIMES_OPT ) SFREE(buf_rel[i].primes);
 
   relation_stream_trigger_disp_progress(rs);
-  fprintf (stderr, "End of read: %lu relations in %.1fs -- %.1f MB/s -- "
+  fprintf (stderr, "End of read: %"PRid" relations in %.1fs -- %.1f MB/s -- "
                    "%.1f rels/s\n", rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
 
   callback_arg->nrels = rs->nrels;
 
   relation_stream_clear(rs);
 
-#if defined FOR_FFS && defined STAT_FFS
-  fprintf (stderr, "# of non zero coeff: %lu\n", __stat_nonzero);
-  for (int i = 1; i <= 10 ; i++)
-    fprintf (stderr, "# of coeffs of abs value %d: %lu(%.2f%%)\n", i,
-             __stat_count[i], 100 * (double) __stat_count[i]/__stat_nonzero);
-  fprintf (stderr, "# of coeffs of abs value > 10: %lu(%.2f%%)\n",
-           __stat_count[0], 100 * (double) __stat_count[0]/__stat_nonzero);
+#ifdef STAT
+  fprintf (stderr, "STAT: W_total=%"PRIu64"\n", __stat_weight);
+#ifdef STAT_VALUES_COEFF
+  {
+    uint64_t tot = 0;
+    int i;
+    for (i = 0; i <= STAT_VALUES_COEFF_LEN; i++)
+      tot += __stat_nbcoeffofvalue[i];
+
+    fprintf (stderr, "STAT: coeffs with non-zero values: %"PRIu64"\n", 
+                     __stat_weight);
+    for (i = 1; i <= STAT_VALUES_COEFF_LEN; i++)
+      fprintf (stderr, "STAT: coeffs of abs value %d: %"PRIu64" (%.2f%%)\n",
+               i, __stat_nbcoeffofvalue[i], 
+               100 * (double) __stat_nbcoeffofvalue[i]/tot);
+    fprintf (stderr, "STAT: coeffs of abs value > %d: %"PRIu64" (%.2f%%)\n",
+             STAT_VALUES_COEFF_LEN, __stat_nbcoeffofvalue[0],
+             100 * (double) __stat_nbcoeffofvalue[0]/tot);
+  }
+#endif
 #endif
 
   return 1;
 }
+
+
+/***************** utils functions for purge binary **************************/
 
 void
 read_rel_used_from_infile (const char *infilerel, size_t rel_used_nb_bytes,
@@ -1398,12 +1467,11 @@ read_rel_used_from_infile (const char *infilerel, size_t rel_used_nb_bytes,
 {
   FILE *in;
   void *p, *pl, *pf;
-  int pipe;
   index_t nr = 0;
 
-  fprintf (stderr, "Loading rel_used file %s, %lu bytes\n", infilerel,
-                   (unsigned long) rel_used_nb_bytes);
-  if (!(in = fopen_maybe_compressed2 (infilerel, "r", &pipe, NULL)))
+  fprintf (stderr, "Loading rel_used file %s, %zu bytes\n", infilerel,
+                   rel_used_nb_bytes);
+  if (!(in = fopen_maybe_compressed (infilerel, "r")))
   {
     fprintf (stderr, "Error, cannot open file %s for reading.\n", infilerel);
     exit (1);
@@ -1417,14 +1485,13 @@ read_rel_used_from_infile (const char *infilerel, size_t rel_used_nb_bytes,
     if ((p == pf) ^ !feof(in))
     {
       fprintf (stderr, "Error, the length of file %s is incorrect compared "
-                       "with nrels (%lu).\n", infilerel, nrelmax);
+                       "with nrels (%"PRIu64").\n", infilerel, nrelmax);
       exit (1);
     }
   }
-  fclose(in);
+  fclose_maybe_compressed(in, infilerel);
   *nrels = nr;
-  fprintf (stderr, "Number of used relations is %lu\n",
-                   (unsigned long) *nrels);
+  fprintf (stderr, "Number of used relations is %"PRid"\n", *nrels);
 }
 
 
@@ -1520,6 +1587,8 @@ purge_parse_npt_param (param_list pl)
   }
 }
 
+/*************************** main ********************************************/
+
 int
 main (int argc, char **argv)
 {
@@ -1529,8 +1598,8 @@ main (int argc, char **argv)
   param_list pl;
   buf_arg_t buf_arg;
   buf_rel_t *buf_rel;
-  int pipe_purged, pipe_deleted;
-  index_t min_index, nrels, nprimes;
+  uint64_t min_index;
+  index_t nrels, nprimes;
 
   set_rep_cado(argv[0], rep_cado);
   wct0 = wct_seconds ();
@@ -1553,10 +1622,10 @@ main (int argc, char **argv)
   }
 
   /* read command-line parameters */
-  param_list_parse_uint64(pl, "nrels", (uint64_t *) &nrelmax);
-  param_list_parse_uint64(pl, "nprimes", (uint64_t *) &nprimemax);
-  param_list_parse_uint64(pl, "keep", (uint64_t *) &keep);
-  param_list_parse_uint64(pl, "minindex", (uint64_t *) &min_index);
+  param_list_parse_uint64(pl, "nrels", &nrelmax);
+  param_list_parse_uint64(pl, "nprimes", &nprimemax);
+  param_list_parse_int64(pl, "keep", &keep);
+  param_list_parse_uint64(pl, "minindex", &min_index);
   purge_parse_npt_param (pl);
   param_list_parse_uint(pl, "npass", &npass);
   param_list_parse_double(pl, "required_excess", &required_excess);
@@ -1609,18 +1678,7 @@ main (int argc, char **argv)
                      "program\nSee #define index_size in typedefs.h\n");
     exit(1);
   }
-#ifdef FOR_DL /* For FFS we need to remember the renumbering of primes*/
-  if (sos == NULL)
-    {
-      fprintf (stderr, "Error, missing -sos option.\n");
-      exit(1);
-    }
-  if (deletedname == NULL)
-    {
-      fprintf (stderr, "Error, missing -outdel option.\n");
-      exit(1);
-    }
-#endif
+  ASSERT_ALWAYS (min_index <= nprimemax);
 
   /* Printing relevant information */
   fprintf (stderr, "Weight function used during clique removal:\n"
@@ -1629,27 +1687,15 @@ main (int argc, char **argv)
     fprintf (stderr, "%0.3f ", weight_function_clique ((weight_t) k));
   fprintf (stderr, "\n");
 
-  fprintf (stderr, "Number of relations is %lu\n", nrelmax);
+  fprintf (stderr, "Number of relations is %"PRIu64"\n", nrelmax);
   fprintf (stderr, "Number of prime ideals below the two large prime bounds: "
-                   "%lu\n", nprimemax);
+                   "%"PRIu64"\n", nprimemax);
 
   /* Allocating memory */
   SMALLOC_AND_PRINT(ideals_weight,nprimemax,"ideals_weight",tot_alloc_bytes);
 
   rel_used_nb_bytes = (nrelmax + 7) >> 3;
-  bit_vector_init(rel_used, nrelmax);
-  if (!rel_used->p)
-  {
-    fprintf (stderr, "Error, cannot allocate memory (%lu bytes) for "
-                     "rel_used.\n", (unsigned long) rel_used_nb_bytes);
-    exit (1);
-  }
-  tot_alloc_bytes += rel_used_nb_bytes;
-  fprintf (stderr, "Allocated rel_used of %luMB (total %zuMB so far)\n",
-                   rel_used_nb_bytes >> 20, tot_alloc_bytes >> 20);
-
-  SMALLOC_AND_PRINT(sum2_index,nprimemax,"sum2_index",tot_alloc_bytes);
-
+  SMALLOC_BIT_VECTOR(rel_used,nrelmax,"rel_used",tot_alloc_bytes);
 
   if (binfilerel)
     read_rel_used_from_infile(infilerel, rel_used_nb_bytes, &nrels);
@@ -1658,7 +1704,6 @@ main (int argc, char **argv)
     bit_vector_set(rel_used, 1);
     nrels = nrelmax;
   }
-
   /* For the last byte of rel_used, put the bits to 0 if it does not
    * correspond to a rel num */
   if (nrelmax & (BV_BITS - 1))
@@ -1666,126 +1711,170 @@ main (int argc, char **argv)
                                 (((bv_t) 1)<<(nrelmax & (BV_BITS - 1))) - 1;
 
   if (!boutfilerel)
+  {
+    SMALLOC_BIT_VECTOR(Tbv,nrelmax,"Tbv",tot_alloc_bytes);
+    SMALLOC_AND_PRINT(sum2_index,nprimemax,"sum2_index",tot_alloc_bytes);
     SMALLOC_AND_PRINT(rel_compact,nrelmax,"rel_compact",tot_alloc_bytes);
+  }
 
   SMALLOC_AND_PRINT (buf_rel,SIZE_BUF_REL,"buf_rel",tot_alloc_bytes);
 
   MEMSETZERO(&buf_arg, 1);
   buf_arg.f_deleted = NULL;
-  buf_arg.min_index = min_index;
+  buf_arg.min_index = (index_t) min_index;
   buf_arg.buf_data = buf_rel;
 
 
-  /************************** first pass *************************************/
+  /**********************Start interessing stuff *****************************/
+  if (!boutfilerel) 
+    fprintf (stderr, "Pass 1, reading and storing ideals with index h >= "
+                     "%"PRIu64"\n", min_index);
+  else
+    fprintf (stderr, "Pass 1, reading ideals with index h >= %"PRIu64"\n", 
+                     min_index);
 
-  fprintf (stderr, "Pass 1, filtering ideals with index h >= %lu\n",
-                   (unsigned long) min_index);
-
+  /* first pass over relations in files */
   prempt_scan_relations (&insertRelation, &buf_arg);
   nprimes = buf_arg.nprimes;
+  
+  tot_alloc_bytes += my_malloc_bytes;
+  fprintf (stderr, "Allocated rel_compact[i] %zuMB (total %zuMB so far)\n",
+                   my_malloc_bytes >> 20, tot_alloc_bytes >> 20);
+#ifdef STAT
+  {
+  size_t tmp = ((uint64_t) buf_arg.W + nrelmax) * sizeof(index_t);
+  double ratio = 100.0 * (double) (((double) tmp) / ((double) my_malloc_bytes));
+  fprintf (stderr, "STAT: W_active=%1.0f\nSTAT: Should take %zuMB in memory, "
+                   "take %zuMB (%.2f %%)\n", buf_arg.W, tmp >> 20,
+                   my_malloc_bytes >> 20, ratio);
+  }
+#endif
 
   if (buf_arg.nrels != nrelmax) 
   {
     fprintf (stderr, "Error, -nrels value should match the number of scanned "
-                     "relations\nexpected %lu relations, found %lu\n", 
-                     (unsigned long) nrelmax, (unsigned long) buf_arg.nrels);
+                     "relations\nexpected %"PRIu64" relations, found %"PRid"\n",
+                     nrelmax, buf_arg.nrels);
     exit (1);
   }
 
-
-  if (!binfilerel)
-    fprintf (stderr, "   nrels=%lu, nprimes=%lu; excess=%ld\n",
-       (unsigned long) nrels, (unsigned long) nprimes, ((long) nrels) - nprimes);
-  else
-    fprintf (stderr, "   nrels=%lu (out of %lu), nprimes=%lu; excess=%ld\n",
-       (unsigned long) nrels, (unsigned long) nrelmax, (unsigned long) nprimes,
-       ((long) nrels) - nprimes);
-
   if (!boutfilerel) 
   {
-    remove_singletons (&nrels, &nprimes);
+    singletons_and_cliques_removal (&nrels, &nprimes);
     if (nrels <= nprimes) /* covers case nrel = nprimes = 0 */
     {
       fprintf(stderr, "number of relations <= number of ideals\n");
       exit (2);
     }
-  }
 
-  if (!boutfilerel) {
+    /* free rel_compact[i] and rel_compact. We do not need it anymore */
     my_malloc_free_all ();
+    tot_alloc_bytes -= my_malloc_bytes;
+    fprintf (stderr, "Freed rel_compact[i] %zuMB (total %zuMB so far)\n",
+                     my_malloc_bytes >> 20, tot_alloc_bytes >> 20);
 
-    fprintf (stderr, "Freeing rel_compact array...\n");
-    /* we do not use it anymore */
     free (rel_compact);
+    size_t tmp = (nrelmax * sizeof(index_t*));
+    tot_alloc_bytes -= tmp;
+    fprintf (stderr, "Freed rel_compact %zuMB (total %zuMB so far)\n",
+                     tmp >> 20, tot_alloc_bytes >> 20);
 
- /*************************** second pass ***********************************/
-
+    // Renumber the primes in [0,nprimes] for merge and replay
     SMALLOC_AND_PRINT(newindex,nprimemax,"newindex",tot_alloc_bytes);
-    renumber (sos, min_index, nprimes);
+    renumber (sos, (index_t) min_index, nprimes);
 
-    /* reread the relation files and convert them to the new coding */
-    fprintf (stderr, "Storing remaining relations...\n");
   }
+  else
+  {
+    if (!binfilerel)
+      fprintf (stderr, "   nrels=%"PRid" nprimes=%"PRid" excess=%"PRId64"\n",
+                       nrels, nprimes, ((int64_t) nrels) - nprimes);
+    else
+      fprintf (stderr, "   nrels=%"PRid" (out of %"PRIu64") nprimes=%"PRid" "
+                       "excess=%"PRId64"\n", nrels, nrelmax, nprimes, 
+                       ((int64_t) nrels) - nprimes);
+  }
+
   relsup = 0;
   prisup = 0;
 
+  /* reread the relation files and convert them to the new coding */
+  fprintf (stderr, "Storing remaining relations...\n");
   
   buf_arg.min_index = 0;
-  buf_arg.f_remaining = 
-                fopen_maybe_compressed2(purgedname, "w", &pipe_purged, NULL);
+  if (!(buf_arg.f_remaining = fopen_maybe_compressed (purgedname, "w")))
+  {
+    fprintf (stderr, "Error, cannot open file %s for writing.\n", purgedname);
+    exit (1);
+  }
   if (deletedname != NULL)
-    buf_arg.f_deleted = 
-                fopen_maybe_compressed2(deletedname, "w", &pipe_deleted, NULL);
-
-    fprintf (buf_arg.f_remaining, "%lu %lu\n", (unsigned long) nrels, 
-                                               (unsigned long) nprimes);
-  prempt_scan_relations (&printrel, &buf_arg);
-  /* write excess to stdout */
-  printf ("NROWS:%lu WEIGHT:%1.0f WEIGHT*NROWS=%1.2e\n",
-               (unsigned long) nrels, buf_arg.W, buf_arg.W * (double) nrels);
-  printf ("EXCESS: %lu\n", ((long) nrels) - nprimes);
-  fflush (stdout);
-
-  if (boutfilerel) {
-    FILE *out;
-    int pipe;
-    void *p, *pf;
-
-    if (nrelmax & (BV_BITS - 1))
-      rel_used->p[nrelmax>>LN2_BV_BITS] &= (((bv_t) 1)<<(nrelmax & (BV_BITS - 1))) - 1;
-
-    fprintf (stderr, "Relations with at least one singleton found and suppress:%lu\nNumber of primes suppress : %lu\nWriting rel_used file %s, %lu bytes\n",
-       (unsigned long) relsup, (unsigned long) prisup, outfilerel, (unsigned long) rel_used_nb_bytes);
-    if (!(out = fopen_maybe_compressed2 (outfilerel, "w", &pipe, NULL))) {
-      fprintf (stderr, "Purge main: rel_used file %s cannot be written.\n", outfilerel);
+    if (!(buf_arg.f_deleted = fopen_maybe_compressed (deletedname, "w")))
+    {
+      fprintf (stderr, "Error, cannot open file %s for writing.\n",deletedname);
       exit (1);
     }
-    for (p = (void *) rel_used->p, pf = p + rel_used_nb_bytes; p != pf;
-   p += fwrite(p, 1, pf - p, out));
-    fclose (out);
+
+  fprintf (buf_arg.f_remaining, "%"PRid" %"PRid"\n", nrels, nprimes);
+  /* second pass over relations in files */
+  prempt_scan_relations (&printrel, &buf_arg);
+
+
+  if (!boutfilerel)
+  {
+    /* write final values to stdout */
+    fprintf(stdout, "Final values:\nnrels=%"PRid" nprimes=%"PRid" "
+                    "excess=%"PRId64"\nweight=%1.0f weight*nrels=%1.2e\n", 
+                    nrels, nprimes, ((int64_t) nrels) - nprimes, buf_arg.W, 
+                    buf_arg.W * (double) nrels);
+    fflush (stdout);
+  }
+  else
+  {
+    FILE *out;
+    void *p, *pf;
+
+    /* For the last byte of rel_used, put the bits to 0 if it does not
+    * correspond to a rel num */
+    if (nrelmax & (BV_BITS - 1))
+      rel_used->p[nrelmax>>LN2_BV_BITS] &= 
+                                  (((bv_t) 1)<<(nrelmax & (BV_BITS - 1))) - 1;
+
+    fprintf (stderr, "Deleted %"PRid" relations with singleton(s)\n"
+                     "Number of primes deleted: %"PRid"\n"
+                     "Writing rel_used file %s, %zu bytes\n",
+                     relsup, prisup, outfilerel, rel_used_nb_bytes);
+
+    if (!(out = fopen_maybe_compressed (outfilerel, "w"))) 
+    {
+      fprintf (stderr, "Error, cannot open file %s for writing.\n", outfilerel);
+      exit (1);
+    }
+    p = (void *) rel_used->p;
+    for (pf = p + rel_used_nb_bytes; p != pf; p += fwrite(p, 1, pf - p, out));
+    
+    fclose_maybe_compressed (out, outfilerel);
   }
 
+
+  /* Free allocated stuff */
+  SFREE (ideals_weight);
   SFREE (buf_rel);
   bit_vector_clear(rel_used);
   SFREE(sum2_index);
   SFREE(newindex);
+  if (!boutfilerel)
+    bit_vector_clear(Tbv);
 
   if (filelist)
     filelist_clear(fic);
 
-  if (pipe_purged)  
-    pclose(buf_arg.f_remaining);
-  else 
-    fclose(buf_arg.f_remaining);
+  fclose_maybe_compressed (buf_arg.f_remaining, purgedname);
   if (buf_arg.f_deleted != NULL)
-  {
-    if (pipe_deleted)
-      pclose(buf_arg.f_deleted); 
-    else
-      fclose(buf_arg.f_deleted); 
-  }
+    fclose_maybe_compressed (buf_arg.f_deleted, deletedname);
 
   param_list_clear(pl);
+
+  /* print usage of time and memory */
   print_timing_and_memory (wct0);
 
   return 0;

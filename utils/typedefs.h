@@ -15,18 +15,20 @@
 
 #if p_r_values_size == 32
 #define p_r_values_t uint32_t
-#define PRpr PRIu32
+#define PRpr PRIx32
 #else
 #define p_r_values_t uint64_t
-#define PRpr PRIu64
+#define PRpr PRIx64
 #endif
 
 #if index_size == 32
 #define index_t uint32_t
 #define PRid PRIu32
+#define PRxid PRIx32
 #else
 #define index_t uint64_t
 #define PRid PRIu64
+#define PRxid PRIx64
 #endif 
 
 /* The weight of ideals saturates at 255 */
