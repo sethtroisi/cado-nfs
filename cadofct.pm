@@ -2355,7 +2355,7 @@ sub purge {
     info "Removing singletons...";
     $tab_level++;
     my $cmd = cmd("$param{'bindir'}/filter/purge ".
-                  "-poly $param{'prefix'}.poly -keep $param{'keeppurge'} ".
+                  "-keep $param{'keeppurge'} ".
                   "-nrels $nbrels -out $param{'prefix'}.purged.gz ".
                   "-nprimes $nprimes -minindex $min_index ".
                   "-npthr $param{'bwmt'} -basepath $param{'wdir'} ".
