@@ -74,11 +74,13 @@ unsigned long sanity_collisions = 0;
 /* end sanity check */
 
 /* infile is the input file
-   if dirname is NULL, no output is done */
+   if dirname is NULL, no output is done.
+   * if pass=0: read already renumbered files only.
+   * if pass=1: read new files only */
 unsigned long
 remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
                      uint32_t * H, unsigned long K, unsigned int ab_base,
-                     renumber_t renumber_table)
+                     renumber_t renumber_table, int pass)
 {
     FILE * f_in;
     int p_in;
@@ -95,6 +97,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
     for( ; *files ; files++) {
         const char * name = *files;
         int raw = 0;
+        unsigned long nodu0 = nodu, dupl0 = dupl;
 
         f_in = fopen_maybe_compressed2 (name, "r", &p_in, &suffix_in);
         ASSERT_ALWAYS(f_in != NULL);
@@ -119,6 +122,12 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
 
         /* close and reopen the file */
         if (p_in) pclose(f_in); else fclose(f_in);
+
+        if (pass == 0 && raw != 0)
+          continue; /* don't treat new files in pass 0 */
+        if (pass == 1 && raw == 0)
+          continue; /* don't treat already renumbered files in pass 1 */
+
         f_in = fopen_maybe_compressed2 (name, "r", &p_in, &suffix_in);
         ASSERT_ALWAYS(f_in != NULL);
 
@@ -188,6 +197,8 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
             }
             if (H[i] == j) {
                 dupl++;
+                /* we should not find duplicates in already renumbered files */
+                ASSERT_ALWAYS(raw != 0);
                 continue;		/* probably duplicate */
             }
 
@@ -206,7 +217,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
             }
 
             nodu++;
-            if (cost >= factor * (double) rs->nrels) {
+            if (cost >= factor * (double) nodu) {
                 full_table = 100.0 * (double) nodu / (double) K;
                 fprintf(stderr, "Warning, hash table is %1.0f%% full\n",
                         full_table);
@@ -281,8 +292,6 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
 
 
         if (dirname && raw) {
-            fprintf(stderr, "%s/{%s => %s}\n",
-                    dirname, path_basename(oname_tmp), path_basename(oname));
             int ret = rename(oname_tmp, oname);
             if (ret) {
                 perror("Problem renaming result file");
@@ -291,6 +300,9 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
             free(oname);
             free(oname_tmp);
         }
+        fprintf (stderr, "%s: %lu relations, %lu duplicates, remains %lu\n",
+                 path_basename(name),
+                 nodu + dupl - (nodu0 + dupl0), dupl - dupl0, nodu - nodu0);
     }
     relation_stream_trigger_disp_progress(rs);
     fprintf(stderr,
@@ -432,8 +444,14 @@ main (int argc, char *argv[])
   }
 
   char ** files = filelist ? filelist_from_file (basepath, filelist, 0) : argv;
-  unsigned long rread = remove_dup_in_files (files, basepath, outfmt, H, K,
-                                             (ab_hexa)?16:10, renumber_table);
+  unsigned long rread;
+  /* pass 0: we read files that were already renumbered, and enter the
+     correspoding (a,b) values in the H table */
+  rread = remove_dup_in_files (files, basepath, outfmt, H, K,
+                               (ab_hexa)?16:10, renumber_table, 0);
+  /* pass 1: we read new files, remove duplicates, and renumber them */
+  rread += remove_dup_in_files (files, basepath, outfmt, H, K,
+                               (ab_hexa)?16:10, renumber_table, 1);
   if (filelist) filelist_clear(files);
 
 
