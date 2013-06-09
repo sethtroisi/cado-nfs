@@ -70,7 +70,31 @@ L2_lognorm_d (double *a, unsigned long d, double s, int method)
    */
 
 #define USE_CIRCULAR
-  if (d == 3)
+  if (d == 2)
+  {
+    double a2, a1, a0;
+    a2 = a[2] * s * s;
+    a1 = a[1] * s;
+    a0 = a[0];
+    if (method == RECTANGULAR) {
+      fprintf (stderr, "L2norm not yet implemented for degree %lu\n", d);
+      exit (1);
+    }
+    else
+    { /* use circular integral (Sage code):
+         var('a2,a1,a0,x,y,r,s,t')
+         f = a2*x^2+a1*x+a0
+         F = expand(f(x=x/y)*y^2)
+         F = F.subs(x=s^(1/2)*r*cos(t),y=r/s^(1/2)*sin(t))
+         v = integrate(integrate(F^2*r,(r,0,1)),(t,0,2*pi))
+         (s^2*v).expand().collect(pi)
+      */
+      n = 3.0 * (a2 * a2 + a0 * a0) + 2.0 * a0 * a2 + a1 * a1;
+      n = n * 0.130899693899574704; /* Pi/24 */
+    }
+    return 0.5 * log(n / (s * s));
+  }
+  else if (d == 3)
     {
       double a3, a2, a1, a0;
       a3 = a[3] * s * s * s;
@@ -896,6 +920,50 @@ L2_skewness_derivative (mpz_t *f, int d, int prec, int method)
             a = c;
         }
     }
+  else if (d == 2)
+    {
+      /* Sage code:
+         R.<x> = PolynomialRing(ZZ)
+         S.<a> = InfinitePolynomialRing(R)
+         d=2; f = SR(sum(a[i]*x^i for i in range(d+1)))
+         F = expand(f(x=x/y)*y^d)
+         var('r,s,t')
+         F = F.subs(x=s^(1/2)*r*cos(t),y=r/s^(1/2)*sin(t))
+         v = integrate(integrate(F^2*r,(r,0,1)),(t,0,2*pi))
+         v = (24*v/pi).expand()
+         dv = v.diff(s)
+         dv = (dv*s^3).expand().collect(s)
+      */
+      dfd[2] = 6.0 * fd[2] * fd[2];
+      dfd[1] = 0.0;
+      dfd[0] = 6.0 * fd[0] * fd[0];
+      nc = -1.0;
+      s = 1.0;
+      /* first isolate the minimum in an interval [s, 2s] by dichotomy */
+      while (nc < 0)
+        {
+          s = 2.0 * s;
+          s1 = s * s;   /* s^2 */
+          s2 = s1 * s1; /* s^4 */
+          nc = dfd[2] * s2 + dfd[1] - dfd[0];
+        }
+
+      /* now dv(s/2) < 0 < dv(s) thus the minimum is in [s/2, s] */
+      a = (s == 2.0) ? 1.0 : 0.5 * s;
+      b = s;
+      /* use dichotomy to refine the root */
+      while (prec--)
+        {
+          c = (a + b) * 0.5;
+          s1 = c * c;   /* s^2 */
+          s2 = s1 * s1; /* s^4 */
+          nc = dfd[2] * s2 + dfd[1] - dfd[0];
+          if (nc > 0)
+            b = c;
+          else
+            a = c;
+        }
+    }
   else
     {
       fprintf (stderr, "L2_skewness_derivative not yet implemented for degree %d\n", d);
@@ -1170,7 +1238,7 @@ m_logmu_insert (m_logmu_t* M, unsigned long alloc, unsigned long *psize,
 /************************** polynomial arithmetic ****************************/
 
 /* g <- content(f) where deg(f)=d */
-static void
+void
 content_poly (mpz_t g, mpz_t *f, int d)
 {
   int i;
@@ -2317,7 +2385,6 @@ print_poly_fg ( mpz_t *f,
    cado_poly_clear (cpoly);
    return e;
 }
-
 
 /* Returns k such that f(x+k) has the smallest 1-norm, with the corresponding
    skewness.

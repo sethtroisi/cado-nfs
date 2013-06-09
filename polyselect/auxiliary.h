@@ -80,7 +80,8 @@ void print_cadopoly_fg (FILE*, mpz_t*, mpz_t*, int, mpz_t);
 double print_cadopoly (FILE*, cado_poly, int);
 void print_cadopoly_extra (FILE*, cado_poly, int, char**, double, int);
 double print_poly_fg ( mpz_t*, mpz_t*, int, mpz_t, int);
-
+void print_nonlinear_poly_info ( mpz_t*, mpz_t*, unsigned int,
+                                 unsigned int, int);
 void discriminant (mpz_t, mpz_t*, const int);
 long rotate_aux (mpz_t *f, mpz_t b, mpz_t m, long k0, long k, unsigned int t);
 double rotate (mpz_t*, int, unsigned long, mpz_t, mpz_t, long*, long*, int,
@@ -91,8 +92,7 @@ void optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation, int
 void optimize_dir_aux (mpz_t *f, int d, mpz_t *g, int verbose, int method);
 void rotate_bounds (mpz_t *f, int d, mpz_t b, mpz_t m, long *K0, long *K1, long *J0, long *J1, int verbose, int);
 void do_translate_z (mpz_t *f, int d, mpz_t *g, mpz_t k);
-
-/* changed for rootsieve5.c */
+void content_poly (mpz_t g, mpz_t *f, int d);
 void eval_poly_ui (mpz_t v, mpz_t *f, int d, unsigned long r);
 void eval_poly_diff_ui (mpz_t v, mpz_t *f, int d, unsigned long r);
 

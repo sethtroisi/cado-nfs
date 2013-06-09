@@ -11,7 +11,8 @@
   If the raw polynomial is not good enough, we will still stream
   it to STDERR for further reference.
 
-  Please report bugs to shih.bai AT gmail.com.
+  Please report bugs to the Bug Tracking System on:
+  https://gforge.inria.fr/tracker/?atid=7442&group_id=2065&func=browse
 */
 
 #define EMIT_ADDRESSABLE_shash_add
@@ -145,6 +146,7 @@ check_parameters (mpz_t m0, unsigned long d, unsigned long lq)
   return 1;
 }
 
+
 /* print poly info */
 void
 print_poly_info ( mpz_t *f,
@@ -172,6 +174,7 @@ print_poly_info ( mpz_t *f,
           logmu - 0.824 * sqrt (2.0 * exp_rot[d] * log (skew)),
           nroots);
 }
+
 
 /* the number of expected collisions is 8*lenPrimes^2/2/(2P)^2 */
 static double
