@@ -129,7 +129,7 @@ renumber_read_table (renumber_t renumber_info, const char * filename)
       report = ret;
       dt = wct_seconds () - t;
       if (dt > 0.01)
-        mb_s = ((double) (ret * renumber_info->nb_bytes) / (double) dt) *1.0e6;
+        mb_s = ((double) (ret * renumber_info->nb_bytes) / (double) dt) * 1.0e-6;
       else
         mb_s = 0.0;
       fprintf(stderr, "Renumbering table: read %"PRid" values from file "
@@ -139,7 +139,7 @@ renumber_read_table (renumber_t renumber_info, const char * filename)
   
   dt = wct_seconds () - t;
   if (dt > 0.01)
-    mb_s = ((double) (ret * renumber_info->nb_bytes) / (double) dt) *1.0e6;
+    mb_s = ((double) (ret * renumber_info->nb_bytes) / (double) dt) * 1.0e-6;
   else
     mb_s = 0.0;
   fprintf(stderr, "Renumbering table: end of read. Read %"PRid" values from "
