@@ -277,7 +277,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
 
             if (relation_stream_disp_progress_now_p(rs)) {
                 fprintf(stderr,
-                        "Read %lu relations, %lu duplicates (%1.2f%%)"
+                        "Read %"PRid" relations, %lu duplicates (%1.2f%%)"
                         " in %.1f s -- %.1f MB/s, %.1f rels/s\n",
                         rs->nrels, dupl, 100.0 * (double) dupl / (double) rs->nrels,
                         rs->dt, rs->mb_s, rs->rels_s);
@@ -306,7 +306,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
     }
     relation_stream_trigger_disp_progress(rs);
     fprintf(stderr,
-            "Read %lu relations, %lu duplicates (%1.2f%%)"
+            "Read %"PRid" relations, %lu duplicates (%1.2f%%)"
             " in %.1f s -- %.1f MB/s, %.1f rels/s\n",
             rs->nrels, dupl, 100.0 * (double) dupl / (double) rs->nrels,
             rs->dt, rs->mb_s, rs->rels_s);

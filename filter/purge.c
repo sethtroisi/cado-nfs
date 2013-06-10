@@ -586,12 +586,11 @@ cliques_removal (index_t target_excess, index_t *nrels, index_t *nprimes)
   for (j = 0; j < ltmp && *nrels > target_excess + *nprimes; j++)
     *nrels -= delete_connected_component (tmp[j].i, nprimes);
 
-  fprintf (stderr, "   deleted %u heavier connected components at %2.2lf\n",
+  fprintf (stderr, "    deleted %u heavier connected components at %2.2lf\n",
                      j, seconds ());
 
 #if DEBUG >= 1
-  fprintf (stderr, "   DEBUG: newnrel=%u newnprimes=%u\n"
-                   "   DEBUG: ltmp=%u chunk=%u target=%u\n", *nrels,
+  fprintf (stderr, "    DEBUG: ltmp=%u chunk=%u target=%u\n", *nrels,
                    *nprimes, ltmp, chunk, target_excess);
 #endif
 
@@ -769,9 +768,8 @@ singletons_and_cliques_removal (index_t *nrels, index_t *nprimes)
     target_excess = excess - chunk;
     if (target_excess <  keep)
       target_excess = keep;
-    fprintf (stderr, "Step %u on %u: %"PRid" real (non null) rels remain\n"
-                     "  excess is %"PRId64", target excess is %"PRId64"\n",
-                     count, npass, *nrels, excess, target_excess);
+    fprintf (stderr, "Step %u on %u: target excess is %"PRId64"\n",
+                     count, npass, target_excess);
     cliques_removal (target_excess, nrels, nprimes);
 
     remove_all_singletons(nrels, nprimes, &excess);
@@ -813,11 +811,13 @@ singletons_and_cliques_removal (index_t *nrels, index_t *nprimes)
    All rows will be 1 more that needed -> subtract 1 in fprint...! */
 
 static void
-renumber (const char *sos, index_t min_index, index_t nprimes)
+renumber (const char *sos, index_t MAYBE_UNUSED min_index, index_t nprimes)
 {
   FILE *fsos = NULL;
   index_t i, nb = 0;
+#if DEBUG >= 1
   unsigned int count = 0;
+#endif
 
 
   if (sos != NULL)
@@ -907,7 +907,7 @@ prempt_load (prempt_t prempt_data) {
   char **p_files = prempt_data->files, *pprod;
   FILE *f;
   size_t try_load, load;
-  char *p, *l, *pmax = &(prempt_data->buf[PREMPT_BUF]);
+  char *pmax = &(prempt_data->buf[PREMPT_BUF]);
 
   pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
   pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
@@ -920,6 +920,7 @@ prempt_load (prempt_t prempt_data) {
       exit (1);
     }
 #if DEBUG >= 1
+    char *p, *l;
     /* Write the command that read the files (one file per line) */
     p = strchr(*p_files, '/');
     if (p)

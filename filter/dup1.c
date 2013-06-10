@@ -117,7 +117,7 @@ int split_relfile (relation_stream_ptr rs, const char *name,
 
         if (relation_stream_disp_progress_now_p(rs)) {
             fprintf (stderr,
-                    "# split %lu relations in %.1fs"
+                    "# split %"PRid" relations in %.1fs"
                     " -- %.1f MB/s -- %.1f rels/s\n",
                     rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
         }
@@ -233,7 +233,7 @@ main (int argc, char * argv[])
     }
     relation_stream_trigger_disp_progress(rs);
     fprintf (stderr,
-            "# split %lu relations in %.1fs"
+            "# split %"PRid" relations in %.1fs"
             " -- %.1f MB/s -- %.1f rels/s\n",
             rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
     for (int i = 0; i < nslices; i++) {
