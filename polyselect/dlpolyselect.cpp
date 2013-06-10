@@ -36,6 +36,42 @@ using namespace NTL;
 
 const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
 
+
+#define SIZE(p) (((long *) (p))[1])
+#define DATA(p) ((mp_limb_t *) (((long *) (p)) + 2))
+
+
+unsigned long ZZ_limbs(const ZZ& z)
+{
+    if (z.rep) return ABS(SIZE(z.rep));
+    else return 0;
+}
+
+
+/*
+  This uses anovocin's patch on 
+  http://trac.sagemath.org/sage_trac/ticket/4283
+*/
+void ZZ_to_mpz(mpz_t output, const ZZ& z)
+{
+    _ntl_gbigint x = z.rep;
+    if (!x)
+    {
+        mpz_set_ui(output, 0L);
+        return;
+    }
+    unsigned long lw = ZZ_limbs(z);
+    mpz_realloc(output, lw);
+
+    mp_limb_t *xp = DATA(x);
+
+    for (unsigned long i = 0; i < lw; i++)
+        output->_mp_d[i] = xp[i];
+    if (z < 0L) output->_mp_size = -lw;
+    else output->_mp_size = lw;
+}
+
+
 /*
   Print two nonlinear poly info
 */
@@ -151,8 +187,8 @@ polygen_JL_f ( mpz_t n,
     srand(time(NULL));
     while (1)
     {
+        fint[d] = ad;
         mpz_set_ui (f[d], ad);
-        fint[0] = ad;
         for (i = 0; i < d; i ++) {
             fint[i] = (2*rand()- RAND_MAX) % bound;
             mpz_set_si (f[i], fint[i]);
@@ -222,17 +258,11 @@ polygen_JL_g (mpz_t N, int dg, mpz_t **g, mpz_t root)
     }
 		
     LLL (zY, Matrix, 0);
-	
-    /* only use first shortest coefficient */
-    for (int k = 0; k <= dg; k ++ ) {
-        for (int i = 0; i <= dg; i ++) {
-            for (int j = 0; j < NumBits (Matrix [k] [i]); j ++)
-                if (bit(Matrix[k][i], j) == 1)
-                    mpz_setbit (g[k][i], j);
-            if (Matrix[k][i] < 0)
-                mpz_mul_si (g[k][i], g[k][i], -1);
-        }
-    }
+
+    /* consider all coefficients */
+    for (int k = 0; k <= dg; k ++ )
+        for (int i = 0; i <= dg; i ++)
+            ZZ_to_mpz(g[k][i], Matrix [k] [i]);
     
     free(stmp1);
     free(stmp2);
@@ -267,11 +297,10 @@ polygen_JL ( mpz_t n,
     nr = polygen_JL_f (n, d, bound, f, rf, ad);
 
     for (i = 0; i < nr; i ++) {
-        
         /* generate g of degree dg */
         polygen_JL_g (n, dg, g, rf[i]);
 
-        for (j = 0; j < dg; j ++) {
+        for (j = 0; j <= dg; j ++) {
             if (format == 1)
                 gmp_printf ("n: %Zd\n", n);
             else
@@ -280,7 +309,7 @@ polygen_JL ( mpz_t n,
             if (format == 1)
                 gmp_printf ("m: %Zd\n", n);
             else
-                gmp_printf ("M %Zd\n\n", n);
+                gmp_printf ("M %Zd\n\n", rf[i]);
         }
     }
     
