@@ -2976,18 +2976,6 @@ static void thread_buckets_alloc(thread_data * thrs, int n)
             int bucket_limit = thrs[i]->si->sides[side]->max_bucket_fill_ratio * BUCKET_REGION;
 
             ts->BA = init_bucket_array(thrs[i]->si->nb_buckets, bucket_limit);
-
-            /*
-            double limit_factor =
-                log(log(si->cpoly->pols[side]->lim)) -
-                log(log(si->bucket_thresh));
-            int bucket_limit_base = limit_factor * BUCKET_REGION;
-            bucket_limit_base *= BUCKET_LIMIT_FACTOR;
-            bucket_limit_base /= las->nb_threads;
-
-
-            fprintf(las->output, "# (thread %d, %s) asymptotic bucket_limit = %d, choosing %d\n", th->id, sidenames[side], bucket_limit_base, bucket_limit);
-            */
         }
     }
 }

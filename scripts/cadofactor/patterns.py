@@ -47,9 +47,9 @@ class Mediator(object, metaclass=abc.ABCMeta):
 
 
 class Colleague(object):
-    def __init__(self, mediator, *args, **kwargs):
-        self.__mediator = mediator
+    def __init__(self, *args, mediator, **kwargs):
         super().__init__(*args, **kwargs)
+        self.__mediator = mediator
     
     def send_notification(self, notification):
         return self.__mediator.relay_notification(notification)

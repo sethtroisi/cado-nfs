@@ -453,7 +453,11 @@ main (int argc, char *argv[])
     if (polyfilename == NULL)
       usage (argv0);
     if (renumberfilename == NULL)
+  #ifdef HAVE_MINGW
+      renumberfilename = "nul"; 
+  #else
       renumberfilename = "/dev/null"; 
+  #endif
 #endif
 
     cado_poly_init(cpoly);

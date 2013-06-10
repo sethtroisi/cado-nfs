@@ -371,7 +371,7 @@ class ClientServerTask(Task, patterns.Observer):
     def paramnames(self):
         return super().paramnames + ("maxwu",)
     
-    def __init__(self, db_listener, *args, **kwargs):
+    def __init__(self, *args, db_listener, **kwargs):
         super().__init__(*args, **kwargs)
         self.db_listener = db_listener
         self.db_listener.subscribeObserver(self)
@@ -443,14 +443,15 @@ class PolyselTask(ClientServerTask):
         super().__init__(*args, **kwargs)
         self.state["adnext"] = \
             max(self.state.get("adnext", 0), int(self.params.get("admin", 0)))
-        if not self.is_done():
-            self.send_notification(Notification.WANT_TO_RUN, None)
     
     def run(self):
-        assert not self.is_done()
         self.logger.info("Starting")
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
+        
+        if self.is_done():
+            self.logger.info("Polynomial selection already finished - nothing to do")
+            return
         
         if "bestpoly" in self.state:
             self.bestpoly = Polynomial(self.state["bestpoly"].splitlines())
@@ -563,7 +564,6 @@ class FactorBaseOrFreerelTask(Task, metaclass=abc.ABCMeta):
         if "outputfile" in self.state:
             assert "poly" in self.state
             # The target file must correspond to the polynomial "poly"
-        self.send_notification(Notification.WANT_TO_RUN, None)
     
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
@@ -712,7 +712,6 @@ class SievingTask(ClientServerTask, FilesCreator):
         if self.state["rels_wanted"] == 0:
             # TODO: Choose sensible default value
             pass
-        self.send_notification(Notification.WANT_TO_RUN, None)
     
     def run(self):
         self.logger.info("Starting")
@@ -784,11 +783,15 @@ class SievingTask(ClientServerTask, FilesCreator):
     def request_more_relations(self, additional):
         if additional > 0:
             self.state["rels_wanted"] += additional
-            self.logger.info("New goal for number of relations is %d",
-                             self.state["rels_wanted"])
         if self.state["rels_wanted"] > self.state["rels_found"]:
             self.send_notification(Notification.WANT_TO_RUN, None)
-
+            self.logger.info("New goal for number of relations is %d, "
+                             "need to sieve more",
+                             self.state["rels_wanted"])
+        else:
+            self.logger.info("New goal for number of relations is %d, but "
+                             "already have %d. No need to sieve more",
+                             self.state["rels_wanted"], self.state["rels_found"])
 
 class Duplicates1Task(Task, FilesCreator):
     """ Removes duplicate relations """
@@ -814,7 +817,6 @@ class Duplicates1Task(Task, FilesCreator):
         # Default slice counts to 0, in single DB commit
         self.slice_relcounts.setdefault(
             None, {str(i): 0 for i in range(0, self.nr_slices)})
-        self.send_notification(Notification.WANT_TO_RUN, None)
     
     def run(self):
         self.logger.info("Starting")
@@ -855,7 +857,6 @@ class Duplicates1Task(Task, FilesCreator):
         if not newfiles:
             self.logger.info("No new files to split")
         else:
-            self.logger.info("Starting")
             basedir = self.make_output_dirname()
             self.make_directories(basedir, map(str, range(0, self.nr_slices)))
             # TODO: can we recover from missing input files? Ask Sieving to
@@ -968,7 +969,6 @@ class Duplicates2Task(Task, FilesCreator):
         self.slice_relcounts = self.make_db_dict(self.make_tablename("counts"))
         self.slice_relcounts.setdefault(
             None, {str(i): 0 for i in range(0, self.nr_slices)})
-        self.send_notification(Notification.WANT_TO_RUN, None)
     
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
@@ -1050,16 +1050,11 @@ class PurgeTask(Task):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.send_notification(Notification.WANT_TO_RUN, None)
     
     def run(self):
         self.logger.info("Starting")
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
                           self.state)
-        
-        if "purgedfile" in self.state:
-            self.logger.info("Already have purged file")
-            return
         
         poly = self.send_request(Request.GET_POLYNOMIAL)
         polyfile = self.make_output_filename("poly")
@@ -1069,6 +1064,15 @@ class PurgeTask(Task):
         if not nunique:
             raise Exception("No unique relation count received")
         nrels = nfree + nunique
+        
+        if "purgedfile" in self.state and nrels == self.state["input_nrels"]:
+            self.logger.info("Already have a purged file, and no new input "
+                             "relations available. Nothing to do")
+            return
+        
+        self.state.pop("purgedfile", None)
+        self.state.pop("input_nrels", None)
+        
         self.logger.info("Reading %d unique and %d free relations, total %d"
                          % (nunique, nfree, nrels))
         purgedfile = self.make_output_filename("purged.gz")
@@ -1086,7 +1090,9 @@ class PurgeTask(Task):
             [nrows, weight, excess] = self.parse_stdout(stdout)
             self.logger.info("After purge, %d relations remain with weight %s and excess %s"
                              % (nrows, weight, excess))
-            self.state["purgedfile"] = purgedfile
+            # Update both atomically
+            self.state.update({"purgedfile": purgedfile, "input_nrels": nrels})
+            self.logger.info("Have enough relations")
             self.send_notification(Notification.HAVE_ENOUGH_RELATIONS, None)
         else:
             self.logger.info("Not enough relations, requesting more")
@@ -1149,7 +1155,6 @@ class MergeTask(Task):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.send_notification(Notification.WANT_TO_RUN, None)
 
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
@@ -1225,7 +1230,6 @@ class LinAlgTask(Task):
     # bwc.pl :complete seed=1 thr=1x1 mpi=1x1 matrix=c59.small.bin nullspace=left mm_impl=bucket interleaving=0 interval=100 mn=64 wdir=c59.bwc shuffled_product=1 bwc_bindir=/localdisk/kruppaal/build/cado-nfs/normal/linalg/bwc
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.send_notification(Notification.WANT_TO_RUN, None)
     
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
@@ -1276,7 +1280,6 @@ class CharactersTask(Task):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.send_notification(Notification.WANT_TO_RUN, None)
     
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
@@ -1335,7 +1338,6 @@ class SqrtTask(Task):
         super().__init__(*args, **kwargs)
         self.factors = self.make_db_dict(self.make_tablename("factors"))
         self.add_factor(int(self.params["N"]))
-        self.send_notification(Notification.WANT_TO_RUN, None)
     
     def run(self):
         self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
@@ -1559,7 +1561,7 @@ class StartClientsTask(Task):
         process = cadocommand.RemoteCommand(wuclient, host, self.parameters, self.path_prefix)
         (rc, stdout, stderr) = process.wait()
         if rc != 0:
-            self.logger.warning("Starting client on %(host)s failed. "
+            self.logger.warning("Starting client on %s failed. "
                                 "Consult log file for details." % host)
             return
         self.pids[clientid] = int(stdout)
@@ -1637,17 +1639,16 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
     @property
     def name(self):
         return "tasks"
-
+    
     CAN_CANCEL_WUS = 0
     
-    def __init__ (self, path_prefix, *args, **kwargs):
+    def __init__ (self, *args, path_prefix, **kwargs):
         super().__init__(*args, path_prefix = path_prefix, **kwargs)
         self.logger = logging.getLogger("Complete Factorization")
         self.params = self.myparams(("name", "workdir"))
         self.db_listener = self.make_db_listener()
         self.registered_filenames = self.make_db_dict(self.params["name"] + '_server_registered_filenames')
         self.chores = []
-        self.tasks_that_want_to_run = []
         
         # Init WU DB
         self.wuar = self.make_wu_access()
@@ -1723,7 +1724,11 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         self.tasks = (self.polysel, self.fb, self.freerel, self.sieving,
                       self.dup1, self.dup2, self.purge, self.merge,
                       self.linalg, self.characters, self.sqrt)
-    
+        
+        # Assume that all tasks want to run. Ff they are finished already, 
+        # they will just return immediately
+        self.tasks_that_want_to_run = list(self.tasks)
+        
         self.request_map = {
             Request.GET_POLYNOMIAL: self.polysel.get_poly,
             Request.GET_FACTORBASE_FILENAME: self.fb.get_filename,

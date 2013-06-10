@@ -1,6 +1,6 @@
 /* Auxiliary routines for polynomial selection
 
-Copyright 2008, 2009, 2010 Emmanuel Thome, Paul Zimmermann
+Copyright 2008, 2009, 2010, 2013 Emmanuel Thome, Paul Zimmermann
 
 This file is part of CADO-NFS.
 
@@ -70,7 +70,31 @@ L2_lognorm_d (double *a, unsigned long d, double s, int method)
    */
 
 #define USE_CIRCULAR
-  if (d == 3)
+  if (d == 2)
+  {
+    double a2, a1, a0;
+    a2 = a[2] * s * s;
+    a1 = a[1] * s;
+    a0 = a[0];
+    if (method == RECTANGULAR) {
+      fprintf (stderr, "L2norm not yet implemented for degree %lu\n", d);
+      exit (1);
+    }
+    else
+    { /* use circular integral (Sage code):
+         var('a2,a1,a0,x,y,r,s,t')
+         f = a2*x^2+a1*x+a0
+         F = expand(f(x=x/y)*y^2)
+         F = F.subs(x=s^(1/2)*r*cos(t),y=r/s^(1/2)*sin(t))
+         v = integrate(integrate(F^2*r,(r,0,1)),(t,0,2*pi))
+         (s^2*v).expand().collect(pi)
+      */
+      n = 3.0 * (a2 * a2 + a0 * a0) + 2.0 * a0 * a2 + a1 * a1;
+      n = n * 0.130899693899574704; /* Pi/24 */
+    }
+    return 0.5 * log(n / (s * s));
+  }
+  else if (d == 3)
     {
       double a3, a2, a1, a0;
       a3 = a[3] * s * s * s;
@@ -215,7 +239,7 @@ L2_lognorm (mpz_t *f, unsigned long d, double s, int method)
 {
   double a[MAX_DEGREE + 1];
   unsigned long i;
-  
+
   for (i = 0; i <= d; i++)
     a[i] = mpz_get_d (f[i]);
   return L2_lognorm_d (a, d, s, method);
@@ -223,7 +247,7 @@ L2_lognorm (mpz_t *f, unsigned long d, double s, int method)
 
 
 /* The name is misleading. It returns the before-log part in
-   1/2 log(int(int(...))) 
+   1/2 log(int(int(...)))
 */
 void
 L2_lognorm_mp (mpz_t *f, unsigned long d, mpz_t s, int method, mpz_t norm)
@@ -253,36 +277,36 @@ L2_lognorm_mp (mpz_t *f, unsigned long d, mpz_t s, int method, mpz_t norm)
 
     // n = 231.0 * (a6 * a6 + a0 * a0)
     mpz_mul (tmp, a[6], a[6]);
-    mpz_mul (tmp1, a[0], a[0]);   
+    mpz_mul (tmp1, a[0], a[0]);
     mpz_add (tmpsum, tmp, tmp1);
     mpz_mul_ui(n, tmpsum, 231);
     //   + 42.0 * (a6 * a4 + a2 * a0)
     mpz_mul (tmp, a[6], a[4]);
-    mpz_mul (tmp1, a[2], a[0]);   
+    mpz_mul (tmp1, a[2], a[0]);
     mpz_add (tmpsum, tmp, tmp1);
     mpz_addmul_ui (n, tmpsum, 42);
     //   + 21.0 * (a5 * a5 + a1 * a1)
     mpz_mul (tmp, a[5], a[5]);
-    mpz_mul (tmp1, a[1], a[1]);   
+    mpz_mul (tmp1, a[1], a[1]);
     mpz_add (tmpsum, tmp, tmp1);
     mpz_addmul_ui (n, tmpsum, 21);
     // + 7.0 * (a4 * a4 + a2 * a2)
     mpz_mul (tmp, a[4], a[4]);
-    mpz_mul (tmp1, a[2], a[2]);   
+    mpz_mul (tmp1, a[2], a[2]);
     mpz_add (tmpsum, tmp, tmp1);
     mpz_addmul_ui (n, tmpsum, 7);
     // +  14.0 * (a6 * a2 + a5 * a3 + a4 * a0 + a3 * a1)
     mpz_mul (tmp, a[6], a[2]);
-    mpz_mul (tmp1, a[5], a[3]);   
+    mpz_mul (tmp1, a[5], a[3]);
     mpz_add (tmpsum, tmp, tmp1);
     mpz_mul (tmp, a[4], a[0]);
     mpz_mul (tmp1, a[3], a[1]);
     mpz_add (tmp, tmp, tmp1);
     mpz_add (tmpsum, tmp, tmpsum);
     mpz_addmul_ui (n, tmpsum, 14);
-    // + 10.0 * (a6 * a0 + a5 * a1 + a4 * a2) 
+    // + 10.0 * (a6 * a0 + a5 * a1 + a4 * a2)
     mpz_mul (tmp, a[6], a[0]);
-    mpz_mul (tmp1, a[5], a[1]);   
+    mpz_mul (tmp1, a[5], a[1]);
     mpz_add (tmpsum, tmp, tmp1);
     mpz_mul (tmp, a[4], a[2]);
     mpz_add (tmpsum, tmpsum, tmp);
@@ -322,7 +346,7 @@ L2_skewness_old (mpz_t *f, int deg, int prec, int method)
     fd[i] = mpz_get_d (f[i]);
 
   /* first isolate the minimum in an interval [s, 2s] by dichotomy */
-  
+
   s = 1.0;
   n0 = L2_lognorm_d (fd, deg, s, method);
   while ((n1 = L2_lognorm_d (fd, deg, 2 * s, method)) < n0)
@@ -733,7 +757,7 @@ L2_skewness_derivative (mpz_t *f, int d, int prec, int method)
           s4 = s2 * s2;
           s5 = s4 * s1;
           s6 = s5 * s1;
-              
+
           nc = dfd[6] * s6 + dfd[5] * s5 + dfd[4] * s4
             - dfd[2] * s2 - dfd[1] * s1 - dfd[0];
 #ifdef DEBUG_SKEW
@@ -896,6 +920,50 @@ L2_skewness_derivative (mpz_t *f, int d, int prec, int method)
             a = c;
         }
     }
+  else if (d == 2)
+    {
+      /* Sage code:
+         R.<x> = PolynomialRing(ZZ)
+         S.<a> = InfinitePolynomialRing(R)
+         d=2; f = SR(sum(a[i]*x^i for i in range(d+1)))
+         F = expand(f(x=x/y)*y^d)
+         var('r,s,t')
+         F = F.subs(x=s^(1/2)*r*cos(t),y=r/s^(1/2)*sin(t))
+         v = integrate(integrate(F^2*r,(r,0,1)),(t,0,2*pi))
+         v = (24*v/pi).expand()
+         dv = v.diff(s)
+         dv = (dv*s^3).expand().collect(s)
+      */
+      dfd[2] = 6.0 * fd[2] * fd[2];
+      dfd[1] = 0.0;
+      dfd[0] = 6.0 * fd[0] * fd[0];
+      nc = -1.0;
+      s = 1.0;
+      /* first isolate the minimum in an interval [s, 2s] by dichotomy */
+      while (nc < 0)
+        {
+          s = 2.0 * s;
+          s1 = s * s;   /* s^2 */
+          s2 = s1 * s1; /* s^4 */
+          nc = dfd[2] * s2 + dfd[1] - dfd[0];
+        }
+
+      /* now dv(s/2) < 0 < dv(s) thus the minimum is in [s/2, s] */
+      a = (s == 2.0) ? 1.0 : 0.5 * s;
+      b = s;
+      /* use dichotomy to refine the root */
+      while (prec--)
+        {
+          c = (a + b) * 0.5;
+          s1 = c * c;   /* s^2 */
+          s2 = s1 * s1; /* s^4 */
+          nc = dfd[2] * s2 + dfd[1] - dfd[0];
+          if (nc > 0)
+            b = c;
+          else
+            a = c;
+        }
+    }
   else
     {
       fprintf (stderr, "L2_skewness_derivative not yet implemented for degree %d\n", d);
@@ -988,13 +1056,13 @@ L2_skewness_derivative_mp (mpz_t *f, int d, int prec, int method, mpz_t skewness
     gmp_fprintf (stderr, "df[1]: %Zd\n", df[1]);
     gmp_fprintf (stderr, "df[0]: %Zd\n", df[0]);
     */
-    
+
     mpz_set_si (nc, -1);
     mpz_set_ui (s, 1);
 
     /* first isolate the minimum in an interval [s, 2s] by dichotomy */
     while ( mpz_cmp_ui(nc, 0) < 0 ) {
-      
+
       mpz_add (s, s, s); /* s = 2.0 * s */
       mpz_mul (s1, s, s); /* s^2 */
       mpz_mul (s2, s1, s1); /* s^4 */
@@ -1034,7 +1102,7 @@ L2_skewness_derivative_mp (mpz_t *f, int d, int prec, int method, mpz_t skewness
       mpz_mul (s4, s2, s2); //s4 = s2 * s2;
       mpz_mul (s5, s4, s1); //s5 = s4 * s1;
       mpz_mul (s6, s5, s1); //s6 = s5 * s1;
-              
+
       /* nc = dfd[6] * s6 + dfd[5] * s5 + dfd[4] * s4
          - dfd[2] * s2 - dfd[1] * s1 - dfd[0]; */
       mpz_mul (s6, s6, df[6]);
@@ -1170,7 +1238,7 @@ m_logmu_insert (m_logmu_t* M, unsigned long alloc, unsigned long *psize,
 /************************** polynomial arithmetic ****************************/
 
 /* g <- content(f) where deg(f)=d */
-static void
+void
 content_poly (mpz_t g, mpz_t *f, int d)
 {
   int i;
@@ -1317,27 +1385,27 @@ special_val0 (mpz_t *f, int d, unsigned long p)
 }
 
 /* Compute the average valuation of F(a,b) for gcd(a,b)=1, for a prime p
-   dividing the discriminant of f, using the following algorithm from 
+   dividing the discriminant of f, using the following algorithm from
    Guillaume Hanrot (which is some kind of p-adic variant of Uspensky's
    algorithm):
 
    val(f, p)
      return val0(f, p) * p / (p+1) + val0(f(1/(p*x))*(p*x)^d, p) * 1/(p+1)
 
-   val0(f, p). 
-     v <- valuation (content(f), p); 
-     f <- f/p^v  
+   val0(f, p).
+     v <- valuation (content(f), p);
+     f <- f/p^v
 
      r <- roots mod p(f, p)
 
      for r_i in r do
-         if f'(r_i) <> 0 mod p then v +=  1/(p-1). 
+         if f'(r_i) <> 0 mod p then v +=  1/(p-1).
          else
               f2 <- f(p*x + r_i)
-              v += val0(f2, p) / p. 
+              v += val0(f2, p) / p.
          endif
      endfor
-     Return v. 
+     Return v.
 
 A special case when:
 (a) p^2 does not divide disc(f),
@@ -1851,7 +1919,7 @@ static void
 mpz_poly_eval_si (mpz_t res, mpz_t *f, int d, long k)
 {
   int i;
-  
+
   mpz_set (res, f[d]);
   for (i = d - 1; i >= 0; i--)
     {
@@ -1877,12 +1945,12 @@ old_rotate (unsigned long p, double *A, long K0, long K1, long k0, mpz_t *f,
     {
       /* translate from k0 to k */
       k0 = rotate_aux (f, b, m, k0, k, 0);
-      
+
       /* compute contribution for k */
       mpz_poly_eval_si (v, D->data, d, k);
       e = special_valuation (f, d, p, v);
       alpha = (one_over_pm1 - e) * logp;
-      
+
       /* and alpha is the contribution for k */
       if (!mpz_divisible_ui_p (v, p))
   {
@@ -1897,7 +1965,7 @@ old_rotate (unsigned long p, double *A, long K0, long K1, long k0, mpz_t *f,
       {
         /* invariant: v = disc (f + i*g), and alpha is the
      contribution for i */
-        
+
         A[i - K0] += alpha;
         if (!mpz_divisible_ui_p (v, pp))
     {
@@ -1939,7 +2007,7 @@ old_rotate (unsigned long p, double *A, long K0, long K1, long k0, mpz_t *f,
    multi=0 or 1, then only 1 polynomial is returned (classical behavior).
    Otherwise, multi polynomials are stored in jmin and kmin (that
    must be initialized arrays with at least multi elements). This option
-   might be useful for Coppersmith variant (a.k.a. MNFS). 
+   might be useful for Coppersmith variant (a.k.a. MNFS).
    In the multi case, the smallest of the returned values of lognorm + alpha
    is returned (and f[] accordingly).
    Warning: the caller is responsible to update the skewness if needed.
@@ -1982,7 +2050,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
   /* allocate sieving zone for computing alpha */
   A = (double*) malloc ((K1 + 1 - K0) * sizeof (double));
   j0 = k0 = 0; /* the current coefficients f[] correspond to f+(j*x+k)*g */
-  
+
   *jmin = *kmin = 0;
 
   alpha0 = get_alpha (f, d, alim); /* value of alpha without rotation */
@@ -2010,7 +2078,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
         for (i = d; i >= 0 && mpz_divisible_ui_p (f[i], p); i--);
         if (i < 0)
           continue;
-        
+
   if (k0 != 0)
     k0 = rotate_aux (f, b, m, k0, 0, 0);
 
@@ -2078,7 +2146,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
                   best_alpha = alpha;
                   *kmin = k;
                   *jmin = j;
-              } 
+              }
           } else { /* multi mode */
               /* Rem: best_lognorm + best_alpha is the worse of the
                  preselected */
@@ -2090,7 +2158,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
                       if (best_E[ii] > newE)
                           break;
                   }
-                  ASSERT_ALWAYS(ii < multi); 
+                  ASSERT_ALWAYS(ii < multi);
                   /* insert */
                   for (i = multi - 1; i > ii; --i) {
                       kmin[i] = kmin[i-1];
@@ -2111,7 +2179,7 @@ rotate (mpz_t *f, int d, unsigned long alim, mpz_t m, mpz_t b,
     j = J0;
   else if (j == 0)
     break;
-  
+
     } /* end of loop on j */
 
   /* we now have f + (j0*x+k0)*(bx-m) and we want f + (jmin*x+kmin)*(bx-m),
@@ -2236,7 +2304,7 @@ print_cadopoly (FILE *fp, cado_poly p, int raw)
    alpha_proj = get_biased_alpha_projective (p->alg->f, p->alg->degree, ALPHA_BOUND);
    nroots = numberOfRealRoots (p->alg->f, p->alg->degree, 0, 0, NULL);
    e = MurphyE (p, BOUND_F, BOUND_G, AREA, MURPHY_K);
-   
+
    fprintf (fp, "# lognorm: %1.2f, alpha: %1.2f (proj: %1.2f), E: %1.2f, nr: %u\n",
         logmu,
         alpha,
@@ -2265,7 +2333,7 @@ print_cadopoly (FILE *fp, cado_poly p, int raw)
 }
 
 
-/* 
+/*
    Print f, g, lognorm, skew, alpha, MurphyE, REV, time duration.
 */
 void
@@ -2317,7 +2385,6 @@ print_poly_fg ( mpz_t *f,
    cado_poly_clear (cpoly);
    return e;
 }
-
 
 /* Returns k such that f(x+k) has the smallest 1-norm, with the corresponding
    skewness.
@@ -2836,7 +2903,7 @@ optimize_aux (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
 }
 
 #ifdef OPTIMIZE_MP
-/* 
+/*
    use mpz
 */
 void
@@ -2919,7 +2986,7 @@ optimize_aux_mp (mpz_t *f, int d, mpz_t *g, int verbose, int use_rotation,
         mpz_add (ktot, ktot, kt);
       }
     }
-      
+
     /* then do rotation by k2*x^2*g if d >= 6 */
     if (d >= 6 && use_rotation)
     {
