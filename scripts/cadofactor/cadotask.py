@@ -1637,9 +1637,10 @@ class Message(object):
         return self.key
     def get_value(self):
         return self.value
-    def reverse_lookup(self, reference):
-        for key in dir(self):
-            if getattr(self, key) is reference:
+    @classmethod
+    def reverse_lookup(cls, reference):
+        for key in dir(cls):
+            if getattr(cls, key) == reference:
                 return key
 
 
@@ -1855,8 +1856,8 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         sender = message.get_sender()
         key = message.get_key()
         value = message.get_value()
-        self.logger.debug("Received notification from %s, key = %s, values = %s",
-                           sender, key, value)
+        self.logger.debug("Received notification from %s, key = %s, value = %s",
+                           sender, Notification.reverse_lookup(key), value)
         """ The relay for letting Tasks talk to us and each other """
         if key == Notification.WANT_MORE_RELATIONS:
             if sender is self.purge:
@@ -1908,7 +1909,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         key = request.get_key()
         value = request.get_value()
         self.logger.debug("Received request from %s, key = %s, values = %s",
-                           sender, key, value)
+                           sender, Request.reverse_lookup(key), value)
         if not key in self.request_map:
             raise KeyError("Unknown Request key %s from sender %s" %
                            (str(key), str(sender)))
