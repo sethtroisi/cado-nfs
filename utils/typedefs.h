@@ -1,6 +1,8 @@
 #ifndef	CADO_TYPEDEFS_H_
 #define	CADO_TYPEDEFS_H_
 
+#include <stdint.h>
+
 /* data type to store the (p,r) values */
 #ifndef p_r_values_size
 #define p_r_values_size 32
