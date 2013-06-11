@@ -12,17 +12,21 @@
 #include "math.h"
 #include "typedefs.h"
 
+#define MAX_LOG_CACHED 20
+
 struct __renumber_t
 {
   FILE * file;           // file containing the renumbering table
   p_r_values_t * table;  //renumbering table
   index_t size;          //number of elements in the renumbering table
   uint8_t nb_bytes;  // number of bytes taken by an index in the file
-  
-  int rat;       // if one poly has degree 1, rat = 0 or 1 depending which one, 
+
+  int rat;       // if one poly has degree 1, rat = 0 or 1 depending which one,
                  // else -1 if no rational side
-                 // if rat = -1, we add p+1 to roots on side 1 
+                 // if rat = -1, we add p+1 to roots on side 1
                  // else we add p+1 to roots on rat side
+  index_t *cached; // We cached the index for primes < 2^MAX_LOG_CACHED
+  index_t first_not_cached;
 };
 typedef struct __renumber_t renumber_t[1];
 
@@ -39,6 +43,6 @@ void renumber_write_p (renumber_t, unsigned long, unsigned long * [2], int [2]);
 index_t renumber_get_index_from_p_r (renumber_t, p_r_values_t, p_r_values_t,int);
 void renumber_get_p_r_from_index (renumber_t, p_r_values_t *, p_r_values_t *,
                                                             index_t, cado_poly);
-//for DEBUG, should be remove later 
+//for DEBUG, should be remove later
 void renumber_debug_print_tab (FILE *, const char *, cado_poly);
 #endif

@@ -3,7 +3,7 @@
 
 
 
-void 
+void
 renumber_init (renumber_t renumber_info, cado_poly pol)
 {
   int max_nb_bits = MAX(pol->pols[0]->lpb, pol->pols[1]->lpb);
@@ -33,20 +33,17 @@ renumber_init (renumber_t renumber_info, cado_poly pol)
 void
 renumber_print_info (FILE * f, renumber_t renumber_info)
 {
-  fprintf (f, "Renumbering struct: size=%"PRid", nb_bytes=%"PRIu8"," 
+  fprintf (f, "Renumbering struct: size=%"PRid", nb_bytes=%"PRIu8", "
               "sizeof(*table)=%zu, rat=%d\n", renumber_info->size,
               renumber_info->nb_bytes, sizeof(*(renumber_info->table)),
               renumber_info->rat);
 }
 
-void 
+void
 renumber_free (renumber_t renumber_info)
 {
-  if (renumber_info->table != NULL)
-  {
-    free(renumber_info->table);
-    renumber_info->table = NULL;
-  }
+  SFREE(renumber_info->table);
+  SFREE(renumber_info->cached);
 }
 
 /* The renumber_t struct MUST have been initialized before */
@@ -59,7 +56,7 @@ renumber_init_write (renumber_t renumber_info, const char * filename)
 
   uint64_t tmp_size = (uint64_t) renumber_info->size;
   fwrite (&(tmp_size), sizeof(uint64_t), 1, renumber_info->file);
-  fwrite (&(renumber_info->nb_bytes), sizeof(renumber_info->nb_bytes), 1, 
+  fwrite (&(renumber_info->nb_bytes), sizeof(renumber_info->nb_bytes), 1,
           renumber_info->file);
 
   renumber_print_info (stderr, renumber_info);
@@ -69,10 +66,10 @@ void
 renumber_close_write (renumber_t renumber_info)
 {
   rewind (renumber_info->file);
-  fwrite (&(renumber_info->size), sizeof(renumber_info->size), 1, 
+  fwrite (&(renumber_info->size), sizeof(renumber_info->size), 1,
           renumber_info->file);
   fprintf (stderr, "Renumbering struct: size=%"PRid"\n", renumber_info->size);
-  
+
   fclose(renumber_info->file);
 }
 
@@ -86,6 +83,7 @@ renumber_read_table (renumber_t renumber_info, const char * filename)
   double dt, t = wct_seconds ();
   double mb_s = 0;
   uint8_t old_nb_bytes = renumber_info->nb_bytes;
+  p_r_values_t v, prev_v = 0;
 
   //open file for reading
   fprintf (stderr, "Opening %s to read the renumbering table\n", filename);
@@ -101,7 +99,7 @@ renumber_read_table (renumber_t renumber_info, const char * filename)
   ASSERT_ALWAYS ((uint64_t) renumber_info->size == tmp_size);
 
   // read nb_bytes
-  ret = fread (&(renumber_info->nb_bytes), sizeof(renumber_info->nb_bytes), 1, 
+  ret = fread (&(renumber_info->nb_bytes), sizeof(renumber_info->nb_bytes), 1,
              renumber_info->file);
   ASSERT(ret == 1);
   ASSERT_ALWAYS (renumber_info->nb_bytes <= sizeof(p_r_values_t));
@@ -115,12 +113,34 @@ renumber_read_table (renumber_t renumber_info, const char * filename)
 
   // Allocate the renumbering table
   SMALLOC (renumber_info->table, renumber_info->size, "Renumbering table");
-
-  renumber_print_info (stderr, renumber_info);
+  // Allocate the cached table
+  SMALLOC (renumber_info->cached, 2 << MAX_LOG_CACHED, "Cached table");
+  MEMSETZERO(renumber_info->cached, 2 << MAX_LOG_CACHED);
 
   // Begin to read the renumbering table
   ret = 0;
-  for (i = 0; i < renumber_info->size; i++)
+  i = 0;
+
+  // we cached value below 2^MAX_LOG_CACHED
+  while (i < renumber_info->size)
+  {
+    ret += renumber_read_one(renumber_info,i);
+    v = renumber_info->table[i];
+    if ((v >> MAX_LOG_CACHED))
+    {
+      i++;
+      break;
+    }
+    if (v > prev_v)
+      renumber_info->cached[v] = i;
+
+    prev_v = v;
+    i++;
+  }
+
+  renumber_info->first_not_cached = i;
+
+  for (; i < renumber_info->size; i++)
   {
     ret += renumber_read_one(renumber_info,i);
 
@@ -136,7 +156,7 @@ renumber_read_table (renumber_t renumber_info, const char * filename)
                       "in %.1fs -- %.1f MB/s\n", ret, dt, mb_s);
     }
   }
-  
+
   dt = wct_seconds () - t;
   if (dt > 0.01)
     mb_s = ((double) (ret * renumber_info->nb_bytes) / (double) dt) * 1.0e-6;
@@ -145,6 +165,10 @@ renumber_read_table (renumber_t renumber_info, const char * filename)
   fprintf(stderr, "Renumbering table: end of read. Read %"PRid" values from "
                   "file in %.1fs -- %.1f MB/s\n", ret, dt, mb_s);
   ASSERT_ALWAYS(ret == renumber_info->size);
+
+  renumber_print_info (stderr, renumber_info);
+  fprintf(stderr, "Renumbering struct: first_not_cached=%"PRid"\n",
+                  renumber_info->first_not_cached);
 
   fclose(renumber_info->file);
 }
@@ -166,16 +190,16 @@ sort (unsigned long *r, int n)
 }
 
 
-void 
-renumber_write_p (renumber_t renumber_info, unsigned long p, unsigned long*r[2], 
+void
+renumber_write_p (renumber_t renumber_info, unsigned long p, unsigned long*r[2],
                   int k[2])
 {
-  unsigned long add_value = p+1; 
+  unsigned long add_value = p+1;
   int i;
 
   // We sort roots by decreasing order
   sort(r[0], k[0]);
-  sort(r[1], k[1]);    
+  sort(r[1], k[1]);
 
   if (renumber_info->rat == -1) // two algebraic sides
   {
@@ -206,7 +230,7 @@ renumber_write_p (renumber_t renumber_info, unsigned long p, unsigned long*r[2],
     else // p < lpbr and lpba <= lpbr
     {
       ASSERT_ALWAYS (k[rat] == 1);
-    
+
       //If there is a rational side, we put p+1 in the renumbering table.
       renumber_write_one(renumber_info, add_value);
       renumber_info->size++;
@@ -223,55 +247,68 @@ renumber_write_p (renumber_t renumber_info, unsigned long p, unsigned long*r[2],
    side is 1 if (p,r) corresponds to the right part.
    For NFS the rational part (if any) corresponds to side 0, and we can
    give any value of r. */
-index_t 
-renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p, 
+index_t
+renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
                              p_r_values_t r, int side)
 {
-  float hint = 2.0 * (((float) p) / logf ((float) p));
-  index_t i = (index_t) hint;
-  // TODO Better int for small prime (up to 2^16?) store the i corresponding to
-  // vp in redirection table
-
-  index_t max = renumber_info->size - 1, min = 0;
-
+  index_t i;
   p_r_values_t *tab = renumber_info->table;
   p_r_values_t vr, vp; /* values of r and p as they are stored in the table*/
-
 
   if (renumber_info->rat == -1)
   {
     vp = (p << 1) + 1;
-    vr = (side == 1) ? (p + 1 + r) : r; 
+    vr = (side == 1) ? (p + 1 + r) : r;
   }
   else
   {
     vp = p + 1;
-    vr = (side == renumber_info->rat) ? vp : r; 
+    vr = (side == renumber_info->rat) ? vp : r;
   }
-  
-  /* Looking for vp: the values of vp are ordered in increasing order and are
-     always at the beginning of a decreasing sequence */
-  while (1)
+
+  if ((p >> MAX_LOG_CACHED)) // p is not cached
   {
-    index_t old_i = i;
+    index_t max = renumber_info->size - 1;
+    index_t min = renumber_info->first_not_cached;
 
-    while (i > 0 && tab[i-1] > tab[i])
-      i--;
+    float hint = 2.0 * (((float) p) / logf ((float) p));
+    i = (index_t) hint;
+    if (i < min)
+      i = min;
+    else if (i > max)
+      i = max;
 
-    if (tab[i] == vp)
-      break;
-    else if (tab[i] < vp)
+    /* Looking for vp: the values of vp are ordered in increasing order and are
+       always at the beginning of a decreasing sequence */
+    while (1)
     {
-      min = old_i;
-      i = (old_i + max)/2;
-    }
-    else
-    {
-      max = old_i;
-      i = (old_i + min)/2;
+      index_t old_i = i;
+
+      while (i > 0 && tab[i-1] > tab[i])
+        i--;
+
+      if (tab[i] == vp)
+        break;
+      else if (tab[i] < vp)
+      {
+        min = old_i;
+        i = (old_i + max)/2;
+        if (i == old_i)
+          i++;
+      }
+      else
+      {
+        max = old_i;
+        i = (old_i + min)/2;
+        if (i == old_i)
+          i--;
+      }
     }
   }
+  else //p is cached
+    i = renumber_info->cached[vp];
 
+  /* now i points at the beginning of a decreasing sequence of values of vr */
   if (side != renumber_info->rat)
   {
     while (i < renumber_info->size)
@@ -293,7 +330,7 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
 
 // TODO should also return side in the case where there are two alg sides
 void
-renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p, 
+renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p,
                              p_r_values_t * r, index_t i, cado_poly pol)
 {
   index_t j;
@@ -318,7 +355,7 @@ renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p,
       if (tab[i] <= *p)
         *r = tab[i];
       else
-        *r = tab[i] - *p - 1; 
+        *r = tab[i] - *p - 1;
     }
   }
   else
@@ -332,7 +369,7 @@ renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p,
       unsigned long *roots;
 
       // if there is a proj root, this the largest (r = p by convention)
-      if (mpz_divisible_ui_p (pol->alg->f[d], *p)) 
+      if (mpz_divisible_ui_p (pol->alg->f[d], *p))
         *r = *p;
       else
       {
@@ -348,8 +385,8 @@ renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p,
   }
 }
 
-//for DEBUG, should be remove later 
-void renumber_debug_print_tab (FILE *output, const char *filename, 
+//for DEBUG, should be remove later
+void renumber_debug_print_tab (FILE *output, const char *filename,
                                     cado_poly pol)
 {
   renumber_t tab;
@@ -358,7 +395,7 @@ void renumber_debug_print_tab (FILE *output, const char *filename,
 
   renumber_init (tab, pol);
   renumber_read_table (tab, filename);
-    
+
   for (i = 0; i < tab->size; i++)
   {
     renumber_get_p_r_from_index (tab, &p, &r, i, pol);
@@ -370,7 +407,7 @@ void renumber_debug_print_tab (FILE *output, const char *filename,
     else
       fprintf (output, "alg side r=%u \n", r);
   }
-  
-  
+
+
   renumber_free(tab);
 }
