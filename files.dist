@@ -729,6 +729,8 @@ utils/purgedfile.h
 utils/random_integer.c
 utils/relation.c
 utils/relation.h
+utils/renumber.c
+utils/renumber.h
 utils/rootfinder.c
 utils/rootfinder.h
 utils/roots.c
@@ -744,6 +746,7 @@ utils/testbase-rootfinder.quick
 utils/testmpz-rootfinder.quick
 utils/timing.c
 utils/timing.h
+utils/typedefs.h
 utils/ularith.h
 utils/usp.c
 utils/usp.h
