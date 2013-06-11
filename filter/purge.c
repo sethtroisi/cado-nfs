@@ -2192,7 +2192,7 @@ main (int argc, char **argv)
     break;
   }
 
-#if HR == 32
+#if p_r_values_size == 32
   param_list_parse_uint(pl, "nrels", (unsigned int *) &nrelmax);
   param_list_parse_uint(pl, "nprimes", (unsigned int *) &nprimes);
   param_list_parse_uint(pl, "keep", (unsigned int *) &keep);
@@ -2202,7 +2202,7 @@ main (int argc, char **argv)
   param_list_parse_uint64(pl, "keep", (uint64_t *) &keep);
 #endif
 
-#if HT == 32
+#if index_size == 32
   param_list_parse_uint(pl, "minpr", (unsigned int *) &minpr);
   param_list_parse_uint(pl, "minpa", (unsigned int *) &minpa);
 #else
