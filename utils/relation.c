@@ -195,6 +195,17 @@ d64toa10 (char *p, int64_t m)
   return (u64toa10 (p, (uint64_t) m));
 }
 
+char *
+d64toa16 (char *p, int64_t m)
+{
+  if (m < 0)
+    {
+      *p++ = '-';
+      m = -m;
+    }
+  return (u64toa16 (p, (uint64_t) m));
+}
+
 void
 fprint_relation (FILE *file, relation_t * rel)
 {
