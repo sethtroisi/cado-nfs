@@ -1002,20 +1002,16 @@ class ResultInfo(WuResultMessage):
             return 0
 
 
-class DbListener(patterns.Observable, patterns.Observer):
+class DbListener(patterns.Observable):
     """ Class that queries the Workunit database for available results
     and sends them to its Observers.
     
     The query is triggered by receiving a SIGUSR1 (the instance subscribes to
     the signal handler relay), or by calling send_result().
     """
-    def __init__(self, db, *args, **kwargs):
+    def __init__(self, *args, db, **kwargs):
         super().__init__(*args, **kwargs)
         self.wuar = WuAccess(db)
-        signalhandler.signal_usr1_relay.subscribeObserver(self)
-    
-    def updateObserver(self, message):
-        self.send_result()
     
     def send_result(self):
         # Check for results
@@ -1066,7 +1062,7 @@ class DbAccess(object):
         return WuAccess(self.__db)
     
     def make_db_listener(self):
-        return DbListener(self.__db)
+        return DbListener(db = self.__db)
 
 
 class DbWorker(DbAccess, threading.Thread):
