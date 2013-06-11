@@ -70,7 +70,7 @@ class Command(object):
             logger.warning("Process with PID %d finished with return code %d",
                            self.child.pid, self.child.returncode)
         else:
-            logger.debug("Process with PID %d finished sucessfully",
+            logger.debug("Process with PID %d finished successfully",
                          self.child.pid)
         if stdout:
             logger.debug("Process with PID %d stdout: %s", 

@@ -371,14 +371,13 @@ class ClientServerTask(Task, patterns.Observer):
     def paramnames(self):
         return super().paramnames + ("maxwu",)
     
-    def __init__(self, *args, db_listener, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.db_listener = db_listener
-        self.db_listener.subscribeObserver(self)
         self.state.setdefault("wu_submitted", 0)
         self.state.setdefault("wu_received", 0)
         self.params.setdefault("maxwu", 10)
         assert self.get_number_outstanding_wus() >= 0
+        self.send_notification(Notification.SUBSCRIBE_WU_NOTIFICATIONS, None)
     
     def submit_command(self, command, identifier):
         ''' Submit a workunit to the database.
@@ -417,11 +416,15 @@ class ClientServerTask(Task, patterns.Observer):
         return False
     
     def wait(self):
-        # If we get notification on new results reliably, we might not
-        # need this poll. But they probably won't be totally reliable
-        if not self.db_listener.send_result():
+        # Ask the mediator to check for workunits of status Received, 
+        # and if there are any, to send WU result notifications to the 
+        # subscribed listeners.
+        # If we get notification on new results reliably from the HTTP server,
+        # we might not need this poll. But they probably won't be totally
+        # reliable
+        if not self.send_request(Request.GET_WU_RESULT):
             time.sleep(1)
- 
+
 
 class PolyselTask(ClientServerTask):
     """ Finds a polynomial, uses client/server """
@@ -1498,6 +1501,11 @@ class StartClientsTask(Task):
         self.used_ids = {}
         self.pids = self.make_db_dict(self.make_tablename("client_pids"))
         self.hosts = self.make_db_dict(self.make_tablename("client_hosts"))
+        assert set(self.pids) == set(self.hosts)
+        # Invariants: the keys of self.pids and of self.hosts are the same set.
+        # The keys of self.used_ids are a subset of the keys of self.pids.
+        # A clientid is in self.used_ids if we know that clientid to be
+        # currently running.
         
         if 'scriptpath' in self.params:
             self.progparams[0]['execpath'] = self.params['scriptpath']
@@ -1521,9 +1529,25 @@ class StartClientsTask(Task):
     
     def launch_clients(self):
         for host in self.hosts_to_launch:
-            self.launch_host(host.strip())
-        s = ", ".join(["%s (Host %s, PID %d)" % (cid, self.hosts[cid], self.pids[cid]) for cid in self.pids])
-        self.logger.info("Launched clients: %s" % s)
+            self.launch_one_client(host.strip())
+        running_clients = [(cid, self.hosts[cid], pid) for (cid, pid) in self.pids.items()]
+        s = ", ".join(["%s (Host %s, PID %d)" % t for t in running_clients])
+        self.logger.info("Running clients: %s" % s)
+        # Check for old clients which we did not mean to start this run
+        for cid in set(self.pids) - set(self.used_ids):
+            if self.is_alive(cid):
+                self.logger.warn("Client id %s (Host %s, PID %d), launched "
+                                 "in a previous run and not meant to be "
+                                 "launched this time, is still running",
+                                 cid, self.hosts[cid], self.pids[cid])
+            else:
+                self.logger.warn("Client id %s (Host %s, PID %d), launched "
+                                 "in a previous run and not meant to be "
+                                 "launched this time, seems to have died. "
+                                 "I'll forget about this client.",
+                                 cid, self.hosts[cid], self.pids[cid])
+                del(self.hosts[cid])
+                del(self.pids[cid])
     
     def make_unique_id(self, host):
         # Make a unique client id for host
@@ -1534,7 +1558,6 @@ class StartClientsTask(Task):
             assert clientid in self.hosts
             i += 1
             clientid = "%s%d" % (host, i)
-        self.used_ids[clientid] = True
         return clientid
     
     # Cases:
@@ -1542,7 +1565,7 @@ class StartClientsTask(Task):
     # Client was started, but does not exist any more. Remove from state, then start and add again
     # Client was started, and does still exists. Nothing to do.
     
-    def launch_host(self, host):
+    def launch_one_client(self, host):
         clientid = self.make_unique_id(host)
         # Check if client is already running
         if clientid in self.pids:
@@ -1550,6 +1573,7 @@ class StartClientsTask(Task):
             if self.is_alive(clientid):
                 self.logger.info("Client %s on host %s with PID %d already running",
                                  clientid, host, self.pids[clientid])
+                self.used_ids[clientid] = True
                 return
             else:
                 del(self.pids[clientid])
@@ -1558,18 +1582,22 @@ class StartClientsTask(Task):
         self.logger.info("Starting client id %s on host %s", clientid, host)
         self.progparams[0]['clientid'] = clientid
         wuclient = cadoprograms.WuClient([], self.progparams[0], stdout = "/dev/null", stderr = "/dev/null", bg=True)
-        process = cadocommand.RemoteCommand(wuclient, host, self.parameters, self.path_prefix)
+        process = cadocommand.RemoteCommand(wuclient, host, self.parameters, self.path_prefix + [host])
         (rc, stdout, stderr) = process.wait()
         if rc != 0:
-            self.logger.warning("Starting client on %s failed. "
-                                "Consult log file for details." % host)
+            self.logger.warning("Starting client on host %s failed.", host)
+            if stdout:
+                self.logger.warning("Stdout: %s", stdout.decode("ASCII").strip())
+            if stderr:
+                self.logger.warning("Stdout: %s", stderr.decode("ASCII").strip())
             return
+        self.used_ids[clientid] = True
         self.pids[clientid] = int(stdout)
         self.hosts[clientid] = host
 
     def kill_all_clients(self):
-        # Need the keys() to make a copy as dict will change in loop body
-        for clientid in list(self.pids.keys()):
+        # Need the list() to make a copy as dict will change in loop body
+        for clientid in list(self.pids):
             (rc, stdout, stderr) = self.kill_client(clientid)
             if rc == 0:
                 self.logger.info("Stopped client %s (Host %s, PID %d)",
@@ -1579,6 +1607,14 @@ class StartClientsTask(Task):
             else:
                 self.logger.warning("Stopping client %s (Host %s, PID %d) failed",
                                     clientid, self.hosts[clientid], self.pids[clientid])
+                if stdout:
+                    self.logger.warning("Stdout: %s", stdout.decode("ASCII").strip())
+                if stderr:
+                    self.logger.warning("Stdout: %s", stderr.decode("ASCII").strip())
+                # Assume that the client is already dead and remove it from
+                # the list of running clients
+                del(self.pids[clientid])
+                del(self.hosts[clientid])
     
     def kill_client(self, clientid, signal = None):
         pid = self.pids[clientid]
@@ -1590,8 +1626,8 @@ class StartClientsTask(Task):
         process = cadocommand.RemoteCommand(kill, host, self.parameters, self.path_prefix)
         return process.wait()
 
-class Message(object, metaclass = abc.ABCMeta):
-    def __init__(self, sender, key, value):
+class Message(object):
+    def __init__(self, sender, key, value = None):
         self.sender = sender
         self.key = key
         self.value = value
@@ -1601,15 +1637,23 @@ class Message(object, metaclass = abc.ABCMeta):
         return self.key
     def get_value(self):
         return self.value
+    @classmethod
+    def reverse_lookup(cls, reference):
+        for key in dir(cls):
+            if getattr(cls, key) == reference:
+                return key
+
 
 class Notification(Message):
     FINISHED_POLYNOMIAL_SELECTION = 0
     WANT_MORE_RELATIONS = 1
     HAVE_ENOUGH_RELATIONS = 2
     REGISTER_FILENAME = 3
-    SUBMIT_WU = 4
-    VERIFY_WU = 5
-    WANT_TO_RUN = 6
+    UNREGISTER_FILENAME = 4
+    SUBMIT_WU = 5
+    VERIFY_WU = 6
+    WANT_TO_RUN = 7
+    SUBSCRIBE_WU_NOTIFICATIONS = 8
 
 class Request(Message):
     GET_POLYNOMIAL = 0
@@ -1629,8 +1673,7 @@ class Request(Message):
     GET_DEPENDENCY_FILENAME = 14
     GET_LINALG_PREFIX = 15
     GET_KERNEL_FILENAME = 16
-    def __init__(self, sender, key, value = None):
-        super().__init__(sender, key, value)
+    GET_WU_RESULT = 17
 
 
 class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Mediator):
@@ -1676,7 +1719,6 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         self.polysel = PolyselTask(*args,
                                    mediator = self,
                                    path_prefix = parampath,
-                                   db_listener = self.db_listener,
                                    **kwargs)
         self.fb = FactorBaseTask(*args,
                                  mediator = self,
@@ -1689,7 +1731,6 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         self.sieving = SievingTask(*args,
                                    mediator = self,
                                    path_prefix = sievepath,
-                                   db_listener = self.db_listener,
                                    **kwargs)
         self.dup1 = Duplicates1Task(*args,
                                     mediator = self,
@@ -1746,7 +1787,8 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
             Request.GET_DENSE_FILENAME: self.merge.get_dense_filename,
             Request.GET_DEPENDENCY_FILENAME: self.linalg.get_dependency_filename,
             Request.GET_LINALG_PREFIX: self.linalg.get_prefix,
-            Request.GET_KERNEL_FILENAME: self.characters.get_kernel_filename
+            Request.GET_KERNEL_FILENAME: self.characters.get_kernel_filename,
+            Request.GET_WU_RESULT: self.db_listener.send_result,
         }
     
     def run(self):
@@ -1814,8 +1856,8 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         sender = message.get_sender()
         key = message.get_key()
         value = message.get_value()
-        self.logger.debug("Received notification from %s, key = %s, values = %s",
-                           sender, key, value)
+        self.logger.debug("Received notification from %s, key = %s, value = %s",
+                           sender, Notification.reverse_lookup(key), value)
         """ The relay for letting Tasks talk to us and each other """
         if key == Notification.WANT_MORE_RELATIONS:
             if sender is self.purge:
@@ -1853,6 +1895,11 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
                                 sender)
             else:
                 self.tasks_that_want_to_run.append(sender)
+        elif key == Notification.SUBSCRIBE_WU_NOTIFICATIONS:
+            if isinstance(sender, ClientServerTask):
+                return self.db_listener.subscribeObserver(sender)
+            else:
+                raise Exception("Got SUBSCRIBE_WU_NOTIFICATIONS, but not from a ClientServerTask")
         else:
             raise KeyError("Notification from %s has unknown key %s" % (sender, key))
     
@@ -1862,15 +1909,14 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         key = request.get_key()
         value = request.get_value()
         self.logger.debug("Received request from %s, key = %s, values = %s",
-                           sender, key, value)
-        if key in self.request_map:
-            if value is None:
-                return self.request_map[key]()
-            else:
-                return self.request_map[key](value)
-        else:
+                           sender, Request.reverse_lookup(key), value)
+        if not key in self.request_map:
             raise KeyError("Unknown Request key %s from sender %s" %
                            (str(key), str(sender)))
+        if value is None:
+            return self.request_map[key]()
+        else:
+            return self.request_map[key](value)
     
     def handle_message(self, message):
         if isinstance(message, Notification):
