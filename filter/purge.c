@@ -73,13 +73,13 @@ Exit value:
 #include "utils.h"
 #include "typedefs.h"
 
-#define DEBUG 0
+#include "filter_utils.h"
+
 //#define STAT
 //#define STAT_VALUES_COEFF //STAT must be defined. Interesting only DL
 
 //#define USE_CAVALLAR_WEIGHT_FUNCTION
 
-#define MAX_FILES 1000000
 #define DEFAULT_NPASS 50
 #define DEFAULT_KEEP 160
 #define DEFAULT_REQUIRED_EXCESS 0.1
@@ -106,23 +106,15 @@ Exit value:
  } while (0)
 
 /* Main variables */
-static char antebuffer[PATH_MAX];         /* "directory/antebuffer" or "cat" */
-static char rep_cado[PATH_MAX];           /* directory of cado */
 char *argv0;                    /* = argv[0]; */
 
 static index_t **rel_compact  = NULL; /* see above */
-
-#define DECR_SATURATED_WEIGHT(o,remove) if (*o<UMAX(*o) && !(--(*o))) remove++;
 weight_t *ideals_weight = NULL;
 index_t *newindex = NULL;
 
 static char ** fic;
-static char *pmin, *pminlessone;
 static bit_vector rel_used, Tbv;
-static relation_stream rs;
 static index_t *sum2_index = NULL; /*sum of rows index for primes of weight 2*/
-static double wct0;
-static size_t tot_alloc_bytes = 0, my_malloc_bytes = 0;
 static index_t relsup, prisup;
 
 static uint64_t nrelmax = 0,
@@ -145,23 +137,6 @@ uint64_t __stat_nbcoeffofvalue[STAT_VALUES_COEFF_LEN+1];
 #endif
 
 
-static const unsigned char ugly[256] = {
-  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-  0,   1,   2,   3,   4,   5,   6,   7,   8,   9, 255, 255, 255, 255, 255, 255,
-  255,  10,  11,  12,  13,  14,  15, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-  255,  10,  11,  12,  13,  14,  15, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-  255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255 };
 
 static const unsigned char nbbits[256] = {
   0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4,
@@ -181,232 +156,9 @@ static const unsigned char nbbits[256] = {
   3,4,4,5,4,5,5,6,4,5,5,6,5,6,6,7,
   4,5,5,6,5,6,6,7,5,6,6,7,6,7,7,8 };
 
-/* 1<<NNFR = Number of sentences computed of (find root + hashkey of each term)
-   computed in one pass. If the number is too big, the buffer between these
-   threaded computations and insertRelation (which cannot be parallelized,
-   because the hashkey is not bijective) is too big (memory waste) and
-   the pipe-line is slow to start;
-   If the number is too small, the computation threads are too often in
-   nanosleep to keep CPU.
-   NNFR=8 to 16, the greatest is the fastest for fast processors & fast
-   memory; 14 seems to be the best choice (maximal speed for medium memory use).
-*/
-#define NNFR (14)
-
-/* Size of relations buffer between parsing & insertRelation.
-   CAREFUL! SIZE_BUF_REL must be greater (at least double) than
-   (1<<(NNFR+1)).
-   Stocks the sentences precomputed but not insered. About
-   64K sentences for the optimal.
-*/
-#define SIZE_BUF_REL MAX((1<<(NNFR+2)),(1<<6))
-
-/* The realistic minimal non-CPU waiting with nanosleep is about
-   10 to 40 µs (1<<13 for nanosleep).
-   But all the I/O between the threads have been buffered,
-   and a thread do a nanosleep only if its buffer is empty.
-   So I use here ~2ms (1<<21) to optimize CPU scheduler.
-   Max pause is about 4 to 8ms (1<<22, 1<<23); after the program
-   is slow down.
-*/
-static const struct timespec wait_classical = { 0, 1<<21 };
-
-#define NB_PRIMES_OPT 31
-
-typedef struct {
-  index_t h;
-  exponent_t e;
-} prime_t;
-
-typedef struct {
-  int64_t a;
-  uint64_t b;
-  prime_t *primes; /*if nb<=NB_PRIME_OPT, contains the address of primes_data*/
-  prime_t primes_data[NB_PRIMES_OPT];
-  weight_t nb;           /* number of primes */
-  weight_t nb_alloc;     /* allocated space for primes */
-  weight_t nb_above_min_index; /* nb of primes above min_index, must be <=nb */
-  index_t num;          /* Relation number */
-} buf_rel_t;
-
-typedef struct {
-  index_t nrels;       // nb of rels read
-  index_t nprimes;     // nb of primes read
-  index_t min_index;   // store only primes with index >= min_index
-  double W;            // Weight (nb of non-zero) of primes >= min_index
-  FILE *f_remaining;   // File for writing remaining rels
-  FILE *f_deleted;     // File for writing deleted rels
-  buf_rel_t *buf_data; // buffer for I/O
-} buf_arg_t;
-
-/* For the multithread sync */
-static volatile unsigned long cpt_rel_a;
-static volatile unsigned long cpt_rel_b;
-static volatile unsigned int end_insertRelation = 0;
-
-/* copied from utils/antebuffer.c */
-#ifndef HAVE_NANOSLEEP
-  int nanosleep(const struct timespec *req, struct timespec *rem) {
-    if (rem == NULL) {
-      /* Dummy to shut up the warning */
-    }
-#ifdef HAVE_USLEEP
-    unsigned long usec = req->tv_sec * 1000000UL + req->tv_nsec / 1000UL;
-    usleep(usec);
-#else
-    sleep(req->tv_sec);
-#endif
-    return 0;
-  }
-#endif
-
-/********************** own memory allocation routines ***********************/
-
-/* Rationale: calling one malloc() for each relation in insertNormalRelation()
-   is expensive, since malloc() allocates some extra information to keep track
-   of every memory blocks. Instead, we allocate memory in big blocks of size
-   BLOCK_SIZE. */
-
-#define BLOCK_SIZE (1<<20)  /* memory blocks are allocated of that # of index_t's */
-/* relcompact_list is a list of blocks, each one of BLOCK_SIZE index_ts */
-static index_t **relcompact_list = NULL;
-static index_t *myrelcompact;
-static unsigned int relcompact_used = BLOCK_SIZE; /* usage of current block */
-static unsigned int relcompact_size = 0;  /* minimal size of relcompact_list */
-static int relcompact_current = -1; /* index of current block */
-
-/* return a pointer to an array of n (index_t) */
-static index_t *
-my_malloc (unsigned int n)
-{
-  index_t *ptr;
-
-  if (relcompact_used + n > BLOCK_SIZE) 
-  {
-    relcompact_used = 0;
-    if (((unsigned int) (++relcompact_current)) == relcompact_size) 
-    {
-      my_malloc_bytes -= relcompact_size * sizeof (index_t *);
-      relcompact_size = relcompact_size ? (relcompact_size << 1) : (1<<16);
-      size_t tmp_size = relcompact_size * sizeof(index_t *);
-      if (!(relcompact_list = (index_t **) realloc(relcompact_list, tmp_size))) 
-      {
-        fprintf (stderr, "my_malloc_int: realloc error: %s\n",strerror(errno));
-        exit (1);
-      }
-      my_malloc_bytes += tmp_size;
-    }
-    SMALLOC(relcompact_list[relcompact_current], BLOCK_SIZE, "my_malloc_int 1");
-    myrelcompact = relcompact_list[relcompact_current];
-    my_malloc_bytes += BLOCK_SIZE * sizeof (index_t);
-  }
-  ptr = &(myrelcompact[relcompact_used]);
-  relcompact_used += n;
-  return ptr;
-}
-
-static void
-my_malloc_free_all (void)
-{
-  for ( ; relcompact_current >= 0; relcompact_current--)
-  {
-    SFREE(relcompact_list[relcompact_current]);
-    relcompact_current--;
-  }
-  SFREE(relcompact_list);
-  relcompact_list = NULL;
-  relcompact_used = BLOCK_SIZE;
-  relcompact_size = 0;
-}
 
 /*****************************************************************************/
 
-/* Print the relation 'rel' in matrix format, i.e., a line of the form:
-
-   a,b:t_1,t_2,...,t_k
-
-   a (signed decimal) is a
-   b (nonnegative decimal) is b
-   t_1 ... t_k (hexadecimal) are the indices of the ideals (starting at 0)
-
-   Return the weight of the relation.
-*/
-
-static void
-fprint_rel_row (FILE *file, buf_rel_t *my_buf_rel)
-{
-  char buf[1<<12], *p;
-  char *op;
-  size_t t;
-  unsigned int i, j;
-  index_t h;
-  exponent_t e;
-
-  p = d64toa10(buf, my_buf_rel->a);
-  *p++ = ',';
-  p = u64toa10(p, my_buf_rel->b);
-  *p++ = ':';
-
-
-  for (i = 0; i < my_buf_rel->nb; i++)
-  {
-    e = my_buf_rel->primes[i].e;
-    h = newindex[my_buf_rel->primes[i].h];
-
-    op = p;
-    p = u64toa16(p, (uint64_t) h);
-    *p++ = ',';
-    t = p - op;
-    for (j = (unsigned int) ((e) - 1); j--; p += t)
-      memcpy (p, op, t);
-  }
-
-  *(--p) = '\n';
-  p[1] = 0;
-  fputs(buf, file);
-}
-
- /* Write relation j from buffer to rel_compact
-    We put in rel_compact only primes such that their index h is greater or
-    equal to min_index
- */
-
-//return the number of new primes
-//TODO try with buf_rel_t instead of buf_rel_t *
-static inline index_t
-insertNormalRelation (buf_rel_t *my_br, index_t min_index)
-{
-  index_t nprimes = 0;
-  unsigned int i, itmp;
-  index_t *my_tmp;
-  index_t h;
-
-  itmp = 0;
-  my_tmp = boutfilerel ? NULL : my_malloc(my_br->nb_above_min_index);
-
-  for (i = 0; i < my_br->nb; i++)
-  {
-    h =  my_br->primes[i].h;
-    if (ideals_weight[h] == 0)
-    {
-      ideals_weight[h] = 1;
-      nprimes++;
-    }
-    else if (ideals_weight[h] != UMAX (weight_t))
-      ideals_weight[h]++;
-
-    if (!boutfilerel && h >= min_index)
-      my_tmp[itmp++] = h;
-  }
-
-  if (!boutfilerel)
-  {
-    my_tmp[itmp] = UMAX(*my_tmp); /* sentinel */
-    rel_compact[my_br->num] = my_tmp;
-  }
-
-  return nprimes;
-}
 
 /* Delete a relation: set rel_used[i] to 0, update the count of primes
    in that relation.
@@ -424,7 +176,8 @@ delete_relation (index_t i)
   {
     o = &(ideals_weight[*tab]);
     ASSERT(*o);
-    DECR_SATURATED_WEIGHT(o, nremoveprimes);
+    if (*o<UMAX(*o) && !(--(*o))) 
+      nremoveprimes++;
   }
 
   /* We do not free rel_compact[i] as it is freed with my_malloc_free_all */
@@ -590,8 +343,8 @@ cliques_removal (index_t target_excess, index_t *nrels, index_t *nprimes)
                      j, seconds ());
 
 #if DEBUG >= 1
-  fprintf (stderr, "    DEBUG: ltmp=%u chunk=%u target=%u\n", *nrels,
-                   *nprimes, ltmp, chunk, target_excess);
+  fprintf (stderr, "    DEBUG: ltmp=%u chunk=%u target=%u\n",
+                   ltmp, chunk, target_excess);
 #endif
 
   free (tmp);
@@ -800,6 +553,32 @@ singletons_and_cliques_removal (index_t *nrels, index_t *nprimes)
   }
 }
 
+/* singleton removal when binary out file (boutfilerel) is requested */
+static int
+no_singleton(buf_rel_t *br)
+{
+  weight_t i;
+  index_t h;
+
+  for (i = 0; i < br->nb; i++)
+  {
+    if (ideals_weight[br->primes[i].h] == 1)
+    {
+      relsup++;
+
+      for (i = 0; i < br->nb; i++)
+      {
+        h = br->primes[i].h;
+        if (ideals_weight[h] != UMAX(weight_t) && !(--(ideals_weight[h])))
+          prisup++;
+      }
+      return 0;
+    }
+  }
+  return 1;
+}
+
+
 /*****************************************************************************/
 /* This function renumbers used primes (those with H->hashcount[i] > 1)
    and puts the corresponding index in H->hashcount[i].
@@ -874,236 +653,9 @@ renumber (const char *sos, index_t MAYBE_UNUSED min_index, index_t nprimes)
 #endif
 }
 
-/* singleton removal when binary out file (boutfilerel) is requested */
-static int
-no_singleton(buf_rel_t *br)
-{
-  weight_t i;
-  index_t h;
-
-  for (i = 0; i < br->nb; i++)
-  {
-    if (ideals_weight[br->primes[i].h] == 1)
-    {
-      relsup++;
-
-      for (i = 0; i < br->nb; i++)
-      {
-        h = br->primes[i].h;
-        if (ideals_weight[h] != UMAX(weight_t) && !(--(ideals_weight[h])))
-          prisup++;
-      }
-      return 0;
-    }
-  }
-  return 1;
-}
-
 
 /*****************************************************************************/
 /* I/O functions */
-static void
-prempt_load (prempt_t prempt_data) {
-  char **p_files = prempt_data->files, *pprod;
-  FILE *f;
-  size_t try_load, load;
-  char *pmax = &(prempt_data->buf[PREMPT_BUF]);
-
-  pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
-  pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-
-  while (*p_files)
-  {
-    if (!(f = popen (*p_files, "r")))
-    {
-      fprintf (stderr, "prempt_load: popen error. %s\n", strerror (errno));
-      exit (1);
-    }
-#if DEBUG >= 1
-    char *p, *l;
-    /* Write the command that read the files (one file per line) */
-    p = strchr(*p_files, '/');
-    if (p)
-    {
-      *p = 0;
-      fprintf (stderr, "%s\n", *p_files);
-      *p = '/';
-      for ( ; ; )
-      {
-        l = strchr(p, ' ');
-        if (l)
-        {
-          *l = 0;
-          fprintf(stderr, "   %-70s\n", p);
-          *l = ' ';
-          p = strchr(&(l[1]), '/');
-          if (!p)
-          {
-            fprintf(stderr, "%s\n", &(l[1]));
-            break;
-          }
-        }
-        else
-        {
-          fprintf(stderr, "   %-70s\n", p);
-          break;
-        }
-      }
-    }
-#endif
-
-    pprod = (char *) prempt_data->pprod;
-    for ( ; ; )
-    {
-      if ((pprod != prempt_data->pcons) &&
-    (((((PREMPT_BUF + ((size_t) prempt_data->pcons))) - ((size_t) pprod)) &
-      (PREMPT_BUF - 1)) <= PREMPT_ONE_READ))
-        {
-          nanosleep(&wait_classical, NULL);
-        }
-      else
-      {
-        try_load =
-         MIN((PREMPT_BUF + ((size_t)pmin)) - ((size_t) pprod), PREMPT_ONE_READ);
-        if ((load = fread (pprod, 1, try_load, f)))
-        {
-          pprod += load;
-          if (pprod == pmax)
-            pprod = pmin;
-          prempt_data->pprod = pprod;
-        }
-        else if (feof(f))  // we go to the next batch of files
-        {
-          pclose(f);
-          free(*p_files);
-          *p_files++ = NULL;
-          break;
-        }
-        else // error
-        {
-          fprintf (stderr, "prempt_load: load error (%s) from\n%s\n",
-                           strerror (errno), *p_files);
-          exit (1);
-        }
-      }
-    }
-  }
-  prempt_data->end = 1;
-  pthread_exit (NULL);
-}
-
-static inline void
-relation_stream_get_fast (prempt_t prempt_data, buf_rel_t *mybufrel, 
-                          index_t min_index)
-{
-  int64_t n;
-  char *p;
-  unsigned int nb_primes_read;
-  unsigned long pr;
-  unsigned char c, v;
-  weight_t nb_above_index = 1; // count the -1 at the end of the relations
-                                // in rel_compact
-#ifdef FOR_FFS
-  unsigned int basis_ab = 16;
-#else
-  unsigned int basis_ab = 10;
-#endif
-
-#define LOAD_ONE(P) { c = *P; P = ((size_t) (P - pminlessone) & (PREMPT_BUF - 1)) + pmin; }
-
-  p = (char *) prempt_data->pcons;
-
-  LOAD_ONE(p);
-  if (c == '-') {
-    mybufrel->a = -1;
-    LOAD_ONE(p);
-  }
-  else
-    mybufrel->a = 1;
-  for (n = 0 ; (v = ugly[c]) < basis_ab ; ) {
-#ifdef FOR_FFS
-    n = (n << 4) + v;
-#else
-    n = n * 10 + v;
-#endif
-    LOAD_ONE(p);
-  }
-  ASSERT_ALWAYS(c == ',');
-  mybufrel->a *= n;
-
-  n = 0;
-  LOAD_ONE(p);
-  for ( ; (v = ugly[c]) < basis_ab ; ) {
-#ifdef FOR_FFS
-    n = (n << 4) + v;
-#else
-    n = n * 10 + v;
-#endif
-    LOAD_ONE(p);
-  }
-  ASSERT_ALWAYS(c == ':');
-  mybufrel->b = n;
-
-  nb_primes_read = 0;
-  for ( c = 0 ; ; )
-  {
-    if (c == '\n')
-      break;
-
-    LOAD_ONE(p);
-    for (pr = 0 ; (v = ugly[c]) < 16 ; )
-    {
-      pr = (pr << 4) + v;
-      LOAD_ONE(p);
-    }
-    ASSERT_ALWAYS(c == ',' || c == '\n');
-
-    if (nb_primes_read > 0 && mybufrel->primes[nb_primes_read-1].h == pr)
-        mybufrel->primes[nb_primes_read-1].e++;
-    else
-    {
-      if (mybufrel->nb_alloc == nb_primes_read)
-      {
-        mybufrel->nb_alloc += mybufrel->nb_alloc >> 1;
-        if (nb_primes_read == NB_PRIMES_OPT)
-        {
-          prime_t *p = mybufrel->primes;
-          SMALLOC(mybufrel->primes, mybufrel->nb_alloc, "realloc primes");
-          memcpy (mybufrel->primes, p, NB_PRIMES_OPT * sizeof(prime_t));
-        }
-        else
-          mybufrel->primes = (prime_t *)
-            realloc (mybufrel->primes, mybufrel->nb_alloc * sizeof(prime_t));
-        fprintf (stderr, "nb_alloc = %u\n", mybufrel->nb_alloc); //FIXME
-      }
-
-      nb_above_index += (weight_t) (pr >= min_index);
-      mybufrel->primes[nb_primes_read++] = (prime_t) { .h = pr, .e = 1};
-    }
-  }
-
-  mybufrel->nb = nb_primes_read;
-  mybufrel->nb_above_min_index = nb_above_index;
-
-#ifdef STAT
-  __stat_weight += nb_primes_read;
-#ifdef STAT_VALUES_COEFF
-  {
-    unsigned int i;
-    for (i = 0; i < mybufrel->nb; i++)
-    {
-      if (bit_vector_getbit(rel_used, (size_t) mybufrel->num))
-      {
-        if (abs(mybufrel->primes[i].e) > STAT_VALUES_COEFF_LEN)
-          __stat_nbcoeffofvalue[0]++;
-        else
-          __stat_nbcoeffofvalue[abs(mybufrel->primes[i].e)]++;
-      }
-    }
-  }
-#endif
-#endif
-}
 
 /* We don't use memory barrier nor (pre)processor orders for portability.
    So, if a ring buffer is empty, one problem exists if the producter
@@ -1123,47 +675,51 @@ relation_stream_get_fast (prempt_t prempt_data, buf_rel_t *mybufrel,
    It's very dirty!
 */
 
+/* Callback function called by prempt_scan_relations */
+
 void *
-insertRelation (buf_arg_t *arg)
+thread_insert (buf_arg_t *arg)
 {
   unsigned int j;
   unsigned long cpy_cpt_rel_b;
+  buf_rel_t *my_rel;
 
   cpy_cpt_rel_b = cpt_rel_b;
   for ( ; ; )
   {
     while (cpt_rel_a == cpy_cpt_rel_b)
     {
-      if (!end_insertRelation)
+      if (!is_finish())
         nanosleep (&wait_classical, NULL);
       else if (cpt_rel_a == cpy_cpt_rel_b)
         pthread_exit(NULL);
     }
 
     j = (unsigned int) (cpy_cpt_rel_b & (SIZE_BUF_REL - 1));
+    my_rel = &(arg->buf_data[j]);
 
     if (cpt_rel_a == cpy_cpt_rel_b + 1)
       nanosleep (&wait_classical, NULL);
 
-    if (bit_vector_getbit(rel_used, (size_t) arg->buf_data[j].num))
+    if (bit_vector_getbit(arg->rel_used, (size_t) my_rel->num))
     {
-      arg->nprimes+=insertNormalRelation (&(arg->buf_data[j]), arg->min_index);
+      arg->nprimes+=insert_relation_in_table (my_rel, arg->min_index, 
+                                     boutfilerel, rel_compact, ideals_weight);
 #ifdef STAT
-      arg->W += (double) arg->buf_data[j].nb_above_min_index;
+      arg->W += (double) my_rel->nb_above_min_index;
 #endif
     }
 
-    if (relation_stream_disp_progress_now_p(rs))
-      fprintf(stderr, "read useful %"PRid" relations in %.1fs"
-                      " -- %.1f MB/s -- %.1f rels/s\n",
-                      rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
+    test_and_print_progress_now ();
     cpy_cpt_rel_b++;
     cpt_rel_b = cpy_cpt_rel_b;
   }
 }
-// TODO same as insertNormalRelations
+
+/* Callback function called by prempt_scan_relations */
+
 static void *
-printrel(buf_arg_t *arg)
+thread_print(buf_arg_t *arg)
 {
   unsigned int j, aff;
   unsigned long cpy_cpt_rel_b;
@@ -1173,7 +729,7 @@ printrel(buf_arg_t *arg)
   for ( ; ; )
   {
     while (cpt_rel_a == cpy_cpt_rel_b)
-      if (!end_insertRelation)
+      if (!is_finish())
         nanosleep (&wait_classical, NULL);
       else if (cpt_rel_a == cpy_cpt_rel_b)
           pthread_exit(NULL);
@@ -1184,279 +740,24 @@ printrel(buf_arg_t *arg)
     if (cpt_rel_a == cpy_cpt_rel_b + 1)
       nanosleep (&wait_classical, NULL);
 
-    aff = bit_vector_getbit(rel_used, (size_t) my_rel->num);
+    aff = bit_vector_getbit(arg->rel_used, (size_t) my_rel->num);
     if (boutfilerel && aff)
     {
       if (!(no_singleton(my_rel)))
-        bit_vector_clearbit(rel_used, (size_t) my_rel->num);
+        bit_vector_clearbit(arg->rel_used, (size_t) my_rel->num);
     }
     else if (aff)
     {
       arg->W += (double) my_rel->nb;
-      fprint_rel_row (arg->f_remaining, my_rel);
+      print_relation (arg->f_remaining, my_rel, newindex);
     }
     else if (!boutfilerel && arg->f_deleted != NULL)
-      fprint_rel_row (arg->f_deleted, my_rel);
+      print_relation (arg->f_deleted, my_rel, newindex);
 
-    if (relation_stream_disp_progress_now_p(rs))
-      fprintf(stderr, "re-read & print useful %"PRid" relations in %.1fs"
-        " -- %.1f MB/s -- %.1f rels/s\n", rs->nrels, rs->dt, rs->mb_s,
-        rs->rels_s);
+    test_and_print_progress_now ();
     cpy_cpt_rel_b++;
     cpt_rel_b = cpy_cpt_rel_b;
   }
-}
-
-/* Read all relations from file, and fills the rel_used and rel_compact arrays
-   for each relation i:
-   - rel_used[i] = 0 if the relation i is deleted
-     rel_used[i] = 1 if the relation i is kept (so far)
-   - rel_compact is an array, terminated by -1, of pointers to the entries
-     in the hash table for the considered primes
-
-     Trick: we only read relations for which rel_used[i]==1.
- */
-static int
-prempt_scan_relations (void * (*callback_fct)(buf_arg_t *), 
-                       buf_arg_t * callback_arg)
-{
-  char *pcons, *pcons_old, *pcons_max, *p, **ff;
-  pthread_attr_t attr;
-  pthread_t thread_load, thread_callback;
-  prempt_t prempt_data;
-  unsigned long cpy_cpt_rel_a;
-  unsigned int length_line, i, k;
-  int err;
-  char c;
-  buf_rel_t *buf_rel = callback_arg->buf_data;
-  
-  callback_arg->nrels = 0;
-  callback_arg->nprimes = 0;
-  callback_arg->W = 0.0;
-
-#ifdef STAT
-  __stat_weight = 0;
-#ifdef STAT_VALUES_COEFF
-  for (int i = 0; i < STAT_VALUES_COEFF_LEN; i++)
-    __stat_nbcoeffofvalue[i] = 0;
-#endif
-#endif
-
-  fprintf (stderr, "Begin reading all relations\n");
-  
-  MEMSETZERO(buf_rel, SIZE_BUF_REL);
-  for (i = SIZE_BUF_REL; i--; ) 
-  {
-    buf_rel[i].primes = buf_rel[i].primes_data;
-    buf_rel[i].nb_alloc = NB_PRIMES_OPT;
-  }
-
-  end_insertRelation = 0;
-
-  cpt_rel_a = cpt_rel_b = 0;
-  cpy_cpt_rel_a = cpt_rel_a;
-  relation_stream_init (rs);
-  rs->pipe = 1;
-  length_line = 0;
-
-  prempt_data->files = prempt_open_compressed_rs (antebuffer, fic);
-
-  SMALLOC (prempt_data->buf, PREMPT_BUF, "prempt_scan_relations prempt_data");
-  pmin = prempt_data->buf;
-  pminlessone = pmin - 1;
-  prempt_data->pcons = pmin;
-  prempt_data->pprod = pmin;
-  pcons_max = &(prempt_data->buf[PREMPT_BUF]);
-  prempt_data->end = 0;
-  pthread_attr_init (&attr);
-  pthread_attr_setstacksize (&attr, 1<<16);
-  pthread_attr_setdetachstate (&attr, PTHREAD_CREATE_JOINABLE);
-
-
-  if ((err = pthread_create (&thread_load, &attr, (void *) prempt_load, prempt_data)))
-  {
-    fprintf (stderr, "prempt_scan_relations: pthread_create error 1: %d. %s\n", 
-                     err, strerror (errno));
-    exit (1);
-  }
-
-  err = pthread_create (&thread_callback, &attr, (void* (*)(void*))callback_fct,
-                        (void*) callback_arg);
-  if (err)
-  {
-    fprintf (stderr, "prempt_scan_relations: pthread_create error 2: %d. %s\n",
-                     err, strerror (errno));
-    exit (1);
-  }
-
-  pcons = (char *) prempt_data->pcons;
-  for ( ; ; )
-    {
-      rs->pos += length_line;
-      length_line = 0;
-      prempt_data->pcons = pcons;
-
-      while (pcons == prempt_data->pprod)
-        if (!prempt_data->end)
-          nanosleep (&wait_classical, NULL);
-        else if (pcons == prempt_data->pprod)
-          goto end_of_files;
-
-      if (pcons == prempt_data->pprod + sizeof(*pcons))
-        nanosleep (&wait_classical, NULL);
-
-      rs->lnum++;
-      if (*pcons != '#')
-      {
-        while ((((PREMPT_BUF + ((size_t) prempt_data->pprod)) -
-               ((size_t) pcons)) & (PREMPT_BUF - 1)) <= ((unsigned int) RELATION_MAX_BYTES) &&
-     !prempt_data->end)
-        nanosleep(&wait_classical, NULL);
-
-        if (pcons > prempt_data->pprod)
-        {
-          p = &(pcons_max[-1]);
-          c = *p;
-          *p = '\n';
-          pcons_old = pcons;
-          while (*pcons++ != '\n');
-            *p = c;
-
-          length_line = (pcons - pcons_old);
-          if (pcons <= p)
-            goto testendline;
-
-          pcons = pmin;
-          if (c == '\n')
-            goto testendline;
-        }
-
-        p = &(((char *) prempt_data->pprod)[-1]);
-        c = *p;
-        *p = '\n';
-        pcons_old = pcons;
-        while (*pcons++ != '\n');
-        *p = c;
-        length_line += (pcons - pcons_old);
-
-      testendline:
-        if (c != '\n' && pcons == prempt_data->pprod)
-        {
-          fprintf (stderr, "prempt_scan_relations: "
-                           "the last line has not a carriage return\n");
-          exit(1);
-        }
-        if (length_line > ((unsigned int) RELATION_MAX_BYTES))
-        {
-          fprintf (stderr, "prempt_scan_relations: relation line size"
-                           " (%u) is greater than RELATION_MAX_BYTES (%d)\n",
-                           length_line, RELATION_MAX_BYTES);
-          exit(1);
-        }
-
-        while (cpy_cpt_rel_a == cpt_rel_b + SIZE_BUF_REL)
-          nanosleep(&wait_classical, NULL);
-
-        k = (unsigned int) (cpy_cpt_rel_a & (SIZE_BUF_REL - 1));
-        if (cpy_cpt_rel_a + 1 == cpt_rel_b + SIZE_BUF_REL)
-          nanosleep(&wait_classical, NULL);
-
-        buf_rel[k].num = rs->nrels++;
-
-        if (bit_vector_getbit(rel_used, (size_t) buf_rel[k].num) ||
-            callback_arg->f_deleted != NULL)
-              relation_stream_get_fast (prempt_data, &(buf_rel[k]),
-                                                     callback_arg->min_index);
-
-        /* Delayed find root computation by block of 1<<NNFR */
-        if (cpy_cpt_rel_a && !(k & ((1<<NNFR)-1)))
-        {
-          if (cpy_cpt_rel_a > (1<<(NNFR)))
-          cpt_rel_a = cpy_cpt_rel_a - (1<<(NNFR));
-        }
-        cpy_cpt_rel_a++;
-      }
-      else
-      {
-        do
-        {
-          while (pcons == prempt_data->pprod)
-          {
-            if (!prempt_data->end)
-              nanosleep (&wait_classical, NULL);
-            else if (pcons == prempt_data->pprod)
-            {
-              fprintf (stderr, "prempt_scan_relations: at the end of files,"
-                               " a line without \\n ?\n");
-              exit (1);
-            }
-          }
-
-          p = ((pcons <= prempt_data->pprod) ? (char *) prempt_data->pprod
-                                             : pcons_max) - 1;
-          c = *p;
-          *p = '\n';
-          pcons_old = pcons;
-          while (*pcons++ != '\n');
-            *p = c;
-
-          length_line += (pcons - pcons_old);
-          err = (pcons > p && c != '\n');
-          if (pcons == pcons_max)
-            pcons = pmin;
-        } while (err);
-      }
-  }
-
- end_of_files:
-  cpt_rel_a = cpy_cpt_rel_a;
-  while (cpy_cpt_rel_a != cpt_rel_b)
-    nanosleep(&wait_classical, NULL);
-
-  end_insertRelation = 1;
-  pthread_join(thread_callback, NULL);
-  /* if (pthread_tryjoin_np (thread_load, NULL)) */
-  pthread_cancel(thread_load);
-  pthread_join(thread_load, NULL);
-  pthread_attr_destroy(&attr);
-
-  free (prempt_data->buf);
-  for (ff = prempt_data->files; *ff; free(*ff++));
-  free (prempt_data->files);
-  for (i = SIZE_BUF_REL; i-- ; )
-    if (buf_rel[i].nb_alloc != NB_PRIMES_OPT ) SFREE(buf_rel[i].primes);
-
-  relation_stream_trigger_disp_progress(rs);
-  fprintf (stderr, "End of read: %"PRid" relations in %.1fs -- %.1f MB/s -- "
-                   "%.1f rels/s\n", rs->nrels, rs->dt, rs->mb_s, rs->rels_s);
-
-  callback_arg->nrels = rs->nrels;
-
-  relation_stream_clear(rs);
-
-#ifdef STAT
-  fprintf (stderr, "STAT: W_total=%"PRIu64"\n", __stat_weight);
-#ifdef STAT_VALUES_COEFF
-  {
-    uint64_t tot = 0;
-    int i;
-    for (i = 0; i <= STAT_VALUES_COEFF_LEN; i++)
-      tot += __stat_nbcoeffofvalue[i];
-
-    fprintf (stderr, "STAT: coeffs with non-zero values: %"PRIu64"\n", 
-                     __stat_weight);
-    for (i = 1; i <= STAT_VALUES_COEFF_LEN; i++)
-      fprintf (stderr, "STAT: coeffs of abs value %d: %"PRIu64" (%.2f%%)\n",
-               i, __stat_nbcoeffofvalue[i], 
-               100 * (double) __stat_nbcoeffofvalue[i]/tot);
-    fprintf (stderr, "STAT: coeffs of abs value > %d: %"PRIu64" (%.2f%%)\n",
-             STAT_VALUES_COEFF_LEN, __stat_nbcoeffofvalue[0],
-             100 * (double) __stat_nbcoeffofvalue[0]/tot);
-  }
-#endif
-#endif
-
-  return 1;
 }
 
 
@@ -1601,9 +902,9 @@ main (int argc, char **argv)
   buf_rel_t *buf_rel;
   uint64_t min_index;
   index_t nrels, nprimes;
+  size_t tot_alloc_bytes = 0;
 
-  set_rep_cado(argv[0], rep_cado);
-  wct0 = wct_seconds ();
+  double wct0 = wct_seconds ();
   fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
   for (k = 1; k < argc; k++)
     fprintf (stderr, " %s", argv[k]);
@@ -1640,7 +941,7 @@ main (int argc, char **argv)
   const char * outfilerel = param_list_lookup_string(pl, "outrel");
   const char * deletedname = param_list_lookup_string(pl, "outdel");
 
-  search_antebuffer (rep_cado, path_antebuffer, antebuffer);
+  set_antebuffer_path (argv0, path_antebuffer);
 
   /* Check command-line parameters */
   binfilerel = (infilerel != 0);
@@ -1724,6 +1025,8 @@ main (int argc, char **argv)
   buf_arg.f_deleted = NULL;
   buf_arg.min_index = (index_t) min_index;
   buf_arg.buf_data = buf_rel;
+  buf_arg.rel_used = rel_used;
+  buf_arg.needed = NEEDED_HMIN;
 
 
   /**********************Start interessing stuff *****************************/
@@ -1735,19 +1038,20 @@ main (int argc, char **argv)
                      min_index);
 
   /* first pass over relations in files */
-  prempt_scan_relations (&insertRelation, &buf_arg);
+  prempt_scan_relations (fic, &thread_insert, &buf_arg);
   nprimes = buf_arg.nprimes;
   
-  tot_alloc_bytes += my_malloc_bytes;
+  tot_alloc_bytes += get_my_malloc_bytes();
   fprintf (stderr, "Allocated rel_compact[i] %zuMB (total %zuMB so far)\n",
-                   my_malloc_bytes >> 20, tot_alloc_bytes >> 20);
+                   get_my_malloc_bytes() >> 20, tot_alloc_bytes >> 20);
 #ifdef STAT
   {
   size_t tmp = ((uint64_t) buf_arg.W + nrelmax) * sizeof(index_t);
-  double ratio = 100.0 * (double) (((double) tmp) / ((double) my_malloc_bytes));
+  double ratio = 100.0 * (double) (((double) tmp) / 
+                                   ((double) get_my_malloc_bytes() ));
   fprintf (stderr, "STAT: W_active=%1.0f\nSTAT: Should take %zuMB in memory, "
                    "take %zuMB (%.2f %%)\n", buf_arg.W, tmp >> 20,
-                   my_malloc_bytes >> 20, ratio);
+                   get_my_malloc_bytes() >> 20, ratio);
   }
 #endif
 
@@ -1770,9 +1074,9 @@ main (int argc, char **argv)
 
     /* free rel_compact[i] and rel_compact. We do not need it anymore */
     my_malloc_free_all ();
-    tot_alloc_bytes -= my_malloc_bytes;
+    tot_alloc_bytes -= get_my_malloc_bytes();
     fprintf (stderr, "Freed rel_compact[i] %zuMB (total %zuMB so far)\n",
-                     my_malloc_bytes >> 20, tot_alloc_bytes >> 20);
+                     get_my_malloc_bytes() >> 20, tot_alloc_bytes >> 20);
 
     free (rel_compact);
     size_t tmp = (nrelmax * sizeof(index_t*));
@@ -1817,7 +1121,8 @@ main (int argc, char **argv)
 
   fprintf (buf_arg.f_remaining, "%"PRid" %"PRid"\n", nrels, nprimes);
   /* second pass over relations in files */
-  prempt_scan_relations (&printrel, &buf_arg);
+  buf_arg.needed = NEEDED_ABH;
+  prempt_scan_relations (fic, &thread_print, &buf_arg);
 
 
   if (!boutfilerel)

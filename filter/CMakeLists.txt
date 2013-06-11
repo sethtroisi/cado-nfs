@@ -2,10 +2,12 @@
 add_executable(dup1 dup1.c)
 target_link_libraries(dup1 utils)
 
-add_executable(dup2 dup2.c)
+add_executable(dup2 dup2.c filter_utils.c filter_io.c filter_memalloc.c)
 target_link_libraries(dup2 utils)
+set_target_properties(dup2 PROPERTIES COMPILE_FLAGS "-DFOR_DUP2")
+add_dependencies(dup2 antebuffer)
 
-add_executable(purge purge.c)
+add_executable(purge purge.c filter_utils.c filter_io.c filter_memalloc.c)
 target_link_libraries(purge utils pthread)
 add_dependencies(purge antebuffer)
 

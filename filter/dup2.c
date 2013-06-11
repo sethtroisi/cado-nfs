@@ -47,6 +47,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include <pthread.h>
 #include <unistd.h>     // for unlink
 #include <inttypes.h>
 #include <ctype.h>  // for isspace
@@ -55,14 +57,21 @@
 #include "relation.h"
 
 #include "portability.h"
-#include "macros.h"
+#include "utils.h"
+#include "typedefs.h"
 
-#define CA 271828182845904523UL
-#define CB 577215664901532889UL
+#include "filter_utils.h"
 
-unsigned long dupl = 0;
-unsigned long nodu = 0;
+char *argv0; /* = argv[0] */
+
+renumber_t renumber_table;
+
+index_t dupl = 0;
+index_t nodu = 0;
 double cost = 0.0;
+
+unsigned long K = 0;
+uint32_t *H;
 
 /* sanity check: we store (a,b) pairs for 0 <= i < sanity_size,
    and check for hash collisions */
@@ -73,14 +82,47 @@ unsigned long sanity_checked = 0;
 unsigned long sanity_collisions = 0;
 /* end sanity check */
 
+static double factor = 1.0;
+
+char ** files, ** files_already_renumbered, ** files_new;
+unsigned int nb_files, nb_f_new, nb_f_renumbered;
+
+static inline void
+sanity_check (uint32_t i, int64_t a, uint64_t b)
+{
+  sanity_checked++;
+  if (sanity_a[i] == 0) 
+  {
+    sanity_a[i] = a; 
+    sanity_b[i] = b;
+  } 
+  else if (sanity_a[i] != a) 
+  {
+    sanity_collisions++;
+    fprintf(stderr, "Collision between (%"PRId64",%"PRIu64") and "
+                    "(%"PRId64",%"PRIu64")\n", sanity_a[i], sanity_b[i], a,b);
+  }
+}
+
+static inline void 
+print_warning_size ()
+{
+  double full_table = 100.0 * (double) nodu / (double) K;
+  fprintf(stderr, "Warning, hash table is %1.0f%% full\n", full_table);
+  if (full_table >= 99) 
+  {
+    fprintf(stderr, "Error, hash table is full\n");
+    exit(1);
+  }
+  factor += 1.0;
+}
+
 /* infile is the input file
    if dirname is NULL, no output is done.
-   * if pass=0: read already renumbered files only.
-   * if pass=1: read new files only */
+   * read new files only */
 unsigned long
 remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
-                     uint32_t * H, unsigned long K, unsigned int ab_base,
-                     renumber_t renumber_table, int pass)
+                     unsigned int ab_base, renumber_t renumber_table)
 {
     FILE * f_in;
     int p_in;
@@ -96,37 +138,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
 
     for( ; *files ; files++) {
         const char * name = *files;
-        int raw = 0;
-        unsigned long nodu0 = nodu, dupl0 = dupl;
-
-        f_in = fopen_maybe_compressed2 (name, "r", &p_in, &suffix_in);
-        ASSERT_ALWAYS(f_in != NULL);
-
-        /* check if f_in is in raw format a,b:...:... or in renumbered format
-           a,b:... */
-        char s[1024];
-        char *ret = fgets (s, 1024, f_in);
-        if (ret == NULL)
-          {
-            fprintf (stderr, "Error while reading %s\n", name);
-            exit (1);
-          }
-        if (strlen (s) >= 1023)
-          {
-            fprintf (stderr, "Too long line while reading %s\n", name);
-            exit (1);
-          }
-        for (unsigned int i = 0; i < strlen (s); i++)
-          raw += s[i] == ':';
-        raw = (raw == 2) ? 1 : 0;
-
-        /* close and reopen the file */
-        if (p_in) pclose(f_in); else fclose(f_in);
-
-        if (pass == 0 && raw != 0)
-          continue; /* don't treat new files in pass 0 */
-        if (pass == 1 && raw == 0)
-          continue; /* don't treat already renumbered files in pass 1 */
+        index_t nodu0 = nodu, dupl0 = dupl;
 
         f_in = fopen_maybe_compressed2 (name, "r", &p_in, &suffix_in);
         ASSERT_ALWAYS(f_in != NULL);
@@ -138,9 +150,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
 
         char * oname = NULL;
         char * oname_tmp = NULL;
-        /* if raw = 0, the input file is already in the new format, no need
-           to write it again */
-        if (dirname && raw) {
+        if (dirname) {
             int rc;
             rc = asprintf(&oname_tmp, "%s/pre-%s%s", dirname, path_basename(newname), suffix_out);
             ASSERT_ALWAYS(rc >= 0);
@@ -160,75 +170,32 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
 
         relation_stream_bind(rs, f_in);
 
-        uint64_t h;
-        uint32_t i, j;
-        static double factor = 1.0;
-        double full_table;
+        uint32_t i;
 
         for (;;) {
             char line[RELATION_MAX_BYTES];
+            unsigned int is_dup;
+            buf_rel_t tmp;
 
-            /* if raw = 0, i.e., the file contains lines a,b:..., then it was
-               already renumbered, thus we only need to read a,b */
-            rs->parse_only_ab = (raw == 0);
+            rs->parse_only_ab = 0;
             if (relation_stream_get (rs, line, 0, ab_base) < 0)
               break;
 
-            h = CA * (uint64_t) rs->rel.a + CB * rs->rel.b;
-            /* dup1 uses the high 5 bits of h to identify the slices
-               but now we use a different hash function, so we can keep these
-               5 bits
-               */
-            i = h % K;
-            j = (uint32_t) (h >> 32);
-            /* Note: in the case where K > 2^32, i and j share some bits.
-             * The high bits of i are in j. These bits correspond therefore to
-             * far away positions in the tables, and keeping them in j can only
-             * help.
-             * FIXME:
-             * TODO: that's wrong!!! it would be better do take i from high
-             * bits instead!
-             */
-            while (H[i] != 0 && H[i] != j) {
-                i++;
-                if (UNLIKELY(i == K))
-                    i = 0;
-                cost++;
-            }
-            if (H[i] == j) {
+            tmp.a = rs->rel.a;
+            tmp.b = rs->rel.b;
+            i = insert_relation_in_dup_hashtable(H, K, &tmp, &cost, &is_dup);
+
+            if(is_dup) {
                 dupl++;
-                /* we should not find duplicates in already renumbered files */
-                ASSERT_ALWAYS(raw != 0);
                 continue;		/* probably duplicate */
             }
-
-            if (i < sanity_size) {
-                sanity_checked++;
-                if (sanity_a[i] == 0) {
-                    sanity_a[i] = rs->rel.a;
-                    sanity_b[i] = rs->rel.b;
-                } else if (sanity_a[i] != rs->rel.a) {
-                    sanity_collisions++;
-                    fprintf(stderr,
-                            "Collision between (%" PRId64 ",%" PRIu64 ") and (%"
-                            PRId64 ",%" PRIu64 ")\n", sanity_a[i], sanity_b[i], rs->rel.a,
-                            rs->rel.b);
-                }
-            }
+            if (i < sanity_size)
+              sanity_check(i, rs->rel.a, rs->rel.b);
 
             nodu++;
-            if (cost >= factor * (double) nodu) {
-                full_table = 100.0 * (double) nodu / (double) K;
-                fprintf(stderr, "Warning, hash table is %1.0f%% full\n",
-                        full_table);
-                if (full_table >= 99) {
-                    fprintf(stderr, "Error, hash table is full\n");
-                    exit(1);
-                }
-                factor += 1.0;
-            }
-            /* now H[i] = 0 */
-            H[i] = j;
+
+            if (cost >= factor * (double) nodu) 
+              print_warning_size (K);   
 
             if (f_out) /* output renumbered relation */
               {
@@ -277,7 +244,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
 
             if (relation_stream_disp_progress_now_p(rs)) {
                 fprintf(stderr,
-                        "Read %"PRid" relations, %lu duplicates (%1.2f%%)"
+                        "Read %"PRid" relations, %"PRid" duplicates (%1.2f%%)"
                         " in %.1f s -- %.1f MB/s, %.1f rels/s\n",
                         rs->nrels, dupl, 100.0 * (double) dupl / (double) rs->nrels,
                         rs->dt, rs->mb_s, rs->rels_s);
@@ -291,7 +258,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
         if (p_in) pclose(f_in); else fclose(f_in);
 
 
-        if (dirname && raw) {
+        if (dirname) {
             int ret = rename(oname_tmp, oname);
             if (ret) {
                 perror("Problem renaming result file");
@@ -300,13 +267,13 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
             free(oname);
             free(oname_tmp);
         }
-        fprintf (stderr, "%s: %lu relations, %lu duplicates, remains %lu\n",
-                 path_basename(name),
+        fprintf (stderr, "%s: %"PRid" relations, %"PRid" duplicates, "
+                         "remains %"PRid"\n", path_basename(name),
                  nodu + dupl - (nodu0 + dupl0), dupl - dupl0, nodu - nodu0);
     }
     relation_stream_trigger_disp_progress(rs);
     fprintf(stderr,
-            "Read %"PRid" relations, %lu duplicates (%1.2f%%)"
+            "Read %"PRid" relations, %"PRid" duplicates (%1.2f%%)"
             " in %.1f s -- %.1f MB/s, %.1f rels/s\n",
             rs->nrels, dupl, 100.0 * (double) dupl / (double) rs->nrels,
             rs->dt, rs->mb_s, rs->rels_s);
@@ -315,6 +282,137 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
     return rread;
 }
 
+void *
+thread_only_hash (buf_arg_t *arg)
+{
+  unsigned int j;
+  unsigned long cpy_cpt_rel_b;
+  buf_rel_t *my_rel;
+  uint32_t i;
+  unsigned int is_dup;
+
+  cpy_cpt_rel_b = cpt_rel_b;
+  for ( ; ; )
+  {
+    while (cpt_rel_a == cpy_cpt_rel_b)
+    {
+      if (!is_finish())
+        nanosleep (&wait_classical, NULL);
+      else if (cpt_rel_a == cpy_cpt_rel_b)
+        pthread_exit(NULL);
+    }
+
+    j = (unsigned int) (cpy_cpt_rel_b & (SIZE_BUF_REL - 1));
+    my_rel = &(arg->buf_data[j]);
+
+    if (cpt_rel_a == cpy_cpt_rel_b + 1)
+      nanosleep (&wait_classical, NULL);
+
+    i = insert_relation_in_dup_hashtable (H, K, my_rel, &cost, &is_dup);
+#if DEBUG >= 1
+    // They should be no duplicate in already renumbered file
+    ASSERT_ALWAYS (is_dup == 0);
+#endif
+    if (i < sanity_size)
+      sanity_check(i, my_rel->a, my_rel->b);
+    nodu++;
+    if (cost >= factor * (double) nodu) 
+      print_warning_size (K);   
+
+    test_and_print_progress_now ();
+    cpy_cpt_rel_b++;
+    cpt_rel_b = cpy_cpt_rel_b;
+  }
+}
+
+static void *
+thread_print(buf_arg_t *arg)
+{
+  unsigned int j;
+  unsigned long cpy_cpt_rel_b;
+  buf_rel_t *my_rel;
+
+  cpy_cpt_rel_b = cpt_rel_b;
+  for ( ; ; )
+  {
+    while (cpt_rel_a == cpy_cpt_rel_b)
+      if (!is_finish())
+        nanosleep (&wait_classical, NULL);
+      else if (cpt_rel_a == cpy_cpt_rel_b)
+          pthread_exit(NULL);
+
+    j = (unsigned int) (cpy_cpt_rel_b & (SIZE_BUF_REL - 1));
+    my_rel = &(arg->buf_data[j]);
+
+    if (cpt_rel_a == cpy_cpt_rel_b + 1)
+      nanosleep (&wait_classical, NULL);
+
+    if (my_rel->nb != 0)
+      print_relation_dup2 (arg->f_deleted, my_rel); //FIXME where do we print
+
+    test_and_print_progress_now ();
+    cpy_cpt_rel_b++;
+    cpt_rel_b = cpy_cpt_rel_b;
+  }
+}
+
+
+void *
+thread_root(fr_t *mfr) 
+{
+  buf_rel_t *myrel;
+  unsigned int i, j;
+  unsigned int is_dup;
+
+  //ep = &(H.ht[H.hm]);
+  for (;;)
+  {
+    switch(mfr->ok) 
+    {
+      case 0:
+        nanosleep (&wait_classical, NULL);
+        break;
+      case 1 :
+        for (j = mfr->num; j <= mfr->end; j++)
+        {
+          myrel = &(mfr->buf_data[j]);
+          
+          i = insert_relation_in_dup_hashtable (H, K, myrel, &cost, &is_dup);
+          if (is_dup)
+          {
+           // WARNING FIXME H, cost, factor, nodu, dupl is not volatile...
+            if (i < sanity_size)
+              sanity_check(i, myrel->a, myrel->b);
+            nodu++;
+            if (cost >= factor * (double) nodu) 
+              print_warning_size (K);   
+
+            compute_index_rel (renumber_table, myrel);
+          }
+          else
+          {
+            dupl++;
+            myrel->nb = 0; /* meaning: do not print this relation */
+          }
+        }
+        mfr->ok = 0;
+        break;
+      case 2:
+        mfr->ok = 3;
+        pthread_exit(NULL);
+    }
+  }
+}
+
+/* Read all relations from file, and fills the rel_used and rel_compact arrays
+   for each relation i:
+   - rel_used[i] = 0 if the relation i is deleted
+     rel_used[i] = 1 if the relation i is kept (so far)
+   - rel_compact is an array, terminated by -1, of pointers to the entries
+     in the hash table for the considered primes
+
+     Trick: we only read relations for which rel_used[i]==1.
+ */
 void usage()
 {
     fprintf (stderr, "Usage: dup2 -poly xxx [-out <dir>] [-basepath <dir>] [-filelist <fl>] -renumber xxx -K <K> file1 ... filen\n");
@@ -324,10 +422,12 @@ void usage()
 int
 main (int argc, char *argv[])
 {
-    unsigned long K = 0;
-    uint32_t *H;
+  argv0 = argv[0];
+  buf_arg_t buf_arg;
+  buf_rel_t *buf_rel;
     const char *renumberfilename = NULL;
     cado_poly cpoly;
+    char **p;
 
     /* print command line */
     fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
@@ -362,6 +462,7 @@ main (int argc, char *argv[])
     const char * filelist = param_list_lookup_string(pl, "filelist");
     const char * basepath = param_list_lookup_string(pl, "basepath");
     renumberfilename = param_list_lookup_string(pl, "renumber");
+  const char * path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
 
     param_list_parse_ulong(pl, "K", &K);
 
@@ -402,7 +503,8 @@ main (int argc, char *argv[])
         exit (1);
       }
 
-    renumber_t renumber_table;
+    set_antebuffer_path (argv0, path_antebuffer);
+  
     renumber_init (renumber_table, cpoly);
     renumber_read_table (renumber_table, renumberfilename);
 
@@ -443,24 +545,83 @@ main (int argc, char *argv[])
       usage();
   }
 
-  char ** files = filelist ? filelist_from_file (basepath, filelist, 0) : argv;
-  unsigned long rread;
-  /* pass 0: we read files that were already renumbered, and enter the
-     correspoding (a,b) values in the H table */
-  rread = remove_dup_in_files (files, basepath, outfmt, H, K,
-                               (ab_hexa)?16:10, renumber_table, 0);
+
+  /* Construct the two filelists : new files and already renumbered files */
+  fprintf(stderr, "Constructing the two filelists...\n");
+  files = filelist ? filelist_from_file (basepath, filelist, 0) : argv;
+  for (p = files, nb_files = 0; *p; p++)
+    nb_files++;
+
+  SMALLOC(files_already_renumbered, nb_files, "files_already_renumbered");
+  SMALLOC(files_new, nb_files, "files_new");
+  
+  /* separate already process files
+   * check if f_tmp is in raw format a,b:...:... or 
+   *            in renumbered format a,b:... 
+   */
+  nb_f_new = 0;
+  nb_f_renumbered = 0;
+  for (p = files; *p; p++)
+  {
+    unsigned int count = 0;
+    char s[1024];
+    FILE *f_tmp = fopen_maybe_compressed (*p, "r");
+    ASSERT_ALWAYS(f_tmp != NULL);
+
+    char *ret = fgets (s, 1024, f_tmp);
+    if (ret == NULL)
+    {
+      fprintf (stderr, "Error while reading %s\n", *p);
+      exit (1);
+    }
+    if (strlen (s) >= 1023)
+    {
+      fprintf (stderr, "Too long line while reading %s\n", *p);
+      exit (1);
+    }
+    for (unsigned int i = 0; i < strlen (s); i++)
+      count += s[i] == ':';
+    
+    if (count == 2)
+      files_new[nb_f_new++] = *p;
+    else
+      files_already_renumbered[nb_f_renumbered++] = *p;
+
+    fclose_maybe_compressed (f_tmp, *p);
+  }
+  files_new[nb_f_new] = NULL;
+  files_already_renumbered[nb_f_renumbered] = NULL;
+  ASSERT_ALWAYS (nb_f_new + nb_f_renumbered == nb_files);
+  fprintf (stderr, "%u files (%u new and %u already renumbered)\n", nb_files, 
+                   nb_f_new, nb_f_renumbered);
+
+
+ //call prempt_scan_rel 2 times with two diff filelist and two diff callback fct
+
+  SMALLOC(buf_rel,SIZE_BUF_REL, "buf_rel");
+  MEMSETZERO(&buf_arg, 1);
+  buf_arg.buf_data = buf_rel;
+  buf_arg.needed = NEEDED_AB;
+  
+  fprintf (stderr, "Reading files already renumbered:\n");
+  prempt_scan_relations (files_already_renumbered, &thread_only_hash, &buf_arg);
+
+  fprintf (stderr, "Reading new files:\n");
+  index_t rread = 0;
+  //buf_arg.needed = NEEDED_ABP;
+  //buf_arg.needr = 1;
+  //prempt_scan_relations (files_new, &thread_print, &buf_arg);
   /* pass 1: we read new files, remove duplicates, and renumber them */
-  rread += remove_dup_in_files (files, basepath, outfmt, H, K,
-                               (ab_hexa)?16:10, renumber_table, 1);
-  if (filelist) filelist_clear(files);
+  rread += remove_dup_in_files (files_new, basepath, outfmt,
+                               (ab_hexa)?16:10, renumber_table);
 
 
-  fprintf (stderr, "Read %lu relations, %lu duplicates (%1.2f%%)\n",
+  fprintf (stderr, "Read %"PRid" relations, %"PRid" duplicates (%1.2f%%)\n",
            rread, dupl, 100.0 * (double) dupl / (double) rread);
 
   free (H);
 
-  fprintf (stderr, "     %lu remaining relations (hash table %1.2f%% full)\n",
+  fprintf (stderr, "     %"PRid" remaining relations (hash table %1.2f%% full)\n",
            nodu, 100.0 * (double) nodu / (double) K);
   fprintf (stderr, "     Hash-table cost %1.2f per relation\n",
            1.0 + cost / (double) rread);
@@ -481,6 +642,13 @@ main (int argc, char *argv[])
     min_index = 0;
   fprintf (stderr, "Renumbering struct: min_index=%lu\n", (uint64_t) min_index);
 
+
+
+  if (filelist)
+    filelist_clear(files);
+  SFREE(files_already_renumbered);
+  SFREE(files_new);
+  SFREE(buf_rel);
 
   param_list_clear(pl);
   renumber_free (renumber_table);

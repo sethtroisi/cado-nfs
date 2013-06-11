@@ -48,6 +48,12 @@ config/test-rand.cmake
 factor.sh
 filter/CMakeLists.txt
 filter/Makefile
+filter/filter_io.c
+filter/filter_io.h
+filter/filter_utils.c
+filter/filter_utils.h
+filter/filter_memalloc.c
+filter/filter_memalloc.h
 filter/dup1.c
 filter/dup2.c
 filter/explain.c
