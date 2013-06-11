@@ -1498,6 +1498,11 @@ class StartClientsTask(Task):
         self.used_ids = {}
         self.pids = self.make_db_dict(self.make_tablename("client_pids"))
         self.hosts = self.make_db_dict(self.make_tablename("client_hosts"))
+        assert set(self.pids) == set(self.hosts)
+        # Invariants: the keys of self.pids and of self.hosts are the same set.
+        # The keys of self.used_ids are a subset of the keys of self.pids.
+        # A clientid is in self.used_ids if we know that clientid to be
+        # currently running.
         
         if 'scriptpath' in self.params:
             self.progparams[0]['execpath'] = self.params['scriptpath']
@@ -1521,9 +1526,25 @@ class StartClientsTask(Task):
     
     def launch_clients(self):
         for host in self.hosts_to_launch:
-            self.launch_host(host.strip())
-        s = ", ".join(["%s (Host %s, PID %d)" % (cid, self.hosts[cid], self.pids[cid]) for cid in self.pids])
-        self.logger.info("Launched clients: %s" % s)
+            self.launch_one_client(host.strip())
+        running_clients = [(cid, self.hosts[cid], pid) for (cid, pid) in self.pids.items()]
+        s = ", ".join(["%s (Host %s, PID %d)" % t for t in running_clients])
+        self.logger.info("Running clients: %s" % s)
+        # Check for old clients which we did not mean to start this run
+        for cid in set(self.pids) - set(self.used_ids):
+            if self.is_alive(cid):
+                self.logger.warn("Client id %s (Host %s, PID %d), launched "
+                                 "in a previous run and not meant to be "
+                                 "launched this time, is still running",
+                                 cid, self.hosts[cid], self.pids[cid])
+            else:
+                self.logger.warn("Client id %s (Host %s, PID %d), launched "
+                                 "in a previous run and not meant to be "
+                                 "launched this time, seems to have died. "
+                                 "I'll forget about this client.",
+                                 cid, self.hosts[cid], self.pids[cid])
+                del(self.hosts[cid])
+                del(self.pids[cid])
     
     def make_unique_id(self, host):
         # Make a unique client id for host
@@ -1534,7 +1555,6 @@ class StartClientsTask(Task):
             assert clientid in self.hosts
             i += 1
             clientid = "%s%d" % (host, i)
-        self.used_ids[clientid] = True
         return clientid
     
     # Cases:
@@ -1542,7 +1562,7 @@ class StartClientsTask(Task):
     # Client was started, but does not exist any more. Remove from state, then start and add again
     # Client was started, and does still exists. Nothing to do.
     
-    def launch_host(self, host):
+    def launch_one_client(self, host):
         clientid = self.make_unique_id(host)
         # Check if client is already running
         if clientid in self.pids:
@@ -1550,6 +1570,7 @@ class StartClientsTask(Task):
             if self.is_alive(clientid):
                 self.logger.info("Client %s on host %s with PID %d already running",
                                  clientid, host, self.pids[clientid])
+                self.used_ids[clientid] = True
                 return
             else:
                 del(self.pids[clientid])
@@ -1558,18 +1579,22 @@ class StartClientsTask(Task):
         self.logger.info("Starting client id %s on host %s", clientid, host)
         self.progparams[0]['clientid'] = clientid
         wuclient = cadoprograms.WuClient([], self.progparams[0], stdout = "/dev/null", stderr = "/dev/null", bg=True)
-        process = cadocommand.RemoteCommand(wuclient, host, self.parameters, self.path_prefix)
+        process = cadocommand.RemoteCommand(wuclient, host, self.parameters, self.path_prefix + [host])
         (rc, stdout, stderr) = process.wait()
         if rc != 0:
-            self.logger.warning("Starting client on %s failed. "
-                                "Consult log file for details." % host)
+            self.logger.warning("Starting client on host %s failed.", host)
+            if stdout:
+                self.logger.warning("Stdout: %s", stdout.decode("ASCII").strip())
+            if stderr:
+                self.logger.warning("Stdout: %s", stderr.decode("ASCII").strip())
             return
+        self.used_ids[clientid] = True
         self.pids[clientid] = int(stdout)
         self.hosts[clientid] = host
 
     def kill_all_clients(self):
-        # Need the keys() to make a copy as dict will change in loop body
-        for clientid in list(self.pids.keys()):
+        # Need the list() to make a copy as dict will change in loop body
+        for clientid in list(self.pids):
             (rc, stdout, stderr) = self.kill_client(clientid)
             if rc == 0:
                 self.logger.info("Stopped client %s (Host %s, PID %d)",
@@ -1579,6 +1604,14 @@ class StartClientsTask(Task):
             else:
                 self.logger.warning("Stopping client %s (Host %s, PID %d) failed",
                                     clientid, self.hosts[clientid], self.pids[clientid])
+                if stdout:
+                    self.logger.warning("Stdout: %s", stdout.decode("ASCII").strip())
+                if stderr:
+                    self.logger.warning("Stdout: %s", stderr.decode("ASCII").strip())
+                # Assume that the client is already dead and remove it from
+                # the list of running clients
+                del(self.pids[clientid])
+                del(self.hosts[clientid])
     
     def kill_client(self, clientid, signal = None):
         pid = self.pids[clientid]
