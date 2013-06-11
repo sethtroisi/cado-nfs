@@ -371,14 +371,13 @@ class ClientServerTask(Task, patterns.Observer):
     def paramnames(self):
         return super().paramnames + ("maxwu",)
     
-    def __init__(self, *args, db_listener, **kwargs):
+    def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.db_listener = db_listener
-        self.db_listener.subscribeObserver(self)
         self.state.setdefault("wu_submitted", 0)
         self.state.setdefault("wu_received", 0)
         self.params.setdefault("maxwu", 10)
         assert self.get_number_outstanding_wus() >= 0
+        self.send_notification(Notification.SUBSCRIBE_WU_NOTIFICATIONS, None)
     
     def submit_command(self, command, identifier):
         ''' Submit a workunit to the database.
@@ -417,11 +416,15 @@ class ClientServerTask(Task, patterns.Observer):
         return False
     
     def wait(self):
-        # If we get notification on new results reliably, we might not
-        # need this poll. But they probably won't be totally reliable
-        if not self.db_listener.send_result():
+        # Ask the mediator to check for workunits of status Received, 
+        # and if there are any, to send WU result notifications to the 
+        # subscribed listeners.
+        # If we get notification on new results reliably from the HTTP server,
+        # we might not need this poll. But they probably won't be totally
+        # reliable
+        if not self.send_request(Request.GET_WU_RESULT):
             time.sleep(1)
- 
+
 
 class PolyselTask(ClientServerTask):
     """ Finds a polynomial, uses client/server """
@@ -1623,8 +1626,8 @@ class StartClientsTask(Task):
         process = cadocommand.RemoteCommand(kill, host, self.parameters, self.path_prefix)
         return process.wait()
 
-class Message(object, metaclass = abc.ABCMeta):
-    def __init__(self, sender, key, value):
+class Message(object):
+    def __init__(self, sender, key, value = None):
         self.sender = sender
         self.key = key
         self.value = value
@@ -1634,15 +1637,22 @@ class Message(object, metaclass = abc.ABCMeta):
         return self.key
     def get_value(self):
         return self.value
+    def reverse_lookup(self, reference):
+        for key in dir(self):
+            if getattr(self, key) is reference:
+                return key
+
 
 class Notification(Message):
     FINISHED_POLYNOMIAL_SELECTION = 0
     WANT_MORE_RELATIONS = 1
     HAVE_ENOUGH_RELATIONS = 2
     REGISTER_FILENAME = 3
-    SUBMIT_WU = 4
-    VERIFY_WU = 5
-    WANT_TO_RUN = 6
+    UNREGISTER_FILENAME = 4
+    SUBMIT_WU = 5
+    VERIFY_WU = 6
+    WANT_TO_RUN = 7
+    SUBSCRIBE_WU_NOTIFICATIONS = 8
 
 class Request(Message):
     GET_POLYNOMIAL = 0
@@ -1662,8 +1672,7 @@ class Request(Message):
     GET_DEPENDENCY_FILENAME = 14
     GET_LINALG_PREFIX = 15
     GET_KERNEL_FILENAME = 16
-    def __init__(self, sender, key, value = None):
-        super().__init__(sender, key, value)
+    GET_WU_RESULT = 17
 
 
 class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Mediator):
@@ -1709,7 +1718,6 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         self.polysel = PolyselTask(*args,
                                    mediator = self,
                                    path_prefix = parampath,
-                                   db_listener = self.db_listener,
                                    **kwargs)
         self.fb = FactorBaseTask(*args,
                                  mediator = self,
@@ -1722,7 +1730,6 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         self.sieving = SievingTask(*args,
                                    mediator = self,
                                    path_prefix = sievepath,
-                                   db_listener = self.db_listener,
                                    **kwargs)
         self.dup1 = Duplicates1Task(*args,
                                     mediator = self,
@@ -1779,7 +1786,8 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
             Request.GET_DENSE_FILENAME: self.merge.get_dense_filename,
             Request.GET_DEPENDENCY_FILENAME: self.linalg.get_dependency_filename,
             Request.GET_LINALG_PREFIX: self.linalg.get_prefix,
-            Request.GET_KERNEL_FILENAME: self.characters.get_kernel_filename
+            Request.GET_KERNEL_FILENAME: self.characters.get_kernel_filename,
+            Request.GET_WU_RESULT: self.db_listener.send_result,
         }
     
     def run(self):
@@ -1886,6 +1894,11 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
                                 sender)
             else:
                 self.tasks_that_want_to_run.append(sender)
+        elif key == Notification.SUBSCRIBE_WU_NOTIFICATIONS:
+            if isinstance(sender, ClientServerTask):
+                return self.db_listener.subscribeObserver(sender)
+            else:
+                raise Exception("Got SUBSCRIBE_WU_NOTIFICATIONS, but not from a ClientServerTask")
         else:
             raise KeyError("Notification from %s has unknown key %s" % (sender, key))
     
@@ -1896,14 +1909,13 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         value = request.get_value()
         self.logger.debug("Received request from %s, key = %s, values = %s",
                            sender, key, value)
-        if key in self.request_map:
-            if value is None:
-                return self.request_map[key]()
-            else:
-                return self.request_map[key](value)
-        else:
+        if not key in self.request_map:
             raise KeyError("Unknown Request key %s from sender %s" %
                            (str(key), str(sender)))
+        if value is None:
+            return self.request_map[key]()
+        else:
+            return self.request_map[key](value)
     
     def handle_message(self, message):
         if isinstance(message, Notification):
