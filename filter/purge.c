@@ -2193,21 +2193,21 @@ main (int argc, char **argv)
   }
 
 #if index_size == 32
-  param_list_parse_uint(pl, "nrels", (unsigned int *) &nrelmax);
-  param_list_parse_uint(pl, "nprimes", (unsigned int *) &nprimes);
-  param_list_parse_uint(pl, "keep", (unsigned int *) &keep);
+  param_list_parse_uint(pl, "nrels", &nrelmax);
+  param_list_parse_uint(pl, "nprimes", &nprimes);
+  param_list_parse_uint(pl, "keep", &keep);
 #else
-  param_list_parse_uint64(pl, "nrels", (uint64_t *) &nrelmax);
-  param_list_parse_uint64(pl, "nprimes", (uint64_t *) &nprimes);
-  param_list_parse_uint64(pl, "keep", (uint64_t *) &keep);
+  param_list_parse_uint64(pl, "nrels", &nrelmax);
+  param_list_parse_uint64(pl, "nprimes", &nprimes);
+  param_list_parse_uint64(pl, "keep", &keep);
 #endif
 
 #if p_r_values_size == 32
-  param_list_parse_uint(pl, "minpr", (unsigned int *) &minpr);
-  param_list_parse_uint(pl, "minpa", (unsigned int *) &minpa);
+  param_list_parse_uint(pl, "minpr", &minpr);
+  param_list_parse_uint(pl, "minpa", &minpa);
 #else
-  param_list_parse_uint64(pl, "minpr", (uint64_t *) &minpr);
-  param_list_parse_uint64(pl, "minpa", (uint64_t *) &minpa);
+  param_list_parse_uint64(pl, "minpr", &minpr);
+  param_list_parse_uint64(pl, "minpa", &minpa);
 #endif
 
   /* param_list_parse_uint(pl, "npthr", (unsigned int *) &npt); */
