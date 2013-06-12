@@ -489,6 +489,9 @@ class DictDbAccess(collections.MutableMapping):
     def  __len__(self):
         return self._data.__len__()
     
+    def __str__(self):
+        return self._data.__str__()
+    
     def __del__(self):
         """ Close the DB connection and delete the dictionary """
         if self._ownconn:
