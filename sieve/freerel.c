@@ -322,6 +322,7 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
 
   if (pmax == 0)
     pmax = lpb[min_side];
+  ASSERT_ALWAYS (pmax <= lpb[min_side]);
 
   for (p = 2; p <= lpb[max_side]; p = getprime (p))
   {
