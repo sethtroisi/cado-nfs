@@ -380,10 +380,7 @@ class ClientServerTask(Task, patterns.Observer):
         self.send_notification(Notification.SUBSCRIBE_WU_NOTIFICATIONS, None)
     
     def submit_command(self, command, identifier):
-        ''' Submit a workunit to the database.
-        Return the result tuple. If the caller is an Observer, also send
-        result to updateObserver().
-        '''
+        ''' Submit a workunit to the database. '''
         
         while self.get_number_outstanding_wus() >= self.params["maxwu"]:
             self.wait()
@@ -449,8 +446,7 @@ class PolyselTask(ClientServerTask):
     
     def run(self):
         self.logger.info("Starting")
-        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
-                          self.state)
+        self.logger.debug("%s.run(): Task state: %s", self.name, self.state)
         
         if self.is_done():
             self.logger.info("Polynomial selection already finished - nothing to do")
@@ -569,8 +565,7 @@ class FactorBaseOrFreerelTask(Task, metaclass=abc.ABCMeta):
             # The target file must correspond to the polynomial "poly"
     
     def run(self):
-        self.logger.debug("%s.run(): Task state: %s", self.__class__.name,
-                          self.state)
+        self.logger.debug("%s.run(): Task state: %s", self.name, self.state)
         
         # Get best polynomial found by polyselect
         poly = self.send_request(Request.GET_POLYNOMIAL)
