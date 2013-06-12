@@ -669,9 +669,9 @@ renumber (const char *sos, index_t MAYBE_UNUSED min_index, index_t nprimes)
    The only << solution >> without synchronous barrier or (pre)processor
    order is a nanosleep after the end of the waiting loop.
    * empty buffer :
-       if (A == B + 1) nanosleep (&wait_classical, NULL);
+       if (A == B + 1) NANOSLEEP;
    * full buffer :
-       if (A + 1 == B + SIZEBUF) nanosleep (&wait_classical, NULL);
+       if (A + 1 == B + SIZEBUF) NANOSLEEP;
    It's very dirty!
 */
 
@@ -690,7 +690,7 @@ thread_insert (buf_arg_t *arg)
     while (cpt_rel_a == cpy_cpt_rel_b)
     {
       if (!is_finish())
-        nanosleep (&wait_classical, NULL);
+        NANOSLEEP;
       else if (cpt_rel_a == cpy_cpt_rel_b)
         pthread_exit(NULL);
     }
@@ -699,7 +699,7 @@ thread_insert (buf_arg_t *arg)
     my_rel = &(arg->buf_data[j]);
 
     if (cpt_rel_a == cpy_cpt_rel_b + 1)
-      nanosleep (&wait_classical, NULL);
+      NANOSLEEP;
 
     if (bit_vector_getbit(arg->rel_used, (size_t) my_rel->num))
     {
@@ -730,7 +730,7 @@ thread_print(buf_arg_t *arg)
   {
     while (cpt_rel_a == cpy_cpt_rel_b)
       if (!is_finish())
-        nanosleep (&wait_classical, NULL);
+        NANOSLEEP;
       else if (cpt_rel_a == cpy_cpt_rel_b)
           pthread_exit(NULL);
 
@@ -738,7 +738,7 @@ thread_print(buf_arg_t *arg)
     my_rel = &(arg->buf_data[j]);
 
     if (cpt_rel_a == cpy_cpt_rel_b + 1)
-      nanosleep (&wait_classical, NULL);
+      NANOSLEEP;
 
     aff = bit_vector_getbit(arg->rel_used, (size_t) my_rel->num);
     if (boutfilerel && aff)

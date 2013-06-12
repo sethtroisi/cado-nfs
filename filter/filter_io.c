@@ -31,22 +31,6 @@ is_finish ()
   return end_insertRelation;
 }
 
-/* copied from utils/antebuffer.c */
-#ifndef HAVE_NANOSLEEP
-  int nanosleep(const struct timespec *req, struct timespec *rem) {
-    if (rem == NULL) {
-      /* Dummy to shut up the warning */
-    }
-#ifdef HAVE_USLEEP
-    unsigned long usec = req->tv_sec * 1000000UL + req->tv_nsec / 1000UL;
-    usleep(usec);
-#else
-    sleep(req->tv_sec);
-#endif
-    return 0;
-  }
-#endif
-
 void
 set_antebuffer_path (char * argv0, const char *path_antebuffer)
 {
@@ -113,7 +97,7 @@ prempt_load (prempt_t prempt_data)
     (((((PREMPT_BUF + ((size_t) prempt_data->pcons))) - ((size_t) pprod)) &
       (PREMPT_BUF - 1)) <= PREMPT_ONE_READ))
         {
-          nanosleep(&wait_classical, NULL);
+          NANOSLEEP;
         }
       else
       {
@@ -513,12 +497,12 @@ prempt_scan_relations (char **fic, void* (*callback_fct)(buf_arg_t *),
 
       while (pcons == prempt_data->pprod)
         if (!prempt_data->end)
-          nanosleep (&wait_classical, NULL);
+          NANOSLEEP;
         else if (pcons == prempt_data->pprod)
           goto end_of_files;
 
       if (pcons == prempt_data->pprod + sizeof(*pcons))
-        nanosleep (&wait_classical, NULL);
+        NANOSLEEP;
 
       rs->lnum++;
       if (*pcons != '#')
@@ -526,7 +510,7 @@ prempt_scan_relations (char **fic, void* (*callback_fct)(buf_arg_t *),
         while ((((PREMPT_BUF + ((size_t) prempt_data->pprod)) -
                ((size_t) pcons)) & (PREMPT_BUF - 1)) <= ((unsigned int) RELATION_MAX_BYTES) &&
      !prempt_data->end)
-        nanosleep(&wait_classical, NULL);
+        NANOSLEEP;
 
         if (pcons > prempt_data->pprod)
         {
@@ -570,11 +554,11 @@ prempt_scan_relations (char **fic, void* (*callback_fct)(buf_arg_t *),
         }
 
         while (cpy_cpt_rel_a == cpt_rel_b + SIZE_BUF_REL)
-          nanosleep(&wait_classical, NULL);
+          NANOSLEEP;
 
         k = (unsigned int) (cpy_cpt_rel_a & (SIZE_BUF_REL - 1));
         if (cpy_cpt_rel_a + 1 == cpt_rel_b + SIZE_BUF_REL)
-          nanosleep(&wait_classical, NULL);
+          NANOSLEEP;
 
         buf_rel[k].num = rs->nrels++;
 
@@ -600,7 +584,7 @@ prempt_scan_relations (char **fic, void* (*callback_fct)(buf_arg_t *),
           {
             i = (k>>NNFR) & ((1<<NFR)-1);
             while (fr[i].ok) 
-              nanosleep(&wait_classical, NULL);
+              NANOSLEEP;
             if (k)
             {
               fr[i].num = k - (1<<NNFR);
@@ -627,7 +611,7 @@ prempt_scan_relations (char **fic, void* (*callback_fct)(buf_arg_t *),
           while (pcons == prempt_data->pprod)
           {
             if (!prempt_data->end)
-              nanosleep (&wait_classical, NULL);
+              NANOSLEEP;
             else if (pcons == prempt_data->pprod)
             {
               fprintf (stderr, "prempt_scan_relations: at the end of files,"
@@ -662,7 +646,7 @@ prempt_scan_relations (char **fic, void* (*callback_fct)(buf_arg_t *),
       {
         i = ((k>>NNFR)+1) & ((1<<NFR)-1);
         while (fr[i].ok) 
-          nanosleep(&wait_classical, NULL);
+          NANOSLEEP;
         fr[i].num = k & ~((1<<NNFR)-1);
         fr[i].end = k;
         fr[i].ok = 1;
@@ -671,7 +655,7 @@ prempt_scan_relations (char **fic, void* (*callback_fct)(buf_arg_t *),
     for (i = 0; i < (1<<NFR); i++) 
     {
       while (fr[i].ok) 
-        nanosleep(&wait_classical, NULL);
+        NANOSLEEP;
       fr[i].ok = 2;
       pthread_join(thread_fr[i], NULL);
     }
@@ -679,7 +663,7 @@ prempt_scan_relations (char **fic, void* (*callback_fct)(buf_arg_t *),
 
   cpt_rel_a = cpy_cpt_rel_a;
   while (cpy_cpt_rel_a != cpt_rel_b)
-    nanosleep(&wait_classical, NULL);
+    NANOSLEEP;
 
   end_insertRelation = 1;
   pthread_join(thread_callback, NULL);

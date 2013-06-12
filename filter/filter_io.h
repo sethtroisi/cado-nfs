@@ -2,6 +2,8 @@
 #define FILTER_IO_H_
 
 #define MAX_FILES 1000000
+#include <unistd.h>
+#include <time.h>
 
 /*
   1<<NFR = Number of computation threads.
@@ -37,7 +39,17 @@
    Max pause is about 4 to 8ms (1<<22, 1<<23); after the program
    is slow down.
 */
+#ifndef HAVE_NANOSLEEP
+#ifdef HAVE_USLEEP
+#define NANOSLEEP usleep((unsigned long) (1<<21 / 1000UL))
+#else
+#define NANOSLEEP sleep(0)
+#endif
+#else
 static const struct timespec wait_classical = { 0, 1<<21 };
+#define NANOSLEEP nanosleep(&wait_classical, NULL)
+#endif
+
 
 /* What part of relations do we read */
 #define NEEDED_ABP 0 //read a,b:p0,...,pk:p'0,...,p'l
