@@ -601,10 +601,6 @@ class FactorBaseOrFreerelTask(Task, metaclass=abc.ABCMeta):
             # Run command to generate factor base/free relations file
             kwargs = self.progparams[0].copy()
             kwargs["poly"] = polyfile
-            if "pmin" in self.programs[0].get_config_keys():
-                kwargs.setdefault("pmin", "1")
-            if "pmax" in self.programs[0].get_config_keys():
-                kwargs.setdefault("pmax", str(2**int(self.params["lpba"])))
             p = self.programs[0](None, kwargs, stdout = outputfile)
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             self.parse_stderr(stderr)
