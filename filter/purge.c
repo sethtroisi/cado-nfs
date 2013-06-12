@@ -953,7 +953,7 @@ static void
 remove_singletons (unsigned int npass, double required_excess)
 {
   p_r_values_t oldnewnrel = 0, oldtmpnewnrel = 0;
-#if index_t == 32
+#if index_size == 32
   int32_t oldexcess = 0, excess;
 #else
   int64_t oldexcess = 0, excess;
