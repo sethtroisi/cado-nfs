@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 import os
-import sqlite3
 import argparse
 import logging
-import sys
 import cadologger
 import cadotask
 import cadoparams
