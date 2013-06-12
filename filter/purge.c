@@ -117,7 +117,7 @@ static cado_poly pol;
 static double wct0;
 static double W; /* total weight of the matrix (used in second pass) */
 static size_t tot_alloc, tot_alloc0;
-static p_r_values_t nrel,
+static index_t nrel,
   nprimes = 0,
   nrelmax = 0,
   relsup,
@@ -128,8 +128,8 @@ static p_r_values_t nrel,
   Hsizer,
   Hsizea,
   keep = 160;         /* default maximum final excess */
-static index_t minpr = UMAX(minpr);
-static index_t minpa = UMAX(minpa); /* negative values mean use minpr=rlim and
+static p_r_values_t minpr = UMAX(minpr);
+static p_r_values_t minpa = UMAX(minpa); /* negative values mean use minpr=rlim and
 				    minpa=alim */
 static int raw = 0, need64;
 static unsigned int npt = 4;
@@ -953,7 +953,7 @@ static void
 remove_singletons (unsigned int npass, double required_excess)
 {
   p_r_values_t oldnewnrel = 0, oldtmpnewnrel = 0;
-#if HR == 32
+#if index_t == 32
   int32_t oldexcess = 0, excess;
 #else
   int64_t oldexcess = 0, excess;
@@ -2192,7 +2192,7 @@ main (int argc, char **argv)
     break;
   }
 
-#if p_r_values_size == 32
+#if index_size == 32
   param_list_parse_uint(pl, "nrels", (unsigned int *) &nrelmax);
   param_list_parse_uint(pl, "nprimes", (unsigned int *) &nprimes);
   param_list_parse_uint(pl, "keep", (unsigned int *) &keep);
@@ -2202,7 +2202,7 @@ main (int argc, char **argv)
   param_list_parse_uint64(pl, "keep", (uint64_t *) &keep);
 #endif
 
-#if index_size == 32
+#if p_r_values_size == 32
   param_list_parse_uint(pl, "minpr", (unsigned int *) &minpr);
   param_list_parse_uint(pl, "minpa", (unsigned int *) &minpa);
 #else
