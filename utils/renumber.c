@@ -68,7 +68,7 @@ renumber_close_write (renumber_t renumber_info)
   rewind (renumber_info->file);
   fwrite (&(renumber_info->size), sizeof(renumber_info->size), 1,
           renumber_info->file);
-  fprintf (stderr, "Renumbering struct: size=%"PRid"\n", renumber_info->size);
+  fprintf (stderr, "Renumbering struct: nprimes=%"PRid"\n", renumber_info->size);
 
   fclose(renumber_info->file);
 }
