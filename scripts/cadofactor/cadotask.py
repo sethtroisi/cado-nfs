@@ -660,7 +660,7 @@ class FreeRelTask(FactorBaseOrFreerelTask):
     @property
     def paramnames(self):
         return super().paramnames + \
-            ("lpba", )
+            ("lpba", "lpbr")
     target = "freerel"
     
     def parse_stderr(self, stderr):
