@@ -70,14 +70,14 @@ checkCoherence(filter_matrix_t *mat, int m, int j)
 {
     int nchk = 0, k;
 
-    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
-	if(mat->R[GETJ(mat, j)][k] != -1)
+    for(k = 1; k <= mat->R[j][0]; k++)
+	if(mat->R[j][k] != -1)
 	    nchk++;
-    ASSERT(nchk == (mat->wt[GETJ(mat, j)] >= 0 ? mat->wt[GETJ(mat, j)] : -mat->wt[GETJ(mat, j)]));
+    ASSERT(nchk == (mat->wt[j] >= 0 ? mat->wt[j] : -mat->wt[j]));
     if(m != -1){
 	if(nchk != m){
 	    printf ("HYPERCHECK: mat->R[%d][0]=%ld, m=%d\n", j,
-                     (long int) mat->R[GETJ(mat, j)][0], m);
+                     (long int) mat->R[j][0], m);
 	    printf ("Gasp: nchk=%d\n", nchk);
 	}
 	ASSERT(nchk == m);
@@ -94,17 +94,17 @@ removeColDefinitely(report_t *rep, filter_matrix_t *mat, int32_t j)
 {
     int32_t k;
 
-    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
-	if(mat->R[GETJ(mat, j)][k] != -1){
+    for(k = 1; k <= mat->R[j][0]; k++)
+	if(mat->R[j][k] != -1){
 # if TRACE_COL >= 0
 	    if(j == TRACE_COL)
-		printf ("deleteAllCols: row is %d\n",mat->R[GETJ(mat, j)][k]);
+		printf ("deleteAllCols: row is %d\n",mat->R[j][k]);
 # endif
-	    remove_j_from_row(mat, mat->R[GETJ(mat, j)][k], j);
-	    removeRowDefinitely(rep, mat, mat->R[GETJ(mat, j)][k]);
+	    remove_j_from_row(mat, mat->R[j][k], j);
+	    removeRowDefinitely(rep, mat, mat->R[j][k]);
 	    mat->rem_ncols--;
 	}
-    mat->wt[GETJ(mat, j)] = 0;
+    mat->wt[j] = 0;
 }
 
 /* remove column j and update matrix */
@@ -149,7 +149,7 @@ removeCellAndUpdate(filter_matrix_t *mat, int i, int32_t j, int final)
 	printf ("TRACE_ROW: removeCellAndUpdate i=%d j=%d\n", i, j);
     }
 #endif
-    if(mat->wt[GETJ(mat, j)] < 0){
+    if(mat->wt[j] < 0){
 	// if mat->wt[j] is already < 0, we don't care about
 	// decreasing, updating, etc. except when > 2
 	return;
@@ -216,8 +216,8 @@ removeSingletons(report_t *rep, filter_matrix_t *mat)
     int32_t j;
     int njrem = 0;
 
-    for(j = mat->jmin; j < mat->jmax; j++)
-	if(mat->wt[GETJ(mat, j)] == 1){
+    for(j = 0; j < mat->ncols; j++)
+	if(mat->wt[j] == 1){
 	    removeColDefinitely(rep, mat, j);
 	    njrem++;
 	}
@@ -278,7 +278,7 @@ tryAllCombinations(report_t *rep, filter_matrix_t *mat, int m, int32_t *ind,
 }
 
 // add u to its sons; we save the history in the history array, so that
-// we can report all at once and prepare for MPI.
+// we can report all at once
 // A[i][j] contains the estimated weight/length of R[ind[i]]+R[ind[j]].
 static int
 addFatherToSonsRec(int history[MERGE_LEVEL_MAX][MERGE_LEVEL_MAX+1],
@@ -380,8 +380,8 @@ checkWeights (filter_matrix_t *mat)
 {
   int *W, j, i, k, minw = INT_MAX;
 
-  W = (int*) malloc (mat->jmax * sizeof(int));
-  for (j = mat->jmin; j < mat->jmax; j++)
+  W = (int*) malloc (mat->ncols * sizeof(int));
+  for (j = 0; j < mat->ncols; j++)
     W[j] = 0;
   for(i = 0; i < mat->nrows; i++)
     if(!isRowNull(mat, i))
@@ -389,11 +389,11 @@ checkWeights (filter_matrix_t *mat)
         for(k = 1; k <= lengthRow(mat, i); k++)
           {
             j = cell(mat, i, k);
-            ASSERT_ALWAYS(mat->jmin <= j && j < mat->jmax);
+            ASSERT_ALWAYS(0 <= j && j < mat->ncols);
             W[j] ++;
           }
       }
-  for (j = mat->jmin; j < mat->jmax; j++)
+  for (j = 0; j < mat->ncols; j++)
     {
       static int count = 0;
       if (W[j] != mat->wt[j])
@@ -445,7 +445,7 @@ checkWeight(filter_matrix_t *mat, int32_t j)
 		w++;
 	    }
     printf ("\n");
-    ASSERT(w == (mat->wt[GETJ(mat, j)] >= 0 ? mat->wt[GETJ(mat, j)] : -mat->wt[GETJ(mat, j)]));
+    ASSERT(w == (mat->wt[j] >= 0 ? mat->wt[j] : -mat->wt[j]));
 }
 #endif
 
@@ -459,7 +459,7 @@ mergeForColumn (report_t *rep, double *tt, double *tfill, double *tMST,
 
 # if 0
     // let's be cautious...
-    if(mat->wt[GETJ(mat, j)] != m){
+    if(mat->wt[j] != m){
 	printf ("GASP: wt[%d]=%d != %d\n", j, mat->wt[j], m);
     }
 # endif
@@ -473,7 +473,7 @@ mergeForColumn (report_t *rep, double *tt, double *tfill, double *tMST,
                  m, MERGE_LEVEL_MAX);
 	exit(1);
       }
-    printf ("Treating column %d of weight %d\n",j,mat->wt[GETJ(mat, j)]);
+    printf ("Treating column %d of weight %d\n",j,mat->wt[j]);
 #if DEBUG >= 2
     printf ("Status before next j=%d to start\n", j);
     // the corresponding rows are in R[j], skipping 1st cell and -1's
@@ -481,9 +481,9 @@ mergeForColumn (report_t *rep, double *tt, double *tfill, double *tMST,
 #endif
 #endif
 
-    for(ni = 0, k = 1; k <= mat->R[GETJ(mat, j)][0]; k++){
-	if(mat->R[GETJ(mat, j)][k] != -1){
-	    ind[ni++] = mat->R[GETJ(mat, j)][k];
+    for(ni = 0, k = 1; k <= mat->R[j][0]; k++){
+	if(mat->R[j][k] != -1){
+	    ind[ni++] = mat->R[j][k];
       if (ni == m)
               break; /* early abort, since we know there are m rows */
 	}
@@ -713,7 +713,7 @@ mergeOneByOne (report_t *rep, filter_matrix_t *mat, int maxlevel,
             printf ("Warning: heap is empty, increase maxlevel\n");
             break;
           }
-	j = dj + mat->jmin;
+	j = dj + 0;
         m = mat->wt[dj];
 	if (m == 1) /* singleton ideal */
           removeColDefinitely(rep, mat, j);
@@ -912,13 +912,13 @@ resume(report_t *rep, filter_matrix_t *mat, const char *resumename)
 	    doAllAdds(rep, mat, str);
     }
     fclose(resumefile);
-    for(j = mat->jmin; j < mat->jmax; j++)
-	if((mat->wt[GETJ(mat,j)] == 0) && MkzIsAlive(mat->MKZA, GETJ(mat,j)))
+    for(j = 0; j < mat->ncols; j++)
+	if((mat->wt[j] == 0) && MkzIsAlive(mat->MKZA, j))
 	    // be sure j was removed...
 	    removeColumnAndUpdate(mat, j);
     nactivej = 0;
-    for(j = mat->jmin; j < mat->jmax; j++)
-	if(mat->wt[GETJ(mat, j)] != 0)
+    for(j = 0; j < mat->ncols; j++)
+	if(mat->wt[j] != 0)
 	    nactivej++;
     mat->rem_ncols = nactivej;
     printf ("At the end of resume, we have");

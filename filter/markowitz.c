@@ -225,7 +225,7 @@ MkzCheck(filter_matrix_t *mat)
     int32_t dj;
     int maxlevel = mat->mergelevelmax;
 
-    for(dj = 0; dj < mat->jmax - mat->jmin; dj++)
+    for(dj = 0; dj < mat->ncols - 0; dj++)
       if (0 < mat->wt[dj] && mat->wt[dj] <= maxlevel)
 	    if(MkzGet(mat->MKZQ, mat->MKZA[dj], 0) != dj)
               {
@@ -238,7 +238,7 @@ MkzCheck(filter_matrix_t *mat)
 static int
 Cavallar(filter_matrix_t *mat, int32_t j)
 {
-    return abs(mat->wt[GETJ(mat, j)]);
+    return abs(mat->wt[j]);
 }
 
 /* #define COUNT_CANCELLED_IDEALS */
@@ -247,7 +247,7 @@ static int
 pureMkz(filter_matrix_t *mat, int32_t j)
 {
     int mkz, k, i;
-    int w = mat->wt[GETJ(mat, j)];
+    int w = mat->wt[j];
 
     if (w == 1)
       return -4; /* ensures that singletons are removed earlier */
@@ -263,8 +263,8 @@ pureMkz(filter_matrix_t *mat, int32_t j)
         /* approximate traditional Markowitz count: we assume we add the
 	   lightest row to all other rows */
         w0 = mat->nrows;
-        for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
-          if((i = mat->R[GETJ(mat, j)][k]) != -1){
+        for(k = 1; k <= mat->R[j][0]; k++)
+          if((i = mat->R[j][k]) != -1){
 	    // this should be the weight of row i
             if(matLengthRow(mat, i) < w0)
               {
@@ -278,12 +278,12 @@ pureMkz(filter_matrix_t *mat, int32_t j)
         /* here we assume there is no cancellation other than for ideal j:
 	   the lightest row has weight w0, we add wt-1 times w0-1,
 	   remove once w0-1, and remove wt entries in the jth column */
-        mkz = (w0 - 2) * (mat->wt[GETJ(mat, j)] - 2) - 2;
+        mkz = (w0 - 2) * (mat->wt[j] - 2) - 2;
 #else   /* we compute the real weight obtained when adding the lightest row.
 	   This is more expensive but gives a slightly sparser matrix. */
 	mkz = 0;
-	for (k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
-          if ((i = mat->R[GETJ(mat, j)][k]) != -1)
+	for (k = 1; k <= mat->R[j][0]; k++)
+          if ((i = mat->R[j][k]) != -1)
 	    {
 	      if (i != i0)
                 mkz += weightSum (mat, i, i0, j); /* merge i and i0 */
@@ -306,7 +306,7 @@ lightColAndMkz(filter_matrix_t *mat, int32_t j)
     double tt = seconds();
 #endif
     // trick to be sure that columns with wt <= 2 are treated asap
-    wj = mat->wt[GETJ(mat, j)];
+    wj = mat->wt[j];
     cte = mat->ncols; // could be smaller
     if(wj == 1)
 	return cte;
@@ -317,13 +317,13 @@ lightColAndMkz(filter_matrix_t *mat, int32_t j)
     }
     else if(wj <= mat->wmstmax){
 	fillTabWithRowsForGivenj(ind, mat, j);
-	mkz = minCostUsingMST(mat, mat->wt[GETJ(mat, j)], ind, j, &tfill, &tMST);
+	mkz = minCostUsingMST(mat, mat->wt[j], ind, j, &tfill, &tMST);
 	return wj * cte + mkz;
     }
     // real traditional Markowitz count
     mkz = mat->nrows;
-    for(k = 1; k <= mat->R[GETJ(mat, j)][0]; k++)
-	if((i = mat->R[GETJ(mat, j)][k]) != -1){
+    for(k = 1; k <= mat->R[j][0]; k++)
+	if((i = mat->R[j][k]) != -1){
 	    // this should be the weight of row i
       if(matLengthRow(mat, i) < mkz)
           mkz = matLengthRow(mat, i);
@@ -396,27 +396,27 @@ MkzInit(filter_matrix_t *mat)
     fprintf(stderr, "Entering initMarkowitz");
     fprintf(stderr, " (wmstmax=%d, type=%d)\n", mat->wmstmax, mat->mkztype);
     // compute number of elligible columns in the heap
-    for(j = mat->jmin; j < mat->jmax; j++)
-      if(0 < mat->wt[GETJ(mat, j)] && mat->wt[GETJ(mat, j)] <= maxlevel)
+    for(j = 0; j < mat->ncols; j++)
+      if(0 < mat->wt[j] && mat->wt[j] <= maxlevel)
 	    sz++;
     fprintf(stderr, "Allocating heap for %d columns\n", sz);
     mat->MKZQ = (int32_t *)malloc((sz+1) * 2 * sizeof(int32_t));
     mat->MKZQ[0] = 0;
     mat->MKZQ[1] = sz; // why not?
     // every j needs a pointer
-    mat->MKZA = (int32_t *)malloc((mat->jmax - mat->jmin + 1) * sizeof(int32_t));
-    for(j = mat->jmin; j < mat->jmax; j++)
-      if (0 < mat->wt[GETJ(mat, j)] && mat->wt[GETJ(mat, j)] <= maxlevel)
+    mat->MKZA = (int32_t *)malloc((mat->ncols + 1) * sizeof(int32_t));
+    for(j = 0; j < mat->ncols; j++)
+      if (0 < mat->wt[j] && mat->wt[j] <= maxlevel)
         {
 	    mkz = MkzCount(mat, j);
 #if MKZ_DEBUG >= 1
-	    printf("j=%d wt=%d", j, mat->wt[GETJ(mat, j)]);
+	    printf("j=%d wt=%d", j, mat->wt[j]);
 	    printf(" => mkz=%d\n", mkz);
 #endif
-	    MkzInsert(mat->MKZQ, mat->MKZA, GETJ(mat, j), mkz);
+	    MkzInsert(mat->MKZQ, mat->MKZA, j, mkz);
 	}
         else
-	    mat->MKZA[GETJ(mat, j)] = MKZ_INF;
+	    mat->MKZA[j] = MKZ_INF;
     // TODO: overflow in mkz???
     MkzCheck(mat);
 #if MKZ_DEBUG >= 1
@@ -445,9 +445,9 @@ MkzIncrCol(filter_matrix_t *mat, int32_t j)
     int ind;
 
 #if MKZ_DEBUG >= 1
-    fprintf(stderr, "Incr: wt(%d) was %d\n", j, mat->wt[GETJ(mat, j)]);
+    fprintf(stderr, "Incr: wt(%d) was %d\n", j, mat->wt[j]);
 #endif
-    ind = mat->wt[GETJ(mat, j)] = incrS(mat->wt[GETJ(mat, j)]);
+    ind = mat->wt[j] = incrS(mat->wt[j]);
     return ind;
 }
 
@@ -456,7 +456,7 @@ MkzIncrCol(filter_matrix_t *mat, int32_t j)
 void
 MkzUpdate(filter_matrix_t *mat, int32_t i MAYBE_UNUSED, int32_t j)
 {
-    int32_t adr = mat->MKZA[GETJ(mat, j)];
+    int32_t adr = mat->MKZA[j];
     int mkz;
 
     if(adr == -1){
@@ -466,8 +466,8 @@ MkzUpdate(filter_matrix_t *mat, int32_t i MAYBE_UNUSED, int32_t j)
 	return;
     }
 #if MKZ_DEBUG >= 1
-    if((mat->wt[GETJ(mat, j)] == 0) || (mat->wt[GETJ(mat, j)] == 1))
-	fprintf(stderr, "W: wt[%d] = %d\n", j, mat->wt[GETJ(mat, j)]);
+    if((mat->wt[j] == 0) || (mat->wt[j] == 1))
+	fprintf(stderr, "W: wt[%d] = %d\n", j, mat->wt[j]);
 #endif
 #if 1
     // costly?
@@ -499,7 +499,7 @@ MkzUpdate(filter_matrix_t *mat, int32_t i MAYBE_UNUSED, int32_t j)
 void
 MkzUpdateDown (filter_matrix_t *mat, int32_t i MAYBE_UNUSED, int32_t j)
 {
-  int32_t adr = mat->MKZA[GETJ(mat, j)];
+  int32_t adr = mat->MKZA[j];
   int mkz;
 
   if (adr == -1) /* column too heavy or already removed */
@@ -525,7 +525,7 @@ MkzUpdateDown (filter_matrix_t *mat, int32_t i MAYBE_UNUSED, int32_t j)
 void
 MkzDecreaseColWeight(filter_matrix_t *mat, int32_t j)
 {
-    int32_t dj = GETJ(mat, j);
+    int32_t dj = j;
 
 #if MKZ_DEBUG >= 1
     fprintf(stderr, "Decreasing col %d; was %d\n", j, mat->wt[dj]);
@@ -537,7 +537,7 @@ MkzDecreaseColWeight(filter_matrix_t *mat, int32_t j)
 void
 MkzRemoveJ(filter_matrix_t *mat, int32_t j)
 {
-    int32_t dj = GETJ(mat, j);
+    int32_t dj = j;
 
     mat->wt[dj] = 0;
 
@@ -574,10 +574,10 @@ MkzDeleteHeavyColumns(report_t *rep MAYBE_UNUSED, filter_matrix_t *mat MAYBE_UNU
     njmax = 10; // humf
     for(nj = 0; nj < njmax; nj++){
 	j = MkzGet(mat->MKZQ, Q[0], 0);
-	w = mat->wt[GETJ(mat, j)]; // make a copy of the weight
+	w = mat->wt[j]; // make a copy of the weight
 	MkzRemoveJ(mat, j);
         // mat->wt[j] was put to 0...
-        mat->wt[GETJ(mat, j)] = -w; // restore and update
+        mat->wt[j] = -w; // restore and update
 	Q[0]--;
     }
     return njmax;

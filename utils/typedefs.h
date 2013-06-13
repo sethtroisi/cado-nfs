@@ -36,5 +36,6 @@
 /* than 255 ideals per relation */
 #define weight_t uint8_t
 #define exponent_t uint8_t
+#define REL_MAX_SIZE 255
 
 #endif	/* CADO_TYPEDEFS_H_ */

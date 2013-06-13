@@ -11,7 +11,7 @@ add_executable(purge purge.c filter_utils.c filter_io.c filter_memalloc.c)
 target_link_libraries(purge utils pthread)
 add_dependencies(purge antebuffer)
 
-add_executable(merge merge.c markowitz.c mst.c report.c merge_mono.c filter_matrix.c sparse.c)
+add_executable(merge merge.c markowitz.c mst.c report.c merge_mono.c filter_matrix.c sparse.c filter_utils.c filter_io.c filter_memalloc.c)
 target_link_libraries(merge utils)
 
 add_executable(replay replay.c sparse.c)

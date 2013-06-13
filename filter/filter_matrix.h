@@ -2,6 +2,7 @@
 #define SPARSE_MAT_H_
 
 #include "purgedfile.h"
+#include "typedefs.h"
 
 typedef struct {
   int32_t id;
@@ -24,7 +25,6 @@ typedef struct {
   int ncols;
   int rem_nrows;     /* number of remaining rows */
   int rem_ncols;     /* number of remaining columns */
-  int32_t jmin, jmax;    /* we are interested in columns [jmin..jmax[ */
   typerow_t **rows;     /* rows[i][k] contains indices of an ideal of row[i] 
                          with 1 <= k <= rows[i][0] */
                         /* FOR_FFS: struct containing also the exponent */
@@ -50,24 +50,18 @@ typedef struct {
   int wmstmax;
   int mkztype;       /* which type of count */
   int itermax;       /* used for performing some sampling */
+
 } filter_matrix_t;
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#ifdef USE_MPI
-#define GETJ(mat, j) ((j)-(mat)->jmin)
-#else
-#define GETJ(mat, j) (j)
-#endif
-
-extern void initMat(filter_matrix_t *mat, int32_t jmin, int32_t jmax);
+extern void initMat(filter_matrix_t *mat);
 extern void clearMat (filter_matrix_t *mat);
 extern void filter_matrix_read_weights(filter_matrix_t *mat, purgedfile_stream_ptr);
 extern void fillmat(filter_matrix_t *mat);
-extern int filter_matrix_read (filter_matrix_t *mat, purgedfile_stream_ptr,
-                               int skip);
+extern void filter_matrix_read (filter_matrix_t *, int, const char *);
 
 extern void remove_j_from_row(filter_matrix_t *mat, int i, int j);
 extern void print_row(filter_matrix_t *mat, int i);
@@ -76,9 +70,11 @@ extern void print_row(filter_matrix_t *mat, int i);
 #ifdef FOR_FFS
 #define matLengthRow(mat, i) (mat)->rows[(i)][0].id
 #define matCell(mat, i, k) (mat)->rows[(i)][(k)].id
+#define setCell(v, j, c) v = (typerow_t) {.id = j, .e = c}
 #else
 #define matLengthRow(mat, i) (mat)->rows[(i)][0]
 #define matCell(mat, i, k) (mat)->rows[(i)][(k)]
+#define setCell(v, j, e) v = j
 #endif
 #define SPARSE_ITERATE(mat, i, k) for((k)=1; (k)<=lengthRow((mat),(i)); (k)++)
 

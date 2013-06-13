@@ -1119,7 +1119,7 @@ main (int argc, char **argv)
       exit (1);
     }
 
-  fprintf (buf_arg.f_remaining, "%"PRid" %"PRid"\n", nrels, nprimes);
+  fprintf (buf_arg.f_remaining, "# %"PRid" %"PRid"\n", nrels, nprimes);
   /* second pass over relations in files */
   buf_arg.needed = NEEDED_ABH;
   prempt_scan_relations (fic, &thread_print, &buf_arg);

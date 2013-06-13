@@ -34,16 +34,12 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "portability.h"
 #include "utils.h" /* for fopen_maybe_compressed */
 
+#include "filter_utils.h"
 #include "merge_opts.h"
 #include "filter_matrix.h" /* for filter_matrix_t */
 #include "report.h"     /* for report_t */
 #include "markowitz.h" /* for MkzInit */
 #include "merge_mono.h" /* for mergeOneByOne */
-
-#ifdef USE_MPI
-#include "mpi.h"
-#include "merge_mpi.h"
-#endif
 
 #ifdef FOR_FFS
 #include "utils_ffs.h"
@@ -113,10 +109,6 @@ main (int argc, char *argv[])
     param_list pl;
     param_list_init (pl);
 
-#ifdef USE_MPI
-    MPI_Init(&argc, &argv);
-#endif
-
     argv++, argc--;
 
     for( ; argc ; ) {
@@ -136,7 +128,10 @@ main (int argc, char *argv[])
     /* -resume can be useful to continue a merge stopped due  */
     /* to a too small value of -maxlevel                      */
     const char * resumename = param_list_lookup_string (pl, "resume");
+  const char * path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
 
+    set_antebuffer_path (argv0, path_antebuffer);
+    
     param_list_parse_uint (pl, "maxlevel", &maxlevel);
     param_list_parse_uint (pl, "keep", &keep);
     param_list_parse_uint (pl, "skip", &skip);
@@ -193,18 +188,12 @@ main (int argc, char *argv[])
 #endif
     mat->keep  = keep;
     mat->cwmax = 2 * maxlevel;
+    ASSERT_ALWAYS (mat->cwmax < 255);
     mat->rwmax = INT_MAX;
     mat->mergelevelmax = maxlevel;
     mat->itermax = itermax;
 
-#ifdef USE_MPI
-    mpi_start_proc(outname,mat,purgedfile,purgedname,forbw,ratio,coverNmax,
-		   resumename);
-    /* TODO: clean the mat data structure (?) */
-    MPI_Finalize();
-    return 0;
-#endif
-    initMat (mat, 0, mat->ncols);
+    initMat (mat);
 
     tt = seconds ();
     filter_matrix_read_weights (mat, ps);
@@ -213,7 +202,6 @@ main (int argc, char *argv[])
     /* note: we can't use purgedfile_stream_rewind on a compressed file,
        thus we close and reopen */
     purgedfile_stream_closefile (ps);
-    purgedfile_stream_openfile (ps, purgedname);
 
     /* print weight counts */
     {
@@ -224,7 +212,7 @@ main (int argc, char *argv[])
       memset (nbm, 0, (maxlevel + 1) * sizeof (unsigned long));
       for (j = 0; j < (unsigned long) mat->ncols; j++)
         {
-          w = mat->wt[GETJ(mat, j)];
+          w = mat->wt[j];
           total_weight += w;
           if (w <= maxlevel)
             nbm[w] ++;
@@ -240,7 +228,7 @@ main (int argc, char *argv[])
     fillmat (mat);
 
     tt = wct_seconds ();
-    filter_matrix_read (mat, ps, skip);
+    filter_matrix_read (mat, skip, purgedname);
     printf ("Time for filter_matrix_read: %2.2lf\n", wct_seconds () - tt);
 
     /* initialize rep, i.e., mostly opens outname */
