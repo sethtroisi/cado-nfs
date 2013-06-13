@@ -484,29 +484,21 @@ readPurged(typerow_t **sparsemat, purgedfile_stream ps, int verbose)
           fprintf(stderr, "Hard to believe: row[%d] is NULL\n", i);
       qsort(ps->cols, ps->nc, sizeof(int), cmp);
       sparsemat[i] = (typerow_t *)malloc((ps->nc+1) * sizeof(typerow_t));
-      int j = ps->nc;
-#ifdef FOR_DL
-      int previous = -1;
-#endif
       ASSERT_ALWAYS(sparsemat[i] != NULL);
+      int j = 1;
       for(int k = 0; k < ps->nc; k++)
         {
 #ifdef FOR_DL
-          if (ps->cols[k] == previous)
-              sparsemat[i][j].e++;
+          if (j > 1 && sparsemat[i][j-1].id == ps->cols[k])
+            sparsemat[i][j-1].e++;
           else
-            {
-              j++;
-              rowCell(sparsemat, i, j) = ps->cols[k];
-              sparsemat[i][j].e = 1;
-            }
-
-          previous = ps->cols[k];
-#else
-          rowCell(sparsemat, i, k+1) = ps->cols[k];
 #endif
+          {
+            setCell(sparsemat[i][j], ps->cols[k], 1);
+            j++;
+          }
         }
-      rowLength(sparsemat, i) = j;
+      rowLength(sparsemat, i) = j-1;
   }
 }
 
