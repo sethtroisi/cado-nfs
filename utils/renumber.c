@@ -208,9 +208,9 @@ renumber_write_p (renumber_t renumber_info, unsigned long p, unsigned long*r[2],
       r[1][i] += add_value;
 
     if (k[1] != 0)
-      r[1][0] = (p < 1) + 1; // The largest roots become 2p+1
+      r[1][0] = (p << 1) + 1; // The largest roots become 2p+1
     else
-      r[0][0] = (p < 1) + 1; // The largest roots become 2p+1
+      r[0][0] = (p << 1) + 1; // The largest roots become 2p+1
 
     for (i = 0; i < k[1]; i++)
       renumber_write_one(renumber_info, r[1][i]);
