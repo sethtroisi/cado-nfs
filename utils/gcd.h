@@ -1,5 +1,5 @@
-#ifndef GCD_INT64_H_
-#define GCD_INT64_H_
+#ifndef GCD_H_
+#define GCD_H_
 
 #include <stdint.h>
 
@@ -8,9 +8,11 @@ extern "C" {
 #endif
 
 int64_t gcd_int64 (int64_t a, int64_t b);
+uint64_t gcd_uint64 (uint64_t a, uint64_t b);
+
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif	/* GCD_INT64_H_ */
+#endif	/* GCD_H_ */
