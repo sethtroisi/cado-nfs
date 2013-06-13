@@ -105,7 +105,7 @@ sanity_check (uint32_t i, int64_t a, uint64_t b)
 }
 
 static inline void 
-print_warning_size ()
+print_warning_size ( )
 {
   double full_table = 100.0 * (double) nodu / (double) K;
   fprintf(stderr, "Warning, hash table is %1.0f%% full\n", full_table);
@@ -782,7 +782,7 @@ main (int argc, char *argv[])
     min_index = (index_t) hint;
   else
     min_index = 0;
-  fprintf (stderr, "Renumbering struct: min_index=%lu\n", (uint64_t) min_index);
+  fprintf (stderr, "Renumbering struct: min_index=%"PRid"\n", min_index);
 
 
 
