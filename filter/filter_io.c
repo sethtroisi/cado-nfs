@@ -430,6 +430,12 @@ prempt_scan_relations (char **fic, void* (*callback_fct)(buf_arg_t *),
   char c;
   buf_rel_t *buf_rel = callback_arg->buf_data;
 
+  if (fic[0] == NULL) // to avoid a seg fault in the case the filelist is empty
+  {
+    fprintf (stderr, "End of read: 0 relation (filelist was empty)\n");
+    return 0;
+  }
+
   callback_arg->nrels = 0;
   callback_arg->nprimes = 0;
   callback_arg->W = 0.0;

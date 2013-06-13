@@ -542,9 +542,7 @@ singletons_and_cliques_removal (index_t *nrels, index_t *nprimes)
     target_excess = excess - chunk;
     target_excess = keep;
 
-    fprintf (stderr, "Step extra: %"PRid" real (non null) rels remain\n"
-                     "  excess is %"PRId64", target excess is %"PRId64"\n",
-                     *nrels, excess, target_excess);
+    fprintf (stderr, "Step extra: target excess is %"PRId64"\n", target_excess);
     cliques_removal (target_excess, nrels, nprimes);
 
     remove_all_singletons(nrels, nprimes, &excess);
@@ -1068,11 +1066,17 @@ main (int argc, char **argv)
   if (!boutfilerel) 
   {
     singletons_and_cliques_removal (&nrels, &nprimes);
-    if (nrels <= nprimes) /* covers case nrel = nprimes = 0 */
+    if (nrels < nprimes)
     {
-      fprintf(stderr, "number of relations <= number of ideals\n");
+      fprintf(stderr, "number of relations < number of ideals\n");
       exit (2);
     }
+    if (nrels == 0 || nprimes == 0)
+    {
+      fprintf(stderr, "number of relations or number of ideals is 0\n");
+      exit (2);
+    }
+
 
     /* free rel_compact[i] and rel_compact. We do not need it anymore */
     my_malloc_free_all ();

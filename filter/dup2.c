@@ -296,7 +296,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
                   {
                     if (rs->rel.ap[i].e > 0)
                     {
-                      if (!modul_isprime(&(rs->rel.ap[i].p)))
+                      if (!modul_isprime(&(rs->rel.rp[i].p)))
                         buggy_line = 1;
                       else
                       {
