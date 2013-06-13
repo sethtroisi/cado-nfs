@@ -840,22 +840,19 @@ usage (const char *argv0)
   fprintf (stderr, "[ -filelist <fl> [-basepath <path>] [-subdirlist <sl>] ");
   fprintf (stderr, "| file1 ... filen ]\n");
   fprintf (stderr, "Mandatory command line options: \n");
-  fprintf (stderr, "       -poly polyfile - use polynomial in polyfile\n");
-  fprintf (stderr, "       -out outfile   - write remaining relations in outfile\n");
-  fprintf (stderr, "       -nrels nnn     - number of initial relations\n");
-  fprintf (stderr, "\n    Other command line options: \n");
-  fprintf (stderr, "       -outdel file - output file for deleted relations\n");
-  fprintf (stderr, "       -sos sosfile - to keep track of the renumbering\n");
-  fprintf (stderr, "       -keep    nnn - prune if excess > nnn (default 160)\n");
-  fprintf (stderr, "       -minpa   nnn - purge alg. primes >= nnn (default alim)\n");
-  fprintf (stderr, "       -minpr   nnn - purge rat. primes >= nnn (default rlim)\n");
-  fprintf (stderr, "       -nprimes nnn - expected number of prime ideals\n");
-  fprintf (stderr, "       -raw         - output relations in CADO format\n");
-  fprintf (stderr, "       -npthr   nnn - threads number for suppress singletons\n");
-  fprintf (stderr, "       -inprel  file_rel_used : load active relations\n");
-  fprintf (stderr, "       -outrel  file_rel_used : write active relations\n");
-  fprintf (stderr, "       -npass   nnn - number of step of clique removal (default %d)\n", DEFAULT_NPASS);
-  fprintf (stderr, "       -required_excess nnn - percentage of excess required at the end of the first singleton removal step (default %.2f)\n",
+  fprintf (stderr, "    -out outfile  - write remaining relations in outfile\n");
+  fprintf (stderr, "    -nrels nnn    - number of initial relations\n");
+  fprintf (stderr, "    -nprimes nnn  - number of prime ideals in renumber table\n");
+  fprintf (stderr, "    -minindex nnn - purge primes with index >= nnn\n");
+  fprintf (stderr, "\nOther command line options: \n");
+  fprintf (stderr, "    -outdel file - output file for deleted relations\n");
+  fprintf (stderr, "    -sos sosfile - to keep track of the renumbering\n");
+  fprintf (stderr, "    -keep    nnn - prune if excess > nnn (default 160)\n");
+  fprintf (stderr, "    -npthr   nnn - threads number for suppress singletons\n");
+  fprintf (stderr, "    -inprel  file_rel_used - load active relations\n");
+  fprintf (stderr, "    -outrel  file_rel_used - write active relations\n");
+  fprintf (stderr, "    -npass   nnn - number of step of clique removal (default %d)\n", DEFAULT_NPASS);
+  fprintf (stderr, "    -required_excess nnn - percentage of excess required at the end of the first singleton removal step (default %.2f)\n",
   DEFAULT_REQUIRED_EXCESS);
   exit (1);
 }
@@ -900,7 +897,7 @@ main (int argc, char **argv)
   param_list pl;
   buf_arg_t buf_arg;
   buf_rel_t *buf_rel;
-  uint64_t min_index;
+  uint64_t min_index = 0;
   index_t nrels, nprimes;
   size_t tot_alloc_bytes = 0;
 
@@ -971,6 +968,11 @@ main (int argc, char **argv)
   if (nprimemax == 0)
   {
     fprintf (stderr, "Error, missing -nprimes ... option (or nprimes=0)\n");
+    usage (argv0);
+  }
+  if (min_index == 0)
+  {
+    fprintf (stderr, "Error, missing -minindex ... option (or minindex=0)\n");
     usage (argv0);
   }
   /* If nrels or nprimes > 2^32, then we need index_t to be 64-bit */
