@@ -200,13 +200,15 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
 
             if (f_out) /* output renumbered relation */
               {
+                char bufline[RELATION_MAX_BYTES];
+                int buggy_line = 0; //to remove lines with non-prime "ideals"
                 int first = 1;
 
                 if (rs->rel.a < 0)
-                  fprintf (f_out, "-%" PRIx64 ",%" PRIx64 ":",
+                  sprintf (bufline, "-%" PRIx64 ",%" PRIx64 ":",
                            (uint64_t) (- rs->rel.a), rs->rel.b);
                 else
-                  fprintf (f_out, "%" PRIx64 ",%" PRIx64 ":",
+                  sprintf (bufline, "%" PRIx64 ",%" PRIx64 ":",
                             (uint64_t) rs->rel.a, rs->rel.b);
 
                 if (!is_for_dl)
@@ -214,40 +216,67 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
 
                 for (int i = 0; i < rs->rel.nb_rp; i++)
                   {
-                    unsigned long j;
-                    j = renumber_get_index_from_p_r (renumber_table,
-                                                     rs->rel.rp[i].p, 0, 0);
-                    for (int k = 0; k < rs->rel.rp[i].e; k++)
+                    if (rs->rel.ap[i].e > 0)
+                    {
+                      if (!modul_isprime(&(rs->rel.ap[i].p)))
+                        buggy_line = 1;
+                      else
                       {
-                        if (first)
-                          first = 0;
-                        else
-                          fputc (',', f_out);
-                        fprintf (f_out, "%lx", j);
+
+                        unsigned long j;
+                        j = renumber_get_index_from_p_r (renumber_table,
+                                                         rs->rel.rp[i].p, 0, 0);
+                        for (int k = 0; k < rs->rel.rp[i].e; k++)
+                        {
+                          if (first)
+                          {
+                            first = 0;
+                            sprintf (bufline, "%s%lx", bufline, j);
+                          }
+                          else
+                            sprintf (bufline, "%s,%lx", bufline, j);
+                        }
                       }
+                    }
                   }
                 for (int i = 0; i < rs->rel.nb_ap; i++)
                   {
-                    unsigned long j;
                     if (rs->rel.ap[i].e > 0)
                     {
                       /* Warning on alg side the r values is not computed by */
                       /* relation_stream_get */
-                      rs->rel.ap[i].r = findroot(rs->rel.a, rs->rel.b,
-                                                            rs->rel.ap[i].p);
-                      j = renumber_get_index_from_p_r (renumber_table,
-                                            rs->rel.ap[i].p, rs->rel.ap[i].r, 1);
-                      for (int k = 0; k < rs->rel.ap[i].e; k++)
+                      if (!modul_isprime(&(rs->rel.ap[i].p)))
+                        buggy_line = 1;
+                      else
                       {
-                        if (first)
-                          first = 0;
-                        else
-                          fputc (',', f_out);
-                        fprintf (f_out, "%lx", j);
+
+                        unsigned long j;
+                        rs->rel.ap[i].r = findroot(rs->rel.a, rs->rel.b,
+                                                              rs->rel.ap[i].p);
+                        j = renumber_get_index_from_p_r (renumber_table,
+                                            rs->rel.ap[i].p, rs->rel.ap[i].r, 1);
+                        for (int k = 0; k < rs->rel.ap[i].e; k++)
+                        {
+                          if (first)
+                          {
+                            first = 0;
+                            sprintf (bufline, "%s%lx", bufline, j);
+                          }
+                          else
+                            sprintf (bufline, "%s,%lx", bufline, j);
+                        }
                       }
                     }
                   }
-                fprintf (f_out, "\n");
+                if (!buggy_line)
+                  fprintf (f_out, "%s\n", bufline);
+                else
+                {
+                  fprintf (stderr, "WARNING: line with a non-prime \"ideals\"."
+                                   "\nWARNING: %s", line);
+                  rs->nrels--;
+                  nodu--;
+                }
               }
 
 
