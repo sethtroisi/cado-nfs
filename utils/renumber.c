@@ -1,7 +1,70 @@
 #include "cado.h"
 #include "renumber.h"
+#include <ctype.h>
 
+#define MAXLINE 1024
+#define MAXBADS 20
+static void
+read_bad_ideals(struct __bad_ideals_t * bad, const char * filename)
+{
+  FILE *file = fopen(filename, "r");
+  ASSERT_ALWAYS(file != NULL);
+  char str[MAXLINE], *ret;
+  bad->n = 0;
 
+  // Remark: the parsing is done with long, whereas we could have 64-bit
+  // exceptional ideals, and that would fail on 32-bit machines.
+  // This is probably never occur, so we leave it like that.
+  do {
+      int c = getc(file);
+      if (c == EOF) 
+          break;
+      if (c == '#') {
+          // skip line
+          c = ungetc(c, file);
+          ASSERT_ALWAYS(c != EOF);
+          fgets(str, MAXLINE, file);
+          continue;
+      }
+      c = ungetc(c, file);
+      ASSERT_ALWAYS(c != EOF);
+      ret = fgets(str, MAXLINE, file);
+      ASSERT_ALWAYS(ret != NULL);
+      size_t n = strnlen(str, MAXLINE);  
+      ASSERT_ALWAYS(n != MAXLINE);
+      char * sstr;
+      errno = 0;
+      long p = strtol(str, &sstr, 10);
+      ASSERT_ALWAYS(errno == 0);
+      ASSERT_ALWAYS(sstr[0] == ',');
+      sstr++;
+      long r = strtol(sstr, &sstr, 10);
+      ASSERT_ALWAYS(errno == 0);
+      ASSERT_ALWAYS(sstr[0] == ':');
+      sstr++;
+      long s = strtol(sstr, &sstr, 10);
+      ASSERT_ALWAYS(errno == 0);
+      ASSERT_ALWAYS(sstr[0] == ':');
+      sstr++;
+      ASSERT_ALWAYS(s == 0 || s == 1);
+      while (isspace(sstr[0]))
+          sstr++;
+      errno = 0;
+      long nb = strtol(sstr, &sstr, 10);
+      ASSERT_ALWAYS(errno == 0);
+
+      // TODO:
+      ASSERT_ALWAYS(s == 1);  // Two algebraic sides not implemented
+
+      ASSERT_ALWAYS(bad->n < MAXBADS);
+      bad->p[bad->n] = p;
+      bad->r[bad->n] = r;
+      bad->nb[bad->n] = nb;
+      bad->n++;
+  } while (1);
+  fclose(file);
+}
+#undef MAXLINE
 
 void
 renumber_init (renumber_t renumber_info, cado_poly pol)
@@ -28,6 +91,24 @@ renumber_init (renumber_t renumber_info, cado_poly pol)
   renumber_info->size = 0;
   renumber_info->table = NULL;
   renumber_info->file = NULL;
+  renumber_info->bad_ideals.n = 0;
+  renumber_info->bad_ideals.p = (p_r_values_t *) malloc(MAXBADS * 
+          sizeof(p_r_values_t));
+  renumber_info->bad_ideals.r = (p_r_values_t *) malloc(MAXBADS * 
+          sizeof(p_r_values_t));
+  renumber_info->bad_ideals.nb = (int *) malloc(MAXBADS*sizeof(int));
+  ASSERT_ALWAYS(renumber_info->bad_ideals.p != NULL);
+  ASSERT_ALWAYS(renumber_info->bad_ideals.r != NULL);
+  ASSERT_ALWAYS(renumber_info->bad_ideals.nb != NULL);
+}
+#undef MAXBADS
+
+void renumber_read_badideals (renumber_t renumber_info, const char * badfile)
+{
+  if (badfile != NULL) 
+    read_bad_ideals(&renumber_info->bad_ideals, badfile);
+  else 
+    renumber_info->bad_ideals.n = 0;
 }
 
 void
@@ -65,10 +146,28 @@ renumber_init_write (renumber_t renumber_info, const char * filename)
 void
 renumber_close_write (renumber_t renumber_info)
 {
+  // Write first the bad ideals information at the end of the file
+  uint64_t n =  (uint64_t) renumber_info->bad_ideals.n;
+  fwrite (&(n), sizeof(uint64_t), 1, renumber_info->file);
+  for (unsigned int i = 0; i < n; ++i) {
+    unsigned long p = renumber_info->bad_ideals.p[i];
+    renumber_write_one(renumber_info, p);
+    unsigned long r = renumber_info->bad_ideals.r[i];
+    renumber_write_one(renumber_info, r);
+    unsigned long nb = renumber_info->bad_ideals.nb[i];
+    renumber_write_one(renumber_info, nb);
+  }
+
+  // Put the right value of size.
   rewind (renumber_info->file);
   fwrite (&(renumber_info->size), sizeof(renumber_info->size), 1,
           renumber_info->file);
-  fprintf (stderr, "Renumbering struct: nprimes=%"PRid"\n", renumber_info->size);
+  
+  index_t offset = 0;
+  for (int j = 0; j < renumber_info->bad_ideals.n; ++j)
+    offset += renumber_info->bad_ideals.nb[j];
+  fprintf (stderr, "Renumbering struct: nprimes=%"PRid"\n", 
+          offset + renumber_info->size);
 
   fclose(renumber_info->file);
 }
@@ -122,6 +221,8 @@ renumber_read_table (renumber_t renumber_info, const char * filename)
   i = 0;
 
   // we cached value below 2^MAX_LOG_CACHED
+  // Remark: the indices in the cache do not take into account 
+  // the possible offset due to bad ideals.
   while (i < renumber_info->size)
   {
     ret += renumber_read_one(renumber_info,i);
@@ -166,6 +267,22 @@ renumber_read_table (renumber_t renumber_info, const char * filename)
                   "file in %.1fs -- %.1f MB/s\n", ret, dt, mb_s);
   ASSERT_ALWAYS(ret == renumber_info->size);
 
+  // Read bad ideal information
+  {
+    uint64_t n;
+    fread (&(n), sizeof(uint64_t), 1, renumber_info->file);
+    renumber_info->bad_ideals.n = n;
+    for (unsigned int i = 0; i < n; ++i) {
+      unsigned long p, r, nb;
+      fread (&p, renumber_info->nb_bytes, 1, renumber_info->file);
+      fread (&r, renumber_info->nb_bytes, 1, renumber_info->file);
+      fread (&nb, renumber_info->nb_bytes, 1, renumber_info->file);
+      renumber_info->bad_ideals.p[i] = p;
+      renumber_info->bad_ideals.r[i] = r;
+      renumber_info->bad_ideals.nb[i] = nb;
+    }
+  }
+
   renumber_print_info (stderr, renumber_info);
   fprintf(stderr, "Renumbering struct: first_not_cached=%"PRid"\n",
                   renumber_info->first_not_cached);
@@ -189,6 +306,16 @@ sort (unsigned long *r, int n)
   }
 }
 
+int renumber_is_bad(renumber_t rn, p_r_values_t p, p_r_values_t r)
+{
+  int bad = 0;
+  for (int i = 0; i < rn->bad_ideals.n; ++i)
+    if (p == rn->bad_ideals.p[i] && r == rn->bad_ideals.r[i]) {
+      bad = 1;
+      break;
+    }
+  return bad;
+}
 
 void
 renumber_write_p (renumber_t renumber_info, unsigned long p, unsigned long*r[2],
@@ -325,7 +452,13 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
     }
   }
 
-  return i;
+  // In the case where there are bad_ideals, we shift the index by the 
+  // number of such ideals
+  index_t offset = 0;
+  for (int j = 0; j < renumber_info->bad_ideals.n; ++j)
+    offset += renumber_info->bad_ideals.nb[j];
+
+  return offset + i;
 }
 
 // TODO should also return side in the case where there are two alg sides
@@ -335,6 +468,13 @@ renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p,
 {
   index_t j;
   p_r_values_t *tab = renumber_info->table;
+  
+  // In the case where there are bad_ideals, we shift the index by the 
+  // number of such ideals
+  index_t offset = 0;
+  for (int j = 0; j < renumber_info->bad_ideals.n; ++j)
+    offset += renumber_info->bad_ideals.nb[j];
+  i -= offset;
 
   for (j = i; j>0 && tab[j-1] > tab[j];)
     j--;
@@ -387,7 +527,7 @@ renumber_get_p_r_from_index (renumber_t renumber_info, p_r_values_t *p,
 
 //for DEBUG, should be remove later
 void renumber_debug_print_tab (FILE *output, const char *filename,
-                                    cado_poly pol)
+        cado_poly pol)
 {
   renumber_t tab;
   index_t i;
@@ -396,9 +536,15 @@ void renumber_debug_print_tab (FILE *output, const char *filename,
   renumber_init (tab, pol);
   renumber_read_table (tab, filename);
 
+  // In the case where there are bad_ideals, we shift the index by the 
+  // number of such ideals
+  index_t offset = 0;
+  for (int j = 0; j < tab->bad_ideals.n; ++j)
+    offset += tab->bad_ideals.nb[j];
+
   for (i = 0; i < tab->size; i++)
   {
-    renumber_get_p_r_from_index (tab, &p, &r, i, pol);
+    renumber_get_p_r_from_index (tab, &p, &r, i+offset, pol);
     fprintf (output, "i=%u\ttab[i]=%u\tp=%u\t", i, tab->table[i], p);
     if (r == p + 1)
       fprintf (output, "rat side\n");
@@ -408,6 +554,15 @@ void renumber_debug_print_tab (FILE *output, const char *filename,
       fprintf (output, "alg side r=%u \n", r);
   }
 
+  if (tab->bad_ideals.n != 0) {
+    fprintf (output, "Bad ideals:\n");
+    for (int i = 0; i < tab->bad_ideals.n; ++i) {
+      unsigned long p = tab->bad_ideals.p[i];
+      unsigned long r = tab->bad_ideals.r[i];
+      unsigned long nb = tab->bad_ideals.nb[i];
+      fprintf(output, "p=%lu r=%lu nb=%lu\n", p, r, nb);
+    }
+  }
 
   renumber_free(tab);
 }

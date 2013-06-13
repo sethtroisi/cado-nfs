@@ -14,9 +14,18 @@
 
 #define MAX_LOG_CACHED 20
 
+struct __bad_ideals_t 
+{
+  int n; // number of p_r_values that correspond to more than one ideals.
+  p_r_values_t * p;  // these p_r_values in two separate tables
+  p_r_values_t * r;  // 
+  int * nb;               // the number of ideals for each
+};
+
 struct __renumber_t
 {
   FILE * file;           // file containing the renumbering table
+  struct __bad_ideals_t bad_ideals;  // the bad ideals
   p_r_values_t * table;  //renumbering table
   index_t size;          //number of elements in the renumbering table
   uint8_t nb_bytes;  // number of bytes taken by an index in the file
@@ -34,6 +43,8 @@ typedef struct __renumber_t renumber_t[1];
 #define renumber_read_one(r,i) fread(&(r->table[i]), r->nb_bytes, 1, r->file)
 
 void renumber_init (renumber_t, cado_poly);
+void renumber_read_badideals (renumber_t, const char *);
+int renumber_is_bad(renumber_t, p_r_values_t, p_r_values_t);
 void renumber_print_info (FILE *, renumber_t);
 void renumber_free (renumber_t);
 void renumber_init_write (renumber_t, const char *);

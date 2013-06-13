@@ -341,6 +341,16 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
     else
       k[alg_side] = 0;
 
+    for (int side = 0; side < 2; side++) {
+      for (int i = 0; i < k[side]; ++i) {
+        if (renumber_is_bad(renumber_table, p, roots[side][i])) {
+          for (int j = i; j < k[side]-1; ++j)
+            roots[side][j] = roots[side][j+1];
+          k[side]--;
+        }
+      }
+    }
+
     renumber_write_p (renumber_table, p, roots, k);
 
     if (p >= pmin && p <= pmax && k[alg_side] == d[alg_side])
@@ -366,7 +376,7 @@ static void
 usage (char *argv0)
 {
   fprintf (stderr, "Usage: %s [-v] [-pmin nnn] [-pmax nnn] -poly xxx.poly "
-                   "-renumber outfile\n", argv0);
+                   "-badideals badfile -renumber outfile\n", argv0);
 #if 0
   fprintf (stderr, "or     %s [-v] -poly xxx.poly -fb xxx.roots xxx.rels1 xxx.rels2 ... xxx.relsk\n", argv0);
 #endif
@@ -378,6 +388,7 @@ main (int argc, char *argv[])
 {
     char *fbfilename MAYBE_UNUSED, *polyfilename = NULL, **fic MAYBE_UNUSED;
     char *renumberfilename = NULL;
+    char *badidealsfilename = NULL;
     char *argv0 = argv[0];
     cado_poly cpoly;
     int nfic MAYBE_UNUSED;
@@ -408,6 +419,12 @@ main (int argc, char *argv[])
         else if (argc > 2 && strcmp (argv[1], "-poly") == 0)
           {
             polyfilename = argv[2];
+            argc -= 2;
+            argv += 2;
+          }
+        else if (argc > 2 && strcmp (argv[1], "-badideals") == 0)
+          {
+            badidealsfilename = argv[2];
             argc -= 2;
             argv += 2;
           }
@@ -450,6 +467,7 @@ main (int argc, char *argv[])
     cado_poly_check (cpoly);
 
     renumber_init (renumber_table, cpoly);
+    renumber_read_badideals(renumber_table, badidealsfilename);
     renumber_init_write (renumber_table, renumberfilename);
 
 #if 0
