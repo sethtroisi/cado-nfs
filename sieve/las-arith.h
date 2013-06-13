@@ -7,6 +7,7 @@
 #include "fb.h"
 #include "utils.h"
 #include "las-config.h"
+#include "utils/misc.h" /* ctzl */
 
 #ifdef __cplusplus
 extern "C" {
