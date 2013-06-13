@@ -4,10 +4,10 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
+#include <errno.h>
 #include "hashpair.h"
 #include "cado_poly.h"
 #include "rootfinder.h"
-#include "misc.h"
 #include "timing.h"
 #include "math.h"
 #include "typedefs.h"

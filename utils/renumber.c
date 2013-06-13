@@ -123,8 +123,24 @@ renumber_print_info (FILE * f, renumber_t renumber_info)
 void
 renumber_free (renumber_t renumber_info)
 {
-  SFREE(renumber_info->table);
-  SFREE(renumber_info->cached);
+  if (renumber_info->table != NULL)
+    free(renumber_info->table);
+  if (renumber_info->cached != NULL)
+    free(renumber_info->cached);
+
+  renumber_info->table = NULL;
+  renumber_info->cached = NULL;
+
+  if (renumber_info->bad_ideals.p != NULL)
+    free(renumber_info->bad_ideals.p);
+  if (renumber_info->bad_ideals.r != NULL)
+    free(renumber_info->bad_ideals.r);
+  if (renumber_info->bad_ideals.nb != NULL)
+    free(renumber_info->bad_ideals.nb);
+
+  renumber_info->bad_ideals.r = NULL;
+  renumber_info->bad_ideals.p = NULL;
+  renumber_info->bad_ideals.nb = NULL;
 }
 
 /* The renumber_t struct MUST have been initialized before */
@@ -211,10 +227,12 @@ renumber_read_table (renumber_t renumber_info, const char * filename)
   }
 
   // Allocate the renumbering table
-  SMALLOC (renumber_info->table, renumber_info->size, "Renumbering table");
+  renumber_info->table = (index_t*) malloc(renumber_info->size*sizeof(index_t));
+  ASSERT_ALWAYS (renumber_info->table != NULL);
   // Allocate the cached table
-  SMALLOC (renumber_info->cached, 2 << MAX_LOG_CACHED, "Cached table");
-  MEMSETZERO(renumber_info->cached, 2 << MAX_LOG_CACHED);
+  renumber_info->cached = (index_t*) malloc((2<<MAX_LOG_CACHED)*sizeof(index_t));
+  ASSERT_ALWAYS (renumber_info->cached != NULL);
+  memset (renumber_info->cached, 0, (2 << MAX_LOG_CACHED)*sizeof(index_t));
 
   // Begin to read the renumbering table
   ret = 0;
@@ -270,13 +288,13 @@ renumber_read_table (renumber_t renumber_info, const char * filename)
   // Read bad ideal information
   {
     uint64_t n;
-    fread (&(n), sizeof(uint64_t), 1, renumber_info->file);
+    ret = fread (&(n), sizeof(uint64_t), 1, renumber_info->file);
     renumber_info->bad_ideals.n = n;
     for (unsigned int i = 0; i < n; ++i) {
       unsigned long p, r, nb;
-      fread (&p, renumber_info->nb_bytes, 1, renumber_info->file);
-      fread (&r, renumber_info->nb_bytes, 1, renumber_info->file);
-      fread (&nb, renumber_info->nb_bytes, 1, renumber_info->file);
+      ret = fread (&p, renumber_info->nb_bytes, 1, renumber_info->file);
+      ret = fread (&r, renumber_info->nb_bytes, 1, renumber_info->file);
+      ret = fread (&nb, renumber_info->nb_bytes, 1, renumber_info->file);
       renumber_info->bad_ideals.p[i] = p;
       renumber_info->bad_ideals.r[i] = r;
       renumber_info->bad_ideals.nb[i] = nb;
