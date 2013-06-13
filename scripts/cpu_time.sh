@@ -51,9 +51,9 @@ if [[ -z $1 || $(expr $1 : '.*[p].*') != 0 ]]
          echo -n "   # of polyselect files:   "
          ls ${name}.polsel_out.* | wc -l
          echo -n "   # of found polynomials:  "
-         grep tried ${name}.polsel_out.* | sed "s/^.*found \([^p]*\).*$/+\1/g" | tr "\n" " " | cut -c2- | bc
+         grep Tried ${name}.polsel_out.* | sed "s/^.*found \([^p]*\).*$/+\1/g" | tr "\n" " " | cut -c2- | bc
          echo -n "   # below maxnorm:         "
-         grep tried ${name}.polsel_out.* | sed "s/^.*, \([0-9]*\) below.*$/+\1/g" | tr "\n" " " | cut -c2- | bc
+         grep Tried ${name}.polsel_out.* | sed "s/^.*, \([0-9]*\) below.*$/+\1/g" | tr "\n" " " | cut -c2- | bc
     fi
 fi
 
