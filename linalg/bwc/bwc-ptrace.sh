@@ -5,9 +5,9 @@ set -x
 
 top=`dirname $0`/../..
 export DEBUG=1
-# export MPI=1
+export MPI=1
 make -s -C $top -j 4
-make -s -C $top -j 4 mpi-plingen
+make -s -C $top -j 4 plingen
 eval `make -s -C $top show`
 bins=$top/$build_tree/linalg/bwc
 mats=$HOME/Local/mats
@@ -29,7 +29,7 @@ Nv=$((Mv*Tv))
 mpi=${Mh}x${Mv}
 thr=${Th}x${Tv}
 
-prime=1009
+prime=1766847064778384329583297500742918515827483896875618958121606201292619891
 bits_per_coeff=64
 
 # The test matrix may be created by:
@@ -129,7 +129,7 @@ while [ $j0 -lt $n ] ; do
 done
 
 afile=$($bins/acollect wdir=$wdir m=$m n=$n bits-per-coeff=$bits_per_coeff --remove-old | tail -1)
-$bins/mpi-plingen lingen-mpi-threshold=10000 lingen-threshold=10 m=$m n=$n wdir=$wdir prime=$prime afile=$afile
+$bins/plingen lingen-mpi-threshold=10000 lingen-threshold=10 m=$m n=$n wdir=$wdir prime=$prime afile=$afile
 
 ln $wdir/$afile.gen $wdir/F0-$n
 j0=0
