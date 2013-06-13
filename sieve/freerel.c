@@ -347,7 +347,7 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
     {
       //print the free rels
       index_t l;
-      printf ("%lu,0:%lx", p, (unsigned long) old_table_size);
+      printf ("%lx,0:%lx", p, (unsigned long) old_table_size);
       for (l = old_table_size + 1; l < renumber_table->size; l++)
         printf (",%lx", (unsigned long) l);
       printf ("\n");

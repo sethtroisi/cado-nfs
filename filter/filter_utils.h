@@ -14,6 +14,9 @@ typedef struct {
 #define CA_DUP2 271828182845904523UL
 #define CB_DUP2 577215664901532889UL
 
+#include <time.h>
+#include <pthread.h>
+
 #include "filter_io.h"
 #include "filter_memalloc.h"
 

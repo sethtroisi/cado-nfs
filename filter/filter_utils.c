@@ -24,9 +24,9 @@ print_relation (FILE *file, buf_rel_t *my_buf_rel, index_t *newindex)
   index_t h;
   exponent_t e;
 
-  p = d64toa10(buf, my_buf_rel->a);
+  p = d64toa16(buf, my_buf_rel->a);
   *p++ = ',';
-  p = u64toa10(p, my_buf_rel->b);
+  p = u64toa16(p, my_buf_rel->b);
   *p++ = ':';
 
 
@@ -57,9 +57,9 @@ print_relation_dup2 (FILE *file, buf_rel_t *rel)
   size_t t;
   unsigned int i, j;
 
-  p = d64toa10(buf, rel->a);
+  p = d64toa16(buf, rel->a);
   *p++ = ',';
-  p = u64toa10(p, rel->b);
+  p = u64toa16(p, rel->b);
   *p++ = ':';
 
 

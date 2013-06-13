@@ -33,7 +33,7 @@ void purgedfile_stream_openfile(purgedfile_stream_ptr ps, const char * fname)
         fprintf(stderr, "opening %s: %s\n", fname, strerror(errno));
         exit(1);
     }
-    int rc = fscanf (ps->source, "%d %d\n", &ps->nrows, &ps->ncols);
+    int rc = fscanf (ps->source, "# %d %d\n", &ps->nrows, &ps->ncols);
     ASSERT_ALWAYS(rc == 2);
     ps->rrows = 0;
 }
@@ -147,7 +147,7 @@ another_line:
         int v, s = 1;
         if (c == '-') { s=-1; STORE(p, c=fgetc(f)); }
         for(*w = 0 ; (v=ugly[(unsigned char) c]) >= 0 ; ) {
-            *w=*w*10+v;
+            *w=(*w << 4) + v;
             STORE(p, c=fgetc(f));
         }
         *w*=s;
@@ -160,7 +160,7 @@ another_line:
         uint64_t * w = &ps->b;
         int v;
         for(*w = 0 ; (v=ugly[(unsigned char) c]) >= 0 ; ) {
-            *w=*w*10+v;
+            *w=(*w << 4) + v;
             STORE(p, c=fgetc(f));
         }
     }

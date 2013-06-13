@@ -122,7 +122,8 @@ print_warning_size ()
    * read new files only */
 unsigned long
 remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
-                     unsigned int ab_base, renumber_t renumber_table)
+                     int is_for_dl, unsigned int ab_base, 
+                     renumber_t renumber_table)
 {
     FILE * f_in;
     int p_in;
@@ -201,11 +202,16 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
               {
                 int first = 1;
 
-                fprintf (f_out, "%" PRId64 ",%" PRIu64 ":",
-                         rs->rel.a, rs->rel.b);
-#if (!defined FOR_FFS) && (!defined FOR_NFS_DL)
-                reduce_exponents_mod2 (&(rs->rel));
-#endif
+                if (rs->rel.a < 0)
+                  fprintf (f_out, "-%" PRIx64 ",%" PRIx64 ":",
+                           (uint64_t) (- rs->rel.a), rs->rel.b);
+                else
+                  fprintf (f_out, "%" PRIx64 ",%" PRIx64 ":",
+                            (uint64_t) rs->rel.a, rs->rel.b);
+
+                if (!is_for_dl)
+                  reduce_exponents_mod2 (&(rs->rel));
+
                 for (int i = 0; i < rs->rel.nb_rp; i++)
                   {
                     unsigned long j;
@@ -223,13 +229,15 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
                 for (int i = 0; i < rs->rel.nb_ap; i++)
                   {
                     unsigned long j;
-                    /* Warning on alg side the r values is not computed by */
-                    /* relation_stream_get */
-                    rs->rel.ap[i].r = findroot(rs->rel.a, rs->rel.b,
-                                               rs->rel.ap[i].p);
-                    j = renumber_get_index_from_p_r (renumber_table,
-                                          rs->rel.ap[i].p, rs->rel.ap[i].r, 1);
-                    for (int k = 0; k < rs->rel.ap[i].e; k++)
+                    if (rs->rel.ap[i].e > 0)
+                    {
+                      /* Warning on alg side the r values is not computed by */
+                      /* relation_stream_get */
+                      rs->rel.ap[i].r = findroot(rs->rel.a, rs->rel.b,
+                                                            rs->rel.ap[i].p);
+                      j = renumber_get_index_from_p_r (renumber_table,
+                                            rs->rel.ap[i].p, rs->rel.ap[i].r, 1);
+                      for (int k = 0; k < rs->rel.ap[i].e; k++)
                       {
                         if (first)
                           first = 0;
@@ -237,6 +245,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
                           fputc (',', f_out);
                         fprintf (f_out, "%lx", j);
                       }
+                    }
                   }
                 fprintf (f_out, "\n");
               }
@@ -444,6 +453,13 @@ main (int argc, char *argv[])
     param_list_configure_switch(pl, "bz", &bz);
     param_list_configure_switch(pl, "abhexa", &ab_hexa);
 
+#ifndef FOR_FFS
+    int is_for_dl = 0; /* Be default we do dup2 for factorization */
+    param_list_configure_switch(pl, "dl", &is_for_dl);
+#else
+    int is_for_dl = 1; /* With FFS, not for dl is meaningless */
+#endif
+
 #ifdef HAVE_MINGW
     _fmode = _O_BINARY;     /* Binary open for all files */
 #endif
@@ -612,7 +628,7 @@ main (int argc, char *argv[])
   //buf_arg.needr = 1;
   //prempt_scan_relations (files_new, &thread_print, &buf_arg);
   /* pass 1: we read new files, remove duplicates, and renumber them */
-  rread += remove_dup_in_files (files_new, basepath, outfmt,
+  rread += remove_dup_in_files (files_new, basepath, outfmt, is_for_dl,
                                (ab_hexa)?16:10, renumber_table);
 
 
