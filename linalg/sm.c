@@ -205,6 +205,10 @@ void shirokauer_maps(const char * outname, relset_srcptr rels, int sr, poly_t F,
     poly_sub_mod_mpz(SM, SMn, SMd, ell2);
 
     for(int j=0; j<F->deg; j++) {
+      if (j > SM->deg) {
+          fprintf(out, "0 ");
+          continue;
+      }
       ASSERT_ALWAYS(mpz_divisible_p(SM->coeff[j], ell));
       mpz_divexact(SM->coeff[j], SM->coeff[j], ell);
       ASSERT_ALWAYS(mpz_cmp(ell, SM->coeff[j])>0);
