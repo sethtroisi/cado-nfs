@@ -10,7 +10,6 @@
 #include <math.h>
 #include <ctype.h>
 #define rdtscll(x)
-#include "basicnt.h"
 #include "fb.h"
 #include "portability.h"
 #include "utils.h"
