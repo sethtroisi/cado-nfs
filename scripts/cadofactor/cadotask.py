@@ -776,14 +776,14 @@ class SievingTask(ClientServerTask, FilesCreator):
         else:
             return self.output_files[filename]
     
-    def request_more_relations(self, additional):
-        if additional > 0:
-            self.state["rels_wanted"] += additional
+    def request_more_relations(self, target):
+        if target > self.state["rels_wanted"]:
+            self.state["rels_wanted"] = target
         if self.state["rels_wanted"] > self.state["rels_found"]:
             self.send_notification(Notification.WANT_TO_RUN, None)
             self.logger.info("New goal for number of relations is %d, "
-                             "need to sieve more",
-                             self.state["rels_wanted"])
+                             "currently have %d. Need to sieve more",
+                             self.state["rels_wanted"], self.state["rels_found"])
         else:
             self.logger.info("New goal for number of relations is %d, but "
                              "already have %d. No need to sieve more",
@@ -940,9 +940,8 @@ class Duplicates1Task(Task, FilesCreator):
     def get_nrels(self, idx):
         return self.slice_relcounts[str(idx)]
     
-    def request_more_relations(self, additional):
-        # TODO: Estimate how many more raw relations we need
-        self.send_notification(Notification.WANT_MORE_RELATIONS, additional)
+    def request_more_relations(self, target):
+        self.send_notification(Notification.WANT_MORE_RELATIONS, target)
         self.send_notification(Notification.WANT_TO_RUN, None)
 
 class Duplicates2Task(Task, FilesCreator):
@@ -974,8 +973,11 @@ class Duplicates2Task(Task, FilesCreator):
                           self.state)
         
         self.logger.info("Starting")
+        input_nrel = 0
         for i in range(0, self.nr_slices):
             files = self.send_request(Request.GET_DUP1_FILENAMES, i.__eq__)
+            rel_count = self.send_request(Request.GET_DUP1_RELCOUNT, i)
+            input_nrel += rel_count
             newfiles = [f for f in files if not f in self.already_done_input]
             if not newfiles:
                 self.logger.info("No new files for slice %d, nothing to do", i)
@@ -988,7 +990,6 @@ class Duplicates2Task(Task, FilesCreator):
             # FIXME: Should we delete the files, too?
             self.forget_output_filenames(self.get_output_filenames(i.__eq__))
             del(self.slice_relcounts[str(i)])
-            rel_count = self.send_request(Request.GET_DUP1_RELCOUNT, i)
             basedir = self.make_output_dirname()
             self.make_directories(basedir, str(i))
             kwargs = self.progparams[0].copy()
@@ -1006,6 +1007,8 @@ class Duplicates2Task(Task, FilesCreator):
             self.add_output_files(outfilenames)
             self.logger.info("%d unique relations remain on slice %d", nr_rels, i)
             self.slice_relcounts[str(i)] = nr_rels
+        self.update_ratio(input_nrel, self.get_nrels())
+        self.state["last_input_nrel"] = input_nrel
         self.logger.info("%d unique relations remain in total", self.get_nrels())
         self.logger.debug("Exit Duplicates2Task.run(" + self.name + ")")
     
@@ -1018,7 +1021,8 @@ class Duplicates2Task(Task, FilesCreator):
         for line in text:
             match = re.match('\s*(\d+) remaining relations', line)
             if match:
-                return int(match.group(1))
+                remaining = int(match.group(1))
+                return remaining
         raise Exception("Received no value for remaining relation count")
 
     def get_nrels(self):
@@ -1026,10 +1030,38 @@ class Duplicates2Task(Task, FilesCreator):
         for i in range(0, self.nr_slices):
             nrels += self.slice_relcounts[str(i)]
         return nrels
-
-    def request_more_relations(self, additional):
-        # TODO: Estimate how many more raw relations we need
-        self.send_notification(Notification.WANT_MORE_RELATIONS, additional)
+    
+    def update_ratio(self, input_nrel, output_nrel):
+        last_input_nrel = self.state.get("last_input_nrel", 0)
+        last_output_nrel = self.state.get("last_output_nrel", 0)
+        new_in = input_nrel - last_input_nrel
+        new_out = output_nrel - last_output_nrel
+        if new_in < 0:
+            self.logger.error("Negative number %d of new relations?", new_in)
+            return
+        if new_in == 0:
+            return
+        if new_out > new_in:
+            self.logger.error("More new output relations (%d) than input (%d)?",
+                              new_out, new_in)
+            return
+        ratio = new_out / new_in
+        self.logger.info("Of %d newly added relations %d were unique (ratio %f)",
+                         new_in, new_out, ratio)
+        self.state.update({"last_input_nrel": input_nrel,
+            "last_output_nrel": output_nrel, "unique_ratio": ratio})
+    
+    def request_more_relations(self, target):
+        nrels = self.get_nrels()
+        if target <= nrels:
+            return
+        additional_out = target - nrels
+        ratio = self.state.get("unique_ratio", 1.)
+        additional_in = int(additional_out / ratio)
+        newtarget = self.state["last_input_nrel"] + additional_in
+        self.logger.info("Got request for %d (%d additional) output relations, estimate %d (%d additional) needed in input",
+                         target, additional_out, newtarget, additional_in)
+        self.send_notification(Notification.WANT_MORE_RELATIONS, newtarget)
         self.send_notification(Notification.WANT_TO_RUN, None)
 
 
@@ -1051,6 +1083,7 @@ class PurgeTask(Task):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.state.setdefault("input_nrels", 0)
     
     def run(self):
         self.logger.info("Starting")
@@ -1087,7 +1120,7 @@ class PurgeTask(Task):
         kwargs["out"] = purgedfile
         p = self.programs[0](args, kwargs)
         (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
-        if self.parse_stderr(stderr):
+        if self.parse_stderr(stderr, nrels):
             [nrows, weight, excess] = self.parse_stdout(stdout)
             self.logger.info("After purge, %d relations remain with weight %s and excess %s"
                              % (nrows, weight, excess))
@@ -1096,27 +1129,126 @@ class PurgeTask(Task):
             self.logger.info("Have enough relations")
             self.send_notification(Notification.HAVE_ENOUGH_RELATIONS, None)
         else:
-            self.logger.info("Not enough relations, requesting more")
-            self.request_more_relations(int(nunique * 0.1))
+            self.logger.info("Not enough relations")
+            self.request_more_relations(nunique)
         self.logger.debug("Exit PurgeTask.run(" + self.name + ")")
     
-    def request_more_relations(self, additional):
-        # TODO: Estimate how many more unique relations we need
-        self.send_notification(Notification.WANT_MORE_RELATIONS, additional)
+    def request_more_relations(self, nunique):
+        """
+        We want an excess of $e = 0.1 n_p$, 
+        with $n_p$ primes among $n_r$ relations in the output file.
+        
+        We have $\Delta_r$ additional relations in the output file per
+        additional input relation, and $\Delta_p$ additional primes in
+        the output file per additional input relation.
+        
+        We need $a$ additional relations so that
+        \begin{eqnarray*}
+            n_r + a  \Delta_r - (n_p + a  \Delta_p) & = & 0.1  (n_p + a  \Delta_p) \\
+            n_r + a  \Delta_r & = & 1.1  (n_p + a  \Delta_p) \\
+            n_r - 1.1 n_p & = & 1.1 a \Delta_p - a \Delta_r \\ 
+            \frac{n_r - 1.1 n_p}{1.1 \Delta_p - \Delta_r} & = & a \\
+        \end{eqnarray*}
+        """
+        
+        additional = nunique * 0.1
+        if "delta_r" in self.state:
+            excess = self.state["last_input_nrels"] - \
+                self.state["last_input_nprimes"]
+            n_r = self.state["last_output_nrels"]
+            n_p = self.state["last_output_nprimes"]
+            delta_r = self.state["delta_r"]
+            delta_p = self.state["delta_p"]
+            if abs(1.1 * delta_p - delta_r) > 0.01:
+                a = (n_r - 1.1 * n_p) / (1.1 * delta_p - delta_r)
+                self.logger.info("a = %f, excess = %d", a, excess)
+                # Use the negative excess among the input relations as an
+                # upper limit on the additional relations needed, to keep
+                # a small donominator from causing a huge value
+                if excess < 0 and a > -excess:
+                    a = -excess
+                if a > 10000. and a < nunique * 0.5:
+                    additional = int(a)
+        # Always request at least 10k more
+        additional = max(additional, 10000)
+        
+        self.logger.info("Requesting %d additional relations", additional)
+        self.send_notification(Notification.WANT_MORE_RELATIONS, nunique + additional)
         self.send_notification(Notification.WANT_TO_RUN, None)
     
     def get_purged_filename(self):
         return self.state["purgedfile"]
     
-    def parse_stderr(self, stderr):
+    def parse_stderr(self, stderr, input_nrels):
         # If stderr ends with 
         # b'excess < 0.10 * #primes. See -required_excess argument.'
         # then we need more relations from filtering and return False
+        input_nprimes = None
+        have_enough = True
+        not_enough1 = re.compile("excess < (\d+.\d+) \* #primes")
+        not_enough2 = re.compile("number of relations <= number of ideals")
+        nrels_nprimes = re.compile("\s*nrels=(\d+), nprimes=(\d+); excess=(-?\d+)")
         for line in stderr.decode("ascii").splitlines():
-            if re.match("excess < \d+.\d+ \* #primes", line) or \
-                    re.match("number of relations <= number of ideals", line):
-                return False
-        return True
+            match = not_enough1.match(line)
+            if match:
+                self.required_excess = float(match.group(1))
+                have_enough = False
+                break
+            if not_enough2.match(line):
+                have_enough = False
+                break
+            match = nrels_nprimes.match(line)
+            if not match is None:
+                (nrels, nprimes, excess) = map(int, match.groups())
+                assert nrels - nprimes == excess
+                # The first occurrence of the message counts input relations
+                if input_nprimes is None:
+                    assert input_nrels == nrels
+                    input_nprimes = nprimes
+        
+        # At this point we shoud have:
+        # input_nrels, input_nprimes: rels and primes among input
+        # nrels, nprimes, excess: rels and primes when purging stopped
+        if not input_nprimes is None:
+            self.update_excess_per_input(input_nrels, input_nprimes, nrels, nprimes)
+        return have_enough
+    
+    def update_excess_per_input(self, input_nrels, input_nprimes, nrels,
+                                nprimes):
+        if input_nrels == 0:
+            return # Nothing sensible that we can do
+        last_input_nrels = self.state.get("last_input_nrels", 0)
+        last_input_nprimes = self.state.get("last_input_nprimes", 0)
+        last_nrels = self.state.get("last_output_nrels", 0)
+        last_nprimes = self.state.get("last_output_nprimes", 0)
+        if last_input_nrels >= input_nrels:
+            self.logger.warn("Previously stored input nrels (%d) is no "
+                             "smaller than value from new run (%d)",
+                             last_input_nrels, input_nrels)
+            return
+        if nrels <= last_nrels:
+            self.logger.warn("Previously stored nrels (%d) is no "
+                             "smaller than value from new run (%d)",
+                             last_nrels, nrels)
+            return
+        if nprimes <= last_nprimes:
+            self.logger.warn("Previously stored nprimes (%d) is no "
+                             "smaller than value from new run (%d)",
+                             last_nprimes, nprimes)
+            return
+        self.logger.info("Previous run had %d input relations and ended with "
+                         "%d relations and %d primes, new run had %d input "
+                         "relations and ended with %d relations and %d primes",
+                         last_input_nrels, last_nrels, last_nprimes,
+                         input_nrels, nrels, nprimes)
+        delta_r = (nrels - last_nrels) / (input_nrels - last_input_nrels)
+        delta_p = (nprimes - last_nprimes) / (input_nrels - last_input_nrels)
+        self.logger.info("Gained %f output relations and %f primes per input relation",
+                         delta_r, delta_p)
+        update = {"last_output_nrels": nrels, "last_output_nprimes": nprimes,
+                  "last_input_nrels": input_nrels, "last_input_nprimes": input_nprimes,
+                  "delta_r": delta_r, "delta_p": delta_p}
+        self.state.update(update) 
     
     def parse_stdout(self, stdout):
         # Program output is expected in the form:
