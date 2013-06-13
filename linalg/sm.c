@@ -44,7 +44,39 @@ typedef relset_struct_t * relset_ptr;
 typedef const relset_struct_t * relset_srcptr;
 
 
-relset_ptr build_rel_sets(const char * purgedname, const char * indexname , int * small_nrows, poly_t F, mpz_t ell)
+/* Q = P^a mod f, mod p. Note, p is mpz_t */
+void
+poly_power_mod_f_mod_mpz_Barrett (poly_t Q, const poly_t P, const poly_t f,
+				  const mpz_t a, const mpz_t p, const mpz_t invp)
+{
+  int k = mpz_sizeinbase(a, 2);
+  poly_t R;
+
+  if (mpz_cmp_ui(a, 0) == 0) {
+    Q->deg = 0;
+    mpz_set_ui(Q->coeff[0], 1);
+    return;
+  }
+
+  poly_alloc(R, 2*f->deg);
+
+  // Initialize R to P
+  poly_copy(R, P);
+
+  // Horner
+  for (k -= 2; k >= 0; k--)
+  {
+    poly_sqr_mod_f_mod_mpz(R, R, f, p, NULL);  // R <- R^2
+    if (mpz_tstbit(a, k))
+      poly_mul_mod_f_mod_mpz(R, R, P, f, p, NULL);  // R <- R*P
+  }
+
+  poly_copy(Q, R);
+  poly_free(R);
+}
+
+
+relset_ptr build_rel_sets(const char * purgedname, const char * indexname , int * small_nrows, poly_t F, const mpz_t ell, const mpz_t ell2)
 {
   purgedfile_stream ps;
   FILE * ix = fopen(indexname, "r");
@@ -58,13 +90,6 @@ relset_ptr build_rel_sets(const char * purgedname, const char * indexname , int 
   */
   relset_ptr rels;
 
-  /* We build relation sets mod ell^2 because Shirokaueur maps will be computed
-     mod ell^2
-  */
-  mpz_t ell2;
-  mpz_init(ell2);
-  mpz_mul(ell2, ell, ell);
-
   purgedfile_stream_init(ps);
   purgedfile_stream_openfile(ps, purgedname);
 
@@ -74,10 +99,17 @@ relset_ptr build_rel_sets(const char * purgedname, const char * indexname , int 
   ps->parse_only_ab = 1;
   for(int i = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; i++) {
     ASSERT_ALWAYS(i < ps->nrows);
-    /* (a,b)-pair is a degree-1 poly */
-    poly_alloc(pairs[i], 1);
-    poly_setcoeff_si(pairs[i], 0, ps->a);
-    poly_setcoeff_si(pairs[i], 1, -ps->b);
+    if (ps->b == 0) {
+	/* freerels */
+	poly_alloc(pairs[i], 0);
+	poly_setcoeff_si(pairs[i], 0, ps->a);
+      }
+    else {
+      /* (a,b)-pair is a degree-1 poly */
+      poly_alloc(pairs[i], 1);
+      poly_setcoeff_si(pairs[i], 0, ps->a);
+      poly_setcoeff_si(pairs[i], 1, -ps->b);
+    }
   }
 
   /* small_ncols isn't used here: we don't care. */
@@ -137,17 +169,24 @@ relset_ptr build_rel_sets(const char * purgedname, const char * indexname , int 
 }
 
 
-void shirokauer_maps(const char * outname, relset_srcptr rels, int sr, poly_t F, mpz_t eps, mpz_t ell)
+void shirokauer_maps(const char * outname, relset_srcptr rels, int sr, poly_t F, const mpz_t eps, const mpz_t ell, const mpz_t ell2)
 {
   FILE * out = fopen(outname, "w");
   poly_t SMn, SMd, SM;
-  mpz_t l2, tmp;
+  mpz_t invl2, tmp;
   
-  mpz_init(l2);
+  /* mpz_init(l2); */
+  mpz_init(invl2);
   mpz_init(tmp);
 
-  /* All computations are done mod l^2 */
-  mpz_mul(l2, ell, ell);
+  barrett_init(invl2, ell2);
+
+  mpz_out_str(stderr, 10, invl2);
+  fprintf(stderr, "\n");
+
+  fprintf(stderr, "\tBuilding %d relation sets mod ell^2:\n\tell^2 = ", sr);
+  mpz_out_str(stderr, 10, ell2);
+  fprintf(stderr, "\n");
 
   poly_alloc(SMn, F->deg);
   poly_alloc(SMd, F->deg);
@@ -157,15 +196,15 @@ void shirokauer_maps(const char * outname, relset_srcptr rels, int sr, poly_t F,
 
   for (int i=0; i<sr; i++) {
 
-    poly_power_mod_f_mod_mpz(SMn, rels[i].num, F, eps, l2);
+    poly_power_mod_f_mod_mpz_Barrett(SMn, rels[i].num, F, eps, ell2, invl2);
     poly_sub_ui(SMn, 1);
   
-    poly_power_mod_f_mod_mpz(SMd, rels[i].denom, F, eps, l2);
+    poly_power_mod_f_mod_mpz_Barrett(SMd, rels[i].denom, F, eps, ell2, invl2);
     poly_sub_ui(SMd, 1);
 
-    poly_sub_mod_mpz(SM, SMn, SMd, l2);
+    poly_sub_mod_mpz(SM, SMn, SMd, ell2);
 
-    for(int j=0; j<=SM->deg; j++) {
+    for(int j=0; j<F->deg; j++) {
       ASSERT_ALWAYS(mpz_divisible_p(SM->coeff[j], ell));
       mpz_divexact(SM->coeff[j], SM->coeff[j], ell);
       ASSERT_ALWAYS(mpz_cmp(ell, SM->coeff[j])>0);
@@ -189,6 +228,8 @@ void usage(const char * me)
   fprintf(stderr, "Usage: %s --poly polyname --purged purgedname --index indexname --out outname --gorder group-order --smexp sm-exponent\n", me);
 }
 
+/* -------------------------------------------------------------------------- */
+
 int main (int argc, char **argv)
 {
   
@@ -205,11 +246,12 @@ int main (int argc, char **argv)
   mpz_t *f;
   relset_ptr rels;
   int sr;
-  mpz_t ell, eps;
+  mpz_t ell, ell2, eps;
 
   double t0;
 
   char * me = *argv;
+
   /* print the command line */
   fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
   for (int i = 1; i < argc; i++)
@@ -264,21 +306,30 @@ int main (int argc, char **argv)
   ASSERT_ALWAYS(group_order != NULL);
   ASSERT_ALWAYS(sm_exponent != NULL);
 
-  t0 = seconds();
-
   /* read ell from command line (assuming radix 10) */
   mpz_init_set_str(ell, group_order, 10);
 
-  rels = build_rel_sets(purgedname, indexname, &sr, F, ell);
+  mpz_init(ell2);
+  mpz_mul(ell2, ell, ell);
 
-  fprintf(stderr, "Building %d relation sets took %lf seconds\n", sr, seconds() - t0);
+  fprintf(stderr, "\nSub-group order:\n\tell = ");
+  mpz_out_str(stderr, 10, ell);
+  fprintf(stderr, "\n");
 
-  /* SM exponent from command line (assuming radix 10) */
   mpz_init_set_str(eps, sm_exponent, 10);
 
-  shirokauer_maps(outname, rels, sr, F, eps, ell);
+  fprintf(stderr, "\nShirokauer maps' exponent:\n\teps = ");
+  mpz_out_str(stderr, 10, eps);
+  fprintf(stderr, "\n");
 
-  fprintf(stderr, "Computing Shirokauer maps for %d relations took %2.2lf seconds\n", sr, seconds() - t0);
+  t0 = seconds();
+  rels = build_rel_sets(purgedname, indexname, &sr, F, ell, ell2);
+
+  fprintf(stderr, "\nComputing Shirokauer maps for %d relations\n", sr);
+
+  shirokauer_maps(outname, rels, sr, F, eps, ell, ell2);
+
+  fprintf(stderr, "\nsm completed in %2.2lf seconds\n", seconds() - t0);
 
   cado_poly_clear(pol);
   param_list_clear(pl);
