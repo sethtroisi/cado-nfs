@@ -1,6 +1,6 @@
 #include "cado.h"
 #include <stdint.h>
-#include "gcd_int64.h"
+#include "gcd.h"
 #include "macros.h"
 
 int64_t
