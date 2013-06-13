@@ -75,7 +75,6 @@ typedef struct {
   index_t nprimes;     // nb of primes read
   buf_rel_t *buf_data; // buffer for I/O
   unsigned int needed; // ABP, AB, H, ABHMIN
-  unsigned int needr;  // non-null if we need to compute r
   index_t min_index;   // store only primes with index >= min_index
   double W;            // Weight (nb of non-zero) of primes >= min_index
   FILE *f_remaining;   // File for writing remaining rels
@@ -118,7 +117,8 @@ int nanosleep(const struct timespec *req, struct timespec *rem);
 #endif
 void prempt_load (prempt_t);
 void relation_stream_get_fast (prempt_t, buf_rel_t *, index_t);
-int prempt_scan_relations (char **, void* (*)(buf_arg_t *), buf_arg_t *);
+int prempt_scan_relations (char **, void* (*)(buf_arg_t *), buf_arg_t *,
+                           void* (*)(fr_t *));
 void test_and_print_progress_now ();
 int is_finish ();
 void set_antebuffer_path (char *, const char *);

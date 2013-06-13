@@ -15,16 +15,6 @@ static char *pmin, *pminlessone;
 static char antebuffer[PATH_MAX];         /* "directory/antebuffer" or "cat" */
 static char rep_cado[PATH_MAX];           /* directory of cado */
 
-#ifdef FOR_DUP2
-extern void * thread_root(fr_t *);
-#else
-static void * thread_root(MAYBE_UNUSED fr_t *mfr)
-{
-  ASSERT_ALWAYS(0); 
-  /* we should never need this function if we are not in dup2*/
-}
-#endif
-
 inline int 
 is_finish ()
 {
@@ -263,8 +253,13 @@ relation_get_fast_abp (prempt_t prempt_data, buf_rel_t *mybufrel)
 
   p = (char *) prempt_data->pcons;
 
+#ifndef FOR_FFS
   READ_A_BASE10(mybufrel->a);
   READ_B_BASE10(mybufrel->b);
+#else
+  READ_A_HEXA(mybufrel->a);
+  READ_B_HEXA(mybufrel->b);
+#endif
 
   nb_primes_read = 0;
   for ( c = 0 ; ; )
@@ -421,7 +416,8 @@ relation_get_fast_hmin (prempt_t prempt_data, buf_rel_t *mybufrel, index_t min)
 
 int
 prempt_scan_relations (char **fic, void* (*callback_fct)(buf_arg_t *), 
-                       buf_arg_t * callback_arg)
+                       buf_arg_t * callback_arg,
+                       void* (*thread_root)(fr_t *))
 {
   char *pcons, *pcons_old, *pcons_max, *p, **ff;
   pthread_attr_t attr;
@@ -430,7 +426,7 @@ prempt_scan_relations (char **fic, void* (*callback_fct)(buf_arg_t *),
   prempt_t prempt_data;
   unsigned long cpy_cpt_rel_a;
   unsigned int length_line, i, k;
-  int err;
+  int err, needr = (thread_root != NULL);
   char c;
   buf_rel_t *buf_rel = callback_arg->buf_data;
 
@@ -495,7 +491,7 @@ prempt_scan_relations (char **fic, void* (*callback_fct)(buf_arg_t *),
     exit (1);
   }
 
-  if (callback_arg->needr)
+  if (needr)
   {
     for (i = 0; i < (1<<NFR); i++)
     {
@@ -601,7 +597,7 @@ prempt_scan_relations (char **fic, void* (*callback_fct)(buf_arg_t *),
         /* Delayed find root computation by block of 1<<NNFR */
         if (cpy_cpt_rel_a && !(k & ((1<<NNFR)-1)))
         {
-          if (callback_arg->needr)
+          if (needr)
           {
             i = (k>>NNFR) & ((1<<NFR)-1);
             while (fr[i].ok) 
@@ -658,7 +654,7 @@ prempt_scan_relations (char **fic, void* (*callback_fct)(buf_arg_t *),
   }
 
  end_of_files:
-  if (callback_arg->needr)
+  if (needr)
   {
     if (cpy_cpt_rel_a) 
     {

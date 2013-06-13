@@ -1038,7 +1038,7 @@ main (int argc, char **argv)
                      min_index);
 
   /* first pass over relations in files */
-  prempt_scan_relations (fic, &thread_insert, &buf_arg);
+  prempt_scan_relations (fic, &thread_insert, &buf_arg, NULL);
   nprimes = buf_arg.nprimes;
   
   tot_alloc_bytes += get_my_malloc_bytes();
@@ -1122,7 +1122,7 @@ main (int argc, char **argv)
   fprintf (buf_arg.f_remaining, "# %"PRid" %"PRid"\n", nrels, nprimes);
   /* second pass over relations in files */
   buf_arg.needed = NEEDED_ABH;
-  prempt_scan_relations (fic, &thread_print, &buf_arg);
+  prempt_scan_relations (fic, &thread_print, &buf_arg, NULL);
 
 
   if (!boutfilerel)

@@ -390,6 +390,7 @@ thread_root(fr_t *mfr)
           if (is_dup)
           {
            // WARNING FIXME H, cost, factor, nodu, dupl is not volatile...
+           // FIX les mettre dans fr_t
             if (i < sanity_size)
               sanity_check(i, myrel->a, myrel->b);
             nodu++;
@@ -620,13 +621,13 @@ main (int argc, char *argv[])
   buf_arg.needed = NEEDED_AB;
   
   fprintf (stderr, "Reading files already renumbered:\n");
-  prempt_scan_relations (files_already_renumbered, &thread_only_hash, &buf_arg);
+  prempt_scan_relations (files_already_renumbered, &thread_only_hash, &buf_arg,
+                         NULL);
 
   fprintf (stderr, "Reading new files:\n");
   index_t rread = 0;
   //buf_arg.needed = NEEDED_ABP;
-  //buf_arg.needr = 1;
-  //prempt_scan_relations (files_new, &thread_print, &buf_arg);
+  //prempt_scan_relations (files_new, &thread_print, &buf_arg, &thread_root);
   /* pass 1: we read new files, remove duplicates, and renumber them */
   rread += remove_dup_in_files (files_new, basepath, outfmt, is_for_dl,
                                (ab_hexa)?16:10, renumber_table);

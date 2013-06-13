@@ -231,7 +231,7 @@ filter_matrix_read (filter_matrix_t *mat, int skip, const char *purgedname)
     buf_arg.rel_used = NULL;
     buf_arg.needed = NEEDED_H;
     char *fic[2] = {(char *) purgedname, NULL};
-    prempt_scan_relations (fic, &thread_insert, &buf_arg);
+    prempt_scan_relations (fic, &thread_insert, &buf_arg, NULL);
 
     SFREE(buf_rel);
 
