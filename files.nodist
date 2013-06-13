@@ -27,6 +27,7 @@ polyselect/alpha.mpl
 polyselect/alpha.sage
 polyselect/alpha.c
 polyselect/debug_rootsieve.sage
+polyselect/dlpolyselect.c
 polyselect/gnuplot_stuff.sage
 polyselect/higher_order_roots.sage
 polyselect/integral.sage

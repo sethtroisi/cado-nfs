@@ -5,13 +5,11 @@
     Q = 15540969060259840402098050505982130509830706095551545985590268879
 
     --run--
-    ./dlpolyselect -N 31081938120519680804196101011964261019661412191103091971180537759 -d 4
+    ./dlpolyselect -df 3 -N 31081938120519680804196101011964261019661412191103091971180537759
     
-    Large ones with deg 4 and 3,
+    ./dlpolyselect -df 4 -dg 3 -N 191147927718986609689229466631454649812986246276667354864188503638807260703436799058776201365135161278134258296128109200046702912984568752800330221777752773957404540495707851421851
 
-    ./dlpolyselect -d 4 -N 191147927718986609689229466631454649812986246276667354864188503638807260703436799058776201365135161278134258296128109200046702912984568752800330221777752773957404540495707851421851
-
-    ./dlpolyselect -d 3 -N 191147927718986609689229466631454649812986246276667354864188503638807260703436799058776201365135161278134258296128109200046702912984568752800330221777752773957404540495707851421851
+    ./dlpolyselect -df 3 -dg 2 -N 191147927718986609689229466631454649812986246276667354864188503638807260703436799058776201365135161278134258296128109200046702912984568752800330221777752773957404540495707851421851
 
 */
 
@@ -21,18 +19,8 @@
 #include "portability.h"
 #include "murphyE.h"
 #include <ctype.h>
-#include <NTL/ZZ_p.h>
-#include <NTL/vec_ZZ.h>
-#include <NTL/vec_ZZ_p.h>
-#include <NTL/ZZ_pX.h>
-#include <NTL/ZZVec.h>
-#include <NTL/LLL.h>
-#include <NTL/mat_ZZ.h>
-#include <NTL/pair_ZZ_pX_long.h>
-#include <NTL/ZZXFactoring.h>
-#include <NTL/ZZ_pXFactoring.h>
-using namespace std;
-using namespace NTL;
+#include <stdlib.h>
+#include <time.h> 
 
 const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
 #define SIZE(p) (((long *) (p))[1])
@@ -64,16 +52,18 @@ const double exp_rot[] = {0, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 0};
  */
 
 #define ROW
+#define LEN_QQ 11
 
 typedef struct {
   mpz_t **coeff;
   int NumRows, NumCols;
 } mat_Z;
 
+const unsigned int QQ[LEN_QQ] = {2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31};
 
 static void
 ident ( mat_Z X, long n )
-{  
+{
    long i, j;
    X.NumRows = X.NumCols = n;
   
@@ -563,21 +553,6 @@ print_nonlinear_poly_info ( mpz_t *f,
 
 
 /*
-  Test irreducibility over ZZx using NTL.
-*/
-static int
-is_irreducible (ZZX f_ZZ) {
-    Vec<Pair<ZZX, long> > factors;
-    ZZ c = to_ZZ(1);
-    factor (c, factors, f_ZZ, 0, 0);
-    if (factors.length() != 1 )
-        return 0;
-    else
-        return 1;
-}
-
-
-/*
   Generate polynomial f(x) of degree d.
 */
 static int
@@ -589,12 +564,12 @@ polygen_JL_f ( mpz_t n,
                int ad )
 {
     unsigned int i;
+    unsigned long *rq;
     int nr, *fint;
     mpz_t t;
     mpz_init (t);
     fint = (int *) malloc ((d + 1)*sizeof(int));
-    /* ntl */
-    ZZX f_ZZ;
+    rq = (unsigned long *) malloc ((d + 1)*sizeof(unsigned long));
 
     /* find irreducible polynomial f */
     srand(time(NULL));
@@ -616,10 +591,20 @@ polygen_JL_f ( mpz_t n,
         }
 
         /* irreducibility test */
+        /*
         f_ZZ.SetLength(d+1);
         for (i = 0; i <= d; i ++)
             SetCoeff(f_ZZ, i, fint[i]);
         if (is_irreducible(f_ZZ) == 0)
+            continue;
+        */
+        int test = 0;
+        for (i = 0; i < LEN_QQ; i ++) {
+            test = poly_roots_ulong (rq, f, d, QQ[i]);
+            if (test == 0)
+                break;
+        }
+        if (test != 0)
             continue;
 
         /* find roots */
@@ -630,6 +615,7 @@ polygen_JL_f ( mpz_t n,
 
     mpz_clear (t);
     free(fint);
+    free(rq);
     return nr;
 }
 
