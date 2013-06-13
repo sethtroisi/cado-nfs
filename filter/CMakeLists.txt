@@ -13,7 +13,6 @@ target_link_libraries(dup1 utils)
 
 add_executable(dup2 dup2.c)
 target_link_libraries(dup2 filterutils)
-set_target_properties(dup2 PROPERTIES COMPILE_FLAGS "-DFOR_DUP2")
 
 add_executable(purge purge.c)
 target_link_libraries(purge filterutils)
@@ -21,8 +20,17 @@ target_link_libraries(purge filterutils)
 add_executable(merge merge.c markowitz.c mst.c report.c merge_mono.c filter_matrix.c sparse.c)
 target_link_libraries(merge filterutils)
 
+add_executable(merge-dl merge.c markowitz.c mst.c report.c merge_mono.c filter_matrix.c sparse.c)
+target_link_libraries(merge-dl filterutils)
+set_target_properties(merge-dl PROPERTIES COMPILE_FLAGS "-DFOR_DL")
+
 add_executable(replay replay.c sparse.c)
 target_link_libraries(replay utils)
+
+add_executable(replay-dl replay.c sparse.c)
+target_link_libraries(replay-dl filterutils)
+set_target_properties(replay-dl PROPERTIES COMPILE_FLAGS "-DFOR_DL")
+
 
 install(TARGETS dup1 dup2 purge merge replay RUNTIME DESTINATION bin/filter)
 

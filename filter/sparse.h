@@ -3,7 +3,7 @@
 
 #include <stdint.h> /* for int32_t */
 
-#ifndef FOR_FFS
+#ifndef FOR_DL
 #define typerow_t int32_t
 #define rowLength(rows, i) rows[(i)][0]
 #define rowCell(rows, i, k) rows[(i)][(k)]

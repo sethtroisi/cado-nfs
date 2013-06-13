@@ -119,7 +119,7 @@ filter_matrix_read_weights(filter_matrix_t * mat, purgedfile_stream_ptr ps)
     int32_t jmin = 0, jmax = mat->ncols;
     for (; purgedfile_stream_get(ps,NULL) >= 0;) 
       {
-#ifdef FOR_FFS
+#ifdef FOR_DL
             int32_t previousj = -1;
 #endif
         for (int k = 0; k < ps->nc; k++) 
@@ -127,8 +127,8 @@ filter_matrix_read_weights(filter_matrix_t * mat, purgedfile_stream_ptr ps)
             int32_t j = ps->cols[k];
             if (LIKELY((j >= jmin) && (j < jmax)))
               {
-#ifdef FOR_FFS
-                /* For FFS we do not want to count multiplicity here*/
+#ifdef FOR_DL
+                /* For DL we do not want to count multiplicity here*/
                 if (j != previousj)
                     mat->wt[j]++;
                 previousj = j;
@@ -138,10 +138,6 @@ filter_matrix_read_weights(filter_matrix_t * mat, purgedfile_stream_ptr ps)
               }
           }
       }
-#ifdef FOR_FFS
-    int32_t j = mat->ncols - 1;
-    mat->wt[j] = mat->nrows;
-#endif
 }
 
 /* initialize Rj[j] for light columns, i.e., for those of weight <= cwmax */
@@ -284,7 +280,7 @@ filter_matrix_read (filter_matrix_t *mat, int skip, const char *purgedname)
         ASSERT_ALWAYS (0 <= j && j < mat->ncols);
         if(mat->wt[j] < 0)
           nb_heavy_j++;
-#ifdef FOR_FFS
+#ifdef FOR_DL
         if (next > 0 && buf[next-1].id == j)
           buf[next-1].e++;
         else
@@ -434,7 +430,7 @@ weightSum(filter_matrix_t *mat, int i1, int i2, MAYBE_UNUSED int32_t j)
     len2 = (isRowNull(mat, i2) ? 0 : matLengthRow(mat, i2));
     if((len1 == 0) || (len2 == 0))
         fprintf(stderr, "i1=%d i2=%d len1=%d len2=%d\n", i1, i2, len1, len2);
-#ifdef FOR_FFS /* look for the exponents of j in i1 i2*/
+#ifdef FOR_DL /* look for the exponents of j in i1 i2*/
     int e1 = 0, e2 = 0;
     int d;
     int l;
@@ -457,7 +453,7 @@ weightSum(filter_matrix_t *mat, int i1, int i2, MAYBE_UNUSED int32_t j)
     {
         if(matCell(mat, i1, k1) < matCell(mat, i2, k2))
         {
-#ifdef FOR_FFS
+#ifdef FOR_DL
             w += weight_ffs (e2 * mat->rows[i1][k1].e);
 #else
             w++;
@@ -466,7 +462,7 @@ weightSum(filter_matrix_t *mat, int i1, int i2, MAYBE_UNUSED int32_t j)
         }
         else if(matCell(mat, i1, k1) > matCell(mat, i2, k2))
         {
-#ifdef FOR_FFS
+#ifdef FOR_DL
             w += weight_ffs (e1 * mat->rows[i2][k2].e);
 #else
             w++;
@@ -475,7 +471,7 @@ weightSum(filter_matrix_t *mat, int i1, int i2, MAYBE_UNUSED int32_t j)
         }
         else
         {
-#ifdef FOR_FFS
+#ifdef FOR_DL
             w += weight_ffs (e2*mat->rows[i1][k1].e + e1*mat->rows[i2][k2].e);
 #endif
             k1++; 
@@ -484,14 +480,14 @@ weightSum(filter_matrix_t *mat, int i1, int i2, MAYBE_UNUSED int32_t j)
     }
     // finish with k1
     for( ; k1 <= matLengthRow(mat, i1); k1++)
-#ifdef FOR_FFS
+#ifdef FOR_DL
             w += weight_ffs (e2 * mat->rows[i1][k1].e);
 #else
             w++;
 #endif
     // finish with k2
     for( ; k2 <= matLengthRow(mat, i2); k2++)
-#ifdef FOR_FFS
+#ifdef FOR_DL
             w += weight_ffs (e1 * mat->rows[i2][k2].e);
 #else
             w++;

@@ -82,7 +82,7 @@ reportn (report_t *rep, int32_t *ind, int n, MAYBE_UNUSED int32_t j)
 	    if(i < n-1)
 		fprintf(rep->outfile, " ");
 	}
-#ifdef FOR_FFS
+#ifdef FOR_DL
     if (j >= 0)
         fprintf(rep->outfile, " #%d", j);
 #endif

@@ -12,7 +12,7 @@ typedef struct {
 #define TRACE_COL -1 // 253224 // 231 // put to -1 if not...!
 #define TRACE_ROW -1 // 59496 // put to -1 if not...!
 
-#ifndef FOR_FFS
+#ifndef FOR_DL
 #define typerow_t int32_t
 #else
 #define typerow_t ideal_merge_ffs_t
@@ -27,7 +27,7 @@ typedef struct {
   int rem_ncols;     /* number of remaining columns */
   typerow_t **rows;     /* rows[i][k] contains indices of an ideal of row[i] 
                          with 1 <= k <= rows[i][0] */
-                        /* FOR_FFS: struct containing also the exponent */
+                        /* FOR_DL: struct containing also the exponent */
   int *wt;           /* weight w of column j, if w <= cwmax,
                         else <= 1 for a deleted column
                         (trick: we store -w if w > cwmax) */
@@ -67,7 +67,7 @@ extern void remove_j_from_row(filter_matrix_t *mat, int i, int j);
 extern void print_row(filter_matrix_t *mat, int i);
 
 #define isRowNull(mat, i) ((mat)->rows[(i)] == NULL)
-#ifdef FOR_FFS
+#ifdef FOR_DL
 #define matLengthRow(mat, i) (mat)->rows[(i)][0].id
 #define matCell(mat, i, k) (mat)->rows[(i)][(k)].id
 #define setCell(v, j, c) v = (typerow_t) {.id = j, .e = c}

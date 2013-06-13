@@ -47,7 +47,7 @@ static unsigned long
 flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
             int small_ncols, int *code, int skip, int bin)
 {
-#ifdef FOR_FFS
+#ifdef FOR_DL
   ASSERT_ALWAYS (skip == 0);
 #endif
     const struct {
@@ -166,7 +166,7 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
             }
 
 
-#if 0 //#ifdef FOR_FFS //for FFS sort the index
+#if 0 //#ifdef FOR_DL //for DL sort the index
       for (int k = 1; k < rowLength(sparsemat, i); k++)
         {
           for (int l = k+1; l <= rowLength(sparsemat, i); l++)
@@ -200,13 +200,13 @@ flushSparse(const char *sparsename, typerow_t **sparsemat, int small_nrows,
                     x-=skip;
                     if (bin) {
                         fwrite32_little(&x, 1, smatfile);
-#ifdef FOR_FFS
+#ifdef FOR_DL
                         uint32_t e = (uint32_t) sparsemat[i][j].e;
                         fwrite32_little(&e, 1, smatfile);
 #endif
                     } else {
                         fprintf(smatfile, " %"PRIu32"", x);
-#ifdef FOR_FFS
+#ifdef FOR_DL
                         fprintf(smatfile, ":%d", sparsemat[i][j].e);
 #endif
                     }
@@ -299,7 +299,7 @@ renumber (int *small_ncols, int *colweight, int ncols,
 {
     int j, k, nb, *tmp;
 
-#ifdef FOR_FFS
+#ifdef FOR_DL
     FILE *renumberfile = fopen (idealsfilename, "w+");
     if (renumberfile == NULL)
       {
@@ -329,12 +329,12 @@ renumber (int *small_ncols, int *colweight, int ncols,
     for(j = nb-1, k = 1; j >= 0; j -= 2)
       {
         colweight[tmp[j]] = k++; // always this +1 trick
-#ifdef FOR_FFS
+#ifdef FOR_DL
         fprintf (renumberfile, "%d %x\n", colweight[tmp[j]]-1, tmp[j]);
 #endif
       }
 
-#ifdef FOR_FFS
+#ifdef FOR_DL
     fclose(renumberfile);
 #endif
     free(tmp);
@@ -379,7 +379,7 @@ doAllAdds(typerow_t **newrows, char *str, MAYBE_UNUSED FILE *outdelfile,
   if(destroy)
     {
       //destroy initial row!
-#ifdef FOR_FFS
+#ifdef FOR_DL
       fprintf (outdelfile, "%x %d", j, rowLength(newrows, i0));
       for (int k = 1; k <= rowLength(newrows, i0); k++)
           fprintf (outdelfile, " %x:%d", newrows[i0][k].id, newrows[i0][k].e);
@@ -483,18 +483,15 @@ readPurged(typerow_t **sparsemat, purgedfile_stream ps, int verbose)
 	    if(ps->nc == 0)
           fprintf(stderr, "Hard to believe: row[%d] is NULL\n", i);
       qsort(ps->cols, ps->nc, sizeof(int), cmp);
-#ifdef FOR_FFS
-      sparsemat[i] = (typerow_t *)malloc((ps->nc+2) * sizeof(typerow_t));
-      int j = 0;
-      int previous = -1;
-#else
       sparsemat[i] = (typerow_t *)malloc((ps->nc+1) * sizeof(typerow_t));
       int j = ps->nc;
+#ifdef FOR_DL
+      int previous = -1;
 #endif
       ASSERT_ALWAYS(sparsemat[i] != NULL);
       for(int k = 0; k < ps->nc; k++)
         {
-#ifdef FOR_FFS
+#ifdef FOR_DL
           if (ps->cols[k] == previous)
               sparsemat[i][j].e++;
           else
@@ -509,14 +506,6 @@ readPurged(typerow_t **sparsemat, purgedfile_stream ps, int verbose)
           rowCell(sparsemat, i, k+1) = ps->cols[k];
 #endif
         }
-#ifdef FOR_FFS
-      if (ps->b != 0)
-        {
-          j++;
-          rowCell(sparsemat, i, j) = ps->ncols - 1;
-          sparsemat[i][j].e = 1;
-        }
-#endif
       rowLength(sparsemat, i) = j;
   }
 }
@@ -533,7 +522,7 @@ writeIndex(const char *indexname, index_data_t index_data,
         ASSERT (index_data[i].n > 0);
         fprintf(indexfile, "%d", index_data[i].n);
         for (int j = 0; j < index_data[i].n; ++j) {
-#ifdef FOR_FFS
+#ifdef FOR_DL
             fprintf(indexfile, " " PURGE_INT_FORMAT ":%d",
                     index_data[i].rels[j].ind_row,
                     index_data[i].rels[j].e);
@@ -650,7 +639,7 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
         ASSERT (ii == small_nrows);
     }
 
-#if defined FOR_FFS && defined STAT_FFS
+#if defined FOR_DL && defined STAT_DL
     uint64_t count[11] = {0,0,0,0,0,0,0,0,0,0,0};
     uint64_t nonzero = 0;
     for (int i = 0; i < small_nrows ; i++)
@@ -766,7 +755,7 @@ main(int argc, char *argv[])
         exit (1);
     }
 
-#ifdef FOR_FFS
+#ifdef FOR_DL
     if (skip != 0)
       {
         fprintf (stderr, "Error, for FFS -skip should be 0\n");
@@ -798,11 +787,6 @@ main(int argc, char *argv[])
     sscanf(str, "%d %d", &nrows, &ncols);
     ASSERT_ALWAYS(nrows == ps->nrows);
     ASSERT_ALWAYS(ncols == ps->ncols);
-
-#ifdef FOR_FFS
-    ncols++; //for FFS we add a column of 1
-    ps->ncols++;
-#endif
 
     fprintf(stderr, "Original matrix has size %d x %d\n", nrows, ncols);
 

@@ -41,10 +41,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "markowitz.h" /* for MkzInit */
 #include "merge_mono.h" /* for mergeOneByOne */
 
-#ifdef FOR_FFS
-#include "utils_ffs.h"
-#endif
-
 #define MAXLEVEL_DEFAULT 10
 #define KEEP_DEFAULT 160
 #define SKIP_DEFAULT 32
@@ -181,11 +177,7 @@ main (int argc, char *argv[])
     purgedfile_stream_openfile (ps, purgedname);
 
     mat->nrows = ps->nrows;
-#ifdef FOR_FFS
-    mat->ncols = ps->ncols + 1; /*for FFS, we add a column of 1*/
-#else
     mat->ncols = ps->ncols;
-#endif
     mat->keep  = keep;
     mat->cwmax = 2 * maxlevel;
     ASSERT_ALWAYS (mat->cwmax < 255);
@@ -234,11 +226,7 @@ main (int argc, char *argv[])
     /* initialize rep, i.e., mostly opens outname */
     init_rep (rep, outname, mat, 0, MERGE_LEVEL_MAX);
     /* output the matrix dimensions in the history file */
-#ifdef FOR_FFS
-    report2 (rep, mat->nrows, mat->ncols-1, -1);
-#else
     report2 (rep, mat->nrows, mat->ncols, -1);
-#endif
 
     /* resume from given history file if needed */
     if (resumename != NULL)
