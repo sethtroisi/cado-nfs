@@ -340,7 +340,7 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters, metaclas
         if stdout:
             self.logger.debug("stdout is: %s", stdout)
         if stderr:
-            self.logger.error("stderr is: %s", stderr)
+            self.logger.debug("stderr is: %s", stderr)
         if output_files:
             self.logger.debug("Output files are: %s", ", ".join(output_files))
         (name, task, identifier) = self.split_wuname(wuid)
@@ -598,6 +598,8 @@ class FactorBaseOrFreerelTask(Task, metaclass=abc.ABCMeta):
             kwargs["poly"] = polyfile
             p = self.programs[0](None, kwargs, stdout = outputfile)
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
+            if rc:
+                raise Exception("Program failed")
             self.parse_stderr(stderr)
             
             self.state["outputfile"] = outputfile
@@ -851,6 +853,7 @@ class Duplicates1Task(Task, FilesCreator):
         if not newfiles:
             self.logger.info("No new files to split")
         else:
+            self.logger.info("Splitting %d new files", len(newfiles))
             basedir = self.make_output_dirname()
             self.make_directories(basedir, map(str, range(0, self.nr_slices)))
             # TODO: can we recover from missing input files? Ask Sieving to
@@ -878,6 +881,8 @@ class Duplicates1Task(Task, FilesCreator):
                     kwargs["out"] = self.make_output_dirname()
                     p = self.programs[0]((f,), kwargs)
                     (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
+                    if rc:
+                        raise Exception("Program failed")
                     # Check that the output files exist now
                     # TODO: How to recover from error? Presumably a dup1
                     # process failed, but that should raise a return code
@@ -991,6 +996,8 @@ class Duplicates2Task(Task, FilesCreator):
             kwargs["output_directory"] = self.make_output_dirname(str(i))
             p = self.programs[0](files, kwargs)
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
+            if rc:
+                raise Exception("Program failed")
             nr_rels = self.parse_remaining(stderr.decode("ascii").splitlines())
             # Mark input file names and output file names
             for f in files:
@@ -1171,6 +1178,8 @@ class MergeTask(Task):
             kwargs["out"] = historyfile
             p = self.programs[0](args, kwargs)
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
+            if rc:
+                raise Exception("Program failed")
             
             indexfile = self.make_output_filename("index")
             mergedfile = self.make_output_filename("small.bin")
@@ -1183,6 +1192,8 @@ class MergeTask(Task):
             kwargs["out"] = mergedfile
             p = self.programs[1](args, kwargs)
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
+            if rc:
+                raise Exception("Program failed")
             
             if not os.path.isfile(indexfile):
                 raise Exception("Output file %s does not exist" % indexfile)
@@ -1242,6 +1253,8 @@ class LinAlgTask(Task):
             kwargs.setdefault("nullspace", "left")
             p = self.programs[0](args, kwargs)
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
+            if rc:
+                raise Exception("Program failed")
             dependencyfilename = self.make_output_filename("W", subdir = True)
             if not os.path.isfile(dependencyfilename):
                 raise Exception("Kernel file %s does not exist" % dependencyfilename)
@@ -1302,6 +1315,8 @@ class CharactersTask(Task):
                 kwargs["heavyblock"] = densefilename
             p = self.programs[0](args, kwargs)
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
+            if rc:
+                raise Exception("Program failed")
             if not os.path.isfile(kernelfilename):
                 raise Exception("Output file %s does not exist" % kernelfilename)
             self.state["kernel"] = kernelfilename
@@ -1356,6 +1371,8 @@ class SqrtTask(Task):
             kwargs["prefix"] = prefix
             p = self.programs[0](args, kwargs)
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
+            if rc:
+                raise Exception("Program failed")
             
             while not self.is_done():
                 self.state.setdefault("next_dep", 0)
@@ -1367,6 +1384,8 @@ class SqrtTask(Task):
                 p = self.programs[0](args, kwargs)
                 (identifier, rc, stdout, stderr, output_files) = \
                     self.submit_command(p, "dep%d" % self.state["next_dep"])
+                if rc:
+                    raise Exception("Program failed")
                 if not stdout.decode("ascii").strip() == "Failed":
                     factorlist = list(map(int,stdout.decode("ascii").split()))
                     # FIXME: Can sqrt print more/less than 2 factors?
@@ -1572,7 +1591,9 @@ class StartClientsTask(Task):
         
         self.logger.info("Starting client id %s on host %s", clientid, host)
         self.progparams[0]['clientid'] = clientid
-        wuclient = cadoprograms.WuClient([], self.progparams[0], stdout = "/dev/null", stderr = "/dev/null", bg=True)
+        wuclient = cadoprograms.WuClient([], self.progparams[0],
+            stdout = "wuclient.%s.stdout" % clientid,
+            stderr = "wuclient.%s.stderr" % clientid, bg=True)
         process = cadocommand.RemoteCommand(wuclient, host, self.parameters, self.path_prefix + [host])
         (rc, stdout, stderr) = process.wait()
         if rc != 0:
@@ -1801,7 +1822,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
     def run_next_task(self):
         for task in self.tasks:
             if task in self.tasks_that_want_to_run:
-                self.logger.info("Next task that wants to run: %s", task.title)
+                # self.logger.info("Next task that wants to run: %s", task.title)
                 self.tasks_that_want_to_run.remove(task)
                 task.run()
                 return True
