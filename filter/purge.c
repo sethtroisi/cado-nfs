@@ -2468,7 +2468,7 @@ main (int argc, char **argv)
 
   if (!boutfilerel) {
     int ok = remove_singletons (npass, required_excess);
-    fprintf (stderr, "   nrel=%lu, nprimes=%lu; excess=%ld\n",
+    fprintf (stderr, "   nrels=%lu, nprimes=%lu; excess=%ld\n",
 	     (unsigned long) nrel, (unsigned long) nprimes, ((long) nrel) - nprimes);
     if (!ok) {
       fprintf(stderr, "excess < %.2f * #primes. See -required_excess "

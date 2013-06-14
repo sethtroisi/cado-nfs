@@ -7,8 +7,8 @@
 #include "macros.h"
 #include "rootfinder.h"
 #include "plain_poly.h"
-#include "modul_poly.h"
 #include "poly.h"
+#include "modul_poly.h"
 
 /* put in r[0], ..., r[n-1] the roots of f (of degree d) modulo p,
    and the return value n is the number of roots (without multiplicities) */

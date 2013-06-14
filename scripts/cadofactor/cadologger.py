@@ -33,9 +33,9 @@ class ScreenFormatter(logging.Formatter):
     """ Class for formatting logger records for screen output, optionally
     with colorized logger level name (like cadofct.pl used to). """
     colours = {
-        logging.INFO : ANSI.BRIGHTGREEN,
-        logging.WARNING : ANSI.BRIGHTYELLOW,
-        logging.ERROR : ANSI.BRIGHTRED,
+        INFO : ANSI.BRIGHTGREEN,
+        WARNING : ANSI.BRIGHTYELLOW,
+        ERROR : ANSI.BRIGHTRED,
         COMMAND : ANSI.BRIGHTBLUE
     }
     
@@ -76,7 +76,7 @@ class FileFormatter(logging.Formatter):
     """ Class for formatting a log record for writing to a log file. No colours 
     here, but we add the process ID and a time stamp """
     formatstr = \
-       'PID%(process)s %(asctime)s %(levelnametitle)s:%(name)s:%(message)s' 
+       'PID%(process)s %(asctime)s %(levelnametitle)s:%(name)s: %(message)s' 
     
     def format(self, record):
         record.levelnametitle = record.levelname.title()

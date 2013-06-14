@@ -12,7 +12,6 @@
 #include "fb.h"
 #include "portability.h"
 #include "utils.h"           /* lots of stuff */
-#include "basicnt.h"         /* ctzl bin_gcd */
 #include "ecm/facul.h"
 #include "bucket.h"
 #include "trialdiv.h"
@@ -508,7 +507,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     /* overrides default only if parameter is given */
     param_list_parse_int(pl, "bkthresh", &(si->bucket_thresh));
 
-    si->td_thresh = 1024;	/* default value */
+    si->td_thresh = si->I;	/* default value */
     param_list_parse_uint(pl, "tdthresh", &(si->td_thresh));
 
     /* Initialize the number of buckets */
@@ -2175,7 +2174,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
         i = abs ((int) (X & (si->I - 1)) - si->I / 2);
         j = X >> si->conf->logI;
 #ifndef UNSIEVE_NOT_COPRIME
-        if (bin_gcd_safe (i, j) != 1)
+        if (bin_gcd_int64_safe (i, j) != 1)
         {
 #ifdef TRACE_K
             if (trace_on_spot_Nx(N, x)) {
@@ -2401,7 +2400,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 cof_succ[cof_rat_bitsize][cof_alg_bitsize] ++;
 
 #ifdef UNSIEVE_NOT_COPRIME
-            ASSERT (bin_gcd_safe (a, b) == 1);
+            ASSERT (bin_gcd_int64_safe (a, b) == 1);
 #endif
 
             relation_t rel[1];
