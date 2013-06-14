@@ -73,6 +73,7 @@ usage (const char *argv0)
   fprintf (stderr, "   -resume xxx    - resume from history file xxx (cf -itermax)\n");
   fprintf (stderr, "   -mkztype nnn   - controls how the weight of a merge is approximated (default %d)\n", MKZTYPE_DEFAULT);
   fprintf (stderr, "   -wmstmax nnn   - if mkztype = 2, controls until when a mst is used (default %d)\n", WMSTMAX_DEFAULT);
+  fprintf (stderr, "   -path_antebuffer <dir> - where is antebuffer\n");
   fprintf (stderr, "\nThe different optimization functions are, where c is the total matrix weight\n");
   fprintf (stderr, "and N the number of rows (relation-sets):\n");
   fprintf (stderr, "   -forbw 0 - optimize the matrix size N (cf -ratio)\n");

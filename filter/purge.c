@@ -838,6 +838,7 @@ usage (const char *argv0)
   fprintf (stderr, "    -npass   nnn - number of step of clique removal (default %d)\n", DEFAULT_NPASS);
   fprintf (stderr, "    -required_excess nnn - percentage of excess required at the end of the first singleton removal step (default %.2f)\n",
   DEFAULT_REQUIRED_EXCESS);
+  fprintf (stderr, "    -path_antebuffer <dir> - where is antebuffer\n");
   exit (1);
 }
 
@@ -934,6 +935,11 @@ main (int argc, char **argv)
   }
   if ((basepath || subdirlist) && !filelist) {
     fprintf(stderr, "-basepath / -subdirlist only valid with -filelist\n");
+    usage(argv0);
+  }
+
+  if ((filelist != NULL) + (argc != 0) != 1) {
+    fprintf(stderr, "Provide either -filelist or freeform file names\n");
     usage(argv0);
   }
 
