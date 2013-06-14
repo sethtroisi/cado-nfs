@@ -103,11 +103,11 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         self.log(logging.INFO, format, *args, **kwargs)
 
     def log_request(self, code='-', size='-'):
-        self.log(logging.INFO, '"%s" %s %s', self.requestline, str(code), 
+        self.log(logging.DEBUG, '"%s" %s %s', self.requestline, str(code), 
                  str(size))
 
     def log_error(self, format, *args):
-        self.log(logging.ERROR, format, *args)
+        self.log(logging.WARNING, format, *args)
 
     def send_body(self, body):
         self.wfile.write(body)

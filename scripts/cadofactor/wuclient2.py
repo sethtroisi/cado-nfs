@@ -408,13 +408,15 @@ class WorkunitProcessorClient(WorkunitProcessor):
 
 # Settings which we require on the command line (no defaults)
 REQUIRED_SETTINGS = {"CLIENTID" : (None, "Unique ID for this client"), 
-                     "DLDIR" : (None, "Directory for downloading files"), 
-                     "SERVER" : (None, "Base URL for WU server"), 
-                     "WORKDIR" : (None, "Directory for result files")}
+                     "SERVER" : (None, "Base URL for WU server")}
+
 # Optional settings with defaults, overrideable on command line, 
 # and a help text
 OPTIONAL_SETTINGS = {"WU_FILENAME" : 
                      (None, "Filename under which to store WU files"), 
+                     "DLDIR" : ('download/', "Directory for downloading files"), 
+                     "WORKDIR" : (None, "Directory for result files"),
+                     "BASEPATH" : (None, "Base directory for download and work directories"),
                      "GETWUPATH" : 
                      ("/cgi-bin/getwu", 
                       "Path segment of URL for requesting WUs from server"), 
@@ -459,9 +461,21 @@ if __name__ == '__main__':
                                 % arg.lower())
 
     parse_cmdline()
+    # If no working directory is given, we use <clientid>.work/
+    if SETTINGS["WORKDIR"] is None:
+        SETTINGS["WORKDIR"] = SETTINGS["CLIENTID"] + '.work/'
+    if not SETTINGS["BASEPATH"] is None:
+        SETTINGS["WORKDIR"] = os.path.join(SETTINGS["BASEPATH"], SETTINGS["WORKDIR"])
+        SETTINGS["DLDIR"] = os.path.join(SETTINGS["BASEPATH"], SETTINGS["DLDIR"])
     # If no WU filename is given, we use "WU." + client id
     if SETTINGS["WU_FILENAME"] is None:
         SETTINGS["WU_FILENAME"] = "WU." + SETTINGS["CLIENTID"]
+
+    # Create download and working directories if they don't exist
+    if not os.path.isdir(SETTINGS["DLDIR"]):
+        os.mkdir(SETTINGS["DLDIR"])
+    if not os.path.isdir(SETTINGS["WORKDIR"]):
+        os.mkdir(SETTINGS["WORKDIR"])
 
     loglevel = getattr(logging, SETTINGS["LOGLEVEL"].upper(), None)
     if not isinstance(loglevel, int):

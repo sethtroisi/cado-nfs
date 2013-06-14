@@ -310,7 +310,9 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
   /* we generate the renumbering table up to the *maximun* of the two large
      prime bounds */
   lpb[rat_side] = pol->rat->lpb;
+  ASSERT_ALWAYS(lpb[rat_side] > 0);
   lpb[alg_side] = pol->alg->lpb;
+  ASSERT_ALWAYS(lpb[alg_side] > 0);
   min_side = (lpb[0] < lpb[1]) ? 0 : 1;
   max_side = 1 - min_side;
   for (i = 0; i < 2; i++)
@@ -322,6 +324,7 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
 
   if (pmax == 0)
     pmax = lpb[min_side];
+  ASSERT_ALWAYS (pmax <= lpb[min_side]);
 
   for (p = 2; p <= lpb[max_side]; p = getprime (p))
   {

@@ -1,6 +1,7 @@
 import sys
 import os
 import re
+import abc
 
 """
 Parameter file format
@@ -79,13 +80,30 @@ class Parameters(object):
         return self._recurse_iter(self.data, [])
     
     @staticmethod
-    def _recurse_iter(dic, path):
-        for key in dic:
-            if isinstance(dic[key], dict):
-                for y in Parameters._recurse_iter(dic[key], path + [key]):
+    def _recurse_iter(source, path):
+        for key in source:
+            if isinstance(source[key], dict):
+                for y in Parameters._recurse_iter(source[key], path + [key]):
                     yield y
             else:
-                yield (path, dic, key, dic[key])
+                yield (path, key, source[key])
+    
+    def _get_subdict(self, path):
+        source = self.data
+        for d in path:
+            assert d in source
+            assert isinstance(source[d], dict)
+            source = source[d]
+        return source
+    
+    def find(self, path, regex):
+        source = self._get_subdict(path)
+        result = []
+        pattern = re.compile(regex)
+        for l in self._recurse_iter(source, path):
+            if pattern.search(l[1]):
+                result.append([l[0], l[1]])
+        return result
     
     def _insertkey(self, path, value):
         ''' path is a path with segments delimited by '.' or an 
@@ -224,7 +242,36 @@ class Parameters(object):
     def __str__(self):
         r = Parameters.__str_internal__(self.data, "")
         return "\n".join(r)
+
+class UseParameters(object, metaclass=abc.ABCMeta):
+    @abc.abstractproperty
+    def name(self):
+        pass
     
+    def __init__(self, parameters, path_prefix):
+        self.parameters = parameters
+        self.path_prefix = path_prefix
+        self.parampath = path_prefix + [self.name]
+    
+    def myparams(self, keys, extrapath = None):
+        path = self.parampath
+        if not extrapath is None:
+            if isinstance(extrapath, str):
+                path += [extrapath]
+            else:
+                path += extrapath
+        return self.parameters.myparams(keys, path)
+    
+    def get_param_prefix(self):
+        return self.path_prefix
+    
+    def get_param_path(self):
+        return self.parampath
+    
+    def get_parameters(self):
+        return self.parameters
+    
+
 DEFAULTS = (
     "logfile = cado.log",
     "tasks.parallel = 0",
@@ -277,7 +324,7 @@ DEFAULTS = (
     "tasks.linalg.algo = bwc",
     "tasks.linalg.threads = 2",
     "tasks.linalg.mpi = 0",
-    "tasks.linalg.hosts = """,
+    "tasks.linalg.hosts = foo",
     "tasks.linalg.bwc.interval = 1000",
     "tasks.linalg.bwc.mm_impl = 'bucket'",
     "tasks.linalg.bwc.interleaving = 0",

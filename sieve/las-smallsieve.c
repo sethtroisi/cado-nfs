@@ -5,7 +5,6 @@
 #include "las-types.h"
 #include "las-debug.h"
 #include "las-qlattice.h"
-#include "basicnt.h"
 #include "misc.h"
 #include "portability.h"
 

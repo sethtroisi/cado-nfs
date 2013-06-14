@@ -471,10 +471,25 @@ build_newrows_from_file(typerow_t **newrows, FILE *hisfile, uint64_t bwcostmin,
     }
 }
 
+/* define FOR_MSIEVE to generate the *.cyc file needed by msieve to construct
+   its matrix, which is of the following (binary) format:
+      small_nrows
+      n1 i1 i2 ... in1
+      n2 j1 j2 ... jn2
+      ...
+      nk ...
+   where each value is stored as a 32-bit integer (no linebreak),
+   small_nrows is the number of relation-sets of the matrix,
+   n1 is the number of relations in the first relation-set,
+   i1 is the index of the first relation in the first relation-set
+   (should correspond to line i1+2 in *.purged.gz), and so on */
+// #define FOR_MSIEVE
+
 // Feed sparsemat with M_purged
 static void
 readPurged(typerow_t **sparsemat, purgedfile_stream ps, int verbose)
 {
+#ifndef FOR_MSIEVE
   fprintf(stderr, "Reading sparse matrix from purged file\n");
   for(int i = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; i++) {
       if (verbose && purgedfile_stream_disp_progress_now_p(ps))
@@ -500,6 +515,23 @@ readPurged(typerow_t **sparsemat, purgedfile_stream ps, int verbose)
         }
       rowLength(sparsemat, i) = j-1;
   }
+#else /* FOR_MSIEVE */
+  /* to generate the .cyc file for msieve, we only need to start from the
+     identity matrix with newnrows relation-sets, where relation-set i
+     contains only relation i. Thus we only need to read the first line of
+     the purged file, to get the number of relations-sets. */
+
+  {
+    long i;
+
+    for (i = 0; i < ps->nrows; i++)
+      {
+        sparsemat[i] = (typerow_t *) malloc(2 * sizeof(typerow_t));
+        rowCell(sparsemat, i, 1) = i;
+        rowLength(sparsemat, i) = 1;
+      }
+  }
+#endif /* FOR_MSIEVE */
 }
 
 static void 

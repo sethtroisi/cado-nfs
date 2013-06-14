@@ -432,6 +432,20 @@ class DictDbAccess(collections.MutableMapping):
     >>> d = DictDbAccess(conn, 'test')
     >>> d == {'a': '3', 'b': 3.0, 'c': '4', 'd': True}
     True
+    >>> d.clear('a', 'd')
+    >>> d == {'b': 3.0, 'c': '4'}
+    True
+    >>> del(d)
+    >>> d = DictDbAccess(conn, 'test')
+    >>> d == {'b': 3.0, 'c': '4'}
+    True
+    >>> d.clear()
+    >>> d == {}
+    True
+    >>> del(d)
+    >>> d = DictDbAccess(conn, 'test')
+    >>> d == {}
+    True
     """
     
     types = (str, int, float, bool)
@@ -474,6 +488,9 @@ class DictDbAccess(collections.MutableMapping):
     
     def  __len__(self):
         return self._data.__len__()
+    
+    def __str__(self):
+        return self._data.__str__()
     
     def __del__(self):
         """ Close the DB connection and delete the dictionary """
@@ -568,7 +585,20 @@ class DictDbAccess(collections.MutableMapping):
             self.__setitem_nocommit(cursor, key, value)
         self._conn.commit()
         cursor.close()
-        
+    
+    def clear(self, *args):
+        """ Overriden clear that allows removing several keys atomically """
+        cursor = self._conn.cursor(MyCursor)
+        if not args:
+            self._data.clear()
+            self._table.delete(cursor)
+        else:
+            for key in args:
+                del(self._data[key])
+                self._table.delete(cursor, eq={"key": key})
+        self._conn.commit()
+        cursor.close()
+
 
 class Mapper(object):
     """ This class translates between application objects, i.e., Python 
@@ -875,9 +905,15 @@ class WuAccess(object): # {
         cursor.close()
 
     def cancel(self, wuid):
+        self.cancel_by_condition(eq={"wuid":wuid})
+    
+    def cancel_all_available(self):
+        self.cancel_by_condition(eq={"status": 0})
+    
+    def cancel_by_condition(self, **conditions):
         cursor = self.conn.cursor(MyCursor)
         d = {"status": WuStatus.CANCELLED}
-        self.mapper.table.update(cursor, d, eq={"wuid": wuid})
+        self.mapper.table.update(cursor, d, **conditions)
         self.conn.commit()
         cursor.close()
 
@@ -969,20 +1005,16 @@ class ResultInfo(WuResultMessage):
             return 0
 
 
-class DbListener(patterns.Observable, patterns.Observer):
+class DbListener(patterns.Observable):
     """ Class that queries the Workunit database for available results
     and sends them to its Observers.
     
     The query is triggered by receiving a SIGUSR1 (the instance subscribes to
     the signal handler relay), or by calling send_result().
     """
-    def __init__(self, db, *args, **kwargs):
+    def __init__(self, *args, db, **kwargs):
         super().__init__(*args, **kwargs)
         self.wuar = WuAccess(db)
-        signalhandler.signal_usr1_relay.subscribeObserver(self)
-    
-    def updateObserver(self, message):
-        self.send_result()
     
     def send_result(self):
         # Check for results
@@ -994,6 +1026,22 @@ class DbListener(patterns.Observable, patterns.Observer):
         return True
 
 
+class IdMap(object):
+    """ Identity map. Ensures that DB-backed dictionaries on the same DB and
+    of the same table name are instanciated only once. """
+    def __init__(self):
+        self.db_dicts = {}
+    
+    def make_db_dict(self, db, name):
+        assert isinstance(db, str)
+        key = (db, name)
+        if not key in self.db_dicts:
+            self.db_dicts[key] = DictDbAccess(db, name)
+        return self.db_dicts[key]
+
+# Singleton instance of IdMap
+idmap = IdMap()
+
 class DbAccess(object):
     """ Base class that lets subclasses create DB-backed dictionaries or 
     WuAccess instances on a database whose file name is specified in the db 
@@ -1003,7 +1051,7 @@ class DbAccess(object):
     later be used to open DB connections.
     """
     
-    def __init__(self, db, *args, **kwargs):
+    def __init__(self, *args, db, **kwargs):
         super().__init__(*args, **kwargs)
         self.__db = db
     
@@ -1011,13 +1059,13 @@ class DbAccess(object):
         return self.__db
     
     def make_db_dict(self, name):
-        return DictDbAccess(self.__db, name)
+        return idmap.make_db_dict(self.__db, name)
     
     def make_wu_access(self):
         return WuAccess(self.__db)
     
     def make_db_listener(self):
-        return DbListener(self.__db)
+        return DbListener(db = self.__db)
 
 
 class DbWorker(DbAccess, threading.Thread):
@@ -1221,7 +1269,10 @@ if __name__ == '__main__': # {
 
     if args["cancel"]:
         wuid = args["cancel"][0]
-        wus = db_pool.cancel(wuid)
+        if wuid == "available":
+            wus = db_pool.cancel_all_available()
+        else:
+            wus = db_pool.cancel(wuid)
 
     if args["result"]:
         (wuid, clientid, filename, filepath) = args["result"]

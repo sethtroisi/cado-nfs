@@ -57,6 +57,12 @@ void * mksol_prog(parallelizing_info_ptr pi, param_list pl, void * arg MAYBE_UNU
             MPFQ_GROUPSIZE, nchecks,
             MPFQ_DONE);
 
+    if (mpz_cmp_ui(p,2) != 0 && bw->n > 1) {
+        fprintf(stderr,
+                "Current mksol code is limited to n==1 in the prime field case. Fixing it is not terribly hard, but not terribly easy either. It requires either implementing a n-at-a-time variant of the mpfq operations, or perhaps more realistically offer a way for mksol to focus only on one possible kernel element, which opens the possibility of reusing existing code. Neither has been coded yet.\n");
+        abort();
+    }
+
     abase_vbase Ar;
     abase_vbase_oo_field_init_byfeatures(Ar,
             MPFQ_PRIME_MPZ, p,

@@ -1,11 +1,11 @@
 import os
 import sys
 import platform
-import subprocess
 import abc
 import logging
 import re
 import cadocommand
+import cadologger
 
 class Option(metaclass=abc.ABCMeta):
     ''' Base class for command line options that may or may not take parameters
@@ -69,9 +69,11 @@ class Toggle(Option):
     value is interpreted as a truth value, the option is either added or not 
     '''
     def map(self, value):
-        if value.lower() in ["yes", "true", "on", "1"]:
+        if value is True or isinstance(value, str) and \
+                value.lower() in ["yes", "true", "on", "1"]:
             return [self.prefix + self.arg]
-        elif value.lower() in ["no", "false", "off", "0"]:
+        elif value is False or isinstance(value, str) and \
+                value.lower() in ["no", "false", "off", "0"]:
             return []
         else:
             raise ValueError("Toggle.map() requires a boolean type argument")
@@ -105,6 +107,8 @@ class Program(object):
     '''
     
     params_list = ("execpath", "execsubdir", "execbin")
+    path = '.'
+    subdir = ""
     
     @staticmethod
     def _shellquote(s):
@@ -118,18 +122,15 @@ class Program(object):
             return s
         return "'" + s.replace("'", "'\\''") + "'"
     
-    def __init__(self, args, parameters, 
-                 stdin = None, stdout = subprocess.PIPE, 
-                 stderr = subprocess.PIPE):
+    def __init__(self, args, parameters, stdin = None, stdout = None,
+                 stderr = None, bg = False):
         ''' Takes a list of positional parameters and a dictionary of command 
         line parameters 
         
-        The stdin, stdout, and stderr parameters accept the same parameters 
-        as subprocess.popen(), but also accept strings. If a string is given,
-        it is interpreted as the file name to use for redirecting that stdio
-        stream. In direct execution, the file is opened for reading or writing,
-        resp., and the file handle is passed to popen(). In workunit 
-        generation, the file name is used for shell redirection.
+        The stdin, stdout, and stderr parameters accept strings. If a string is
+        given, it is interpreted as the file name to use for redirecting that
+        stdio stream. In workunit generation, the file name is used for shell
+        redirection.
         '''
         
         self.args = args
@@ -139,9 +140,17 @@ class Program(object):
         self.stdout = stdout
         self.stderr = stderr
         
+        # If we are to run in background, we add " & echo $!" to the command
+        # line to print the pid of the spawned process. We require that stdout
+        # and stderr are redirected to files.
+        self.bg = bg
+        if bg and (stdout is None or stderr is None):
+            raise Exception("Programs to run in background must redirect "
+                            "stdout and stderr")
+        
         # Look for location of the binary executable at __init__, to avoid 
         # calling os.path.isfile() multiple times
-        path = self.parameters.get("execpath", ".")
+        path = self.parameters.get("execpath", self.path)
         subdir = self.parameters.get("execsubdir", self.subdir)
         binary = self.parameters.get("execbin", self.binary)
         execfile = os.path.normpath(os.sep.join([path, binary]))
@@ -150,21 +159,34 @@ class Program(object):
             # print ("Found %s in %s" % (binary, execsubfile))
             self.execfile = execsubfile
         else:
+            # FIXME Should we check that the file exists?
             self.execfile = execfile
     
     @classmethod
     def get_param_keys(cls):
-        """ Return the config file keys which map to command line arguments for this program """
+        """ Return the config file keys which map to command line arguments for
+        this program
+        """
         return [opt.get_key() for opt in cls.params_list]
     
     @classmethod
     def get_config_keys(cls):
-        """ Return all config file keys which can be used by this program, including those that don't
-        directly map to command line parameters, like those specifying search paths.
+        """ Return all config file keys which can be used by this program,
+        including those that don't directly map to command line parameters,
+        like those specifying search paths.
         """
         l = list(Program.params_list) + cls.get_param_keys()
         return l
     
+    def get_stdin(self):
+        return self.stdin
+    
+    def get_stdout(self):
+        return self.stdout
+    
+    def get_stderr(self):
+        return self.stderr
+
     def get_input_files(self):
         input_files = []
         if isinstance(self.stdin, str):
@@ -239,9 +261,11 @@ class Program(object):
         if isinstance(self.stdout, str):
             cmdline += ' > ' + Program._shellquote(self.translate_path(self.stdout, outputpath))
         if isinstance(self.stderr, str):
-            cmdline += ' 2> ' + Program._shellquote(self.translate_path(self.stdout, outputpath))
-        if self.stderr is subprocess.STDOUT:
+            cmdline += ' 2> ' + Program._shellquote(self.translate_path(self.stderr, outputpath))
+        if not self.stderr is None and self.stderr is self.stdout:
             cmdline += ' 2>&1'
+        if self.bg:
+            cmdline += " & echo $!"
         return cmdline
     
     def make_wu(self, wuname):
@@ -249,52 +273,13 @@ class Program(object):
         for f in self.get_input_files():
             wu.append('FILE %s' % os.path.basename(f))
         wu.append('EXECFILE %s' % os.path.basename(self.get_exec_file()))
-        wu.append('COMMAND %s' % self.make_command_line(binpath = "${DLDIR}", inputpath = "${DLDIR}", outputpath = "${WORKDIR}"))
+        cmdline = self.make_command_line(binpath = "${DLDIR}",
+            inputpath = "${DLDIR}", outputpath = "${WORKDIR}")
+        wu.append('COMMAND %s' % cmdline)
         for f in self.get_output_files():
             wu.append('RESULT %s' % os.path.basename(f))
         wu.append("") # Make a trailing newline
         return '\n'.join(wu)
-        
-    @staticmethod
-    def _open_or_not(fn, mode):
-        """ If fn is a string, opens a file handle to a file with fn as 
-        the name, using mode as the file mode. Otherwise returns fn.
-        """
-        if isinstance(fn, str):
-            return open(fn, mode)
-        else:
-            return fn
-
-    def run(self):
-        ''' Runs the command and waits for termination '''
-
-        # If we run a command locally, and file names were given for stdin,
-        # stdout or stderr, we open the corresponding file and pass it 
-        # to the command
-        self.infile = self._open_or_not(self.stdin, "r")
-        self.outfile = self._open_or_not(self.stdout, "w")
-        self.errfile = self._open_or_not(self.stderr, "w")
-        
-        # print (self.make_command_array()
-        # print ("%s.Program.run(): cmdline = %s" % (__file__, self.make_command_line()))
-        # print ("Input files: %s" % ", ".join(self.get_input_files()))
-        # print ("Output files: %s" % ", ".join(self.get_output_files()))
-        self.child = cadocommand.Command(self.make_command_array(), 
-                                         stdin=self.infile,
-                                         stdout=self.outfile, 
-                                         stderr=self.errfile)
-    
-    def wait(self):
-        (rc, stdout, stderr) = self.child.wait()
-        
-        if isinstance(self.stdin, str):
-            self.infile.close()
-        if isinstance(self.stdout, str):
-            self.outfile.close()
-        if isinstance(self.stderr, str):
-            self.errfile.close()
-        
-        return (rc, stdout, stderr)
     
     
 class Polyselect2l(Program):
@@ -507,3 +492,63 @@ class Sqrt(Program):
         Parameter("index"),
         Parameter("kernel", "ker")
         )
+
+class WuClient(Program):
+    binary = "wuclient2.py"
+    name = "wuclient"
+    subdir = "scripts/cadofactor"
+    params_list = (
+        Parameter("dldir", prefix='--'),
+        Parameter("workdir", prefix='--'),
+        Parameter("clientid", prefix='--'),
+        Parameter("basepath", prefix='--'),
+        Parameter("server", prefix='--'),
+        Parameter("getwupath", prefix='--'),
+        Parameter("loglevel", prefix='--'),
+        Parameter("postresultpath", prefix='--'),
+        Parameter("downloadretry", prefix='--'),
+        Parameter("logfile", prefix='--'),
+        Parameter("debug", prefix='--'),
+        Parameter("niceness", prefix='--'),
+        Parameter("wu_filename", prefix='--'),
+        Parameter("arch", prefix='--'),
+    )
+
+class SSH(Program):
+    binary = "ssh"
+    name = binary
+    path = "/usr/bin"
+    params_list = (
+        Toggle("compression", "C"),
+        Toggle("verbose", "v"),
+        Parameter("cipher", "c"),
+        Parameter("configfile", "F"),
+        Parameter("identity_file", "i"),
+        Parameter("login_name", "l"),
+        Parameter("port", "p"),
+    )
+
+class RSync(Program):
+    binary = "rsync"
+    name = binary
+    path = "/usr/bin"
+    params_list = ()
+
+class Ls(Program):
+    binary = "ls"
+    name = binary
+    path = "/bin"
+    params_list = (
+        Toggle("long", "l"),
+    )
+
+class Kill(Program):
+    binary = "kill"
+    name = binary
+    path = "/bin"
+    params_list = (
+        Parameter("signal", "s"),
+    )
+    # Make Kill accept integers as argument list
+    def __init__(self, arglist, *args, **kwargs):
+        super().__init__(map(str, arglist), *args, **kwargs)

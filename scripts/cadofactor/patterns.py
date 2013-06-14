@@ -35,3 +35,25 @@ class Observer(object):
     def updateObserver(self, message):
         # Subclasses should implement this
         return
+
+
+class Mediator(object, metaclass=abc.ABCMeta):
+    @abc.abstractmethod
+    def relay_notification(self, notification):
+        pass
+    @abc.abstractmethod
+    def answer_request(self, request):
+        pass
+
+
+class Colleague(object):
+    def __init__(self, *args, mediator, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.__mediator = mediator
+    
+    def send_notification(self, notification):
+        return self.__mediator.relay_notification(notification)
+    
+    def send_request(self, request):
+        return self.__mediator.answer_request(request)
+

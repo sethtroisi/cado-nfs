@@ -2768,7 +2768,12 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
   /* on the algebraic side, we want that the non-reports on the rational
      side, which are set to 255, remain larger than the report bound 'r',
      even if the algebraic norm is totally smooth. For this, we artificially
-     increase by 'r' the maximal range */
+     increase by 'r' the maximal range.
+     If lambda * lpb < logmax, which is the usual case, then non-reports on
+     the rational side will start from logmax + lambda * lpb or more, and
+     decrease to lambda * lpb or more, thus above the threshold as we want.
+     If logmax < lambda * lpb, non-reports on the rational side will start
+     from 2*logmax or more, and decrease to logmax or more. */
   r = MIN(si->conf->sides[ALGEBRAIC_SIDE]->lambda * (double) si->conf->sides[ALGEBRAIC_SIDE]->lpb, alg->logmax);
   maxlog2 = alg->logmax + r;
 
@@ -2789,7 +2794,7 @@ void sieve_info_init_norm_data(FILE * output, sieve_info_ptr si, double q0d, int
   if (si->cpoly->alg->lambda > max_alambda) {
       fprintf(output, "# Warning, alambda>%.1f does not make sense (capped to limit)\n", max_alambda);
   }
-  /* Obsolete: alg->Bound is remplaced by a single threshold alg->bound */
+  /* Obsolete: alg->Bound is replaced by a single threshold alg->bound */
   /*
   sieve_info_init_lognorm (alg->Bound, alg->bound, si->conf->sides[ALGEBRAIC_SIDE]->lim,
                            si->conf->sides[ALGEBRAIC_SIDE]->lpb, alg->scale);
