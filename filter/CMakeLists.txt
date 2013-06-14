@@ -34,4 +34,4 @@ set_target_properties(replay-dl PROPERTIES COMPILE_FLAGS "-DFOR_DL")
 
 install(TARGETS dup1 dup2 purge merge replay RUNTIME DESTINATION bin/filter)
 
-#include(CMakeLists-nodist.txt OPTIONAL)
+include(CMakeLists-nodist.txt OPTIONAL)

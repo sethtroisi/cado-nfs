@@ -8,22 +8,22 @@ link_directories (${CADO_NFS_BINARY_DIR}/ffs/f3)
 include_directories (${CADO_NFS_SOURCE_DIR}/ffs)
 #link_directories (${CADO_NFS_BINARY_DIR}/gf2x/.libs)
 
-add_library (ffs-f2 ${sources})
+add_library (ffs-f2 EXCLUDE_FROM_ALL ${sources})
 target_link_libraries(ffs-f2 utils pthread m libfppol-f2.a)
 #target_link_libraries(ffs-f2 utils pthread m libfppol-f2.a gf2x)
 set_target_properties(ffs-f2 PROPERTIES COMPILE_FLAGS "-DFOR_FFS -DUSE_F2")
 add_dependencies(ffs-f2 antebuffer)
 
-add_library (ffs-f3 ${sources})
+add_library (ffs-f3 EXCLUDE_FROM_ALL ${sources})
 target_link_libraries(ffs-f3 utils pthread m libfppol-f2.a)
 set_target_properties(ffs-f3 PROPERTIES COMPILE_FLAGS "-DFOR_FFS -DUSE_F3")
 add_dependencies(ffs-f3 antebuffer)
 
-add_executable(dup2-ffs-f2 dup2.c)
+add_executable(dup2-ffs-f2 EXCLUDE_FROM_ALL dup2.c)
 target_link_libraries(dup2-ffs-f2 ffs-f2)
 set_target_properties(dup2-ffs-f2 PROPERTIES COMPILE_FLAGS "-DFOR_FFS -DUSE_F2")
 
-add_executable(dup2-ffs-f3 dup2.c)
+add_executable(dup2-ffs-f3 EXCLUDE_FROM_ALL dup2.c)
 target_link_libraries(dup2-ffs-f3 ffs-f3)
 set_target_properties(dup2-ffs-f3 PROPERTIES COMPILE_FLAGS "-DFOR_FFS -DUSE_F3")
 
@@ -33,7 +33,7 @@ target_link_libraries(refresh-purged utils)
 add_executable(explain explain.c)
 target_link_libraries(explain utils)
 
-add_executable(print_table print_table.c)
+add_executable(print_table EXCLUDE_FROM_ALL print_table.c)
 target_link_libraries(print_table utils)
 
 # vim: ft=cmake:
