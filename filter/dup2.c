@@ -542,13 +542,13 @@ thread_root(fr_t *mfr)
 static void
 usage(const char *argv0)
 {
-    fprintf (stderr, "Usage: dup2 %s [options] ", argv0);
+    fprintf (stderr, "Usage: %s [options] ", argv0);
     fprintf (stderr, "[ -filelist <fl> [-basepath <dir>] | file1 ... filen ]\n");
     fprintf (stderr, "Mandatory command line options:\n");
     fprintf (stderr, "     -poly xxx     - polynomial file\n");
-    fprintf (stderr, "     -renumber xxx - renumbering table\n");
+    fprintf (stderr, "     -renumber xxx - file with renumbering table\n");
     fprintf (stderr, "     -K <K>        - size of the hashtable\n");
-    fprintf (stderr, "\nOther command lone options:\n");
+    fprintf (stderr, "\nOther command line options:\n");
     fprintf (stderr, "    -outfmt .ext - output is written in .ext files\n");
     fprintf (stderr, "    -bz          - shortcut for -outfmt .bz2\n");
     fprintf (stderr, "    -path_antebuffer <dir> - where is antebuffer\n");

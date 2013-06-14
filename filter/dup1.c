@@ -138,14 +138,33 @@ int split_relfile (relation_stream_ptr rs, const char *name,
     return 0;
 }
 
+/*
 void usage()
 {
-    fprintf(stderr, "Usage: ./dup1 [-outfmt <fmt> | -bz] [-only <i>] [-n <nslices_log>] -out <output_dir> [files...]\n");
+    fprintf(stderr, "Usage: ./dup1 [-only <i>] [-n <nslices_log>] -out <output_dir> [files...]\n");
+}
+*/
+static void
+usage(const char *argv0)
+{
+    fprintf (stderr, "Usage: %s [options] ", argv0);
+    fprintf (stderr, "[ -filelist <fl> [-basepath <dir>] | file1 ... filen ]\n");
+    fprintf (stderr, "Mandatory command line options:\n");
+    fprintf (stderr, "     -out <dir>  - output directory\n");
+    fprintf (stderr, "\nOther command line options:\n");
+    fprintf (stderr, "    -n           - log of number of slices (default 1)\n");
+    fprintf (stderr, "    -only        - do only slice i (default all)\n");
+    fprintf (stderr, "    -ab          - only print a and b in the ouput\n");
+    fprintf (stderr, "    -outfmt .ext - output is written in .ext files\n");
+    fprintf (stderr, "    -bz          - shortcut for -outfmt .bz2\n");
+    fprintf (stderr, "    -abhexa      - read a and b as hexa no decimal\n");
+    exit (1);
 }
 
 int
 main (int argc, char * argv[])
 {
+  char * argv0 = argv[0];
     int had_error = 0;
 
     param_list pl;
@@ -191,18 +210,18 @@ main (int argc, char * argv[])
     }
 
     if (!dirname)
-        usage();
+        usage(argv0);
     if (bz) {
         if (outfmt) {
             fprintf(stderr, "-bz and -outfmt are exclusive");
-            usage();
+            usage(argv0);
         } else {
             outfmt = ".bz2";
         }
     }
     if (outfmt && !is_supported_compression_format(outfmt)) {
         fprintf(stderr, "output compression format unsupported\n");
-        usage();
+        usage(argv0);
     }
 
     int do_slice[nslices];
@@ -217,7 +236,7 @@ main (int argc, char * argv[])
 
     if ((filelist != NULL) + (argc != 0) != 1) {
         fprintf(stderr, "Provide either -filelist or freeform file names\n");
-        usage();
+        usage(argv0);
     }
 
     char ** files = filelist ? filelist_from_file(basepath, filelist, 0) : argv;
