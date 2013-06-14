@@ -123,15 +123,16 @@ prempt_load (prempt_t prempt_data)
 static inline void 
 realloc_buffer_primes (buf_rel_t *buf)
 {
-  buf->nb_alloc += buf->nb_alloc >> 1;
   if (buf->nb_alloc == NB_PRIMES_OPT)
   {
+    buf->nb_alloc += buf->nb_alloc >> 1;
     prime_t *p = buf->primes;
     SMALLOC(buf->primes, buf->nb_alloc, "realloc buffer primes");
     memcpy (buf->primes, p, NB_PRIMES_OPT * sizeof(prime_t));
   }
   else
   {
+    buf->nb_alloc += buf->nb_alloc >> 1;
     buf->primes =(prime_t*)realloc(buf->primes, buf->nb_alloc * sizeof(prime_t));
   }
 #if DEBUG >= 2

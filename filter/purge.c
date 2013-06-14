@@ -993,6 +993,7 @@ main (int argc, char **argv)
   tot_alloc_bytes += cur_alloc;
   fprintf (stderr, "Allocated ideals_weight of %zuMb (total %zuMb so far)\n",
                     cur_alloc >> 20, tot_alloc_bytes >> 20);
+  memset(ideals_weight, 0, cur_alloc);
 
   rel_used_nb_bytes = (nrelmax + 7) >> 3;
   bit_vector_init(rel_used, nrelmax);
