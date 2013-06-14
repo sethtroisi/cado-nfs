@@ -87,10 +87,10 @@ Exit value:
 
 #define SMALLOC_AND_PRINT(p,n,id,count) do {   \
    SMALLOC(p, n, id);                          \
-   count += n * sizeof(*p);                    \
+   size_t __count = count + n * sizeof(*p);    \
    /* %zu is the C99 modifier for size_t */    \
-   fprintf (stderr, "Allocated %s of %zuMb (total %zuMb so far)\n",  \
-                    id, (n * sizeof(*p)) >> 20, count >> 20); \
+   fprintf (stderr, "Allocated %s of %zuMb (total %zuMb so far)\n",     \
+                    id, (size_t)(n * sizeof(*p)) >> 20, __count >> 20); \
  } while (0)
 
 #define SMALLOC_BIT_VECTOR(bv,n,id,count) do { \
@@ -102,7 +102,7 @@ Exit value:
   }                                            \
   count += tmp;                                \
   fprintf (stderr, "Allocated %s of %zuMB (total %zuMB so far)\n",   \
-                   id, tmp >> 20, count >> 20);                      \
+                   id, tmp >> 20, (size_t)(count >> 20));            \
  } while (0)
 
 /* Main variables */
