@@ -83,8 +83,9 @@ relset_ptr build_rel_sets(const char * purgedname, const char * indexname , int 
   FILE * ix = fopen(indexname, "r");
 
   /* array of (a,b) pairs from (purgedname) file */
+  /* change to ab_pair *pairs, where ab_pair is uint64_t[2] */
   poly_t *pairs;
-
+  
   /* Array of (small_nrows) relation sets built from array (pairs) and (indexname) file
      rels->num is used for (a,b)-pairs with positive multiplicities, whereas
      rels->denom for those with negative ones
@@ -157,7 +158,7 @@ relset_ptr build_rel_sets(const char * purgedname, const char * indexname , int 
 	  mpz_set_si(ee, -e);
 	  /* TODO: poly_long_power_mod_f_mod_mpz */
 	  poly_power_mod_f_mod_mpz(tmp, pairs[ridx], F, ee, ell2);
-	  poly_mul_mod_f_mod_mpz(rels[i].num, rels[i].num, tmp, F, ell2, NULL);
+	  poly_mul_mod_f_mod_mpz(rels[i].denom, rels[i].denom, tmp, F, ell2, NULL);
       }
     }
   }
@@ -199,9 +200,15 @@ void shirokauer_maps(const char * outname, relset_srcptr rels, int sr, poly_t F,
 
     poly_power_mod_f_mod_mpz_Barrett(SMn, rels[i].num, F, eps, ell2, invl2);
     poly_sub_ui(SMn, 1);
-  
+
+    /* fprintf(stderr, "SMn: "); */
+    /* poly_print(SMn); */
+
     poly_power_mod_f_mod_mpz_Barrett(SMd, rels[i].denom, F, eps, ell2, invl2);
     poly_sub_ui(SMd, 1);
+
+    /* fprintf(stderr, "SMd: "); */
+    /* poly_print(SMd); */
 
     poly_sub_mod_mpz(SM, SMn, SMd, ell2);
 
