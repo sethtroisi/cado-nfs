@@ -377,14 +377,14 @@ class ClientServerTask(Task, patterns.Observer):
         super().__init__(*args, **kwargs)
         self.state.setdefault("wu_submitted", 0)
         self.state.setdefault("wu_received", 0)
-        self.params.setdefault("maxwu", 10)
+        self.params.setdefault("maxwu", "100")
         assert self.get_number_outstanding_wus() >= 0
         self.send_notification(Notification.SUBSCRIBE_WU_NOTIFICATIONS, None)
     
     def submit_command(self, command, identifier):
         ''' Submit a workunit to the database. '''
         
-        while self.get_number_outstanding_wus() >= self.params["maxwu"]:
+        while self.get_number_outstanding_wus() >= int(self.params["maxwu"]):
             self.wait()
         wuid = self.make_wuname(identifier)
         wutext = command.make_wu(wuid)
@@ -704,7 +704,7 @@ class SievingTask(ClientServerTask, FilesCreator):
             
         self.state.setdefault("rels_found", 0)
         self.state.setdefault("rels_wanted", 0)
-        self.params.setdefault("max_wus", 10)
+        self.params.setdefault("maxwu", "100")
         self.state["rels_wanted"] = max(self.state.get("rels_wanted", 0), 
                                         int(self.params.get("rels_wanted", 0)))
         if self.state["rels_wanted"] == 0:
