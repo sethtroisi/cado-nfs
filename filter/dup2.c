@@ -548,9 +548,23 @@ thread_root(fr_t *mfr)
 
      Trick: we only read relations for which rel_used[i]==1.
  */
-void usage()
+
+static void
+usage(const char *argv0)
 {
-    fprintf (stderr, "Usage: dup2 -poly xxx [-out <dir>] [-basepath <dir>] [-filelist <fl>] -renumber xxx -K <K> file1 ... filen\n");
+    fprintf (stderr, "Usage: dup2 %s [options] ", argv0);
+    fprintf (stderr, "[ -filelist <fl> [-basepath <dir>] | file1 ... filen ]\n");
+    fprintf (stderr, "Mandatory command line options:\n");
+    fprintf (stderr, "     -poly xxx     - polynomial file\n");
+    fprintf (stderr, "     -renumber xxx - renumbering table\n");
+    fprintf (stderr, "     -K <K>        - size of the hashtable\n");
+    fprintf (stderr, "\nOther command lone options:\n");
+    fprintf (stderr, "    -outfmt .ext - output is written in .ext files\n");
+    fprintf (stderr, "    -bz          - shortcut for -outfmt .bz2\n");
+    fprintf (stderr, "    -path_antebuffer <dir> - where is antebuffer\n");
+#ifndef FOR_FFS
+    fprintf (stderr, "    -dl          - do not reduce exponents modulo 2\n");
+#endif
     exit (1);
 }
 
@@ -575,9 +589,7 @@ main (int argc, char *argv[])
     argv++,argc--;
 
     int bz = 0;
-    int ab_hexa = 0;
     param_list_configure_switch(pl, "bz", &bz);
-    param_list_configure_switch(pl, "abhexa", &ab_hexa);
 
 #ifndef FOR_FFS
     int is_for_dl = 0; /* Be default we do dup2 for factorization */
@@ -609,7 +621,7 @@ main (int argc, char *argv[])
     param_list_parse_ulong(pl, "K", &K);
 
     if (param_list_warn_unused(pl) || polyfilename == NULL)
-      usage();
+      usage(argv0);
 
     cado_poly_init (cpoly);
     if (!cado_poly_read (cpoly, polyfilename))
@@ -624,19 +636,19 @@ main (int argc, char *argv[])
     }
 
     if (K == 0)
-        usage();
+        usage(argv0);
 
     if (bz) {
         if (outfmt) {
             fprintf(stderr, "-bz and -outfmt are mutually exclusive");
-            usage();
+            usage(argv0);
         } else {
             outfmt = ".bz2";
         }
     }
     if (outfmt && !is_supported_compression_format(outfmt)) {
         fprintf(stderr, "output compression format unsupported\n");
-        usage();
+        usage(argv0);
     }
 
     if (renumberfilename == NULL)
@@ -684,7 +696,7 @@ main (int argc, char *argv[])
 
   if ((filelist != NULL) + (argc != 0) != 1) {
       fprintf(stderr, "Provide either -filelist or freeform file names\n");
-      usage();
+      usage(argv0);
   }
 
 
@@ -754,8 +766,13 @@ main (int argc, char *argv[])
   //buf_arg.needed = NEEDED_ABP;
   //prempt_scan_relations (files_new, &thread_print, &buf_arg, &thread_root);
   /* pass 1: we read new files, remove duplicates, and renumber them */
-  rread += remove_dup_in_files (files_new, basepath, outfmt, is_for_dl,
-                               (ab_hexa)?16:10, renumber_table);
+#ifndef FOR_FFS
+  rread += remove_dup_in_files (files_new, basepath, outfmt, is_for_dl, 10,
+                                renumber_table);
+#else
+  rread += remove_dup_in_files (files_new, basepath, outfmt, is_for_dl, 16,
+                                renumber_table);
+#endif
 
 
   fprintf (stderr, "Read %"PRid" relations, %"PRid" duplicates (%1.2f%%)\n",
@@ -775,7 +792,8 @@ main (int argc, char *argv[])
 
   // Find the index that corresponds to the min value of alim and rlim (for
   // purge)
-  p_r_values_t min = MIN(cpoly->rat->lim, cpoly->alg->lim);
+  // TODO in dup2-ffs   instanciated ->lim
+  p_r_values_t min = MIN(cpoly->pols[0]->lim, cpoly->pols[1]->lim);
   float hint = 2.0 * (((float) min) / logf ((float) min));
   index_t min_index;
   if (hint > 0.0)
