@@ -274,7 +274,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
             nodu++;
 
             if (cost >= factor * (double) nodu) 
-              print_warning_size (K);   
+              print_warning_size ();   
 
             if (f_out) /* output renumbered relation */
               {
@@ -451,7 +451,7 @@ thread_only_hash (buf_arg_t *arg)
       sanity_check(i, my_rel->a, my_rel->b);
     nodu++;
     if (cost >= factor * (double) nodu) 
-      print_warning_size (K);   
+      print_warning_size ();   
 
     test_and_print_progress_now ();
     cpy_cpt_rel_b++;
@@ -520,7 +520,7 @@ thread_root(fr_t *mfr)
               sanity_check(i, myrel->a, myrel->b);
             nodu++;
             if (cost >= factor * (double) nodu) 
-              print_warning_size (K);   
+              print_warning_size ();   
 
             compute_index_rel (renumber_table, myrel);
           }
