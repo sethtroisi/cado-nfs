@@ -91,6 +91,7 @@ renumber_init (renumber_t renumber_info, cado_poly pol)
   renumber_info->size = 0;
   renumber_info->table = NULL;
   renumber_info->file = NULL;
+  renumber_info->cached = NULL;
   renumber_info->bad_ideals.n = 0;
   renumber_info->bad_ideals.p = (p_r_values_t *) malloc(MAXBADS * 
           sizeof(p_r_values_t));
@@ -186,6 +187,8 @@ renumber_close_write (renumber_t renumber_info)
           offset + renumber_info->size);
 
   fclose(renumber_info->file);
+
+  renumber_free(renumber_info);
 }
 
 
