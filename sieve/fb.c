@@ -389,7 +389,7 @@ fb_nroots_total (const factorbase_degn_t *fb)
 
 
 /* Extracts primes (not prime powers) p with p/nr_roots <= costlim up to and 
-   exluding the first prime p > plim. Prime powers in the factor base are 
+   excluding the first prime p > plim. Prime powers in the factor base are
    ignored. List ends with FB_END. Allocates memory */
 fbprime_t *
 fb_extract_bycost (const factorbase_degn_t *fb, const fbprime_t plim,
