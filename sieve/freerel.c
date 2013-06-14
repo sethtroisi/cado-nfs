@@ -343,6 +343,8 @@ allFreeRelations (cado_poly pol, unsigned long pmin, unsigned long pmax,
 
     for (int side = 0; side < 2; side++) {
       for (int i = 0; i < k[side]; ++i) {
+        if (side == rat_side)
+          continue;
         if (renumber_is_bad(renumber_table, p, roots[side][i])) {
           for (int j = i; j < k[side]-1; ++j)
             roots[side][j] = roots[side][j+1];
@@ -485,7 +487,7 @@ main (int argc, char *argv[])
     fprintf (stderr, "# Free relations: %lu\n", nfree);
 
     renumber_close_write (renumber_table);
-#if 0 //To debug the renumbering table
+#if 1 //To debug the renumbering table
     renumber_debug_print_tab(stderr, renumberfilename, cpoly);
 #endif
     cado_poly_clear (cpoly);

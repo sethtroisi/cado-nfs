@@ -105,7 +105,7 @@ sanity_check (uint32_t i, int64_t a, uint64_t b)
 }
 
 static inline void 
-print_warning_size ()
+print_warning_size ( )
 {
   double full_table = 100.0 * (double) nodu / (double) K;
   fprintf(stderr, "Warning, hash table is %1.0f%% full\n", full_table);
@@ -274,7 +274,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
             nodu++;
 
             if (cost >= factor * (double) nodu) 
-              print_warning_size (K);   
+              print_warning_size ();   
 
             if (f_out) /* output renumbered relation */
               {
@@ -451,7 +451,7 @@ thread_only_hash (buf_arg_t *arg)
       sanity_check(i, my_rel->a, my_rel->b);
     nodu++;
     if (cost >= factor * (double) nodu) 
-      print_warning_size (K);   
+      print_warning_size ();   
 
     test_and_print_progress_now ();
     cpy_cpt_rel_b++;
@@ -459,7 +459,7 @@ thread_only_hash (buf_arg_t *arg)
   }
 }
 
-static void *
+MAYBE_UNUSED static void *
 thread_print(buf_arg_t *arg)
 {
   unsigned int j;
@@ -520,7 +520,7 @@ thread_root(fr_t *mfr)
               sanity_check(i, myrel->a, myrel->b);
             nodu++;
             if (cost >= factor * (double) nodu) 
-              print_warning_size (K);   
+              print_warning_size ();   
 
             compute_index_rel (renumber_table, myrel);
           }
@@ -782,7 +782,7 @@ main (int argc, char *argv[])
     min_index = (index_t) hint;
   else
     min_index = 0;
-  fprintf (stderr, "Renumbering struct: min_index=%lu\n", (uint64_t) min_index);
+  fprintf (stderr, "Renumbering struct: min_index=%"PRid"\n", min_index);
 
 
 
