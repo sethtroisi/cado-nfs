@@ -143,81 +143,91 @@ realloc_buffer_primes (buf_rel_t *buf)
 #define LOAD_ONE(P) { c = *P;  \
        P = ((size_t) (P - pminlessone) & (PREMPT_BUF - 1)) + pmin;}
 
-#define READ_ONE_PRIME(pr) do {                 \
-    unsigned char v;                            \
-    LOAD_ONE(p);                                \
-    for (pr = 0 ; (v = ugly[c]) < 16; )         \
-    {                                           \
-      pr = (pr << 4) + v;                       \
-      LOAD_ONE(p);                              \
-    }                                           \
-    ASSERT_ALWAYS(c == ',' || c == '\n');       \
-  } while (0)
 
+static inline unsigned char
+read_one_prime (p_r_values_t * pr, char **p)
+{
+  unsigned char v, c;
+  LOAD_ONE(*p);
+  for (*pr = 0 ; (v = ugly[c]) < 16; )
+  {
+    *pr = (*pr << 4) + v;
+    LOAD_ONE(*p);
+  }
+  ASSERT_ALWAYS(c == ',' || c == '\n');
 
-#define READ_A_B_HEXA(n) do {            \
-    unsigned char v;                     \
-    for (n = 0 ; (v = ugly[c]) < 16; )   \
-    {                                    \
-      n = (n << 4) + v;                  \
-      LOAD_ONE(p);                       \
-    }                                    \
-  } while (0)
+  return c;
+}
 
-#define READ_A_B_BASE10(n) do {          \
-    unsigned char v;                     \
-    for (n = 0 ; (v = ugly[c]) < 10; )   \
-    {                                    \
-      n = n * 10 + v;                    \
-      LOAD_ONE(p);                       \
-    }                                    \
-  } while (0)
+static inline unsigned char
+read_a_or_b (uint64_t *n, char **p, unsigned char c, int ab_hexa)
+{
+  unsigned char v;
+  if (ab_hexa)
+  {
+    for (*n = 0 ; (v = ugly[c]) < 16; )
+    {
+      *n = (*n << 4) + v;
+      LOAD_ONE(*p);
+    }
+  }
+  else
+  {
+    for (*n = 0 ; (v = ugly[c]) < 10; )
+    {
+      *n = (*n * 10) + v;
+      LOAD_ONE(*p);
+    }
+  }
 
-#define READ_A_HEXA(a) do {   \
-    LOAD_ONE(p);              \
-    if (c == '-') {           \
-      a = -1;                 \
-      LOAD_ONE(p);            \
-    }                         \
-    else                      \
-      a = 1;                  \
-    READ_A_B_HEXA(n);         \
-    ASSERT_ALWAYS(c == ',');  \
-    a *= n;                   \
-  }while (0)
+  return c;
+}
 
-#define READ_B_HEXA(b) do {   \
-    LOAD_ONE(p);              \
-    READ_A_B_HEXA(n);         \
-    ASSERT_ALWAYS(c == ':');  \
-    b = n;                    \
-  } while (0)
+static inline unsigned char
+read_b (uint64_t *b, char **p, int ab_hexa)
+{
+  unsigned char c;
+  LOAD_ONE(*p);
 
-#define READ_A_BASE10(a) do { \
-    LOAD_ONE(p);              \
-    if (c == '-') {           \
-      a = -1;                 \
-      LOAD_ONE(p);            \
-    }                         \
-    else                      \
-      a = 1;                  \
-    READ_A_B_BASE10(n);       \
-    ASSERT_ALWAYS(c == ',');  \
-    a *= n;                   \
-  }while (0)
+  c = read_a_or_b (b, p, c, ab_hexa);
+  ASSERT_ALWAYS(c == ':');
 
-#define READ_B_BASE10(b) do { \
-    LOAD_ONE(p);              \
-    READ_A_B_BASE10(n);       \
-    ASSERT_ALWAYS(c == ':');  \
-    b = n;                    \
-  } while (0)
+  return c;
+}
 
-#define SKIP_AB do {  \
-    LOAD_ONE(p)       \
-    while (c != ':')  \
-      LOAD_ONE(p)     \
-  } while (0)
+static inline unsigned char
+read_a (int64_t *a, char **p, int ab_hexa)
+{
+  unsigned char c;
+  uint64_t n;
+
+  LOAD_ONE(*p);
+  if (c == '-') 
+  {
+    *a = -1;
+    LOAD_ONE(*p);
+  }
+  else
+    *a = 1;
+
+  c = read_a_or_b (&n, p, c, ab_hexa);
+
+  ASSERT_ALWAYS(c == ',');
+  *a *= n;
+
+  return c;
+}
+
+static inline unsigned char
+skip_ab (char **p)
+{
+  unsigned char c;
+  LOAD_ONE(*p)
+  while (c != ':')
+    LOAD_ONE(*p)
+
+  return c;
+}
 
 #if 0
 #ifdef STAT
@@ -243,7 +253,6 @@ realloc_buffer_primes (buf_rel_t *buf)
 static inline void
 relation_get_fast_abp (prempt_t prempt_data, buf_rel_t *mybufrel)
 {
-  uint64_t n;
   char *p;
   unsigned int nb_primes_read;
   int i;
@@ -254,11 +263,11 @@ relation_get_fast_abp (prempt_t prempt_data, buf_rel_t *mybufrel)
   p = (char *) prempt_data->pcons;
 
 #ifndef FOR_FFS
-  READ_A_BASE10(mybufrel->a);
-  READ_B_BASE10(mybufrel->b);
+  c = read_a (&(mybufrel->a), &p, 0);
+  c = read_b (&(mybufrel->b), &p, 0);
 #else
-  READ_A_HEXA(mybufrel->a);
-  READ_B_HEXA(mybufrel->b);
+  c = read_a (&(mybufrel->a), &p, 1);
+  c = read_b (&(mybufrel->b), &p, 1);
 #endif
 
   nb_primes_read = 0;
@@ -269,7 +278,7 @@ relation_get_fast_abp (prempt_t prempt_data, buf_rel_t *mybufrel)
     if (c == ':')
       side++;
 
-    READ_ONE_PRIME(pr);
+    c = read_one_prime(&pr, &p);
 
     for (i = nb_primes_read-1; i >= 0; i-- )
       if (mybufrel->primes[i].p == pr)
@@ -291,7 +300,6 @@ relation_get_fast_abp (prempt_t prempt_data, buf_rel_t *mybufrel)
 static inline void
 relation_get_fast_abh (prempt_t prempt_data, buf_rel_t *mybufrel)
 {
-  uint64_t n;
   char *p;
   unsigned int nb_primes_read;
   index_t pr;
@@ -299,8 +307,8 @@ relation_get_fast_abh (prempt_t prempt_data, buf_rel_t *mybufrel)
 
   p = (char *) prempt_data->pcons;
 
-  READ_A_HEXA(mybufrel->a);
-  READ_B_HEXA(mybufrel->b);
+  c = read_a (&(mybufrel->a), &p, 1);
+  c = read_b (&(mybufrel->b), &p, 1);
 
   nb_primes_read = 0;
   for ( c = 0 ; ; )
@@ -308,7 +316,7 @@ relation_get_fast_abh (prempt_t prempt_data, buf_rel_t *mybufrel)
     if (c == '\n')
       break;
 
-    READ_ONE_PRIME(pr);
+    c = read_one_prime(&pr, &p);
 
     if (nb_primes_read > 0 && mybufrel->primes[nb_primes_read-1].h == pr)
         mybufrel->primes[nb_primes_read-1].e++;
@@ -328,14 +336,13 @@ relation_get_fast_abh (prempt_t prempt_data, buf_rel_t *mybufrel)
 static inline void
 relation_get_fast_ab (prempt_t prempt_data, buf_rel_t *mybufrel)
 {
-  uint64_t n;
   char *p;
   unsigned char c;
 
   p = (char *) prempt_data->pcons;
 
-  READ_A_HEXA(mybufrel->a);
-  READ_B_HEXA(mybufrel->b);
+  c = read_a (&(mybufrel->a), &p, 1);
+  c = read_b (&(mybufrel->b), &p, 1);
 
   while (c != '\n')
     LOAD_ONE(p);
@@ -351,7 +358,7 @@ relation_get_fast_h (prempt_t prempt_data, buf_rel_t *mybufrel)
 
   p = (char *) prempt_data->pcons;
 
-  SKIP_AB;
+  c = skip_ab(&p);
 
   nb_primes_read = 0;
   for ( c = 0 ; ; )
@@ -359,7 +366,7 @@ relation_get_fast_h (prempt_t prempt_data, buf_rel_t *mybufrel)
     if (c == '\n')
       break;
 
-    READ_ONE_PRIME(pr);
+    c = read_one_prime(&pr, &p);
 
     if (nb_primes_read > 0 && mybufrel->primes[nb_primes_read-1].h == pr)
         mybufrel->primes[nb_primes_read-1].e++;
@@ -388,7 +395,7 @@ relation_get_fast_hmin (prempt_t prempt_data, buf_rel_t *mybufrel, index_t min)
 
   p = (char *) prempt_data->pcons;
 
-  SKIP_AB;
+  c = skip_ab(&p);
 
   nb_primes_read = 0;
   for ( c = 0 ; ; )
@@ -396,7 +403,7 @@ relation_get_fast_hmin (prempt_t prempt_data, buf_rel_t *mybufrel, index_t min)
     if (c == '\n')
       break;
 
-    READ_ONE_PRIME(pr);
+    c = read_one_prime(&pr, &p);
 
     if (nb_primes_read > 0 && mybufrel->primes[nb_primes_read-1].h == pr)
         mybufrel->primes[nb_primes_read-1].e++;
