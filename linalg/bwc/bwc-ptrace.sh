@@ -5,7 +5,7 @@ set -x
 
 top=`dirname $0`/../..
 export DEBUG=1
-export MPI=1
+# export MPI=1
 make -s -C $top -j 4
 make -s -C $top -j 4 plingen
 eval `make -s -C $top show`
@@ -30,7 +30,17 @@ mpi=${Mh}x${Mv}
 thr=${Th}x${Tv}
 
 prime=1766847064778384329583297500742918515827483896875618958121606201292619891
-bits_per_coeff=64
+bits_per_coeff=256
+
+if ! echo "$prime-2^$bits_per_coeff" | bc | grep -q '^-' ; then
+    echo "2^bits_per_coeff must be above the prime" >&2
+    echo "Please fix $0" >&2
+    exit 1
+elif echo "$prime-2^($bits_per_coeff-64)" | bc | grep -q '^-' ; then
+    echo "2^(bits_per_coeff-64) must be below the prime" >&2
+    echo "Please fix $0" >&2
+    exit 1
+fi
 
 # The test matrix may be created by:
 #
