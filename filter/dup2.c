@@ -459,7 +459,7 @@ thread_only_hash (buf_arg_t *arg)
   }
 }
 
-static void *
+MAYBE_UNUSED static void *
 thread_print(buf_arg_t *arg)
 {
   unsigned int j;
