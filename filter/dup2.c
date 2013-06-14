@@ -539,16 +539,6 @@ thread_root(fr_t *mfr)
   }
 }
 
-/* Read all relations from file, and fills the rel_used and rel_compact arrays
-   for each relation i:
-   - rel_used[i] = 0 if the relation i is deleted
-     rel_used[i] = 1 if the relation i is kept (so far)
-   - rel_compact is an array, terminated by -1, of pointers to the entries
-     in the hash table for the considered primes
-
-     Trick: we only read relations for which rel_used[i]==1.
- */
-
 static void
 usage(const char *argv0)
 {
