@@ -680,6 +680,27 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
     fclose (hisfile);
 }
 
+static void
+usage (const char *argv0)
+{
+  fprintf (stderr, "Usage: %s [options]\n", argv0);
+  fprintf (stderr, "\nMandatory command line options: \n");
+  fprintf (stderr, "   -purged  xxx   - input (purged) file is xxx\n");
+  fprintf (stderr, "   -his  xxx      - history file (produced by merge)\n");
+  fprintf (stderr, "   -out  xxx      - basename for output matrices\n");
+  fprintf (stderr, "\nOther command line options: \n");
+  fprintf (stderr, "   -skip nnn      - dense matrice contains the nnn heaviest "
+                                       "columns (default %u)\n", SKIP_DEFAULT);
+  fprintf (stderr, "   -v or --verbose\n");
+  fprintf (stderr, "   --binary\n");
+  fprintf (stderr, "   --noindex\n");
+  fprintf (stderr, "   -index <file>  - if and only if there is no --noindex\n");
+  fprintf (stderr, "   -ideals\n");
+  fprintf (stderr, "   -outdel\n");
+  exit (1);
+}
+
+
 // We start from M_purged which is nrows x ncols;
 // we build M_small which is small_nrows x small_ncols.
 // newrows[i] if != NULL, contains a list of the indices of the rows in
@@ -689,13 +710,14 @@ fasterVersion(typerow_t **newrows, const char *sparsename,
 int
 main(int argc, char *argv[])
 {
+  char * argv0 = argv[0];
     FILE *hisfile;
     uint64_t bwcostmin = 0;
     int nrows, ncols;
     typerow_t **newrows;
     int verbose = 0;
     int bin=0;
-    int skip=0;
+    int skip = SKIP_DEFAULT;
     int noindex = 0;
     char *rp, str[STRLENMAX];
     double wct0 = wct_seconds ();
@@ -721,7 +743,7 @@ main(int argc, char *argv[])
     for( ; argc ; ) {
         if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
         fprintf (stderr, "Unknown option: %s\n", argv[0]);
-        abort();
+        usage(argv0);
     }
     const char * purgedname = param_list_lookup_string(pl, "purged");
     const char * hisname = param_list_lookup_string(pl, "his");
@@ -729,9 +751,21 @@ main(int argc, char *argv[])
     const char * indexname = param_list_lookup_string(pl, "index");
     const char * idealsfilename = param_list_lookup_string(pl, "ideals");
     const char * outdelfilename = param_list_lookup_string(pl, "outdel");
-    param_list_parse_int(pl, "binary", &bin);
     param_list_parse_int(pl, "skip", &skip);
     param_list_parse_uint64(pl, "bwcostmin", &bwcostmin);
+
+    if (purgedname == NULL)
+    {
+      fprintf (stderr, "Error, missing mandatory -purged option.\n");
+      usage(argv0);
+    }
+
+    if (sparsename == NULL)
+    {
+      fprintf (stderr, "Error, missing mandatory -out option.\n");
+      usage(argv0);
+    }
+
     if (has_suffix(sparsename, ".bin") || has_suffix(sparsename, ".bin.gz"))
         bin=1;
 
@@ -750,17 +784,17 @@ main(int argc, char *argv[])
 #ifdef FOR_DL
     if (skip != 0)
       {
-        fprintf (stderr, "Error, for FFS -skip should be 0\n");
+        fprintf (stderr, "Error, for DL -skip should be 0\n");
         exit (1);
       }
     if (idealsfilename == NULL)
       {
-        fprintf (stderr, "Error, for FFS -ideals should be non null\n");
+        fprintf (stderr, "Error, for DL -ideals should be non null\n");
         exit (1);
       }
     if (outdelfilename == NULL)
       {
-        fprintf (stderr, "Error, for FFS -outdel should be non null\n");
+        fprintf (stderr, "Error, for DL -outdel should be non null\n");
         exit (1);
       }
 #endif

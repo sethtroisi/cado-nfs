@@ -40,10 +40,10 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA.
 #include "report.h"     /* for report_t */
 #include "markowitz.h" /* for MkzInit */
 #include "merge_mono.h" /* for mergeOneByOne */
+#include "sparse.h"
 
 #define MAXLEVEL_DEFAULT 10
 #define KEEP_DEFAULT 160
-#define SKIP_DEFAULT 32
 #define FORBW_DEFAULT 0
 #define RATIO_DEFAULT 1.1
 #define COVERNMAX_DEFAULT 100.0
