@@ -85,26 +85,6 @@ Exit value:
 #define DEFAULT_REQUIRED_EXCESS 0.1
 #define DEFAULT_NPT 4
 
-#define SMALLOC_AND_PRINT(p,n,id,count) do {   \
-   SMALLOC(p, n, id);                          \
-   size_t __count = count + n * sizeof(*p);    \
-   /* %zu is the C99 modifier for size_t */    \
-   fprintf (stderr, "Allocated %s of %zuMb (total %zuMb so far)\n",     \
-                    id, (size_t)(n * sizeof(*p)) >> 20, __count >> 20); \
- } while (0)
-
-#define SMALLOC_BIT_VECTOR(bv,n,id,count) do { \
-  size_t tmp = (n + 7) >> 3;                   \
-  bit_vector_init(bv, n);                      \
-  if (!bv->p) {                                \
-    fprintf (stderr, "%s: malloc error (%zu MB)\n",id,tmp>>20); \
-    exit (1);                                  \
-  }                                            \
-  count += tmp;                                \
-  fprintf (stderr, "Allocated %s of %zuMB (total %zuMB so far)\n",   \
-                   id, tmp >> 20, (size_t)(count >> 20));            \
- } while (0)
-
 /* Main variables */
 char *argv0;                    /* = argv[0]; */
 
@@ -295,7 +275,7 @@ cliques_removal (index_t target_excess, index_t *nrels, index_t *nprimes)
   chunk = excess - target_excess;
 
   /* first collect sums for primes with weight 2, and compute total weight */
-  MEMSETZERO(sum2_index, nprimemax);
+  memset (sum2_index, 0, nprimemax * sizeof(index_t));
   for (i = 0; i < nrelmax; i++)
     if (bit_vector_getbit(rel_used, (size_t) i)) 
     {
@@ -310,7 +290,8 @@ cliques_removal (index_t target_excess, index_t *nrels, index_t *nprimes)
   /* now initialize bit table for relations used */
   bit_vector_neg (Tbv, rel_used);
   memset(Count, 0, sizeof(unsigned int) * MAX_WEIGHT);
-  SMALLOC(tmp, alloctmp, "deleteHeavierRows 2");
+  tmp = (comp_t *) malloc (alloctmp * sizeof (comp_t));
+  ASSERT_ALWAYS (tmp != NULL);
 
   for (i = 0; i < nrelmax; i++)
   {
@@ -434,7 +415,8 @@ onepass_singleton_parallel_removal (unsigned int nb_thread, index_t *nrels,
   unsigned int i;
   int err;
 
-  SMALLOC(ti, nb_thread, "onepass_singleton_parallel_removal :");
+  ti = (ti_t *) malloc (nb_thread * sizeof (ti_t));
+  ASSERT_ALWAYS (ti != NULL);
   ti[0].begin = 0;
   pas = (nrelmax / nb_thread) & ((index_t) ~(BV_BITS -1));
   incr = 0;
@@ -461,7 +443,9 @@ onepass_singleton_parallel_removal (unsigned int nb_thread, index_t *nrels,
     *nprimes -= ti[i].sup_npri;
   }
   pthread_attr_destroy(&attr);
-  SFREE(ti);
+  if (ti != NULL)
+    free(ti);
+  ti = NULL;
 }
 #endif /* ifdef HAVE_SYNC_FETCH */
 
@@ -817,7 +801,9 @@ filelist_from_file_with_subdirlist(const char *basepath, const char *filelist,
   char ** sl = filelist_from_file (basepath, subdirlist, 1);
   for(char ** p = sl ; *p ; p++, nsubdirs++);
 
-  SMALLOC(fic, nsubdirs * nfiles + 1, "main 3");
+  fic = (char **) malloc ((nsubdirs * nfiles + 1) * sizeof (char *));
+  ASSERT_ALWAYS(fic != NULL);
+
   char ** full = fic;
   for(char ** f = fl ; *f ; f++) {
     for(char ** s = sl ; *s ; s++, full++) {
@@ -897,7 +883,7 @@ main (int argc, char **argv)
   buf_rel_t *buf_rel;
   uint64_t min_index = 0;
   index_t nrels, nprimes;
-  size_t tot_alloc_bytes = 0;
+  size_t tot_alloc_bytes = 0, cur_alloc;
 
   double wct0 = wct_seconds ();
   fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
@@ -994,10 +980,20 @@ main (int argc, char **argv)
                    "%"PRIu64"\n", nprimemax);
 
   /* Allocating memory */
-  SMALLOC_AND_PRINT(ideals_weight,nprimemax,"ideals_weight",tot_alloc_bytes);
+
+  cur_alloc = nprimemax * sizeof (weight_t);
+  ideals_weight = (weight_t *) malloc (cur_alloc);
+  ASSERT_ALWAYS (ideals_weight != NULL);
+  tot_alloc_bytes += cur_alloc;
+  fprintf (stderr, "Allocated ideals_weight of %zuMb (total %zuMb so far)\n",
+                    cur_alloc >> 20, tot_alloc_bytes >> 20);
 
   rel_used_nb_bytes = (nrelmax + 7) >> 3;
-  SMALLOC_BIT_VECTOR(rel_used,nrelmax,"rel_used",tot_alloc_bytes);
+  bit_vector_init(rel_used, nrelmax);
+  ASSERT_ALWAYS (rel_used->p != NULL);
+  tot_alloc_bytes += rel_used_nb_bytes;
+  fprintf (stderr, "Allocated rel_used of %zuMB (total %zuMB so far)\n",
+                   rel_used_nb_bytes >> 20, tot_alloc_bytes >> 20);
 
   if (binfilerel)
     read_rel_used_from_infile(infilerel, rel_used_nb_bytes, &nrels);
@@ -1014,14 +1010,35 @@ main (int argc, char **argv)
 
   if (!boutfilerel)
   {
-    SMALLOC_BIT_VECTOR(Tbv,nrelmax,"Tbv",tot_alloc_bytes);
-    SMALLOC_AND_PRINT(sum2_index,nprimemax,"sum2_index",tot_alloc_bytes);
-    SMALLOC_AND_PRINT(rel_compact,nrelmax,"rel_compact",tot_alloc_bytes);
+    bit_vector_init(Tbv, nrelmax);
+    ASSERT_ALWAYS (Tbv->p != NULL);
+    tot_alloc_bytes += rel_used_nb_bytes;
+    fprintf (stderr, "Allocated Tbv of %zuMB (total %zuMB so far)\n",
+                     rel_used_nb_bytes >> 20, tot_alloc_bytes >> 20);
+
+    cur_alloc = nprimemax * sizeof (index_t);
+    sum2_index = (index_t *) malloc (cur_alloc);
+    ASSERT_ALWAYS (sum2_index != NULL);
+    tot_alloc_bytes += cur_alloc;
+    fprintf (stderr, "Allocated sum2_index of %zuMb (total %zuMb so far)\n",
+                     cur_alloc >> 20, tot_alloc_bytes >> 20);
+
+    cur_alloc = nrelmax * sizeof (index_t *);
+    rel_compact = (index_t **) malloc (cur_alloc);
+    ASSERT_ALWAYS (rel_compact != NULL);
+    tot_alloc_bytes += cur_alloc;
+    fprintf (stderr, "Allocated rel_compact of %zuMb (total %zuMb so far)\n",
+                     cur_alloc >> 20, tot_alloc_bytes >> 20);
   }
 
-  SMALLOC_AND_PRINT (buf_rel,SIZE_BUF_REL,"buf_rel",tot_alloc_bytes);
+  cur_alloc = SIZE_BUF_REL * sizeof (buf_rel_t);
+  buf_rel = (buf_rel_t *) malloc (cur_alloc);
+  ASSERT_ALWAYS (buf_rel != NULL);
+  tot_alloc_bytes += cur_alloc;
+  fprintf (stderr, "Allocated buf_rel of %zuMb (total %zuMb so far)\n",
+                    cur_alloc >> 20, tot_alloc_bytes >> 20);
 
-  MEMSETZERO(&buf_arg, 1);
+  memset (&buf_arg, 0, sizeof(buf_arg_t));
   buf_arg.f_deleted = NULL;
   buf_arg.min_index = (index_t) min_index;
   buf_arg.buf_data = buf_rel;
@@ -1091,7 +1108,13 @@ main (int argc, char **argv)
                      tmp >> 20, tot_alloc_bytes >> 20);
 
     // Renumber the primes in [0,nprimes] for merge and replay
-    SMALLOC_AND_PRINT(newindex,nprimemax,"newindex",tot_alloc_bytes);
+    cur_alloc = nprimemax * sizeof (index_t);
+    newindex = (index_t *) malloc (cur_alloc);
+    ASSERT_ALWAYS (newindex != NULL);
+    tot_alloc_bytes += cur_alloc;
+    fprintf (stderr, "Allocated newindex of %zuMb (total %zuMb so far)\n",
+                      cur_alloc >> 20, tot_alloc_bytes >> 20);
+
     renumber (sos, (index_t) min_index, nprimes);
 
   }
@@ -1169,11 +1192,20 @@ main (int argc, char **argv)
 
 
   /* Free allocated stuff */
-  SFREE (ideals_weight);
-  SFREE (buf_rel);
+  if (ideals_weight != NULL)
+    free(ideals_weight);
+  ideals_weight = NULL;
+  if (buf_rel != NULL)
+    free(buf_rel);
+  buf_rel = NULL;
+  if (newindex != NULL)
+    free(newindex);
+  newindex = NULL;
+  if (sum2_index != NULL)
+    free(sum2_index);
+  sum2_index = NULL;
+
   bit_vector_clear(rel_used);
-  SFREE(sum2_index);
-  SFREE(newindex);
   if (!boutfilerel)
     bit_vector_clear(Tbv);
 
