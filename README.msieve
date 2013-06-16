@@ -1,0 +1,46 @@
+Instructions on how to use CADO-NFS with msieve
+===============================================
+
+I) Using CADO-NFS with relations computed with msieve (or ggnfs)
+
+The format of relations used by CADO-NFS is the same as the one used by ggnfs
+or msieve. We assume here we want to factor a number c100.
+
+1) create a working directory, say /tmp/c100
+
+2) create a file c100.n in /tmp/c100 containing a single line:
+   n: <number to factor>
+
+3) create in /tmp/c100 the polynomial file c100.poly in CADO-NFS format
+   (process the factor.sh example in the README, and look in the
+   /tmp/cado.xxx/c59.poly file to see that format)
+
+4) put all relations in ggnfs format into a single file c100.rels.0-1.gz
+   (into /tmp/c100) and in c100.nrels the number of relations
+
+5) create empty files in /tmp/c100 (in order):
+  
+   touch c100.polysel_done
+   touch c100.factbase_done
+   touch c100.freerels_done
+   touch c100.sieve_done
+
+6) run (where $CADO is the CADO-NFS directory):
+
+   $ $CADO/cadofactor.pl n=<number to factor> params=$CADO/params/params.c100 parallel=0 wdir=/tmp/c100 bindir=$CADO/build/<hostname>
+
+   The script should print:
+
+Info:There is already some data relative to `c100' in the working directory. Trying to recover...
+Info:Nothing to be done for polynomial selection.
+Info:Nothing to be done for factor base.
+Info:Nothing to be done for sieve and purge.
+
+   and ask:
+
+Warning:I will clean up the following tasks: duplicates.
+Warning:Are you OK to continue? [y/l/N] (30s timeout)
+
+   Asnwer 'y'.
+
+   
