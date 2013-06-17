@@ -189,6 +189,8 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters, metaclas
         self.logger.debug("state = %s", self.state)
         # Set default parametes for this task, if any are given
         self.params = self.myparams(self.paramnames)
+        self.logger.debug("param_prefix = %s, get_param_path = %s", 
+                          self.get_param_prefix(), self.get_param_path())
         self.logger.debug("params = %s", self.params)
         # Set default parameters for our programs
         self.progparams = []
@@ -375,14 +377,14 @@ class ClientServerTask(Task, patterns.Observer):
         super().__init__(*args, **kwargs)
         self.state.setdefault("wu_submitted", 0)
         self.state.setdefault("wu_received", 0)
-        self.params.setdefault("maxwu", 10)
+        self.params.setdefault("maxwu", "100")
         assert self.get_number_outstanding_wus() >= 0
         self.send_notification(Notification.SUBSCRIBE_WU_NOTIFICATIONS, None)
     
     def submit_command(self, command, identifier):
         ''' Submit a workunit to the database. '''
         
-        while self.get_number_outstanding_wus() >= self.params["maxwu"]:
+        while self.get_number_outstanding_wus() >= int(self.params["maxwu"]):
             self.wait()
         wuid = self.make_wuname(identifier)
         wutext = command.make_wu(wuid)
@@ -702,7 +704,7 @@ class SievingTask(ClientServerTask, FilesCreator):
             
         self.state.setdefault("rels_found", 0)
         self.state.setdefault("rels_wanted", 0)
-        self.params.setdefault("max_wus", 10)
+        self.params.setdefault("maxwu", "100")
         self.state["rels_wanted"] = max(self.state.get("rels_wanted", 0), 
                                         int(self.params.get("rels_wanted", 0)))
         if self.state["rels_wanted"] == 0:
@@ -1726,7 +1728,8 @@ class StartClientsTask(Task):
         wuclient = cadoprograms.WuClient([], self.progparams[0],
             stdout = "wuclient.%s.stdout" % clientid,
             stderr = "wuclient.%s.stderr" % clientid, bg=True)
-        process = cadocommand.RemoteCommand(wuclient, host, self.parameters, self.path_prefix + [host])
+        process = cadocommand.RemoteCommand(wuclient, host, self.get_parameters(), 
+                                            self.get_param_prefix())
         (rc, stdout, stderr) = process.wait()
         if rc != 0:
             self.logger.warning("Starting client on host %s failed.", host)
@@ -1767,7 +1770,7 @@ class StartClientsTask(Task):
         if not signal is None:
             params["signal"] = str(signal)
         kill = cadoprograms.Kill((pid,), params)
-        process = cadocommand.RemoteCommand(kill, host, self.parameters, self.path_prefix)
+        process = cadocommand.RemoteCommand(kill, host, self.parameters, self.get_param_prefix())
         return process.wait()
 
 class Message(object):

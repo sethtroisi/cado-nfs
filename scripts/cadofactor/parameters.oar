@@ -1,0 +1,41 @@
+N = 90377629292003121684002147101760858109247336549001090677693
+name = testrun
+workdir = work
+
+# Adjust execpath to point to the root of your CADO build directory
+tasks.execpath=${HOME}/build/cado-nfs
+tasks.verbose = 1
+tasks.rlim=50000
+tasks.alim=100000
+tasks.lpbr=22
+tasks.lpba=22
+tasks.mfbr=24
+tasks.mfba=24
+threads=2
+tasks.polyselect.verbose = 0
+tasks.polyselect.P = 420
+tasks.polyselect.degree = 4
+tasks.polyselect.admin = 0
+tasks.polyselect.admax = 10000
+tasks.polyselect.adrange = 5000
+# tasks.sieve.rels_wanted = 222540
+tasks.sieve.rels_wanted = 122540
+tasks.sieve.qrange = 2000
+tasks.sieve.I = 11
+tasks.sieve.rlambda=1.2
+tasks.sieve.alambda=1.2
+tasks.filter.nslices_log=1
+tasks.filter.keep = 160
+tasks.filter.skip = 32
+tasks.filter.forbw = 3
+tasks.filter.coverNmax  = 100
+tasks.filter.maxlevel = 15
+tasks.filter.ratio = 1.1
+tasks.linalg.mn = 64
+tasks.linalg.verbose = 0
+tasks.linalg.nchar = 64
+
+slaves.catrel.hostnames = @${OAR_NODE_FILE}
+slaves.catrel.scriptpath = ${HOME}/git/cado-nfs/scripts/cadofactor
+slaves.catrel.downloadretry = 10
+slaves.catrel.ssh.execbin = oarsh
