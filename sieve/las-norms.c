@@ -146,8 +146,12 @@ void init_rat_norms_bucket_region(unsigned char *S,
                                  unsigned int j,
                                  sieve_info_ptr si)
 {
+#define COMPUTE_Y(G) ((LIKELY((G) > 1.0)) ? inttruncfastlog2 ((G), add, scale) : GUARD)
+/* #define COMPUTE_Y(G) (inttruncfastlog2 ((G), add, scale)) */
+
   /* #define DEBUG_INIT_RAT 1 */ /* For internal debug: trace all */
   /* #define CHECK_INIT_RAT 1 */ /* For internal debug: control all */
+
   sieve_side_info_ptr rat = si->sides[RATIONAL_SIDE];
   int halfI = (si->I)>>1,
     int_i;
@@ -173,7 +177,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
   if (!j) {
     // compute only the norm for i = 1. Everybody else is 255.
     memset(S, 255, halfI<<1);
-    S[halfI + 1] = inttruncfastlog2(fabs(u1),add,scale);
+    S[halfI + 1] = COMPUTE_Y(fabs(u1));
     S+= halfI<<1;
     j++;
     u0j += u0;
@@ -188,14 +192,24 @@ void init_rat_norms_bucket_region(unsigned char *S,
     rac = u0j * (-invu1);
     d0 = d0_init;
     d1 = rac - d0 * rac;
-    if (g > 0) {
-      y = inttruncfastlog2 (g, add, scale);
-      if (rac > -halfI) goto cas1; else goto cas4;
-    }
+    /* g sign is mandatory at the beginning of the line intialization.
+       If g ~= 0, the sign of g is not significant; so the sign of g
+       is the sign of u1 (g+u1 is the next g value). CAREFUL:
+       g ~== 0 is coded g + u0j == u0j. It's possible it's not suffisant;
+       in this case, the right test will be g >= fabs(u0j)*(1.0/(1ULL<<51)) */
+    if (LIKELY(g + u0j != u0j))
+      if (signbit(g)) {
+	g = -g;
+	y = COMPUTE_Y(g);
+	if (rac >= -halfI) goto cas3; else goto cas2;
+      }
+      else {
+	y = COMPUTE_Y(g);
+	if (rac >= -halfI) goto cas1; else goto cas4;
+      }
     else {
-      g = -g;
-      y = inttruncfastlog2 (g, add, scale);
-      if (rac > -halfI) goto cas3; else goto cas2;
+      y = GUARD;
+      if (signbit(u1)) goto cas2; else goto cas4;
     }
   cas1:
     /* In this case, we exit from the loop when ts == 0, at the exception
@@ -234,7 +248,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
     g = u0j + u1 * int_i;
     if (UNLIKELY(trunc(rac) >= halfI - 1)) {
       for ( ; int_i < halfI; int_i++) {
-	y = inttruncfastlog2 (g, add, scale);
+	y = COMPUTE_Y(g);
 #ifdef DEBUG_INIT_RAT
 	fprintf (stderr, "A2.1 : i=%d, y=%u, rac=%e\n", int_i, y, rac);
 #endif
@@ -244,7 +258,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
       goto nextj;
     }
     for (inc = 0; g > 0; g += u1) {
-      y = inttruncfastlog2 (g, add, scale);
+      y = COMPUTE_Y(g);
 #ifdef DEBUG_INIT_RAT
       fprintf (stderr, "A2.2 : i=%d, y=%u, rac=%e\n", int_i + inc, y, rac);
 #endif
@@ -253,7 +267,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
     int_i += inc;
     S += inc;
     g = -g;
-    y = inttruncfastlog2 (g, add, scale);
+    y = COMPUTE_Y(g);
   cas2:
     do {
 #ifdef DEBUG_INIT_RAT
@@ -263,7 +277,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
       if (++int_i >= halfI) goto nextj;
       oy = y;
       g -= u1;
-      y = inttruncfastlog2 (g, add, scale);
+      y = COMPUTE_Y(g);
     } while (oy != y);
     d0 = 1.0/d0;
     d1 = rac - d0 * rac;
@@ -324,7 +338,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
     g = -(u0j + u1 * int_i);
     if (UNLIKELY(trunc(rac) >= halfI - 1)) {
       for ( ; int_i < halfI; int_i++) {
-	y = inttruncfastlog2 (g, add, scale);
+	y = COMPUTE_Y(g);
 #ifdef DEBUG_INIT_RAT
 	fprintf (stderr, "B2.1 : i=%d, y=%u, rac=%e\n", int_i, y, rac);
 #endif
@@ -334,7 +348,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
       goto nextj;
     }
     for (inc = 0; g > 0; g -= u1) {
-      y = inttruncfastlog2 (g, add, scale);
+      y = COMPUTE_Y(g);
 #ifdef DEBUG_INIT_RAT
       fprintf (stderr, "B2.2 : i=%d, y=%u, rac=%e\n", int_i + inc, y, rac);
 #endif
@@ -343,7 +357,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
     int_i += inc;
     S += inc;
     g = -g;
-    y = inttruncfastlog2 (g, add, scale);
+    y = COMPUTE_Y(g);
   cas4:
     do {
 #ifdef DEBUG_INIT_RAT
@@ -353,7 +367,7 @@ void init_rat_norms_bucket_region(unsigned char *S,
       if (++int_i == halfI) goto nextj;
       oy = y;
       g += u1;
-      y = inttruncfastlog2 (g, add, scale);
+      y = COMPUTE_Y(g);
     } while (oy != y);
     d0 = 1.0/d0;
     d1 = rac - d0 * rac;
@@ -385,24 +399,25 @@ void init_rat_norms_bucket_region(unsigned char *S,
   nextj:
     for (;0;); /* gcc needs something after a label */
 #ifdef CHECK_INIT_RAT 
-    /* This code checks the complete line init with the real formula */
+    /* First MANDATORY condition. The exact line must be initialised. */
     if (UNLIKELY(cS + halfI != S)) {
       fprintf (stderr, "init_rat_norms_bucket_region: S control Error: OldS(%p) + I(%d) != S(%p)", cS - halfI, si->I, S);
       exit (1);
     }
-    unsigned int arret = 0;
+    /* Not really mandatory: when g ~= 0, the two formula (log2 & fastlog2) could really differ */
     int_i = -halfI;
     g = u0j + u1 * int_i;
-    while (LIKELY(int_i < halfI)) {
-      y = log2(fabs(g)))*rat->scale+GUARD;
+    while (int_i < halfI) {
+      y = LIKELY(fabs(g) > 1.0) ? log2(fabs(g))*rat->scale+GUARD : GUARD;
       if (UNLIKELY(fabs(cS[int_i] - y) > 1.)) {
-	fprintf (stderr, "init_rat_norms_bucket_region: S control BUG, offset %d: real value=%d, S value=%d, rat->scale=%e\n", int_i, y, cS[int_i], rat->scale);
-	arret = 1;
+	fprintf (stderr, "\
+init_rat_norms_bucket_region: possible problem in S, offset %d:\n	\
+   real value=%d, S init value=%d. If g + uj0 ~= uj0,\n			\
+   it could be OK: g=%e, u0j=%e\n", int_i, y, cS[int_i], g, u0j);
       }
       int_i++;
       g += u1;
     }
-    if (UNLIKELY(arret)) exit(1);
 #endif
   }
 }
