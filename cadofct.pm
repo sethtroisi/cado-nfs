@@ -2339,7 +2339,7 @@ sub purge {
             if ( $_ =~ /^\s+(\d+) remaining relations/ ) {
                 $last = $1;
             }
-            if ( $_ =~ /size=(\d+), nb_bytes=/ ) {
+            if ( $_ =~ /nprimes=(\d+)/ ) {
                 $nprimes = $1;
             }
             if ( $_ =~ /min_index=(\d+)/ ) {

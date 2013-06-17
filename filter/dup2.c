@@ -331,7 +331,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
                         // Here we have to take care of bad ideals that
                         // generate several columns:
                         if (renumber_is_bad(renumber_table, rs->rel.ap[i].p,
-                                    rs->rel.ap[i].r)) {
+                                    rs->rel.ap[i].r, 1)) {
                             // At the moment, we use code specific to p59.
                             unsigned long j1, j2, n1, n2;
                             ugly_for_p59(&j1, &j2, &n1, &n2, rs->rel.a, rs->rel.b, rs->rel.ap[i].p, rs->rel.ap[i].e);
@@ -564,6 +564,8 @@ main (int argc, char *argv[])
   argv0 = argv[0];
   buf_arg_t buf_arg;
   buf_rel_t *buf_rel;
+  p_r_values_t pmin;
+  index_t min_index;
     const char *renumberfilename = NULL;
     cado_poly cpoly;
     char **p;
@@ -783,13 +785,10 @@ main (int argc, char *argv[])
   // Find the index that corresponds to the min value of alim and rlim (for
   // purge)
   // TODO in dup2-ffs   instanciated ->lim
-  p_r_values_t min = MIN(cpoly->pols[0]->lim, cpoly->pols[1]->lim);
-  float hint = 2.0 * (((float) min) / logf ((float) min));
-  index_t min_index;
-  if (hint > 0.0)
-    min_index = (index_t) hint;
-  else
-    min_index = 0;
+  pmin = ulong_nextprime (MIN (cpoly->pols[0]->lim, cpoly->pols[1]->lim));
+  //not correct in the case of two alg side
+  min_index = renumber_get_index_from_p_r (renumber_table, pmin, 0,
+                                                          renumber_table->rat);
   fprintf (stderr, "Renumbering struct: min_index=%"PRid"\n", min_index);
 
 
