@@ -365,7 +365,12 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
                     }
                   }
                 if (!buggy_line)
-                  fprintf (f_out, "%s\n", bufline);
+                {
+                  if (renumber_table->add_full_col)
+                    fprintf (f_out, "%s,0\n", bufline); //added col is always 0
+                  else
+                    fprintf (f_out, "%s\n", bufline);
+                }
                 else
                 {
                   fprintf (stderr, "WARNING: line with a non-prime \"ideals\"."
