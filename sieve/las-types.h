@@ -115,14 +115,14 @@ struct sieve_side_info_s {
      */
     factorbase_degn_t ** fb_bucket_threads;
     /* When threads pick up this sieve_info structure, they should check
-     * theur bucket allocation */
+     * their bucket allocation */
     double max_bucket_fill_ratio;
 
 
     /* These fields are used for the norm initialization essentially.
      * Only the scale is also relevant to part of the rest, since it
      * determines the logp contributions for factor base primes */
-    double scale;      /* norm scale used on the algebraic side */
+    double scale;      /* scale used for logarithms for fb and norm */
     double cexp2[257]; /* for 2^X * scale + GUARD */
     double logmax;     /* norms on the alg-> side are < 2^alg->logmax */
 
