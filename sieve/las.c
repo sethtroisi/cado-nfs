@@ -1627,8 +1627,13 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
 #endif
             continue;
         }
-        if (UNLIKELY(r == p))
+        if (UNLIKELY(r >= p))
         {
+          if (r > p) /* should only happen for lattice-sieved prime powers,
+                        which is not possible currently since maxbits < I */
+            continue;
+
+          /* now r == p */
             /* r == p means root at infinity, which hits for
                j == 0 (mod p). Since q > I > J, this implies j = 0
                or j > J. This means we sieve only (i,j) = (1,0) here.
@@ -1647,10 +1652,6 @@ but which of these two (if any) do we sieve? */
               fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
                        (unsigned int) update.x, logp, p, sidenames[side], 0);
 #endif
-            continue;
-        }
-        if (UNLIKELY(r > p))
-        {
             continue;
         }
 
