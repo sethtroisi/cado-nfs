@@ -1,6 +1,13 @@
 Instructions on how to use CADO-NFS with msieve
 ===============================================
 
+Summary:
+
+I) Using CADO-NFS with relations computed with msieve (or ggnfs)
+II) Using msieve linear algebra after CADO-NFS filtering
+
+==============================================================================
+
 I) Using CADO-NFS with relations computed with msieve (or ggnfs)
 
 The format of relations used by CADO-NFS is the same as the one used by ggnfs
@@ -43,4 +50,28 @@ Warning:Are you OK to continue? [y/l/N] (30s timeout)
 
    Asnwer 'y'.
 
-   
+==============================================================================
+
+II) Using msieve linear algebra after CADO-NFS filtering
+
+up from SVN 891, msieve can read a cycle file produced by CADO-NFS. To use it,
+you will have to:
+
+- use CADO-NFS for the filtering. In what follows, let 'prefix' be
+  the prefix used for all the CADO filenames
+- use a version of the CADO 'replay' binary compiled to emit
+  a file <prefix>.cyc
+- concatenate all the relation files specified by purge.log in
+  the order specified, and name the file <prefix> in the same
+  directory as all the other CADO intermediate files. If Msieve was
+  compiled with zlib support, the files do not have to be uncompressed
+- create a <prefix>.fb file with the polynomials in Msieve format
+- create worktodo.ini with a single line containing N
+- run Msieve LA with
+
+  -v -nf <prefix>.fb -s <prefix> -nc2 "cado_filter=1"
+
+The string at the end may get extra options depending on whether
+the LA has more tweaking, like using MPI. The .cyc file gets
+overwritten during the LA, so re-running the LA does not require
+cado_filter=1.
