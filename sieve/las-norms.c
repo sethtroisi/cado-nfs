@@ -2879,11 +2879,16 @@ sieve_info_update_norm_data (sieve_info_ptr si, int nb_threads)
         sieve_side_info_ptr s = si->sides[side];
         cado_poly_side_ptr ps = si->cpoly->pols[side];
         mp_poly_homography (s->fij, ps->f, ps->degree, H);
-        double invq = 1.0;
-        if (si->conf->side == side)
-            invq /= mpz_get_d(si->doing->p);
+        /* On the special-q side, divide all the coefficients of the 
+           transformed polynomial by q */
+        if (si->conf->side == side) {
+            for (int i = 0; i <= ps->degree; i++) {
+                ASSERT_ALWAYS(mpz_divisible_p(s->fij[i], si->doing->p));
+                mpz_divexact(s->fij[i], s->fij[i], si->doing->p);
+            }
+        }
         for (int k = 0; k <= ps->degree; k++)
-            s->fijd[k] = mpz_get_d (s->fij[k]) * invq;
+            s->fijd[k] = mpz_get_d (s->fij[k]);
     }
 
     /* improve bound on J if possible */
