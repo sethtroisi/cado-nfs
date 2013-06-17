@@ -1,4 +1,4 @@
-BIN = sieve makefb normstats checkrels freerels testirred descent_init
+BIN = sieve makefb normstats checkrels testirred descent_init
 LIB = fppol
 
 fppol_OBJ = f2pol.o f3pol.o fppol.o fppol_test.o fppol_set.o  \
@@ -39,11 +39,19 @@ WARNFLAGS = -Wall -Wextra -pedantic
 
 FFSREV = `./version.sh`
 
-CPPFLAGS    = -DFFSREV=\"$(FFSREV)\" -DSCALE=0
+CPPFLAGS    = -DFFSREV=\"$(FFSREV)\" -DSCALE=0 -I../utils -I..
 CFLAGS      = $(OPTFLAGS) $(WARNFLAGS) -std=c99   -g
 TARGET_ARCH = -mtune=native -march=native
 LDFLAGS     = 
 LDLIBS      = -lm
+
+#begin for freerels
+#BIN += freerels
+#LDFLAGS  += -L$(BUILDDIR)/../utils #for freerels
+#LDLIBS   += -rdynamic $(BUILDDIR)/../utils/libutils.so #for freerels
+#RPATH     = $(shell readlink -f $(BUILDDIR)/../utils) #for freerels
+#LDLIBS   += -Wl,-rpath,${RPATH} #for freerels
+#end for freerels
 
 # Override variables in here!
 # See Makefile.local.example for a small documentation about compile
