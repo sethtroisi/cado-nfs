@@ -12,7 +12,6 @@
 #include "fb.h"
 #include "portability.h"
 #include "utils.h"           /* lots of stuff */
-#include "basicnt.h"         /* ctzl bin_gcd */
 #include "ecm/facul.h"
 #include "bucket.h"
 #include "trialdiv.h"
@@ -508,7 +507,7 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
     /* overrides default only if parameter is given */
     param_list_parse_int(pl, "bkthresh", &(si->bucket_thresh));
 
-    si->td_thresh = 1024;	/* default value */
+    si->td_thresh = si->I;	/* default value */
     param_list_parse_uint(pl, "tdthresh", &(si->td_thresh));
 
     /* Initialize the number of buckets */
@@ -1621,10 +1620,20 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
             WHERE_AM_I_UPDATE(w, x, update.x);
             ASSERT(test_divisible(w)); 
             push_bucket_update(BA, x >> shiftbucket, update);
+#ifdef TRACE_K
+            if (trace_on_spot_x(x))
+              fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
+                       (unsigned int) update.x, logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
+#endif
             continue;
         }
-        if (UNLIKELY(r == p))
+        if (UNLIKELY(r >= p))
         {
+          if (r > p) /* should only happen for lattice-sieved prime powers,
+                        which is not possible currently since maxbits < I */
+            continue;
+
+          /* now r == p */
             /* r == p means root at infinity, which hits for
                j == 0 (mod p). Since q > I > J, this implies j = 0
                or j > J. This means we sieve only (i,j) = (1,0) here.
@@ -1638,10 +1647,11 @@ but which of these two (if any) do we sieve? */
             WHERE_AM_I_UPDATE(w, x, update.x);
             ASSERT(test_divisible(w));
             push_bucket_update(BA, 0, update);
-            continue;
-        }
-        if (UNLIKELY(r > p))
-        {
+#ifdef TRACE_K
+            if (trace_on_spot_x(update.x))
+              fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
+                       (unsigned int) update.x, logp, p, sidenames[side], 0);
+#endif
             continue;
         }
 
@@ -2175,7 +2185,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
         i = abs ((int) (X & (si->I - 1)) - si->I / 2);
         j = X >> si->conf->logI;
 #ifndef UNSIEVE_NOT_COPRIME
-        if (bin_gcd_safe (i, j) != 1)
+        if (bin_gcd_int64_safe (i, j) != 1)
         {
 #ifdef TRACE_K
             if (trace_on_spot_Nx(N, x)) {
@@ -2401,7 +2411,7 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
                 cof_succ[cof_rat_bitsize][cof_alg_bitsize] ++;
 
 #ifdef UNSIEVE_NOT_COPRIME
-            ASSERT (bin_gcd_safe (a, b) == 1);
+            ASSERT (bin_gcd_int64_safe (a, b) == 1);
 #endif
 
             relation_t rel[1];

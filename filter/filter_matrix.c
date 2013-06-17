@@ -373,7 +373,7 @@ add_i_to_Rj(filter_matrix_t *mat, int i, int j)
 {
     // be semi-dumb for a while
     int k;
-    
+
 #if DEBUG >= 1
     fprintf(stderr, "Adding row %d to R[%d]\n", i, j);
 #endif

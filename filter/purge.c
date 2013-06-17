@@ -117,7 +117,7 @@ static cado_poly pol;
 static double wct0;
 static double W; /* total weight of the matrix (used in second pass) */
 static size_t tot_alloc, tot_alloc0;
-static p_r_values_t nrel,
+static index_t nrel,
   nprimes = 0,
   nrelmax = 0,
   relsup,
@@ -128,8 +128,8 @@ static p_r_values_t nrel,
   Hsizer,
   Hsizea,
   keep = 160;         /* default maximum final excess */
-static index_t minpr = UMAX(minpr);
-static index_t minpa = UMAX(minpa); /* negative values mean use minpr=rlim and
+static p_r_values_t minpr = UMAX(minpr);
+static p_r_values_t minpa = UMAX(minpa); /* negative values mean use minpr=rlim and
 				    minpa=alim */
 static int raw = 0, need64;
 static unsigned int npt = 4;
@@ -949,16 +949,16 @@ onepass_singleton_parallel_removal (unsigned int nb_thread)
 }
 #endif /* ifdef HAVE_SYNC_FETCH */
 
-static void
+static int 
 remove_singletons (unsigned int npass, double required_excess)
 {
   p_r_values_t oldnewnrel = 0, oldtmpnewnrel = 0;
-#if HR == 32
+#if index_size == 32
   int32_t oldexcess = 0, excess;
 #else
   int64_t oldexcess = 0, excess;
 #endif
-  int count = 0;
+  int count = 0, ok = 1;
 
   SMALLOC(sum, H.hm, "remove_singletons 1");
   if (!binfilerel) newnrel = nrel;
@@ -970,9 +970,8 @@ remove_singletons (unsigned int npass, double required_excess)
       /* check we have enough excess initially (at least required_excess) */
       if (count++ == 0 && (double) excess < required_excess*(double)newnprimes)
         {
-          fprintf(stderr, "excess < %.2f * #primes. See -required_excess "
-                          "argument.\n", required_excess);
-          exit (2);
+          ok = 0;
+          break;
         }
       if (oldexcess > excess)
 	fprintf (stderr, "   [each excess row deleted %2.2lf rows]\n",
@@ -997,6 +996,7 @@ remove_singletons (unsigned int npass, double required_excess)
   nrel = newnrel;
   nprimes = newnprimes;
   SFREE(sum);
+  return ok;
 }
 
 /* This function renumbers used primes (those with H->hashcount[i] > 1)
@@ -2192,25 +2192,25 @@ main (int argc, char **argv)
     break;
   }
 
-#if p_r_values_size == 32
-  param_list_parse_uint(pl, "nrels", (unsigned int *) &nrelmax);
-  param_list_parse_uint(pl, "nprimes", (unsigned int *) &nprimes);
-  param_list_parse_uint(pl, "keep", (unsigned int *) &keep);
-#else
-  param_list_parse_uint64(pl, "nrels", (uint64_t *) &nrelmax);
-  param_list_parse_uint64(pl, "nprimes", (uint64_t *) &nprimes);
-  param_list_parse_uint64(pl, "keep", (uint64_t *) &keep);
-#endif
-
 #if index_size == 32
-  param_list_parse_uint(pl, "minpr", (unsigned int *) &minpr);
-  param_list_parse_uint(pl, "minpa", (unsigned int *) &minpa);
+  param_list_parse_uint(pl, "nrels", &nrelmax);
+  param_list_parse_uint(pl, "nprimes", &nprimes);
+  param_list_parse_uint(pl, "keep", &keep);
 #else
-  param_list_parse_uint64(pl, "minpr", (uint64_t *) &minpr);
-  param_list_parse_uint64(pl, "minpa", (uint64_t *) &minpa);
+  param_list_parse_uint64(pl, "nrels", &nrelmax);
+  param_list_parse_uint64(pl, "nprimes", &nprimes);
+  param_list_parse_uint64(pl, "keep", &keep);
 #endif
 
-  /* param_list_parse_uint(pl, "npthr", (unsigned int *) &npt); */
+#if p_r_values_size == 32
+  param_list_parse_uint(pl, "minpr", &minpr);
+  param_list_parse_uint(pl, "minpa", &minpa);
+#else
+  param_list_parse_uint64(pl, "minpr", &minpr);
+  param_list_parse_uint64(pl, "minpa", &minpa);
+#endif
+
+  /* param_list_parse_uint(pl, "npthr", &npt); */
   const char * snpt = param_list_lookup_string(pl, "npthr");
   if (snpt) {
     char *p, oldp;
@@ -2467,9 +2467,14 @@ main (int argc, char **argv)
 	     (unsigned long) nrel, (unsigned long) newnrel, (unsigned long) nprimes, ((long) newnrel) - nprimes);
 
   if (!boutfilerel) {
-    remove_singletons (npass, required_excess);
-    fprintf (stderr, "   nrel=%lu, nprimes=%lu; excess=%ld\n",
+    int ok = remove_singletons (npass, required_excess);
+    fprintf (stderr, "   nrels=%lu, nprimes=%lu; excess=%ld\n",
 	     (unsigned long) nrel, (unsigned long) nprimes, ((long) nrel) - nprimes);
+    if (!ok) {
+      fprintf(stderr, "excess < %.2f * #primes. See -required_excess "
+	      "argument.\n", required_excess);
+      exit(2);
+    }
     if (nrel <= nprimes) /* covers case nrel = nprimes = 0 */
       {
 	fprintf(stderr, "number of relations <= number of ideals\n");

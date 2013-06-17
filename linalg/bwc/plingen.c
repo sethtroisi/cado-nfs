@@ -627,7 +627,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
             if (!is_pivot[j]) continue;
             if (pi_lengths[j] >= pi->alloc) {
                 if (!generator_found) {
-                    polymat_realloc(pi, pi->alloc + pi->alloc / (m+n));
+                    polymat_realloc(pi, pi->alloc + 1 + pi->alloc / (m+n));
                     printf("t=%u, expanding allocation for pi (now %zu%%) ; lengths: ",
                             bm->t,
                             100 * pi->alloc / pi_room_base);
@@ -645,6 +645,7 @@ static int bw_lingen_basecase(bmstatus_ptr bm, polymat pi, polymat E, unsigned i
                     continue;
                 }
             }
+            ASSERT_ALWAYS(pi_lengths[j] + 1 <= pi->alloc);
             bwmat_move_coeffs(ab,
                     polymat_part(pi, 0, j, 1), b,
                     polymat_part(pi, 0, j, 0), b,

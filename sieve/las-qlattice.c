@@ -30,7 +30,8 @@ int mpz_rdiv_q(mpz_ptr q, mpz_t a, mpz_t b)
 
 /* We work with two vectors v0=(a0,b0) and v1=(a1,b1). The quadratic form
  * is proportional to a0^2+skewness^2*b0^2 */
-int generic_skew_gauss(mpz_t a[2], mpz_t b[2], double skewness)
+static int 
+generic_skew_gauss(mpz_t a[2], mpz_t b[2], double skewness)
 {
     // skewness^2 can be written as a one-word (actually, 53 bits)
     // integer times a power of two, which is presumably larger than

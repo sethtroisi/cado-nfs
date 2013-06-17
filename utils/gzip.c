@@ -183,7 +183,6 @@ prempt_open_compressed_rs (char *antebuffer, char **ficname)
     fprintf (stderr, "fopen_compressed_rs: calloc error : %s\n", strerror(errno));
     exit (1);
   }
-  fic_realpath = (char *) malloc(PATH_MAX * sizeof(char));
   if ((fic_realpath = (char *) malloc(PATH_MAX * sizeof(char))) == NULL) {
     fprintf (stderr, "fopen_compressed_rs: malloc error : %s\n", strerror(errno));
     exit (1);

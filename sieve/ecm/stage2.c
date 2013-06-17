@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include "../basicnt.h"
 #include "utils.h"
 #include "stage2.h"
 #include "portability.h"
@@ -33,6 +32,44 @@ binsearch (const int *a, const unsigned int l, const int x)
 }
 #endif
 
+
+static inline unsigned long 
+eulerphi_ul (unsigned long n)
+{
+  unsigned long p, r = 1UL;
+  
+  if (n == 0UL) /* Undefined, we return 0 */
+    return 0UL;
+
+  if (n % 2UL == 0UL)
+    {
+      n /= 2UL;
+      while (n % 2UL == 0UL)
+        {
+          n /= 2UL;
+          r *= 2UL;
+        }
+    }
+
+  for (p = 3UL; p*p <= n; p += 2UL)
+    {
+      if (n % p == 0UL)
+        {
+          n /= p;
+          r *= p - 1UL;
+          while (n % p == 0UL)
+            {
+              n /= p;
+              r *= p;
+            }
+        }
+    }
+  /* Now n is either 1 or a prime */
+  if (n > 1UL)
+    r *= n - 1UL;
+  
+  return r;
+}
 
 /* Tries to find a factor p of n such that primes[p] != 0.
    We assume p is the largest prime factor of n.

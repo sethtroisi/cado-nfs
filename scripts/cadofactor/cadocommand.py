@@ -96,7 +96,8 @@ class RemoteCommand(Command):
         self.prog = cadoprograms.SSH
         progparams = parameters.myparams(self.prog.get_config_keys(),
                                          path_prefix + [self.prog.name])
-        ssh = self.prog([host, cmdline], progparams)
+        ssh = self.prog([host, "env", "sh", "-c", Command._shellquote(cmdline)],
+            progparams)
         super().__init__(ssh, *args, **kwargs)
 
 class SendFile(Command):
