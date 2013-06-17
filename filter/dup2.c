@@ -62,6 +62,12 @@
 
 #include "filter_utils.h"
 
+#ifdef FOR_FFS
+#include "fppol.h"
+#include "fq.h"
+#include "utils_ffs.h"
+#endif
+
 char *argv0; /* = argv[0] */
 
 renumber_t renumber_table;
@@ -571,8 +577,8 @@ main (int argc, char *argv[])
   buf_rel_t *buf_rel;
   p_r_values_t pmin;
   index_t min_index;
+  cado_poly cpoly;
     const char *renumberfilename = NULL;
-    cado_poly cpoly;
     char **p;
 
     /* print command line */
@@ -621,11 +627,30 @@ main (int argc, char *argv[])
       usage(argv0);
 
     cado_poly_init (cpoly);
+#ifndef FOR_FFS
     if (!cado_poly_read (cpoly, polyfilename))
+    {
+      fprintf (stderr, "Error reading polynomial file\n");
+      exit (EXIT_FAILURE);
+    }
+    pmin = ulong_nextprime (MIN (cpoly->pols[0]->lim, cpoly->pols[1]->lim));
+#else
+    if (!ffs_poly_read (cpoly, polyfilename))
+    {
+      fprintf (stderr, "Error reading polynomial file\n");
+      exit (EXIT_FAILURE);
+    }
+    //compute pmin
+    {
+      sq_t p;
+      sq_set_ti(p, MIN (cpoly->pols[0]->lim, cpoly->pols[1]->lim) + 1);
+      do
       {
-        fprintf (stderr, "Error reading polynomial file\n");
-        exit (EXIT_FAILURE);
-      }
+        sq_monic_set_next(p, p, 64);
+      } while (!sq_is_irreducible(p));
+      pmin = fppol64_get_ui_sparse (p);
+    }
+#endif
 
     if (basepath && !filelist) {
         fprintf(stderr, "-basepath only valid with -filelist\n");
@@ -658,6 +683,14 @@ main (int argc, char *argv[])
   
     renumber_init (renumber_table, cpoly);
     renumber_read_table (renumber_table, renumberfilename);
+    // Find the index that corresponds to the min value of alim and rlim (for
+    // purge)
+    // FIXME not correct in the case of two alg side
+    min_index = renumber_get_index_from_p_r (renumber_table, pmin, 0,
+                                                           renumber_table->rat);
+    fprintf (stderr, "Renumbering struct: min_index=%"PRid"\n", min_index);
+
+
 
   /* sanity check: since we allocate two 64-bit words for each, instead of
      one 32-bit word for the hash table, taking K/100 will use 2.5% extra
@@ -786,16 +819,6 @@ main (int argc, char *argv[])
   free (sanity_b);
   fprintf (stderr, "[found %lu true duplicates on sample of %lu relations]\n",
            sanity_collisions, sanity_checked);
-
-  // Find the index that corresponds to the min value of alim and rlim (for
-  // purge)
-  // TODO in dup2-ffs   instanciated ->lim
-  pmin = ulong_nextprime (MIN (cpoly->pols[0]->lim, cpoly->pols[1]->lim));
-  //not correct in the case of two alg side
-  min_index = renumber_get_index_from_p_r (renumber_table, pmin, 0,
-                                                          renumber_table->rat);
-  fprintf (stderr, "Renumbering struct: min_index=%"PRid"\n", min_index);
-
 
 
   if (filelist)
