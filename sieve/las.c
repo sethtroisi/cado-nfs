@@ -2311,18 +2311,18 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
             for(int z = 0 ; pass && z < 2 ; z++) {
                 int side = RATIONAL_SIDE ^ z;   /* start with rational */
-                mpz_t * f = cpoly->pols[side]->f;
+                mpz_t * f = si->sides[side]->fij;
                 int deg = cpoly->pols[side]->degree;
                 int lim = si->conf->sides[side]->lim;
+                int i;
+                unsigned int j;
 
                 // Trial divide rational norm
-                mp_poly_homogeneous_eval_siui (norm[side], f, deg, a, b);
-                if (si->conf->side == side) {
-#ifdef  WANT_ASSERT_EXPENSIVE
-                    ASSERT(mpz_divisible_p(norm[side], si->doing->p));
-#endif
-                    mpz_divexact (norm[side], norm[side], si->doing->p);
-                }
+                /* Compute the norms using the polynomials transformed to 
+                   i,j-coordinates. The transformed polynomial on the 
+                   special-q side is already divided by q */
+                NxToIJ (&i, &j, N, x, si);
+                mp_poly_homogeneous_eval_siui (norm[side], f, deg, i, j);
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b)) {
                     gmp_fprintf(stderr, "# start trial division for norm=%Zd on %s side for (%"PRId64",%"PRIu64")\n",norm[side],sidenames[side],a,b);
