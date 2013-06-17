@@ -1620,6 +1620,11 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
             WHERE_AM_I_UPDATE(w, x, update.x);
             ASSERT(test_divisible(w)); 
             push_bucket_update(BA, x >> shiftbucket, update);
+#ifdef TRACE_K
+            if (trace_on_spot_x(x))
+              fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
+                       (unsigned int) update.x, logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
+#endif
             continue;
         }
         if (UNLIKELY(r == p))
@@ -1637,6 +1642,11 @@ but which of these two (if any) do we sieve? */
             WHERE_AM_I_UPDATE(w, x, update.x);
             ASSERT(test_divisible(w));
             push_bucket_update(BA, 0, update);
+#ifdef TRACE_K
+            if (trace_on_spot_x(update.x))
+              fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
+                       (unsigned int) update.x, logp, p, sidenames[side], 0);
+#endif
             continue;
         }
         if (UNLIKELY(r > p))
