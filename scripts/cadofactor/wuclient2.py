@@ -275,8 +275,9 @@ class WorkunitProcessorClient(WorkunitProcessor):
                     logging.warning("Sleeping until %s contains data", dlpath)
                     time.sleep(1)
                     slept += 1
-                logging.warning("Slept %d seconds, %s still has no data", 
-                                timeout, dlpath)
+                if slept == timeout:
+                    logging.warning("Slept %d seconds, %s still has no data", 
+                                    timeout, dlpath)
                 return
             else:
                 raise
