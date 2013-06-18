@@ -947,7 +947,10 @@ class WuAccess(object): # {
         count = self.mapper.count(cursor, **cond)
         cursor.close()
         return count
-
+    
+    def count_available(self):
+        return self.count(eq={"status": WuStatus.AVAILABLE})
+    
     def get_one_result(self):
         r = self.query(limit = 1, eq={"status": WuStatus.RECEIVED_OK})
         if not r:

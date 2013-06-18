@@ -385,7 +385,7 @@ class ClientServerTask(Task, patterns.Observer):
     def submit_command(self, command, identifier):
         ''' Submit a workunit to the database. '''
         
-        while self.get_number_outstanding_wus() >= int(self.params["maxwu"]):
+        while self.get_number_available_wus() >= int(self.params["maxwu"]):
             self.wait()
         wuid = self.make_wuname(identifier)
         wutext = command.make_wu(wuid)
@@ -410,6 +410,9 @@ class ClientServerTask(Task, patterns.Observer):
     
     def get_number_outstanding_wus(self):
         return self.state["wu_submitted"] - self.state["wu_received"]
+
+    def get_number_available_wus(self):
+        return self.send_request(Request.GET_NR_AVAILABLE_WU, None)
 
     def test_outputfile_exists(self, filename):
         # Can't test
@@ -1721,6 +1724,8 @@ class StartClientsTask(Task):
                 self.used_ids[clientid] = True
                 return
             else:
+                self.logger.info("Client %s on host %s with PID %d seems to have died",
+                                 clientid, host, self.pids[clientid])
                 del(self.pids[clientid])
                 del(self.hosts[clientid])
         
@@ -1802,6 +1807,7 @@ class Notification(Message):
     VERIFY_WU = 6
     WANT_TO_RUN = 7
     SUBSCRIBE_WU_NOTIFICATIONS = 8
+    CHECK_TIMEDOUT_WUS = 9
 
 class Request(Message):
     GET_POLYNOMIAL = 0
@@ -1822,7 +1828,7 @@ class Request(Message):
     GET_LINALG_PREFIX = 15
     GET_KERNEL_FILENAME = 16
     GET_WU_RESULT = 17
-
+    GET_NR_AVAILABLE_WU = 18
 
 class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Mediator):
     """ The complete factorization, aggregate of the individual tasks """
@@ -1938,6 +1944,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
             Request.GET_LINALG_PREFIX: self.linalg.get_prefix,
             Request.GET_KERNEL_FILENAME: self.characters.get_kernel_filename,
             Request.GET_WU_RESULT: self.db_listener.send_result,
+            Request.GET_NR_AVAILABLE_WU: self.wuar.count_available
         }
     
     def run(self):
@@ -1966,7 +1973,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         return False
     
     def do_chores(self):
-        if self.chores:
+        while self.chores:
             chore = self.chores.pop()
             if chore == self.CAN_CANCEL_WUS:
                 self.logger.info("Cancelling remaining workunits")
@@ -1999,6 +2006,15 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
             else:
                 # Was already registered with the same target. Nothing to do
                 pass
+    
+    def check_timedout_wus(self, sender):
+        # Check at most once per minute
+        attr = "last_check_timedout_wus"
+        if getattr(self, attr, 0.) + 60. > time.time():
+            # TODO
+            # self.wuar.timeout_wus(self.params.get("wu_timeout", 3600))
+            pass
+        setattr(self, attr, time.time())
     
     def relay_notification(self, message):
         assert isinstance(message, Notification)
@@ -2049,6 +2065,11 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
                 return self.db_listener.subscribeObserver(sender)
             else:
                 raise Exception("Got SUBSCRIBE_WU_NOTIFICATIONS, but not from a ClientServerTask")
+        elif key == Notification.CHECK_TIMEDOUT_WUS:
+            if isinstance(sender, ClientServerTask):
+                return self.check_timedout_wus(sender)
+            else:
+                raise Exception("Got CHECK_TIMEDOUT_WUS, but not from a ClientServerTask")
         else:
             raise KeyError("Notification from %s has unknown key %s" % (sender, key))
     
