@@ -1054,7 +1054,7 @@ void init_alg_norms_bucket_region(unsigned char *S,
 #endif
 
 /**************** 3: HAVE_SSE2, !ALG_LAZY, ALG_RAT **************************/
-#if /* defined(NOTDEFINED) */ defined(__x86_64) && defined(HAVE_SSE2)  /* Not active: code slower than non SSE version */
+#if defined(NOTDEFINED) /* defined(__x86_64) && defined(HAVE_SSE2) */ /* Not active: code slower than non SSE version */
 #ifndef ALG_LAZY
 #ifdef ALG_RAT
 /* Smart initialization of the algebraics : only if the corresponding
@@ -2193,7 +2193,8 @@ void init_alg_norms_bucket_region(unsigned char *S,
 #endif
 
 /********** 7: !(HAVE_SSE2 & x86-64), !ALG_LAZY, ALG_RAT **************/
-#if /* !defined(NOTDEFINED) */ !defined(__x86_64) || !defined(HAVE_SSE2) /* Active by default: SSE code slower */
+/* Active by default: SSE code slower */
+#if !defined(NOTDEFINED) /* !defined(__x86_64) || !defined(HAVE_SSE2) */
 #ifndef ALG_LAZY
 #ifdef ALG_RAT
 /* Smart initialization of the algebraics : only if the corresponding
