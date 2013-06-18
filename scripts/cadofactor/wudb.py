@@ -245,7 +245,6 @@ class MyCursor(sqlite3.Cursor):
         command = "SELECT COUNT(*)" + " FROM " + joinsource + WHERE + ";"
         self._exec(command, values)
         r = self.fetchone()
-        print(r)
         return int(r[0])
         
     def delete(self, table, **conditions):
