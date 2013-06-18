@@ -3386,6 +3386,16 @@ int main (int argc0, char *argv0[])/*{{{*/
         if (SkewGauss (si, si->cpoly->skew) != 0)
             continue;
 
+        /* check |a0|, |a1| < 2^31 if we use fb_root_in_qlattice_31bits */
+#ifndef SUPPORT_LARGE_Q
+        if (si->a0 <= -2147483648L || 2147483648L <= si->a0 ||
+            si->a1 <= -2147483648L || 2147483648L <= si->a1)
+          {
+            fprintf (stderr, "Error, too large special-q, define SUPPORT_LARGE_Q\n");
+            exit (1);
+          }
+#endif
+
         /* FIXME: maybe we can discard some special q's if a1/a0 is too large,
          * see http://www.mersenneforum.org/showthread.php?p=130478 
          *
