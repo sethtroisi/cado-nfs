@@ -9,6 +9,7 @@ import random
 import time
 import wudb
 import logging
+import socket
 import patterns
 import cadoprograms
 import cadoparams
@@ -1845,10 +1846,11 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         self.wuar.create_tables()
         
         # Set up WU server
-        serveraddress = "localhost"
+        serveraddress = socket.gethostname()
         serverport = 8001
         uploaddir = self.params["workdir"].rstrip(os.sep) + os.sep + self.params["name"] + ".upload/"
-        self.server = wuserver.ServerLauncher(serveraddress, serverport, False, self.get_db_filename(), 
+        threaded = False
+        self.server = wuserver.ServerLauncher(serveraddress, serverport, threaded, self.get_db_filename(), 
             self.registered_filenames, uploaddir, bg = True)
         
         # Init client lists
