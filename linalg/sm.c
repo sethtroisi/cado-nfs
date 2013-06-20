@@ -47,7 +47,8 @@ typedef const relset_struct_t * relset_srcptr;
 /* Q = P^a mod f, mod p. Note, p is mpz_t */
 void
 poly_power_mod_f_mod_mpz_Barrett (poly_t Q, const poly_t P, const poly_t f,
-				  const mpz_t a, const mpz_t p, const mpz_t invp)
+				  const mpz_t a, const mpz_t p,
+                                  MAYBE_UNUSED const mpz_t invp)
 {
   int k = mpz_sizeinbase(a, 2);
   poly_t R;
@@ -76,7 +77,7 @@ poly_power_mod_f_mod_mpz_Barrett (poly_t Q, const poly_t P, const poly_t f,
 }
 
 
-relset_ptr build_rel_sets(const char * purgedname, const char * indexname , int * small_nrows, poly_t F, const mpz_t ell, const mpz_t ell2)
+relset_ptr build_rel_sets(const char * purgedname, const char * indexname , int * small_nrows, poly_t F, const mpz_t ell2)
 {
   purgedfile_stream ps;
   FILE * ix = fopen(indexname, "r");
@@ -327,7 +328,7 @@ int main (int argc, char **argv)
   fprintf(stderr, "\n");
 
   t0 = seconds();
-  rels = build_rel_sets(purgedname, indexname, &sr, F, ell, ell2);
+  rels = build_rel_sets(purgedname, indexname, &sr, F, ell2);
 
   fprintf(stderr, "\nComputing Shirokauer maps for %d relations\n", sr);
 
