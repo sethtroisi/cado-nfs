@@ -44,9 +44,7 @@ typedef relset_struct_t * relset_ptr;
 typedef const relset_struct_t * relset_srcptr;
 
 
-relset_ptr
-build_rel_sets (const char * purgedname, const char * indexname ,
-                int * small_nrows, poly_t F, mpz_t ell)
+relset_ptr build_rel_sets(const char * purgedname, const char * indexname , int * small_nrows, poly_t F, mpz_t ell)
 {
   purgedfile_stream ps;
   FILE * ix = fopen(indexname, "r");
@@ -74,13 +72,12 @@ build_rel_sets (const char * purgedname, const char * indexname ,
 
   /* Parse purgedfile (a,b)-pairs only*/
   ps->parse_only_ab = 1;
-  int npairs;
-  for(npairs = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; npairs++) {
-    ASSERT_ALWAYS(npairs < ps->nrows);
+  for(int i = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; i++) {
+    ASSERT_ALWAYS(i < ps->nrows);
     /* (a,b)-pair is a degree-1 poly */
-    poly_alloc(pairs[npairs], 1);
-    poly_setcoeff_si(pairs[npairs], 0, ps->a);
-    poly_setcoeff_si(pairs[npairs], 1, -ps->b);
+    poly_alloc(pairs[i], 1);
+    poly_setcoeff_si(pairs[i], 0, ps->a);
+    poly_setcoeff_si(pairs[i], 1, -ps->b);
   }
 
   /* small_ncols isn't used here: we don't care. */
@@ -102,11 +99,11 @@ build_rel_sets (const char * purgedname, const char * indexname ,
   mpz_t ee;
   mpz_init(ee);  
 
-  poly_alloc (tmp, F->deg);
   for(int i = 0 ; i < *small_nrows ; i++) {
     ret = fscanf(ix, "%ld", &nc); 
     ASSERT_ALWAYS(ret == 1);
 	
+    poly_alloc(tmp, F->deg);
     poly_setcoeff_si(rels[i].num, 0, 1);      /* rels[i].num = 1   */
     poly_setcoeff_si(rels[i].denom, 0, 1);    /* rels[i].denom = 1 */
 
@@ -117,22 +114,24 @@ build_rel_sets (const char * purgedname, const char * indexname ,
       /* Should never happen! */
       ASSERT_ALWAYS(e != 0);
 
-      mpz_set_si(ee, (e > 0) ? e : -e);
-      /* TODO: poly_long_power_mod_f_mod_mpz */
-      poly_power_mod_f_mod_mpz(tmp, pairs[ridx], F, ee, ell2);
-      poly_mul_mod_f_mod_mpz(rels[i].num, rels[i].num, tmp, F, ell2, NULL);
+      if (e > 0) {
+	  mpz_set_si(ee, e);
+	  /* TODO: poly_long_power_mod_f_mod_mpz */
+	  poly_power_mod_f_mod_mpz(tmp, pairs[ridx], F, ee, ell2);
+	  poly_mul_mod_f_mod_mpz(rels[i].num, rels[i].num, tmp, F, ell2, NULL);
+      }
+      else {
+	  mpz_set_si(ee, -e);
+	  /* TODO: poly_long_power_mod_f_mod_mpz */
+	  poly_power_mod_f_mod_mpz(tmp, pairs[ridx], F, ee, ell2);
+	  poly_mul_mod_f_mod_mpz(rels[i].num, rels[i].num, tmp, F, ell2, NULL);
+      }
     }
   }
-  poly_free (tmp);
-
+ 
   fclose(ix);
-  mpz_clear (ell2);
   purgedfile_stream_closefile(ps);
   purgedfile_stream_clear(ps);
-  while (npairs > 0)
-    poly_free (pairs[--npairs]);
-  free (pairs);
-  mpz_clear (ee);
   
   return rels;
 }
@@ -142,9 +141,10 @@ void shirokauer_maps(const char * outname, relset_srcptr rels, int sr, poly_t F,
 {
   FILE * out = fopen(outname, "w");
   poly_t SMn, SMd, SM;
-  mpz_t l2;
+  mpz_t l2, tmp;
   
   mpz_init(l2);
+  mpz_init(tmp);
 
   /* All computations are done mod l^2 */
   mpz_mul(l2, ell, ell);
@@ -180,7 +180,6 @@ void shirokauer_maps(const char * outname, relset_srcptr rels, int sr, poly_t F,
   poly_free(SMn);
   poly_free(SMd);
   poly_free(SM);
-  mpz_clear (l2);
   fclose(out);
 }
 
@@ -247,10 +246,6 @@ int main (int argc, char **argv)
   const char * tmp;
 
   ASSERT_ALWAYS((tmp = param_list_lookup_string(pl, "poly")) != NULL);
-
-  if (param_list_warn_unused(pl))
-    exit(1);
-
   cado_poly_read(pol, tmp);
   
   /* Construct poly_t F from cado_poly pol (algebraic side) */
@@ -260,6 +255,9 @@ int main (int argc, char **argv)
   poly_alloc (F, deg);
   for (int i = deg; i >= 0; --i)
     poly_setcoeff (F, i, f[i]);
+
+  if (param_list_warn_unused(pl))
+    exit(1);
 
   ASSERT_ALWAYS(purgedname != NULL);
   ASSERT_ALWAYS(indexname != NULL);
@@ -282,8 +280,6 @@ int main (int argc, char **argv)
 
   fprintf(stderr, "Computing Shirokauer maps for %d relations took %2.2lf seconds\n", sr, seconds() - t0);
 
-  mpz_clear (eps);
-  poly_free (F);
   cado_poly_clear(pol);
   param_list_clear(pl);
 
