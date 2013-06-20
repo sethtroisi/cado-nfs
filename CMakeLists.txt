@@ -113,17 +113,19 @@ include("${CADO_NFS_SOURCE_DIR}/config/asprintf.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/mingw.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/test-rand.cmake")
 
-if(MINGW)
+if(MINGW OR COMPARE NOTEQUAL "$ENV{DISABLE_SHARED}" "")
     unset(BUILD_DYNAMICALLY_LINKABLE_BWC)
-else(MINGW)
+else(MINGW OR COMPARE NOTEQUAL "$ENV{DISABLE_SHARED}" "")
     set(BUILD_DYNAMICALLY_LINKABLE_BWC 1)
-endif(MINGW)
+endif(MINGW OR COMPARE NOTEQUAL "$ENV{DISABLE_SHARED}" "")
 
 if(BUILD_DYNAMICALLY_LINKABLE_BWC)
     set(CADO_SHARED SHARED)
 else(BUILD_DYNAMICALLY_LINKABLE_BWC)
     set(CADO_SHARED)
 endif(BUILD_DYNAMICALLY_LINKABLE_BWC)
+
+
 
 ######################################################################
 # Try to detect whether pthreads and/or MPI are available.
