@@ -77,7 +77,8 @@ poly_power_mod_f_mod_mpz_Barrett (poly_t Q, const poly_t P, const poly_t f,
 }
 
 
-relset_ptr build_rel_sets(const char * purgedname, const char * indexname , int * small_nrows, poly_t F, const mpz_t ell2)
+relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
+			  int * small_nrows, poly_t F, const mpz_t ell2)
 {
   purgedfile_stream ps;
   FILE * ix = fopen(indexname, "r");
@@ -99,18 +100,19 @@ relset_ptr build_rel_sets(const char * purgedname, const char * indexname , int 
 
   /* Parse purgedfile (a,b)-pairs only*/
   ps->parse_only_ab = 1;
-  for(int i = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; i++) {
-    ASSERT_ALWAYS(i < ps->nrows);
+  int npairs;
+  for(npairs = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; npairs++) {
+    ASSERT_ALWAYS(npairs < ps->nrows);
     if (ps->b == 0) {
 	/* freerels */
-	poly_alloc(pairs[i], 0);
-	poly_setcoeff_si(pairs[i], 0, ps->a);
+	poly_alloc(pairs[npairs], 0);
+	poly_setcoeff_si(pairs[npairs], 0, ps->a);
       }
     else {
       /* (a,b)-pair is a degree-1 poly */
-      poly_alloc(pairs[i], 1);
-      poly_setcoeff_si(pairs[i], 0, ps->a);
-      poly_setcoeff_si(pairs[i], 1, -ps->b);
+      poly_alloc(pairs[npairs], 1);
+      poly_setcoeff_si(pairs[npairs], 0, ps->a);
+      poly_setcoeff_si(pairs[npairs], 1, -ps->b);
     }
   }
 
@@ -133,11 +135,12 @@ relset_ptr build_rel_sets(const char * purgedname, const char * indexname , int 
   mpz_t ee;
   mpz_init(ee);  
 
+  poly_alloc(tmp, F->deg);
+
   for(int i = 0 ; i < *small_nrows ; i++) {
     ret = fscanf(ix, "%ld", &nc); 
     ASSERT_ALWAYS(ret == 1);
 	
-    poly_alloc(tmp, F->deg);
     poly_setcoeff_si(rels[i].num, 0, 1);      /* rels[i].num = 1   */
     poly_setcoeff_si(rels[i].denom, 0, 1);    /* rels[i].denom = 1 */
 
@@ -162,10 +165,16 @@ relset_ptr build_rel_sets(const char * purgedname, const char * indexname , int 
       }
     }
   }
- 
+  poly_free(tmp);
+
   fclose(ix);
   purgedfile_stream_closefile(ps);
   purgedfile_stream_clear(ps);
+
+  while (npairs > 0)
+    poly_free (pairs[--npairs]);
+  free (pairs);
+  mpz_clear (ee);
   
   return rels;
 }
@@ -175,11 +184,11 @@ void shirokauer_maps(const char * outname, relset_srcptr rels, int sr, poly_t F,
 {
   FILE * out = fopen(outname, "w");
   poly_t SMn, SMd, SM;
-  mpz_t invl2, tmp;
+  mpz_t invl2;
   
   /* mpz_init(l2); */
   mpz_init(invl2);
-  mpz_init(tmp);
+  //  mpz_init(tmp);
 
   barrett_init(invl2, ell2);
 
@@ -231,6 +240,7 @@ void shirokauer_maps(const char * outname, relset_srcptr rels, int sr, poly_t F,
   poly_free(SMn);
   poly_free(SMd);
   poly_free(SM);
+  mpz_clear(invl2);
   fclose(out);
 }
 
@@ -302,6 +312,9 @@ int main (int argc, char **argv)
   ASSERT_ALWAYS((tmp = param_list_lookup_string(pl, "poly")) != NULL);
   cado_poly_read(pol, tmp);
   
+  if (param_list_warn_unused(pl))
+    exit(1);
+
   /* Construct poly_t F from cado_poly pol (algebraic side) */
   deg = pol->pols[ALGEBRAIC_SIDE]->degree;
   f = pol->pols[ALGEBRAIC_SIDE]->f;
@@ -309,9 +322,6 @@ int main (int argc, char **argv)
   poly_alloc (F, deg);
   for (int i = deg; i >= 0; --i)
     poly_setcoeff (F, i, f[i]);
-
-  if (param_list_warn_unused(pl))
-    exit(1);
 
   ASSERT_ALWAYS(purgedname != NULL);
   ASSERT_ALWAYS(indexname != NULL);
@@ -343,6 +353,10 @@ int main (int argc, char **argv)
 
   fprintf(stderr, "\nsm completed in %2.2lf seconds\n", seconds() - t0);
 
+  mpz_clear(eps);
+  mpz_clear(ell);
+  mpz_clear(ell2);
+  poly_free(F);
   cado_poly_clear(pol);
   param_list_clear(pl);
 
