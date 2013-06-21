@@ -65,7 +65,7 @@ you will have to:
 
 - use CADO-NFS for the filtering. In what follows, let 'prefix' be
   the prefix used for all the CADO filenames
-- use a version of the CADO 'replay' binary compiled to emit
+- use the CADO 'replay' binary with --for_msieve to produce
   a file <prefix>.cyc
 - concatenate all the relation files specified by purge.log in
   the order specified, and name the file <prefix> in the same
