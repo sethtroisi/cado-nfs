@@ -1,9 +1,5 @@
 #!/usr/bin/env python2
 
-# TODO: file locking for downloading files, so several clients can use the 
-# same files (factorbase etc.) safely
-# TODO: file locking for workunit files, so name collision can be detected
-
 import sys
 import os
 import fcntl
