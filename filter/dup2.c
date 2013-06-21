@@ -703,8 +703,8 @@ main (int argc, char *argv[])
   for (p = files, nb_files = 0; *p; p++)
     nb_files++;
 
-  SMALLOC(files_already_renumbered, nb_files, "files_already_renumbered");
-  SMALLOC(files_new, nb_files, "files_new");
+  SMALLOC(files_already_renumbered, nb_files + 1, "files_already_renumbered");
+  SMALLOC(files_new, nb_files + 1, "files_new");
   
   /* separate already process files
    * check if f_tmp is in raw format a,b:...:... or 
