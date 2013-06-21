@@ -23,7 +23,13 @@ or msieve. We assume here we want to factor a number c100.
    /tmp/cado.xxx/c59.poly file to see that format)
 
 4) put all relations in ggnfs format into a single file c100.rels.0-1.gz
-   (into /tmp/c100) and in c100.nrels the number of relations
+   (into /tmp/c100) and in c100.nrels the number of relations.
+
+   Note: since ggnfs doesn't print prime factors under 10000, and CADO-NFS
+   requires all prime factors, you will need first to complete factorizations:
+
+   $ build/<hostname>/utils/complete_rels -f -poly c100.poly c100.rels.ggnfs >
+                                                             c100.rels.0-1
 
 5) create empty files in /tmp/c100 (in order):
   
