@@ -101,7 +101,8 @@ include("${CADO_NFS_SOURCE_DIR}/config/sse2.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/sse3.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/ssse3.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/sse41.cmake")
-include("${CADO_NFS_SOURCE_DIR}/config/gcc-assembly.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/gcc-inline-assembly.cmake")
+include("${CADO_NFS_SOURCE_DIR}/config/gas-assembly.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/curl.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/alloca.cmake")
 include("${CADO_NFS_SOURCE_DIR}/config/math.cmake")
@@ -156,7 +157,7 @@ include (${CADO_NFS_SOURCE_DIR}/config/mpi.cmake)
 # The code in linalg/bwc/mpfq/ is 64-bit only, and relies on GNU CC
 # idioms. As it is not used in production yet, we don't want to expose it
 # on 32-bit platforms.
-set(ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG ${HAVE_GCC_STYLE_AMD64_ASM})
+set(ENABLE_MPFQ_PRIME_FIELDS_FOR_DLOG ${HAVE_GCC_STYLE_AMD64_INLINE_ASM})
 
 message(STATUS "Using libs: ${math_libs} (math) ${pthread_libs} (pthreads)")
 

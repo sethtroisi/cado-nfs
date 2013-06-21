@@ -6,7 +6,7 @@
 #include "macros.h"
 #include "portability.h"
 
-#ifdef HAVE_GCC_STYLE_AMD64_ASM
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
 
 //#define DEBUG_CACHESIZE_CPUID
 

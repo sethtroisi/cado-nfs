@@ -21,12 +21,12 @@ set_target_properties(test_hello PROPERTIES
     COMPILE_FLAGS "--mpi"
     LINK_FLAGS "--mpi")
 
-# if(HAVE_GCC_STYLE_AMD64_ASM)
+# if(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
 # add_executable(matops matops.cpp ../gauss.c)
 # set_target_properties(matops PROPERTIES
 #         COMPILE_FLAGS "-I.")
 # target_link_libraries(matops gmp utils m)
-# endif(HAVE_GCC_STYLE_AMD64_ASM)
+# endif(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
 
 if(HAVE_WAITPID)        # unavailable under mingw
 add_executable(shell shell.c)
