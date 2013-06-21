@@ -235,6 +235,19 @@ class MyCursor(sqlite3.Cursor):
             ORDER + LIMIT + ";"
         self._exec(command, values)
         
+    def count(self, joinsource, **conditions):
+        """ Count rows where the key:value pairs of the dictionary "conditions" are 
+            set to the same value in the database table """
+
+        # Table/Column names cannot be substituted, so include in query directly.
+        (WHERE, values) = self._where_str("WHERE", **conditions)
+
+        command = "SELECT COUNT(*)" + " FROM " + joinsource + WHERE + ";"
+        self._exec(command, values)
+        r = self.fetchone()
+        print(r)
+        return int(r[0])
+        
     def delete(self, table, **conditions):
         """ Delete the rows specified by conditions """
         (WHERE, values) = self._where_str("WHERE", **conditions)
@@ -669,6 +682,10 @@ class Mapper(object):
             for s in sub.keys:
                 self.subtables[s].update(cursor, sub_dict[s])
     
+    def count(self, cursor, **cond):
+        joinsource = self.table.tablename
+        return cursor.count(joinsource, **cond)
+    
     def where(self, cursor, limit = None, order = None, **cond):
         pk = self.getpk()
         joinsource = self.table.tablename
@@ -910,6 +927,9 @@ class WuAccess(object): # {
     def cancel_all_available(self):
         self.cancel_by_condition(eq={"status": 0})
     
+    def cancel_all_assigned(self):
+        self.cancel_by_condition(eq={"status": 1})
+    
     def cancel_by_condition(self, **conditions):
         cursor = self.conn.cursor(MyCursor)
         d = {"status": WuStatus.CANCELLED}
@@ -922,6 +942,12 @@ class WuAccess(object): # {
         r = self.mapper.where(cursor, limit=limit, **conditions)
         cursor.close()
         return r
+
+    def count(self, **cond):
+        cursor = self.conn.cursor(MyCursor)
+        count = self.mapper.count(cursor, **cond)
+        cursor.close()
+        return count
 
     def get_one_result(self):
         r = self.query(limit = 1, eq={"status": WuStatus.RECEIVED_OK})
@@ -1174,6 +1200,7 @@ if __name__ == '__main__': # {
                "receivederr": ("Received with error workunits: ", {"eq": {"status": WuStatus.RECEIVED_ERROR}}), 
                "verifiedok": ("Verified ok workunits: ", {"eq": {"status": WuStatus.VERIFIED_OK}}), 
                "verifiederr": ("Verified with error workunits: ", {"eq": {"status": WuStatus.VERIFIED_ERROR}}), 
+               "cancelled": ("Cancelled workunits: ", {"eq": {"status": WuStatus.CANCELLED}}), 
                "all": ("All existing workunits: ", {})
               }
 
@@ -1247,13 +1274,16 @@ if __name__ == '__main__': # {
     for (arg, (msg, condition)) in queries.items():
         if not args[arg]:
             continue
-        wus = db_pool.query(**condition)
         print(msg)
-        if wus is None:
-            print("None")
-            continue
-        print (len(wus))
-        if args["dump"]:
+        if not args["dump"]:
+            count = db_pool.count(**condition)
+            print (count)
+        elif args["dump"]:
+            wus = db_pool.query(**condition)
+            if wus is None:
+                print("None")
+                continue
+            print (len(wus))
             if args["dump"] == "all":
                 print(WuAccess.to_str(wus))
             else:
@@ -1271,6 +1301,8 @@ if __name__ == '__main__': # {
         wuid = args["cancel"][0]
         if wuid == "available":
             wus = db_pool.cancel_all_available()
+        if wuid == "assigned":
+            wus = db_pool.cancel_all_assigned()
         else:
             wus = db_pool.cancel(wuid)
 
