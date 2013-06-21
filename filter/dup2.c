@@ -216,6 +216,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
     rs->parse_only_ab = 1;
 
     for( ; *files ; files++) {
+
         const char * name = *files;
         index_t nodu0 = nodu, dupl0 = dupl;
 
@@ -335,6 +336,7 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
                             // At the moment, we use code specific to p59.
                             unsigned long j1, j2, n1, n2;
                             ugly_for_p59(&j1, &j2, &n1, &n2, rs->rel.a, rs->rel.b, rs->rel.ap[i].p, rs->rel.ap[i].e);
+
                             for (unsigned int k = 0; k < n1; k++) {
                               if (first) {
                                  first = 0;
@@ -389,13 +391,13 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
                         rs->dt, rs->mb_s, rs->rels_s);
             }
         }
+
         relation_stream_unbind(rs);
         if (f_out != NULL)
           {
             if (p_out) pclose(f_out); else fclose(f_out);
           }
         if (p_in) pclose(f_in); else fclose(f_in);
-
 
         if (dirname) {
             int ret = rename(oname_tmp, oname);
@@ -406,10 +408,14 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
             free(oname);
             free(oname_tmp);
         }
+
         fprintf (stderr, "%s: %"PRid" relations, %"PRid" duplicates, "
                          "remains %"PRid"\n", path_basename(name),
                  nodu + dupl - (nodu0 + dupl0), dupl - dupl0, nodu - nodu0);
+
     }
+
+
     relation_stream_trigger_disp_progress(rs);
     fprintf(stderr,
             "Read %"PRid" relations, %"PRid" duplicates (%1.2f%%)"
@@ -571,94 +577,96 @@ main (int argc, char *argv[])
   buf_rel_t *buf_rel;
   p_r_values_t pmin;
   index_t min_index;
-    const char *renumberfilename = NULL;
-    cado_poly cpoly;
-    char **p;
+  const char *renumberfilename = NULL;
+  cado_poly cpoly;
+  char **p;
 
-    /* print command line */
-    fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
-    for (int k = 1; k < argc; k++)
-      fprintf (stderr, " %s", argv[k]);
-    fprintf (stderr, "\n");
-
-    param_list pl;
-    param_list_init(pl);
-    argv++,argc--;
-
-    int bz = 0;
-    param_list_configure_switch(pl, "bz", &bz);
+  /* print command line */
+  fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
+  for (int k = 1; k < argc; k++)
+    fprintf (stderr, " %s", argv[k]);
+  fprintf (stderr, "\n");
+  
+  param_list pl;
+  param_list_init(pl);
+  argv++,argc--;
+  
+  int bz = 0;
+  param_list_configure_switch(pl, "bz", &bz);
 
 #ifndef FOR_FFS
-    int is_for_dl = 0; /* Be default we do dup2 for factorization */
-    param_list_configure_switch(pl, "dl", &is_for_dl);
+  int is_for_dl = 0; /* Be default we do dup2 for factorization */
+  param_list_configure_switch(pl, "dl", &is_for_dl);
 #else
-    int is_for_dl = 1; /* With FFS, not for dl is meaningless */
+  int is_for_dl = 1; /* With FFS, not for dl is meaningless */
 #endif
 
 #ifdef HAVE_MINGW
-    _fmode = _O_BINARY;     /* Binary open for all files */
+  _fmode = _O_BINARY;     /* Binary open for all files */
 #endif
 
-    for( ; argc ; ) {
-        if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
-        /* Since we accept file names freeform, we decide to never abort
-         * on unrecognized options */
-        break;
-        // fprintf (stderr, "Unknown option: %s\n", argv[0]);
-        // abort();
-    }
-
-    const char * polyfilename = param_list_lookup_string(pl, "poly");
-    const char * outfmt = param_list_lookup_string(pl, "outfmt");
-    const char * filelist = param_list_lookup_string(pl, "filelist");
-    const char * basepath = param_list_lookup_string(pl, "basepath");
-    renumberfilename = param_list_lookup_string(pl, "renumber");
+  for( ; argc ; ) {
+    if (param_list_update_cmdline(pl, &argc, &argv)) { continue; }
+    /* Since we accept file names freeform, we decide to never abort
+     * on unrecognized options */
+    break;
+    // fprintf (stderr, "Unknown option: %s\n", argv[0]);
+    // abort();
+  }
+  
+  const char * polyfilename = param_list_lookup_string(pl, "poly");
+  const char * outfmt = param_list_lookup_string(pl, "outfmt");
+  const char * filelist = param_list_lookup_string(pl, "filelist");
+  const char * basepath = param_list_lookup_string(pl, "basepath");
+  renumberfilename = param_list_lookup_string(pl, "renumber");
   const char * path_antebuffer = param_list_lookup_string(pl, "path_antebuffer");
 
-    param_list_parse_ulong(pl, "K", &K);
+  param_list_parse_ulong(pl, "K", &K);
 
-    if (param_list_warn_unused(pl) || polyfilename == NULL)
-      usage(argv0);
 
-    cado_poly_init (cpoly);
-    if (!cado_poly_read (cpoly, polyfilename))
-      {
-        fprintf (stderr, "Error reading polynomial file\n");
-        exit (EXIT_FAILURE);
-      }
-
-    if (basepath && !filelist) {
-        fprintf(stderr, "-basepath only valid with -filelist\n");
-        exit(1);
-    }
-
-    if (K == 0)
-        usage(argv0);
-
-    if (bz) {
-        if (outfmt) {
-            fprintf(stderr, "-bz and -outfmt are mutually exclusive");
-            usage(argv0);
-        } else {
-            outfmt = ".bz2";
-        }
-    }
-    if (outfmt && !is_supported_compression_format(outfmt)) {
-        fprintf(stderr, "output compression format unsupported\n");
-        usage(argv0);
-    }
-
-    if (renumberfilename == NULL)
-      {
-        fprintf (stderr, "Missing -renumber option\n");
-        exit (1);
-      }
-
-    set_antebuffer_path (argv0, path_antebuffer);
+  if (param_list_warn_unused(pl) || polyfilename == NULL)
+    usage(argv0);
   
-    renumber_init (renumber_table, cpoly);
-    renumber_read_table (renumber_table, renumberfilename);
-
+  cado_poly_init (cpoly);
+  if (!cado_poly_read (cpoly, polyfilename))
+    {
+      fprintf (stderr, "Error reading polynomial file\n");
+      exit (EXIT_FAILURE);
+    }
+  
+  if (basepath && !filelist) {
+    fprintf(stderr, "-basepath only valid with -filelist\n");
+    exit(1);
+  }
+  
+  if (K == 0)
+    usage(argv0);
+  
+  if (bz) {
+    if (outfmt) {
+      fprintf(stderr, "-bz and -outfmt are mutually exclusive");
+      usage(argv0);
+    } else {
+      outfmt = ".bz2";
+    }
+  }
+  if (outfmt && !is_supported_compression_format(outfmt)) {
+    fprintf(stderr, "output compression format unsupported\n");
+    usage(argv0);
+  }
+  
+  if (renumberfilename == NULL)
+    {
+      fprintf (stderr, "Missing -renumber option\n");
+      exit (1);
+    }
+  
+  set_antebuffer_path (argv0, path_antebuffer);
+  
+  renumber_init (renumber_table, cpoly);
+  renumber_read_table (renumber_table, renumberfilename);
+  
+  
   /* sanity check: since we allocate two 64-bit words for each, instead of
      one 32-bit word for the hash table, taking K/100 will use 2.5% extra
      memory */
@@ -704,7 +712,7 @@ main (int argc, char *argv[])
     nb_files++;
 
   SMALLOC(files_already_renumbered, nb_files, "files_already_renumbered");
-  SMALLOC(files_new, nb_files, "files_new");
+  SMALLOC(files_new, nb_files+1, "files_new");
   
   /* separate already process files
    * check if f_tmp is in raw format a,b:...:... or 
@@ -746,7 +754,7 @@ main (int argc, char *argv[])
   fprintf (stderr, "%u files (%u new and %u already renumbered)\n", nb_files, 
                    nb_f_new, nb_f_renumbered);
 
-
+  
  //call prempt_scan_rel 2 times with two diff filelist and two diff callback fct
 
   SMALLOC(buf_rel,SIZE_BUF_REL, "buf_rel");
@@ -760,20 +768,26 @@ main (int argc, char *argv[])
 
   fprintf (stderr, "Reading new files:\n");
   index_t rread = 0;
+
+
   //buf_arg.needed = NEEDED_ABP;
   //prempt_scan_relations (files_new, &thread_print, &buf_arg, &thread_root);
   /* pass 1: we read new files, remove duplicates, and renumber them */
+
 #ifndef FOR_FFS
+
   rread += remove_dup_in_files (files_new, basepath, outfmt, is_for_dl, 10,
                                 renumber_table);
 #else
+
   rread += remove_dup_in_files (files_new, basepath, outfmt, is_for_dl, 16,
                                 renumber_table);
 #endif
 
-
   fprintf (stderr, "Read %"PRid" relations, %"PRid" duplicates (%1.2f%%)\n",
            rread, dupl, 100.0 * (double) dupl / (double) rread);
+
+
 
   free (H);
 
