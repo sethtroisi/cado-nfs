@@ -9,9 +9,13 @@ import optparse
 import shutil
 import time
 try:
+    # pylint: disable=W0404
     import urllib2 as urllib_request
     import urllib2 as urllib_error
 except ImportError:
+    # pylint: disable=W0404
+    # pylint: disable=E0611
+    # pylint: disable=F0401
     import urllib.request as urllib_request
     import urllib.error as urllib_error
 import subprocess
@@ -94,6 +98,20 @@ class WuMIMEMultipart(MIMEMultipart):
         attachment.add_header('Content-Disposition', 'form-data', 
                               name=key)
         self.attach(attachment)
+
+    def flatten(self, debug = 0):
+        ''' Flatten the mimedata with BytesGenerator and return bytes array '''
+        if debug >= 2:
+            print("Headers of mimedata as a dictionary:")
+            print(dict(self.items()))
+        bio = BytesIO()
+        gen = FixedBytesGenerator(bio)
+        gen.flatten(self, unixfrom=False)
+        postdata = bio.getvalue() + b"\n"
+        if debug >= 2:
+            print("Postdata as a bytes array:")
+            print(postdata)
+        return postdata
 
 
 class WorkunitProcessor(Workunit):
@@ -222,7 +240,7 @@ class WorkunitProcessorClient(WorkunitProcessor):
         self.wu_file.close()
         os.remove(self.wu_filename)
 
-    def _urlopen(self, request, operation):
+    def _urlopen(self, request, wait, is_upload = False):
         """ Wrapper around urllib2.urlopen() that retries in case of
         connection failure.
         """
@@ -232,8 +250,8 @@ class WorkunitProcessorClient(WorkunitProcessor):
                 conn = urllib_request.urlopen(request)
             except (NameError, urllib_error.URLError) as error:
                 conn = None
-                wait = float(self.settings["DOWNLOADRETRY"])
-                logging.error("%s of result failed, %s", operation, 
+                logging.error("%s of result failed, %s", 
+                              'Upload' if is_upload else 'Download', 
                               str(error))
                 logging.error("Waiting %s seconds before retrying", wait)
                 time.sleep(wait)
@@ -249,7 +267,8 @@ class WorkunitProcessorClient(WorkunitProcessor):
         if options:
             url = url + "?" + options
         logging.info ("Downloading %s to %s", url, dlpath)
-        request = self._urlopen(url, "Download")
+        wait = float(self.settings["DOWNLOADRETRY"])
+        request = self._urlopen(url, wait)
         # Try to open the file exclusively
         try:
             fd = os.open(dlpath, os.O_CREAT | os.O_WRONLY | os.O_EXCL)
@@ -347,23 +366,8 @@ class WorkunitProcessorClient(WorkunitProcessor):
                     os.chmod(dlpath, mode | stat.S_IXUSR)
         return True
 
-    def _flatten(self, postdata):
-        ''' Flatten the postdata with BytesGenerator and return bytes array '''
-        if int(self.settings["DEBUG"]) >= 2:
-            print("Headers of postdata as a dictionary:")
-            print(dict(postdata.items()))
-        bio = BytesIO()
-        gen = FixedBytesGenerator(bio)
-        gen.flatten(postdata, unixfrom=False)
-        postdata = bio.getvalue() + b"\n"
-        if int(self.settings["DEBUG"]) >= 2:
-            print("Postdata as a bytes array:")
-            print(postdata)
-        return postdata
-
-    def _make_mimedata(self):
+    def attach_result(self, mimedata):
         # Build a multi-part MIME document containing the WU id and result file
-        mimedata = WuMIMEMultipart()
         mimedata.attach_key("WUid", self.get_id())
         mimedata.attach_key("clientid", self.settings["CLIENTID"])
         if self.exitcode:
@@ -384,14 +388,17 @@ class WorkunitProcessorClient(WorkunitProcessor):
         return mimedata
 
     def upload_result(self):
-        mimedata = self._make_mimedata()
+        mimedata = WuMIMEMultipart()
+        self.attach_result(mimedata)
+        postdata = mimedata.flatten(debug=int(self.settings["DEBUG"]))
 
         url = self.settings["SERVER"] + "/" + self.settings["POSTRESULTPATH"]
         logging.info("Sending result for workunit %s to %s", 
                      self.get_id(), url)
-        request = urllib_request.Request(url, data=self._flatten(mimedata), 
+        request = urllib_request.Request(url, data=postdata, 
                                          headers=dict(mimedata.items()))
-        conn = self._urlopen(request, "Upload")
+        wait = float(self.settings["DOWNLOADRETRY"])
+        conn = self._urlopen(request, wait, is_upload=True)
         if not conn:
             return False
         response = conn.read()
