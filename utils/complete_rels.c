@@ -96,7 +96,7 @@ int complete_relation_files(char ** files, cado_poly_ptr cpoly)
 }
 
 void usage_and_die(char *str) {
-    fprintf(stderr, "usage: %s -poly <polyfile> <relfile1> <relfile2> ...\n",
+    fprintf(stderr, "usage: %s [-f] -poly <polyfile> <relfile1> <relfile2> ...\n",
             str);
     exit(3);
 }
@@ -105,9 +105,18 @@ int main(int argc, char * argv[])
 {
     cado_poly cpoly;
     int had_error = 0;
+    int forced_read = 0;
+
+    if (argc >= 2 && strcmp (argv[1], "-f") == 0)
+      {
+        forced_read = 1;
+        fprintf (stderr, "Skipping corrupted lines\n");
+        argv ++;
+        argc --;
+      }
 
     if (argc < 4 || strcmp(argv[1], "-poly") != 0) {
-        usage_and_die(argv[0]);
+        usage_and_die(argv[-forced_read]);
     }
     cado_poly_init(cpoly);
     if (!cado_poly_read(cpoly, argv[2])) 
