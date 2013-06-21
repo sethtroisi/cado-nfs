@@ -253,10 +253,11 @@ fb_make_linear (const mpz_t *poly, const fbprime_t bound,
 
   if (verbose)
     gmp_fprintf (output,
-		 "# Making factor base for polynomial g(x) = %Zd * x + %Zd,\n"
+		 "# Making factor base for polynomial g(x) = %Zd*x%s%Zd,\n"
 		 "# including primes up to " FBPRIME_FORMAT
 		 " and prime powers up to " FBPRIME_FORMAT ".\n",
-		 poly[1], poly[0], bound, powbound);
+		 poly[1], (mpz_cmp_ui (poly[0], 0) >= 0) ? "+" : "",
+                 poly[0], bound, powbound);
 
   p = 2;
   while (p <= bound)

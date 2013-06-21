@@ -10,7 +10,7 @@
  *
  * (a, b): This is the one from textbooks. We always have b>=0 (only free
  *         relations have b=0, and we don't see them here).
- * (i, j): For a give special q, this is a point in the q-lattice. Given
+ * (i, j): For a given special q, this is a point in the q-lattice. Given
  *         the lattice basis given by (a0 b0 a1 b1), this corresponds to
  *         the (a,b) pair equal to i*(a0,b0)+j*(a1,b1). By construction
  *         this should lead to one of the norms having si->doing->p as a factor.
@@ -68,7 +68,7 @@ void IJToAB(int64_t *a, uint64_t *b, const int i, const unsigned int j,
 
 int ABToIJ(int *i, unsigned int *j, const int64_t a, const uint64_t b, sieve_info_srcptr si)
 {
-    /* Both a,b and the coordinates ot the lattice basis can be quite
+    /* Both a,b and the coordinates of the lattice basis can be quite
      * large. However the result should be small.
      */
     mpz_t za,zb,ii,jj,a0,b0,a1,b1;

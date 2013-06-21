@@ -38,6 +38,9 @@ void las_display_config_flags(FILE * stream)
 #ifdef ALG_RAT
     fprintf(stream, " ALG_RAT");
 #endif
+#ifdef SUPPORT_LARGE_Q
+    fprintf(stream, " SUPPORT_LARGE_Q");
+#endif
     fprintf(stream, " NORM_BITS=%u", NORM_BITS);
     fprintf(stream, " LOG_BUCKET_REGION=%u", LOG_BUCKET_REGION);
     fprintf(stream, " GUARD=%1.2f", (double) GUARD);
