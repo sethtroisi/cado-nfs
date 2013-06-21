@@ -34,7 +34,7 @@ using namespace std;
 
 /* Make sure that the assembly function is only called if it matches
  * correctly the abase header !! */
-#if defined(HAVE_GCC_STYLE_AMD64_ASM) && defined(ABASE_U64_H_) && !defined(DISABLE_ASM)
+#if defined(HAVE_GAS_SYNTAX_ASSEMBLY_SOURCES) && defined(ABASE_U64_H_) && !defined(DISABLE_ASM)
 // disabling one particular assembly code is done by simply disabling the
 // header file (and optionally removing the assembly file from the link
 // list is the CMakeLists.txt file, but in reality it's not needed. This
