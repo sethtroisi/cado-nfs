@@ -509,6 +509,11 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 
     si->td_thresh = si->I;	/* default value */
     param_list_parse_uint(pl, "tdthresh", &(si->td_thresh));
+    if (si->td_thresh < si->I)
+      {
+        fprintf (stderr, "Using tdthresh < I not allowed due to bug #15897\n");
+        exit (1);
+      }
 
     /* Initialize the number of buckets */
 
