@@ -57,7 +57,8 @@ complete_relation (relation_t *rel, cado_poly_ptr cpoly)
   return 1;
 }
 
-int complete_relation_files(char ** files, cado_poly_ptr cpoly)
+int
+complete_relation_files (char ** files, cado_poly_ptr cpoly, int forced_read)
 {
     relation_stream rs;
     relation_stream_init(rs);
@@ -70,7 +71,7 @@ int complete_relation_files(char ** files, cado_poly_ptr cpoly)
         unsigned long l0 = rs->lnum;
         unsigned long ok0 = ok;
         unsigned long bad0 = bad;
-        for( ; relation_stream_get(rs, line, 0, 10) >= 0 ; ) {
+        for( ; relation_stream_get(rs, line, forced_read, 10) >= 0 ; ) {
             unsigned long l = rs->lnum - l0;
             if (complete_relation(&rs->rel, cpoly)) {
                 fprint_relation (stdout, &rs->rel);
@@ -85,7 +86,7 @@ int complete_relation_files(char ** files, cado_poly_ptr cpoly)
         if (bad == bad0) {
             fprintf(stderr, "%s : %lu ok\n", *files, ok-ok0);
         } else {
-            fprintf(stderr, "%s : %lu ok ; FOUND %lu ERRORS\n",
+            fprintf(stderr, "%s : %lu ok ; FOUND %lu ERROR(S)\n",
                     *files, ok-ok0, bad-bad0);
         }
         relation_stream_closefile(rs);
@@ -126,7 +127,7 @@ int main(int argc, char * argv[])
     argv++,argc--;
     argv++,argc--;
 
-    had_error = complete_relation_files(argv, cpoly) < 0;
+    had_error = complete_relation_files (argv, cpoly, forced_read) < 0;
 
     cado_poly_clear(cpoly);
 
