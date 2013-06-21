@@ -9,6 +9,7 @@ import random
 import time
 import wudb
 import logging
+import socket
 import patterns
 import cadoprograms
 import cadoparams
@@ -189,6 +190,8 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters, metaclas
         self.logger.debug("state = %s", self.state)
         # Set default parametes for this task, if any are given
         self.params = self.myparams(self.paramnames)
+        self.logger.debug("param_prefix = %s, get_param_path = %s", 
+                          self.get_param_prefix(), self.get_param_path())
         self.logger.debug("params = %s", self.params)
         # Set default parameters for our programs
         self.progparams = []
@@ -375,14 +378,14 @@ class ClientServerTask(Task, patterns.Observer):
         super().__init__(*args, **kwargs)
         self.state.setdefault("wu_submitted", 0)
         self.state.setdefault("wu_received", 0)
-        self.params.setdefault("maxwu", 10)
+        self.params.setdefault("maxwu", "100")
         assert self.get_number_outstanding_wus() >= 0
         self.send_notification(Notification.SUBSCRIBE_WU_NOTIFICATIONS, None)
     
     def submit_command(self, command, identifier):
         ''' Submit a workunit to the database. '''
         
-        while self.get_number_outstanding_wus() >= self.params["maxwu"]:
+        while self.get_number_available_wus() >= int(self.params["maxwu"]):
             self.wait()
         wuid = self.make_wuname(identifier)
         wutext = command.make_wu(wuid)
@@ -407,6 +410,9 @@ class ClientServerTask(Task, patterns.Observer):
     
     def get_number_outstanding_wus(self):
         return self.state["wu_submitted"] - self.state["wu_received"]
+
+    def get_number_available_wus(self):
+        return self.send_request(Request.GET_NR_AVAILABLE_WU, None)
 
     def test_outputfile_exists(self, filename):
         # Can't test
@@ -702,7 +708,7 @@ class SievingTask(ClientServerTask, FilesCreator):
             
         self.state.setdefault("rels_found", 0)
         self.state.setdefault("rels_wanted", 0)
-        self.params.setdefault("max_wus", 10)
+        self.params.setdefault("maxwu", "100")
         self.state["rels_wanted"] = max(self.state.get("rels_wanted", 0), 
                                         int(self.params.get("rels_wanted", 0)))
         if self.state["rels_wanted"] == 0:
@@ -1718,6 +1724,8 @@ class StartClientsTask(Task):
                 self.used_ids[clientid] = True
                 return
             else:
+                self.logger.info("Client %s on host %s with PID %d seems to have died",
+                                 clientid, host, self.pids[clientid])
                 del(self.pids[clientid])
                 del(self.hosts[clientid])
         
@@ -1726,7 +1734,8 @@ class StartClientsTask(Task):
         wuclient = cadoprograms.WuClient([], self.progparams[0],
             stdout = "wuclient.%s.stdout" % clientid,
             stderr = "wuclient.%s.stderr" % clientid, bg=True)
-        process = cadocommand.RemoteCommand(wuclient, host, self.parameters, self.path_prefix + [host])
+        process = cadocommand.RemoteCommand(wuclient, host, self.get_parameters(), 
+                                            self.get_param_prefix())
         (rc, stdout, stderr) = process.wait()
         if rc != 0:
             self.logger.warning("Starting client on host %s failed.", host)
@@ -1767,7 +1776,7 @@ class StartClientsTask(Task):
         if not signal is None:
             params["signal"] = str(signal)
         kill = cadoprograms.Kill((pid,), params)
-        process = cadocommand.RemoteCommand(kill, host, self.parameters, self.path_prefix)
+        process = cadocommand.RemoteCommand(kill, host, self.parameters, self.get_param_prefix())
         return process.wait()
 
 class Message(object):
@@ -1798,6 +1807,7 @@ class Notification(Message):
     VERIFY_WU = 6
     WANT_TO_RUN = 7
     SUBSCRIBE_WU_NOTIFICATIONS = 8
+    CHECK_TIMEDOUT_WUS = 9
 
 class Request(Message):
     GET_POLYNOMIAL = 0
@@ -1818,7 +1828,7 @@ class Request(Message):
     GET_LINALG_PREFIX = 15
     GET_KERNEL_FILENAME = 16
     GET_WU_RESULT = 17
-
+    GET_NR_AVAILABLE_WU = 18
 
 class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Mediator):
     """ The complete factorization, aggregate of the individual tasks """
@@ -1842,10 +1852,11 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         self.wuar.create_tables()
         
         # Set up WU server
-        serveraddress = "localhost"
+        serveraddress = socket.gethostname()
         serverport = 8001
         uploaddir = self.params["workdir"].rstrip(os.sep) + os.sep + self.params["name"] + ".upload/"
-        self.server = wuserver.ServerLauncher(serveraddress, serverport, False, self.get_db_filename(), 
+        threaded = False
+        self.server = wuserver.ServerLauncher(serveraddress, serverport, threaded, self.get_db_filename(), 
             self.registered_filenames, uploaddir, bg = True)
         
         # Init client lists
@@ -1933,6 +1944,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
             Request.GET_LINALG_PREFIX: self.linalg.get_prefix,
             Request.GET_KERNEL_FILENAME: self.characters.get_kernel_filename,
             Request.GET_WU_RESULT: self.db_listener.send_result,
+            Request.GET_NR_AVAILABLE_WU: self.wuar.count_available
         }
     
     def run(self):
@@ -1961,7 +1973,7 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
         return False
     
     def do_chores(self):
-        if self.chores:
+        while self.chores:
             chore = self.chores.pop()
             if chore == self.CAN_CANCEL_WUS:
                 self.logger.info("Cancelling remaining workunits")
@@ -1994,6 +2006,15 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
             else:
                 # Was already registered with the same target. Nothing to do
                 pass
+    
+    def check_timedout_wus(self, sender):
+        # Check at most once per minute
+        attr = "last_check_timedout_wus"
+        if getattr(self, attr, 0.) + 60. > time.time():
+            # TODO
+            # self.wuar.timeout_wus(self.params.get("wu_timeout", 3600))
+            pass
+        setattr(self, attr, time.time())
     
     def relay_notification(self, message):
         assert isinstance(message, Notification)
@@ -2044,6 +2065,11 @@ class CompleteFactorization(wudb.DbAccess, cadoparams.UseParameters, patterns.Me
                 return self.db_listener.subscribeObserver(sender)
             else:
                 raise Exception("Got SUBSCRIBE_WU_NOTIFICATIONS, but not from a ClientServerTask")
+        elif key == Notification.CHECK_TIMEDOUT_WUS:
+            if isinstance(sender, ClientServerTask):
+                return self.check_timedout_wus(sender)
+            else:
+                raise Exception("Got CHECK_TIMEDOUT_WUS, but not from a ClientServerTask")
         else:
             raise KeyError("Notification from %s has unknown key %s" % (sender, key))
     

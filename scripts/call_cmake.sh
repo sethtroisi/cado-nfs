@@ -79,6 +79,7 @@ export CURL_INCDIR
 export CURL_LIBDIR
 export GF2X_CONFIGURE_EXTRA_FLAGS
 export CMAKE_DUMP_VARIABLES
+export DISABLE_SHARED
 
 if [ "$1" = "tidy" ] ; then
     echo "Wiping out $build_tree"
@@ -103,6 +104,7 @@ if [ "$1" = "show" ] ; then
     echo "GF2X_CONFIGURE_EXTRA=\"$GF2X_CONFIGURE_EXTRA\""
     echo "PTHREADS=\"$PTHREADS\""
     echo "CMAKE_GENERATOR=\"$CMAKE_GENERATOR\""
+    echo "DISABLE_SHARED=\"$DISABLE_SHARED\""
     exit 0
 fi
 

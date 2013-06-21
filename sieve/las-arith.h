@@ -76,7 +76,7 @@ redc_32(const int64_t x, const uint32_t p, const uint32_t invp)
     return y;
 }
 
-#ifdef   HAVE_GCC_STYLE_AMD64_ASM
+#ifdef   HAVE_GCC_STYLE_AMD64_INLINE_ASM
 #define HAVE_redc_64
 /* This does a full mul, and should grok slightly larger bounds than the
  * version above. Presumably, as long as x fits within 64 bits, (63 bits,

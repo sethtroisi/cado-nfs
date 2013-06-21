@@ -115,18 +115,19 @@ struct sieve_side_info_s {
      */
     factorbase_degn_t ** fb_bucket_threads;
     /* When threads pick up this sieve_info structure, they should check
-     * theur bucket allocation */
+     * their bucket allocation */
     double max_bucket_fill_ratio;
 
 
     /* These fields are used for the norm initialization essentially.
      * Only the scale is also relevant to part of the rest, since it
      * determines the logp contributions for factor base primes */
-    double scale;      /* norm scale used on the algebraic side */
+    double scale;      /* scale used for logarithms for fb and norm */
     double cexp2[257]; /* for 2^X * scale + GUARD */
     double logmax;     /* norms on the alg-> side are < 2^alg->logmax */
 
-    mpz_t *fij;       /* coefficients of F(a0*i+a1*j, b0*i+b1*j)  */
+    mpz_t *fij;       /* coefficients of F(a0*i+a1*j, b0*i+b1*j) (divided by 
+                         q on the special-q side) */
     double *fijd;     /* coefficients of F_q (divided by q on the special q side) */
 
     /* This updated by applying the special-q lattice transform to the
@@ -149,7 +150,7 @@ typedef struct sieve_side_info_s sieve_side_info[1];
  * file names, or verbosity flags, which do not affect the output).
  */
 struct sieve_info_s {
-    cado_poly_ptr cpoly;
+    cado_poly_ptr cpoly; /* The polynomial pair */
 
     /* This conditions the validity of the sieve_info_side members
      * sides[0,1], as well as some other members */

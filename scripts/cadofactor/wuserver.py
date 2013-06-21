@@ -86,6 +86,7 @@ class HtmlGen(io.BytesIO):
 
 class MyHandler(http.server.CGIHTTPRequestHandler):
     cgi_directories = ['/cgi-bin']
+    clientid_pattern = re.compile("^[\w.-]*$")
     
     def log(self, lvl, format, *args, **kwargs):
         """ Interface to the logger class. 
@@ -198,7 +199,7 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         (key, clientid) = query.split("=")
         if key != "clientid":
             return self.send_error(400, "No client id specified")
-        if not clientid.isalnum():
+        if not self.clientid_pattern.match(clientid):
             return self.send_error(400, "Malformed client id specified")
         
         if self.db_pool:
