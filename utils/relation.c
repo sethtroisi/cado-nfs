@@ -535,6 +535,7 @@ another_line:
 
     *p++ = (c = getc_unlocked(f));
     if (c == EOF) return -1;
+    if (c == '\n') goto another_line;
     if (c == '#') {
         for( ; c != EOF && c != '\n' ; *p++ = (c=getc_unlocked(f))) ;
         goto another_line;

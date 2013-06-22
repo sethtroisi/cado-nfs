@@ -44,28 +44,54 @@ typedef relset_struct_t * relset_ptr;
 typedef const relset_struct_t * relset_srcptr;
 
 
-relset_ptr
-build_rel_sets (const char * purgedname, const char * indexname ,
-                int * small_nrows, poly_t F, mpz_t ell)
+/* Q = P^a mod f, mod p. Note, p is mpz_t */
+void
+poly_power_mod_f_mod_mpz_Barrett (poly_t Q, const poly_t P, const poly_t f,
+				  const mpz_t a, const mpz_t p,
+                                  MAYBE_UNUSED const mpz_t invp)
+{
+  int k = mpz_sizeinbase(a, 2);
+  poly_t R;
+
+  if (mpz_cmp_ui(a, 0) == 0) {
+    Q->deg = 0;
+    mpz_set_ui(Q->coeff[0], 1);
+    return;
+  }
+
+  poly_alloc(R, 2*f->deg);
+
+  // Initialize R to P
+  poly_copy(R, P);
+
+  // Horner
+  for (k -= 2; k >= 0; k--)
+  {
+    poly_sqr_mod_f_mod_mpz(R, R, f, p, NULL);  // R <- R^2
+    if (mpz_tstbit(a, k))
+      poly_mul_mod_f_mod_mpz(R, R, P, f, p, NULL);  // R <- R*P
+  }
+
+  poly_copy(Q, R);
+  poly_free(R);
+}
+
+
+relset_ptr build_rel_sets(const char * purgedname, const char * indexname,
+			  int * small_nrows, poly_t F, const mpz_t ell2)
 {
   purgedfile_stream ps;
   FILE * ix = fopen(indexname, "r");
 
   /* array of (a,b) pairs from (purgedname) file */
+  /* change to ab_pair *pairs, where ab_pair is uint64_t[2] */
   poly_t *pairs;
-
+  
   /* Array of (small_nrows) relation sets built from array (pairs) and (indexname) file
      rels->num is used for (a,b)-pairs with positive multiplicities, whereas
      rels->denom for those with negative ones
   */
   relset_ptr rels;
-
-  /* We build relation sets mod ell^2 because Shirokaueur maps will be computed
-     mod ell^2
-  */
-  mpz_t ell2;
-  mpz_init(ell2);
-  mpz_mul(ell2, ell, ell);
 
   purgedfile_stream_init(ps);
   purgedfile_stream_openfile(ps, purgedname);
@@ -77,10 +103,17 @@ build_rel_sets (const char * purgedname, const char * indexname ,
   int npairs;
   for(npairs = 0 ; purgedfile_stream_get(ps, NULL) >= 0 ; npairs++) {
     ASSERT_ALWAYS(npairs < ps->nrows);
-    /* (a,b)-pair is a degree-1 poly */
-    poly_alloc(pairs[npairs], 1);
-    poly_setcoeff_si(pairs[npairs], 0, ps->a);
-    poly_setcoeff_si(pairs[npairs], 1, -ps->b);
+    if (ps->b == 0) {
+	/* freerels */
+	poly_alloc(pairs[npairs], 0);
+	poly_setcoeff_si(pairs[npairs], 0, ps->a);
+      }
+    else {
+      /* (a,b)-pair is a degree-1 poly */
+      poly_alloc(pairs[npairs], 1);
+      poly_setcoeff_si(pairs[npairs], 0, ps->a);
+      poly_setcoeff_si(pairs[npairs], 1, -ps->b);
+    }
   }
 
   /* small_ncols isn't used here: we don't care. */
@@ -102,7 +135,8 @@ build_rel_sets (const char * purgedname, const char * indexname ,
   mpz_t ee;
   mpz_init(ee);  
 
-  poly_alloc (tmp, F->deg);
+  poly_alloc(tmp, F->deg);
+
   for(int i = 0 ; i < *small_nrows ; i++) {
     ret = fscanf(ix, "%ld", &nc); 
     ASSERT_ALWAYS(ret == 1);
@@ -117,18 +151,26 @@ build_rel_sets (const char * purgedname, const char * indexname ,
       /* Should never happen! */
       ASSERT_ALWAYS(e != 0);
 
-      mpz_set_si(ee, (e > 0) ? e : -e);
-      /* TODO: poly_long_power_mod_f_mod_mpz */
-      poly_power_mod_f_mod_mpz(tmp, pairs[ridx], F, ee, ell2);
-      poly_mul_mod_f_mod_mpz(rels[i].num, rels[i].num, tmp, F, ell2, NULL);
+      if (e > 0) {
+	  mpz_set_si(ee, e);
+	  /* TODO: poly_long_power_mod_f_mod_mpz */
+	  poly_power_mod_f_mod_mpz(tmp, pairs[ridx], F, ee, ell2);
+	  poly_mul_mod_f_mod_mpz(rels[i].num, rels[i].num, tmp, F, ell2, NULL);
+      }
+      else {
+	  mpz_set_si(ee, -e);
+	  /* TODO: poly_long_power_mod_f_mod_mpz */
+	  poly_power_mod_f_mod_mpz(tmp, pairs[ridx], F, ee, ell2);
+	  poly_mul_mod_f_mod_mpz(rels[i].denom, rels[i].denom, tmp, F, ell2, NULL);
+      }
     }
   }
-  poly_free (tmp);
+  poly_free(tmp);
 
   fclose(ix);
-  mpz_clear (ell2);
   purgedfile_stream_closefile(ps);
   purgedfile_stream_clear(ps);
+
   while (npairs > 0)
     poly_free (pairs[--npairs]);
   free (pairs);
@@ -138,16 +180,24 @@ build_rel_sets (const char * purgedname, const char * indexname ,
 }
 
 
-void shirokauer_maps(const char * outname, relset_srcptr rels, int sr, poly_t F, mpz_t eps, mpz_t ell)
+void shirokauer_maps(const char * outname, relset_srcptr rels, int sr, poly_t F, const mpz_t eps, const mpz_t ell, const mpz_t ell2)
 {
   FILE * out = fopen(outname, "w");
   poly_t SMn, SMd, SM;
-  mpz_t l2;
+  mpz_t invl2;
   
-  mpz_init(l2);
+  /* mpz_init(l2); */
+  mpz_init(invl2);
+  //  mpz_init(tmp);
 
-  /* All computations are done mod l^2 */
-  mpz_mul(l2, ell, ell);
+  barrett_init(invl2, ell2);
+
+  mpz_out_str(stderr, 10, invl2);
+  fprintf(stderr, "\n");
+
+  fprintf(stderr, "\tBuilding %d relation sets mod ell^2:\n\tell^2 = ", sr);
+  mpz_out_str(stderr, 10, ell2);
+  fprintf(stderr, "\n");
 
   poly_alloc(SMn, F->deg);
   poly_alloc(SMd, F->deg);
@@ -157,15 +207,25 @@ void shirokauer_maps(const char * outname, relset_srcptr rels, int sr, poly_t F,
 
   for (int i=0; i<sr; i++) {
 
-    poly_power_mod_f_mod_mpz(SMn, rels[i].num, F, eps, l2);
+    poly_power_mod_f_mod_mpz_Barrett(SMn, rels[i].num, F, eps, ell2, invl2);
     poly_sub_ui(SMn, 1);
-  
-    poly_power_mod_f_mod_mpz(SMd, rels[i].denom, F, eps, l2);
+
+    /* fprintf(stderr, "SMn: "); */
+    /* poly_print(SMn); */
+
+    poly_power_mod_f_mod_mpz_Barrett(SMd, rels[i].denom, F, eps, ell2, invl2);
     poly_sub_ui(SMd, 1);
 
-    poly_sub_mod_mpz(SM, SMn, SMd, l2);
+    /* fprintf(stderr, "SMd: "); */
+    /* poly_print(SMd); */
 
-    for(int j=0; j<=SM->deg; j++) {
+    poly_sub_mod_mpz(SM, SMn, SMd, ell2);
+
+    for(int j=0; j<F->deg; j++) {
+      if (j > SM->deg) {
+          fprintf(out, "0 ");
+          continue;
+      }
       ASSERT_ALWAYS(mpz_divisible_p(SM->coeff[j], ell));
       mpz_divexact(SM->coeff[j], SM->coeff[j], ell);
       ASSERT_ALWAYS(mpz_cmp(ell, SM->coeff[j])>0);
@@ -180,7 +240,7 @@ void shirokauer_maps(const char * outname, relset_srcptr rels, int sr, poly_t F,
   poly_free(SMn);
   poly_free(SMd);
   poly_free(SM);
-  mpz_clear (l2);
+  mpz_clear(invl2);
   fclose(out);
 }
 
@@ -189,6 +249,8 @@ void usage(const char * me)
 {
   fprintf(stderr, "Usage: %s --poly polyname --purged purgedname --index indexname --out outname --gorder group-order --smexp sm-exponent\n", me);
 }
+
+/* -------------------------------------------------------------------------- */
 
 int main (int argc, char **argv)
 {
@@ -206,11 +268,12 @@ int main (int argc, char **argv)
   mpz_t *f;
   relset_ptr rels;
   int sr;
-  mpz_t ell, eps;
+  mpz_t ell, ell2, eps;
 
   double t0;
 
   char * me = *argv;
+
   /* print the command line */
   fprintf (stderr, "%s.r%s", argv[0], CADO_REV);
   for (int i = 1; i < argc; i++)
@@ -247,12 +310,11 @@ int main (int argc, char **argv)
   const char * tmp;
 
   ASSERT_ALWAYS((tmp = param_list_lookup_string(pl, "poly")) != NULL);
-
+  cado_poly_read(pol, tmp);
+  
   if (param_list_warn_unused(pl))
     exit(1);
 
-  cado_poly_read(pol, tmp);
-  
   /* Construct poly_t F from cado_poly pol (algebraic side) */
   deg = pol->pols[ALGEBRAIC_SIDE]->degree;
   f = pol->pols[ALGEBRAIC_SIDE]->f;
@@ -266,24 +328,35 @@ int main (int argc, char **argv)
   ASSERT_ALWAYS(group_order != NULL);
   ASSERT_ALWAYS(sm_exponent != NULL);
 
-  t0 = seconds();
-
   /* read ell from command line (assuming radix 10) */
   mpz_init_set_str(ell, group_order, 10);
 
-  rels = build_rel_sets(purgedname, indexname, &sr, F, ell);
+  mpz_init(ell2);
+  mpz_mul(ell2, ell, ell);
 
-  fprintf(stderr, "Building %d relation sets took %lf seconds\n", sr, seconds() - t0);
+  fprintf(stderr, "\nSub-group order:\n\tell = ");
+  mpz_out_str(stderr, 10, ell);
+  fprintf(stderr, "\n");
 
-  /* SM exponent from command line (assuming radix 10) */
   mpz_init_set_str(eps, sm_exponent, 10);
 
-  shirokauer_maps(outname, rels, sr, F, eps, ell);
+  fprintf(stderr, "\nShirokauer maps' exponent:\n\teps = ");
+  mpz_out_str(stderr, 10, eps);
+  fprintf(stderr, "\n");
 
-  fprintf(stderr, "Computing Shirokauer maps for %d relations took %2.2lf seconds\n", sr, seconds() - t0);
+  t0 = seconds();
+  rels = build_rel_sets(purgedname, indexname, &sr, F, ell2);
 
-  mpz_clear (eps);
-  poly_free (F);
+  fprintf(stderr, "\nComputing Shirokauer maps for %d relations\n", sr);
+
+  shirokauer_maps(outname, rels, sr, F, eps, ell, ell2);
+
+  fprintf(stderr, "\nsm completed in %2.2lf seconds\n", seconds() - t0);
+
+  mpz_clear(eps);
+  mpz_clear(ell);
+  mpz_clear(ell2);
+  poly_free(F);
   cado_poly_clear(pol);
   param_list_clear(pl);
 
