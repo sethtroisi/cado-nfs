@@ -158,22 +158,39 @@ class WorkDir(object):
         """
         return "%s%s%s.%s" % (self.workdir, os.sep, self.jobname, self.taskname)
     
-    def make_output_dirname(self, extra = None):
+    def make_dirname(self, subdir = None):
         """ Make a directory name of the form workdir/jobname.taskname/ if 
-        extra is not given, or workdir/jobname.taskname/extra/ if it is
+        subdir is not given, or workdir/jobname.taskname/subdir/ if it is
         """
         r = self._make_basename() + os.sep
-        if extra:
-            r += "%s%s" % (extra, os.sep)
+        if subdir:
+            r += "%s%s" % (subdir, os.sep)
         return r
     
-    def make_output_filename(self, name, subdir = False, dirextra = None):
-        """ Make a filename of the form workdir/jobname.taskname.name """
+    def make_filename(self, name, subdir = False, dirextra = None):
+        """ If subdir is False, make a filename of the form 
+        workdir/jobname.taskname.name 
+        If subdir is True and dirextra is None, make a filename of the form 
+        workdir/jobname.taskname/name
+        If subdir is True and dirextra is a string, make a filename of the form 
+        workdir/jobname.taskname/dirextra/name
+        """
         if subdir:
-            return self.make_output_dirname(dirextra) + name
+            return self.make_dirname(dirextra) + name
         else:
             assert dirextra is None
             return "%s.%s" % (self._make_basename(), name)
+
+    def make_directories(self, subdirs = None):
+        dirname = self.make_dirname()
+        if not os.path.isdir(dirname):
+            os.mkdir(dirname)
+        if subdirs:
+            for subdir in subdirs:
+                dirname = self.make_dirname(subdir)
+                if not os.path.isdir(dirname):
+                    os.mkdir(dirname)
+        return
 
 
 class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters, metaclass=abc.ABCMeta):
@@ -275,17 +292,6 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters, metaclas
                 raise IOError("%s file %s already exists" % (filedesc, f))
         return
     
-    @staticmethod
-    def make_directories(basedir, extra = None):
-        if not os.path.isdir(basedir):
-            os.mkdir(basedir)
-        if extra:
-            for subdir in extra:
-                dirname = basedir + os.sep + subdir
-                if not os.path.isdir(dirname):
-                    os.mkdir(dirname)
-        return
-
     # These two function go together, one produces a workunit name from the 
     # name of the factorization, the task name, and a task-provided identifier,
     # and the other function splits them again
@@ -553,7 +559,7 @@ class PolyselTask(ClientServerTask):
         polyselect_params = self.progparams[0].copy()
         polyselect_params["admin"] = str(adstart)
         polyselect_params["admax"] = str(adend)
-        outputfile = self.workdir.make_output_filename("%d-%d" % (adstart, adend))
+        outputfile = self.workdir.make_filename("%d-%d" % (adstart, adend))
         if self.test_outputfile_exists(outputfile):
             self.logger.info("%s already exists, won't generate again",
                              outputfile)
@@ -599,11 +605,11 @@ class FactorBaseOrFreerelTask(Task, metaclass=abc.ABCMeta):
         if not "outputfile" in self.state:
             self.logger.info("Starting")
             # Write polynomial to a file
-            polyfile = self.workdir.make_output_filename("poly")
+            polyfile = self.workdir.make_filename("poly")
             poly.create_file(polyfile, self.params)
             
             # Make file name for factor base/free relations file
-            outputfile = self.workdir.make_output_filename(self.target)
+            outputfile = self.workdir.make_filename(self.target)
 
             # Run command to generate factor base/free relations file
             kwargs = self.progparams[0].copy()
@@ -731,14 +737,14 @@ class SievingTask(ClientServerTask, FilesCreator):
         if not poly:
             raise Exception("SievingTask(): no polynomial received")
         # Write polynomial to a file
-        polyfile = self.workdir.make_output_filename("poly")
+        polyfile = self.workdir.make_filename("poly")
         poly.create_file(polyfile, self.params)
         
         while self.state["rels_found"] < int(self.state["rels_wanted"]):
             kwargs = self.progparams[0].copy()
             q0 = self.state["qnext"]
             q1 = q0 + int(self.params["qrange"])
-            outputfile = self.workdir.make_output_filename("%d-%d" % (q0, q1))
+            outputfile = self.workdir.make_filename("%d-%d" % (q0, q1))
             self.check_files_exist([outputfile], "output", shouldexist=False)
             kwargs["q0"] = str(q0)
             kwargs["q1"] = str(q1)
@@ -866,8 +872,7 @@ class Duplicates1Task(Task, FilesCreator):
             self.logger.info("No new files to split")
         else:
             self.logger.info("Splitting %d new files", len(newfiles))
-            basedir = self.workdir.make_output_dirname()
-            self.make_directories(basedir, map(str, range(0, self.nr_slices)))
+            self.workdir.make_directories(map(str, range(0, self.nr_slices)))
             # TODO: can we recover from missing input files? Ask Sieving to
             # generate them again? Just ignore the missing ones?
             self.check_files_exist(newfiles, "input", shouldexist = True)
@@ -890,7 +895,7 @@ class Duplicates1Task(Task, FilesCreator):
                     self.check_files_exist(outfilenames.keys(), "output", 
                                             shouldexist=False)
                     kwargs = self.progparams[0].copy()
-                    kwargs["out"] = self.workdir.make_output_dirname()
+                    kwargs["out"] = self.workdir.make_dirname()
                     p = self.programs[0]((f,), kwargs)
                     (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
                     if rc:
@@ -925,7 +930,7 @@ class Duplicates1Task(Task, FilesCreator):
             r = {}
             basename = os.path.basename(name)
             for i in range(0, self.nr_slices):
-                r[self.workdir.make_output_filename(basename, True, str(i))] = i
+                r[self.workdir.make_filename(basename, True, str(i))] = i
             return r;
     
     def parse_slice_counts(self, stderr):
@@ -1002,11 +1007,10 @@ class Duplicates2Task(Task, FilesCreator):
             # FIXME: Should we delete the files, too?
             self.forget_output_filenames(self.get_output_filenames(i.__eq__))
             del(self.slice_relcounts[str(i)])
-            basedir = self.workdir.make_output_dirname()
-            self.make_directories(basedir, str(i))
+            self.workdir.make_directories(str(i))
             kwargs = self.progparams[0].copy()
             kwargs["rel_count"] = str(rel_count * 12 // 10)
-            kwargs["output_directory"] = self.workdir.make_output_dirname(str(i))
+            kwargs["output_directory"] = self.workdir.make_dirname(str(i))
             p = self.programs[0](files, kwargs)
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             if rc:
@@ -1026,7 +1030,7 @@ class Duplicates2Task(Task, FilesCreator):
     
     def make_output_filename(self, f, i):
         basename = os.path.basename(f)
-        return self.workdir.make_output_filename(basename, True, str(i))
+        return self.workdir.make_filename(basename, True, str(i))
     
     def parse_remaining(self, text):
         # "     112889 remaining relations"
@@ -1103,7 +1107,7 @@ class PurgeTask(Task):
                           self.state)
         
         poly = self.send_request(Request.GET_POLYNOMIAL)
-        polyfile = self.workdir.make_output_filename("poly")
+        polyfile = self.workdir.make_filename("poly")
         poly.create_file(polyfile, self.params)
         nfree = self.send_request(Request.GET_FREEREL_RELCOUNT)
         nunique = self.send_request(Request.GET_UNIQUE_RELCOUNT)
@@ -1121,7 +1125,7 @@ class PurgeTask(Task):
         
         self.logger.info("Reading %d unique and %d free relations, total %d"
                          % (nunique, nfree, nrels))
-        purgedfile = self.workdir.make_output_filename("purged.gz")
+        purgedfile = self.workdir.make_filename("purged.gz")
         freerel_filename = self.send_request(Request.GET_FREEREL_FILENAME)
         unique_filenames = self.send_request(Request.GET_UNIQUE_FILENAMES)
         args = unique_filenames + [freerel_filename]
@@ -1315,7 +1319,7 @@ class MergeTask(Task):
                 del(self.state["densefile"])
             
             purged_filename = self.send_request(Request.GET_PURGED_FILENAME)
-            historyfile = self.workdir.make_output_filename("history")
+            historyfile = self.workdir.make_filename("history")
             args = ()
             kwargs = self.progparams[0].copy()
             kwargs["mat"] = purged_filename
@@ -1325,8 +1329,8 @@ class MergeTask(Task):
             if rc:
                 raise Exception("Program failed")
             
-            indexfile = self.workdir.make_output_filename("index")
-            mergedfile = self.workdir.make_output_filename("small.bin")
+            indexfile = self.workdir.make_filename("index")
+            mergedfile = self.workdir.make_filename("small.bin")
             args = ()
             kwargs = self.progparams[1].copy()
             kwargs["binary"] = "1"
@@ -1345,7 +1349,7 @@ class MergeTask(Task):
                 raise Exception("Output file %s does not exist" % mergedfile)
             self.state["indexfile"] = indexfile
             self.state["mergedfile"] = mergedfile
-            densefilename = self.workdir.make_output_filename("small.dense.bin")
+            densefilename = self.workdir.make_filename("small.dense.bin")
             if os.path.isfile(densefilename):
                 self.state["densefile"] = densefilename
             
@@ -1376,7 +1380,6 @@ class LinAlgTask(Task):
     def paramnames(self):
         return super().paramnames + \
             ()
-    # bwc.pl :complete seed=1 thr=1x1 mpi=1x1 matrix=c59.small.bin nullspace=left mm_impl=bucket interleaving=0 interval=100 mn=64 wdir=c59.bwc shuffled_product=1 bwc_bindir=/localdisk/kruppaal/build/cado-nfs/normal/linalg/bwc
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
     
@@ -1386,8 +1389,8 @@ class LinAlgTask(Task):
         
         if not "dependency" in self.state:
             self.logger.info("Starting")
-            workdir = self.workdir.make_output_dirname()
-            self.make_directories(workdir)
+            workdir = self.workdir.make_dirname()
+            self.workdir.make_directories()
             mergedfile = self.send_request(Request.GET_MERGED_FILENAME)
             args = ()
             kwargs = self.progparams[0].copy()
@@ -1399,7 +1402,7 @@ class LinAlgTask(Task):
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             if rc:
                 raise Exception("Program failed")
-            dependencyfilename = self.workdir.make_output_filename("W", subdir = True)
+            dependencyfilename = self.workdir.make_filename("W", subdir = True)
             if not os.path.isfile(dependencyfilename):
                 raise Exception("Kernel file %s does not exist" % dependencyfilename)
             self.state["dependency"] =  dependencyfilename
@@ -1438,10 +1441,10 @@ class CharactersTask(Task):
         
         if not "kernel" in self.state:
             self.logger.info("Starting")
-            polyfilename = self.workdir.make_output_filename("poly")
+            polyfilename = self.workdir.make_filename("poly")
             poly = self.send_request(Request.GET_POLYNOMIAL)
             poly.create_file(polyfilename, self.params)
-            kernelfilename = self.workdir.make_output_filename("kernel")
+            kernelfilename = self.workdir.make_filename("kernel")
             
             purgedfilename = self.send_request(Request.GET_PURGED_FILENAME)
             indexfilename = self.send_request(Request.GET_INDEX_FILENAME)
@@ -1497,7 +1500,7 @@ class SqrtTask(Task):
                           self.state)
         if not self.is_done():
             self.logger.info("Starting")
-            polyfilename = self.workdir.make_output_filename("poly")
+            polyfilename = self.workdir.make_filename("poly")
             poly = self.send_request(Request.GET_POLYNOMIAL)
             poly.create_file(polyfilename, self.params)
             
