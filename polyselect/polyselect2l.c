@@ -23,7 +23,6 @@
 
 #define TARGET_TIME 10000000 /* print stats every TARGET_TIME milliseconds */
 #define NEW_ROOTSIEVE
-#define MAX_THREADS 16
 #define INIT_FACTOR 7UL
 //#define DEBUG_POLYSELECT2L
 
@@ -396,7 +395,13 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
 #endif
       mpz_neg (m, g[0]);
 
+#ifdef MAX_THREADS
+  pthread_mutex_lock (&lock);
+#endif
       rootsieve_time -= seconds_thread ();
+#ifdef MAX_THREADS
+  pthread_mutex_unlock (&lock);
+#endif
 
 #ifdef NEW_ROOTSIEVE
       if (d > 3) {
@@ -418,7 +423,13 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
       optimize_aux (f, d, g, 0, 0, CIRCULAR);
 #endif
 
+#ifdef MAX_THREADS
+  pthread_mutex_lock (&lock);
+#endif
       rootsieve_time += seconds_thread ();
+#ifdef MAX_THREADS
+  pthread_mutex_unlock (&lock);
+#endif
 
     } // raw and sopt only ?
 
@@ -752,7 +763,13 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
 #endif
       mpz_neg (m, g[0]);
 
+#ifdef MAX_THREADS
+  pthread_mutex_lock (&lock);
+#endif
       rootsieve_time -= seconds_thread ();
+#ifdef MAX_THREADS
+  pthread_mutex_unlock (&lock);
+#endif
 
 #ifdef NEW_ROOTSIEVE
       if (d > 3) {
@@ -774,7 +791,13 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
       optimize_aux (f, d, g, 0, 0, CIRCULAR);
 #endif
 
+#ifdef MAX_THREADS
+  pthread_mutex_lock (&lock);
+#endif
       rootsieve_time += seconds_thread ();
+#ifdef MAX_THREADS
+  pthread_mutex_unlock (&lock);
+#endif
 
     } // raw and sopt only ?
 
@@ -2144,6 +2167,9 @@ main (int argc, char *argv[])
     fprintf (stderr, "Error, too small value of P\n");
     exit (1);
   }
+
+  /* detect L1 cache size */
+  ropt_L1_cachesize ();
 
   st = milliseconds ();
   lenPrimes = initPrimes (P, &Primes);
