@@ -91,13 +91,16 @@ class Parameters(object):
     def _get_subdict(self, path):
         source = self.data
         for d in path:
-            assert d in source
+            if not d in source:
+                return None
             assert isinstance(source[d], dict)
             source = source[d]
         return source
     
     def find(self, path, regex):
         source = self._get_subdict(path)
+        if not source:
+            source = {}
         result = []
         pattern = re.compile(regex)
         for l in self._recurse_iter(source, path):

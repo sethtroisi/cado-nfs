@@ -6,6 +6,8 @@
 
 import sys
 import os
+import fcntl
+import errno
 import stat
 import optparse
 import shutil
@@ -68,11 +70,11 @@ class WuMIMEMultipart(MIMEMultipart):
         ''' Attach the data as a file
 
         name is the string that is sent to the server as the name of the form 
-        input field for the upload; for us it is always 'result'
+        input field for the upload; for us it is always 'result'.
         filename is the string that is sent to the server as the source file 
         name, this is the name as given in the RESULT lines, or stdout1 for 
         stdout of the first command that ran, etc.
-        data is the content of the file to send
+        data is the content of the file to send.
         '''
         result = MIMEApplication(data, _encoder=email.encoders.encode_noop)
         result.add_header('Content-Disposition', 'form-data', 
@@ -198,14 +200,30 @@ class WorkunitProcessorClient(WorkunitProcessor):
 
         # Parse the contents of the WU file
         logging.debug ("Parsing workunit from file %s", self.wu_filename)
-        with open(self.wu_filename) as wu_file:
-            wu_text = wu_file.read()
+
+        self.wu_file = open(self.wu_filename)
+
+        # Get an exclusive lock to avoid two clients working on the same 
+        # workunit
+        try:
+            fcntl.flock(self.wu_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except IOError as err:
+            if err.errno == errno.EACCES or err.errno == errno.EAGAIN:
+                logging.error("Workunit file is already locked. This may "
+                              "indicate that two clients with clientid %s are "
+                              "running. Terminating.", self.settings["CLIENTID"])
+            raise
+
+        wu_text = self.wu_file.read()
         super(WorkunitProcessorClient, self).__init__(
             text = wu_text, settings = settings)
     
     def cleanup(self):
         super(WorkunitProcessorClient, self).cleanup()
         logging.info ("Removing workunit file %s", self.wu_filename)
+        
+        fcntl.flock(self.wu_file, fcntl.LOCK_UN)
+        self.wu_file.close()
         os.remove(self.wu_filename)
 
     def _urlopen(self, request, operation):
@@ -216,8 +234,6 @@ class WorkunitProcessorClient(WorkunitProcessor):
         while conn is None:
             try:
                 conn = urllib_request.urlopen(request)
-            except urllib_error.HTTPError as error:
-                raise
             except (NameError, urllib_error.URLError) as error:
                 conn = None
                 wait = float(self.settings["DOWNLOADRETRY"])
@@ -225,6 +241,8 @@ class WorkunitProcessorClient(WorkunitProcessor):
                               str(error))
                 logging.error("Waiting %s seconds before retrying", wait)
                 time.sleep(wait)
+            except Exception:
+                raise
         return conn
 
     def get_file(self, urlpath, dlpath = None, options = None):
@@ -236,9 +254,38 @@ class WorkunitProcessorClient(WorkunitProcessor):
             url = url + "?" + options
         logging.info ("Downloading %s to %s", url, dlpath)
         request = self._urlopen(url, "Download")
-        outfile = open(dlpath, "wb")
+        # Try to open the file exclusively
+        try:
+            fd = os.open(dlpath, os.O_CREAT | os.O_WRONLY | os.O_EXCL)
+        except OSError as err:
+            if err.errno == 17: # File exists error
+                # There is a possible race condition here. If process A creates 
+                # the file, then process B tries and finds that the file exists
+                # and immediately get a shared lock for reading, then process A 
+                # can never get an exclusive lock for writing.
+                # To avoid this, we let process B wait until the file has 
+                # positive size, which implies that process A must have the 
+                # lock already. After 60 seconds, assume the file really has 0 
+                # bytes and return
+                logging.warning("Looks like another process already created "
+                                "file %s", dlpath)
+                slept = 0
+                timeout = 60
+                while slept < timeout and os.path.getsize(dlpath) == 0:
+                    logging.warning("Sleeping until %s contains data", dlpath)
+                    time.sleep(1)
+                    slept += 1
+                if slept == timeout:
+                    logging.warning("Slept %d seconds, %s still has no data", 
+                                    timeout, dlpath)
+                return
+            else:
+                raise
+        fcntl.flock(fd, fcntl.LOCK_EX)
+        outfile = os.fdopen(fd, "w")
         shutil.copyfileobj (request, outfile)
-        outfile.close()
+        fcntl.flock(fd, fcntl.LOCK_UN)
+        outfile.close() # This should also close the fd
         request.close()
     
     def get_missing_file(self, urlpath, filename, checksum = None, 
@@ -291,6 +338,12 @@ class WorkunitProcessorClient(WorkunitProcessor):
             dlpath = self.paste_path(self.settings["DLDIR"], dlname)
             if not self.get_missing_file (archname, dlpath, checksum):
                 return False
+            # Try to lock the file once to be sure that download has finished
+            # if another wuclient is doing the downloading
+            with open(dlpath) as f:
+                fcntl.flock(f, fcntl.LOCK_SH)
+                fcntl.flock(f, fcntl.LOCK_UN)
+            
             if filename in dict(self.wudata.get("EXECFILE", [])):
                 mode = os.stat(dlpath).st_mode
                 if mode & stat.S_IXUSR == 0:
@@ -375,10 +428,13 @@ class WorkunitProcessorClient(WorkunitProcessor):
         blocksize = 65536
         sha1hash = hashlib.sha1() # pylint: disable=E1101
         infile = open(filename, "rb")
+        fcntl.flock(infile, fcntl.LOCK_SH)
+        
         data = infile.read(blocksize)
         while data:
             sha1hash.update(data)
             data = infile.read(blocksize)
+        fcntl.flock(infile, fcntl.LOCK_UN)
         infile.close()
         filesum = sha1hash.hexdigest()
         if checksum is None:
@@ -487,9 +543,5 @@ if __name__ == '__main__':
 
     ok = True
     while ok:
-        try:
-            processor = WorkunitProcessorClient(settings = SETTINGS)
-        except Exception as error:
-            print (error)
-            break
+        processor = WorkunitProcessorClient(settings = SETTINGS)
         ok = processor.process()

@@ -446,7 +446,7 @@ modul_add (residueul_t r, const residueul_t a, const residueul_t b,
   printf ("modul_add: a = %lu, b = %lu", a[0], b[0]);
 #endif
 
-#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_ASM)
+#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
   {
     unsigned long t = a[0] - m[0], tr = a[0] + b[0];
     
@@ -502,7 +502,7 @@ modul_sub (residueul_t r, const residueul_t a, const residueul_t b,
   printf ("submod_ul: a = %lu, b = %lu", a[0], b[0]);
 #endif
 
-#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_ASM)
+#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
   {
     unsigned long tr, t = a[0];
     __asm__ (
@@ -675,7 +675,7 @@ modul_addredcsemi_ul (residueul_t r, const residueul_t a,
   
   ASSERT_EXPENSIVE(a[0] <= m[0]);
   slow = b;
-#ifdef HAVE_GCC_STYLE_AMD64_ASM
+#ifdef HAVE_GCC_STYLE_AMD64_INLINE_ASM
   {
     unsigned char sb;
     __asm__ ( "addq %2, %0\n\t" /* cy * 2^w + slow = a + b */
@@ -814,7 +814,7 @@ MAYBE_UNUSED
 static inline void
 modul_div2 (residueul_t r, const residueul_t a, const modulusul_t m)
 {
-#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_ASM)
+#if (defined(__i386__) && defined(__GNUC__)) || defined(HAVE_GCC_STYLE_AMD64_INLINE_ASM)
   unsigned long s = a[0], t = m[0];
   ASSERT_EXPENSIVE (m[0] % 2UL != 0UL);
 

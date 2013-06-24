@@ -135,7 +135,7 @@ macro(configure_matmul_lib v i)
     string(COMPARE EQUAL "${i}" "bucket" doing_bucket)
     set(sources matmul-common.c matmul_facade.c ${matmul_${i}_sources})
     if(doing_u64 AND doing_bucket)
-        if(HAVE_GCC_STYLE_AMD64_ASM)
+        if(HAVE_GAS_SYNTAX_ASSEMBLY_SOURCES)
             set(sources ${sources}
                     matmul-sub-small1.S
                     matmul-sub-small2.S
@@ -150,7 +150,7 @@ macro(configure_matmul_lib v i)
             set_property(SOURCE matmul-sub-large-fbd.S PROPERTY LANGUAGE C)
             set_property(SOURCE matmul-sub-vsc-dispatch.S PROPERTY LANGUAGE C)
             set_property(SOURCE matmul-sub-vsc-combine.S PROPERTY LANGUAGE C)
-        endif(HAVE_GCC_STYLE_AMD64_ASM)
+        endif(HAVE_GAS_SYNTAX_ASSEMBLY_SOURCES)
     endif(doing_u64 AND doing_bucket)
 
     add_library(matmul_${v}_${i} ${CADO_SHARED} ${sources})

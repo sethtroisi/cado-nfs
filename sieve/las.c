@@ -509,6 +509,11 @@ sieve_info_init_from_siever_config(las_info_ptr las, sieve_info_ptr si, siever_c
 
     si->td_thresh = si->I;	/* default value */
     param_list_parse_uint(pl, "tdthresh", &(si->td_thresh));
+    if (si->td_thresh < si->I)
+      {
+        fprintf (stderr, "Using tdthresh < I not allowed due to bug #15897\n");
+        exit (1);
+      }
 
     /* Initialize the number of buckets */
 
@@ -1620,10 +1625,20 @@ fill_in_buckets(thread_data_ptr th, int side, where_am_I_ptr w MAYBE_UNUSED)
             WHERE_AM_I_UPDATE(w, x, update.x);
             ASSERT(test_divisible(w)); 
             push_bucket_update(BA, x >> shiftbucket, update);
+#ifdef TRACE_K
+            if (trace_on_spot_x(x))
+              fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
+                       (unsigned int) update.x, logp, p, sidenames[side], (unsigned int) (x >> shiftbucket));
+#endif
             continue;
         }
-        if (UNLIKELY(r == p))
+        if (UNLIKELY(r >= p))
         {
+          if (r > p) /* should only happen for lattice-sieved prime powers,
+                        which is not possible currently since maxbits < I */
+            continue;
+
+          /* now r == p */
             /* r == p means root at infinity, which hits for
                j == 0 (mod p). Since q > I > J, this implies j = 0
                or j > J. This means we sieve only (i,j) = (1,0) here.
@@ -1637,10 +1652,11 @@ but which of these two (if any) do we sieve? */
             WHERE_AM_I_UPDATE(w, x, update.x);
             ASSERT(test_divisible(w));
             push_bucket_update(BA, 0, update);
-            continue;
-        }
-        if (UNLIKELY(r > p))
-        {
+#ifdef TRACE_K
+            if (trace_on_spot_x(update.x))
+              fprintf (stderr, "# Pushed (%u, %u) (%u, %s) to BA[%u]\n",
+                       (unsigned int) update.x, logp, p, sidenames[side], 0);
+#endif
             continue;
         }
 
@@ -2300,18 +2316,18 @@ factor_survivors (thread_data_ptr th, int N, unsigned char * S[2], where_am_I_pt
 
             for(int z = 0 ; pass && z < 2 ; z++) {
                 int side = RATIONAL_SIDE ^ z;   /* start with rational */
-                mpz_t * f = cpoly->pols[side]->f;
+                mpz_t * f = si->sides[side]->fij;
                 int deg = cpoly->pols[side]->degree;
                 int lim = si->conf->sides[side]->lim;
+                int i;
+                unsigned int j;
 
                 // Trial divide rational norm
-                mp_poly_homogeneous_eval_siui (norm[side], f, deg, a, b);
-                if (si->conf->side == side) {
-#ifdef  WANT_ASSERT_EXPENSIVE
-                    ASSERT(mpz_divisible_p(norm[side], si->doing->p));
-#endif
-                    mpz_divexact (norm[side], norm[side], si->doing->p);
-                }
+                /* Compute the norms using the polynomials transformed to 
+                   i,j-coordinates. The transformed polynomial on the 
+                   special-q side is already divided by q */
+                NxToIJ (&i, &j, N, x, si);
+                mp_poly_homogeneous_eval_siui (norm[side], f, deg, i, j);
 #ifdef TRACE_K
                 if (trace_on_spot_ab(a, b)) {
                     gmp_fprintf(stderr, "# start trial division for norm=%Zd on %s side for (%"PRId64",%"PRIu64")\n",norm[side],sidenames[side],a,b);
@@ -3374,6 +3390,16 @@ int main (int argc0, char *argv0[])/*{{{*/
 
         if (SkewGauss (si, si->cpoly->skew) != 0)
             continue;
+
+        /* check |a0|, |a1| < 2^31 if we use fb_root_in_qlattice_31bits */
+#ifndef SUPPORT_LARGE_Q
+        if (si->a0 <= -2147483648L || 2147483648L <= si->a0 ||
+            si->a1 <= -2147483648L || 2147483648L <= si->a1)
+          {
+            fprintf (stderr, "Error, too large special-q, define SUPPORT_LARGE_Q\n");
+            exit (1);
+          }
+#endif
 
         /* FIXME: maybe we can discard some special q's if a1/a0 is too large,
          * see http://www.mersenneforum.org/showthread.php?p=130478 
