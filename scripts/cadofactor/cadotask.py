@@ -407,7 +407,7 @@ class ClientServerTask(Task, patterns.Observer):
         super().__init__(*args, **kwargs)
         self.state.setdefault("wu_submitted", 0)
         self.state.setdefault("wu_received", 0)
-        self.params.setdefault("maxwu", "100")
+        self.params.setdefault("maxwu", "10")
         assert self.get_number_outstanding_wus() >= 0
         self.send_notification(Notification.SUBSCRIBE_WU_NOTIFICATIONS, None)
     
@@ -743,7 +743,7 @@ class SievingTask(ClientServerTask, FilesCreator):
             
         self.state.setdefault("rels_found", 0)
         self.state.setdefault("rels_wanted", 0)
-        self.params.setdefault("maxwu", "100")
+        self.params.setdefault("maxwu", "10")
         self.state["rels_wanted"] = max(self.state.get("rels_wanted", 0), 
                                         int(self.params.get("rels_wanted", 0)))
         if self.state["rels_wanted"] == 0:
