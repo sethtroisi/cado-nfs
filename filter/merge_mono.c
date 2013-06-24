@@ -635,7 +635,11 @@ mergeForColumn2(report_t *rep, filter_matrix_t *mat, int *njrem,
 int
 number_of_superfluous_rows(filter_matrix_t *mat)
 {
-    int kappa = (mat->rem_nrows-mat->rem_ncols) / mat->keep, ni2rem;
+    int kappa, ni2rem;
+    if (mat->keep > 0)
+      kappa = (mat->rem_nrows-mat->rem_ncols) / mat->keep;
+    else
+      kappa = (mat->rem_nrows-mat->rem_ncols);
 
     if(kappa <= (1<<4))
       ni2rem = mat->keep / 2;
