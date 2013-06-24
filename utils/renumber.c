@@ -484,6 +484,7 @@ renumber_write_p (renumber_t renumber_info, unsigned long p, unsigned long*r[2],
   }
 }
 
+#define DEBUG_RENUMB
 /* side is 0 if (p,r) corresponds to the left part in the relation,
    side is 1 if (p,r) corresponds to the right part.
    For NFS the rational part (if any) corresponds to side 0, and we can
@@ -509,6 +510,9 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
 
   if ((p >> MAX_LOG_CACHED)) // p is not cached
   {
+#ifdef DEBUG_RENUMB
+    int nstep = 0;
+#endif
     index_t max = renumber_info->size - 1;
     index_t min = renumber_info->first_not_cached;
 
@@ -544,19 +548,29 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
         if (i == old_i)
           i--;
       }
+#ifdef DEBUG_RENUMB
+      nstep++;
+      ASSERT_ALWAYS (nstep < 64);
+#endif
     }
   }
   else //p is cached
+  {
     i = renumber_info->cached[vp];
+#ifdef DEBUG_RENUMB
+    ASSERT_ALWAYS (renumber_info->table[i] != vp);
+#endif
+  }
 
   /* now i points at the beginning of a decreasing sequence of values of vr */
+  fprintf (stderr, "side=%d rat=%d\n", side, renumber_info->rat);
   if (side != renumber_info->rat)
   {
     while (i < renumber_info->size)
     {
       if (vr < tab[i])
       {
-        if (i == renumber_info->size || vr > tab[i+1])
+        if (i == renumber_info->size - 1 || vr > tab[i+1])
           break;
         else
           i++;
