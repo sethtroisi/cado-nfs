@@ -56,9 +56,9 @@ int ffs_poly_set_plist(cado_poly poly, param_list pl)
   const char *s;
 
   param_list_parse_ulong(pl, "fbb0", &lim);
-  poly->pols[0]->lim = __FP_BITS + __FP_BITS * lim;
+  poly->pols[0]->lim = lim;
   param_list_parse_ulong(pl, "fbb1", &lim);
-  poly->pols[1]->lim = __FP_BITS + __FP_BITS * lim;
+  poly->pols[1]->lim = lim;
   
   param_list_parse_int(pl, "lpb0", &lpb);
   poly->pols[0]->lpb = __FP_BITS + __FP_BITS * lpb;
@@ -66,12 +66,12 @@ int ffs_poly_set_plist(cado_poly poly, param_list pl)
   poly->pols[1]->lpb = __FP_BITS + __FP_BITS * lpb;
   
   s = param_list_lookup_string(pl, "pol0");
-  for (deg = 0; *s != '\n'; s++)
+  for (deg = 0; *s != '\0'; s++)
     if (*s == ',')
       deg++;
   poly->pols[0]->degree = deg;
   s = param_list_lookup_string(pl, "pol1");
-  for (deg = 0; *s != '\n'; s++)
+  for (deg = 0; *s != '\0'; s++)
     if (*s == ',')
       deg++;
   poly->pols[1]->degree = deg;

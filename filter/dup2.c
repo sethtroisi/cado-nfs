@@ -201,6 +201,42 @@ ugly_for_p59(unsigned long *j1, unsigned long *j2,
   ASSERT_ALWAYS(0);
 }
 
+static inline void
+print_prime (int64_t a, uint64_t b, unsigned long p, int e, int side,
+             char *s)
+{
+  unsigned long j, k;
+  p_r_values_t r;
+
+  if (side == renumber_table->rat)
+    r = 0;
+  else
+#ifndef FOR_FFS
+    r = findroot(a, b, p);
+#else
+    r = findroot_ffs (a, b, p);
+#endif
+
+  // Here we have to take care of bad ideals that
+  // generate several columns:
+  if (renumber_is_bad (renumber_table, p, r, side))
+  {
+    // At the moment, we use code specific to p59.
+    unsigned long j1, j2, n1, n2;
+    ugly_for_p59(&j1, &j2, &n1, &n2, a, b, p, e);
+    for (k = 0; k < n1; k++)
+      sprintf (s, "%s%lx,", s, j1);
+    for (k = 0; k < n2; k++)
+      sprintf (s, "%s%lx,", s, j2);
+  }
+  else
+  {
+    j = renumber_get_index_from_p_r (renumber_table, p, r, side);
+    for (k = 0; k < (unsigned long) e; k++)
+      sprintf (s, "%s%lx,", s, j);
+  }
+}
+
 /* infile is the input file
    if dirname is NULL, no output is done.
    * read new files only */
@@ -286,7 +322,6 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
               {
                 char bufline[RELATION_MAX_BYTES];
                 int buggy_line = 0; //to remove lines with non-prime "ideals"
-                int first = 1;
 
                 if (rs->rel.a < 0)
                   sprintf (bufline, "-%" PRIx64 ",%" PRIx64 ":",
@@ -298,84 +333,47 @@ remove_dup_in_files (char ** files, const char *dirname, const char * outfmt,
                 if (!is_for_dl)
                   reduce_exponents_mod2 (&(rs->rel));
 
+                /* r stands for side 0 (not rational side)
+                   a stands for side 1 (not algebraic side)
+                */
                 for (int i = 0; i < rs->rel.nb_rp; i++)
+                {
+                  if (rs->rel.rp[i].e > 0)
                   {
-                    if (rs->rel.ap[i].e > 0)
-                    {
-                      if (!modul_isprime(&(rs->rel.rp[i].p)))
-                        buggy_line = 1;
-                      else
-                      {
-
-                        unsigned long j;
-                        j = renumber_get_index_from_p_r (renumber_table,
-                                                         rs->rel.rp[i].p, 0, 0);
-                        for (int k = 0; k < rs->rel.rp[i].e; k++)
-                        {
-                          if (first)
-                          {
-                            first = 0;
-                            sprintf (bufline, "%s%lx", bufline, j);
-                          }
-                          else
-                            sprintf (bufline, "%s,%lx", bufline, j);
-                        }
-                      }
-                    }
+#ifndef FOR_FFS
+                    if (!modul_isprime(&(rs->rel.rp[i].p)))
+                      buggy_line = 1;
+                    else
+#endif
+                      print_prime (rs->rel.a, rs->rel.b, rs->rel.rp[i].p,
+                                   rs->rel.rp[i].e, 0, bufline);
                   }
+                }
                 for (int i = 0; i < rs->rel.nb_ap; i++)
+                {
+                  if (rs->rel.ap[i].e > 0)
                   {
-                    if (rs->rel.ap[i].e > 0)
-                    {
-                      /* Warning on alg side the r values is not computed by */
-                      /* relation_stream_get */
-                      if (!modul_isprime(&(rs->rel.ap[i].p)))
-                        buggy_line = 1;
-                      else {
-                        rs->rel.ap[i].r = findroot(rs->rel.a, rs->rel.b,
-                                rs->rel.ap[i].p);
-                        // Here we have to take care of bad ideals that
-                        // generate several columns:
-                        if (renumber_is_bad(renumber_table, rs->rel.ap[i].p,
-                                    rs->rel.ap[i].r, 1)) {
-                            // At the moment, we use code specific to p59.
-                            unsigned long j1, j2, n1, n2;
-                            ugly_for_p59(&j1, &j2, &n1, &n2, rs->rel.a, rs->rel.b, rs->rel.ap[i].p, rs->rel.ap[i].e);
-                            for (unsigned int k = 0; k < n1; k++) {
-                              if (first) {
-                                 first = 0;
-                                 sprintf (bufline, "%s%lx", bufline, j1);
-                              } else
-                                sprintf (bufline, "%s,%lx", bufline, j1);
-                            }
-                            for (unsigned int k = 0; k < n2; k++) {
-                              if (first) {
-                                 first = 0;
-                                 sprintf (bufline, "%s%lx", bufline, j2);
-                              } else
-                                sprintf (bufline, "%s,%lx", bufline, j2);
-                            }
-                        } else { // classical ideal
-                          unsigned long j;
-                          j = renumber_get_index_from_p_r (renumber_table,
-                                 rs->rel.ap[i].p, rs->rel.ap[i].r, 1);
-                          for (int k = 0; k < rs->rel.ap[i].e; k++) {
-                            if (first) {
-                              first = 0;
-                              sprintf (bufline, "%s%lx", bufline, j);
-                            } else
-                              sprintf (bufline, "%s,%lx", bufline, j);
-                          }
-                        }
-                      }
-                    }
+#ifndef FOR_FFS
+                    if (!modul_isprime(&(rs->rel.ap[i].p)))
+                      buggy_line = 1;
+                    else
+#endif
+                      print_prime (rs->rel.a, rs->rel.b, rs->rel.ap[i].p,
+                                   rs->rel.ap[i].e, 1, bufline);
+
                   }
+                }
+
                 if (!buggy_line)
                 {
+                  // bufline end with a extra ,
                   if (renumber_table->add_full_col)
-                    fprintf (f_out, "%s,0\n", bufline); //added col is always 0
+                    fprintf (f_out, "%s0\n", bufline); //added col is always 0
                   else
+                  {
+                    bufline[strlen(bufline)-1] = '\0';
                     fprintf (f_out, "%s\n", bufline);
+                  }
                 }
                 else
                 {
