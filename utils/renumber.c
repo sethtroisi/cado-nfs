@@ -563,7 +563,6 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
   }
 
   /* now i points at the beginning of a decreasing sequence of values of vr */
-  fprintf (stderr, "side=%d rat=%d\n", side, renumber_info->rat);
   if (side != renumber_info->rat)
   {
     while (i < renumber_info->size)
