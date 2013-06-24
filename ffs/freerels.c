@@ -194,16 +194,16 @@ int main(int argc, char **argv)
       /* first compute the roots */
       for (int i = 0; i < 2; i++)
       {
-        if (sq_deg(p) < lpb[i])
+        if (sq_deg(p) <= lpb[i])
           k[i] = sq_roots(roots[i], p, ffspol[i]);
         else
           k[i] = 0;
       }
 
-      unsigned long p_int= fppol64_get_ui_sparse (p);
+      unsigned long p_int = fppol64_get_ui_sparse (p);
       renumber_write_p (tab, p_int, roots, k);
 
-      if (sq_deg(p) <= max_deg && k[0] == d[0] && k[1] == d[1])
+      if (sq_deg(p) <= min_deg && k[0] == d[0] && k[1] == d[1])
       { 
         //print the free rels
         index_t l;
