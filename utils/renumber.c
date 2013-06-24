@@ -558,7 +558,7 @@ renumber_get_index_from_p_r (renumber_t renumber_info, p_r_values_t p,
   {
     i = renumber_info->cached[vp];
 #ifdef DEBUG_RENUMB
-    ASSERT_ALWAYS (renumber_info->table[i] != vp);
+    ASSERT_ALWAYS (renumber_info->table[i] == vp);
 #endif
   }
 
