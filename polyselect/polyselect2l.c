@@ -23,7 +23,7 @@
 
 #define TARGET_TIME 10000000 /* print stats every TARGET_TIME milliseconds */
 #define NEW_ROOTSIEVE
-#define INIT_FACTOR 7UL
+#define INIT_FACTOR 8UL
 //#define DEBUG_POLYSELECT2L
 
 #ifdef NEW_ROOTSIEVE
