@@ -436,13 +436,12 @@ match (unsigned long p1, unsigned long p2, int64_t i, mpz_t m0,
     skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
     logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
 
-    for (i = 10; i > 0 && logmu < best_logmu[i-1]; i--)
-      best_logmu[i] = best_logmu[i-1];
-    best_logmu[i] = logmu;
-
 #ifdef MAX_THREADS
     pthread_mutex_lock (&lock);
 #endif
+    for (i = 10; i > 0 && logmu < best_logmu[i-1]; i--)
+      best_logmu[i] = best_logmu[i-1];
+    best_logmu[i] = logmu;
     collisions_good ++;
     aver_opt_lognorm += logmu;
     var_opt_lognorm += logmu * logmu;
@@ -804,13 +803,12 @@ gmp_match (uint32_t p1, uint32_t p2, int64_t i, mpz_t m0,
     skew = L2_skewness (f, d, SKEWNESS_DEFAULT_PREC, DEFAULT_L2_METHOD);
     logmu = L2_lognorm (f, d, skew, DEFAULT_L2_METHOD);
 
-    for (i = 10; i > 0 && logmu < best_logmu[i-1]; i--)
-      best_logmu[i] = best_logmu[i-1];
-    best_logmu[i] = logmu;
-
 #ifdef MAX_THREADS
     pthread_mutex_lock (&lock);
 #endif
+    for (i = 10; i > 0 && logmu < best_logmu[i-1]; i--)
+      best_logmu[i] = best_logmu[i-1];
+    best_logmu[i] = logmu;
     collisions_good ++;
     aver_opt_lognorm += logmu;
     var_opt_lognorm += logmu * logmu;
