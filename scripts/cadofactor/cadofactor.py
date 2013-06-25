@@ -10,13 +10,14 @@ if __name__ == '__main__':
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Integer Factorisation with the Number Field Sieve')
     parser.add_argument("--screenlog", help="Screen logging level, e.g., INFO/COMMAND/DEBUG", default="INFO", metavar="LEVEL")
+    parser.add_argument("--old", help="Use old parameter file format", action='store_true')
     parser.add_argument("parameters", help="A file with the parameters to use")
     args = parser.parse_args()
     paramfile = args.parameters
     screenlvlname = args.screenlog
     
     parameters = cadoparams.Parameters()
-    parameters._readfile(open(paramfile))
+    parameters.readfile(open(paramfile), old_format = args.old)
     tasksparams = parameters.myparams(("workdir", "name"), "tasks")
     
     screenlvl = getattr(cadologger, screenlvlname.upper())

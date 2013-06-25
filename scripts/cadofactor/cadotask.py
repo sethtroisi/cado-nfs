@@ -1136,7 +1136,7 @@ class PurgeTask(Task):
     """ Removes singletons and computes excess """
     @property
     def name(self):
-        return "singletons"
+        return "purge"
     @property
     def title(self):
         return "Filtering - Singleton removal"
@@ -1343,7 +1343,7 @@ class MergeTask(Task):
     """ Merges relations """
     @property
     def name(self):
-        return "merging"
+        return "merge"
     @property
     def title(self):
         return "Filtering - Merging"
