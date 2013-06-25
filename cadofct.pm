@@ -2845,10 +2845,6 @@ sub do_linalg {
     } elsif ($param{'linalg'} eq "bwc") {
         info "Calling Block-Wiedemann...\n";
         $tab_level++;
-        my $mt = $param{'bwmt'};
-        if ($mt =~ /^(\d+)$/) {
-            $mt = "${mt}x1";
-        }
 
         my $bwc_script = "$param{'bindir'}/linalg/bwc/bwc.pl";
 
@@ -2874,7 +2870,7 @@ sub do_linalg {
         $cmd = "$bwc_script ".
                ":complete " .
                "seed=1 ". # For debugging purposes, we use a deterministic BW
-               "thr=$mt ";
+               "thr=$param{'bwmt'} ";
         if ( $param{'mpi'} > 1 ) {
             my $a = int ( sqrt($param{'mpi'}) );
             $a-- while ( $param{'mpi'} % $a != 0);

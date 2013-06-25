@@ -54,13 +54,6 @@ for ((i=1; i<=2; i=i+1)) ; do
   fi
 done
 
-b=$(perl -e '{print int(sqrt(<STDIN>))."\n"}' <<< $cores)
-until [ `expr $cores % $b` -eq  0 ]; do
-      b=`expr $b - 1`
-done
-a=`expr $cores / $b`
-bwmt=${a}x$b
-
 
 #########################################################################
 # Set paths properly.
@@ -155,7 +148,7 @@ EOF
 if [ $ssh -eq 0 ]; then
   $cadofactor params=$t/param n=$n bindir=$bindir parallel=0 \
   sieve_max_threads=$cores nthchar=$cores\
-  bwmt=$bwmt wdir=$t sievenice=0 polsel_nice=0 logfile=$t/out "$@"
+  bwmt=$cores wdir=$t sievenice=0 polsel_nice=0 logfile=$t/out "$@"
 else
   $cadofactor params=$t/param n=$n bindir=$bindir parallel=1 \
   machines=$t/mach_desc nthchar=$cores bwmt=$bwmt wdir=$t \
