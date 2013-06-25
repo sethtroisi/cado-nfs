@@ -143,7 +143,7 @@ class WorkunitProcessor(object):
     def __init__(self, workunit, settings):
         self.settings = settings
         self.workunit = workunit
-        self.exitcode = 0 # will get set if any command exits with code != 0
+        self.errorcode = 0 # will get set if any command exits with code != 0
         self.failedcommand = None # If any command exits with code != 0, this
                                   # get set to the index of the failed command
         self.stdio = {"stdout": [], "stderr": []}
@@ -189,7 +189,7 @@ class WorkunitProcessor(object):
                 if self.stdio["stderr"][-1]:
                     logging.error ("Stderr: %s", self.stdio["stderr"][-1]) 
                 self.failedcommand = counter
-                self.exitcode = child.returncode
+                self.errorcode = child.returncode
                 return False
             else:
                 logging.debug ("Command exited successfully")
@@ -414,8 +414,8 @@ class WorkunitClient(object):
         # Build a multi-part MIME document containing the WU id and result file
         mimedata.attach_key("WUid", self.workunit.get_id())
         mimedata.attach_key("clientid", self.settings["CLIENTID"])
-        if processor.exitcode:
-            mimedata.attach_key("exitcode", processor.exitcode)
+        if processor.errorcode:
+            mimedata.attach_key("errorcode", processor.errorcode)
         if processor.failedcommand:
             mimedata.attach_key("failedcommand", processor.failedcommand)
         for filename in self.workunit.get("RESULT", []):
@@ -435,6 +435,7 @@ class WorkunitClient(object):
         mimedata = WuMIMEMultipart()
         self.attach_result(processor, mimedata)
         postdata = mimedata.flatten(debug=int(self.settings["DEBUG"]))
+        logging.debug("POST data: %s", mimedata)
 
         url = self.settings["SERVER"].rstrip("/") + "/" + \
                 self.settings["POSTRESULTPATH"]
