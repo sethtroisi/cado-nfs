@@ -932,7 +932,7 @@ class Duplicates1Task(Task, FilesCreator):
                     # having another copy of the data on disk. Since we don't
                     # process the file at all, we need to ask the Siever task
                     # for the relation count in this file
-                    current_counts = [self.send_request(Request.GET_SIEVER_RELNUMBER, f)]
+                    current_counts = [self.send_request(Request.GET_SIEVER_RELCOUNT, f)]
                 else:
                     # TODO: how to recover from existing output files?
                     # Simply re-split? Check whether they all exist and assume 
