@@ -134,7 +134,7 @@ class Polynomial(object):
     def create_file(self, filename, params):
         # Write polynomial to a file, and add lines with parameters such as 
         # "alim" if supplied in params 
-        with open(filename, "w") as f:
+        with open(str(filename), "w") as f:
             f.write(str(self))
             for key in self.paramnames:
                 if key in params:
@@ -190,9 +190,12 @@ class WorkDir(object):
         self.jobname = jobname
         self.taskname = taskname
     
+    def path_in_workdir(self, filename):
+        return FilePath(self.workdir, filename)
+    
     def _make_path(self, extra):
         """ Make a path of the form: "workdir/jobname.taskname""extra" """
-        return FilePath(self.workdir, "%s.%s%s" % (self.jobname, self.taskname, extra))
+        return self.path_in_workdir("%s.%s%s" % (self.jobname, self.taskname, extra))
     
     def make_dirname(self, subdir = None):
         """ Make a directory name of the form workdir/jobname.taskname/ if 
@@ -312,7 +315,7 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters, metaclas
         return filename
 
     def test_outputfile_exists(self, filename):
-        return os.path.isfile(filename)
+        return os.path.isfile(str(filename))
     
     @staticmethod
     def check_files_exist(filenames, filedesc, shouldexist):
@@ -322,7 +325,7 @@ class Task(patterns.Colleague, wudb.DbAccess, cadoparams.UseParameters, metaclas
         Raise IOError if any check fails, return None
         """
         for f in filenames:
-            exists = os.path.isfile(f)
+            exists = os.path.isfile(str(f))
             if shouldexist and not exists:
                 raise IOError("%s file %s does not exist" % (filedesc, f))
             elif not shouldexist and exists:
@@ -598,12 +601,12 @@ class PolyselTask(ClientServerTask):
         polyselect_params = self.progparams[0].copy()
         polyselect_params["admin"] = str(adstart)
         polyselect_params["admax"] = str(adend)
-        outputfile = str(self.workdir.make_filename("%d-%d" % (adstart, adend)))
+        outputfile = self.workdir.make_filename("%d-%d" % (adstart, adend))
         if self.test_outputfile_exists(outputfile):
             self.logger.info("%s already exists, won't generate again",
                              outputfile)
         else:
-            p = self.programs[0](None, polyselect_params, stdout = outputfile)
+            p = self.programs[0](None, polyselect_params, stdout = str(outputfile))
             self.submit_command(p, "%d-%d" % (adstart, adend))
         self.state["adnext"] = adend
 
@@ -646,30 +649,30 @@ class FactorBaseOrFreerelTask(Task, metaclass=abc.ABCMeta):
         if not "outputfile" in self.state:
             self.logger.info("Starting")
             # Write polynomial to a file
-            polyfile = str(self.workdir.make_filename("poly"))
-            poly.create_file(polyfile, self.params)
+            polyfilename = self.workdir.make_filename("poly")
+            poly.create_file(polyfilename, self.params)
             
             # Make file name for factor base/free relations file
-            outputfile = str(self.workdir.make_filename(self.target))
+            outputfilename = self.workdir.make_filename(self.target)
 
             # Run command to generate factor base/free relations file
             kwargs = self.progparams[0].copy()
-            kwargs["poly"] = polyfile
-            p = self.programs[0](None, kwargs, stdout = outputfile)
+            kwargs["poly"] = str(polyfilename)
+            p = self.programs[0](None, kwargs, stdout = str(outputfilename))
             (identifier, rc, stdout, stderr, output_files) = self.submit_command(p, "")
             if rc:
                 raise Exception("Program failed")
             self.parse_stderr(stderr)
             
-            self.state["outputfile"] = outputfile
+            self.state["outputfile"] = outputfilename.get_relative()
             self.logger.info("Finished")
 
-        self.check_files_exist([self.state["outputfile"]], "output", 
+        self.check_files_exist([self.get_filename()], "output", 
                                shouldexist=True)
     
     def get_filename(self):
         if "outputfile" in self.state:
-            return self.state["outputfile"]
+            return str(self.workdir.path_in_workdir(self.state["outputfile"]))
         else:
             return None
     
@@ -780,20 +783,20 @@ class SievingTask(ClientServerTask, FilesCreator):
         if not poly:
             raise Exception("SievingTask(): no polynomial received")
         # Write polynomial to a file
-        polyfile = str(self.workdir.make_filename("poly"))
-        poly.create_file(polyfile, self.params)
+        polyfilename = self.workdir.make_filename("poly")
+        poly.create_file(polyfilename, self.params)
         
         while self.state["rels_found"] < int(self.state["rels_wanted"]):
             kwargs = self.progparams[0].copy()
             q0 = self.state["qnext"]
             q1 = q0 + int(self.params["qrange"])
-            outputfile = str(self.workdir.make_filename("%d-%d" % (q0, q1)))
-            self.check_files_exist([outputfile], "output", shouldexist=False)
+            outputfilename = self.workdir.make_filename("%d-%d" % (q0, q1))
+            self.check_files_exist([outputfilename], "output", shouldexist=False)
             kwargs["q0"] = str(q0)
             kwargs["q1"] = str(q1)
-            kwargs["poly"] = polyfile
+            kwargs["poly"] = str(polyfilename)
             kwargs["factorbase"] = self.send_request(Request.GET_FACTORBASE_FILENAME)
-            kwargs["out"] = outputfile
+            kwargs["out"] = str(outputfilename)
             p = self.programs[0](None, kwargs)
             self.submit_command(p, "%d-%d" % (q0, q1))
             self.state["qnext"] = q1
@@ -835,6 +838,7 @@ class SievingTask(ClientServerTask, FilesCreator):
         if filename is None:
             return self.state["rels_found"]
         else:
+            # Fixme: don't access self.output_files directly
             return self.output_files[filename]
     
     def request_more_relations(self, target):
