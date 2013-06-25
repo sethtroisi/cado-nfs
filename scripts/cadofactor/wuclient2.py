@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python
 
 import sys
 import os
@@ -19,6 +19,7 @@ elif sys.version_info[0] == 2:
 import subprocess
 import hashlib
 import logging
+import socket
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -270,6 +271,12 @@ class WorkunitClient(object):
                 conn = urllib_request.urlopen(request)
             except (NameError, urllib_error.URLError) as error:
                 conn = None
+            except (socket.error) as error:
+                if error.errno == errno.ECONNRESET:
+                    conn = None
+                else:
+                    raise
+            if not conn:
                 logging.error("%s of result failed, %s", 
                               'Upload' if is_upload else 'Download', 
                               str(error))
@@ -541,7 +548,7 @@ if __name__ == '__main__':
         # Parse command line
         (options, args) = parser.parse_args()
         if args:
-            sys.stderr.write("Did not understand command line arguments %s",
+            sys.stderr.write("Did not understand command line arguments %s\n" %
                              " ".join(args))
             raise Exception()
         # Copy values to SETTINGS
