@@ -7,6 +7,12 @@
 #include "portability.h"
 #include "utils.h"
 
+#ifdef FOR_FFS
+#include "fppol.h"
+#include "fq.h"
+#include "utils_ffs.h"
+#endif
+
 static void
 usage (char *argv0)
 {
@@ -18,7 +24,7 @@ int
 main (int argc, char *argv[])
 {
     char *polyfilename = NULL;
-    int k;
+    int k, check = 0;
     char *renumberfilename = NULL;
     char *argv0 = argv[0];
     cado_poly cpoly;
@@ -37,11 +43,17 @@ main (int argc, char *argv[])
             argc -= 2;
             argv += 2;
           }
-        else if (argc > 2 && strcmp (argv[1], "-renumberfile") == 0)
+        else if (argc > 2 && strcmp (argv[1], "-renumber") == 0)
           {
             renumberfilename = argv[2];
             argc -= 2;
             argv += 2;
+          }
+        else if (argc > 1 && strcmp (argv[1], "-check") == 0)
+          {
+            check = 1;
+            argc -= 1;
+            argv += 1;
           }
         else
           usage (argv0);
@@ -53,18 +65,23 @@ main (int argc, char *argv[])
       usage (argv0);
 
     cado_poly_init(cpoly);
+#ifndef FOR_FFS
     if (!cado_poly_read (cpoly, polyfilename))
-      {
-        fprintf (stderr, "Error reading polynomial file\n");
-        exit (EXIT_FAILURE);
-      }
-
-    /* check that n divides Res(f,g) [might be useful to factor n...] */
-    cado_poly_check (cpoly);
+#else
+    if (!ffs_poly_read (cpoly, polyfilename))
+#endif
+    {
+      fprintf (stderr, "Error reading polynomial file\n");
+      exit (EXIT_FAILURE);
+    }
 
     renumber_debug_print_tab(stdout, renumberfilename, cpoly);
 
-/*
+  /* Check for all index i if it can retrieved p and r from it and if it can
+   * retrieved the same index from this p and r
+   */
+  if (check)
+  {
     renumber_init (tab, cpoly);
     renumber_read_table (tab, renumberfilename);
 
@@ -74,16 +91,20 @@ main (int argc, char *argv[])
     for (i = 0; i < tab->size; i++)
     {
       renumber_get_p_r_from_index(tab, &p, &r, i, cpoly); 
-      side = (r > p) ? 0 : 1;
+      if (tab->rat != -1)
+        side = (r == p+1) ? tab->rat : 1-tab->rat;
+      else
+        side = (r > p) ? 1 : 0;
       j = renumber_get_index_from_p_r (tab, p, r, side);
       if (i == j)
-        fprintf (stderr, "%"PRid":Ok\n", i);
+        fprintf (stderr, "## %"PRid":Ok\n", i);
       else
-        fprintf (stderr, "%"PRid":Error:%"PRid"\n", i, j);
+        fprintf (stderr, "#### %"PRid":Error:%"PRid"\n", i, j);
     }
 
     renumber_free (tab);
-*/
+  }
+
     cado_poly_clear (cpoly);
     return 0;
 }

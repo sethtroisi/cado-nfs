@@ -37,4 +37,10 @@ target_link_libraries(explain utils)
 add_executable(print_table EXCLUDE_FROM_ALL print_table.c)
 target_link_libraries(print_table utils)
 
+add_executable(print_table-ffs-f2 EXCLUDE_FROM_ALL print_table.c)
+target_link_libraries(print_table-ffs-f2 ffs-f2)
+set_target_properties(print_table-ffs-f2 PROPERTIES COMPILE_FLAGS "-DFOR_FFS -DUSE_F2")
+add_executable(print_table-ffs-f3 EXCLUDE_FROM_ALL print_table.c)
+target_link_libraries(print_table-ffs-f3 ffs-f3)
+set_target_properties(print_table-ffs-f3 PROPERTIES COMPILE_FLAGS "-DFOR_FFS -DUSE_F3")
 # vim: ft=cmake:

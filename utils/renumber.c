@@ -662,13 +662,13 @@ void renumber_debug_print_tab (FILE *output, const char *filename,
     else
     {
       renumber_get_p_r_from_index (tab, &p, &r, i, pol);
-      fprintf (output, "i=%u tab[i]=%u p=%u    ", i, tab->table[i], p);
+      fprintf (output, "i=%"PRid" tab[i]=%"PRpr" p=%"PRpr, i, tab->table[i], p);
       if (r == p + 1)
-        fprintf (output, "rat side\n");
+        fprintf (output, " rat side\n");
       else if (r == p)
-        fprintf (output, "alg side proj\n");
+        fprintf (output, " r=%"PRpr" alg side proj\n", r);
       else
-        fprintf (output, "alg side r=%u\n", r);
+        fprintf (output, " r=%"PRpr" alg side\n", r);
     }
   }
 
