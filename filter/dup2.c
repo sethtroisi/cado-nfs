@@ -61,6 +61,7 @@
 #include "typedefs.h"
 
 #include "filter_utils.h"
+#include "filter_badideals.h"
 
 #ifdef FOR_FFS
 #include "fppol.h"
@@ -124,89 +125,13 @@ print_warning_size ( )
 }
 
 
-// This is an ugly quick-and-dirty hack to be able to split the
-// columns in the p59 nfs-dl example.
-static void
-ugly_for_p59(unsigned long *j1, unsigned long *j2,
-        unsigned long *n1, unsigned long *n2,
-        int64_t a, uint64_t b, unsigned long p, int e)
-{
-  if (p == 2) {
-    *j1 = 0;
-    *j2 = 1;
-    int amod8 = a%8;
-    if (amod8 < 0)
-      amod8 += 8;
-    int bmod8 = b%8;
-    ASSERT_ALWAYS(amod8 == 0 || amod8 == 2 || amod8 == 4 || amod8 == 6);
-    ASSERT_ALWAYS(bmod8 == 1 || bmod8 == 3 || bmod8 == 5 || bmod8 == 7);
-    int v = (amod8*bmod8) % 8;
-    if (v == 0 || v == 4) {
-      ASSERT_ALWAYS(e == 3);
-      *n1 = 1;
-      *n2 = 2;
-      return;
-    }
-    if (v == 2) {
-      ASSERT_ALWAYS(e == 5);
-      *n1 = 2;
-      *n2 = 3;
-      return;
-    }
-    if (v == 6) {
-      ASSERT_ALWAYS(e >= 6);
-      *n1 = e-3;
-      *n2 = 3;
-      return;
-    }
-    // should not go there.
-    ASSERT_ALWAYS(0);
-  }
-  if (p == 3) {
-    *j1 = 2;
-    *j2 = 3;
-    int amod9 = a%9;
-    if (amod9 < 0)
-      amod9 += 9;
-    int bmod9 = b%9;
-    ASSERT_ALWAYS(amod9 == 0 || amod9 == 3 || amod9 == 6);
-    ASSERT_ALWAYS(bmod9 == 1 || bmod9 == 2 || bmod9 == 4 || bmod9 == 5 || bmod9 == 7 || bmod9 == 8);
-    if (bmod9 == 2 || bmod9 == 4)
-      bmod9 += 3;
-    else if (bmod9 == 5 || bmod9 == 7)
-      bmod9 -= 3;
-    int v = (amod9*bmod9) % 9;
-    if (v == 0) {
-      ASSERT_ALWAYS(e == 2);
-      *n1 = 1;
-      *n2 = 1;
-      return;
-    }
-    if (v == 3) {
-      ASSERT_ALWAYS(e >= 2);
-      *n1 = 1;
-      *n2 = e-1;
-      return;
-    }
-    if (v == 6) {
-      ASSERT_ALWAYS(e >= 2);
-      *n1 = e-1;
-      *n2 = 1;
-      return;
-    }
-    // should not go there.
-    ASSERT_ALWAYS(0);
-  }
-  // should not go there: only 2 and 3 are ramified
-  ASSERT_ALWAYS(0);
-}
-
 static inline void
 print_prime (int64_t a, uint64_t b, unsigned long p, int e, int side,
              char *s)
 {
   unsigned long j, k;
   p_r_values_t r;
+  int nb;
 
   if (side == renumber_table->rat)
     r = 0;
@@ -219,15 +144,13 @@ print_prime (int64_t a, uint64_t b, unsigned long p, int e, int side,
 
   // Here we have to take care of bad ideals that
   // generate several columns:
-  if (renumber_is_bad (renumber_table, p, r, side))
+  if (renumber_is_bad (&nb, renumber_table, p, r, side))
   {
-    // At the moment, we use code specific to p59.
-    unsigned long j1, j2, n1, n2;
-    ugly_for_p59(&j1, &j2, &n1, &n2, a, b, p, e);
-    for (k = 0; k < n1; k++)
-      sprintf (s, "%s%lx,", s, j1);
-    for (k = 0; k < n2; k++)
-      sprintf (s, "%s%lx,", s, j2);
+    prime_t above[RENUMBER_MAX_ABOVE_BADIDEALS];
+    handle_bad_ideals (above, a, b, p, e);
+    for (int n = 0; n < nb; n++)
+      for (k = 0; k < (unsigned long) above[n].e; k++)
+        sprintf (s, "%s%"PRxid",", s, above[n].h);
   }
   else
   {

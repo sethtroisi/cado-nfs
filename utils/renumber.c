@@ -110,6 +110,7 @@ parse_one_line_bad_ideals(struct __bad_ideals_t * bad, const char * str, int k)
   for ( ; (t=ugly[(unsigned char) *ptr]) >= 0; ptr++)
     nb = (nb * 10) + t;
   ASSERT_ALWAYS(*ptr == '\n');
+  ASSERT_ALWAYS(nb <= RENUMBER_MAX_ABOVE_BADIDEALS);
 
   bad->p[k] = p;
   bad->r[k] = r;
@@ -418,13 +419,15 @@ renumber_read_table (renumber_t tab, const char * filename)
   fclose(tab->file);
 }
 
-int renumber_is_bad(renumber_t rn, p_r_values_t p, p_r_values_t r, int side)
+int renumber_is_bad (int *nb, renumber_t rn, p_r_values_t p, p_r_values_t r, 
+                     int side)
 {
   int bad = 0;
   for (int i = 0; i < rn->bad_ideals.n; ++i)
     if (p == rn->bad_ideals.p[i] && r == rn->bad_ideals.r[i]
                                  && side == rn->bad_ideals.side[i])
     {
+      *nb = rn->bad_ideals.nb[i];
       bad = 1;
       break;
     }
