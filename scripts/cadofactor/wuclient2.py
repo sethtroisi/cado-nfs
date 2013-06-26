@@ -16,6 +16,7 @@ if sys.version_info[0] == 3:
 elif sys.version_info[0] == 2:
     import urllib2 as urllib_request
     import urllib2 as urllib_error
+from httplib import BadStatusLine
 import subprocess
 import hashlib
 import logging
@@ -272,17 +273,20 @@ class WorkunitClient(object):
         while conn is None:
             try:
                 conn = urllib_request.urlopen(request)
-            except (NameError, urllib_error.URLError) as error:
+            except (NameError, urllib_error.URLError, BadStatusLine) \
+                    as error:
                 conn = None
+                errorstr = str(error)
             except (socket.error) as error:
                 if error.errno == errno.ECONNRESET:
                     conn = None
+                    errorstr = str(error)
                 else:
                     raise
             if not conn:
                 logging.error("%s of result failed, %s", 
                               'Upload' if is_upload else 'Download', 
-                              str(error))
+                              errorstr)
                 logging.error("Waiting %s seconds before retrying", wait)
                 time.sleep(wait)
         return conn
