@@ -12,12 +12,14 @@ if __name__ == '__main__':
     parser.add_argument("--screenlog", help="Screen logging level, e.g., INFO/COMMAND/DEBUG", default="INFO", metavar="LEVEL")
     parser.add_argument("--old", help="Use old parameter file format", action='store_true')
     parser.add_argument("parameters", help="A file with the parameters to use")
+    parser.add_argument("options", metavar='OPTION', help="An option as in parameter file (format: key=value)", nargs="*")
     args = parser.parse_args()
     paramfile = args.parameters
     screenlvlname = args.screenlog
     
     parameters = cadoparams.Parameters()
     parameters.readfile(open(paramfile), old_format = args.old)
+    parameters.readfile(args.options, old_format = args.old)
     tasksparams = parameters.myparams(("workdir", "name"), "tasks")
     
     screenlvl = getattr(cadologger, screenlvlname.upper())
