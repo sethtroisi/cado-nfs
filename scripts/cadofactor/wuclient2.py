@@ -198,6 +198,9 @@ class WorkunitProcessor(object):
     def result_exists(self):
         ''' Check whether all result files already exist, returns True of False 
         '''
+        # If there is no RESULT line in the workunit, always run commands
+        if self.workunit.get("RESULT", None) is None:
+            return False
         for filename in self.workunit.get("RESULT", []):
             filepath = os.path.join(self.settings["WORKDIR"], filename)
             if not os.path.isfile(filepath):
