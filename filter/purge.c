@@ -882,7 +882,7 @@ main (int argc, char **argv)
   param_list pl;
   buf_arg_t buf_arg;
   buf_rel_t *buf_rel;
-  uint64_t min_index = 0;
+  uint64_t min_index = UMAX(uint64_t);
   index_t nrels, nprimes;
   size_t tot_alloc_bytes = 0, cur_alloc;
 
@@ -960,9 +960,9 @@ main (int argc, char **argv)
     fprintf (stderr, "Error, missing -nprimes ... option (or nprimes=0)\n");
     usage (argv0);
   }
-  if (min_index == 0)
+  if (min_index > nprimemax)
   {
-    fprintf (stderr, "Error, missing -minindex ... option (or minindex=0)\n");
+    fprintf (stderr, "Error, missing -minindex ... option (or > nprimes)\n");
     usage (argv0);
   }
   /* If nrels or nprimes > 2^32, then we need index_t to be 64-bit */
