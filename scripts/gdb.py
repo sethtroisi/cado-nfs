@@ -1,5 +1,5 @@
 # This script allows printing MPZ and MPFR types in a readable way in gdb.
-# Written by E. Thomé, with minor changes by A. Kruppa
+# Written by E. Thom\'e, with minor changes by A. Kruppa
 # Use in gdb by saying:
 #   source path/to/this/script/gdb.py
 # Then all mpz_t etc. should magically be printed nicely.
