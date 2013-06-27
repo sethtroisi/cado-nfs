@@ -86,7 +86,7 @@ handle_bad_ideals (MAYBE_UNUSED int *exp_above, int64_t a, uint64_t b,
   else
     ASSERT_ALWAYS(0);
 
-#elif 1
+#elif 0
   /* handle bad ideals for the following polynomial:
       c5: 1919367450
       c4: -372912695938455
@@ -151,6 +151,7 @@ handle_bad_ideals (MAYBE_UNUSED int *exp_above, int64_t a, uint64_t b,
   }
   else
     ASSERT_ALWAYS(0);
+
 #elif 0
   /* handle bad ideals for the following polynomial:
         pol0=19B3,326,1AB,6B,0,7,1
