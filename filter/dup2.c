@@ -61,13 +61,13 @@
 #include "typedefs.h"
 
 #include "filter_utils.h"
-#include "filter_badideals.h"
 
 #ifdef FOR_FFS
 #include "fppol.h"
 #include "fq.h"
 #include "utils_ffs.h"
 #endif
+#include "filter_badideals.h"
 
 char *argv0; /* = argv[0] */
 
