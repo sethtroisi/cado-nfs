@@ -49,7 +49,7 @@ handle_bad_ideals (MAYBE_UNUSED int *exp_above, int64_t a, uint64_t b,
     else
       ASSERT_ALWAYS(0);
   }
-  if (p == 3)
+  else if (p == 3)
   {
     int amod9 = a%9;
     if (amod9 < 0)
