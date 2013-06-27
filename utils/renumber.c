@@ -419,11 +419,13 @@ renumber_read_table (renumber_t tab, const char * filename)
   fclose(tab->file);
 }
 
-int renumber_is_bad (int *nb, renumber_t rn, p_r_values_t p, p_r_values_t r, 
-                     int side)
+int renumber_is_bad (int *nb, index_t *first, renumber_t rn, p_r_values_t p, 
+                     p_r_values_t r, int side)
 {
+  *first = 0;
   int bad = 0;
   for (int i = 0; i < rn->bad_ideals.n; ++i)
+  {
     if (p == rn->bad_ideals.p[i] && r == rn->bad_ideals.r[i]
                                  && side == rn->bad_ideals.side[i])
     {
@@ -431,6 +433,9 @@ int renumber_is_bad (int *nb, renumber_t rn, p_r_values_t p, p_r_values_t r,
       bad = 1;
       break;
     }
+    else
+      *first += rn->bad_ideals.nb[i];
+  }
   return bad;
 }
 

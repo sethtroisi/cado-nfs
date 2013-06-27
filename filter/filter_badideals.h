@@ -1,6 +1,6 @@
 /* Do not check that p is really a bad ideal, must call renumber_is_bad before */
 static inline void
-handle_bad_ideals (MAYBE_UNUSED prime_t *above, int64_t a, uint64_t b,
+handle_bad_ideals (MAYBE_UNUSED int *exp_above, int64_t a, uint64_t b,
                    unsigned long p, MAYBE_UNUSED int e)
 {
 #if 0
@@ -21,10 +21,6 @@ handle_bad_ideals (MAYBE_UNUSED prime_t *above, int64_t a, uint64_t b,
   */
   if (p == 2)
   {
-    // 0 and 1 are the two ideals above p=2 r=0
-    above[0].h = 0;
-    above[1].h = 1;
-
     int amod8 = a%8;
     if (amod8 < 0)
       amod8 += 8;
@@ -35,30 +31,26 @@ handle_bad_ideals (MAYBE_UNUSED prime_t *above, int64_t a, uint64_t b,
     if (v == 0 || v == 4)
     {
       ASSERT_ALWAYS(e == 3);
-      above[0].e = 1;
-      above[1].e = 2;
+      exp_above[0] = 1;
+      exp_above[1] = 2;
     }
     else if (v == 2)
     {
       ASSERT_ALWAYS(e == 5);
-      above[0].e = 2;
-      above[1].e = 3;
+      exp_above[0] = 2;
+      exp_above[1] = 3;
     }
     else if (v == 6)
     {
       ASSERT_ALWAYS(e >= 6);
-      above[0].e = e-3;
-      above[1].e = 3;
+      exp_above[0] = e-3;
+      exp_above[1] = 3;
     }
     else
       ASSERT_ALWAYS(0);
   }
   if (p == 3)
   {
-    // 2 and 3 are the two ideals above p=3 r=0
-    above[0].h = 2;
-    above[1].h = 3;
-
     int amod9 = a%9;
     if (amod9 < 0)
       amod9 += 9;
@@ -73,20 +65,20 @@ handle_bad_ideals (MAYBE_UNUSED prime_t *above, int64_t a, uint64_t b,
     if (v == 0)
     {
       ASSERT_ALWAYS(e == 2);
-      above[0].e = 1;
-      above[1].e = 1;
+      exp_above[0] = 1;
+      exp_above[1] = 1;
     }
     else if (v == 3)
     {
       ASSERT_ALWAYS(e >= 2);
-      above[0].e = 1;
-      above[1].e = e-1;
+      exp_above[0] = 1;
+      exp_above[1] = e-1;
     }
     else if (v == 6)
     {
       ASSERT_ALWAYS(e >= 2);
-      above[0].e = e-1;
-      above[1].e = 1;
+      exp_above[0] = e-1;
+      exp_above[1] = 1;
     }
     else
       ASSERT_ALWAYS(0);
@@ -118,58 +110,51 @@ handle_bad_ideals (MAYBE_UNUSED prime_t *above, int64_t a, uint64_t b,
   */
   if (p == 2)
   {
-    // 0 and 1 are the two ideals above p=2 r=0
-    above[0].h = 0;
-    above[1].h = 1;
     // 1 has always exponent 1
-    above[1].e = 1;
+    exp_above[1] = 1;
 
     //hack: this compute a/b % 16 (not very efficient)
     unsigned long r = findroot (a, b, 16);
     if (r == 2 || r == 6 || r == 10 || r == 14)
     {
       ASSERT_ALWAYS(e == 2); //Is it correct?
-      above[0].e = 1;
+      exp_above[0] = 1;
     }
     else if (r == 0 || r == 8)
     {
       ASSERT_ALWAYS(e == 3); //Is it correct?
-      above[0].e = 2;
+      exp_above[0] = 2;
     }
     else if (r == 4)
     {
       ASSERT_ALWAYS(e == 4); //Is it correct?
-      above[0].e = 3;
+      exp_above[0] = 3;
     }
     else if (r == 12)
     {
-      above[0].e = e-1;
+      exp_above[0] = e-1;
     }
     else
       ASSERT_ALWAYS(0);
   }
   else if (p == 5)
   {
-    // 2 and 3 are the two ideals above p=5 r=2
-    above[0].h = 2;
-    above[1].h = 3;
-
     //hack: this compute a/b % 16 (not very efficient)
     unsigned long r = findroot (a, b, 25);
     if (r == 2 || r == 7 || r == 22)
     {
-      above[0].e = 1;
-      above[1].e = 1;
+      exp_above[0] = 1;
+      exp_above[1] = 1;
     }
     else if (r == 12)
     {
-      above[0].e = 1;
-      above[1].e = e-1;
+      exp_above[0] = 1;
+      exp_above[1] = e-1;
     }
     else if (r == 17)
     {
-      above[0].e = e-1;
-      above[1].e = 1;
+      exp_above[0] = e-1;
+      exp_above[1] = 1;
     }
     else
       ASSERT_ALWAYS(0);
@@ -219,25 +204,20 @@ handle_bad_ideals (MAYBE_UNUSED prime_t *above, int64_t a, uint64_t b,
   //   slope = 1    ->   [ 1, e-1 ]
   //   slope = other ->  [ 1, 1 ]   and in that case, e = 2.
 
-  // 0 and 1 are the two ideals above p=7 r=2
-  above[0].h = 0;
-  above[1].h = 1;
-
-
   if (slope[0] == (uint64_t)0U)
   {
-    above[0].e = e-1;
-    above[1].e = 1;
+    exp_above[0] = e-1;
+    exp_above[1] = 1;
   }
   else if (slope[0] == (uint64_t)1U)
   {
-    above[0].e = 1;
-    above[1].e = e-1;
+    exp_above[0] = 1;
+    exp_above[1] = e-1;
   }
   else
   {
-    above[0].e = 1;
-    above[1].e = 1;
+    exp_above[0] = 1;
+    exp_above[1] = 1;
     ASSERT_ALWAYS (e == 2);
   }
 

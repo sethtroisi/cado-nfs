@@ -47,7 +47,7 @@ struct __renumber_t
 typedef struct __renumber_t renumber_t[1];
 
 void renumber_init (renumber_t, cado_poly);
-int renumber_is_bad(int *, renumber_t, p_r_values_t, p_r_values_t, int);
+int renumber_is_bad(int *, index_t*,renumber_t, p_r_values_t, p_r_values_t, int);
 void renumber_free (renumber_t);
 void renumber_init_write (renumber_t, const char *, const char *, int);
 void renumber_close_write (renumber_t);

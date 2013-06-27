@@ -132,6 +132,7 @@ print_prime (int64_t a, uint64_t b, unsigned long p, int e, int side,
   unsigned long j, k;
   p_r_values_t r;
   int nb;
+  index_t first_index;
 
   if (side == renumber_table->rat)
     r = 0;
@@ -144,13 +145,16 @@ print_prime (int64_t a, uint64_t b, unsigned long p, int e, int side,
 
   // Here we have to take care of bad ideals that
   // generate several columns:
-  if (renumber_is_bad (&nb, renumber_table, p, r, side))
+  if (renumber_is_bad (&nb, &first_index, renumber_table, p, r, side))
   {
-    prime_t above[RENUMBER_MAX_ABOVE_BADIDEALS];
-    handle_bad_ideals (above, a, b, p, e);
+    int exp_above[RENUMBER_MAX_ABOVE_BADIDEALS];
+    handle_bad_ideals (exp_above, a, b, p, e);
     for (int n = 0; n < nb; n++)
-      for (k = 0; k < (unsigned long) above[n].e; k++)
-        sprintf (s, "%s%"PRxid",", s, above[n].h);
+    {
+      for (k = 0; k < (unsigned long) exp_above[n]; k++)
+        sprintf (s, "%s%"PRxid",", s, first_index);
+      first_index++;
+    }
   }
   else
   {
