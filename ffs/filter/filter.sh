@@ -177,7 +177,6 @@ FREERELSFILE="${DIR}/${NAME}.freerels"
 FREEGZFILE="${DIR}/${NAME}.freerels.gz"
 RENUMBERFILE="${DIR}/${NAME}.renumber"
 RELSFILE="${DIR}/${NAME}.rels.purged.gz"
-INDEX_ID_PURGE="${DIR}/${NAME}.ideals.tmp"
 DELRELSFILE="${DIR}/${NAME}.rels.deleted"
 HISFILE="${DIR}/${NAME}.merge.his"
 
@@ -321,7 +320,7 @@ MIN=`grep min_index ${LOGD20} | cut -d "=" -f 2`
 ###### PURGE ######
 if [ "${DO_PURGE}" -eq "1" ] ; then
   argp0="-out ${RELSFILE} -basepath ${NODUPDIR} -subdirlist ${SUBDIRLIST} "
-  argp1="-filelist ${FILELIST} -keep ${EXCESS} -sos ${INDEX_ID_PURGE} "
+  argp1="-filelist ${FILELIST} -keep ${EXCESS} "
   argp2="-outdel ${DELRELSFILE} "
   argp3="-nrels ${NBREL} -nprimes ${NBPR} -minindex ${MIN} "
   if [ "x${REQ_EXCESS}" = "x-1" ] ; then
@@ -374,7 +373,7 @@ if [ "${TIDY}" -eq "1" ] ; then
   rm -r ${NODUPDIR} ${INVERTDIR}
   rm ${PARAMFILE} ${FILELIST} ${SUBDIRLIST}
   rm "${RELSFILE}" "${NRELSFILE}"
-  rm "${INDEX_ID_PURGE}" "${DELRELSFILE}"
+  rm "${DELRELSFILE}"
   rm "${HISFILE}" "${MERGEDRELSFILE}"
   rm "${INDEX_ID_MERGE}"
 fi
