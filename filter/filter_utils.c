@@ -15,42 +15,7 @@
 */
 //TODO try with buf_rel_t instead of buf_rel_t *
 inline void
-print_relation (FILE *file, buf_rel_t *my_buf_rel, index_t *newindex)
-{
-  char buf[1<<12], *p;
-  char *op;
-  size_t t;
-  unsigned int i, j;
-  index_t h;
-  exponent_t e;
-
-  p = d64toa16(buf, my_buf_rel->a);
-  *p++ = ',';
-  p = u64toa16(p, my_buf_rel->b);
-  *p++ = ':';
-
-
-  for (i = 0; i < my_buf_rel->nb; i++)
-  {
-    e = my_buf_rel->primes[i].e;
-    h = newindex[my_buf_rel->primes[i].h];
-
-    op = p;
-    p = u64toa16(p, (uint64_t) h);
-    *p++ = ',';
-    t = p - op;
-    for (j = (unsigned int) ((e) - 1); j--; p += t)
-      memcpy (p, op, t);
-  }
-
-  *(--p) = '\n';
-  p[1] = 0;
-  fputs(buf, file);
-}
-
-//in the futur, this function should be merge with print_relation above
-inline void
-print_relation_dup2 (FILE *file, buf_rel_t *rel)
+print_relation (FILE *file, buf_rel_t *rel)
 {
   char buf[1<<12], *p;
   char *op;
@@ -61,7 +26,6 @@ print_relation_dup2 (FILE *file, buf_rel_t *rel)
   *p++ = ',';
   p = u64toa16(p, rel->b);
   *p++ = ':';
-
 
   for (i = 0; i < rel->nb; i++)
   {

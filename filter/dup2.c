@@ -418,7 +418,7 @@ thread_print(buf_arg_t *arg)
       NANOSLEEP;
 
     if (my_rel->nb != 0)
-      print_relation_dup2 (arg->f_deleted, my_rel); //FIXME where do we print
+      print_relation (arg->f_deleted, my_rel); //FIXME where do we print
 
     test_and_print_progress_now ();
     cpy_cpt_rel_b++;

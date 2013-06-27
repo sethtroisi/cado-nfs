@@ -90,7 +90,6 @@ char *argv0;                    /* = argv[0]; */
 
 static index_t **rel_compact  = NULL; /* see above */
 weight_t *ideals_weight = NULL;
-index_t *newindex = NULL;
 
 static char ** fic;
 static bit_vector rel_used, Tbv;
@@ -562,81 +561,6 @@ no_singleton(buf_rel_t *br)
 
 
 /*****************************************************************************/
-/* This function renumbers used primes (those with H->hashcount[i] > 1)
-   and puts the corresponding index in H->hashcount[i].
-
-   At return, nprimes is the number of used primes.
-
-   We locate used primes and do not try to do fancy things as sorting w.r.t.
-   weight, since this will probably be done later on.
-   All rows will be 1 more that needed -> subtract 1 in fprint...! */
-
-static void
-renumber (const char *sos, index_t MAYBE_UNUSED min_index, index_t nprimes)
-{
-  FILE *fsos = NULL;
-  index_t i, nb = 0;
-#if DEBUG >= 1
-  unsigned int count = 0;
-#endif
-
-
-  if (sos != NULL)
-  {
-    fprintf (stderr, "Output renumber table in file %s\n", sos);
-    if (!(fsos = fopen_maybe_compressed (sos, "w")))
-    {
-      fprintf (stderr, "Error, cannot open file %s for writing.\n", sos);
-      exit (1);
-    }
-    fprintf (fsos, "# each row contains 2 hexadecimal values: n i\n"
-    "# n is the new ideal index (for merge and replay)\n"
-    "# i is the ideal index value in the renumber file\n");
-  }
-
-  for (i = 0; i < nprimemax; i++)
-  {
-    if (ideals_weight[i])
-    {
-    /* Since we consider only primes >= minpr or minpa,
-       smaller primes might appear only once here, thus we can't
-       assert H->hashcount[i] > 1, but H->hashcount[i] = 1 should
-       be rare if minpr/minpa are well chosen (not too large). */
-#if DEBUG >= 1
-      if (ideals_weight[i] == 1)
-      {
-        if (i < min_index)
-          fprintf (stderr, "Warning: ");
-        else
-          fprintf (stderr, "WARNING (probably an error): ");
-
-        fprintf (stderr, "singleton prime with index %"PRid"\n", i);
-        count++;
-      }
-#endif
-
-      if (fsos)
-        fprintf(fsos, "%"PRxid" %"PRxid"\n", nb, i);
-
-      newindex[i] = nb++;
-    }
-    else
-      newindex[i] = UMAX(index_t);
-  }
-  
-  if (fsos)
-    fclose_maybe_compressed (fsos, sos);
-
-  
-  ASSERT_ALWAYS(nprimes == nb);
-#if DEBUG >= 1
-  if (count)
-    fprintf (stderr, "Warning: %u singleton(s) at the end of purge\n", count);
-#endif
-}
-
-
-/*****************************************************************************/
 /* I/O functions */
 
 /* We don't use memory barrier nor (pre)processor orders for portability.
@@ -731,10 +655,10 @@ thread_print(buf_arg_t *arg)
     else if (aff)
     {
       arg->W += (double) my_rel->nb;
-      print_relation (arg->f_remaining, my_rel, newindex);
+      print_relation (arg->f_remaining, my_rel);
     }
     else if (!boutfilerel && arg->f_deleted != NULL)
-      print_relation (arg->f_deleted, my_rel, newindex);
+      print_relation (arg->f_deleted, my_rel);
 
     test_and_print_progress_now ();
     cpy_cpt_rel_b++;
@@ -830,7 +754,6 @@ usage (const char *argv0)
   fprintf (stderr, "    -minindex nnn - purge primes with index >= nnn\n");
   fprintf (stderr, "\nOther command line options: \n");
   fprintf (stderr, "    -outdel file - output file for deleted relations\n");
-  fprintf (stderr, "    -sos sosfile - to keep track of the renumbering\n");
   fprintf (stderr, "    -keep    nnn - prune if excess > nnn (default 160)\n");
   fprintf (stderr, "    -npthr   nnn - threads number for suppress singletons\n");
   fprintf (stderr, "    -inprel  file_rel_used - load active relations\n");
@@ -918,7 +841,6 @@ main (int argc, char **argv)
   const char * basepath = param_list_lookup_string(pl, "basepath");
   const char * subdirlist = param_list_lookup_string(pl, "subdirlist");
   const char * purgedname = param_list_lookup_string(pl, "out");
-  const char * sos = param_list_lookup_string(pl, "sos");
   const char * infilerel = param_list_lookup_string(pl, "inrel");
   const char * outfilerel = param_list_lookup_string(pl, "outrel");
   const char * deletedname = param_list_lookup_string(pl, "outdel");
@@ -1113,17 +1035,6 @@ main (int argc, char **argv)
     tot_alloc_bytes -= tmp;
     fprintf (stderr, "Freed rel_compact %zuMB (total %zuMB so far)\n",
                      tmp >> 20, tot_alloc_bytes >> 20);
-
-    // Renumber the primes in [0,nprimes] for merge and replay
-    cur_alloc = nprimemax * sizeof (index_t);
-    newindex = (index_t *) malloc (cur_alloc);
-    ASSERT_ALWAYS (newindex != NULL);
-    tot_alloc_bytes += cur_alloc;
-    fprintf (stderr, "Allocated newindex of %zuMb (total %zuMb so far)\n",
-                      cur_alloc >> 20, tot_alloc_bytes >> 20);
-
-    renumber (sos, (index_t) min_index, nprimes);
-
   }
   else
   {
@@ -1155,7 +1066,16 @@ main (int argc, char **argv)
       exit (1);
     }
 
-  fprintf (buf_arg.f_remaining, "# %"PRid" %"PRid"\n", nrels, nprimes);
+
+  // compute last index i such that ideals_weight[i] != 0
+  {
+    index_t last_used = nprimemax - 1;
+    while (ideals_weight[last_used] == 0)
+      last_used--;
+
+    fprintf (buf_arg.f_remaining, "# %"PRid" %"PRid"\n", nrels, last_used);
+  }
+  
   /* second pass over relations in files */
   buf_arg.needed = NEEDED_ABH;
   prempt_scan_relations (fic, &thread_print, &buf_arg, NULL);
@@ -1205,9 +1125,6 @@ main (int argc, char **argv)
   if (buf_rel != NULL)
     free(buf_rel);
   buf_rel = NULL;
-  if (newindex != NULL)
-    free(newindex);
-  newindex = NULL;
   if (sum2_index != NULL)
     free(sum2_index);
   sum2_index = NULL;

@@ -23,8 +23,7 @@ typedef struct {
 
 index_t insert_relation_in_table (buf_rel_t *, index_t, uint8_t, index_t **,
                                   weight_t *);
-void print_relation (FILE *, buf_rel_t *, index_t *);
-void print_relation_dup2 (FILE *, buf_rel_t *);
+void print_relation (FILE *, buf_rel_t *);
 uint32_t insert_relation_in_dup_hashtable (uint32_t *, unsigned long, buf_rel_t*,
                                            double *, unsigned int *);
 
