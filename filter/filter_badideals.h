@@ -126,7 +126,7 @@ handle_bad_ideals (MAYBE_UNUSED prime_t *above, int64_t a, uint64_t b,
 
     //hack: this compute a/b % 16 (not very efficient)
     unsigned long r = findroot (a, b, 16);
-    if (r == 4 || r == 6 || r == 10 || r == 14)
+    if (r == 2 || r == 6 || r == 10 || r == 14)
     {
       ASSERT_ALWAYS(e == 2); //Is it correct?
       above[0].e = 1;
@@ -156,7 +156,7 @@ handle_bad_ideals (MAYBE_UNUSED prime_t *above, int64_t a, uint64_t b,
 
     //hack: this compute a/b % 16 (not very efficient)
     unsigned long r = findroot (a, b, 25);
-    if (r == 5 || r == 7 || r == 22)
+    if (r == 2 || r == 7 || r == 22)
     {
       above[0].e = 1;
       above[1].e = 1;
