@@ -86,7 +86,7 @@ handle_bad_ideals (MAYBE_UNUSED int *exp_above, int64_t a, uint64_t b,
   else
     ASSERT_ALWAYS(0);
 
-#elif 0
+#elif 1
   /* handle bad ideals for the following polynomial:
       c5: 1919367450
       c4: -372912695938455
@@ -110,32 +110,22 @@ handle_bad_ideals (MAYBE_UNUSED int *exp_above, int64_t a, uint64_t b,
   */
   if (p == 2)
   {
-    // 1 has always exponent 1
+    exp_above[0] = e-1;
     exp_above[1] = 1;
-
+#ifdef DEBUG
     //hack: this compute a/b % 16 (not very efficient)
     unsigned long r = findroot (a, b, 16);
     if (r == 2 || r == 6 || r == 10 || r == 14)
-    {
-      ASSERT_ALWAYS(e == 2); //Is it correct?
-      exp_above[0] = 1;
-    }
+      ASSERT_ALWAYS(e == 2);
     else if (r == 0 || r == 8)
-    {
-      ASSERT_ALWAYS(e == 3); //Is it correct?
-      exp_above[0] = 2;
-    }
+      ASSERT_ALWAYS(e == 3);
     else if (r == 4)
-    {
-      ASSERT_ALWAYS(e == 4); //Is it correct?
-      exp_above[0] = 3;
-    }
+      ASSERT_ALWAYS(e == 4);
     else if (r == 12)
-    {
-      exp_above[0] = e-1;
-    }
+      ASSERT_ALWAYS(1); //which assert here ??
     else
       ASSERT_ALWAYS(0);
+#endif
   }
   else if (p == 5)
   {
