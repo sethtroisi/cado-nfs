@@ -73,7 +73,7 @@ class Parameters(object):
         "name": "name",
         "nchar": "tasks.linalg.nchar",
         "nkermax": None, # FIXME: implement this
-        "nslices_log": "tasks.purge.nslices_log",
+        "nslices_log": "tasks.filter.nslices_log",
         "nthchar": "tasks.characters.nthchar",
         "poly_max_threads": "tasks.polyselect.threads", 
         "parallel": None, # We (currently) always use client/server
@@ -94,6 +94,7 @@ class Parameters(object):
         "rlim": "rlim",
         "sieve_max_threads": "tasks.sieve.threads",
         "sievenice": None,
+        "slaves": "slaves.hostnames",
         "skip": "tasks.purge.skip",
         "wdir": "workdir",
         "expected_factorization": None
@@ -101,6 +102,7 @@ class Parameters(object):
 
     def __init__(self, *args, **kwargs):
         self.data = dict(*args, **kwargs)
+        self._have_read_defaults = False
     
     def myparams(self, keys, path):
         ''' From the hierarchical dictionary params, generate a flat 
@@ -276,7 +278,8 @@ class Parameters(object):
         {'parallel': '0', 'incr': '60', 'degree': '5'}
         True
         """
-        if old_format and not infile is DEFAULTS_OLD:
+        if old_format and not self._have_read_defaults:
+            self._have_read_defaults = True
             self.readfile(DEFAULTS_OLD, True)
         for line in infile:
             line2 = line.split('#', 1)[0].strip()
