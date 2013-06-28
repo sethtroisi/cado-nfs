@@ -94,8 +94,8 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
             logger can print that """
         # e = kwargs.copy()
         # e["address_string"] = self.address_string()
-        format = self.address_string() + ' ' + format
-        self.logger.log(lvl, format, *args, **kwargs)
+        format = '%s ' + format
+        self.logger.log(lvl, format, self.address_string(), *args, **kwargs)
 
     # These three methods overwrite the corresponding methods from 
     # http.server.BaseHTTPRequestHandler
@@ -104,11 +104,15 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         self.log(logging.INFO, format, *args, **kwargs)
 
     def log_request(self, code='-', size='-'):
-        self.log(logging.DEBUG, '"%s" %s %s', self.requestline, str(code), 
-                 str(size))
+        self.log(logging.DEBUG, '"%s" %d %d', self.requestline, code, size)
 
     def log_error(self, format, *args):
-        self.log(logging.WARNING, format, *args)
+        # Log errors with WARNING level, except messages about no work being
+        # available, as those are frequent and kinda spammy
+        level = logging.WARNING
+        if hasattr(self, "error_is_no_work_available"):
+            level = logging.DEBUG
+        self.log(level, format, *args)
 
     def send_body(self, body):
         self.wfile.write(body)
@@ -207,6 +211,8 @@ class MyHandler(http.server.CGIHTTPRequestHandler):
         else:
             wu_text = wudb.WuAccess(self.dbfilename).assign(clientid)
         if not wu_text:
+            # This flag is to downgrade the logging level. Ugly.
+            self.error_is_no_work_available = True
             return self.send_error(404, "No work available")
         
         self.log_message("Sending work unit " + Workunit(wu_text).get_id() + 
@@ -291,8 +297,8 @@ class ServerLauncher(object):
         self.name = "HTTP server"
         self.logger = logging.getLogger(self.name)
         self.logger.setLevel(logging.INFO)
-        formatter = logging.Formatter(
-            fmt='%(address_string)s - - [%(asctime)s] %(message)s')
+        # formatter = logging.Formatter(
+        #    fmt='%(address_string)s - - [%(asctime)s] %(message)s')
         #self.ch = logging.StreamHandler()
         #self.ch.setFormatter(formatter)
         #self.logger.addHandler(self.ch)
@@ -330,7 +336,8 @@ class ServerLauncher(object):
         self.httpd.server_name = self.name
     
     def serve(self):
-        logging.info("serving at %s:%d", self.httpd.server_address, self.httpd.server_port)
+        logging.info("serving at http://%s:%d",
+                     *self.httpd.server_address)
         
         if self.bg:
             from threading import Thread
@@ -366,6 +373,9 @@ if __name__ == '__main__':
     HTTP = args.address
     dbfilename = args.dbfile
     registered_filenames = {}
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.NOTSET)
 
     httpd = ServerLauncher(HTTP, PORT, args.threaded, dbfilename, registered_filenames, args.uploaddir)
     
