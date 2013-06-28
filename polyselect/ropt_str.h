@@ -22,7 +22,7 @@ typedef struct {
   mpz_t *f;
   mpz_t *g;
 
-  /* polynomila values */
+  /* polynomial values */
   mpz_t *fx;
   mpz_t *gx;
   mpz_t *numerator;
