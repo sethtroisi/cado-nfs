@@ -517,10 +517,6 @@ return_combined_sublattice ( ropt_poly_t poly,
   /* for each prime[i], lift the roots */
   for (i = 0; i < s1param->tlen_e_sl; i ++) {
 
-#ifdef HAVE_MINGW
-    fprintf (stderr, "# ropt_stage1: i=%d s1param->individual_nbest_sl[i]=%d\n", i,
-             s1param->individual_nbest_sl[i]);
-#endif
     new_single_sublattice_pq (&top, s1param->individual_nbest_sl[i]);
 
     /* find individual sublattices */

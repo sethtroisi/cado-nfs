@@ -784,15 +784,11 @@ void
 ropt_s1param_setup_individual_nbest_sl (ropt_s1param_t s1param)
 {
   unsigned int i;
+  static int count = 0;
+  fprintf (stderr, "# ropt_str.c: count=%d\n", ++count);
   for (i = 0; i < s1param->len_e_sl; i ++)
-    {
-      s1param->individual_nbest_sl[i] =
-        size_each_sublattice[s1param->tlen_e_sl - 1][i];
-#ifdef HAVE_MINGW
-      fprintf (stderr, "# ropt_str:792 individual_nbest_sl[%u] = %d\n", i,
-               s1param->individual_nbest_sl[i]);
-#endif
-    }
+    s1param->individual_nbest_sl[i] =
+      size_each_sublattice[s1param->tlen_e_sl - 1][i];
 }
 
 
@@ -804,13 +800,7 @@ ropt_s1param_setup_individual_nbest_sl_tune (ropt_s1param_t s1param)
 {
   unsigned int i;
   for (i = 0; i < s1param->len_e_sl; i ++)
-    {
-      s1param->individual_nbest_sl[i] = size_each_sublattice_tune[i];
-#ifdef HAVE_MINGW
-      fprintf (stderr, "# ropt_str:810: individual_nbest_sl[%u] = %d\n", i,
-               s1param->individual_nbest_sl[i]);
-#endif
-    }
+    s1param->individual_nbest_sl[i] = size_each_sublattice_tune[i];
 }
 
 
