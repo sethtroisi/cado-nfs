@@ -784,8 +784,6 @@ void
 ropt_s1param_setup_individual_nbest_sl (ropt_s1param_t s1param)
 {
   unsigned int i;
-  static int count = 0;
-  fprintf (stderr, "# ropt_str.c: count=%d\n", ++count);
   for (i = 0; i < s1param->len_e_sl; i ++)
     s1param->individual_nbest_sl[i] =
       size_each_sublattice[s1param->tlen_e_sl - 1][i];
