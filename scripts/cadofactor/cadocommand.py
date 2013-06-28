@@ -29,12 +29,16 @@ class Command(object):
         return (not a is None and a is b)
     
     @staticmethod
-    def _open(fn, is_output):
-        none = [None, subprocess.PIPE]
-        mode = ["r", "w"]
+    def _open(fn, is_output, appending = False):
         if fn is None:
-            return none[int(is_output)]
-        return open(fn, mode[int(is_output)])
+            assert not appending
+            return subprocess.PIPE if is_output else None
+        if is_output:
+            mode = "a" if appending else "w"
+        else:
+            assert not appending
+            mode = "r"
+        return open(fn, mode)
     
     @staticmethod
     def _close_or_not(fd, ref):
@@ -50,12 +54,15 @@ class Command(object):
         # - subprocess.STDOUT for stderr if program.get_stdout() and
         #   program.get_stdin() return the same object
         # - a newly opened file handle which needs to be closed later
-        self.stdin = self._open(self.program.get_stdin(), False)
-        self.stdout = self._open(self.program.get_stdout(), True)
-        if self.is_same(self.program.get_stdout(), self.program.get_stderr()):
+        (stdin, (stdout, append_out), (stderr, append_err)) = \
+            self.program.get_stdio()
+        
+        self.stdin = self._open(stdin, False)
+        self.stdout = self._open(stdout, True, append_out)
+        if self.is_same(stdout, stderr):
             self.stderr = subprocess.STDOUT
         else:
-            self.stderr = self._open(self.program.get_stderr(), True)
+            self.stderr = self._open(stderr, True, append_err)
         
         self.child = subprocess.Popen(progargs, *args, stdin=self.stdin,
             stdout=self.stdout, stderr=self.stderr, **kwargs)

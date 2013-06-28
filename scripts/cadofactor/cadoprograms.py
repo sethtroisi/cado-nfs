@@ -104,6 +104,34 @@ class Program(object):
       initialised with the command line parameter they should map to, e.g.,
       "verbose" should map to an instance Toggle("-v"), and "threads" should 
       map to an instance Parameter("-t")
+
+    >>> p = Ls([], {})
+    >>> p.make_command_line()
+    '/bin/ls'
+    >>> p = Ls([], {}, stdout='foo')
+    >>> p.make_command_line()
+    '/bin/ls > foo'
+    >>> p = Ls([], {}, stderr='foo')
+    >>> p.make_command_line()
+    '/bin/ls 2> foo'
+    >>> p = Ls([], {}, stdout='foo', stderr='bar')
+    >>> p.make_command_line()
+    '/bin/ls > foo 2> bar'
+    >>> p = Ls([], {}, stdout='foo', stderr='foo')
+    >>> p.make_command_line()
+    '/bin/ls > foo 2>&1'
+    >>> p = Ls([], {}, stdout='foo', append_stdout=True)
+    >>> p.make_command_line()
+    '/bin/ls >> foo'
+    >>> p = Ls([], {}, stderr='foo', append_stderr=True)
+    >>> p.make_command_line()
+    '/bin/ls 2>> foo'
+    >>> p = Ls([], {}, stdout='foo', append_stdout=True, stderr='bar', append_stderr=True)
+    >>> p.make_command_line()
+    '/bin/ls >> foo 2>> bar'
+    >>> p = Ls([], {}, stdout='foo', append_stdout=True, stderr='foo', append_stderr=True)
+    >>> p.make_command_line()
+    '/bin/ls >> foo 2>&1'
     '''
     
     params_list = ("execpath", "execsubdir", "execbin")
@@ -123,7 +151,8 @@ class Program(object):
         return "'" + s.replace("'", "'\\''") + "'"
     
     def __init__(self, args, parameters, stdin = None, stdout = None,
-                 stderr = None, bg = False):
+                 append_stdout = False, stderr = None, append_stderr = False,
+                 bg = False):
         ''' Takes a list of positional parameters and a dictionary of command 
         line parameters 
         
@@ -138,7 +167,9 @@ class Program(object):
         
         self.stdin = stdin
         self.stdout = stdout
+        self.append_stdout = append_stdout
         self.stderr = stderr
+        self.append_stderr = append_stderr
         
         # If we are to run in background, we add " & echo $!" to the command
         # line to print the pid of the spawned process. We require that stdout
@@ -187,6 +218,21 @@ class Program(object):
     def get_stderr(self):
         return self.stderr
 
+    def get_stdio(self):
+        """ Returns a 3-tuple with information on the stdin, stdout, and stderr
+        streams for this program.
+        
+        The first entry is for stdin, and is either a file name or None.
+        The second entry is for stdout and is a 2-tuple, whose first entry is
+            either a file name or None, and whose second entry is True if we
+            should append to the file and False if we should not.
+        The third entry is like the second, but for stderr.
+        """
+        return (self.stdin,
+            (self.stdout, self.append_stdout),
+            (self.stderr, self.append_stderr)
+        )
+    
     def get_input_files(self):
         input_files = []
         if isinstance(self.stdin, str):
@@ -255,17 +301,19 @@ class Program(object):
         are added to the command line.
         """
         cmdarr = self.make_command_array(binpath, inputpath, outputpath)
-        cmdline = " ".join([Program._shellquote(arg) for arg in cmdarr])
+        cmdline = " ".join(map(Program._shellquote, cmdarr))
         if isinstance(self.stdin, str):
             cmdline += ' < ' + Program._shellquote(self.translate_path(self.stdin, inputpath))
         if isinstance(self.stdout, str):
-            cmdline += ' > ' + Program._shellquote(self.translate_path(self.stdout, outputpath))
-        if isinstance(self.stderr, str):
-            cmdline += ' 2> ' + Program._shellquote(self.translate_path(self.stderr, outputpath))
+            redir = ' >> ' if self.append_stdout else ' > '
+            cmdline += redir + Program._shellquote(self.translate_path(self.stdout, outputpath))
         if not self.stderr is None and self.stderr is self.stdout:
             cmdline += ' 2>&1'
+        elif isinstance(self.stderr, str):
+            redir = ' 2>> ' if self.append_stderr else ' 2> '
+            cmdline += redir + Program._shellquote(self.translate_path(self.stderr, outputpath))
         if self.bg:
-            cmdline += " & echo $!"
+            cmdline += " & echo $!" # FIXME: the echo does not belong here
         return cmdline
     
     def make_wu(self, wuname):
