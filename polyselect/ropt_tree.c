@@ -564,6 +564,9 @@ void
 new_single_sublattice_pq ( single_sublattice_pq **ppqueue,
                            unsigned long len )
 {
+#ifdef HAVE_MINGW
+  fprintf (stderr, "# len=%lu\n", len);
+#endif
   if ( len < 1 ) {
     fprintf(stderr,"Error: len < 1 in new_single_sublattice_pq()\n");
     exit(1);
