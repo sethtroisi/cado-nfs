@@ -186,20 +186,16 @@ thread_insert (buf_arg_t *arg)
 /* Callback function called by prempt_scan_relations */
 /* Reads a matrix file.
 
-   We skip columns that are too heavy.
-
    mat->wt is already filled:
    * if mat->wt[j] > 0, it is the weight of column j that we consider
    * if mat->wt[j] < 0, we don't consider column j
 
-   mat->weight is correct on exit; it will be only approximately true
-   when skipheavycols will be activated.
+   FIXME mat->weight is correct on exit.
 */
 
 void
 filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
 {
-    int nh = 0;
     int32_t j;
 
     fprintf(stderr, "Reading matrix of %d rows and %d columns: excess is %d\n",
@@ -251,7 +247,6 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
     for (i = 0; i < mat->nrows; i++)
     {
       weight_t w = 0;
-      weight_t nb_heavy_j = 0;
       weight_t next = 0;
       index_t *p;
       for (p = rel_compact[i]; *p != UMAX(*p); p++)
@@ -262,8 +257,6 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
       {
         int32_t j = rel_compact[i][k];
         ASSERT_ALWAYS (0 <= j && j < mat->ncols);
-        if(mat->wt[j] < 0)
-          nb_heavy_j++;
 #ifdef FOR_DL
         if (next > 0 && buf[next-1].id == j)
           buf[next-1].e++;
@@ -284,22 +277,12 @@ filter_matrix_read (filter_matrix_t *mat, const char *purgedname)
         }
       }
       
-      // all the columns are heavy and thus will never participate
-      if(nb_heavy_j == w)
-      {
-        mat->rows[i] = NULL;
-        nh++;
-      }
-      else
-      {
-        mat->rows[i] = (typerow_t*) malloc ((next+1) * sizeof (typerow_t));
-        matLengthRow(mat, i) = next;
-        memcpy(mat->rows[i]+1, buf, next * sizeof(typerow_t)); 
-        // sort indices in val to ease row merges
-        qsort(mat->rows[i]+1, next, sizeof(typerow_t), cmp);
-      }
+      mat->rows[i] = (typerow_t*) malloc ((next+1) * sizeof (typerow_t));
+      matLengthRow(mat, i) = next;
+      memcpy(mat->rows[i]+1, buf, next * sizeof(typerow_t));
+      // sort indices in val to ease row merges
+      qsort(mat->rows[i]+1, next, sizeof(typerow_t), cmp);
     }
-    fprintf(stderr, "Number of heavy rows: %d\n", nh);
 }
 
 void
